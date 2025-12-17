@@ -1,0 +1,46 @@
+﻿#pragma once
+
+#include <atomic>
+#include <iostream>
+#include "d3dx12.h"
+#include "dxgi.h"
+
+#include "NRI.h"
+#include "Extensions/NRIWrapperD3D12.h"
+
+#include "Unity/IUnityGraphicsD3D12.h"
+#include "Unity/IUnityGraphics.h"
+#include "Unity/IUnityLog.h"
+ 
+class RenderSystem
+{
+public:
+    static RenderSystem& Get();
+    
+    void Initialize(IUnityInterfaces* interfaces);
+    void Shutdown();
+
+    RenderSystem();
+    ~RenderSystem();
+    
+    nri::Device* GetNriDevice() const { return m_NriDevice; }
+    nri::CoreInterface& GetNriCore() { return m_NriCore; }
+    nri::WrapperD3D12Interface& GetNriWrapper() { return m_NriWrapper; }
+    IUnityGraphicsD3D12v7* GetD3D12() const { return s_d3d12; }
+
+    void ProcessDeviceEvent(UnityGfxDeviceEventType type, IUnityInterfaces* interfaces);
+
+    
+private:
+    static constexpr int kMaxFramesInFlight = 3;
+
+    IUnityGraphicsD3D12v7* s_d3d12 = nullptr;
+    IUnityLog* s_Log = nullptr;
+
+    // NRI
+    nri::Device* m_NriDevice = nullptr;
+    nri::CoreInterface m_NriCore = {};
+    nri::WrapperD3D12Interface m_NriWrapper = {};
+
+    std::atomic<bool> m_are_resources_initialized{false};
+};
