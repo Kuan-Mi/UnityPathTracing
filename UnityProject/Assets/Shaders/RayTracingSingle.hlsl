@@ -68,6 +68,8 @@ struct TraceOpaqueResult
 void MainMissShader(inout MainRayPayload payload : SV_RayPayload)
 {
     payload.hitT = INF;
+    payload.X = WorldRayOrigin() + WorldRayDirection() * payload.hitT;
+    payload.Xprev = payload.X;
     // payload.emission = g_EnvTex.SampleLevel(sampler_g_EnvTex, WorldRayDirection(), 0).xyz;
     //
     // // payload.emission = float3(0.5,0.5,0.5); // 固定背景色，便于调试

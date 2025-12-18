@@ -80,7 +80,7 @@ MonoBehaviour:
     denoisingRange: 500000
     disocclusionThreshold: 0.01
     disocclusionThresholdAlternate: 0.05
-    splitScreen: 1
+    splitScreen: 0.617
     isMotionVectorInWorldSpace: 0
     isHistoryConfidenceAvailable: 0
     isDisocclusionThresholdMixAvailable: 0
@@ -163,9 +163,8 @@ MonoBehaviour:
       z: 0
     useOverriddenSigmaValues: 0
     lightDir: {x: 0, y: 0, z: 0}
-    showValidation: 0
+    showValidation: 1
     showMV: 1
     showShadow: 1
-    showNormal: 0
   gIn_ScramblingRanking: {fileID: 2800000, guid: ba45d1e4dcf9022438a4798a5f9e7b80, type: 3}
   gIn_Sobol: {fileID: 2800000, guid: 17e7ce8147355314ea8aab1178a6a43c, type: 3}
