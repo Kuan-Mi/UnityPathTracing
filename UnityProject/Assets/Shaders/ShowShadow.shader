@@ -10,6 +10,51 @@
 
         Pass
         {
+            Name "ShowValidation"
+            ZWrite Off
+            ZTest Always
+            Cull Off
+            Blend SrcAlpha OneMinusSrcAlpha
+
+            HLSLPROGRAM
+            #pragma vertex Vert
+            #pragma fragment Frag
+            #pragma target 4.5
+
+            #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
+
+            // Blitter 会自动绑定
+            TEXTURE2D(_BlitTexture);
+            SAMPLER(sampler_BlitTexture);
+
+            struct Attributes
+            {
+                uint vertexID : SV_VertexID;
+            };
+
+            struct Varyings
+            {
+                float4 positionCS : SV_POSITION;
+                float2 uv : TEXCOORD0;
+            };
+
+            Varyings Vert(Attributes input)
+            {
+                Varyings o;
+                o.positionCS = GetFullScreenTriangleVertexPosition(input.vertexID);
+                o.uv = GetFullScreenTriangleTexCoord(input.vertexID);
+                return o;
+            }
+
+            float4 Frag(Varyings i) : SV_Target
+            {
+                return SAMPLE_TEXTURE2D(_BlitTexture, sampler_BlitTexture, i.uv);
+            }
+            ENDHLSL
+        }
+
+        Pass
+        {
             Name "ShowShadow"
             ZWrite Off
             ZTest Always
@@ -49,20 +94,16 @@
 
             float4 Frag(Varyings i) : SV_Target
             {
-                // float OUT_SHADOW_TRANSLUCENCY = SAMPLE_TEXTURE2D(_BlitTexture, sampler_BlitTexture, i.uv).r;
-                //
-                //
-                // float shadow = SIGMA_BackEnd_UnpackShadow(OUT_SHADOW_TRANSLUCENCY);
-                //
-                // shadow = OUT_SHADOW_TRANSLUCENCY;
-                // float4 color = float4(shadow, shadow, shadow, 1);   
+                float OUT_SHADOW_TRANSLUCENCY = SAMPLE_TEXTURE2D(_BlitTexture, sampler_BlitTexture, i.uv).r;
+                float shadow = SIGMA_BackEnd_UnpackShadow(OUT_SHADOW_TRANSLUCENCY);
+                float4 color = float4(shadow, shadow, shadow, 1);   
                 
-                return SAMPLE_TEXTURE2D(_BlitTexture, sampler_BlitTexture, i.uv);
-
- 
+                return color;
             }
             ENDHLSL
         }
+
+
         Pass
         {
             Name "ShowMV"
@@ -195,7 +236,6 @@
                 // 如果想要纯色高亮，可以用下面这行：
                 // color = float3(1.0, 1.0, 0.0); // 黄色
 
-                return float4(color, 0);
                 return float4(color, alpha);
             }
             ENDHLSL

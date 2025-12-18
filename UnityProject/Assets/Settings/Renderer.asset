@@ -67,14 +67,14 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: f50908f0e9bf42149891b36684931380, type: 3}
   m_Name: PathTracingFeature
   m_EditorClassIdentifier: Assembly-CSharp::PathTracing.PathTracingFeature
-  m_Active: 0
+  m_Active: 1
   showShadowMaterial: {fileID: 0}
   rayTracingShader: {fileID: 4807578003741378534, guid: 71faa22953dc9834daf36cc38966c196, type: 3}
   pathTracingSetting:
     bounceCountOpaque: 5
     bounceCountTransparent: 5
     sampleCount: 1
-    lightOffset: 0.0001
+    lightOffset: 9.09
     envTexture: {fileID: 0}
     enableRussianRoulette: 1
     denoisingRange: 500000
@@ -163,5 +163,8 @@ MonoBehaviour:
       z: 0
     useOverriddenSigmaValues: 0
     lightDir: {x: 0, y: 0, z: 0}
+    showValidation: 1
+    showMV: 0
+    showShadow: 1
   gIn_ScramblingRanking: {fileID: 2800000, guid: ba45d1e4dcf9022438a4798a5f9e7b80, type: 3}
   gIn_Sobol: {fileID: 2800000, guid: 17e7ce8147355314ea8aab1178a6a43c, type: 3}

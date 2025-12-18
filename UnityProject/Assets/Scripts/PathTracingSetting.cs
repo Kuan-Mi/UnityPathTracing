@@ -48,5 +48,9 @@ namespace PathTracing
         public bool useOverriddenSigmaValues;
 
         public Vector3 lightDir;
+        
+        public bool showValidation;
+        public bool showMV;
+        public bool showShadow;
     }
 }

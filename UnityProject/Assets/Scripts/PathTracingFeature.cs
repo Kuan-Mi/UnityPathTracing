@@ -55,7 +55,7 @@ namespace PathTracing
                 showShadowMaterial = new Material(shader);
             }
 
-            _pathTracingPass.showShadow = showShadowMaterial;
+            _pathTracingPass.biltMaterial = showShadowMaterial;
         }
 
         public override void AddRenderPasses(ScriptableRenderer renderer, ref RenderingData renderingData)

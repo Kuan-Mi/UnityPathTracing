@@ -122,7 +122,7 @@ namespace PathTracing
             internal TextureHandle Spec;
 
             internal RayTracingShader rayTracingShader;
-            internal Material showShadow;
+            internal Material blitMaterial;
             internal Camera cam;
             internal int width;
             internal int height;
@@ -130,17 +130,22 @@ namespace PathTracing
             internal Settings pathTracingSettings;
             internal ComputeBuffer pathTracingSettingsBuffer;
             internal IntPtr dataPtr;
+
+
+            internal bool showValidation;
+            internal bool showMv;
+            internal bool showShadow;
         }
 
         public NRDHelper NrdHelper;
-        public Material showShadow;
+        public Material biltMaterial;
 
         public PathTracingPassSingle(PathTracingSetting setting)
         {
             _settings = setting;
             pathTracingSettingsBuffer = new ComputeBuffer(1, Marshal.SizeOf<Settings>(), ComputeBufferType.Constant);
         }
-        
+
         static Matrix4x4 GetWorldToClipMatrix(Camera camera)
         {
             // Unity 的 GPU 投影矩阵（处理平台差异 & Y 翻转）
@@ -166,18 +171,13 @@ namespace PathTracing
                 data.pathTracingSettingsBuffer, 0, data.pathTracingSettingsBuffer.stride);
 
             natCmd.SetRayTracingTextureParam(data.rayTracingShader, g_OutputID, data.outputTexture);
-
             natCmd.SetRayTracingTextureParam(data.rayTracingShader, g_ScramblingRankingID, data.scramblingRanking);
             natCmd.SetRayTracingTextureParam(data.rayTracingShader, g_SobolID, data.sobol);
-
-
             natCmd.SetRayTracingTextureParam(data.rayTracingShader, g_MvID, data.Mv);
             natCmd.SetRayTracingTextureParam(data.rayTracingShader, g_ViewZID, data.ViewZ);
             natCmd.SetRayTracingTextureParam(data.rayTracingShader, g_Normal_RoughnessID, data.Normal_Roughness);
             natCmd.SetRayTracingTextureParam(data.rayTracingShader, g_PenumbraID, data.Penumbra);
-
             natCmd.SetRayTracingTextureParam(data.rayTracingShader, g_Shadow_TranslucencyID, data.Shadow_Translucency);
-
             natCmd.SetRayTracingTextureParam(data.rayTracingShader, g_BaseColor_MetalnessID, data.BaseColor_Metalness);
             natCmd.SetRayTracingTextureParam(data.rayTracingShader, g_DirectLightingID, data.DirectLighting);
             natCmd.SetRayTracingTextureParam(data.rayTracingShader, g_DirectEmissionID, data.DirectEmission);
@@ -186,19 +186,23 @@ namespace PathTracing
             natCmd.SetRayTracingTextureParam(data.rayTracingShader, g_DiffID, data.Diff);
             natCmd.SetRayTracingTextureParam(data.rayTracingShader, g_SpecID, data.Spec);
 
-
             natCmd.DispatchRays(data.rayTracingShader, "MainRayGenShader", (uint)data.width, (uint)data.height, 1,
                 data.cam);
 
             natCmd.IssuePluginEventAndData(GetRenderEventAndDataFunc(), 1, data.dataPtr);
+
             natCmd.SetRenderTarget(data.cameraTexture);
-            Blitter.BlitTexture(natCmd, data.Validation, new Vector4(1, 1, 0, 0), data.showShadow,0);
-            Blitter.BlitTexture(natCmd, data.Mv, new Vector4(1, 1, 0, 0),data.showShadow,1);
+            if (data.showShadow)
+                Blitter.BlitTexture(natCmd, data.Shadow_Translucency, new Vector4(1, 1, 0, 0), data.blitMaterial, 1);
+            if (data.showValidation)
+                Blitter.BlitTexture(natCmd, data.Validation, new Vector4(1, 1, 0, 0), data.blitMaterial, 0);
+            if (data.showMv)
+                Blitter.BlitTexture(natCmd, data.Mv, new Vector4(1, 1, 0, 0), data.blitMaterial, 2);
         }
 
         private Matrix4x4 prevWorldToView;
         private Matrix4x4 prevWorldToClip;
-        
+
         // private Matrix4x4 prevCameraMatrix;
         // private int prevBounceCountOpaque;
         // private int prevBounceCountTransparent;
@@ -255,10 +259,9 @@ namespace PathTracing
 
             var worldToView = cameraData.GetViewMatrix();
             var worldToClip = GetWorldToClipMatrix(cameraData.camera);
-            
+
             var viewToWorld = worldToView.inverse;
-            
-            
+
 
             var cameraProjectionMatrix = cameraData.camera.projectionMatrix;
 
@@ -295,7 +298,7 @@ namespace PathTracing
                 gWorldToViewPrev = prevWorldToView,
                 gWorldToClipPrev = prevWorldToClip,
                 gRectSize = new float2(cam.pixelWidth, cam.pixelHeight),
-                
+
                 _CInverseProjection = invCameraProjectionMatrix,
                 gSunBasisX = new float4(gSunBasisX.x, gSunBasisX.y, gSunBasisX.z, 0),
                 gSunBasisY = new float4(gSunBasisY.x, gSunBasisY.y, gSunBasisY.z, 0),
@@ -322,7 +325,11 @@ namespace PathTracing
             passData.width = textureDesc.width;
             passData.height = textureDesc.height;
             passData.pathTracingSettingsBuffer = pathTracingSettingsBuffer;
-            passData.showShadow = showShadow;
+            passData.blitMaterial = biltMaterial;
+
+            passData.showShadow = _settings.showShadow;
+            passData.showMv = _settings.showMV;
+            passData.showValidation = _settings.showValidation;
 
             // Debug.Log("Texture Width: " + textureDesc.width + " Height: " + textureDesc.height);
 
@@ -330,7 +337,7 @@ namespace PathTracing
             // var settingsBufferHandle = renderGraph.ImportBuffer(pathTracingSettingsBuffer);
 
             passData.outputTexture = renderGraph.CreateTexture(textureDesc);
-            
+
             passData.scramblingRanking = renderGraph.ImportTexture(scramblingRanking);
             passData.sobol = renderGraph.ImportTexture(sobol);
 
@@ -398,7 +405,7 @@ namespace PathTracing
 
             prevWorldToView = worldToView;
             prevWorldToClip = worldToClip;
-            
+
             // prevCameraMatrix = cameraData.camera.cameraToWorldMatrix;
             // prevBounceCountOpaque = _settings.bounceCountOpaque;
             // prevBounceCountTransparent = _settings.bounceCountTransparent;
