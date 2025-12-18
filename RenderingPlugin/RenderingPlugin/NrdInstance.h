@@ -32,7 +32,6 @@ private:
 
     // void UpdateNrdSettings(const FrameData* data);
     void CreateNrd();
-    nri::Texture* WrapD3D12Texture(ID3D12Resource* resource, DXGI_FORMAT format);
     void initialize_and_create_resources();
     void release_resources();
 
@@ -44,7 +43,7 @@ private:
     // nrd::CommonSettings commonSettings;
     // nrd::SigmaSettings sigmaSettings;
 
-    std::unordered_map<ID3D12Resource*, nri::Texture*> m_NriTextureCache;
+    // std::unordered_map<ID3D12Resource*, nri::Texture*> m_NriTextureCache;
 
     UINT TextureWidth = 0;
     UINT TextureHeight = 0;

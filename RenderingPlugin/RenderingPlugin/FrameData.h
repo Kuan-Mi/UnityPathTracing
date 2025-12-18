@@ -5,6 +5,11 @@
 #include <NRDSettings.h>
 
 #pragma pack(push, 1)
+namespace nri
+{
+    struct Texture;
+}
+
 struct FrameData
 {
     nrd::CommonSettings commonSettings;
@@ -22,6 +27,15 @@ struct FrameData
     ID3D12Resource* diffRadiancePointer;
     ID3D12Resource* outDiffRadiancePointer;
     ID3D12Resource* validationPointer;
+
+    nri::Texture* nriMv;
+    nri::Texture* nriNormalRoughness;
+    nri::Texture* nriViewZ;
+    nri::Texture* nriPenumbra;
+    nri::Texture* nriShadowTranslucency;
+    nri::Texture* nriDiffRadiance;
+    nri::Texture* nriOutDiffRadiance;
+    nri::Texture* nriValidation;
 
     int instanceId;
 };

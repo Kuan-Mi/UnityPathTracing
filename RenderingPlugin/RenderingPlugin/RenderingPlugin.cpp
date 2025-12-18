@@ -80,7 +80,7 @@ void UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API UnityPluginLoad(IUnityInterfaces
     s_Logger = s_UnityInterfaces->Get<IUnityLog>();
     // 注册回调以接收图形设备事件
     s_Graphics->RegisterDeviceEventCallback(OnGraphicsDeviceEvent);
- 
+
     // 在插件加载时手动运行OnGraphicsDeviceEvent（initialize）
     OnGraphicsDeviceEvent(kUnityGfxDeviceEventInitialize);
 
@@ -120,5 +120,16 @@ UNITY_INTERFACE_EXPORT void UNITY_INTERFACE_API DestroyDenoiserInstance(int id)
         delete it->second;
         g_Instances.erase(it);
     }
+}
+
+// C# Dispose 时调用
+UNITY_INTERFACE_EXPORT void* UNITY_INTERFACE_API WrapD3D12Texture(ID3D12Resource* resource, DXGI_FORMAT format)
+{
+    return RenderSystem::Get().WrapD3D12Texture(resource, format);
+}
+
+UNITY_INTERFACE_EXPORT void UNITY_INTERFACE_API ReleaseTexture(nri::Texture* nriTex)
+{
+    RenderSystem::Get().Release(nriTex);
 }
 }

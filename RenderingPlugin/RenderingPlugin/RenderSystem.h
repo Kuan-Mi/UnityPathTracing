@@ -19,6 +19,7 @@ public:
     
     void Initialize(IUnityInterfaces* interfaces);
     void Shutdown();
+    void Release(nri::Texture* texture);
 
     RenderSystem();
     ~RenderSystem();
@@ -29,8 +30,8 @@ public:
     IUnityGraphicsD3D12v7* GetD3D12() const { return s_d3d12; }
 
     void ProcessDeviceEvent(UnityGfxDeviceEventType type, IUnityInterfaces* interfaces);
+    nri::Texture* WrapD3D12Texture(ID3D12Resource* resource, DXGI_FORMAT format) const;
 
-    
 private:
     static constexpr int kMaxFramesInFlight = 3;
 

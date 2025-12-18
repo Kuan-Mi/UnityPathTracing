@@ -64,17 +64,6 @@ void NrdInstance::DispatchCompute(const FrameData* data)
     nri::CommandBuffer* nriCmdBuffer = nullptr;
     RenderSystem::Get().GetNriWrapper().CreateCommandBufferD3D12(*RenderSystem::Get().GetNriDevice(), cmdDesc, nriCmdBuffer);
 
-    nri::Texture* nriMv = WrapD3D12Texture(data->mvPointer, DXGI_FORMAT_R16G16B16A16_FLOAT);
-    nri::Texture* nriNormal = WrapD3D12Texture(data->normalRoughnessPointer, DXGI_FORMAT_R10G10B10A2_UNORM);
-    nri::Texture* nriViewZ = WrapD3D12Texture(data->viewZPointer, DXGI_FORMAT_R32_FLOAT);
-    nri::Texture* nriPENUMBRA = WrapD3D12Texture(data->penumbraPointer, DXGI_FORMAT_R16_FLOAT);
-    nri::Texture* nriSHADOW_TRANSLUCENCY = WrapD3D12Texture(data->shadowTranslucencyPointer, DXGI_FORMAT_R16_FLOAT);
-
-    nri::Texture* nriDiffRadiance = WrapD3D12Texture(data->diffRadiancePointer, DXGI_FORMAT_R16G16B16A16_FLOAT);
-    nri::Texture* nriOutDiffRadiance = WrapD3D12Texture(data->outDiffRadiancePointer, DXGI_FORMAT_R16G16B16A16_FLOAT);
-    nri::Texture* nriValidation = WrapD3D12Texture(data->validationPointer, DXGI_FORMAT_R8G8B8A8_UNORM);
-
-
     m_NrdIntegration.SetCommonSettings(data->commonSettings);
     m_NrdIntegration.SetDenoiserSettings(m_SigmaId, &data->sigmaSettings);
     m_NrdIntegration.SetDenoiserSettings(m_ReblurId, &data->reblurSettings);
@@ -106,16 +95,14 @@ void NrdInstance::DispatchCompute(const FrameData* data)
         nri::AccessBits::NONE, nri::Layout::GENERAL, nri::StageBits::NONE
     };
 
-    AddResource(nrd::ResourceType::IN_MV, nriMv, data->commonSettings.frameIndex == 0 ? uavState : srvState);
-    AddResource(nrd::ResourceType::IN_NORMAL_ROUGHNESS, nriNormal, data->commonSettings.frameIndex == 0 ? uavState : srvState);
-    AddResource(nrd::ResourceType::IN_VIEWZ, nriViewZ, data->commonSettings.frameIndex == 0 ? uavState : srvState);
-    AddResource(nrd::ResourceType::IN_PENUMBRA, nriPENUMBRA, data->commonSettings.frameIndex == 0 ? uavState : srvState);
-    AddResource(nrd::ResourceType::OUT_SHADOW_TRANSLUCENCY, nriSHADOW_TRANSLUCENCY, uavState);
-
-
-    AddResource(nrd::ResourceType::IN_DIFF_RADIANCE_HITDIST, nriDiffRadiance, data->commonSettings.frameIndex == 0 ? rtState : srvState);
-    AddResource(nrd::ResourceType::OUT_DIFF_RADIANCE_HITDIST, nriOutDiffRadiance, data->commonSettings.frameIndex == 0 ? rtState : uavState);
-    AddResource(nrd::ResourceType::OUT_VALIDATION, nriValidation, commonState);
+    AddResource(nrd::ResourceType::IN_MV, data->nriMv, data->commonSettings.frameIndex == 0 ? uavState : srvState);
+    AddResource(nrd::ResourceType::IN_NORMAL_ROUGHNESS, data->nriNormalRoughness, data->commonSettings.frameIndex == 0 ? uavState : srvState);
+    AddResource(nrd::ResourceType::IN_VIEWZ, data->nriViewZ, data->commonSettings.frameIndex == 0 ? uavState : srvState);
+    AddResource(nrd::ResourceType::IN_PENUMBRA, data->nriPenumbra, data->commonSettings.frameIndex == 0 ? uavState : srvState);
+    AddResource(nrd::ResourceType::OUT_SHADOW_TRANSLUCENCY, data->nriShadowTranslucency, uavState);
+    AddResource(nrd::ResourceType::IN_DIFF_RADIANCE_HITDIST, data->nriDiffRadiance, data->commonSettings.frameIndex == 0 ? rtState : srvState);
+    AddResource(nrd::ResourceType::OUT_DIFF_RADIANCE_HITDIST, data->nriOutDiffRadiance, data->commonSettings.frameIndex == 0 ? rtState : uavState);
+    AddResource(nrd::ResourceType::OUT_VALIDATION, data->nriValidation, commonState);
 
     const nrd::Identifier denoisers[] = {m_SigmaId, m_ReblurId};
 
@@ -180,37 +167,6 @@ void NrdInstance::CreateNrd()
     LOG("NRD Integration created successfully.");
 }
 
-nri::Texture* NrdInstance::WrapD3D12Texture(ID3D12Resource* resource, DXGI_FORMAT format)
-{
-    if (!resource) return nullptr;
-
-    // 检查缓存
-    auto it = m_NriTextureCache.find(resource);
-    if (it != m_NriTextureCache.end())
-    {
-        return it->second;
-    }
-
-    // 使用 Wrapper 接口创建 NRI Texture
-    nri::TextureD3D12Desc desc;
-    desc.d3d12Resource = resource;
-    desc.format = format;
-
-    nri::Texture* nriTexture = nullptr;
-    RenderSystem::Get().GetNriWrapper().CreateTextureD3D12(*RenderSystem::Get().GetNriDevice(), desc, nriTexture);
-
-    if (nriTexture)
-    {
-        m_NriTextureCache[resource] = nriTexture;
-    }
-    else
-    {
-        LOG("Failed to wrap D3D12 texture into NRI texture");
-    }
-
-    return nriTexture;
-}
-
 void NrdInstance::initialize_and_create_resources()
 {
     if (m_are_resources_initialized)
@@ -222,16 +178,6 @@ void NrdInstance::release_resources()
 {
     if (!m_are_resources_initialized)
         return;
-
-    for (auto& pair : m_NriTextureCache)
-    {
-        if (nri::Texture* nri_texture = pair.second)
-        {
-            RenderSystem::Get().GetNriCore().DestroyTexture(nri_texture);
-        }
-    }
-
-    m_NriTextureCache.clear();
 
     m_NrdIntegration.Destroy();
 

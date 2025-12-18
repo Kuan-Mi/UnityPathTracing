@@ -65,6 +65,14 @@ void RenderSystem::Shutdown()
     LOG("RenderSystem Shutdown completed.");
 }
 
+void RenderSystem::Release(nri::Texture* texture)
+{
+    if (texture)
+    {
+        m_NriCore.DestroyTexture(texture);
+    }
+}
+
 RenderSystem::RenderSystem()
 = default;
 
@@ -110,4 +118,15 @@ void RenderSystem::ProcessDeviceEvent(UnityGfxDeviceEventType type, IUnityInterf
     case kUnityGfxDeviceEventAfterReset:
         break;
     }
+}
+
+nri::Texture* RenderSystem::WrapD3D12Texture(ID3D12Resource* resource, DXGI_FORMAT format) const
+{
+    nri::TextureD3D12Desc desc;
+    desc.d3d12Resource = resource;
+    desc.format = format;
+
+    nri::Texture* nriTexture = nullptr;
+    m_NriWrapper.CreateTextureD3D12(*RenderSystem::Get().GetNriDevice(), desc, nriTexture);
+    return nriTexture;
 }
