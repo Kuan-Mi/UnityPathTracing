@@ -64,7 +64,7 @@ namespace Nrd
             nrdInstanceId = instanceId;
             buffer = new NativeArray<FrameData>(BufferCount, Allocator.Persistent);
         }
-        
+
         public void EnsureResources(int width, int height)
         {
             // 如果尺寸没变且资源都存在，直接返回
@@ -179,7 +179,7 @@ namespace Nrd
             localData.commonSettings.rectSizePrev[0] = w;
             localData.commonSettings.rectSizePrev[1] = h;
 
-            localData.commonSettings.motionVectorScale = new float3(1.0f / w, 1.0f / h, 1.0f);
+            localData.commonSettings.motionVectorScale = new float3(1.0f / w, 1.0f / h, 0.0f);
             localData.commonSettings.isMotionVectorInWorldSpace = false;
 
             localData.commonSettings.accumulationMode = AccumulationMode.CONTINUE;
@@ -218,9 +218,11 @@ namespace Nrd
                 localData.commonSettings.viewToClipMatrixPrev = setting.viewToClipMatrixPrev;
                 localData.commonSettings.worldToViewMatrix = setting.worldToViewMatrix;
                 localData.commonSettings.worldToViewMatrixPrev = setting.worldToViewMatrixPrev;
-                localData.commonSettings.motionVectorScale = setting.motionVectorScale;
             }
-
+ 
+            localData.commonSettings.motionVectorScale.z = setting.is2DMotionVector?0.0f:1.0f;
+            
+            
             localData.commonSettings.denoisingRange = setting.denoisingRange;
             localData.commonSettings.disocclusionThreshold = setting.disocclusionThreshold;
             localData.commonSettings.disocclusionThresholdAlternate = setting.disocclusionThresholdAlternate;

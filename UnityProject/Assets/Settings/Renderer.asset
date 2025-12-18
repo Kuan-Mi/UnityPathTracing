@@ -77,10 +77,10 @@ MonoBehaviour:
     lightOffset: 9.09
     envTexture: {fileID: 0}
     enableRussianRoulette: 1
-    denoisingRange: 500000
+    denoisingRange: 1000
     disocclusionThreshold: 0.01
     disocclusionThresholdAlternate: 0.05
-    splitScreen: 0.617
+    splitScreen: 0
     isMotionVectorInWorldSpace: 0
     isHistoryConfidenceAvailable: 0
     isDisocclusionThresholdMixAvailable: 0

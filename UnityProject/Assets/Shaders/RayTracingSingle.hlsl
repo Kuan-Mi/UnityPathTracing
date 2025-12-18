@@ -120,7 +120,7 @@ float2 GetBlueNoise(uint2 pixelPos, uint seed = 0)
     // return float2(sampleIndex/4.0,0); // 仅用于调试，显示采样索引
 
     // The algorithm
-    uint3 A = gIn_ScramblingRanking[pixelPos & (BLUE_NOISE_SPATIAL_DIM - 1)] * 255;
+    uint3 A = gIn_ScramblingRanking[pixelPos & (BLUE_NOISE_SPATIAL_DIM - 1)].xyz * 255;
 
 
     uint rankedSampleIndex = sampleIndex ^ A.z;
@@ -175,9 +175,6 @@ float3 GetMotion( float3 X, float3 Xprev )
 
     float viewZprev = Geometry::AffineTransform( gWorldToViewPrev, Xprev ).z;
     float2 sampleUvPrev = Geometry::GetScreenUv( gWorldToClipPrev, Xprev );
-
-    // viewZ =  mul(gWorldToView, float4(X, 1)).z;
-    // viewZprev = mul(gWorldToViewPrev, float4(Xprev, 1)).z;
     
     // IMPORTANT: scaling to "pixel" unit significantly improves utilization of FP16
     motion.xy = ( sampleUvPrev - sampleUv ) * gRectSize;
@@ -305,21 +302,23 @@ void MainRayGenShader()
     // 这三个应该从贴图再计算一次
     materialProps0.curvature = payload.curvature;
     materialProps0.N = payload.N;
-    materialProps0.T = payload.T;
+    materialProps0.T = payload.T.xyz;
 
     float3 X0 = payload.X;
     float3 V0 = -rayDirection;
-    float viewZ0 = abs(mul(gWorldToView, float4(X0, 1)).z);
+    // float viewZ0 = abs(mul(gWorldToView, float4(X0, 1)).z);
+    // float viewZ0 = mul(gWorldToView, float4(X0, 1)).z;
+    
+    float viewZ0 = Geometry::AffineTransform( gWorldToView, X0 ).z;
+    
     // float viewZ0 = payload.hitT;
 
     gOut_Mv[launchIndex] = float4(GetMotion(geometryProps0.X, geometryProps0.Xprev), 1);
     gOut_ViewZ[launchIndex] = viewZ0;
 
 
-    float4 v2= NRD_FrontEnd_PackNormalAndRoughness(payload.N, payload.roughness, 0);
-    // v2.zw = 0;
-    gOut_Normal_Roughness[launchIndex] = v2;
-    // gOut_Normal_Roughness[launchIndex] = float4(payload.N, payload.roughness);
+    gOut_Normal_Roughness[launchIndex] = NRD_FrontEnd_PackNormalAndRoughness(payload.N, payload.roughness, 0);
+
     gOut_BaseColor_Metalness[launchIndex] = float4(payload.baseColor, payload.metalness);
 
     float3 Ldirect = GetLighting(geometryProps0, materialProps0, LIGHTING, X0);
@@ -332,7 +331,7 @@ void MainRayGenShader()
 
     float2 rnd = GetBlueNoise(launchIndex);
     
-    // rnd = float2(RandomFloat01(rngState), RandomFloat01(rngState));
+    rnd = float2(RandomFloat01(rngState), RandomFloat01(rngState));
     rnd = ImportanceSampling::Cosine::GetRay(rnd).xy;
     rnd *= gTanSunAngularRadius;
 

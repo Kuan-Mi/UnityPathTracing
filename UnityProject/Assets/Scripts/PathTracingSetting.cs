@@ -42,6 +42,9 @@ namespace PathTracing
         public Matrix4x4 viewToClipMatrixPrev;
         public Matrix4x4 worldToViewMatrix;
         public Matrix4x4 worldToViewMatrixPrev;
+        
+        [Header("motionVectorScale Override")]
+        public bool is2DMotionVector;
         public float3 motionVectorScale = new(1.0f, 1.0f, 0.0f); // Default: {1.0, 1.0, 0.0}
 
         [Header("NRD Sigma Settings Override")]
