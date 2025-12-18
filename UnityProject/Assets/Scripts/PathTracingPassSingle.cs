@@ -149,8 +149,7 @@ namespace PathTracing
         static Matrix4x4 GetWorldToClipMatrix(Camera camera)
         {
             // Unity 的 GPU 投影矩阵（处理平台差异 & Y 翻转）
-            Matrix4x4 proj = GL.GetGPUProjectionMatrix(
-                camera.projectionMatrix, false);
+            Matrix4x4 proj = GL.GetGPUProjectionMatrix(camera.projectionMatrix, false);
 
             return proj * camera.worldToCameraMatrix;
         }
@@ -260,7 +259,8 @@ namespace PathTracing
 
             var tan = Mathf.Tan(fov * 0.5f * Mathf.Deg2Rad);
 
-            var worldToView = cameraData.GetViewMatrix();
+            // var worldToView = cameraData.GetViewMatrix();
+            var worldToView = cameraData.camera.worldToCameraMatrix;
             var worldToClip = GetWorldToClipMatrix(cameraData.camera);
 
             var viewToWorld = worldToView.inverse;
