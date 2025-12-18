@@ -195,7 +195,10 @@ namespace PathTracing
             if (data.showShadow)
                 Blitter.BlitTexture(natCmd, data.Shadow_Translucency, new Vector4(1, 1, 0, 0), data.blitMaterial, 1);
             if (data.showValidation)
-                Blitter.BlitTexture(natCmd, data.Validation, new Vector4(1, 1, 0, 0), data.blitMaterial, 0);
+            {
+                // Blitter.BlitTexture(natCmd, data.Validation, new Vector4(1, 1, 0, 0), data.blitMaterial, 0);
+                Blitter.BlitTexture(natCmd, data.Validation, new Vector4(1, 1, 0, 0),0,false);
+            }
             if (data.showMv)
                 Blitter.BlitTexture(natCmd, data.Mv, new Vector4(1, 1, 0, 0), data.blitMaterial, 2);
         }
