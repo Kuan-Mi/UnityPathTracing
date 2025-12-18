@@ -12,7 +12,8 @@ void RenderSystem::Initialize(IUnityInterfaces* interfaces)
 {
     if (m_are_resources_initialized)
         return;
-    
+
+    m_UnityInterfaces = interfaces;
     s_d3d12 = interfaces->Get<IUnityGraphicsD3D12v7>();
     s_Log = interfaces->Get<IUnityLog>();
 
@@ -41,7 +42,7 @@ void RenderSystem::Initialize(IUnityInterfaces* interfaces)
     s_d3d12->SetPhysicalVideoMemoryControlValues(&control_values);
 
     m_are_resources_initialized = true;
-    
+
     LOG("RenderSystem Initialized.");
 }
 

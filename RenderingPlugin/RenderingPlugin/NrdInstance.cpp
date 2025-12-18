@@ -7,10 +7,11 @@
 
 #define LOG(msg) UNITY_LOG(s_Log, msg)
 
-NrdInstance::NrdInstance(IUnityGraphicsD3D12v7* d3d12, IUnityLog* log)
+NrdInstance::NrdInstance(IUnityInterfaces* interfaces)
 {
-    s_d3d12 = d3d12;
-    s_Log = log;
+    s_d3d12 = interfaces->Get<IUnityGraphicsD3D12v7>();
+    s_d3d121 = interfaces->Get<IUnityGraphicsD3D12>();
+    s_Log = interfaces->Get<IUnityLog>();
     initialize_and_create_resources();
 }
 
@@ -99,6 +100,11 @@ void NrdInstance::DispatchCompute(const FrameData* data)
     nri::AccessLayoutStage uavState = {
         nri::AccessBits::SHADER_RESOURCE_STORAGE, nri::Layout::SHADER_RESOURCE_STORAGE, nri::StageBits::COMPUTE_SHADER
     };
+
+    // D3D12_RESOURCE_STATES* outState = nullptr;
+    // s_d3d121->GetResourceState(data->mvPointer, outState);
+    //
+    // LOG(("MV Resource State: " + std::to_string(static_cast<uint32_t>(*outState))).c_str());
 
     AddResource(nrd::ResourceType::IN_MV, nriMv, data->commonSettings.frameIndex == 0 ? uavState : srvState);
     AddResource(nrd::ResourceType::IN_NORMAL_ROUGHNESS, nriNormal,data->commonSettings.frameIndex == 0 ? uavState : srvState);

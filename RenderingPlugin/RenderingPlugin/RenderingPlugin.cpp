@@ -106,7 +106,7 @@ UNITY_INTERFACE_EXPORT int UNITY_INTERFACE_API CreateDenoiserInstance()
 {
     std::scoped_lock lock(g_InstanceMutex);
     int id = g_NextInstanceId++;
-    g_Instances[id] = new NrdInstance(RenderSystem::Get().GetD3D12(), s_Logger);
+    g_Instances[id] = new NrdInstance(s_UnityInterfaces);
     return id;
 }
 

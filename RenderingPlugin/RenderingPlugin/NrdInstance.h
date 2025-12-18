@@ -22,7 +22,7 @@
 class NrdInstance
 {
 public:
-    NrdInstance(IUnityGraphicsD3D12v7* d3d12, IUnityLog* log);
+    NrdInstance(IUnityInterfaces* interfaces);
     ~NrdInstance();
 
     void DispatchCompute(const FrameData* data);
@@ -37,6 +37,7 @@ private:
     void release_resources();
 
     IUnityGraphicsD3D12v7* s_d3d12 = nullptr;
+    IUnityGraphicsD3D12* s_d3d121 = nullptr;
     IUnityLog* s_Log = nullptr;
 
     // NRD

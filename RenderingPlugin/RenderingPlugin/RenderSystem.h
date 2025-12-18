@@ -34,6 +34,7 @@ public:
 private:
     static constexpr int kMaxFramesInFlight = 3;
 
+    IUnityInterfaces* m_UnityInterfaces = nullptr;
     IUnityGraphicsD3D12v7* s_d3d12 = nullptr;
     IUnityLog* s_Log = nullptr;
 
