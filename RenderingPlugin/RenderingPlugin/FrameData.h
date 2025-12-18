@@ -3,6 +3,7 @@
 #include <d3d12.h>
 #include <NRD.h>
 #include <NRDSettings.h>
+#include <NRIDescs.h>
 
 #pragma pack(push, 1)
 namespace nri
@@ -38,5 +39,17 @@ struct FrameData
     nri::Texture* nriValidation;
 
     int instanceId;
+};
+
+struct NriResourceState {
+    uint32_t accessBits;
+    uint32_t layout;
+    uint32_t stageBits;
+};
+
+struct NrdResourceInput {
+    nrd::ResourceType type;       // nrd::ResourceType
+    nri::Texture* texture;       // nri::Texture*
+    NriResourceState state;
 };
 #pragma pack(pop)

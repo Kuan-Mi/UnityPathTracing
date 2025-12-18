@@ -71,38 +71,51 @@ void NrdInstance::DispatchCompute(const FrameData* data)
     m_NrdIntegration.NewFrame();
 
     nrd::ResourceSnapshot snapshot = {};
-
-    // 定义辅助 lambda 来填充 pool
-    auto AddResource = [&](nrd::ResourceType type, nri::Texture* tex, nri::AccessLayoutStage state)
+    
+    for (const auto& input : m_CachedResources)
     {
-        if (!tex) return;
+        if (input.texture == nullptr) continue;
+
         nrd::Resource r = {};
-        r.nri.texture = tex;
-        r.state = state; // 指定资源进入 NRD 之前的状态
-        snapshot.SetResource(type, r);
-    };
+        r.nri.texture = input.texture;
+        r.state.access = (nri::AccessBits)input.state.accessBits;
+        r.state.layout = (nri::Layout)input.state.layout;
+        r.state.stages = (nri::StageBits)input.state.stageBits;
 
-    nri::AccessLayoutStage srvState = {
-        nri::AccessBits::SHADER_RESOURCE, nri::Layout::SHADER_RESOURCE, nri::StageBits::FRAGMENT_SHADER
-    };
-    nri::AccessLayoutStage uavState = {
-        nri::AccessBits::SHADER_RESOURCE_STORAGE, nri::Layout::SHADER_RESOURCE_STORAGE, nri::StageBits::COMPUTE_SHADER
-    };
-    nri::AccessLayoutStage rtState = {
-        nri::AccessBits::COLOR_ATTACHMENT, nri::Layout::UNDEFINED, nri::StageBits::FRAGMENT_SHADER
-    };
-    nri::AccessLayoutStage commonState = {
-        nri::AccessBits::NONE, nri::Layout::GENERAL, nri::StageBits::NONE
-    };
-
-    AddResource(nrd::ResourceType::IN_MV, data->nriMv, data->commonSettings.frameIndex == 0 ? uavState : srvState);
-    AddResource(nrd::ResourceType::IN_NORMAL_ROUGHNESS, data->nriNormalRoughness, data->commonSettings.frameIndex == 0 ? uavState : srvState);
-    AddResource(nrd::ResourceType::IN_VIEWZ, data->nriViewZ, data->commonSettings.frameIndex == 0 ? uavState : srvState);
-    AddResource(nrd::ResourceType::IN_PENUMBRA, data->nriPenumbra, data->commonSettings.frameIndex == 0 ? uavState : srvState);
-    AddResource(nrd::ResourceType::OUT_SHADOW_TRANSLUCENCY, data->nriShadowTranslucency, uavState);
-    AddResource(nrd::ResourceType::IN_DIFF_RADIANCE_HITDIST, data->nriDiffRadiance, data->commonSettings.frameIndex == 0 ? rtState : srvState);
-    AddResource(nrd::ResourceType::OUT_DIFF_RADIANCE_HITDIST, data->nriOutDiffRadiance, data->commonSettings.frameIndex == 0 ? rtState : uavState);
-    AddResource(nrd::ResourceType::OUT_VALIDATION, data->nriValidation, commonState);
+        snapshot.SetResource(input.type, r);
+    }
+    
+    // // 定义辅助 lambda 来填充 pool
+    // auto AddResource = [&](nrd::ResourceType type, nri::Texture* tex, nri::AccessLayoutStage state)
+    // {
+    //     if (!tex) return;
+    //     nrd::Resource r = {};
+    //     r.nri.texture = tex;
+    //     r.state = state; // 指定资源进入 NRD 之前的状态
+    //     snapshot.SetResource(type, r);
+    // };
+    //
+    // nri::AccessLayoutStage srvState = {
+    //     nri::AccessBits::SHADER_RESOURCE, nri::Layout::SHADER_RESOURCE, nri::StageBits::FRAGMENT_SHADER
+    // };
+    // nri::AccessLayoutStage uavState = {
+    //     nri::AccessBits::SHADER_RESOURCE_STORAGE, nri::Layout::SHADER_RESOURCE_STORAGE, nri::StageBits::COMPUTE_SHADER
+    // };
+    // nri::AccessLayoutStage rtState = {
+    //     nri::AccessBits::COLOR_ATTACHMENT, nri::Layout::UNDEFINED, nri::StageBits::FRAGMENT_SHADER
+    // };
+    // nri::AccessLayoutStage commonState = {
+    //     nri::AccessBits::NONE, nri::Layout::GENERAL, nri::StageBits::NONE
+    // };
+    //
+    // AddResource(nrd::ResourceType::IN_MV, data->nriMv, data->commonSettings.frameIndex == 0 ? uavState : srvState);
+    // AddResource(nrd::ResourceType::IN_NORMAL_ROUGHNESS, data->nriNormalRoughness, data->commonSettings.frameIndex == 0 ? uavState : srvState);
+    // AddResource(nrd::ResourceType::IN_VIEWZ, data->nriViewZ, data->commonSettings.frameIndex == 0 ? uavState : srvState);
+    // AddResource(nrd::ResourceType::IN_PENUMBRA, data->nriPenumbra, data->commonSettings.frameIndex == 0 ? uavState : srvState);
+    // AddResource(nrd::ResourceType::OUT_SHADOW_TRANSLUCENCY, data->nriShadowTranslucency, uavState);
+    // AddResource(nrd::ResourceType::IN_DIFF_RADIANCE_HITDIST, data->nriDiffRadiance, data->commonSettings.frameIndex == 0 ? rtState : srvState);
+    // AddResource(nrd::ResourceType::OUT_DIFF_RADIANCE_HITDIST, data->nriOutDiffRadiance, data->commonSettings.frameIndex == 0 ? rtState : uavState);
+    // AddResource(nrd::ResourceType::OUT_VALIDATION, data->nriValidation, commonState);
 
     const nrd::Identifier denoisers[] = {m_SigmaId, m_ReblurId};
 
@@ -129,6 +142,21 @@ void NrdInstance::DispatchCompute(const FrameData* data)
     recording_state.commandList->ResourceBarrier(1, &barrier2);
 
     RenderSystem::Get().GetNriCore().DestroyCommandBuffer(nriCmdBuffer);
+}
+
+void NrdInstance::UpdateResources(NrdResourceInput* resources, int count)
+{
+    if (!resources || count <= 0)
+    {
+        m_CachedResources.clear();
+        return;
+    }
+
+    m_CachedResources.resize(count);
+    // 直接内存拷贝，因为结构体是 POD (Plain Old Data)
+    memcpy(m_CachedResources.data(), resources, count * sizeof(NrdResourceInput));
+
+    LOG(("Updated NRD Resources. Count: " + std::to_string(count)).c_str());
 }
 
 void NrdInstance::CreateNrd()

@@ -26,6 +26,8 @@ public:
     ~NrdInstance();
 
     void DispatchCompute(const FrameData* data);
+    void UpdateResources(NrdResourceInput* resources, int count);
+    
 
 private:
     static constexpr int kMaxFramesInFlight = 3;
@@ -40,6 +42,9 @@ private:
 
     // NRD
     nrd::Integration m_NrdIntegration = {};
+    
+    std::vector<NrdResourceInput> m_CachedResources;
+    
     // nrd::CommonSettings commonSettings;
     // nrd::SigmaSettings sigmaSettings;
 

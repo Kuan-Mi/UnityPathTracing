@@ -132,4 +132,18 @@ UNITY_INTERFACE_EXPORT void UNITY_INTERFACE_API ReleaseTexture(nri::Texture* nri
 {
     RenderSystem::Get().Release(nriTex);
 }
+    
+    void UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API UpdateDenoiserResources(
+    int instanceId, 
+    NrdResourceInput* resources, 
+    int count)
+{
+    
+    std::scoped_lock lock(g_InstanceMutex);
+    auto it = g_Instances.find(instanceId);
+    if (it != g_Instances.end())
+    {
+        it->second->UpdateResources(resources, count);
+    }
+}
 }

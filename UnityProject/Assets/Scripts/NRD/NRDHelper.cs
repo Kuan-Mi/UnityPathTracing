@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Runtime.InteropServices;
+using Nri;
 using PathTracing;
 using Unity.Collections;
 using Unity.Collections.LowLevel.Unsafe;
@@ -153,8 +154,14 @@ namespace Nrd
 
         [DllImport("RenderingPlugin")]
         private static extern IntPtr WrapD3D12Texture(IntPtr resource, DXGI_FORMAT format);
+
         [DllImport("RenderingPlugin")]
         private static extern void ReleaseTexture(IntPtr nriTex);
+
+        [DllImport("RenderingPlugin")]
+        private static extern void UpdateDenoiserResources(int instanceId, IntPtr resources, int count);
+
+        private NativeArray<NrdResourceInput> m_ResourceCache;
 
         private uint FrameIndex;
         private readonly int nrdInstanceId;
@@ -212,6 +219,12 @@ namespace Nrd
             if (width == _prevWidth && height == _prevHeight &&
                 MvHandle != null && ViewZHandle != null)
             {
+
+                if (FrameIndex == 1)
+                {
+                    UpdateResourceSnapshotInCpp();
+                }
+                
                 return;
             }
 
@@ -247,8 +260,8 @@ namespace Nrd
 
             ValidationHandle = AllocRT("NRD_Validation", width, height, GraphicsFormat.R8G8B8A8_UNorm);
             Ptr_ValidationPointer = ValidationHandle.rt.GetNativeTexturePtr();
-            
-            
+
+
             nriMv = WrapD3D12Texture(Ptr_Mv, DXGI_FORMAT.DXGI_FORMAT_R16G16B16A16_FLOAT);
             nriNormal = WrapD3D12Texture(Ptr_NormalRoughness, DXGI_FORMAT.DXGI_FORMAT_R10G10B10A2_UNORM);
             nriViewZ = WrapD3D12Texture(Ptr_ViewZ, DXGI_FORMAT.DXGI_FORMAT_R32_FLOAT);
@@ -257,6 +270,49 @@ namespace Nrd
             nriDiffRadiance = WrapD3D12Texture(Ptr_DiffRadiancePointer, DXGI_FORMAT.DXGI_FORMAT_R16G16B16A16_FLOAT);
             nriOutDiffRadiance = WrapD3D12Texture(Ptr_OutDiffRadiancePointer, DXGI_FORMAT.DXGI_FORMAT_R16G16B16A16_FLOAT);
             nriValidation = WrapD3D12Texture(Ptr_ValidationPointer, DXGI_FORMAT.DXGI_FORMAT_R8G8B8A8_UNORM);
+
+
+            UpdateResourceSnapshotInCpp();
+        }
+
+        private unsafe void UpdateResourceSnapshotInCpp()
+        {
+            // 定义需要的资源数量 (Sigma + Reblur 大概 10-15 个)
+            int maxResources = 20;
+            if (!m_ResourceCache.IsCreated || m_ResourceCache.Length < maxResources)
+            {
+                if (m_ResourceCache.IsCreated) m_ResourceCache.Dispose();
+                m_ResourceCache = new NativeArray<NrdResourceInput>(maxResources, Allocator.Persistent);
+            }
+
+            int idx = 0;
+
+            // 定义状态 (与 C++ 保持一致)
+            var srvState = new NriResourceState { accessBits = AccessBits.SHADER_RESOURCE, layout = Layout.SHADER_RESOURCE, stageBits = 1 << 7 };
+            var uavState = new NriResourceState { accessBits = AccessBits.SHADER_RESOURCE_STORAGE, layout = Layout.SHADER_RESOURCE_STORAGE, stageBits = 1 << 10 };
+            var rtState = new NriResourceState { accessBits = AccessBits.COLOR_ATTACHMENT, layout = Layout.COLOR_ATTACHMENT, stageBits = 1 << 7 };
+            var commonState = new NriResourceState { accessBits = AccessBits.NONE, layout = Layout.GENERAL, stageBits = 0 };
+
+
+            // Reblur/Sigma Inputs
+            NrdResourceInput* ptr = (NrdResourceInput*)m_ResourceCache.GetUnsafePtr();
+
+            ptr[idx++] = new NrdResourceInput { type = ResourceType.IN_MV, texture = nriMv, state = FrameIndex == 0 ? uavState : srvState };
+            ptr[idx++] = new NrdResourceInput { type = ResourceType.IN_NORMAL_ROUGHNESS, texture = nriNormal, state = FrameIndex == 0 ? uavState : srvState  };
+            ptr[idx++] = new NrdResourceInput { type = ResourceType.IN_VIEWZ, texture = nriViewZ, state = FrameIndex == 0 ? uavState : srvState  };
+            ptr[idx++] = new NrdResourceInput { type = ResourceType.IN_PENUMBRA, texture = nriPENUMBRA, state = FrameIndex == 0 ? uavState : srvState  };
+
+            ptr[idx++] = new NrdResourceInput { type = ResourceType.OUT_SHADOW_TRANSLUCENCY, texture = nriSHADOW_TRANSLUCENCY, state = uavState };
+
+            ptr[idx++] = new NrdResourceInput { type = ResourceType.IN_DIFF_RADIANCE_HITDIST, texture = nriDiffRadiance, state = FrameIndex == 0 ? rtState : srvState };
+            ptr[idx++] = new NrdResourceInput { type = ResourceType.OUT_DIFF_RADIANCE_HITDIST, texture = nriOutDiffRadiance, state = FrameIndex == 0 ? rtState : uavState };
+
+            ptr[idx++] = new NrdResourceInput { type = ResourceType.OUT_VALIDATION, texture = nriValidation, state = commonState };
+
+            // 发送到 C++
+            UpdateDenoiserResources(nrdInstanceId, (IntPtr)ptr, idx);
+
+            Debug.Log($"[NRD] Updated resources pointer to C++. Count: {idx}");
         }
 
         private RTHandle AllocRT(string name, int w, int h, GraphicsFormat format)
@@ -290,7 +346,7 @@ namespace Nrd
             ReleaseTexture(nriDiffRadiance);
             ReleaseTexture(nriOutDiffRadiance);
             ReleaseTexture(nriValidation);
-            
+
             nriMv = IntPtr.Zero;
             nriNormal = IntPtr.Zero;
             nriViewZ = IntPtr.Zero;
@@ -299,8 +355,8 @@ namespace Nrd
             nriDiffRadiance = IntPtr.Zero;
             nriOutDiffRadiance = IntPtr.Zero;
             nriValidation = IntPtr.Zero;
-            
-            
+
+
             RTHandles.Release(MvHandle);
             MvHandle = null;
             RTHandles.Release(ViewZHandle);
@@ -388,7 +444,7 @@ namespace Nrd
             localData.diffRadiancePointer = Ptr_DiffRadiancePointer;
             localData.outDiffRadiancePointer = Ptr_OutDiffRadiancePointer;
             localData.validationPointer = Ptr_ValidationPointer;
-            
+
             localData.nriMv = nriMv;
             localData.nriNormalRoughness = nriNormal;
             localData.nriViewZ = nriViewZ;
@@ -397,7 +453,7 @@ namespace Nrd
             localData.nriDiffRadiance = nriDiffRadiance;
             localData.nriOutDiffRadiance = nriOutDiffRadiance;
             localData.nriValidation = nriValidation;
-            
+
 
             // Debug.Log("Record Frame Index: " + m_FrameIndex);
 
