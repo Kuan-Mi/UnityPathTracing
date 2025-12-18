@@ -58,7 +58,7 @@ namespace Nrd
     }
 
     [Serializable]
-    [StructLayout(LayoutKind.Sequential)]
+    [StructLayout(LayoutKind.Sequential, Pack = 1)]
     public struct NriResourceState
     {
         public AccessBits accessBits;
@@ -67,7 +67,7 @@ namespace Nrd
     }
 
     [Serializable]
-    [StructLayout(LayoutKind.Sequential)]
+    [StructLayout(LayoutKind.Sequential, Pack = 1)]
     public struct NrdResourceInput
     {
         public ResourceType type;
