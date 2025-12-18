@@ -55,7 +55,7 @@ void NrdInstance::DispatchCompute(const FrameData* data)
         CreateNrd();
     }
 
-    LOG(("Dispatching Frame : " + std::to_string(data->commonSettings.frameIndex)).c_str());
+    // LOG(("Dispatching Frame : " + std::to_string(data->commonSettings.frameIndex)).c_str());
 
     nri::CommandBufferD3D12Desc cmdDesc;
     cmdDesc.d3d12CommandList = recording_state.commandList;
@@ -104,7 +104,7 @@ void NrdInstance::DispatchCompute(const FrameData* data)
     barrier2.Flags = D3D12_RESOURCE_BARRIER_FLAG_NONE;
     barrier2.Transition.pResource = data->validationPointer;
     barrier2.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
-    barrier2.Transition.StateBefore = D3D12_RESOURCE_STATE_UNORDERED_ACCESS;
+    barrier2.Transition.StateBefore = D3D12_RESOURCE_STATE_COMMON;
     barrier2.Transition.StateAfter = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
 
     recording_state.commandList->ResourceBarrier(1, &barrier2);

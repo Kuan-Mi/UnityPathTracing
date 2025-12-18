@@ -314,7 +314,10 @@ void MainRayGenShader()
     gOut_ViewZ[launchIndex] = viewZ0;
 
 
-    gOut_Normal_Roughness[launchIndex] = NRD_FrontEnd_PackNormalAndRoughness(payload.N, payload.roughness, 0);
+    float4 v2= NRD_FrontEnd_PackNormalAndRoughness(payload.N, payload.roughness, 0);
+    // v2.zw = 0;
+    gOut_Normal_Roughness[launchIndex] = v2;
+    // gOut_Normal_Roughness[launchIndex] = float4(payload.N, payload.roughness);
     gOut_BaseColor_Metalness[launchIndex] = float4(payload.baseColor, payload.metalness);
 
     float3 Ldirect = GetLighting(geometryProps0, materialProps0, LIGHTING, X0);

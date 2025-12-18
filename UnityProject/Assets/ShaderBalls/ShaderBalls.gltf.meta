@@ -1,0 +1,97 @@
+fileFormatVersion: 2
+guid: 9c2e154e190f89945a49f6b86fc55b2a
+ScriptedImporter:
+  internalIDToNameTable: []
+  externalObjects: {}
+  serializedVersion: 2
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+  script: {fileID: 11500000, guid: 715df9372183c47e389bb6e19fbc3b52, type: 3}
+  editorImportSettings:
+    generateSecondaryUVSet: 0
+  importSettings:
+    nodeNameMethod: 0
+    animationMethod: 0
+    generateMipMaps: 0
+    texturesReadable: 0
+    defaultMinFilterMode: 9729
+    defaultMagFilterMode: 9729
+    anisotropicFilterLevel: 1
+  instantiationSettings:
+    mask: -1
+    layer: 0
+    skinUpdateWhenOffscreen: 1
+    lightIntensityFactor: 1
+    sceneObjectCreation: 2
+  assetDependencies:
+  - type: 0
+    originalUri: Assets\ShaderBalls\ShaderBalls.bin
+    assetPath: Assets\ShaderBalls\ShaderBalls.bin
+  - type: 1
+    originalUri: Assets\ShaderBalls\T_Tile_White_N.dds
+    assetPath: Assets\ShaderBalls\T_Tile_White_N.dds
+  - type: 1
+    originalUri: Assets\ShaderBalls\T_Tile_White_D.dds
+    assetPath: Assets\ShaderBalls\T_Tile_White_D.dds
+  - type: 1
+    originalUri: Assets\ShaderBalls\T_Tile_White_R.dds
+    assetPath: Assets\ShaderBalls\T_Tile_White_R.dds
+  - type: 1
+    originalUri: Assets\ShaderBalls\white.png
+    assetPath: Assets\ShaderBalls\white.png
+  - type: 1
+    originalUri: Assets\ShaderBalls\roughness0_metalness1.png
+    assetPath: Assets\ShaderBalls\roughness0_metalness1.png
+  - type: 1
+    originalUri: Assets\ShaderBalls\flat_normal.png
+    assetPath: Assets\ShaderBalls\flat_normal.png
+  - type: 1
+    originalUri: Assets\ShaderBalls\black.png
+    assetPath: Assets\ShaderBalls\black.png
+  - type: 1
+    originalUri: Assets\ShaderBalls\roughness0_metalness0.png
+    assetPath: Assets\ShaderBalls\roughness0_metalness0.png
+  - type: 1
+    originalUri: Assets\ShaderBalls\gold.png
+    assetPath: Assets\ShaderBalls\gold.png
+  - type: 1
+    originalUri: Assets\ShaderBalls\gold_mat.png
+    assetPath: Assets\ShaderBalls\gold_mat.png
+  - type: 1
+    originalUri: Assets\ShaderBalls\T_Brick_Concrete_N.dds
+    assetPath: Assets\ShaderBalls\T_Brick_Concrete_N.dds
+  - type: 1
+    originalUri: Assets\ShaderBalls\green.png
+    assetPath: Assets\ShaderBalls\green.png
+  - type: 1
+    originalUri: Assets\ShaderBalls\T_Brick_Concrete_R.dds
+    assetPath: Assets\ShaderBalls\T_Brick_Concrete_R.dds
+  - type: 1
+    originalUri: Assets\ShaderBalls\T_Brick_Yellow_N.dds
+    assetPath: Assets\ShaderBalls\T_Brick_Yellow_N.dds
+  - type: 1
+    originalUri: Assets\ShaderBalls\T_Brick_Yellow_D.dds
+    assetPath: Assets\ShaderBalls\T_Brick_Yellow_D.dds
+  - type: 1
+    originalUri: Assets\ShaderBalls\T_Brick_Yellow_R.dds
+    assetPath: Assets\ShaderBalls\T_Brick_Yellow_R.dds
+  - type: 1
+    originalUri: Assets\ShaderBalls\T_Brick_Beige_N.dds
+    assetPath: Assets\ShaderBalls\T_Brick_Beige_N.dds
+  - type: 1
+    originalUri: Assets\ShaderBalls\red.png
+    assetPath: Assets\ShaderBalls\red.png
+  - type: 1
+    originalUri: Assets\ShaderBalls\roughness1_metalness0.png
+    assetPath: Assets\ShaderBalls\roughness1_metalness0.png
+  - type: 1
+    originalUri: Assets\ShaderBalls\T_Concrete_Shimizu_N.dds
+    assetPath: Assets\ShaderBalls\T_Concrete_Shimizu_N.dds
+  - type: 1
+    originalUri: Assets\ShaderBalls\T_Concrete_Shimizu_D.dds
+    assetPath: Assets\ShaderBalls\T_Concrete_Shimizu_D.dds
+  - type: 1
+    originalUri: Assets\ShaderBalls\T_Concrete_Shimizu_R.dds
+    assetPath: Assets\ShaderBalls\T_Concrete_Shimizu_R.dds
+  reportItems: []
