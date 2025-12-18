@@ -132,6 +132,22 @@
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <AdditionalLibraryDirectories>$(NRD_ROOT)\NRD\_NRD_SDK\Lib\Debug;$(NRD_ROOT)\NRD\_NRI_SDK\Lib\Debug</AdditionalLibraryDirectories>
     </Link>
+    <PostBuildEvent>
+      <!-- 
+           说明：
+           1. $(ProjectDir) 表示 vcxproj 文件所在目录，带末尾斜杠。
+           2. 我将你的绝对路径 F:\URPPathTracing... 改为了相对路径。
+              假设你的 vcxproj 在 F:\URPPathTracing\YourCppFolder\ 下，
+              那么用 ..\ 就可以回退到 URPPathTracing 根目录。
+              如果路径不对，你可以把下方 set TARGET_PLUGIN_PATH 的值改回你的绝对路径。
+      -->
+      <Command>
+        set "TARGET_PLUGIN_PATH=$(ProjectDir)..\..\UnityProject\Assets\Plugins\x86_64"
+        echo Target Path is %TARGET_PLUGIN_PATH%
+        copy /Y "$(TargetPath)" "%TARGET_PLUGIN_PATH%\RenderingPlugin.dll"
+      </Command>
+      <Message>正在将 RenderingPlugin.dll 复制到 Unity Plugins 目录...</Message>
+    </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
     <ClCompile>
