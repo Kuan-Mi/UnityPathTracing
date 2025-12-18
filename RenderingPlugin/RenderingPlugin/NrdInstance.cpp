@@ -78,45 +78,13 @@ void NrdInstance::DispatchCompute(const FrameData* data)
 
         nrd::Resource r = {};
         r.nri.texture = input.texture;
-        r.state.access = (nri::AccessBits)input.state.accessBits;
+        r.state.access = input.state.accessBits;
         r.state.layout = (nri::Layout)input.state.layout;
-        r.state.stages = (nri::StageBits)input.state.stageBits;
+        r.state.stages = input.state.stageBits;
 
         snapshot.SetResource(input.type, r);
     }
     
-    // // 定义辅助 lambda 来填充 pool
-    // auto AddResource = [&](nrd::ResourceType type, nri::Texture* tex, nri::AccessLayoutStage state)
-    // {
-    //     if (!tex) return;
-    //     nrd::Resource r = {};
-    //     r.nri.texture = tex;
-    //     r.state = state; // 指定资源进入 NRD 之前的状态
-    //     snapshot.SetResource(type, r);
-    // };
-    //
-    // nri::AccessLayoutStage srvState = {
-    //     nri::AccessBits::SHADER_RESOURCE, nri::Layout::SHADER_RESOURCE, nri::StageBits::FRAGMENT_SHADER
-    // };
-    // nri::AccessLayoutStage uavState = {
-    //     nri::AccessBits::SHADER_RESOURCE_STORAGE, nri::Layout::SHADER_RESOURCE_STORAGE, nri::StageBits::COMPUTE_SHADER
-    // };
-    // nri::AccessLayoutStage rtState = {
-    //     nri::AccessBits::COLOR_ATTACHMENT, nri::Layout::UNDEFINED, nri::StageBits::FRAGMENT_SHADER
-    // };
-    // nri::AccessLayoutStage commonState = {
-    //     nri::AccessBits::NONE, nri::Layout::GENERAL, nri::StageBits::NONE
-    // };
-    //
-    // AddResource(nrd::ResourceType::IN_MV, data->nriMv, data->commonSettings.frameIndex == 0 ? uavState : srvState);
-    // AddResource(nrd::ResourceType::IN_NORMAL_ROUGHNESS, data->nriNormalRoughness, data->commonSettings.frameIndex == 0 ? uavState : srvState);
-    // AddResource(nrd::ResourceType::IN_VIEWZ, data->nriViewZ, data->commonSettings.frameIndex == 0 ? uavState : srvState);
-    // AddResource(nrd::ResourceType::IN_PENUMBRA, data->nriPenumbra, data->commonSettings.frameIndex == 0 ? uavState : srvState);
-    // AddResource(nrd::ResourceType::OUT_SHADOW_TRANSLUCENCY, data->nriShadowTranslucency, uavState);
-    // AddResource(nrd::ResourceType::IN_DIFF_RADIANCE_HITDIST, data->nriDiffRadiance, data->commonSettings.frameIndex == 0 ? rtState : srvState);
-    // AddResource(nrd::ResourceType::OUT_DIFF_RADIANCE_HITDIST, data->nriOutDiffRadiance, data->commonSettings.frameIndex == 0 ? rtState : uavState);
-    // AddResource(nrd::ResourceType::OUT_VALIDATION, data->nriValidation, commonState);
-
     const nrd::Identifier denoisers[] = {m_SigmaId, m_ReblurId};
 
     D3D12_RESOURCE_BARRIER barrier;

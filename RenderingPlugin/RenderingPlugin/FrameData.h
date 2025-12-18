@@ -19,7 +19,7 @@ struct FrameData
 
     uint16_t width;
     uint16_t height;
-    
+
     ID3D12Resource* mvPointer;
     ID3D12Resource* normalRoughnessPointer;
     ID3D12Resource* viewZPointer;
@@ -32,15 +32,17 @@ struct FrameData
     int instanceId;
 };
 
-struct NriResourceState {
-    uint32_t accessBits;
+struct NriResourceState
+{
+    nri::AccessBits accessBits;
     uint32_t layout;
-    uint32_t stageBits;
+    nri::StageBits stageBits;
 };
 
-struct NrdResourceInput {
-    nrd::ResourceType type;       // nrd::ResourceType
-    nri::Texture* texture;       // nri::Texture*
+struct NrdResourceInput
+{
+    nrd::ResourceType type;
+    nri::Texture* texture;
     NriResourceState state;
 };
 #pragma pack(pop)

@@ -17,7 +17,7 @@ void RenderSystem::Initialize(IUnityInterfaces* interfaces)
     s_d3d12 = interfaces->Get<IUnityGraphicsD3D12v7>();
     s_Log = interfaces->Get<IUnityLog>();
 
-    ID3D12Device* device = s_d3d12->GetDevice();
+    device = s_d3d12->GetDevice();
 
     nri::DeviceCreationD3D12Desc deviceDesc = {};
     deviceDesc.d3d12Device = device;
