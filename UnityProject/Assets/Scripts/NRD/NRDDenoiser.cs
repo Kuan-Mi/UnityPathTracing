@@ -68,8 +68,7 @@ namespace Nrd
         public void EnsureResources(int width, int height)
         {
             // 如果尺寸没变且资源都存在，直接返回
-            if (width == _prevWidth && height == _prevHeight &&
-                MvHandle != null && ViewZHandle != null)
+            if (width == _prevWidth && height == _prevHeight)
             {
                 if (FrameIndex == 1)
                 {
