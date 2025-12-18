@@ -402,15 +402,6 @@ namespace Nrd
         public IntPtr outDiffRadiancePointer;   // OUT_DIFF_RADIANCE_HITDIST
         public IntPtr validationPointer;   
 
-        public IntPtr nriMv;
-        public IntPtr nriNormalRoughness;
-        public IntPtr nriViewZ;
-        public IntPtr nriPenumbra;
-        public IntPtr nriShadowTranslucency;
-        public IntPtr nriDiffRadiance;
-        public IntPtr nriOutDiffRadiance;
-        public IntPtr nriValidation;
-
         public int instanceId;
         
         public static FrameData _default = CreateDefault();

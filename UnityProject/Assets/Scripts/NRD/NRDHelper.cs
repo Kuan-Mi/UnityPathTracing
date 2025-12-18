@@ -445,16 +445,6 @@ namespace Nrd
             localData.outDiffRadiancePointer = Ptr_OutDiffRadiancePointer;
             localData.validationPointer = Ptr_ValidationPointer;
 
-            localData.nriMv = nriMv;
-            localData.nriNormalRoughness = nriNormal;
-            localData.nriViewZ = nriViewZ;
-            localData.nriPenumbra = nriPENUMBRA;
-            localData.nriShadowTranslucency = nriSHADOW_TRANSLUCENCY;
-            localData.nriDiffRadiance = nriDiffRadiance;
-            localData.nriOutDiffRadiance = nriOutDiffRadiance;
-            localData.nriValidation = nriValidation;
-
-
             // Debug.Log("Record Frame Index: " + m_FrameIndex);
 
             // 4. 更新历史状态
