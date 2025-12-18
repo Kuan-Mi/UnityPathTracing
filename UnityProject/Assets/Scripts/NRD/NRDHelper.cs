@@ -156,7 +156,7 @@ namespace Nrd
 
         private unsafe FrameData GetData(Camera m_Camera, Vector3 dirToLight)
         {
-            Matrix4x4 proj = GL.GetGPUProjectionMatrix(m_Camera.projectionMatrix, true);
+            Matrix4x4 proj = GL.GetGPUProjectionMatrix(m_Camera.projectionMatrix, false);
 
             Matrix4x4 worldToView = m_Camera.worldToCameraMatrix;
             Matrix4x4 viewProj = m_Camera.projectionMatrix;

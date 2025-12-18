@@ -264,6 +264,8 @@ void MainRayGenShader()
     float2 ndcCoord = (frameCoord + jitter) / float2(launchDim.x - 1, launchDim.y - 1);
     // -1 - 1
     ndcCoord = ndcCoord * 2.0 - 1.0;
+    
+    ndcCoord.y = -ndcCoord.y; // NDC Y 轴向上，纹理 UV Y 轴向下，需要翻转
 
     float4 viewPos = mul(_CInverseProjection, float4(ndcCoord.x, ndcCoord.y, 1.0, 1.0));
     viewPos /= viewPos.w;

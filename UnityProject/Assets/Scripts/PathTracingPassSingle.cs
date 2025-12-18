@@ -150,7 +150,7 @@ namespace PathTracing
         {
             // Unity 的 GPU 投影矩阵（处理平台差异 & Y 翻转）
             Matrix4x4 proj = GL.GetGPUProjectionMatrix(
-                camera.projectionMatrix, true);
+                camera.projectionMatrix, false);
 
             return proj * camera.worldToCameraMatrix;
         }
@@ -196,8 +196,8 @@ namespace PathTracing
                 Blitter.BlitTexture(natCmd, data.Shadow_Translucency, new Vector4(1, 1, 0, 0), data.blitMaterial, 1);
             if (data.showValidation)
             {
-                // Blitter.BlitTexture(natCmd, data.Validation, new Vector4(1, 1, 0, 0), data.blitMaterial, 0);
-                Blitter.BlitTexture(natCmd, data.Validation, new Vector4(1, 1, 0, 0),0,false);
+                Blitter.BlitTexture(natCmd, data.Validation, new Vector4(1, 1, 0, 0), data.blitMaterial, 0);
+                // Blitter.BlitTexture(natCmd, data.Validation, new Vector4(1, 1, 0, 0),0,false);
             }
             if (data.showMv)
                 Blitter.BlitTexture(natCmd, data.Mv, new Vector4(1, 1, 0, 0), data.blitMaterial, 2);
@@ -295,6 +295,7 @@ namespace PathTracing
                 lightOffset = _settings.lightOffset,
 
                 _CameraPosition = cameraData.worldSpaceCameraPos,
+
                 _CCameraToWorld = viewToWorld,
                 gWorldToView = worldToView,
                 gWorldToClip = worldToClip,

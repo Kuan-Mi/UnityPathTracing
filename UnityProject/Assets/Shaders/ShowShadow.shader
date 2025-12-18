@@ -48,6 +48,11 @@
 
             float4 Frag(Varyings i) : SV_Target
             {
+                                // 翻转Y
+                #ifdef UNITY_UV_STARTS_AT_TOP
+                    i.uv.y = 1.0 - i.uv.y;
+                #endif
+                
                 return SAMPLE_TEXTURE2D(_BlitTexture, sampler_BlitTexture, i.uv);
             }
             ENDHLSL
@@ -94,6 +99,11 @@
 
             float4 Frag(Varyings i) : SV_Target
             {
+                // 翻转Y
+                #ifdef UNITY_UV_STARTS_AT_TOP
+                    i.uv.y = 1.0 - i.uv.y;
+                #endif
+                
                 float OUT_SHADOW_TRANSLUCENCY = SAMPLE_TEXTURE2D(_BlitTexture, sampler_BlitTexture, i.uv).r;
                 float shadow = SIGMA_BackEnd_UnpackShadow(OUT_SHADOW_TRANSLUCENCY);
                 float4 color = float4(shadow, shadow, shadow, 1);   
@@ -183,6 +193,11 @@
 
             float4 Frag(Varyings i) : SV_Target
             {
+                                // 翻转Y
+                #ifdef UNITY_UV_STARTS_AT_TOP
+                    i.uv.y = 1.0 - i.uv.y;
+                #endif
+                
                 float2 gScreenSize = _ScreenParams.xy;
 
                 // --- 配置参数 ---
