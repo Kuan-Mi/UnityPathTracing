@@ -20,25 +20,10 @@ namespace NRD
         public string Name;
 
         public bool IsCreated => Handle != null;
-        
-        public DXGI_FORMAT GetDXGIFormat(GraphicsFormat format)
-        {
-            switch (format)
-            {
-                case GraphicsFormat.R16G16B16A16_SFloat:
-                    return DXGI_FORMAT.DXGI_FORMAT_R16G16B16A16_FLOAT;
-                case GraphicsFormat.R32G32B32A32_SFloat:
-                    return DXGI_FORMAT.DXGI_FORMAT_R32G32B32A32_FLOAT;
-                case GraphicsFormat.R8G8B8A8_UNorm:
-                    return DXGI_FORMAT.DXGI_FORMAT_R8G8B8A8_UNORM;
-                default:
-                    throw new ArgumentOutOfRangeException(nameof(format), format, null);
-            }
-        }
 
         public void Allocate(string name, int w, int h, GraphicsFormat graphicsFormat)
         {
-            var dxgiFormat = GetDXGIFormat(graphicsFormat);
+            var dxgiFormat = NRDUtil.GetDXGIFormat(graphicsFormat);
             Release(); // 确保先释放旧的
             Name = name;
 
