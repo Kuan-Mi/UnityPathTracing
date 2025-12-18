@@ -108,12 +108,10 @@ namespace Nrd
 
             int idx = 0;
 
-            // 定义状态 (与 C++ 保持一致)
             var srvState = new NriResourceState { accessBits = AccessBits.SHADER_RESOURCE, layout = Layout.SHADER_RESOURCE, stageBits = 1 << 7 };
             var uavState = new NriResourceState { accessBits = AccessBits.SHADER_RESOURCE_STORAGE, layout = Layout.SHADER_RESOURCE_STORAGE, stageBits = 1 << 10 };
             var rtState = new NriResourceState { accessBits = AccessBits.COLOR_ATTACHMENT, layout = Layout.COLOR_ATTACHMENT, stageBits = 1 << 7 };
             var commonState = new NriResourceState { accessBits = AccessBits.NONE, layout = Layout.GENERAL, stageBits = 0 };
-
 
             // Reblur/Sigma Inputs
             NrdResourceInput* ptr = (NrdResourceInput*)m_ResourceCache.GetUnsafePtr();
@@ -122,15 +120,11 @@ namespace Nrd
             ptr[idx++] = new NrdResourceInput { type = ResourceType.IN_NORMAL_ROUGHNESS, texture = m_NormalRoughness.NriPtr, state = FrameIndex == 0 ? uavState : srvState };
             ptr[idx++] = new NrdResourceInput { type = ResourceType.IN_VIEWZ, texture = m_ViewZ.NriPtr, state = FrameIndex == 0 ? uavState : srvState };
             ptr[idx++] = new NrdResourceInput { type = ResourceType.IN_PENUMBRA, texture = m_Penumbra.NriPtr, state = FrameIndex == 0 ? uavState : srvState };
-
             ptr[idx++] = new NrdResourceInput { type = ResourceType.OUT_SHADOW_TRANSLUCENCY, texture = m_ShadowTranslucency.NriPtr, state = uavState };
-
             ptr[idx++] = new NrdResourceInput { type = ResourceType.IN_DIFF_RADIANCE_HITDIST, texture = m_DiffRadiance.NriPtr, state = FrameIndex == 0 ? rtState : srvState };
             ptr[idx++] = new NrdResourceInput { type = ResourceType.OUT_DIFF_RADIANCE_HITDIST, texture = m_OutDiffRadiance.NriPtr, state = FrameIndex == 0 ? rtState : uavState };
-
             ptr[idx++] = new NrdResourceInput { type = ResourceType.OUT_VALIDATION, texture = m_Validation.NriPtr, state = commonState };
 
-            // 发送到 C++
             UpdateDenoiserResources(nrdInstanceId, (IntPtr)ptr, idx);
 
             Debug.Log($"[NRD] Updated resources pointer to C++. Count: {idx}");
