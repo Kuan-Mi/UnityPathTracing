@@ -145,13 +145,8 @@
         set "TARGET_PLUGIN_PATH=$(ProjectDir)..\..\UnityProject\Assets\Plugins\x86_64"
         echo Target Path is %TARGET_PLUGIN_PATH%
         copy /Y "$(TargetPath)" "%TARGET_PLUGIN_PATH%\RenderingPlugin.dll"
-        
         copy /Y  "%NRD_ROOT%\NRD\_NRD_SDK\Lib\Debug\NRD.dll" "%TARGET_PLUGIN_PATH%\NRD.dll"
         copy /Y  "%NRD_ROOT%\NRD\_NRI_SDK\Lib\Debug\NRI.dll" "%TARGET_PLUGIN_PATH%\NRI.dll"
-
-
-
-
       </Command>
       <Message>正在将 RenderingPlugin.dll 复制到 Unity Plugins 目录...</Message>
     </PostBuildEvent>
