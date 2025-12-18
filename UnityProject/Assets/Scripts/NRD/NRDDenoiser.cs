@@ -25,7 +25,7 @@ namespace Nrd
 
         private NativeArray<NrdResourceInput> m_ResourceCache;
 
-        private uint FrameIndex;
+        public uint FrameIndex;
         private readonly int nrdInstanceId;
 
         private Matrix4x4 PrevViewMatrix;

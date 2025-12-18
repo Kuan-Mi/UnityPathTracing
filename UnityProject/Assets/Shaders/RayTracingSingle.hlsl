@@ -313,7 +313,16 @@ void MainRayGenShader()
 
     // float s = viewZ0 * 0.1;
     float s = payload.metalness;
-    s = penumbra;
-    g_Output[launchIndex] = float3(s, s, s);
+    
+    s = 1 - penumbra;
+    
+    float3 allRadiance = float3(s, s, s);
+    
+    float3 prevRadiance = g_Output[launchIndex];
+
+    float3 result = lerp(prevRadiance, allRadiance , 1.0f / float(g_ConvergenceStep + 1));
+    
+    
+    g_Output[launchIndex] = result;
     // g_Output[launchIndex] = gOut_DirectEmission[launchIndex];
 }
