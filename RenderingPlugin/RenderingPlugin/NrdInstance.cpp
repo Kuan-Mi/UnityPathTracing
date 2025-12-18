@@ -62,8 +62,7 @@ void NrdInstance::DispatchCompute(const FrameData* data)
     cmdDesc.d3d12CommandAllocator = nullptr;
 
     nri::CommandBuffer* nriCmdBuffer = nullptr;
-    RenderSystem::Get().GetNriWrapper().CreateCommandBufferD3D12(*RenderSystem::Get().GetNriDevice(), cmdDesc,
-                                                                 nriCmdBuffer);
+    RenderSystem::Get().GetNriWrapper().CreateCommandBufferD3D12(*RenderSystem::Get().GetNriDevice(), cmdDesc, nriCmdBuffer);
 
     nri::Texture* nriMv = WrapD3D12Texture(data->mvPointer, DXGI_FORMAT_R16G16B16A16_FLOAT);
     nri::Texture* nriNormal = WrapD3D12Texture(data->normalRoughnessPointer, DXGI_FORMAT_R10G10B10A2_UNORM);
@@ -97,8 +96,6 @@ void NrdInstance::DispatchCompute(const FrameData* data)
     nri::AccessLayoutStage srvState = {
         nri::AccessBits::SHADER_RESOURCE, nri::Layout::SHADER_RESOURCE, nri::StageBits::FRAGMENT_SHADER
     };
-
-
     nri::AccessLayoutStage uavState = {
         nri::AccessBits::SHADER_RESOURCE_STORAGE, nri::Layout::SHADER_RESOURCE_STORAGE, nri::StageBits::COMPUTE_SHADER
     };
@@ -110,14 +107,14 @@ void NrdInstance::DispatchCompute(const FrameData* data)
     };
 
     AddResource(nrd::ResourceType::IN_MV, nriMv, data->commonSettings.frameIndex == 0 ? uavState : srvState);
-    AddResource(nrd::ResourceType::IN_NORMAL_ROUGHNESS, nriNormal,data->commonSettings.frameIndex == 0 ? uavState : srvState);
+    AddResource(nrd::ResourceType::IN_NORMAL_ROUGHNESS, nriNormal, data->commonSettings.frameIndex == 0 ? uavState : srvState);
     AddResource(nrd::ResourceType::IN_VIEWZ, nriViewZ, data->commonSettings.frameIndex == 0 ? uavState : srvState);
-    AddResource(nrd::ResourceType::IN_PENUMBRA, nriPENUMBRA,data->commonSettings.frameIndex == 0 ? uavState : srvState);
+    AddResource(nrd::ResourceType::IN_PENUMBRA, nriPENUMBRA, data->commonSettings.frameIndex == 0 ? uavState : srvState);
     AddResource(nrd::ResourceType::OUT_SHADOW_TRANSLUCENCY, nriSHADOW_TRANSLUCENCY, uavState);
 
 
-    AddResource(nrd::ResourceType::IN_DIFF_RADIANCE_HITDIST, nriDiffRadiance,data->commonSettings.frameIndex == 0 ? rtState : srvState);
-    AddResource(nrd::ResourceType::OUT_DIFF_RADIANCE_HITDIST, nriOutDiffRadiance,data->commonSettings.frameIndex == 0 ? rtState : uavState);
+    AddResource(nrd::ResourceType::IN_DIFF_RADIANCE_HITDIST, nriDiffRadiance, data->commonSettings.frameIndex == 0 ? rtState : srvState);
+    AddResource(nrd::ResourceType::OUT_DIFF_RADIANCE_HITDIST, nriOutDiffRadiance, data->commonSettings.frameIndex == 0 ? rtState : uavState);
     AddResource(nrd::ResourceType::OUT_VALIDATION, nriValidation, commonState);
 
     const nrd::Identifier denoisers[] = {m_SigmaId, m_ReblurId};
