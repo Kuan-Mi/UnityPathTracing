@@ -121,7 +121,7 @@ void NrdInstance::UpdateResources(NrdResourceInput* resources, int count)
     }
 
     m_CachedResources.resize(count);
-    // 直接内存拷贝，因为结构体是 POD (Plain Old Data)
+
     memcpy(m_CachedResources.data(), resources, count * sizeof(NrdResourceInput));
 
     LOG(("Updated NRD Resources. Count: " + std::to_string(count)).c_str());
