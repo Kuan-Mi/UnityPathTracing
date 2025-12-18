@@ -109,7 +109,7 @@ namespace Nrd
                 enableRandomWrite = true,
                 useMipMap = false,
                 msaaSamples = 1,
-                sRGB = false
+                sRGB = false,
             };
 
             var rt = new RenderTexture(desc)

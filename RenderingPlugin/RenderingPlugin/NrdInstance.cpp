@@ -10,7 +10,6 @@
 NrdInstance::NrdInstance(IUnityInterfaces* interfaces)
 {
     s_d3d12 = interfaces->Get<IUnityGraphicsD3D12v7>();
-    s_d3d121 = interfaces->Get<IUnityGraphicsD3D12>();
     s_Log = interfaces->Get<IUnityLog>();
     initialize_and_create_resources();
 }
@@ -56,6 +55,8 @@ void NrdInstance::DispatchCompute(const FrameData* data)
         CreateNrd();
     }
 
+    LOG(("Dispatching Frame : " + std::to_string(data->commonSettings.frameIndex)).c_str());
+
     nri::CommandBufferD3D12Desc cmdDesc;
     cmdDesc.d3d12CommandList = recording_state.commandList;
     cmdDesc.d3d12CommandAllocator = nullptr;
@@ -73,9 +74,8 @@ void NrdInstance::DispatchCompute(const FrameData* data)
     nri::Texture* nriDiffRadiance = WrapD3D12Texture(data->diffRadiancePointer, DXGI_FORMAT_R16G16B16A16_FLOAT);
     nri::Texture* nriOutDiffRadiance = WrapD3D12Texture(data->outDiffRadiancePointer, DXGI_FORMAT_R16G16B16A16_FLOAT);
     nri::Texture* nriValidation = WrapD3D12Texture(data->validationPointer, DXGI_FORMAT_R8G8B8A8_UNORM);
-    
-    
-    
+
+
     m_NrdIntegration.SetCommonSettings(data->commonSettings);
     m_NrdIntegration.SetDenoiserSettings(m_SigmaId, &data->sigmaSettings);
     m_NrdIntegration.SetDenoiserSettings(m_ReblurId, &data->reblurSettings);
@@ -97,14 +97,17 @@ void NrdInstance::DispatchCompute(const FrameData* data)
     nri::AccessLayoutStage srvState = {
         nri::AccessBits::SHADER_RESOURCE, nri::Layout::SHADER_RESOURCE, nri::StageBits::FRAGMENT_SHADER
     };
+
+
     nri::AccessLayoutStage uavState = {
         nri::AccessBits::SHADER_RESOURCE_STORAGE, nri::Layout::SHADER_RESOURCE_STORAGE, nri::StageBits::COMPUTE_SHADER
     };
-
-    // D3D12_RESOURCE_STATES* outState = nullptr;
-    // s_d3d121->GetResourceState(data->mvPointer, outState);
-    //
-    // LOG(("MV Resource State: " + std::to_string(static_cast<uint32_t>(*outState))).c_str());
+    nri::AccessLayoutStage rtState = {
+        nri::AccessBits::COLOR_ATTACHMENT, nri::Layout::UNDEFINED, nri::StageBits::FRAGMENT_SHADER
+    };
+    nri::AccessLayoutStage commonState = {
+        nri::AccessBits::NONE, nri::Layout::GENERAL, nri::StageBits::NONE
+    };
 
     AddResource(nrd::ResourceType::IN_MV, nriMv, data->commonSettings.frameIndex == 0 ? uavState : srvState);
     AddResource(nrd::ResourceType::IN_NORMAL_ROUGHNESS, nriNormal,data->commonSettings.frameIndex == 0 ? uavState : srvState);
@@ -112,18 +115,34 @@ void NrdInstance::DispatchCompute(const FrameData* data)
     AddResource(nrd::ResourceType::IN_PENUMBRA, nriPENUMBRA,data->commonSettings.frameIndex == 0 ? uavState : srvState);
     AddResource(nrd::ResourceType::OUT_SHADOW_TRANSLUCENCY, nriSHADOW_TRANSLUCENCY, uavState);
 
-    // [NEW] Reblur Inputs/Outputs
-    // REBLUR 的 Noisy Input 必须绑定 (SRV)
-    AddResource(nrd::ResourceType::IN_DIFF_RADIANCE_HITDIST, nriDiffRadiance, data->commonSettings.frameIndex == 0 ? uavState : srvState);
-    // REBLUR 的 Denoised Output (UAV)
-    AddResource(nrd::ResourceType::OUT_DIFF_RADIANCE_HITDIST, nriOutDiffRadiance, uavState);
-    
-    AddResource(nrd::ResourceType::OUT_VALIDATION, nriValidation, uavState);
-    
-    
+
+    AddResource(nrd::ResourceType::IN_DIFF_RADIANCE_HITDIST, nriDiffRadiance,data->commonSettings.frameIndex == 0 ? rtState : srvState);
+    AddResource(nrd::ResourceType::OUT_DIFF_RADIANCE_HITDIST, nriOutDiffRadiance,data->commonSettings.frameIndex == 0 ? rtState : uavState);
+    AddResource(nrd::ResourceType::OUT_VALIDATION, nriValidation, commonState);
+
     const nrd::Identifier denoisers[] = {m_SigmaId, m_ReblurId};
 
+    D3D12_RESOURCE_BARRIER barrier;
+    barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
+    barrier.Flags = D3D12_RESOURCE_BARRIER_FLAG_NONE;
+    barrier.Transition.pResource = data->validationPointer;
+    barrier.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
+    barrier.Transition.StateBefore = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
+    barrier.Transition.StateAfter = D3D12_RESOURCE_STATE_COMMON;
+
+    recording_state.commandList->ResourceBarrier(1, &barrier);
+
     m_NrdIntegration.Denoise(denoisers, 2, *nriCmdBuffer, snapshot);
+
+    D3D12_RESOURCE_BARRIER barrier2;
+    barrier2.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
+    barrier2.Flags = D3D12_RESOURCE_BARRIER_FLAG_NONE;
+    barrier2.Transition.pResource = data->validationPointer;
+    barrier2.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
+    barrier2.Transition.StateBefore = D3D12_RESOURCE_STATE_UNORDERED_ACCESS;
+    barrier2.Transition.StateAfter = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
+
+    recording_state.commandList->ResourceBarrier(1, &barrier2);
 
     RenderSystem::Get().GetNriCore().DestroyCommandBuffer(nriCmdBuffer);
 }
