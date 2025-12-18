@@ -21,7 +21,7 @@ namespace PathTracing
         public Texture2D gIn_ScramblingRanking;
         public Texture2D gIn_Sobol;
 
-        private Dictionary<int, NRDHelper> m_HelperDic = new();
+        private Dictionary<int, NRDDenoriser> m_HelperDic = new();
 
         public override void Create()
         {
@@ -68,11 +68,11 @@ namespace PathTracing
 
             if (!m_HelperDic.TryGetValue(camID, out var nrd))
             {
-                nrd = new NRDHelper(pathTracingSetting);
+                nrd = new NRDDenoriser(pathTracingSetting);
                 m_HelperDic.Add(camID, nrd);
             }
 
-            _pathTracingPass.NrdHelper = nrd;
+            _pathTracingPass.NrdDenoriser = nrd;
             renderer.EnqueuePass(_pathTracingPass);
         }
 
