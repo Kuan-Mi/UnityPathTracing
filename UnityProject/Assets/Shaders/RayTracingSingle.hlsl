@@ -181,67 +181,11 @@ float3 GetMotion( float3 X, float3 Xprev )
 
     // IMPORTANT: 2.5D motion is preferred over 3D motion due to imprecision issues caused by FP16 rounding negative effects
     motion.z = viewZprev - viewZ;
-
+    // motion.z = 0;
+    motion.z = - motion.z;
     // return 0;
     return motion;
 }
-
-
-// float3 GetMotion( float3 X, float3 Xprev ) {
-//     
-//     // ---------------------------------------------------------
-//     // 1. 计算当前帧 (Current) 的信息
-//     // ---------------------------------------------------------
-//     float4 viewPos = mul(gWorldToView, float4(X, 1.0));
-//     float4 clipPos = mul(gWorldToClip, float4(X, 1.0));
-//     
-//     // 剔除无效点(可选，防止除以0)
-//     float kEpsilon = 1e-7;
-//     float rcpW = 1.0 / max(clipPos.w, kEpsilon);
-//     
-//     // NDC (Normalized Device Coordinates)
-//     // DX12 Clip Space: X[-1, 1], Y[-1, 1], Z[0, 1]
-//     float2 ndc = clipPos.xy * rcpW;
-//
-//     // NDC -> UV [0, 1]
-//     // DX12 Texture UV 原点在左上角 (0,0)，Clip Space Y轴向上 (+1)
-//     // 因此 Y 轴需要翻转: V = (1 - Y_ndc) * 0.5  =>  -0.5 * Y_ndc + 0.5
-//     float2 sampleUv = ndc * float2(0.5, -0.5) + 0.5;
-//     
-//     // NRD 需要 View Space Z (通常是线性深度)
-//     float viewZ = viewPos.z;
-//
-//
-//     // ---------------------------------------------------------
-//     // 2. 计算上一帧 (Previous) 的信息
-//     // ---------------------------------------------------------
-//     float4 viewPosPrev = mul(gWorldToViewPrev, float4(Xprev, 1.0));
-//     float4 clipPosPrev = mul(gWorldToClipPrev, float4(Xprev, 1.0));
-//     
-//     float rcpWPrev = 1.0 / max(clipPosPrev.w, kEpsilon);
-//     float2 ndcPrev = clipPosPrev.xy * rcpWPrev;
-//     
-//     // 同样的 NDC -> UV 转换
-//     float2 sampleUvPrev = ndcPrev * float2(0.5, -0.5) + 0.5;
-//     
-//     float viewZprev = viewPosPrev.z;
-//
-//
-//     // ---------------------------------------------------------
-//     // 3. 计算 Motion Vector (符合 NRD 要求)
-//     // ---------------------------------------------------------
-//     float3 motion;
-//
-//     // XY: Screen-space motion in Pixels
-//     // Direction: Previous position - Current position (指向历史帧)
-//     motion.xy = ( sampleUvPrev - sampleUv ) * gRectSize;
-//     
-//     // Z: View-space depth difference
-//     motion.z = viewZprev - viewZ;
-//
-//     return motion;
-// }
-
 
 [shader("raygeneration")]
 void MainRayGenShader()
@@ -314,7 +258,7 @@ void MainRayGenShader()
     // float viewZ0 = payload.hitT;
 
     gOut_Mv[launchIndex] = float4(GetMotion(geometryProps0.X, geometryProps0.Xprev), 1);
-    gOut_ViewZ[launchIndex] = viewZ0;
+    gOut_ViewZ[launchIndex] = -viewZ0;
 
 
     gOut_Normal_Roughness[launchIndex] = NRD_FrontEnd_PackNormalAndRoughness(payload.N, payload.roughness, 0);
