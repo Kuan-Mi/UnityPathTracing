@@ -212,26 +212,27 @@ namespace Nrd
 
             //  Common 设置
 
-            if (setting.useOverriddenCommonSettings)
-            {
-                localData.commonSettings.viewToClipMatrix = setting.viewToClipMatrix;
-                localData.commonSettings.viewToClipMatrixPrev = setting.viewToClipMatrixPrev;
-                localData.commonSettings.worldToViewMatrix = setting.worldToViewMatrix;
-                localData.commonSettings.worldToViewMatrixPrev = setting.worldToViewMatrixPrev;
-            }
+            // if (setting.useOverriddenCommonSettings)
+            // {
+            //     localData.commonSettings.viewToClipMatrix = setting.viewToClipMatrix;
+            //     localData.commonSettings.viewToClipMatrixPrev = setting.viewToClipMatrixPrev;
+            //     localData.commonSettings.worldToViewMatrix = setting.worldToViewMatrix;
+            //     localData.commonSettings.worldToViewMatrixPrev = setting.worldToViewMatrixPrev;
+            // }
  
             localData.commonSettings.motionVectorScale.z = setting.is2DMotionVector?0.0f:1.0f;
             
             
             localData.commonSettings.denoisingRange = setting.denoisingRange;
-            localData.commonSettings.disocclusionThreshold = setting.disocclusionThreshold;
-            localData.commonSettings.disocclusionThresholdAlternate = setting.disocclusionThresholdAlternate;
+            
+            // localData.commonSettings.disocclusionThreshold = setting.disocclusionThreshold;
+            // localData.commonSettings.disocclusionThresholdAlternate = setting.disocclusionThresholdAlternate;
             localData.commonSettings.splitScreen = setting.splitScreen;
 
             // localData.commonSettings.isMotionVectorInWorldSpace = setting.isMotionVectorInWorldSpace;
-            localData.commonSettings.isHistoryConfidenceAvailable = setting.isHistoryConfidenceAvailable;
-            localData.commonSettings.isDisocclusionThresholdMixAvailable = setting.isDisocclusionThresholdMixAvailable;
-            localData.commonSettings.isBaseColorMetalnessAvailable = setting.isBaseColorMetalnessAvailable;
+            // localData.commonSettings.isHistoryConfidenceAvailable = setting.isHistoryConfidenceAvailable;
+            // localData.commonSettings.isDisocclusionThresholdMixAvailable = setting.isDisocclusionThresholdMixAvailable;
+            // localData.commonSettings.isBaseColorMetalnessAvailable = setting.isBaseColorMetalnessAvailable;
             localData.commonSettings.enableValidation = true;
 
 

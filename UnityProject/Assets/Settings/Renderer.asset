@@ -78,90 +78,10 @@ MonoBehaviour:
     envTexture: {fileID: 0}
     enableRussianRoulette: 1
     denoisingRange: 1000
-    disocclusionThreshold: 0.01
-    disocclusionThresholdAlternate: 0.05
     splitScreen: 0.536
-    isMotionVectorInWorldSpace: 0
-    isHistoryConfidenceAvailable: 0
-    isDisocclusionThresholdMixAvailable: 0
-    isBaseColorMetalnessAvailable: 0
-    enableValidation: 1
-    planeDistanceSensitivity: 0.106
-    maxStabilizedFrameNum: 5
-    useOverriddenCommonSettings: 0
-    viewToClipMatrix:
-      e00: 0
-      e01: 0
-      e02: 0
-      e03: 0
-      e10: 0
-      e11: 0
-      e12: 0
-      e13: 0
-      e20: 0
-      e21: 0
-      e22: 0
-      e23: 0
-      e30: 0
-      e31: 0
-      e32: 0
-      e33: 0
-    viewToClipMatrixPrev:
-      e00: 0
-      e01: 0
-      e02: 0
-      e03: 0
-      e10: 0
-      e11: 0
-      e12: 0
-      e13: 0
-      e20: 0
-      e21: 0
-      e22: 0
-      e23: 0
-      e30: 0
-      e31: 0
-      e32: 0
-      e33: 0
-    worldToViewMatrix:
-      e00: 0
-      e01: 0
-      e02: 0
-      e03: 0
-      e10: 0
-      e11: 0
-      e12: 0
-      e13: 0
-      e20: 0
-      e21: 0
-      e22: 0
-      e23: 0
-      e30: 0
-      e31: 0
-      e32: 0
-      e33: 0
-    worldToViewMatrixPrev:
-      e00: 0
-      e01: 0
-      e02: 0
-      e03: 0
-      e10: 0
-      e11: 0
-      e12: 0
-      e13: 0
-      e20: 0
-      e21: 0
-      e22: 0
-      e23: 0
-      e30: 0
-      e31: 0
-      e32: 0
-      e33: 0
+    planeDistanceSensitivity: 0.02
+    maxStabilizedFrameNum: 7
     is2DMotionVector: 0
-    motionVectorScale:
-      x: 1
-      y: 1
-      z: 0
     useOverriddenSigmaValues: 0
     lightDir: {x: 0, y: 0, z: 0}
     showValidation: 1

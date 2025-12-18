@@ -45,7 +45,6 @@ namespace Nrd
         public Matrix4x4 viewToClipMatrix;
         public Matrix4x4 viewToClipMatrixPrev;
         public Matrix4x4 worldToViewMatrix;
-
         public Matrix4x4 worldToViewMatrixPrev;
 
         // 可选
@@ -77,7 +76,8 @@ namespace Nrd
         public float historyFixAlternatePixelStrideMaterialID; // Default: 999.0f
 
         public float strandThickness; // Default: 80e-6f
-        [Range(0.0f, 1.0f)] public float splitScreen; // Default: 0.0f
+        [Range(0.0f, 1.0f)] 
+        public float splitScreen; // Default: 0.0f
 
         public fixed ushort printfAt[2]; // Default: {9999, 9999}
         public float debug; // Default: 0.0f

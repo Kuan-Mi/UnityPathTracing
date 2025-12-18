@@ -20,32 +20,32 @@ namespace PathTracing
         [Header("NRD Common Settings")] [Range(0.1f, 1000000.0f)]
         public float denoisingRange = 500000; // Default: 500000.0f
 
-        [Range(0.01f, 0.02f)] public float disocclusionThreshold = 0.01f; // Default: 0.01f
-        [Range(0.02f, 0.2f)] public float disocclusionThresholdAlternate = 0.05f; // Default: 0.05f
+        // [Range(0.01f, 0.02f)] public float disocclusionThreshold = 0.01f; // Default: 0.01f
+        // [Range(0.02f, 0.2f)] public float disocclusionThresholdAlternate = 0.05f; // Default: 0.05f
         [Range(0.0f, 1.0f)] public float splitScreen; // Default: 0.0f
 
-        public bool isMotionVectorInWorldSpace; // Default: false
-        public bool isHistoryConfidenceAvailable; // Default: false
-        public bool isDisocclusionThresholdMixAvailable; // Default: false
-        public bool isBaseColorMetalnessAvailable; // Default: false
-        public bool enableValidation; // Default: false
+        // public bool isMotionVectorInWorldSpace; // Default: false
+        // public bool isHistoryConfidenceAvailable; // Default: false
+        // public bool isDisocclusionThresholdMixAvailable; // Default: false
+        // public bool isBaseColorMetalnessAvailable; // Default: false
+        // public bool enableValidation; // Default: false
 
         [Header("NRD Sigma Settings")] [Range(0.0f, 1.0f)]
         public float planeDistanceSensitivity = 0.02f; // Default: 0.02f
 
         [Range(0, 7)] public uint maxStabilizedFrameNum = 5; // Default: 5
 
-        [Header("NRD Common Settings Override")]
-        public bool useOverriddenCommonSettings;
-
-        public Matrix4x4 viewToClipMatrix;
-        public Matrix4x4 viewToClipMatrixPrev;
-        public Matrix4x4 worldToViewMatrix;
-        public Matrix4x4 worldToViewMatrixPrev;
+        // [Header("NRD Common Settings Override")]
+        // public bool useOverriddenCommonSettings;
+        //
+        // public Matrix4x4 viewToClipMatrix;
+        // public Matrix4x4 viewToClipMatrixPrev;
+        // public Matrix4x4 worldToViewMatrix;
+        // public Matrix4x4 worldToViewMatrixPrev;
         
         [Header("motionVectorScale Override")]
         public bool is2DMotionVector;
-        public float3 motionVectorScale = new(1.0f, 1.0f, 0.0f); // Default: {1.0, 1.0, 0.0}
+        // public float3 motionVectorScale = new(1.0f, 1.0f, 0.0f); // Default: {1.0, 1.0, 0.0}
 
         [Header("NRD Sigma Settings Override")]
         public bool useOverriddenSigmaValues;
