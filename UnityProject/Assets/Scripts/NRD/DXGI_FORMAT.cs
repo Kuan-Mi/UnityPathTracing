@@ -1,6 +1,6 @@
 ﻿namespace Nrd
 {
-    enum DXGI_FORMAT : uint
+    public enum DXGI_FORMAT : uint
     {
         DXGI_FORMAT_UNKNOWN = 0,
         DXGI_FORMAT_R32G32B32A32_TYPELESS = 1,
