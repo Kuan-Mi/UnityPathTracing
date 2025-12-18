@@ -275,7 +275,7 @@ void MainRayGenShader()
 
     float2 rnd = GetBlueNoise(launchIndex);
     
-    rnd = float2(RandomFloat01(rngState), RandomFloat01(rngState));
+    // rnd = float2(RandomFloat01(rngState), RandomFloat01(rngState));
     rnd = ImportanceSampling::Cosine::GetRay(rnd).xy;
     rnd *= gTanSunAngularRadius;
 

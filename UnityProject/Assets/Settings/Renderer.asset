@@ -80,7 +80,7 @@ MonoBehaviour:
     denoisingRange: 1000
     disocclusionThreshold: 0.01
     disocclusionThresholdAlternate: 0.05
-    splitScreen: 0
+    splitScreen: 0.536
     isMotionVectorInWorldSpace: 0
     isHistoryConfidenceAvailable: 0
     isDisocclusionThresholdMixAvailable: 0
