@@ -125,12 +125,12 @@
       <ConformanceMode>true</ConformanceMode>
       <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
       <LanguageStandard>stdcpp17</LanguageStandard>
-      <AdditionalIncludeDirectories>C:\Data\NRD\_NRI_SDK\Include;C:\Data\NRD\_NRD_SDK\Include;C:\Data\NRD\_NRD_SDK\Integration;C:\Data\DirectX-Headers\include\directx</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(NRD_ROOT)\NRD\_NRI_SDK\Include;$(NRD_ROOT)\NRD\_NRD_SDK\Include;$(NRD_ROOT)\NRD\_NRD_SDK\Integration;$(NRD_ROOT)\DirectX-Headers\include\directx</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalLibraryDirectories>C:\Data\NRD\_NRD_SDK\Lib\Debug;C:\Data\NRD\_NRI_SDK\Lib\Debug</AdditionalLibraryDirectories>
+      <AdditionalLibraryDirectories>$(NRD_ROOT)\NRD\_NRD_SDK\Lib\Debug;$(NRD_ROOT)\NRD\_NRI_SDK\Lib\Debug</AdditionalLibraryDirectories>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">

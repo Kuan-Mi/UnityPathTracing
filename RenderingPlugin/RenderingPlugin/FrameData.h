@@ -21,7 +21,7 @@ struct FrameData
     ID3D12Resource* shadowTranslucencyPointer;
     ID3D12Resource* diffRadiancePointer;
     ID3D12Resource* outDiffRadiancePointer;
-    ID3D12Resource* validationPointer;   ;
+    ID3D12Resource* validationPointer;
 
     int instanceId;
 };

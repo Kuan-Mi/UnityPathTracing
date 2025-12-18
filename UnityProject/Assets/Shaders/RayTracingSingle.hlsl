@@ -3,9 +3,9 @@
 #include "NRDInclude/NRD.hlsli"
 
 // #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Lighting.hlsl"
-#include "Packages/com.unity.render-pipelines.universal/Shaders/_Utils.hlsl"
-#include "Packages/com.unity.render-pipelines.universal/Shaders/RayPayload.hlsl"
-#include "Packages/com.unity.render-pipelines.universal/Shaders/GlobalResource.hlsl"
+#include "_Utils.hlsl"
+#include "RayPayload.hlsl"
+#include "GlobalResource.hlsl"
 
 #pragma max_recursion_depth 1
 
