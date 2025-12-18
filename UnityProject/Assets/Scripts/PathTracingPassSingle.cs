@@ -137,7 +137,7 @@ namespace PathTracing
             internal bool showShadow;
         }
 
-        public NRDDenoriser NrdDenoriser;
+        public NRDDenoiser NrdDenoiser;
         public Material biltMaterial;
 
         public PathTracingPassSingle(PathTracingSetting setting)
@@ -226,7 +226,7 @@ namespace PathTracing
             }
 
 
-            NrdDenoriser.EnsureResources(cameraData.camera.pixelWidth, cameraData.camera.pixelHeight);
+            NrdDenoiser.EnsureResources(cameraData.camera.pixelWidth, cameraData.camera.pixelHeight);
 
             string passName = "Path Tracing Pass";
 
@@ -284,7 +284,7 @@ namespace PathTracing
             float m11 = cam.projectionMatrix.m11;
             var rectH = cam.pixelHeight;
 
-            passData.dataPtr = NrdDenoriser.GetInteropDataPtr(cam, gSunDirection);
+            passData.dataPtr = NrdDenoiser.GetInteropDataPtr(cam, gSunDirection);
 
             var setting = new Settings
             {
@@ -345,12 +345,12 @@ namespace PathTracing
             passData.scramblingRanking = renderGraph.ImportTexture(scramblingRanking);
             passData.sobol = renderGraph.ImportTexture(sobol);
 
-            passData.Mv = renderGraph.ImportTexture(NrdDenoriser.MvHandle);
-            passData.ViewZ = renderGraph.ImportTexture(NrdDenoriser.ViewZHandle);
-            passData.Normal_Roughness = renderGraph.ImportTexture(NrdDenoriser.NormalRoughnessHandle);
-            passData.Penumbra = renderGraph.ImportTexture(NrdDenoriser.PenumbraHandle);
-            passData.Shadow_Translucency = renderGraph.ImportTexture(NrdDenoriser.ShadowTranslucencyHandle);
-            passData.Validation = renderGraph.ImportTexture(NrdDenoriser.ValidationHandle);
+            passData.Mv = renderGraph.ImportTexture(NrdDenoiser.MvHandle);
+            passData.ViewZ = renderGraph.ImportTexture(NrdDenoiser.ViewZHandle);
+            passData.Normal_Roughness = renderGraph.ImportTexture(NrdDenoiser.NormalRoughnessHandle);
+            passData.Penumbra = renderGraph.ImportTexture(NrdDenoiser.PenumbraHandle);
+            passData.Shadow_Translucency = renderGraph.ImportTexture(NrdDenoiser.ShadowTranslucencyHandle);
+            passData.Validation = renderGraph.ImportTexture(NrdDenoiser.ValidationHandle);
 
             passData.BaseColor_Metalness = CreateTex(textureDesc, renderGraph, "BaseColor_Metalness",
                 GraphicsFormat.R16G16B16A16_SFloat);

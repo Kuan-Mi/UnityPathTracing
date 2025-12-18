@@ -12,7 +12,7 @@ using UnityEngine.Rendering;
 
 namespace Nrd
 {
-    public class NRDDenoriser : IDisposable
+    public class NRDDenoiser : IDisposable
     {
         [DllImport("RenderingPlugin")]
         private static extern int CreateDenoiserInstance();
@@ -57,7 +57,7 @@ namespace Nrd
 
         private PathTracingSetting setting;
 
-        public NRDDenoriser(PathTracingSetting setting)
+        public NRDDenoiser(PathTracingSetting setting)
         {
             this.setting = setting;
             int instanceId = CreateDenoiserInstance();
