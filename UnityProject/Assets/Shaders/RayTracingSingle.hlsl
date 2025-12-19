@@ -134,9 +134,9 @@ float2 GetBlueNoise(uint2 pixelPos, uint seed = 0)
     float4 blue = (float4(B ^ A.xyxy) + 0.5) * (1.0 / 256.0);
 
     // ( Optional ) Randomize in [ 0; 1 / 256 ] area to get rid of possible banding
-    // uint d = Bayer4x4ui(pixelPos, g_FrameIndex);
-    // float2 dither = (float2(d & 3, d >> 2) + 0.5) * (1.0 / 4.0);
-    // blue += (dither.xyxy - 0.5) * (1.0 / 256.0);
+    uint d = Bayer4x4ui(pixelPos, g_FrameIndex);
+    float2 dither = (float2(d & 3, d >> 2) + 0.5) * (1.0 / 4.0);
+    blue += (dither.xyxy - 0.5) * (1.0 / 256.0);
 
     return saturate(blue.xy);
 }
