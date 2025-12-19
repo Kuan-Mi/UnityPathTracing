@@ -22,8 +22,8 @@ namespace PathTracing
 
         public Texture2D gIn_ScramblingRanking;
         public Texture2D gIn_Sobol;
-        public ComputeBuffer  gIn_ScramblingRankingUint;
-        public ComputeBuffer  gIn_SobolUint;
+        public ComputeBuffer gIn_ScramblingRankingUint;
+        public ComputeBuffer gIn_SobolUint;
 
         private Dictionary<int, NRDDenoiser> m_HelperDic = new();
 
@@ -40,32 +40,54 @@ namespace PathTracing
 
                 accelerationStructure.Build();
             }
- 
+
 
             if (gIn_ScramblingRankingUint == null)
             {
-                gIn_ScramblingRankingUint = new ComputeBuffer(gIn_ScramblingRanking.width * gIn_ScramblingRanking.height,16);
+
+                Debug.Log($"gIn_ScramblingRanking {gIn_ScramblingRanking.format}");
+                Debug.Log($"gIn_Sobol {gIn_Sobol.format}");
+                
+                gIn_ScramblingRankingUint =
+                    new ComputeBuffer(gIn_ScramblingRanking.width * gIn_ScramblingRanking.height, 16);
                 var scramblingRankingData = new uint4[gIn_ScramblingRanking.width * gIn_ScramblingRanking.height];
-                Color32[] pixels = gIn_ScramblingRanking.GetPixels32();
-                int count = pixels.Length;
+                byte[] rawData = gIn_ScramblingRanking.GetRawTextureData();
+                
+                
+                Debug.Log($"gIn_ScramblingRanking rawData Length: {rawData.Length}");
+                
+                int count = scramblingRankingData.Length;
                 for (int i = 0; i < count; i++)
                 {
-                    scramblingRankingData[i] = new uint4(pixels[i].r, pixels[i].g, pixels[i].b, pixels[i].a);
-                } 
+                    scramblingRankingData[i] = new uint4(
+                        rawData[i * 4 + 0],
+                        rawData[i * 4 + 1],
+                        rawData[i * 4 + 2],
+                        rawData[i * 4 + 3]);
+                }
+
                 gIn_ScramblingRankingUint.SetData(scramblingRankingData);
-                
-                
-                gIn_SobolUint = new ComputeBuffer(gIn_Sobol.width * gIn_Sobol.height,16);
+
+
+                gIn_SobolUint = new ComputeBuffer(gIn_Sobol.width * gIn_Sobol.height, 16);
                 var sobolData = new uint4[gIn_Sobol.width * gIn_Sobol.height];
-                pixels = gIn_Sobol.GetPixels32();
-                count = pixels.Length;
+                rawData = gIn_Sobol.GetRawTextureData();
+                
+                Debug.Log($"gIn_Sobol rawData Length: {rawData.Length}");
+                
+                count = sobolData.Length;
                 for (int i = 0; i < count; i++)
                 {
-                    sobolData[i] = new uint4(pixels[i].r, pixels[i].g, pixels[i].b, pixels[i].a);
-                } 
+                    sobolData[i] = new uint4(
+                        rawData[i * 4 + 0],
+                        rawData[i * 4 + 1],
+                        rawData[i * 4 + 2],
+                        rawData[i * 4 + 3]);
+                }
+
                 gIn_SobolUint.SetData(sobolData);
             }
-            
+
             rayTracingShader.SetShaderPass("Test2");
 
             _pathTracingPass = new PathTracingPassSingle(pathTracingSetting)

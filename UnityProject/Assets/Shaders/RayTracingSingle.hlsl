@@ -18,11 +18,6 @@ SamplerState sampler_g_EnvTex;
 StructuredBuffer<uint4> gIn_ScramblingRanking;
 StructuredBuffer<uint4> gIn_Sobol;
 
-
-// Inputs
-// Texture2D<uint4> gIn_ScramblingRanking;
-// Texture2D<uint4> gIn_Sobol;
-
 // Output
 RWTexture2D<float3> g_Output;
 
@@ -120,17 +115,18 @@ float2 GetBlueNoise(uint2 pixelPos, uint seed = 0)
     // Sample index
     uint sampleIndex = (g_FrameIndex + seed) & (BLUE_NOISE_TEMPORAL_DIM - 1);
 
+    sampleIndex = 2;
     uint2 uv = pixelPos & (BLUE_NOISE_SPATIAL_DIM - 1);
-    uint index = uv.x + uv.y * 128;
-    uint3 A = gIn_ScramblingRanking[index];
+    uint index = uv.x + uv.y * BLUE_NOISE_SPATIAL_DIM;
+    uint3 A = gIn_ScramblingRanking[index].xyz;
     uint rankedSampleIndex = sampleIndex ^ A.z;
     uint4 B = gIn_Sobol[rankedSampleIndex & 255];
     float4 blue = (float4(B ^ A.xyxy) + 0.5) * (1.0 / 256.0);
 
     // ( Optional ) Randomize in [ 0; 1 / 256 ] area to get rid of possible banding
-    uint d = Bayer4x4ui(pixelPos, g_FrameIndex);
-    float2 dither = (float2(d & 3, d >> 2) + 0.5) * (1.0 / 4.0);
-    blue += (dither.xyxy - 0.5) * (1.0 / 256.0);
+    // uint d = Bayer4x4ui(pixelPos, g_FrameIndex);
+    // float2 dither = (float2(d & 3, d >> 2) + 0.5) * (1.0 / 4.0);
+    // blue += (dither.xyxy - 0.5) * (1.0 / 256.0);
 
     return saturate(blue.xy);
 }
@@ -274,7 +270,7 @@ void MainRayGenShader()
 
     float2 Blue = GetBlueNoise(launchIndex);
 
-    // rnd = float2(RandomFloat01(rngState), RandomFloat01(rngState));
+    // Blue = float2(RandomFloat01(rngState), RandomFloat01(rngState));
     float2 rnd = ImportanceSampling::Cosine::GetRay(Blue).xy;
     rnd *= gTanSunAngularRadius;
 
