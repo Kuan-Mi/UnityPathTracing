@@ -1,6 +1,8 @@
 ﻿using System.Collections.Generic;
 using Nrd;
+using Unity.Mathematics;
 using UnityEngine;
+using UnityEngine.Experimental.Rendering;
 using UnityEngine.Rendering;
 using UnityEngine.Rendering.Universal;
 using static UnityEngine.Rendering.RayTracingAccelerationStructure;
@@ -20,6 +22,8 @@ namespace PathTracing
 
         public Texture2D gIn_ScramblingRanking;
         public Texture2D gIn_Sobol;
+        public ComputeBuffer  gIn_ScramblingRankingUint;
+        public ComputeBuffer  gIn_SobolUint;
 
         private Dictionary<int, NRDDenoiser> m_HelperDic = new();
 
@@ -36,7 +40,31 @@ namespace PathTracing
 
                 accelerationStructure.Build();
             }
+ 
 
+            if (gIn_ScramblingRankingUint == null)
+            {
+                gIn_ScramblingRankingUint = new ComputeBuffer(gIn_ScramblingRanking.width * gIn_ScramblingRanking.height,16);
+                var scramblingRankingData = new uint4[gIn_ScramblingRanking.width * gIn_ScramblingRanking.height];
+                Color32[] pixels = gIn_ScramblingRanking.GetPixels32();
+                int count = pixels.Length;
+                for (int i = 0; i < count; i++)
+                {
+                    scramblingRankingData[i] = new uint4(pixels[i].r, pixels[i].g, pixels[i].b, pixels[i].a);
+                } 
+                gIn_ScramblingRankingUint.SetData(scramblingRankingData);
+                
+                
+                gIn_SobolUint = new ComputeBuffer(gIn_Sobol.width * gIn_Sobol.height,16);
+                var sobolData = new uint4[gIn_Sobol.width * gIn_Sobol.height];
+                pixels = gIn_Sobol.GetPixels32();
+                count = pixels.Length;
+                for (int i = 0; i < count; i++)
+                {
+                    sobolData[i] = new uint4(pixels[i].r, pixels[i].g, pixels[i].b, pixels[i].a);
+                } 
+                gIn_SobolUint.SetData(sobolData);
+            }
             
             rayTracingShader.SetShaderPass("Test2");
 
@@ -45,8 +73,8 @@ namespace PathTracing
                 renderPassEvent = RenderPassEvent.BeforeRenderingPostProcessing,
                 rayTracingShader = rayTracingShader,
                 accelerationStructure = accelerationStructure,
-                scramblingRanking = RTHandles.Alloc(gIn_ScramblingRanking),
-                sobol = RTHandles.Alloc(gIn_Sobol)
+                scramblingRanking = gIn_ScramblingRankingUint,
+                sobol = gIn_SobolUint
             };
 
             if (showShadowMaterial == null)

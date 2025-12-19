@@ -15,9 +15,13 @@
 TextureCube<float4> g_EnvTex; // 环境贴图，用于在 Miss 时返回背景光照
 SamplerState sampler_g_EnvTex;
 
+StructuredBuffer<uint4> gIn_ScramblingRanking;
+StructuredBuffer<uint4> gIn_Sobol;
+
+
 // Inputs
-Texture2D<float4> gIn_ScramblingRanking;
-Texture2D<float4> gIn_Sobol;
+// Texture2D<uint4> gIn_ScramblingRanking;
+// Texture2D<uint4> gIn_Sobol;
 
 // Output
 RWTexture2D<float3> g_Output;
@@ -33,7 +37,6 @@ RWTexture2D<float4> gOut_Normal_Roughness;
 
 // 半影信息（Penumbra），用于软阴影的计算和去噪。
 RWTexture2D<float> gOut_Penumbra;
-
 
 
 // 基础色（BaseColor，已转为sRGB）和金属度（Metalness）。
@@ -117,33 +120,17 @@ float2 GetBlueNoise(uint2 pixelPos, uint seed = 0)
     // Sample index
     uint sampleIndex = (g_FrameIndex + seed) & (BLUE_NOISE_TEMPORAL_DIM - 1);
 
-    // return float2(sampleIndex,sampleIndex); // 仅用于调试，显示采样索引
-    // uint2 uv =pixelPos & (BLUE_NOISE_SPATIAL_DIM - 1);
-    // return float2(uv.x / float(BLUE_NOISE_SPATIAL_DIM), uv.y / float(BLUE_NOISE_SPATIAL_DIM));
-    
-    float3 fa = gIn_ScramblingRanking[pixelPos & (BLUE_NOISE_SPATIAL_DIM - 1)].xyz;
-    
-    // return fa;
-    // The algorithm
-    // uint3 A = gIn_ScramblingRanking[pixelPos & (BLUE_NOISE_SPATIAL_DIM - 1)].xyz;
-    uint3 A = fa * 255;
-    
-    // return A/255.0;
-
+    uint2 uv = pixelPos & (BLUE_NOISE_SPATIAL_DIM - 1);
+    uint index = uv.x + uv.y * 128;
+    uint3 A = gIn_ScramblingRanking[index];
     uint rankedSampleIndex = sampleIndex ^ A.z;
-    
-    float4 fB = gIn_ScramblingRanking[uint2(rankedSampleIndex & 255, 0)];
-    
-    // uint4 B = gIn_Sobol[uint2(rankedSampleIndex & 255, 0)] * 255;
-    
-    uint4 B = fB * 255;
+    uint4 B = gIn_Sobol[rankedSampleIndex & 255];
     float4 blue = (float4(B ^ A.xyxy) + 0.5) * (1.0 / 256.0);
 
     // ( Optional ) Randomize in [ 0; 1 / 256 ] area to get rid of possible banding
     uint d = Bayer4x4ui(pixelPos, g_FrameIndex);
     float2 dither = (float2(d & 3, d >> 2) + 0.5) * (1.0 / 4.0);
     blue += (dither.xyxy - 0.5) * (1.0 / 256.0);
-
 
     return saturate(blue.xy);
 }
@@ -178,23 +165,23 @@ float2 GetConeAngleFromAngularRadius(float mip, float tanConeAngle)
     return float2(mip, tanConeAngle);
 }
 
-float3 GetMotion( float3 X, float3 Xprev )
+float3 GetMotion(float3 X, float3 Xprev)
 {
     float3 motion = Xprev - X;
 
-    float viewZ = Geometry::AffineTransform( gWorldToView, X ).z;
-    float2 sampleUv = Geometry::GetScreenUv( gWorldToClip, X );
+    float viewZ = Geometry::AffineTransform(gWorldToView, X).z;
+    float2 sampleUv = Geometry::GetScreenUv(gWorldToClip, X);
 
-    float viewZprev = Geometry::AffineTransform( gWorldToViewPrev, Xprev ).z;
-    float2 sampleUvPrev = Geometry::GetScreenUv( gWorldToClipPrev, Xprev );
-    
+    float viewZprev = Geometry::AffineTransform(gWorldToViewPrev, Xprev).z;
+    float2 sampleUvPrev = Geometry::GetScreenUv(gWorldToClipPrev, Xprev);
+
     // IMPORTANT: scaling to "pixel" unit significantly improves utilization of FP16
-    motion.xy = ( sampleUvPrev - sampleUv ) * gRectSize;
+    motion.xy = (sampleUvPrev - sampleUv) * gRectSize;
 
     // IMPORTANT: 2.5D motion is preferred over 3D motion due to imprecision issues caused by FP16 rounding negative effects
     motion.z = viewZprev - viewZ;
     // motion.z = 0;
-    motion.z = - motion.z;
+    motion.z = -motion.z;
     // return 0;
     return motion;
 }
@@ -219,7 +206,7 @@ void MainRayGenShader()
     float2 ndcCoord = (frameCoord + jitter) / float2(launchDim.x - 1, launchDim.y - 1);
     // -1 - 1
     ndcCoord = ndcCoord * 2.0 - 1.0;
-    
+
     ndcCoord.y = -ndcCoord.y; // NDC Y 轴向上，纹理 UV Y 轴向下，需要翻转
 
     float4 viewPos = mul(_CInverseProjection, float4(ndcCoord.x, ndcCoord.y, 1.0, 1.0));
@@ -264,9 +251,9 @@ void MainRayGenShader()
     float3 V0 = -rayDirection;
     // float viewZ0 = abs(mul(gWorldToView, float4(X0, 1)).z);
     // float viewZ0 = mul(gWorldToView, float4(X0, 1)).z;
-    
-    float viewZ0 = Geometry::AffineTransform( gWorldToView, X0 ).z;
-    
+
+    float viewZ0 = Geometry::AffineTransform(gWorldToView, X0).z;
+
     // float viewZ0 = payload.hitT;
 
     gOut_Mv[launchIndex] = float4(GetMotion(geometryProps0.X, geometryProps0.Xprev), 1);
@@ -285,13 +272,11 @@ void MainRayGenShader()
     gOut_ShadowData[launchIndex] = float2(0, 0);
 
 
-    float2 rnd = GetBlueNoise(launchIndex);
-    
+    float2 Blue = GetBlueNoise(launchIndex);
+
     // rnd = float2(RandomFloat01(rngState), RandomFloat01(rngState));
-    // rnd = ImportanceSampling::Cosine::GetRay(rnd).xy;
-    
-    
-    // rnd *= gTanSunAngularRadius;
+    float2 rnd = ImportanceSampling::Cosine::GetRay(Blue).xy;
+    rnd *= gTanSunAngularRadius;
 
     float3 sunDirection = normalize(gSunBasisX.xyz * rnd.x + gSunBasisY.xyz * rnd.y + gSunDirection.xyz);
     float3 Xoffset = payload.GetXoffset(sunDirection, PT_SHADOW_RAY_OFFSET);
@@ -327,18 +312,18 @@ void MainRayGenShader()
 
     // float s = viewZ0 * 0.1;
     float s = payload.metalness;
-    
+
     s = 1 - penumbra;
-    
+
     float3 allRadiance = float3(s, s, s);
-    
+
     float3 prevRadiance = g_Output[launchIndex];
 
-    float3 result = lerp(prevRadiance, allRadiance , 1.0f / float(g_ConvergenceStep + 1));
-    
-    
+    float3 result = lerp(prevRadiance, allRadiance, 1.0f / float(g_ConvergenceStep + 1));
+
+
     // g_Output[launchIndex] = result;
-    
-    g_Output[launchIndex] = float3(rnd, 0);
+
+    g_Output[launchIndex] = float3(Blue.y, Blue.y, Blue.y);
     // g_Output[launchIndex] = gOut_DirectEmission[launchIndex];
 }

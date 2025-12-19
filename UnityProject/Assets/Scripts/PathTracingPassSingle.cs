@@ -19,8 +19,8 @@ namespace PathTracing
         private PathTracingSetting _settings;
         public RayTracingAccelerationStructure accelerationStructure;
 
-        public RTHandle scramblingRanking;
-        public RTHandle sobol;
+        public ComputeBuffer scramblingRanking;
+        public ComputeBuffer sobol;
 
         // public int convergenceStep = 0;
 
@@ -102,8 +102,8 @@ namespace PathTracing
             internal TextureHandle outputTexture;
             internal TextureHandle cameraTexture;
 
-            internal TextureHandle scramblingRanking;
-            internal TextureHandle sobol;
+            internal ComputeBuffer scramblingRanking;
+            internal ComputeBuffer sobol;
 
             internal TextureHandle Mv;
             internal TextureHandle ViewZ;
@@ -169,9 +169,12 @@ namespace PathTracing
             natCmd.SetRayTracingConstantBufferParam(data.rayTracingShader, "PathTracingParams",
                 data.pathTracingSettingsBuffer, 0, data.pathTracingSettingsBuffer.stride);
 
+            data.rayTracingShader.SetBuffer(g_ScramblingRankingID, data.scramblingRanking);
+            data.rayTracingShader.SetBuffer(g_SobolID, data.sobol);
+            // natCmd.SetRayTracingTextureParam(data.rayTracingShader, g_SobolID, data.sobol);
+            
+            
             natCmd.SetRayTracingTextureParam(data.rayTracingShader, g_OutputID, data.outputTexture);
-            natCmd.SetRayTracingTextureParam(data.rayTracingShader, g_ScramblingRankingID, data.scramblingRanking);
-            natCmd.SetRayTracingTextureParam(data.rayTracingShader, g_SobolID, data.sobol);
             natCmd.SetRayTracingTextureParam(data.rayTracingShader, g_MvID, data.Mv);
             natCmd.SetRayTracingTextureParam(data.rayTracingShader, g_ViewZID, data.ViewZ);
             natCmd.SetRayTracingTextureParam(data.rayTracingShader, g_Normal_RoughnessID, data.Normal_Roughness);
@@ -345,8 +348,10 @@ namespace PathTracing
 
             passData.outputTexture = renderGraph.CreateTexture(textureDesc);
 
-            passData.scramblingRanking = renderGraph.ImportTexture(scramblingRanking);
-            passData.sobol = renderGraph.ImportTexture(sobol);
+            // passData.scramblingRanking = renderGraph.ImportBuffer(scramblingRanking);
+            // passData.sobol = renderGraph.ImportTexture(sobol);
+            passData.scramblingRanking = scramblingRanking;
+            passData.sobol = sobol;
 
             passData.Mv = renderGraph.ImportTexture(NrdDenoiser.MvHandle);
             passData.ViewZ = renderGraph.ImportTexture(NrdDenoiser.ViewZHandle);
