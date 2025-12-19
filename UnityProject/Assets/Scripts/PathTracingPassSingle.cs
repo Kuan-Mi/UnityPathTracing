@@ -94,7 +94,8 @@ namespace PathTracing
 
             public float gTanPixelAngularRadius;
             public float gUnproject;
-            public float2 pad;
+            public float gTanSunAngularRadius;
+            public float pad;
         }
 
         class PassData
@@ -281,9 +282,9 @@ namespace PathTracing
             Vector3 up = new Vector3(0, 1, 0);
 
             var gSunBasisX = math.normalize(math.cross(new float3(up.x, up.y, up.z),
-                new float3(gSunDirection.x, gSunDirection.y, gSunDirection.z))) * _settings.lightOffset;
+                new float3(gSunDirection.x, gSunDirection.y, gSunDirection.z))) ;
             var gSunBasisY = math.normalize(math.cross(new float3(gSunDirection.x, gSunDirection.y, gSunDirection.z),
-                gSunBasisX)) * _settings.lightOffset;
+                gSunBasisX));
 
 
             var cam = cameraData.camera;
@@ -314,7 +315,8 @@ namespace PathTracing
                 gSunBasisY = new float4(gSunBasisY.x, gSunBasisY.y, gSunBasisY.z, 0),
                 gSunDirection = new float4(gSunDirection.x, gSunDirection.y, gSunDirection.z, 0),
                 gTanPixelAngularRadius = math.tan(0.5f * math.radians(cam.fieldOfView) / cam.pixelWidth),
-                gUnproject = 1.0f / (0.5f * rectH * m11)
+                gUnproject = 1.0f / (0.5f * rectH * m11),
+                gTanSunAngularRadius = _settings.lightOffset
             };
             passData.pathTracingSettings = setting;
 

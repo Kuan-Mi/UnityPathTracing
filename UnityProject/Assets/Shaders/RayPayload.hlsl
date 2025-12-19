@@ -40,6 +40,7 @@ cbuffer PathTracingParams : register(b0)
 
     float gTanPixelAngularRadius;
     float gUnproject;
+    float gTanSunAngularRadius;
 };
 
 
@@ -111,7 +112,7 @@ struct MaterialProps
 
 #define SKY_INTENSITY 1.0
 #define SUN_INTENSITY 10.0
-#define gTanSunAngularRadius 0.00436332313 // 0.25 degrees in radians
+
 
 
 float3 GetSunIntensity(float3 v)
