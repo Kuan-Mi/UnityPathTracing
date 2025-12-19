@@ -115,11 +115,21 @@ float2 GetBlueNoise(uint2 pixelPos, uint seed = 0)
     // Sample index
     uint sampleIndex = (g_FrameIndex + seed) & (BLUE_NOISE_TEMPORAL_DIM - 1);
 
-    sampleIndex = 2;
+    sampleIndex = 0;
+    
+    // pixelPos /= 8;
+    
     uint2 uv = pixelPos & (BLUE_NOISE_SPATIAL_DIM - 1);
     uint index = uv.x + uv.y * BLUE_NOISE_SPATIAL_DIM;
     uint3 A = gIn_ScramblingRanking[index].xyz;
+    
+    // return float2(A.x/256.0 , A.y / 256.0);
     uint rankedSampleIndex = sampleIndex ^ A.z;
+    
+    
+    // return float2(rankedSampleIndex / float(BLUE_NOISE_TEMPORAL_DIM), 0);
+    
+    
     uint4 B = gIn_Sobol[rankedSampleIndex & 255];
     float4 blue = (float4(B ^ A.xyxy) + 0.5) * (1.0 / 256.0);
 
@@ -320,6 +330,6 @@ void MainRayGenShader()
 
     // g_Output[launchIndex] = result;
 
-    g_Output[launchIndex] = float3(Blue.y, Blue.y, Blue.y);
+    g_Output[launchIndex] = float3(Blue.x, Blue.x, Blue.x);
     // g_Output[launchIndex] = gOut_DirectEmission[launchIndex];
 }

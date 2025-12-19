@@ -44,17 +44,21 @@ namespace PathTracing
 
             if (gIn_ScramblingRankingUint == null)
             {
+                Debug.Log(
+                    $"gIn_ScramblingRanking {gIn_ScramblingRanking.format} width:{gIn_ScramblingRanking.width} height:{gIn_ScramblingRanking.height}");
+                Debug.Log($"gIn_Sobol {gIn_Sobol.format} width:{gIn_Sobol.width} height:{gIn_Sobol.height}");
 
-                Debug.Log($"gIn_ScramblingRanking {gIn_ScramblingRanking.format}");
-                Debug.Log($"gIn_Sobol {gIn_Sobol.format}");
-                
                 gIn_ScramblingRankingUint =
                     new ComputeBuffer(gIn_ScramblingRanking.width * gIn_ScramblingRanking.height, 16);
                 var scramblingRankingData = new uint4[gIn_ScramblingRanking.width * gIn_ScramblingRanking.height];
                 byte[] rawData = gIn_ScramblingRanking.GetRawTextureData();
                 
-                
+                Color32[] colors = gIn_ScramblingRanking.GetPixels32();
+
+
                 Debug.Log($"gIn_ScramblingRanking rawData Length: {rawData.Length}");
+                Debug.Log($"gIn_ScramblingRanking colors Length: {colors.Length}");
+                
                 
                 int count = scramblingRankingData.Length;
                 for (int i = 0; i < count; i++)
@@ -63,7 +67,13 @@ namespace PathTracing
                         rawData[i * 4 + 0],
                         rawData[i * 4 + 1],
                         rawData[i * 4 + 2],
-                        rawData[i * 4 + 3]);
+                        rawData[i * 4 + 3]);                   
+                    
+                    // scramblingRankingData[i] = new uint4(
+                    //     colors[i].r,
+                    //     colors[i].g,
+                    //     colors[i].b,
+                    //     colors[i].a);
                 }
 
                 gIn_ScramblingRankingUint.SetData(scramblingRankingData);
@@ -72,9 +82,11 @@ namespace PathTracing
                 gIn_SobolUint = new ComputeBuffer(gIn_Sobol.width * gIn_Sobol.height, 16);
                 var sobolData = new uint4[gIn_Sobol.width * gIn_Sobol.height];
                 rawData = gIn_Sobol.GetRawTextureData();
-                
+                colors = gIn_Sobol.GetPixels32();
+
                 Debug.Log($"gIn_Sobol rawData Length: {rawData.Length}");
-                
+                Debug.Log($"gIn_Sobol colors Length: {colors.Length}");
+
                 count = sobolData.Length;
                 for (int i = 0; i < count; i++)
                 {
@@ -83,8 +95,14 @@ namespace PathTracing
                         rawData[i * 4 + 1],
                         rawData[i * 4 + 2],
                         rawData[i * 4 + 3]);
+                    
+                    // sobolData[i] = new uint4(
+                    //     colors[i].r,
+                    //     colors[i].g,
+                    //     colors[i].b,
+                    //     colors[i].a);
                 }
-
+ 
                 gIn_SobolUint.SetData(sobolData);
             }
 
