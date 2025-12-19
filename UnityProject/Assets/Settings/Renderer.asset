@@ -78,7 +78,7 @@ MonoBehaviour:
     envTexture: {fileID: 0}
     enableRussianRoulette: 1
     denoisingRange: 1000
-    splitScreen: 0
+    splitScreen: 0.07
     planeDistanceSensitivity: 0.131
     maxStabilizedFrameNum: 5
     is2DMotionVector: 0
