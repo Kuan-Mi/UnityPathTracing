@@ -117,14 +117,26 @@ float2 GetBlueNoise(uint2 pixelPos, uint seed = 0)
     // Sample index
     uint sampleIndex = (g_FrameIndex + seed) & (BLUE_NOISE_TEMPORAL_DIM - 1);
 
-    // return float2(sampleIndex/4.0,0); // 仅用于调试，显示采样索引
-
+    // return float2(sampleIndex,sampleIndex); // 仅用于调试，显示采样索引
+    // uint2 uv =pixelPos & (BLUE_NOISE_SPATIAL_DIM - 1);
+    // return float2(uv.x / float(BLUE_NOISE_SPATIAL_DIM), uv.y / float(BLUE_NOISE_SPATIAL_DIM));
+    
+    float3 fa = gIn_ScramblingRanking[pixelPos & (BLUE_NOISE_SPATIAL_DIM - 1)].xyz;
+    
+    // return fa;
     // The algorithm
-    uint3 A = gIn_ScramblingRanking[pixelPos & (BLUE_NOISE_SPATIAL_DIM - 1)].xyz * 255;
-
+    // uint3 A = gIn_ScramblingRanking[pixelPos & (BLUE_NOISE_SPATIAL_DIM - 1)].xyz;
+    uint3 A = fa * 255;
+    
+    // return A/255.0;
 
     uint rankedSampleIndex = sampleIndex ^ A.z;
-    uint4 B = gIn_Sobol[uint2(rankedSampleIndex & 255, 0)] * 255;
+    
+    float4 fB = gIn_ScramblingRanking[uint2(rankedSampleIndex & 255, 0)];
+    
+    // uint4 B = gIn_Sobol[uint2(rankedSampleIndex & 255, 0)] * 255;
+    
+    uint4 B = fB * 255;
     float4 blue = (float4(B ^ A.xyxy) + 0.5) * (1.0 / 256.0);
 
     // ( Optional ) Randomize in [ 0; 1 / 256 ] area to get rid of possible banding
@@ -276,8 +288,10 @@ void MainRayGenShader()
     float2 rnd = GetBlueNoise(launchIndex);
     
     // rnd = float2(RandomFloat01(rngState), RandomFloat01(rngState));
-    rnd = ImportanceSampling::Cosine::GetRay(rnd).xy;
-    rnd *= gTanSunAngularRadius;
+    // rnd = ImportanceSampling::Cosine::GetRay(rnd).xy;
+    
+    
+    // rnd *= gTanSunAngularRadius;
 
     float3 sunDirection = normalize(gSunBasisX.xyz * rnd.x + gSunBasisY.xyz * rnd.y + gSunDirection.xyz);
     float3 Xoffset = payload.GetXoffset(sunDirection, PT_SHADOW_RAY_OFFSET);
@@ -323,6 +337,8 @@ void MainRayGenShader()
     float3 result = lerp(prevRadiance, allRadiance , 1.0f / float(g_ConvergenceStep + 1));
     
     
-    g_Output[launchIndex] = result;
+    // g_Output[launchIndex] = result;
+    
+    g_Output[launchIndex] = float3(rnd, 0);
     // g_Output[launchIndex] = gOut_DirectEmission[launchIndex];
 }

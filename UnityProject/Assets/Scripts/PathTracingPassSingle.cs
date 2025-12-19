@@ -191,9 +191,9 @@ namespace PathTracing
             natCmd.IssuePluginEventAndData(GetRenderEventAndDataFunc(), 1, data.dataPtr);
 
             
-            // Blitter.BlitTexture(natCmd, data.outputTexture, new Vector4(1, 1, 0, 0),0,false);
-            
             natCmd.SetRenderTarget(data.cameraTexture);
+            Blitter.BlitTexture(natCmd, data.outputTexture, new Vector4(1, 1, 0, 0),0,false);
+            
             if (data.showShadow)
                 Blitter.BlitTexture(natCmd, data.Shadow_Translucency, new Vector4(1, 1, 0, 0), data.blitMaterial, 1);
             if (data.showValidation)
