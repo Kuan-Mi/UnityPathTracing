@@ -84,7 +84,7 @@ void UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API UnityPluginLoad(IUnityInterfaces
     // 在插件加载时手动运行OnGraphicsDeviceEvent（initialize）
     OnGraphicsDeviceEvent(kUnityGfxDeviceEventInitialize);
 
-    LOG("UnityPluginLoad completed.");
+    LOG("[NRD Native] UnityPluginLoad completed.");
 }
 
 // 卸载Unity插件
@@ -92,7 +92,7 @@ void UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API UnityPluginUnload()
 {
     // 取消注册图形设备事件回调
     s_Graphics->UnregisterDeviceEventCallback(OnGraphicsDeviceEvent);
-    LOG("UnityPluginUnload completed.");
+    LOG("[NRD Native] UnityPluginUnload completed.");
 }
 
 // 获取渲染事件和数据的函数指针

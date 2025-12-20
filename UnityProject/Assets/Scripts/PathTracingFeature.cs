@@ -25,7 +25,7 @@ namespace PathTracing
         public ComputeBuffer gIn_ScramblingRankingUint;
         public ComputeBuffer gIn_SobolUint;
 
-        private Dictionary<int, NRDDenoiser> m_HelperDic = new();
+        private Dictionary<int, NRDDenoiser> _denoisers = new();
 
         public override void Create()
         {
@@ -134,10 +134,10 @@ namespace PathTracing
 
             int camID = cam.GetInstanceID();
 
-            if (!m_HelperDic.TryGetValue(camID, out var nrd))
+            if (!_denoisers.TryGetValue(camID, out var nrd))
             {
-                nrd = new NRDDenoiser(pathTracingSetting);
-                m_HelperDic.Add(camID, nrd);
+                nrd = new NRDDenoiser(pathTracingSetting,cam.name);
+                _denoisers.Add(camID, nrd);
             }
 
             _pathTracingPass.NrdDenoiser = nrd;
@@ -152,12 +152,12 @@ namespace PathTracing
             accelerationStructure = null;
             _pathTracingPass.Dispose();
 
-            foreach (var helper in m_HelperDic.Values)
+            foreach (var denoiser in _denoisers.Values)
             {
-                helper.Dispose();
+                denoiser.Dispose();
             }
 
-            m_HelperDic.Clear();
+            _denoisers.Clear();
         }
     }
 }

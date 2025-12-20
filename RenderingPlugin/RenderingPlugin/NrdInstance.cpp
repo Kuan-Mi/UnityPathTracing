@@ -100,7 +100,7 @@ void NrdInstance::DispatchCompute(const FrameData* data)
         return;
     if (data->width == 0 || data->height == 0)
     {
-        LOG("Invalid texture dimensions");
+        LOG("[NRD Native] Invalid texture dimensions");
         return;
     }
 
@@ -112,16 +112,16 @@ void NrdInstance::DispatchCompute(const FrameData* data)
     {
         if (TextureWidth == 0 || TextureHeight == 0)
         {
-            LOG("Creating NRD instance.");
+            LOG("[NRD Native] Creating NRD instance.");
         }
         else
         {
-            LOG("Input texture size changed, recreating NRD instance.");
+            LOG("[NRD Native] Input texture size changed, recreating NRD instance.");
         }
 
         if (data->commonSettings.frameIndex != 0)
         {
-            LOG("Warning: data->commonSettings.frameIndex != 0");
+            LOG("[NRD Native] Warning: data->commonSettings.frameIndex != 0");
         }
 
         TextureWidth = data->width;
@@ -130,7 +130,7 @@ void NrdInstance::DispatchCompute(const FrameData* data)
         CreateNrd();
     }
 
-    // LOG(("Dispatching Frame : " + std::to_string(data->commonSettings.frameIndex)).c_str());
+    // LOG(("[NRD Native] Dispatching Frame : " + std::to_string(data->commonSettings.frameIndex)).c_str());
 
     nri::CommandBufferD3D12Desc cmdDesc;
     cmdDesc.d3d12CommandList = recording_state.commandList;
@@ -196,7 +196,7 @@ void NrdInstance::UpdateResources(NrdResourceInput* resources, int count)
 
     memcpy(m_CachedResources.data(), resources, count * sizeof(NrdResourceInput));
 
-    LOG(("Updated NRD Resources. Count: " + std::to_string(count)).c_str());
+    LOG(("[NRD Native] Updated NRD Resources. Count: " + std::to_string(count)).c_str());
 }
 
 void NrdInstance::CreateNrd()
@@ -228,11 +228,11 @@ void NrdInstance::CreateNrd()
 
     if (result != nrd::Result::SUCCESS)
     {
-        LOG("Failed to initialize NRD Integration with NRI Wrapper");
+        LOG("[NRD Native] Failed to initialize NRD Integration with NRI Wrapper");
         throw std::runtime_error("NRD Integration Init Failed");
     }
 
-    LOG("NRD Integration created successfully.");
+    LOG("[NRD Native] NRD Integration created successfully.");
 }
 
 void NrdInstance::initialize_and_create_resources()
@@ -251,5 +251,5 @@ void NrdInstance::release_resources()
 
     m_are_resources_initialized = false;
 
-    LOG("NrdInstance resources released.");
+    LOG("[NRD Native] NrdInstance resources released.");
 }

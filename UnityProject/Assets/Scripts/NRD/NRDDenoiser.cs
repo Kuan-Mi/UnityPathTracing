@@ -28,6 +28,7 @@ namespace Nrd
 
         public uint FrameIndex;
         private readonly int nrdInstanceId;
+        private string cameraName;
 
         private Matrix4x4 PrevViewMatrix;
         private Matrix4x4 PrevViewProjMatrix;
@@ -52,11 +53,11 @@ namespace Nrd
 
         private PathTracingSetting setting;
 
-        public NRDDenoiser(PathTracingSetting setting)
+        public NRDDenoiser(PathTracingSetting setting, string camName)
         {
             this.setting = setting;
-            int instanceId = CreateDenoiserInstance();
-            nrdInstanceId = instanceId;
+            nrdInstanceId = CreateDenoiserInstance();
+            cameraName = camName;
             buffer = new NativeArray<FrameData>(BufferCount, Allocator.Persistent);
 
             var srvState = new NriResourceState { accessBits = AccessBits.SHADER_RESOURCE, layout = Layout.SHADER_RESOURCE, stageBits = 1 << 7 };
@@ -70,6 +71,8 @@ namespace Nrd
             allocatedResources.Add(new NrdTextureResource(ResourceType.IN_DIFF_RADIANCE_HITDIST, GraphicsFormat.R16G16B16A16_SFloat, srvState));
             allocatedResources.Add(new NrdTextureResource(ResourceType.OUT_DIFF_RADIANCE_HITDIST, GraphicsFormat.R16G16B16A16_SFloat, uavState));
             allocatedResources.Add(new NrdTextureResource(ResourceType.OUT_VALIDATION, GraphicsFormat.R8G8B8A8_UNorm, uavState));
+
+            Debug.Log($"[NRD] Created Denoiser Instance {nrdInstanceId} for Camera {cameraName}");
         }
 
         public void EnsureResources(int width, int height)
@@ -77,11 +80,6 @@ namespace Nrd
             // 如果尺寸没变且资源都存在，直接返回
             if (width == _prevWidth && height == _prevHeight)
             {
-                if (FrameIndex == 1)
-                {
-                    UpdateResourceSnapshotInCpp();
-                }
-
                 return;
             }
 
@@ -110,9 +108,6 @@ namespace Nrd
 
             int idx = 0;
 
-            var srvState = new NriResourceState { accessBits = AccessBits.SHADER_RESOURCE, layout = Layout.SHADER_RESOURCE, stageBits = 1 << 7 };
-            var uavState = new NriResourceState { accessBits = AccessBits.SHADER_RESOURCE_STORAGE, layout = Layout.SHADER_RESOURCE_STORAGE, stageBits = 1 << 10 };
-
             // Reblur/Sigma Inputs
             NrdResourceInput* ptr = (NrdResourceInput*)m_ResourceCache.GetUnsafePtr();
 
@@ -121,14 +116,14 @@ namespace Nrd
                 ptr[idx++] = new NrdResourceInput { type = nrdTextureResource.ResourceType, texture = nrdTextureResource.NriPtr, state = nrdTextureResource.ResourceState };
             }
 
-
             UpdateDenoiserResources(nrdInstanceId, (IntPtr)ptr, idx);
 
-            Debug.Log($"[NRD] Updated resources pointer to C++. Count: {idx}");
+            Debug.Log($"[NRD] Updated Resources for Denoiser Instance {nrdInstanceId} with {idx} resources.");
         }
 
         private void ReleaseTextures()
         {
+            Debug.Log($"[NRD] Releasing Textures for Denoiser Instance {nrdInstanceId}.");
             foreach (var nrdTextureResource in allocatedResources)
             {
                 nrdTextureResource.Release();
@@ -246,14 +241,16 @@ namespace Nrd
             }
         }
 
-        public void Dispose()
+        public async void Dispose()
         {
             if (buffer.IsCreated)
             {
                 buffer.Dispose();
             }
 
+            await Awaitable.NextFrameAsync();
             ReleaseTextures();
+            Debug.Log($"[NRD] Destroying Denoiser Instance {nrdInstanceId} for Camera {cameraName}");
             DestroyDenoiserInstance(nrdInstanceId);
         }
     }

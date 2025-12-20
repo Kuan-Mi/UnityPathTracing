@@ -27,7 +27,7 @@ void RenderSystem::Initialize(IUnityInterfaces* interfaces)
     nri::Result result = nriCreateDeviceFromD3D12Device(deviceDesc, m_NriDevice);
     if (result != nri::Result::SUCCESS)
     {
-        LOG("Failed to create NRI device from D3D12");
+        LOG("[NRD Native] Failed to create NRI device from D3D12");
         return;
     }
 
@@ -43,7 +43,7 @@ void RenderSystem::Initialize(IUnityInterfaces* interfaces)
 
     m_are_resources_initialized = true;
 
-    LOG("RenderSystem Initialized.");
+    LOG("[NRD Native] RenderSystem Initialized.");
 }
 
 void RenderSystem::Shutdown()
@@ -62,7 +62,7 @@ void RenderSystem::Shutdown()
 
     m_are_resources_initialized = false;
 
-    LOG("RenderSystem Shutdown completed.");
+    LOG("[NRD Native] RenderSystem Shutdown completed.");
 }
 
 void RenderSystem::Release(nri::Texture* texture)
@@ -90,7 +90,7 @@ void RenderSystem::ProcessDeviceEvent(UnityGfxDeviceEventType type, IUnityInterf
         s_d3d12 = interfaces->Get<IUnityGraphicsD3D12v7>();
         s_Log = interfaces->Get<IUnityLog>();
 
-        LOG("ProcessDeviceEvent kUnityGfxDeviceEventInitialize");
+        LOG("[NRD Native] ProcessDeviceEvent kUnityGfxDeviceEventInitialize");
 
         UnityD3D12PluginEventConfig config_1;
         config_1.graphicsQueueAccess = kUnityD3D12GraphicsQueueAccess_DontCare;
@@ -111,7 +111,7 @@ void RenderSystem::ProcessDeviceEvent(UnityGfxDeviceEventType type, IUnityInterf
         // initialize_and_create_resources();
         break;
     case kUnityGfxDeviceEventShutdown:
-        LOG("ProcessDeviceEvent kUnityGfxDeviceEventShutdown");
+        LOG("[NRD Native] ProcessDeviceEvent kUnityGfxDeviceEventShutdown");
         // release_resources();
         break;
     case kUnityGfxDeviceEventBeforeReset:
