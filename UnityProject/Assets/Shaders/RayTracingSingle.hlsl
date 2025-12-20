@@ -274,6 +274,8 @@ void MainRayGenShader()
 
     float penumbra = SIGMA_FrontEnd_PackPenumbra(shadowHitDist, gTanSunAngularRadius);
 
-    gOut_ShadowData [launchIndex] = penumbra;
+    gOut_ShadowData[launchIndex] = penumbra;
+
+
     g_Output[launchIndex] = Ldirect;
 }

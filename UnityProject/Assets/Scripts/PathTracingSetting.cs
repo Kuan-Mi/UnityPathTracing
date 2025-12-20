@@ -27,7 +27,7 @@ namespace PathTracing
         // public bool isMotionVectorInWorldSpace; // Default: false
         // public bool isHistoryConfidenceAvailable; // Default: false
         // public bool isDisocclusionThresholdMixAvailable; // Default: false
-        // public bool isBaseColorMetalnessAvailable; // Default: false
+        public bool isBaseColorMetalnessAvailable; // Default: false
         // public bool enableValidation; // Default: false
 
         [Header("NRD Sigma Settings")] [Range(0.0f, 1.0f)]
@@ -42,19 +42,27 @@ namespace PathTracing
         // public Matrix4x4 viewToClipMatrixPrev;
         // public Matrix4x4 worldToViewMatrix;
         // public Matrix4x4 worldToViewMatrixPrev;
-        
-        [Header("motionVectorScale Override")]
-        public bool is2DMotionVector;
+
+        [Header("motionVectorScale Override")] public bool is2DMotionVector;
         // public float3 motionVectorScale = new(1.0f, 1.0f, 0.0f); // Default: {1.0, 1.0, 0.0}
 
         [Header("NRD Sigma Settings Override")]
         public bool useOverriddenSigmaValues;
 
         public Vector3 lightDir;
-        
-        public bool showValidation;
-        public bool showMV;
+
+        public bool showBaseColor;
+        public bool showMetalness;
+        public bool showNormal;
+        public bool showRoughness;
+
+
         public bool showShadow;
+        public bool showDiffuse;
+        public bool showSpecular;
         public bool showOut;
+
+        public bool showMV;
+        public bool showValidation;
     }
 }

@@ -105,19 +105,19 @@ namespace PathTracing
             internal ComputeBuffer sobol;
 
             internal TextureHandle outputTexture;
-            
+
             internal TextureHandle Mv;
             internal TextureHandle ViewZ;
             internal TextureHandle Normal_Roughness;
             internal TextureHandle BaseColor_Metalness;
-            
+
             internal TextureHandle DirectLighting;
             internal TextureHandle DirectEmission;
-            
+
             internal TextureHandle Penumbra;
             internal TextureHandle Diff;
             internal TextureHandle Spec;
-            
+
             internal TextureHandle Shadow_Translucency;
             internal TextureHandle DenoisedDiff;
             internal TextureHandle DenoisedSpec;
@@ -134,10 +134,7 @@ namespace PathTracing
             internal IntPtr dataPtr;
 
 
-            internal bool showValidation;
-            internal bool showMv;
-            internal bool showShadow;
-            internal bool showOut;
+            internal PathTracingSetting _setting;
         }
 
         public NRDDenoiser NrdDenoiser;
@@ -198,25 +195,59 @@ namespace PathTracing
 
 
             natCmd.SetRenderTarget(data.cameraTexture);
-            if (data.showOut)
+
+
+            // 0 showValidation 1 showShadow 2 showMv 3 ShowNormal 4 showOut 5 showAlpha  
+
+
+            if (data._setting.showBaseColor)
             {
-                Blitter.BlitTexture(natCmd, data.outputTexture, new Vector4(1, 1, 0, 0), data.blitMaterial, 1);
+                Blitter.BlitTexture(natCmd, data.BaseColor_Metalness, new Vector4(1, 1, 0, 0), data.blitMaterial, 4);
             }
 
-            if (data.showShadow)
+            if (data._setting.showMetalness)
+            {
+                Blitter.BlitTexture(natCmd, data.BaseColor_Metalness, new Vector4(1, 1, 0, 0), data.blitMaterial, 5);
+            }
+
+            if (data._setting.showNormal)
+            {
+                Blitter.BlitTexture(natCmd, data.Normal_Roughness, new Vector4(1, 1, 0, 0), data.blitMaterial, 3);
+            }
+
+            if (data._setting.showRoughness)
+            {
+                Blitter.BlitTexture(natCmd, data.Normal_Roughness, new Vector4(1, 1, 0, 0), data.blitMaterial, 6);
+            }
+
+            if (data._setting.showShadow)
             {
                 Blitter.BlitTexture(natCmd, data.Shadow_Translucency, new Vector4(1, 1, 0, 0), data.blitMaterial, 1);
             }
 
-            if (data.showValidation)
+            if (data._setting.showDiffuse)
             {
-                Blitter.BlitTexture(natCmd, data.Validation, new Vector4(1, 1, 0, 0), data.blitMaterial, 0);
-                // Blitter.BlitTexture(natCmd, data.Validation, new Vector4(1, 1, 0, 0),0,false);
+                Blitter.BlitTexture(natCmd, data.DenoisedDiff, new Vector4(1, 1, 0, 0), data.blitMaterial, 4);
             }
 
-            if (data.showMv)
+            if (data._setting.showSpecular)
+            {
+                Blitter.BlitTexture(natCmd, data.DenoisedSpec, new Vector4(1, 1, 0, 0), data.blitMaterial, 4);
+            }
+
+            if (data._setting.showOut)
+            {
+                Blitter.BlitTexture(natCmd, data.outputTexture, new Vector4(1, 1, 0, 0), data.blitMaterial, 4);
+            }
+
+            if (data._setting.showMV)
             {
                 Blitter.BlitTexture(natCmd, data.Mv, new Vector4(1, 1, 0, 0), data.blitMaterial, 2);
+            }
+
+            if (data._setting.showValidation)
+            {
+                Blitter.BlitTexture(natCmd, data.Validation, new Vector4(1, 1, 0, 0), data.blitMaterial, 0);
             }
         }
 
@@ -350,10 +381,7 @@ namespace PathTracing
             passData.pathTracingSettingsBuffer = pathTracingSettingsBuffer;
             passData.blitMaterial = biltMaterial;
 
-            passData.showOut = _settings.showOut;
-            passData.showShadow = _settings.showShadow;
-            passData.showMv = _settings.showMV;
-            passData.showValidation = _settings.showValidation;
+            passData._setting = _settings;
 
             // Debug.Log("Texture Width: " + textureDesc.width + " Height: " + textureDesc.height);
 
@@ -377,13 +405,12 @@ namespace PathTracing
             passData.Penumbra = renderGraph.ImportTexture(NrdDenoiser.GetRT(ResourceType.IN_PENUMBRA));
             passData.Diff = renderGraph.ImportTexture(NrdDenoiser.GetRT(ResourceType.IN_DIFF_RADIANCE_HITDIST));
             passData.Spec = renderGraph.ImportTexture(NrdDenoiser.GetRT(ResourceType.IN_SPEC_RADIANCE_HITDIST));
-            
+
             // 输出
             passData.Shadow_Translucency = renderGraph.ImportTexture(NrdDenoiser.GetRT(ResourceType.OUT_SHADOW_TRANSLUCENCY));
             passData.DenoisedDiff = renderGraph.ImportTexture(NrdDenoiser.GetRT(ResourceType.OUT_DIFF_RADIANCE_HITDIST));
             passData.DenoisedSpec = renderGraph.ImportTexture(NrdDenoiser.GetRT(ResourceType.OUT_SPEC_RADIANCE_HITDIST));
             passData.Validation = renderGraph.ImportTexture(NrdDenoiser.GetRT(ResourceType.OUT_VALIDATION));
-
 
 
             rayTracingShader.SetShaderPass("Test2");
@@ -404,19 +431,19 @@ namespace PathTracing
 
 
             builder.UseTexture(passData.outputTexture, AccessFlags.ReadWrite);
-            
+
             builder.UseTexture(passData.Mv, AccessFlags.ReadWrite);
             builder.UseTexture(passData.ViewZ, AccessFlags.ReadWrite);
             builder.UseTexture(passData.Normal_Roughness, AccessFlags.ReadWrite);
             builder.UseTexture(passData.BaseColor_Metalness, AccessFlags.ReadWrite);
-            
+
             builder.UseTexture(passData.DirectLighting, AccessFlags.ReadWrite);
             builder.UseTexture(passData.DirectEmission, AccessFlags.ReadWrite);
-            
+
             builder.UseTexture(passData.Penumbra, AccessFlags.ReadWrite);
             builder.UseTexture(passData.Diff, AccessFlags.ReadWrite);
             builder.UseTexture(passData.Spec, AccessFlags.ReadWrite);
-            
+
             // 输出
             builder.UseTexture(passData.Shadow_Translucency, AccessFlags.ReadWrite);
             builder.UseTexture(passData.DenoisedDiff, AccessFlags.ReadWrite);

@@ -48,11 +48,11 @@
 
             float4 Frag(Varyings i) : SV_Target
             {
-                                // 翻转Y
+                // 翻转Y
                 #ifdef UNITY_UV_STARTS_AT_TOP
-                    i.uv.y = 1.0 - i.uv.y;
+                i.uv.y = 1.0 - i.uv.y;
                 #endif
-                
+
                 return SAMPLE_TEXTURE2D(_BlitTexture, sampler_BlitTexture, i.uv);
             }
             ENDHLSL
@@ -101,18 +101,17 @@
             {
                 // 翻转Y
                 #ifdef UNITY_UV_STARTS_AT_TOP
-                    i.uv.y = 1.0 - i.uv.y;
+                i.uv.y = 1.0 - i.uv.y;
                 #endif
-                
+
                 float OUT_SHADOW_TRANSLUCENCY = SAMPLE_TEXTURE2D(_BlitTexture, sampler_BlitTexture, i.uv).r;
                 float shadow = SIGMA_BackEnd_UnpackShadow(OUT_SHADOW_TRANSLUCENCY);
-                float4 color = float4(shadow, shadow, shadow, 1);   
-                
+                float4 color = float4(shadow, shadow, shadow, 1);
+
                 return color;
             }
             ENDHLSL
         }
-
 
         Pass
         {
@@ -193,11 +192,11 @@
 
             float4 Frag(Varyings i) : SV_Target
             {
-                                // 翻转Y
+                // 翻转Y
                 #ifdef UNITY_UV_STARTS_AT_TOP
-                    i.uv.y = 1.0 - i.uv.y;
+                i.uv.y = 1.0 - i.uv.y;
                 #endif
-                
+
                 float2 gScreenSize = _ScreenParams.xy;
 
                 // --- 配置参数 ---
@@ -255,6 +254,7 @@
             }
             ENDHLSL
         }
+
         Pass
         {
             Name "ShowNormal"
@@ -298,23 +298,185 @@
 
             float4 Frag(Varyings i) : SV_Target
             {
-
                 // 翻转Y
                 #ifdef UNITY_UV_STARTS_AT_TOP
-                    i.uv.y = 1.0 - i.uv.y;
+                i.uv.y = 1.0 - i.uv.y;
                 #endif
-                
+
                 float4 OUT_SHADOW_TRANSLUCENCY = SAMPLE_TEXTURE2D(_BlitTexture, sampler_BlitTexture, i.uv);
                 float4 X = NRD_FrontEnd_UnpackNormalAndRoughness(OUT_SHADOW_TRANSLUCENCY);
-                
+
                 // float3 normal = X.rgb ;
                 float3 normal = X.rgb * 0.5 + 0.5; // [-1,1] -> [0,1]
-                
-                float4 color = float4(normal,1);   
-                
+
+                float4 color = float4(normal, 1);
+
                 return color;
             }
             ENDHLSL
         }
+
+        Pass
+        {
+            Name "ShowOut"
+            ZWrite Off
+            ZTest Always
+            Cull Off
+            Blend SrcAlpha OneMinusSrcAlpha
+
+            HLSLPROGRAM
+            #pragma vertex Vert
+            #pragma fragment Frag
+            #pragma target 4.5
+
+            #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
+
+            // Blitter 会自动绑定
+            TEXTURE2D(_BlitTexture);
+            SAMPLER(sampler_BlitTexture);
+
+            struct Attributes
+            {
+                uint vertexID : SV_VertexID;
+            };
+
+            struct Varyings
+            {
+                float4 positionCS : SV_POSITION;
+                float2 uv : TEXCOORD0;
+            };
+
+            Varyings Vert(Attributes input)
+            {
+                Varyings o;
+                o.positionCS = GetFullScreenTriangleVertexPosition(input.vertexID);
+                o.uv = GetFullScreenTriangleTexCoord(input.vertexID);
+                return o;
+            }
+
+            float4 Frag(Varyings i) : SV_Target
+            {
+                // 翻转Y
+                #ifdef UNITY_UV_STARTS_AT_TOP
+                i.uv.y = 1.0 - i.uv.y;
+                #endif
+
+
+                return float4(SAMPLE_TEXTURE2D(_BlitTexture, sampler_BlitTexture, i.uv).rgb, 1);
+            }
+            ENDHLSL
+        }
+
+        Pass
+        {
+            Name "ShowAlpha"
+            ZWrite Off
+            ZTest Always
+            Cull Off
+            Blend SrcAlpha OneMinusSrcAlpha
+
+            HLSLPROGRAM
+            #pragma vertex Vert
+            #pragma fragment Frag
+            #pragma target 4.5
+
+            #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
+
+            // Blitter 会自动绑定
+            TEXTURE2D(_BlitTexture);
+            SAMPLER(sampler_BlitTexture);
+
+            struct Attributes
+            {
+                uint vertexID : SV_VertexID;
+            };
+
+            struct Varyings
+            {
+                float4 positionCS : SV_POSITION;
+                float2 uv : TEXCOORD0;
+            };
+
+            Varyings Vert(Attributes input)
+            {
+                Varyings o;
+                o.positionCS = GetFullScreenTriangleVertexPosition(input.vertexID);
+                o.uv = GetFullScreenTriangleTexCoord(input.vertexID);
+                return o;
+            }
+
+            float4 Frag(Varyings i) : SV_Target
+            {
+                // 翻转Y
+                #ifdef UNITY_UV_STARTS_AT_TOP
+                i.uv.y = 1.0 - i.uv.y;
+                #endif
+
+                float alpha = SAMPLE_TEXTURE2D(_BlitTexture, sampler_BlitTexture, i.uv).a;
+                return float4(alpha, alpha, alpha, 1);
+            }
+            ENDHLSL
+        }
+
+        Pass
+        {
+            Name "ShowRoughness"
+            // 【重要】混合模式：保证只显示箭头，不黑屏
+            Blend SrcAlpha OneMinusSrcAlpha
+            // 【重要】总是显示在最上层
+            ZTest Always
+            ZWrite Off
+            Cull Off
+
+            HLSLPROGRAM
+            #pragma vertex Vert
+            #pragma fragment Frag
+            #pragma target 4.5
+
+            #include "NRDInclude/NRD.hlsli"
+            #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
+
+            // 你的 Motion Vector 贴图
+            TEXTURE2D(_BlitTexture);
+            SAMPLER(sampler_BlitTexture);
+
+            struct Attributes
+            {
+                uint vertexID : SV_VertexID;
+            };
+
+            struct Varyings
+            {
+                float4 positionCS : SV_POSITION;
+                float2 uv : TEXCOORD0;
+            };
+
+            Varyings Vert(Attributes input)
+            {
+                Varyings o;
+                o.positionCS = GetFullScreenTriangleVertexPosition(input.vertexID);
+                o.uv = GetFullScreenTriangleTexCoord(input.vertexID);
+                return o;
+            }
+
+            float4 Frag(Varyings i) : SV_Target
+            {
+                // 翻转Y
+                #ifdef UNITY_UV_STARTS_AT_TOP
+                i.uv.y = 1.0 - i.uv.y;
+                #endif
+
+                float4 OUT_SHADOW_TRANSLUCENCY = SAMPLE_TEXTURE2D(_BlitTexture, sampler_BlitTexture, i.uv);
+                float4 X = NRD_FrontEnd_UnpackNormalAndRoughness(OUT_SHADOW_TRANSLUCENCY);
+
+
+
+                float4 color = float4(X.a, X.a, X.a, 1);
+
+                return color;
+            }
+            ENDHLSL
+        }
+ 
     }
 }

@@ -221,7 +221,7 @@ namespace Nrd
             // localData.commonSettings.isMotionVectorInWorldSpace = setting.isMotionVectorInWorldSpace;
             // localData.commonSettings.isHistoryConfidenceAvailable = setting.isHistoryConfidenceAvailable;
             // localData.commonSettings.isDisocclusionThresholdMixAvailable = setting.isDisocclusionThresholdMixAvailable;
-            // localData.commonSettings.isBaseColorMetalnessAvailable = setting.isBaseColorMetalnessAvailable;
+            localData.commonSettings.isBaseColorMetalnessAvailable = setting.isBaseColorMetalnessAvailable;
             localData.commonSettings.enableValidation = true;
 
 
