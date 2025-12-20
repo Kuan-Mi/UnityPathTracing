@@ -85,7 +85,8 @@ struct GeometryProps
     float curvature; // 曲率估算值（用于材质、去噪等）
     uint instanceIndex; // 命中的实例索引（用于查找InstanceData）
 
-    float3 GetXoffset(float3 offsetDir, float amount)
+    #define PT_BOUNCE_RAY_OFFSET                0.25 // pixels
+    float3 GetXoffset(float3 offsetDir, float amount = PT_BOUNCE_RAY_OFFSET)
     {
         float viewZ = Geometry::AffineTransform(gWorldToView, X).z;
         amount *= gUnproject * abs(viewZ);

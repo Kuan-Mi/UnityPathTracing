@@ -60,6 +60,10 @@ namespace PathTracing
         public bool showShadow;
         public bool showDiffuse;
         public bool showSpecular;
+        
+        public bool showDirectLight;
+        public bool showEmissive;
+        
         public bool showOut;
 
         public bool showMV;

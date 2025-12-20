@@ -78,15 +78,24 @@ MonoBehaviour:
     envTexture: {fileID: 0}
     enableRussianRoulette: 1
     denoisingRange: 1000
-    splitScreen: 0
+    splitScreen: 0.506
+    isBaseColorMetalnessAvailable: 0
     planeDistanceSensitivity: 0.131
     maxStabilizedFrameNum: 5
     is2DMotionVector: 0
     useOverriddenSigmaValues: 0
     lightDir: {x: 0, y: 0, z: 0}
-    showValidation: 1
-    showMV: 0
-    showShadow: 1
+    showBaseColor: 0
+    showMetalness: 0
+    showNormal: 0
+    showRoughness: 0
+    showShadow: 0
+    showDiffuse: 1
+    showSpecular: 0
+    showDirectLight: 0
+    showEmissive: 0
     showOut: 0
+    showMV: 0
+    showValidation: 1
   gIn_ScramblingRanking: {fileID: 2800000, guid: ba45d1e4dcf9022438a4798a5f9e7b80, type: 3}
   gIn_Sobol: {fileID: 2800000, guid: 17e7ce8147355314ea8aab1178a6a43c, type: 3}

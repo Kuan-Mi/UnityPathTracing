@@ -235,6 +235,16 @@ namespace PathTracing
                 Blitter.BlitTexture(natCmd, data.DenoisedSpec, new Vector4(1, 1, 0, 0), data.blitMaterial, 4);
             }
 
+            if (data._setting.showDirectLight)
+            {
+                Blitter.BlitTexture(natCmd, data.DirectLighting, new Vector4(1, 1, 0, 0), data.blitMaterial, 4);
+            }
+            
+            if (data._setting.showEmissive)
+            {
+                Blitter.BlitTexture(natCmd, data.DirectEmission, new Vector4(1, 1, 0, 0), data.blitMaterial, 4);
+            }
+            
             if (data._setting.showOut)
             {
                 Blitter.BlitTexture(natCmd, data.outputTexture, new Vector4(1, 1, 0, 0), data.blitMaterial, 4);
