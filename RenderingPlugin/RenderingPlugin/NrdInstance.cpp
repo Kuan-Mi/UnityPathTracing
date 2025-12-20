@@ -7,10 +7,11 @@
 
 #define LOG(msg) UNITY_LOG(s_Log, msg)
 
-NrdInstance::NrdInstance(IUnityInterfaces* interfaces)
+NrdInstance::NrdInstance(IUnityInterfaces* interfaces, int instanceId)
 {
     s_d3d12 = interfaces->Get<IUnityGraphicsD3D12v8>();
     s_Log = interfaces->Get<IUnityLog>();
+    id = instanceId;
 
     initialize_and_create_resources();
 }
@@ -19,11 +20,13 @@ NrdInstance::~NrdInstance()
 {
     release_resources();
 }
-inline bool IsUAVAccess(nri::AccessBits access) {
+
+inline bool IsUAVAccess(nri::AccessBits access)
+{
     // 定义所有映射到 D3D12_RESOURCE_STATE_UNORDERED_ACCESS 的 NRI 位
-    const nri::AccessBits uavBits = 
-        nri::AccessBits::SHADER_RESOURCE_STORAGE | 
-        nri::AccessBits::SCRATCH_BUFFER | 
+    const nri::AccessBits uavBits =
+        nri::AccessBits::SHADER_RESOURCE_STORAGE |
+        nri::AccessBits::SCRATCH_BUFFER |
         nri::AccessBits::CLEAR_STORAGE |
         nri::AccessBits::ACCELERATION_STRUCTURE_READ |
         nri::AccessBits::ACCELERATION_STRUCTURE_WRITE |
@@ -94,13 +97,13 @@ static inline D3D12_RESOURCE_STATES GetResourceStates(nri::AccessBits accessBits
 }
 
 
-void NrdInstance::DispatchCompute(const FrameData* data)
+void NrdInstance::DispatchCompute( FrameData* data)
 {
     if (data == nullptr)
         return;
     if (data->width == 0 || data->height == 0)
     {
-        LOG("[NRD Native] Invalid texture dimensions");
+        LOG(("[NRD Native] id:" + std::to_string(id) + " - Invalid texture size, skipping dispatch.").c_str());
         return;
     }
 
@@ -112,16 +115,16 @@ void NrdInstance::DispatchCompute(const FrameData* data)
     {
         if (TextureWidth == 0 || TextureHeight == 0)
         {
-            LOG("[NRD Native] Creating NRD instance.");
+            LOG(("[NRD Native] id:" + std::to_string(id) + " - Creating NRD instance for the first time.").c_str());
         }
         else
         {
-            LOG("[NRD Native] Input texture size changed, recreating NRD instance.");
+            LOG(("[NRD Native] id:" + std::to_string(id) + " - Texture size changed, recreating NRD instance.").c_str());
         }
 
         if (data->commonSettings.frameIndex != 0)
         {
-            LOG("[NRD Native] Warning: data->commonSettings.frameIndex != 0");
+            LOG(("[NRD Native] id:" + std::to_string(id) + " - Warning: Frame index is not zero during NRD recreation. This may lead to instability.").c_str());
         }
 
         TextureWidth = data->width;
@@ -130,7 +133,7 @@ void NrdInstance::DispatchCompute(const FrameData* data)
         CreateNrd();
     }
 
-    // LOG(("[NRD Native] Dispatching Frame : " + std::to_string(data->commonSettings.frameIndex)).c_str());
+    // LOG(("[NRD Native] id:" + std::to_string(id) + " - Dispatching NRD compute for frame index " + std::to_string(data->commonSettings.frameIndex) + ".").c_str());
 
     nri::CommandBufferD3D12Desc cmdDesc;
     cmdDesc.d3d12CommandList = recording_state.commandList;
@@ -139,6 +142,9 @@ void NrdInstance::DispatchCompute(const FrameData* data)
     nri::CommandBuffer* nriCmdBuffer = nullptr;
     RenderSystem::Get().GetNriWrapper().CreateCommandBufferD3D12(*RenderSystem::Get().GetNriDevice(), cmdDesc, nriCmdBuffer);
 
+    data->commonSettings.frameIndex = frameIndex;
+    frameIndex++;
+    
     m_NrdIntegration.SetCommonSettings(data->commonSettings);
     m_NrdIntegration.SetDenoiserSettings(m_SigmaId, &data->sigmaSettings);
     m_NrdIntegration.SetDenoiserSettings(m_ReblurId, &data->reblurSettings);
@@ -175,9 +181,9 @@ void NrdInstance::DispatchCompute(const FrameData* data)
         uint64_t nativeHandle = RenderSystem::Get().GetNriCore().GetTextureNativeObject(res.nri.texture);
         ID3D12Resource* rawResource = reinterpret_cast<ID3D12Resource*>(nativeHandle);
         auto state = GetResourceStates(res.state.access, D3D12_COMMAND_LIST_TYPE_DIRECT);
-        
-        bool isUAV = IsUAVAccess (res.state.access);
-        
+
+        bool isUAV = IsUAVAccess(res.state.access);
+
         s_d3d12->NotifyResourceState(rawResource, state, isUAV);
     }
 
@@ -195,8 +201,6 @@ void NrdInstance::UpdateResources(NrdResourceInput* resources, int count)
     m_CachedResources.resize(count);
 
     memcpy(m_CachedResources.data(), resources, count * sizeof(NrdResourceInput));
-
-    LOG(("[NRD Native] Updated NRD Resources. Count: " + std::to_string(count)).c_str());
 }
 
 void NrdInstance::CreateNrd()
@@ -228,11 +232,11 @@ void NrdInstance::CreateNrd()
 
     if (result != nrd::Result::SUCCESS)
     {
-        LOG("[NRD Native] Failed to initialize NRD Integration with NRI Wrapper");
+        LOG(("[NRD Native] id:" + std::to_string(id) + " - NRD Integration Init Failed.").c_str());
         throw std::runtime_error("NRD Integration Init Failed");
     }
 
-    LOG("[NRD Native] NRD Integration created successfully.");
+    LOG(("[NRD Native] id:" + std::to_string(id) + " - NRD Instance Created/Updated.").c_str());
 }
 
 void NrdInstance::initialize_and_create_resources()
@@ -251,5 +255,5 @@ void NrdInstance::release_resources()
 
     m_are_resources_initialized = false;
 
-    LOG("[NRD Native] NrdInstance resources released.");
+    LOG(("[NRD Native] id:" + std::to_string(id) + " - NRD Instance Released.").c_str());
 }

@@ -241,17 +241,19 @@ namespace Nrd
             }
         }
 
-        public async void Dispose()
+        public void Dispose()
         {
             if (buffer.IsCreated)
             {
                 buffer.Dispose();
             }
 
-            await Awaitable.NextFrameAsync();
+            var request = AsyncGPUReadback.Request(allocatedResources[0].Handle);
+            request.WaitForCompletion();
+
             ReleaseTextures();
-            Debug.Log($"[NRD] Destroying Denoiser Instance {nrdInstanceId} for Camera {cameraName}");
             DestroyDenoiserInstance(nrdInstanceId);
+            Debug.Log($"[NRD] Destroyed Denoiser Instance {nrdInstanceId} for Camera {cameraName} - Dispose Complete");
         }
     }
 }

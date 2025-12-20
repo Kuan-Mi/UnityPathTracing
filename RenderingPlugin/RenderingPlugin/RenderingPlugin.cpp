@@ -50,7 +50,7 @@ namespace
     {
         if (eventID == 1)
         {
-            const FrameData* frameData = static_cast<const FrameData*>(data);
+            FrameData* frameData = static_cast<FrameData*>(data);
 
             // LOG(("instanceId: " + std::to_string(frameData->instanceId)).c_str());
             // LOG(("w: " + std::to_string(frameData->width)).c_str());
@@ -106,7 +106,7 @@ UNITY_INTERFACE_EXPORT int UNITY_INTERFACE_API CreateDenoiserInstance()
 {
     std::scoped_lock lock(g_InstanceMutex);
     int id = g_NextInstanceId++;
-    g_Instances[id] = new NrdInstance(s_UnityInterfaces);
+    g_Instances[id] = new NrdInstance(s_UnityInterfaces, id);
     return id;
 }
 
@@ -132,13 +132,12 @@ UNITY_INTERFACE_EXPORT void UNITY_INTERFACE_API ReleaseTexture(nri::Texture* nri
 {
     RenderSystem::Get().Release(nriTex);
 }
-    
-    void UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API UpdateDenoiserResources(
-    int instanceId, 
-    NrdResourceInput* resources, 
+
+void UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API UpdateDenoiserResources(
+    int instanceId,
+    NrdResourceInput* resources,
     int count)
 {
-    
     std::scoped_lock lock(g_InstanceMutex);
     auto it = g_Instances.find(instanceId);
     if (it != g_Instances.end())

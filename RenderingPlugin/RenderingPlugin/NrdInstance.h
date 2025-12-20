@@ -22,10 +22,10 @@
 class NrdInstance
 {
 public:
-    NrdInstance(IUnityInterfaces* interfaces);
+    NrdInstance(IUnityInterfaces* interfaces,int instanceId);
     ~NrdInstance();
 
-    void DispatchCompute(const FrameData* data);
+    void DispatchCompute( FrameData* data);
     void UpdateResources(NrdResourceInput* resources, int count);
     
 
@@ -39,16 +39,14 @@ private:
 
     IUnityGraphicsD3D12v8* s_d3d12 = nullptr;
     IUnityLog* s_Log = nullptr;
+    int id;
 
     // NRD
     nrd::Integration m_NrdIntegration = {};
     
     std::vector<NrdResourceInput> m_CachedResources;
     
-    // nrd::CommonSettings commonSettings;
-    // nrd::SigmaSettings sigmaSettings;
-
-    // std::unordered_map<ID3D12Resource*, nri::Texture*> m_NriTextureCache;
+    uint32_t frameIndex = 0;
 
     UINT TextureWidth = 0;
     UINT TextureHeight = 0;
