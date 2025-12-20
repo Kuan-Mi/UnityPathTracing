@@ -186,7 +186,7 @@ float3 GetLighting(GeometryProps geometryProps, inout MaterialProps materialProp
 
         // Pseudo sky importance sampling
         float3 Cimp = lerp(Csky, Csun, Math::SmoothStep(0.0, 0.2, materialProps.roughness));
-        Cimp *= Math::SmoothStep(-0.01, 0.05, gSunDirection.z);
+        Cimp *= Math::SmoothStep(-0.01, 0.05, gSunDirection.y);
 
         // Common BRDF
         float3 N = geometryProps.N;

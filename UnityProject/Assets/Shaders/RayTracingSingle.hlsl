@@ -116,20 +116,20 @@ float2 GetBlueNoise(uint2 pixelPos, uint seed = 0)
     uint sampleIndex = (g_FrameIndex + seed) & (BLUE_NOISE_TEMPORAL_DIM - 1);
 
     // sampleIndex = 0;
-    
+
     // pixelPos /= 8;
-    
+
     uint2 uv = pixelPos & (BLUE_NOISE_SPATIAL_DIM - 1);
     uint index = uv.x + uv.y * BLUE_NOISE_SPATIAL_DIM;
     uint3 A = gIn_ScramblingRanking[index].xyz;
-    
+
     // return float2(A.x/256.0 , A.y / 256.0);
     uint rankedSampleIndex = sampleIndex ^ A.z;
-    
-    
+
+
     // return float2(rankedSampleIndex / float(BLUE_NOISE_TEMPORAL_DIM), 0);
-    
-    
+
+
     uint4 B = gIn_Sobol[rankedSampleIndex & 255];
     float4 blue = (float4(B ^ A.xyxy) + 0.5) * (1.0 / 256.0);
 
@@ -284,52 +284,52 @@ void MainRayGenShader()
     float2 rnd = ImportanceSampling::Cosine::GetRay(Blue).xy;
     rnd *= gTanSunAngularRadius;
 
+    // rnd *= 0;
+
     float3 sunDirection = normalize(gSunBasisX.xyz * rnd.x + gSunBasisY.xyz * rnd.y + gSunDirection.xyz);
-    float3 Xoffset = payload.GetXoffset(sunDirection, PT_SHADOW_RAY_OFFSET);
+    // float3 Xoffset = payload.GetXoffset(sunDirection, PT_SHADOW_RAY_OFFSET);
+    float3 Xoffset = payload.GetXoffset(payload.N, PT_SHADOW_RAY_OFFSET);
     float2 mipAndCone = GetConeAngleFromAngularRadius(1, gTanSunAngularRadius);
 
-    float shadowTranslucency = (Color::Luminance(Ldirect) != 0.0 && !true) ? 1.0 : 0.0;
+    float shadowTranslucency = (Color::Luminance(Ldirect) != 0.0) ? 1.0 : 0.0;
+
     float shadowHitDist = 0.0;
 
-    RayDesc rayDesc;
-    rayDesc.Origin = Xoffset;
-    rayDesc.Direction = sunDirection;
-    rayDesc.TMin = 0;
-    rayDesc.TMax = 1000;
+    if (shadowTranslucency > 0.1)
+    {
+        RayDesc rayDesc;
+        rayDesc.Origin = Xoffset;
+        rayDesc.Direction = sunDirection;
+        rayDesc.TMin = 0;
+        rayDesc.TMax = 1000;
 
 
-    MainRayPayload shadowPayload = (MainRayPayload)0;
-    TraceRay(g_AccelStruct, RAY_FLAG_NONE | RAY_FLAG_NONE, 0xFF, 0, 1, 1, rayDesc, shadowPayload);
-    shadowHitDist = shadowPayload.hitT;
+        MainRayPayload shadowPayload = (MainRayPayload)0;
+        TraceRay(g_AccelStruct, RAY_FLAG_NONE | RAY_FLAG_NONE, 0xFF, 0, 1, 1, rayDesc, shadowPayload);
+        shadowHitDist = shadowPayload.hitT;
+    }
+
+    // float aa = 0;
+    //
+    // if (shadowHitDist < 0.1)
+    // {
+    //     aa = 1.0;
+    // }
+    //
+    //
+    //
+    // float nDotL = saturate(dot(payload.N, sunDirection));
+    //
+    // // 如果光线被遮挡，则认为没有半影
+    // if (nDotL <= 0.0)
+    // {
+    //     shadowHitDist = 0;
+    // }
+    //
+
 
     float penumbra = SIGMA_FrontEnd_PackPenumbra(shadowHitDist, gTanSunAngularRadius);
     gOut_Penumbra[launchIndex] = penumbra;
 
-    // float4 translucency = SIGMA_FrontEnd_PackTranslucency(shadowHitDist, shadowTranslucency);
-    gOut_ShadowData[launchIndex] = penumbra;
-    gOut_Shadow_Translucency[launchIndex] = gOut_Shadow_Translucency[launchIndex];
-
-    float3x3 mirrorMatrix = Geometry::GetMirrorMatrix(0); // identity
-
-
-    float3 v = GetSunIntensity(-V0);
-    float3 s2 = GetSkyIntensity(-V0);
-
-
-    // float s = viewZ0 * 0.1;
-    float s = payload.metalness;
-
-    s = 1 - penumbra;
-
-    float3 allRadiance = float3(s, s, s);
-
-    float3 prevRadiance = g_Output[launchIndex];
-
-    float3 result = lerp(prevRadiance, allRadiance, 1.0f / float(g_ConvergenceStep + 1));
-
-
-    // g_Output[launchIndex] = result;
-
-    g_Output[launchIndex] = float3(Blue.x, Blue.x, Blue.x);
-    // g_Output[launchIndex] = gOut_DirectEmission[launchIndex];
+    g_Output[launchIndex] = float3(shadowTranslucency, shadowTranslucency, shadowTranslucency);
 }

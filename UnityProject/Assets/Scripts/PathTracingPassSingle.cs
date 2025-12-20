@@ -199,7 +199,7 @@ namespace PathTracing
             natCmd.SetRenderTarget(data.cameraTexture);
             if (data.showOut)
             {
-                Blitter.BlitTexture(natCmd, data.outputTexture, new Vector4(1, 1, 0, 0), 0, false);
+                Blitter.BlitTexture(natCmd, data.outputTexture, new Vector4(1, 1, 0, 0), data.blitMaterial, 1);
             }
 
             if (data.showShadow)
