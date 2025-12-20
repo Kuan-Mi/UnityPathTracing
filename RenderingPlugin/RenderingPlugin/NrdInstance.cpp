@@ -21,10 +21,10 @@ NrdInstance::~NrdInstance()
     release_resources();
 }
 
-inline bool IsUAVAccess(nri::AccessBits access)
+static bool IsUAVAccess(nri::AccessBits access)
 {
     // 定义所有映射到 D3D12_RESOURCE_STATE_UNORDERED_ACCESS 的 NRI 位
-    const nri::AccessBits uavBits =
+    constexpr nri::AccessBits uavBits =
         nri::AccessBits::SHADER_RESOURCE_STORAGE |
         nri::AccessBits::SCRATCH_BUFFER |
         nri::AccessBits::CLEAR_STORAGE |
@@ -36,7 +36,7 @@ inline bool IsUAVAccess(nri::AccessBits access)
     return (access & uavBits) != 0;
 }
 
-static inline D3D12_RESOURCE_STATES GetResourceStates(nri::AccessBits accessBits, D3D12_COMMAND_LIST_TYPE commandListType)
+static D3D12_RESOURCE_STATES GetResourceStates(nri::AccessBits accessBits, D3D12_COMMAND_LIST_TYPE commandListType)
 {
     D3D12_RESOURCE_STATES resourceStates = D3D12_RESOURCE_STATE_COMMON;
 
@@ -122,15 +122,11 @@ void NrdInstance::DispatchCompute( FrameData* data)
             LOG(("[NRD Native] id:" + std::to_string(id) + " - Texture size changed, recreating NRD instance.").c_str());
         }
 
-        if (data->commonSettings.frameIndex != 0)
-        {
-            LOG(("[NRD Native] id:" + std::to_string(id) + " - Warning: Frame index is not zero during NRD recreation. This may lead to instability.").c_str());
-        }
-
         TextureWidth = data->width;
         TextureHeight = data->height;
 
         CreateNrd();
+        frameIndex = 0;
     }
 
     // LOG(("[NRD Native] id:" + std::to_string(id) + " - Dispatching NRD compute for frame index " + std::to_string(data->commonSettings.frameIndex) + ".").c_str());
@@ -165,7 +161,7 @@ void NrdInstance::DispatchCompute( FrameData* data)
         nrd::Resource r = {};
         r.nri.texture = input.texture;
         r.state.access = input.state.accessBits;
-        r.state.layout = (nri::Layout)input.state.layout;
+        r.state.layout = static_cast<nri::Layout>(input.state.layout);
         r.state.stages = input.state.stageBits;
 
         snapshot.SetResource(input.type, r);
@@ -190,7 +186,7 @@ void NrdInstance::DispatchCompute( FrameData* data)
     RenderSystem::Get().GetNriCore().DestroyCommandBuffer(nriCmdBuffer);
 }
 
-void NrdInstance::UpdateResources(NrdResourceInput* resources, int count)
+void NrdInstance::UpdateResources(const NrdResourceInput* resources, int count)
 {
     if (!resources || count <= 0)
     {

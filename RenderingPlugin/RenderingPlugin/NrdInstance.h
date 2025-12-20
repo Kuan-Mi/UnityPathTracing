@@ -26,7 +26,7 @@ public:
     ~NrdInstance();
 
     void DispatchCompute( FrameData* data);
-    void UpdateResources(NrdResourceInput* resources, int count);
+    void UpdateResources(const NrdResourceInput* resources, int count);
     
 
 private:
