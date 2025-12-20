@@ -136,6 +136,7 @@ namespace PathTracing
             internal bool showValidation;
             internal bool showMv;
             internal bool showShadow;
+            internal bool showOut;
         }
 
         public NRDDenoiser NrdDenoiser;
@@ -173,8 +174,8 @@ namespace PathTracing
             data.rayTracingShader.SetBuffer(g_ScramblingRankingID, data.scramblingRanking);
             data.rayTracingShader.SetBuffer(g_SobolID, data.sobol);
             // natCmd.SetRayTracingTextureParam(data.rayTracingShader, g_SobolID, data.sobol);
-            
-            
+
+
             natCmd.SetRayTracingTextureParam(data.rayTracingShader, g_OutputID, data.outputTexture);
             natCmd.SetRayTracingTextureParam(data.rayTracingShader, g_MvID, data.Mv);
             natCmd.SetRayTracingTextureParam(data.rayTracingShader, g_ViewZID, data.ViewZ);
@@ -194,19 +195,28 @@ namespace PathTracing
 
             natCmd.IssuePluginEventAndData(GetRenderEventAndDataFunc(), 1, data.dataPtr);
 
-            
+
             natCmd.SetRenderTarget(data.cameraTexture);
-            Blitter.BlitTexture(natCmd, data.outputTexture, new Vector4(1, 1, 0, 0),0,false);
-            
+            if (data.showOut)
+            {
+                Blitter.BlitTexture(natCmd, data.outputTexture, new Vector4(1, 1, 0, 0), 0, false);
+            }
+
             if (data.showShadow)
+            {
                 Blitter.BlitTexture(natCmd, data.Shadow_Translucency, new Vector4(1, 1, 0, 0), data.blitMaterial, 1);
+            }
+
             if (data.showValidation)
             {
                 Blitter.BlitTexture(natCmd, data.Validation, new Vector4(1, 1, 0, 0), data.blitMaterial, 0);
                 // Blitter.BlitTexture(natCmd, data.Validation, new Vector4(1, 1, 0, 0),0,false);
             }
+
             if (data.showMv)
+            {
                 Blitter.BlitTexture(natCmd, data.Mv, new Vector4(1, 1, 0, 0), data.blitMaterial, 2);
+            }
         }
 
         private Matrix4x4 prevWorldToView;
@@ -282,7 +292,7 @@ namespace PathTracing
             Vector3 up = new Vector3(0, 1, 0);
 
             var gSunBasisX = math.normalize(math.cross(new float3(up.x, up.y, up.z),
-                new float3(gSunDirection.x, gSunDirection.y, gSunDirection.z))) ;
+                new float3(gSunDirection.x, gSunDirection.y, gSunDirection.z)));
             var gSunBasisY = math.normalize(math.cross(new float3(gSunDirection.x, gSunDirection.y, gSunDirection.z),
                 gSunBasisX));
 
@@ -300,7 +310,7 @@ namespace PathTracing
                 g_FrameIndex = (uint)Time.frameCount,
                 g_SampleCount = (uint)_settings.sampleCount,
                 lightOffset = _settings.lightOffset,
- 
+
                 _CameraPosition = cameraData.worldSpaceCameraPos,
 
                 _CCameraToWorld = viewToWorld,
@@ -339,6 +349,7 @@ namespace PathTracing
             passData.pathTracingSettingsBuffer = pathTracingSettingsBuffer;
             passData.blitMaterial = biltMaterial;
 
+            passData.showOut = _settings.showOut;
             passData.showShadow = _settings.showShadow;
             passData.showMv = _settings.showMV;
             passData.showValidation = _settings.showValidation;
@@ -412,10 +423,7 @@ namespace PathTracing
 
             builder.AllowPassCulling(false);
 
-            builder.SetRenderFunc((PassData passData, UnsafeGraphContext context) =>
-            {
-                ExecutePass(passData, context);
-            });
+            builder.SetRenderFunc((PassData passData, UnsafeGraphContext context) => { ExecutePass(passData, context); });
 
             prevWorldToView = worldToView;
             prevWorldToClip = worldToClip;

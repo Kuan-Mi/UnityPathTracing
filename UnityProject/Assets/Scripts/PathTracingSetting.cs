@@ -55,5 +55,6 @@ namespace PathTracing
         public bool showValidation;
         public bool showMV;
         public bool showShadow;
+        public bool showOut;
     }
 }
