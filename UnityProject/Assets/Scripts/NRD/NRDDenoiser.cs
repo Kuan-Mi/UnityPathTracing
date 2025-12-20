@@ -58,6 +58,18 @@ namespace Nrd
             int instanceId = CreateDenoiserInstance();
             nrdInstanceId = instanceId;
             buffer = new NativeArray<FrameData>(BufferCount, Allocator.Persistent);
+
+            var srvState = new NriResourceState { accessBits = AccessBits.SHADER_RESOURCE, layout = Layout.SHADER_RESOURCE, stageBits = 1 << 7 };
+            var uavState = new NriResourceState { accessBits = AccessBits.SHADER_RESOURCE_STORAGE, layout = Layout.SHADER_RESOURCE_STORAGE, stageBits = 1 << 10 };
+
+            allocatedResources.Add(new NrdTextureResource(ResourceType.IN_MV, GraphicsFormat.R16G16B16A16_SFloat, srvState));
+            allocatedResources.Add(new NrdTextureResource(ResourceType.IN_VIEWZ, GraphicsFormat.R32_SFloat, srvState));
+            allocatedResources.Add(new NrdTextureResource(ResourceType.IN_NORMAL_ROUGHNESS, GraphicsFormat.A2B10G10R10_UNormPack32, srvState));
+            allocatedResources.Add(new NrdTextureResource(ResourceType.IN_PENUMBRA, GraphicsFormat.R16_SFloat, srvState));
+            allocatedResources.Add(new NrdTextureResource(ResourceType.OUT_SHADOW_TRANSLUCENCY, GraphicsFormat.R16_SFloat, uavState));
+            allocatedResources.Add(new NrdTextureResource(ResourceType.IN_DIFF_RADIANCE_HITDIST, GraphicsFormat.R16G16B16A16_SFloat, srvState));
+            allocatedResources.Add(new NrdTextureResource(ResourceType.OUT_DIFF_RADIANCE_HITDIST, GraphicsFormat.R16G16B16A16_SFloat, uavState));
+            allocatedResources.Add(new NrdTextureResource(ResourceType.OUT_VALIDATION, GraphicsFormat.R8G8B8A8_UNorm, uavState));
         }
 
         public void EnsureResources(int width, int height)
@@ -77,19 +89,6 @@ namespace Nrd
             _prevHeight = height;
 
             FrameIndex = 0;
-
-
-            var srvState = new NriResourceState { accessBits = AccessBits.SHADER_RESOURCE, layout = Layout.SHADER_RESOURCE, stageBits = 1 << 7 };
-            var uavState = new NriResourceState { accessBits = AccessBits.SHADER_RESOURCE_STORAGE, layout = Layout.SHADER_RESOURCE_STORAGE, stageBits = 1 << 10 };
-
-            allocatedResources.Add(new NrdTextureResource(ResourceType.IN_MV, GraphicsFormat.R16G16B16A16_SFloat, srvState));
-            allocatedResources.Add(new NrdTextureResource(ResourceType.IN_VIEWZ, GraphicsFormat.R32_SFloat, srvState));
-            allocatedResources.Add(new NrdTextureResource(ResourceType.IN_NORMAL_ROUGHNESS, GraphicsFormat.A2B10G10R10_UNormPack32, srvState));
-            allocatedResources.Add(new NrdTextureResource(ResourceType.IN_PENUMBRA, GraphicsFormat.R16_SFloat, srvState));
-            allocatedResources.Add(new NrdTextureResource(ResourceType.OUT_SHADOW_TRANSLUCENCY, GraphicsFormat.R16_SFloat, uavState));
-            allocatedResources.Add(new NrdTextureResource(ResourceType.IN_DIFF_RADIANCE_HITDIST, GraphicsFormat.R16G16B16A16_SFloat, srvState));
-            allocatedResources.Add(new NrdTextureResource(ResourceType.OUT_DIFF_RADIANCE_HITDIST, GraphicsFormat.R16G16B16A16_SFloat, uavState));
-            allocatedResources.Add(new NrdTextureResource(ResourceType.OUT_VALIDATION, GraphicsFormat.R8G8B8A8_UNorm, uavState));
 
             foreach (var nrdTextureResource in allocatedResources)
             {
