@@ -19,15 +19,6 @@ namespace Nrd
         public ushort width;
         public ushort height;
 
-        public IntPtr mvPointer;
-        public IntPtr normalRoughnessPointer;
-        public IntPtr viewZPointer;
-        public IntPtr penumbraPointer;
-        public IntPtr shadowTranslucencyPointer;
-        public IntPtr diffRadiancePointer;
-        public IntPtr outDiffRadiancePointer;
-        public IntPtr validationPointer;
-
         public int instanceId;
 
         public static FrameData _default = CreateDefault();
@@ -44,14 +35,6 @@ namespace Nrd
                 reblurSettings = ReblurSettings._default,
                 width = 0,
                 height = 0,
-                mvPointer = IntPtr.Zero,
-                normalRoughnessPointer = IntPtr.Zero,
-                viewZPointer = IntPtr.Zero,
-                penumbraPointer = IntPtr.Zero,
-                shadowTranslucencyPointer = IntPtr.Zero,
-                diffRadiancePointer = IntPtr.Zero,
-                outDiffRadiancePointer = IntPtr.Zero,
-                validationPointer = IntPtr.Zero,
                 instanceId = 0
             };
         }

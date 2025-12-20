@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.Runtime.InteropServices;
 using NRD;
 using Nri;
@@ -37,23 +38,17 @@ namespace Nrd
         private NativeArray<FrameData> buffer;
         private const int BufferCount = 3;
 
-        private readonly NrdTextureResource m_Mv = new();
-        private readonly NrdTextureResource m_NormalRoughness = new();
-        private readonly NrdTextureResource m_ViewZ = new();
-        private readonly NrdTextureResource m_Penumbra = new();
-        private readonly NrdTextureResource m_ShadowTranslucency = new();
-        private readonly NrdTextureResource m_DiffRadiance = new();
-        private readonly NrdTextureResource m_OutDiffRadiance = new();
-        private readonly NrdTextureResource m_Validation = new();
+        private List<NrdTextureResource> allocatedResources = new();
 
-        public RTHandle MvHandle => m_Mv.Handle;
-        public RTHandle NormalRoughnessHandle => m_NormalRoughness.Handle;
-        public RTHandle ViewZHandle => m_ViewZ.Handle;
-        public RTHandle PenumbraHandle => m_Penumbra.Handle;
-        public RTHandle ShadowTranslucencyHandle => m_ShadowTranslucency.Handle;
-        public RTHandle DiffRadianceHandle => m_DiffRadiance.Handle;
-        public RTHandle OutDiffRadianceHandle => m_OutDiffRadiance.Handle;
-        public RTHandle ValidationHandle => m_Validation.Handle;
+        public NrdTextureResource GetResource(ResourceType type)
+        {
+            return allocatedResources.Find(res => res.ResourceType == type);
+        }
+
+        public RTHandle GetRT(ResourceType type)
+        {
+            return allocatedResources.Find(res => res.ResourceType == type).Handle;
+        }
 
         private PathTracingSetting setting;
 
@@ -83,14 +78,23 @@ namespace Nrd
 
             FrameIndex = 0;
 
-            m_Mv.Allocate("IN_MV", width, height, GraphicsFormat.R16G16B16A16_SFloat);
-            m_ViewZ.Allocate("IN_VIEWZ", width, height, GraphicsFormat.R32_SFloat);
-            m_NormalRoughness.Allocate("IN_NORMAL_ROUGHNESS", width, height, GraphicsFormat.A2B10G10R10_UNormPack32);
-            m_Penumbra.Allocate("IN_PENUMBRA", width, height, GraphicsFormat.R16_SFloat);
-            m_ShadowTranslucency.Allocate("OUT_SHADOW_TRANSLUCENCY", width, height, GraphicsFormat.R16_SFloat);
-            m_DiffRadiance.Allocate("IN_DIFF_RADIANCE_HITDIST", width, height, GraphicsFormat.R16G16B16A16_SFloat);
-            m_OutDiffRadiance.Allocate("OUT_DIFF_RADIANCE_HITDIST", width, height, GraphicsFormat.R16G16B16A16_SFloat);
-            m_Validation.Allocate("OUT_VALIDATION", width, height, GraphicsFormat.R8G8B8A8_UNorm);
+
+            var srvState = new NriResourceState { accessBits = AccessBits.SHADER_RESOURCE, layout = Layout.SHADER_RESOURCE, stageBits = 1 << 7 };
+            var uavState = new NriResourceState { accessBits = AccessBits.SHADER_RESOURCE_STORAGE, layout = Layout.SHADER_RESOURCE_STORAGE, stageBits = 1 << 10 };
+
+            allocatedResources.Add(new NrdTextureResource(ResourceType.IN_MV, GraphicsFormat.R16G16B16A16_SFloat, srvState));
+            allocatedResources.Add(new NrdTextureResource(ResourceType.IN_VIEWZ, GraphicsFormat.R32_SFloat, srvState));
+            allocatedResources.Add(new NrdTextureResource(ResourceType.IN_NORMAL_ROUGHNESS, GraphicsFormat.A2B10G10R10_UNormPack32, srvState));
+            allocatedResources.Add(new NrdTextureResource(ResourceType.IN_PENUMBRA, GraphicsFormat.R16_SFloat, srvState));
+            allocatedResources.Add(new NrdTextureResource(ResourceType.OUT_SHADOW_TRANSLUCENCY, GraphicsFormat.R16_SFloat, uavState));
+            allocatedResources.Add(new NrdTextureResource(ResourceType.IN_DIFF_RADIANCE_HITDIST, GraphicsFormat.R16G16B16A16_SFloat, srvState));
+            allocatedResources.Add(new NrdTextureResource(ResourceType.OUT_DIFF_RADIANCE_HITDIST, GraphicsFormat.R16G16B16A16_SFloat, uavState));
+            allocatedResources.Add(new NrdTextureResource(ResourceType.OUT_VALIDATION, GraphicsFormat.R8G8B8A8_UNorm, uavState));
+
+            foreach (var nrdTextureResource in allocatedResources)
+            {
+                nrdTextureResource.Allocate(width, height);
+            }
 
             UpdateResourceSnapshotInCpp();
         }
@@ -109,20 +113,15 @@ namespace Nrd
 
             var srvState = new NriResourceState { accessBits = AccessBits.SHADER_RESOURCE, layout = Layout.SHADER_RESOURCE, stageBits = 1 << 7 };
             var uavState = new NriResourceState { accessBits = AccessBits.SHADER_RESOURCE_STORAGE, layout = Layout.SHADER_RESOURCE_STORAGE, stageBits = 1 << 10 };
-            var rtState = new NriResourceState { accessBits = AccessBits.COLOR_ATTACHMENT, layout = Layout.COLOR_ATTACHMENT, stageBits = 1 << 7 };
-            var commonState = new NriResourceState { accessBits = AccessBits.NONE, layout = Layout.GENERAL, stageBits = 0 };
 
             // Reblur/Sigma Inputs
             NrdResourceInput* ptr = (NrdResourceInput*)m_ResourceCache.GetUnsafePtr();
 
-            ptr[idx++] = new NrdResourceInput { type = ResourceType.IN_MV, texture = m_Mv.NriPtr, state = FrameIndex == 0 ? uavState : srvState };
-            ptr[idx++] = new NrdResourceInput { type = ResourceType.IN_NORMAL_ROUGHNESS, texture = m_NormalRoughness.NriPtr, state = FrameIndex == 0 ? uavState : srvState };
-            ptr[idx++] = new NrdResourceInput { type = ResourceType.IN_VIEWZ, texture = m_ViewZ.NriPtr, state = FrameIndex == 0 ? uavState : srvState };
-            ptr[idx++] = new NrdResourceInput { type = ResourceType.IN_PENUMBRA, texture = m_Penumbra.NriPtr, state = FrameIndex == 0 ? uavState : srvState };
-            ptr[idx++] = new NrdResourceInput { type = ResourceType.OUT_SHADOW_TRANSLUCENCY, texture = m_ShadowTranslucency.NriPtr, state = uavState };
-            ptr[idx++] = new NrdResourceInput { type = ResourceType.IN_DIFF_RADIANCE_HITDIST, texture = m_DiffRadiance.NriPtr, state = FrameIndex == 0 ? rtState : srvState };
-            ptr[idx++] = new NrdResourceInput { type = ResourceType.OUT_DIFF_RADIANCE_HITDIST, texture = m_OutDiffRadiance.NriPtr, state = FrameIndex == 0 ? rtState : uavState };
-            ptr[idx++] = new NrdResourceInput { type = ResourceType.OUT_VALIDATION, texture = m_Validation.NriPtr, state = commonState };
+            foreach (var nrdTextureResource in allocatedResources)
+            {
+                ptr[idx++] = new NrdResourceInput { type = nrdTextureResource.ResourceType, texture = nrdTextureResource.NriPtr, state = nrdTextureResource.ResourceState };
+            }
+
 
             UpdateDenoiserResources(nrdInstanceId, (IntPtr)ptr, idx);
 
@@ -131,14 +130,12 @@ namespace Nrd
 
         private void ReleaseTextures()
         {
-            m_Mv.Release();
-            m_NormalRoughness.Release();
-            m_ViewZ.Release();
-            m_Penumbra.Release();
-            m_ShadowTranslucency.Release();
-            m_DiffRadiance.Release();
-            m_OutDiffRadiance.Release();
-            m_Validation.Release();
+            foreach (var nrdTextureResource in allocatedResources)
+            {
+                nrdTextureResource.Release();
+            }
+
+            allocatedResources.Clear();
         }
 
         private unsafe FrameData GetData(Camera mCamera, Vector3 dirToLight)
@@ -189,16 +186,6 @@ namespace Nrd
             // Sigma 需要指向光源的方向 (normalized)
             localData.sigmaSettings.lightDirection = dirToLight;
 
-            // --- 其他设置 ---
-            localData.mvPointer = m_Mv.NativePtr;
-            localData.normalRoughnessPointer = m_NormalRoughness.NativePtr;
-            localData.viewZPointer = m_ViewZ.NativePtr;
-            localData.penumbraPointer = m_Penumbra.NativePtr;
-            localData.shadowTranslucencyPointer = m_ShadowTranslucency.NativePtr;
-            localData.diffRadiancePointer = m_DiffRadiance.NativePtr;
-            localData.outDiffRadiancePointer = m_OutDiffRadiance.NativePtr;
-            localData.validationPointer = m_Validation.NativePtr;
-
             // Debug.Log("Record Frame Index: " + m_FrameIndex);
 
             // 4. 更新历史状态
@@ -219,12 +206,12 @@ namespace Nrd
             //     localData.commonSettings.worldToViewMatrix = setting.worldToViewMatrix;
             //     localData.commonSettings.worldToViewMatrixPrev = setting.worldToViewMatrixPrev;
             // }
- 
-            localData.commonSettings.motionVectorScale.z = setting.is2DMotionVector?0.0f:1.0f;
-            
-            
+
+            localData.commonSettings.motionVectorScale.z = setting.is2DMotionVector ? 0.0f : 1.0f;
+
+
             localData.commonSettings.denoisingRange = setting.denoisingRange;
-            
+
             // localData.commonSettings.disocclusionThreshold = setting.disocclusionThreshold;
             // localData.commonSettings.disocclusionThresholdAlternate = setting.disocclusionThresholdAlternate;
             localData.commonSettings.splitScreen = setting.splitScreen;

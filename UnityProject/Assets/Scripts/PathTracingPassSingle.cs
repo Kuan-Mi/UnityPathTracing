@@ -355,12 +355,12 @@ namespace PathTracing
             passData.scramblingRanking = scramblingRanking;
             passData.sobol = sobol;
 
-            passData.Mv = renderGraph.ImportTexture(NrdDenoiser.MvHandle);
-            passData.ViewZ = renderGraph.ImportTexture(NrdDenoiser.ViewZHandle);
-            passData.Normal_Roughness = renderGraph.ImportTexture(NrdDenoiser.NormalRoughnessHandle);
-            passData.Penumbra = renderGraph.ImportTexture(NrdDenoiser.PenumbraHandle);
-            passData.Shadow_Translucency = renderGraph.ImportTexture(NrdDenoiser.ShadowTranslucencyHandle);
-            passData.Validation = renderGraph.ImportTexture(NrdDenoiser.ValidationHandle);
+            passData.Mv = renderGraph.ImportTexture(NrdDenoiser.GetRT(ResourceType.IN_MV));
+            passData.ViewZ = renderGraph.ImportTexture(NrdDenoiser.GetRT(ResourceType.IN_VIEWZ));
+            passData.Normal_Roughness = renderGraph.ImportTexture(NrdDenoiser.GetRT(ResourceType.IN_NORMAL_ROUGHNESS));
+            passData.Penumbra = renderGraph.ImportTexture(NrdDenoiser.GetRT(ResourceType.IN_PENUMBRA));
+            passData.Shadow_Translucency = renderGraph.ImportTexture(NrdDenoiser.GetRT(ResourceType.OUT_SHADOW_TRANSLUCENCY));
+            passData.Validation = renderGraph.ImportTexture(NrdDenoiser.GetRT(ResourceType.OUT_VALIDATION));
 
             passData.BaseColor_Metalness = CreateTex(textureDesc, renderGraph, "BaseColor_Metalness",
                 GraphicsFormat.R16G16B16A16_SFloat);

@@ -17,18 +17,30 @@ namespace NRD
         public RTHandle Handle;  // Unity RTHandle封装
         public IntPtr NativePtr; // DX12底层指针
         public IntPtr NriPtr;    // NRD封装指针
+        
+        
         public string Name;
-
+        public NriResourceState ResourceState;
+        public ResourceType ResourceType;
+        public GraphicsFormat GraphicsFormat;
         public bool IsCreated => Handle != null;
-
-        public void Allocate(string name, int w, int h, GraphicsFormat graphicsFormat)
+        
+        
+        public NrdTextureResource(ResourceType resourceType, GraphicsFormat graphicsFormat,NriResourceState initialState)
         {
-            var dxgiFormat = NRDUtil.GetDXGIFormat(graphicsFormat);
+            Name = resourceType.ToString();
+            ResourceType = resourceType;
+            ResourceState = initialState;
+            GraphicsFormat = graphicsFormat;
+        }
+
+        public void Allocate( int w, int h)
+        {
+            var dxgiFormat = NRDUtil.GetDXGIFormat(GraphicsFormat);
             Release(); // 确保先释放旧的
-            Name = name;
 
             // 创建 RT 描述
-            var desc = new RenderTextureDescriptor(w, h, graphicsFormat, 0)
+            var desc = new RenderTextureDescriptor(w, h, GraphicsFormat, 0)
             {
                 enableRandomWrite = true,
                 useMipMap = false,
@@ -39,7 +51,7 @@ namespace NRD
             // 创建 RT
             var rt = new RenderTexture(desc)
             {
-                name = name,
+                name = Name,
                 filterMode = FilterMode.Point,
                 wrapMode = TextureWrapMode.Clamp
             };

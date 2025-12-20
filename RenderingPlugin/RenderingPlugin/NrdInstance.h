@@ -37,7 +37,7 @@ private:
     void initialize_and_create_resources();
     void release_resources();
 
-    IUnityGraphicsD3D12v7* s_d3d12 = nullptr;
+    IUnityGraphicsD3D12v8* s_d3d12 = nullptr;
     IUnityLog* s_Log = nullptr;
 
     // NRD

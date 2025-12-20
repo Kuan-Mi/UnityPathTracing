@@ -9,8 +9,9 @@
 
 NrdInstance::NrdInstance(IUnityInterfaces* interfaces)
 {
-    s_d3d12 = interfaces->Get<IUnityGraphicsD3D12v7>();
+    s_d3d12 = interfaces->Get<IUnityGraphicsD3D12v8>();
     s_Log = interfaces->Get<IUnityLog>();
+
     initialize_and_create_resources();
 }
 
@@ -18,6 +19,80 @@ NrdInstance::~NrdInstance()
 {
     release_resources();
 }
+inline bool IsUAVAccess(nri::AccessBits access) {
+    // 定义所有映射到 D3D12_RESOURCE_STATE_UNORDERED_ACCESS 的 NRI 位
+    const nri::AccessBits uavBits = 
+        nri::AccessBits::SHADER_RESOURCE_STORAGE | 
+        nri::AccessBits::SCRATCH_BUFFER | 
+        nri::AccessBits::CLEAR_STORAGE |
+        nri::AccessBits::ACCELERATION_STRUCTURE_READ |
+        nri::AccessBits::ACCELERATION_STRUCTURE_WRITE |
+        nri::AccessBits::MICROMAP_READ |
+        nri::AccessBits::MICROMAP_WRITE;
+
+    return (access & uavBits) != 0;
+}
+
+static inline D3D12_RESOURCE_STATES GetResourceStates(nri::AccessBits accessBits, D3D12_COMMAND_LIST_TYPE commandListType)
+{
+    D3D12_RESOURCE_STATES resourceStates = D3D12_RESOURCE_STATE_COMMON;
+
+    if (accessBits & nri::AccessBits::INDEX_BUFFER)
+        resourceStates |= D3D12_RESOURCE_STATE_INDEX_BUFFER;
+
+    if (accessBits & (nri::AccessBits::CONSTANT_BUFFER | nri::AccessBits::VERTEX_BUFFER))
+        resourceStates |= D3D12_RESOURCE_STATE_VERTEX_AND_CONSTANT_BUFFER;
+
+    if (accessBits & nri::AccessBits::ARGUMENT_BUFFER)
+        resourceStates |= D3D12_RESOURCE_STATE_INDIRECT_ARGUMENT;
+
+    if (accessBits & nri::AccessBits::COLOR_ATTACHMENT)
+        resourceStates |= D3D12_RESOURCE_STATE_RENDER_TARGET;
+
+    if (accessBits & nri::AccessBits::SHADING_RATE_ATTACHMENT)
+        resourceStates |= D3D12_RESOURCE_STATE_SHADING_RATE_SOURCE;
+
+    if (accessBits & nri::AccessBits::DEPTH_STENCIL_ATTACHMENT_READ)
+        resourceStates |= D3D12_RESOURCE_STATE_DEPTH_READ;
+
+    if (accessBits & nri::AccessBits::DEPTH_STENCIL_ATTACHMENT_WRITE)
+        resourceStates |= D3D12_RESOURCE_STATE_DEPTH_WRITE;
+
+    if (accessBits & (nri::AccessBits::ACCELERATION_STRUCTURE_READ | nri::AccessBits::MICROMAP_READ))
+        resourceStates |= D3D12_RESOURCE_STATE_UNORDERED_ACCESS;
+
+    if (accessBits & (nri::AccessBits::ACCELERATION_STRUCTURE_WRITE | nri::AccessBits::MICROMAP_WRITE))
+        resourceStates |= D3D12_RESOURCE_STATE_UNORDERED_ACCESS;
+
+    if (accessBits & nri::AccessBits::SHADER_RESOURCE)
+    {
+        resourceStates |= D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE;
+
+        if (commandListType == D3D12_COMMAND_LIST_TYPE_DIRECT)
+            resourceStates |= D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
+    }
+
+    if (accessBits & nri::AccessBits::SHADER_BINDING_TABLE)
+        resourceStates |= D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE;
+
+    if (accessBits & (nri::AccessBits::SHADER_RESOURCE_STORAGE | nri::AccessBits::SCRATCH_BUFFER | nri::AccessBits::CLEAR_STORAGE))
+        resourceStates |= D3D12_RESOURCE_STATE_UNORDERED_ACCESS;
+
+    if (accessBits & nri::AccessBits::COPY_SOURCE)
+        resourceStates |= D3D12_RESOURCE_STATE_COPY_SOURCE;
+
+    if (accessBits & nri::AccessBits::COPY_DESTINATION)
+        resourceStates |= D3D12_RESOURCE_STATE_COPY_DEST;
+
+    if (accessBits & nri::AccessBits::RESOLVE_SOURCE)
+        resourceStates |= D3D12_RESOURCE_STATE_RESOLVE_SOURCE;
+
+    if (accessBits & nri::AccessBits::RESOLVE_DESTINATION)
+        resourceStates |= D3D12_RESOURCE_STATE_RESOLVE_DEST;
+
+    return resourceStates;
+}
+
 
 void NrdInstance::DispatchCompute(const FrameData* data)
 {
@@ -71,10 +146,15 @@ void NrdInstance::DispatchCompute(const FrameData* data)
     m_NrdIntegration.NewFrame();
 
     nrd::ResourceSnapshot snapshot = {};
-    
+
     for (const auto& input : m_CachedResources)
     {
         if (input.texture == nullptr) continue;
+
+        uint64_t nativeHandle = RenderSystem::Get().GetNriCore().GetTextureNativeObject(input.texture);
+        ID3D12Resource* rawResource = reinterpret_cast<ID3D12Resource*>(nativeHandle);
+        auto state = GetResourceStates(input.state.accessBits, D3D12_COMMAND_LIST_TYPE_DIRECT);
+        s_d3d12->RequestResourceState(rawResource, state);
 
         nrd::Resource r = {};
         r.nri.texture = input.texture;
@@ -84,30 +164,22 @@ void NrdInstance::DispatchCompute(const FrameData* data)
 
         snapshot.SetResource(input.type, r);
     }
-    
+
     const nrd::Identifier denoisers[] = {m_SigmaId, m_ReblurId};
-
-    D3D12_RESOURCE_BARRIER barrier;
-    barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
-    barrier.Flags = D3D12_RESOURCE_BARRIER_FLAG_NONE;
-    barrier.Transition.pResource = data->validationPointer;
-    barrier.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
-    barrier.Transition.StateBefore = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
-    barrier.Transition.StateAfter = D3D12_RESOURCE_STATE_COMMON;
-
-    recording_state.commandList->ResourceBarrier(1, &barrier);
 
     m_NrdIntegration.Denoise(denoisers, 2, *nriCmdBuffer, snapshot);
 
-    D3D12_RESOURCE_BARRIER barrier2;
-    barrier2.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
-    barrier2.Flags = D3D12_RESOURCE_BARRIER_FLAG_NONE;
-    barrier2.Transition.pResource = data->validationPointer;
-    barrier2.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
-    barrier2.Transition.StateBefore = D3D12_RESOURCE_STATE_UNORDERED_ACCESS;
-    barrier2.Transition.StateAfter = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
-
-    recording_state.commandList->ResourceBarrier(1, &barrier2);
+    for (size_t i = 0; i < snapshot.uniqueNum; i++)
+    {
+        nrd::Resource& res = snapshot.unique[i];
+        uint64_t nativeHandle = RenderSystem::Get().GetNriCore().GetTextureNativeObject(res.nri.texture);
+        ID3D12Resource* rawResource = reinterpret_cast<ID3D12Resource*>(nativeHandle);
+        auto state = GetResourceStates(res.state.access, D3D12_COMMAND_LIST_TYPE_DIRECT);
+        
+        bool isUAV = IsUAVAccess (res.state.access);
+        
+        s_d3d12->NotifyResourceState(rawResource, state, isUAV);
+    }
 
     RenderSystem::Get().GetNriCore().DestroyCommandBuffer(nriCmdBuffer);
 }
