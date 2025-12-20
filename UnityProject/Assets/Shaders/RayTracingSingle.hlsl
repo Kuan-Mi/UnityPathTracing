@@ -23,34 +23,24 @@ RWTexture2D<float3> g_Output;
 
 // 运动矢量（Motion Vector），用于描述像素在当前帧与上一帧之间的运动，以及视深（ViewZ）和TAA遮罩信息。
 RWTexture2D<float4> gOut_Mv;
-
 // 视空间深度（ViewZ），即像素在视空间中的Z值。
 RWTexture2D<float> gOut_ViewZ;
-
 // 法线、粗糙度和材质ID的打包信息。用于后续的去噪和材质区分。
 RWTexture2D<float4> gOut_Normal_Roughness;
-
-// 半影信息（Penumbra），用于软阴影的计算和去噪。
-RWTexture2D<float> gOut_Penumbra;
-
-
 // 基础色（BaseColor，已转为sRGB）和金属度（Metalness）。
 RWTexture2D<float4> gOut_BaseColor_Metalness;
+
 // 直接光照（Direct Lighting），即主光线命中点的直接光照结果。
 RWTexture2D<float3> gOut_DirectLighting;
 // 直接自发光（Direct Emission），即材质的自发光分量。
 RWTexture2D<float3> gOut_DirectEmission;
-// 主表面替换（PSR）后的路径通量（Throughput），用于镜面跳跃等特殊路径的能量追踪。
-RWTexture2D<float3> gOut_PsrThroughput;
+
 // 阴影数据（Shadow Data），如半影宽度等，用于软阴影和去噪。
-RWTexture2D<float2> gOut_ShadowData;
-// 阴影穿透率（Shadow Translucency），描述光线穿透透明物体后的能量变化。
-RWTexture2D<float4> gOut_Shadow_Translucency;
+RWTexture2D<float> gOut_ShadowData;
 // 漫反射光照结果（Diffuse Radiance），包含去噪和打包后的信息。
 RWTexture2D<float4> gOut_Diff;
 // 高光反射光照结果（Specular Radiance），包含去噪和打包后的信息。
 RWTexture2D<float4> gOut_Spec;
-
 
 struct TraceOpaqueResult
 {
@@ -73,11 +63,6 @@ void MainMissShader(inout MainRayPayload payload : SV_RayPayload)
     // // payload.emission = float3(0.5,0.5,0.5); // 固定背景色，便于调试
     // payload.bounceIndexOpaque = -1;
 }
-
-// struct ShadowPayload
-// {
-//     bool hit;
-// };
 
 [shader("miss")]
 void MissShadow(inout MainRayPayload payload : SV_RayPayload)
@@ -140,25 +125,6 @@ float2 GetBlueNoise(uint2 pixelPos, uint seed = 0)
 
     return saturate(blue.xy);
 }
-
-// float4 NRD_FrontEnd_PackNormalAndRoughness(float3 N, float roughness)
-// {
-//     float4 p;
-//
-//     // Best fit ( optional )
-//     N /= max(abs(N.x), max(abs(N.y), abs(N.z)));
-//
-//     #if( NRD_NORMAL_ENCODING == NRD_NORMAL_ENCODING_RGBA8_UNORM || NRD_NORMAL_ENCODING == NRD_NORMAL_ENCODING_RGBA16_UNORM )
-//     N = N * 0.5 + 0.5;
-//     #endif
-//
-//     p.xyz = N;
-//     p.w = roughness;
-//
-//
-//     return p;
-// }
-
 
 #define PT_SHADOW_RAY_OFFSET                1.0 // pixels
 
@@ -250,7 +216,7 @@ void MainRayGenShader()
     materialProps0.Lemi = payload.Lemi;
     // 这三个应该从贴图再计算一次
     materialProps0.curvature = payload.curvature;
-    materialProps0.N = payload.N;
+    materialProps0.N = payload.matN;
     materialProps0.T = payload.T.xyz;
 
     float3 X0 = payload.X;
@@ -266,7 +232,8 @@ void MainRayGenShader()
     gOut_ViewZ[launchIndex] = -viewZ0;
 
 
-    gOut_Normal_Roughness[launchIndex] = NRD_FrontEnd_PackNormalAndRoughness(payload.N, payload.roughness, 0);
+    // gOut_Normal_Roughness[launchIndex] = NRD_FrontEnd_PackNormalAndRoughness(payload.N, payload.roughness, 0);
+    gOut_Normal_Roughness[launchIndex] = NRD_FrontEnd_PackNormalAndRoughness(payload.matN, payload.roughness, 0);
 
     gOut_BaseColor_Metalness[launchIndex] = float4(payload.baseColor, payload.metalness);
 
@@ -274,9 +241,6 @@ void MainRayGenShader()
 
     gOut_DirectLighting[launchIndex] = Ldirect;
     gOut_DirectEmission[launchIndex] = payload.Lemi;
-    gOut_PsrThroughput[launchIndex] = float3(1, 1, 1);
-    gOut_ShadowData[launchIndex] = float2(0, 0);
-
 
     float2 Blue = GetBlueNoise(launchIndex);
 
@@ -303,33 +267,13 @@ void MainRayGenShader()
         rayDesc.TMin = 0;
         rayDesc.TMax = 1000;
 
-
         MainRayPayload shadowPayload = (MainRayPayload)0;
         TraceRay(g_AccelStruct, RAY_FLAG_NONE | RAY_FLAG_NONE, 0xFF, 0, 1, 1, rayDesc, shadowPayload);
         shadowHitDist = shadowPayload.hitT;
     }
 
-    // float aa = 0;
-    //
-    // if (shadowHitDist < 0.1)
-    // {
-    //     aa = 1.0;
-    // }
-    //
-    //
-    //
-    // float nDotL = saturate(dot(payload.N, sunDirection));
-    //
-    // // 如果光线被遮挡，则认为没有半影
-    // if (nDotL <= 0.0)
-    // {
-    //     shadowHitDist = 0;
-    // }
-    //
-
-
     float penumbra = SIGMA_FrontEnd_PackPenumbra(shadowHitDist, gTanSunAngularRadius);
-    gOut_Penumbra[launchIndex] = penumbra;
 
-    g_Output[launchIndex] = float3(shadowTranslucency, shadowTranslucency, shadowTranslucency);
+    gOut_ShadowData [launchIndex] = penumbra;
+    g_Output[launchIndex] = Ldirect;
 }

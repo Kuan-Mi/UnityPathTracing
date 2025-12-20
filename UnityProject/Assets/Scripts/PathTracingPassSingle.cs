@@ -27,26 +27,25 @@ namespace PathTracing
         #region ID
 
         private static int g_ZoomID = Shader.PropertyToID("g_Zoom");
-        private static int g_OutputID = Shader.PropertyToID("g_Output");
-
 
         private static int g_ScramblingRankingID = Shader.PropertyToID("gIn_ScramblingRanking");
         private static int g_SobolID = Shader.PropertyToID("gIn_Sobol");
 
+        // 测试用
+        private static int g_OutputID = Shader.PropertyToID("g_Output");
+
+        //  传入NRD的无噪声资源
         private static int g_MvID = Shader.PropertyToID("gOut_Mv");
-        private static int g_PenumbraID = Shader.PropertyToID("gOut_Penumbra");
-        private static int g_ValidationID = Shader.PropertyToID("gOut_Validation");
-
-
         private static int g_ViewZID = Shader.PropertyToID("gOut_ViewZ");
         private static int g_Normal_RoughnessID = Shader.PropertyToID("gOut_Normal_Roughness");
         private static int g_BaseColor_MetalnessID = Shader.PropertyToID("gOut_BaseColor_Metalness");
+
+        // 不传入NRD的资源
         private static int g_DirectLightingID = Shader.PropertyToID("gOut_DirectLighting");
         private static int g_DirectEmissionID = Shader.PropertyToID("gOut_DirectEmission");
-        private static int g_PsrThroughputID = Shader.PropertyToID("gOut_PsrThroughput");
-        private static int g_ShadowDataID = Shader.PropertyToID("gOut_ShadowData");
-        private static int g_Shadow_TranslucencyID = Shader.PropertyToID("gOut_Shadow_Translucency");
 
+        // 传入NRD的有噪声资源
+        private static int g_ShadowDataID = Shader.PropertyToID("gOut_ShadowData");
         private static int g_DiffID = Shader.PropertyToID("gOut_Diff");
         private static int g_SpecID = Shader.PropertyToID("gOut_Spec");
 
@@ -100,27 +99,29 @@ namespace PathTracing
 
         class PassData
         {
-            internal TextureHandle outputTexture;
             internal TextureHandle cameraTexture;
 
             internal ComputeBuffer scramblingRanking;
             internal ComputeBuffer sobol;
 
+            internal TextureHandle outputTexture;
+            
             internal TextureHandle Mv;
             internal TextureHandle ViewZ;
             internal TextureHandle Normal_Roughness;
-            internal TextureHandle Penumbra;
-            internal TextureHandle DiffRadianceHITDIST;
-            internal TextureHandle Validation;
-
             internal TextureHandle BaseColor_Metalness;
+            
             internal TextureHandle DirectLighting;
             internal TextureHandle DirectEmission;
-            internal TextureHandle PsrThroughput;
-            internal TextureHandle ShadowData;
-            internal TextureHandle Shadow_Translucency;
+            
+            internal TextureHandle Penumbra;
             internal TextureHandle Diff;
             internal TextureHandle Spec;
+            
+            internal TextureHandle Shadow_Translucency;
+            internal TextureHandle DenoisedDiff;
+            internal TextureHandle DenoisedSpec;
+            internal TextureHandle Validation;
 
             internal RayTracingShader rayTracingShader;
             internal Material blitMaterial;
@@ -177,16 +178,16 @@ namespace PathTracing
 
 
             natCmd.SetRayTracingTextureParam(data.rayTracingShader, g_OutputID, data.outputTexture);
+
             natCmd.SetRayTracingTextureParam(data.rayTracingShader, g_MvID, data.Mv);
             natCmd.SetRayTracingTextureParam(data.rayTracingShader, g_ViewZID, data.ViewZ);
             natCmd.SetRayTracingTextureParam(data.rayTracingShader, g_Normal_RoughnessID, data.Normal_Roughness);
-            natCmd.SetRayTracingTextureParam(data.rayTracingShader, g_PenumbraID, data.Penumbra);
-            natCmd.SetRayTracingTextureParam(data.rayTracingShader, g_Shadow_TranslucencyID, data.Shadow_Translucency);
             natCmd.SetRayTracingTextureParam(data.rayTracingShader, g_BaseColor_MetalnessID, data.BaseColor_Metalness);
+
             natCmd.SetRayTracingTextureParam(data.rayTracingShader, g_DirectLightingID, data.DirectLighting);
             natCmd.SetRayTracingTextureParam(data.rayTracingShader, g_DirectEmissionID, data.DirectEmission);
-            natCmd.SetRayTracingTextureParam(data.rayTracingShader, g_PsrThroughputID, data.PsrThroughput);
-            natCmd.SetRayTracingTextureParam(data.rayTracingShader, g_ShadowDataID, data.ShadowData);
+
+            natCmd.SetRayTracingTextureParam(data.rayTracingShader, g_ShadowDataID, data.Penumbra);
             natCmd.SetRayTracingTextureParam(data.rayTracingShader, g_DiffID, data.Diff);
             natCmd.SetRayTracingTextureParam(data.rayTracingShader, g_SpecID, data.Spec);
 
@@ -359,32 +360,31 @@ namespace PathTracing
 
             // var settingsBufferHandle = renderGraph.ImportBuffer(pathTracingSettingsBuffer);
 
-            passData.outputTexture = renderGraph.CreateTexture(textureDesc);
 
-            // passData.scramblingRanking = renderGraph.ImportBuffer(scramblingRanking);
-            // passData.sobol = renderGraph.ImportTexture(sobol);
             passData.scramblingRanking = scramblingRanking;
             passData.sobol = sobol;
+
+            passData.outputTexture = renderGraph.CreateTexture(textureDesc);
 
             passData.Mv = renderGraph.ImportTexture(NrdDenoiser.GetRT(ResourceType.IN_MV));
             passData.ViewZ = renderGraph.ImportTexture(NrdDenoiser.GetRT(ResourceType.IN_VIEWZ));
             passData.Normal_Roughness = renderGraph.ImportTexture(NrdDenoiser.GetRT(ResourceType.IN_NORMAL_ROUGHNESS));
+            passData.BaseColor_Metalness = renderGraph.ImportTexture(NrdDenoiser.GetRT(ResourceType.IN_BASECOLOR_METALNESS));
+
+            passData.DirectLighting = CreateTex(textureDesc, renderGraph, "DirectLighting", GraphicsFormat.B10G11R11_UFloatPack32);
+            passData.DirectEmission = CreateTex(textureDesc, renderGraph, "DirectEmission", GraphicsFormat.B10G11R11_UFloatPack32);
+
             passData.Penumbra = renderGraph.ImportTexture(NrdDenoiser.GetRT(ResourceType.IN_PENUMBRA));
+            passData.Diff = renderGraph.ImportTexture(NrdDenoiser.GetRT(ResourceType.IN_DIFF_RADIANCE_HITDIST));
+            passData.Spec = renderGraph.ImportTexture(NrdDenoiser.GetRT(ResourceType.IN_SPEC_RADIANCE_HITDIST));
+            
+            // 输出
             passData.Shadow_Translucency = renderGraph.ImportTexture(NrdDenoiser.GetRT(ResourceType.OUT_SHADOW_TRANSLUCENCY));
+            passData.DenoisedDiff = renderGraph.ImportTexture(NrdDenoiser.GetRT(ResourceType.OUT_DIFF_RADIANCE_HITDIST));
+            passData.DenoisedSpec = renderGraph.ImportTexture(NrdDenoiser.GetRT(ResourceType.OUT_SPEC_RADIANCE_HITDIST));
             passData.Validation = renderGraph.ImportTexture(NrdDenoiser.GetRT(ResourceType.OUT_VALIDATION));
 
-            passData.BaseColor_Metalness = CreateTex(textureDesc, renderGraph, "BaseColor_Metalness",
-                GraphicsFormat.R16G16B16A16_SFloat);
-            passData.DirectLighting = CreateTex(textureDesc, renderGraph, "DirectLighting",
-                GraphicsFormat.B10G11R11_UFloatPack32);
-            passData.DirectEmission = CreateTex(textureDesc, renderGraph, "DirectEmission",
-                GraphicsFormat.B10G11R11_UFloatPack32);
-            passData.PsrThroughput = CreateTex(textureDesc, renderGraph, "PsrThroughput",
-                GraphicsFormat.B10G11R11_UFloatPack32);
-            passData.ShadowData = CreateTex(textureDesc, renderGraph, "ShadowData", GraphicsFormat.R8G8B8A8_UNorm);
 
-            passData.Diff = CreateTex(textureDesc, renderGraph, "Diff", GraphicsFormat.R16G16B16A16_SFloat);
-            passData.Spec = CreateTex(textureDesc, renderGraph, "Spec", GraphicsFormat.R16G16B16A16_SFloat);
 
             rayTracingShader.SetShaderPass("Test2");
 
@@ -404,22 +404,24 @@ namespace PathTracing
 
 
             builder.UseTexture(passData.outputTexture, AccessFlags.ReadWrite);
+            
             builder.UseTexture(passData.Mv, AccessFlags.ReadWrite);
             builder.UseTexture(passData.ViewZ, AccessFlags.ReadWrite);
             builder.UseTexture(passData.Normal_Roughness, AccessFlags.ReadWrite);
-            builder.UseTexture(passData.Penumbra, AccessFlags.ReadWrite);
-            builder.UseTexture(passData.Validation, AccessFlags.ReadWrite);
-
-
             builder.UseTexture(passData.BaseColor_Metalness, AccessFlags.ReadWrite);
+            
             builder.UseTexture(passData.DirectLighting, AccessFlags.ReadWrite);
             builder.UseTexture(passData.DirectEmission, AccessFlags.ReadWrite);
-            builder.UseTexture(passData.PsrThroughput, AccessFlags.ReadWrite);
-            builder.UseTexture(passData.ShadowData, AccessFlags.ReadWrite);
-            builder.UseTexture(passData.Shadow_Translucency, AccessFlags.ReadWrite);
-            // builder.UseTexture(passData.Validation, AccessFlags.ReadWrite);
+            
+            builder.UseTexture(passData.Penumbra, AccessFlags.ReadWrite);
             builder.UseTexture(passData.Diff, AccessFlags.ReadWrite);
             builder.UseTexture(passData.Spec, AccessFlags.ReadWrite);
+            
+            // 输出
+            builder.UseTexture(passData.Shadow_Translucency, AccessFlags.ReadWrite);
+            builder.UseTexture(passData.DenoisedDiff, AccessFlags.ReadWrite);
+            builder.UseTexture(passData.DenoisedSpec, AccessFlags.ReadWrite);
+            builder.UseTexture(passData.Validation, AccessFlags.ReadWrite);
 
             builder.AllowPassCulling(false);
 

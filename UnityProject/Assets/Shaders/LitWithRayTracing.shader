@@ -420,6 +420,24 @@ Shader "Custom/LitWithRayTracing"
                 float3 normalOS = isFrontFace ? v.normal : -v.normal;
 
                 float3 normalWS = normalize(mul(normalOS, (float3x3)WorldToObject()));
+                
+                
+                #if _NORMALMAP
+                float3 tangentWS = normalize(mul(v.tangent.xyz, (float3x3)WorldToObject()));
+                
+                float2 normalUV = float2(v.uv.x,1-v.uv.y); // 修正UV翻转问题
+                
+                float4 n = _BumpMap.SampleLevel(sampler_BumpMap, _BaseMap_ST.xy * normalUV + _BaseMap_ST.zw, 0);
+                float3 tangentNormal = UnpackNormalScale(n, _BumpScale);
+
+                float3 bitangent = cross(normalWS.xyz, tangentWS.xyz);
+                half3x3 tangentToWorld = half3x3(tangentWS.xyz, bitangent.xyz, normalWS.xyz);
+
+                float3 worldNormal = TransformTangentToWorld(tangentNormal, tangentToWorld);
+
+                #else
+                float3 worldNormal = normalWS;
+                #endif
 
                 float3 albedo = _BaseColor.xyz * _BaseMap.SampleLevel(sampler_BaseMap,
                                                                       _BaseMap_ST.xy * v.uv + _BaseMap_ST.zw, 0).xyz;
@@ -451,6 +469,7 @@ Shader "Custom/LitWithRayTracing"
                 float3x3 mPrevObjectToWorld = (float3x3)prev;
                 // 法线
                 payload.N = normalWS;
+                payload.matN = worldNormal;
 
                 float3 worldPosition = mul(ObjectToWorld(), float4(v.position, 1)).xyz;
                 
@@ -462,7 +481,7 @@ Shader "Custom/LitWithRayTracing"
                 payload.baseColor = albedo;
                 payload.metalness = metallic;
                 
-                                #if _EMISSION
+                #if _EMISSION
                 float3 emission = _EmissionColor.xyz * _EmissionMap.SampleLevel(sampler_EmissionMap, v.uv, 0).xyz;
                 payload.Lemi = emission;
                 #else

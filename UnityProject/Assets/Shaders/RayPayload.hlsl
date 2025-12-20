@@ -53,6 +53,8 @@ struct MainRayPayload
     float hitT; // 光线命中的距离（t值），INF表示未命中
     float curvature; // 曲率估算值（用于材质、去噪等）
     uint instanceIndex; // 命中的实例索引（用于查找InstanceData）
+    
+    float3 matN;
 
     float3 Lemi;
     float3 baseColor;
@@ -171,7 +173,6 @@ float3 GetLighting(GeometryProps geometryProps, inout MaterialProps materialProp
 
     float3 Csun = GetSunIntensity(gSunDirection.xyz);
     float3 Csky = GetSkyIntensity(-geometryProps.V);
-
     float NoL = saturate(dot(geometryProps.N, gSunDirection.xyz));
     bool isSSS = false;
     float minThreshold = isSSS ? -0.2 : 0.03; // TODO: hand-tuned for SSS, a helper in RTXCR SDK is needed
@@ -189,7 +190,7 @@ float3 GetLighting(GeometryProps geometryProps, inout MaterialProps materialProp
         Cimp *= Math::SmoothStep(-0.01, 0.05, gSunDirection.y);
 
         // Common BRDF
-        float3 N = geometryProps.N;
+        float3 N = materialProps.N;
         float3 L = gSunDirection.xyz;
         float3 V = geometryProps.V;
         float3 H = normalize(L + V);
