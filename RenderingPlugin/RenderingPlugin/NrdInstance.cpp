@@ -215,7 +215,7 @@ void NrdInstance::CreateNrd()
     // 2. 配置 NRD Denoiser
     nrd::DenoiserDesc denoisers[] = {
         {0, nrd::Denoiser::SIGMA_SHADOW},
-        {1, nrd::Denoiser::REBLUR_DIFFUSE} // Identifier设为1，类型为 REBLUR_DIFFUSE
+        {1, nrd::Denoiser::REBLUR_DIFFUSE_SPECULAR} // Identifier设为1，类型为 REBLUR_DIFFUSE
     };
     m_SigmaId = denoisers[0].identifier;
     m_ReblurId = denoisers[1].identifier; // [NEW] 保存 Reblur ID

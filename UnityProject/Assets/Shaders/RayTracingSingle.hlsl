@@ -597,7 +597,7 @@ TraceOpaqueResult TraceOpaque(GeometryProps geometryProps0, MaterialProps materi
     uint pathNum = 2;
     uint diffPathNum = 0;
 
-    pathNum = 1;
+    // pathNum = 1;
     [loop]
     for (uint path = 0; path < pathNum; path++)
     {
@@ -661,8 +661,7 @@ TraceOpaqueResult TraceOpaque(GeometryProps geometryProps0, MaterialProps materi
 
                 float3 ray = GenerateRayAndUpdateThroughput(geometryProps, materialProps, pathThroughput, sampleMaxNum, isDiffuse, rnd2);
 
-                // result.debug = ray;
-                // result.debug = float3(isDiffuse,isDiffuse,isDiffuse);
+
 
                 // Special case for primary surface ( 1st bounce starts here )
                 if (bounce == 1)
@@ -722,7 +721,7 @@ TraceOpaqueResult TraceOpaque(GeometryProps geometryProps0, MaterialProps materi
                 }
 
 
-                result.debug = Lcached.xyz;
+
 
                 //=============================================================================================================================================================
                 // Other
@@ -730,6 +729,7 @@ TraceOpaqueResult TraceOpaque(GeometryProps geometryProps0, MaterialProps materi
 
                 // Accumulate lighting
                 float3 L = Lcached.xyz * pathThroughput;
+
                 Lsum += L;
 
                 // ( Biased ) Reduce contribution of next samples if previous frame is sampled, which already has multi-bounce information
@@ -773,6 +773,7 @@ TraceOpaqueResult TraceOpaque(GeometryProps geometryProps0, MaterialProps materi
         // if( gDenoiserType != DENOISER_RELAX )
         //     normHitDist = REBLUR_FrontEnd_GetNormHitDist( accumulatedHitDist, viewZ0, gHitDistParams, isDiffusePath ? 1.0 : materialProps0.roughness );
 
+        
         // Accumulate diffuse and specular separately for denoising
         if (!USE_SANITIZATION || NRD_IsValidRadiance(Lsum))
         {
@@ -794,6 +795,8 @@ TraceOpaqueResult TraceOpaque(GeometryProps geometryProps0, MaterialProps materi
             }
         }
     }
+    
+     
 
     // Material de-modulation ( convert irradiance into radiance )
     // if( gOnScreen != SHOW_MIP_SPECULAR )
@@ -807,6 +810,7 @@ TraceOpaqueResult TraceOpaque(GeometryProps geometryProps0, MaterialProps materi
     result.diffRadiance *= radianceNorm;
     result.specRadiance *= radianceNorm;
 
+    
     // Others are not divided by sampling probability, we need to average across diffuse / specular only paths
     float diffNorm = diffPathNum == 0 ? 0.0 : 1.0 / float(diffPathNum);
     float specNorm = pathNum == diffPathNum ? 0.0 : 1.0 / float(pathNum - diffPathNum);
@@ -974,6 +978,7 @@ void MainRayGenShader()
     gOut_Diff[launchIndex] = RELAX_FrontEnd_PackRadianceAndHitDist(result.diffRadiance, result.diffHitDist, USE_SANITIZATION);
     gOut_Spec[launchIndex] = RELAX_FrontEnd_PackRadianceAndHitDist(result.specRadiance, result.specHitDist, USE_SANITIZATION);
 
+    result.debug = float3(result.specHitDist,result.specHitDist,result.specHitDist)*10;
 
     g_Output[launchIndex] = float4(result.debug, 1);
 }
