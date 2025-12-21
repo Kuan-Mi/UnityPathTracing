@@ -319,6 +319,7 @@ Shader "Custom/LitWithRayTracing"
             }
             HLSLPROGRAM
             #include "UnityRaytracingMeshUtils.cginc"
+            #include "ml.hlsli"
             #include "Packages/com.unity.render-pipelines.universal/Shaders/LitInput.hlsl"
 
             #pragma shader_feature_local_raytracing _EMISSION
@@ -468,14 +469,20 @@ Shader "Custom/LitWithRayTracing"
 
                 float2 normalUV = float2(v.uv.x, 1 - v.uv.y); // 修正UV翻转问题
 
-                float4 n = _BumpMap.SampleLevel(sampler_BumpMap, _BaseMap_ST.xy * normalUV + _BaseMap_ST.zw, mip);
-                float3 tangentNormal = UnpackNormalScale(n, _BumpScale);
+                float2 packedNormal = _BumpMap.SampleLevel(sampler_BumpMap, _BaseMap_ST.xy * normalUV + _BaseMap_ST.zw, mip).xy;
+                
+                float4 T = float4(tangentWS, 1);
+                
+                float3 N = Geometry::TransformLocalNormal( packedNormal, T, normalWS );
+                
+                // float3 tangentNormal = UnpackNormalScale(n, _BumpScale);
 
-                float3 bitangent = cross(normalWS.xyz, tangentWS.xyz);
-                half3x3 tangentToWorld = half3x3(tangentWS.xyz, bitangent.xyz, normalWS.xyz);
+                // float3 bitangent = cross(normalWS.xyz, tangentWS.xyz);
+                // half3x3 tangentToWorld = half3x3(tangentWS.xyz, bitangent.xyz, normalWS.xyz);
 
-                float3 worldNormal = TransformTangentToWorld(tangentNormal, tangentToWorld);
+                // float3 worldNormal = TransformTangentToWorld(tangentNormal, tangentToWorld);
 
+                float3 worldNormal = N;
                 #else
                 float3 worldNormal = normalWS;
                 #endif

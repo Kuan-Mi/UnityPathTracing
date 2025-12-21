@@ -307,7 +307,10 @@
                 float4 X = NRD_FrontEnd_UnpackNormalAndRoughness(OUT_SHADOW_TRANSLUCENCY);
 
                 // float3 normal = X.rgb ;
-                float3 normal = X.rgb * 0.5 + 0.5; // [-1,1] -> [0,1]
+                
+                float3  n = float3(-X.r,-X.b,X.g);
+                
+                float3 normal = n * 0.5 + 0.5; // [-1,1] -> [0,1]
 
                 float4 color = float4(normal, 1);
 

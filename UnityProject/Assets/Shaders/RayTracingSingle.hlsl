@@ -830,5 +830,5 @@ void MainRayGenShader()
     gOut_Spec[launchIndex] = RELAX_FrontEnd_PackRadianceAndHitDist(result.specRadiance, result.specHitDist, USE_SANITIZATION);
 
 
-    g_Output[launchIndex] = float4(mip, 1);
+    g_Output[launchIndex] = float4(materialProps0.N, 1);
 }
