@@ -354,6 +354,20 @@
                 return o;
             }
 
+            float3 SRGBToLinear(float3 srgb)
+            {
+                float3 linear1;
+                linear1.r = (srgb.r <= 0.04045) ? (srgb.r / 12.92) : pow((srgb.r + 0.055) / 1.055, 2.4);
+                linear1.g = (srgb.g <= 0.04045) ? (srgb.g / 12.92) : pow((srgb.g + 0.055) / 1.055, 2.4);
+                linear1.b = (srgb.b <= 0.04045) ? (srgb.b / 12.92) : pow((srgb.b + 0.055) / 1.055, 2.4);
+                return linear1;
+            }
+            
+            float LinearToSRGB(float linear1)
+            {
+                return (linear1 <= 0.0031308) ? (linear1 * 12.92) : (1.055 * pow(linear1, 1.0 / 2.4) - 0.055);
+            }
+
             float4 Frag(Varyings i) : SV_Target
             {
                 // 翻转Y
@@ -362,7 +376,11 @@
                 #endif
 
 
-                return float4(SAMPLE_TEXTURE2D(_BlitTexture, sampler_BlitTexture, i.uv).rgb, 1);
+                float3 rgb = SAMPLE_TEXTURE2D(_BlitTexture, sampler_BlitTexture, i.uv).rgb;
+                
+                float3 linearRgb = LinearToSRGB(rgb);
+                
+                return float4(rgb, 1);
             }
             ENDHLSL
         }

@@ -697,17 +697,8 @@ void CastRay(float3 origin, float3 direction, float Tmin, float Tmax, float2 mip
     props.N = payload.N;
     props.curvature = payload.curvature;
 
-
-    // Mip level
-    float NoRay = abs(dot(direction, props.N));
-    float a = props.hitT * mipAndCone.y;
-    a *= Math::PositiveRcp(NoRay);
-    // a *= sqrt( primitiveData.uvArea / worldArea );
-
-    float mip = log2(a);
-    mip += MAX_MIP_LEVEL;
-    mip = max(mip, 0.0);
-    props.mip += mip;
+ 
+    props.mip = payload.mipAndCone.x;
 
     props.T = payload.T;
     props.X = payload.X;

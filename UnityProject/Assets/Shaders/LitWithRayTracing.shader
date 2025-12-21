@@ -447,17 +447,20 @@ Shader "Custom/LitWithRayTracing"
                 // 将模型空间的面积向量转换到世界空间，从而自动处理非统一缩放
                 // 使用 ObjectToWorld 的转置逆矩阵或直接变换向量（视缩放情况而定）
                 float3 worldCrossProduct = mul((float3x3)ObjectToWorld(), crossProduct);
-                float worldArea = length(worldCrossProduct) * 0.5f;
+                float worldArea = length(crossProduct) * 0.5f;
 
                 float NoRay = abs(dot(direction, normalWS));
                 float a = payload.hitT * payload.mipAndCone.y;
                 a *= Math::PositiveRcp(NoRay);
-                // a *= sqrt(uvArea / max(worldArea, 1e-10f)); 
-                // a *= 0.8;
+                a *= sqrt(uvArea / max(worldArea, 1e-10f)); 
 
                 float mip = log2(a);
                 mip += MAX_MIP_LEVEL;
                 mip = max(mip, 0.0);
+                
+                // mip = payload.mipAndCone.y;
+                 
+                // mip = 0;
                 payload.mipAndCone.x += mip;
 
                 #if _NORMALMAP

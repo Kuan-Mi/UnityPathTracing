@@ -345,6 +345,12 @@ namespace PathTracing
 
             passData.dataPtr = NrdDenoiser.GetInteropDataPtr(cam, gSunDirection);
 
+            
+            float VerticalFieldOfView = cam.fieldOfView;
+            float AspectRatio = (float)cam.pixelWidth / (float)cam.pixelHeight;
+            float HorizontalFieldOfView = Mathf.Atan(Mathf.Tan(Mathf.Deg2Rad * VerticalFieldOfView * 0.5f) * AspectRatio) * 2 * Mathf.Rad2Deg;
+
+            
             var setting = new Settings
             {
                 g_Zoom = tan,
@@ -366,10 +372,14 @@ namespace PathTracing
                 gSunBasisX = new float4(gSunBasisX.x, gSunBasisX.y, gSunBasisX.z, 0),
                 gSunBasisY = new float4(gSunBasisY.x, gSunBasisY.y, gSunBasisY.z, 0),
                 gSunDirection = new float4(gSunDirection.x, gSunDirection.y, gSunDirection.z, 0),
-                gTanPixelAngularRadius = math.tan(0.5f * math.radians(cam.fieldOfView) / cam.pixelWidth),
+                 
+                
+                gTanPixelAngularRadius = math.tan(0.5f * math.radians(HorizontalFieldOfView) / cam.pixelWidth),
+                
                 gUnproject = 1.0f / (0.5f * rectH * m11),
                 gTanSunAngularRadius = _settings.lightOffset
             };
+
             passData.pathTracingSettings = setting;
 
             UniversalResourceData resourceData = frameData.Get<UniversalResourceData>();
