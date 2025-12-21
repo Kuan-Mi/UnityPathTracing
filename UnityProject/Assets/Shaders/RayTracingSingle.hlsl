@@ -103,7 +103,7 @@ float2 GetBlueNoise(uint2 pixelPos, uint seed = 0)
     // Sample index
     uint sampleIndex = (g_FrameIndex + seed) & (BLUE_NOISE_TEMPORAL_DIM - 1);
 
-    // sampleIndex = 0;
+    sampleIndex = 3;
 
     // pixelPos /= 8;
 
@@ -697,7 +697,7 @@ void CastRay(float3 origin, float3 direction, float Tmin, float Tmax, float2 mip
     props.N = payload.N;
     props.curvature = payload.curvature;
 
- 
+
     props.mip = payload.mipAndCone.x;
 
     props.T = payload.T;
@@ -756,26 +756,24 @@ void MainRayGenShader()
 
     CastRay(cameraRayOrigin, cameraRayDirection, 0.0, 1000.0, GetConeAngleFromRoughness(0.0, 0.0), geometryProps0, materialProps0);
 
-    
-    float mipNorm = Math::Sqrt01( geometryProps0.mip / MAX_MIP_LEVEL );
-    float3 mip = Color::ColorizeZucconi( mipNorm );
-     
+
+    // float mipNorm = Math::Sqrt01( geometryProps0.mip / MAX_MIP_LEVEL );
+    // float3 mip = Color::ColorizeZucconi( mipNorm );
+
     float3 X0 = geometryProps0.X;
-    float3 V0 = -rayDirection;
-    // float viewZ0 = abs(mul(gWorldToView, float4(X0, 1)).z);
-    // float viewZ0 = mul(gWorldToView, float4(X0, 1)).z;
 
     float viewZ0 = Geometry::AffineTransform(gWorldToView, X0).z;
 
-    // float viewZ0 = payload.hitT;
-
     gOut_Mv[launchIndex] = float4(GetMotion(geometryProps0.X, geometryProps0.Xprev), 1);
     gOut_ViewZ[launchIndex] = -viewZ0;
-
-
-    // gOut_Normal_Roughness[launchIndex] = NRD_FrontEnd_PackNormalAndRoughness(payload.N, payload.roughness, 0);
+    
+    if( geometryProps0.IsMiss( ) )
+    {
+        return;
+    }
+    
+    
     gOut_Normal_Roughness[launchIndex] = NRD_FrontEnd_PackNormalAndRoughness(materialProps0.N, materialProps0.roughness, 0);
-
     gOut_BaseColor_Metalness[launchIndex] = float4(materialProps0.baseColor, materialProps0.metalness);
 
     float3 Ldirect = GetLighting(geometryProps0, materialProps0, LIGHTING, X0);
@@ -784,33 +782,35 @@ void MainRayGenShader()
     gOut_DirectEmission[launchIndex] = materialProps0.Lemi;
 
     float2 Blue = GetBlueNoise(launchIndex);
-
-    // Blue = float2(RandomFloat01(rngState), RandomFloat01(rngState));
     float2 rnd = ImportanceSampling::Cosine::GetRay(Blue).xy;
     rnd *= gTanSunAngularRadius;
 
-    // rnd *= 0;
-
     float3 sunDirection = normalize(gSunBasisX.xyz * rnd.x + gSunBasisY.xyz * rnd.y + gSunDirection.xyz);
-    // float3 Xoffset = payload.GetXoffset(sunDirection, PT_SHADOW_RAY_OFFSET);
-    float3 Xoffset = geometryProps0.GetXoffset(geometryProps0.N, PT_SHADOW_RAY_OFFSET);
-    float2 mipAndCone = GetConeAngleFromAngularRadius(1, gTanSunAngularRadius);
+    float3 Xoffset = geometryProps0.GetXoffset(sunDirection, PT_SHADOW_RAY_OFFSET);
+    float2 mipAndCone = GetConeAngleFromAngularRadius(geometryProps0.mip, gTanSunAngularRadius);
 
     float shadowTranslucency = (Color::Luminance(Ldirect) != 0.0) ? 1.0 : 0.0;
-
     float shadowHitDist = 0.0;
 
     if (shadowTranslucency > 0.1)
     {
-        RayDesc rayDesc;
-        rayDesc.Origin = Xoffset;
-        rayDesc.Direction = sunDirection;
-        rayDesc.TMin = 0;
-        rayDesc.TMax = 1000;
+        GeometryProps geometryPropsShadow;
+        MaterialProps materialPropsShadow;
 
-        MainRayPayload shadowPayload = (MainRayPayload)0;
-        TraceRay(g_AccelStruct, RAY_FLAG_NONE | RAY_FLAG_NONE, 0xFF, 0, 1, 1, rayDesc, shadowPayload);
-        shadowHitDist = shadowPayload.hitT;
+        CastRay(Xoffset, sunDirection, 0.0, INF, mipAndCone, geometryPropsShadow, materialPropsShadow);
+
+        /*
+        // RayDesc rayDesc;
+        // rayDesc.Origin = Xoffset;
+        // rayDesc.Direction = sunDirection;
+        // rayDesc.TMin = 0;
+        // rayDesc.TMax = 1000;
+        //
+        // MainRayPayload shadowPayload = (MainRayPayload)0;
+        // TraceRay(g_AccelStruct, RAY_FLAG_NONE | RAY_FLAG_NONE, 0xFF, 0, 1, 1, rayDesc, shadowPayload);
+        */
+
+        shadowHitDist = geometryPropsShadow.hitT;
     }
 
     float penumbra = SIGMA_FrontEnd_PackPenumbra(shadowHitDist, gTanSunAngularRadius);
@@ -830,5 +830,5 @@ void MainRayGenShader()
     gOut_Spec[launchIndex] = RELAX_FrontEnd_PackRadianceAndHitDist(result.specRadiance, result.specHitDist, USE_SANITIZATION);
 
 
-    g_Output[launchIndex] = float4(materialProps0.N, 1);
+    g_Output[launchIndex] = float4(Blue.x, Blue.x, Blue.x, 1);
 }
