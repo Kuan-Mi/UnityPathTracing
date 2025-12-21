@@ -62,7 +62,7 @@ void MainMissShader(inout MainRayPayload payload : SV_RayPayload)
     payload.X = WorldRayOrigin() +ray * payload.hitT;
     payload.Xprev = payload.X;
     
-    payload.Lemi = GetSkyIntensity( -ray );
+    payload.Lemi = GetSkyIntensity( ray );
     
     // payload.emission = g_EnvTex.SampleLevel(sampler_g_EnvTex, WorldRayDirection(), 0).xyz;
     //
@@ -488,6 +488,87 @@ void CastRay(float3 origin, float3 direction, float Tmin, float Tmax, float2 mip
     matProps.T = payload.T.xyz;
 }
 
+
+#define LIGHTING    0x01
+#define SHADOW      0x02
+#define SSS         0x04
+
+
+ 
+
+
+
+float3 GetLighting(GeometryProps geometryProps, inout MaterialProps materialProps, uint flags, out float3 Xshadow)
+{
+    float3 lighting = 0.0;
+
+    // Lighting
+    Xshadow = geometryProps.X;
+
+    float3 Csun = GetSunIntensity(gSunDirection.xyz);
+    float3 Csky = GetSkyIntensity(-geometryProps.V);
+    float NoL = saturate(dot(geometryProps.N, gSunDirection.xyz));
+    bool isSSS = false;
+    float minThreshold = isSSS ? -0.2 : 0.03; // TODO: hand-tuned for SSS, a helper in RTXCR SDK is needed
+    float shadow = Math::SmoothStep(minThreshold, 0.1, NoL);
+
+    // COMMON MATERIAL
+    if (shadow != 0.0)
+    {
+        // Extract materials
+        float3 albedo, Rf0;
+        BRDF::ConvertBaseColorMetalnessToAlbedoRf0(materialProps.baseColor.xyz, materialProps.metalness, albedo, Rf0);
+
+        // Pseudo sky importance sampling
+        float3 Cimp = lerp(Csky, Csun, Math::SmoothStep(0.0, 0.2, materialProps.roughness));
+        Cimp *= Math::SmoothStep(-0.01, 0.05, gSunDirection.y);
+
+        // Common BRDF
+        float3 N = materialProps.N;
+        float3 L = gSunDirection.xyz;
+        float3 V = geometryProps.V;
+        float3 H = normalize(L + V);
+
+        float NoL = saturate(dot(N, L));
+        float NoH = saturate(dot(N, H));
+        float VoH = saturate(dot(V, H));
+        float NoV = abs(dot(N, V));
+
+        float D = BRDF::DistributionTerm(materialProps.roughness, NoH);
+        float G = BRDF::GeometryTermMod(materialProps.roughness, NoL, NoV, VoH, NoH);
+        float3 F = BRDF::FresnelTerm(Rf0, VoH);
+        float Kdiff = BRDF::DiffuseTerm(materialProps.roughness, NoL, NoV, VoH);
+
+        float3 Cspec = saturate(F * D * G * NoL);
+        float3 Cdiff = Kdiff * Csun * albedo * NoL;
+
+        lighting = Cspec * Cimp;
+
+        lighting += Cdiff * (1.0 - F);
+        lighting *= shadow;
+    }
+    
+    // Shadow
+    if( ( flags & SHADOW ) != 0 && Color::Luminance( lighting ) != 0 )
+    {
+        
+        float2 rnd = Rng::Hash::GetFloat2( );
+        rnd = ImportanceSampling::Cosine::GetRay( rnd ).xy;
+        rnd *= gTanSunAngularRadius;
+        
+        float3 sunDirection = normalize( gSunBasisX.xyz * rnd.x + gSunBasisY.xyz * rnd.y + gSunDirection.xyz );
+        float2 mipAndCone = GetConeAngleFromAngularRadius( geometryProps.mip, gTanSunAngularRadius );
+
+        GeometryProps shadowRayGeometryProps;
+        MaterialProps shadowRayMaterialProps;
+        
+        CastRay(Xshadow,sunDirection,0.0,INF,mipAndCone,shadowRayGeometryProps,shadowRayMaterialProps);
+        float hitT = shadowRayGeometryProps.hitT;
+        lighting *= float( hitT == INF );
+    }
+
+    return lighting;
+}
 
 TraceOpaqueResult TraceOpaque(GeometryProps geometryProps0, MaterialProps materialProps0, uint2 pixelPos, float3x3 mirrorMatrix, float4 Lpsr)
 {
