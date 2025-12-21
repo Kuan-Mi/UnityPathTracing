@@ -771,7 +771,9 @@ TraceOpaqueResult TraceOpaque(GeometryProps geometryProps0, MaterialProps materi
         // Normalize hit distances for REBLUR before averaging ( needed only for AO for REFERENCE )
         float normHitDist = accumulatedHitDist;
         // if( gDenoiserType != DENOISER_RELAX )
-        //     normHitDist = REBLUR_FrontEnd_GetNormHitDist( accumulatedHitDist, viewZ0, gHitDistParams, isDiffusePath ? 1.0 : materialProps0.roughness );
+        
+        float4 gHitDistParams = float4(3,0.1,20,-25);
+        normHitDist = REBLUR_FrontEnd_GetNormHitDist( accumulatedHitDist, viewZ0, gHitDistParams, isDiffusePath ? 1.0 : materialProps0.roughness );
 
         // result.debug = float3(normHitDist,normHitDist,normHitDist);
         
@@ -979,8 +981,8 @@ void MainRayGenShader()
     //================================================================================================================================================================================
     // Output
     //================================================================================================================================================================================
-    gOut_Diff[launchIndex] = RELAX_FrontEnd_PackRadianceAndHitDist(result.diffRadiance, result.diffHitDist, USE_SANITIZATION);
-    gOut_Spec[launchIndex] = RELAX_FrontEnd_PackRadianceAndHitDist(result.specRadiance, result.specHitDist, USE_SANITIZATION);
+    gOut_Diff[launchIndex] = REBLUR_FrontEnd_PackRadianceAndNormHitDist(result.diffRadiance, result.diffHitDist, USE_SANITIZATION);
+    gOut_Spec[launchIndex] = REBLUR_FrontEnd_PackRadianceAndNormHitDist(result.specRadiance, result.specHitDist, USE_SANITIZATION);
 
     result.debug = float3(result.diffHitDist,result.diffHitDist,result.diffHitDist);
     // result.debug = float3(result.specHitDist,result.specHitDist,result.specHitDist);

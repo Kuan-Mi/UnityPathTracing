@@ -68,9 +68,9 @@ namespace Nrd
             allocatedResources.Add(new NrdTextureResource(ResourceType.IN_VIEWZ, GraphicsFormat.R32_SFloat, srvState));
             allocatedResources.Add(new NrdTextureResource(ResourceType.IN_NORMAL_ROUGHNESS, GraphicsFormat.A2B10G10R10_UNormPack32, srvState));
             allocatedResources.Add(new NrdTextureResource(ResourceType.IN_BASECOLOR_METALNESS, GraphicsFormat.R8G8B8A8_UNorm, srvState));
-            
+
             // 有噪声输入
-            allocatedResources.Add(new NrdTextureResource(ResourceType.IN_PENUMBRA, GraphicsFormat.R16_SFloat, srvState));      
+            allocatedResources.Add(new NrdTextureResource(ResourceType.IN_PENUMBRA, GraphicsFormat.R16_SFloat, srvState));
             allocatedResources.Add(new NrdTextureResource(ResourceType.IN_DIFF_RADIANCE_HITDIST, GraphicsFormat.R16G16B16A16_SFloat, srvState));
             allocatedResources.Add(new NrdTextureResource(ResourceType.IN_SPEC_RADIANCE_HITDIST, GraphicsFormat.R16G16B16A16_SFloat, srvState));
 
@@ -234,8 +234,17 @@ namespace Nrd
 
             localData.sigmaSettings.planeDistanceSensitivity = setting.planeDistanceSensitivity;
             localData.sigmaSettings.maxStabilizedFrameNum = setting.maxStabilizedFrameNum;
-            
+
             // reblur 设置
+
+
+            localData.reblurSettings.checkerboardMode = CheckerboardMode.OFF;
+            localData.reblurSettings.minMaterialForDiffuse = 0;
+            localData.reblurSettings.minMaterialForSpecular = 1;
+            // localData.reblurSettings.hitDistanceReconstructionMode = mHitDistanceReconstructionMode::OFF;
+            
+            
+
 
             return localData;
         }

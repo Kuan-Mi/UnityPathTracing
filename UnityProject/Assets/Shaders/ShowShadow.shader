@@ -559,7 +559,7 @@
                 #endif
 
                 float4 OUT_SHADOW_TRANSLUCENCY = SAMPLE_TEXTURE2D(_BlitTexture, sampler_BlitTexture, i.uv);
-                float4 X = RELAX_BackEnd_UnpackRadiance(OUT_SHADOW_TRANSLUCENCY);
+                float4 X = REBLUR_BackEnd_UnpackRadianceAndNormHitDist(OUT_SHADOW_TRANSLUCENCY);
 
 
                 float4 color = float4(X.rgb, 1);
