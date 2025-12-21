@@ -234,6 +234,8 @@ namespace Nrd
 
             localData.sigmaSettings.planeDistanceSensitivity = setting.planeDistanceSensitivity;
             localData.sigmaSettings.maxStabilizedFrameNum = setting.maxStabilizedFrameNum;
+            
+            // reblur 设置
 
             return localData;
         }

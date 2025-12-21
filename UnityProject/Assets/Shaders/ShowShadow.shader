@@ -8,6 +8,7 @@
             "RenderType"="Opaque"
         }
 
+        // 0
         Pass
         {
             Name "ShowValidation"
@@ -58,6 +59,7 @@
             ENDHLSL
         }
 
+        // 1
         Pass
         {
             Name "ShowShadow"
@@ -113,6 +115,7 @@
             ENDHLSL
         }
 
+        // 2
         Pass
         {
             Name "ShowMV"
@@ -255,6 +258,7 @@
             ENDHLSL
         }
 
+        // 3
         Pass
         {
             Name "ShowNormal"
@@ -307,9 +311,9 @@
                 float4 X = NRD_FrontEnd_UnpackNormalAndRoughness(OUT_SHADOW_TRANSLUCENCY);
 
                 // float3 normal = X.rgb ;
-                
-                float3  n = float3(-X.r,-X.b,X.g);
-                
+
+                float3 n = float3(-X.r, -X.b, X.g);
+
                 float3 normal = n * 0.5 + 0.5; // [-1,1] -> [0,1]
 
                 float4 color = float4(normal, 1);
@@ -319,6 +323,7 @@
             ENDHLSL
         }
 
+        // 4
         Pass
         {
             Name "ShowOut"
@@ -365,7 +370,7 @@
                 linear1.b = (srgb.b <= 0.04045) ? (srgb.b / 12.92) : pow((srgb.b + 0.055) / 1.055, 2.4);
                 return linear1;
             }
-            
+
             float LinearToSRGB(float linear1)
             {
                 return (linear1 <= 0.0031308) ? (linear1 * 12.92) : (1.055 * pow(linear1, 1.0 / 2.4) - 0.055);
@@ -380,18 +385,19 @@
 
 
                 float3 rgb = SAMPLE_TEXTURE2D(_BlitTexture, sampler_BlitTexture, i.uv).rgb;
-                
+
                 float3 linearRgb = LinearToSRGB(rgb);
-                
-                
+
+
                 // float3  x = float3(-rgb.r,-rgb.b,rgb.g);
                 // return  float4(x,1);
-                
+
                 return float4(rgb, 1);
             }
             ENDHLSL
         }
 
+        // 5
         Pass
         {
             Name "ShowAlpha"
@@ -443,6 +449,7 @@
             ENDHLSL
         }
 
+        // 6
         Pass
         {
             Name "ShowRoughness"
@@ -495,13 +502,72 @@
                 float4 X = NRD_FrontEnd_UnpackNormalAndRoughness(OUT_SHADOW_TRANSLUCENCY);
 
 
-
                 float4 color = float4(X.a, X.a, X.a, 1);
 
                 return color;
             }
             ENDHLSL
         }
- 
+
+        // 7
+        Pass
+        {
+            Name "ShowRadiance"
+            // 【重要】混合模式：保证只显示箭头，不黑屏
+            Blend SrcAlpha OneMinusSrcAlpha
+            // 【重要】总是显示在最上层
+            ZTest Always
+            ZWrite Off
+            Cull Off
+
+            HLSLPROGRAM
+            #pragma vertex Vert
+            #pragma fragment Frag
+            #pragma target 4.5
+
+            #include "NRDInclude/NRD.hlsli"
+            #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
+
+            // 你的 Motion Vector 贴图
+            TEXTURE2D(_BlitTexture);
+            SAMPLER(sampler_BlitTexture);
+
+            struct Attributes
+            {
+                uint vertexID : SV_VertexID;
+            };
+
+            struct Varyings
+            {
+                float4 positionCS : SV_POSITION;
+                float2 uv : TEXCOORD0;
+            };
+
+            Varyings Vert(Attributes input)
+            {
+                Varyings o;
+                o.positionCS = GetFullScreenTriangleVertexPosition(input.vertexID);
+                o.uv = GetFullScreenTriangleTexCoord(input.vertexID);
+                return o;
+            }
+
+            float4 Frag(Varyings i) : SV_Target
+            {
+                // 翻转Y
+                #ifdef UNITY_UV_STARTS_AT_TOP
+                i.uv.y = 1.0 - i.uv.y;
+                #endif
+
+                float4 OUT_SHADOW_TRANSLUCENCY = SAMPLE_TEXTURE2D(_BlitTexture, sampler_BlitTexture, i.uv);
+                float4 X = RELAX_BackEnd_UnpackRadiance(OUT_SHADOW_TRANSLUCENCY);
+
+
+                float4 color = float4(X.rgb, 1);
+
+                return color;
+            }
+            ENDHLSL
+        }
+
     }
 }

@@ -597,7 +597,7 @@ TraceOpaqueResult TraceOpaque(GeometryProps geometryProps0, MaterialProps materi
     uint pathNum = 2;
     uint diffPathNum = 0;
 
-    // pathNum = 1;
+    pathNum = 2;
     [loop]
     for (uint path = 0; path < pathNum; path++)
     {
@@ -773,6 +773,7 @@ TraceOpaqueResult TraceOpaque(GeometryProps geometryProps0, MaterialProps materi
         // if( gDenoiserType != DENOISER_RELAX )
         //     normHitDist = REBLUR_FrontEnd_GetNormHitDist( accumulatedHitDist, viewZ0, gHitDistParams, isDiffusePath ? 1.0 : materialProps0.roughness );
 
+        // result.debug = float3(normHitDist,normHitDist,normHitDist);
         
         // Accumulate diffuse and specular separately for denoising
         if (!USE_SANITIZATION || NRD_IsValidRadiance(Lsum))
@@ -789,6 +790,8 @@ TraceOpaqueResult TraceOpaque(GeometryProps geometryProps0, MaterialProps materi
 
                 #if( NRD_MODE < OCCLUSION )
                 NRD_FrontEnd_SpecHitDistAveraging_Add(result.specHitDist, normHitDist);
+
+                result.debug = float3(result.specHitDist,result.specHitDist,result.specHitDist);
                 #else
                 result.specHitDist += normHitDist;
                 #endif
@@ -797,7 +800,6 @@ TraceOpaqueResult TraceOpaque(GeometryProps geometryProps0, MaterialProps materi
     }
     
      
-
     // Material de-modulation ( convert irradiance into radiance )
     // if( gOnScreen != SHOW_MIP_SPECULAR )
     {
@@ -822,6 +824,8 @@ TraceOpaqueResult TraceOpaque(GeometryProps geometryProps0, MaterialProps materi
     #else
     result.specHitDist *= specNorm;
     #endif
+    
+    // result.debug = float3(0.5,0.5,0.5);
 
     #if( NRD_MODE == SH || NRD_MODE == DIRECTIONAL_OCCLUSION )
     result.diffDirection *= diffNorm;
@@ -915,7 +919,7 @@ void MainRayGenShader()
     gOut_Normal_Roughness[launchIndex] = NRD_FrontEnd_PackNormalAndRoughness(materialProps0.N, materialProps0.roughness, materialID);
 
     // Base color and metalness
-    gOut_BaseColor_Metalness[launchIndex] = float4(materialProps0.baseColor, materialProps0.metalness);
+    gOut_BaseColor_Metalness[launchIndex] = float4(Color::ToSrgb(materialProps0.baseColor), materialProps0.metalness);
 
     // Direct lighting
     float3 Xshadow;
@@ -978,7 +982,8 @@ void MainRayGenShader()
     gOut_Diff[launchIndex] = RELAX_FrontEnd_PackRadianceAndHitDist(result.diffRadiance, result.diffHitDist, USE_SANITIZATION);
     gOut_Spec[launchIndex] = RELAX_FrontEnd_PackRadianceAndHitDist(result.specRadiance, result.specHitDist, USE_SANITIZATION);
 
-    result.debug = float3(result.specHitDist,result.specHitDist,result.specHitDist)*10;
+    result.debug = float3(result.diffHitDist,result.diffHitDist,result.diffHitDist);
+    // result.debug = float3(result.specHitDist,result.specHitDist,result.specHitDist);
 
     g_Output[launchIndex] = float4(result.debug, 1);
 }

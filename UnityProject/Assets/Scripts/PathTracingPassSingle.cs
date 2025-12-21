@@ -197,7 +197,7 @@ namespace PathTracing
             natCmd.SetRenderTarget(data.cameraTexture);
 
 
-            // 0 showValidation 1 showShadow 2 showMv 3 ShowNormal 4 showOut 5 showAlpha  
+            // 0 showValidation 1 showShadow 2 showMv 3 ShowNormal 4 showOut 5 showAlpha  6 showR 7 ShowRadiance
 
 
             if (data._setting.showBaseColor)
@@ -227,12 +227,12 @@ namespace PathTracing
 
             if (data._setting.showDiffuse)
             {
-                Blitter.BlitTexture(natCmd, data.DenoisedDiff, new Vector4(1, 1, 0, 0), data.blitMaterial, 4);
+                Blitter.BlitTexture(natCmd, data.DenoisedDiff, new Vector4(1, 1, 0, 0), data.blitMaterial, 7);
             }
 
             if (data._setting.showSpecular)
             {
-                Blitter.BlitTexture(natCmd, data.DenoisedSpec, new Vector4(1, 1, 0, 0), data.blitMaterial, 4);
+                Blitter.BlitTexture(natCmd, data.DenoisedSpec, new Vector4(1, 1, 0, 0), data.blitMaterial, 7);
             }
 
             if (data._setting.showDirectLight)
