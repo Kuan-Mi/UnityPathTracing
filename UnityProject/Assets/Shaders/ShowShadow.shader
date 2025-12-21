@@ -383,6 +383,10 @@
                 
                 float3 linearRgb = LinearToSRGB(rgb);
                 
+                
+                // float3  x = float3(-rgb.r,-rgb.b,rgb.g);
+                // return  float4(x,1);
+                
                 return float4(rgb, 1);
             }
             ENDHLSL

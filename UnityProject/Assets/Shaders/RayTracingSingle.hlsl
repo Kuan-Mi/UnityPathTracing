@@ -49,15 +49,21 @@ struct TraceOpaqueResult
 
     float3 specRadiance;
     float specHitDist;
+
+    float3 debug;
 };
 
 
 [shader("miss")]
 void MainMissShader(inout MainRayPayload payload : SV_RayPayload)
 {
-    payload.hitT = INF;
-    payload.X = WorldRayOrigin() + WorldRayDirection() * payload.hitT;
+    payload.hitT = INF; 
+    float3 ray = WorldRayDirection();
+    payload.X = WorldRayOrigin() +ray * payload.hitT;
     payload.Xprev = payload.X;
+    
+    payload.Lemi = GetSkyIntensity( -ray );
+    
     // payload.emission = g_EnvTex.SampleLevel(sampler_g_EnvTex, WorldRayDirection(), 0).xyz;
     //
     // // payload.emission = float3(0.5,0.5,0.5); // 固定背景色，便于调试
@@ -219,6 +225,47 @@ float EstimateDiffuseProbability(GeometryProps geometryProps, MaterialProps mate
 
 #define PT_SPEC_LOBE_ENERGY                 0.95 // trimmed to 95%
 
+
+float3x3 GetBasisUnity(float3 N)
+{
+    // 注意：这里的 sy 对应原代码中的 sz
+    // 原代码是基于 Z 轴构造，现在改为基于 Y 轴（因为你的映射中 N 对应 Y）
+    float sy = Math::Sign(N.y);
+    float a = 1.0f / (sy + N.y);
+    float xa = N.x * a;
+    float b = N.z * xa;
+    float c = N.z * sy;
+
+    // 重新排列分量以匹配旋转逻辑
+    // 原 T = ( c * N.x * a - 1.0f, sz * b, c ) -> 映射到 Y-up 空间
+    float3 T = float3(sy * b, c, c * N.z * a - 1.0f);
+
+    // 原 B = ( b, N.y * ya - sz, N.y ) -> 映射到 Y-up 空间
+    float3 B = float3(N.x * xa - sy, N.x, b);
+
+    // 返回矩阵。在 Unity HLSL 中，这会将 T, B, N 作为矩阵的行。
+    // RotateVector(m, V) 通常等价于 float3(dot(T,V), dot(B,V), dot(N,V))
+    return float3x3(T, B, N);
+}
+
+float3x3 GetBasisUnity2(float3 N)
+{
+    float sy = Math::Sign(N.y);
+    float a = 1.0f / (sy + N.y);
+
+    float ya = N.y * a;
+    float b = N.x * ya;
+    float c = N.x * sy;
+
+    float3 T = float3(c * N.x * a - 1.0f, sy * b, c);
+    float3 B = float3(b, N.y * ya - sy, N.y);
+
+    // Note: due to the quaternion formulation, the generated frame is rotated by 180 degrees,
+    // s.t. if N = (0, 0, 1), then T = (-1, 0, 0) and B = (0, -1, 0).
+    return float3x3(T, B, N);
+}
+
+
 float3 GenerateRayAndUpdateThroughput(inout GeometryProps geometryProps, inout MaterialProps materialProps, inout float3 throughput, uint sampleMaxNum, bool isDiffuse, float2 rnd)
 {
     bool isHair = false;
@@ -226,6 +273,9 @@ float3 GenerateRayAndUpdateThroughput(inout GeometryProps geometryProps, inout M
     float3x3 mLocalBasis = Geometry::GetBasis(materialProps.N);
     float3 Vlocal = Geometry::RotateVector(mLocalBasis, geometryProps.V);
 
+
+    // return geometryProps.V;
+    // return Vlocal;
     // Importance sampling
     float3 rayLocal = 0;
     uint emissiveHitNum = 0;
@@ -256,6 +306,9 @@ float3 GenerateRayAndUpdateThroughput(inout GeometryProps geometryProps, inout M
             float3 Hlocal = ImportanceSampling::VNDF::GetRay(rnd, materialProps.roughness, Vlocal, PT_SPEC_LOBE_ENERGY);
             candidateRayLocal = reflect(-Vlocal, Hlocal);
         }
+        // return float3(rnd,0);
+        // return  Geometry::RotateVectorInverse(mLocalBasis, candidateRayLocal);
+        // return candidateRayLocal;
 
         // If IS enabled, check the candidate in LightBVH
         bool isEmissiveHit = false;
@@ -393,6 +446,49 @@ float ApplyThinLensEquation(float hitDist, float curvature)
     return hitDist / (2.0 * curvature * hitDist + 1.0);
 }
 
+
+void CastRay(float3 origin, float3 direction, float Tmin, float Tmax, float2 mipAndCone, out GeometryProps props, out MaterialProps matProps)
+{
+    RayDesc rayDesc;
+    rayDesc.Origin = origin;
+    rayDesc.Direction = direction;
+    rayDesc.TMin = Tmin;
+    rayDesc.TMax = Tmax;
+
+    MainRayPayload payload = (MainRayPayload)0;
+    payload.mipAndCone = mipAndCone;
+
+    TraceRay(g_AccelStruct, RAY_FLAG_NONE | RAY_FLAG_NONE, 0xFF, 0, 1, 0, rayDesc, payload);
+
+
+    props = (GeometryProps)0;
+    props.mip = mipAndCone.x;
+    props.hitT = payload.hitT;
+    props.instanceIndex = payload.instanceIndex;
+    props.N = payload.N;
+    props.curvature = payload.curvature;
+
+
+    props.mip = payload.mipAndCone.x;
+
+    props.T = payload.T;
+    props.X = payload.X;
+    // 全静止物体
+    props.Xprev = payload.X;
+    props.V = -direction;
+
+    matProps = (MaterialProps)0;
+    matProps.baseColor = payload.baseColor;
+    matProps.roughness = payload.roughness;
+    matProps.metalness = payload.metalness;
+    matProps.Lemi = payload.Lemi;
+    // 这三个应该从贴图再计算一次
+    matProps.curvature = payload.curvature;
+    matProps.N = payload.matN;
+    matProps.T = payload.T.xyz;
+}
+
+
 TraceOpaqueResult TraceOpaque(GeometryProps geometryProps0, MaterialProps materialProps0, uint2 pixelPos, float3x3 mirrorMatrix, float4 Lpsr)
 {
     TraceOpaqueResult result = (TraceOpaqueResult)0;
@@ -418,9 +514,9 @@ TraceOpaqueResult TraceOpaque(GeometryProps geometryProps0, MaterialProps materi
     // uint pathNum = gSampleNum << (gTracingMode == RESOLUTION_FULL ? 1 : 0);
     // 两条路径
     uint pathNum = 2;
-
     uint diffPathNum = 0;
 
+    pathNum = 1;
     [loop]
     for (uint path = 0; path < pathNum; path++)
     {
@@ -461,6 +557,7 @@ TraceOpaqueResult TraceOpaque(GeometryProps geometryProps0, MaterialProps materi
                 if (gTracingMode == RESOLUTION_FULL_PROBABILISTIC || bounce > 1)
                     pathThroughput /= isDiffuse ? diffuseProbability : (1.0 - diffuseProbability);
                 else
+                    // 第1次 是镜面反射 第2次 是漫反射
                     isDiffuse = (path & 0x1);
 
                 // // This is not needed in case of "RESOLUTION_FULL_PROBABILISTIC", since hair doesn't have diffuse component
@@ -482,6 +579,9 @@ TraceOpaqueResult TraceOpaque(GeometryProps geometryProps0, MaterialProps materi
                 #endif
 
                 float3 ray = GenerateRayAndUpdateThroughput(geometryProps, materialProps, pathThroughput, sampleMaxNum, isDiffuse, rnd2);
+
+                // result.debug = ray;
+                // result.debug = float3(isDiffuse,isDiffuse,isDiffuse);
 
                 // Special case for primary surface ( 1st bounce starts here )
                 if (bounce == 1)
@@ -513,42 +613,11 @@ TraceOpaqueResult TraceOpaque(GeometryProps geometryProps0, MaterialProps materi
                 lobeTanHalfAngleAtOrigin = roughnessTemp * roughnessTemp / (1.0 + roughnessTemp * roughnessTemp);
 
                 // float2 mipAndCone = GetConeAngleFromRoughness( geometryProps.mip, isDiffuse ? 1.0 : materialProps.roughness );
-                float2 mipAndCone = GetConeAngleFromRoughness(0, isDiffuse ? 1.0 : materialProps.roughness);
+                float2 mipAndCone = GetConeAngleFromRoughness(geometryProps.mip, isDiffuse ? 1.0 : materialProps.roughness);
 
-
-                RayDesc ray2;
-                ray2.Origin = geometryProps.GetXoffset(geometryProps.N);
-                ray2.Direction = ray;
-                ray2.TMin = 0.0f;
-                ray2.TMax = 1000.0f;
-
-                MainRayPayload payload = (MainRayPayload)0;
-
-
-                TraceRay(g_AccelStruct, RAY_FLAG_NONE | RAY_FLAG_NONE, 0xFF, 0, 1, 0, ray2, payload);
-
-                geometryProps = (GeometryProps)0;
-                geometryProps.X = payload.X;
-                geometryProps.Xprev = payload.X;
-                geometryProps.V = -ray;
-                geometryProps.N = payload.N;
-                geometryProps.T = payload.T;
-                geometryProps.hitT = payload.hitT;
-                geometryProps.curvature = payload.curvature;
-                geometryProps.instanceIndex = payload.instanceIndex;
-
-                materialProps.baseColor = payload.baseColor;
-                materialProps.roughness = payload.roughness;
-                materialProps.metalness = payload.metalness;
-                materialProps.Lemi = payload.Lemi;
-                materialProps.curvature = payload.curvature;
-                materialProps.N = payload.matN;
-                materialProps.T = payload.T.xyz;
-
-
-                // geometryProps = CastRay( geometryProps.GetXoffset( geometryProps.N ), ray, 0.0, INF, mipAndCone, gWorldTlas, FLAG_NON_TRANSPARENT, PT_RAY_FLAGS );
-                // materialProps = GetMaterialProps( geometryProps ); // TODO: try to read metrials only if L1- and L2- lighting caches failed
+                CastRay(geometryProps.GetXoffset(geometryProps.N), ray, 0.0, INF, mipAndCone, geometryProps, materialProps);
             }
+
 
             //=============================================================================================================================================================
             // Hit point
@@ -570,6 +639,9 @@ TraceOpaqueResult TraceOpaque(GeometryProps geometryProps0, MaterialProps materi
                         Lcached.xyz = bounce < gBounceNum ? L : max(Lcached.xyz, L);
                     }
                 }
+
+
+                result.debug = Lcached.xyz;
 
                 //=============================================================================================================================================================
                 // Other
@@ -674,57 +746,14 @@ TraceOpaqueResult TraceOpaque(GeometryProps geometryProps0, MaterialProps materi
     return result;
 }
 
-#define MAX_MIP_LEVEL                       11.0
-
-void CastRay(float3 origin, float3 direction, float Tmin, float Tmax, float2 mipAndCone, out GeometryProps props, out MaterialProps matProps)
-{
-    RayDesc rayDesc;
-    rayDesc.Origin = origin;
-    rayDesc.Direction = direction;
-    rayDesc.TMin = Tmin;
-    rayDesc.TMax = Tmax;
-
-    MainRayPayload payload = (MainRayPayload)0;
-    payload.mipAndCone = mipAndCone;
-
-    TraceRay(g_AccelStruct, RAY_FLAG_NONE | RAY_FLAG_NONE, 0xFF, 0, 1, 0, rayDesc, payload);
-
-
-    props = (GeometryProps)0;
-    props.mip = mipAndCone.x;
-    props.hitT = payload.hitT;
-    props.instanceIndex = payload.instanceIndex;
-    props.N = payload.N;
-    props.curvature = payload.curvature;
-
-
-    props.mip = payload.mipAndCone.x;
-
-    props.T = payload.T;
-    props.X = payload.X;
-    // 全静止物体
-    props.Xprev = payload.X;
-    props.V = -direction;
-
-    matProps = (MaterialProps)0;
-    matProps.baseColor = payload.baseColor;
-    matProps.roughness = payload.roughness;
-    matProps.metalness = payload.metalness;
-    matProps.Lemi = payload.Lemi;
-    // 这三个应该从贴图再计算一次
-    matProps.curvature = payload.curvature;
-    matProps.N = payload.matN;
-    matProps.T = payload.T.xyz;
-}
-
 
 #define MATERIAL_ID_DEFAULT                 0.0f
 #define MATERIAL_ID_METAL                   1.0f
 
-float GetMaterialID( GeometryProps geometryProps, MaterialProps materialProps )
+float GetMaterialID(GeometryProps geometryProps, MaterialProps materialProps)
 {
     bool isMetal = materialProps.metalness > 0.5;
-    return  ( isMetal ? MATERIAL_ID_METAL : MATERIAL_ID_DEFAULT );
+    return (isMetal ? MATERIAL_ID_METAL : MATERIAL_ID_DEFAULT);
 }
 
 [shader("raygeneration")]
@@ -757,6 +786,10 @@ void MainRayGenShader()
 
     float3 rayDirection = mul((float3x3)_CCameraToWorld, viewDirection);
 
+
+    // Initialize RNG
+    Rng::Hash::Initialize(launchIndex, gFrameIndex);
+
     //================================================================================================================================================================================
     // Primary ray
     //================================================================================================================================================================================
@@ -772,15 +805,15 @@ void MainRayGenShader()
     //================================================================================================================================================================================
     // G-buffer ( guides )
     //================================================================================================================================================================================
-    
+
     // Motion
     float3 X0 = geometryProps0.X;
     gOut_Mv[launchIndex] = float4(GetMotion(geometryProps0.X, geometryProps0.Xprev), 1);
-    
+
     // ViewZ
     float viewZ = -Geometry::AffineTransform(gWorldToView, X0).z;
-    viewZ = geometryProps0.IsMiss( ) ? Math::Sign( viewZ ) * INF : viewZ;
-    
+    viewZ = geometryProps0.IsMiss() ? Math::Sign(viewZ) * INF : viewZ;
+
     gOut_ViewZ[launchIndex] = viewZ;
 
     // Emission
@@ -793,9 +826,9 @@ void MainRayGenShader()
     }
 
     // Normal, roughness and material ID
-    float materialID = GetMaterialID( geometryProps0, materialProps0 );
+    float materialID = GetMaterialID(geometryProps0, materialProps0);
     gOut_Normal_Roughness[launchIndex] = NRD_FrontEnd_PackNormalAndRoughness(materialProps0.N, materialProps0.roughness, materialID);
-    
+
     // Base color and metalness
     gOut_BaseColor_Metalness[launchIndex] = float4(materialProps0.baseColor, materialProps0.metalness);
 
@@ -816,7 +849,7 @@ void MainRayGenShader()
     //================================================================================================================================================================================
     // Sun shadow
     //================================================================================================================================================================================
-    geometryProps0.X  = Xshadow;
+    geometryProps0.X = Xshadow;
 
     float2 rnd = GetBlueNoise(launchIndex);
     rnd = ImportanceSampling::Cosine::GetRay(rnd).xy;
@@ -853,7 +886,7 @@ void MainRayGenShader()
     float penumbra = SIGMA_FrontEnd_PackPenumbra(shadowHitDist, gTanSunAngularRadius);
 
     gOut_ShadowData[launchIndex] = penumbra;
-    
+
     //================================================================================================================================================================================
     // Output
     //================================================================================================================================================================================
@@ -861,5 +894,5 @@ void MainRayGenShader()
     gOut_Spec[launchIndex] = RELAX_FrontEnd_PackRadianceAndHitDist(result.specRadiance, result.specHitDist, USE_SANITIZATION);
 
 
-    g_Output[launchIndex] = float4(0,0,0, 1);
+    g_Output[launchIndex] = float4(result.debug, 1);
 }
