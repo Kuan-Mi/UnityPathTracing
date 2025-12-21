@@ -717,6 +717,16 @@ void CastRay(float3 origin, float3 direction, float Tmin, float Tmax, float2 mip
     matProps.T = payload.T.xyz;
 }
 
+
+#define MATERIAL_ID_DEFAULT                 0.0f
+#define MATERIAL_ID_METAL                   1.0f
+
+float GetMaterialID( GeometryProps geometryProps, MaterialProps materialProps )
+{
+    bool isMetal = materialProps.metalness > 0.5;
+    return  ( isMetal ? MATERIAL_ID_METAL : MATERIAL_ID_DEFAULT );
+}
+
 [shader("raygeneration")]
 void MainRayGenShader()
 {
@@ -747,6 +757,9 @@ void MainRayGenShader()
 
     float3 rayDirection = mul((float3x3)_CCameraToWorld, viewDirection);
 
+    //================================================================================================================================================================================
+    // Primary ray
+    //================================================================================================================================================================================
 
     float3 cameraRayOrigin = _CameraPosition;
     float3 cameraRayDirection = rayDirection;
@@ -756,33 +769,57 @@ void MainRayGenShader()
 
     CastRay(cameraRayOrigin, cameraRayDirection, 0.0, 1000.0, GetConeAngleFromRoughness(0.0, 0.0), geometryProps0, materialProps0);
 
-
-    // float mipNorm = Math::Sqrt01( geometryProps0.mip / MAX_MIP_LEVEL );
-    // float3 mip = Color::ColorizeZucconi( mipNorm );
-
-    float3 X0 = geometryProps0.X;
-
-    float viewZ0 = Geometry::AffineTransform(gWorldToView, X0).z;
-
-    gOut_Mv[launchIndex] = float4(GetMotion(geometryProps0.X, geometryProps0.Xprev), 1);
-    gOut_ViewZ[launchIndex] = -viewZ0;
+    //================================================================================================================================================================================
+    // G-buffer ( guides )
+    //================================================================================================================================================================================
     
-    if( geometryProps0.IsMiss( ) )
+    // Motion
+    float3 X0 = geometryProps0.X;
+    gOut_Mv[launchIndex] = float4(GetMotion(geometryProps0.X, geometryProps0.Xprev), 1);
+    
+    // ViewZ
+    float viewZ = -Geometry::AffineTransform(gWorldToView, X0).z;
+    viewZ = geometryProps0.IsMiss( ) ? Math::Sign( viewZ ) * INF : viewZ;
+    
+    gOut_ViewZ[launchIndex] = viewZ;
+
+    // Emission
+    gOut_DirectEmission[launchIndex] = materialProps0.Lemi;
+
+    // Early out
+    if (geometryProps0.IsMiss())
     {
         return;
     }
+
+    // Normal, roughness and material ID
+    float materialID = GetMaterialID( geometryProps0, materialProps0 );
+    gOut_Normal_Roughness[launchIndex] = NRD_FrontEnd_PackNormalAndRoughness(materialProps0.N, materialProps0.roughness, materialID);
     
-    
-    gOut_Normal_Roughness[launchIndex] = NRD_FrontEnd_PackNormalAndRoughness(materialProps0.N, materialProps0.roughness, 0);
+    // Base color and metalness
     gOut_BaseColor_Metalness[launchIndex] = float4(materialProps0.baseColor, materialProps0.metalness);
 
-    float3 Ldirect = GetLighting(geometryProps0, materialProps0, LIGHTING, X0);
+    // Direct lighting
+    float3 Xshadow;
+    float3 Ldirect = GetLighting(geometryProps0, materialProps0, LIGHTING, Xshadow);
 
     gOut_DirectLighting[launchIndex] = Ldirect;
-    gOut_DirectEmission[launchIndex] = materialProps0.Lemi;
 
-    float2 Blue = GetBlueNoise(launchIndex);
-    float2 rnd = ImportanceSampling::Cosine::GetRay(Blue).xy;
+    float3x3 mirrorMatrix = Geometry::GetMirrorMatrix(0); // identity
+    float4 Lpsr = 0;
+
+    //================================================================================================================================================================================
+    // Secondary rays
+    //================================================================================================================================================================================
+    TraceOpaqueResult result = TraceOpaque(geometryProps0, materialProps0, launchIndex, mirrorMatrix, Lpsr);
+
+    //================================================================================================================================================================================
+    // Sun shadow
+    //================================================================================================================================================================================
+    geometryProps0.X  = Xshadow;
+
+    float2 rnd = GetBlueNoise(launchIndex);
+    rnd = ImportanceSampling::Cosine::GetRay(rnd).xy;
     rnd *= gTanSunAngularRadius;
 
     float3 sunDirection = normalize(gSunBasisX.xyz * rnd.x + gSunBasisY.xyz * rnd.y + gSunDirection.xyz);
@@ -816,19 +853,13 @@ void MainRayGenShader()
     float penumbra = SIGMA_FrontEnd_PackPenumbra(shadowHitDist, gTanSunAngularRadius);
 
     gOut_ShadowData[launchIndex] = penumbra;
-
-    // 漫反射和高光噪声
-
-
-    float3x3 mirrorMatrix = Geometry::GetMirrorMatrix(0); // identity
-    float4 Lpsr = 0;
-
-    TraceOpaqueResult result = TraceOpaque(geometryProps0, materialProps0, launchIndex, mirrorMatrix, Lpsr);
-
-
+    
+    //================================================================================================================================================================================
+    // Output
+    //================================================================================================================================================================================
     gOut_Diff[launchIndex] = RELAX_FrontEnd_PackRadianceAndHitDist(result.diffRadiance, result.diffHitDist, USE_SANITIZATION);
     gOut_Spec[launchIndex] = RELAX_FrontEnd_PackRadianceAndHitDist(result.specRadiance, result.specHitDist, USE_SANITIZATION);
 
 
-    g_Output[launchIndex] = float4(Blue.x, Blue.x, Blue.x, 1);
+    g_Output[launchIndex] = float4(0,0,0, 1);
 }
