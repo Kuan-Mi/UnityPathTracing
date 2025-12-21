@@ -9,7 +9,7 @@ Shader "Custom/LitWithRayTracing"
         [MainColor] _BaseColor("Color", Color) = (1,1,1,1)
 
         _Cutoff("Alpha Cutoff", Range(0.0, 1.0)) = 0.5
-        
+
         _IOR("IOR", Range(0.0, 2.0)) = 1.5
 
         _Smoothness("Smoothness", Range(0.0, 1.0)) = 0.5
@@ -126,6 +126,7 @@ Shader "Custom/LitWithRayTracing"
             #pragma raytracing test
 
             float _IOR;
+
             struct AttributeData
             {
                 float2 barycentrics;
@@ -182,7 +183,7 @@ Shader "Custom/LitWithRayTracing"
 
             [shader("closesthit")]
             void ClosestHitMain(inout RayPayload payload : SV_RayPayload,
-                        AttributeData attribs : SV_IntersectionAttributes)
+                                AttributeData attribs : SV_IntersectionAttributes)
             {
                 if (payload.bounceIndexOpaque == g_BounceCountOpaque)
                 {
@@ -196,7 +197,7 @@ Shader "Custom/LitWithRayTracing"
                 Vertex v2 = FetchVertex(triangleIndices.z);
 
                 float3 barycentricCoords = float3(1.0 - attribs.barycentrics.x - attribs.barycentrics.y,
-                                                      attribs.barycentrics.x, attribs.barycentrics.y);
+                                                  attribs.barycentrics.x, attribs.barycentrics.y);
 
                 Vertex v = InterpolateVertices(v0, v1, v2, barycentricCoords);
 
@@ -224,14 +225,14 @@ Shader "Custom/LitWithRayTracing"
                 float3 worldPosition = mul(ObjectToWorld(), float4(v.position, 1)).xyz;
 
                 float3 albedo = _BaseColor.xyz * _BaseMap.SampleLevel(sampler_BaseMap,
-                                                                               _BaseMap_ST.xy * v.uv + _BaseMap_ST.zw,
-                                                                               0).xyz;
+                                                                      _BaseMap_ST.xy * v.uv + _BaseMap_ST.zw,
+                                                                      0).xyz;
 
 
                 albedo = float3(0, 1, 0);
 
                 float4 vv = _MetallicGlossMap.SampleLevel(sampler_MetallicGlossMap,
-                                               _BaseMap_ST.xy * v.uv + _BaseMap_ST.zw, 0);
+                                                                          _BaseMap_ST.xy * v.uv + _BaseMap_ST.zw, 0);
                 float metallic = vv.r * _Metallic;
                 float smooth = vv.a * _Smoothness;
 
@@ -261,8 +262,8 @@ Shader "Custom/LitWithRayTracing"
 
                 float pushOff = doRefraction ? -K_RAY_ORIGIN_PUSH_OFF : K_RAY_ORIGIN_PUSH_OFF;
                 float3 albedoTransparent = !isFrontFace
-               ? exp(-(1 - albedo) * RayTCurrent() * _BaseColor.a * 20)
-               : float3(1, 1, 1);
+                                                                       ? exp(-(1 - albedo) * RayTCurrent() * _BaseColor.a * 20)
+                                                                       : float3(1, 1, 1);
 
 
                 #endif
@@ -388,6 +389,8 @@ Shader "Custom/LitWithRayTracing"
                 return v;
             }
 
+            #define MAX_MIP_LEVEL                       11.0
+
             [shader("closesthit")]
             void ClosestHitMain(inout MainRayPayload payload : SV_RayPayload,
                                 AttributeData attribs : SV_IntersectionAttributes)
@@ -420,14 +423,49 @@ Shader "Custom/LitWithRayTracing"
                 float3 normalOS = isFrontFace ? v.normal : -v.normal;
 
                 float3 normalWS = normalize(mul(normalOS, (float3x3)WorldToObject()));
-                
-                
+
+
+                float3 direction = WorldRayDirection();
+
+                // 长度
+                payload.hitT = RayTCurrent();
+
+                // Mip level
+
+                // 2. 计算 UV 空间面积 (uvArea)
+                float2 uvE1 = v1.uv - v0.uv;
+                float2 uvE2 = v2.uv - v0.uv;
+                // 使用 2D 叉乘公式计算面积
+                float uvArea = abs(uvE1.x * uvE2.y - uvE2.x * uvE1.y) * 0.5f;
+
+                // 3. 计算世界空间面积 (worldArea)
+                // 注意：v0.position 是模型空间，需要考虑物体的缩放
+                float3 edge1 = v1.position - v0.position;
+                float3 edge2 = v2.position - v0.position;
+                float3 crossProduct = cross(edge1, edge2);
+
+                // 将模型空间的面积向量转换到世界空间，从而自动处理非统一缩放
+                // 使用 ObjectToWorld 的转置逆矩阵或直接变换向量（视缩放情况而定）
+                float3 worldCrossProduct = mul((float3x3)ObjectToWorld(), crossProduct);
+                float worldArea = length(worldCrossProduct) * 0.5f;
+
+                float NoRay = abs(dot(direction, normalWS));
+                float a = payload.hitT * payload.mipAndCone.y;
+                a *= Math::PositiveRcp(NoRay);
+                // a *= sqrt(uvArea / max(worldArea, 1e-10f)); 
+                // a *= 0.8;
+
+                float mip = log2(a);
+                mip += MAX_MIP_LEVEL;
+                mip = max(mip, 0.0);
+                payload.mipAndCone.x += mip;
+
                 #if _NORMALMAP
                 float3 tangentWS = normalize(mul(v.tangent.xyz, (float3x3)WorldToObject()));
-                
-                float2 normalUV = float2(v.uv.x,1-v.uv.y); // 修正UV翻转问题
-                
-                float4 n = _BumpMap.SampleLevel(sampler_BumpMap, _BaseMap_ST.xy * normalUV + _BaseMap_ST.zw, 0);
+
+                float2 normalUV = float2(v.uv.x, 1 - v.uv.y); // 修正UV翻转问题
+
+                float4 n = _BumpMap.SampleLevel(sampler_BumpMap, _BaseMap_ST.xy * normalUV + _BaseMap_ST.zw, mip);
                 float3 tangentNormal = UnpackNormalScale(n, _BumpScale);
 
                 float3 bitangent = cross(normalWS.xyz, tangentWS.xyz);
@@ -440,22 +478,21 @@ Shader "Custom/LitWithRayTracing"
                 #endif
 
                 float3 albedo = _BaseColor.xyz * _BaseMap.SampleLevel(sampler_BaseMap,
-                                                                      _BaseMap_ST.xy * v.uv + _BaseMap_ST.zw, 0).xyz;
+                           _BaseMap_ST.xy * v.uv + _BaseMap_ST.zw, mip).xyz;
 
                 // albedo = randomColor;
                 // albedo = float3(ccR, ccG, ccB);
 
-                float4 vv = _MetallicGlossMap.SampleLevel(sampler_MetallicGlossMap,
-                 _BaseMap_ST.xy * v.uv + _BaseMap_ST.zw, 0);
+                float4 vv = _MetallicGlossMap.SampleLevel(sampler_MetallicGlossMap, _BaseMap_ST.xy * v.uv + _BaseMap_ST.zw, mip);
                 float metallic = vv.r * _Metallic;
-                float smooth = vv.a * _Smoothness;
+                // float smooth = vv.r * _Smoothness;
+                float roughness = vv.g * (1 - _Smoothness);
 
+
+                metallic = vv.b;
                 float3 dielectricSpecular = float3(0.04, 0.04, 0.04);
                 float3 _SpecularColor = lerp(dielectricSpecular, albedo, metallic);
 
-
-                // 长度
-                payload.hitT = RayTCurrent();
 
                 // Instance
                 uint instanceIndex = InstanceIndex();
@@ -463,31 +500,30 @@ Shader "Custom/LitWithRayTracing"
 
                 float3x3 mObjectToWorld = (float3x3)ObjectToWorld();
 
-                
-               float4x4 prev = GetPrevObjectToWorldMatrix();
-                
+
+                float4x4 prev = GetPrevObjectToWorldMatrix();
+
                 float3x3 mPrevObjectToWorld = (float3x3)prev;
                 // 法线
                 payload.N = normalWS;
                 payload.matN = worldNormal;
 
                 float3 worldPosition = mul(ObjectToWorld(), float4(v.position, 1)).xyz;
-                
+
                 float3 prevWorldPosition = mul(mPrevObjectToWorld, v.position);
                 // 位置
                 payload.X = worldPosition;
                 payload.Xprev = prevWorldPosition;
-                payload.roughness = 1 - smooth;
+                payload.roughness = roughness;
                 payload.baseColor = albedo;
                 payload.metalness = metallic;
-                
+
                 #if _EMISSION
-                float3 emission = _EmissionColor.xyz * _EmissionMap.SampleLevel(sampler_EmissionMap, v.uv, 0).xyz;
+                float3 emission = _EmissionColor.xyz * _EmissionMap.SampleLevel(sampler_EmissionMap, v.uv, mip).xyz;
                 payload.Lemi = emission;
                 #else
                 payload.Lemi = float3(0, 0, 0);
                 #endif
-                   
             }
             ENDHLSL
         }

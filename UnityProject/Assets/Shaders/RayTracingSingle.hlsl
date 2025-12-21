@@ -413,9 +413,11 @@ TraceOpaqueResult TraceOpaque(GeometryProps geometryProps0, MaterialProps materi
     }
 
 
-    uint checkerboard = Sequence::CheckerBoard(pixelPos, g_FrameIndex) != 0;
+    // uint checkerboard = Sequence::CheckerBoard(pixelPos, g_FrameIndex) != 0;
 
-    uint pathNum = gSampleNum << (gTracingMode == RESOLUTION_FULL ? 1 : 0);
+    // uint pathNum = gSampleNum << (gTracingMode == RESOLUTION_FULL ? 1 : 0);
+    // 两条路径
+    uint pathNum = 2;
 
     uint diffPathNum = 0;
 
@@ -459,7 +461,7 @@ TraceOpaqueResult TraceOpaque(GeometryProps geometryProps0, MaterialProps materi
                 if (gTracingMode == RESOLUTION_FULL_PROBABILISTIC || bounce > 1)
                     pathThroughput /= isDiffuse ? diffuseProbability : (1.0 - diffuseProbability);
                 else
-                    isDiffuse = gTracingMode == RESOLUTION_HALF ? checkerboard : (path & 0x1);
+                    isDiffuse = (path & 0x1);
 
                 // // This is not needed in case of "RESOLUTION_FULL_PROBABILISTIC", since hair doesn't have diffuse component
                 // if( geometryProps.Has( FLAG_HAIR ) && isDiffuse )
@@ -488,40 +490,10 @@ TraceOpaqueResult TraceOpaque(GeometryProps geometryProps0, MaterialProps materi
 
                     if (gTracingMode == RESOLUTION_FULL)
                         Lsum *= isDiffuse ? diffuseProbability : (1.0 - diffuseProbability);
-
-                    // ( Optional ) Save sampling direction for the 1st bounce
-                    #if( NRD_MODE == SH )
-                    float3 psrRay = Geometry::RotateVectorInverse(mirrorMatrix, ray);
-
-                    if (isDiffuse)
-                        result.diffDirection += psrRay;
-                    else
-                        result.specDirection += psrRay;
-                    #endif
                 }
 
                 // Abort tracing if the current bounce contribution is low
-                #if( USE_RUSSIAN_ROULETTE == 1 )
-                /*
-                BAD PRACTICE:
-                Russian Roulette approach is here to demonstrate that it's a bad practice for real time denoising for the following reasons:
-                - increases entropy of the signal
-                - transforms radiance into non-radiance, which is strictly speaking not allowed to be processed spatially (who wants to get a high energy firefly
-                redistributed around surrounding pixels?)
-                - not necessarily converges to the right image, because we do assumptions about the future and approximate the tail of the path via a scaling factor
-                - this approach breaks denoising, especially REBLUR, which has been designed to work with pure radiance
-                */
 
-                // Nevertheless, RR can be used with caution: the code below tuned for good IQ / PERF tradeoff
-                float russianRouletteProbability = Color::Luminance(pathThroughput);
-                russianRouletteProbability = Math::Pow01(russianRouletteProbability, 0.25);
-                russianRouletteProbability = max(russianRouletteProbability, 0.01);
-
-                if (Rng::Hash::GetFloat() > russianRouletteProbability)
-                    break;
-
-                pathThroughput /= russianRouletteProbability;
-                #else
                 /*
                 GOOD PRACTICE:
                 - terminate path if "pathThroughput" is smaller than some threshold
@@ -531,7 +503,7 @@ TraceOpaqueResult TraceOpaque(GeometryProps geometryProps0, MaterialProps materi
 
                 if (PT_THROUGHPUT_THRESHOLD != 0.0 && Color::Luminance(pathThroughput) < PT_THROUGHPUT_THRESHOLD)
                     break;
-                #endif
+
 
                 //=========================================================================================================================================================
                 // Trace to the next hit
@@ -591,7 +563,7 @@ TraceOpaqueResult TraceOpaque(GeometryProps geometryProps0, MaterialProps materi
                 if (!geometryProps.IsMiss())
                 {
                     // Cache miss - compute lighting, if not found in caches
-                    if (Rng::Hash::GetFloat() > Lcached.w)
+                    // if (Rng::Hash::GetFloat() > Lcached.w)
                     {
                         float3 nouse;
                         float3 L = GetLighting(geometryProps, materialProps, LIGHTING | SHADOW, nouse) + materialProps.Lemi;
@@ -702,6 +674,58 @@ TraceOpaqueResult TraceOpaque(GeometryProps geometryProps0, MaterialProps materi
     return result;
 }
 
+#define MAX_MIP_LEVEL                       11.0
+
+void CastRay(float3 origin, float3 direction, float Tmin, float Tmax, float2 mipAndCone, out GeometryProps props, out MaterialProps matProps)
+{
+    RayDesc rayDesc;
+    rayDesc.Origin = origin;
+    rayDesc.Direction = direction;
+    rayDesc.TMin = Tmin;
+    rayDesc.TMax = Tmax;
+
+    MainRayPayload payload = (MainRayPayload)0;
+    payload.mipAndCone = mipAndCone;
+
+    TraceRay(g_AccelStruct, RAY_FLAG_NONE | RAY_FLAG_NONE, 0xFF, 0, 1, 0, rayDesc, payload);
+
+
+    props = (GeometryProps)0;
+    props.mip = mipAndCone.x;
+    props.hitT = payload.hitT;
+    props.instanceIndex = payload.instanceIndex;
+    props.N = payload.N;
+    props.curvature = payload.curvature;
+
+
+    // Mip level
+    float NoRay = abs(dot(direction, props.N));
+    float a = props.hitT * mipAndCone.y;
+    a *= Math::PositiveRcp(NoRay);
+    // a *= sqrt( primitiveData.uvArea / worldArea );
+
+    float mip = log2(a);
+    mip += MAX_MIP_LEVEL;
+    mip = max(mip, 0.0);
+    props.mip += mip;
+
+    props.T = payload.T;
+    props.X = payload.X;
+    // 全静止物体
+    props.Xprev = payload.X;
+    props.V = -direction;
+
+    matProps = (MaterialProps)0;
+    matProps.baseColor = payload.baseColor;
+    matProps.roughness = payload.roughness;
+    matProps.metalness = payload.metalness;
+    matProps.Lemi = payload.Lemi;
+    // 这三个应该从贴图再计算一次
+    matProps.curvature = payload.curvature;
+    matProps.N = payload.matN;
+    matProps.T = payload.T.xyz;
+}
+
 [shader("raygeneration")]
 void MainRayGenShader()
 {
@@ -732,38 +756,20 @@ void MainRayGenShader()
 
     float3 rayDirection = mul((float3x3)_CCameraToWorld, viewDirection);
 
-    RayDesc ray;
-    ray.Origin = _CameraPosition;
-    ray.Direction = rayDirection;
-    ray.TMin = 0.0f;
-    ray.TMax = 1000.0f;
 
-    MainRayPayload payload = (MainRayPayload)0;
+    float3 cameraRayOrigin = _CameraPosition;
+    float3 cameraRayDirection = rayDirection;
 
+    GeometryProps geometryProps0;
+    MaterialProps materialProps0;
 
-    TraceRay(g_AccelStruct, RAY_FLAG_NONE | RAY_FLAG_NONE, 0xFF, 0, 1, 0, ray, payload);
+    CastRay(cameraRayOrigin, cameraRayDirection, 0.0, 1000.0, GetConeAngleFromRoughness(0.0, 0.0), geometryProps0, materialProps0);
 
-    GeometryProps geometryProps0 = (GeometryProps)0;
-    geometryProps0.X = payload.X;
-    geometryProps0.Xprev = payload.X;
-    geometryProps0.V = -rayDirection;
-    geometryProps0.N = payload.N;
-    geometryProps0.T = payload.T;
-    geometryProps0.hitT = payload.hitT;
-    geometryProps0.curvature = payload.curvature;
-    geometryProps0.instanceIndex = payload.instanceIndex;
-
-    MaterialProps materialProps0 = (MaterialProps)0;
-    materialProps0.baseColor = payload.baseColor;
-    materialProps0.roughness = payload.roughness;
-    materialProps0.metalness = payload.metalness;
-    materialProps0.Lemi = payload.Lemi;
-    // 这三个应该从贴图再计算一次
-    materialProps0.curvature = payload.curvature;
-    materialProps0.N = payload.matN;
-    materialProps0.T = payload.T.xyz;
-
-    float3 X0 = payload.X;
+    
+    float mipNorm = Math::Sqrt01( geometryProps0.mip / MAX_MIP_LEVEL );
+    float3 mip = Color::ColorizeZucconi( mipNorm );
+     
+    float3 X0 = geometryProps0.X;
     float3 V0 = -rayDirection;
     // float viewZ0 = abs(mul(gWorldToView, float4(X0, 1)).z);
     // float viewZ0 = mul(gWorldToView, float4(X0, 1)).z;
@@ -777,14 +783,14 @@ void MainRayGenShader()
 
 
     // gOut_Normal_Roughness[launchIndex] = NRD_FrontEnd_PackNormalAndRoughness(payload.N, payload.roughness, 0);
-    gOut_Normal_Roughness[launchIndex] = NRD_FrontEnd_PackNormalAndRoughness(payload.matN, payload.roughness, 0);
+    gOut_Normal_Roughness[launchIndex] = NRD_FrontEnd_PackNormalAndRoughness(materialProps0.N, materialProps0.roughness, 0);
 
-    gOut_BaseColor_Metalness[launchIndex] = float4(payload.baseColor, payload.metalness);
+    gOut_BaseColor_Metalness[launchIndex] = float4(materialProps0.baseColor, materialProps0.metalness);
 
     float3 Ldirect = GetLighting(geometryProps0, materialProps0, LIGHTING, X0);
 
     gOut_DirectLighting[launchIndex] = Ldirect;
-    gOut_DirectEmission[launchIndex] = payload.Lemi;
+    gOut_DirectEmission[launchIndex] = materialProps0.Lemi;
 
     float2 Blue = GetBlueNoise(launchIndex);
 
@@ -796,7 +802,7 @@ void MainRayGenShader()
 
     float3 sunDirection = normalize(gSunBasisX.xyz * rnd.x + gSunBasisY.xyz * rnd.y + gSunDirection.xyz);
     // float3 Xoffset = payload.GetXoffset(sunDirection, PT_SHADOW_RAY_OFFSET);
-    float3 Xoffset = payload.GetXoffset(payload.N, PT_SHADOW_RAY_OFFSET);
+    float3 Xoffset = geometryProps0.GetXoffset(geometryProps0.N, PT_SHADOW_RAY_OFFSET);
     float2 mipAndCone = GetConeAngleFromAngularRadius(1, gTanSunAngularRadius);
 
     float shadowTranslucency = (Color::Luminance(Ldirect) != 0.0) ? 1.0 : 0.0;
@@ -833,5 +839,5 @@ void MainRayGenShader()
     gOut_Spec[launchIndex] = RELAX_FrontEnd_PackRadianceAndHitDist(result.specRadiance, result.specHitDist, USE_SANITIZATION);
 
 
-    g_Output[launchIndex] = float4(result.diffRadiance, 1);
+    g_Output[launchIndex] = float4(mip, 1);
 }
