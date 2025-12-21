@@ -350,14 +350,14 @@ namespace PathTracing
             float AspectRatio = (float)cam.pixelWidth / (float)cam.pixelHeight;
             float HorizontalFieldOfView = Mathf.Atan(Mathf.Tan(Mathf.Deg2Rad * VerticalFieldOfView * 0.5f) * AspectRatio) * 2 * Mathf.Rad2Deg;
 
-            
+
             var setting = new Settings
             {
                 g_Zoom = tan,
                 g_ConvergenceStep = NrdDenoiser.FrameIndex,
                 g_FrameIndex = (uint)Time.frameCount,
                 g_SampleCount = (uint)_settings.sampleCount,
-                lightOffset = _settings.lightOffset,
+                lightOffset = _settings.sunAngularDiameter,
 
                 _CameraPosition = cameraData.worldSpaceCameraPos,
 
@@ -372,12 +372,12 @@ namespace PathTracing
                 gSunBasisX = new float4(gSunBasisX.x, gSunBasisX.y, gSunBasisX.z, 0),
                 gSunBasisY = new float4(gSunBasisY.x, gSunBasisY.y, gSunBasisY.z, 0),
                 gSunDirection = new float4(gSunDirection.x, gSunDirection.y, gSunDirection.z, 0),
-                 
-                
+
+
                 gTanPixelAngularRadius = math.tan(0.5f * math.radians(HorizontalFieldOfView) / cam.pixelWidth),
-                
+
                 gUnproject = 1.0f / (0.5f * rectH * m11),
-                gTanSunAngularRadius = _settings.lightOffset
+                gTanSunAngularRadius = math.tan(math.radians(_settings.sunAngularDiameter * 0.5f))
             };
 
             passData.pathTracingSettings = setting;

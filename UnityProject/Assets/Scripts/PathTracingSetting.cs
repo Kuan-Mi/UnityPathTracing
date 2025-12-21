@@ -11,7 +11,7 @@ namespace PathTracing
         [Range(1, 10)] public int bounceCountTransparent = 5;
         [Range(1, 128)] public int sampleCount = 1;
 
-        [Range(0.001f, 0.02f)] public float lightOffset = 0.0001f;
+        [Range(0.001f, 1f)] public float sunAngularDiameter = 0.533f;
 
         public Cubemap envTexture = null;
 
