@@ -110,6 +110,7 @@ void CSMain(int2 pixelPos : SV_DispatchThreadID)
     
     Ldiff += Ldirect;
     
-    gOut_ComposedDiff[ pixelPos ] = Ldiff;
+    // gOut_ComposedDiff[ pixelPos ] = Ldiff;
+    gOut_ComposedDiff[ pixelPos ] = Ldiff + Lspec;
     gOut_ComposedSpec_ViewZ[ pixelPos ] = float4( Lspec, z );
 }
