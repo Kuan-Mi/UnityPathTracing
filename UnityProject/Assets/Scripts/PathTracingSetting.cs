@@ -68,5 +68,9 @@ namespace PathTracing
 
         public bool showMV;
         public bool showValidation;
+
+        public bool showComposedDiff;
+        public bool showComposedSpec;
+        
     }
 }

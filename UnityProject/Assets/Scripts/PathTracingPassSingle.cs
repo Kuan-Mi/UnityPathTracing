@@ -15,6 +15,7 @@ namespace PathTracing
     public class PathTracingPassSingle : ScriptableRenderPass
     {
         public RayTracingShader rayTracingShader;
+        public ComputeShader compositionComputeShader;
 
         private PathTracingSetting _settings;
         public RayTracingAccelerationStructure accelerationStructure;
@@ -64,6 +65,24 @@ namespace PathTracing
         private static int g_AccelStructID = Shader.PropertyToID("g_AccelStruct");
         private static int g_DirLightDirectionID = Shader.PropertyToID("g_DirLightDirection");
         private static int g_DirLightColorID = Shader.PropertyToID("g_DirLightColor");
+
+
+        private static int gViewToWorldID = Shader.PropertyToID("gViewToWorld");
+        private static int gSunDirectionID = Shader.PropertyToID("gSunDirection");
+        private static int gCameraFrustumID = Shader.PropertyToID("gCameraFrustum");
+        private static int gInvRectSizeID = Shader.PropertyToID("gInvRectSize");
+
+
+        private static int gIn_ViewZID = Shader.PropertyToID("gIn_ViewZ");
+        private static int gIn_Normal_RoughnessID = Shader.PropertyToID("gIn_Normal_Roughness");
+        private static int gIn_BaseColor_MetalnessID = Shader.PropertyToID("gIn_BaseColor_Metalness");
+        private static int gIn_DirectLightingID = Shader.PropertyToID("gIn_DirectLighting");
+        private static int gIn_DirectEmissionID = Shader.PropertyToID("gIn_DirectEmission");
+        private static int gIn_ShadowID = Shader.PropertyToID("gIn_Shadow");
+        private static int gIn_DiffID = Shader.PropertyToID("gIn_Diff");
+        private static int gIn_SpecID = Shader.PropertyToID("gIn_Spec");
+        private static int gOut_ComposedDiffID = Shader.PropertyToID("gOut_ComposedDiff");
+        private static int gOut_ComposedSpec_ViewZID = Shader.PropertyToID("gOut_ComposedSpec_ViewZ");
 
         #endregion
 
@@ -123,7 +142,11 @@ namespace PathTracing
             internal TextureHandle DenoisedSpec;
             internal TextureHandle Validation;
 
+            internal TextureHandle ComposedDiff;
+            internal TextureHandle ComposedSpec_ViewZ;
+
             internal RayTracingShader rayTracingShader;
+            internal ComputeShader compositionComputeShader;
             internal Material blitMaterial;
             internal Camera cam;
             internal int width;
@@ -194,6 +217,24 @@ namespace PathTracing
             natCmd.IssuePluginEventAndData(GetRenderEventAndDataFunc(), 1, data.dataPtr);
 
 
+            // 组合通道
+            natCmd.SetComputeBufferParam(data.compositionComputeShader, 0, "PathTracingParams", data.pathTracingSettingsBuffer);
+            natCmd.SetComputeTextureParam(data.compositionComputeShader, 0, gIn_ViewZID, data.ViewZ);
+            natCmd.SetComputeTextureParam(data.compositionComputeShader, 0, gIn_Normal_RoughnessID, data.Normal_Roughness);
+            natCmd.SetComputeTextureParam(data.compositionComputeShader, 0, gIn_BaseColor_MetalnessID, data.BaseColor_Metalness);
+            natCmd.SetComputeTextureParam(data.compositionComputeShader, 0, gIn_DirectLightingID, data.DirectLighting);
+            natCmd.SetComputeTextureParam(data.compositionComputeShader, 0, gIn_DirectEmissionID, data.DirectEmission);
+            natCmd.SetComputeTextureParam(data.compositionComputeShader, 0, gIn_ShadowID, data.Shadow_Translucency);
+            natCmd.SetComputeTextureParam(data.compositionComputeShader, 0, gIn_DiffID, data.DenoisedDiff);
+            natCmd.SetComputeTextureParam(data.compositionComputeShader, 0, gIn_SpecID, data.DenoisedSpec);
+            natCmd.SetComputeTextureParam(data.compositionComputeShader, 0, gOut_ComposedDiffID, data.ComposedDiff);
+            natCmd.SetComputeTextureParam(data.compositionComputeShader, 0, gOut_ComposedSpec_ViewZID, data.ComposedSpec_ViewZ);
+            
+            int threadGroupX = Mathf.CeilToInt(data.width / 16.0f);
+            int threadGroupY = Mathf.CeilToInt(data.height / 16.0f);
+            natCmd.DispatchCompute(data.compositionComputeShader, 0, threadGroupX, threadGroupY, 1);
+            
+
             natCmd.SetRenderTarget(data.cameraTexture);
 
 
@@ -239,12 +280,12 @@ namespace PathTracing
             {
                 Blitter.BlitTexture(natCmd, data.DirectLighting, new Vector4(1, 1, 0, 0), data.blitMaterial, 4);
             }
-            
+
             if (data._setting.showEmissive)
             {
                 Blitter.BlitTexture(natCmd, data.DirectEmission, new Vector4(1, 1, 0, 0), data.blitMaterial, 4);
             }
-            
+
             if (data._setting.showOut)
             {
                 Blitter.BlitTexture(natCmd, data.outputTexture, new Vector4(1, 1, 0, 0), data.blitMaterial, 4);
@@ -259,6 +300,16 @@ namespace PathTracing
             {
                 Blitter.BlitTexture(natCmd, data.Validation, new Vector4(1, 1, 0, 0), data.blitMaterial, 0);
             }
+            
+            if (data._setting.showComposedDiff)
+            {
+                Blitter.BlitTexture(natCmd, data.ComposedDiff, new Vector4(1, 1, 0, 0), data.blitMaterial, 4);
+            }
+            
+            if (data._setting.showComposedSpec)
+            {
+                Blitter.BlitTexture(natCmd, data.ComposedSpec_ViewZ, new Vector4(1, 1, 0, 0), data.blitMaterial, 4);
+            }
         }
 
         private Matrix4x4 prevWorldToView;
@@ -267,6 +318,48 @@ namespace PathTracing
         // private Matrix4x4 prevCameraMatrix;
         // private int prevBounceCountOpaque;
         // private int prevBounceCountTransparent;
+
+
+        public static Vector4 GetNrdFrustum(Camera cam)
+        {
+            Matrix4x4 p = cam.projectionMatrix;
+
+            // Unity 的投影矩阵 p 的元素索引:
+            // [0,0] = 2n/(r-left), [0,2] = (r+left)/(r-left)
+            // [1,1] = 2n/(top-bottom), [1,2] = (top+bottom)/(top-bottom)
+
+            float x0, x1, y0, y1;
+
+            if (!cam.orthographic)
+            {
+                // 透视投影重建 (基于投影矩阵的逆推)
+                // 对应 C++ 中的 x0 = vPlane[PLANE_LEFT].z / vPlane[PLANE_LEFT].x
+                x0 = (-1.0f - p.m02) / p.m00;
+                x1 = (1.0f - p.m02) / p.m00;
+                y0 = (-1.0f - p.m12) / p.m11;
+                y1 = (1.0f - p.m12) / p.m11;
+            }
+            else
+            {
+                // 正交投影
+                float halfHeight = cam.orthographicSize;
+                float halfWidth = halfHeight * cam.aspect;
+                x0 = -halfWidth;
+                x1 = halfWidth;
+                y0 = -halfHeight;
+                y1 = halfHeight;
+            }
+
+            // 匹配 C++ 代码逻辑:
+            // pfFrustum4[0] = -x0;
+            // pfFrustum4[2] = x0 - x1;
+            // 针对 D3D 风格 (Unity 在 GPU 端通常使用 D3D 类似约定):
+            // pfFrustum4[1] = -y1;
+            // pfFrustum4[3] = y1 - y0;
+
+            return new Vector4(-x0, -y1, x0 - x1, y1 - y0);
+        }
+
 
         public override void RecordRenderGraph(RenderGraph renderGraph, ContextContainer frameData)
         {
@@ -291,6 +384,7 @@ namespace PathTracing
             using var builder = renderGraph.AddUnsafePass<PassData>(passName, out var passData);
 
             passData.rayTracingShader = rayTracingShader;
+            passData.compositionComputeShader = compositionComputeShader;
             passData.cam = cameraData.camera;
 
             // if (prevCameraMatrix != cameraData.camera.cameraToWorldMatrix)
@@ -345,10 +439,11 @@ namespace PathTracing
 
             passData.dataPtr = NrdDenoiser.GetInteropDataPtr(cam, gSunDirection);
 
-            
+
             float VerticalFieldOfView = cam.fieldOfView;
             float AspectRatio = (float)cam.pixelWidth / (float)cam.pixelHeight;
-            float HorizontalFieldOfView = Mathf.Atan(Mathf.Tan(Mathf.Deg2Rad * VerticalFieldOfView * 0.5f) * AspectRatio) * 2 * Mathf.Rad2Deg;
+            float HorizontalFieldOfView =
+                Mathf.Atan(Mathf.Tan(Mathf.Deg2Rad * VerticalFieldOfView * 0.5f) * AspectRatio) * 2 * Mathf.Rad2Deg;
 
 
             var setting = new Settings
@@ -391,7 +486,7 @@ namespace PathTracing
             textureDesc.name = "Path";
 
             rayTracingShader.SetShaderPass("Test2");
-
+ 
             textureDesc.depthBufferBits = 0;
             textureDesc.clearBuffer = false;
             textureDesc.discardBuffer = false;
@@ -413,25 +508,37 @@ namespace PathTracing
             passData.sobol = sobol;
 
             passData.outputTexture = renderGraph.CreateTexture(textureDesc);
+            
 
             passData.Mv = renderGraph.ImportTexture(NrdDenoiser.GetRT(ResourceType.IN_MV));
             passData.ViewZ = renderGraph.ImportTexture(NrdDenoiser.GetRT(ResourceType.IN_VIEWZ));
             passData.Normal_Roughness = renderGraph.ImportTexture(NrdDenoiser.GetRT(ResourceType.IN_NORMAL_ROUGHNESS));
-            passData.BaseColor_Metalness = renderGraph.ImportTexture(NrdDenoiser.GetRT(ResourceType.IN_BASECOLOR_METALNESS));
+            passData.BaseColor_Metalness =
+                renderGraph.ImportTexture(NrdDenoiser.GetRT(ResourceType.IN_BASECOLOR_METALNESS));
 
-            passData.DirectLighting = CreateTex(textureDesc, renderGraph, "DirectLighting", GraphicsFormat.B10G11R11_UFloatPack32);
-            passData.DirectEmission = CreateTex(textureDesc, renderGraph, "DirectEmission", GraphicsFormat.B10G11R11_UFloatPack32);
+            passData.DirectLighting = CreateTex(textureDesc, renderGraph, "DirectLighting",
+                GraphicsFormat.B10G11R11_UFloatPack32);
+            passData.DirectEmission = CreateTex(textureDesc, renderGraph, "DirectEmission",
+                GraphicsFormat.B10G11R11_UFloatPack32);
 
             passData.Penumbra = renderGraph.ImportTexture(NrdDenoiser.GetRT(ResourceType.IN_PENUMBRA));
             passData.Diff = renderGraph.ImportTexture(NrdDenoiser.GetRT(ResourceType.IN_DIFF_RADIANCE_HITDIST));
             passData.Spec = renderGraph.ImportTexture(NrdDenoiser.GetRT(ResourceType.IN_SPEC_RADIANCE_HITDIST));
 
             // 输出
-            passData.Shadow_Translucency = renderGraph.ImportTexture(NrdDenoiser.GetRT(ResourceType.OUT_SHADOW_TRANSLUCENCY));
-            passData.DenoisedDiff = renderGraph.ImportTexture(NrdDenoiser.GetRT(ResourceType.OUT_DIFF_RADIANCE_HITDIST));
-            passData.DenoisedSpec = renderGraph.ImportTexture(NrdDenoiser.GetRT(ResourceType.OUT_SPEC_RADIANCE_HITDIST));
+            passData.Shadow_Translucency =
+                renderGraph.ImportTexture(NrdDenoiser.GetRT(ResourceType.OUT_SHADOW_TRANSLUCENCY));
+            passData.DenoisedDiff =
+                renderGraph.ImportTexture(NrdDenoiser.GetRT(ResourceType.OUT_DIFF_RADIANCE_HITDIST));
+            passData.DenoisedSpec =
+                renderGraph.ImportTexture(NrdDenoiser.GetRT(ResourceType.OUT_SPEC_RADIANCE_HITDIST));
             passData.Validation = renderGraph.ImportTexture(NrdDenoiser.GetRT(ResourceType.OUT_VALIDATION));
 
+            
+            passData.ComposedDiff = CreateTex(textureDesc, renderGraph, "ComposedDiff",
+                GraphicsFormat.R16G16B16A16_SFloat);
+            passData.ComposedSpec_ViewZ = CreateTex(textureDesc, renderGraph, "ComposedSpec_ViewZ",
+                GraphicsFormat.R16G16B16A16_SFloat);
 
             rayTracingShader.SetShaderPass("Test2");
 
@@ -446,6 +553,12 @@ namespace PathTracing
 
             accelerationStructure.Build();
             Shader.SetGlobalRayTracingAccelerationStructure(g_AccelStructID, accelerationStructure);
+
+            compositionComputeShader.SetMatrix(gViewToWorldID, viewToWorld);
+            compositionComputeShader.SetVector(gSunDirectionID, gSunDirection);
+            compositionComputeShader.SetVector(gInvRectSizeID, new Vector2(1.0f / setting.gRectSize.x, 1.0f / setting.gRectSize.y));
+            compositionComputeShader.SetVector(gCameraFrustumID, GetNrdFrustum(cameraData.camera));
+
 
             // convergenceStep++;
 
@@ -469,10 +582,16 @@ namespace PathTracing
             builder.UseTexture(passData.DenoisedDiff, AccessFlags.ReadWrite);
             builder.UseTexture(passData.DenoisedSpec, AccessFlags.ReadWrite);
             builder.UseTexture(passData.Validation, AccessFlags.ReadWrite);
+            
+            builder.UseTexture(passData.ComposedDiff, AccessFlags.ReadWrite);
+            builder.UseTexture(passData.ComposedSpec_ViewZ, AccessFlags.ReadWrite);
 
             builder.AllowPassCulling(false);
 
-            builder.SetRenderFunc((PassData passData, UnsafeGraphContext context) => { ExecutePass(passData, context); });
+            builder.SetRenderFunc((PassData passData, UnsafeGraphContext context) =>
+            {
+                ExecutePass(passData, context);
+            });
 
             prevWorldToView = worldToView;
             prevWorldToClip = worldToClip;

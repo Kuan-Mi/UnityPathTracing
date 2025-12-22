@@ -1,0 +1,115 @@
+// Each #kernel tells which function to compile; you can have many kernels
+#pragma kernel CSMain
+#include "ml.hlsli"
+#include "NRDInclude/NRD.hlsli"
+
+
+Texture2D<float> gIn_ViewZ;
+Texture2D<float4> gIn_Normal_Roughness;
+Texture2D<float4> gIn_BaseColor_Metalness;
+Texture2D<float3> gIn_DirectLighting;
+Texture2D<float3> gIn_DirectEmission;
+// Texture2D<float3> gIn_PsrThroughput;
+Texture2D<float4> gIn_Shadow;
+Texture2D<float4> gIn_Diff;
+Texture2D<float4> gIn_Spec;
+ 
+RWTexture2D<float3> gOut_ComposedDiff;
+RWTexture2D<float4> gOut_ComposedSpec_ViewZ;
+
+
+#define FP16_VIEWZ_SCALE                    0.125 // TODO: tuned for meters, needs to be scaled down for cm and mm
+
+#define INF                                 1e5
+
+
+float4x4 gViewToWorld;
+float4 gSunDirection;
+float4 gCameraFrustum;
+float2 gInvRectSize;
+
+
+[numthreads(16,16,1)]
+void CSMain(int2 pixelPos : SV_DispatchThreadID)
+{
+
+    float2 pixelUv = float2( pixelPos + 0.5 ) * gInvRectSize;
+    float2 sampleUv = pixelUv;
+    
+
+    if( pixelUv.x > 1.0 || pixelUv.y > 1.0 )
+        return;
+    
+
+    float viewZ = gIn_ViewZ[ pixelPos ];
+    float3 Lemi = gIn_DirectEmission[ pixelPos ];
+    
+    
+    // Normal, roughness and material ID
+    float materialID;
+    float4 normalAndRoughness = NRD_FrontEnd_UnpackNormalAndRoughness( gIn_Normal_Roughness[ pixelPos ], materialID );
+    float3 N = normalAndRoughness.xyz;
+    float roughness = normalAndRoughness.w;
+    
+    
+    // ( Trick ) Needed only to avoid back facing in "ReprojectIrradiance"
+    float z = abs( viewZ ) * FP16_VIEWZ_SCALE;
+    z *= Math::Sign( dot( N, gSunDirection.xyz ) );
+    
+    
+    // Early out - sky
+    if( abs( viewZ ) >= INF )
+    {
+        gOut_ComposedDiff[ pixelPos ] = Lemi;
+        gOut_ComposedSpec_ViewZ[ pixelPos ] = float4( 0, 0, 0, z );
+        return;
+    }
+    
+    
+    // Direct sun lighting * shadow + emission
+    float4 shadowData = gIn_Shadow[ pixelPos ];
+
+    
+    float shadow = SIGMA_BackEnd_UnpackShadow( shadowData ).x;
+    
+    float3 Ldirect = gIn_DirectLighting[ pixelPos ];
+
+        Ldirect = Ldirect * shadow + Lemi;
+    
+    
+    // G-buffer
+    float3 albedo, Rf0;
+    float4 baseColorMetalness = gIn_BaseColor_Metalness[ pixelPos ];
+    BRDF::ConvertBaseColorMetalnessToAlbedoRf0( baseColorMetalness.xyz, baseColorMetalness.w, albedo, Rf0 );
+
+    
+    float3 Xv = Geometry::ReconstructViewPosition( sampleUv, gCameraFrustum, viewZ );
+    float3 X = Geometry::AffineTransform( gViewToWorld, Xv );
+    float3 V =  normalize( Geometry::RotateVector( gViewToWorld, 0 - Xv ) ) ;
+
+    
+    // Sample NRD outputs
+    float4 diff = gIn_Diff[ pixelPos ];
+    float4 spec = gIn_Spec[ pixelPos ];
+    
+    diff = REBLUR_BackEnd_UnpackRadianceAndNormHitDist( diff );
+    spec = REBLUR_BackEnd_UnpackRadianceAndNormHitDist( spec );
+    
+    
+    // diff.xyz *= gIndirectDiffuse;
+    // spec.xyz *= gIndirectSpecular;
+    
+    
+    float3 diffFactor, specFactor;
+    NRD_MaterialFactors( N, V, albedo, Rf0, roughness, diffFactor, specFactor );
+
+    
+    // Composition
+    float3 Ldiff = diff.xyz * diffFactor;
+    float3 Lspec = spec.xyz * specFactor;
+    
+    Ldiff += Ldirect;
+    
+    gOut_ComposedDiff[ pixelPos ] = Ldiff;
+    gOut_ComposedSpec_ViewZ[ pixelPos ] = float4( Lspec, z );
+}
