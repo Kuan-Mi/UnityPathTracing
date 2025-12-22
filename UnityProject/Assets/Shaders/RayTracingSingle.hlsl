@@ -921,7 +921,8 @@ void MainRayGenShader()
     gOut_Normal_Roughness[launchIndex] = NRD_FrontEnd_PackNormalAndRoughness(materialProps0.N, materialProps0.roughness, materialID);
 
     // Base color and metalness
-    gOut_BaseColor_Metalness[launchIndex] = float4(Color::ToSrgb(materialProps0.baseColor), materialProps0.metalness);
+    // gOut_BaseColor_Metalness[launchIndex] = float4(Color::ToSrgb(materialProps0.baseColor), materialProps0.metalness);
+    gOut_BaseColor_Metalness[launchIndex] = float4((materialProps0.baseColor), materialProps0.metalness);
 
     // Direct lighting
     float3 Xshadow;
@@ -984,8 +985,13 @@ void MainRayGenShader()
     gOut_Diff[launchIndex] = REBLUR_FrontEnd_PackRadianceAndNormHitDist(result.diffRadiance, result.diffHitDist, USE_SANITIZATION);
     gOut_Spec[launchIndex] = REBLUR_FrontEnd_PackRadianceAndNormHitDist(result.specRadiance, result.specHitDist, USE_SANITIZATION);
 
-    result.debug = float3(result.diffHitDist,result.diffHitDist,result.diffHitDist);
+    // result.debug = float3(result.diffHitDist,result.diffHitDist,result.diffHitDist);
     // result.debug = float3(result.specHitDist,result.specHitDist,result.specHitDist);
+    
+    float mipNorm = Math::Sqrt01( geometryProps0.mip / 11.0 );
+      result.debug= Color::ColorizeZucconi( mipNorm );
+     
+    
 
     g_Output[launchIndex] = float4(result.debug, 1);
 }

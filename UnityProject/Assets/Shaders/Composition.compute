@@ -112,7 +112,7 @@ void CSMain(int2 pixelPos : SV_DispatchThreadID)
     
     float3 finalColor = Ldiff + Lspec;
     
-    finalColor *= 10;
+    // finalColor *= 10;
     
     // gOut_ComposedDiff[ pixelPos ] = Ldiff;
     gOut_ComposedDiff[ pixelPos ] = finalColor;

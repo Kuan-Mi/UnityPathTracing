@@ -38,6 +38,8 @@ namespace NRD
         {
             var dxgiFormat = NRDUtil.GetDXGIFormat(GraphicsFormat);
             Release(); // 确保先释放旧的
+            
+            Debug.Log($"Allocating NRD Texture Resource: {Name}, Size: {w}x{h}, Format: {GraphicsFormat}");
 
             // 创建 RT 描述
             var desc = new RenderTextureDescriptor(w, h, GraphicsFormat, 0)

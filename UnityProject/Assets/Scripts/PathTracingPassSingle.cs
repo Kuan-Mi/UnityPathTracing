@@ -451,7 +451,7 @@ namespace PathTracing
                 g_Zoom = tan,
                 g_ConvergenceStep = NrdDenoiser.FrameIndex,
                 g_FrameIndex = (uint)Time.frameCount,
-                g_SampleCount = (uint)_settings.sampleCount,
+                // g_SampleCount = (uint)_settings.sampleCount,
                 lightOffset = _settings.sunAngularDiameter,
 
                 _CameraPosition = cameraData.worldSpaceCameraPos,
@@ -513,6 +513,8 @@ namespace PathTracing
             passData.Mv = renderGraph.ImportTexture(NrdDenoiser.GetRT(ResourceType.IN_MV));
             passData.ViewZ = renderGraph.ImportTexture(NrdDenoiser.GetRT(ResourceType.IN_VIEWZ));
             passData.Normal_Roughness = renderGraph.ImportTexture(NrdDenoiser.GetRT(ResourceType.IN_NORMAL_ROUGHNESS));
+            var rtHandle = NrdDenoiser.GetRT(ResourceType.IN_BASECOLOR_METALNESS);
+            
             passData.BaseColor_Metalness =
                 renderGraph.ImportTexture(NrdDenoiser.GetRT(ResourceType.IN_BASECOLOR_METALNESS));
 
@@ -544,8 +546,8 @@ namespace PathTracing
 
             // rayTracingShader.SetTexture(g_EnvTexID, _settings.envTexture);
 
-            Shader.SetGlobalInt(g_BounceCountOpaqueID, _settings.bounceCountOpaque);
-            Shader.SetGlobalInt(g_BounceCountTransparentID, _settings.bounceCountTransparent);
+            // Shader.SetGlobalInt(g_BounceCountOpaqueID, _settings.bounceCountOpaque);
+            // Shader.SetGlobalInt(g_BounceCountTransparentID, _settings.bounceCountTransparent);
 
 
             Shader.SetGlobalVector(g_DirLightDirectionID, gSunDirection);

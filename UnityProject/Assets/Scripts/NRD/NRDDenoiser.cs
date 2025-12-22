@@ -67,7 +67,7 @@ namespace Nrd
             allocatedResources.Add(new NrdTextureResource(ResourceType.IN_MV, GraphicsFormat.R16G16B16A16_SFloat, srvState));
             allocatedResources.Add(new NrdTextureResource(ResourceType.IN_VIEWZ, GraphicsFormat.R32_SFloat, srvState));
             allocatedResources.Add(new NrdTextureResource(ResourceType.IN_NORMAL_ROUGHNESS, GraphicsFormat.A2B10G10R10_UNormPack32, srvState));
-            allocatedResources.Add(new NrdTextureResource(ResourceType.IN_BASECOLOR_METALNESS, GraphicsFormat.R8G8B8A8_UNorm, srvState));
+            allocatedResources.Add(new NrdTextureResource(ResourceType.IN_BASECOLOR_METALNESS, GraphicsFormat.B8G8R8A8_SRGB, srvState));
 
             // 有噪声输入
             allocatedResources.Add(new NrdTextureResource(ResourceType.IN_PENUMBRA, GraphicsFormat.R16_SFloat, srvState));
@@ -227,10 +227,10 @@ namespace Nrd
 
             // Sigma 设置
 
-            if (setting.useOverriddenSigmaValues)
-            {
-                localData.sigmaSettings.lightDirection = setting.lightDir;
-            }
+            // if (setting.useOverriddenSigmaValues)
+            // {
+            //     localData.sigmaSettings.lightDirection = setting.lightDir;
+            // }
 
             localData.sigmaSettings.planeDistanceSensitivity = setting.planeDistanceSensitivity;
             localData.sigmaSettings.maxStabilizedFrameNum = setting.maxStabilizedFrameNum;

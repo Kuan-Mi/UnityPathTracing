@@ -7,15 +7,15 @@ namespace PathTracing
     [System.Serializable]
     public class PathTracingSetting
     {
-        [Range(1, 10)] public int bounceCountOpaque = 5;
-        [Range(1, 10)] public int bounceCountTransparent = 5;
-        [Range(1, 128)] public int sampleCount = 1;
+        // [Range(1, 10)] public int bounceCountOpaque = 5;
+        // [Range(1, 10)] public int bounceCountTransparent = 5;
+        // [Range(1, 128)] public int sampleCount = 1;
 
-        [Range(0.001f, 1f)] public float sunAngularDiameter = 0.533f;
+        [Range(0.001f, 10f)] public float sunAngularDiameter = 0.533f;
 
-        public Cubemap envTexture = null;
+        // public Cubemap envTexture = null;
 
-        public bool enableRussianRoulette = true;
+        // public bool enableRussianRoulette = true;
 
         [Header("NRD Common Settings")] [Range(0.1f, 1000000.0f)]
         public float denoisingRange = 500000; // Default: 500000.0f
@@ -49,7 +49,7 @@ namespace PathTracing
         [Header("NRD Sigma Settings Override")]
         public bool useOverriddenSigmaValues;
 
-        public Vector3 lightDir;
+        // public Vector3 lightDir;
 
         public bool showBaseColor;
         public bool showMetalness;
