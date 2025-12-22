@@ -18,34 +18,30 @@ struct RayPayload
 
 cbuffer PathTracingParams : register(b0)
 {
-    float g_Zoom;
-    uint g_ConvergenceStep;
-    uint g_FrameIndex;
-    uint g_SampleCount;
-
-    float lightOffset;
-    float3 _CameraPosition;
     float4x4 gViewToWorld;
     float4x4 gWorldToView;
-    float4x4 gWorldToClip;
     float4x4 gWorldToViewPrev;
+    float4x4 gWorldToClip;
     float4x4 gWorldToClipPrev;
-    float2 gRectSize;
-    float2 gJitter;
-    float4x4 _CInverseProjection;
-    float4 gCameraFrustum;
 
+    float4 gCameraFrustum;
     float4 gSunBasisX;
     float4 gSunBasisY;
     float4 gSunDirection;
+
+    float2 gRectSize;
+    float2 gJitter;
+
 
     float gTanPixelAngularRadius;
     float gUnproject;
     float gTanSunAngularRadius;
     float gNearZ;
+
+
     float gAperture;
     float gFocalDistance;
-    
+    uint gFrameIndex;
 };
 
 
@@ -59,7 +55,7 @@ struct MainRayPayload
     float curvature; // 曲率估算值（用于材质、去噪等）
     float2 mipAndCone;
     uint instanceIndex; // 命中的实例索引（用于查找InstanceData）
-    
+
     float3 matN;
 
     float3 Lemi;
@@ -93,6 +89,7 @@ struct GeometryProps
     uint instanceIndex; // 命中的实例索引（用于查找InstanceData）
 
     #define PT_BOUNCE_RAY_OFFSET                0.25 // pixels
+
     float3 GetXoffset(float3 offsetDir, float amount = PT_BOUNCE_RAY_OFFSET)
     {
         float viewZ = Geometry::AffineTransform(gWorldToView, X).z;
@@ -122,7 +119,6 @@ struct MaterialProps
 
 #define SKY_INTENSITY 1.0
 #define SUN_INTENSITY 10.0
-
 
 
 float3 GetSunIntensity(float3 v)
@@ -166,4 +162,3 @@ float3 GetSkyIntensity(float3 v)
 
     return Color::FromGamma(skyColor) * SKY_INTENSITY + GetSunIntensity(v);
 }
-

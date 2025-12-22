@@ -107,7 +107,7 @@ float2 GetBlueNoise(uint2 pixelPos, uint seed = 0)
     // https://belcour.github.io/blog/research/publication/2019/06/17/sampling-bluenoise.html
 
     // Sample index
-    uint sampleIndex = (g_FrameIndex + seed) & (BLUE_NOISE_TEMPORAL_DIM - 1);
+    uint sampleIndex = (gFrameIndex + seed) & (BLUE_NOISE_TEMPORAL_DIM - 1);
 
     // sampleIndex = 3;
 
@@ -128,7 +128,7 @@ float2 GetBlueNoise(uint2 pixelPos, uint seed = 0)
     float4 blue = (float4(B ^ A.xyxy) + 0.5) * (1.0 / 256.0);
 
     // ( Optional ) Randomize in [ 0; 1 / 256 ] area to get rid of possible banding
-    uint d = Bayer4x4ui(pixelPos, g_FrameIndex);
+    uint d = Bayer4x4ui(pixelPos, gFrameIndex);
     float2 dither = (float2(d & 3, d >> 2) + 0.5) * (1.0 / 4.0);
     blue += (dither.xyxy - 0.5) * (1.0 / 256.0);
 
@@ -189,7 +189,7 @@ float3 GetMotion(float3 X, float3 Xprev)
 #define gTracingMode                      RESOLUTION_FULL
 #define gSampleNum                      1
 #define gRR                      0
-#define gFrameIndex                      g_FrameIndex
+ 
 #define gMinProbability                      0
 
 float EstimateDiffuseProbability(GeometryProps geometryProps, MaterialProps materialProps, bool useMagicBoost = false)

@@ -91,26 +91,19 @@ namespace PathTracing
 
         struct Settings
         {
-            public float g_Zoom;
-            public uint g_ConvergenceStep;
-            public uint g_FrameIndex;
-            public uint g_SampleCount;
-            public float lightOffset;
-
-            public float3 _CameraPosition;
             public float4x4 gViewToWorld;
             public float4x4 gWorldToView;
-            public float4x4 gWorldToClip;
             public float4x4 gWorldToViewPrev;
+            public float4x4 gWorldToClip;
             public float4x4 gWorldToClipPrev;
-            public float2 gRectSize;
-            public float2 gJitter;
-            public float4x4 _CInverseProjection;
+            
             public float4 gCameraFrustum;
-
             public float4 gSunBasisX;
             public float4 gSunBasisY;
             public float4 gSunDirection;
+            
+            public float2 gRectSize;
+            public float2 gJitter; 
 
             public float gTanPixelAngularRadius;
             public float gUnproject;
@@ -119,8 +112,8 @@ namespace PathTracing
             
             public float gAperture;
             public float gFocalDistance;
-            public float pad0;
-            public float pad1;
+            public uint gFrameIndex;
+            public float pad0; 
         }
 
         class PassData
@@ -453,13 +446,13 @@ namespace PathTracing
 
             var setting = new Settings
             {
-                g_Zoom = tan,
-                g_ConvergenceStep = NrdDenoiser.FrameIndex,
-                g_FrameIndex = (uint)Time.frameCount,
+                // g_Zoom = tan,
+                // g_ConvergenceStep = NrdDenoiser.FrameIndex,
+                // g_FrameIndex = (uint)Time.frameCount,
                 // g_SampleCount = (uint)_settings.sampleCount,
-                lightOffset = _settings.sunAngularDiameter,
+                // lightOffset = _settings.sunAngularDiameter,
 
-                _CameraPosition = cameraData.worldSpaceCameraPos,
+                // _CameraPosition = cameraData.worldSpaceCameraPos,
 
                 gViewToWorld = viewToWorld,
                 gWorldToView = worldToView,
@@ -469,7 +462,7 @@ namespace PathTracing
                 gRectSize = new float2(cam.pixelWidth, cam.pixelHeight),
                 gJitter = NrdDenoiser.ViewportJitter / new float2(cam.pixelWidth, cam.pixelHeight),
 
-                _CInverseProjection = invCameraProjectionMatrix,
+                // _CInverseProjection = invCameraProjectionMatrix,
                 gCameraFrustum = GetNrdFrustum(cameraData.camera),
                 gSunBasisX = new float4(gSunBasisX.x, gSunBasisX.y, gSunBasisX.z, 0),
                 gSunBasisY = new float4(gSunBasisY.x, gSunBasisY.y, gSunBasisY.z, 0),
@@ -483,6 +476,8 @@ namespace PathTracing
                 gNearZ = -cam.nearClipPlane,
                 gAperture = _settings.dofAperture * 0.01f,
                 gFocalDistance = _settings.dofFocalDistance,
+                
+                gFrameIndex = (uint)Time.frameCount,
             };
 
             passData.pathTracingSettings = setting;
