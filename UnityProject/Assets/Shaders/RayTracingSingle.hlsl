@@ -109,7 +109,7 @@ float2 GetBlueNoise(uint2 pixelPos, uint seed = 0)
     // Sample index
     uint sampleIndex = (g_FrameIndex + seed) & (BLUE_NOISE_TEMPORAL_DIM - 1);
 
-    sampleIndex = 3;
+    // sampleIndex = 3;
 
     // pixelPos /= 8;
 
