@@ -551,7 +551,7 @@ namespace PathTracing
             Shader.SetGlobalVector(g_DirLightDirectionID, gSunDirection);
             Shader.SetGlobalColor(g_DirLightColorID, mainLight.finalColor);
 
-            accelerationStructure.Build();
+            // accelerationStructure.Build();
             Shader.SetGlobalRayTracingAccelerationStructure(g_AccelStructID, accelerationStructure);
 
             compositionComputeShader.SetMatrix(gViewToWorldID, viewToWorld);

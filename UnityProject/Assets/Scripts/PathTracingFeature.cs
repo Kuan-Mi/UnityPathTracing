@@ -31,6 +31,10 @@ namespace PathTracing
 
         public override void Create()
         {
+            
+            Debug.Log("PathTracingFeature Create");
+            
+            
             if (accelerationStructure == null)
             {
                 settings = new Settings
@@ -149,6 +153,7 @@ namespace PathTracing
 
         protected override void Dispose(bool disposing)
         {
+            Debug.Log("PathTracingFeature Dispose");
             base.Dispose(disposing);
             accelerationStructure.Dispose();
             accelerationStructure.Release();
