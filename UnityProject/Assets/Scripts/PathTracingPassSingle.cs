@@ -71,6 +71,7 @@ namespace PathTracing
         private static int gSunDirectionID = Shader.PropertyToID("gSunDirection");
         private static int gCameraFrustumID = Shader.PropertyToID("gCameraFrustum");
         private static int gInvRectSizeID = Shader.PropertyToID("gInvRectSize");
+        private static int gJitterID = Shader.PropertyToID("gJitter");
 
 
         private static int gIn_ViewZID = Shader.PropertyToID("gIn_ViewZ");
@@ -97,14 +98,15 @@ namespace PathTracing
             public float lightOffset;
 
             public float3 _CameraPosition;
-            public float4x4 _CCameraToWorld;
+            public float4x4 gViewToWorld;
             public float4x4 gWorldToView;
             public float4x4 gWorldToClip;
             public float4x4 gWorldToViewPrev;
             public float4x4 gWorldToClipPrev;
             public float2 gRectSize;
-            public float2 pad1;
+            public float2 gJitter;
             public float4x4 _CInverseProjection;
+            public float4 gCameraFrustum;
 
             public float4 gSunBasisX;
             public float4 gSunBasisY;
@@ -113,7 +115,12 @@ namespace PathTracing
             public float gTanPixelAngularRadius;
             public float gUnproject;
             public float gTanSunAngularRadius;
-            public float pad;
+            public float gNearZ;
+            
+            public float gAperture;
+            public float gFocalDistance;
+            public float pad0;
+            public float pad1;
         }
 
         class PassData
@@ -229,11 +236,11 @@ namespace PathTracing
             natCmd.SetComputeTextureParam(data.compositionComputeShader, 0, gIn_SpecID, data.DenoisedSpec);
             natCmd.SetComputeTextureParam(data.compositionComputeShader, 0, gOut_ComposedDiffID, data.ComposedDiff);
             natCmd.SetComputeTextureParam(data.compositionComputeShader, 0, gOut_ComposedSpec_ViewZID, data.ComposedSpec_ViewZ);
-            
+
             int threadGroupX = Mathf.CeilToInt(data.width / 16.0f);
             int threadGroupY = Mathf.CeilToInt(data.height / 16.0f);
             natCmd.DispatchCompute(data.compositionComputeShader, 0, threadGroupX, threadGroupY, 1);
-            
+
 
             natCmd.SetRenderTarget(data.cameraTexture);
 
@@ -300,12 +307,12 @@ namespace PathTracing
             {
                 Blitter.BlitTexture(natCmd, data.Validation, new Vector4(1, 1, 0, 0), data.blitMaterial, 0);
             }
-            
+
             if (data._setting.showComposedDiff)
             {
                 Blitter.BlitTexture(natCmd, data.ComposedDiff, new Vector4(1, 1, 0, 0), data.blitMaterial, 4);
             }
-            
+
             if (data._setting.showComposedSpec)
             {
                 Blitter.BlitTexture(natCmd, data.ComposedSpec_ViewZ, new Vector4(1, 1, 0, 0), data.blitMaterial, 4);
@@ -427,10 +434,8 @@ namespace PathTracing
             // var gSunDirection = new Vector3(-forward.x, -forward.y, -forward.z);
             Vector3 up = new Vector3(0, 1, 0);
 
-            var gSunBasisX = math.normalize(math.cross(new float3(up.x, up.y, up.z),
-                new float3(gSunDirection.x, gSunDirection.y, gSunDirection.z)));
-            var gSunBasisY = math.normalize(math.cross(new float3(gSunDirection.x, gSunDirection.y, gSunDirection.z),
-                gSunBasisX));
+            var gSunBasisX = math.normalize(math.cross(new float3(up.x, up.y, up.z), new float3(gSunDirection.x, gSunDirection.y, gSunDirection.z)));
+            var gSunBasisY = math.normalize(math.cross(new float3(gSunDirection.x, gSunDirection.y, gSunDirection.z), gSunBasisX));
 
 
             var cam = cameraData.camera;
@@ -442,9 +447,9 @@ namespace PathTracing
 
             float VerticalFieldOfView = cam.fieldOfView;
             float AspectRatio = (float)cam.pixelWidth / (float)cam.pixelHeight;
-            float HorizontalFieldOfView =
-                Mathf.Atan(Mathf.Tan(Mathf.Deg2Rad * VerticalFieldOfView * 0.5f) * AspectRatio) * 2 * Mathf.Rad2Deg;
+            float HorizontalFieldOfView = Mathf.Atan(Mathf.Tan(Mathf.Deg2Rad * VerticalFieldOfView * 0.5f) * AspectRatio) * 2 * Mathf.Rad2Deg;
 
+            // Debug.Log(cam.nearClipPlane);
 
             var setting = new Settings
             {
@@ -456,14 +461,16 @@ namespace PathTracing
 
                 _CameraPosition = cameraData.worldSpaceCameraPos,
 
-                _CCameraToWorld = viewToWorld,
+                gViewToWorld = viewToWorld,
                 gWorldToView = worldToView,
                 gWorldToClip = worldToClip,
                 gWorldToViewPrev = prevWorldToView,
                 gWorldToClipPrev = prevWorldToClip,
                 gRectSize = new float2(cam.pixelWidth, cam.pixelHeight),
+                gJitter = NrdDenoiser.ViewportJitter / new float2(cam.pixelWidth, cam.pixelHeight),
 
                 _CInverseProjection = invCameraProjectionMatrix,
+                gCameraFrustum = GetNrdFrustum(cameraData.camera),
                 gSunBasisX = new float4(gSunBasisX.x, gSunBasisX.y, gSunBasisX.z, 0),
                 gSunBasisY = new float4(gSunBasisY.x, gSunBasisY.y, gSunBasisY.z, 0),
                 gSunDirection = new float4(gSunDirection.x, gSunDirection.y, gSunDirection.z, 0),
@@ -472,7 +479,10 @@ namespace PathTracing
                 gTanPixelAngularRadius = math.tan(0.5f * math.radians(HorizontalFieldOfView) / cam.pixelWidth),
 
                 gUnproject = 1.0f / (0.5f * rectH * m11),
-                gTanSunAngularRadius = math.tan(math.radians(_settings.sunAngularDiameter * 0.5f))
+                gTanSunAngularRadius = math.tan(math.radians(_settings.sunAngularDiameter * 0.5f)),
+                gNearZ = -cam.nearClipPlane,
+                gAperture = _settings.dofAperture * 0.01f,
+                gFocalDistance = _settings.dofFocalDistance,
             };
 
             passData.pathTracingSettings = setting;
@@ -486,7 +496,7 @@ namespace PathTracing
             textureDesc.name = "Path";
 
             rayTracingShader.SetShaderPass("Test2");
- 
+
             textureDesc.depthBufferBits = 0;
             textureDesc.clearBuffer = false;
             textureDesc.discardBuffer = false;
@@ -508,39 +518,28 @@ namespace PathTracing
             passData.sobol = sobol;
 
             passData.outputTexture = renderGraph.CreateTexture(textureDesc);
-            
- 
+
             passData.Mv = renderGraph.ImportTexture(NrdDenoiser.GetRT(ResourceType.IN_MV));
             passData.ViewZ = renderGraph.ImportTexture(NrdDenoiser.GetRT(ResourceType.IN_VIEWZ));
             passData.Normal_Roughness = renderGraph.ImportTexture(NrdDenoiser.GetRT(ResourceType.IN_NORMAL_ROUGHNESS));
-            var rtHandle = NrdDenoiser.GetRT(ResourceType.IN_BASECOLOR_METALNESS);
-            
-            passData.BaseColor_Metalness =
-                renderGraph.ImportTexture(NrdDenoiser.GetRT(ResourceType.IN_BASECOLOR_METALNESS));
 
-            passData.DirectLighting = CreateTex(textureDesc, renderGraph, "DirectLighting",
-                GraphicsFormat.B10G11R11_UFloatPack32);
-            passData.DirectEmission = CreateTex(textureDesc, renderGraph, "DirectEmission",
-                GraphicsFormat.B10G11R11_UFloatPack32);
+            passData.BaseColor_Metalness = renderGraph.ImportTexture(NrdDenoiser.GetRT(ResourceType.IN_BASECOLOR_METALNESS));
+            passData.DirectLighting = CreateTex(textureDesc, renderGraph, "DirectLighting", GraphicsFormat.B10G11R11_UFloatPack32);
+            passData.DirectEmission = CreateTex(textureDesc, renderGraph, "DirectEmission", GraphicsFormat.B10G11R11_UFloatPack32);
 
             passData.Penumbra = renderGraph.ImportTexture(NrdDenoiser.GetRT(ResourceType.IN_PENUMBRA));
             passData.Diff = renderGraph.ImportTexture(NrdDenoiser.GetRT(ResourceType.IN_DIFF_RADIANCE_HITDIST));
             passData.Spec = renderGraph.ImportTexture(NrdDenoiser.GetRT(ResourceType.IN_SPEC_RADIANCE_HITDIST));
 
             // 输出
-            passData.Shadow_Translucency =
-                renderGraph.ImportTexture(NrdDenoiser.GetRT(ResourceType.OUT_SHADOW_TRANSLUCENCY));
-            passData.DenoisedDiff =
-                renderGraph.ImportTexture(NrdDenoiser.GetRT(ResourceType.OUT_DIFF_RADIANCE_HITDIST));
-            passData.DenoisedSpec =
-                renderGraph.ImportTexture(NrdDenoiser.GetRT(ResourceType.OUT_SPEC_RADIANCE_HITDIST));
+            passData.Shadow_Translucency = renderGraph.ImportTexture(NrdDenoiser.GetRT(ResourceType.OUT_SHADOW_TRANSLUCENCY));
+            passData.DenoisedDiff = renderGraph.ImportTexture(NrdDenoiser.GetRT(ResourceType.OUT_DIFF_RADIANCE_HITDIST));
+            passData.DenoisedSpec = renderGraph.ImportTexture(NrdDenoiser.GetRT(ResourceType.OUT_SPEC_RADIANCE_HITDIST));
             passData.Validation = renderGraph.ImportTexture(NrdDenoiser.GetRT(ResourceType.OUT_VALIDATION));
 
-            
-            passData.ComposedDiff = CreateTex(textureDesc, renderGraph, "ComposedDiff",
-                GraphicsFormat.R16G16B16A16_SFloat);
-            passData.ComposedSpec_ViewZ = CreateTex(textureDesc, renderGraph, "ComposedSpec_ViewZ",
-                GraphicsFormat.R16G16B16A16_SFloat);
+
+            passData.ComposedDiff = CreateTex(textureDesc, renderGraph, "ComposedDiff", GraphicsFormat.R16G16B16A16_SFloat);
+            passData.ComposedSpec_ViewZ = CreateTex(textureDesc, renderGraph, "ComposedSpec_ViewZ", GraphicsFormat.R16G16B16A16_SFloat);
 
             rayTracingShader.SetShaderPass("Test2");
 
@@ -560,6 +559,7 @@ namespace PathTracing
             compositionComputeShader.SetVector(gSunDirectionID, gSunDirection);
             compositionComputeShader.SetVector(gInvRectSizeID, new Vector2(1.0f / setting.gRectSize.x, 1.0f / setting.gRectSize.y));
             compositionComputeShader.SetVector(gCameraFrustumID, GetNrdFrustum(cameraData.camera));
+            compositionComputeShader.SetVector(gJitterID, new Vector4(setting.gJitter.x, setting.gJitter.y, 0, 0));
 
 
             // convergenceStep++;
@@ -584,16 +584,13 @@ namespace PathTracing
             builder.UseTexture(passData.DenoisedDiff, AccessFlags.ReadWrite);
             builder.UseTexture(passData.DenoisedSpec, AccessFlags.ReadWrite);
             builder.UseTexture(passData.Validation, AccessFlags.ReadWrite);
-            
+
             builder.UseTexture(passData.ComposedDiff, AccessFlags.ReadWrite);
             builder.UseTexture(passData.ComposedSpec_ViewZ, AccessFlags.ReadWrite);
 
             builder.AllowPassCulling(false);
 
-            builder.SetRenderFunc((PassData passData, UnsafeGraphContext context) =>
-            {
-                ExecutePass(passData, context);
-            });
+            builder.SetRenderFunc((PassData passData, UnsafeGraphContext context) => { ExecutePass(passData, context); });
 
             prevWorldToView = worldToView;
             prevWorldToClip = worldToClip;

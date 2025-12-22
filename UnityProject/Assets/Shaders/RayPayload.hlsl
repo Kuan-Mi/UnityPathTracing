@@ -25,14 +25,15 @@ cbuffer PathTracingParams : register(b0)
 
     float lightOffset;
     float3 _CameraPosition;
-    float4x4 _CCameraToWorld;
+    float4x4 gViewToWorld;
     float4x4 gWorldToView;
     float4x4 gWorldToClip;
     float4x4 gWorldToViewPrev;
     float4x4 gWorldToClipPrev;
     float2 gRectSize;
-    float2 pad1;
+    float2 gJitter;
     float4x4 _CInverseProjection;
+    float4 gCameraFrustum;
 
     float4 gSunBasisX;
     float4 gSunBasisY;
@@ -41,6 +42,10 @@ cbuffer PathTracingParams : register(b0)
     float gTanPixelAngularRadius;
     float gUnproject;
     float gTanSunAngularRadius;
+    float gNearZ;
+    float gAperture;
+    float gFocalDistance;
+    
 };
 
 

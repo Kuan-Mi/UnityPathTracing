@@ -139,6 +139,57 @@ namespace Nrd
 
             allocatedResources.Clear();
         }
+        
+        
+        public static float Halton(uint n, uint @base)
+        {
+            float a = 1.0f;
+            float b = 0.0f;
+            float baseInv = 1.0f / @base;
+
+            while (n != 0)
+            {
+                a *= baseInv;
+                b += a * (n % @base);
+                n = (uint)(n * baseInv);
+            }
+
+            return b;
+        }
+
+        // 32 位反转（等价于 Math::ReverseBits32）
+        public static uint ReverseBits32(uint v)
+        {
+            v = ((v & 0x55555555u) << 1) | ((v >> 1) & 0x55555555u);
+            v = ((v & 0x33333333u) << 2) | ((v >> 2) & 0x33333333u);
+            v = ((v & 0x0F0F0F0Fu) << 4) | ((v >> 4) & 0x0F0F0F0Fu);
+            v = ((v & 0x00FF00FFu) << 8) | ((v >> 8) & 0x00FF00FFu);
+            v = (v << 16) | (v >> 16);
+            return v;
+        }
+
+        // 优化版 Halton(n, 2)
+        public static float Halton2(uint n)
+        {
+            return ReverseBits32(n) * 2.3283064365386963e-10f;
+            // 2^-32
+        }
+
+        public static float Halton1D(uint n)
+        {
+            return Halton2(n);
+        }
+
+        public static float2 Halton2D(uint n)
+        {
+            return new float2(
+                Halton2(n),
+                Halton(n, 3)
+            );
+        }
+
+        public float2 ViewportJitter;
+        public float2 PrevViewportJitter;
 
         private unsafe FrameData GetData(Camera mCamera, Vector3 dirToLight)
         {
@@ -157,12 +208,11 @@ namespace Nrd
             localData.commonSettings.worldToViewMatrix = worldToView;
             localData.commonSettings.worldToViewMatrixPrev = PrevViewMatrix;
 
+            ViewportJitter = Halton2D(FrameIndex + 1) - new float2(0.5f, 0.5f);
+            
             // --- Jitter ---
-            // 填入你实际的 TAA Jitter 值。如果没有 TAA，保持为 0
-            localData.commonSettings.cameraJitter[0] = 0.0f;
-            localData.commonSettings.cameraJitter[1] = 0.0f;
-            localData.commonSettings.cameraJitterPrev[0] = 0.0f;
-            localData.commonSettings.cameraJitterPrev[1] = 0.0f;
+            localData.commonSettings.cameraJitter = ViewportJitter;
+            localData.commonSettings.cameraJitterPrev = PrevViewportJitter;
 
             // --- 分辨率与重置逻辑 ---
             ushort w = (ushort)mCamera.pixelWidth;

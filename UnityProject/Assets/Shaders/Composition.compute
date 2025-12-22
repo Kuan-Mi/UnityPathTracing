@@ -27,6 +27,7 @@ float4x4 gViewToWorld;
 float4 gSunDirection;
 float4 gCameraFrustum;
 float2 gInvRectSize;
+float2 gJitter;
 
 
 [numthreads(16,16,1)]
@@ -34,7 +35,7 @@ void CSMain(int2 pixelPos : SV_DispatchThreadID)
 {
 
     float2 pixelUv = float2( pixelPos + 0.5 ) * gInvRectSize;
-    float2 sampleUv = pixelUv;
+    float2 sampleUv = pixelUv + gJitter;
     
 
     if( pixelUv.x > 1.0 || pixelUv.y > 1.0 )

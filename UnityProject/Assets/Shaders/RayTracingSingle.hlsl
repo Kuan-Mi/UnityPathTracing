@@ -57,13 +57,13 @@ struct TraceOpaqueResult
 [shader("miss")]
 void MainMissShader(inout MainRayPayload payload : SV_RayPayload)
 {
-    payload.hitT = INF; 
+    payload.hitT = INF;
     float3 ray = WorldRayDirection();
-    payload.X = WorldRayOrigin() +ray * payload.hitT;
+    payload.X = WorldRayOrigin() + ray * payload.hitT;
     payload.Xprev = payload.X;
-    
-    payload.Lemi = GetSkyIntensity( ray );
-    
+
+    payload.Lemi = GetSkyIntensity(ray);
+
     // payload.emission = g_EnvTex.SampleLevel(sampler_g_EnvTex, WorldRayDirection(), 0).xyz;
     //
     // // payload.emission = float3(0.5,0.5,0.5); // 固定背景色，便于调试
@@ -494,10 +494,6 @@ void CastRay(float3 origin, float3 direction, float Tmin, float Tmax, float2 mip
 #define SSS         0x04
 
 
- 
-
-
-
 float3 GetLighting(GeometryProps geometryProps, inout MaterialProps materialProps, uint flags, out float3 Xshadow)
 {
     float3 lighting = 0.0;
@@ -547,24 +543,23 @@ float3 GetLighting(GeometryProps geometryProps, inout MaterialProps materialProp
         lighting += Cdiff * (1.0 - F);
         lighting *= shadow;
     }
-    
+
     // Shadow
-    if( ( flags & SHADOW ) != 0 && Color::Luminance( lighting ) != 0 )
+    if ((flags & SHADOW) != 0 && Color::Luminance(lighting) != 0)
     {
-        
-        float2 rnd = Rng::Hash::GetFloat2( );
-        rnd = ImportanceSampling::Cosine::GetRay( rnd ).xy;
+        float2 rnd = Rng::Hash::GetFloat2();
+        rnd = ImportanceSampling::Cosine::GetRay(rnd).xy;
         rnd *= gTanSunAngularRadius;
-        
-        float3 sunDirection = normalize( gSunBasisX.xyz * rnd.x + gSunBasisY.xyz * rnd.y + gSunDirection.xyz );
-        float2 mipAndCone = GetConeAngleFromAngularRadius( geometryProps.mip, gTanSunAngularRadius );
+
+        float3 sunDirection = normalize(gSunBasisX.xyz * rnd.x + gSunBasisY.xyz * rnd.y + gSunDirection.xyz);
+        float2 mipAndCone = GetConeAngleFromAngularRadius(geometryProps.mip, gTanSunAngularRadius);
 
         GeometryProps shadowRayGeometryProps;
         MaterialProps shadowRayMaterialProps;
-        
-        CastRay(Xshadow,sunDirection,0.0,INF,mipAndCone,shadowRayGeometryProps,shadowRayMaterialProps);
+
+        CastRay(Xshadow, sunDirection, 0.0,INF, mipAndCone, shadowRayGeometryProps, shadowRayMaterialProps);
         float hitT = shadowRayGeometryProps.hitT;
-        lighting *= float( hitT == INF );
+        lighting *= float(hitT == INF);
     }
 
     return lighting;
@@ -662,7 +657,6 @@ TraceOpaqueResult TraceOpaque(GeometryProps geometryProps0, MaterialProps materi
                 float3 ray = GenerateRayAndUpdateThroughput(geometryProps, materialProps, pathThroughput, sampleMaxNum, isDiffuse, rnd2);
 
 
-
                 // Special case for primary surface ( 1st bounce starts here )
                 if (bounce == 1)
                 {
@@ -721,8 +715,6 @@ TraceOpaqueResult TraceOpaque(GeometryProps geometryProps0, MaterialProps materi
                 }
 
 
-
-
                 //=============================================================================================================================================================
                 // Other
                 //=============================================================================================================================================================
@@ -771,12 +763,12 @@ TraceOpaqueResult TraceOpaque(GeometryProps geometryProps0, MaterialProps materi
         // Normalize hit distances for REBLUR before averaging ( needed only for AO for REFERENCE )
         float normHitDist = accumulatedHitDist;
         // if( gDenoiserType != DENOISER_RELAX )
-        
-        float4 gHitDistParams = float4(3,0.1,20,-25);
-        normHitDist = REBLUR_FrontEnd_GetNormHitDist( accumulatedHitDist, viewZ0, gHitDistParams, isDiffusePath ? 1.0 : materialProps0.roughness );
+
+        float4 gHitDistParams = float4(3, 0.1, 20, -25);
+        normHitDist = REBLUR_FrontEnd_GetNormHitDist(accumulatedHitDist, viewZ0, gHitDistParams, isDiffusePath ? 1.0 : materialProps0.roughness);
 
         // result.debug = float3(normHitDist,normHitDist,normHitDist);
-        
+
         // Accumulate diffuse and specular separately for denoising
         if (!USE_SANITIZATION || NRD_IsValidRadiance(Lsum))
         {
@@ -793,15 +785,15 @@ TraceOpaqueResult TraceOpaque(GeometryProps geometryProps0, MaterialProps materi
                 #if( NRD_MODE < OCCLUSION )
                 NRD_FrontEnd_SpecHitDistAveraging_Add(result.specHitDist, normHitDist);
 
-                result.debug = float3(result.specHitDist,result.specHitDist,result.specHitDist);
+                result.debug = float3(result.specHitDist, result.specHitDist, result.specHitDist);
                 #else
                 result.specHitDist += normHitDist;
                 #endif
             }
         }
     }
-    
-     
+
+
     // Material de-modulation ( convert irradiance into radiance )
     // if( gOnScreen != SHOW_MIP_SPECULAR )
     {
@@ -814,7 +806,7 @@ TraceOpaqueResult TraceOpaque(GeometryProps geometryProps0, MaterialProps materi
     result.diffRadiance *= radianceNorm;
     result.specRadiance *= radianceNorm;
 
-    
+
     // Others are not divided by sampling probability, we need to average across diffuse / specular only paths
     float diffNorm = diffPathNum == 0 ? 0.0 : 1.0 / float(diffPathNum);
     float specNorm = pathNum == diffPathNum ? 0.0 : 1.0 / float(pathNum - diffPathNum);
@@ -826,7 +818,7 @@ TraceOpaqueResult TraceOpaque(GeometryProps geometryProps0, MaterialProps materi
     #else
     result.specHitDist *= specNorm;
     #endif
-    
+
     // result.debug = float3(0.5,0.5,0.5);
 
     #if( NRD_MODE == SH || NRD_MODE == DIRECTIONAL_OCCLUSION )
@@ -847,68 +839,82 @@ float GetMaterialID(GeometryProps geometryProps, MaterialProps materialProps)
     return (isMetal ? MATERIAL_ID_METAL : MATERIAL_ID_DEFAULT);
 }
 
+
+void GetCameraRay(out float3 origin, out float3 direction, float2 sampleUv)
+{
+    // https://www.slideshare.net/TiagoAlexSousa/graphics-gems-from-cryengine-3-siggraph-2013 ( slides 23+ )
+
+    // Pinhole ray
+    float3 Xv = Geometry::ReconstructViewPosition(sampleUv, gCameraFrustum, gNearZ);
+    direction = normalize(Xv);
+
+    // Distorted ray
+    float2 rnd = Rng::Hash::GetFloat2();
+    rnd = ImportanceSampling::Cosine::GetRay(rnd).xy;
+    Xv.xy += rnd * gAperture;
+
+    float3 Fv = direction * gFocalDistance; // z-plane
+    #if 0
+    Fv /= dot(vForward, direction); // radius
+    #endif
+
+    origin = Geometry::AffineTransform(gViewToWorld, Xv);
+    direction = normalize(Geometry::RotateVector(gViewToWorld, Fv - Xv));
+}
+
+
 [shader("raygeneration")]
 void MainRayGenShader()
 {
-    uint2 launchIndex = DispatchRaysIndex().xy;
-    uint2 launchDim = DispatchRaysDimensions().xy;
-    float2 frameCoord = float2(launchIndex.x, launchIndex.y) + float2(0.5, 0.5);
+    uint2 pixelPos = DispatchRaysIndex().xy;
 
-    uint rngState = uint(
-        uint(launchIndex.x) * uint(1973) + uint(launchIndex.y) * uint(9277) + uint(
-            g_ConvergenceStep + g_FrameIndex * g_SampleCount) *
-        uint(26699)) | uint(1);
-    float2 jitter = float2(RandomFloat01(rngState), RandomFloat01(rngState)) - float2(0.5, 0.5);
+    float2 pixelUv = float2(pixelPos + 0.5) / gRectSize;
+    float2 sampleUv = pixelUv + gJitter;
 
-    jitter = float2(0.0, 0.0); // 关闭抖动以便调试
-
-
-    // 0 - 1
-    float2 ndcCoord = (frameCoord + jitter) / float2(launchDim.x - 1, launchDim.y - 1);
-    // -1 - 1
-    ndcCoord = ndcCoord * 2.0 - 1.0;
-
-    ndcCoord.y = -ndcCoord.y; // NDC Y 轴向上，纹理 UV Y 轴向下，需要翻转
-
-    float4 viewPos = mul(_CInverseProjection, float4(ndcCoord.x, ndcCoord.y, 1.0, 1.0));
-    viewPos /= viewPos.w;
-    // viewPos.z = viewPos.z;
-    float3 viewDirection = normalize(viewPos.xyz);
-
-    float3 rayDirection = mul((float3x3)_CCameraToWorld, viewDirection);
-
+    if (pixelUv.x > 1.0 || pixelUv.y > 1.0)
+    {
+        return;
+    }
 
     // Initialize RNG
-    Rng::Hash::Initialize(launchIndex, gFrameIndex);
+    Rng::Hash::Initialize(pixelPos, gFrameIndex);
 
     //================================================================================================================================================================================
     // Primary ray
     //================================================================================================================================================================================
 
-    float3 cameraRayOrigin = _CameraPosition;
-    float3 cameraRayDirection = rayDirection;
+    float3 cameraRayOrigin = 0;
+    float3 cameraRayDirection = 0;
+    GetCameraRay(cameraRayOrigin, cameraRayDirection, sampleUv);
 
     GeometryProps geometryProps0;
     MaterialProps materialProps0;
-
     CastRay(cameraRayOrigin, cameraRayDirection, 0.0, 1000.0, GetConeAngleFromRoughness(0.0, 0.0), geometryProps0, materialProps0);
 
+    //================================================================================================================================================================================
+    // Primary surface replacement ( aka jump through mirrors )
+    //================================================================================================================================================================================
+    
+    float3 psrThroughput = 1.0;
+    float3x3 mirrorMatrix = Geometry::GetMirrorMatrix(0); // identity
+    
     //================================================================================================================================================================================
     // G-buffer ( guides )
     //================================================================================================================================================================================
 
     // Motion
     float3 X0 = geometryProps0.X;
-    gOut_Mv[launchIndex] = float4(GetMotion(geometryProps0.X, geometryProps0.Xprev), 1);
+    float3 motion = GetMotion(X0, geometryProps0.Xprev);
+    gOut_Mv[pixelPos] = float4(motion, 1);
 
     // ViewZ
     float viewZ = -Geometry::AffineTransform(gWorldToView, X0).z;
     viewZ = geometryProps0.IsMiss() ? Math::Sign(viewZ) * INF : viewZ;
 
-    gOut_ViewZ[launchIndex] = viewZ;
+    gOut_ViewZ[pixelPos] = viewZ;
 
     // Emission
-    gOut_DirectEmission[launchIndex] = materialProps0.Lemi;
+    gOut_DirectEmission[pixelPos] = materialProps0.Lemi;
 
     // Early out
     if (geometryProps0.IsMiss())
@@ -918,32 +924,32 @@ void MainRayGenShader()
 
     // Normal, roughness and material ID
     float materialID = GetMaterialID(geometryProps0, materialProps0);
-    gOut_Normal_Roughness[launchIndex] = NRD_FrontEnd_PackNormalAndRoughness(materialProps0.N, materialProps0.roughness, materialID);
+    gOut_Normal_Roughness[pixelPos] = NRD_FrontEnd_PackNormalAndRoughness(materialProps0.N, materialProps0.roughness, materialID);
 
     // Base color and metalness
     // gOut_BaseColor_Metalness[launchIndex] = float4(Color::ToSrgb(materialProps0.baseColor), materialProps0.metalness);
-    gOut_BaseColor_Metalness[launchIndex] = float4((materialProps0.baseColor), materialProps0.metalness);
+    gOut_BaseColor_Metalness[pixelPos] = float4((materialProps0.baseColor), materialProps0.metalness);
 
     // Direct lighting
     float3 Xshadow;
     float3 Ldirect = GetLighting(geometryProps0, materialProps0, LIGHTING, Xshadow);
 
-    gOut_DirectLighting[launchIndex] = Ldirect;
-
-    float3x3 mirrorMatrix = Geometry::GetMirrorMatrix(0); // identity
+    gOut_DirectLighting[pixelPos] = Ldirect;
+    // gOut_PsrThroughput[ pixelPos ] = psrThroughput;
+    
     float4 Lpsr = 0;
 
     //================================================================================================================================================================================
     // Secondary rays
     //================================================================================================================================================================================
-    TraceOpaqueResult result = TraceOpaque(geometryProps0, materialProps0, launchIndex, mirrorMatrix, Lpsr);
+    TraceOpaqueResult result = TraceOpaque(geometryProps0, materialProps0, pixelPos, mirrorMatrix, Lpsr);
 
     //================================================================================================================================================================================
     // Sun shadow
     //================================================================================================================================================================================
     geometryProps0.X = Xshadow;
 
-    float2 rnd = GetBlueNoise(launchIndex);
+    float2 rnd = GetBlueNoise(pixelPos);
     rnd = ImportanceSampling::Cosine::GetRay(rnd).xy;
     rnd *= gTanSunAngularRadius;
 
@@ -977,21 +983,20 @@ void MainRayGenShader()
 
     float penumbra = SIGMA_FrontEnd_PackPenumbra(shadowHitDist, gTanSunAngularRadius);
 
-    gOut_ShadowData[launchIndex] = penumbra;
+    gOut_ShadowData[pixelPos] = penumbra;
 
     //================================================================================================================================================================================
     // Output
     //================================================================================================================================================================================
-    gOut_Diff[launchIndex] = REBLUR_FrontEnd_PackRadianceAndNormHitDist(result.diffRadiance, result.diffHitDist, USE_SANITIZATION);
-    gOut_Spec[launchIndex] = REBLUR_FrontEnd_PackRadianceAndNormHitDist(result.specRadiance, result.specHitDist, USE_SANITIZATION);
+    gOut_Diff[pixelPos] = REBLUR_FrontEnd_PackRadianceAndNormHitDist(result.diffRadiance, result.diffHitDist, USE_SANITIZATION);
+    gOut_Spec[pixelPos] = REBLUR_FrontEnd_PackRadianceAndNormHitDist(result.specRadiance, result.specHitDist, USE_SANITIZATION);
 
     // result.debug = float3(result.diffHitDist,result.diffHitDist,result.diffHitDist);
     // result.debug = float3(result.specHitDist,result.specHitDist,result.specHitDist);
-    
-    float mipNorm = Math::Sqrt01( geometryProps0.mip / 11.0 );
-      result.debug= Color::ColorizeZucconi( mipNorm );
-     
-    
 
-    g_Output[launchIndex] = float4(result.debug, 1);
+    float mipNorm = Math::Sqrt01(geometryProps0.mip / 11.0);
+    result.debug = Color::ColorizeZucconi(mipNorm);
+
+
+    g_Output[pixelPos] = float4(result.debug, 1);
 }

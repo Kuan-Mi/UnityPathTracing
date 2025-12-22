@@ -72,12 +72,7 @@ MonoBehaviour:
   rayTracingShader: {fileID: 4807578003741378534, guid: 71faa22953dc9834daf36cc38966c196, type: 3}
   compositionComputeShader: {fileID: 7200000, guid: 6b0c89c26f4363a4781550cf86801786, type: 3}
   pathTracingSetting:
-    bounceCountOpaque: 5
-    bounceCountTransparent: 5
-    sampleCount: 1
     sunAngularDiameter: 1
-    envTexture: {fileID: 0}
-    enableRussianRoulette: 1
     denoisingRange: 1000
     splitScreen: 0.49
     isBaseColorMetalnessAvailable: 0
@@ -85,8 +80,7 @@ MonoBehaviour:
     maxStabilizedFrameNum: 5
     is2DMotionVector: 0
     useOverriddenSigmaValues: 0
-    lightDir: {x: 0, y: 0, z: 0}
-    showBaseColor: 1
+    showBaseColor: 0
     showMetalness: 0
     showNormal: 0
     showRoughness: 0
@@ -98,7 +92,9 @@ MonoBehaviour:
     showOut: 0
     showMV: 0
     showValidation: 0
-    showComposedDiff: 0
+    showComposedDiff: 1
     showComposedSpec: 0
+    dofAperture: 0
+    dofFocalDistance: 2
   gIn_ScramblingRanking: {fileID: 2800000, guid: ba45d1e4dcf9022438a4798a5f9e7b80, type: 3}
   gIn_Sobol: {fileID: 2800000, guid: 17e7ce8147355314ea8aab1178a6a43c, type: 3}

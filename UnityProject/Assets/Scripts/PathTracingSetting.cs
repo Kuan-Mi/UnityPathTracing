@@ -72,5 +72,9 @@ namespace PathTracing
         public bool showComposedDiff;
         public bool showComposedSpec;
         
+        [Range(0,100f)]
+        public float dofAperture;
+        [Range(0.1f,10f)]
+        public float dofFocalDistance;
     }
 }
