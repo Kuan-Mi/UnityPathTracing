@@ -262,8 +262,8 @@ Shader "Custom/LitWithRayTracing"
 
                 float pushOff = doRefraction ? -K_RAY_ORIGIN_PUSH_OFF : K_RAY_ORIGIN_PUSH_OFF;
                 float3 albedoTransparent = !isFrontFace
-                                                                       ? exp(-(1 - albedo) * RayTCurrent() * _BaseColor.a * 20)
-                                                                       : float3(1, 1, 1);
+                               ? exp(-(1 - albedo) * RayTCurrent() * _BaseColor.a * 20)
+                               : float3(1, 1, 1);
 
 
                 #endif
@@ -453,14 +453,14 @@ Shader "Custom/LitWithRayTracing"
                 float NoRay = abs(dot(direction, normalWS));
                 float a = payload.hitT * payload.mipAndCone.y;
                 a *= Math::PositiveRcp(NoRay);
-                a *= sqrt(uvArea / max(worldArea, 1e-10f)); 
+                a *= sqrt(uvArea / max(worldArea, 1e-10f));
 
                 float mip = log2(a);
                 mip += MAX_MIP_LEVEL;
                 mip = max(mip, 0.0);
-                
+
                 // mip = payload.mipAndCone.y;
-                 
+
                 // mip = 0;
                 payload.mipAndCone.x += mip;
 
@@ -469,12 +469,13 @@ Shader "Custom/LitWithRayTracing"
 
                 float2 normalUV = float2(v.uv.x, 1 - v.uv.y); // 修正UV翻转问题
 
-                float2 packedNormal = _BumpMap.SampleLevel(sampler_BumpMap, _BaseMap_ST.xy * normalUV + _BaseMap_ST.zw, mip).xy;
-                
+                float2 packedNormal = _BumpMap.SampleLevel(sampler_BumpMap, _BaseMap_ST.xy * normalUV + _BaseMap_ST.zw,
+                         mip).xy;
+
                 float4 T = float4(tangentWS, 1);
-                
-                float3 N = Geometry::TransformLocalNormal( packedNormal, T, normalWS );
-                
+
+                float3 N = Geometry::TransformLocalNormal(packedNormal, T, normalWS);
+
                 // float3 tangentNormal = UnpackNormalScale(n, _BumpScale);
 
                 // float3 bitangent = cross(normalWS.xyz, tangentWS.xyz);
@@ -488,18 +489,29 @@ Shader "Custom/LitWithRayTracing"
                 #endif
 
                 float3 albedo = _BaseColor.xyz * _BaseMap.SampleLevel(sampler_BaseMap,
-                           _BaseMap_ST.xy * v.uv + _BaseMap_ST.zw, mip).xyz;
+           _BaseMap_ST.xy * v.uv + _BaseMap_ST.zw, mip).xyz;
 
                 // albedo = randomColor;
                 // albedo = float3(ccR, ccG, ccB);
 
+                float roughness;
+                float metallic;
+
+                #if _METALLICSPECGLOSSMAP
+
                 float4 vv = _MetallicGlossMap.SampleLevel(sampler_MetallicGlossMap, _BaseMap_ST.xy * v.uv + _BaseMap_ST.zw, mip);
-                float metallic = vv.r * _Metallic;
-                // float smooth = vv.r * _Smoothness;
-                float roughness = vv.g * (1 - _Smoothness);
-
-
+                // metallic = vv.r;
+                roughness = vv.g * (1 - _Smoothness);
                 metallic = vv.b;
+
+                #else
+
+                roughness = 1 - _Smoothness;
+                metallic = _Metallic;
+
+                #endif
+
+
                 float3 dielectricSpecular = float3(0.04, 0.04, 0.04);
                 float3 _SpecularColor = lerp(dielectricSpecular, albedo, metallic);
 

@@ -12,9 +12,9 @@ namespace PathTracing
     {
         public Material showShadowMaterial;
         public RayTracingShader rayTracingShader;
-        
+
         public ComputeShader compositionComputeShader;
-        
+
         public PathTracingSetting pathTracingSetting;
 
         private PathTracingPassSingle _pathTracingPass;
@@ -31,10 +31,9 @@ namespace PathTracing
 
         public override void Create()
         {
-            
             Debug.Log("PathTracingFeature Create");
-            
-            
+
+
             if (accelerationStructure == null)
             {
                 settings = new Settings
@@ -58,14 +57,14 @@ namespace PathTracing
                     new ComputeBuffer(gIn_ScramblingRanking.width * gIn_ScramblingRanking.height, 16);
                 var scramblingRankingData = new uint4[gIn_ScramblingRanking.width * gIn_ScramblingRanking.height];
                 byte[] rawData = gIn_ScramblingRanking.GetRawTextureData();
-                
+
                 Color32[] colors = gIn_ScramblingRanking.GetPixels32();
 
 
                 Debug.Log($"gIn_ScramblingRanking rawData Length: {rawData.Length}");
                 Debug.Log($"gIn_ScramblingRanking colors Length: {colors.Length}");
-                
-                
+
+
                 int count = scramblingRankingData.Length;
                 for (int i = 0; i < count; i++)
                 {
@@ -73,8 +72,8 @@ namespace PathTracing
                         rawData[i * 4 + 0],
                         rawData[i * 4 + 1],
                         rawData[i * 4 + 2],
-                        rawData[i * 4 + 3]);                   
-                    
+                        rawData[i * 4 + 3]);
+
                     // scramblingRankingData[i] = new uint4(
                     //     colors[i].r,
                     //     colors[i].g,
@@ -101,14 +100,14 @@ namespace PathTracing
                         rawData[i * 4 + 1],
                         rawData[i * 4 + 2],
                         rawData[i * 4 + 3]);
-                    
+
                     // sobolData[i] = new uint4(
                     //     colors[i].r,
                     //     colors[i].g,
                     //     colors[i].b,
                     //     colors[i].a);
                 }
- 
+
                 gIn_SobolUint.SetData(sobolData);
             }
 
@@ -143,7 +142,7 @@ namespace PathTracing
 
             if (!_denoisers.TryGetValue(camID, out var nrd))
             {
-                nrd = new NRDDenoiser(pathTracingSetting,cam.name);
+                nrd = new NRDDenoiser(pathTracingSetting, cam.name);
                 _denoisers.Add(camID, nrd);
             }
 

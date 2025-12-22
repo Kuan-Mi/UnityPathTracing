@@ -75,7 +75,7 @@ MonoBehaviour:
     bounceCountOpaque: 5
     bounceCountTransparent: 5
     sampleCount: 1
-    sunAngularDiameter: 0.533
+    sunAngularDiameter: 1
     envTexture: {fileID: 0}
     enableRussianRoulette: 1
     denoisingRange: 1000
