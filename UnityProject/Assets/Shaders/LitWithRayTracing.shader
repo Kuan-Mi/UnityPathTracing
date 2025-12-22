@@ -185,11 +185,11 @@ Shader "Custom/LitWithRayTracing"
             void ClosestHitMain(inout RayPayload payload : SV_RayPayload,
                                 AttributeData attribs : SV_IntersectionAttributes)
             {
-                if (payload.bounceIndexOpaque == g_BounceCountOpaque)
-                {
-                    payload.bounceIndexOpaque += 1;
-                    return;
-                }
+                // if (payload.bounceIndexOpaque == g_BounceCountOpaque)
+                // {
+                //     payload.bounceIndexOpaque += 1;
+                //     return;
+                // }
 
                 uint3 triangleIndices = UnityRayTracingFetchTriangleIndices(PrimitiveIndex());
                 Vertex v0 = FetchVertex(triangleIndices.x);

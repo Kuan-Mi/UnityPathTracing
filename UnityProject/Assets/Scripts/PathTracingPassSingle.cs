@@ -23,11 +23,7 @@ namespace PathTracing
         public ComputeBuffer scramblingRanking;
         public ComputeBuffer sobol;
 
-        // public int convergenceStep = 0;
-
         #region ID
-
-        private static int g_ZoomID = Shader.PropertyToID("g_Zoom");
 
         private static int g_ScramblingRankingID = Shader.PropertyToID("gIn_ScramblingRanking");
         private static int g_SobolID = Shader.PropertyToID("gIn_Sobol");
@@ -51,20 +47,7 @@ namespace PathTracing
         private static int g_SpecID = Shader.PropertyToID("gOut_Spec");
 
 
-        private static int g_ConvergenceStepID = Shader.PropertyToID("g_ConvergenceStep");
-        private static int g_FrameIndexID = Shader.PropertyToID("g_FrameIndex");
-        private static int g_SampleCountID = Shader.PropertyToID("g_SampleCount");
-        private static int g_EnvTexID = Shader.PropertyToID("g_EnvTex");
-        private static int lightOffsetID = Shader.PropertyToID("lightOffset");
-
-
-        private static int g_BounceCountOpaqueID = Shader.PropertyToID("g_BounceCountOpaque");
-        private static int g_BounceCountTransparentID = Shader.PropertyToID("g_BounceCountTransparent");
-
-
         private static int g_AccelStructID = Shader.PropertyToID("g_AccelStruct");
-        private static int g_DirLightDirectionID = Shader.PropertyToID("g_DirLightDirection");
-        private static int g_DirLightColorID = Shader.PropertyToID("g_DirLightColor");
 
 
         private static int gViewToWorldID = Shader.PropertyToID("gViewToWorld");
@@ -194,8 +177,6 @@ namespace PathTracing
 
             data.rayTracingShader.SetBuffer(g_ScramblingRankingID, data.scramblingRanking);
             data.rayTracingShader.SetBuffer(g_SobolID, data.sobol);
-            // natCmd.SetRayTracingTextureParam(data.rayTracingShader, g_SobolID, data.sobol);
-
 
             natCmd.SetRayTracingTextureParam(data.rayTracingShader, g_OutputID, data.outputTexture);
 
@@ -315,11 +296,6 @@ namespace PathTracing
         private Matrix4x4 prevWorldToView;
         private Matrix4x4 prevWorldToClip;
 
-        // private Matrix4x4 prevCameraMatrix;
-        // private int prevBounceCountOpaque;
-        // private int prevBounceCountTransparent;
-
-
         public static Vector4 GetNrdFrustum(Camera cam)
         {
             Matrix4x4 p = cam.projectionMatrix;
@@ -376,7 +352,6 @@ namespace PathTracing
                 return;
             }
 
-
             NrdDenoiser.EnsureResources(cameraData.camera.pixelWidth, cameraData.camera.pixelHeight);
 
             string passName = "Path Tracing Pass";
@@ -386,22 +361,6 @@ namespace PathTracing
             passData.rayTracingShader = rayTracingShader;
             passData.compositionComputeShader = compositionComputeShader;
             passData.cam = cameraData.camera;
-
-            // if (prevCameraMatrix != cameraData.camera.cameraToWorldMatrix)
-            // {
-            //     convergenceStep = 0;
-            // }
-            //
-            // if (prevBounceCountOpaque != _settings.bounceCountOpaque)
-            // {
-            //     convergenceStep = 0;
-            // }
-            //
-            // if (prevBounceCountTransparent != _settings.bounceCountTransparent)
-            // {
-            //     convergenceStep = 0;
-            // }
-
 
             var fov = cameraData.camera.fieldOfView;
             if (cameraData.camera.usePhysicalProperties)
@@ -446,14 +405,6 @@ namespace PathTracing
 
             var setting = new Settings
             {
-                // g_Zoom = tan,
-                // g_ConvergenceStep = NrdDenoiser.FrameIndex,
-                // g_FrameIndex = (uint)Time.frameCount,
-                // g_SampleCount = (uint)_settings.sampleCount,
-                // lightOffset = _settings.sunAngularDiameter,
-
-                // _CameraPosition = cameraData.worldSpaceCameraPos,
-
                 gViewToWorld = viewToWorld,
                 gWorldToView = worldToView,
                 gWorldToClip = worldToClip,
@@ -462,7 +413,7 @@ namespace PathTracing
                 gRectSize = new float2(cam.pixelWidth, cam.pixelHeight),
                 gJitter = NrdDenoiser.ViewportJitter / new float2(cam.pixelWidth, cam.pixelHeight),
 
-                // _CInverseProjection = invCameraProjectionMatrix,
+                
                 gCameraFrustum = GetNrdFrustum(cameraData.camera),
                 gSunBasisX = new float4(gSunBasisX.x, gSunBasisX.y, gSunBasisX.z, 0),
                 gSunBasisY = new float4(gSunBasisY.x, gSunBasisY.y, gSunBasisY.z, 0),
@@ -540,12 +491,6 @@ namespace PathTracing
 
             // rayTracingShader.SetTexture(g_EnvTexID, _settings.envTexture);
 
-            // Shader.SetGlobalInt(g_BounceCountOpaqueID, _settings.bounceCountOpaque);
-            // Shader.SetGlobalInt(g_BounceCountTransparentID, _settings.bounceCountTransparent);
-
-
-            Shader.SetGlobalVector(g_DirLightDirectionID, gSunDirection);
-            Shader.SetGlobalColor(g_DirLightColorID, mainLight.finalColor);
 
             // accelerationStructure.Build();
             Shader.SetGlobalRayTracingAccelerationStructure(g_AccelStructID, accelerationStructure);
@@ -555,10 +500,6 @@ namespace PathTracing
             compositionComputeShader.SetVector(gInvRectSizeID, new Vector2(1.0f / setting.gRectSize.x, 1.0f / setting.gRectSize.y));
             compositionComputeShader.SetVector(gCameraFrustumID, GetNrdFrustum(cameraData.camera));
             compositionComputeShader.SetVector(gJitterID, new Vector4(setting.gJitter.x, setting.gJitter.y, 0, 0));
-
-
-            // convergenceStep++;
-
 
             builder.UseTexture(passData.outputTexture, AccessFlags.ReadWrite);
 
@@ -589,10 +530,6 @@ namespace PathTracing
 
             prevWorldToView = worldToView;
             prevWorldToClip = worldToClip;
-
-            // prevCameraMatrix = cameraData.camera.cameraToWorldMatrix;
-            // prevBounceCountOpaque = _settings.bounceCountOpaque;
-            // prevBounceCountTransparent = _settings.bounceCountTransparent;
         }
 
         private TextureHandle CreateTex(TextureDesc textureDesc, RenderGraph renderGraph, string name,
