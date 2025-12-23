@@ -4,6 +4,23 @@ using UnityEngine;
 
 namespace PathTracing
 {
+    public enum ShowMode
+    {
+        None = 0,
+        BaseColor = 1,
+        Metalness = 2,
+        Normal = 3,
+        Roughness = 4,
+        Shadow = 5,
+        Diffuse = 6,
+        Specular = 7,
+        DirectLight = 8,
+        Emissive = 9,
+        Out = 10,
+        ComposedDiff = 11,
+        ComposedSpec = 12
+    }
+
     [System.Serializable]
     public class PathTracingSetting
     {
@@ -46,35 +63,13 @@ namespace PathTracing
         [Header("motionVectorScale Override")] public bool is2DMotionVector;
         // public float3 motionVectorScale = new(1.0f, 1.0f, 0.0f); // Default: {1.0, 1.0, 0.0}
 
-        [Header("NRD Sigma Settings Override")]
-        public bool useOverriddenSigmaValues;
-
-        // public Vector3 lightDir;
-
-        public bool showBaseColor;
-        public bool showMetalness;
-        public bool showNormal;
-        public bool showRoughness;
-
-
-        public bool showShadow;
-        public bool showDiffuse;
-        public bool showSpecular;
-        
-        public bool showDirectLight;
-        public bool showEmissive;
-        
-        public bool showOut;
-
+        public ShowMode showMode;
         public bool showMV;
         public bool showValidation;
 
-        public bool showComposedDiff;
-        public bool showComposedSpec;
-        
-        [Range(0,100f)]
-        public float dofAperture;
-        [Range(0.1f,10f)]
-        public float dofFocalDistance;
+        [Range(0, 100f)] public float dofAperture;
+        [Range(0.1f, 10f)] public float dofFocalDistance;
+
+        [Range(0.1f, 10f)] public float exposure = 1.0f;
     }
 }

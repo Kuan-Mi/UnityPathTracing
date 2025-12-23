@@ -30,7 +30,9 @@ cbuffer PathTracingParams : register(b0)
     float4 gSunDirection;
 
     float2 gRectSize;
+    float2 gInvRectSize;
     float2 gJitter;
+    float2 pad;
 
 
     float gTanPixelAngularRadius;
@@ -41,6 +43,7 @@ cbuffer PathTracingParams : register(b0)
 
     float gAperture;
     float gFocalDistance;
+    float gExposure;
     uint gFrameIndex;
 };
 
