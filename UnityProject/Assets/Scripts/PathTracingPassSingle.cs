@@ -223,8 +223,8 @@ namespace PathTracing
             }
         }
 
-        private Matrix4x4 prevWorldToView;
-        private Matrix4x4 prevWorldToClip;
+        // private Matrix4x4 prevWorldToView;
+        // private Matrix4x4 prevWorldToClip;
 
         public override void RecordRenderGraph(RenderGraph renderGraph, ContextContainer frameData)
         {
@@ -252,9 +252,7 @@ namespace PathTracing
             opaqueTracingShader.SetShaderPass("Test2");
             transparentTracingShader.SetShaderPass("Test2");
 
-            var passName = "Path Tracing Pass";
-
-            using var builder = renderGraph.AddUnsafePass<PassData>(passName, out var passData);
+            using var builder = renderGraph.AddUnsafePass<PassData>("Path Tracing Pass", out var passData);
 
             passData.OpaqueTracingShader = opaqueTracingShader;
             passData.TransparentTracingShader = transparentTracingShader;
@@ -264,9 +262,9 @@ namespace PathTracing
             passData.Cam = cameraData.camera;
 
 
-            var worldToView = cameraData.camera.worldToCameraMatrix;
-            var worldToClip = GetWorldToClipMatrix(cameraData.camera);
-            var viewToWorld = worldToView.inverse;
+            // var worldToView = cameraData.camera.worldToCameraMatrix;
+            // var worldToClip = GetWorldToClipMatrix(cameraData.camera);
+            // var viewToWorld = worldToView.inverse;
 
             // var cameraProjectionMatrix = cameraData.camera.projectionMatrix;
             // var invCameraProjectionMatrix = cameraProjectionMatrix.inverse;
@@ -294,11 +292,11 @@ namespace PathTracing
 
             var globalConstants = new GlobalConstants
             {
-                gViewToWorld = viewToWorld,
-                gWorldToView = worldToView,
-                gWorldToClip = worldToClip,
-                gWorldToViewPrev = prevWorldToView,
-                gWorldToClipPrev = prevWorldToClip,
+                gViewToWorld = NrdDenoiser. worldToView.inverse,
+                gWorldToView = NrdDenoiser.worldToView,
+                gWorldToClip = NrdDenoiser.worldToClip,
+                gWorldToViewPrev = NrdDenoiser.prevWorldToView,
+                gWorldToClipPrev = NrdDenoiser.prevWorldToClip,
                 gRectSize = rectSize,
                 gInvRectSize = invRectSize,
                 gJitter = NrdDenoiser.ViewportJitter / rectSize,
@@ -345,11 +343,11 @@ namespace PathTracing
             passData.Sobol = sobol;
             passData.IsEven = isEven;
 
+            Shader.SetGlobalConstantBuffer(paramsID, pathTracingSettingsBuffer, 0, pathTracingSettingsBuffer.stride);
+
+
             builder.AllowPassCulling(false);
             builder.SetRenderFunc((PassData data, UnsafeGraphContext context) => { ExecutePass(data, context); });
-
-            prevWorldToView = worldToView;
-            prevWorldToClip = worldToClip;
         }
 
         private void CreateTextureHandle(RenderGraph renderGraph, PassData passData, TextureDesc textureDesc, IUnsafeRenderGraphBuilder builder)

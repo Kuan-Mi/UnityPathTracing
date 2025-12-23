@@ -10,6 +10,7 @@ using Unity.Mathematics;
 using UnityEngine;
 using UnityEngine.Experimental.Rendering;
 using UnityEngine.Rendering;
+using static PathTracing.PathTracingUtils;
 
 namespace Nrd
 {
@@ -30,8 +31,15 @@ namespace Nrd
         private readonly int nrdInstanceId;
         private string cameraName;
 
-        private Matrix4x4 PrevViewMatrix;
-        private Matrix4x4 PrevViewProjMatrix;
+        public Matrix4x4 worldToView;
+        public Matrix4x4 worldToClip;
+
+
+        public Matrix4x4 prevWorldToView;
+        public Matrix4x4 prevWorldToClip;
+
+        public Matrix4x4 viewToClip;
+        public Matrix4x4 preViewToClip;
 
         private int _prevWidth = -1;
         private int _prevHeight = -1;
@@ -202,20 +210,23 @@ namespace Nrd
 
         private unsafe FrameData GetData(Camera mCamera, Vector3 dirToLight)
         {
-            Matrix4x4 proj = GL.GetGPUProjectionMatrix(mCamera.projectionMatrix, false);
+            prevWorldToView = worldToView;
+            prevWorldToClip = worldToClip;
+            preViewToClip = viewToClip;
 
-            Matrix4x4 worldToView = mCamera.worldToCameraMatrix;
 
-            var viewProj = proj;
+            worldToView = mCamera.worldToCameraMatrix;
+            worldToClip = GetWorldToClipMatrix(mCamera);
+            viewToClip = GL.GetGPUProjectionMatrix(mCamera.projectionMatrix, false);
 
             FrameData localData = FrameData._default;
 
             // --- 矩阵赋值 ---
-            localData.commonSettings.viewToClipMatrix = viewProj;
-            localData.commonSettings.viewToClipMatrixPrev = PrevViewProjMatrix;
+            localData.commonSettings.viewToClipMatrix = viewToClip;
+            localData.commonSettings.viewToClipMatrixPrev = preViewToClip;
 
             localData.commonSettings.worldToViewMatrix = worldToView;
-            localData.commonSettings.worldToViewMatrixPrev = PrevViewMatrix;
+            localData.commonSettings.worldToViewMatrixPrev = prevWorldToView;
 
             ViewportJitter = Halton2D(FrameIndex + 1) - new float2(0.5f, 0.5f);
 
@@ -224,7 +235,7 @@ namespace Nrd
             localData.commonSettings.cameraJitterPrev = PrevViewportJitter;
 
             PrevViewportJitter = ViewportJitter;
-            
+
             // --- 分辨率与重置逻辑 ---
             ushort w = (ushort)mCamera.pixelWidth;
             ushort h = (ushort)mCamera.pixelHeight;
@@ -252,8 +263,6 @@ namespace Nrd
             // Debug.Log("Record Frame Index: " + m_FrameIndex);
 
             // 4. 更新历史状态
-            PrevViewProjMatrix = viewProj;
-            PrevViewMatrix = worldToView;
 
             localData.instanceId = nrdInstanceId;
 

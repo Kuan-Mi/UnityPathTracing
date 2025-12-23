@@ -35,6 +35,7 @@ cbuffer PathTracingParams : register(b0)
     float2 gInvRectSize;
     float2 gJitter;
     float2 gRectSizePrev;
+    
     float2 gRenderSize;
     float2 gInvRenderSize;
 
