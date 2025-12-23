@@ -80,6 +80,11 @@ namespace Nrd
             allocatedResources.Add(new NrdTextureResource(ResourceType.OUT_SPEC_RADIANCE_HITDIST, GraphicsFormat.R16G16B16A16_SFloat, uavState));
             allocatedResources.Add(new NrdTextureResource(ResourceType.OUT_VALIDATION, GraphicsFormat.R8G8B8A8_UNorm, uavState));
 
+            // TAA
+            allocatedResources.Add(new NrdTextureResource(ResourceType.TaaHistory, GraphicsFormat.R16G16B16A16_SFloat, uavState));
+            allocatedResources.Add(new NrdTextureResource(ResourceType.TaaHistoryPrev, GraphicsFormat.R16G16B16A16_SFloat, uavState));
+
+
             Debug.Log($"[NRD] Created Denoiser Instance {nrdInstanceId} for Camera {cameraName}");
         }
 
@@ -121,6 +126,10 @@ namespace Nrd
 
             foreach (var nrdTextureResource in allocatedResources)
             {
+                if (nrdTextureResource.ResourceType == ResourceType.TaaHistory ||
+                    nrdTextureResource.ResourceType == ResourceType.TaaHistoryPrev)
+                    continue; // TAA 资源不传给 NRD)
+
                 ptr[idx++] = new NrdResourceInput { type = nrdTextureResource.ResourceType, texture = nrdTextureResource.NriPtr, state = nrdTextureResource.ResourceState };
             }
 
@@ -139,8 +148,8 @@ namespace Nrd
 
             allocatedResources.Clear();
         }
-        
-        
+
+
         public static float Halton(uint n, uint @base)
         {
             float a = 1.0f;
@@ -209,7 +218,7 @@ namespace Nrd
             localData.commonSettings.worldToViewMatrixPrev = PrevViewMatrix;
 
             ViewportJitter = Halton2D(FrameIndex + 1) - new float2(0.5f, 0.5f);
-            
+
             // --- Jitter ---
             localData.commonSettings.cameraJitter = ViewportJitter;
             localData.commonSettings.cameraJitterPrev = PrevViewportJitter;
@@ -292,8 +301,6 @@ namespace Nrd
             localData.reblurSettings.minMaterialForDiffuse = 0;
             localData.reblurSettings.minMaterialForSpecular = 1;
             // localData.reblurSettings.hitDistanceReconstructionMode = mHitDistanceReconstructionMode::OFF;
-            
-            
 
 
             return localData;

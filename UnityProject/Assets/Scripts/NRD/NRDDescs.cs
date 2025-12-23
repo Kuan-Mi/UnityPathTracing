@@ -124,6 +124,10 @@ namespace Nrd
 
         // Dedicated to NRD, can't be reused
         PERMANENT_POOL,
+        
+        // 本地使用
+        TaaHistory,
+        TaaHistoryPrev,
 
         MAX_NUM,
     };

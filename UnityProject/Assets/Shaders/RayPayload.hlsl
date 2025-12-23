@@ -1,6 +1,8 @@
 #include "ml.hlsli"
 
 #define INF                                 1e5
+#define FP16_VIEWZ_SCALE                    0.125 // TODO: tuned for meters, needs to be scaled down for cm and mm
+
 
 struct RayPayload
 {
@@ -32,7 +34,9 @@ cbuffer PathTracingParams : register(b0)
     float2 gRectSize;
     float2 gInvRectSize;
     float2 gJitter;
-    float2 pad;
+    float2 gRectSizePrev;
+    float2 gRenderSize;
+    float2 gInvRenderSize;
 
 
     float gTanPixelAngularRadius;
@@ -45,6 +49,8 @@ cbuffer PathTracingParams : register(b0)
     float gFocalDistance;
     float gExposure;
     uint gFrameIndex;
+    
+    float gTAA;
 };
 
 

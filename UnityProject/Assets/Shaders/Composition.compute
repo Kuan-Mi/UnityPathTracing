@@ -18,18 +18,6 @@ Texture2D<float4> gIn_Spec;
 RWTexture2D<float3> gOut_ComposedDiff;
 RWTexture2D<float4> gOut_ComposedSpec_ViewZ;
 
-
-#define FP16_VIEWZ_SCALE                    0.125 // TODO: tuned for meters, needs to be scaled down for cm and mm
-
-#define INF                                 1e5
-
-
-// float4x4 gViewToWorld;
-// float4 gSunDirection;
-// float4 gCameraFrustum;
-// float2 gJitter;
-
-
 [numthreads(16,16,1)]
 void CSMain(int2 pixelPos : SV_DispatchThreadID)
 {

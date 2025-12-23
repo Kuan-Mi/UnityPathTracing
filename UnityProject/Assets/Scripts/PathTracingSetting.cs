@@ -18,7 +18,8 @@ namespace PathTracing
         Emissive = 9,
         Out = 10,
         ComposedDiff = 11,
-        ComposedSpec = 12
+        ComposedSpec = 12,
+        AfterTaa = 13,
     }
 
     [System.Serializable]
@@ -71,5 +72,6 @@ namespace PathTracing
         [Range(0.1f, 10f)] public float dofFocalDistance;
 
         [Range(0.1f, 10f)] public float exposure = 1.0f;
+        [Range(0f, 1f)] public float taa = 1.0f;
     }
 }

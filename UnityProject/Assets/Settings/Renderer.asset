@@ -71,6 +71,7 @@ MonoBehaviour:
   showShadowMaterial: {fileID: 0}
   rayTracingShader: {fileID: 4807578003741378534, guid: 71faa22953dc9834daf36cc38966c196, type: 3}
   compositionComputeShader: {fileID: 7200000, guid: 6b0c89c26f4363a4781550cf86801786, type: 3}
+  taaComputeShader: {fileID: 7200000, guid: 6af7363d73bc4764bd8420bb5cc5d306, type: 3}
   pathTracingSetting:
     sunAngularDiameter: 1
     denoisingRange: 1000
@@ -83,7 +84,8 @@ MonoBehaviour:
     showMV: 0
     showValidation: 0
     dofAperture: 0
-    dofFocalDistance: 2
+    dofFocalDistance: 0.57
     exposure: 10
+    taa: 1
   gIn_ScramblingRanking: {fileID: 2800000, guid: ba45d1e4dcf9022438a4798a5f9e7b80, type: 3}
   gIn_Sobol: {fileID: 2800000, guid: 17e7ce8147355314ea8aab1178a6a43c, type: 3}

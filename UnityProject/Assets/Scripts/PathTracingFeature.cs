@@ -14,6 +14,7 @@ namespace PathTracing
         public RayTracingShader rayTracingShader;
 
         public ComputeShader compositionComputeShader;
+        public ComputeShader taaComputeShader;
 
         public PathTracingSetting pathTracingSetting;
 
@@ -118,6 +119,7 @@ namespace PathTracing
                 renderPassEvent = RenderPassEvent.BeforeRenderingPostProcessing,
                 rayTracingShader = rayTracingShader,
                 compositionComputeShader = compositionComputeShader,
+                taaComputeShader = taaComputeShader,
                 accelerationStructure = accelerationStructure,
                 scramblingRanking = gIn_ScramblingRankingUint,
                 sobol = gIn_SobolUint
