@@ -232,7 +232,7 @@ Shader "Custom/LitWithRayTracing"
                 albedo = float3(0, 1, 0);
 
                 float4 vv = _MetallicGlossMap.SampleLevel(sampler_MetallicGlossMap,
-                                                                          _BaseMap_ST.xy * v.uv + _BaseMap_ST.zw, 0);
+                                                          _BaseMap_ST.xy * v.uv + _BaseMap_ST.zw, 0);
                 float metallic = vv.r * _Metallic;
                 float smooth = vv.a * _Smoothness;
 
@@ -467,10 +467,11 @@ Shader "Custom/LitWithRayTracing"
                 #if _NORMALMAP
                 float3 tangentWS = normalize(mul(v.tangent.xyz, (float3x3)WorldToObject()));
 
-                float2 normalUV = float2(v.uv.x, 1 - v.uv.y); // 修正UV翻转问题
+                // float2 normalUV = float2(v.uv.x, 1 - v.uv.y); // 修正UV翻转问题
+                float2 normalUV = (v.uv); // 修正UV翻转问题
 
                 float2 packedNormal = _BumpMap.SampleLevel(sampler_BumpMap, _BaseMap_ST.xy * normalUV + _BaseMap_ST.zw,
-                         mip).xy;
+                                                           mip).xy;
 
                 float4 T = float4(tangentWS, 1);
 
@@ -487,12 +488,9 @@ Shader "Custom/LitWithRayTracing"
                 #else
                 float3 worldNormal = normalWS;
                 #endif
+ 
+                float3 albedo = _BaseColor.xyz * _BaseMap.SampleLevel(sampler_BaseMap, _BaseMap_ST.xy * v.uv + _BaseMap_ST.zw, mip).xyz;
 
-                float3 albedo = _BaseColor.xyz * _BaseMap.SampleLevel(sampler_BaseMap,
-           _BaseMap_ST.xy * v.uv + _BaseMap_ST.zw, mip).xyz;
-
-                // albedo = randomColor;
-                // albedo = float3(ccR, ccG, ccB);
 
                 float roughness;
                 float metallic;
@@ -510,6 +508,19 @@ Shader "Custom/LitWithRayTracing"
                 metallic = _Metallic;
 
                 #endif
+                
+                #if _EMISSION
+                float3 emission = _EmissionColor.xyz * _EmissionMap.SampleLevel(sampler_EmissionMap, v.uv, mip).xyz;
+                payload.Lemi = emission;
+                #else
+                payload.Lemi = float3(0, 0, 0);
+                #endif
+                
+                float emissionLevel = Color::Luminance( payload.Lemi );
+                emissionLevel = saturate( emissionLevel * 50.0 );
+
+                metallic = lerp( metallic, 0.0, emissionLevel );
+                roughness = lerp( roughness, 1.0, emissionLevel );
 
 
                 float3 dielectricSpecular = float3(0.04, 0.04, 0.04);
@@ -540,12 +551,6 @@ Shader "Custom/LitWithRayTracing"
                 payload.baseColor = albedo;
                 payload.metalness = metallic;
 
-                #if _EMISSION
-                float3 emission = _EmissionColor.xyz * _EmissionMap.SampleLevel(sampler_EmissionMap, v.uv, mip).xyz;
-                payload.Lemi = emission;
-                #else
-                payload.Lemi = float3(0, 0, 0);
-                #endif
             }
             ENDHLSL
         }

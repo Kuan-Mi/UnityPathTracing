@@ -153,7 +153,7 @@ namespace PathTracing
             _pathTracingPass.NrdDenoiser = nrd;
             renderer.EnqueuePass(_pathTracingPass);
         }
-
+        
         protected override void Dispose(bool disposing)
         {
             Debug.Log("PathTracingFeature Dispose");

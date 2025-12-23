@@ -451,7 +451,7 @@ void CastRay(float3 origin, float3 direction, float Tmin, float Tmax, float2 mip
     MainRayPayload payload = (MainRayPayload)0;
     payload.mipAndCone = mipAndCone;
 
-    TraceRay(g_AccelStruct, RAY_FLAG_NONE | RAY_FLAG_NONE, 0xFF, 0, 1, 0, rayDesc, payload);
+    TraceRay(g_AccelStruct, RAY_FLAG_NONE | RAY_FLAG_CULL_NON_OPAQUE, 0xFF, 0, 1, 0, rayDesc, payload);
 
 
     props = (GeometryProps)0;
