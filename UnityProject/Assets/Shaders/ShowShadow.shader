@@ -262,7 +262,6 @@
         Pass
         {
             Name "ShowNormal"
-            // 【重要】混合模式：保证只显示箭头，不黑屏
             Blend SrcAlpha OneMinusSrcAlpha
             // 【重要】总是显示在最上层
             ZTest Always
@@ -277,7 +276,6 @@
             #include "NRDInclude/NRD.hlsli"
             #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
 
-            // 你的 Motion Vector 贴图
             TEXTURE2D(_BlitTexture);
             SAMPLER(sampler_BlitTexture);
 

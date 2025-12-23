@@ -223,6 +223,8 @@ namespace Nrd
             localData.commonSettings.cameraJitter = ViewportJitter;
             localData.commonSettings.cameraJitterPrev = PrevViewportJitter;
 
+            PrevViewportJitter = ViewportJitter;
+            
             // --- 分辨率与重置逻辑 ---
             ushort w = (ushort)mCamera.pixelWidth;
             ushort h = (ushort)mCamera.pixelHeight;
@@ -268,9 +270,7 @@ namespace Nrd
             //     localData.commonSettings.worldToViewMatrixPrev = setting.worldToViewMatrixPrev;
             // }
 
-            localData.commonSettings.motionVectorScale.z = setting.is2DMotionVector ? 0.0f : 1.0f;
-
-
+            localData.commonSettings.motionVectorScale.z = 1.0f;
             localData.commonSettings.denoisingRange = setting.denoisingRange;
 
             // localData.commonSettings.disocclusionThreshold = setting.disocclusionThreshold;
@@ -296,12 +296,10 @@ namespace Nrd
 
             // reblur 设置
 
-
             localData.reblurSettings.checkerboardMode = CheckerboardMode.OFF;
             localData.reblurSettings.minMaterialForDiffuse = 0;
             localData.reblurSettings.minMaterialForSpecular = 1;
             // localData.reblurSettings.hitDistanceReconstructionMode = mHitDistanceReconstructionMode::OFF;
-
 
             return localData;
         }

@@ -32,7 +32,7 @@ namespace PathTracing
 
         public override void Create()
         {
-            Debug.Log("PathTracingFeature Create");
+            // Debug.Log("PathTracingFeature Create");
 
 
             if (accelerationStructure == null)

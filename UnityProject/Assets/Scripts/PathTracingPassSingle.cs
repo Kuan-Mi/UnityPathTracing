@@ -249,19 +249,24 @@ namespace PathTracing
             natCmd.SetRenderTarget(data.cameraTexture);
 
 
-            // 0 showValidation 1 showShadow 2 showMv 3 ShowNormal 4 showOut 5 showAlpha  6 showR 7 ShowRadiance
+            // 0 showValidation     Blend Alpha
+            // 1 showShadow         解码后输出阴影
+            // 2 showMv             VM
+            // 3 ShowNormal         解码后输出法线 转到NRD坐标系
+            // 4 showOut            Blend Alpha
+            // 5 showAlpha          灰度输出
+            // 6 ShowRoughness      解码后输出粗糙度
+            // 7 ShowRadiance       解码后RGB输出
 
             switch (data._setting.showMode)
             {
                 case ShowMode.None:
                     break;
                 case ShowMode.BaseColor:
-                    Blitter.BlitTexture(natCmd, data.BaseColor_Metalness, new Vector4(1, 1, 0, 0), data.blitMaterial,
-                        4);
+                    Blitter.BlitTexture(natCmd, data.BaseColor_Metalness, new Vector4(1, 1, 0, 0), data.blitMaterial, 4);
                     break;
                 case ShowMode.Metalness:
-                    Blitter.BlitTexture(natCmd, data.BaseColor_Metalness, new Vector4(1, 1, 0, 0), data.blitMaterial,
-                        5);
+                    Blitter.BlitTexture(natCmd, data.BaseColor_Metalness, new Vector4(1, 1, 0, 0), data.blitMaterial, 5);
                     break;
                 case ShowMode.Normal:
                     Blitter.BlitTexture(natCmd, data.Normal_Roughness, new Vector4(1, 1, 0, 0), data.blitMaterial, 3);
@@ -270,8 +275,7 @@ namespace PathTracing
                     Blitter.BlitTexture(natCmd, data.Normal_Roughness, new Vector4(1, 1, 0, 0), data.blitMaterial, 6);
                     break;
                 case ShowMode.Shadow:
-                    Blitter.BlitTexture(natCmd, data.Shadow_Translucency, new Vector4(1, 1, 0, 0), data.blitMaterial,
-                        1);
+                    Blitter.BlitTexture(natCmd, data.Shadow_Translucency, new Vector4(1, 1, 0, 0), data.blitMaterial, 1);
                     break;
                 case ShowMode.Diffuse:
                     Blitter.BlitTexture(natCmd, data.DenoisedDiff, new Vector4(1, 1, 0, 0), data.blitMaterial, 7);
@@ -296,6 +300,9 @@ namespace PathTracing
                     break;
                 case ShowMode.AfterTaa:
                     Blitter.BlitTexture(natCmd, taaDst, new Vector4(1, 1, 0, 0), data.blitMaterial, 4);
+                    break;
+                case ShowMode.Taa:
+                    Blitter.BlitTexture(natCmd, taaDst, new Vector4(1, 1, 0, 0), data.blitMaterial, 5);
                     break;
                 default:
                     throw new ArgumentOutOfRangeException();
