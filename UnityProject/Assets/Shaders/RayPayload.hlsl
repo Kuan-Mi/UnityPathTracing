@@ -54,6 +54,7 @@ cbuffer PathTracingParams : register(b0)
     float gTAA;
     uint gSampleNum;
     uint gBounceNum;
+    float gPrevFrameConfidence;
 };
 
 

@@ -38,6 +38,6 @@ namespace PathTracing
         public float gTAA;
         public uint gSampleNum;
         public uint gBounceNum;
-        public float vbv;
+        public float gPrevFrameConfidence;
     }
 }

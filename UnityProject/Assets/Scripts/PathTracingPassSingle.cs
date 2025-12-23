@@ -117,6 +117,9 @@ namespace PathTracing
             natCmd.SetRayTracingTextureParam(data.OpaqueTracingShader, g_DiffID, data.Diff);
             natCmd.SetRayTracingTextureParam(data.OpaqueTracingShader, g_SpecID, data.Spec);
 
+            natCmd.SetRayTracingTextureParam(data.OpaqueTracingShader, gIn_PrevComposedDiffID, data.ComposedDiff);
+            natCmd.SetRayTracingTextureParam(data.OpaqueTracingShader, gIn_PrevComposedSpec_PrevViewZID, data.ComposedSpecViewZ);
+
             natCmd.DispatchRays(data.OpaqueTracingShader, "MainRayGenShader", (uint)data.Width, (uint)data.Height, 1, data.Cam);
 
             // NRD降噪
@@ -284,7 +287,7 @@ namespace PathTracing
 
             var globalConstants = new GlobalConstants
             {
-                gViewToWorld = NrdDenoiser. worldToView.inverse,
+                gViewToWorld = NrdDenoiser.worldToView.inverse,
                 gWorldToView = NrdDenoiser.worldToView,
                 gWorldToClip = NrdDenoiser.worldToClip,
                 gWorldToViewPrev = NrdDenoiser.prevWorldToView,
@@ -312,7 +315,8 @@ namespace PathTracing
                 gFrameIndex = frameIndex,
                 gTAA = _settings.taa,
                 gSampleNum = _settings.rpp,
-                gBounceNum = _settings.bounceNum
+                gBounceNum = _settings.bounceNum,
+                gPrevFrameConfidence = 1
             };
 
             opaqueTracingShader.SetShaderPass("Test2");

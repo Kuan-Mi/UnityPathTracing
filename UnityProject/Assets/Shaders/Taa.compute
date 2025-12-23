@@ -219,7 +219,7 @@ void CSMain(int2 threadPos : SV_GroupThreadId, int2 pixelPos : SV_DispatchThread
     
     mixRate = max (mixRate, gTAA); // min blending to reduce flickering
 
-    gOut_Debug[pixelPos] = float4(mixRate,mixRate,mixRate, 1);
+    // gOut_Debug[pixelPos] = float4(mixRate,mixRate,mixRate, 1);
     // TODO: anti-flickering, compatible with "mixRate"?
 
     // Final mix

@@ -28,6 +28,9 @@ namespace PathTracing
         public static int g_ShadowDataID = Shader.PropertyToID("gOut_ShadowData");
         public static int g_DiffID = Shader.PropertyToID("gOut_Diff");
         public static int g_SpecID = Shader.PropertyToID("gOut_Spec");
+        
+        public static int gIn_PrevComposedDiffID = Shader.PropertyToID("gIn_PrevComposedDiff");
+        public static int gIn_PrevComposedSpec_PrevViewZID = Shader.PropertyToID("gIn_PrevComposedSpec_PrevViewZ");
 
 
         public static int g_AccelStructID = Shader.PropertyToID("g_AccelStruct");
