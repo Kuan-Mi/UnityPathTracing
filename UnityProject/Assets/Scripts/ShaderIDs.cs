@@ -4,6 +4,10 @@ namespace PathTracing
 {
     public static class ShaderIDs
     {
+        
+        public static readonly int paramsID = Shader.PropertyToID("PathTracingParams");
+        
+        
         public static int g_ScramblingRankingID = Shader.PropertyToID("gIn_ScramblingRanking");
         public static int g_SobolID = Shader.PropertyToID("gIn_Sobol");
 
