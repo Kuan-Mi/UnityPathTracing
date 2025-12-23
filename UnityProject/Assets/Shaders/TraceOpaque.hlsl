@@ -173,7 +173,7 @@ float3 GetMotion(float3 X, float3 Xprev)
 #define SH                                  1 // NORMAL + SH (SG) resolve
 #define OCCLUSION                           2
 #define DIRECTIONAL_OCCLUSION               3 // diffuse OCCLUSION + SH (SG) resolve
-#define gBounceNum               1 // diffuse OCCLUSION + SH (SG) resolve
+
 
 
 #define PT_MAX_FIREFLY_RELATIVE_INTENSITY   20.0 // no more than 20x energy increase in case of probabilistic sampling
@@ -187,7 +187,6 @@ float3 GetMotion(float3 X, float3 Xprev)
 
 
 #define gTracingMode                      RESOLUTION_FULL
-#define gSampleNum                      1
 #define gRR                      0
 
 #define gMinProbability                      0
@@ -587,9 +586,8 @@ TraceOpaqueResult TraceOpaque(GeometryProps geometryProps0, MaterialProps materi
 
     // uint checkerboard = Sequence::CheckerBoard(pixelPos, g_FrameIndex) != 0;
 
-    // uint pathNum = gSampleNum << (gTracingMode == RESOLUTION_FULL ? 1 : 0);
     // 两条路径
-    uint pathNum = 2;
+    uint pathNum = gSampleNum << (gTracingMode == RESOLUTION_FULL ? 1 : 0);
     uint diffPathNum = 0;
 
     pathNum = 2;

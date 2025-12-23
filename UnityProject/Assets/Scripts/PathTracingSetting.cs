@@ -63,7 +63,7 @@ namespace PathTracing
 
         [Header("motionVectorScale Override")] public bool is2DMotionVector;
         // public float3 motionVectorScale = new(1.0f, 1.0f, 0.0f); // Default: {1.0, 1.0, 0.0}
- 
+
         public ShowMode showMode;
         public bool showMV;
         public bool showValidation;
@@ -73,5 +73,7 @@ namespace PathTracing
 
         [Range(0.1f, 100f)] public float exposure = 1.0f;
         [Range(0f, 1f)] public float taa = 1.0f;
+        [Range(1, 4)] public uint rpp = 1;
+        [Range(1, 4)] public uint bounceNum = 1;
     }
 }

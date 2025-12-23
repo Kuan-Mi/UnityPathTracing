@@ -105,9 +105,9 @@ namespace PathTracing
 
 
             public float gTAA;
-            public float aa;
+            public uint gSampleNum;
+            public uint gBounceNum;
             public float vbv;
-            public float asdf;
         }
 
         class PassData
@@ -455,7 +455,9 @@ namespace PathTracing
                 gFocalDistance = _settings.dofFocalDistance,
                 gExposure = _settings.exposure,
                 gFrameIndex = (uint)Time.frameCount,
-                gTAA = _settings.taa
+                gTAA = _settings.taa,
+                gSampleNum = _settings.rpp,
+                gBounceNum = _settings.bounceNum
             };
 
             passData.pathTracingSettings = setting;
