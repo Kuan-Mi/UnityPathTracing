@@ -230,6 +230,8 @@ namespace Nrd
 
             ViewportJitter = Halton2D(FrameIndex + 1) - new float2(0.5f, 0.5f);
 
+            // Debug.Log($"[NRD] Viewport Jitter: {ViewportJitter}");
+
             // --- Jitter ---
             localData.commonSettings.cameraJitter = ViewportJitter;
             localData.commonSettings.cameraJitterPrev = PrevViewportJitter;

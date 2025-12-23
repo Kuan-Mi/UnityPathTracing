@@ -685,7 +685,6 @@ TraceOpaqueResult TraceOpaque(GeometryProps geometryProps0, MaterialProps materi
     uint pathNum = gSampleNum << (gTracingMode == RESOLUTION_FULL ? 1 : 0);
     uint diffPathNum = 0;
 
-    pathNum = 2;
     [loop]
     for (uint path = 0; path < pathNum; path++)
     {

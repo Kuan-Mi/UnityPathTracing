@@ -285,6 +285,9 @@ namespace PathTracing
             var frameIndex = (uint)Time.frameCount;
             var isEven = (frameIndex & 1) == 0;
 
+            // var debug1 = NrdDenoiser.ViewportJitter / rectSize;
+            // Debug.Log($"debug1: {debug1}");
+
             var globalConstants = new GlobalConstants
             {
                 gViewToWorld = NrdDenoiser.worldToView.inverse,
@@ -294,7 +297,7 @@ namespace PathTracing
                 gWorldToClipPrev = NrdDenoiser.prevWorldToClip,
                 gRectSize = rectSize,
                 gInvRectSize = invRectSize,
-                gJitter = NrdDenoiser.ViewportJitter / rectSize,
+                gJitter = (NrdDenoiser.ViewportJitter / rectSize),
                 gRectSizePrev = rectSize,
                 gRenderSize = rectSize,
                 gInvRenderSize = invRectSize,

@@ -212,14 +212,14 @@ void CSMain(int2 threadPos : SV_GroupThreadId, int2 pixelPos : SV_DispatchThread
     const float JND = 2.3; // just noticable difference
     float diff = length(a - b) / (JND * 3.0);
     #endif
+    
     mixRate += diff;
+    
+    gOut_Debug[pixelPos] = float4(diff.xxx, 1);
 
     // Clamp mix rate
     mixRate = saturate(mixRate);
     
-    mixRate = max (mixRate, gTAA); // min blending to reduce flickering
-
-    // gOut_Debug[pixelPos] = float4(mixRate,mixRate,mixRate, 1);
     // TODO: anti-flickering, compatible with "mixRate"?
 
     // Final mix
