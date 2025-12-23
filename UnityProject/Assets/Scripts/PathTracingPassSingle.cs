@@ -261,14 +261,6 @@ namespace PathTracing
             passData.BlitMaterial = biltMaterial;
             passData.Cam = cameraData.camera;
 
-
-            // var worldToView = cameraData.camera.worldToCameraMatrix;
-            // var worldToClip = GetWorldToClipMatrix(cameraData.camera);
-            // var viewToWorld = worldToView.inverse;
-
-            // var cameraProjectionMatrix = cameraData.camera.projectionMatrix;
-            // var invCameraProjectionMatrix = cameraProjectionMatrix.inverse;
-
             var gSunDirection = -lightForward;
             var up = new Vector3(0, 1, 0);
             var gSunBasisX = math.normalize(math.cross(new float3(up.x, up.y, up.z), new float3(gSunDirection.x, gSunDirection.y, gSunDirection.z)));
