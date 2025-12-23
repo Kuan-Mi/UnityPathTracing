@@ -65,6 +65,7 @@ namespace PathTracing
         private static int gIn_ComposedID = Shader.PropertyToID("gIn_Composed");
         private static int gIn_HistoryID = Shader.PropertyToID("gIn_History");
         private static int gOut_ResultID = Shader.PropertyToID("gOut_Result");
+        private static int gOut_DebugID = Shader.PropertyToID("gOut_Debug");
 
         #endregion
 
@@ -229,8 +230,6 @@ namespace PathTracing
 
 
             // TAA
-
-
             TextureHandle taaSrc = data.isEven ? data.TaaHistoryPrev : data.TaaHistory;
             TextureHandle taaDst = data.isEven ? data.TaaHistory : data.TaaHistoryPrev;
 
@@ -240,7 +239,12 @@ namespace PathTracing
             natCmd.SetComputeTextureParam(data.taaComputeShader, 0, gIn_ComposedID, data.ComposedDiff);
             natCmd.SetComputeTextureParam(data.taaComputeShader, 0, gIn_HistoryID, taaSrc);
             natCmd.SetComputeTextureParam(data.taaComputeShader, 0, gOut_ResultID, taaDst);
+            natCmd.SetComputeTextureParam(data.taaComputeShader, 0, gOut_DebugID, data.outputTexture);
 
+            // int taaThreadGroupX = Mathf.CeilToInt(data.width / 16.0f);
+            // int taaThreadGroupY = Mathf.CeilToInt(data.height / 16.0f);
+
+            natCmd.DispatchCompute(data.taaComputeShader, 0, threadGroupX, threadGroupY, 1);
 
             natCmd.SetRenderTarget(data.cameraTexture);
 

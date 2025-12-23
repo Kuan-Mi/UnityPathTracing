@@ -189,7 +189,7 @@ float3 GetMotion(float3 X, float3 Xprev)
 #define gTracingMode                      RESOLUTION_FULL
 #define gSampleNum                      1
 #define gRR                      0
- 
+
 #define gMinProbability                      0
 
 float EstimateDiffuseProbability(GeometryProps geometryProps, MaterialProps materialProps, bool useMagicBoost = false)
@@ -894,10 +894,10 @@ void MainRayGenShader()
     //================================================================================================================================================================================
     // Primary surface replacement ( aka jump through mirrors )
     //================================================================================================================================================================================
-    
+
     float3 psrThroughput = 1.0;
     float3x3 mirrorMatrix = Geometry::GetMirrorMatrix(0); // identity
-    
+
     //================================================================================================================================================================================
     // G-buffer ( guides )
     //================================================================================================================================================================================
@@ -905,7 +905,14 @@ void MainRayGenShader()
     // Motion
     float3 X0 = geometryProps0.X;
     float3 motion = GetMotion(X0, geometryProps0.Xprev);
-    gOut_Mv[pixelPos] = float4(motion, 1);
+
+
+    float viewZ0 = -Geometry::AffineTransform(gWorldToView, geometryProps0.X).z;
+    bool isTaa5x5 = geometryProps0.IsMiss(); // switched TAA to "higher quality & slower response" mode
+    float viewZAndTaaMask0 = abs(viewZ0) * FP16_VIEWZ_SCALE * (isTaa5x5 ? -1.0 : 1.0);
+
+
+    gOut_Mv[pixelPos] = float4(motion, viewZAndTaaMask0);
 
     // ViewZ
     float viewZ = -Geometry::AffineTransform(gWorldToView, X0).z;
@@ -936,7 +943,7 @@ void MainRayGenShader()
 
     gOut_DirectLighting[pixelPos] = Ldirect;
     // gOut_PsrThroughput[ pixelPos ] = psrThroughput;
-    
+
     float4 Lpsr = 0;
 
     //================================================================================================================================================================================

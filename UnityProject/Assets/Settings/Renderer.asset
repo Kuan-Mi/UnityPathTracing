@@ -80,12 +80,12 @@ MonoBehaviour:
     planeDistanceSensitivity: 0.131
     maxStabilizedFrameNum: 5
     is2DMotionVector: 0
-    showMode: 11
+    showMode: 13
     showMV: 0
     showValidation: 0
     dofAperture: 0
     dofFocalDistance: 0.57
-    exposure: 10
-    taa: 1
+    exposure: 100
+    taa: 0.03
   gIn_ScramblingRanking: {fileID: 2800000, guid: ba45d1e4dcf9022438a4798a5f9e7b80, type: 3}
   gIn_Sobol: {fileID: 2800000, guid: 17e7ce8147355314ea8aab1178a6a43c, type: 3}
