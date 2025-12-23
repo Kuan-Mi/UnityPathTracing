@@ -1,9 +1,5 @@
-#include "UnityShaderVariables.cginc"
 #include "ml.hlsli"
 #include "NRDInclude/NRD.hlsli"
-
-// #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Lighting.hlsl"
-#include "_Utils.hlsl"
 #include "RayPayload.hlsl"
 #include "GlobalResource.hlsl"
 
@@ -74,14 +70,6 @@ void MainMissShader(inout MainRayPayload payload : SV_RayPayload)
 void MissShadow(inout MainRayPayload payload : SV_RayPayload)
 {
     payload.hitT = INF;
-}
-
-float3 EvalFromClip(float4 clip)
-{
-    float4 viewPos = mul(unity_CameraInvProjection, clip);
-    // 输出未经透视除法时查看 w 的符号/大小也有用，调试时可写到其它 buffer
-    viewPos /= viewPos.w;
-    return normalize(viewPos.xyz);
 }
 
 #define BLUE_NOISE_SPATIAL_DIM              128 // see StaticTexture::ScramblingRanking

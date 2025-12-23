@@ -69,17 +69,17 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::PathTracing.PathTracingFeature
   m_Active: 1
   showShadowMaterial: {fileID: 0}
-  rayTracingShader: {fileID: 4807578003741378534, guid: 71faa22953dc9834daf36cc38966c196, type: 3}
+  opaqueTracingShader: {fileID: 4807578003741378534, guid: 71faa22953dc9834daf36cc38966c196, type: 3}
+  transparentTracingShader: {fileID: 4807578003741378534, guid: d207e5fb066a4b579353785310fd0dea, type: 3}
   compositionComputeShader: {fileID: 7200000, guid: 6b0c89c26f4363a4781550cf86801786, type: 3}
   taaComputeShader: {fileID: 7200000, guid: 6af7363d73bc4764bd8420bb5cc5d306, type: 3}
   pathTracingSetting:
     sunAngularDiameter: 1
     denoisingRange: 1000
-    splitScreen: 0.522
-    isBaseColorMetalnessAvailable: 0
+    splitScreen: 0
+    isBaseColorMetalnessAvailable: 1
     planeDistanceSensitivity: 0.131
     maxStabilizedFrameNum: 5
-    is2DMotionVector: 0
     showMode: 13
     showMV: 0
     showValidation: 0

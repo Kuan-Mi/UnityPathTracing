@@ -4,21 +4,21 @@ namespace PathTracing
 {
     public enum ShowMode
     {
-        None = 0,
-        BaseColor = 1,
-        Metalness = 2,
-        Normal = 3,
-        Roughness = 4,
-        Shadow = 5,
-        Diffuse = 6,
-        Specular = 7,
-        DirectLight = 8,
-        Emissive = 9,
-        Out = 10,
-        ComposedDiff = 11,
-        ComposedSpec = 12,
-        AfterTaa = 13,
-        Taa
+        None,
+        BaseColor ,
+        Metalness,
+        Normal ,
+        Roughness ,
+        Shadow ,
+        Diffuse ,
+        Specular ,
+        DirectLight ,
+        Emissive ,
+        Out ,
+        ComposedDiff ,
+        ComposedSpec,
+        Taa,
+        Final,
     }
 
     [System.Serializable]

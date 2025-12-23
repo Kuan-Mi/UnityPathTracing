@@ -11,7 +11,8 @@ namespace PathTracing
     public class PathTracingFeature : ScriptableRendererFeature
     {
         public Material showShadowMaterial;
-        public RayTracingShader rayTracingShader;
+        public RayTracingShader opaqueTracingShader;
+        public RayTracingShader transparentTracingShader;
 
         public ComputeShader compositionComputeShader;
         public ComputeShader taaComputeShader;
@@ -112,12 +113,13 @@ namespace PathTracing
                 gIn_SobolUint.SetData(sobolData);
             }
 
-            rayTracingShader.SetShaderPass("Test2");
+            opaqueTracingShader.SetShaderPass("Test2");
 
             _pathTracingPass = new PathTracingPassSingle(pathTracingSetting)
             {
                 renderPassEvent = RenderPassEvent.BeforeRenderingPostProcessing,
-                rayTracingShader = rayTracingShader,
+                opaqueTracingShader = opaqueTracingShader,
+                transparentTracingShader = transparentTracingShader,
                 compositionComputeShader = compositionComputeShader,
                 taaComputeShader = taaComputeShader,
                 accelerationStructure = accelerationStructure,
