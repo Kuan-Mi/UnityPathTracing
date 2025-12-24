@@ -1,4 +1,6 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Collections.Generic;
+using System.Runtime.InteropServices;
 using Nrd;
 using Unity.Mathematics;
 using UnityEngine;
@@ -8,8 +10,126 @@ using static UnityEngine.Rendering.RayTracingAccelerationStructure;
 
 namespace PathTracing
 {
+    public struct InstanceData
+    {
+        public Matrix4x4 prevObjectToWorld;
+        // 你也可以在这里存其他东西，比如材质 ID
+    }
+
+
     public class PathTracingFeature : ScriptableRendererFeature
     {
+        // private List<Renderer> m_ActiveRenderers = new List<Renderer>();
+        // private Dictionary<Renderer, Matrix4x4> m_PrevMatrices = new Dictionary<Renderer, Matrix4x4>();
+        // private ComputeBuffer m_InstanceDataBuffer;
+
+        //
+        // void UpdateAccelerationStructure()
+        // {
+        //     // 1. 准备数据数组
+        //     int count = m_ActiveRenderers.Count;
+        //     InstanceData[] data = new InstanceData[count];
+        //
+        //     // 2. 清除并重新填充 AS
+        //     accelerationStructure.ClearInstances();
+        //
+        //     for (int i = 0; i < count; i++)
+        //     {
+        //         Renderer r = m_ActiveRenderers[i];
+        //
+        //         // 获取上一帧矩阵（如果找不到则用当前矩阵兜底）
+        //         Matrix4x4 prevM = m_PrevMatrices.ContainsKey(r) ? m_PrevMatrices[r] : r.localToWorldMatrix;
+        //
+        //         data[i] = new InstanceData { prevObjectToWorld = prevM };
+        //
+        //         // 构造配置
+        //         var config = new RayTracingMeshInstanceConfig(mesh, subMeshIndex, material);
+        //
+        //         // 关键：将当前索引 i 作为 id 传入
+        //         // 这样在 Shader 中调用 InstanceID() 就会返回 i
+        //         accelerationStructure.AddInstance(config, r.localToWorldMatrix, prevM, (uint)i);
+        //
+        //         // 记录本帧矩阵供下一帧使用
+        //         m_PrevMatrices[r] = r.localToWorldMatrix;
+        //     }
+        //
+        //     // 3. 更新并上传 GPU Buffer
+        //     if (m_InstanceDataBuffer == null || m_InstanceDataBuffer.count != count)
+        //     {
+        //         m_InstanceDataBuffer?.Release();
+        //         m_InstanceDataBuffer = new ComputeBuffer(count, Marshal.SizeOf<InstanceData>());
+        //     }
+        //
+        //     m_InstanceDataBuffer.SetData(data);
+        //
+        //     // 4. 构建 TLAS
+        //     accelerationStructure.Build();
+        // }
+
+        private List<Renderer> m_TrackedRenderers = new List<Renderer>();
+        private Matrix4x4[] m_PrevMatrices;
+        private GraphicsBuffer m_PrevMatrixBuffer;
+
+
+        void InitializeTracking()
+        {
+            // 1. 找到所有符合条件的 Renderer (需要与你的 AS Settings 掩码一致)
+            // 注意：这里建议根据 Layer 或特定 Component 筛选
+            Renderer[] allRenderers = GameObject.FindObjectsByType<Renderer>(FindObjectsSortMode.None);
+
+            m_TrackedRenderers.Clear();
+            foreach (var r in allRenderers)
+            {
+                // 这里的判断逻辑要和你的 RayTracingModeMask 匹配
+                // 如果物体设置了 RayTracingMode.Off，Unity AS 就不会包含它
+                // if (r.rayTracingObjectsConfig != null) // 举例：如果是 HDRP/URP 可能会有特定配置
+                {
+                    m_TrackedRenderers.Add(r);
+                }
+            }
+
+            int count = m_TrackedRenderers.Count;
+            m_PrevMatrices = new Matrix4x4[count];
+
+            // 2. 关键：强制设置 InstanceID，使其与数组索引 [i] 一致
+            for (int i = 0; i < count; i++)
+            {
+                // 这一步非常关键：它把 GPU 端的 InstanceID() 和我们的数组索引绑定了
+                accelerationStructure.UpdateInstanceID(m_TrackedRenderers[i], (uint)i);
+
+                // 记录初始矩阵
+                m_PrevMatrices[i] = m_TrackedRenderers[i].localToWorldMatrix;
+            }
+
+            // 3. 创建 GPU Buffer
+            m_PrevMatrixBuffer = new GraphicsBuffer(GraphicsBuffer.Target.Structured, count, 64);
+        }
+
+        void Update()
+        {
+            // 1. 在 Unity 自动 Build 之前或之后（只要在渲染前）同步数据
+            // 注意：Automatic 模式下 Unity 会自动处理 Build，但你可以在渲染前更新 Buffer
+
+            int count = m_TrackedRenderers.Count;
+            for (int i = 0; i < count; i++)
+            {
+                // 注意：这里逻辑要清晰
+                // 我们在这一帧提交的是“上一帧”的记录
+                // 所以先上传 m_PrevMatrices 到 GPU
+            }
+
+            m_PrevMatrixBuffer.SetData(m_PrevMatrices);
+
+            // 2. 将 Buffer 传给 Ray Tracing Shader
+            // cmd.SetRayTracingBufferParam(rayTracingShader, "MyHitGroup", "_PrevObjectToWorldMatrices", m_PrevMatrixBuffer);
+
+            // 3. 最后，更新 CPU 端的“上一帧”记录，供下帧使用
+            for (int i = 0; i < count; i++)
+            {
+                m_PrevMatrices[i] = m_TrackedRenderers[i].localToWorldMatrix;
+            }
+        }
+
         private Material showShadowMaterial;
         public RayTracingShader opaqueTracingShader;
         public RayTracingShader transparentTracingShader;
@@ -26,8 +146,8 @@ namespace PathTracing
 
         public Texture2D gIn_ScramblingRanking;
         public Texture2D gIn_Sobol;
-        public ComputeBuffer gIn_ScramblingRankingUint;
-        public ComputeBuffer gIn_SobolUint;
+        public GraphicsBuffer gIn_ScramblingRankingUint;
+        public GraphicsBuffer gIn_SobolUint;
 
         private Dictionary<int, NRDDenoiser> _denoisers = new();
 
@@ -46,7 +166,6 @@ namespace PathTracing
                 accelerationStructure = new RayTracingAccelerationStructure(settings);
 
                 accelerationStructure.Build();
-                
             }
 
 
@@ -57,7 +176,7 @@ namespace PathTracing
                 Debug.Log($"gIn_Sobol {gIn_Sobol.format} width:{gIn_Sobol.width} height:{gIn_Sobol.height}");
 
                 gIn_ScramblingRankingUint =
-                    new ComputeBuffer(gIn_ScramblingRanking.width * gIn_ScramblingRanking.height, 16);
+                    new GraphicsBuffer(GraphicsBuffer.Target.Structured, gIn_ScramblingRanking.width * gIn_ScramblingRanking.height, 16);
                 var scramblingRankingData = new uint4[gIn_ScramblingRanking.width * gIn_ScramblingRanking.height];
                 byte[] rawData = gIn_ScramblingRanking.GetRawTextureData();
 
@@ -87,7 +206,7 @@ namespace PathTracing
                 gIn_ScramblingRankingUint.SetData(scramblingRankingData);
 
 
-                gIn_SobolUint = new ComputeBuffer(gIn_Sobol.width * gIn_Sobol.height, 16);
+                gIn_SobolUint = new GraphicsBuffer(GraphicsBuffer.Target.Structured, gIn_Sobol.width * gIn_Sobol.height, 16);
                 var sobolData = new uint4[gIn_Sobol.width * gIn_Sobol.height];
                 rawData = gIn_Sobol.GetRawTextureData();
                 colors = gIn_Sobol.GetPixels32();
@@ -113,8 +232,6 @@ namespace PathTracing
 
                 gIn_SobolUint.SetData(sobolData);
             }
-
-            opaqueTracingShader.SetShaderPass("Test2");
 
             _pathTracingPass = new PathTracingPassSingle(pathTracingSetting)
             {
@@ -151,10 +268,11 @@ namespace PathTracing
                 _denoisers.Add(camID, nrd);
             }
 
+
             _pathTracingPass.NrdDenoiser = nrd;
             renderer.EnqueuePass(_pathTracingPass);
         }
-        
+
         protected override void Dispose(bool disposing)
         {
             Debug.Log("PathTracingFeature Dispose");

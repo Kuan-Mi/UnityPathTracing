@@ -20,26 +20,24 @@ namespace PathTracing
         public ComputeShader taaComputeShader;
         public Material biltMaterial;
 
-
         public RayTracingAccelerationStructure accelerationStructure;
         private PathTracingSetting _settings;
         public NRDDenoiser NrdDenoiser;
 
+        public GraphicsBuffer scramblingRanking;
+        public GraphicsBuffer sobol;
 
-        public ComputeBuffer scramblingRanking;
-        public ComputeBuffer sobol;
-
-        private ComputeBuffer pathTracingSettingsBuffer;
+        private GraphicsBuffer pathTracingSettingsBuffer;
 
         [DllImport("RenderingPlugin")]
-        public static extern IntPtr GetRenderEventAndDataFunc();
+        private static extern IntPtr GetRenderEventAndDataFunc();
 
         class PassData
         {
             internal TextureHandle CameraTexture;
 
-            internal ComputeBuffer ScramblingRanking;
-            internal ComputeBuffer Sobol;
+            internal GraphicsBuffer ScramblingRanking;
+            internal GraphicsBuffer Sobol;
 
             internal TextureHandle OutputTexture;
 
@@ -77,7 +75,7 @@ namespace PathTracing
             internal int Height;
 
             internal GlobalConstants GlobalConstants;
-            internal ComputeBuffer computeBuffer;
+            internal GraphicsBuffer ConstantBuffer;
 
             internal IntPtr NrdDataPtr;
 
@@ -88,20 +86,21 @@ namespace PathTracing
         public PathTracingPassSingle(PathTracingSetting setting)
         {
             _settings = setting;
-            pathTracingSettingsBuffer = new ComputeBuffer(1, Marshal.SizeOf<GlobalConstants>(), ComputeBufferType.Constant);
+            pathTracingSettingsBuffer = new GraphicsBuffer(GraphicsBuffer.Target.Constant, 1, Marshal.SizeOf<GlobalConstants>());
         }
 
         static void ExecutePass(PassData data, UnsafeGraphContext context)
         {
             var natCmd = CommandBufferHelpers.GetNativeCommandBuffer(context.cmd);
 
-            natCmd.SetBufferData(data.computeBuffer, new[] { data.GlobalConstants });
+            natCmd.SetBufferData(data.ConstantBuffer, new[] { data.GlobalConstants });
 
             // 不透明
-            natCmd.SetRayTracingConstantBufferParam(data.OpaqueTracingShader, paramsID, data.computeBuffer, 0, data.computeBuffer.stride);
+            natCmd.SetRayTracingShaderPass(data.OpaqueTracingShader, "Test2");
+            natCmd.SetRayTracingConstantBufferParam(data.OpaqueTracingShader, paramsID, data.ConstantBuffer, 0, data.ConstantBuffer.stride);
 
-            data.OpaqueTracingShader.SetBuffer(g_ScramblingRankingID, data.ScramblingRanking);
-            data.OpaqueTracingShader.SetBuffer(g_SobolID, data.Sobol);
+            natCmd.SetRayTracingBufferParam(data.OpaqueTracingShader, g_ScramblingRankingID, data.ScramblingRanking);
+            natCmd.SetRayTracingBufferParam(data.OpaqueTracingShader, g_SobolID, data.Sobol);
 
             natCmd.SetRayTracingTextureParam(data.OpaqueTracingShader, g_OutputID, data.OutputTexture);
 
@@ -112,7 +111,7 @@ namespace PathTracing
 
             natCmd.SetRayTracingTextureParam(data.OpaqueTracingShader, g_DirectLightingID, data.DirectLighting);
             natCmd.SetRayTracingTextureParam(data.OpaqueTracingShader, g_DirectEmissionID, data.DirectEmission);
- 
+
             natCmd.SetRayTracingTextureParam(data.OpaqueTracingShader, g_ShadowDataID, data.Penumbra);
             natCmd.SetRayTracingTextureParam(data.OpaqueTracingShader, g_DiffID, data.Diff);
             natCmd.SetRayTracingTextureParam(data.OpaqueTracingShader, g_SpecID, data.Spec);
@@ -121,12 +120,12 @@ namespace PathTracing
             natCmd.SetRayTracingTextureParam(data.OpaqueTracingShader, gIn_PrevComposedSpec_PrevViewZID, data.ComposedSpecViewZ);
 
             natCmd.DispatchRays(data.OpaqueTracingShader, "MainRayGenShader", (uint)data.Width, (uint)data.Height, 1, data.Cam);
- 
+
             // NRD降噪
             natCmd.IssuePluginEventAndData(GetRenderEventAndDataFunc(), 1, data.NrdDataPtr);
 
             // 合成
-            natCmd.SetComputeBufferParam(data.CompositionComputeShader, 0, paramsID, data.computeBuffer);
+            natCmd.SetComputeConstantBufferParam(data.CompositionComputeShader, paramsID, data.ConstantBuffer, 0, data.ConstantBuffer.stride);
             natCmd.SetComputeTextureParam(data.CompositionComputeShader, 0, gIn_ViewZID, data.ViewZ);
             natCmd.SetComputeTextureParam(data.CompositionComputeShader, 0, gIn_Normal_RoughnessID, data.NormalRoughness);
             natCmd.SetComputeTextureParam(data.CompositionComputeShader, 0, gIn_BaseColor_MetalnessID, data.BaseColorMetalness);
@@ -143,7 +142,8 @@ namespace PathTracing
             natCmd.DispatchCompute(data.CompositionComputeShader, 0, threadGroupX, threadGroupY, 1);
 
             // 透明
-            natCmd.SetRayTracingConstantBufferParam(data.TransparentTracingShader, paramsID, data.computeBuffer, 0, data.computeBuffer.stride);
+            natCmd.SetRayTracingShaderPass(data.TransparentTracingShader, "Test2");
+            natCmd.SetRayTracingConstantBufferParam(data.TransparentTracingShader, paramsID, data.ConstantBuffer, 0, data.ConstantBuffer.stride);
             natCmd.SetRayTracingTextureParam(data.TransparentTracingShader, gIn_ComposedDiffID, data.ComposedDiff);
             natCmd.SetRayTracingTextureParam(data.TransparentTracingShader, gIn_ComposedSpec_ViewZID, data.ComposedSpecViewZ);
             natCmd.SetRayTracingTextureParam(data.TransparentTracingShader, gOut_ComposedID, data.Composed);
@@ -154,7 +154,7 @@ namespace PathTracing
             TextureHandle taaSrc = data.IsEven ? data.TaaHistoryPrev : data.TaaHistory;
             TextureHandle taaDst = data.IsEven ? data.TaaHistory : data.TaaHistoryPrev;
 
-            natCmd.SetComputeBufferParam(data.TaaComputeShader, 0, paramsID, data.computeBuffer);
+            natCmd.SetComputeConstantBufferParam(data.TaaComputeShader, paramsID, data.ConstantBuffer, 0, data.ConstantBuffer.stride);
             natCmd.SetComputeTextureParam(data.TaaComputeShader, 0, gIn_MvID, data.Mv);
             natCmd.SetComputeTextureParam(data.TaaComputeShader, 0, gIn_ComposedID, data.Composed);
             natCmd.SetComputeTextureParam(data.TaaComputeShader, 0, gIn_HistoryID, taaSrc);
@@ -226,9 +226,6 @@ namespace PathTracing
             }
         }
 
-        // private Matrix4x4 prevWorldToView;
-        // private Matrix4x4 prevWorldToClip;
-
         public override void RecordRenderGraph(RenderGraph renderGraph, ContextContainer frameData)
         {
             var cameraData = frameData.Get<UniversalCameraData>();
@@ -251,9 +248,6 @@ namespace PathTracing
             NrdDenoiser.EnsureResources(cameraData.camera.pixelWidth, cameraData.camera.pixelHeight);
 
             Shader.SetGlobalRayTracingAccelerationStructure(g_AccelStructID, accelerationStructure);
-
-            opaqueTracingShader.SetShaderPass("Test2");
-            transparentTracingShader.SetShaderPass("Test2");
 
             using var builder = renderGraph.AddUnsafePass<PassData>("Path Tracing Pass", out var passData);
 
@@ -324,9 +318,6 @@ namespace PathTracing
                 gSharcMaxAccumulatedFrameNum = 10,
             };
 
-            opaqueTracingShader.SetShaderPass("Test2");
-            transparentTracingShader.SetShaderPass("Test2");
-
             var textureDesc = resourceData.activeColorTexture.GetDescriptor(renderGraph);
             textureDesc.enableRandomWrite = true;
             textureDesc.depthBufferBits = 0;
@@ -338,14 +329,11 @@ namespace PathTracing
             passData.CameraTexture = resourceData.activeColorTexture;
             passData.Width = textureDesc.width;
             passData.Height = textureDesc.height;
-            passData.computeBuffer = pathTracingSettingsBuffer;
+            passData.ConstantBuffer = pathTracingSettingsBuffer;
             passData.Setting = _settings;
             passData.ScramblingRanking = scramblingRanking;
             passData.Sobol = sobol;
             passData.IsEven = isEven;
-
-            Shader.SetGlobalConstantBuffer(paramsID, pathTracingSettingsBuffer, 0, pathTracingSettingsBuffer.stride);
-
 
             builder.AllowPassCulling(false);
             builder.SetRenderFunc((PassData data, UnsafeGraphContext context) => { ExecutePass(data, context); });
