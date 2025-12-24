@@ -68,7 +68,6 @@ MonoBehaviour:
   m_Name: PathTracingFeature
   m_EditorClassIdentifier: Assembly-CSharp::PathTracing.PathTracingFeature
   m_Active: 1
-  showShadowMaterial: {fileID: 0}
   opaqueTracingShader: {fileID: 4807578003741378534, guid: 71faa22953dc9834daf36cc38966c196, type: 3}
   transparentTracingShader: {fileID: 4807578003741378534, guid: d207e5fb066a4b579353785310fd0dea, type: 3}
   compositionComputeShader: {fileID: 7200000, guid: 6b0c89c26f4363a4781550cf86801786, type: 3}
