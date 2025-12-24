@@ -153,9 +153,6 @@ namespace PathTracing
 
         public override void Create()
         {
-            // Debug.Log("PathTracingFeature Create");
-
-
             if (accelerationStructure == null)
             {
                 settings = new Settings
@@ -195,12 +192,6 @@ namespace PathTracing
                         rawData[i * 4 + 1],
                         rawData[i * 4 + 2],
                         rawData[i * 4 + 3]);
-
-                    // scramblingRankingData[i] = new uint4(
-                    //     colors[i].r,
-                    //     colors[i].g,
-                    //     colors[i].b,
-                    //     colors[i].a);
                 }
 
                 gIn_ScramblingRankingUint.SetData(scramblingRankingData);
@@ -222,12 +213,6 @@ namespace PathTracing
                         rawData[i * 4 + 1],
                         rawData[i * 4 + 2],
                         rawData[i * 4 + 3]);
-
-                    // sobolData[i] = new uint4(
-                    //     colors[i].r,
-                    //     colors[i].g,
-                    //     colors[i].b,
-                    //     colors[i].a);
                 }
 
                 gIn_SobolUint.SetData(sobolData);
