@@ -5,17 +5,17 @@ namespace PathTracing
     public enum ShowMode
     {
         None,
-        BaseColor ,
+        BaseColor,
         Metalness,
-        Normal ,
-        Roughness ,
-        Shadow ,
-        Diffuse ,
-        Specular ,
-        DirectLight ,
-        Emissive ,
-        Out ,
-        ComposedDiff ,
+        Normal,
+        Roughness,
+        Shadow,
+        Diffuse,
+        Specular,
+        DirectLight,
+        Emissive,
+        Out,
+        ComposedDiff,
         ComposedSpec,
         Taa,
         Final,
@@ -28,22 +28,24 @@ namespace PathTracing
         public float sunAngularDiameter = 0.533f;
 
         [Header("NRD Common Settings")]
-        [Range(0.1f, 1000000.0f)]
-        public float denoisingRange = 500000; // Default: 500000.0f
+        [Range(0.1f, 10000.0f)]
+        public float denoisingRange = 5000;
 
         [Range(0.0f, 1.0f)]
-        public float splitScreen; // Default: 0.0f
+        public float splitScreen;
 
-        public bool isBaseColorMetalnessAvailable; // Default: false
+        public bool isBaseColorMetalnessAvailable;
 
         [Header("NRD Sigma Settings")]
         [Range(0.0f, 1.0f)]
-        public float planeDistanceSensitivity = 0.02f; // Default: 0.02f
+        public float planeDistanceSensitivity = 0.02f;
 
         [Range(0, 7)]
-        public uint maxStabilizedFrameNum = 5; // Default: 5
+        public uint maxStabilizedFrameNum = 5;
 
+        [Header("显示模式")]
         public ShowMode showMode;
+
         public bool showMV;
         public bool showValidation;
 

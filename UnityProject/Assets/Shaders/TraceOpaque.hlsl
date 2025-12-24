@@ -15,9 +15,8 @@ StructuredBuffer<uint4> gIn_ScramblingRanking;
 StructuredBuffer<uint4> gIn_Sobol;
 
 
-
-Texture2D<float3>  gIn_PrevComposedDiff;
-Texture2D<float4>  gIn_PrevComposedSpec_PrevViewZ;
+Texture2D<float3> gIn_PrevComposedDiff;
+Texture2D<float4> gIn_PrevComposedSpec_PrevViewZ;
 
 
 // Output
@@ -144,10 +143,10 @@ float3 GetMotion(float3 X, float3 Xprev)
 {
     float3 motion = Xprev - X;
 
-    float viewZ = Geometry::AffineTransform(gWorldToView, X).z;
+    float viewZ = -Geometry::AffineTransform(gWorldToView, X).z;
     float2 sampleUv = Geometry::GetScreenUv(gWorldToClip, X);
 
-    float viewZprev = Geometry::AffineTransform(gWorldToViewPrev, Xprev).z;
+    float viewZprev = -Geometry::AffineTransform(gWorldToViewPrev, Xprev).z;
     float2 sampleUvPrev = Geometry::GetScreenUv(gWorldToClipPrev, Xprev);
 
     // IMPORTANT: scaling to "pixel" unit significantly improves utilization of FP16
@@ -155,8 +154,6 @@ float3 GetMotion(float3 X, float3 Xprev)
 
     // IMPORTANT: 2.5D motion is preferred over 3D motion due to imprecision issues caused by FP16 rounding negative effects
     motion.z = viewZprev - viewZ;
-    // motion.z = 0;
-    motion.z = -motion.z;
     // return 0;
     return motion;
 }
@@ -167,7 +164,6 @@ float3 GetMotion(float3 X, float3 Xprev)
 #define SH                                  1 // NORMAL + SH (SG) resolve
 #define OCCLUSION                           2
 #define DIRECTIONAL_OCCLUSION               3 // diffuse OCCLUSION + SH (SG) resolve
-
 
 
 #define PT_MAX_FIREFLY_RELATIVE_INTENSITY   20.0 // no more than 20x energy increase in case of probabilistic sampling
@@ -217,47 +213,6 @@ float EstimateDiffuseProbability(GeometryProps geometryProps, MaterialProps mate
 }
 
 #define PT_SPEC_LOBE_ENERGY                 0.95 // trimmed to 95%
-
-
-float3x3 GetBasisUnity(float3 N)
-{
-    // 注意：这里的 sy 对应原代码中的 sz
-    // 原代码是基于 Z 轴构造，现在改为基于 Y 轴（因为你的映射中 N 对应 Y）
-    float sy = Math::Sign(N.y);
-    float a = 1.0f / (sy + N.y);
-    float xa = N.x * a;
-    float b = N.z * xa;
-    float c = N.z * sy;
-
-    // 重新排列分量以匹配旋转逻辑
-    // 原 T = ( c * N.x * a - 1.0f, sz * b, c ) -> 映射到 Y-up 空间
-    float3 T = float3(sy * b, c, c * N.z * a - 1.0f);
-
-    // 原 B = ( b, N.y * ya - sz, N.y ) -> 映射到 Y-up 空间
-    float3 B = float3(N.x * xa - sy, N.x, b);
-
-    // 返回矩阵。在 Unity HLSL 中，这会将 T, B, N 作为矩阵的行。
-    // RotateVector(m, V) 通常等价于 float3(dot(T,V), dot(B,V), dot(N,V))
-    return float3x3(T, B, N);
-}
-
-float3x3 GetBasisUnity2(float3 N)
-{
-    float sy = Math::Sign(N.y);
-    float a = 1.0f / (sy + N.y);
-
-    float ya = N.y * a;
-    float b = N.x * ya;
-    float c = N.x * sy;
-
-    float3 T = float3(c * N.x * a - 1.0f, sy * b, c);
-    float3 B = float3(b, N.y * ya - sy, N.y);
-
-    // Note: due to the quaternion formulation, the generated frame is rotated by 180 degrees,
-    // s.t. if N = (0, 0, 1), then T = (-1, 0, 0) and B = (0, -1, 0).
-    return float3x3(T, B, N);
-}
-
 
 float3 GenerateRayAndUpdateThroughput(inout GeometryProps geometryProps, inout MaterialProps materialProps, inout float3 throughput, uint sampleMaxNum, bool isDiffuse, float2 rnd)
 {
@@ -560,69 +515,69 @@ float3 GetLighting(GeometryProps geometryProps, inout MaterialProps materialProp
 
 SamplerState sampler_point_clamp;
 
-float ReprojectIrradiance( bool isPrevFrame, bool isRefraction, Texture2D<float3> texDiff, Texture2D<float4> texSpecViewZ, GeometryProps geometryProps, uint2 pixelPos, out float3 Ldiff, out float3 Lspec )
+float ReprojectIrradiance(bool isPrevFrame, bool isRefraction, Texture2D<float3> texDiff, Texture2D<float4> texSpecViewZ, GeometryProps geometryProps, uint2 pixelPos, out float3 Ldiff, out float3 Lspec)
 {
     // Get UV and ignore back projection
-    float2 uv = Geometry::GetScreenUv( isPrevFrame ? gWorldToClipPrev : gWorldToClip, geometryProps.X, true ) - gJitter;
+    float2 uv = Geometry::GetScreenUv(isPrevFrame ? gWorldToClipPrev : gWorldToClip, geometryProps.X, true) - gJitter;
 
-    float2 rescale = ( isPrevFrame ? gRectSizePrev : gRectSize ) * gInvRenderSize;
-    float4 data = texSpecViewZ.SampleLevel( sampler_point_clamp, uv * rescale, 0 );
-    float prevViewZ = abs( data.w ) / FP16_VIEWZ_SCALE;
+    float2 rescale = (isPrevFrame ? gRectSizePrev : gRectSize) * gInvRenderSize;
+    float4 data = texSpecViewZ.SampleLevel(sampler_point_clamp, uv * rescale, 0);
+    float prevViewZ = abs(data.w) / FP16_VIEWZ_SCALE;
 
     // Initial state
     float weight = 1.0;
-    float2 pixelUv = float2( pixelPos + 0.5 ) * gInvRectSize;
+    float2 pixelUv = float2(pixelPos + 0.5) * gInvRectSize;
 
     // Relaxed checks for refractions
-    float viewZ = abs( Geometry::AffineTransform( isPrevFrame ? gWorldToViewPrev : gWorldToView, geometryProps.X ).z );
-    float err = ( viewZ - prevViewZ ) * Math::PositiveRcp( max( viewZ, prevViewZ ) );
+    float viewZ = abs(Geometry::AffineTransform(isPrevFrame ? gWorldToViewPrev : gWorldToView, geometryProps.X).z);
+    float err = (viewZ - prevViewZ) * Math::PositiveRcp(max(viewZ, prevViewZ));
 
-    if( isRefraction )
+    if (isRefraction)
     {
         // Confidence - viewZ ( PSR makes prevViewZ further than the original primary surface )
-        weight *= Math::LinearStep( 0.01, 0.005, saturate( err ) );
+        weight *= Math::LinearStep(0.01, 0.005, saturate(err));
 
         // Fade-out on screen edges ( hard )
-        weight *= all( saturate( uv ) == uv );
+        weight *= all(saturate(uv) == uv);
     }
     else
     {
         // Confidence - viewZ
-        weight *= Math::LinearStep( 0.01, 0.005, abs( err ) );
+        weight *= Math::LinearStep(0.01, 0.005, abs(err));
 
         // Fade-out on screen edges ( soft )
-        float2 f = Math::LinearStep( 0.0, 0.1, uv ) * Math::LinearStep( 1.0, 0.9, uv );
+        float2 f = Math::LinearStep(0.0, 0.1, uv) * Math::LinearStep(1.0, 0.9, uv);
         weight *= f.x * f.y;
 
         // Confidence - ignore back-facing
         // Instead of storing previous normal we can store previous NoL, if signs do not match we hit the surface from the opposite side
-        float NoL = dot( geometryProps.N, gSunDirection.xyz );
-        weight *= float( NoL * Math::Sign( data.w ) > 0.0 );
+        float NoL = dot(geometryProps.N, gSunDirection.xyz);
+        weight *= float(NoL * Math::Sign(data.w) > 0.0);
 
         // Confidence - ignore too short rays
-        float2 uv = Geometry::GetScreenUv( gWorldToClip, geometryProps.X, true ) - gJitter;
-        float d = length( ( uv - pixelUv ) * gRectSize );
-        weight *= Math::LinearStep( 1.0, 3.0, d );
+        float2 uv = Geometry::GetScreenUv(gWorldToClip, geometryProps.X, true) - gJitter;
+        float d = length((uv - pixelUv) * gRectSize);
+        weight *= Math::LinearStep(1.0, 3.0, d);
     }
 
     // Ignore sky
-    weight *= float( !geometryProps.IsMiss( ) );
+    weight *= float(!geometryProps.IsMiss());
 
     // Use only if radiance is on the screen
     // weight *= float( gOnScreen < SHOW_AMBIENT_OCCLUSION );
     // weight *= float( gOnScreen < SHOW_AMBIENT_OCCLUSION );
 
     // Add global confidence
-    if( isPrevFrame )
+    if (isPrevFrame)
         weight *= gPrevFrameConfidence; // see C++ code for details
 
     // Read data
-    Ldiff = texDiff.SampleLevel( sampler_point_clamp, uv * rescale, 0 );
+    Ldiff = texDiff.SampleLevel(sampler_point_clamp, uv * rescale, 0);
     Lspec = data.xyz;
 
     // Avoid NANs
     [flatten]
-    if( any( isnan( Ldiff ) | isinf( Ldiff ) | isnan( Lspec ) | isinf( Lspec ) ) || NRD_MODE >= OCCLUSION ) // TODO: needed?
+    if (any(isnan(Ldiff) | isinf(Ldiff) | isnan(Lspec) | isinf(Lspec)) || NRD_MODE >= OCCLUSION) // TODO: needed?
     {
         Ldiff = 0;
         Lspec = 0;
@@ -630,7 +585,7 @@ float ReprojectIrradiance( bool isPrevFrame, bool isRefraction, Texture2D<float3
     }
 
     // Avoid really bad reprojection
-    float f = saturate( weight / 0.001 );
+    float f = saturate(weight / 0.001);
     Ldiff *= f;
     Lspec *= f;
 
@@ -638,25 +593,25 @@ float ReprojectIrradiance( bool isPrevFrame, bool isRefraction, Texture2D<float3
 }
 
 
-float4 GetRadianceFromPreviousFrame( GeometryProps geometryProps, MaterialProps materialProps, uint2 pixelPos )
+float4 GetRadianceFromPreviousFrame(GeometryProps geometryProps, MaterialProps materialProps, uint2 pixelPos)
 {
     // Reproject previous frame
     float3 prevLdiff, prevLspec;
-    float prevFrameWeight = ReprojectIrradiance( true, false, gIn_PrevComposedDiff, gIn_PrevComposedSpec_PrevViewZ, geometryProps, pixelPos, prevLdiff, prevLspec );
+    float prevFrameWeight = ReprojectIrradiance(true, false, gIn_PrevComposedDiff, gIn_PrevComposedSpec_PrevViewZ, geometryProps, pixelPos, prevLdiff, prevLspec);
 
     // Estimate how strong lighting at hit depends on the view direction
-    float diffuseProbabilityBiased = EstimateDiffuseProbability( geometryProps, materialProps, true );
+    float diffuseProbabilityBiased = EstimateDiffuseProbability(geometryProps, materialProps, true);
     float3 prevLsum = prevLdiff + prevLspec * diffuseProbabilityBiased;
 
-    float diffuseLikeMotion = lerp( diffuseProbabilityBiased, 1.0, Math::Sqrt01( materialProps.curvature ) ); // TODO: review
+    float diffuseLikeMotion = lerp(diffuseProbabilityBiased, 1.0, Math::Sqrt01(materialProps.curvature)); // TODO: review
     prevFrameWeight *= diffuseLikeMotion;
 
-    float a = Color::Luminance( prevLdiff );
-    float b = Color::Luminance( prevLspec );
-    prevFrameWeight *= lerp( diffuseProbabilityBiased, 1.0, ( a + NRD_EPS ) / ( a + b + NRD_EPS ) );
+    float a = Color::Luminance(prevLdiff);
+    float b = Color::Luminance(prevLspec);
+    prevFrameWeight *= lerp(diffuseProbabilityBiased, 1.0, (a + NRD_EPS) / (a + b + NRD_EPS));
 
     // Avoid really bad reprojection
-    return NRD_MODE < OCCLUSION ? float4( prevLsum * saturate( prevFrameWeight / 0.001 ), prevFrameWeight ) : 0.0;
+    return NRD_MODE < OCCLUSION ? float4(prevLsum * saturate(prevFrameWeight / 0.001), prevFrameWeight) : 0.0;
 }
 
 TraceOpaqueResult TraceOpaque(GeometryProps geometryProps0, MaterialProps materialProps0, uint2 pixelPos, float3x3 mirrorMatrix, float4 Lpsr)
@@ -666,6 +621,7 @@ TraceOpaqueResult TraceOpaque(GeometryProps geometryProps0, MaterialProps materi
     result.specHitDist = NRD_FrontEnd_SpecHitDistAveraging_Begin();
     #endif
 
+    // 里面取绝对值了
     float viewZ0 = Geometry::AffineTransform(gWorldToView, geometryProps0.X).z;
     float roughness0 = materialProps0.roughness;
 
@@ -797,13 +753,13 @@ TraceOpaqueResult TraceOpaque(GeometryProps geometryProps0, MaterialProps materi
                 float4 Lcached = float4(materialProps.Lemi, 0.0);
                 if (!geometryProps.IsMiss())
                 {
-                    Lcached = GetRadianceFromPreviousFrame( geometryProps, materialProps, pixelPos );
-                    
-                    
+                    Lcached = GetRadianceFromPreviousFrame(geometryProps, materialProps, pixelPos);
+
+
                     if (path == 0)
-                        g_Output[pixelPos] = float4(Lcached.xyz,1);
+                        g_Output[pixelPos] = float4(Lcached.xyz, 1);
                     // g_Output[pixelPos] = float4(1,0,0,1);
-                    
+
                     // Cache miss - compute lighting, if not found in caches
                     if (Rng::Hash::GetFloat() > Lcached.w)
                     {

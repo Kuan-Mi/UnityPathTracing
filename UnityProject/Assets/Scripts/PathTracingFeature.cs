@@ -10,7 +10,7 @@ namespace PathTracing
 {
     public class PathTracingFeature : ScriptableRendererFeature
     {
-        public Material showShadowMaterial;
+        private Material showShadowMaterial;
         public RayTracingShader opaqueTracingShader;
         public RayTracingShader transparentTracingShader;
 

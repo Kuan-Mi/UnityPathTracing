@@ -112,7 +112,7 @@ namespace PathTracing
 
             natCmd.SetRayTracingTextureParam(data.OpaqueTracingShader, g_DirectLightingID, data.DirectLighting);
             natCmd.SetRayTracingTextureParam(data.OpaqueTracingShader, g_DirectEmissionID, data.DirectEmission);
-
+ 
             natCmd.SetRayTracingTextureParam(data.OpaqueTracingShader, g_ShadowDataID, data.Penumbra);
             natCmd.SetRayTracingTextureParam(data.OpaqueTracingShader, g_DiffID, data.Diff);
             natCmd.SetRayTracingTextureParam(data.OpaqueTracingShader, g_SpecID, data.Spec);
@@ -121,7 +121,7 @@ namespace PathTracing
             natCmd.SetRayTracingTextureParam(data.OpaqueTracingShader, gIn_PrevComposedSpec_PrevViewZID, data.ComposedSpecViewZ);
 
             natCmd.DispatchRays(data.OpaqueTracingShader, "MainRayGenShader", (uint)data.Width, (uint)data.Height, 1, data.Cam);
-
+ 
             // NRD降噪
             natCmd.IssuePluginEventAndData(GetRenderEventAndDataFunc(), 1, data.NrdDataPtr);
 
