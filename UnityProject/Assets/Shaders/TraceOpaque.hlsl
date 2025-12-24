@@ -502,11 +502,21 @@ float3 GetLighting(GeometryProps geometryProps, inout MaterialProps materialProp
         float3 sunDirection = normalize(gSunBasisX.xyz * rnd.x + gSunBasisY.xyz * rnd.y + gSunDirection.xyz);
         float2 mipAndCone = GetConeAngleFromAngularRadius(geometryProps.mip, gTanSunAngularRadius);
 
-        GeometryProps shadowRayGeometryProps;
-        MaterialProps shadowRayMaterialProps;
+        // GeometryProps shadowRayGeometryProps;
+        // MaterialProps shadowRayMaterialProps;
+        // CastRay(Xshadow, sunDirection, 0.0,INF, mipAndCone, shadowRayGeometryProps, shadowRayMaterialProps);
+        // float hitT = shadowRayGeometryProps.hitT;
 
-        CastRay(Xshadow, sunDirection, 0.0,INF, mipAndCone, shadowRayGeometryProps, shadowRayMaterialProps);
-        float hitT = shadowRayGeometryProps.hitT;
+        RayDesc rayDesc;
+        rayDesc.Origin = Xshadow;
+        rayDesc.Direction = sunDirection;
+        rayDesc.TMin = 0;
+        rayDesc.TMax = 1000;
+
+        MainRayPayload shadowPayload = (MainRayPayload)0;
+        TraceRay(g_AccelStruct, RAY_FLAG_NONE | RAY_FLAG_NONE, 0xFF, 0, 1, 1, rayDesc, shadowPayload);
+        float hitT = shadowPayload.hitT;
+
         lighting *= float(hitT == INF);
     }
 
@@ -753,11 +763,11 @@ TraceOpaqueResult TraceOpaque(GeometryProps geometryProps0, MaterialProps materi
                 float4 Lcached = float4(materialProps.Lemi, 0.0);
                 if (!geometryProps.IsMiss())
                 {
-                    Lcached = GetRadianceFromPreviousFrame(geometryProps, materialProps, pixelPos);
+                    // Lcached = GetRadianceFromPreviousFrame(geometryProps, materialProps, pixelPos);
 
 
-                    if (path == 0)
-                        g_Output[pixelPos] = float4(Lcached.xyz, 1);
+                    // if (path == 0)
+                    //     g_Output[pixelPos] = float4(Lcached.xyz, 1);
                     // g_Output[pixelPos] = float4(1,0,0,1);
 
                     // Cache miss - compute lighting, if not found in caches
@@ -1024,23 +1034,23 @@ void MainRayGenShader()
 
     if (shadowTranslucency > 0.1)
     {
-        GeometryProps geometryPropsShadow;
-        MaterialProps materialPropsShadow;
-
-        CastRay(Xoffset, sunDirection, 0.0, INF, mipAndCone, geometryPropsShadow, materialPropsShadow);
-
-        /*
-        // RayDesc rayDesc;
-        // rayDesc.Origin = Xoffset;
-        // rayDesc.Direction = sunDirection;
-        // rayDesc.TMin = 0;
-        // rayDesc.TMax = 1000;
+        // GeometryProps geometryPropsShadow;
+        // MaterialProps materialPropsShadow;
         //
-        // MainRayPayload shadowPayload = (MainRayPayload)0;
-        // TraceRay(g_AccelStruct, RAY_FLAG_NONE | RAY_FLAG_NONE, 0xFF, 0, 1, 1, rayDesc, shadowPayload);
-        */
+        // CastRay(Xoffset, sunDirection, 0.0, INF, mipAndCone, geometryPropsShadow, materialPropsShadow);
 
-        shadowHitDist = geometryPropsShadow.hitT;
+
+        RayDesc rayDesc;
+        rayDesc.Origin = Xoffset;
+        rayDesc.Direction = sunDirection;
+        rayDesc.TMin = 0;
+        rayDesc.TMax = 1000;
+
+        MainRayPayload shadowPayload = (MainRayPayload)0;
+        TraceRay(g_AccelStruct, RAY_FLAG_NONE | RAY_FLAG_NONE, 0xFF, 0, 1, 1, rayDesc, shadowPayload);
+        shadowHitDist = shadowPayload.hitT;
+
+        // shadowHitDist = geometryPropsShadow.hitT;
     }
 
     float penumbra = SIGMA_FrontEnd_PackPenumbra(shadowHitDist, gTanSunAngularRadius);
