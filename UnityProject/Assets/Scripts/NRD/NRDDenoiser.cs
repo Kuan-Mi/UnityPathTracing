@@ -41,6 +41,10 @@ namespace Nrd
         public Matrix4x4 viewToClip;
         public Matrix4x4 preViewToClip;
 
+
+        public float4 camPos;
+        public float4 prevCamPos;
+
         private int _prevWidth = -1;
         private int _prevHeight = -1;
 
@@ -213,8 +217,10 @@ namespace Nrd
             prevWorldToView = worldToView;
             prevWorldToClip = worldToClip;
             preViewToClip = viewToClip;
+            prevCamPos = camPos;
 
 
+            camPos = new float4(mCamera.transform.position.x, mCamera.transform.position.y, mCamera.transform.position.z, 1.0f);
             worldToView = mCamera.worldToCameraMatrix;
             worldToClip = GetWorldToClipMatrix(mCamera);
             viewToClip = GL.GetGPUProjectionMatrix(mCamera.projectionMatrix, false);

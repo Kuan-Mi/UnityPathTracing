@@ -3,6 +3,15 @@
 #define INF                                 1e5
 #define FP16_VIEWZ_SCALE                    0.125 // TODO: tuned for meters, needs to be scaled down for cm and mm
 
+// Spatial HAsh-based Radiance Cache ( SHARC )
+#define SHARC_CAPACITY                      ( 1 << 22 )
+#define SHARC_SCENE_SCALE                   45.0
+#define SHARC_DOWNSCALE                     5
+#define SHARC_ANTI_FIREFLY                  false
+#define SHARC_STALE_FRAME_NUM_MIN           32 // new version uses 8 by default, old value offers more stability in voxels with low number of samples ( critical for glass )
+#define SHARC_SEPARATE_EMISSIVE             1
+#define SHARC_MATERIAL_DEMODULATION         1
+#define SHARC_USE_FP16                      0
 
 struct RayPayload
 {
@@ -30,12 +39,14 @@ cbuffer PathTracingParams : register(b0)
     float4 gSunBasisX;
     float4 gSunBasisY;
     float4 gSunDirection;
+    float4 gCameraGlobalPos;;
+    float4 gCameraGlobalPosPrev;;
 
     float2 gRectSize;
     float2 gInvRectSize;
     float2 gJitter;
     float2 gRectSizePrev;
-    
+
     float2 gRenderSize;
     float2 gInvRenderSize;
 
@@ -50,11 +61,13 @@ cbuffer PathTracingParams : register(b0)
     float gFocalDistance;
     float gExposure;
     uint gFrameIndex;
-    
+
     float gTAA;
     uint gSampleNum;
     uint gBounceNum;
     float gPrevFrameConfidence;
+
+    uint gSharcMaxAccumulatedFrameNum;
 };
 
 

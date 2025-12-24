@@ -46,6 +46,7 @@ namespace PathTracing
                 accelerationStructure = new RayTracingAccelerationStructure(settings);
 
                 accelerationStructure.Build();
+                
             }
 
 

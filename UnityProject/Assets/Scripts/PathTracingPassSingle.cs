@@ -306,7 +306,8 @@ namespace PathTracing
                 gSunBasisX = new float4(gSunBasisX.x, gSunBasisX.y, gSunBasisX.z, 0),
                 gSunBasisY = new float4(gSunBasisY.x, gSunBasisY.y, gSunBasisY.z, 0),
                 gSunDirection = new float4(gSunDirection.x, gSunDirection.y, gSunDirection.z, 0),
-
+                gCameraGlobalPos = NrdDenoiser.camPos,
+                gCameraGlobalPosPrev = NrdDenoiser.prevCamPos,
                 gTanPixelAngularRadius = math.tan(0.5f * math.radians(horizontalFieldOfView) / cam.pixelWidth),
 
                 gUnproject = 1.0f / (0.5f * rectH * m11),
@@ -319,7 +320,8 @@ namespace PathTracing
                 gTAA = _settings.taa,
                 gSampleNum = _settings.rpp,
                 gBounceNum = _settings.bounceNum,
-                gPrevFrameConfidence = 1
+                gPrevFrameConfidence = 1,
+                gSharcMaxAccumulatedFrameNum = 10,
             };
 
             opaqueTracingShader.SetShaderPass("Test2");

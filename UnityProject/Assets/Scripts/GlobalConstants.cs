@@ -14,6 +14,8 @@ namespace PathTracing
         public float4 gSunBasisX;
         public float4 gSunBasisY;
         public float4 gSunDirection;
+        public float4 gCameraGlobalPos;
+        public float4 gCameraGlobalPosPrev;
 
         public float2 gRectSize;
         public float2 gInvRectSize;
@@ -39,5 +41,10 @@ namespace PathTracing
         public uint gSampleNum;
         public uint gBounceNum;
         public float gPrevFrameConfidence;
+        
+        public uint  gSharcMaxAccumulatedFrameNum;
+        public uint  fdf;
+        public uint  fdff;
+        public uint  fddff;
     }
 }
