@@ -14,20 +14,20 @@ namespace PathTracing
 {
     public class PathTracingPassSingle : ScriptableRenderPass
     {
-        public RayTracingShader opaqueTracingShader;
-        public RayTracingShader transparentTracingShader;
-        public ComputeShader compositionComputeShader;
-        public ComputeShader taaComputeShader;
-        public Material biltMaterial;
+        public RayTracingShader OpaqueTs;
+        public RayTracingShader TransparentTs;
+        public ComputeShader CompositionCs;
+        public ComputeShader TaaCs;
+        public Material BiltMaterial;
 
-        public RayTracingAccelerationStructure accelerationStructure;
-        private PathTracingSetting _settings;
+        public RayTracingAccelerationStructure AccelerationStructure;
         public NRDDenoiser NrdDenoiser;
 
-        public GraphicsBuffer scramblingRanking;
-        public GraphicsBuffer sobol;
+        public GraphicsBuffer ScramblingRanking;
+        public GraphicsBuffer Sobol;
 
-        private GraphicsBuffer pathTracingSettingsBuffer;
+        private readonly PathTracingSetting _settings;
+        private readonly GraphicsBuffer _pathTracingSettingsBuffer;
 
         [DllImport("RenderingPlugin")]
         private static extern IntPtr GetRenderEventAndDataFunc();
@@ -65,28 +65,24 @@ namespace PathTracing
             internal TextureHandle TaaHistory;
             internal TextureHandle TaaHistoryPrev;
 
-            internal RayTracingShader OpaqueTracingShader;
-            internal RayTracingShader TransparentTracingShader;
-            internal ComputeShader CompositionComputeShader;
-            internal ComputeShader TaaComputeShader;
+            internal RayTracingShader OpaqueTs;
+            internal RayTracingShader TransparentTs;
+            internal ComputeShader CompositionCs;
+            internal ComputeShader TaaCs;
             internal Material BlitMaterial;
-            internal Camera Cam;
-            internal int Width;
-            internal int Height;
+            internal uint Width;
+            internal uint Height;
 
             internal GlobalConstants GlobalConstants;
             internal GraphicsBuffer ConstantBuffer;
-
             internal IntPtr NrdDataPtr;
-
             internal PathTracingSetting Setting;
-            internal bool IsEven;
         }
 
         public PathTracingPassSingle(PathTracingSetting setting)
         {
             _settings = setting;
-            pathTracingSettingsBuffer = new GraphicsBuffer(GraphicsBuffer.Target.Constant, 1, Marshal.SizeOf<GlobalConstants>());
+            _pathTracingSettingsBuffer = new GraphicsBuffer(GraphicsBuffer.Target.Constant, 1, Marshal.SizeOf<GlobalConstants>());
         }
 
         static void ExecutePass(PassData data, UnsafeGraphContext context)
@@ -96,71 +92,72 @@ namespace PathTracing
             natCmd.SetBufferData(data.ConstantBuffer, new[] { data.GlobalConstants });
 
             // 不透明
-            natCmd.SetRayTracingShaderPass(data.OpaqueTracingShader, "Test2");
-            natCmd.SetRayTracingConstantBufferParam(data.OpaqueTracingShader, paramsID, data.ConstantBuffer, 0, data.ConstantBuffer.stride);
+            natCmd.SetRayTracingShaderPass(data.OpaqueTs, "Test2");
+            natCmd.SetRayTracingConstantBufferParam(data.OpaqueTs, paramsID, data.ConstantBuffer, 0, data.ConstantBuffer.stride);
 
-            natCmd.SetRayTracingBufferParam(data.OpaqueTracingShader, g_ScramblingRankingID, data.ScramblingRanking);
-            natCmd.SetRayTracingBufferParam(data.OpaqueTracingShader, g_SobolID, data.Sobol);
+            natCmd.SetRayTracingBufferParam(data.OpaqueTs, g_ScramblingRankingID, data.ScramblingRanking);
+            natCmd.SetRayTracingBufferParam(data.OpaqueTs, g_SobolID, data.Sobol);
 
-            natCmd.SetRayTracingTextureParam(data.OpaqueTracingShader, g_OutputID, data.OutputTexture);
+            natCmd.SetRayTracingTextureParam(data.OpaqueTs, g_OutputID, data.OutputTexture);
 
-            natCmd.SetRayTracingTextureParam(data.OpaqueTracingShader, g_MvID, data.Mv);
-            natCmd.SetRayTracingTextureParam(data.OpaqueTracingShader, g_ViewZID, data.ViewZ);
-            natCmd.SetRayTracingTextureParam(data.OpaqueTracingShader, g_Normal_RoughnessID, data.NormalRoughness);
-            natCmd.SetRayTracingTextureParam(data.OpaqueTracingShader, g_BaseColor_MetalnessID, data.BaseColorMetalness);
+            natCmd.SetRayTracingTextureParam(data.OpaqueTs, g_MvID, data.Mv);
+            natCmd.SetRayTracingTextureParam(data.OpaqueTs, g_ViewZID, data.ViewZ);
+            natCmd.SetRayTracingTextureParam(data.OpaqueTs, g_Normal_RoughnessID, data.NormalRoughness);
+            natCmd.SetRayTracingTextureParam(data.OpaqueTs, g_BaseColor_MetalnessID, data.BaseColorMetalness);
 
-            natCmd.SetRayTracingTextureParam(data.OpaqueTracingShader, g_DirectLightingID, data.DirectLighting);
-            natCmd.SetRayTracingTextureParam(data.OpaqueTracingShader, g_DirectEmissionID, data.DirectEmission);
+            natCmd.SetRayTracingTextureParam(data.OpaqueTs, g_DirectLightingID, data.DirectLighting);
+            natCmd.SetRayTracingTextureParam(data.OpaqueTs, g_DirectEmissionID, data.DirectEmission);
 
-            natCmd.SetRayTracingTextureParam(data.OpaqueTracingShader, g_ShadowDataID, data.Penumbra);
-            natCmd.SetRayTracingTextureParam(data.OpaqueTracingShader, g_DiffID, data.Diff);
-            natCmd.SetRayTracingTextureParam(data.OpaqueTracingShader, g_SpecID, data.Spec);
+            natCmd.SetRayTracingTextureParam(data.OpaqueTs, g_ShadowDataID, data.Penumbra);
+            natCmd.SetRayTracingTextureParam(data.OpaqueTs, g_DiffID, data.Diff);
+            natCmd.SetRayTracingTextureParam(data.OpaqueTs, g_SpecID, data.Spec);
 
-            natCmd.SetRayTracingTextureParam(data.OpaqueTracingShader, gIn_PrevComposedDiffID, data.ComposedDiff);
-            natCmd.SetRayTracingTextureParam(data.OpaqueTracingShader, gIn_PrevComposedSpec_PrevViewZID, data.ComposedSpecViewZ);
+            natCmd.SetRayTracingTextureParam(data.OpaqueTs, gIn_PrevComposedDiffID, data.ComposedDiff);
+            natCmd.SetRayTracingTextureParam(data.OpaqueTs, gIn_PrevComposedSpec_PrevViewZID, data.ComposedSpecViewZ);
 
-            natCmd.DispatchRays(data.OpaqueTracingShader, "MainRayGenShader", (uint)data.Width, (uint)data.Height, 1, data.Cam);
+            natCmd.DispatchRays(data.OpaqueTs, "MainRayGenShader", data.Width, data.Height, 1);
 
             // NRD降噪
             natCmd.IssuePluginEventAndData(GetRenderEventAndDataFunc(), 1, data.NrdDataPtr);
 
             // 合成
-            natCmd.SetComputeConstantBufferParam(data.CompositionComputeShader, paramsID, data.ConstantBuffer, 0, data.ConstantBuffer.stride);
-            natCmd.SetComputeTextureParam(data.CompositionComputeShader, 0, gIn_ViewZID, data.ViewZ);
-            natCmd.SetComputeTextureParam(data.CompositionComputeShader, 0, gIn_Normal_RoughnessID, data.NormalRoughness);
-            natCmd.SetComputeTextureParam(data.CompositionComputeShader, 0, gIn_BaseColor_MetalnessID, data.BaseColorMetalness);
-            natCmd.SetComputeTextureParam(data.CompositionComputeShader, 0, gIn_DirectLightingID, data.DirectLighting);
-            natCmd.SetComputeTextureParam(data.CompositionComputeShader, 0, gIn_DirectEmissionID, data.DirectEmission);
-            natCmd.SetComputeTextureParam(data.CompositionComputeShader, 0, gIn_ShadowID, data.ShadowTranslucency);
-            natCmd.SetComputeTextureParam(data.CompositionComputeShader, 0, gIn_DiffID, data.DenoisedDiff);
-            natCmd.SetComputeTextureParam(data.CompositionComputeShader, 0, gIn_SpecID, data.DenoisedSpec);
-            natCmd.SetComputeTextureParam(data.CompositionComputeShader, 0, gOut_ComposedDiffID, data.ComposedDiff);
-            natCmd.SetComputeTextureParam(data.CompositionComputeShader, 0, gOut_ComposedSpec_ViewZID, data.ComposedSpecViewZ);
+            natCmd.SetComputeConstantBufferParam(data.CompositionCs, paramsID, data.ConstantBuffer, 0, data.ConstantBuffer.stride);
+            natCmd.SetComputeTextureParam(data.CompositionCs, 0, gIn_ViewZID, data.ViewZ);
+            natCmd.SetComputeTextureParam(data.CompositionCs, 0, gIn_Normal_RoughnessID, data.NormalRoughness);
+            natCmd.SetComputeTextureParam(data.CompositionCs, 0, gIn_BaseColor_MetalnessID, data.BaseColorMetalness);
+            natCmd.SetComputeTextureParam(data.CompositionCs, 0, gIn_DirectLightingID, data.DirectLighting);
+            natCmd.SetComputeTextureParam(data.CompositionCs, 0, gIn_DirectEmissionID, data.DirectEmission);
+            natCmd.SetComputeTextureParam(data.CompositionCs, 0, gIn_ShadowID, data.ShadowTranslucency);
+            natCmd.SetComputeTextureParam(data.CompositionCs, 0, gIn_DiffID, data.DenoisedDiff);
+            natCmd.SetComputeTextureParam(data.CompositionCs, 0, gIn_SpecID, data.DenoisedSpec);
+            natCmd.SetComputeTextureParam(data.CompositionCs, 0, gOut_ComposedDiffID, data.ComposedDiff);
+            natCmd.SetComputeTextureParam(data.CompositionCs, 0, gOut_ComposedSpec_ViewZID, data.ComposedSpecViewZ);
 
             int threadGroupX = Mathf.CeilToInt(data.Width / 16.0f);
             int threadGroupY = Mathf.CeilToInt(data.Height / 16.0f);
-            natCmd.DispatchCompute(data.CompositionComputeShader, 0, threadGroupX, threadGroupY, 1);
+            natCmd.DispatchCompute(data.CompositionCs, 0, threadGroupX, threadGroupY, 1);
 
             // 透明
-            natCmd.SetRayTracingShaderPass(data.TransparentTracingShader, "Test2");
-            natCmd.SetRayTracingConstantBufferParam(data.TransparentTracingShader, paramsID, data.ConstantBuffer, 0, data.ConstantBuffer.stride);
-            natCmd.SetRayTracingTextureParam(data.TransparentTracingShader, gIn_ComposedDiffID, data.ComposedDiff);
-            natCmd.SetRayTracingTextureParam(data.TransparentTracingShader, gIn_ComposedSpec_ViewZID, data.ComposedSpecViewZ);
-            natCmd.SetRayTracingTextureParam(data.TransparentTracingShader, gOut_ComposedID, data.Composed);
+            natCmd.SetRayTracingShaderPass(data.TransparentTs, "Test2");
+            natCmd.SetRayTracingConstantBufferParam(data.TransparentTs, paramsID, data.ConstantBuffer, 0, data.ConstantBuffer.stride);
+            natCmd.SetRayTracingTextureParam(data.TransparentTs, gIn_ComposedDiffID, data.ComposedDiff);
+            natCmd.SetRayTracingTextureParam(data.TransparentTs, gIn_ComposedSpec_ViewZID, data.ComposedSpecViewZ);
+            natCmd.SetRayTracingTextureParam(data.TransparentTs, gOut_ComposedID, data.Composed);
 
-            natCmd.DispatchRays(data.TransparentTracingShader, "MainRayGenShader", (uint)data.Width, (uint)data.Height, 1, data.Cam);
+            natCmd.DispatchRays(data.TransparentTs, "MainRayGenShader", data.Width, data.Height, 1);
 
             // TAA
-            TextureHandle taaSrc = data.IsEven ? data.TaaHistoryPrev : data.TaaHistory;
-            TextureHandle taaDst = data.IsEven ? data.TaaHistory : data.TaaHistoryPrev;
+            var isEven = (data.GlobalConstants.gFrameIndex & 1) == 0;
+            var taaSrc = isEven ? data.TaaHistoryPrev : data.TaaHistory;
+            var taaDst = isEven ? data.TaaHistory : data.TaaHistoryPrev;
 
-            natCmd.SetComputeConstantBufferParam(data.TaaComputeShader, paramsID, data.ConstantBuffer, 0, data.ConstantBuffer.stride);
-            natCmd.SetComputeTextureParam(data.TaaComputeShader, 0, gIn_MvID, data.Mv);
-            natCmd.SetComputeTextureParam(data.TaaComputeShader, 0, gIn_ComposedID, data.Composed);
-            natCmd.SetComputeTextureParam(data.TaaComputeShader, 0, gIn_HistoryID, taaSrc);
-            natCmd.SetComputeTextureParam(data.TaaComputeShader, 0, gOut_ResultID, taaDst);
-            natCmd.SetComputeTextureParam(data.TaaComputeShader, 0, gOut_DebugID, data.OutputTexture);
-            natCmd.DispatchCompute(data.TaaComputeShader, 0, threadGroupX, threadGroupY, 1);
+            natCmd.SetComputeConstantBufferParam(data.TaaCs, paramsID, data.ConstantBuffer, 0, data.ConstantBuffer.stride);
+            natCmd.SetComputeTextureParam(data.TaaCs, 0, gIn_MvID, data.Mv);
+            natCmd.SetComputeTextureParam(data.TaaCs, 0, gIn_ComposedID, data.Composed);
+            natCmd.SetComputeTextureParam(data.TaaCs, 0, gIn_HistoryID, taaSrc);
+            natCmd.SetComputeTextureParam(data.TaaCs, 0, gOut_ResultID, taaDst);
+            natCmd.SetComputeTextureParam(data.TaaCs, 0, gOut_DebugID, data.OutputTexture);
+            natCmd.DispatchCompute(data.TaaCs, 0, threadGroupX, threadGroupY, 1);
 
             // 显示输出
             natCmd.SetRenderTarget(data.CameraTexture);
@@ -247,16 +244,15 @@ namespace PathTracing
 
             NrdDenoiser.EnsureResources(cameraData.camera.pixelWidth, cameraData.camera.pixelHeight);
 
-            Shader.SetGlobalRayTracingAccelerationStructure(g_AccelStructID, accelerationStructure);
+            Shader.SetGlobalRayTracingAccelerationStructure(g_AccelStructID, AccelerationStructure);
 
             using var builder = renderGraph.AddUnsafePass<PassData>("Path Tracing Pass", out var passData);
 
-            passData.OpaqueTracingShader = opaqueTracingShader;
-            passData.TransparentTracingShader = transparentTracingShader;
-            passData.CompositionComputeShader = compositionComputeShader;
-            passData.TaaComputeShader = taaComputeShader;
-            passData.BlitMaterial = biltMaterial;
-            passData.Cam = cameraData.camera;
+            passData.OpaqueTs = OpaqueTs;
+            passData.TransparentTs = TransparentTs;
+            passData.CompositionCs = CompositionCs;
+            passData.TaaCs = TaaCs;
+            passData.BlitMaterial = BiltMaterial;
 
             var gSunDirection = -lightForward;
             var up = new Vector3(0, 1, 0);
@@ -276,12 +272,6 @@ namespace PathTracing
             var aspectRatio = (float)rectW / rectH;
             var horizontalFieldOfView = Mathf.Atan(Mathf.Tan(Mathf.Deg2Rad * verticalFieldOfView * 0.5f) * aspectRatio) * 2 * Mathf.Rad2Deg;
 
-            var frameIndex = (uint)Time.frameCount;
-            var isEven = (frameIndex & 1) == 0;
-
-            // var debug1 = NrdDenoiser.ViewportJitter / rectSize;
-            // Debug.Log($"debug1: {debug1}");
-
             var globalConstants = new GlobalConstants
             {
                 gViewToWorld = NrdDenoiser.worldToView.inverse,
@@ -291,7 +281,7 @@ namespace PathTracing
                 gWorldToClipPrev = NrdDenoiser.prevWorldToClip,
                 gRectSize = rectSize,
                 gInvRectSize = invRectSize,
-                gJitter = (NrdDenoiser.ViewportJitter / rectSize),
+                gJitter = NrdDenoiser.ViewportJitter / rectSize,
                 gRectSizePrev = rectSize,
                 gRenderSize = rectSize,
                 gInvRenderSize = invRectSize,
@@ -310,7 +300,7 @@ namespace PathTracing
                 gAperture = _settings.dofAperture * 0.01f,
                 gFocalDistance = _settings.dofFocalDistance,
                 gExposure = _settings.exposure,
-                gFrameIndex = frameIndex,
+                gFrameIndex = (uint)Time.frameCount,
                 gTAA = _settings.taa,
                 gSampleNum = _settings.rpp,
                 gBounceNum = _settings.bounceNum,
@@ -327,13 +317,14 @@ namespace PathTracing
 
             passData.GlobalConstants = globalConstants;
             passData.CameraTexture = resourceData.activeColorTexture;
-            passData.Width = textureDesc.width;
-            passData.Height = textureDesc.height;
-            passData.ConstantBuffer = pathTracingSettingsBuffer;
+            passData.Width = (uint)textureDesc.width;
+            passData.Height = (uint)textureDesc.height;
+            passData.ConstantBuffer = _pathTracingSettingsBuffer;
             passData.Setting = _settings;
-            passData.ScramblingRanking = scramblingRanking;
-            passData.Sobol = sobol;
-            passData.IsEven = isEven;
+            passData.ScramblingRanking = ScramblingRanking;
+            passData.Sobol = Sobol;
+
+            builder.UseTexture(passData.CameraTexture, AccessFlags.Write);
 
             builder.AllowPassCulling(false);
             builder.SetRenderFunc((PassData data, UnsafeGraphContext context) => { ExecutePass(data, context); });
@@ -403,7 +394,7 @@ namespace PathTracing
 
         public void Dispose()
         {
-            pathTracingSettingsBuffer?.Release();
+            _pathTracingSettingsBuffer?.Release();
         }
     }
 }

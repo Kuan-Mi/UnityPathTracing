@@ -236,13 +236,13 @@ namespace PathTracing
             _pathTracingPass = new PathTracingPassSingle(pathTracingSetting)
             {
                 renderPassEvent = RenderPassEvent.BeforeRenderingPostProcessing,
-                opaqueTracingShader = opaqueTracingShader,
-                transparentTracingShader = transparentTracingShader,
-                compositionComputeShader = compositionComputeShader,
-                taaComputeShader = taaComputeShader,
-                accelerationStructure = accelerationStructure,
-                scramblingRanking = gIn_ScramblingRankingUint,
-                sobol = gIn_SobolUint
+                OpaqueTs = opaqueTracingShader,
+                TransparentTs = transparentTracingShader,
+                CompositionCs = compositionComputeShader,
+                TaaCs = taaComputeShader,
+                AccelerationStructure = accelerationStructure,
+                ScramblingRanking = gIn_ScramblingRankingUint,
+                Sobol = gIn_SobolUint
             };
 
             if (showShadowMaterial == null)
@@ -251,7 +251,7 @@ namespace PathTracing
                 showShadowMaterial = new Material(shader);
             }
 
-            _pathTracingPass.biltMaterial = showShadowMaterial;
+            _pathTracingPass.BiltMaterial = showShadowMaterial;
         }
 
         public override void AddRenderPasses(ScriptableRenderer renderer, ref RenderingData renderingData)
