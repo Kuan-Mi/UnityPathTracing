@@ -130,7 +130,7 @@ namespace PathTracing
             }
         }
 
-        private Material showShadowMaterial;
+        private Material finalMaterial;
         public RayTracingShader opaqueTracingShader;
         public RayTracingShader transparentTracingShader;
 
@@ -245,13 +245,13 @@ namespace PathTracing
                 Sobol = gIn_SobolUint
             };
 
-            if (showShadowMaterial == null)
+            if (finalMaterial == null)
             {
-                var shader = Shader.Find("KM/ShowShadow");
-                showShadowMaterial = new Material(shader);
+                var shader = Shader.Find("KM/Final");
+                finalMaterial = new Material(shader);
             }
 
-            _pathTracingPass.BiltMaterial = showShadowMaterial;
+            _pathTracingPass.BiltMaterial = finalMaterial;
         }
 
         public override void AddRenderPasses(ScriptableRenderer renderer, ref RenderingData renderingData)

@@ -514,7 +514,7 @@ float3 GetLighting(GeometryProps geometryProps, inout MaterialProps materialProp
         rayDesc.TMax = 1000;
 
         MainRayPayload shadowPayload = (MainRayPayload)0;
-        TraceRay(g_AccelStruct, RAY_FLAG_NONE | RAY_FLAG_NONE, 0xFF, 0, 1, 1, rayDesc, shadowPayload);
+        TraceRay(g_AccelStruct, RAY_FLAG_NONE | RAY_FLAG_CULL_NON_OPAQUE, 0xFF, 0, 1, 1, rayDesc, shadowPayload);
         float hitT = shadowPayload.hitT;
 
         lighting *= float(hitT == INF);
@@ -763,7 +763,7 @@ TraceOpaqueResult TraceOpaque(GeometryProps geometryProps0, MaterialProps materi
                 float4 Lcached = float4(materialProps.Lemi, 0.0);
                 if (!geometryProps.IsMiss())
                 {
-                    // Lcached = GetRadianceFromPreviousFrame(geometryProps, materialProps, pixelPos);
+                    Lcached = GetRadianceFromPreviousFrame(geometryProps, materialProps, pixelPos);
 
 
                     // if (path == 0)
@@ -1047,7 +1047,7 @@ void MainRayGenShader()
         rayDesc.TMax = 1000;
 
         MainRayPayload shadowPayload = (MainRayPayload)0;
-        TraceRay(g_AccelStruct, RAY_FLAG_NONE | RAY_FLAG_NONE, 0xFF, 0, 1, 1, rayDesc, shadowPayload);
+        TraceRay(g_AccelStruct, RAY_FLAG_NONE | RAY_FLAG_CULL_NON_OPAQUE, 0xFF, 0, 1, 1, rayDesc, shadowPayload);
         shadowHitDist = shadowPayload.hitT;
 
         // shadowHitDist = geometryPropsShadow.hitT;
