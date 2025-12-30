@@ -13,6 +13,24 @@
 #define SHARC_MATERIAL_DEMODULATION         1
 #define SHARC_USE_FP16                      0
 
+
+
+
+#define FLAG_NON_TRANSPARENT                0x01 // geometry flag: non-transparent
+#define FLAG_TRANSPARENT                    0x02 // geometry flag: transparent
+#define FLAG_FORCED_EMISSION                0x04 // animated emissive cube
+#define FLAG_STATIC                         0x08 // no velocity
+#define FLAG_HAIR                           0x10 // hair
+#define FLAG_LEAF                           0x20 // leaf
+#define FLAG_SKIN                           0x40 // skin
+#define FLAG_MORPH                          0x80 // morph
+
+#define GEOMETRY_ALL                        ( FLAG_NON_TRANSPARENT | FLAG_TRANSPARENT )
+
+    #define FLAG_FIRST_BIT                      24 // this + number of flags must be <= 32
+
+
+
 struct RayPayload
 {
     float k;
@@ -81,6 +99,8 @@ struct MainRayPayload
     float curvature; // 曲率估算值（用于材质、去噪等）
     float2 mipAndCone;
     uint instanceIndex; // 命中的实例索引（用于查找InstanceData）
+    
+    uint textureOffsetAndFlags;
 
     float3 matN;
 
@@ -100,6 +120,13 @@ struct MainRayPayload
     {
         return hitT == INF;
     }
+    
+    
+    void SetFlag(uint flag)
+    {
+        textureOffsetAndFlags |= (flag << FLAG_FIRST_BIT);
+    }
+
 };
 
 struct GeometryProps
@@ -113,8 +140,10 @@ struct GeometryProps
     float mip;
     float curvature; // 曲率估算值（用于材质、去噪等）
     uint instanceIndex; // 命中的实例索引（用于查找InstanceData）
+    uint textureOffsetAndFlags;
 
     #define PT_BOUNCE_RAY_OFFSET                0.25 // pixels
+    #define PT_GLASS_RAY_OFFSET                 0.05 // pixels
 
     float3 GetXoffset(float3 offsetDir, float amount = PT_BOUNCE_RAY_OFFSET)
     {
@@ -122,6 +151,17 @@ struct GeometryProps
         amount *= gUnproject * abs(viewZ);
 
         return X + offsetDir * max(amount, 0.00001);
+    }
+
+
+    bool Has(uint flag)
+    {
+        return (textureOffsetAndFlags & (flag << FLAG_FIRST_BIT)) != 0;
+    }
+
+    void SetFlag(uint flag)
+    {
+        textureOffsetAndFlags |= (flag << FLAG_FIRST_BIT);
     }
 
     bool IsMiss()

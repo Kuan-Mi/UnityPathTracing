@@ -298,7 +298,7 @@ namespace Nrd
             // localData.commonSettings.isHistoryConfidenceAvailable = setting.isHistoryConfidenceAvailable;
             // localData.commonSettings.isDisocclusionThresholdMixAvailable = setting.isDisocclusionThresholdMixAvailable;
             localData.commonSettings.isBaseColorMetalnessAvailable = setting.isBaseColorMetalnessAvailable;
-            localData.commonSettings.enableValidation = true;
+            localData.commonSettings.enableValidation = setting.showValidation;
 
 
             // Sigma 设置

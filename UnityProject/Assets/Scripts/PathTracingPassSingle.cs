@@ -14,6 +14,7 @@ namespace PathTracing
 {
     public class PathTracingPassSingle : ScriptableRenderPass
     {
+        private static readonly int GInOutMv = Shader.PropertyToID("gInOut_Mv");
         public RayTracingShader OpaqueTs;
         public RayTracingShader TransparentTs;
         public ComputeShader CompositionCs;
@@ -143,6 +144,7 @@ namespace PathTracing
             natCmd.SetRayTracingTextureParam(data.TransparentTs, gIn_ComposedDiffID, data.ComposedDiff);
             natCmd.SetRayTracingTextureParam(data.TransparentTs, gIn_ComposedSpec_ViewZID, data.ComposedSpecViewZ);
             natCmd.SetRayTracingTextureParam(data.TransparentTs, gOut_ComposedID, data.Composed);
+            natCmd.SetRayTracingTextureParam(data.TransparentTs,GInOutMv, data.Mv);
 
             natCmd.DispatchRays(data.TransparentTs, "MainRayGenShader", data.Width, data.Height, 1);
 

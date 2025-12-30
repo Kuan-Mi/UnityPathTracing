@@ -262,8 +262,8 @@ Shader "Custom/LitWithRayTracing"
 
                 float pushOff = doRefraction ? -K_RAY_ORIGIN_PUSH_OFF : K_RAY_ORIGIN_PUSH_OFF;
                 float3 albedoTransparent = !isFrontFace
-                               ? exp(-(1 - albedo) * RayTCurrent() * _BaseColor.a * 20)
-                               : float3(1, 1, 1);
+                                               ? exp(-(1 - albedo) * RayTCurrent() * _BaseColor.a * 20)
+                                               : float3(1, 1, 1);
 
 
                 #endif
@@ -488,7 +488,7 @@ Shader "Custom/LitWithRayTracing"
                 #else
                 float3 worldNormal = normalWS;
                 #endif
- 
+
                 float3 albedo = _BaseColor.xyz * _BaseMap.SampleLevel(sampler_BaseMap, _BaseMap_ST.xy * v.uv + _BaseMap_ST.zw, mip).xyz;
 
 
@@ -508,19 +508,19 @@ Shader "Custom/LitWithRayTracing"
                 metallic = _Metallic;
 
                 #endif
-                
+
                 #if _EMISSION
                 float3 emission = _EmissionColor.xyz * _EmissionMap.SampleLevel(sampler_EmissionMap, v.uv, mip).xyz;
                 payload.Lemi = emission;
                 #else
                 payload.Lemi = float3(0, 0, 0);
                 #endif
-                
-                float emissionLevel = Color::Luminance( payload.Lemi );
-                emissionLevel = saturate( emissionLevel * 50.0 );
 
-                metallic = lerp( metallic, 0.0, emissionLevel );
-                roughness = lerp( roughness, 1.0, emissionLevel );
+                float emissionLevel = Color::Luminance(payload.Lemi);
+                emissionLevel = saturate(emissionLevel * 50.0);
+
+                metallic = lerp(metallic, 0.0, emissionLevel);
+                roughness = lerp(roughness, 1.0, emissionLevel);
 
 
                 float3 dielectricSpecular = float3(0.04, 0.04, 0.04);
@@ -551,6 +551,11 @@ Shader "Custom/LitWithRayTracing"
                 payload.baseColor = albedo;
                 payload.metalness = metallic;
 
+                uint flag = FLAG_NON_TRANSPARENT;
+                #if  _SURFACE_TYPE_TRANSPARENT
+                flag = FLAG_TRANSPARENT;
+                #endif
+                payload.SetFlag(flag);
             }
             ENDHLSL
         }

@@ -1038,20 +1038,22 @@ void MainRayGenShader()
         // MaterialProps materialPropsShadow;
         //
         // CastRay(Xoffset, sunDirection, 0.0, INF, mipAndCone, geometryPropsShadow, materialPropsShadow);
-
-
+    
+    
         RayDesc rayDesc;
         rayDesc.Origin = Xoffset;
         rayDesc.Direction = sunDirection;
         rayDesc.TMin = 0;
         rayDesc.TMax = 1000;
-
+    
         MainRayPayload shadowPayload = (MainRayPayload)0;
         TraceRay(g_AccelStruct, RAY_FLAG_NONE | RAY_FLAG_CULL_NON_OPAQUE, 0xFF, 0, 1, 1, rayDesc, shadowPayload);
         shadowHitDist = shadowPayload.hitT;
-
+    
         // shadowHitDist = geometryPropsShadow.hitT;
     }
+    
+    // shadowHitDist = 0;
 
     float penumbra = SIGMA_FrontEnd_PackPenumbra(shadowHitDist, gTanSunAngularRadius);
 
