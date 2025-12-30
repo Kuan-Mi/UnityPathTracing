@@ -8,7 +8,6 @@
 // Input
 StructuredBuffer<uint4> gIn_ScramblingRanking;
 StructuredBuffer<uint4> gIn_Sobol;
-
 Texture2D<float3> gIn_PrevComposedDiff;
 Texture2D<float4> gIn_PrevComposedSpec_PrevViewZ;
 
@@ -36,6 +35,57 @@ RWTexture2D<float4> gOut_Diff;
 // 高光反射光照结果（Specular Radiance），包含噪声和打包后的信息。
 RWTexture2D<float4> gOut_Spec;
 
+float2 GetBlueNoise(uint2 pixelPos, uint seed = 0)
+{
+    // https://eheitzresearch.wordpress.com/772-2/
+    // https://belcour.github.io/blog/research/publication/2019/06/17/sampling-bluenoise.html
+
+    // Sample index
+    uint sampleIndex = (gFrameIndex + seed) & (BLUE_NOISE_TEMPORAL_DIM - 1);
+
+    // sampleIndex = 3;
+    // pixelPos /= 8;
+
+    uint2 uv = pixelPos & (BLUE_NOISE_SPATIAL_DIM - 1);
+    uint index = uv.x + uv.y * BLUE_NOISE_SPATIAL_DIM;
+    uint3 A = gIn_ScramblingRanking[index].xyz;
+
+    // return float2(A.x/256.0 , A.y / 256.0);
+    uint rankedSampleIndex = sampleIndex ^ A.z;
+    // return float2(rankedSampleIndex / float(BLUE_NOISE_TEMPORAL_DIM), 0);
+
+    uint4 B = gIn_Sobol[rankedSampleIndex & 255];
+    float4 blue = (float4(B ^ A.xyxy) + 0.5) * (1.0 / 256.0);
+
+    // ( Optional ) Randomize in [ 0; 1 / 256 ] area to get rid of possible banding
+    uint d = Sequence::Bayer4x4ui(pixelPos, gFrameIndex);
+    float2 dither = (float2(d & 3, d >> 2) + 0.5) * (1.0 / 4.0);
+    blue += (dither.xyxy - 0.5) * (1.0 / 256.0);
+
+    return saturate(blue.xy);
+}
+
+float4 GetRadianceFromPreviousFrame(GeometryProps geometryProps, MaterialProps materialProps, uint2 pixelPos)
+{
+    // Reproject previous frame
+    float3 prevLdiff, prevLspec;
+    float prevFrameWeight = ReprojectIrradiance(true, false, gIn_PrevComposedDiff, gIn_PrevComposedSpec_PrevViewZ, geometryProps, pixelPos, prevLdiff, prevLspec);
+
+    // Estimate how strong lighting at hit depends on the view direction
+    float diffuseProbabilityBiased = EstimateDiffuseProbability(geometryProps, materialProps, true);
+    float3 prevLsum = prevLdiff + prevLspec * diffuseProbabilityBiased;
+
+    float diffuseLikeMotion = lerp(diffuseProbabilityBiased, 1.0, Math::Sqrt01(materialProps.curvature)); // TODO: review
+    prevFrameWeight *= diffuseLikeMotion;
+
+    float a = Color::Luminance(prevLdiff);
+    float b = Color::Luminance(prevLspec);
+    prevFrameWeight *= lerp(diffuseProbabilityBiased, 1.0, (a + NRD_EPS) / (a + b + NRD_EPS));
+
+    // Avoid really bad reprojection
+    return NRD_MODE < OCCLUSION ? float4(prevLsum * saturate(prevFrameWeight / 0.001), prevFrameWeight) : 0.0;
+}
+
 struct TraceOpaqueResult
 {
     float3 diffRadiance;
@@ -46,53 +96,6 @@ struct TraceOpaqueResult
 
     float3 debug;
 };
-
-
-
-uint Bayer4x4ui(uint2 samplePos, uint frameIndex)
-{
-    uint2 samplePosWrap = samplePos & 3;
-    uint a = 2068378560 * (1 - (samplePosWrap.x >> 1)) + 1500172770 * (samplePosWrap.x >> 1);
-    uint b = (samplePosWrap.y + ((samplePosWrap.x & 1) << 2)) << 2;
-
-    uint sampleOffset = frameIndex;
-
-    return ((a >> b) + sampleOffset) & 0xF;
-}
-
-float2 GetBlueNoise(uint2 pixelPos, uint seed = 0)
-{
-    // https://eheitzresearch.wordpress.com/772-2/
-    // https://belcour.github.io/blog/research/publication/2019/06/17/sampling-bluenoise.html
-
-    // Sample index
-    uint sampleIndex = (gFrameIndex + seed) & (BLUE_NOISE_TEMPORAL_DIM - 1);
-
-    // sampleIndex = 3;
-
-    // pixelPos /= 8;
-
-    uint2 uv = pixelPos & (BLUE_NOISE_SPATIAL_DIM - 1);
-    uint index = uv.x + uv.y * BLUE_NOISE_SPATIAL_DIM;
-    uint3 A = gIn_ScramblingRanking[index].xyz;
-
-    // return float2(A.x/256.0 , A.y / 256.0);
-    uint rankedSampleIndex = sampleIndex ^ A.z;
-
-
-    // return float2(rankedSampleIndex / float(BLUE_NOISE_TEMPORAL_DIM), 0);
-
-
-    uint4 B = gIn_Sobol[rankedSampleIndex & 255];
-    float4 blue = (float4(B ^ A.xyxy) + 0.5) * (1.0 / 256.0);
-
-    // ( Optional ) Randomize in [ 0; 1 / 256 ] area to get rid of possible banding
-    uint d = Bayer4x4ui(pixelPos, gFrameIndex);
-    float2 dither = (float2(d & 3, d >> 2) + 0.5) * (1.0 / 4.0);
-    blue += (dither.xyxy - 0.5) * (1.0 / 256.0);
-
-    return saturate(blue.xy);
-}
 
 
 void CastRay(float3 origin, float3 direction, float Tmin, float Tmax, float2 mipAndCone, out GeometryProps props, out MaterialProps matProps)
@@ -136,26 +139,6 @@ void CastRay(float3 origin, float3 direction, float Tmin, float Tmax, float2 mip
     matProps.T = payload.T.xyz;
 }
 
-float4 GetRadianceFromPreviousFrame(GeometryProps geometryProps, MaterialProps materialProps, uint2 pixelPos)
-{
-    // Reproject previous frame
-    float3 prevLdiff, prevLspec;
-    float prevFrameWeight = ReprojectIrradiance(true, false, gIn_PrevComposedDiff, gIn_PrevComposedSpec_PrevViewZ, geometryProps, pixelPos, prevLdiff, prevLspec);
-
-    // Estimate how strong lighting at hit depends on the view direction
-    float diffuseProbabilityBiased = EstimateDiffuseProbability(geometryProps, materialProps, true);
-    float3 prevLsum = prevLdiff + prevLspec * diffuseProbabilityBiased;
-
-    float diffuseLikeMotion = lerp(diffuseProbabilityBiased, 1.0, Math::Sqrt01(materialProps.curvature)); // TODO: review
-    prevFrameWeight *= diffuseLikeMotion;
-
-    float a = Color::Luminance(prevLdiff);
-    float b = Color::Luminance(prevLspec);
-    prevFrameWeight *= lerp(diffuseProbabilityBiased, 1.0, (a + NRD_EPS) / (a + b + NRD_EPS));
-
-    // Avoid really bad reprojection
-    return NRD_MODE < OCCLUSION ? float4(prevLsum * saturate(prevFrameWeight / 0.001), prevFrameWeight) : 0.0;
-}
 
 TraceOpaqueResult TraceOpaque(GeometryProps geometryProps0, MaterialProps materialProps0, uint2 pixelPos, float3x3 mirrorMatrix, float4 Lpsr)
 {
@@ -543,21 +526,21 @@ void MainRayGenShader()
         // MaterialProps materialPropsShadow;
         //
         // CastRay(Xoffset, sunDirection, 0.0, INF, mipAndCone, geometryPropsShadow, materialPropsShadow);
-    
-    
+
+
         RayDesc rayDesc;
         rayDesc.Origin = Xoffset;
         rayDesc.Direction = sunDirection;
         rayDesc.TMin = 0;
         rayDesc.TMax = 1000;
-    
+
         MainRayPayload shadowPayload = (MainRayPayload)0;
         TraceRay(gWorldTlas, RAY_FLAG_NONE | RAY_FLAG_CULL_NON_OPAQUE, 0xFF, 0, 1, 1, rayDesc, shadowPayload);
         shadowHitDist = shadowPayload.hitT;
-    
+
         // shadowHitDist = geometryPropsShadow.hitT;
     }
-    
+
     // shadowHitDist = 0;
 
     float penumbra = SIGMA_FrontEnd_PackPenumbra(shadowHitDist, gTanSunAngularRadius);
