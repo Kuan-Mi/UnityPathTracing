@@ -1,25 +1,23 @@
-RaytracingAccelerationStructure g_AccelStruct : register(t0, space1);
+RaytracingAccelerationStructure gWorldTlas : register(t0, space1);
 
 
 #if( USE_STOCHASTIC_SAMPLING == 1 )
-    #define TEX_SAMPLER gNearestMipmapNearestSampler
+#define TEX_SAMPLER gNearestMipmapNearestSampler
 #else
-    #define TEX_SAMPLER gLinearMipmapLinearSampler
+#define TEX_SAMPLER gLinearMipmapLinearSampler
 #endif
-
 
 #if( USE_LOAD == 1 )
-    #define SAMPLE( coords ) Load( int3( coords ) )
+#define SAMPLE( coords ) Load( int3( coords ) )
 #else
-    #define SAMPLE( coords ) SampleLevel( TEX_SAMPLER, coords.xy, coords.z )
+#define SAMPLE( coords ) SampleLevel( TEX_SAMPLER, coords.xy, coords.z )
 #endif
 
-
-float3x3 Hair_GetBasis( float3 N, float3 T )
+float3x3 Hair_GetBasis(float3 N, float3 T)
 {
-    float3 B = cross( N, T );
+    float3 B = cross(N, T);
 
-    return float3x3( T, B, N );
+    return float3x3(T, B, N);
 }
 
 #include "Payload.hlsl"
@@ -36,7 +34,6 @@ struct GeometryProps
     float curvature; // 曲率估算值（用于材质、去噪等）
     uint textureOffsetAndFlags;
     uint instanceIndex; // 命中的实例索引（用于查找InstanceData）
- 
 
     float3 GetXoffset(float3 offsetDir, float amount = PT_BOUNCE_RAY_OFFSET)
     {
@@ -62,7 +59,6 @@ struct GeometryProps
     }
 };
 
-
 struct MaterialProps
 {
     float3 Lemi;
@@ -74,27 +70,27 @@ struct MaterialProps
     float curvature;
 };
 
-float2 GetConeAngleFromAngularRadius( float mip, float tanConeAngle )
+float2 GetConeAngleFromAngularRadius(float mip, float tanConeAngle)
 {
     // In any case, we are limited by the output resolution
-    tanConeAngle = max( tanConeAngle, gTanPixelAngularRadius );
+    tanConeAngle = max(tanConeAngle, gTanPixelAngularRadius);
 
-    return float2( mip, tanConeAngle );
+    return float2(mip, tanConeAngle);
 }
 
-float2 GetConeAngleFromRoughness( float mip, float roughness )
+float2 GetConeAngleFromRoughness(float mip, float roughness)
 {
     float tanConeAngle = roughness * roughness * 0.05; // TODO: tweaked to be accurate and give perf boost
 
-    return GetConeAngleFromAngularRadius( mip, tanConeAngle );
+    return GetConeAngleFromAngularRadius(mip, tanConeAngle);
 }
 
-float2 STF_Bilinear( float2 uv, float2 texSize )
+float2 STF_Bilinear(float2 uv, float2 texSize)
 {
-    Filtering::Bilinear f = Filtering::GetBilinearFilter( uv, texSize );
+    Filtering::Bilinear f = Filtering::GetBilinearFilter(uv, texSize);
 
-    float2 rnd = Rng::Hash::GetFloat2( );
-    f.origin += step( rnd, f.weights );
+    float2 rnd = Rng::Hash::GetFloat2();
+    f.origin += step(rnd, f.weights);
 
     return f.origin / texSize;
 }
@@ -132,7 +128,7 @@ void CastRay(float3 origin, float3 direction, float Tmin, float Tmax, float2 mip
     MainRayPayload payload = (MainRayPayload)0;
     payload.mipAndCone = mipAndCone;
 
-    TraceRay(g_AccelStruct, flag, 0xFF, 0, 1, 0, rayDesc, payload);
+    TraceRay(gWorldTlas, flag, 0xFF, 0, 1, 0, rayDesc, payload);
 
     props = (GeometryProps)0;
     props.mip = mipAndCone.x;
@@ -241,7 +237,7 @@ float3 GetLighting(GeometryProps geometryProps, inout MaterialProps materialProp
         rayDesc.TMax = 1000;
 
         MainRayPayload shadowPayload = (MainRayPayload)0;
-        TraceRay(g_AccelStruct, RAY_FLAG_NONE | RAY_FLAG_CULL_NON_OPAQUE, 0xFF, 0, 1, 1, rayDesc, shadowPayload);
+        TraceRay(gWorldTlas, RAY_FLAG_NONE | RAY_FLAG_CULL_NON_OPAQUE, 0xFF, 0, 1, 1, rayDesc, shadowPayload);
         float hitT = shadowPayload.hitT;
 
         lighting *= float(hitT == INF);
@@ -250,10 +246,10 @@ float3 GetLighting(GeometryProps geometryProps, inout MaterialProps materialProp
     return lighting;
 }
 
-float3 GetLighting( GeometryProps geometryProps, MaterialProps materialProps, uint flags )
+float3 GetLighting(GeometryProps geometryProps, MaterialProps materialProps, uint flags)
 {
     float3 unused;
-    return GetLighting( geometryProps, materialProps, flags, unused );
+    return GetLighting(geometryProps, materialProps, flags, unused);
 }
 
 
@@ -423,17 +419,17 @@ float3 GenerateRayAndUpdateThroughput(inout GeometryProps geometryProps, inout M
 
     return ray;
 }
- 
 
-float3 GetMaterialDemodulation( GeometryProps geometryProps, MaterialProps materialProps )
+
+float3 GetMaterialDemodulation(GeometryProps geometryProps, MaterialProps materialProps)
 {
     float3 albedo, Rf0;
-    BRDF::ConvertBaseColorMetalnessToAlbedoRf0( materialProps.baseColor, materialProps.metalness, albedo, Rf0 );
+    BRDF::ConvertBaseColorMetalnessToAlbedoRf0(materialProps.baseColor, materialProps.metalness, albedo, Rf0);
 
-    float NoV = abs( dot( geometryProps.N, geometryProps.V ) );
-    float3 Fenv = _NRD_EnvironmentTerm_Rtg( Rf0, NoV, materialProps.roughness );
+    float NoV = abs(dot(geometryProps.N, geometryProps.V));
+    float3 Fenv = _NRD_EnvironmentTerm_Rtg(Rf0, NoV, materialProps.roughness);
 
-    return ( albedo + Fenv ) * 0.95 + 0.05;
+    return (albedo + Fenv) * 0.95 + 0.05;
 }
 
 float GetDeltaEventRay(GeometryProps geometryProps, bool isReflection, float eta, out float3 Xoffset, out float3 ray)
@@ -458,11 +454,11 @@ float GetDeltaEventRay(GeometryProps geometryProps, bool isReflection, float eta
     return eta;
 }
 
-bool IsDelta( MaterialProps materialProps )
+bool IsDelta(MaterialProps materialProps)
 {
     return materialProps.roughness < 0.041 // TODO: tweaked for kitchen
-        && ( materialProps.metalness > 0.941 || Color::Luminance( materialProps.baseColor ) < 0.005 )
-        && sqrt( abs( materialProps.curvature ) ) < 2.5;
+        && (materialProps.metalness > 0.941 || Color::Luminance(materialProps.baseColor) < 0.005)
+        && sqrt(abs(materialProps.curvature)) < 2.5;
 }
 
 
@@ -573,5 +569,3 @@ float ReprojectIrradiance(bool isPrevFrame, bool isRefraction, Texture2D<float3>
 
     return weight;
 }
-
-

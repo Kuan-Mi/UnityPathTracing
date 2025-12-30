@@ -33,7 +33,7 @@ namespace PathTracing
         public static int gIn_PrevComposedSpec_PrevViewZID = Shader.PropertyToID("gIn_PrevComposedSpec_PrevViewZ");
 
 
-        public static int g_AccelStructID = Shader.PropertyToID("g_AccelStruct");
+        public static int g_AccelStructID = Shader.PropertyToID("gWorldTlas");
 
 
         // TraceOpaque
