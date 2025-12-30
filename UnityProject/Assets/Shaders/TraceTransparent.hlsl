@@ -365,9 +365,9 @@ float3 TraceTransparent(TraceTransparentDesc desc)
             pathThroughput *= isReflection ? F : 1.0 - F;
         else
         {
-            // float rnd = frac(bayer + Sequence::Halton(bounce, 3)); // "Halton( bounce, 2 )" works worse than others
+            float rnd = frac(bayer + Sequence::Halton(bounce, 3)); // "Halton( bounce, 2 )" works worse than others
 
-            float rnd = Rng::Hash::GetFloat();
+            // float rnd = Rng::Hash::GetFloat();
             
             F = clamp(F, PT_GLASS_MIN_F, 1.0 - PT_GLASS_MIN_F); // TODO: needed?
 
