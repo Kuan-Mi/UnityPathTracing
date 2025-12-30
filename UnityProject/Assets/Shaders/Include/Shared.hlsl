@@ -162,7 +162,6 @@
 #define GEOMETRY_ALL                        ( FLAG_NON_TRANSPARENT | FLAG_TRANSPARENT )
 
 
-
 cbuffer PathTracingParams : register(b0)
 {
     float4x4 gViewToWorld;
@@ -253,35 +252,33 @@ SamplerState sampler_Point_Repeat;
 //=============================================================================================
 
 // For SHARC
-float3 GetGlobalPos( float3 X )
+float3 GetGlobalPos(float3 X)
 {
     return gCameraGlobalPos.xyz * gCameraGlobalPos.w + X;
 }
 
 // Taken out from NRD
-float GetSpecMagicCurve( float roughness )
+float GetSpecMagicCurve(float roughness)
 {
-    float f = 1.0 - exp2( -200.0 * roughness * roughness );
-    f *= Math::Pow01( roughness, 0.5 );
+    float f = 1.0 - exp2(-200.0 * roughness * roughness);
+    f *= Math::Pow01(roughness, 0.5);
 
     return f;
 }
 
-
-float ApplyThinLensEquation( float hitDist, float curvature )
+float ApplyThinLensEquation(float hitDist, float curvature)
 {
-    return hitDist / ( 2.0 * curvature * hitDist + 1.0 );
+    return hitDist / (2.0 * curvature * hitDist + 1.0);
 }
-
 
 float3 GetMotion(float3 X, float3 Xprev)
 {
     float3 motion = Xprev - X;
 
-    float viewZ = -Geometry::AffineTransform(gWorldToView, X).z;
+    float viewZ = Geometry::AffineTransform(gWorldToView, X).z;
     float2 sampleUv = Geometry::GetScreenUv(gWorldToClip, X);
 
-    float viewZprev = -Geometry::AffineTransform(gWorldToViewPrev, Xprev).z;
+    float viewZprev = Geometry::AffineTransform(gWorldToViewPrev, Xprev).z;
     float2 sampleUvPrev = Geometry::GetScreenUv(gWorldToClipPrev, Xprev);
 
     // IMPORTANT: scaling to "pixel" unit significantly improves utilization of FP16
@@ -289,33 +286,29 @@ float3 GetMotion(float3 X, float3 Xprev)
 
     // IMPORTANT: 2.5D motion is preferred over 3D motion due to imprecision issues caused by FP16 rounding negative effects
     motion.z = viewZprev - viewZ;
-    // return 0;
+
     return motion;
 }
 
-
-float3 ApplyExposure( float3 Lsum )
+float3 ApplyExposure(float3 Lsum)
 {
-    if( gOnScreen <= SHOW_DENOISED_SPECULAR )
+    if (gOnScreen <= SHOW_DENOISED_SPECULAR)
         Lsum *= gExposure;
 
     return Lsum;
 }
 
-
-float3 ApplyTonemap( float3 Lsum )
+float3 ApplyTonemap(float3 Lsum)
 {
     #if( NRD_MODE < OCCLUSION )
-    if( gOnScreen == SHOW_FINAL )
-        Lsum = gHdrScale * Color::HdrToLinear_Uncharted( Lsum );
+    if (gOnScreen == SHOW_FINAL)
+        Lsum = gHdrScale * Color::HdrToLinear_Uncharted(Lsum);
     #else
     Lsum = Lsum.xxx;
     #endif
 
     return Lsum;
 }
-
-
 
 float4 BicubicFilterNoCorners(Texture2D<float4> tex, SamplerState samp, float2 samplePos, float2 invResourceSize, float sharpness)
 {
@@ -357,13 +350,12 @@ float4 BicubicFilterNoCorners(Texture2D<float4> tex, SamplerState samp, float2 s
     return color;
 }
 
-
 void GetCameraRay(out float3 origin, out float3 direction, float2 sampleUv)
 {
     // https://www.slideshare.net/TiagoAlexSousa/graphics-gems-from-cryengine-3-siggraph-2013 ( slides 23+ )
 
     // Pinhole ray
-    float3 Xv = Geometry::ReconstructViewPosition(sampleUv, gCameraFrustum, gNearZ);
+    float3 Xv = Geometry::ReconstructViewPosition(sampleUv, gCameraFrustum, gNearZ, gOrthoMode);
     direction = normalize(Xv);
 
     // Distorted ray
@@ -377,24 +369,24 @@ void GetCameraRay(out float3 origin, out float3 direction, float2 sampleUv)
     #endif
 
     origin = Geometry::AffineTransform(gViewToWorld, Xv);
-    direction = normalize(Geometry::RotateVector(gViewToWorld, Fv - Xv));
+    direction = gOrthoMode == 0.0 ? normalize(Geometry::RotateVector(gViewToWorld, Fv - Xv)) : -gViewDirection.xyz;
 }
 
-
-float GetCircleOfConfusion( float distance ) // diameter
+float GetCircleOfConfusion(float distance) // diameter
 {
     float F = gFocalLength; // focal lenght ( deducted from FOV )
     float A = gAperture; // aperture diameter
     float P = gFocalDistance; // focal distance
 
-    return gOrthoMode == 0.0 ? abs( A * ( F * ( P - distance ) ) / ( distance * ( P - F ) ) ) : A;
+    return gOrthoMode == 0.0 ? abs(A * (F * (P - distance)) / (distance * (P - F))) : A;
 }
 
-
+//=============================================================================================
+// VERY SIMPLE SKY MODEL
+//=============================================================================================
 
 #define SKY_INTENSITY 1.0
 #define SUN_INTENSITY 10.0
-
 
 float3 GetSunIntensity(float3 v)
 {
@@ -419,7 +411,6 @@ float3 GetSunIntensity(float3 v)
 
     return Color::FromGamma(sunColor) * SUN_INTENSITY;
 }
-
 
 float3 GetSkyIntensity(float3 v)
 {

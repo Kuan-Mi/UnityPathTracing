@@ -287,7 +287,7 @@ namespace Nrd
             //     localData.commonSettings.worldToViewMatrixPrev = setting.worldToViewMatrixPrev;
             // }
 
-            localData.commonSettings.motionVectorScale.z = 1.0f;
+            localData.commonSettings.motionVectorScale.z = -1.0f;
             localData.commonSettings.denoisingRange = setting.denoisingRange;
 
             // localData.commonSettings.disocclusionThreshold = setting.disocclusionThreshold;

@@ -141,7 +141,7 @@ namespace Nrd
 
             s.motionVectorScale[0] = 1.0f;
             s.motionVectorScale[1] = 1.0f;
-            s.motionVectorScale[2] = 1.0f;
+            s.motionVectorScale[2] = -1.0f;
             s.isMotionVectorInWorldSpace = true;
 
             // Scalars
