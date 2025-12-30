@@ -136,6 +136,9 @@ void CSMain(int2 threadPos : SV_GroupThreadId, int2 pixelPos : SV_DispatchThread
     bool want5x5 = centerMv.z < 0.0; // 5x5 is needed for hair ( super thin ) and glass ( noisy ), also it's safe to use it for sky to get better edges
 
 
+    want5x5 = false;
+    // gOut_Result[pixelPos] = float4(want5x5,want5x5,want5x5,1); // debug
+    
     [unroll]
     for (int dy = 0; dy <= BORDER * 2; dy++)
     {
