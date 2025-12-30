@@ -1,7 +1,7 @@
 // Each #kernel tells which function to compile; you can have many kernels
 #pragma kernel CSMain
 // #include "ml.hlsli"
-#include "RayPayload.hlsl"
+#include "Include/Shared.hlsl"
 #include "NRDInclude/NRD.hlsli"
 
 

@@ -84,11 +84,11 @@ MonoBehaviour:
     showValidation: 0
     dofAperture: 0
     dofFocalDistance: 0.57
-    exposure: 100
-    taa: 0.168
+    exposure: 30.1
+    taa: 0.109
     rpp: 1
     bounceNum: 1
-    dofFocalLength: 0
-    mipBias: 0
+    dofFocalLength: 2.39
+    mipBias: 1.29
   gIn_ScramblingRanking: {fileID: 2800000, guid: ba45d1e4dcf9022438a4798a5f9e7b80, type: 3}
   gIn_Sobol: {fileID: 2800000, guid: 17e7ce8147355314ea8aab1178a6a43c, type: 3}
