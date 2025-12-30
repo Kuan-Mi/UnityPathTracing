@@ -245,7 +245,7 @@ TraceOpaqueResult TraceOpaque(GeometryProps geometryProps0, MaterialProps materi
                 float2 rnd2 = GetBlueNoise(blueNoisePos, gTracingMode == RESOLUTION_HALF);
                 #endif
 
-                float3 ray = GenerateRayAndUpdateThroughput(geometryProps, materialProps, pathThroughput, sampleMaxNum, isDiffuse, rnd2);
+                float3 ray = GenerateRayAndUpdateThroughput(geometryProps, materialProps, pathThroughput, sampleMaxNum, isDiffuse, rnd2,HAIR);
 
 
                 // Special case for primary surface ( 1st bounce starts here )
