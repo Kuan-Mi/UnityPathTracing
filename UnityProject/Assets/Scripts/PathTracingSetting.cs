@@ -70,6 +70,8 @@ namespace PathTracing
 
         [Range(1, 4)]
         public uint bounceNum = 1;
- 
+
+        public float dofFocalLength;
+        public float mipBias;
     }
 }

@@ -102,215 +102,6 @@ Shader "Custom/LitWithRayTracing"
     {
         Pass
         {
-            Name "Test"
-
-            Tags
-            {
-                "LightMode"="RayTracing"
-            }
-            HLSLPROGRAM
-            #include "UnityRaytracingMeshUtils.cginc"
-            #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
-            #include "_Utils.hlsl"
-            #include "Packages/com.unity.render-pipelines.universal/Shaders/LitInput.hlsl"
-
-            #pragma shader_feature_local_raytracing _EMISSION
-            #pragma shader_feature_local_raytracing _NORMALMAP
-            #pragma shader_feature_local_raytracing _METALLICSPECGLOSSMAP
-            #pragma shader_feature_local_raytracing _SURFACE_TYPE_TRANSPARENT
-
-            #pragma multi_compile_local RAY_TRACING_PROCEDURAL_GEOMETRY
-
-            #pragma max_recursion_depth 2
-
-            #pragma raytracing test
-
-            float _IOR;
-
-            struct AttributeData
-            {
-                float2 barycentrics;
-            };
-
-
-            #include "RayPayload.hlsl"
-            #include "GlobalResource.hlsl"
-
-            #if RAY_TRACING_PROCEDURAL_GEOMETRY
-
-            [shader("intersection")]
-            void IntersectionMain()
-            {
-                AttributeData attr;
-                attr.barycentrics = float2(0.0, 0.0);
-                ReportHit(0, 0.0, attr);
-            }
-
-            #endif
-
-            struct Vertex
-            {
-                float3 position;
-                float3 normal;
-                float4 tangent;
-                float2 uv;
-            };
-
-
-            Vertex FetchVertex(uint vertexIndex)
-            {
-                Vertex v;
-                // 从 Unity 提供的 Vertex Attribute 结构中读取数据
-                v.position = UnityRayTracingFetchVertexAttribute3(vertexIndex, kVertexAttributePosition);
-                v.normal = UnityRayTracingFetchVertexAttribute3(vertexIndex, kVertexAttributeNormal);
-                v.tangent = UnityRayTracingFetchVertexAttribute4(vertexIndex, kVertexAttributeTangent);
-                v.uv = UnityRayTracingFetchVertexAttribute2(vertexIndex, kVertexAttributeTexCoord0);
-                return v;
-            }
-
-            // 手动插值顶点属性
-            Vertex InterpolateVertices(Vertex v0, Vertex v1, Vertex v2, float3 barycentrics)
-            {
-                Vertex v;
-                #define INTERPOLATE_ATTRIBUTE(attr) v.attr = v0.attr * barycentrics.x + v1.attr * barycentrics.y + v2.attr * barycentrics.z
-                INTERPOLATE_ATTRIBUTE(position);
-                INTERPOLATE_ATTRIBUTE(normal);
-                INTERPOLATE_ATTRIBUTE(tangent);
-                INTERPOLATE_ATTRIBUTE(uv);
-                return v;
-            }
-
-
-            [shader("closesthit")]
-            void ClosestHitMain(inout RayPayload payload : SV_RayPayload,
-                                AttributeData attribs : SV_IntersectionAttributes)
-            {
-                // if (payload.bounceIndexOpaque == g_BounceCountOpaque)
-                // {
-                //     payload.bounceIndexOpaque += 1;
-                //     return;
-                // }
-
-                uint3 triangleIndices = UnityRayTracingFetchTriangleIndices(PrimitiveIndex());
-                Vertex v0 = FetchVertex(triangleIndices.x);
-                Vertex v1 = FetchVertex(triangleIndices.y);
-                Vertex v2 = FetchVertex(triangleIndices.z);
-
-                float3 barycentricCoords = float3(1.0 - attribs.barycentrics.x - attribs.barycentrics.y,
-                                                  attribs.barycentrics.x, attribs.barycentrics.y);
-
-                Vertex v = InterpolateVertices(v0, v1, v2, barycentricCoords);
-
-
-                bool isFrontFace = HitKind() == HIT_KIND_TRIANGLE_FRONT_FACE;
-
-                float3 normalOS = isFrontFace ? v.normal : -v.normal;
-
-                float3 normalWS = normalize(mul(normalOS, (float3x3)WorldToObject()));
-
-                #if _NORMALMAP
-                float3 tangentWS = normalize(mul(v.tangent.xyz, (float3x3)WorldToObject()));
-                float4 n = _BumpMap.SampleLevel(sampler_BumpMap, _BaseMap_ST.xy * v.uv + _BaseMap_ST.zw, 0);
-                float3 tangentNormal = UnpackNormalScale(n, _BumpScale);
-
-                float3 bitangent = cross(normalWS.xyz, tangentWS.xyz);
-                half3x3 tangentToWorld = half3x3(tangentWS.xyz, bitangent.xyz, normalWS.xyz);
-
-                float3 worldNormal = TransformTangentToWorld(tangentNormal, tangentToWorld);
-
-                #else
-                float3 worldNormal = normalWS;
-                #endif
-
-                float3 worldPosition = mul(ObjectToWorld(), float4(v.position, 1)).xyz;
-
-                float3 albedo = _BaseColor.xyz * _BaseMap.SampleLevel(sampler_BaseMap,
-                                                                      _BaseMap_ST.xy * v.uv + _BaseMap_ST.zw,
-                                                                      0).xyz;
-
-
-                albedo = float3(0, 1, 0);
-
-                float4 vv = _MetallicGlossMap.SampleLevel(sampler_MetallicGlossMap,
-                                                          _BaseMap_ST.xy * v.uv + _BaseMap_ST.zw, 0);
-                float metallic = vv.r * _Metallic;
-                float smooth = vv.a * _Smoothness;
-
-                float3 dielectricSpecular = float3(0.04, 0.04, 0.04);
-                float3 _SpecularColor = lerp(dielectricSpecular, albedo, metallic);
-
-                // float avgF0 = dot(_SpecularColor, float3(0.3333, 0.3333, 0.3333));
-                // float _IOR = (1 + sqrt(avgF0)) / (1 - sqrt(avgF0));
-
-                // _IOR = 0.5f;
-
-                #if _SURFACE_TYPE_TRANSPARENT
-
-                worldNormal = normalize(worldNormal + RandomUnitVector(payload.rngState) * (1 - smooth));
-
-                float3 reflectionRayDir = reflect(WorldRayDirection(), worldNormal);
-
-                // _IOR = 1.5; // 水的折射率
-                float indexOfRefraction = isFrontFace ? 1.0 / _IOR : _IOR;
-
-                float3 refractionRayDir = refract(WorldRayDirection(), worldNormal, indexOfRefraction); // 折射方向
-                float fresnelFactorTransparent = FresnelReflectAmountTransparent(
-                    isFrontFace ? 1 : _IOR, isFrontFace ? _IOR : 1, WorldRayDirection(), worldNormal);
-                // 是否进行折射
-                float doRefraction = (RandomFloat01(payload.rngState) > fresnelFactorTransparent) ? 1 : 0;
-                float3 bounceRayDir = lerp(reflectionRayDir, refractionRayDir, doRefraction);
-
-                float pushOff = doRefraction ? -K_RAY_ORIGIN_PUSH_OFF : K_RAY_ORIGIN_PUSH_OFF;
-                float3 albedoTransparent = !isFrontFace
-                                               ? exp(-(1 - albedo) * RayTCurrent() * _BaseColor.a * 20)
-                                               : float3(1, 1, 1);
-
-
-                #endif
-
-                #if _EMISSION
-                float3 emission = _EmissionColor.xyz * _EmissionMap.SampleLevel(sampler_EmissionMap, v.uv, 0).xyz;
-                payload.emission = emission;
-                #else
-                payload.emission = float3(0, 0, 0);
-                #endif
-
-
-                #if _SURFACE_TYPE_TRANSPARENT
-
-                payload.k = (doRefraction == 1) ? 1 - fresnelFactorTransparent : fresnelFactorTransparent;
-                payload.albedo = albedoTransparent;
-                payload.bounceRayOrigin = worldPosition + pushOff * worldNormal;
-                payload.bounceRayDirection = bounceRayDir;
-                payload.bounceIndexTransparent = payload.bounceIndexTransparent + 1;
-
-                #else
-
-                payload.bounceIndexOpaque = payload.bounceIndexOpaque + 1;
-                float3 reflectionRayDir = reflect(WorldRayDirection(), worldNormal);
-                float3 diffuseRayDir = normalize(worldNormal + RandomUnitVector(payload.rngState));
-                float3 specularRayDir = normalize(lerp(diffuseRayDir, reflectionRayDir, smooth));
-
-                float fresnelFactor = FresnelReflectAmountOpaque(1, _IOR, WorldRayDirection(), worldNormal);
-                float specularChance = lerp(metallic, 1, fresnelFactor * smooth);
-                float doSpecular = (RandomFloat01(payload.rngState) < specularChance) ? 1 : 0;
-                float3 reflectedRayDir = lerp(diffuseRayDir, specularRayDir, doSpecular);
-
-                payload.k = (doSpecular == 1) ? specularChance : 1 - specularChance;
-                payload.albedo = lerp(albedo, _SpecularColor.xyz, doSpecular);
-                payload.bounceRayOrigin = worldPosition + K_RAY_ORIGIN_PUSH_OFF * worldNormal;
-                payload.bounceRayDirection = reflectedRayDir;
-
-                #endif
-
-
-                // payload.worldFaceNormal = worldNormal;
-                // payload.albedo = worldNormal;
-            }
-            ENDHLSL
-        }
-        Pass
-        {
             Name "Test2"
 
             Tags
@@ -321,6 +112,8 @@ Shader "Custom/LitWithRayTracing"
             #include "UnityRaytracingMeshUtils.cginc"
             #include "ml.hlsli"
             #include "Packages/com.unity.render-pipelines.universal/Shaders/LitInput.hlsl"
+            #include "Include/Shared.hlsl"
+            #include "Include/Payload.hlsl"
 
             #pragma shader_feature_local_raytracing _EMISSION
             #pragma shader_feature_local_raytracing _NORMALMAP
@@ -338,9 +131,6 @@ Shader "Custom/LitWithRayTracing"
                 float2 barycentrics;
             };
 
-
-            #include "RayPayload.hlsl"
-            #include "GlobalResource.hlsl"
 
             #if RAY_TRACING_PROCEDURAL_GEOMETRY
 
@@ -394,7 +184,7 @@ Shader "Custom/LitWithRayTracing"
 
             [shader("closesthit")]
             void ClosestHitMain(inout MainRayPayload payload : SV_RayPayload,
-                                AttributeData attribs : SV_IntersectionAttributes)
+                    AttributeData attribs : SV_IntersectionAttributes)
             {
                 uint3 triangleIndices = UnityRayTracingFetchTriangleIndices(PrimitiveIndex());
                 Vertex v0 = FetchVertex(triangleIndices.x);
@@ -414,7 +204,7 @@ Shader "Custom/LitWithRayTracing"
                 payload.curvature = sqrt(dnSq);
 
                 float3 barycentricCoords = float3(1.0 - attribs.barycentrics.x - attribs.barycentrics.y,
-                                                  attribs.barycentrics.x, attribs.barycentrics.y);
+                           attribs.barycentrics.x, attribs.barycentrics.y);
 
                 Vertex v = InterpolateVertices(v0, v1, v2, barycentricCoords);
 
@@ -471,7 +261,7 @@ Shader "Custom/LitWithRayTracing"
                 float2 normalUV = (v.uv); // 修正UV翻转问题
 
                 float2 packedNormal = _BumpMap.SampleLevel(sampler_BumpMap, _BaseMap_ST.xy * normalUV + _BaseMap_ST.zw,
-                                                           mip).xy;
+               mip).xy;
 
                 float4 T = float4(tangentWS, 1);
 

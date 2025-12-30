@@ -1,0 +1,439 @@
+// © 2022 NVIDIA Corporation
+
+//=============================================================================================
+// SETTINGS
+//=============================================================================================
+
+// Fused or separate denoising selection
+// 0 - DIFFUSE and SPECULAR
+// 1 - DIFFUSE_SPECULAR
+#define NRD_COMBINED                        1
+
+// NORMAL - common (non specialized) denoisers
+// SH - SH (spherical harmonics or spherical gaussian) denoisers
+// OCCLUSION - OCCLUSION (ambient or specular occlusion only) denoisers
+// DIRECTIONAL_OCCLUSION - DIRECTIONAL_OCCLUSION (ambient occlusion in SH mode) denoisers
+#define NRD_MODE                            NORMAL // NRD sample recompilation required
+#define SIGMA_TRANSLUCENCY                  1
+
+// Default = 1
+#define USE_IMPORTANCE_SAMPLING             1
+#define USE_SHARC_DITHERING                 1.5 // radius in voxels
+#define USE_TRANSLUCENCY                    1 // translucent foliage
+#define USE_MOVING_EMISSION_FIX             1 // fixes a dark tail, left by an animated emissive object
+
+// Default = 0
+#define USE_SANITIZATION                    0 // NRD sample is NAN/INF free
+#define USE_SIMULATED_MATERIAL_ID_TEST      0 // "material ID" debugging
+#define USE_SIMULATED_FIREFLY_TEST          0 // "anti-firefly" debugging
+#define USE_CAMERA_ATTACHED_REFLECTION_TEST 0 // test special treatment for reflections of objects attached to the camera
+#define USE_RUSSIAN_ROULETTE                0 // bad practice for real-time denoising
+#define USE_DRS_STRESS_TEST                 0 // NRD must not touch GARBAGE data outside of DRS rectangle
+#define USE_INF_STRESS_TEST                 0 // NRD must not touch GARBAGE data outside of denoising range
+#define USE_ANOTHER_COBALT                  0 // another cobalt variant
+#define USE_PUDDLES                         0 // add puddles
+#define USE_RANDOMIZED_ROUGHNESS            0 // randomize roughness ( a common case in games )
+#define USE_STOCHASTIC_SAMPLING             0 // needed?
+#define USE_LOAD                            0 // Load vs SampleLevel
+#define USE_SHARC_DEBUG                     0 // 1 - show cache, 2 - show grid (NRD sample recompile required)
+#define USE_TAA_DEBUG                       0 // 1 - show weight
+#define USE_BIAS_FIX                        0 // fixes negligible hair and specular bias
+
+//=============================================================================================
+// CONSTANTS
+//=============================================================================================
+
+// NRD variant
+#define NORMAL                              0
+#define SH                                  1 // NORMAL + SH (SG) resolve
+#define OCCLUSION                           2
+#define DIRECTIONAL_OCCLUSION               3 // diffuse OCCLUSION + SH (SG) resolve
+
+// Denoiser
+#define DENOISER_REBLUR                     0
+#define DENOISER_RELAX                      1
+#define DENOISER_REFERENCE                  2
+
+// Resolution
+#define RESOLUTION_FULL                     0
+#define RESOLUTION_FULL_PROBABILISTIC       1
+#define RESOLUTION_HALF                     2
+
+// What is on screen?
+#define SHOW_FINAL                          0
+#define SHOW_DENOISED_DIFFUSE               1
+#define SHOW_DENOISED_SPECULAR              2
+#define SHOW_AMBIENT_OCCLUSION              3
+#define SHOW_SPECULAR_OCCLUSION             4
+#define SHOW_SHADOW                         5
+#define SHOW_BASE_COLOR                     6
+#define SHOW_NORMAL                         7
+#define SHOW_ROUGHNESS                      8
+#define SHOW_METALNESS                      9
+#define SHOW_MATERIAL_ID                    10
+#define SHOW_PSR_THROUGHPUT                 11
+#define SHOW_WORLD_UNITS                    12
+#define SHOW_INSTANCE_INDEX                 13
+#define SHOW_UV                             14
+#define SHOW_CURVATURE                      15
+#define SHOW_MIP_PRIMARY                    16
+#define SHOW_MIP_SPECULAR                   17
+
+// Predefined material override
+#define MATERIAL_GYPSUM                     1
+#define MATERIAL_COBALT                     2
+
+// Material ID
+#define MATERIAL_ID_DEFAULT                 0.0f
+#define MATERIAL_ID_METAL                   1.0f
+#define MATERIAL_ID_HAIR                    2.0f
+#define MATERIAL_ID_SELF_REFLECTION         3.0f
+
+// Mip mode
+#define MIP_VISIBILITY                      0 // for visibility: emission, shadow and alpha mask
+#define MIP_LESS_SHARP                      1 // for normal
+#define MIP_SHARP                           2 // for albedo and roughness
+
+// Register spaces ( sets )
+#define SET_OTHER                           0
+#define SET_RAY_TRACING                     1
+#define SET_SHARC                           2
+#define SET_MORPH                           3
+#define SET_ROOT                            4
+
+// Path tracing
+#define PT_THROUGHPUT_THRESHOLD             0.001
+#define PT_IMPORTANCE_SAMPLES_NUM           16
+#define PT_SPEC_LOBE_ENERGY                 0.95 // trimmed to 95%
+#define PT_SHADOW_RAY_OFFSET                1.0 // pixels
+#define PT_BOUNCE_RAY_OFFSET                0.25 // pixels
+#define PT_GLASS_RAY_OFFSET                 0.05 // pixels
+#define PT_MAX_FIREFLY_RELATIVE_INTENSITY   20.0 // no more than 20x energy increase in case of probabilistic sampling
+#define PT_EVIL_TWIN_LOBE_TOLERANCE         0.005 // normalized %
+#define PT_GLASS_MIN_F                      0.05 // adds a bit of stability and bias
+#define PT_DELTA_BOUNCES_NUM                8
+#define PT_PSR_BOUNCES_NUM                  2
+#define PT_RAY_FLAGS                        0
+
+// Spatial HAsh-based Radiance Cache ( SHARC )
+#define SHARC_CAPACITY                      ( 1 << 22 )
+#define SHARC_SCENE_SCALE                   45.0
+#define SHARC_DOWNSCALE                     5
+#define SHARC_ANTI_FIREFLY                  false
+#define SHARC_STALE_FRAME_NUM_MIN           32 // new version uses 8 by default, old value offers more stability in voxels with low number of samples ( critical for glass )
+#define SHARC_SEPARATE_EMISSIVE             1
+#define SHARC_MATERIAL_DEMODULATION         1
+#define SHARC_USE_FP16                      0
+
+// Blue noise
+#define BLUE_NOISE_SPATIAL_DIM              128 // see StaticTexture::ScramblingRanking
+#define BLUE_NOISE_TEMPORAL_DIM             4 // good values: 4-8 for shadows, 8-16 for occlusion, 8-32 for lighting
+
+// Other
+#define FP16_MAX                            65504.0
+#define INF                                 1e5
+#define LINEAR_BLOCK_SIZE                   256
+#define FP16_VIEWZ_SCALE                    0.125 // TODO: tuned for meters, needs to be scaled down for cm and mm
+#define MAX_MIP_LEVEL                       11.0
+#define LEAF_TRANSLUCENCY                   0.25
+#define LEAF_THICKNESS                      0.001 // TODO: viewZ dependent?
+#define STRAND_THICKNESS                    80e-6f
+#define TAA_HISTORY_SHARPNESS               0.66 // sharper ( was 0.5 )
+#define TAA_SIGMA_SCALE                     2.0 // allow nano ghosting ( was 1.0 ) // TODO: can negatively affect moving shadows
+#define GARBAGE                             sqrt( -1.0 ) // sqrt( -1.0 ) or -log( 0.0 ) or 32768.0
+
+#define MORPH_MAX_ACTIVE_TARGETS_NUM        8u
+#define MORPH_ELEMENTS_PER_ROW_NUM          4
+#define MORPH_ROWS_NUM                      ( MORPH_MAX_ACTIVE_TARGETS_NUM / MORPH_ELEMENTS_PER_ROW_NUM )
+
+// Instance flags
+#define FLAG_FIRST_BIT                      24 // this + number of flags must be <= 32
+#define NON_FLAG_MASK                       ( ( 1 << FLAG_FIRST_BIT ) - 1 )
+
+#define FLAG_NON_TRANSPARENT                0x01 // geometry flag: non-transparent
+#define FLAG_TRANSPARENT                    0x02 // geometry flag: transparent
+#define FLAG_FORCED_EMISSION                0x04 // animated emissive cube
+#define FLAG_STATIC                         0x08 // no velocity
+#define FLAG_HAIR                           0x10 // hair
+#define FLAG_LEAF                           0x20 // leaf
+#define FLAG_SKIN                           0x40 // skin
+#define FLAG_MORPH                          0x80 // morph
+
+#define GEOMETRY_ALL                        ( FLAG_NON_TRANSPARENT | FLAG_TRANSPARENT )
+
+
+
+cbuffer PathTracingParams : register(b0)
+{
+    float4x4 gViewToWorld;
+    float4x4 gViewToClip;
+    float4x4 gWorldToView;
+    float4x4 gWorldToViewPrev;
+    float4x4 gWorldToClip;
+    float4x4 gWorldToClipPrev;
+    float4 gHitDistParams;
+    float4 gCameraFrustum;
+    float4 gSunBasisX;
+    float4 gSunBasisY;
+    float4 gSunDirection;
+    float4 gCameraGlobalPos;
+    float4 gCameraGlobalPosPrev;
+    float4 gViewDirection;
+    float4 gHairBaseColor;
+    float2 gHairBetas;
+    float2 gOutputSize; // represents native resolution ( >= gRenderSize )
+    float2 gRenderSize; // up to native resolution ( >= gRectSize )
+    float2 gRectSize; // dynamic resolution scaling
+    float2 gInvOutputSize;
+    float2 gInvRenderSize;
+    float2 gInvRectSize;
+    float2 gRectSizePrev;
+    float2 gJitter;
+    float gEmissionIntensity;
+    float gNearZ;
+    float gSeparator;
+    float gRoughnessOverride;
+    float gMetalnessOverride;
+    float gUnitToMetersMultiplier;
+    float gTanSunAngularRadius;
+    float gTanPixelAngularRadius;
+    float gDebug;
+    float gPrevFrameConfidence;
+    float gUnproject;
+    float gAperture;
+    float gFocalDistance;
+    float gFocalLength;
+    float gTAA;
+    float gHdrScale;
+    float gExposure;
+    float gMipBias;
+    float gOrthoMode;
+    float gIndirectDiffuse;
+    float gIndirectSpecular;
+    float gMinProbability;
+    uint gSharcMaxAccumulatedFrameNum;
+    uint gDenoiserType;
+    uint gDisableShadowsAndEnableImportanceSampling; // TODO: remove - modify GetSunIntensity to return 0 if sun is below horizon
+    uint gFrameIndex;
+    uint gForcedMaterial;
+    uint gUseNormalMap;
+    uint gBounceNum;
+    uint gResolve;
+    uint gValidation;
+    uint gSR;
+    uint gRR;
+    uint gIsSrgb;
+    uint gOnScreen;
+    uint gTracingMode;
+    uint gSampleNum;
+    uint gPSR;
+    uint gSHARC;
+    uint gTrimLobe;
+};
+
+#include "../ml.hlsli"
+#include "../NRDInclude/NRD.hlsli"
+
+
+SamplerState sampler_Trilinear_Repeat;
+SamplerState sampler_Linear_Repeat;
+SamplerState sampler_Point_Repeat;
+
+#define gLinearMipmapLinearSampler  sampler_Trilinear_Repeat
+#define gLinearMipmapNearestSampler  sampler_Linear_Repeat
+#define gNearestMipmapNearestSampler  sampler_Point_Repeat
+
+
+#define gLinearSampler gLinearMipmapLinearSampler
+#define gNearestSampler gNearestMipmapNearestSampler
+
+
+//=============================================================================================
+// MISC
+//=============================================================================================
+
+// For SHARC
+float3 GetGlobalPos( float3 X )
+{
+    return gCameraGlobalPos.xyz * gCameraGlobalPos.w + X;
+}
+
+// Taken out from NRD
+float GetSpecMagicCurve( float roughness )
+{
+    float f = 1.0 - exp2( -200.0 * roughness * roughness );
+    f *= Math::Pow01( roughness, 0.5 );
+
+    return f;
+}
+
+
+float ApplyThinLensEquation( float hitDist, float curvature )
+{
+    return hitDist / ( 2.0 * curvature * hitDist + 1.0 );
+}
+
+
+float3 GetMotion(float3 X, float3 Xprev)
+{
+    float3 motion = Xprev - X;
+
+    float viewZ = -Geometry::AffineTransform(gWorldToView, X).z;
+    float2 sampleUv = Geometry::GetScreenUv(gWorldToClip, X);
+
+    float viewZprev = -Geometry::AffineTransform(gWorldToViewPrev, Xprev).z;
+    float2 sampleUvPrev = Geometry::GetScreenUv(gWorldToClipPrev, Xprev);
+
+    // IMPORTANT: scaling to "pixel" unit significantly improves utilization of FP16
+    motion.xy = (sampleUvPrev - sampleUv) * gRectSize;
+
+    // IMPORTANT: 2.5D motion is preferred over 3D motion due to imprecision issues caused by FP16 rounding negative effects
+    motion.z = viewZprev - viewZ;
+    // return 0;
+    return motion;
+}
+
+
+float3 ApplyExposure( float3 Lsum )
+{
+    if( gOnScreen <= SHOW_DENOISED_SPECULAR )
+        Lsum *= gExposure;
+
+    return Lsum;
+}
+
+
+float3 ApplyTonemap( float3 Lsum )
+{
+    #if( NRD_MODE < OCCLUSION )
+    if( gOnScreen == SHOW_FINAL )
+        Lsum = gHdrScale * Color::HdrToLinear_Uncharted( Lsum );
+    #else
+    Lsum = Lsum.xxx;
+    #endif
+
+    return Lsum;
+}
+
+
+
+float4 BicubicFilterNoCorners(Texture2D<float4> tex, SamplerState samp, float2 samplePos, float2 invResourceSize, float sharpness)
+{
+    float2 centerPos = floor(samplePos - 0.5) + 0.5;
+    float2 f = saturate(samplePos - centerPos);
+    float2 f2 = f * f;
+    float2 f3 = f * f2;
+    float2 w0 = -sharpness * f3 + 2.0 * sharpness * f2 - sharpness * f;
+    float2 w1 = (2.0 - sharpness) * f3 - (3.0 - sharpness) * f2 + 1.0;
+    float2 w2 = -(2.0 - sharpness) * f3 + (3.0 - 2.0 * sharpness) * f2 + sharpness * f;
+    float2 w3 = sharpness * f3 - sharpness * f2;
+    float2 wl2 = w1 + w2;
+    float2 tc2 = invResourceSize * (centerPos + w2 * Math::PositiveRcp(wl2));
+    float2 tc0 = invResourceSize * (centerPos - 1.0);
+    float2 tc3 = invResourceSize * (centerPos + 2.0);
+
+    float w = wl2.x * w0.y;
+    float4 color = tex.SampleLevel(samp, float2(tc2.x, tc0.y), 0) * w;
+    float sum = w;
+
+    w = w0.x * wl2.y;
+    color += tex.SampleLevel(samp, float2(tc0.x, tc2.y), 0) * w;
+    sum += w;
+
+    w = wl2.x * wl2.y;
+    color += tex.SampleLevel(samp, float2(tc2.x, tc2.y), 0) * w;
+    sum += w;
+
+    w = w3.x * wl2.y;
+    color += tex.SampleLevel(samp, float2(tc3.x, tc2.y), 0) * w;
+    sum += w;
+
+    w = wl2.x * w3.y;
+    color += tex.SampleLevel(samp, float2(tc2.x, tc3.y), 0) * w;
+    sum += w;
+
+    color *= Math::PositiveRcp(sum);
+
+    return color;
+}
+
+
+void GetCameraRay(out float3 origin, out float3 direction, float2 sampleUv)
+{
+    // https://www.slideshare.net/TiagoAlexSousa/graphics-gems-from-cryengine-3-siggraph-2013 ( slides 23+ )
+
+    // Pinhole ray
+    float3 Xv = Geometry::ReconstructViewPosition(sampleUv, gCameraFrustum, gNearZ);
+    direction = normalize(Xv);
+
+    // Distorted ray
+    float2 rnd = Rng::Hash::GetFloat2();
+    rnd = ImportanceSampling::Cosine::GetRay(rnd).xy;
+    Xv.xy += rnd * gAperture;
+
+    float3 Fv = direction * gFocalDistance; // z-plane
+    #if 0
+    Fv /= dot(vForward, direction); // radius
+    #endif
+
+    origin = Geometry::AffineTransform(gViewToWorld, Xv);
+    direction = normalize(Geometry::RotateVector(gViewToWorld, Fv - Xv));
+}
+
+
+float GetCircleOfConfusion( float distance ) // diameter
+{
+    float F = gFocalLength; // focal lenght ( deducted from FOV )
+    float A = gAperture; // aperture diameter
+    float P = gFocalDistance; // focal distance
+
+    return gOrthoMode == 0.0 ? abs( A * ( F * ( P - distance ) ) / ( distance * ( P - F ) ) ) : A;
+}
+
+
+
+#define SKY_INTENSITY 1.0
+#define SUN_INTENSITY 10.0
+
+
+float3 GetSunIntensity(float3 v)
+{
+    float b = dot(v, gSunDirection.xyz);
+    float d = length(v - gSunDirection.xyz * b);
+
+    float glow = saturate(1.015 - d);
+    glow *= b * 0.5 + 0.5;
+    glow *= 0.6;
+
+    float a = Math::Sqrt01(1.0 - b * b) / b;
+    float sun = 1.0 - Math::SmoothStep(gTanSunAngularRadius * 0.9, gTanSunAngularRadius * 1.66 + 0.01, a);
+    sun *= float(b > 0.0);
+    sun *= 1.0 - Math::Pow01(1.0 - v.y, 4.85);
+    sun *= Math::SmoothStep(0.0, 0.1, gSunDirection.y);
+    sun += glow;
+
+    float3 sunColor = lerp(float3(1.0, 0.6, 0.3), float3(1.0, 0.9, 0.7), Math::Sqrt01(gSunDirection.y));
+    sunColor *= sun;
+
+    sunColor *= Math::SmoothStep(-0.01, 0.05, gSunDirection.y);
+
+    return Color::FromGamma(sunColor) * SUN_INTENSITY;
+}
+
+
+float3 GetSkyIntensity(float3 v)
+{
+    float atmosphere = sqrt(1.0 - saturate(v.y));
+
+    float scatter = pow(saturate(gSunDirection.y), 1.0 / 15.0);
+    scatter = 1.0 - clamp(scatter, 0.8, 1.0);
+
+    float3 scatterColor = lerp(float3(1.0, 1.0, 1.0), float3(1.0, 0.3, 0.0) * 1.5, scatter);
+    float3 skyColor = lerp(float3(0.2, 0.4, 0.8), float3(scatterColor), atmosphere / 1.3);
+    skyColor *= saturate(1.0 + gSunDirection.y);
+
+    float ground = 0.5 + 0.5 * Math::SmoothStep(-1.0, 0.0, v.y);
+    skyColor *= ground;
+
+    return Color::FromGamma(skyColor) * SKY_INTENSITY + GetSunIntensity(v);
+}
