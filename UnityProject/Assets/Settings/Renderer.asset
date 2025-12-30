@@ -84,8 +84,8 @@ MonoBehaviour:
     showValidation: 0
     dofAperture: 0
     dofFocalDistance: 0.57
-    exposure: 30.1
-    taa: 0.109
+    exposure: 59
+    taa: 0
     rpp: 1
     bounceNum: 1
     dofFocalLength: 2.39

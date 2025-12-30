@@ -86,6 +86,37 @@ float4 GetRadianceFromPreviousFrame(GeometryProps geometryProps, MaterialProps m
     return NRD_MODE < OCCLUSION ? float4(prevLsum * saturate(prevFrameWeight / 0.001), prevFrameWeight) : 0.0;
 }
 
+
+float GetMaterialID(GeometryProps geometryProps, MaterialProps materialProps)
+{
+    bool isHair = geometryProps.Has(FLAG_HAIR);
+    bool isMetal = materialProps.metalness > 0.5;
+
+    return isHair ? MATERIAL_ID_HAIR : (isMetal ? MATERIAL_ID_METAL : MATERIAL_ID_DEFAULT);
+}
+
+//========================================================================================
+// TRACE OPAQUE
+//========================================================================================
+
+/*
+The function has not been designed to trace primary hits. But still can be used to trace
+direct and indirect lighting.
+
+Prerequisites:
+    Rng::Hash::Initialize( )
+
+Derivation:
+    Lsum = L0 + BRDF0 * ( L1 + BRDF1 * ( L2 + BRDF2 * ( L3 +  ... ) ) )
+
+    Lsum = L0 +
+        L1 * BRDF0 +
+        L2 * BRDF0 * BRDF1 +
+        L3 * BRDF0 * BRDF1 * BRDF2 +
+        ...
+*/
+
+
 struct TraceOpaqueResult
 {
     float3 diffRadiance;
@@ -98,48 +129,6 @@ struct TraceOpaqueResult
 };
 
 
-void CastRay(float3 origin, float3 direction, float Tmin, float Tmax, float2 mipAndCone, out GeometryProps props, out MaterialProps matProps)
-{
-    RayDesc rayDesc;
-    rayDesc.Origin = origin;
-    rayDesc.Direction = direction;
-    rayDesc.TMin = Tmin;
-    rayDesc.TMax = Tmax;
-
-    MainRayPayload payload = (MainRayPayload)0;
-    payload.mipAndCone = mipAndCone;
-
-    TraceRay(gWorldTlas, RAY_FLAG_NONE | RAY_FLAG_CULL_NON_OPAQUE, 0xFF, 0, 1, 0, rayDesc, payload);
-
-
-    props = (GeometryProps)0;
-    props.mip = mipAndCone.x;
-    props.hitT = payload.hitT;
-    props.instanceIndex = payload.instanceIndex;
-    props.N = payload.N;
-    props.curvature = payload.curvature;
-
-
-    props.mip = payload.mipAndCone.x;
-
-    props.T = payload.T;
-    props.X = payload.X;
-    // 全静止物体
-    props.Xprev = payload.X;
-    props.V = -direction;
-
-    matProps = (MaterialProps)0;
-    matProps.baseColor = payload.baseColor;
-    matProps.roughness = payload.roughness;
-    matProps.metalness = payload.metalness;
-    matProps.Lemi = payload.Lemi;
-    // 这三个应该从贴图再计算一次
-    matProps.curvature = payload.curvature;
-    matProps.N = payload.matN;
-    matProps.T = payload.T.xyz;
-}
-
-
 TraceOpaqueResult TraceOpaque(GeometryProps geometryProps0, MaterialProps materialProps0, uint2 pixelPos, float3x3 mirrorMatrix, float4 Lpsr)
 {
     TraceOpaqueResult result = (TraceOpaqueResult)0;
@@ -147,7 +136,6 @@ TraceOpaqueResult TraceOpaque(GeometryProps geometryProps0, MaterialProps materi
     result.specHitDist = NRD_FrontEnd_SpecHitDistAveraging_Begin();
     #endif
 
-    // 里面取绝对值了
     float viewZ0 = Geometry::AffineTransform(gWorldToView, geometryProps0.X).z;
     float roughness0 = materialProps0.roughness;
 
@@ -158,12 +146,18 @@ TraceOpaqueResult TraceOpaque(GeometryProps geometryProps0, MaterialProps materi
         BRDF::ConvertBaseColorMetalnessToAlbedoRf0(materialProps0.baseColor, materialProps0.metalness, albedo, Rf0);
 
         NRD_MaterialFactors(materialProps0.N, geometryProps0.V, albedo, Rf0, materialProps0.roughness, diffFactor0, specFactor0);
-    }
 
+        // We can combine radiance ( for everything ) and irradiance ( for hair ) in denoising if material ID test is enabled
+        if (geometryProps0.Has(FLAG_HAIR) && NRD_NORMAL_ENCODING == NRD_NORMAL_ENCODING_R10G10B10A2_UNORM)
+        {
+            diffFactor0 = 1.0;
+            specFactor0 = 1.0;
+        }
+    }
 
     // uint checkerboard = Sequence::CheckerBoard(pixelPos, g_FrameIndex) != 0;
 
-    // 两条路径
+    uint checkerboard = Sequence::CheckerBoard(pixelPos, gFrameIndex) != 0;
     uint pathNum = gSampleNum << (gTracingMode == RESOLUTION_FULL ? 1 : 0);
     uint diffPathNum = 0;
 
@@ -263,7 +257,7 @@ TraceOpaqueResult TraceOpaque(GeometryProps geometryProps0, MaterialProps materi
                 // float2 mipAndCone = GetConeAngleFromRoughness( geometryProps.mip, isDiffuse ? 1.0 : materialProps.roughness );
                 float2 mipAndCone = GetConeAngleFromRoughness(geometryProps.mip, isDiffuse ? 1.0 : materialProps.roughness);
 
-                CastRay(geometryProps.GetXoffset(geometryProps.N), ray, 0.0, INF, mipAndCone, geometryProps, materialProps);
+                CastRay(geometryProps.GetXoffset(geometryProps.N), ray, 0.0, INF, mipAndCone, RAY_FLAG_CULL_NON_OPAQUE, geometryProps, materialProps);
             }
 
 
@@ -410,12 +404,6 @@ TraceOpaqueResult TraceOpaque(GeometryProps geometryProps0, MaterialProps materi
     return result;
 }
 
-float GetMaterialID(GeometryProps geometryProps, MaterialProps materialProps)
-{
-    bool isMetal = materialProps.metalness > 0.5;
-    return (isMetal ? MATERIAL_ID_METAL : MATERIAL_ID_DEFAULT);
-}
-
 [shader("raygeneration")]
 void MainRayGenShader()
 {
@@ -442,7 +430,7 @@ void MainRayGenShader()
 
     GeometryProps geometryProps0;
     MaterialProps materialProps0;
-    CastRay(cameraRayOrigin, cameraRayDirection, 0.0, 1000.0, GetConeAngleFromRoughness(0.0, 0.0), geometryProps0, materialProps0);
+    CastRay(cameraRayOrigin, cameraRayDirection, 0.0, 1000.0, GetConeAngleFromRoughness(0.0, 0.0), RAY_FLAG_CULL_NON_OPAQUE, geometryProps0, materialProps0);
 
     //================================================================================================================================================================================
     // Primary surface replacement ( aka jump through mirrors )
