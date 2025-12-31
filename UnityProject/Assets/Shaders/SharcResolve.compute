@@ -1,21 +1,12 @@
 #pragma kernel CSMain
-#include "RayPayload.hlsl"
 
 #define SHARC_ENABLE_64_BIT_ATOMICS 1
 #pragma exclude_renderers   opengl vulkan metal  glCore gles3 webgpu
 #pragma use_dxc
 #pragma target 6.0
 
-
-#include "Sharc/SharcCommon.h"
-
-#define LINEAR_BLOCK_SIZE                   256
-
-
-RWStructuredBuffer<uint64_t> gInOut_SharcHashEntriesBuffer;
-RWStructuredBuffer<SharcAccumulationData> gInOut_SharcAccumulated;
-RWStructuredBuffer<SharcPackedData> gInOut_SharcResolved;
-
+#include "Include/Shared.hlsl"
+#include "Include/RaytracingShared.hlsl"
 
 [numthreads( LINEAR_BLOCK_SIZE, 1, 1 )]
 void CSMain(uint threadIndex : SV_DispatchThreadID)
