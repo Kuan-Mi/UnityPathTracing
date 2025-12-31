@@ -68,6 +68,7 @@ MonoBehaviour:
   m_Name: PathTracingFeature
   m_EditorClassIdentifier: Assembly-CSharp::PathTracing.PathTracingFeature
   m_Active: 1
+  finalMaterial: {fileID: 2100000, guid: 27695a2bc55ef2f469362b9a2994989e, type: 2}
   opaqueTracingShader: {fileID: 4807578003741378534, guid: 71faa22953dc9834daf36cc38966c196, type: 3}
   transparentTracingShader: {fileID: 4807578003741378534, guid: d207e5fb066a4b579353785310fd0dea, type: 3}
   compositionComputeShader: {fileID: 7200000, guid: 6b0c89c26f4363a4781550cf86801786, type: 3}
@@ -83,12 +84,12 @@ MonoBehaviour:
     showMV: 0
     showValidation: 0
     dofAperture: 0
-    dofFocalDistance: 0.57
-    exposure: 59
-    taa: 0
+    dofFocalDistance: 1
+    exposure: 1.7
+    taa: 0.042553
     rpp: 1
     bounceNum: 1
-    dofFocalLength: 2.39
-    mipBias: 1.29
+    dofFocalLength: 0.175
+    mipBias: -0.5
   gIn_ScramblingRanking: {fileID: 2800000, guid: ba45d1e4dcf9022438a4798a5f9e7b80, type: 3}
   gIn_Sobol: {fileID: 2800000, guid: 17e7ce8147355314ea8aab1178a6a43c, type: 3}

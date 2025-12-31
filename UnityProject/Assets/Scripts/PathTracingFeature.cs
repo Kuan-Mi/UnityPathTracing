@@ -130,7 +130,7 @@ namespace PathTracing
             }
         }
 
-        private Material finalMaterial;
+        public Material finalMaterial;
         public RayTracingShader opaqueTracingShader;
         public RayTracingShader transparentTracingShader;
 
@@ -233,7 +233,8 @@ namespace PathTracing
             if (finalMaterial == null)
             {
                 var shader = Shader.Find("KM/Final");
-                finalMaterial = new Material(shader);
+                finalMaterial = new Material(shader); 
+                DontDestroyOnLoad(finalMaterial);
             }
 
             _pathTracingPass.BiltMaterial = finalMaterial;
@@ -266,6 +267,7 @@ namespace PathTracing
             accelerationStructure.Release();
             accelerationStructure = null;
             _pathTracingPass.Dispose();
+            _pathTracingPass = null;
 
             foreach (var denoiser in _denoisers.Values)
             {

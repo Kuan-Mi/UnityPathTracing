@@ -4,6 +4,7 @@ using Nrd;
 using UnityEngine;
 using UnityEngine.Experimental.Rendering;
 using UnityEngine.Rendering;
+using Object = UnityEngine.Object;
 
 namespace NRD
 {

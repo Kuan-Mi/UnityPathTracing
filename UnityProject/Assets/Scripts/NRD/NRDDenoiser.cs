@@ -102,8 +102,21 @@ namespace Nrd
 
         public void EnsureResources(int width, int height)
         {
+            // 检查是否有任何资源失效（例如场景切换导致 RenderTexture 被销毁）
+            bool isResourceInvalid = false;
+            foreach (var nrdTextureResource in allocatedResources)
+            {
+                // 如果 Handle 为空，或者底层的 rt 已经被 Unity 销毁 (null)
+                if (nrdTextureResource.Handle == null || nrdTextureResource.Handle.rt == null)
+                {
+                    isResourceInvalid = true;
+                    break;
+                }
+            }
+            
+            
             // 如果尺寸没变且资源都存在，直接返回
-            if (width == _prevWidth && height == _prevHeight)
+            if (!isResourceInvalid && width == _prevWidth && height == _prevHeight)
             {
                 return;
             }

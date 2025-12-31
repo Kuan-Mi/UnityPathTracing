@@ -208,6 +208,10 @@ namespace PathTracing
                     Blitter.BlitTexture(natCmd, taaDst, new Vector4(1, 1, 0, 0), data.BlitMaterial, (int)ShowPass.showAlpha);
                     break;
                 case ShowMode.Final:
+                    if (data.BlitMaterial == null)
+                    {
+                        Debug.LogError("BlitMaterial is null"); 
+                    }
                     Blitter.BlitTexture(natCmd, taaDst, new Vector4(1, 1, 0, 0), data.BlitMaterial, (int)ShowPass.showOut);
                     break;
                 default:
@@ -374,6 +378,14 @@ namespace PathTracing
         {
             passData.OutputTexture = CreateTex(textureDesc, renderGraph, "PathTracingOutput", GraphicsFormat.R16G16B16A16_SFloat);
 
+            
+            var inMV = NrdDenoiser.GetRT(ResourceType.IN_MV);
+
+            if (inMV == null)
+            {
+                Debug.LogError("NrdDenoiser IN_MV is null");
+            }
+            
             passData.Mv = renderGraph.ImportTexture(NrdDenoiser.GetRT(ResourceType.IN_MV));
             passData.ViewZ = renderGraph.ImportTexture(NrdDenoiser.GetRT(ResourceType.IN_VIEWZ));
             passData.NormalRoughness = renderGraph.ImportTexture(NrdDenoiser.GetRT(ResourceType.IN_NORMAL_ROUGHNESS));
