@@ -27,7 +27,7 @@ namespace PathTracing
         public GraphicsBuffer ScramblingRanking;
         public GraphicsBuffer Sobol;
 
-        private readonly PathTracingSetting _settings;
+        private readonly PathTracingSetting m_Settings;
         private readonly GraphicsBuffer _pathTracingSettingsBuffer;
 
         [DllImport("RenderingPlugin")]
@@ -83,7 +83,7 @@ namespace PathTracing
 
         public PathTracingPassSingle(PathTracingSetting setting)
         {
-            _settings = setting;
+            m_Settings = setting;
             _pathTracingSettingsBuffer = new GraphicsBuffer(GraphicsBuffer.Target.Constant, 1, Marshal.SizeOf<GlobalConstants>());
         }
 
@@ -233,6 +233,11 @@ namespace PathTracing
             }
         }
 
+        uint GetMaxAccumulatedFrameNum(float accumulationTime, float fps)
+        {
+            return (uint)(accumulationTime * fps + 0.5f);
+        }
+        
         public override void RecordRenderGraph(RenderGraph renderGraph, ContextContainer frameData)
         {
             var cameraData = frameData.Get<UniversalCameraData>();
@@ -282,6 +287,46 @@ namespace PathTracing
             var aspectRatio = (float)rectW / rectH;
             var horizontalFieldOfView = Mathf.Atan(Mathf.Tan(Mathf.Deg2Rad * verticalFieldOfView * 0.5f) * aspectRatio) * 2 * Mathf.Rad2Deg;
 
+            
+            
+            float emissionIntensity = m_Settings.emissionIntensity *  (m_Settings.emission? 1.0f : 0.0f);
+            
+            float ACCUMULATION_TIME = 0.5f;
+            int MAX_HISTORY_FRAME_NUM = 60;
+            
+            float fps = 1000.0f /  Mathf.Max(Time.deltaTime * 1000.0f, 0.0001f);
+            fps = math.min(fps, 121.0f);
+            float resetHistoryFactor = 1.0f;
+            
+            
+            float otherMaxAccumulatedFrameNum = GetMaxAccumulatedFrameNum(ACCUMULATION_TIME, fps);
+            otherMaxAccumulatedFrameNum = math.min(otherMaxAccumulatedFrameNum,  (MAX_HISTORY_FRAME_NUM));
+            otherMaxAccumulatedFrameNum *= resetHistoryFactor;
+            
+            
+            uint sharcMaxAccumulatedFrameNum = (uint)(otherMaxAccumulatedFrameNum * (m_Settings.boost ? 0.667f : 1.0f) + 0.5f);
+            float taaMaxAccumulatedFrameNum = otherMaxAccumulatedFrameNum * 0.5f;
+            float prevFrameMaxAccumulatedFrameNum = otherMaxAccumulatedFrameNum * 0.3f;
+            
+            
+            
+            float minProbability = 0.0f;
+            if (m_Settings.tracingMode == RESOLUTION.RESOLUTION_FULL_PROBABILISTIC) {
+                HitDistanceReconstructionMode mode = HitDistanceReconstructionMode.OFF;
+                if (m_Settings.denoiser == DenoiserType.DENOISER_REBLUR)
+                    mode = HitDistanceReconstructionMode.OFF;
+                //     mode = m_ReblurSettings.hitDistanceReconstructionMode;
+                // else if (m_Settings.denoiser == DenoiserType.DENOISER_RELAX)
+                //     mode = m_RelaxSettings.hitDistanceReconstructionMode;
+
+                // Min / max allowed probability to guarantee a sample in 3x3 or 5x5 area - https://godbolt.org/z/YGYo1rjnM
+                if (mode == HitDistanceReconstructionMode.AREA_3X3)
+                    minProbability = 1.0f / 4.0f;
+                else if (mode == HitDistanceReconstructionMode.AREA_5X5)
+                    minProbability = 1.0f / 16.0f;
+            }
+            
+            
             var globalConstants = new GlobalConstants
             {
                 gViewToWorld = NrdDenoiser.worldToView.inverse,
@@ -296,8 +341,8 @@ namespace PathTracing
                 gSunBasisX = new float4(gSunBasisX.x, gSunBasisX.y, gSunBasisX.z, 0),
                 gSunBasisY = new float4(gSunBasisY.x, gSunBasisY.y, gSunBasisY.z, 0),
                 gSunDirection = new float4(gSunDirection.x, gSunDirection.y, gSunDirection.z, 0),
-                gCameraGlobalPos = NrdDenoiser.camPos,
-                gCameraGlobalPosPrev = NrdDenoiser.prevCamPos,
+                gCameraGlobalPos = new float4(NrdDenoiser.camPos, 1),
+                gCameraGlobalPosPrev = new float4(NrdDenoiser.prevCamPos,0),
                 gViewDirection = new float4(cam.transform.forward, 0),
                 gHairBaseColor = new float4(0.1f, 0.1f, 0.1f, 1.0f),
 
@@ -311,47 +356,47 @@ namespace PathTracing
                 gRectSizePrev = rectSize,
                 gJitter = NrdDenoiser.ViewportJitter / rectSize,
 
-                gEmissionIntensity = 1.0f,
+                gEmissionIntensity = emissionIntensity,
                 gNearZ = -cam.nearClipPlane,
-                gSeparator = _settings.splitScreen,
+                gSeparator = m_Settings.splitScreen,
                 gRoughnessOverride = 0,
                 gMetalnessOverride = 0,
                 gUnitToMetersMultiplier = 1.0f,
-                gTanSunAngularRadius = math.tan(math.radians(_settings.sunAngularDiameter * 0.5f)),
+                gTanSunAngularRadius = math.tan(math.radians(m_Settings.sunAngularDiameter * 0.5f)),
                 gTanPixelAngularRadius = math.tan(0.5f * math.radians(horizontalFieldOfView) / cam.pixelWidth),
                 gDebug = 0,
-                gPrevFrameConfidence = 1,
+                gPrevFrameConfidence = (m_Settings.usePrevFrame && !m_Settings.RR) ? prevFrameMaxAccumulatedFrameNum / (1.0f + prevFrameMaxAccumulatedFrameNum) : 0.0f,
                 gUnproject = 1.0f / (0.5f * rectH * m11),
-                gAperture = _settings.dofAperture * 0.01f,
-                gFocalDistance = _settings.dofFocalDistance,
-                gFocalLength = _settings.dofFocalLength,
-                gTAA = _settings.taa,
+                gAperture = m_Settings.dofAperture * 0.01f,
+                gFocalDistance = m_Settings.dofFocalDistance,
+                gFocalLength = (0.5f * (35.0f * 0.001f)) / math.tan(math.radians(horizontalFieldOfView * 0.5f)),
+                gTAA = (m_Settings.denoiser != DenoiserType.DENOISER_REFERENCE && m_Settings.TAA) ? 1.0f / (1.0f + taaMaxAccumulatedFrameNum) : 1.0f,
                 gHdrScale = 1.0f,
-                gExposure = _settings.exposure,
-                gMipBias = _settings.mipBias,
+                gExposure = m_Settings.exposure,
+                gMipBias = m_Settings.mipBias,
                 gOrthoMode = cam.orthographic ? 1.0f : 0f,
-                gIndirectDiffuse = 1.0f,
-                gIndirectSpecular = 1.0f,
-                gMinProbability = 0.000f,
+                gIndirectDiffuse = m_Settings.indirectDiffuse ? 1.0f : 0.0f,
+                gIndirectSpecular = m_Settings.indirectSpecular ? 1.0f : 0.0f,
+                gMinProbability = minProbability,
 
-                gSharcMaxAccumulatedFrameNum = 45,
-                gDenoiserType = 0,
-                gDisableShadowsAndEnableImportanceSampling = 0,
+                gSharcMaxAccumulatedFrameNum = sharcMaxAccumulatedFrameNum,
+                gDenoiserType = (uint)m_Settings.denoiser,
+                gDisableShadowsAndEnableImportanceSampling = m_Settings.importanceSampling ? 1u : 0u,
                 gFrameIndex = (uint)Time.frameCount,
                 gForcedMaterial = 0,
                 gUseNormalMap = 1,
-                gBounceNum = _settings.bounceNum,
+                gBounceNum = m_Settings.bounceNum,
                 gResolve = 1,
                 gValidation = 1,
-                gSR = 0,
-                gRR = 0,
+                gSR = (m_Settings.SR && !m_Settings.RR) ? 1u : 0u,
+                gRR = m_Settings.RR ? 1u : 0,
                 gIsSrgb = 0,
                 gOnScreen = 0,
-                gTracingMode = _settings.tracingMode,
-                gSampleNum = _settings.rpp,
-                gPSR = _settings.psr ? (uint)1 : 0,
-                gSHARC = 1,
-                gTrimLobe = 1,
+                gTracingMode = m_Settings.RR ? (uint)RESOLUTION.RESOLUTION_FULL_PROBABILISTIC : (uint)m_Settings.tracingMode,
+                gSampleNum = m_Settings.rpp,
+                gPSR = m_Settings.psr ? (uint)1 : 0,
+                gSHARC = m_Settings.SHARC ? (uint)1 : 0,
+                gTrimLobe = m_Settings.specularLobeTrimming ? 1u : 0,
             };
 
             // Debug.Log(globalConstants.ToString());
@@ -368,7 +413,7 @@ namespace PathTracing
             passData.Width = (uint)textureDesc.width;
             passData.Height = (uint)textureDesc.height;
             passData.ConstantBuffer = _pathTracingSettingsBuffer;
-            passData.Setting = _settings;
+            passData.Setting = m_Settings;
             passData.ScramblingRanking = ScramblingRanking;
             passData.Sobol = Sobol;
 

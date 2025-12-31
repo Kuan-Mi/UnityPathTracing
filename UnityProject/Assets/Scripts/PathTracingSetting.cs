@@ -20,6 +20,21 @@ namespace PathTracing
         Taa,
         Final,
     }
+    
+    public enum DenoiserType
+    {
+        DENOISER_REBLUR = 0,
+        DENOISER_RELAX = 1,
+        DENOISER_REFERENCE = 2,
+    }
+
+    public enum RESOLUTION
+    {
+        RESOLUTION_FULL = 0,
+        RESOLUTION_FULL_PROBABILISTIC = 1,
+        RESOLUTION_HALF = 2,
+    }
+ 
 
     [System.Serializable]
     public class PathTracingSetting
@@ -60,9 +75,9 @@ namespace PathTracing
         [Range(0.1f, 100f)]
         public float exposure = 1.0f;
 
-        [Header("TAA")]
-        [Range(0f, 1f)]
-        public float taa = 1.0f;
+        // [Header("TAA")]
+        // [Range(0f, 1f)]
+        // public float taa = 1.0f;
 
         [Header("采样")]
         [Range(1, 4)]
@@ -70,12 +85,25 @@ namespace PathTracing
 
         [Range(1, 4)]
         public uint bounceNum = 1;
-
-        public float dofFocalLength;
+ 
         public float mipBias;
-        public bool psr;
+         
+        public RESOLUTION tracingMode = RESOLUTION.RESOLUTION_FULL;
+        public DenoiserType denoiser = DenoiserType.DENOISER_REBLUR;
         
-        [Range(0, 2)]
-        public uint tracingMode;
+        public float emissionIntensity = 1.0f;
+        
+        public bool psr = false;
+        public bool emission = true;
+        public bool usePrevFrame = true;
+        public bool TAA = true;
+        public bool indirectDiffuse = true;
+        public bool indirectSpecular = true;
+        public bool importanceSampling = false;
+        public bool SHARC = true;
+        public bool specularLobeTrimming = true;
+        public bool boost = false;
+        public bool SR = false;
+        public bool RR = false;
     }
 }
