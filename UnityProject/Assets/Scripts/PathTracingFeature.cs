@@ -135,6 +135,9 @@ namespace PathTracing
         public ComputeShader compositionComputeShader;
         public ComputeShader taaComputeShader;
 
+        public ComputeShader sharcResolveCs;
+        public RayTracingShader sharcUpdateTs;
+
         public PathTracingSetting pathTracingSetting;
 
         private PathTracingPassSingle _pathTracingPass;
@@ -146,6 +149,12 @@ namespace PathTracing
         public Texture2D gIn_Sobol;
         public GraphicsBuffer gIn_ScramblingRankingUint;
         public GraphicsBuffer gIn_SobolUint;
+
+
+        private GraphicsBuffer _hashEntriesBuffer;
+        private GraphicsBuffer _accumulationBuffer;
+        private GraphicsBuffer _resolvedBuffer;
+
 
         private Dictionary<int, NRDDenoiser> _denoisers = new();
 
@@ -173,6 +182,7 @@ namespace PathTracing
                 {
                     scramblingRankingData[i] = new uint4(rawData[i * 4 + 0], rawData[i * 4 + 1], rawData[i * 4 + 2], rawData[i * 4 + 3]);
                 }
+
                 gIn_ScramblingRankingUint.SetData(scramblingRankingData);
 
                 gIn_SobolUint = new GraphicsBuffer(GraphicsBuffer.Target.Structured, gIn_Sobol.width * gIn_Sobol.height, 16);
@@ -183,7 +193,13 @@ namespace PathTracing
                 {
                     sobolData[i] = new uint4(rawData[i * 4 + 0], rawData[i * 4 + 1], rawData[i * 4 + 2], rawData[i * 4 + 3]);
                 }
+
                 gIn_SobolUint.SetData(sobolData);
+            }
+
+            if (_accumulationBuffer == null)
+            {
+                InitializeBuffers();
             }
 
             _pathTracingPass = new PathTracingPassSingle(pathTracingSetting)
@@ -196,8 +212,36 @@ namespace PathTracing
                 AccelerationStructure = accelerationStructure,
                 ScramblingRanking = gIn_ScramblingRankingUint,
                 Sobol = gIn_SobolUint,
-                BiltMaterial = finalMaterial
+                BiltMaterial = finalMaterial,
+                SharcResolveCs = sharcResolveCs,
+                SharcUpdateTs = sharcUpdateTs,
+                HashEntriesBuffer = _hashEntriesBuffer,
+                AccumulationBuffer = _accumulationBuffer,
+                ResolvedBuffer = _resolvedBuffer
             };
+        }
+
+        public int capacity = 1000000; // 对应 HLSL 中的 SHARC_CAPACITY
+
+        private void InitializeBuffers()
+        {
+            // 1. Hash Entries Buffer: storing uint64_t (8 bytes)
+            // HLSL: RWStructuredBuffer<uint64_t> gInOut_SharcHashEntriesBuffer;
+            _hashEntriesBuffer = new GraphicsBuffer(GraphicsBuffer.Target.Structured, capacity, sizeof(ulong));
+
+            // 2. Accumulation Buffer: storing uint4 (16 bytes)
+            // HLSL: RWStructuredBuffer<SharcAccumulationData> gInOut_SharcAccumulated;
+            _accumulationBuffer = new GraphicsBuffer(GraphicsBuffer.Target.Structured, capacity, sizeof(uint) * 4);
+
+            // 3. Resolved Buffer: storing uint3 + uint (16 bytes)
+            // HLSL: RWStructuredBuffer<SharcPackedData> gInOut_SharcResolved;
+            _resolvedBuffer = new GraphicsBuffer(GraphicsBuffer.Target.Structured, capacity, sizeof(uint) * 4);
+
+            // 初始化时清空 Buffer，特别是 HashEntries 必须为 0 (HASH_GRID_INVALID_HASH_KEY)
+            // 注意：C# 这里的 SetData 只是初始化，实际运行中由 CSMain 维护
+            uint[] clearData = new uint[capacity * 2]; // ulong = 2 uints
+            _hashEntriesBuffer.SetData(clearData);
+            // 其他 buffer 可以不手动清空，因为 shader 会处理，但清空是好习惯
         }
 
         public override void AddRenderPasses(ScriptableRenderer renderer, ref RenderingData renderingData)
@@ -215,6 +259,18 @@ namespace PathTracing
             }
 
             _pathTracingPass.NrdDenoiser = nrd;
+
+            if (compositionComputeShader == null
+                || taaComputeShader == null
+                || finalMaterial == null
+                || opaqueTracingShader == null
+                || transparentTracingShader == null 
+                || sharcResolveCs == null
+                || sharcUpdateTs == null
+               )
+                return;
+
+
             renderer.EnqueuePass(_pathTracingPass);
         }
 

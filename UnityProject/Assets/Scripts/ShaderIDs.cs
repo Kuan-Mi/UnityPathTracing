@@ -7,6 +7,12 @@ namespace PathTracing
         
         public static readonly int paramsID = Shader.PropertyToID("PathTracingParams");
         
+        public static readonly int g_HashEntriesID = Shader.PropertyToID("gInOut_SharcHashEntriesBuffer");
+        public static readonly int g_AccumulationBufferID = Shader.PropertyToID("gInOut_SharcAccumulated");
+        public static readonly int g_ResolvedBufferID = Shader.PropertyToID("gInOut_SharcResolved");
+        
+        
+        
         
         public static int g_ScramblingRankingID = Shader.PropertyToID("gIn_ScramblingRanking");
         public static int g_SobolID = Shader.PropertyToID("gIn_Sobol");

@@ -21,6 +21,13 @@ namespace PathTracing
         public ComputeShader TaaCs;
         public Material BiltMaterial;
 
+        public ComputeShader SharcResolveCs;
+        public RayTracingShader SharcUpdateTs;
+
+        public GraphicsBuffer HashEntriesBuffer;
+        public GraphicsBuffer AccumulationBuffer;
+        public GraphicsBuffer ResolvedBuffer;
+
         public RayTracingAccelerationStructure AccelerationStructure;
         public NRDDenoiser NrdDenoiser;
 
@@ -79,6 +86,14 @@ namespace PathTracing
             internal GraphicsBuffer ConstantBuffer;
             internal IntPtr NrdDataPtr;
             internal PathTracingSetting Setting;
+
+
+            internal ComputeShader SharcResolveCs;
+            internal RayTracingShader SharcUpdateTs;
+
+            internal GraphicsBuffer HashEntriesBuffer;
+            internal GraphicsBuffer AccumulationBuffer;
+            internal GraphicsBuffer ResolvedBuffer;
         }
 
         public PathTracingPassSingle(PathTracingSetting setting)
@@ -89,9 +104,29 @@ namespace PathTracing
 
         static void ExecutePass(PassData data, UnsafeGraphContext context)
         {
+            int threadGroupX = Mathf.CeilToInt(data.Width / 16.0f);
+            int threadGroupY = Mathf.CeilToInt(data.Height / 16.0f);
             var natCmd = CommandBufferHelpers.GetNativeCommandBuffer(context.cmd);
 
             natCmd.SetBufferData(data.ConstantBuffer, new[] { data.GlobalConstants });
+
+            // Sharc update
+            natCmd.SetRayTracingShaderPass(data.SharcUpdateTs, "Test2");
+            natCmd.SetRayTracingConstantBufferParam(data.SharcUpdateTs, paramsID, data.ConstantBuffer, 0, data.ConstantBuffer.stride);
+
+            natCmd.SetRayTracingBufferParam(data.SharcUpdateTs, g_HashEntriesID, data.HashEntriesBuffer);
+            natCmd.SetRayTracingBufferParam(data.SharcUpdateTs, g_AccumulationBufferID, data.AccumulationBuffer);
+            natCmd.SetRayTracingBufferParam(data.SharcUpdateTs, g_ResolvedBufferID, data.ResolvedBuffer);
+
+            natCmd.DispatchRays(data.SharcUpdateTs, "MainRayGenShader", data.Width, data.Height, 1);
+
+            // Sharc resolve
+            natCmd.SetComputeConstantBufferParam(data.SharcResolveCs, paramsID, data.ConstantBuffer, 0, data.ConstantBuffer.stride);
+            natCmd.SetComputeBufferParam(data.SharcResolveCs, 0, g_HashEntriesID, data.HashEntriesBuffer);
+            natCmd.SetComputeBufferParam(data.SharcResolveCs, 0, g_AccumulationBufferID, data.AccumulationBuffer);
+            natCmd.SetComputeBufferParam(data.SharcResolveCs, 0, g_ResolvedBufferID, data.ResolvedBuffer);
+
+            natCmd.DispatchCompute(data.SharcResolveCs, 0, threadGroupX, threadGroupY, 1);
 
             // 不透明
             natCmd.SetRayTracingShaderPass(data.OpaqueTs, "Test2");
@@ -137,8 +172,6 @@ namespace PathTracing
             natCmd.SetComputeTextureParam(data.CompositionCs, 0, gOut_ComposedDiffID, data.ComposedDiff);
             natCmd.SetComputeTextureParam(data.CompositionCs, 0, gOut_ComposedSpec_ViewZID, data.ComposedSpecViewZ);
 
-            int threadGroupX = Mathf.CeilToInt(data.Width / 16.0f);
-            int threadGroupY = Mathf.CeilToInt(data.Height / 16.0f);
             natCmd.DispatchCompute(data.CompositionCs, 0, threadGroupX, threadGroupY, 1);
 
             // 透明
@@ -237,7 +270,7 @@ namespace PathTracing
         {
             return (uint)(accumulationTime * fps + 0.5f);
         }
-        
+
         public override void RecordRenderGraph(RenderGraph renderGraph, ContextContainer frameData)
         {
             var cameraData = frameData.Get<UniversalCameraData>();
@@ -269,6 +302,12 @@ namespace PathTracing
             passData.TaaCs = TaaCs;
             passData.BlitMaterial = BiltMaterial;
 
+            passData.SharcResolveCs = SharcResolveCs;
+            passData.SharcUpdateTs = SharcUpdateTs;
+            passData.AccumulationBuffer = AccumulationBuffer;
+            passData.HashEntriesBuffer = HashEntriesBuffer;
+            passData.ResolvedBuffer = ResolvedBuffer;
+
             var gSunDirection = -lightForward;
             var up = new Vector3(0, 1, 0);
             var gSunBasisX = math.normalize(math.cross(new float3(up.x, up.y, up.z), new float3(gSunDirection.x, gSunDirection.y, gSunDirection.z)));
@@ -287,34 +326,33 @@ namespace PathTracing
             var aspectRatio = (float)rectW / rectH;
             var horizontalFieldOfView = Mathf.Atan(Mathf.Tan(Mathf.Deg2Rad * verticalFieldOfView * 0.5f) * aspectRatio) * 2 * Mathf.Rad2Deg;
 
-            
-            
-            float emissionIntensity = m_Settings.emissionIntensity *  (m_Settings.emission? 1.0f : 0.0f);
-            
+
+            float emissionIntensity = m_Settings.emissionIntensity * (m_Settings.emission ? 1.0f : 0.0f);
+
             float ACCUMULATION_TIME = 0.5f;
             int MAX_HISTORY_FRAME_NUM = 60;
-            
-            float fps = 1000.0f /  Mathf.Max(Time.deltaTime * 1000.0f, 0.0001f);
+
+            float fps = 1000.0f / Mathf.Max(Time.deltaTime * 1000.0f, 0.0001f);
             fps = math.min(fps, 121.0f);
 
             // Debug.Log(fps);
 
             float resetHistoryFactor = 1.0f;
-            
-            
+
+
             float otherMaxAccumulatedFrameNum = GetMaxAccumulatedFrameNum(ACCUMULATION_TIME, fps);
-            otherMaxAccumulatedFrameNum = math.min(otherMaxAccumulatedFrameNum,  (MAX_HISTORY_FRAME_NUM));
+            otherMaxAccumulatedFrameNum = math.min(otherMaxAccumulatedFrameNum, (MAX_HISTORY_FRAME_NUM));
             otherMaxAccumulatedFrameNum *= resetHistoryFactor;
-            
-            
+
+
             uint sharcMaxAccumulatedFrameNum = (uint)(otherMaxAccumulatedFrameNum * (m_Settings.boost ? 0.667f : 1.0f) + 0.5f);
             float taaMaxAccumulatedFrameNum = otherMaxAccumulatedFrameNum * 0.5f;
             float prevFrameMaxAccumulatedFrameNum = otherMaxAccumulatedFrameNum * 0.3f;
-            
-            
-            
+
+
             float minProbability = 0.0f;
-            if (m_Settings.tracingMode == RESOLUTION.RESOLUTION_FULL_PROBABILISTIC) {
+            if (m_Settings.tracingMode == RESOLUTION.RESOLUTION_FULL_PROBABILISTIC)
+            {
                 HitDistanceReconstructionMode mode = HitDistanceReconstructionMode.OFF;
                 if (m_Settings.denoiser == DenoiserType.DENOISER_REBLUR)
                     mode = HitDistanceReconstructionMode.OFF;
@@ -328,8 +366,8 @@ namespace PathTracing
                 else if (mode == HitDistanceReconstructionMode.AREA_5X5)
                     minProbability = 1.0f / 16.0f;
             }
-            
-            
+
+
             var globalConstants = new GlobalConstants
             {
                 gViewToWorld = NrdDenoiser.worldToView.inverse,
@@ -345,7 +383,7 @@ namespace PathTracing
                 gSunBasisY = new float4(gSunBasisY.x, gSunBasisY.y, gSunBasisY.z, 0),
                 gSunDirection = new float4(gSunDirection.x, gSunDirection.y, gSunDirection.z, 0),
                 gCameraGlobalPos = new float4(NrdDenoiser.camPos, 1),
-                gCameraGlobalPosPrev = new float4(NrdDenoiser.prevCamPos,0),
+                gCameraGlobalPosPrev = new float4(NrdDenoiser.prevCamPos, 0),
                 gViewDirection = new float4(cam.transform.forward, 0),
                 gHairBaseColor = new float4(0.1f, 0.1f, 0.1f, 1.0f),
 
@@ -429,7 +467,7 @@ namespace PathTracing
         private void CreateTextureHandle(RenderGraph renderGraph, PassData passData, TextureDesc textureDesc, IUnsafeRenderGraphBuilder builder)
         {
             passData.OutputTexture = CreateTex(textureDesc, renderGraph, "PathTracingOutput", GraphicsFormat.R16G16B16A16_SFloat);
-            
+
             passData.Mv = renderGraph.ImportTexture(NrdDenoiser.GetRT(ResourceType.IN_MV));
             passData.ViewZ = renderGraph.ImportTexture(NrdDenoiser.GetRT(ResourceType.IN_VIEWZ));
             passData.NormalRoughness = renderGraph.ImportTexture(NrdDenoiser.GetRT(ResourceType.IN_NORMAL_ROUGHNESS));
