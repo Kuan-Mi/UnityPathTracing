@@ -65,6 +65,7 @@ namespace PathTracing
 
             internal TextureHandle TaaHistory;
             internal TextureHandle TaaHistoryPrev;
+            internal TextureHandle PsrThroughput;
 
             internal RayTracingShader OpaqueTs;
             internal RayTracingShader TransparentTs;
@@ -108,6 +109,7 @@ namespace PathTracing
 
             natCmd.SetRayTracingTextureParam(data.OpaqueTs, g_DirectLightingID, data.DirectLighting);
             natCmd.SetRayTracingTextureParam(data.OpaqueTs, g_DirectEmissionID, data.DirectEmission);
+            natCmd.SetRayTracingTextureParam(data.OpaqueTs, g_PsrThroughputID, data.PsrThroughput);
 
             natCmd.SetRayTracingTextureParam(data.OpaqueTs, g_ShadowDataID, data.Penumbra);
             natCmd.SetRayTracingTextureParam(data.OpaqueTs, g_DiffID, data.Diff);
@@ -131,6 +133,7 @@ namespace PathTracing
             natCmd.SetComputeTextureParam(data.CompositionCs, 0, gIn_ShadowID, data.ShadowTranslucency);
             natCmd.SetComputeTextureParam(data.CompositionCs, 0, gIn_DiffID, data.DenoisedDiff);
             natCmd.SetComputeTextureParam(data.CompositionCs, 0, gIn_SpecID, data.DenoisedSpec);
+            natCmd.SetComputeTextureParam(data.CompositionCs, 0, gIn_PsrThroughputID, data.PsrThroughput);
             natCmd.SetComputeTextureParam(data.CompositionCs, 0, gOut_ComposedDiffID, data.ComposedDiff);
             natCmd.SetComputeTextureParam(data.CompositionCs, 0, gOut_ComposedSpec_ViewZID, data.ComposedSpecViewZ);
 
@@ -210,8 +213,9 @@ namespace PathTracing
                 case ShowMode.Final:
                     if (data.BlitMaterial == null)
                     {
-                        Debug.LogError("BlitMaterial is null"); 
+                        Debug.LogError("BlitMaterial is null");
                     }
+
                     Blitter.BlitTexture(natCmd, taaDst, new Vector4(1, 1, 0, 0), data.BlitMaterial, (int)ShowPass.showOut);
                     break;
                 default:
@@ -345,11 +349,11 @@ namespace PathTracing
                 gOnScreen = 0,
                 gTracingMode = 0,
                 gSampleNum = _settings.rpp,
-                gPSR = 0,
+                gPSR = _settings.psr ? (uint)1 : 0,
                 gSHARC = 1,
                 gTrimLobe = 1,
             };
-            
+
             // Debug.Log(globalConstants.ToString());
 
             var textureDesc = resourceData.activeColorTexture.GetDescriptor(renderGraph);
@@ -377,14 +381,6 @@ namespace PathTracing
         private void CreateTextureHandle(RenderGraph renderGraph, PassData passData, TextureDesc textureDesc, IUnsafeRenderGraphBuilder builder)
         {
             passData.OutputTexture = CreateTex(textureDesc, renderGraph, "PathTracingOutput", GraphicsFormat.R16G16B16A16_SFloat);
-
-            
-            var inMV = NrdDenoiser.GetRT(ResourceType.IN_MV);
-
-            if (inMV == null)
-            {
-                Debug.LogError("NrdDenoiser IN_MV is null");
-            }
             
             passData.Mv = renderGraph.ImportTexture(NrdDenoiser.GetRT(ResourceType.IN_MV));
             passData.ViewZ = renderGraph.ImportTexture(NrdDenoiser.GetRT(ResourceType.IN_VIEWZ));
@@ -411,6 +407,7 @@ namespace PathTracing
 
             passData.TaaHistory = renderGraph.ImportTexture(NrdDenoiser.GetRT(ResourceType.TaaHistory));
             passData.TaaHistoryPrev = renderGraph.ImportTexture(NrdDenoiser.GetRT(ResourceType.TaaHistoryPrev));
+            passData.PsrThroughput = renderGraph.ImportTexture(NrdDenoiser.GetRT(ResourceType.PsrThroughput));
 
             builder.UseTexture(passData.OutputTexture, AccessFlags.ReadWrite);
 
@@ -435,6 +432,10 @@ namespace PathTracing
             builder.UseTexture(passData.ComposedDiff, AccessFlags.ReadWrite);
             builder.UseTexture(passData.ComposedSpecViewZ, AccessFlags.ReadWrite);
             builder.UseTexture(passData.Composed, AccessFlags.ReadWrite);
+
+            builder.UseTexture(passData.TaaHistory, AccessFlags.ReadWrite);
+            builder.UseTexture(passData.TaaHistoryPrev, AccessFlags.ReadWrite);
+            builder.UseTexture(passData.PsrThroughput, AccessFlags.ReadWrite);
         }
 
         private TextureHandle CreateTex(TextureDesc textureDesc, RenderGraph renderGraph, string name, GraphicsFormat format)

@@ -128,6 +128,7 @@ namespace Nrd
         // 本地使用
         TaaHistory,
         TaaHistoryPrev,
+        PsrThroughput,
 
         MAX_NUM,
     };

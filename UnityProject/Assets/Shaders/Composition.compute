@@ -10,7 +10,7 @@ Texture2D<float4> gIn_Normal_Roughness;
 Texture2D<float4> gIn_BaseColor_Metalness;
 Texture2D<float3> gIn_DirectLighting;
 Texture2D<float3> gIn_DirectEmission;
-// Texture2D<float3> gIn_PsrThroughput;
+Texture2D<float3> gIn_PsrThroughput;
 Texture2D<float4> gIn_Shadow;
 Texture2D<float4> gIn_Diff;
 Texture2D<float4> gIn_Spec;
@@ -83,6 +83,13 @@ void CSMain(int2 pixelPos : SV_DispatchThreadID)
     float3 Ldiff = diff.xyz * diffFactor;
     float3 Lspec = spec.xyz * specFactor;
 
+    
+    float3 psrThroughput = gIn_PsrThroughput[ pixelPos ];
+    Ldiff *= psrThroughput;
+    Lspec *= psrThroughput;
+    Ldirect *= psrThroughput;
+    
+    
     Ldiff += Ldirect;
 
     gOut_ComposedDiff[pixelPos] = Ldiff;

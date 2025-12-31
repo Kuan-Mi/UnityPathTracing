@@ -73,5 +73,6 @@ namespace PathTracing
 
         public float dofFocalLength;
         public float mipBias;
+        public bool psr;
     }
 }

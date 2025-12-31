@@ -23,6 +23,7 @@ namespace PathTracing
         // 不传入NRD的资源
         public static int g_DirectLightingID = Shader.PropertyToID("gOut_DirectLighting");
         public static int g_DirectEmissionID = Shader.PropertyToID("gOut_DirectEmission");
+        public static int g_PsrThroughputID = Shader.PropertyToID("gOut_PsrThroughput");
 
         // 传入NRD的有噪声资源
         public static int g_ShadowDataID = Shader.PropertyToID("gOut_ShadowData");
@@ -45,6 +46,8 @@ namespace PathTracing
         public static int gIn_ShadowID = Shader.PropertyToID("gIn_Shadow");
         public static int gIn_DiffID = Shader.PropertyToID("gIn_Diff");
         public static int gIn_SpecID = Shader.PropertyToID("gIn_Spec");
+        public static int gIn_PsrThroughputID = Shader.PropertyToID("gIn_PsrThroughput");
+        
         public static int gOut_ComposedDiffID = Shader.PropertyToID("gOut_ComposedDiff");
         public static int gOut_ComposedSpec_ViewZID = Shader.PropertyToID("gOut_ComposedSpec_ViewZ");
 

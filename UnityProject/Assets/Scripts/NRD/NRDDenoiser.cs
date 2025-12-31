@@ -95,6 +95,7 @@ namespace Nrd
             // TAA
             allocatedResources.Add(new NrdTextureResource(ResourceType.TaaHistory, GraphicsFormat.R16G16B16A16_SFloat, uavState));
             allocatedResources.Add(new NrdTextureResource(ResourceType.TaaHistoryPrev, GraphicsFormat.R16G16B16A16_SFloat, uavState));
+            allocatedResources.Add(new NrdTextureResource(ResourceType.PsrThroughput, GraphicsFormat.R16G16B16A16_SFloat, uavState));
 
 
             Debug.Log($"[NRD] Created Denoiser Instance {nrdInstanceId} for Camera {cameraName}");
@@ -152,7 +153,8 @@ namespace Nrd
             foreach (var nrdTextureResource in allocatedResources)
             {
                 if (nrdTextureResource.ResourceType == ResourceType.TaaHistory ||
-                    nrdTextureResource.ResourceType == ResourceType.TaaHistoryPrev)
+                    nrdTextureResource.ResourceType == ResourceType.TaaHistoryPrev ||
+                     nrdTextureResource.ResourceType == ResourceType.PsrThroughput)
                     continue; // TAA 资源不传给 NRD)
 
                 ptr[idx++] = new NrdResourceInput { type = nrdTextureResource.ResourceType, texture = nrdTextureResource.NriPtr, state = nrdTextureResource.ResourceState };
