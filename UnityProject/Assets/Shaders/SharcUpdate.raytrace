@@ -1,0 +1,4 @@
+
+#pragma require Int64BufferAtomics
+
+#include "SharcUpdate.hlsl"
