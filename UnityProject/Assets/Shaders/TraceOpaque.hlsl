@@ -304,54 +304,54 @@ TraceOpaqueResult TraceOpaque(GeometryProps geometryProps0, MaterialProps materi
                     // L1 cache - reproject previous frame, carefully treating specular
                     Lcached = GetRadianceFromPreviousFrame(geometryProps, materialProps, pixelPos);
 
-                    // // L2 cache - SHARC
-                    // HashGridParameters hashGridParams;
-                    // hashGridParams.cameraPosition = gCameraGlobalPos.xyz;
-                    // hashGridParams.sceneScale = SHARC_SCENE_SCALE;
-                    // hashGridParams.logarithmBase = SHARC_GRID_LOGARITHM_BASE;
-                    // hashGridParams.levelBias = SHARC_GRID_LEVEL_BIAS;
-                    //
-                    // float3 Xglobal = GetGlobalPos(geometryProps.X);
-                    // uint level = HashGridGetLevel(Xglobal, hashGridParams);
-                    // float voxelSize = HashGridGetVoxelSize(level, hashGridParams);
-                    //
-                    // float footprint = geometryProps.hitT * lobeTanHalfAngleAtOrigin * 2.0;
-                    // float footprintNorm = saturate(footprint / voxelSize);
-                    //
-                    // float2 rndScaled = ImportanceSampling::Cosine::GetRay(Rng::Hash::GetFloat2()).xy;
-                    // rndScaled *= 1.0 - footprintNorm; // reduce dithering if cone is already wide
-                    // rndScaled *= voxelSize;
-                    // rndScaled *= USE_SHARC_DITHERING;
-                    //
-                    // float3x3 mBasis = Geometry::GetBasis(geometryProps.N);
-                    // Xglobal += mBasis[0] * rndScaled.x + mBasis[1] * rndScaled.y;
-                    //
-                    // SharcHitData sharcHitData;
-                    // sharcHitData.positionWorld = Xglobal;
-                    // sharcHitData.materialDemodulation = GetMaterialDemodulation(geometryProps, materialProps);
-                    // sharcHitData.normalWorld = geometryProps.N;
-                    // sharcHitData.emissive = materialProps.Lemi;
-                    //
-                    // HashMapData hashMapData;
-                    // hashMapData.capacity = SHARC_CAPACITY;
-                    // hashMapData.hashEntriesBuffer = gInOut_SharcHashEntriesBuffer;
-                    //
-                    // SharcParameters sharcParams;
-                    // sharcParams.gridParameters = hashGridParams;
-                    // sharcParams.hashMapData = hashMapData;
-                    // sharcParams.radianceScale = SHARC_RADIANCE_SCALE;
-                    // sharcParams.enableAntiFireflyFilter = SHARC_ANTI_FIREFLY;
-                    // sharcParams.accumulationBuffer = gInOut_SharcAccumulated;
-                    // sharcParams.resolvedBuffer = gInOut_SharcResolved;
-                    //
-                    // bool isSharcAllowed = !geometryProps.Has(FLAG_HAIR); // ignore if the hit is hair // TODO: if hair don't allow if hitT is too short
-                    // isSharcAllowed &= Rng::Hash::GetFloat() > Lcached.w; // is needed?
-                    // isSharcAllowed &= Rng::Hash::GetFloat() < (bounce == gBounceNum ? 1.0 : footprintNorm); // is voxel size acceptable?
-                    // isSharcAllowed &= gSHARC && NRD_MODE < OCCLUSION; // trivial
-                    //
-                    // float3 sharcRadiance;
-                    // if (isSharcAllowed && SharcGetCachedRadiance(sharcParams, sharcHitData, sharcRadiance, false))
-                    //     Lcached = float4(sharcRadiance, 1.0);
+                    // L2 cache - SHARC
+                    HashGridParameters hashGridParams;
+                    hashGridParams.cameraPosition = gCameraGlobalPos.xyz;
+                    hashGridParams.sceneScale = SHARC_SCENE_SCALE;
+                    hashGridParams.logarithmBase = SHARC_GRID_LOGARITHM_BASE;
+                    hashGridParams.levelBias = SHARC_GRID_LEVEL_BIAS;
+                    
+                    float3 Xglobal = GetGlobalPos(geometryProps.X);
+                    uint level = HashGridGetLevel(Xglobal, hashGridParams);
+                    float voxelSize = HashGridGetVoxelSize(level, hashGridParams);
+                    
+                    float footprint = geometryProps.hitT * lobeTanHalfAngleAtOrigin * 2.0;
+                    float footprintNorm = saturate(footprint / voxelSize);
+                    
+                    float2 rndScaled = ImportanceSampling::Cosine::GetRay(Rng::Hash::GetFloat2()).xy;
+                    rndScaled *= 1.0 - footprintNorm; // reduce dithering if cone is already wide
+                    rndScaled *= voxelSize;
+                    rndScaled *= USE_SHARC_DITHERING;
+                    
+                    float3x3 mBasis = Geometry::GetBasis(geometryProps.N);
+                    Xglobal += mBasis[0] * rndScaled.x + mBasis[1] * rndScaled.y;
+                    
+                    SharcHitData sharcHitData;
+                    sharcHitData.positionWorld = Xglobal;
+                    sharcHitData.materialDemodulation = GetMaterialDemodulation(geometryProps, materialProps);
+                    sharcHitData.normalWorld = geometryProps.N;
+                    sharcHitData.emissive = materialProps.Lemi;
+                    
+                    HashMapData hashMapData;
+                    hashMapData.capacity = SHARC_CAPACITY;
+                    hashMapData.hashEntriesBuffer = gInOut_SharcHashEntriesBuffer;
+                    
+                    SharcParameters sharcParams;
+                    sharcParams.gridParameters = hashGridParams;
+                    sharcParams.hashMapData = hashMapData;
+                    sharcParams.radianceScale = SHARC_RADIANCE_SCALE;
+                    sharcParams.enableAntiFireflyFilter = SHARC_ANTI_FIREFLY;
+                    sharcParams.accumulationBuffer = gInOut_SharcAccumulated;
+                    sharcParams.resolvedBuffer = gInOut_SharcResolved;
+                    
+                    bool isSharcAllowed = !geometryProps.Has(FLAG_HAIR); // ignore if the hit is hair // TODO: if hair don't allow if hitT is too short
+                    isSharcAllowed &= Rng::Hash::GetFloat() > Lcached.w; // is needed?
+                    isSharcAllowed &= Rng::Hash::GetFloat() < (bounce == gBounceNum ? 1.0 : footprintNorm); // is voxel size acceptable?
+                    isSharcAllowed &= gSHARC && NRD_MODE < OCCLUSION; // trivial
+                    
+                    float3 sharcRadiance;
+                    if (isSharcAllowed && SharcGetCachedRadiance(sharcParams, sharcHitData, sharcRadiance, false))
+                        Lcached = float4(sharcRadiance, 1.0);
 
                     // Cache miss - compute lighting, if not found in caches
                     if (Rng::Hash::GetFloat() > Lcached.w)

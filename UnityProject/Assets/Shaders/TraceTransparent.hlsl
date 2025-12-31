@@ -83,6 +83,50 @@ float3 TraceTransparent(TraceTransparentDesc desc)
         float reprojectionWeight = ReprojectIrradiance(false, !isReflection, gIn_ComposedDiff, gIn_ComposedSpec_ViewZ, geometryProps, desc.pixelPos, prevLdiff, prevLspec);
         Lcached = float4(prevLdiff + prevLspec, reprojectionWeight);
 
+        // L2 cache - SHARC
+        HashGridParameters hashGridParams;
+        hashGridParams.cameraPosition = gCameraGlobalPos.xyz;
+        hashGridParams.sceneScale = SHARC_SCENE_SCALE;
+        hashGridParams.logarithmBase = SHARC_GRID_LOGARITHM_BASE;
+        hashGridParams.levelBias = SHARC_GRID_LEVEL_BIAS;
+
+        float3 Xglobal = GetGlobalPos( geometryProps.X );
+        uint level = HashGridGetLevel( Xglobal, hashGridParams );
+        float voxelSize = HashGridGetVoxelSize( level, hashGridParams );
+
+        float2 rndScaled = ImportanceSampling::Cosine::GetRay( Rng::Hash::GetFloat2( ) ).xy;
+        rndScaled *= voxelSize;
+        rndScaled *= USE_SHARC_DITHERING * float( USE_SHARC_DEBUG == 0 );
+
+        float3x3 mBasis = Geometry::GetBasis( geometryProps.N );
+        Xglobal += mBasis[ 0 ] * rndScaled.x + mBasis[ 1 ] * rndScaled.y;
+
+        SharcHitData sharcHitData;
+        sharcHitData.positionWorld = Xglobal;
+        sharcHitData.materialDemodulation = GetMaterialDemodulation( geometryProps, materialProps );
+        sharcHitData.normalWorld = geometryProps.N;
+        sharcHitData.emissive = materialProps.Lemi;
+
+        HashMapData hashMapData;
+        hashMapData.capacity = SHARC_CAPACITY;
+        hashMapData.hashEntriesBuffer = gInOut_SharcHashEntriesBuffer;
+
+        SharcParameters sharcParams;
+        sharcParams.gridParameters = hashGridParams;
+        sharcParams.hashMapData = hashMapData;
+        sharcParams.radianceScale = SHARC_RADIANCE_SCALE;
+        sharcParams.enableAntiFireflyFilter = SHARC_ANTI_FIREFLY;
+        sharcParams.accumulationBuffer = gInOut_SharcAccumulated;
+        sharcParams.resolvedBuffer = gInOut_SharcResolved;
+
+        bool isSharcAllowed = Rng::Hash::GetFloat( ) > Lcached.w; // is needed?
+        isSharcAllowed &= gSHARC && NRD_MODE < OCCLUSION; // trivial
+
+        float3 sharcRadiance;
+        if (isSharcAllowed && SharcGetCachedRadiance( sharcParams, sharcHitData, sharcRadiance, false))
+            Lcached = float4( sharcRadiance, 1.0 );
+
+        // Cache miss - compute lighting, if not found in caches
         if (Rng::Hash::GetFloat() > Lcached.w)
         {
             float3 L = GetLighting(geometryProps, materialProps, LIGHTING | SHADOW) + materialProps.Lemi;
