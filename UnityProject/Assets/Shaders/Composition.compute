@@ -43,55 +43,114 @@ void CSMain(int2 pixelPos : SV_DispatchThreadID)
     // Early out - sky
     if (abs(viewZ) >= INF)
     {
-        gOut_ComposedDiff[pixelPos] = Lemi;
+        gOut_ComposedDiff[pixelPos] = Lemi * float(gOnScreen == SHOW_FINAL);
         gOut_ComposedSpec_ViewZ[pixelPos] = float4(0, 0, 0, z);
+
         return;
     }
 
     // Direct sun lighting * shadow + emission
     float4 shadowData = gIn_Shadow[pixelPos];
 
+    #if( SIGMA_TRANSLUCENCY == 1 )
+    float3 shadow = SIGMA_BackEnd_UnpackShadow(shadowData).yzw;
+    #else
     float shadow = SIGMA_BackEnd_UnpackShadow(shadowData).x;
+    #endif
 
     float3 Ldirect = gIn_DirectLighting[pixelPos];
-
-    Ldirect = Ldirect * shadow + Lemi;
+    if (gOnScreen < SHOW_INSTANCE_INDEX)
+        Ldirect = Ldirect * shadow + Lemi;
 
     // G-buffer
     float3 albedo, Rf0;
     float4 baseColorMetalness = gIn_BaseColor_Metalness[pixelPos];
     BRDF::ConvertBaseColorMetalnessToAlbedoRf0(baseColorMetalness.xyz, baseColorMetalness.w, albedo, Rf0);
 
-    float3 Xv = Geometry::ReconstructViewPosition(sampleUv, gCameraFrustum, viewZ);
+    float3 Xv = Geometry::ReconstructViewPosition(sampleUv, gCameraFrustum, viewZ, gOrthoMode);
     float3 X = Geometry::AffineTransform(gViewToWorld, Xv);
-    float3 V = normalize(Geometry::RotateVector(gViewToWorld, 0 - Xv));
+    float3 V = gOrthoMode == 0 ? normalize(Geometry::RotateVector(gViewToWorld, 0 - Xv)) : gViewDirection.xyz;
 
     // Sample NRD outputs
     float4 diff = gIn_Diff[pixelPos];
     float4 spec = gIn_Spec[pixelPos];
 
-    diff = REBLUR_BackEnd_UnpackRadianceAndNormHitDist(diff);
-    spec = REBLUR_BackEnd_UnpackRadianceAndNormHitDist(spec);
+    if (gDenoiserType == DENOISER_RELAX)
+    {
+        diff = RELAX_BackEnd_UnpackRadiance(diff);
+        spec = RELAX_BackEnd_UnpackRadiance(spec);
+    }
+    else
+    {
+        diff = REBLUR_BackEnd_UnpackRadianceAndNormHitDist(diff);
+        spec = REBLUR_BackEnd_UnpackRadianceAndNormHitDist(spec);
+    }
 
-    // diff.xyz *= gIndirectDiffuse;
-    // spec.xyz *= gIndirectSpecular;
+    // ( Optional ) RELAX doesn't support AO / SO
+    if (gDenoiserType == DENOISER_RELAX)
+    {
+        diff.w = 1.0 / Math::Pi(1.0);
+        spec.w = 1.0 / Math::Pi(1.0);
+    }
 
+    diff.xyz *= gIndirectDiffuse;
+    spec.xyz *= gIndirectSpecular;
+
+    // Material modulation ( convert radiance back into irradiance )
     float3 diffFactor, specFactor;
     NRD_MaterialFactors(N, V, albedo, Rf0, roughness, diffFactor, specFactor);
+
+    // We can combine radiance ( for everything ) and irradiance ( for hair ) in denoising if material ID test is enabled
+    if (materialID == MATERIAL_ID_HAIR)
+    {
+        diffFactor = 1.0;
+        specFactor = 1.0;
+    }
 
     // Composition
     float3 Ldiff = diff.xyz * diffFactor;
     float3 Lspec = spec.xyz * specFactor;
 
-    
-    float3 psrThroughput = gIn_PsrThroughput[ pixelPos ];
+
+    // Apply PSR throughput ( primary surface material before replacement )
+    float3 psrThroughput = gIn_PsrThroughput[pixelPos];
     Ldiff *= psrThroughput;
     Lspec *= psrThroughput;
     Ldirect *= psrThroughput;
-    
-    
+
+    // IMPORTANT: we store diffuse and specular separately to be able to use the reprojection trick. Let's assume that direct lighting can always be reprojected as diffuse
     Ldiff += Ldirect;
 
+
+    // Debug
+    if (gOnScreen == SHOW_DENOISED_DIFFUSE)
+        Ldiff = diff.xyz;
+    else if (gOnScreen == SHOW_DENOISED_SPECULAR)
+        Ldiff = spec.xyz;
+    else if (gOnScreen == SHOW_AMBIENT_OCCLUSION)
+        Ldiff = diff.w;
+    else if (gOnScreen == SHOW_SPECULAR_OCCLUSION)
+        Ldiff = spec.w;
+    else if (gOnScreen == SHOW_SHADOW)
+        Ldiff = shadow;
+    else if (gOnScreen == SHOW_BASE_COLOR)
+        Ldiff = baseColorMetalness.xyz;
+    else if (gOnScreen == SHOW_NORMAL)
+        Ldiff = N * 0.5 + 0.5;
+    else if (gOnScreen == SHOW_ROUGHNESS)
+        Ldiff = roughness;
+    else if (gOnScreen == SHOW_METALNESS)
+        Ldiff = baseColorMetalness.w;
+    else if (gOnScreen == SHOW_MATERIAL_ID)
+        Ldiff = materialID / 3.0;
+    else if (gOnScreen == SHOW_PSR_THROUGHPUT)
+        Ldiff = psrThroughput;
+    else if (gOnScreen == SHOW_WORLD_UNITS)
+        Ldiff = frac(X * gUnitToMetersMultiplier);
+    else if (gOnScreen != SHOW_FINAL)
+        Ldiff = gOnScreen == SHOW_MIP_SPECULAR ? spec.xyz : Ldirect.xyz;
+
+    // Output
     gOut_ComposedDiff[pixelPos] = Ldiff;
     gOut_ComposedSpec_ViewZ[pixelPos] = float4(Lspec, z);
 }

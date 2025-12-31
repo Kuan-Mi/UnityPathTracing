@@ -608,7 +608,7 @@ void MainRayGenShader()
     gOut_Mv[pixelPos] = float4(motion, viewZAndTaaMask0); // IMPORTANT: keep viewZ before PSR ( needed for glass )
 
     // ViewZ
-    float viewZ = -Geometry::AffineTransform(gWorldToView, Xvirtual).z;
+    float viewZ = Geometry::AffineTransform(gWorldToView, Xvirtual).z;
     viewZ = geometryProps0.IsMiss() ? Math::Sign(viewZ) * INF : viewZ;
 
     gOut_ViewZ[pixelPos] = viewZ;
@@ -622,6 +622,7 @@ void MainRayGenShader()
         #if( USE_INF_STRESS_TEST == 1 )
         WriteResult(pixelPos, GARBAGE, GARBAGE, GARBAGE, GARBAGE);
         #endif
+
         return;
     }
 
@@ -662,15 +663,32 @@ void MainRayGenShader()
         Ldirect = Color::ColorizeZucconi(mipNorm);
     }
 
-    gOut_DirectLighting[pixelPos] = Ldirect;
+    gOut_DirectLighting[pixelPos] = Ldirect; // "psrThroughput" applied in "Composition"
     gOut_PsrThroughput[pixelPos] = psrThroughput;
 
     // Lighting at PSR hit, if found
     float4 Lpsr = 0;
+    if (!geometryProps0.IsMiss() && bounceNum != PT_PSR_BOUNCES_NUM)
+    {
+        // L1 cache - reproject previous frame, carefully treating specular
+        Lpsr = GetRadianceFromPreviousFrame(geometryProps0, materialProps0, pixelPos);
+
+        // Subtract direct lighting, process it separately
+        float3 L = Ldirect * GetLighting(geometryProps0, materialProps0, SHADOW) + materialProps0.Lemi;
+        Lpsr.xyz = max(Lpsr.xyz - L, 0.0);
+
+        // TODO: it's not a 100% fix
+        if (gTracingMode == RESOLUTION_HALF && (gIndirectDiffuse + gIndirectSpecular) > 1.5)
+            Lpsr *= 0.5;
+
+        // This is important!
+        Lpsr.xyz *= Lpsr.w;
+    }
 
     //================================================================================================================================================================================
     // Secondary rays
     //================================================================================================================================================================================
+
     TraceOpaqueResult result = TraceOpaque(geometryProps0, materialProps0, pixelPos, mirrorMatrix, Lpsr);
 
     #if( USE_MOVING_EMISSION_FIX == 1 )

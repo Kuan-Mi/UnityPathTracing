@@ -74,5 +74,8 @@ namespace PathTracing
         public float dofFocalLength;
         public float mipBias;
         public bool psr;
+        
+        [Range(0, 2)]
+        public uint tracingMode;
     }
 }

@@ -347,7 +347,7 @@ namespace PathTracing
                 gRR = 0,
                 gIsSrgb = 0,
                 gOnScreen = 0,
-                gTracingMode = 0,
+                gTracingMode = _settings.tracingMode,
                 gSampleNum = _settings.rpp,
                 gPSR = _settings.psr ? (uint)1 : 0,
                 gSHARC = 1,
