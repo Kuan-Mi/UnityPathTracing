@@ -30,7 +30,6 @@ float3 TraceTransparent(TraceTransparentDesc desc)
     bool isReflection = desc.isReflection;
     float bayer = Sequence::Bayer4x4(desc.pixelPos, gFrameIndex);
 
-
     MaterialProps materialProps;
 
     [loop]
@@ -47,7 +46,7 @@ float3 TraceTransparent(TraceTransparentDesc desc)
             float rnd = frac(bayer + Sequence::Halton(bounce, 3)); // "Halton( bounce, 2 )" works worse than others
 
             // float rnd = Rng::Hash::GetFloat();
-            
+
             F = clamp(F, PT_GLASS_MIN_F, 1.0 - PT_GLASS_MIN_F); // TODO: needed?
 
             isReflection = rnd < F; // TODO: if "F" is clamped, "pathThroughput" should be adjusted too
@@ -66,11 +65,9 @@ float3 TraceTransparent(TraceTransparentDesc desc)
 
 
         bool isAir = eta < 1.0;
-
         float extinction = isAir ? 0.0 : 1.0; // TODO: tint color?
         if (!geometryProps.IsMiss()) // TODO: fix for non-convex geometry
-            pathThroughput *= exp(-extinction * geometryProps.hitT * 1);
-
+            pathThroughput *= exp(-extinction * geometryProps.hitT * gUnitToMetersMultiplier);
 
         // Is opaque hit found?
         if (!geometryProps.Has(FLAG_TRANSPARENT)) // TODO: stop if pathThroughput is low
@@ -86,7 +83,6 @@ float3 TraceTransparent(TraceTransparentDesc desc)
         float reprojectionWeight = ReprojectIrradiance(false, !isReflection, gIn_ComposedDiff, gIn_ComposedSpec_ViewZ, geometryProps, desc.pixelPos, prevLdiff, prevLspec);
         Lcached = float4(prevLdiff + prevLspec, reprojectionWeight);
 
-
         if (Rng::Hash::GetFloat() > Lcached.w)
         {
             float3 L = GetLighting(geometryProps, materialProps, LIGHTING | SHADOW) + materialProps.Lemi;
@@ -94,27 +90,31 @@ float3 TraceTransparent(TraceTransparentDesc desc)
         }
     }
 
+    // Output
     return Lcached.xyz * pathThroughput;
 }
+
+//========================================================================================
+// MAIN
+//========================================================================================
 
 [shader("raygeneration")]
 void MainRayGenShader()
 {
     uint2 pixelPos = DispatchRaysIndex().xy;
 
-    float2 pixelUv = float2(pixelPos + 0.5) / gRectSize;
+    float2 pixelUv = float2(pixelPos + 0.5) * gInvRectSize;
     float2 sampleUv = pixelUv + gJitter;
 
+    // Do not generate NANs for unused threads
     if (pixelUv.x > 1.0 || pixelUv.y > 1.0)
-    {
         return;
-    }
 
     Rng::Hash::Initialize(pixelPos, gFrameIndex);
 
     float3 diff = gIn_ComposedDiff[pixelPos];
     float3 spec = gIn_ComposedSpec_ViewZ[pixelPos].xyz;
-    float3 Lsum = diff + spec;
+    float3 Lsum = diff + spec * float(gOnScreen == SHOW_FINAL);
 
     // Primary ray for transparent geometry only
     float3 cameraRayOrigin = (float3)0;
@@ -123,31 +123,37 @@ void MainRayGenShader()
 
     float viewZAndTaaMask = gInOut_Mv[pixelPos].w;
     float viewZ = Math::Sign(gNearZ) * abs(viewZAndTaaMask) / FP16_VIEWZ_SCALE; // viewZ before PSR
-    float3 Xv = Geometry::ReconstructViewPosition(sampleUv, gCameraFrustum, viewZ, 0);
-    float tmin0 = 0 == 0 ? length(Xv) : abs(Xv.z);
-
+    float3 Xv = Geometry::ReconstructViewPosition(sampleUv, gCameraFrustum, viewZ, gOrthoMode);
+    float tmin0 = gOrthoMode == 0 ? length(Xv) : abs(Xv.z);
 
     GeometryProps geometryPropsT;
     MaterialProps materialPropsT;
 
     CastRay(cameraRayOrigin, cameraRayDirection, 0.0, tmin0, GetConeAngleFromRoughness(0.0, 0.0), RAY_FLAG_CULL_OPAQUE, geometryPropsT, materialPropsT);
 
-    if (!geometryPropsT.IsMiss() && geometryPropsT.hitT < tmin0)
+    // Trace delta events
+    if (!geometryPropsT.IsMiss() && geometryPropsT.hitT < tmin0 && gOnScreen == SHOW_FINAL)
     {
+        // Append "glass" mask to "hair" mask
         viewZAndTaaMask = -abs(viewZAndTaaMask);
-    
+
         float3 mvT = GetMotion(geometryPropsT.X, geometryPropsT.Xprev);
         gInOut_Mv[pixelPos] = float4(mvT, viewZAndTaaMask);
-    
-    
+
+
+        // // Patch guides for RR
+        // [branch]
+        // if( gRR )
+        //     gOut_Normal_Roughness[ pixelPos ] = NRD_FrontEnd_PackNormalAndRoughness( geometryPropsT.N, 0.0, 0 );
+
         TraceTransparentDesc desc;
         desc.geometryProps = geometryPropsT;
         desc.pixelPos = pixelPos;
-    
+
         desc.isReflection = true;
         float3 reflection = TraceTransparent(desc);
         Lsum = reflection;
-    
+
         desc.isReflection = false;
         float3 refraction = TraceTransparent(desc);
         Lsum += refraction;
