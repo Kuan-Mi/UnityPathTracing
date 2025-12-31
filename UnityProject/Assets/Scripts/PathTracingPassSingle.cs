@@ -296,6 +296,9 @@ namespace PathTracing
             
             float fps = 1000.0f /  Mathf.Max(Time.deltaTime * 1000.0f, 0.0001f);
             fps = math.min(fps, 121.0f);
+
+            // Debug.Log(fps);
+
             float resetHistoryFactor = 1.0f;
             
             
@@ -354,7 +357,7 @@ namespace PathTracing
                 gInvRenderSize = invRectSize,
                 gInvRectSize = invRectSize,
                 gRectSizePrev = rectSize,
-                gJitter = NrdDenoiser.ViewportJitter / rectSize,
+                gJitter = (m_Settings.cameraJitter ? NrdDenoiser.ViewportJitter : 0f) / rectSize,
 
                 gEmissionIntensity = emissionIntensity,
                 gNearZ = -cam.nearClipPlane,

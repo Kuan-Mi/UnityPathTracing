@@ -93,6 +93,7 @@ namespace PathTracing
         
         public float emissionIntensity = 1.0f;
         
+        public bool cameraJitter = true;
         public bool psr = false;
         public bool emission = true;
         public bool usePrevFrame = true;

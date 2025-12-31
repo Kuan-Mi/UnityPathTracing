@@ -114,8 +114,8 @@ namespace Nrd
                     break;
                 }
             }
-            
-            
+
+
             // 如果尺寸没变且资源都存在，直接返回
             if (!isResourceInvalid && width == _prevWidth && height == _prevHeight)
             {
@@ -154,7 +154,7 @@ namespace Nrd
             {
                 if (nrdTextureResource.ResourceType == ResourceType.TaaHistory ||
                     nrdTextureResource.ResourceType == ResourceType.TaaHistoryPrev ||
-                     nrdTextureResource.ResourceType == ResourceType.PsrThroughput)
+                    nrdTextureResource.ResourceType == ResourceType.PsrThroughput)
                     continue; // TAA 资源不传给 NRD)
 
                 ptr[idx++] = new NrdResourceInput { type = nrdTextureResource.ResourceType, texture = nrdTextureResource.NriPtr, state = nrdTextureResource.ResourceState };
@@ -254,8 +254,8 @@ namespace Nrd
             // Debug.Log($"[NRD] Viewport Jitter: {ViewportJitter}");
 
             // --- Jitter ---
-            localData.commonSettings.cameraJitter = ViewportJitter;
-            localData.commonSettings.cameraJitterPrev = PrevViewportJitter;
+            localData.commonSettings.cameraJitter = setting.cameraJitter ? ViewportJitter : float2.zero;
+            localData.commonSettings.cameraJitterPrev = setting.cameraJitter ? PrevViewportJitter : float2.zero;
 
             PrevViewportJitter = ViewportJitter;
 
