@@ -144,7 +144,7 @@ namespace PathTracing
             natCmd.SetRayTracingTextureParam(data.TransparentTs, gIn_ComposedDiffID, data.ComposedDiff);
             natCmd.SetRayTracingTextureParam(data.TransparentTs, gIn_ComposedSpec_ViewZID, data.ComposedSpecViewZ);
             natCmd.SetRayTracingTextureParam(data.TransparentTs, gOut_ComposedID, data.Composed);
-            natCmd.SetRayTracingTextureParam(data.TransparentTs,GInOutMv, data.Mv);
+            natCmd.SetRayTracingTextureParam(data.TransparentTs, GInOutMv, data.Mv);
 
             natCmd.DispatchRays(data.TransparentTs, "MainRayGenShader", data.Width, data.Height, 1);
 
@@ -276,7 +276,7 @@ namespace PathTracing
 
             var globalConstants = new GlobalConstants
             {
-                                gViewToWorld = NrdDenoiser.worldToView.inverse,
+                gViewToWorld = NrdDenoiser.worldToView.inverse,
                 gViewToClip = NrdDenoiser.viewToClip,
                 gWorldToView = NrdDenoiser.worldToView,
                 gWorldToViewPrev = NrdDenoiser.prevWorldToView,
@@ -324,30 +324,29 @@ namespace PathTracing
                 gOrthoMode = cam.orthographic ? 1.0f : 0f,
                 gIndirectDiffuse = 1.0f,
                 gIndirectSpecular = 1.0f,
-                gMinProbability = 0.0001f,
+                gMinProbability = 0.000f,
 
-                gSharcMaxAccumulatedFrameNum = 10,
-// #define DENOISER_REBLUR                     0
-// #define DENOISER_RELAX                      1
-// #define DENOISER_REFERENCE                  2
+                gSharcMaxAccumulatedFrameNum = 45,
                 gDenoiserType = 0,
                 gDisableShadowsAndEnableImportanceSampling = 0,
                 gFrameIndex = (uint)Time.frameCount,
                 gForcedMaterial = 0,
-                gUseNormalMap =  1,
+                gUseNormalMap = 1,
                 gBounceNum = _settings.bounceNum,
-                gResolve = 0,
-                gValidation =  1,
+                gResolve = 1,
+                gValidation = 1,
                 gSR = 0,
-                gRR =0,
+                gRR = 0,
                 gIsSrgb = 0,
-                gOnScreen = 1,
+                gOnScreen = 0,
                 gTracingMode = 0,
                 gSampleNum = _settings.rpp,
                 gPSR = 0,
-                gSHARC = 0,
-                gTrimLobe = 0,
+                gSHARC = 1,
+                gTrimLobe = 1,
             };
+            
+            // Debug.Log(globalConstants.ToString());
 
             var textureDesc = resourceData.activeColorTexture.GetDescriptor(renderGraph);
             textureDesc.enableRandomWrite = true;
