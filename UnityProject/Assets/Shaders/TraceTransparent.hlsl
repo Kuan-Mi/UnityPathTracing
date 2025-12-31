@@ -132,29 +132,29 @@ void MainRayGenShader()
 
     CastRay(cameraRayOrigin, cameraRayDirection, 0.0, tmin0, GetConeAngleFromRoughness(0.0, 0.0), RAY_FLAG_CULL_OPAQUE, geometryPropsT, materialPropsT);
 
-    // if (!geometryPropsT.IsMiss() && geometryPropsT.hitT < tmin0)
-    // {
-    //     viewZAndTaaMask = -abs(viewZAndTaaMask);
-    //
-    //     float3 mvT = GetMotion(geometryPropsT.X, geometryPropsT.Xprev);
-    //     gInOut_Mv[pixelPos] = float4(mvT, viewZAndTaaMask);
-    //
-    //
-    //     TraceTransparentDesc desc;
-    //     desc.geometryProps = geometryPropsT;
-    //     desc.pixelPos = pixelPos;
-    //
-    //     desc.isReflection = true;
-    //     float3 reflection = TraceTransparent(desc);
-    //     Lsum = reflection;
-    //
-    //     desc.isReflection = false;
-    //     float3 refraction = TraceTransparent(desc);
-    //     Lsum += refraction;
-    // }
+    if (!geometryPropsT.IsMiss() && geometryPropsT.hitT < tmin0)
+    {
+        viewZAndTaaMask = -abs(viewZAndTaaMask);
+    
+        float3 mvT = GetMotion(geometryPropsT.X, geometryPropsT.Xprev);
+        gInOut_Mv[pixelPos] = float4(mvT, viewZAndTaaMask);
+    
+    
+        TraceTransparentDesc desc;
+        desc.geometryProps = geometryPropsT;
+        desc.pixelPos = pixelPos;
+    
+        desc.isReflection = true;
+        float3 reflection = TraceTransparent(desc);
+        Lsum = reflection;
+    
+        desc.isReflection = false;
+        float3 refraction = TraceTransparent(desc);
+        Lsum += refraction;
+    }
 
     // Apply exposure
-    // Lsum = ApplyExposure(Lsum);
+    Lsum = ApplyExposure(Lsum);
 
     // Output
     gOut_Composed[pixelPos] = Lsum;

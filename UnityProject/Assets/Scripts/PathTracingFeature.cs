@@ -1,6 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Runtime.InteropServices;
+﻿using System.Collections.Generic;
 using Nrd;
 using Unity.Mathematics;
 using UnityEngine;
@@ -165,56 +163,26 @@ namespace PathTracing
                 accelerationStructure.Build();
             }
 
-
             if (gIn_ScramblingRankingUint == null)
             {
-                Debug.Log(
-                    $"gIn_ScramblingRanking {gIn_ScramblingRanking.format} width:{gIn_ScramblingRanking.width} height:{gIn_ScramblingRanking.height}");
-                Debug.Log($"gIn_Sobol {gIn_Sobol.format} width:{gIn_Sobol.width} height:{gIn_Sobol.height}");
-
-                gIn_ScramblingRankingUint =
-                    new GraphicsBuffer(GraphicsBuffer.Target.Structured, gIn_ScramblingRanking.width * gIn_ScramblingRanking.height, 16);
+                gIn_ScramblingRankingUint = new GraphicsBuffer(GraphicsBuffer.Target.Structured, gIn_ScramblingRanking.width * gIn_ScramblingRanking.height, 16);
                 var scramblingRankingData = new uint4[gIn_ScramblingRanking.width * gIn_ScramblingRanking.height];
-                byte[] rawData = gIn_ScramblingRanking.GetRawTextureData();
-
-                Color32[] colors = gIn_ScramblingRanking.GetPixels32();
-
-
-                Debug.Log($"gIn_ScramblingRanking rawData Length: {rawData.Length}");
-                Debug.Log($"gIn_ScramblingRanking colors Length: {colors.Length}");
-
-
-                int count = scramblingRankingData.Length;
-                for (int i = 0; i < count; i++)
+                var rawData = gIn_ScramblingRanking.GetRawTextureData();
+                var count = scramblingRankingData.Length;
+                for (var i = 0; i < count; i++)
                 {
-                    scramblingRankingData[i] = new uint4(
-                        rawData[i * 4 + 0],
-                        rawData[i * 4 + 1],
-                        rawData[i * 4 + 2],
-                        rawData[i * 4 + 3]);
+                    scramblingRankingData[i] = new uint4(rawData[i * 4 + 0], rawData[i * 4 + 1], rawData[i * 4 + 2], rawData[i * 4 + 3]);
                 }
-
                 gIn_ScramblingRankingUint.SetData(scramblingRankingData);
-
 
                 gIn_SobolUint = new GraphicsBuffer(GraphicsBuffer.Target.Structured, gIn_Sobol.width * gIn_Sobol.height, 16);
                 var sobolData = new uint4[gIn_Sobol.width * gIn_Sobol.height];
                 rawData = gIn_Sobol.GetRawTextureData();
-                colors = gIn_Sobol.GetPixels32();
-
-                Debug.Log($"gIn_Sobol rawData Length: {rawData.Length}");
-                Debug.Log($"gIn_Sobol colors Length: {colors.Length}");
-
                 count = sobolData.Length;
-                for (int i = 0; i < count; i++)
+                for (var i = 0; i < count; i++)
                 {
-                    sobolData[i] = new uint4(
-                        rawData[i * 4 + 0],
-                        rawData[i * 4 + 1],
-                        rawData[i * 4 + 2],
-                        rawData[i * 4 + 3]);
+                    sobolData[i] = new uint4(rawData[i * 4 + 0], rawData[i * 4 + 1], rawData[i * 4 + 2], rawData[i * 4 + 3]);
                 }
-
                 gIn_SobolUint.SetData(sobolData);
             }
 
@@ -227,23 +195,15 @@ namespace PathTracing
                 TaaCs = taaComputeShader,
                 AccelerationStructure = accelerationStructure,
                 ScramblingRanking = gIn_ScramblingRankingUint,
-                Sobol = gIn_SobolUint
+                Sobol = gIn_SobolUint,
+                BiltMaterial = finalMaterial
             };
-
-            if (finalMaterial == null)
-            {
-                var shader = Shader.Find("KM/Final");
-                finalMaterial = new Material(shader); 
-                DontDestroyOnLoad(finalMaterial);
-            }
-
-            _pathTracingPass.BiltMaterial = finalMaterial;
         }
 
         public override void AddRenderPasses(ScriptableRenderer renderer, ref RenderingData renderingData)
         {
             Camera cam = renderingData.cameraData.camera;
-            if (cam.cameraType == CameraType.Preview || cam.cameraType == CameraType.Reflection)
+            if (cam.cameraType is CameraType.Preview or CameraType.Reflection)
                 return;
 
             int camID = cam.GetInstanceID();
@@ -253,7 +213,6 @@ namespace PathTracing
                 nrd = new NRDDenoiser(pathTracingSetting, cam.name);
                 _denoisers.Add(camID, nrd);
             }
-
 
             _pathTracingPass.NrdDenoiser = nrd;
             renderer.EnqueuePass(_pathTracingPass);
