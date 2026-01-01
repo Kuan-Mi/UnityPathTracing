@@ -91,7 +91,7 @@ MonoBehaviour:
     rpp: 1
     bounceNum: 1
     mipBias: -0.5
-    tracingMode: 0
+    tracingMode: 1
     denoiser: 0
     emissionIntensity: 1
     cameraJitter: 1

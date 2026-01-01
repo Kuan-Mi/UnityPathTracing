@@ -1,6 +1,7 @@
 {
   "dependencies": {
     "com.unity.ai.navigation": "2.0.9",
+    "com.unity.cinemachine": "3.1.5",
     "com.unity.cloud.gltfast": "6.15.1",
     "com.unity.collab-proxy": "2.10.2",
     "com.unity.ide.rider": "3.0.38",
