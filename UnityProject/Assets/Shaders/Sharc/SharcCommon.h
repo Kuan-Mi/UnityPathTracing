@@ -350,7 +350,10 @@ bool SharcGetCachedRadiance(in SharcParameters sharcParameters, in SharcHitData 
 
     HashGridIndex cacheIndex = HashMapFindEntry(sharcParameters.hashMapData, sharcHitData.positionWorld, sharcHitData.normalWorld, sharcParameters.gridParameters);
     if (cacheIndex == HASH_GRID_INVALID_CACHE_INDEX)
+    {
+        radiance = float3(0, 1, 0);
         return false;
+    }
 
     SharcVoxelData voxelData = SharcGetVoxelData(sharcParameters.resolvedBuffer, cacheIndex);
     if (voxelData.accumulatedSampleNum > sampleThreshold)

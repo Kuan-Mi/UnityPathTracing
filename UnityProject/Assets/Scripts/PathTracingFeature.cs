@@ -228,20 +228,20 @@ namespace PathTracing
             // 1. Hash Entries Buffer: storing uint64_t (8 bytes)
             // HLSL: RWStructuredBuffer<uint64_t> gInOut_SharcHashEntriesBuffer;
             _hashEntriesBuffer = new GraphicsBuffer(GraphicsBuffer.Target.Structured, Capacity, sizeof(ulong));
-
+            ulong[] clearData = new ulong[Capacity];
+            _hashEntriesBuffer.SetData(clearData);
+            
             // 2. Accumulation Buffer: storing uint4 (16 bytes)
             // HLSL: RWStructuredBuffer<SharcAccumulationData> gInOut_SharcAccumulated;
             _accumulationBuffer = new GraphicsBuffer(GraphicsBuffer.Target.Structured, Capacity, sizeof(uint) * 4);
+            uint4[] clearAccumData = new uint4[Capacity];
+            _accumulationBuffer.SetData(clearAccumData);
 
             // 3. Resolved Buffer: storing uint3 + uint (16 bytes)
             // HLSL: RWStructuredBuffer<SharcPackedData> gInOut_SharcResolved;
             _resolvedBuffer = new GraphicsBuffer(GraphicsBuffer.Target.Structured, Capacity, sizeof(uint) * 4);
-
-            // 初始化时清空 Buffer，特别是 HashEntries 必须为 0 (HASH_GRID_INVALID_HASH_KEY)
-            // 注意：C# 这里的 SetData 只是初始化，实际运行中由 CSMain 维护
-            uint[] clearData = new uint[Capacity * 2]; // ulong = 2 uints
-            _hashEntriesBuffer.SetData(clearData);
-            // 其他 buffer 可以不手动清空，因为 shader 会处理，但清空是好习惯
+            uint4[] clearResolvedData = new uint4[Capacity];
+            _resolvedBuffer.SetData(clearResolvedData);
         }
 
         public override void AddRenderPasses(ScriptableRenderer renderer, ref RenderingData renderingData)

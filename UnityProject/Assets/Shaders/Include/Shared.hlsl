@@ -44,7 +44,7 @@
 #define USE_RANDOMIZED_ROUGHNESS            0 // randomize roughness ( a common case in games )
 #define USE_STOCHASTIC_SAMPLING             0 // needed?
 #define USE_LOAD                            0 // Load vs SampleLevel
-#define USE_SHARC_DEBUG                     2 // 1 - show cache, 2 - show grid (NRD sample recompile required)
+#define USE_SHARC_DEBUG                     0 // 1 - show cache, 2 - show grid (NRD sample recompile required)
 #define USE_TAA_DEBUG                       0 // 1 - show weight
 #define USE_BIAS_FIX                        0 // fixes negligible hair and specular bias
 
@@ -127,7 +127,7 @@
 // Spatial HAsh-based Radiance Cache ( SHARC )
 #define SHARC_CAPACITY                      ( 1 << 22 )
 #define SHARC_SCENE_SCALE                   45.0
-#define SHARC_DOWNSCALE                     5
+#define SHARC_DOWNSCALE                     4
 #define SHARC_ANTI_FIREFLY                  false
 #define SHARC_STALE_FRAME_NUM_MIN           32 // new version uses 8 by default, old value offers more stability in voxels with low number of samples ( critical for glass )
 #define SHARC_SEPARATE_EMISSIVE             1

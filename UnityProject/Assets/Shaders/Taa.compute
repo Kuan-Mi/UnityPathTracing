@@ -155,7 +155,7 @@ void CSMain(int2 threadPos : SV_GroupThreadId, int2 pixelPos : SV_DispatchThread
     #endif
     mixRate += diff;
 
-    gOut_Debug[pixelPos] = float4(diff.xxx, 1);
+    // gOut_Debug[pixelPos] = float4(diff.xxx, 1);
 
     // Clamp mix rate
     mixRate = saturate(mixRate);

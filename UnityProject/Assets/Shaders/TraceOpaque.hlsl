@@ -195,7 +195,7 @@ TraceOpaqueResult TraceOpaque(GeometryProps geometryProps0, MaterialProps materi
     // result.diffRadiance = isValid ?  result.diffRadiance : float3( 1.0, 0.0, 0.0 );
     #endif
 
-    result.diffRadiance /= diffFactor0;
+    // result.diffRadiance /= diffFactor0;
 
     return result;
     #endif

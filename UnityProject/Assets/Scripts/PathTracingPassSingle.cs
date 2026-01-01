@@ -118,7 +118,9 @@ namespace PathTracing
             natCmd.SetRayTracingBufferParam(data.SharcUpdateTs, g_AccumulationBufferID, data.AccumulationBuffer);
             natCmd.SetRayTracingBufferParam(data.SharcUpdateTs, g_ResolvedBufferID, data.ResolvedBuffer);
 
-            natCmd.DispatchRays(data.SharcUpdateTs, "MainRayGenShader", data.Width, data.Height, 1);
+            natCmd.SetRayTracingTextureParam(data.SharcUpdateTs, g_OutputID, data.OutputTexture);
+            
+            natCmd.DispatchRays(data.SharcUpdateTs, "MainRayGenShader", data.Width/4, data.Height/4, 1);
 
             // Sharc resolve
             natCmd.SetComputeConstantBufferParam(data.SharcResolveCs, paramsID, data.ConstantBuffer, 0, data.ConstantBuffer.stride);
@@ -396,7 +398,7 @@ namespace PathTracing
                 gSunBasisX = new float4(gSunBasisX.x, gSunBasisX.y, gSunBasisX.z, 0),
                 gSunBasisY = new float4(gSunBasisY.x, gSunBasisY.y, gSunBasisY.z, 0),
                 gSunDirection = new float4(gSunDirection.x, gSunDirection.y, gSunDirection.z, 0),
-                gCameraGlobalPos = new float4(NrdDenoiser.camPos, 1),
+                gCameraGlobalPos = new float4(NrdDenoiser.camPos, 0),
                 gCameraGlobalPosPrev = new float4(NrdDenoiser.prevCamPos, 0),
                 gViewDirection = new float4(cam.transform.forward, 0),
                 gHairBaseColor = new float4(0.1f, 0.1f, 0.1f, 1.0f),
