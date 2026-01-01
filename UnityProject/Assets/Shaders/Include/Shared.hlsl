@@ -44,7 +44,7 @@
 #define USE_RANDOMIZED_ROUGHNESS            0 // randomize roughness ( a common case in games )
 #define USE_STOCHASTIC_SAMPLING             0 // needed?
 #define USE_LOAD                            0 // Load vs SampleLevel
-#define USE_SHARC_DEBUG                     0 // 1 - show cache, 2 - show grid (NRD sample recompile required)
+#define USE_SHARC_DEBUG                     2 // 1 - show cache, 2 - show grid (NRD sample recompile required)
 #define USE_TAA_DEBUG                       0 // 1 - show weight
 #define USE_BIAS_FIX                        0 // fixes negligible hair and specular bias
 

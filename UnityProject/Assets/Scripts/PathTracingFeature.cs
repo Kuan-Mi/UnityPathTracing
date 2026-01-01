@@ -221,25 +221,25 @@ namespace PathTracing
             };
         }
 
-        public int capacity = 1000000; // 对应 HLSL 中的 SHARC_CAPACITY
+          static readonly int Capacity = 1 << 22;
 
         private void InitializeBuffers()
         {
             // 1. Hash Entries Buffer: storing uint64_t (8 bytes)
             // HLSL: RWStructuredBuffer<uint64_t> gInOut_SharcHashEntriesBuffer;
-            _hashEntriesBuffer = new GraphicsBuffer(GraphicsBuffer.Target.Structured, capacity, sizeof(ulong));
+            _hashEntriesBuffer = new GraphicsBuffer(GraphicsBuffer.Target.Structured, Capacity, sizeof(ulong));
 
             // 2. Accumulation Buffer: storing uint4 (16 bytes)
             // HLSL: RWStructuredBuffer<SharcAccumulationData> gInOut_SharcAccumulated;
-            _accumulationBuffer = new GraphicsBuffer(GraphicsBuffer.Target.Structured, capacity, sizeof(uint) * 4);
+            _accumulationBuffer = new GraphicsBuffer(GraphicsBuffer.Target.Structured, Capacity, sizeof(uint) * 4);
 
             // 3. Resolved Buffer: storing uint3 + uint (16 bytes)
             // HLSL: RWStructuredBuffer<SharcPackedData> gInOut_SharcResolved;
-            _resolvedBuffer = new GraphicsBuffer(GraphicsBuffer.Target.Structured, capacity, sizeof(uint) * 4);
+            _resolvedBuffer = new GraphicsBuffer(GraphicsBuffer.Target.Structured, Capacity, sizeof(uint) * 4);
 
             // 初始化时清空 Buffer，特别是 HashEntries 必须为 0 (HASH_GRID_INVALID_HASH_KEY)
             // 注意：C# 这里的 SetData 只是初始化，实际运行中由 CSMain 维护
-            uint[] clearData = new uint[capacity * 2]; // ulong = 2 uints
+            uint[] clearData = new uint[Capacity * 2]; // ulong = 2 uints
             _hashEntriesBuffer.SetData(clearData);
             // 其他 buffer 可以不手动清空，因为 shader 会处理，但清空是好习惯
         }
@@ -290,6 +290,13 @@ namespace PathTracing
             }
 
             _denoisers.Clear();
+             
+            _accumulationBuffer?.Release();
+            _accumulationBuffer = null;
+            _hashEntriesBuffer?.Release();
+            _hashEntriesBuffer = null;
+            _resolvedBuffer?.Release();
+            _resolvedBuffer = null;
         }
     }
 }

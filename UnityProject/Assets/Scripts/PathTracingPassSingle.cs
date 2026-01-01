@@ -126,7 +126,11 @@ namespace PathTracing
             natCmd.SetComputeBufferParam(data.SharcResolveCs, 0, g_AccumulationBufferID, data.AccumulationBuffer);
             natCmd.SetComputeBufferParam(data.SharcResolveCs, 0, g_ResolvedBufferID, data.ResolvedBuffer);
 
-            natCmd.DispatchCompute(data.SharcResolveCs, 0, threadGroupX, threadGroupY, 1);
+            ulong SHARC_CAPACITY = 1 << 22;
+            ulong LINEAR_BLOCK_SIZE = 256;
+            int x = (int)((SHARC_CAPACITY + LINEAR_BLOCK_SIZE - 1) / LINEAR_BLOCK_SIZE);
+            
+            natCmd.DispatchCompute(data.SharcResolveCs, 0, x, 1, 1);
 
             // 不透明
             natCmd.SetRayTracingShaderPass(data.OpaqueTs, "Test2");
