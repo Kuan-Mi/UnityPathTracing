@@ -759,23 +759,23 @@ void MainRayGenShader()
 
     if (shadowTranslucency > 0.1)
     {
-        // GeometryProps geometryPropsShadow;
-        // MaterialProps materialPropsShadow;
+        GeometryProps geometryPropsShadow;
+        MaterialProps materialPropsShadow;
+        
+        CastRay(Xoffset, sunDirection, 0.0, INF, mipAndCone, FLAG_NON_TRANSPARENT,geometryPropsShadow, materialPropsShadow);
+
+        shadowHitDist = geometryPropsShadow.hitT;
+
+        // RayDesc rayDesc;
+        // rayDesc.Origin = Xoffset;
+        // rayDesc.Direction = sunDirection;
+        // rayDesc.TMin = 0;
+        // rayDesc.TMax = 1000;
         //
-        // CastRay(Xoffset, sunDirection, 0.0, INF, mipAndCone, geometryPropsShadow, materialPropsShadow);
+        // MainRayPayload shadowPayload = (MainRayPayload)0;
+        // TraceRay(gWorldTlas, RAY_FLAG_NONE | RAY_FLAG_CULL_NON_OPAQUE, 0xFF, 0, 1, 1, rayDesc, shadowPayload);
+        // shadowHitDist = shadowPayload.hitT;
 
-
-        RayDesc rayDesc;
-        rayDesc.Origin = Xoffset;
-        rayDesc.Direction = sunDirection;
-        rayDesc.TMin = 0;
-        rayDesc.TMax = 1000;
-
-        MainRayPayload shadowPayload = (MainRayPayload)0;
-        TraceRay(gWorldTlas, RAY_FLAG_NONE | RAY_FLAG_CULL_NON_OPAQUE, 0xFF, 0, 1, 1, rayDesc, shadowPayload);
-        shadowHitDist = shadowPayload.hitT;
-
-        // shadowHitDist = geometryPropsShadow.hitT;
     }
 
     // shadowHitDist = 0;

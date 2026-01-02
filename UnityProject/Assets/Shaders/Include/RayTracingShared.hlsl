@@ -137,7 +137,7 @@ void CastRay(float3 origin, float3 direction, float Tmin, float Tmax, float2 mip
     MainRayPayload payload = (MainRayPayload)0;
     payload.mipAndCone = mipAndCone;
 
-    uint maxBounce = 10;
+    uint maxBounce = 3;
 
     do
     {
