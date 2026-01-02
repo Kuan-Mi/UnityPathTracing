@@ -13,6 +13,7 @@
 #include "NRI.h"
 #include "Extensions/NRIHelper.h" 
 #include "Extensions/NRIWrapperD3D12.h"
+#include "Extensions/NRIUpscaler.h"
 #include "NRDIntegration.h"
 
 #include "dxgi.h"
@@ -54,4 +55,5 @@ private:
     nrd::Identifier m_SigmaId = 0;
     nrd::Identifier m_ReblurId = 0;
     std::atomic<bool> m_are_resources_initialized{false};
+    nri::Upscaler* m_DLRR = nullptr;
 };

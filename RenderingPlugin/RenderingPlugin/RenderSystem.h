@@ -7,6 +7,7 @@
 
 #include "NRI.h"
 #include "Extensions/NRIWrapperD3D12.h"
+#include "Extensions/NRIUpscaler.h"
 
 #include "Unity/IUnityGraphicsD3D12.h"
 #include "Unity/IUnityGraphics.h"
@@ -27,6 +28,7 @@ public:
     ID3D12Device* GetDevice() const { return device; }
     nri::Device* GetNriDevice() const { return m_NriDevice; }
     nri::CoreInterface& GetNriCore() { return m_NriCore; }
+    nri::UpscalerInterface& GetNriUpScaler() { return m_NriUpScaler; }
     nri::WrapperD3D12Interface& GetNriWrapper() { return m_NriWrapper; }
     IUnityGraphicsD3D12v7* GetD3D12() const { return s_d3d12; }
 
@@ -44,7 +46,11 @@ private:
 
     // NRI
     nri::Device* m_NriDevice = nullptr;
+    
+    
+
     nri::CoreInterface m_NriCore = {};
+    nri::UpscalerInterface m_NriUpScaler = {};
     nri::WrapperD3D12Interface m_NriWrapper = {};
 
     std::atomic<bool> m_are_resources_initialized{false};

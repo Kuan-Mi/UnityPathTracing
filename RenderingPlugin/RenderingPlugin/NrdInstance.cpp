@@ -97,7 +97,7 @@ static D3D12_RESOURCE_STATES GetResourceStates(nri::AccessBits accessBits, D3D12
 }
 
 
-void NrdInstance::DispatchCompute( FrameData* data)
+void NrdInstance::DispatchCompute(FrameData* data)
 {
     if (data == nullptr)
         return;
@@ -111,6 +111,14 @@ void NrdInstance::DispatchCompute( FrameData* data)
     if (!s_d3d12->CommandRecordingState(&recording_state))
         return;
 
+    nri::CommandBufferD3D12Desc cmdDesc;
+    cmdDesc.d3d12CommandList = recording_state.commandList;
+    cmdDesc.d3d12CommandAllocator = nullptr;
+
+    nri::CommandBuffer* nriCmdBuffer = nullptr;
+    RenderSystem::Get().GetNriWrapper().CreateCommandBufferD3D12(*RenderSystem::Get().GetNriDevice(), cmdDesc, nriCmdBuffer);
+    
+    
     if (TextureWidth != data->width || TextureHeight != data->height)
     {
         if (TextureWidth == 0 || TextureHeight == 0)
@@ -125,22 +133,57 @@ void NrdInstance::DispatchCompute( FrameData* data)
         TextureWidth = data->width;
         TextureHeight = data->height;
 
+        
+        RenderSystem& rs = RenderSystem::Get();
+
+        const nri::DeviceDesc& nrideviceDesc = rs.GetNriCore().GetDeviceDesc(*rs.GetNriDevice());
+
+        LOG(("[NRD Native] NRI Device created. VendorID: " + std::to_string((int)nrideviceDesc.adapterDesc.vendor) + ", rayTracing: " + std::to_string(nrideviceDesc.features.rayTracing)).c_str());
+
+
+        if (rs.GetNriUpScaler().IsUpscalerSupported(*rs.GetNriDevice(), nri::UpscalerType::DLRR))
+        {
+            LOG("[NRD Native] DLRR Upscaler is supported.");
+        }
+        else
+        {
+            LOG("[NRD Native] DLRR Upscaler is NOT supported.");
+        }
+
+        nri::UpscalerMode mode = nri::UpscalerMode::NATIVE;
+
+        nri::UpscalerBits upscalerFlags = nri::UpscalerBits::DEPTH_INFINITE;
+
+        upscalerFlags |= nri::UpscalerBits::DEPTH_INVERTED;
+
+        nri::UpscalerDesc upscalerDesc = {};
+        upscalerDesc.upscaleResolution = {(nri::Dim_t) TextureWidth, (nri::Dim_t)TextureHeight};
+        upscalerDesc.type = nri::UpscalerType::DLRR;
+        upscalerDesc.mode = mode;
+        upscalerDesc.flags = upscalerFlags;
+        upscalerDesc.commandBuffer = nriCmdBuffer;
+
+        nri::Result r = rs.GetNriUpScaler().CreateUpscaler(*rs.GetNriDevice(), upscalerDesc, m_DLRR);
+        if (r != nri::Result::SUCCESS)
+        {
+            LOG(("[NRD Native] Failed to create DLRR Upscaler . Error code: " + std::to_string(static_cast<int>(r))).c_str());
+        }else
+        {
+            LOG("[NRD Native] DLRR Upscaler created successfully.");
+        }
+
+        
+        
         CreateNrd();
         frameIndex = 0;
     }
 
     // LOG(("[NRD Native] id:" + std::to_string(id) + " - Dispatching NRD compute for frame index " + std::to_string(data->commonSettings.frameIndex) + ".").c_str());
 
-    nri::CommandBufferD3D12Desc cmdDesc;
-    cmdDesc.d3d12CommandList = recording_state.commandList;
-    cmdDesc.d3d12CommandAllocator = nullptr;
-
-    nri::CommandBuffer* nriCmdBuffer = nullptr;
-    RenderSystem::Get().GetNriWrapper().CreateCommandBufferD3D12(*RenderSystem::Get().GetNriDevice(), cmdDesc, nriCmdBuffer);
 
     data->commonSettings.frameIndex = frameIndex;
     frameIndex++;
-    
+
     m_NrdIntegration.SetCommonSettings(data->commonSettings);
     m_NrdIntegration.SetDenoiserSettings(m_SigmaId, &data->sigmaSettings);
     m_NrdIntegration.SetDenoiserSettings(m_ReblurId, &data->reblurSettings);
@@ -182,6 +225,21 @@ void NrdInstance::DispatchCompute( FrameData* data)
 
         s_d3d12->NotifyResourceState(rawResource, state, isUAV);
     }
+    
+    
+    nri::DispatchUpscaleDesc dispatchUpscaleDesc = {};
+    // dispatchUpscaleDesc.output = {Get(Texture::DlssOutput), Get(Descriptor::DlssOutput_StorageTexture)};
+    // dispatchUpscaleDesc.input = {Get(Texture::Composed), Get(Descriptor::Composed_Texture)};
+    
+    
+    dispatchUpscaleDesc.currentResolution = {(nri::Dim_t)data->width, (nri::Dim_t)data->height};
+    
+    dispatchUpscaleDesc.cameraJitter = {-data->commonSettings.cameraJitter[0], -data->commonSettings.cameraJitter[1]};
+    dispatchUpscaleDesc.mvScale = {1.0f, 1.0f};
+    dispatchUpscaleDesc.flags = nri::DispatchUpscaleBits::NONE;
+    
+    
+    
 
     RenderSystem::Get().GetNriCore().DestroyCommandBuffer(nriCmdBuffer);
 }
@@ -201,6 +259,8 @@ void NrdInstance::UpdateResources(const NrdResourceInput* resources, int count)
 
 void NrdInstance::CreateNrd()
 {
+
+
     m_NrdIntegration.Destroy();
 
     // 1. 配置 NRD Integration

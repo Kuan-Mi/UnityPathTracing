@@ -23,6 +23,7 @@ void RenderSystem::Initialize(IUnityInterfaces* interfaces)
     deviceDesc.d3d12Device = device;
     deviceDesc.disableD3D12EnhancedBarriers = true;
     deviceDesc.enableNRIValidation = true;
+    
 
     nri::Result result = nriCreateDeviceFromD3D12Device(deviceDesc, m_NriDevice);
     if (result != nri::Result::SUCCESS)
@@ -33,6 +34,7 @@ void RenderSystem::Initialize(IUnityInterfaces* interfaces)
 
     nriGetInterface(*m_NriDevice, NRI_INTERFACE(nri::CoreInterface), &m_NriCore);
     nriGetInterface(*m_NriDevice, NRI_INTERFACE(nri::WrapperD3D12Interface), &m_NriWrapper);
+    nriGetInterface(*m_NriDevice, NRI_INTERFACE(nri::UpscalerInterface), &m_NriUpScaler);
 
     UnityGraphicsD3D12PhysicalVideoMemoryControlValues control_values;
     control_values.reservation = 64000000;
