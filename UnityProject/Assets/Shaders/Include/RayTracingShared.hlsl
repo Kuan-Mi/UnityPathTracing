@@ -1,4 +1,3 @@
-
 #include "Sharc/SharcCommon.h"
 RaytracingAccelerationStructure gWorldTlas : register(t0, space1);
 
