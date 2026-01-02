@@ -19,15 +19,18 @@
     </ProjectConfiguration>
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="DLRRInstance.h" />
     <ClInclude Include="FrameData.h" />
     <ClInclude Include="NrdInstance.h" />
     <ClInclude Include="RenderSystem.h" />
+    <ClInclude Include="RRFrameData.h" />
     <ClInclude Include="Unity\IUnityGraphics.h" />
     <ClInclude Include="Unity\IUnityGraphicsD3D12.h" />
     <ClInclude Include="Unity\IUnityInterface.h" />
     <ClInclude Include="Unity\IUnityLog.h" />
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="DLRRInstance.cpp" />
     <ClCompile Include="NrdInstance.cpp" />
     <ClCompile Include="RenderingPlugin.cpp" />
     <ClCompile Include="RenderSystem.cpp" />

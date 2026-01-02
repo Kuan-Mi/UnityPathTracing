@@ -1,7 +1,10 @@
 ﻿#include <cassert>
 #include <mutex>
+
+#include "DLRRInstance.h"
 #include "RenderSystem.h"
 #include "NrdInstance.h"
+#include "RRFrameData.h"
 #include "Unity/IUnityLog.h"
 
 
@@ -17,9 +20,14 @@ namespace
     IUnityInterfaces* s_UnityInterfaces = nullptr;
     IUnityGraphics* s_Graphics = nullptr;
     IUnityLog* s_Logger = nullptr;
-    std::unordered_map<int32_t, NrdInstance*> g_Instances;
-    std::mutex g_InstanceMutex;
-    int32_t g_NextInstanceId = 1;
+
+    std::unordered_map<int32_t, NrdInstance*> g_NrdInstances;
+    std::mutex g_NrdInstanceMutex;
+    int32_t g_NrdNextInstanceId = 1;
+
+    std::unordered_map<int32_t, DLRRInstance*> g_DLRRInstances;
+    std::mutex g_DLRRInstanceMutex;
+    int32_t g_DLRRNextInstanceId = 1;
 
 
     // 图形设备事件回调
@@ -37,9 +45,9 @@ namespace
         // 在关闭时清理图形API
         if (eventType == kUnityGfxDeviceEventShutdown)
         {
-            std::scoped_lock lock(g_InstanceMutex);
-            for (auto& pair : g_Instances) delete pair.second;
-            g_Instances.clear();
+            std::scoped_lock lock(g_NrdInstanceMutex);
+            for (auto& pair : g_NrdInstances) delete pair.second;
+            g_NrdInstances.clear();
 
             RenderSystem::Get().Shutdown();
         }
@@ -52,17 +60,21 @@ namespace
         {
             FrameData* frameData = static_cast<FrameData*>(data);
 
-            // LOG(("instanceId: " + std::to_string(frameData->instanceId)).c_str());
-            // LOG(("w: " + std::to_string(frameData->width)).c_str());
-            // LOG(("h: " + std::to_string(frameData->height)).c_str());
-            // LOG(("commonSettings.resourceSize[0] : " + std::to_string(frameData->commonSettings.resourceSize[0] )).c_str());
-            // LOG(("commonSettings.resourceSize[1] : " + std::to_string(frameData->commonSettings.resourceSize[1] )).c_str());
-            // LOG(("commonSettings.resourceSizePrev[0] : " + std::to_string(frameData->commonSettings.resourceSizePrev[0] )).c_str());
-            // LOG(("commonSettings.resourceSizePrev[1] : " + std::to_string(frameData->commonSettings.resourceSizePrev[1] )).c_str());
+            std::scoped_lock lock(g_NrdInstanceMutex);
+            auto it = g_NrdInstances.find(frameData->instanceId);
+            if (it != g_NrdInstances.end())
+            {
+                it->second->DispatchCompute(frameData);
+            }
+        }
+        else if (eventID == 2)
+        {
+            // DLRR 事件处理（如果需要）
+            RRFrameData* frameData = static_cast<RRFrameData*>(data);
 
-            std::scoped_lock lock(g_InstanceMutex);
-            auto it = g_Instances.find(frameData->instanceId);
-            if (it != g_Instances.end())
+            std::scoped_lock lock(g_DLRRInstanceMutex);
+            auto it = g_DLRRInstances.find(frameData->instanceId);
+            if (it != g_DLRRInstances.end())
             {
                 it->second->DispatchCompute(frameData);
             }
@@ -104,21 +116,40 @@ UnityRenderingEventAndData UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API GetRenderE
 // C# 构造时调用
 UNITY_INTERFACE_EXPORT int UNITY_INTERFACE_API CreateDenoiserInstance()
 {
-    std::scoped_lock lock(g_InstanceMutex);
-    int id = g_NextInstanceId++;
-    g_Instances[id] = new NrdInstance(s_UnityInterfaces, id);
+    std::scoped_lock lock(g_NrdInstanceMutex);
+    int id = g_NrdNextInstanceId++;
+    g_NrdInstances[id] = new NrdInstance(s_UnityInterfaces, id);
+    return id;
+}
+
+UNITY_INTERFACE_EXPORT int UNITY_INTERFACE_API CreateDLRRInstance()
+{
+    std::scoped_lock lock(g_NrdInstanceMutex);
+    int id = g_NrdNextInstanceId++;
+    g_DLRRInstances[id] = new DLRRInstance(s_UnityInterfaces, id);
     return id;
 }
 
 // C# Dispose 时调用
 UNITY_INTERFACE_EXPORT void UNITY_INTERFACE_API DestroyDenoiserInstance(int id)
 {
-    std::scoped_lock lock(g_InstanceMutex);
-    auto it = g_Instances.find(id);
-    if (it != g_Instances.end())
+    std::scoped_lock lock(g_NrdInstanceMutex);
+    auto it = g_NrdInstances.find(id);
+    if (it != g_NrdInstances.end())
     {
         delete it->second;
-        g_Instances.erase(it);
+        g_NrdInstances.erase(it);
+    }
+}
+
+UNITY_INTERFACE_EXPORT void UNITY_INTERFACE_API DestroyDLRRInstance(int id)
+{
+    std::scoped_lock lock(g_DLRRInstanceMutex);
+    auto it = g_DLRRInstances.find(id);
+    if (it != g_DLRRInstances.end())
+    {
+        delete it->second;
+        g_DLRRInstances.erase(it);
     }
 }
 
@@ -138,9 +169,9 @@ void UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API UpdateDenoiserResources(
     NrdResourceInput* resources,
     int count)
 {
-    std::scoped_lock lock(g_InstanceMutex);
-    auto it = g_Instances.find(instanceId);
-    if (it != g_Instances.end())
+    std::scoped_lock lock(g_NrdInstanceMutex);
+    auto it = g_NrdInstances.find(instanceId);
+    if (it != g_NrdInstances.end())
     {
         it->second->UpdateResources(resources, count);
     }

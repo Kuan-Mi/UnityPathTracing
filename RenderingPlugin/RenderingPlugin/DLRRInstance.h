@@ -17,43 +17,28 @@
 #include "NRDIntegration.h"
 
 #include "dxgi.h"
+#include "RRFrameData.h"
 #include "Unity/IUnityGraphicsD3D12.h"
 #include "Unity/IUnityLog.h"
-
-class NrdInstance
+class DLRRInstance
 {
 public:
-    NrdInstance(IUnityInterfaces* interfaces,int instanceId);
-    ~NrdInstance();
-
-    void DispatchCompute( FrameData* data);
-    void UpdateResources(const NrdResourceInput* resources, int count);
-    
-
-private:
-    static constexpr int kMaxFramesInFlight = 3;
-
-    // void UpdateNrdSettings(const FrameData* data);
-    void CreateNrd();
+    DLRRInstance(IUnityInterfaces* interfaces,int instanceId);
+    ~DLRRInstance();
+    nri::Descriptor* GetOrCreateDescriptor(nri::Texture* texture, bool isStorage);
+    nri::UpscalerResource&& GetPair(nri::Texture* texture, bool cond);  
+    void DispatchCompute(RRFrameData* data);
     void initialize_and_create_resources();
     void release_resources();
 
+private:
     IUnityGraphicsD3D12v8* s_d3d12 = nullptr;
     IUnityLog* s_Log = nullptr;
     int id;
-
-    // NRD
-    nrd::Integration m_NrdIntegration = {};
-    
-    std::vector<NrdResourceInput> m_CachedResources;
-    
-    uint32_t frameIndex = 0;
-
-    UINT TextureWidth = 0;
-    UINT TextureHeight = 0;
-
-    nrd::Identifier m_SigmaId = 0;
-    nrd::Identifier m_ReblurId = 0;
     std::atomic<bool> m_are_resources_initialized{false};
     
+    UINT TextureWidth = 0;
+    UINT TextureHeight = 0;
+    std::unordered_map<uint64_t, nri::Descriptor*> m_DescriptorCache;
+    nri::Upscaler* m_DLRR = nullptr;
 };
