@@ -184,9 +184,19 @@ namespace PathTracing
             natCmd.SetComputeTextureParam(data.CompositionCs, 0, gIn_BaseColor_MetalnessID, data.BaseColorMetalness);
             natCmd.SetComputeTextureParam(data.CompositionCs, 0, gIn_DirectLightingID, data.DirectLighting);
             natCmd.SetComputeTextureParam(data.CompositionCs, 0, gIn_DirectEmissionID, data.DirectEmission);
-            natCmd.SetComputeTextureParam(data.CompositionCs, 0, gIn_ShadowID, data.ShadowTranslucency);
-            natCmd.SetComputeTextureParam(data.CompositionCs, 0, gIn_DiffID, data.DenoisedDiff);
-            natCmd.SetComputeTextureParam(data.CompositionCs, 0, gIn_SpecID, data.DenoisedSpec);
+            if (data.Setting.RR)
+            {
+                natCmd.SetComputeTextureParam(data.CompositionCs, 0, gIn_ShadowID, data.Penumbra);
+                natCmd.SetComputeTextureParam(data.CompositionCs, 0, gIn_DiffID, data.Diff);
+                natCmd.SetComputeTextureParam(data.CompositionCs, 0, gIn_SpecID, data.Spec);
+            }
+            else
+            {
+                natCmd.SetComputeTextureParam(data.CompositionCs, 0, gIn_ShadowID, data.ShadowTranslucency);
+                natCmd.SetComputeTextureParam(data.CompositionCs, 0, gIn_DiffID, data.DenoisedDiff);
+                natCmd.SetComputeTextureParam(data.CompositionCs, 0, gIn_SpecID, data.DenoisedSpec);
+            }
+
             natCmd.SetComputeTextureParam(data.CompositionCs, 0, gIn_PsrThroughputID, data.PsrThroughput);
             natCmd.SetComputeTextureParam(data.CompositionCs, 0, gOut_ComposedDiffID, data.ComposedDiff);
             natCmd.SetComputeTextureParam(data.CompositionCs, 0, gOut_ComposedSpec_ViewZID, data.ComposedSpecViewZ);
@@ -209,19 +219,6 @@ namespace PathTracing
 
             natCmd.DispatchRays(data.TransparentTs, "MainRayGenShader", data.Width, data.Height, 1);
 
-            // TAA
-            var isEven = (data.GlobalConstants.gFrameIndex & 1) == 0;
-            var taaSrc = isEven ? data.TaaHistoryPrev : data.TaaHistory;
-            var taaDst = isEven ? data.TaaHistory : data.TaaHistoryPrev;
-
-            natCmd.SetComputeConstantBufferParam(data.TaaCs, paramsID, data.ConstantBuffer, 0, data.ConstantBuffer.stride);
-            natCmd.SetComputeTextureParam(data.TaaCs, 0, gIn_MvID, data.Mv);
-            natCmd.SetComputeTextureParam(data.TaaCs, 0, gIn_ComposedID, data.Composed);
-            natCmd.SetComputeTextureParam(data.TaaCs, 0, gIn_HistoryID, taaSrc);
-            natCmd.SetComputeTextureParam(data.TaaCs, 0, gOut_ResultID, taaDst);
-            natCmd.SetComputeTextureParam(data.TaaCs, 0, gOut_DebugID, data.OutputTexture);
-            natCmd.DispatchCompute(data.TaaCs, 0, threadGroupX, threadGroupY, 1);
-
 
             if (data.Setting.dlss)
             {
@@ -240,13 +237,27 @@ namespace PathTracing
 
 
                 natCmd.DispatchCompute(data.DlssBeforeCs, 0, threadGroupX, threadGroupY, 1);
-                
-                
+
+
                 // DLSS调用
-                
+
                 // NRD降噪
                 natCmd.IssuePluginEventAndData(GetRenderEventAndDataFunc(), 1, data.NrdDataPtr);
-                
+            }
+            else
+            {
+                // TAA
+                var isEven = (data.GlobalConstants.gFrameIndex & 1) == 0;
+                var taaSrc = isEven ? data.TaaHistoryPrev : data.TaaHistory;
+                var taaDst = isEven ? data.TaaHistory : data.TaaHistoryPrev;
+
+                natCmd.SetComputeConstantBufferParam(data.TaaCs, paramsID, data.ConstantBuffer, 0, data.ConstantBuffer.stride);
+                natCmd.SetComputeTextureParam(data.TaaCs, 0, gIn_MvID, data.Mv);
+                natCmd.SetComputeTextureParam(data.TaaCs, 0, gIn_ComposedID, data.Composed);
+                natCmd.SetComputeTextureParam(data.TaaCs, 0, gIn_HistoryID, taaSrc);
+                natCmd.SetComputeTextureParam(data.TaaCs, 0, gOut_ResultID, taaDst);
+                natCmd.SetComputeTextureParam(data.TaaCs, 0, gOut_DebugID, data.OutputTexture);
+                natCmd.DispatchCompute(data.TaaCs, 0, threadGroupX, threadGroupY, 1);
             }
 
 
@@ -273,9 +284,15 @@ namespace PathTracing
                     Blitter.BlitTexture(natCmd, data.ShadowTranslucency, new Vector4(1, 1, 0, 0), data.BlitMaterial, (int)ShowPass.showShadow);
                     break;
                 case ShowMode.Diffuse:
-                    Blitter.BlitTexture(natCmd, data.DenoisedDiff, new Vector4(1, 1, 0, 0), data.BlitMaterial, (int)ShowPass.ShowRadiance);
+                    Blitter.BlitTexture(natCmd, data.Diff, new Vector4(1, 1, 0, 0), data.BlitMaterial, (int)ShowPass.ShowRadiance);
                     break;
                 case ShowMode.Specular:
+                    Blitter.BlitTexture(natCmd, data.Spec, new Vector4(1, 1, 0, 0), data.BlitMaterial, (int)ShowPass.ShowRadiance);
+                    break;
+                case ShowMode.DenoisedDiffuse:
+                    Blitter.BlitTexture(natCmd, data.DenoisedDiff, new Vector4(1, 1, 0, 0), data.BlitMaterial, (int)ShowPass.ShowRadiance);
+                    break;
+                case ShowMode.DenoisedSpecular:
                     Blitter.BlitTexture(natCmd, data.DenoisedSpec, new Vector4(1, 1, 0, 0), data.BlitMaterial, (int)ShowPass.ShowRadiance);
                     break;
                 case ShowMode.DirectLight:
@@ -293,17 +310,20 @@ namespace PathTracing
                 case ShowMode.ComposedSpec:
                     Blitter.BlitTexture(natCmd, data.ComposedSpecViewZ, new Vector4(1, 1, 0, 0), data.BlitMaterial, (int)ShowPass.showOut);
                     break;
-                case ShowMode.Taa:
-                    Blitter.BlitTexture(natCmd, taaDst, new Vector4(1, 1, 0, 0), data.BlitMaterial, (int)ShowPass.showAlpha);
+                case ShowMode.Composed:
+                    Blitter.BlitTexture(natCmd, data.Composed, new Vector4(1, 1, 0, 0), data.BlitMaterial, (int)ShowPass.showOut);
                     break;
-                case ShowMode.Final:
-                    if (data.BlitMaterial == null)
-                    {
-                        Debug.LogError("BlitMaterial is null");
-                    }
-
-                    Blitter.BlitTexture(natCmd, taaDst, new Vector4(1, 1, 0, 0), data.BlitMaterial, (int)ShowPass.showOut);
-                    break;
+                // case ShowMode.Taa:
+                //     Blitter.BlitTexture(natCmd, taaDst, new Vector4(1, 1, 0, 0), data.BlitMaterial, (int)ShowPass.showAlpha);
+                //     break;
+                // case ShowMode.Final:
+                //     if (data.BlitMaterial == null)
+                //     {
+                //         Debug.LogError("BlitMaterial is null");
+                //     }
+                //
+                //     Blitter.BlitTexture(natCmd, taaDst, new Vector4(1, 1, 0, 0), data.BlitMaterial, (int)ShowPass.showOut);
+                //     break;
                 case ShowMode.DLSS_DiffuseAlbedo:
                     Blitter.BlitTexture(natCmd, data.RRGuide_DiffAlbedo, new Vector4(1, 1, 0, 0), data.BlitMaterial, (int)ShowPass.showOut);
                     break;
@@ -317,7 +337,7 @@ namespace PathTracing
                     Blitter.BlitTexture(natCmd, data.RRGuide_Normal_Roughness, new Vector4(1, 1, 0, 0), data.BlitMaterial, (int)ShowPass.showOut);
                     break;
                 case ShowMode.DLSS_Output:
-                    Blitter.BlitTexture(natCmd, data.DlssOutput, new Vector4 (1, 1, 0, 0), data.BlitMaterial, (int)ShowPass.showOut);
+                    Blitter.BlitTexture(natCmd, data.DlssOutput, new Vector4(1, 1, 0, 0), data.BlitMaterial, (int)ShowPass.showOut);
                     break;
                 default:
                     throw new ArgumentOutOfRangeException();
@@ -558,7 +578,7 @@ namespace PathTracing
             passData.ComposedDiff = CreateTex(textureDesc, renderGraph, "ComposedDiff", GraphicsFormat.R16G16B16A16_SFloat);
             passData.ComposedSpecViewZ = CreateTex(textureDesc, renderGraph, "ComposedSpec_ViewZ", GraphicsFormat.R16G16B16A16_SFloat);
 
-            passData.Composed = CreateTex(textureDesc, renderGraph, "Composed", GraphicsFormat.R16G16B16A16_SFloat);
+            passData.Composed = renderGraph.ImportTexture(NrdDenoiser.GetRT(ResourceType.Composed));
 
             passData.TaaHistory = renderGraph.ImportTexture(NrdDenoiser.GetRT(ResourceType.TaaHistory));
             passData.TaaHistoryPrev = renderGraph.ImportTexture(NrdDenoiser.GetRT(ResourceType.TaaHistoryPrev));

@@ -103,6 +103,7 @@ namespace Nrd
             allocatedResources.Add(new NrdTextureResource(ResourceType.RRGuide_SpecHitDistance, GraphicsFormat.R16_SFloat, uavState));
             allocatedResources.Add(new NrdTextureResource(ResourceType.RRGuide_Normal_Roughness, GraphicsFormat.R16G16B16A16_SFloat, uavState));
             allocatedResources.Add(new NrdTextureResource(ResourceType.DlssOutput, GraphicsFormat.R16G16B16A16_SFloat, uavState));
+            allocatedResources.Add(new NrdTextureResource(ResourceType.Composed, GraphicsFormat.R16G16B16A16_SFloat, uavState));
 
 
             Debug.Log($"[NRD] Created Denoiser Instance {nrdInstanceId} for Camera {cameraName}");

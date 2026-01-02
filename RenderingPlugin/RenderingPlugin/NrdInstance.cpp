@@ -196,7 +196,7 @@ void NrdInstance::DispatchCompute(FrameData* data)
         {
             LOG("[NRD Native] DLRR Upscaler is NOT supported.");
         }
-      
+
         nri::UpscalerMode mode = nri::UpscalerMode::NATIVE;
 
         nri::UpscalerBits upscalerFlags = nri::UpscalerBits::DEPTH_INFINITE;
@@ -222,7 +222,7 @@ void NrdInstance::DispatchCompute(FrameData* data)
         {
             LOG("[NRD Native] DLRR Upscaler created successfully.");
         }
-  
+
 
         CreateNrd();
         frameIndex = 0;
@@ -277,35 +277,41 @@ void NrdInstance::DispatchCompute(FrameData* data)
     // }
 
 
-    // auto GetPair = [&](nrd::ResourceType type, bool isUAV = false) -> nri::UpscalerResource
-    // {
-    //     for (auto& item : m_CachedResources)
-    //     {
-    //         if (item.type == type)
-    //         {
-    //             nri::Descriptor* desc = GetOrCreateDescriptor(item.texture, isUAV);
-    //             return {item.texture, desc};
-    //         }
-    //     }
-    //     return {nullptr, nullptr};
-    // };
-    //
-    // nri::DispatchUpscaleDesc dispatchUpscaleDesc = {};
-    // dispatchUpscaleDesc.input = GetPair(nrd::ResourceType::IN_DIFF_HITDIST, false);
-    // dispatchUpscaleDesc.output = GetPair(nrd::ResourceType::OUT_DIFF_HITDIST, true);
-    //
-    //
-    // dispatchUpscaleDesc.currentResolution = {(nri::Dim_t)data->width, (nri::Dim_t)data->height};
-    //
-    // dispatchUpscaleDesc.cameraJitter = {-data->commonSettings.cameraJitter[0], -data->commonSettings.cameraJitter[1]};
-    // dispatchUpscaleDesc.mvScale = {1.0f, 1.0f};
-    // dispatchUpscaleDesc.flags = nri::DispatchUpscaleBits::NONE;
-    //
-    // dispatchUpscaleDesc.guides.denoiser.mv = GetPair(nrd::ResourceType::IN_MV, false);
-    // dispatchUpscaleDesc.guides.denoiser.depth = GetPair(nrd::ResourceType::IN_VIEWZ, false);
-    //
+    auto GetPair = [&](MyResourceType type, bool isUAV = false) -> nri::UpscalerResource
+    {
+        for (auto& item : m_CachedResources)
+        {
+            if ((uint32_t)item.type == (uint32_t)type)
+            {
+                nri::Descriptor* desc = GetOrCreateDescriptor(item.texture, isUAV);
+                return {item.texture, desc};
+            }
+        }
+        return {nullptr, nullptr};
+    };
 
-    // RenderSystem::Get().GetNriUpScaler().CmdDispatchUpscale(*nriCmdBuffer, *m_DLRR, dispatchUpscaleDesc);
+    nri::DispatchUpscaleDesc dispatchUpscaleDesc = {};
+    dispatchUpscaleDesc.input = GetPair(MyResourceType::Composed, false);
+    dispatchUpscaleDesc.output = GetPair(MyResourceType::DlssOutput, true);
+
+
+    dispatchUpscaleDesc.currentResolution = {(nri::Dim_t)data->width, (nri::Dim_t)data->height};
+
+    dispatchUpscaleDesc.cameraJitter = {-data->commonSettings.cameraJitter[0], -data->commonSettings.cameraJitter[1]};
+    dispatchUpscaleDesc.mvScale = {1.0f, 1.0f};
+    dispatchUpscaleDesc.flags = nri::DispatchUpscaleBits::NONE;
+
+    dispatchUpscaleDesc.guides.denoiser.mv = GetPair(MyResourceType::IN_MV, false);
+    dispatchUpscaleDesc.guides.denoiser.depth = GetPair(MyResourceType::IN_VIEWZ, false);
+    dispatchUpscaleDesc.guides.denoiser.diffuseAlbedo = GetPair(MyResourceType::RRGuide_DiffAlbedo, false);
+    dispatchUpscaleDesc.guides.denoiser.specularAlbedo = GetPair(MyResourceType::RRGuide_SpecAlbedo, false);
+    dispatchUpscaleDesc.guides.denoiser.normalRoughness = GetPair(MyResourceType::RRGuide_Normal_Roughness, false);
+    dispatchUpscaleDesc.guides.denoiser.specularMvOrHitT = GetPair(MyResourceType::RRGuide_SpecHitDistance, false);
+
+    memcpy(&dispatchUpscaleDesc.settings.dlrr.worldToViewMatrix, &data->commonSettings.worldToViewMatrix, sizeof(data->commonSettings.worldToViewMatrix));
+    memcpy(&dispatchUpscaleDesc.settings.dlrr.viewToClipMatrix, &data->commonSettings.viewToClipMatrix, sizeof(data->commonSettings.viewToClipMatrix));
+
+    RenderSystem::Get().GetNriUpScaler().CmdDispatchUpscale(*nriCmdBuffer, *m_DLRR, dispatchUpscaleDesc);
 
 
     RenderSystem::Get().GetNriCore().DestroyCommandBuffer(nriCmdBuffer);

@@ -136,6 +136,7 @@ namespace Nrd
         RRGuide_SpecHitDistance,
         RRGuide_Normal_Roughness,
         DlssOutput,
+        Composed,
 
         MAX_NUM,
     };
