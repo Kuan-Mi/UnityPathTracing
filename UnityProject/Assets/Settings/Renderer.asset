@@ -88,9 +88,9 @@ MonoBehaviour:
     showValidation: 0
     dofAperture: 0
     dofFocalDistance: 1
-    exposure: 19.5
+    exposure: 4.1
     rpp: 2
-    bounceNum: 2
+    bounceNum: 1
     mipBias: -0.5
     tracingMode: 1
     denoiser: 0
