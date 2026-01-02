@@ -329,7 +329,7 @@ TraceOpaqueResult TraceOpaque(GeometryProps geometryProps0, MaterialProps materi
 
                 float2 mipAndCone = GetConeAngleFromRoughness(geometryProps.mip, isDiffuse ? 1.0 : materialProps.roughness);
 
-                CastRay(geometryProps.GetXoffset(geometryProps.N), ray, 0.0, INF, mipAndCone, RAY_FLAG_CULL_NON_OPAQUE, geometryProps, materialProps);
+                CastRay(geometryProps.GetXoffset(geometryProps.N), ray, 0.0, INF, mipAndCone, FLAG_NON_TRANSPARENT, geometryProps, materialProps);
             }
 
             //=============================================================================================================================================================
@@ -580,7 +580,7 @@ void MainRayGenShader()
 
     GeometryProps geometryProps0;
     MaterialProps materialProps0;
-    CastRay(cameraRayOrigin, cameraRayDirection, 0.0, 1000.0, GetConeAngleFromRoughness(0.0, 0.0), (gOnScreen == SHOW_INSTANCE_INDEX || gOnScreen == SHOW_NORMAL) ? RAY_FLAG_NONE : RAY_FLAG_CULL_NON_OPAQUE, geometryProps0, materialProps0);
+    CastRay(cameraRayOrigin, cameraRayDirection, 0.0, 1000.0, GetConeAngleFromRoughness(0.0, 0.0), (gOnScreen == SHOW_INSTANCE_INDEX || gOnScreen == SHOW_NORMAL) ? GEOMETRY_ALL : FLAG_NON_TRANSPARENT, geometryProps0, materialProps0);
 
     //================================================================================================================================================================================
     // Primary surface replacement ( aka jump through mirrors )
@@ -627,7 +627,7 @@ void MainRayGenShader()
             float2 mipAndCone = GetConeAngleFromRoughness(geometryProps0.mip, materialProps0.roughness);
 
 
-            CastRay(geometryProps0.GetXoffset(geometryProps0.N), ray, 0.0, INF, mipAndCone, RAY_FLAG_NONE, geometryProps0, materialProps0);
+            CastRay(geometryProps0.GetXoffset(geometryProps0.N), ray, 0.0, INF, mipAndCone, GEOMETRY_ALL, geometryProps0, materialProps0);
         }
 
         {

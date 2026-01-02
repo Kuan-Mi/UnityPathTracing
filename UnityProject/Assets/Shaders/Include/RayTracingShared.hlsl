@@ -108,6 +108,24 @@ void MissShadow(inout MainRayPayload payload : SV_RayPayload)
     payload.hitT = INF;
 }
 
+uint ToRayFlag(uint flag)
+{
+    if (flag == FLAG_TRANSPARENT)
+        return RAY_FLAG_CULL_OPAQUE;
+    else if (flag == FLAG_NON_TRANSPARENT)
+        return RAY_FLAG_CULL_NON_OPAQUE;
+    else
+        return RAY_FLAG_NONE;
+}
+
+uint ToRayFlag2(uint flag)
+{
+    if (flag == FLAG_TRANSPARENT)
+        return RAY_FLAG_CULL_OPAQUE;
+    else
+        return RAY_FLAG_NONE;
+}
+
 void CastRay(float3 origin, float3 direction, float Tmin, float Tmax, float2 mipAndCone, uint flag, out GeometryProps props, out MaterialProps matProps)
 {
     RayDesc rayDesc;
@@ -119,7 +137,38 @@ void CastRay(float3 origin, float3 direction, float Tmin, float Tmax, float2 mip
     MainRayPayload payload = (MainRayPayload)0;
     payload.mipAndCone = mipAndCone;
 
-    TraceRay(gWorldTlas, flag, 0xFF, 0, 1, 0, rayDesc, payload);
+    uint maxBounce = 10;
+
+    do
+    {
+        TraceRay(gWorldTlas, ToRayFlag2(flag), 0xFF, 0, 1, 0, rayDesc, payload);
+        rayDesc.TMin = payload.hitT + 0.0001;
+    }
+    while (!payload.IsMiss() && !payload.Has(flag) && --maxBounce > 0);
+
+
+    // TraceRay(gWorldTlas, ToRayFlag2(flag), 0xFF, 0, 1, 0, rayDesc, payload);
+    // // 如果有交点，但是交点不是我们想要的类型,继续追踪
+    // if (!payload.IsMiss() && !payload.Has(flag))
+    // {
+    //     rayDesc.TMin = payload.hitT + 0.0001;
+    //     TraceRay(gWorldTlas, ToRayFlag2(flag), 0xFF, 0, 1, 0, rayDesc, payload);
+    // }
+    // if (!payload.IsMiss() && !payload.Has(flag))
+    // {
+    //     rayDesc.TMin = payload.hitT + 0.0001;
+    //     TraceRay(gWorldTlas, ToRayFlag2(flag), 0xFF, 0, 1, 0, rayDesc, payload);
+    // }
+    // if (!payload.IsMiss() && !payload.Has(flag))
+    // {
+    //     rayDesc.TMin = payload.hitT + 0.0001;
+    //     TraceRay(gWorldTlas, ToRayFlag2(flag), 0xFF, 0, 1, 0, rayDesc, payload);
+    // }
+    // if (!payload.IsMiss() && !payload.Has(flag))
+    // {
+    //     rayDesc.TMin = payload.hitT + 0.0001;
+    //     TraceRay(gWorldTlas, ToRayFlag2(flag), 0xFF, 0, 1, 0, rayDesc, payload);
+    // }
 
     props = (GeometryProps)0;
     props.mip = mipAndCone.x;

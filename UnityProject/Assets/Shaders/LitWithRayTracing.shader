@@ -181,6 +181,38 @@ Shader "Custom/LitWithRayTracing"
             }
 
             #define MAX_MIP_LEVEL                       11.0
+            
+            [shader("anyhit")]
+        void AnyHitMain(inout MainRayPayload payload, AttributeData attribs)
+        {
+            #if !_SURFACE_TYPE_TRANSPARENT
+            
+            // 1. 获取顶点索引
+            uint3 triangleIndices = UnityRayTracingFetchTriangleIndices(PrimitiveIndex());
+            
+            // 2. 获取三个顶点的 UV（为了性能，AnyHit 通常只取 UV，不计算法线等复杂属性）
+            float2 uv0 = UnityRayTracingFetchVertexAttribute2(triangleIndices.x, kVertexAttributeTexCoord0);
+            float2 uv1 = UnityRayTracingFetchVertexAttribute2(triangleIndices.y, kVertexAttributeTexCoord0);
+            float2 uv2 = UnityRayTracingFetchVertexAttribute2(triangleIndices.z, kVertexAttributeTexCoord0);
+            
+            // 3. 计算插值 UV
+            float3 barycentricCoords = float3(1.0 - attribs.barycentrics.x - attribs.barycentrics.y,
+                                                        attribs.barycentrics.x, attribs.barycentrics.y);
+            float2 uv = uv0 * barycentricCoords.x + uv1 * barycentricCoords.y + uv2 * barycentricCoords.z;
+            
+            // 4. 采样 Alpha 通道
+            // 注意：在 AnyHit 中采样通常使用 SampleLevel 0 以保证性能，或者根据 RayT 计算一个近似 Mip
+            float4 baseColor = _BaseMap.SampleLevel(sampler_BaseMap, _BaseMap_ST.xy * uv + _BaseMap_ST.zw, 0);
+            float alpha = baseColor.a * _BaseColor.a;
+            
+            // 5. Alpha Test 判定
+            // 如果透明度小于阈值，则调用 IgnoreHit()，光线将穿透该物体继续飞行
+            if (alpha < _Cutoff)
+            {
+                IgnoreHit();
+            }
+            #endif
+        }
 
             [shader("closesthit")]
             void ClosestHitMain(inout MainRayPayload payload : SV_RayPayload,

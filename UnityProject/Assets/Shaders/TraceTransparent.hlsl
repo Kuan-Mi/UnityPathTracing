@@ -55,7 +55,7 @@ float3 TraceTransparent(TraceTransparentDesc desc)
 
         // uint flags = bounce == PT_DELTA_BOUNCES_NUM ? FLAG_NON_TRANSPARENT : GEOMETRY_ALL;
         // uint flags = bounce == PT_DELTA_BOUNCES_NUM ? FLAG_NON_TRANSPARENT : GEOMETRY_ALL;
-        uint flags = bounce == PT_DELTA_BOUNCES_NUM ? RAY_FLAG_CULL_NON_OPAQUE : RAY_FLAG_NONE;
+        uint flags = bounce == PT_DELTA_BOUNCES_NUM ? FLAG_NON_TRANSPARENT : GEOMETRY_ALL;
 
 
         float3 Xoffset, ray;
@@ -173,7 +173,7 @@ void MainRayGenShader()
     GeometryProps geometryPropsT;
     MaterialProps materialPropsT;
 
-    CastRay(cameraRayOrigin, cameraRayDirection, 0.0, tmin0, GetConeAngleFromRoughness(0.0, 0.0), RAY_FLAG_CULL_OPAQUE, geometryPropsT, materialPropsT);
+    CastRay(cameraRayOrigin, cameraRayDirection, 0.0, tmin0, GetConeAngleFromRoughness(0.0, 0.0), FLAG_TRANSPARENT  , geometryPropsT, materialPropsT);
 
     // Trace delta events
     if (!geometryPropsT.IsMiss() && geometryPropsT.hitT < tmin0 && gOnScreen == SHOW_FINAL)

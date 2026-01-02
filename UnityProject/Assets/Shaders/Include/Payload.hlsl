@@ -36,5 +36,11 @@ struct MainRayPayload
     {
         textureOffsetAndFlags |= (flag << FLAG_FIRST_BIT);
     }
+    
+    bool Has(uint flag)
+    {
+        return (textureOffsetAndFlags & (flag << FLAG_FIRST_BIT)) != 0;
+    }
+
 
 };

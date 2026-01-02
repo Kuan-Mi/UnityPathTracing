@@ -83,7 +83,7 @@ void Trace(GeometryProps geometryProps, MaterialProps materialProps)
             //=========================================================================================================================================================
 
             float2 mipAndCone = GetConeAngleFromRoughness(geometryProps.mip, isDiffuse ? 1.0 : materialProps.roughness);
-            CastRay(geometryProps.GetXoffset(geometryProps.N), ray, 0.0, INF, mipAndCone, RAY_FLAG_CULL_NON_OPAQUE, geometryProps, materialProps);
+            CastRay(geometryProps.GetXoffset(geometryProps.N), ray, 0.0, INF, mipAndCone, FLAG_NON_TRANSPARENT, geometryProps, materialProps);
         }
 
         {
@@ -145,7 +145,7 @@ void MainRayGenShader()
     [loop]
     for (uint bounce = 1; bounce <= PT_DELTA_BOUNCES_NUM; bounce++)
     {
-        uint flags = bounce == PT_DELTA_BOUNCES_NUM ? RAY_FLAG_CULL_NON_OPAQUE : RAY_FLAG_NONE;
+        uint flags = bounce == PT_DELTA_BOUNCES_NUM ? FLAG_NON_TRANSPARENT : GEOMETRY_ALL;
         CastRay(Xoffset, ray, 0.0, INF, mip, flags, geometryProps, materialProps);
 
         bool isGlass = geometryProps.Has(FLAG_TRANSPARENT);
