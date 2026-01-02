@@ -135,11 +135,11 @@ void DLRRInstance::DispatchCompute(RRFrameData* data)
         nri::Result r = rs.GetNriUpScaler().CreateUpscaler(*rs.GetNriDevice(), upscalerDesc, m_DLRR);
         if (r != nri::Result::SUCCESS)
         {
-            LOG(("[NRD Native] Failed to create DLRR Upscaler . Error code: " + std::to_string(static_cast<int>(r))).c_str());
+            LOG(("[DLRR] Failed to create DLRR Upscaler . Error code: " + std::to_string(static_cast<int>(r))).c_str());
         }
         else
         {
-            LOG("[NRD Native] DLRR Upscaler created successfully.");
+            LOG("[DLRR] DLRR Upscaler created successfully.");
         }
     }
 

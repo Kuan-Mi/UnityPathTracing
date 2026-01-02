@@ -67,7 +67,7 @@ namespace Nrd
             FrameIndex++;
             unsafe
             {
-                return (IntPtr)buffer.GetUnsafePtr() + index * sizeof(FrameData);
+                return (IntPtr)buffer.GetUnsafePtr() + index * sizeof(RRFrameData);
             }
         }
 

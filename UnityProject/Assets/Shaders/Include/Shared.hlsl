@@ -1,9 +1,9 @@
 
 
 #define SHARC_ENABLE_64_BIT_ATOMICS 1
-#pragma exclude_renderers   opengl vulkan metal  glCore gles3 webgpu
-#pragma use_dxc
-#pragma target 6.0
+// #pragma exclude_renderers   opengl vulkan metal  glCore gles3 webgpu
+// #pragma use_dxc
+// #pragma target 6.0
 
 
 // © 2022 NVIDIA Corporation
