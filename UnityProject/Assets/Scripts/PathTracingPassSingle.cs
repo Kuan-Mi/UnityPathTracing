@@ -19,6 +19,7 @@ namespace PathTracing
         public RayTracingShader TransparentTs;
         public ComputeShader CompositionCs;
         public ComputeShader TaaCs;
+        public ComputeShader DlssBeforeCs;
         public Material BiltMaterial;
 
         public ComputeShader SharcResolveCs;
@@ -74,10 +75,18 @@ namespace PathTracing
             internal TextureHandle TaaHistoryPrev;
             internal TextureHandle PsrThroughput;
 
+
+            internal TextureHandle RRGuide_DiffAlbedo;
+            internal TextureHandle RRGuide_SpecAlbedo;
+            internal TextureHandle RRGuide_SpecHitDistance;
+            internal TextureHandle RRGuide_Normal_Roughness;
+            internal TextureHandle DlssOutput;
+
             internal RayTracingShader OpaqueTs;
             internal RayTracingShader TransparentTs;
             internal ComputeShader CompositionCs;
             internal ComputeShader TaaCs;
+            internal ComputeShader DlssBeforeCs;
             internal Material BlitMaterial;
             internal uint Width;
             internal uint Height;
@@ -119,8 +128,8 @@ namespace PathTracing
             natCmd.SetRayTracingBufferParam(data.SharcUpdateTs, g_ResolvedBufferID, data.ResolvedBuffer);
 
             natCmd.SetRayTracingTextureParam(data.SharcUpdateTs, g_OutputID, data.OutputTexture);
-            
-            natCmd.DispatchRays(data.SharcUpdateTs, "MainRayGenShader", data.Width/4, data.Height/4, 1);
+
+            natCmd.DispatchRays(data.SharcUpdateTs, "MainRayGenShader", data.Width / 4, data.Height / 4, 1);
 
             // Sharc resolve
             natCmd.SetComputeConstantBufferParam(data.SharcResolveCs, paramsID, data.ConstantBuffer, 0, data.ConstantBuffer.stride);
@@ -131,7 +140,7 @@ namespace PathTracing
             ulong SHARC_CAPACITY = 1 << 22;
             ulong LINEAR_BLOCK_SIZE = 256;
             int x = (int)((SHARC_CAPACITY + LINEAR_BLOCK_SIZE - 1) / LINEAR_BLOCK_SIZE);
-            
+
             natCmd.DispatchCompute(data.SharcResolveCs, 0, x, 1, 1);
 
             // 不透明
@@ -165,8 +174,8 @@ namespace PathTracing
 
             natCmd.DispatchRays(data.OpaqueTs, "MainRayGenShader", data.Width, data.Height, 1);
 
-            // NRD降噪
-            natCmd.IssuePluginEventAndData(GetRenderEventAndDataFunc(), 1, data.NrdDataPtr);
+            // // NRD降噪
+            // natCmd.IssuePluginEventAndData(GetRenderEventAndDataFunc(), 1, data.NrdDataPtr);
 
             // 合成
             natCmd.SetComputeConstantBufferParam(data.CompositionCs, paramsID, data.ConstantBuffer, 0, data.ConstantBuffer.stride);
@@ -212,6 +221,34 @@ namespace PathTracing
             natCmd.SetComputeTextureParam(data.TaaCs, 0, gOut_ResultID, taaDst);
             natCmd.SetComputeTextureParam(data.TaaCs, 0, gOut_DebugID, data.OutputTexture);
             natCmd.DispatchCompute(data.TaaCs, 0, threadGroupX, threadGroupY, 1);
+
+
+            if (data.Setting.dlss)
+            {
+                // dlss Before
+                natCmd.SetComputeConstantBufferParam(data.DlssBeforeCs, paramsID, data.ConstantBuffer, 0, data.ConstantBuffer.stride);
+
+                natCmd.SetComputeTextureParam(data.DlssBeforeCs, 0, "gIn_Normal_Roughness", data.NormalRoughness);
+                natCmd.SetComputeTextureParam(data.DlssBeforeCs, 0, "gIn_BaseColor_Metalness", data.BaseColorMetalness);
+                natCmd.SetComputeTextureParam(data.DlssBeforeCs, 0, "gIn_Spec", data.Spec);
+
+                natCmd.SetComputeTextureParam(data.DlssBeforeCs, 0, "gInOut_ViewZ", data.ViewZ);
+                natCmd.SetComputeTextureParam(data.DlssBeforeCs, 0, "gOut_DiffAlbedo", data.RRGuide_DiffAlbedo);
+                natCmd.SetComputeTextureParam(data.DlssBeforeCs, 0, "gOut_SpecAlbedo", data.RRGuide_SpecAlbedo);
+                natCmd.SetComputeTextureParam(data.DlssBeforeCs, 0, "gOut_SpecHitDistance", data.RRGuide_SpecHitDistance);
+                natCmd.SetComputeTextureParam(data.DlssBeforeCs, 0, "gOut_Normal_Roughness", data.RRGuide_Normal_Roughness);
+
+
+                natCmd.DispatchCompute(data.DlssBeforeCs, 0, threadGroupX, threadGroupY, 1);
+                
+                
+                // DLSS调用
+                
+                // NRD降噪
+                natCmd.IssuePluginEventAndData(GetRenderEventAndDataFunc(), 1, data.NrdDataPtr);
+                
+            }
+
 
             // 显示输出
             natCmd.SetRenderTarget(data.CameraTexture);
@@ -267,6 +304,21 @@ namespace PathTracing
 
                     Blitter.BlitTexture(natCmd, taaDst, new Vector4(1, 1, 0, 0), data.BlitMaterial, (int)ShowPass.showOut);
                     break;
+                case ShowMode.DLSS_DiffuseAlbedo:
+                    Blitter.BlitTexture(natCmd, data.RRGuide_DiffAlbedo, new Vector4(1, 1, 0, 0), data.BlitMaterial, (int)ShowPass.showOut);
+                    break;
+                case ShowMode.DLSS_SpecularAlbedo:
+                    Blitter.BlitTexture(natCmd, data.RRGuide_SpecAlbedo, new Vector4(1, 1, 0, 0), data.BlitMaterial, (int)ShowPass.showOut);
+                    break;
+                case ShowMode.DLSS_SpecularHitDistance:
+                    Blitter.BlitTexture(natCmd, data.RRGuide_SpecHitDistance, new Vector4(1, 1, 0, 0), data.BlitMaterial, (int)ShowPass.showOut);
+                    break;
+                case ShowMode.DLSS_NormalRoughness:
+                    Blitter.BlitTexture(natCmd, data.RRGuide_Normal_Roughness, new Vector4(1, 1, 0, 0), data.BlitMaterial, (int)ShowPass.showOut);
+                    break;
+                case ShowMode.DLSS_Output:
+                    Blitter.BlitTexture(natCmd, data.DlssOutput, new Vector4 (1, 1, 0, 0), data.BlitMaterial, (int)ShowPass.showOut);
+                    break;
                 default:
                     throw new ArgumentOutOfRangeException();
             }
@@ -316,6 +368,7 @@ namespace PathTracing
             passData.TransparentTs = TransparentTs;
             passData.CompositionCs = CompositionCs;
             passData.TaaCs = TaaCs;
+            passData.DlssBeforeCs = DlssBeforeCs;
             passData.BlitMaterial = BiltMaterial;
 
             passData.SharcResolveCs = SharcResolveCs;
@@ -511,6 +564,13 @@ namespace PathTracing
             passData.TaaHistoryPrev = renderGraph.ImportTexture(NrdDenoiser.GetRT(ResourceType.TaaHistoryPrev));
             passData.PsrThroughput = renderGraph.ImportTexture(NrdDenoiser.GetRT(ResourceType.PsrThroughput));
 
+            passData.RRGuide_DiffAlbedo = renderGraph.ImportTexture(NrdDenoiser.GetRT(ResourceType.RRGuide_DiffAlbedo));
+            passData.RRGuide_SpecAlbedo = renderGraph.ImportTexture(NrdDenoiser.GetRT(ResourceType.RRGuide_SpecAlbedo));
+            passData.RRGuide_SpecHitDistance = renderGraph.ImportTexture(NrdDenoiser.GetRT(ResourceType.RRGuide_SpecHitDistance));
+            passData.RRGuide_Normal_Roughness = renderGraph.ImportTexture(NrdDenoiser.GetRT(ResourceType.RRGuide_Normal_Roughness));
+            passData.DlssOutput = renderGraph.ImportTexture(NrdDenoiser.GetRT(ResourceType.DlssOutput));
+
+
             builder.UseTexture(passData.OutputTexture, AccessFlags.ReadWrite);
 
             builder.UseTexture(passData.Mv, AccessFlags.ReadWrite);
@@ -538,6 +598,12 @@ namespace PathTracing
             builder.UseTexture(passData.TaaHistory, AccessFlags.ReadWrite);
             builder.UseTexture(passData.TaaHistoryPrev, AccessFlags.ReadWrite);
             builder.UseTexture(passData.PsrThroughput, AccessFlags.ReadWrite);
+
+            builder.UseTexture(passData.RRGuide_DiffAlbedo, AccessFlags.ReadWrite);
+            builder.UseTexture(passData.RRGuide_SpecAlbedo, AccessFlags.ReadWrite);
+            builder.UseTexture(passData.RRGuide_SpecHitDistance, AccessFlags.ReadWrite);
+            builder.UseTexture(passData.RRGuide_Normal_Roughness, AccessFlags.ReadWrite);
+            builder.UseTexture(passData.DlssOutput, AccessFlags.ReadWrite);
         }
 
         private TextureHandle CreateTex(TextureDesc textureDesc, RenderGraph renderGraph, string name, GraphicsFormat format)

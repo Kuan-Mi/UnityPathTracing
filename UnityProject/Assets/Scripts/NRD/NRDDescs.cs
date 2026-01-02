@@ -129,6 +129,13 @@ namespace Nrd
         TaaHistory,
         TaaHistoryPrev,
         PsrThroughput,
+        
+        // dlss
+        RRGuide_DiffAlbedo,
+        RRGuide_SpecAlbedo,
+        RRGuide_SpecHitDistance,
+        RRGuide_Normal_Roughness,
+        DlssOutput,
 
         MAX_NUM,
     };

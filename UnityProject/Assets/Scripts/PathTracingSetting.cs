@@ -19,6 +19,11 @@ namespace PathTracing
         ComposedSpec,
         Taa,
         Final,
+        DLSS_DiffuseAlbedo,
+        DLSS_SpecularAlbedo,
+        DLSS_SpecularHitDistance,
+        DLSS_NormalRoughness,
+        DLSS_Output,
     }
     
     public enum DenoiserType
@@ -106,5 +111,6 @@ namespace PathTracing
         public bool boost = false;
         public bool SR = false;
         public bool RR = false;
+        public bool dlss;
     }
 }

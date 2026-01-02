@@ -229,81 +229,81 @@ void NrdInstance::DispatchCompute(FrameData* data)
     }
 
     // LOG(("[NRD Native] id:" + std::to_string(id) + " - Dispatching NRD compute for frame index " + std::to_string(data->commonSettings.frameIndex) + ".").c_str());
-
-
-    data->commonSettings.frameIndex = frameIndex;
-    frameIndex++;
-
-    m_NrdIntegration.SetCommonSettings(data->commonSettings);
-    m_NrdIntegration.SetDenoiserSettings(m_SigmaId, &data->sigmaSettings);
-    m_NrdIntegration.SetDenoiserSettings(m_ReblurId, &data->reblurSettings);
-
-    m_NrdIntegration.NewFrame();
-
-    nrd::ResourceSnapshot snapshot = {};
-
-    for (const auto& input : m_CachedResources)
-    {
-        if (input.texture == nullptr) continue;
-
-        uint64_t nativeHandle = RenderSystem::Get().GetNriCore().GetTextureNativeObject(input.texture);
-        ID3D12Resource* rawResource = reinterpret_cast<ID3D12Resource*>(nativeHandle);
-        auto state = GetResourceStates(input.state.accessBits, D3D12_COMMAND_LIST_TYPE_DIRECT);
-        s_d3d12->RequestResourceState(rawResource, state);
-
-        nrd::Resource r = {};
-        r.nri.texture = input.texture;
-        r.state.access = input.state.accessBits;
-        r.state.layout = static_cast<nri::Layout>(input.state.layout);
-        r.state.stages = input.state.stageBits;
-
-        snapshot.SetResource(input.type, r);
-    }
+    //
+    //
+    // data->commonSettings.frameIndex = frameIndex;
+    // frameIndex++;
+    //
+    // m_NrdIntegration.SetCommonSettings(data->commonSettings);
+    // m_NrdIntegration.SetDenoiserSettings(m_SigmaId, &data->sigmaSettings);
+    // m_NrdIntegration.SetDenoiserSettings(m_ReblurId, &data->reblurSettings);
+    //
+    // m_NrdIntegration.NewFrame();
+    //
+    // nrd::ResourceSnapshot snapshot = {};
+    //
+    // for (const auto& input : m_CachedResources)
+    // {
+    //     if (input.texture == nullptr) continue;
+    //
+    //     uint64_t nativeHandle = RenderSystem::Get().GetNriCore().GetTextureNativeObject(input.texture);
+    //     ID3D12Resource* rawResource = reinterpret_cast<ID3D12Resource*>(nativeHandle);
+    //     auto state = GetResourceStates(input.state.accessBits, D3D12_COMMAND_LIST_TYPE_DIRECT);
+    //     s_d3d12->RequestResourceState(rawResource, state);
+    //
+    //     nrd::Resource r = {};
+    //     r.nri.texture = input.texture;
+    //     r.state.access = input.state.accessBits;
+    //     r.state.layout = static_cast<nri::Layout>(input.state.layout);
+    //     r.state.stages = input.state.stageBits;
+    //
+    //     snapshot.SetResource(input.type, r);
+    // }
 
     // const nrd::Identifier denoisers[] = {m_SigmaId, m_ReblurId};
     //
     // m_NrdIntegration.Denoise(denoisers, 2, *nriCmdBuffer, snapshot);
     //
-    for (size_t i = 0; i < snapshot.uniqueNum; i++)
-    {
-        nrd::Resource& res = snapshot.unique[i];
-        uint64_t nativeHandle = RenderSystem::Get().GetNriCore().GetTextureNativeObject(res.nri.texture);
-        ID3D12Resource* rawResource = reinterpret_cast<ID3D12Resource*>(nativeHandle);
-        auto state = GetResourceStates(res.state.access, D3D12_COMMAND_LIST_TYPE_DIRECT);
-    
-        bool isUAV = IsUAVAccess(res.state.access);
-    
-        s_d3d12->NotifyResourceState(rawResource, state, isUAV);
-    }
+    // for (size_t i = 0; i < snapshot.uniqueNum; i++)
+    // {
+    //     nrd::Resource& res = snapshot.unique[i];
+    //     uint64_t nativeHandle = RenderSystem::Get().GetNriCore().GetTextureNativeObject(res.nri.texture);
+    //     ID3D12Resource* rawResource = reinterpret_cast<ID3D12Resource*>(nativeHandle);
+    //     auto state = GetResourceStates(res.state.access, D3D12_COMMAND_LIST_TYPE_DIRECT);
+    //
+    //     bool isUAV = IsUAVAccess(res.state.access);
+    //
+    //     s_d3d12->NotifyResourceState(rawResource, state, isUAV);
+    // }
 
 
-    auto GetPair = [&](nrd::ResourceType type, bool isUAV = false) -> nri::UpscalerResource
-    {
-        for (auto& item : m_CachedResources)
-        {
-            if (item.type == type)
-            {
-                nri::Descriptor* desc = GetOrCreateDescriptor(item.texture, isUAV);
-                return {item.texture, desc};
-            }
-        }
-        return {nullptr, nullptr};
-    };
-
-    nri::DispatchUpscaleDesc dispatchUpscaleDesc = {};
-    dispatchUpscaleDesc.input = GetPair(nrd::ResourceType::IN_DIFF_HITDIST, false);
-    dispatchUpscaleDesc.output = GetPair(nrd::ResourceType::OUT_DIFF_HITDIST, true);
-
-
-    dispatchUpscaleDesc.currentResolution = {(nri::Dim_t)data->width, (nri::Dim_t)data->height};
-
-    dispatchUpscaleDesc.cameraJitter = {-data->commonSettings.cameraJitter[0], -data->commonSettings.cameraJitter[1]};
-    dispatchUpscaleDesc.mvScale = {1.0f, 1.0f};
-    dispatchUpscaleDesc.flags = nri::DispatchUpscaleBits::NONE;
-
-    dispatchUpscaleDesc.guides.denoiser.mv = GetPair(nrd::ResourceType::IN_MV, false);
-    dispatchUpscaleDesc.guides.denoiser.depth = GetPair(nrd::ResourceType::IN_VIEWZ, false);
-
+    // auto GetPair = [&](nrd::ResourceType type, bool isUAV = false) -> nri::UpscalerResource
+    // {
+    //     for (auto& item : m_CachedResources)
+    //     {
+    //         if (item.type == type)
+    //         {
+    //             nri::Descriptor* desc = GetOrCreateDescriptor(item.texture, isUAV);
+    //             return {item.texture, desc};
+    //         }
+    //     }
+    //     return {nullptr, nullptr};
+    // };
+    //
+    // nri::DispatchUpscaleDesc dispatchUpscaleDesc = {};
+    // dispatchUpscaleDesc.input = GetPair(nrd::ResourceType::IN_DIFF_HITDIST, false);
+    // dispatchUpscaleDesc.output = GetPair(nrd::ResourceType::OUT_DIFF_HITDIST, true);
+    //
+    //
+    // dispatchUpscaleDesc.currentResolution = {(nri::Dim_t)data->width, (nri::Dim_t)data->height};
+    //
+    // dispatchUpscaleDesc.cameraJitter = {-data->commonSettings.cameraJitter[0], -data->commonSettings.cameraJitter[1]};
+    // dispatchUpscaleDesc.mvScale = {1.0f, 1.0f};
+    // dispatchUpscaleDesc.flags = nri::DispatchUpscaleBits::NONE;
+    //
+    // dispatchUpscaleDesc.guides.denoiser.mv = GetPair(nrd::ResourceType::IN_MV, false);
+    // dispatchUpscaleDesc.guides.denoiser.depth = GetPair(nrd::ResourceType::IN_VIEWZ, false);
+    //
 
     // RenderSystem::Get().GetNriUpScaler().CmdDispatchUpscale(*nriCmdBuffer, *m_DLRR, dispatchUpscaleDesc);
 

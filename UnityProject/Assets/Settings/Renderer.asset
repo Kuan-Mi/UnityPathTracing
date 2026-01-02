@@ -73,6 +73,7 @@ MonoBehaviour:
   transparentTracingShader: {fileID: 4807578003741378534, guid: d207e5fb066a4b579353785310fd0dea, type: 3}
   compositionComputeShader: {fileID: 7200000, guid: 6b0c89c26f4363a4781550cf86801786, type: 3}
   taaComputeShader: {fileID: 7200000, guid: 6af7363d73bc4764bd8420bb5cc5d306, type: 3}
+  dlssBeforeComputeShader: {fileID: 7200000, guid: b34d979c2031436aad2b456c4456c6eb, type: 3}
   sharcResolveCs: {fileID: 7200000, guid: 8a8bff82bc5641aaabee502a09792151, type: 3}
   sharcUpdateTs: {fileID: 4807578003741378534, guid: 171e2660e0894b3cb5c6c809e595ae5d, type: 3}
   pathTracingSetting:
@@ -82,7 +83,7 @@ MonoBehaviour:
     isBaseColorMetalnessAvailable: 1
     planeDistanceSensitivity: 0.131
     maxStabilizedFrameNum: 5
-    showMode: 14
+    showMode: 18
     showMV: 0
     showValidation: 0
     dofAperture: 0
@@ -106,6 +107,7 @@ MonoBehaviour:
     specularLobeTrimming: 1
     boost: 0
     SR: 0
-    RR: 0
+    RR: 1
+    dlss: 1
   gIn_ScramblingRanking: {fileID: 2800000, guid: ba45d1e4dcf9022438a4798a5f9e7b80, type: 3}
   gIn_Sobol: {fileID: 2800000, guid: 17e7ce8147355314ea8aab1178a6a43c, type: 3}

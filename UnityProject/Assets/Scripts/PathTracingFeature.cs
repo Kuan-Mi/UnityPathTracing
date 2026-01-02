@@ -134,6 +134,7 @@ namespace PathTracing
 
         public ComputeShader compositionComputeShader;
         public ComputeShader taaComputeShader;
+        public ComputeShader dlssBeforeComputeShader;
 
         public ComputeShader sharcResolveCs;
         public RayTracingShader sharcUpdateTs;
@@ -209,6 +210,7 @@ namespace PathTracing
                 TransparentTs = transparentTracingShader,
                 CompositionCs = compositionComputeShader,
                 TaaCs = taaComputeShader,
+                DlssBeforeCs = dlssBeforeComputeShader,
                 AccelerationStructure = accelerationStructure,
                 ScramblingRanking = gIn_ScramblingRankingUint,
                 Sobol = gIn_SobolUint,
