@@ -26,6 +26,7 @@ public:
     NrdInstance(IUnityInterfaces* interfaces,int instanceId);
     ~NrdInstance();
 
+    nri::Descriptor* GetOrCreateDescriptor(nri::Texture* texture, bool isStorage);
     void DispatchCompute( FrameData* data);
     void UpdateResources(const NrdResourceInput* resources, int count);
     
@@ -56,4 +57,6 @@ private:
     nrd::Identifier m_ReblurId = 0;
     std::atomic<bool> m_are_resources_initialized{false};
     nri::Upscaler* m_DLRR = nullptr;
+    
+    std::unordered_map<uint64_t, nri::Descriptor*> m_DescriptorCache;
 };

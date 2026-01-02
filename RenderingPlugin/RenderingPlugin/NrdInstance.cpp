@@ -96,6 +96,53 @@ static D3D12_RESOURCE_STATES GetResourceStates(nri::AccessBits accessBits, D3D12
     return resourceStates;
 }
 
+// 模仿源码中的 Key 创建逻辑
+static inline uint64_t CreateDescriptorKey(uint64_t texturePtr, bool isStorage)
+{
+    return (uint64_t(isStorage ? 1 : 0) << 63ull) | (texturePtr & 0x7FFFFFFFFFFFFFFFull);
+}
+
+nri::Descriptor* NrdInstance::GetOrCreateDescriptor(nri::Texture* texture, bool isStorage)
+{
+    if (!texture) return nullptr;
+
+    auto& nriCore = RenderSystem::Get().GetNriCore();
+
+    uint64_t nativeHandle = nriCore.GetTextureNativeObject(texture);
+    uint64_t key = CreateDescriptorKey(nativeHandle, isStorage);
+
+    // 2. 查找缓存
+    auto it = m_DescriptorCache.find(key);
+    if (it != m_DescriptorCache.end())
+    {
+        return it->second;
+    }
+
+    // 3. 缓存未命中，创建新的视图
+    const nri::TextureDesc& texDesc = nriCore.GetTextureDesc(*texture);
+
+    nri::Texture2DViewDesc viewDesc = {};
+    viewDesc.texture = texture;
+    // 根据是否是存储纹理（UAV）选择类型
+    viewDesc.viewType = isStorage
+                            ? nri::Texture2DViewType::SHADER_RESOURCE_STORAGE_2D
+                            : nri::Texture2DViewType::SHADER_RESOURCE_2D;
+    viewDesc.format = texDesc.format;
+    viewDesc.mipOffset = 0;
+    viewDesc.mipNum = 1;
+
+    nri::Descriptor* descriptor = nullptr;
+    nri::Result res = nriCore.CreateTexture2DView(viewDesc, descriptor);
+
+    if (res == nri::Result::SUCCESS)
+    {
+        m_DescriptorCache[key] = descriptor;
+        return descriptor;
+    }
+
+    return nullptr;
+}
+
 
 void NrdInstance::DispatchCompute(FrameData* data)
 {
@@ -117,8 +164,8 @@ void NrdInstance::DispatchCompute(FrameData* data)
 
     nri::CommandBuffer* nriCmdBuffer = nullptr;
     RenderSystem::Get().GetNriWrapper().CreateCommandBufferD3D12(*RenderSystem::Get().GetNriDevice(), cmdDesc, nriCmdBuffer);
-    
-    
+
+
     if (TextureWidth != data->width || TextureHeight != data->height)
     {
         if (TextureWidth == 0 || TextureHeight == 0)
@@ -133,7 +180,7 @@ void NrdInstance::DispatchCompute(FrameData* data)
         TextureWidth = data->width;
         TextureHeight = data->height;
 
-        
+
         RenderSystem& rs = RenderSystem::Get();
 
         const nri::DeviceDesc& nrideviceDesc = rs.GetNriCore().GetDeviceDesc(*rs.GetNriDevice());
@@ -149,15 +196,18 @@ void NrdInstance::DispatchCompute(FrameData* data)
         {
             LOG("[NRD Native] DLRR Upscaler is NOT supported.");
         }
-
+      
         nri::UpscalerMode mode = nri::UpscalerMode::NATIVE;
 
         nri::UpscalerBits upscalerFlags = nri::UpscalerBits::DEPTH_INFINITE;
-
+        upscalerFlags |= nri::UpscalerBits::HDR;
         upscalerFlags |= nri::UpscalerBits::DEPTH_INVERTED;
 
+
+        LOG(("[NRD Native] Creating DLRR Upscaler with resolution: " + std::to_string(TextureWidth) + "x" + std::to_string(TextureHeight)).c_str());
+
         nri::UpscalerDesc upscalerDesc = {};
-        upscalerDesc.upscaleResolution = {(nri::Dim_t) TextureWidth, (nri::Dim_t)TextureHeight};
+        upscalerDesc.upscaleResolution = {(nri::Dim_t)TextureWidth, (nri::Dim_t)TextureHeight};
         upscalerDesc.type = nri::UpscalerType::DLRR;
         upscalerDesc.mode = mode;
         upscalerDesc.flags = upscalerFlags;
@@ -167,13 +217,13 @@ void NrdInstance::DispatchCompute(FrameData* data)
         if (r != nri::Result::SUCCESS)
         {
             LOG(("[NRD Native] Failed to create DLRR Upscaler . Error code: " + std::to_string(static_cast<int>(r))).c_str());
-        }else
+        }
+        else
         {
             LOG("[NRD Native] DLRR Upscaler created successfully.");
         }
+  
 
-        
-        
         CreateNrd();
         frameIndex = 0;
     }
@@ -210,36 +260,53 @@ void NrdInstance::DispatchCompute(FrameData* data)
         snapshot.SetResource(input.type, r);
     }
 
-    const nrd::Identifier denoisers[] = {m_SigmaId, m_ReblurId};
-
-    m_NrdIntegration.Denoise(denoisers, 2, *nriCmdBuffer, snapshot);
-
+    // const nrd::Identifier denoisers[] = {m_SigmaId, m_ReblurId};
+    //
+    // m_NrdIntegration.Denoise(denoisers, 2, *nriCmdBuffer, snapshot);
+    //
     for (size_t i = 0; i < snapshot.uniqueNum; i++)
     {
         nrd::Resource& res = snapshot.unique[i];
         uint64_t nativeHandle = RenderSystem::Get().GetNriCore().GetTextureNativeObject(res.nri.texture);
         ID3D12Resource* rawResource = reinterpret_cast<ID3D12Resource*>(nativeHandle);
         auto state = GetResourceStates(res.state.access, D3D12_COMMAND_LIST_TYPE_DIRECT);
-
+    
         bool isUAV = IsUAVAccess(res.state.access);
-
+    
         s_d3d12->NotifyResourceState(rawResource, state, isUAV);
     }
-    
-    
+
+
+    auto GetPair = [&](nrd::ResourceType type, bool isUAV = false) -> nri::UpscalerResource
+    {
+        for (auto& item : m_CachedResources)
+        {
+            if (item.type == type)
+            {
+                nri::Descriptor* desc = GetOrCreateDescriptor(item.texture, isUAV);
+                return {item.texture, desc};
+            }
+        }
+        return {nullptr, nullptr};
+    };
+
     nri::DispatchUpscaleDesc dispatchUpscaleDesc = {};
-    // dispatchUpscaleDesc.output = {Get(Texture::DlssOutput), Get(Descriptor::DlssOutput_StorageTexture)};
-    // dispatchUpscaleDesc.input = {Get(Texture::Composed), Get(Descriptor::Composed_Texture)};
-    
-    
+    dispatchUpscaleDesc.input = GetPair(nrd::ResourceType::IN_DIFF_HITDIST, false);
+    dispatchUpscaleDesc.output = GetPair(nrd::ResourceType::OUT_DIFF_HITDIST, true);
+
+
     dispatchUpscaleDesc.currentResolution = {(nri::Dim_t)data->width, (nri::Dim_t)data->height};
-    
+
     dispatchUpscaleDesc.cameraJitter = {-data->commonSettings.cameraJitter[0], -data->commonSettings.cameraJitter[1]};
     dispatchUpscaleDesc.mvScale = {1.0f, 1.0f};
     dispatchUpscaleDesc.flags = nri::DispatchUpscaleBits::NONE;
-    
-    
-    
+
+    dispatchUpscaleDesc.guides.denoiser.mv = GetPair(nrd::ResourceType::IN_MV, false);
+    dispatchUpscaleDesc.guides.denoiser.depth = GetPair(nrd::ResourceType::IN_VIEWZ, false);
+
+
+    // RenderSystem::Get().GetNriUpScaler().CmdDispatchUpscale(*nriCmdBuffer, *m_DLRR, dispatchUpscaleDesc);
+
 
     RenderSystem::Get().GetNriCore().DestroyCommandBuffer(nriCmdBuffer);
 }
@@ -259,8 +326,6 @@ void NrdInstance::UpdateResources(const NrdResourceInput* resources, int count)
 
 void NrdInstance::CreateNrd()
 {
-
-
     m_NrdIntegration.Destroy();
 
     // 1. 配置 NRD Integration
