@@ -157,7 +157,8 @@ namespace PathTracing
         private GraphicsBuffer _resolvedBuffer;
 
 
-        private Dictionary<int, NRDDenoiser> _denoisers = new();
+        private Dictionary<int, NRDDenoiser> _nrdDenoisers = new();
+        private Dictionary<int, DLRRDenoiser> _dlrrDenoisers = new();
 
         public override void Create()
         {
@@ -254,13 +255,21 @@ namespace PathTracing
 
             int camID = cam.GetInstanceID();
 
-            if (!_denoisers.TryGetValue(camID, out var nrd))
+            if (!_nrdDenoisers.TryGetValue(camID, out var nrd))
             {
                 nrd = new NRDDenoiser(pathTracingSetting, cam.name);
-                _denoisers.Add(camID, nrd);
+                _nrdDenoisers.Add(camID, nrd);
+            }
+            
+            
+            if (!_dlrrDenoisers.TryGetValue(camID, out var dlrr))
+            {
+                dlrr = new DLRRDenoiser(pathTracingSetting, cam.name);
+                _dlrrDenoisers.Add(camID, dlrr);
             }
 
             _pathTracingPass.NrdDenoiser = nrd;
+            _pathTracingPass.DLRRDenoiser = dlrr;
 
             if (compositionComputeShader == null
                 || taaComputeShader == null
@@ -286,12 +295,18 @@ namespace PathTracing
             _pathTracingPass.Dispose();
             _pathTracingPass = null;
 
-            foreach (var denoiser in _denoisers.Values)
+            foreach (var denoiser in _nrdDenoisers.Values)
             {
                 denoiser.Dispose();
             }
 
-            _denoisers.Clear();
+            _nrdDenoisers.Clear();
+            foreach (var denoiser in _dlrrDenoisers.Values)
+            {
+                denoiser.Dispose();
+            }
+
+            _dlrrDenoisers.Clear();
              
             _accumulationBuffer?.Release();
             _accumulationBuffer = null;

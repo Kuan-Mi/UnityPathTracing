@@ -31,6 +31,7 @@ namespace PathTracing
 
         public RayTracingAccelerationStructure AccelerationStructure;
         public NRDDenoiser NrdDenoiser;
+        public DLRRDenoiser DLRRDenoiser;
 
         public GraphicsBuffer ScramblingRanking;
         public GraphicsBuffer Sobol;
@@ -94,6 +95,7 @@ namespace PathTracing
             internal GlobalConstants GlobalConstants;
             internal GraphicsBuffer ConstantBuffer;
             internal IntPtr NrdDataPtr;
+            internal IntPtr RRDataPtr;
             internal PathTracingSetting Setting;
 
 
@@ -174,8 +176,9 @@ namespace PathTracing
 
             natCmd.DispatchRays(data.OpaqueTs, "MainRayGenShader", data.Width, data.Height, 1);
 
-            // // NRD降噪
-            // natCmd.IssuePluginEventAndData(GetRenderEventAndDataFunc(), 1, data.NrdDataPtr);
+            // NRD降噪
+            if (!data.Setting.RR)
+                natCmd.IssuePluginEventAndData(GetRenderEventAndDataFunc(), 1, data.NrdDataPtr);
 
             // 合成
             natCmd.SetComputeConstantBufferParam(data.CompositionCs, paramsID, data.ConstantBuffer, 0, data.ConstantBuffer.stride);
@@ -220,7 +223,10 @@ namespace PathTracing
             natCmd.DispatchRays(data.TransparentTs, "MainRayGenShader", data.Width, data.Height, 1);
 
 
-            if (data.Setting.dlss)
+            var isEven = (data.GlobalConstants.gFrameIndex & 1) == 0;
+            var taaSrc = isEven ? data.TaaHistoryPrev : data.TaaHistory;
+            var taaDst = isEven ? data.TaaHistory : data.TaaHistoryPrev;
+            if (data.Setting.RR)
             {
                 // dlss Before
                 natCmd.SetComputeConstantBufferParam(data.DlssBeforeCs, paramsID, data.ConstantBuffer, 0, data.ConstantBuffer.stride);
@@ -242,14 +248,11 @@ namespace PathTracing
                 // DLSS调用
 
                 // NRD降噪
-                natCmd.IssuePluginEventAndData(GetRenderEventAndDataFunc(), 1, data.NrdDataPtr);
+                natCmd.IssuePluginEventAndData(GetRenderEventAndDataFunc(), 2, data.RRDataPtr);
             }
             else
             {
                 // TAA
-                var isEven = (data.GlobalConstants.gFrameIndex & 1) == 0;
-                var taaSrc = isEven ? data.TaaHistoryPrev : data.TaaHistory;
-                var taaDst = isEven ? data.TaaHistory : data.TaaHistoryPrev;
 
                 natCmd.SetComputeConstantBufferParam(data.TaaCs, paramsID, data.ConstantBuffer, 0, data.ConstantBuffer.stride);
                 natCmd.SetComputeTextureParam(data.TaaCs, 0, gIn_MvID, data.Mv);
@@ -313,17 +316,20 @@ namespace PathTracing
                 case ShowMode.Composed:
                     Blitter.BlitTexture(natCmd, data.Composed, new Vector4(1, 1, 0, 0), data.BlitMaterial, (int)ShowPass.showOut);
                     break;
-                // case ShowMode.Taa:
-                //     Blitter.BlitTexture(natCmd, taaDst, new Vector4(1, 1, 0, 0), data.BlitMaterial, (int)ShowPass.showAlpha);
-                //     break;
-                // case ShowMode.Final:
-                //     if (data.BlitMaterial == null)
-                //     {
-                //         Debug.LogError("BlitMaterial is null");
-                //     }
-                //
-                //     Blitter.BlitTexture(natCmd, taaDst, new Vector4(1, 1, 0, 0), data.BlitMaterial, (int)ShowPass.showOut);
-                //     break;
+                case ShowMode.Taa:
+                    Blitter.BlitTexture(natCmd, taaDst, new Vector4(1, 1, 0, 0), data.BlitMaterial, (int)ShowPass.showAlpha);
+                    break;
+                case ShowMode.Final:
+                    if (data.Setting.RR)
+                    {
+                        Blitter.BlitTexture(natCmd, data.DlssOutput, new Vector4(1, 1, 0, 0), data.BlitMaterial, (int)ShowPass.showOut);
+                    }
+                    else
+                    {
+                        Blitter.BlitTexture(natCmd, taaDst, new Vector4(1, 1, 0, 0), data.BlitMaterial, (int)ShowPass.showOut);
+                    }
+
+                    break;
                 case ShowMode.DLSS_DiffuseAlbedo:
                     Blitter.BlitTexture(natCmd, data.RRGuide_DiffAlbedo, new Vector4(1, 1, 0, 0), data.BlitMaterial, (int)ShowPass.showOut);
                     break;
@@ -410,6 +416,7 @@ namespace PathTracing
             var invRectSize = new float2(1.0f / rectW, 1.0f / rectH);
 
             passData.NrdDataPtr = NrdDenoiser.GetInteropDataPtr(cam, gSunDirection);
+            passData.RRDataPtr = DLRRDenoiser.GetInteropDataPtr(cam, NrdDenoiser);
 
             var verticalFieldOfView = cam.fieldOfView;
             var aspectRatio = (float)rectW / rectH;

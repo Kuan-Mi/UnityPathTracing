@@ -114,6 +114,6 @@ namespace PathTracing
         public bool boost = false;
         public bool SR = false;
         public bool RR = false;
-        public bool dlss;
+        // public bool dlss;
     }
 }

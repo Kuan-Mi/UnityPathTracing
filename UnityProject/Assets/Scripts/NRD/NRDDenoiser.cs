@@ -160,10 +160,8 @@ namespace Nrd
 
             foreach (var nrdTextureResource in allocatedResources)
             {
-                if (nrdTextureResource.ResourceType == ResourceType.TaaHistory ||
-                    nrdTextureResource.ResourceType == ResourceType.TaaHistoryPrev ||
-                    nrdTextureResource.ResourceType == ResourceType.PsrThroughput)
-                    continue; // TAA 资源不传给 NRD)
+                if (nrdTextureResource.ResourceType >= ResourceType.MAX_NUM)
+                    continue; // 跳过本地使用的资源
 
                 ptr[idx++] = new NrdResourceInput { type = nrdTextureResource.ResourceType, texture = nrdTextureResource.NriPtr, state = nrdTextureResource.ResourceState };
             }

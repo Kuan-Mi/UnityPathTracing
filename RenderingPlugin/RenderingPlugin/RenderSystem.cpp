@@ -23,7 +23,7 @@ void RenderSystem::Initialize(IUnityInterfaces* interfaces)
     deviceDesc.d3d12Device = device;
     deviceDesc.disableD3D12EnhancedBarriers = true;
     deviceDesc.enableNRIValidation = true;
-    
+
 
     nri::Result result = nriCreateDeviceFromD3D12Device(deviceDesc, m_NriDevice);
     if (result != nri::Result::SUCCESS)
@@ -103,11 +103,11 @@ void RenderSystem::ProcessDeviceEvent(UnityGfxDeviceEventType type, IUnityInterf
         s_d3d12->ConfigureEvent(1, &config_1);
 
         UnityD3D12PluginEventConfig config_2;
-        config_2.graphicsQueueAccess = kUnityD3D12GraphicsQueueAccess_Allow;
+        config_2.graphicsQueueAccess = kUnityD3D12GraphicsQueueAccess_DontCare;
         config_2.flags = kUnityD3D12EventConfigFlag_SyncWorkerThreads |
             kUnityD3D12EventConfigFlag_ModifiesCommandBuffersState |
             kUnityD3D12EventConfigFlag_EnsurePreviousFrameSubmission;
-        config_2.ensureActiveRenderTextureIsBound = false;
+        config_2.ensureActiveRenderTextureIsBound = true;
         s_d3d12->ConfigureEvent(2, &config_2);
 
         // initialize_and_create_resources();

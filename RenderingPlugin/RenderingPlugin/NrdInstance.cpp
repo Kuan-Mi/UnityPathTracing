@@ -137,7 +137,7 @@ void NrdInstance::DispatchCompute(FrameData* data)
         frameIndex = 0;
     }
 
-    LOG(("[NRD Native] id:" + std::to_string(id) + " - Dispatching NRD compute for frame index " + std::to_string(data->commonSettings.frameIndex) + ".").c_str());
+    // LOG(("[NRD Native] id:" + std::to_string(id) + " - Dispatching NRD compute for frame index " + std::to_string(data->commonSettings.frameIndex) + ".").c_str());
 
 
     data->commonSettings.frameIndex = frameIndex;

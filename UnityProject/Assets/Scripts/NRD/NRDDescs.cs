@@ -124,12 +124,14 @@ namespace Nrd
 
         // Dedicated to NRD, can't be reused
         PERMANENT_POOL,
-        
+
+        MAX_NUM,
+
         // 本地使用
         TaaHistory,
         TaaHistoryPrev,
         PsrThroughput,
-        
+
         // dlss
         RRGuide_DiffAlbedo,
         RRGuide_SpecAlbedo,
@@ -137,7 +139,5 @@ namespace Nrd
         RRGuide_Normal_Roughness,
         DlssOutput,
         Composed,
-
-        MAX_NUM,
     };
 }
