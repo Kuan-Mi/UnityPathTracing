@@ -47,6 +47,9 @@ namespace Nrd
 
         public int2 renderResolution;
 
+        public float resolutionScale;
+        public float prevResolutionScale;
+
 
         private NativeArray<FrameData> buffer;
         private const int BufferCount = 3;
@@ -105,6 +108,7 @@ namespace Nrd
             allocatedResources.Add(new NrdTextureResource(ResourceType.DlssOutput, GraphicsFormat.R16G16B16A16_SFloat, uavState));
             allocatedResources.Add(new NrdTextureResource(ResourceType.Composed, GraphicsFormat.R16G16B16A16_SFloat, uavState));
 
+            prevResolutionScale = setting.resolutionScale;
 
             Debug.Log($"[NRD] Created Denoiser Instance {nrdInstanceId} for Camera {cameraName}");
         }
@@ -155,7 +159,7 @@ namespace Nrd
 
             foreach (var nrdTextureResource in allocatedResources)
             {
-                if (nrdTextureResource.ResourceType is ResourceType.DlssOutput or ResourceType.TaaHistory or ResourceType.TaaHistoryPrev)
+                if (nrdTextureResource.ResourceType is ResourceType.DlssOutput)
                 {
                     nrdTextureResource.Allocate(outputResolution);
                 }
@@ -264,12 +268,14 @@ namespace Nrd
             prevWorldToClip = worldToClip;
             preViewToClip = viewToClip;
             prevCamPos = camPos;
+            prevResolutionScale = resolutionScale;
 
 
             camPos = new float3(mCamera.transform.position.x, mCamera.transform.position.y, mCamera.transform.position.z);
             worldToView = mCamera.worldToCameraMatrix;
             worldToClip = GetWorldToClipMatrix(mCamera);
             viewToClip = GL.GetGPUProjectionMatrix(mCamera.projectionMatrix, false);
+            resolutionScale = setting.resolutionScale;
 
             FrameData localData = FrameData._default;
 
@@ -292,22 +298,24 @@ namespace Nrd
 
             // --- 分辨率与重置逻辑 ---
 
-            uint rectW = (uint)(renderResolution.x * setting.resolutionScale + 0.5f);
-            uint rectH = (uint)(renderResolution.y * setting.resolutionScale + 0.5f);
+            ushort rectW = (ushort)(renderResolution.x * setting.resolutionScale + 0.5f);
+            ushort rectH = (ushort)(renderResolution.y * setting.resolutionScale + 0.5f);
 
+            ushort prevRectW = (ushort)(renderResolution.x * prevResolutionScale + 0.5f);
+            ushort prevRectH = (ushort)(renderResolution.y * prevResolutionScale + 0.5f);
+            //
+            // ushort w = (ushort)(mCamera.pixelWidth / 2);
+            // ushort h = (ushort)(mCamera.pixelHeight / 2);
 
-            ushort w = (ushort)(mCamera.pixelWidth / 2);
-            ushort h = (ushort)(mCamera.pixelHeight / 2);
+            localData.commonSettings.resourceSize[0] = (ushort)renderResolution.x;
+            localData.commonSettings.resourceSize[1] = (ushort)renderResolution.y;
+            localData.commonSettings.rectSize[0] = rectW;
+            localData.commonSettings.rectSize[1] = rectH;
 
-            localData.commonSettings.resourceSize[0] = w;
-            localData.commonSettings.resourceSize[1] = h;
-            localData.commonSettings.rectSize[0] = w;
-            localData.commonSettings.rectSize[1] = h;
-
-            localData.commonSettings.resourceSizePrev[0] = w;
-            localData.commonSettings.resourceSizePrev[1] = h;
-            localData.commonSettings.rectSizePrev[0] = w;
-            localData.commonSettings.rectSizePrev[1] = h;
+            localData.commonSettings.resourceSizePrev[0] = (ushort)renderResolution.x;
+            localData.commonSettings.resourceSizePrev[1] = (ushort)renderResolution.y;
+            localData.commonSettings.rectSizePrev[0] = prevRectW;
+            localData.commonSettings.rectSizePrev[1] = prevRectH;
 
             localData.commonSettings.motionVectorScale = new float3(1.0f / rectW, 1.0f / rectH, -1.0f);
             localData.commonSettings.isMotionVectorInWorldSpace = false;
@@ -325,8 +333,8 @@ namespace Nrd
 
             localData.instanceId = nrdInstanceId;
 
-            localData.width = w;
-            localData.height = h;
+            localData.width = (ushort)renderResolution.x;
+            localData.height = (ushort)renderResolution.y;
 
             //  Common 设置
 

@@ -79,6 +79,7 @@
             // Blitter 会自动绑定
             TEXTURE2D(_BlitTexture);
             SAMPLER(sampler_BlitTexture);
+            float4 _BlitScaleBias;
 
             struct Attributes
             {
@@ -106,6 +107,8 @@
                 i.uv.y = 1.0 - i.uv.y;
                 #endif
 
+                i.uv = i.uv * _BlitScaleBias.xy + _BlitScaleBias.zw;
+                
                 float OUT_SHADOW_TRANSLUCENCY = SAMPLE_TEXTURE2D(_BlitTexture, sampler_BlitTexture, i.uv).r;
                 float shadow = SIGMA_BackEnd_UnpackShadow(OUT_SHADOW_TRANSLUCENCY);
                 float4 color = float4(shadow, shadow, shadow, 1);
@@ -136,6 +139,7 @@
             // 你的 Motion Vector 贴图
             TEXTURE2D(_BlitTexture);
             SAMPLER(sampler_BlitTexture);
+            float4 _BlitScaleBias;
 
             struct Attributes
             {
@@ -199,6 +203,7 @@
                 #ifdef UNITY_UV_STARTS_AT_TOP
                 i.uv.y = 1.0 - i.uv.y;
                 #endif
+                i.uv = i.uv * _BlitScaleBias.xy + _BlitScaleBias.zw;
 
                 float2 gScreenSize = _ScreenParams.xy;
 
@@ -278,6 +283,8 @@
 
             TEXTURE2D(_BlitTexture);
             SAMPLER(sampler_BlitTexture);
+             
+            float4 _BlitScaleBias;
 
             struct Attributes
             {
@@ -304,6 +311,7 @@
                 #ifdef UNITY_UV_STARTS_AT_TOP
                 i.uv.y = 1.0 - i.uv.y;
                 #endif
+                i.uv = i.uv * _BlitScaleBias.xy + _BlitScaleBias.zw;
 
                 float4 OUT_SHADOW_TRANSLUCENCY = SAMPLE_TEXTURE2D(_BlitTexture, sampler_BlitTexture, i.uv);
                 float4 X = NRD_FrontEnd_UnpackNormalAndRoughness(OUT_SHADOW_TRANSLUCENCY);
@@ -340,6 +348,7 @@
             // Blitter 会自动绑定
             TEXTURE2D(_BlitTexture);
             SAMPLER(sampler_BlitTexture);
+            float4 _BlitScaleBias;  
 
             struct Attributes
             {
@@ -357,6 +366,8 @@
                 Varyings o;
                 o.positionCS = GetFullScreenTriangleVertexPosition(input.vertexID);
                 o.uv = GetFullScreenTriangleTexCoord(input.vertexID);
+                // scale and offset
+                
                 return o;
             }
 
@@ -381,14 +392,12 @@
                 i.uv.y = 1.0 - i.uv.y;
                 #endif
 
+                i.uv = i.uv * _BlitScaleBias.xy + _BlitScaleBias.zw;
 
                 float3 rgb = SAMPLE_TEXTURE2D(_BlitTexture, sampler_BlitTexture, i.uv).rgb;
 
                 float3 linearRgb = LinearToSRGB(rgb);
-
-
-                // float3  x = float3(-rgb.r,-rgb.b,rgb.g);
-                // return  float4(x,1);
+ 
 
                 return float4(rgb, 1);
             }
@@ -414,6 +423,7 @@
             // Blitter 会自动绑定
             TEXTURE2D(_BlitTexture);
             SAMPLER(sampler_BlitTexture);
+            float4 _BlitScaleBias;
 
             struct Attributes
             {
@@ -440,6 +450,7 @@
                 #ifdef UNITY_UV_STARTS_AT_TOP
                 i.uv.y = 1.0 - i.uv.y;
                 #endif
+                i.uv = i.uv * _BlitScaleBias.xy + _BlitScaleBias.zw;
 
                 float alpha = SAMPLE_TEXTURE2D(_BlitTexture, sampler_BlitTexture, i.uv).a;
                 return float4(alpha, alpha, alpha, 1);
@@ -469,6 +480,7 @@
             // 你的 Motion Vector 贴图
             TEXTURE2D(_BlitTexture);
             SAMPLER(sampler_BlitTexture);
+            float4 _BlitScaleBias;
 
             struct Attributes
             {
@@ -495,6 +507,7 @@
                 #ifdef UNITY_UV_STARTS_AT_TOP
                 i.uv.y = 1.0 - i.uv.y;
                 #endif
+                i.uv = i.uv * _BlitScaleBias.xy + _BlitScaleBias.zw;
 
                 float4 OUT_SHADOW_TRANSLUCENCY = SAMPLE_TEXTURE2D(_BlitTexture, sampler_BlitTexture, i.uv);
                 float4 X = NRD_FrontEnd_UnpackNormalAndRoughness(OUT_SHADOW_TRANSLUCENCY);
@@ -510,10 +523,8 @@
         // 7
         Pass
         {
-            Name "ShowRadiance"
-            // 【重要】混合模式：保证只显示箭头，不黑屏
-            Blend SrcAlpha OneMinusSrcAlpha
-            // 【重要】总是显示在最上层
+            Name "ShowRadiance" 
+            Blend SrcAlpha OneMinusSrcAlpha 
             ZTest Always
             ZWrite Off
             Cull Off
@@ -525,10 +536,10 @@
 
             #include "NRDInclude/NRD.hlsli"
             #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
-
-            // 你的 Motion Vector 贴图
+ 
             TEXTURE2D(_BlitTexture);
             SAMPLER(sampler_BlitTexture);
+            float4 _BlitScaleBias;
 
             struct Attributes
             {
@@ -555,6 +566,7 @@
                 #ifdef UNITY_UV_STARTS_AT_TOP
                 i.uv.y = 1.0 - i.uv.y;
                 #endif
+                i.uv = i.uv * _BlitScaleBias.xy + _BlitScaleBias.zw;
 
                 float4 OUT_SHADOW_TRANSLUCENCY = SAMPLE_TEXTURE2D(_BlitTexture, sampler_BlitTexture, i.uv);
                 float4 X = REBLUR_BackEnd_UnpackRadianceAndNormHitDist(OUT_SHADOW_TRANSLUCENCY);

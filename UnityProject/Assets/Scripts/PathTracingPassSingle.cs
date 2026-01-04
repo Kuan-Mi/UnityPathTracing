@@ -100,6 +100,7 @@ namespace PathTracing
             internal IntPtr NrdDataPtr;
             internal IntPtr RRDataPtr;
             internal PathTracingSetting Setting;
+            internal float resolutionScale;
 
 
             internal ComputeShader SharcResolveCs;
@@ -138,8 +139,8 @@ namespace PathTracing
 
             int SHARC_DOWNSCALE = 4;
 
-            uint w = (uint)(data.m_RenderResolution.x / SHARC_DOWNSCALE + 15) / 16;
-            uint h = (uint)(data.m_RenderResolution.y / SHARC_DOWNSCALE + 15) / 16;
+            uint w = (uint)(data.m_RenderResolution.x / SHARC_DOWNSCALE);
+            uint h = (uint)(data.m_RenderResolution.y / SHARC_DOWNSCALE);
 
             natCmd.DispatchRays(data.SharcUpdateTs, "MainRayGenShader", w, h, 1);
 
@@ -184,14 +185,18 @@ namespace PathTracing
             natCmd.SetRayTracingTextureParam(data.OpaqueTs, gIn_PrevComposedDiffID, data.ComposedDiff);
             natCmd.SetRayTracingTextureParam(data.OpaqueTs, gIn_PrevComposedSpec_PrevViewZID, data.ComposedSpecViewZ);
 
-            
-            uint rectWmod = (uint)(data.m_RenderResolution.x * data.Setting.resolutionScale + 0.5f);
-            uint rectHmod = (uint)(data.m_RenderResolution.y * data.Setting.resolutionScale + 0.5f);
+            // Debug.Log(data.m_RenderResolution);
+
+            uint rectWmod = (uint)(data.m_RenderResolution.x * data.resolutionScale + 0.5f);
+            uint rectHmod = (uint)(data.m_RenderResolution.y * data.resolutionScale + 0.5f);
+
+            // Debug.Log($"Dispatch Rays Size: {rectWmod} x {rectHmod}");
+
             uint rectGridWmod = (rectWmod + 15) / 16;
             uint rectGridHmod = (rectHmod + 15) / 16;
-            
-            
-            natCmd.DispatchRays(data.OpaqueTs, "MainRayGenShader", rectGridWmod, rectGridHmod, 1);
+
+
+            natCmd.DispatchRays(data.OpaqueTs, "MainRayGenShader", rectWmod, rectHmod, 1);
 
             // NRD降噪
             if (!data.Setting.RR)
@@ -238,7 +243,7 @@ namespace PathTracing
             natCmd.SetRayTracingTextureParam(data.TransparentTs, gOut_ComposedID, data.Composed);
             natCmd.SetRayTracingTextureParam(data.TransparentTs, GInOutMv, data.Mv);
 
-            natCmd.DispatchRays(data.TransparentTs, "MainRayGenShader", data.rectGridW, data.rectGridH, 1);
+            natCmd.DispatchRays(data.TransparentTs, "MainRayGenShader", (uint)data.m_RenderResolution.x, (uint)data.m_RenderResolution.y, 1);
 
 
             var isEven = (data.GlobalConstants.gFrameIndex & 1) == 0;
@@ -260,7 +265,7 @@ namespace PathTracing
                 natCmd.SetComputeTextureParam(data.DlssBeforeCs, 0, "gOut_Normal_Roughness", data.RRGuide_Normal_Roughness);
 
 
-                natCmd.DispatchCompute(data.DlssBeforeCs, 0, ( int)data.rectGridW, (int)data.rectGridH, 1);
+                natCmd.DispatchCompute(data.DlssBeforeCs, 0, (int)data.rectGridW, (int)data.rectGridH, 1);
 
 
                 // DLSS调用
@@ -278,87 +283,89 @@ namespace PathTracing
                 natCmd.SetComputeTextureParam(data.TaaCs, 0, gIn_HistoryID, taaSrc);
                 natCmd.SetComputeTextureParam(data.TaaCs, 0, gOut_ResultID, taaDst);
                 natCmd.SetComputeTextureParam(data.TaaCs, 0, gOut_DebugID, data.OutputTexture);
-                natCmd.DispatchCompute(data.TaaCs, 0, ( int)data.rectGridW, (int)data.rectGridH, 1);
+                natCmd.DispatchCompute(data.TaaCs, 0, (int)data.rectGridW, (int)data.rectGridH, 1);
             }
 
 
             // 显示输出
             natCmd.SetRenderTarget(data.CameraTexture);
 
+            Vector4 scaleOffset = new Vector4(data.resolutionScale, data.resolutionScale, 0, 0);
             switch (data.Setting.showMode)
             {
                 case ShowMode.None:
                     break;
                 case ShowMode.BaseColor:
-                    Blitter.BlitTexture(natCmd, data.BaseColorMetalness, new Vector4(1, 1, 0, 0), data.BlitMaterial, (int)ShowPass.showOut);
+                    Blitter.BlitTexture(natCmd, data.BaseColorMetalness, scaleOffset, data.BlitMaterial, (int)ShowPass.showOut);
                     break;
                 case ShowMode.Metalness:
-                    Blitter.BlitTexture(natCmd, data.BaseColorMetalness, new Vector4(1, 1, 0, 0), data.BlitMaterial, (int)ShowPass.showAlpha);
+                    Blitter.BlitTexture(natCmd, data.BaseColorMetalness, scaleOffset, data.BlitMaterial, (int)ShowPass.showAlpha);
                     break;
                 case ShowMode.Normal:
-                    Blitter.BlitTexture(natCmd, data.NormalRoughness, new Vector4(1, 1, 0, 0), data.BlitMaterial, (int)ShowPass.ShowNormal);
+                    Blitter.BlitTexture(natCmd, data.NormalRoughness, scaleOffset, data.BlitMaterial, (int)ShowPass.ShowNormal);
                     break;
                 case ShowMode.Roughness:
-                    Blitter.BlitTexture(natCmd, data.NormalRoughness, new Vector4(1, 1, 0, 0), data.BlitMaterial, (int)ShowPass.ShowRoughness);
+                    Blitter.BlitTexture(natCmd, data.NormalRoughness, scaleOffset, data.BlitMaterial, (int)ShowPass.ShowRoughness);
                     break;
                 case ShowMode.Shadow:
-                    Blitter.BlitTexture(natCmd, data.ShadowTranslucency, new Vector4(1, 1, 0, 0), data.BlitMaterial, (int)ShowPass.showShadow);
+                    Blitter.BlitTexture(natCmd, data.ShadowTranslucency, scaleOffset, data.BlitMaterial, (int)ShowPass.showShadow);
                     break;
                 case ShowMode.Diffuse:
-                    Blitter.BlitTexture(natCmd, data.Diff, new Vector4(1, 1, 0, 0), data.BlitMaterial, (int)ShowPass.ShowRadiance);
+                    Blitter.BlitTexture(natCmd, data.Diff, scaleOffset, data.BlitMaterial, (int)ShowPass.ShowRadiance);
                     break;
                 case ShowMode.Specular:
-                    Blitter.BlitTexture(natCmd, data.Spec, new Vector4(1, 1, 0, 0), data.BlitMaterial, (int)ShowPass.ShowRadiance);
+                    Blitter.BlitTexture(natCmd, data.Spec, scaleOffset, data.BlitMaterial, (int)ShowPass.ShowRadiance);
                     break;
                 case ShowMode.DenoisedDiffuse:
-                    Blitter.BlitTexture(natCmd, data.DenoisedDiff, new Vector4(1, 1, 0, 0), data.BlitMaterial, (int)ShowPass.ShowRadiance);
+                    Blitter.BlitTexture(natCmd, data.DenoisedDiff, scaleOffset, data.BlitMaterial, (int)ShowPass.ShowRadiance);
                     break;
                 case ShowMode.DenoisedSpecular:
-                    Blitter.BlitTexture(natCmd, data.DenoisedSpec, new Vector4(1, 1, 0, 0), data.BlitMaterial, (int)ShowPass.ShowRadiance);
+                    Blitter.BlitTexture(natCmd, data.DenoisedSpec, scaleOffset, data.BlitMaterial, (int)ShowPass.ShowRadiance);
                     break;
                 case ShowMode.DirectLight:
-                    Blitter.BlitTexture(natCmd, data.DirectLighting, new Vector4(1, 1, 0, 0), data.BlitMaterial, (int)ShowPass.showOut);
+                    Blitter.BlitTexture(natCmd, data.DirectLighting, scaleOffset, data.BlitMaterial, (int)ShowPass.showOut);
                     break;
                 case ShowMode.Emissive:
-                    Blitter.BlitTexture(natCmd, data.DirectEmission, new Vector4(1, 1, 0, 0), data.BlitMaterial, (int)ShowPass.showOut);
+                    Blitter.BlitTexture(natCmd, data.DirectEmission, scaleOffset, data.BlitMaterial, (int)ShowPass.showOut);
                     break;
                 case ShowMode.Out:
-                    Blitter.BlitTexture(natCmd, data.OutputTexture, new Vector4(1, 1, 0, 0), data.BlitMaterial, (int)ShowPass.showOut);
+                    Blitter.BlitTexture(natCmd, data.OutputTexture, scaleOffset, data.BlitMaterial, (int)ShowPass.showOut);
                     break;
                 case ShowMode.ComposedDiff:
-                    Blitter.BlitTexture(natCmd, data.ComposedDiff, new Vector4(1, 1, 0, 0), data.BlitMaterial, (int)ShowPass.showOut);
+                    Blitter.BlitTexture(natCmd, data.ComposedDiff, scaleOffset, data.BlitMaterial, (int)ShowPass.showOut);
                     break;
                 case ShowMode.ComposedSpec:
-                    Blitter.BlitTexture(natCmd, data.ComposedSpecViewZ, new Vector4(1, 1, 0, 0), data.BlitMaterial, (int)ShowPass.showOut);
+                    Blitter.BlitTexture(natCmd, data.ComposedSpecViewZ, scaleOffset, data.BlitMaterial, (int)ShowPass.showOut);
                     break;
                 case ShowMode.Composed:
-                    Blitter.BlitTexture(natCmd, data.Composed, new Vector4(1, 1, 0, 0), data.BlitMaterial, (int)ShowPass.showOut);
+                    Blitter.BlitTexture(natCmd, data.Composed, scaleOffset, data.BlitMaterial, (int)ShowPass.showOut);
                     break;
                 case ShowMode.Taa:
-                    Blitter.BlitTexture(natCmd, taaDst, new Vector4(1, 1, 0, 0), data.BlitMaterial, (int)ShowPass.showAlpha);
+                    Blitter.BlitTexture(natCmd, taaDst, scaleOffset, data.BlitMaterial, (int)ShowPass.showAlpha);
                     break;
                 case ShowMode.Final:
+
                     if (data.Setting.RR)
                     {
                         Blitter.BlitTexture(natCmd, data.DlssOutput, new Vector4(1, 1, 0, 0), data.BlitMaterial, (int)ShowPass.showOut);
                     }
                     else
                     {
-                        Blitter.BlitTexture(natCmd, taaDst, new Vector4(1, 1, 0, 0), data.BlitMaterial, (int)ShowPass.showOut);
+                        Blitter.BlitTexture(natCmd, taaDst, scaleOffset, data.BlitMaterial, (int)ShowPass.showOut);
                     }
 
                     break;
                 case ShowMode.DLSS_DiffuseAlbedo:
-                    Blitter.BlitTexture(natCmd, data.RRGuide_DiffAlbedo, new Vector4(1, 1, 0, 0), data.BlitMaterial, (int)ShowPass.showOut);
+                    Blitter.BlitTexture(natCmd, data.RRGuide_DiffAlbedo, scaleOffset, data.BlitMaterial, (int)ShowPass.showOut);
                     break;
                 case ShowMode.DLSS_SpecularAlbedo:
-                    Blitter.BlitTexture(natCmd, data.RRGuide_SpecAlbedo, new Vector4(1, 1, 0, 0), data.BlitMaterial, (int)ShowPass.showOut);
+                    Blitter.BlitTexture(natCmd, data.RRGuide_SpecAlbedo, scaleOffset, data.BlitMaterial, (int)ShowPass.showOut);
                     break;
                 case ShowMode.DLSS_SpecularHitDistance:
-                    Blitter.BlitTexture(natCmd, data.RRGuide_SpecHitDistance, new Vector4(1, 1, 0, 0), data.BlitMaterial, (int)ShowPass.showOut);
+                    Blitter.BlitTexture(natCmd, data.RRGuide_SpecHitDistance, scaleOffset, data.BlitMaterial, (int)ShowPass.showOut);
                     break;
                 case ShowMode.DLSS_NormalRoughness:
-                    Blitter.BlitTexture(natCmd, data.RRGuide_Normal_Roughness, new Vector4(1, 1, 0, 0), data.BlitMaterial, (int)ShowPass.showOut);
+                    Blitter.BlitTexture(natCmd, data.RRGuide_Normal_Roughness, scaleOffset, data.BlitMaterial, (int)ShowPass.showOut);
                     break;
                 case ShowMode.DLSS_Output:
                     Blitter.BlitTexture(natCmd, data.DlssOutput, new Vector4(1, 1, 0, 0), data.BlitMaterial, (int)ShowPass.showOut);
@@ -429,26 +436,27 @@ namespace PathTracing
             var gSunBasisY = math.normalize(math.cross(new float3(gSunDirection.x, gSunDirection.y, gSunDirection.z), gSunBasisX));
 
             var cam = cameraData.camera;
+            passData.NrdDataPtr = NrdDenoiser.GetInteropDataPtr(cam, gSunDirection);
+            passData.RRDataPtr = DLRRDenoiser.GetInteropDataPtr(cam, NrdDenoiser);
+
             var m11 = cam.projectionMatrix.m11;
 
             var renderResolution = NrdDenoiser.renderResolution;
 
-            var rectH = (uint)(renderResolution.x * m_Settings.resolutionScale + 0.5f);
-            var rectW = (uint)(renderResolution.y * m_Settings.resolutionScale + 0.5f);
+            var rectW = (uint)(renderResolution.x * NrdDenoiser.resolutionScale + 0.5f);
+            var rectH = (uint)(renderResolution.y * NrdDenoiser.resolutionScale + 0.5f);
 
             // todo prev
-            var rectWprev = (uint)(renderResolution.x * m_Settings.resolutionScale + 0.5f);
-            var rectHprev = (uint)(renderResolution.y * m_Settings.resolutionScale + 0.5f);
+            var rectWprev = (uint)(renderResolution.x * NrdDenoiser.prevResolutionScale + 0.5f);
+            var rectHprev = (uint)(renderResolution.y * NrdDenoiser.prevResolutionScale + 0.5f);
 
 
             var renderSize = new float2((renderResolution.x), (renderResolution.y));
             var outputSize = new float2((outputResolution.x), (outputResolution.y));
             var rectSize = new float2(rectW, rectH);
+
             var rectSizePrev = new float2((rectWprev), (rectHprev));
             var jitter = (m_Settings.cameraJitter ? NrdDenoiser.ViewportJitter : 0f) / rectSize;
-
-            passData.NrdDataPtr = NrdDenoiser.GetInteropDataPtr(cam, gSunDirection);
-            passData.RRDataPtr = DLRRDenoiser.GetInteropDataPtr(cam, NrdDenoiser);
 
             var verticalFieldOfView = cam.fieldOfView;
             var aspectRatio = (float)rectW / rectH;
@@ -591,6 +599,7 @@ namespace PathTracing
 
             passData.ConstantBuffer = _pathTracingSettingsBuffer;
             passData.Setting = m_Settings;
+            passData.resolutionScale = NrdDenoiser.resolutionScale;
             passData.ScramblingRanking = ScramblingRanking;
             passData.Sobol = Sobol;
 

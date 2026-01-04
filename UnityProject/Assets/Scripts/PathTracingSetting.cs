@@ -129,7 +129,7 @@ namespace PathTracing
         public bool RR = false;
 
         [Range(0.5f, 1.0f)]
-        public float resolutionScale;
+        public float resolutionScale = 0.5f;
 
         public UpscalerMode upscalerMode;
  
