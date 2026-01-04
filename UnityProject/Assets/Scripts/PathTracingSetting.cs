@@ -10,6 +10,7 @@ namespace PathTracing
         Metalness,
         Normal,
         Roughness,
+        NoiseShadow,
         Shadow,
         Diffuse,
         Specular,
@@ -30,7 +31,7 @@ namespace PathTracing
         DLSS_Output,
     }
 
-    public enum UpscalerMode        // Scaling factor       // Min jitter phases (or just use unclamped Halton2D)
+    public enum UpscalerMode  : byte      // Scaling factor       // Min jitter phases (or just use unclamped Halton2D)
     {
         NATIVE,                     // 1.0x                 8
         ULTRA_QUALITY,              // 1.3x                 14

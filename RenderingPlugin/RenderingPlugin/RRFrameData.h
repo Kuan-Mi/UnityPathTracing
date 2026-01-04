@@ -22,12 +22,15 @@ struct RRFrameData
     float worldToViewMatrix[16];
     float viewToClipMatrix[16];
 
-    uint16_t width;
-    uint16_t height;
-    
+    uint16_t outputWidth;
+    uint16_t outputHeight;
+    uint16_t currentWidth;
+    uint16_t currentHeight;
     float cameraJitter[2];
 
     int instanceId;
+    nri::UpscalerMode upscalerMode;
+    
 };
 
 #pragma pack(pop)

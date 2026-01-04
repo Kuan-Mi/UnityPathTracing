@@ -51,8 +51,16 @@ namespace Nrd
 
             data.worldToViewMatrix = denoiser.worldToView;
             data.viewToClipMatrix = denoiser.viewToClip;
-            data.width = (ushort)mCamera.pixelWidth;
-            data.height = (ushort)mCamera.pixelHeight;
+            data.outputWidth = (ushort)mCamera.pixelWidth;
+            data.outputHeight = (ushort)mCamera.pixelHeight;
+            
+            ushort rectW = (ushort)(denoiser.renderResolution.x * setting.resolutionScale + 0.5f);
+            ushort rectH = (ushort)(denoiser.renderResolution.y * setting.resolutionScale + 0.5f);
+            
+            data.currentWidth = rectW;
+            data.currentHeight = rectH;
+
+            data.upscalerMode = setting.upscalerMode;
 
             data.cameraJitter = denoiser.ViewportJitter;
             data.instanceId = instanceId;

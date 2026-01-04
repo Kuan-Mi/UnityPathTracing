@@ -437,3 +437,23 @@ float3 GetSkyIntensity(float3 v)
 
     return Color::FromGamma(skyColor) * SKY_INTENSITY + GetSunIntensity(v);
 }
+
+
+float SIGMA_FrontEnd_UnpackPenumbra( float packedPenumbra, float tanOfLightAngularRadius )
+{
+    // 1. 处理特殊值：如果 packedPenumbra 是最大值，说明没有遮挡物或距离无限远
+    if (packedPenumbra >= NRD_FP16_MAX)
+    {
+        return NRD_FP16_MAX;
+    }
+    return  0;
+
+    // 2. 逆向推导公式：
+    // 根据 Pack 函数: penumbraRadius = distanceToOccluder * tanOfLightAngularRadius * 0.5
+    // 推导: distanceToOccluder = (penumbraRadius * 2.0) / tanOfLightAngularRadius
+    
+    // 为了防止除以 0，给 tanOfLightAngularRadius 一个极小的 epsilon 值
+    float distanceToOccluder = (packedPenumbra * 2.0) / max(tanOfLightAngularRadius, 1e-6);
+
+    return distanceToOccluder;
+}

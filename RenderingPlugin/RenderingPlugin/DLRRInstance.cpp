@@ -79,7 +79,7 @@ void DLRRInstance::DispatchCompute(RRFrameData* data)
     if (data == nullptr)
         return;
 
-    if (data->width == 0 || data->height == 0)
+    if (data->outputWidth == 0 || data->outputHeight == 0)
     {
         LOG(("[DLRR] id:" + std::to_string(id) + " - Invalid texture size, skipping dispatch.").c_str());
         return;
@@ -98,7 +98,7 @@ void DLRRInstance::DispatchCompute(RRFrameData* data)
     RenderSystem::Get().GetNriWrapper().CreateCommandBufferD3D12(*RenderSystem::Get().GetNriDevice(), cmdDesc, nriCmdBuffer);
 
 
-    if (TextureWidth != data->width || TextureHeight != data->height)
+    if (TextureWidth != data->outputWidth || TextureHeight != data->outputHeight  || upscalerMode != data->upscalerMode)
     {
         if (TextureWidth == 0 || TextureHeight == 0)
         {
@@ -109,8 +109,9 @@ void DLRRInstance::DispatchCompute(RRFrameData* data)
             LOG(("[DLRR] id:" + std::to_string(id) + " - Texture size changed, recreating DLRR instance.").c_str());
         }
 
-        TextureWidth = data->width;
-        TextureHeight = data->height;
+        TextureWidth = data->outputWidth;
+        TextureHeight = data->outputHeight;
+        upscalerMode = data->upscalerMode;
 
         if (m_DLRR)
         {
@@ -121,7 +122,7 @@ void DLRRInstance::DispatchCompute(RRFrameData* data)
         RenderSystem& rs = RenderSystem::Get();
 
         // nri::UpscalerMode mode = nri::UpscalerMode::NATIVE;
-        nri::UpscalerMode mode = nri::UpscalerMode::PERFORMANCE;
+        nri::UpscalerMode mode = upscalerMode;
         nri::UpscalerBits upscalerFlags = nri::UpscalerBits::DEPTH_INFINITE;
         upscalerFlags |= nri::UpscalerBits::HDR;
         upscalerFlags |= nri::UpscalerBits::DEPTH_INVERTED;
@@ -160,7 +161,7 @@ void DLRRInstance::DispatchCompute(RRFrameData* data)
     dispatchUpscaleDesc.output = GetPair(data->outputTex, true);
 
 
-    dispatchUpscaleDesc.currentResolution = {(nri::Dim_t)(data->width/2), (nri::Dim_t)(data->height/2)};
+    dispatchUpscaleDesc.currentResolution = {(nri::Dim_t)(data->currentWidth), (nri::Dim_t)(data->currentHeight)};
 
     dispatchUpscaleDesc.cameraJitter = {-data->cameraJitter[0], -data->cameraJitter[1]};
     dispatchUpscaleDesc.mvScale = {1.0f, 1.0f};

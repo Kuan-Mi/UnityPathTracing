@@ -578,6 +578,66 @@
             }
             ENDHLSL
         }
+        // 8
+        Pass
+        {
+            Name "ShowNoiseShadow" 
+//            Blend SrcAlpha OneMinusSrcAlpha 
+            ZTest Always
+            ZWrite Off
+            Cull Off
+
+            HLSLPROGRAM
+            #pragma vertex Vert
+            #pragma fragment Frag
+            #pragma target 4.5
+
+            #include "Include/Shared.hlsl"
+            #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
+ 
+            TEXTURE2D(_BlitTexture);
+            SAMPLER(sampler_BlitTexture);
+            float4 _BlitScaleBias;
+
+            struct Attributes
+            {
+                uint vertexID : SV_VertexID;
+            };
+
+            struct Varyings
+            {
+                float4 positionCS : SV_POSITION;
+                float2 uv : TEXCOORD0;
+            };
+
+            Varyings Vert(Attributes input)
+            {
+                Varyings o;
+                o.positionCS = GetFullScreenTriangleVertexPosition(input.vertexID);
+                o.uv = GetFullScreenTriangleTexCoord(input.vertexID);
+                return o;
+            }
+
+            float4 Frag(Varyings i) : SV_Target
+            {
+                // 翻转Y
+                #ifdef UNITY_UV_STARTS_AT_TOP
+                i.uv.y = 1.0 - i.uv.y;
+                #endif
+                i.uv = i.uv * _BlitScaleBias.xy + _BlitScaleBias.zw;
+
+                float4 OUT_SHADOW_TRANSLUCENCY = SAMPLE_TEXTURE2D(_BlitTexture, sampler_BlitTexture, i.uv);
+                
+            float shadowHitDist = SIGMA_FrontEnd_UnpackPenumbra(OUT_SHADOW_TRANSLUCENCY.x, gTanSunAngularRadius);
+            float missing = shadowHitDist >= NRD_FP16_MAX? 1.0 : 0.0;
+                
+                 
+                float4 color = float4(missing, missing, missing, 1);
+
+                return color;
+            }
+            ENDHLSL
+        }
 
     }
 }

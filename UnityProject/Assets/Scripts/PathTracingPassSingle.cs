@@ -307,6 +307,9 @@ namespace PathTracing
                 case ShowMode.Roughness:
                     Blitter.BlitTexture(natCmd, data.NormalRoughness, scaleOffset, data.BlitMaterial, (int)ShowPass.ShowRoughness);
                     break;
+                case ShowMode.NoiseShadow:
+                    Blitter.BlitTexture(natCmd, data.Penumbra, scaleOffset, data.BlitMaterial, (int)ShowPass.ShowNoiseShadow);
+                    break;        
                 case ShowMode.Shadow:
                     Blitter.BlitTexture(natCmd, data.ShadowTranslucency, scaleOffset, data.BlitMaterial, (int)ShowPass.showShadow);
                     break;

@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Runtime.InteropServices;
 using Nri;
+using PathTracing;
 using Unity.Mathematics;
 using UnityEngine;
 
@@ -28,11 +29,16 @@ namespace Nrd
         public Matrix4x4 worldToViewMatrix;
         public Matrix4x4 viewToClipMatrix;
          
-        public ushort width;
-        public ushort height;
+        
+        public ushort outputWidth;
+        public ushort outputHeight;
+        public ushort currentWidth;
+        public ushort currentHeight;
 
         public float2 cameraJitter;
         public int instanceId;
+        
+        public UpscalerMode upscalerMode;
     }
  
 }

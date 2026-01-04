@@ -18,5 +18,6 @@
         showAlpha,
         ShowRoughness,
         ShowRadiance,
+        ShowNoiseShadow,
     }
 }

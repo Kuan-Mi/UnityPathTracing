@@ -39,12 +39,12 @@ namespace NRD
 
         public void Allocate(int2 resolution)
         {
-            var dxgiFormat = NRDUtil.GetDXGIFormat(GraphicsFormat);
             Release(); // 确保先释放旧的
+            var dxgiFormat = NRDUtil.GetDXGIFormat(GraphicsFormat);
 
             Debug.Log($"Allocating NRD Texture Resource: {Name}, Size: {resolution}, Format: {GraphicsFormat}");
 
-            
+
             // 创建 RT 描述
             var desc = new RenderTextureDescriptor(resolution.x, resolution.y, GraphicsFormat, 0)
             {
@@ -80,8 +80,18 @@ namespace NRD
 
             if (Handle != null)
             {
+                var rt = Handle.rt;
+
+
                 RTHandles.Release(Handle);
                 Handle = null;
+                if (rt != null)
+                {
+                    if (Application.isPlaying)
+                        Object.Destroy(rt);
+                    else
+                        Object.DestroyImmediate(rt);
+                }
             }
         }
     }

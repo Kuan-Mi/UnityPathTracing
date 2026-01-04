@@ -127,7 +127,7 @@ namespace Nrd
                 _ => 1.0f
             };
 
-            return new int2((int)(outputRes.x / scale), (int)(outputRes.y / scale));
+            return new int2((int)(outputRes.x / scale + 0.5f), (int)(outputRes.y / scale + 0.5f));
         }
 
         public void EnsureResources(int2 outputResolution)
@@ -264,6 +264,11 @@ namespace Nrd
 
         private unsafe FrameData GetData(Camera mCamera, Vector3 dirToLight)
         {
+            if (setting.RR)
+            {
+                setting.resolutionScale = 1.0f;
+            }
+            
             prevWorldToView = worldToView;
             prevWorldToClip = worldToClip;
             preViewToClip = viewToClip;

@@ -39,6 +39,7 @@ private:
     
     UINT TextureWidth = 0;
     UINT TextureHeight = 0;
+    nri::UpscalerMode upscalerMode;
     std::unordered_map<uint64_t, nri::Descriptor*> m_DescriptorCache;
     nri::Upscaler* m_DLRR = nullptr;
 };
