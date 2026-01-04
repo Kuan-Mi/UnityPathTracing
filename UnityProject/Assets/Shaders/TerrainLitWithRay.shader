@@ -1,102 +1,58 @@
-Shader "Custom/LitWithRayTracing"
+Shader "Custom/TerrainLitWithRay"
 {
     Properties
     {
-        // Specular vs Metallic workflow
-        _WorkflowMode("WorkflowMode", Float) = 1.0
+        [HideInInspector] [ToggleUI] _EnableHeightBlend("EnableHeightBlend", Float) = 0.0
+        _HeightTransition("Height Transition", Range(0, 1.0)) = 0.0
+        // Layer count is passed down to guide height-blend enable/disable, due
+        // to the fact that heigh-based blend will be broken with multipass.
+        [HideInInspector] [PerRendererData] _NumLayersCount ("Total Layer Count", Float) = 1.0
 
-        [MainTexture] _BaseMap("Albedo", 2D) = "white" {}
-        [MainColor] _BaseColor("Color", Color) = (1,1,1,1)
+        // set by terrain engine
+        [HideInInspector] _Control("Control (RGBA)", 2D) = "red" {}
+        [HideInInspector] _Splat3("Layer 3 (A)", 2D) = "grey" {}
+        [HideInInspector] _Splat2("Layer 2 (B)", 2D) = "grey" {}
+        [HideInInspector] _Splat1("Layer 1 (G)", 2D) = "grey" {}
+        [HideInInspector] _Splat0("Layer 0 (R)", 2D) = "grey" {}
+        [HideInInspector] _Normal3("Normal 3 (A)", 2D) = "bump" {}
+        [HideInInspector] _Normal2("Normal 2 (B)", 2D) = "bump" {}
+        [HideInInspector] _Normal1("Normal 1 (G)", 2D) = "bump" {}
+        [HideInInspector] _Normal0("Normal 0 (R)", 2D) = "bump" {}
+        [HideInInspector] _Mask3("Mask 3 (A)", 2D) = "grey" {}
+        [HideInInspector] _Mask2("Mask 2 (B)", 2D) = "grey" {}
+        [HideInInspector] _Mask1("Mask 1 (G)", 2D) = "grey" {}
+        [HideInInspector] _Mask0("Mask 0 (R)", 2D) = "grey" {}
+        [HideInInspector][Gamma] _Metallic0("Metallic 0", Range(0.0, 1.0)) = 0.0
+        [HideInInspector][Gamma] _Metallic1("Metallic 1", Range(0.0, 1.0)) = 0.0
+        [HideInInspector][Gamma] _Metallic2("Metallic 2", Range(0.0, 1.0)) = 0.0
+        [HideInInspector][Gamma] _Metallic3("Metallic 3", Range(0.0, 1.0)) = 0.0
+        [HideInInspector] _Smoothness0("Smoothness 0", Range(0.0, 1.0)) = 0.5
+        [HideInInspector] _Smoothness1("Smoothness 1", Range(0.0, 1.0)) = 0.5
+        [HideInInspector] _Smoothness2("Smoothness 2", Range(0.0, 1.0)) = 0.5
+        [HideInInspector] _Smoothness3("Smoothness 3", Range(0.0, 1.0)) = 0.5
 
-        _Cutoff("Alpha Cutoff", Range(0.0, 1.0)) = 0.5
+        // used in fallback on old cards & base map
+        [HideInInspector] _MainTex("BaseMap (RGB)", 2D) = "grey" {}
+        [HideInInspector] _BaseColor("Main Color", Color) = (1,1,1,1)
 
-        _IOR("IOR", Range(0.0, 2.0)) = 1.5
+        [HideInInspector] _TerrainHolesTexture("Holes Map (RGB)", 2D) = "white" {}
 
-        _Smoothness("Smoothness", Range(0.0, 1.0)) = 0.5
-        _SmoothnessTextureChannel("Smoothness texture channel", Float) = 0
-
-        _Metallic("Metallic", Range(0.0, 1.0)) = 0.0
-        _MetallicGlossMap("Metallic", 2D) = "white" {}
-
-        _SpecColor("Specular", Color) = (0.2, 0.2, 0.2)
-        _SpecGlossMap("Specular", 2D) = "white" {}
-
-        [ToggleOff] _SpecularHighlights("Specular Highlights", Float) = 1.0
-        [ToggleOff] _EnvironmentReflections("Environment Reflections", Float) = 1.0
-
-        _BumpScale("Scale", Float) = 1.0
-        _BumpMap("Normal Map", 2D) = "bump" {}
-
-        _Parallax("Scale", Range(0.005, 0.08)) = 0.005
-        _ParallaxMap("Height Map", 2D) = "black" {}
-
-        _OcclusionStrength("Strength", Range(0.0, 1.0)) = 1.0
-        _OcclusionMap("Occlusion", 2D) = "white" {}
-
-        [HDR] _EmissionColor("Color", Color) = (0,0,0)
-        _EmissionMap("Emission", 2D) = "white" {}
-
-        _DetailMask("Detail Mask", 2D) = "white" {}
-        _DetailAlbedoMapScale("Scale", Range(0.0, 2.0)) = 1.0
-        _DetailAlbedoMap("Detail Albedo x2", 2D) = "linearGrey" {}
-        _DetailNormalMapScale("Scale", Range(0.0, 2.0)) = 1.0
-        [Normal] _DetailNormalMap("Normal Map", 2D) = "bump" {}
-
-        // SRP batching compatibility for Clear Coat (Not used in Lit)
-        [HideInInspector] _ClearCoatMask("_ClearCoatMask", Float) = 0.0
-        [HideInInspector] _ClearCoatSmoothness("_ClearCoatSmoothness", Float) = 0.0
-
-        // Blending state
-        _Surface("__surface", Float) = 0.0
-        _Blend("__blend", Float) = 0.0
-        _Cull("__cull", Float) = 2.0
-        [ToggleUI] _AlphaClip("__clip", Float) = 0.0
-        [HideInInspector] _SrcBlend("__src", Float) = 1.0
-        [HideInInspector] _DstBlend("__dst", Float) = 0.0
-        [HideInInspector] _SrcBlendAlpha("__srcA", Float) = 1.0
-        [HideInInspector] _DstBlendAlpha("__dstA", Float) = 0.0
-        [HideInInspector] _ZWrite("__zw", Float) = 1.0
-        [HideInInspector] _BlendModePreserveSpecular("_BlendModePreserveSpecular", Float) = 1.0
-        [HideInInspector] _AlphaToMask("__alphaToMask", Float) = 0.0
-        [HideInInspector] _AddPrecomputedVelocity("_AddPrecomputedVelocity", Float) = 0.0
-        [HideInInspector] _XRMotionVectorsPass("_XRMotionVectorsPass", Float) = 1.0
-
-        [ToggleUI] _ReceiveShadows("Receive Shadows", Float) = 1.0
-        // Editmode props
-        _QueueOffset("Queue offset", Float) = 0.0
-
-        // ObsoleteProperties
-        [HideInInspector] _MainTex("BaseMap", 2D) = "white" {}
-        [HideInInspector] _Color("Base Color", Color) = (1, 1, 1, 1)
-        [HideInInspector] _GlossMapScale("Smoothness", Float) = 0.0
-        [HideInInspector] _Glossiness("Smoothness", Float) = 0.0
-        [HideInInspector] _GlossyReflections("EnvironmentReflections", Float) = 0.0
-
-        [HideInInspector][NoScaleOffset]unity_Lightmaps("unity_Lightmaps", 2DArray) = "" {}
-        [HideInInspector][NoScaleOffset]unity_LightmapsInd("unity_LightmapsInd", 2DArray) = "" {}
-        [HideInInspector][NoScaleOffset]unity_ShadowMasks("unity_ShadowMasks", 2DArray) = "" {}
+        [ToggleUI] _EnableInstancedPerPixelNormal("Enable Instanced per-pixel normal", Float) = 1.0
     }
 
     SubShader
     {
-        Tags
-        {
-            "RenderType" = "Opaque"
-            "RenderPipeline" = "UniversalPipeline"
-            "UniversalMaterialType" = "Lit"
-            "IgnoreProjector" = "True"
-        }
-        LOD 300
 
-        UsePass "Universal Render Pipeline/Lit/ForwardLit"
-        UsePass "Universal Render Pipeline/Lit/ShadowCaster"
-        UsePass "Universal Render Pipeline/Lit/GBuffer"
-        UsePass "Universal Render Pipeline/Lit/DepthOnly"
-        UsePass "Universal Render Pipeline/Lit/DepthNormals"
-        UsePass "Universal Render Pipeline/Lit/Meta"
-        UsePass "Universal Render Pipeline/Lit/Universal2D"
-        UsePass "Universal Render Pipeline/Lit/MotionVectors"
-        UsePass "Universal Render Pipeline/Lit/XRMotionVectors"
+        Tags { "Queue" = "Geometry-100" "RenderType" = "Opaque" "RenderPipeline" = "UniversalPipeline" "UniversalMaterialType" = "Lit" "IgnoreProjector" = "False" "TerrainCompatible" = "True"}
+
+
+        UsePass "Universal Render Pipeline/Terrain/Lit/ForwardLit"
+        UsePass "Universal Render Pipeline/Terrain/Lit/ShadowCaster"
+        UsePass "Universal Render Pipeline/Terrain/Lit/GBuffer"
+        UsePass "Universal Render Pipeline/Terrain/Lit/DepthOnly"
+        UsePass "Universal Render Pipeline/Terrain/Lit/DepthNormals"
+        UsePass "Universal Render Pipeline/Terrain/Lit/SceneSelectionPass"
+        UsePass "Universal Render Pipeline/Terrain/Lit/Meta"
     }
     SubShader
     {
@@ -111,7 +67,7 @@ Shader "Custom/LitWithRayTracing"
             HLSLPROGRAM
             #include "UnityRaytracingMeshUtils.cginc"
             #include "ml.hlsli"
-            #include "Packages/com.unity.render-pipelines.universal/Shaders/LitInput.hlsl"
+            #include "Packages/com.unity.render-pipelines.universal/Shaders/Terrain/TerrainLitInput.hlsl"
             #include "Include/Shared.hlsl"
             #include "Include/Payload.hlsl"
 
@@ -185,33 +141,7 @@ Shader "Custom/LitWithRayTracing"
             [shader("anyhit")]
             void AnyHitMain(inout MainRayPayload payload, AttributeData attribs)
             {
-                #if !_SURFACE_TYPE_TRANSPARENT
-
-                // 1. 获取顶点索引
-                uint3 triangleIndices = UnityRayTracingFetchTriangleIndices(PrimitiveIndex());
-
-                // 2. 获取三个顶点的 UV（为了性能，AnyHit 通常只取 UV，不计算法线等复杂属性）
-                float2 uv0 = UnityRayTracingFetchVertexAttribute2(triangleIndices.x, kVertexAttributeTexCoord0);
-                float2 uv1 = UnityRayTracingFetchVertexAttribute2(triangleIndices.y, kVertexAttributeTexCoord0);
-                float2 uv2 = UnityRayTracingFetchVertexAttribute2(triangleIndices.z, kVertexAttributeTexCoord0);
-
-                // 3. 计算插值 UV
-                float3 barycentricCoords = float3(1.0 - attribs.barycentrics.x - attribs.barycentrics.y,
-                                                  attribs.barycentrics.x, attribs.barycentrics.y);
-                float2 uv = uv0 * barycentricCoords.x + uv1 * barycentricCoords.y + uv2 * barycentricCoords.z;
-
-                // 4. 采样 Alpha 通道
-                // 注意：在 AnyHit 中采样通常使用 SampleLevel 0 以保证性能，或者根据 RayT 计算一个近似 Mip
-                float4 baseColor = _BaseMap.SampleLevel(sampler_BaseMap, _BaseMap_ST.xy * uv + _BaseMap_ST.zw, 0);
-                float alpha = baseColor.a * _BaseColor.a;
-
-                // 5. Alpha Test 判定
-                // 如果透明度小于阈值，则调用 IgnoreHit()，光线将穿透该物体继续飞行
-                if (alpha < _Cutoff)
-                {
-                    IgnoreHit();
-                }
-                #endif
+ 
             }
 
             [shader("closesthit")]
@@ -292,47 +222,50 @@ Shader "Custom/LitWithRayTracing"
                 // float2 normalUV = float2(v.uv.x, 1 - v.uv.y); // 修正UV翻转问题
                 float2 normalUV = (v.uv); // 修正UV翻转问题
 
-                float4 n = _BumpMap.SampleLevel(sampler_BumpMap, _BaseMap_ST.xy * normalUV + _BaseMap_ST.zw,mip);
+                // float2 packedNormal = _BumpMap.SampleLevel(sampler_BumpMap, _BaseMap_ST.xy * normalUV + _BaseMap_ST.zw,
+                //                        mip).xy;
 
-                // float4 T = float4(tangentWS, 1);
+                float4 T = float4(tangentWS, 1);
 
                 // float3 N = Geometry::TransformLocalNormal(packedNormal, T, normalWS);
+                
+                // N = normalWS;
 
-                float3 tangentNormal = UnpackNormalScale(n, _BumpScale);
+                // float3 tangentNormal = UnpackNormalScale(n, _BumpScale);
 
-                float3 bitangent = cross(normalWS.xyz, tangentWS.xyz);
-                half3x3 tangentToWorld = half3x3(tangentWS.xyz, bitangent.xyz, normalWS.xyz);
+                // float3 bitangent = cross(normalWS.xyz, tangentWS.xyz);
+                // half3x3 tangentToWorld = half3x3(tangentWS.xyz, bitangent.xyz, normalWS.xyz);
 
-                float3 worldNormal = TransformTangentToWorld(tangentNormal, tangentToWorld);
+                // float3 worldNormal = TransformTangentToWorld(tangentNormal, tangentToWorld);
 
-                // float3 worldNormal = N;
+                float3 worldNormal = normalWS;
                 #else
                 float3 worldNormal = normalWS;
                 #endif
 
-                float3 albedo = _BaseColor.xyz * _BaseMap.SampleLevel(sampler_BaseMap, _BaseMap_ST.xy * v.uv + _BaseMap_ST.zw, mip).xyz;
+                // float3 albedo = _BaseColor.xyz * _BaseMap.SampleLevel(sampler_BaseMap, _BaseMap_ST.xy * v.uv + _BaseMap_ST.zw, mip).xyz;
 
-
+float3 albedo = float3(1, 1, 1);
                 float roughness;
                 float metallic;
 
                 #if _METALLICSPECGLOSSMAP
 
                 float4 vv = _MetallicGlossMap.SampleLevel(sampler_MetallicGlossMap, _BaseMap_ST.xy * v.uv + _BaseMap_ST.zw, mip);
-                // metallic = vv.r;
-                roughness = vv.g * (1 - _Smoothness);
-                metallic = vv.b;
-
+                metallic = vv.r;
+                float smooth = vv.a * _Smoothness;
+                roughness =   (1 - smooth); 
                 #else
 
-                roughness = 1 - _Smoothness;
-                metallic = _Metallic;
+                roughness = 1  ;
+                metallic = 0;
 
                 #endif
 
                 #if _EMISSION
                 float3 emission = _EmissionColor.xyz * _EmissionMap.SampleLevel(sampler_EmissionMap, v.uv, mip).xyz;
                 payload.Lemi = emission;
+                // payload.Lemi = _EmissionMap.SampleLevel(sampler_EmissionMap, v.uv, mip).xyz;
                 #else
                 payload.Lemi = float3(0, 0, 0);
                 #endif
@@ -383,6 +316,8 @@ Shader "Custom/LitWithRayTracing"
             ENDHLSL
         }
     }
-    FallBack "Hidden/Universal Render Pipeline/FallbackError"
-    CustomEditor "UnityEditor.Rendering.Universal.ShaderGUI.LitShader"
+
+    CustomEditor "UnityEditor.Rendering.Universal.TerrainLitShaderGUI"
+
+    Fallback "Hidden/Universal Render Pipeline/FallbackError"
 }

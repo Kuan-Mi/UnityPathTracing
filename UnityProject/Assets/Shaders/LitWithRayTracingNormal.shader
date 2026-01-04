@@ -1,4 +1,4 @@
-Shader "Custom/LitWithRayTracing"
+Shader "Custom/LitWithRayTracingNormal"
 {
     Properties
     {
@@ -292,20 +292,23 @@ Shader "Custom/LitWithRayTracing"
                 // float2 normalUV = float2(v.uv.x, 1 - v.uv.y); // 修正UV翻转问题
                 float2 normalUV = (v.uv); // 修正UV翻转问题
 
-                float4 n = _BumpMap.SampleLevel(sampler_BumpMap, _BaseMap_ST.xy * normalUV + _BaseMap_ST.zw,mip);
+                float2 packedNormal = _BumpMap.SampleLevel(sampler_BumpMap, _BaseMap_ST.xy * normalUV + _BaseMap_ST.zw,
+                                       mip).xy;
 
-                // float4 T = float4(tangentWS, 1);
+                float4 T = float4(tangentWS, 1);
 
-                // float3 N = Geometry::TransformLocalNormal(packedNormal, T, normalWS);
+                float3 N = Geometry::TransformLocalNormal(packedNormal, T, normalWS);
+                
+                N = normalWS;
 
-                float3 tangentNormal = UnpackNormalScale(n, _BumpScale);
+                // float3 tangentNormal = UnpackNormalScale(n, _BumpScale);
 
-                float3 bitangent = cross(normalWS.xyz, tangentWS.xyz);
-                half3x3 tangentToWorld = half3x3(tangentWS.xyz, bitangent.xyz, normalWS.xyz);
+                // float3 bitangent = cross(normalWS.xyz, tangentWS.xyz);
+                // half3x3 tangentToWorld = half3x3(tangentWS.xyz, bitangent.xyz, normalWS.xyz);
 
-                float3 worldNormal = TransformTangentToWorld(tangentNormal, tangentToWorld);
+                // float3 worldNormal = TransformTangentToWorld(tangentNormal, tangentToWorld);
 
-                // float3 worldNormal = N;
+                float3 worldNormal = N;
                 #else
                 float3 worldNormal = normalWS;
                 #endif
@@ -319,10 +322,9 @@ Shader "Custom/LitWithRayTracing"
                 #if _METALLICSPECGLOSSMAP
 
                 float4 vv = _MetallicGlossMap.SampleLevel(sampler_MetallicGlossMap, _BaseMap_ST.xy * v.uv + _BaseMap_ST.zw, mip);
-                // metallic = vv.r;
-                roughness = vv.g * (1 - _Smoothness);
-                metallic = vv.b;
-
+                metallic = vv.r;
+                float smooth = vv.a * _Smoothness;
+                roughness =   (1 - smooth); 
                 #else
 
                 roughness = 1 - _Smoothness;
@@ -333,6 +335,7 @@ Shader "Custom/LitWithRayTracing"
                 #if _EMISSION
                 float3 emission = _EmissionColor.xyz * _EmissionMap.SampleLevel(sampler_EmissionMap, v.uv, mip).xyz;
                 payload.Lemi = emission;
+                // payload.Lemi = _EmissionMap.SampleLevel(sampler_EmissionMap, v.uv, mip).xyz;
                 #else
                 payload.Lemi = float3(0, 0, 0);
                 #endif
