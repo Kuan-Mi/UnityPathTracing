@@ -223,7 +223,7 @@
                 // 你的代码是 prev - current (指向上一帧)
                 // 如果想让箭头指向物体“前进”的方向，需要取反 (-motion.xy)
                 // 如果想看“轨迹”来源，则保持原样。这里默认取反以符合直觉。
-                float2 velocityPixels = -motion.xy;
+                float2 velocityPixels = motion.xy;
 
                 float speed = length(velocityPixels);
 

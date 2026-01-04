@@ -88,7 +88,7 @@ MonoBehaviour:
     showValidation: 0
     dofAperture: 0
     dofFocalDistance: 1
-    exposure: 2.7
+    exposure: 30.1
     rpp: 2
     bounceNum: 1
     mipBias: -0.5
@@ -107,6 +107,6 @@ MonoBehaviour:
     specularLobeTrimming: 1
     boost: 0
     SR: 0
-    RR: 1
+    RR: 0
   gIn_ScramblingRanking: {fileID: 2800000, guid: ba45d1e4dcf9022438a4798a5f9e7b80, type: 3}
   gIn_Sobol: {fileID: 2800000, guid: 17e7ce8147355314ea8aab1178a6a43c, type: 3}

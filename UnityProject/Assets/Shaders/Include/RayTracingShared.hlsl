@@ -146,30 +146,6 @@ void CastRay(float3 origin, float3 direction, float Tmin, float Tmax, float2 mip
     }
     while (!payload.IsMiss() && !payload.Has(flag) && --maxBounce > 0);
 
-
-    // TraceRay(gWorldTlas, ToRayFlag2(flag), 0xFF, 0, 1, 0, rayDesc, payload);
-    // // 如果有交点，但是交点不是我们想要的类型,继续追踪
-    // if (!payload.IsMiss() && !payload.Has(flag))
-    // {
-    //     rayDesc.TMin = payload.hitT + 0.0001;
-    //     TraceRay(gWorldTlas, ToRayFlag2(flag), 0xFF, 0, 1, 0, rayDesc, payload);
-    // }
-    // if (!payload.IsMiss() && !payload.Has(flag))
-    // {
-    //     rayDesc.TMin = payload.hitT + 0.0001;
-    //     TraceRay(gWorldTlas, ToRayFlag2(flag), 0xFF, 0, 1, 0, rayDesc, payload);
-    // }
-    // if (!payload.IsMiss() && !payload.Has(flag))
-    // {
-    //     rayDesc.TMin = payload.hitT + 0.0001;
-    //     TraceRay(gWorldTlas, ToRayFlag2(flag), 0xFF, 0, 1, 0, rayDesc, payload);
-    // }
-    // if (!payload.IsMiss() && !payload.Has(flag))
-    // {
-    //     rayDesc.TMin = payload.hitT + 0.0001;
-    //     TraceRay(gWorldTlas, ToRayFlag2(flag), 0xFF, 0, 1, 0, rayDesc, payload);
-    // }
-
     props = (GeometryProps)0;
     props.mip = mipAndCone.x;
     props.hitT = payload.hitT;
@@ -182,8 +158,8 @@ void CastRay(float3 origin, float3 direction, float Tmin, float Tmax, float2 mip
 
     props.T = payload.T;
     props.X = payload.X;
-    // 全静止物体
-    props.Xprev = payload.X;
+
+    props.Xprev = payload.Xprev;
     props.V = -direction;
     props.textureOffsetAndFlags = payload.textureOffsetAndFlags;
 
