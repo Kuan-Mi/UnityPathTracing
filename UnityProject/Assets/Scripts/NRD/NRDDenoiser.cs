@@ -45,8 +45,8 @@ namespace Nrd
         public float3 camPos;
         public float3 prevCamPos;
 
-        private int _prevWidth = -1;
-        private int _prevHeight = -1;
+        public int2 renderResolution;
+
 
         private NativeArray<FrameData> buffer;
         private const int BufferCount = 3;
@@ -109,7 +109,24 @@ namespace Nrd
             Debug.Log($"[NRD] Created Denoiser Instance {nrdInstanceId} for Camera {cameraName}");
         }
 
-        public void EnsureResources(int width, int height)
+
+        public static int2 GetUpscaledResolution(int2 outputRes, UpscalerMode mode)
+        {
+            float scale = mode switch
+            {
+                UpscalerMode.NATIVE => 1.0f,
+                UpscalerMode.ULTRA_QUALITY => 1.3f,
+                UpscalerMode.QUALITY => 1.5f,
+                UpscalerMode.BALANCED => 1.7f,
+                UpscalerMode.PERFORMANCE => 2.0f,
+                UpscalerMode.ULTRA_PERFORMANCE => 3.0f,
+                _ => 1.0f
+            };
+
+            return new int2((int)(outputRes.x / scale), (int)(outputRes.y / scale));
+        }
+
+        public void EnsureResources(int2 outputResolution)
         {
             // 检查是否有任何资源失效（例如场景切换导致 RenderTexture 被销毁）
             bool isResourceInvalid = false;
@@ -123,21 +140,29 @@ namespace Nrd
                 }
             }
 
+            int2 currentRenderResolution = GetUpscaledResolution(outputResolution, setting.upscalerMode);
+
 
             // 如果尺寸没变且资源都存在，直接返回
-            if (!isResourceInvalid && width == _prevWidth && height == _prevHeight)
+            if (!isResourceInvalid && currentRenderResolution.x == renderResolution.x && currentRenderResolution.y == renderResolution.y)
             {
                 return;
             }
 
-            _prevWidth = width;
-            _prevHeight = height;
+            renderResolution = currentRenderResolution;
 
             FrameIndex = 0;
 
             foreach (var nrdTextureResource in allocatedResources)
             {
-                nrdTextureResource.Allocate(width, height);
+                if (nrdTextureResource.ResourceType is ResourceType.DlssOutput or ResourceType.TaaHistory or ResourceType.TaaHistoryPrev)
+                {
+                    nrdTextureResource.Allocate(outputResolution);
+                }
+                else
+                {
+                    nrdTextureResource.Allocate(renderResolution);
+                }
             }
 
             UpdateResourceSnapshotInCpp();
@@ -266,8 +291,13 @@ namespace Nrd
             PrevViewportJitter = ViewportJitter;
 
             // --- 分辨率与重置逻辑 ---
-            ushort w = (ushort)mCamera.pixelWidth;
-            ushort h = (ushort)mCamera.pixelHeight;
+
+            uint rectW = (uint)(renderResolution.x * setting.resolutionScale + 0.5f);
+            uint rectH = (uint)(renderResolution.y * setting.resolutionScale + 0.5f);
+
+
+            ushort w = (ushort)(mCamera.pixelWidth / 2);
+            ushort h = (ushort)(mCamera.pixelHeight / 2);
 
             localData.commonSettings.resourceSize[0] = w;
             localData.commonSettings.resourceSize[1] = h;
@@ -279,7 +309,7 @@ namespace Nrd
             localData.commonSettings.rectSizePrev[0] = w;
             localData.commonSettings.rectSizePrev[1] = h;
 
-            localData.commonSettings.motionVectorScale = new float3(1.0f / w, 1.0f / h, 0.0f);
+            localData.commonSettings.motionVectorScale = new float3(1.0f / rectW, 1.0f / rectH, -1.0f);
             localData.commonSettings.isMotionVectorInWorldSpace = false;
 
             localData.commonSettings.accumulationMode = AccumulationMode.CONTINUE;
@@ -308,7 +338,6 @@ namespace Nrd
             //     localData.commonSettings.worldToViewMatrixPrev = setting.worldToViewMatrixPrev;
             // }
 
-            localData.commonSettings.motionVectorScale.z = -1.0f;
             localData.commonSettings.denoisingRange = setting.denoisingRange;
 
             // localData.commonSettings.disocclusionThreshold = setting.disocclusionThreshold;

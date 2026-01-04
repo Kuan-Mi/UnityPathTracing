@@ -120,7 +120,8 @@ void DLRRInstance::DispatchCompute(RRFrameData* data)
 
         RenderSystem& rs = RenderSystem::Get();
 
-        nri::UpscalerMode mode = nri::UpscalerMode::NATIVE;
+        // nri::UpscalerMode mode = nri::UpscalerMode::NATIVE;
+        nri::UpscalerMode mode = nri::UpscalerMode::PERFORMANCE;
         nri::UpscalerBits upscalerFlags = nri::UpscalerBits::DEPTH_INFINITE;
         upscalerFlags |= nri::UpscalerBits::HDR;
         upscalerFlags |= nri::UpscalerBits::DEPTH_INVERTED;
@@ -141,15 +142,25 @@ void DLRRInstance::DispatchCompute(RRFrameData* data)
         {
             LOG("[DLRR] DLRR Upscaler created successfully.");
         }
+        
+        
+        nri::UpscalerProps upscalerProps = {};
+        rs.GetNriUpScaler().GetUpscalerProps(*m_DLRR, upscalerProps);
+        
+        LOG(("[DLRR] id:" + std::to_string(id) + " - DLRR Upscaler created with render resolution: " +
+             std::to_string(upscalerProps.renderResolution.w) + "x" + std::to_string(upscalerProps.renderResolution.h) +
+             ", upscale resolution: " + std::to_string(upscalerProps.upscaleResolution.w) + "x" + std::to_string(upscalerProps.upscaleResolution.h))
+            .c_str());
+        
+        
     }
-
 
     nri::DispatchUpscaleDesc dispatchUpscaleDesc = {};
     dispatchUpscaleDesc.input = GetPair(data->inputTex, false);
     dispatchUpscaleDesc.output = GetPair(data->outputTex, true);
 
 
-    dispatchUpscaleDesc.currentResolution = {(nri::Dim_t)data->width, (nri::Dim_t)data->height};
+    dispatchUpscaleDesc.currentResolution = {(nri::Dim_t)(data->width/2), (nri::Dim_t)(data->height/2)};
 
     dispatchUpscaleDesc.cameraJitter = {-data->cameraJitter[0], -data->cameraJitter[1]};
     dispatchUpscaleDesc.mvScale = {1.0f, 1.0f};

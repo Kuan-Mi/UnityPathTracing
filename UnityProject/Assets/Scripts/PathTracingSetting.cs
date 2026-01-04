@@ -1,4 +1,5 @@
-﻿using UnityEngine;
+﻿using Unity.Mathematics;
+using UnityEngine;
 
 namespace PathTracing
 {
@@ -28,6 +29,18 @@ namespace PathTracing
         DLSS_NormalRoughness,
         DLSS_Output,
     }
+
+    public enum UpscalerMode        // Scaling factor       // Min jitter phases (or just use unclamped Halton2D)
+    {
+        NATIVE,                     // 1.0x                 8
+        ULTRA_QUALITY,              // 1.3x                 14
+        QUALITY,                    // 1.5x                 18
+        BALANCED,                   // 1.7x                 23
+        PERFORMANCE,                // 2.0x                 32
+        ULTRA_PERFORMANCE           // 3.0x                 72
+    }
+    
+    
     
     public enum DenoiserType
     {
@@ -114,6 +127,12 @@ namespace PathTracing
         public bool boost = false;
         public bool SR = false;
         public bool RR = false;
+
+        [Range(0.5f, 1.0f)]
+        public float resolutionScale;
+
+        public UpscalerMode upscalerMode;
+ 
         // public bool dlss;
     }
 }

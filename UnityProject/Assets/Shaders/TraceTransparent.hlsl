@@ -6,6 +6,7 @@
 Texture2D<float3> gIn_ComposedDiff;
 Texture2D<float4> gIn_ComposedSpec_ViewZ;
 
+RWTexture2D<float4> gOut_Normal_Roughness;
 RWTexture2D<float3> gOut_Composed;
 RWTexture2D<float4> gInOut_Mv;
 
@@ -45,9 +46,11 @@ float3 TraceTransparent(TraceTransparentDesc desc)
         {
             float rnd = frac(bayer + Sequence::Halton(bounce, 3)); // "Halton( bounce, 2 )" works worse than others
 
-            // float rnd = Rng::Hash::GetFloat();
-
-            F = clamp(F, PT_GLASS_MIN_F, 1.0 - PT_GLASS_MIN_F); // TODO: needed?
+            [flatten]
+            if( gDenoiserType == DENOISER_REFERENCE || gRR )
+                rnd = Rng::Hash::GetFloat( );
+            else
+                F = clamp( F, PT_GLASS_MIN_F, 1.0 - PT_GLASS_MIN_F ); // TODO: needed?
 
             isReflection = rnd < F; // TODO: if "F" is clamped, "pathThroughput" should be adjusted too
         }
@@ -185,10 +188,10 @@ void MainRayGenShader()
         gInOut_Mv[pixelPos] = float4(mvT, viewZAndTaaMask);
 
 
-        // // Patch guides for RR
-        // [branch]
-        // if( gRR )
-        //     gOut_Normal_Roughness[ pixelPos ] = NRD_FrontEnd_PackNormalAndRoughness( geometryPropsT.N, 0.0, 0 );
+        // Patch guides for RR
+        [branch]
+        if( gRR )
+            gOut_Normal_Roughness[ pixelPos ] = NRD_FrontEnd_PackNormalAndRoughness( geometryPropsT.N, 0.0, 0 );
 
         TraceTransparentDesc desc;
         desc.geometryProps = geometryPropsT;

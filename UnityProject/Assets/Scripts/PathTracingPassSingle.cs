@@ -89,8 +89,11 @@ namespace PathTracing
             internal ComputeShader TaaCs;
             internal ComputeShader DlssBeforeCs;
             internal Material BlitMaterial;
-            internal uint Width;
-            internal uint Height;
+            internal uint outputGridW;
+            internal uint outputGridH;
+            internal uint rectGridW;
+            internal uint rectGridH;
+            internal int2 m_RenderResolution;
 
             internal GlobalConstants GlobalConstants;
             internal GraphicsBuffer ConstantBuffer;
@@ -115,8 +118,10 @@ namespace PathTracing
 
         static void ExecutePass(PassData data, UnsafeGraphContext context)
         {
-            int threadGroupX = Mathf.CeilToInt(data.Width / 16.0f);
-            int threadGroupY = Mathf.CeilToInt(data.Height / 16.0f);
+            // int threadGroupX = Mathf.CeilToInt(data.Width / 16.0f);
+            // int threadGroupY = Mathf.CeilToInt(data.Height / 16.0f);
+
+
             var natCmd = CommandBufferHelpers.GetNativeCommandBuffer(context.cmd);
 
             natCmd.SetBufferData(data.ConstantBuffer, new[] { data.GlobalConstants });
@@ -131,7 +136,12 @@ namespace PathTracing
 
             natCmd.SetRayTracingTextureParam(data.SharcUpdateTs, g_OutputID, data.OutputTexture);
 
-            natCmd.DispatchRays(data.SharcUpdateTs, "MainRayGenShader", data.Width / 4, data.Height / 4, 1);
+            int SHARC_DOWNSCALE = 4;
+
+            uint w = (uint)(data.m_RenderResolution.x / SHARC_DOWNSCALE + 15) / 16;
+            uint h = (uint)(data.m_RenderResolution.y / SHARC_DOWNSCALE + 15) / 16;
+
+            natCmd.DispatchRays(data.SharcUpdateTs, "MainRayGenShader", w, h, 1);
 
             // Sharc resolve
             natCmd.SetComputeConstantBufferParam(data.SharcResolveCs, paramsID, data.ConstantBuffer, 0, data.ConstantBuffer.stride);
@@ -174,7 +184,14 @@ namespace PathTracing
             natCmd.SetRayTracingTextureParam(data.OpaqueTs, gIn_PrevComposedDiffID, data.ComposedDiff);
             natCmd.SetRayTracingTextureParam(data.OpaqueTs, gIn_PrevComposedSpec_PrevViewZID, data.ComposedSpecViewZ);
 
-            natCmd.DispatchRays(data.OpaqueTs, "MainRayGenShader", data.Width, data.Height, 1);
+            
+            uint rectWmod = (uint)(data.m_RenderResolution.x * data.Setting.resolutionScale + 0.5f);
+            uint rectHmod = (uint)(data.m_RenderResolution.y * data.Setting.resolutionScale + 0.5f);
+            uint rectGridWmod = (rectWmod + 15) / 16;
+            uint rectGridHmod = (rectHmod + 15) / 16;
+            
+            
+            natCmd.DispatchRays(data.OpaqueTs, "MainRayGenShader", rectGridWmod, rectGridHmod, 1);
 
             // NRD降噪
             if (!data.Setting.RR)
@@ -204,7 +221,7 @@ namespace PathTracing
             natCmd.SetComputeTextureParam(data.CompositionCs, 0, gOut_ComposedDiffID, data.ComposedDiff);
             natCmd.SetComputeTextureParam(data.CompositionCs, 0, gOut_ComposedSpec_ViewZID, data.ComposedSpecViewZ);
 
-            natCmd.DispatchCompute(data.CompositionCs, 0, threadGroupX, threadGroupY, 1);
+            natCmd.DispatchCompute(data.CompositionCs, 0, (int)data.rectGridW, (int)data.rectGridH, 1);
 
             // 透明
             natCmd.SetRayTracingShaderPass(data.TransparentTs, "Test2");
@@ -217,10 +234,11 @@ namespace PathTracing
 
             natCmd.SetRayTracingTextureParam(data.TransparentTs, gIn_ComposedDiffID, data.ComposedDiff);
             natCmd.SetRayTracingTextureParam(data.TransparentTs, gIn_ComposedSpec_ViewZID, data.ComposedSpecViewZ);
+            natCmd.SetRayTracingTextureParam(data.TransparentTs, g_Normal_RoughnessID, data.NormalRoughness);
             natCmd.SetRayTracingTextureParam(data.TransparentTs, gOut_ComposedID, data.Composed);
             natCmd.SetRayTracingTextureParam(data.TransparentTs, GInOutMv, data.Mv);
 
-            natCmd.DispatchRays(data.TransparentTs, "MainRayGenShader", data.Width, data.Height, 1);
+            natCmd.DispatchRays(data.TransparentTs, "MainRayGenShader", data.rectGridW, data.rectGridH, 1);
 
 
             var isEven = (data.GlobalConstants.gFrameIndex & 1) == 0;
@@ -242,7 +260,7 @@ namespace PathTracing
                 natCmd.SetComputeTextureParam(data.DlssBeforeCs, 0, "gOut_Normal_Roughness", data.RRGuide_Normal_Roughness);
 
 
-                natCmd.DispatchCompute(data.DlssBeforeCs, 0, threadGroupX, threadGroupY, 1);
+                natCmd.DispatchCompute(data.DlssBeforeCs, 0, ( int)data.rectGridW, (int)data.rectGridH, 1);
 
 
                 // DLSS调用
@@ -260,7 +278,7 @@ namespace PathTracing
                 natCmd.SetComputeTextureParam(data.TaaCs, 0, gIn_HistoryID, taaSrc);
                 natCmd.SetComputeTextureParam(data.TaaCs, 0, gOut_ResultID, taaDst);
                 natCmd.SetComputeTextureParam(data.TaaCs, 0, gOut_DebugID, data.OutputTexture);
-                natCmd.DispatchCompute(data.TaaCs, 0, threadGroupX, threadGroupY, 1);
+                natCmd.DispatchCompute(data.TaaCs, 0, ( int)data.rectGridW, (int)data.rectGridH, 1);
             }
 
 
@@ -384,7 +402,9 @@ namespace PathTracing
 
             var resourceData = frameData.Get<UniversalResourceData>();
 
-            NrdDenoiser.EnsureResources(cameraData.camera.pixelWidth, cameraData.camera.pixelHeight);
+            int2 outputResolution = new int2(cameraData.camera.pixelWidth, cameraData.camera.pixelHeight);
+
+            NrdDenoiser.EnsureResources(outputResolution);
 
             Shader.SetGlobalRayTracingAccelerationStructure(g_AccelStructID, AccelerationStructure);
 
@@ -410,10 +430,22 @@ namespace PathTracing
 
             var cam = cameraData.camera;
             var m11 = cam.projectionMatrix.m11;
-            var rectH = cam.pixelHeight;
-            var rectW = cam.pixelWidth;
+
+            var renderResolution = NrdDenoiser.renderResolution;
+
+            var rectH = (uint)(renderResolution.x * m_Settings.resolutionScale + 0.5f);
+            var rectW = (uint)(renderResolution.y * m_Settings.resolutionScale + 0.5f);
+
+            // todo prev
+            var rectWprev = (uint)(renderResolution.x * m_Settings.resolutionScale + 0.5f);
+            var rectHprev = (uint)(renderResolution.y * m_Settings.resolutionScale + 0.5f);
+
+
+            var renderSize = new float2((renderResolution.x), (renderResolution.y));
+            var outputSize = new float2((outputResolution.x), (outputResolution.y));
             var rectSize = new float2(rectW, rectH);
-            var invRectSize = new float2(1.0f / rectW, 1.0f / rectH);
+            var rectSizePrev = new float2((rectWprev), (rectHprev));
+            var jitter = (m_Settings.cameraJitter ? NrdDenoiser.ViewportJitter : 0f) / rectSize;
 
             passData.NrdDataPtr = NrdDenoiser.GetInteropDataPtr(cam, gSunDirection);
             passData.RRDataPtr = DLRRDenoiser.GetInteropDataPtr(cam, NrdDenoiser);
@@ -484,14 +516,14 @@ namespace PathTracing
                 gHairBaseColor = new float4(0.1f, 0.1f, 0.1f, 1.0f),
 
                 gHairBetas = new float2(0.25f, 0.3f),
-                gOutputSize = rectSize,
-                gRenderSize = rectSize,
+                gOutputSize = outputSize,
+                gRenderSize = renderSize,
                 gRectSize = rectSize,
-                gInvOutputSize = invRectSize,
-                gInvRenderSize = invRectSize,
-                gInvRectSize = invRectSize,
-                gRectSizePrev = rectSize,
-                gJitter = (m_Settings.cameraJitter ? NrdDenoiser.ViewportJitter : 0f) / rectSize,
+                gInvOutputSize = new float2(1.0f, 1.0f) / outputSize,
+                gInvRenderSize = new float2(1.0f, 1.0f) / renderSize,
+                gInvRectSize = new float2(1.0f, 1.0f) / rectSize,
+                gRectSizePrev = rectSizePrev,
+                gJitter = jitter,
 
                 gEmissionIntensity = emissionIntensity,
                 gNearZ = -cam.nearClipPlane,
@@ -500,7 +532,7 @@ namespace PathTracing
                 gMetalnessOverride = 0,
                 gUnitToMetersMultiplier = 1.0f,
                 gTanSunAngularRadius = math.tan(math.radians(m_Settings.sunAngularDiameter * 0.5f)),
-                gTanPixelAngularRadius = math.tan(0.5f * math.radians(horizontalFieldOfView) / cam.pixelWidth),
+                gTanPixelAngularRadius = math.tan(0.5f * math.radians(horizontalFieldOfView) / rectSize.x),
                 gDebug = 0,
                 gPrevFrameConfidence = (m_Settings.usePrevFrame && !m_Settings.RR) ? prevFrameMaxAccumulatedFrameNum / (1.0f + prevFrameMaxAccumulatedFrameNum) : 0.0f,
                 gUnproject = 1.0f / (0.5f * rectH * m11),
@@ -543,12 +575,20 @@ namespace PathTracing
             textureDesc.depthBufferBits = 0;
             textureDesc.clearBuffer = false;
             textureDesc.discardBuffer = false;
+            textureDesc.width = renderResolution.x;
+            textureDesc.height = renderResolution.y;
+
             CreateTextureHandle(renderGraph, passData, textureDesc, builder);
 
             passData.GlobalConstants = globalConstants;
             passData.CameraTexture = resourceData.activeColorTexture;
-            passData.Width = (uint)textureDesc.width;
-            passData.Height = (uint)textureDesc.height;
+            passData.outputGridW = (uint)((renderResolution.x + 15) / 16);
+            passData.outputGridH = (uint)((renderResolution.y + 15) / 16);
+            passData.rectGridW = (uint)((rectW + 15) / 16);
+            passData.rectGridH = (uint)((rectH + 15) / 16);
+            passData.m_RenderResolution = renderResolution;
+
+
             passData.ConstantBuffer = _pathTracingSettingsBuffer;
             passData.Setting = m_Settings;
             passData.ScramblingRanking = ScramblingRanking;

@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Runtime.InteropServices;
 using Nrd;
+using Unity.Mathematics;
 using UnityEngine;
 using UnityEngine.Experimental.Rendering;
 using UnityEngine.Rendering;
@@ -10,24 +11,25 @@ namespace NRD
 {
     public class NrdTextureResource
     {
-        
-        [DllImport("RenderingPlugin")] private static extern IntPtr WrapD3D12Texture(IntPtr resource, DXGI_FORMAT format);
-        
-        [DllImport("RenderingPlugin")] private static extern void ReleaseTexture(IntPtr nriTex);
-        
-        public RTHandle Handle;  // Unity RTHandle封装
+        [DllImport("RenderingPlugin")]
+        private static extern IntPtr WrapD3D12Texture(IntPtr resource, DXGI_FORMAT format);
+
+        [DllImport("RenderingPlugin")]
+        private static extern void ReleaseTexture(IntPtr nriTex);
+
+        public RTHandle Handle; // Unity RTHandle封装
         public IntPtr NativePtr; // DX12底层指针
-        public IntPtr NriPtr;    // NRD封装指针
-        
-        
+        public IntPtr NriPtr; // NRD封装指针
+
+
         public string Name;
         public NriResourceState ResourceState;
         public ResourceType ResourceType;
         public GraphicsFormat GraphicsFormat;
         public bool IsCreated => Handle != null;
-        
-        
-        public NrdTextureResource(ResourceType resourceType, GraphicsFormat graphicsFormat,NriResourceState initialState)
+
+
+        public NrdTextureResource(ResourceType resourceType, GraphicsFormat graphicsFormat, NriResourceState initialState)
         {
             Name = resourceType.ToString();
             ResourceType = resourceType;
@@ -35,15 +37,16 @@ namespace NRD
             GraphicsFormat = graphicsFormat;
         }
 
-        public void Allocate( int w, int h)
+        public void Allocate(int2 resolution)
         {
             var dxgiFormat = NRDUtil.GetDXGIFormat(GraphicsFormat);
             Release(); // 确保先释放旧的
-            
-            // Debug.Log($"Allocating NRD Texture Resource: {Name}, Size: {w}x{h}, Format: {GraphicsFormat}");
 
+            Debug.Log($"Allocating NRD Texture Resource: {Name}, Size: {resolution}, Format: {GraphicsFormat}");
+
+            
             // 创建 RT 描述
-            var desc = new RenderTextureDescriptor(w, h, GraphicsFormat, 0)
+            var desc = new RenderTextureDescriptor(resolution.x, resolution.y, GraphicsFormat, 0)
             {
                 enableRandomWrite = true,
                 useMipMap = false,
@@ -72,7 +75,7 @@ namespace NRD
                 ReleaseTexture(NriPtr);
                 NriPtr = IntPtr.Zero;
             }
-                
+
             NativePtr = IntPtr.Zero;
 
             if (Handle != null)
