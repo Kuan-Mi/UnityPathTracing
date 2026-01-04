@@ -679,8 +679,7 @@ void MainRayGenShader()
     gOut_Normal_Roughness[pixelPos] = NRD_FrontEnd_PackNormalAndRoughness(N, materialProps0.roughness, materialID);
 
     // Base color and metalness
-    // gOut_BaseColor_Metalness[launchIndex] = float4(Color::ToSrgb(materialProps0.baseColor), materialProps0.metalness);
-    gOut_BaseColor_Metalness[pixelPos] = float4((materialProps0.baseColor), materialProps0.metalness);
+    gOut_BaseColor_Metalness[pixelPos] = float4(Color::ToSrgb(materialProps0.baseColor), materialProps0.metalness);
 
     // Direct lighting
     float3 Xshadow;

@@ -26,15 +26,18 @@ namespace NRD
         public NriResourceState ResourceState;
         public ResourceType ResourceType;
         public GraphicsFormat GraphicsFormat;
+        public bool SRGB;
+        
         public bool IsCreated => Handle != null;
 
 
-        public NrdTextureResource(ResourceType resourceType, GraphicsFormat graphicsFormat, NriResourceState initialState)
+        public NrdTextureResource(ResourceType resourceType, GraphicsFormat graphicsFormat, NriResourceState initialState, bool srgb = false)
         {
             Name = resourceType.ToString();
             ResourceType = resourceType;
             ResourceState = initialState;
             GraphicsFormat = graphicsFormat;
+            SRGB = srgb;
         }
 
         public void Allocate(int2 resolution)
@@ -51,7 +54,7 @@ namespace NRD
                 enableRandomWrite = true,
                 useMipMap = false,
                 msaaSamples = 1,
-                sRGB = false
+                sRGB = SRGB
             };
 
             // 创建 RT

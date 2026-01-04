@@ -108,7 +108,7 @@
                 #endif
 
                 i.uv = i.uv * _BlitScaleBias.xy + _BlitScaleBias.zw;
-                
+
                 float OUT_SHADOW_TRANSLUCENCY = SAMPLE_TEXTURE2D(_BlitTexture, sampler_BlitTexture, i.uv).r;
                 float shadow = SIGMA_BackEnd_UnpackShadow(OUT_SHADOW_TRANSLUCENCY);
                 float4 color = float4(shadow, shadow, shadow, 1);
@@ -283,7 +283,7 @@
 
             TEXTURE2D(_BlitTexture);
             SAMPLER(sampler_BlitTexture);
-             
+
             float4 _BlitScaleBias;
 
             struct Attributes
@@ -348,7 +348,7 @@
             // Blitter 会自动绑定
             TEXTURE2D(_BlitTexture);
             SAMPLER(sampler_BlitTexture);
-            float4 _BlitScaleBias;  
+            float4 _BlitScaleBias;
 
             struct Attributes
             {
@@ -367,7 +367,7 @@
                 o.positionCS = GetFullScreenTriangleVertexPosition(input.vertexID);
                 o.uv = GetFullScreenTriangleTexCoord(input.vertexID);
                 // scale and offset
-                
+
                 return o;
             }
 
@@ -397,7 +397,7 @@
                 float3 rgb = SAMPLE_TEXTURE2D(_BlitTexture, sampler_BlitTexture, i.uv).rgb;
 
                 float3 linearRgb = LinearToSRGB(rgb);
- 
+
 
                 return float4(rgb, 1);
             }
@@ -523,8 +523,8 @@
         // 7
         Pass
         {
-            Name "ShowRadiance" 
-            Blend SrcAlpha OneMinusSrcAlpha 
+            Name "ShowRadiance"
+            Blend SrcAlpha OneMinusSrcAlpha
             ZTest Always
             ZWrite Off
             Cull Off
@@ -536,7 +536,7 @@
 
             #include "NRDInclude/NRD.hlsli"
             #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
- 
+
             TEXTURE2D(_BlitTexture);
             SAMPLER(sampler_BlitTexture);
             float4 _BlitScaleBias;
@@ -581,8 +581,8 @@
         // 8
         Pass
         {
-            Name "ShowNoiseShadow" 
-//            Blend SrcAlpha OneMinusSrcAlpha 
+            Name "ShowNoiseShadow"
+            //            Blend SrcAlpha OneMinusSrcAlpha 
             ZTest Always
             ZWrite Off
             Cull Off
@@ -594,7 +594,7 @@
 
             #include "Include/Shared.hlsl"
             #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
- 
+
             TEXTURE2D(_BlitTexture);
             SAMPLER(sampler_BlitTexture);
             float4 _BlitScaleBias;
@@ -627,14 +627,93 @@
                 i.uv = i.uv * _BlitScaleBias.xy + _BlitScaleBias.zw;
 
                 float4 OUT_SHADOW_TRANSLUCENCY = SAMPLE_TEXTURE2D(_BlitTexture, sampler_BlitTexture, i.uv);
-                
-            float shadowHitDist = SIGMA_FrontEnd_UnpackPenumbra(OUT_SHADOW_TRANSLUCENCY.x, gTanSunAngularRadius);
-            float missing = shadowHitDist >= NRD_FP16_MAX? 1.0 : 0.0;
-                
-                 
+
+                float shadowHitDist = SIGMA_FrontEnd_UnpackPenumbra(OUT_SHADOW_TRANSLUCENCY.x, gTanSunAngularRadius);
+                float missing = shadowHitDist >= NRD_FP16_MAX ? 1.0 : 0.0;
+
+
                 float4 color = float4(missing, missing, missing, 1);
 
                 return color;
+            }
+            ENDHLSL
+        }
+
+
+        // 9
+        Pass
+        {
+            Name "ShowDlss"
+            ZWrite Off
+            ZTest Always
+            Cull Off
+            Blend SrcAlpha OneMinusSrcAlpha
+
+            HLSLPROGRAM
+            #pragma vertex Vert
+            #pragma fragment Frag
+            #pragma target 4.5
+
+
+            #include "Include/Shared.hlsl"
+            #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
+
+            // Blitter 会自动绑定
+            TEXTURE2D(_BlitTexture);
+            SAMPLER(sampler_BlitTexture);
+            float4 _BlitScaleBias;
+
+            struct Attributes
+            {
+                uint vertexID : SV_VertexID;
+            };
+
+            struct Varyings
+            {
+                float4 positionCS : SV_POSITION;
+                float2 uv : TEXCOORD0;
+            };
+
+            Varyings Vert(Attributes input)
+            {
+                Varyings o;
+                o.positionCS = GetFullScreenTriangleVertexPosition(input.vertexID);
+                o.uv = GetFullScreenTriangleTexCoord(input.vertexID);
+                // scale and offset
+
+                return o;
+            }
+
+            float3 SRGBToLinear(float3 srgb)
+            {
+                float3 linear1;
+                linear1.r = (srgb.r <= 0.04045) ? (srgb.r / 12.92) : pow((srgb.r + 0.055) / 1.055, 2.4);
+                linear1.g = (srgb.g <= 0.04045) ? (srgb.g / 12.92) : pow((srgb.g + 0.055) / 1.055, 2.4);
+                linear1.b = (srgb.b <= 0.04045) ? (srgb.b / 12.92) : pow((srgb.b + 0.055) / 1.055, 2.4);
+                return linear1;
+            }
+
+            float LinearToSRGB(float linear1)
+            {
+                return (linear1 <= 0.0031308) ? (linear1 * 12.92) : (1.055 * pow(linear1, 1.0 / 2.4) - 0.055);
+            }
+
+            float4 Frag(Varyings i) : SV_Target
+            {
+                // 翻转Y
+                #ifdef UNITY_UV_STARTS_AT_TOP
+                i.uv.y = 1.0 - i.uv.y;
+                #endif
+
+                i.uv = i.uv * _BlitScaleBias.xy + _BlitScaleBias.zw;
+
+                float3 color = SAMPLE_TEXTURE2D(_BlitTexture, sampler_BlitTexture, i.uv).rgb;
+
+
+                color = Color::HdrToLinear_Uncharted(color);
+
+
+                return float4(color, 1);
             }
             ENDHLSL
         }

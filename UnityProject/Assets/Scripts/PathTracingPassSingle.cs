@@ -350,7 +350,7 @@ namespace PathTracing
 
                     if (data.Setting.RR)
                     {
-                        Blitter.BlitTexture(natCmd, data.DlssOutput, new Vector4(1, 1, 0, 0), data.BlitMaterial, (int)ShowPass.showOut);
+                        Blitter.BlitTexture(natCmd, data.DlssOutput, new Vector4(1, 1, 0, 0), data.BlitMaterial, (int)ShowPass.showDlss);
                     }
                     else
                     {

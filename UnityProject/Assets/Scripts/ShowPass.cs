@@ -19,5 +19,6 @@
         ShowRoughness,
         ShowRadiance,
         ShowNoiseShadow,
+        showDlss,
     }
 }
