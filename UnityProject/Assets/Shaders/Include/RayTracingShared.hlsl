@@ -97,7 +97,7 @@ void MainMissShader(inout MainRayPayload payload : SV_RayPayload)
     payload.hitT = INF;
     float3 ray = WorldRayDirection();
     // payload.X = WorldRayOrigin() + ray * payload.hitT;
-    payload.Xprev = WorldRayOrigin() + ray * payload.hitT;
+    // payload.Xprev = WorldRayOrigin() + ray * payload.hitT;
 
     payload.Lemi = Packing::EncodeRgbe(GetSkyIntensity(ray));
 }
@@ -180,7 +180,7 @@ void CastRay(float3 origin, float3 direction, float Tmin, float Tmax, float2 mip
     props = (GeometryProps)0;
     props.hitT = payload.hitT;
     props.instanceIndex = payload.GetInstanceIndex();
-    props.N = payload.N;
+    props.N = Packing::DecodeUnitVector( payload.N);
     props.curvature = payload.curvature;
 
 
@@ -189,18 +189,21 @@ void CastRay(float3 origin, float3 direction, float Tmin, float Tmax, float2 mip
     props.T = payload.T;
     props.X = origin + direction * payload.hitT;
 
-    props.Xprev = payload.Xprev;
+    // props.Xprev = payload.X;
+    props.Xprev =props.X;
     props.V = -direction;
     props.textureOffsetAndFlags = payload.instanceIndexAndFlags;
 
     matProps = (MaterialProps)0;
     matProps.baseColor = Packing::UintToRgba(payload.baseColor, 8, 8, 8, 8);
-    matProps.roughness = payload.roughness;
-    matProps.metalness = payload.metalness;
+    
+    float2 rAm = Packing::UintToRg16f(payload.roughnessAndMetalness);
+    matProps.roughness = rAm.r;
+    matProps.metalness = rAm.g;
     matProps.Lemi = Packing::DecodeRgbe( payload.Lemi);
     // 这三个应该从贴图再计算一次
     matProps.curvature = payload.curvature;
-    matProps.N = payload.matN;
+    matProps.N = Packing::DecodeUnitVector( payload.matN);
     matProps.T = payload.T.xyz;
 }
 

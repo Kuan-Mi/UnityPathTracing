@@ -365,8 +365,8 @@ Shader "Custom/LitWithRayTracingNormal"
 
                 float3x3 mPrevObjectToWorld = (float3x3)prev;
                 // 法线
-                payload.N = normalWS;
-                payload.matN = worldNormal;
+                payload.N = Packing::EncodeUnitVector(normalWS);
+                payload.matN = Packing::EncodeUnitVector( worldNormal);
 
                 float3 worldPosition = mul(ObjectToWorld3x4(), float4(v.position, 1.0)).xyz;
 
@@ -374,11 +374,13 @@ Shader "Custom/LitWithRayTracingNormal"
 
                 // 位置
                 // payload.X = worldPosition;
-                payload.Xprev = prevWorldPosition;
-                payload.roughness = roughness;
+                // payload.Xprev = prevWorldPosition;
+                // payload.roughness = roughness; 
+                
+                payload.roughnessAndMetalness = Packing::Rg16fToUint(float2(roughness, metallic));
                 payload.baseColor = Packing::RgbaToUint(float4(albedo, 1.0), 8,8,8,8);
-                payload.metalness = metallic;
-
+                // payload.metalness = metallic;
+                
                 uint flag = FLAG_NON_TRANSPARENT;
                 #if  _SURFACE_TYPE_TRANSPARENT
                 flag = FLAG_TRANSPARENT;
