@@ -337,9 +337,10 @@ Shader "Custom/LitWithRayTracing"
 
                 #if _EMISSION
                 float3 emission = _EmissionColor.xyz * _EmissionMap.SampleLevel(sampler_EmissionMap, v.uv, mip).xyz;
-                payload.Lemi = emission;
+                payload.Lemi =  Packing::EncodeRgbe( emission);
                 #else
-                payload.Lemi = float3(0, 0, 0);
+                payload.Lemi = Packing::EncodeRgbe( float3(0, 0, 0));
+                    
                 #endif
 
                 float emissionLevel = Color::Luminance(payload.Lemi);
@@ -355,7 +356,8 @@ Shader "Custom/LitWithRayTracing"
 
                 // Instance
                 uint instanceIndex = InstanceIndex();
-                payload.instanceIndex = instanceIndex;
+                // payload.instanceIndex = instanceIndex;
+                payload.SetInstanceIndex(instanceIndex);
 
                 float3x3 mObjectToWorld = (float3x3)ObjectToWorld();
 
@@ -373,12 +375,11 @@ Shader "Custom/LitWithRayTracing"
                 float3 prevWorldPosition = mul(GetPrevObjectToWorldMatrix(), float4(v.position, 1.0)).xyz;
 
                 // 位置
-                payload.X = worldPosition;
+                // payload.X = worldPosition;
                 payload.Xprev = prevWorldPosition;
                 payload.roughness = roughness;
-                payload.baseColor = albedo;
+                payload.baseColor = Packing::RgbaToUint(float4(albedo, 1.0), 8,8,8,8);
                 payload.metalness = metallic;
-
                 uint flag = FLAG_NON_TRANSPARENT;
                 #if  _SURFACE_TYPE_TRANSPARENT
                 flag = FLAG_TRANSPARENT;

@@ -96,10 +96,10 @@ void MainMissShader(inout MainRayPayload payload : SV_RayPayload)
 {
     payload.hitT = INF;
     float3 ray = WorldRayDirection();
-    payload.X = WorldRayOrigin() + ray * payload.hitT;
-    payload.Xprev = payload.X;
+    // payload.X = WorldRayOrigin() + ray * payload.hitT;
+    payload.Xprev = WorldRayOrigin() + ray * payload.hitT;
 
-    payload.Lemi = GetSkyIntensity(ray);
+    payload.Lemi = Packing::EncodeRgbe(GetSkyIntensity(ray));
 }
 
 uint ToRayFlag(uint flag)
@@ -139,7 +139,7 @@ float CastVisibilityRay_AnyHit(float3 origin, float3 direction, float Tmin, floa
 
     do
     {
-        payload.textureOffsetAndFlags = 0;
+        payload.instanceIndexAndFlags = 0;
         TraceRay(accelerationStructure, flag, 0xFF, 0, 1, 0, rayDesc, payload);
         rayDesc.TMin = payload.hitT + 0.0001;
     }
@@ -178,9 +178,8 @@ void CastRay(float3 origin, float3 direction, float Tmin, float Tmax, float2 mip
     while (!payload.IsMiss() && !payload.Has(mask) && --maxBounce > 0);
 
     props = (GeometryProps)0;
-    props.mip = mipAndCone.x;
     props.hitT = payload.hitT;
-    props.instanceIndex = payload.instanceIndex;
+    props.instanceIndex = payload.GetInstanceIndex();
     props.N = payload.N;
     props.curvature = payload.curvature;
 
@@ -188,17 +187,17 @@ void CastRay(float3 origin, float3 direction, float Tmin, float Tmax, float2 mip
     props.mip = payload.mipAndCone.x;
 
     props.T = payload.T;
-    props.X = payload.X;
+    props.X = origin + direction * payload.hitT;
 
     props.Xprev = payload.Xprev;
     props.V = -direction;
-    props.textureOffsetAndFlags = payload.textureOffsetAndFlags;
+    props.textureOffsetAndFlags = payload.instanceIndexAndFlags;
 
     matProps = (MaterialProps)0;
-    matProps.baseColor = payload.baseColor;
+    matProps.baseColor = Packing::UintToRgba(payload.baseColor, 8, 8, 8, 8);
     matProps.roughness = payload.roughness;
     matProps.metalness = payload.metalness;
-    matProps.Lemi = payload.Lemi;
+    matProps.Lemi = Packing::DecodeRgbe( payload.Lemi);
     // 这三个应该从贴图再计算一次
     matProps.curvature = payload.curvature;
     matProps.N = payload.matN;
