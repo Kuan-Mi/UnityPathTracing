@@ -88,9 +88,9 @@ MonoBehaviour:
     showValidation: 0
     dofAperture: 0
     dofFocalDistance: 1
-    exposure: 2.7
-    rpp: 2
-    bounceNum: 1
+    exposure: 4.1
+    rpp: 1
+    bounceNum: 2
     mipBias: -0.5
     tracingMode: 0
     denoiser: 0
@@ -109,6 +109,6 @@ MonoBehaviour:
     SR: 0
     RR: 1
     resolutionScale: 1
-    upscalerMode: 0
+    upscalerMode: 3
   gIn_ScramblingRanking: {fileID: 2800000, guid: ba45d1e4dcf9022438a4798a5f9e7b80, type: 3}
   gIn_Sobol: {fileID: 2800000, guid: 17e7ce8147355314ea8aab1178a6a43c, type: 3}

@@ -102,12 +102,6 @@ void MainMissShader(inout MainRayPayload payload : SV_RayPayload)
     payload.Lemi = GetSkyIntensity(ray);
 }
 
-[shader("miss")]
-void MissShadow(inout MainRayPayload payload : SV_RayPayload)
-{
-    payload.hitT = INF;
-}
-
 uint ToRayFlag(uint flag)
 {
     if (flag == FLAG_TRANSPARENT)
@@ -126,7 +120,35 @@ uint ToRayFlag2(uint flag)
         return RAY_FLAG_NONE;
 }
 
-void CastRay(float3 origin, float3 direction, float Tmin, float Tmax, float2 mipAndCone, uint flag, out GeometryProps props, out MaterialProps matProps)
+
+float CastVisibilityRay_AnyHit(float3 origin, float3 direction, float Tmin, float Tmax, float2 mipAndCone, RaytracingAccelerationStructure accelerationStructure, uint mask, uint rayFlags)
+{
+    RayDesc rayDesc;
+    rayDesc.Origin = origin;
+    rayDesc.Direction = direction;
+    rayDesc.TMin = Tmin;
+    rayDesc.TMax = Tmax;
+
+    MainRayPayload payload = (MainRayPayload)0;
+    payload.mipAndCone = mipAndCone;
+
+    uint maxBounce = 3;
+
+    uint flag = ToRayFlag2(mask);
+    flag = flag | RAY_FLAG_SKIP_CLOSEST_HIT_SHADER;
+
+    do
+    {
+        payload.textureOffsetAndFlags = 0;
+        TraceRay(accelerationStructure, flag, 0xFF, 0, 1, 0, rayDesc, payload);
+        rayDesc.TMin = payload.hitT + 0.0001;
+    }
+    while (!payload.IsMiss() && !payload.Has(mask) && --maxBounce > 0);
+
+    return payload.hitT;
+}
+
+void CastRay(float3 origin, float3 direction, float Tmin, float Tmax, float2 mipAndCone, uint mask, out GeometryProps props, out MaterialProps matProps)
 {
     RayDesc rayDesc;
     rayDesc.Origin = origin;
@@ -141,10 +163,19 @@ void CastRay(float3 origin, float3 direction, float Tmin, float Tmax, float2 mip
 
     do
     {
-        TraceRay(gWorldTlas, ToRayFlag2(flag), 0xFF, 0, 1, 0, rayDesc, payload);
+        // void TraceRay(RaytracingAccelerationStructure AccelerationStructure,
+        //               uint RayFlags,
+        //               uint InstanceInclusionMask,
+        //               uint RayContributionToHitGroupIndex,
+        //               uint MultiplierForGeometryContributionToHitGroupIndex,
+        //               uint MissShaderIndex,
+        //               RayDesc Ray,
+        //               inout payload_t Payload);
+
+        TraceRay(gWorldTlas, ToRayFlag2(mask), 0xFF, 0, 1, 0, rayDesc, payload);
         rayDesc.TMin = payload.hitT + 0.0001;
     }
-    while (!payload.IsMiss() && !payload.Has(flag) && --maxBounce > 0);
+    while (!payload.IsMiss() && !payload.Has(mask) && --maxBounce > 0);
 
     props = (GeometryProps)0;
     props.mip = mipAndCone.x;
@@ -245,21 +276,21 @@ float3 GetLighting(GeometryProps geometryProps, MaterialProps materialProps, uin
         rnd *= gTanSunAngularRadius;
 
         float3 sunDirection = normalize(gSunBasisX.xyz * rnd.x + gSunBasisY.xyz * rnd.y + gSunDirection.xyz);
+        float2 mipAndCone = GetConeAngleFromAngularRadius(geometryProps.mip, gTanSunAngularRadius);
 
-        // float2 mipAndCone = GetConeAngleFromAngularRadius(geometryProps.mip, gTanSunAngularRadius);
-        // float hitT = CastVisibilityRay_AnyHit(Xshadow, sunDirection, 0.0, INF, mipAndCone, gWorldTlas, instanceInclusionMask, rayFlags);
-
-        RayDesc rayDesc;
-        rayDesc.Origin = Xshadow;
-        rayDesc.Direction = sunDirection;
-        rayDesc.TMin = 0;
-        rayDesc.TMax = 1000;
-
-        MainRayPayload shadowPayload = (MainRayPayload)0;
-        TraceRay(gWorldTlas, RAY_FLAG_NONE | RAY_FLAG_CULL_NON_OPAQUE, 0xFF, 0, 1, 1, rayDesc, shadowPayload);
-        float hitT = shadowPayload.hitT;
-
+        float hitT = CastVisibilityRay_AnyHit(Xshadow, sunDirection, 0.0, INF, mipAndCone, gWorldTlas, instanceInclusionMask, rayFlags);
         lighting *= float(hitT == INF);
+
+        // RayDesc rayDesc;
+        // rayDesc.Origin = Xshadow;
+        // rayDesc.Direction = sunDirection;
+        // rayDesc.TMin = 0;
+        // rayDesc.TMax = 1000;
+        //
+        // MainRayPayload shadowPayload = (MainRayPayload)0;
+        // TraceRay(gWorldTlas, RAY_FLAG_NONE | RAY_FLAG_CULL_NON_OPAQUE, 0xFF, 0, 1, 0, rayDesc, shadowPayload);
+        // float hitT = shadowPayload.hitT;
+        // lighting *= float(hitT == INF);
     }
 
     return lighting;

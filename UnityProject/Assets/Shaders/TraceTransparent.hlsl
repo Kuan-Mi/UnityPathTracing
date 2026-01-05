@@ -54,10 +54,7 @@ float3 TraceTransparent(TraceTransparentDesc desc)
 
             isReflection = rnd < F; // TODO: if "F" is clamped, "pathThroughput" should be adjusted too
         }
-
-
-        // uint flags = bounce == PT_DELTA_BOUNCES_NUM ? FLAG_NON_TRANSPARENT : GEOMETRY_ALL;
-        // uint flags = bounce == PT_DELTA_BOUNCES_NUM ? FLAG_NON_TRANSPARENT : GEOMETRY_ALL;
+        
         uint flags = bounce == PT_DELTA_BOUNCES_NUM ? FLAG_NON_TRANSPARENT : GEOMETRY_ALL;
 
 

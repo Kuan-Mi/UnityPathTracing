@@ -1,1 +1,4 @@
+#pragma enable_ray_tracing_shader_debug_symbols
+#pragma use_dxc
+
 #include "TraceOpaque.hlsl"

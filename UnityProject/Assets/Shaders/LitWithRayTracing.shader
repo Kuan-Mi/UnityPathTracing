@@ -122,9 +122,10 @@ Shader "Custom/LitWithRayTracing"
 
             #pragma multi_compile_local RAY_TRACING_PROCEDURAL_GEOMETRY
 
-            #pragma max_recursion_depth 2
-
             #pragma raytracing test
+            #pragma enable_d3d11_debug_symbols
+            #pragma use_dxc
+            #pragma enable_ray_tracing_shader_debug_symbols
 
             struct AttributeData
             {
@@ -173,10 +174,10 @@ Shader "Custom/LitWithRayTracing"
             {
                 Vertex v;
                 #define INTERPOLATE_ATTRIBUTE(attr) v.attr = v0.attr * barycentrics.x + v1.attr * barycentrics.y + v2.attr * barycentrics.z
-                INTERPOLATE_ATTRIBUTE(position);
-                INTERPOLATE_ATTRIBUTE(normal);
-                INTERPOLATE_ATTRIBUTE(tangent);
-                INTERPOLATE_ATTRIBUTE(uv);
+                    INTERPOLATE_ATTRIBUTE(position);
+                    INTERPOLATE_ATTRIBUTE(normal);
+                    INTERPOLATE_ATTRIBUTE(tangent);
+                    INTERPOLATE_ATTRIBUTE(uv);
                 return v;
             }
 
@@ -185,8 +186,10 @@ Shader "Custom/LitWithRayTracing"
             [shader("anyhit")]
             void AnyHitMain(inout MainRayPayload payload, AttributeData attribs)
             {
-                #if !_SURFACE_TYPE_TRANSPARENT
-
+                #if _SURFACE_TYPE_TRANSPARENT
+                payload.SetFlag(FLAG_TRANSPARENT);
+                payload.hitT = RayTCurrent();
+                #else
                 // 1. 获取顶点索引
                 uint3 triangleIndices = UnityRayTracingFetchTriangleIndices(PrimitiveIndex());
 
@@ -197,7 +200,7 @@ Shader "Custom/LitWithRayTracing"
 
                 // 3. 计算插值 UV
                 float3 barycentricCoords = float3(1.0 - attribs.barycentrics.x - attribs.barycentrics.y,
-                                                  attribs.barycentrics.x, attribs.barycentrics.y);
+                                                              attribs.barycentrics.x, attribs.barycentrics.y);
                 float2 uv = uv0 * barycentricCoords.x + uv1 * barycentricCoords.y + uv2 * barycentricCoords.z;
 
                 // 4. 采样 Alpha 通道
@@ -211,12 +214,14 @@ Shader "Custom/LitWithRayTracing"
                 {
                     IgnoreHit();
                 }
+                payload.SetFlag(FLAG_NON_TRANSPARENT);
+                payload.hitT = RayTCurrent();
                 #endif
             }
 
             [shader("closesthit")]
             void ClosestHitMain(inout MainRayPayload payload : SV_RayPayload,
-                                        AttributeData attribs : SV_IntersectionAttributes)
+                            AttributeData attribs : SV_IntersectionAttributes)
             {
                 uint3 triangleIndices = UnityRayTracingFetchTriangleIndices(PrimitiveIndex());
                 Vertex v0 = FetchVertex(triangleIndices.x);
@@ -236,7 +241,7 @@ Shader "Custom/LitWithRayTracing"
                 payload.curvature = sqrt(dnSq);
 
                 float3 barycentricCoords = float3(1.0 - attribs.barycentrics.x - attribs.barycentrics.y,
-                                                        attribs.barycentrics.x, attribs.barycentrics.y);
+                                                                attribs.barycentrics.x, attribs.barycentrics.y);
 
                 Vertex v = InterpolateVertices(v0, v1, v2, barycentricCoords);
 
@@ -292,7 +297,7 @@ Shader "Custom/LitWithRayTracing"
                 // float2 normalUV = float2(v.uv.x, 1 - v.uv.y); // 修正UV翻转问题
                 float2 normalUV = (v.uv); // 修正UV翻转问题
 
-                float4 n = _BumpMap.SampleLevel(sampler_BumpMap, _BaseMap_ST.xy * normalUV + _BaseMap_ST.zw,mip);
+                float4 n = _BumpMap.SampleLevel(sampler_BumpMap, _BaseMap_ST.xy * normalUV + _BaseMap_ST.zw, mip);
 
                 // float4 T = float4(tangentWS, 1);
 
