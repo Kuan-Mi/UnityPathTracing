@@ -166,7 +166,7 @@
 #define FLAG_HAIR                           0x10 // hair
 #define FLAG_LEAF                           0x20 // leaf
 #define FLAG_SKIN                           0x40 // skin
-#define FLAG_MORPH                          0x80 // morph
+#define FLAG_IGNORE_WHEN_TRANSPARENT                        0x80 // morph
 
 #define GEOMETRY_ALL                        ( FLAG_NON_TRANSPARENT | FLAG_TRANSPARENT )
 

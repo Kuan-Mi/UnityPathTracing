@@ -356,7 +356,7 @@ namespace PathTracing
                     {
                         Blitter.BlitTexture(natCmd, taaDst, scaleOffset, data.BlitMaterial, (int)ShowPass.showOut);
                     }
-
+ 
                     break;
                 case ShowMode.DLSS_DiffuseAlbedo:
                     Blitter.BlitTexture(natCmd, data.RRGuide_DiffAlbedo, scaleOffset, data.BlitMaterial, (int)ShowPass.showOut);

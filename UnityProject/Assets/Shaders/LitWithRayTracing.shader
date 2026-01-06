@@ -187,8 +187,10 @@ Shader "Custom/LitWithRayTracing"
             void AnyHitMain(inout MainRayPayload payload, AttributeData attribs)
             {
                 #if _SURFACE_TYPE_TRANSPARENT
-                payload.SetFlag(FLAG_TRANSPARENT);
-                payload.hitT = RayTCurrent();
+                if (payload.Has(FLAG_IGNORE_WHEN_TRANSPARENT))
+                {
+                    IgnoreHit();
+                }
                 #else
                 // 1. 获取顶点索引
                 uint3 triangleIndices = UnityRayTracingFetchTriangleIndices(PrimitiveIndex());
@@ -209,13 +211,11 @@ Shader "Custom/LitWithRayTracing"
                 float alpha = baseColor.a * _BaseColor.a;
 
                 // 5. Alpha Test 判定
-                // 如果透明度小于阈值，则调用 IgnoreHit()，光线将穿透该物体继续飞行
+                // 如果透明度小于阈值，则调用 IgnoreHit()，光线将忽略此次相交
                 if (alpha < _Cutoff)
                 {
                     IgnoreHit();
                 }
-                payload.SetFlag(FLAG_NON_TRANSPARENT);
-                payload.hitT = RayTCurrent();
                 #endif
             }
 

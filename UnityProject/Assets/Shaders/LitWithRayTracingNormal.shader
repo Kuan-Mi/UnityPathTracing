@@ -174,10 +174,10 @@ Shader "Custom/LitWithRayTracingNormal"
             {
                 Vertex v;
                 #define INTERPOLATE_ATTRIBUTE(attr) v.attr = v0.attr * barycentrics.x + v1.attr * barycentrics.y + v2.attr * barycentrics.z
-                    INTERPOLATE_ATTRIBUTE(position);
-                    INTERPOLATE_ATTRIBUTE(normal);
-                    INTERPOLATE_ATTRIBUTE(tangent);
-                    INTERPOLATE_ATTRIBUTE(uv);
+                INTERPOLATE_ATTRIBUTE(position);
+                INTERPOLATE_ATTRIBUTE(normal);
+                INTERPOLATE_ATTRIBUTE(tangent);
+                INTERPOLATE_ATTRIBUTE(uv);
                 return v;
             }
 
@@ -186,7 +186,14 @@ Shader "Custom/LitWithRayTracingNormal"
             [shader("anyhit")]
             void AnyHitMain(inout MainRayPayload payload, AttributeData attribs)
             {
-                #if !_SURFACE_TYPE_TRANSPARENT
+                #if _SURFACE_TYPE_TRANSPARENT
+
+                if (payload.Has(FLAG_IGNORE_WHEN_TRANSPARENT))
+                {
+                    IgnoreHit();
+                }
+
+                #else
 
                 // 1. 获取顶点索引
                 uint3 triangleIndices = UnityRayTracingFetchTriangleIndices(PrimitiveIndex());
@@ -198,7 +205,7 @@ Shader "Custom/LitWithRayTracingNormal"
 
                 // 3. 计算插值 UV
                 float3 barycentricCoords = float3(1.0 - attribs.barycentrics.x - attribs.barycentrics.y,
-                                                              attribs.barycentrics.x, attribs.barycentrics.y);
+       attribs.barycentrics.x, attribs.barycentrics.y);
                 float2 uv = uv0 * barycentricCoords.x + uv1 * barycentricCoords.y + uv2 * barycentricCoords.z;
 
                 // 4. 采样 Alpha 通道
@@ -217,7 +224,7 @@ Shader "Custom/LitWithRayTracingNormal"
 
             [shader("closesthit")]
             void ClosestHitMain(inout MainRayPayload payload : SV_RayPayload,
-                            AttributeData attribs : SV_IntersectionAttributes)
+       AttributeData attribs : SV_IntersectionAttributes)
             {
                 uint3 triangleIndices = UnityRayTracingFetchTriangleIndices(PrimitiveIndex());
                 Vertex v0 = FetchVertex(triangleIndices.x);
@@ -237,7 +244,7 @@ Shader "Custom/LitWithRayTracingNormal"
                 payload.curvature = sqrt(dnSq);
 
                 float3 barycentricCoords = float3(1.0 - attribs.barycentrics.x - attribs.barycentrics.y,
-                                                                attribs.barycentrics.x, attribs.barycentrics.y);
+                                         attribs.barycentrics.x, attribs.barycentrics.y);
 
                 Vertex v = InterpolateVertices(v0, v1, v2, barycentricCoords);
 
@@ -294,7 +301,7 @@ Shader "Custom/LitWithRayTracingNormal"
                 float2 normalUV = (v.uv); // 修正UV翻转问题
 
                 float2 packedNormal = _BumpMap.SampleLevel(sampler_BumpMap, _BaseMap_ST.xy * normalUV + _BaseMap_ST.zw,
-                                                             mip).xy;
+                                                 mip).xy;
 
                 float4 T = float4(tangentWS, 1);
 
@@ -335,10 +342,10 @@ Shader "Custom/LitWithRayTracingNormal"
 
                 #if _EMISSION
                 float3 emission = _EmissionColor.xyz * _EmissionMap.SampleLevel(sampler_EmissionMap, v.uv, mip).xyz;
-                payload.Lemi =  Packing::EncodeRgbe( emission);               
+                payload.Lemi = Packing::EncodeRgbe(emission);
                 // payload.Lemi = _EmissionMap.SampleLevel(sampler_EmissionMap, v.uv, mip).xyz;
                 #else
-                payload.Lemi = Packing::EncodeRgbe( float3(0, 0, 0));
+                payload.Lemi = Packing::EncodeRgbe(float3(0, 0, 0));
                 #endif
 
                 float emissionLevel = Color::Luminance(payload.Lemi);
@@ -366,7 +373,7 @@ Shader "Custom/LitWithRayTracingNormal"
                 float3x3 mPrevObjectToWorld = (float3x3)prev;
                 // 法线
                 payload.N = Packing::EncodeUnitVector(normalWS);
-                payload.matN = Packing::EncodeUnitVector( worldNormal);
+                payload.matN = Packing::EncodeUnitVector(worldNormal);
 
                 float3 worldPosition = mul(ObjectToWorld3x4(), float4(v.position, 1.0)).xyz;
 
@@ -376,11 +383,11 @@ Shader "Custom/LitWithRayTracingNormal"
                 // payload.X = worldPosition;
                 // payload.Xprev = prevWorldPosition;
                 // payload.roughness = roughness; 
-                
+
                 payload.roughnessAndMetalness = Packing::Rg16fToUint(float2(roughness, metallic));
-                payload.baseColor = Packing::RgbaToUint(float4(albedo, 1.0), 8,8,8,8);
+                payload.baseColor = Packing::RgbaToUint(float4(albedo, 1.0), 8, 8, 8, 8);
                 // payload.metalness = metallic;
-                
+
                 uint flag = FLAG_NON_TRANSPARENT;
                 #if  _SURFACE_TYPE_TRANSPARENT
                 flag = FLAG_TRANSPARENT;

@@ -128,6 +128,49 @@ namespace PathTracing
             }
         }
 
+
+// #define FLAG_NON_TRANSPARENT                0x01 // geometry flag: non-transparent
+// #define FLAG_TRANSPARENT                    0x02 // geometry flag: transparent
+// #define FLAG_FORCED_EMISSION                0x04 // animated emissive cube
+// #define FLAG_STATIC                         0x08 // no velocity
+// #define FLAG_HAIR                           0x10 // hair
+// #define FLAG_LEAF                           0x20 // leaf
+// #define FLAG_SKIN                           0x40 // skin
+// #define FLAG_MORPH                          0x80 // morph
+
+        void SetMask()
+        {
+            var allRenderers = GameObject.FindObjectsByType<Renderer>(FindObjectsSortMode.None);
+            foreach (var r in allRenderers)
+            {
+                var materials = r.sharedMaterials;
+                bool hasTransparent = false;
+                bool hasOpaque = false;
+                foreach (var mat in materials)
+                {
+                    if (mat != null && mat.renderQueue >= 3000)
+                    {
+                        hasTransparent = true;
+                    }
+                    else
+                    {
+                        hasOpaque = true;
+                    }
+                }
+                
+                uint mask = 0;
+                
+                if (hasOpaque)
+                    mask |= 0x01; // FLAG_NON_TRANSPARENT
+                if (hasTransparent)
+                    mask |= 0x02; // FLAG_TRANSPARENT
+                
+                // Debug.Log($"Renderer {r.name} Mask: {mask}");
+                
+                accelerationStructure.UpdateInstanceMask(r, mask); // 1 表示包含在内
+            }
+        }
+
         public Material finalMaterial;
         public RayTracingShader opaqueTracingShader;
         public RayTracingShader transparentTracingShader;
@@ -172,6 +215,7 @@ namespace PathTracing
                 accelerationStructure = new RayTracingAccelerationStructure(settings);
 
                 accelerationStructure.Build();
+                SetMask();
             }
 
             if (gIn_ScramblingRankingUint == null)
@@ -307,6 +351,12 @@ namespace PathTracing
             }
 
             _dlrrDenoisers.Clear();
+            
+            gIn_ScramblingRankingUint?.Release();
+            gIn_ScramblingRankingUint = null;
+
+            gIn_SobolUint?.Release();
+            gIn_SobolUint = null;
              
             _accumulationBuffer?.Release();
             _accumulationBuffer = null;

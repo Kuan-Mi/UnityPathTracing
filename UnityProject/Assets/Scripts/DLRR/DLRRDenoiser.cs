@@ -4,18 +4,17 @@ using PathTracing;
 using Unity.Collections;
 using Unity.Collections.LowLevel.Unsafe;
 using UnityEngine;
+using UnityEngine.Rendering;
 
 namespace Nrd
 {
-    public class DLRRDenoiser: IDisposable
+    public class DLRRDenoiser : IDisposable
     {
         [DllImport("RenderingPlugin")]
         private static extern int CreateDLRRInstance();
 
         [DllImport("RenderingPlugin")]
         private static extern void DestroyDLRRInstance(int id);
-
-        private NativeArray<NrdResourceInput> m_ResourceCache;
 
         private readonly int instanceId;
         private NativeArray<RRFrameData> buffer;
@@ -34,18 +33,18 @@ namespace Nrd
         }
 
 
-        private unsafe RRFrameData GetData(Camera mCamera,NRDDenoiser denoiser)
+        private unsafe RRFrameData GetData(Camera mCamera, NRDDenoiser denoiser)
         {
             RRFrameData data = new RRFrameData();
 
             data.inputTex = denoiser.GetResource(ResourceType.Composed).NriPtr;
             data.outputTex = denoiser.GetResource(ResourceType.DlssOutput).NriPtr;
-            
+
             data.mvTex = denoiser.GetResource(ResourceType.IN_MV).NriPtr;
             data.depthTex = denoiser.GetResource(ResourceType.IN_VIEWZ).NriPtr;
-            
+
             data.diffuseAlbedoTex = denoiser.GetResource(ResourceType.RRGuide_DiffAlbedo).NriPtr;
-            data.specularAlbedoTex = denoiser .GetResource(ResourceType.RRGuide_SpecAlbedo).NriPtr;
+            data.specularAlbedoTex = denoiser.GetResource(ResourceType.RRGuide_SpecAlbedo).NriPtr;
             data.normalRoughnessTex = denoiser.GetResource(ResourceType.RRGuide_Normal_Roughness).NriPtr;
             data.specularMvOrHitTex = denoiser.GetResource(ResourceType.RRGuide_SpecHitDistance).NriPtr;
 
@@ -53,10 +52,10 @@ namespace Nrd
             data.viewToClipMatrix = denoiser.viewToClip;
             data.outputWidth = (ushort)mCamera.pixelWidth;
             data.outputHeight = (ushort)mCamera.pixelHeight;
-            
+
             ushort rectW = (ushort)(denoiser.renderResolution.x * setting.resolutionScale + 0.5f);
             ushort rectH = (ushort)(denoiser.renderResolution.y * setting.resolutionScale + 0.5f);
-            
+
             data.currentWidth = rectW;
             data.currentHeight = rectH;
 
@@ -64,10 +63,10 @@ namespace Nrd
 
             data.cameraJitter = denoiser.ViewportJitter;
             data.instanceId = instanceId;
-            
+
             return data;
         }
-        
+
         public IntPtr GetInteropDataPtr(Camera mCamera, NRDDenoiser denoiser)
         {
             var index = (int)(FrameIndex % BufferCount);
@@ -79,10 +78,14 @@ namespace Nrd
             }
         }
 
-        
         public void Dispose()
         {
-            m_ResourceCache.Dispose();
+            if (buffer.IsCreated)
+            {
+                buffer.Dispose();
+            }
+
+            DestroyDLRRInstance(instanceId);
         }
     }
 }

@@ -157,9 +157,8 @@ TraceOpaqueResult TraceOpaque(GeometryProps geometryProps0, MaterialProps materi
             specFactor0 = 1.0;
         }
     }
-    
-    
-    
+
+
     // SHARC debug visualization
     #if( USE_SHARC_DEBUG != 0 )
     HashGridParameters hashGridParams;
@@ -169,8 +168,8 @@ TraceOpaqueResult TraceOpaque(GeometryProps geometryProps0, MaterialProps materi
     hashGridParams.levelBias = SHARC_GRID_LEVEL_BIAS;
 
     SharcHitData sharcHitData;
-    sharcHitData.positionWorld = GetGlobalPos( geometryProps0.X );
-    sharcHitData.materialDemodulation = GetMaterialDemodulation( geometryProps0, materialProps0 );
+    sharcHitData.positionWorld = GetGlobalPos(geometryProps0.X);
+    sharcHitData.materialDemodulation = GetMaterialDemodulation(geometryProps0, materialProps0);
     sharcHitData.normalWorld = geometryProps0.N;
     sharcHitData.emissive = materialProps0.Lemi;
 
@@ -187,9 +186,9 @@ TraceOpaqueResult TraceOpaque(GeometryProps geometryProps0, MaterialProps materi
     sharcParams.resolvedBuffer = gInOut_SharcResolved;
 
     #if( USE_SHARC_DEBUG == 2 )
-    result.diffRadiance = HashGridDebugColoredHash( sharcHitData.positionWorld, sharcHitData.normalWorld,hashGridParams );
+    result.diffRadiance = HashGridDebugColoredHash(sharcHitData.positionWorld, sharcHitData.normalWorld, hashGridParams);
     #else
-    bool isValid = SharcGetCachedRadiance( sharcParams, sharcHitData, result.diffRadiance, true );
+    bool isValid = SharcGetCachedRadiance(sharcParams, sharcHitData, result.diffRadiance, true);
 
     // Highlight invalid cells
     // result.diffRadiance = isValid ?  result.diffRadiance : float3( 1.0, 0.0, 0.0 );
@@ -758,23 +757,20 @@ void MainRayGenShader()
 
     if (shadowTranslucency > 0.1)
     {
-        GeometryProps geometryPropsShadow;
-        MaterialProps materialPropsShadow;
-        
-        CastRay(Xoffset, sunDirection, 0.0, INF, mipAndCone, FLAG_NON_TRANSPARENT,geometryPropsShadow, materialPropsShadow);
+        if (gRR)
+        {
+            float hitT = CastVisibilityRay_AnyHit( Xoffset, sunDirection, 0.0, INF, mipAndCone, gWorldTlas,FLAG_NON_TRANSPARENT,0);
+            shadowHitDist = hitT;
+        }
+        else
+        {
+            GeometryProps geometryPropsShadow;
+            MaterialProps materialPropsShadow;
 
-        shadowHitDist = geometryPropsShadow.hitT;
+            CastRay(Xoffset, sunDirection, 0.0, INF, mipAndCone, FLAG_NON_TRANSPARENT, geometryPropsShadow, materialPropsShadow);
 
-        // RayDesc rayDesc;
-        // rayDesc.Origin = Xoffset;
-        // rayDesc.Direction = sunDirection;
-        // rayDesc.TMin = 0;
-        // rayDesc.TMax = 1000;
-        //
-        // MainRayPayload shadowPayload = (MainRayPayload)0;
-        // TraceRay(gWorldTlas, RAY_FLAG_NONE | RAY_FLAG_CULL_NON_OPAQUE, 0xFF, 0, 1, 1, rayDesc, shadowPayload);
-        // shadowHitDist = shadowPayload.hitT;
-
+            shadowHitDist = geometryPropsShadow.hitT;
+        }
     }
 
     // shadowHitDist = 0;

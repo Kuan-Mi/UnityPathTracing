@@ -132,18 +132,10 @@ float CastVisibilityRay_AnyHit(float3 origin, float3 direction, float Tmin, floa
     MainRayPayload payload = (MainRayPayload)0;
     payload.mipAndCone = mipAndCone;
 
-    uint maxBounce = 3;
-
     uint flag = ToRayFlag2(mask);
-    flag = flag | RAY_FLAG_SKIP_CLOSEST_HIT_SHADER;
+    flag = flag | RAY_FLAG_SKIP_CLOSEST_HIT_SHADER | RAY_FLAG_ACCEPT_FIRST_HIT_AND_END_SEARCH;
 
-    do
-    {
-        payload.instanceIndexAndFlags = 0;
-        TraceRay(accelerationStructure, flag, 0xFF, 0, 1, 0, rayDesc, payload);
-        rayDesc.TMin = payload.hitT + 0.0001;
-    }
-    while (!payload.IsMiss() && !payload.Has(mask) && --maxBounce > 0);
+    TraceRay(accelerationStructure, flag, mask, 0, 1, 0, rayDesc, payload);
 
     return payload.hitT;
 }
@@ -159,30 +151,16 @@ void CastRay(float3 origin, float3 direction, float Tmin, float Tmax, float2 mip
     MainRayPayload payload = (MainRayPayload)0;
     payload.mipAndCone = mipAndCone;
 
-    uint maxBounce = 3;
+    if (mask == FLAG_NON_TRANSPARENT)
+        payload.SetFlag(FLAG_IGNORE_WHEN_TRANSPARENT);
 
-    do
-    {
-        // void TraceRay(RaytracingAccelerationStructure AccelerationStructure,
-        //               uint RayFlags,
-        //               uint InstanceInclusionMask,
-        //               uint RayContributionToHitGroupIndex,
-        //               uint MultiplierForGeometryContributionToHitGroupIndex,
-        //               uint MissShaderIndex,
-        //               RayDesc Ray,
-        //               inout payload_t Payload);
-
-        TraceRay(gWorldTlas, ToRayFlag2(mask), 0xFF, 0, 1, 0, rayDesc, payload);
-        rayDesc.TMin = payload.hitT + 0.0001;
-    }
-    while (!payload.IsMiss() && !payload.Has(mask) && --maxBounce > 0);
+    TraceRay(gWorldTlas, ToRayFlag2(mask), mask, 0, 1, 0, rayDesc, payload);
 
     props = (GeometryProps)0;
     props.hitT = payload.hitT;
     props.instanceIndex = payload.GetInstanceIndex();
-    props.N = Packing::DecodeUnitVector( payload.N);
+    props.N = Packing::DecodeUnitVector(payload.N);
     props.curvature = payload.curvature;
-
 
     props.mip = payload.mipAndCone.x;
 
@@ -190,20 +168,20 @@ void CastRay(float3 origin, float3 direction, float Tmin, float Tmax, float2 mip
     props.X = origin + direction * payload.hitT;
 
     // props.Xprev = payload.X;
-    props.Xprev =props.X;
+    props.Xprev = props.X;
     props.V = -direction;
     props.textureOffsetAndFlags = payload.instanceIndexAndFlags;
 
     matProps = (MaterialProps)0;
     matProps.baseColor = Packing::UintToRgba(payload.baseColor, 8, 8, 8, 8);
-    
+
     float2 rAm = Packing::UintToRg16f(payload.roughnessAndMetalness);
     matProps.roughness = rAm.r;
     matProps.metalness = rAm.g;
-    matProps.Lemi = Packing::DecodeRgbe( payload.Lemi);
+    matProps.Lemi = Packing::DecodeRgbe(payload.Lemi);
     // 这三个应该从贴图再计算一次
     matProps.curvature = payload.curvature;
-    matProps.N = Packing::DecodeUnitVector( payload.matN);
+    matProps.N = Packing::DecodeUnitVector(payload.matN);
     matProps.T = payload.T.xyz;
 }
 
@@ -282,17 +260,6 @@ float3 GetLighting(GeometryProps geometryProps, MaterialProps materialProps, uin
 
         float hitT = CastVisibilityRay_AnyHit(Xshadow, sunDirection, 0.0, INF, mipAndCone, gWorldTlas, instanceInclusionMask, rayFlags);
         lighting *= float(hitT == INF);
-
-        // RayDesc rayDesc;
-        // rayDesc.Origin = Xshadow;
-        // rayDesc.Direction = sunDirection;
-        // rayDesc.TMin = 0;
-        // rayDesc.TMax = 1000;
-        //
-        // MainRayPayload shadowPayload = (MainRayPayload)0;
-        // TraceRay(gWorldTlas, RAY_FLAG_NONE | RAY_FLAG_CULL_NON_OPAQUE, 0xFF, 0, 1, 0, rayDesc, shadowPayload);
-        // float hitT = shadowPayload.hitT;
-        // lighting *= float(hitT == INF);
     }
 
     return lighting;
