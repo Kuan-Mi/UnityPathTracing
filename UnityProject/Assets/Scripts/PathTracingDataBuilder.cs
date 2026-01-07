@@ -144,7 +144,7 @@ namespace DefaultNamespace
             
             settings = new RayTracingAccelerationStructure.Settings
             {
-                managementMode = RayTracingAccelerationStructure.ManagementMode.Automatic,
+                managementMode = RayTracingAccelerationStructure.ManagementMode.Manual,
                 rayTracingModeMask = RayTracingAccelerationStructure.RayTracingModeMask.Everything
             };
 
@@ -163,6 +163,8 @@ namespace DefaultNamespace
             for (int i = 0; i < renderers.Length; i++)
             {
                 Renderer r = renderers[i];
+                
+                
                 MeshFilter mf = r.GetComponent<MeshFilter>();
 
                 if (mf == null || mf.sharedMesh == null)
@@ -186,9 +188,10 @@ namespace DefaultNamespace
 
                 // 【关键修改 2】设置 RTAS 中该 Renderer 的 InstanceID 为当前的全局计数器基数
                 // 这样 shader 中: Index = BaseID + GeometryIndex(SubMeshIndex) 就能对齐了
-                accelerationStructure.UpdateInstanceID(r, (uint)globalInstanceIndexCounter);
-                Debug.Log($"Updated InstanceID for Renderer '{r.name}' to {globalInstanceIndexCounter}.");
-
+                
+                uint instanceID = (uint)globalInstanceIndexCounter;
+                
+                RayTracingSubMeshFlags[] subMeshFlags = new RayTracingSubMeshFlags[subMeshCount];
 
                 // 【关键修改 3】遍历 SubMesh
                 for (int subIdx = 0; subIdx < subMeshCount; subIdx++)
@@ -283,16 +286,25 @@ namespace DefaultNamespace
 
                     // 处理 Flags
                     uint currentFlags = 0;
+                        RayTracingSubMeshFlags subMeshFlag = RayTracingSubMeshFlags.Enabled;
                     if (mat != null)
                     {
                         bool isTransparent = mat.renderQueue >= 3000 || mat.IsKeywordEnabled("_SURFACE_TYPE_TRANSPARENT");
+
+                        
+                        if(!isTransparent)
+                            subMeshFlag |= RayTracingSubMeshFlags.ClosestHitOnly;
+                        
                         currentFlags |= isTransparent ? FLAG_TRANSPARENT : FLAG_NON_TRANSPARENT;
-                        if (r.gameObject.isStatic) currentFlags |= FLAG_STATIC;
+                        if (r.gameObject.isStatic) 
+                            currentFlags |= FLAG_STATIC;
                     }
                     else
                     {
                         currentFlags |= FLAG_NON_TRANSPARENT; // 默认不透明
                     }
+                    
+                    subMeshFlags[subIdx] = subMeshFlag;
 
                     inst.textureOffsetAndFlags = ((currentFlags & 0xFF) << FLAG_FIRST_BIT) | (baseTextureIndex & NON_FLAG_MASK);
 
@@ -338,9 +350,11 @@ namespace DefaultNamespace
                     // 更新全局索引
                     globalInstanceIndexCounter++;
                 }
+                
+                
+                accelerationStructure.AddInstance(r, subMeshFlags, true, false,255U,instanceID);
+                Debug.Log($"Add InstanceID for Renderer '{r.name}' to {globalInstanceIndexCounter}.");
             }
-
- 
 
 
             _instanceBuffer?.Release();

@@ -402,7 +402,7 @@ namespace Nrd
                 buffer.Dispose();
             }
 
-            if (allocatedResources.Count > 0)
+            if (allocatedResources.Count > 0 && allocatedResources[0].IsCreated)
             {
                 var request = AsyncGPUReadback.Request(allocatedResources[0].Handle);
                 request.WaitForCompletion();

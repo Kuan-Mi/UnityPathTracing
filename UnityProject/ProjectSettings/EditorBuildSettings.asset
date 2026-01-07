@@ -10,14 +10,14 @@ EditorBuildSettings:
     guid: 99c9720ab356a0642a771bea13969a05
   - enabled: 0
     path: Assets/Bistro_v5_2/Bistro.unity
-    guid: 202754a75b914024c8c9f24dc5dd9132
+    guid: 20ed219d0caafb34388f6d06af57465f
   - enabled: 0
     path: Assets/Bistro_v5_2/BistroInterior_Wine.unity
-    guid: ef50fabb6ef397b4a9f5933104d9372b
+    guid: dc37a925dc4eeb349b1b55517320fa30
   - enabled: 0
     path: Assets/Bistro_v5_2/BistroExterior.unity
     guid: 7f48638e312073949af0cee59c9e68ee
-  - enabled: 1
+  - enabled: 0
     path: "Assets/ART/\u5929\u7136\u6C14\u884C\u4E1A/Scenes/\u5929\u7136\u6C14\u884C\u4E1A\u6F14\u7EC3.unity"
     guid: 46290435bf4ca7542ab62b0389191e5c
   m_configObjects:

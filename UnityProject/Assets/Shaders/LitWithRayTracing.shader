@@ -277,9 +277,9 @@ Shader "Custom/LitWithRayTracing"
             {
                 Vertex v;
                 #define INTERPOLATE_ATTRIBUTE(attr) v.attr = v0.attr * barycentrics.x + v1.attr * barycentrics.y + v2.attr * barycentrics.z
-                    INTERPOLATE_ATTRIBUTE(position);
-                    INTERPOLATE_ATTRIBUTE(normal);
-                    INTERPOLATE_ATTRIBUTE(tangent);
+                INTERPOLATE_ATTRIBUTE(position);
+                INTERPOLATE_ATTRIBUTE(normal);
+                INTERPOLATE_ATTRIBUTE(tangent);
                 INTERPOLATE_ATTRIBUTE(uv);
                 return v;
             }
@@ -305,7 +305,7 @@ Shader "Custom/LitWithRayTracing"
 
                 // 3. 计算插值 UV
                 float3 barycentricCoords = float3(1.0 - attribs.barycentrics.x - attribs.barycentrics.y,
-                                                              attribs.barycentrics.x, attribs.barycentrics.y);
+                                                  attribs.barycentrics.x, attribs.barycentrics.y);
                 float2 uv = uv0 * barycentricCoords.x + uv1 * barycentricCoords.y + uv2 * barycentricCoords.z;
 
                 // 4. 采样 Alpha 通道
@@ -324,129 +324,97 @@ Shader "Custom/LitWithRayTracing"
 
             [shader("closesthit")]
             void ClosestHitMain(inout MainRayPayload payload : SV_RayPayload,
-                                                                    AttributeData attribs : SV_IntersectionAttributes)
+                                AttributeData attribs : SV_IntersectionAttributes)
             {
-                // uint instanceIndex = InstanceIndex() + GeometryIndex();
-                uint instanceIndex = InstanceIndex();
+                payload.hitT = RayTCurrent();
+
+                uint instanceIndex = InstanceID();
                 InstanceData instanceData = gIn_InstanceData[instanceIndex];
-                
-                uint primitiveIndex = instanceData.primitiveOffset  + PrimitiveIndex();
+
+                uint primitiveIndex = instanceData.primitiveOffset + PrimitiveIndex();
                 PrimitiveData primitiveData = gIn_PrimitiveData[primitiveIndex];
-                //
-                //
-                //
 
+                float worldArea = primitiveData.worldArea * instanceData.scale * instanceData.scale;
 
-                uint3 triangleIndices = UnityRayTracingFetchTriangleIndices(PrimitiveIndex());
-                Vertex v0 = FetchVertex(triangleIndices.x);
-                Vertex v1 = FetchVertex(triangleIndices.y);
-                Vertex v2 = FetchVertex(triangleIndices.z);
+                float3x3 mObjectToWorld = ObjectToWorld3x4();
+                bool isFrontFace = HitKind() == HIT_KIND_TRIANGLE_FRONT_FACE;
 
-                float3 n0 = v0.normal;
-                float3 n1 = v1.normal;
-                float3 n2 = v2.normal;
+                float flip = isFrontFace ? -1.0 : 1.0;
+
+                // Barycentrics
+                float3 barycentrics = float3(1.0 - attribs.barycentrics.x - attribs.barycentrics.y,
+                                             attribs.barycentrics.x, attribs.barycentrics.y);
+
+                // Normal
+                float3 n0 = Packing::DecodeUnitVector(primitiveData.n0, true);
+                float3 n1 = Packing::DecodeUnitVector(primitiveData.n1, true);
+                float3 n2 = Packing::DecodeUnitVector(primitiveData.n2, true);
+
+                float3 N = barycentrics.x * n0 + barycentrics.y * n1 + barycentrics.z * n2;
+                
+                
+                N = Geometry::RotateVector(mObjectToWorld, N);
+                
+                N = normalize(mul(N, (float3x3)WorldToObject()));
+                
+                N = normalize(N * flip);
+                payload.N = Packing::EncodeUnitVector(-N);
 
                 // Curvature
                 float dnSq0 = LengthSquared(n0 - n1);
                 float dnSq1 = LengthSquared(n1 - n2);
                 float dnSq2 = LengthSquared(n2 - n0);
                 float dnSq = max(dnSq0, max(dnSq1, dnSq2));
-
-                payload.curvature = sqrt(dnSq);
-
-                float3 barycentrics = float3(1.0 - attribs.barycentrics.x - attribs.barycentrics.y,
-                      attribs.barycentrics.x, attribs.barycentrics.y);
-                
-                float3x3 mObjectToWorld = (float3x3)ObjectToWorld();
-                bool isFrontFace = HitKind() == HIT_KIND_TRIANGLE_FRONT_FACE;
-                
-                
-                
-        // // Normal
-        // float3 n10 = Packing::DecodeUnitVector(primitiveData.n0, true);
-        // float3 n11 = Packing::DecodeUnitVector(primitiveData.n1, true);
-        // float3 n12 = Packing::DecodeUnitVector(primitiveData.n2, true);
-        //         
-        //         float flip = isFrontFace ? -1.0 : 1.0;
-        //          
-        // float3 N = barycentrics.x * n0 + barycentrics.y * n1 + barycentrics.z * n2;
-        // N = Geometry::RotateVector(mObjectToWorld, N);
-        // N = normalize(N * flip);
-                
-                
-
-                Vertex v = InterpolateVertices(v0, v1, v2, barycentrics);
-
-
-
-                float3 normalOS = isFrontFace ? v.normal : -v.normal;
-
-                float3 normalWS = normalize(mul(normalOS, (float3x3)WorldToObject()));
-
+                payload.curvature = sqrt(dnSq / worldArea);
 
                 float3 direction = WorldRayDirection();
 
-                // 长度
-                payload.hitT = RayTCurrent();
-
                 // Mip level
-
-                // 2. 计算 UV 空间面积 (uvArea)
-                float2 uvE1 = v1.uv - v0.uv;
-                float2 uvE2 = v2.uv - v0.uv;
-                // 使用 2D 叉乘公式计算面积
-                float uvArea = abs(uvE1.x * uvE2.y - uvE2.x * uvE1.y) * 0.5f;
-
-                // 3. 计算世界空间面积 (worldArea)
-                // 注意：v0.position 是模型空间，需要考虑物体的缩放
-                float3 edge1 = v1.position - v0.position;
-                float3 edge2 = v2.position - v0.position;
-                float3 crossProduct = cross(edge1, edge2);
-
-                // 将模型空间的面积向量转换到世界空间，从而自动处理非统一缩放
-                // 使用 ObjectToWorld 的转置逆矩阵或直接变换向量（视缩放情况而定）
-                float3 worldCrossProduct = mul((float3x3)ObjectToWorld(), crossProduct);
-                float worldArea = length(crossProduct) * 0.5f;
-
-                float NoRay = abs(dot(direction, normalWS));
+                float NoRay = abs(dot(direction, -N));
                 float a = payload.hitT * payload.mipAndCone.y;
                 a *= Math::PositiveRcp(NoRay);
-                a *= sqrt(uvArea / max(worldArea, 1e-10f));
+                a *= sqrt(primitiveData.uvArea / worldArea);
 
                 float mip = log2(a);
                 mip += MAX_MIP_LEVEL;
                 mip = max(mip, 0.0);
-
-                // mip = payload.mipAndCone.y;
-
-                // mip = 0;
                 payload.mipAndCone.x += mip;
 
+                // Uv
+                float2 uv = barycentrics.x * primitiveData.uv0 + barycentrics.y * primitiveData.uv1 + barycentrics.z * primitiveData.uv2;
+
+                // Tangent
+                float3 t0 = Packing::DecodeUnitVector(primitiveData.t0, true);
+                float3 t1 = Packing::DecodeUnitVector(primitiveData.t1, true);
+                float3 t2 = Packing::DecodeUnitVector(primitiveData.t2, true);
+
+                float3 T = barycentrics.x * t0 + barycentrics.y * t1 + barycentrics.z * t2;
+                T = Geometry::RotateVector(mObjectToWorld, T);
+                T = normalize(T);
+                payload.T = float4(T, primitiveData.bitangentSign);
+
                 #if _NORMALMAP
-                float3 tangentWS = normalize(mul(v.tangent.xyz, (float3x3)WorldToObject()));
+                float3 tangentWS = T;
 
                 // float2 normalUV = float2(v.uv.x, 1 - v.uv.y); // 修正UV翻转问题
-                float2 normalUV = (v.uv); // 修正UV翻转问题
+                float2 normalUV = uv; // 修正UV翻转问题
 
                 float4 n = _BumpMap.SampleLevel(sampler_BumpMap, _BaseMap_ST.xy * normalUV + _BaseMap_ST.zw, mip);
 
-                // float4 T = float4(tangentWS, 1);
-
-                // float3 N = Geometry::TransformLocalNormal(packedNormal, T, normalWS);
-
                 float3 tangentNormal = UnpackNormalScale(n, _BumpScale);
 
-                float3 bitangent = cross(normalWS.xyz, tangentWS.xyz);
-                half3x3 tangentToWorld = half3x3(tangentWS.xyz, bitangent.xyz, normalWS.xyz);
+                float3 bitangent = cross(N.xyz, tangentWS.xyz);
+                half3x3 tangentToWorld = half3x3(tangentWS.xyz, bitangent.xyz, N.xyz);
 
-                float3 worldNormal = TransformTangentToWorld(tangentNormal, tangentToWorld);
-
-                // float3 worldNormal = N;
+                float3 matWorldNormal = TransformTangentToWorld(tangentNormal, tangentToWorld);
+ 
                 #else
-                float3 worldNormal = normalWS;
+                float3 matWorldNormal = N;
                 #endif
 
-                float3 albedo = _BaseColor.xyz * _BaseMap.SampleLevel(sampler_BaseMap, _BaseMap_ST.xy * v.uv + _BaseMap_ST.zw, mip).xyz;
+                payload.matN = Packing::EncodeUnitVector(-matWorldNormal);
+
+                float3 albedo = _BaseColor.xyz * _BaseMap.SampleLevel(sampler_BaseMap, _BaseMap_ST.xy * uv + _BaseMap_ST.zw, mip).xyz;
 
 
                 float roughness;
@@ -454,7 +422,7 @@ Shader "Custom/LitWithRayTracing"
 
                 #if _METALLICSPECGLOSSMAP
 
-                float4 vv = _MetallicGlossMap.SampleLevel(sampler_MetallicGlossMap, _BaseMap_ST.xy * v.uv + _BaseMap_ST.zw, mip);
+                float4 vv = _MetallicGlossMap.SampleLevel(sampler_MetallicGlossMap, _BaseMap_ST.xy * uv + _BaseMap_ST.zw, mip);
                 // metallic = vv.r;
                 roughness = vv.g * (1 - _Smoothness);
                 metallic = vv.b;
@@ -467,7 +435,7 @@ Shader "Custom/LitWithRayTracing"
                 #endif
 
                 #if _EMISSION
-                float3 emission = _EmissionColor.xyz * _EmissionMap.SampleLevel(sampler_EmissionMap, v.uv, mip).xyz;
+                float3 emission = _EmissionColor.xyz * _EmissionMap.SampleLevel(sampler_EmissionMap, uv, mip).xyz;
                 payload.Lemi = Packing::EncodeRgbe(emission);
                 #else
                 payload.Lemi = Packing::EncodeRgbe(float3(0, 0, 0));
@@ -480,9 +448,7 @@ Shader "Custom/LitWithRayTracing"
                 metallic = lerp(metallic, 0.0, emissionLevel);
                 roughness = lerp(roughness, 1.0, emissionLevel);
 
-
-                float3 dielectricSpecular = float3(0.04, 0.04, 0.04);
-                float3 _SpecularColor = lerp(dielectricSpecular, albedo, metallic);
+ 
 
 
                 // Instance
@@ -490,21 +456,15 @@ Shader "Custom/LitWithRayTracing"
                 payload.SetInstanceIndex(instanceIndex);
 
 
-
                 float4x4 prev = GetPrevObjectToWorldMatrix();
                 // float4x4 prev = unity_MatrixPreviousM;
+ 
 
-                float3x3 mPrevObjectToWorld = (float3x3)prev;
-                // 法线
-                payload.N = Packing::EncodeUnitVector(normalWS);
-                // payload.N = Packing::EncodeUnitVector(-N);
-                
-                
-                payload.matN = Packing::EncodeUnitVector(worldNormal);
 
-                float3 worldPosition = mul(ObjectToWorld3x4(), float4(v.position, 1.0)).xyz;
 
-                float3 prevWorldPosition = mul(GetPrevObjectToWorldMatrix(), float4(v.position, 1.0)).xyz;
+                // float3 worldPosition = mul(ObjectToWorld3x4(), float4(v.position, 1.0)).xyz;
+                //
+                // float3 prevWorldPosition = mul(GetPrevObjectToWorldMatrix(), float4(v.position, 1.0)).xyz;
 
                 // 位置
                 // payload.X = worldPosition;
@@ -513,14 +473,14 @@ Shader "Custom/LitWithRayTracing"
 
                 payload.roughnessAndMetalness = Packing::Rg16fToUint(float2(roughness, metallic));
                 payload.baseColor = Packing::RgbaToUint(float4(albedo, 1.0), 8, 8, 8, 8);
-                
+
                 // float dd = instanceData.primitiveOffset/100000.0;
                 // float dd = primitiveIndex  /70412.0;
-                float dd = instanceIndex  /8.0;
-                // payload.baseColor = Packing::RgbaToUint(float4(primitiveData.uv0,0, 1.0), 8, 8, 8, 8);
-                payload.baseColor = Packing::RgbaToUint(float4(dd,dd,dd, 1.0), 8, 8, 8, 8);
-                
-                
+                float dd = NoRay ;
+                // payload.baseColor = Packing::RgbaToUint(float4(N, 1.0), 8, 8, 8, 8);
+                // payload.baseColor = Packing::RgbaToUint(float4(dd,dd,dd, 1.0), 8, 8, 8, 8);
+
+
                 // payload.metalness = metallic;
                 uint flag = FLAG_NON_TRANSPARENT;
                 #if  _SURFACE_TYPE_TRANSPARENT
