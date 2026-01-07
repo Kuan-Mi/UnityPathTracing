@@ -268,7 +268,7 @@ namespace Nrd
             {
                 setting.resolutionScale = 1.0f;
             }
-            
+
             prevWorldToView = worldToView;
             prevWorldToClip = worldToClip;
             preViewToClip = viewToClip;
@@ -402,8 +402,11 @@ namespace Nrd
                 buffer.Dispose();
             }
 
-            var request = AsyncGPUReadback.Request(allocatedResources[0].Handle);
-            request.WaitForCompletion();
+            if (allocatedResources.Count > 0)
+            {
+                var request = AsyncGPUReadback.Request(allocatedResources[0].Handle);
+                request.WaitForCompletion();
+            }
 
             ReleaseTextures();
             DestroyDenoiserInstance(nrdInstanceId);
