@@ -90,7 +90,7 @@ MonoBehaviour:
     dofFocalDistance: 1
     exposure: 1
     rpp: 1
-    bounceNum: 2
+    bounceNum: 1
     mipBias: -0.5
     tracingMode: 0
     denoiser: 0
