@@ -27,7 +27,7 @@ namespace DefaultNamespace
         public half2 t2;
         public float bitangentSign;
     }
- 
+
     [StructLayout(LayoutKind.Sequential)]
     public struct InstanceData
     {
@@ -141,7 +141,7 @@ namespace DefaultNamespace
             globalTexturePool.Clear();
             textureGroupCache.Clear();
 
-            
+
             settings = new RayTracingAccelerationStructure.Settings
             {
                 managementMode = RayTracingAccelerationStructure.ManagementMode.Manual,
@@ -163,8 +163,8 @@ namespace DefaultNamespace
             for (int i = 0; i < renderers.Length; i++)
             {
                 Renderer r = renderers[i];
-                
-                
+
+
                 MeshFilter mf = r.GetComponent<MeshFilter>();
 
                 if (mf == null || mf.sharedMesh == null)
@@ -188,10 +188,9 @@ namespace DefaultNamespace
 
                 // 【关键修改 2】设置 RTAS 中该 Renderer 的 InstanceID 为当前的全局计数器基数
                 // 这样 shader 中: Index = BaseID + GeometryIndex(SubMeshIndex) 就能对齐了
-                
-                uint instanceID = (uint)globalInstanceIndexCounter;
-                
-                RayTracingSubMeshFlags[] subMeshFlags = new RayTracingSubMeshFlags[subMeshCount];
+
+                // uint instanceID = (uint)globalInstanceIndexCounter;
+
 
                 // 【关键修改 3】遍历 SubMesh
                 for (int subIdx = 0; subIdx < subMeshCount; subIdx++)
@@ -286,25 +285,24 @@ namespace DefaultNamespace
 
                     // 处理 Flags
                     uint currentFlags = 0;
-                        RayTracingSubMeshFlags subMeshFlag = RayTracingSubMeshFlags.Enabled;
+                    RayTracingSubMeshFlags subMeshFlag = RayTracingSubMeshFlags.Enabled;
                     if (mat != null)
                     {
                         bool isTransparent = mat.renderQueue >= 3000 || mat.IsKeywordEnabled("_SURFACE_TYPE_TRANSPARENT");
 
-                        
-                        if(!isTransparent)
+
+                        if (!isTransparent)
                             subMeshFlag |= RayTracingSubMeshFlags.ClosestHitOnly;
-                        
+
                         currentFlags |= isTransparent ? FLAG_TRANSPARENT : FLAG_NON_TRANSPARENT;
-                        if (r.gameObject.isStatic) 
+                        if (r.gameObject.isStatic)
                             currentFlags |= FLAG_STATIC;
                     }
                     else
                     {
                         currentFlags |= FLAG_NON_TRANSPARENT; // 默认不透明
                     }
-                    
-                    subMeshFlags[subIdx] = subMeshFlag;
+
 
                     inst.textureOffsetAndFlags = ((currentFlags & 0xFF) << FLAG_FIRST_BIT) | (baseTextureIndex & NON_FLAG_MASK);
 
@@ -341,8 +339,43 @@ namespace DefaultNamespace
 
                     // 添加到列表
                     instanceDataList.Add(inst);
-                    
-                    Debug.Log($"Added Instance {instanceDataList.Count - 1}: Renderer '{r.name}', SubMesh {subIdx}, Material '{(mat != null ? mat.name : "null")}', PrimitiveOffset {currentPrimitiveOffset}, Triangles {subMeshTriangles.Length / 3}");
+
+
+                    RayTracingSubMeshFlags[] subMeshFlags = new RayTracingSubMeshFlags[subMeshCount];
+                    for (int n = 0; n < subMeshCount; n++)
+                        subMeshFlags[n] = RayTracingSubMeshFlags.Disabled; // 先全部禁用
+
+                    subMeshFlags[subIdx] = subMeshFlag;
+
+                    int result;
+
+                    if (subIdx != 0)
+                    {
+                        var newObj = Object.Instantiate(r.gameObject);
+                        newObj.transform.position = r.transform.position;
+                        newObj.transform.rotation = r.transform.rotation;
+                        newObj.transform.localScale = r.transform.lossyScale;
+                        
+                        
+                        var newRenderer = newObj.GetComponent<Renderer>();
+                        newRenderer.name = r.name + $"_SubMesh_{subIdx}";
+
+                        result = accelerationStructure.AddInstance(newRenderer, subMeshFlags, true, false, 255U, (uint)globalInstanceIndexCounter);
+                    }
+                    else
+                    {
+                        result = accelerationStructure.AddInstance(r, subMeshFlags, true, false, 255U, (uint)globalInstanceIndexCounter);
+                    }
+
+                    var subMeshFlagStr = "";
+                    foreach (var flag in subMeshFlags)
+                    {
+                        subMeshFlagStr += flag.ToString() + " ";
+                    }
+
+                    Debug.Log($"Result {result} Add InstanceID for Renderer '{r.name}',SubMesh {subIdx} to {globalInstanceIndexCounter} with Flags: {subMeshFlagStr.Trim()}");
+
+                    // Debug.Log($"Added Instance {instanceDataList.Count - 1}: Renderer '{r.name}', SubMesh {subIdx}, Material '{(mat != null ? mat.name : "null")}', PrimitiveOffset {currentPrimitiveOffset}, Triangles {subMeshTriangles.Length / 3}");
 
                     // 更新 Offset
                     currentPrimitiveOffset += (uint)(subMeshTriangles.Length / 3);
@@ -350,10 +383,6 @@ namespace DefaultNamespace
                     // 更新全局索引
                     globalInstanceIndexCounter++;
                 }
-                
-                
-                accelerationStructure.AddInstance(r, subMeshFlags, true, false,255U,instanceID);
-                Debug.Log($"Add InstanceID for Renderer '{r.name}' to {globalInstanceIndexCounter}.");
             }
 
 

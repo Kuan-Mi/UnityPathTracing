@@ -183,6 +183,9 @@ Shader "Custom/LitWithRayTracing"
 
             // #pragma require Int64BufferAtomics
             #pragma require Native16Bit
+            // #pragma require inlineraytracing
+            // #pragma target 6.4
+            
 
             struct AttributeData
             {
@@ -432,7 +435,7 @@ Shader "Custom/LitWithRayTracing"
                 payload.SetInstanceIndex(instanceIndex);
 
 
-                float4x4 prev = GetPrevObjectToWorldMatrix();
+                // float4x4 prev = GetPrevObjectToWorldMatrix();
                 // float4x4 prev = unity_MatrixPreviousM;
 
 
@@ -448,14 +451,6 @@ Shader "Custom/LitWithRayTracing"
                 payload.roughnessAndMetalness = Packing::Rg16fToUint(float2(roughness, metallic));
                 payload.baseColor = Packing::RgbaToUint(float4(albedo, 1.0), 8, 8, 8, 8);
 
-                // float dd = instanceData.primitiveOffset/100000.0;
-                // float dd = primitiveIndex  /70412.0;
-                float dd = NoRay;
-                // payload.baseColor = Packing::RgbaToUint(float4(N, 1.0), 8, 8, 8, 8);
-                // payload.baseColor = Packing::RgbaToUint(float4(dd,dd,dd, 1.0), 8, 8, 8, 8);
-
-
-                // payload.metalness = metallic;
                 uint flag = FLAG_NON_TRANSPARENT;
                 #if  _SURFACE_TYPE_TRANSPARENT
                 flag = FLAG_TRANSPARENT;

@@ -227,6 +227,8 @@ namespace PathTracing
             //     SetMask();
             // }
 
+            // ReBuild();
+
             if (gIn_ScramblingRankingUint == null)
             {
                 gIn_ScramblingRankingUint = new GraphicsBuffer(GraphicsBuffer.Target.Structured, gIn_ScramblingRanking.width * gIn_ScramblingRanking.height, 16);
