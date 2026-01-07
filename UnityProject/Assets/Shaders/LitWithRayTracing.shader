@@ -261,28 +261,6 @@ Shader "Custom/LitWithRayTracing"
                 return dot(v, v);
             }
 
-            Vertex FetchVertex(uint vertexIndex)
-            {
-                Vertex v;
-                // 从 Unity 提供的 Vertex Attribute 结构中读取数据
-                v.position = UnityRayTracingFetchVertexAttribute3(vertexIndex, kVertexAttributePosition);
-                v.normal = UnityRayTracingFetchVertexAttribute3(vertexIndex, kVertexAttributeNormal);
-                v.tangent = UnityRayTracingFetchVertexAttribute4(vertexIndex, kVertexAttributeTangent);
-                v.uv = UnityRayTracingFetchVertexAttribute2(vertexIndex, kVertexAttributeTexCoord0);
-                return v;
-            }
-
-            // 手动插值顶点属性
-            Vertex InterpolateVertices(Vertex v0, Vertex v1, Vertex v2, float3 barycentrics)
-            {
-                Vertex v;
-                #define INTERPOLATE_ATTRIBUTE(attr) v.attr = v0.attr * barycentrics.x + v1.attr * barycentrics.y + v2.attr * barycentrics.z
-                INTERPOLATE_ATTRIBUTE(position);
-                INTERPOLATE_ATTRIBUTE(normal);
-                INTERPOLATE_ATTRIBUTE(tangent);
-                INTERPOLATE_ATTRIBUTE(uv);
-                return v;
-            }
 
             #define MAX_MIP_LEVEL                       11.0
 
@@ -351,19 +329,19 @@ Shader "Custom/LitWithRayTracing"
                 float3 n2 = Packing::DecodeUnitVector(primitiveData.n2, true);
 
                 float3 N = barycentrics.x * n0 + barycentrics.y * n1 + barycentrics.z * n2;
-                
-                
+
+
                 N = Geometry::RotateVector(mObjectToWorld, N);
-                
+
                 N = normalize(mul(N, (float3x3)WorldToObject()));
-                
+
                 N = normalize(N * flip);
                 payload.N = Packing::EncodeUnitVector(-N);
 
                 // Curvature
-                float dnSq0 = LengthSquared(n0 - n1);
-                float dnSq1 = LengthSquared(n1 - n2);
-                float dnSq2 = LengthSquared(n2 - n0);
+                float dnSq0 = Math::LengthSquared(n0 - n1);
+                float dnSq1 = Math::LengthSquared(n1 - n2);
+                float dnSq2 = Math::LengthSquared(n2 - n0);
                 float dnSq = max(dnSq0, max(dnSq1, dnSq2));
                 payload.curvature = sqrt(dnSq / worldArea);
 
@@ -407,7 +385,7 @@ Shader "Custom/LitWithRayTracing"
                 half3x3 tangentToWorld = half3x3(tangentWS.xyz, bitangent.xyz, N.xyz);
 
                 float3 matWorldNormal = TransformTangentToWorld(tangentNormal, tangentToWorld);
- 
+
                 #else
                 float3 matWorldNormal = N;
                 #endif
@@ -448,8 +426,6 @@ Shader "Custom/LitWithRayTracing"
                 metallic = lerp(metallic, 0.0, emissionLevel);
                 roughness = lerp(roughness, 1.0, emissionLevel);
 
- 
-
 
                 // Instance
                 // payload.instanceIndex = instanceIndex;
@@ -458,8 +434,6 @@ Shader "Custom/LitWithRayTracing"
 
                 float4x4 prev = GetPrevObjectToWorldMatrix();
                 // float4x4 prev = unity_MatrixPreviousM;
- 
-
 
 
                 // float3 worldPosition = mul(ObjectToWorld3x4(), float4(v.position, 1.0)).xyz;
@@ -476,7 +450,7 @@ Shader "Custom/LitWithRayTracing"
 
                 // float dd = instanceData.primitiveOffset/100000.0;
                 // float dd = primitiveIndex  /70412.0;
-                float dd = NoRay ;
+                float dd = NoRay;
                 // payload.baseColor = Packing::RgbaToUint(float4(N, 1.0), 8, 8, 8, 8);
                 // payload.baseColor = Packing::RgbaToUint(float4(dd,dd,dd, 1.0), 8, 8, 8, 8);
 
