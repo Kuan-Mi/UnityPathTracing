@@ -57,6 +57,11 @@ namespace PathTracing
         public static int gOut_ComposedDiffID = Shader.PropertyToID("gOut_ComposedDiff");
         public static int gOut_ComposedSpec_ViewZID = Shader.PropertyToID("gOut_ComposedSpec_ViewZ");
 
+        public static int gWorldTlasID = Shader.PropertyToID("gWorldTlas");
+        public static int gIn_InstanceDataID = Shader.PropertyToID("gIn_InstanceData");
+        public static int gIn_PrimitiveDataID = Shader.PropertyToID("gIn_PrimitiveData");
+
+
         // TraceTransparency
         public static int gIn_ComposedDiffID = Shader.PropertyToID("gIn_ComposedDiff");
         public static int gIn_ComposedSpec_ViewZID = Shader.PropertyToID("gIn_ComposedSpec_ViewZ");

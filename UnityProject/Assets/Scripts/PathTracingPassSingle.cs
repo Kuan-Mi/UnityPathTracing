@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Runtime.InteropServices;
+using DefaultNamespace;
 using Nrd;
 using Unity.Mathematics;
 using UnityEngine;
@@ -28,6 +29,7 @@ namespace PathTracing
         public GraphicsBuffer HashEntriesBuffer;
         public GraphicsBuffer AccumulationBuffer;
         public GraphicsBuffer ResolvedBuffer;
+        public PathTracingDataBuilder _dataBuilder;
 
         public RayTracingAccelerationStructure AccelerationStructure;
         public NRDDenoiser NrdDenoiser;
@@ -109,6 +111,7 @@ namespace PathTracing
             internal GraphicsBuffer HashEntriesBuffer;
             internal GraphicsBuffer AccumulationBuffer;
             internal GraphicsBuffer ResolvedBuffer;
+            internal PathTracingDataBuilder _dataBuilder;
         }
 
         public PathTracingPassSingle(PathTracingSetting setting)
@@ -156,6 +159,11 @@ namespace PathTracing
 
             natCmd.DispatchCompute(data.SharcResolveCs, 0, x, 1, 1);
 
+            
+            natCmd.SetGlobalBuffer(gIn_InstanceDataID, data._dataBuilder._instanceBuffer);
+            natCmd.SetGlobalBuffer( gIn_PrimitiveDataID, data._dataBuilder._primitiveBuffer);
+            
+            
             // 不透明
             natCmd.SetRayTracingShaderPass(data.OpaqueTs, "Test2");
             natCmd.SetRayTracingConstantBufferParam(data.OpaqueTs, paramsID, data.ConstantBuffer, 0, data.ConstantBuffer.stride);
@@ -416,7 +424,7 @@ namespace PathTracing
 
             NrdDenoiser.EnsureResources(outputResolution);
 
-            Shader.SetGlobalRayTracingAccelerationStructure(g_AccelStructID, AccelerationStructure);
+            Shader.SetGlobalRayTracingAccelerationStructure(g_AccelStructID, _dataBuilder.accelerationStructure);
 
             using var builder = renderGraph.AddUnsafePass<PassData>("Path Tracing Pass", out var passData);
 
@@ -432,6 +440,7 @@ namespace PathTracing
             passData.AccumulationBuffer = AccumulationBuffer;
             passData.HashEntriesBuffer = HashEntriesBuffer;
             passData.ResolvedBuffer = ResolvedBuffer;
+            passData._dataBuilder = _dataBuilder;
 
             var gSunDirection = -lightForward;
             var up = new Vector3(0, 1, 0);

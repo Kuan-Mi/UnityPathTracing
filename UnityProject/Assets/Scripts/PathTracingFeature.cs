@@ -1,4 +1,5 @@
 ﻿using System.Collections.Generic;
+using DefaultNamespace;
 using Nrd;
 using Unity.Mathematics;
 using UnityEngine;
@@ -69,39 +70,39 @@ namespace PathTracing
         private GraphicsBuffer m_PrevMatrixBuffer;
 
 
-        void InitializeTracking()
-        {
-            // 1. 找到所有符合条件的 Renderer (需要与你的 AS Settings 掩码一致)
-            // 注意：这里建议根据 Layer 或特定 Component 筛选
-            Renderer[] allRenderers = GameObject.FindObjectsByType<Renderer>(FindObjectsSortMode.None);
-
-            m_TrackedRenderers.Clear();
-            foreach (var r in allRenderers)
-            {
-                // 这里的判断逻辑要和你的 RayTracingModeMask 匹配
-                // 如果物体设置了 RayTracingMode.Off，Unity AS 就不会包含它
-                // if (r.rayTracingObjectsConfig != null) // 举例：如果是 HDRP/URP 可能会有特定配置
-                {
-                    m_TrackedRenderers.Add(r);
-                }
-            }
-
-            int count = m_TrackedRenderers.Count;
-            m_PrevMatrices = new Matrix4x4[count];
-
-            // 2. 关键：强制设置 InstanceID，使其与数组索引 [i] 一致
-            for (int i = 0; i < count; i++)
-            {
-                // 这一步非常关键：它把 GPU 端的 InstanceID() 和我们的数组索引绑定了
-                accelerationStructure.UpdateInstanceID(m_TrackedRenderers[i], (uint)i);
-
-                // 记录初始矩阵
-                m_PrevMatrices[i] = m_TrackedRenderers[i].localToWorldMatrix;
-            }
-
-            // 3. 创建 GPU Buffer
-            m_PrevMatrixBuffer = new GraphicsBuffer(GraphicsBuffer.Target.Structured, count, 64);
-        }
+        // void InitializeTracking()
+        // {
+        //     // 1. 找到所有符合条件的 Renderer (需要与你的 AS Settings 掩码一致)
+        //     // 注意：这里建议根据 Layer 或特定 Component 筛选
+        //     Renderer[] allRenderers = GameObject.FindObjectsByType<Renderer>(FindObjectsSortMode.None);
+        //
+        //     m_TrackedRenderers.Clear();
+        //     foreach (var r in allRenderers)
+        //     {
+        //         // 这里的判断逻辑要和你的 RayTracingModeMask 匹配
+        //         // 如果物体设置了 RayTracingMode.Off，Unity AS 就不会包含它
+        //         // if (r.rayTracingObjectsConfig != null) // 举例：如果是 HDRP/URP 可能会有特定配置
+        //         {
+        //             m_TrackedRenderers.Add(r);
+        //         }
+        //     }
+        //
+        //     int count = m_TrackedRenderers.Count;
+        //     m_PrevMatrices = new Matrix4x4[count];
+        //
+        //     // 2. 关键：强制设置 InstanceID，使其与数组索引 [i] 一致
+        //     for (int i = 0; i < count; i++)
+        //     {
+        //         // 这一步非常关键：它把 GPU 端的 InstanceID() 和我们的数组索引绑定了
+        //         accelerationStructure.UpdateInstanceID(m_TrackedRenderers[i], (uint)i);
+        //
+        //         // 记录初始矩阵
+        //         m_PrevMatrices[i] = m_TrackedRenderers[i].localToWorldMatrix;
+        //     }
+        //
+        //     // 3. 创建 GPU Buffer
+        //     m_PrevMatrixBuffer = new GraphicsBuffer(GraphicsBuffer.Target.Structured, count, 64);
+        // }
 
         void Update()
         {
@@ -138,38 +139,38 @@ namespace PathTracing
 // #define FLAG_SKIN                           0x40 // skin
 // #define FLAG_MORPH                          0x80 // morph
 
-        void SetMask()
-        {
-            var allRenderers = GameObject.FindObjectsByType<Renderer>(FindObjectsSortMode.None);
-            foreach (var r in allRenderers)
-            {
-                var materials = r.sharedMaterials;
-                bool hasTransparent = false;
-                bool hasOpaque = false;
-                foreach (var mat in materials)
-                {
-                    if (mat != null && mat.renderQueue >= 3000)
-                    {
-                        hasTransparent = true;
-                    }
-                    else
-                    {
-                        hasOpaque = true;
-                    }
-                }
-                
-                uint mask = 0;
-                
-                if (hasOpaque)
-                    mask |= 0x01; // FLAG_NON_TRANSPARENT
-                if (hasTransparent)
-                    mask |= 0x02; // FLAG_TRANSPARENT
-                
-                // Debug.Log($"Renderer {r.name} Mask: {mask}");
-                
-                accelerationStructure.UpdateInstanceMask(r, mask); // 1 表示包含在内
-            }
-        }
+        // void SetMask()
+        // {
+        //     var allRenderers = GameObject.FindObjectsByType<Renderer>(FindObjectsSortMode.None);
+        //     foreach (var r in allRenderers)
+        //     {
+        //         var materials = r.sharedMaterials;
+        //         bool hasTransparent = false;
+        //         bool hasOpaque = false;
+        //         foreach (var mat in materials)
+        //         {
+        //             if (mat != null && mat.renderQueue >= 3000)
+        //             {
+        //                 hasTransparent = true;
+        //             }
+        //             else
+        //             {
+        //                 hasOpaque = true;
+        //             }
+        //         }
+        //
+        //         uint mask = 0;
+        //
+        //         if (hasOpaque)
+        //             mask |= 0x01; // FLAG_NON_TRANSPARENT
+        //         if (hasTransparent)
+        //             mask |= 0x02; // FLAG_TRANSPARENT
+        //
+        //         // Debug.Log($"Renderer {r.name} Mask: {mask}");
+        //
+        //         accelerationStructure.UpdateInstanceMask(r, mask); // 1 表示包含在内
+        //     }
+        // }
 
         public Material finalMaterial;
         public RayTracingShader opaqueTracingShader;
@@ -186,7 +187,7 @@ namespace PathTracing
 
         private PathTracingPassSingle _pathTracingPass;
 
-        public RayTracingAccelerationStructure accelerationStructure;
+        // public RayTracingAccelerationStructure accelerationStructure;
         public Settings settings;
 
         public Texture2D gIn_ScramblingRanking;
@@ -203,20 +204,28 @@ namespace PathTracing
         private Dictionary<int, NRDDenoiser> _nrdDenoisers = new();
         private Dictionary<int, DLRRDenoiser> _dlrrDenoisers = new();
 
+        public PathTracingDataBuilder _dataBuilder = new PathTracingDataBuilder();
+
+        [ContextMenu("ReBuild AccelerationStructure")]
+        public void ReBuild()
+        {
+            _dataBuilder.Build();
+        }
+
         public override void Create()
         {
-            if (accelerationStructure == null)
-            {
-                settings = new Settings
-                {
-                    managementMode = ManagementMode.Automatic,
-                    rayTracingModeMask = RayTracingModeMask.Everything
-                };
-                accelerationStructure = new RayTracingAccelerationStructure(settings);
-
-                accelerationStructure.Build();
-                SetMask();
-            }
+            // if (accelerationStructure == null)
+            // {
+            //     settings = new Settings
+            //     {
+            //         managementMode = ManagementMode.Automatic,
+            //         rayTracingModeMask = RayTracingModeMask.Everything
+            //     };
+            //     accelerationStructure = new RayTracingAccelerationStructure(settings);
+            //
+            //     accelerationStructure.Build();
+            //     SetMask();
+            // }
 
             if (gIn_ScramblingRankingUint == null)
             {
@@ -256,7 +265,7 @@ namespace PathTracing
                 CompositionCs = compositionComputeShader,
                 TaaCs = taaComputeShader,
                 DlssBeforeCs = dlssBeforeComputeShader,
-                AccelerationStructure = accelerationStructure,
+                // AccelerationStructure = accelerationStructure,
                 ScramblingRanking = gIn_ScramblingRankingUint,
                 Sobol = gIn_SobolUint,
                 BiltMaterial = finalMaterial,
@@ -264,11 +273,12 @@ namespace PathTracing
                 SharcUpdateTs = sharcUpdateTs,
                 HashEntriesBuffer = _hashEntriesBuffer,
                 AccumulationBuffer = _accumulationBuffer,
-                ResolvedBuffer = _resolvedBuffer
+                ResolvedBuffer = _resolvedBuffer,
+                _dataBuilder = _dataBuilder
             };
         }
 
-          static readonly int Capacity = 1 << 22;
+        static readonly int Capacity = 1 << 22;
 
         private void InitializeBuffers()
         {
@@ -277,7 +287,7 @@ namespace PathTracing
             _hashEntriesBuffer = new GraphicsBuffer(GraphicsBuffer.Target.Structured, Capacity, sizeof(ulong));
             ulong[] clearData = new ulong[Capacity];
             _hashEntriesBuffer.SetData(clearData);
-            
+
             // 2. Accumulation Buffer: storing uint4 (16 bytes)
             // HLSL: RWStructuredBuffer<SharcAccumulationData> gInOut_SharcAccumulated;
             _accumulationBuffer = new GraphicsBuffer(GraphicsBuffer.Target.Structured, Capacity, sizeof(uint) * 4);
@@ -304,8 +314,8 @@ namespace PathTracing
                 nrd = new NRDDenoiser(pathTracingSetting, cam.name);
                 _nrdDenoisers.Add(camID, nrd);
             }
-            
-            
+
+
             if (!_dlrrDenoisers.TryGetValue(camID, out var dlrr))
             {
                 dlrr = new DLRRDenoiser(pathTracingSetting, cam.name);
@@ -319,23 +329,25 @@ namespace PathTracing
                 || taaComputeShader == null
                 || finalMaterial == null
                 || opaqueTracingShader == null
-                || transparentTracingShader == null 
+                || transparentTracingShader == null
                 || sharcResolveCs == null
                 || sharcUpdateTs == null
                )
                 return;
 
-
-            renderer.EnqueuePass(_pathTracingPass);
+            if (!_dataBuilder.IsEmpty())
+            {
+                renderer.EnqueuePass(_pathTracingPass);
+            }
         }
 
         protected override void Dispose(bool disposing)
         {
             Debug.Log("PathTracingFeature Dispose");
             base.Dispose(disposing);
-            accelerationStructure.Dispose();
-            accelerationStructure.Release();
-            accelerationStructure = null;
+            // accelerationStructure.Dispose();
+            // accelerationStructure.Release();
+            // accelerationStructure = null;
             _pathTracingPass.Dispose();
             _pathTracingPass = null;
 
@@ -351,13 +363,13 @@ namespace PathTracing
             }
 
             _dlrrDenoisers.Clear();
-            
+
             gIn_ScramblingRankingUint?.Release();
             gIn_ScramblingRankingUint = null;
 
             gIn_SobolUint?.Release();
             gIn_SobolUint = null;
-             
+
             _accumulationBuffer?.Release();
             _accumulationBuffer = null;
             _hashEntriesBuffer?.Release();

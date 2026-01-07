@@ -111,7 +111,61 @@ Shader "Custom/LitWithRayTracing"
             HLSLPROGRAM
             #include "UnityRaytracingMeshUtils.cginc"
             #include "ml.hlsli"
-            #include "Packages/com.unity.render-pipelines.universal/Shaders/LitInput.hlsl"
+
+            // #define half float
+
+
+            // #include "Packages/com.unity.render-pipelines.universal/Shaders/LitInput.hlsl"
+
+            #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
+
+
+            CBUFFER_START(UnityPerMaterial)
+                float4 _BaseMap_ST;
+                float4 _BaseMap_TexelSize;
+                float4 _DetailAlbedoMap_ST;
+                float4 _BaseColor;
+                float4 _SpecColor;
+                float4 _EmissionColor;
+                float _Cutoff;
+                float _Smoothness;
+                float _Metallic;
+                float _BumpScale;
+                float _Parallax;
+                float _OcclusionStrength;
+                float _ClearCoatMask;
+                float _ClearCoatSmoothness;
+                float _DetailAlbedoMapScale;
+                float _DetailNormalMapScale;
+                float _Surface;
+            CBUFFER_END
+
+            TEXTURE2D(_BaseMap);
+            SAMPLER(sampler_BaseMap);
+            TEXTURE2D(_BumpMap);
+            SAMPLER(sampler_BumpMap);
+            TEXTURE2D(_EmissionMap);
+            SAMPLER(sampler_EmissionMap);
+
+
+            TEXTURE2D(_ParallaxMap);
+            SAMPLER(sampler_ParallaxMap);
+            TEXTURE2D(_OcclusionMap);
+            SAMPLER(sampler_OcclusionMap);
+            TEXTURE2D(_DetailMask);
+            SAMPLER(sampler_DetailMask);
+            TEXTURE2D(_DetailAlbedoMap);
+            SAMPLER(sampler_DetailAlbedoMap);
+            TEXTURE2D(_DetailNormalMap);
+            SAMPLER(sampler_DetailNormalMap);
+            TEXTURE2D(_MetallicGlossMap);
+            SAMPLER(sampler_MetallicGlossMap);
+            TEXTURE2D(_SpecGlossMap);
+            SAMPLER(sampler_SpecGlossMap);
+            TEXTURE2D(_ClearCoatMap);
+            SAMPLER(sampler_ClearCoatMap);
+
+
             #include "Include/Shared.hlsl"
             #include "Include/Payload.hlsl"
 
@@ -126,6 +180,9 @@ Shader "Custom/LitWithRayTracing"
             #pragma enable_d3d11_debug_symbols
             #pragma use_dxc
             #pragma enable_ray_tracing_shader_debug_symbols
+
+            // #pragma require Int64BufferAtomics
+            #pragma require Native16Bit
 
             struct AttributeData
             {
@@ -144,6 +201,52 @@ Shader "Custom/LitWithRayTracing"
             }
 
             #endif
+
+
+            struct PrimitiveData
+            {
+                float16_t2 uv0;
+                float16_t2 uv1;
+                float16_t2 uv2;
+                float worldArea;
+
+                float16_t2 n0;
+                float16_t2 n1;
+                float16_t2 n2;
+                float uvArea;
+
+                float16_t2 t0;
+                float16_t2 t1;
+                float16_t2 t2;
+                float bitangentSign;
+            };
+
+            struct InstanceData
+            {
+                // For static: mObjectToWorld
+                // For dynamic: mWorldToWorldPrev
+                float4 mOverloadedMatrix0;
+                float4 mOverloadedMatrix1;
+                float4 mOverloadedMatrix2;
+
+                float16_t4 baseColorAndMetalnessScale;
+                float16_t4 emissionAndRoughnessScale;
+
+                float16_t2 normalUvScale;
+                uint32_t textureOffsetAndFlags;
+                uint32_t primitiveOffset;
+                float scale; // TODO: handling object scale embedded into the transformation matrix (assuming uniform scale), sign represents triangle winding
+
+                uint32_t morphPrimitiveOffset;
+                uint32_t unused1;
+                uint32_t unused2;
+                uint32_t unused3;
+            };
+
+
+            StructuredBuffer<InstanceData> gIn_InstanceData;
+            StructuredBuffer<PrimitiveData> gIn_PrimitiveData;
+
 
             struct Vertex
             {
@@ -177,7 +280,7 @@ Shader "Custom/LitWithRayTracing"
                     INTERPOLATE_ATTRIBUTE(position);
                     INTERPOLATE_ATTRIBUTE(normal);
                     INTERPOLATE_ATTRIBUTE(tangent);
-                    INTERPOLATE_ATTRIBUTE(uv);
+                INTERPOLATE_ATTRIBUTE(uv);
                 return v;
             }
 
@@ -221,8 +324,19 @@ Shader "Custom/LitWithRayTracing"
 
             [shader("closesthit")]
             void ClosestHitMain(inout MainRayPayload payload : SV_RayPayload,
-                            AttributeData attribs : SV_IntersectionAttributes)
+                                                                    AttributeData attribs : SV_IntersectionAttributes)
             {
+                // uint instanceIndex = InstanceIndex() + GeometryIndex();
+                uint instanceIndex = InstanceIndex();
+                InstanceData instanceData = gIn_InstanceData[instanceIndex];
+                
+                uint primitiveIndex = instanceData.primitiveOffset  + PrimitiveIndex();
+                PrimitiveData primitiveData = gIn_PrimitiveData[primitiveIndex];
+                //
+                //
+                //
+
+
                 uint3 triangleIndices = UnityRayTracingFetchTriangleIndices(PrimitiveIndex());
                 Vertex v0 = FetchVertex(triangleIndices.x);
                 Vertex v1 = FetchVertex(triangleIndices.y);
@@ -240,13 +354,30 @@ Shader "Custom/LitWithRayTracing"
 
                 payload.curvature = sqrt(dnSq);
 
-                float3 barycentricCoords = float3(1.0 - attribs.barycentrics.x - attribs.barycentrics.y,
-                                                                attribs.barycentrics.x, attribs.barycentrics.y);
-
-                Vertex v = InterpolateVertices(v0, v1, v2, barycentricCoords);
-
-
+                float3 barycentrics = float3(1.0 - attribs.barycentrics.x - attribs.barycentrics.y,
+                      attribs.barycentrics.x, attribs.barycentrics.y);
+                
+                float3x3 mObjectToWorld = (float3x3)ObjectToWorld();
                 bool isFrontFace = HitKind() == HIT_KIND_TRIANGLE_FRONT_FACE;
+                
+                
+                
+        // // Normal
+        // float3 n10 = Packing::DecodeUnitVector(primitiveData.n0, true);
+        // float3 n11 = Packing::DecodeUnitVector(primitiveData.n1, true);
+        // float3 n12 = Packing::DecodeUnitVector(primitiveData.n2, true);
+        //         
+        //         float flip = isFrontFace ? -1.0 : 1.0;
+        //          
+        // float3 N = barycentrics.x * n0 + barycentrics.y * n1 + barycentrics.z * n2;
+        // N = Geometry::RotateVector(mObjectToWorld, N);
+        // N = normalize(N * flip);
+                
+                
+
+                Vertex v = InterpolateVertices(v0, v1, v2, barycentrics);
+
+
 
                 float3 normalOS = isFrontFace ? v.normal : -v.normal;
 
@@ -337,10 +468,10 @@ Shader "Custom/LitWithRayTracing"
 
                 #if _EMISSION
                 float3 emission = _EmissionColor.xyz * _EmissionMap.SampleLevel(sampler_EmissionMap, v.uv, mip).xyz;
-                payload.Lemi =  Packing::EncodeRgbe( emission);
+                payload.Lemi = Packing::EncodeRgbe(emission);
                 #else
-                payload.Lemi = Packing::EncodeRgbe( float3(0, 0, 0));
-                    
+                payload.Lemi = Packing::EncodeRgbe(float3(0, 0, 0));
+
                 #endif
 
                 float emissionLevel = Color::Luminance(payload.Lemi);
@@ -355,11 +486,9 @@ Shader "Custom/LitWithRayTracing"
 
 
                 // Instance
-                uint instanceIndex = InstanceIndex();
                 // payload.instanceIndex = instanceIndex;
                 payload.SetInstanceIndex(instanceIndex);
 
-                float3x3 mObjectToWorld = (float3x3)ObjectToWorld();
 
 
                 float4x4 prev = GetPrevObjectToWorldMatrix();
@@ -368,7 +497,10 @@ Shader "Custom/LitWithRayTracing"
                 float3x3 mPrevObjectToWorld = (float3x3)prev;
                 // 法线
                 payload.N = Packing::EncodeUnitVector(normalWS);
-                payload.matN = Packing::EncodeUnitVector( worldNormal);
+                // payload.N = Packing::EncodeUnitVector(-N);
+                
+                
+                payload.matN = Packing::EncodeUnitVector(worldNormal);
 
                 float3 worldPosition = mul(ObjectToWorld3x4(), float4(v.position, 1.0)).xyz;
 
@@ -378,9 +510,17 @@ Shader "Custom/LitWithRayTracing"
                 // payload.X = worldPosition;
                 // payload.Xprev = prevWorldPosition;
                 // payload.roughness = roughness; 
-                
+
                 payload.roughnessAndMetalness = Packing::Rg16fToUint(float2(roughness, metallic));
-                payload.baseColor = Packing::RgbaToUint(float4(albedo, 1.0), 8,8,8,8);
+                payload.baseColor = Packing::RgbaToUint(float4(albedo, 1.0), 8, 8, 8, 8);
+                
+                // float dd = instanceData.primitiveOffset/100000.0;
+                // float dd = primitiveIndex  /70412.0;
+                float dd = instanceIndex  /8.0;
+                // payload.baseColor = Packing::RgbaToUint(float4(primitiveData.uv0,0, 1.0), 8, 8, 8, 8);
+                payload.baseColor = Packing::RgbaToUint(float4(dd,dd,dd, 1.0), 8, 8, 8, 8);
+                
+                
                 // payload.metalness = metallic;
                 uint flag = FLAG_NON_TRANSPARENT;
                 #if  _SURFACE_TYPE_TRANSPARENT
