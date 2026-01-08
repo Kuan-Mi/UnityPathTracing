@@ -581,6 +581,7 @@ void MainRayGenShader()
     MaterialProps materialProps0;
     CastRay(cameraRayOrigin, cameraRayDirection, 0.0, 1000.0, GetConeAngleFromRoughness(0.0, 0.0), (gOnScreen == SHOW_INSTANCE_INDEX || gOnScreen == SHOW_NORMAL) ? GEOMETRY_ALL : FLAG_NON_TRANSPARENT, geometryProps0, materialProps0);
 
+    g_Output[pixelPos] =   float4(materialProps0.N,1);
     //================================================================================================================================================================================
     // Primary surface replacement ( aka jump through mirrors )
     //================================================================================================================================================================================
@@ -599,44 +600,44 @@ void MainRayGenShader()
     bool isTaa5x5 = geometryProps0.Has(FLAG_HAIR | FLAG_SKIN) || geometryProps0.IsMiss(); // switched TAA to "higher quality & slower response" mode
     float viewZAndTaaMask0 = abs(viewZ0) * FP16_VIEWZ_SCALE * (isTaa5x5 ? -1.0 : 1.0);
 
-    // [loop]
-    // while (bounceNum && !geometryProps0.IsMiss() && IsDelta(materialProps0) && gPSR)
-    // {
-    //     {
-    //         // Origin point
-    //         // Accumulate curvature
-    //         accumulatedCurvature += materialProps0.curvature; // yes, before hit
-    //
-    //         // Accumulate mirror matrix
-    //         mirrorMatrix = mul(Geometry::GetMirrorMatrix(materialProps0.N), mirrorMatrix);
-    //
-    //         // Choose a ray
-    //         float3 ray = reflect(-geometryProps0.V, materialProps0.N);
-    //
-    //         // Update throughput
-    //         float3 albedo, Rf0;
-    //         BRDF::ConvertBaseColorMetalnessToAlbedoRf0(materialProps0.baseColor, materialProps0.metalness, albedo, Rf0);
-    //
-    //         float NoV = abs(dot(materialProps0.N, geometryProps0.V));
-    //         float3 Fenv = BRDF::EnvironmentTerm_Rtg(Rf0, NoV, materialProps0.roughness);
-    //
-    //         psrThroughput *= Fenv;
-    //
-    //         // Trace to the next hit
-    //         float2 mipAndCone = GetConeAngleFromRoughness(geometryProps0.mip, materialProps0.roughness);
-    //
-    //
-    //         CastRay(geometryProps0.GetXoffset(geometryProps0.N), ray, 0.0, INF, mipAndCone, GEOMETRY_ALL, geometryProps0, materialProps0);
-    //     }
-    //
-    //     {
-    //         // Hit point
-    //         // Accumulate hit distance representing virtual point position ( see "README/NOISY INPUTS" )
-    //         accumulatedHitDist += ApplyThinLensEquation(geometryProps0.hitT, accumulatedCurvature); // TODO: take updated from NRD
-    //     }
-    //
-    //     bounceNum--;
-    // }
+    [loop]
+    while (bounceNum && !geometryProps0.IsMiss() && IsDelta(materialProps0) && gPSR)
+    {
+        {
+            // Origin point
+            // Accumulate curvature
+            accumulatedCurvature += materialProps0.curvature; // yes, before hit
+    
+            // Accumulate mirror matrix
+            mirrorMatrix = mul(Geometry::GetMirrorMatrix(materialProps0.N), mirrorMatrix);
+    
+            // Choose a ray
+            float3 ray = reflect(-geometryProps0.V, materialProps0.N);
+    
+            // Update throughput
+            float3 albedo, Rf0;
+            BRDF::ConvertBaseColorMetalnessToAlbedoRf0(materialProps0.baseColor, materialProps0.metalness, albedo, Rf0);
+    
+            float NoV = abs(dot(materialProps0.N, geometryProps0.V));
+            float3 Fenv = BRDF::EnvironmentTerm_Rtg(Rf0, NoV, materialProps0.roughness);
+    
+            psrThroughput *= Fenv;
+    
+            // Trace to the next hit
+            float2 mipAndCone = GetConeAngleFromRoughness(geometryProps0.mip, materialProps0.roughness);
+    
+    
+            CastRay(geometryProps0.GetXoffset(geometryProps0.N), ray, 0.0, INF, mipAndCone, GEOMETRY_ALL, geometryProps0, materialProps0);
+        }
+    
+        {
+            // Hit point
+            // Accumulate hit distance representing virtual point position ( see "README/NOISY INPUTS" )
+            accumulatedHitDist += ApplyThinLensEquation(geometryProps0.hitT, accumulatedCurvature); // TODO: take updated from NRD
+        }
+    
+        bounceNum--;
+    }
 
     //================================================================================================================================================================================
     // G-buffer ( guides )

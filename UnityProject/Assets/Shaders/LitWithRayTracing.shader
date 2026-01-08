@@ -179,32 +179,16 @@ Shader "Custom/LitWithRayTracing"
             #pragma raytracing test
             #pragma enable_d3d11_debug_symbols
             #pragma use_dxc
-            #pragma enable_ray_tracing_shader_debug_symbols
 
-            // #pragma require Int64BufferAtomics
             #pragma require Native16Bit
+            #pragma require raytracing
             // #pragma require inlineraytracing
-            // #pragma target 6.4
-            
+            // #pragma target 6.5
 
             struct AttributeData
             {
                 float2 barycentrics;
             };
-
-
-            #if RAY_TRACING_PROCEDURAL_GEOMETRY
-
-            [shader("intersection")]
-            void IntersectionMain()
-            {
-                AttributeData attr;
-                attr.barycentrics = float2(0.0, 0.0);
-                ReportHit(0, 0.0, attr);
-            }
-
-            #endif
-
 
             struct PrimitiveData
             {
@@ -286,7 +270,7 @@ Shader "Custom/LitWithRayTracing"
 
                 // 3. 计算插值 UV
                 float3 barycentricCoords = float3(1.0 - attribs.barycentrics.x - attribs.barycentrics.y,
-                                                  attribs.barycentrics.x, attribs.barycentrics.y);
+                                      attribs.barycentrics.x, attribs.barycentrics.y);
                 float2 uv = uv0 * barycentricCoords.x + uv1 * barycentricCoords.y + uv2 * barycentricCoords.z;
 
                 // 4. 采样 Alpha 通道
@@ -305,9 +289,10 @@ Shader "Custom/LitWithRayTracing"
 
             [shader("closesthit")]
             void ClosestHitMain(inout MainRayPayload payload : SV_RayPayload,
-                                AttributeData attribs : SV_IntersectionAttributes)
+                               AttributeData attribs : SV_IntersectionAttributes)
             {
                 payload.hitT = RayTCurrent();
+
 
                 uint instanceIndex = InstanceID();
                 InstanceData instanceData = gIn_InstanceData[instanceIndex];
@@ -324,7 +309,7 @@ Shader "Custom/LitWithRayTracing"
 
                 // Barycentrics
                 float3 barycentrics = float3(1.0 - attribs.barycentrics.x - attribs.barycentrics.y,
-                                             attribs.barycentrics.x, attribs.barycentrics.y);
+                attribs.barycentrics.x, attribs.barycentrics.y);
 
                 // Normal
                 float3 n0 = Packing::DecodeUnitVector(primitiveData.n0, true);
@@ -333,10 +318,7 @@ Shader "Custom/LitWithRayTracing"
 
                 float3 N = barycentrics.x * n0 + barycentrics.y * n1 + barycentrics.z * n2;
 
-
                 N = Geometry::RotateVector(mObjectToWorld, N);
-
-                N = normalize(mul(N, (float3x3)WorldToObject()));
 
                 N = normalize(N * flip);
                 payload.N = Packing::EncodeUnitVector(-N);

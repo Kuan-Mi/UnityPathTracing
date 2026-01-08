@@ -164,6 +164,11 @@ namespace DefaultNamespace
             {
                 Renderer r = renderers[i];
 
+                if(r.name.Contains("_SubMesh_"))
+                {
+                    // 已经是子网格拆分出来的对象，跳过
+                    continue;
+                }
 
                 MeshFilter mf = r.GetComponent<MeshFilter>();
 
@@ -286,22 +291,17 @@ namespace DefaultNamespace
                     // 处理 Flags
                     uint currentFlags = 0;
                     RayTracingSubMeshFlags subMeshFlag = RayTracingSubMeshFlags.Enabled;
-                    if (mat != null)
-                    {
-                        bool isTransparent = mat.renderQueue >= 3000 || mat.IsKeywordEnabled("_SURFACE_TYPE_TRANSPARENT");
+                    // if (mat != null)
+
+                    bool isTransparent = mat.renderQueue >= 3000 || mat.IsKeywordEnabled("_SURFACE_TYPE_TRANSPARENT");
 
 
-                        if (!isTransparent)
-                            subMeshFlag |= RayTracingSubMeshFlags.ClosestHitOnly;
+                    if (!isTransparent)
+                        subMeshFlag |= RayTracingSubMeshFlags.ClosestHitOnly;
 
-                        currentFlags |= isTransparent ? FLAG_TRANSPARENT : FLAG_NON_TRANSPARENT;
-                        if (r.gameObject.isStatic)
-                            currentFlags |= FLAG_STATIC;
-                    }
-                    else
-                    {
-                        currentFlags |= FLAG_NON_TRANSPARENT; // 默认不透明
-                    }
+                    currentFlags |= isTransparent ? FLAG_TRANSPARENT : FLAG_NON_TRANSPARENT;
+                    if (r.gameObject.isStatic)
+                        currentFlags |= FLAG_STATIC;
 
 
                     inst.textureOffsetAndFlags = ((currentFlags & 0xFF) << FLAG_FIRST_BIT) | (baseTextureIndex & NON_FLAG_MASK);
@@ -349,22 +349,44 @@ namespace DefaultNamespace
 
                     int result;
 
+
+                    uint mask = 0;
+
+                    if (isTransparent)
+                        mask |= 0x02;
+                    else
+                        mask |= 0x01;
+
+
                     if (subIdx != 0)
                     {
-                        var newObj = Object.Instantiate(r.gameObject);
-                        newObj.transform.position = r.transform.position;
-                        newObj.transform.rotation = r.transform.rotation;
-                        newObj.transform.localScale = r.transform.lossyScale;
+                        var subMeshName = r.name + $"_SubMesh_{subIdx}";
                         
-                        
-                        var newRenderer = newObj.GetComponent<Renderer>();
-                        newRenderer.name = r.name + $"_SubMesh_{subIdx}";
+                        var subObjExisting = GameObject.Find(subMeshName);
 
-                        result = accelerationStructure.AddInstance(newRenderer, subMeshFlags, true, false, 255U, (uint)globalInstanceIndexCounter);
+                        Renderer newRenderer;
+                        if (subObjExisting == null)
+                        {
+                            
+                            var newObj = Object.Instantiate(r.gameObject);
+                            newObj.transform.position = r.transform.position;
+                            newObj.transform.rotation = r.transform.rotation;
+                            newObj.transform.localScale = r.transform.lossyScale;
+
+                            newObj.name = r.name + $"_SubMesh_{subIdx}";
+
+                              newRenderer = newObj.GetComponent<Renderer>();
+                        }
+                        else
+                        {
+                            newRenderer = subObjExisting.GetComponent<Renderer>();
+                        }
+                        
+                        result = accelerationStructure.AddInstance(newRenderer, subMeshFlags, true, false, mask, (uint)globalInstanceIndexCounter);
                     }
                     else
                     {
-                        result = accelerationStructure.AddInstance(r, subMeshFlags, true, false, 255U, (uint)globalInstanceIndexCounter);
+                        result = accelerationStructure.AddInstance(r, subMeshFlags, true, false, mask, (uint)globalInstanceIndexCounter);
                     }
 
                     var subMeshFlagStr = "";
