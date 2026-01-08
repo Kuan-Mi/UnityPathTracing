@@ -83,12 +83,12 @@ MonoBehaviour:
     isBaseColorMetalnessAvailable: 1
     planeDistanceSensitivity: 0.131
     maxStabilizedFrameNum: 5
-    showMode: 18
+    showMode: 16
     showMV: 0
     showValidation: 0
     dofAperture: 0
     dofFocalDistance: 1
-    exposure: 80
+    exposure: 4
     rpp: 1
     bounceNum: 1
     mipBias: -0.5
@@ -108,6 +108,7 @@ MonoBehaviour:
     boost: 0
     SR: 0
     RR: 1
+    tmpDisableRR: 1
     resolutionScale: 1
     upscalerMode: 0
   gIn_ScramblingRanking: {fileID: 2800000, guid: ba45d1e4dcf9022438a4798a5f9e7b80, type: 3}

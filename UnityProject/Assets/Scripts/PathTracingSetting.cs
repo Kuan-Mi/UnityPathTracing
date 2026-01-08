@@ -128,6 +128,7 @@ namespace PathTracing
         public bool boost = false;
         public bool SR = false;
         public bool RR = false;
+        public bool tmpDisableRR = false;
 
         [Range(0.5f, 1.0f)]
         public float resolutionScale = 0.5f;

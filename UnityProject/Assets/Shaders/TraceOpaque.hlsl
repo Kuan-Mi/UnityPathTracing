@@ -581,7 +581,6 @@ void MainRayGenShader()
     MaterialProps materialProps0;
     CastRay(cameraRayOrigin, cameraRayDirection, 0.0, 1000.0, GetConeAngleFromRoughness(0.0, 0.0), (gOnScreen == SHOW_INSTANCE_INDEX || gOnScreen == SHOW_NORMAL) ? GEOMETRY_ALL : FLAG_NON_TRANSPARENT, geometryProps0, materialProps0);
 
-    g_Output[pixelPos] =   float4(materialProps0.N,1);
     //================================================================================================================================================================================
     // Primary surface replacement ( aka jump through mirrors )
     //================================================================================================================================================================================

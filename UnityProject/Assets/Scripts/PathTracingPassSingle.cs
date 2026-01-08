@@ -159,11 +159,11 @@ namespace PathTracing
 
             natCmd.DispatchCompute(data.SharcResolveCs, 0, x, 1, 1);
 
-            
+
             natCmd.SetGlobalBuffer(gIn_InstanceDataID, data._dataBuilder._instanceBuffer);
-            natCmd.SetGlobalBuffer( gIn_PrimitiveDataID, data._dataBuilder._primitiveBuffer);
-            
-            
+            natCmd.SetGlobalBuffer(gIn_PrimitiveDataID, data._dataBuilder._primitiveBuffer);
+
+
             // 不透明
             natCmd.SetRayTracingShaderPass(data.OpaqueTs, "Test2");
             natCmd.SetRayTracingConstantBufferParam(data.OpaqueTs, paramsID, data.ConstantBuffer, 0, data.ConstantBuffer.stride);
@@ -278,8 +278,10 @@ namespace PathTracing
 
                 // DLSS调用
 
-                // NRD降噪
-                natCmd.IssuePluginEventAndData(GetRenderEventAndDataFunc(), 2, data.RRDataPtr);
+                if (!data.Setting.tmpDisableRR)
+                {
+                    natCmd.IssuePluginEventAndData(GetRenderEventAndDataFunc(), 2, data.RRDataPtr);
+                }
             }
             else
             {
@@ -317,7 +319,7 @@ namespace PathTracing
                     break;
                 case ShowMode.NoiseShadow:
                     Blitter.BlitTexture(natCmd, data.Penumbra, scaleOffset, data.BlitMaterial, (int)ShowPass.ShowNoiseShadow);
-                    break;        
+                    break;
                 case ShowMode.Shadow:
                     Blitter.BlitTexture(natCmd, data.ShadowTranslucency, scaleOffset, data.BlitMaterial, (int)ShowPass.showShadow);
                     break;
@@ -364,7 +366,7 @@ namespace PathTracing
                     {
                         Blitter.BlitTexture(natCmd, taaDst, scaleOffset, data.BlitMaterial, (int)ShowPass.showOut);
                     }
- 
+
                     break;
                 case ShowMode.DLSS_DiffuseAlbedo:
                     Blitter.BlitTexture(natCmd, data.RRGuide_DiffAlbedo, scaleOffset, data.BlitMaterial, (int)ShowPass.showOut);
