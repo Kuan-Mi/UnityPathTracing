@@ -40,6 +40,8 @@ RWTexture2D<float4> gOut_Spec;
 
 float2 GetBlueNoise(uint2 pixelPos, uint seed = 0)
 {
+    // 缓存效率低 多0.2ms
+    return Rng::Hash::GetFloat2();
     // https://eheitzresearch.wordpress.com/772-2/
     // https://belcour.github.io/blog/research/publication/2019/06/17/sampling-bluenoise.html
 
