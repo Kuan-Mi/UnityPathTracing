@@ -52,6 +52,13 @@ namespace DefaultNamespace
 
     public class PathTracingDataBuilder
     {
+        public static PathTracingDataBuilder instance ;
+        
+        public PathTracingDataBuilder()
+        {
+            instance = this;
+        }
+        
         // 位偏移定义
         private const int FLAG_FIRST_BIT = 24;
         private const uint NON_FLAG_MASK = (1u << FLAG_FIRST_BIT) - 1;
