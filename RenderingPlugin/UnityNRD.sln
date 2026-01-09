@@ -2,6 +2,8 @@
 Microsoft Visual Studio Solution File, Format Version 12.00
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "RenderingPlugin", "RenderingPlugin\RenderingPlugin.vcxproj", "{23885AE6-1F41-4AD5-9FB8-F77D6A8E3C0E}"
 EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "UnityRtxdi", "UnityRtxdi\UnityRtxdi.vcxproj", "{62D516E3-7482-4C7D-9DE5-A9EC8BB6BF15}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Win32 = Debug|Win32
@@ -18,5 +20,13 @@ Global
 		{23885AE6-1F41-4AD5-9FB8-F77D6A8E3C0E}.Release|Win32.Build.0 = Release|Win32
 		{23885AE6-1F41-4AD5-9FB8-F77D6A8E3C0E}.Release|x64.ActiveCfg = Release|x64
 		{23885AE6-1F41-4AD5-9FB8-F77D6A8E3C0E}.Release|x64.Build.0 = Release|x64
+		{62D516E3-7482-4C7D-9DE5-A9EC8BB6BF15}.Debug|Win32.ActiveCfg = Debug|Win32
+		{62D516E3-7482-4C7D-9DE5-A9EC8BB6BF15}.Debug|Win32.Build.0 = Debug|Win32
+		{62D516E3-7482-4C7D-9DE5-A9EC8BB6BF15}.Debug|x64.ActiveCfg = Debug|x64
+		{62D516E3-7482-4C7D-9DE5-A9EC8BB6BF15}.Debug|x64.Build.0 = Debug|x64
+		{62D516E3-7482-4C7D-9DE5-A9EC8BB6BF15}.Release|Win32.ActiveCfg = Release|Win32
+		{62D516E3-7482-4C7D-9DE5-A9EC8BB6BF15}.Release|Win32.Build.0 = Release|Win32
+		{62D516E3-7482-4C7D-9DE5-A9EC8BB6BF15}.Release|x64.ActiveCfg = Release|x64
+		{62D516E3-7482-4C7D-9DE5-A9EC8BB6BF15}.Release|x64.Build.0 = Release|x64
 	EndGlobalSection
 EndGlobal
