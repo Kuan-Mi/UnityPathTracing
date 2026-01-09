@@ -15,9 +15,6 @@ namespace
     IUnityLog* s_Logger = nullptr;
 
 
-    std::unique_ptr<rtxdi::ReSTIRDIContext> m_restirDIContext;
-
-
     void UNITY_INTERFACE_API OnGraphicsDeviceEvent(UnityGfxDeviceEventType eventType)
     {
     }
@@ -44,24 +41,31 @@ void UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API UnityPluginUnload()
     LOG("[NRD Native] UnityPluginUnload completed.");
 }
 
-void UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API CreateReSTIRDIContext(int width, int height)
+UNITY_INTERFACE_EXPORT rtxdi::ReSTIRDIContext* UNITY_INTERFACE_API CreateReSTIRDIContext(int width, int height)
 {
     rtxdi::ReSTIRDIStaticParameters contextParams;
     contextParams.RenderWidth = width;
     contextParams.RenderHeight = height;
 
-    // 初始化ReSTIR-DI上下文
-    m_restirDIContext = std::make_unique<rtxdi::ReSTIRDIContext>(contextParams);
+    // 创建并在堆上分配对象，将指针返回给 C#
+    // C# 端需要负责保存这个指针，并在不再使用时调用对应的 Destroy 函数（如果有的话）来释放内存
+    return new rtxdi::ReSTIRDIContext(contextParams);
 }
 
-UNITY_INTERFACE_EXPORT const rtxdi::ReSTIRDIStaticParameters* UNITY_INTERFACE_API GetStaticParameters()
+UNITY_INTERFACE_EXPORT void UNITY_INTERFACE_API DestroyReSTIRDIContext(rtxdi::ReSTIRDIContext* context)
 {
-    if (m_restirDIContext)
+    if (context)
     {
-        // 返回内部对象的地址
-        return &m_restirDIContext->GetStaticParameters();
+        delete context;
     }
-    // 如果上下文还没创建，返回 nullptr，防止 C# 端读乱码或崩溃
+}
+
+UNITY_INTERFACE_EXPORT const rtxdi::ReSTIRDIStaticParameters* UNITY_INTERFACE_API GetStaticParameters(rtxdi::ReSTIRDIContext* context)
+{
+    if (context)
+    {
+        return &context->GetStaticParameters();
+    }
     return nullptr;
 }
 }
