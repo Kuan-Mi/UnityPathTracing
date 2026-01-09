@@ -54,7 +54,7 @@ void UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API CreateReSTIRDIContext(int width,
     m_restirDIContext = std::make_unique<rtxdi::ReSTIRDIContext>(contextParams);
 }
 
-const rtxdi::ReSTIRDIStaticParameters* UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API GetStaticParameters()
+UNITY_INTERFACE_EXPORT const rtxdi::ReSTIRDIStaticParameters* UNITY_INTERFACE_API GetStaticParameters()
 {
     if (m_restirDIContext)
     {
