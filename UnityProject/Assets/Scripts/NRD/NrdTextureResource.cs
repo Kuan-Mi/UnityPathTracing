@@ -45,7 +45,7 @@ namespace NRD
             Release(); // 确保先释放旧的
             var dxgiFormat = NRDUtil.GetDXGIFormat(GraphicsFormat);
 
-            Debug.Log($"Allocating NRD Texture Resource: {Name}, Size: {resolution}, Format: {GraphicsFormat}");
+            // Debug.Log($"Allocating NRD Texture Resource: {Name}, Size: {resolution}, Format: {GraphicsFormat}");
 
 
             // 创建 RT 描述
