@@ -115,6 +115,8 @@ namespace PathTracing
             internal GraphicsBuffer AccumulationBuffer;
 
             internal GraphicsBuffer ResolvedBuffer;
+            
+            internal int passIndex;
             // internal PathTracingDataBuilder _dataBuilder;
         }
 
@@ -143,6 +145,7 @@ namespace PathTracing
 
 
             // Sharc update
+            if(data.passIndex == 0)
             {
                 natCmd.BeginSample(sharcUpdateMarker);
                 natCmd.SetRayTracingShaderPass(data.SharcUpdateTs, "Test2");
@@ -165,6 +168,7 @@ namespace PathTracing
 
 
             // Sharc resolve
+            if(data.passIndex == 0)
             {
                 natCmd.BeginSample(sharcResolveMarker);
                 natCmd.SetComputeConstantBufferParam(data.SharcResolveCs, paramsID, data.ConstantBuffer, 0, data.ConstantBuffer.stride);
@@ -503,6 +507,7 @@ namespace PathTracing
             passData.AccumulationBuffer = AccumulationBuffer;
             passData.HashEntriesBuffer = HashEntriesBuffer;
             passData.ResolvedBuffer = ResolvedBuffer;
+            passData.passIndex = isXr? xrPass.multipassId : 0;
             // passData._dataBuilder = _dataBuilder;
 
             var gSunDirection = -lightForward;

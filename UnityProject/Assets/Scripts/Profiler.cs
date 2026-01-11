@@ -109,8 +109,7 @@ public class GPUProfiler : MonoBehaviour
         // 过滤出有数据的Recorder
         var activeData = _recorderMap.Where(r => r.Value.recorder.isValid && r.Value.history.Count > 0).ToList();
         if (activeData.Count == 0) return;
-
-        GUI.backgroundColor = new Color(0, 0, 0, 0.6f);
+ 
 
         int h = Screen.height;
         var fontSize = h * 2 / 100;
@@ -122,18 +121,29 @@ public class GPUProfiler : MonoBehaviour
         GUIStyle valueStyle = new GUIStyle(nameStyle);
         valueStyle.alignment = TextAnchor.MiddleRight;
 
+        float v = fontSize / 12f;
         // 布局参数
-        float startX = 20;
-        float startY = 40;
-        float nameWidth = 220;    // 第一列：名称
-        float currentWidth = 120; // 第二列：当前值
-        float averageWidth = 120; // 第三列：平均值
+        float startX = v*20;
+        float startY = v*40;
+        float nameWidth = v*120;    // 第一列：名称
+        float currentWidth = v*80; // 第二列：当前值
+        float averageWidth = v*80; // 第三列：平均值
         float lineHeight = fontSize * 1.6f;
 
         float totalWidth = nameWidth + currentWidth + averageWidth + startX * 2;
         float totalHeight = (activeData.Count + 1) * lineHeight + 50; // +1 是为了表头
 
-        GUI.Box(new Rect(10, 10, totalWidth, totalHeight), $"GPU Profiler ({averageWindowSeconds}s Avg)");
+        GUIStyle boxStyle = new GUIStyle(GUI.skin.box);
+        boxStyle.fontSize = fontSize; 
+        boxStyle .normal.background = Texture2D.blackTexture;
+        boxStyle.normal.textColor = Color.white;
+        boxStyle.padding = new RectOffset(10, 10, 10, 10);
+        
+        
+        
+       var content = new GUIContent($"GPU Profiler ({averageWindowSeconds}s Avg)", Texture2D.blackTexture, "This is a tooltip");
+        
+        GUI.Box(new Rect(10, 10, totalWidth, totalHeight), $"GPU Profiler ({averageWindowSeconds}s Avg)",boxStyle);
 
         // 绘制表头
         float headerY = startY;
