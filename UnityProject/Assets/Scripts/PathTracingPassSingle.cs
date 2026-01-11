@@ -131,7 +131,7 @@ namespace PathTracing
             var sharcUpdateMarker = new ProfilerMarker(ProfilerCategory.Render, "Sharc Update", MarkerFlags.SampleGPU);
             var sharcResolveMarker = new ProfilerMarker(ProfilerCategory.Render, "Sharc Resolve", MarkerFlags.SampleGPU);
             var opaqueTracingMarker = new ProfilerMarker(ProfilerCategory.Render, "Opaque Tracing", MarkerFlags.SampleGPU);
-            var nrdDenoise = new ProfilerMarker(ProfilerCategory.Render, "NRD Denoise", MarkerFlags.SampleGPU);
+            var nrdDenoiseMarker = new ProfilerMarker(ProfilerCategory.Render, "NRD Denoise", MarkerFlags.SampleGPU);
             var compositionMarker = new ProfilerMarker(ProfilerCategory.Render, "Composition", MarkerFlags.SampleGPU);
             var transparentTracingMarker = new ProfilerMarker(ProfilerCategory.Render, "Transparent Tracing", MarkerFlags.SampleGPU);
             var taaMarker = new ProfilerMarker(ProfilerCategory.Render, "TAA", MarkerFlags.SampleGPU);
@@ -232,10 +232,9 @@ namespace PathTracing
             // NRD降噪
             if (!data.Setting.RR)
             {
-                natCmd.BeginSample(nrdDenoise);
+                natCmd.BeginSample(nrdDenoiseMarker);
                 natCmd.IssuePluginEventAndData(GetRenderEventAndDataFunc(), 1, data.NrdDataPtr);
-                natCmd.SetRenderTarget(data.CameraTexture);
-                natCmd.EndSample(nrdDenoise);
+                natCmd.EndSample(nrdDenoiseMarker);
             }
 
 
@@ -323,7 +322,6 @@ namespace PathTracing
                 {
                     natCmd.BeginSample(dlssDenoiseMarker);
                     natCmd.IssuePluginEventAndData(GetRenderEventAndDataFunc(), 2, data.RRDataPtr);
-                    natCmd.SetRenderTarget(data.CameraTexture);
                     natCmd.EndSample(dlssDenoiseMarker);
                 }
             }
