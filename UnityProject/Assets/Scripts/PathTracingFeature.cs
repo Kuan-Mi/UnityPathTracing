@@ -158,16 +158,16 @@ namespace PathTracing
                         hasOpaque = true;
                     }
                 }
-        
+
                 uint mask = 0;
-        
+
                 if (hasOpaque)
                     mask |= 0x01; // FLAG_NON_TRANSPARENT
                 if (hasTransparent)
                     mask |= 0x02; // FLAG_TRANSPARENT
-        
+
                 // Debug.Log($"Renderer {r.name} Mask: {mask}");
-        
+
                 accelerationStructure.UpdateInstanceMask(r, mask); // 1 表示包含在内
             }
         }
@@ -201,8 +201,8 @@ namespace PathTracing
         private GraphicsBuffer _resolvedBuffer;
 
 
-        private Dictionary<int, NRDDenoiser> _nrdDenoisers = new();
-        private Dictionary<int, DLRRDenoiser> _dlrrDenoisers = new();
+        private Dictionary<long, NRDDenoiser> _nrdDenoisers = new();
+        private Dictionary<long, DLRRDenoiser> _dlrrDenoisers = new();
 
         // public PathTracingDataBuilder _dataBuilder = new PathTracingDataBuilder();
 
@@ -222,7 +222,7 @@ namespace PathTracing
                     rayTracingModeMask = RayTracingModeMask.Everything
                 };
                 accelerationStructure = new RayTracingAccelerationStructure(settings);
-            
+
                 accelerationStructure.Build();
                 SetMask();
             }
@@ -309,19 +309,37 @@ namespace PathTracing
             if (cam.cameraType is CameraType.Preview or CameraType.Reflection)
                 return;
 
-            int camID = cam.GetInstanceID();
+            int eyeIndex = renderingData.cameraData.xr.enabled ? renderingData.cameraData.xr.multipassId : 0;
 
-            if (!_nrdDenoisers.TryGetValue(camID, out var nrd))
+
+            long uniqueKey = cam.GetInstanceID() + (eyeIndex * 100000L);
+
+
+            var isVR = renderingData.cameraData.xrRendering;
+
+            if (!_nrdDenoisers.TryGetValue(uniqueKey, out var nrd))
             {
-                nrd = new NRDDenoiser(pathTracingSetting, cam.name);
-                _nrdDenoisers.Add(camID, nrd);
+                var camName = cam.name;
+                if (isVR)
+                {
+                    camName = $"{cam.name}_Eye{eyeIndex}";
+                }
+
+                nrd = new NRDDenoiser(pathTracingSetting, camName);
+                _nrdDenoisers.Add(uniqueKey, nrd);
             }
 
 
-            if (!_dlrrDenoisers.TryGetValue(camID, out var dlrr))
+            if (!_dlrrDenoisers.TryGetValue(uniqueKey, out var dlrr))
             {
-                dlrr = new DLRRDenoiser(pathTracingSetting, cam.name);
-                _dlrrDenoisers.Add(camID, dlrr);
+                var camName = cam.name;
+                if (isVR)
+                {
+                    camName = $"{cam.name}_Eye{eyeIndex}";
+                }
+
+                dlrr = new DLRRDenoiser(pathTracingSetting, camName);
+                _dlrrDenoisers.Add(uniqueKey, dlrr);
             }
 
             _pathTracingPass.NrdDenoiser = nrd;
@@ -336,6 +354,7 @@ namespace PathTracing
                 || sharcUpdateTs == null
                )
                 return;
+
 
             // if (!_dataBuilder.IsEmpty())
             {

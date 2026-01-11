@@ -34,6 +34,7 @@ namespace PathTracing
         // public PathTracingDataBuilder _dataBuilder;
 
         public RayTracingAccelerationStructure AccelerationStructure;
+        
         public NRDDenoiser NrdDenoiser;
         public DLRRDenoiser DLRRDenoiser;
 
