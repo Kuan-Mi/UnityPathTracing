@@ -31,7 +31,7 @@ namespace PathTracing
         public GraphicsBuffer HashEntriesBuffer;
         public GraphicsBuffer AccumulationBuffer;
         public GraphicsBuffer ResolvedBuffer;
-        public PathTracingDataBuilder _dataBuilder;
+        // public PathTracingDataBuilder _dataBuilder;
 
         public RayTracingAccelerationStructure AccelerationStructure;
         public NRDDenoiser NrdDenoiser;
@@ -113,7 +113,7 @@ namespace PathTracing
             internal GraphicsBuffer HashEntriesBuffer;
             internal GraphicsBuffer AccumulationBuffer;
             internal GraphicsBuffer ResolvedBuffer;
-            internal PathTracingDataBuilder _dataBuilder;
+            // internal PathTracingDataBuilder _dataBuilder;
         }
 
         public PathTracingPassSingle(PathTracingSetting setting)
@@ -183,8 +183,8 @@ namespace PathTracing
             {
                 natCmd.BeginSample(opaqueTracingMarker);
 
-                natCmd.SetGlobalBuffer(gIn_InstanceDataID, data._dataBuilder._instanceBuffer);
-                natCmd.SetGlobalBuffer(gIn_PrimitiveDataID, data._dataBuilder._primitiveBuffer);
+                // natCmd.SetGlobalBuffer(gIn_InstanceDataID, data._dataBuilder._instanceBuffer);
+                // natCmd.SetGlobalBuffer(gIn_PrimitiveDataID, data._dataBuilder._primitiveBuffer);
 
 
                 natCmd.SetRayTracingShaderPass(data.OpaqueTs, "Test2");
@@ -474,7 +474,8 @@ namespace PathTracing
 
             NrdDenoiser.EnsureResources(outputResolution);
 
-            Shader.SetGlobalRayTracingAccelerationStructure(g_AccelStructID, _dataBuilder.accelerationStructure);
+            // Shader.SetGlobalRayTracingAccelerationStructure(g_AccelStructID, _dataBuilder.accelerationStructure);
+            Shader.SetGlobalRayTracingAccelerationStructure(g_AccelStructID, AccelerationStructure);
 
             using var builder = renderGraph.AddUnsafePass<PassData>("Path Tracing Pass", out var passData);
 
@@ -490,7 +491,7 @@ namespace PathTracing
             passData.AccumulationBuffer = AccumulationBuffer;
             passData.HashEntriesBuffer = HashEntriesBuffer;
             passData.ResolvedBuffer = ResolvedBuffer;
-            passData._dataBuilder = _dataBuilder;
+            // passData._dataBuilder = _dataBuilder;
 
             var gSunDirection = -lightForward;
             var up = new Vector3(0, 1, 0);

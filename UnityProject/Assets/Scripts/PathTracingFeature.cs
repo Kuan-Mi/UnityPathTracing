@@ -139,38 +139,38 @@ namespace PathTracing
 // #define FLAG_SKIN                           0x40 // skin
 // #define FLAG_MORPH                          0x80 // morph
 
-        // void SetMask()
-        // {
-        //     var allRenderers = GameObject.FindObjectsByType<Renderer>(FindObjectsSortMode.None);
-        //     foreach (var r in allRenderers)
-        //     {
-        //         var materials = r.sharedMaterials;
-        //         bool hasTransparent = false;
-        //         bool hasOpaque = false;
-        //         foreach (var mat in materials)
-        //         {
-        //             if (mat != null && mat.renderQueue >= 3000)
-        //             {
-        //                 hasTransparent = true;
-        //             }
-        //             else
-        //             {
-        //                 hasOpaque = true;
-        //             }
-        //         }
-        //
-        //         uint mask = 0;
-        //
-        //         if (hasOpaque)
-        //             mask |= 0x01; // FLAG_NON_TRANSPARENT
-        //         if (hasTransparent)
-        //             mask |= 0x02; // FLAG_TRANSPARENT
-        //
-        //         // Debug.Log($"Renderer {r.name} Mask: {mask}");
-        //
-        //         accelerationStructure.UpdateInstanceMask(r, mask); // 1 表示包含在内
-        //     }
-        // }
+        void SetMask()
+        {
+            var allRenderers = GameObject.FindObjectsByType<Renderer>(FindObjectsSortMode.None);
+            foreach (var r in allRenderers)
+            {
+                var materials = r.sharedMaterials;
+                bool hasTransparent = false;
+                bool hasOpaque = false;
+                foreach (var mat in materials)
+                {
+                    if (mat != null && mat.renderQueue >= 3000)
+                    {
+                        hasTransparent = true;
+                    }
+                    else
+                    {
+                        hasOpaque = true;
+                    }
+                }
+        
+                uint mask = 0;
+        
+                if (hasOpaque)
+                    mask |= 0x01; // FLAG_NON_TRANSPARENT
+                if (hasTransparent)
+                    mask |= 0x02; // FLAG_TRANSPARENT
+        
+                // Debug.Log($"Renderer {r.name} Mask: {mask}");
+        
+                accelerationStructure.UpdateInstanceMask(r, mask); // 1 表示包含在内
+            }
+        }
 
         public Material finalMaterial;
         public RayTracingShader opaqueTracingShader;
@@ -187,7 +187,7 @@ namespace PathTracing
 
         private PathTracingPassSingle _pathTracingPass;
 
-        // public RayTracingAccelerationStructure accelerationStructure;
+        public RayTracingAccelerationStructure accelerationStructure;
         public Settings settings;
 
         public Texture2D gIn_ScramblingRanking;
@@ -204,28 +204,28 @@ namespace PathTracing
         private Dictionary<int, NRDDenoiser> _nrdDenoisers = new();
         private Dictionary<int, DLRRDenoiser> _dlrrDenoisers = new();
 
-        public PathTracingDataBuilder _dataBuilder = new PathTracingDataBuilder();
+        // public PathTracingDataBuilder _dataBuilder = new PathTracingDataBuilder();
 
         [ContextMenu("ReBuild AccelerationStructure")]
         public void ReBuild()
         {
-            _dataBuilder.Build();
+            // _dataBuilder.Build();
         }
 
         public override void Create()
         {
-            // if (accelerationStructure == null)
-            // {
-            //     settings = new Settings
-            //     {
-            //         managementMode = ManagementMode.Automatic,
-            //         rayTracingModeMask = RayTracingModeMask.Everything
-            //     };
-            //     accelerationStructure = new RayTracingAccelerationStructure(settings);
-            //
-            //     accelerationStructure.Build();
-            //     SetMask();
-            // }
+            if (accelerationStructure == null)
+            {
+                settings = new Settings
+                {
+                    managementMode = ManagementMode.Automatic,
+                    rayTracingModeMask = RayTracingModeMask.Everything
+                };
+                accelerationStructure = new RayTracingAccelerationStructure(settings);
+            
+                accelerationStructure.Build();
+                SetMask();
+            }
 
             // ReBuild();
 
@@ -267,7 +267,7 @@ namespace PathTracing
                 CompositionCs = compositionComputeShader,
                 TaaCs = taaComputeShader,
                 DlssBeforeCs = dlssBeforeComputeShader,
-                // AccelerationStructure = accelerationStructure,
+                AccelerationStructure = accelerationStructure,
                 ScramblingRanking = gIn_ScramblingRankingUint,
                 Sobol = gIn_SobolUint,
                 BiltMaterial = finalMaterial,
@@ -276,7 +276,7 @@ namespace PathTracing
                 HashEntriesBuffer = _hashEntriesBuffer,
                 AccumulationBuffer = _accumulationBuffer,
                 ResolvedBuffer = _resolvedBuffer,
-                _dataBuilder = _dataBuilder
+                // _dataBuilder = _dataBuilder
             };
         }
 
@@ -337,7 +337,7 @@ namespace PathTracing
                )
                 return;
 
-            if (!_dataBuilder.IsEmpty())
+            // if (!_dataBuilder.IsEmpty())
             {
                 renderer.EnqueuePass(_pathTracingPass);
             }
