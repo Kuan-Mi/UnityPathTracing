@@ -10,6 +10,7 @@ using Unity.Mathematics;
 using UnityEngine;
 using UnityEngine.Experimental.Rendering;
 using UnityEngine.Rendering;
+using UnityEngine.Rendering.Universal;
 using static PathTracing.PathTracingUtils;
 
 namespace Nrd
@@ -262,7 +263,7 @@ namespace Nrd
         public float2 ViewportJitter;
         public float2 PrevViewportJitter;
 
-        private unsafe FrameData GetData(Camera mCamera, Vector3 dirToLight)
+        private unsafe FrameData GetData(UniversalCameraData cameraData, Vector3 dirToLight)
         {
             if (setting.RR)
             {
@@ -276,12 +277,32 @@ namespace Nrd
             prevResolutionScale = resolutionScale;
 
 
-            camPos = new float3(mCamera.transform.position.x, mCamera.transform.position.y, mCamera.transform.position.z);
-            worldToView = mCamera.worldToCameraMatrix;
-            worldToClip = GetWorldToClipMatrix(mCamera);
-            viewToClip = GL.GetGPUProjectionMatrix(mCamera.projectionMatrix, false);
-            resolutionScale = setting.resolutionScale;
+            var xrPass = cameraData.xr;
+            if (xrPass.enabled)
+            {
+                worldToView = cameraData.xr.GetViewMatrix();
+                var proj = GL.GetGPUProjectionMatrix(xrPass.GetProjMatrix(), false);
+                worldToClip = proj * worldToView;
+                viewToClip = proj;
 
+                Matrix4x4 invView = worldToView.inverse;
+                camPos = new float3(invView.m03, invView.m13, invView.m23);
+                
+                // Vector3 delta = camPos  - (float3)cameraData.camera.transform.position;
+                
+                // var deltaInCamSpace = cameraData.camera.transform.InverseTransformVector(delta);
+                // Debug.Log($"delta XR cam pos: {deltaInCamSpace}");
+            }
+            else
+            {
+                var mCamera = cameraData.camera;
+                camPos = new float3(mCamera.transform.position.x, mCamera.transform.position.y, mCamera.transform.position.z);
+                worldToView = mCamera.worldToCameraMatrix;
+                worldToClip = GetWorldToClipMatrix(mCamera);
+                viewToClip = GL.GetGPUProjectionMatrix(mCamera.projectionMatrix, false);
+            }
+
+            resolutionScale = setting.resolutionScale;
             FrameData localData = FrameData._default;
 
             // --- 矩阵赋值 ---
@@ -292,8 +313,6 @@ namespace Nrd
             localData.commonSettings.worldToViewMatrixPrev = prevWorldToView;
 
             ViewportJitter = Halton2D(FrameIndex + 1) - new float2(0.5f, 0.5f);
-
-            // Debug.Log($"[NRD] Viewport Jitter: {ViewportJitter}");
 
             // --- Jitter ---
             localData.commonSettings.cameraJitter = setting.cameraJitter ? ViewportJitter : float2.zero;
@@ -308,9 +327,6 @@ namespace Nrd
 
             ushort prevRectW = (ushort)(renderResolution.x * prevResolutionScale + 0.5f);
             ushort prevRectH = (ushort)(renderResolution.y * prevResolutionScale + 0.5f);
-            //
-            // ushort w = (ushort)(mCamera.pixelWidth / 2);
-            // ushort h = (ushort)(mCamera.pixelHeight / 2);
 
             localData.commonSettings.resourceSize[0] = (ushort)renderResolution.x;
             localData.commonSettings.resourceSize[1] = (ushort)renderResolution.y;
@@ -343,34 +359,13 @@ namespace Nrd
 
             //  Common 设置
 
-            // if (setting.useOverriddenCommonSettings)
-            // {
-            //     localData.commonSettings.viewToClipMatrix = setting.viewToClipMatrix;
-            //     localData.commonSettings.viewToClipMatrixPrev = setting.viewToClipMatrixPrev;
-            //     localData.commonSettings.worldToViewMatrix = setting.worldToViewMatrix;
-            //     localData.commonSettings.worldToViewMatrixPrev = setting.worldToViewMatrixPrev;
-            // }
-
             localData.commonSettings.denoisingRange = setting.denoisingRange;
-
-            // localData.commonSettings.disocclusionThreshold = setting.disocclusionThreshold;
-            // localData.commonSettings.disocclusionThresholdAlternate = setting.disocclusionThresholdAlternate;
             localData.commonSettings.splitScreen = setting.splitScreen;
-
-            // localData.commonSettings.isMotionVectorInWorldSpace = setting.isMotionVectorInWorldSpace;
-            // localData.commonSettings.isHistoryConfidenceAvailable = setting.isHistoryConfidenceAvailable;
-            // localData.commonSettings.isDisocclusionThresholdMixAvailable = setting.isDisocclusionThresholdMixAvailable;
             localData.commonSettings.isBaseColorMetalnessAvailable = setting.isBaseColorMetalnessAvailable;
             localData.commonSettings.enableValidation = setting.showValidation;
 
 
             // Sigma 设置
-
-            // if (setting.useOverriddenSigmaValues)
-            // {
-            //     localData.sigmaSettings.lightDirection = setting.lightDir;
-            // }
-
             localData.sigmaSettings.planeDistanceSensitivity = setting.planeDistanceSensitivity;
             localData.sigmaSettings.maxStabilizedFrameNum = setting.maxStabilizedFrameNum;
 
@@ -379,15 +374,14 @@ namespace Nrd
             localData.reblurSettings.checkerboardMode = CheckerboardMode.OFF;
             localData.reblurSettings.minMaterialForDiffuse = 0;
             localData.reblurSettings.minMaterialForSpecular = 1;
-            // localData.reblurSettings.hitDistanceReconstructionMode = mHitDistanceReconstructionMode::OFF;
 
             return localData;
         }
 
-        public IntPtr GetInteropDataPtr(Camera mCamera, Vector3 dirToLight)
+        public IntPtr GetInteropDataPtr(UniversalCameraData cameraData, Vector3 dirToLight)
         {
             var index = (int)(FrameIndex % BufferCount);
-            buffer[index] = GetData(mCamera, dirToLight);
+            buffer[index] = GetData(cameraData, dirToLight);
             FrameIndex++;
             unsafe
             {

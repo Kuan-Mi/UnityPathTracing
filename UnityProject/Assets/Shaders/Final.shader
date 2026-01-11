@@ -27,6 +27,8 @@
             // Blitter 会自动绑定
             TEXTURE2D(_BlitTexture);
             SAMPLER(sampler_BlitTexture);
+            
+            float4 _BlitScaleBias;
 
             struct Attributes
             {
@@ -53,6 +55,13 @@
                 #ifdef UNITY_UV_STARTS_AT_TOP
                 i.uv.y = 1.0 - i.uv.y;
                 #endif
+                
+                i.uv = i.uv * _BlitScaleBias.xy + _BlitScaleBias.zw;
+                
+                if (i.uv.x < 0.0 || i.uv.x > 1.0 || i.uv.y < 0.0 || i.uv.y > 1.0)
+                {
+                    return float4(0, 0, 0, 0);
+                }
 
                 return SAMPLE_TEXTURE2D(_BlitTexture, sampler_BlitTexture, i.uv);
             }

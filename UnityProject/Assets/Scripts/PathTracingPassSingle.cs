@@ -34,7 +34,7 @@ namespace PathTracing
         // public PathTracingDataBuilder _dataBuilder;
 
         public RayTracingAccelerationStructure AccelerationStructure;
-        
+
         public NRDDenoiser NrdDenoiser;
         public DLRRDenoiser DLRRDenoiser;
 
@@ -113,6 +113,7 @@ namespace PathTracing
 
             internal GraphicsBuffer HashEntriesBuffer;
             internal GraphicsBuffer AccumulationBuffer;
+
             internal GraphicsBuffer ResolvedBuffer;
             // internal PathTracingDataBuilder _dataBuilder;
         }
@@ -473,6 +474,16 @@ namespace PathTracing
 
             int2 outputResolution = new int2(cameraData.camera.pixelWidth, cameraData.camera.pixelHeight);
 
+            // Debug.Log($"Output Resolution: {outputResolution.x} x {outputResolution.y}");
+            var xrPass = cameraData.xr;
+            var isXr = xrPass.enabled;
+            if (xrPass.enabled)
+            {
+                // Debug.Log($"XR Enabled. Eye Texture Resolution: {xrPass.renderTargetDesc.width} x {xrPass.renderTargetDesc.height}");
+
+                outputResolution = new int2(xrPass.renderTargetDesc.width, xrPass.renderTargetDesc.height);
+            }
+
             NrdDenoiser.EnsureResources(outputResolution);
 
             // Shader.SetGlobalRayTracingAccelerationStructure(g_AccelStructID, _dataBuilder.accelerationStructure);
@@ -499,11 +510,16 @@ namespace PathTracing
             var gSunBasisX = math.normalize(math.cross(new float3(up.x, up.y, up.z), new float3(gSunDirection.x, gSunDirection.y, gSunDirection.z)));
             var gSunBasisY = math.normalize(math.cross(new float3(gSunDirection.x, gSunDirection.y, gSunDirection.z), gSunBasisX));
 
-            var cam = cameraData.camera;
-            passData.NrdDataPtr = NrdDenoiser.GetInteropDataPtr(cam, gSunDirection);
-            passData.RRDataPtr = DLRRDenoiser.GetInteropDataPtr(cam, NrdDenoiser);
+            // var cam = cameraData.camera;
 
-            var m11 = cam.projectionMatrix.m11;
+
+            passData.NrdDataPtr = NrdDenoiser.GetInteropDataPtr(cameraData, gSunDirection);
+            passData.RRDataPtr = DLRRDenoiser.GetInteropDataPtr(cameraData, NrdDenoiser);
+
+
+            var proj = isXr ? xrPass.GetProjMatrix() : cameraData.camera.projectionMatrix;
+
+            var m11 = proj.m11;
 
             var renderResolution = NrdDenoiser.renderResolution;
 
@@ -522,10 +538,11 @@ namespace PathTracing
             var rectSizePrev = new float2((rectWprev), (rectHprev));
             var jitter = (m_Settings.cameraJitter ? NrdDenoiser.ViewportJitter : 0f) / rectSize;
 
-            var verticalFieldOfView = cam.fieldOfView;
-            var aspectRatio = (float)rectW / rectH;
-            var horizontalFieldOfView = Mathf.Atan(Mathf.Tan(Mathf.Deg2Rad * verticalFieldOfView * 0.5f) * aspectRatio) * 2 * Mathf.Rad2Deg;
 
+            float fovXRad = math.atan(1.0f / proj.m00) * 2.0f;
+            float horizontalFieldOfView = fovXRad * Mathf.Rad2Deg;
+
+            float nearZ = proj.m23 / (proj.m22 - 1.0f);
 
             float emissionIntensity = m_Settings.emissionIntensity * (m_Settings.emission ? 1.0f : 0.0f);
 
@@ -578,13 +595,13 @@ namespace PathTracing
                 gWorldToClipPrev = NrdDenoiser.prevWorldToClip,
 
                 gHitDistParams = new float4(3, 0.1f, 20, -25),
-                gCameraFrustum = GetNrdFrustum(cameraData.camera),
+                gCameraFrustum = GetNrdFrustum(cameraData),
                 gSunBasisX = new float4(gSunBasisX.x, gSunBasisX.y, gSunBasisX.z, 0),
                 gSunBasisY = new float4(gSunBasisY.x, gSunBasisY.y, gSunBasisY.z, 0),
                 gSunDirection = new float4(gSunDirection.x, gSunDirection.y, gSunDirection.z, 0),
                 gCameraGlobalPos = new float4(NrdDenoiser.camPos, 0),
                 gCameraGlobalPosPrev = new float4(NrdDenoiser.prevCamPos, 0),
-                gViewDirection = new float4(cam.transform.forward, 0),
+                gViewDirection = new float4(cameraData.camera.transform.forward, 0),
                 gHairBaseColor = new float4(0.1f, 0.1f, 0.1f, 1.0f),
 
                 gHairBetas = new float2(0.25f, 0.3f),
@@ -598,7 +615,7 @@ namespace PathTracing
                 gJitter = jitter,
 
                 gEmissionIntensity = emissionIntensity,
-                gNearZ = -cam.nearClipPlane,
+                gNearZ = -nearZ,
                 gSeparator = m_Settings.splitScreen,
                 gRoughnessOverride = 0,
                 gMetalnessOverride = 0,
@@ -615,7 +632,7 @@ namespace PathTracing
                 gHdrScale = 1.0f,
                 gExposure = m_Settings.exposure,
                 gMipBias = m_Settings.mipBias,
-                gOrthoMode = cam.orthographic ? 1.0f : 0f,
+                gOrthoMode = cameraData.camera.orthographic ? 1.0f : 0f,
                 gIndirectDiffuse = m_Settings.indirectDiffuse ? 1.0f : 0.0f,
                 gIndirectSpecular = m_Settings.indirectSpecular ? 1.0f : 0.0f,
                 gMinProbability = minProbability,

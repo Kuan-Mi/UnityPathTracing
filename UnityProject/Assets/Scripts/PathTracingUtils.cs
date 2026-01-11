@@ -1,4 +1,5 @@
 ﻿using UnityEngine;
+using UnityEngine.Rendering.Universal;
 
 namespace PathTracing
 {
@@ -13,27 +14,37 @@ namespace PathTracing
             return proj * camera.worldToCameraMatrix;
         }
         
-        public static Vector4 GetNrdFrustum(Camera cam)
+        public static Vector4 GetNrdFrustum(UniversalCameraData cameraData)
         {
-            Matrix4x4 p = cam.projectionMatrix;
+            Matrix4x4 p = cameraData.xr.enabled? cameraData.xr.GetProjMatrix() : cameraData.camera.projectionMatrix;
 
-            // Unity 的投影矩阵 p 的元素索引:
-            // [0,0] = 2n/(r-left), [0,2] = (r+left)/(r-left)
-            // [1,1] = 2n/(top-bottom), [1,2] = (top+bottom)/(top-bottom)
+            var isOrthographic = cameraData.camera.orthographic;
 
             float x0, x1, y0, y1;
 
-            if (!cam.orthographic)
+            if (!isOrthographic)
             {
-                // 透视投影重建 (基于投影矩阵的逆推)
-                // 对应 C++ 中的 x0 = vPlane[PLANE_LEFT].z / vPlane[PLANE_LEFT].x
-                x0 = (-1.0f - p.m02) / p.m00;
-                x1 = (1.0f - p.m02) / p.m00;
-                y0 = (-1.0f - p.m12) / p.m11;
-                y1 = (1.0f - p.m12) / p.m11;
+
+                float m00 = p.m00;
+                float m11 = p.m11;
+                float m02 = p.m02;
+                float m12 = p.m12;
+                
+                // Debug.Log($"Proj Matrix: \n{p.m00}, {p.m01}, {p.m02}, {p.m03}\n{p.m10}, {p.m11}, {p.m12}, {p.m13}\n{p.m20}, {p.m21}, {p.m22}, {p.m23}\n{p.m30}, {p.m31}, {p.m32}, {p.m33}");
+
+                // 计算 scale 和 offset
+                // 这里的逻辑是将 uv [0,1] 映射到 view space 射线方向
+                float x = -(1.0f - m02) / m00;
+                float y = -(1.0f + m12) / m11;
+                float z = 2.0f / m00;
+                float w = 2.0f / m11;
+
+                return new Vector4(-x, y, -z, w);
+                
             }
             else
             {
+                var cam = cameraData.camera;
                 // 正交投影
                 float halfHeight = cam.orthographicSize;
                 float halfWidth = halfHeight * cam.aspect;
@@ -50,6 +61,10 @@ namespace PathTracing
             // pfFrustum4[1] = -y1;
             // pfFrustum4[3] = y1 - y0;
 
+
+            var result = new Vector4(-x0, -y1, x0 - x1, y1 - y0);
+            Debug .Log($"NRD Frustum: {result.x}, {result.y}, {result.z}, {result.w}");
+            
             return new Vector4(-x0, -y1, x0 - x1, y1 - y0);
         }
 

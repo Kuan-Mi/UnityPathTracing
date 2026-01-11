@@ -5,6 +5,7 @@ using Unity.Collections;
 using Unity.Collections.LowLevel.Unsafe;
 using UnityEngine;
 using UnityEngine.Rendering;
+using UnityEngine.Rendering.Universal;
 
 namespace Nrd
 {
@@ -67,10 +68,10 @@ namespace Nrd
             return data;
         }
 
-        public IntPtr GetInteropDataPtr(Camera mCamera, NRDDenoiser denoiser)
+        public IntPtr GetInteropDataPtr(UniversalCameraData mCamera, NRDDenoiser denoiser)
         {
             var index = (int)(FrameIndex % BufferCount);
-            buffer[index] = GetData(mCamera, denoiser);
+            buffer[index] = GetData(mCamera.camera, denoiser);
             FrameIndex++;
             unsafe
             {
