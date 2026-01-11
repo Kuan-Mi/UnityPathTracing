@@ -107,7 +107,7 @@ MonoBehaviour:
     specularLobeTrimming: 1
     boost: 0
     SR: 0
-    RR: 0
+    RR: 1
     tmpDisableRR: 0
     resolutionScale: 1
     upscalerMode: 0

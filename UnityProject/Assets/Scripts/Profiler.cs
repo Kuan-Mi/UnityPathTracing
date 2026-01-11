@@ -67,11 +67,21 @@ public class GPUProfiler : MonoBehaviour
         foreach (var item in _recorderMap)
         {
             var data = item.Value;
-            if (!data.recorder.isValid) continue;
+            if (!data.recorder.isValid)
+            {
+                data.history.Clear();
+                data.currentAverage = 0f;
+                continue;
+            }
 
             // 获取当前帧毫秒数 (gpuElapsedNanoseconds 为 0 时不计入采样，避免干扰平均值)
             long ns = data.recorder.gpuElapsedNanoseconds;
-            if (ns <= 0) continue;
+            if (ns <= 0)
+            {
+                data.history.Clear();
+                data.currentAverage = 0f;
+                continue;
+            }
 
             float currentMs = ns * 1e-6f;
 
@@ -137,6 +147,9 @@ public class GPUProfiler : MonoBehaviour
         int i = 0;
         foreach (var item in activeData)
         {
+            if (item.Value.history.Count == 0)
+                continue;
+            
             float y = headerY + lineHeight + (i * lineHeight);
             var data = item.Value;
 
