@@ -287,9 +287,9 @@ namespace Nrd
 
                 Matrix4x4 invView = worldToView.inverse;
                 camPos = new float3(invView.m03, invView.m13, invView.m23);
-                
+
                 // Vector3 delta = camPos  - (float3)cameraData.camera.transform.position;
-                
+
                 // var deltaInCamSpace = cameraData.camera.transform.InverseTransformVector(delta);
                 // Debug.Log($"delta XR cam pos: {deltaInCamSpace}");
             }
@@ -398,8 +398,11 @@ namespace Nrd
 
             if (allocatedResources.Count > 0 && allocatedResources[0].IsCreated)
             {
-                var request = AsyncGPUReadback.Request(allocatedResources[0].Handle);
-                request.WaitForCompletion();
+                if (allocatedResources[0].Handle != null)
+                {
+                    var request = AsyncGPUReadback.Request(allocatedResources[0].Handle);
+                    request.WaitForCompletion();
+                }
             }
 
             ReleaseTextures();

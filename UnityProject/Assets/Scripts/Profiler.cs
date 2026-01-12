@@ -46,8 +46,10 @@ public class GPUProfiler : MonoBehaviour
         }
     }
 
-    private void OnEnable()
+    private async void OnEnable()
     {
+        await Awaitable.WaitForSecondsAsync(3.0f);
+        
         EnableRecorder();
     }
 

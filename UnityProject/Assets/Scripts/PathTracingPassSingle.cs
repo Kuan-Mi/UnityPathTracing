@@ -476,7 +476,7 @@ namespace PathTracing
 
             var resourceData = frameData.Get<UniversalResourceData>();
 
-            int2 outputResolution = new int2(cameraData.camera.pixelWidth, cameraData.camera.pixelHeight);
+            int2 outputResolution = new int2((int)(cameraData.camera.pixelWidth * cameraData.renderScale), (int)(cameraData.camera.pixelHeight * cameraData.renderScale));
 
             // Debug.Log($"Output Resolution: {outputResolution.x} x {outputResolution.y}");
             var xrPass = cameraData.xr;
