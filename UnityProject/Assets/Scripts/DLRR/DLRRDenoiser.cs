@@ -61,8 +61,8 @@ namespace Nrd
             }
             else
             {
-                data.outputWidth = (ushort)denoiser.renderResolution.x;
-                data.outputHeight = (ushort)denoiser.renderResolution.y;
+                data.outputWidth = (ushort)cameraData.scaledWidth;
+                data.outputHeight = (ushort)cameraData.scaledHeight;
             }
 
 
