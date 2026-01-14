@@ -1,7 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Runtime.InteropServices;
-using PathTracing;
 using Unity.Mathematics;
 using UnityEngine;
 using UnityEngine.Rendering;
@@ -119,13 +118,8 @@ namespace DefaultNamespace
             return startIndex;
         }
 
-        // public RayTracingAccelerationStructure accelerationStructure;
-
-        // public RayTracingAccelerationStructure.Settings settings;
         public ComputeBuffer _instanceBuffer;
         public ComputeBuffer _primitiveBuffer;
-
-        public Texture2DArray textureArray;
 
         public List<InstanceData> instanceDataList = new List<InstanceData>();
         public List<PrimitiveData> primitiveDataList = new List<PrimitiveData>();
@@ -138,35 +132,21 @@ namespace DefaultNamespace
             defaultNormal = Texture2D.normalTexture;
             defaultMask = Texture2D.whiteTexture;
 
-
-            // if (accelerationStructure != null)
-            // {
-            //     accelerationStructure.Release();
-            //     accelerationStructure = null;
-            // }
-
             instanceDataList.Clear();
             primitiveDataList.Clear();
 
             globalTexturePool.Clear();
             textureGroupCache.Clear();
 
-
             meshPrimitiveCache.Clear();
 
             var renderers = Object.FindObjectsByType<Renderer>(FindObjectsSortMode.None);
             Debug.Log($"Found {renderers.Length} renderers in scene.");
 
-
-            // uint currentPrimitiveOffset = 0;
-
-            // 【关键修改 1】全局 Instance 索引计数器，用于对应 InstanceBuffer 的下标
             int globalInstanceIndexCounter = 0;
 
-            for (int i = 0; i < renderers.Length; i++)
+            foreach (var r in renderers)
             {
-                Renderer r = renderers[i];
-
                 if (r.name.Contains("_SubMesh_"))
                 {
                     // 已经是子网格拆分出来的对象，跳过
@@ -182,14 +162,11 @@ namespace DefaultNamespace
                 int subMeshCount = mesh.subMeshCount;
                 int meshInstanceID = mesh.GetInstanceID(); // 获取 Mesh 唯一 ID
 
-                Matrix4x4 localToWorld = renderers[i].transform.localToWorldMatrix;
+                Matrix4x4 localToWorld = r.transform.localToWorldMatrix;
 
                 bool isMeshCached = meshPrimitiveCache.TryGetValue(meshInstanceID, out List<uint> cachedOffsets);
                 List<uint> currentMeshOffsets = isMeshCached ? cachedOffsets : new List<uint>();
 
-
-                // --- 构造 Primitive Data (每个三角形一个) ---
-                // int[] triangles = mesh.triangles;
                 Vector3[] vertices = mesh.vertices;
                 Vector2[] uvs = mesh.uv;
                 Vector3[] normals = mesh.normals;
@@ -197,7 +174,6 @@ namespace DefaultNamespace
                 mesh.RecalculateTangents();
                 Vector4[] tangents = mesh.tangents;
                 Material[] sharedMaterials = r.sharedMaterials;
-
 
                 uint instanceID = (uint)globalInstanceIndexCounter;
                 RayTracingSubMeshFlags[] subMeshFlags = new RayTracingSubMeshFlags[subMeshCount];
@@ -230,7 +206,6 @@ namespace DefaultNamespace
                         // 获取当前 SubMesh 的三角形索引
                         // 注意：GetTriangles 返回的是顶点索引，不需要偏移，直接对应 mesh.vertices
                         int[] subMeshTriangles = mesh.GetTriangles(subIdx);
-
 
                         // --- 构造 Primitive Data ---
                         for (int t = 0; t < subMeshTriangles.Length; t += 3)
@@ -311,7 +286,7 @@ namespace DefaultNamespace
                     }
 
                     // 如果材质索引超出了（比如 Mesh 有 3 个 SubMesh 但 Renderer 只填了 1 个材质），通常取最后一个或默认
-                    if (mat == null && sharedMaterials.Length > 0) mat = sharedMaterials[sharedMaterials.Length - 1];
+                    if (mat == null && sharedMaterials.Length > 0) mat = sharedMaterials[^1];
 
                     // 处理材质纹理
                     uint baseTextureIndex = GetTextureGroupIndex(mat);
@@ -385,11 +360,9 @@ namespace DefaultNamespace
                     meshPrimitiveCache.Add(meshInstanceID, currentMeshOffsets);
                 }
 
-                // accelerationStructure.AddInstance(r, subMeshFlags, true, false, mask, instanceID);
                 accelerationStructure.UpdateInstanceID(r, instanceID);
                 accelerationStructure.UpdateInstanceMask(r, mask);
             }
-
 
             _instanceBuffer?.Release();
             _instanceBuffer = new ComputeBuffer(instanceDataList.Count, Marshal.SizeOf<InstanceData>());
@@ -399,10 +372,7 @@ namespace DefaultNamespace
             _primitiveBuffer = new ComputeBuffer(primitiveDataList.Count, Marshal.SizeOf<PrimitiveData>());
             _primitiveBuffer.SetData(primitiveDataList.ToArray());
 
-            // accelerationStructure.Build();
-
-
-            Debug.Log($"Built RTAS. Renderers: {renderers.Length}, Instances: {instanceDataList.Count}, Primitives: {primitiveDataList.Count}");
+            Debug.Log($"Renderers: {renderers.Length}, Instances: {instanceDataList.Count}, Primitives: {primitiveDataList.Count}");
         }
 
         float SafeSign(float x)
