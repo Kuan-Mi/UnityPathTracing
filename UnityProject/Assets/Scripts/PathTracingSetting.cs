@@ -135,6 +135,6 @@ namespace PathTracing
 
         public UpscalerMode upscalerMode;
  
-        // public bool dlss;
+        public bool usePackedData;
     }
 }

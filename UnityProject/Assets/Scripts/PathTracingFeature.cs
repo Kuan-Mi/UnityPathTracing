@@ -204,12 +204,12 @@ namespace PathTracing
         private Dictionary<long, NRDDenoiser> _nrdDenoisers = new();
         private Dictionary<long, DLRRDenoiser> _dlrrDenoisers = new();
 
-        // public PathTracingDataBuilder _dataBuilder = new PathTracingDataBuilder();
+        public PathTracingDataBuilder _dataBuilder = new PathTracingDataBuilder();
 
         [ContextMenu("ReBuild AccelerationStructure")]
         public void ReBuild()
         {
-            // _dataBuilder.Build();
+            _dataBuilder.Build();
         }
 
         public override void Create()
@@ -276,16 +276,30 @@ namespace PathTracing
                 HashEntriesBuffer = _hashEntriesBuffer,
                 AccumulationBuffer = _accumulationBuffer,
                 ResolvedBuffer = _resolvedBuffer,
-                // _dataBuilder = _dataBuilder
+                _dataBuilder = _dataBuilder
             };
         }
 
         static readonly int Capacity = 1 << 22;
 
-        private void InitializeBuffers()
+        public void InitializeBuffers()
         {
-            // 1. Hash Entries Buffer: storing uint64_t (8 bytes)
-            // HLSL: RWStructuredBuffer<uint64_t> gInOut_SharcHashEntriesBuffer;
+            if (_hashEntriesBuffer != null)
+            {
+                _hashEntriesBuffer.Release();
+                _hashEntriesBuffer = null;
+            }
+            if (_accumulationBuffer != null)
+            {
+                _accumulationBuffer.Release();
+                _accumulationBuffer = null;
+            }
+            if (_resolvedBuffer != null)
+            {
+                _resolvedBuffer.Release();
+                _resolvedBuffer = null;
+            }
+            
             _hashEntriesBuffer = new GraphicsBuffer(GraphicsBuffer.Target.Structured, Capacity, sizeof(ulong));
             ulong[] clearData = new ulong[Capacity];
             _hashEntriesBuffer.SetData(clearData);
@@ -344,6 +358,10 @@ namespace PathTracing
 
             _pathTracingPass.NrdDenoiser = nrd;
             _pathTracingPass.DLRRDenoiser = dlrr;
+            
+            _pathTracingPass.AccumulationBuffer = _accumulationBuffer;
+            _pathTracingPass.HashEntriesBuffer = _hashEntriesBuffer;
+            _pathTracingPass.ResolvedBuffer = _resolvedBuffer;
 
             if (compositionComputeShader == null
                 || taaComputeShader == null
@@ -356,7 +374,14 @@ namespace PathTracing
                 return;
 
 
-            // if (!_dataBuilder.IsEmpty())
+            if (pathTracingSetting.usePackedData)
+            {
+                if (!_dataBuilder.IsEmpty())
+                {
+                    renderer.EnqueuePass(_pathTracingPass);
+                }
+            }
+            else
             {
                 renderer.EnqueuePass(_pathTracingPass);
             }

@@ -201,8 +201,12 @@ namespace DefaultNamespace
                 // 【关键修改 2】设置 RTAS 中该 Renderer 的 InstanceID 为当前的全局计数器基数
                 // 这样 shader 中: Index = BaseID + GeometryIndex(SubMeshIndex) 就能对齐了
 
-                // uint instanceID = (uint)globalInstanceIndexCounter;
+                uint instanceID = (uint)globalInstanceIndexCounter;
 
+                RayTracingSubMeshFlags[] subMeshFlags = new RayTracingSubMeshFlags[subMeshCount];
+                
+                
+                uint mask = 0;
 
                 // 【关键修改 3】遍历 SubMesh
                 for (int subIdx = 0; subIdx < subMeshCount; subIdx++)
@@ -348,16 +352,13 @@ namespace DefaultNamespace
                     instanceDataList.Add(inst);
 
 
-                    RayTracingSubMeshFlags[] subMeshFlags = new RayTracingSubMeshFlags[subMeshCount];
-                    for (int n = 0; n < subMeshCount; n++)
-                        subMeshFlags[n] = RayTracingSubMeshFlags.Disabled; // 先全部禁用
-
+                    // RayTracingSubMeshFlags[] subMeshFlags = new RayTracingSubMeshFlags[subMeshCount];
+                    // for (int n = 0; n < subMeshCount; n++)
+                    //     subMeshFlags[n] = RayTracingSubMeshFlags.Disabled; // 先全部禁用
+                    //
                     subMeshFlags[subIdx] = subMeshFlag;
+ 
 
-                    int result;
-
-
-                    uint mask = 0;
 
                     if (isTransparent)
                         mask |= 0x02;
@@ -365,44 +366,44 @@ namespace DefaultNamespace
                         mask |= 0x01;
 
 
-                    if (subIdx != 0)
-                    {
-                        var subMeshName = r.name + $"_SubMesh_{subIdx}";
-                        
-                        var subObjExisting = GameObject.Find(subMeshName);
+                    // if (subIdx != 0)
+                    // {
+                    //     var subMeshName = r.name + $"_SubMesh_{subIdx}";
+                    //     
+                    //     var subObjExisting = GameObject.Find(subMeshName);
+                    //
+                    //     Renderer newRenderer;
+                    //     if (subObjExisting == null)
+                    //     {
+                    //         
+                    //         var newObj = Object.Instantiate(r.gameObject);
+                    //         newObj.transform.position = r.transform.position;
+                    //         newObj.transform.rotation = r.transform.rotation;
+                    //         newObj.transform.localScale = r.transform.lossyScale;
+                    //
+                    //         newObj.name = r.name + $"_SubMesh_{subIdx}";
+                    //
+                    //           newRenderer = newObj.GetComponent<Renderer>();
+                    //     }
+                    //     else
+                    //     {
+                    //         newRenderer = subObjExisting.GetComponent<Renderer>();
+                    //     }
+                    //     
+                    //     result = accelerationStructure.AddInstance(newRenderer, subMeshFlags, true, false, mask, (uint)globalInstanceIndexCounter);
+                    // }
+                    // else
+                    // {
+                    //     result = accelerationStructure.AddInstance(r, subMeshFlags, true, false, mask, (uint)globalInstanceIndexCounter);
+                    // }
 
-                        Renderer newRenderer;
-                        if (subObjExisting == null)
-                        {
-                            
-                            var newObj = Object.Instantiate(r.gameObject);
-                            newObj.transform.position = r.transform.position;
-                            newObj.transform.rotation = r.transform.rotation;
-                            newObj.transform.localScale = r.transform.lossyScale;
+                    // var subMeshFlagStr = "";
+                    // foreach (var flag in subMeshFlags)
+                    // {
+                    //     subMeshFlagStr += flag.ToString() + " ";
+                    // }
 
-                            newObj.name = r.name + $"_SubMesh_{subIdx}";
-
-                              newRenderer = newObj.GetComponent<Renderer>();
-                        }
-                        else
-                        {
-                            newRenderer = subObjExisting.GetComponent<Renderer>();
-                        }
-                        
-                        result = accelerationStructure.AddInstance(newRenderer, subMeshFlags, true, false, mask, (uint)globalInstanceIndexCounter);
-                    }
-                    else
-                    {
-                        result = accelerationStructure.AddInstance(r, subMeshFlags, true, false, mask, (uint)globalInstanceIndexCounter);
-                    }
-
-                    var subMeshFlagStr = "";
-                    foreach (var flag in subMeshFlags)
-                    {
-                        subMeshFlagStr += flag.ToString() + " ";
-                    }
-
-                    Debug.Log($"Result {result} Add InstanceID for Renderer '{r.name}',SubMesh {subIdx} to {globalInstanceIndexCounter} with Flags: {subMeshFlagStr.Trim()}");
+                    // Debug.Log($"Result {result} Add InstanceID for Renderer '{r.name}',SubMesh {subIdx} to {globalInstanceIndexCounter} with Flags: {subMeshFlagStr.Trim()}");
 
                     // Debug.Log($"Added Instance {instanceDataList.Count - 1}: Renderer '{r.name}', SubMesh {subIdx}, Material '{(mat != null ? mat.name : "null")}', PrimitiveOffset {currentPrimitiveOffset}, Triangles {subMeshTriangles.Length / 3}");
 
@@ -412,6 +413,8 @@ namespace DefaultNamespace
                     // 更新全局索引
                     globalInstanceIndexCounter++;
                 }
+                
+                accelerationStructure.AddInstance(r, subMeshFlags, true, false, mask, instanceID);
             }
 
 

@@ -31,7 +31,7 @@ namespace PathTracing
         public GraphicsBuffer HashEntriesBuffer;
         public GraphicsBuffer AccumulationBuffer;
         public GraphicsBuffer ResolvedBuffer;
-        // public PathTracingDataBuilder _dataBuilder;
+        public PathTracingDataBuilder _dataBuilder;
 
         public RayTracingAccelerationStructure AccelerationStructure;
 
@@ -115,9 +115,9 @@ namespace PathTracing
             internal GraphicsBuffer AccumulationBuffer;
 
             internal GraphicsBuffer ResolvedBuffer;
-            
+
             internal int passIndex;
-            // internal PathTracingDataBuilder _dataBuilder;
+            internal PathTracingDataBuilder _dataBuilder;
         }
 
         public PathTracingPassSingle(PathTracingSetting setting)
@@ -145,7 +145,7 @@ namespace PathTracing
 
 
             // Sharc update
-            if(data.passIndex == 0)
+            if (data.passIndex == 0)
             {
                 natCmd.BeginSample(sharcUpdateMarker);
                 natCmd.SetRayTracingShaderPass(data.SharcUpdateTs, "Test2");
@@ -168,7 +168,7 @@ namespace PathTracing
 
 
             // Sharc resolve
-            if(data.passIndex == 0)
+            if (data.passIndex == 0)
             {
                 natCmd.BeginSample(sharcResolveMarker);
                 natCmd.SetComputeConstantBufferParam(data.SharcResolveCs, paramsID, data.ConstantBuffer, 0, data.ConstantBuffer.stride);
@@ -189,8 +189,8 @@ namespace PathTracing
             {
                 natCmd.BeginSample(opaqueTracingMarker);
 
-                // natCmd.SetGlobalBuffer(gIn_InstanceDataID, data._dataBuilder._instanceBuffer);
-                // natCmd.SetGlobalBuffer(gIn_PrimitiveDataID, data._dataBuilder._primitiveBuffer);
+                natCmd.SetGlobalBuffer(gIn_InstanceDataID, data._dataBuilder._instanceBuffer);
+                natCmd.SetGlobalBuffer(gIn_PrimitiveDataID, data._dataBuilder._primitiveBuffer);
 
 
                 natCmd.SetRayTracingShaderPass(data.OpaqueTs, "Test2");
@@ -474,6 +474,15 @@ namespace PathTracing
             }
 
 
+            if (m_Settings.usePackedData)
+            {
+                Shader.EnableKeyword("_USEPACK");
+            }
+            else
+            {
+                Shader.DisableKeyword("_USEPACK");
+            }
+
             var resourceData = frameData.Get<UniversalResourceData>();
 
             int2 outputResolution = new int2((int)(cameraData.camera.pixelWidth * cameraData.renderScale), (int)(cameraData.camera.pixelHeight * cameraData.renderScale));
@@ -490,8 +499,14 @@ namespace PathTracing
 
             NrdDenoiser.EnsureResources(outputResolution);
 
-            // Shader.SetGlobalRayTracingAccelerationStructure(g_AccelStructID, _dataBuilder.accelerationStructure);
-            Shader.SetGlobalRayTracingAccelerationStructure(g_AccelStructID, AccelerationStructure);
+            if (m_Settings.usePackedData)
+            {
+                Shader.SetGlobalRayTracingAccelerationStructure(g_AccelStructID, _dataBuilder.accelerationStructure);
+            }
+            else
+            {
+                Shader.SetGlobalRayTracingAccelerationStructure(g_AccelStructID, AccelerationStructure);
+            }
 
             using var builder = renderGraph.AddUnsafePass<PassData>("Path Tracing Pass", out var passData);
 
@@ -507,8 +522,8 @@ namespace PathTracing
             passData.AccumulationBuffer = AccumulationBuffer;
             passData.HashEntriesBuffer = HashEntriesBuffer;
             passData.ResolvedBuffer = ResolvedBuffer;
-            passData.passIndex = isXr? xrPass.multipassId : 0;
-            // passData._dataBuilder = _dataBuilder;
+            passData.passIndex = isXr ? xrPass.multipassId : 0;
+            passData._dataBuilder = _dataBuilder;
 
             var gSunDirection = -lightForward;
             var up = new Vector3(0, 1, 0);
