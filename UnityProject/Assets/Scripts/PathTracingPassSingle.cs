@@ -499,14 +499,7 @@ namespace PathTracing
 
             NrdDenoiser.EnsureResources(outputResolution);
 
-            if (m_Settings.usePackedData)
-            {
-                Shader.SetGlobalRayTracingAccelerationStructure(g_AccelStructID, _dataBuilder.accelerationStructure);
-            }
-            else
-            {
-                Shader.SetGlobalRayTracingAccelerationStructure(g_AccelStructID, AccelerationStructure);
-            }
+            Shader.SetGlobalRayTracingAccelerationStructure(g_AccelStructID, AccelerationStructure);
 
             using var builder = renderGraph.AddUnsafePass<PassData>("Path Tracing Pass", out var passData);
 

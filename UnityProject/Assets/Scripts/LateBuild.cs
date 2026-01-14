@@ -8,7 +8,7 @@ namespace DefaultNamespace
         {
             await Awaitable.WaitForSecondsAsync(1);
             
-            PathTracingDataBuilder.instance.Build();
+            // PathTracingDataBuilder.instance.Build();
         }
         
     }

@@ -209,7 +209,7 @@ namespace PathTracing
         [ContextMenu("ReBuild AccelerationStructure")]
         public void ReBuild()
         {
-            _dataBuilder.Build();
+            _dataBuilder.Build(accelerationStructure);
         }
 
         public override void Create()

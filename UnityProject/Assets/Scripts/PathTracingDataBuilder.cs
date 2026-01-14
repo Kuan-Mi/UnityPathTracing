@@ -116,9 +116,9 @@ namespace DefaultNamespace
             return startIndex;
         }
 
-        public RayTracingAccelerationStructure accelerationStructure;
+        // public RayTracingAccelerationStructure accelerationStructure;
 
-        public RayTracingAccelerationStructure.Settings settings;
+        // public RayTracingAccelerationStructure.Settings settings;
         public ComputeBuffer _instanceBuffer;
         public ComputeBuffer _primitiveBuffer;
 
@@ -128,7 +128,7 @@ namespace DefaultNamespace
         public List<PrimitiveData> primitiveDataList = new List<PrimitiveData>();
 
         [ContextMenu("Build RTAS and Buffers")]
-        public void Build()
+        public void Build(RayTracingAccelerationStructure accelerationStructure)
         {
             defaultWhite = Texture2D.whiteTexture;
             defaultBlack = Texture2D.blackTexture;
@@ -136,11 +136,11 @@ namespace DefaultNamespace
             defaultMask = Texture2D.whiteTexture;
 
 
-            if (accelerationStructure != null)
-            {
-                accelerationStructure.Release();
-                accelerationStructure = null;
-            }
+            // if (accelerationStructure != null)
+            // {
+            //     accelerationStructure.Release();
+            //     accelerationStructure = null;
+            // }
 
             instanceDataList.Clear();
             primitiveDataList.Clear();
@@ -149,14 +149,14 @@ namespace DefaultNamespace
             textureGroupCache.Clear();
 
 
-            settings = new RayTracingAccelerationStructure.Settings
-            {
-                managementMode = RayTracingAccelerationStructure.ManagementMode.Manual,
-                rayTracingModeMask = RayTracingAccelerationStructure.RayTracingModeMask.Everything
-            };
-
-            accelerationStructure = new RayTracingAccelerationStructure(settings);
-            accelerationStructure.Build();
+            // settings = new RayTracingAccelerationStructure.Settings
+            // {
+            //     managementMode = RayTracingAccelerationStructure.ManagementMode.Manual,
+            //     rayTracingModeMask = RayTracingAccelerationStructure.RayTracingModeMask.Everything
+            // };
+            //
+            // accelerationStructure = new RayTracingAccelerationStructure(settings);
+            // accelerationStructure.Build();
 
             var renderers = Object.FindObjectsByType<Renderer>(FindObjectsSortMode.None);
             Debug.Log($"Found {renderers.Length} renderers in scene.");
@@ -351,61 +351,13 @@ namespace DefaultNamespace
                     // 添加到列表
                     instanceDataList.Add(inst);
 
-
-                    // RayTracingSubMeshFlags[] subMeshFlags = new RayTracingSubMeshFlags[subMeshCount];
-                    // for (int n = 0; n < subMeshCount; n++)
-                    //     subMeshFlags[n] = RayTracingSubMeshFlags.Disabled; // 先全部禁用
-                    //
                     subMeshFlags[subIdx] = subMeshFlag;
- 
-
 
                     if (isTransparent)
                         mask |= 0x02;
                     else
                         mask |= 0x01;
 
-
-                    // if (subIdx != 0)
-                    // {
-                    //     var subMeshName = r.name + $"_SubMesh_{subIdx}";
-                    //     
-                    //     var subObjExisting = GameObject.Find(subMeshName);
-                    //
-                    //     Renderer newRenderer;
-                    //     if (subObjExisting == null)
-                    //     {
-                    //         
-                    //         var newObj = Object.Instantiate(r.gameObject);
-                    //         newObj.transform.position = r.transform.position;
-                    //         newObj.transform.rotation = r.transform.rotation;
-                    //         newObj.transform.localScale = r.transform.lossyScale;
-                    //
-                    //         newObj.name = r.name + $"_SubMesh_{subIdx}";
-                    //
-                    //           newRenderer = newObj.GetComponent<Renderer>();
-                    //     }
-                    //     else
-                    //     {
-                    //         newRenderer = subObjExisting.GetComponent<Renderer>();
-                    //     }
-                    //     
-                    //     result = accelerationStructure.AddInstance(newRenderer, subMeshFlags, true, false, mask, (uint)globalInstanceIndexCounter);
-                    // }
-                    // else
-                    // {
-                    //     result = accelerationStructure.AddInstance(r, subMeshFlags, true, false, mask, (uint)globalInstanceIndexCounter);
-                    // }
-
-                    // var subMeshFlagStr = "";
-                    // foreach (var flag in subMeshFlags)
-                    // {
-                    //     subMeshFlagStr += flag.ToString() + " ";
-                    // }
-
-                    // Debug.Log($"Result {result} Add InstanceID for Renderer '{r.name}',SubMesh {subIdx} to {globalInstanceIndexCounter} with Flags: {subMeshFlagStr.Trim()}");
-
-                    // Debug.Log($"Added Instance {instanceDataList.Count - 1}: Renderer '{r.name}', SubMesh {subIdx}, Material '{(mat != null ? mat.name : "null")}', PrimitiveOffset {currentPrimitiveOffset}, Triangles {subMeshTriangles.Length / 3}");
 
                     // 更新 Offset
                     currentPrimitiveOffset += (uint)(subMeshTriangles.Length / 3);
@@ -414,7 +366,9 @@ namespace DefaultNamespace
                     globalInstanceIndexCounter++;
                 }
                 
-                accelerationStructure.AddInstance(r, subMeshFlags, true, false, mask, instanceID);
+                // accelerationStructure.AddInstance(r, subMeshFlags, true, false, mask, instanceID);
+                accelerationStructure.UpdateInstanceID(r,  instanceID);
+                accelerationStructure.UpdateInstanceMask(r,  mask);
             }
 
 
@@ -426,7 +380,7 @@ namespace DefaultNamespace
             _primitiveBuffer = new ComputeBuffer(primitiveDataList.Count, Marshal.SizeOf<PrimitiveData>());
             _primitiveBuffer.SetData(primitiveDataList.ToArray());
 
-            accelerationStructure.Build();
+            // accelerationStructure.Build();
 
 
             Debug.Log($"Built RTAS. Renderers: {renderers.Length}, Instances: {instanceDataList.Count}, Primitives: {primitiveDataList.Count}");
