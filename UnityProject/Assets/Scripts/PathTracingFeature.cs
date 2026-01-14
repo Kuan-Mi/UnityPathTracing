@@ -9,127 +9,8 @@ using static UnityEngine.Rendering.RayTracingAccelerationStructure;
 
 namespace PathTracing
 {
-    public struct InstanceData
-    {
-        public Matrix4x4 prevObjectToWorld;
-        // 你也可以在这里存其他东西，比如材质 ID
-    }
-
-
     public class PathTracingFeature : ScriptableRendererFeature
     {
-        // private List<Renderer> m_ActiveRenderers = new List<Renderer>();
-        // private Dictionary<Renderer, Matrix4x4> m_PrevMatrices = new Dictionary<Renderer, Matrix4x4>();
-        // private ComputeBuffer m_InstanceDataBuffer;
-
-        //
-        // void UpdateAccelerationStructure()
-        // {
-        //     // 1. 准备数据数组
-        //     int count = m_ActiveRenderers.Count;
-        //     InstanceData[] data = new InstanceData[count];
-        //
-        //     // 2. 清除并重新填充 AS
-        //     accelerationStructure.ClearInstances();
-        //
-        //     for (int i = 0; i < count; i++)
-        //     {
-        //         Renderer r = m_ActiveRenderers[i];
-        //
-        //         // 获取上一帧矩阵（如果找不到则用当前矩阵兜底）
-        //         Matrix4x4 prevM = m_PrevMatrices.ContainsKey(r) ? m_PrevMatrices[r] : r.localToWorldMatrix;
-        //
-        //         data[i] = new InstanceData { prevObjectToWorld = prevM };
-        //
-        //         // 构造配置
-        //         var config = new RayTracingMeshInstanceConfig(mesh, subMeshIndex, material);
-        //
-        //         // 关键：将当前索引 i 作为 id 传入
-        //         // 这样在 Shader 中调用 InstanceID() 就会返回 i
-        //         accelerationStructure.AddInstance(config, r.localToWorldMatrix, prevM, (uint)i);
-        //
-        //         // 记录本帧矩阵供下一帧使用
-        //         m_PrevMatrices[r] = r.localToWorldMatrix;
-        //     }
-        //
-        //     // 3. 更新并上传 GPU Buffer
-        //     if (m_InstanceDataBuffer == null || m_InstanceDataBuffer.count != count)
-        //     {
-        //         m_InstanceDataBuffer?.Release();
-        //         m_InstanceDataBuffer = new ComputeBuffer(count, Marshal.SizeOf<InstanceData>());
-        //     }
-        //
-        //     m_InstanceDataBuffer.SetData(data);
-        //
-        //     // 4. 构建 TLAS
-        //     accelerationStructure.Build();
-        // }
-
-        private List<Renderer> m_TrackedRenderers = new List<Renderer>();
-        private Matrix4x4[] m_PrevMatrices;
-        private GraphicsBuffer m_PrevMatrixBuffer;
-
-
-        // void InitializeTracking()
-        // {
-        //     // 1. 找到所有符合条件的 Renderer (需要与你的 AS Settings 掩码一致)
-        //     // 注意：这里建议根据 Layer 或特定 Component 筛选
-        //     Renderer[] allRenderers = GameObject.FindObjectsByType<Renderer>(FindObjectsSortMode.None);
-        //
-        //     m_TrackedRenderers.Clear();
-        //     foreach (var r in allRenderers)
-        //     {
-        //         // 这里的判断逻辑要和你的 RayTracingModeMask 匹配
-        //         // 如果物体设置了 RayTracingMode.Off，Unity AS 就不会包含它
-        //         // if (r.rayTracingObjectsConfig != null) // 举例：如果是 HDRP/URP 可能会有特定配置
-        //         {
-        //             m_TrackedRenderers.Add(r);
-        //         }
-        //     }
-        //
-        //     int count = m_TrackedRenderers.Count;
-        //     m_PrevMatrices = new Matrix4x4[count];
-        //
-        //     // 2. 关键：强制设置 InstanceID，使其与数组索引 [i] 一致
-        //     for (int i = 0; i < count; i++)
-        //     {
-        //         // 这一步非常关键：它把 GPU 端的 InstanceID() 和我们的数组索引绑定了
-        //         accelerationStructure.UpdateInstanceID(m_TrackedRenderers[i], (uint)i);
-        //
-        //         // 记录初始矩阵
-        //         m_PrevMatrices[i] = m_TrackedRenderers[i].localToWorldMatrix;
-        //     }
-        //
-        //     // 3. 创建 GPU Buffer
-        //     m_PrevMatrixBuffer = new GraphicsBuffer(GraphicsBuffer.Target.Structured, count, 64);
-        // }
-
-        void Update()
-        {
-            // 1. 在 Unity 自动 Build 之前或之后（只要在渲染前）同步数据
-            // 注意：Automatic 模式下 Unity 会自动处理 Build，但你可以在渲染前更新 Buffer
-
-            int count = m_TrackedRenderers.Count;
-            for (int i = 0; i < count; i++)
-            {
-                // 注意：这里逻辑要清晰
-                // 我们在这一帧提交的是“上一帧”的记录
-                // 所以先上传 m_PrevMatrices 到 GPU
-            }
-
-            m_PrevMatrixBuffer.SetData(m_PrevMatrices);
-
-            // 2. 将 Buffer 传给 Ray Tracing Shader
-            // cmd.SetRayTracingBufferParam(rayTracingShader, "MyHitGroup", "_PrevObjectToWorldMatrices", m_PrevMatrixBuffer);
-
-            // 3. 最后，更新 CPU 端的“上一帧”记录，供下帧使用
-            for (int i = 0; i < count; i++)
-            {
-                m_PrevMatrices[i] = m_TrackedRenderers[i].localToWorldMatrix;
-            }
-        }
-
-
 // #define FLAG_NON_TRANSPARENT                0x01 // geometry flag: non-transparent
 // #define FLAG_TRANSPARENT                    0x02 // geometry flag: transparent
 // #define FLAG_FORCED_EMISSION                0x04 // animated emissive cube
@@ -224,7 +105,13 @@ namespace PathTracing
                 accelerationStructure = new RayTracingAccelerationStructure(settings);
 
                 accelerationStructure.Build();
-                SetMask();
+
+                // SetMask();
+            }
+
+            if (_dataBuilder.IsEmpty())
+            {
+                _dataBuilder.Build(accelerationStructure);
             }
 
             // ReBuild();
@@ -289,17 +176,19 @@ namespace PathTracing
                 _hashEntriesBuffer.Release();
                 _hashEntriesBuffer = null;
             }
+
             if (_accumulationBuffer != null)
             {
                 _accumulationBuffer.Release();
                 _accumulationBuffer = null;
             }
+
             if (_resolvedBuffer != null)
             {
                 _resolvedBuffer.Release();
                 _resolvedBuffer = null;
             }
-            
+
             _hashEntriesBuffer = new GraphicsBuffer(GraphicsBuffer.Target.Structured, Capacity, sizeof(ulong));
             ulong[] clearData = new ulong[Capacity];
             _hashEntriesBuffer.SetData(clearData);
@@ -358,7 +247,7 @@ namespace PathTracing
 
             _pathTracingPass.NrdDenoiser = nrd;
             _pathTracingPass.DLRRDenoiser = dlrr;
-            
+
             _pathTracingPass.AccumulationBuffer = _accumulationBuffer;
             _pathTracingPass.HashEntriesBuffer = _hashEntriesBuffer;
             _pathTracingPass.ResolvedBuffer = _resolvedBuffer;
