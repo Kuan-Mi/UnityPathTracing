@@ -181,7 +181,7 @@ void CastRay(float3 origin, float3 direction, float Tmin, float Tmax, float2 mip
     matProps.Lemi = Packing::DecodeRgbe(payload.Lemi);
     // 这三个应该从贴图再计算一次
     matProps.curvature = payload.curvature;
-    matProps.N = Packing::DecodeUnitVector(payload.matN);
+    matProps.N = Packing::DecodeUnitVector(payload.N);
     matProps.T = payload.T.xyz;
 }
 

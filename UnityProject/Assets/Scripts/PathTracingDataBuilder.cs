@@ -52,13 +52,13 @@ namespace DefaultNamespace
 
     public class PathTracingDataBuilder
     {
-        public static PathTracingDataBuilder instance ;
-        
+        public static PathTracingDataBuilder instance;
+
         public PathTracingDataBuilder()
         {
             instance = this;
         }
-        
+
         // 位偏移定义
         private const int FLAG_FIRST_BIT = 24;
         private const uint NON_FLAG_MASK = (1u << FLAG_FIRST_BIT) - 1;
@@ -86,6 +86,9 @@ namespace DefaultNamespace
 
         // 缓存已添加的纹理组，避免重复上传相同的材质纹理组合
         private Dictionary<string, uint> textureGroupCache = new Dictionary<string, uint>();
+
+
+        private Dictionary<int, List<uint>> meshPrimitiveCache = new Dictionary<int, List<uint>>();
 
         private uint GetTextureGroupIndex(Material mat)
         {
@@ -149,20 +152,13 @@ namespace DefaultNamespace
             textureGroupCache.Clear();
 
 
-            // settings = new RayTracingAccelerationStructure.Settings
-            // {
-            //     managementMode = RayTracingAccelerationStructure.ManagementMode.Manual,
-            //     rayTracingModeMask = RayTracingAccelerationStructure.RayTracingModeMask.Everything
-            // };
-            //
-            // accelerationStructure = new RayTracingAccelerationStructure(settings);
-            // accelerationStructure.Build();
+            meshPrimitiveCache.Clear();
 
             var renderers = Object.FindObjectsByType<Renderer>(FindObjectsSortMode.None);
             Debug.Log($"Found {renderers.Length} renderers in scene.");
 
 
-            uint currentPrimitiveOffset = 0;
+            // uint currentPrimitiveOffset = 0;
 
             // 【关键修改 1】全局 Instance 索引计数器，用于对应 InstanceBuffer 的下标
             int globalInstanceIndexCounter = 0;
@@ -171,7 +167,7 @@ namespace DefaultNamespace
             {
                 Renderer r = renderers[i];
 
-                if(r.name.Contains("_SubMesh_"))
+                if (r.name.Contains("_SubMesh_"))
                 {
                     // 已经是子网格拆分出来的对象，跳过
                     continue;
@@ -184,11 +180,16 @@ namespace DefaultNamespace
 
                 Mesh mesh = mf.sharedMesh;
                 int subMeshCount = mesh.subMeshCount;
+                int meshInstanceID = mesh.GetInstanceID(); // 获取 Mesh 唯一 ID
 
                 Matrix4x4 localToWorld = renderers[i].transform.localToWorldMatrix;
 
+                bool isMeshCached = meshPrimitiveCache.TryGetValue(meshInstanceID, out List<uint> cachedOffsets);
+                List<uint> currentMeshOffsets = isMeshCached ? cachedOffsets : new List<uint>();
+
+
                 // --- 构造 Primitive Data (每个三角形一个) ---
-                int[] triangles = mesh.triangles;
+                // int[] triangles = mesh.triangles;
                 Vector3[] vertices = mesh.vertices;
                 Vector2[] uvs = mesh.uv;
                 Vector3[] normals = mesh.normals;
@@ -198,79 +199,95 @@ namespace DefaultNamespace
                 Material[] sharedMaterials = r.sharedMaterials;
 
 
-                // 【关键修改 2】设置 RTAS 中该 Renderer 的 InstanceID 为当前的全局计数器基数
-                // 这样 shader 中: Index = BaseID + GeometryIndex(SubMeshIndex) 就能对齐了
-
                 uint instanceID = (uint)globalInstanceIndexCounter;
-
                 RayTracingSubMeshFlags[] subMeshFlags = new RayTracingSubMeshFlags[subMeshCount];
-                
-                
                 uint mask = 0;
 
                 // 【关键修改 3】遍历 SubMesh
                 for (int subIdx = 0; subIdx < subMeshCount; subIdx++)
                 {
-                    // 获取当前 SubMesh 的三角形索引
-                    // 注意：GetTriangles 返回的是顶点索引，不需要偏移，直接对应 mesh.vertices
-                    int[] subMeshTriangles = mesh.GetTriangles(subIdx);
+                    uint thisSubMeshPrimitiveOffset = 0;
 
-
-                    // --- 构造 Primitive Data ---
-                    for (int t = 0; t < subMeshTriangles.Length; t += 3)
+                    if (isMeshCached)
                     {
-                        PrimitiveData prim = new PrimitiveData();
-                        int i0 = subMeshTriangles[t];
-                        int i1 = subMeshTriangles[t + 1];
-                        int i2 = subMeshTriangles[t + 2];
-
-                        prim.n0 = EncodeUnitVector(normals[i0], true);
-                        prim.n1 = EncodeUnitVector(normals[i1], true);
-                        prim.n2 = EncodeUnitVector(normals[i2], true);
-
-                        // 增加安全检查，防止 UV 数组越界（有些 Mesh 可能没有 UV）
-                        prim.uv0 = new half2(uvs[i0]);
-                        prim.uv1 = new half2(uvs[i1]);
-                        prim.uv2 = new half2(uvs[i2]);
-
-                        // 计算面积
-                        Vector3 p0 = vertices[i0];
-                        Vector3 p1 = vertices[i1];
-                        Vector3 p2 = vertices[i2];
-
-                        Vector3 edge20 = p2 - p0;
-                        Vector3 edge10 = p1 - p0;
-                        float worldArea = Vector3.Cross(edge20, edge10).magnitude * 0.5f;
-                        prim.worldArea = Math.Max(worldArea, 1e-9f);
-
-                        // UV 面积
-                        if (uvs.Length > 0)
+                        if (subIdx < currentMeshOffsets.Count)
                         {
-                            // 3. 计算 UV 面积 (原版代码逻辑)
-                            Vector3 uvEdge20 = uvs[i2] - uvs[i0];
-                            Vector3 uvEdge10 = uvs[i1] - uvs[i0];
-                            float uvArea = Vector3.Cross(uvEdge20, uvEdge10).magnitude * 0.5f;
-                            prim.uvArea = Math.Max(uvArea, 1e-9f);
+                            thisSubMeshPrimitiveOffset = currentMeshOffsets[subIdx];
                         }
                         else
                         {
-                            prim.uvArea = 1e-9f;
+                            Debug.LogError($"Mesh Cache mismatch for {r.name}");
+                            thisSubMeshPrimitiveOffset = 0;
                         }
+                    }
+                    else
+                    {
+                        thisSubMeshPrimitiveOffset = (uint)primitiveDataList.Count;
 
-                        // 切线
+                        // 记录到缓存列表
+                        currentMeshOffsets.Add(thisSubMeshPrimitiveOffset);
+
+                        // 获取当前 SubMesh 的三角形索引
+                        // 注意：GetTriangles 返回的是顶点索引，不需要偏移，直接对应 mesh.vertices
+                        int[] subMeshTriangles = mesh.GetTriangles(subIdx);
+
+
+                        // --- 构造 Primitive Data ---
+                        for (int t = 0; t < subMeshTriangles.Length; t += 3)
                         {
-                            Vector3 tang0 = tangents[i0];
-                            Vector3 tang1 = tangents[i1];
-                            Vector3 tang2 = tangents[i2];
+                            PrimitiveData prim = new PrimitiveData();
+                            int i0 = subMeshTriangles[t];
+                            int i1 = subMeshTriangles[t + 1];
+                            int i2 = subMeshTriangles[t + 2];
+
+                            prim.n0 = EncodeUnitVector(normals[i0], true);
+                            prim.n1 = EncodeUnitVector(normals[i1], true);
+                            prim.n2 = EncodeUnitVector(normals[i2], true);
+
+                            // 增加安全检查，防止 UV 数组越界（有些 Mesh 可能没有 UV）
+                            prim.uv0 = new half2(uvs[i0]);
+                            prim.uv1 = new half2(uvs[i1]);
+                            prim.uv2 = new half2(uvs[i2]);
+
+                            // 计算面积
+                            Vector3 p0 = vertices[i0];
+                            Vector3 p1 = vertices[i1];
+                            Vector3 p2 = vertices[i2];
+
+                            Vector3 edge20 = p2 - p0;
+                            Vector3 edge10 = p1 - p0;
+                            float worldArea = Vector3.Cross(edge20, edge10).magnitude * 0.5f;
+                            prim.worldArea = Math.Max(worldArea, 1e-9f);
+
+                            // UV 面积
+                            if (uvs.Length > 0)
+                            {
+                                // 3. 计算 UV 面积 (原版代码逻辑)
+                                Vector3 uvEdge20 = uvs[i2] - uvs[i0];
+                                Vector3 uvEdge10 = uvs[i1] - uvs[i0];
+                                float uvArea = Vector3.Cross(uvEdge20, uvEdge10).magnitude * 0.5f;
+                                prim.uvArea = Math.Max(uvArea, 1e-9f);
+                            }
+                            else
+                            {
+                                prim.uvArea = 1e-9f;
+                            }
+
+                            // 切线
+                            {
+                                Vector3 tang0 = tangents[i0];
+                                Vector3 tang1 = tangents[i1];
+                                Vector3 tang2 = tangents[i2];
 
 
-                            prim.t0 = EncodeUnitVector(tang0, true);
-                            prim.t1 = EncodeUnitVector(tang1, true);
-                            prim.t2 = EncodeUnitVector(tang2, true);
-                            prim.bitangentSign = tangents[i0].w;
+                                prim.t0 = EncodeUnitVector(tang0, true);
+                                prim.t1 = EncodeUnitVector(tang1, true);
+                                prim.t2 = EncodeUnitVector(tang2, true);
+                                prim.bitangentSign = tangents[i0].w;
+                            }
+
+                            primitiveDataList.Add(prim);
                         }
-
-                        primitiveDataList.Add(prim);
                     }
 
 
@@ -283,7 +300,7 @@ namespace DefaultNamespace
                     inst.mOverloadedMatrix1 = new float4(localToWorld.m10, localToWorld.m11, localToWorld.m12, localToWorld.m13);
                     inst.mOverloadedMatrix2 = new float4(localToWorld.m20, localToWorld.m21, localToWorld.m22, localToWorld.m23);
 
-                    inst.primitiveOffset = currentPrimitiveOffset;
+                    inst.primitiveOffset = thisSubMeshPrimitiveOffset;
                     inst.morphPrimitiveOffset = 0;
 
                     // 获取当前 SubMesh 对应的材质
@@ -358,17 +375,19 @@ namespace DefaultNamespace
                     else
                         mask |= 0x01;
 
-
-                    // 更新 Offset
-                    currentPrimitiveOffset += (uint)(subMeshTriangles.Length / 3);
+ 
 
                     // 更新全局索引
                     globalInstanceIndexCounter++;
                 }
-                
+                if (!isMeshCached)
+                {
+                    meshPrimitiveCache.Add(meshInstanceID, currentMeshOffsets);
+                }
+
                 // accelerationStructure.AddInstance(r, subMeshFlags, true, false, mask, instanceID);
-                accelerationStructure.UpdateInstanceID(r,  instanceID);
-                accelerationStructure.UpdateInstanceMask(r,  mask);
+                accelerationStructure.UpdateInstanceID(r, instanceID);
+                accelerationStructure.UpdateInstanceMask(r, mask);
             }
 
 
