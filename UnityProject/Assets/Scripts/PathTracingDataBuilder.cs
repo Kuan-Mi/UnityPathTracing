@@ -91,6 +91,7 @@ namespace DefaultNamespace
 
         private uint GetTextureGroupIndex(Material mat)
         {
+            return 0;
             if (mat == null) return 0;
 
             // 获取四张纹理，如果为空则使用默认值
@@ -98,7 +99,7 @@ namespace DefaultNamespace
             Texture2D texMask = (Texture2D)mat.GetTexture("_MetallicGlossMap") ?? defaultMask;
             Texture2D texNormal = (Texture2D)mat.GetTexture("_BumpMap") ?? defaultNormal;
             Texture2D texEmission = (Texture2D)mat.GetTexture("_EmissionMap") ?? defaultBlack;
-
+ 
             // 生成唯一 Key 判断这四张图是否已经成组添加过
             string key = $"{texBase.GetInstanceID()}_{texMask.GetInstanceID()}_{texNormal.GetInstanceID()}_{texEmission.GetInstanceID()}";
 
@@ -123,7 +124,7 @@ namespace DefaultNamespace
 
         public List<InstanceData> instanceDataList = new List<InstanceData>();
         public List<PrimitiveData> primitiveDataList = new List<PrimitiveData>();
-
+ 
         [ContextMenu("Build RTAS and Buffers")]
         public void Build(RayTracingAccelerationStructure accelerationStructure)
         {
