@@ -33,10 +33,10 @@ MonoBehaviour:
   m_AssetVersion: 3
   m_PrepassLayerMask:
     serializedVersion: 2
-    m_Bits: 0
+    m_Bits: 4294967295
   m_OpaqueLayerMask:
     serializedVersion: 2
-    m_Bits: 0
+    m_Bits: 4294967295
   m_TransparentLayerMask:
     serializedVersion: 2
     m_Bits: 0
@@ -87,8 +87,8 @@ MonoBehaviour:
     showMV: 0
     showValidation: 0
     dofAperture: 0
-    dofFocalDistance: 1
-    exposure: 49.3
+    dofFocalDistance: 5.15
+    exposure: 100
     rpp: 1
     bounceNum: 1
     mipBias: -0.5

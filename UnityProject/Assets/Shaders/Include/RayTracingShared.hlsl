@@ -168,7 +168,7 @@ void CastRay(float3 origin, float3 direction, float Tmin, float Tmax, float2 mip
     props.X = origin + direction * payload.hitT;
 
     // props.Xprev = payload.X;
-    props.Xprev = props.X;
+    props.Xprev = payload.Xprev;
     props.V = -direction;
     props.textureOffsetAndFlags = payload.instanceIndexAndFlags;
 

@@ -1,7 +1,7 @@
 struct MainRayPayload
 {
     // float3 X; // 命中点的世界空间坐标
-    // half3 Xprev;
+    float3 Xprev;
     float4 T; // 切线向量（xyz）和副切线符号（w）
     float2 N; // 法线向量（世界空间）
     float hitT; // 光线命中的距离（t值），INF表示未命中

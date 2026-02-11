@@ -221,9 +221,20 @@ namespace DefaultNamespace
                             prim.n2 = EncodeUnitVector(normals[i2], true);
 
                             // 增加安全检查，防止 UV 数组越界（有些 Mesh 可能没有 UV）
-                            prim.uv0 = new half2(uvs[i0]);
-                            prim.uv1 = new half2(uvs[i1]);
-                            prim.uv2 = new half2(uvs[i2]);
+                            
+                            if (uvs.Length == 0)
+                            {
+                                prim.uv0 = half2.zero;
+                                prim.uv1 = half2.zero;
+                                prim.uv2 = half2.zero;
+                            }
+                            else
+                            {
+
+                                prim.uv0 = new half2(uvs[i0]);
+                                prim.uv1 = new half2(uvs[i1]);
+                                prim.uv2 = new half2(uvs[i2]);
+                            }
 
                             // 计算面积
                             Vector3 p0 = vertices[i0];

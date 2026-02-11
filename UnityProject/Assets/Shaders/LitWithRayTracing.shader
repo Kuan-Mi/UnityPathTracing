@@ -562,8 +562,8 @@ Shader "Custom/LitWithRayTracing"
 
                 float4 vv = _MetallicGlossMap.SampleLevel(sampler_MetallicGlossMap, _BaseMap_ST.xy * v.uv + _BaseMap_ST.zw, mip);
                 // metallic = vv.r;
-                roughness = vv.g * (1 - _Smoothness);
-                metallic = vv.b;
+                roughness = (1 - vv.a) * (1 - _Smoothness);
+                metallic = vv.r;
 
                 #else
 
@@ -613,7 +613,7 @@ Shader "Custom/LitWithRayTracing"
 
                 // 位置
                 // payload.X = worldPosition;
-                // payload.Xprev = prevWorldPosition;
+                payload.Xprev = worldPosition;
                 // payload.roughness = roughness; 
 
                 payload.roughnessAndMetalness = Packing::Rg16fToUint(float2(roughness, metallic));

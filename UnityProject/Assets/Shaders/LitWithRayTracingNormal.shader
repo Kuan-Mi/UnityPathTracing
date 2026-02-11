@@ -381,7 +381,7 @@ Shader "Custom/LitWithRayTracingNormal"
 
                 // 位置
                 // payload.X = worldPosition;
-                // payload.Xprev = prevWorldPosition;
+                payload.Xprev = prevWorldPosition;
                 // payload.roughness = roughness; 
 
                 payload.roughnessAndMetalness = Packing::Rg16fToUint(float2(roughness, metallic));
