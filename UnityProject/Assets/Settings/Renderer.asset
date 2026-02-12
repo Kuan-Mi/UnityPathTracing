@@ -95,7 +95,7 @@ MonoBehaviour:
     tracingMode: 1
     denoiser: 0
     emissionIntensity: 1
-    cameraJitter: 0
+    cameraJitter: 1
     psr: 1
     emission: 1
     usePrevFrame: 1
@@ -107,7 +107,7 @@ MonoBehaviour:
     specularLobeTrimming: 1
     boost: 0
     SR: 0
-    RR: 1
+    RR: 0
     tmpDisableRR: 0
     resolutionScale: 1
     upscalerMode: 0

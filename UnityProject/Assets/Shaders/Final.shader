@@ -405,7 +405,7 @@
 
                 float3 rgb = SAMPLE_TEXTURE2D(_BlitTexture, sampler_BlitTexture, i.uv).rgb;
 
-                float3 linearRgb = LinearToSRGB(rgb);
+                // float3 linearRgb = LinearToSRGB(rgb);
 
 
                 return float4(rgb, 1);

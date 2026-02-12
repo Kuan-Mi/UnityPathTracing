@@ -173,7 +173,7 @@ void CastRay(float3 origin, float3 direction, float Tmin, float Tmax, float2 mip
     props.textureOffsetAndFlags = payload.instanceIndexAndFlags;
 
     matProps = (MaterialProps)0;
-    matProps.baseColor = Packing::UintToRgba(payload.baseColor, 8, 8, 8, 8);
+    matProps.baseColor = Packing::UintToRgba(payload.baseColor, 8, 8, 8, 8).xyz;
 
     float2 rAm = Packing::UintToRg16f(payload.roughnessAndMetalness);
     matProps.roughness = rAm.r;
