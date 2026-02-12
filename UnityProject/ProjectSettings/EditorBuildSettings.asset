@@ -11,7 +11,7 @@ EditorBuildSettings:
   - enabled: 0
     path: Assets/Bistro_v5_2/Bistro.unity
     guid: 202754a75b914024c8c9f24dc5dd9132
-  - enabled: 1
+  - enabled: 0
     path: Assets/Bistro_v5_2/BistroInterior_Wine.unity
     guid: ef50fabb6ef397b4a9f5933104d9372b
   - enabled: 0

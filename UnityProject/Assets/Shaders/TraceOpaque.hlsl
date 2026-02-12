@@ -757,23 +757,23 @@ void MainRayGenShader()
     float shadowTranslucency = (Color::Luminance(Ldirect) != 0.0) ? 1.0 : 0.0;
     float shadowHitDist = 0.0;
 
-    // if (shadowTranslucency > 0.1)
-    // {
-    //     if (gRR)
-    //     {
-    //         float hitT = CastVisibilityRay_AnyHit( Xoffset, sunDirection, 0.0, INF, mipAndCone, gWorldTlas,FLAG_NON_TRANSPARENT,0);
-    //         shadowHitDist = hitT;
-    //     }
-    //     else
-    //     {
-    //         GeometryProps geometryPropsShadow;
-    //         MaterialProps materialPropsShadow;
-    //
-    //         CastRay(Xoffset, sunDirection, 0.0, INF, mipAndCone, FLAG_NON_TRANSPARENT, geometryPropsShadow, materialPropsShadow);
-    //
-    //         shadowHitDist = geometryPropsShadow.hitT;
-    //     }
-    // }
+    if (shadowTranslucency > 0.1)
+    {
+        if (gRR)
+        {
+            float hitT = CastVisibilityRay_AnyHit( Xoffset, sunDirection, 0.0, INF, mipAndCone, gWorldTlas,FLAG_NON_TRANSPARENT,0);
+            shadowHitDist = hitT;
+        }
+        else
+        {
+            GeometryProps geometryPropsShadow;
+            MaterialProps materialPropsShadow;
+    
+            CastRay(Xoffset, sunDirection, 0.0, INF, mipAndCone, FLAG_NON_TRANSPARENT, geometryPropsShadow, materialPropsShadow);
+    
+            shadowHitDist = geometryPropsShadow.hitT;
+        }
+    }
 
     // shadowHitDist = 0;
 
