@@ -97,7 +97,7 @@ void MainMissShader(inout MainRayPayload payload : SV_RayPayload)
     payload.hitT = INF;
     float3 ray = WorldRayDirection();
     // payload.X = WorldRayOrigin() + ray * payload.hitT;
-    // payload.Xprev = WorldRayOrigin() + ray * payload.hitT;
+    payload.Xprev = WorldRayOrigin() + ray * payload.hitT;
 
     payload.Lemi = Packing::EncodeRgbe(GetSkyIntensity(ray));
 }
