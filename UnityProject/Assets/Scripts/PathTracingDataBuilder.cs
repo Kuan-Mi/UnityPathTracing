@@ -99,7 +99,7 @@ namespace DefaultNamespace
             Texture2D texMask = (Texture2D)mat.GetTexture("_MetallicGlossMap") ?? defaultMask;
             Texture2D texNormal = (Texture2D)mat.GetTexture("_BumpMap") ?? defaultNormal;
             Texture2D texEmission = (Texture2D)mat.GetTexture("_EmissionMap") ?? defaultBlack;
- 
+
             // 生成唯一 Key 判断这四张图是否已经成组添加过
             string key = $"{texBase.GetInstanceID()}_{texMask.GetInstanceID()}_{texNormal.GetInstanceID()}_{texEmission.GetInstanceID()}";
 
@@ -124,7 +124,7 @@ namespace DefaultNamespace
 
         public List<InstanceData> instanceDataList = new List<InstanceData>();
         public List<PrimitiveData> primitiveDataList = new List<PrimitiveData>();
- 
+
         [ContextMenu("Build RTAS and Buffers")]
         public void Build(RayTracingAccelerationStructure accelerationStructure)
         {
@@ -221,7 +221,7 @@ namespace DefaultNamespace
                             prim.n2 = EncodeUnitVector(normals[i2], true);
 
                             // 增加安全检查，防止 UV 数组越界（有些 Mesh 可能没有 UV）
-                            
+
                             if (uvs.Length == 0)
                             {
                                 prim.uv0 = half2.zero;
@@ -230,7 +230,6 @@ namespace DefaultNamespace
                             }
                             else
                             {
-
                                 prim.uv0 = new half2(uvs[i0]);
                                 prim.uv1 = new half2(uvs[i1]);
                                 prim.uv2 = new half2(uvs[i2]);
@@ -362,11 +361,11 @@ namespace DefaultNamespace
                     else
                         mask |= 0x01;
 
- 
 
                     // 更新全局索引
                     globalInstanceIndexCounter++;
                 }
+
                 if (!isMeshCached)
                 {
                     meshPrimitiveCache.Add(meshInstanceID, currentMeshOffsets);
@@ -377,12 +376,19 @@ namespace DefaultNamespace
             }
 
             _instanceBuffer?.Release();
-            _instanceBuffer = new ComputeBuffer(instanceDataList.Count, Marshal.SizeOf<InstanceData>());
-            _instanceBuffer.SetData(instanceDataList.ToArray());
+
+            if (instanceDataList.Count > 0)
+            {
+                _instanceBuffer = new ComputeBuffer(instanceDataList.Count, Marshal.SizeOf<InstanceData>());
+                _instanceBuffer.SetData(instanceDataList.ToArray());
+            }
 
             _primitiveBuffer?.Release();
-            _primitiveBuffer = new ComputeBuffer(primitiveDataList.Count, Marshal.SizeOf<PrimitiveData>());
-            _primitiveBuffer.SetData(primitiveDataList.ToArray());
+            if (primitiveDataList.Count > 0)
+            {
+                _primitiveBuffer = new ComputeBuffer(primitiveDataList.Count, Marshal.SizeOf<PrimitiveData>());
+                _primitiveBuffer.SetData(primitiveDataList.ToArray());
+            }
 
             Debug.Log($"Renderers: {renderers.Length}, Instances: {instanceDataList.Count}, Primitives: {primitiveDataList.Count}");
         }
