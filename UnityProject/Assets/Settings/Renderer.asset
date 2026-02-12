@@ -84,7 +84,7 @@ MonoBehaviour:
     planeDistanceSensitivity: 0.131
     maxStabilizedFrameNum: 5
     showMode: 18
-    showMV: 0
+    showMV: 1
     showValidation: 0
     dofAperture: 0
     dofFocalDistance: 5.15

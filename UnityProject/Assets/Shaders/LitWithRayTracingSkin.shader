@@ -1,4 +1,4 @@
-Shader "Custom/LitWithRayTracing"
+Shader "Custom/LitWithRayTracingSkin"
 {
     Properties
     {
@@ -235,6 +235,7 @@ Shader "Custom/LitWithRayTracing"
                 float3 normal;
                 float4 tangent;
                 float2 uv;
+                float3 lastPos;
             };
 
             float LengthSquared(float3 v)
@@ -250,6 +251,7 @@ Shader "Custom/LitWithRayTracing"
                 v.normal = UnityRayTracingFetchVertexAttribute3(vertexIndex, kVertexAttributeNormal);
                 v.tangent = UnityRayTracingFetchVertexAttribute4(vertexIndex, kVertexAttributeTangent);
                 v.uv = UnityRayTracingFetchVertexAttribute2(vertexIndex, kVertexAttributeTexCoord0);
+                v.lastPos = UnityRayTracingFetchVertexAttribute3(vertexIndex, kVertexAttributeTexCoord4);
                 return v;
             }
 
@@ -262,6 +264,8 @@ Shader "Custom/LitWithRayTracing"
                 INTERPOLATE_ATTRIBUTE(normal);
                     INTERPOLATE_ATTRIBUTE(tangent);
                     INTERPOLATE_ATTRIBUTE(uv);
+                    INTERPOLATE_ATTRIBUTE(lastPos);
+                
                 return v;
             }
 
@@ -609,7 +613,7 @@ Shader "Custom/LitWithRayTracing"
 
                 float3 worldPosition = mul(ObjectToWorld3x4(), float4(v.position, 1.0)).xyz;
 
-                float3 prevWorldPosition = mul(GetPrevObjectToWorldMatrix(), float4(v.position, 1.0)).xyz;
+                float3 prevWorldPosition = mul(GetPrevObjectToWorldMatrix(), float4(v.lastPos, 1.0)).xyz;
 
                 // 位置
                 // payload.X = worldPosition;
