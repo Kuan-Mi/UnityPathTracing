@@ -74,9 +74,9 @@ crashlytics-build.properties
 /[Aa]ssets/[Ss]treaming[Aa]ssets/aa.meta
 /[Aa]ssets/[Ss]treaming[Aa]ssets/aa/*
 
-NRD.dll
-NRI.dll
-RenderingPlugin.dll
+#NRD.dll
+#NRI.dll
+#RenderingPlugin.dll
 
 Bistro_v5_2
 Bistro_v5_2.meta
