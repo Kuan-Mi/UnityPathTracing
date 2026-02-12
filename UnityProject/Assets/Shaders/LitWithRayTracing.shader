@@ -561,9 +561,12 @@ Shader "Custom/LitWithRayTracing"
                 #if _METALLICSPECGLOSSMAP
 
                 float4 vv = _MetallicGlossMap.SampleLevel(sampler_MetallicGlossMap, _BaseMap_ST.xy * v.uv + _BaseMap_ST.zw, mip);
-                // metallic = vv.r;
+                
                 roughness = (1 - vv.a) * (1 - _Smoothness);
                 metallic = vv.r;
+                
+                // roughness = vv.g * (1 - _Smoothness);
+                // metallic = vv.b;
 
                 #else
 
