@@ -682,7 +682,7 @@ Shader "TextMeshPro/Distance Field Ray"
 
                 // --- Payload Construction ---
                 
-                payload.Lemi = Packing::EncodeRgbe(float3(0, 0, 0)); // No emission by default
+                payload.Lemi = Packing::EncodeRgbe(finalColor); // No emission by default
 
                 // Instance
                 payload.SetInstanceIndex(InstanceIndex());
@@ -693,7 +693,7 @@ Shader "TextMeshPro/Distance Field Ray"
                 float3 worldPosition = mul(ObjectToWorld3x4(), float4(v.position, 1.0)).xyz;
                 float3 prevWorldPosition = mul(GetPrevObjectToWorldMatrix(), float4(v.position, 1.0)).xyz;
 
-                payload.Xprev = worldPosition;
+                payload.Xprev = prevWorldPosition;
                 payload.roughnessAndMetalness = Packing::Rg16fToUint(float2(1, metallic));
                 payload.baseColor = Packing::RgbaToUint(float4(finalColor, 1.0), 8, 8, 8, 8);
 

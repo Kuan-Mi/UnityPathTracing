@@ -148,7 +148,7 @@ namespace PathTracing
 
             _pathTracingPass = new PathTracingPassSingle(pathTracingSetting)
             {
-                renderPassEvent = RenderPassEvent.AfterRenderingOpaques,
+                renderPassEvent = RenderPassEvent.BeforeRenderingTransparents,
                 OpaqueTs = opaqueTracingShader,
                 TransparentTs = transparentTracingShader,
                 CompositionCs = compositionComputeShader,
