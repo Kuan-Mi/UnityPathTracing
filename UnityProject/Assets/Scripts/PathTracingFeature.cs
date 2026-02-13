@@ -262,6 +262,11 @@ namespace PathTracing
                )
                 return;
 
+            
+            var allSkinnedMeshRenderers = GameObject.FindObjectsByType<SkinnedMeshRenderer>(FindObjectsSortMode.None);
+            foreach (var smr in allSkinnedMeshRenderers)            {
+                accelerationStructure.UpdateInstanceTransform(smr);
+            } 
 
             if (pathTracingSetting.usePackedData)
             {
