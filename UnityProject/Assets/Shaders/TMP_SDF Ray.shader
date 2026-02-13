@@ -91,9 +91,10 @@ Shader "TextMeshPro/Distance Field Ray"
 
         Tags
         {
-            "Queue"="Transparent"
             "IgnoreProjector"="True"
-            "RenderType"="Transparent"
+            "RenderPipeline" = "UniversalPipeline"
+            "RenderType" = "Opaque"
+            "Queue" = "AlphaTest"
         }
 
         Stencil
@@ -581,7 +582,7 @@ Shader "TextMeshPro/Distance Field Ray"
 
             #define MAX_MIP_LEVEL                       11.0
 
-[shader("anyhit")]
+            [shader("anyhit")]
             void AnyHitMain(inout MainRayPayload payload, AttributeData attribs)
             {
                 uint3 triangleIndices = UnityRayTracingFetchTriangleIndices(PrimitiveIndex());
@@ -692,7 +693,7 @@ Shader "TextMeshPro/Distance Field Ray"
                 float3 worldPosition = mul(ObjectToWorld3x4(), float4(v.position, 1.0)).xyz;
                 float3 prevWorldPosition = mul(GetPrevObjectToWorldMatrix(), float4(v.position, 1.0)).xyz;
 
-                payload.Xprev = prevWorldPosition;
+                payload.Xprev = worldPosition;
                 payload.roughnessAndMetalness = Packing::Rg16fToUint(float2(1, metallic));
                 payload.baseColor = Packing::RgbaToUint(float4(finalColor, 1.0), 8, 8, 8, 8);
 

@@ -373,6 +373,8 @@ namespace DefaultNamespace
 
                 accelerationStructure.UpdateInstanceID(r, instanceID);
                 accelerationStructure.UpdateInstanceMask(r, mask);
+
+                Debug.Log($"updated instance ID {instanceID} and mask {mask} for renderer {r.name}");
             }
 
             _instanceBuffer?.Release();
