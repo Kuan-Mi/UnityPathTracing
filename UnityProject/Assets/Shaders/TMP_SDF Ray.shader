@@ -415,7 +415,9 @@ Shader "TextMeshPro/Distance Field Ray"
             uniform float _MaskSoftnessY;
 
             // Font Atlas properties
-            uniform sampler2D _MainTex;
+            TEXTURE2D(_MainTex);
+            SAMPLER(sampler_MainTex);
+                
             uniform float _TextureWidth;
             uniform float _TextureHeight;
             uniform float _GradientScale;
@@ -477,10 +479,15 @@ Shader "TextMeshPro/Distance Field Ray"
             {
                 // Read "height field"
                 float4 h = {
-                    tex2D(_MainTex, uv - delta.xz).a,
-                    tex2D(_MainTex, uv + delta.xz).a,
-                    tex2D(_MainTex, uv - delta.zy).a,
-                    tex2D(_MainTex, uv + delta.zy).a
+                    _MainTex.SampleLevel(sampler_MainTex, uv - delta.xz, 0).a,
+                    _MainTex.SampleLevel(sampler_MainTex, uv + delta.xz, 0).a,
+                    _MainTex.SampleLevel(sampler_MainTex, uv - delta.zy, 0).a,
+                    _MainTex.SampleLevel(sampler_MainTex, uv + delta.zy, 0).a
+                     
+                    // tex2D(_MainTex, uv - delta.xz).a,
+                    // tex2D(_MainTex, uv + delta.xz).a,
+                    // tex2D(_MainTex, uv - delta.zy).a,
+                    // tex2D(_MainTex, uv + delta.zy).a
                 };
 
                 return GetSurfaceNormal(h, bias);
@@ -574,29 +581,32 @@ Shader "TextMeshPro/Distance Field Ray"
 
             #define MAX_MIP_LEVEL                       11.0
 
-            [shader("anyhit")]
+[shader("anyhit")]
             void AnyHitMain(inout MainRayPayload payload, AttributeData attribs)
             {
-                // 1. 获取顶点索引
                 uint3 triangleIndices = UnityRayTracingFetchTriangleIndices(PrimitiveIndex());
 
-                // 2. 获取三个顶点的 UV（为了性能，AnyHit 通常只取 UV，不计算法线等复杂属性）
                 float2 uv0 = UnityRayTracingFetchVertexAttribute2(triangleIndices.x, kVertexAttributeTexCoord0);
                 float2 uv1 = UnityRayTracingFetchVertexAttribute2(triangleIndices.y, kVertexAttributeTexCoord0);
                 float2 uv2 = UnityRayTracingFetchVertexAttribute2(triangleIndices.z, kVertexAttributeTexCoord0);
 
-                // 3. 计算插值 UV
                 float3 barycentricCoords = float3(1.0 - attribs.barycentrics.x - attribs.barycentrics.y, attribs.barycentrics.x, attribs.barycentrics.y);
                 float2 uv = uv0 * barycentricCoords.x + uv1 * barycentricCoords.y + uv2 * barycentricCoords.z;
 
-                // 4. 采样 Alpha 通道
-                // 注意：在 AnyHit 中采样通常使用 SampleLevel 0 以保证性能，或者根据 RayT 计算一个近似 Mip
-                float4 baseColor = _BaseMap.SampleLevel(sampler_BaseMap, _BaseMap_ST.xy * uv + _BaseMap_ST.zw, 0);
-                float alpha = baseColor.a * _BaseColor.a;
+                // --- TMP SDF Logic for Clipping ---
+                // In TMP, the alpha channel of MainTex is the signed distance field.
+                // 0.5 is the edge. Values > 0.5 are inside.
+                float sdf = _MainTex.SampleLevel(sampler_MainTex, uv, 0).a;
+                
+                // Calculate Effective SDF threshold based on Face Dilate
+                // _FaceDilate in TMP expands the shape. 
+                // We simplify the weight logic here for RT clipping.
+                float threshold = 0.5 - _FaceDilate * 0.5;
 
-                // 5. Alpha Test 判定
-                // 如果透明度小于阈值，则调用 IgnoreHit()，光线将忽略此次相交
-                if (alpha < _Cutoff)
+                // Simple hard cutout. 
+                // For smoother edges in RT, ClosestHit needs to handle transparency, 
+                // but anyhit is for binary visibility unless we process transparency hits.
+                if (sdf < threshold)
                 {
                     IgnoreHit();
                 }
@@ -610,170 +620,86 @@ Shader "TextMeshPro/Distance Field Ray"
                 Vertex v1 = FetchVertex(triangleIndices.y);
                 Vertex v2 = FetchVertex(triangleIndices.z);
 
-                float3 n0 = v0.normal;
-                float3 n1 = v1.normal;
-                float3 n2 = v2.normal;
-
-                // Curvature
-                float dnSq0 = LengthSquared(n0 - n1);
-                float dnSq1 = LengthSquared(n1 - n2);
-                float dnSq2 = LengthSquared(n2 - n0);
-                float dnSq = max(dnSq0, max(dnSq1, dnSq2));
-
-                payload.curvature = sqrt(dnSq);
-
-                float3 barycentricCoords = float3(1.0 - attribs.barycentrics.x - attribs.barycentrics.y,
-                         attribs.barycentrics.x, attribs.barycentrics.y);
-
+                float3 barycentricCoords = float3(1.0 - attribs.barycentrics.x - attribs.barycentrics.y, attribs.barycentrics.x, attribs.barycentrics.y);
                 Vertex v = InterpolateVertices(v0, v1, v2, barycentricCoords);
 
-
+                // Normal Calculation
+                // Standard built-in constant for HitKind
                 bool isFrontFace = HitKind() == HIT_KIND_TRIANGLE_FRONT_FACE;
-
                 float3 normalOS = isFrontFace ? v.normal : -v.normal;
-
                 float3 normalWS = normalize(mul(normalOS, (float3x3)WorldToObject()));
 
-
+                // Calculate MIP level (Simplified)
                 float3 direction = WorldRayDirection();
-
-                // 长度
                 payload.hitT = RayTCurrent();
+                float mip = 0; // Simplified for TMP which uses SDF, usually mip 0 is what we want for shape data
 
-                // Mip level
+                // --- TMP SDF Sampling & Color Logic ---
+                float sdf = _MainTex.SampleLevel(sampler_MainTex, v.uv, 0).a;
+                
+                // Calculate Outline factor
+                // Outline is present if SDF is within a certain range
+                float outlineHalfWidth = _OutlineWidth * 0.5; // * ScaleRatio logic omitted for simplicity
+                float outlineThreshold = 0.5 - outlineHalfWidth;
+                
+                // Use a simple step for Face vs Outline for now
+                // In full TMP shader, this uses smoothstep based on gradients
+                bool isOutline = (sdf < 0.5) && (sdf > outlineThreshold);
 
-                // 2. 计算 UV 空间面积 (uvArea)
-                float2 uvE1 = v1.uv - v0.uv;
-                float2 uvE2 = v2.uv - v0.uv;
-                // 使用 2D 叉乘公式计算面积
-                float uvArea = abs(uvE1.x * uvE2.y - uvE2.x * uvE1.y) * 0.5f;
+                // Sample Face/Outline Textures (Ignoring scrolling for RT static geometry usually)
+                // Note: TRANSFORM_TEX macro doesn't work directly here without proper defines, using raw ST calculation
+                // float2 faceUV = v.uv * _FaceTex_ST.xy + _FaceTex_ST.zw;
+                // float4 faceTexColor = _FaceTex.SampleLevel(sampler_FaceTex, faceUV, mip);
+                //
+                // float2 outlineUV = v.uv * _OutlineTex_ST.xy + _OutlineTex_ST.zw;
+                // float4 outlineTexColor = _OutlineTex.SampleLevel(sampler_OutlineTex, outlineUV, mip);
 
-                // 3. 计算世界空间面积 (worldArea)
-                // 注意：v0.position 是模型空间，需要考虑物体的缩放
-                float3 edge1 = v1.position - v0.position;
-                float3 edge2 = v2.position - v0.position;
-                float3 crossProduct = cross(edge1, edge2);
+                float3 finalColor = _FaceColor.rgb;
+                
+                // if (isOutline)
+                // {
+                //     finalColor = _OutlineColor.rgb * outlineTexColor.rgb;
+                // }
+                // else
+                // {
+                //     finalColor = _FaceColor.rgb * faceTexColor.rgb;
+                // }
 
-                // 将模型空间的面积向量转换到世界空间，从而自动处理非统一缩放
-                // 使用 ObjectToWorld 的转置逆矩阵或直接变换向量（视缩放情况而定）
-                float3 worldCrossProduct = mul((float3x3)ObjectToWorld(), crossProduct);
-                float worldArea = length(crossProduct) * 0.5f;
-
-                float NoRay = abs(dot(direction, normalWS));
-                float a = payload.hitT * payload.mipAndCone.y;
-                a *= Math::PositiveRcp(NoRay);
-                a *= sqrt(uvArea / max(worldArea, 1e-10f));
-
-                float mip = log2(a);
-                mip += MAX_MIP_LEVEL;
-                mip = max(mip, 0.0);
-
-                // mip = payload.mipAndCone.y;
-
-                // mip = 0;
-                payload.mipAndCone.x += mip;
-
-                #if _NORMALMAP
-                float3 tangentWS = normalize(mul(v.tangent.xyz, (float3x3)WorldToObject()));
-
-                // float2 normalUV = float2(v.uv.x, 1 - v.uv.y); // 修正UV翻转问题
-                float2 normalUV = (v.uv); // 修正UV翻转问题
-
-                float4 n = _BumpMap.SampleLevel(sampler_BumpMap, _BaseMap_ST.xy * normalUV + _BaseMap_ST.zw, mip);
-
-                // float4 T = float4(tangentWS, 1);
-
-                // float3 N = Geometry::TransformLocalNormal(packedNormal, T, normalWS);
-
-                float3 tangentNormal = UnpackNormalScale(n, _BumpScale);
-
-                float3 bitangent = cross(normalWS.xyz, tangentWS.xyz);
-                half3x3 tangentToWorld = half3x3(tangentWS.xyz, bitangent.xyz, normalWS.xyz);
-
-                float3 matWorldNormal = TransformTangentToWorld(tangentNormal, tangentToWorld);
-                // worldNormal = tangentNormal; 
-                // float3 worldNormal = N;
-                #else
+                // Normal Map Logic (Simplified)
+                // If using bump map
+                // float3 normalMap = _BumpMap.SampleLevel(sampler_BumpMap, faceUV, mip).xyz;
+                // You would need to unpack normal and transform to world space here if needed.
                 float3 matWorldNormal = normalWS;
-                #endif
 
-                float3 albedo = _BaseColor.xyz * _BaseMap.SampleLevel(sampler_BaseMap, _BaseMap_ST.xy * v.uv + _BaseMap_ST.zw, mip).xyz;
+                // Standard Surface Properties
+                // Mapping TMP Reflectivity to Metallic/Gloss roughly
+                // TMP Reflectivity is 5-15, Specular is Color.
+                float roughness = 1.0 - (_SpecularPower / 4.0); // Rough approximation
+                float metallic = 0.0; // Text is usually dielectric
+                
+                roughness = 1.0f;
 
-
-                float roughness;
-                float metallic;
-
-                #if _METALLICSPECGLOSSMAP
-
-                float4 vv = _MetallicGlossMap.SampleLevel(sampler_MetallicGlossMap, _BaseMap_ST.xy * v.uv + _BaseMap_ST.zw, mip);
-
-                roughness = (1 - vv.a) * (1 - _Smoothness);
-                metallic = vv.r;
-
-                // roughness = vv.g * (1 - _Smoothness);
-                // metallic = vv.b;
-
-                #else
-
-                roughness = 1 - _Smoothness;
-                metallic = _Metallic;
-
-                #endif
-
-                #if _EMISSION
-                float3 emission = _EmissionColor.xyz * _EmissionMap.SampleLevel(sampler_EmissionMap, v.uv, mip).xyz;
-                payload.Lemi = Packing::EncodeRgbe(emission);
-                #else
-                payload.Lemi = Packing::EncodeRgbe(float3(0, 0, 0));
-
-                #endif
-
-                float emissionLevel = Color::Luminance(payload.Lemi);
-                emissionLevel = saturate(emissionLevel * 50.0);
-
-                metallic = lerp(metallic, 0.0, emissionLevel);
-                roughness = lerp(roughness, 1.0, emissionLevel);
-
-
-                float3 dielectricSpecular = float3(0.04, 0.04, 0.04);
-                float3 _SpecularColor = lerp(dielectricSpecular, albedo, metallic);
-
+                // --- Payload Construction ---
+                
+                payload.Lemi = Packing::EncodeRgbe(float3(0, 0, 0)); // No emission by default
 
                 // Instance
-                uint instanceIndex = InstanceIndex();
-                // payload.instanceIndex = instanceIndex;
-                payload.SetInstanceIndex(instanceIndex);
+                payload.SetInstanceIndex(InstanceIndex());
 
-                float3x3 mObjectToWorld = (float3x3)ObjectToWorld();
-
-
-                float4x4 prev = GetPrevObjectToWorldMatrix();
-                // float4x4 prev = unity_MatrixPreviousM;
-
-                float3x3 mPrevObjectToWorld = (float3x3)prev;
-                // 法线
                 payload.N = Packing::EncodeUnitVector(normalWS);
                 payload.matN = Packing::EncodeUnitVector(matWorldNormal);
 
                 float3 worldPosition = mul(ObjectToWorld3x4(), float4(v.position, 1.0)).xyz;
-
                 float3 prevWorldPosition = mul(GetPrevObjectToWorldMatrix(), float4(v.position, 1.0)).xyz;
 
-                // 位置
-                // payload.X = worldPosition;
                 payload.Xprev = prevWorldPosition;
-                // payload.roughness = roughness; 
+                payload.roughnessAndMetalness = Packing::Rg16fToUint(float2(1, metallic));
+                payload.baseColor = Packing::RgbaToUint(float4(finalColor, 1.0), 8, 8, 8, 8);
 
-                payload.roughnessAndMetalness = Packing::Rg16fToUint(float2(roughness, metallic));
-
-                // albedo *= float3(0, 1.0, 0);
-
-                payload.baseColor = Packing::RgbaToUint(float4(albedo, 1.0), 8, 8, 8, 8);
-                // payload.metalness = metallic;
+                // Transparency handling
                 uint flag = FLAG_NON_TRANSPARENT;
-                #if  _SURFACE_TYPE_TRANSPARENT
-                flag = FLAG_TRANSPARENT;
-                #endif
+                // If you want proper alpha blending, you need recursive ray tracing or accumulation
+                // For now we set it as opaque because we did cutout in AnyHit
                 payload.SetFlag(flag);
             }
             ENDHLSL
