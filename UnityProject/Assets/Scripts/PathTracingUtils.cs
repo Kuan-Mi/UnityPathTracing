@@ -63,7 +63,7 @@ namespace PathTracing
 
 
             var result = new Vector4(-x0, -y1, x0 - x1, y1 - y0);
-            Debug .Log($"NRD Frustum: {result.x}, {result.y}, {result.z}, {result.w}");
+            // Debug .Log($"NRD Frustum: {result.x}, {result.y}, {result.z}, {result.w}");
             
             return new Vector4(-x0, -y1, x0 - x1, y1 - y0);
         }
