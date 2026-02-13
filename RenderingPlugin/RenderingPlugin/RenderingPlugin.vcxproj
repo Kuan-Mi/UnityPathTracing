@@ -67,7 +67,7 @@
     <CharacterSet>Unicode</CharacterSet>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'" Label="Configuration">
-    <ConfigurationType>Application</ConfigurationType>
+    <ConfigurationType>DynamicLibrary</ConfigurationType>
     <UseDebugLibraries>false</UseDebugLibraries>
     <PlatformToolset>v143</PlatformToolset>
     <WholeProgramOptimization>true</WholeProgramOptimization>
@@ -184,13 +184,26 @@
       <PreprocessorDefinitions>NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
+      <LanguageStandard>stdcpp17</LanguageStandard>
+      <AdditionalIncludeDirectories>$(NRD_ROOT)\NRD\_NRI_SDK\Include;$(NRD_ROOT)\NRD\_NRD_SDK\Include;$(NRD_ROOT)\NRD\_NRD_SDK\Integration;$(NRD_ROOT)\DirectX-Headers\include\directx</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <OptimizeReferences>true</OptimizeReferences>
       <GenerateDebugInformation>true</GenerateDebugInformation>
+      <AdditionalLibraryDirectories>$(NRD_ROOT)\NRD\_NRD_SDK\Lib\Release;$(NRD_ROOT)\NRD\_NRI_SDK\Lib\Release</AdditionalLibraryDirectories>
     </Link>
+    <PostBuildEvent>
+      <Command>
+        set "TARGET_PLUGIN_PATH=$(ProjectDir)..\..\UnityProject\Assets\Plugins\x86_64"
+        echo Target Path is %TARGET_PLUGIN_PATH%
+        copy /Y "$(TargetPath)" "%TARGET_PLUGIN_PATH%\RenderingPlugin.dll"
+        copy /Y  "%NRD_ROOT%\NRD\_NRD_SDK\Lib\Release\NRD.dll" "%TARGET_PLUGIN_PATH%\NRD.dll"
+        copy /Y  "%NRD_ROOT%\NRD\_NRI_SDK\Lib\Release\NRI.dll" "%TARGET_PLUGIN_PATH%\NRI.dll"
+      </Command>
+      <Message>正在将 RenderingPlugin.dll 复制到 Unity Plugins 目录...</Message>
+    </PostBuildEvent>
   </ItemDefinitionGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
