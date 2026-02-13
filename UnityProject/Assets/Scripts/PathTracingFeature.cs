@@ -268,6 +268,7 @@ namespace PathTracing
                 accelerationStructure.UpdateInstanceTransform(smr);
             } 
 
+            accelerationStructure.Build();
             if (pathTracingSetting.usePackedData)
             {
                 if (!_dataBuilder.IsEmpty())

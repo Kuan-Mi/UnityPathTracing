@@ -96,7 +96,7 @@ MonoBehaviour:
     denoiser: 0
     emissionIntensity: 1
     cameraJitter: 1
-    psr: 0
+    psr: 1
     emission: 1
     usePrevFrame: 1
     TAA: 1
