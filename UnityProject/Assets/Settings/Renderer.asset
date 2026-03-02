@@ -114,8 +114,8 @@ MonoBehaviour:
     resolutionScale: 1
     upscalerMode: 0
     usePackedData: 0
-    volumetricFog: 0
-    fogDensity: 0.5
+    volumetricFog: 1
+    fogDensity: 0.147
     scatterAlbedo: 0.965
     hgAnisotropy: 0
     fogFar: 10

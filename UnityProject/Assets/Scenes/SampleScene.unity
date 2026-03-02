@@ -270,6 +270,7 @@ GameObject:
   - component: {fileID: 330585547}
   - component: {fileID: 330585548}
   - component: {fileID: 330585549}
+  - component: {fileID: 330585550}
   m_Layer: 0
   m_Name: Main Camera
   m_TagString: MainCamera
@@ -345,7 +346,7 @@ Transform:
   m_GameObject: {fileID: 330585543}
   serializedVersion: 2
   m_LocalRotation: {x: 0.006066565, y: 0.42311758, z: -0.0032296204, w: 0.9060487}
-  m_LocalPosition: {x: -5.1295395, y: 0.7590567, z: -1.6881332}
+  m_LocalPosition: {x: -5.1295395, y: 2.098, z: -1.6881332}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -430,6 +431,31 @@ MonoBehaviour:
   m_TrackingType: 0
   m_UpdateType: 0
   m_UseRelativeTransform: 0
+--- !u!114 &330585550
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 330585543}
+  m_Enabled: 0
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 55b850be0cee4959a534c5bb8135c99a, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::FroxelFrustumVisualizer
+  fogFar: 10
+  sliceCount: 64
+  froxelW: 8
+  froxelH: 8
+  displaySliceStep: 1
+  showFrustumEdges: 0
+  showSlicePlanes: 0
+  showFroxelCells: 0
+  showSliceLabels: 0
+  frustumEdgeColor: {r: 1, g: 1, b: 0, a: 0.8}
+  nearSliceColor: {r: 0, g: 1, b: 0, a: 0.5}
+  farSliceColor: {r: 1, g: 0, b: 0, a: 0.5}
+  cellColor: {r: 0.5, g: 0.8, b: 1, a: 0.15}
 --- !u!1001 &356623995
 PrefabInstance:
   m_ObjectHideFlags: 0
@@ -540,7 +566,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 8771091787928289351, guid: 9c2e154e190f89945a49f6b86fc55b2a, type: 3}
       propertyPath: m_IsActive
-      value: 1
+      value: 0
       objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []

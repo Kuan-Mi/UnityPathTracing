@@ -118,6 +118,7 @@ namespace PathTracing
             internal ComputeShader    VolumetricIntegrateCs;
             internal TextureHandle    FroxelVolume;
             internal TextureHandle    VolumeResult;
+            internal TextureHandle    FinalVolumetricLight;
             internal int              FroxelW;
             internal int              FroxelH;
             internal int              FroxelShadowKernel;
@@ -263,7 +264,8 @@ namespace PathTracing
             const int volSlices = 64;
             if (data.Setting.volumetricFog
                 && data.VolumetricFogShadowCs != null && data.VolumetricIntegrateCs != null
-                && data.FroxelVolume.IsValid() && data.VolumeResult.IsValid())
+                && data.FroxelVolume.IsValid() && data.VolumeResult.IsValid()
+                && data.FinalVolumetricLight.IsValid())
             {
                 // --- Pass A: inline RT shadow per froxel (compute shader) ---
                 natCmd.BeginSample(volShadowMarker);
@@ -284,20 +286,19 @@ namespace PathTracing
                     Mathf.CeilToInt(volSlices / 8f));
                 natCmd.EndSample(volShadowMarker);
 
-                // --- Pass B: front-to-back integration at full render resolution ---
+                // --- Pass B: front-to-back prefix-sum integration at froxel grid resolution ---
                 natCmd.BeginSample(volIntgrtMarker);
                 int intKernel = data.FroxelIntegrateKernel; // pre-cached in RecordRenderGraph
                 natCmd.SetComputeConstantBufferParam(data.VolumetricIntegrateCs, paramsID, data.ConstantBuffer, 0, data.ConstantBuffer.stride);
-                natCmd.SetComputeTextureParam(data.VolumetricIntegrateCs, intKernel, "_FroxelVolume", data.FroxelVolume);
-                natCmd.SetComputeTextureParam(data.VolumetricIntegrateCs, intKernel, "_VolumeResult", data.VolumeResult);
-                natCmd.SetComputeTextureParam(data.VolumetricIntegrateCs, intKernel, "_SceneViewZ",   data.ViewZ);
+                natCmd.SetComputeTextureParam(data.VolumetricIntegrateCs, intKernel, "_FroxelVolume",        data.FroxelVolume);
+                natCmd.SetComputeTextureParam(data.VolumetricIntegrateCs, intKernel, "_FinalVolumetricLight", data.FinalVolumetricLight);
                 natCmd.SetComputeIntParam(data.VolumetricIntegrateCs, "_SliceCount", volSlices);
-                natCmd.SetComputeIntParam(data.VolumetricIntegrateCs, "_SceneW",     data.m_RenderResolution.x);
-                natCmd.SetComputeIntParam(data.VolumetricIntegrateCs, "_SceneH",     data.m_RenderResolution.y);
+                natCmd.SetComputeIntParam(data.VolumetricIntegrateCs, "_FroxelW",    data.FroxelW);
+                natCmd.SetComputeIntParam(data.VolumetricIntegrateCs, "_FroxelH",    data.FroxelH);
                 natCmd.SetComputeFloatParam(data.VolumetricIntegrateCs, "_FogFar",   data.Setting.fogFar);
                 natCmd.DispatchCompute(data.VolumetricIntegrateCs, intKernel,
-                    Mathf.CeilToInt(data.m_RenderResolution.x / 16f),
-                    Mathf.CeilToInt(data.m_RenderResolution.y / 16f), 1);
+                    Mathf.CeilToInt(data.FroxelW / 8f),
+                    Mathf.CeilToInt(data.FroxelH / 8f), 1);
                 natCmd.EndSample(volIntgrtMarker);
             }
 
@@ -360,6 +361,47 @@ namespace PathTracing
             var isEven = (data.GlobalConstants.gFrameIndex & 1) == 0;
             var taaSrc = isEven ? data.TaaHistoryPrev : data.TaaHistory;
             var taaDst = isEven ? data.TaaHistory : data.TaaHistoryPrev;
+            
+            
+            // ==== Apply volumetric fog onto final scene color ====
+            // Must run AFTER TAA/DLSS so temporal history is unaffected.
+            // formula: finalColor = sceneColor * transmittance + inScatter
+            if (data.Setting.volumetricFog && data.VolumeResult.IsValid())
+            {
+                var fogApplyMarker = new ProfilerMarker(ProfilerCategory.Render, "Fog Apply", MarkerFlags.SampleGPU);
+                natCmd.BeginSample(fogApplyMarker);
+
+                int fogKernel = data.FogApplyKernel;
+                // Bind the prefix-sum 3D volume (SRV) and scene depth for depth-aware sampling
+                natCmd.SetComputeTextureParam(data.VolumetricIntegrateCs, fogKernel, "_FinalVolumetricLightSrv", data.FinalVolumetricLight);
+                natCmd.SetComputeTextureParam(data.VolumetricIntegrateCs, fogKernel, "_SceneViewZ",              data.ViewZ);
+
+                if (data.Setting.RR)
+                {
+                    // RR path: apply onto DLSS upscaled output (output resolution)
+                    int outW = (int)data.GlobalConstants.gOutputSize.x;
+                    int outH = (int)data.GlobalConstants.gOutputSize.y;
+                    natCmd.SetComputeTextureParam(data.VolumetricIntegrateCs, fogKernel, "_SceneColorRW", data.DlssOutput);
+                    natCmd.SetComputeIntParam(data.VolumetricIntegrateCs, "_SceneW", outW);
+                    natCmd.SetComputeIntParam(data.VolumetricIntegrateCs, "_SceneH", outH);
+                    natCmd.DispatchCompute(data.VolumetricIntegrateCs, fogKernel,
+                        Mathf.CeilToInt(outW / 16f),
+                        Mathf.CeilToInt(outH / 16f), 1);
+                }
+                else
+                {
+                    // Non-RR path: apply onto TAA output
+                    natCmd.SetComputeTextureParam(data.VolumetricIntegrateCs, fogKernel, "_SceneColorRW", data.Composed);
+                    natCmd.SetComputeIntParam(data.VolumetricIntegrateCs, "_SceneW", data.m_RenderResolution.x);
+                    natCmd.SetComputeIntParam(data.VolumetricIntegrateCs, "_SceneH", data.m_RenderResolution.y);
+                    natCmd.DispatchCompute(data.VolumetricIntegrateCs, fogKernel,
+                        Mathf.CeilToInt(data.m_RenderResolution.x / 16f),
+                        Mathf.CeilToInt(data.m_RenderResolution.y / 16f), 1);
+                }
+
+                natCmd.EndSample(fogApplyMarker);
+            }
+            
             if (data.Setting.RR)
             {
                 // dlss Before
@@ -405,42 +447,6 @@ namespace PathTracing
             }
 
 
-            // ==== Apply volumetric fog onto final scene color ====
-            // Must run AFTER TAA/DLSS so temporal history is unaffected.
-            // formula: finalColor = sceneColor * transmittance + inScatter
-            if (data.Setting.volumetricFog && data.VolumeResult.IsValid())
-            {
-                var fogApplyMarker = new ProfilerMarker(ProfilerCategory.Render, "Fog Apply", MarkerFlags.SampleGPU);
-                natCmd.BeginSample(fogApplyMarker);
-
-                int fogKernel = data.FogApplyKernel;
-                natCmd.SetComputeTextureParam(data.VolumetricIntegrateCs, fogKernel, "_VolumeResultSrv", data.VolumeResult);
-
-                if (data.Setting.RR)
-                {
-                    // RR path: apply onto DLSS upscaled output (output resolution)
-                    int outW = (int)data.GlobalConstants.gOutputSize.x;
-                    int outH = (int)data.GlobalConstants.gOutputSize.y;
-                    natCmd.SetComputeTextureParam(data.VolumetricIntegrateCs, fogKernel, "_SceneColorRW", data.DlssOutput);
-                    natCmd.SetComputeIntParam(data.VolumetricIntegrateCs, "_SceneW", outW);
-                    natCmd.SetComputeIntParam(data.VolumetricIntegrateCs, "_SceneH", outH);
-                    natCmd.DispatchCompute(data.VolumetricIntegrateCs, fogKernel,
-                        Mathf.CeilToInt(outW / 16f),
-                        Mathf.CeilToInt(outH / 16f), 1);
-                }
-                else
-                {
-                    // Non-RR path: apply onto TAA output
-                    natCmd.SetComputeTextureParam(data.VolumetricIntegrateCs, fogKernel, "_SceneColorRW", taaDst);
-                    natCmd.SetComputeIntParam(data.VolumetricIntegrateCs, "_SceneW", data.m_RenderResolution.x);
-                    natCmd.SetComputeIntParam(data.VolumetricIntegrateCs, "_SceneH", data.m_RenderResolution.y);
-                    natCmd.DispatchCompute(data.VolumetricIntegrateCs, fogKernel,
-                        Mathf.CeilToInt(data.m_RenderResolution.x / 16f),
-                        Mathf.CeilToInt(data.m_RenderResolution.y / 16f), 1);
-                }
-
-                natCmd.EndSample(fogApplyMarker);
-            }
 
             // 显示输出
             natCmd.BeginSample(outputBlitMarker);
@@ -627,12 +633,14 @@ namespace PathTracing
             passData.VolumetricFogShadowCs = VolumetricFogShadowCs;
             passData.VolumetricIntegrateCs = VolumetricIntegrateCs;
             if (m_Settings.volumetricFog
-                && NrdDenoiser.FroxelVolume != null && NrdDenoiser.FroxelVolume.rt != null
-                && NrdDenoiser.VolumeResult  != null && NrdDenoiser.VolumeResult.rt  != null)
+                && NrdDenoiser.FroxelVolume        != null && NrdDenoiser.FroxelVolume.rt        != null
+                && NrdDenoiser.VolumeResult          != null && NrdDenoiser.VolumeResult.rt          != null
+                && NrdDenoiser.FinalVolumetricLight  != null && NrdDenoiser.FinalVolumetricLight.rt  != null)
             {
                 // NrdDenoiser.EnsureResources() has already been called above and owns these RTHandles
                 passData.FroxelVolume          = renderGraph.ImportTexture(NrdDenoiser.FroxelVolume);
                 passData.VolumeResult          = renderGraph.ImportTexture(NrdDenoiser.VolumeResult);
+                passData.FinalVolumetricLight  = renderGraph.ImportTexture(NrdDenoiser.FinalVolumetricLight);
                 passData.FroxelW               = NrdDenoiser.FroxelW;
                 passData.FroxelH               = NrdDenoiser.FroxelH;
                 passData.FroxelShadowKernel    = VolumetricFogShadowCs.FindKernel("VolumetricShadow"); // cached once per frame
@@ -900,8 +908,9 @@ namespace PathTracing
             builder.UseTexture(passData.RRGuide_Normal_Roughness, AccessFlags.ReadWrite);
             builder.UseTexture(passData.DlssOutput, AccessFlags.ReadWrite);
 
-            if (passData.FroxelVolume.IsValid()) builder.UseTexture(passData.FroxelVolume, AccessFlags.ReadWrite);
-            if (passData.VolumeResult.IsValid())  builder.UseTexture(passData.VolumeResult,  AccessFlags.ReadWrite);
+            if (passData.FroxelVolume.IsValid())        builder.UseTexture(passData.FroxelVolume,         AccessFlags.ReadWrite);
+            if (passData.VolumeResult.IsValid())          builder.UseTexture(passData.VolumeResult,          AccessFlags.ReadWrite);
+            if (passData.FinalVolumetricLight.IsValid())  builder.UseTexture(passData.FinalVolumetricLight,  AccessFlags.ReadWrite);
         }
 
         private TextureHandle CreateTex(TextureDesc textureDesc, RenderGraph renderGraph, string name, GraphicsFormat format)

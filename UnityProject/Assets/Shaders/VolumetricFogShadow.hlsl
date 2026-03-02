@@ -36,15 +36,20 @@ void VolumetricShadow(uint3 id : SV_DispatchThreadID)
     if (id.x >= _FroxelW || id.y >= _FroxelH || id.z >= _SliceCount)
         return;
 
-    // Reconstruct froxel centre world position
-    float viewZ     = SliceToViewZ((float)id.z + 0.5);
-    float2 uv       = ((float2)id.xy + 0.5) / float2(_FroxelW, _FroxelH);
+    // Reconstruct froxel sample world position.
+    // gJitter.x is in [-0.5, 0.5] (TAA pixel jitter); repurposed here as a per-frame
+    // temporal offset along the slice axis so adjacent frames sample at different depths
+    // within the same slice — TAA then averages them out, removing Z-banding.
+    float viewZ     = SliceToViewZ((float)id.z + 0.5 + gJitter.x*1000);
+    float2 uv       = ((float2)id.xy + 0.5 + gJitter*1000) / float2(_FroxelW, _FroxelH);
     float3 viewPos  = Geometry::ReconstructViewPosition(uv, gCameraFrustum, viewZ, gOrthoMode);
     float3 worldPos = Geometry::AffineTransform(gViewToWorld, viewPos);
 
-    // Step length in metres (difference between this and previous slice depth)
-    float viewZPrev = SliceToViewZ((float)id.z);
-    float stepM     = -(viewZ - viewZPrev) * gUnitToMetersMultiplier;
+    // Step length in metres: use fixed slice boundaries (not the jittered sample point)
+    // so that the integrated extinction is independent of the jitter value.
+    float viewZNear = SliceToViewZ((float)id.z);
+    float viewZFar  = SliceToViewZ((float)id.z + 1.0);
+    float stepM     = -(viewZFar - viewZNear) * gUnitToMetersMultiplier;
 
     // Inline shadow ray toward the sun
     RayDesc ray;

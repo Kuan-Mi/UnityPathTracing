@@ -146,7 +146,7 @@ namespace PathTracing
         public float scatterAlbedo = 0.9f;
         [Range(-0.99f, 0.99f)]
         public float hgAnisotropy = 0.3f;
-        [Range(10f, 500f)]
+        [Range(1f, 500f)]
         public float fogFar = 80f;
     }
 }
