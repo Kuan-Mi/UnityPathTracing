@@ -64,6 +64,9 @@ namespace PathTracing
         public ComputeShader sharcResolveCs;
         public RayTracingShader sharcUpdateTs;
 
+        public ComputeShader volumetricFogShadowCs;
+        public ComputeShader    volumetricIntegrateCs;
+
         public PathTracingSetting pathTracingSetting;
 
         private PathTracingPassSingle _pathTracingPass;
@@ -163,7 +166,9 @@ namespace PathTracing
                 HashEntriesBuffer = _hashEntriesBuffer,
                 AccumulationBuffer = _accumulationBuffer,
                 ResolvedBuffer = _resolvedBuffer,
-                _dataBuilder = _dataBuilder
+                _dataBuilder = _dataBuilder,
+                VolumetricFogShadowCs = volumetricFogShadowCs,
+                VolumetricIntegrateCs = volumetricIntegrateCs,
             };
         }
 

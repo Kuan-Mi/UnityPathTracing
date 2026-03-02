@@ -1,0 +1,2 @@
+// This file is superseded by VolumetricFogShadow.compute (inline ray tracing).
+// Kept for reference only; no longer referenced by C# code.

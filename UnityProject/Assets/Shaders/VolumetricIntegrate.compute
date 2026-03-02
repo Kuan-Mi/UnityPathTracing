@@ -1,0 +1,101 @@
+#pragma kernel Integrate
+#pragma kernel FogApply
+#pragma use_dxc
+
+#include "Include/Shared.hlsl"
+
+Texture3D<float4>   _FroxelVolume;   // output from VolumetricFogShadow.raytrace (froxel res)
+RWTexture2D<float4> _VolumeResult;   // rgb = accumulated in-scatter, a = transmittance (render res)
+
+uint  _SliceCount;
+float _FogFar;   // must match value used in VolumetricFogShadow
+
+// Integrate + FogApply share the same screen-size uniforms
+uint  _SceneW;   // render resolution width  (Integrate) / output width  (FogApply)
+uint  _SceneH;   // render resolution height (Integrate) / output height (FogApply)
+
+// Depth-aware integration — Load on same-resolution ViewZ
+Texture2D<float4> _SceneViewZ;
+
+// Trilinear sampler for the 3-D froxel volume
+SamplerState      sampler_trilinear_clamp;
+
+// Mirror of SliceToViewZ in VolumetricFogShadow.hlsl.
+// gNearZ is negative (e.g. -0.1); returns increasingly negative values as k grows.
+float SliceToViewZ_Int(float k)
+{
+    return gNearZ * pow(_FogFar / -gNearZ, k / (float)_SliceCount);
+}
+
+// FogApply kernel resources
+Texture2D<float4>   _VolumeResultSrv;   // same RT as _VolumeResult, bound read-only
+SamplerState        sampler_linear_clamp;
+RWTexture2D<float4> _SceneColorRW;      // TAA/DLSS output to apply fog onto (in-place)
+
+[numthreads(16, 16, 1)]
+void Integrate(uint2 id : SV_DispatchThreadID)
+{
+    // Runs at full render resolution (_SceneW x _SceneH).
+    if (id.x >= _SceneW || id.y >= _SceneH) return;
+
+    // Normalised screen UV for trilinear 3-D sampling (centred on the texel).
+    float2 uv = ((float2)id + 0.5f) / float2(_SceneW, _SceneH);
+
+    // Load scene depth directly (same resolution — no UV rescaling needed).
+    // sceneViewZ < 0 = valid surface; >= 0 = sky / no geometry.
+    float sceneViewZ = _SceneViewZ.Load(int3((int2)id, 0)).r;
+    bool  hasSurface = (sceneViewZ < 0.0);
+
+    float  transmittance = 1.0;
+    float3 accumulated   = 0.0;
+
+    for (uint k = 0; k < _SliceCount; k++)
+    {
+        // Near/far view-space depth of this slice (both negative; near is less negative).
+        float sliceNear = SliceToViewZ_Int((float)k);
+        float sliceFar  = SliceToViewZ_Int((float)k + 1.0);
+
+        // Entire slice starts behind the surface — stop integrating.
+        if (hasSurface && sliceNear < sceneViewZ)
+            break;
+
+        // Trilinear sample of the low-res froxel volume.
+        // W coordinate places us at the slice centre; hardware trilinear handles
+        // both XY (froxel → pixel upscale) and Z (inter-slice) interpolation.
+        float  w    = (k + 0.5f) / (float)_SliceCount;
+        float4 cell = _FroxelVolume.SampleLevel(sampler_trilinear_clamp, float3(uv, w), 0);
+        // cell.rgb = in-scatter * step-length,  cell.a = sigma_e * step-length
+
+        // Partial clip when the surface cuts through the middle of a slice.
+        float clipFraction = 1.0;
+        if (hasSurface && sliceFar < sceneViewZ)
+            clipFraction = (sliceNear - sceneViewZ) / (sliceNear - sliceFar);
+
+        accumulated  += transmittance * cell.rgb * clipFraction;
+        transmittance *= exp(-cell.a * clipFraction);
+    }
+
+    _VolumeResult[id] = float4(accumulated, transmittance);
+}
+
+// ---------------------------------------------------------------------------
+// FogApply: composites the integrated fog onto the final scene color (in-place)
+// Dispatched at scene (TAA/DLSS output) resolution.
+// fog.rgb = in-scatter already integrated front-to-back
+// fog.a   = total transmittance (Beer-Lambert product over all slices)
+// formula : finalColor = sceneColor * transmittance + inScatter
+// ---------------------------------------------------------------------------
+[numthreads(16, 16, 1)]
+void FogApply(uint2 id : SV_DispatchThreadID)
+{
+    if (id.x >= _SceneW || id.y >= _SceneH) return;
+
+    // UV mapping: VolumeResult is at render res; FogApply may dispatch at output res (RR/DLSS).
+    // UV-based sampling handles the potential render→output rescale in the RR path.
+    float2 uv  = ((float2)id + 0.5f) / float2(_SceneW, _SceneH);
+    float4 fog = _VolumeResultSrv.SampleLevel(sampler_linear_clamp, uv, 0);
+    // fog.rgb = in-scatter, fog.a = transmittance
+
+    float4 scene      = _SceneColorRW[id];
+    _SceneColorRW[id] = float4(scene.rgb * fog.a + fog.rgb, scene.a);
+}

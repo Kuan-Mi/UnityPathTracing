@@ -29,6 +29,7 @@ namespace PathTracing
         DLSS_SpecularHitDistance,
         DLSS_NormalRoughness,
         DLSS_Output,
+        VolumetricFog,
     }
 
     public enum UpscalerMode  : byte      // Scaling factor       // Min jitter phases (or just use unclamped Halton2D)
@@ -136,5 +137,16 @@ namespace PathTracing
         public UpscalerMode upscalerMode;
  
         public bool usePackedData;
+
+        [Header("体积光")]
+        public bool volumetricFog = true;
+        [Range(0.001f, 0.5f)]
+        public float fogDensity = 0.02f;
+        [Range(0f, 1f)]
+        public float scatterAlbedo = 0.9f;
+        [Range(-0.99f, 0.99f)]
+        public float hgAnisotropy = 0.3f;
+        [Range(10f, 500f)]
+        public float fogFar = 80f;
     }
 }

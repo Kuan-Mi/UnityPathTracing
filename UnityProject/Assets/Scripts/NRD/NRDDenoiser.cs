@@ -12,6 +12,7 @@ using UnityEngine.Experimental.Rendering;
 using UnityEngine.Rendering;
 using UnityEngine.Rendering.Universal;
 using static PathTracing.PathTracingUtils;
+using Object = UnityEngine.Object;
 
 namespace Nrd
 {
@@ -50,6 +51,12 @@ namespace Nrd
 
         public float resolutionScale;
         public float prevResolutionScale;
+
+        // Volumetric fog RTs (per-camera, owned by this denoiser)
+        public RTHandle FroxelVolume { get; private set; }  // 3D ARGBHalf (froxelW x froxelH x 64)  — ray gen writes at 1/8 res
+        public RTHandle VolumeResult  { get; private set; }  // 2D ARGBHalf (renderW x renderH)       — Integrate writes at full render res
+        public int FroxelW { get; private set; }
+        public int FroxelH { get; private set; }
 
 
         private NativeArray<FrameData> buffer;
@@ -148,6 +155,10 @@ namespace Nrd
             int2 currentRenderResolution = GetUpscaledResolution(outputResolution, setting.upscalerMode);
 
 
+            // 同步检查体积雾 RT 是否已被 Unity 销毁（Domain Reload / 场景切换后常见）
+            if (FroxelVolume != null && FroxelVolume.rt == null) isResourceInvalid = true;
+            if (VolumeResult  != null && VolumeResult.rt  == null) isResourceInvalid = true;
+
             // 如果尺寸没变且资源都存在，直接返回
             if (!isResourceInvalid && currentRenderResolution.x == renderResolution.x && currentRenderResolution.y == renderResolution.y)
             {
@@ -168,6 +179,52 @@ namespace Nrd
                 {
                     nrdTextureResource.Allocate(renderResolution);
                 }
+            }
+
+            // Volumetric fog RTs: 1/8 of render resolution — only allocate when fog is enabled
+            {
+                const int volSlices = 64;
+                int fw = Mathf.Max(1, Mathf.CeilToInt(renderResolution.x / 8f));
+                int fh = Mathf.Max(1, Mathf.CeilToInt(renderResolution.y / 8f));
+
+                // Release old RTHandles before reallocating
+                if (FroxelVolume != null)
+                {
+                    var oldRt = FroxelVolume.rt;
+                    RTHandles.Release(FroxelVolume);
+                    FroxelVolume = null;
+                    if (oldRt != null) { if (Application.isPlaying) Object.Destroy(oldRt); else Object.DestroyImmediate(oldRt); }
+                }
+                if (VolumeResult != null)
+                {
+                    var oldRt = VolumeResult.rt;
+                    RTHandles.Release(VolumeResult);
+                    VolumeResult = null;
+                    if (oldRt != null) { if (Application.isPlaying) Object.Destroy(oldRt); else Object.DestroyImmediate(oldRt); }
+                }
+
+                var froxelRt = new RenderTexture(fw, fh, 0, RenderTextureFormat.ARGBHalf)
+                {
+                    dimension         = TextureDimension.Tex3D,
+                    volumeDepth       = volSlices,
+                    enableRandomWrite = true,
+                    filterMode        = FilterMode.Bilinear,
+                    name              = $"FroxelVolume_{cameraName}",
+                };
+                froxelRt.Create();
+                FroxelVolume = RTHandles.Alloc(froxelRt);
+
+                var volumeResultRt = new RenderTexture(renderResolution.x, renderResolution.y, 0, RenderTextureFormat.ARGBHalf)
+                {
+                    enableRandomWrite = true,
+                    filterMode        = FilterMode.Bilinear,
+                    name              = $"VolumeResult_{cameraName}",
+                };
+                volumeResultRt.Create();
+                VolumeResult = RTHandles.Alloc(volumeResultRt);
+
+                FroxelW = fw;
+                FroxelH = fh;
             }
 
             UpdateResourceSnapshotInCpp();
@@ -210,6 +267,21 @@ namespace Nrd
             }
 
             allocatedResources.Clear();
+
+            if (FroxelVolume != null)
+            {
+                var rt = FroxelVolume.rt;
+                RTHandles.Release(FroxelVolume);
+                FroxelVolume = null;
+                if (rt != null) { if (Application.isPlaying) Object.Destroy(rt); else Object.DestroyImmediate(rt); }
+            }
+            if (VolumeResult != null)
+            {
+                var rt = VolumeResult.rt;
+                RTHandles.Release(VolumeResult);
+                VolumeResult = null;
+                if (rt != null) { if (Application.isPlaying) Object.Destroy(rt); else Object.DestroyImmediate(rt); }
+            }
         }
 
 

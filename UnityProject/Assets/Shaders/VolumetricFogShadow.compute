@@ -1,0 +1,10 @@
+// Compute shader entry-point for volumetric fog shadow pass.
+// Uses inline ray tracing (RayQuery) to avoid mixing RT and Compute pipelines
+// in the same CommandBuffer submission, which caused D3D12 descriptor-heap conflicts.
+
+#pragma kernel VolumetricShadow
+#pragma use_dxc
+#pragma require inlineraytracing
+#pragma enable_ray_tracing_shader_debug_symbols
+
+#include "VolumetricFogShadow.hlsl"
