@@ -1,0 +1,15 @@
+// Ray tracing shader entry-point for volumetric fog shadow pass.
+// Replaces the compute + inline-RT approach with a full DXR pipeline:
+//   - RayGeneration  : one invocation per froxel voxel (dispatched W x H x SliceCount)
+//   - Miss           : sun is visible (no occluder hit)
+//   - No closest-hit : RAY_FLAG_SKIP_CLOSEST_HIT_SHADER terminates on first opaque hit
+// Shared fog utilities and the TLAS binding live in VolumetricFogShadow.hlsl.
+
+#pragma max_recursion_depth 1
+#pragma use_dxc
+#pragma enable_ray_tracing_shader_debug_symbols
+
+// Enable the RT entry-point block inside the shared header
+#define VOLUMETRIC_FOG_RAYTRACE
+
+#include "VolumetricFogShadow.hlsl"

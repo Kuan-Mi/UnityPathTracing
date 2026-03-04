@@ -28,7 +28,7 @@ namespace PathTracing
         public ComputeShader SharcResolveCs;
         public RayTracingShader SharcUpdateTs;
 
-        public ComputeShader    VolumetricFogShadowCs;
+        public RayTracingShader  VolumetricFogShadowTs;
         public ComputeShader    VolumetricIntegrateCs;
 
         public GraphicsBuffer HashEntriesBuffer;
@@ -114,7 +114,7 @@ namespace PathTracing
             internal ComputeShader SharcResolveCs;
             internal RayTracingShader SharcUpdateTs;
 
-            internal ComputeShader    VolumetricFogShadowCs;
+            internal RayTracingShader VolumetricFogShadowTs;
             internal ComputeShader    VolumetricIntegrateCs;
             internal TextureHandle    FroxelVolume;
             internal TextureHandle    FroxelVolumeHistory;
@@ -122,7 +122,6 @@ namespace PathTracing
             internal TextureHandle    FinalVolumetricLight;
             internal int              FroxelW;
             internal int              FroxelH;
-            internal int              FroxelShadowKernel;
             internal int              FroxelIntegrateKernel;
             internal int              FogApplyKernel;
             internal Vector3          SunColor;
@@ -264,35 +263,30 @@ namespace PathTracing
             // ==== Volumetric Fog ====
             const int volSlices = 64;
             if (data.Setting.volumetricFog
-                && data.VolumetricFogShadowCs != null && data.VolumetricIntegrateCs != null
+                && data.VolumetricFogShadowTs != null && data.VolumetricIntegrateCs != null
                 && data.FroxelVolume.IsValid() && data.FroxelVolumeHistory.IsValid()
                 && data.VolumeResult.IsValid()
                 && data.FinalVolumetricLight.IsValid())
             {
-                // --- Pass A: inline RT shadow per froxel (compute shader) ---
+                // --- Pass A: DXR shadow ray per froxel (ray tracing shader) ---
                 natCmd.BeginSample(volShadowMarker);
-                int shadowKernel = data.FroxelShadowKernel;
-                natCmd.SetComputeConstantBufferParam(data.VolumetricFogShadowCs, paramsID, data.ConstantBuffer, 0, data.ConstantBuffer.stride);
-                
-                
-                natCmd.SetComputeBufferParam(data.VolumetricFogShadowCs, shadowKernel,g_ScramblingRankingID, data.ScramblingRanking);
-                natCmd.SetComputeBufferParam(data.VolumetricFogShadowCs,shadowKernel, g_SobolID, data.Sobol);
-                
-                natCmd.SetComputeTextureParam(data.VolumetricFogShadowCs, shadowKernel, "_FroxelVolume",        data.FroxelVolume);
-                natCmd.SetComputeTextureParam(data.VolumetricFogShadowCs, shadowKernel, "_FroxelVolumeHistory", data.FroxelVolumeHistory);
-                natCmd.SetComputeFloatParam(data.VolumetricFogShadowCs, "_FogDensity",    data.Setting.fogDensity);
-                natCmd.SetComputeFloatParam(data.VolumetricFogShadowCs, "_ScatterAlbedo", data.Setting.scatterAlbedo);
-                natCmd.SetComputeFloatParam(data.VolumetricFogShadowCs, "_HGG",           data.Setting.hgAnisotropy);
-                natCmd.SetComputeFloatParam(data.VolumetricFogShadowCs, "_FogFar",        data.Setting.fogFar);
-                natCmd.SetComputeVectorParam(data.VolumetricFogShadowCs, "_SunColor",     new Vector4(data.SunColor.x, data.SunColor.y, data.SunColor.z, 1));
-                natCmd.SetComputeIntParam(data.VolumetricFogShadowCs, "_SliceCount",  volSlices);
-                natCmd.SetComputeIntParam(data.VolumetricFogShadowCs, "_FroxelW",     data.FroxelW);
-                natCmd.SetComputeIntParam(data.VolumetricFogShadowCs, "_FroxelH",     data.FroxelH);
-                natCmd.SetComputeFloatParam(data.VolumetricFogShadowCs, "_TemporalBlend", data.Setting.fogTemporalBlend);
-                natCmd.DispatchCompute(data.VolumetricFogShadowCs, shadowKernel,
-                    Mathf.CeilToInt(data.FroxelW / 8f),
-                    Mathf.CeilToInt(data.FroxelH / 8f),
-                    Mathf.CeilToInt(volSlices / 8f));
+                natCmd.SetRayTracingShaderPass(data.VolumetricFogShadowTs, "VolFogShadow");
+                natCmd.SetRayTracingConstantBufferParam(data.VolumetricFogShadowTs, paramsID, data.ConstantBuffer, 0, data.ConstantBuffer.stride);
+                natCmd.SetRayTracingBufferParam(data.VolumetricFogShadowTs, g_ScramblingRankingID, data.ScramblingRanking);
+                natCmd.SetRayTracingBufferParam(data.VolumetricFogShadowTs, g_SobolID, data.Sobol);
+                natCmd.SetRayTracingTextureParam(data.VolumetricFogShadowTs, "_FroxelVolume",        data.FroxelVolume);
+                natCmd.SetRayTracingTextureParam(data.VolumetricFogShadowTs, "_FroxelVolumeHistory", data.FroxelVolumeHistory);
+                natCmd.SetRayTracingFloatParam(data.VolumetricFogShadowTs, "_FogDensity",    data.Setting.fogDensity);
+                natCmd.SetRayTracingFloatParam(data.VolumetricFogShadowTs, "_ScatterAlbedo", data.Setting.scatterAlbedo);
+                natCmd.SetRayTracingFloatParam(data.VolumetricFogShadowTs, "_HGG",           data.Setting.hgAnisotropy);
+                natCmd.SetRayTracingFloatParam(data.VolumetricFogShadowTs, "_FogFar",        data.Setting.fogFar);
+                natCmd.SetRayTracingVectorParam(data.VolumetricFogShadowTs, "_SunColor",     new Vector4(data.SunColor.x, data.SunColor.y, data.SunColor.z, 1));
+                natCmd.SetRayTracingIntParam(data.VolumetricFogShadowTs, "_SliceCount",  volSlices);
+                natCmd.SetRayTracingIntParam(data.VolumetricFogShadowTs, "_FroxelW",     data.FroxelW);
+                natCmd.SetRayTracingIntParam(data.VolumetricFogShadowTs, "_FroxelH",     data.FroxelH);
+                natCmd.SetRayTracingFloatParam(data.VolumetricFogShadowTs, "_TemporalBlend", data.Setting.fogTemporalBlend);
+                natCmd.DispatchRays(data.VolumetricFogShadowTs, "VolumetricShadowRayGen",
+                    (uint)data.FroxelW, (uint)data.FroxelH, (uint)volSlices);
                 // Copy current froxel result into history for next frame's temporal accumulation
                 natCmd.CopyTexture(data.FroxelVolume, data.FroxelVolumeHistory);
                 natCmd.EndSample(volShadowMarker);
@@ -641,7 +635,7 @@ namespace PathTracing
             passData._dataBuilder = _dataBuilder;
 
             // Volumetric fog resources — owned by NrdDenoiser (per-camera), just read references here
-            passData.VolumetricFogShadowCs = VolumetricFogShadowCs;
+            passData.VolumetricFogShadowTs = VolumetricFogShadowTs;
             passData.VolumetricIntegrateCs = VolumetricIntegrateCs;
             if (m_Settings.volumetricFog
                 && NrdDenoiser.FroxelVolume        != null && NrdDenoiser.FroxelVolume.rt        != null
@@ -656,7 +650,6 @@ namespace PathTracing
                 passData.FinalVolumetricLight  = renderGraph.ImportTexture(NrdDenoiser.FinalVolumetricLight);
                 passData.FroxelW               = NrdDenoiser.FroxelW;
                 passData.FroxelH               = NrdDenoiser.FroxelH;
-                passData.FroxelShadowKernel    = VolumetricFogShadowCs.FindKernel("VolumetricShadow"); // cached once per frame
                 passData.FroxelIntegrateKernel = VolumetricIntegrateCs.FindKernel("Integrate");
                 passData.FogApplyKernel         = VolumetricIntegrateCs.FindKernel("FogApply");
                 // Sun color from main directional light (mainLight already declared above)

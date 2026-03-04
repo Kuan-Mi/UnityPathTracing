@@ -70,18 +70,12 @@ float2 GetBlueNoise(uint2 pixelPos, uint seed = 0)
     return saturate(blue.xy);
 }
 
-[numthreads(8, 8, 8)]
-void VolumetricShadow(uint3 id : SV_DispatchThreadID)
+// ---- Shared per-froxel evaluation logic (used by both compute and raytrace entries) ----
+void EvaluateFroxel(uint3 id, bool visible)
 {
-    if (id.x >= _FroxelW || id.y >= _FroxelH || id.z >= _SliceCount)
-        return;
-    
-    Rng::Hash::Initialize(id.xy, gFrameIndex);
-    // float2 temporalJitter = Rng::Hash::GetFloat2();
-    // temporalJitter = 0.5;
-    float2 temporalJitter = GetBlueNoise(id.xy, 12345); // TODO: add UI to disable blue noise and use pure RNG instead (for better performance and easier debugging)
-    
-    float viewZ     = SliceToViewZ((float)id.z + temporalJitter.x);  
+    float2 temporalJitter = GetBlueNoise(id.xy, 12345); // TODO: add UI to disable blue noise and use pure RNG instead
+
+    float viewZ     = SliceToViewZ((float)id.z + temporalJitter.x);
     float2 uv       = ((float2)id.xy + temporalJitter) / float2(_FroxelW, _FroxelH);
     float3 viewPos  = Geometry::ReconstructViewPosition(uv, gCameraFrustum, viewZ, gOrthoMode);
     float3 worldPos = Geometry::AffineTransform(gViewToWorld, viewPos);
@@ -91,19 +85,6 @@ void VolumetricShadow(uint3 id : SV_DispatchThreadID)
     float viewZNear = SliceToViewZ((float)id.z);
     float viewZFar  = SliceToViewZ((float)id.z + 1.0);
     float stepM     = -(viewZFar - viewZNear) * gUnitToMetersMultiplier;
-
-    // Inline shadow ray toward the sun
-    RayDesc ray;
-    ray.Origin    = worldPos;
-    ray.Direction = gSunDirection.xyz;
-    ray.TMin      = 0.05;
-    ray.TMax      = 2000.0;
-
-    RayQuery<RAY_FLAG_ACCEPT_FIRST_HIT_AND_END_SEARCH | RAY_FLAG_SKIP_CLOSEST_HIT_SHADER> q;
-    q.TraceRayInline(gWorldTlas, RAY_FLAG_NONE, 0xFF, ray);
-    q.Proceed();
-
-    bool visible = (q.CommittedStatus() == COMMITTED_NOTHING);
 
     float3 scatter = 0.001;
     if (visible)
@@ -132,3 +113,56 @@ void VolumetricShadow(uint3 id : SV_DispatchThreadID)
     // a   = extinction integral for this step (Beer-Lambert: exp(-a) per slice)
     _FroxelVolume[id] = lerp(history, current, blend);
 }
+
+// ---- Ray Tracing entry points (VolumetricFogShadow.raytrace) ----
+#ifdef VOLUMETRIC_FOG_RAYTRACE
+
+struct VolShadowPayload
+{
+    bool visible;
+};
+
+// Miss shader: ray reached TMax without hitting any geometry → sun is visible
+[shader("miss")]
+void VolumetricShadowMiss(inout VolShadowPayload payload)
+{
+    payload.visible = true;
+}
+
+// Ray generation shader: one invocation per froxel voxel (dispatched as W x H x SliceCount)
+[shader("raygeneration")]
+void VolumetricShadowRayGen()
+{
+    uint3 id = DispatchRaysIndex().xyz;
+    if (id.x >= _FroxelW || id.y >= _FroxelH || id.z >= _SliceCount)
+        return;
+
+    Rng::Hash::Initialize(id.xy, gFrameIndex);
+
+    // Reconstruct world-space voxel centre for ray origin
+    float2 temporalJitter = GetBlueNoise(id.xy, 12345);
+    float viewZ    = SliceToViewZ((float)id.z + temporalJitter.x);
+    float2 uv      = ((float2)id.xy + temporalJitter) / float2(_FroxelW, _FroxelH);
+    float3 viewPos = Geometry::ReconstructViewPosition(uv, gCameraFrustum, viewZ, gOrthoMode);
+    float3 worldPos = Geometry::AffineTransform(gViewToWorld, viewPos);
+
+    // Shadow ray toward the sun using the full DXR pipeline
+    RayDesc ray;
+    ray.Origin    = worldPos;
+    ray.Direction = gSunDirection.xyz;
+    ray.TMin      = 0.05;
+    ray.TMax      = 2000.0;
+
+    VolShadowPayload payload;
+    payload.visible = false;
+
+    // RAY_FLAG_SKIP_CLOSEST_HIT_SHADER: no closest-hit execution needed, only miss matters
+    // RAY_FLAG_ACCEPT_FIRST_HIT_AND_END_SEARCH: terminate on first opaque hit for performance
+    TraceRay(gWorldTlas,
+             RAY_FLAG_ACCEPT_FIRST_HIT_AND_END_SEARCH | RAY_FLAG_SKIP_CLOSEST_HIT_SHADER,
+             0xFF, 0, 1, 0, ray, payload);
+
+    EvaluateFroxel(id, payload.visible);
+}
+
+#endif // VOLUMETRIC_FOG_RAYTRACE
