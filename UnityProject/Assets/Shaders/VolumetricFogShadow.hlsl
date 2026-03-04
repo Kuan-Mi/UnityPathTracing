@@ -1,7 +1,5 @@
 ﻿#include "Include/Shared.hlsl"
-
-// TLAS for inline ray queries (space1 avoids clashing with default SRV space)
-RaytracingAccelerationStructure gWorldTlas;
+#include "Include/RayTracingShared.hlsl"
 
 // ---- Output ----
 RWTexture3D<float4> _FroxelVolume;   // rgb = in-scatter * step, a = extinction * step
@@ -20,6 +18,8 @@ uint   _SliceCount;       // number of depth slices (e.g. 64)
 uint   _FroxelW;          // froxel X resolution
 uint   _FroxelH;          // froxel Y resolution
 float  _TemporalBlend;    // blend weight for current frame (0 = all history, 1 = all current)
+uint   _EmissiveRayCount;       // number of random probe rays for emissive in-scatter (0 = off)
+float  _EmissiveIntensityScale; // manual scale for emissive contribution to fog
 
 // Exponential depth distribution: slice k -> view-space depth
 float SliceToViewZ(float k)
@@ -70,63 +70,25 @@ float2 GetBlueNoise(uint2 pixelPos, uint seed = 0)
     return saturate(blue.xy);
 }
 
-// ---- Shared per-froxel evaluation logic (used by both compute and raytrace entries) ----
-void EvaluateFroxel(uint3 id, bool visible)
+float3 UniformSphereDir(float2 u)
 {
-    float2 temporalJitter = GetBlueNoise(id.xy, 12345); // TODO: add UI to disable blue noise and use pure RNG instead
-
-    float viewZ     = SliceToViewZ((float)id.z + temporalJitter.x);
-    float2 uv       = ((float2)id.xy + temporalJitter) / float2(_FroxelW, _FroxelH);
-    float3 viewPos  = Geometry::ReconstructViewPosition(uv, gCameraFrustum, viewZ, gOrthoMode);
-    float3 worldPos = Geometry::AffineTransform(gViewToWorld, viewPos);
-
-    // Step length in metres: use fixed slice boundaries (not the jittered sample point)
-    // so that the integrated extinction is independent of the jitter value.
-    float viewZNear = SliceToViewZ((float)id.z);
-    float viewZFar  = SliceToViewZ((float)id.z + 1.0);
-    float stepM     = -(viewZFar - viewZNear) * gUnitToMetersMultiplier;
-
-    float3 scatter = 0.001;
-    if (visible)
-    {
-        // Phase function evaluated for the view ray direction
-        float3 rayDir  = normalize(worldPos - gCameraGlobalPos.xyz);
-        float cosTheta = dot(rayDir, gSunDirection.xyz);
-        float phase    = PhaseHG(cosTheta, _HGG);
-        scatter        = _SunColor.rgb * _FogDensity * _ScatterAlbedo * phase;
-    }
-
-    float4 current = float4(scatter * stepM, _FogDensity * stepM);
-
-    // ---- Temporal accumulation ----
-    // Reproject this voxel's world position into the previous frame's froxel volume.
-    float2 prevScreenUV = Geometry::GetScreenUv(gWorldToClipPrev, worldPos);
-    float  prevViewZ    = Geometry::AffineTransform(gWorldToViewPrev, worldPos).z;
-    // Invert SliceToViewZ: sliceUV = log(viewZ/gNearZ) / log(_FogFar / -gNearZ)  (mirrors VolumetricIntegrate.compute)
-    float  prevSliceUV  = saturate(log(prevViewZ / gNearZ) / log(_FogFar / -gNearZ));
-    float3 prevUVW      = float3(prevScreenUV, prevSliceUV);
-    bool   prevValid    = all(prevUVW >= 0.0) && all(prevUVW <= 1.0);
-
-    float4 history = _FroxelVolumeHistory.SampleLevel(sampler_FroxelVolumeHistory, prevUVW, 0);
-    float  blend   = prevValid ? _TemporalBlend : 1.0;
-    // rgb = accumulated in-scatter contribution for this step
-    // a   = extinction integral for this step (Beer-Lambert: exp(-a) per slice)
-    _FroxelVolume[id] = lerp(history, current, blend);
+    float cosTheta = 2.0 * u.x - 1.0;
+    float sinTheta = sqrt(max(0.0, 1.0 - cosTheta * cosTheta));
+    float phi      = 2.0 * 3.14159265 * u.y;
+    return float3(sinTheta * cos(phi), sinTheta * sin(phi), cosTheta);
 }
 
-// ---- Ray Tracing entry points (VolumetricFogShadow.raytrace) ----
-#ifdef VOLUMETRIC_FOG_RAYTRACE
-
-struct VolShadowPayload
+float3 CastEmissiveRay(float3 origin, float3 direction,out float hitDist)
 {
-    bool visible;
-};
+    hitDist = INF;
+    GeometryProps geometryProps0;
+    MaterialProps materialProps0;
+    CastRay(origin, direction, 0.0, 1000.0, GetConeAngleFromRoughness(0.0, 0.0), (gOnScreen == SHOW_INSTANCE_INDEX || gOnScreen == SHOW_NORMAL) ? GEOMETRY_ALL : FLAG_NON_TRANSPARENT, geometryProps0, materialProps0);
 
-// Miss shader: ray reached TMax without hitting any geometry → sun is visible
-[shader("miss")]
-void VolumetricShadowMiss(inout VolShadowPayload payload)
-{
-    payload.visible = true;
+    if (geometryProps0.IsMiss())
+        return float3(0, 0, 0);
+    hitDist = geometryProps0.hitT;
+    return materialProps0.Lemi;
 }
 
 // Ray generation shader: one invocation per froxel voxel (dispatched as W x H x SliceCount)
@@ -145,24 +107,81 @@ void VolumetricShadowRayGen()
     float2 uv      = ((float2)id.xy + temporalJitter) / float2(_FroxelW, _FroxelH);
     float3 viewPos = Geometry::ReconstructViewPosition(uv, gCameraFrustum, viewZ, gOrthoMode);
     float3 worldPos = Geometry::AffineTransform(gViewToWorld, viewPos);
+ 
+    float2 mipAndCone = float2(0, 0); // not needed for shadow ray, but must be provided for visibility query
+    
+    float hitT = CastVisibilityRay_AnyHit( worldPos, gSunDirection.xyz, 0.0, INF, mipAndCone, gWorldTlas,FLAG_NON_TRANSPARENT,0);
 
-    // Shadow ray toward the sun using the full DXR pipeline
-    RayDesc ray;
-    ray.Origin    = worldPos;
-    ray.Direction = gSunDirection.xyz;
-    ray.TMin      = 0.05;
-    ray.TMax      = 2000.0;
+    
+    // ---- Emissive in-scatter: N random sphere rays sampling nearby emissive surfaces ----
+    // Uses the VolFogShadow closest-hit pass in material shaders to read emission.
+    // Monte Carlo estimator: scatter += (4π / N) * Σ [ Lemi_i * phase(viewRay, emissiveDir_i) ]
+    float3 emissiveScatter = 0.0;
+    if (_EmissiveRayCount > 0)
+    {
+        float3 viewRayDir = normalize(worldPos - gCameraGlobalPos.xyz);
+    
+        [loop]
+        for (uint i = 0; i < _EmissiveRayCount; i++)
+        {
+            float2 rndE       = Rng::Hash::GetFloat2();
+            float3 emissiveDir = UniformSphereDir(rndE);
+            
+            float hitDist = 0;
+            float3 Lemi        = CastEmissiveRay(worldPos, emissiveDir, hitDist);
+            
+            // 如果击中了发光体 (Lemi > 0) 且距离有效
+            if (any(Lemi > 0.0) && hitDist < 1000.0)
+            {
+                // 核心修复：计算透射率 transmittance
+                // Beer-Lambert: exp(-Density * Distance)
+                float transmittance = exp(-_FogDensity * hitDist);
+            
+                float cosTheta = dot(viewRayDir, emissiveDir);
+                float phase    = PhaseHG(cosTheta, _HGG);
+            
+                // 累加时乘上透射率
+                emissiveScatter += Lemi * transmittance * phase;
+            }
+        }
+    
+        // Monte Carlo weight: integrate over the sphere (PDF = 1/4π → multiply by 4π / N)
+        emissiveScatter *= (4.0 * 3.14159265) / (float)_EmissiveRayCount;
+        emissiveScatter *= _FogDensity * _ScatterAlbedo * _EmissiveIntensityScale;
+    }
 
-    VolShadowPayload payload;
-    payload.visible = false;
+    // Step length in metres: use fixed slice boundaries (not the jittered sample point)
+    // so that the integrated extinction is independent of the jitter value.
+    float viewZNear = SliceToViewZ((float)id.z);
+    float viewZFar  = SliceToViewZ((float)id.z + 1.0);
+    float stepM     = -(viewZFar - viewZNear) * gUnitToMetersMultiplier;
 
-    // RAY_FLAG_SKIP_CLOSEST_HIT_SHADER: no closest-hit execution needed, only miss matters
-    // RAY_FLAG_ACCEPT_FIRST_HIT_AND_END_SEARCH: terminate on first opaque hit for performance
-    TraceRay(gWorldTlas,
-             RAY_FLAG_ACCEPT_FIRST_HIT_AND_END_SEARCH | RAY_FLAG_SKIP_CLOSEST_HIT_SHADER,
-             0xFF, 0, 1, 0, ray, payload);
+    float3 scatter = 0;
+    if (hitT == INF)
+    {
+        // Phase function evaluated for the view ray direction
+        float3 rayDir  = normalize(worldPos - gCameraGlobalPos.xyz);
+        float cosTheta = dot(rayDir, gSunDirection.xyz);
+        float phase    = PhaseHG(cosTheta, _HGG);
+        scatter        = _SunColor.rgb * _FogDensity * _ScatterAlbedo * phase;
+    }
 
-    EvaluateFroxel(id, payload.visible);
+    scatter += emissiveScatter;
+    
+    float4 current = float4(scatter * stepM, _FogDensity * stepM);
+
+    // ---- Temporal accumulation ----
+    // Reproject this voxel's world position into the previous frame's froxel volume.
+    float2 prevScreenUV = Geometry::GetScreenUv(gWorldToClipPrev, worldPos);
+    float  prevViewZ    = Geometry::AffineTransform(gWorldToViewPrev, worldPos).z;
+    // Invert SliceToViewZ: sliceUV = log(viewZ/gNearZ) / log(_FogFar / -gNearZ)  (mirrors VolumetricIntegrate.compute)
+    float  prevSliceUV  = saturate(log(prevViewZ / gNearZ) / log(_FogFar / -gNearZ));
+    float3 prevUVW      = float3(prevScreenUV, prevSliceUV);
+    bool   prevValid    = all(prevUVW >= 0.0) && all(prevUVW <= 1.0);
+
+    float4 history = _FroxelVolumeHistory.SampleLevel(sampler_FroxelVolumeHistory, prevUVW, 0);
+    float  blend   = prevValid ? _TemporalBlend : 1.0;
+    // rgb = accumulated in-scatter contribution for this step
+    // a   = extinction integral for this step (Beer-Lambert: exp(-a) per slice)
+    _FroxelVolume[id] = lerp(history, current, blend);
 }
-
-#endif // VOLUMETRIC_FOG_RAYTRACE

@@ -270,7 +270,7 @@ namespace PathTracing
             {
                 // --- Pass A: DXR shadow ray per froxel (ray tracing shader) ---
                 natCmd.BeginSample(volShadowMarker);
-                natCmd.SetRayTracingShaderPass(data.VolumetricFogShadowTs, "VolFogShadow");
+                natCmd.SetRayTracingShaderPass(data.VolumetricFogShadowTs, "Test2");
                 natCmd.SetRayTracingConstantBufferParam(data.VolumetricFogShadowTs, paramsID, data.ConstantBuffer, 0, data.ConstantBuffer.stride);
                 natCmd.SetRayTracingBufferParam(data.VolumetricFogShadowTs, g_ScramblingRankingID, data.ScramblingRanking);
                 natCmd.SetRayTracingBufferParam(data.VolumetricFogShadowTs, g_SobolID, data.Sobol);
@@ -285,6 +285,8 @@ namespace PathTracing
                 natCmd.SetRayTracingIntParam(data.VolumetricFogShadowTs, "_FroxelW",     data.FroxelW);
                 natCmd.SetRayTracingIntParam(data.VolumetricFogShadowTs, "_FroxelH",     data.FroxelH);
                 natCmd.SetRayTracingFloatParam(data.VolumetricFogShadowTs, "_TemporalBlend", data.Setting.fogTemporalBlend);
+                natCmd.SetRayTracingIntParam  (data.VolumetricFogShadowTs, "_EmissiveRayCount",        data.Setting.fogEmissiveRayCount);
+                natCmd.SetRayTracingFloatParam(data.VolumetricFogShadowTs, "_EmissiveIntensityScale",   data.Setting.fogEmissiveIntensityScale);
                 natCmd.DispatchRays(data.VolumetricFogShadowTs, "VolumetricShadowRayGen",
                     (uint)data.FroxelW, (uint)data.FroxelH, (uint)volSlices);
                 // Copy current froxel result into history for next frame's temporal accumulation

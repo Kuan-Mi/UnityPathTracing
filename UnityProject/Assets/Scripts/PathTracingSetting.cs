@@ -150,5 +150,10 @@ namespace PathTracing
         public float fogFar = 80f;
         [Range(0.01f, 1f), Tooltip("Current-frame blend weight for temporal accumulation (0=full history, 1=no TAA)")]
         public float fogTemporalBlend = 0.1f;
+
+        [Range(0, 80), Tooltip("Number of random sphere rays per froxel to detect emissive surfaces (0 = disabled)")]
+        public int fogEmissiveRayCount = 2;
+        [Range(0f, 10f), Tooltip("Intensity multiplier for the emissive in-scatter contribution")]
+        public float fogEmissiveIntensityScale = 1.0f;
     }
 }

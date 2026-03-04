@@ -1,9 +1,11 @@
 // Ray tracing shader entry-point for volumetric fog shadow pass.
-// Replaces the compute + inline-RT approach with a full DXR pipeline:
+// Full DXR pipeline:
 //   - RayGeneration  : one invocation per froxel voxel (dispatched W x H x SliceCount)
-//   - Miss           : sun is visible (no occluder hit)
-//   - No closest-hit : RAY_FLAG_SKIP_CLOSEST_HIT_SHADER terminates on first opaque hit
-// Shared fog utilities and the TLAS binding live in VolumetricFogShadow.hlsl.
+//   - Miss index 0   : VolumetricShadowMiss — sun is visible (no occluder hit)
+//   - Miss index 1   : VolumetricEmissiveMiss — emissive probe ray escaped the scene
+//   - No closest-hit for sun shadow : RAY_FLAG_SKIP_CLOSEST_HIT_SHADER
+//   - VolFogShadow closest-hit (from material shaders) for emissive probe rays
+// Shared fog utilities, helpers, and the TLAS binding live in VolumetricFogShadow.hlsl.
 
 #pragma max_recursion_depth 1
 #pragma use_dxc
