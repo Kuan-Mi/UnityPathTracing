@@ -42,14 +42,6 @@ float ViewZToSliceW(float viewZ)
     return saturate(log(viewZ / gNearZ) / log(_FogFar / -gNearZ));
 }
 
-// Interleaved Gradient Noise: fast, screen-space random in [0, 1).
-// Combine with gJitter.x (varies each TAA frame) for temporal dithering.
-float RandNoise(float2 pixelPos)
-{
-    float n = frac(52.9829189 * frac(dot(pixelPos, float2(0.06711056, 0.00583715))));
-    return frac(n + gJitter.x*10000 + 0.5);
-}
-
 // FogApply kernel resources
 Texture2D<float4>   _VolumeResultSrv;       // same RT as _VolumeResult, bound read-only
 Texture3D<float4>   _FinalVolumetricLightSrv; // same resource as _FinalVolumetricLight, SRV for FogApply
@@ -76,8 +68,7 @@ void Integrate(uint2 id : SV_DispatchThreadID)
     {
         // Trilinear sample of the low-res froxel volume.
         // W is offset by per-column noise to sub-slice-precision to remove Z banding.
-        float noise = Rng::Hash::GetFloat();
-        float  w    = (k + noise) / (float)_SliceCount;
+        float  w    = k  / (float)_SliceCount;
         float4 cell = _FroxelVolume.SampleLevel(sampler_trilinear_clamp, float3(sampleUv, w), 0);
         // cell.rgb = in-scatter * step-length,  cell.a = sigma_e * step-length
 

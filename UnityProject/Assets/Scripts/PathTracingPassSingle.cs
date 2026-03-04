@@ -271,6 +271,11 @@ namespace PathTracing
                 natCmd.BeginSample(volShadowMarker);
                 int shadowKernel = data.FroxelShadowKernel;
                 natCmd.SetComputeConstantBufferParam(data.VolumetricFogShadowCs, paramsID, data.ConstantBuffer, 0, data.ConstantBuffer.stride);
+                
+                
+                natCmd.SetComputeBufferParam(data.VolumetricFogShadowCs, shadowKernel,g_ScramblingRankingID, data.ScramblingRanking);
+                natCmd.SetComputeBufferParam(data.VolumetricFogShadowCs,shadowKernel, g_SobolID, data.Sobol);
+                
                 natCmd.SetComputeTextureParam(data.VolumetricFogShadowCs, shadowKernel, "_FroxelVolume", data.FroxelVolume);
                 natCmd.SetComputeFloatParam(data.VolumetricFogShadowCs, "_FogDensity",    data.Setting.fogDensity);
                 natCmd.SetComputeFloatParam(data.VolumetricFogShadowCs, "_ScatterAlbedo", data.Setting.scatterAlbedo);
@@ -376,19 +381,19 @@ namespace PathTracing
                 natCmd.SetComputeTextureParam(data.VolumetricIntegrateCs, fogKernel, "_FinalVolumetricLightSrv", data.FinalVolumetricLight);
                 natCmd.SetComputeTextureParam(data.VolumetricIntegrateCs, fogKernel, "_SceneViewZ",              data.ViewZ);
 
-                if (data.Setting.RR)
-                {
-                    // RR path: apply onto DLSS upscaled output (output resolution)
-                    int outW = (int)data.GlobalConstants.gOutputSize.x;
-                    int outH = (int)data.GlobalConstants.gOutputSize.y;
-                    natCmd.SetComputeTextureParam(data.VolumetricIntegrateCs, fogKernel, "_SceneColorRW", data.DlssOutput);
-                    natCmd.SetComputeIntParam(data.VolumetricIntegrateCs, "_SceneW", outW);
-                    natCmd.SetComputeIntParam(data.VolumetricIntegrateCs, "_SceneH", outH);
-                    natCmd.DispatchCompute(data.VolumetricIntegrateCs, fogKernel,
-                        Mathf.CeilToInt(outW / 16f),
-                        Mathf.CeilToInt(outH / 16f), 1);
-                }
-                else
+                // if (data.Setting.RR)
+                // {
+                //     // RR path: apply onto DLSS upscaled output (output resolution)
+                //     int outW = (int)data.GlobalConstants.gOutputSize.x;
+                //     int outH = (int)data.GlobalConstants.gOutputSize.y;
+                //     natCmd.SetComputeTextureParam(data.VolumetricIntegrateCs, fogKernel, "_SceneColorRW", data.Composed);
+                //     natCmd.SetComputeIntParam(data.VolumetricIntegrateCs, "_SceneW", outW);
+                //     natCmd.SetComputeIntParam(data.VolumetricIntegrateCs, "_SceneH", outH);
+                //     natCmd.DispatchCompute(data.VolumetricIntegrateCs, fogKernel,
+                //         Mathf.CeilToInt(outW / 16f),
+                //         Mathf.CeilToInt(outH / 16f), 1);
+                // }
+                // else
                 {
                     // Non-RR path: apply onto TAA output
                     natCmd.SetComputeTextureParam(data.VolumetricIntegrateCs, fogKernel, "_SceneColorRW", data.Composed);

@@ -109,15 +109,15 @@ MonoBehaviour:
     specularLobeTrimming: 1
     boost: 0
     SR: 0
-    RR: 0
+    RR: 1
     tmpDisableRR: 0
     resolutionScale: 1
     upscalerMode: 0
     usePackedData: 0
     volumetricFog: 1
-    fogDensity: 0.147
-    scatterAlbedo: 0.965
+    fogDensity: 0.5
+    scatterAlbedo: 1
     hgAnisotropy: 0
-    fogFar: 10
+    fogFar: 100
   gIn_ScramblingRanking: {fileID: 2800000, guid: ba45d1e4dcf9022438a4798a5f9e7b80, type: 3}
   gIn_Sobol: {fileID: 2800000, guid: 17e7ce8147355314ea8aab1178a6a43c, type: 3}

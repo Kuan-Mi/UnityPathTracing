@@ -30,18 +30,54 @@ float PhaseHG(float cosTheta, float g)
     return (1.0 - g2) / (4.0 * 3.14159265 * pow(1.0 + g2 - 2.0 * g * cosTheta, 1.5));
 }
 
+StructuredBuffer<uint4> gIn_ScramblingRanking;
+StructuredBuffer<uint4> gIn_Sobol;
+
+float2 GetBlueNoise(uint2 pixelPos, uint seed = 0)
+{
+    // 缓存效率低 多0.2ms
+    // return Rng::Hash::GetFloat2();
+    // https://eheitzresearch.wordpress.com/772-2/
+    // https://belcour.github.io/blog/research/publication/2019/06/17/sampling-bluenoise.html
+
+    // Sample index
+    uint sampleIndex = (gFrameIndex + seed) & (BLUE_NOISE_TEMPORAL_DIM - 1);
+
+    // sampleIndex = 3;
+    // pixelPos /= 8;
+
+    uint2 uv = pixelPos & (BLUE_NOISE_SPATIAL_DIM - 1);
+    uint index = uv.x + uv.y * BLUE_NOISE_SPATIAL_DIM;
+    uint3 A = gIn_ScramblingRanking[index].xyz;
+
+    // return float2(A.x/256.0 , A.y / 256.0);
+    uint rankedSampleIndex = sampleIndex ^ A.z;
+    // return float2(rankedSampleIndex / float(BLUE_NOISE_TEMPORAL_DIM), 0);
+
+    uint4 B = gIn_Sobol[rankedSampleIndex & 255];
+    float4 blue = (float4(B ^ A.xyxy) + 0.5) * (1.0 / 256.0);
+
+    // ( Optional ) Randomize in [ 0; 1 / 256 ] area to get rid of possible banding
+    uint d = Sequence::Bayer4x4ui(pixelPos, gFrameIndex);
+    float2 dither = (float2(d & 3, d >> 2) + 0.5) * (1.0 / 4.0);
+    blue += (dither.xyxy - 0.5) * (1.0 / 256.0);
+
+    return saturate(blue.xy);
+}
+
 [numthreads(8, 8, 8)]
 void VolumetricShadow(uint3 id : SV_DispatchThreadID)
 {
     if (id.x >= _FroxelW || id.y >= _FroxelH || id.z >= _SliceCount)
         return;
-
-    // Reconstruct froxel sample world position.
-    // gJitter.x is in [-0.5, 0.5] (TAA pixel jitter); repurposed here as a per-frame
-    // temporal offset along the slice axis so adjacent frames sample at different depths
-    // within the same slice — TAA then averages them out, removing Z-banding.
-    float viewZ     = SliceToViewZ((float)id.z + 0.5 + gJitter.x*1000);
-    float2 uv       = ((float2)id.xy + 0.5 + gJitter*1000) / float2(_FroxelW, _FroxelH);
+    
+    Rng::Hash::Initialize(id.xy, gFrameIndex);
+    // float2 temporalJitter = Rng::Hash::GetFloat2();
+    // temporalJitter = 0.5;
+    float2 temporalJitter = GetBlueNoise(id.xy, 12345); // TODO: add UI to disable blue noise and use pure RNG instead (for better performance and easier debugging)
+    
+    float viewZ     = SliceToViewZ((float)id.z + temporalJitter.x);  
+    float2 uv       = ((float2)id.xy + temporalJitter) / float2(_FroxelW, _FroxelH);
     float3 viewPos  = Geometry::ReconstructViewPosition(uv, gCameraFrustum, viewZ, gOrthoMode);
     float3 worldPos = Geometry::AffineTransform(gViewToWorld, viewPos);
 
@@ -64,7 +100,7 @@ void VolumetricShadow(uint3 id : SV_DispatchThreadID)
 
     bool visible = (q.CommittedStatus() == COMMITTED_NOTHING);
 
-    float3 scatter = 0.0;
+    float3 scatter = 0.001;
     if (visible)
     {
         // Phase function evaluated for the view ray direction
