@@ -148,5 +148,7 @@ namespace PathTracing
         public float hgAnisotropy = 0.3f;
         [Range(1f, 500f)]
         public float fogFar = 80f;
+        [Range(0.01f, 1f), Tooltip("Current-frame blend weight for temporal accumulation (0=full history, 1=no TAA)")]
+        public float fogTemporalBlend = 0.1f;
     }
 }

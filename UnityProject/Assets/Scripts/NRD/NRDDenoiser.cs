@@ -54,6 +54,7 @@ namespace Nrd
 
         // Volumetric fog RTs (per-camera, owned by this denoiser)
         public RTHandle FroxelVolume          { get; private set; }  // 3D ARGBHalf (froxelW x froxelH x 64)  — VolumetricFogShadow writes
+        public RTHandle FroxelVolumeHistory   { get; private set; }  // 3D ARGBHalf (froxelW x froxelH x 64)  — previous-frame froxel volume for temporal accumulation
         public RTHandle VolumeResult          { get; private set; }  // 2D ARGBHalf (renderW x renderH)       — legacy, kept for reference
         public RTHandle FinalVolumetricLight  { get; private set; }  // 3D ARGBHalf (froxelW x froxelH x 64)  — Integrate prefix-sum; FogApply reads
         public int FroxelW { get; private set; }
@@ -157,9 +158,10 @@ namespace Nrd
 
 
             // 同步检查体积雾 RT 是否已被 Unity 销毁（Domain Reload / 场景切换后常见）
-            if (FroxelVolume         != null && FroxelVolume.rt         == null) isResourceInvalid = true;
-            if (VolumeResult          != null && VolumeResult.rt          == null) isResourceInvalid = true;
-            if (FinalVolumetricLight  != null && FinalVolumetricLight.rt  == null) isResourceInvalid = true;
+            if (FroxelVolume        != null && FroxelVolume.rt        == null) isResourceInvalid = true;
+            if (FroxelVolumeHistory != null && FroxelVolumeHistory.rt == null) isResourceInvalid = true;
+            if (VolumeResult         != null && VolumeResult.rt         == null) isResourceInvalid = true;
+            if (FinalVolumetricLight != null && FinalVolumetricLight.rt == null) isResourceInvalid = true;
 
             // 如果尺寸没变且资源都存在，直接返回
             if (!isResourceInvalid && currentRenderResolution.x == renderResolution.x && currentRenderResolution.y == renderResolution.y)
@@ -197,6 +199,13 @@ namespace Nrd
                     FroxelVolume = null;
                     if (oldRt != null) { if (Application.isPlaying) Object.Destroy(oldRt); else Object.DestroyImmediate(oldRt); }
                 }
+                if (FroxelVolumeHistory != null)
+                {
+                    var oldRt = FroxelVolumeHistory.rt;
+                    RTHandles.Release(FroxelVolumeHistory);
+                    FroxelVolumeHistory = null;
+                    if (oldRt != null) { if (Application.isPlaying) Object.Destroy(oldRt); else Object.DestroyImmediate(oldRt); }
+                }
                 if (VolumeResult != null)
                 {
                     var oldRt = VolumeResult.rt;
@@ -222,6 +231,17 @@ namespace Nrd
                 };
                 froxelRt.Create();
                 FroxelVolume = RTHandles.Alloc(froxelRt);
+
+                var historyRt = new RenderTexture(fw, fh, 0, RenderTextureFormat.ARGBHalf)
+                {
+                    dimension         = TextureDimension.Tex3D,
+                    volumeDepth       = volSlices,
+                    enableRandomWrite = true,
+                    filterMode        = FilterMode.Bilinear,
+                    name              = $"FroxelVolumeHistory_{cameraName}",
+                };
+                historyRt.Create();
+                FroxelVolumeHistory = RTHandles.Alloc(historyRt);
 
                 var volumeResultRt = new RenderTexture(renderResolution.x, renderResolution.y, 0, RenderTextureFormat.ARGBHalf)
                 {
@@ -295,6 +315,13 @@ namespace Nrd
                 var rt = FroxelVolume.rt;
                 RTHandles.Release(FroxelVolume);
                 FroxelVolume = null;
+                if (rt != null) { if (Application.isPlaying) Object.Destroy(rt); else Object.DestroyImmediate(rt); }
+            }
+            if (FroxelVolumeHistory != null)
+            {
+                var rt = FroxelVolumeHistory.rt;
+                RTHandles.Release(FroxelVolumeHistory);
+                FroxelVolumeHistory = null;
                 if (rt != null) { if (Application.isPlaying) Object.Destroy(rt); else Object.DestroyImmediate(rt); }
             }
             if (VolumeResult != null)

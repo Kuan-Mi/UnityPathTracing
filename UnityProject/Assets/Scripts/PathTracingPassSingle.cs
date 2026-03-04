@@ -117,6 +117,7 @@ namespace PathTracing
             internal ComputeShader    VolumetricFogShadowCs;
             internal ComputeShader    VolumetricIntegrateCs;
             internal TextureHandle    FroxelVolume;
+            internal TextureHandle    FroxelVolumeHistory;
             internal TextureHandle    VolumeResult;
             internal TextureHandle    FinalVolumetricLight;
             internal int              FroxelW;
@@ -264,7 +265,8 @@ namespace PathTracing
             const int volSlices = 64;
             if (data.Setting.volumetricFog
                 && data.VolumetricFogShadowCs != null && data.VolumetricIntegrateCs != null
-                && data.FroxelVolume.IsValid() && data.VolumeResult.IsValid()
+                && data.FroxelVolume.IsValid() && data.FroxelVolumeHistory.IsValid()
+                && data.VolumeResult.IsValid()
                 && data.FinalVolumetricLight.IsValid())
             {
                 // --- Pass A: inline RT shadow per froxel (compute shader) ---
@@ -276,7 +278,8 @@ namespace PathTracing
                 natCmd.SetComputeBufferParam(data.VolumetricFogShadowCs, shadowKernel,g_ScramblingRankingID, data.ScramblingRanking);
                 natCmd.SetComputeBufferParam(data.VolumetricFogShadowCs,shadowKernel, g_SobolID, data.Sobol);
                 
-                natCmd.SetComputeTextureParam(data.VolumetricFogShadowCs, shadowKernel, "_FroxelVolume", data.FroxelVolume);
+                natCmd.SetComputeTextureParam(data.VolumetricFogShadowCs, shadowKernel, "_FroxelVolume",        data.FroxelVolume);
+                natCmd.SetComputeTextureParam(data.VolumetricFogShadowCs, shadowKernel, "_FroxelVolumeHistory", data.FroxelVolumeHistory);
                 natCmd.SetComputeFloatParam(data.VolumetricFogShadowCs, "_FogDensity",    data.Setting.fogDensity);
                 natCmd.SetComputeFloatParam(data.VolumetricFogShadowCs, "_ScatterAlbedo", data.Setting.scatterAlbedo);
                 natCmd.SetComputeFloatParam(data.VolumetricFogShadowCs, "_HGG",           data.Setting.hgAnisotropy);
@@ -285,10 +288,13 @@ namespace PathTracing
                 natCmd.SetComputeIntParam(data.VolumetricFogShadowCs, "_SliceCount",  volSlices);
                 natCmd.SetComputeIntParam(data.VolumetricFogShadowCs, "_FroxelW",     data.FroxelW);
                 natCmd.SetComputeIntParam(data.VolumetricFogShadowCs, "_FroxelH",     data.FroxelH);
+                natCmd.SetComputeFloatParam(data.VolumetricFogShadowCs, "_TemporalBlend", data.Setting.fogTemporalBlend);
                 natCmd.DispatchCompute(data.VolumetricFogShadowCs, shadowKernel,
                     Mathf.CeilToInt(data.FroxelW / 8f),
                     Mathf.CeilToInt(data.FroxelH / 8f),
                     Mathf.CeilToInt(volSlices / 8f));
+                // Copy current froxel result into history for next frame's temporal accumulation
+                natCmd.CopyTexture(data.FroxelVolume, data.FroxelVolumeHistory);
                 natCmd.EndSample(volShadowMarker);
 
                 // --- Pass B: front-to-back prefix-sum integration at froxel grid resolution ---
@@ -639,11 +645,13 @@ namespace PathTracing
             passData.VolumetricIntegrateCs = VolumetricIntegrateCs;
             if (m_Settings.volumetricFog
                 && NrdDenoiser.FroxelVolume        != null && NrdDenoiser.FroxelVolume.rt        != null
+                && NrdDenoiser.FroxelVolumeHistory != null && NrdDenoiser.FroxelVolumeHistory.rt != null
                 && NrdDenoiser.VolumeResult          != null && NrdDenoiser.VolumeResult.rt          != null
                 && NrdDenoiser.FinalVolumetricLight  != null && NrdDenoiser.FinalVolumetricLight.rt  != null)
             {
                 // NrdDenoiser.EnsureResources() has already been called above and owns these RTHandles
                 passData.FroxelVolume          = renderGraph.ImportTexture(NrdDenoiser.FroxelVolume);
+                passData.FroxelVolumeHistory   = renderGraph.ImportTexture(NrdDenoiser.FroxelVolumeHistory);
                 passData.VolumeResult          = renderGraph.ImportTexture(NrdDenoiser.VolumeResult);
                 passData.FinalVolumetricLight  = renderGraph.ImportTexture(NrdDenoiser.FinalVolumetricLight);
                 passData.FroxelW               = NrdDenoiser.FroxelW;
@@ -913,7 +921,8 @@ namespace PathTracing
             builder.UseTexture(passData.RRGuide_Normal_Roughness, AccessFlags.ReadWrite);
             builder.UseTexture(passData.DlssOutput, AccessFlags.ReadWrite);
 
-            if (passData.FroxelVolume.IsValid())        builder.UseTexture(passData.FroxelVolume,         AccessFlags.ReadWrite);
+            if (passData.FroxelVolume.IsValid())         builder.UseTexture(passData.FroxelVolume,          AccessFlags.ReadWrite);
+            if (passData.FroxelVolumeHistory.IsValid())  builder.UseTexture(passData.FroxelVolumeHistory,   AccessFlags.ReadWrite);
             if (passData.VolumeResult.IsValid())          builder.UseTexture(passData.VolumeResult,          AccessFlags.ReadWrite);
             if (passData.FinalVolumetricLight.IsValid())  builder.UseTexture(passData.FinalVolumetricLight,  AccessFlags.ReadWrite);
         }

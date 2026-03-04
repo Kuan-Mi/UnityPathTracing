@@ -6,6 +6,10 @@ RaytracingAccelerationStructure gWorldTlas;
 // ---- Output ----
 RWTexture3D<float4> _FroxelVolume;   // rgb = in-scatter * step, a = extinction * step
 
+// ---- Temporal history (previous frame, read-only) ----
+Texture3D<float4>   _FroxelVolumeHistory;
+SamplerState        sampler_FroxelVolumeHistory;  // Unity auto-binds (bilinear clamp)
+
 // ---- Parameters (set per-frame from C#) ----
 float  _FogDensity;       // sigma_e (extinction coefficient)
 float  _ScatterAlbedo;    // scattering / extinction
@@ -15,6 +19,7 @@ float4 _SunColor;         // main light color * intensity (linear)
 uint   _SliceCount;       // number of depth slices (e.g. 64)
 uint   _FroxelW;          // froxel X resolution
 uint   _FroxelH;          // froxel Y resolution
+float  _TemporalBlend;    // blend weight for current frame (0 = all history, 1 = all current)
 
 // Exponential depth distribution: slice k -> view-space depth
 float SliceToViewZ(float k)
@@ -110,7 +115,20 @@ void VolumetricShadow(uint3 id : SV_DispatchThreadID)
         scatter        = _SunColor.rgb * _FogDensity * _ScatterAlbedo * phase;
     }
 
+    float4 current = float4(scatter * stepM, _FogDensity * stepM);
+
+    // ---- Temporal accumulation ----
+    // Reproject this voxel's world position into the previous frame's froxel volume.
+    float2 prevScreenUV = Geometry::GetScreenUv(gWorldToClipPrev, worldPos);
+    float  prevViewZ    = Geometry::AffineTransform(gWorldToViewPrev, worldPos).z;
+    // Invert SliceToViewZ: sliceUV = log(viewZ/gNearZ) / log(_FogFar / -gNearZ)  (mirrors VolumetricIntegrate.compute)
+    float  prevSliceUV  = saturate(log(prevViewZ / gNearZ) / log(_FogFar / -gNearZ));
+    float3 prevUVW      = float3(prevScreenUV, prevSliceUV);
+    bool   prevValid    = all(prevUVW >= 0.0) && all(prevUVW <= 1.0);
+
+    float4 history = _FroxelVolumeHistory.SampleLevel(sampler_FroxelVolumeHistory, prevUVW, 0);
+    float  blend   = prevValid ? _TemporalBlend : 1.0;
     // rgb = accumulated in-scatter contribution for this step
     // a   = extinction integral for this step (Beer-Lambert: exp(-a) per slice)
-    _FroxelVolume[id] = float4(scatter * stepM, _FogDensity * stepM);
+    _FroxelVolume[id] = lerp(history, current, blend);
 }
