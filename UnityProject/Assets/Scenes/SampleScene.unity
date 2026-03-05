@@ -725,7 +725,7 @@ Light:
   serializedVersion: 12
   m_Type: 1
   m_Color: {r: 1, g: 1, b: 1, a: 1}
-  m_Intensity: 10
+  m_Intensity: 2
   m_Range: 10
   m_SpotAngle: 30
   m_InnerSpotAngle: 21.80208
@@ -1433,7 +1433,7 @@ Transform:
   serializedVersion: 2
   m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
   m_LocalPosition: {x: 1.57, y: 5.98, z: -14.6605}
-  m_LocalScale: {x: 28.788576, y: 2.743162, z: 38.660225}
+  m_LocalScale: {x: 28.788576, y: 2.743162, z: 21.3}
   m_ConstrainProportionsScale: 0
   m_Children: []
   m_Father: {fileID: 2085145997}
@@ -2594,7 +2594,7 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 31.303, z: 0}
   m_AnchorMin: {x: 0.5, y: 0.5}
   m_AnchorMax: {x: 0.5, y: 0.5}
-  m_AnchoredPosition: {x: 1.0217123, y: 1.19}
+  m_AnchoredPosition: {x: 1.0217123, y: 1.34}
   m_SizeDelta: {x: 20, y: 5}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!1 &1215890392
