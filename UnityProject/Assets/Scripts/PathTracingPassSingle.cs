@@ -132,6 +132,11 @@ namespace PathTracing
 
         static void ExecutePass(PassData data, UnsafeGraphContext context)
         {
+            if (data.passIndex != 0)
+            {
+                return;
+            }
+            
             var natCmd = CommandBufferHelpers.GetNativeCommandBuffer(context.cmd);
 
             natCmd.SetBufferData(data.ConstantBuffer, new[] { data.GlobalConstants });
