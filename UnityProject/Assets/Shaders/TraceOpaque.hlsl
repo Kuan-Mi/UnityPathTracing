@@ -38,6 +38,9 @@ RWTexture2D<float4> gOut_Diff;
 // 高光反射光照结果（Specular Radiance），包含噪声和打包后的信息。
 RWTexture2D<float4> gOut_Spec;
 
+// 所有射灯直接光照的累加结果（不经 NRD 降噪，在 Composition 直接叠加）
+RWTexture2D<float3> gOut_SpotDirect;
+
 float2 GetBlueNoise(uint2 pixelPos, uint seed = 0)
 {
     // 缓存效率低 多0.2ms
@@ -707,6 +710,7 @@ void MainRayGenShader()
     }
 
     gOut_DirectLighting[pixelPos] = Ldirect; // "psrThroughput" applied in "Composition"
+    gOut_SpotDirect[pixelPos] = EvaluateSpotLights(geometryProps0, materialProps0);
     gOut_PsrThroughput[pixelPos] = psrThroughput;
 
     // Lighting at PSR hit, if found

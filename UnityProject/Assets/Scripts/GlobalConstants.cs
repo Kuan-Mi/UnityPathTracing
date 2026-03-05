@@ -68,6 +68,7 @@ namespace PathTracing
         public uint gPSR;
         public uint gSHARC;
         public uint gTrimLobe;
+        public uint gSpotLightCount;
 
         public override string ToString()
         {
