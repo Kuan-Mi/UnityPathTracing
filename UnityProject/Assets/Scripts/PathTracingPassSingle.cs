@@ -43,6 +43,7 @@ namespace PathTracing
 
         private readonly PathTracingSetting m_Settings;
         private readonly GraphicsBuffer _pathTracingSettingsBuffer;
+        private GraphicsBuffer m_SpotLightBuffer;
 
         [DllImport("RenderingPlugin")]
         private static extern IntPtr GetRenderEventAndDataFunc();
@@ -118,6 +119,9 @@ namespace PathTracing
 
             internal int passIndex;
             internal PathTracingDataBuilder _dataBuilder;
+
+            internal TextureHandle SpotDirect;
+            internal GraphicsBuffer SpotLightBuffer;
         }
 
         public PathTracingPassSingle(PathTracingSetting setting)
@@ -156,6 +160,7 @@ namespace PathTracing
                 natCmd.SetRayTracingBufferParam(data.SharcUpdateTs, g_ResolvedBufferID, data.ResolvedBuffer);
 
                 natCmd.SetRayTracingTextureParam(data.SharcUpdateTs, g_OutputID, data.OutputTexture);
+                natCmd.SetRayTracingBufferParam(data.SharcUpdateTs, gIn_SpotLightsID, data.SpotLightBuffer);
 
                 int SHARC_DOWNSCALE = 4;
 
@@ -220,6 +225,8 @@ namespace PathTracing
 
                 natCmd.SetRayTracingTextureParam(data.OpaqueTs, gIn_PrevComposedDiffID, data.ComposedDiff);
                 natCmd.SetRayTracingTextureParam(data.OpaqueTs, gIn_PrevComposedSpec_PrevViewZID, data.ComposedSpecViewZ);
+                natCmd.SetRayTracingBufferParam(data.OpaqueTs, gIn_SpotLightsID, data.SpotLightBuffer);
+                natCmd.SetRayTracingTextureParam(data.OpaqueTs, gOut_SpotDirectID, data.SpotDirect);
 
                 // Debug.Log(data.m_RenderResolution);
 
@@ -266,6 +273,7 @@ namespace PathTracing
                     natCmd.SetComputeTextureParam(data.CompositionCs, 0, gIn_SpecID, data.DenoisedSpec);
                 }
 
+                natCmd.SetComputeTextureParam(data.CompositionCs, 0, gIn_SpotDirectID, data.SpotDirect);
                 natCmd.SetComputeTextureParam(data.CompositionCs, 0, gIn_PsrThroughputID, data.PsrThroughput);
                 natCmd.SetComputeTextureParam(data.CompositionCs, 0, gOut_ComposedDiffID, data.ComposedDiff);
                 natCmd.SetComputeTextureParam(data.CompositionCs, 0, gOut_ComposedSpec_ViewZID, data.ComposedSpecViewZ);
@@ -468,6 +476,41 @@ namespace PathTracing
             var mat = mainLight.localToWorldMatrix;
             Vector3 lightForward = mat.GetColumn(2);
 
+            // Collect visible spot lights and upload to GPU buffer
+            var spotLightList = new System.Collections.Generic.List<SpotLightData>();
+            foreach (var vl in lightData.visibleLights)
+            {
+                if (vl.lightType != LightType.Spot) continue;
+                var lmat       = vl.localToWorldMatrix;
+                Vector3 pos    = lmat.GetColumn(3);
+                Vector3 dir    = ((Vector3)lmat.GetColumn(2)).normalized;
+                Color   fc     = vl.finalColor;
+                float   outerHalf = vl.spotAngle * 0.5f * Mathf.Deg2Rad;
+                float   innerHalf = vl.light != null
+                    ? vl.light.innerSpotAngle * 0.5f * Mathf.Deg2Rad
+                    : outerHalf * 0.9f;
+                spotLightList.Add(new SpotLightData
+                {
+                    position      = pos,
+                    range         = vl.range,
+                    direction     = dir,
+                    cosOuterAngle = Mathf.Cos(outerHalf),
+                    color         = new Vector3(fc.r, fc.g, fc.b),
+                    cosInnerAngle = Mathf.Cos(innerHalf),
+                });
+            }
+            int spotCount = spotLightList.Count;
+            int bufferCount = Mathf.Max(spotCount, 1);
+            if (m_SpotLightBuffer == null || m_SpotLightBuffer.count < bufferCount)
+            {
+                m_SpotLightBuffer?.Release();
+                m_SpotLightBuffer = new GraphicsBuffer(
+                    GraphicsBuffer.Target.Structured, bufferCount,
+                    Marshal.SizeOf<SpotLightData>());
+            }
+            if (spotCount > 0)
+                m_SpotLightBuffer.SetData(spotLightList.ToArray());
+
             if (cameraData.camera.cameraType != CameraType.Game && cameraData.camera.cameraType != CameraType.SceneView)
             {
                 return;
@@ -517,6 +560,7 @@ namespace PathTracing
             passData.ResolvedBuffer = ResolvedBuffer;
             passData.passIndex = isXr ? xrPass.multipassId : 0;
             passData._dataBuilder = _dataBuilder;
+            passData.SpotLightBuffer = m_SpotLightBuffer;
 
             var gSunDirection = -lightForward;
             var up = new Vector3(0, 1, 0);
@@ -669,6 +713,7 @@ namespace PathTracing
                 gSHARC = m_Settings.SHARC ? (uint)1 : 0,
                 gTrimLobe = m_Settings.specularLobeTrimming ? 1u : 0,
             };
+            globalConstants.gSpotLightCount = (uint)spotCount;
 
             // Debug.Log(globalConstants.ToString());
 
@@ -714,6 +759,7 @@ namespace PathTracing
             passData.BaseColorMetalness = renderGraph.ImportTexture(NrdDenoiser.GetRT(ResourceType.IN_BASECOLOR_METALNESS));
             passData.DirectLighting = CreateTex(textureDesc, renderGraph, "DirectLighting", GraphicsFormat.B10G11R11_UFloatPack32);
             passData.DirectEmission = CreateTex(textureDesc, renderGraph, "DirectEmission", GraphicsFormat.B10G11R11_UFloatPack32);
+            passData.SpotDirect = CreateTex(textureDesc, renderGraph, "SpotDirect", GraphicsFormat.B10G11R11_UFloatPack32);
 
             passData.Penumbra = renderGraph.ImportTexture(NrdDenoiser.GetRT(ResourceType.IN_PENUMBRA));
             passData.Diff = renderGraph.ImportTexture(NrdDenoiser.GetRT(ResourceType.IN_DIFF_RADIANCE_HITDIST));
@@ -750,6 +796,7 @@ namespace PathTracing
 
             builder.UseTexture(passData.DirectLighting, AccessFlags.ReadWrite);
             builder.UseTexture(passData.DirectEmission, AccessFlags.ReadWrite);
+            builder.UseTexture(passData.SpotDirect, AccessFlags.ReadWrite);
 
             builder.UseTexture(passData.Penumbra, AccessFlags.ReadWrite);
             builder.UseTexture(passData.Diff, AccessFlags.ReadWrite);
@@ -786,6 +833,7 @@ namespace PathTracing
         public void Dispose()
         {
             _pathTracingSettingsBuffer?.Release();
+            m_SpotLightBuffer?.Release();
         }
     }
 }

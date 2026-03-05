@@ -12,6 +12,7 @@ Texture2D<float4> gIn_Normal_Roughness;
 Texture2D<float4> gIn_BaseColor_Metalness;
 Texture2D<float3> gIn_DirectLighting;
 Texture2D<float3> gIn_DirectEmission;
+Texture2D<float3> gIn_SpotDirect;
 Texture2D<float3> gIn_PsrThroughput;
 Texture2D<float4> gIn_Shadow;
 Texture2D<float4> gIn_Diff;
@@ -71,7 +72,7 @@ void CSMain(int2 pixelPos : SV_DispatchThreadID)
 
     float3 Ldirect = gIn_DirectLighting[pixelPos];
     if (gOnScreen < SHOW_INSTANCE_INDEX)
-        Ldirect = Ldirect * shadow + Lemi;
+        Ldirect = Ldirect * shadow + Lemi + gIn_SpotDirect[pixelPos];
 
     // G-buffer
     float3 albedo, Rf0;

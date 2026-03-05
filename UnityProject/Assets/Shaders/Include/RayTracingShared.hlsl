@@ -76,6 +76,7 @@ struct MaterialProps
     float curvature;
 };
 
+
 float2 GetConeAngleFromAngularRadius(float mip, float tanConeAngle)
 {
     // In any case, we are limited by the output resolution
@@ -184,6 +185,8 @@ void CastRay(float3 origin, float3 direction, float Tmin, float Tmax, float2 mip
     matProps.N = Packing::DecodeUnitVector(payload.N);
     matProps.T = payload.T.xyz;
 }
+
+#include "SpotLights.hlsl"
 
 // Compile-time flags for "GetLighting"
 #define LIGHTING    0x01
