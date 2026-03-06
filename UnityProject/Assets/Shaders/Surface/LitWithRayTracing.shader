@@ -1,4 +1,4 @@
-Shader "Custom/LitWithRayTracingSkin"
+Shader "Custom/LitWithRayTracing"
 {
     Properties
     {
@@ -110,7 +110,7 @@ Shader "Custom/LitWithRayTracingSkin"
             }
             HLSLPROGRAM
             #include "UnityRaytracingMeshUtils.cginc"
-            #include "ml.hlsli"
+            #include "Assets/Shaders/Include/ml.hlsli"
             #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
 
 
@@ -160,8 +160,8 @@ Shader "Custom/LitWithRayTracingSkin"
             SAMPLER(sampler_ClearCoatMap);
 
 
-            #include "Include/Shared.hlsl"
-            #include "Include/Payload.hlsl"
+            #include "Assets/Shaders/Include/Shared.hlsl"
+            #include "Assets/Shaders/Include/Payload.hlsl"
 
             #pragma shader_feature_raytracing _USEPACK
 
@@ -235,7 +235,6 @@ Shader "Custom/LitWithRayTracingSkin"
                 float3 normal;
                 float4 tangent;
                 float2 uv;
-                float3 lastPos;
             };
 
             float LengthSquared(float3 v)
@@ -251,7 +250,6 @@ Shader "Custom/LitWithRayTracingSkin"
                 v.normal = UnityRayTracingFetchVertexAttribute3(vertexIndex, kVertexAttributeNormal);
                 v.tangent = UnityRayTracingFetchVertexAttribute4(vertexIndex, kVertexAttributeTangent);
                 v.uv = UnityRayTracingFetchVertexAttribute2(vertexIndex, kVertexAttributeTexCoord0);
-                v.lastPos = UnityRayTracingFetchVertexAttribute3(vertexIndex, kVertexAttributeTexCoord4);
                 return v;
             }
 
@@ -264,8 +262,6 @@ Shader "Custom/LitWithRayTracingSkin"
                 INTERPOLATE_ATTRIBUTE(normal);
                     INTERPOLATE_ATTRIBUTE(tangent);
                     INTERPOLATE_ATTRIBUTE(uv);
-                    INTERPOLATE_ATTRIBUTE(lastPos);
-                
                 return v;
             }
 
@@ -565,9 +561,12 @@ Shader "Custom/LitWithRayTracingSkin"
                 #if _METALLICSPECGLOSSMAP
 
                 float4 vv = _MetallicGlossMap.SampleLevel(sampler_MetallicGlossMap, _BaseMap_ST.xy * v.uv + _BaseMap_ST.zw, mip);
-                // metallic = vv.r;
+                
                 roughness = (1 - vv.a) * (1 - _Smoothness);
                 metallic = vv.r;
+                
+                // roughness = vv.g * (1 - _Smoothness);
+                // metallic = vv.b;
 
                 #else
 
@@ -613,7 +612,7 @@ Shader "Custom/LitWithRayTracingSkin"
 
                 float3 worldPosition = mul(ObjectToWorld3x4(), float4(v.position, 1.0)).xyz;
 
-                float3 prevWorldPosition = mul(GetPrevObjectToWorldMatrix(), float4(v.lastPos, 1.0)).xyz;
+                float3 prevWorldPosition = mul(GetPrevObjectToWorldMatrix(), float4(v.position, 1.0)).xyz;
 
                 // 位置
                 // payload.X = worldPosition;

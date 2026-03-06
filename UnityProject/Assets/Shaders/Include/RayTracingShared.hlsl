@@ -1,4 +1,4 @@
-#include "Sharc/SharcCommon.h"
+#include "../Sharc/SharcCommon.h"
 RaytracingAccelerationStructure gWorldTlas : register(t0, space1);
 
 RWStructuredBuffer<uint64_t> gInOut_SharcHashEntriesBuffer;

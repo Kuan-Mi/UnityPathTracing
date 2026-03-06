@@ -1,7 +1,7 @@
-#include "ml.hlsli"
-#include "NRDInclude/NRD.hlsli"
-#include "Include/Shared.hlsl"
-#include "Include/RayTracingShared.hlsl"
+#include "Assets/Shaders/Include/ml.hlsli"
+#include "Assets/Shaders/NRDInclude/NRD.hlsli"
+#include "Assets/Shaders/Include/Shared.hlsl"
+#include "Assets/Shaders/Include/RayTracingShared.hlsl"
 
 Texture2D<float3> gIn_ComposedDiff;
 Texture2D<float4> gIn_ComposedSpec_ViewZ;

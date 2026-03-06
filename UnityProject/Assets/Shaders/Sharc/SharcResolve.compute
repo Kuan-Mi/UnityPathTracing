@@ -6,8 +6,8 @@
 #pragma target 6.0
 #pragma enable_d3d11_debug_symbols
 
-#include "Include/Shared.hlsl"
-#include "Include/RaytracingShared.hlsl"
+#include "Assets/Shaders/Include/Shared.hlsl"
+#include "Assets/Shaders/Include/RaytracingShared.hlsl"
 
 [numthreads( LINEAR_BLOCK_SIZE, 1, 1 )]
 void CSMain(uint threadIndex : SV_DispatchThreadID)

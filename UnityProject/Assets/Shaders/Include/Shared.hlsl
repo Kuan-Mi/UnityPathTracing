@@ -242,8 +242,8 @@ cbuffer PathTracingParams : register(b0)
     uint gPointLightCount;
 };
 
-#include "../ml.hlsli"
-#include "../NRDInclude/NRD.hlsli"
+#include "Assets/Shaders/Include/ml.hlsli"
+#include "Assets/Shaders/NRDInclude/NRD.hlsli"
 
 
 SamplerState sampler_Trilinear_Repeat;
