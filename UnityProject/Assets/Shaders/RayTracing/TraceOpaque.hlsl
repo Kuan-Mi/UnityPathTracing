@@ -1,7 +1,7 @@
 #include "Assets/Shaders/Include/Shared.hlsl"
 #include "Assets/Shaders/Include/RayTracingShared.hlsl"
 
-#include "Assets/Shaders/NRDInclude/NRD.hlsli"
+#include "Assets/Shaders/NRD/NRD.hlsli"
 
 #pragma max_recursion_depth 1
 

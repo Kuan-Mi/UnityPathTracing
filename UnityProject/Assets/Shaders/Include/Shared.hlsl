@@ -243,7 +243,7 @@ cbuffer PathTracingParams : register(b0)
 };
 
 #include "Assets/Shaders/Include/ml.hlsli"
-#include "Assets/Shaders/NRDInclude/NRD.hlsli"
+#include "Assets/Shaders/NRD/NRD.hlsli"
 
 
 SamplerState sampler_Trilinear_Repeat;
