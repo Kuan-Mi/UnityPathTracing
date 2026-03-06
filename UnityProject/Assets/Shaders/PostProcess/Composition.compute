@@ -4,7 +4,7 @@
 #pragma enable_d3d11_debug_symbols
 
 #include "Assets/Shaders/Include/Shared.hlsl"
-#include "Assets/Shaders/NRDInclude/NRD.hlsli"
+#include "Assets/Shaders/NRD/NRD.hlsli"
 
 
 Texture2D<float> gIn_ViewZ;

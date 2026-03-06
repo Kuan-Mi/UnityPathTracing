@@ -1,5 +1,5 @@
 #include "Assets/Shaders/Include/ml.hlsli"
-#include "Assets/Shaders/NRDInclude/NRD.hlsli"
+#include "Assets/Shaders/NRD/NRD.hlsli"
 #include "Assets/Shaders/Include/Shared.hlsl"
 #include "Assets/Shaders/Include/RayTracingShared.hlsl"
 
