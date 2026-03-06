@@ -136,7 +136,7 @@ namespace PathTracing
             {
                 return;
             }
-            
+
             var natCmd = CommandBufferHelpers.GetNativeCommandBuffer(context.cmd);
 
             natCmd.SetBufferData(data.ConstantBuffer, new[] { data.GlobalConstants });
@@ -306,7 +306,7 @@ namespace PathTracing
                 natCmd.SetRayTracingTextureParam(data.TransparentTs, g_Normal_RoughnessID, data.NormalRoughness);
                 natCmd.SetRayTracingTextureParam(data.TransparentTs, gOut_ComposedID, data.Composed);
                 natCmd.SetRayTracingTextureParam(data.TransparentTs, GInOutMv, data.Mv);
-                
+
                 natCmd.SetRayTracingBufferParam(data.TransparentTs, gIn_SpotLightsID, data.SpotLightBuffer);
 
                 natCmd.DispatchRays(data.TransparentTs, "MainRayGenShader", (uint)data.m_RenderResolution.x, (uint)data.m_RenderResolution.y, 1);
@@ -483,29 +483,59 @@ namespace PathTracing
             var mat = mainLight.localToWorldMatrix;
             Vector3 lightForward = mat.GetColumn(2);
 
-            // Collect visible spot lights and upload to GPU buffer
+            // // Collect visible spot lights and upload to GPU buffer
+            // var spotLightList = new System.Collections.Generic.List<SpotLightData>();
+            // foreach (var vl in lightData.visibleLights)
+            // {
+            //     if (vl.lightType != LightType.Spot) continue;
+            //     var lmat       = vl.localToWorldMatrix;
+            //     Vector3 pos    = lmat.GetColumn(3);
+            //     Vector3 dir    = ((Vector3)lmat.GetColumn(2)).normalized;
+            //     Color   fc     = vl.finalColor;
+            //     float   outerHalf = vl.spotAngle * 0.5f * Mathf.Deg2Rad;
+            //     float   innerHalf = vl.light != null
+            //         ? vl.light.innerSpotAngle * 0.5f * Mathf.Deg2Rad
+            //         : outerHalf * 0.9f;
+            //     spotLightList.Add(new SpotLightData
+            //     {
+            //         position      = pos,
+            //         range         = vl.range,
+            //         direction     = dir,
+            //         cosOuterAngle = Mathf.Cos(outerHalf),
+            //         color         = new Vector3(fc.r, fc.g, fc.b),
+            //         cosInnerAngle = Mathf.Cos(innerHalf),
+            //     });
+            // }
+
+
             var spotLightList = new System.Collections.Generic.List<SpotLightData>();
-            foreach (var vl in lightData.visibleLights)
+
+            // 获取场景中所有激活的 Light 组件（不受视锥体裁剪限制）
+            var allLights = UnityEngine.Object.FindObjectsByType<Light>(FindObjectsSortMode.None);
+            foreach (var light in allLights)
             {
-                if (vl.lightType != LightType.Spot) continue;
-                var lmat       = vl.localToWorldMatrix;
-                Vector3 pos    = lmat.GetColumn(3);
-                Vector3 dir    = ((Vector3)lmat.GetColumn(2)).normalized;
-                Color   fc     = vl.finalColor;
-                float   outerHalf = vl.spotAngle * 0.5f * Mathf.Deg2Rad;
-                float   innerHalf = vl.light != null
-                    ? vl.light.innerSpotAngle * 0.5f * Mathf.Deg2Rad
-                    : outerHalf * 0.9f;
+                if (!light.enabled || !light.gameObject.activeInHierarchy) continue;
+                if (light.type != LightType.Spot) continue;
+
+                Vector3 pos = light.transform.position;
+                Vector3 dir = light.transform.forward.normalized;
+                Color fc = light.color * light.intensity;
+
+                float outerHalf = light.spotAngle * 0.5f * Mathf.Deg2Rad;
+                float innerHalf = light.innerSpotAngle * 0.5f * Mathf.Deg2Rad;
+
                 spotLightList.Add(new SpotLightData
                 {
-                    position      = pos,
-                    range         = vl.range,
-                    direction     = dir,
+                    position = pos,
+                    range = light.range,
+                    direction = dir,
                     cosOuterAngle = Mathf.Cos(outerHalf),
-                    color         = new Vector3(fc.r, fc.g, fc.b),
+                    color = new Vector3(fc.r, fc.g, fc.b),
                     cosInnerAngle = Mathf.Cos(innerHalf),
                 });
             }
+
+
             int spotCount = spotLightList.Count;
             int bufferCount = Mathf.Max(spotCount, 1);
             if (m_SpotLightBuffer == null || m_SpotLightBuffer.count < bufferCount)
@@ -515,6 +545,7 @@ namespace PathTracing
                     GraphicsBuffer.Target.Structured, bufferCount,
                     Marshal.SizeOf<SpotLightData>());
             }
+
             if (spotCount > 0)
                 m_SpotLightBuffer.SetData(spotLightList.ToArray());
 

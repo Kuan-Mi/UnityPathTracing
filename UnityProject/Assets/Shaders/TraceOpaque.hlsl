@@ -686,8 +686,8 @@ void MainRayGenShader()
     gOut_BaseColor_Metalness[pixelPos] = float4(Color::ToSrgb(materialProps0.baseColor), materialProps0.metalness);
 
     // Direct lighting
-    float3 Xshadow;
-    float3 Ldirect = GetLighting(geometryProps0, materialProps0, LIGHTING | SHADOW, Xshadow);
+    // float3 Xshadow;
+    float3 Ldirect = GetLighting(geometryProps0, materialProps0, LIGHTING | SHADOW);
 
     if (gOnScreen == SHOW_INSTANCE_INDEX)
     {
@@ -722,7 +722,7 @@ void MainRayGenShader()
         Lpsr = GetRadianceFromPreviousFrame(geometryProps0, materialProps0, pixelPos);
 
         // Subtract direct lighting, process it separately
-        float3 L = Ldirect * GetLighting(geometryProps0, materialProps0, SHADOW) + materialProps0.Lemi;
+        float3 L = Ldirect + materialProps0.Lemi;
         Lpsr.xyz = max(Lpsr.xyz - L, 0.0);
 
         // TODO: it's not a 100% fix
@@ -746,43 +746,42 @@ void MainRayGenShader()
     #endif
 
 
-    //================================================================================================================================================================================
-    // Sun shadow
-    //================================================================================================================================================================================
-    geometryProps0.X = Xshadow;
+    // //================================================================================================================================================================================
+    // // Sun shadow
+    // //================================================================================================================================================================================
+    // geometryProps0.X = Xshadow;
+    //
+    // float2 rnd = GetBlueNoise(pixelPos);
+    // rnd = ImportanceSampling::Cosine::GetRay(rnd).xy;
+    // rnd *= gTanSunAngularRadius;
+    //
+    // float3 sunDirection = normalize(gSunBasisX.xyz * rnd.x + gSunBasisY.xyz * rnd.y + gSunDirection.xyz);
+    // float3 Xoffset = geometryProps0.GetXoffset(sunDirection, PT_SHADOW_RAY_OFFSET);
+    // float2 mipAndCone = GetConeAngleFromAngularRadius(geometryProps0.mip, gTanSunAngularRadius);
+    //
+    // float shadowTranslucency = (Color::Luminance(Ldirect) != 0.0) ? 1.0 : 0.0;
+    // float shadowHitDist = 0.0;
+    //
+    // if (shadowTranslucency > 0.1)
+    // {
+    //     if (gRR)
+    //     {
+    //         float hitT = CastVisibilityRay_AnyHit( Xoffset, sunDirection, 0.0, INF, mipAndCone, gWorldTlas,FLAG_NON_TRANSPARENT,0);
+    //         shadowHitDist = hitT;
+    //     }
+    //     else
+    //     {
+    //         GeometryProps geometryPropsShadow;
+    //         MaterialProps materialPropsShadow;
+    //
+    //         CastRay(Xoffset, sunDirection, 0.0, INF, mipAndCone, FLAG_NON_TRANSPARENT, geometryPropsShadow, materialPropsShadow);
+    //
+    //         shadowHitDist = geometryPropsShadow.hitT;
+    //     }
+    // }
+    // shadowHitDist = INF;
 
-    float2 rnd = GetBlueNoise(pixelPos);
-    rnd = ImportanceSampling::Cosine::GetRay(rnd).xy;
-    rnd *= gTanSunAngularRadius;
-
-    float3 sunDirection = normalize(gSunBasisX.xyz * rnd.x + gSunBasisY.xyz * rnd.y + gSunDirection.xyz);
-    float3 Xoffset = geometryProps0.GetXoffset(sunDirection, PT_SHADOW_RAY_OFFSET);
-    float2 mipAndCone = GetConeAngleFromAngularRadius(geometryProps0.mip, gTanSunAngularRadius);
-
-    float shadowTranslucency = (Color::Luminance(Ldirect) != 0.0) ? 1.0 : 0.0;
-    float shadowHitDist = 0.0;
-
-    if (shadowTranslucency > 0.1)
-    {
-        if (gRR)
-        {
-            float hitT = CastVisibilityRay_AnyHit( Xoffset, sunDirection, 0.0, INF, mipAndCone, gWorldTlas,FLAG_NON_TRANSPARENT,0);
-            shadowHitDist = hitT;
-        }
-        else
-        {
-            GeometryProps geometryPropsShadow;
-            MaterialProps materialPropsShadow;
-    
-            CastRay(Xoffset, sunDirection, 0.0, INF, mipAndCone, FLAG_NON_TRANSPARENT, geometryPropsShadow, materialPropsShadow);
-    
-            shadowHitDist = geometryPropsShadow.hitT;
-        }
-    }
-
-    shadowHitDist = INF;
-
-    float penumbra = SIGMA_FrontEnd_PackPenumbra(shadowHitDist, gTanSunAngularRadius);
+    float penumbra = SIGMA_FrontEnd_PackPenumbra(INF, gTanSunAngularRadius);
 
     gOut_ShadowData[pixelPos] = penumbra;
 
