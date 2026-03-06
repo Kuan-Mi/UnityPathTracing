@@ -23,6 +23,7 @@ Blog post: [NRDSample Implementation in Unity](https://www.kuanmi.top/2026/01/22
 - [x] **Primary Surface Replacement**: High-quality specular reflection via PSR
 - [x] **VR Support**: Path tracing in VR mode
 - [x] **TextMeshPro**: World-space TextMeshPro rendering support
+- [x] **Auto Exposure**: Histogram-based auto exposure
 - [ ] **ReSTIR DI**: Planned
 - [ ] **Volumetric Lighting**: Planned
 
@@ -71,6 +72,7 @@ Thanks to [inedelcu](https://github.com/INedelcu) for the great help with writin
 - [x] **主表面替换**：通过主表面替换实现高质量的镜面反射
 - [x] **VR 支持**：支持 VR 模式下的路径追踪渲染
 - [x] **TMP 支持**：世界空间下的 TextMeshPro 文本渲染支持
+- [x] **自动曝光**：基于直方图的自动曝光
 - [ ] **ReSTIR DI**：待实现
 - [ ] **体积光**：待实现
 
