@@ -72,6 +72,9 @@ namespace PathTracing
         // public static int gOut_SpotDirectID = Shader.PropertyToID("gOut_SpotDirect");
         // public static int gIn_SpotDirectID  = Shader.PropertyToID("gIn_SpotDirect");
 
+        // Area lights
+        public static int gIn_AreaLightsID  = Shader.PropertyToID("gIn_AreaLights");
+
         // TAA
         public static int gIn_MvID = Shader.PropertyToID("gIn_Mv");
         public static int gIn_ComposedID = Shader.PropertyToID("gIn_Composed");

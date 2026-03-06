@@ -126,6 +126,8 @@ namespace PathTracing
         public bool SHARC = true;
         public bool specularLobeTrimming = true;
         public bool boost = false;
+        [Range(0.0f, 1.0f)]
+        public float boostFactor = 1.0f;
         public bool SR = false;
         public bool RR = false;
         public bool tmpDisableRR = false;

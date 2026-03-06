@@ -44,6 +44,7 @@ namespace PathTracing
         private readonly PathTracingSetting m_Settings;
         private readonly GraphicsBuffer _pathTracingSettingsBuffer;
         private GraphicsBuffer m_SpotLightBuffer;
+        private GraphicsBuffer m_AreaLightBuffer;
 
         [DllImport("RenderingPlugin")]
         private static extern IntPtr GetRenderEventAndDataFunc();
@@ -122,6 +123,7 @@ namespace PathTracing
 
             // internal TextureHandle SpotDirect;
             internal GraphicsBuffer SpotLightBuffer;
+            internal GraphicsBuffer AreaLightBuffer;
         }
 
         public PathTracingPassSingle(PathTracingSetting setting)
@@ -166,6 +168,7 @@ namespace PathTracing
 
                 natCmd.SetRayTracingTextureParam(data.SharcUpdateTs, g_OutputID, data.OutputTexture);
                 natCmd.SetRayTracingBufferParam(data.SharcUpdateTs, gIn_SpotLightsID, data.SpotLightBuffer);
+                natCmd.SetRayTracingBufferParam(data.SharcUpdateTs, gIn_AreaLightsID, data.AreaLightBuffer);
 
                 int SHARC_DOWNSCALE = 4;
 
@@ -231,6 +234,7 @@ namespace PathTracing
                 natCmd.SetRayTracingTextureParam(data.OpaqueTs, gIn_PrevComposedDiffID, data.ComposedDiff);
                 natCmd.SetRayTracingTextureParam(data.OpaqueTs, gIn_PrevComposedSpec_PrevViewZID, data.ComposedSpecViewZ);
                 natCmd.SetRayTracingBufferParam(data.OpaqueTs, gIn_SpotLightsID, data.SpotLightBuffer);
+                natCmd.SetRayTracingBufferParam(data.OpaqueTs, gIn_AreaLightsID, data.AreaLightBuffer);
                 // natCmd.SetRayTracingTextureParam(data.OpaqueTs, gOut_SpotDirectID, data.SpotDirect);
 
                 // Debug.Log(data.m_RenderResolution);
@@ -308,6 +312,7 @@ namespace PathTracing
                 natCmd.SetRayTracingTextureParam(data.TransparentTs, GInOutMv, data.Mv);
 
                 natCmd.SetRayTracingBufferParam(data.TransparentTs, gIn_SpotLightsID, data.SpotLightBuffer);
+                natCmd.SetRayTracingBufferParam(data.TransparentTs, gIn_AreaLightsID, data.AreaLightBuffer);
 
                 natCmd.DispatchRays(data.TransparentTs, "MainRayGenShader", (uint)data.m_RenderResolution.x, (uint)data.m_RenderResolution.y, 1);
                 natCmd.EndSample(transparentTracingMarker);
@@ -549,6 +554,45 @@ namespace PathTracing
             if (spotCount > 0)
                 m_SpotLightBuffer.SetData(spotLightList.ToArray());
 
+            // ---------------------------------------------------------------
+            // Collect area lights (LightType.Area — rectangular)
+            // ---------------------------------------------------------------
+            var areaLightList = new System.Collections.Generic.List<AreaLightData>();
+
+            foreach (var light in allLights)
+            {
+                if (!light.enabled || !light.gameObject.activeInHierarchy) continue;
+                if (light.type != LightType.Rectangle) continue;
+
+                Color  fc  = light.color * light.intensity;
+                Vector2 sz = light.areaSize;
+
+                areaLightList.Add(new AreaLightData
+                {
+                    position   = light.transform.position,
+                    halfWidth  = sz.x * 0.5f,
+                    right      = light.transform.right.normalized,
+                    halfHeight = sz.y * 0.5f,
+                    up         = light.transform.up.normalized,
+                    pad        = 0f,
+                    color      = new Vector3(fc.r, fc.g, fc.b),
+                    pad2       = 0f,
+                });
+            }
+
+            int areaCount       = areaLightList.Count;
+            int areaBufferCount = Mathf.Max(areaCount, 1);
+            if (m_AreaLightBuffer == null || m_AreaLightBuffer.count < areaBufferCount)
+            {
+                m_AreaLightBuffer?.Release();
+                m_AreaLightBuffer = new GraphicsBuffer(
+                    GraphicsBuffer.Target.Structured, areaBufferCount,
+                    Marshal.SizeOf<AreaLightData>());
+            }
+
+            if (areaCount > 0)
+                m_AreaLightBuffer.SetData(areaLightList.ToArray());
+
             if (cameraData.camera.cameraType != CameraType.Game && cameraData.camera.cameraType != CameraType.SceneView)
             {
                 return;
@@ -599,6 +643,7 @@ namespace PathTracing
             passData.passIndex = isXr ? xrPass.multipassId : 0;
             passData._dataBuilder = _dataBuilder;
             passData.SpotLightBuffer = m_SpotLightBuffer;
+            passData.AreaLightBuffer = m_AreaLightBuffer;
 
             var gSunDirection = -lightForward;
             var up = new Vector3(0, 1, 0);
@@ -657,7 +702,7 @@ namespace PathTracing
             otherMaxAccumulatedFrameNum *= resetHistoryFactor;
 
 
-            uint sharcMaxAccumulatedFrameNum = (uint)(otherMaxAccumulatedFrameNum * (m_Settings.boost ? 0.667f : 1.0f) + 0.5f);
+            uint sharcMaxAccumulatedFrameNum = (uint)(otherMaxAccumulatedFrameNum * (m_Settings.boost ? m_Settings.boostFactor : 1.0f) + 0.5f);
             float taaMaxAccumulatedFrameNum = otherMaxAccumulatedFrameNum * 0.5f;
             float prevFrameMaxAccumulatedFrameNum = otherMaxAccumulatedFrameNum * 0.3f;
 
@@ -752,6 +797,7 @@ namespace PathTracing
                 gTrimLobe = m_Settings.specularLobeTrimming ? 1u : 0,
             };
             globalConstants.gSpotLightCount = (uint)spotCount;
+            globalConstants.gAreaLightCount = (uint)areaCount;
 
             // Debug.Log(globalConstants.ToString());
 
@@ -872,6 +918,7 @@ namespace PathTracing
         {
             _pathTracingSettingsBuffer?.Release();
             m_SpotLightBuffer?.Release();
+            m_AreaLightBuffer?.Release();
         }
     }
 }

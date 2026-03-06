@@ -77,7 +77,7 @@ MonoBehaviour:
   sharcResolveCs: {fileID: 7200000, guid: 8a8bff82bc5641aaabee502a09792151, type: 3}
   sharcUpdateTs: {fileID: 4807578003741378534, guid: 171e2660e0894b3cb5c6c809e595ae5d, type: 3}
   pathTracingSetting:
-    sunAngularDiameter: 0.39
+    sunAngularDiameter: 3.12
     denoisingRange: 1000
     splitScreen: 0
     isBaseColorMetalnessAvailable: 1
