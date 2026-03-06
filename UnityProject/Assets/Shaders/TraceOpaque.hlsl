@@ -39,7 +39,7 @@ RWTexture2D<float4> gOut_Diff;
 RWTexture2D<float4> gOut_Spec;
 
 // 所有射灯直接光照的累加结果（不经 NRD 降噪，在 Composition 直接叠加）
-RWTexture2D<float3> gOut_SpotDirect;
+// RWTexture2D<float3> gOut_SpotDirect;
 
 float2 GetBlueNoise(uint2 pixelPos, uint seed = 0)
 {
@@ -687,7 +687,7 @@ void MainRayGenShader()
 
     // Direct lighting
     float3 Xshadow;
-    float3 Ldirect = GetLighting(geometryProps0, materialProps0, LIGHTING, Xshadow);
+    float3 Ldirect = GetLighting(geometryProps0, materialProps0, LIGHTING | SHADOW, Xshadow);
 
     if (gOnScreen == SHOW_INSTANCE_INDEX)
     {
@@ -710,7 +710,8 @@ void MainRayGenShader()
     }
 
     gOut_DirectLighting[pixelPos] = Ldirect; // "psrThroughput" applied in "Composition"
-    gOut_SpotDirect[pixelPos] = EvaluateSpotLights(geometryProps0, materialProps0);
+    // gOut_SpotDirect[pixelPos] = EvaluateSpotLights(geometryProps0, materialProps0);
+    // gOut_SpotDirect[pixelPos] = 0;
     gOut_PsrThroughput[pixelPos] = psrThroughput;
 
     // Lighting at PSR hit, if found
@@ -779,7 +780,7 @@ void MainRayGenShader()
         }
     }
 
-    // shadowHitDist = 0;
+    shadowHitDist = INF;
 
     float penumbra = SIGMA_FrontEnd_PackPenumbra(shadowHitDist, gTanSunAngularRadius);
 

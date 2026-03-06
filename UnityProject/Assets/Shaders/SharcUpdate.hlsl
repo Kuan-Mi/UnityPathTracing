@@ -48,7 +48,7 @@ void Trace(GeometryProps geometryProps, MaterialProps materialProps)
         SharcSetThroughput(sharcState, 1.0);
 
         float3 L = GetLighting(geometryProps, materialProps, LIGHTING | SHADOW);
-        L += EvaluateSpotLights(geometryProps, materialProps);
+        // L += EvaluateSpotLights(geometryProps, materialProps);
         if (!SharcUpdateHit(sharcParams, sharcState, sharcHitData, L, 1.0))
             return;
     }
