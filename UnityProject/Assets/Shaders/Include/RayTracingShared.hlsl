@@ -188,6 +188,7 @@ void CastRay(float3 origin, float3 direction, float Tmin, float Tmax, float2 mip
 
 #include "SpotLights.hlsl"
 #include "AreaLights.hlsl"
+#include "PointLights.hlsl"
 
 // Compile-time flags for "GetLighting"
 #define LIGHTING    0x01
@@ -271,6 +272,7 @@ float3 GetLighting(GeometryProps geometryProps, MaterialProps materialProps, uin
     if ((flags & SHADOW) != 0 ){
         lighting += EvaluateSpotLights(geometryProps, materialProps);
         lighting += EvaluateAreaLights(geometryProps, materialProps);
+        lighting += EvaluatePointLights(geometryProps, materialProps);
     }
 
     return lighting;

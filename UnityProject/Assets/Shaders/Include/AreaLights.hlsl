@@ -1,23 +1,27 @@
 // AreaLights.hlsl
-// Rectangular area lights with single stochastic shadow rays.
+// Rectangular and disc area lights with single stochastic shadow rays.
 // All area lights are accumulated into a single float3 per pixel.
 // No NRD denoising is applied — the result is composited directly.
+// lightType: 0 = rectangle, 1 = disc
+
+#define AREA_LIGHT_RECT 0.0
+#define AREA_LIGHT_DISC 1.0
 
 struct AreaLight
 {
-    float3 position;    // World-space centre of the rectangle
-    float  halfWidth;   // Half-extent along the right axis
+    float3 position;    // World-space centre
+    float  halfWidth;   // Rect: half-extent along right.  Disc: radius.
     float3 right;       // Unit right vector (world-space)
-    float  halfHeight;  // Half-extent along the up axis
+    float  halfHeight;  // Rect: half-extent along up.     Disc: unused.
     float3 up;          // Unit up vector (world-space)
-    float  pad;
+    float  lightType;   // 0 = rectangle, 1 = disc
     float3 color;       // Pre-multiplied color * intensity
     float  pad2;
 };
 
 StructuredBuffer<AreaLight> gIn_AreaLights;
 
-// Evaluate the direct lighting contribution of all rectangular area lights at a surface point.
+// Evaluate the direct lighting contribution of all area lights (rect + disc) at a surface point.
 // A single stochastic shadow ray is cast per light per frame; soft shadows emerge via accumulation.
 float3 EvaluateAreaLights(GeometryProps geo, MaterialProps mat)
 {
@@ -30,17 +34,34 @@ float3 EvaluateAreaLights(GeometryProps geo, MaterialProps mat)
 
         // ---------------------------------------------------------------
         // Derive light normal (one-sided: front face only)
-        // The normal points in the direction the light emits.
         // ---------------------------------------------------------------
         float3 lightNormal = normalize(cross(light.right, light.up));
 
         // ---------------------------------------------------------------
         // Stochastic sample point on the light surface
         // ---------------------------------------------------------------
-        float2 xi = Rng::Hash::GetFloat2() * 2.0 - 1.0; // [-1, 1]^2
-        float3 samplePos = light.position
-                         + light.right  * (xi.x * light.halfWidth)
-                         + light.up     * (xi.y * light.halfHeight);
+        float2 xi = Rng::Hash::GetFloat2(); // [0, 1]^2
+        float3 samplePos;
+        float  lightArea;
+
+        if (light.lightType > 0.5) // disc
+        {
+            // Uniform sampling of a disc: r = radius * sqrt(xi.x), theta = 2*pi * xi.y
+            float r     = light.halfWidth * sqrt(xi.x);
+            float theta = 6.28318530718 * xi.y;
+            samplePos = light.position
+                      + light.right * (r * cos(theta))
+                      + light.up    * (r * sin(theta));
+            lightArea = 3.14159265359 * light.halfWidth * light.halfWidth;
+        }
+        else // rectangle
+        {
+            float2 uv = xi * 2.0 - 1.0; // [-1, 1]^2
+            samplePos = light.position
+                      + light.right * (uv.x * light.halfWidth)
+                      + light.up    * (uv.y * light.halfHeight);
+            lightArea = 4.0 * light.halfWidth * light.halfHeight;
+        }
 
         // ---------------------------------------------------------------
         // Geometry term
@@ -63,12 +84,9 @@ float3 EvaluateAreaLights(GeometryProps geo, MaterialProps mat)
             continue;
 
         // ---------------------------------------------------------------
-        // Solid-angle weight
-        // Solid angle contribution ≈ A * cos(theta_light) / dist^2
-        // Rectangle area = (2 * halfWidth) * (2 * halfHeight) = 4 * halfWidth * halfHeight
+        // Solid-angle weight: A * cos(theta_light) / dist^2
         // ---------------------------------------------------------------
-        float solidAngle = cosLight * (4.0 * light.halfWidth * light.halfHeight)
-                         / max(dist * dist, 0.0001);
+        float solidAngle = cosLight * lightArea / max(dist * dist, 0.0001);
 
         // ---------------------------------------------------------------
         // Shadow ray (single stochastic sample — soft shadows via accumulation)

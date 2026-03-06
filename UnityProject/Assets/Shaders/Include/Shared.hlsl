@@ -239,6 +239,7 @@ cbuffer PathTracingParams : register(b0)
     uint gTrimLobe;
     uint gSpotLightCount;
     uint gAreaLightCount;
+    uint gPointLightCount;
 };
 
 #include "../ml.hlsli"

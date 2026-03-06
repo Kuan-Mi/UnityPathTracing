@@ -70,6 +70,7 @@ namespace PathTracing
         public uint gTrimLobe;
         public uint gSpotLightCount;
         public uint gAreaLightCount;
+        public uint gPointLightCount;
 
         public override string ToString()
         {

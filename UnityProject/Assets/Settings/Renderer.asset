@@ -105,7 +105,8 @@ MonoBehaviour:
     importanceSampling: 0
     SHARC: 1
     specularLobeTrimming: 1
-    boost: 0
+    boost: 1
+    boostFactor: 1
     SR: 0
     RR: 1
     tmpDisableRR: 0
