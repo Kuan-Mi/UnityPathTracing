@@ -120,7 +120,7 @@ namespace PathTracing
             internal int passIndex;
             internal PathTracingDataBuilder _dataBuilder;
 
-            internal TextureHandle SpotDirect;
+            // internal TextureHandle SpotDirect;
             internal GraphicsBuffer SpotLightBuffer;
         }
 
@@ -231,7 +231,7 @@ namespace PathTracing
                 natCmd.SetRayTracingTextureParam(data.OpaqueTs, gIn_PrevComposedDiffID, data.ComposedDiff);
                 natCmd.SetRayTracingTextureParam(data.OpaqueTs, gIn_PrevComposedSpec_PrevViewZID, data.ComposedSpecViewZ);
                 natCmd.SetRayTracingBufferParam(data.OpaqueTs, gIn_SpotLightsID, data.SpotLightBuffer);
-                natCmd.SetRayTracingTextureParam(data.OpaqueTs, gOut_SpotDirectID, data.SpotDirect);
+                // natCmd.SetRayTracingTextureParam(data.OpaqueTs, gOut_SpotDirectID, data.SpotDirect);
 
                 // Debug.Log(data.m_RenderResolution);
 
@@ -278,7 +278,7 @@ namespace PathTracing
                     natCmd.SetComputeTextureParam(data.CompositionCs, 0, gIn_SpecID, data.DenoisedSpec);
                 }
 
-                natCmd.SetComputeTextureParam(data.CompositionCs, 0, gIn_SpotDirectID, data.SpotDirect);
+                // natCmd.SetComputeTextureParam(data.CompositionCs, 0, gIn_SpotDirectID, data.SpotDirect);
                 natCmd.SetComputeTextureParam(data.CompositionCs, 0, gIn_PsrThroughputID, data.PsrThroughput);
                 natCmd.SetComputeTextureParam(data.CompositionCs, 0, gOut_ComposedDiffID, data.ComposedDiff);
                 natCmd.SetComputeTextureParam(data.CompositionCs, 0, gOut_ComposedSpec_ViewZID, data.ComposedSpecViewZ);
@@ -306,6 +306,8 @@ namespace PathTracing
                 natCmd.SetRayTracingTextureParam(data.TransparentTs, g_Normal_RoughnessID, data.NormalRoughness);
                 natCmd.SetRayTracingTextureParam(data.TransparentTs, gOut_ComposedID, data.Composed);
                 natCmd.SetRayTracingTextureParam(data.TransparentTs, GInOutMv, data.Mv);
+                
+                natCmd.SetRayTracingBufferParam(data.TransparentTs, gIn_SpotLightsID, data.SpotLightBuffer);
 
                 natCmd.DispatchRays(data.TransparentTs, "MainRayGenShader", (uint)data.m_RenderResolution.x, (uint)data.m_RenderResolution.y, 1);
                 natCmd.EndSample(transparentTracingMarker);
@@ -764,7 +766,7 @@ namespace PathTracing
             passData.BaseColorMetalness = renderGraph.ImportTexture(NrdDenoiser.GetRT(ResourceType.IN_BASECOLOR_METALNESS));
             passData.DirectLighting = CreateTex(textureDesc, renderGraph, "DirectLighting", GraphicsFormat.B10G11R11_UFloatPack32);
             passData.DirectEmission = CreateTex(textureDesc, renderGraph, "DirectEmission", GraphicsFormat.B10G11R11_UFloatPack32);
-            passData.SpotDirect = CreateTex(textureDesc, renderGraph, "SpotDirect", GraphicsFormat.B10G11R11_UFloatPack32);
+            // passData.SpotDirect = CreateTex(textureDesc, renderGraph, "SpotDirect", GraphicsFormat.B10G11R11_UFloatPack32);
 
             passData.Penumbra = renderGraph.ImportTexture(NrdDenoiser.GetRT(ResourceType.IN_PENUMBRA));
             passData.Diff = renderGraph.ImportTexture(NrdDenoiser.GetRT(ResourceType.IN_DIFF_RADIANCE_HITDIST));
@@ -801,7 +803,7 @@ namespace PathTracing
 
             builder.UseTexture(passData.DirectLighting, AccessFlags.ReadWrite);
             builder.UseTexture(passData.DirectEmission, AccessFlags.ReadWrite);
-            builder.UseTexture(passData.SpotDirect, AccessFlags.ReadWrite);
+            // builder.UseTexture(passData.SpotDirect, AccessFlags.ReadWrite);
 
             builder.UseTexture(passData.Penumbra, AccessFlags.ReadWrite);
             builder.UseTexture(passData.Diff, AccessFlags.ReadWrite);

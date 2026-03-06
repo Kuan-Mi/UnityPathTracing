@@ -261,8 +261,14 @@ float3 GetLighting(GeometryProps geometryProps, MaterialProps materialProps, uin
         float3 sunDirection = normalize(gSunBasisX.xyz * rnd.x + gSunBasisY.xyz * rnd.y + gSunDirection.xyz);
         float2 mipAndCone = GetConeAngleFromAngularRadius(geometryProps.mip, gTanSunAngularRadius);
 
+        
+        Xshadow = geometryProps.GetXoffset(sunDirection,PT_SHADOW_RAY_OFFSET);
         float hitT = CastVisibilityRay_AnyHit(Xshadow, sunDirection, 0.0, INF, mipAndCone, gWorldTlas, instanceInclusionMask, rayFlags);
         lighting *= float(hitT == INF);
+    }
+    
+    if ((flags & SHADOW) != 0 ){
+        lighting += EvaluateSpotLights(geometryProps, materialProps);
     }
 
     return lighting;

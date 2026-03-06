@@ -69,8 +69,8 @@ namespace PathTracing
 
         // Spot lights
         public static int gIn_SpotLightsID  = Shader.PropertyToID("gIn_SpotLights");
-        public static int gOut_SpotDirectID = Shader.PropertyToID("gOut_SpotDirect");
-        public static int gIn_SpotDirectID  = Shader.PropertyToID("gIn_SpotDirect");
+        // public static int gOut_SpotDirectID = Shader.PropertyToID("gOut_SpotDirect");
+        // public static int gIn_SpotDirectID  = Shader.PropertyToID("gIn_SpotDirect");
 
         // TAA
         public static int gIn_MvID = Shader.PropertyToID("gIn_Mv");
