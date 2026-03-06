@@ -46,6 +46,12 @@ Blog post: [NRDSample Implementation in Unity](https://www.kuanmi.top/2026/01/22
 
 ---
 
+## Acknowledgements
+
+Thanks to [inedelcu](https://github.com/INedelcu) for the great help with writing ray tracing shaders and handling acceleration structures.
+
+---
+
 <a name="中文"></a>
 
 在 Unity URP 中实现的实时路径追踪渲染系统，复刻了 NVIDIA NRDSample 的核心功能，并针对 Unity 环境进行了优化和扩展。
@@ -85,6 +91,12 @@ Blog post: [NRDSample Implementation in Unity](https://www.kuanmi.top/2026/01/22
 | 降噪 | NVIDIA NRD（REBLUR、SIGMA） |
 | 超分 / 重建 | NVIDIA DLSS Ray Reconstruction |
 | 辐射缓存 | SHARC |
+
+---
+
+## 致谢
+
+感谢 [inedelcu](https://github.com/INedelcu) 的帮助，在编写光追着色器和处理加速结构方面帮了我很多。
 
 ---
 
