@@ -53,34 +53,32 @@ namespace PathTracing
             }
         }
 
+        public PathTracingSetting pathTracingSetting;
+
         public Material finalMaterial;
         public RayTracingShader opaqueTracingShader;
         public RayTracingShader transparentTracingShader;
-
         public ComputeShader compositionComputeShader;
         public ComputeShader taaComputeShader;
         public ComputeShader dlssBeforeComputeShader;
-
         public ComputeShader sharcResolveCs;
         public RayTracingShader sharcUpdateTs;
 
-        public PathTracingSetting pathTracingSetting;
+        public Texture2D scramblingRankingTex;
+        public Texture2D sobolTex;
+
 
         private PathTracingPass _pathTracingPass;
 
-        public RayTracingAccelerationStructure accelerationStructure;
-        public Settings settings;
+        private RayTracingAccelerationStructure accelerationStructure;
+        private Settings settings;
 
-        public Texture2D gIn_ScramblingRanking;
-        public Texture2D gIn_Sobol;
-        public GraphicsBuffer gIn_ScramblingRankingUint;
-        public GraphicsBuffer gIn_SobolUint;
-
+        private GraphicsBuffer scramblingRankingUintBuffer;
+        private GraphicsBuffer sobolUintBuffer;
 
         private GraphicsBuffer _hashEntriesBuffer;
         private GraphicsBuffer _accumulationBuffer;
         private GraphicsBuffer _resolvedBuffer;
-
 
         private Dictionary<long, NRDDenoiser> _nrdDenoisers = new();
         private Dictionary<long, DLRRDenoiser> _dlrrDenoisers = new();
@@ -116,29 +114,32 @@ namespace PathTracing
 
             // ReBuild();
 
-            if (gIn_ScramblingRankingUint == null)
+            if (scramblingRankingUintBuffer == null && scramblingRankingTex != null)
             {
-                gIn_ScramblingRankingUint = new GraphicsBuffer(GraphicsBuffer.Target.Structured, gIn_ScramblingRanking.width * gIn_ScramblingRanking.height, 16);
-                var scramblingRankingData = new uint4[gIn_ScramblingRanking.width * gIn_ScramblingRanking.height];
-                var rawData = gIn_ScramblingRanking.GetRawTextureData();
+                scramblingRankingUintBuffer = new GraphicsBuffer(GraphicsBuffer.Target.Structured, scramblingRankingTex.width * scramblingRankingTex.height, 16);
+                var scramblingRankingData = new uint4[scramblingRankingTex.width * scramblingRankingTex.height];
+                var rawData = scramblingRankingTex.GetRawTextureData();
                 var count = scramblingRankingData.Length;
                 for (var i = 0; i < count; i++)
                 {
                     scramblingRankingData[i] = new uint4(rawData[i * 4 + 0], rawData[i * 4 + 1], rawData[i * 4 + 2], rawData[i * 4 + 3]);
                 }
 
-                gIn_ScramblingRankingUint.SetData(scramblingRankingData);
+                scramblingRankingUintBuffer.SetData(scramblingRankingData);
+            }
 
-                gIn_SobolUint = new GraphicsBuffer(GraphicsBuffer.Target.Structured, gIn_Sobol.width * gIn_Sobol.height, 16);
-                var sobolData = new uint4[gIn_Sobol.width * gIn_Sobol.height];
-                rawData = gIn_Sobol.GetRawTextureData();
-                count = sobolData.Length;
+            if (sobolUintBuffer == null && sobolTex != null)
+            {
+                sobolUintBuffer = new GraphicsBuffer(GraphicsBuffer.Target.Structured, sobolTex.width * sobolTex.height, 16);
+                var sobolData = new uint4[sobolTex.width * sobolTex.height];
+                var rawData = sobolTex.GetRawTextureData();
+                var count = sobolData.Length;
                 for (var i = 0; i < count; i++)
                 {
                     sobolData[i] = new uint4(rawData[i * 4 + 0], rawData[i * 4 + 1], rawData[i * 4 + 2], rawData[i * 4 + 3]);
                 }
 
-                gIn_SobolUint.SetData(sobolData);
+                sobolUintBuffer.SetData(sobolData);
             }
 
             if (_accumulationBuffer == null)
@@ -155,8 +156,8 @@ namespace PathTracing
                 TaaCs = taaComputeShader,
                 DlssBeforeCs = dlssBeforeComputeShader,
                 AccelerationStructure = accelerationStructure,
-                ScramblingRanking = gIn_ScramblingRankingUint,
-                Sobol = gIn_SobolUint,
+                ScramblingRanking = scramblingRankingUintBuffer,
+                Sobol = sobolUintBuffer,
                 BiltMaterial = finalMaterial,
                 SharcResolveCs = sharcResolveCs,
                 SharcUpdateTs = sharcUpdateTs,
@@ -211,6 +212,11 @@ namespace PathTracing
             Camera cam = renderingData.cameraData.camera;
             if (cam.cameraType is CameraType.Preview or CameraType.Reflection)
                 return;
+            
+            
+            cam.depthTextureMode = DepthTextureMode.Depth | DepthTextureMode.MotionVectors;
+            
+            
 
             int eyeIndex = renderingData.cameraData.xr.enabled ? renderingData.cameraData.xr.multipassId : 0;
 
@@ -252,21 +258,28 @@ namespace PathTracing
             _pathTracingPass.HashEntriesBuffer = _hashEntriesBuffer;
             _pathTracingPass.ResolvedBuffer = _resolvedBuffer;
 
-            if (compositionComputeShader == null
-                || taaComputeShader == null
-                || finalMaterial == null
+            if (finalMaterial == null
                 || opaqueTracingShader == null
                 || transparentTracingShader == null
+                || compositionComputeShader == null
+                || taaComputeShader == null
+                || dlssBeforeComputeShader == null
                 || sharcResolveCs == null
                 || sharcUpdateTs == null
+                || finalMaterial == null
+                || scramblingRankingTex == null
+                || sobolTex == null
                )
+            {
+                Debug.LogWarning("PathTracingFeature: Missing required assets, skipping path tracing pass.");
                 return;
+            }
 
-            
             var allSkinnedMeshRenderers = GameObject.FindObjectsByType<SkinnedMeshRenderer>(FindObjectsSortMode.None);
-            foreach (var smr in allSkinnedMeshRenderers)            {
+            foreach (var smr in allSkinnedMeshRenderers)
+            {
                 accelerationStructure.UpdateInstanceTransform(smr);
-            } 
+            }
 
             accelerationStructure.Build();
             if (pathTracingSetting.usePackedData)
@@ -305,11 +318,11 @@ namespace PathTracing
 
             _dlrrDenoisers.Clear();
 
-            gIn_ScramblingRankingUint?.Release();
-            gIn_ScramblingRankingUint = null;
+            scramblingRankingUintBuffer?.Release();
+            scramblingRankingUintBuffer = null;
 
-            gIn_SobolUint?.Release();
-            gIn_SobolUint = null;
+            sobolUintBuffer?.Release();
+            sobolUintBuffer = null;
 
             _accumulationBuffer?.Release();
             _accumulationBuffer = null;

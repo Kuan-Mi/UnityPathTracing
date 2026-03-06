@@ -31,18 +31,16 @@ namespace PathTracing
         DLSS_Output,
     }
 
-    public enum UpscalerMode  : byte      // Scaling factor       // Min jitter phases (or just use unclamped Halton2D)
+    public enum UpscalerMode : byte // Scaling factor       // Min jitter phases (or just use unclamped Halton2D)
     {
-        NATIVE,                     // 1.0x                 8
-        ULTRA_QUALITY,              // 1.3x                 14
-        QUALITY,                    // 1.5x                 18
-        BALANCED,                   // 1.7x                 23
-        PERFORMANCE,                // 2.0x                 32
-        ULTRA_PERFORMANCE           // 3.0x                 72
+        NATIVE, // 1.0x                 8
+        ULTRA_QUALITY, // 1.3x                 14
+        QUALITY, // 1.5x                 18
+        BALANCED, // 1.7x                 23
+        PERFORMANCE, // 2.0x                 32
+        ULTRA_PERFORMANCE // 3.0x                 72
     }
-    
-    
-    
+
     public enum DenoiserType
     {
         DENOISER_REBLUR = 0,
@@ -56,7 +54,7 @@ namespace PathTracing
         RESOLUTION_FULL_PROBABILISTIC = 1,
         RESOLUTION_HALF = 2,
     }
- 
+
 
     [System.Serializable]
     public class PathTracingSetting
@@ -66,12 +64,12 @@ namespace PathTracing
 
         [Header("NRD Common Settings")]
         [Range(0.1f, 10000.0f)]
-        public float denoisingRange = 5000;
+        public float denoisingRange = 1000;
 
         [Range(0.0f, 1.0f)]
         public float splitScreen;
 
-        public bool isBaseColorMetalnessAvailable;
+        public bool isBaseColorMetalnessAvailable = true;
 
         [Header("NRD Sigma Settings")]
         [Range(0.0f, 1.0f)]
@@ -81,7 +79,7 @@ namespace PathTracing
         public uint maxStabilizedFrameNum = 5;
 
         [Header("显示模式")]
-        public ShowMode showMode;
+        public ShowMode showMode = ShowMode.Final;
 
         public bool showMV;
         public bool showValidation;
@@ -91,7 +89,7 @@ namespace PathTracing
         public float dofAperture;
 
         [Range(0.1f, 10f)]
-        public float dofFocalDistance;
+        public float dofFocalDistance = 5;
 
         [Header("曝光")]
         [Range(0.1f, 100f)]
@@ -107,16 +105,16 @@ namespace PathTracing
 
         [Range(1, 4)]
         public uint bounceNum = 1;
- 
-        public float mipBias;
-         
-        public RESOLUTION tracingMode = RESOLUTION.RESOLUTION_FULL;
+
+        public float mipBias = -0.5f;
+
+        public RESOLUTION tracingMode = RESOLUTION.RESOLUTION_FULL_PROBABILISTIC;
         public DenoiserType denoiser = DenoiserType.DENOISER_REBLUR;
-        
+
         public float emissionIntensity = 1.0f;
-        
+
         public bool cameraJitter = true;
-        public bool psr = false;
+        public bool psr = true;
         public bool emission = true;
         public bool usePrevFrame = true;
         public bool TAA = true;
@@ -126,17 +124,19 @@ namespace PathTracing
         public bool SHARC = true;
         public bool specularLobeTrimming = true;
         public bool boost = false;
+
         [Range(0.0f, 1.0f)]
-        public float boostFactor = 1.0f;
+        public float boostFactor = 0.6667f;
+
         public bool SR = false;
-        public bool RR = false;
+        public bool RR = true;
         public bool tmpDisableRR = false;
 
         [Range(0.5f, 1.0f)]
-        public float resolutionScale = 0.5f;
+        public float resolutionScale = 1.0f;
 
-        public UpscalerMode upscalerMode;
- 
+        public UpscalerMode upscalerMode = UpscalerMode.NATIVE;
+
         public bool usePackedData;
     }
 }

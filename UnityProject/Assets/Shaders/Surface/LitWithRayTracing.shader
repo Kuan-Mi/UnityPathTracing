@@ -260,8 +260,8 @@ Shader "Custom/LitWithRayTracing"
                 #define INTERPOLATE_ATTRIBUTE(attr) v.attr = v0.attr * barycentrics.x + v1.attr * barycentrics.y + v2.attr * barycentrics.z
                 INTERPOLATE_ATTRIBUTE(position);
                 INTERPOLATE_ATTRIBUTE(normal);
-                    INTERPOLATE_ATTRIBUTE(tangent);
-                    INTERPOLATE_ATTRIBUTE(uv);
+                INTERPOLATE_ATTRIBUTE(tangent);
+                INTERPOLATE_ATTRIBUTE(uv);
                 return v;
             }
 
@@ -286,7 +286,7 @@ Shader "Custom/LitWithRayTracing"
 
                 // 3. 计算插值 UV
                 float3 barycentricCoords = float3(1.0 - attribs.barycentrics.x - attribs.barycentrics.y,
-                              attribs.barycentrics.x, attribs.barycentrics.y);
+                                          attribs.barycentrics.x, attribs.barycentrics.y);
                 float2 uv = uv0 * barycentricCoords.x + uv1 * barycentricCoords.y + uv2 * barycentricCoords.z;
 
                 // 4. 采样 Alpha 通道
@@ -327,7 +327,7 @@ Shader "Custom/LitWithRayTracing"
 
                 // Barycentrics
                 float3 barycentrics = float3(1.0 - attribs.barycentrics.x - attribs.barycentrics.y,
-                         attribs.barycentrics.x, attribs.barycentrics.y);
+                                                 attribs.barycentrics.x, attribs.barycentrics.y);
 
                 // Normal
                 float3 n0 = Packing::DecodeUnitVector(primitiveData.n0, true);
@@ -478,7 +478,7 @@ Shader "Custom/LitWithRayTracing"
                 payload.curvature = sqrt(dnSq);
 
                 float3 barycentricCoords = float3(1.0 - attribs.barycentrics.x - attribs.barycentrics.y,
-           attribs.barycentrics.x, attribs.barycentrics.y);
+                                                                              attribs.barycentrics.x, attribs.barycentrics.y);
 
                 Vertex v = InterpolateVertices(v0, v1, v2, barycentricCoords);
 
@@ -561,11 +561,14 @@ Shader "Custom/LitWithRayTracing"
                 #if _METALLICSPECGLOSSMAP
 
                 float4 vv = _MetallicGlossMap.SampleLevel(sampler_MetallicGlossMap, _BaseMap_ST.xy * v.uv + _BaseMap_ST.zw, mip);
-                
-                roughness = (1 - vv.a) * (1 - _Smoothness);
+
+                float smooth = vv.a * _Smoothness;
+                roughness = 1 - smooth;
                 metallic = vv.r;
-                
-                // roughness = vv.g * (1 - _Smoothness);
+
+                // for Bistro
+                // float smooth = (1 - vv.g) * _Smoothness;
+                // roughness = 1 - smooth;
                 // metallic = vv.b;
 
                 #else
