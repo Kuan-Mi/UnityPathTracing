@@ -63,6 +63,7 @@ namespace PathTracing
         public ComputeShader dlssBeforeComputeShader;
         public ComputeShader sharcResolveCs;
         public RayTracingShader sharcUpdateTs;
+        public ComputeShader autoExposureShader;
 
         public Texture2D scramblingRankingTex;
         public Texture2D sobolTex;
@@ -79,6 +80,10 @@ namespace PathTracing
         private GraphicsBuffer _hashEntriesBuffer;
         private GraphicsBuffer _accumulationBuffer;
         private GraphicsBuffer _resolvedBuffer;
+
+        // Auto-exposure buffers (persistent across frames)
+        private GraphicsBuffer _aeHistogramBuffer; // 256 x uint
+        private GraphicsBuffer _aeExposureBuffer;  // 1 x float  (current exposure multiplier)
 
         private Dictionary<long, NRDDenoiser> _nrdDenoisers = new();
         private Dictionary<long, DLRRDenoiser> _dlrrDenoisers = new();
@@ -147,6 +152,19 @@ namespace PathTracing
                 InitializeBuffers();
             }
 
+            // Auto-exposure buffers
+            if (_aeHistogramBuffer == null)
+            {
+                _aeHistogramBuffer = new GraphicsBuffer(GraphicsBuffer.Target.Structured, 256, sizeof(uint));
+            }
+
+            if (_aeExposureBuffer == null)
+            {
+                _aeExposureBuffer = new GraphicsBuffer(GraphicsBuffer.Target.Structured, 1, sizeof(float));
+                // Seed with the manual exposure value so first frame is not zero
+                _aeExposureBuffer.SetData(new float[] { pathTracingSetting != null ? pathTracingSetting.exposure : 1.0f });
+            }
+
             _pathTracingPass = new PathTracingPass(pathTracingSetting)
             {
                 renderPassEvent = RenderPassEvent.BeforeRenderingTransparents,
@@ -164,7 +182,10 @@ namespace PathTracing
                 HashEntriesBuffer = _hashEntriesBuffer,
                 AccumulationBuffer = _accumulationBuffer,
                 ResolvedBuffer = _resolvedBuffer,
-                _dataBuilder = _dataBuilder
+                _dataBuilder = _dataBuilder,
+                AutoExposureCs = autoExposureShader,
+                AeHistogramBuffer = _aeHistogramBuffer,
+                AeExposureBuffer = _aeExposureBuffer
             };
         }
 
@@ -257,6 +278,8 @@ namespace PathTracing
             _pathTracingPass.AccumulationBuffer = _accumulationBuffer;
             _pathTracingPass.HashEntriesBuffer = _hashEntriesBuffer;
             _pathTracingPass.ResolvedBuffer = _resolvedBuffer;
+            _pathTracingPass.AeHistogramBuffer = _aeHistogramBuffer;
+            _pathTracingPass.AeExposureBuffer = _aeExposureBuffer;
 
             if (finalMaterial == null
                 || opaqueTracingShader == null
@@ -330,6 +353,11 @@ namespace PathTracing
             _hashEntriesBuffer = null;
             _resolvedBuffer?.Release();
             _resolvedBuffer = null;
+
+            _aeHistogramBuffer?.Release();
+            _aeHistogramBuffer = null;
+            _aeExposureBuffer?.Release();
+            _aeExposureBuffer = null;
         }
     }
 }

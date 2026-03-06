@@ -80,7 +80,17 @@ MonoBehaviour:
     showValidation: 0
     dofAperture: 0
     dofFocalDistance: 5
-    exposure: 100
+    exposure: 31.8
+    enableAutoExposure: 1
+    aeEVMin: -10
+    aeEVMax: 10
+    aeLowPercent: 0.05
+    aeHighPercent: 0.95
+    aeAdaptationSpeedUp: 2
+    aeAdaptationSpeedDown: 1
+    aeExposureCompensation: 0
+    aeMinExposure: 0.01
+    aeMaxExposure: 100
     rpp: 1
     bounceNum: 1
     mipBias: -0.5
@@ -113,5 +123,6 @@ MonoBehaviour:
   dlssBeforeComputeShader: {fileID: 7200000, guid: b34d979c2031436aad2b456c4456c6eb, type: 3}
   sharcResolveCs: {fileID: 7200000, guid: 8a8bff82bc5641aaabee502a09792151, type: 3}
   sharcUpdateTs: {fileID: 4807578003741378534, guid: 171e2660e0894b3cb5c6c809e595ae5d, type: 3}
+  autoExposureShader: {fileID: 7200000, guid: dd8e8b3823bdf9c4e987096a78bd2248, type: 3}
   scramblingRankingTex: {fileID: 2800000, guid: ba45d1e4dcf9022438a4798a5f9e7b80, type: 3}
   sobolTex: {fileID: 2800000, guid: 17e7ce8147355314ea8aab1178a6a43c, type: 3}

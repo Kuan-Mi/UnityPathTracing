@@ -95,6 +95,45 @@ namespace PathTracing
         [Range(0.1f, 100f)]
         public float exposure = 1.0f;
 
+        [Header("自动曝光 (Histogram Auto Exposure)")]
+        public bool enableAutoExposure = false;
+
+        [Tooltip("Histogram EV range lower bound (log2 luminance)")]
+        [Range(-16f, 0f)]
+        public float aeEVMin = -10f;
+
+        [Tooltip("Histogram EV range upper bound (log2 luminance)")]
+        [Range(0f, 16f)]
+        public float aeEVMax = 10f;
+
+        [Tooltip("Fraction of darkest pixels to ignore when computing average EV")]
+        [Range(0f, 0.5f)]
+        public float aeLowPercent = 0.05f;
+
+        [Tooltip("Fraction of brightest pixels to keep when computing average EV")]
+        [Range(0.5f, 1f)]
+        public float aeHighPercent = 0.95f;
+
+        [Tooltip("Adaptation speed (EV/s) when scene becomes brighter")]
+        [Range(0.01f, 10f)]
+        public float aeAdaptationSpeedUp = 2.0f;
+
+        [Tooltip("Adaptation speed (EV/s) when scene becomes darker")]
+        [Range(0.01f, 10f)]
+        public float aeAdaptationSpeedDown = 1.0f;
+
+        [Tooltip("Artistic EV offset added to computed target exposure")]
+        [Range(-5f, 5f)]
+        public float aeExposureCompensation = 0f;
+
+        [Tooltip("Minimum allowed output exposure multiplier")]
+        [Range(0.001f, 1f)]
+        public float aeMinExposure = 0.01f;
+
+        [Tooltip("Maximum allowed output exposure multiplier")]
+        [Range(1f, 1000f)]
+        public float aeMaxExposure = 100f;
+
         // [Header("TAA")]
         // [Range(0f, 1f)]
         // public float taa = 1.0f;

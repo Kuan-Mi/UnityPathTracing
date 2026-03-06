@@ -258,6 +258,11 @@ SamplerState sampler_Point_Repeat;
 #define gLinearSampler gLinearMipmapLinearSampler
 #define gNearestSampler gNearestMipmapNearestSampler
 
+// Auto-exposure: current exposure multiplier written by AutoExposure.compute.
+// When auto-exposure is disabled, the C# side writes gExposure into this buffer each frame
+// so ApplyExposure() works identically in both modes.
+StructuredBuffer<float> _AE_ExposureBuffer;
+
 
 //=============================================================================================
 // MISC
@@ -305,7 +310,7 @@ float3 GetMotion(float3 X, float3 Xprev)
 float3 ApplyExposure(float3 Lsum)
 {
     if (gOnScreen <= SHOW_DENOISED_SPECULAR)
-        Lsum *= gExposure;
+        Lsum *= _AE_ExposureBuffer[0]; // updated by AutoExposure.compute each frame
 
     return Lsum;
 }

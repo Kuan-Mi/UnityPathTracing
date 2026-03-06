@@ -18,6 +18,7 @@ namespace PathTracing
             ("dlssBeforeComputeShader",   "Assets/Shaders/PostProcess/DlssBefore.compute"),
             ("sharcResolveCs",            "Assets/Shaders/Sharc/SharcResolve.compute"),
             ("sharcUpdateTs",             "Assets/Shaders/Sharc/SharcUpdate.raytrace"),
+            ("autoExposureShader",        "Assets/Shaders/PostProcess/AutoExposure.compute"),
             ("scramblingRankingTex",     "Assets/Textures/scrambling_ranking_128x128_2d_4spp.png"),
             ("sobolTex",                 "Assets/Textures/sobol_256_4d.png"),
         };

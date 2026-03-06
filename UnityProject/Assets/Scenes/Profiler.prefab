@@ -55,4 +55,5 @@ MonoBehaviour:
   - DLSS Before
   - DLSS Denoise
   - Output Blit
+  - Auto Exposure
   averageWindowSeconds: 1

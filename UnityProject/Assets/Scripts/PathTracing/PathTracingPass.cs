@@ -41,6 +41,11 @@ namespace PathTracing
         public GraphicsBuffer ScramblingRanking;
         public GraphicsBuffer Sobol;
 
+        // Auto-exposure
+        public ComputeShader AutoExposureCs;
+        public GraphicsBuffer AeHistogramBuffer;
+        public GraphicsBuffer AeExposureBuffer;
+
         private readonly PathTracingSetting m_Settings;
         private readonly GraphicsBuffer _pathTracingSettingsBuffer;
         private GraphicsBuffer m_SpotLightBuffer;
@@ -126,6 +131,25 @@ namespace PathTracing
             internal GraphicsBuffer SpotLightBuffer;
             internal GraphicsBuffer AreaLightBuffer;
             internal GraphicsBuffer PointLightBuffer;
+
+            // ── Auto-exposure ──
+            internal ComputeShader AeCs;
+            internal GraphicsBuffer AeHistogramBuffer;
+            internal GraphicsBuffer AeExposureBuffer;
+            internal bool AeEnabled;
+            internal float AeEVMin;
+            internal float AeEVMax;
+            internal float AeLowPercent;
+            internal float AeHighPercent;
+            internal float AeSpeedUp;
+            internal float AeSpeedDown;
+            internal float AeDeltaTime;
+            internal float AeExposureCompensation;
+            internal float AeMinExposure;
+            internal float AeMaxExposure;
+            internal uint AeTexWidth;
+            internal uint AeTexHeight;
+            internal float ManualExposure;
         }
 
         public PathTracingPass(PathTracingSetting setting)
@@ -145,6 +169,15 @@ namespace PathTracing
 
             natCmd.SetBufferData(data.ConstantBuffer, new[] { data.GlobalConstants });
 
+            // Bind the exposure buffer globally so all shaders can read the current EV.
+            // When auto-exposure is OFF: seed the buffer with the manual value from settings.
+            // When auto-exposure is ON:  the buffer is updated later by ReduceHistogram.
+            natCmd.SetGlobalBuffer("_AE_ExposureBuffer", data.AeExposureBuffer);
+            if (!data.AeEnabled)
+            {
+                natCmd.SetBufferData(data.AeExposureBuffer, new[] { data.ManualExposure });
+            }
+
             var sharcUpdateMarker = new ProfilerMarker(ProfilerCategory.Render, "Sharc Update", MarkerFlags.SampleGPU);
             var sharcResolveMarker = new ProfilerMarker(ProfilerCategory.Render, "Sharc Resolve", MarkerFlags.SampleGPU);
             var opaqueTracingMarker = new ProfilerMarker(ProfilerCategory.Render, "Opaque Tracing", MarkerFlags.SampleGPU);
@@ -155,7 +188,7 @@ namespace PathTracing
             var dlssBeforeMarker = new ProfilerMarker(ProfilerCategory.Render, "DLSS Before", MarkerFlags.SampleGPU);
             var dlssDenoiseMarker = new ProfilerMarker(ProfilerCategory.Render, "DLSS Denoise", MarkerFlags.SampleGPU);
             var outputBlitMarker = new ProfilerMarker(ProfilerCategory.Render, "Output Blit", MarkerFlags.SampleGPU);
-
+            var aeMarker = new ProfilerMarker(ProfilerCategory.Render, "Auto Exposure", MarkerFlags.SampleGPU);
 
             // Sharc update
             if (data.passIndex == 0)
@@ -321,6 +354,49 @@ namespace PathTracing
 
                 natCmd.DispatchRays(data.TransparentTs, "MainRayGenShader", (uint)data.m_RenderResolution.x, (uint)data.m_RenderResolution.y, 1);
                 natCmd.EndSample(transparentTracingMarker);
+            }
+
+
+            // ── Auto-exposure: histogram build + reduce (after transparent, before TAA) ──
+            if (data.AeEnabled && data.AeCs != null && data.AeHistogramBuffer != null && data.AeExposureBuffer != null)
+            {
+                natCmd.BeginSample(aeMarker);
+
+                int kernelClear  = data.AeCs.FindKernel("ClearHistogram");
+                int kernelBuild  = data.AeCs.FindKernel("BuildHistogram");
+                int kernelReduce = data.AeCs.FindKernel("ReduceHistogram");
+
+                // -- Kernel 0: Clear --
+                natCmd.SetComputeBufferParam(data.AeCs, kernelClear, "_AE_HistogramBuffer", data.AeHistogramBuffer);
+                natCmd.DispatchCompute(data.AeCs, kernelClear, 1, 1, 1);
+
+                // -- Kernel 1: Build --
+                natCmd.SetComputeTextureParam(data.AeCs, kernelBuild, "_AE_ComposedTexture", data.Composed);
+                natCmd.SetComputeBufferParam(data.AeCs, kernelBuild, "_AE_HistogramBuffer", data.AeHistogramBuffer);
+                natCmd.SetComputeIntParam(data.AeCs, "_AE_TexWidth",  (int)data.AeTexWidth);
+                natCmd.SetComputeIntParam(data.AeCs, "_AE_TexHeight", (int)data.AeTexHeight);
+                natCmd.SetComputeFloatParam(data.AeCs, "_AE_EVMin", data.AeEVMin);
+                natCmd.SetComputeFloatParam(data.AeCs, "_AE_EVMax", data.AeEVMax);
+                uint buildX = (data.AeTexWidth  + 15u) / 16u;
+                uint buildY = (data.AeTexHeight + 15u) / 16u;
+                natCmd.DispatchCompute(data.AeCs, kernelBuild, (int)buildX, (int)buildY, 1);
+
+                // -- Kernel 2: Reduce --
+                natCmd.SetComputeBufferParam(data.AeCs, kernelReduce, "_AE_HistogramBuffer", data.AeHistogramBuffer);
+                natCmd.SetComputeBufferParam(data.AeCs, kernelReduce, "_AE_ExposureBuffer",  data.AeExposureBuffer);
+                natCmd.SetComputeFloatParam(data.AeCs, "_AE_EVMin",                data.AeEVMin);
+                natCmd.SetComputeFloatParam(data.AeCs, "_AE_EVMax",                data.AeEVMax);
+                natCmd.SetComputeFloatParam(data.AeCs, "_AE_LowPercent",           data.AeLowPercent);
+                natCmd.SetComputeFloatParam(data.AeCs, "_AE_HighPercent",          data.AeHighPercent);
+                natCmd.SetComputeFloatParam(data.AeCs, "_AE_SpeedUp",              data.AeSpeedUp);
+                natCmd.SetComputeFloatParam(data.AeCs, "_AE_SpeedDown",            data.AeSpeedDown);
+                natCmd.SetComputeFloatParam(data.AeCs, "_AE_DeltaTime",            data.AeDeltaTime);
+                natCmd.SetComputeFloatParam(data.AeCs, "_AE_ExposureCompensation", data.AeExposureCompensation);
+                natCmd.SetComputeFloatParam(data.AeCs, "_AE_MinExposure",          data.AeMinExposure);
+                natCmd.SetComputeFloatParam(data.AeCs, "_AE_MaxExposure",          data.AeMaxExposure);
+                natCmd.DispatchCompute(data.AeCs, kernelReduce, 1, 1, 1);
+
+                natCmd.EndSample(aeMarker);
             }
 
 
@@ -665,6 +741,8 @@ namespace PathTracing
 
             NrdDenoiser.EnsureResources(outputResolution);
 
+            var renderResolution = NrdDenoiser.renderResolution;
+            
             Shader.SetGlobalRayTracingAccelerationStructure(g_AccelStructID, AccelerationStructure);
 
             using var builder = renderGraph.AddUnsafePass<PassData>("Path Tracing Pass", out var passData);
@@ -687,6 +765,25 @@ namespace PathTracing
             passData.AreaLightBuffer  = m_AreaLightBuffer;
             passData.PointLightBuffer = m_PointLightBuffer;
 
+            // Auto-exposure pass data
+            passData.AeCs                  = AutoExposureCs;
+            passData.AeHistogramBuffer     = AeHistogramBuffer;
+            passData.AeExposureBuffer      = AeExposureBuffer;
+            passData.AeEnabled             = m_Settings.enableAutoExposure;
+            passData.AeEVMin               = m_Settings.aeEVMin;
+            passData.AeEVMax               = m_Settings.aeEVMax;
+            passData.AeLowPercent          = m_Settings.aeLowPercent;
+            passData.AeHighPercent         = m_Settings.aeHighPercent;
+            passData.AeSpeedUp             = m_Settings.aeAdaptationSpeedUp;
+            passData.AeSpeedDown           = m_Settings.aeAdaptationSpeedDown;
+            passData.AeDeltaTime           = Time.deltaTime;
+            passData.AeExposureCompensation = m_Settings.aeExposureCompensation;
+            passData.AeMinExposure         = m_Settings.aeMinExposure;
+            passData.AeMaxExposure         = m_Settings.aeMaxExposure;
+            passData.AeTexWidth            = (uint)renderResolution.x;
+            passData.AeTexHeight           = (uint)renderResolution.y;
+            passData.ManualExposure        = m_Settings.exposure;
+
             var gSunDirection = -lightForward;
             var up = new Vector3(0, 1, 0);
             var gSunBasisX = math.normalize(math.cross(new float3(up.x, up.y, up.z), new float3(gSunDirection.x, gSunDirection.y, gSunDirection.z)));
@@ -703,7 +800,6 @@ namespace PathTracing
 
             var m11 = proj.m11;
 
-            var renderResolution = NrdDenoiser.renderResolution;
 
             var rectW = (uint)(renderResolution.x * NrdDenoiser.resolutionScale + 0.5f);
             var rectH = (uint)(renderResolution.y * NrdDenoiser.resolutionScale + 0.5f);

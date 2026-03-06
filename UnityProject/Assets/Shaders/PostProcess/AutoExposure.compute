@@ -1,0 +1,179 @@
+// AutoExposure.compute
+// Histogram-based auto-exposure in three passes:
+//   Kernel 0: ClearHistogram  – zero the 256-bin histogram buffer
+//   Kernel 1: BuildHistogram  – scatter luminance of each pixel into the histogram
+//   Kernel 2: ReduceHistogram – compute percentile-weighted average EV, time-smooth,
+//                               write new exposure multiplier to _AE_ExposureBuffer[0]
+
+#pragma kernel ClearHistogram
+#pragma kernel BuildHistogram
+#pragma kernel ReduceHistogram
+
+// ──────────────────────────────────────────────────────────────────────────────
+// Resources
+// ──────────────────────────────────────────────────────────────────────────────
+Texture2D<float4>       _AE_ComposedTexture;   // HDR Composed texture (after transparent pass)
+RWStructuredBuffer<uint>  _AE_HistogramBuffer;   // 256 uint bins
+RWStructuredBuffer<float> _AE_ExposureBuffer;    // [0] = current exposure multiplier
+
+// ──────────────────────────────────────────────────────────────────────────────
+// Per-dispatch uniforms (set from C# each frame)
+// ──────────────────────────────────────────────────────────────────────────────
+uint  _AE_TexWidth;
+uint  _AE_TexHeight;
+float _AE_EVMin;               // lower bound of histogram range  (EV = log2 of luminance)
+float _AE_EVMax;               // upper bound of histogram range
+float _AE_LowPercent;          // fraction of darkest pixels to ignore  (e.g. 0.05)
+float _AE_HighPercent;         // fraction of brightest pixels to keep  (e.g. 0.95)
+float _AE_SpeedUp;             // EV adaptation speed when scene is brighter (EV/s)
+float _AE_SpeedDown;           // EV adaptation speed when scene is darker  (EV/s)
+float _AE_DeltaTime;           // Time.deltaTime passed from CPU
+float _AE_ExposureCompensation;// Artistic EV offset added to target exposure
+float _AE_MinExposure;         // Clamp: minimum output exposure multiplier
+float _AE_MaxExposure;         // Clamp: maximum output exposure multiplier
+
+// ──────────────────────────────────────────────────────────────────────────────
+// Constants
+// ──────────────────────────────────────────────────────────────────────────────
+#define HISTOGRAM_BINS 256
+#define KEY_VALUE      0.18   // target middle-grey luminance (standard 18 % grey)
+
+// ──────────────────────────────────────────────────────────────────────────────
+// Helpers
+// ──────────────────────────────────────────────────────────────────────────────
+float Luma(float3 c)
+{
+    return dot(c, float3(0.2126, 0.7152, 0.0722));
+}
+
+// Map a linear luminance value to a histogram bin index [0, HISTOGRAM_BINS-1]
+uint LumaToBin(float luma)
+{
+    if (luma <= 1e-9)
+        return 0;
+    float ev = log2(luma);
+    float t  = saturate((ev - _AE_EVMin) / (_AE_EVMax - _AE_EVMin));
+    return (uint)(t * (HISTOGRAM_BINS - 1u));
+}
+
+// Convert bin index back to the centre EV of that bin
+float BinToEV(uint bin)
+{
+    float t = (float(bin) + 0.5) / float(HISTOGRAM_BINS);
+    return _AE_EVMin + t * (_AE_EVMax - _AE_EVMin);
+}
+
+// ──────────────────────────────────────────────────────────────────────────────
+// Kernel 0: ClearHistogram
+// Dispatch: ceil(256 / 256) x 1 x 1  →  one group of 256 threads
+// ──────────────────────────────────────────────────────────────────────────────
+[numthreads(HISTOGRAM_BINS, 1, 1)]
+void ClearHistogram(uint3 id : SV_DispatchThreadID)
+{
+    _AE_HistogramBuffer[id.x] = 0u;
+}
+
+// ──────────────────────────────────────────────────────────────────────────────
+// Kernel 1: BuildHistogram
+// Dispatch: ceil(W/16) x ceil(H/16) x 1
+// Uses group-shared memory to reduce global atomics from O(W*H) to O(numGroups*256)
+// ──────────────────────────────────────────────────────────────────────────────
+groupshared uint gs_LocalHist[HISTOGRAM_BINS];
+
+[numthreads(16, 16, 1)]
+void BuildHistogram(uint3 groupId      : SV_GroupID,
+                    uint3 localId      : SV_GroupThreadID,
+                    uint3 dispatchId   : SV_DispatchThreadID)
+{
+    // ── 1. Initialise group-shared histogram ──
+    uint localIdx = localId.y * 16u + localId.x;  // 0..255
+    gs_LocalHist[localIdx] = 0u;
+    GroupMemoryBarrierWithGroupSync();
+
+    // ── 2. Accumulate into LDS ──
+    if (dispatchId.x < _AE_TexWidth && dispatchId.y < _AE_TexHeight)
+    {
+        float3 color = _AE_ComposedTexture[dispatchId.xy].rgb;
+        float  luma  = Luma(color);
+        uint   bin   = LumaToBin(luma);
+        InterlockedAdd(gs_LocalHist[bin], 1u);
+    }
+    GroupMemoryBarrierWithGroupSync();
+
+    // ── 3. Merge LDS into global histogram ──
+    InterlockedAdd(_AE_HistogramBuffer[localIdx], gs_LocalHist[localIdx]);
+}
+
+// ──────────────────────────────────────────────────────────────────────────────
+// Kernel 2: ReduceHistogram
+// Dispatch: 1 x 1 x 1  (single thread, serial scan over 256 bins)
+// Reads the histogram, computes percentile-weighted average EV,
+// time-smooths in EV space, writes new exposure to _AE_ExposureBuffer[0].
+// ──────────────────────────────────────────────────────────────────────────────
+[numthreads(1, 1, 1)]
+void ReduceHistogram(uint3 id : SV_DispatchThreadID)
+{
+    // ── 1. Total pixel count ──
+    uint total = 0u;
+    [unroll(HISTOGRAM_BINS)]
+    for (uint i = 0u; i < (uint)HISTOGRAM_BINS; i++)
+        total += _AE_HistogramBuffer[i];
+
+    if (total == 0u)
+        return;
+
+    // ── 2. Percentile window ──
+    uint lowCount  = (uint)(_AE_LowPercent  * (float)total + 0.5);
+    uint highCount = (uint)(_AE_HighPercent * (float)total + 0.5);
+    highCount = max(highCount, lowCount + 1u);
+    highCount = min(highCount, total);
+
+    // ── 3. Weighted average EV of pixels in [lowCount, highCount) ──
+    float weightedEV  = 0.0;
+    uint  weightCount = 0u;
+    uint  accumulated = 0u;
+
+    [unroll(HISTOGRAM_BINS)]
+    for (uint b = 0u; b < (uint)HISTOGRAM_BINS; b++)
+    {
+        uint cnt    = _AE_HistogramBuffer[b];
+        uint newAcc = accumulated + cnt;
+
+        uint lo = max(accumulated, lowCount);
+        uint hi = min(newAcc,      highCount);
+        if (hi > lo)
+        {
+            float ev     = BinToEV(b);
+            uint  w      = hi - lo;
+            weightedEV  += ev * float(w);
+            weightCount += w;
+        }
+        accumulated = newAcc;
+    }
+
+    if (weightCount == 0u)
+        return;
+
+    // avgEV is the EV of the already-exposed image (Composed texture).
+    // The target is to map the average exposed luminance to KEY_VALUE.
+    // => targetExposureEV = currentExposureEV + (log2(KEY_VALUE) - avgEV_exposed) + compensate
+    float avgEV_exposed = weightedEV / float(weightCount);
+
+    float currentExposure = _AE_ExposureBuffer[0];
+    float currentEV       = log2(max(currentExposure, 1e-10));
+
+    // Target: exposed average = KEY_VALUE  => we want  avgEV_exposed + currentEV → log2(KEY_VALUE)
+    // Rearranging: targetEV_delta = log2(KEY_VALUE) - avgEV_exposed
+    float targetDeltaEV = log2(KEY_VALUE) - avgEV_exposed + _AE_ExposureCompensation;
+    float targetEV      = currentEV + targetDeltaEV;
+
+    // ── 4. Time-smooth in EV space ──
+    float speed   = (targetDeltaEV > 0.0) ? _AE_SpeedUp : _AE_SpeedDown;
+    float blend   = saturate(speed * _AE_DeltaTime);
+    float newEV   = currentEV + targetDeltaEV * blend;
+
+    // ── 5. Clamp and write ──
+    float newExposure = exp2(newEV);
+    newExposure = clamp(newExposure, _AE_MinExposure, _AE_MaxExposure);
+    _AE_ExposureBuffer[0] = newExposure;
+}
