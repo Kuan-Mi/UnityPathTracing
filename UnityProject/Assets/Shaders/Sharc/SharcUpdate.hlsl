@@ -7,8 +7,8 @@
 #define SHARC_UPDATE 1
 
 
-#include "Include/Shared.hlsl"
-#include "Include/RayTracingShared.hlsl"
+#include "Assets/Shaders/Include/Shared.hlsl"
+#include "Assets/Shaders/Include/RayTracingShared.hlsl"
 
 
 void Trace(GeometryProps geometryProps, MaterialProps materialProps)

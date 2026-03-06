@@ -82,7 +82,7 @@
             #pragma fragment Frag
             #pragma target 4.5
 
-            #include "NRDInclude/NRD.hlsli"
+            #include "../NRDInclude/NRD.hlsli"
             #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
 
             // Blitter 会自动绑定
@@ -287,7 +287,7 @@
             #pragma fragment Frag
             #pragma target 4.5
 
-            #include "NRDInclude/NRD.hlsli"
+            #include "../NRDInclude/NRD.hlsli"
             #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
 
             TEXTURE2D(_BlitTexture);
@@ -483,7 +483,7 @@
             #pragma fragment Frag
             #pragma target 4.5
 
-            #include "NRDInclude/NRD.hlsli"
+            #include "../NRDInclude/NRD.hlsli"
             #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
 
             // 你的 Motion Vector 贴图
@@ -543,7 +543,7 @@
             #pragma fragment Frag
             #pragma target 4.5
 
-            #include "NRDInclude/NRD.hlsli"
+            #include "../NRDInclude/NRD.hlsli"
             #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
 
             TEXTURE2D(_BlitTexture);
@@ -601,7 +601,7 @@
             #pragma fragment Frag
             #pragma target 4.5
 
-            #include "Include/Shared.hlsl"
+            #include "Assets/Shaders/Include/Shared.hlsl"
             #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
 
             TEXTURE2D(_BlitTexture);
@@ -666,7 +666,7 @@
             #pragma use_dxc
 
 
-            #include "Include/Shared.hlsl"
+            #include "Assets/Shaders/Include/Shared.hlsl"
             #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
 
             // Blitter 会自动绑定

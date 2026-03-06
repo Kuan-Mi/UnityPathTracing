@@ -341,7 +341,7 @@ Shader "TextMeshPro/Distance Field Ray"
             }
             HLSLPROGRAM
             #include "UnityRaytracingMeshUtils.cginc"
-            #include "ml.hlsli"
+            #include "Assets/Shaders/Include/ml.hlsli"
             #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
 
             // UI Editable properties
@@ -520,8 +520,8 @@ Shader "TextMeshPro/Distance Field Ray"
             }
 
 
-            #include "Include/Shared.hlsl"
-            #include "Include/Payload.hlsl"
+            #include "Assets/Shaders/Include/Shared.hlsl"
+            #include "Assets/Shaders/Include/Payload.hlsl"
 
             #pragma shader_feature_raytracing _USEPACK
 

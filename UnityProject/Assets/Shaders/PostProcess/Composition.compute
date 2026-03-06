@@ -3,8 +3,8 @@
 #pragma use_dxc
 #pragma enable_d3d11_debug_symbols
 
-#include "Include/Shared.hlsl"
-#include "NRDInclude/NRD.hlsli"
+#include "Assets/Shaders/Include/Shared.hlsl"
+#include "Assets/Shaders/NRDInclude/NRD.hlsli"
 
 
 Texture2D<float> gIn_ViewZ;
