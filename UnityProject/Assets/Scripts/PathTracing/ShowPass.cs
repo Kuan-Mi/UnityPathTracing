@@ -10,15 +10,15 @@
     // 7 ShowRadiance       解码后RGB输出
     public enum ShowPass : int
     {
-        showValidation,
-        showShadow,
-        showMv,
-        ShowNormal,
-        showOut,
-        showAlpha,
-        ShowRoughness,
-        ShowRadiance,
-        ShowNoiseShadow,
-        showDlss,
+        Validation,
+        Shadow,
+        Mv,
+        Normal,
+        Out,
+        Alpha,
+        Roughness,
+        Radiance,
+        NoiseShadow,
+        Dlss,
     }
 }

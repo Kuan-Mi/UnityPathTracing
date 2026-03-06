@@ -66,7 +66,7 @@ namespace PathTracing
 
         public PathTracingSetting pathTracingSetting;
 
-        private PathTracingPassSingle _pathTracingPass;
+        private PathTracingPass _pathTracingPass;
 
         public RayTracingAccelerationStructure accelerationStructure;
         public Settings settings;
@@ -146,7 +146,7 @@ namespace PathTracing
                 InitializeBuffers();
             }
 
-            _pathTracingPass = new PathTracingPassSingle(pathTracingSetting)
+            _pathTracingPass = new PathTracingPass(pathTracingSetting)
             {
                 renderPassEvent = RenderPassEvent.BeforeRenderingTransparents,
                 OpaqueTs = opaqueTracingShader,
