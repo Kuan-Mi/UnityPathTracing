@@ -9,7 +9,7 @@
 ## 功能特性
 
 - [x] **路径追踪**：基于 DXR 的路径追踪管线
-- [x] **SHARC**：屏幕空间哈希辐射缓存
+- [x] **SHARC**：空间哈希辐射缓存
 - [x] **NRD 降噪**：通过原生 C++ 插件集成 NVIDIA NRD，支持 REBLUR 和 SIGMA
 - [x] **DLSS Ray Reconstruction**：通过原生插件集成 DLSS RR，实现超分辨率和重建功能
 - [x] **多种光源支持**：点光源、聚光灯、区域光源支持
