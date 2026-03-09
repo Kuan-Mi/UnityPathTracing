@@ -168,7 +168,13 @@ void MainRayGenShader()
     float viewZAndTaaMask = gInOut_Mv[pixelPos].w;
     float viewZ = Math::Sign(gNearZ) * abs(viewZAndTaaMask) / FP16_VIEWZ_SCALE; // viewZ before PSR
     float3 Xv = Geometry::ReconstructViewPosition(sampleUv, gCameraFrustum, viewZ, gOrthoMode);
-    float tmin0 = gOrthoMode == 0 ? length(Xv) : abs(Xv.z);
+    float tOpaque = gOrthoMode == 0 ? length(Xv) : abs(Xv.z);
+
+    // 减去 ray origin（近平面）到相机原点的距离
+    float3 XvNear = Geometry::ReconstructViewPosition(sampleUv, gCameraFrustum, abs(gNearZ), gOrthoMode);
+    float tNear = gOrthoMode == 0 ? length(XvNear) : abs(gNearZ);
+
+    float tmin0 = max(0.0, tOpaque - tNear); // ← 修正后的 tmax
 
     GeometryProps geometryPropsT;
     MaterialProps materialPropsT;
