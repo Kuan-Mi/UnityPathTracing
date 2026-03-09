@@ -12,6 +12,6 @@ namespace PathTracing
         public float   range;       // Maximum range (hard cutoff)
 
         public Vector3 color;       // Pre-multiplied color * intensity
-        public float   pad;
+        public float   radius;      // Sphere radius for soft shadows (0 = hard point light)
     }
 }

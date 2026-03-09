@@ -688,12 +688,17 @@ namespace PathTracing
 
                 Color fc = light.color * light.intensity;
 
+                // Read optional sphere radius from the PointLightRadius component.
+                // Falls back to 0 (hard point light) when the component is absent.
+                var    plr    = light.GetComponent<PointLightRadius>();
+                float  radius = plr != null ? Mathf.Max(0f, plr.radius) : 0f;
+
                 pointLightList.Add(new PointLightData
                 {
                     position = light.transform.position,
                     range    = light.range,
                     color    = new Vector3(fc.r, fc.g, fc.b),
-                    pad      = 0f,
+                    radius   = radius,
                 });
             }
 
