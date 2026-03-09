@@ -80,8 +80,8 @@ MonoBehaviour:
     showValidation: 0
     dofAperture: 0
     dofFocalDistance: 5
-    exposure: 31.8
-    enableAutoExposure: 1
+    exposure: 8
+    enableAutoExposure: 0
     aeEVMin: -10
     aeEVMax: 10
     aeLowPercent: 0.05
@@ -92,7 +92,7 @@ MonoBehaviour:
     aeMinExposure: 0.01
     aeMaxExposure: 100
     rpp: 1
-    bounceNum: 2
+    bounceNum: 1
     mipBias: -0.5
     tracingMode: 1
     denoiser: 0
@@ -107,13 +107,13 @@ MonoBehaviour:
     importanceSampling: 0
     SHARC: 1
     specularLobeTrimming: 1
-    boost: 0
-    boostFactor: 0.6667
+    boost: 1
+    boostFactor: 1
     SR: 0
     RR: 1
     tmpDisableRR: 0
     resolutionScale: 1
-    upscalerMode: 2
+    upscalerMode: 0
     usePackedData: 0
   finalMaterial: {fileID: 2100000, guid: 27695a2bc55ef2f469362b9a2994989e, type: 2}
   opaqueTracingShader: {fileID: 4807578003741378534, guid: 71faa22953dc9834daf36cc38966c196, type: 3}
