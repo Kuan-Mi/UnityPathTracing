@@ -48,6 +48,10 @@ namespace PathTracing
             {
                 ptFeature.InitializeBuffers();
             }
+            if (GUILayout.Button("SetMask"))
+            {
+                ptFeature.SetMask();
+            }
         }
 
         private void AutoConfigure()

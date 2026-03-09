@@ -20,7 +20,7 @@ namespace PathTracing
 // #define FLAG_SKIN                           0x40 // skin
 // #define FLAG_MORPH                          0x80 // morph
 
-        void SetMask()
+        public void SetMask()
         {
             var allRenderers = GameObject.FindObjectsByType<Renderer>(FindObjectsSortMode.None);
             foreach (var r in allRenderers)
@@ -109,7 +109,7 @@ namespace PathTracing
 
                 accelerationStructure.Build();
 
-                // SetMask();
+                SetMask();
             }
 
             if (_dataBuilder.IsEmpty())
@@ -236,7 +236,7 @@ namespace PathTracing
             
             
             cam.depthTextureMode = DepthTextureMode.Depth | DepthTextureMode.MotionVectors;
-            
+             
             
 
             int eyeIndex = renderingData.cameraData.xr.enabled ? renderingData.cameraData.xr.multipassId : 0;

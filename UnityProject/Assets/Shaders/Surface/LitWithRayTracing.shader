@@ -163,8 +163,6 @@ Shader "Custom/LitWithRayTracing"
             #include "Assets/Shaders/Include/Shared.hlsl"
             #include "Assets/Shaders/Include/Payload.hlsl"
 
-            #pragma shader_feature_raytracing _USEPACK
-
             #pragma shader_feature_local_raytracing _EMISSION
             #pragma shader_feature_local_raytracing _NORMALMAP
             #pragma shader_feature_local_raytracing _METALLICSPECGLOSSMAP
@@ -183,51 +181,6 @@ Shader "Custom/LitWithRayTracing"
             {
                 float2 barycentrics;
             };
-
-            struct PrimitiveData
-            {
-                float16_t2 uv0;
-                float16_t2 uv1;
-                float16_t2 uv2;
-                float worldArea;
-
-                float16_t2 n0;
-                float16_t2 n1;
-                float16_t2 n2;
-                float uvArea;
-
-                float16_t2 t0;
-                float16_t2 t1;
-                float16_t2 t2;
-                float bitangentSign;
-            };
-
-            struct InstanceData
-            {
-                // For static: mObjectToWorld
-                // For dynamic: mWorldToWorldPrev
-                float4 mOverloadedMatrix0;
-                float4 mOverloadedMatrix1;
-                float4 mOverloadedMatrix2;
-
-                float16_t4 baseColorAndMetalnessScale;
-                float16_t4 emissionAndRoughnessScale;
-
-                float16_t2 normalUvScale;
-                uint32_t textureOffsetAndFlags;
-                uint32_t primitiveOffset;
-                float scale; // TODO: handling object scale embedded into the transformation matrix (assuming uniform scale), sign represents triangle winding
-
-                uint32_t morphPrimitiveOffset;
-                uint32_t unused1;
-                uint32_t unused2;
-                uint32_t unused3;
-            };
-
-
-            StructuredBuffer<InstanceData> gIn_InstanceData;
-            StructuredBuffer<PrimitiveData> gIn_PrimitiveData;
-
 
             struct Vertex
             {
@@ -306,326 +259,173 @@ Shader "Custom/LitWithRayTracing"
             [shader("closesthit")]
             void ClosestHitMain(inout MainRayPayload payload : SV_RayPayload, AttributeData attribs : SV_IntersectionAttributes)
             {
-                #if _USEPACK
-
-
-                payload.hitT = RayTCurrent();
-
-
-                uint instanceIndex = InstanceID() + GeometryIndex();
-                InstanceData instanceData = gIn_InstanceData[instanceIndex];
-
-                uint primitiveIndex = instanceData.primitiveOffset + PrimitiveIndex();
-                PrimitiveData primitiveData = gIn_PrimitiveData[primitiveIndex];
-
-                float worldArea = primitiveData.worldArea * instanceData.scale * instanceData.scale;
-
-                float3x3 mObjectToWorld = ObjectToWorld3x4();
-                bool isFrontFace = HitKind() == HIT_KIND_TRIANGLE_FRONT_FACE;
-
-                float flip = isFrontFace ? -1.0 : 1.0;
-
-                // Barycentrics
-                float3 barycentrics = float3(1.0 - attribs.barycentrics.x - attribs.barycentrics.y,
-                                                 attribs.barycentrics.x, attribs.barycentrics.y);
-
-                // Normal
-                float3 n0 = Packing::DecodeUnitVector(primitiveData.n0, true);
-                float3 n1 = Packing::DecodeUnitVector(primitiveData.n1, true);
-                float3 n2 = Packing::DecodeUnitVector(primitiveData.n2, true);
-
-                float3 N = barycentrics.x * n0 + barycentrics.y * n1 + barycentrics.z * n2;
-
-                N = Geometry::RotateVector(mObjectToWorld, N);
-
-                N = normalize(N * flip);
-                payload.N = Packing::EncodeUnitVector(-N);
-
-                // Curvature
-                float dnSq0 = Math::LengthSquared(n0 - n1);
-                float dnSq1 = Math::LengthSquared(n1 - n2);
-                float dnSq2 = Math::LengthSquared(n2 - n0);
-                float dnSq = max(dnSq0, max(dnSq1, dnSq2));
-                payload.curvature = sqrt(dnSq / worldArea);
-
-                float3 direction = WorldRayDirection();
-
-                // Mip level
-                float NoRay = abs(dot(direction, -N));
-                float a = payload.hitT * payload.mipAndCone.y;
-                a *= Math::PositiveRcp(NoRay);
-                a *= sqrt(primitiveData.uvArea / worldArea);
-
-                float mip = log2(a);
-                mip += MAX_MIP_LEVEL;
-                mip = max(mip, 0.0);
-                payload.mipAndCone.x += mip;
-
-                // Uv
-                float2 uv = barycentrics.x * primitiveData.uv0 + barycentrics.y * primitiveData.uv1 + barycentrics.z * primitiveData.uv2;
-
-                // Tangent
-                float3 t0 = Packing::DecodeUnitVector(primitiveData.t0, true);
-                float3 t1 = Packing::DecodeUnitVector(primitiveData.t1, true);
-                float3 t2 = Packing::DecodeUnitVector(primitiveData.t2, true);
-
-                float3 T = barycentrics.x * t0 + barycentrics.y * t1 + barycentrics.z * t2;
-                T = Geometry::RotateVector(mObjectToWorld, T);
-                T = normalize(T);
-                payload.T = float4(T, primitiveData.bitangentSign);
-
-                #if _NORMALMAP
-                float3 tangentWS = T;
-
-                // float2 normalUV = float2(v.uv.x, 1 - v.uv.y); // 修正UV翻转问题
-                float2 normalUV = uv; // 修正UV翻转问题
-
-                float4 n = _BumpMap.SampleLevel(sampler_BumpMap, _BaseMap_ST.xy * normalUV + _BaseMap_ST.zw, mip);
-
-                float3 tangentNormal = UnpackNormalScale(n, _BumpScale);
-
-                float3 normalWS = -N;
-                float3 bitangent = cross(normalWS.xyz, tangentWS.xyz);
-                half3x3 tangentToWorld = half3x3(tangentWS.xyz, bitangent.xyz, normalWS.xyz);
-
-                float3 matWorldNormal = TransformTangentToWorld(tangentNormal, tangentToWorld);
-
-                #else
-                float3 matWorldNormal = N;
-                #endif
-
-                payload.matN = Packing::EncodeUnitVector(matWorldNormal);
-
-                float3 albedo = _BaseColor.xyz * _BaseMap.SampleLevel(sampler_BaseMap, _BaseMap_ST.xy * uv + _BaseMap_ST.zw, mip).xyz;
-
-
-                float roughness;
-                float metallic;
-
-                #if _METALLICSPECGLOSSMAP
-
-                float4 vv = _MetallicGlossMap.SampleLevel(sampler_MetallicGlossMap, _BaseMap_ST.xy * uv + _BaseMap_ST.zw, mip);
-                // metallic = vv.r;
-                roughness = vv.g * (1 - _Smoothness);
-                metallic = vv.b;
-
-                #else
-
-                roughness = 1 - _Smoothness;
-                metallic = _Metallic;
-
-                #endif
-
-                #if _EMISSION
-                float3 emission = _EmissionColor.xyz * _EmissionMap.SampleLevel(sampler_EmissionMap, uv, mip).xyz;
-                payload.Lemi = Packing::EncodeRgbe(emission);
-                #else
-                payload.Lemi = Packing::EncodeRgbe(float3(0, 0, 0));
-
-                #endif
-
-                float emissionLevel = Color::Luminance(payload.Lemi);
-                emissionLevel = saturate(emissionLevel * 50.0);
-
-                metallic = lerp(metallic, 0.0, emissionLevel);
-                roughness = lerp(roughness, 1.0, emissionLevel);
-
-
-                // Instance
-                // payload.instanceIndex = instanceIndex;
-                payload.SetInstanceIndex(instanceIndex);
-
-
-                // float4x4 prev = GetPrevObjectToWorldMatrix();
-                // float4x4 prev = unity_MatrixPreviousM;
-
-
-                // float3 worldPosition = mul(ObjectToWorld3x4(), float4(v.position, 1.0)).xyz;
-                //
-                // float3 prevWorldPosition = mul(GetPrevObjectToWorldMatrix(), float4(v.position, 1.0)).xyz;
-
-                // 位置
-                // payload.X = worldPosition;
-                // payload.Xprev = prevWorldPosition;
-                // payload.roughness = roughness; 
-
-                payload.roughnessAndMetalness = Packing::Rg16fToUint(float2(roughness, metallic));
-                payload.baseColor = Packing::RgbaToUint(float4(albedo, 1.0), 8, 8, 8, 8);
-
-                uint flag = FLAG_NON_TRANSPARENT;
-                #if  _SURFACE_TYPE_TRANSPARENT
-                flag = FLAG_TRANSPARENT;
-                #endif
-                payload.SetFlag(flag);
-
-                #else
 
                 uint3 triangleIndices = UnityRayTracingFetchTriangleIndices(PrimitiveIndex());
                 Vertex v0 = FetchVertex(triangleIndices.x);
                 Vertex v1 = FetchVertex(triangleIndices.y);
                 Vertex v2 = FetchVertex(triangleIndices.z);
-
+                
                 float3 n0 = v0.normal;
                 float3 n1 = v1.normal;
                 float3 n2 = v2.normal;
-
+                
                 // Curvature
                 float dnSq0 = LengthSquared(n0 - n1);
                 float dnSq1 = LengthSquared(n1 - n2);
                 float dnSq2 = LengthSquared(n2 - n0);
                 float dnSq = max(dnSq0, max(dnSq1, dnSq2));
-
+                
                 payload.curvature = sqrt(dnSq);
-
+                
                 float3 barycentricCoords = float3(1.0 - attribs.barycentrics.x - attribs.barycentrics.y,
                                                                               attribs.barycentrics.x, attribs.barycentrics.y);
-
+                
                 Vertex v = InterpolateVertices(v0, v1, v2, barycentricCoords);
-
-
+                
+                
                 bool isFrontFace = HitKind() == HIT_KIND_TRIANGLE_FRONT_FACE;
-
+                
                 float3 normalOS = isFrontFace ? v.normal : -v.normal;
-
+                
                 float3 normalWS = normalize(mul(normalOS, (float3x3)WorldToObject()));
-
-
+                
+                
                 float3 direction = WorldRayDirection();
-
+                
                 // 长度
                 payload.hitT = RayTCurrent();
-
+                
                 // Mip level
-
+                
                 // 2. 计算 UV 空间面积 (uvArea)
                 float2 uvE1 = v1.uv - v0.uv;
                 float2 uvE2 = v2.uv - v0.uv;
                 // 使用 2D 叉乘公式计算面积
                 float uvArea = abs(uvE1.x * uvE2.y - uvE2.x * uvE1.y) * 0.5f;
-
+                
                 // 3. 计算世界空间面积 (worldArea)
                 // 注意：v0.position 是模型空间，需要考虑物体的缩放
                 float3 edge1 = v1.position - v0.position;
                 float3 edge2 = v2.position - v0.position;
                 float3 crossProduct = cross(edge1, edge2);
-
+                
                 // 将模型空间的面积向量转换到世界空间，从而自动处理非统一缩放
                 // 使用 ObjectToWorld 的转置逆矩阵或直接变换向量（视缩放情况而定）
                 float3 worldCrossProduct = mul((float3x3)ObjectToWorld(), crossProduct);
                 float worldArea = length(crossProduct) * 0.5f;
-
+                
                 float NoRay = abs(dot(direction, normalWS));
                 float a = payload.hitT * payload.mipAndCone.y;
                 a *= Math::PositiveRcp(NoRay);
                 a *= sqrt(uvArea / max(worldArea, 1e-10f));
-
+                
                 float mip = log2(a);
                 mip += MAX_MIP_LEVEL;
                 mip = max(mip, 0.0);
-
+                
                 // mip = payload.mipAndCone.y;
-
+                
                 // mip = 0;
                 payload.mipAndCone.x += mip;
-
+                
                 #if _NORMALMAP
                 float3 tangentWS = normalize(mul(v.tangent.xyz, (float3x3)WorldToObject()));
-
+                
                 // float2 normalUV = float2(v.uv.x, 1 - v.uv.y); // 修正UV翻转问题
                 float2 normalUV = (v.uv); // 修正UV翻转问题
-
+                
                 float4 n = _BumpMap.SampleLevel(sampler_BumpMap, _BaseMap_ST.xy * normalUV + _BaseMap_ST.zw, mip);
-
+                
                 // float4 T = float4(tangentWS, 1);
-
+                
                 // float3 N = Geometry::TransformLocalNormal(packedNormal, T, normalWS);
-
+                
                 float3 tangentNormal = UnpackNormalScale(n, _BumpScale);
-
+                
                 float3 bitangent = cross(normalWS.xyz, tangentWS.xyz);
                 half3x3 tangentToWorld = half3x3(tangentWS.xyz, bitangent.xyz, normalWS.xyz);
-
+                
                 float3 matWorldNormal = TransformTangentToWorld(tangentNormal, tangentToWorld);
                 // worldNormal = tangentNormal; 
                 // float3 worldNormal = N;
                 #else
                 float3 matWorldNormal = normalWS;
                 #endif
-
+                
                 float3 albedo = _BaseColor.xyz * _BaseMap.SampleLevel(sampler_BaseMap, _BaseMap_ST.xy * v.uv + _BaseMap_ST.zw, mip).xyz;
-
-
+                
+                
                 float roughness;
                 float metallic;
-
+                
                 #if _METALLICSPECGLOSSMAP
-
+                
                 float4 vv = _MetallicGlossMap.SampleLevel(sampler_MetallicGlossMap, _BaseMap_ST.xy * v.uv + _BaseMap_ST.zw, mip);
-
+                
                 float smooth = vv.a * _Smoothness;
                 roughness = 1 - smooth;
                 metallic = vv.r;
-
+                
                 // for Bistro
                 // float smooth = (1 - vv.g) * _Smoothness;
                 // roughness = 1 - smooth;
                 // metallic = vv.b;
-
+                
                 #else
-
+                
                 roughness = 1 - _Smoothness;
                 metallic = _Metallic;
-
+                
                 #endif
-
+                
                 #if _EMISSION
                 float3 emission = _EmissionColor.xyz * _EmissionMap.SampleLevel(sampler_EmissionMap, v.uv, mip).xyz;
                 payload.Lemi = Packing::EncodeRgbe(emission);
                 #else
                 payload.Lemi = Packing::EncodeRgbe(float3(0, 0, 0));
-
+                
                 #endif
-
+                
                 float emissionLevel = Color::Luminance(payload.Lemi);
                 emissionLevel = saturate(emissionLevel * 50.0);
-
+                
                 metallic = lerp(metallic, 0.0, emissionLevel);
                 roughness = lerp(roughness, 1.0, emissionLevel);
-
-
+                
+                
                 float3 dielectricSpecular = float3(0.04, 0.04, 0.04);
                 float3 _SpecularColor = lerp(dielectricSpecular, albedo, metallic);
-
-
+                
+                
                 // Instance
                 uint instanceIndex = InstanceIndex();
                 // payload.instanceIndex = instanceIndex;
                 payload.SetInstanceIndex(instanceIndex);
-
+                
                 float3x3 mObjectToWorld = (float3x3)ObjectToWorld();
-
-
+                
+                
                 float4x4 prev = GetPrevObjectToWorldMatrix();
                 // float4x4 prev = unity_MatrixPreviousM;
-
+                
                 float3x3 mPrevObjectToWorld = (float3x3)prev;
                 // 法线
                 payload.N = Packing::EncodeUnitVector(normalWS);
                 payload.matN = Packing::EncodeUnitVector(matWorldNormal);
-
+                
                 float3 worldPosition = mul(ObjectToWorld3x4(), float4(v.position, 1.0)).xyz;
-
+                
                 float3 prevWorldPosition = mul(GetPrevObjectToWorldMatrix(), float4(v.position, 1.0)).xyz;
-
+                
                 // 位置
                 // payload.X = worldPosition;
                 payload.Xprev = prevWorldPosition;
                 // payload.roughness = roughness; 
-
+                
                 payload.roughnessAndMetalness = Packing::Rg16fToUint(float2(roughness, metallic));
-
+                
                 // albedo *= float3(0, 1.0, 0);
-
+                
                 payload.baseColor = Packing::RgbaToUint(float4(albedo, 1.0), 8, 8, 8, 8);
                 // payload.metalness = metallic;
                 uint flag = FLAG_NON_TRANSPARENT;
@@ -633,9 +433,6 @@ Shader "Custom/LitWithRayTracing"
                 flag = FLAG_TRANSPARENT;
                 #endif
                 payload.SetFlag(flag);
-
-
-                #endif
             }
             ENDHLSL
         }

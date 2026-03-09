@@ -307,6 +307,11 @@ namespace DefaultNamespace
                     RayTracingSubMeshFlags subMeshFlag = RayTracingSubMeshFlags.Enabled;
                     // if (mat != null)
 
+                    if (mat == null)
+                    {
+                        Debug.LogError($"Renderer {r.name} SubMesh {subIdx} has no material assigned. Using defaults.");
+                    }
+                    
                     bool isTransparent = mat.renderQueue >= 3000 || mat.IsKeywordEnabled("_SURFACE_TYPE_TRANSPARENT");
 
 
