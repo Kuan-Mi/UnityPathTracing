@@ -206,7 +206,7 @@ namespace PathTracing
                 natCmd.SetRayTracingBufferParam(data.SharcUpdateTs, gIn_AreaLightsID, data.AreaLightBuffer);
                 natCmd.SetRayTracingBufferParam(data.SharcUpdateTs, gIn_PointLightsID, data.PointLightBuffer);
 
-                int SHARC_DOWNSCALE = 4;
+                int SHARC_DOWNSCALE = 1;  
 
                 uint w = (uint)(data.m_RenderResolution.x / SHARC_DOWNSCALE);
                 uint h = (uint)(data.m_RenderResolution.y / SHARC_DOWNSCALE);

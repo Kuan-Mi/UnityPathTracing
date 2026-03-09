@@ -81,7 +81,9 @@ float3 TraceTransparent(TraceTransparentDesc desc)
         // L1 cache - reproject previous frame, carefully treating specular
         float3 prevLdiff, prevLspec;
         float reprojectionWeight = ReprojectIrradiance(false, !isReflection, gIn_ComposedDiff, gIn_ComposedSpec_ViewZ, geometryProps, desc.pixelPos, prevLdiff, prevLspec);
+        reprojectionWeight = 0;
         Lcached = float4(prevLdiff + prevLspec, reprojectionWeight);
+        // Lcached = float4(1,0,0, reprojectionWeight);
 
         // L2 cache - SHARC
         HashGridParameters hashGridParams;
@@ -122,15 +124,22 @@ float3 TraceTransparent(TraceTransparentDesc desc)
         bool isSharcAllowed = Rng::Hash::GetFloat( ) > Lcached.w; // is needed?
         isSharcAllowed &= gSHARC && NRD_MODE < OCCLUSION; // trivial
 
+        // isSharcAllowed = false;
         float3 sharcRadiance;
         if (isSharcAllowed && SharcGetCachedRadiance( sharcParams, sharcHitData, sharcRadiance, false))
+        {
             Lcached = float4( sharcRadiance, 1.0 );
+            // Lcached = float4( 0,1,0, 1.0 );
+            
+        }
 
         // Cache miss - compute lighting, if not found in caches
         if (Rng::Hash::GetFloat() > Lcached.w)
         {
             float3 L = GetLighting(geometryProps, materialProps, LIGHTING | SHADOW) + materialProps.Lemi;
             Lcached.xyz = max(Lcached.xyz, L);
+            
+            // Lcached.xyz = float3(1,0,1);
         }
     }
 
