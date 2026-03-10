@@ -242,6 +242,8 @@ namespace PathTracing
             int eyeIndex = renderingData.cameraData.xr.enabled ? renderingData.cameraData.xr.multipassId : 0;
 
 
+            if(eyeIndex == 1)
+                return;
             long uniqueKey = cam.GetInstanceID() + (eyeIndex * 100000L);
 
 
