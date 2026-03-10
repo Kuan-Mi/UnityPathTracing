@@ -31,7 +31,7 @@ namespace PathTracing
         public GraphicsBuffer HashEntriesBuffer;
         public GraphicsBuffer AccumulationBuffer;
         public GraphicsBuffer ResolvedBuffer;
-        public PathTracingDataBuilder _dataBuilder;
+        // public PathTracingDataBuilder _dataBuilder;
 
         public RayTracingAccelerationStructure AccelerationStructure;
 
@@ -125,7 +125,7 @@ namespace PathTracing
             internal GraphicsBuffer ResolvedBuffer;
 
             internal int passIndex;
-            internal PathTracingDataBuilder _dataBuilder;
+            // internal PathTracingDataBuilder _dataBuilder;
 
             // internal TextureHandle SpotDirect;
             internal GraphicsBuffer SpotLightBuffer;
@@ -206,7 +206,7 @@ namespace PathTracing
                 natCmd.SetRayTracingBufferParam(data.SharcUpdateTs, gIn_AreaLightsID, data.AreaLightBuffer);
                 natCmd.SetRayTracingBufferParam(data.SharcUpdateTs, gIn_PointLightsID, data.PointLightBuffer);
 
-                int SHARC_DOWNSCALE = 1;  
+                int SHARC_DOWNSCALE = 4;  
 
                 uint w = (uint)(data.m_RenderResolution.x / SHARC_DOWNSCALE);
                 uint h = (uint)(data.m_RenderResolution.y / SHARC_DOWNSCALE);
@@ -224,10 +224,9 @@ namespace PathTracing
                 natCmd.SetComputeBufferParam(data.SharcResolveCs, 0, g_HashEntriesID, data.HashEntriesBuffer);
                 natCmd.SetComputeBufferParam(data.SharcResolveCs, 0, g_AccumulationBufferID, data.AccumulationBuffer);
                 natCmd.SetComputeBufferParam(data.SharcResolveCs, 0, g_ResolvedBufferID, data.ResolvedBuffer);
-
-                ulong SHARC_CAPACITY = 1 << 22;
-                ulong LINEAR_BLOCK_SIZE = 256;
-                int x = (int)((SHARC_CAPACITY + LINEAR_BLOCK_SIZE - 1) / LINEAR_BLOCK_SIZE);
+ 
+                int LINEAR_BLOCK_SIZE = 256;
+                int x = (int)((PathTracingFeature.Capacity + LINEAR_BLOCK_SIZE - 1) / LINEAR_BLOCK_SIZE);
 
                 natCmd.DispatchCompute(data.SharcResolveCs, 0, x, 1, 1);
 
@@ -238,8 +237,8 @@ namespace PathTracing
             {
                 natCmd.BeginSample(opaqueTracingMarker);
 
-                natCmd.SetGlobalBuffer(gIn_InstanceDataID, data._dataBuilder._instanceBuffer);
-                natCmd.SetGlobalBuffer(gIn_PrimitiveDataID, data._dataBuilder._primitiveBuffer);
+                // natCmd.SetGlobalBuffer(gIn_InstanceDataID, data._dataBuilder._instanceBuffer);
+                // natCmd.SetGlobalBuffer(gIn_PrimitiveDataID, data._dataBuilder._primitiveBuffer);
 
 
                 natCmd.SetRayTracingShaderPass(data.OpaqueTs, "Test2");
@@ -721,11 +720,11 @@ namespace PathTracing
             }
 
 
-            if (m_Settings.usePackedData)
-            {
-                Shader.EnableKeyword("_USEPACK");
-            }
-            else
+            // if (m_Settings.usePackedData)
+            // {
+            //     Shader.EnableKeyword("_USEPACK");
+            // }
+            // else
             {
                 Shader.DisableKeyword("_USEPACK");
             }
@@ -765,7 +764,7 @@ namespace PathTracing
             passData.HashEntriesBuffer = HashEntriesBuffer;
             passData.ResolvedBuffer = ResolvedBuffer;
             passData.passIndex = isXr ? xrPass.multipassId : 0;
-            passData._dataBuilder = _dataBuilder;
+            // passData._dataBuilder = _dataBuilder;
             passData.SpotLightBuffer  = m_SpotLightBuffer;
             passData.AreaLightBuffer  = m_AreaLightBuffer;
             passData.PointLightBuffer = m_PointLightBuffer;
@@ -846,6 +845,7 @@ namespace PathTracing
 
 
             uint sharcMaxAccumulatedFrameNum = (uint)(otherMaxAccumulatedFrameNum * (m_Settings.boost ? m_Settings.boostFactor : 1.0f) + 0.5f);
+            // Debug.Log($"sharcMaxAccumulatedFrameNum: {sharcMaxAccumulatedFrameNum}");
             float taaMaxAccumulatedFrameNum = otherMaxAccumulatedFrameNum * 0.5f;
             float prevFrameMaxAccumulatedFrameNum = otherMaxAccumulatedFrameNum * 0.3f;
 

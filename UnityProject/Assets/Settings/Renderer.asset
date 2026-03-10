@@ -69,7 +69,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::PathTracing.PathTracingFeature
   m_Active: 1
   pathTracingSetting:
-    sunAngularDiameter: 0.533
+    sunAngularDiameter: 0.69
     denoisingRange: 1000
     splitScreen: 0
     isBaseColorMetalnessAvailable: 1
@@ -79,9 +79,9 @@ MonoBehaviour:
     showMV: 0
     showValidation: 0
     dofAperture: 0
-    dofFocalDistance: 5
+    dofFocalDistance: 0.71
     exposure: 8
-    enableAutoExposure: 0
+    enableAutoExposure: 1
     aeEVMin: -10
     aeEVMax: 10
     aeLowPercent: 0.05
@@ -114,7 +114,6 @@ MonoBehaviour:
     tmpDisableRR: 0
     resolutionScale: 1
     upscalerMode: 0
-    usePackedData: 0
   finalMaterial: {fileID: 2100000, guid: 27695a2bc55ef2f469362b9a2994989e, type: 2}
   opaqueTracingShader: {fileID: 4807578003741378534, guid: 71faa22953dc9834daf36cc38966c196, type: 3}
   transparentTracingShader: {fileID: 4807578003741378534, guid: d207e5fb066a4b579353785310fd0dea, type: 3}

@@ -48,7 +48,7 @@ void Trace(GeometryProps geometryProps, MaterialProps materialProps)
         SharcSetThroughput(sharcState, 1.0);
 
         float3 L = GetLighting(geometryProps, materialProps, LIGHTING | SHADOW);
-        // L += EvaluateSpotLights(geometryProps, materialProps);
+
         if (!SharcUpdateHit(sharcParams, sharcState, sharcHitData, L, 1.0))
             return;
     }
@@ -143,30 +143,131 @@ void MainRayGenShader()
     float eta = BRDF::IOR::Air / BRDF::IOR::Glass;
     float2 mip = GetConeAngleFromAngularRadius(0.0, gTanPixelAngularRadius * SHARC_DOWNSCALE);
 
-
-    [loop]
-    for (uint bounce = 1; bounce <= PT_DELTA_BOUNCES_NUM; bounce++)
+    
+    // CastRay(Xoffset, ray, 0.0, INF, mip, GEOMETRY_ALL, geometryProps, materialProps);
+    // bool isGlass = geometryProps.Has(FLAG_TRANSPARENT);
+    //
+    // if (isGlass)
+    // {
+    //     [loop]
+    //     for (uint bounce = 1; bounce <= PT_DELTA_BOUNCES_NUM; bounce++)
+    //     {
+    //         uint flags = bounce == PT_DELTA_BOUNCES_NUM ? FLAG_NON_TRANSPARENT : GEOMETRY_ALL;
+    //         CastRay(Xoffset, ray, 0.0, INF, mip, flags, geometryProps, materialProps);
+    //
+    //         bool isGlass = geometryProps.Has(FLAG_TRANSPARENT);
+    //         bool isDelta = IsDelta(materialProps); // TODO: verify corner cases
+    //
+    //
+    //         if (!(isGlass || isDelta) || geometryProps.IsMiss())
+    //             break;
+    //
+    //         // Reflection or refraction?
+    //         bool isReflection = false;
+    //         if (bounce == 1)
+    //         {
+    //             isReflection = true;
+    //         }else
+    //         {
+    //             float NoV = abs(dot(geometryProps.N, geometryProps.V));
+    //             float F = BRDF::FresnelTerm_Dielectric(eta, NoV);
+    //             float rnd = Rng::Hash::GetFloat();
+    //             isReflection = isDelta ? true : rnd < F;
+    //         }
+    //         eta = GetDeltaEventRay(geometryProps, isReflection, eta, Xoffset, ray);
+    //     }
+    //
+    //     // Opaque path
+    //     if (!geometryProps.IsMiss())
+    //         Trace(geometryProps, materialProps); // TODO: looping this for 4-8 iterations helps to improve cache quality, but it's expensive
+    //     
+    //     
+    //     [loop]
+    //     for (uint bounce = 1; bounce <= PT_DELTA_BOUNCES_NUM; bounce++)
+    //     {
+    //         uint flags = bounce == PT_DELTA_BOUNCES_NUM ? FLAG_NON_TRANSPARENT : GEOMETRY_ALL;
+    //         CastRay(Xoffset, ray, 0.0, INF, mip, flags, geometryProps, materialProps);
+    //
+    //         bool isGlass = geometryProps.Has(FLAG_TRANSPARENT);
+    //         bool isDelta = IsDelta(materialProps); // TODO: verify corner cases
+    //
+    //
+    //         if (!(isGlass || isDelta) || geometryProps.IsMiss())
+    //             break;
+    //
+    //         // Reflection or refraction?
+    //         bool isReflection = false;
+    //         if (bounce == 1)
+    //         {
+    //             isReflection = false;
+    //         }else
+    //         {
+    //             float NoV = abs(dot(geometryProps.N, geometryProps.V));
+    //             float F = BRDF::FresnelTerm_Dielectric(eta, NoV);
+    //             float rnd = Rng::Hash::GetFloat();
+    //             isReflection = isDelta ? true : rnd < F;
+    //         }
+    //         eta = GetDeltaEventRay(geometryProps, isReflection, eta, Xoffset, ray);
+    //     }
+    //
+    //     // Opaque path
+    //     if (!geometryProps.IsMiss())
+    //         Trace(geometryProps, materialProps); // TODO: looping this for 4-8 iterations helps to improve cache quality, but it's expensive
+    //     
+    // }
+    // else
     {
-        uint flags = bounce == PT_DELTA_BOUNCES_NUM ? FLAG_NON_TRANSPARENT : GEOMETRY_ALL;
-        CastRay(Xoffset, ray, 0.0, INF, mip, flags, geometryProps, materialProps);
+        [loop]
+        for (uint bounce = 1; bounce <= PT_DELTA_BOUNCES_NUM; bounce++)
+        {
+            uint flags = bounce == PT_DELTA_BOUNCES_NUM ? FLAG_NON_TRANSPARENT : GEOMETRY_ALL;
+            CastRay(Xoffset, ray, 0.0, INF, mip, flags, geometryProps, materialProps);
 
-        bool isGlass = geometryProps.Has(FLAG_TRANSPARENT);
-        bool isDelta = IsDelta(materialProps); // TODO: verify corner cases
+            bool isGlass = geometryProps.Has(FLAG_TRANSPARENT);
+            bool isDelta = IsDelta(materialProps); // TODO: verify corner cases
 
 
-        if (!(isGlass || isDelta) || geometryProps.IsMiss())
-            break;
+            if (!(isGlass || isDelta) || geometryProps.IsMiss())
+                break;
 
-        // Reflection or refraction?
-        float NoV = abs(dot(geometryProps.N, geometryProps.V));
-        float F = BRDF::FresnelTerm_Dielectric(eta, NoV);
-        float rnd = Rng::Hash::GetFloat();
-        bool isReflection = isDelta ? true : rnd < F;
+            // Reflection or refraction?
+            float NoV = abs(dot(geometryProps.N, geometryProps.V));
+            float F = BRDF::FresnelTerm_Dielectric(eta, NoV);
+            float rnd = Rng::Hash::GetFloat();
+            bool isReflection = isDelta ? true : rnd < F;
 
-        eta = GetDeltaEventRay(geometryProps, isReflection, eta, Xoffset, ray);
+            eta = GetDeltaEventRay(geometryProps, isReflection, eta, Xoffset, ray);
+        }
+
+        // Opaque path
+        if (!geometryProps.IsMiss())
+            Trace(geometryProps, materialProps); // TODO: looping this for 4-8 iterations helps to improve cache quality, but it's expensive
     }
+    
 
-    // Opaque path
-    if (!geometryProps.IsMiss())
-        Trace(geometryProps, materialProps); // TODO: looping this for 4-8 iterations helps to improve cache quality, but it's expensive
+    // [loop]
+    // for (uint bounce = 1; bounce <= PT_DELTA_BOUNCES_NUM; bounce++)
+    // {
+    //     uint flags = bounce == PT_DELTA_BOUNCES_NUM ? FLAG_NON_TRANSPARENT : GEOMETRY_ALL;
+    //     CastRay(Xoffset, ray, 0.0, INF, mip, flags, geometryProps, materialProps);
+    //
+    //     bool isGlass = geometryProps.Has(FLAG_TRANSPARENT);
+    //     bool isDelta = IsDelta(materialProps); // TODO: verify corner cases
+    //
+    //
+    //     if (!(isGlass || isDelta) || geometryProps.IsMiss())
+    //         break;
+    //
+    //     // Reflection or refraction?
+    //     float NoV = abs(dot(geometryProps.N, geometryProps.V));
+    //     float F = BRDF::FresnelTerm_Dielectric(eta, NoV);
+    //     float rnd = Rng::Hash::GetFloat();
+    //     bool isReflection = isDelta ? true : rnd < F;
+    //
+    //     eta = GetDeltaEventRay(geometryProps, isReflection, eta, Xoffset, ray);
+    // }
+    //
+    // // Opaque path
+    // if (!geometryProps.IsMiss())
+    //     Trace(geometryProps, materialProps); // TODO: looping this for 4-8 iterations helps to improve cache quality, but it's expensive
 }

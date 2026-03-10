@@ -164,7 +164,7 @@ namespace PathTracing
         public bool specularLobeTrimming = true;
         public bool boost = false;
 
-        [Range(0.0f, 1.0f)]
+        [Range(0.0f, 10.0f)]
         public float boostFactor = 0.6667f;
 
         public bool SR = false;
@@ -176,6 +176,6 @@ namespace PathTracing
 
         public UpscalerMode upscalerMode = UpscalerMode.NATIVE;
 
-        public bool usePackedData;
+        // public bool usePackedData;
     }
 }
