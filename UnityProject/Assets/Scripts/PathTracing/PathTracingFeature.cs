@@ -88,13 +88,13 @@ namespace PathTracing
         private Dictionary<long, NRDDenoiser> _nrdDenoisers = new();
         private Dictionary<long, DLRRDenoiser> _dlrrDenoisers = new();
 
-        public PathTracingDataBuilder _dataBuilder = new PathTracingDataBuilder();
+        // public PathTracingDataBuilder _dataBuilder = new PathTracingDataBuilder();
 
-        [ContextMenu("ReBuild AccelerationStructure")]
-        public void ReBuild()
-        {
-            _dataBuilder.Build(accelerationStructure);
-        }
+        // [ContextMenu("ReBuild AccelerationStructure")]
+        // public void ReBuild()
+        // {
+        //     _dataBuilder.Build(accelerationStructure);
+        // }
 
         public override void Create()
         {
@@ -112,10 +112,10 @@ namespace PathTracing
                 SetMask();
             }
 
-            if (_dataBuilder.IsEmpty())
-            {
-                _dataBuilder.Build(accelerationStructure);
-            }
+            // if (_dataBuilder.IsEmpty())
+            // {
+            //     _dataBuilder.Build(accelerationStructure);
+            // }
 
             // ReBuild();
 
@@ -182,14 +182,14 @@ namespace PathTracing
                 HashEntriesBuffer = _hashEntriesBuffer,
                 AccumulationBuffer = _accumulationBuffer,
                 ResolvedBuffer = _resolvedBuffer,
-                _dataBuilder = _dataBuilder,
+                // _dataBuilder = _dataBuilder,
                 AutoExposureCs = autoExposureShader,
                 AeHistogramBuffer = _aeHistogramBuffer,
                 AeExposureBuffer = _aeExposureBuffer
             };
         }
 
-        static readonly int Capacity = 1 << 22;
+        public static readonly int Capacity = 1 << 23;
 
         public void InitializeBuffers()
         {
@@ -305,14 +305,14 @@ namespace PathTracing
             }
 
             accelerationStructure.Build();
-            if (pathTracingSetting.usePackedData)
-            {
-                if (!_dataBuilder.IsEmpty())
-                {
-                    renderer.EnqueuePass(_pathTracingPass);
-                }
-            }
-            else
+            // if (pathTracingSetting.usePackedData)
+            // {
+            //     if (!_dataBuilder.IsEmpty())
+            //     {
+            //         renderer.EnqueuePass(_pathTracingPass);
+            //     }
+            // }
+            // else
             {
                 renderer.EnqueuePass(_pathTracingPass);
             }

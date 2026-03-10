@@ -40,10 +40,10 @@ namespace PathTracing
 
             EditorGUILayout.Space();
 
-            if (GUILayout.Button("ReBuild"))
-            {
-                ptFeature.ReBuild();
-            }
+            // if (GUILayout.Button("ReBuild"))
+            // {
+            //     ptFeature.ReBuild();
+            // }
             if (GUILayout.Button("InitializeBuffers"))
             {
                 ptFeature.InitializeBuffers();

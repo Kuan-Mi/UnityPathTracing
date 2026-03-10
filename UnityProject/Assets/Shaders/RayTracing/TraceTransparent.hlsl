@@ -40,8 +40,14 @@ float3 TraceTransparent(TraceTransparentDesc desc)
         float NoV = abs(dot(geometryProps.N, geometryProps.V));
         float F = BRDF::FresnelTerm_Dielectric(eta, NoV);
 
+        // 第一次时，固定为反射或折射，之后根据概率随机
         if (bounce == 1)
             pathThroughput *= isReflection ? F : 1.0 - F;
+        // else if (bounce == 2)
+        // {
+        //     isReflection = !isReflection; // TODO: verify corner cases
+        //     pathThroughput *= isReflection ? F : 1.0 - F;
+        // }
         else
         {
             float rnd = frac(bayer + Sequence::Halton(bounce, 3)); // "Halton( bounce, 2 )" works worse than others
@@ -81,9 +87,9 @@ float3 TraceTransparent(TraceTransparentDesc desc)
         // L1 cache - reproject previous frame, carefully treating specular
         float3 prevLdiff, prevLspec;
         float reprojectionWeight = ReprojectIrradiance(false, !isReflection, gIn_ComposedDiff, gIn_ComposedSpec_ViewZ, geometryProps, desc.pixelPos, prevLdiff, prevLspec);
-        reprojectionWeight = 0;
+        // reprojectionWeight = 0;
         Lcached = float4(prevLdiff + prevLspec, reprojectionWeight);
-        // Lcached = float4(1,0,0, reprojectionWeight);
+        // Lcached = float4(reprojectionWeight,reprojectionWeight,reprojectionWeight, 1);
 
         // L2 cache - SHARC
         HashGridParameters hashGridParams;
@@ -134,13 +140,13 @@ float3 TraceTransparent(TraceTransparentDesc desc)
         }
 
         // Cache miss - compute lighting, if not found in caches
-        if (Rng::Hash::GetFloat() > Lcached.w)
-        {
-            float3 L = GetLighting(geometryProps, materialProps, LIGHTING | SHADOW) + materialProps.Lemi;
-            Lcached.xyz = max(Lcached.xyz, L);
-            
-            // Lcached.xyz = float3(1,0,1);
-        }
+        // if (Rng::Hash::GetFloat() > Lcached.w)
+        // {
+        //     float3 L = GetLighting(geometryProps, materialProps, LIGHTING | SHADOW) + materialProps.Lemi;
+        //     Lcached.xyz = max(Lcached.xyz, L);
+        //     
+        //     // Lcached.xyz = float3(1,0,1);
+        // }
     }
 
     // Output
@@ -197,7 +203,7 @@ void MainRayGenShader()
         viewZAndTaaMask = -abs(viewZAndTaaMask);
 
         float3 mvT = GetMotion(geometryPropsT.X, geometryPropsT.Xprev);
-        gInOut_Mv[pixelPos] = float4(mvT, viewZAndTaaMask);
+        // gInOut_Mv[pixelPos] = float4(mvT, viewZAndTaaMask);
 
 
         // Patch guides for RR
