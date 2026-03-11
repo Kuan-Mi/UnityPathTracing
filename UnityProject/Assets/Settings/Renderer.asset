@@ -115,9 +115,9 @@ MonoBehaviour:
     resolutionScale: 1
     upscalerMode: 0
     sssScatteringColor: {r: 1, g: 1, b: 1, a: 1}
-    sssMinThreshold: -0.2
-    sssScale: 1
-    sssMaxSampleRadius: 0.004
+    sssMinThreshold: -1
+    sssScale: 1.92
+    sssMaxSampleRadius: 0.0124
   finalMaterial: {fileID: 2100000, guid: 27695a2bc55ef2f469362b9a2994989e, type: 2}
   opaqueTracingShader: {fileID: 4807578003741378534, guid: 71faa22953dc9834daf36cc38966c196, type: 3}
   transparentTracingShader: {fileID: 4807578003741378534, guid: d207e5fb066a4b579353785310fd0dea, type: 3}

@@ -316,9 +316,9 @@ float3 GetLighting(GeometryProps geometryProps, MaterialProps materialProps, uin
     }
     
     if ((flags & SHADOW) != 0 ){
-        lighting += EvaluateSpotLights(geometryProps, materialProps);
-        lighting += EvaluateAreaLights(geometryProps, materialProps);
-        lighting += EvaluatePointLights(geometryProps, materialProps);
+        lighting += EvaluateSpotLights(geometryProps, materialProps, (flags & SSS) != 0 && geometryProps.Has(FLAG_SKIN));
+        lighting += EvaluateAreaLights(geometryProps, materialProps, (flags & SSS) != 0 && geometryProps.Has(FLAG_SKIN));
+        lighting += EvaluatePointLights(geometryProps, materialProps, (flags & SSS) != 0 && geometryProps.Has(FLAG_SKIN));
     }
 
     return lighting;
