@@ -81,7 +81,7 @@ MonoBehaviour:
     dofAperture: 0
     dofFocalDistance: 0.71
     exposure: 8
-    enableAutoExposure: 0
+    enableAutoExposure: 1
     aeEVMin: -10
     aeEVMax: 10
     aeLowPercent: 0.05
