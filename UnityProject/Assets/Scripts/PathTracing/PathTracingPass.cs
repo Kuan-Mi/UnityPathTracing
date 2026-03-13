@@ -948,6 +948,7 @@ namespace PathTracing
             globalConstants.gSssTransmissionPerBsdfScatteringSampleCount       = m_Settings.sssTransmissionPerBsdfScatteringSampleCount;
             
             globalConstants.gSssScale              = m_Settings.sssScale;
+            globalConstants.gSssAnisotropy = m_Settings.sssAnisotropy;
             globalConstants.gSssMaxSampleRadius    = m_Settings.sssMaxSampleRadius;
             globalConstants.gIsEditor = cameraData.camera.cameraType == CameraType.SceneView ? 1u : 0u;
 

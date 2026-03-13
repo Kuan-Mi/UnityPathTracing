@@ -245,6 +245,7 @@ cbuffer PathTracingParams : register(b0)
     float gSssTransmissionBsdfSampleCount;
     float gSsTransmissionPerBsdfScatteringSampleCount;
     float gSssScale;
+    float gSssAnisotropy;
     float gSssMaxSampleRadius;
     float gIsEditor;
 };

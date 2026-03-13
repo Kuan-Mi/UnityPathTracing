@@ -76,6 +76,7 @@ namespace PathTracing
         public float gSssTransmissionBsdfSampleCount;
         public float gSssTransmissionPerBsdfScatteringSampleCount;
         public float gSssScale;
+        public float gSssAnisotropy;
         public float gSssMaxSampleRadius;
         public float gIsEditor;
 
