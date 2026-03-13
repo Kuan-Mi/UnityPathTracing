@@ -5,7 +5,8 @@ Shader "RayTracing/Skin"
         [MainTexture] _BaseMap("Albedo", 2D) = "white" {}
         [MainColor] _BaseColor("Color", Color) = (1,1,1,1)
 
-        _ScatteringColor ("Scattering Color", Color) = (1, 0.5, 0.3, 1)
+        _SSSScatteringColor("SSS Scattering Color", Color) = (1, 0.5, 0.3, 1)
+        _SSSScatteringScale("SSS Scattering Scale", Float) = 1.0
         _Smoothness("Smoothness", Range(0.0, 1.0)) = 0.5
 
         _Metallic("Metallic", Range(0.0, 1.0)) = 0.0
@@ -71,7 +72,8 @@ Shader "RayTracing/Skin"
             float _MicroNormalTiling;
 
             float4 _BaseColor;
-            float3 _ScatteringColor;
+            float4 _SSSScatteringColor;
+            float _SSSScatteringScale;
 
             TEXTURE2D(_BaseMap);
             SAMPLER(sampler_BaseMap);
@@ -188,8 +190,11 @@ Shader "RayTracing/Skin"
                 // ----------------------------------------------------------
                 // 6. Emission
                 // ----------------------------------------------------------
-                payload.Lemi = Packing::EncodeRgbe(_ScatteringColor);
-
+#if _SSS
+                payload.Lemi = Packing::EncodeRgbe(_SSSScatteringColor.xyz * _SSSScatteringScale);
+#else 
+                payload.Lemi = Packing::EncodeRgbe(float3(0, 0, 0));
+#endif
                 // ----------------------------------------------------------
                 // 7. Fill payload
                 // ----------------------------------------------------------

@@ -12,6 +12,8 @@ public class LitRayTracingShader : BaseShaderGUI
     private LitGUI.LitProperties litProperties;
     private LitRayDetailGUI.LitProperties litDetailProperties;
     private MaterialProperty SSSProp;
+    private MaterialProperty SSSScatteringColorProp;
+    private MaterialProperty SSSScatteringScaleProp;
     private MaterialProperty SkinnedMeshProp;
 
     public override void FillAdditionalFoldouts(MaterialHeaderScopeList materialScopesList)
@@ -26,6 +28,8 @@ public class LitRayTracingShader : BaseShaderGUI
         litProperties = new LitGUI.LitProperties(properties);
         litDetailProperties = new LitRayDetailGUI.LitProperties(properties);
         SSSProp = FindProperty("_SSS", properties, false);
+        SSSScatteringColorProp = FindProperty("_SSSScatteringColor", properties, false);
+        SSSScatteringScaleProp = FindProperty("_SSSScatteringScale", properties, false);
         SkinnedMeshProp = FindProperty("_SKINNEDMESH", properties, false);
     }
 
@@ -47,6 +51,12 @@ public class LitRayTracingShader : BaseShaderGUI
             DoPopup(LitGUI.Styles.workflowModeText, litProperties.workflowMode, workflowModeNames);
 
         base.DrawSurfaceOptions(material);
+        
+        if (SSSProp != null)
+            materialEditor.ShaderProperty(SSSProp, "SSS (Ray Tracing)");
+
+        if (SkinnedMeshProp != null)
+            materialEditor.ShaderProperty(SkinnedMeshProp, "Skinned Mesh (Ray Tracing)");
     }
 
     // material main surface inputs
@@ -56,6 +66,15 @@ public class LitRayTracingShader : BaseShaderGUI
         LitGUI.Inputs(litProperties, materialEditor, material);
         DrawEmissionProperties(material, true);
         DrawTileOffset(materialEditor, baseMapProp);
+        
+
+        if (SSSProp != null)
+        {
+            if (SSSScatteringColorProp != null && material.GetFloat("_SSS") > 0.5f)
+                materialEditor.ShaderProperty(SSSScatteringColorProp, "SSS Scattering Color");
+            if (SSSScatteringScaleProp != null && material.GetFloat("_SSS") > 0.5f)
+                materialEditor.ShaderProperty(SSSScatteringScaleProp, "SSS Scattering Scale");
+        }
     }
 
     // material main advanced options
@@ -66,12 +85,6 @@ public class LitRayTracingShader : BaseShaderGUI
             materialEditor.ShaderProperty(litProperties.highlights, LitGUI.Styles.highlightsText);
             materialEditor.ShaderProperty(litProperties.reflections, LitGUI.Styles.reflectionsText);
         }
-
-        if (SSSProp != null)
-            materialEditor.ShaderProperty(SSSProp, "SSS (Ray Tracing)");
-
-        if (SkinnedMeshProp != null)
-            materialEditor.ShaderProperty(SkinnedMeshProp, "Skinned Mesh (Ray Tracing)");
 
         base.DrawAdvancedOptions(material);
     }

@@ -16,6 +16,8 @@ public class SkinRayTracingShader : BaseShaderGUI
     private MaterialProperty microNormalMapProp;
     private MaterialProperty microNormalStrengthProp;
     private MaterialProperty microNormalTilingProp;
+    private MaterialProperty sssScatteringColorProp;
+    private MaterialProperty sssScatteringScaleProp;
     private MaterialProperty SSSProp;
     private MaterialProperty SkinnedMeshProp;
 
@@ -31,6 +33,8 @@ public class SkinRayTracingShader : BaseShaderGUI
         microNormalMapProp      = FindProperty("_MicroNormalMap",      properties, false);
         microNormalStrengthProp = FindProperty("_MicroNormalStrength", properties, false);
         microNormalTilingProp   = FindProperty("_MicroNormalTiling",   properties, false);
+        sssScatteringColorProp   = FindProperty("_SSSScatteringColor",  properties, false);
+        sssScatteringScaleProp  = FindProperty("_SSSScatteringScale",  properties, false);
         SSSProp                 = FindProperty("_SSS",                 properties, false);
         SkinnedMeshProp         = FindProperty("_SKINNEDMESH",         properties, false);
     }
@@ -89,6 +93,12 @@ public class SkinRayTracingShader : BaseShaderGUI
     // material main advanced options
     public override void DrawAdvancedOptions(Material material)
     {
+        if (sssScatteringColorProp != null)
+            materialEditor.ShaderProperty(sssScatteringColorProp, "SSS Scattering Color");
+
+        if (sssScatteringScaleProp != null)
+            materialEditor.ShaderProperty(sssScatteringScaleProp, "SSS Scattering Scale");
+
         if (SSSProp != null)
             materialEditor.ShaderProperty(SSSProp, "SSS (Ray Tracing)");
 

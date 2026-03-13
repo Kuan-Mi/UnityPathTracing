@@ -63,6 +63,8 @@ Shader "RayTracing/Lit"
 
         [ToggleUI] _ReceiveShadows("Receive Shadows", Float) = 1.0
         [Toggle(_SSS)] _SSS("SSS", Float) = 0.0
+        _SSSScatteringColor("SSS Scattering Color", Color) = (1, 0.5, 0.3, 1)
+        _SSSScatteringScale("SSS Scattering Scale", Float) = 1.0
         [Toggle(_SKINNEDMESH)] _SKINNEDMESH("Skinned Mesh", Float) = 0.0
         // Editmode props
         _QueueOffset("Queue offset", Float) = 0.0
@@ -135,6 +137,9 @@ Shader "RayTracing/Lit"
                 float _DetailNormalMapScale;
                 float _Surface;
             CBUFFER_END
+            
+                float4 _SSSScatteringColor;
+                float _SSSScatteringScale;
 
             TEXTURE2D(_BaseMap);
             SAMPLER(sampler_BaseMap);
@@ -305,19 +310,25 @@ Shader "RayTracing/Lit"
 
                 #endif
 
-                #if _EMISSION
+                #if _SSS
+                
+                float3 scattering = _SSSScatteringColor.xyz * _SSSScatteringScale;
+                
+                payload.Lemi = Packing::EncodeRgbe(scattering);
+                #elif _EMISSION
                 float3 emission = _EmissionColor.xyz * _EmissionMap.SampleLevel(sampler_EmissionMap, v.uv, mip).xyz;
                 payload.Lemi = Packing::EncodeRgbe(emission);
                 #else
                 payload.Lemi = Packing::EncodeRgbe(float3(0, 0, 0));
-
                 #endif
 
+                #if !_SSS
                 float emissionLevel = Color::Luminance(payload.Lemi);
                 emissionLevel = saturate(emissionLevel * 50.0);
 
                 metallic = lerp(metallic, 0.0, emissionLevel);
                 roughness = lerp(roughness, 1.0, emissionLevel);
+                #endif
 
 
                 float3 dielectricSpecular = float3(0.04, 0.04, 0.04);
