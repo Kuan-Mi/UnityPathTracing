@@ -69,6 +69,9 @@ Shader "Custom/Fabric"
             #include "Assets/Shaders/Include/ml.hlsli"
             #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
 
+            #pragma shader_feature_local_raytracing _SSS
+            #pragma shader_feature_local_raytracing _SKINNEDMESH
+            
             // ------------------------------------------------------------
             // 材质 CBuffer —— 名称与 AVP_Fabric ShaderGraph 生成代码完全匹配
             // ------------------------------------------------------------
@@ -114,6 +117,7 @@ Shader "Custom/Fabric"
 
             #include "Assets/Shaders/Include/Shared.hlsl"
             #include "Assets/Shaders/Include/Payload.hlsl"
+            #include "Assets/Shaders/Include/SurfaceRayTracingCommon.hlsl"
 
             #pragma multi_compile_local RAY_TRACING_PROCEDURAL_GEOMETRY
 
@@ -124,60 +128,10 @@ Shader "Custom/Fabric"
             #pragma require Native16Bit
             #pragma require int64
 
-            // ------------------------------------------------------------
-            // 顶点数据结构
-            // ------------------------------------------------------------
-            struct AttributeData
-            {
-                float2 barycentrics;
-            };
-
-            struct Vertex
-            {
-                float3 position;
-                float3 normal;
-                float4 tangent;
-                float2 uv;
-            };
-
-            float LengthSquared(float3 v) { return dot(v, v); }
-
-            Vertex FetchVertex(uint vertexIndex)
-            {
-                Vertex v;
-                v.position = UnityRayTracingFetchVertexAttribute3(vertexIndex, kVertexAttributePosition);
-                v.normal   = UnityRayTracingFetchVertexAttribute3(vertexIndex, kVertexAttributeNormal);
-                v.tangent  = UnityRayTracingFetchVertexAttribute4(vertexIndex, kVertexAttributeTangent);
-                v.uv       = UnityRayTracingFetchVertexAttribute2(vertexIndex, kVertexAttributeTexCoord0);
-                return v;
-            }
-
-            Vertex InterpolateVertices(Vertex v0, Vertex v1, Vertex v2, float3 bary)
-            {
-                Vertex v;
-                #define INTERP(attr) v.attr = v0.attr * bary.x + v1.attr * bary.y + v2.attr * bary.z
-                INTERP(position);
-                INTERP(normal);
-                INTERP(tangent);
-                INTERP(uv);
-                #undef INTERP
-                return v;
-            }
-
-            // 与 LitWithRayTracing 保持同一值
-            #define MAX_MIP_LEVEL 11.0
-
-            // ------------------------------------------------------------
-            // NormalStrength / NormalBlend（复刻 ShaderGraph 的 Unity 函数）
-            // ------------------------------------------------------------
+            // NormalStrength helper (ShaderGraph-compatible)
             float3 FabricNormalStrength(float3 n, float strength)
             {
                 return float3(n.rg * strength, lerp(1.0, n.b, saturate(strength)));
-            }
-
-            float3 FabricNormalBlend(float3 A, float3 B)
-            {
-                return SafeNormalize(float3(A.rg + B.rg, A.b * B.b));
             }
 
             // // ============================================================
@@ -196,9 +150,6 @@ Shader "Custom/Fabric"
             void ClosestHitMain(inout MainRayPayload payload : SV_RayPayload,
                                 AttributeData attribs : SV_IntersectionAttributes)
             {
-                
-                
-                // payload.baseColor             = Packing::RgbaToUint(float4(1,0,0, 1.0), 8, 8, 8, 8);
                 // ----------------------------------------------------------
                 // 1. 获取并插值顶点属性
                 // ----------------------------------------------------------
@@ -223,38 +174,16 @@ Shader "Custom/Fabric"
                 float3 rayDir = WorldRayDirection();
                 payload.hitT  = RayTCurrent();
                 
-                // ----------------------------------------------------------
-                // 3. 曲率估算
-                // ----------------------------------------------------------
-                {
-                    float dnSq0 = LengthSquared(v0.normal - v1.normal);
-                    float dnSq1 = LengthSquared(v1.normal - v2.normal);
-                    float dnSq2 = LengthSquared(v2.normal - v0.normal);
-                    payload.curvature = sqrt(max(dnSq0, max(dnSq1, dnSq2)));
-                }
+                // Curvature
+                payload.curvature = ComputeVertexCurvature(v0.normal, v1.normal, v2.normal);
                 
-                // ----------------------------------------------------------
-                // 4. Mip 计算（基于主 Tiling 后的 UV 面积）
-                // ----------------------------------------------------------
-                float mip;
-                {
-                    float2 uvE1 = (v1.uv - v0.uv) * Vector1_4784DC7;
-                    float2 uvE2 = (v2.uv - v0.uv) * Vector1_4784DC7;
-                    float uvArea = abs(uvE1.x * uvE2.y - uvE2.x * uvE1.y) * 0.5f;
-                
-                    float3 edge1 = v1.position - v0.position;
-                    float3 edge2 = v2.position - v0.position;
-                    float worldArea = length(cross(edge1, edge2)) * 0.5f;
-                
-                    float NoRay = abs(dot(rayDir, normalWS));
-                    float a = payload.hitT * payload.mipAndCone.y;
-                    a *= Math::PositiveRcp(NoRay);
-                    a *= sqrt(uvArea / max(worldArea, 1e-10f));
-                
-                    mip = log2(a) + MAX_MIP_LEVEL;
-                    mip = max(mip, 0.0);
-                    payload.mipAndCone.x += mip;
-                }
+                // Mip level (UV tiled by main tiling factor)
+                float mip = ComputeRayMipLevel(
+                    v0.uv, v1.uv, v2.uv,
+                    v0.position, v1.position, v2.position,
+                    normalWS, rayDir,
+                    payload.hitT, payload.mipAndCone.y, Vector1_4784DC7);
+                payload.mipAndCone.x += mip;
                 
                 // ----------------------------------------------------------
                 // 5. 纹理坐标
@@ -270,8 +199,7 @@ Shader "Custom/Fabric"
                 float3 tangentWS = normalize(mul(v.tangent.xyz, (float3x3)WorldToObject()));
                 
                 // 主法线贴图（使用主 Tiling UV，NormalPower = Vector1_4548C0F8）
-                float4 mainNormalSample = Texture2D_C4AB2143.SampleLevel(
-                    sampler_Texture2D_C4AB2143, mainUV, mip);
+                float4 mainNormalSample = Texture2D_C4AB2143.SampleLevel(sampler_Texture2D_C4AB2143, mainUV, mip);
                 float3 mainNormalTS = UnpackNormal(mainNormalSample);
                 float3 mainNormalScaled = FabricNormalStrength(mainNormalTS, Vector1_4548C0F8);
                 
@@ -282,7 +210,7 @@ Shader "Custom/Fabric"
                 float3 detailNormalScaled = FabricNormalStrength(detailNormalTS, Vector1_5514B0AB);
                 
                 // NormalBlend（与 ShaderGraph Unity_NormalBlend 等价）
-                float3 blendedNormalTS = normalize(FabricNormalBlend(detailNormalScaled, mainNormalScaled));
+                float3 blendedNormalTS = BlendNormals(detailNormalScaled, mainNormalScaled);
                 
                 // 切线空间 → 世界空间
                 float3 bitangentWS = cross(normalWS, tangentWS) * v.tangent.w;
@@ -345,7 +273,11 @@ Shader "Custom/Fabric"
                 // 10. 运动向量：Xprev
                 // ----------------------------------------------------------
                 float3 worldPos    = mul(ObjectToWorld3x4(), float4(v.position, 1.0)).xyz;
+#if _SKINNEDMESH
+                float3 prevWorldPos = mul(GetPrevObjectToWorldMatrix(), float4(v.lastPos, 1.0)).xyz;
+#else
                 float3 prevWorldPos = mul(GetPrevObjectToWorldMatrix(), float4(v.position, 1.0)).xyz;
+#endif
                 payload.Xprev = prevWorldPos;
                 
                 // ----------------------------------------------------------
@@ -359,7 +291,19 @@ Shader "Custom/Fabric"
                 
                 uint instanceIndex = InstanceIndex();
                 payload.SetInstanceIndex(instanceIndex);
-                payload.SetFlag(FLAG_NON_TRANSPARENT);
+                
+                
+                uint flag = FLAG_NON_TRANSPARENT;
+                #if  _SURFACE_TYPE_TRANSPARENT
+                flag = FLAG_TRANSPARENT;
+                #endif
+                
+                #if _SKIN
+                flag |= FLAG_SKIN;
+                #endif
+                
+                
+                payload.SetFlag(flag);
             }
             ENDHLSL
         }

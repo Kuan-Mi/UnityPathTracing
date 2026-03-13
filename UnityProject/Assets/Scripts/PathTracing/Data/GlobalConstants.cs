@@ -71,6 +71,10 @@ namespace PathTracing
         public uint gSpotLightCount;
         public uint gAreaLightCount;
         public uint gPointLightCount;
+        public float3 gSssScatteringColor;
+        public float gSssMinThreshold;
+        public float gSssScale;
+        public float gSssMaxSampleRadius;
 
         public override string ToString()
         {

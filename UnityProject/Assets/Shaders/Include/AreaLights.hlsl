@@ -1,7 +1,7 @@
 // AreaLights.hlsl
 // Rectangular and disc area lights with single stochastic shadow rays.
-// All area lights are accumulated into a single float3 per pixel.
-// No NRD denoising is applied — the result is composited directly.
+// Mirrors the sun path in GetLighting(): NoL+SmoothStep first, then BRDF,
+// then SSS Burley override of Cdiff + shadow origin, then shadow ray.
 // lightType: 0 = rectangle, 1 = disc
 
 #define AREA_LIGHT_RECT 0.0
@@ -23,30 +23,28 @@ StructuredBuffer<AreaLight> gIn_AreaLights;
 
 // Evaluate the direct lighting contribution of all area lights (rect + disc) at a surface point.
 // A single stochastic shadow ray is cast per light per frame; soft shadows emerge via accumulation.
-float3 EvaluateAreaLights(GeometryProps geo, MaterialProps mat)
+// When isSSS is true, also adds a Burley-sampled subsurface scattering contribution.
+float3 EvaluateAreaLights(GeometryProps geo, MaterialProps mat, bool isSSS)
 {
     float3 result = 0.0;
+
+    float3 albedo, Rf0;
+    BRDF::ConvertBaseColorMetalnessToAlbedoRf0(mat.baseColor, mat.metalness, albedo, Rf0);
 
     [loop]
     for (uint i = 0; i < gAreaLightCount; i++)
     {
         AreaLight light = gIn_AreaLights[i];
 
-        // ---------------------------------------------------------------
-        // Derive light normal (one-sided: front face only)
-        // ---------------------------------------------------------------
         float3 lightNormal = normalize(cross(light.right, light.up));
 
-        // ---------------------------------------------------------------
         // Stochastic sample point on the light surface
-        // ---------------------------------------------------------------
-        float2 xi = Rng::Hash::GetFloat2(); // [0, 1]^2
+        float2 xi = Rng::Hash::GetFloat2();
         float3 samplePos;
         float  lightArea;
 
         if (light.lightType > 0.5) // disc
         {
-            // Uniform sampling of a disc: r = radius * sqrt(xi.x), theta = 2*pi * xi.y
             float r     = light.halfWidth * sqrt(xi.x);
             float theta = 6.28318530718 * xi.y;
             samplePos = light.position
@@ -56,76 +54,107 @@ float3 EvaluateAreaLights(GeometryProps geo, MaterialProps mat)
         }
         else // rectangle
         {
-            float2 uv = xi * 2.0 - 1.0; // [-1, 1]^2
+            float2 uv = xi * 2.0 - 1.0;
             samplePos = light.position
                       + light.right * (uv.x * light.halfWidth)
                       + light.up    * (uv.y * light.halfHeight);
             lightArea = 4.0 * light.halfWidth * light.halfHeight;
         }
 
-        // ---------------------------------------------------------------
-        // Geometry term
-        // ---------------------------------------------------------------
         float3 toLight = samplePos - geo.X;
         float  dist    = length(toLight);
+        if (dist < 0.0001) continue;
 
-        if (dist < 0.0001)
-            continue;
+        float3 L = toLight / dist;
 
-        float3 L   = toLight / dist;
-        float  NoL = saturate(dot(mat.N, L));
+        // One-sided: reject back face
+        float cosLight = dot(lightNormal, -L);
+        if (cosLight <= 0.0) continue;
 
-        if (NoL == 0.0)
-            continue;
-
-        // One-sided: reject rays hitting the back face of the light
-        float cosLight = dot(lightNormal, -L); // > 0 when surface is on the emitting side
-        if (cosLight <= 0.0)
-            continue;
-
-        // ---------------------------------------------------------------
-        // Solid-angle weight: A * cos(theta_light) / dist^2
-        // ---------------------------------------------------------------
         float solidAngle = cosLight * lightArea / max(dist * dist, 0.0001);
 
         // ---------------------------------------------------------------
-        // Shadow ray (single stochastic sample — soft shadows via accumulation)
+        // NoL + SSS-aware shadow factor (matches GetLighting sun path)
         // ---------------------------------------------------------------
-        float3 Xoffset    = geo.GetXoffset(L, PT_BOUNCE_RAY_OFFSET);
-        float2 mipAndCone = float2(geo.mip, 0.0);
-
-        float shadowHitT = CastVisibilityRay_AnyHit(
-            Xoffset, L,
-            0.0, dist,
-            mipAndCone,
-            gWorldTlas,
-            FLAG_NON_TRANSPARENT, 0);
-
-        if (shadowHitT != INF)
-            continue;   // Occluded
+        float NoL_geom  = dot(geo.N, L);
+        float minThresh = isSSS ? gSssMinThreshold : 0.03;
+        float shadow    = Math::SmoothStep(minThresh, 0.1, NoL_geom);
+        if (shadow == 0.0) continue;
 
         // ---------------------------------------------------------------
-        // PBR BRDF (same D·G·F path as spot lights)
+        // BRDF
         // ---------------------------------------------------------------
-        float3 albedo, Rf0;
-        BRDF::ConvertBaseColorMetalnessToAlbedoRf0(mat.baseColor, mat.metalness, albedo, Rf0);
-
         float3 V   = geo.V;
         float3 H   = normalize(L + V);
+        float  NoL = saturate(dot(mat.N, L));
         float  NoH = saturate(dot(mat.N, H));
         float  VoH = saturate(dot(V, H));
         float  NoV = abs(dot(mat.N, V));
 
-        float  D    = BRDF::DistributionTerm(mat.roughness, NoH);
-        float  G    = BRDF::GeometryTermMod(mat.roughness, NoL, NoV, VoH, NoH);
-        float3 F    = BRDF::FresnelTerm(Rf0, VoH);
-        float  Kd   = BRDF::DiffuseTerm(mat.roughness, NoL, NoV, VoH);
+        float  D  = BRDF::DistributionTerm(mat.roughness, NoH);
+        float  G  = BRDF::GeometryTermMod(mat.roughness, NoL, NoV, VoH, NoH);
+        float3 F  = BRDF::FresnelTerm(Rf0, VoH);
+        float  Kd = BRDF::DiffuseTerm(mat.roughness, NoL, NoV, VoH);
 
-        float3 Cspec = F * D * G * NoL;
-        float3 Cdiff = Kd * albedo * NoL;
-        float3 brdf  = Cspec + Cdiff * (1.0 - F);
+        float3 Clinc = light.color * solidAngle;
+        float3 Cspec = F * D * G * NoL;           // Clinc excluded — multiplied at end
+        float3 Cdiff = Kd * albedo * NoL * Clinc; // Clinc included
 
-        result += light.color * brdf * solidAngle;
+        // ---------------------------------------------------------------
+        // SSS: Burley sample -> exit point -> override Cdiff + shadow origin
+        // ---------------------------------------------------------------
+        GeometryProps shadowGeo   = geo;
+        float3        L_shadow    = L;
+        float         dist_shadow = dist;
+
+#if( RTXCR_INTEGRATION == 1 )
+        if (isSSS)
+        {
+            RTXCR_SubsurfaceMaterialData sssMat = (RTXCR_SubsurfaceMaterialData)0;
+            sssMat.transmissionColor = albedo;
+            sssMat.scatteringColor   = gSssScatteringColor;
+            sssMat.scale             = gSssScale / gUnitToMetersMultiplier;
+            sssMat.g                 = 0.0;
+
+            float3 Xoff = geo.GetXoffset(geo.N, PT_SHADOW_RAY_OFFSET);
+            float3x3 basis = Geometry::GetBasis(geo.N);
+            RTXCR_SubsurfaceInteraction sssInteraction =
+                RTXCR_CreateSubsurfaceInteraction(Xoff, basis[2], basis[0], basis[1]);
+
+            RTXCR_SubsurfaceSample sssSample = (RTXCR_SubsurfaceSample)0;
+            RTXCR_EvalBurleyDiffusionProfile(sssMat, sssInteraction,
+                gSssMaxSampleRadius / gUnitToMetersMultiplier, false, Rng::Hash::GetFloat2(), sssSample);
+
+            GeometryProps sssProps;
+            MaterialProps sssMaterialProps;
+            CastRay(sssSample.samplePosition, -sssInteraction.normal,
+                    0.0, INF, float2(geo.mip, 0.0), FLAG_NON_TRANSPARENT, sssProps, sssMaterialProps);
+
+            if (!sssProps.IsMiss() && sssProps.Has(FLAG_SKIN))
+            {
+                shadowGeo = sssProps;
+                // Shadow targets the original sampled point on the area light surface
+                float3 toLightExit = samplePos - sssProps.X;
+                dist_shadow = length(toLightExit);
+                L_shadow = dist_shadow > 0.0001 ? toLightExit / dist_shadow : L;
+
+                float NoL_sss = saturate(dot(sssMaterialProps.N, L_shadow));
+                Cdiff = RTXCR_EvalBssrdf(sssSample, Clinc, NoL_sss);
+            }
+        }
+#endif
+
+        // ---------------------------------------------------------------
+        // Shadow ray from exit point (SSS) or entry point (non-SSS)
+        // ---------------------------------------------------------------
+        float3 Xoffset = shadowGeo.GetXoffset(L_shadow, PT_BOUNCE_RAY_OFFSET);
+        float  shadowHitT = CastVisibilityRay_AnyHit(
+            Xoffset, L_shadow, 0.0, dist_shadow,
+            float2(shadowGeo.mip, 0.0),
+            gWorldTlas, FLAG_NON_TRANSPARENT, 0);
+        if (shadowHitT != INF) continue;
+
+        result += (Clinc * Cspec + Cdiff * (1.0 - F)) * shadow;
     }
 
     return result;

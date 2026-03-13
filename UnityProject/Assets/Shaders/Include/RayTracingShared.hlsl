@@ -5,7 +5,7 @@ RWStructuredBuffer<uint64_t> gInOut_SharcHashEntriesBuffer;
 RWStructuredBuffer<SharcAccumulationData> gInOut_SharcAccumulated;
 RWStructuredBuffer<SharcPackedData> gInOut_SharcResolved;
 
-#define RTXCR_INTEGRATION 0
+#define RTXCR_INTEGRATION 1
 
 #if( USE_STOCHASTIC_SAMPLING == 1 )
 #define TEX_SAMPLER gNearestMipmapNearestSampler
@@ -17,6 +17,18 @@ RWStructuredBuffer<SharcPackedData> gInOut_SharcResolved;
 #define SAMPLE( coords ) Load( int3( coords ) )
 #else
 #define SAMPLE( coords ) SampleLevel( TEX_SAMPLER, coords.xy, coords.z )
+#endif
+
+#if( RTXCR_INTEGRATION == 1 )
+// Required by RTXCR
+float luminance(float3 x)
+{
+    return Color::Luminance(x);
+}
+
+#include "../rtxcr/HairFarFieldBCSDF.hlsli"
+#include "../rtxcr/SubsurfaceScattering.hlsli"
+#include "../rtxcr/Transmission.hlsli"
 #endif
 
 float3x3 Hair_GetBasis(float3 N, float3 T)
@@ -168,8 +180,8 @@ void CastRay(float3 origin, float3 direction, float Tmin, float Tmax, float2 mip
     props.T = payload.T;
     props.X = origin + direction * payload.hitT;
 
-    // props.Xprev = payload.X;
     props.Xprev = payload.Xprev;
+
     props.V = -direction;
     props.textureOffsetAndFlags = payload.instanceIndexAndFlags;
 
@@ -186,6 +198,7 @@ void CastRay(float3 origin, float3 direction, float Tmin, float Tmax, float2 mip
     matProps.T = payload.T.xyz;
 }
 
+#include "DirectionalLights.hlsl"
 #include "SpotLights.hlsl"
 #include "AreaLights.hlsl"
 #include "PointLights.hlsl"
@@ -195,95 +208,21 @@ void CastRay(float3 origin, float3 direction, float Tmin, float Tmax, float2 mip
 #define SHADOW      0x02
 #define SSS         0x04
 
-float3 GetLighting(GeometryProps geometryProps, MaterialProps materialProps, uint flags, out float3 Xshadow)
+float3 GetLighting(GeometryProps geometryProps, MaterialProps materialProps, uint flags)
 {
     float3 lighting = 0.0;
 
-    // Lighting
-    Xshadow = geometryProps.X;
-
     if ((flags & LIGHTING) != 0)
     {
-        float3 Csun = GetSunIntensity(gSunDirection.xyz);
-        float3 Csky = GetSkyIntensity(-geometryProps.V);
-        float NoL = saturate(dot(geometryProps.N, gSunDirection.xyz));
         bool isSSS = (flags & SSS) != 0 && geometryProps.Has(FLAG_SKIN);
-        float minThreshold = isSSS ? -0.2 : 0.03; // TODO: hand-tuned for SSS, a helper in RTXCR SDK is needed
-        float shadow = Math::SmoothStep(minThreshold, 0.1, NoL);
-
-        // COMMON MATERIAL
-        if (shadow != 0.0)
-        {
-            // Extract materials
-            float3 albedo, Rf0;
-            BRDF::ConvertBaseColorMetalnessToAlbedoRf0(materialProps.baseColor.xyz, materialProps.metalness, albedo, Rf0);
-
-            // Pseudo sky importance sampling
-            float3 Cimp = lerp(Csky, Csun, Math::SmoothStep(0.0, 0.2, materialProps.roughness));
-            Cimp *= Math::SmoothStep(-0.01, 0.05, gSunDirection.z);
-
-            // Common BRDF
-            float3 N = materialProps.N;
-            float3 L = gSunDirection.xyz;
-            float3 V = geometryProps.V;
-            float3 H = normalize(L + V);
-
-            float NoL = saturate(dot(N, L));
-            float NoH = saturate(dot(N, H));
-            float VoH = saturate(dot(V, H));
-            float NoV = abs(dot(N, V));
-
-            float D = BRDF::DistributionTerm(materialProps.roughness, NoH);
-            float G = BRDF::GeometryTermMod(materialProps.roughness, NoL, NoV, VoH, NoH);
-            float3 F = BRDF::FresnelTerm(Rf0, VoH);
-            float Kdiff = BRDF::DiffuseTerm(materialProps.roughness, NoL, NoV, VoH);
-
-            float3 Cspec = saturate(F * D * G * NoL);
-            float3 Cdiff = Kdiff * Csun * albedo * NoL;
-
-            lighting = Cspec * Cimp;
-
-            lighting += Cdiff * (1.0 - F);
-            lighting *= shadow;
-        }
-    }
-    else
-        lighting = 1.0;
-
-    // Shadow
-    const uint instanceInclusionMask = FLAG_NON_TRANSPARENT; // Default shadow rays must ignore transparency // TODO: what about translucency?
-    const uint rayFlags = 0;
-
-    if ((flags & SHADOW) != 0 && Color::Luminance(lighting) != 0 && !gDisableShadowsAndEnableImportanceSampling)
-    {
-        float2 rnd = Rng::Hash::GetFloat2();
-        rnd = ImportanceSampling::Cosine::GetRay(rnd).xy;
-        rnd *= gTanSunAngularRadius;
-
-        float3 sunDirection = normalize(gSunBasisX.xyz * rnd.x + gSunBasisY.xyz * rnd.y + gSunDirection.xyz);
-        float2 mipAndCone = GetConeAngleFromAngularRadius(geometryProps.mip, gTanSunAngularRadius);
-
-        
-        Xshadow = geometryProps.GetXoffset(sunDirection,PT_SHADOW_RAY_OFFSET);
-        float hitT = CastVisibilityRay_AnyHit(Xshadow, sunDirection, 0.0, INF, mipAndCone, gWorldTlas, instanceInclusionMask, rayFlags);
-        lighting *= float(hitT == INF);
-    }
-    
-    if ((flags & SHADOW) != 0 ){
-        lighting += EvaluateSpotLights(geometryProps, materialProps);
-        lighting += EvaluateAreaLights(geometryProps, materialProps);
-        lighting += EvaluatePointLights(geometryProps, materialProps);
+        lighting += EvaluateDirectionalLights(geometryProps, materialProps, isSSS);
+        lighting += EvaluateSpotLights(geometryProps, materialProps, isSSS);
+        lighting += EvaluateAreaLights(geometryProps, materialProps, isSSS);
+        lighting += EvaluatePointLights(geometryProps, materialProps, isSSS);
     }
 
     return lighting;
 }
-
-float3 GetLighting(GeometryProps geometryProps, MaterialProps materialProps, uint flags)
-{
-    float3 unused;
-    return GetLighting(geometryProps, materialProps, flags, unused);
-}
-
 
 // Compile-time flags for "GenerateRayAndUpdateThroughput"
 #define HAIR 0x1
@@ -304,21 +243,21 @@ float3 GenerateRayAndUpdateThroughput(inout GeometryProps geometryProps, inout M
     {
         // Generate a ray in local space
         float3 candidateRayLocal;
-        #if( RTXCR_INTEGRATION == 1 )
-        if (isHair)
-        {
-            float2 rand[2] = {Rng::Hash::GetFloat2(), Rng::Hash::GetFloat2()};
-
-            float3 specular = 0.0;
-            float3 diffuse = 0.0;
-            float pdf = 0.0;
-
-            RTXCR_HairInteractionSurface hairSurface = Hair_GetSurface(Vlocal);
-            RTXCR_HairMaterialInteractionBcsdf hairMaterial = Hair_GetMaterial();
-            RTXCR_SampleFarFieldBcsdf(hairSurface, hairMaterial, Vlocal, 2.0 * rnd.x - 1.0, rnd.y, rand, candidateRayLocal, specular, diffuse, pdf);
-        }
-        else
-        #endif
+        // #if( RTXCR_INTEGRATION == 1 )
+        // if (isHair)
+        // {
+        //     float2 rand[2] = {Rng::Hash::GetFloat2(), Rng::Hash::GetFloat2()};
+        //
+        //     float3 specular = 0.0;
+        //     float3 diffuse = 0.0;
+        //     float pdf = 0.0;
+        //
+        //     RTXCR_HairInteractionSurface hairSurface = Hair_GetSurface(Vlocal);
+        //     RTXCR_HairMaterialInteractionBcsdf hairMaterial = Hair_GetMaterial();
+        //     RTXCR_SampleFarFieldBcsdf(hairSurface, hairMaterial, Vlocal, 2.0 * rnd.x - 1.0, rnd.y, rand, candidateRayLocal, specular, diffuse, pdf);
+        // }
+        // else
+        // #endif
         if (isDiffuse)
             candidateRayLocal = ImportanceSampling::Cosine::GetRay(rnd);
         else
@@ -365,7 +304,7 @@ float3 GenerateRayAndUpdateThroughput(inout GeometryProps geometryProps, inout M
         throughput *= float(emissiveHitNum) / float(sampleMaxNum);
 
     // Update throughput
-    #if( NRD_MODE < OCCLUSION )
+#if( NRD_MODE < OCCLUSION )
     float3 albedo, Rf0;
     BRDF::ConvertBaseColorMetalnessToAlbedoRf0(materialProps.baseColor, materialProps.metalness, albedo, Rf0);
 
@@ -375,21 +314,21 @@ float3 GenerateRayAndUpdateThroughput(inout GeometryProps geometryProps, inout M
     float NoL = saturate(dot(Nlocal, rayLocal));
     float VoH = abs(dot(Vlocal, Hlocal));
 
-    #if( RTXCR_INTEGRATION == 1 )
-    if (isHair)
-    {
-        float3 specular = 0.0;
-        float3 diffuse = 0.0;
-        float pdf = 0.0;
-
-        RTXCR_HairInteractionSurface hairGeometry = Hair_GetSurface(Vlocal);
-        RTXCR_HairMaterialInteractionBcsdf hairMaterial = Hair_GetMaterial();
-        RTXCR_HairFarFieldBcsdfEval(hairGeometry, hairMaterial, rayLocal, Vlocal, specular, diffuse, pdf);
-
-        throughput *= pdf > 0.0 ? (specular + diffuse) / pdf : 0.0;
-    }
-    else
-    #endif
+    // #if( RTXCR_INTEGRATION == 1 )
+    // if (isHair)
+    // {
+    //     float3 specular = 0.0;
+    //     float3 diffuse = 0.0;
+    //     float pdf = 0.0;
+    //
+    //     RTXCR_HairInteractionSurface hairGeometry = Hair_GetSurface(Vlocal);
+    //     RTXCR_HairMaterialInteractionBcsdf hairMaterial = Hair_GetMaterial();
+    //     RTXCR_HairFarFieldBcsdfEval(hairGeometry, hairMaterial, rayLocal, Vlocal, specular, diffuse, pdf);
+    //
+    //     throughput *= pdf > 0.0 ? (specular + diffuse) / pdf : 0.0;
+    // }
+    // else
+    // #endif
     if (isDiffuse)
     {
         float NoV = abs(dot(Nlocal, Vlocal));
@@ -419,7 +358,7 @@ float3 GenerateRayAndUpdateThroughput(inout GeometryProps geometryProps, inout M
         else
             throughput /= 1.0 - LEAF_TRANSLUCENCY;
     }
-    #endif
+#endif
 
     // Transform to world space
     float3 ray = Geometry::RotateVectorInverse(mLocalBasis, rayLocal);

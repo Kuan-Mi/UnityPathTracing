@@ -80,7 +80,7 @@ MonoBehaviour:
     showValidation: 0
     dofAperture: 0
     dofFocalDistance: 0.71
-    exposure: 8
+    exposure: 0.2
     enableAutoExposure: 0
     aeEVMin: -10
     aeEVMax: 10
@@ -113,7 +113,11 @@ MonoBehaviour:
     RR: 1
     tmpDisableRR: 0
     resolutionScale: 1
-    upscalerMode: 5
+    upscalerMode: 0
+    sssScatteringColor: {r: 1, g: 1, b: 1, a: 1}
+    sssMinThreshold: -0.654
+    sssScale: 2.53
+    sssMaxSampleRadius: 0.0437
   finalMaterial: {fileID: 2100000, guid: 27695a2bc55ef2f469362b9a2994989e, type: 2}
   opaqueTracingShader: {fileID: 4807578003741378534, guid: 71faa22953dc9834daf36cc38966c196, type: 3}
   transparentTracingShader: {fileID: 4807578003741378534, guid: d207e5fb066a4b579353785310fd0dea, type: 3}

@@ -1,196 +1,253 @@
 // PointLights.hlsl
 // Omnidirectional point lights, optionally with a sphere radius for soft shadows.
-// When radius == 0: hard shadow ray (ideal point light).
-// When radius  > 0: stochastic sample on the hemisphere facing the surface,
-//                   producing soft shadows that converge via temporal accumulation.
-// All point lights are accumulated into a single float3 per pixel.
-// No NRD denoising is applied — the result is composited directly.
+// Mirrors the sun path in GetLighting(): NoL+SmoothStep first, then BRDF,
+// then SSS Burley override of Cdiff + shadow origin, then shadow ray.
 
 struct PointLight
 {
-    float3 position;    // World-space position
-    float  range;       // Maximum range (hard cutoff)
-    float3 color;       // Pre-multiplied color * intensity
-    float  radius;      // Sphere radius (0 = hard point light)
+    float3 position; // World-space position
+    float range; // Maximum range (hard cutoff)
+    float3 color; // Pre-multiplied color * intensity
+    float radius; // Sphere radius (0 = hard point light)
 };
 
 StructuredBuffer<PointLight> gIn_PointLights;
 
 // Evaluate the direct lighting contribution of all point lights at a surface point.
 // When radius > 0, a single stochastic shadow ray is cast per light per frame;
-// soft shadows emerge via temporal accumulation (same strategy as area lights).
-float3 EvaluatePointLights(GeometryProps geo, MaterialProps mat)
+// soft shadows emerge via temporal accumulation.
+// When isSSS is true, also adds a Burley-sampled subsurface scattering contribution.
+float3 EvaluatePointLights(GeometryProps geo, MaterialProps mat, bool isSSS)
 {
     float3 result = 0.0;
+
+    float3 albedo, Rf0;
+    BRDF::ConvertBaseColorMetalnessToAlbedoRf0(mat.baseColor, mat.metalness, albedo, Rf0);
+
+    // ---------------------------------------------------------------
+    // SSS: find the subsurface entry point once, outside the light loop.
+    // The entry point depends only on geometry/material/camera, not on
+    // the number of lights; computing it per-light would cost O(N) rays.
+    // ---------------------------------------------------------------
+#if( RTXCR_INTEGRATION == 1 )
+    GeometryProps sssProps;
+    MaterialProps sssMaterialProps;
+    RTXCR_SubsurfaceSample sssSample = (RTXCR_SubsurfaceSample)0;
+    bool sssHit = false;
+
+    if (isSSS)
+    {
+        RTXCR_SubsurfaceMaterialData sssMat = (RTXCR_SubsurfaceMaterialData)0;
+        sssMat.transmissionColor = albedo;
+        sssMat.scatteringColor = gSssScatteringColor;
+        sssMat.scale = gSssScale / gUnitToMetersMultiplier;
+        sssMat.g = 0.0;
+
+        float3 Xoff = geo.GetXoffset(geo.N, PT_SHADOW_RAY_OFFSET);
+        float3x3 basis = Geometry::GetBasis(geo.N);
+        RTXCR_SubsurfaceInteraction sssInteraction =
+            RTXCR_CreateSubsurfaceInteraction(Xoff, basis[2], basis[0], basis[1]);
+
+        RTXCR_EvalBurleyDiffusionProfile(sssMat, sssInteraction,
+                                         gSssMaxSampleRadius / gUnitToMetersMultiplier, false, Rng::Hash::GetFloat2(), sssSample);
+
+        CastRay(sssSample.samplePosition, -sssInteraction.normal,
+                0.0, INF, float2(geo.mip, 0.0), FLAG_NON_TRANSPARENT, sssProps, sssMaterialProps);
+
+        sssHit = !sssProps.IsMiss() && sssProps.Has(FLAG_SKIN);
+    }
+#endif
 
     [loop]
     for (uint i = 0; i < gPointLightCount; i++)
     {
         PointLight light = gIn_PointLights[i];
 
-        // ---------------------------------------------------------------
-        // Determine sample position on the light
-        // ---------------------------------------------------------------
-        float3 samplePos;
-        float  solidAngleWeight;   // cosLight * lightArea / dist^2  (or 1/dist^2 for a point)
-        float  shadowDist;
+        float3 L;
+        float dist;
+        float3 Clinc; // light irradiance factor, NoL NOT included
 
-        if (light.radius > 0.0001)
+        // Early range cull before consuming any RNG budget.
+        float centDist = length(light.position - geo.X);
+        if (centDist >= light.range) continue;
+
+        float rangeFade = Math::SmoothStep(light.range, light.range * 0.75, centDist);
+
+        float3 samplePos;
+        // if (light.radius > 0.0)
         {
             // -----------------------------------------------------------
-            // Sphere light: uniformly sample the hemisphere facing geo.X.
-            // light.color = luminous intensity I (W/sr), same as hard point light.
-            // Surface radiance: L_e = I / (pi*r^2).
-            // PDF = 1 / (2*pi*r^2).  Estimator = L_e * cosLight * 2*pi*r^2 / dist^2
-            //                                   = I * cosLight * 2 / dist^2   (r^2 cancels).
+            // Sphere light: stochastic hemisphere sample for soft shadows.
             // -----------------------------------------------------------
             float3 toSurface = normalize(geo.X - light.position);
 
-            // Build an orthonormal basis aligned to toSurface
             float3 T, B;
             float3 up = abs(toSurface.x) < 0.9 ? float3(1, 0, 0) : float3(0, 1, 0);
             T = normalize(cross(toSurface, up));
             B = cross(toSurface, T);
 
-            // Uniform hemisphere sampling
-            float2 xi    = Rng::Hash::GetFloat2();
-            float  cosT  = xi.x;                            // cosine from hemisphere pole
-            float  sinT  = sqrt(max(0.0, 1.0 - cosT * cosT));
-            float  phi   = 6.28318530718 * xi.y;
+            float2 xi = Rng::Hash::GetFloat2();
+            float cosT = xi.x;
+            float sinT = sqrt(max(0.0, 1.0 - cosT * cosT));
+            float phi = 6.28318530718 * xi.y;
 
             float3 sampleDir = T * (sinT * cos(phi))
-                             + B * (sinT * sin(phi))
-                             + toSurface * cosT;            // unit vector toward surface side
+                + B * (sinT * sin(phi))
+                + toSurface * cosT;
 
             samplePos = light.position + sampleDir * light.radius;
 
             float3 toLight = samplePos - geo.X;
-            float  dist    = length(toLight);
+            dist = length(toLight);
             if (dist < 0.0001) continue;
+            L = toLight / dist;
 
-            float3 L   = toLight / dist;
-            float  NoL = saturate(dot(mat.N, L));
-            if (NoL == 0.0) continue;
-
-            // Range hard cutoff (use sphere center distance for consistency)
-            float centDist = length(light.position - geo.X);
-            if (centDist >= light.range) continue;
-
-            float cosLight = dot(sampleDir, -L);   // > 0 by hemisphere construction
+            float cosLight = dot(sampleDir, -L);
             if (cosLight <= 0.0) continue;
 
-            // light.color is luminous intensity I (W/sr), same convention as the hard point light.
-            // Surface radiance of the sphere: L_e = I / (pi * r^2).
-            // Monte Carlo estimator: L_e * 2*pi*r^2 * cosLight / dist^2
-            //                      = I * 2 * cosLight / dist^2   (r^2 cancels).
-            // This makes brightness independent of radius, matching the point light at r->0.
-            float rangeFade    = Math::SmoothStep(light.range, light.range * 0.75, centDist);
-            solidAngleWeight   = cosLight * 2.0 / max(dist * dist, 0.0001) * rangeFade;
-            shadowDist         = dist;
-
-            // ---------------------------------------------------------------
-            // Stochastic shadow ray
-            // ---------------------------------------------------------------
-            float3 Xoffset    = geo.GetXoffset(L, PT_BOUNCE_RAY_OFFSET);
-            float2 mipAndCone = float2(geo.mip, 0.0);
-
-            float shadowHitT = CastVisibilityRay_AnyHit(
-                Xoffset, L,
-                0.0, shadowDist,
-                mipAndCone,
-                gWorldTlas,
-                FLAG_NON_TRANSPARENT, 0);
-
-            if (shadowHitT != INF)
-                continue;   // Occluded
-
-            // ---------------------------------------------------------------
-            // PBR BRDF
-            // ---------------------------------------------------------------
-            float3 albedo, Rf0;
-            BRDF::ConvertBaseColorMetalnessToAlbedoRf0(mat.baseColor, mat.metalness, albedo, Rf0);
-
-            float3 V   = geo.V;
-            float3 H   = normalize(L + V);
-            float  NoH = saturate(dot(mat.N, H));
-            float  VoH = saturate(dot(V, H));
-            float  NoV = abs(dot(mat.N, V));
-
-            float  D    = BRDF::DistributionTerm(mat.roughness, NoH);
-            float  G    = BRDF::GeometryTermMod(mat.roughness, NoL, NoV, VoH, NoH);
-            float3 F    = BRDF::FresnelTerm(Rf0, VoH);
-            float  Kd   = BRDF::DiffuseTerm(mat.roughness, NoL, NoV, VoH);
-
-            float3 Cspec = F * D * G * NoL;
-            float3 Cdiff = Kd * albedo * NoL;
-            float3 brdf  = Cspec + Cdiff * (1.0 - F);
-
-            result += light.color * brdf * solidAngleWeight;
+            Clinc = light.color * (cosLight * 2.0 / max(dist * dist, 0.0001) * rangeFade);
         }
-        else
+        // else
+        // {
+        //     // -----------------------------------------------------------
+        //     // Hard point light: no area, plain inverse-square falloff.
+        //     // Hemisphere cosine weighting must NOT be used here — it would
+        //     // multiply Clinc by xi.x (a per-frame random), causing severe
+        //     // frame-to-frame flicker on stationary lights.
+        //     // -----------------------------------------------------------
+        //     samplePos = light.position;
+        //     dist = centDist;
+        //     L = (light.position - geo.X) / dist;
+        //
+        //     Clinc = light.color * (rangeFade / max(dist * dist, 0.0001));
+        // }
+
+        // ---------------------------------------------------------------
+        // NoL + SSS-aware shadow factor (matches GetLighting sun path)
+        // ---------------------------------------------------------------
+        float NoL_geom = dot(geo.N, L);
+        float minThresh = isSSS ? gSssMinThreshold : 0.03;
+        float shadow = Math::SmoothStep(minThresh, 0.1, NoL_geom);
+
+        if (shadow == 0.0) continue;
+
+        // ---------------------------------------------------------------
+        // Common BRDF
+        // ---------------------------------------------------------------
+        float3 V = geo.V;
+        float3 H = normalize(L + V);
+
+        float NoL = saturate(dot(mat.N, L));
+        float NoH = saturate(dot(mat.N, H));
+        float VoH = saturate(dot(V, H));
+        float NoV = abs(dot(mat.N, V));
+
+        float D = BRDF::DistributionTerm(mat.roughness, NoH);
+        float G = BRDF::GeometryTermMod(mat.roughness, NoL, NoV, VoH, NoH);
+        float3 F = BRDF::FresnelTerm(Rf0, VoH);
+        float Kdiff = BRDF::DiffuseTerm(mat.roughness, NoL, NoV, VoH);
+
+        float3 Cspec = F * D * G * NoL; // Clinc excluded — multiplied at end
+        float3 Cdiff = Kdiff * Clinc * albedo * NoL; // Clinc included
+
+        float3 lighting = Cspec * Clinc;
+
+        // ---------------------------------------------------------------
+        // SSS: override Cdiff + redirect shadow ray to pre-computed entry
+        // point. Clinc_sss is re-evaluated at the entry point to correctly
+        // apply inverse-square falloff from the point of light penetration,
+        // not from the (potentially distant) exit point on geo.X.
+        // ---------------------------------------------------------------
+        GeometryProps shadowGeo = geo;
+        float3 L_shadow = L;
+        float dist_shadow = dist;
+
+#if( RTXCR_INTEGRATION == 1 )
+        if (isSSS && sssHit)
         {
-            // -----------------------------------------------------------
-            // Ideal point light: hard shadow ray, inverse-square falloff.
-            // -----------------------------------------------------------
-            float3 toLight = light.position - geo.X;
-            float  dist    = length(toLight);
+            float centDist_entry = length(light.position - sssProps.X);
+            float rangeFade_entry = Math::SmoothStep(light.range, light.range * 0.75, centDist_entry);
 
-            // Range hard cutoff
-            if (dist >= light.range)
-                continue;
+            float3 shadowTarget;
+            float3 Clinc_sss = 0.0;
+            bool validSss = false;
 
-            float3 L   = toLight / dist;
-            float  NoL = saturate(dot(mat.N, L));
+            if (light.radius > 0.0001)
+            {
+                // Re-sample the hemisphere facing the SSS entry point.
+                // xi_sss is coupled exclusively to Clinc_sss so the shadow
+                // direction and its energy estimate come from the same Monte
+                // Carlo sample, fixing the decoupled-variance bug of the
+                // original code where xi and xi_sss were independent.
+                float3 toSurface_sss = normalize(sssProps.X - light.position);
+                float3 up_sss = abs(toSurface_sss.x) < 0.9 ? float3(1, 0, 0) : float3(0, 1, 0);
+                float3 T_sss = normalize(cross(toSurface_sss, up_sss));
+                float3 B_sss = cross(toSurface_sss, T_sss);
 
-            if (NoL == 0.0)
-                continue;
+                float2 xi_sss = Rng::Hash::GetFloat2();
+                float cosT_sss = xi_sss.x;
+                float sinT_sss = sqrt(max(0.0, 1.0 - cosT_sss * cosT_sss));
+                float phi_sss = 6.28318530718 * xi_sss.y;
 
-            // ---------------------------------------------------------------
-            // Distance attenuation: inverse-square with smooth range rolloff
-            // ---------------------------------------------------------------
-            float atten     = 1.0 / max(dist * dist, 0.0001);
-            float rangeFade = Math::SmoothStep(light.range, light.range * 0.75, dist);
-            atten *= rangeFade;
+                float3 sampleDir_sss = T_sss * (sinT_sss * cos(phi_sss))
+                    + B_sss * (sinT_sss * sin(phi_sss))
+                    + toSurface_sss * cosT_sss;
 
-            // ---------------------------------------------------------------
-            // Hard shadow ray (single ray — point light has no angular radius)
-            // ---------------------------------------------------------------
-            float3 Xoffset    = geo.GetXoffset(L, PT_BOUNCE_RAY_OFFSET);
-            float2 mipAndCone = float2(geo.mip, 0.0);
+                shadowTarget = light.position + sampleDir_sss * light.radius;
 
-            float shadowHitT = CastVisibilityRay_AnyHit(
-                Xoffset, L,
-                0.0, dist,
-                mipAndCone,
-                gWorldTlas,
-                FLAG_NON_TRANSPARENT, 0);
+                float3 toEntry = shadowTarget - sssProps.X;
+                float dist_entry = length(toEntry);
+                if (dist_entry >= 0.0001)
+                {
+                    float cosLight_sss = dot(sampleDir_sss, -toEntry / dist_entry);
+                    if (cosLight_sss > 0.0)
+                    {
+                        Clinc_sss = light.color * (cosLight_sss * 2.0 / max(dist_entry * dist_entry, 0.0001) * rangeFade_entry);
+                        validSss = true;
+                    }
+                }
+            }
+            else
+            {
+                // Hard point light: inverse-square falloff at entry point.
+                shadowTarget = light.position;
+                float3 toEntry = shadowTarget - sssProps.X;
+                float dist_entry = length(toEntry);
+                if (dist_entry >= 0.0001)
+                {
+                    Clinc_sss = light.color * (rangeFade_entry / max(dist_entry * dist_entry, 0.0001));
+                    validSss = true;
+                }
+            }
 
-            if (shadowHitT != INF)
-                continue;   // Occluded
+            if (validSss)
+            {
+                shadowGeo = sssProps;
+                float3 toEntry = shadowTarget - sssProps.X;
+                dist_shadow = length(toEntry);
+                L_shadow = dist_shadow > 0.0001 ? toEntry / dist_shadow : L;
 
-            // ---------------------------------------------------------------
-            // PBR BRDF (same D·G·F path as spot lights)
-            // ---------------------------------------------------------------
-            float3 albedo, Rf0;
-            BRDF::ConvertBaseColorMetalnessToAlbedoRf0(mat.baseColor, mat.metalness, albedo, Rf0);
-
-            float3 V   = geo.V;
-            float3 H   = normalize(L + V);
-            float  NoH = saturate(dot(mat.N, H));
-            float  VoH = saturate(dot(V, H));
-            float  NoV = abs(dot(mat.N, V));
-
-            float  D    = BRDF::DistributionTerm(mat.roughness, NoH);
-            float  G    = BRDF::GeometryTermMod(mat.roughness, NoL, NoV, VoH, NoH);
-            float3 F    = BRDF::FresnelTerm(Rf0, VoH);
-            float  Kd   = BRDF::DiffuseTerm(mat.roughness, NoL, NoV, VoH);
-
-            float3 Cspec = F * D * G * NoL;
-            float3 Cdiff = Kd * albedo * NoL;
-            float3 brdf  = Cspec + Cdiff * (1.0 - F);
-
-            result += light.color * brdf * atten;
+                float NoL_sss = saturate(dot(sssMaterialProps.N, L_shadow));
+                Cdiff = RTXCR_EvalBssrdf(sssSample, Clinc_sss, NoL_sss);
+            }
         }
+#endif
+
+        lighting += Cdiff * (1.0 - F);
+        lighting *= shadow;
+
+        // ---------------------------------------------------------------
+        // Shadow ray from exit point (SSS) or entry point (non-SSS)
+        // ---------------------------------------------------------------
+
+        if (Color::Luminance(lighting) != 0)
+        {
+            float3 Xshadow = shadowGeo.GetXoffset(L_shadow, PT_BOUNCE_RAY_OFFSET);
+            float shadowHitT = CastVisibilityRay_AnyHit(Xshadow, L_shadow, 0.0, dist_shadow, float2(shadowGeo.mip, 0.0), gWorldTlas, FLAG_NON_TRANSPARENT, 0);
+            lighting *= float(shadowHitT == INF);
+        }
+
+        result += lighting;
     }
 
     return result;

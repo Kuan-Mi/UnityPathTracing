@@ -176,6 +176,22 @@ namespace PathTracing
 
         public UpscalerMode upscalerMode = UpscalerMode.NATIVE;
 
+        [Header("SSS (次表面散射)")]
+        [Tooltip("皮肤散射颜色，暖橙红色为典型皮肤值")]
+        public Color sssScatteringColor = new Color(1.0f, 0.3f, 0.1f);
+
+        [Tooltip("SSS 阴影阈值：皮肤在该 NoL 值以下时开始渐入散射（默认 -0.2，允许背透光）")]
+        [Range(-1.0f, 0.1f)]
+        public float sssMinThreshold = -0.2f;
+
+        [Tooltip("Burley 散射尺度参数（以 SSS_METERS_UNIT=0.01m 为单位，0.4 ≈ 4mm 散射半径）")]
+        [Range(0.01f, 20.0f)]
+        public float sssScale = 0.4f;
+
+        [Tooltip("Burley 采样最大盘半径（世界单位/m，默认 0.004 = 4mm）")]
+        [Range(0.0001f, 0.1f)]
+        public float sssMaxSampleRadius = 0.004f;
+
         // public bool usePackedData;
     }
 }

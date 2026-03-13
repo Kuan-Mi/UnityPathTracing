@@ -28,15 +28,25 @@ namespace PathTracing
                 var materials = r.sharedMaterials;
                 bool hasTransparent = false;
                 bool hasOpaque = false;
+                // bool isSSS = false;
                 foreach (var mat in materials)
                 {
-                    if (mat != null && mat.renderQueue >= 3000)
+                    if (mat != null)
                     {
-                        hasTransparent = true;
-                    }
-                    else
-                    {
-                        hasOpaque = true;
+                        if (mat.renderQueue >= 3000)
+                        {
+                            hasTransparent = true;
+                        }
+                        else
+                        {
+                            hasOpaque = true;
+                        }
+
+                        // if (mat.IsKeywordEnabled("_SSS"))
+                        // {
+                        //     isSSS = true;
+                        //     Debug.Log($"Renderer {r.name} marked as SSS.");
+                        // }
                     }
                 }
 
@@ -46,6 +56,9 @@ namespace PathTracing
                     mask |= 0x01; // FLAG_NON_TRANSPARENT
                 if (hasTransparent)
                     mask |= 0x02; // FLAG_TRANSPARENT
+
+                // if (isSSS)
+                //     mask |= 0x40; // FLAG_SKIN
 
                 // Debug.Log($"Renderer {r.name} Mask: {mask}");
 
@@ -83,7 +96,7 @@ namespace PathTracing
 
         // Auto-exposure buffers (persistent across frames)
         private GraphicsBuffer _aeHistogramBuffer; // 256 x uint
-        private GraphicsBuffer _aeExposureBuffer;  // 1 x float  (current exposure multiplier)
+        private GraphicsBuffer _aeExposureBuffer; // 1 x float  (current exposure multiplier)
 
         private Dictionary<long, NRDDenoiser> _nrdDenoisers = new();
         private Dictionary<long, DLRRDenoiser> _dlrrDenoisers = new();
@@ -233,16 +246,13 @@ namespace PathTracing
             Camera cam = renderingData.cameraData.camera;
             if (cam.cameraType is CameraType.Preview or CameraType.Reflection)
                 return;
-            
-            
+
             cam.depthTextureMode = DepthTextureMode.Depth | DepthTextureMode.MotionVectors;
-             
-            
 
             int eyeIndex = renderingData.cameraData.xr.enabled ? renderingData.cameraData.xr.multipassId : 0;
 
 
-            if(eyeIndex == 1)
+            if (eyeIndex == 1)
                 return;
             long uniqueKey = cam.GetInstanceID() + (eyeIndex * 100000L);
 
