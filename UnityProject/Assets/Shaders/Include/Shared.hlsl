@@ -240,6 +240,10 @@ cbuffer PathTracingParams : register(b0)
     uint gSpotLightCount;
     uint gAreaLightCount;
     uint gPointLightCount;
+    float3 gSssScatteringColor;
+    float gSssMinThreshold;
+    float gSssScale;
+    float gSssMaxSampleRadius;
 };
 
 #include "Assets/Shaders/Include/ml.hlsli"
@@ -403,7 +407,7 @@ float GetCircleOfConfusion(float distance) // diameter
 //=============================================================================================
 
 #define SKY_INTENSITY 1.0
-#define SUN_INTENSITY 10.0
+#define SUN_INTENSITY 50.0
 
 float3 GetSunIntensity(float3 v)
 {
@@ -431,6 +435,7 @@ float3 GetSunIntensity(float3 v)
 
 float3 GetSkyIntensity(float3 v)
 {
+    return 0;
     float atmosphere = sqrt(1.0 - saturate(v.y));
 
     float scatter = pow(saturate(gSunDirection.y), 1.0 / 15.0);

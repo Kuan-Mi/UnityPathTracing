@@ -942,6 +942,10 @@ namespace PathTracing
             globalConstants.gSpotLightCount  = (uint)spotCount;
             globalConstants.gAreaLightCount  = (uint)areaCount;
             globalConstants.gPointLightCount = (uint)pointCount;
+            globalConstants.gSssScatteringColor    = new float3(m_Settings.sssScatteringColor.r, m_Settings.sssScatteringColor.g, m_Settings.sssScatteringColor.b);
+            globalConstants.gSssMinThreshold       = m_Settings.sssMinThreshold;
+            globalConstants.gSssScale              = m_Settings.sssScale;
+            globalConstants.gSssMaxSampleRadius    = m_Settings.sssMaxSampleRadius;
 
             // Debug.Log(globalConstants.ToString());
 

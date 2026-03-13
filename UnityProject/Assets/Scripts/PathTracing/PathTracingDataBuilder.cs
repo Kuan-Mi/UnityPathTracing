@@ -321,6 +321,8 @@ namespace DefaultNamespace
                     currentFlags |= isTransparent ? FLAG_TRANSPARENT : FLAG_NON_TRANSPARENT;
                     if (r.gameObject.isStatic)
                         currentFlags |= FLAG_STATIC;
+                    if (mat != null && mat.IsKeywordEnabled("_SKIN"))
+                        currentFlags |= FLAG_SKIN;
 
 
                     inst.textureOffsetAndFlags = ((currentFlags & 0xFF) << FLAG_FIRST_BIT) | (baseTextureIndex & NON_FLAG_MASK);

@@ -144,6 +144,8 @@ TraceOpaqueResult TraceOpaque(GeometryProps geometryProps0, MaterialProps materi
     result.specHitDist = NRD_FrontEnd_SpecHitDistAveraging_Begin();
     #endif
 
+    // viewZ0 and NRD demodulation factors MUST use the original primary surface
+    // so that they match the G-Buffer written in MainRayGenShader.
     float viewZ0 = Geometry::AffineTransform(gWorldToView, geometryProps0.X).z;
     float roughness0 = materialProps0.roughness;
 
@@ -162,7 +164,6 @@ TraceOpaqueResult TraceOpaque(GeometryProps geometryProps0, MaterialProps materi
             specFactor0 = 1.0;
         }
     }
-
 
     // SHARC debug visualization
     #if( USE_SHARC_DEBUG != 0 )
@@ -687,7 +688,7 @@ void MainRayGenShader()
 
     // Direct lighting
     // float3 Xshadow;
-    float3 Ldirect = GetLighting(geometryProps0, materialProps0, LIGHTING | SHADOW);
+    float3 Ldirect = GetLighting(geometryProps0, materialProps0, LIGHTING | SHADOW | SSS);
 
     if (gOnScreen == SHOW_INSTANCE_INDEX)
     {
