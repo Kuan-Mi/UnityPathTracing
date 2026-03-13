@@ -186,15 +186,15 @@ namespace PathTracing
         public float sssMinThreshold = -0.2f;
         
         [Tooltip("SSS 采样每个 BSDF 的样本数量（默认 4，过高会显著增加渲染时间）")]
-        [Range(1, 16)]
+        [Range(0, 16)]
         public int sssTransmissionBsdfSampleCount = 4;
         
         [Tooltip("SSS 采样每个 BSDF 散射样本数量（默认 4，过高会显著增加渲染时间）")]
-        [Range(1, 16)]
+        [Range(0, 16)]
         public int sssTransmissionPerBsdfScatteringSampleCount = 4;
 
         [Tooltip("Burley 散射尺度参数（以 SSS_METERS_UNIT=0.01m 为单位，0.4 ≈ 4mm 散射半径）")]
-        [Range(0.01f, 100.0f)]
+        [Range(0.0f, 100.0f)]
         public float sssScale = 0.4f;
         
         [Tooltip("Burley 散射各向异性参数（-1 完全向后散射，0 各向同性，1 完全向前散射，默认 0）")]
