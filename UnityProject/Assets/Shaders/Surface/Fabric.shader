@@ -274,11 +274,11 @@ Shader "Custom/Fabric"
                 // ----------------------------------------------------------
                 float3 worldPos    = mul(ObjectToWorld3x4(), float4(v.position, 1.0)).xyz;
 #if _SKINNEDMESH
-                float3 prevWorldPos = mul(GetPrevObjectToWorldMatrix(), float4(v.lastPos, 1.0)).xyz;
+                float3 prevWorldPosition = mul(GetPrevObjectToWorldMatrix(), float4(v.lastPos, 1.0)).xyz;
 #else
-                float3 prevWorldPos = mul(GetPrevObjectToWorldMatrix(), float4(v.position, 1.0)).xyz;
+                float3 prevWorldPosition = mul(GetPrevObjectToWorldMatrix(), float4(v.position, 1.0)).xyz;
 #endif
-                payload.Xprev = prevWorldPos;
+                payload.Xprev = prevWorldPosition;
                 
                 // ----------------------------------------------------------
                 // 11. 填充 Payload

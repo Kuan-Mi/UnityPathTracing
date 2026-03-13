@@ -946,6 +946,7 @@ namespace PathTracing
             globalConstants.gSssMinThreshold       = m_Settings.sssMinThreshold;
             globalConstants.gSssScale              = m_Settings.sssScale;
             globalConstants.gSssMaxSampleRadius    = m_Settings.sssMaxSampleRadius;
+            globalConstants.gIsEditor = cameraData.camera.cameraType == CameraType.SceneView ? 1u : 0u;
 
             // Debug.Log(globalConstants.ToString());
 

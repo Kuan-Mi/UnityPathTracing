@@ -76,7 +76,7 @@ MonoBehaviour:
     planeDistanceSensitivity: 0.02
     maxStabilizedFrameNum: 5
     showMode: 18
-    showMV: 0
+    showMV: 1
     showValidation: 0
     dofAperture: 0
     dofFocalDistance: 0.71
@@ -114,10 +114,10 @@ MonoBehaviour:
     tmpDisableRR: 0
     resolutionScale: 1
     upscalerMode: 0
-    sssScatteringColor: {r: 1, g: 1, b: 1, a: 1}
+    sssScatteringColor: {r: 0.3517711, g: 0.8018868, b: 0.4559155, a: 1}
     sssMinThreshold: -0.654
-    sssScale: 2.53
-    sssMaxSampleRadius: 0.0437
+    sssScale: 0.93
+    sssMaxSampleRadius: 0.0192
   finalMaterial: {fileID: 2100000, guid: 27695a2bc55ef2f469362b9a2994989e, type: 2}
   opaqueTracingShader: {fileID: 4807578003741378534, guid: 71faa22953dc9834daf36cc38966c196, type: 3}
   transparentTracingShader: {fileID: 4807578003741378534, guid: d207e5fb066a4b579353785310fd0dea, type: 3}

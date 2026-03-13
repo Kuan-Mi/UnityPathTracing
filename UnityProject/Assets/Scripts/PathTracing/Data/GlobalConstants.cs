@@ -75,6 +75,7 @@ namespace PathTracing
         public float gSssMinThreshold;
         public float gSssScale;
         public float gSssMaxSampleRadius;
+        public float gIsEditor;
 
         public override string ToString()
         {

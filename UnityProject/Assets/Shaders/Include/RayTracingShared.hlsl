@@ -60,6 +60,11 @@ struct GeometryProps
 
         return X + offsetDir * max(amount, 0.00001);
     }
+    float3 GetXoffset2(float3 offsetDir, float amount = 0.001)
+    { 
+
+        return X + offsetDir * max(amount, 0.00001);
+    }
 
     bool Has(uint flag)
     {
@@ -181,6 +186,11 @@ void CastRay(float3 origin, float3 direction, float Tmin, float Tmax, float2 mip
     props.X = origin + direction * payload.hitT;
 
     props.Xprev = payload.Xprev;
+    
+    if (gIsEditor)
+    {
+        props.Xprev = props.X;
+    }
 
     props.V = -direction;
     props.textureOffsetAndFlags = payload.instanceIndexAndFlags;
