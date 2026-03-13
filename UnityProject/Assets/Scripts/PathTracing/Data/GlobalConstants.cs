@@ -73,6 +73,8 @@ namespace PathTracing
         public uint gPointLightCount;
         public float3 gSssScatteringColor;
         public float gSssMinThreshold;
+        public float gSssTransmissionBsdfSampleCount;
+        public float gSssTransmissionPerBsdfScatteringSampleCount;
         public float gSssScale;
         public float gSssMaxSampleRadius;
         public float gIsEditor;

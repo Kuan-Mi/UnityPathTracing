@@ -944,6 +944,9 @@ namespace PathTracing
             globalConstants.gPointLightCount = (uint)pointCount;
             globalConstants.gSssScatteringColor    = new float3(m_Settings.sssScatteringColor.r, m_Settings.sssScatteringColor.g, m_Settings.sssScatteringColor.b);
             globalConstants.gSssMinThreshold       = m_Settings.sssMinThreshold;
+            globalConstants.gSssTransmissionBsdfSampleCount       = m_Settings.sssTransmissionBsdfSampleCount;
+            globalConstants.gSssTransmissionPerBsdfScatteringSampleCount       = m_Settings.sssTransmissionPerBsdfScatteringSampleCount;
+            
             globalConstants.gSssScale              = m_Settings.sssScale;
             globalConstants.gSssMaxSampleRadius    = m_Settings.sssMaxSampleRadius;
             globalConstants.gIsEditor = cameraData.camera.cameraType == CameraType.SceneView ? 1u : 0u;

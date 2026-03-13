@@ -184,6 +184,14 @@ namespace PathTracing
         [Tooltip("SSS 阴影阈值：皮肤在该 NoL 值以下时开始渐入散射（默认 -0.2，允许背透光）")]
         [Range(-1.0f, 0.1f)]
         public float sssMinThreshold = -0.2f;
+        
+        [Tooltip("SSS 采样每个 BSDF 的样本数量（默认 4，过高会显著增加渲染时间）")]
+        [Range(1, 16)]
+        public int sssTransmissionBsdfSampleCount = 4;
+        
+        [Tooltip("SSS 采样每个 BSDF 散射样本数量（默认 4，过高会显著增加渲染时间）")]
+        [Range(1, 16)]
+        public int sssTransmissionPerBsdfScatteringSampleCount = 4;
 
         [Tooltip("Burley 散射尺度参数（以 SSS_METERS_UNIT=0.01m 为单位，0.4 ≈ 4mm 散射半径）")]
         [Range(0.01f, 100.0f)]
