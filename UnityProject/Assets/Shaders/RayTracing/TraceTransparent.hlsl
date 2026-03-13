@@ -140,13 +140,13 @@ float3 TraceTransparent(TraceTransparentDesc desc)
         }
 
         // Cache miss - compute lighting, if not found in caches
-        // if (Rng::Hash::GetFloat() > Lcached.w)
-        // {
-        //     float3 L = GetLighting(geometryProps, materialProps, LIGHTING | SHADOW) + materialProps.Lemi;
-        //     Lcached.xyz = max(Lcached.xyz, L);
-        //     
-        //     // Lcached.xyz = float3(1,0,1);
-        // }
+        if (Rng::Hash::GetFloat() > Lcached.w)
+        {
+            float3 L = GetLighting(geometryProps, materialProps, LIGHTING | SHADOW) + materialProps.Lemi;
+            Lcached.xyz = max(Lcached.xyz, L);
+            
+            // Lcached.xyz = float3(1,0,1);
+        }
     }
 
     // Output

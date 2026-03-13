@@ -439,7 +439,6 @@ float3 GetSunIntensity(float3 v)
 
 float3 GetSkyIntensity(float3 v)
 {
-    return 0;
     float atmosphere = sqrt(1.0 - saturate(v.y));
 
     float scatter = pow(saturate(gSunDirection.y), 1.0 / 15.0);

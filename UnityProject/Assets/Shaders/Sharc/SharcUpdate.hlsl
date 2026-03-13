@@ -241,7 +241,11 @@ void MainRayGenShader()
 
         // Opaque path
         if (!geometryProps.IsMiss())
-            Trace(geometryProps, materialProps); // TODO: looping this for 4-8 iterations helps to improve cache quality, but it's expensive
+        {
+                        Trace(geometryProps, materialProps); // TODO: looping this for 4-8 iterations helps to improve cache quality, but it's expensive
+                        // Trace(geometryProps, materialProps); // TODO: looping this for 4-8 iterations helps to improve cache quality, but it's expensive
+
+        }
     }
     
 

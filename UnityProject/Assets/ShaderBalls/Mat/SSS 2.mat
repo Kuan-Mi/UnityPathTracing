@@ -162,8 +162,8 @@ Material:
     - _ReceiveShadows: 1
     - _SKINNEDMESH: 0
     - _SSS: 1
-    - _SSSScatteringScale: 30
-    - _Smoothness: 1
+    - _SSSScatteringScale: 36.9
+    - _Smoothness: 0
     - _SmoothnessTextureChannel: 0
     - _SpecularHighlights: 1
     - _SrcBlend: 1
