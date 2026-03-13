@@ -125,7 +125,7 @@ float3 EvaluateDirectionalLights(GeometryProps geo, MaterialProps mat, bool isSS
                 //     return float3(0.0, 1.0, 0.0); // 纯绿色。说明射线成功找到了出口！
                 // }
 
-                if (refrProps.IsMiss())
+                if (refrProps.IsMiss() || refrProps.instanceIndex != geo.instanceIndex)
                     continue;
 
                 thickness = refrProps.hitT;
@@ -146,10 +146,8 @@ float3 EvaluateDirectionalLights(GeometryProps geo, MaterialProps mat, bool isSS
 
                 if (shadowHitT == INF)
                 {
-                    // Boundary term: Li * BSDF * PI
-                    // (PI comes from cosine-lobe PDF cancellation: cosTheta / (cosTheta/pi) = pi)
                     float3 transmissionBsdf = RTXCR_EvaluateBoundaryTerm(mat.N, L, refractedRayDirection, backN, thickness, sssMaterialCoeffcients);
-                    // transmissionRadiance += Csun * transmissionBsdf * RTXCR_PI;
+                    radiance += Csun * transmissionBsdf * RTXCR_PI;
                 }
             }
 
@@ -174,26 +172,26 @@ float3 EvaluateDirectionalLights(GeometryProps geo, MaterialProps mat, bool isSS
 
                 // Trace scattering ray to find exit boundary
                 // 追踪散射射线找到出口边界
-                GeometryProps scatteringProps;
+                GeometryProps scatteringGeoProps;
                 MaterialProps scatteringMatProps;
-                CastRay(samplePosition, scatteringDirection, 0.0, INF, mipConeRefr, FLAG_NON_TRANSPARENT, scatteringProps, scatteringMatProps);
+                CastRay(samplePosition, scatteringDirection, 0.0, INF, mipConeRefr, FLAG_NON_TRANSPARENT, scatteringGeoProps, scatteringMatProps);
 
 
                 // 找到散射出口了
-                if (!scatteringProps.IsMiss())
+                if (!scatteringGeoProps.IsMiss() && scatteringGeoProps.instanceIndex == geo.instanceIndex)
                 {
                     // float3 scatteringBoundaryPosition = samplePosition + scatteringProps.hitT * scatteringDirection;
-                    float3 scatteringSampleGeometryNormal = -scatteringMatProps.N;
+                    float3 scatteringSampleGeometryNormal = -scatteringGeoProps.N;
 
                     // Offset and cast shadow ray from scattering exit
-                    float3 scatteringBoundaryPosition = scatteringProps.GetXoffset(scatteringSampleGeometryNormal, PT_SHADOW_RAY_OFFSET);
+                    float3 scatteringBoundaryPosition = scatteringGeoProps.GetXoffset(scatteringSampleGeometryNormal, PT_SHADOW_RAY_OFFSET);
                     float scatteringShadowHitT = CastVisibilityRay_AnyHit(
                         scatteringBoundaryPosition, L, 0.0, INF,
-                        GetConeAngleFromAngularRadius(scatteringProps.mip, gTanSunAngularRadius),
+                        GetConeAngleFromAngularRadius(scatteringGeoProps.mip, gTanSunAngularRadius),
                         gWorldTlas, FLAG_NON_TRANSPARENT, 0);
 
 
-                    // if (ssShadowHitT == INF) {
+                    // if (scatteringShadowHitT == INF) {
                     //     return float3(0.0, 1.0, 1.0); // 【测试3】纯青色！说明光线没被遮挡，能照到背面！
                     // } else {
                     //     return float3(1.0, 0.0, 1.0); // 纯洋红色！说明物体的背面被其他东西（或者自身错误偏移）遮挡了，一直在阴影里。
@@ -202,7 +200,7 @@ float3 EvaluateDirectionalLights(GeometryProps geo, MaterialProps mat, bool isSS
 
                     if (scatteringShadowHitT == INF)
                     {
-                        float totalScatteringDistance = currentT + scatteringProps.hitT;
+                        float totalScatteringDistance = currentT + scatteringGeoProps.hitT;
                         float3 ssTransmissionBsdf = RTXCR_EvaluateSingleScattering(L, scatteringSampleGeometryNormal, totalScatteringDistance, sssMaterialCoeffcients);
 
                         scatteringThroughput += Csun * ssTransmissionBsdf * stepSize;
@@ -240,7 +238,7 @@ float3 EvaluateDirectionalLights(GeometryProps geo, MaterialProps mat, bool isSS
 
     // Add transmission after shadow — it has its own per-exit shadow rays
 #if( RTXCR_INTEGRATION == 1 )
-    lighting = radiance;
+    lighting += radiance;
 #endif
 
     return lighting;
