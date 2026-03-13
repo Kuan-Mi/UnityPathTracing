@@ -170,26 +170,26 @@ float3 EvaluateDirectionalLights(GeometryProps geo, MaterialProps mat, bool isSS
 
                 // Sample a scattering direction with HG phase function
                 // 采样一个散射方向，使用Henyey-Greenstein相函数
-                float3 scatterDir = RTXCR_SampleDirectionHenyeyGreenstein(Rng::Hash::GetFloat2(), subsurfaceMaterialData.g, refractedRayDirection);
+                float3 scatteringDirection = RTXCR_SampleDirectionHenyeyGreenstein(Rng::Hash::GetFloat2(), subsurfaceMaterialData.g, refractedRayDirection);
 
                 // Trace scattering ray to find exit boundary
                 // 追踪散射射线找到出口边界
-                GeometryProps ssRayProps;
-                MaterialProps ssRayMatProps;
-                CastRay(samplePosition, scatterDir, 0.0, INF, mipConeRefr, FLAG_NON_TRANSPARENT, ssRayProps, ssRayMatProps);
+                GeometryProps scatteringProps;
+                MaterialProps scatteringMatProps;
+                CastRay(samplePosition, scatteringDirection, 0.0, INF, mipConeRefr, FLAG_NON_TRANSPARENT, scatteringProps, scatteringMatProps);
 
 
                 // 找到散射出口了
-                if (!ssRayProps.IsMiss())
+                if (!scatteringProps.IsMiss())
                 {
-                    float3 scatterExitPos = samplePosition + ssRayProps.hitT * scatterDir;
-                    float3 scatterExitN = -ssRayMatProps.N;
+                    float3 scatterExitPos = samplePosition + scatteringProps.hitT * scatteringDirection;
+                    float3 scatterExitN = -scatteringMatProps.N;
 
                     // Offset and cast shadow ray from scattering exit
-                    float3 scatterExitOffset = ssRayProps.GetXoffset(scatterExitN, PT_SHADOW_RAY_OFFSET);
+                    float3 scatterExitOffset = scatteringProps.GetXoffset(scatterExitN, PT_SHADOW_RAY_OFFSET);
                     float ssShadowHitT = CastVisibilityRay_AnyHit(
                         scatterExitOffset, L, 0.0, INF,
-                        GetConeAngleFromAngularRadius(ssRayProps.mip, gTanSunAngularRadius),
+                        GetConeAngleFromAngularRadius(scatteringProps.mip, gTanSunAngularRadius),
                         gWorldTlas, FLAG_NON_TRANSPARENT, 0);
 
 
@@ -202,7 +202,7 @@ float3 EvaluateDirectionalLights(GeometryProps geo, MaterialProps mat, bool isSS
 
                     if (ssShadowHitT == INF)
                     {
-                        float totalScatteringDist = currentT + ssRayProps.hitT;
+                        float totalScatteringDist = currentT + scatteringProps.hitT;
                         float3 ssContrib = RTXCR_EvaluateSingleScattering(L, scatterExitN, totalScatteringDist, sssMaterialCoeffcients);
 
                         scatteringThroughput += Csun * ssContrib * stepSize;
