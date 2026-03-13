@@ -20,7 +20,7 @@ Material:
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_Name: Red_Test
+  m_Name: SSS 2
   m_Shader: {fileID: 4800000, guid: f906aaa2a642e584085642e4a0c1fd93, type: 3}
   m_Parent: {fileID: 0}
   m_ModifiedSerializedProperties: 0
@@ -162,7 +162,7 @@ Material:
     - _ReceiveShadows: 1
     - _SKINNEDMESH: 0
     - _SSS: 1
-    - _SSSScatteringScale: 54.4
+    - _SSSScatteringScale: 30
     - _Smoothness: 1
     - _SmoothnessTextureChannel: 0
     - _SpecularHighlights: 1
@@ -187,10 +187,10 @@ Material:
     - roughnessFactor: 1
     - transmissionFactor: 0
     m_Colors:
-    - _BaseColor: {r: 1, g: 0.9737111, b: 0.8820755, a: 1}
-    - _Color: {r: 1, g: 0.9737111, b: 0.8820755, a: 1}
+    - _BaseColor: {r: 0.383277, g: 0.9339623, b: 0.45530835, a: 1}
+    - _Color: {r: 0.38327697, g: 0.9339623, b: 0.45530826, a: 1}
     - _EmissionColor: {r: 0, g: 0, b: 0, a: 1}
-    - _SSSScatteringColor: {r: 0.9811321, g: 0.9581473, b: 0.9487362, a: 1}
+    - _SSSScatteringColor: {r: 0.5223834, g: 0.8584906, b: 0.5620863, a: 1}
     - _SpecColor: {r: 0.19999996, g: 0.19999996, b: 0.19999996, a: 1}
     - baseColorFactor: {r: 1, g: 1, b: 1, a: 1}
     - baseColorTexture_Rotation: {r: 0, g: 0, b: 0, a: 0}
