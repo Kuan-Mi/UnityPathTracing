@@ -1,6 +1,3 @@
-#define SSS_TRANSMISSION_BSDF_SAMPLE_COUNT       5
-#define SSS_TRANSMISSION_SCATTERING_SAMPLE_COUNT 5
-
 float3 evalSingleScatteringTransmission(
     GeometryProps geo,
     MaterialProps mat,
@@ -13,7 +10,7 @@ float3 evalSingleScatteringTransmission(
 
     RTXCR_SubsurfaceMaterialCoefficients sssMaterialCoeffcients = RTXCR_ComputeSubsurfaceMaterialCoefficients(subsurfaceMaterialData);
 
-    for (int bsdfSampleIndex = 0; bsdfSampleIndex < SSS_TRANSMISSION_BSDF_SAMPLE_COUNT; ++bsdfSampleIndex)
+    for (int bsdfSampleIndex = 0; bsdfSampleIndex < gSssTransmissionBsdfSampleCount; ++bsdfSampleIndex)
     {
         // Step 4.1: generate cosine-weighted refraction ray into the volume
         const float3 refractedRayDirection = RTXCR_CalculateRefractionRay(subsurfaceInteraction, Rng::Hash::GetFloat2());
@@ -60,16 +57,15 @@ float3 evalSingleScatteringTransmission(
             if (shadowHitT == INF)
             {
                 float3 transmissionBsdf = RTXCR_EvaluateBoundaryTerm(mat.N, vectorToLight, refractedRayDirection, backN, thickness, sssMaterialCoeffcients);
-                radiance += Csun * transmissionBsdf * RTXCR_PI;
+                // radiance += Csun * transmissionBsdf * RTXCR_PI;
             }
         }
-
         // Step 4.2: single scattering — uniform stepping along the refraction ray
-        float stepSize = thickness / (SSS_TRANSMISSION_SCATTERING_SAMPLE_COUNT + 1);
+        float stepSize = thickness / (gSsTransmissionPerBsdfScatteringSampleCount + 1);
         float accumulatedT = 0.0;
         float3 scatteringThroughput = 0.0;
 
-        for (int sampleIndex = 0; sampleIndex < SSS_TRANSMISSION_SCATTERING_SAMPLE_COUNT; ++sampleIndex)
+        for (int sampleIndex = 0; sampleIndex < gSsTransmissionPerBsdfScatteringSampleCount; ++sampleIndex)
         {
             const float currentT = accumulatedT + stepSize;
             accumulatedT = currentT;
@@ -116,7 +112,7 @@ float3 evalSingleScatteringTransmission(
                     float totalScatteringDistance = currentT + scatteringGeoProps.hitT;
                     float3 ssTransmissionBsdf = RTXCR_EvaluateSingleScattering(vectorToLight, scatteringSampleGeometryNormal, totalScatteringDistance, sssMaterialCoeffcients);
 
-                    scatteringThroughput += Csun * ssTransmissionBsdf * stepSize;
+                    scatteringThroughput += Csun * ssTransmissionBsdf * stepSize; // Li * BSDF / PDF
                 }
             }
         }
@@ -124,7 +120,7 @@ float3 evalSingleScatteringTransmission(
         radiance += scatteringThroughput;
     }
 
-    radiance /= max(SSS_TRANSMISSION_BSDF_SAMPLE_COUNT, 1);
+    radiance /= gSssTransmissionBsdfSampleCount;
     return radiance;
 }
 
@@ -246,7 +242,7 @@ float3 EvaluateDirectionalLights(GeometryProps geo, MaterialProps mat, bool isSS
     }
 
 #if( RTXCR_INTEGRATION == 1 )
-    lighting += transmissionRadiance;
+    lighting = transmissionRadiance;
 #endif
 
     return lighting;

@@ -242,6 +242,8 @@ cbuffer PathTracingParams : register(b0)
     uint gPointLightCount;
     float3 gSssScatteringColor;
     float gSssMinThreshold;
+    float gSssTransmissionBsdfSampleCount;
+    float gSsTransmissionPerBsdfScatteringSampleCount;
     float gSssScale;
     float gSssMaxSampleRadius;
     float gIsEditor;
