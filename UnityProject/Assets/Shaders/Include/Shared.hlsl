@@ -244,6 +244,7 @@ cbuffer PathTracingParams : register(b0)
     float gSssMinThreshold;
     float gSssScale;
     float gSssMaxSampleRadius;
+    float gIsEditor;
 };
 
 #include "Assets/Shaders/Include/ml.hlsli"
@@ -407,7 +408,7 @@ float GetCircleOfConfusion(float distance) // diameter
 //=============================================================================================
 
 #define SKY_INTENSITY 1.0
-#define SUN_INTENSITY 50.0
+#define SUN_INTENSITY 10.0
 
 float3 GetSunIntensity(float3 v)
 {

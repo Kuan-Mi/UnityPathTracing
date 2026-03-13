@@ -1,5 +1,5 @@
 float3 EvaluateDirectionalLights(GeometryProps geo, MaterialProps mat, bool isSSS)
-{ 
+{
     // -----------------------------------------------------------------------
     // Extract materials
     // -----------------------------------------------------------------------
@@ -54,27 +54,36 @@ float3 EvaluateDirectionalLights(GeometryProps geo, MaterialProps mat, bool isSS
 #if( RTXCR_INTEGRATION == 1 )
     if (isSSS)
     {
-        RTXCR_SubsurfaceMaterialData sssMat = (RTXCR_SubsurfaceMaterialData)0;
-        sssMat.transmissionColor = albedo;
-        sssMat.scatteringColor = gSssScatteringColor;
-        sssMat.scale = gSssScale / gUnitToMetersMultiplier;
-        sssMat.g = 0.0;
+        // 定义次表面材质
+        RTXCR_SubsurfaceMaterialData subsurfaceMaterialData = (RTXCR_SubsurfaceMaterialData)0;
+        subsurfaceMaterialData.transmissionColor = albedo;
+        subsurfaceMaterialData.scatteringColor = gSssScatteringColor;
+        subsurfaceMaterialData.scale = gSssScale / gUnitToMetersMultiplier;
+        subsurfaceMaterialData.g = 0.0;
 
+        // ---------------------------------------------------------------
+        // 首先是 Evaluate Diffusion Profile
+        // ---------------------------------------------------------------
+
+        // 定义次表面交互
         float3 Xoff = geo.GetXoffset(geo.N, PT_SHADOW_RAY_OFFSET);
         float3x3 basis = Geometry::GetBasis(geo.N);
-        RTXCR_SubsurfaceInteraction sssInteraction =
+        RTXCR_SubsurfaceInteraction subsurfaceInteraction =
             RTXCR_CreateSubsurfaceInteraction(Xoff, basis[2], basis[0], basis[1]);
 
+        // 生成次表面样本并评估BSSDF，（采样点和权重）
         RTXCR_SubsurfaceSample sssSample = (RTXCR_SubsurfaceSample)0;
-        RTXCR_EvalBurleyDiffusionProfile(sssMat, sssInteraction,
+        RTXCR_EvalBurleyDiffusionProfile(subsurfaceMaterialData, subsurfaceInteraction,
                                          gSssMaxSampleRadius / gUnitToMetersMultiplier, true, Rng::Hash::GetFloat2(), sssSample);
 
+        // 从采样点向太阳方向投射锥形光线，找到第一个交点（如果有的话）
         float2 mipConeSSS = GetConeAngleFromRoughness(geo.mip, 0.0);
         GeometryProps sssProps;
         MaterialProps sssMaterialProps;
-        CastRay(sssSample.samplePosition, -sssInteraction.normal,
+        CastRay(sssSample.samplePosition, -subsurfaceInteraction.normal,
                 0.0, INF, mipConeSSS, FLAG_NON_TRANSPARENT, sssProps, sssMaterialProps);
 
+        // 如果交点有效且是皮肤材质，使用这个交点来计算SSS贡献并更新阴影原点
         if (!sssProps.IsMiss() && sssProps.Has(FLAG_SKIN))
         {
             Xshadow = sssProps.X;
@@ -84,65 +93,59 @@ float3 EvaluateDirectionalLights(GeometryProps geo, MaterialProps mat, bool isSS
         }
 
         // ---------------------------------------------------------------
+        // 然后是透射
         // SSS Transmission: boundary term + single scattering (Step 4)
         // Following the RTXCR SDK integration guide.
         // ---------------------------------------------------------------
-        #define SSS_TRANSMISSION_BSDF_SAMPLE_COUNT       1
-        #define SSS_TRANSMISSION_SCATTERING_SAMPLE_COUNT 10
+#define SSS_TRANSMISSION_BSDF_SAMPLE_COUNT       5
+#define SSS_TRANSMISSION_SCATTERING_SAMPLE_COUNT 5
 
-        RTXCR_SubsurfaceMaterialCoefficients sssCoeffs =
-            RTXCR_ComputeSubsurfaceMaterialCoefficients(sssMat);
+        RTXCR_SubsurfaceMaterialCoefficients sssMaterialCoeffcients = RTXCR_ComputeSubsurfaceMaterialCoefficients(subsurfaceMaterialData);
 
-        for (int bsdfSampleIdx = 0; bsdfSampleIdx < SSS_TRANSMISSION_BSDF_SAMPLE_COUNT; ++bsdfSampleIdx)
+        for (int bsdfSampleIndex = 0; bsdfSampleIndex < SSS_TRANSMISSION_BSDF_SAMPLE_COUNT; ++bsdfSampleIndex)
         {
             // Step 4.1: generate cosine-weighted refraction ray into the volume
-            float3 refrDir = RTXCR_CalculateRefractionRay(sssInteraction,
-                                                           Rng::Hash::GetFloat2());
+            float3 refractedRayDirection = RTXCR_CalculateRefractionRay(subsurfaceInteraction, Rng::Hash::GetFloat2());
 
             // Trace the refraction ray to find the backface exit
+            // 追踪折射射线找到背面出口
             float2 mipConeRefr = GetConeAngleFromRoughness(geo.mip, 0.0);
             GeometryProps refrProps;
             MaterialProps refrMatProps;
-            float3 refrOrigin = geo.GetXoffset(-geo.N, PT_SHADOW_RAY_OFFSET);
-            CastRay(refrOrigin, refrDir,
-                    0.0, INF, mipConeRefr, FLAG_NON_TRANSPARENT, refrProps, refrMatProps);
+            float3 refrOrigin = geo.GetXoffset2(-geo.N, 0.0001);
+            CastRay(refrOrigin, refractedRayDirection, 0.0, INF, mipConeRefr, FLAG_NON_TRANSPARENT, refrProps, refrMatProps);
 
             // if (refrProps.IsMiss()) {
             //     return float3(1.0, 1.0, 0.0); // 【测试2】纯黄色！如果物体变黄了，说明射线穿透了体积但没有碰到任何东西！(99%是背面剔除或者模型不是闭合的)
             // } else {
             //     return float3(0.0, 1.0, 0.0); // 纯绿色。说明射线成功找到了出口！
             // }
-            
-            
+
             if (refrProps.IsMiss())
                 continue;
 
             float thickness = refrProps.hitT;
-            float3 backPosition = refrOrigin + thickness * refrDir;
+            float3 backPosition = refrOrigin + thickness * refractedRayDirection;
             float3 backN = -refrMatProps.N;
 
             // Offset exit point along backface normal for shadow ray
             float3 backPositionOffset = refrProps.GetXoffset(backN, PT_SHADOW_RAY_OFFSET);
 
             // Cast shadow ray from the backface exit toward the sun
-            float shadowHitT = CastVisibilityRay_AnyHit(
-                backPositionOffset, L, 0.0, INF,
-                GetConeAngleFromAngularRadius(refrProps.mip, gTanSunAngularRadius),
-                gWorldTlas, FLAG_NON_TRANSPARENT, 0);
+            float shadowHitT = CastVisibilityRay_AnyHit(backPositionOffset, L, 0.0, INF, GetConeAngleFromAngularRadius(refrProps.mip, gTanSunAngularRadius), gWorldTlas, FLAG_NON_TRANSPARENT, 0);
 
-            // if (shadowHitT == INF) {
-            //     return float3(0.0, 1.0, 1.0); // 【测试3】纯青色！说明光线没被遮挡，能照到背面！
-            // } else {
-            //     return float3(1.0, 0.0, 1.0); // 纯洋红色！说明物体的背面被其他东西（或者自身错误偏移）遮挡了，一直在阴影里。
-            // }
-            
+            if (shadowHitT == INF) {
+                return float3(0.0, 1.0, 1.0); // 【测试3】纯青色！说明光线没被遮挡，能照到背面！
+            } else {
+                return float3(1.0, 0.0, 1.0); // 纯洋红色！说明物体的背面被其他东西（或者自身错误偏移）遮挡了，一直在阴影里。
+            }
+
             if (shadowHitT == INF)
             {
                 // Boundary term: Li * BSDF * PI
                 // (PI comes from cosine-lobe PDF cancellation: cosTheta / (cosTheta/pi) = pi)
-                float3 boundaryBsdf = RTXCR_EvaluateBoundaryTerm(
-                    sssInteraction.normal, L, refrDir, backN, thickness, sssCoeffs);
-                transmissionRadiance += Csun * boundaryBsdf * RTXCR_PI;
+                float3 boundaryBsdf = RTXCR_EvaluateBoundaryTerm( subsurfaceInteraction.normal, L, refractedRayDirection, backN, thickness, sssMaterialCoeffcients);
+                // transmissionRadiance += Csun * boundaryBsdf * RTXCR_PI;
             }
 
             // Step 4.2: single scattering — uniform stepping along the refraction ray
@@ -154,50 +157,49 @@ float3 EvaluateDirectionalLights(GeometryProps geo, MaterialProps mat, bool isSS
             {
                 float currentT = accumulatedT + stepSize;
                 accumulatedT = currentT;
-
+            
                 if (currentT >= thickness)
                     break;
-
-                float3 samplePos = refrOrigin + currentT * refrDir;
-
+            
+                float3 samplePos = refrOrigin + currentT * refractedRayDirection;
+            
                 // Sample a scattering direction with HG phase function
-                float3 scatterDir = RTXCR_SampleDirectionHenyeyGreenstein(
-                    Rng::Hash::GetFloat2(), sssMat.g, refrDir);
-
+                // 采样一个散射方向，使用Henyey-Greenstein相函数
+                float3 scatterDir = RTXCR_SampleDirectionHenyeyGreenstein(Rng::Hash::GetFloat2(), subsurfaceMaterialData.g, refractedRayDirection);
+            
                 // Trace scattering ray to find exit boundary
+                // 追踪散射射线找到出口边界
                 GeometryProps ssRayProps;
                 MaterialProps ssRayMatProps;
-                CastRay(samplePos, scatterDir,
-                        0.0, INF, mipConeRefr, FLAG_NON_TRANSPARENT, ssRayProps, ssRayMatProps);
-                
-                
+                CastRay(samplePos, scatterDir,0.0, INF, mipConeRefr, FLAG_NON_TRANSPARENT, ssRayProps, ssRayMatProps);
+            
+            
                 // 找到散射出口了
                 if (!ssRayProps.IsMiss())
                 {
                     float3 scatterExitPos = samplePos + ssRayProps.hitT * scatterDir;
-                    float3 scatterExitN =  - ssRayMatProps.N;
-
+                    float3 scatterExitN = -ssRayMatProps.N;
+            
                     // Offset and cast shadow ray from scattering exit
                     float3 scatterExitOffset = ssRayProps.GetXoffset(scatterExitN, PT_SHADOW_RAY_OFFSET);
                     float ssShadowHitT = CastVisibilityRay_AnyHit(
                         scatterExitOffset, L, 0.0, INF,
                         GetConeAngleFromAngularRadius(ssRayProps.mip, gTanSunAngularRadius),
                         gWorldTlas, FLAG_NON_TRANSPARENT, 0);
-
-                    
+            
+            
                     // if (ssShadowHitT == INF) {
                     //     return float3(0.0, 1.0, 1.0); // 【测试3】纯青色！说明光线没被遮挡，能照到背面！
                     // } else {
                     //     return float3(1.0, 0.0, 1.0); // 纯洋红色！说明物体的背面被其他东西（或者自身错误偏移）遮挡了，一直在阴影里。
                     // }
             
-                    
+            
                     if (ssShadowHitT == INF)
                     {
                         float totalScatteringDist = currentT + ssRayProps.hitT;
-                        float3 ssContrib = RTXCR_EvaluateSingleScattering(
-                            L, scatterExitN, totalScatteringDist, sssCoeffs);
-                        // Li * BSDF / PDF, stepSize is the numerical integration weight
+                        float3 ssContrib = RTXCR_EvaluateSingleScattering(L, scatterExitN, totalScatteringDist, sssMaterialCoeffcients);
+                        
                         scatteringThroughput += Csun * ssContrib * stepSize;
                     }
                 }
@@ -233,7 +235,7 @@ float3 EvaluateDirectionalLights(GeometryProps geo, MaterialProps mat, bool isSS
 
     // Add transmission after shadow — it has its own per-exit shadow rays
 #if( RTXCR_INTEGRATION == 1 )
-    lighting += transmissionRadiance;
+    lighting = transmissionRadiance;
 #endif
 
     return lighting;
