@@ -183,7 +183,8 @@ float3 EvaluateDirectionalLights(GeometryProps geo, MaterialProps mat, bool isSS
         // 定义次表面材质
         RTXCR_SubsurfaceMaterialData subsurfaceMaterialData = (RTXCR_SubsurfaceMaterialData)0;
         subsurfaceMaterialData.transmissionColor = albedo;
-        subsurfaceMaterialData.scatteringColor = gSssScatteringColor;
+        // 使用Lemi作为散射颜色只是为了测试
+        subsurfaceMaterialData.scatteringColor = mat.scatteringColor;
         subsurfaceMaterialData.scale = gSssScale / gUnitToMetersMultiplier;
         subsurfaceMaterialData.g = gSssAnisotropy;
 

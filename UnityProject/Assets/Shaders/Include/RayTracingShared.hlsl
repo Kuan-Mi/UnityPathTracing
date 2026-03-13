@@ -60,9 +60,9 @@ struct GeometryProps
 
         return X + offsetDir * max(amount, 0.00001);
     }
-    float3 GetXoffset2(float3 offsetDir, float amount = 0.001)
-    { 
 
+    float3 GetXoffset2(float3 offsetDir, float amount = 0.001)
+    {
         return X + offsetDir * max(amount, 0.00001);
     }
 
@@ -85,6 +85,7 @@ struct GeometryProps
 struct MaterialProps
 {
     float3 Lemi;
+    float3 scatteringColor;
     float3 N;
     float3 T;
     float3 baseColor;
@@ -186,7 +187,7 @@ void CastRay(float3 origin, float3 direction, float Tmin, float Tmax, float2 mip
     props.X = origin + direction * payload.hitT;
 
     props.Xprev = payload.Xprev;
-    
+
     if (gIsEditor)
     {
         props.Xprev = props.X;
@@ -201,7 +202,17 @@ void CastRay(float3 origin, float3 direction, float Tmin, float Tmax, float2 mip
     float2 rAm = Packing::UintToRg16f(payload.roughnessAndMetalness);
     matProps.roughness = rAm.r;
     matProps.metalness = rAm.g;
-    matProps.Lemi = Packing::DecodeRgbe(payload.Lemi);
+
+    if (props.Has(FLAG_SKIN))
+    {
+        matProps.scatteringColor = Packing::DecodeRgbe(payload.Lemi);
+        matProps.Lemi = 0;
+    }
+    else
+    {
+        matProps.Lemi = Packing::DecodeRgbe(payload.Lemi);
+    }
+
     // 这三个应该从贴图再计算一次
     matProps.curvature = payload.curvature;
     matProps.N = Packing::DecodeUnitVector(payload.matN);
