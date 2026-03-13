@@ -49,7 +49,7 @@ float3 EvaluateDirectionalLights(GeometryProps geo, MaterialProps mat, bool isSS
     // SSS: Burley sample -> exit point -> override Cdiff + shadow origin
     // -----------------------------------------------------------------------
     GeometryProps shadowGeo = geo;
-    float3 transmissionRadiance = 0.0;
+    float3 radiance = 0.0;
 
 #if( RTXCR_INTEGRATION == 1 )
     if (isSSS)
@@ -106,11 +106,11 @@ float3 EvaluateDirectionalLights(GeometryProps geo, MaterialProps mat, bool isSS
             const float3 refractedRayDirection = RTXCR_CalculateRefractionRay(subsurfaceInteraction, Rng::Hash::GetFloat2());
             const float3 hitPos = subsurfaceInteraction.centerPosition;
 
-            
+
             float thickness = 0.0f;
             float3 backPosition;
             float2 mipConeRefr = GetConeAngleFromRoughness(geo.mip, 0.0);
-            
+
             {
                 // Trace the refraction ray to find the backface exit
                 // 追踪折射射线找到背面出口
@@ -182,13 +182,13 @@ float3 EvaluateDirectionalLights(GeometryProps geo, MaterialProps mat, bool isSS
                 // 找到散射出口了
                 if (!scatteringProps.IsMiss())
                 {
-                    float3 scatterExitPos = samplePosition + scatteringProps.hitT * scatteringDirection;
-                    float3 scatterExitN = -scatteringMatProps.N;
+                    // float3 scatteringBoundaryPosition = samplePosition + scatteringProps.hitT * scatteringDirection;
+                    float3 scatteringSampleGeometryNormal = -scatteringMatProps.N;
 
                     // Offset and cast shadow ray from scattering exit
-                    float3 scatterExitOffset = scatteringProps.GetXoffset(scatterExitN, PT_SHADOW_RAY_OFFSET);
-                    float ssShadowHitT = CastVisibilityRay_AnyHit(
-                        scatterExitOffset, L, 0.0, INF,
+                    float3 scatteringBoundaryPosition = scatteringProps.GetXoffset(scatteringSampleGeometryNormal, PT_SHADOW_RAY_OFFSET);
+                    float scatteringShadowHitT = CastVisibilityRay_AnyHit(
+                        scatteringBoundaryPosition, L, 0.0, INF,
                         GetConeAngleFromAngularRadius(scatteringProps.mip, gTanSunAngularRadius),
                         gWorldTlas, FLAG_NON_TRANSPARENT, 0);
 
@@ -200,20 +200,20 @@ float3 EvaluateDirectionalLights(GeometryProps geo, MaterialProps mat, bool isSS
                     // }
 
 
-                    if (ssShadowHitT == INF)
+                    if (scatteringShadowHitT == INF)
                     {
-                        float totalScatteringDist = currentT + scatteringProps.hitT;
-                        float3 ssContrib = RTXCR_EvaluateSingleScattering(L, scatterExitN, totalScatteringDist, sssMaterialCoeffcients);
+                        float totalScatteringDistance = currentT + scatteringProps.hitT;
+                        float3 ssTransmissionBsdf = RTXCR_EvaluateSingleScattering(L, scatteringSampleGeometryNormal, totalScatteringDistance, sssMaterialCoeffcients);
 
-                        scatteringThroughput += Csun * ssContrib * stepSize;
+                        scatteringThroughput += Csun * ssTransmissionBsdf * stepSize;
                     }
                 }
             }
 
-            transmissionRadiance += scatteringThroughput;
+            radiance += scatteringThroughput;
         }
 
-        transmissionRadiance /= max(SSS_TRANSMISSION_BSDF_SAMPLE_COUNT, 1);
+        radiance /= max(SSS_TRANSMISSION_BSDF_SAMPLE_COUNT, 1);
     }
 #endif
 
@@ -240,7 +240,7 @@ float3 EvaluateDirectionalLights(GeometryProps geo, MaterialProps mat, bool isSS
 
     // Add transmission after shadow — it has its own per-exit shadow rays
 #if( RTXCR_INTEGRATION == 1 )
-    lighting = transmissionRadiance;
+    lighting = radiance;
 #endif
 
     return lighting;
