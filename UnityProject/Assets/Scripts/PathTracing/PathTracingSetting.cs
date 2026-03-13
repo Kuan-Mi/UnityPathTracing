@@ -196,6 +196,10 @@ namespace PathTracing
         [Tooltip("Burley 散射尺度参数（以 SSS_METERS_UNIT=0.01m 为单位，0.4 ≈ 4mm 散射半径）")]
         [Range(0.01f, 100.0f)]
         public float sssScale = 0.4f;
+        
+        [Tooltip("Burley 散射各向异性参数（-1 完全向后散射，0 各向同性，1 完全向前散射，默认 0）")]
+        [Range(-1.0f, 1.0f)]
+        public float sssAnisotropy = 0.0f;
 
         [Tooltip("Burley 采样最大盘半径（世界单位/m，默认 0.004 = 4mm）")]
         [Range(0.0001f, 0.1f)]

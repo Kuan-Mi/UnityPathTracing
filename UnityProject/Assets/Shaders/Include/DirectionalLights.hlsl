@@ -185,7 +185,7 @@ float3 EvaluateDirectionalLights(GeometryProps geo, MaterialProps mat, bool isSS
         subsurfaceMaterialData.transmissionColor = albedo;
         subsurfaceMaterialData.scatteringColor = gSssScatteringColor;
         subsurfaceMaterialData.scale = gSssScale / gUnitToMetersMultiplier;
-        subsurfaceMaterialData.g = 0.0;
+        subsurfaceMaterialData.g = gSssAnisotropy;
 
         // ---------------------------------------------------------------
         // 首先是 Evaluate Diffusion Profile
@@ -196,15 +196,19 @@ float3 EvaluateDirectionalLights(GeometryProps geo, MaterialProps mat, bool isSS
         RTXCR_SubsurfaceInteraction subsurfaceInteraction = RTXCR_CreateSubsurfaceInteraction(geo.X, basis[2], basis[0], basis[1]);
 
         // 生成次表面样本并评估BSSDF，（采样点和权重）
-        RTXCR_SubsurfaceSample sssSample = (RTXCR_SubsurfaceSample)0;
-        RTXCR_EvalBurleyDiffusionProfile(subsurfaceMaterialData, subsurfaceInteraction,
-                                         gSssMaxSampleRadius / gUnitToMetersMultiplier, true, Rng::Hash::GetFloat2(), sssSample);
+        RTXCR_SubsurfaceSample subsurfaceSample = (RTXCR_SubsurfaceSample)0;
+        RTXCR_EvalBurleyDiffusionProfile(subsurfaceMaterialData,
+                                         subsurfaceInteraction,
+                                         gSssMaxSampleRadius / gUnitToMetersMultiplier,
+                                         true,
+                                         Rng::Hash::GetFloat2(),
+                                         subsurfaceSample);
 
         // 从采样点向太阳方向投射锥形光线，找到第一个交点（如果有的话）
         float2 mipConeSSS = GetConeAngleFromRoughness(geo.mip, 0.0);
         GeometryProps sssProps;
         MaterialProps sssMaterialProps;
-        CastRay(sssSample.samplePosition, -subsurfaceInteraction.normal,
+        CastRay(subsurfaceSample.samplePosition, -subsurfaceInteraction.normal,
                 0.0, INF, mipConeSSS, FLAG_NON_TRANSPARENT, sssProps, sssMaterialProps);
 
         // 如果交点有效且是皮肤材质，使用这个交点来计算SSS贡献并更新阴影原点
@@ -213,7 +217,7 @@ float3 EvaluateDirectionalLights(GeometryProps geo, MaterialProps mat, bool isSS
             Xshadow = sssProps.X;
             shadowGeo = sssProps;
             float NoL_sss = saturate(dot(sssMaterialProps.N, L));
-            Cdiff = RTXCR_EvalBssrdf(sssSample, Csun, NoL_sss);
+            Cdiff = RTXCR_EvalBssrdf(subsurfaceSample, Csun, NoL_sss);
         }
 
         transmissionRadiance = evalSingleScatteringTransmission(geo, mat, gSunDirection.xyz, Csun, subsurfaceMaterialData, subsurfaceInteraction);
