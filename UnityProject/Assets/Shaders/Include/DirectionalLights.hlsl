@@ -57,7 +57,7 @@ float3 evalSingleScatteringTransmission(
             if (shadowHitT == INF)
             {
                 float3 transmissionBsdf = RTXCR_EvaluateBoundaryTerm(mat.N, vectorToLight, refractedRayDirection, backN, thickness, sssMaterialCoeffcients);
-                // radiance += Csun * transmissionBsdf * RTXCR_PI;
+                radiance += Csun * transmissionBsdf * RTXCR_PI;
             }
         }
         // Step 4.2: single scattering — uniform stepping along the refraction ray
@@ -120,7 +120,7 @@ float3 evalSingleScatteringTransmission(
         radiance += scatteringThroughput;
     }
 
-    radiance /= gSssTransmissionBsdfSampleCount;
+    radiance /= max(gSssTransmissionBsdfSampleCount, 1);
     return radiance;
 }
 
@@ -246,7 +246,7 @@ float3 EvaluateDirectionalLights(GeometryProps geo, MaterialProps mat, bool isSS
     }
 
 #if( RTXCR_INTEGRATION == 1 )
-    lighting = transmissionRadiance;
+    lighting += transmissionRadiance;
 #endif
 
     return lighting;
