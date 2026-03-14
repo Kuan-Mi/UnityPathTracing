@@ -1,5 +1,19 @@
 %YAML 1.1
 %TAG !u! tag:unity3d.com,2011:
+--- !u!114 &-1024662699661763357
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 421ac11f321cdbb4fbe9c68d4e698dae, type: 3}
+  m_Name: DemoRenderFeature
+  m_EditorClassIdentifier: Assembly-CSharp::DefaultNamespace.DemoRenderFeature
+  m_Active: 1
+  inputTexture: {fileID: 0}
 --- !u!114 &11400000
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -26,7 +40,8 @@ MonoBehaviour:
     probeVolumeBlendStatesCS: {fileID: 7200000, guid: b9a23f869c4fd45f19c5ada54dd82176, type: 3}
   m_RendererFeatures:
   - {fileID: 7213446213844144994}
-  m_RendererFeatureMap: 621391ee1c4f1b64
+  - {fileID: -1024662699661763357}
+  m_RendererFeatureMap: 621391ee1c4f1b64e35c111cb4aac7f1
   m_UseNativeRenderPass: 1
   xrSystemData: {fileID: 0}
   postProcessData: {fileID: 11400000, guid: 41439944d30ece34e96484bdb6645b55, type: 2}
@@ -75,7 +90,7 @@ MonoBehaviour:
     isBaseColorMetalnessAvailable: 1
     planeDistanceSensitivity: 0.02
     maxStabilizedFrameNum: 5
-    showMode: 18
+    showMode: 16
     showMV: 0
     showValidation: 0
     dofAperture: 0

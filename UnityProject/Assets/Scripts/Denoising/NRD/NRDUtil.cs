@@ -1,4 +1,5 @@
-﻿using Nrd;
+﻿using DefaultNamespace;
+using Nrd;
 using UnityEngine.Experimental.Rendering;
 
 namespace NRD
@@ -232,6 +233,112 @@ namespace NRD
                 // PVRTC, ETC, ASTC 等格式在标准 DXGI 中不存在
                 default:
                     return DXGI_FORMAT.DXGI_FORMAT_UNKNOWN;
+            }
+        }
+        
+        
+
+        public static NriFormat GetNriFormat(GraphicsFormat format)
+        {
+            switch (format)
+            {
+                // --- 8-bit Formats ---
+                case GraphicsFormat.R8_UNorm: return NriFormat.R8_UNORM;
+                case GraphicsFormat.R8_SNorm: return NriFormat.R8_SNORM;
+                case GraphicsFormat.R8_UInt:  return NriFormat.R8_UINT;
+                case GraphicsFormat.R8_SInt:  return NriFormat.R8_SINT;
+
+                case GraphicsFormat.R8G8_UNorm: return NriFormat.RG8_UNORM;
+                case GraphicsFormat.R8G8_SNorm: return NriFormat.RG8_SNORM;
+                case GraphicsFormat.R8G8_UInt:  return NriFormat.RG8_UINT;
+                case GraphicsFormat.R8G8_SInt:  return NriFormat.RG8_SINT;
+
+                case GraphicsFormat.R8G8B8A8_UNorm: return NriFormat.RGBA8_UNORM;
+                case GraphicsFormat.R8G8B8A8_SRGB:  return NriFormat.RGBA8_SRGB;
+                case GraphicsFormat.R8G8B8A8_SNorm: return NriFormat.RGBA8_SNORM;
+                case GraphicsFormat.R8G8B8A8_UInt:  return NriFormat.RGBA8_UINT;
+                case GraphicsFormat.R8G8B8A8_SInt:  return NriFormat.RGBA8_SINT;
+
+                case GraphicsFormat.B8G8R8A8_UNorm: return NriFormat.BGRA8_UNORM;
+                case GraphicsFormat.B8G8R8A8_SRGB:  return NriFormat.BGRA8_SRGB;
+
+                // --- 16-bit Formats ---
+                case GraphicsFormat.R16_UNorm:  return NriFormat.R16_UNORM;
+                case GraphicsFormat.R16_SNorm:  return NriFormat.R16_SNORM;
+                case GraphicsFormat.R16_UInt:   return NriFormat.R16_UINT;
+                case GraphicsFormat.R16_SInt:   return NriFormat.R16_SINT;
+                case GraphicsFormat.R16_SFloat: return NriFormat.R16_SFLOAT;
+
+                case GraphicsFormat.R16G16_UNorm:  return NriFormat.RG16_UNORM;
+                case GraphicsFormat.R16G16_SNorm:  return NriFormat.RG16_SNORM;
+                case GraphicsFormat.R16G16_UInt:   return NriFormat.RG16_UINT;
+                case GraphicsFormat.R16G16_SInt:   return NriFormat.RG16_SINT;
+                case GraphicsFormat.R16G16_SFloat: return NriFormat.RG16_SFLOAT;
+
+                case GraphicsFormat.R16G16B16A16_UNorm:  return NriFormat.RGBA16_UNORM;
+                case GraphicsFormat.R16G16B16A16_SNorm:  return NriFormat.RGBA16_SNORM;
+                case GraphicsFormat.R16G16B16A16_UInt:   return NriFormat.RGBA16_UINT;
+                case GraphicsFormat.R16G16B16A16_SInt:   return NriFormat.RGBA16_SINT;
+                case GraphicsFormat.R16G16B16A16_SFloat: return NriFormat.RGBA16_SFLOAT;
+
+                // --- 32-bit Formats ---
+                case GraphicsFormat.R32_UInt:   return NriFormat.R32_UINT;
+                case GraphicsFormat.R32_SInt:   return NriFormat.R32_SINT;
+                case GraphicsFormat.R32_SFloat: return NriFormat.R32_SFLOAT;
+
+                case GraphicsFormat.R32G32_UInt:   return NriFormat.RG32_UINT;
+                case GraphicsFormat.R32G32_SInt:   return NriFormat.RG32_SINT;
+                case GraphicsFormat.R32G32_SFloat: return NriFormat.RG32_SFLOAT;
+
+                case GraphicsFormat.R32G32B32_UInt:   return NriFormat.RGB32_UINT;
+                case GraphicsFormat.R32G32B32_SInt:   return NriFormat.RGB32_SINT;
+                case GraphicsFormat.R32G32B32_SFloat: return NriFormat.RGB32_SFLOAT;
+
+                case GraphicsFormat.R32G32B32A32_UInt:   return NriFormat.RGBA32_UINT;
+                case GraphicsFormat.R32G32B32A32_SInt:   return NriFormat.RGBA32_SINT;
+                case GraphicsFormat.R32G32B32A32_SFloat: return NriFormat.RGBA32_SFLOAT;
+
+                // --- Packed Formats ---
+                case GraphicsFormat.B5G6R5_UNormPack16:      return NriFormat.B5_G6_R5_UNORM;
+                case GraphicsFormat.B5G5R5A1_UNormPack16:    return NriFormat.B5_G5_R5_A1_UNORM;
+                case GraphicsFormat.B4G4R4A4_UNormPack16:    return NriFormat.B4_G4_R4_A4_UNORM;
+                
+                case GraphicsFormat.A2B10G10R10_UNormPack32: return NriFormat.R10_G10_B10_A2_UNORM;
+                case GraphicsFormat.A2B10G10R10_UIntPack32:  return NriFormat.R10_G10_B10_A2_UINT;
+                case GraphicsFormat.B10G11R11_UFloatPack32:  return NriFormat.R11_G11_B10_UFLOAT;
+                case GraphicsFormat.E5B9G9R9_UFloatPack32:   return NriFormat.R9_G9_B9_E5_UFLOAT;
+
+                // --- Compressed Formats (BC / DXT) ---
+                case GraphicsFormat.RGBA_DXT1_UNorm: return NriFormat.BC1_RGBA_UNORM;
+                case GraphicsFormat.RGBA_DXT1_SRGB:  return NriFormat.BC1_RGBA_SRGB;
+                
+                case GraphicsFormat.RGBA_DXT3_UNorm: return NriFormat.BC2_RGBA_UNORM;
+                case GraphicsFormat.RGBA_DXT3_SRGB:  return NriFormat.BC2_RGBA_SRGB;
+                
+                case GraphicsFormat.RGBA_DXT5_UNorm: return NriFormat.BC3_RGBA_UNORM;
+                case GraphicsFormat.RGBA_DXT5_SRGB:  return NriFormat.BC3_RGBA_SRGB;
+
+                case GraphicsFormat.R_BC4_UNorm:  return NriFormat.BC4_R_UNORM;
+                case GraphicsFormat.R_BC4_SNorm:  return NriFormat.BC4_R_SNORM;
+                
+                case GraphicsFormat.RG_BC5_UNorm: return NriFormat.BC5_RG_UNORM;
+                case GraphicsFormat.RG_BC5_SNorm: return NriFormat.BC5_RG_SNORM;
+                
+                case GraphicsFormat.RGB_BC6H_UFloat: return NriFormat.BC6H_RGB_UFLOAT;
+                case GraphicsFormat.RGB_BC6H_SFloat: return NriFormat.BC6H_RGB_SFLOAT;
+                
+                case GraphicsFormat.RGBA_BC7_UNorm: return NriFormat.BC7_RGBA_UNORM;
+                case GraphicsFormat.RGBA_BC7_SRGB:  return NriFormat.BC7_RGBA_SRGB;
+
+                // --- Depth / Stencil ---
+                case GraphicsFormat.D16_UNorm:          return NriFormat.D16_UNORM;
+                case GraphicsFormat.D24_UNorm_S8_UInt:  return NriFormat.D24_UNORM_S8_UINT;
+                case GraphicsFormat.D32_SFloat:         return NriFormat.D32_SFLOAT;
+                case GraphicsFormat.D32_SFloat_S8_UInt: return NriFormat.D32_SFLOAT_S8_UINT_X24;
+
+                // 其他情况 (包括 Unity 的 24位 RGB, 48位 RGB 等 NRI 不直接支持的格式)
+                default:
+                    return NriFormat.UNKNOWN;
             }
         }
     }
