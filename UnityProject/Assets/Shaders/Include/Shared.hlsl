@@ -410,8 +410,8 @@ float GetCircleOfConfusion(float distance) // diameter
 // VERY SIMPLE SKY MODEL
 //=============================================================================================
 
-#define SKY_INTENSITY 1.0
-#define SUN_INTENSITY 10.0
+#define SKY_INTENSITY 0.0
+#define SUN_INTENSITY 0.0
 
 float3 GetSunIntensity(float3 v)
 {
