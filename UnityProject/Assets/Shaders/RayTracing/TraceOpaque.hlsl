@@ -38,6 +38,9 @@ RWTexture2D<float4> gOut_Diff;
 // 高光反射光照结果（Specular Radiance），包含噪声和打包后的信息。
 RWTexture2D<float4> gOut_Spec;
 
+
+#include "Assets/Shaders/RTXDI/DI/Reservoir.hlsli"
+
 // 所有射灯直接光照的累加结果（不经 NRD 降噪，在 Composition 直接叠加）
 // RWTexture2D<float3> gOut_SpotDirect;
 
@@ -746,6 +749,14 @@ void MainRayGenShader()
     result.specRadiance += materialProps0.Lemi / Math::Pi(2.0);
     #endif
 
+    
+    // Test RTXDI
+    
+    RTXDI_DIReservoir reservoir = RTXDI_EmptyDIReservoir();
+    
+    
+    
+    // END of test RTXDI
 
     // //================================================================================================================================================================================
     // // Sun shadow
