@@ -51,6 +51,9 @@ namespace PathTracing
         private GraphicsBuffer m_SpotLightBuffer;
         private GraphicsBuffer m_AreaLightBuffer;
         private GraphicsBuffer m_PointLightBuffer;
+        
+        public PrepareLightResource prepareLightResource;
+
 
         [DllImport("RenderingPlugin")]
         private static extern IntPtr GetRenderEventAndDataFunc();
@@ -150,6 +153,9 @@ namespace PathTracing
             internal uint AeTexWidth;
             internal uint AeTexHeight;
             internal float ManualExposure;
+            
+            
+            internal IntPtr DataPtr;
         }
 
         public PathTracingPass(PathTracingSetting setting)
@@ -178,6 +184,7 @@ namespace PathTracing
                 natCmd.SetBufferData(data.AeExposureBuffer, new[] { data.ManualExposure });
             }
 
+            var prepareLightMarker = new ProfilerMarker(ProfilerCategory.Render, "PrepareLight", MarkerFlags.SampleGPU);
             var sharcUpdateMarker = new ProfilerMarker(ProfilerCategory.Render, "Sharc Update", MarkerFlags.SampleGPU);
             var sharcResolveMarker = new ProfilerMarker(ProfilerCategory.Render, "Sharc Resolve", MarkerFlags.SampleGPU);
             var opaqueTracingMarker = new ProfilerMarker(ProfilerCategory.Render, "Opaque Tracing", MarkerFlags.SampleGPU);
@@ -190,6 +197,14 @@ namespace PathTracing
             var outputBlitMarker = new ProfilerMarker(ProfilerCategory.Render, "Output Blit", MarkerFlags.SampleGPU);
             var aeMarker = new ProfilerMarker(ProfilerCategory.Render, "Auto Exposure", MarkerFlags.SampleGPU);
 
+            
+            natCmd.BeginSample(prepareLightMarker);
+            natCmd.IssuePluginEventAndData(UnityRTXDI.GetRenderEventAndDataFunc(), 1, data.DataPtr);
+            natCmd.EndSample(prepareLightMarker);
+
+            
+            
+            
             // Sharc update
             if (data.passIndex == 0)
             {
@@ -799,6 +814,7 @@ namespace PathTracing
             passData.NrdDataPtr = NrdDenoiser.GetInteropDataPtr(cameraData, gSunDirection);
             passData.RRDataPtr = DLRRDenoiser.GetInteropDataPtr(cameraData, NrdDenoiser);
 
+            passData.DataPtr = prepareLightResource.GetInteropDataPtr();
 
             var proj = isXr ? xrPass.GetProjMatrix() : cameraData.camera.projectionMatrix;
 

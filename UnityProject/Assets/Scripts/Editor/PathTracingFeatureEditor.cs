@@ -52,6 +52,10 @@ namespace PathTracing
             {
                 ptFeature.SetMask();
             }
+            if (GUILayout.Button("TestPrepareLight"))
+            {
+                ptFeature.Test();
+            }
         }
 
         private void AutoConfigure()

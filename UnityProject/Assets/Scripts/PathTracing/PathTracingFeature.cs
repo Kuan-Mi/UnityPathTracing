@@ -1,6 +1,7 @@
 ﻿using System.Collections.Generic;
 using DefaultNamespace;
 using Nrd;
+using RTXDI;
 using Unity.Mathematics;
 using UnityEngine;
 using UnityEngine.Rendering;
@@ -101,6 +102,13 @@ namespace PathTracing
         private Dictionary<long, NRDDenoiser> _nrdDenoisers = new();
         private Dictionary<long, DLRRDenoiser> _dlrrDenoisers = new();
 
+        
+        
+        private Dictionary<long, PrepareLightResource> _resources = new Dictionary<long, PrepareLightResource>();
+
+        public GPUScene gpuScene = new GPUScene();
+        
+        
         // public PathTracingDataBuilder _dataBuilder = new PathTracingDataBuilder();
 
         // [ContextMenu("ReBuild AccelerationStructure")]
@@ -123,6 +131,11 @@ namespace PathTracing
                 accelerationStructure.Build();
 
                 SetMask();
+            }
+            
+            if (gpuScene.IsEmpty())
+            {
+                gpuScene.Build();
             }
 
             // if (_dataBuilder.IsEmpty())
@@ -283,6 +296,15 @@ namespace PathTracing
                 dlrr = new DLRRDenoiser(pathTracingSetting, camName);
                 _dlrrDenoisers.Add(uniqueKey, dlrr);
             }
+            
+            
+            if (!_resources.TryGetValue(uniqueKey, out var prepareLightResource))
+            {
+                prepareLightResource = new PrepareLightResource();
+                _resources.Add(uniqueKey, prepareLightResource);
+                prepareLightResource.SendTexture(gpuScene.globalTexturePool);
+                prepareLightResource.SetBuffer(gpuScene);
+            }
 
             _pathTracingPass.NrdDenoiser = nrd;
             _pathTracingPass.DLRRDenoiser = dlrr;
@@ -292,6 +314,7 @@ namespace PathTracing
             _pathTracingPass.ResolvedBuffer = _resolvedBuffer;
             _pathTracingPass.AeHistogramBuffer = _aeHistogramBuffer;
             _pathTracingPass.AeExposureBuffer = _aeExposureBuffer;
+            _pathTracingPass.prepareLightResource = prepareLightResource;
 
             if (finalMaterial == null
                 || opaqueTracingShader == null
@@ -352,6 +375,14 @@ namespace PathTracing
             }
 
             _dlrrDenoisers.Clear();
+            
+            
+            foreach (var resource in _resources.Values)
+            {
+                resource.Dispose();
+            }
+
+            _resources.Clear();
 
             scramblingRankingUintBuffer?.Release();
             scramblingRankingUintBuffer = null;
@@ -370,6 +401,11 @@ namespace PathTracing
             _aeHistogramBuffer = null;
             _aeExposureBuffer?.Release();
             _aeExposureBuffer = null;
+        }
+        
+        public void Test()
+        {
+            gpuScene.DebugReadback();
         }
     }
 }

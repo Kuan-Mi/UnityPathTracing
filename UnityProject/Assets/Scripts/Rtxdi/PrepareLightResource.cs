@@ -20,7 +20,7 @@ namespace DefaultNamespace
         public IntPtr NriPtr; // NRD封装指针
     }
 
-    public class DemoResource : IDisposable
+    public class PrepareLightResource : IDisposable
     {
         [DllImport("UnityRTXDI")]
         private static extern int CreateDenoiserInstance();
@@ -93,7 +93,7 @@ namespace DefaultNamespace
             nriLightInfoBufferPtr = WrapD3D12Buffer(scene._lightInfoBuffer.GetNativeBufferPtr(), (ushort)Marshal.SizeOf<LightData>());
         }
         
-        public DemoResource()
+        public PrepareLightResource()
         {
             instanceId = CreateDenoiserInstance();
 
