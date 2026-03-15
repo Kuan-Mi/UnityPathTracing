@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Runtime.InteropServices;
 using DefaultNamespace;
+using mini;
 using Nrd;
 using RTXDI;
 using Unity.Mathematics;
@@ -54,6 +55,7 @@ namespace PathTracing
         private GraphicsBuffer m_PointLightBuffer;
         
         public PrepareLightResource prepareLightResource;
+        public RtxdiResources  rtxdiResources;
 
 
         [DllImport("RenderingPlugin")]
@@ -162,6 +164,9 @@ namespace PathTracing
             
             
             internal IntPtr DataPtr;
+            
+            
+            internal RtxdiResources RtxdiResources;
         }
 
         public PathTracingPass(PathTracingSetting setting)
@@ -265,6 +270,10 @@ namespace PathTracing
 
                 natCmd.SetRayTracingShaderPass(data.OpaqueTs, "Test2");
                 natCmd.SetRayTracingConstantBufferParam(data.OpaqueTs, paramsID, data.ConstantBuffer, 0, data.ConstantBuffer.stride);
+                
+                natCmd.SetRayTracingConstantBufferParam(data.OpaqueTs, t_LightDataBufferID, data.RtxdiResources.LightDataBuffer, 0, data.RtxdiResources.LightDataBufferSize);
+                natCmd.SetRayTracingConstantBufferParam(data.OpaqueTs, t_NeighborOffsetsID, data.RtxdiResources.NeighborOffsetsBuffer, 0, data.RtxdiResources.NeighborOffsetsBufferSize);
+                natCmd.SetRayTracingConstantBufferParam(data.OpaqueTs, u_LightReservoirsID, data.RtxdiResources.LightReservoirBuffer, 0, data.RtxdiResources.LightReservoirBufferSize);
 
                 natCmd.SetRayTracingBufferParam(data.OpaqueTs, g_ScramblingRankingID, data.ScramblingRanking);
                 natCmd.SetRayTracingBufferParam(data.OpaqueTs, g_SobolID, data.Sobol);
@@ -834,6 +843,7 @@ namespace PathTracing
             passData.RRDataPtr = DLRRDenoiser.GetInteropDataPtr(cameraData, NrdDenoiser);
 
             passData.DataPtr = prepareLightResource.GetInteropDataPtr();
+            passData.RtxdiResources = rtxdiResources;
 
             var proj = isXr ? xrPass.GetProjMatrix() : cameraData.camera.projectionMatrix;
 

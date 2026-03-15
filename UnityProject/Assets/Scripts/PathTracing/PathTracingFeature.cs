@@ -340,7 +340,9 @@ namespace PathTracing
             _pathTracingPass.ResolvedBuffer = _resolvedBuffer;
             _pathTracingPass.AeHistogramBuffer = _aeHistogramBuffer;
             _pathTracingPass.AeExposureBuffer = _aeExposureBuffer;
+            
             _pathTracingPass.prepareLightResource = prepareLightResource;
+            _pathTracingPass.rtxdiResources = rtxdiResources;
 
             if (finalMaterial == null
                 || opaqueTracingShader == null

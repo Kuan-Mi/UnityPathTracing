@@ -89,5 +89,11 @@ namespace PathTracing
         public static int gIn_PrevViewZID = Shader.PropertyToID("gIn_PrevViewZ");
         public static int gIn_PrevNormalRoughnessID = Shader.PropertyToID("gIn_PrevNormalRoughness");
         public static int gIn_PrevBaseColorMetalnessID = Shader.PropertyToID("gIn_PrevBaseColorMetalness");
+        
+        
+        public static int t_LightDataBufferID = Shader.PropertyToID("t_LightDataBuffer");
+        public static int t_NeighborOffsetsID = Shader.PropertyToID("t_NeighborOffsets");
+        
+        public static int u_LightReservoirsID = Shader.PropertyToID("u_LightReservoirs");
     }
 }

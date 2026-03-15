@@ -22,6 +22,12 @@ namespace mini
         public GraphicsBuffer NeighborOffsetsBuffer { get; private set; }
         public GraphicsBuffer LightReservoirBuffer { get; private set; }
 
+
+        public int LightDataBufferSize;
+        public int NeighborOffsetsBufferSize;
+        public int LightReservoirBufferSize;
+        
+
         public RtxdiResources(
             ReSTIRDIContext context,
             uint maxEmissiveMeshes,
@@ -30,6 +36,7 @@ namespace mini
             GraphicsBuffer LightDataBuffer)
         {
             this.LightDataBuffer = LightDataBuffer;
+            LightDataBufferSize = (int)(maxEmissiveTriangles * Marshal.SizeOf<RAB_LightInfo>());
             // m_maxEmissiveMeshes = maxEmissiveMeshes;
             // m_maxEmissiveTriangles = maxEmissiveTriangles;
             // m_maxGeometryInstances = maxGeometryInstances;
@@ -99,6 +106,7 @@ namespace mini
                 4
             );
             NeighborOffsetsBuffer.name = "NeighborOffsets";
+            NeighborOffsetsBufferSize = alignedNeighborSize;
             
             InitializeNeighborOffsets(staticParams.NeighborOffsetCount);
 
@@ -116,6 +124,7 @@ namespace mini
                     reservoirStride
                 );
                 LightReservoirBuffer.name = "LightReservoirBuffer";
+                LightReservoirBufferSize = totalReservoirs * reservoirStride;
             }
         }
         

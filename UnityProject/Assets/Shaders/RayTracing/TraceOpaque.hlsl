@@ -48,7 +48,6 @@ RWTexture2D<float4> gOut_Spec;
 // RTXDI resources
 StructuredBuffer<RAB_LightInfo> t_LightDataBuffer;
 Buffer<float2> t_NeighborOffsets;
-StructuredBuffer<uint> t_GeometryInstanceToLight;
 
 RWStructuredBuffer<RTXDI_PackedDIReservoir> u_LightReservoirs;
 
