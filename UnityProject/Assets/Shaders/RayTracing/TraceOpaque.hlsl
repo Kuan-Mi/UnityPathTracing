@@ -11,6 +11,11 @@ StructuredBuffer<uint4> gIn_Sobol;
 Texture2D<float3> gIn_PrevComposedDiff;
 Texture2D<float4> gIn_PrevComposedSpec_PrevViewZ;
 
+// RTXDI：上一帧 GBuffer
+Texture2D<float>  gIn_PrevViewZ;
+Texture2D<float4> gIn_PrevNormalRoughness;
+Texture2D<float4> gIn_PrevBaseColorMetalness;
+
 // Output
 RWTexture2D<float3> g_Output;
 
@@ -40,15 +45,15 @@ RWTexture2D<float4> gOut_Spec;
 
 #include "Assets/Shaders/Rtxdi/RtxdiParameters.h"
 
-RWStructuredBuffer<RTXDI_PackedDIReservoir> u_LightReservoirs : register(u0);
-Buffer<float2> t_NeighborOffsets : register(t21);
+RWStructuredBuffer<RTXDI_PackedDIReservoir> u_LightReservoirs;
+Buffer<float2> t_NeighborOffsets;
 
 #define RTXDI_LIGHT_RESERVOIR_BUFFER u_LightReservoirs
 #define RTXDI_NEIGHBOR_OFFSETS_BUFFER t_NeighborOffsets
 
-#include "RtxdiApplicationBridge/RtxdiApplicationBridge.hlsli"
-
-#include "Assets/Shaders/RTXDI/DI/InitialSampling.hlsli"
+// #include "RtxdiApplicationBridge/RtxdiApplicationBridge.hlsli"
+//
+// #include "Assets/Shaders/RTXDI/DI/InitialSampling.hlsli"
 
 
 
@@ -729,6 +734,8 @@ void MainRayGenShader()
     }
 
     gOut_DirectLighting[pixelPos] = Ldirect; // "psrThroughput" applied in "Composition"
+    
+    // gOut_DirectLighting[pixelPos] = gIn_PrevBaseColorMetalness[pixelPos].xyz  - gOut_BaseColor_Metalness[pixelPos];
     // gOut_SpotDirect[pixelPos] = EvaluateSpotLights(geometryProps0, materialProps0);
     // gOut_SpotDirect[pixelPos] = 0;
     gOut_PsrThroughput[pixelPos] = psrThroughput;
@@ -766,22 +773,22 @@ void MainRayGenShader()
 
     
     // Test RTXDI
-    
-    RTXDI_DIReservoir reservoir = RTXDI_EmptyDIReservoir();
-    
-
-    
-    RTXDI_SampleParameters sampleParams = RTXDI_InitSampleParameters(
-        g_numInitialSamples, // local light samples 
-        0, // infinite light samples
-        0, // environment map samples
-        g_numInitialBRDFSamples,
-        g_brdfCutoff,
-        0.001f);
-    
-    
-    // Generate the initial sample
-    RAB_LightSample lightSample = RAB_EmptyLightSample();
+    //
+    // RTXDI_DIReservoir reservoir = RTXDI_EmptyDIReservoir();
+    //
+    //
+    //
+    // RTXDI_SampleParameters sampleParams = RTXDI_InitSampleParameters(
+    //     g_numInitialSamples, // local light samples 
+    //     0, // infinite light samples
+    //     0, // environment map samples
+    //     g_numInitialBRDFSamples,
+    //     g_brdfCutoff,
+    //     0.001f);
+    //
+    //
+    // // Generate the initial sample
+    // RAB_LightSample lightSample = RAB_EmptyLightSample();
     
     
     // END of test RTXDI

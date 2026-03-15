@@ -139,5 +139,10 @@ namespace Nrd
         RRGuide_Normal_Roughness,
         DlssOutput,
         Composed,
+
+        // RTXDI：上一帧 GBuffer（用于时间复用）
+        Prev_ViewZ,
+        Prev_NormalRoughness,
+        Prev_BaseColorMetalness,
     };
 }

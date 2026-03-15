@@ -109,6 +109,11 @@ namespace Nrd
             allocatedResources.Add(new NrdTextureResource(ResourceType.DlssOutput, GraphicsFormat.R16G16B16A16_SFloat, uavState));
             allocatedResources.Add(new NrdTextureResource(ResourceType.Composed, GraphicsFormat.R16G16B16A16_SFloat, uavState));
 
+            // RTXDI：上一帧 GBuffer（格式与当帧对应纹理相同）
+            allocatedResources.Add(new NrdTextureResource(ResourceType.Prev_ViewZ, GraphicsFormat.R32_SFloat, uavState));
+            allocatedResources.Add(new NrdTextureResource(ResourceType.Prev_NormalRoughness, GraphicsFormat.A2B10G10R10_UNormPack32, uavState));
+            allocatedResources.Add(new NrdTextureResource(ResourceType.Prev_BaseColorMetalness, GraphicsFormat.B8G8R8A8_SRGB, uavState, true));
+
             prevResolutionScale = setting.resolutionScale;
 
             Debug.Log($"[NRD] Created Denoiser Instance {nrdInstanceId} for Camera {cameraName}");

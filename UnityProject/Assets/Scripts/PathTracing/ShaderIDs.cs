@@ -84,5 +84,10 @@ namespace PathTracing
         public static int gIn_HistoryID = Shader.PropertyToID("gIn_History");
         public static int gOut_ResultID = Shader.PropertyToID("gOut_Result");
         public static int gOut_DebugID = Shader.PropertyToID("gOut_Debug");
+
+        // RTXDI：上一帧 GBuffer
+        public static int gIn_PrevViewZID = Shader.PropertyToID("gIn_PrevViewZ");
+        public static int gIn_PrevNormalRoughnessID = Shader.PropertyToID("gIn_PrevNormalRoughness");
+        public static int gIn_PrevBaseColorMetalnessID = Shader.PropertyToID("gIn_PrevBaseColorMetalness");
     }
 }

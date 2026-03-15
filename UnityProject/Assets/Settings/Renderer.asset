@@ -75,7 +75,7 @@ MonoBehaviour:
     isBaseColorMetalnessAvailable: 1
     planeDistanceSensitivity: 0.02
     maxStabilizedFrameNum: 5
-    showMode: 16
+    showMode: 11
     showMV: 0
     showValidation: 0
     dofAperture: 0
@@ -97,7 +97,7 @@ MonoBehaviour:
     tracingMode: 1
     denoiser: 0
     emissionIntensity: 1
-    cameraJitter: 1
+    cameraJitter: 0
     psr: 1
     emission: 1
     usePrevFrame: 1

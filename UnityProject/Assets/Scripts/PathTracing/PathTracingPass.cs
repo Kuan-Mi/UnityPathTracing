@@ -99,6 +99,11 @@ namespace PathTracing
             internal TextureHandle RRGuide_Normal_Roughness;
             internal TextureHandle DlssOutput;
 
+            // RTXDI：上一帧 GBuffer
+            internal TextureHandle PrevViewZ;
+            internal TextureHandle PrevNormalRoughness;
+            internal TextureHandle PrevBaseColorMetalness;
+
             internal RayTracingShader OpaqueTs;
             internal RayTracingShader TransparentTs;
             internal ComputeShader CompositionCs;
@@ -196,6 +201,7 @@ namespace PathTracing
             var dlssDenoiseMarker = new ProfilerMarker(ProfilerCategory.Render, "DLSS Denoise", MarkerFlags.SampleGPU);
             var outputBlitMarker = new ProfilerMarker(ProfilerCategory.Render, "Output Blit", MarkerFlags.SampleGPU);
             var aeMarker = new ProfilerMarker(ProfilerCategory.Render, "Auto Exposure", MarkerFlags.SampleGPU);
+            var copyGBufferMarker = new ProfilerMarker(ProfilerCategory.Render, "Copy GBuffer to Prev", MarkerFlags.SampleGPU);
 
             
             natCmd.BeginSample(prepareLightMarker);
@@ -283,6 +289,11 @@ namespace PathTracing
 
                 natCmd.SetRayTracingTextureParam(data.OpaqueTs, gIn_PrevComposedDiffID, data.ComposedDiff);
                 natCmd.SetRayTracingTextureParam(data.OpaqueTs, gIn_PrevComposedSpec_PrevViewZID, data.ComposedSpecViewZ);
+
+                natCmd.SetRayTracingTextureParam(data.OpaqueTs, gIn_PrevViewZID, data.PrevViewZ);
+                natCmd.SetRayTracingTextureParam(data.OpaqueTs, gIn_PrevNormalRoughnessID, data.PrevNormalRoughness);
+                natCmd.SetRayTracingTextureParam(data.OpaqueTs, gIn_PrevBaseColorMetalnessID, data.PrevBaseColorMetalness);
+
                 natCmd.SetRayTracingBufferParam(data.OpaqueTs, gIn_SpotLightsID, data.SpotLightBuffer);
                 natCmd.SetRayTracingBufferParam(data.OpaqueTs, gIn_AreaLightsID, data.AreaLightBuffer);
                 natCmd.SetRayTracingBufferParam(data.OpaqueTs, gIn_PointLightsID, data.PointLightBuffer);
@@ -299,6 +310,13 @@ namespace PathTracing
                 natCmd.DispatchRays(data.OpaqueTs, "MainRayGenShader", rectWmod, rectHmod, 1);
 
                 natCmd.EndSample(opaqueTracingMarker);
+
+                // 保存当帧 GBuffer 到 prev 纹理，供下一帧 RTXDI 时间复用读取
+                natCmd.BeginSample(copyGBufferMarker);
+                natCmd.CopyTexture(data.ViewZ, data.PrevViewZ);
+                natCmd.CopyTexture(data.NormalRoughness, data.PrevNormalRoughness);
+                natCmd.CopyTexture(data.BaseColorMetalness, data.PrevBaseColorMetalness);
+                natCmd.EndSample(copyGBufferMarker);
             }
 
 
@@ -1039,6 +1057,11 @@ namespace PathTracing
             passData.RRGuide_Normal_Roughness = renderGraph.ImportTexture(NrdDenoiser.GetRT(ResourceType.RRGuide_Normal_Roughness));
             passData.DlssOutput = renderGraph.ImportTexture(NrdDenoiser.GetRT(ResourceType.DlssOutput));
 
+            // RTXDI：上一帧 GBuffer
+            passData.PrevViewZ = renderGraph.ImportTexture(NrdDenoiser.GetRT(ResourceType.Prev_ViewZ));
+            passData.PrevNormalRoughness = renderGraph.ImportTexture(NrdDenoiser.GetRT(ResourceType.Prev_NormalRoughness));
+            passData.PrevBaseColorMetalness = renderGraph.ImportTexture(NrdDenoiser.GetRT(ResourceType.Prev_BaseColorMetalness));
+
 
             builder.UseTexture(passData.OutputTexture, AccessFlags.ReadWrite);
 
@@ -1074,6 +1097,10 @@ namespace PathTracing
             builder.UseTexture(passData.RRGuide_SpecHitDistance, AccessFlags.ReadWrite);
             builder.UseTexture(passData.RRGuide_Normal_Roughness, AccessFlags.ReadWrite);
             builder.UseTexture(passData.DlssOutput, AccessFlags.ReadWrite);
+
+            builder.UseTexture(passData.PrevViewZ, AccessFlags.ReadWrite);
+            builder.UseTexture(passData.PrevNormalRoughness, AccessFlags.ReadWrite);
+            builder.UseTexture(passData.PrevBaseColorMetalness, AccessFlags.ReadWrite);
         }
 
         private TextureHandle CreateTex(TextureDesc textureDesc, RenderGraph renderGraph, string name, GraphicsFormat format)
