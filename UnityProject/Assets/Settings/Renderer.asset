@@ -75,13 +75,13 @@ MonoBehaviour:
     isBaseColorMetalnessAvailable: 1
     planeDistanceSensitivity: 0.02
     maxStabilizedFrameNum: 5
-    showMode: 11
+    showMode: 18
     showMV: 0
     showValidation: 0
     dofAperture: 0
     dofFocalDistance: 0.71
-    exposure: 100
-    enableAutoExposure: 0
+    exposure: 91.3
+    enableAutoExposure: 1
     aeEVMin: -10
     aeEVMax: 10
     aeLowPercent: 0.05
@@ -90,7 +90,7 @@ MonoBehaviour:
     aeAdaptationSpeedDown: 1
     aeExposureCompensation: 0
     aeMinExposure: 0.01
-    aeMaxExposure: 100
+    aeMaxExposure: 1000
     rpp: 1
     bounceNum: 1
     mipBias: -0.5

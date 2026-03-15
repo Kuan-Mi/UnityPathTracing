@@ -1,7 +1,9 @@
 ﻿using System.Collections.Generic;
 using DefaultNamespace;
+using mini;
 using Nrd;
 using RTXDI;
+using Rtxdi.DI;
 using Unity.Mathematics;
 using UnityEngine;
 using UnityEngine.Rendering;
@@ -101,6 +103,9 @@ namespace PathTracing
 
         private Dictionary<long, NRDDenoiser> _nrdDenoisers = new();
         private Dictionary<long, DLRRDenoiser> _dlrrDenoisers = new();
+        
+        private Dictionary<long, ReSTIRDIContext> _restirDIContexts = new();
+        private Dictionary<long, RtxdiResources> _rtxdiResources = new();
 
         
         
@@ -304,6 +309,27 @@ namespace PathTracing
                 _resources.Add(uniqueKey, prepareLightResource);
                 prepareLightResource.SendTexture(gpuScene.globalTexturePool);
                 prepareLightResource.SetBuffer(gpuScene);
+            }
+            
+            if (!_restirDIContexts.TryGetValue(uniqueKey, out var restirDIContext))
+            {
+                
+                ReSTIRDIStaticParameters contextParams = ReSTIRDIStaticParameters.Default();
+                contextParams.RenderWidth = (uint)cam.pixelWidth;
+                contextParams.RenderHeight = (uint)cam.pixelHeight;
+                
+                restirDIContext = new ReSTIRDIContext(contextParams);
+                _restirDIContexts.Add(uniqueKey, restirDIContext);
+            } 
+            
+            if (!_rtxdiResources.TryGetValue(uniqueKey, out var rtxdiResources))
+            {
+                uint maxEmissiveMeshes = gpuScene.emissiveMeshCount;
+                uint maxEmissiveTriangles = gpuScene.emissiveTriangleCount;
+                uint maxGeometryInstances = gpuScene.instanceCount;
+
+                rtxdiResources = new RtxdiResources(restirDIContext, maxEmissiveMeshes, maxEmissiveTriangles, maxGeometryInstances,gpuScene._lightInfoBuffer);
+                _rtxdiResources.Add(uniqueKey, rtxdiResources);
             }
 
             _pathTracingPass.NrdDenoiser = nrd;

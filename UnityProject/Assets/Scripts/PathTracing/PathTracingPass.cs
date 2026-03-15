@@ -2,6 +2,7 @@
 using System.Runtime.InteropServices;
 using DefaultNamespace;
 using Nrd;
+using RTXDI;
 using Unity.Mathematics;
 using Unity.Profiling;
 using Unity.Profiling.LowLevel;

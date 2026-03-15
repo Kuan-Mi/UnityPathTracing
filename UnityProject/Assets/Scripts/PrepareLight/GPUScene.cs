@@ -66,6 +66,11 @@ namespace RTXDI
 
         private Dictionary<int, List<uint>> meshPrimitiveCache = new Dictionary<int, List<uint>>();
 
+        public uint emissiveMeshCount;
+        public uint emissiveTriangleCount;
+        public uint instanceCount;
+        
+
         private uint GetTextureGroupIndex(Material mat)
         {
             if (mat == null) return 0;
@@ -88,7 +93,7 @@ namespace RTXDI
 
         public ComputeBuffer _instanceBuffer;
         public ComputeBuffer _primitiveBuffer;
-        public ComputeBuffer _lightInfoBuffer;
+        public GraphicsBuffer _lightInfoBuffer;
 
         public List<InstanceData> instanceDataList = new List<InstanceData>();
         public List<PrimitiveData> primitiveDataList = new List<PrimitiveData>();
@@ -201,16 +206,16 @@ namespace RTXDI
 
 
                     // --- 构造 Instance Data (每个 SubMesh 一个) ---
-                    InstanceData inst = new InstanceData();
-
-                    inst.transform = localToWorld;
-
                     // 处理材质纹理
                     uint baseTextureIndex = GetTextureGroupIndex(mat);
-
-                    inst.emissiveTextureIndex = baseTextureIndex;
                     var emissiveColor = mat.GetColor("_EmissionColor").linear;
-                    inst.emissiveColor = new float3(emissiveColor.r, emissiveColor.g, emissiveColor.b);
+                    
+                    InstanceData inst = new InstanceData
+                    {
+                        transform = localToWorld,
+                        emissiveTextureIndex = baseTextureIndex,
+                        emissiveColor = new float3(emissiveColor.r, emissiveColor.g, emissiveColor.b)
+                    };
 
                     // 添加到列表
                     instanceDataList.Add(inst);
@@ -237,9 +242,18 @@ namespace RTXDI
             _primitiveBuffer.SetData(primitiveDataList.ToArray());
             
             _lightInfoBuffer?.Release();
-            _lightInfoBuffer = new ComputeBuffer(primitiveDataList.Count, Marshal.SizeOf<RAB_LightInfo>());
+            _lightInfoBuffer = new GraphicsBuffer(GraphicsBuffer.Target.Structured,primitiveDataList.Count, Marshal.SizeOf<RAB_LightInfo>());
 
             Debug.Log($"Renderers: {renderers.Length}, Instances: {instanceDataList.Count}, Primitives: {primitiveDataList.Count}");
+            
+            
+            
+            // todo 待确认
+            instanceCount = (uint)instanceDataList.Count;
+            emissiveMeshCount = (uint)meshPrimitiveCache.Count;
+            emissiveTriangleCount = (uint)primitiveDataList.Count;
+            
+            Debug.Log($"emissiveMeshCount: {emissiveMeshCount}, emissiveTriangleCount: {emissiveTriangleCount} , instanceCount: {instanceCount}");
         }
 
         public bool IsEmpty()

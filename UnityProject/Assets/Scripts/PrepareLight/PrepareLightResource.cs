@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Runtime.InteropServices;
+using DefaultNamespace;
 using Nrd;
 using NRD;
 using RTXDI;
@@ -11,7 +12,7 @@ using UnityEngine.Playables;
 using UnityEngine.Rendering;
 using UnityEngine.Rendering.Universal;
 
-namespace DefaultNamespace
+namespace RTXDI
 {
     class NativeTex
     {
@@ -90,7 +91,7 @@ namespace DefaultNamespace
             _scene = scene;
             nriInstanceBufferPtr = WrapD3D12Buffer(scene._instanceBuffer.GetNativeBufferPtr(), (ushort)Marshal.SizeOf<InstanceData>());
             nriPrimtiveBufferPtr = WrapD3D12Buffer(scene._primitiveBuffer.GetNativeBufferPtr(), (ushort)Marshal.SizeOf<PrimitiveData>());
-            nriLightInfoBufferPtr = WrapD3D12Buffer(scene._lightInfoBuffer.GetNativeBufferPtr(), (ushort)Marshal.SizeOf<LightData>());
+            nriLightInfoBufferPtr = WrapD3D12Buffer(scene._lightInfoBuffer.GetNativeBufferPtr(), (ushort)Marshal.SizeOf<RAB_LightInfo>());
         }
         
         public PrepareLightResource()
@@ -111,18 +112,18 @@ namespace DefaultNamespace
         private NativeArray<PrepareLightFrameData> buffer;
         private const int BufferCount = 3;
 
-        private unsafe PrepareLightFrameData GetData()
+        private PrepareLightFrameData GetData()
         {
-            PrepareLightFrameData data = new PrepareLightFrameData();
-            
-            data.instanceBuffer = nriInstanceBufferPtr;
-            data.primitiveBuffer = nriPrimtiveBufferPtr;
-            data.lightDataBuffer = nriLightInfoBufferPtr;
-            
-            data.numPrimitives = _scene._primitiveBuffer.count;
-            data.InstanceCount = _scene._instanceBuffer.count;
-             
-            data.instanceId = instanceId;
+            PrepareLightFrameData data = new PrepareLightFrameData
+            {
+                instanceBuffer = nriInstanceBufferPtr,
+                primitiveBuffer = nriPrimtiveBufferPtr,
+                lightDataBuffer = nriLightInfoBufferPtr,
+                numPrimitives = _scene._primitiveBuffer.count,
+                InstanceCount = _scene._instanceBuffer.count,
+                instanceId = instanceId
+            };
+
             return data;
         }
 
