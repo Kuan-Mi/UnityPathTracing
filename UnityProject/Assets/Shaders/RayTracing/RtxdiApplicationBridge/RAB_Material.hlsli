@@ -39,21 +39,47 @@ float GetRoughness(RAB_Material material)
 
 // 非必要实现
 // 根据坐标从 G-buffer 获取表面材质信息。对于无效坐标，返回一个空材质实例。
+// RAB_Material RAB_GetGBufferMaterial(
+//     int2 pixelPosition,
+//     PlanarViewConstants view,
+//     RWTexture2D<uint> diffuseAlbedoTexture,
+//     RWTexture2D<uint> specularRoughTexture)
+// {
+//     RAB_Material material = RAB_EmptyMaterial();
+//
+//     if (any(pixelPosition >= view.viewportSize))
+//         return material;
+//
+//     material.diffuseAlbedo = Unpack_R11G11B10_UFLOAT(diffuseAlbedoTexture[pixelPosition]).rgb;
+//     float4 specularRough = Unpack_R8G8B8A8_Gamma_UFLOAT(specularRoughTexture[pixelPosition]);
+//     material.roughness = specularRough.a;
+//     material.specularF0 = specularRough.rgb;
+//
+//     return material;
+// }
 RAB_Material RAB_GetGBufferMaterial(
-    int2 pixelPosition,
-    PlanarViewConstants view,
-    RWTexture2D<uint> diffuseAlbedoTexture,
-    RWTexture2D<uint> specularRoughTexture)
+    int2 pixelPosition)
 {
     RAB_Material material = RAB_EmptyMaterial();
 
-    if (any(pixelPosition >= view.viewportSize))
+    if (any(pixelPosition >= gRectSize))
         return material;
 
-    material.diffuseAlbedo = Unpack_R11G11B10_UFLOAT(diffuseAlbedoTexture[pixelPosition]).rgb;
-    float4 specularRough = Unpack_R8G8B8A8_Gamma_UFLOAT(specularRoughTexture[pixelPosition]);
-    material.roughness = specularRough.a;
-    material.specularF0 = specularRough.rgb;
+    float3 BaseColor = Color::FromSrgb(gIn_PrevBaseColorMetalness[pixelPosition].xyz);
+    float Metalness = gIn_PrevBaseColorMetalness[pixelPosition].w;
+    float4 Normal_RoughnessPacked = gIn_PrevNormalRoughness[pixelPosition];
+    float4 Normal_Roughness = NRD_FrontEnd_UnpackNormalAndRoughness(Normal_RoughnessPacked);
+    float3 Normal = Normal_Roughness.xyz;
+    float Roughness = Normal_RoughnessPacked.w;
+    
+    float3 albedo, Rf0;
+    BRDF::ConvertBaseColorMetalnessToAlbedoRf0(BaseColor, Metalness, albedo, Rf0);
+
+    
+    material.diffuseAlbedo = albedo;
+
+    material.roughness = Roughness;
+    material.specularF0 = Rf0;
 
     return material;
 }

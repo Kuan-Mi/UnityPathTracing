@@ -17,6 +17,7 @@ struct MainRayPayload
     // float metalness;
     
     uint primitiveIndex; // 命中的三角形索引
+    float2 barycentrics; // 命中的三角形的重心坐标（uv）
 
     bool IsMiss()
     {

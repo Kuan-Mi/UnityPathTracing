@@ -1,7 +1,7 @@
 #ifndef RTXDI_RAB_SURFACE_HLSLI
 #define RTXDI_RAB_SURFACE_HLSLI
 
-#include "../GBufferHelpers.hlsli"
+// #include "../GBufferHelpers.hlsli"
 
 #include "RAB_RandomSamplerState.hlsli"
 #include "RAB_Material.hlsli"
@@ -92,23 +92,47 @@ RAB_Surface RAB_GetGBufferSurface(int2 pixelPosition, bool previousFrame)
     if (!previousFrame)
         return surface;
 
-    const PlanarViewConstants view = g_Const.prevView;
+    // const PlanarViewConstants view = g_Const.prevView;
 
-    if (any(pixelPosition >= view.viewportSize))
+    if (any(pixelPosition >= gRectSize))
         return surface;
 
-    surface.viewDepth = t_PrevGBufferDepth[pixelPosition];
+    surface.viewDepth = gIn_PrevViewZ[pixelPosition];
 
     if(surface.viewDepth == BACKGROUND_DEPTH)
         return surface;
-
-    surface.normal = octToNdirUnorm32(t_PrevGBufferNormals[pixelPosition]);
-    surface.geoNormal = octToNdirUnorm32(t_PrevGBufferGeoNormals[pixelPosition]);
-    float4 specularRough = Unpack_R8G8B8A8_Gamma_UFLOAT(t_PrevGBufferSpecularRough[pixelPosition]);
-    surface.material = RAB_GetGBufferMaterial(pixelPosition, view, u_GBufferDiffuseAlbedo, u_GBufferSpecularRough);
-    surface.worldPos = viewDepthToWorldPos(view, pixelPosition, surface.viewDepth);
-    surface.viewDir = normalize(g_Const.view.cameraDirectionOrPosition.xyz - surface.worldPos);
+    
+    
+    float3 BaseColor = Color::FromSrgb(gIn_PrevBaseColorMetalness[pixelPosition].xyz);
+    float Metalness = gIn_PrevBaseColorMetalness[pixelPosition].w;
+    float4 Normal_RoughnessPacked = gIn_PrevNormalRoughness[pixelPosition];
+    float4 Normal_Roughness = NRD_FrontEnd_UnpackNormalAndRoughness(Normal_RoughnessPacked);
+    float3 Normal = Normal_Roughness.xyz;
+    float Roughness = Normal_RoughnessPacked.w;
+    
+    
+    surface.normal = Normal;
+    surface.geoNormal = Normal;
+    surface.material = RAB_GetGBufferMaterial(pixelPosition);
+    
+    
+    float2 sampleUv = (float2(pixelPosition) + 0.5f) / gRectSize;
+    
+    float3 Xv = Geometry::ReconstructViewPosition(sampleUv, gCameraFrustum, surface.viewDepth, gOrthoMode);
+    float3 X = Geometry::AffineTransform(gViewToWorld, Xv);
+    
+    surface.worldPos = X;
+    surface.viewDir = normalize(gCameraGlobalPos - surface.worldPos);
     surface.diffuseProbability = getSurfaceDiffuseProbability(surface);
+
+
+    // surface.normal = octToNdirUnorm32(t_PrevGBufferNormals[pixelPosition]);
+    // surface.geoNormal = octToNdirUnorm32(t_PrevGBufferGeoNormals[pixelPosition]);
+    // float4 specularRough = Unpack_R8G8B8A8_Gamma_UFLOAT(t_PrevGBufferSpecularRough[pixelPosition]);
+    // surface.material = RAB_GetGBufferMaterial(pixelPosition, view, u_GBufferDiffuseAlbedo, u_GBufferSpecularRough);
+    // surface.worldPos = viewDepthToWorldPos(view, pixelPosition, surface.viewDepth);
+    // surface.viewDir = normalize(g_Const.view.cameraDirectionOrPosition.xyz - surface.worldPos);
+    // surface.diffuseProbability = getSurfaceDiffuseProbability(surface);
 
     return surface;
 }

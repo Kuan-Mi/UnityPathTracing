@@ -248,6 +248,9 @@ cbuffer PathTracingParams : register(b0)
     float gSssAnisotropy;
     float gSssMaxSampleRadius;
     float gIsEditor;
+    
+    uint gNumLights;
+    
 };
 
 #include "Assets/Shaders/Include/ml.hlsli"

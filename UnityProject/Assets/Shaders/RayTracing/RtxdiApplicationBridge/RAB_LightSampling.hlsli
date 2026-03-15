@@ -22,7 +22,7 @@ float RAB_EvaluateEnvironmentMapSamplingPdf(float3 L)
 float RAB_EvaluateLocalLightSourcePdf(uint lightIndex)
 {
     // Uniform pdf
-    return 1.0 / g_Const.lightBufferParams.localLightBufferRegion.numLights;
+    return 1.0 / gNumLights;
 }
 
 float3 RAB_GetReflectedRadianceForSurface(float3 incomingRadianceLocation, float3 incomingRadiance, RAB_Surface surface)
@@ -107,13 +107,20 @@ bool IsComplexSurface(int2 pixelPosition, RAB_Surface surface)
 
 uint getLightIndex(uint instanceID, uint geometryIndex, uint primitiveIndex)
 {
-    uint lightIndex = RTXDI_InvalidLightIndex;
-    InstanceData hitInstance = t_InstanceData[instanceID];
-    uint geometryInstanceIndex = hitInstance.firstGeometryInstanceIndex + geometryIndex;
-    lightIndex = t_GeometryInstanceToLight[geometryInstanceIndex];
-    if (lightIndex != RTXDI_InvalidLightIndex)
-      lightIndex += primitiveIndex;
-    return lightIndex;
+    if (primitiveIndex == INF)
+    {
+        return RTXDI_InvalidLightIndex;
+    }
+    
+    return primitiveIndex;
+    
+    // uint lightIndex = RTXDI_InvalidLightIndex;
+    // InstanceData hitInstance = t_InstanceData[instanceID];
+    // uint geometryInstanceIndex = hitInstance.firstGeometryInstanceIndex + geometryIndex;
+    // lightIndex = t_GeometryInstanceToLight[geometryInstanceIndex];
+    // if (lightIndex != RTXDI_InvalidLightIndex)
+    //   lightIndex += primitiveIndex;
+    // return lightIndex;
 }
 
 // Return true if anything was hit. If false, RTXDI will do environment map sampling
@@ -134,28 +141,47 @@ bool RAB_TraceRayForLocalLight(float3 origin, float3 direction, float tMin, floa
     o_lightIndex = RTXDI_InvalidLightIndex;
     o_randXY = 0;
 
-    RayDesc ray;
-    ray.Origin = origin;
-    ray.Direction = direction;
-    ray.TMin = tMin;
-    ray.TMax = tMax;
+    
+    
+    GeometryProps geometryProps0;
+    MaterialProps materialProps0;
+    CastRay(origin, direction, tMin, tMax, GetConeAngleFromRoughness(0.0, 0.0),  FLAG_NON_TRANSPARENT, geometryProps0, materialProps0);
 
-    RayQuery<RAY_FLAG_CULL_NON_OPAQUE | RAY_FLAG_SKIP_PROCEDURAL_PRIMITIVES> rayQuery;
-    rayQuery.TraceRayInline(SceneBVH, RAY_FLAG_NONE, INSTANCE_MASK_OPAQUE, ray);
-    rayQuery.Proceed();
-
-    bool hitAnything = rayQuery.CommittedStatus() == COMMITTED_TRIANGLE_HIT;
+    bool hitAnything = !geometryProps0.IsMiss();
     if (hitAnything)
     {
-        o_lightIndex = getLightIndex(rayQuery.CommittedInstanceID(), rayQuery.CommittedGeometryIndex(), rayQuery.CommittedPrimitiveIndex());
+        o_lightIndex = getLightIndex(geometryProps0.instanceIndex, 0, geometryProps0.primitiveIndex);
         if (o_lightIndex != RTXDI_InvalidLightIndex)
         {
-            float2 hitUV = rayQuery.CommittedTriangleBarycentrics();
+            float2 hitUV =  geometryProps0.barycentrics;
             o_randXY = randomFromBarycentric(hitUVToBarycentric(hitUV));
         }
     }
-
+    
     return hitAnything;
+    
+    // RayDesc ray;
+    // ray.Origin = origin;
+    // ray.Direction = direction;
+    // ray.TMin = tMin;
+    // ray.TMax = tMax;
+    //
+    // RayQuery<RAY_FLAG_CULL_NON_OPAQUE | RAY_FLAG_SKIP_PROCEDURAL_PRIMITIVES> rayQuery;
+    // rayQuery.TraceRayInline(SceneBVH, RAY_FLAG_NONE, INSTANCE_MASK_OPAQUE, ray);
+    // rayQuery.Proceed();
+    //
+    // bool hitAnything = rayQuery.CommittedStatus() == COMMITTED_TRIANGLE_HIT;
+    // if (hitAnything)
+    // {
+    //     o_lightIndex = getLightIndex(rayQuery.CommittedInstanceID(), rayQuery.CommittedGeometryIndex(), rayQuery.CommittedPrimitiveIndex());
+    //     if (o_lightIndex != RTXDI_InvalidLightIndex)
+    //     {
+    //         float2 hitUV = rayQuery.CommittedTriangleBarycentrics();
+    //         o_randXY = randomFromBarycentric(hitUVToBarycentric(hitUV));
+    //     }
+    // }
+    //
+    // return hitAnything;
 }
 
 // Compute the position on a triangle light given a pair of random numbers

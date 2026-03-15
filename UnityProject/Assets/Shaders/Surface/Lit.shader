@@ -373,6 +373,7 @@ Shader "RayTracing/Lit"
                 
                 payload.primitiveIndex = INF;
                 #endif
+                payload.barycentrics = attribs.barycentrics;
                 
             }
             ENDHLSL
