@@ -10,7 +10,7 @@
 // 它可以限制位置，也可以将其沿最近的屏幕边缘反射。最简单的实现方式是直接返回输入像素的位置。
 int2 RAB_ClampSamplePositionIntoView(int2 pixelPosition, bool previousFrame)
 {
-    return clamp(pixelPosition, 0, int2(g_Const.view.viewportSize) - 1);
+    return clamp(pixelPosition, 0, int2(gRectSize) - 1);
 }
 
 bool RAB_ValidateGISampleWithJacobian(inout float jacobian)

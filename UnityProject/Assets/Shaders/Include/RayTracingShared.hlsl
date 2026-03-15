@@ -53,6 +53,7 @@ struct GeometryProps
     uint textureOffsetAndFlags;
     uint instanceIndex; // 命中的实例索引（用于查找InstanceData）
     uint primitiveIndex; // 命中的三角形索引
+    float2 barycentrics; // 命中的三角形的重心坐标（uv）
 
     float3 GetXoffset(float3 offsetDir, float amount = PT_BOUNCE_RAY_OFFSET)
     {
@@ -197,6 +198,7 @@ void CastRay(float3 origin, float3 direction, float Tmin, float Tmax, float2 mip
     props.V = -direction;
     props.textureOffsetAndFlags = payload.instanceIndexAndFlags;
     props.primitiveIndex = payload.primitiveIndex;
+    props.barycentrics = payload.barycentrics;
 
     matProps = (MaterialProps)0;
     matProps.baseColor = Packing::UintToRgba(payload.baseColor, 8, 8, 8, 8).xyz;

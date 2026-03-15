@@ -10,7 +10,7 @@ typedef RandomSamplerState RAB_RandomSamplerState;
 
 RAB_RandomSamplerState RAB_InitRandomSampler(uint2 index, uint pass)
 {
-    return initRandomSampler(index, g_Const.frameIndex + pass * 13);
+    return initRandomSampler(index, gFrameIndex + pass * 13);
 }
 
 // 从提供的随机数生成器 (RNG) 状态返回下一个随机数。这些数字必须介于 0 和 1 之间，因此对于每个返回的 x ， 0.0 <= x < 1.0 。

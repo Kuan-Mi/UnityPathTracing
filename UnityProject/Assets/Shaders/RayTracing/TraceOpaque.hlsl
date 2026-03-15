@@ -45,6 +45,7 @@ RWTexture2D<float4> gOut_Spec;
 
 #include "Assets/Shaders/Rtxdi/RtxdiParameters.h"
 #include "Assets/Shaders/donut/packing.hlsli"
+#include "Assets/Shaders/donut/brdf.hlsli"
 
 // RTXDI resources
 StructuredBuffer<RAB_LightInfo> t_LightDataBuffer;
@@ -55,9 +56,14 @@ RWStructuredBuffer<RTXDI_PackedDIReservoir> u_LightReservoirs;
 #define RTXDI_LIGHT_RESERVOIR_BUFFER u_LightReservoirs
 #define RTXDI_NEIGHBOR_OFFSETS_BUFFER t_NeighborOffsets
 
-// #include "RtxdiApplicationBridge/RtxdiApplicationBridge.hlsli"
+#define BACKGROUND_DEPTH 65504.f
+
+#define RTXDI_ENABLE_PRESAMPLING 0
+
+#include "RtxdiApplicationBridge/RtxdiApplicationBridge.hlsli"
 //
-// #include "Assets/Shaders/RTXDI/DI/InitialSampling.hlsli"
+#include "Assets/Shaders/RTXDI/DI/InitialSampling.hlsli"
+#include <Assets/Shaders/RTXDI/DI/SpatioTemporalResampling.hlsli>
 
 
 // 所有射灯直接光照的累加结果（不经 NRD 降噪，在 Composition 直接叠加）
@@ -785,11 +791,20 @@ void MainRayGenShader()
 
 
     // Test RTXDI
-    //
-    // RTXDI_DIReservoir reservoir = RTXDI_EmptyDIReservoir();
-    //
-    //
-    //
+    
+    RAB_RandomSamplerState rng = RAB_InitRandomSampler(pixelPos, 1);
+    
+    RTXDI_DIReservoir reservoir = RTXDI_EmptyDIReservoir();
+    
+    
+    RTXDI_SampleParameters sampleParams = RTXDI_InitSampleParameters(
+        8, // local light samples 
+        0, // infinite light samples
+        0, // environment map samples
+        1,
+        0,
+        0.001f);
+    
     // RTXDI_SampleParameters sampleParams = RTXDI_InitSampleParameters(
     //     g_numInitialSamples, // local light samples 
     //     0, // infinite light samples
@@ -797,12 +812,96 @@ void MainRayGenShader()
     //     g_numInitialBRDFSamples,
     //     g_brdfCutoff,
     //     0.001f);
-    //
-    //
-    // // Generate the initial sample
-    // RAB_LightSample lightSample = RAB_EmptyLightSample();
+    
+    RTXDI_LightBufferRegion light_buffer_region = (RTXDI_LightBufferRegion)0;
+    light_buffer_region.firstLightIndex = 0;
+    light_buffer_region.numLights = 3963;
+    
+    RAB_Surface primarySurface = RAB_EmptySurface();
+    primarySurface.worldPos = geometryProps0.X;
+    primarySurface.viewDir = -geometryProps0.V;
+    primarySurface.viewDepth = viewZ0;
+    primarySurface.normal = geometryProps0.N;
+    primarySurface.geoNormal = geometryProps0.N;
+    primarySurface.diffuseProbability = 0; // todo
+    
+    RAB_Material material = RAB_EmptyMaterial();
+    
+    float3 albedo, Rf0;
+    BRDF::ConvertBaseColorMetalnessToAlbedoRf0(materialProps0.baseColor, materialProps0.metalness, albedo, Rf0);
+    
+    material.diffuseAlbedo = albedo;
+    material.specularF0 = Rf0;
+    material.roughness = materialProps0.roughness;
+    
+    primarySurface.material = material;
+    
+    
+    // Generate the initial sample
+    RAB_LightSample lightSample = RAB_EmptyLightSample();
+    RTXDI_DIReservoir localReservoir = RTXDI_SampleLocalLights(rng, rng, primarySurface,
+        sampleParams, ReSTIRDI_LocalLightSamplingMode_UNIFORM, light_buffer_region, lightSample);
 
+    RTXDI_LightBufferParameters lightBufferParams = (RTXDI_LightBufferParameters)0;
+    lightBufferParams.localLightBufferRegion = light_buffer_region;
+    
+    
+    // Resample BRDF samples.
+    RAB_LightSample brdfSample = RAB_EmptyLightSample();
+    RTXDI_DIReservoir brdfReservoir = RTXDI_SampleBrdf(rng, primarySurface, sampleParams, lightBufferParams, brdfSample);
+    bool selectBrdf = RTXDI_CombineDIReservoirs(reservoir, brdfReservoir, RAB_GetNextRandom(rng), brdfReservoir.targetPdf);
+    if (selectBrdf)
+    {
+        lightSample = brdfSample;
+    }
+    
+    
+    RTXDI_FinalizeResampling(reservoir, 1.0, 1.0);
+    reservoir.M = 1;
+    
+    
+    // BRDF was generated with a trace so no need to trace visibility again
+    if (RTXDI_IsValidDIReservoir(reservoir) && !selectBrdf)
+    {
+        // See if the initial sample is visible from the surface
+        if (!RAB_GetConservativeVisibility(primarySurface, lightSample))
+        {
+            // If not visible, discard the sample (but keep the M)
+            RTXDI_StoreVisibilityInDIReservoir(reservoir, 0, true);
+        }
+    }
+    
+    
+    
+    float3 shadingOutput = 0;
+    
+    
+    // Shade the surface with the selected light sample
+    if (RTXDI_IsValidDIReservoir(reservoir))
+    {
+        // Compute the correctly weighted reflected radiance
+        shadingOutput = ShadeSurfaceWithLightSample(lightSample, primarySurface)
+                      * RTXDI_GetDIReservoirInvPdf(reservoir);
 
+        // Test if the selected light is visible from the surface
+        bool visibility = RAB_GetConservativeVisibility(primarySurface, lightSample);
+
+        // If not visible, discard the shading output and the light sample
+        if (!visibility)
+        {
+            shadingOutput = 0;
+            RTXDI_StoreVisibilityInDIReservoir(reservoir, 0, true);
+        }
+    }
+    
+    
+    shadingOutput += materialProps0.Lemi;
+    shadingOutput = basicToneMapping(shadingOutput, 0.005);
+
+    gOut_DirectLighting[pixelPos] = float4(shadingOutput * 100, 1.0);
+    
+    // RTXDI_StoreDIReservoir(reservoir, g_Const.restirDIReservoirBufferParams, pixelPosition, g_Const.outputBufferIndex);
+    
     // END of test RTXDI
 
     // //================================================================================================================================================================================

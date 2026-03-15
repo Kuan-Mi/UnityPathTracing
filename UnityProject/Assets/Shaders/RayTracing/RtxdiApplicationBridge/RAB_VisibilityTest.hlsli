@@ -18,17 +18,26 @@ RayDesc setupVisibilityRay(RAB_Surface surface, RAB_LightSample lightSample, flo
 // Returns true if there is nothing between them.
 bool RAB_GetConservativeVisibility(RAB_Surface surface, RAB_LightSample lightSample)
 {
-    RayDesc ray = setupVisibilityRay(surface, lightSample);
-
-    RayQuery<RAY_FLAG_CULL_NON_OPAQUE | RAY_FLAG_ACCEPT_FIRST_HIT_AND_END_SEARCH> rayQuery;
-
-    rayQuery.TraceRayInline(SceneBVH, RAY_FLAG_NONE, INSTANCE_MASK_OPAQUE, ray);
-
-    rayQuery.Proceed();
-
-    bool visible = (rayQuery.CommittedStatus() == COMMITTED_NOTHING);
     
-    return visible;
+    float3 L = lightSample.position - surface.worldPos;
+    float offset = 0.001;
+    float TMax = length(L) - offset;
+    
+    float hitT = CastVisibilityRay_AnyHit( surface.worldPos, L, 0.001, TMax, float2(0,0), gWorldTlas,FLAG_NON_TRANSPARENT,0);
+
+    return  hitT == INF;
+    
+    // RayDesc ray = setupVisibilityRay(surface, lightSample);
+    //
+    // RayQuery<RAY_FLAG_CULL_NON_OPAQUE | RAY_FLAG_ACCEPT_FIRST_HIT_AND_END_SEARCH> rayQuery;
+    //
+    // rayQuery.TraceRayInline(SceneBVH, RAY_FLAG_NONE, INSTANCE_MASK_OPAQUE, ray);
+    //
+    // rayQuery.Proceed();
+    //
+    // bool visible = (rayQuery.CommittedStatus() == COMMITTED_NOTHING);
+    //
+    // return visible;
 }
 
 // Tests the visibility between a surface and a light sample on the previous frame.
