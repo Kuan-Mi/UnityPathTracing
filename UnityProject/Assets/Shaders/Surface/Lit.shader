@@ -294,19 +294,20 @@ Shader "RayTracing/Lit"
 
                 float4 vv = _MetallicGlossMap.SampleLevel(sampler_MetallicGlossMap, _BaseMap_ST.xy * v.uv + _BaseMap_ST.zw, mip);
 
-                float smooth = vv.a * _Smoothness;
-                roughness = 1 - smooth;
-                metallic = vv.r;
+                // float smooth = vv.a * _Smoothness;
+                // roughness = 1 - smooth;
+                // metallic = vv.r;
 
                 // for Bistro
-                // float smooth = (1 - vv.g) * _Smoothness;
-                // roughness = 1 - smooth;
-                // metallic = vv.b;
+                float smooth = (1 - vv.g) * _Smoothness;
+                roughness = 1 - smooth;
+                metallic = vv.b;
 
                 #else
 
                 roughness = 1 - _Smoothness;
                 metallic = _Metallic;
+                 
 
                 #endif
 
@@ -326,8 +327,9 @@ Shader "RayTracing/Lit"
                 float emissionLevel = Color::Luminance(payload.Lemi);
                 emissionLevel = saturate(emissionLevel * 50.0);
 
-                metallic = lerp(metallic, 0.0, emissionLevel);
-                roughness = lerp(roughness, 1.0, emissionLevel);
+                // 临时禁用发光对金属度和粗糙度的影响，后续可以考虑更合理的方式（比如单独一个参数控制发光对金属度和粗糙度的影响程度）
+                // metallic = lerp(metallic, 0.0, emissionLevel);
+                // roughness = lerp(roughness, 1.0, emissionLevel);
                 #endif
 
 

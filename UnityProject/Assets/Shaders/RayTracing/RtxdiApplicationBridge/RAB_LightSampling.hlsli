@@ -22,7 +22,8 @@ float RAB_EvaluateEnvironmentMapSamplingPdf(float3 L)
 float RAB_EvaluateLocalLightSourcePdf(uint lightIndex)
 {
     // Uniform pdf
-    return 1.0 / gNumLights;
+    // return 1.0 / gNumLights;
+    return 1.0 / 3964;
 }
 
 float3 RAB_GetReflectedRadianceForSurface(float3 incomingRadianceLocation, float3 incomingRadiance, RAB_Surface surface)

@@ -1,4 +1,5 @@
-﻿using Unity.Mathematics;
+﻿using Rtxdi;
+using Unity.Mathematics;
 
 namespace PathTracing
 {
@@ -179,5 +180,13 @@ namespace PathTracing
     {{ {m.c2.x:F6}, {m.c2.y:F6}, {m.c2.z:F6}, {m.c2.w:F6} }},
     {{ {m.c3.x:F6}, {m.c3.y:F6}, {m.c3.z:F6}, {m.c3.w:F6} }}";
         }
+    }
+
+    public struct ResamplingConstants
+    {
+       public RTXDI_ReservoirBufferParameters restirDIReservoirBufferParams;
+       
+       public uint inputBufferIndex;
+       public uint outputBufferIndex;
     }
 }

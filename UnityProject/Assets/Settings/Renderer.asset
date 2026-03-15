@@ -80,8 +80,8 @@ MonoBehaviour:
     showValidation: 0
     dofAperture: 0
     dofFocalDistance: 0.71
-    exposure: 91.3
-    enableAutoExposure: 1
+    exposure: 100
+    enableAutoExposure: 0
     aeEVMin: -10
     aeEVMax: 10
     aeLowPercent: 0.05
@@ -98,7 +98,7 @@ MonoBehaviour:
     denoiser: 0
     emissionIntensity: 1
     cameraJitter: 0
-    psr: 1
+    psr: 0
     emission: 1
     usePrevFrame: 1
     TAA: 1

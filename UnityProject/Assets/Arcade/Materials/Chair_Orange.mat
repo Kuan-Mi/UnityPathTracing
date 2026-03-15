@@ -125,7 +125,7 @@ Material:
     - _SKINNEDMESH: 0
     - _SSS: 0
     - _SSSScatteringScale: 1
-    - _Smoothness: 0.070710674
+    - _Smoothness: 1
     - _SmoothnessTextureChannel: 0
     - _SpecularHighlights: 1
     - _SrcBlend: 1
