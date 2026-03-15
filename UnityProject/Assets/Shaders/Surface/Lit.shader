@@ -364,6 +364,16 @@ Shader "RayTracing/Lit"
                 #endif
 
                 payload.SetFlag(flag);
+                
+                #if _EMISSION
+                
+                payload.primitiveIndex = PrimitiveIndex();
+                
+                #else
+                
+                payload.primitiveIndex = INF;
+                #endif
+                
             }
             ENDHLSL
         }

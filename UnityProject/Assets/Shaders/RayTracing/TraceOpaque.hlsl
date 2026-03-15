@@ -44,6 +44,7 @@ RWTexture2D<float4> gOut_Diff;
 RWTexture2D<float4> gOut_Spec;
 
 #include "Assets/Shaders/Rtxdi/RtxdiParameters.h"
+#include "Assets/Shaders/donut/packing.hlsli"
 
 // RTXDI resources
 StructuredBuffer<RAB_LightInfo> t_LightDataBuffer;
@@ -734,6 +735,19 @@ void MainRayGenShader()
     gOut_DirectLighting[pixelPos] = Ldirect; // "psrThroughput" applied in "Composition"
 
     // gOut_DirectLighting[pixelPos] = gIn_PrevBaseColorMetalness[pixelPos].xyz  - gOut_BaseColor_Metalness[pixelPos];
+
+    if (geometryProps0.primitiveIndex == INF)
+    {
+        gOut_DirectLighting[pixelPos] = 0;
+    }
+    else
+    {
+        // float3 ll = float3(geometryProps0.primitiveIndex % 10 / 10.0, (geometryProps0.primitiveIndex) % 10 / 10.0, (geometryProps0.primitiveIndex) % 10 / 10.0);
+
+        RAB_LightInfo lightInfo = t_LightDataBuffer[geometryProps0.primitiveIndex];
+        float3 ll =  Unpack_R16G16B16A16_FLOAT(lightInfo.radiance);
+        gOut_DirectLighting[pixelPos] = ll;
+    }
     // gOut_SpotDirect[pixelPos] = EvaluateSpotLights(geometryProps0, materialProps0);
     // gOut_SpotDirect[pixelPos] = 0;
     gOut_PsrThroughput[pixelPos] = psrThroughput;

@@ -15,6 +15,8 @@ struct MainRayPayload
     uint baseColor;
     uint roughnessAndMetalness;
     // float metalness;
+    
+    uint primitiveIndex; // 命中的三角形索引
 
     bool IsMiss()
     {

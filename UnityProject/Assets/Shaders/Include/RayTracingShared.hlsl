@@ -52,6 +52,7 @@ struct GeometryProps
     float curvature; // 曲率估算值（用于材质、去噪等）
     uint textureOffsetAndFlags;
     uint instanceIndex; // 命中的实例索引（用于查找InstanceData）
+    uint primitiveIndex; // 命中的三角形索引
 
     float3 GetXoffset(float3 offsetDir, float amount = PT_BOUNCE_RAY_OFFSET)
     {
@@ -195,6 +196,7 @@ void CastRay(float3 origin, float3 direction, float Tmin, float Tmax, float2 mip
 
     props.V = -direction;
     props.textureOffsetAndFlags = payload.instanceIndexAndFlags;
+    props.primitiveIndex = payload.primitiveIndex;
 
     matProps = (MaterialProps)0;
     matProps.baseColor = Packing::UintToRgba(payload.baseColor, 8, 8, 8, 8).xyz;
