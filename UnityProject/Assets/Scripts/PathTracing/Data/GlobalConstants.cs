@@ -188,5 +188,8 @@ namespace PathTracing
        
        public uint inputBufferIndex;
        public uint outputBufferIndex;
+    
+       public  uint neighborOffsetMask;
+       public uint pad3;
     }
 }

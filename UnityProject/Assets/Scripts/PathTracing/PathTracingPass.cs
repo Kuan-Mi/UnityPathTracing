@@ -1026,6 +1026,8 @@ namespace PathTracing
             resamplingConstants.inputBufferIndex = ((Time.frameCount & 1) == 0) ? 0u : 1u;
             resamplingConstants.outputBufferIndex = ((Time.frameCount & 1) == 0) ? 1u : 0u;
             
+            resamplingConstants.neighborOffsetMask =  rtxdiResources.context.GetStaticParameters().NeighborOffsetCount - 1;
+            
             passData.ResamplingConstants = resamplingConstants;
             
             Debug.Log($"Reservoir reservoirArrayPitch: {resamplingConstants.restirDIReservoirBufferParams.reservoirArrayPitch}, reservoirBlockRowPitch: {resamplingConstants.restirDIReservoirBufferParams.reservoirBlockRowPitch}");
