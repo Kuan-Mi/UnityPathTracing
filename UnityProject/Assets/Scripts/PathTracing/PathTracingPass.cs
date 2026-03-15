@@ -1030,7 +1030,7 @@ namespace PathTracing
             
             passData.ResamplingConstants = resamplingConstants;
             
-            Debug.Log($"Reservoir reservoirArrayPitch: {resamplingConstants.restirDIReservoirBufferParams.reservoirArrayPitch}, reservoirBlockRowPitch: {resamplingConstants.restirDIReservoirBufferParams.reservoirBlockRowPitch}");
+            // Debug.Log($"Reservoir reservoirArrayPitch: {resamplingConstants.restirDIReservoirBufferParams.reservoirArrayPitch}, reservoirBlockRowPitch: {resamplingConstants.restirDIReservoirBufferParams.reservoirBlockRowPitch}");
             
             
             

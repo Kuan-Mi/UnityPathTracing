@@ -845,14 +845,12 @@ void MainRayGenShader()
     
     RAB_Surface primarySurface = RAB_EmptySurface();
     primarySurface.worldPos = geometryProps0.X;
-    // todo？
-    primarySurface.viewDir = -geometryProps0.V;
+
+    primarySurface.viewDir = geometryProps0.V;
     primarySurface.viewDepth = viewZ0;
     primarySurface.normal = geometryProps0.N;
     primarySurface.geoNormal = geometryProps0.N;
-    primarySurface.diffuseProbability = getSurfaceDiffuseProbability(primarySurface);
-    // primarySurface.diffuseProbability = 0.0;
-
+    
     RAB_Material material = RAB_EmptyMaterial();
     
     float3 albedo, Rf0;
@@ -863,6 +861,8 @@ void MainRayGenShader()
     material.roughness = materialProps0.roughness;
     
     primarySurface.material = material;
+    
+    primarySurface.diffuseProbability = getSurfaceDiffuseProbability(primarySurface);
     
     
     // Generate the initial sample
@@ -967,8 +967,14 @@ void MainRayGenShader()
     shadingOutput = basicToneMapping(shadingOutput, 0.005);
 
     gOut_DirectLighting[pixelPos] = float4(shadingOutput , 1.0);
+    
+    
+    
+    
+    
     // gOut_DirectLighting[pixelPos] = float4(primarySurface.material.specularF0 , 1.0);
-    // gOut_DirectLighting[pixelPos] = float4(1 -materialProps0.metalness,1 -materialProps0.metalness,1 -materialProps0.metalness , 1.0);
+    float3 debugTest  = primarySurface.diffuseProbability;
+    gOut_DirectLighting[pixelPos] = float4(debugTest  , 1.0);
 
     
     
