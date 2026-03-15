@@ -23,7 +23,7 @@ bool RAB_GetConservativeVisibility(RAB_Surface surface, RAB_LightSample lightSam
     float offset = 0.001;
     float TMax = length(L) - offset;
     
-    float hitT = CastVisibilityRay_AnyHit( surface.worldPos, L, 0.001, TMax, float2(0,0), gWorldTlas,FLAG_NON_TRANSPARENT,0);
+    float hitT = CastVisibilityRay_AnyHit( surface.worldPos, normalize(L), 0.001, TMax, float2(0,0), gWorldTlas,FLAG_NON_TRANSPARENT,0);
 
     return  hitT == INF;
     
