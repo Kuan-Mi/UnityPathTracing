@@ -473,3 +473,16 @@ float SIGMA_FrontEnd_UnpackPenumbra( float packedPenumbra, float tanOfLightAngul
 
     return distanceToOccluder;
 }
+
+
+struct RAB_LightInfo
+{
+    // uint4[0]
+    float3 center;
+    uint scalars; // 2x float16
+    
+    // uint4[1]
+    uint2 radiance; // fp16x4
+    uint direction1; // oct-encoded
+    uint direction2; // oct-encoded
+};

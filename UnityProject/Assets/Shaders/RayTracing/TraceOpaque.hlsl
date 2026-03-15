@@ -12,7 +12,7 @@ Texture2D<float3> gIn_PrevComposedDiff;
 Texture2D<float4> gIn_PrevComposedSpec_PrevViewZ;
 
 // RTXDI：上一帧 GBuffer
-Texture2D<float>  gIn_PrevViewZ;
+Texture2D<float> gIn_PrevViewZ;
 Texture2D<float4> gIn_PrevNormalRoughness;
 Texture2D<float4> gIn_PrevBaseColorMetalness;
 
@@ -45,8 +45,12 @@ RWTexture2D<float4> gOut_Spec;
 
 #include "Assets/Shaders/Rtxdi/RtxdiParameters.h"
 
-RWStructuredBuffer<RTXDI_PackedDIReservoir> u_LightReservoirs;
+// RTXDI resources
+StructuredBuffer<RAB_LightInfo> t_LightDataBuffer;
 Buffer<float2> t_NeighborOffsets;
+StructuredBuffer<uint> t_GeometryInstanceToLight;
+
+RWStructuredBuffer<RTXDI_PackedDIReservoir> u_LightReservoirs;
 
 #define RTXDI_LIGHT_RESERVOIR_BUFFER u_LightReservoirs
 #define RTXDI_NEIGHBOR_OFFSETS_BUFFER t_NeighborOffsets
@@ -54,11 +58,6 @@ Buffer<float2> t_NeighborOffsets;
 // #include "RtxdiApplicationBridge/RtxdiApplicationBridge.hlsli"
 //
 // #include "Assets/Shaders/RTXDI/DI/InitialSampling.hlsli"
-
-
-
-
- 
 
 
 // 所有射灯直接光照的累加结果（不经 NRD 降噪，在 Composition 直接叠加）
@@ -635,35 +634,35 @@ void MainRayGenShader()
             // Origin point
             // Accumulate curvature
             accumulatedCurvature += materialProps0.curvature; // yes, before hit
-    
+
             // Accumulate mirror matrix
             mirrorMatrix = mul(Geometry::GetMirrorMatrix(materialProps0.N), mirrorMatrix);
-    
+
             // Choose a ray
             float3 ray = reflect(-geometryProps0.V, materialProps0.N);
-    
+
             // Update throughput
             float3 albedo, Rf0;
             BRDF::ConvertBaseColorMetalnessToAlbedoRf0(materialProps0.baseColor, materialProps0.metalness, albedo, Rf0);
-    
+
             float NoV = abs(dot(materialProps0.N, geometryProps0.V));
             float3 Fenv = BRDF::EnvironmentTerm_Rtg(Rf0, NoV, materialProps0.roughness);
-    
+
             psrThroughput *= Fenv;
-    
+
             // Trace to the next hit
             float2 mipAndCone = GetConeAngleFromRoughness(geometryProps0.mip, materialProps0.roughness);
-    
-    
+
+
             CastRay(geometryProps0.GetXoffset(geometryProps0.N), ray, 0.0, INF, mipAndCone, GEOMETRY_ALL, geometryProps0, materialProps0);
         }
-    
+
         {
             // Hit point
             // Accumulate hit distance representing virtual point position ( see "README/NOISY INPUTS" )
             accumulatedHitDist += ApplyThinLensEquation(geometryProps0.hitT, accumulatedCurvature); // TODO: take updated from NRD
         }
-    
+
         bounceNum--;
     }
 
@@ -734,7 +733,7 @@ void MainRayGenShader()
     }
 
     gOut_DirectLighting[pixelPos] = Ldirect; // "psrThroughput" applied in "Composition"
-    
+
     // gOut_DirectLighting[pixelPos] = gIn_PrevBaseColorMetalness[pixelPos].xyz  - gOut_BaseColor_Metalness[pixelPos];
     // gOut_SpotDirect[pixelPos] = EvaluateSpotLights(geometryProps0, materialProps0);
     // gOut_SpotDirect[pixelPos] = 0;
@@ -771,7 +770,7 @@ void MainRayGenShader()
     result.specRadiance += materialProps0.Lemi / Math::Pi(2.0);
     #endif
 
-    
+
     // Test RTXDI
     //
     // RTXDI_DIReservoir reservoir = RTXDI_EmptyDIReservoir();
@@ -789,8 +788,8 @@ void MainRayGenShader()
     //
     // // Generate the initial sample
     // RAB_LightSample lightSample = RAB_EmptyLightSample();
-    
-    
+
+
     // END of test RTXDI
 
     // //================================================================================================================================================================================
