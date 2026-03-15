@@ -842,12 +842,14 @@ void MainRayGenShader()
     
     RAB_Surface primarySurface = RAB_EmptySurface();
     primarySurface.worldPos = geometryProps0.X;
+    // todo？
     primarySurface.viewDir = -geometryProps0.V;
     primarySurface.viewDepth = viewZ0;
     primarySurface.normal = geometryProps0.N;
     primarySurface.geoNormal = geometryProps0.N;
-    primarySurface.diffuseProbability = 0; // todo
-    
+    primarySurface.diffuseProbability = getSurfaceDiffuseProbability(primarySurface);
+    // primarySurface.diffuseProbability = 0.0;
+
     RAB_Material material = RAB_EmptyMaterial();
     
     float3 albedo, Rf0;
