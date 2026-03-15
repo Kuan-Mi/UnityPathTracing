@@ -23,6 +23,8 @@ namespace mini
         public GraphicsBuffer LightReservoirBuffer { get; private set; }
 
 
+        public ReSTIRDIContext context;
+
         public int LightDataBufferSize;
         public int NeighborOffsetsBufferSize;
         public int LightReservoirBufferSize;
@@ -35,6 +37,7 @@ namespace mini
             uint maxGeometryInstances,
             GraphicsBuffer LightDataBuffer)
         {
+            this.context = context;
             this.LightDataBuffer = LightDataBuffer;
             LightDataBufferSize = (int)(maxEmissiveTriangles * Marshal.SizeOf<RAB_LightInfo>());
             // m_maxEmissiveMeshes = maxEmissiveMeshes;

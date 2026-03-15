@@ -47,6 +47,9 @@ RWTexture2D<float4> gOut_Spec;
 #include "Assets/Shaders/donut/packing.hlsli"
 #include "Assets/Shaders/donut/brdf.hlsli"
 
+
+
+
 // RTXDI resources
 StructuredBuffer<RAB_LightInfo> t_LightDataBuffer;
 Buffer<float2> t_NeighborOffsets;
@@ -64,6 +67,19 @@ RWStructuredBuffer<RTXDI_PackedDIReservoir> u_LightReservoirs;
 //
 #include "Assets/Shaders/RTXDI/DI/InitialSampling.hlsli"
 #include <Assets/Shaders/RTXDI/DI/SpatioTemporalResampling.hlsli>
+
+cbuffer ResamplingConstants {
+    // RTXDI_ReservoirBufferParameters restirDIReservoirBufferParams;
+    
+    uint32_t reservoirBlockRowPitch;
+    uint32_t reservoirArrayPitch;
+    
+    uint32_t pad1;
+    uint32_t pad2;
+    
+    uint32_t inputBufferIndex;
+    uint32_t outputBufferIndex;
+}
 
 
 // 所有射灯直接光照的累加结果（不经 NRD 降噪，在 Composition 直接叠加）
@@ -813,9 +829,16 @@ void MainRayGenShader()
     //     g_brdfCutoff,
     //     0.001f);
     
-    RTXDI_LightBufferRegion light_buffer_region = (RTXDI_LightBufferRegion)0;
-    light_buffer_region.firstLightIndex = 0;
-    light_buffer_region.numLights = 3963;
+    
+    RTXDI_LightBufferParameters lightBufferParams = (RTXDI_LightBufferParameters)0;
+
+    
+    lightBufferParams.localLightBufferRegion.firstLightIndex = 0;
+    lightBufferParams.localLightBufferRegion.numLights = 3964;
+    lightBufferParams.infiniteLightBufferRegion.firstLightIndex = 0;
+    lightBufferParams.infiniteLightBufferRegion.numLights = 0;
+    lightBufferParams.environmentLightParams.lightIndex = RTXDI_INVALID_LIGHT_INDEX;
+    lightBufferParams.environmentLightParams.lightPresent = false;
     
     RAB_Surface primarySurface = RAB_EmptySurface();
     primarySurface.worldPos = geometryProps0.X;
@@ -840,10 +863,9 @@ void MainRayGenShader()
     // Generate the initial sample
     RAB_LightSample lightSample = RAB_EmptyLightSample();
     RTXDI_DIReservoir localReservoir = RTXDI_SampleLocalLights(rng, rng, primarySurface,
-        sampleParams, ReSTIRDI_LocalLightSamplingMode_UNIFORM, light_buffer_region, lightSample);
-
-    RTXDI_LightBufferParameters lightBufferParams = (RTXDI_LightBufferParameters)0;
-    lightBufferParams.localLightBufferRegion = light_buffer_region;
+        sampleParams, ReSTIRDI_LocalLightSamplingMode_UNIFORM, lightBufferParams.localLightBufferRegion, lightSample);
+    
+    RTXDI_CombineDIReservoirs(reservoir, localReservoir, 0.5, localReservoir.targetPdf);
     
     
     // Resample BRDF samples.
@@ -854,6 +876,7 @@ void MainRayGenShader()
     {
         lightSample = brdfSample;
     }
+    // gOut_DirectLighting[pixelPos] = float4(lightSample.radiance , 1.0);
     
     
     RTXDI_FinalizeResampling(reservoir, 1.0, 1.0);
@@ -882,10 +905,10 @@ void MainRayGenShader()
         // Compute the correctly weighted reflected radiance
         shadingOutput = ShadeSurfaceWithLightSample(lightSample, primarySurface)
                       * RTXDI_GetDIReservoirInvPdf(reservoir);
-
+    
         // Test if the selected light is visible from the surface
         bool visibility = RAB_GetConservativeVisibility(primarySurface, lightSample);
-
+    
         // If not visible, discard the shading output and the light sample
         if (!visibility)
         {
@@ -898,9 +921,16 @@ void MainRayGenShader()
     shadingOutput += materialProps0.Lemi;
     shadingOutput = basicToneMapping(shadingOutput, 0.005);
 
-    gOut_DirectLighting[pixelPos] = float4(shadingOutput * 100, 1.0);
+    gOut_DirectLighting[pixelPos] = float4(shadingOutput , 1.0);
+    // gOut_DirectLighting[pixelPos] = float4(primarySurface.material.specularF0 , 1.0);
+    // gOut_DirectLighting[pixelPos] = float4(1 -materialProps0.metalness,1 -materialProps0.metalness,1 -materialProps0.metalness , 1.0);
+    RTXDI_ReservoirBufferParameters restirDIReservoirBufferParams;
     
-    // RTXDI_StoreDIReservoir(reservoir, g_Const.restirDIReservoirBufferParams, pixelPosition, g_Const.outputBufferIndex);
+    restirDIReservoirBufferParams.reservoirBlockRowPitch = reservoirBlockRowPitch;
+    restirDIReservoirBufferParams.reservoirArrayPitch = reservoirArrayPitch;
+    
+    
+    RTXDI_StoreDIReservoir(reservoir, restirDIReservoirBufferParams, pixelPos, outputBufferIndex);
     
     // END of test RTXDI
 

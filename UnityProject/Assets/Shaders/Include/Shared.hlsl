@@ -170,6 +170,8 @@
 
 #define GEOMETRY_ALL                        ( FLAG_NON_TRANSPARENT | FLAG_TRANSPARENT )
 
+ 
+
 
 cbuffer PathTracingParams : register(b0)
 {
@@ -249,9 +251,12 @@ cbuffer PathTracingParams : register(b0)
     float gSssMaxSampleRadius;
     float gIsEditor;
     
-    uint gNumLights;
-    
 };
+
+
+
+
+// RTXDI_ReservoirBufferParameters restirDIReservoirBufferParams;
 
 #include "Assets/Shaders/Include/ml.hlsli"
 #include "Assets/Shaders/NRD/NRD.hlsli"

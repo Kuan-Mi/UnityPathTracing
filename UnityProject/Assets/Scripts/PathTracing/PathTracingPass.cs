@@ -50,6 +50,7 @@ namespace PathTracing
 
         private readonly PathTracingSetting m_Settings;
         private readonly GraphicsBuffer _pathTracingSettingsBuffer;
+        private readonly GraphicsBuffer _resamplingConstantsBuffer;
         private GraphicsBuffer m_SpotLightBuffer;
         private GraphicsBuffer m_AreaLightBuffer;
         private GraphicsBuffer m_PointLightBuffer;
@@ -120,6 +121,9 @@ namespace PathTracing
             internal int2 m_RenderResolution;
 
             internal GlobalConstants GlobalConstants;
+            internal ResamplingConstants ResamplingConstants;
+            
+            internal GraphicsBuffer ResamplingConstantBuffer;
             internal GraphicsBuffer ConstantBuffer;
             internal IntPtr NrdDataPtr;
             internal IntPtr RRDataPtr;
@@ -173,6 +177,7 @@ namespace PathTracing
         {
             m_Settings = setting;
             _pathTracingSettingsBuffer = new GraphicsBuffer(GraphicsBuffer.Target.Constant, 1, Marshal.SizeOf<GlobalConstants>());
+            _resamplingConstantsBuffer = new GraphicsBuffer(GraphicsBuffer.Target.Constant, 1, Marshal.SizeOf<ResamplingConstants>());
         }
 
         static void ExecutePass(PassData data, UnsafeGraphContext context)
@@ -185,6 +190,7 @@ namespace PathTracing
             var natCmd = CommandBufferHelpers.GetNativeCommandBuffer(context.cmd);
 
             natCmd.SetBufferData(data.ConstantBuffer, new[] { data.GlobalConstants });
+            natCmd.SetBufferData(data.ResamplingConstantBuffer, new[] { data.ResamplingConstants });
 
             // Bind the exposure buffer globally so all shaders can read the current EV.
             // When auto-exposure is OFF: seed the buffer with the manual value from settings.
@@ -270,6 +276,7 @@ namespace PathTracing
 
                 natCmd.SetRayTracingShaderPass(data.OpaqueTs, "Test2");
                 natCmd.SetRayTracingConstantBufferParam(data.OpaqueTs, paramsID, data.ConstantBuffer, 0, data.ConstantBuffer.stride);
+                natCmd.SetRayTracingConstantBufferParam(data.OpaqueTs, "ResamplingConstants" , data.ResamplingConstantBuffer, 0, data.ResamplingConstantBuffer.stride);
                 
                 natCmd.SetRayTracingBufferParam(data.OpaqueTs, t_LightDataBufferID, data.RtxdiResources.LightDataBuffer);
                 natCmd.SetRayTracingBufferParam(data.OpaqueTs, t_NeighborOffsetsID, data.RtxdiResources.NeighborOffsetsBuffer);
@@ -984,6 +991,7 @@ namespace PathTracing
                 gSHARC = m_Settings.SHARC ? (uint)1 : 0,
                 gTrimLobe = m_Settings.specularLobeTrimming ? 1u : 0,
             };
+            
             globalConstants.gSpotLightCount  = (uint)spotCount;
             globalConstants.gAreaLightCount  = (uint)areaCount;
             globalConstants.gPointLightCount = (uint)pointCount;
@@ -1010,6 +1018,22 @@ namespace PathTracing
             CreateTextureHandle(renderGraph, passData, textureDesc, builder);
 
             passData.GlobalConstants = globalConstants;
+            
+            var resamplingConstants = new ResamplingConstants();
+
+            resamplingConstants.restirDIReservoirBufferParams = rtxdiResources.context.GetReservoirBufferParameters();
+            
+            resamplingConstants.inputBufferIndex = ((Time.frameCount & 1) == 0) ? 0u : 1u;
+            resamplingConstants.outputBufferIndex = ((Time.frameCount & 1) == 0) ? 1u : 0u;
+            
+            passData.ResamplingConstants = resamplingConstants;
+            
+            Debug.Log($"Reservoir reservoirArrayPitch: {resamplingConstants.restirDIReservoirBufferParams.reservoirArrayPitch}, reservoirBlockRowPitch: {resamplingConstants.restirDIReservoirBufferParams.reservoirBlockRowPitch}");
+            
+            
+            
+            
+            
             passData.CameraTexture = resourceData.activeColorTexture;
             passData.outputGridW = (uint)((renderResolution.x + 15) / 16);
             passData.outputGridH = (uint)((renderResolution.y + 15) / 16);
@@ -1019,6 +1043,8 @@ namespace PathTracing
 
 
             passData.ConstantBuffer = _pathTracingSettingsBuffer;
+            passData.ResamplingConstantBuffer = _resamplingConstantsBuffer;
+            
             passData.Setting = m_Settings;
             passData.resolutionScale = NrdDenoiser.resolutionScale;
             passData.ScramblingRanking = ScramblingRanking;
@@ -1124,6 +1150,7 @@ namespace PathTracing
         public void Dispose()
         {
             _pathTracingSettingsBuffer?.Release();
+            _resamplingConstantsBuffer?.Release();
             m_SpotLightBuffer?.Release();
             m_AreaLightBuffer?.Release();
             m_PointLightBuffer?.Release();
