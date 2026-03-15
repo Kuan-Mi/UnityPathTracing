@@ -11,7 +11,7 @@
 #ifndef RTXDI_DI_PAIRWISE_STREAMING_HLSLI
 #define RTXDI_DI_PAIRWISE_STREAMING_HLSLI
 
-#include "Rtxdi/DI/Reservoir.hlsli"
+#include "Assets/Shaders/Rtxdi/DI/Reservoir.hlsli"
 
 // A helper used for pairwise MIS computations.  This might be able to simplify code elsewhere, too.
 float RTXDI_TargetPdfHelper(const RTXDI_DIReservoir lightReservoir, const RAB_Surface surface, bool priorFrame RTXDI_DEFAULT(false))

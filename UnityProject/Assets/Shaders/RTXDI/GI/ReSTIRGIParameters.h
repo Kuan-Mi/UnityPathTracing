@@ -11,8 +11,8 @@
 #ifndef RTXDI_RESTIRGI_PARAMETERS_H
 #define RTXDI_RESTIRGI_PARAMETERS_H
 
-#include "Rtxdi/RtxdiParameters.h"
-#include "Rtxdi/RtxdiTypes.h"
+#include "Assets/Shaders/Rtxdi/RtxdiParameters.h"
+#include "Assets/Shaders/Rtxdi/RtxdiTypes.h"
 
 struct RTXDI_PackedGIReservoir
 {

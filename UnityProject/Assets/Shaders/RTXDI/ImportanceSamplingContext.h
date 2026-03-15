@@ -12,9 +12,9 @@
 
 #include <memory>
 
-#include "Rtxdi/DI/ReSTIRDI.h"
-#include "Rtxdi/GI/ReSTIRGI.h"
-#include "Rtxdi/ReGIR/ReGIR.h"
+#include "Assets/Shaders/Rtxdi/DI/ReSTIRDI.h"
+#include "Assets/Shaders/Rtxdi/GI/ReSTIRGI.h"
+#include "Assets/Shaders/Rtxdi/ReGIR/ReGIR.h"
 
 namespace rtxdi
 {

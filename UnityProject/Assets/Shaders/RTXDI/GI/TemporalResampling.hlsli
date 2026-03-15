@@ -11,10 +11,10 @@
 #ifndef RTXDI_GI_TEMPORAL_RESAMPLING_HLSLI
 #define RTXDI_GI_TEMPORAL_RESAMPLING_HLSLI
 
-#include "Rtxdi/GI/JacobianMath.hlsli"
-#include "Rtxdi/GI/Reservoir.hlsli"
-#include "Rtxdi/Utils/Checkerboard.hlsli"
-#include "Rtxdi/Utils/ReservoirAddressing.hlsli"
+#include "Assets/Shaders/Rtxdi/GI/JacobianMath.hlsli"
+#include "Assets/Shaders/Rtxdi/GI/Reservoir.hlsli"
+#include "Assets/Shaders/Rtxdi/Utils/Checkerboard.hlsli"
+#include "Assets/Shaders/Rtxdi/Utils/ReservoirAddressing.hlsli"
 
 // Enabled by default. Application code need to define those macros appropriately to optimize shaders.
 #ifndef RTXDI_GI_ALLOWED_BIAS_CORRECTION

@@ -1,8 +1,8 @@
 #ifndef RTXDI_DI_BOILING_FILTER_HLSLI
 #define RTXDI_DI_BOILING_FILTER_HLSLI
 
-#include "Rtxdi/DI/Reservoir.hlsli"
-#include "Rtxdi/Utils/BoilingFilter.hlsli"
+#include "Assets/Shaders/Rtxdi/DI/Reservoir.hlsli"
+#include "Assets/Shaders/Rtxdi/Utils/BoilingFilter.hlsli"
 
 #ifdef RTXDI_ENABLE_BOILING_FILTER
 // Boiling filter that should be applied at the end of the temporal resampling pass.

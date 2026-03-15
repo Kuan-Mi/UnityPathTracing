@@ -11,16 +11,16 @@
 #ifndef INITIAL_SAMPLING_FUNCTIONS_HLSLI
 #define INITIAL_SAMPLING_FUNCTIONS_HLSLI
 
-#include "Rtxdi/DI/ReSTIRDIParameters.h"
-#include "Rtxdi/DI/Reservoir.hlsli"
-#include "Rtxdi/LightSampling/LocalLightSelection.hlsli"
+#include "Assets/Shaders/Rtxdi/DI/ReSTIRDIParameters.h"
+#include "Assets/Shaders/Rtxdi/DI/Reservoir.hlsli"
+#include "Assets/Shaders/Rtxdi/LightSampling/LocalLightSelection.hlsli"
 #ifdef RTXDI_RIS_BUFFER_HLSLI
-#include "Rtxdi/LightSampling/RISBuffer.hlsli"
+#include "Assets/Shaders/Rtxdi/LightSampling/RISBuffer.hlsli"
 #if RTXDI_REGIR_MODE != RTXDI_REGIR_DISABLED
-#include "Rtxdi/ReGIR/ReGIRSampling.hlsli"
+#include "Assets/Shaders/Rtxdi/ReGIR/ReGIRSampling.hlsli"
 #endif
 #endif // RTXDI_RIS_BUFFER_HLSLI
-#include "Rtxdi/LightSampling/UniformSampling.hlsli"
+#include "Assets/Shaders/Rtxdi/LightSampling/UniformSampling.hlsli"
 
 #ifndef RTXDI_TILE_SIZE_IN_PIXELS
 #define RTXDI_TILE_SIZE_IN_PIXELS 16

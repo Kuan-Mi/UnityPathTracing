@@ -14,8 +14,8 @@
 #include <memory>
 #include <vector>
 
-#include "Rtxdi/RtxdiUtils.h"
-#include "Rtxdi/DI/ReSTIRDIParameters.h"
+#include "Assets/Shaders/Rtxdi/RtxdiUtils.h"
+#include "Assets/Shaders/Rtxdi/DI/ReSTIRDIParameters.h"
 
 namespace rtxdi
 {

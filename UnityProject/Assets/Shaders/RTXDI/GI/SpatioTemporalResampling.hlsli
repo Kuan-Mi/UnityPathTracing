@@ -11,10 +11,10 @@
 #ifndef RTXDI_GI_SPATIOTEMPORAL_RESAMPLING_HLSLI
 #define RTXDI_GI_SPATIOTEMPORAL_RESAMPLING_HLSLI
 
-#include "Rtxdi/GI/JacobianMath.hlsli"
-#include "Rtxdi/GI/Reservoir.hlsli"
-#include "Rtxdi/GI/SpatialResampling.hlsli"
-#include "Rtxdi/GI/TemporalResampling.hlsli"
+#include "Assets/Shaders/Rtxdi/GI/JacobianMath.hlsli"
+#include "Assets/Shaders/Rtxdi/GI/Reservoir.hlsli"
+#include "Assets/Shaders/Rtxdi/GI/SpatialResampling.hlsli"
+#include "Assets/Shaders/Rtxdi/GI/TemporalResampling.hlsli"
 
 // A structure that groups the application-provided settings for spatio-temporal resampling.
 struct RTXDI_GISpatioTemporalResamplingParameters

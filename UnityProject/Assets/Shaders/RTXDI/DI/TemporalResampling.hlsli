@@ -11,8 +11,8 @@
 #ifndef RTXDI_DI_TEMPORAL_RESAMPLING_HLSLI
 #define RTXDI_DI_TEMPORAL_RESAMPLING_HLSLI
 
-#include "Rtxdi/DI/Reservoir.hlsli"
-#include "Rtxdi/Utils/Checkerboard.hlsli"
+#include "Assets/Shaders/Rtxdi/DI/Reservoir.hlsli"
+#include "Assets/Shaders/Rtxdi/Utils/Checkerboard.hlsli"
 
  // A structure that groups the application-provided settings for temporal resampling.
 struct RTXDI_DITemporalResamplingParameters

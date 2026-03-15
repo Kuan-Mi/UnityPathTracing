@@ -11,8 +11,8 @@
 #ifndef RTXDI_GI_RESERVOIR_HLSLI
 #define RTXDI_GI_RESERVOIR_HLSLI
 
-#include "Rtxdi/GI/ReSTIRGIParameters.h"
-#include "Rtxdi/Utils/ReservoirAddressing.hlsli"
+#include "Assets/Shaders/Rtxdi/GI/ReSTIRGIParameters.h"
+#include "Assets/Shaders/Rtxdi/Utils/ReservoirAddressing.hlsli"
 
 // Define this macro to 0 if your shader needs read-only access to the reservoirs, 
 // to avoid compile errors in the RTXDI_StoreDIReservoir function

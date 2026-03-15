@@ -11,8 +11,8 @@
 #pragma once
 
 #include <stdint.h>
-#include "Rtxdi/RtxdiUtils.h"
-#include "Rtxdi/GI/ReSTIRGIParameters.h"
+#include "Assets/Shaders/Rtxdi/RtxdiUtils.h"
+#include "Assets/Shaders/Rtxdi/GI/ReSTIRGIParameters.h"
 
 namespace rtxdi
 {

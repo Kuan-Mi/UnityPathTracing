@@ -12,9 +12,9 @@
 #define RTXDI_LOCAL_LIGHT_SELECTION_CONTEXT_HLSLI
 
 #if RTXDI_ENABLE_PRESAMPLING
-#include "Rtxdi/LightSampling/RISBuffer.hlsli"
+#include "Assets/Shaders/Rtxdi/LightSampling/RISBuffer.hlsli"
 #endif
-#include "Rtxdi/LightSampling/UniformSampling.hlsli"
+#include "Assets/Shaders/Rtxdi/LightSampling/UniformSampling.hlsli"
 
 #define RTXDI_LocalLightContextSamplingMode uint
 #define RTXDI_LocalLightContextSamplingMode_UNIFORM 0

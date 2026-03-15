@@ -11,8 +11,8 @@
 #ifndef RTXDI_RESTIRDI_PARAMETERS_H
 #define RTXDI_RESTIRDI_PARAMETERS_H
 
-#include "Rtxdi/RtxdiParameters.h"
-#include "Rtxdi/RtxdiTypes.h"
+#include "Assets/Shaders/Rtxdi/RtxdiParameters.h"
+#include "Assets/Shaders/Rtxdi/RtxdiTypes.h"
 
 #ifdef __cplusplus
 enum class ReSTIRDI_LocalLightSamplingMode : uint32_t

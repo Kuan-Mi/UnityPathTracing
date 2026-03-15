@@ -38,8 +38,23 @@ RWTexture2D<float4> gOut_Diff;
 // 高光反射光照结果（Specular Radiance），包含噪声和打包后的信息。
 RWTexture2D<float4> gOut_Spec;
 
+#include "Assets/Shaders/Rtxdi/RtxdiParameters.h"
 
-#include "Assets/Shaders/RTXDI/DI/Reservoir.hlsli"
+RWStructuredBuffer<RTXDI_PackedDIReservoir> u_LightReservoirs : register(u0);
+Buffer<float2> t_NeighborOffsets : register(t21);
+
+#define RTXDI_LIGHT_RESERVOIR_BUFFER u_LightReservoirs
+#define RTXDI_NEIGHBOR_OFFSETS_BUFFER t_NeighborOffsets
+
+#include "RtxdiApplicationBridge/RtxdiApplicationBridge.hlsli"
+
+#include "Assets/Shaders/RTXDI/DI/InitialSampling.hlsli"
+
+
+
+
+ 
+
 
 // 所有射灯直接光照的累加结果（不经 NRD 降噪，在 Composition 直接叠加）
 // RWTexture2D<float3> gOut_SpotDirect;
@@ -754,6 +769,19 @@ void MainRayGenShader()
     
     RTXDI_DIReservoir reservoir = RTXDI_EmptyDIReservoir();
     
+
+    
+    RTXDI_SampleParameters sampleParams = RTXDI_InitSampleParameters(
+        g_numInitialSamples, // local light samples 
+        0, // infinite light samples
+        0, // environment map samples
+        g_numInitialBRDFSamples,
+        g_brdfCutoff,
+        0.001f);
+    
+    
+    // Generate the initial sample
+    RAB_LightSample lightSample = RAB_EmptyLightSample();
     
     
     // END of test RTXDI

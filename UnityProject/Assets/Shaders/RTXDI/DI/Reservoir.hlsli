@@ -11,8 +11,8 @@
 #ifndef RTXDI_DIRESERVOIR_HLSLI
 #define RTXDI_DIRESERVOIR_HLSLI
 
-#include "Rtxdi/RtxdiParameters.h"
-#include "Rtxdi/Utils/ReservoirAddressing.hlsli"
+#include "Assets/Shaders/Rtxdi/RtxdiParameters.h"
+#include "Assets/Shaders/Rtxdi/Utils/ReservoirAddressing.hlsli"
 
 #ifndef RTXDI_LIGHT_RESERVOIR_BUFFER
 #error "RTXDI_LIGHT_RESERVOIR_BUFFER must be defined to point to a RWStructuredBuffer<RTXDI_PackedDIReservoir> type resource"

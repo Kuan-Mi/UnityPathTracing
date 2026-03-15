@@ -11,9 +11,9 @@
 #ifndef RTXDI_DI_SPATIOTEMPORAL_RESAMPLIHG_HLSLI
 #define RTXDI_DI_SPATIOTEMPORAL_RESAMPLIHG_HLSLI
 
-#include "Rtxdi/DI/PairwiseStreaming.hlsli"
-#include "Rtxdi/DI/Reservoir.hlsli"
-#include "Rtxdi/Utils/Checkerboard.hlsli"
+#include "Assets/Shaders/Rtxdi/DI/PairwiseStreaming.hlsli"
+#include "Assets/Shaders/Rtxdi/DI/Reservoir.hlsli"
+#include "Assets/Shaders/Rtxdi/Utils/Checkerboard.hlsli"
 
 #ifndef RTXDI_NEIGHBOR_OFFSETS_BUFFER
 #error "RTXDI_NEIGHBOR_OFFSETS_BUFFER must be defined to point to a Buffer<float2> type resource"
