@@ -4,6 +4,7 @@ using DefaultNamespace;
 using mini;
 using Nrd;
 using RTXDI;
+using Rtxdi.DI;
 using Unity.Mathematics;
 using Unity.Profiling;
 using Unity.Profiling.LowLevel;
@@ -57,6 +58,7 @@ namespace PathTracing
         
         public PrepareLightResource prepareLightResource;
         public RtxdiResources  rtxdiResources;
+        public ReSTIRDIContext  restirDIContext;
 
 
         [DllImport("RenderingPlugin")]
@@ -171,6 +173,7 @@ namespace PathTracing
             
             
             internal RtxdiResources RtxdiResources;
+            internal ReSTIRDIContext  RestirDIContext;
         }
 
         public PathTracingPass(PathTracingSetting setting)
@@ -851,6 +854,7 @@ namespace PathTracing
 
             passData.DataPtr = prepareLightResource.GetInteropDataPtr();
             passData.RtxdiResources = rtxdiResources;
+            passData.RestirDIContext = restirDIContext;
 
             var proj = isXr ? xrPass.GetProjMatrix() : cameraData.camera.projectionMatrix;
 
@@ -1019,14 +1023,18 @@ namespace PathTracing
 
             passData.GlobalConstants = globalConstants;
             
+            
+            restirDIContext.SetFrameIndex((uint)Time.frameCount);
+            
+            
             var resamplingConstants = new ResamplingConstants();
 
-            resamplingConstants.restirDIReservoirBufferParams = rtxdiResources.context.GetReservoirBufferParameters();
+            resamplingConstants.restirDIReservoirBufferParams = restirDIContext.GetReservoirBufferParameters();
             
             resamplingConstants.inputBufferIndex = ((Time.frameCount & 1) == 0) ? 0u : 1u;
             resamplingConstants.outputBufferIndex = ((Time.frameCount & 1) == 0) ? 1u : 0u;
             
-            resamplingConstants.neighborOffsetMask =  rtxdiResources.context.GetStaticParameters().NeighborOffsetCount - 1;
+            resamplingConstants.neighborOffsetMask =  restirDIContext.GetStaticParameters().NeighborOffsetCount - 1;
             
             passData.ResamplingConstants = resamplingConstants;
             

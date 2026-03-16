@@ -328,7 +328,7 @@ namespace PathTracing
                 uint maxEmissiveTriangles = gpuScene.emissiveTriangleCount;
                 uint maxGeometryInstances = gpuScene.instanceCount;
 
-                rtxdiResources = new RtxdiResources(restirDIContext, maxEmissiveMeshes, maxEmissiveTriangles, maxGeometryInstances,gpuScene._lightInfoBuffer);
+                rtxdiResources = new RtxdiResources(restirDIContext , maxEmissiveMeshes, maxEmissiveTriangles, maxGeometryInstances,gpuScene._lightInfoBuffer);
                 _rtxdiResources.Add(uniqueKey, rtxdiResources);
             }
 
@@ -343,6 +343,7 @@ namespace PathTracing
             
             _pathTracingPass.prepareLightResource = prepareLightResource;
             _pathTracingPass.rtxdiResources = rtxdiResources;
+            _pathTracingPass.restirDIContext = restirDIContext;
 
             if (finalMaterial == null
                 || opaqueTracingShader == null
