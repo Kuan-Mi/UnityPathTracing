@@ -882,14 +882,10 @@ void MainRayGenShader()
     {
         lightSample = brdfSample;
     }
-    // debugTest = selectBrdf;
-    // // gOut_DirectLighting[pixelPos] = float4(debugTest , 1.0);
-    //
-    //
+
     RTXDI_FinalizeResampling(reservoir, 1.0, 1.0);
     reservoir.M = 1;
-    
-    
+
     // BRDF was generated with a trace so no need to trace visibility again
     // BRDF 是通过追踪生成的，因此无需再次追踪可见性
     if (RTXDI_IsValidDIReservoir(reservoir) && !selectBrdf)
@@ -903,47 +899,46 @@ void MainRayGenShader()
             RTXDI_StoreVisibilityInDIReservoir(reservoir, 0, true);
         }
     }
-    //
-    //
-    // //
-    // // RTXDI_ReservoirBufferParameters restirDIReservoirBufferParams;
-    // //
-    // // restirDIReservoirBufferParams.reservoirBlockRowPitch = reservoirBlockRowPitch;
-    // // restirDIReservoirBufferParams.reservoirArrayPitch = reservoirArrayPitch;
-    // //
-    // // {
-    // //     RTXDI_DISpatioTemporalResamplingParameters stparams;
-    // //     stparams.screenSpaceMotion = motion;
-    // //     stparams.sourceBufferIndex = inputBufferIndex;
-    // //     stparams.maxHistoryLength = 20;
-    // //     stparams.biasCorrectionMode = RTXDI_BIAS_CORRECTION_BASIC;
-    // //     stparams.depthThreshold = 0.1;
-    // //     stparams.normalThreshold = 0.5;
-    // //     stparams.numSamples = 1 + 1;
-    // //     stparams.numDisocclusionBoostSamples = 0;
-    // //     stparams.samplingRadius = 32;
-    // //     stparams.enableVisibilityShortcut = true;
-    // //     stparams.enablePermutationSampling = true;
-    // //     stparams.discountNaiveSamples = false;
-    // //
-    // //
-    // //     // This variable will receive the position of the sample reused from the previous frame.
-    // //     // It's only needed for gradient evaluation, ignore it here.
-    // //     int2 temporalSamplePixelPos = -1;
-    // //
-    // //
-    // //     RTXDI_RuntimeParameters runtimeParams;
-    // //
-    // //     runtimeParams.neighborOffsetMask = neighborOffsetMask;
-    // //     runtimeParams.activeCheckerboardField = 0;
-    // //
-    // //
-    // //     // Call the resampling function, update the reservoir and lightSample variables
-    // //     reservoir = RTXDI_DISpatioTemporalResampling(pixelPos, primarySurface, reservoir,
-    // //                                                  rng, runtimeParams, restirDIReservoirBufferParams, stparams, temporalSamplePixelPos, lightSample);
-    // // }
-    // //
-    // //
+    
+    
+    RTXDI_ReservoirBufferParameters restirDIReservoirBufferParams;
+    
+    restirDIReservoirBufferParams.reservoirBlockRowPitch = reservoirBlockRowPitch;
+    restirDIReservoirBufferParams.reservoirArrayPitch = reservoirArrayPitch;
+    
+    {
+        RTXDI_DISpatioTemporalResamplingParameters stparams;
+        stparams.screenSpaceMotion = motion;
+        stparams.sourceBufferIndex = inputBufferIndex;
+        stparams.maxHistoryLength = 20;
+        stparams.biasCorrectionMode = RTXDI_BIAS_CORRECTION_BASIC;
+        stparams.depthThreshold = 0.1;
+        stparams.normalThreshold = 0.5;
+        stparams.numSamples = 1 + 1;
+        stparams.numDisocclusionBoostSamples = 0;
+        stparams.samplingRadius = 32;
+        stparams.enableVisibilityShortcut = true;
+        stparams.enablePermutationSampling = true;
+        stparams.discountNaiveSamples = false;
+    
+    
+        // This variable will receive the position of the sample reused from the previous frame.
+        // It's only needed for gradient evaluation, ignore it here.
+        int2 temporalSamplePixelPos = -1;
+    
+    
+        RTXDI_RuntimeParameters runtimeParams;
+    
+        runtimeParams.neighborOffsetMask = neighborOffsetMask;
+        runtimeParams.activeCheckerboardField = 0;
+    
+    
+        // Call the resampling function, update the reservoir and lightSample variables
+        reservoir = RTXDI_DISpatioTemporalResampling(pixelPos, primarySurface, reservoir,
+                                                     rng, runtimeParams, restirDIReservoirBufferParams, stparams, temporalSamplePixelPos, lightSample);
+    }
+    
+    
     float3 shadingOutput = 0;
     
     
@@ -977,7 +972,7 @@ void MainRayGenShader()
     gOut_DirectLighting[pixelPos] = float4(shadingOutput, 1.0);
 
 
-    // RTXDI_StoreDIReservoir(reservoir, restirDIReservoirBufferParams, pixelPos, outputBufferIndex);
+    RTXDI_StoreDIReservoir(reservoir, restirDIReservoirBufferParams, pixelPos, outputBufferIndex);
 
     // END of test RTXDI
 
