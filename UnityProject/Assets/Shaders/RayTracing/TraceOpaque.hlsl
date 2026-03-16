@@ -61,10 +61,10 @@ RWStructuredBuffer<RTXDI_PackedDIReservoir> u_LightReservoirs;
 
 #define RTXDI_ENABLE_PRESAMPLING 0
 
-#include "RtxdiApplicationBridge/RtxdiApplicationBridge.hlsli"
+#include "RtxdiApplicationBridge/RtxdiApplicationBridge.hlsl"
 //
-#include "Assets/Shaders/RTXDI/DI/InitialSampling.hlsli"
-#include <Assets/Shaders/RTXDI/DI/SpatioTemporalResampling.hlsli>
+#include "Assets/Shaders/RTXDI/DI/InitialSampling.hlsl"
+#include <Assets/Shaders/RTXDI/DI/SpatioTemporalResampling.hlsl>
 
 cbuffer ResamplingConstants
 {
