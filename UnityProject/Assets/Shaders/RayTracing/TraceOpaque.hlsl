@@ -867,8 +867,6 @@ void MainRayGenShader()
     // Generate the initial sample
     RAB_LightSample lightSample = RAB_EmptyLightSample();
     RTXDI_DIReservoir localReservoir = RTXDI_SampleLocalLights(rng, rng, primarySurface, sampleParams, ReSTIRDI_LocalLightSamplingMode_UNIFORM, lightBufferParams.localLightBufferRegion, lightSample);
-    ShadeSurfaceWithLightSample(lightSample, primarySurface) * RTXDI_GetDIReservoirInvPdf(localReservoir);
-
     gOut_DirectLighting[pixelPos] = float4(lightSample.radiance, 1.0);
 
 
