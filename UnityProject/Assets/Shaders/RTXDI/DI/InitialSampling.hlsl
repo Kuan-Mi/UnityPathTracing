@@ -271,7 +271,7 @@ RTXDI_DIReservoir RTXDI_SampleLocalLightsInternal(
     ReGIR_Parameters regirParams,
 #endif
 #endif
-    out RAB_LightSample o_selectedSample)
+    inout RAB_LightSample o_selectedSample)
 {
     RTXDI_DIReservoir state = RTXDI_EmptyDIReservoir();
 
@@ -322,7 +322,7 @@ RTXDI_DIReservoir RTXDI_SampleLocalLights(
     ReGIR_Parameters regirParams,
 #endif
 #endif
-    out RAB_LightSample o_selectedSample)
+    inout RAB_LightSample o_selectedSample)
 {
     o_selectedSample = RAB_EmptyLightSample();
 
