@@ -363,6 +363,17 @@ namespace RTXDI
                     {
                         var c = UnpackRadiance(debugData[i].radiance);
                         
+                        var vv = c.r + c.g + c.b;
+                        if (vv < 0.01f)
+                        {
+                             continue;
+                        }
+
+                        if (c.r < 0.8)
+                        {
+                            continue;
+                        }
+                        
                         float3 decodedDir1 = UnpackOctDirection(debugData[i].direction1);
                         float3 decodedDir2 = UnpackOctDirection(debugData[i].direction2);
                         

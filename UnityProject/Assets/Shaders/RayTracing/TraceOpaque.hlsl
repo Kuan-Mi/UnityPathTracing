@@ -48,8 +48,6 @@ RWTexture2D<float4> gOut_Spec;
 #include "Assets/Shaders/donut/brdf.hlsli"
 
 
-
-
 // RTXDI resources
 StructuredBuffer<RAB_LightInfo> t_LightDataBuffer;
 Buffer<float2> t_NeighborOffsets;
@@ -68,18 +66,19 @@ RWStructuredBuffer<RTXDI_PackedDIReservoir> u_LightReservoirs;
 #include "Assets/Shaders/RTXDI/DI/InitialSampling.hlsli"
 #include <Assets/Shaders/RTXDI/DI/SpatioTemporalResampling.hlsli>
 
-cbuffer ResamplingConstants {
+cbuffer ResamplingConstants
+{
     // RTXDI_ReservoirBufferParameters restirDIReservoirBufferParams;
-    
+
     uint32_t reservoirBlockRowPitch;
     uint32_t reservoirArrayPitch;
-    
+
     uint32_t pad1;
     uint32_t pad2;
-    
+
     uint32_t inputBufferIndex;
     uint32_t outputBufferIndex;
-    
+
     uint neighborOffsetMask;
     uint32_t pad3;
 }
@@ -770,7 +769,7 @@ void MainRayGenShader()
         // float3 ll = float3(geometryProps0.primitiveIndex % 10 / 10.0, (geometryProps0.primitiveIndex) % 10 / 10.0, (geometryProps0.primitiveIndex) % 10 / 10.0);
 
         RAB_LightInfo lightInfo = t_LightDataBuffer[geometryProps0.primitiveIndex];
-        float3 ll =  Unpack_R16G16B16A16_FLOAT(lightInfo.radiance);
+        float3 ll = Unpack_R16G16B16A16_FLOAT(lightInfo.radiance);
         gOut_DirectLighting[pixelPos] = ll;
     }
     // gOut_SpotDirect[pixelPos] = EvaluateSpotLights(geometryProps0, materialProps0);
@@ -810,12 +809,12 @@ void MainRayGenShader()
 
 
     // Test RTXDI
-    
+
     RAB_RandomSamplerState rng = RAB_InitRandomSampler(pixelPos, 1);
-    
+
     RTXDI_DIReservoir reservoir = RTXDI_EmptyDIReservoir();
-    
-    
+
+
     RTXDI_SampleParameters sampleParams = RTXDI_InitSampleParameters(
         8, // local light samples 
         0, // infinite light samples
@@ -823,7 +822,7 @@ void MainRayGenShader()
         1,
         0,
         0.001f);
-    
+
     // RTXDI_SampleParameters sampleParams = RTXDI_InitSampleParameters(
     //     g_numInitialSamples, // local light samples 
     //     0, // infinite light samples
@@ -831,18 +830,18 @@ void MainRayGenShader()
     //     g_numInitialBRDFSamples,
     //     g_brdfCutoff,
     //     0.001f);
-    
-    
+
+
     RTXDI_LightBufferParameters lightBufferParams = (RTXDI_LightBufferParameters)0;
 
-    
+
     lightBufferParams.localLightBufferRegion.firstLightIndex = 0;
     lightBufferParams.localLightBufferRegion.numLights = 3964;
     lightBufferParams.infiniteLightBufferRegion.firstLightIndex = 0;
     lightBufferParams.infiniteLightBufferRegion.numLights = 0;
     lightBufferParams.environmentLightParams.lightIndex = RTXDI_INVALID_LIGHT_INDEX;
     lightBufferParams.environmentLightParams.lightPresent = false;
-    
+
     RAB_Surface primarySurface = RAB_EmptySurface();
     primarySurface.worldPos = geometryProps0.X;
 
@@ -850,29 +849,29 @@ void MainRayGenShader()
     primarySurface.viewDepth = -viewZ0;
     primarySurface.normal = materialProps0.N;
     primarySurface.geoNormal = geometryProps0.N;
-    
+
     RAB_Material material = RAB_EmptyMaterial();
-    
+
     float3 albedo, Rf0;
     BRDF::ConvertBaseColorMetalnessToAlbedoRf0(materialProps0.baseColor, materialProps0.metalness, albedo, Rf0);
-    
+
     material.diffuseAlbedo = albedo;
     material.specularF0 = Rf0;
     material.roughness = materialProps0.roughness;
-    
+
     primarySurface.material = material;
-    
+
     primarySurface.diffuseProbability = getSurfaceDiffuseProbability(primarySurface);
-    
-    
+
+
     // Generate the initial sample
     RAB_LightSample lightSample = RAB_EmptyLightSample();
     RTXDI_DIReservoir localReservoir = RTXDI_SampleLocalLights(rng, rng, primarySurface,
-        sampleParams, ReSTIRDI_LocalLightSamplingMode_UNIFORM, lightBufferParams.localLightBufferRegion, lightSample);
-    
+                                                               sampleParams, ReSTIRDI_LocalLightSamplingMode_UNIFORM, lightBufferParams.localLightBufferRegion, lightSample);
+
     RTXDI_CombineDIReservoirs(reservoir, localReservoir, 0.5, localReservoir.targetPdf);
-    
-    
+
+
     // Resample BRDF samples.
     RAB_LightSample brdfSample = RAB_EmptyLightSample();
     RTXDI_DIReservoir brdfReservoir = RTXDI_SampleBrdf(rng, primarySurface, sampleParams, lightBufferParams, brdfSample);
@@ -882,12 +881,12 @@ void MainRayGenShader()
         lightSample = brdfSample;
     }
     // gOut_DirectLighting[pixelPos] = float4(lightSample.radiance , 1.0);
-    
-    
+
+
     RTXDI_FinalizeResampling(reservoir, 1.0, 1.0);
     reservoir.M = 1;
-    
-    
+
+
     // BRDF was generated with a trace so no need to trace visibility again
     if (RTXDI_IsValidDIReservoir(reservoir) && !selectBrdf)
     {
@@ -898,19 +897,18 @@ void MainRayGenShader()
             RTXDI_StoreVisibilityInDIReservoir(reservoir, 0, true);
         }
     }
-    
+
     RTXDI_ReservoirBufferParameters restirDIReservoirBufferParams;
-    
+
     restirDIReservoirBufferParams.reservoirBlockRowPitch = reservoirBlockRowPitch;
     restirDIReservoirBufferParams.reservoirArrayPitch = reservoirArrayPitch;
-    
+
     {
-        
         RTXDI_DISpatioTemporalResamplingParameters stparams;
         stparams.screenSpaceMotion = motion;
         stparams.sourceBufferIndex = inputBufferIndex;
         stparams.maxHistoryLength = 20;
-        stparams.biasCorrectionMode =    RTXDI_BIAS_CORRECTION_BASIC;
+        stparams.biasCorrectionMode = RTXDI_BIAS_CORRECTION_BASIC;
         stparams.depthThreshold = 0.1;
         stparams.normalThreshold = 0.5;
         stparams.numSamples = 1 + 1;
@@ -919,41 +917,38 @@ void MainRayGenShader()
         stparams.enableVisibilityShortcut = true;
         stparams.enablePermutationSampling = true;
         stparams.discountNaiveSamples = false;
-        
-        
-        
+
+
         // This variable will receive the position of the sample reused from the previous frame.
         // It's only needed for gradient evaluation, ignore it here.
         int2 temporalSamplePixelPos = -1;
 
-        
+
         RTXDI_RuntimeParameters runtimeParams;
-        
+
         runtimeParams.neighborOffsetMask = neighborOffsetMask;
         runtimeParams.activeCheckerboardField = 0;
-        
-        
+
+
         // Call the resampling function, update the reservoir and lightSample variables
         reservoir = RTXDI_DISpatioTemporalResampling(pixelPos, primarySurface, reservoir,
-                rng, runtimeParams, restirDIReservoirBufferParams, stparams, temporalSamplePixelPos, lightSample);
-        
-        
+                                                     rng, runtimeParams, restirDIReservoirBufferParams, stparams, temporalSamplePixelPos, lightSample);
     }
-    
-    
+
+
     float3 shadingOutput = 0;
-    
-    
+
+
     // Shade the surface with the selected light sample
     if (RTXDI_IsValidDIReservoir(reservoir))
     {
         // Compute the correctly weighted reflected radiance
         shadingOutput = ShadeSurfaceWithLightSample(lightSample, primarySurface)
-                      * RTXDI_GetDIReservoirInvPdf(reservoir);
-    
+            * RTXDI_GetDIReservoirInvPdf(reservoir);
+
         // Test if the selected light is visible from the surface
         bool visibility = RAB_GetConservativeVisibility(primarySurface, lightSample);
-    
+
         // If not visible, discard the shading output and the light sample
         if (!visibility)
         {
@@ -961,57 +956,112 @@ void MainRayGenShader()
             RTXDI_StoreVisibilityInDIReservoir(reservoir, 0, true);
         }
     }
-    
-    
+
+
     shadingOutput += materialProps0.Lemi;
     shadingOutput = basicToneMapping(shadingOutput, 0.005);
 
-    gOut_DirectLighting[pixelPos] = float4(shadingOutput , 1.0);
-    
-    
-    
-    
-    
+    gOut_DirectLighting[pixelPos] = float4(shadingOutput, 1.0);
+
+
     // gOut_DirectLighting[pixelPos] = float4(primarySurface.material.specularF0 , 1.0);
 
 
     // RAB_Surface emptySurface = RAB_EmptySurface();
     // bool isValid = RAB_IsSurfaceValid(primarySurface);
-    
+
     // float3 debugTest = RAB_GetSurfaceWorldPos(primarySurface);
-    
+
     // float3 debugTest = RAB_GetSurfaceNormal(primarySurface);
-    
+
     // float3 debugTest = RAB_GetSurfaceLinearDepth(primarySurface);
-    
+
     // int2 debugPixelPos = pixelPos * 1;
     // debugPixelPos = RAB_ClampSamplePositionIntoView(debugPixelPos,false);
     // float3 debugTest = float3(debugPixelPos/gRectSize, 0);
-    
+
     // uint index = geometryProps0.primitiveIndex;
     // RAB_LightInfo rab_load_light_info = RAB_LoadLightInfo(index,true);
     // float3 light = Unpack_R16G16B16A16_FLOAT(rab_load_light_info.radiance);
     // float3 debugTest  = light;
-    
-    RAB_LightSample lightSampleTest = RAB_EmptyLightSample();
-    lightSampleTest.radiance = float3(1,0,0);
-    lightSampleTest.normal = float3(0,0,0);
-    lightSampleTest.position = float3(0,1,0);
-    lightSampleTest.solidAnglePdf = 1;
-    
-    
-    float rab_get_light_sample_target_pdf_for_surface = RAB_GetLightSampleTargetPdfForSurface(lightSampleTest, primarySurface);
-    
-    
-    float3 debugTest  = rab_get_light_sample_target_pdf_for_surface;
-    // float3 debugTest  = primarySurface.material.roughness;
-        // float3 debugTest  = 0.7f;
-    // gOut_DirectLighting[pixelPos] = float4(debugTest  , 1.0);
 
-    
-    
+    // RAB_LightInfo rab_load_light_info = RAB_LoadLightInfo(839,true);
+
+
+    // uint index =  pixelPos.x ;
+    //
+    // RAB_LightInfo rab_load_light_info = RAB_LoadLightInfo(index,true);
+    //
+    // float3 l = Unpack_R16G16B16A16_FLOAT(rab_load_light_info.radiance);
+    //
+    // RAB_LightSample lightSampleTest = RAB_EmptyLightSample();
+    // lightSampleTest.radiance = l;
+    // lightSampleTest.normal = float3(0,0,0);
+    // lightSampleTest.position = rab_load_light_info.center;
+    // lightSampleTest.solidAnglePdf = 1;
+
+    // RAB_LightSample lightSampleTest = RAB_EmptyLightSample();
+    // lightSampleTest.radiance = float3(1,0,0);
+    // lightSampleTest.normal = float3(0,0,0);
+    // lightSampleTest.position = float3(0,1,0);
+    // lightSampleTest.solidAnglePdf = 1;
+
+    TriangleLight triangleLight;
+    triangleLight.base = float3(0, 1, 0);
+    triangleLight.edge1 = float3(1, 0, 0);
+    triangleLight.edge2 = float3(0, 1, 0);
+    triangleLight.radiance = float3(1, 0, 0);
+
+    RAB_LightInfo light_info = Store(triangleLight);
+
+
+    float2 rnd = float2(RAB_GetNextRandom(rng), RAB_GetNextRandom(rng));
+
+    RAB_LightSample rab_sample_polymorphic_light = RAB_SamplePolymorphicLight(light_info, primarySurface, rnd);
+
+    float rab_get_light_sample_target_pdf_for_surface = RAB_GetLightSampleTargetPdfForSurface(rab_sample_polymorphic_light, primarySurface);
+
+    bool rab_get_conservative_visibility = RAB_GetConservativeVisibility(primarySurface, rab_sample_polymorphic_light);
+
+    float3 debugTest = rab_get_conservative_visibility;
+    // debugTest = l;
+    // float3 debugTest  = primarySurface.material.roughness;
+    // float3 debugTest  = 0.7f;
+
+    // float3 dir;
+    // bool rab_get_surface_brdf_sample = RAB_GetSurfaceBrdfSample(primarySurface,rng,dir );
+    // debugTest = rab_get_surface_brdf_sample;
+    //
+    // dir .z = -dir.z;
+    // float dDotV = dot(dir, primarySurface.viewDir);
+
+
+    float rab_get_surface_brdf_pdf = RAB_GetSurfaceBrdfPdf(primarySurface, primarySurface.viewDir);
+
+
+    debugTest = rab_get_surface_brdf_pdf;
+    //
+    // uint o_lightIndex = 0;
+    // float2 uv;
+    // bool hit = RAB_TraceRayForLocalLight(cameraRayOrigin, cameraRayDirection, 0,INF, o_lightIndex, uv);
+    //
+    // if (hit && o_lightIndex != RTXDI_INVALID_LIGHT_INDEX)
+    // {
+    //     RAB_LightInfo rab_load_light_info = RAB_LoadLightInfo(o_lightIndex,true);
+    //     float3 l = Unpack_R16G16B16A16_FLOAT(rab_load_light_info.radiance);
+    //     
+    //     l = float3(uv,0);
+    //     debugTest = l;
+    //     // debugTest = 1;
+    // }
+    // else
+    // {
+    //     debugTest = 0;
+    // }
+
+    gOut_DirectLighting[pixelPos] = float4(debugTest, 1.0);
     RTXDI_StoreDIReservoir(reservoir, restirDIReservoirBufferParams, pixelPos, outputBufferIndex);
-    
+
     // END of test RTXDI
 
     // //================================================================================================================================================================================
