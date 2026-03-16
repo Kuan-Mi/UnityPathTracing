@@ -847,8 +847,8 @@ void MainRayGenShader()
     primarySurface.worldPos = geometryProps0.X;
 
     primarySurface.viewDir = geometryProps0.V;
-    primarySurface.viewDepth = viewZ0;
-    primarySurface.normal = geometryProps0.N;
+    primarySurface.viewDepth = -viewZ0;
+    primarySurface.normal = materialProps0.N;
     primarySurface.geoNormal = geometryProps0.N;
     
     RAB_Material material = RAB_EmptyMaterial();
@@ -973,8 +973,40 @@ void MainRayGenShader()
     
     
     // gOut_DirectLighting[pixelPos] = float4(primarySurface.material.specularF0 , 1.0);
-    float3 debugTest  = primarySurface.diffuseProbability;
-    gOut_DirectLighting[pixelPos] = float4(debugTest  , 1.0);
+
+
+    // RAB_Surface emptySurface = RAB_EmptySurface();
+    // bool isValid = RAB_IsSurfaceValid(primarySurface);
+    
+    // float3 debugTest = RAB_GetSurfaceWorldPos(primarySurface);
+    
+    // float3 debugTest = RAB_GetSurfaceNormal(primarySurface);
+    
+    // float3 debugTest = RAB_GetSurfaceLinearDepth(primarySurface);
+    
+    // int2 debugPixelPos = pixelPos * 1;
+    // debugPixelPos = RAB_ClampSamplePositionIntoView(debugPixelPos,false);
+    // float3 debugTest = float3(debugPixelPos/gRectSize, 0);
+    
+    // uint index = geometryProps0.primitiveIndex;
+    // RAB_LightInfo rab_load_light_info = RAB_LoadLightInfo(index,true);
+    // float3 light = Unpack_R16G16B16A16_FLOAT(rab_load_light_info.radiance);
+    // float3 debugTest  = light;
+    
+    RAB_LightSample lightSampleTest = RAB_EmptyLightSample();
+    lightSampleTest.radiance = float3(1,0,0);
+    lightSampleTest.normal = float3(0,0,0);
+    lightSampleTest.position = float3(0,1,0);
+    lightSampleTest.solidAnglePdf = 1;
+    
+    
+    float rab_get_light_sample_target_pdf_for_surface = RAB_GetLightSampleTargetPdfForSurface(lightSampleTest, primarySurface);
+    
+    
+    float3 debugTest  = rab_get_light_sample_target_pdf_for_surface;
+    // float3 debugTest  = primarySurface.material.roughness;
+        // float3 debugTest  = 0.7f;
+    // gOut_DirectLighting[pixelPos] = float4(debugTest  , 1.0);
 
     
     
