@@ -7,8 +7,8 @@ namespace PathTracing
         private float deltaTime = 0.0f;
         
         
-        private int frameCount = 0;
-        private float startTime = 0.0f;
+        // private int frameCount = 0;
+        // private float startTime = 0.0f;
 
         // void Update()
         // {

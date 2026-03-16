@@ -3,10 +3,6 @@
 using UnityEngine.InputSystem;
 // #endif
 
-using System.Collections.Generic;
-using UnityEngine;
-using UnityEngine.InputSystem;
-
 namespace UnityEngine.Rendering
 {
     /// <summary>
@@ -25,12 +21,12 @@ namespace UnityEngine.Rendering
         /// <summary>
         /// Rotation speed when using the mouse.
         /// </summary>
-        public float m_LookSpeedMouse = 4.0f;
+        public float m_LookSpeedMouse = 1f;
 
         /// <summary>
         /// Movement speed.
         /// </summary>
-        public float m_MoveSpeed = 10.0f;
+        public float m_MoveSpeed = 1.0f;
 
         /// <summary>
         /// Value added to the speed when incrementing.

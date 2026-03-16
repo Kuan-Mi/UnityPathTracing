@@ -37,7 +37,7 @@ namespace PathTracing
                 return;
             }
 
-            var allObjects = FindObjectsOfType<GameObject>();
+            var allObjects = FindObjectsByType<GameObject>(FindObjectsSortMode.None);
             int replaceCount = 0;
 
             foreach (var obj in allObjects)

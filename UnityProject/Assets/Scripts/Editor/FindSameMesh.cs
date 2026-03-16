@@ -61,7 +61,7 @@ namespace DefaultNamespace.Editor
 
         private void FindSameMeshColliderInScene()
         {
-            var allMeshColliders = GameObject.FindObjectsOfType<MeshCollider>(true);
+            var allMeshColliders = FindObjectsByType<MeshCollider>(FindObjectsInactive.Include,FindObjectsSortMode.None);
 
 
             foreach (var meshCollider in allMeshColliders)
@@ -97,9 +97,9 @@ namespace DefaultNamespace.Editor
 
         private void FindMatWithoutAO()
         {
-            var allMeshRenderers = GameObject.FindObjectsOfType<MeshRenderer>(true).ToList();
+            var allMeshRenderers = GameObject.FindObjectsByType<MeshRenderer>(FindObjectsInactive.Include,FindObjectsSortMode.None).ToList();
 
-            var allSkinnedMeshRenderers = GameObject.FindObjectsOfType<SkinnedMeshRenderer>(true);
+            var allSkinnedMeshRenderers = GameObject.FindObjectsByType<SkinnedMeshRenderer>(FindObjectsInactive.Include,FindObjectsSortMode.None);
 
             var allRenderers = new List<Renderer>();
             allRenderers.AddRange(allSkinnedMeshRenderers);
@@ -179,7 +179,7 @@ namespace DefaultNamespace.Editor
 
         private void FindSameMatScene()
         {
-            var allRenderers = FindObjectsOfType<MeshRenderer>(true);
+            var allRenderers = FindObjectsByType<MeshRenderer>(FindObjectsInactive.Include,FindObjectsSortMode.None);
 
             foreach (var meshRenderer in allRenderers)
             {
@@ -253,7 +253,7 @@ namespace DefaultNamespace.Editor
             var keyToMesh = new Dictionary<int, Mesh>();
 
 
-            var allObjects = FindObjectsOfType<MeshFilter>(true);
+            var allObjects = FindObjectsByType<MeshFilter>(FindObjectsInactive.Include,FindObjectsSortMode.None);
 
             foreach (var meshFilter in allObjects)
             {
@@ -300,7 +300,7 @@ namespace DefaultNamespace.Editor
             var keyToTexture = new Dictionary<int, Texture2D>();
 
 
-            var allObjects = FindObjectsOfType<MeshRenderer>(true);
+            var allObjects = FindObjectsByType<MeshRenderer>(FindObjectsInactive.Include,FindObjectsSortMode.None);
             
             var allMaterials = new HashSet<Material>();
             
@@ -425,7 +425,7 @@ namespace DefaultNamespace.Editor
             var keyToMesh = new Dictionary<int, Mesh>();
 
 
-            var allObjects = GameObject.FindObjectsOfType<SkinnedMeshRenderer>(true);
+            var allObjects = GameObject.FindObjectsByType<SkinnedMeshRenderer>(FindObjectsInactive.Include,FindObjectsSortMode.None);
 
             foreach (var meshFilter in allObjects)
             {

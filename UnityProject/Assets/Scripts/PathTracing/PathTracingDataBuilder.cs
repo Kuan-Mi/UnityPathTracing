@@ -92,31 +92,31 @@ namespace DefaultNamespace
         private uint GetTextureGroupIndex(Material mat)
         {
             return 0;
-            if (mat == null) return 0;
-
-            // 获取四张纹理，如果为空则使用默认值
-            Texture2D texBase = (Texture2D)mat.GetTexture("_BaseMap") ?? defaultWhite;
-            Texture2D texMask = (Texture2D)mat.GetTexture("_MetallicGlossMap") ?? defaultMask;
-            Texture2D texNormal = (Texture2D)mat.GetTexture("_BumpMap") ?? defaultNormal;
-            Texture2D texEmission = (Texture2D)mat.GetTexture("_EmissionMap") ?? defaultBlack;
-
-            // 生成唯一 Key 判断这四张图是否已经成组添加过
-            string key = $"{texBase.GetInstanceID()}_{texMask.GetInstanceID()}_{texNormal.GetInstanceID()}_{texEmission.GetInstanceID()}";
-
-            if (textureGroupCache.TryGetValue(key, out uint startIndex))
-            {
-                return startIndex;
-            }
-
-            // 如果没添加过，则按顺序连续存入 4 张
-            startIndex = (uint)globalTexturePool.Count;
-            globalTexturePool.Add(texBase); // index + 0
-            globalTexturePool.Add(texMask); // index + 1
-            globalTexturePool.Add(texNormal); // index + 2
-            globalTexturePool.Add(texEmission); // index + 3
-
-            textureGroupCache.Add(key, startIndex);
-            return startIndex;
+            // if (mat == null) return 0;
+            //
+            // // 获取四张纹理，如果为空则使用默认值
+            // Texture2D texBase = (Texture2D)mat.GetTexture("_BaseMap") ?? defaultWhite;
+            // Texture2D texMask = (Texture2D)mat.GetTexture("_MetallicGlossMap") ?? defaultMask;
+            // Texture2D texNormal = (Texture2D)mat.GetTexture("_BumpMap") ?? defaultNormal;
+            // Texture2D texEmission = (Texture2D)mat.GetTexture("_EmissionMap") ?? defaultBlack;
+            //
+            // // 生成唯一 Key 判断这四张图是否已经成组添加过
+            // string key = $"{texBase.GetInstanceID()}_{texMask.GetInstanceID()}_{texNormal.GetInstanceID()}_{texEmission.GetInstanceID()}";
+            //
+            // if (textureGroupCache.TryGetValue(key, out uint startIndex))
+            // {
+            //     return startIndex;
+            // }
+            //
+            // // 如果没添加过，则按顺序连续存入 4 张
+            // startIndex = (uint)globalTexturePool.Count;
+            // globalTexturePool.Add(texBase); // index + 0
+            // globalTexturePool.Add(texMask); // index + 1
+            // globalTexturePool.Add(texNormal); // index + 2
+            // globalTexturePool.Add(texEmission); // index + 3
+            //
+            // textureGroupCache.Add(key, startIndex);
+            // return startIndex;
         }
 
         public ComputeBuffer _instanceBuffer;
