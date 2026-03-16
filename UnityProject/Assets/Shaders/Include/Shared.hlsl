@@ -176,6 +176,7 @@
 cbuffer PathTracingParams : register(b0)
 {
     float4x4 gViewToWorld;
+    float4x4 gViewToWorldPrev;
     float4x4 gViewToClip;
     float4x4 gWorldToView;
     float4x4 gWorldToViewPrev;

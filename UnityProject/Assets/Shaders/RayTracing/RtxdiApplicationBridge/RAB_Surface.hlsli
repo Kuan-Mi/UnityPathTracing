@@ -122,10 +122,11 @@ RAB_Surface RAB_GetGBufferSurface(int2 pixelPosition, bool previousFrame)
     float2 sampleUv = (float2(pixelPosition) + 0.5f) / gRectSize;
     
     float3 Xv = Geometry::ReconstructViewPosition(sampleUv, gCameraFrustum, surface.viewDepth, gOrthoMode);
-    float3 X = Geometry::AffineTransform(gViewToWorld, Xv);
+     
+    float3 X = Geometry::AffineTransform(gViewToWorldPrev, Xv);
     
     surface.worldPos = X;
-    surface.viewDir = normalize(gCameraGlobalPos - surface.worldPos);
+    surface.viewDir = normalize(gCameraGlobalPosPrev - surface.worldPos);
     surface.diffuseProbability = getSurfaceDiffuseProbability(surface);
 
 
