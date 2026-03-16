@@ -70,7 +70,7 @@ RAB_Material RAB_GetGBufferMaterial(
     float4 Normal_RoughnessPacked = gIn_PrevNormalRoughness[pixelPosition];
     float4 Normal_Roughness = NRD_FrontEnd_UnpackNormalAndRoughness(Normal_RoughnessPacked);
     float3 Normal = Normal_Roughness.xyz;
-    float Roughness = Normal_RoughnessPacked.w;
+    float Roughness = Normal_Roughness.w;
     
     float3 albedo, Rf0;
     BRDF::ConvertBaseColorMetalnessToAlbedoRf0(BaseColor, Metalness, albedo, Rf0);

@@ -1059,6 +1059,8 @@ void MainRayGenShader()
     //     debugTest = 0;
     // }
 
+    RAB_Material rab_get_g_buffer_material = RAB_GetGBufferMaterial(pixelPos);
+    debugTest = rab_get_g_buffer_material.roughness - materialProps0.roughness;
     gOut_DirectLighting[pixelPos] = float4(debugTest, 1.0);
     RTXDI_StoreDIReservoir(reservoir, restirDIReservoirBufferParams, pixelPos, outputBufferIndex);
 
