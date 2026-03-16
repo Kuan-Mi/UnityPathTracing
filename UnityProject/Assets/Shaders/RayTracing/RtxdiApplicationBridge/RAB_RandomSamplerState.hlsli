@@ -10,6 +10,7 @@ typedef RandomSamplerState RAB_RandomSamplerState;
 
 RAB_RandomSamplerState RAB_InitRandomSampler(uint2 index, uint pass)
 {
+    return initRandomSampler(index, 0 + pass * 13);
     return initRandomSampler(index, gFrameIndex + pass * 13);
 }
 
