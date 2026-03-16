@@ -6,6 +6,7 @@ namespace PathTracing
     public struct GlobalConstants
     {
         public float4x4 gViewToWorld;
+        public float4x4 gViewToWorldPrev;
         public float4x4 gViewToClip;
         public float4x4 gWorldToView;
         public float4x4 gWorldToViewPrev;

@@ -927,6 +927,7 @@ namespace PathTracing
             var globalConstants = new GlobalConstants
             {
                 gViewToWorld = NrdDenoiser.worldToView.inverse,
+                gViewToWorldPrev =  NrdDenoiser.prevWorldToView.inverse,
                 gViewToClip = NrdDenoiser.viewToClip,
                 gWorldToView = NrdDenoiser.worldToView,
                 gWorldToViewPrev = NrdDenoiser.prevWorldToView,
