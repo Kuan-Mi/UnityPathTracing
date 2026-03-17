@@ -945,14 +945,22 @@ void MainRayGenShader()
 
 
     gOut_DirectLighting[pixelPos] = float4(shadingOutput, 1.0);
-
-    uint2 scalePixelPosition = pixelPos / 8;
     
-    uint t_NeighborOffsetsIndex =  scalePixelPosition.x + scalePixelPosition.y * gRectSize.x /8;
-    float2 neighborOffsets = t_NeighborOffsets[t_NeighborOffsetsIndex];
-    
-    gOut_DirectLighting[pixelPos] = float4(neighborOffsets,0, 1.0);
+    uint pointer = RTXDI_ReservoirPositionToPointer(g_Const.restirDIReservoirBufferParams, pixelPos, 0);
 
+    RTXDI_PackedDIReservoir rtxdi_packed_di_reservoir = u_LightReservoirs[pointer];
+    RTXDI_DIReservoir unpackedReservoir = RTXDI_UnpackDIReservoir(rtxdi_packed_di_reservoir);
+    
+    uint lightIndex = RTXDI_GetDIReservoirLightIndex(unpackedReservoir);
+    
+    RAB_LightInfo rab_load_light_info = RAB_LoadLightInfo(lightIndex,false);
+    
+    float3 lightRadiance = Unpack_R16G16B16A16_FLOAT(rab_load_light_info.radiance);
+    
+    float3 debugTest = lightRadiance;
+      // debugTest = pointer / float(gRectSize.x * gRectSize.y);
+    gOut_DirectLighting[pixelPos] = float4(debugTest, 1.0);
+    
     RTXDI_StoreDIReservoir(reservoir, g_Const.restirDIReservoirBufferParams, pixelPos, g_Const.outputBufferIndex);
 
     // END of test RTXDI
