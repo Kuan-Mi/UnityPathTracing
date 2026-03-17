@@ -290,7 +290,9 @@ RTXDI_DIReservoir RTXDI_DISpatioTemporalResampling(
     RTXDI_ReservoirBufferParameters reservoirParams,
     RTXDI_DISpatioTemporalResamplingParameters stparams,
     out int2 temporalSamplePixelPos,
-    inout RAB_LightSample selectedLightSample)
+    inout RAB_LightSample selectedLightSample,
+    inout  bool foundTemporalSurface,
+    inout  float3 debugColor)
 {
     if (stparams.biasCorrectionMode == RTXDI_BIAS_CORRECTION_PAIRWISE)
     {
@@ -301,40 +303,49 @@ RTXDI_DIReservoir RTXDI_DISpatioTemporalResampling(
     uint historyLimit = min(RTXDI_PackedDIReservoir_MaxM, uint(stparams.maxHistoryLength * curSample.M));
 
     int selectedLightPrevID = -1;
-
+    
+    // 如果当前像素自带的样本（curSample）有效，先提取出它的光源 ID
     if (RTXDI_IsValidDIReservoir(curSample))
     {
         selectedLightPrevID = RAB_TranslateLightIndex(RTXDI_GetDIReservoirLightIndex(curSample), true);
     }
 
     temporalSamplePixelPos = int2(-1, -1);
-
+    
+    // 创建一个新的空 Reservoir (水库/蓄水池)，用来存放接下来融合的结果。
     RTXDI_DIReservoir state = RTXDI_EmptyDIReservoir();
+    // 把当前像素自己的光源样本先放进这个新的水库里。
     RTXDI_CombineDIReservoirs(state, curSample, /* random = */ 0.5, curSample.targetPdf);
 
+    // 随机一个起始索引，用于后续在周围邻居中随机挑人。
     uint startIdx = uint(RAB_GetNextRandom(rng) * params.neighborOffsetMask);
 
     // Backproject this pixel to last frame
+    // 获取屏幕空间运动矢量 (Motion Vectors)。用于把当前像素映射回上一帧的屏幕位置。
     float3 motion = stparams.screenSpaceMotion;
 
+    // 如果没开排列采样，给运动矢量加一点亚像素级别的随机抖动，打破走样规律。
     if (!stparams.enablePermutationSampling)
     {
         motion.xy += float2(RAB_GetNextRandom(rng), RAB_GetNextRandom(rng)) - 0.5;
     }
-
+    
+    // 计算出上一帧的浮点坐标，并四舍五入变成整数像素坐标 (prevPos)
     float2 reprojectedSamplePosition = float2(pixelPosition) + motion.xy;
     int2 prevPos = int2(round(reprojectedSamplePosition));
-
+    
+    // 预测上一帧的线性深度（当前深度 + 运动矢量中的深度变化）
     float expectedPrevLinearDepth = RAB_GetSurfaceLinearDepth(surface) + motion.z;
 
     int i;
 
     RAB_Surface temporalSurface = RAB_EmptySurface();
-    bool foundTemporalSurface = false;
+    foundTemporalSurface = false;
     const float temporalSearchRadius = (params.activeCheckerboardField == 0) ? 4 : 8;
     int2 temporalSpatialOffset = int2(0, 0);
 
     // Try to find a matching surface in the neighborhood of the reprojected pixel
+    // 循环 9 次：第0次是中心点，后8次是周围随机偏移的点。
     for (i = 0; i < 9; i++)
     {
         int2 offset = int2(0, 0);
@@ -354,17 +365,36 @@ RTXDI_DIReservoir RTXDI_DISpatioTemporalResampling(
         RTXDI_ActivateCheckerboardPixel(idx, true, params.activeCheckerboardField);
 
         // Grab shading / g-buffer data from last frame
+        // 读取上一帧该位置的 G-Buffer（法线、深度等）
         temporalSurface = RAB_GetGBufferSurface(idx, true);
         if (!RAB_IsSurfaceValid(temporalSurface))
+        {
+            debugColor = float3(1, 0, 0);   // Red debug color means no valid surface at this neighbor
             continue;
+        }
         
         // Test surface similarity, discard the sample if the surface is too different.
+        // 【关键判断】：比较当前表面和上一帧表面的 法线夹角、深度差。
+        // 如果差异太大（说明不是同一个物体，发生了遮挡/脱落），就抛弃它 (continue)。
         if (!RTXDI_IsValidNeighbor(
             RAB_GetSurfaceNormal(surface), RAB_GetSurfaceNormal(temporalSurface), 
             expectedPrevLinearDepth, RAB_GetSurfaceLinearDepth(temporalSurface), 
             stparams.normalThreshold, stparams.depthThreshold))
+        {
+            float3 theirNorm = RAB_GetSurfaceNormal(temporalSurface);
+            float3 ourNorm = RAB_GetSurfaceNormal(surface);
+            
+            if ((dot(theirNorm.xyz, ourNorm.xyz) >= stparams.normalThreshold))
+                debugColor += float3(0, 1, 0);   // Green debug color means surface was too different (not a valid temporal neighbor)
+            
+            float ourDepth = expectedPrevLinearDepth;
+            float theirDepth = RAB_GetSurfaceLinearDepth(temporalSurface);
+            if (RTXDI_CompareRelativeDifference(ourDepth, theirDepth, stparams.depthThreshold))
+                debugColor += float3(0, 0, 1);
             continue;
+        }
 
+        // 如果法线和深度都对上了，说明找到了上一帧真正的对应点！保存偏移并跳出循环。
         temporalSpatialOffset = idx - prevPos;
         foundTemporalSurface = true;
         break;

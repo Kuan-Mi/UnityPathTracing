@@ -63,7 +63,7 @@ float3 RAB_GetSurfaceNormal(RAB_Surface surface)
 // 提供给 RTXDI_TemporalResampling 或 RTXDI_SpatioTemporalResampling 的运动矢量，其 .z 分量必须计算为同一表面在前一帧和当前帧的线性深度之差。
 float RAB_GetSurfaceLinearDepth(RAB_Surface surface)
 {
-    return surface.viewDepth;
+    return -surface.viewDepth;
 }
 
 float getSurfaceDiffuseProbability(RAB_Surface surface)

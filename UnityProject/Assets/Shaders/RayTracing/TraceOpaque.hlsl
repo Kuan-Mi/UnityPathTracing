@@ -888,10 +888,12 @@ void MainRayGenShader()
         }
     }
 
+    bool foundTemporalSurface = true;
+    float3 debugColor = 0;
     if (g_Const.enableResampling)
     {
         RTXDI_DISpatioTemporalResamplingParameters stparams;
-        stparams.screenSpaceMotion = motion;
+        stparams.screenSpaceMotion = 0;
         stparams.sourceBufferIndex = g_Const.inputBufferIndex;
         stparams.maxHistoryLength = 20;
         stparams.biasCorrectionMode = g_Const.unbiasedMode ? RTXDI_BIAS_CORRECTION_RAY_TRACED : RTXDI_BIAS_CORRECTION_BASIC;
@@ -912,7 +914,7 @@ void MainRayGenShader()
 
         // Call the resampling function, update the reservoir and lightSample variables
         reservoir = RTXDI_DISpatioTemporalResampling(pixelPos, primarySurface, reservoir,
-                                                     rng, g_Const.runtimeParams, g_Const.restirDIReservoirBufferParams, stparams, temporalSamplePixelPos, lightSample);
+                                                     rng, g_Const.runtimeParams, g_Const.restirDIReservoirBufferParams, stparams, temporalSamplePixelPos, lightSample,foundTemporalSurface,debugColor);
     }
 
     float3 shadingOutput = 0;
@@ -957,9 +959,9 @@ void MainRayGenShader()
     
     float3 lightRadiance = Unpack_R16G16B16A16_FLOAT(rab_load_light_info.radiance);
     
-    float3 debugTest = lightRadiance;
-      // debugTest = pointer / float(gRectSize.x * gRectSize.y);
-    gOut_DirectLighting[pixelPos] = float4(debugTest, 1.0);
+
+    // debugTest = -theirDepth;
+    // gOut_DirectLighting[pixelPos] = float4(debugColor, 1.0);
     
     RTXDI_StoreDIReservoir(reservoir, g_Const.restirDIReservoirBufferParams, pixelPos, g_Const.outputBufferIndex);
 
