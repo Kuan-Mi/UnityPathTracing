@@ -48,6 +48,31 @@ RWTexture2D<float4> gOut_Spec;
 #include "Assets/Shaders/donut/brdf.hlsli"
 
 
+struct ResamplingConstants
+{
+    RTXDI_RuntimeParameters runtimeParams;
+    RTXDI_LightBufferParameters lightBufferParams;
+    RTXDI_ReservoirBufferParameters restirDIReservoirBufferParams;
+
+    uint frameIndex;
+    uint numInitialSamples;
+    uint numSpatialSamples;
+    uint useAccurateGBufferNormal;
+
+    uint numInitialBRDFSamples;
+    float brdfCutoff;
+    uint2 pad2;
+
+    uint enableResampling;
+    uint unbiasedMode;
+    uint inputBufferIndex;
+    uint outputBufferIndex;
+};
+
+RWStructuredBuffer<ResamplingConstants> ResampleConstants;
+#define g_Const ResampleConstants[0]
+
+
 // RTXDI resources
 StructuredBuffer<RAB_LightInfo> t_LightDataBuffer;
 Buffer<float2> t_NeighborOffsets;
@@ -816,11 +841,11 @@ void MainRayGenShader()
 
 
     RTXDI_SampleParameters sampleParams = RTXDI_InitSampleParameters(
-         gLocalLightSamples, // local light samples 
+         g_Const.numInitialSamples, // local light samples 
         0, // infinite light samples
         0, // environment map samples
-        gBrdfSamples,
-        0,
+        g_Const.numInitialBRDFSamples,
+        g_Const.brdfCutoff,
         0.001f);
 
     // RTXDI_SampleParameters sampleParams = RTXDI_InitSampleParameters(
@@ -846,7 +871,7 @@ void MainRayGenShader()
     primarySurface.worldPos = geometryProps0.X;
 
     primarySurface.viewDir = geometryProps0.V;
-    primarySurface.viewDepth = -viewZ0;
+    primarySurface.viewDepth = viewZ0;
     primarySurface.normal = materialProps0.N;
     primarySurface.geoNormal = geometryProps0.N;
 
@@ -906,7 +931,7 @@ void MainRayGenShader()
     restirDIReservoirBufferParams.reservoirBlockRowPitch = reservoirBlockRowPitch;
     restirDIReservoirBufferParams.reservoirArrayPitch = reservoirArrayPitch;
     
-    if (gEnableResampling)
+    if (g_Const.enableResampling)
     {
         RTXDI_DISpatioTemporalResamplingParameters stparams;
         stparams.screenSpaceMotion = motion;

@@ -180,7 +180,7 @@ namespace PathTracing
         {
             m_Settings = setting;
             _pathTracingSettingsBuffer = new GraphicsBuffer(GraphicsBuffer.Target.Constant, 1, Marshal.SizeOf<GlobalConstants>());
-            _resamplingConstantsBuffer = new GraphicsBuffer(GraphicsBuffer.Target.Constant, 1, Marshal.SizeOf<ResamplingConstants>());
+            _resamplingConstantsBuffer = new GraphicsBuffer(GraphicsBuffer.Target.Structured, 1, Marshal.SizeOf<ResamplingConstants>());
         }
 
         static void ExecutePass(PassData data, UnsafeGraphContext context)
@@ -279,7 +279,7 @@ namespace PathTracing
 
                 natCmd.SetRayTracingShaderPass(data.OpaqueTs, "Test2");
                 natCmd.SetRayTracingConstantBufferParam(data.OpaqueTs, paramsID, data.ConstantBuffer, 0, data.ConstantBuffer.stride);
-                natCmd.SetRayTracingConstantBufferParam(data.OpaqueTs, "ResamplingConstants" , data.ResamplingConstantBuffer, 0, data.ResamplingConstantBuffer.stride);
+                natCmd.SetRayTracingBufferParam(data.OpaqueTs, "ResampleConstants" , data.ResamplingConstantBuffer);
                 
                 natCmd.SetRayTracingBufferParam(data.OpaqueTs, t_LightDataBufferID, data.RtxdiResources.LightDataBuffer);
                 natCmd.SetRayTracingBufferParam(data.OpaqueTs, t_NeighborOffsetsID, data.RtxdiResources.NeighborOffsetsBuffer);
@@ -1011,11 +1011,6 @@ namespace PathTracing
             
             
             globalConstants.gIsEditor = cameraData.camera.cameraType == CameraType.SceneView ? 1u : 0u;
-
-            
-            globalConstants.gLocalLightSamples = m_Settings.localLightSamples;
-            globalConstants.gBrdfSamples = m_Settings.brdfSamples;
-            globalConstants.gEnableResampling = m_Settings.enableResampling ? 1u : 0u;
             
             // Debug.Log(globalConstants.ToString());
 
@@ -1035,15 +1030,35 @@ namespace PathTracing
             restirDIContext.SetFrameIndex((uint)Time.frameCount);
             
             
-            var resamplingConstants = new ResamplingConstants();
+            var resamplingConstants = new ResamplingConstants
+            {
+                runtimeParams = restirDIContext.GetRuntimeParams()
+            };
+
+            resamplingConstants.lightBufferParams.localLightBufferRegion.firstLightIndex = 0;
+            resamplingConstants.lightBufferParams.localLightBufferRegion.numLights = 3964;
+            
+            resamplingConstants.lightBufferParams.infiniteLightBufferRegion.firstLightIndex = 0;
+            resamplingConstants.lightBufferParams.infiniteLightBufferRegion.numLights = 0;
+            
+            resamplingConstants.lightBufferParams.environmentLightParams.lightPresent = 0;
+            resamplingConstants.lightBufferParams.environmentLightParams.lightIndex = (0xffffffffu);
+
 
             resamplingConstants.restirDIReservoirBufferParams = restirDIContext.GetReservoirBufferParameters();
-            
-            resamplingConstants.inputBufferIndex = ((Time.frameCount & 1) == 0) ? 0u : 1u;
-            resamplingConstants.outputBufferIndex = ((Time.frameCount & 1) == 0) ? 1u : 0u;
-            
-            resamplingConstants.neighborOffsetMask =  restirDIContext.GetStaticParameters().NeighborOffsetCount - 1;
-            
+
+            resamplingConstants.frameIndex = restirDIContext.GetFrameIndex();
+            resamplingConstants.numInitialSamples = m_Settings.localLightSamples;
+            resamplingConstants.numSpatialSamples = 0;
+            resamplingConstants.useAccurateGBufferNormal = 0;
+            resamplingConstants.numInitialBRDFSamples = m_Settings.brdfSamples;
+            resamplingConstants.brdfCutoff = 0;
+            resamplingConstants.pad2 = new uint2(0, 0);
+            resamplingConstants.enableResampling = m_Settings.enableResampling ? 1u : 0u;
+            resamplingConstants.unbiasedMode = 0;
+            resamplingConstants.inputBufferIndex = (resamplingConstants.frameIndex & 1u) ^ 1;
+            resamplingConstants.outputBufferIndex = (resamplingConstants.frameIndex & 1u);
+             
             passData.ResamplingConstants = resamplingConstants;
             
             // Debug.Log($"Reservoir reservoirArrayPitch: {resamplingConstants.restirDIReservoirBufferParams.reservoirArrayPitch}, reservoirBlockRowPitch: {resamplingConstants.restirDIReservoirBufferParams.reservoirBlockRowPitch}");

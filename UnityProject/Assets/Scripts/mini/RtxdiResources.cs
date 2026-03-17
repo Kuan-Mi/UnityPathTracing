@@ -2,6 +2,7 @@
 using Rtxdi;
 using RTXDI;
 using Rtxdi.DI;
+using Unity.Mathematics;
 using UnityEngine;
 
 namespace mini
@@ -19,17 +20,13 @@ namespace mini
         // public GraphicsBuffer TaskBuffer { get; private set; }
         public GraphicsBuffer LightDataBuffer { get; private set; }
         // public GraphicsBuffer GeometryInstanceToLightBuffer { get; private set; }
-        public GraphicsBuffer NeighborOffsetsBuffer { get; private set; }
+        public ComputeBuffer NeighborOffsetsBuffer { get; private set; }
         public GraphicsBuffer LightReservoirBuffer { get; private set; }
 
- 
-
-        public int LightDataBufferSize;
-        public int NeighborOffsetsBufferSize;
-        public int LightReservoirBufferSize;
+  
         
 
-        public RtxdiResources(
+        public unsafe  RtxdiResources(
             ReSTIRDIContext context,
             uint maxEmissiveMeshes,
             uint maxEmissiveTriangles,
@@ -37,7 +34,6 @@ namespace mini
             GraphicsBuffer LightDataBuffer)
         { 
             this.LightDataBuffer = LightDataBuffer;
-            LightDataBufferSize = (int)(maxEmissiveTriangles * Marshal.SizeOf<RAB_LightInfo>());
             // m_maxEmissiveMeshes = maxEmissiveMeshes;
             // m_maxEmissiveTriangles = maxEmissiveTriangles;
             // m_maxGeometryInstances = maxGeometryInstances;
@@ -86,28 +82,14 @@ namespace mini
             var reservoirParams = context.GetReservoirBufferParameters();
 
             // 4. NeighborOffsetsBuffer
-            // C++: format = nvrhi::Format::RG8_SNORM (2 bytes per element)
-            // Unity 处理 Typed Buffer (Buffer<float2>) 比较麻烦，通常使用 Raw 缓冲区或 Texture1D。
-            // 这里使用 Target.Raw (ByteAddressBuffer)，在 Shader 中需要手动解包，
-            // 或者如果 Shader 只是将其视为 uint/short 数组，可以使用 Structured。
-            // 为通用起见，这里使用 Raw，因为 byteSize 可能不是 stride 的整数倍。
-            // 大小 = NeighborOffsetCount * 2 bytes
-            uint neighborBufferSize = staticParams.NeighborOffsetCount * 2;
-            
-            Debug.Log($"Creating NeighborOffsetsBuffer with neighborBufferSize: {neighborBufferSize} bytes for NeighborOffsetCount: {staticParams.NeighborOffsetCount}");
-            
-            // 向上取整到 4 字节对齐，因为 Raw buffer 寻址通常是 4 字节
-            int alignedNeighborSize = (int)((neighborBufferSize + 3) & ~3);
-            
-            Debug.Log($"Aligned NeighborOffsetsBuffer size: {alignedNeighborSize} bytes");
+            Debug.Log($"NeighborOffsetCount: {staticParams.NeighborOffsetCount}");
 
-            NeighborOffsetsBuffer = new GraphicsBuffer(
-                GraphicsBuffer.Target.Raw,
-                alignedNeighborSize / 4, // Count for Raw is in ints (4 bytes)
-                4
+            NeighborOffsetsBuffer = new ComputeBuffer(
+                (int)staticParams.NeighborOffsetCount,
+                sizeof(Vector2), 
+                ComputeBufferType.Default
             );
             NeighborOffsetsBuffer.name = "NeighborOffsets";
-            NeighborOffsetsBufferSize = alignedNeighborSize;
             
             InitializeNeighborOffsets(staticParams.NeighborOffsetCount);
 
@@ -125,7 +107,6 @@ namespace mini
                     reservoirStride
                 );
                 LightReservoirBuffer.name = "LightReservoirBuffer";
-                LightReservoirBufferSize = totalReservoirs * reservoirStride;
             }
         }
         
