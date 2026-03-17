@@ -816,10 +816,10 @@ void MainRayGenShader()
 
 
     RTXDI_SampleParameters sampleParams = RTXDI_InitSampleParameters(
-         gSssTransmissionBsdfSampleCount, // local light samples 
+         gLocalLightSamples, // local light samples 
         0, // infinite light samples
         0, // environment map samples
-        gSsTransmissionPerBsdfScatteringSampleCount,
+        gBrdfSamples,
         0,
         0.001f);
 
@@ -906,6 +906,7 @@ void MainRayGenShader()
     restirDIReservoirBufferParams.reservoirBlockRowPitch = reservoirBlockRowPitch;
     restirDIReservoirBufferParams.reservoirArrayPitch = reservoirArrayPitch;
     
+    if (gEnableResampling)
     {
         RTXDI_DISpatioTemporalResamplingParameters stparams;
         stparams.screenSpaceMotion = motion;

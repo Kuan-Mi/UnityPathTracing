@@ -1008,8 +1008,15 @@ namespace PathTracing
             globalConstants.gSssScale              = m_Settings.sssScale;
             globalConstants.gSssAnisotropy = m_Settings.sssAnisotropy;
             globalConstants.gSssMaxSampleRadius    = m_Settings.sssMaxSampleRadius;
+            
+            
             globalConstants.gIsEditor = cameraData.camera.cameraType == CameraType.SceneView ? 1u : 0u;
 
+            
+            globalConstants.gLocalLightSamples = m_Settings.localLightSamples;
+            globalConstants.gBrdfSamples = m_Settings.brdfSamples;
+            globalConstants.gEnableResampling = m_Settings.enableResampling ? 1u : 0u;
+            
             // Debug.Log(globalConstants.ToString());
 
             var textureDesc = resourceData.activeColorTexture.GetDescriptor(renderGraph);

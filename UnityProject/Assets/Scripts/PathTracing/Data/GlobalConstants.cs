@@ -81,6 +81,9 @@ namespace PathTracing
         public float gSssAnisotropy;
         public float gSssMaxSampleRadius;
         public float gIsEditor;
+        public uint gLocalLightSamples;
+        public  uint gBrdfSamples;
+        public  uint gEnableResampling;
 
         public override string ToString()
         {
