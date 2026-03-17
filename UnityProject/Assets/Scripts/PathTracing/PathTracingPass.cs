@@ -1059,6 +1059,46 @@ namespace PathTracing
             resamplingConstants.inputBufferIndex = (resamplingConstants.frameIndex & 1u) ^ 1;
             resamplingConstants.outputBufferIndex = (resamplingConstants.frameIndex & 1u);
              
+            
+            // var sb = new System.Text.StringBuilder();
+            // sb.AppendLine($"resamplingConstants.frameIndex: {resamplingConstants.frameIndex}");
+            // sb.AppendLine($"resamplingConstants.numInitialSamples: {resamplingConstants.numInitialSamples}");
+            // sb.AppendLine($"resamplingConstants.numSpatialSamples: {resamplingConstants.numSpatialSamples}");
+            // sb.AppendLine($"resamplingConstants.numInitialBRDFSamples: {resamplingConstants.numInitialBRDFSamples}");
+            // sb.AppendLine($"resamplingConstants.brdfCutoff: {resamplingConstants.brdfCutoff:F6}");
+            // sb.AppendLine($"resamplingConstants.enableResampling: {resamplingConstants.enableResampling}");
+            // sb.AppendLine($"resamplingConstants.unbiasedMode: {resamplingConstants.unbiasedMode}");
+            // sb.AppendLine($"resamplingConstants.inputBufferIndex: {resamplingConstants.inputBufferIndex}");
+            // sb.AppendLine($"resamplingConstants.outputBufferIndex: {resamplingConstants.outputBufferIndex}");
+            // var rp = resamplingConstants.runtimeParams;
+            // sb.AppendLine($"resamplingConstants.runtimeParams.neighborOffsetMask: {rp.neighborOffsetMask}");
+            // sb.AppendLine($"resamplingConstants.runtimeParams.activeCheckerboardField: {rp.activeCheckerboardField}");
+            // sb.AppendLine($"resamplingConstants.runtimeParams.pad1: {rp.pad1}");
+            // sb.AppendLine($"resamplingConstants.runtimeParams.pad2: {rp.pad2}");
+            // var rb = resamplingConstants.restirDIReservoirBufferParams;
+            // sb.AppendLine($"resamplingConstants.restirDIReservoirBufferParams.reservoirBlockRowPitch: {rb.reservoirBlockRowPitch}");
+            // sb.AppendLine($"resamplingConstants.restirDIReservoirBufferParams.reservoirArrayPitch: {rb.reservoirArrayPitch}");
+            // sb.AppendLine($"resamplingConstants.restirDIReservoirBufferParams.pad1: {rb.pad1}");
+            // sb.AppendLine($"resamplingConstants.restirDIReservoirBufferParams.pad2: {rb.pad2}");
+            // var lb = resamplingConstants.lightBufferParams;
+            // var localRegion = lb.localLightBufferRegion;
+            // sb.AppendLine($"resamplingConstants.lightBufferParams.localLightBufferRegion.firstLightIndex: {localRegion.firstLightIndex}");
+            // sb.AppendLine($"resamplingConstants.lightBufferParams.localLightBufferRegion.numLights: {localRegion.numLights}");
+            // sb.AppendLine($"resamplingConstants.lightBufferParams.localLightBufferRegion.pad1: {localRegion.pad1}");
+            // sb.AppendLine($"resamplingConstants.lightBufferParams.localLightBufferRegion.pad2: {localRegion.pad2}");
+            // var infRegion = lb.infiniteLightBufferRegion;
+            // sb.AppendLine($"resamplingConstants.lightBufferParams.infiniteLightBufferRegion.firstLightIndex: {infRegion.firstLightIndex}");
+            // sb.AppendLine($"resamplingConstants.lightBufferParams.infiniteLightBufferRegion.numLights: {infRegion.numLights}");
+            // sb.AppendLine($"resamplingConstants.lightBufferParams.infiniteLightBufferRegion.pad1: {infRegion.pad1}");
+            // sb.AppendLine($"resamplingConstants.lightBufferParams.infiniteLightBufferRegion.pad2: {infRegion.pad2}");
+            // var env = lb.environmentLightParams;
+            // sb.AppendLine($"resamplingConstants.lightBufferParams.environmentLightParams.lightPresent: {env.lightPresent}");
+            // sb.AppendLine($"resamplingConstants.lightBufferParams.environmentLightParams.lightIndex: {env.lightIndex}");
+            // sb.AppendLine($"resamplingConstants.lightBufferParams.environmentLightParams.pad1: {env.pad1}");
+            // sb.AppendLine($"resamplingConstants.lightBufferParams.environmentLightParams.pad2: {env.pad2}");
+            // Debug.Log(sb.ToString());
+
+
             passData.ResamplingConstants = resamplingConstants;
             
             // Debug.Log($"Reservoir reservoirArrayPitch: {resamplingConstants.restirDIReservoirBufferParams.reservoirArrayPitch}, reservoirBlockRowPitch: {resamplingConstants.restirDIReservoirBufferParams.reservoirBlockRowPitch}");
@@ -1190,3 +1230,4 @@ namespace PathTracing
         }
     }
 }
+

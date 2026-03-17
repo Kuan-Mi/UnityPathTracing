@@ -121,8 +121,8 @@ MonoBehaviour:
     sssScale: 1
     sssAnisotropy: 0.8
     sssMaxSampleRadius: 0.0001
-    localLightSamples: 2
-    spatialSamples: 2
+    localLightSamples: 8
+    spatialSamples: 1
     brdfSamples: 1
     enableResampling: 1
   finalMaterial: {fileID: 2100000, guid: 27695a2bc55ef2f469362b9a2994989e, type: 2}
