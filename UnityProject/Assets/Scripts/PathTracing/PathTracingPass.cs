@@ -1049,7 +1049,7 @@ namespace PathTracing
 
             resamplingConstants.frameIndex = restirDIContext.GetFrameIndex();
             resamplingConstants.numInitialSamples = m_Settings.localLightSamples;
-            resamplingConstants.numSpatialSamples = 0;
+            resamplingConstants.numSpatialSamples = m_Settings.spatialSamples;
             resamplingConstants.useAccurateGBufferNormal = 0;
             resamplingConstants.numInitialBRDFSamples = m_Settings.brdfSamples;
             resamplingConstants.brdfCutoff = 0;

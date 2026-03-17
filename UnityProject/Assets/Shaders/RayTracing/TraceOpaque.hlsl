@@ -91,23 +91,6 @@ RWStructuredBuffer<RTXDI_PackedDIReservoir> u_LightReservoirs;
 #include "Assets/Shaders/RTXDI/DI/InitialSampling.hlsl"
 #include <Assets/Shaders/RTXDI/DI/SpatioTemporalResampling.hlsl>
 
-cbuffer ResamplingConstants
-{
-    // RTXDI_ReservoirBufferParameters restirDIReservoirBufferParams;
-
-    uint32_t reservoirBlockRowPitch;
-    uint32_t reservoirArrayPitch;
-
-    uint32_t pad1;
-    uint32_t pad2;
-
-    uint32_t inputBufferIndex;
-    uint32_t outputBufferIndex;
-
-    uint neighborOffsetMask;
-    uint32_t pad3;
-}
-
 
 // 所有射灯直接光照的累加结果（不经 NRD 降噪，在 Composition 直接叠加）
 // RWTexture2D<float3> gOut_SpotDirect;
@@ -835,37 +818,7 @@ void MainRayGenShader()
 
     // Test RTXDI
 
-    RAB_RandomSamplerState rng = RAB_InitRandomSampler(pixelPos, 1);
-
-    RTXDI_DIReservoir reservoir = RTXDI_EmptyDIReservoir();
-
-
-    RTXDI_SampleParameters sampleParams = RTXDI_InitSampleParameters(
-         g_Const.numInitialSamples, // local light samples 
-        0, // infinite light samples
-        0, // environment map samples
-        g_Const.numInitialBRDFSamples,
-        g_Const.brdfCutoff,
-        0.001f);
-
-    // RTXDI_SampleParameters sampleParams = RTXDI_InitSampleParameters(
-    //     g_numInitialSamples, // local light samples 
-    //     0, // infinite light samples
-    //     0, // environment map samples
-    //     g_numInitialBRDFSamples,
-    //     g_brdfCutoff,
-    //     0.001f);
-
-
-    RTXDI_LightBufferParameters lightBufferParams = (RTXDI_LightBufferParameters)0;
-
-
-    lightBufferParams.localLightBufferRegion.firstLightIndex = 0;
-    lightBufferParams.localLightBufferRegion.numLights = 3964;
-    lightBufferParams.infiniteLightBufferRegion.firstLightIndex = 0;
-    lightBufferParams.infiniteLightBufferRegion.numLights = 0;
-    lightBufferParams.environmentLightParams.lightIndex = RTXDI_INVALID_LIGHT_INDEX;
-    lightBufferParams.environmentLightParams.lightPresent = false;
+    const RTXDI_LightBufferParameters lightBufferParams = g_Const.lightBufferParams;
 
     RAB_Surface primarySurface = RAB_EmptySurface();
     primarySurface.worldPos = geometryProps0.X;
@@ -888,17 +841,27 @@ void MainRayGenShader()
 
     primarySurface.diffuseProbability = getSurfaceDiffuseProbability(primarySurface);
 
+    RTXDI_DIReservoir reservoir = RTXDI_EmptyDIReservoir();
+
+    RAB_RandomSamplerState rng = RAB_InitRandomSampler(pixelPos, 1);
+
+    RTXDI_SampleParameters sampleParams = RTXDI_InitSampleParameters(
+        g_Const.numInitialSamples, // local light samples 
+        // 局部光源采样数
+        0, // infinite light samples
+        // 无限光源采样数
+        0, // environment map samples
+        // 环境贴图采样数
+        g_Const.numInitialBRDFSamples,
+        g_Const.brdfCutoff,
+        0.001f);
 
     // Generate the initial sample
     RAB_LightSample lightSample = RAB_EmptyLightSample();
     RTXDI_DIReservoir localReservoir = RTXDI_SampleLocalLights(rng, rng, primarySurface, sampleParams, ReSTIRDI_LocalLightSamplingMode_UNIFORM, lightBufferParams.localLightBufferRegion, lightSample);
-
-
-
-    
     RTXDI_CombineDIReservoirs(reservoir, localReservoir, 0.5, localReservoir.targetPdf);
-    
-    
+
+
     // Resample BRDF samples.
     RAB_LightSample brdfSample = RAB_EmptyLightSample();
     RTXDI_DIReservoir brdfReservoir = RTXDI_SampleBrdf(rng, primarySurface, sampleParams, lightBufferParams, brdfSample);
@@ -924,50 +887,36 @@ void MainRayGenShader()
             RTXDI_StoreVisibilityInDIReservoir(reservoir, 0, true);
         }
     }
-    
-    
-    RTXDI_ReservoirBufferParameters restirDIReservoirBufferParams;
-    
-    restirDIReservoirBufferParams.reservoirBlockRowPitch = reservoirBlockRowPitch;
-    restirDIReservoirBufferParams.reservoirArrayPitch = reservoirArrayPitch;
-    
+
     if (g_Const.enableResampling)
     {
         RTXDI_DISpatioTemporalResamplingParameters stparams;
         stparams.screenSpaceMotion = motion;
-        stparams.sourceBufferIndex = inputBufferIndex;
+        stparams.sourceBufferIndex = g_Const.inputBufferIndex;
         stparams.maxHistoryLength = 20;
-        stparams.biasCorrectionMode = RTXDI_BIAS_CORRECTION_BASIC;
+        stparams.biasCorrectionMode = g_Const.unbiasedMode ? RTXDI_BIAS_CORRECTION_RAY_TRACED : RTXDI_BIAS_CORRECTION_BASIC;
         stparams.depthThreshold = 0.1;
         stparams.normalThreshold = 0.5;
-        stparams.numSamples = 1 + 1;
+        stparams.numSamples = g_Const.numSpatialSamples + 1;
         stparams.numDisocclusionBoostSamples = 0;
         stparams.samplingRadius = 32;
         stparams.enableVisibilityShortcut = true;
         stparams.enablePermutationSampling = true;
         stparams.discountNaiveSamples = false;
-    
-    
+
+
         // This variable will receive the position of the sample reused from the previous frame.
         // It's only needed for gradient evaluation, ignore it here.
         int2 temporalSamplePixelPos = -1;
-    
-    
-        RTXDI_RuntimeParameters runtimeParams;
-    
-        runtimeParams.neighborOffsetMask = neighborOffsetMask;
-        runtimeParams.activeCheckerboardField = 0;
-    
-    
+
+
         // Call the resampling function, update the reservoir and lightSample variables
         reservoir = RTXDI_DISpatioTemporalResampling(pixelPos, primarySurface, reservoir,
-                                                     rng, runtimeParams, restirDIReservoirBufferParams, stparams, temporalSamplePixelPos, lightSample);
+                                                     rng, g_Const.runtimeParams, g_Const.restirDIReservoirBufferParams, stparams, temporalSamplePixelPos, lightSample);
     }
-    
-    
+
     float3 shadingOutput = 0;
-    
-    
+
     // Shade the surface with the selected light sample
     // 使用选定的光照样本对表面进行着色
     if (RTXDI_IsValidDIReservoir(reservoir))
@@ -976,11 +925,11 @@ void MainRayGenShader()
         // 计算正确加权的反射辐射亮度
         shadingOutput = ShadeSurfaceWithLightSample(lightSample, primarySurface)
             * RTXDI_GetDIReservoirInvPdf(reservoir);
-    
+
         // Test if the selected light is visible from the surface
         // 测试选定的光源对于表面是否可见
         bool visibility = RAB_GetConservativeVisibility(primarySurface, lightSample);
-    
+
         // If not visible, discard the shading output and the light sample
         // 如果不可见，则丢弃着色输出和光照样本
         if (!visibility)
@@ -989,16 +938,16 @@ void MainRayGenShader()
             RTXDI_StoreVisibilityInDIReservoir(reservoir, 0, true);
         }
     }
-    
-    
+
+
     shadingOutput += materialProps0.Lemi;
     shadingOutput = basicToneMapping(shadingOutput, 0.005);
-    
+
 
     gOut_DirectLighting[pixelPos] = float4(shadingOutput, 1.0);
 
 
-    RTXDI_StoreDIReservoir(reservoir, restirDIReservoirBufferParams, pixelPos, outputBufferIndex);
+    RTXDI_StoreDIReservoir(reservoir, g_Const.restirDIReservoirBufferParams, pixelPos, g_Const.outputBufferIndex);
 
     // END of test RTXDI
 
