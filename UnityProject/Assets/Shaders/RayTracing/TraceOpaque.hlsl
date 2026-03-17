@@ -893,7 +893,7 @@ void MainRayGenShader()
     if (g_Const.enableResampling)
     {
         RTXDI_DISpatioTemporalResamplingParameters stparams;
-        stparams.screenSpaceMotion = 0;
+        stparams.screenSpaceMotion = motion;
         stparams.sourceBufferIndex = g_Const.inputBufferIndex;
         stparams.maxHistoryLength = 20;
         stparams.biasCorrectionMode = g_Const.unbiasedMode ? RTXDI_BIAS_CORRECTION_RAY_TRACED : RTXDI_BIAS_CORRECTION_BASIC;
@@ -959,8 +959,17 @@ void MainRayGenShader()
     
     float3 lightRadiance = Unpack_R16G16B16A16_FLOAT(rab_load_light_info.radiance);
     
+    RAB_LightInfo r = RAB_LoadLightInfo(geometryProps0.primitiveIndex,false);
+    float3 ll = Unpack_R16G16B16A16_FLOAT(r.radiance);
 
-    // debugTest = -theirDepth;
+    // ll.y = 1-ll.y;
+    // debugTest = -theirDepth;、
+    
+    debugColor = !foundTemporalSurface;
+    // if (foundTemporalSurface)
+    // {
+    //     debugColor = 0;
+    // }
     // gOut_DirectLighting[pixelPos] = float4(debugColor, 1.0);
     
     RTXDI_StoreDIReservoir(reservoir, g_Const.restirDIReservoirBufferParams, pixelPos, g_Const.outputBufferIndex);

@@ -80,7 +80,7 @@ MonoBehaviour:
     showValidation: 0
     dofAperture: 0
     dofFocalDistance: 0.71
-    exposure: 100
+    exposure: 19
     enableAutoExposure: 0
     aeEVMin: -10
     aeEVMax: 10
