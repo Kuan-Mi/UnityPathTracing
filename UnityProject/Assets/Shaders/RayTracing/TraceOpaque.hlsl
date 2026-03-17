@@ -946,6 +946,12 @@ void MainRayGenShader()
 
     gOut_DirectLighting[pixelPos] = float4(shadingOutput, 1.0);
 
+    uint2 scalePixelPosition = pixelPos / 8;
+    
+    uint t_NeighborOffsetsIndex =  scalePixelPosition.x + scalePixelPosition.y * gRectSize.x /8;
+    float2 neighborOffsets = t_NeighborOffsets[t_NeighborOffsetsIndex];
+    
+    gOut_DirectLighting[pixelPos] = float4(neighborOffsets,0, 1.0);
 
     RTXDI_StoreDIReservoir(reservoir, g_Const.restirDIReservoirBufferParams, pixelPos, g_Const.outputBufferIndex);
 

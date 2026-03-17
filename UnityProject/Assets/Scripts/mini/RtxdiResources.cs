@@ -1,4 +1,5 @@
-﻿using System.Runtime.InteropServices;
+﻿using System;
+using System.Runtime.InteropServices;
 using Rtxdi;
 using RTXDI;
 using Rtxdi.DI;
@@ -116,9 +117,35 @@ namespace mini
             if (m_neighborOffsetsInitialized)
                 return;
 
-            byte[] offsets = new byte[neighborOffsetCount * 2]; 
+            
+            var offsets = new Vector2[neighborOffsetCount];
+            Array.Fill(offsets, Vector2.zero);
+            
+            {
+                int R = 250;
+                const float phi2 = 1.0f / 1.3247179572447f;
+                uint num = 0;
+                float u = 0.5f;
+                float v = 0.5f;
+                while (num < neighborOffsetCount) 
+                {
+                    u += phi2;
+                    v += phi2 * phi2;
+                    if (u >= 1.0f) u -= 1.0f;
+                    if (v >= 1.0f) v -= 1.0f;
 
-            RtxdiUtils.FillNeighborOffsetBuffer(offsets, neighborOffsetCount);
+                    float rSq = (u - 0.5f) * (u - 0.5f) + (v - 0.5f) * (v - 0.5f);
+                    if (rSq > 0.25f)
+                        continue;
+
+                    offsets[num++] = new Vector2((u - 0.5f) * R / 128.0f, (v - 0.5f) * R / 128.0f);
+                }
+            }
+            
+            // byte[] offsets = new byte[neighborOffsetCount * 2]; 
+            //
+            // RtxdiUtils.FillNeighborOffsetBuffer(offsets, neighborOffsetCount);
+            
             NeighborOffsetsBuffer.SetData(offsets);
             
             m_neighborOffsetsInitialized = true;
