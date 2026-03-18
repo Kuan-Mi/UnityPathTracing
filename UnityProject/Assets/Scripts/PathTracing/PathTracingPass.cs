@@ -1055,7 +1055,7 @@ namespace PathTracing
             resamplingConstants.brdfCutoff = 0;
             resamplingConstants.pad2 = new uint2(0, 0);
             resamplingConstants.enableResampling = m_Settings.enableResampling ? 1u : 0u;
-            resamplingConstants.unbiasedMode = 0;
+            resamplingConstants.unbiasedMode = 1;
             resamplingConstants.inputBufferIndex = (resamplingConstants.frameIndex & 1u) ^ 1;
             resamplingConstants.outputBufferIndex = (resamplingConstants.frameIndex & 1u);
              
