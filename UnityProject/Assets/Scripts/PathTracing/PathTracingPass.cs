@@ -1011,7 +1011,7 @@ namespace PathTracing
             
             
             globalConstants.gIsEditor = cameraData.camera.cameraType == CameraType.SceneView ? 1u : 0u;
-            
+            globalConstants.gShowLight = m_Settings.gShowLight?  1u : 0u; 
             // Debug.Log(globalConstants.ToString());
 
             var textureDesc = resourceData.activeColorTexture.GetDescriptor(renderGraph);

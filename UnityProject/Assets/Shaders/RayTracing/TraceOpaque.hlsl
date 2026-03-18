@@ -948,17 +948,23 @@ void MainRayGenShader()
 
     gOut_DirectLighting[pixelPos] = float4(shadingOutput, 1.0);
     
-    uint pointer = RTXDI_ReservoirPositionToPointer(g_Const.restirDIReservoirBufferParams, pixelPos, 0);
+    // uint pointer = RTXDI_ReservoirPositionToPointer(g_Const.restirDIReservoirBufferParams, pixelPos, 0);
+    //
+    // RTXDI_PackedDIReservoir rtxdi_packed_di_reservoir = u_LightReservoirs[pointer];
+    // RTXDI_DIReservoir unpackedReservoir = RTXDI_UnpackDIReservoir(rtxdi_packed_di_reservoir);
+    //
+    // uint lightIndex = RTXDI_GetDIReservoirLightIndex(unpackedReservoir);
+    //
+    // RAB_LightInfo rab_load_light_info = RAB_LoadLightInfo(lightIndex,false);
+    //
+    // float3 lightRadiance = Unpack_R16G16B16A16_FLOAT(rab_load_light_info.radiance);
 
-    RTXDI_PackedDIReservoir rtxdi_packed_di_reservoir = u_LightReservoirs[pointer];
-    RTXDI_DIReservoir unpackedReservoir = RTXDI_UnpackDIReservoir(rtxdi_packed_di_reservoir);
-    
-    uint lightIndex = RTXDI_GetDIReservoirLightIndex(unpackedReservoir);
-    
-    RAB_LightInfo rab_load_light_info = RAB_LoadLightInfo(lightIndex,false);
-    
-    float3 lightRadiance = Unpack_R16G16B16A16_FLOAT(rab_load_light_info.radiance);
-    
+    if (gShowLight)
+    {
+        RAB_LightInfo rab_load_light_info = RAB_LoadLightInfo(geometryProps0.primitiveIndex,false);
+        float3 lightRadiance = Unpack_R16G16B16A16_FLOAT(rab_load_light_info.radiance);
+        gOut_DirectLighting[pixelPos] = float4(lightRadiance, 1);
+    }
 
     // debugTest = -theirDepth;
     // gOut_DirectLighting[pixelPos] = float4(debugColor, 1.0);

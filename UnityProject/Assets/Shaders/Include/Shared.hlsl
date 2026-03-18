@@ -251,6 +251,7 @@ cbuffer PathTracingParams : register(b0)
     float gSssAnisotropy;
     float gSssMaxSampleRadius;
     float gIsEditor;
+    uint gShowLight;
 };
 
 

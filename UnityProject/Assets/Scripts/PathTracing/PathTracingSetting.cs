@@ -215,6 +215,7 @@ namespace PathTracing
         public uint brdfSamples;
 
         public bool enableResampling;
-        // public bool usePackedData;
+        public bool gShowLight;
+ 
     }
 }

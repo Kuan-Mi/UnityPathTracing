@@ -368,11 +368,6 @@ namespace RTXDI
                         {
                              continue;
                         }
-
-                        if (c.r < 0.8)
-                        {
-                            continue;
-                        }
                         
                         float3 decodedDir1 = UnpackOctDirection(debugData[i].direction1);
                         float3 decodedDir2 = UnpackOctDirection(debugData[i].direction2);
