@@ -766,22 +766,6 @@ void MainRayGenShader()
 
     gOut_DirectLighting[pixelPos] = Ldirect; // "psrThroughput" applied in "Composition"
 
-    // gOut_DirectLighting[pixelPos] = gIn_PrevBaseColorMetalness[pixelPos].xyz  - gOut_BaseColor_Metalness[pixelPos];
-
-    if (geometryProps0.primitiveIndex == INF)
-    {
-        gOut_DirectLighting[pixelPos] = 0;
-    }
-    else
-    {
-        // float3 ll = float3(geometryProps0.primitiveIndex % 10 / 10.0, (geometryProps0.primitiveIndex) % 10 / 10.0, (geometryProps0.primitiveIndex) % 10 / 10.0);
-
-        RAB_LightInfo lightInfo = t_LightDataBuffer[geometryProps0.primitiveIndex];
-        float3 ll = Unpack_R16G16B16A16_FLOAT(lightInfo.radiance);
-        gOut_DirectLighting[pixelPos] = ll;
-    }
-    // gOut_SpotDirect[pixelPos] = EvaluateSpotLights(geometryProps0, materialProps0);
-    // gOut_SpotDirect[pixelPos] = 0;
     gOut_PsrThroughput[pixelPos] = psrThroughput;
 
     // Lighting at PSR hit, if found
@@ -914,7 +898,7 @@ void MainRayGenShader()
 
         // Call the resampling function, update the reservoir and lightSample variables
         reservoir = RTXDI_DISpatioTemporalResampling(pixelPos, primarySurface, reservoir,
-                                                     rng, g_Const.runtimeParams, g_Const.restirDIReservoirBufferParams, stparams, temporalSamplePixelPos, lightSample,foundTemporalSurface,debugColor);
+                                                     rng, g_Const.runtimeParams, g_Const.restirDIReservoirBufferParams, stparams, temporalSamplePixelPos, lightSample, foundTemporalSurface, debugColor);
     }
 
     float3 shadingOutput = 0;
@@ -941,25 +925,22 @@ void MainRayGenShader()
         }
     }
 
+    // shadingOutput = basicToneMapping(shadingOutput, 0.005);
 
-    shadingOutput += materialProps0.Lemi;
-    shadingOutput = basicToneMapping(shadingOutput, 0.005);
+    gOut_DirectLighting[pixelPos] = float4(Ldirect + shadingOutput, 1.0);
 
-
-    gOut_DirectLighting[pixelPos] = float4(shadingOutput, 1.0);
-    
     // uint pointer = RTXDI_ReservoirPositionToPointer(g_Const.restirDIReservoirBufferParams, pixelPos, 0);
 
     if (gShowLight)
     {
-        RAB_LightInfo rab_load_light_info = RAB_LoadLightInfo(geometryProps0.primitiveIndex,false);
+        RAB_LightInfo rab_load_light_info = RAB_LoadLightInfo(geometryProps0.primitiveIndex, false);
         float3 lightRadiance = Unpack_R16G16B16A16_FLOAT(rab_load_light_info.radiance);
         gOut_DirectLighting[pixelPos] = float4(lightRadiance, 1);
     }
 
     // debugTest = -theirDepth;
     // gOut_DirectLighting[pixelPos] = float4(debugColor, 1.0);
-    
+
     RTXDI_StoreDIReservoir(reservoir, g_Const.restirDIReservoirBufferParams, pixelPos, g_Const.outputBufferIndex);
 
     // END of test RTXDI
