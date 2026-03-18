@@ -429,6 +429,8 @@ namespace PathTracing
             _aeHistogramBuffer = null;
             _aeExposureBuffer?.Release();
             _aeExposureBuffer = null;
+            
+            gpuScene.Dispose();
         }
 
         public void Test()

@@ -48,6 +48,15 @@ namespace RTXDI
 
         public void InitBuffer()
         {
+            
+#if UNITY_EDITOR
+            UnityEditor.ObjectChangeEvents.changesPublished += (ref UnityEditor.ObjectChangeEventStream stream) =>
+            {
+                MarkSceneDirty();
+            };
+#endif
+            
+            
             _instanceBuffer = new ComputeBuffer(8192, Marshal.SizeOf<InstanceData>());
             _primitiveBuffer = new ComputeBuffer(32768, Marshal.SizeOf<PrimitiveData>());
             _lightInfoBuffer = new GraphicsBuffer(GraphicsBuffer.Target.Structured, 32768, Marshal.SizeOf<RAB_LightInfo>());
@@ -93,147 +102,149 @@ namespace RTXDI
         private List<InstanceData> instanceDataList = new List<InstanceData>();
         private List<PrimitiveData> primitiveDataList = new List<PrimitiveData>();
 
+        // Mesh 数据缓存：避免每帧重复分配 vertices/uv/triangles 数组
+        private struct MeshCache
+        {
+            public Vector3[] vertices;
+            public Vector2[] uvs;
+            public int[][] trianglesPerSubMesh;
+        }
+        private Dictionary<int, MeshCache> _meshDataCache = new Dictionary<int, MeshCache>();
+
+        // Renderer 缓存 + 自发光实例引用：避免每帧 FindObjectsByType 和重建 primitive
+        private Renderer[] _cachedRenderers;
+        private struct EmissiveInstanceRef { public Renderer renderer; }
+        private List<EmissiveInstanceRef> _emissiveInstanceRefs = new List<EmissiveInstanceRef>();
+
+        // 场景拓扑脏标记：true 时完整重建，false 时仅更新 transform
+        private bool _sceneTopologyDirty = true;
+
+        /// <summary>场景物体增减、材质/Mesh 变化时调用，触发下一帧完整重建。</summary>
+        public void MarkSceneDirty() => _sceneTopologyDirty = true;
+
         public void Build()
+        {
+            if (_sceneTopologyDirty)
+            {
+                BuildFull();
+                _sceneTopologyDirty = false;
+            }
+            else
+            {
+                UpdateTransformsOnly();
+            }
+        }
+
+        // 完整重建：刷新 renderer 列表、primitive 数据、instance 数据，上传两个 buffer
+        private void BuildFull()
         {
             instanceDataList.Clear();
             primitiveDataList.Clear();
-
             globalTexturePool.Clear();
             textureGroupCache.Clear();
+            _emissiveInstanceRefs.Clear();
 
-            // meshPrimitiveCache.Clear();
+            _cachedRenderers = Object.FindObjectsByType<Renderer>(FindObjectsSortMode.None);
 
-            var renderers = Object.FindObjectsByType<Renderer>(FindObjectsSortMode.None);
-            // Debug.Log($"Found {renderers.Length} renderers in scene.");
-            
-            foreach (var r in renderers)
+            foreach (var r in _cachedRenderers)
             {
                 MeshFilter mf = r.GetComponent<MeshFilter>();
-
                 if (mf == null || mf.sharedMesh == null)
                     continue;
 
                 Mesh mesh = mf.sharedMesh;
                 int subMeshCount = mesh.subMeshCount;
-                // int meshInstanceID = mesh.GetInstanceID(); // 获取 Mesh 唯一 ID
-
                 Matrix4x4 localToWorld = r.transform.localToWorldMatrix;
-
-                // bool isMeshCached = meshPrimitiveCache.TryGetValue(meshInstanceID, out List<uint> cachedOffsets);
-                // List<uint> currentMeshOffsets = isMeshCached ? cachedOffsets : new List<uint>();
-                List<uint> currentMeshOffsets = new List<uint>();
-
-                Vector3[] vertices = mesh.vertices;
-                Vector2[] uvs = mesh.uv;
                 Material[] sharedMaterials = r.sharedMaterials;
 
-                // 【关键修改 3】遍历 SubMesh
+                // 从缓存获取 Mesh 数据，避免重复分配托管数组
+                MeshCache mc = GetOrCacheMeshData(mesh);
+
                 for (int subIdx = 0; subIdx < subMeshCount; subIdx++)
                 {
-                    // 获取当前 SubMesh 对应的材质
-                    Material mat = null;
-                    if (subIdx < sharedMaterials.Length)
-                    {
-                        mat = sharedMaterials[subIdx];
-                    }
-
-                    // 如果材质索引超出了（比如 Mesh 有 3 个 SubMesh 但 Renderer 只填了 1 个材质），通常取最后一个或默认
+                    Material mat = subIdx < sharedMaterials.Length ? sharedMaterials[subIdx] : null;
                     if (mat == null && sharedMaterials.Length > 0) mat = sharedMaterials[^1];
 
-                    var isEmissive = mat != null && mat.IsKeywordEnabled("_EMISSION") && mat.GetColor("_EmissionColor").maxColorComponent > 0.01f;
-
+                    bool isEmissive = mat != null && mat.IsKeywordEnabled("_EMISSION") && mat.GetColor("_EmissionColor").maxColorComponent > 0.01f;
                     if (!isEmissive)
-                    {
-                        // 非自发光材质跳过
                         continue;
-                    }
-                    // Debug.Log($"Renderer: {r.name}, MeshFilter: {r.GetComponent<MeshFilter>()}, Material Count: {r.sharedMaterials.Length}");
 
-                    uint thisSubMeshPrimitiveOffset = 0;
-
-                    // if (isMeshCached)
-                    // {
-                    //     if (subIdx < currentMeshOffsets.Count)
-                    //     {
-                    //         thisSubMeshPrimitiveOffset = currentMeshOffsets[subIdx];
-                    //     }
-                    //     else
-                    //     {
-                    //         Debug.LogError($"Mesh Cache mismatch for {r.name}");
-                    //         thisSubMeshPrimitiveOffset = 0;
-                    //     }
-                    // }
-                    // else
+                    // 构造 Primitive Data（本地空间，不随 transform 变化）
+                    int[] subMeshTriangles = mc.trianglesPerSubMesh[subIdx];
+                    uint instanceIndex = (uint)instanceDataList.Count;
+                    for (int t = 0; t < subMeshTriangles.Length; t += 3)
                     {
-                        thisSubMeshPrimitiveOffset = (uint)primitiveDataList.Count;
-
-                        // 记录到缓存列表
-                        currentMeshOffsets.Add(thisSubMeshPrimitiveOffset);
-
-                        // 获取当前 SubMesh 的三角形索引
-                        // 注意：GetTriangles 返回的是顶点索引，不需要偏移，直接对应 mesh.vertices
-                        int[] subMeshTriangles = mesh.GetTriangles(subIdx);
-
-                        // --- 构造 Primitive Data ---
-                        for (int t = 0; t < subMeshTriangles.Length; t += 3)
+                        int i0 = subMeshTriangles[t];
+                        int i1 = subMeshTriangles[t + 1];
+                        int i2 = subMeshTriangles[t + 2];
+                        primitiveDataList.Add(new PrimitiveData
                         {
-                            PrimitiveData prim = new PrimitiveData();
-                            int i0 = subMeshTriangles[t];
-                            int i1 = subMeshTriangles[t + 1];
-                            int i2 = subMeshTriangles[t + 2];
-
-                            prim.pos0 = new float3(vertices[i0]);
-                            prim.pos1 = new float3(vertices[i1]);
-                            prim.pos2 = new float3(vertices[i2]);
-
-                            // 增加安全检查，防止 UV 数组越界（有些 Mesh 可能没有 UV）
-                            prim.uv0 = new float2(uvs[i0]);
-                            prim.uv1 = new float2(uvs[i1]);
-                            prim.uv2 = new float2(uvs[i2]);
-
-                            prim.instanceId = (uint)instanceDataList.Count; // 当前 Instance 的索引
-
-                            primitiveDataList.Add(prim);
-                        }
+                            pos0 = new float3(mc.vertices[i0]),
+                            pos1 = new float3(mc.vertices[i1]),
+                            pos2 = new float3(mc.vertices[i2]),
+                            uv0  = new float2(mc.uvs[i0]),
+                            uv1  = new float2(mc.uvs[i1]),
+                            uv2  = new float2(mc.uvs[i2]),
+                            instanceId = instanceIndex
+                        });
                     }
 
-
-                    // --- 构造 Instance Data (每个 SubMesh 一个) ---
-                    // 处理材质纹理
+                    // 构造 Instance Data
                     uint baseTextureIndex = GetTextureGroupIndex(mat);
                     var emissiveColor = mat.GetColor("_EmissionColor").linear;
-
-                    InstanceData inst = new InstanceData
+                    instanceDataList.Add(new InstanceData
                     {
-                        transform = localToWorld,
+                        transform            = localToWorld,
                         emissiveTextureIndex = baseTextureIndex,
-                        emissiveColor = new float3(emissiveColor.r, emissiveColor.g, emissiveColor.b)
-                    };
+                        emissiveColor        = new float3(emissiveColor.r, emissiveColor.g, emissiveColor.b)
+                    });
 
-                    // 添加到列表
-                    instanceDataList.Add(inst);
+                    // 记录引用，供后续逐帧 transform 更新使用
+                    _emissiveInstanceRefs.Add(new EmissiveInstanceRef { renderer = r });
                 }
-
-                // if (!isMeshCached)
-                // {
-                //     meshPrimitiveCache.Add(meshInstanceID, currentMeshOffsets);
-                // }
             }
-
 
             if (instanceDataList.Count > _instanceBuffer.count)
                 Debug.LogError($"Instance count {instanceDataList.Count} exceeds buffer capacity {_instanceBuffer.count}!");
             if (primitiveDataList.Count > _primitiveBuffer.count)
                 Debug.LogError($"Primitive count {primitiveDataList.Count} exceeds buffer capacity {_primitiveBuffer.count}!");
 
-
-            _instanceBuffer.SetData(instanceDataList.ToArray());
-            _primitiveBuffer.SetData(primitiveDataList.ToArray());
+            _instanceBuffer.SetData(instanceDataList);
+            _primitiveBuffer.SetData(primitiveDataList);
 
             emissiveTriangleCount = (uint)primitiveDataList.Count;
-            // Debug.Log($"Renderers: {renderers.Length}, Instances: {instanceDataList.Count}, Primitives: {primitiveDataList.Count}");
+            // Debug.Log($"BuildFull completed: {instanceDataList.Count} instances, {primitiveDataList.Count} primitives, {globalTexturePool.Count} unique emissive textures.");
+        }
 
-            // Debug.Log($"emissiveTriangleCount: {emissiveTriangleCount}");
+        // 仅更新动态 transform，不重建 primitive，每帧开销极小
+        private void UpdateTransformsOnly()
+        {
+            for (int i = 0; i < _emissiveInstanceRefs.Count; i++)
+            {
+                var inst = instanceDataList[i];
+                inst.transform = _emissiveInstanceRefs[i].renderer.transform.localToWorldMatrix;
+                instanceDataList[i] = inst;
+            }
+            _instanceBuffer.SetData(instanceDataList);
+        }
+
+        private MeshCache GetOrCacheMeshData(Mesh mesh)
+        {
+            int id = mesh.GetInstanceID();
+            if (!_meshDataCache.TryGetValue(id, out MeshCache cache))
+            {
+                int subCount = mesh.subMeshCount;
+                cache = new MeshCache
+                {
+                    vertices            = mesh.vertices,
+                    uvs                 = mesh.uv,
+                    trianglesPerSubMesh = new int[subCount][]
+                };
+                for (int i = 0; i < subCount; i++)
+                    cache.trianglesPerSubMesh[i] = mesh.GetTriangles(i);
+                _meshDataCache[id] = cache;
+            }
+            return cache;
         }
 
         #region Debugging Helpers
@@ -385,6 +396,7 @@ namespace RTXDI
             _instanceBuffer?.Dispose();
             _primitiveBuffer?.Dispose();
             _lightInfoBuffer?.Dispose();
+            _meshDataCache.Clear();
         }
     }
 }

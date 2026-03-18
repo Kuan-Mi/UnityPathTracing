@@ -124,7 +124,7 @@ MonoBehaviour:
     localLightSamples: 2
     spatialSamples: 0
     brdfSamples: 0
-    enableResampling: 1
+    enableResampling: 0
     gShowLight: 0
   finalMaterial: {fileID: 2100000, guid: 27695a2bc55ef2f469362b9a2994989e, type: 2}
   opaqueTracingShader: {fileID: 4807578003741378534, guid: 71faa22953dc9834daf36cc38966c196, type: 3}

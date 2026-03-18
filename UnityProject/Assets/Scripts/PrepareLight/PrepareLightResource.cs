@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Runtime.InteropServices;
 using DefaultNamespace;
 using Nrd;
@@ -41,9 +42,17 @@ namespace RTXDI
         // private IntPtr inputNriTex;
 
         private NativeArray<EmissionResourceInput> m_ResourceCache;
+        
+        private List<Texture2D> lastSentTextures = new List<Texture2D>();
 
         public unsafe void SendTexture(List<Texture2D> textures)
         {
+
+            if (lastSentTextures.SequenceEqual(textures))
+            {
+                return; // No change in textures, skip updating
+            }
+            
             if (m_ResourceCache.IsCreated) m_ResourceCache.Dispose();
             m_ResourceCache = new NativeArray<EmissionResourceInput>(textures.Count, Allocator.Persistent);
 
@@ -71,6 +80,8 @@ namespace RTXDI
             EmissionResourceInput* ptr = (EmissionResourceInput*)m_ResourceCache.GetUnsafePtr();
 
             UpdateDenoiserResources(instanceId, (IntPtr)ptr, m_ResourceCache.Length);
+            
+            lastSentTextures = new List<Texture2D>(textures);
         }
         
         

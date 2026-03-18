@@ -403,7 +403,8 @@ namespace Nrd
 
             if (allocatedResources.Count > 0 && allocatedResources[0].IsCreated)
             {
-                if (allocatedResources[0].Handle != null)
+                var handle = allocatedResources[0].Handle;
+                if (handle != null && (handle.externalTexture != null || handle.rt != null))
                 {
                     var request = AsyncGPUReadback.Request(allocatedResources[0].Handle);
                     request.WaitForCompletion();
