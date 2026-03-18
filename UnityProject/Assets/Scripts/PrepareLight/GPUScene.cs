@@ -56,8 +56,8 @@ namespace RTXDI
 
 
             _instanceBuffer = new ComputeBuffer(8192, Marshal.SizeOf<InstanceData>());
-            _primitiveBuffer = new ComputeBuffer(32768, Marshal.SizeOf<PrimitiveData>());
-            _lightInfoBuffer = new GraphicsBuffer(GraphicsBuffer.Target.Structured, 32768, Marshal.SizeOf<RAB_LightInfo>());
+            _primitiveBuffer = new ComputeBuffer(262144, Marshal.SizeOf<PrimitiveData>());
+            _lightInfoBuffer = new GraphicsBuffer(GraphicsBuffer.Target.Structured, 262144, Marshal.SizeOf<RAB_LightInfo>());
             isBufferInitialized = true;
         }
 
@@ -76,8 +76,20 @@ namespace RTXDI
         private uint GetTextureGroupIndex(Material mat)
         {
             if (mat == null) return 0;
+            Texture2D texEmission;
 
-            Texture2D texEmission = (Texture2D)mat.GetTexture("_EmissionMap") ?? Texture2D.whiteTexture;
+
+            Texture e = mat.GetTexture("_EmissionMap");
+            if (e == null)
+            {
+                texEmission = Texture2D.whiteTexture;
+            }
+            else
+            {
+                // Debug.Log(e.name);
+                texEmission = (Texture2D)e;
+            }
+
 
             string key = $"{texEmission.GetInstanceID()}";
 
@@ -174,6 +186,7 @@ namespace RTXDI
 
             foreach (var r in _cachedRenderers)
             {
+                
                 Mesh mesh = r.GetComponent<MeshFilter>().sharedMesh;
                 int subMeshCount = mesh.subMeshCount;
                 Material[] sharedMaterials = r.sharedMaterials;
@@ -181,6 +194,7 @@ namespace RTXDI
                 MeshCache mc = GetOrCacheMeshData(mesh);
                 Matrix4x4 localToWorld = r.transform.localToWorldMatrix;
 
+                Debug.Log($"Processing Renderer: {r.name}, count: {mc.vertices.Length}");  
                 for (int subIdx = 0; subIdx < subMeshCount; subIdx++)
                 {
                     Material mat = subIdx < sharedMaterials.Length ? sharedMaterials[subIdx] : null;
@@ -419,6 +433,7 @@ namespace RTXDI
             // Debug.LogWarning(" ~GPUScene ");
             Dispose();
         }
+
         public void Dispose()
         {
             _instanceBuffer?.Dispose();
