@@ -925,8 +925,6 @@ void MainRayGenShader()
         }
     }
 
-    // shadingOutput = basicToneMapping(shadingOutput, 0.005);
-
     gOut_DirectLighting[pixelPos] = float4(Ldirect + shadingOutput, 1.0);
 
     // uint pointer = RTXDI_ReservoirPositionToPointer(g_Const.restirDIReservoirBufferParams, pixelPos, 0);

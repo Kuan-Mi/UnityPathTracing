@@ -80,7 +80,7 @@ MonoBehaviour:
     showValidation: 0
     dofAperture: 0
     dofFocalDistance: 0.71
-    exposure: 8.4
+    exposure: 1
     enableAutoExposure: 0
     aeEVMin: -10
     aeEVMax: 10
@@ -122,7 +122,7 @@ MonoBehaviour:
     sssAnisotropy: 0.8
     sssMaxSampleRadius: 0.0001
     localLightSamples: 8
-    spatialSamples: 1
+    spatialSamples: 3
     brdfSamples: 1
     enableResampling: 1
     gShowLight: 0
