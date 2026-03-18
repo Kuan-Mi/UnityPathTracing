@@ -23,7 +23,7 @@ float RAB_EvaluateLocalLightSourcePdf(uint lightIndex)
 {
     // Uniform pdf
     // return 1.0 / gNumLights;
-    return 1.0 / 3964;
+    return 1.0 / g_Const.lightBufferParams.localLightBufferRegion.numLights;
 }
 
 float3 RAB_GetReflectedRadianceForSurface(float3 incomingRadianceLocation, float3 incomingRadiance, RAB_Surface surface)

@@ -103,17 +103,16 @@ namespace PathTracing
 
         private Dictionary<long, NRDDenoiser> _nrdDenoisers = new();
         private Dictionary<long, DLRRDenoiser> _dlrrDenoisers = new();
-        
+
         private Dictionary<long, ReSTIRDIContext> _restirDIContexts = new();
         private Dictionary<long, RtxdiResources> _rtxdiResources = new();
 
-        
-        
-        private Dictionary<long, PrepareLightResource> _resources = new Dictionary<long, PrepareLightResource>();
+
+        private Dictionary<long, PrepareLightResource> _prepareLightResources = new Dictionary<long, PrepareLightResource>();
 
         public GPUScene gpuScene = new GPUScene();
-        
-        
+
+
         // public PathTracingDataBuilder _dataBuilder = new PathTracingDataBuilder();
 
         // [ContextMenu("ReBuild AccelerationStructure")]
@@ -137,10 +136,10 @@ namespace PathTracing
 
                 SetMask();
             }
-            
-            if (gpuScene.IsEmpty())
+
+            if (!gpuScene.isBufferInitialized)
             {
-                gpuScene.Build();
+                gpuScene.InitBuffer();
             }
 
             // if (_dataBuilder.IsEmpty())
@@ -272,6 +271,11 @@ namespace PathTracing
 
             if (eyeIndex == 1)
                 return;
+
+
+            gpuScene.Build();
+
+
             long uniqueKey = cam.GetInstanceID() + (eyeIndex * 100000L);
 
 
@@ -301,34 +305,29 @@ namespace PathTracing
                 dlrr = new DLRRDenoiser(pathTracingSetting, camName);
                 _dlrrDenoisers.Add(uniqueKey, dlrr);
             }
-            
-            
-            if (!_resources.TryGetValue(uniqueKey, out var prepareLightResource))
+
+
+            if (!_prepareLightResources.TryGetValue(uniqueKey, out var prepareLightResource))
             {
                 prepareLightResource = new PrepareLightResource();
-                _resources.Add(uniqueKey, prepareLightResource);
+                _prepareLightResources.Add(uniqueKey, prepareLightResource);
                 prepareLightResource.SendTexture(gpuScene.globalTexturePool);
                 prepareLightResource.SetBuffer(gpuScene);
             }
-            
+
             if (!_restirDIContexts.TryGetValue(uniqueKey, out var restirDIContext))
             {
-                
                 ReSTIRDIStaticParameters contextParams = ReSTIRDIStaticParameters.Default();
                 contextParams.RenderWidth = (uint)cam.pixelWidth;
                 contextParams.RenderHeight = (uint)cam.pixelHeight;
-                
+
                 restirDIContext = new ReSTIRDIContext(contextParams);
                 _restirDIContexts.Add(uniqueKey, restirDIContext);
-            } 
-            
+            }
+
             if (!_rtxdiResources.TryGetValue(uniqueKey, out var rtxdiResources))
             {
-                uint maxEmissiveMeshes = gpuScene.emissiveMeshCount;
-                uint maxEmissiveTriangles = gpuScene.emissiveTriangleCount;
-                uint maxGeometryInstances = gpuScene.instanceCount;
-
-                rtxdiResources = new RtxdiResources(restirDIContext , maxEmissiveMeshes, maxEmissiveTriangles, maxGeometryInstances,gpuScene._lightInfoBuffer);
+                rtxdiResources = new RtxdiResources(restirDIContext, gpuScene);
                 _rtxdiResources.Add(uniqueKey, rtxdiResources);
             }
 
@@ -340,7 +339,7 @@ namespace PathTracing
             _pathTracingPass.ResolvedBuffer = _resolvedBuffer;
             _pathTracingPass.AeHistogramBuffer = _aeHistogramBuffer;
             _pathTracingPass.AeExposureBuffer = _aeExposureBuffer;
-            
+
             _pathTracingPass.prepareLightResource = prepareLightResource;
             _pathTracingPass.rtxdiResources = rtxdiResources;
             _pathTracingPass.restirDIContext = restirDIContext;
@@ -404,14 +403,14 @@ namespace PathTracing
             }
 
             _dlrrDenoisers.Clear();
-            
-            
-            foreach (var resource in _resources.Values)
+
+
+            foreach (var resource in _prepareLightResources.Values)
             {
                 resource.Dispose();
             }
 
-            _resources.Clear();
+            _prepareLightResources.Clear();
 
             scramblingRankingUintBuffer?.Release();
             scramblingRankingUintBuffer = null;
@@ -431,7 +430,7 @@ namespace PathTracing
             _aeExposureBuffer?.Release();
             _aeExposureBuffer = null;
         }
-        
+
         public void Test()
         {
             gpuScene.DebugReadback();

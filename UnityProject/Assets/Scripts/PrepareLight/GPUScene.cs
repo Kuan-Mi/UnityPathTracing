@@ -42,7 +42,7 @@ namespace RTXDI
         public uint direction1; // oct-encoded
         public uint direction2; // oct-encoded
     };
- 
+
     public class GPUScene
     {
         public static GPUScene instance;
@@ -50,6 +50,16 @@ namespace RTXDI
         public GPUScene()
         {
             instance = this;
+        }
+        
+        public bool isBufferInitialized = false;
+
+        public void InitBuffer()
+        {
+            _instanceBuffer = new ComputeBuffer(10, Marshal.SizeOf<InstanceData>());
+            _primitiveBuffer = new ComputeBuffer(8192, Marshal.SizeOf<PrimitiveData>());
+            _lightInfoBuffer = new GraphicsBuffer(GraphicsBuffer.Target.Structured, 8192, Marshal.SizeOf<RAB_LightInfo>());
+            isBufferInitialized = true;
         }
 
         // 预定义默认纹理，防止材质缺失纹理导致索引错位
@@ -61,12 +71,12 @@ namespace RTXDI
         // 缓存已添加的纹理组，避免重复上传相同的材质纹理组合
         private Dictionary<string, uint> textureGroupCache = new Dictionary<string, uint>();
 
-        private Dictionary<int, List<uint>> meshPrimitiveCache = new Dictionary<int, List<uint>>();
+        // private Dictionary<int, List<uint>> meshPrimitiveCache = new Dictionary<int, List<uint>>();
 
-        public uint emissiveMeshCount;
+        // public uint emissiveMeshCount;
         public uint emissiveTriangleCount;
-        public uint instanceCount;
-        
+        // public uint instanceCount;
+
 
         private uint GetTextureGroupIndex(Material mat)
         {
@@ -107,10 +117,10 @@ namespace RTXDI
             globalTexturePool.Clear();
             textureGroupCache.Clear();
 
-            meshPrimitiveCache.Clear();
+            // meshPrimitiveCache.Clear();
 
             var renderers = Object.FindObjectsByType<Renderer>(FindObjectsSortMode.None);
-            Debug.Log($"Found {renderers.Length} renderers in scene.");
+            // Debug.Log($"Found {renderers.Length} renderers in scene.");
 
             foreach (var r in renderers)
             {
@@ -121,12 +131,13 @@ namespace RTXDI
 
                 Mesh mesh = mf.sharedMesh;
                 int subMeshCount = mesh.subMeshCount;
-                int meshInstanceID = mesh.GetInstanceID(); // 获取 Mesh 唯一 ID
+                // int meshInstanceID = mesh.GetInstanceID(); // 获取 Mesh 唯一 ID
 
                 Matrix4x4 localToWorld = r.transform.localToWorldMatrix;
 
-                bool isMeshCached = meshPrimitiveCache.TryGetValue(meshInstanceID, out List<uint> cachedOffsets);
-                List<uint> currentMeshOffsets = isMeshCached ? cachedOffsets : new List<uint>();
+                // bool isMeshCached = meshPrimitiveCache.TryGetValue(meshInstanceID, out List<uint> cachedOffsets);
+                // List<uint> currentMeshOffsets = isMeshCached ? cachedOffsets : new List<uint>();
+                List<uint> currentMeshOffsets =  new List<uint>();
 
                 Vector3[] vertices = mesh.vertices;
                 Vector2[] uvs = mesh.uv;
@@ -155,19 +166,19 @@ namespace RTXDI
 
                     uint thisSubMeshPrimitiveOffset = 0;
 
-                    if (isMeshCached)
-                    {
-                        if (subIdx < currentMeshOffsets.Count)
-                        {
-                            thisSubMeshPrimitiveOffset = currentMeshOffsets[subIdx];
-                        }
-                        else
-                        {
-                            Debug.LogError($"Mesh Cache mismatch for {r.name}");
-                            thisSubMeshPrimitiveOffset = 0;
-                        }
-                    }
-                    else
+                    // if (isMeshCached)
+                    // {
+                    //     if (subIdx < currentMeshOffsets.Count)
+                    //     {
+                    //         thisSubMeshPrimitiveOffset = currentMeshOffsets[subIdx];
+                    //     }
+                    //     else
+                    //     {
+                    //         Debug.LogError($"Mesh Cache mismatch for {r.name}");
+                    //         thisSubMeshPrimitiveOffset = 0;
+                    //     }
+                    // }
+                    // else
                     {
                         thisSubMeshPrimitiveOffset = (uint)primitiveDataList.Count;
 
@@ -206,7 +217,7 @@ namespace RTXDI
                     // 处理材质纹理
                     uint baseTextureIndex = GetTextureGroupIndex(mat);
                     var emissiveColor = mat.GetColor("_EmissionColor").linear;
-                    
+
                     InstanceData inst = new InstanceData
                     {
                         transform = localToWorld,
@@ -218,45 +229,26 @@ namespace RTXDI
                     instanceDataList.Add(inst);
                 }
 
-                if (!isMeshCached)
-                {
-                    meshPrimitiveCache.Add(meshInstanceID, currentMeshOffsets);
-                }
+                // if (!isMeshCached)
+                // {
+                //     meshPrimitiveCache.Add(meshInstanceID, currentMeshOffsets);
+                // }
             }
 
-            _instanceBuffer?.Release();
-            _instanceBuffer = new ComputeBuffer(instanceDataList.Count, Marshal.SizeOf<InstanceData>());
             _instanceBuffer.SetData(instanceDataList.ToArray());
-            
-            
-            foreach (var instanceData in instanceDataList)
-            {
-                Debug.Log($"Instance Emissive Texture Index: {instanceData.emissiveTextureIndex}, Emissive Color: {instanceData.emissiveColor}, Transform :{instanceData.transform}");
-            }
-
-            _primitiveBuffer?.Release();
-            _primitiveBuffer = new ComputeBuffer(primitiveDataList.Count, Marshal.SizeOf<PrimitiveData>());
             _primitiveBuffer.SetData(primitiveDataList.ToArray());
-            
-            _lightInfoBuffer?.Release();
-            _lightInfoBuffer = new GraphicsBuffer(GraphicsBuffer.Target.Structured,primitiveDataList.Count, Marshal.SizeOf<RAB_LightInfo>());
 
-            Debug.Log($"Renderers: {renderers.Length}, Instances: {instanceDataList.Count}, Primitives: {primitiveDataList.Count}");
-            
-            
-            
-            // todo 待确认
-            instanceCount = (uint)instanceDataList.Count;
-            emissiveMeshCount = (uint)meshPrimitiveCache.Count;
             emissiveTriangleCount = (uint)primitiveDataList.Count;
-            
-            Debug.Log($"emissiveMeshCount: {emissiveMeshCount}, emissiveTriangleCount: {emissiveTriangleCount} , instanceCount: {instanceCount}");
+            // Debug.Log($"Renderers: {renderers.Length}, Instances: {instanceDataList.Count}, Primitives: {primitiveDataList.Count}");
+
+            Debug.Log($"emissiveTriangleCount: {emissiveTriangleCount}");
         }
 
         public bool IsEmpty()
         {
             return instanceDataList.Count == 0 || primitiveDataList.Count == 0;
         }
+
         public static Color UnpackRadiance(uint2 packed)
         {
             // packed.x 包含 R (低16位) 和 G (高16位)
@@ -264,13 +256,13 @@ namespace RTXDI
 
             // 1. 提取 R (x 的低 16 位)
             ushort r_bits = (ushort)(packed.x & 0xFFFF);
-    
+
             // 2. 提取 G (x 的高 16 位)
             ushort g_bits = (ushort)((packed.x >> 16) & 0xFFFF);
-    
+
             // 3. 提取 B (y 的低 16 位)
             ushort b_bits = (ushort)(packed.y & 0xFFFF);
-    
+
             // 4. 提取 A (y 的高 16 位)
             ushort a_bits = (ushort)((packed.y >> 16) & 0xFFFF);
 
@@ -282,7 +274,7 @@ namespace RTXDI
 
             return new Color(r, g, b, a);
         }
-        
+
         private float3 UnpackOctDirection(uint packed)
         {
             // 1. 提取低16位和高16位
@@ -301,7 +293,7 @@ namespace RTXDI
             // 4. 重建 Z 轴
             // 在八面体表面 |x| + |y| + |z| = 1 => |z| = 1 - (|x| + |y|)
             float z = 1.0f - (math.abs(x) + math.abs(y));
- 
+
             // 5. 处理背面 (Z < 0) 的折叠 (Wrap)
             // 对应 Shader 中的 octWrap
             if (z < 0)
@@ -327,7 +319,7 @@ namespace RTXDI
             s2 = math.f16tof32(h2);
         }
 
-        
+
         [ContextMenu("Debug Readback Buffer")]
         public void DebugReadback()
         {
@@ -339,7 +331,7 @@ namespace RTXDI
 
             // 1. 准备接收数组
             RAB_LightInfo[] debugData = new RAB_LightInfo[primitiveDataList.Count];
-    
+
             // 2. 从 GPU 同步回读数据 (注意：这会阻塞 CPU，仅调试用)
             _lightInfoBuffer.GetData(debugData);
 
@@ -349,8 +341,8 @@ namespace RTXDI
             {
                 // 简单检查：如果 radiance 或 center 有非零值，说明 Shader 跑通了
                 // 注意：lightInfo.radiance 是 uint2 (fp16 packed)，检查 raw value 即可
-                bool hasData = debugData[i].radiance.x != 0 || 
-                               debugData[i].radiance.y != 0 || 
+                bool hasData = debugData[i].radiance.x != 0 ||
+                               debugData[i].radiance.y != 0 ||
                                math.lengthsq(debugData[i].center) > 0;
 
                 if (hasData)
@@ -359,37 +351,37 @@ namespace RTXDI
                     // if (validCount <= 5) // 只打印前 5 个有效数据避免刷屏
                     {
                         var c = UnpackRadiance(debugData[i].radiance);
-                        
+
                         var vv = c.r + c.g + c.b;
                         if (vv < 0.01f)
                         {
-                             continue;
+                            continue;
                         }
-                        
+
                         float3 decodedDir1 = UnpackOctDirection(debugData[i].direction1);
                         float3 decodedDir2 = UnpackOctDirection(debugData[i].direction2);
-                        
+
                         var normalDir = math.cross(decodedDir1, decodedDir2);
 
                         // --- 解包 Scalars (Edge Lengths) ---
                         UnpackScalars(debugData[i].scalars, out float len1, out float len2);
-                        
-                        
+
+
                         Debug.Log($"[Primitive {i}] Center: {debugData[i].center}, Radiance: {c}, " +
                                   $"Dir1: {decodedDir1}, Dir2: {decodedDir2}, Normal: {normalDir}, " +
                                   $"EdgeLengths: ({len1}, {len2})");
 
                         c.a = 1.0f;
 
-                        if(c is { r: < 0.01f, g: < 0.01f, b: < 0.01f })
+                        if (c is { r: < 0.01f, g: < 0.01f, b: < 0.01f })
                             continue;
-                        Debug.DrawLine(debugData[i].center, debugData[i].center + normalDir, c,10);
+                        Debug.DrawLine(debugData[i].center, debugData[i].center + normalDir, c, 10);
                     }
                 }
             }
 
             Debug.Log($"Total primitives with data: {validCount} / {debugData.Length}");
-    
+
             if (validCount == 0)
             {
                 Debug.LogWarning("Shader execution finished, but all data is ZERO. Possible causes:\n" +

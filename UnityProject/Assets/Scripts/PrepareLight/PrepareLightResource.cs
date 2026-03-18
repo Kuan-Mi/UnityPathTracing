@@ -14,13 +14,6 @@ using UnityEngine.Rendering.Universal;
 
 namespace RTXDI
 {
-    class NativeTex
-    {
-        public RTHandle Handle; // Unity RTHandle封装
-        public IntPtr NativePtr; // DX12底层指针
-        public IntPtr NriPtr; // NRD封装指针
-    }
-
     public class PrepareLightResource : IDisposable
     {
         [DllImport("UnityRTXDI")]
@@ -62,7 +55,7 @@ namespace RTXDI
                 
                 var format = tex.graphicsFormat;
                 var dxgiFormat = NRDUtil.GetDXGIFormat(format);
-                
+                 
                 Debug.Log($"Sending Texture {i}: {tex.name}, Format: {format}, DXGI Format: {dxgiFormat}");
                 
                 IntPtr nriTex = WrapD3D12Texture(nativePtr, dxgiFormat);
@@ -119,7 +112,7 @@ namespace RTXDI
                 instanceBuffer = nriInstanceBufferPtr,
                 primitiveBuffer = nriPrimtiveBufferPtr,
                 lightDataBuffer = nriLightInfoBufferPtr,
-                numPrimitives = _scene._primitiveBuffer.count,
+                numPrimitives = (int)_scene.emissiveTriangleCount,
                 InstanceCount = _scene._instanceBuffer.count,
                 instanceId = instanceId
             };

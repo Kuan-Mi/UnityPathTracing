@@ -14,7 +14,7 @@ namespace mini
 
         private bool m_neighborOffsetsInitialized = false;
         private uint m_maxEmissiveMeshes;
-        private uint m_maxEmissiveTriangles;
+        public uint m_maxEmissiveTriangles;
         private uint m_maxGeometryInstances;
 
 
@@ -29,16 +29,13 @@ namespace mini
 
         public unsafe  RtxdiResources(
             ReSTIRDIContext context,
-            uint maxEmissiveMeshes,
-            uint maxEmissiveTriangles,
-            uint maxGeometryInstances,
-            GraphicsBuffer LightDataBuffer)
+            GPUScene scene)
         { 
-            this.LightDataBuffer = LightDataBuffer;
+            LightDataBuffer = scene._lightInfoBuffer;
             // m_maxEmissiveMeshes = maxEmissiveMeshes;
-            // m_maxEmissiveTriangles = maxEmissiveTriangles;
+            m_maxEmissiveTriangles =scene.emissiveTriangleCount;
             // m_maxGeometryInstances = maxGeometryInstances;
-
+ 
 
             // // 1. TaskBuffer
             // // initial state: ShaderResource, canHaveUAVs = true

@@ -948,7 +948,7 @@ void MainRayGenShader()
 
     gOut_DirectLighting[pixelPos] = float4(shadingOutput, 1.0);
     
-    uint pointer = RTXDI_ReservoirPositionToPointer(g_Const.restirDIReservoirBufferParams, pixelPos, 0);
+    // uint pointer = RTXDI_ReservoirPositionToPointer(g_Const.restirDIReservoirBufferParams, pixelPos, 0);
 
     if (gShowLight)
     {

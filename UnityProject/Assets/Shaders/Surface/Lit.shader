@@ -324,6 +324,7 @@ Shader "RayTracing/Lit"
                 #endif
 
                 #if !_SSS
+                // todo packed error
                 float emissionLevel = Color::Luminance(payload.Lemi);
                 emissionLevel = saturate(emissionLevel * 50.0);
 
@@ -376,7 +377,6 @@ Shader "RayTracing/Lit"
                 payload.primitiveIndex = INF;
                 #endif
                 payload.barycentrics = attribs.barycentrics;
-                
             }
             ENDHLSL
         }
