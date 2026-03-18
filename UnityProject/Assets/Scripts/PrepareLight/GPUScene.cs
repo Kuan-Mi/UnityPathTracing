@@ -20,6 +20,8 @@ namespace RTXDI
         public uint instanceId;
     }
 
+    // 对应不是每个 MeshRenderer，而是每个发光 SubMesh 实例（一个 Renderer 多个发光 SubMesh 会产生多条记录）
+    // 是transform + 材质信息
     [StructLayout(LayoutKind.Sequential)]
     public struct InstanceData
     {
@@ -48,15 +50,11 @@ namespace RTXDI
 
         public void InitBuffer()
         {
-            
 #if UNITY_EDITOR
-            UnityEditor.ObjectChangeEvents.changesPublished += (ref UnityEditor.ObjectChangeEventStream stream) =>
-            {
-                MarkSceneDirty();
-            };
+            UnityEditor.ObjectChangeEvents.changesPublished += (ref UnityEditor.ObjectChangeEventStream stream) => { MarkSceneDirty(); };
 #endif
-            
-            
+
+
             _instanceBuffer = new ComputeBuffer(8192, Marshal.SizeOf<InstanceData>());
             _primitiveBuffer = new ComputeBuffer(32768, Marshal.SizeOf<PrimitiveData>());
             _lightInfoBuffer = new GraphicsBuffer(GraphicsBuffer.Target.Structured, 32768, Marshal.SizeOf<RAB_LightInfo>());
@@ -109,12 +107,14 @@ namespace RTXDI
             public Vector2[] uvs;
             public int[][] trianglesPerSubMesh;
         }
+
         private Dictionary<int, MeshCache> _meshDataCache = new Dictionary<int, MeshCache>();
 
         // Renderer 缓存 + 自发光实例引用：避免每帧 FindObjectsByType 和重建 primitive
         private Renderer[] _cachedRenderers;
-        private struct EmissiveInstanceRef { public Renderer renderer; }
-        private List<EmissiveInstanceRef> _emissiveInstanceRefs = new List<EmissiveInstanceRef>();
+
+        // 每个 instance 对应的 Renderer（一个 Renderer 多个自发光 SubMesh 会产生多条记录）
+        private List<Renderer> _emissiveInstanceRenderers = new List<Renderer>();
 
         // 场景拓扑脏标记：true 时完整重建，false 时仅更新 transform
         private bool _sceneTopologyDirty = true;
@@ -142,23 +142,44 @@ namespace RTXDI
             primitiveDataList.Clear();
             globalTexturePool.Clear();
             textureGroupCache.Clear();
-            _emissiveInstanceRefs.Clear();
+            _emissiveInstanceRenderers.Clear();
 
-            _cachedRenderers = Object.FindObjectsByType<Renderer>(FindObjectsSortMode.None);
-
-            foreach (var r in _cachedRenderers)
+            // 过滤：只保留有 MeshFilter+Mesh 且含自发光 SubMesh 的 Renderer
+            var allRenderers = Object.FindObjectsByType<Renderer>(FindObjectsSortMode.None);
+            var filtered = new List<Renderer>();
+            foreach (var r in allRenderers)
             {
                 MeshFilter mf = r.GetComponent<MeshFilter>();
                 if (mf == null || mf.sharedMesh == null)
                     continue;
 
                 Mesh mesh = mf.sharedMesh;
+                Material[] mats = r.sharedMaterials;
+                bool hasAnyEmissive = false;
+                for (int i = 0; i < mesh.subMeshCount; i++)
+                {
+                    Material mat = i < mats.Length ? mats[i] : (mats.Length > 0 ? mats[^1] : null);
+                    if (mat != null && mat.IsKeywordEnabled("_EMISSION") && mat.GetColor("_EmissionColor").maxColorComponent > 0.01f)
+                    {
+                        hasAnyEmissive = true;
+                        break;
+                    }
+                }
+
+                if (hasAnyEmissive)
+                    filtered.Add(r);
+            }
+
+            _cachedRenderers = filtered.ToArray();
+
+            foreach (var r in _cachedRenderers)
+            {
+                Mesh mesh = r.GetComponent<MeshFilter>().sharedMesh;
                 int subMeshCount = mesh.subMeshCount;
-                Matrix4x4 localToWorld = r.transform.localToWorldMatrix;
                 Material[] sharedMaterials = r.sharedMaterials;
 
-                // 从缓存获取 Mesh 数据，避免重复分配托管数组
                 MeshCache mc = GetOrCacheMeshData(mesh);
+                Matrix4x4 localToWorld = r.transform.localToWorldMatrix;
 
                 for (int subIdx = 0; subIdx < subMeshCount; subIdx++)
                 {
@@ -182,9 +203,9 @@ namespace RTXDI
                             pos0 = new float3(mc.vertices[i0]),
                             pos1 = new float3(mc.vertices[i1]),
                             pos2 = new float3(mc.vertices[i2]),
-                            uv0  = new float2(mc.uvs[i0]),
-                            uv1  = new float2(mc.uvs[i1]),
-                            uv2  = new float2(mc.uvs[i2]),
+                            uv0 = new float2(mc.uvs[i0]),
+                            uv1 = new float2(mc.uvs[i1]),
+                            uv2 = new float2(mc.uvs[i2]),
                             instanceId = instanceIndex
                         });
                     }
@@ -194,13 +215,13 @@ namespace RTXDI
                     var emissiveColor = mat.GetColor("_EmissionColor").linear;
                     instanceDataList.Add(new InstanceData
                     {
-                        transform            = localToWorld,
+                        transform = localToWorld,
                         emissiveTextureIndex = baseTextureIndex,
-                        emissiveColor        = new float3(emissiveColor.r, emissiveColor.g, emissiveColor.b)
+                        emissiveColor = new float3(emissiveColor.r, emissiveColor.g, emissiveColor.b)
                     });
 
                     // 记录引用，供后续逐帧 transform 更新使用
-                    _emissiveInstanceRefs.Add(new EmissiveInstanceRef { renderer = r });
+                    _emissiveInstanceRenderers.Add(r);
                 }
             }
 
@@ -219,12 +240,13 @@ namespace RTXDI
         // 仅更新动态 transform，不重建 primitive，每帧开销极小
         private void UpdateTransformsOnly()
         {
-            for (int i = 0; i < _emissiveInstanceRefs.Count; i++)
+            for (int i = 0; i < _emissiveInstanceRenderers.Count; i++)
             {
                 var inst = instanceDataList[i];
-                inst.transform = _emissiveInstanceRefs[i].renderer.transform.localToWorldMatrix;
+                inst.transform = _emissiveInstanceRenderers[i].transform.localToWorldMatrix;
                 instanceDataList[i] = inst;
             }
+
             _instanceBuffer.SetData(instanceDataList);
         }
 
@@ -236,14 +258,15 @@ namespace RTXDI
                 int subCount = mesh.subMeshCount;
                 cache = new MeshCache
                 {
-                    vertices            = mesh.vertices,
-                    uvs                 = mesh.uv,
+                    vertices = mesh.vertices,
+                    uvs = mesh.uv,
                     trianglesPerSubMesh = new int[subCount][]
                 };
                 for (int i = 0; i < subCount; i++)
                     cache.trianglesPerSubMesh[i] = mesh.GetTriangles(i);
                 _meshDataCache[id] = cache;
             }
+
             return cache;
         }
 
@@ -391,6 +414,11 @@ namespace RTXDI
 
         #endregion
 
+        ~GPUScene()
+        {
+            // Debug.LogWarning(" ~GPUScene ");
+            Dispose();
+        }
         public void Dispose()
         {
             _instanceBuffer?.Dispose();

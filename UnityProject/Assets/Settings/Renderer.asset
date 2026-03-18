@@ -75,7 +75,7 @@ MonoBehaviour:
     isBaseColorMetalnessAvailable: 1
     planeDistanceSensitivity: 0.02
     maxStabilizedFrameNum: 5
-    showMode: 11
+    showMode: 18
     showMV: 0
     showValidation: 0
     dofAperture: 0
@@ -116,15 +116,15 @@ MonoBehaviour:
     upscalerMode: 0
     sssScatteringColor: {r: 3.5, g: 4, b: 3, a: 1}
     sssMinThreshold: -0.043
-    sssTransmissionBsdfSampleCount: 8
-    sssTransmissionPerBsdfScatteringSampleCount: 1
+    sssTransmissionBsdfSampleCount: 6
+    sssTransmissionPerBsdfScatteringSampleCount: 3
     sssScale: 1
     sssAnisotropy: 0.8
     sssMaxSampleRadius: 0.0001
-    localLightSamples: 2
-    spatialSamples: 0
-    brdfSamples: 0
-    enableResampling: 0
+    localLightSamples: 8
+    spatialSamples: 1
+    brdfSamples: 1
+    enableResampling: 1
     gShowLight: 0
   finalMaterial: {fileID: 2100000, guid: 27695a2bc55ef2f469362b9a2994989e, type: 2}
   opaqueTracingShader: {fileID: 4807578003741378534, guid: 71faa22953dc9834daf36cc38966c196, type: 3}
