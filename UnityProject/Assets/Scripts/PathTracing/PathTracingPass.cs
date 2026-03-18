@@ -1036,7 +1036,7 @@ namespace PathTracing
             };
 
             resamplingConstants.lightBufferParams.localLightBufferRegion.firstLightIndex = 0;
-            resamplingConstants.lightBufferParams.localLightBufferRegion.numLights = rtxdiResources.m_maxEmissiveTriangles;
+            resamplingConstants.lightBufferParams.localLightBufferRegion.numLights = rtxdiResources.Scene.emissiveTriangleCount;
             
             resamplingConstants.lightBufferParams.infiniteLightBufferRegion.firstLightIndex = 0;
             resamplingConstants.lightBufferParams.infiniteLightBufferRegion.numLights = 0;

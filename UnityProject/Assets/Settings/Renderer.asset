@@ -80,7 +80,7 @@ MonoBehaviour:
     showValidation: 0
     dofAperture: 0
     dofFocalDistance: 0.71
-    exposure: 9.1
+    exposure: 1
     enableAutoExposure: 0
     aeEVMin: -10
     aeEVMax: 10
@@ -121,9 +121,9 @@ MonoBehaviour:
     sssScale: 1
     sssAnisotropy: 0.8
     sssMaxSampleRadius: 0.0001
-    localLightSamples: 8
-    spatialSamples: 2
-    brdfSamples: 1
+    localLightSamples: 2
+    spatialSamples: 0
+    brdfSamples: 0
     enableResampling: 1
     gShowLight: 0
   finalMaterial: {fileID: 2100000, guid: 27695a2bc55ef2f469362b9a2994989e, type: 2}

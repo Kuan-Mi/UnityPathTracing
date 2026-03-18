@@ -311,9 +311,9 @@ namespace PathTracing
             {
                 prepareLightResource = new PrepareLightResource();
                 _prepareLightResources.Add(uniqueKey, prepareLightResource);
-                prepareLightResource.SendTexture(gpuScene.globalTexturePool);
                 prepareLightResource.SetBuffer(gpuScene);
             }
+                prepareLightResource.SendTexture(gpuScene.globalTexturePool);
 
             if (!_restirDIContexts.TryGetValue(uniqueKey, out var restirDIContext))
             {

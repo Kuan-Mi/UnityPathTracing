@@ -14,7 +14,7 @@ namespace mini
 
         private bool m_neighborOffsetsInitialized = false;
         private uint m_maxEmissiveMeshes;
-        public uint m_maxEmissiveTriangles;
+        // public uint m_maxEmissiveTriangles;
         private uint m_maxGeometryInstances;
 
 
@@ -24,6 +24,8 @@ namespace mini
         public ComputeBuffer NeighborOffsetsBuffer { get; private set; }
         public GraphicsBuffer LightReservoirBuffer { get; private set; }
 
+        public GPUScene Scene;
+
   
         
 
@@ -32,8 +34,9 @@ namespace mini
             GPUScene scene)
         { 
             LightDataBuffer = scene._lightInfoBuffer;
+            this.Scene = scene;
             // m_maxEmissiveMeshes = maxEmissiveMeshes;
-            m_maxEmissiveTriangles =scene.emissiveTriangleCount;
+            // m_maxEmissiveTriangles =scene.emissiveTriangleCount;
             // m_maxGeometryInstances = maxGeometryInstances;
  
 

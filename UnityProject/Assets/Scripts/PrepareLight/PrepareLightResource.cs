@@ -56,7 +56,7 @@ namespace RTXDI
                 var format = tex.graphicsFormat;
                 var dxgiFormat = NRDUtil.GetDXGIFormat(format);
                  
-                Debug.Log($"Sending Texture {i}: {tex.name}, Format: {format}, DXGI Format: {dxgiFormat}");
+                // Debug.Log($"Sending Texture {i}: {tex.name}, Format: {format}, DXGI Format: {dxgiFormat}");
                 
                 IntPtr nriTex = WrapD3D12Texture(nativePtr, dxgiFormat);
 

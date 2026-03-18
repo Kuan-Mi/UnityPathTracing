@@ -29,7 +29,6 @@ namespace RTXDI
         public uint emissiveTextureIndex;
     }
 
-
     [StructLayout(LayoutKind.Sequential)]
     public struct RAB_LightInfo
     {
@@ -43,27 +42,17 @@ namespace RTXDI
         public uint direction2; // oct-encoded
     };
 
-    public class GPUScene
+    public class GPUScene : System.IDisposable
     {
-        public static GPUScene instance;
-
-        public GPUScene()
-        {
-            instance = this;
-        }
-        
-        public bool isBufferInitialized = false;
+        public bool isBufferInitialized;
 
         public void InitBuffer()
         {
-            _instanceBuffer = new ComputeBuffer(10, Marshal.SizeOf<InstanceData>());
-            _primitiveBuffer = new ComputeBuffer(8192, Marshal.SizeOf<PrimitiveData>());
-            _lightInfoBuffer = new GraphicsBuffer(GraphicsBuffer.Target.Structured, 8192, Marshal.SizeOf<RAB_LightInfo>());
+            _instanceBuffer = new ComputeBuffer(8192, Marshal.SizeOf<InstanceData>());
+            _primitiveBuffer = new ComputeBuffer(32768, Marshal.SizeOf<PrimitiveData>());
+            _lightInfoBuffer = new GraphicsBuffer(GraphicsBuffer.Target.Structured, 32768, Marshal.SizeOf<RAB_LightInfo>());
             isBufferInitialized = true;
         }
-
-        // 预定义默认纹理，防止材质缺失纹理导致索引错位
-        public Texture2D defaultBlack; // 用于 Emission
 
         // 存储最终传给 BindlessPlugin 的总列表
         public List<Texture2D> globalTexturePool = new List<Texture2D>();
@@ -77,12 +66,11 @@ namespace RTXDI
         public uint emissiveTriangleCount;
         // public uint instanceCount;
 
-
         private uint GetTextureGroupIndex(Material mat)
         {
             if (mat == null) return 0;
 
-            Texture2D texEmission = (Texture2D)mat.GetTexture("_EmissionMap") ?? defaultBlack;
+            Texture2D texEmission = (Texture2D)mat.GetTexture("_EmissionMap") ?? Texture2D.whiteTexture;
 
             string key = $"{texEmission.GetInstanceID()}";
 
@@ -102,15 +90,11 @@ namespace RTXDI
         public ComputeBuffer _primitiveBuffer;
         public GraphicsBuffer _lightInfoBuffer;
 
-        public List<InstanceData> instanceDataList = new List<InstanceData>();
-        public List<PrimitiveData> primitiveDataList = new List<PrimitiveData>();
+        private List<InstanceData> instanceDataList = new List<InstanceData>();
+        private List<PrimitiveData> primitiveDataList = new List<PrimitiveData>();
 
-
-        [ContextMenu("Build RTAS and Buffers")]
         public void Build()
         {
-            defaultBlack = Texture2D.blackTexture;
-
             instanceDataList.Clear();
             primitiveDataList.Clear();
 
@@ -121,7 +105,7 @@ namespace RTXDI
 
             var renderers = Object.FindObjectsByType<Renderer>(FindObjectsSortMode.None);
             // Debug.Log($"Found {renderers.Length} renderers in scene.");
-
+            
             foreach (var r in renderers)
             {
                 MeshFilter mf = r.GetComponent<MeshFilter>();
@@ -137,7 +121,7 @@ namespace RTXDI
 
                 // bool isMeshCached = meshPrimitiveCache.TryGetValue(meshInstanceID, out List<uint> cachedOffsets);
                 // List<uint> currentMeshOffsets = isMeshCached ? cachedOffsets : new List<uint>();
-                List<uint> currentMeshOffsets =  new List<uint>();
+                List<uint> currentMeshOffsets = new List<uint>();
 
                 Vector3[] vertices = mesh.vertices;
                 Vector2[] uvs = mesh.uv;
@@ -156,13 +140,14 @@ namespace RTXDI
                     // 如果材质索引超出了（比如 Mesh 有 3 个 SubMesh 但 Renderer 只填了 1 个材质），通常取最后一个或默认
                     if (mat == null && sharedMaterials.Length > 0) mat = sharedMaterials[^1];
 
-                    var isEmissive = mat != null && mat.IsKeywordEnabled("_EMISSION");
+                    var isEmissive = mat != null && mat.IsKeywordEnabled("_EMISSION") && mat.GetColor("_EmissionColor").maxColorComponent > 0.01f;
 
                     if (!isEmissive)
                     {
                         // 非自发光材质跳过
                         continue;
                     }
+                    // Debug.Log($"Renderer: {r.name}, MeshFilter: {r.GetComponent<MeshFilter>()}, Material Count: {r.sharedMaterials.Length}");
 
                     uint thisSubMeshPrimitiveOffset = 0;
 
@@ -235,19 +220,23 @@ namespace RTXDI
                 // }
             }
 
+
+            if (instanceDataList.Count > _instanceBuffer.count)
+                Debug.LogError($"Instance count {instanceDataList.Count} exceeds buffer capacity {_instanceBuffer.count}!");
+            if (primitiveDataList.Count > _primitiveBuffer.count)
+                Debug.LogError($"Primitive count {primitiveDataList.Count} exceeds buffer capacity {_primitiveBuffer.count}!");
+
+
             _instanceBuffer.SetData(instanceDataList.ToArray());
             _primitiveBuffer.SetData(primitiveDataList.ToArray());
 
             emissiveTriangleCount = (uint)primitiveDataList.Count;
             // Debug.Log($"Renderers: {renderers.Length}, Instances: {instanceDataList.Count}, Primitives: {primitiveDataList.Count}");
 
-            Debug.Log($"emissiveTriangleCount: {emissiveTriangleCount}");
+            // Debug.Log($"emissiveTriangleCount: {emissiveTriangleCount}");
         }
 
-        public bool IsEmpty()
-        {
-            return instanceDataList.Count == 0 || primitiveDataList.Count == 0;
-        }
+        #region Debugging Helpers
 
         public static Color UnpackRadiance(uint2 packed)
         {
@@ -319,8 +308,6 @@ namespace RTXDI
             s2 = math.f16tof32(h2);
         }
 
-
-        [ContextMenu("Debug Readback Buffer")]
         public void DebugReadback()
         {
             if (_lightInfoBuffer == null || primitiveDataList.Count == 0)
@@ -389,6 +376,15 @@ namespace RTXDI
                                  "2. Emissive color/texture is black\n" +
                                  "3. Transform matrix placed objects at (0,0,0)");
             }
+        }
+
+        #endregion
+
+        public void Dispose()
+        {
+            _instanceBuffer?.Dispose();
+            _primitiveBuffer?.Dispose();
+            _lightInfoBuffer?.Dispose();
         }
     }
 }
