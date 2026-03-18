@@ -9,18 +9,15 @@ namespace RTXDI
     [StructLayout(LayoutKind.Sequential)]
     public struct PrimitiveData
     {
-        public half2 uv0;
-        public half2 uv1;
-        public half2 uv2;
+        public float2 uv0;
+        public float2 uv1;
+        public float2 uv2;
 
         public float3 pos0;
         public float3 pos1;
         public float3 pos2;
 
         public uint instanceId;
-        public uint padding0;
-        public uint padding1;
-        public uint padding2;
     }
 
     [StructLayout(LayoutKind.Sequential)]
@@ -194,9 +191,9 @@ namespace RTXDI
                             prim.pos2 = new float3(vertices[i2]);
 
                             // 增加安全检查，防止 UV 数组越界（有些 Mesh 可能没有 UV）
-                            prim.uv0 = new half2(uvs[i0]);
-                            prim.uv1 = new half2(uvs[i1]);
-                            prim.uv2 = new half2(uvs[i2]);
+                            prim.uv0 = new float2(uvs[i0]);
+                            prim.uv1 = new float2(uvs[i1]);
+                            prim.uv2 = new float2(uvs[i2]);
 
                             prim.instanceId = (uint)instanceDataList.Count; // 当前 Instance 的索引
 
@@ -304,7 +301,7 @@ namespace RTXDI
             // 4. 重建 Z 轴
             // 在八面体表面 |x| + |y| + |z| = 1 => |z| = 1 - (|x| + |y|)
             float z = 1.0f - (math.abs(x) + math.abs(y));
-
+ 
             // 5. 处理背面 (Z < 0) 的折叠 (Wrap)
             // 对应 Shader 中的 octWrap
             if (z < 0)
