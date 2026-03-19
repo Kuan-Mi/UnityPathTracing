@@ -6,7 +6,6 @@ using Unity.Collections;
 using Unity.Collections.LowLevel.Unsafe;
 using Unity.Mathematics;
 using UnityEngine;
-using UnityEngine.Rendering;
 using UnityEngine.Rendering.Universal;
 using static PathTracing.PathTracingUtils;
 
@@ -203,11 +202,6 @@ namespace Nrd
 
                 Matrix4x4 invView = worldToView.inverse;
                 camPos = new float3(invView.m03, invView.m13, invView.m23);
-
-                // Vector3 delta = camPos  - (float3)cameraData.camera.transform.position;
-
-                // var deltaInCamSpace = cameraData.camera.transform.InverseTransformVector(delta);
-                // Debug.Log($"delta XR cam pos: {deltaInCamSpace}");
             }
             else
             {
@@ -293,17 +287,6 @@ namespace Nrd
 
             return localData;
         }
-
-        // public IntPtr GetInteropDataPtr(UniversalCameraData cameraData, Vector3 dirToLight)
-        // {
-        //     var index = (int)(FrameIndex % BufferCount);
-        //     buffer[index] = GetData(cameraData, dirToLight);
-        //     FrameIndex++;
-        //     unsafe
-        //     {
-        //         return (IntPtr)buffer.GetUnsafePtr() + index * sizeof(FrameData);
-        //     }
-        // }
         
         public IntPtr GetInteropDataPtr(RenderingData renderingData)
         {

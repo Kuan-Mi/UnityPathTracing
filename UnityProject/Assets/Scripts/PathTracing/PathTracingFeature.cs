@@ -19,6 +19,8 @@ namespace PathTracing
     {
         public PathTracingSetting pathTracingSetting;
 
+        public RenderPassEvent renderPassEvent = RenderPassEvent.BeforeRenderingPostProcessing;
+
         public Material finalMaterial;
         public RayTracingShader opaqueTracingShader;
         public RayTracingShader transparentTracingShader;
@@ -128,16 +130,46 @@ namespace PathTracing
                 InitializeBuffers();
             }
 
-            _sharcPass ??= new SharcPass(sharcResolveCs, sharcUpdateTs);
-            _prepareLightPass ??= new PrepareLightPass();
-            _opaquePass ??= new OpaquePass(opaqueTracingShader);
-            _nrdPass ??= new NrdPass();
-            _compositionPass ??= new CompositionPass(compositionComputeShader);
-            _transparentPass ??= new TransparentPass(transparentTracingShader);
-            _autoExposurePass ??= new AutoExposurePass(autoExposureShader);
-            _taaPass ??= new TaaPass(taaComputeShader);
-            _dlssrrPass ??= new DlssRRPass(dlssBeforeComputeShader);
-            _outputBlitPass ??= new OutputBlitPass(finalMaterial);
+            _sharcPass ??= new SharcPass(sharcResolveCs, sharcUpdateTs)
+            {
+                renderPassEvent = renderPassEvent
+            };
+            _prepareLightPass ??= new PrepareLightPass()
+            {
+                renderPassEvent = renderPassEvent
+            };
+            _opaquePass ??= new OpaquePass(opaqueTracingShader)
+            {
+                renderPassEvent = renderPassEvent
+            };
+            _nrdPass ??= new NrdPass()
+            {
+                renderPassEvent = renderPassEvent
+            };
+            _compositionPass ??= new CompositionPass(compositionComputeShader)
+            {
+                renderPassEvent = renderPassEvent
+            };
+            _transparentPass ??= new TransparentPass(transparentTracingShader)
+            {
+                renderPassEvent = renderPassEvent
+            };
+            _autoExposurePass ??= new AutoExposurePass(autoExposureShader)
+            {
+                renderPassEvent = renderPassEvent
+            };
+            _taaPass ??= new TaaPass(taaComputeShader)
+            {
+                renderPassEvent = renderPassEvent
+            };
+            _dlssrrPass ??= new DlssRRPass(dlssBeforeComputeShader)
+            {
+                renderPassEvent = renderPassEvent
+            };
+            _outputBlitPass ??= new OutputBlitPass(finalMaterial)
+            {
+                renderPassEvent = renderPassEvent
+            };
         }
 
         public static readonly int Capacity = 1 << 23;
@@ -312,17 +344,17 @@ namespace PathTracing
 
             var nrdRes = new NRDDenoiser.NrdResources
             {
-                InMv                   = pool.GetNriResource(RenderResourceType.IN_MV),
-                InViewZ                = pool.GetNriResource(RenderResourceType.IN_VIEWZ),
-                InNormalRoughness      = pool.GetNriResource(RenderResourceType.IN_NORMAL_ROUGHNESS),
-                InBaseColorMetalness   = pool.GetNriResource(RenderResourceType.IN_BASECOLOR_METALNESS),
-                InPenumbra             = pool.GetNriResource(RenderResourceType.IN_PENUMBRA),
-                InDiffRadianceHitDist  = pool.GetNriResource(RenderResourceType.IN_DIFF_RADIANCE_HITDIST),
-                InSpecRadianceHitDist  = pool.GetNriResource(RenderResourceType.IN_SPEC_RADIANCE_HITDIST),
-                OutShadowTranslucency  = pool.GetNriResource(RenderResourceType.OUT_SHADOW_TRANSLUCENCY),
+                InMv = pool.GetNriResource(RenderResourceType.IN_MV),
+                InViewZ = pool.GetNriResource(RenderResourceType.IN_VIEWZ),
+                InNormalRoughness = pool.GetNriResource(RenderResourceType.IN_NORMAL_ROUGHNESS),
+                InBaseColorMetalness = pool.GetNriResource(RenderResourceType.IN_BASECOLOR_METALNESS),
+                InPenumbra = pool.GetNriResource(RenderResourceType.IN_PENUMBRA),
+                InDiffRadianceHitDist = pool.GetNriResource(RenderResourceType.IN_DIFF_RADIANCE_HITDIST),
+                InSpecRadianceHitDist = pool.GetNriResource(RenderResourceType.IN_SPEC_RADIANCE_HITDIST),
+                OutShadowTranslucency = pool.GetNriResource(RenderResourceType.OUT_SHADOW_TRANSLUCENCY),
                 OutDiffRadianceHitDist = pool.GetNriResource(RenderResourceType.OUT_DIFF_RADIANCE_HITDIST),
                 OutSpecRadianceHitDist = pool.GetNriResource(RenderResourceType.OUT_SPEC_RADIANCE_HITDIST),
-                OutValidation          = pool.GetNriResource(RenderResourceType.OUT_VALIDATION),
+                OutValidation = pool.GetNriResource(RenderResourceType.OUT_VALIDATION),
             };
 
             if (resourcesChanged)
@@ -334,12 +366,12 @@ namespace PathTracing
 
             var dlrrRes = new DLRRDenoiser.DlrrResources
             {
-                Input           = pool.GetNriResource(RenderResourceType.Composed),
-                Output          = pool.GetNriResource(RenderResourceType.DlssOutput),
-                Mv              = pool.GetNriResource(RenderResourceType.IN_MV),
-                Depth           = pool.GetNriResource(RenderResourceType.IN_VIEWZ),
-                DiffAlbedo      = pool.GetNriResource(RenderResourceType.RRGuide_DiffAlbedo),
-                SpecAlbedo      = pool.GetNriResource(RenderResourceType.RRGuide_SpecAlbedo),
+                Input = pool.GetNriResource(RenderResourceType.Composed),
+                Output = pool.GetNriResource(RenderResourceType.DlssOutput),
+                Mv = pool.GetNriResource(RenderResourceType.IN_MV),
+                Depth = pool.GetNriResource(RenderResourceType.IN_VIEWZ),
+                DiffAlbedo = pool.GetNriResource(RenderResourceType.RRGuide_DiffAlbedo),
+                SpecAlbedo = pool.GetNriResource(RenderResourceType.RRGuide_SpecAlbedo),
                 NormalRoughness = pool.GetNriResource(RenderResourceType.RRGuide_Normal_Roughness),
                 SpecHitDistance = pool.GetNriResource(RenderResourceType.RRGuide_SpecHitDistance),
             };
@@ -450,8 +482,8 @@ namespace PathTracing
                 compositionResource.Spec = pool.GetRT(RenderResourceType.OUT_SPEC_RADIANCE_HITDIST);
             }
 
-            var rectGridW = (int)(cam.pixelWidth * pathTracingSetting.resolutionScale + 0.5f) / 16;
-            var rectGridH = (int)(cam.pixelHeight * pathTracingSetting.resolutionScale + 0.5f) / 16;
+            var rectGridW = (int)(cam.pixelWidth * pathTracingSetting.resolutionScale + 0.5f + 15) / 16;
+            var rectGridH = (int)(cam.pixelHeight * pathTracingSetting.resolutionScale + 0.5f + 15) / 16;
 
             var compositionSettings = new CompositionPass.Settings
             {

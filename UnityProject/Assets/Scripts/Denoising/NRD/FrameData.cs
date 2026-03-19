@@ -14,7 +14,7 @@ namespace Nrd
     {
         public CommonSettings commonSettings;
         public SigmaSettings sigmaSettings;
-        public ReblurSettings reblurSettings; // 新增
+        public ReblurSettings reblurSettings;
 
         public ushort width;
         public ushort height;
