@@ -34,7 +34,7 @@ namespace Nrd
         }
 
 
-        private unsafe RRFrameData GetData(UniversalCameraData cameraData, NRDDenoiser denoiser)
+        private unsafe RRFrameData GetData(CameraData cameraData, NRDDenoiser denoiser)
         {
             RRFrameData data = new RRFrameData();
 
@@ -61,8 +61,8 @@ namespace Nrd
             }
             else
             {
-                data.outputWidth = (ushort)cameraData.scaledWidth;
-                data.outputHeight = (ushort)cameraData.scaledHeight;
+                data.outputWidth = (ushort)cameraData.camera.scaledPixelWidth;
+                data.outputHeight = (ushort)cameraData.camera.scaledPixelHeight;
             }
 
 
@@ -80,10 +80,10 @@ namespace Nrd
             return data;
         }
 
-        public IntPtr GetInteropDataPtr(UniversalCameraData cameraData, NRDDenoiser denoiser)
+        public IntPtr GetInteropDataPtr(RenderingData renderingData, NRDDenoiser denoiser)
         {
             var index = (int)(FrameIndex % BufferCount);
-            buffer[index] = GetData(cameraData, denoiser);
+            buffer[index] = GetData(renderingData.cameraData, denoiser);
             FrameIndex++;
             unsafe
             {

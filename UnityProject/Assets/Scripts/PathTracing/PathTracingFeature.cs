@@ -96,6 +96,8 @@ namespace PathTracing
         private CompositionPass _compositionPass;
         private TransparentPass _transparentPass;
         private AutoExposurePass _autoExposurePass;
+        private TaaPass _taaPass;
+        private DlssRRPass _dlssRRPass;
 
         private RayTracingAccelerationStructure accelerationStructure;
         private Settings settings;
@@ -220,17 +222,9 @@ namespace PathTracing
             _pathTracingPass = new PathTracingPass(pathTracingSetting)
             {
                 renderPassEvent = RenderPassEvent.BeforeRenderingTransparents,
-                TransparentTs = transparentTracingShader,
-                CompositionCs = compositionComputeShader,
                 TaaCs = taaComputeShader,
                 DlssBeforeCs = dlssBeforeComputeShader,
                 BiltMaterial = finalMaterial,
-                HashEntriesBuffer = _hashEntriesBuffer,
-                AccumulationBuffer = _accumulationBuffer,
-                ResolvedBuffer = _resolvedBuffer,
-                AutoExposureCs = autoExposureShader,
-                AeHistogramBuffer = _aeHistogramBuffer,
-                AeExposureBuffer = _aeExposureBuffer
             };
 
             _sharcPass = new SharcPass(sharcResolveCs, sharcUpdateTs);
@@ -240,6 +234,8 @@ namespace PathTracing
             _compositionPass = new CompositionPass(compositionComputeShader);
             _transparentPass = new TransparentPass(transparentTracingShader);
             _autoExposurePass = new AutoExposurePass(autoExposureShader);
+            _taaPass = new TaaPass(taaComputeShader);
+            _dlssRRPass = new DlssRRPass(dlssBeforeComputeShader);
         }
 
         public static readonly int Capacity = 1 << 23;
@@ -371,12 +367,6 @@ namespace PathTracing
             _pathTracingPass.NrdDenoiser = nrd;
             _pathTracingPass.DLRRDenoiser = dlrr;
 
-            _pathTracingPass.AccumulationBuffer = _accumulationBuffer;
-            _pathTracingPass.HashEntriesBuffer = _hashEntriesBuffer;
-            _pathTracingPass.ResolvedBuffer = _resolvedBuffer;
-            _pathTracingPass.AeHistogramBuffer = _aeHistogramBuffer;
-            _pathTracingPass.AeExposureBuffer = _aeExposureBuffer;
-
 
             if (finalMaterial == null
                 || opaqueTracingShader == null
@@ -407,6 +397,7 @@ namespace PathTracing
             Light();
 
             var nrdDataPtr = nrd.GetInteropDataPtr(renderingData);
+            var dlssDataPtr = dlrr.GetInteropDataPtr(renderingData,nrd);
 
             // GlobalConstants globalConstants =   GetConstants();
 
@@ -538,8 +529,8 @@ namespace PathTracing
                 PointLightBuffer = m_PointLightBuffer,
                 AreaLightBuffer = m_AreaLightBuffer,
                 SpotLightBuffer = m_SpotLightBuffer,
-                
-                AeExposureBuffer =  _aeExposureBuffer
+
+                AeExposureBuffer = _aeExposureBuffer
             };
 
             var transparentSettings = new TransparentPass.Settings
@@ -588,9 +579,58 @@ namespace PathTracing
             }
 
 
-            _pathTracingPass.m_SpotLightBuffer = m_SpotLightBuffer;
-            _pathTracingPass.m_AreaLightBuffer = m_AreaLightBuffer;
-            _pathTracingPass.m_PointLightBuffer = m_PointLightBuffer;
+            var isEven = (globalConstants.gFrameIndex & 1) == 0;
+
+            if (pathTracingSetting.RR)
+            {
+                var dlssResource = new DlssRRPass.Resource
+                {
+                    ConstantBuffer = ConstantBuffer,
+
+                    NormalRoughness = nrd.GetRT(ResourceType.IN_NORMAL_ROUGHNESS), 
+                    BaseColorMetalness = nrd.GetRT(ResourceType.IN_BASECOLOR_METALNESS), 
+                    Spec = nrd.GetRT(ResourceType.IN_SPEC_RADIANCE_HITDIST),
+                    ViewZ = nrd.GetRT(ResourceType.IN_VIEWZ),
+
+                    RRGuide_DiffAlbedo = nrd.GetRT(ResourceType.RRGuide_DiffAlbedo),
+                    RRGuide_SpecAlbedo = nrd.GetRT(ResourceType.RRGuide_SpecAlbedo),
+                    RRGuide_SpecHitDistance = nrd.GetRT(ResourceType.RRGuide_SpecHitDistance),
+                    RRGuide_Normal_Roughness = nrd.GetRT(ResourceType.RRGuide_Normal_Roughness),
+                };
+                
+                var dlssSettings = new DlssRRPass.Settings
+                {
+                    rectGridW = (int)(cam.pixelWidth * pathTracingSetting.resolutionScale + 0.5f) / 16,
+                    rectGridH = (int)(cam.pixelHeight * pathTracingSetting.resolutionScale + 0.5f) / 16,
+                    tmpDisableRR = pathTracingSetting.tmpDisableRR
+                };
+                
+                _dlssRRPass.Setup(dlssDataPtr,dlssResource, dlssSettings);
+                renderer.EnqueuePass(_dlssRRPass);
+            }
+            else
+            {
+                var taaResource = new TaaPass.Resource
+                {
+                    ConstantBuffer = ConstantBuffer,
+
+                    Mv = nrd.GetRT(ResourceType.IN_MV),
+                    Composed = nrd.GetRT(ResourceType.Composed),
+                    taaSrc = nrd.GetRT(isEven ? ResourceType.TaaHistoryPrev : ResourceType.TaaHistory),
+                    taaDst = nrd.GetRT(isEven ? ResourceType.TaaHistory : ResourceType.TaaHistoryPrev)
+                };
+
+                var taaSettings = new TaaPass.Settings
+                {
+                    rectGridW = (int)(cam.pixelWidth * pathTracingSetting.resolutionScale + 0.5f) / 16,
+                    rectGridH = (int)(cam.pixelHeight * pathTracingSetting.resolutionScale + 0.5f) / 16
+                };
+
+                _taaPass.Setup(taaResource, taaSettings);
+                renderer.EnqueuePass(_taaPass);
+            }
+
+
             _pathTracingPass._pathTracingSettingsBuffer = ConstantBuffer;
 
             _pathTracingPass.Setup();

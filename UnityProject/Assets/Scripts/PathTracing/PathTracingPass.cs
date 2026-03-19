@@ -20,36 +20,15 @@ namespace PathTracing
 {
     public class PathTracingPass : ScriptableRenderPass
     {
-        private static readonly int GInOutMv = Shader.PropertyToID("gInOut_Mv");
-        
-        public RayTracingShader TransparentTs;
-        public ComputeShader CompositionCs;
         public ComputeShader TaaCs;
         public ComputeShader DlssBeforeCs;
         public Material BiltMaterial;
 
-        public GraphicsBuffer HashEntriesBuffer;
-        public GraphicsBuffer AccumulationBuffer;
-        public GraphicsBuffer ResolvedBuffer;
-
-
         public NRDDenoiser NrdDenoiser;
         public DLRRDenoiser DLRRDenoiser;
 
-
-        // Auto-exposure
-        public ComputeShader AutoExposureCs;
-        public GraphicsBuffer AeHistogramBuffer;
-        public GraphicsBuffer AeExposureBuffer;
-
         private readonly PathTracingSetting m_Settings;
         public  GraphicsBuffer _pathTracingSettingsBuffer;
-        
-        public GraphicsBuffer m_SpotLightBuffer;
-        public GraphicsBuffer m_AreaLightBuffer;
-        public GraphicsBuffer m_PointLightBuffer;
-        
-
 
         [DllImport("RenderingPlugin")]
         private static extern IntPtr GetRenderEventAndDataFunc();
@@ -110,29 +89,7 @@ namespace PathTracing
             internal PathTracingSetting Setting;
             internal float resolutionScale;
 
-
             internal int passIndex;
-            
-
-            // // ── Auto-exposure ──
-            // internal ComputeShader AeCs;
-            // internal GraphicsBuffer AeHistogramBuffer;
-            // internal GraphicsBuffer AeExposureBuffer;
-            // internal bool AeEnabled;
-            // internal float AeEVMin;
-            // internal float AeEVMax;
-            // internal float AeLowPercent;
-            // internal float AeHighPercent;
-            // internal float AeSpeedUp;
-            // internal float AeSpeedDown;
-            // internal float AeDeltaTime;
-            // internal float AeExposureCompensation;
-            // internal float AeMinExposure;
-            // internal float AeMaxExposure;
-            // internal uint AeTexWidth;
-            // internal uint AeTexHeight;
-            // internal float ManualExposure;
-            
         }
 
         public PathTracingPass(PathTracingSetting setting)
@@ -149,112 +106,61 @@ namespace PathTracing
 
             var natCmd = CommandBufferHelpers.GetNativeCommandBuffer(context.cmd);
 
-            // Bind the exposure buffer globally so all shaders can read the current EV.
-            // When auto-exposure is OFF: seed the buffer with the manual value from settings.
-            // When auto-exposure is ON:  the buffer is updated later by ReduceHistogram.
-            // natCmd.SetGlobalBuffer("_AE_ExposureBuffer", data.AeExposureBuffer);
-            // if (!data.AeEnabled)
-            // {
-            //     natCmd.SetBufferData(data.AeExposureBuffer, new[] { data.ManualExposure });
-            // }
 
-            var taaMarker = new ProfilerMarker(ProfilerCategory.Render, "TAA", MarkerFlags.SampleGPU);
-            var dlssBeforeMarker = new ProfilerMarker(ProfilerCategory.Render, "DLSS Before", MarkerFlags.SampleGPU);
-            var dlssDenoiseMarker = new ProfilerMarker(ProfilerCategory.Render, "DLSS Denoise", MarkerFlags.SampleGPU);
+
+            // var taaMarker = new ProfilerMarker(ProfilerCategory.Render, "TAA", MarkerFlags.SampleGPU);
+            // var dlssBeforeMarker = new ProfilerMarker(ProfilerCategory.Render, "DLSS Before", MarkerFlags.SampleGPU);
+            // var dlssDenoiseMarker = new ProfilerMarker(ProfilerCategory.Render, "DLSS Denoise", MarkerFlags.SampleGPU);
             var outputBlitMarker = new ProfilerMarker(ProfilerCategory.Render, "Output Blit", MarkerFlags.SampleGPU);
-            // var aeMarker = new ProfilerMarker(ProfilerCategory.Render, "Auto Exposure", MarkerFlags.SampleGPU);
-            
 
-            // // ── Auto-exposure: histogram build + reduce (after transparent, before TAA) ──
-            // if (data.AeEnabled && data.AeCs != null && data.AeHistogramBuffer != null && data.AeExposureBuffer != null)
+            //
+            // // var isEven = (data.GlobalConstants.gFrameIndex & 1) == 0;
+            // var isEven = false;
+            // var taaSrc = isEven ? data.TaaHistoryPrev : data.TaaHistory;
+            // var taaDst = isEven ? data.TaaHistory : data.TaaHistoryPrev;
+            // if (data.Setting.RR)
             // {
-            //     natCmd.BeginSample(aeMarker);
+            //     // dlss Before
+            //     natCmd.BeginSample(dlssBeforeMarker);
+            //     natCmd.SetComputeConstantBufferParam(data.DlssBeforeCs, paramsID, data.ConstantBuffer, 0, data.ConstantBuffer.stride);
             //
-            //     int kernelClear  = data.AeCs.FindKernel("ClearHistogram");
-            //     int kernelBuild  = data.AeCs.FindKernel("BuildHistogram");
-            //     int kernelReduce = data.AeCs.FindKernel("ReduceHistogram");
+            //     natCmd.SetComputeTextureParam(data.DlssBeforeCs, 0, "gIn_Normal_Roughness", data.NormalRoughness);
+            //     natCmd.SetComputeTextureParam(data.DlssBeforeCs, 0, "gIn_BaseColor_Metalness", data.BaseColorMetalness);
+            //     natCmd.SetComputeTextureParam(data.DlssBeforeCs, 0, "gIn_Spec", data.Spec);
             //
-            //     // -- Kernel 0: Clear --
-            //     natCmd.SetComputeBufferParam(data.AeCs, kernelClear, "_AE_HistogramBuffer", data.AeHistogramBuffer);
-            //     natCmd.DispatchCompute(data.AeCs, kernelClear, 1, 1, 1);
+            //     natCmd.SetComputeTextureParam(data.DlssBeforeCs, 0, "gInOut_ViewZ", data.ViewZ);
+            //     natCmd.SetComputeTextureParam(data.DlssBeforeCs, 0, "gOut_DiffAlbedo", data.RRGuide_DiffAlbedo);
+            //     natCmd.SetComputeTextureParam(data.DlssBeforeCs, 0, "gOut_SpecAlbedo", data.RRGuide_SpecAlbedo);
+            //     natCmd.SetComputeTextureParam(data.DlssBeforeCs, 0, "gOut_SpecHitDistance", data.RRGuide_SpecHitDistance);
+            //     natCmd.SetComputeTextureParam(data.DlssBeforeCs, 0, "gOut_Normal_Roughness", data.RRGuide_Normal_Roughness);
             //
-            //     // -- Kernel 1: Build --
-            //     natCmd.SetComputeTextureParam(data.AeCs, kernelBuild, "_AE_ComposedTexture", data.Composed);
-            //     natCmd.SetComputeBufferParam(data.AeCs, kernelBuild, "_AE_HistogramBuffer", data.AeHistogramBuffer);
-            //     natCmd.SetComputeIntParam(data.AeCs, "_AE_TexWidth",  (int)data.AeTexWidth);
-            //     natCmd.SetComputeIntParam(data.AeCs, "_AE_TexHeight", (int)data.AeTexHeight);
-            //     natCmd.SetComputeFloatParam(data.AeCs, "_AE_EVMin", data.AeEVMin);
-            //     natCmd.SetComputeFloatParam(data.AeCs, "_AE_EVMax", data.AeEVMax);
-            //     uint buildX = (data.AeTexWidth  + 15u) / 16u;
-            //     uint buildY = (data.AeTexHeight + 15u) / 16u;
-            //     natCmd.DispatchCompute(data.AeCs, kernelBuild, (int)buildX, (int)buildY, 1);
             //
-            //     // -- Kernel 2: Reduce --
-            //     natCmd.SetComputeBufferParam(data.AeCs, kernelReduce, "_AE_HistogramBuffer", data.AeHistogramBuffer);
-            //     natCmd.SetComputeBufferParam(data.AeCs, kernelReduce, "_AE_ExposureBuffer",  data.AeExposureBuffer);
-            //     natCmd.SetComputeFloatParam(data.AeCs, "_AE_EVMin",                data.AeEVMin);
-            //     natCmd.SetComputeFloatParam(data.AeCs, "_AE_EVMax",                data.AeEVMax);
-            //     natCmd.SetComputeFloatParam(data.AeCs, "_AE_LowPercent",           data.AeLowPercent);
-            //     natCmd.SetComputeFloatParam(data.AeCs, "_AE_HighPercent",          data.AeHighPercent);
-            //     natCmd.SetComputeFloatParam(data.AeCs, "_AE_SpeedUp",              data.AeSpeedUp);
-            //     natCmd.SetComputeFloatParam(data.AeCs, "_AE_SpeedDown",            data.AeSpeedDown);
-            //     natCmd.SetComputeFloatParam(data.AeCs, "_AE_DeltaTime",            data.AeDeltaTime);
-            //     natCmd.SetComputeFloatParam(data.AeCs, "_AE_ExposureCompensation", data.AeExposureCompensation);
-            //     natCmd.SetComputeFloatParam(data.AeCs, "_AE_MinExposure",          data.AeMinExposure);
-            //     natCmd.SetComputeFloatParam(data.AeCs, "_AE_MaxExposure",          data.AeMaxExposure);
-            //     natCmd.DispatchCompute(data.AeCs, kernelReduce, 1, 1, 1);
+            //     natCmd.DispatchCompute(data.DlssBeforeCs, 0, (int)data.rectGridW, (int)data.rectGridH, 1);
+            //     natCmd.EndSample(dlssBeforeMarker);
             //
-            //     natCmd.EndSample(aeMarker);
+            //     // DLSS调用
+            //
+            //     if (!data.Setting.tmpDisableRR)
+            //     {
+            //         natCmd.BeginSample(dlssDenoiseMarker);
+            //         natCmd.IssuePluginEventAndData(GetRenderEventAndDataFunc(), 2, data.RRDataPtr);
+            //         natCmd.EndSample(dlssDenoiseMarker);
+            //     }
             // }
-
-
-            // var isEven = (data.GlobalConstants.gFrameIndex & 1) == 0;
-            var isEven = false;
-            var taaSrc = isEven ? data.TaaHistoryPrev : data.TaaHistory;
-            var taaDst = isEven ? data.TaaHistory : data.TaaHistoryPrev;
-            if (data.Setting.RR)
-            {
-                // dlss Before
-                natCmd.BeginSample(dlssBeforeMarker);
-                natCmd.SetComputeConstantBufferParam(data.DlssBeforeCs, paramsID, data.ConstantBuffer, 0, data.ConstantBuffer.stride);
-
-                natCmd.SetComputeTextureParam(data.DlssBeforeCs, 0, "gIn_Normal_Roughness", data.NormalRoughness);
-                natCmd.SetComputeTextureParam(data.DlssBeforeCs, 0, "gIn_BaseColor_Metalness", data.BaseColorMetalness);
-                natCmd.SetComputeTextureParam(data.DlssBeforeCs, 0, "gIn_Spec", data.Spec);
-
-                natCmd.SetComputeTextureParam(data.DlssBeforeCs, 0, "gInOut_ViewZ", data.ViewZ);
-                natCmd.SetComputeTextureParam(data.DlssBeforeCs, 0, "gOut_DiffAlbedo", data.RRGuide_DiffAlbedo);
-                natCmd.SetComputeTextureParam(data.DlssBeforeCs, 0, "gOut_SpecAlbedo", data.RRGuide_SpecAlbedo);
-                natCmd.SetComputeTextureParam(data.DlssBeforeCs, 0, "gOut_SpecHitDistance", data.RRGuide_SpecHitDistance);
-                natCmd.SetComputeTextureParam(data.DlssBeforeCs, 0, "gOut_Normal_Roughness", data.RRGuide_Normal_Roughness);
-
-
-                natCmd.DispatchCompute(data.DlssBeforeCs, 0, (int)data.rectGridW, (int)data.rectGridH, 1);
-                natCmd.EndSample(dlssBeforeMarker);
-
-                // DLSS调用
-
-                if (!data.Setting.tmpDisableRR)
-                {
-                    natCmd.BeginSample(dlssDenoiseMarker);
-                    natCmd.IssuePluginEventAndData(GetRenderEventAndDataFunc(), 2, data.RRDataPtr);
-                    natCmd.EndSample(dlssDenoiseMarker);
-                }
-            }
-            else
-            {
-                // TAA
-                natCmd.BeginSample(taaMarker);
-
-                natCmd.SetComputeConstantBufferParam(data.TaaCs, paramsID, data.ConstantBuffer, 0, data.ConstantBuffer.stride);
-                natCmd.SetComputeTextureParam(data.TaaCs, 0, gIn_MvID, data.Mv);
-                natCmd.SetComputeTextureParam(data.TaaCs, 0, gIn_ComposedID, data.Composed);
-                natCmd.SetComputeTextureParam(data.TaaCs, 0, gIn_HistoryID, taaSrc);
-                natCmd.SetComputeTextureParam(data.TaaCs, 0, gOut_ResultID, taaDst);
-                natCmd.SetComputeTextureParam(data.TaaCs, 0, gOut_DebugID, data.OutputTexture);
-                natCmd.DispatchCompute(data.TaaCs, 0, (int)data.rectGridW, (int)data.rectGridH, 1);
-                natCmd.EndSample(taaMarker);
-            }
+            // else
+            // {
+            //     // TAA
+            //     natCmd.BeginSample(taaMarker);
+            //
+            //     natCmd.SetComputeConstantBufferParam(data.TaaCs, paramsID, data.ConstantBuffer, 0, data.ConstantBuffer.stride);
+            //     natCmd.SetComputeTextureParam(data.TaaCs, 0, gIn_MvID, data.Mv);
+            //     natCmd.SetComputeTextureParam(data.TaaCs, 0, gIn_ComposedID, data.Composed);
+            //     natCmd.SetComputeTextureParam(data.TaaCs, 0, gIn_HistoryID, taaSrc);
+            //     natCmd.SetComputeTextureParam(data.TaaCs, 0, gOut_ResultID, taaDst);
+            //     natCmd.SetComputeTextureParam(data.TaaCs, 0, gOut_DebugID, data.OutputTexture);
+            //     natCmd.DispatchCompute(data.TaaCs, 0, (int)data.rectGridW, (int)data.rectGridH, 1);
+            //     natCmd.EndSample(taaMarker);
+            // }
 
 
             // 显示输出
@@ -315,9 +221,9 @@ namespace PathTracing
                 case ShowMode.Composed:
                     Blitter.BlitTexture(natCmd, data.Composed, scaleOffset, data.BlitMaterial, (int)ShowPass.Out);
                     break;
-                case ShowMode.Taa:
-                    Blitter.BlitTexture(natCmd, taaDst, scaleOffset, data.BlitMaterial, (int)ShowPass.Alpha);
-                    break;
+                // case ShowMode.Taa:
+                //     Blitter.BlitTexture(natCmd, taaDst, scaleOffset, data.BlitMaterial, (int)ShowPass.Alpha);
+                //     break;
                 case ShowMode.Final:
 
                     if (data.Setting.RR)
@@ -326,7 +232,7 @@ namespace PathTracing
                     }
                     else
                     {
-                        Blitter.BlitTexture(natCmd, taaDst, scaleOffset, data.BlitMaterial, (int)ShowPass.Out);
+                        // Blitter.BlitTexture(natCmd, taaDst, scaleOffset, data.BlitMaterial, (int)ShowPass.Out);
                     }
 
                     break;
@@ -362,15 +268,9 @@ namespace PathTracing
             natCmd.EndSample(outputBlitMarker);
         }
 
-        uint GetMaxAccumulatedFrameNum(float accumulationTime, float fps)
-        {
-            return (uint)(accumulationTime * fps + 0.5f);
-        }
-
         public override void RecordRenderGraph(RenderGraph renderGraph, ContextContainer frameData)
         {
             var cameraData = frameData.Get<UniversalCameraData>();
-
 
             var universalLightData = frameData.Get<UniversalLightData>();
             var lightData = universalLightData;
@@ -390,29 +290,7 @@ namespace PathTracing
 
             passData.passIndex = isXr ? xrPass.multipassId : 0;
 
-            // // Auto-exposure pass data
-            // passData.AeCs                  = AutoExposureCs;
-            // passData.AeHistogramBuffer     = AeHistogramBuffer;
-            // passData.AeExposureBuffer      = AeExposureBuffer;
-            // passData.AeEnabled             = m_Settings.enableAutoExposure;
-            // passData.AeEVMin               = m_Settings.aeEVMin;
-            // passData.AeEVMax               = m_Settings.aeEVMax;
-            // passData.AeLowPercent          = m_Settings.aeLowPercent;
-            // passData.AeHighPercent         = m_Settings.aeHighPercent;
-            // passData.AeSpeedUp             = m_Settings.aeAdaptationSpeedUp;
-            // passData.AeSpeedDown           = m_Settings.aeAdaptationSpeedDown;
-            // passData.AeDeltaTime           = Time.deltaTime;
-            // passData.AeExposureCompensation = m_Settings.aeExposureCompensation;
-            // passData.AeMinExposure         = m_Settings.aeMinExposure;
-            // passData.AeMaxExposure         = m_Settings.aeMaxExposure;
-            // passData.AeTexWidth            = (uint)renderResolution.x;
-            // passData.AeTexHeight           = (uint)renderResolution.y;
-            // passData.ManualExposure        = m_Settings.exposure;
-
-
-            passData.RRDataPtr = DLRRDenoiser.GetInteropDataPtr(cameraData, NrdDenoiser);
-
-
+            // passData.RRDataPtr = DLRRDenoiser.GetInteropDataPtr(cameraData, NrdDenoiser);
 
             var textureDesc = resourceData.activeColorTexture.GetDescriptor(renderGraph);
             textureDesc.enableRandomWrite = true;
