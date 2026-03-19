@@ -73,6 +73,7 @@ namespace PathTracing
         private Dictionary<long, PathTracingResourcePool> _resourcePools = new();
         private Dictionary<long, ReSTIRDIContext> _restirDIContexts = new();
         private Dictionary<long, RtxdiResources> _rtxdiResources = new();
+        private Dictionary<long, CameraFrameState> _cameraFrameStates = new();
 
         public override void Create()
         {
@@ -292,6 +293,12 @@ namespace PathTracing
                 _dlrrDenoisers.Add(uniqueKey, dlrr);
             }
 
+            if (!_cameraFrameStates.TryGetValue(uniqueKey, out var frameState))
+            {
+                frameState = new CameraFrameState(pathTracingSetting.resolutionScale);
+                _cameraFrameStates.Add(uniqueKey, frameState);
+            }
+
             _prepareLightResources.SetBuffer(_gpuScene);
             _prepareLightResources.SendTexture(_gpuScene.globalTexturePool);
 
@@ -337,10 +344,38 @@ namespace PathTracing
 
             _lightCollector.Collect();
 
-            var nrdDataPtr = nrd.GetInteropDataPtr(renderingData);
-
             var outputResolution = ComputeOutputResolution(renderingData.cameraData);
             bool resourcesChanged = pool.EnsureResources(outputResolution);
+
+            if (resourcesChanged)
+            {
+                frameState.renderResolution = pool.renderResolution;
+                frameState.FrameIndex = 0;
+            }
+
+            // Update per-camera temporal state for this frame
+            uint curFrame = frameState.FrameIndex;
+            frameState.Update(renderingData, pathTracingSetting);
+
+            var nrdInput = new NRDDenoiser.NrdFrameInput
+            {
+                worldToView        = frameState.worldToView,
+                prevWorldToView    = frameState.prevWorldToView,
+                worldToClip        = frameState.worldToClip,
+                prevWorldToClip    = frameState.prevWorldToClip,
+                viewToClip         = frameState.viewToClip,
+                prevViewToClip     = frameState.prevViewToClip,
+                camPos             = frameState.camPos,
+                prevCamPos         = frameState.prevCamPos,
+                ViewportJitter     = frameState.ViewportJitter,
+                PrevViewportJitter = frameState.PrevViewportJitter,
+                resolutionScale    = frameState.resolutionScale,
+                prevResolutionScale = frameState.prevResolutionScale,
+                renderResolution   = frameState.renderResolution,
+                FrameIndex         = curFrame,
+            };
+
+            var nrdDataPtr = nrd.GetInteropDataPtr(nrdInput, renderingData);
 
             var nrdRes = new NRDDenoiser.NrdResources
             {
@@ -359,8 +394,6 @@ namespace PathTracing
 
             if (resourcesChanged)
             {
-                nrd.renderResolution = pool.renderResolution;
-                nrd.FrameIndex = 0;
                 nrd.UpdateResources(nrdRes);
             }
 
@@ -375,9 +408,18 @@ namespace PathTracing
                 NormalRoughness = pool.GetNriResource(RenderResourceType.RRGuide_Normal_Roughness),
                 SpecHitDistance = pool.GetNriResource(RenderResourceType.RRGuide_SpecHitDistance),
             };
-            var dlssDataPtr = dlrr.GetInteropDataPtr(renderingData, nrd, dlrrRes);
 
-            var globalConstants = GetConstants(renderingData, nrd);
+            var dlrrInput = new DLRRDenoiser.DlrrFrameInput
+            {
+                worldToView      = frameState.worldToView,
+                viewToClip       = frameState.viewToClip,
+                ViewportJitter   = frameState.ViewportJitter,
+                renderResolution = frameState.renderResolution,
+                FrameIndex       = curFrame,
+            };
+            var dlssDataPtr = dlrr.GetInteropDataPtr(renderingData, dlrrInput, dlrrRes);
+
+            var globalConstants = GetConstants(renderingData, frameState);
             _globalConstantsArray[0] = globalConstants;
             _constantBuffer.SetData(_globalConstantsArray);
 
@@ -640,7 +682,7 @@ namespace PathTracing
             var pathTracingSettings = new OutputBlitPass.Settings
             {
                 showMode = pathTracingSetting.showMode,
-                resolutionScale = nrd.resolutionScale,
+                resolutionScale = frameState.resolutionScale,
                 enableDlssRR = pathTracingSetting.RR,
                 showMV = pathTracingSetting.showMV,
                 showValidation = pathTracingSetting.showValidation,
@@ -697,7 +739,7 @@ namespace PathTracing
                 (int)(cameraData.camera.pixelHeight * cameraData.renderScale));
         }
 
-        private GlobalConstants GetConstants(RenderingData renderingData, NRDDenoiser nrdDenoiser)
+        private GlobalConstants GetConstants(RenderingData renderingData, CameraFrameState frameState)
         {
             var cameraData = renderingData.cameraData;
             var settings = pathTracingSetting;
@@ -718,7 +760,7 @@ namespace PathTracing
             var xrPass = cameraData.xr;
             var isXr = xrPass.enabled;
 
-            var renderResolution = nrdDenoiser.renderResolution;
+            var renderResolution = frameState.renderResolution;
 
             Shader.SetGlobalRayTracingAccelerationStructure(g_AccelStructID, _accelerationStructure);
 
@@ -727,12 +769,11 @@ namespace PathTracing
             var m11 = proj.m11;
 
 
-            var rectW = (uint)(renderResolution.x * nrdDenoiser.resolutionScale + 0.5f);
-            var rectH = (uint)(renderResolution.y * nrdDenoiser.resolutionScale + 0.5f);
+            var rectW = (uint)(renderResolution.x * frameState.resolutionScale + 0.5f);
+            var rectH = (uint)(renderResolution.y * frameState.resolutionScale + 0.5f);
 
-            // todo prev
-            var rectWprev = (uint)(renderResolution.x * nrdDenoiser.prevResolutionScale + 0.5f);
-            var rectHprev = (uint)(renderResolution.y * nrdDenoiser.prevResolutionScale + 0.5f);
+            var rectWprev = (uint)(renderResolution.x * frameState.prevResolutionScale + 0.5f);
+            var rectHprev = (uint)(renderResolution.y * frameState.prevResolutionScale + 0.5f);
 
 
             var renderSize = new float2((renderResolution.x), (renderResolution.y));
@@ -741,7 +782,7 @@ namespace PathTracing
 
 
             var rectSizePrev = new float2((rectWprev), (rectHprev));
-            var jitter = (settings.cameraJitter ? nrdDenoiser.ViewportJitter : 0f) / rectSize;
+            var jitter = (settings.cameraJitter ? frameState.ViewportJitter : 0f) / rectSize;
 
 
             var fovXRad = math.atan(1.0f / proj.m00) * 2.0f;
@@ -793,21 +834,21 @@ namespace PathTracing
 
             var globalConstants = new GlobalConstants
             {
-                gViewToWorld = nrdDenoiser.worldToView.inverse,
-                gViewToWorldPrev = nrdDenoiser.prevWorldToView.inverse,
-                gViewToClip = nrdDenoiser.viewToClip,
-                gWorldToView = nrdDenoiser.worldToView,
-                gWorldToViewPrev = nrdDenoiser.prevWorldToView,
-                gWorldToClip = nrdDenoiser.worldToClip,
-                gWorldToClipPrev = nrdDenoiser.prevWorldToClip,
+                gViewToWorld = frameState.worldToView.inverse,
+                gViewToWorldPrev = frameState.prevWorldToView.inverse,
+                gViewToClip = frameState.viewToClip,
+                gWorldToView = frameState.worldToView,
+                gWorldToViewPrev = frameState.prevWorldToView,
+                gWorldToClip = frameState.worldToClip,
+                gWorldToClipPrev = frameState.prevWorldToClip,
 
                 gHitDistParams = new float4(3, 0.1f, 20, -25),
                 gCameraFrustum = GetNrdFrustum(cameraData),
                 gSunBasisX = new float4(gSunBasisX.x, gSunBasisX.y, gSunBasisX.z, 0),
                 gSunBasisY = new float4(gSunBasisY.x, gSunBasisY.y, gSunBasisY.z, 0),
                 gSunDirection = new float4(gSunDirection.x, gSunDirection.y, gSunDirection.z, 0),
-                gCameraGlobalPos = new float4(nrdDenoiser.camPos, 0),
-                gCameraGlobalPosPrev = new float4(nrdDenoiser.prevCamPos, 0),
+                gCameraGlobalPos = new float4(frameState.camPos, 0),
+                gCameraGlobalPosPrev = new float4(frameState.prevCamPos, 0),
                 gViewDirection = new float4(cameraData.camera.transform.forward, 0),
                 gHairBaseColor = new float4(0.1f, 0.1f, 0.1f, 1.0f),
 
@@ -907,6 +948,8 @@ namespace PathTracing
             }
 
             _dlrrDenoisers.Clear();
+
+            _cameraFrameStates.Clear();
 
             foreach (var pool in _resourcePools.Values)
             {

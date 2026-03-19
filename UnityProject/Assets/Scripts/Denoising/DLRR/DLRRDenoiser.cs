@@ -5,6 +5,8 @@ using Nri;
 using PathTracing;
 using Unity.Collections;
 using Unity.Collections.LowLevel.Unsafe;
+using Unity.Mathematics;
+using UnityEngine;
 using UnityEngine.Rendering.Universal;
 
 namespace DLRR
@@ -19,11 +21,23 @@ namespace DLRR
 
         private readonly int instanceId;
         private NativeArray<RRFrameData> buffer;
-        public uint FrameIndex;
         private const int BufferCount = 3;
         private string cameraName;
 
         private PathTracingSetting setting;
+
+        /// <summary>
+        /// Per-frame camera data filled by PathTracingFeature from CameraFrameState.
+        /// DLRRDenoiser does not depend on CameraFrameState directly.
+        /// </summary>
+        public struct DlrrFrameInput
+        {
+            public Matrix4x4 worldToView;
+            public Matrix4x4 viewToClip;
+            public float2    ViewportJitter;
+            public int2      renderResolution;
+            public uint      FrameIndex;
+        }
 
         /// <summary>
         /// DLSS-RR textures packed by PathTracingFeature and passed each frame.
@@ -48,7 +62,7 @@ namespace DLRR
             buffer = new NativeArray<RRFrameData>(BufferCount, Allocator.Persistent);
         }
 
-        private RRFrameData GetData(CameraData cameraData, NRDDenoiser denoiser, DlrrResources res)
+        private RRFrameData GetData(CameraData cameraData, DlrrFrameInput fi, DlrrResources res)
         {
             RRFrameData data = new RRFrameData();
 
@@ -63,42 +77,39 @@ namespace DLRR
             data.normalRoughnessTex = res.NormalRoughness.NriPtr;
             data.specularMvOrHitTex = res.SpecHitDistance.NriPtr;
 
-            data.worldToViewMatrix = denoiser.worldToView;
-            data.viewToClipMatrix = denoiser.viewToClip;
+            data.worldToViewMatrix = fi.worldToView;
+            data.viewToClipMatrix  = fi.viewToClip;
 
             var xr = cameraData.xr;
             if (xr.enabled)
             {
                 var desc = xr.renderTargetDesc;
-                data.outputWidth = (ushort)desc.width;
+                data.outputWidth  = (ushort)desc.width;
                 data.outputHeight = (ushort)desc.height;
             }
             else
             {
-                data.outputWidth = (ushort)cameraData.camera.scaledPixelWidth;
+                data.outputWidth  = (ushort)cameraData.camera.scaledPixelWidth;
                 data.outputHeight = (ushort)cameraData.camera.scaledPixelHeight;
             }
 
+            ushort rectW = (ushort)(fi.renderResolution.x * setting.resolutionScale + 0.5f);
+            ushort rectH = (ushort)(fi.renderResolution.y * setting.resolutionScale + 0.5f);
 
-            ushort rectW = (ushort)(denoiser.renderResolution.x * setting.resolutionScale + 0.5f);
-            ushort rectH = (ushort)(denoiser.renderResolution.y * setting.resolutionScale + 0.5f);
-
-            data.currentWidth = rectW;
+            data.currentWidth  = rectW;
             data.currentHeight = rectH;
 
-            data.upscalerMode = setting.upscalerMode;
-
-            data.cameraJitter = denoiser.ViewportJitter;
-            data.instanceId = instanceId;
+            data.upscalerMode  = setting.upscalerMode;
+            data.cameraJitter  = fi.ViewportJitter;
+            data.instanceId    = instanceId;
 
             return data;
         }
 
-        public IntPtr GetInteropDataPtr(RenderingData renderingData, NRDDenoiser denoiser, DlrrResources res)
+        public IntPtr GetInteropDataPtr(RenderingData renderingData, DlrrFrameInput fi, DlrrResources res)
         {
-            var index = (int)(FrameIndex % BufferCount);
-            buffer[index] = GetData(renderingData.cameraData, denoiser, res);
-            FrameIndex++;
+            var index = (int)(fi.FrameIndex % BufferCount);
+            buffer[index] = GetData(renderingData.cameraData, fi, res);
             unsafe
             {
                 return (IntPtr)buffer.GetUnsafePtr() + index * sizeof(RRFrameData);
