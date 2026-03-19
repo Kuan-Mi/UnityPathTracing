@@ -21,28 +21,21 @@ namespace PathTracing
     public class PathTracingPass : ScriptableRenderPass
     {
         private static readonly int GInOutMv = Shader.PropertyToID("gInOut_Mv");
-        public RayTracingShader OpaqueTs;
+        
         public RayTracingShader TransparentTs;
         public ComputeShader CompositionCs;
         public ComputeShader TaaCs;
         public ComputeShader DlssBeforeCs;
         public Material BiltMaterial;
 
-        public ComputeShader SharcResolveCs;
-        public RayTracingShader SharcUpdateTs;
-
         public GraphicsBuffer HashEntriesBuffer;
         public GraphicsBuffer AccumulationBuffer;
         public GraphicsBuffer ResolvedBuffer;
-        // public PathTracingDataBuilder _dataBuilder;
 
-        public RayTracingAccelerationStructure AccelerationStructure;
 
         public NRDDenoiser NrdDenoiser;
         public DLRRDenoiser DLRRDenoiser;
 
-        public GraphicsBuffer ScramblingRanking;
-        public GraphicsBuffer Sobol;
 
         // Auto-exposure
         public ComputeShader AutoExposureCs;
@@ -51,14 +44,11 @@ namespace PathTracing
 
         private readonly PathTracingSetting m_Settings;
         public  GraphicsBuffer _pathTracingSettingsBuffer;
-        private readonly GraphicsBuffer _resamplingConstantsBuffer;
+        
         public GraphicsBuffer m_SpotLightBuffer;
         public GraphicsBuffer m_AreaLightBuffer;
         public GraphicsBuffer m_PointLightBuffer;
         
-        // public PrepareLightResource prepareLightResource;
-        public RtxdiResources  rtxdiResources;
-        public ReSTIRDIContext  restirDIContext;
 
 
         [DllImport("RenderingPlugin")]
@@ -67,9 +57,6 @@ namespace PathTracing
         class PassData
         {
             internal TextureHandle CameraTexture;
-
-            internal GraphicsBuffer ScramblingRanking;
-            internal GraphicsBuffer Sobol;
 
             internal TextureHandle OutputTexture;
 
@@ -110,22 +97,15 @@ namespace PathTracing
             internal TextureHandle PrevNormalRoughness;
             internal TextureHandle PrevBaseColorMetalness;
 
-            internal RayTracingShader OpaqueTs;
             internal RayTracingShader TransparentTs;
             internal ComputeShader CompositionCs;
             internal ComputeShader TaaCs;
             internal ComputeShader DlssBeforeCs;
             internal Material BlitMaterial;
-            internal uint outputGridW;
-            internal uint outputGridH;
             internal uint rectGridW;
             internal uint rectGridH;
             internal int2 m_RenderResolution;
 
-            // internal GlobalConstants GlobalConstants;
-            // internal ResamplingConstants ResamplingConstants;
-            
-            internal GraphicsBuffer ResamplingConstantBuffer;
             internal GraphicsBuffer ConstantBuffer;
             // internal IntPtr NrdDataPtr;
             internal IntPtr RRDataPtr;
@@ -133,8 +113,6 @@ namespace PathTracing
             internal float resolutionScale;
 
 
-            internal ComputeShader SharcResolveCs;
-            internal RayTracingShader SharcUpdateTs;
 
             internal GraphicsBuffer HashEntriesBuffer;
             internal GraphicsBuffer AccumulationBuffer;
@@ -168,19 +146,11 @@ namespace PathTracing
             internal uint AeTexHeight;
             internal float ManualExposure;
             
-            
-            // internal IntPtr DataPtr;
-            
-            
-            internal RtxdiResources RtxdiResources;
-            internal ReSTIRDIContext  RestirDIContext;
         }
 
         public PathTracingPass(PathTracingSetting setting)
         {
             m_Settings = setting;
-            _pathTracingSettingsBuffer = new GraphicsBuffer(GraphicsBuffer.Target.Constant, 1, Marshal.SizeOf<GlobalConstants>());
-            _resamplingConstantsBuffer = new GraphicsBuffer(GraphicsBuffer.Target.Structured, 1, Marshal.SizeOf<ResamplingConstants>());
         }
 
         static void ExecutePass(PassData data, UnsafeGraphContext context)
@@ -192,9 +162,6 @@ namespace PathTracing
 
             var natCmd = CommandBufferHelpers.GetNativeCommandBuffer(context.cmd);
 
-            // natCmd.SetBufferData(data.ConstantBuffer, new[] { data.GlobalConstants });
-            // natCmd.SetBufferData(data.ResamplingConstantBuffer, new[] { data.ResamplingConstants });
-
             // Bind the exposure buffer globally so all shaders can read the current EV.
             // When auto-exposure is OFF: seed the buffer with the manual value from settings.
             // When auto-exposure is ON:  the buffer is updated later by ReduceHistogram.
@@ -204,7 +171,6 @@ namespace PathTracing
                 natCmd.SetBufferData(data.AeExposureBuffer, new[] { data.ManualExposure });
             }
 
-            var nrdDenoiseMarker = new ProfilerMarker(ProfilerCategory.Render, "NRD Denoise", MarkerFlags.SampleGPU);
             var compositionMarker = new ProfilerMarker(ProfilerCategory.Render, "Composition", MarkerFlags.SampleGPU);
             var transparentTracingMarker = new ProfilerMarker(ProfilerCategory.Render, "Transparent Tracing", MarkerFlags.SampleGPU);
             var taaMarker = new ProfilerMarker(ProfilerCategory.Render, "TAA", MarkerFlags.SampleGPU);
@@ -214,13 +180,6 @@ namespace PathTracing
             var aeMarker = new ProfilerMarker(ProfilerCategory.Render, "Auto Exposure", MarkerFlags.SampleGPU);
 
 
-            // // NRD降噪
-            // if (!data.Setting.RR)
-            // {
-            //     natCmd.BeginSample(nrdDenoiseMarker);
-            //     natCmd.IssuePluginEventAndData(GetRenderEventAndDataFunc(), 1, data.NrdDataPtr);
-            //     natCmd.EndSample(nrdDenoiseMarker);
-            // }
 
 
             // 合成
@@ -502,15 +461,12 @@ namespace PathTracing
 
             using var builder = renderGraph.AddUnsafePass<PassData>("Path Tracing Pass", out var passData);
 
-            passData.OpaqueTs = OpaqueTs;
             passData.TransparentTs = TransparentTs;
             passData.CompositionCs = CompositionCs;
             passData.TaaCs = TaaCs;
             passData.DlssBeforeCs = DlssBeforeCs;
             passData.BlitMaterial = BiltMaterial;
 
-            passData.SharcResolveCs = SharcResolveCs;
-            passData.SharcUpdateTs = SharcUpdateTs;
             passData.AccumulationBuffer = AccumulationBuffer;
             passData.HashEntriesBuffer = HashEntriesBuffer;
             passData.ResolvedBuffer = ResolvedBuffer;
@@ -538,179 +494,11 @@ namespace PathTracing
             passData.AeTexWidth            = (uint)renderResolution.x;
             passData.AeTexHeight           = (uint)renderResolution.y;
             passData.ManualExposure        = m_Settings.exposure;
-            //
-            var gSunDirection = -lightForward;
-            // var up = new Vector3(0, 1, 0);
-            // var gSunBasisX = math.normalize(math.cross(new float3(up.x, up.y, up.z), new float3(gSunDirection.x, gSunDirection.y, gSunDirection.z)));
-            // var gSunBasisY = math.normalize(math.cross(new float3(gSunDirection.x, gSunDirection.y, gSunDirection.z), gSunBasisX));
-
-            // var cam = cameraData.camera;
 
 
-            // passData.NrdDataPtr = NrdDenoiser.GetInteropDataPtr(cameraData, gSunDirection);
             passData.RRDataPtr = DLRRDenoiser.GetInteropDataPtr(cameraData, NrdDenoiser);
 
-            // passData.DataPtr = prepareLightResource.GetInteropDataPtr();
-            passData.RtxdiResources = rtxdiResources;
-            passData.RestirDIContext = restirDIContext;
-            //
-            // var proj = isXr ? xrPass.GetProjMatrix() : cameraData.camera.projectionMatrix;
-            //
-            // var m11 = proj.m11;
-            //
-            //
-            // var rectW = (uint)(renderResolution.x * NrdDenoiser.resolutionScale + 0.5f);
-            // var rectH = (uint)(renderResolution.y * NrdDenoiser.resolutionScale + 0.5f);
-            //
-            // // todo prev
-            // var rectWprev = (uint)(renderResolution.x * NrdDenoiser.prevResolutionScale + 0.5f);
-            // var rectHprev = (uint)(renderResolution.y * NrdDenoiser.prevResolutionScale + 0.5f);
-            //
-            //
-            // var renderSize = new float2((renderResolution.x), (renderResolution.y));
-            // var outputSize = new float2((outputResolution.x), (outputResolution.y));
-            // var rectSize = new float2(rectW, rectH);
-            //
-            // var rectSizePrev = new float2((rectWprev), (rectHprev));
-            // var jitter = (m_Settings.cameraJitter ? NrdDenoiser.ViewportJitter : 0f) / rectSize;
-            //
-            //
-            // float fovXRad = math.atan(1.0f / proj.m00) * 2.0f;
-            // float horizontalFieldOfView = fovXRad * Mathf.Rad2Deg;
-            //
-            // float nearZ = proj.m23 / (proj.m22 - 1.0f);
-            //
-            // float emissionIntensity = m_Settings.emissionIntensity * (m_Settings.emission ? 1.0f : 0.0f);
-            //
-            // float ACCUMULATION_TIME = 0.5f;
-            // int MAX_HISTORY_FRAME_NUM = 60;
-            //
-            // float fps = 1000.0f / Mathf.Max(Time.deltaTime * 1000.0f, 0.0001f);
-            // fps = math.min(fps, 121.0f);
-            //
-            // // Debug.Log(fps);
-            //
-            // float resetHistoryFactor = 1.0f;
-            //
-            //
-            // float otherMaxAccumulatedFrameNum = GetMaxAccumulatedFrameNum(ACCUMULATION_TIME, fps);
-            // otherMaxAccumulatedFrameNum = math.min(otherMaxAccumulatedFrameNum, (MAX_HISTORY_FRAME_NUM));
-            // otherMaxAccumulatedFrameNum *= resetHistoryFactor;
-            //
-            //
-            // uint sharcMaxAccumulatedFrameNum = (uint)(otherMaxAccumulatedFrameNum * (m_Settings.boost ? m_Settings.boostFactor : 1.0f) + 0.5f);
-            // // Debug.Log($"sharcMaxAccumulatedFrameNum: {sharcMaxAccumulatedFrameNum}");
-            // float taaMaxAccumulatedFrameNum = otherMaxAccumulatedFrameNum * 0.5f;
-            // float prevFrameMaxAccumulatedFrameNum = otherMaxAccumulatedFrameNum * 0.3f;
-            //
-            //
-            // float minProbability = 0.0f;
-            // if (m_Settings.tracingMode == RESOLUTION.RESOLUTION_FULL_PROBABILISTIC)
-            // {
-            //     HitDistanceReconstructionMode mode = HitDistanceReconstructionMode.OFF;
-            //     if (m_Settings.denoiser == DenoiserType.DENOISER_REBLUR)
-            //         mode = HitDistanceReconstructionMode.OFF;
-            //     //     mode = m_ReblurSettings.hitDistanceReconstructionMode;
-            //     // else if (m_Settings.denoiser == DenoiserType.DENOISER_RELAX)
-            //     //     mode = m_RelaxSettings.hitDistanceReconstructionMode;
-            //
-            //     // Min / max allowed probability to guarantee a sample in 3x3 or 5x5 area - https://godbolt.org/z/YGYo1rjnM
-            //     if (mode == HitDistanceReconstructionMode.AREA_3X3)
-            //         minProbability = 1.0f / 4.0f;
-            //     else if (mode == HitDistanceReconstructionMode.AREA_5X5)
-            //         minProbability = 1.0f / 16.0f;
-            // }
-            //
-            //
-            // var globalConstants = new GlobalConstants
-            // {
-            //     gViewToWorld = NrdDenoiser.worldToView.inverse,
-            //     gViewToWorldPrev =  NrdDenoiser.prevWorldToView.inverse,
-            //     gViewToClip = NrdDenoiser.viewToClip,
-            //     gWorldToView = NrdDenoiser.worldToView,
-            //     gWorldToViewPrev = NrdDenoiser.prevWorldToView,
-            //     gWorldToClip = NrdDenoiser.worldToClip,
-            //     gWorldToClipPrev = NrdDenoiser.prevWorldToClip,
-            //
-            //     gHitDistParams = new float4(3, 0.1f, 20, -25),
-            //     gCameraFrustum = GetNrdFrustum(cameraData),
-            //     gSunBasisX = new float4(gSunBasisX.x, gSunBasisX.y, gSunBasisX.z, 0),
-            //     gSunBasisY = new float4(gSunBasisY.x, gSunBasisY.y, gSunBasisY.z, 0),
-            //     gSunDirection = new float4(gSunDirection.x, gSunDirection.y, gSunDirection.z, 0),
-            //     gCameraGlobalPos = new float4(NrdDenoiser.camPos, 0),
-            //     gCameraGlobalPosPrev = new float4(NrdDenoiser.prevCamPos, 0),
-            //     gViewDirection = new float4(cameraData.camera.transform.forward, 0),
-            //     gHairBaseColor = new float4(0.1f, 0.1f, 0.1f, 1.0f),
-            //
-            //     gHairBetas = new float2(0.25f, 0.3f),
-            //     gOutputSize = outputSize,
-            //     gRenderSize = renderSize,
-            //     gRectSize = rectSize,
-            //     gInvOutputSize = new float2(1.0f, 1.0f) / outputSize,
-            //     gInvRenderSize = new float2(1.0f, 1.0f) / renderSize,
-            //     gInvRectSize = new float2(1.0f, 1.0f) / rectSize,
-            //     gRectSizePrev = rectSizePrev,
-            //     gJitter = jitter,
-            //
-            //     gEmissionIntensity = emissionIntensity,
-            //     gNearZ = -nearZ,
-            //     gSeparator = m_Settings.splitScreen,
-            //     gRoughnessOverride = 0,
-            //     gMetalnessOverride = 0,
-            //     gUnitToMetersMultiplier = 1.0f,
-            //     gTanSunAngularRadius = math.tan(math.radians(m_Settings.sunAngularDiameter * 0.5f)),
-            //     gTanPixelAngularRadius = math.tan(0.5f * math.radians(horizontalFieldOfView) / rectSize.x),
-            //     gDebug = 0,
-            //     gPrevFrameConfidence = (m_Settings.usePrevFrame && !m_Settings.RR) ? prevFrameMaxAccumulatedFrameNum / (1.0f + prevFrameMaxAccumulatedFrameNum) : 0.0f,
-            //     gUnproject = 1.0f / (0.5f * rectH * m11),
-            //     gAperture = m_Settings.dofAperture * 0.01f,
-            //     gFocalDistance = m_Settings.dofFocalDistance,
-            //     gFocalLength = (0.5f * (35.0f * 0.001f)) / math.tan(math.radians(horizontalFieldOfView * 0.5f)),
-            //     gTAA = (m_Settings.denoiser != DenoiserType.DENOISER_REFERENCE && m_Settings.TAA) ? 1.0f / (1.0f + taaMaxAccumulatedFrameNum) : 1.0f,
-            //     gHdrScale = 1.0f,
-            //     gExposure = m_Settings.exposure,
-            //     gMipBias = m_Settings.mipBias,
-            //     gOrthoMode = cameraData.camera.orthographic ? 1.0f : 0f,
-            //     gIndirectDiffuse = m_Settings.indirectDiffuse ? 1.0f : 0.0f,
-            //     gIndirectSpecular = m_Settings.indirectSpecular ? 1.0f : 0.0f,
-            //     gMinProbability = minProbability,
-            //
-            //     gSharcMaxAccumulatedFrameNum = sharcMaxAccumulatedFrameNum,
-            //     gDenoiserType = (uint)m_Settings.denoiser,
-            //     gDisableShadowsAndEnableImportanceSampling = m_Settings.importanceSampling ? 1u : 0u,
-            //     gFrameIndex = (uint)Time.frameCount,
-            //     gForcedMaterial = 0,
-            //     gUseNormalMap = 1,
-            //     gBounceNum = m_Settings.bounceNum,
-            //     gResolve = 1,
-            //     gValidation = 1,
-            //     gSR = (m_Settings.SR && !m_Settings.RR) ? 1u : 0u,
-            //     gRR = m_Settings.RR ? 1u : 0,
-            //     gIsSrgb = 0,
-            //     gOnScreen = 0,
-            //     gTracingMode = m_Settings.RR ? (uint)RESOLUTION.RESOLUTION_FULL_PROBABILISTIC : (uint)m_Settings.tracingMode,
-            //     gSampleNum = m_Settings.rpp,
-            //     gPSR = m_Settings.psr ? (uint)1 : 0,
-            //     gSHARC = m_Settings.SHARC ? (uint)1 : 0,
-            //     gTrimLobe = m_Settings.specularLobeTrimming ? 1u : 0,
-            // };
-            //
-            // globalConstants.gSpotLightCount  = (uint)spotCount;
-            // globalConstants.gAreaLightCount  = (uint)areaCount;
-            // globalConstants.gPointLightCount = (uint)pointCount;
-            // globalConstants.gSssScatteringColor    = new float3(m_Settings.sssScatteringColor.r, m_Settings.sssScatteringColor.g, m_Settings.sssScatteringColor.b);
-            // globalConstants.gSssMinThreshold       = m_Settings.sssMinThreshold;
-            // globalConstants.gSssTransmissionBsdfSampleCount       = m_Settings.sssTransmissionBsdfSampleCount;
-            // globalConstants.gSssTransmissionPerBsdfScatteringSampleCount       = m_Settings.sssTransmissionPerBsdfScatteringSampleCount;
-            //
-            // globalConstants.gSssScale              = m_Settings.sssScale;
-            // globalConstants.gSssAnisotropy = m_Settings.sssAnisotropy;
-            // globalConstants.gSssMaxSampleRadius    = m_Settings.sssMaxSampleRadius;
-            //
-            //
-            // globalConstants.gIsEditor = cameraData.camera.cameraType == CameraType.SceneView ? 1u : 0u;
-            // globalConstants.gShowLight = m_Settings.gShowLight?  1u : 0u; 
-            // Debug.Log(globalConstants.ToString());
+
 
             var textureDesc = resourceData.activeColorTexture.GetDescriptor(renderGraph);
             textureDesc.enableRandomWrite = true;
@@ -737,107 +525,21 @@ namespace PathTracing
             builder.UseTexture(passData.ComposedDiff,  AccessFlags.ReadWrite);
             builder.UseTexture(passData.ComposedSpecViewZ,  AccessFlags.ReadWrite);
             
-
-            // passData.GlobalConstants = globalConstants;
-            
-            //
-            // restirDIContext.SetFrameIndex((uint)Time.frameCount);
-            //
-            //
-            // var resamplingConstants = new ResamplingConstants
-            // {
-            //     runtimeParams = restirDIContext.GetRuntimeParams()
-            // };
-            //
-            // resamplingConstants.lightBufferParams.localLightBufferRegion.firstLightIndex = 0;
-            // resamplingConstants.lightBufferParams.localLightBufferRegion.numLights = rtxdiResources.Scene.emissiveTriangleCount;
-            //
-            // resamplingConstants.lightBufferParams.infiniteLightBufferRegion.firstLightIndex = 0;
-            // resamplingConstants.lightBufferParams.infiniteLightBufferRegion.numLights = 0;
-            //
-            // resamplingConstants.lightBufferParams.environmentLightParams.lightPresent = 0;
-            // resamplingConstants.lightBufferParams.environmentLightParams.lightIndex = (0xffffffffu);
-            //
-            //
-            // resamplingConstants.restirDIReservoirBufferParams = restirDIContext.GetReservoirBufferParameters();
-            //
-            // resamplingConstants.frameIndex = restirDIContext.GetFrameIndex();
-            // resamplingConstants.numInitialSamples = m_Settings.localLightSamples;
-            // resamplingConstants.numSpatialSamples = m_Settings.spatialSamples;
-            // resamplingConstants.useAccurateGBufferNormal = 0;
-            // resamplingConstants.numInitialBRDFSamples = m_Settings.brdfSamples;
-            // resamplingConstants.brdfCutoff = 0;
-            // resamplingConstants.pad2 = new uint2(0, 0);
-            // resamplingConstants.enableResampling = m_Settings.enableResampling ? 1u : 0u;
-            // resamplingConstants.unbiasedMode = 1;
-            // resamplingConstants.inputBufferIndex = (resamplingConstants.frameIndex & 1u) ^ 1;
-            // resamplingConstants.outputBufferIndex = (resamplingConstants.frameIndex & 1u);
-             
-            
-            // var sb = new System.Text.StringBuilder();
-            // sb.AppendLine($"resamplingConstants.frameIndex: {resamplingConstants.frameIndex}");
-            // sb.AppendLine($"resamplingConstants.numInitialSamples: {resamplingConstants.numInitialSamples}");
-            // sb.AppendLine($"resamplingConstants.numSpatialSamples: {resamplingConstants.numSpatialSamples}");
-            // sb.AppendLine($"resamplingConstants.numInitialBRDFSamples: {resamplingConstants.numInitialBRDFSamples}");
-            // sb.AppendLine($"resamplingConstants.brdfCutoff: {resamplingConstants.brdfCutoff:F6}");
-            // sb.AppendLine($"resamplingConstants.enableResampling: {resamplingConstants.enableResampling}");
-            // sb.AppendLine($"resamplingConstants.unbiasedMode: {resamplingConstants.unbiasedMode}");
-            // sb.AppendLine($"resamplingConstants.inputBufferIndex: {resamplingConstants.inputBufferIndex}");
-            // sb.AppendLine($"resamplingConstants.outputBufferIndex: {resamplingConstants.outputBufferIndex}");
-            // var rp = resamplingConstants.runtimeParams;
-            // sb.AppendLine($"resamplingConstants.runtimeParams.neighborOffsetMask: {rp.neighborOffsetMask}");
-            // sb.AppendLine($"resamplingConstants.runtimeParams.activeCheckerboardField: {rp.activeCheckerboardField}");
-            // sb.AppendLine($"resamplingConstants.runtimeParams.pad1: {rp.pad1}");
-            // sb.AppendLine($"resamplingConstants.runtimeParams.pad2: {rp.pad2}");
-            // var rb = resamplingConstants.restirDIReservoirBufferParams;
-            // sb.AppendLine($"resamplingConstants.restirDIReservoirBufferParams.reservoirBlockRowPitch: {rb.reservoirBlockRowPitch}");
-            // sb.AppendLine($"resamplingConstants.restirDIReservoirBufferParams.reservoirArrayPitch: {rb.reservoirArrayPitch}");
-            // sb.AppendLine($"resamplingConstants.restirDIReservoirBufferParams.pad1: {rb.pad1}");
-            // sb.AppendLine($"resamplingConstants.restirDIReservoirBufferParams.pad2: {rb.pad2}");
-            // var lb = resamplingConstants.lightBufferParams;
-            // var localRegion = lb.localLightBufferRegion;
-            // sb.AppendLine($"resamplingConstants.lightBufferParams.localLightBufferRegion.firstLightIndex: {localRegion.firstLightIndex}");
-            // sb.AppendLine($"resamplingConstants.lightBufferParams.localLightBufferRegion.numLights: {localRegion.numLights}");
-            // sb.AppendLine($"resamplingConstants.lightBufferParams.localLightBufferRegion.pad1: {localRegion.pad1}");
-            // sb.AppendLine($"resamplingConstants.lightBufferParams.localLightBufferRegion.pad2: {localRegion.pad2}");
-            // var infRegion = lb.infiniteLightBufferRegion;
-            // sb.AppendLine($"resamplingConstants.lightBufferParams.infiniteLightBufferRegion.firstLightIndex: {infRegion.firstLightIndex}");
-            // sb.AppendLine($"resamplingConstants.lightBufferParams.infiniteLightBufferRegion.numLights: {infRegion.numLights}");
-            // sb.AppendLine($"resamplingConstants.lightBufferParams.infiniteLightBufferRegion.pad1: {infRegion.pad1}");
-            // sb.AppendLine($"resamplingConstants.lightBufferParams.infiniteLightBufferRegion.pad2: {infRegion.pad2}");
-            // var env = lb.environmentLightParams;
-            // sb.AppendLine($"resamplingConstants.lightBufferParams.environmentLightParams.lightPresent: {env.lightPresent}");
-            // sb.AppendLine($"resamplingConstants.lightBufferParams.environmentLightParams.lightIndex: {env.lightIndex}");
-            // sb.AppendLine($"resamplingConstants.lightBufferParams.environmentLightParams.pad1: {env.pad1}");
-            // sb.AppendLine($"resamplingConstants.lightBufferParams.environmentLightParams.pad2: {env.pad2}");
-            // Debug.Log(sb.ToString());
-
-
-            // passData.ResamplingConstants = resamplingConstants;
-            
-            // Debug.Log($"Reservoir reservoirArrayPitch: {resamplingConstants.restirDIReservoirBufferParams.reservoirArrayPitch}, reservoirBlockRowPitch: {resamplingConstants.restirDIReservoirBufferParams.reservoirBlockRowPitch}");
-            
-            
             
             var rectW = (uint)(renderResolution.x * NrdDenoiser.resolutionScale + 0.5f);
             var rectH = (uint)(renderResolution.y * NrdDenoiser.resolutionScale + 0.5f);
             
             
             passData.CameraTexture = resourceData.activeColorTexture;
-            passData.outputGridW = (uint)((renderResolution.x + 15) / 16);
-            passData.outputGridH = (uint)((renderResolution.y + 15) / 16);
             passData.rectGridW = (uint)((rectW + 15) / 16);
             passData.rectGridH = (uint)((rectH + 15) / 16);
             passData.m_RenderResolution = renderResolution;
 
 
             passData.ConstantBuffer = _pathTracingSettingsBuffer;
-            passData.ResamplingConstantBuffer = _resamplingConstantsBuffer;
             
             passData.Setting = m_Settings;
             passData.resolutionScale = NrdDenoiser.resolutionScale;
-            passData.ScramblingRanking = ScramblingRanking;
-            passData.Sobol = Sobol;
 
             builder.UseTexture(passData.CameraTexture, AccessFlags.Write);
 
@@ -847,16 +549,13 @@ namespace PathTracing
 
         private void CreateTextureHandle(RenderGraph renderGraph, PassData passData, TextureDesc textureDesc, IUnsafeRenderGraphBuilder builder)
         {
-            // passData.OutputTexture = CreateTex(textureDesc, renderGraph, "PathTracingOutput", GraphicsFormat.R16G16B16A16_SFloat);
 
             passData.Mv = renderGraph.ImportTexture(NrdDenoiser.GetRT(ResourceType.IN_MV));
             passData.ViewZ = renderGraph.ImportTexture(NrdDenoiser.GetRT(ResourceType.IN_VIEWZ));
             passData.NormalRoughness = renderGraph.ImportTexture(NrdDenoiser.GetRT(ResourceType.IN_NORMAL_ROUGHNESS));
 
             passData.BaseColorMetalness = renderGraph.ImportTexture(NrdDenoiser.GetRT(ResourceType.IN_BASECOLOR_METALNESS));
-            // passData.DirectLighting = CreateTex(textureDesc, renderGraph, "DirectLighting", GraphicsFormat.B10G11R11_UFloatPack32);
-            // passData.DirectEmission = CreateTex(textureDesc, renderGraph, "DirectEmission", GraphicsFormat.B10G11R11_UFloatPack32);
-            // passData.SpotDirect = CreateTex(textureDesc, renderGraph, "SpotDirect", GraphicsFormat.B10G11R11_UFloatPack32);
+
 
             passData.Penumbra = renderGraph.ImportTexture(NrdDenoiser.GetRT(ResourceType.IN_PENUMBRA));
             passData.Diff = renderGraph.ImportTexture(NrdDenoiser.GetRT(ResourceType.IN_DIFF_RADIANCE_HITDIST));
@@ -868,8 +567,6 @@ namespace PathTracing
             passData.DenoisedSpec = renderGraph.ImportTexture(NrdDenoiser.GetRT(ResourceType.OUT_SPEC_RADIANCE_HITDIST));
             passData.Validation = renderGraph.ImportTexture(NrdDenoiser.GetRT(ResourceType.OUT_VALIDATION));
 
-            // passData.ComposedDiff = CreateTex(textureDesc, renderGraph, "ComposedDiff", GraphicsFormat.R16G16B16A16_SFloat);
-            // passData.ComposedSpecViewZ = CreateTex(textureDesc, renderGraph, "ComposedSpec_ViewZ", GraphicsFormat.R16G16B16A16_SFloat);
 
             passData.Composed = renderGraph.ImportTexture(NrdDenoiser.GetRT(ResourceType.Composed));
 
@@ -889,16 +586,12 @@ namespace PathTracing
             passData.PrevBaseColorMetalness = renderGraph.ImportTexture(NrdDenoiser.GetRT(ResourceType.Prev_BaseColorMetalness));
 
 
-            // builder.UseTexture(passData.OutputTexture, AccessFlags.ReadWrite);
 
             builder.UseTexture(passData.Mv, AccessFlags.ReadWrite);
             builder.UseTexture(passData.ViewZ, AccessFlags.ReadWrite);
             builder.UseTexture(passData.NormalRoughness, AccessFlags.ReadWrite);
             builder.UseTexture(passData.BaseColorMetalness, AccessFlags.ReadWrite);
 
-            // builder.UseTexture(passData.DirectLighting, AccessFlags.ReadWrite);
-            // builder.UseTexture(passData.DirectEmission, AccessFlags.ReadWrite);
-            // builder.UseTexture(passData.SpotDirect, AccessFlags.ReadWrite);
 
             builder.UseTexture(passData.Penumbra, AccessFlags.ReadWrite);
             builder.UseTexture(passData.Diff, AccessFlags.ReadWrite);
@@ -910,8 +603,6 @@ namespace PathTracing
             builder.UseTexture(passData.DenoisedSpec, AccessFlags.ReadWrite);
             builder.UseTexture(passData.Validation, AccessFlags.ReadWrite);
 
-            // builder.UseTexture(passData.ComposedDiff, AccessFlags.ReadWrite);
-            // builder.UseTexture(passData.ComposedSpecViewZ, AccessFlags.ReadWrite);
             builder.UseTexture(passData.Composed, AccessFlags.ReadWrite);
 
             builder.UseTexture(passData.TaaHistory, AccessFlags.ReadWrite);
@@ -927,22 +618,6 @@ namespace PathTracing
             builder.UseTexture(passData.PrevViewZ, AccessFlags.ReadWrite);
             builder.UseTexture(passData.PrevNormalRoughness, AccessFlags.ReadWrite);
             builder.UseTexture(passData.PrevBaseColorMetalness, AccessFlags.ReadWrite);
-        }
-
-        // private TextureHandle CreateTex(TextureDesc textureDesc, RenderGraph renderGraph, string name, GraphicsFormat format)
-        // {
-        //     textureDesc.format = format;
-        //     textureDesc.name = name;
-        //     return renderGraph.CreateTexture(textureDesc);
-        // }
-
-        public void Dispose()
-        {
-            _pathTracingSettingsBuffer?.Release();
-            _resamplingConstantsBuffer?.Release();
-            // m_SpotLightBuffer?.Release();
-            // m_AreaLightBuffer?.Release();
-            // m_PointLightBuffer?.Release();
         }
 
         public void Setup()

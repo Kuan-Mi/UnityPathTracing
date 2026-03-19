@@ -217,21 +217,14 @@ namespace PathTracing
             _pathTracingPass = new PathTracingPass(pathTracingSetting)
             {
                 renderPassEvent = RenderPassEvent.BeforeRenderingTransparents,
-                OpaqueTs = opaqueTracingShader,
                 TransparentTs = transparentTracingShader,
                 CompositionCs = compositionComputeShader,
                 TaaCs = taaComputeShader,
                 DlssBeforeCs = dlssBeforeComputeShader,
-                AccelerationStructure = accelerationStructure,
-                ScramblingRanking = scramblingRankingUintBuffer,
-                Sobol = sobolUintBuffer,
                 BiltMaterial = finalMaterial,
-                SharcResolveCs = sharcResolveCs,
-                SharcUpdateTs = sharcUpdateTs,
                 HashEntriesBuffer = _hashEntriesBuffer,
                 AccumulationBuffer = _accumulationBuffer,
                 ResolvedBuffer = _resolvedBuffer,
-                // _dataBuilder = _dataBuilder,
                 AutoExposureCs = autoExposureShader,
                 AeHistogramBuffer = _aeHistogramBuffer,
                 AeExposureBuffer = _aeExposureBuffer
@@ -378,9 +371,6 @@ namespace PathTracing
             _pathTracingPass.AeHistogramBuffer = _aeHistogramBuffer;
             _pathTracingPass.AeExposureBuffer = _aeExposureBuffer;
 
-            // _pathTracingPass.prepareLightResource = prepareLightResource;
-            _pathTracingPass.rtxdiResources = rtxdiResources;
-            _pathTracingPass.restirDIContext = restirDIContext;
 
             if (finalMaterial == null
                 || opaqueTracingShader == null
@@ -867,7 +857,6 @@ namespace PathTracing
             // accelerationStructure.Dispose();
             // accelerationStructure.Release();
             // accelerationStructure = null;
-            _pathTracingPass.Dispose();
             _pathTracingPass = null;
 
             foreach (var denoiser in _nrdDenoisers.Values)
