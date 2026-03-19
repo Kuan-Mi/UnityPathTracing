@@ -68,12 +68,12 @@ namespace PathTracing
         private readonly ResamplingConstants[] _resamplingConstantsArray = new ResamplingConstants[1];
         private readonly float[] _exposureArray = new float[1];
 
-        private Dictionary<long, NRDDenoiser> _nrdDenoisers = new();
-        private Dictionary<long, DLRRDenoiser> _dlrrDenoisers = new();
-        private Dictionary<long, PathTracingResourcePool> _resourcePools = new();
-        private Dictionary<long, ReSTIRDIContext> _restirDIContexts = new();
-        private Dictionary<long, RtxdiResources> _rtxdiResources = new();
-        private Dictionary<long, CameraFrameState> _cameraFrameStates = new();
+        private readonly Dictionary<long, NrdDenoiser> _nrdDenoisers = new();
+        private readonly Dictionary<long, DlrrDenoiser> _dlrrDenoisers = new();
+        private readonly Dictionary<long, PathTracingResourcePool> _resourcePools = new();
+        private readonly Dictionary<long, ReSTIRDIContext> _restirDiContexts = new();
+        private readonly Dictionary<long, RtxdiResources> _rtxdiResources = new();
+        private readonly Dictionary<long, CameraFrameState> _cameraFrameStates = new();
 
         public override void Create()
         {
@@ -215,10 +215,7 @@ namespace PathTracing
             _resolvedBuffer.SetData(clearResolvedData);
 
             // Auto-exposure buffers
-            if (_aeHistogramBuffer == null)
-            {
-                _aeHistogramBuffer = new GraphicsBuffer(GraphicsBuffer.Target.Structured, 256, sizeof(uint));
-            }
+            _aeHistogramBuffer ??= new GraphicsBuffer(GraphicsBuffer.Target.Structured, 256, sizeof(uint));
 
             if (_aeExposureBuffer == null)
             {
@@ -276,7 +273,7 @@ namespace PathTracing
                     camName = $"{cam.name}_Eye{eyeIndex}";
                 }
 
-                nrd = new NRDDenoiser(pathTracingSetting, camName);
+                nrd = new NrdDenoiser(pathTracingSetting, camName);
                 _nrdDenoisers.Add(uniqueKey, nrd);
             }
 
@@ -289,7 +286,7 @@ namespace PathTracing
                     camName = $"{cam.name}_Eye{eyeIndex}";
                 }
 
-                dlrr = new DLRRDenoiser(pathTracingSetting, camName);
+                dlrr = new DlrrDenoiser(pathTracingSetting, camName);
                 _dlrrDenoisers.Add(uniqueKey, dlrr);
             }
 
@@ -302,19 +299,19 @@ namespace PathTracing
             _prepareLightResources.SetBuffer(_gpuScene);
             _prepareLightResources.SendTexture(_gpuScene.globalTexturePool);
 
-            if (!_restirDIContexts.TryGetValue(uniqueKey, out var restirDIContext))
+            if (!_restirDiContexts.TryGetValue(uniqueKey, out var restirDiContext))
             {
                 var contextParams = ReSTIRDIStaticParameters.Default();
                 contextParams.RenderWidth = (uint)cam.pixelWidth;
                 contextParams.RenderHeight = (uint)cam.pixelHeight;
 
-                restirDIContext = new ReSTIRDIContext(contextParams);
-                _restirDIContexts.Add(uniqueKey, restirDIContext);
+                restirDiContext = new ReSTIRDIContext(contextParams);
+                _restirDiContexts.Add(uniqueKey, restirDiContext);
             }
 
             if (!_rtxdiResources.TryGetValue(uniqueKey, out var rtxdiResources))
             {
-                rtxdiResources = new RtxdiResources(restirDIContext, _gpuScene);
+                rtxdiResources = new RtxdiResources(restirDiContext, _gpuScene);
                 _rtxdiResources.Add(uniqueKey, rtxdiResources);
             }
 
@@ -357,39 +354,40 @@ namespace PathTracing
             uint curFrame = frameState.FrameIndex;
             frameState.Update(renderingData, pathTracingSetting);
 
-            var nrdInput = new NRDDenoiser.NrdFrameInput
+            var nrdLightData = renderingData.lightData;
+            var nrdMainLight = nrdLightData.mainLightIndex >= 0 ? nrdLightData.visibleLights[nrdLightData.mainLightIndex] : default;
+            var nrdLightDir  = new float3(-(Vector3)nrdMainLight.localToWorldMatrix.GetColumn(2));
+
+            var nrdInput = new NrdDenoiser.NrdFrameInput
             {
                 worldToView        = frameState.worldToView,
                 prevWorldToView    = frameState.prevWorldToView,
-                worldToClip        = frameState.worldToClip,
-                prevWorldToClip    = frameState.prevWorldToClip,
                 viewToClip         = frameState.viewToClip,
                 prevViewToClip     = frameState.prevViewToClip,
-                camPos             = frameState.camPos,
-                prevCamPos         = frameState.prevCamPos,
-                ViewportJitter     = frameState.ViewportJitter,
-                PrevViewportJitter = frameState.PrevViewportJitter,
+                viewportJitter     = frameState.ViewportJitter,
+                prevViewportJitter = frameState.PrevViewportJitter,
                 resolutionScale    = frameState.resolutionScale,
                 prevResolutionScale = frameState.prevResolutionScale,
                 renderResolution   = frameState.renderResolution,
-                FrameIndex         = curFrame,
+                frameIndex         = curFrame,
+                lightDirection     = nrdLightDir,
             };
 
-            var nrdDataPtr = nrd.GetInteropDataPtr(nrdInput, renderingData);
+            var nrdDataPtr = nrd.GetInteropDataPtr(nrdInput);
 
-            var nrdRes = new NRDDenoiser.NrdResources
+            var nrdRes = new NrdDenoiser.NrdResources
             {
-                InMv = pool.GetNriResource(RenderResourceType.IN_MV),
-                InViewZ = pool.GetNriResource(RenderResourceType.IN_VIEWZ),
-                InNormalRoughness = pool.GetNriResource(RenderResourceType.IN_NORMAL_ROUGHNESS),
-                InBaseColorMetalness = pool.GetNriResource(RenderResourceType.IN_BASECOLOR_METALNESS),
-                InPenumbra = pool.GetNriResource(RenderResourceType.IN_PENUMBRA),
-                InDiffRadianceHitDist = pool.GetNriResource(RenderResourceType.IN_DIFF_RADIANCE_HITDIST),
-                InSpecRadianceHitDist = pool.GetNriResource(RenderResourceType.IN_SPEC_RADIANCE_HITDIST),
-                OutShadowTranslucency = pool.GetNriResource(RenderResourceType.OUT_SHADOW_TRANSLUCENCY),
-                OutDiffRadianceHitDist = pool.GetNriResource(RenderResourceType.OUT_DIFF_RADIANCE_HITDIST),
-                OutSpecRadianceHitDist = pool.GetNriResource(RenderResourceType.OUT_SPEC_RADIANCE_HITDIST),
-                OutValidation = pool.GetNriResource(RenderResourceType.OUT_VALIDATION),
+                inMv = pool.GetNriResource(RenderResourceType.IN_MV),
+                inViewZ = pool.GetNriResource(RenderResourceType.IN_VIEWZ),
+                inNormalRoughness = pool.GetNriResource(RenderResourceType.IN_NORMAL_ROUGHNESS),
+                inBaseColorMetalness = pool.GetNriResource(RenderResourceType.IN_BASECOLOR_METALNESS),
+                inPenumbra = pool.GetNriResource(RenderResourceType.IN_PENUMBRA),
+                inDiffRadianceHitDist = pool.GetNriResource(RenderResourceType.IN_DIFF_RADIANCE_HITDIST),
+                inSpecRadianceHitDist = pool.GetNriResource(RenderResourceType.IN_SPEC_RADIANCE_HITDIST),
+                outShadowTranslucency = pool.GetNriResource(RenderResourceType.OUT_SHADOW_TRANSLUCENCY),
+                outDiffRadianceHitDist = pool.GetNriResource(RenderResourceType.OUT_DIFF_RADIANCE_HITDIST),
+                outSpecRadianceHitDist = pool.GetNriResource(RenderResourceType.OUT_SPEC_RADIANCE_HITDIST),
+                outValidation = pool.GetNriResource(RenderResourceType.OUT_VALIDATION),
             };
 
             if (resourcesChanged)
@@ -397,33 +395,35 @@ namespace PathTracing
                 nrd.UpdateResources(nrdRes);
             }
 
-            var dlrrRes = new DLRRDenoiser.DlrrResources
+            var dlrrRes = new DlrrDenoiser.DlrrResources
             {
-                Input = pool.GetNriResource(RenderResourceType.Composed),
-                Output = pool.GetNriResource(RenderResourceType.DlssOutput),
-                Mv = pool.GetNriResource(RenderResourceType.IN_MV),
-                Depth = pool.GetNriResource(RenderResourceType.IN_VIEWZ),
-                DiffAlbedo = pool.GetNriResource(RenderResourceType.RRGuide_DiffAlbedo),
-                SpecAlbedo = pool.GetNriResource(RenderResourceType.RRGuide_SpecAlbedo),
-                NormalRoughness = pool.GetNriResource(RenderResourceType.RRGuide_Normal_Roughness),
-                SpecHitDistance = pool.GetNriResource(RenderResourceType.RRGuide_SpecHitDistance),
+                input = pool.GetNriResource(RenderResourceType.Composed),
+                output = pool.GetNriResource(RenderResourceType.DlssOutput),
+                mv = pool.GetNriResource(RenderResourceType.IN_MV),
+                depth = pool.GetNriResource(RenderResourceType.IN_VIEWZ),
+                diffAlbedo = pool.GetNriResource(RenderResourceType.RRGuide_DiffAlbedo),
+                specAlbedo = pool.GetNriResource(RenderResourceType.RRGuide_SpecAlbedo),
+                normalRoughness = pool.GetNriResource(RenderResourceType.RRGuide_Normal_Roughness),
+                specHitDistance = pool.GetNriResource(RenderResourceType.RRGuide_SpecHitDistance),
             };
 
-            var dlrrInput = new DLRRDenoiser.DlrrFrameInput
+            var dlrrInput = new DlrrDenoiser.DlrrFrameInput
             {
                 worldToView      = frameState.worldToView,
                 viewToClip       = frameState.viewToClip,
-                ViewportJitter   = frameState.ViewportJitter,
+                viewportJitter   = frameState.ViewportJitter,
                 renderResolution = frameState.renderResolution,
-                FrameIndex       = curFrame,
+                frameIndex       = curFrame,
+                outputWidth      = (ushort)outputResolution.x,
+                outputHeight     = (ushort)outputResolution.y,
             };
-            var dlssDataPtr = dlrr.GetInteropDataPtr(renderingData, dlrrInput, dlrrRes);
+            var dlssDataPtr = dlrr.GetInteropDataPtr(dlrrInput, dlrrRes);
 
             var globalConstants = GetConstants(renderingData, frameState);
             _globalConstantsArray[0] = globalConstants;
             _constantBuffer.SetData(_globalConstantsArray);
 
-            var resamplingConstants = GetResamplingConstants(restirDIContext, rtxdiResources);
+            var resamplingConstants = GetResamplingConstants(restirDiContext, rtxdiResources);
             _resamplingConstantsArray[0] = resamplingConstants;
             _resamplingConstantBuffer.SetData(_resamplingConstantsArray);
 
@@ -692,14 +692,14 @@ namespace PathTracing
             renderer.EnqueuePass(_outputBlitPass);
         }
 
-        private ResamplingConstants GetResamplingConstants(ReSTIRDIContext restirDIContext, RtxdiResources rtxdiResources)
+        private ResamplingConstants GetResamplingConstants(ReSTIRDIContext restirDiContext, RtxdiResources rtxdiResources)
         {
-            restirDIContext.SetFrameIndex((uint)Time.frameCount);
+            restirDiContext.SetFrameIndex((uint)Time.frameCount);
 
 
             var resamplingConstants = new ResamplingConstants
             {
-                runtimeParams = restirDIContext.GetRuntimeParams()
+                runtimeParams = restirDiContext.GetRuntimeParams()
             };
 
 
@@ -713,9 +713,9 @@ namespace PathTracing
             resamplingConstants.lightBufferParams.environmentLightParams.lightIndex = (0xffffffffu);
 
 
-            resamplingConstants.restirDIReservoirBufferParams = restirDIContext.GetReservoirBufferParameters();
+            resamplingConstants.restirDIReservoirBufferParams = restirDiContext.GetReservoirBufferParameters();
 
-            resamplingConstants.frameIndex = restirDIContext.GetFrameIndex();
+            resamplingConstants.frameIndex = restirDiContext.GetFrameIndex();
             resamplingConstants.numInitialSamples = pathTracingSetting.localLightSamples;
             resamplingConstants.numSpatialSamples = pathTracingSetting.spatialSamples;
             resamplingConstants.useAccurateGBufferNormal = 0;
@@ -792,8 +792,8 @@ namespace PathTracing
 
             var emissionIntensity = settings.emissionIntensity * (settings.emission ? 1.0f : 0.0f);
 
-            var ACCUMULATION_TIME = 0.5f;
-            var MAX_HISTORY_FRAME_NUM = 60;
+            var accumulationTime = 0.5f;
+            var maxHistoryFrameNum = 60;
 
             var fps = 1000.0f / Mathf.Max(Time.deltaTime * 1000.0f, 0.0001f);
             fps = math.min(fps, 121.0f);
@@ -803,8 +803,8 @@ namespace PathTracing
             var resetHistoryFactor = 1.0f;
 
 
-            float otherMaxAccumulatedFrameNum = GetMaxAccumulatedFrameNum(ACCUMULATION_TIME, fps);
-            otherMaxAccumulatedFrameNum = math.min(otherMaxAccumulatedFrameNum, (MAX_HISTORY_FRAME_NUM));
+            float otherMaxAccumulatedFrameNum = GetMaxAccumulatedFrameNum(accumulationTime, fps);
+            otherMaxAccumulatedFrameNum = math.min(otherMaxAccumulatedFrameNum, (maxHistoryFrameNum));
             otherMaxAccumulatedFrameNum *= resetHistoryFactor;
 
 
@@ -815,21 +815,21 @@ namespace PathTracing
 
 
             var minProbability = 0.0f;
-            if (settings.tracingMode == RESOLUTION.RESOLUTION_FULL_PROBABILISTIC)
-            {
-                var mode = HitDistanceReconstructionMode.OFF;
-                if (settings.denoiser == DenoiserType.DENOISER_REBLUR)
-                    mode = HitDistanceReconstructionMode.OFF;
-                //     mode = m_ReblurSettings.hitDistanceReconstructionMode;
-                // else if (m_Settings.denoiser == DenoiserType.DENOISER_RELAX)
-                //     mode = m_RelaxSettings.hitDistanceReconstructionMode;
-
-                // Min / max allowed probability to guarantee a sample in 3x3 or 5x5 area - https://godbolt.org/z/YGYo1rjnM
-                if (mode == HitDistanceReconstructionMode.AREA_3X3)
-                    minProbability = 1.0f / 4.0f;
-                else if (mode == HitDistanceReconstructionMode.AREA_5X5)
-                    minProbability = 1.0f / 16.0f;
-            }
+            // if (settings.tracingMode == RESOLUTION.RESOLUTION_FULL_PROBABILISTIC)
+            // {
+            //     var mode = HitDistanceReconstructionMode.OFF;
+            //     if (settings.denoiser == DenoiserType.DENOISER_REBLUR)
+            //         mode = HitDistanceReconstructionMode.OFF;
+            //     //     mode = m_ReblurSettings.hitDistanceReconstructionMode;
+            //     // else if (m_Settings.denoiser == DenoiserType.DENOISER_RELAX)
+            //     //     mode = m_RelaxSettings.hitDistanceReconstructionMode;
+            //
+            //     // Min / max allowed probability to guarantee a sample in 3x3 or 5x5 area - https://godbolt.org/z/YGYo1rjnM
+            //     if (mode == HitDistanceReconstructionMode.AREA_3X3)
+            //         minProbability = 1.0f / 4.0f;
+            //     else if (mode == HitDistanceReconstructionMode.AREA_5X5)
+            //         minProbability = 1.0f / 16.0f;
+            // }
 
 
             var globalConstants = new GlobalConstants
@@ -965,7 +965,7 @@ namespace PathTracing
 
             _rtxdiResources.Clear();
 
-            _restirDIContexts.Clear();
+            _restirDiContexts.Clear();
 
             _lightCollector?.Dispose();
             _lightCollector = null;

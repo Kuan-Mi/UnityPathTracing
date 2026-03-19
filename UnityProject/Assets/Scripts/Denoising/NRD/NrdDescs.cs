@@ -1,9 +1,4 @@
-﻿using System;
-using System.Runtime.InteropServices;
-using Nrd;
-
-
-namespace Nrd
+﻿namespace Nrd
 {
     public enum ResourceType : uint
     {

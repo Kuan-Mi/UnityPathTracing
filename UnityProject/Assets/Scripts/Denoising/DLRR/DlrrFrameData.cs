@@ -12,7 +12,7 @@ namespace DLRR
 
     [Serializable]
     [StructLayout(LayoutKind.Sequential)]
-    public struct RRFrameData
+    public struct DlrrFrameData
     {
         
         public IntPtr inputTex;
