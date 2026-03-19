@@ -1449,7 +1449,6 @@ GameObject:
   - component: {fileID: 635211432}
   - component: {fileID: 635211431}
   - component: {fileID: 635211430}
-  - component: {fileID: 635211433}
   m_Layer: 0
   m_Name: Spot Light
   m_TagString: Untagged
@@ -1566,19 +1565,6 @@ Transform:
   m_Children: []
   m_Father: {fileID: 938125658}
   m_LocalEulerAnglesHint: {x: 90, y: 0, z: 0}
---- !u!114 &635211433
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 635211429}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 7c6c9594ed489b24884989c41da6a628, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::PointLightRadius
-  radius: 0.667
 --- !u!1 &667211474
 GameObject:
   m_ObjectHideFlags: 0
