@@ -8,7 +8,7 @@ using UnityEngine;
 
 namespace mini
 {
-    public class RtxdiResources
+    public class RtxdiResources : IDisposable
     {
         private const int c_NumReSTIRDIReservoirBuffers = 3;
 
@@ -149,6 +149,12 @@ namespace mini
             NeighborOffsetsBuffer.SetData(offsets);
             
             m_neighborOffsetsInitialized = true;
+        }
+
+        public void Dispose()
+        {
+            NeighborOffsetsBuffer?.Release();
+            LightReservoirBuffer?.Release();
         }
     }
 }

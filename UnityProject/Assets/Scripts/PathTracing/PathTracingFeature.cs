@@ -60,6 +60,10 @@ namespace PathTracing
 
         private LightCollector _lightCollector = new();
 
+        private readonly GlobalConstants[] _globalConstantsArray = new GlobalConstants[1];
+        private readonly ResamplingConstants[] _resamplingConstantsArray = new ResamplingConstants[1];
+        private readonly float[] _exposureArray = new float[1];
+
         private Dictionary<long, NRDDenoiser> _nrdDenoisers = new();
         private Dictionary<long, DLRRDenoiser> _dlrrDenoisers = new();
         private Dictionary<long, ReSTIRDIContext> _restirDIContexts = new();
@@ -81,6 +85,9 @@ namespace PathTracing
                 accelerationStructure.Build();
                 SetMask();
             }
+
+            gpuScene ??= new GPUScene();
+            _lightCollector ??= new LightCollector();
 
             if (!gpuScene.isBufferInitialized)
             {
@@ -120,16 +127,16 @@ namespace PathTracing
                 InitializeBuffers();
             }
 
-            _sharcPass = new SharcPass(sharcResolveCs, sharcUpdateTs);
-            _prepareLightPass = new PrepareLightPass();
-            _opaquePass = new OpaquePass(opaqueTracingShader);
-            _nrdPass = new NrdPass();
-            _compositionPass = new CompositionPass(compositionComputeShader);
-            _transparentPass = new TransparentPass(transparentTracingShader);
-            _autoExposurePass = new AutoExposurePass(autoExposureShader);
-            _taaPass = new TaaPass(taaComputeShader);
-            _dlssRRPass = new DlssRRPass(dlssBeforeComputeShader);
-            _outputBlitPass = new OutputBlitPass(finalMaterial);
+            _sharcPass ??= new SharcPass(sharcResolveCs, sharcUpdateTs);
+            _prepareLightPass ??= new PrepareLightPass();
+            _opaquePass ??= new OpaquePass(opaqueTracingShader);
+            _nrdPass ??= new NrdPass();
+            _compositionPass ??= new CompositionPass(compositionComputeShader);
+            _transparentPass ??= new TransparentPass(transparentTracingShader);
+            _autoExposurePass ??= new AutoExposurePass(autoExposureShader);
+            _taaPass ??= new TaaPass(taaComputeShader);
+            _dlssRRPass ??= new DlssRRPass(dlssBeforeComputeShader);
+            _outputBlitPass ??= new OutputBlitPass(finalMaterial);
         }
 
         public static readonly int Capacity = 1 << 23;
@@ -183,7 +190,8 @@ namespace PathTracing
             {
                 _aeExposureBuffer = new GraphicsBuffer(GraphicsBuffer.Target.Structured, 1, sizeof(float));
                 // Seed with the manual exposure value so first frame is not zero
-                _aeExposureBuffer.SetData(new float[] { pathTracingSetting != null ? pathTracingSetting.exposure : 1.0f });
+                _exposureArray[0] = pathTracingSetting != null ? pathTracingSetting.exposure : 1.0f;
+                _aeExposureBuffer.SetData(_exposureArray);
             }
         }
 
@@ -302,11 +310,16 @@ namespace PathTracing
             var nrdDataPtr = nrd.GetInteropDataPtr(renderingData);
             var dlssDataPtr = dlrr.GetInteropDataPtr(renderingData, nrd);
 
+            var outputResolution = ComputeOutputResolution(renderingData.cameraData);
+            nrd.EnsureResources(outputResolution);
+
             var globalConstants = GetConstants(renderingData, nrd);
-            ConstantBuffer.SetData(new[] { globalConstants });
+            _globalConstantsArray[0] = globalConstants;
+            ConstantBuffer.SetData(_globalConstantsArray);
 
             var resamplingConstants = GetResamplingConstants(restirDIContext, rtxdiResources);
-            ResamplingConstantBuffer.SetData(new[] { resamplingConstants });
+            _resamplingConstantsArray[0] = resamplingConstants;
+            ResamplingConstantBuffer.SetData(_resamplingConstantsArray);
 
             // Sharc 
             var sharcResource = new SharcPass.Resource
@@ -405,10 +418,13 @@ namespace PathTracing
                 compositionResource.Spec = nrd.GetRT(ResourceType.OUT_SPEC_RADIANCE_HITDIST);
             }
 
+            int rectGridW = (int)(cam.pixelWidth * pathTracingSetting.resolutionScale + 0.5f) / 16;
+            int rectGridH = (int)(cam.pixelHeight * pathTracingSetting.resolutionScale + 0.5f) / 16;
+
             var compositionSettings = new CompositionPass.Settings
             {
-                rectGridW = (int)(cam.pixelWidth * pathTracingSetting.resolutionScale + 0.5f) / 16,
-                rectGridH = (int)(cam.pixelHeight * pathTracingSetting.resolutionScale + 0.5f) / 16
+                rectGridW = rectGridW,
+                rectGridH = rectGridH
             };
 
             _compositionPass.Setup(compositionResource, compositionSettings);
@@ -471,7 +487,8 @@ namespace PathTracing
 
             if (!pathTracingSetting.enableAutoExposure)
             {
-                _aeExposureBuffer.SetData(new[] { pathTracingSetting.exposure });
+                _exposureArray[0] = pathTracingSetting.exposure;
+                _aeExposureBuffer.SetData(_exposureArray);
             }
             else
             {
@@ -500,8 +517,8 @@ namespace PathTracing
 
                 var dlssSettings = new DlssRRPass.Settings
                 {
-                    rectGridW = (int)(cam.pixelWidth * pathTracingSetting.resolutionScale + 0.5f) / 16,
-                    rectGridH = (int)(cam.pixelHeight * pathTracingSetting.resolutionScale + 0.5f) / 16,
+                    rectGridW = rectGridW,
+                    rectGridH = rectGridH,
                     tmpDisableRR = pathTracingSetting.tmpDisableRR
                 };
 
@@ -522,8 +539,8 @@ namespace PathTracing
 
                 var taaSettings = new TaaPass.Settings
                 {
-                    rectGridW = (int)(cam.pixelWidth * pathTracingSetting.resolutionScale + 0.5f) / 16,
-                    rectGridH = (int)(cam.pixelHeight * pathTracingSetting.resolutionScale + 0.5f) / 16
+                    rectGridW = rectGridW,
+                    rectGridH = rectGridH
                 };
 
                 _taaPass.Setup(taaResource, taaSettings);
@@ -606,6 +623,16 @@ namespace PathTracing
             return resamplingConstants;
         }
 
+        private static int2 ComputeOutputResolution(CameraData cameraData)
+        {
+            var xrPass = cameraData.xr;
+            if (xrPass.enabled)
+                return new int2(xrPass.renderTargetDesc.width, xrPass.renderTargetDesc.height);
+            return new int2(
+                (int)(cameraData.camera.pixelWidth * cameraData.renderScale),
+                (int)(cameraData.camera.pixelHeight * cameraData.renderScale));
+        }
+
         private GlobalConstants GetConstants(RenderingData renderingData, NRDDenoiser nrd)
         {
             var NrdDenoiser = nrd;
@@ -622,19 +649,11 @@ namespace PathTracing
             var gSunBasisX = math.normalize(math.cross(new float3(up.x, up.y, up.z), new float3(gSunDirection.x, gSunDirection.y, gSunDirection.z)));
             var gSunBasisY = math.normalize(math.cross(new float3(gSunDirection.x, gSunDirection.y, gSunDirection.z), gSunBasisX));
 
-            int2 outputResolution = new int2((int)(cameraData.camera.pixelWidth * cameraData.renderScale), (int)(cameraData.camera.pixelHeight * cameraData.renderScale));
 
+            var outputResolution = ComputeOutputResolution(cameraData);
 
             var xrPass = cameraData.xr;
             var isXr = xrPass.enabled;
-            if (xrPass.enabled)
-            {
-                // Debug.Log($"XR Enabled. Eye Texture Resolution: {xrPass.renderTargetDesc.width} x {xrPass.renderTargetDesc.height}");
-
-                outputResolution = new int2(xrPass.renderTargetDesc.width, xrPass.renderTargetDesc.height);
-            }
-
-            NrdDenoiser.EnsureResources(outputResolution);
 
             var renderResolution = NrdDenoiser.renderResolution;
 
@@ -804,10 +823,17 @@ namespace PathTracing
 
         protected override void Dispose(bool disposing)
         {
-            Debug.Log("PathTracingFeature Dispose");
+            Debug.LogWarning("PathTracingFeature Dispose");
             base.Dispose(disposing);
 
-            _outputBlitPass = null;
+            accelerationStructure?.Dispose();
+            accelerationStructure = null;
+
+            ConstantBuffer?.Release();
+            ConstantBuffer = null;
+
+            ResamplingConstantBuffer?.Release();
+            ResamplingConstantBuffer = null;
 
             foreach (var denoiser in _nrdDenoisers.Values)
             {
@@ -815,6 +841,7 @@ namespace PathTracing
             }
 
             _nrdDenoisers.Clear();
+
             foreach (var denoiser in _dlrrDenoisers.Values)
             {
                 denoiser.Dispose();
@@ -822,13 +849,24 @@ namespace PathTracing
 
             _dlrrDenoisers.Clear();
 
-
             foreach (var resource in _prepareLightResources.Values)
             {
                 resource.Dispose();
             }
 
             _prepareLightResources.Clear();
+
+            foreach (var res in _rtxdiResources.Values)
+            {
+                res.Dispose();
+            }
+
+            _rtxdiResources.Clear();
+
+            _restirDIContexts.Clear();
+
+            gpuScene?.Dispose();
+            gpuScene = null;
 
             scramblingRankingUintBuffer?.Release();
             scramblingRankingUintBuffer = null;
@@ -838,8 +876,10 @@ namespace PathTracing
 
             _accumulationBuffer?.Release();
             _accumulationBuffer = null;
+
             _hashEntriesBuffer?.Release();
             _hashEntriesBuffer = null;
+
             _resolvedBuffer?.Release();
             _resolvedBuffer = null;
 
@@ -848,8 +888,20 @@ namespace PathTracing
 
             _aeHistogramBuffer?.Release();
             _aeHistogramBuffer = null;
+
             _aeExposureBuffer?.Release();
             _aeExposureBuffer = null;
+
+            _sharcPass = null;
+            _prepareLightPass = null;
+            _opaquePass = null;
+            _transparentPass = null;
+            _compositionPass = null;
+            _nrdPass = null;
+            _taaPass = null;
+            _dlssRRPass = null;
+            _autoExposurePass = null;
+            _outputBlitPass = null;
         }
 
         public void Test()
