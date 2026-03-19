@@ -58,13 +58,7 @@ namespace PathTracing
         private GraphicsBuffer _aeHistogramBuffer; // 256 x uint
         private GraphicsBuffer _aeExposureBuffer; // 1 x float  (current exposure multiplier)
 
-        private GraphicsBuffer m_SpotLightBuffer;
-        private GraphicsBuffer m_AreaLightBuffer;
-        private GraphicsBuffer m_PointLightBuffer;
-
-        private int spotCount;
-        private int areaCount;
-        private int pointCount;
+        private LightCollector _lightCollector = new();
 
         private Dictionary<long, NRDDenoiser> _nrdDenoisers = new();
         private Dictionary<long, DLRRDenoiser> _dlrrDenoisers = new();
@@ -303,7 +297,7 @@ namespace PathTracing
 
             accelerationStructure.Build();
 
-            Light();
+            _lightCollector.Collect();
 
             var nrdDataPtr = nrd.GetInteropDataPtr(renderingData);
             var dlssDataPtr = dlrr.GetInteropDataPtr(renderingData, nrd);
@@ -321,9 +315,9 @@ namespace PathTracing
                 AccumulationBuffer = _accumulationBuffer,
                 HashEntriesBuffer = _hashEntriesBuffer,
                 ResolvedBuffer = _resolvedBuffer,
-                PointLightBuffer = m_PointLightBuffer,
-                AreaLightBuffer = m_AreaLightBuffer,
-                SpotLightBuffer = m_SpotLightBuffer
+                PointLightBuffer = _lightCollector.PointLightBuffer,
+                AreaLightBuffer = _lightCollector.AreaLightBuffer,
+                SpotLightBuffer = _lightCollector.SpotLightBuffer
             };
 
             var sharcSettings = new SharcPass.Settings
@@ -346,9 +340,9 @@ namespace PathTracing
                 HashEntriesBuffer = _hashEntriesBuffer,
                 ResolvedBuffer = _resolvedBuffer,
 
-                PointLightBuffer = m_PointLightBuffer,
-                AreaLightBuffer = m_AreaLightBuffer,
-                SpotLightBuffer = m_SpotLightBuffer,
+                PointLightBuffer = _lightCollector.PointLightBuffer,
+                AreaLightBuffer = _lightCollector.AreaLightBuffer,
+                SpotLightBuffer = _lightCollector.SpotLightBuffer,
 
                 ScramblingRanking = scramblingRankingUintBuffer,
                 Sobol = sobolUintBuffer,
@@ -433,9 +427,9 @@ namespace PathTracing
                 AccumulationBuffer = _accumulationBuffer,
                 ResolvedBuffer = _resolvedBuffer,
 
-                PointLightBuffer = m_PointLightBuffer,
-                AreaLightBuffer = m_AreaLightBuffer,
-                SpotLightBuffer = m_SpotLightBuffer,
+                PointLightBuffer = _lightCollector.PointLightBuffer,
+                AreaLightBuffer = _lightCollector.AreaLightBuffer,
+                SpotLightBuffer = _lightCollector.SpotLightBuffer,
 
                 AeExposureBuffer = _aeExposureBuffer
             };
@@ -788,9 +782,9 @@ namespace PathTracing
                 gTrimLobe = m_Settings.specularLobeTrimming ? 1u : 0,
             };
 
-            globalConstants.gSpotLightCount = (uint)spotCount;
-            globalConstants.gAreaLightCount = (uint)areaCount;
-            globalConstants.gPointLightCount = (uint)pointCount;
+            globalConstants.gSpotLightCount = (uint)_lightCollector.SpotCount;
+            globalConstants.gAreaLightCount = (uint)_lightCollector.AreaCount;
+            globalConstants.gPointLightCount = (uint)_lightCollector.PointCount;
             globalConstants.gSssScatteringColor = new float3(m_Settings.sssScatteringColor.r, m_Settings.sssScatteringColor.g, m_Settings.sssScatteringColor.b);
             globalConstants.gSssMinThreshold = m_Settings.sssMinThreshold;
             globalConstants.gSssTransmissionBsdfSampleCount = m_Settings.sssTransmissionBsdfSampleCount;
@@ -807,130 +801,6 @@ namespace PathTracing
             return globalConstants;
         }
 
-
-        private void Light()
-        {
-            var spotLightList = new List<SpotLightData>();
-
-            // 获取场景中所有激活的 Light 组件（不受视锥体裁剪限制）
-            var allLights = FindObjectsByType<Light>(FindObjectsSortMode.None);
-            foreach (var light in allLights)
-            {
-                if (!light.enabled || !light.gameObject.activeInHierarchy) continue;
-                if (light.type != LightType.Spot) continue;
-
-                Vector3 pos = light.transform.position;
-                Vector3 dir = light.transform.forward.normalized;
-                Color fc = light.color * light.intensity;
-
-                float outerHalf = light.spotAngle * 0.5f * Mathf.Deg2Rad;
-                float innerHalf = light.innerSpotAngle * 0.5f * Mathf.Deg2Rad;
-
-                spotLightList.Add(new SpotLightData
-                {
-                    position = pos,
-                    range = light.range,
-                    direction = dir,
-                    cosOuterAngle = Mathf.Cos(outerHalf),
-                    color = new Vector3(fc.r, fc.g, fc.b),
-                    cosInnerAngle = Mathf.Cos(innerHalf),
-                });
-            }
-
-
-            spotCount = spotLightList.Count;
-            int bufferCount = Mathf.Max(spotCount, 1);
-            if (m_SpotLightBuffer == null || m_SpotLightBuffer.count < bufferCount)
-            {
-                m_SpotLightBuffer?.Release();
-                m_SpotLightBuffer = new GraphicsBuffer(
-                    GraphicsBuffer.Target.Structured, bufferCount,
-                    Marshal.SizeOf<SpotLightData>());
-            }
-
-            if (spotCount > 0)
-                m_SpotLightBuffer.SetData(spotLightList.ToArray());
-
-            // ---------------------------------------------------------------
-            // Collect area lights (LightType.Rectangle + LightType.Disc)
-            // ---------------------------------------------------------------
-            var areaLightList = new List<AreaLightData>();
-
-            foreach (var light in allLights)
-            {
-                if (!light.enabled || !light.gameObject.activeInHierarchy) continue;
-                if (light.type != LightType.Rectangle && light.type != LightType.Disc) continue;
-
-                Color fc = light.color * light.intensity;
-                Vector2 sz = light.areaSize;
-                bool isDisc = light.type == LightType.Disc;
-
-                areaLightList.Add(new AreaLightData
-                {
-                    position = light.transform.position,
-                    // Disc: areaSize.x is the radius. Rect: areaSize is full width/height.
-                    halfWidth = isDisc ? sz.x : sz.x * 0.5f,
-                    right = light.transform.right.normalized,
-                    halfHeight = isDisc ? 0f : sz.y * 0.5f,
-                    up = light.transform.up.normalized,
-                    lightType = isDisc ? 1f : 0f,
-                    color = new Vector3(fc.r, fc.g, fc.b),
-                    pad2 = 0f,
-                });
-            }
-
-            areaCount = areaLightList.Count;
-            int areaBufferCount = Mathf.Max(areaCount, 1);
-            if (m_AreaLightBuffer == null || m_AreaLightBuffer.count < areaBufferCount)
-            {
-                m_AreaLightBuffer?.Release();
-                m_AreaLightBuffer = new GraphicsBuffer(
-                    GraphicsBuffer.Target.Structured, areaBufferCount,
-                    Marshal.SizeOf<AreaLightData>());
-            }
-
-            if (areaCount > 0)
-                m_AreaLightBuffer.SetData(areaLightList.ToArray());
-
-            // ---------------------------------------------------------------
-            // Collect point lights (LightType.Point)
-            // ---------------------------------------------------------------
-            var pointLightList = new List<PointLightData>();
-
-            foreach (var light in allLights)
-            {
-                if (!light.enabled || !light.gameObject.activeInHierarchy) continue;
-                if (light.type != LightType.Point) continue;
-
-                Color fc = light.color * light.intensity;
-
-                // Read optional sphere radius from the PointLightRadius component.
-                // Falls back to 0 (hard point light) when the component is absent.
-                var plr = light.GetComponent<PointLightRadius>();
-                float radius = plr != null ? Mathf.Max(0f, plr.radius) : 0f;
-
-                pointLightList.Add(new PointLightData
-                {
-                    position = light.transform.position,
-                    range = light.range,
-                    color = new Vector3(fc.r, fc.g, fc.b),
-                    radius = radius,
-                });
-            }
-
-            pointCount = pointLightList.Count;
-            int pointBufferCount = Mathf.Max(pointCount, 1);
-            if (m_PointLightBuffer == null || m_PointLightBuffer.count < pointBufferCount)
-            {
-                m_PointLightBuffer?.Release();
-                m_PointLightBuffer = new GraphicsBuffer(
-                    GraphicsBuffer.Target.Structured, pointBufferCount,
-                    Marshal.SizeOf<PointLightData>());
-            }
-
-            if (pointCount > 0)
-                m_PointLightBuffer.SetData(pointLightList.ToArray());
-        }
 
         protected override void Dispose(bool disposing)
         {
@@ -972,6 +842,9 @@ namespace PathTracing
             _hashEntriesBuffer = null;
             _resolvedBuffer?.Release();
             _resolvedBuffer = null;
+
+            _lightCollector?.Dispose();
+            _lightCollector = null;
 
             _aeHistogramBuffer?.Release();
             _aeHistogramBuffer = null;
