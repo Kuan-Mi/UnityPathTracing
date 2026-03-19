@@ -171,7 +171,6 @@ namespace PathTracing
                 natCmd.SetBufferData(data.AeExposureBuffer, new[] { data.ManualExposure });
             }
 
-            var compositionMarker = new ProfilerMarker(ProfilerCategory.Render, "Composition", MarkerFlags.SampleGPU);
             var transparentTracingMarker = new ProfilerMarker(ProfilerCategory.Render, "Transparent Tracing", MarkerFlags.SampleGPU);
             var taaMarker = new ProfilerMarker(ProfilerCategory.Render, "TAA", MarkerFlags.SampleGPU);
             var dlssBeforeMarker = new ProfilerMarker(ProfilerCategory.Render, "DLSS Before", MarkerFlags.SampleGPU);
@@ -181,38 +180,6 @@ namespace PathTracing
 
 
 
-
-            // 合成
-            {
-                natCmd.BeginSample(compositionMarker);
-                natCmd.SetComputeConstantBufferParam(data.CompositionCs, paramsID, data.ConstantBuffer, 0, data.ConstantBuffer.stride);
-                natCmd.SetComputeTextureParam(data.CompositionCs, 0, gIn_ViewZID, data.ViewZ);
-                natCmd.SetComputeTextureParam(data.CompositionCs, 0, gIn_Normal_RoughnessID, data.NormalRoughness);
-                natCmd.SetComputeTextureParam(data.CompositionCs, 0, gIn_BaseColor_MetalnessID, data.BaseColorMetalness);
-                natCmd.SetComputeTextureParam(data.CompositionCs, 0, gIn_DirectLightingID, data.DirectLighting);
-                natCmd.SetComputeTextureParam(data.CompositionCs, 0, gIn_DirectEmissionID, data.DirectEmission);
-                if (data.Setting.RR)
-                {
-                    natCmd.SetComputeTextureParam(data.CompositionCs, 0, gIn_ShadowID, data.Penumbra);
-                    natCmd.SetComputeTextureParam(data.CompositionCs, 0, gIn_DiffID, data.Diff);
-                    natCmd.SetComputeTextureParam(data.CompositionCs, 0, gIn_SpecID, data.Spec);
-                }
-                else
-                {
-                    natCmd.SetComputeTextureParam(data.CompositionCs, 0, gIn_ShadowID, data.ShadowTranslucency);
-                    natCmd.SetComputeTextureParam(data.CompositionCs, 0, gIn_DiffID, data.DenoisedDiff);
-                    natCmd.SetComputeTextureParam(data.CompositionCs, 0, gIn_SpecID, data.DenoisedSpec);
-                }
-
-                // natCmd.SetComputeTextureParam(data.CompositionCs, 0, gIn_SpotDirectID, data.SpotDirect);
-                natCmd.SetComputeTextureParam(data.CompositionCs, 0, gIn_PsrThroughputID, data.PsrThroughput);
-                natCmd.SetComputeTextureParam(data.CompositionCs, 0, gOut_ComposedDiffID, data.ComposedDiff);
-                natCmd.SetComputeTextureParam(data.CompositionCs, 0, gOut_ComposedSpec_ViewZID, data.ComposedSpecViewZ);
-
-                natCmd.DispatchCompute(data.CompositionCs, 0, (int)data.rectGridW, (int)data.rectGridH, 1);
-
-                natCmd.EndSample(compositionMarker);
-            }
 
 
             // 透明
