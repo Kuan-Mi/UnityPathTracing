@@ -95,6 +95,7 @@ namespace PathTracing
         private NrdPass _nrdPass;
         private CompositionPass _compositionPass;
         private TransparentPass _transparentPass;
+        private AutoExposurePass _autoExposurePass;
 
         private RayTracingAccelerationStructure accelerationStructure;
         private Settings settings;
@@ -238,6 +239,7 @@ namespace PathTracing
             _nrdPass = new NrdPass();
             _compositionPass = new CompositionPass(compositionComputeShader);
             _transparentPass = new TransparentPass(transparentTracingShader);
+            _autoExposurePass = new AutoExposurePass(autoExposureShader);
         }
 
         public static readonly int Capacity = 1 << 23;
@@ -536,6 +538,8 @@ namespace PathTracing
                 PointLightBuffer = m_PointLightBuffer,
                 AreaLightBuffer = m_AreaLightBuffer,
                 SpotLightBuffer = m_SpotLightBuffer,
+                
+                AeExposureBuffer =  _aeExposureBuffer
             };
 
             var transparentSettings = new TransparentPass.Settings
@@ -545,6 +549,44 @@ namespace PathTracing
 
             _transparentPass.Setup(transparentResource, transparentSettings);
             renderer.EnqueuePass(_transparentPass);
+
+            var autoExposureResource = new AutoExposurePass.Resource
+            {
+                AeHistogramBuffer = _aeHistogramBuffer,
+                AeExposureBuffer = _aeExposureBuffer,
+                Composed = nrd.GetRT(ResourceType.Composed)
+            };
+
+            var renderResolution = nrd.renderResolution;
+
+            var aeSettings = new AutoExposurePass.Settings
+            {
+                AeEnabled = pathTracingSetting.enableAutoExposure,
+                AeEVMin = pathTracingSetting.aeEVMin,
+                AeEVMax = pathTracingSetting.aeEVMax,
+                AeLowPercent = pathTracingSetting.aeLowPercent,
+                AeHighPercent = pathTracingSetting.aeHighPercent,
+                AeSpeedUp = pathTracingSetting.aeAdaptationSpeedUp,
+                AeSpeedDown = pathTracingSetting.aeAdaptationSpeedDown,
+                AeDeltaTime = Time.deltaTime,
+                AeExposureCompensation = pathTracingSetting.aeExposureCompensation,
+                AeMinExposure = pathTracingSetting.aeMinExposure,
+                AeMaxExposure = pathTracingSetting.aeMaxExposure,
+                AeTexWidth = (uint)renderResolution.x,
+                AeTexHeight = (uint)renderResolution.y,
+                ManualExposure = pathTracingSetting.exposure
+            };
+
+            if (!pathTracingSetting.enableAutoExposure)
+            {
+                _aeExposureBuffer.SetData(new[] { pathTracingSetting.exposure });
+            }
+            else
+            {
+                _autoExposurePass.Setup(autoExposureResource, aeSettings);
+                renderer.EnqueuePass(_autoExposurePass);
+            }
+
 
             _pathTracingPass.m_SpotLightBuffer = m_SpotLightBuffer;
             _pathTracingPass.m_AreaLightBuffer = m_AreaLightBuffer;

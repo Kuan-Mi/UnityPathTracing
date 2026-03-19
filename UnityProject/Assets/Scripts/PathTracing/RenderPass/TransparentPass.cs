@@ -18,7 +18,7 @@ namespace PathTracing
 
 
         public TransparentPass(RayTracingShader transparentCs)
-        { 
+        {
             _transparentTs = transparentCs;
         }
 
@@ -35,20 +35,21 @@ namespace PathTracing
             internal RTHandle Mv;
             internal RTHandle Composed;
             internal RTHandle NormalRoughness;
-            
+
             internal GraphicsBuffer HashEntriesBuffer;
             internal GraphicsBuffer AccumulationBuffer;
             internal GraphicsBuffer ResolvedBuffer;
-            
+
             internal GraphicsBuffer SpotLightBuffer;
             internal GraphicsBuffer AreaLightBuffer;
             internal GraphicsBuffer PointLightBuffer;
+
+            internal GraphicsBuffer AeExposureBuffer;
         }
 
         public class Settings
-        {            
+        {
             internal int2 m_RenderResolution;
-
         }
 
         class PassData
@@ -86,6 +87,7 @@ namespace PathTracing
             natCmd.SetRayTracingBufferParam(data.TransparentTs, gIn_SpotLightsID, data.Resource.SpotLightBuffer);
             natCmd.SetRayTracingBufferParam(data.TransparentTs, gIn_AreaLightsID, data.Resource.AreaLightBuffer);
             natCmd.SetRayTracingBufferParam(data.TransparentTs, gIn_PointLightsID, data.Resource.PointLightBuffer);
+            natCmd.SetRayTracingBufferParam(data.TransparentTs, "_AE_ExposureBuffer", data.Resource.AeExposureBuffer);
 
             natCmd.DispatchRays(data.TransparentTs, "MainRayGenShader", (uint)data.Settings.m_RenderResolution.x, (uint)data.Settings.m_RenderResolution.y, 1);
             natCmd.EndSample(transparentTracingMarker);
@@ -100,14 +102,14 @@ namespace PathTracing
 
             passData.Resource = _resource;
             passData.Settings = _settings;
-            
+
             var ptContextItem = frameData.Get<PTContextItem>();
 
             passData.ComposedDiff = ptContextItem.ComposedDiff;
             passData.ComposedSpecViewZ = ptContextItem.ComposedSpecViewZ;
 
-            builder.UseTexture(passData.ComposedDiff,  AccessFlags.ReadWrite);
-            builder.UseTexture(passData.ComposedSpecViewZ,  AccessFlags.ReadWrite);
+            builder.UseTexture(passData.ComposedDiff, AccessFlags.ReadWrite);
+            builder.UseTexture(passData.ComposedSpecViewZ, AccessFlags.ReadWrite);
 
             builder.AllowPassCulling(false);
             builder.SetRenderFunc((PassData data, UnsafeGraphContext context) => { ExecutePass(data, context); });
