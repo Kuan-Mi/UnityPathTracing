@@ -123,7 +123,7 @@ namespace PathTracing
             internal int2 m_RenderResolution;
 
             // internal GlobalConstants GlobalConstants;
-            internal ResamplingConstants ResamplingConstants;
+            // internal ResamplingConstants ResamplingConstants;
             
             internal GraphicsBuffer ResamplingConstantBuffer;
             internal GraphicsBuffer ConstantBuffer;
@@ -193,7 +193,7 @@ namespace PathTracing
             var natCmd = CommandBufferHelpers.GetNativeCommandBuffer(context.cmd);
 
             // natCmd.SetBufferData(data.ConstantBuffer, new[] { data.GlobalConstants });
-            natCmd.SetBufferData(data.ResamplingConstantBuffer, new[] { data.ResamplingConstants });
+            // natCmd.SetBufferData(data.ResamplingConstantBuffer, new[] { data.ResamplingConstants });
 
             // Bind the exposure buffer globally so all shaders can read the current EV.
             // When auto-exposure is OFF: seed the buffer with the manual value from settings.
@@ -204,10 +204,6 @@ namespace PathTracing
                 natCmd.SetBufferData(data.AeExposureBuffer, new[] { data.ManualExposure });
             }
 
-            var prepareLightMarker = new ProfilerMarker(ProfilerCategory.Render, "PrepareLight", MarkerFlags.SampleGPU);
-            var sharcUpdateMarker = new ProfilerMarker(ProfilerCategory.Render, "Sharc Update", MarkerFlags.SampleGPU);
-            var sharcResolveMarker = new ProfilerMarker(ProfilerCategory.Render, "Sharc Resolve", MarkerFlags.SampleGPU);
-            var opaqueTracingMarker = new ProfilerMarker(ProfilerCategory.Render, "Opaque Tracing", MarkerFlags.SampleGPU);
             var nrdDenoiseMarker = new ProfilerMarker(ProfilerCategory.Render, "NRD Denoise", MarkerFlags.SampleGPU);
             var compositionMarker = new ProfilerMarker(ProfilerCategory.Render, "Composition", MarkerFlags.SampleGPU);
             var transparentTracingMarker = new ProfilerMarker(ProfilerCategory.Render, "Transparent Tracing", MarkerFlags.SampleGPU);
@@ -216,128 +212,77 @@ namespace PathTracing
             var dlssDenoiseMarker = new ProfilerMarker(ProfilerCategory.Render, "DLSS Denoise", MarkerFlags.SampleGPU);
             var outputBlitMarker = new ProfilerMarker(ProfilerCategory.Render, "Output Blit", MarkerFlags.SampleGPU);
             var aeMarker = new ProfilerMarker(ProfilerCategory.Render, "Auto Exposure", MarkerFlags.SampleGPU);
-            var copyGBufferMarker = new ProfilerMarker(ProfilerCategory.Render, "Copy GBuffer to Prev", MarkerFlags.SampleGPU);
 
-            
-            // natCmd.BeginSample(prepareLightMarker);
-            // natCmd.IssuePluginEventAndData(UnityRTXDI.GetRenderEventAndDataFunc(), 1, data.DataPtr);
-            // natCmd.EndSample(prepareLightMarker);
 
-            
-            
-            
-            // // Sharc update
-            // if (data.passIndex == 0)
+            // // 不透明
             // {
-            //     natCmd.BeginSample(sharcUpdateMarker);
-            //     natCmd.SetRayTracingShaderPass(data.SharcUpdateTs, "Test2");
-            //     natCmd.SetRayTracingConstantBufferParam(data.SharcUpdateTs, paramsID, data.ConstantBuffer, 0, data.ConstantBuffer.stride);
+            //     natCmd.BeginSample(opaqueTracingMarker);
             //
-            //     natCmd.SetRayTracingBufferParam(data.SharcUpdateTs, g_HashEntriesID, data.HashEntriesBuffer);
-            //     natCmd.SetRayTracingBufferParam(data.SharcUpdateTs, g_AccumulationBufferID, data.AccumulationBuffer);
-            //     natCmd.SetRayTracingBufferParam(data.SharcUpdateTs, g_ResolvedBufferID, data.ResolvedBuffer);
+            //     // natCmd.SetGlobalBuffer(gIn_InstanceDataID, data._dataBuilder._instanceBuffer);
+            //     // natCmd.SetGlobalBuffer(gIn_PrimitiveDataID, data._dataBuilder._primitiveBuffer);
             //
-            //     natCmd.SetRayTracingTextureParam(data.SharcUpdateTs, g_OutputID, data.OutputTexture);
-            //     natCmd.SetRayTracingBufferParam(data.SharcUpdateTs, gIn_SpotLightsID, data.SpotLightBuffer);
-            //     natCmd.SetRayTracingBufferParam(data.SharcUpdateTs, gIn_AreaLightsID, data.AreaLightBuffer);
-            //     natCmd.SetRayTracingBufferParam(data.SharcUpdateTs, gIn_PointLightsID, data.PointLightBuffer);
             //
-            //     int SHARC_DOWNSCALE = 4;  
+            //     natCmd.SetRayTracingShaderPass(data.OpaqueTs, "Test2");
+            //     natCmd.SetRayTracingConstantBufferParam(data.OpaqueTs, paramsID, data.ConstantBuffer, 0, data.ConstantBuffer.stride);
+            //     natCmd.SetRayTracingBufferParam(data.OpaqueTs, "ResampleConstants" , data.ResamplingConstantBuffer);
+            //     
+            //     natCmd.SetRayTracingBufferParam(data.OpaqueTs, t_LightDataBufferID, data.RtxdiResources.LightDataBuffer);
+            //     natCmd.SetRayTracingBufferParam(data.OpaqueTs, t_NeighborOffsetsID, data.RtxdiResources.NeighborOffsetsBuffer);
+            //     natCmd.SetRayTracingBufferParam(data.OpaqueTs, u_LightReservoirsID, data.RtxdiResources.LightReservoirBuffer);
             //
-            //     uint w = (uint)(data.m_RenderResolution.x / SHARC_DOWNSCALE);
-            //     uint h = (uint)(data.m_RenderResolution.y / SHARC_DOWNSCALE);
+            //     natCmd.SetRayTracingBufferParam(data.OpaqueTs, g_ScramblingRankingID, data.ScramblingRanking);
+            //     natCmd.SetRayTracingBufferParam(data.OpaqueTs, g_SobolID, data.Sobol);
             //
-            //     natCmd.DispatchRays(data.SharcUpdateTs, "MainRayGenShader", w, h, 1);
-            //     natCmd.EndSample(sharcUpdateMarker);
+            //     natCmd.SetRayTracingBufferParam(data.OpaqueTs, g_HashEntriesID, data.HashEntriesBuffer);
+            //     natCmd.SetRayTracingBufferParam(data.OpaqueTs, g_AccumulationBufferID, data.AccumulationBuffer);
+            //     natCmd.SetRayTracingBufferParam(data.OpaqueTs, g_ResolvedBufferID, data.ResolvedBuffer);
+            //
+            //     natCmd.SetRayTracingTextureParam(data.OpaqueTs, g_OutputID, data.OutputTexture);
+            //
+            //     natCmd.SetRayTracingTextureParam(data.OpaqueTs, g_MvID, data.Mv);
+            //     natCmd.SetRayTracingTextureParam(data.OpaqueTs, g_ViewZID, data.ViewZ);
+            //     natCmd.SetRayTracingTextureParam(data.OpaqueTs, g_Normal_RoughnessID, data.NormalRoughness);
+            //     natCmd.SetRayTracingTextureParam(data.OpaqueTs, g_BaseColor_MetalnessID, data.BaseColorMetalness);
+            //
+            //     natCmd.SetRayTracingTextureParam(data.OpaqueTs, g_DirectLightingID, data.DirectLighting);
+            //     natCmd.SetRayTracingTextureParam(data.OpaqueTs, g_DirectEmissionID, data.DirectEmission);
+            //     natCmd.SetRayTracingTextureParam(data.OpaqueTs, g_PsrThroughputID, data.PsrThroughput);
+            //
+            //     natCmd.SetRayTracingTextureParam(data.OpaqueTs, g_ShadowDataID, data.Penumbra);
+            //     natCmd.SetRayTracingTextureParam(data.OpaqueTs, g_DiffID, data.Diff);
+            //     natCmd.SetRayTracingTextureParam(data.OpaqueTs, g_SpecID, data.Spec);
+            //
+            //     natCmd.SetRayTracingTextureParam(data.OpaqueTs, gIn_PrevComposedDiffID, data.ComposedDiff);
+            //     natCmd.SetRayTracingTextureParam(data.OpaqueTs, gIn_PrevComposedSpec_PrevViewZID, data.ComposedSpecViewZ);
+            //
+            //     natCmd.SetRayTracingTextureParam(data.OpaqueTs, gIn_PrevViewZID, data.PrevViewZ);
+            //     natCmd.SetRayTracingTextureParam(data.OpaqueTs, gIn_PrevNormalRoughnessID, data.PrevNormalRoughness);
+            //     natCmd.SetRayTracingTextureParam(data.OpaqueTs, gIn_PrevBaseColorMetalnessID, data.PrevBaseColorMetalness);
+            //
+            //     natCmd.SetRayTracingBufferParam(data.OpaqueTs, gIn_SpotLightsID, data.SpotLightBuffer);
+            //     natCmd.SetRayTracingBufferParam(data.OpaqueTs, gIn_AreaLightsID, data.AreaLightBuffer);
+            //     natCmd.SetRayTracingBufferParam(data.OpaqueTs, gIn_PointLightsID, data.PointLightBuffer);
+            //     // natCmd.SetRayTracingTextureParam(data.OpaqueTs, gOut_SpotDirectID, data.SpotDirect);
+            //
+            //     // Debug.Log(data.m_RenderResolution);
+            //
+            //     uint rectWmod = (uint)(data.m_RenderResolution.x * data.resolutionScale + 0.5f);
+            //     uint rectHmod = (uint)(data.m_RenderResolution.y * data.resolutionScale + 0.5f);
+            //
+            //     // Debug.Log($"Dispatch Rays Size: {rectWmod} x {rectHmod}");
+            //
+            //
+            //     natCmd.DispatchRays(data.OpaqueTs, "MainRayGenShader", rectWmod, rectHmod, 1);
+            //
+            //     natCmd.EndSample(opaqueTracingMarker);
+            //
+            //     // 保存当帧 GBuffer 到 prev 纹理，供下一帧 RTXDI 时间复用读取
+            //     natCmd.BeginSample(copyGBufferMarker);
+            //     natCmd.CopyTexture(data.ViewZ, data.PrevViewZ);
+            //     natCmd.CopyTexture(data.NormalRoughness, data.PrevNormalRoughness);
+            //     natCmd.CopyTexture(data.BaseColorMetalness, data.PrevBaseColorMetalness);
+            //     natCmd.EndSample(copyGBufferMarker);
             // }
-            //
-            //
-            // // Sharc resolve
-            // if (data.passIndex == 0)
-            // {
-            //     natCmd.BeginSample(sharcResolveMarker);
-            //     natCmd.SetComputeConstantBufferParam(data.SharcResolveCs, paramsID, data.ConstantBuffer, 0, data.ConstantBuffer.stride);
-            //     natCmd.SetComputeBufferParam(data.SharcResolveCs, 0, g_HashEntriesID, data.HashEntriesBuffer);
-            //     natCmd.SetComputeBufferParam(data.SharcResolveCs, 0, g_AccumulationBufferID, data.AccumulationBuffer);
-            //     natCmd.SetComputeBufferParam(data.SharcResolveCs, 0, g_ResolvedBufferID, data.ResolvedBuffer);
-            //
-            //     int LINEAR_BLOCK_SIZE = 256;
-            //     int x = (int)((PathTracingFeature.Capacity + LINEAR_BLOCK_SIZE - 1) / LINEAR_BLOCK_SIZE);
-            //
-            //     natCmd.DispatchCompute(data.SharcResolveCs, 0, x, 1, 1);
-            //
-            //     natCmd.EndSample(sharcResolveMarker);
-            // }
-
-            // 不透明
-            {
-                natCmd.BeginSample(opaqueTracingMarker);
-
-                // natCmd.SetGlobalBuffer(gIn_InstanceDataID, data._dataBuilder._instanceBuffer);
-                // natCmd.SetGlobalBuffer(gIn_PrimitiveDataID, data._dataBuilder._primitiveBuffer);
-
-
-                natCmd.SetRayTracingShaderPass(data.OpaqueTs, "Test2");
-                natCmd.SetRayTracingConstantBufferParam(data.OpaqueTs, paramsID, data.ConstantBuffer, 0, data.ConstantBuffer.stride);
-                natCmd.SetRayTracingBufferParam(data.OpaqueTs, "ResampleConstants" , data.ResamplingConstantBuffer);
-                
-                natCmd.SetRayTracingBufferParam(data.OpaqueTs, t_LightDataBufferID, data.RtxdiResources.LightDataBuffer);
-                natCmd.SetRayTracingBufferParam(data.OpaqueTs, t_NeighborOffsetsID, data.RtxdiResources.NeighborOffsetsBuffer);
-                natCmd.SetRayTracingBufferParam(data.OpaqueTs, u_LightReservoirsID, data.RtxdiResources.LightReservoirBuffer);
-
-                natCmd.SetRayTracingBufferParam(data.OpaqueTs, g_ScramblingRankingID, data.ScramblingRanking);
-                natCmd.SetRayTracingBufferParam(data.OpaqueTs, g_SobolID, data.Sobol);
-
-                natCmd.SetRayTracingBufferParam(data.OpaqueTs, g_HashEntriesID, data.HashEntriesBuffer);
-                natCmd.SetRayTracingBufferParam(data.OpaqueTs, g_AccumulationBufferID, data.AccumulationBuffer);
-                natCmd.SetRayTracingBufferParam(data.OpaqueTs, g_ResolvedBufferID, data.ResolvedBuffer);
-
-                natCmd.SetRayTracingTextureParam(data.OpaqueTs, g_OutputID, data.OutputTexture);
-
-                natCmd.SetRayTracingTextureParam(data.OpaqueTs, g_MvID, data.Mv);
-                natCmd.SetRayTracingTextureParam(data.OpaqueTs, g_ViewZID, data.ViewZ);
-                natCmd.SetRayTracingTextureParam(data.OpaqueTs, g_Normal_RoughnessID, data.NormalRoughness);
-                natCmd.SetRayTracingTextureParam(data.OpaqueTs, g_BaseColor_MetalnessID, data.BaseColorMetalness);
-
-                natCmd.SetRayTracingTextureParam(data.OpaqueTs, g_DirectLightingID, data.DirectLighting);
-                natCmd.SetRayTracingTextureParam(data.OpaqueTs, g_DirectEmissionID, data.DirectEmission);
-                natCmd.SetRayTracingTextureParam(data.OpaqueTs, g_PsrThroughputID, data.PsrThroughput);
-
-                natCmd.SetRayTracingTextureParam(data.OpaqueTs, g_ShadowDataID, data.Penumbra);
-                natCmd.SetRayTracingTextureParam(data.OpaqueTs, g_DiffID, data.Diff);
-                natCmd.SetRayTracingTextureParam(data.OpaqueTs, g_SpecID, data.Spec);
-
-                natCmd.SetRayTracingTextureParam(data.OpaqueTs, gIn_PrevComposedDiffID, data.ComposedDiff);
-                natCmd.SetRayTracingTextureParam(data.OpaqueTs, gIn_PrevComposedSpec_PrevViewZID, data.ComposedSpecViewZ);
-
-                natCmd.SetRayTracingTextureParam(data.OpaqueTs, gIn_PrevViewZID, data.PrevViewZ);
-                natCmd.SetRayTracingTextureParam(data.OpaqueTs, gIn_PrevNormalRoughnessID, data.PrevNormalRoughness);
-                natCmd.SetRayTracingTextureParam(data.OpaqueTs, gIn_PrevBaseColorMetalnessID, data.PrevBaseColorMetalness);
-
-                natCmd.SetRayTracingBufferParam(data.OpaqueTs, gIn_SpotLightsID, data.SpotLightBuffer);
-                natCmd.SetRayTracingBufferParam(data.OpaqueTs, gIn_AreaLightsID, data.AreaLightBuffer);
-                natCmd.SetRayTracingBufferParam(data.OpaqueTs, gIn_PointLightsID, data.PointLightBuffer);
-                // natCmd.SetRayTracingTextureParam(data.OpaqueTs, gOut_SpotDirectID, data.SpotDirect);
-
-                // Debug.Log(data.m_RenderResolution);
-
-                uint rectWmod = (uint)(data.m_RenderResolution.x * data.resolutionScale + 0.5f);
-                uint rectHmod = (uint)(data.m_RenderResolution.y * data.resolutionScale + 0.5f);
-
-                // Debug.Log($"Dispatch Rays Size: {rectWmod} x {rectHmod}");
-
-
-                natCmd.DispatchRays(data.OpaqueTs, "MainRayGenShader", rectWmod, rectHmod, 1);
-
-                natCmd.EndSample(opaqueTracingMarker);
-
-                // 保存当帧 GBuffer 到 prev 纹理，供下一帧 RTXDI 时间复用读取
-                natCmd.BeginSample(copyGBufferMarker);
-                natCmd.CopyTexture(data.ViewZ, data.PrevViewZ);
-                natCmd.CopyTexture(data.NormalRoughness, data.PrevNormalRoughness);
-                natCmd.CopyTexture(data.BaseColorMetalness, data.PrevBaseColorMetalness);
-                natCmd.EndSample(copyGBufferMarker);
-            }
 
 
             // NRD降噪
@@ -615,193 +560,16 @@ namespace PathTracing
         {
             var cameraData = frameData.Get<UniversalCameraData>();
 
-            // 获取主光源方向
+
             var universalLightData = frameData.Get<UniversalLightData>();
             var lightData = universalLightData;
             var mainLight = lightData.mainLightIndex >= 0 ? lightData.visibleLights[lightData.mainLightIndex] : default;
             var mat = mainLight.localToWorldMatrix;
             Vector3 lightForward = mat.GetColumn(2);
-
-            // // Collect visible spot lights and upload to GPU buffer
-            // var spotLightList = new System.Collections.Generic.List<SpotLightData>();
-            // foreach (var vl in lightData.visibleLights)
-            // {
-            //     if (vl.lightType != LightType.Spot) continue;
-            //     var lmat       = vl.localToWorldMatrix;
-            //     Vector3 pos    = lmat.GetColumn(3);
-            //     Vector3 dir    = ((Vector3)lmat.GetColumn(2)).normalized;
-            //     Color   fc     = vl.finalColor;
-            //     float   outerHalf = vl.spotAngle * 0.5f * Mathf.Deg2Rad;
-            //     float   innerHalf = vl.light != null
-            //         ? vl.light.innerSpotAngle * 0.5f * Mathf.Deg2Rad
-            //         : outerHalf * 0.9f;
-            //     spotLightList.Add(new SpotLightData
-            //     {
-            //         position      = pos,
-            //         range         = vl.range,
-            //         direction     = dir,
-            //         cosOuterAngle = Mathf.Cos(outerHalf),
-            //         color         = new Vector3(fc.r, fc.g, fc.b),
-            //         cosInnerAngle = Mathf.Cos(innerHalf),
-            //     });
-            // }
-            //
-            //
-            // var spotLightList = new System.Collections.Generic.List<SpotLightData>();
-            //
-            // // 获取场景中所有激活的 Light 组件（不受视锥体裁剪限制）
-            // var allLights = UnityEngine.Object.FindObjectsByType<Light>(FindObjectsSortMode.None);
-            // foreach (var light in allLights)
-            // {
-            //     if (!light.enabled || !light.gameObject.activeInHierarchy) continue;
-            //     if (light.type != LightType.Spot) continue;
-            //
-            //     Vector3 pos = light.transform.position;
-            //     Vector3 dir = light.transform.forward.normalized;
-            //     Color fc = light.color * light.intensity;
-            //
-            //     float outerHalf = light.spotAngle * 0.5f * Mathf.Deg2Rad;
-            //     float innerHalf = light.innerSpotAngle * 0.5f * Mathf.Deg2Rad;
-            //
-            //     spotLightList.Add(new SpotLightData
-            //     {
-            //         position = pos,
-            //         range = light.range,
-            //         direction = dir,
-            //         cosOuterAngle = Mathf.Cos(outerHalf),
-            //         color = new Vector3(fc.r, fc.g, fc.b),
-            //         cosInnerAngle = Mathf.Cos(innerHalf),
-            //     });
-            // }
-            //
-            //
-            // int spotCount = spotLightList.Count;
-            // int bufferCount = Mathf.Max(spotCount, 1);
-            // if (m_SpotLightBuffer == null || m_SpotLightBuffer.count < bufferCount)
-            // {
-            //     m_SpotLightBuffer?.Release();
-            //     m_SpotLightBuffer = new GraphicsBuffer(
-            //         GraphicsBuffer.Target.Structured, bufferCount,
-            //         Marshal.SizeOf<SpotLightData>());
-            // }
-            //
-            // if (spotCount > 0)
-            //     m_SpotLightBuffer.SetData(spotLightList.ToArray());
-            //
-            // // ---------------------------------------------------------------
-            // // Collect area lights (LightType.Rectangle + LightType.Disc)
-            // // ---------------------------------------------------------------
-            // var areaLightList = new System.Collections.Generic.List<AreaLightData>();
-            //
-            // foreach (var light in allLights)
-            // {
-            //     if (!light.enabled || !light.gameObject.activeInHierarchy) continue;
-            //     if (light.type != LightType.Rectangle && light.type != LightType.Disc) continue;
-            //
-            //     Color   fc     = light.color * light.intensity;
-            //     Vector2 sz     = light.areaSize;
-            //     bool    isDisc = light.type == LightType.Disc;
-            //
-            //     areaLightList.Add(new AreaLightData
-            //     {
-            //         position   = light.transform.position,
-            //         // Disc: areaSize.x is the radius. Rect: areaSize is full width/height.
-            //         halfWidth  = isDisc ? sz.x          : sz.x * 0.5f,
-            //         right      = light.transform.right.normalized,
-            //         halfHeight = isDisc ? 0f             : sz.y * 0.5f,
-            //         up         = light.transform.up.normalized,
-            //         lightType  = isDisc ? 1f : 0f,
-            //         color      = new Vector3(fc.r, fc.g, fc.b),
-            //         pad2       = 0f,
-            //     });
-            // }
-            //
-            // int areaCount       = areaLightList.Count;
-            // int areaBufferCount = Mathf.Max(areaCount, 1);
-            // if (m_AreaLightBuffer == null || m_AreaLightBuffer.count < areaBufferCount)
-            // {
-            //     m_AreaLightBuffer?.Release();
-            //     m_AreaLightBuffer = new GraphicsBuffer(
-            //         GraphicsBuffer.Target.Structured, areaBufferCount,
-            //         Marshal.SizeOf<AreaLightData>());
-            // }
-            //
-            // if (areaCount > 0)
-            //     m_AreaLightBuffer.SetData(areaLightList.ToArray());
-            //
-            // // ---------------------------------------------------------------
-            // // Collect point lights (LightType.Point)
-            // // ---------------------------------------------------------------
-            // var pointLightList = new System.Collections.Generic.List<PointLightData>();
-            //
-            // foreach (var light in allLights)
-            // {
-            //     if (!light.enabled || !light.gameObject.activeInHierarchy) continue;
-            //     if (light.type != LightType.Point) continue;
-            //
-            //     Color fc = light.color * light.intensity;
-            //
-            //     // Read optional sphere radius from the PointLightRadius component.
-            //     // Falls back to 0 (hard point light) when the component is absent.
-            //     var    plr    = light.GetComponent<PointLightRadius>();
-            //     float  radius = plr != null ? Mathf.Max(0f, plr.radius) : 0f;
-            //
-            //     pointLightList.Add(new PointLightData
-            //     {
-            //         position = light.transform.position,
-            //         range    = light.range,
-            //         color    = new Vector3(fc.r, fc.g, fc.b),
-            //         radius   = radius,
-            //     });
-            // }
-            //
-            // int pointCount       = pointLightList.Count;
-            // int pointBufferCount = Mathf.Max(pointCount, 1);
-            // if (m_PointLightBuffer == null || m_PointLightBuffer.count < pointBufferCount)
-            // {
-            //     m_PointLightBuffer?.Release();
-            //     m_PointLightBuffer = new GraphicsBuffer(
-            //         GraphicsBuffer.Target.Structured, pointBufferCount,
-            //         Marshal.SizeOf<PointLightData>());
-            // }
-            //
-            // if (pointCount > 0)
-            //     m_PointLightBuffer.SetData(pointLightList.ToArray());
-            //
-            // if (cameraData.camera.cameraType != CameraType.Game && cameraData.camera.cameraType != CameraType.SceneView)
-            // {
-            //     return;
-            // }
-
-
-            // if (m_Settings.usePackedData)
-            // {
-            //     Shader.EnableKeyword("_USEPACK");
-            // }
-            // else
-            // {
-            //     Shader.DisableKeyword("_USEPACK");
-            // }
-
             var resourceData = frameData.Get<UniversalResourceData>();
-            //
-            // int2 outputResolution = new int2((int)(cameraData.camera.pixelWidth * cameraData.renderScale), (int)(cameraData.camera.pixelHeight * cameraData.renderScale));
-            //
-            // // Debug.Log($"Output Resolution: {outputResolution.x} x {outputResolution.y}");
             var xrPass = cameraData.xr;
             var isXr = xrPass.enabled;
-            // if (xrPass.enabled)
-            // {
-            //     // Debug.Log($"XR Enabled. Eye Texture Resolution: {xrPass.renderTargetDesc.width} x {xrPass.renderTargetDesc.height}");
-            //
-            //     outputResolution = new int2(xrPass.renderTargetDesc.width, xrPass.renderTargetDesc.height);
-            // }
-            //
-            // NrdDenoiser.EnsureResources(outputResolution);
-            //
             var renderResolution = NrdDenoiser.renderResolution;
-            //
-            // Shader.SetGlobalRayTracingAccelerationStructure(g_AccelStructID, AccelerationStructure);
 
             using var builder = renderGraph.AddUnsafePass<PassData>("Path Tracing Pass", out var passData);
 
@@ -1024,41 +792,57 @@ namespace PathTracing
             textureDesc.height = renderResolution.y;
 
             CreateTextureHandle(renderGraph, passData, textureDesc, builder);
+            
+            var ptContextItem = frameData.Get<PTContextItem>();
+
+
+            passData.OutputTexture = ptContextItem.OutputTexture;
+            passData.DirectLighting = ptContextItem.DirectLighting;
+            passData.DirectEmission = ptContextItem.DirectEmission;
+            passData.ComposedDiff = ptContextItem.ComposedDiff;
+            passData.ComposedSpecViewZ = ptContextItem.ComposedSpecViewZ;
+
+            builder.UseTexture(passData.OutputTexture,  AccessFlags.ReadWrite);
+            builder.UseTexture(passData.DirectLighting,  AccessFlags.ReadWrite);
+            builder.UseTexture(passData.DirectEmission,  AccessFlags.ReadWrite);
+            builder.UseTexture(passData.ComposedDiff,  AccessFlags.ReadWrite);
+            builder.UseTexture(passData.ComposedSpecViewZ,  AccessFlags.ReadWrite);
+            
 
             // passData.GlobalConstants = globalConstants;
             
-            
-            restirDIContext.SetFrameIndex((uint)Time.frameCount);
-            
-            
-            var resamplingConstants = new ResamplingConstants
-            {
-                runtimeParams = restirDIContext.GetRuntimeParams()
-            };
-
-            resamplingConstants.lightBufferParams.localLightBufferRegion.firstLightIndex = 0;
-            resamplingConstants.lightBufferParams.localLightBufferRegion.numLights = rtxdiResources.Scene.emissiveTriangleCount;
-            
-            resamplingConstants.lightBufferParams.infiniteLightBufferRegion.firstLightIndex = 0;
-            resamplingConstants.lightBufferParams.infiniteLightBufferRegion.numLights = 0;
-            
-            resamplingConstants.lightBufferParams.environmentLightParams.lightPresent = 0;
-            resamplingConstants.lightBufferParams.environmentLightParams.lightIndex = (0xffffffffu);
-
-
-            resamplingConstants.restirDIReservoirBufferParams = restirDIContext.GetReservoirBufferParameters();
-
-            resamplingConstants.frameIndex = restirDIContext.GetFrameIndex();
-            resamplingConstants.numInitialSamples = m_Settings.localLightSamples;
-            resamplingConstants.numSpatialSamples = m_Settings.spatialSamples;
-            resamplingConstants.useAccurateGBufferNormal = 0;
-            resamplingConstants.numInitialBRDFSamples = m_Settings.brdfSamples;
-            resamplingConstants.brdfCutoff = 0;
-            resamplingConstants.pad2 = new uint2(0, 0);
-            resamplingConstants.enableResampling = m_Settings.enableResampling ? 1u : 0u;
-            resamplingConstants.unbiasedMode = 1;
-            resamplingConstants.inputBufferIndex = (resamplingConstants.frameIndex & 1u) ^ 1;
-            resamplingConstants.outputBufferIndex = (resamplingConstants.frameIndex & 1u);
+            //
+            // restirDIContext.SetFrameIndex((uint)Time.frameCount);
+            //
+            //
+            // var resamplingConstants = new ResamplingConstants
+            // {
+            //     runtimeParams = restirDIContext.GetRuntimeParams()
+            // };
+            //
+            // resamplingConstants.lightBufferParams.localLightBufferRegion.firstLightIndex = 0;
+            // resamplingConstants.lightBufferParams.localLightBufferRegion.numLights = rtxdiResources.Scene.emissiveTriangleCount;
+            //
+            // resamplingConstants.lightBufferParams.infiniteLightBufferRegion.firstLightIndex = 0;
+            // resamplingConstants.lightBufferParams.infiniteLightBufferRegion.numLights = 0;
+            //
+            // resamplingConstants.lightBufferParams.environmentLightParams.lightPresent = 0;
+            // resamplingConstants.lightBufferParams.environmentLightParams.lightIndex = (0xffffffffu);
+            //
+            //
+            // resamplingConstants.restirDIReservoirBufferParams = restirDIContext.GetReservoirBufferParameters();
+            //
+            // resamplingConstants.frameIndex = restirDIContext.GetFrameIndex();
+            // resamplingConstants.numInitialSamples = m_Settings.localLightSamples;
+            // resamplingConstants.numSpatialSamples = m_Settings.spatialSamples;
+            // resamplingConstants.useAccurateGBufferNormal = 0;
+            // resamplingConstants.numInitialBRDFSamples = m_Settings.brdfSamples;
+            // resamplingConstants.brdfCutoff = 0;
+            // resamplingConstants.pad2 = new uint2(0, 0);
+            // resamplingConstants.enableResampling = m_Settings.enableResampling ? 1u : 0u;
+            // resamplingConstants.unbiasedMode = 1;
+            // resamplingConstants.inputBufferIndex = (resamplingConstants.frameIndex & 1u) ^ 1;
+            // resamplingConstants.outputBufferIndex = (resamplingConstants.frameIndex & 1u);
              
             
             // var sb = new System.Text.StringBuilder();
@@ -1100,7 +884,7 @@ namespace PathTracing
             // Debug.Log(sb.ToString());
 
 
-            passData.ResamplingConstants = resamplingConstants;
+            // passData.ResamplingConstants = resamplingConstants;
             
             // Debug.Log($"Reservoir reservoirArrayPitch: {resamplingConstants.restirDIReservoirBufferParams.reservoirArrayPitch}, reservoirBlockRowPitch: {resamplingConstants.restirDIReservoirBufferParams.reservoirBlockRowPitch}");
             
@@ -1134,15 +918,15 @@ namespace PathTracing
 
         private void CreateTextureHandle(RenderGraph renderGraph, PassData passData, TextureDesc textureDesc, IUnsafeRenderGraphBuilder builder)
         {
-            passData.OutputTexture = CreateTex(textureDesc, renderGraph, "PathTracingOutput", GraphicsFormat.R16G16B16A16_SFloat);
+            // passData.OutputTexture = CreateTex(textureDesc, renderGraph, "PathTracingOutput", GraphicsFormat.R16G16B16A16_SFloat);
 
             passData.Mv = renderGraph.ImportTexture(NrdDenoiser.GetRT(ResourceType.IN_MV));
             passData.ViewZ = renderGraph.ImportTexture(NrdDenoiser.GetRT(ResourceType.IN_VIEWZ));
             passData.NormalRoughness = renderGraph.ImportTexture(NrdDenoiser.GetRT(ResourceType.IN_NORMAL_ROUGHNESS));
 
             passData.BaseColorMetalness = renderGraph.ImportTexture(NrdDenoiser.GetRT(ResourceType.IN_BASECOLOR_METALNESS));
-            passData.DirectLighting = CreateTex(textureDesc, renderGraph, "DirectLighting", GraphicsFormat.B10G11R11_UFloatPack32);
-            passData.DirectEmission = CreateTex(textureDesc, renderGraph, "DirectEmission", GraphicsFormat.B10G11R11_UFloatPack32);
+            // passData.DirectLighting = CreateTex(textureDesc, renderGraph, "DirectLighting", GraphicsFormat.B10G11R11_UFloatPack32);
+            // passData.DirectEmission = CreateTex(textureDesc, renderGraph, "DirectEmission", GraphicsFormat.B10G11R11_UFloatPack32);
             // passData.SpotDirect = CreateTex(textureDesc, renderGraph, "SpotDirect", GraphicsFormat.B10G11R11_UFloatPack32);
 
             passData.Penumbra = renderGraph.ImportTexture(NrdDenoiser.GetRT(ResourceType.IN_PENUMBRA));
@@ -1155,8 +939,8 @@ namespace PathTracing
             passData.DenoisedSpec = renderGraph.ImportTexture(NrdDenoiser.GetRT(ResourceType.OUT_SPEC_RADIANCE_HITDIST));
             passData.Validation = renderGraph.ImportTexture(NrdDenoiser.GetRT(ResourceType.OUT_VALIDATION));
 
-            passData.ComposedDiff = CreateTex(textureDesc, renderGraph, "ComposedDiff", GraphicsFormat.R16G16B16A16_SFloat);
-            passData.ComposedSpecViewZ = CreateTex(textureDesc, renderGraph, "ComposedSpec_ViewZ", GraphicsFormat.R16G16B16A16_SFloat);
+            // passData.ComposedDiff = CreateTex(textureDesc, renderGraph, "ComposedDiff", GraphicsFormat.R16G16B16A16_SFloat);
+            // passData.ComposedSpecViewZ = CreateTex(textureDesc, renderGraph, "ComposedSpec_ViewZ", GraphicsFormat.R16G16B16A16_SFloat);
 
             passData.Composed = renderGraph.ImportTexture(NrdDenoiser.GetRT(ResourceType.Composed));
 
@@ -1176,15 +960,15 @@ namespace PathTracing
             passData.PrevBaseColorMetalness = renderGraph.ImportTexture(NrdDenoiser.GetRT(ResourceType.Prev_BaseColorMetalness));
 
 
-            builder.UseTexture(passData.OutputTexture, AccessFlags.ReadWrite);
+            // builder.UseTexture(passData.OutputTexture, AccessFlags.ReadWrite);
 
             builder.UseTexture(passData.Mv, AccessFlags.ReadWrite);
             builder.UseTexture(passData.ViewZ, AccessFlags.ReadWrite);
             builder.UseTexture(passData.NormalRoughness, AccessFlags.ReadWrite);
             builder.UseTexture(passData.BaseColorMetalness, AccessFlags.ReadWrite);
 
-            builder.UseTexture(passData.DirectLighting, AccessFlags.ReadWrite);
-            builder.UseTexture(passData.DirectEmission, AccessFlags.ReadWrite);
+            // builder.UseTexture(passData.DirectLighting, AccessFlags.ReadWrite);
+            // builder.UseTexture(passData.DirectEmission, AccessFlags.ReadWrite);
             // builder.UseTexture(passData.SpotDirect, AccessFlags.ReadWrite);
 
             builder.UseTexture(passData.Penumbra, AccessFlags.ReadWrite);
@@ -1197,8 +981,8 @@ namespace PathTracing
             builder.UseTexture(passData.DenoisedSpec, AccessFlags.ReadWrite);
             builder.UseTexture(passData.Validation, AccessFlags.ReadWrite);
 
-            builder.UseTexture(passData.ComposedDiff, AccessFlags.ReadWrite);
-            builder.UseTexture(passData.ComposedSpecViewZ, AccessFlags.ReadWrite);
+            // builder.UseTexture(passData.ComposedDiff, AccessFlags.ReadWrite);
+            // builder.UseTexture(passData.ComposedSpecViewZ, AccessFlags.ReadWrite);
             builder.UseTexture(passData.Composed, AccessFlags.ReadWrite);
 
             builder.UseTexture(passData.TaaHistory, AccessFlags.ReadWrite);
@@ -1216,12 +1000,12 @@ namespace PathTracing
             builder.UseTexture(passData.PrevBaseColorMetalness, AccessFlags.ReadWrite);
         }
 
-        private TextureHandle CreateTex(TextureDesc textureDesc, RenderGraph renderGraph, string name, GraphicsFormat format)
-        {
-            textureDesc.format = format;
-            textureDesc.name = name;
-            return renderGraph.CreateTexture(textureDesc);
-        }
+        // private TextureHandle CreateTex(TextureDesc textureDesc, RenderGraph renderGraph, string name, GraphicsFormat format)
+        // {
+        //     textureDesc.format = format;
+        //     textureDesc.name = name;
+        //     return renderGraph.CreateTexture(textureDesc);
+        // }
 
         public void Dispose()
         {

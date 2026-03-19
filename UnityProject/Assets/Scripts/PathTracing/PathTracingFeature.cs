@@ -91,6 +91,7 @@ namespace PathTracing
         private PathTracingPass _pathTracingPass;
         private SharcPass _sharcPass;
         private PrepareLightPass _prepareLightPass;
+        private OpaquePass _opaquePass;
 
         private RayTracingAccelerationStructure accelerationStructure;
         private Settings settings;
@@ -99,6 +100,7 @@ namespace PathTracing
         private GraphicsBuffer sobolUintBuffer;
 
         private GraphicsBuffer ConstantBuffer;
+        private GraphicsBuffer ResamplingConstantBuffer;
         
         private GraphicsBuffer _hashEntriesBuffer;
         private GraphicsBuffer _accumulationBuffer;
@@ -235,8 +237,8 @@ namespace PathTracing
             };
 
             _sharcPass = new SharcPass(sharcResolveCs, sharcUpdateTs);
-
             _prepareLightPass = new PrepareLightPass();
+            _opaquePass = new OpaquePass(opaqueTracingShader);
         }
 
         public static readonly int Capacity = 1 << 23;
@@ -264,7 +266,8 @@ namespace PathTracing
             }
 
             ConstantBuffer = new GraphicsBuffer(GraphicsBuffer.Target.Constant, 1, Marshal.SizeOf<GlobalConstants>());
-            
+            ResamplingConstantBuffer =  new GraphicsBuffer(GraphicsBuffer.Target.Structured, 1, Marshal.SizeOf<ResamplingConstants>());
+
             _hashEntriesBuffer = new GraphicsBuffer(GraphicsBuffer.Target.Structured, Capacity, sizeof(ulong));
             ulong[] clearData = new ulong[Capacity];
             _hashEntriesBuffer.SetData(clearData);
@@ -410,11 +413,13 @@ namespace PathTracing
             // GlobalConstants globalConstants =   GetConstants();
 
             var globalConstants = GetConstants(renderingData, nrd);
-            
             ConstantBuffer.SetData(new[] { globalConstants });
 
+            var resamplingConstants = GetResamplingConstants(restirDIContext, rtxdiResources);
+            ResamplingConstantBuffer.SetData(new[] { resamplingConstants });
+            
             // Sharc 
-            SharcPass.Resource sharcResource = new SharcPass.Resource
+            var sharcResource = new SharcPass.Resource
             {
                 ConstantBuffer =  ConstantBuffer,
                 AccumulationBuffer = _accumulationBuffer,
@@ -425,7 +430,7 @@ namespace PathTracing
                 SpotLightBuffer = m_SpotLightBuffer
             };
             
-            SharcPass.Settings sharcSettings = new SharcPass.Settings
+            var sharcSettings = new SharcPass.Settings
             {
                 RenderResolution = new int2(cam.pixelWidth, cam.pixelHeight)
             };
@@ -435,6 +440,51 @@ namespace PathTracing
             
             _prepareLightPass.Setup(prepareLightResource);
             renderer.EnqueuePass(_prepareLightPass);
+            
+            var opaqueResource = new OpaquePass.Resource
+            {
+                ConstantBuffer =  ConstantBuffer,
+                ResamplingConstantBuffer = ResamplingConstantBuffer,
+                
+                AccumulationBuffer = _accumulationBuffer,
+                HashEntriesBuffer = _hashEntriesBuffer,
+                ResolvedBuffer = _resolvedBuffer,
+                
+                PointLightBuffer = m_PointLightBuffer,
+                AreaLightBuffer = m_AreaLightBuffer,
+                SpotLightBuffer = m_SpotLightBuffer,
+                
+                ScramblingRanking = scramblingRankingUintBuffer,
+                Sobol = sobolUintBuffer,
+                
+                Mv =  nrd.GetRT(ResourceType.IN_MV),
+                ViewZ = nrd.GetRT(ResourceType.IN_VIEWZ),
+                NormalRoughness = nrd.GetRT(ResourceType.IN_NORMAL_ROUGHNESS),
+                BaseColorMetalness = nrd.GetRT(ResourceType.IN_BASECOLOR_METALNESS),
+                
+                Penumbra = nrd.GetRT(ResourceType.IN_PENUMBRA),
+                Diff = nrd.GetRT(ResourceType.IN_DIFF_RADIANCE_HITDIST),
+                Spec = nrd.GetRT(ResourceType.IN_SPEC_RADIANCE_HITDIST),
+                
+                PrevViewZ = nrd.GetRT(ResourceType.Prev_ViewZ),
+                PrevNormalRoughness = nrd.GetRT(ResourceType.Prev_NormalRoughness),
+                PrevBaseColorMetalness = nrd.GetRT(ResourceType.Prev_BaseColorMetalness),
+                
+                PsrThroughput = nrd.GetRT(ResourceType.PsrThroughput),
+                
+                RtxdiResources = rtxdiResources
+            };
+            
+            var opaqueSettings = new OpaquePass.Settings
+            {
+                m_RenderResolution = new int2(cam.pixelWidth, cam.pixelHeight),
+                resolutionScale = pathTracingSetting.resolutionScale
+            };
+            
+            _opaquePass.Setup(opaqueResource, opaqueSettings);
+            renderer.EnqueuePass(_opaquePass);
+            
+            
 
 
             _pathTracingPass.m_SpotLightBuffer = m_SpotLightBuffer;
@@ -445,6 +495,43 @@ namespace PathTracing
             _pathTracingPass.Setup();
             renderer.EnqueuePass(_pathTracingPass);
             
+        }
+
+        private ResamplingConstants GetResamplingConstants(ReSTIRDIContext restirDIContext, RtxdiResources rtxdiResources)
+        {
+            restirDIContext.SetFrameIndex((uint)Time.frameCount);
+
+
+            var resamplingConstants = new ResamplingConstants
+            {
+                runtimeParams = restirDIContext.GetRuntimeParams()
+            };
+
+            
+            resamplingConstants.lightBufferParams.localLightBufferRegion.firstLightIndex = 0;
+            resamplingConstants.lightBufferParams.localLightBufferRegion.numLights = rtxdiResources.Scene.emissiveTriangleCount;
+            
+            resamplingConstants.lightBufferParams.infiniteLightBufferRegion.firstLightIndex = 0;
+            resamplingConstants.lightBufferParams.infiniteLightBufferRegion.numLights = 0;
+            
+            resamplingConstants.lightBufferParams.environmentLightParams.lightPresent = 0;
+            resamplingConstants.lightBufferParams.environmentLightParams.lightIndex = (0xffffffffu);
+
+
+            resamplingConstants.restirDIReservoirBufferParams = restirDIContext.GetReservoirBufferParameters();
+
+            resamplingConstants.frameIndex = restirDIContext.GetFrameIndex();
+            resamplingConstants.numInitialSamples = pathTracingSetting.localLightSamples;
+            resamplingConstants.numSpatialSamples = pathTracingSetting.spatialSamples;
+            resamplingConstants.useAccurateGBufferNormal = 0;
+            resamplingConstants.numInitialBRDFSamples = pathTracingSetting.brdfSamples;
+            resamplingConstants.brdfCutoff = 0;
+            resamplingConstants.pad2 = new uint2(0, 0);
+            resamplingConstants.enableResampling = pathTracingSetting.enableResampling ? 1u : 0u;
+            resamplingConstants.unbiasedMode = 1;
+            resamplingConstants.inputBufferIndex = (resamplingConstants.frameIndex & 1u) ^ 1;
+            resamplingConstants.outputBufferIndex = (resamplingConstants.frameIndex & 1u);
+            return resamplingConstants;
         }
 
         private GlobalConstants GetConstants(RenderingData renderingData, NRDDenoiser nrd)
