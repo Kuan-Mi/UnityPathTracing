@@ -11,7 +11,6 @@ using UnityEngine.Rendering;
 using UnityEngine.Rendering.Universal;
 using static UnityEngine.Rendering.RayTracingAccelerationStructure;
 using static PathTracing.ShaderIDs;
-using static PathTracing.PathTracingUtils;
 
 namespace PathTracing
 {
@@ -22,13 +21,14 @@ namespace PathTracing
         public RenderPassEvent renderPassEvent = RenderPassEvent.BeforeRenderingPostProcessing;
 
         public Material finalMaterial;
+        public RayTracingShader sharcUpdateTs;
         public RayTracingShader opaqueTracingShader;
         public RayTracingShader transparentTracingShader;
+        
         public ComputeShader compositionComputeShader;
         public ComputeShader taaComputeShader;
         public ComputeShader dlssBeforeComputeShader;
         public ComputeShader sharcResolveCs;
-        public RayTracingShader sharcUpdateTs;
         public ComputeShader autoExposureShader;
 
         public Texture2D scramblingRankingTex;
@@ -227,11 +227,6 @@ namespace PathTracing
         }
 
 
-        uint GetMaxAccumulatedFrameNum(float accumulationTime, float fps)
-        {
-            return (uint)(accumulationTime * fps + 0.5f);
-        }
-
         public override void AddRenderPasses(ScriptableRenderer renderer, ref RenderingData renderingData)
         {
             var cam = renderingData.cameraData.camera;
@@ -251,6 +246,7 @@ namespace PathTracing
                 return;
 
 
+            Shader.SetGlobalRayTracingAccelerationStructure(g_AccelStructID, _accelerationStructure);
             _gpuScene.Build();
 
 
@@ -356,21 +352,21 @@ namespace PathTracing
 
             var nrdLightData = renderingData.lightData;
             var nrdMainLight = nrdLightData.mainLightIndex >= 0 ? nrdLightData.visibleLights[nrdLightData.mainLightIndex] : default;
-            var nrdLightDir  = new float3(-(Vector3)nrdMainLight.localToWorldMatrix.GetColumn(2));
+            var nrdLightDir = new float3(-(Vector3)nrdMainLight.localToWorldMatrix.GetColumn(2));
 
             var nrdInput = new NrdDenoiser.NrdFrameInput
             {
-                worldToView        = frameState.worldToView,
-                prevWorldToView    = frameState.prevWorldToView,
-                viewToClip         = frameState.viewToClip,
-                prevViewToClip     = frameState.prevViewToClip,
-                viewportJitter     = frameState.ViewportJitter,
+                worldToView = frameState.worldToView,
+                prevWorldToView = frameState.prevWorldToView,
+                viewToClip = frameState.viewToClip,
+                prevViewToClip = frameState.prevViewToClip,
+                viewportJitter = frameState.ViewportJitter,
                 prevViewportJitter = frameState.PrevViewportJitter,
-                resolutionScale    = frameState.resolutionScale,
+                resolutionScale = frameState.resolutionScale,
                 prevResolutionScale = frameState.prevResolutionScale,
-                renderResolution   = frameState.renderResolution,
-                frameIndex         = curFrame,
-                lightDirection     = nrdLightDir,
+                renderResolution = frameState.renderResolution,
+                frameIndex = curFrame,
+                lightDirection = nrdLightDir,
             };
 
             var nrdDataPtr = nrd.GetInteropDataPtr(nrdInput);
@@ -409,21 +405,21 @@ namespace PathTracing
 
             var dlrrInput = new DlrrDenoiser.DlrrFrameInput
             {
-                worldToView      = frameState.worldToView,
-                viewToClip       = frameState.viewToClip,
-                viewportJitter   = frameState.ViewportJitter,
+                worldToView = frameState.worldToView,
+                viewToClip = frameState.viewToClip,
+                viewportJitter = frameState.ViewportJitter,
                 renderResolution = frameState.renderResolution,
-                frameIndex       = curFrame,
-                outputWidth      = (ushort)outputResolution.x,
-                outputHeight     = (ushort)outputResolution.y,
+                frameIndex = curFrame,
+                outputWidth = (ushort)outputResolution.x,
+                outputHeight = (ushort)outputResolution.y,
             };
             var dlssDataPtr = dlrr.GetInteropDataPtr(dlrrInput, dlrrRes);
 
-            var globalConstants = GetConstants(renderingData, frameState);
+            var globalConstants = frameState.GetConstants(renderingData, pathTracingSetting, _lightCollector);
             _globalConstantsArray[0] = globalConstants;
             _constantBuffer.SetData(_globalConstantsArray);
 
-            var resamplingConstants = GetResamplingConstants(restirDiContext, rtxdiResources);
+            var resamplingConstants = GetResamplingConstants(restirDiContext, rtxdiResources, frameState);
             _resamplingConstantsArray[0] = resamplingConstants;
             _resamplingConstantBuffer.SetData(_resamplingConstantsArray);
 
@@ -692,16 +688,14 @@ namespace PathTracing
             renderer.EnqueuePass(_outputBlitPass);
         }
 
-        private ResamplingConstants GetResamplingConstants(ReSTIRDIContext restirDiContext, RtxdiResources rtxdiResources)
+        private ResamplingConstants GetResamplingConstants(ReSTIRDIContext restirDiContext, RtxdiResources rtxdiResources, CameraFrameState frameState)
         {
-            restirDiContext.SetFrameIndex((uint)Time.frameCount);
-
+            restirDiContext.SetFrameIndex(frameState.FrameIndex);
 
             var resamplingConstants = new ResamplingConstants
             {
                 runtimeParams = restirDiContext.GetRuntimeParams()
             };
-
 
             resamplingConstants.lightBufferParams.localLightBufferRegion.firstLightIndex = 0;
             resamplingConstants.lightBufferParams.localLightBufferRegion.numLights = rtxdiResources.Scene.emissiveTriangleCount;
@@ -711,7 +705,6 @@ namespace PathTracing
 
             resamplingConstants.lightBufferParams.environmentLightParams.lightPresent = 0;
             resamplingConstants.lightBufferParams.environmentLightParams.lightIndex = (0xffffffffu);
-
 
             resamplingConstants.restirDIReservoirBufferParams = restirDiContext.GetReservoirBufferParameters();
 
@@ -737,187 +730,6 @@ namespace PathTracing
             return new int2(
                 (int)(cameraData.camera.pixelWidth * cameraData.renderScale),
                 (int)(cameraData.camera.pixelHeight * cameraData.renderScale));
-        }
-
-        private GlobalConstants GetConstants(RenderingData renderingData, CameraFrameState frameState)
-        {
-            var cameraData = renderingData.cameraData;
-            var settings = pathTracingSetting;
-
-            var lightData = renderingData.lightData;
-            var mainLight = lightData.mainLightIndex >= 0 ? lightData.visibleLights[lightData.mainLightIndex] : default;
-            var mat = mainLight.localToWorldMatrix;
-            Vector3 lightForward = mat.GetColumn(2);
-
-            var gSunDirection = -lightForward;
-            var up = new Vector3(0, 1, 0);
-            var gSunBasisX = math.normalize(math.cross(new float3(up.x, up.y, up.z), new float3(gSunDirection.x, gSunDirection.y, gSunDirection.z)));
-            var gSunBasisY = math.normalize(math.cross(new float3(gSunDirection.x, gSunDirection.y, gSunDirection.z), gSunBasisX));
-
-
-            var outputResolution = ComputeOutputResolution(cameraData);
-
-            var xrPass = cameraData.xr;
-            var isXr = xrPass.enabled;
-
-            var renderResolution = frameState.renderResolution;
-
-            Shader.SetGlobalRayTracingAccelerationStructure(g_AccelStructID, _accelerationStructure);
-
-            var proj = isXr ? xrPass.GetProjMatrix() : cameraData.camera.projectionMatrix;
-
-            var m11 = proj.m11;
-
-
-            var rectW = (uint)(renderResolution.x * frameState.resolutionScale + 0.5f);
-            var rectH = (uint)(renderResolution.y * frameState.resolutionScale + 0.5f);
-
-            var rectWprev = (uint)(renderResolution.x * frameState.prevResolutionScale + 0.5f);
-            var rectHprev = (uint)(renderResolution.y * frameState.prevResolutionScale + 0.5f);
-
-
-            var renderSize = new float2((renderResolution.x), (renderResolution.y));
-            var outputSize = new float2((outputResolution.x), (outputResolution.y));
-            var rectSize = new float2(rectW, rectH);
-
-
-            var rectSizePrev = new float2((rectWprev), (rectHprev));
-            var jitter = (settings.cameraJitter ? frameState.ViewportJitter : 0f) / rectSize;
-
-
-            var fovXRad = math.atan(1.0f / proj.m00) * 2.0f;
-            var horizontalFieldOfView = fovXRad * Mathf.Rad2Deg;
-
-            var nearZ = proj.m23 / (proj.m22 - 1.0f);
-
-            var emissionIntensity = settings.emissionIntensity * (settings.emission ? 1.0f : 0.0f);
-
-            var accumulationTime = 0.5f;
-            var maxHistoryFrameNum = 60;
-
-            var fps = 1000.0f / Mathf.Max(Time.deltaTime * 1000.0f, 0.0001f);
-            fps = math.min(fps, 121.0f);
-
-            // Debug.Log(fps);
-
-            var resetHistoryFactor = 1.0f;
-
-
-            float otherMaxAccumulatedFrameNum = GetMaxAccumulatedFrameNum(accumulationTime, fps);
-            otherMaxAccumulatedFrameNum = math.min(otherMaxAccumulatedFrameNum, (maxHistoryFrameNum));
-            otherMaxAccumulatedFrameNum *= resetHistoryFactor;
-
-
-            var sharcMaxAccumulatedFrameNum = (uint)(otherMaxAccumulatedFrameNum * (settings.boost ? settings.boostFactor : 1.0f) + 0.5f);
-            // Debug.Log($"sharcMaxAccumulatedFrameNum: {sharcMaxAccumulatedFrameNum}");
-            var taaMaxAccumulatedFrameNum = otherMaxAccumulatedFrameNum * 0.5f;
-            var prevFrameMaxAccumulatedFrameNum = otherMaxAccumulatedFrameNum * 0.3f;
-
-
-            var minProbability = 0.0f;
-            // if (settings.tracingMode == RESOLUTION.RESOLUTION_FULL_PROBABILISTIC)
-            // {
-            //     var mode = HitDistanceReconstructionMode.OFF;
-            //     if (settings.denoiser == DenoiserType.DENOISER_REBLUR)
-            //         mode = HitDistanceReconstructionMode.OFF;
-            //     //     mode = m_ReblurSettings.hitDistanceReconstructionMode;
-            //     // else if (m_Settings.denoiser == DenoiserType.DENOISER_RELAX)
-            //     //     mode = m_RelaxSettings.hitDistanceReconstructionMode;
-            //
-            //     // Min / max allowed probability to guarantee a sample in 3x3 or 5x5 area - https://godbolt.org/z/YGYo1rjnM
-            //     if (mode == HitDistanceReconstructionMode.AREA_3X3)
-            //         minProbability = 1.0f / 4.0f;
-            //     else if (mode == HitDistanceReconstructionMode.AREA_5X5)
-            //         minProbability = 1.0f / 16.0f;
-            // }
-
-
-            var globalConstants = new GlobalConstants
-            {
-                gViewToWorld = frameState.worldToView.inverse,
-                gViewToWorldPrev = frameState.prevWorldToView.inverse,
-                gViewToClip = frameState.viewToClip,
-                gWorldToView = frameState.worldToView,
-                gWorldToViewPrev = frameState.prevWorldToView,
-                gWorldToClip = frameState.worldToClip,
-                gWorldToClipPrev = frameState.prevWorldToClip,
-
-                gHitDistParams = new float4(3, 0.1f, 20, -25),
-                gCameraFrustum = GetNrdFrustum(cameraData),
-                gSunBasisX = new float4(gSunBasisX.x, gSunBasisX.y, gSunBasisX.z, 0),
-                gSunBasisY = new float4(gSunBasisY.x, gSunBasisY.y, gSunBasisY.z, 0),
-                gSunDirection = new float4(gSunDirection.x, gSunDirection.y, gSunDirection.z, 0),
-                gCameraGlobalPos = new float4(frameState.camPos, 0),
-                gCameraGlobalPosPrev = new float4(frameState.prevCamPos, 0),
-                gViewDirection = new float4(cameraData.camera.transform.forward, 0),
-                gHairBaseColor = new float4(0.1f, 0.1f, 0.1f, 1.0f),
-
-                gHairBetas = new float2(0.25f, 0.3f),
-                gOutputSize = outputSize,
-                gRenderSize = renderSize,
-                gRectSize = rectSize,
-                gInvOutputSize = new float2(1.0f, 1.0f) / outputSize,
-                gInvRenderSize = new float2(1.0f, 1.0f) / renderSize,
-                gInvRectSize = new float2(1.0f, 1.0f) / rectSize,
-                gRectSizePrev = rectSizePrev,
-                gJitter = jitter,
-
-                gEmissionIntensity = emissionIntensity,
-                gNearZ = -nearZ,
-                gSeparator = settings.splitScreen,
-                gRoughnessOverride = 0,
-                gMetalnessOverride = 0,
-                gUnitToMetersMultiplier = 1.0f,
-                gTanSunAngularRadius = math.tan(math.radians(settings.sunAngularDiameter * 0.5f)),
-                gTanPixelAngularRadius = math.tan(0.5f * math.radians(horizontalFieldOfView) / rectSize.x),
-                gDebug = 0,
-                gPrevFrameConfidence = (settings.usePrevFrame && !settings.RR) ? prevFrameMaxAccumulatedFrameNum / (1.0f + prevFrameMaxAccumulatedFrameNum) : 0.0f,
-                gUnproject = 1.0f / (0.5f * rectH * m11),
-                gAperture = settings.dofAperture * 0.01f,
-                gFocalDistance = settings.dofFocalDistance,
-                gFocalLength = (0.5f * (35.0f * 0.001f)) / math.tan(math.radians(horizontalFieldOfView * 0.5f)),
-                gTAA = (settings.denoiser != DenoiserType.DENOISER_REFERENCE && settings.TAA) ? 1.0f / (1.0f + taaMaxAccumulatedFrameNum) : 1.0f,
-                gHdrScale = 1.0f,
-                gExposure = settings.exposure,
-                gMipBias = settings.mipBias,
-                gOrthoMode = cameraData.camera.orthographic ? 1.0f : 0f,
-                gIndirectDiffuse = settings.indirectDiffuse ? 1.0f : 0.0f,
-                gIndirectSpecular = settings.indirectSpecular ? 1.0f : 0.0f,
-                gMinProbability = minProbability,
-
-                gSharcMaxAccumulatedFrameNum = sharcMaxAccumulatedFrameNum,
-                gDenoiserType = (uint)settings.denoiser,
-                gDisableShadowsAndEnableImportanceSampling = settings.importanceSampling ? 1u : 0u,
-                gFrameIndex = (uint)Time.frameCount,
-                gForcedMaterial = 0,
-                gUseNormalMap = 1,
-                gBounceNum = settings.bounceNum,
-                gResolve = 1,
-                gValidation = 1,
-                gSR = (settings.SR && !settings.RR) ? 1u : 0u,
-                gRR = settings.RR ? 1u : 0,
-                gIsSrgb = 0,
-                gOnScreen = 0,
-                gTracingMode = settings.RR ? (uint)RESOLUTION.RESOLUTION_FULL_PROBABILISTIC : (uint)settings.tracingMode,
-                gSampleNum = settings.rpp,
-                gPSR = settings.psr ? (uint)1 : 0,
-                gSHARC = settings.SHARC ? (uint)1 : 0,
-                gTrimLobe = settings.specularLobeTrimming ? 1u : 0,
-                gSpotLightCount = (uint)_lightCollector.SpotCount,
-                gAreaLightCount = (uint)_lightCollector.AreaCount,
-                gPointLightCount = (uint)_lightCollector.PointCount,
-                gSssScatteringColor = new float3(settings.sssScatteringColor.r, settings.sssScatteringColor.g, settings.sssScatteringColor.b),
-                gSssMinThreshold = settings.sssMinThreshold,
-                gSssTransmissionBsdfSampleCount = settings.sssTransmissionBsdfSampleCount,
-                gSssTransmissionPerBsdfScatteringSampleCount = settings.sssTransmissionPerBsdfScatteringSampleCount,
-                gSssScale = settings.sssScale,
-                gSssAnisotropy = settings.sssAnisotropy,
-                gSssMaxSampleRadius = settings.sssMaxSampleRadius,
-                gIsEditor = cameraData.camera.cameraType == CameraType.SceneView ? 1u : 0u,
-                gShowLight = settings.gShowLight ? 1u : 0u
-            };
-
-            return globalConstants;
         }
 
 

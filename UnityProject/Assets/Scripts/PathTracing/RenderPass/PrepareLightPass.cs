@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Runtime.InteropServices;
 using RTXDI;
 using Unity.Mathematics;
 using Unity.Profiling;
@@ -14,6 +15,8 @@ namespace PathTracing
     {
         private PrepareLightResource _prepareLightResource;
 
+        [DllImport("UnityRTXDI")]
+        private static extern IntPtr GetRenderEventAndDataFunc();
 
         public void Setup(PrepareLightResource prepareLightResource)
         {
@@ -32,7 +35,7 @@ namespace PathTracing
             var prepareLightMarker = new ProfilerMarker(ProfilerCategory.Render, "PrepareLight", MarkerFlags.SampleGPU);
 
             natCmd.BeginSample(prepareLightMarker);
-            natCmd.IssuePluginEventAndData(UnityRTXDI.GetRenderEventAndDataFunc(), 1, data.DataPtr);
+            natCmd.IssuePluginEventAndData(GetRenderEventAndDataFunc(), 1, data.DataPtr);
             natCmd.EndSample(prepareLightMarker);
         }
 

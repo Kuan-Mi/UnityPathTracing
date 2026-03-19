@@ -112,5 +112,201 @@ namespace PathTracing
         public static float Halton1D(uint n)  => Halton2(n);
 
         public static float2 Halton2D(uint n) => new float2(Halton2(n), Halton(n, 3));
+        
+
+        uint GetMaxAccumulatedFrameNum(float accumulationTime, float fps)
+        {
+            return (uint)(accumulationTime * fps + 0.5f);
+        }
+        
+        
+        private static int2 ComputeOutputResolution(CameraData cameraData)
+        {
+            var xrPass = cameraData.xr;
+            if (xrPass.enabled)
+                return new int2(xrPass.renderTargetDesc.width, xrPass.renderTargetDesc.height);
+            return new int2(
+                (int)(cameraData.camera.pixelWidth * cameraData.renderScale),
+                (int)(cameraData.camera.pixelHeight * cameraData.renderScale));
+        }
+        
+        
+        public GlobalConstants GetConstants(RenderingData renderingData, PathTracingSetting settings,LightCollector lightCollector)
+        {
+            var cameraData = renderingData.cameraData;
+
+            var lightData = renderingData.lightData;
+            var mainLight = lightData.mainLightIndex >= 0 ? lightData.visibleLights[lightData.mainLightIndex] : default;
+            var mat = mainLight.localToWorldMatrix;
+            Vector3 lightForward = mat.GetColumn(2);
+
+            var gSunDirection = -lightForward;
+            var up = new Vector3(0, 1, 0);
+            var gSunBasisX = math.normalize(math.cross(new float3(up.x, up.y, up.z), new float3(gSunDirection.x, gSunDirection.y, gSunDirection.z)));
+            var gSunBasisY = math.normalize(math.cross(new float3(gSunDirection.x, gSunDirection.y, gSunDirection.z), gSunBasisX));
+
+
+            var outputResolution = ComputeOutputResolution(cameraData);
+
+            var xrPass = cameraData.xr;
+            var isXr = xrPass.enabled;
+
+            var proj = isXr ? xrPass.GetProjMatrix() : cameraData.camera.projectionMatrix;
+
+            var m11 = proj.m11;
+
+
+            var rectW = (uint)(renderResolution.x * resolutionScale + 0.5f);
+            var rectH = (uint)(renderResolution.y * resolutionScale + 0.5f);
+
+            var rectWprev = (uint)(renderResolution.x * prevResolutionScale + 0.5f);
+            var rectHprev = (uint)(renderResolution.y * prevResolutionScale + 0.5f);
+
+
+            var renderSize = new float2((renderResolution.x), (renderResolution.y));
+            var outputSize = new float2((outputResolution.x), (outputResolution.y));
+            var rectSize = new float2(rectW, rectH);
+
+
+            var rectSizePrev = new float2((rectWprev), (rectHprev));
+            var jitter = (settings.cameraJitter ? ViewportJitter : 0f) / rectSize;
+
+
+            var fovXRad = math.atan(1.0f / proj.m00) * 2.0f;
+            var horizontalFieldOfView = fovXRad * Mathf.Rad2Deg;
+
+            var nearZ = proj.m23 / (proj.m22 - 1.0f);
+
+            var emissionIntensity = settings.emissionIntensity * (settings.emission ? 1.0f : 0.0f);
+
+            var accumulationTime = 0.5f;
+            var maxHistoryFrameNum = 60;
+
+            var fps = 1000.0f / Mathf.Max(Time.deltaTime * 1000.0f, 0.0001f);
+            fps = math.min(fps, 121.0f);
+
+            // Debug.Log(fps);
+
+            var resetHistoryFactor = 1.0f;
+
+
+            float otherMaxAccumulatedFrameNum = GetMaxAccumulatedFrameNum(accumulationTime, fps);
+            otherMaxAccumulatedFrameNum = math.min(otherMaxAccumulatedFrameNum, (maxHistoryFrameNum));
+            otherMaxAccumulatedFrameNum *= resetHistoryFactor;
+
+
+            var sharcMaxAccumulatedFrameNum = (uint)(otherMaxAccumulatedFrameNum * (settings.boost ? settings.boostFactor : 1.0f) + 0.5f);
+            // Debug.Log($"sharcMaxAccumulatedFrameNum: {sharcMaxAccumulatedFrameNum}");
+            var taaMaxAccumulatedFrameNum = otherMaxAccumulatedFrameNum * 0.5f;
+            var prevFrameMaxAccumulatedFrameNum = otherMaxAccumulatedFrameNum * 0.3f;
+
+
+            var minProbability = 0.0f;
+            // if (settings.tracingMode == RESOLUTION.RESOLUTION_FULL_PROBABILISTIC)
+            // {
+            //     var mode = HitDistanceReconstructionMode.OFF;
+            //     if (settings.denoiser == DenoiserType.DENOISER_REBLUR)
+            //         mode = HitDistanceReconstructionMode.OFF;
+            //     //     mode = m_ReblurSettings.hitDistanceReconstructionMode;
+            //     // else if (m_Settings.denoiser == DenoiserType.DENOISER_RELAX)
+            //     //     mode = m_RelaxSettings.hitDistanceReconstructionMode;
+            //
+            //     // Min / max allowed probability to guarantee a sample in 3x3 or 5x5 area - https://godbolt.org/z/YGYo1rjnM
+            //     if (mode == HitDistanceReconstructionMode.AREA_3X3)
+            //         minProbability = 1.0f / 4.0f;
+            //     else if (mode == HitDistanceReconstructionMode.AREA_5X5)
+            //         minProbability = 1.0f / 16.0f;
+            // }
+
+
+            var globalConstants = new GlobalConstants
+            {
+                gViewToWorld = worldToView.inverse,
+                gViewToWorldPrev = prevWorldToView.inverse,
+                gViewToClip = viewToClip,
+                gWorldToView = worldToView,
+                gWorldToViewPrev = prevWorldToView,
+                gWorldToClip = worldToClip,
+                gWorldToClipPrev = prevWorldToClip,
+
+                gHitDistParams = new float4(3, 0.1f, 20, -25),
+                gCameraFrustum = GetNrdFrustum(cameraData),
+                gSunBasisX = new float4(gSunBasisX.x, gSunBasisX.y, gSunBasisX.z, 0),
+                gSunBasisY = new float4(gSunBasisY.x, gSunBasisY.y, gSunBasisY.z, 0),
+                gSunDirection = new float4(gSunDirection.x, gSunDirection.y, gSunDirection.z, 0),
+                gCameraGlobalPos = new float4(camPos, 0),
+                gCameraGlobalPosPrev = new float4(prevCamPos, 0),
+                gViewDirection = new float4(cameraData.camera.transform.forward, 0),
+                gHairBaseColor = new float4(0.1f, 0.1f, 0.1f, 1.0f),
+
+                gHairBetas = new float2(0.25f, 0.3f),
+                gOutputSize = outputSize,
+                gRenderSize = renderSize,
+                gRectSize = rectSize,
+                gInvOutputSize = new float2(1.0f, 1.0f) / outputSize,
+                gInvRenderSize = new float2(1.0f, 1.0f) / renderSize,
+                gInvRectSize = new float2(1.0f, 1.0f) / rectSize,
+                gRectSizePrev = rectSizePrev,
+                gJitter = jitter,
+
+                gEmissionIntensity = emissionIntensity,
+                gNearZ = -nearZ,
+                gSeparator = settings.splitScreen,
+                gRoughnessOverride = 0,
+                gMetalnessOverride = 0,
+                gUnitToMetersMultiplier = 1.0f,
+                gTanSunAngularRadius = math.tan(math.radians(settings.sunAngularDiameter * 0.5f)),
+                gTanPixelAngularRadius = math.tan(0.5f * math.radians(horizontalFieldOfView) / rectSize.x),
+                gDebug = 0,
+                gPrevFrameConfidence = (settings.usePrevFrame && !settings.RR) ? prevFrameMaxAccumulatedFrameNum / (1.0f + prevFrameMaxAccumulatedFrameNum) : 0.0f,
+                gUnproject = 1.0f / (0.5f * rectH * m11),
+                gAperture = settings.dofAperture * 0.01f,
+                gFocalDistance = settings.dofFocalDistance,
+                gFocalLength = (0.5f * (35.0f * 0.001f)) / math.tan(math.radians(horizontalFieldOfView * 0.5f)),
+                gTAA = (settings.denoiser != DenoiserType.DENOISER_REFERENCE && settings.TAA) ? 1.0f / (1.0f + taaMaxAccumulatedFrameNum) : 1.0f,
+                gHdrScale = 1.0f,
+                gExposure = settings.exposure,
+                gMipBias = settings.mipBias,
+                gOrthoMode = cameraData.camera.orthographic ? 1.0f : 0f,
+                gIndirectDiffuse = settings.indirectDiffuse ? 1.0f : 0.0f,
+                gIndirectSpecular = settings.indirectSpecular ? 1.0f : 0.0f,
+                gMinProbability = minProbability,
+
+                gSharcMaxAccumulatedFrameNum = sharcMaxAccumulatedFrameNum,
+                gDenoiserType = (uint)settings.denoiser,
+                gDisableShadowsAndEnableImportanceSampling = settings.importanceSampling ? 1u : 0u,
+                gFrameIndex = (uint)Time.frameCount,
+                gForcedMaterial = 0,
+                gUseNormalMap = 1,
+                gBounceNum = settings.bounceNum,
+                gResolve = 1,
+                gValidation = 1,
+                gSR = (settings.SR && !settings.RR) ? 1u : 0u,
+                gRR = settings.RR ? 1u : 0,
+                gIsSrgb = 0,
+                gOnScreen = 0,
+                gTracingMode = settings.RR ? (uint)RESOLUTION.RESOLUTION_FULL_PROBABILISTIC : (uint)settings.tracingMode,
+                gSampleNum = settings.rpp,
+                gPSR = settings.psr ? (uint)1 : 0,
+                gSHARC = settings.SHARC ? (uint)1 : 0,
+                gTrimLobe = settings.specularLobeTrimming ? 1u : 0,
+                gSpotLightCount = (uint)lightCollector.SpotCount,
+                gAreaLightCount = (uint)lightCollector.AreaCount,
+                gPointLightCount = (uint)lightCollector.PointCount,
+                gSssScatteringColor = new float3(settings.sssScatteringColor.r, settings.sssScatteringColor.g, settings.sssScatteringColor.b),
+                gSssMinThreshold = settings.sssMinThreshold,
+                gSssTransmissionBsdfSampleCount = settings.sssTransmissionBsdfSampleCount,
+                gSssTransmissionPerBsdfScatteringSampleCount = settings.sssTransmissionPerBsdfScatteringSampleCount,
+                gSssScale = settings.sssScale,
+                gSssAnisotropy = settings.sssAnisotropy,
+                gSssMaxSampleRadius = settings.sssMaxSampleRadius,
+                gIsEditor = cameraData.camera.cameraType == CameraType.SceneView ? 1u : 0u,
+                gShowLight = settings.gShowLight ? 1u : 0u
+            };
+
+            return globalConstants;
+        }
+
+
     }
 }
