@@ -6,7 +6,6 @@ using Unity.Collections;
 using Unity.Collections.LowLevel.Unsafe;
 using Unity.Mathematics;
 using UnityEngine;
-using UnityEngine.Experimental.Rendering;
 using UnityEngine.Rendering;
 using UnityEngine.Rendering.Universal;
 using static PathTracing.PathTracingUtils;
@@ -29,7 +28,6 @@ namespace Nrd
         public uint FrameIndex;
         private readonly int nrdInstanceId;
         private string cameraName;
-        private readonly PathTracingResourcePool pool;
 
         public Matrix4x4 worldToView;
         public Matrix4x4 worldToClip;
@@ -45,7 +43,7 @@ namespace Nrd
         public float3 camPos;
         public float3 prevCamPos;
 
-        public int2 renderResolution => pool.renderResolution;
+        public int2 renderResolution;
 
         public float resolutionScale;
         public float prevResolutionScale;
@@ -56,10 +54,28 @@ namespace Nrd
 
         private PathTracingSetting setting;
 
-        public NRDDenoiser(PathTracingSetting setting, string camName, PathTracingResourcePool pool)
+        /// <summary>
+        /// NRD-required textures packed by PathTracingFeature and passed on each resource refresh.
+        /// </summary>
+        public struct NrdResources
+        {
+            public NriTextureResource InMv;
+            public NriTextureResource InViewZ;
+            public NriTextureResource InNormalRoughness;
+            public NriTextureResource InBaseColorMetalness;
+            public NriTextureResource InPenumbra;
+            public NriTextureResource InDiffRadianceHitDist;
+            public NriTextureResource InSpecRadianceHitDist;
+
+            public NriTextureResource OutShadowTranslucency;
+            public NriTextureResource OutDiffRadianceHitDist;
+            public NriTextureResource OutSpecRadianceHitDist;
+            public NriTextureResource OutValidation;
+        }
+
+        public NRDDenoiser(PathTracingSetting setting, string camName)
         {
             this.setting = setting;
-            this.pool = pool;
             nrdInstanceId = CreateDenoiserInstance();
             cameraName = camName;
             buffer = new NativeArray<FrameData>(BufferCount, Allocator.Persistent);
@@ -68,40 +84,40 @@ namespace Nrd
             Debug.Log($"[NRD] Created Denoiser Instance {nrdInstanceId} for Camera {cameraName}");
         }
 
-
-        public void EnsureResources(int2 outputResolution)
+        /// <summary>
+        /// Pushes the current NRD texture snapshot to the C++ denoiser.
+        /// Called by PathTracingFeature whenever textures are reallocated.
+        /// </summary>
+        public unsafe void UpdateResources(NrdResources res)
         {
-            bool resourcesChanged = pool.EnsureResources(outputResolution);
-            if (resourcesChanged)
-            {
-                FrameIndex = 0;
-                UpdateResourceSnapshotInCpp();
-            }
-        }
-
-        private unsafe void UpdateResourceSnapshotInCpp()
-        {
-            int maxResources = 20;
-            if (!m_ResourceCache.IsCreated || m_ResourceCache.Length < maxResources)
+            const int count = 11;
+            if (!m_ResourceCache.IsCreated || m_ResourceCache.Length < count)
             {
                 if (m_ResourceCache.IsCreated) m_ResourceCache.Dispose();
-                m_ResourceCache = new NativeArray<NrdResourceInput>(maxResources, Allocator.Persistent);
+                m_ResourceCache = new NativeArray<NrdResourceInput>(count, Allocator.Persistent);
             }
 
             int idx = 0;
-            NrdResourceInput* ptr = (NrdResourceInput*)m_ResourceCache.GetUnsafePtr();
+            var ptr = (NrdResourceInput*)m_ResourceCache.GetUnsafePtr();
 
-            foreach (var res in pool.GetAllNrdResources())
-            {
-                ptr[idx++] = new NrdResourceInput { type = res.ResourceType, texture = res.NriPtr, state = res.ResourceState };
-            }
+            void Add(ResourceType t, NriTextureResource r) =>
+                ptr[idx++] = new NrdResourceInput { type = t, texture = r.NriPtr, state = r.ResourceState };
+
+            Add(ResourceType.IN_MV,                    res.InMv);
+            Add(ResourceType.IN_VIEWZ,                 res.InViewZ);
+            Add(ResourceType.IN_NORMAL_ROUGHNESS,      res.InNormalRoughness);
+            Add(ResourceType.IN_BASECOLOR_METALNESS,   res.InBaseColorMetalness);
+            Add(ResourceType.IN_PENUMBRA,              res.InPenumbra);
+            Add(ResourceType.IN_DIFF_RADIANCE_HITDIST, res.InDiffRadianceHitDist);
+            Add(ResourceType.IN_SPEC_RADIANCE_HITDIST, res.InSpecRadianceHitDist);
+            Add(ResourceType.OUT_SHADOW_TRANSLUCENCY,  res.OutShadowTranslucency);
+            Add(ResourceType.OUT_DIFF_RADIANCE_HITDIST,res.OutDiffRadianceHitDist);
+            Add(ResourceType.OUT_SPEC_RADIANCE_HITDIST,res.OutSpecRadianceHitDist);
+            Add(ResourceType.OUT_VALIDATION,           res.OutValidation);
 
             UpdateDenoiserResources(nrdInstanceId, (IntPtr)ptr, idx);
-
             Debug.Log($"[NRD] Updated Resources for Denoiser Instance {nrdInstanceId} with {idx} resources.");
         }
-
-
 
         public static float Halton(uint n, uint @base)
         {

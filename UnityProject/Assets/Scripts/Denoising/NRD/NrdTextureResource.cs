@@ -1,6 +1,6 @@
 ﻿using System;
 using System.Runtime.InteropServices;
-using Nrd;
+using PathTracing;
 using Unity.Mathematics;
 using UnityEngine;
 using UnityEngine.Experimental.Rendering;
@@ -9,7 +9,7 @@ using Object = UnityEngine.Object;
 
 namespace NRD
 {
-    public class NrdTextureResource
+    public class NriTextureResource
     {
         [DllImport("RenderingPlugin")]
         private static extern IntPtr WrapD3D12Texture(IntPtr resource, DXGI_FORMAT format);
@@ -24,31 +24,17 @@ namespace NRD
 
         public string Name;
         public NriResourceState ResourceState;
-        public ResourceType ResourceType;
+        public RenderResourceType ResourceType;
         public GraphicsFormat GraphicsFormat;
         public bool SRGB;
         
         public bool IsCreated => Handle != null;
 
 
-        public NrdTextureResource(ResourceType resourceType, GraphicsFormat graphicsFormat, NriResourceState initialState, bool srgb = false)
+        public NriTextureResource(RenderResourceType resourceType, GraphicsFormat graphicsFormat, NriResourceState initialState, bool srgb = false)
         {
             Name = resourceType.ToString();
             ResourceType = resourceType;
-            ResourceState = initialState;
-            GraphicsFormat = graphicsFormat;
-            SRGB = srgb;
-        }
-
-        /// <summary>
-        /// Constructor for resources that require an NRI pointer but are NOT part of the NRD API
-        /// (e.g. DLSS/RR guide textures, composition buffers).
-        /// ResourceType is set to MAX_NUM as a sentinel value.
-        /// </summary>
-        public NrdTextureResource(string name, GraphicsFormat graphicsFormat, NriResourceState initialState, bool srgb = false)
-        {
-            Name = name;
-            ResourceType = ResourceType.MAX_NUM;
             ResourceState = initialState;
             GraphicsFormat = graphicsFormat;
             SRGB = srgb;

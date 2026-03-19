@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Runtime.InteropServices;
+using NRD;
 using PathTracing;
 using Unity.Collections;
 using Unity.Collections.LowLevel.Unsafe;
@@ -25,6 +26,21 @@ namespace Nrd
 
         private PathTracingSetting setting;
 
+        /// <summary>
+        /// DLSS-RR textures packed by PathTracingFeature and passed each frame.
+        /// </summary>
+        public struct DlrrResources
+        {
+            public NriTextureResource Input;           // Composed
+            public NriTextureResource Output;          // DlssOutput
+            public NriTextureResource Mv;              // IN_MV
+            public NriTextureResource Depth;           // IN_VIEWZ
+            public NriTextureResource DiffAlbedo;      // RRGuide_DiffAlbedo
+            public NriTextureResource SpecAlbedo;      // RRGuide_SpecAlbedo
+            public NriTextureResource NormalRoughness; // RRGuide_Normal_Roughness
+            public NriTextureResource SpecHitDistance; // RRGuide_SpecHitDistance
+        }
+
         public DLRRDenoiser(PathTracingSetting setting, string camName)
         {
             this.setting = setting;
@@ -34,20 +50,20 @@ namespace Nrd
         }
 
 
-        private unsafe RRFrameData GetData(CameraData cameraData, NRDDenoiser denoiser, PathTracingResourcePool pool)
+        private unsafe RRFrameData GetData(CameraData cameraData, NRDDenoiser denoiser, DlrrResources res)
         {
             RRFrameData data = new RRFrameData();
 
-            data.inputTex  = pool.GetNriResource(RenderResourceType.Composed).NriPtr;
-            data.outputTex = pool.GetNriResource(RenderResourceType.DlssOutput).NriPtr;
+            data.inputTex  = res.Input.NriPtr;
+            data.outputTex = res.Output.NriPtr;
 
-            data.mvTex    = pool.GetNrdResource(ResourceType.IN_MV).NriPtr;
-            data.depthTex = pool.GetNrdResource(ResourceType.IN_VIEWZ).NriPtr;
+            data.mvTex    = res.Mv.NriPtr;
+            data.depthTex = res.Depth.NriPtr;
 
-            data.diffuseAlbedoTex   = pool.GetNriResource(RenderResourceType.RRGuide_DiffAlbedo).NriPtr;
-            data.specularAlbedoTex  = pool.GetNriResource(RenderResourceType.RRGuide_SpecAlbedo).NriPtr;
-            data.normalRoughnessTex = pool.GetNriResource(RenderResourceType.RRGuide_Normal_Roughness).NriPtr;
-            data.specularMvOrHitTex = pool.GetNriResource(RenderResourceType.RRGuide_SpecHitDistance).NriPtr;
+            data.diffuseAlbedoTex   = res.DiffAlbedo.NriPtr;
+            data.specularAlbedoTex  = res.SpecAlbedo.NriPtr;
+            data.normalRoughnessTex = res.NormalRoughness.NriPtr;
+            data.specularMvOrHitTex = res.SpecHitDistance.NriPtr;
 
             data.worldToViewMatrix = denoiser.worldToView;
             data.viewToClipMatrix = denoiser.viewToClip;
@@ -80,10 +96,10 @@ namespace Nrd
             return data;
         }
 
-        public IntPtr GetInteropDataPtr(RenderingData renderingData, NRDDenoiser denoiser, PathTracingResourcePool pool)
+        public IntPtr GetInteropDataPtr(RenderingData renderingData, NRDDenoiser denoiser, DlrrResources res)
         {
             var index = (int)(FrameIndex % BufferCount);
-            buffer[index] = GetData(renderingData.cameraData, denoiser, pool);
+            buffer[index] = GetData(renderingData.cameraData, denoiser, res);
             FrameIndex++;
             unsafe
             {
