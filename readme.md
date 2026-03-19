@@ -24,7 +24,8 @@ Blog post: [NRDSample Implementation in Unity](https://www.kuanmi.top/2026/01/22
 - [x] **VR Support**: Path tracing in VR mode
 - [x] **TextMeshPro**: World-space TextMeshPro rendering support
 - [x] **Auto Exposure**: Histogram-based auto exposure
-- [ ] **ReSTIR DI**: Planned
+- [x] **ReSTIR DI**: Minimal implementation integrated
+- [x] **Subsurface Scattering**: RTXCR integrated, supports transmission (direct light)
 - [ ] **Volumetric Lighting**: Planned
 
 ---
@@ -73,7 +74,8 @@ Thanks to [inedelcu](https://github.com/INedelcu) for the great help with writin
 - [x] **VR 支持**：支持 VR 模式下的路径追踪渲染
 - [x] **TMP 支持**：世界空间下的 TextMeshPro 文本渲染支持
 - [x] **自动曝光**：基于直方图的自动曝光
-- [ ] **ReSTIR DI**：待实现
+- [x] **ReSTIR DI**：已集成（最小实现）
+- [x] **次表面散射**：集成 RTXCR，支持透射（直接光）
 - [ ] **体积光**：待实现
 
 ---
