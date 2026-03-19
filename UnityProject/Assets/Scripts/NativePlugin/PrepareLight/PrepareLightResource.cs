@@ -3,15 +3,10 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Runtime.InteropServices;
 using DefaultNamespace;
-using Nrd;
 using Nri;
-using RTXDI;
 using Unity.Collections;
 using Unity.Collections.LowLevel.Unsafe;
 using UnityEngine;
-using UnityEngine.Playables;
-using UnityEngine.Rendering;
-using UnityEngine.Rendering.Universal;
 
 namespace RTXDI
 {
@@ -22,7 +17,6 @@ namespace RTXDI
 
         [DllImport("UnityRTXDI")]
         private static extern void DestroyDenoiserInstance(int id);
-
 
         [DllImport("UnityRTXDI")]
         private static extern IntPtr WrapD3D12Texture(IntPtr resource, DXGI_FORMAT format);
@@ -63,7 +57,7 @@ namespace RTXDI
                 
                 
                 var format = tex.graphicsFormat;
-                var dxgiFormat = NRIUtil.GetDXGIFormat(format);
+                var dxgiFormat = NriUtil.GetDXGIFormat(format);
                  
                 // Debug.Log($"Sending Texture {i}: {tex.name}, Format: {format}, DXGI Format: {dxgiFormat}");
                 
@@ -72,7 +66,7 @@ namespace RTXDI
                 EmissionResourceInput resourceInput = new EmissionResourceInput
                 {
                     texture = nriTex,
-                    format =  NRIUtil.GetNriFormat(format)
+                    format =  NriUtil.GetNriFormat(format)
                 };
                 m_ResourceCache[i] = resourceInput;
             }

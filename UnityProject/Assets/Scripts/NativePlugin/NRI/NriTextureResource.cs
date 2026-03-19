@@ -43,7 +43,7 @@ namespace Nri
         public void Allocate(int2 resolution)
         {
             Release(); // 确保先释放旧的
-            var dxgiFormat = NRIUtil.GetDXGIFormat(GraphicsFormat);
+            var dxgiFormat = NriUtil.GetDXGIFormat(GraphicsFormat);
 
             // Debug.Log($"Allocating NRD Texture Resource: {Name}, Size: {resolution}, Format: {GraphicsFormat}");
 

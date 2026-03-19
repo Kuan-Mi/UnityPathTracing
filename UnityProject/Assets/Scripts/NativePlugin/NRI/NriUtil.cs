@@ -4,7 +4,7 @@ using UnityEngine.Experimental.Rendering;
 
 namespace Nri
 {
-    public class NRIUtil
+    public class NriUtil
     {
         public static DXGI_FORMAT GetDXGIFormat(GraphicsFormat format)
         {
