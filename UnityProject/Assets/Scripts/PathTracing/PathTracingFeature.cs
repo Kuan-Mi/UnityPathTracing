@@ -1,6 +1,5 @@
 ﻿using System.Collections.Generic;
 using System.Runtime.InteropServices;
-using DefaultNamespace;
 using mini;
 using Nrd;
 using RTXDI;
@@ -17,61 +16,6 @@ namespace PathTracing
 {
     public class PathTracingFeature : ScriptableRendererFeature
     {
-// #define FLAG_NON_TRANSPARENT                0x01 // geometry flag: non-transparent
-// #define FLAG_TRANSPARENT                    0x02 // geometry flag: transparent
-// #define FLAG_FORCED_EMISSION                0x04 // animated emissive cube
-// #define FLAG_STATIC                         0x08 // no velocity
-// #define FLAG_HAIR                           0x10 // hair
-// #define FLAG_LEAF                           0x20 // leaf
-// #define FLAG_SKIN                           0x40 // skin
-// #define FLAG_MORPH                          0x80 // morph
-
-        public void SetMask()
-        {
-            var allRenderers = FindObjectsByType<Renderer>(FindObjectsSortMode.None);
-            foreach (var r in allRenderers)
-            {
-                var materials = r.sharedMaterials;
-                bool hasTransparent = false;
-                bool hasOpaque = false;
-                // bool isSSS = false;
-                foreach (var mat in materials)
-                {
-                    if (mat != null)
-                    {
-                        if (mat.renderQueue >= 3000)
-                        {
-                            hasTransparent = true;
-                        }
-                        else
-                        {
-                            hasOpaque = true;
-                        }
-
-                        // if (mat.IsKeywordEnabled("_SSS"))
-                        // {
-                        //     isSSS = true;
-                        //     Debug.Log($"Renderer {r.name} marked as SSS.");
-                        // }
-                    }
-                }
-
-                uint mask = 0;
-
-                if (hasOpaque)
-                    mask |= 0x01; // FLAG_NON_TRANSPARENT
-                if (hasTransparent)
-                    mask |= 0x02; // FLAG_TRANSPARENT
-
-                // if (isSSS)
-                //     mask |= 0x40; // FLAG_SKIN
-
-                // Debug.Log($"Renderer {r.name} Mask: {mask}");
-
-                accelerationStructure.UpdateInstanceMask(r, mask); // 1 表示包含在内
-            }
-        }
-
         public PathTracingSetting pathTracingSetting;
 
         public Material finalMaterial;
@@ -100,18 +44,19 @@ namespace PathTracing
         private DlssRRPass _dlssRRPass;
 
         private RayTracingAccelerationStructure accelerationStructure;
-        private Settings settings;
-
-        private GraphicsBuffer scramblingRankingUintBuffer;
-        private GraphicsBuffer sobolUintBuffer;
 
         private GraphicsBuffer ConstantBuffer;
         private GraphicsBuffer ResamplingConstantBuffer;
+
+        private GraphicsBuffer scramblingRankingUintBuffer;
+        private GraphicsBuffer sobolUintBuffer;
 
         private GraphicsBuffer _hashEntriesBuffer;
         private GraphicsBuffer _accumulationBuffer;
         private GraphicsBuffer _resolvedBuffer;
 
+        private GraphicsBuffer _aeHistogramBuffer; // 256 x uint
+        private GraphicsBuffer _aeExposureBuffer; // 1 x float  (current exposure multiplier)
 
         private GraphicsBuffer m_SpotLightBuffer;
         private GraphicsBuffer m_AreaLightBuffer;
@@ -121,43 +66,25 @@ namespace PathTracing
         private int areaCount;
         private int pointCount;
 
-        // Auto-exposure buffers (persistent across frames)
-        private GraphicsBuffer _aeHistogramBuffer; // 256 x uint
-        private GraphicsBuffer _aeExposureBuffer; // 1 x float  (current exposure multiplier)
-
         private Dictionary<long, NRDDenoiser> _nrdDenoisers = new();
         private Dictionary<long, DLRRDenoiser> _dlrrDenoisers = new();
-
         private Dictionary<long, ReSTIRDIContext> _restirDIContexts = new();
         private Dictionary<long, RtxdiResources> _rtxdiResources = new();
+        private Dictionary<long, PrepareLightResource> _prepareLightResources = new();
 
-
-        private Dictionary<long, PrepareLightResource> _prepareLightResources = new Dictionary<long, PrepareLightResource>();
-
-        public GPUScene gpuScene = new GPUScene();
-
-
-        // public PathTracingDataBuilder _dataBuilder = new PathTracingDataBuilder();
-
-        // [ContextMenu("ReBuild AccelerationStructure")]
-        // public void ReBuild()
-        // {
-        //     _dataBuilder.Build(accelerationStructure);
-        // }
+        private GPUScene gpuScene = new();
 
         public override void Create()
         {
             if (accelerationStructure == null)
             {
-                settings = new Settings
+                var settings = new Settings
                 {
                     managementMode = ManagementMode.Automatic,
                     rayTracingModeMask = RayTracingModeMask.Everything
                 };
                 accelerationStructure = new RayTracingAccelerationStructure(settings);
-
                 accelerationStructure.Build();
-
                 SetMask();
             }
 
@@ -165,13 +92,6 @@ namespace PathTracing
             {
                 gpuScene.InitBuffer();
             }
-
-            // if (_dataBuilder.IsEmpty())
-            // {
-            //     _dataBuilder.Build(accelerationStructure);
-            // }
-
-            // ReBuild();
 
             if (scramblingRankingUintBuffer == null && scramblingRankingTex != null)
             {
@@ -205,20 +125,6 @@ namespace PathTracing
             {
                 InitializeBuffers();
             }
-
-            // Auto-exposure buffers
-            if (_aeHistogramBuffer == null)
-            {
-                _aeHistogramBuffer = new GraphicsBuffer(GraphicsBuffer.Target.Structured, 256, sizeof(uint));
-            }
-
-            if (_aeExposureBuffer == null)
-            {
-                _aeExposureBuffer = new GraphicsBuffer(GraphicsBuffer.Target.Structured, 1, sizeof(float));
-                // Seed with the manual exposure value so first frame is not zero
-                _aeExposureBuffer.SetData(new float[] { pathTracingSetting != null ? pathTracingSetting.exposure : 1.0f });
-            }
-
 
             _sharcPass = new SharcPass(sharcResolveCs, sharcUpdateTs);
             _prepareLightPass = new PrepareLightPass();
@@ -272,6 +178,19 @@ namespace PathTracing
             _resolvedBuffer = new GraphicsBuffer(GraphicsBuffer.Target.Structured, Capacity, sizeof(uint) * 4);
             uint4[] clearResolvedData = new uint4[Capacity];
             _resolvedBuffer.SetData(clearResolvedData);
+
+            // Auto-exposure buffers
+            if (_aeHistogramBuffer == null)
+            {
+                _aeHistogramBuffer = new GraphicsBuffer(GraphicsBuffer.Target.Structured, 256, sizeof(uint));
+            }
+
+            if (_aeExposureBuffer == null)
+            {
+                _aeExposureBuffer = new GraphicsBuffer(GraphicsBuffer.Target.Structured, 1, sizeof(float));
+                // Seed with the manual exposure value so first frame is not zero
+                _aeExposureBuffer.SetData(new float[] { pathTracingSetting != null ? pathTracingSetting.exposure : 1.0f });
+            }
         }
 
 
@@ -384,13 +303,10 @@ namespace PathTracing
 
             accelerationStructure.Build();
 
-
             Light();
 
             var nrdDataPtr = nrd.GetInteropDataPtr(renderingData);
-            var dlssDataPtr = dlrr.GetInteropDataPtr(renderingData,nrd);
-
-            // GlobalConstants globalConstants =   GetConstants();
+            var dlssDataPtr = dlrr.GetInteropDataPtr(renderingData, nrd);
 
             var globalConstants = GetConstants(renderingData, nrd);
             ConstantBuffer.SetData(new[] { globalConstants });
@@ -569,7 +485,6 @@ namespace PathTracing
                 renderer.EnqueuePass(_autoExposurePass);
             }
 
-
             var isEven = (globalConstants.gFrameIndex & 1) == 0;
 
             if (pathTracingSetting.RR)
@@ -578,8 +493,8 @@ namespace PathTracing
                 {
                     ConstantBuffer = ConstantBuffer,
 
-                    NormalRoughness = nrd.GetRT(ResourceType.IN_NORMAL_ROUGHNESS), 
-                    BaseColorMetalness = nrd.GetRT(ResourceType.IN_BASECOLOR_METALNESS), 
+                    NormalRoughness = nrd.GetRT(ResourceType.IN_NORMAL_ROUGHNESS),
+                    BaseColorMetalness = nrd.GetRT(ResourceType.IN_BASECOLOR_METALNESS),
                     Spec = nrd.GetRT(ResourceType.IN_SPEC_RADIANCE_HITDIST),
                     ViewZ = nrd.GetRT(ResourceType.IN_VIEWZ),
 
@@ -588,15 +503,15 @@ namespace PathTracing
                     RRGuide_SpecHitDistance = nrd.GetRT(ResourceType.RRGuide_SpecHitDistance),
                     RRGuide_Normal_Roughness = nrd.GetRT(ResourceType.RRGuide_Normal_Roughness),
                 };
-                
+
                 var dlssSettings = new DlssRRPass.Settings
                 {
                     rectGridW = (int)(cam.pixelWidth * pathTracingSetting.resolutionScale + 0.5f) / 16,
                     rectGridH = (int)(cam.pixelHeight * pathTracingSetting.resolutionScale + 0.5f) / 16,
                     tmpDisableRR = pathTracingSetting.tmpDisableRR
                 };
-                
-                _dlssRRPass.Setup(dlssDataPtr,dlssResource, dlssSettings);
+
+                _dlssRRPass.Setup(dlssDataPtr, dlssResource, dlssSettings);
                 renderer.EnqueuePass(_dlssRRPass);
             }
             else
@@ -626,19 +541,19 @@ namespace PathTracing
                 Mv = nrd.GetRT(ResourceType.IN_MV),
                 NormalRoughness = nrd.GetRT(ResourceType.IN_NORMAL_ROUGHNESS),
                 BaseColorMetalness = nrd.GetRT(ResourceType.IN_BASECOLOR_METALNESS),
-                
+
 
                 Penumbra = nrd.GetRT(ResourceType.IN_PENUMBRA),
                 Diff = nrd.GetRT(ResourceType.IN_DIFF_RADIANCE_HITDIST),
                 Spec = nrd.GetRT(ResourceType.IN_SPEC_RADIANCE_HITDIST),
-                
+
                 ShadowTranslucency = nrd.GetRT(ResourceType.OUT_SHADOW_TRANSLUCENCY),
                 DenoisedDiff = nrd.GetRT(ResourceType.OUT_DIFF_RADIANCE_HITDIST),
                 DenoisedSpec = nrd.GetRT(ResourceType.OUT_SPEC_RADIANCE_HITDIST),
                 Validation = nrd.GetRT(ResourceType.OUT_VALIDATION),
 
                 Composed = nrd.GetRT(ResourceType.Composed),
-                
+
                 RRGuide_DiffAlbedo = nrd.GetRT(ResourceType.RRGuide_DiffAlbedo),
                 RRGuide_SpecAlbedo = nrd.GetRT(ResourceType.RRGuide_SpecAlbedo),
                 RRGuide_Normal_Roughness = nrd.GetRT(ResourceType.RRGuide_Normal_Roughness),
@@ -646,15 +561,14 @@ namespace PathTracing
                 DlssOutput = nrd.GetRT(ResourceType.DlssOutput),
                 taaDst = nrd.GetRT(isEven ? ResourceType.TaaHistory : ResourceType.TaaHistoryPrev),
             };
-            
+
             var pathTracingSettings = new OutputBlitPass.Settings
             {
-                showMode =  pathTracingSetting.showMode,
-                resolutionScale =  nrd.resolutionScale,
-                enableDlssRR =  pathTracingSetting.RR,
+                showMode = pathTracingSetting.showMode,
+                resolutionScale = nrd.resolutionScale,
+                enableDlssRR = pathTracingSetting.RR,
                 showMV = pathTracingSetting.showMV,
-                showValidation =  pathTracingSetting.showValidation,
-                
+                showValidation = pathTracingSetting.showValidation,
             };
 
             _outputBlitPass.Setup(pathTracingResource, pathTracingSettings);
@@ -1022,9 +936,7 @@ namespace PathTracing
         {
             Debug.Log("PathTracingFeature Dispose");
             base.Dispose(disposing);
-            // accelerationStructure.Dispose();
-            // accelerationStructure.Release();
-            // accelerationStructure = null;
+
             _outputBlitPass = null;
 
             foreach (var denoiser in _nrdDenoisers.Values)
@@ -1070,6 +982,61 @@ namespace PathTracing
         public void Test()
         {
             gpuScene.DebugReadback();
+        }
+
+        // #define FLAG_NON_TRANSPARENT                0x01 // geometry flag: non-transparent
+        // #define FLAG_TRANSPARENT                    0x02 // geometry flag: transparent
+        // #define FLAG_FORCED_EMISSION                0x04 // animated emissive cube
+        // #define FLAG_STATIC                         0x08 // no velocity
+        // #define FLAG_HAIR                           0x10 // hair
+        // #define FLAG_LEAF                           0x20 // leaf
+        // #define FLAG_SKIN                           0x40 // skin
+        // #define FLAG_MORPH                          0x80 // morph
+
+        public void SetMask()
+        {
+            var allRenderers = FindObjectsByType<Renderer>(FindObjectsSortMode.None);
+            foreach (var r in allRenderers)
+            {
+                var materials = r.sharedMaterials;
+                bool hasTransparent = false;
+                bool hasOpaque = false;
+                // bool isSSS = false;
+                foreach (var mat in materials)
+                {
+                    if (mat != null)
+                    {
+                        if (mat.renderQueue >= 3000)
+                        {
+                            hasTransparent = true;
+                        }
+                        else
+                        {
+                            hasOpaque = true;
+                        }
+
+                        // if (mat.IsKeywordEnabled("_SSS"))
+                        // {
+                        //     isSSS = true;
+                        //     Debug.Log($"Renderer {r.name} marked as SSS.");
+                        // }
+                    }
+                }
+
+                uint mask = 0;
+
+                if (hasOpaque)
+                    mask |= 0x01; // FLAG_NON_TRANSPARENT
+                if (hasTransparent)
+                    mask |= 0x02; // FLAG_TRANSPARENT
+
+                // if (isSSS)
+                //     mask |= 0x40; // FLAG_SKIN
+
+                // Debug.Log($"Renderer {r.name} Mask: {mask}");
+
+                accelerationStructure.UpdateInstanceMask(r, mask); // 1 表示包含在内
+            }
         }
     }
 }
