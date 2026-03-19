@@ -1,11 +1,10 @@
 ﻿using System;
 using System.Runtime.InteropServices;
-using Nri;
 using PathTracing;
 using Unity.Mathematics;
 using UnityEngine;
 
-namespace Nrd
+namespace DLRR
 {
     // ===================================================================================
     // FRAME DATA (Packed)

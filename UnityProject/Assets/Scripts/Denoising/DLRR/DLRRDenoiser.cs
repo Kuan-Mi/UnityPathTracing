@@ -1,12 +1,13 @@
 ﻿using System;
 using System.Runtime.InteropServices;
+using Nrd;
 using Nri;
 using PathTracing;
 using Unity.Collections;
 using Unity.Collections.LowLevel.Unsafe;
 using UnityEngine.Rendering.Universal;
 
-namespace Nrd
+namespace DLRR
 {
     public class DLRRDenoiser : IDisposable
     {
@@ -47,8 +48,7 @@ namespace Nrd
             buffer = new NativeArray<RRFrameData>(BufferCount, Allocator.Persistent);
         }
 
-
-        private unsafe RRFrameData GetData(CameraData cameraData, NRDDenoiser denoiser, DlrrResources res)
+        private RRFrameData GetData(CameraData cameraData, NRDDenoiser denoiser, DlrrResources res)
         {
             RRFrameData data = new RRFrameData();
 
