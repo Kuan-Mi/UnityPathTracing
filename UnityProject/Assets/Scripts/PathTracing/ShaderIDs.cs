@@ -95,5 +95,8 @@ namespace PathTracing
         public static int t_NeighborOffsetsID = Shader.PropertyToID("t_NeighborOffsets");
         
         public static int u_LightReservoirsID = Shader.PropertyToID("u_LightReservoirs");
+        
+        
+        public static readonly int GInOutMv = Shader.PropertyToID("gInOut_Mv");
     }
 }

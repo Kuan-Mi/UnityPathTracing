@@ -171,7 +171,7 @@ namespace PathTracing
                 natCmd.SetBufferData(data.AeExposureBuffer, new[] { data.ManualExposure });
             }
 
-            var transparentTracingMarker = new ProfilerMarker(ProfilerCategory.Render, "Transparent Tracing", MarkerFlags.SampleGPU);
+            // var transparentTracingMarker = new ProfilerMarker(ProfilerCategory.Render, "Transparent Tracing", MarkerFlags.SampleGPU);
             var taaMarker = new ProfilerMarker(ProfilerCategory.Render, "TAA", MarkerFlags.SampleGPU);
             var dlssBeforeMarker = new ProfilerMarker(ProfilerCategory.Render, "DLSS Before", MarkerFlags.SampleGPU);
             var dlssDenoiseMarker = new ProfilerMarker(ProfilerCategory.Render, "DLSS Denoise", MarkerFlags.SampleGPU);
@@ -179,34 +179,31 @@ namespace PathTracing
             var aeMarker = new ProfilerMarker(ProfilerCategory.Render, "Auto Exposure", MarkerFlags.SampleGPU);
 
 
-
-
-
-            // 透明
-            {
-                natCmd.BeginSample(transparentTracingMarker);
-
-                natCmd.SetRayTracingShaderPass(data.TransparentTs, "Test2");
-                natCmd.SetRayTracingConstantBufferParam(data.TransparentTs, paramsID, data.ConstantBuffer, 0, data.ConstantBuffer.stride);
-
-                natCmd.SetRayTracingBufferParam(data.TransparentTs, g_HashEntriesID, data.HashEntriesBuffer);
-                natCmd.SetRayTracingBufferParam(data.TransparentTs, g_AccumulationBufferID, data.AccumulationBuffer);
-                natCmd.SetRayTracingBufferParam(data.TransparentTs, g_ResolvedBufferID, data.ResolvedBuffer);
-
-
-                natCmd.SetRayTracingTextureParam(data.TransparentTs, gIn_ComposedDiffID, data.ComposedDiff);
-                natCmd.SetRayTracingTextureParam(data.TransparentTs, gIn_ComposedSpec_ViewZID, data.ComposedSpecViewZ);
-                natCmd.SetRayTracingTextureParam(data.TransparentTs, g_Normal_RoughnessID, data.NormalRoughness);
-                natCmd.SetRayTracingTextureParam(data.TransparentTs, gOut_ComposedID, data.Composed);
-                natCmd.SetRayTracingTextureParam(data.TransparentTs, GInOutMv, data.Mv);
-
-                natCmd.SetRayTracingBufferParam(data.TransparentTs, gIn_SpotLightsID, data.SpotLightBuffer);
-                natCmd.SetRayTracingBufferParam(data.TransparentTs, gIn_AreaLightsID, data.AreaLightBuffer);
-                natCmd.SetRayTracingBufferParam(data.TransparentTs, gIn_PointLightsID, data.PointLightBuffer);
-
-                natCmd.DispatchRays(data.TransparentTs, "MainRayGenShader", (uint)data.m_RenderResolution.x, (uint)data.m_RenderResolution.y, 1);
-                natCmd.EndSample(transparentTracingMarker);
-            }
+            // // 透明
+            // {
+            //     natCmd.BeginSample(transparentTracingMarker);
+            //
+            //     natCmd.SetRayTracingShaderPass(data.TransparentTs, "Test2");
+            //     natCmd.SetRayTracingConstantBufferParam(data.TransparentTs, paramsID, data.ConstantBuffer, 0, data.ConstantBuffer.stride);
+            //
+            //     natCmd.SetRayTracingBufferParam(data.TransparentTs, g_HashEntriesID, data.HashEntriesBuffer);
+            //     natCmd.SetRayTracingBufferParam(data.TransparentTs, g_AccumulationBufferID, data.AccumulationBuffer);
+            //     natCmd.SetRayTracingBufferParam(data.TransparentTs, g_ResolvedBufferID, data.ResolvedBuffer);
+            //
+            //
+            //     natCmd.SetRayTracingTextureParam(data.TransparentTs, gIn_ComposedDiffID, data.ComposedDiff);
+            //     natCmd.SetRayTracingTextureParam(data.TransparentTs, gIn_ComposedSpec_ViewZID, data.ComposedSpecViewZ);
+            //     natCmd.SetRayTracingTextureParam(data.TransparentTs, g_Normal_RoughnessID, data.NormalRoughness);
+            //     natCmd.SetRayTracingTextureParam(data.TransparentTs, gOut_ComposedID, data.Composed);
+            //     natCmd.SetRayTracingTextureParam(data.TransparentTs, GInOutMv, data.Mv);
+            //
+            //     natCmd.SetRayTracingBufferParam(data.TransparentTs, gIn_SpotLightsID, data.SpotLightBuffer);
+            //     natCmd.SetRayTracingBufferParam(data.TransparentTs, gIn_AreaLightsID, data.AreaLightBuffer);
+            //     natCmd.SetRayTracingBufferParam(data.TransparentTs, gIn_PointLightsID, data.PointLightBuffer);
+            //
+            //     natCmd.DispatchRays(data.TransparentTs, "MainRayGenShader", (uint)data.m_RenderResolution.x, (uint)data.m_RenderResolution.y, 1);
+            //     natCmd.EndSample(transparentTracingMarker);
+            // }
 
 
             // ── Auto-exposure: histogram build + reduce (after transparent, before TAA) ──

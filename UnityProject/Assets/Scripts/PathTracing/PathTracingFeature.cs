@@ -94,6 +94,7 @@ namespace PathTracing
         private OpaquePass _opaquePass;
         private NrdPass _nrdPass;
         private CompositionPass _compositionPass;
+        private TransparentPass _transparentPass;
 
         private RayTracingAccelerationStructure accelerationStructure;
         private Settings settings;
@@ -236,6 +237,7 @@ namespace PathTracing
             _opaquePass = new OpaquePass(opaqueTracingShader);
             _nrdPass = new NrdPass();
             _compositionPass = new CompositionPass(compositionComputeShader);
+            _transparentPass = new TransparentPass(transparentTracingShader);
         }
 
         public static readonly int Capacity = 1 << 23;
@@ -489,7 +491,7 @@ namespace PathTracing
             var compositionResource = new CompositionPass.Resource
             {
                 ConstantBuffer = ConstantBuffer,
-                
+
                 ViewZ = nrd.GetRT(ResourceType.IN_VIEWZ),
                 NormalRoughness = nrd.GetRT(ResourceType.IN_NORMAL_ROUGHNESS),
                 BaseColorMetalness = nrd.GetRT(ResourceType.IN_BASECOLOR_METALNESS),
@@ -517,6 +519,32 @@ namespace PathTracing
 
             _compositionPass.Setup(compositionResource, compositionSettings);
             renderer.EnqueuePass(_compositionPass);
+
+
+            var transparentResource = new TransparentPass.Resource
+            {
+                ConstantBuffer = ConstantBuffer,
+
+                Mv = nrd.GetRT(ResourceType.IN_MV),
+                Composed = nrd.GetRT(ResourceType.Composed),
+                NormalRoughness = nrd.GetRT(ResourceType.IN_NORMAL_ROUGHNESS),
+
+                HashEntriesBuffer = _hashEntriesBuffer,
+                AccumulationBuffer = _accumulationBuffer,
+                ResolvedBuffer = _resolvedBuffer,
+
+                PointLightBuffer = m_PointLightBuffer,
+                AreaLightBuffer = m_AreaLightBuffer,
+                SpotLightBuffer = m_SpotLightBuffer,
+            };
+
+            var transparentSettings = new TransparentPass.Settings
+            {
+                m_RenderResolution = new int2(cam.pixelWidth, cam.pixelHeight)
+            };
+
+            _transparentPass.Setup(transparentResource, transparentSettings);
+            renderer.EnqueuePass(_transparentPass);
 
             _pathTracingPass.m_SpotLightBuffer = m_SpotLightBuffer;
             _pathTracingPass.m_AreaLightBuffer = m_AreaLightBuffer;
