@@ -92,6 +92,7 @@ namespace PathTracing
         private SharcPass _sharcPass;
         private PrepareLightPass _prepareLightPass;
         private OpaquePass _opaquePass;
+        private NrdPass _nrdPass;
 
         private RayTracingAccelerationStructure accelerationStructure;
         private Settings settings;
@@ -101,12 +102,12 @@ namespace PathTracing
 
         private GraphicsBuffer ConstantBuffer;
         private GraphicsBuffer ResamplingConstantBuffer;
-        
+
         private GraphicsBuffer _hashEntriesBuffer;
         private GraphicsBuffer _accumulationBuffer;
         private GraphicsBuffer _resolvedBuffer;
-        
-        
+
+
         private GraphicsBuffer m_SpotLightBuffer;
         private GraphicsBuffer m_AreaLightBuffer;
         private GraphicsBuffer m_PointLightBuffer;
@@ -239,14 +240,13 @@ namespace PathTracing
             _sharcPass = new SharcPass(sharcResolveCs, sharcUpdateTs);
             _prepareLightPass = new PrepareLightPass();
             _opaquePass = new OpaquePass(opaqueTracingShader);
+            _nrdPass = new NrdPass();
         }
 
         public static readonly int Capacity = 1 << 23;
 
         public void InitializeBuffers()
         {
-            
-            
             if (_hashEntriesBuffer != null)
             {
                 _hashEntriesBuffer.Release();
@@ -266,7 +266,7 @@ namespace PathTracing
             }
 
             ConstantBuffer = new GraphicsBuffer(GraphicsBuffer.Target.Constant, 1, Marshal.SizeOf<GlobalConstants>());
-            ResamplingConstantBuffer =  new GraphicsBuffer(GraphicsBuffer.Target.Structured, 1, Marshal.SizeOf<ResamplingConstants>());
+            ResamplingConstantBuffer = new GraphicsBuffer(GraphicsBuffer.Target.Structured, 1, Marshal.SizeOf<ResamplingConstants>());
 
             _hashEntriesBuffer = new GraphicsBuffer(GraphicsBuffer.Target.Structured, Capacity, sizeof(ulong));
             ulong[] clearData = new ulong[Capacity];
@@ -285,12 +285,12 @@ namespace PathTracing
             _resolvedBuffer.SetData(clearResolvedData);
         }
 
-        
+
         uint GetMaxAccumulatedFrameNum(float accumulationTime, float fps)
         {
             return (uint)(accumulationTime * fps + 0.5f);
         }
-        
+
         public override void AddRenderPasses(ScriptableRenderer renderer, ref RenderingData renderingData)
         {
             Camera cam = renderingData.cameraData.camera;
@@ -350,7 +350,8 @@ namespace PathTracing
                 _prepareLightResources.Add(uniqueKey, prepareLightResource);
                 prepareLightResource.SetBuffer(gpuScene);
             }
-                prepareLightResource.SendTexture(gpuScene.globalTexturePool);
+
+            prepareLightResource.SendTexture(gpuScene.globalTexturePool);
 
             if (!_restirDIContexts.TryGetValue(uniqueKey, out var restirDIContext))
             {
@@ -406,9 +407,10 @@ namespace PathTracing
 
             accelerationStructure.Build();
 
-            
-            
+
             Light();
+
+            var nrdDataPtr = nrd.GetInteropDataPtr(renderingData);
 
             // GlobalConstants globalConstants =   GetConstants();
 
@@ -417,11 +419,11 @@ namespace PathTracing
 
             var resamplingConstants = GetResamplingConstants(restirDIContext, rtxdiResources);
             ResamplingConstantBuffer.SetData(new[] { resamplingConstants });
-            
+
             // Sharc 
             var sharcResource = new SharcPass.Resource
             {
-                ConstantBuffer =  ConstantBuffer,
+                ConstantBuffer = ConstantBuffer,
                 AccumulationBuffer = _accumulationBuffer,
                 HashEntriesBuffer = _hashEntriesBuffer,
                 ResolvedBuffer = _resolvedBuffer,
@@ -429,72 +431,76 @@ namespace PathTracing
                 AreaLightBuffer = m_AreaLightBuffer,
                 SpotLightBuffer = m_SpotLightBuffer
             };
-            
+
             var sharcSettings = new SharcPass.Settings
             {
                 RenderResolution = new int2(cam.pixelWidth, cam.pixelHeight)
             };
 
-            _sharcPass.Setup(sharcResource,sharcSettings);
+            _sharcPass.Setup(sharcResource, sharcSettings);
             renderer.EnqueuePass(_sharcPass);
-            
+
             _prepareLightPass.Setup(prepareLightResource);
             renderer.EnqueuePass(_prepareLightPass);
-            
+
             var opaqueResource = new OpaquePass.Resource
             {
-                ConstantBuffer =  ConstantBuffer,
+                ConstantBuffer = ConstantBuffer,
                 ResamplingConstantBuffer = ResamplingConstantBuffer,
-                
+
                 AccumulationBuffer = _accumulationBuffer,
                 HashEntriesBuffer = _hashEntriesBuffer,
                 ResolvedBuffer = _resolvedBuffer,
-                
+
                 PointLightBuffer = m_PointLightBuffer,
                 AreaLightBuffer = m_AreaLightBuffer,
                 SpotLightBuffer = m_SpotLightBuffer,
-                
+
                 ScramblingRanking = scramblingRankingUintBuffer,
                 Sobol = sobolUintBuffer,
-                
-                Mv =  nrd.GetRT(ResourceType.IN_MV),
+
+                Mv = nrd.GetRT(ResourceType.IN_MV),
                 ViewZ = nrd.GetRT(ResourceType.IN_VIEWZ),
                 NormalRoughness = nrd.GetRT(ResourceType.IN_NORMAL_ROUGHNESS),
                 BaseColorMetalness = nrd.GetRT(ResourceType.IN_BASECOLOR_METALNESS),
-                
+
                 Penumbra = nrd.GetRT(ResourceType.IN_PENUMBRA),
                 Diff = nrd.GetRT(ResourceType.IN_DIFF_RADIANCE_HITDIST),
                 Spec = nrd.GetRT(ResourceType.IN_SPEC_RADIANCE_HITDIST),
-                
+
                 PrevViewZ = nrd.GetRT(ResourceType.Prev_ViewZ),
                 PrevNormalRoughness = nrd.GetRT(ResourceType.Prev_NormalRoughness),
                 PrevBaseColorMetalness = nrd.GetRT(ResourceType.Prev_BaseColorMetalness),
-                
+
                 PsrThroughput = nrd.GetRT(ResourceType.PsrThroughput),
-                
+
                 RtxdiResources = rtxdiResources
             };
-            
+
             var opaqueSettings = new OpaquePass.Settings
             {
                 m_RenderResolution = new int2(cam.pixelWidth, cam.pixelHeight),
                 resolutionScale = pathTracingSetting.resolutionScale
             };
-            
+
             _opaquePass.Setup(opaqueResource, opaqueSettings);
             renderer.EnqueuePass(_opaquePass);
-            
-            
+
+
+            if (!pathTracingSetting.RR)
+            {
+                _nrdPass.Setup(nrdDataPtr);
+                renderer.EnqueuePass(_nrdPass);
+            }
 
 
             _pathTracingPass.m_SpotLightBuffer = m_SpotLightBuffer;
             _pathTracingPass.m_AreaLightBuffer = m_AreaLightBuffer;
             _pathTracingPass.m_PointLightBuffer = m_PointLightBuffer;
-            _pathTracingPass._pathTracingSettingsBuffer =  ConstantBuffer;
-            
+            _pathTracingPass._pathTracingSettingsBuffer = ConstantBuffer;
+
             _pathTracingPass.Setup();
             renderer.EnqueuePass(_pathTracingPass);
-            
         }
 
         private ResamplingConstants GetResamplingConstants(ReSTIRDIContext restirDIContext, RtxdiResources rtxdiResources)
@@ -507,13 +513,13 @@ namespace PathTracing
                 runtimeParams = restirDIContext.GetRuntimeParams()
             };
 
-            
+
             resamplingConstants.lightBufferParams.localLightBufferRegion.firstLightIndex = 0;
             resamplingConstants.lightBufferParams.localLightBufferRegion.numLights = rtxdiResources.Scene.emissiveTriangleCount;
-            
+
             resamplingConstants.lightBufferParams.infiniteLightBufferRegion.firstLightIndex = 0;
             resamplingConstants.lightBufferParams.infiniteLightBufferRegion.numLights = 0;
-            
+
             resamplingConstants.lightBufferParams.environmentLightParams.lightPresent = 0;
             resamplingConstants.lightBufferParams.environmentLightParams.lightIndex = (0xffffffffu);
 
@@ -536,7 +542,7 @@ namespace PathTracing
 
         private GlobalConstants GetConstants(RenderingData renderingData, NRDDenoiser nrd)
         {
-            var NrdDenoiser =  nrd;
+            var NrdDenoiser = nrd;
             var cameraData = renderingData.cameraData;
             var m_Settings = pathTracingSetting;
 
@@ -544,15 +550,15 @@ namespace PathTracing
             var mainLight = lightData.mainLightIndex >= 0 ? lightData.visibleLights[lightData.mainLightIndex] : default;
             var mat = mainLight.localToWorldMatrix;
             Vector3 lightForward = mat.GetColumn(2);
-            
+
             var gSunDirection = -lightForward;
             var up = new Vector3(0, 1, 0);
             var gSunBasisX = math.normalize(math.cross(new float3(up.x, up.y, up.z), new float3(gSunDirection.x, gSunDirection.y, gSunDirection.z)));
             var gSunBasisY = math.normalize(math.cross(new float3(gSunDirection.x, gSunDirection.y, gSunDirection.z), gSunBasisX));
-            
+
             int2 outputResolution = new int2((int)(cameraData.camera.pixelWidth * cameraData.renderScale), (int)(cameraData.camera.pixelHeight * cameraData.renderScale));
-            
-            
+
+
             var xrPass = cameraData.xr;
             var isXr = xrPass.enabled;
             if (xrPass.enabled)
@@ -561,18 +567,18 @@ namespace PathTracing
 
                 outputResolution = new int2(xrPass.renderTargetDesc.width, xrPass.renderTargetDesc.height);
             }
-            
+
             NrdDenoiser.EnsureResources(outputResolution);
-            
+
             var renderResolution = NrdDenoiser.renderResolution;
-            
+
             Shader.SetGlobalRayTracingAccelerationStructure(g_AccelStructID, accelerationStructure);
-            
+
             var proj = isXr ? xrPass.GetProjMatrix() : cameraData.camera.projectionMatrix;
 
             var m11 = proj.m11;
 
-            
+
             var rectW = (uint)(renderResolution.x * NrdDenoiser.resolutionScale + 0.5f);
             var rectH = (uint)(renderResolution.y * NrdDenoiser.resolutionScale + 0.5f);
 
@@ -580,16 +586,16 @@ namespace PathTracing
             var rectWprev = (uint)(renderResolution.x * NrdDenoiser.prevResolutionScale + 0.5f);
             var rectHprev = (uint)(renderResolution.y * NrdDenoiser.prevResolutionScale + 0.5f);
 
-            
+
             var renderSize = new float2((renderResolution.x), (renderResolution.y));
             var outputSize = new float2((outputResolution.x), (outputResolution.y));
             var rectSize = new float2(rectW, rectH);
-            
-            
+
+
             var rectSizePrev = new float2((rectWprev), (rectHprev));
             var jitter = (m_Settings.cameraJitter ? NrdDenoiser.ViewportJitter : 0f) / rectSize;
-            
-            
+
+
             float fovXRad = math.atan(1.0f / proj.m00) * 2.0f;
             float horizontalFieldOfView = fovXRad * Mathf.Rad2Deg;
 
@@ -635,12 +641,12 @@ namespace PathTracing
                 else if (mode == HitDistanceReconstructionMode.AREA_5X5)
                     minProbability = 1.0f / 16.0f;
             }
-            
-            
+
+
             var globalConstants = new GlobalConstants
             {
                 gViewToWorld = NrdDenoiser.worldToView.inverse,
-                gViewToWorldPrev =  NrdDenoiser.prevWorldToView.inverse,
+                gViewToWorldPrev = NrdDenoiser.prevWorldToView.inverse,
                 gViewToClip = NrdDenoiser.viewToClip,
                 gWorldToView = NrdDenoiser.worldToView,
                 gWorldToViewPrev = NrdDenoiser.prevWorldToView,
@@ -709,22 +715,22 @@ namespace PathTracing
                 gSHARC = m_Settings.SHARC ? (uint)1 : 0,
                 gTrimLobe = m_Settings.specularLobeTrimming ? 1u : 0,
             };
-            
-            globalConstants.gSpotLightCount  = (uint)spotCount;
-            globalConstants.gAreaLightCount  = (uint)areaCount;
+
+            globalConstants.gSpotLightCount = (uint)spotCount;
+            globalConstants.gAreaLightCount = (uint)areaCount;
             globalConstants.gPointLightCount = (uint)pointCount;
-            globalConstants.gSssScatteringColor    = new float3(m_Settings.sssScatteringColor.r, m_Settings.sssScatteringColor.g, m_Settings.sssScatteringColor.b);
-            globalConstants.gSssMinThreshold       = m_Settings.sssMinThreshold;
-            globalConstants.gSssTransmissionBsdfSampleCount       = m_Settings.sssTransmissionBsdfSampleCount;
-            globalConstants.gSssTransmissionPerBsdfScatteringSampleCount       = m_Settings.sssTransmissionPerBsdfScatteringSampleCount;
-            
-            globalConstants.gSssScale              = m_Settings.sssScale;
+            globalConstants.gSssScatteringColor = new float3(m_Settings.sssScatteringColor.r, m_Settings.sssScatteringColor.g, m_Settings.sssScatteringColor.b);
+            globalConstants.gSssMinThreshold = m_Settings.sssMinThreshold;
+            globalConstants.gSssTransmissionBsdfSampleCount = m_Settings.sssTransmissionBsdfSampleCount;
+            globalConstants.gSssTransmissionPerBsdfScatteringSampleCount = m_Settings.sssTransmissionPerBsdfScatteringSampleCount;
+
+            globalConstants.gSssScale = m_Settings.sssScale;
             globalConstants.gSssAnisotropy = m_Settings.sssAnisotropy;
-            globalConstants.gSssMaxSampleRadius    = m_Settings.sssMaxSampleRadius;
-            
-            
+            globalConstants.gSssMaxSampleRadius = m_Settings.sssMaxSampleRadius;
+
+
             globalConstants.gIsEditor = cameraData.camera.cameraType == CameraType.SceneView ? 1u : 0u;
-            globalConstants.gShowLight = m_Settings.gShowLight?  1u : 0u;
+            globalConstants.gShowLight = m_Settings.gShowLight ? 1u : 0u;
 
             return globalConstants;
         }
@@ -783,25 +789,25 @@ namespace PathTracing
                 if (!light.enabled || !light.gameObject.activeInHierarchy) continue;
                 if (light.type != LightType.Rectangle && light.type != LightType.Disc) continue;
 
-                Color   fc     = light.color * light.intensity;
-                Vector2 sz     = light.areaSize;
-                bool    isDisc = light.type == LightType.Disc;
+                Color fc = light.color * light.intensity;
+                Vector2 sz = light.areaSize;
+                bool isDisc = light.type == LightType.Disc;
 
                 areaLightList.Add(new AreaLightData
                 {
-                    position   = light.transform.position,
+                    position = light.transform.position,
                     // Disc: areaSize.x is the radius. Rect: areaSize is full width/height.
-                    halfWidth  = isDisc ? sz.x          : sz.x * 0.5f,
-                    right      = light.transform.right.normalized,
-                    halfHeight = isDisc ? 0f             : sz.y * 0.5f,
-                    up         = light.transform.up.normalized,
-                    lightType  = isDisc ? 1f : 0f,
-                    color      = new Vector3(fc.r, fc.g, fc.b),
-                    pad2       = 0f,
+                    halfWidth = isDisc ? sz.x : sz.x * 0.5f,
+                    right = light.transform.right.normalized,
+                    halfHeight = isDisc ? 0f : sz.y * 0.5f,
+                    up = light.transform.up.normalized,
+                    lightType = isDisc ? 1f : 0f,
+                    color = new Vector3(fc.r, fc.g, fc.b),
+                    pad2 = 0f,
                 });
             }
 
-            areaCount       = areaLightList.Count;
+            areaCount = areaLightList.Count;
             int areaBufferCount = Mathf.Max(areaCount, 1);
             if (m_AreaLightBuffer == null || m_AreaLightBuffer.count < areaBufferCount)
             {
@@ -828,19 +834,19 @@ namespace PathTracing
 
                 // Read optional sphere radius from the PointLightRadius component.
                 // Falls back to 0 (hard point light) when the component is absent.
-                var    plr    = light.GetComponent<PointLightRadius>();
-                float  radius = plr != null ? Mathf.Max(0f, plr.radius) : 0f;
+                var plr = light.GetComponent<PointLightRadius>();
+                float radius = plr != null ? Mathf.Max(0f, plr.radius) : 0f;
 
                 pointLightList.Add(new PointLightData
                 {
                     position = light.transform.position,
-                    range    = light.range,
-                    color    = new Vector3(fc.r, fc.g, fc.b),
-                    radius   = radius,
+                    range = light.range,
+                    color = new Vector3(fc.r, fc.g, fc.b),
+                    radius = radius,
                 });
             }
 
-            pointCount       = pointLightList.Count;
+            pointCount = pointLightList.Count;
             int pointBufferCount = Mathf.Max(pointCount, 1);
             if (m_PointLightBuffer == null || m_PointLightBuffer.count < pointBufferCount)
             {

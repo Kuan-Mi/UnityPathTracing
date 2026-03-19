@@ -127,7 +127,7 @@ namespace PathTracing
             
             internal GraphicsBuffer ResamplingConstantBuffer;
             internal GraphicsBuffer ConstantBuffer;
-            internal IntPtr NrdDataPtr;
+            // internal IntPtr NrdDataPtr;
             internal IntPtr RRDataPtr;
             internal PathTracingSetting Setting;
             internal float resolutionScale;
@@ -214,84 +214,13 @@ namespace PathTracing
             var aeMarker = new ProfilerMarker(ProfilerCategory.Render, "Auto Exposure", MarkerFlags.SampleGPU);
 
 
-            // // 不透明
+            // // NRD降噪
+            // if (!data.Setting.RR)
             // {
-            //     natCmd.BeginSample(opaqueTracingMarker);
-            //
-            //     // natCmd.SetGlobalBuffer(gIn_InstanceDataID, data._dataBuilder._instanceBuffer);
-            //     // natCmd.SetGlobalBuffer(gIn_PrimitiveDataID, data._dataBuilder._primitiveBuffer);
-            //
-            //
-            //     natCmd.SetRayTracingShaderPass(data.OpaqueTs, "Test2");
-            //     natCmd.SetRayTracingConstantBufferParam(data.OpaqueTs, paramsID, data.ConstantBuffer, 0, data.ConstantBuffer.stride);
-            //     natCmd.SetRayTracingBufferParam(data.OpaqueTs, "ResampleConstants" , data.ResamplingConstantBuffer);
-            //     
-            //     natCmd.SetRayTracingBufferParam(data.OpaqueTs, t_LightDataBufferID, data.RtxdiResources.LightDataBuffer);
-            //     natCmd.SetRayTracingBufferParam(data.OpaqueTs, t_NeighborOffsetsID, data.RtxdiResources.NeighborOffsetsBuffer);
-            //     natCmd.SetRayTracingBufferParam(data.OpaqueTs, u_LightReservoirsID, data.RtxdiResources.LightReservoirBuffer);
-            //
-            //     natCmd.SetRayTracingBufferParam(data.OpaqueTs, g_ScramblingRankingID, data.ScramblingRanking);
-            //     natCmd.SetRayTracingBufferParam(data.OpaqueTs, g_SobolID, data.Sobol);
-            //
-            //     natCmd.SetRayTracingBufferParam(data.OpaqueTs, g_HashEntriesID, data.HashEntriesBuffer);
-            //     natCmd.SetRayTracingBufferParam(data.OpaqueTs, g_AccumulationBufferID, data.AccumulationBuffer);
-            //     natCmd.SetRayTracingBufferParam(data.OpaqueTs, g_ResolvedBufferID, data.ResolvedBuffer);
-            //
-            //     natCmd.SetRayTracingTextureParam(data.OpaqueTs, g_OutputID, data.OutputTexture);
-            //
-            //     natCmd.SetRayTracingTextureParam(data.OpaqueTs, g_MvID, data.Mv);
-            //     natCmd.SetRayTracingTextureParam(data.OpaqueTs, g_ViewZID, data.ViewZ);
-            //     natCmd.SetRayTracingTextureParam(data.OpaqueTs, g_Normal_RoughnessID, data.NormalRoughness);
-            //     natCmd.SetRayTracingTextureParam(data.OpaqueTs, g_BaseColor_MetalnessID, data.BaseColorMetalness);
-            //
-            //     natCmd.SetRayTracingTextureParam(data.OpaqueTs, g_DirectLightingID, data.DirectLighting);
-            //     natCmd.SetRayTracingTextureParam(data.OpaqueTs, g_DirectEmissionID, data.DirectEmission);
-            //     natCmd.SetRayTracingTextureParam(data.OpaqueTs, g_PsrThroughputID, data.PsrThroughput);
-            //
-            //     natCmd.SetRayTracingTextureParam(data.OpaqueTs, g_ShadowDataID, data.Penumbra);
-            //     natCmd.SetRayTracingTextureParam(data.OpaqueTs, g_DiffID, data.Diff);
-            //     natCmd.SetRayTracingTextureParam(data.OpaqueTs, g_SpecID, data.Spec);
-            //
-            //     natCmd.SetRayTracingTextureParam(data.OpaqueTs, gIn_PrevComposedDiffID, data.ComposedDiff);
-            //     natCmd.SetRayTracingTextureParam(data.OpaqueTs, gIn_PrevComposedSpec_PrevViewZID, data.ComposedSpecViewZ);
-            //
-            //     natCmd.SetRayTracingTextureParam(data.OpaqueTs, gIn_PrevViewZID, data.PrevViewZ);
-            //     natCmd.SetRayTracingTextureParam(data.OpaqueTs, gIn_PrevNormalRoughnessID, data.PrevNormalRoughness);
-            //     natCmd.SetRayTracingTextureParam(data.OpaqueTs, gIn_PrevBaseColorMetalnessID, data.PrevBaseColorMetalness);
-            //
-            //     natCmd.SetRayTracingBufferParam(data.OpaqueTs, gIn_SpotLightsID, data.SpotLightBuffer);
-            //     natCmd.SetRayTracingBufferParam(data.OpaqueTs, gIn_AreaLightsID, data.AreaLightBuffer);
-            //     natCmd.SetRayTracingBufferParam(data.OpaqueTs, gIn_PointLightsID, data.PointLightBuffer);
-            //     // natCmd.SetRayTracingTextureParam(data.OpaqueTs, gOut_SpotDirectID, data.SpotDirect);
-            //
-            //     // Debug.Log(data.m_RenderResolution);
-            //
-            //     uint rectWmod = (uint)(data.m_RenderResolution.x * data.resolutionScale + 0.5f);
-            //     uint rectHmod = (uint)(data.m_RenderResolution.y * data.resolutionScale + 0.5f);
-            //
-            //     // Debug.Log($"Dispatch Rays Size: {rectWmod} x {rectHmod}");
-            //
-            //
-            //     natCmd.DispatchRays(data.OpaqueTs, "MainRayGenShader", rectWmod, rectHmod, 1);
-            //
-            //     natCmd.EndSample(opaqueTracingMarker);
-            //
-            //     // 保存当帧 GBuffer 到 prev 纹理，供下一帧 RTXDI 时间复用读取
-            //     natCmd.BeginSample(copyGBufferMarker);
-            //     natCmd.CopyTexture(data.ViewZ, data.PrevViewZ);
-            //     natCmd.CopyTexture(data.NormalRoughness, data.PrevNormalRoughness);
-            //     natCmd.CopyTexture(data.BaseColorMetalness, data.PrevBaseColorMetalness);
-            //     natCmd.EndSample(copyGBufferMarker);
+            //     natCmd.BeginSample(nrdDenoiseMarker);
+            //     natCmd.IssuePluginEventAndData(GetRenderEventAndDataFunc(), 1, data.NrdDataPtr);
+            //     natCmd.EndSample(nrdDenoiseMarker);
             // }
-
-
-            // NRD降噪
-            if (!data.Setting.RR)
-            {
-                natCmd.BeginSample(nrdDenoiseMarker);
-                natCmd.IssuePluginEventAndData(GetRenderEventAndDataFunc(), 1, data.NrdDataPtr);
-                natCmd.EndSample(nrdDenoiseMarker);
-            }
 
 
             // 合成
@@ -618,7 +547,7 @@ namespace PathTracing
             // var cam = cameraData.camera;
 
 
-            passData.NrdDataPtr = NrdDenoiser.GetInteropDataPtr(cameraData, gSunDirection);
+            // passData.NrdDataPtr = NrdDenoiser.GetInteropDataPtr(cameraData, gSunDirection);
             passData.RRDataPtr = DLRRDenoiser.GetInteropDataPtr(cameraData, NrdDenoiser);
 
             // passData.DataPtr = prepareLightResource.GetInteropDataPtr();

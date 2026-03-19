@@ -268,8 +268,18 @@ namespace Nrd
         public float2 ViewportJitter;
         public float2 PrevViewportJitter;
 
-        private unsafe FrameData GetData(UniversalCameraData cameraData, Vector3 dirToLight)
+        private unsafe FrameData GetData(RenderingData renderingData)
         {
+
+            var cameraData = renderingData.cameraData;
+            var lightData = renderingData.lightData;
+            var mainLight = lightData.mainLightIndex >= 0 ? lightData.visibleLights[lightData.mainLightIndex] : default;
+            var mat = mainLight.localToWorldMatrix;
+            Vector3 lightForward = mat.GetColumn(2);
+            
+            var dirToLight = -lightForward;
+            
+            
             if (setting.RR)
             {
                 setting.resolutionScale = 1.0f;
@@ -383,10 +393,21 @@ namespace Nrd
             return localData;
         }
 
-        public IntPtr GetInteropDataPtr(UniversalCameraData cameraData, Vector3 dirToLight)
+        // public IntPtr GetInteropDataPtr(UniversalCameraData cameraData, Vector3 dirToLight)
+        // {
+        //     var index = (int)(FrameIndex % BufferCount);
+        //     buffer[index] = GetData(cameraData, dirToLight);
+        //     FrameIndex++;
+        //     unsafe
+        //     {
+        //         return (IntPtr)buffer.GetUnsafePtr() + index * sizeof(FrameData);
+        //     }
+        // }
+        
+        public IntPtr GetInteropDataPtr(RenderingData renderingData)
         {
             var index = (int)(FrameIndex % BufferCount);
-            buffer[index] = GetData(cameraData, dirToLight);
+            buffer[index] = GetData(renderingData);
             FrameIndex++;
             unsafe
             {
