@@ -93,6 +93,7 @@ namespace PathTracing
         private PrepareLightPass _prepareLightPass;
         private OpaquePass _opaquePass;
         private NrdPass _nrdPass;
+        private CompositionPass _compositionPass;
 
         private RayTracingAccelerationStructure accelerationStructure;
         private Settings settings;
@@ -234,6 +235,7 @@ namespace PathTracing
             _prepareLightPass = new PrepareLightPass();
             _opaquePass = new OpaquePass(opaqueTracingShader);
             _nrdPass = new NrdPass();
+            _compositionPass = new CompositionPass(compositionComputeShader);
         }
 
         public static readonly int Capacity = 1 << 23;
@@ -483,6 +485,38 @@ namespace PathTracing
                 renderer.EnqueuePass(_nrdPass);
             }
 
+
+            var compositionResource = new CompositionPass.Resource
+            {
+                ConstantBuffer = ConstantBuffer,
+                
+                ViewZ = nrd.GetRT(ResourceType.IN_VIEWZ),
+                NormalRoughness = nrd.GetRT(ResourceType.IN_NORMAL_ROUGHNESS),
+                BaseColorMetalness = nrd.GetRT(ResourceType.IN_BASECOLOR_METALNESS),
+                PsrThroughput = nrd.GetRT(ResourceType.PsrThroughput)
+            };
+
+            if (pathTracingSetting.RR)
+            {
+                compositionResource.Shadow = nrd.GetRT(ResourceType.IN_PENUMBRA);
+                compositionResource.Diff = nrd.GetRT(ResourceType.IN_DIFF_RADIANCE_HITDIST);
+                compositionResource.Spec = nrd.GetRT(ResourceType.IN_SPEC_RADIANCE_HITDIST);
+            }
+            else
+            {
+                compositionResource.Shadow = nrd.GetRT(ResourceType.OUT_SHADOW_TRANSLUCENCY);
+                compositionResource.Diff = nrd.GetRT(ResourceType.OUT_DIFF_RADIANCE_HITDIST);
+                compositionResource.Spec = nrd.GetRT(ResourceType.OUT_SPEC_RADIANCE_HITDIST);
+            }
+
+            var compositionSettings = new CompositionPass.Settings
+            {
+                rectGridW = (int)(cam.pixelWidth * pathTracingSetting.resolutionScale + 0.5f) / 16,
+                rectGridH = (int)(cam.pixelHeight * pathTracingSetting.resolutionScale + 0.5f) / 16
+            };
+
+            _compositionPass.Setup(compositionResource, compositionSettings);
+            renderer.EnqueuePass(_compositionPass);
 
             _pathTracingPass.m_SpotLightBuffer = m_SpotLightBuffer;
             _pathTracingPass.m_AreaLightBuffer = m_AreaLightBuffer;
