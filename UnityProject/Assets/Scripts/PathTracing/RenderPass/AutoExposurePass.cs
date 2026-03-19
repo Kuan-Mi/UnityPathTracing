@@ -114,7 +114,7 @@ namespace PathTracing
 
         public override void RecordRenderGraph(RenderGraph renderGraph, ContextContainer frameData)
         {
-            using var builder = renderGraph.AddUnsafePass<SharcPassData>("Sharc Pass", out var passData);
+            using var builder = renderGraph.AddUnsafePass<SharcPassData>("Auto Exposure", out var passData);
             
             passData.AeCs = _aeCs;
 

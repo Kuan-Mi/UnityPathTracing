@@ -192,7 +192,7 @@ namespace PathTracing
         {
             var resourceData = frameData.Get<UniversalResourceData>();
 
-            using var builder = renderGraph.AddUnsafePass<PassData>("Output Blit Pass", out var passData);
+            using var builder = renderGraph.AddUnsafePass<PassData>("Output Blit", out var passData);
 
             passData.BlitMaterial = _biltMaterial;
 

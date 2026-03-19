@@ -38,7 +38,7 @@ namespace PathTracing
 
         public override void RecordRenderGraph(RenderGraph renderGraph, ContextContainer frameData)
         {
-            using var builder = renderGraph.AddUnsafePass<PassData>("PrepareLight Pass", out var passData);
+            using var builder = renderGraph.AddUnsafePass<PassData>("Prepare Light", out var passData);
 
             passData.DataPtr = _prepareLightResource.GetInteropDataPtr();
 

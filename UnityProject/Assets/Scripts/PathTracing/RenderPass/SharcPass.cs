@@ -109,7 +109,7 @@ namespace PathTracing
 
         public override void RecordRenderGraph(RenderGraph renderGraph, ContextContainer frameData)
         {
-            using var builder = renderGraph.AddUnsafePass<SharcPassData>("Sharc Pass", out var passData);
+            using var builder = renderGraph.AddUnsafePass<SharcPassData>("Sharc", out var passData);
             
             passData.SharcResolveCs = _sharcResolveCs;
             passData.SharcUpdateTs = _sharcUpdateTs;

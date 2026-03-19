@@ -74,7 +74,7 @@ namespace PathTracing
 
         public override void RecordRenderGraph(RenderGraph renderGraph, ContextContainer frameData)
         {
-            using var builder = renderGraph.AddUnsafePass<PassData>("Taa Pass", out var passData);
+            using var builder = renderGraph.AddUnsafePass<PassData>("Taa", out var passData);
 
             passData.TaaCs = _taaCs;
 

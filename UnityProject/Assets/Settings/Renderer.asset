@@ -110,7 +110,7 @@ MonoBehaviour:
     boost: 1
     boostFactor: 1
     SR: 0
-    RR: 0
+    RR: 1
     tmpDisableRR: 0
     resolutionScale: 1
     upscalerMode: 0

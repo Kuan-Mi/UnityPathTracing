@@ -104,7 +104,7 @@ namespace PathTracing
 
         public override void RecordRenderGraph(RenderGraph renderGraph, ContextContainer frameData)
         {
-            using var builder = renderGraph.AddUnsafePass<PassData>("DLSS RR Pass", out var passData);
+            using var builder = renderGraph.AddUnsafePass<PassData>("DLSS RR", out var passData);
 
             passData.DlssBeforeCs = DlssBeforeCs;
             passData.Resource = _resource;

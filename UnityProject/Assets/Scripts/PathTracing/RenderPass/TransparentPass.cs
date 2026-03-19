@@ -96,7 +96,7 @@ namespace PathTracing
 
         public override void RecordRenderGraph(RenderGraph renderGraph, ContextContainer frameData)
         {
-            using var builder = renderGraph.AddUnsafePass<PassData>("Transparent Pass", out var passData);
+            using var builder = renderGraph.AddUnsafePass<PassData>("Transparent", out var passData);
 
             passData.TransparentTs = _transparentTs;
 
