@@ -1,4 +1,5 @@
 ﻿using System.Collections.Generic;
+using System.Linq;
 using System.Runtime.InteropServices;
 using Unity.Mathematics;
 using UnityEngine;
@@ -46,18 +47,40 @@ namespace RTXDI
 
     public class GPUScene : System.IDisposable
     {
+        
+        // MeshLight 缓存
+        private static HashSet<MeshLight> MeshLightCache = new HashSet<MeshLight>();
+        public static void RegisterMeshLight(MeshLight ml)
+        {
+            MeshLightCache.Add(ml);
+            Instance?.MarkSceneDirty();
+            Debug.Log($"Registered MeshLight: {ml.name}. Total count: {MeshLightCache.Count}");
+        }
+        public static void UnregisterMeshLight(MeshLight ml)
+        {
+            MeshLightCache.Remove(ml);
+            Instance?.MarkSceneDirty();
+            Debug.Log($"Unregistered MeshLight: {ml.name}. Total count: {MeshLightCache.Count}");
+        }
+        // 单例引用（可选，方便通知）
+        public static GPUScene Instance { get; private set; }
+
+        public GPUScene() { Instance = this; }
+        
+        
         public bool isBufferInitialized;
 
         public void InitBuffer()
         {
 #if UNITY_EDITOR
             UnityEditor.ObjectChangeEvents.changesPublished += (ref UnityEditor.ObjectChangeEventStream stream) => { MarkSceneDirty(); };
+
 #endif
 
 
             _instanceBuffer = new ComputeBuffer(8192, Marshal.SizeOf<InstanceData>());
-            _primitiveBuffer = new ComputeBuffer(32768, Marshal.SizeOf<PrimitiveData>());
-            _lightInfoBuffer = new GraphicsBuffer(GraphicsBuffer.Target.Structured, 32768, Marshal.SizeOf<RAB_LightInfo>());
+            _primitiveBuffer = new ComputeBuffer(327680, Marshal.SizeOf<PrimitiveData>());
+            _lightInfoBuffer = new GraphicsBuffer(GraphicsBuffer.Target.Structured, 327680, Marshal.SizeOf<RAB_LightInfo>());
             isBufferInitialized = true;
         }
 
@@ -110,9 +133,6 @@ namespace RTXDI
 
         private Dictionary<int, MeshCache> _meshDataCache = new Dictionary<int, MeshCache>();
 
-        // Renderer 缓存 + 自发光实例引用：避免每帧 FindObjectsByType 和重建 primitive
-        private Renderer[] _cachedRenderers;
-
         // 每个 instance 对应的 Renderer（一个 Renderer 多个自发光 SubMesh 会产生多条记录）
         private List<Renderer> _emissiveInstanceRenderers = new List<Renderer>();
 
@@ -144,53 +164,24 @@ namespace RTXDI
             textureGroupCache.Clear();
             _emissiveInstanceRenderers.Clear();
 
-            // 过滤：只保留有 MeshFilter+Mesh 且含自发光 SubMesh 的 Renderer
-            var allRenderers = Object.FindObjectsByType<Renderer>(FindObjectsSortMode.None);
-            var filtered = new List<Renderer>();
-            foreach (var r in allRenderers)
+            // 只遍历 MeshLightCache
+            var meshLights = MeshLightCache.ToList();
+            foreach (var ml in meshLights)
             {
-                MeshFilter mf = r.GetComponent<MeshFilter>();
-                if (mf == null || mf.sharedMesh == null)
+                if (ml == null || !ml.enabled || ml.Mesh == null || ml.Materials == null)
                     continue;
-
-                Mesh mesh = mf.sharedMesh;
-                Material[] mats = r.sharedMaterials;
-                bool hasAnyEmissive = false;
-                for (int i = 0; i < mesh.subMeshCount; i++)
-                {
-                    Material mat = i < mats.Length ? mats[i] : (mats.Length > 0 ? mats[^1] : null);
-                    if (mat != null && mat.IsKeywordEnabled("_EMISSION") && mat.GetColor("_EmissionColor").maxColorComponent > 0.01f)
-                    {
-                        hasAnyEmissive = true;
-                        break;
-                    }
-                }
-
-                if (hasAnyEmissive)
-                    filtered.Add(r);
-            }
-
-            _cachedRenderers = filtered.ToArray();
-
-            foreach (var r in _cachedRenderers)
-            {
-                Mesh mesh = r.GetComponent<MeshFilter>().sharedMesh;
+                Mesh mesh = ml.Mesh;
                 int subMeshCount = mesh.subMeshCount;
-                Material[] sharedMaterials = r.sharedMaterials;
-
+                Material[] sharedMaterials = ml.Materials;
                 MeshCache mc = GetOrCacheMeshData(mesh);
-                Matrix4x4 localToWorld = r.transform.localToWorldMatrix;
-
+                Matrix4x4 localToWorld = ml.transform.localToWorldMatrix;
                 for (int subIdx = 0; subIdx < subMeshCount; subIdx++)
                 {
                     Material mat = subIdx < sharedMaterials.Length ? sharedMaterials[subIdx] : null;
                     if (mat == null && sharedMaterials.Length > 0) mat = sharedMaterials[^1];
-
                     bool isEmissive = mat != null && mat.IsKeywordEnabled("_EMISSION") && mat.GetColor("_EmissionColor").maxColorComponent > 0.01f;
                     if (!isEmissive)
                         continue;
-
-                    // 构造 Primitive Data（本地空间，不随 transform 变化）
                     int[] subMeshTriangles = mc.trianglesPerSubMesh[subIdx];
                     uint instanceIndex = (uint)instanceDataList.Count;
                     for (int t = 0; t < subMeshTriangles.Length; t += 3)
@@ -209,8 +200,6 @@ namespace RTXDI
                             instanceId = instanceIndex
                         });
                     }
-
-                    // 构造 Instance Data
                     uint baseTextureIndex = GetTextureGroupIndex(mat);
                     var emissiveColor = mat.GetColor("_EmissionColor").linear;
                     instanceDataList.Add(new InstanceData
@@ -219,12 +208,9 @@ namespace RTXDI
                         emissiveTextureIndex = baseTextureIndex,
                         emissiveColor = new float3(emissiveColor.r, emissiveColor.g, emissiveColor.b)
                     });
-
-                    // 记录引用，供后续逐帧 transform 更新使用
-                    _emissiveInstanceRenderers.Add(r);
+                    _emissiveInstanceRenderers.Add(ml.Renderer);
                 }
             }
-
             if (instanceDataList.Count > _instanceBuffer.count)
                 Debug.LogError($"Instance count {instanceDataList.Count} exceeds buffer capacity {_instanceBuffer.count}!");
             if (primitiveDataList.Count > _primitiveBuffer.count)
@@ -242,6 +228,12 @@ namespace RTXDI
         {
             for (int i = 0; i < _emissiveInstanceRenderers.Count; i++)
             {
+                if (_emissiveInstanceRenderers[i] == null)
+                {
+                    // Renderer 已被销毁（如场景切换），回退到完整重建
+                    BuildFull();
+                    return;
+                }
                 var inst = instanceDataList[i];
                 inst.transform = _emissiveInstanceRenderers[i].transform.localToWorldMatrix;
                 instanceDataList[i] = inst;
@@ -427,4 +419,5 @@ namespace RTXDI
             _meshDataCache.Clear();
         }
     }
+
 }
