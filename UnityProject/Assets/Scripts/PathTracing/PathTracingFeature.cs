@@ -88,7 +88,7 @@ namespace PathTracing
         public Texture2D sobolTex;
 
 
-        private PathTracingPass _pathTracingPass;
+        private OutputBlitPass _outputBlitPass;
         private SharcPass _sharcPass;
         private PrepareLightPass _prepareLightPass;
         private OpaquePass _opaquePass;
@@ -219,13 +219,6 @@ namespace PathTracing
                 _aeExposureBuffer.SetData(new float[] { pathTracingSetting != null ? pathTracingSetting.exposure : 1.0f });
             }
 
-            _pathTracingPass = new PathTracingPass(pathTracingSetting)
-            {
-                renderPassEvent = RenderPassEvent.BeforeRenderingTransparents,
-                TaaCs = taaComputeShader,
-                DlssBeforeCs = dlssBeforeComputeShader,
-                BiltMaterial = finalMaterial,
-            };
 
             _sharcPass = new SharcPass(sharcResolveCs, sharcUpdateTs);
             _prepareLightPass = new PrepareLightPass();
@@ -236,6 +229,7 @@ namespace PathTracing
             _autoExposurePass = new AutoExposurePass(autoExposureShader);
             _taaPass = new TaaPass(taaComputeShader);
             _dlssRRPass = new DlssRRPass(dlssBeforeComputeShader);
+            _outputBlitPass = new OutputBlitPass(finalMaterial);
         }
 
         public static readonly int Capacity = 1 << 23;
@@ -363,9 +357,6 @@ namespace PathTracing
                 rtxdiResources = new RtxdiResources(restirDIContext, gpuScene);
                 _rtxdiResources.Add(uniqueKey, rtxdiResources);
             }
-
-            _pathTracingPass.NrdDenoiser = nrd;
-            _pathTracingPass.DLRRDenoiser = dlrr;
 
 
             if (finalMaterial == null
@@ -630,11 +621,44 @@ namespace PathTracing
                 renderer.EnqueuePass(_taaPass);
             }
 
+            var pathTracingResource = new OutputBlitPass.Resource
+            {
+                Mv = nrd.GetRT(ResourceType.IN_MV),
+                NormalRoughness = nrd.GetRT(ResourceType.IN_NORMAL_ROUGHNESS),
+                BaseColorMetalness = nrd.GetRT(ResourceType.IN_BASECOLOR_METALNESS),
+                
 
-            _pathTracingPass._pathTracingSettingsBuffer = ConstantBuffer;
+                Penumbra = nrd.GetRT(ResourceType.IN_PENUMBRA),
+                Diff = nrd.GetRT(ResourceType.IN_DIFF_RADIANCE_HITDIST),
+                Spec = nrd.GetRT(ResourceType.IN_SPEC_RADIANCE_HITDIST),
+                
+                ShadowTranslucency = nrd.GetRT(ResourceType.OUT_SHADOW_TRANSLUCENCY),
+                DenoisedDiff = nrd.GetRT(ResourceType.OUT_DIFF_RADIANCE_HITDIST),
+                DenoisedSpec = nrd.GetRT(ResourceType.OUT_SPEC_RADIANCE_HITDIST),
+                Validation = nrd.GetRT(ResourceType.OUT_VALIDATION),
 
-            _pathTracingPass.Setup();
-            renderer.EnqueuePass(_pathTracingPass);
+                Composed = nrd.GetRT(ResourceType.Composed),
+                
+                RRGuide_DiffAlbedo = nrd.GetRT(ResourceType.RRGuide_DiffAlbedo),
+                RRGuide_SpecAlbedo = nrd.GetRT(ResourceType.RRGuide_SpecAlbedo),
+                RRGuide_Normal_Roughness = nrd.GetRT(ResourceType.RRGuide_Normal_Roughness),
+                RRGuide_SpecHitDistance = nrd.GetRT(ResourceType.RRGuide_SpecHitDistance),
+                DlssOutput = nrd.GetRT(ResourceType.DlssOutput),
+                taaDst = nrd.GetRT(isEven ? ResourceType.TaaHistory : ResourceType.TaaHistoryPrev),
+            };
+            
+            var pathTracingSettings = new OutputBlitPass.Settings
+            {
+                showMode =  pathTracingSetting.showMode,
+                resolutionScale =  nrd.resolutionScale,
+                enableDlssRR =  pathTracingSetting.RR,
+                showMV = pathTracingSetting.showMV,
+                showValidation =  pathTracingSetting.showValidation,
+                
+            };
+
+            _outputBlitPass.Setup(pathTracingResource, pathTracingSettings);
+            renderer.EnqueuePass(_outputBlitPass);
         }
 
         private ResamplingConstants GetResamplingConstants(ReSTIRDIContext restirDIContext, RtxdiResources rtxdiResources)
@@ -1001,7 +1025,7 @@ namespace PathTracing
             // accelerationStructure.Dispose();
             // accelerationStructure.Release();
             // accelerationStructure = null;
-            _pathTracingPass = null;
+            _outputBlitPass = null;
 
             foreach (var denoiser in _nrdDenoisers.Values)
             {

@@ -6,7 +6,6 @@ using UnityEngine.Rendering;
 using UnityEngine.Rendering.RenderGraphModule;
 using UnityEngine.Rendering.Universal;
 using static PathTracing.ShaderIDs;
-using static PathTracing.PathTracingUtils;
 
 namespace PathTracing
 {
