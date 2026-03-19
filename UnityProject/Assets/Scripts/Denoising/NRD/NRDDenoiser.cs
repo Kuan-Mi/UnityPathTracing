@@ -1,8 +1,6 @@
 ﻿using System;
-using System.Collections.Generic;
 using System.Runtime.InteropServices;
 using NRD;
-using Nri;
 using PathTracing;
 using Unity.Collections;
 using Unity.Collections.LowLevel.Unsafe;
@@ -31,6 +29,7 @@ namespace Nrd
         public uint FrameIndex;
         private readonly int nrdInstanceId;
         private string cameraName;
+        private readonly PathTracingResourcePool pool;
 
         public Matrix4x4 worldToView;
         public Matrix4x4 worldToClip;
@@ -46,7 +45,7 @@ namespace Nrd
         public float3 camPos;
         public float3 prevCamPos;
 
-        public int2 renderResolution;
+        public int2 renderResolution => pool.renderResolution;
 
         public float resolutionScale;
         public float prevResolutionScale;
@@ -55,132 +54,33 @@ namespace Nrd
         private NativeArray<FrameData> buffer;
         private const int BufferCount = 3;
 
-        private List<NrdTextureResource> allocatedResources = new();
-
-        public NrdTextureResource GetResource(ResourceType type)
-        {
-            return allocatedResources.Find(res => res.ResourceType == type);
-        }
-
-        public RTHandle GetRT(ResourceType type)
-        {
-            return allocatedResources.Find(res => res.ResourceType == type).Handle;
-        }
-
         private PathTracingSetting setting;
 
-        public NRDDenoiser(PathTracingSetting setting, string camName)
+        public NRDDenoiser(PathTracingSetting setting, string camName, PathTracingResourcePool pool)
         {
             this.setting = setting;
+            this.pool = pool;
             nrdInstanceId = CreateDenoiserInstance();
             cameraName = camName;
             buffer = new NativeArray<FrameData>(BufferCount, Allocator.Persistent);
-
-            var srvState = new NriResourceState { accessBits = AccessBits.SHADER_RESOURCE, layout = Layout.SHADER_RESOURCE, stageBits = 1 << 7 };
-            var uavState = new NriResourceState { accessBits = AccessBits.SHADER_RESOURCE_STORAGE, layout = Layout.SHADER_RESOURCE_STORAGE, stageBits = 1 << 10 };
-
-            // 无噪声输入
-            allocatedResources.Add(new NrdTextureResource(ResourceType.IN_MV, GraphicsFormat.R16G16B16A16_SFloat, srvState));
-            allocatedResources.Add(new NrdTextureResource(ResourceType.IN_VIEWZ, GraphicsFormat.R32_SFloat, srvState));
-            allocatedResources.Add(new NrdTextureResource(ResourceType.IN_NORMAL_ROUGHNESS, GraphicsFormat.A2B10G10R10_UNormPack32, srvState));
-            allocatedResources.Add(new NrdTextureResource(ResourceType.IN_BASECOLOR_METALNESS, GraphicsFormat.B8G8R8A8_SRGB, srvState, true));
-
-            // 有噪声输入
-            allocatedResources.Add(new NrdTextureResource(ResourceType.IN_PENUMBRA, GraphicsFormat.R16_SFloat, srvState));
-            allocatedResources.Add(new NrdTextureResource(ResourceType.IN_DIFF_RADIANCE_HITDIST, GraphicsFormat.R16G16B16A16_SFloat, srvState));
-            allocatedResources.Add(new NrdTextureResource(ResourceType.IN_SPEC_RADIANCE_HITDIST, GraphicsFormat.R16G16B16A16_SFloat, srvState));
-
-            // 输出
-            allocatedResources.Add(new NrdTextureResource(ResourceType.OUT_SHADOW_TRANSLUCENCY, GraphicsFormat.R16_SFloat, uavState));
-            allocatedResources.Add(new NrdTextureResource(ResourceType.OUT_DIFF_RADIANCE_HITDIST, GraphicsFormat.R16G16B16A16_SFloat, uavState));
-            allocatedResources.Add(new NrdTextureResource(ResourceType.OUT_SPEC_RADIANCE_HITDIST, GraphicsFormat.R16G16B16A16_SFloat, uavState));
-            allocatedResources.Add(new NrdTextureResource(ResourceType.OUT_VALIDATION, GraphicsFormat.R8G8B8A8_UNorm, uavState));
-
-            // TAA
-            allocatedResources.Add(new NrdTextureResource(ResourceType.TaaHistory, GraphicsFormat.R16G16B16A16_SFloat, uavState));
-            allocatedResources.Add(new NrdTextureResource(ResourceType.TaaHistoryPrev, GraphicsFormat.R16G16B16A16_SFloat, uavState));
-            allocatedResources.Add(new NrdTextureResource(ResourceType.PsrThroughput, GraphicsFormat.R16G16B16A16_SFloat, uavState));
-
-            // rr
-            allocatedResources.Add(new NrdTextureResource(ResourceType.RRGuide_DiffAlbedo, GraphicsFormat.A2B10G10R10_UNormPack32, uavState));
-            allocatedResources.Add(new NrdTextureResource(ResourceType.RRGuide_SpecAlbedo, GraphicsFormat.A2B10G10R10_UNormPack32, uavState));
-            allocatedResources.Add(new NrdTextureResource(ResourceType.RRGuide_SpecHitDistance, GraphicsFormat.R16_SFloat, uavState));
-            allocatedResources.Add(new NrdTextureResource(ResourceType.RRGuide_Normal_Roughness, GraphicsFormat.R16G16B16A16_SFloat, uavState));
-            allocatedResources.Add(new NrdTextureResource(ResourceType.DlssOutput, GraphicsFormat.R16G16B16A16_SFloat, uavState));
-            allocatedResources.Add(new NrdTextureResource(ResourceType.Composed, GraphicsFormat.R16G16B16A16_SFloat, uavState));
-
-            // RTXDI：上一帧 GBuffer（格式与当帧对应纹理相同）
-            allocatedResources.Add(new NrdTextureResource(ResourceType.Prev_ViewZ, GraphicsFormat.R32_SFloat, uavState));
-            allocatedResources.Add(new NrdTextureResource(ResourceType.Prev_NormalRoughness, GraphicsFormat.A2B10G10R10_UNormPack32, uavState));
-            allocatedResources.Add(new NrdTextureResource(ResourceType.Prev_BaseColorMetalness, GraphicsFormat.B8G8R8A8_SRGB, uavState, true));
-
             prevResolutionScale = setting.resolutionScale;
 
             Debug.Log($"[NRD] Created Denoiser Instance {nrdInstanceId} for Camera {cameraName}");
         }
 
 
-        public static int2 GetUpscaledResolution(int2 outputRes, UpscalerMode mode)
-        {
-            float scale = mode switch
-            {
-                UpscalerMode.NATIVE => 1.0f,
-                UpscalerMode.ULTRA_QUALITY => 1.3f,
-                UpscalerMode.QUALITY => 1.5f,
-                UpscalerMode.BALANCED => 1.7f,
-                UpscalerMode.PERFORMANCE => 2.0f,
-                UpscalerMode.ULTRA_PERFORMANCE => 3.0f,
-                _ => 1.0f
-            };
-
-            return new int2((int)(outputRes.x / scale + 0.5f), (int)(outputRes.y / scale + 0.5f));
-        }
-
         public void EnsureResources(int2 outputResolution)
         {
-            // 检查是否有任何资源失效（例如场景切换导致 RenderTexture 被销毁）
-            bool isResourceInvalid = false;
-            foreach (var nrdTextureResource in allocatedResources)
+            bool resourcesChanged = pool.EnsureResources(outputResolution);
+            if (resourcesChanged)
             {
-                // 如果 Handle 为空，或者底层的 rt 已经被 Unity 销毁 (null)
-                if (nrdTextureResource.Handle == null || nrdTextureResource.Handle.rt == null)
-                {
-                    isResourceInvalid = true;
-                    break;
-                }
+                FrameIndex = 0;
+                UpdateResourceSnapshotInCpp();
             }
-
-            int2 currentRenderResolution = GetUpscaledResolution(outputResolution, setting.upscalerMode);
-
-
-            // 如果尺寸没变且资源都存在，直接返回
-            if (!isResourceInvalid && currentRenderResolution.x == renderResolution.x && currentRenderResolution.y == renderResolution.y)
-            {
-                return;
-            }
-
-            renderResolution = currentRenderResolution;
-
-            FrameIndex = 0;
-
-            foreach (var nrdTextureResource in allocatedResources)
-            {
-                if (nrdTextureResource.ResourceType is ResourceType.DlssOutput)
-                {
-                    nrdTextureResource.Allocate(outputResolution);
-                }
-                else
-                {
-                    nrdTextureResource.Allocate(renderResolution);
-                }
-            }
-
-            UpdateResourceSnapshotInCpp();
         }
 
         private unsafe void UpdateResourceSnapshotInCpp()
         {
-            // 定义需要的资源数量 (Sigma + Reblur 大概 10-15 个)
             int maxResources = 20;
             if (!m_ResourceCache.IsCreated || m_ResourceCache.Length < maxResources)
             {
@@ -189,16 +89,11 @@ namespace Nrd
             }
 
             int idx = 0;
-
-            // Reblur/Sigma Inputs
             NrdResourceInput* ptr = (NrdResourceInput*)m_ResourceCache.GetUnsafePtr();
 
-            foreach (var nrdTextureResource in allocatedResources)
+            foreach (var res in pool.GetAllNrdResources())
             {
-                if (nrdTextureResource.ResourceType >= ResourceType.MAX_NUM)
-                    continue; // 跳过本地使用的资源
-
-                ptr[idx++] = new NrdResourceInput { type = nrdTextureResource.ResourceType, texture = nrdTextureResource.NriPtr, state = nrdTextureResource.ResourceState };
+                ptr[idx++] = new NrdResourceInput { type = res.ResourceType, texture = res.NriPtr, state = res.ResourceState };
             }
 
             UpdateDenoiserResources(nrdInstanceId, (IntPtr)ptr, idx);
@@ -206,16 +101,6 @@ namespace Nrd
             Debug.Log($"[NRD] Updated Resources for Denoiser Instance {nrdInstanceId} with {idx} resources.");
         }
 
-        private void ReleaseTextures()
-        {
-            Debug.Log($"[NRD] Releasing Textures for Denoiser Instance {nrdInstanceId}.");
-            foreach (var nrdTextureResource in allocatedResources)
-            {
-                nrdTextureResource.Release();
-            }
-
-            allocatedResources.Clear();
-        }
 
 
         public static float Halton(uint n, uint @base)
@@ -417,22 +302,8 @@ namespace Nrd
 
         public void Dispose()
         {
-            if (buffer.IsCreated)
-            {
-                buffer.Dispose();
-            }
-
-            if (allocatedResources.Count > 0 && allocatedResources[0].IsCreated)
-            {
-                var handle = allocatedResources[0].Handle;
-                if (handle != null && (handle.externalTexture != null || handle.rt != null))
-                {
-                    var request = AsyncGPUReadback.Request(allocatedResources[0].Handle);
-                    request.WaitForCompletion();
-                }
-            }
-
-            ReleaseTextures();
+            if (buffer.IsCreated) buffer.Dispose();
+            if (m_ResourceCache.IsCreated) m_ResourceCache.Dispose();
             DestroyDenoiserInstance(nrdInstanceId);
             Debug.Log($"[NRD] Destroyed Denoiser Instance {nrdInstanceId} for Camera {cameraName} - Dispose Complete");
         }

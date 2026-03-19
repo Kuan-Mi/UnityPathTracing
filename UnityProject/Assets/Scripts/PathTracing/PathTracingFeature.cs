@@ -59,7 +59,7 @@ namespace PathTracing
 
         private GPUScene _gpuScene = new();
         private LightCollector _lightCollector = new();
-        private PrepareLightResource _prepareLightResources = new();
+        private PrepareLightResource _prepareLightResources;
 
         private readonly GlobalConstants[] _globalConstantsArray = new GlobalConstants[1];
         private readonly ResamplingConstants[] _resamplingConstantsArray = new ResamplingConstants[1];
@@ -67,6 +67,7 @@ namespace PathTracing
 
         private Dictionary<long, NRDDenoiser> _nrdDenoisers = new();
         private Dictionary<long, DLRRDenoiser> _dlrrDenoisers = new();
+        private Dictionary<long, PathTracingResourcePool> _resourcePools = new();
         private Dictionary<long, ReSTIRDIContext> _restirDIContexts = new();
         private Dictionary<long, RtxdiResources> _rtxdiResources = new();
 
@@ -227,6 +228,12 @@ namespace PathTracing
 
             var isVR = renderingData.cameraData.xrRendering;
 
+            if (!_resourcePools.TryGetValue(uniqueKey, out var pool))
+            {
+                pool = new PathTracingResourcePool(pathTracingSetting);
+                _resourcePools.Add(uniqueKey, pool);
+            }
+
             if (!_nrdDenoisers.TryGetValue(uniqueKey, out var nrd))
             {
                 var camName = cam.name;
@@ -235,7 +242,7 @@ namespace PathTracing
                     camName = $"{cam.name}_Eye{eyeIndex}";
                 }
 
-                nrd = new NRDDenoiser(pathTracingSetting, camName);
+                nrd = new NRDDenoiser(pathTracingSetting, camName, pool);
                 _nrdDenoisers.Add(uniqueKey, nrd);
             }
 
@@ -279,7 +286,6 @@ namespace PathTracing
                 || dlssBeforeComputeShader == null
                 || sharcResolveCs == null
                 || sharcUpdateTs == null
-                || finalMaterial == null
                 || scramblingRankingTex == null
                 || sobolTex == null
                )
@@ -299,7 +305,7 @@ namespace PathTracing
             _lightCollector.Collect();
 
             var nrdDataPtr = nrd.GetInteropDataPtr(renderingData);
-            var dlssDataPtr = dlrr.GetInteropDataPtr(renderingData, nrd);
+            var dlssDataPtr = dlrr.GetInteropDataPtr(renderingData, nrd, pool);
 
             var outputResolution = ComputeOutputResolution(renderingData.cameraData);
             nrd.EnsureResources(outputResolution);
@@ -351,20 +357,20 @@ namespace PathTracing
                 ScramblingRanking = _scramblingRankingUintBuffer,
                 Sobol = _sobolUintBuffer,
 
-                Mv = nrd.GetRT(ResourceType.IN_MV),
-                ViewZ = nrd.GetRT(ResourceType.IN_VIEWZ),
-                NormalRoughness = nrd.GetRT(ResourceType.IN_NORMAL_ROUGHNESS),
-                BaseColorMetalness = nrd.GetRT(ResourceType.IN_BASECOLOR_METALNESS),
+                Mv = pool.GetNrdRT(ResourceType.IN_MV),
+                ViewZ = pool.GetNrdRT(ResourceType.IN_VIEWZ),
+                NormalRoughness = pool.GetNrdRT(ResourceType.IN_NORMAL_ROUGHNESS),
+                BaseColorMetalness = pool.GetNrdRT(ResourceType.IN_BASECOLOR_METALNESS),
 
-                Penumbra = nrd.GetRT(ResourceType.IN_PENUMBRA),
-                Diff = nrd.GetRT(ResourceType.IN_DIFF_RADIANCE_HITDIST),
-                Spec = nrd.GetRT(ResourceType.IN_SPEC_RADIANCE_HITDIST),
+                Penumbra = pool.GetNrdRT(ResourceType.IN_PENUMBRA),
+                Diff = pool.GetNrdRT(ResourceType.IN_DIFF_RADIANCE_HITDIST),
+                Spec = pool.GetNrdRT(ResourceType.IN_SPEC_RADIANCE_HITDIST),
 
-                PrevViewZ = nrd.GetRT(ResourceType.Prev_ViewZ),
-                PrevNormalRoughness = nrd.GetRT(ResourceType.Prev_NormalRoughness),
-                PrevBaseColorMetalness = nrd.GetRT(ResourceType.Prev_BaseColorMetalness),
+                PrevViewZ = pool.GetRT(RenderResourceType.Prev_ViewZ),
+                PrevNormalRoughness = pool.GetRT(RenderResourceType.Prev_NormalRoughness),
+                PrevBaseColorMetalness = pool.GetRT(RenderResourceType.Prev_BaseColorMetalness),
 
-                PsrThroughput = nrd.GetRT(ResourceType.PsrThroughput),
+                PsrThroughput = pool.GetRT(RenderResourceType.PsrThroughput),
 
                 RtxdiResources = rtxdiResources
             };
@@ -390,23 +396,23 @@ namespace PathTracing
             {
                 ConstantBuffer = _constantBuffer,
 
-                ViewZ = nrd.GetRT(ResourceType.IN_VIEWZ),
-                NormalRoughness = nrd.GetRT(ResourceType.IN_NORMAL_ROUGHNESS),
-                BaseColorMetalness = nrd.GetRT(ResourceType.IN_BASECOLOR_METALNESS),
-                PsrThroughput = nrd.GetRT(ResourceType.PsrThroughput)
+                ViewZ = pool.GetNrdRT(ResourceType.IN_VIEWZ),
+                NormalRoughness = pool.GetNrdRT(ResourceType.IN_NORMAL_ROUGHNESS),
+                BaseColorMetalness = pool.GetNrdRT(ResourceType.IN_BASECOLOR_METALNESS),
+                PsrThroughput = pool.GetRT(RenderResourceType.PsrThroughput)
             };
 
             if (pathTracingSetting.RR)
             {
-                compositionResource.Shadow = nrd.GetRT(ResourceType.IN_PENUMBRA);
-                compositionResource.Diff = nrd.GetRT(ResourceType.IN_DIFF_RADIANCE_HITDIST);
-                compositionResource.Spec = nrd.GetRT(ResourceType.IN_SPEC_RADIANCE_HITDIST);
+                compositionResource.Shadow = pool.GetNrdRT(ResourceType.IN_PENUMBRA);
+                compositionResource.Diff = pool.GetNrdRT(ResourceType.IN_DIFF_RADIANCE_HITDIST);
+                compositionResource.Spec = pool.GetNrdRT(ResourceType.IN_SPEC_RADIANCE_HITDIST);
             }
             else
             {
-                compositionResource.Shadow = nrd.GetRT(ResourceType.OUT_SHADOW_TRANSLUCENCY);
-                compositionResource.Diff = nrd.GetRT(ResourceType.OUT_DIFF_RADIANCE_HITDIST);
-                compositionResource.Spec = nrd.GetRT(ResourceType.OUT_SPEC_RADIANCE_HITDIST);
+                compositionResource.Shadow = pool.GetNrdRT(ResourceType.OUT_SHADOW_TRANSLUCENCY);
+                compositionResource.Diff = pool.GetNrdRT(ResourceType.OUT_DIFF_RADIANCE_HITDIST);
+                compositionResource.Spec = pool.GetNrdRT(ResourceType.OUT_SPEC_RADIANCE_HITDIST);
             }
 
             var rectGridW = (int)(cam.pixelWidth * pathTracingSetting.resolutionScale + 0.5f) / 16;
@@ -426,9 +432,9 @@ namespace PathTracing
             {
                 ConstantBuffer = _constantBuffer,
 
-                Mv = nrd.GetRT(ResourceType.IN_MV),
-                Composed = nrd.GetRT(ResourceType.Composed),
-                NormalRoughness = nrd.GetRT(ResourceType.IN_NORMAL_ROUGHNESS),
+                Mv = pool.GetNrdRT(ResourceType.IN_MV),
+                Composed = pool.GetRT(RenderResourceType.Composed),
+                NormalRoughness = pool.GetNrdRT(ResourceType.IN_NORMAL_ROUGHNESS),
 
                 HashEntriesBuffer = _hashEntriesBuffer,
                 AccumulationBuffer = _accumulationBuffer,
@@ -453,10 +459,10 @@ namespace PathTracing
             {
                 AeHistogramBuffer = _aeHistogramBuffer,
                 AeExposureBuffer = _aeExposureBuffer,
-                Composed = nrd.GetRT(ResourceType.Composed)
+                Composed = pool.GetRT(RenderResourceType.Composed)
             };
 
-            var renderResolution = nrd.renderResolution;
+            var renderResolution = pool.renderResolution;
 
             var aeSettings = new AutoExposurePass.Settings
             {
@@ -495,15 +501,15 @@ namespace PathTracing
                 {
                     ConstantBuffer = _constantBuffer,
 
-                    NormalRoughness = nrd.GetRT(ResourceType.IN_NORMAL_ROUGHNESS),
-                    BaseColorMetalness = nrd.GetRT(ResourceType.IN_BASECOLOR_METALNESS),
-                    Spec = nrd.GetRT(ResourceType.IN_SPEC_RADIANCE_HITDIST),
-                    ViewZ = nrd.GetRT(ResourceType.IN_VIEWZ),
+                    NormalRoughness = pool.GetNrdRT(ResourceType.IN_NORMAL_ROUGHNESS),
+                    BaseColorMetalness = pool.GetNrdRT(ResourceType.IN_BASECOLOR_METALNESS),
+                    Spec = pool.GetNrdRT(ResourceType.IN_SPEC_RADIANCE_HITDIST),
+                    ViewZ = pool.GetNrdRT(ResourceType.IN_VIEWZ),
 
-                    RRGuide_DiffAlbedo = nrd.GetRT(ResourceType.RRGuide_DiffAlbedo),
-                    RRGuide_SpecAlbedo = nrd.GetRT(ResourceType.RRGuide_SpecAlbedo),
-                    RRGuide_SpecHitDistance = nrd.GetRT(ResourceType.RRGuide_SpecHitDistance),
-                    RRGuide_Normal_Roughness = nrd.GetRT(ResourceType.RRGuide_Normal_Roughness),
+                    RRGuide_DiffAlbedo = pool.GetRT(RenderResourceType.RRGuide_DiffAlbedo),
+                    RRGuide_SpecAlbedo = pool.GetRT(RenderResourceType.RRGuide_SpecAlbedo),
+                    RRGuide_SpecHitDistance = pool.GetRT(RenderResourceType.RRGuide_SpecHitDistance),
+                    RRGuide_Normal_Roughness = pool.GetRT(RenderResourceType.RRGuide_Normal_Roughness),
                 };
 
                 var dlssSettings = new DlssRRPass.Settings
@@ -522,10 +528,10 @@ namespace PathTracing
                 {
                     ConstantBuffer = _constantBuffer,
 
-                    Mv = nrd.GetRT(ResourceType.IN_MV),
-                    Composed = nrd.GetRT(ResourceType.Composed),
-                    taaSrc = nrd.GetRT(isEven ? ResourceType.TaaHistoryPrev : ResourceType.TaaHistory),
-                    taaDst = nrd.GetRT(isEven ? ResourceType.TaaHistory : ResourceType.TaaHistoryPrev)
+                    Mv = pool.GetNrdRT(ResourceType.IN_MV),
+                    Composed = pool.GetRT(RenderResourceType.Composed),
+                    taaSrc = pool.GetRT(isEven ? RenderResourceType.TaaHistoryPrev : RenderResourceType.TaaHistory),
+                    taaDst = pool.GetRT(isEven ? RenderResourceType.TaaHistory : RenderResourceType.TaaHistoryPrev)
                 };
 
                 var taaSettings = new TaaPass.Settings
@@ -540,28 +546,28 @@ namespace PathTracing
 
             var pathTracingResource = new OutputBlitPass.Resource
             {
-                Mv = nrd.GetRT(ResourceType.IN_MV),
-                NormalRoughness = nrd.GetRT(ResourceType.IN_NORMAL_ROUGHNESS),
-                BaseColorMetalness = nrd.GetRT(ResourceType.IN_BASECOLOR_METALNESS),
+                Mv = pool.GetNrdRT(ResourceType.IN_MV),
+                NormalRoughness = pool.GetNrdRT(ResourceType.IN_NORMAL_ROUGHNESS),
+                BaseColorMetalness = pool.GetNrdRT(ResourceType.IN_BASECOLOR_METALNESS),
 
 
-                Penumbra = nrd.GetRT(ResourceType.IN_PENUMBRA),
-                Diff = nrd.GetRT(ResourceType.IN_DIFF_RADIANCE_HITDIST),
-                Spec = nrd.GetRT(ResourceType.IN_SPEC_RADIANCE_HITDIST),
+                Penumbra = pool.GetNrdRT(ResourceType.IN_PENUMBRA),
+                Diff = pool.GetNrdRT(ResourceType.IN_DIFF_RADIANCE_HITDIST),
+                Spec = pool.GetNrdRT(ResourceType.IN_SPEC_RADIANCE_HITDIST),
 
-                ShadowTranslucency = nrd.GetRT(ResourceType.OUT_SHADOW_TRANSLUCENCY),
-                DenoisedDiff = nrd.GetRT(ResourceType.OUT_DIFF_RADIANCE_HITDIST),
-                DenoisedSpec = nrd.GetRT(ResourceType.OUT_SPEC_RADIANCE_HITDIST),
-                Validation = nrd.GetRT(ResourceType.OUT_VALIDATION),
+                ShadowTranslucency = pool.GetNrdRT(ResourceType.OUT_SHADOW_TRANSLUCENCY),
+                DenoisedDiff = pool.GetNrdRT(ResourceType.OUT_DIFF_RADIANCE_HITDIST),
+                DenoisedSpec = pool.GetNrdRT(ResourceType.OUT_SPEC_RADIANCE_HITDIST),
+                Validation = pool.GetNrdRT(ResourceType.OUT_VALIDATION),
 
-                Composed = nrd.GetRT(ResourceType.Composed),
+                Composed = pool.GetRT(RenderResourceType.Composed),
 
-                RRGuide_DiffAlbedo = nrd.GetRT(ResourceType.RRGuide_DiffAlbedo),
-                RRGuide_SpecAlbedo = nrd.GetRT(ResourceType.RRGuide_SpecAlbedo),
-                RRGuide_Normal_Roughness = nrd.GetRT(ResourceType.RRGuide_Normal_Roughness),
-                RRGuide_SpecHitDistance = nrd.GetRT(ResourceType.RRGuide_SpecHitDistance),
-                DlssOutput = nrd.GetRT(ResourceType.DlssOutput),
-                taaDst = nrd.GetRT(isEven ? ResourceType.TaaHistory : ResourceType.TaaHistoryPrev),
+                RRGuide_DiffAlbedo = pool.GetRT(RenderResourceType.RRGuide_DiffAlbedo),
+                RRGuide_SpecAlbedo = pool.GetRT(RenderResourceType.RRGuide_SpecAlbedo),
+                RRGuide_Normal_Roughness = pool.GetRT(RenderResourceType.RRGuide_Normal_Roughness),
+                RRGuide_SpecHitDistance = pool.GetRT(RenderResourceType.RRGuide_SpecHitDistance),
+                DlssOutput = pool.GetRT(RenderResourceType.DlssOutput),
+                taaDst = pool.GetRT(isEven ? RenderResourceType.TaaHistory : RenderResourceType.TaaHistoryPrev),
             };
 
             var pathTracingSettings = new OutputBlitPass.Settings
@@ -834,6 +840,13 @@ namespace PathTracing
             }
 
             _dlrrDenoisers.Clear();
+
+            foreach (var pool in _resourcePools.Values)
+            {
+                pool.Dispose();
+            }
+
+            _resourcePools.Clear();
 
             foreach (var res in _rtxdiResources.Values)
             {

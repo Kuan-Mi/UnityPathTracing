@@ -40,6 +40,20 @@ namespace NRD
             SRGB = srgb;
         }
 
+        /// <summary>
+        /// Constructor for resources that require an NRI pointer but are NOT part of the NRD API
+        /// (e.g. DLSS/RR guide textures, composition buffers).
+        /// ResourceType is set to MAX_NUM as a sentinel value.
+        /// </summary>
+        public NrdTextureResource(string name, GraphicsFormat graphicsFormat, NriResourceState initialState, bool srgb = false)
+        {
+            Name = name;
+            ResourceType = ResourceType.MAX_NUM;
+            ResourceState = initialState;
+            GraphicsFormat = graphicsFormat;
+            SRGB = srgb;
+        }
+
         public void Allocate(int2 resolution)
         {
             Release(); // 确保先释放旧的

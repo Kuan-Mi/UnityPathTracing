@@ -34,20 +34,20 @@ namespace Nrd
         }
 
 
-        private unsafe RRFrameData GetData(CameraData cameraData, NRDDenoiser denoiser)
+        private unsafe RRFrameData GetData(CameraData cameraData, NRDDenoiser denoiser, PathTracingResourcePool pool)
         {
             RRFrameData data = new RRFrameData();
 
-            data.inputTex = denoiser.GetResource(ResourceType.Composed).NriPtr;
-            data.outputTex = denoiser.GetResource(ResourceType.DlssOutput).NriPtr;
+            data.inputTex  = pool.GetNriResource(RenderResourceType.Composed).NriPtr;
+            data.outputTex = pool.GetNriResource(RenderResourceType.DlssOutput).NriPtr;
 
-            data.mvTex = denoiser.GetResource(ResourceType.IN_MV).NriPtr;
-            data.depthTex = denoiser.GetResource(ResourceType.IN_VIEWZ).NriPtr;
+            data.mvTex    = pool.GetNrdResource(ResourceType.IN_MV).NriPtr;
+            data.depthTex = pool.GetNrdResource(ResourceType.IN_VIEWZ).NriPtr;
 
-            data.diffuseAlbedoTex = denoiser.GetResource(ResourceType.RRGuide_DiffAlbedo).NriPtr;
-            data.specularAlbedoTex = denoiser.GetResource(ResourceType.RRGuide_SpecAlbedo).NriPtr;
-            data.normalRoughnessTex = denoiser.GetResource(ResourceType.RRGuide_Normal_Roughness).NriPtr;
-            data.specularMvOrHitTex = denoiser.GetResource(ResourceType.RRGuide_SpecHitDistance).NriPtr;
+            data.diffuseAlbedoTex   = pool.GetNriResource(RenderResourceType.RRGuide_DiffAlbedo).NriPtr;
+            data.specularAlbedoTex  = pool.GetNriResource(RenderResourceType.RRGuide_SpecAlbedo).NriPtr;
+            data.normalRoughnessTex = pool.GetNriResource(RenderResourceType.RRGuide_Normal_Roughness).NriPtr;
+            data.specularMvOrHitTex = pool.GetNriResource(RenderResourceType.RRGuide_SpecHitDistance).NriPtr;
 
             data.worldToViewMatrix = denoiser.worldToView;
             data.viewToClipMatrix = denoiser.viewToClip;
@@ -80,10 +80,10 @@ namespace Nrd
             return data;
         }
 
-        public IntPtr GetInteropDataPtr(RenderingData renderingData, NRDDenoiser denoiser)
+        public IntPtr GetInteropDataPtr(RenderingData renderingData, NRDDenoiser denoiser, PathTracingResourcePool pool)
         {
             var index = (int)(FrameIndex % BufferCount);
-            buffer[index] = GetData(renderingData.cameraData, denoiser);
+            buffer[index] = GetData(renderingData.cameraData, denoiser, pool);
             FrameIndex++;
             unsafe
             {

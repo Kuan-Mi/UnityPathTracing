@@ -126,23 +126,5 @@ namespace Nrd
         PERMANENT_POOL,
 
         MAX_NUM,
-
-        // 本地使用
-        TaaHistory,
-        TaaHistoryPrev,
-        PsrThroughput,
-
-        // dlss
-        RRGuide_DiffAlbedo,
-        RRGuide_SpecAlbedo,
-        RRGuide_SpecHitDistance,
-        RRGuide_Normal_Roughness,
-        DlssOutput,
-        Composed,
-
-        // RTXDI：上一帧 GBuffer（用于时间复用）
-        Prev_ViewZ,
-        Prev_NormalRoughness,
-        Prev_BaseColorMetalness,
     };
 }
