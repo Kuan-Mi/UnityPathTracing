@@ -1,4 +1,4 @@
-﻿namespace Nrd
+﻿namespace Nri
 {
     public enum DXGI_FORMAT : uint
     {

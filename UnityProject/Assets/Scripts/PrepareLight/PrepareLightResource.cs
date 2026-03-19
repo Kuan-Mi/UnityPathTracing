@@ -4,7 +4,7 @@ using System.Linq;
 using System.Runtime.InteropServices;
 using DefaultNamespace;
 using Nrd;
-using NRD;
+using Nri;
 using RTXDI;
 using Unity.Collections;
 using Unity.Collections.LowLevel.Unsafe;
@@ -63,7 +63,7 @@ namespace RTXDI
                 
                 
                 var format = tex.graphicsFormat;
-                var dxgiFormat = NRDUtil.GetDXGIFormat(format);
+                var dxgiFormat = NRIUtil.GetDXGIFormat(format);
                  
                 // Debug.Log($"Sending Texture {i}: {tex.name}, Format: {format}, DXGI Format: {dxgiFormat}");
                 
@@ -72,7 +72,7 @@ namespace RTXDI
                 EmissionResourceInput resourceInput = new EmissionResourceInput
                 {
                     texture = nriTex,
-                    format =  NRDUtil.GetNriFormat(format)
+                    format =  NRIUtil.GetNriFormat(format)
                 };
                 m_ResourceCache[i] = resourceInput;
             }

@@ -40,14 +40,7 @@ namespace Nrd
         }
     }
 
-    [Serializable]
-    [StructLayout(LayoutKind.Sequential, Pack = 1)]
-    public struct NriResourceState
-    {
-        public AccessBits accessBits;
-        public Layout layout;
-        public uint stageBits;
-    }
+
 
     [Serializable]
     [StructLayout(LayoutKind.Sequential, Pack = 1)]

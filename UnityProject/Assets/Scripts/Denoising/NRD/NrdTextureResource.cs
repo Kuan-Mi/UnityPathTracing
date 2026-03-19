@@ -7,7 +7,7 @@ using UnityEngine.Experimental.Rendering;
 using UnityEngine.Rendering;
 using Object = UnityEngine.Object;
 
-namespace NRD
+namespace Nri
 {
     public class NriTextureResource
     {
@@ -43,7 +43,7 @@ namespace NRD
         public void Allocate(int2 resolution)
         {
             Release(); // 确保先释放旧的
-            var dxgiFormat = NRDUtil.GetDXGIFormat(GraphicsFormat);
+            var dxgiFormat = NRIUtil.GetDXGIFormat(GraphicsFormat);
 
             // Debug.Log($"Allocating NRD Texture Resource: {Name}, Size: {resolution}, Format: {GraphicsFormat}");
 
