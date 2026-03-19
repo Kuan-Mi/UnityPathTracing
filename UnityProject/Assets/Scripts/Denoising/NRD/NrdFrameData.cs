@@ -10,7 +10,7 @@ namespace Nrd
 
     [Serializable]
     [StructLayout(LayoutKind.Sequential)]
-    public struct FrameData
+    public struct NrdFrameData
     {
         public CommonSettings commonSettings;
         public SigmaSettings sigmaSettings;
@@ -21,14 +21,14 @@ namespace Nrd
 
         public int instanceId;
 
-        public static FrameData _default = CreateDefault();
+        public static NrdFrameData _default = CreateDefault();
 
         // -----------------------------------------------------------------------
         // Factory Method for C++ Defaults
         // -----------------------------------------------------------------------
-        private static FrameData CreateDefault()
+        private static NrdFrameData CreateDefault()
         {
-            return new FrameData
+            return new NrdFrameData
             {
                 commonSettings = CommonSettings._default,
                 sigmaSettings = SigmaSettings._default,
