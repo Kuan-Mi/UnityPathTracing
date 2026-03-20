@@ -99,7 +99,7 @@ namespace PathTracing
             lastIsAutoExposureEnabled = setting.enableAutoExposure;
             lastExposure = setting.exposure;
             
-            if (hasCameraMoved || settingsChanged)
+            if (hasCameraMoved || settingsChanged || !setting.accumulateReference)
             {
                 convergenceStep = 0;
             }

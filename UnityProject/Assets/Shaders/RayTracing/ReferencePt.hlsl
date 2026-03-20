@@ -84,16 +84,17 @@ void MainRayGenShader()
         float3 diffuseRayDir = normalize(materialProps.N + RandomUnitVector());
         float3 specularRayDir = lerp(reflectionRayDir, diffuseRayDir, materialProps.roughness);
 
-        float fresnelFactor = FresnelReflectAmountOpaque(1.0, 1.7, rayDirection, materialProps.N);
-        float specularChance = lerp(materialProps.metalness, 1, fresnelFactor * (1 - materialProps.roughness));
-        float doSpecular = Rng::Hash::GetFloat() < specularChance;
+        float diffuseProbability = EstimateDiffuseProbability(geometryProps, materialProps);
+        bool isDiffuse = Rng::Hash::GetFloat() < diffuseProbability;
+        
+        float doSpecular = !isDiffuse;
         float3 reflectedRayDir = lerp(diffuseRayDir, specularRayDir, doSpecular);
-        float k = (doSpecular == 1) ? specularChance : 1 - specularChance;
+        float k = (doSpecular == 1) ? 1 - diffuseProbability : diffuseProbability;
         
-        float3 dielectricSpecular = float3(0.04, 0.04, 0.04);
-        
-        float3 _SpecularColor = lerp(dielectricSpecular, materialProps.baseColor, materialProps.metalness);
-        float3 albedo = lerp(materialProps.baseColor, _SpecularColor, doSpecular);
+        float3 albedo, Rf0;
+        BRDF::ConvertBaseColorMetalnessToAlbedoRf0(materialProps.baseColor, materialProps.metalness, albedo, Rf0);
+
+        albedo = lerp(albedo, Rf0, doSpecular);
         
         radiance += throughput * materialProps.Lemi;
         throughput *= albedo / max(0.001, k);
@@ -116,6 +117,8 @@ void MainRayGenShader()
     float3 prevRadiance = g_Output[pixelPos].xyz;
     
     radiance = ApplyExposure(radiance);
+    
+    radiance = Color::HdrToLinear_Uncharted(radiance);
 
     float3 result = lerp(prevRadiance, radiance, 1.0f / float(g_ConvergenceStep + 1));
     
