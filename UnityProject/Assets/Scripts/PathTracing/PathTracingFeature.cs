@@ -24,7 +24,8 @@ namespace PathTracing
         public RayTracingShader sharcUpdateTs;
         public RayTracingShader opaqueTracingShader;
         public RayTracingShader transparentTracingShader;
-        
+        public RayTracingShader referencePtTracingShader;
+
         public ComputeShader compositionComputeShader;
         public ComputeShader taaComputeShader;
         public ComputeShader dlssBeforeComputeShader;
@@ -44,6 +45,7 @@ namespace PathTracing
         private AutoExposurePass _autoExposurePass;
         private TaaPass _taaPass;
         private DlssRRPass _dlssrrPass;
+        private ReferencePtPass _referencePtPass;
 
         private RayTracingAccelerationStructure _accelerationStructure;
 
@@ -168,6 +170,10 @@ namespace PathTracing
                 renderPassEvent = renderPassEvent
             };
             _outputBlitPass ??= new OutputBlitPass(finalMaterial)
+            {
+                renderPassEvent = renderPassEvent
+            };
+            _referencePtPass ??= new ReferencePtPass(referencePtTracingShader)
             {
                 renderPassEvent = renderPassEvent
             };
@@ -686,6 +692,25 @@ namespace PathTracing
 
             _outputBlitPass.Setup(pathTracingResource, pathTracingSettings);
             renderer.EnqueuePass(_outputBlitPass);
+
+
+            var referencePtResource = new ReferencePtPass.Resource
+            {
+                ConstantBuffer = _constantBuffer,
+
+                PointLightBuffer = _lightCollector.PointLightBuffer,
+                AreaLightBuffer = _lightCollector.AreaLightBuffer,
+                SpotLightBuffer = _lightCollector.SpotLightBuffer,
+            };
+
+            var referencePtSettings = new ReferencePtPass.Settings
+            {
+                m_RenderResolution = new int2(cam.pixelWidth, cam.pixelHeight),
+                resolutionScale = pathTracingSetting.resolutionScale
+            };
+
+            _referencePtPass.Setup(referencePtResource, referencePtSettings);
+            renderer.EnqueuePass(_referencePtPass);
         }
 
         private ResamplingConstants GetResamplingConstants(ReSTIRDIContext restirDiContext, RtxdiResources rtxdiResources, CameraFrameState frameState)
