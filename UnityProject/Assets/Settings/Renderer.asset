@@ -457,6 +457,9 @@ MonoBehaviour:
   sharcUpdateTs: {fileID: 4807578003741378534, guid: 171e2660e0894b3cb5c6c809e595ae5d, type: 3}
   opaqueTracingShader: {fileID: 4807578003741378534, guid: 71faa22953dc9834daf36cc38966c196, type: 3}
   generateInitialSShader: {fileID: 4807578003741378534, guid: d360fd1504e84137ab8253780770f0b6, type: 3}
+  temporalResamplingShader: {fileID: 4807578003741378534, guid: 190468c66edf4d45b3f8535a3bd6f0d4, type: 3}
+  spatialResamplingShader: {fileID: 4807578003741378534, guid: d603ddad10874923ab65a70b34fe6a60, type: 3}
+  shadeSamplesShader: {fileID: 4807578003741378534, guid: 78d7660a5ed54d6fa49f9d2ad6265c82, type: 3}
   transparentTracingShader: {fileID: 4807578003741378534, guid: d207e5fb066a4b579353785310fd0dea, type: 3}
   referencePtTracingShader: {fileID: 4807578003741378534, guid: e0dfc84565ad452aab99e3b8d28eafb1, type: 3}
   compositionComputeShader: {fileID: 7200000, guid: 6b0c89c26f4363a4781550cf86801786, type: 3}

@@ -7,12 +7,11 @@ using UnityEngine.Experimental.Rendering;
 using UnityEngine.Rendering;
 using UnityEngine.Rendering.RenderGraphModule;
 using UnityEngine.Rendering.Universal;
-
 using static PathTracing.ShaderIDs;
 
 namespace PathTracing
 {
-    public class GenerateInitialSamplesPass: ScriptableRenderPass
+    public class GenerateInitialSamplesPass : ScriptableRenderPass
     {
         private readonly RayTracingShader _opaqueTs;
         private Resource _resource;
@@ -43,7 +42,6 @@ namespace PathTracing
             internal RTHandle GeoNormal;
 
 
-
             internal RTHandle PrevViewZ;
             internal RTHandle PrevNormalRoughness;
             internal RTHandle PrevBaseColorMetalness;
@@ -55,7 +53,7 @@ namespace PathTracing
         public class Settings
         {
             internal int2 m_RenderResolution;
-            internal float resolutionScale;     
+            internal float resolutionScale;
         }
 
         class PassData
@@ -72,7 +70,6 @@ namespace PathTracing
             var natCmd = CommandBufferHelpers.GetNativeCommandBuffer(context.cmd);
 
             var opaqueTracingMarker = new ProfilerMarker(ProfilerCategory.Render, "GIS Tracing", MarkerFlags.SampleGPU);
-            var copyGBufferMarker = new ProfilerMarker(ProfilerCategory.Render, "Copy GBuffer to Prev", MarkerFlags.SampleGPU);
 
             natCmd.BeginSample(opaqueTracingMarker);
 
@@ -98,11 +95,11 @@ namespace PathTracing
             natCmd.SetRayTracingTextureParam(data.OpaqueTs, gIn_PrevViewZID, resource.PrevViewZ);
             natCmd.SetRayTracingTextureParam(data.OpaqueTs, gIn_PrevNormalRoughnessID, resource.PrevNormalRoughness);
             natCmd.SetRayTracingTextureParam(data.OpaqueTs, gIn_PrevBaseColorMetalnessID, resource.PrevBaseColorMetalness);
-            
-            
-            natCmd.SetRayTracingTextureParam(data.OpaqueTs,"gOut_GeoNormal", resource.GeoNormal);
-            natCmd.SetRayTracingTextureParam(data.OpaqueTs,"gIn_PrevGeoNormal", resource.PrevGeoNormal);
-            
+
+
+            natCmd.SetRayTracingTextureParam(data.OpaqueTs, "gOut_GeoNormal", resource.GeoNormal);
+            natCmd.SetRayTracingTextureParam(data.OpaqueTs, "gIn_PrevGeoNormal", resource.PrevGeoNormal);
+
 
             uint rectWmod = (uint)(settings.m_RenderResolution.x * settings.resolutionScale + 0.5f);
             uint rectHmod = (uint)(settings.m_RenderResolution.y * settings.resolutionScale + 0.5f);
@@ -113,14 +110,6 @@ namespace PathTracing
             natCmd.DispatchRays(data.OpaqueTs, "MainRayGenShader", rectWmod, rectHmod, 1);
 
             natCmd.EndSample(opaqueTracingMarker);
-
-            // 保存当帧 GBuffer 到 prev 纹理，供下一帧 RTXDI 时间复用读取
-            natCmd.BeginSample(copyGBufferMarker);
-            natCmd.CopyTexture(resource.ViewZ, resource.PrevViewZ);
-            natCmd.CopyTexture(resource.NormalRoughness, resource.PrevNormalRoughness);
-            natCmd.CopyTexture(resource.BaseColorMetalness, resource.PrevBaseColorMetalness);
-            natCmd.CopyTexture(resource.GeoNormal, resource.PrevGeoNormal);
-            natCmd.EndSample(copyGBufferMarker);
         }
 
 
@@ -151,12 +140,12 @@ namespace PathTracing
             textureDesc.width = _settings.m_RenderResolution.x;
             textureDesc.height = _settings.m_RenderResolution.y;
 
-            
+
             var ptContextItem = frameData.Get<PTContextItem>();
-            
+
             passData.DirectLighting = ptContextItem.DirectLighting;
-            
-            builder.UseTexture(passData.DirectLighting,  AccessFlags.ReadWrite);
+
+            builder.UseTexture(passData.DirectLighting, AccessFlags.ReadWrite);
 
             builder.AllowPassCulling(false);
             builder.SetRenderFunc((PassData data, UnsafeGraphContext context) => { ExecutePass(data, context); });

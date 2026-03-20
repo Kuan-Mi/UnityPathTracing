@@ -13,7 +13,16 @@ RayDesc setupVisibilityRay(RAB_Surface surface, RAB_LightSample lightSample, flo
 
     return ray;
 }
+bool GetFinalVisibility(RAB_Surface surface,float3 samplePosition)
+{
+    float3 L = samplePosition - surface.worldPos;
+    float offset = 0.001;
+    float TMax = length(L) - offset;
+    
+    float hitT = CastVisibilityRay_AnyHit( surface.worldPos, normalize(L), 0.001, TMax, float2(0,0), gWorldTlas,FLAG_NON_TRANSPARENT,0);
 
+    return  hitT == INF;
+}
 // Tests the visibility between a surface and a light sample.
 // Returns true if there is nothing between them.
 bool RAB_GetConservativeVisibility(RAB_Surface surface, RAB_LightSample lightSample)

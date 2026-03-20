@@ -1,4 +1,5 @@
 ﻿using Rtxdi;
+using Rtxdi.DI;
 using Unity.Mathematics;
 
 namespace PathTracing
@@ -197,6 +198,8 @@ namespace PathTracing
       public  RTXDI_LightBufferParameters lightBufferParams;
       public  RTXDI_ReservoirBufferParameters restirDIReservoirBufferParams;
 
+      public ReSTIRDI_Parameters restirDI;
+      
       public  uint frameIndex;
       public  uint numInitialSamples;
       public  uint numSpatialSamples;

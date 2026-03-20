@@ -48,16 +48,16 @@ MonoBehaviour:
   - Sharc Update
   - Sharc Resolve
   - Opaque Tracing
+  - PrepareLight
+  - GIS Tracing
+  - Copy GBuffer to Prev
   - NRD Denoise
   - Composition
+  - Auto Exposure
   - Transparent Tracing
   - TAA
   - DLSS Before
   - DLSS Denoise
-  - Output Blit
-  - Auto Exposure
   - Reference Pt Tracing
-  - PrepareLight
-  - Copy GBuffer to Prev
-  - GIS Tracing
+  - Output Blit
   averageWindowSeconds: 1
