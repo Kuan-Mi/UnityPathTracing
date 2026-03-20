@@ -56,4 +56,7 @@ MonoBehaviour:
   - DLSS Denoise
   - Output Blit
   - Auto Exposure
+  - Reference Pt Tracing
+  - PrepareLight
+  - Copy GBuffer to Prev
   averageWindowSeconds: 1

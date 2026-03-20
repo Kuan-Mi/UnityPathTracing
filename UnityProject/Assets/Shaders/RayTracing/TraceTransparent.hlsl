@@ -10,6 +10,10 @@ RWTexture2D<float4> gOut_Normal_Roughness;
 RWTexture2D<float3> gOut_Composed;
 RWTexture2D<float4> gInOut_Mv;
 
+
+uint g_ConvergenceStep;
+
+
 struct TraceTransparentDesc
 {
     // Geometry properties
@@ -226,7 +230,17 @@ void MainRayGenShader()
 
     // Apply exposure
     Lsum = ApplyExposure(Lsum);
+    
+    float3 prevRadiance = gOut_Composed[pixelPos].xyz;
+    
+     
 
+    float3 result = lerp(prevRadiance, Lsum, 1.0f / float(g_ConvergenceStep + 1));
+     
+
+    gOut_Composed[pixelPos] = float4(result, 1);
+
+    
     // Output
-    gOut_Composed[pixelPos] = Lsum;
+    // gOut_Composed[pixelPos] = Lsum;
 }

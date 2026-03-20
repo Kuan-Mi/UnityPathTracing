@@ -69,7 +69,8 @@ namespace PathTracing
         public class Settings
         {
             internal int2 m_RenderResolution;
-            internal float resolutionScale;
+            internal float resolutionScale;     
+            internal int convergenceStep;
         }
 
         class PassData

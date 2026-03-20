@@ -560,7 +560,9 @@ namespace PathTracing
 
             var transparentSettings = new TransparentPass.Settings
             {
-                m_RenderResolution = new int2(cam.pixelWidth, cam.pixelHeight)
+                m_RenderResolution = new int2(cam.pixelWidth, cam.pixelHeight),
+                
+                convergenceStep = frameState.convergenceStep,
             };
 
             _transparentPass.Setup(transparentResource, transparentSettings);

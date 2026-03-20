@@ -36,6 +36,7 @@ namespace PathTracing
         
         private bool lastIsAutoExposureEnabled;
         private float lastExposure;
+        private int lastBounceNum;
         
 
         public CameraFrameState(float initialResolutionScale)
@@ -94,10 +95,13 @@ namespace PathTracing
             FrameIndex++;
             
             bool hasCameraMoved = worldToView != prevWorldToView || worldToClip != prevWorldToClip;
-            bool settingsChanged =  setting.enableAutoExposure != lastIsAutoExposureEnabled || !Mathf.Approximately(setting.exposure, lastExposure);
+            bool settingsChanged =  setting.enableAutoExposure != lastIsAutoExposureEnabled 
+                                    || !Mathf.Approximately(setting.exposure, lastExposure)
+                                     || setting.referenceBounceNum != lastBounceNum;
             
             lastIsAutoExposureEnabled = setting.enableAutoExposure;
             lastExposure = setting.exposure;
+            lastBounceNum = setting.referenceBounceNum;
             
             if (hasCameraMoved || settingsChanged || !setting.accumulateReference)
             {

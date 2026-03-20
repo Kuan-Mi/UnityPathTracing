@@ -29,7 +29,7 @@
 #define USE_IMPORTANCE_SAMPLING             1
 #define USE_SHARC_DITHERING                 1.5 // radius in voxels
 #define USE_TRANSLUCENCY                    1 // translucent foliage
-#define USE_MOVING_EMISSION_FIX             1 // fixes a dark tail, left by an animated emissive object
+#define USE_MOVING_EMISSION_FIX             0 // fixes a dark tail, left by an animated emissive object
 
 // Default = 0
 #define USE_SANITIZATION                    0 // NRD sample is NAN/INF free

@@ -799,13 +799,13 @@ Transform:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 330585543}
   serializedVersion: 2
-  m_LocalRotation: {x: -0.25346878, y: -0.18509793, z: 0.054171357, w: -0.94792295}
-  m_LocalPosition: {x: -9.583167, y: 5.1706276, z: -2.447608}
+  m_LocalRotation: {x: 0, y: 1, z: 0, w: 0}
+  m_LocalPosition: {x: -0.09419487, y: 2.0803719, z: 5.9828544}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
   m_Father: {fileID: 550365711}
-  m_LocalEulerAnglesHint: {x: 45, y: 0, z: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 180, z: 0}
 --- !u!114 &330585547
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -5470,23 +5470,31 @@ PrefabInstance:
       propertyPath: m_LocalEulerAnglesHint.z
       value: 0
       objectReference: {fileID: 0}
+    - target: {fileID: -3330101927117454214, guid: 6388ff436ab1fc24f8d742c8e9535c74, type: 3}
+      propertyPath: 'm_Materials.Array.data[0]'
+      value: 
+      objectReference: {fileID: 2100000, guid: 631162b369507bc4d9f339e5aabc8eaa, type: 2}
+    - target: {fileID: -2964700662566688157, guid: 6388ff436ab1fc24f8d742c8e9535c74, type: 3}
+      propertyPath: m_IsActive
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: -572048032474717501, guid: 6388ff436ab1fc24f8d742c8e9535c74, type: 3}
+      propertyPath: m_IsActive
+      value: 0
+      objectReference: {fileID: 0}
     - target: {fileID: 919132149155446097, guid: 6388ff436ab1fc24f8d742c8e9535c74, type: 3}
       propertyPath: m_Name
       value: CornellBox
       objectReference: {fileID: 0}
+    - target: {fileID: 919132149155446097, guid: 6388ff436ab1fc24f8d742c8e9535c74, type: 3}
+      propertyPath: m_IsActive
+      value: 1
+      objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
-    m_AddedGameObjects:
-    - targetCorrespondingSourceObject: {fileID: -8679921383154817045, guid: 6388ff436ab1fc24f8d742c8e9535c74, type: 3}
-      insertIndex: -1
-      addedObject: {fileID: 1931643486}
+    m_AddedGameObjects: []
     m_AddedComponents: []
   m_SourcePrefab: {fileID: 100100000, guid: 6388ff436ab1fc24f8d742c8e9535c74, type: 3}
---- !u!4 &1814562903 stripped
-Transform:
-  m_CorrespondingSourceObject: {fileID: -8679921383154817045, guid: 6388ff436ab1fc24f8d742c8e9535c74, type: 3}
-  m_PrefabInstance: {fileID: 1814562902}
-  m_PrefabAsset: {fileID: 0}
 --- !u!1 &1858160348
 GameObject:
   m_ObjectHideFlags: 0
@@ -5808,12 +5816,12 @@ Transform:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1931643485}
   serializedVersion: 2
-  m_LocalRotation: {x: -0.7071068, y: 0, z: 0, w: 0.7071068}
+  m_LocalRotation: {x: -0.7071068, y: -0, z: 0, w: 0.7071068}
   m_LocalPosition: {x: 0, y: 4.87, z: 0}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
-  m_Father: {fileID: 1814562903}
+  m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: -90, y: 0, z: 0}
 --- !u!23 &1931643488
 MeshRenderer:
@@ -5879,7 +5887,7 @@ MonoBehaviour:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1931643485}
-  m_Enabled: 1
+  m_Enabled: 0
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: bd46de2334c135c47bafec0a26b90b9a, type: 3}
   m_Name: 
@@ -7278,4 +7286,5 @@ SceneRoots:
   - {fileID: 667211478}
   - {fileID: 931081711}
   - {fileID: 1493632335}
+  - {fileID: 1931643486}
   - {fileID: 1814562902}
