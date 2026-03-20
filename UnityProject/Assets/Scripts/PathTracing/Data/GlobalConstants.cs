@@ -82,6 +82,9 @@ namespace PathTracing
         public float gSssMaxSampleRadius;
         public float gIsEditor;
         public uint gShowLight;
+        public float gSharcDownscale;
+        public float gSharcSceneScale;
+        public uint sharcDebug;
 
 
         public override string ToString()

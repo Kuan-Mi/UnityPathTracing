@@ -144,6 +144,13 @@ namespace PathTracing
         [Range(1, 4)]
         public uint bounceNum = 1;
 
+        [Header("SHARC")]
+        [Range(1, 8)]
+        public float sharcDownscale = 4;
+        [Range(10, 100)]
+        public float sharcSceneScale = 45;
+        public bool sharcDebug = false;
+
         public float mipBias = -0.5f;
 
         public RESOLUTION tracingMode = RESOLUTION.RESOLUTION_FULL_PROBABILISTIC;

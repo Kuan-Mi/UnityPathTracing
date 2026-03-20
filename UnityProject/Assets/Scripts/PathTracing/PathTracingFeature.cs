@@ -443,7 +443,8 @@ namespace PathTracing
 
             var sharcSettings = new SharcPass.Settings
             {
-                RenderResolution = new int2(cam.pixelWidth, cam.pixelHeight)
+                RenderResolution = new int2(cam.pixelWidth, cam.pixelHeight),
+                sharcDownscale = pathTracingSetting.sharcDownscale
             };
 
             _sharcPass.Setup(sharcResource, sharcSettings);

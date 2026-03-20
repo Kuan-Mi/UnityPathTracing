@@ -45,6 +45,7 @@ namespace PathTracing
         public class Settings
         {
             internal int2 RenderResolution;
+            internal float sharcDownscale;
         }
         
         class SharcPassData
@@ -78,11 +79,10 @@ namespace PathTracing
                 natCmd.SetRayTracingBufferParam(data.SharcUpdateTs, gIn_SpotLightsID, data.Resource.SpotLightBuffer);
                 natCmd.SetRayTracingBufferParam(data.SharcUpdateTs, gIn_AreaLightsID, data.Resource.AreaLightBuffer);
                 natCmd.SetRayTracingBufferParam(data.SharcUpdateTs, gIn_PointLightsID, data.Resource.PointLightBuffer);
+ 
 
-                const int sharcDownscale = 4;
-
-                var w = (uint)(data.Settings.RenderResolution.x / sharcDownscale);
-                var h = (uint)(data.Settings.RenderResolution.y / sharcDownscale);
+                var w = (uint)(data.Settings.RenderResolution.x / data.Settings.sharcDownscale);
+                var h = (uint)(data.Settings.RenderResolution.y / data.Settings.sharcDownscale);
 
                 natCmd.DispatchRays(data.SharcUpdateTs, "MainRayGenShader", w, h, 1);
                 natCmd.EndSample(sharcUpdateMarker);

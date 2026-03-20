@@ -334,7 +334,10 @@ namespace PathTracing
                 gSssAnisotropy = settings.sssAnisotropy,
                 gSssMaxSampleRadius = settings.sssMaxSampleRadius,
                 gIsEditor = cameraData.camera.cameraType == CameraType.SceneView ? 1u : 0u,
-                gShowLight = settings.gShowLight ? 1u : 0u
+                gShowLight = settings.gShowLight ? 1u : 0u,
+                gSharcDownscale =  settings.sharcDownscale,
+                gSharcSceneScale =  settings.sharcSceneScale,
+                sharcDebug =  settings.sharcDebug? 1u : 0u,
             };
 
             return globalConstants;

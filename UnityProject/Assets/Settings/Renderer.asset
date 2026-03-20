@@ -75,7 +75,7 @@ MonoBehaviour:
     isBaseColorMetalnessAvailable: 1
     planeDistanceSensitivity: 0.02
     maxStabilizedFrameNum: 5
-    showMode: 16
+    showMode: 7
     showMV: 0
     showValidation: 0
     dofAperture: 0
@@ -93,12 +93,15 @@ MonoBehaviour:
     aeMaxExposure: 1000
     rpp: 1
     bounceNum: 1
+    sharcDownscale: 1
+    sharcSceneScale: 100
+    sharcDebug: 0
     mipBias: -0.5
     tracingMode: 1
     denoiser: 0
     emissionIntensity: 1
     cameraJitter: 0
-    psr: 0
+    psr: 1
     emission: 1
     usePrevFrame: 1
     TAA: 1
@@ -127,9 +130,9 @@ MonoBehaviour:
     enableResampling: 1
     gShowLight: 0
     useReferencePathTracing: 1
-    referenceBounceNum: 1
-    split: 0.5
-    accumulateReference: 1
+    referenceBounceNum: 16
+    split: 0.34
+    accumulateReference: 0
   renderPassEvent: 550
   finalMaterial: {fileID: 2100000, guid: 27695a2bc55ef2f469362b9a2994989e, type: 2}
   sharcUpdateTs: {fileID: 4807578003741378534, guid: 171e2660e0894b3cb5c6c809e595ae5d, type: 3}

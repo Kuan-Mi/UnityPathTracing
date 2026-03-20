@@ -44,11 +44,12 @@ void MainRayGenShader()
     float3 rayOrigin = cameraRayOrigin;
     float3 rayDirection = cameraRayDirection;
 
+    float2 coneAngle = GetConeAngleFromRoughness(0.0, 0.0);
     uint bounceIndexOpaque = 0;
 
     do
     {
-        CastRay(rayOrigin, rayDirection, 0.0, 1000.0, GetConeAngleFromRoughness(0.0, 0.0), GEOMETRY_ALL, geometryProps, materialProps);
+        CastRay(rayOrigin, rayDirection, 0.0, 1000.0, coneAngle, GEOMETRY_ALL, geometryProps, materialProps);
 
         radiance += throughput * materialProps.Lemi;
 

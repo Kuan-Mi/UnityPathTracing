@@ -220,44 +220,45 @@ TraceOpaqueResult TraceOpaque(GeometryProps geometryProps0, MaterialProps materi
     }
 
     // SHARC debug visualization
-    #if( USE_SHARC_DEBUG != 0 )
-    HashGridParameters hashGridParams;
-    hashGridParams.cameraPosition = gCameraGlobalPos.xyz;
-    hashGridParams.sceneScale = SHARC_SCENE_SCALE;
-    hashGridParams.logarithmBase = SHARC_GRID_LOGARITHM_BASE;
-    hashGridParams.levelBias = SHARC_GRID_LEVEL_BIAS;
+    if (sharcDebug != 0)
+    {
+        HashGridParameters hashGridParams;
+        hashGridParams.cameraPosition = gCameraGlobalPos.xyz;
+        hashGridParams.sceneScale = SHARC_SCENE_SCALE;
+        hashGridParams.logarithmBase = SHARC_GRID_LOGARITHM_BASE;
+        hashGridParams.levelBias = SHARC_GRID_LEVEL_BIAS;
 
-    SharcHitData sharcHitData;
-    sharcHitData.positionWorld = GetGlobalPos(geometryProps0.X);
-    sharcHitData.materialDemodulation = GetMaterialDemodulation(geometryProps0, materialProps0);
-    sharcHitData.normalWorld = geometryProps0.N;
-    sharcHitData.emissive = materialProps0.Lemi;
+        SharcHitData sharcHitData;
+        sharcHitData.positionWorld = GetGlobalPos(geometryProps0.X);
+        sharcHitData.materialDemodulation = GetMaterialDemodulation(geometryProps0, materialProps0);
+        sharcHitData.normalWorld = geometryProps0.N;
+        sharcHitData.emissive = materialProps0.Lemi;
 
-    HashMapData hashMapData;
-    hashMapData.capacity = SHARC_CAPACITY;
-    hashMapData.hashEntriesBuffer = gInOut_SharcHashEntriesBuffer;
+        HashMapData hashMapData;
+        hashMapData.capacity = SHARC_CAPACITY;
+        hashMapData.hashEntriesBuffer = gInOut_SharcHashEntriesBuffer;
 
-    SharcParameters sharcParams;
-    sharcParams.gridParameters = hashGridParams;
-    sharcParams.hashMapData = hashMapData;
-    sharcParams.radianceScale = SHARC_RADIANCE_SCALE;
-    sharcParams.enableAntiFireflyFilter = SHARC_ANTI_FIREFLY;
-    sharcParams.accumulationBuffer = gInOut_SharcAccumulated;
-    sharcParams.resolvedBuffer = gInOut_SharcResolved;
+        SharcParameters sharcParams;
+        sharcParams.gridParameters = hashGridParams;
+        sharcParams.hashMapData = hashMapData;
+        sharcParams.radianceScale = SHARC_RADIANCE_SCALE;
+        sharcParams.enableAntiFireflyFilter = SHARC_ANTI_FIREFLY;
+        sharcParams.accumulationBuffer = gInOut_SharcAccumulated;
+        sharcParams.resolvedBuffer = gInOut_SharcResolved;
 
-    #if( USE_SHARC_DEBUG == 2 )
-    result.diffRadiance = HashGridDebugColoredHash(sharcHitData.positionWorld, sharcHitData.normalWorld, hashGridParams);
-    #else
-    bool isValid = SharcGetCachedRadiance(sharcParams, sharcHitData, result.diffRadiance, true);
+        #if( USE_SHARC_DEBUG == 2 )
+        result.diffRadiance = HashGridDebugColoredHash(sharcHitData.positionWorld, sharcHitData.normalWorld, hashGridParams);
+        #else
+        bool isValid = SharcGetCachedRadiance(sharcParams, sharcHitData, result.diffRadiance, true);
 
-    // Highlight invalid cells
-    // result.diffRadiance = isValid ?  result.diffRadiance : float3( 1.0, 0.0, 0.0 );
-    #endif
+        // Highlight invalid cells
+        // result.diffRadiance = isValid ?  result.diffRadiance : float3( 1.0, 0.0, 0.0 );
+        #endif
 
-    // result.diffRadiance /= diffFactor0;
+        // result.diffRadiance /= diffFactor0;
 
-    return result;
-    #endif
+        return result;
+    }
 
 
     // uint checkerboard = Sequence::CheckerBoard(pixelPos, g_FrameIndex) != 0;
