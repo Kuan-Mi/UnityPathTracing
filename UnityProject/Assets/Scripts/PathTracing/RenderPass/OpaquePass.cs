@@ -50,6 +50,7 @@ namespace PathTracing
             internal RTHandle ViewZ;
             internal RTHandle NormalRoughness;
             internal RTHandle BaseColorMetalness;
+            internal RTHandle GeoNormal;
 
 
             internal RTHandle Penumbra;
@@ -60,6 +61,7 @@ namespace PathTracing
             internal RTHandle PrevViewZ;
             internal RTHandle PrevNormalRoughness;
             internal RTHandle PrevBaseColorMetalness;
+            internal RTHandle PrevGeoNormal;
 
             internal RTHandle PsrThroughput;
 
@@ -134,6 +136,13 @@ namespace PathTracing
             natCmd.SetRayTracingTextureParam(data.OpaqueTs, gIn_PrevViewZID, resource.PrevViewZ);
             natCmd.SetRayTracingTextureParam(data.OpaqueTs, gIn_PrevNormalRoughnessID, resource.PrevNormalRoughness);
             natCmd.SetRayTracingTextureParam(data.OpaqueTs, gIn_PrevBaseColorMetalnessID, resource.PrevBaseColorMetalness);
+            
+            
+            natCmd.SetRayTracingTextureParam(data.OpaqueTs,"gOut_GeoNormal", resource.GeoNormal);
+            natCmd.SetRayTracingTextureParam(data.OpaqueTs,"gIn_PrevGeoNormal", resource.PrevGeoNormal);
+            
+            
+            
 
             natCmd.SetRayTracingBufferParam(data.OpaqueTs, gIn_SpotLightsID, resource.SpotLightBuffer);
             natCmd.SetRayTracingBufferParam(data.OpaqueTs, gIn_AreaLightsID, resource.AreaLightBuffer);
@@ -155,6 +164,7 @@ namespace PathTracing
             natCmd.CopyTexture(resource.ViewZ, resource.PrevViewZ);
             natCmd.CopyTexture(resource.NormalRoughness, resource.PrevNormalRoughness);
             natCmd.CopyTexture(resource.BaseColorMetalness, resource.PrevBaseColorMetalness);
+            natCmd.CopyTexture(resource.GeoNormal, resource.PrevGeoNormal);
             natCmd.EndSample(copyGBufferMarker);
         }
 

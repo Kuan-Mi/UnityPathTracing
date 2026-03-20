@@ -15,6 +15,7 @@ Texture2D<float4> gIn_PrevComposedSpec_PrevViewZ;
 Texture2D<float> gIn_PrevViewZ;
 Texture2D<float4> gIn_PrevNormalRoughness;
 Texture2D<float4> gIn_PrevBaseColorMetalness;
+Texture2D<uint>   gIn_PrevGeoNormal;
 
 // Output
 RWTexture2D<float3> g_Output;
@@ -27,6 +28,8 @@ RWTexture2D<float> gOut_ViewZ;
 RWTexture2D<float4> gOut_Normal_Roughness;
 // 基础色（BaseColor，已转为sRGB）和金属度（Metalness）。
 RWTexture2D<float4> gOut_BaseColor_Metalness;
+
+RWTexture2D<uint> gOut_GeoNormal;
 
 // 路径追踪累积通量（Path Traced Throughput），用于存储路径追踪过程中光线的累积贡献。
 RWTexture2D<float3> gOut_PsrThroughput;
@@ -738,6 +741,7 @@ void MainRayGenShader()
 
     gOut_Normal_Roughness[pixelPos] = NRD_FrontEnd_PackNormalAndRoughness(N, materialProps0.roughness, materialID);
 
+    gOut_GeoNormal[pixelPos] = ndirToOctUnorm32(geometryProps0.N);
     // Base color and metalness
     gOut_BaseColor_Metalness[pixelPos] = float4(Color::ToSrgb(materialProps0.baseColor), materialProps0.metalness);
 

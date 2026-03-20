@@ -33,25 +33,26 @@ namespace PathTracing
             var uavState = new NriResourceState { accessBits = AccessBits.SHADER_RESOURCE_STORAGE, layout = Layout.SHADER_RESOURCE_STORAGE, stageBits = 1 << 10 };
 
             // ── NRD standard I/O ────────────────────────────────────────────────
-            _nriResources[RenderResourceType.IN_MV]                     = new NriTextureResource(RenderResourceType.IN_MV,                     GraphicsFormat.R16G16B16A16_SFloat,    srvState);
-            _nriResources[RenderResourceType.IN_VIEWZ]                  = new NriTextureResource(RenderResourceType.IN_VIEWZ,                  GraphicsFormat.R32_SFloat,             srvState);
-            _nriResources[RenderResourceType.IN_NORMAL_ROUGHNESS]       = new NriTextureResource(RenderResourceType.IN_NORMAL_ROUGHNESS,       GraphicsFormat.A2B10G10R10_UNormPack32, srvState);
-            _nriResources[RenderResourceType.IN_BASECOLOR_METALNESS]    = new NriTextureResource(RenderResourceType.IN_BASECOLOR_METALNESS,    GraphicsFormat.B8G8R8A8_SRGB,          srvState, true);
-            _nriResources[RenderResourceType.IN_PENUMBRA]               = new NriTextureResource(RenderResourceType.IN_PENUMBRA,               GraphicsFormat.R16_SFloat,             srvState);
-            _nriResources[RenderResourceType.IN_DIFF_RADIANCE_HITDIST]  = new NriTextureResource(RenderResourceType.IN_DIFF_RADIANCE_HITDIST,  GraphicsFormat.R16G16B16A16_SFloat,    srvState);
-            _nriResources[RenderResourceType.IN_SPEC_RADIANCE_HITDIST]  = new NriTextureResource(RenderResourceType.IN_SPEC_RADIANCE_HITDIST,  GraphicsFormat.R16G16B16A16_SFloat,    srvState);
-            _nriResources[RenderResourceType.OUT_SHADOW_TRANSLUCENCY]   = new NriTextureResource(RenderResourceType.OUT_SHADOW_TRANSLUCENCY,   GraphicsFormat.R16_SFloat,             uavState);
-            _nriResources[RenderResourceType.OUT_DIFF_RADIANCE_HITDIST] = new NriTextureResource(RenderResourceType.OUT_DIFF_RADIANCE_HITDIST, GraphicsFormat.R16G16B16A16_SFloat,    uavState);
-            _nriResources[RenderResourceType.OUT_SPEC_RADIANCE_HITDIST] = new NriTextureResource(RenderResourceType.OUT_SPEC_RADIANCE_HITDIST, GraphicsFormat.R16G16B16A16_SFloat,    uavState);
-            _nriResources[RenderResourceType.OUT_VALIDATION]            = new NriTextureResource(RenderResourceType.OUT_VALIDATION,            GraphicsFormat.R8G8B8A8_UNorm,         uavState);
+            _nriResources[RenderResourceType.MV]                     = new NriTextureResource(RenderResourceType.MV,                     GraphicsFormat.R16G16B16A16_SFloat,    srvState);
+            _nriResources[RenderResourceType.Viewz]                  = new NriTextureResource(RenderResourceType.Viewz,                  GraphicsFormat.R32_SFloat,             srvState);
+            _nriResources[RenderResourceType.NormalRoughness]       = new NriTextureResource(RenderResourceType.NormalRoughness,       GraphicsFormat.A2B10G10R10_UNormPack32, srvState);
+            _nriResources[RenderResourceType.BasecolorMetalness]    = new NriTextureResource(RenderResourceType.BasecolorMetalness,    GraphicsFormat.B8G8R8A8_SRGB,          srvState, true);
+            _nriResources[RenderResourceType.GeoNormal]             = new NriTextureResource(RenderResourceType.GeoNormal,              GraphicsFormat.R32_UInt,    srvState);
+            _nriResources[RenderResourceType.Penumbra]               = new NriTextureResource(RenderResourceType.Penumbra,               GraphicsFormat.R16_SFloat,             srvState);
+            _nriResources[RenderResourceType.DiffRadianceHitdist]  = new NriTextureResource(RenderResourceType.DiffRadianceHitdist,  GraphicsFormat.R16G16B16A16_SFloat,    srvState);
+            _nriResources[RenderResourceType.SpecRadianceHitdist]  = new NriTextureResource(RenderResourceType.SpecRadianceHitdist,  GraphicsFormat.R16G16B16A16_SFloat,    srvState);
+            _nriResources[RenderResourceType.OutShadowTranslucency]   = new NriTextureResource(RenderResourceType.OutShadowTranslucency,   GraphicsFormat.R16_SFloat,             uavState);
+            _nriResources[RenderResourceType.OutDiffRadianceHitdist] = new NriTextureResource(RenderResourceType.OutDiffRadianceHitdist, GraphicsFormat.R16G16B16A16_SFloat,    uavState);
+            _nriResources[RenderResourceType.OutSpecRadianceHitdist] = new NriTextureResource(RenderResourceType.OutSpecRadianceHitdist, GraphicsFormat.R16G16B16A16_SFloat,    uavState);
+            _nriResources[RenderResourceType.Validation]            = new NriTextureResource(RenderResourceType.Validation,            GraphicsFormat.R8G8B8A8_UNorm,         uavState);
 
             // ── NRI-interop resources (DLSS / composition) ──────────────────────
             _nriResources[RenderResourceType.Composed]               = new NriTextureResource(RenderResourceType.Composed,               GraphicsFormat.R16G16B16A16_SFloat,    uavState);
             _nriResources[RenderResourceType.DlssOutput]             = new NriTextureResource(RenderResourceType.DlssOutput,             GraphicsFormat.R16G16B16A16_SFloat,    uavState);
-            _nriResources[RenderResourceType.RRGuide_DiffAlbedo]     = new NriTextureResource(RenderResourceType.RRGuide_DiffAlbedo,     GraphicsFormat.A2B10G10R10_UNormPack32, uavState);
-            _nriResources[RenderResourceType.RRGuide_SpecAlbedo]     = new NriTextureResource(RenderResourceType.RRGuide_SpecAlbedo,     GraphicsFormat.A2B10G10R10_UNormPack32, uavState);
-            _nriResources[RenderResourceType.RRGuide_SpecHitDistance]   = new NriTextureResource(RenderResourceType.RRGuide_SpecHitDistance,   GraphicsFormat.R16_SFloat,          uavState);
-            _nriResources[RenderResourceType.RRGuide_Normal_Roughness]  = new NriTextureResource(RenderResourceType.RRGuide_Normal_Roughness,  GraphicsFormat.R16G16B16A16_SFloat, uavState);
+            _nriResources[RenderResourceType.RrGuideDiffAlbedo]     = new NriTextureResource(RenderResourceType.RrGuideDiffAlbedo,     GraphicsFormat.A2B10G10R10_UNormPack32, uavState);
+            _nriResources[RenderResourceType.RrGuideSpecAlbedo]     = new NriTextureResource(RenderResourceType.RrGuideSpecAlbedo,     GraphicsFormat.A2B10G10R10_UNormPack32, uavState);
+            _nriResources[RenderResourceType.RrGuideSpecHitDistance]   = new NriTextureResource(RenderResourceType.RrGuideSpecHitDistance,   GraphicsFormat.R16_SFloat,          uavState);
+            _nriResources[RenderResourceType.RrGuideNormalRoughness]  = new NriTextureResource(RenderResourceType.RrGuideNormalRoughness,  GraphicsFormat.R16G16B16A16_SFloat, uavState);
         }
 
         // ── Public accessors ────────────────────────────────────────────────────
@@ -112,9 +113,10 @@ namespace PathTracing
             AllocateRT(RenderResourceType.TaaHistory,              GraphicsFormat.R16G16B16A16_SFloat,     renderResolution);
             AllocateRT(RenderResourceType.TaaHistoryPrev,          GraphicsFormat.R16G16B16A16_SFloat,     renderResolution);
             AllocateRT(RenderResourceType.PsrThroughput,           GraphicsFormat.R16G16B16A16_SFloat,     renderResolution);
-            AllocateRT(RenderResourceType.Prev_ViewZ,              GraphicsFormat.R32_SFloat,              renderResolution);
-            AllocateRT(RenderResourceType.Prev_NormalRoughness,    GraphicsFormat.A2B10G10R10_UNormPack32, renderResolution);
-            AllocateRT(RenderResourceType.Prev_BaseColorMetalness, GraphicsFormat.B8G8R8A8_SRGB,           renderResolution, true);
+            AllocateRT(RenderResourceType.PrevViewZ,              GraphicsFormat.R32_SFloat,              renderResolution);
+            AllocateRT(RenderResourceType.PrevNormalRoughness,    GraphicsFormat.A2B10G10R10_UNormPack32, renderResolution);
+            AllocateRT(RenderResourceType.PrevBaseColorMetalness, GraphicsFormat.B8G8R8A8_SRGB,           renderResolution, true);
+            AllocateRT(RenderResourceType.PrevGeoNormal,         GraphicsFormat.R32_UInt,     renderResolution);
 
             return true;
         }
@@ -152,7 +154,7 @@ namespace PathTracing
         public void Dispose()
         {
             // Wait for GPU before releasing (same guard as was in original NRDDenoiser)
-            if (_nriResources.TryGetValue(RenderResourceType.IN_MV, out var mvRes) && mvRes.IsCreated)
+            if (_nriResources.TryGetValue(RenderResourceType.MV, out var mvRes) && mvRes.IsCreated)
             {
                 var h = mvRes.Handle;
                 if (h != null && (h.externalTexture != null || h.rt != null))
