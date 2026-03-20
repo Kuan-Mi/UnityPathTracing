@@ -75,7 +75,7 @@ MonoBehaviour:
     isBaseColorMetalnessAvailable: 1
     planeDistanceSensitivity: 0.02
     maxStabilizedFrameNum: 5
-    showMode: 18
+    showMode: 11
     showMV: 0
     showValidation: 0
     dofAperture: 0
@@ -125,7 +125,7 @@ MonoBehaviour:
     sssAnisotropy: 0.8
     sssMaxSampleRadius: 0.0001
     localLightSamples: 8
-    spatialSamples: 4
+    spatialSamples: 0
     brdfSamples: 0
     enableResampling: 0
     gShowLight: 0

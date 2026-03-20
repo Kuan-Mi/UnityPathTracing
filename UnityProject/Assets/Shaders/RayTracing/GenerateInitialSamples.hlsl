@@ -64,7 +64,6 @@ RWStructuredBuffer<RTXDI_PackedDIReservoir> u_LightReservoirs;
 #define RTXDI_ENABLE_PRESAMPLING 0
 
 #include "RtxdiApplicationBridge/RtxdiApplicationBridge.hlsl"
-//
 #include "Assets/Shaders/RTXDI/DI/InitialSampling.hlsl"
 #include <Assets/Shaders/RTXDI/DI/SpatioTemporalResampling.hlsl>
 
@@ -78,8 +77,6 @@ void MainRayGenShader()
     const RTXDI_LightBufferParameters lightBufferParams = g_Const.lightBufferParams;
 
     RAB_Surface primarySurface =  RAB_GetGBufferSurface(pixelPos,false);
-
-    primarySurface.diffuseProbability = getSurfaceDiffuseProbability(primarySurface);
 
     RTXDI_DIReservoir reservoir = RTXDI_EmptyDIReservoir();
 
@@ -117,6 +114,7 @@ void MainRayGenShader()
     // BRDF was generated with a trace so no need to trace visibility again
     // BRDF 是通过追踪生成的，因此无需再次追踪可见性
     if (RTXDI_IsValidDIReservoir(reservoir) && !selectBrdf)
+    // if (RTXDI_IsValidDIReservoir(reservoir))
     {
         // See if the initial sample is visible from the surface
         // 查看初始样本对于表面是否可见
