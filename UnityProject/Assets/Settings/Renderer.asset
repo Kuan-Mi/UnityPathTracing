@@ -80,8 +80,8 @@ MonoBehaviour:
     showValidation: 0
     dofAperture: 0
     dofFocalDistance: 0.71
-    exposure: 3.1
-    enableAutoExposure: 1
+    exposure: 1
+    enableAutoExposure: 0
     aeEVMin: -10
     aeEVMax: 10
     aeLowPercent: 0.05
@@ -98,7 +98,7 @@ MonoBehaviour:
     denoiser: 0
     emissionIntensity: 1
     cameraJitter: 0
-    psr: 0
+    psr: 1
     emission: 1
     usePrevFrame: 1
     TAA: 1
@@ -126,6 +126,9 @@ MonoBehaviour:
     brdfSamples: 0
     enableResampling: 1
     gShowLight: 0
+    useReferencePathTracing: 1
+    referenceBounceNum: 4
+    split: 0
   renderPassEvent: 550
   finalMaterial: {fileID: 2100000, guid: 27695a2bc55ef2f469362b9a2994989e, type: 2}
   sharcUpdateTs: {fileID: 4807578003741378534, guid: 171e2660e0894b3cb5c6c809e595ae5d, type: 3}
