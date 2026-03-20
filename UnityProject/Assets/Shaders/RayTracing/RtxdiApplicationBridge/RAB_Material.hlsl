@@ -58,14 +58,14 @@ float GetRoughness(RAB_Material material)
 //     return material;
 // }
 RAB_Material RAB_GetGBufferMaterial(
-    int2 pixelPosition, float roughness)
+    int2 pixelPosition, float roughness, Texture2D<float4> baseColorMetalness)
 {
     RAB_Material material = RAB_EmptyMaterial();
 
     if (any(pixelPosition >= gRectSize))
         return material;
 
-    float4 packedBaseColorMetalness = gIn_PrevBaseColorMetalness[pixelPosition];
+    float4 packedBaseColorMetalness = baseColorMetalness[pixelPosition];
     float3 BaseColor = Color::FromSrgb(packedBaseColorMetalness.xyz);
     float Metalness = packedBaseColorMetalness.w;
 
