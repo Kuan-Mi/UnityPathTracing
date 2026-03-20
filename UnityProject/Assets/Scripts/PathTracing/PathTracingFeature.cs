@@ -358,74 +358,28 @@ namespace PathTracing
                 frameState.FrameIndex = 0;
             }
 
-            // Update per-camera temporal state for this frame
-            uint curFrame = frameState.FrameIndex;
-            frameState.Update(renderingData, pathTracingSetting);
-
-            var nrdLightData = renderingData.lightData;
-            var nrdMainLight = nrdLightData.mainLightIndex >= 0 ? nrdLightData.visibleLights[nrdLightData.mainLightIndex] : default;
-            var nrdLightDir = new float3(-(Vector3)nrdMainLight.localToWorldMatrix.GetColumn(2));
-
-            var nrdInput = new NrdDenoiser.NrdFrameInput
-            {
-                worldToView = frameState.worldToView,
-                prevWorldToView = frameState.prevWorldToView,
-                viewToClip = frameState.viewToClip,
-                prevViewToClip = frameState.prevViewToClip,
-                viewportJitter = frameState.ViewportJitter,
-                prevViewportJitter = frameState.PrevViewportJitter,
-                resolutionScale = frameState.resolutionScale,
-                prevResolutionScale = frameState.prevResolutionScale,
-                renderResolution = frameState.renderResolution,
-                frameIndex = curFrame,
-                lightDirection = nrdLightDir,
-            };
-
-            var nrdDataPtr = nrd.GetInteropDataPtr(nrdInput);
-
-            var nrdRes = new NrdDenoiser.NrdResources
-            {
-                inMv = pool.GetNriResource(RenderResourceType.IN_MV),
-                inViewZ = pool.GetNriResource(RenderResourceType.IN_VIEWZ),
-                inNormalRoughness = pool.GetNriResource(RenderResourceType.IN_NORMAL_ROUGHNESS),
-                inBaseColorMetalness = pool.GetNriResource(RenderResourceType.IN_BASECOLOR_METALNESS),
-                inPenumbra = pool.GetNriResource(RenderResourceType.IN_PENUMBRA),
-                inDiffRadianceHitDist = pool.GetNriResource(RenderResourceType.IN_DIFF_RADIANCE_HITDIST),
-                inSpecRadianceHitDist = pool.GetNriResource(RenderResourceType.IN_SPEC_RADIANCE_HITDIST),
-                outShadowTranslucency = pool.GetNriResource(RenderResourceType.OUT_SHADOW_TRANSLUCENCY),
-                outDiffRadianceHitDist = pool.GetNriResource(RenderResourceType.OUT_DIFF_RADIANCE_HITDIST),
-                outSpecRadianceHitDist = pool.GetNriResource(RenderResourceType.OUT_SPEC_RADIANCE_HITDIST),
-                outValidation = pool.GetNriResource(RenderResourceType.OUT_VALIDATION),
-            };
-
             if (resourcesChanged)
             {
+                var nrdRes = new NrdDenoiser.NrdResources
+                {
+                    inMv = pool.GetNriResource(RenderResourceType.IN_MV),
+                    inViewZ = pool.GetNriResource(RenderResourceType.IN_VIEWZ),
+                    inNormalRoughness = pool.GetNriResource(RenderResourceType.IN_NORMAL_ROUGHNESS),
+                    inBaseColorMetalness = pool.GetNriResource(RenderResourceType.IN_BASECOLOR_METALNESS),
+                    inPenumbra = pool.GetNriResource(RenderResourceType.IN_PENUMBRA),
+                    inDiffRadianceHitDist = pool.GetNriResource(RenderResourceType.IN_DIFF_RADIANCE_HITDIST),
+                    inSpecRadianceHitDist = pool.GetNriResource(RenderResourceType.IN_SPEC_RADIANCE_HITDIST),
+                    outShadowTranslucency = pool.GetNriResource(RenderResourceType.OUT_SHADOW_TRANSLUCENCY),
+                    outDiffRadianceHitDist = pool.GetNriResource(RenderResourceType.OUT_DIFF_RADIANCE_HITDIST),
+                    outSpecRadianceHitDist = pool.GetNriResource(RenderResourceType.OUT_SPEC_RADIANCE_HITDIST),
+                    outValidation = pool.GetNriResource(RenderResourceType.OUT_VALIDATION),
+                };
                 nrd.UpdateResources(nrdRes);
             }
 
-            var dlrrRes = new DlrrDenoiser.DlrrResources
-            {
-                input = pool.GetNriResource(RenderResourceType.Composed),
-                output = pool.GetNriResource(RenderResourceType.DlssOutput),
-                mv = pool.GetNriResource(RenderResourceType.IN_MV),
-                depth = pool.GetNriResource(RenderResourceType.IN_VIEWZ),
-                diffAlbedo = pool.GetNriResource(RenderResourceType.RRGuide_DiffAlbedo),
-                specAlbedo = pool.GetNriResource(RenderResourceType.RRGuide_SpecAlbedo),
-                normalRoughness = pool.GetNriResource(RenderResourceType.RRGuide_Normal_Roughness),
-                specHitDistance = pool.GetNriResource(RenderResourceType.RRGuide_SpecHitDistance),
-            };
-
-            var dlrrInput = new DlrrDenoiser.DlrrFrameInput
-            {
-                worldToView = frameState.worldToView,
-                viewToClip = frameState.viewToClip,
-                viewportJitter = frameState.ViewportJitter,
-                renderResolution = frameState.renderResolution,
-                frameIndex = curFrame,
-                outputWidth = (ushort)outputResolution.x,
-                outputHeight = (ushort)outputResolution.y,
-            };
-            var dlssDataPtr = dlrr.GetInteropDataPtr(dlrrInput, dlrrRes);
+            // Update per-camera temporal state for this frame
+            uint curFrame = frameState.FrameIndex;
+            frameState.Update(renderingData, pathTracingSetting);
 
             var globalConstants = frameState.GetConstants(renderingData, pathTracingSetting, _lightCollector);
             _globalConstantsArray[0] = globalConstants;
@@ -505,6 +459,27 @@ namespace PathTracing
 
             if (!pathTracingSetting.RR)
             {
+                var nrdLightData = renderingData.lightData;
+                var nrdMainLight = nrdLightData.mainLightIndex >= 0 ? nrdLightData.visibleLights[nrdLightData.mainLightIndex] : default;
+                var nrdLightDir = new float3(-(Vector3)nrdMainLight.localToWorldMatrix.GetColumn(2));
+
+                var nrdInput = new NrdDenoiser.NrdFrameInput
+                {
+                    worldToView = frameState.worldToView,
+                    prevWorldToView = frameState.prevWorldToView,
+                    viewToClip = frameState.viewToClip,
+                    prevViewToClip = frameState.prevViewToClip,
+                    viewportJitter = frameState.ViewportJitter,
+                    prevViewportJitter = frameState.PrevViewportJitter,
+                    resolutionScale = frameState.resolutionScale,
+                    prevResolutionScale = frameState.prevResolutionScale,
+                    renderResolution = frameState.renderResolution,
+                    frameIndex = curFrame,
+                    lightDirection = nrdLightDir,
+                };
+
+                var nrdDataPtr = nrd.GetInteropDataPtr(nrdInput);
+
                 _nrdPass.Setup(nrdDataPtr);
                 renderer.EnqueuePass(_nrdPass);
             }
@@ -624,19 +599,43 @@ namespace PathTracing
                         noise = pool.GetRT(RenderResourceType.Composed),
                         accumulation = pool.GetRT(RenderResourceType.DlssOutput),
                     };
-                    
+
                     var accumulateSettings = new AccumulatePass.Settings
                     {
                         rectGridW = rectGridW,
                         rectGridH = rectGridH,
                         convergenceStep = frameState.convergenceStep,
                     };
-                    
+
                     _accumulatePass.Setup(accumulateResource, accumulateSettings);
                     renderer.EnqueuePass(_accumulatePass);
                 }
                 else
                 {
+                    var dlrrRes = new DlrrDenoiser.DlrrResources
+                    {
+                        input = pool.GetNriResource(RenderResourceType.Composed),
+                        output = pool.GetNriResource(RenderResourceType.DlssOutput),
+                        mv = pool.GetNriResource(RenderResourceType.IN_MV),
+                        depth = pool.GetNriResource(RenderResourceType.IN_VIEWZ),
+                        diffAlbedo = pool.GetNriResource(RenderResourceType.RRGuide_DiffAlbedo),
+                        specAlbedo = pool.GetNriResource(RenderResourceType.RRGuide_SpecAlbedo),
+                        normalRoughness = pool.GetNriResource(RenderResourceType.RRGuide_Normal_Roughness),
+                        specHitDistance = pool.GetNriResource(RenderResourceType.RRGuide_SpecHitDistance),
+                    };
+
+                    var dlrrInput = new DlrrDenoiser.DlrrFrameInput
+                    {
+                        worldToView = frameState.worldToView,
+                        viewToClip = frameState.viewToClip,
+                        viewportJitter = frameState.ViewportJitter,
+                        renderResolution = frameState.renderResolution,
+                        frameIndex = curFrame,
+                        outputWidth = (ushort)outputResolution.x,
+                        outputHeight = (ushort)outputResolution.y,
+                    };
+                    var dlssDataPtr = dlrr.GetInteropDataPtr(dlrrInput, dlrrRes);
+
                     var dlssResource = new DlssRRPass.Resource
                     {
                         ConstantBuffer = _constantBuffer,
@@ -702,7 +701,7 @@ namespace PathTracing
                     m_RenderResolution = new int2(cam.pixelWidth, cam.pixelHeight),
                     resolutionScale = pathTracingSetting.resolutionScale,
                     referenceBounceNum = pathTracingSetting.referenceBounceNum,
-                    convergenceStep = pathTracingSetting.accumulateReference? frameState.convergenceStep : 0,
+                    convergenceStep = pathTracingSetting.accumulateReference ? frameState.convergenceStep : 0,
                     split = pathTracingSetting.split
                 };
 
