@@ -75,7 +75,7 @@ MonoBehaviour:
     isBaseColorMetalnessAvailable: 1
     planeDistanceSensitivity: 0.02
     maxStabilizedFrameNum: 5
-    showMode: 11
+    showMode: 18
     showMV: 0
     showValidation: 0
     dofAperture: 0
@@ -124,16 +124,334 @@ MonoBehaviour:
     sssScale: 1
     sssAnisotropy: 0.8
     sssMaxSampleRadius: 0.0001
-    localLightSamples: 8
-    spatialSamples: 0
+    localLightSamples: 16
+    spatialSamples: 4
     brdfSamples: 0
-    enableResampling: 0
+    enableResampling: 1
     gShowLight: 0
     useReferencePathTracing: 0
-    referenceBounceNum: 16
+    referenceBounceNum: 2
     split: 0.34
     accumulateReference: 0
     accumulate: 0
+  globalConstants:
+    gViewToWorld:
+      c0:
+        x: -0.9305407
+        y: 0.0015815785
+        z: 0.36618534
+        w: 0
+      c1:
+        x: -0.21524051
+        y: 0.80664676
+        z: -0.5504476
+        w: 0
+      c2:
+        x: 0.29625282
+        y: 0.5910317
+        z: 0.7502773
+        w: 0
+      c3:
+        x: 1.9711031
+        y: 3.9223614
+        z: 4.2147045
+        w: 1
+    gViewToWorldPrev:
+      c0:
+        x: -0.9305407
+        y: 0.0015815785
+        z: 0.36618534
+        w: 0
+      c1:
+        x: -0.21524051
+        y: 0.80664676
+        z: -0.5504476
+        w: 0
+      c2:
+        x: 0.29625282
+        y: 0.5910317
+        z: 0.7502773
+        w: 0
+      c3:
+        x: 1.9711031
+        y: 3.9223614
+        z: 4.2147045
+        w: 1
+    gViewToClip:
+      c0:
+        x: 0.90310955
+        y: 0
+        z: 0
+        w: 0
+      c1:
+        x: 0
+        y: 1.7320508
+        z: 0
+        w: 0
+      c2:
+        x: 0
+        y: 0
+        z: 0.0000030398369
+        w: -1
+      c3:
+        x: 0
+        y: 0
+        z: 0.03000009
+        w: 0
+    gWorldToView:
+      c0:
+        x: -0.93054056
+        y: -0.21524048
+        z: 0.29625276
+        w: 0
+      c1:
+        x: 0.0015815869
+        y: 0.8066468
+        z: 0.5910317
+        w: 0
+      c2:
+        x: 0.36618528
+        y: -0.55044746
+        z: 0.75027704
+        w: 0
+      c3:
+        x: 0.28462505
+        y: -0.41972584
+        z: -6.06438
+        w: 1
+    gWorldToViewPrev:
+      c0:
+        x: -0.93054056
+        y: -0.21524048
+        z: 0.29625276
+        w: 0
+      c1:
+        x: 0.0015815869
+        y: 0.8066468
+        z: 0.5910317
+        w: 0
+      c2:
+        x: 0.36618528
+        y: -0.55044746
+        z: 0.75027704
+        w: 0
+      c3:
+        x: 0.28462505
+        y: -0.41972584
+        z: -6.06438
+        w: 1
+    gWorldToClip:
+      c0:
+        x: -0.8403801
+        y: -0.37280744
+        z: 0.00000090056005
+        w: -0.29625276
+      c1:
+        x: 0.0014283463
+        y: 1.3971533
+        z: 0.0000017966398
+        w: -0.5910317
+      c2:
+        x: 0.33070543
+        y: -0.95340294
+        z: 0.0000022807199
+        w: -0.75027704
+      c3:
+        x: 0.2570476
+        y: -0.72698647
+        z: 0.029981656
+        w: 6.06438
+    gWorldToClipPrev:
+      c0:
+        x: -0.8403801
+        y: -0.37280744
+        z: 0.00000090056005
+        w: -0.29625276
+      c1:
+        x: 0.0014283463
+        y: 1.3971533
+        z: 0.0000017966398
+        w: -0.5910317
+      c2:
+        x: 0.33070543
+        y: -0.95340294
+        z: 0.0000022807199
+        w: -0.75027704
+      c3:
+        x: 0.2570476
+        y: -0.72698647
+        z: 0.029981656
+        w: 6.06438
+    gHitDistParams:
+      x: 3
+      y: 0.1
+      z: 20
+      w: -25
+    gCameraFrustum:
+      x: 1.1072854
+      y: -0.57735026
+      z: -2.2145708
+      w: 1.1547005
+    gSunBasisX:
+      x: -0.86602545
+      y: 0
+      z: -0.5
+      w: 0
+    gSunBasisY:
+      x: 0.4768585
+      y: 0.30070585
+      z: -0.8259432
+      w: 0
+    gSunDirection:
+      x: 0.15035291
+      y: -0.953717
+      z: -0.2604189
+      w: 0
+    gCameraGlobalPos:
+      x: 1.971103
+      y: 3.9223611
+      z: 4.214704
+      w: 0
+    gCameraGlobalPosPrev:
+      x: 1.971103
+      y: 3.9223611
+      z: 4.214704
+      w: 0
+    gViewDirection:
+      x: -0.29625276
+      y: -0.5910317
+      z: -0.7502771
+      w: 0
+    gHairBaseColor:
+      x: 0.1
+      y: 0.1
+      z: 0.1
+      w: 1
+    gHairBetas:
+      x: 0.25
+      y: 0.3
+    gOutputSize:
+      x: 1191
+      y: 621
+    gRenderSize:
+      x: 1191
+      y: 621
+    gRectSize:
+      x: 1191
+      y: 621
+    gInvOutputSize:
+      x: 0.00083963055
+      y: 0.001610306
+    gInvRenderSize:
+      x: 0.00083963055
+      y: 0.001610306
+    gInvRectSize:
+      x: 0.00083963055
+      y: 0.001610306
+    gRectSizePrev:
+      x: 1191
+      y: 621
+    gJitter:
+      x: 0
+      y: 0
+    gEmissionIntensity: 1
+    gNearZ: -0.03
+    gSeparator: 0
+    gRoughnessOverride: 0
+    gMetalnessOverride: 0
+    gUnitToMetersMultiplier: 1
+    gTanSunAngularRadius: 0.0060214587
+    gTanPixelAngularRadius: 0.00070215453
+    gDebug: 0
+    gPrevFrameConfidence: 0
+    gUnproject: 0.0018594211
+    gAperture: 0
+    gFocalDistance: 0.71
+    gFocalLength: 0.015804417
+    gTAA: 0.2
+    gHdrScale: 1
+    gExposure: 1
+    gMipBias: -0.5
+    gOrthoMode: 0
+    gIndirectDiffuse: 1
+    gIndirectSpecular: 1
+    gMinProbability: 0
+    gSharcMaxAccumulatedFrameNum: 8
+    gDenoiserType: 0
+    gDisableShadowsAndEnableImportanceSampling: 0
+    gFrameIndex: 31744
+    gForcedMaterial: 0
+    gUseNormalMap: 1
+    gBounceNum: 1
+    gResolve: 1
+    gValidation: 1
+    gSR: 0
+    gRR: 1
+    gIsSrgb: 0
+    gOnScreen: 0
+    gTracingMode: 1
+    gSampleNum: 1
+    gPSR: 1
+    gSHARC: 1
+    gTrimLobe: 1
+    gSpotLightCount: 0
+    gAreaLightCount: 0
+    gPointLightCount: 0
+    gSssScatteringColor:
+      x: 3.5
+      y: 4
+      z: 3
+    gSssMinThreshold: -0.043
+    gSssTransmissionBsdfSampleCount: 6
+    gSssTransmissionPerBsdfScatteringSampleCount: 3
+    gSssScale: 1
+    gSssAnisotropy: 0.8
+    gSssMaxSampleRadius: 0.0001
+    gIsEditor: 1
+    gShowLight: 0
+    gSharcDownscale: 4
+    gSharcSceneScale: 45
+    sharcDebug: 0
+  resamplingConstants:
+    runtimeParams:
+      neighborOffsetMask: 8191
+      activeCheckerboardField: 0
+      pad1: 0
+      pad2: 0
+    lightBufferParams:
+      localLightBufferRegion:
+        firstLightIndex: 0
+        numLights: 3976
+        pad1: 0
+        pad2: 0
+      infiniteLightBufferRegion:
+        firstLightIndex: 0
+        numLights: 0
+        pad1: 0
+        pad2: 0
+      environmentLightParams:
+        lightPresent: 0
+        lightIndex: 4294967295
+        pad1: 0
+        pad2: 0
+    restirDIReservoirBufferParams:
+      reservoirBlockRowPitch: 19200
+      reservoirArrayPitch: 748800
+      pad1: 0
+      pad2: 0
+    frameIndex: 22805
+    numInitialSamples: 16
+    numSpatialSamples: 4
+    useAccurateGBufferNormal: 0
+    numInitialBRDFSamples: 0
+    brdfCutoff: 0
+    pad2:
+      x: 0
+      y: 0
+    enableResampling: 1
+    unbiasedMode: 1
+    inputBufferIndex: 0
+    outputBufferIndex: 1
   renderPassEvent: 550
   finalMaterial: {fileID: 2100000, guid: 27695a2bc55ef2f469362b9a2994989e, type: 2}
   sharcUpdateTs: {fileID: 4807578003741378534, guid: 171e2660e0894b3cb5c6c809e595ae5d, type: 3}

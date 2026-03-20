@@ -3,6 +3,7 @@ using Unity.Mathematics;
 
 namespace PathTracing
 {
+    [System.Serializable]
     public struct GlobalConstants
     {
         public float4x4 gViewToWorld;
@@ -188,8 +189,9 @@ namespace PathTracing
         }
     }
 
-    
-    struct ResamplingConstants
+ 
+    [System.Serializable]
+    public struct ResamplingConstants
     {
       public  RTXDI_RuntimeParameters runtimeParams;
       public  RTXDI_LightBufferParameters lightBufferParams;

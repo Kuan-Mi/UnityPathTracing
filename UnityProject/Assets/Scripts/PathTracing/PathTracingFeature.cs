@@ -17,6 +17,8 @@ namespace PathTracing
     public class PathTracingFeature : ScriptableRendererFeature
     {
         public PathTracingSetting pathTracingSetting;
+        public GlobalConstants globalConstants;
+        public ResamplingConstants resamplingConstants;
 
         public RenderPassEvent renderPassEvent = RenderPassEvent.BeforeRenderingPostProcessing;
 
@@ -388,11 +390,11 @@ namespace PathTracing
             uint curFrame = frameState.FrameIndex;
             frameState.Update(renderingData, pathTracingSetting);
 
-            var globalConstants = frameState.GetConstants(renderingData, pathTracingSetting, _lightCollector);
+             globalConstants = frameState.GetConstants(renderingData, pathTracingSetting, _lightCollector);
             _globalConstantsArray[0] = globalConstants;
             _constantBuffer.SetData(_globalConstantsArray);
 
-            var resamplingConstants = GetResamplingConstants(restirDiContext, rtxdiResources, frameState);
+             resamplingConstants = GetResamplingConstants(restirDiContext, rtxdiResources, frameState);
             _resamplingConstantsArray[0] = resamplingConstants;
             _resamplingConstantBuffer.SetData(_resamplingConstantsArray);
 
