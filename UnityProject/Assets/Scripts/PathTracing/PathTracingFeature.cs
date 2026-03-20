@@ -31,6 +31,7 @@ namespace PathTracing
         public ComputeShader dlssBeforeComputeShader;
         public ComputeShader sharcResolveCs;
         public ComputeShader autoExposureShader;
+        public ComputeShader accumulateCs;
 
         public Texture2D scramblingRankingTex;
         public Texture2D sobolTex;
@@ -46,6 +47,7 @@ namespace PathTracing
         private TaaPass _taaPass;
         private DlssRRPass _dlssrrPass;
         private ReferencePtPass _referencePtPass;
+        private AccumulatePass _accumulatePass;
 
         private RayTracingAccelerationStructure _accelerationStructure;
 
@@ -174,6 +176,10 @@ namespace PathTracing
                 renderPassEvent = renderPassEvent
             };
             _referencePtPass ??= new ReferencePtPass(referencePtTracingShader)
+            {
+                renderPassEvent = renderPassEvent
+            };
+            _accumulatePass ??= new AccumulatePass(accumulateCs)
             {
                 renderPassEvent = renderPassEvent
             };
@@ -562,7 +568,7 @@ namespace PathTracing
             var transparentSettings = new TransparentPass.Settings
             {
                 m_RenderResolution = new int2(cam.pixelWidth, cam.pixelHeight),
-                
+
                 convergenceStep = frameState.convergenceStep,
             };
 
@@ -611,30 +617,51 @@ namespace PathTracing
 
             if (pathTracingSetting.RR)
             {
-                var dlssResource = new DlssRRPass.Resource
+                if (pathTracingSetting.accumulate)
                 {
-                    ConstantBuffer = _constantBuffer,
-
-                    NormalRoughness = pool.GetRT(RenderResourceType.IN_NORMAL_ROUGHNESS),
-                    BaseColorMetalness = pool.GetRT(RenderResourceType.IN_BASECOLOR_METALNESS),
-                    Spec = pool.GetRT(RenderResourceType.IN_SPEC_RADIANCE_HITDIST),
-                    ViewZ = pool.GetRT(RenderResourceType.IN_VIEWZ),
-
-                    RRGuide_DiffAlbedo = pool.GetRT(RenderResourceType.RRGuide_DiffAlbedo),
-                    RRGuide_SpecAlbedo = pool.GetRT(RenderResourceType.RRGuide_SpecAlbedo),
-                    RRGuide_SpecHitDistance = pool.GetRT(RenderResourceType.RRGuide_SpecHitDistance),
-                    RRGuide_Normal_Roughness = pool.GetRT(RenderResourceType.RRGuide_Normal_Roughness),
-                };
-
-                var dlssSettings = new DlssRRPass.Settings
+                    var accumulateResource = new AccumulatePass.Resource
+                    {
+                        noise = pool.GetRT(RenderResourceType.Composed),
+                        accumulation = pool.GetRT(RenderResourceType.DlssOutput),
+                    };
+                    
+                    var accumulateSettings = new AccumulatePass.Settings
+                    {
+                        rectGridW = rectGridW,
+                        rectGridH = rectGridH,
+                        convergenceStep = frameState.convergenceStep,
+                    };
+                    
+                    _accumulatePass.Setup(accumulateResource, accumulateSettings);
+                    renderer.EnqueuePass(_accumulatePass);
+                }
+                else
                 {
-                    rectGridW = rectGridW,
-                    rectGridH = rectGridH,
-                    tmpDisableRR = pathTracingSetting.tmpDisableRR
-                };
+                    var dlssResource = new DlssRRPass.Resource
+                    {
+                        ConstantBuffer = _constantBuffer,
 
-                _dlssrrPass.Setup(dlssDataPtr, dlssResource, dlssSettings);
-                renderer.EnqueuePass(_dlssrrPass);
+                        NormalRoughness = pool.GetRT(RenderResourceType.IN_NORMAL_ROUGHNESS),
+                        BaseColorMetalness = pool.GetRT(RenderResourceType.IN_BASECOLOR_METALNESS),
+                        Spec = pool.GetRT(RenderResourceType.IN_SPEC_RADIANCE_HITDIST),
+                        ViewZ = pool.GetRT(RenderResourceType.IN_VIEWZ),
+
+                        RRGuide_DiffAlbedo = pool.GetRT(RenderResourceType.RRGuide_DiffAlbedo),
+                        RRGuide_SpecAlbedo = pool.GetRT(RenderResourceType.RRGuide_SpecAlbedo),
+                        RRGuide_SpecHitDistance = pool.GetRT(RenderResourceType.RRGuide_SpecHitDistance),
+                        RRGuide_Normal_Roughness = pool.GetRT(RenderResourceType.RRGuide_Normal_Roughness),
+                    };
+
+                    var dlssSettings = new DlssRRPass.Settings
+                    {
+                        rectGridW = rectGridW,
+                        rectGridH = rectGridH,
+                        tmpDisableRR = pathTracingSetting.tmpDisableRR
+                    };
+
+                    _dlssrrPass.Setup(dlssDataPtr, dlssResource, dlssSettings);
+                    renderer.EnqueuePass(_dlssrrPass);
+                }
             }
             else
             {
@@ -675,7 +702,7 @@ namespace PathTracing
                     m_RenderResolution = new int2(cam.pixelWidth, cam.pixelHeight),
                     resolutionScale = pathTracingSetting.resolutionScale,
                     referenceBounceNum = pathTracingSetting.referenceBounceNum,
-                    convergenceStep = frameState.convergenceStep,
+                    convergenceStep = pathTracingSetting.accumulateReference? frameState.convergenceStep : 0,
                     split = pathTracingSetting.split
                 };
 

@@ -1,0 +1,21 @@
+#pragma kernel CSMain
+#pragma use_dxc
+#pragma enable_d3d11_debug_symbols
+
+
+Texture2D<float4> gIn_noise;
+
+RWTexture2D<float4> gIn_Accumulated;
+
+uint g_ConvergenceStep;
+
+[numthreads(16,16,1)]
+void CSMain(int2 pixelPos : SV_DispatchThreadID)
+{
+    float3 prev_radiance = gIn_Accumulated[pixelPos].xyz;
+    float3 noise = gIn_noise[pixelPos].xyz;
+
+    float3 result = lerp(prev_radiance, noise, 1.0f / float(g_ConvergenceStep + 1));
+
+    gIn_Accumulated[pixelPos] = float4(result, 1.0f);
+}

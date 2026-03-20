@@ -230,16 +230,8 @@ void MainRayGenShader()
 
     // Apply exposure
     Lsum = ApplyExposure(Lsum);
-    
-    float3 prevRadiance = gOut_Composed[pixelPos].xyz;
-    
-     
 
-    float3 result = lerp(prevRadiance, Lsum, 1.0f / float(g_ConvergenceStep + 1));
-     
-
-    gOut_Composed[pixelPos] = float4(result, 1);
-
+    gOut_Composed[pixelPos] = float4(Lsum, 1);
     
     // Output
     // gOut_Composed[pixelPos] = Lsum;

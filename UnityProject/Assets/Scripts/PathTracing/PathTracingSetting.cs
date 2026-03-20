@@ -234,6 +234,7 @@ namespace PathTracing
         public float split;
         
         public bool accumulateReference = true;
- 
+        public bool accumulate = false;
+
     }
 }
