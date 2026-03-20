@@ -225,6 +225,8 @@ namespace PathTracing
         
         [Range(0.0f, 1.0f)]
         public float split;
+        
+        public bool accumulateReference = true;
  
     }
 }
