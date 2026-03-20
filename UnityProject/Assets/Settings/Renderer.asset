@@ -75,7 +75,7 @@ MonoBehaviour:
     isBaseColorMetalnessAvailable: 1
     planeDistanceSensitivity: 0.02
     maxStabilizedFrameNum: 5
-    showMode: 7
+    showMode: 23
     showMV: 0
     showValidation: 0
     dofAperture: 0
@@ -93,8 +93,8 @@ MonoBehaviour:
     aeMaxExposure: 1000
     rpp: 1
     bounceNum: 1
-    sharcDownscale: 1
-    sharcSceneScale: 100
+    sharcDownscale: 4
+    sharcSceneScale: 45
     sharcDebug: 0
     mipBias: -0.5
     tracingMode: 1
@@ -129,10 +129,11 @@ MonoBehaviour:
     brdfSamples: 0
     enableResampling: 1
     gShowLight: 0
-    useReferencePathTracing: 1
+    useReferencePathTracing: 0
     referenceBounceNum: 16
     split: 0.34
     accumulateReference: 0
+    accumulate: 0
   renderPassEvent: 550
   finalMaterial: {fileID: 2100000, guid: 27695a2bc55ef2f469362b9a2994989e, type: 2}
   sharcUpdateTs: {fileID: 4807578003741378534, guid: 171e2660e0894b3cb5c6c809e595ae5d, type: 3}
@@ -144,5 +145,6 @@ MonoBehaviour:
   dlssBeforeComputeShader: {fileID: 7200000, guid: b34d979c2031436aad2b456c4456c6eb, type: 3}
   sharcResolveCs: {fileID: 7200000, guid: 8a8bff82bc5641aaabee502a09792151, type: 3}
   autoExposureShader: {fileID: 7200000, guid: dd8e8b3823bdf9c4e987096a78bd2248, type: 3}
+  accumulateCs: {fileID: 7200000, guid: c1e50e483fac4de7803cd658d0f9cdd2, type: 3}
   scramblingRankingTex: {fileID: 2800000, guid: ba45d1e4dcf9022438a4798a5f9e7b80, type: 3}
   sobolTex: {fileID: 2800000, guid: 17e7ce8147355314ea8aab1178a6a43c, type: 3}

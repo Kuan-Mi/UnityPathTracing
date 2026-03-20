@@ -103,7 +103,7 @@ namespace PathTracing
             lastExposure = setting.exposure;
             lastBounceNum = setting.referenceBounceNum;
             
-            if (hasCameraMoved || settingsChanged || !setting.accumulateReference)
+            if (hasCameraMoved || settingsChanged)
             {
                 convergenceStep = 0;
             }
