@@ -655,7 +655,32 @@ namespace PathTracing
                 renderer.EnqueuePass(_taaPass);
             }
 
-            var pathTracingResource = new OutputBlitPass.Resource
+            if (pathTracingSetting.useReferencePathTracing)
+            {
+                var referencePtResource = new ReferencePtPass.Resource
+                {
+                    ConstantBuffer = _constantBuffer,
+
+                    PointLightBuffer = _lightCollector.PointLightBuffer,
+                    AreaLightBuffer = _lightCollector.AreaLightBuffer,
+                    SpotLightBuffer = _lightCollector.SpotLightBuffer,
+                    AeExposureBuffer = _aeExposureBuffer
+                };
+
+                var referencePtSettings = new ReferencePtPass.Settings
+                {
+                    m_RenderResolution = new int2(cam.pixelWidth, cam.pixelHeight),
+                    resolutionScale = pathTracingSetting.resolutionScale,
+                    referenceBounceNum = pathTracingSetting.referenceBounceNum,
+                    convergenceStep = frameState.convergenceStep,
+                    split = pathTracingSetting.split
+                };
+
+                _referencePtPass.Setup(referencePtResource, referencePtSettings);
+                renderer.EnqueuePass(_referencePtPass);
+            }
+
+            var outputBlitResource = new OutputBlitPass.Resource
             {
                 Mv = pool.GetRT(RenderResourceType.IN_MV),
                 NormalRoughness = pool.GetRT(RenderResourceType.IN_NORMAL_ROUGHNESS),
@@ -681,36 +706,18 @@ namespace PathTracing
                 taaDst = pool.GetRT(isEven ? RenderResourceType.TaaHistory : RenderResourceType.TaaHistoryPrev),
             };
 
-            var pathTracingSettings = new OutputBlitPass.Settings
+            var outputBlitSettings = new OutputBlitPass.Settings
             {
                 showMode = pathTracingSetting.showMode,
                 resolutionScale = frameState.resolutionScale,
                 enableDlssRR = pathTracingSetting.RR,
                 showMV = pathTracingSetting.showMV,
                 showValidation = pathTracingSetting.showValidation,
+                showReference = pathTracingSetting.useReferencePathTracing,
             };
 
-            _outputBlitPass.Setup(pathTracingResource, pathTracingSettings);
+            _outputBlitPass.Setup(outputBlitResource, outputBlitSettings);
             renderer.EnqueuePass(_outputBlitPass);
-
-
-            var referencePtResource = new ReferencePtPass.Resource
-            {
-                ConstantBuffer = _constantBuffer,
-
-                PointLightBuffer = _lightCollector.PointLightBuffer,
-                AreaLightBuffer = _lightCollector.AreaLightBuffer,
-                SpotLightBuffer = _lightCollector.SpotLightBuffer,
-            };
-
-            var referencePtSettings = new ReferencePtPass.Settings
-            {
-                m_RenderResolution = new int2(cam.pixelWidth, cam.pixelHeight),
-                resolutionScale = pathTracingSetting.resolutionScale
-            };
-
-            _referencePtPass.Setup(referencePtResource, referencePtSettings);
-            renderer.EnqueuePass(_referencePtPass);
         }
 
         private ResamplingConstants GetResamplingConstants(ReSTIRDIContext restirDiContext, RtxdiResources rtxdiResources, CameraFrameState frameState)

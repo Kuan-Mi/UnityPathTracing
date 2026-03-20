@@ -215,6 +215,16 @@ namespace PathTracing
 
         public bool enableResampling;
         public bool gShowLight;
+        
+        [Header("参考路径追踪")]
+        
+        public bool useReferencePathTracing;
+        
+        [Range(0, 16)]
+        public int referenceBounceNum = 4;
+        
+        [Range(0.0f, 1.0f)]
+        public float split;
  
     }
 }

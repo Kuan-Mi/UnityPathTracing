@@ -1,3 +1,4 @@
+using System;
 using Unity.Mathematics;
 using UnityEngine;
 using UnityEngine.Rendering.Universal;
@@ -30,18 +31,29 @@ namespace PathTracing
         public float2    PrevViewportJitter;
         public float     prevResolutionScale;
 
+        // ── other state ───────────────────────────────────────────────
+        public int convergenceStep;
+        
+        private bool lastIsAutoExposureEnabled;
+        private float lastExposure;
+        
+
         public CameraFrameState(float initialResolutionScale)
         {
             resolutionScale     = initialResolutionScale;
             prevResolutionScale = initialResolutionScale;
         }
-
+        
         /// <summary>
         /// Must be called once per frame before GetInteropDataPtr on NRD / DLRR.
         /// Saves current values to prev*, then refreshes from the camera.
         /// </summary>
         public void Update(RenderingData renderingData, PathTracingSetting setting)
         {
+            
+            
+            
+            
             // 1. save prev
             prevWorldToView     = worldToView;
             prevWorldToClip     = worldToClip;
@@ -80,7 +92,24 @@ namespace PathTracing
 
             // 5. advance frame counter
             FrameIndex++;
+            
+            bool hasCameraMoved = worldToView != prevWorldToView || worldToClip != prevWorldToClip;
+            bool settingsChanged =  setting.enableAutoExposure != lastIsAutoExposureEnabled || !Mathf.Approximately(setting.exposure, lastExposure);
+            
+            lastIsAutoExposureEnabled = setting.enableAutoExposure;
+            lastExposure = setting.exposure;
+            
+            if (hasCameraMoved || settingsChanged)
+            {
+                convergenceStep = 0;
+            }
+            else
+            {
+                convergenceStep++;
+            }
+            
         }
+ 
 
         // ── Halton helpers (moved from NRDDenoiser) ────────────────────
 

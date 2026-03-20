@@ -56,6 +56,7 @@ namespace PathTracing
             internal bool enableDlssRR;
             internal bool showMV;
             internal bool showValidation;
+            internal bool showReference;
         }
 
 
@@ -183,6 +184,11 @@ namespace PathTracing
             if (data.Setting.showValidation)
             {
                 Blitter.BlitTexture(natCmd, data.Resource.Validation, new Vector4(1, 1, 0, 0), data.BlitMaterial, (int)ShowPass.Validation);
+            }
+            
+            if (data.Setting.showReference)
+            {
+                Blitter.BlitTexture(natCmd, data.OutputTexture, new Vector4(1, 1, 0, 0), data.BlitMaterial, (int)ShowPass.Validation);
             }
 
             natCmd.EndSample(outputBlitMarker);

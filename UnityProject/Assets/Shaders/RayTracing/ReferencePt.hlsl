@@ -6,7 +6,11 @@
 #pragma max_recursion_depth 1
 
 // Output
-RWTexture2D<float3> g_Output;
+RWTexture2D<float4> g_Output;
+
+uint _ReferenceBounceNum;
+uint g_ConvergenceStep;
+float g_split;
 
 #define K_TWO_PI                6.283185307f
 
@@ -27,8 +31,8 @@ float FresnelReflectAmountOpaque(float n1, float n2, float3 incident, float3 nor
     r0 *= r0;
     float cosX = -dot(normal, incident);
     float x = 1.0 - cosX;
-    float xx = x*x;
-    return r0 + (1.0 - r0)*xx*xx*x;
+    float xx = x * x;
+    return r0 + (1.0 - r0) * xx * xx * x;
 }
 
 [shader("raygeneration")]
@@ -61,47 +65,59 @@ void MainRayGenShader()
 
     GeometryProps geometryProps0;
     MaterialProps materialProps0;
-    
+
     uint safeNet = 0;
 
 
     float3 radiance = float3(0, 0, 0);
     float3 throughput = float3(1, 1, 1);
-    
+
     float3 rayOrigin = cameraRayOrigin;
     float3 rayDirection = cameraRayDirection;
-    
+
     uint bounceIndexOpaque = 0;
     uint bounceIndexTransparent = 0;
-    
+
     do
     {
-        CastRay(rayOrigin, rayDirection, 0.0, 1000.0, GetConeAngleFromRoughness(0.0, 0.0),  GEOMETRY_ALL , geometryProps0, materialProps0);
-        float3 reflectionRayDir =  reflect(rayDirection, materialProps0.N);
-        float3 diffuseRayDir = normalize( materialProps0.N + RandomUnitVector() );
+        CastRay(rayOrigin, rayDirection, 0.0, 1000.0, GetConeAngleFromRoughness(0.0, 0.0), GEOMETRY_ALL, geometryProps0, materialProps0);
+        float3 reflectionRayDir = reflect(rayDirection, materialProps0.N);
+        float3 diffuseRayDir = normalize(materialProps0.N + RandomUnitVector());
         float3 specularRayDir = lerp(reflectionRayDir, diffuseRayDir, materialProps0.roughness);
-        
-        float fresnelFactor =   FresnelReflectAmountOpaque(1.0, 1.7, rayDirection, materialProps0.N);
+
+        float fresnelFactor = FresnelReflectAmountOpaque(1.0, 1.7, rayDirection, materialProps0.N);
         float specularChance = lerp(materialProps0.metalness, 1, fresnelFactor * (1 - materialProps0.roughness));
         float doSpecular = Rng::Hash::GetFloat() < specularChance;
         float3 reflectedRayDir = lerp(diffuseRayDir, specularRayDir, doSpecular);
         float k = (doSpecular == 1) ? specularChance : 1 - specularChance;
-        
+
         radiance += throughput * materialProps0.Lemi;
         throughput *= materialProps0.baseColor / max(0.001, k);
-        
+
+        if (!geometryProps0.IsMiss())
+        {
+            bounceIndexOpaque++;
+        }
+        else
+        {
+            break;
+        }
+
         rayOrigin = geometryProps0.GetXoffset(geometryProps0.N);
         rayDirection = reflectedRayDir;
-    
     }
-    while (bounceIndexOpaque <= 10  && ++safeNet < 100);
+    while (bounceIndexOpaque <= _ReferenceBounceNum && ++safeNet < 100);
+
+    float3 prevRadiance = g_Output[pixelPos].xyz;
     
-    // float3 prevRadiance = g_Output[pixelPos];
-    //
-    // float3 result = lerp(prevRadiance, radiance, 1.0f / float(g_ConvergenceStep + 1));
-    //
-    // g_Output[pixelPos] = result;
+    radiance = ApplyExposure(radiance);
+
+    float3 result = lerp(prevRadiance, radiance, 1.0f / float(g_ConvergenceStep + 1));
+
     
     
-    g_Output[pixelPos] = radiance;
+    float alpha = pixelUv.x < g_split ? 1.0 : 0.0;
+
+    g_Output[pixelPos] = float4(result, alpha);
+    // g_Output[pixelPos] =  radiance;
 }

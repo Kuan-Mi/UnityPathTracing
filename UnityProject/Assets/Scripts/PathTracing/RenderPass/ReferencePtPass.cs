@@ -39,12 +39,18 @@ namespace PathTracing
             internal GraphicsBuffer SpotLightBuffer;
             internal GraphicsBuffer AreaLightBuffer;
             internal GraphicsBuffer PointLightBuffer;
+            
+            internal GraphicsBuffer AeExposureBuffer;
+            
         }
 
         public class Settings
         {
             internal int2 m_RenderResolution;
             internal float resolutionScale;
+            internal int referenceBounceNum;
+            internal int convergenceStep;
+            internal float split;
         }
 
         class PassData
@@ -70,6 +76,7 @@ namespace PathTracing
             natCmd.SetRayTracingShaderPass(data.ReferencePtTs, "Test2");
             natCmd.SetRayTracingConstantBufferParam(data.ReferencePtTs, paramsID, resource.ConstantBuffer, 0, resource.ConstantBuffer.stride);
 
+            natCmd.SetRayTracingBufferParam(data.ReferencePtTs, "_AE_ExposureBuffer", data.Resource.AeExposureBuffer);
 
 
 
@@ -81,6 +88,9 @@ namespace PathTracing
             natCmd.SetRayTracingBufferParam(data.ReferencePtTs, gIn_AreaLightsID, resource.AreaLightBuffer);
             natCmd.SetRayTracingBufferParam(data.ReferencePtTs, gIn_PointLightsID, resource.PointLightBuffer);
 
+            natCmd.SetRayTracingIntParam(data.ReferencePtTs, "_ReferenceBounceNum", settings.referenceBounceNum);
+            natCmd.SetRayTracingIntParam(data.ReferencePtTs, "g_ConvergenceStep", settings.convergenceStep);
+            natCmd.SetRayTracingFloatParam(data.ReferencePtTs, "g_split", settings.split);
 
             uint rectWmod = (uint)(settings.m_RenderResolution.x * settings.resolutionScale + 0.5f);
             uint rectHmod = (uint)(settings.m_RenderResolution.y * settings.resolutionScale + 0.5f);
