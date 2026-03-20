@@ -59,4 +59,5 @@ MonoBehaviour:
   - Reference Pt Tracing
   - PrepareLight
   - Copy GBuffer to Prev
+  - GIS Tracing
   averageWindowSeconds: 1

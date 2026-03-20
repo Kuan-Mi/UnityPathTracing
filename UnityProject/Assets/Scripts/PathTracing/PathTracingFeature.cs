@@ -23,6 +23,7 @@ namespace PathTracing
         public Material finalMaterial;
         public RayTracingShader sharcUpdateTs;
         public RayTracingShader opaqueTracingShader;
+        public RayTracingShader generateInitialSShader;
         public RayTracingShader transparentTracingShader;
         public RayTracingShader referencePtTracingShader;
 
@@ -40,6 +41,7 @@ namespace PathTracing
         private SharcPass _sharcPass;
         private PrepareLightPass _prepareLightPass;
         private OpaquePass _opaquePass;
+        private GenerateInitialSamplesPass _generateInitialSamplesPass;
         private NrdPass _nrdPass;
         private CompositionPass _compositionPass;
         private TransparentPass _transparentPass;
@@ -48,7 +50,7 @@ namespace PathTracing
         private DlssRRPass _dlssrrPass;
         private ReferencePtPass _referencePtPass;
         private AccumulatePass _accumulatePass;
-
+ 
         private RayTracingAccelerationStructure _accelerationStructure;
 
         private GraphicsBuffer _constantBuffer;
@@ -147,6 +149,11 @@ namespace PathTracing
             {
                 renderPassEvent = renderPassEvent
             };
+            _generateInitialSamplesPass ??= new GenerateInitialSamplesPass(generateInitialSShader)
+            {
+                renderPassEvent = renderPassEvent
+            };
+
             _nrdPass ??= new NrdPass()
             {
                 renderPassEvent = renderPassEvent
@@ -413,10 +420,10 @@ namespace PathTracing
             _prepareLightPass.Setup(_prepareLightResources);
             renderer.EnqueuePass(_prepareLightPass);
 
+            // Opaque Pass
             var opaqueResource = new OpaquePass.Resource
             {
                 ConstantBuffer = _constantBuffer,
-                ResamplingConstantBuffer = _resamplingConstantBuffer,
 
                 AccumulationBuffer = _accumulationBuffer,
                 HashEntriesBuffer = _hashEntriesBuffer,
@@ -433,7 +440,7 @@ namespace PathTracing
                 ViewZ = pool.GetRT(RenderResourceType.Viewz),
                 NormalRoughness = pool.GetRT(RenderResourceType.NormalRoughness),
                 BaseColorMetalness = pool.GetRT(RenderResourceType.BasecolorMetalness),
-                GeoNormal =  pool.GetRT(RenderResourceType.GeoNormal), 
+                GeoNormal = pool.GetRT(RenderResourceType.GeoNormal),
 
                 Penumbra = pool.GetRT(RenderResourceType.Penumbra),
                 Diff = pool.GetRT(RenderResourceType.DiffRadianceHitdist),
@@ -442,11 +449,9 @@ namespace PathTracing
                 PrevViewZ = pool.GetRT(RenderResourceType.PrevViewZ),
                 PrevNormalRoughness = pool.GetRT(RenderResourceType.PrevNormalRoughness),
                 PrevBaseColorMetalness = pool.GetRT(RenderResourceType.PrevBaseColorMetalness),
-                PrevGeoNormal =  pool.GetRT(RenderResourceType.PrevGeoNormal),
+                PrevGeoNormal = pool.GetRT(RenderResourceType.PrevGeoNormal),
 
                 PsrThroughput = pool.GetRT(RenderResourceType.PsrThroughput),
-
-                RtxdiResources = rtxdiResources
             };
 
             var opaqueSettings = new OpaquePass.Settings
@@ -457,6 +462,35 @@ namespace PathTracing
 
             _opaquePass.Setup(opaqueResource, opaqueSettings);
             renderer.EnqueuePass(_opaquePass);
+
+            // GenerateInitialSamplesPass
+            var gisResource = new GenerateInitialSamplesPass.Resource
+            {
+                ConstantBuffer = _constantBuffer,
+                ResamplingConstantBuffer = _resamplingConstantBuffer,
+
+                Mv = pool.GetRT(RenderResourceType.MV),
+                ViewZ = pool.GetRT(RenderResourceType.Viewz),
+                NormalRoughness = pool.GetRT(RenderResourceType.NormalRoughness),
+                BaseColorMetalness = pool.GetRT(RenderResourceType.BasecolorMetalness),
+                GeoNormal = pool.GetRT(RenderResourceType.GeoNormal),
+
+                PrevViewZ = pool.GetRT(RenderResourceType.PrevViewZ),
+                PrevNormalRoughness = pool.GetRT(RenderResourceType.PrevNormalRoughness),
+                PrevBaseColorMetalness = pool.GetRT(RenderResourceType.PrevBaseColorMetalness),
+                PrevGeoNormal = pool.GetRT(RenderResourceType.PrevGeoNormal),
+
+                RtxdiResources = rtxdiResources
+            };
+
+            var gisSettings = new GenerateInitialSamplesPass.Settings
+            {
+                m_RenderResolution = new int2(cam.pixelWidth, cam.pixelHeight),
+                resolutionScale = pathTracingSetting.resolutionScale,
+            };
+
+            _generateInitialSamplesPass.Setup(gisResource, gisSettings);
+            renderer.EnqueuePass(_generateInitialSamplesPass);
 
 
             if (!pathTracingSetting.RR)
