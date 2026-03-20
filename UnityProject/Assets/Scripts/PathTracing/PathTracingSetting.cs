@@ -1,4 +1,5 @@
-﻿using UnityEngine;
+﻿using Rtxdi.DI;
+using UnityEngine;
 
 namespace PathTracing
 {
@@ -220,7 +221,10 @@ namespace PathTracing
         [Range(0, 16)]
         public uint brdfSamples;
 
-        public bool enableResampling;
+        public bool enableSpatialResampling => resamplingMode is ReSTIRDI_ResamplingMode.Spatial or ReSTIRDI_ResamplingMode.TemporalAndSpatial;
+        public bool enableTemporalResampling => resamplingMode is ReSTIRDI_ResamplingMode.Temporal or ReSTIRDI_ResamplingMode.TemporalAndSpatial;
+
+        public ReSTIRDI_ResamplingMode resamplingMode; 
         public bool gShowLight;
         
         [Header("参考路径追踪")]

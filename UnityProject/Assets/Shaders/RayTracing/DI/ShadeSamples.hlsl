@@ -15,7 +15,7 @@ Texture2D<uint> gOut_GeoNormal;
 Texture2D<float> gIn_PrevViewZ;
 Texture2D<float4> gIn_PrevNormalRoughness;
 Texture2D<float4> gIn_PrevBaseColorMetalness;
-Texture2D<uint>   gIn_PrevGeoNormal;
+Texture2D<uint> gIn_PrevGeoNormal;
 
 RWTexture2D<float3> gOut_DirectLighting;
 
@@ -118,45 +118,47 @@ float3 DemodulateSpecular(float3 surfaceSpecularF0, float3 specular)
 }
 
 
-
-
-
 [shader("raygeneration")]
 void MainRayGenShader()
 {
     uint2 pixelPos = DispatchRaysIndex().xy;
-    
+
     const RTXDI_RuntimeParameters params = g_Const.runtimeParams;
 
     RAB_Surface surface = RAB_GetGBufferSurface(pixelPos, false);
-    
+
     RTXDI_DIReservoir reservoir = RTXDI_LoadDIReservoir(g_Const.restirDI.reservoirBufferParams, pixelPos, g_Const.restirDI.bufferIndices.shadingInputBufferIndex);
-    
+
     float3 diffuse = 0;
     float3 specular = 0;
     float lightDistance = 0;
     float2 currLuminance = 0;
-    
-    
+
+
     if (RTXDI_IsValidDIReservoir(reservoir))
     {
         RAB_LightInfo lightInfo = RAB_LoadLightInfo(RTXDI_GetDIReservoirLightIndex(reservoir), false);
 
         RAB_LightSample lightSample = RAB_SamplePolymorphicLight(lightInfo,
-            surface, RTXDI_GetDIReservoirSampleUV(reservoir));
+                                                                 surface, RTXDI_GetDIReservoirSampleUV(reservoir));
 
         bool needToStore = ShadeSurfaceWithLightSample(reservoir, surface, lightSample,
-            /* previousFrameTLAS = */ false, /* enableVisibilityReuse = */ true, diffuse, specular, lightDistance);
-    
+                                                       /* previousFrameTLAS = */ false, /* enableVisibilityReuse = */ true, diffuse, specular, lightDistance);
+
         // currLuminance = float2(calcLuminance(diffuse * surface.material.diffuseAlbedo), calcLuminance(specular));
-    
+
         specular = DemodulateSpecular(surface.material.specularF0, specular);
+
+        gOut_DirectLighting[pixelPos] = ShadeSurfaceWithLightSample(lightSample, surface)
+            * RTXDI_GetDIReservoirInvPdf(reservoir);
 
         if (needToStore)
         {
             RTXDI_StoreDIReservoir(reservoir, g_Const.restirDI.reservoirBufferParams, pixelPos, g_Const.restirDI.bufferIndices.shadingInputBufferIndex);
         }
     }
-    
-    gOut_DirectLighting[pixelPos] = diffuse * surface.material.diffuseAlbedo + specular;
+    else
+    {
+        gOut_DirectLighting[pixelPos] = 0;
+    }
 }

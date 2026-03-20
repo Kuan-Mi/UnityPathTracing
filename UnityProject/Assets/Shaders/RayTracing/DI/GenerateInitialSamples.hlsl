@@ -89,7 +89,8 @@ void MainRayGenShader()
         }
     }
 
-    RTXDI_StoreDIReservoir(reservoir, g_Const.restirDIReservoirBufferParams, pixelPos, g_Const.outputBufferIndex);
+    RTXDI_StoreDIReservoir(reservoir, g_Const.restirDI.reservoirBufferParams, pixelPos, g_Const.restirDI.bufferIndices.initialSamplingOutputBufferIndex);
+    // RTXDI_StoreDIReservoir(reservoir, g_Const.restirDIReservoirBufferParams, pixelPos, g_Const.outputBufferIndex);
 
 
     

@@ -74,8 +74,7 @@ void MainRayGenShader()
 
         RAB_LightSample selectedLightSample = (RAB_LightSample)0;
         
-        temporalResult = RTXDI_DITemporalResampling(pixelPos, surface, curSample,
-                rng, params, g_Const.restirDI.reservoirBufferParams, tparams, temporalSamplePixelPos, selectedLightSample);
+        temporalResult = RTXDI_DITemporalResampling(pixelPos, surface, curSample, rng, params, g_Const.restirDI.reservoirBufferParams, tparams, temporalSamplePixelPos, selectedLightSample);
   
     }
     

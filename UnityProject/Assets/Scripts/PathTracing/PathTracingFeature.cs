@@ -30,8 +30,8 @@ namespace PathTracing
         public RayTracingShader temporalResamplingShader;
         public RayTracingShader spatialResamplingShader;
         public RayTracingShader shadeSamplesShader;
-        
-        
+
+
         public RayTracingShader transparentTracingShader;
         public RayTracingShader referencePtTracingShader;
 
@@ -53,9 +53,8 @@ namespace PathTracing
         private TemporalResamplingPass _temporalResamplingPass;
         private SpatialResamplingPass _spatialResamplingPass;
         private ShadeSamplesPass _shadeSamplesPass;
-        
-        
-        
+
+
         private NrdPass _nrdPass;
         private CompositionPass _compositionPass;
         private TransparentPass _transparentPass;
@@ -172,18 +171,18 @@ namespace PathTracing
             {
                 renderPassEvent = renderPassEvent
             };
-            
+
             _spatialResamplingPass ??= new SpatialResamplingPass(spatialResamplingShader)
             {
                 renderPassEvent = renderPassEvent
             };
-            
+
             _shadeSamplesPass ??= new ShadeSamplesPass(shadeSamplesShader)
             {
                 renderPassEvent = renderPassEvent
             };
-            
-            
+
+
             _nrdPass ??= new NrdPass()
             {
                 renderPassEvent = renderPassEvent
@@ -522,68 +521,73 @@ namespace PathTracing
             _generateInitialSamplesPass.Setup(gisResource, gisSettings);
             renderer.EnqueuePass(_generateInitialSamplesPass);
 
-            
-            
+
             // TemporalResamplingPass
-            var temResource = new TemporalResamplingPass.Resource
+            if (pathTracingSetting.enableTemporalResampling)
             {
-                ConstantBuffer = _constantBuffer,
-                ResamplingConstantBuffer = _resamplingConstantBuffer,
+                var temResource = new TemporalResamplingPass.Resource
+                {
+                    ConstantBuffer = _constantBuffer,
+                    ResamplingConstantBuffer = _resamplingConstantBuffer,
 
-                Mv = pool.GetRT(RenderResourceType.MV),
-                ViewZ = pool.GetRT(RenderResourceType.Viewz),
-                NormalRoughness = pool.GetRT(RenderResourceType.NormalRoughness),
-                BaseColorMetalness = pool.GetRT(RenderResourceType.BasecolorMetalness),
-                GeoNormal = pool.GetRT(RenderResourceType.GeoNormal),
+                    Mv = pool.GetRT(RenderResourceType.MV),
+                    ViewZ = pool.GetRT(RenderResourceType.Viewz),
+                    NormalRoughness = pool.GetRT(RenderResourceType.NormalRoughness),
+                    BaseColorMetalness = pool.GetRT(RenderResourceType.BasecolorMetalness),
+                    GeoNormal = pool.GetRT(RenderResourceType.GeoNormal),
 
-                PrevViewZ = pool.GetRT(RenderResourceType.PrevViewZ),
-                PrevNormalRoughness = pool.GetRT(RenderResourceType.PrevNormalRoughness),
-                PrevBaseColorMetalness = pool.GetRT(RenderResourceType.PrevBaseColorMetalness),
-                PrevGeoNormal = pool.GetRT(RenderResourceType.PrevGeoNormal),
+                    PrevViewZ = pool.GetRT(RenderResourceType.PrevViewZ),
+                    PrevNormalRoughness = pool.GetRT(RenderResourceType.PrevNormalRoughness),
+                    PrevBaseColorMetalness = pool.GetRT(RenderResourceType.PrevBaseColorMetalness),
+                    PrevGeoNormal = pool.GetRT(RenderResourceType.PrevGeoNormal),
 
-                RtxdiResources = rtxdiResources
-            };
+                    RtxdiResources = rtxdiResources
+                };
 
-            var temSettings = new TemporalResamplingPass.Settings
-            {
-                m_RenderResolution = new int2(cam.pixelWidth, cam.pixelHeight),
-                resolutionScale = pathTracingSetting.resolutionScale,
-            };
+                var temSettings = new TemporalResamplingPass.Settings
+                {
+                    m_RenderResolution = new int2(cam.pixelWidth, cam.pixelHeight),
+                    resolutionScale = pathTracingSetting.resolutionScale,
+                };
 
-            _temporalResamplingPass.Setup(temResource, temSettings);
-            renderer.EnqueuePass(_temporalResamplingPass);
-            
-            
+                _temporalResamplingPass.Setup(temResource, temSettings);
+                renderer.EnqueuePass(_temporalResamplingPass);
+            }
+
+
             // SpatialResamplingPass
-            var SpResource = new SpatialResamplingPass.Resource
+            if (pathTracingSetting.enableSpatialResampling)
             {
-                ConstantBuffer = _constantBuffer,
-                ResamplingConstantBuffer = _resamplingConstantBuffer,
+                var SpResource = new SpatialResamplingPass.Resource
+                {
+                    ConstantBuffer = _constantBuffer,
+                    ResamplingConstantBuffer = _resamplingConstantBuffer,
 
-                Mv = pool.GetRT(RenderResourceType.MV),
-                ViewZ = pool.GetRT(RenderResourceType.Viewz),
-                NormalRoughness = pool.GetRT(RenderResourceType.NormalRoughness),
-                BaseColorMetalness = pool.GetRT(RenderResourceType.BasecolorMetalness),
-                GeoNormal = pool.GetRT(RenderResourceType.GeoNormal),
+                    Mv = pool.GetRT(RenderResourceType.MV),
+                    ViewZ = pool.GetRT(RenderResourceType.Viewz),
+                    NormalRoughness = pool.GetRT(RenderResourceType.NormalRoughness),
+                    BaseColorMetalness = pool.GetRT(RenderResourceType.BasecolorMetalness),
+                    GeoNormal = pool.GetRT(RenderResourceType.GeoNormal),
 
-                PrevViewZ = pool.GetRT(RenderResourceType.PrevViewZ),
-                PrevNormalRoughness = pool.GetRT(RenderResourceType.PrevNormalRoughness),
-                PrevBaseColorMetalness = pool.GetRT(RenderResourceType.PrevBaseColorMetalness),
-                PrevGeoNormal = pool.GetRT(RenderResourceType.PrevGeoNormal),
+                    PrevViewZ = pool.GetRT(RenderResourceType.PrevViewZ),
+                    PrevNormalRoughness = pool.GetRT(RenderResourceType.PrevNormalRoughness),
+                    PrevBaseColorMetalness = pool.GetRT(RenderResourceType.PrevBaseColorMetalness),
+                    PrevGeoNormal = pool.GetRT(RenderResourceType.PrevGeoNormal),
 
-                RtxdiResources = rtxdiResources
-            };
+                    RtxdiResources = rtxdiResources
+                };
 
-            var SpSettings = new SpatialResamplingPass.Settings
-            {
-                m_RenderResolution = new int2(cam.pixelWidth, cam.pixelHeight),
-                resolutionScale = pathTracingSetting.resolutionScale,
-            };
+                var SpSettings = new SpatialResamplingPass.Settings
+                {
+                    m_RenderResolution = new int2(cam.pixelWidth, cam.pixelHeight),
+                    resolutionScale = pathTracingSetting.resolutionScale,
+                };
 
-            _spatialResamplingPass.Setup(SpResource, SpSettings);
-            renderer.EnqueuePass(_spatialResamplingPass);
-            
-            
+                _spatialResamplingPass.Setup(SpResource, SpSettings);
+                renderer.EnqueuePass(_spatialResamplingPass);
+            }
+
+
             // ShadeSamplesPass
             var shaResource = new ShadeSamplesPass.Resource
             {
@@ -612,8 +616,7 @@ namespace PathTracing
 
             _shadeSamplesPass.Setup(shaResource, shaSettings);
             renderer.EnqueuePass(_shadeSamplesPass);
-            
-            
+
 
             if (!pathTracingSetting.RR)
             {
@@ -925,6 +928,8 @@ namespace PathTracing
         private ResamplingConstants GetResamplingConstants(ReSTIRDIContext restirDiContext, RtxdiResources rtxdiResources, CameraFrameState frameState)
         {
             restirDiContext.SetFrameIndex(frameState.FrameIndex);
+            
+            restirDiContext.SetResamplingMode( pathTracingSetting.resamplingMode);
 
             var resamplingConstants = new ResamplingConstants
             {
@@ -949,7 +954,7 @@ namespace PathTracing
             resamplingConstants.numInitialBRDFSamples = pathTracingSetting.brdfSamples;
             resamplingConstants.brdfCutoff = 0;
             resamplingConstants.pad2 = new uint2(0, 0);
-            resamplingConstants.enableResampling = pathTracingSetting.enableResampling ? 1u : 0u;
+            resamplingConstants.enableResampling = pathTracingSetting.enableTemporalResampling ? 1u : 0u;
             resamplingConstants.unbiasedMode = 1;
             resamplingConstants.inputBufferIndex = (resamplingConstants.frameIndex & 1u) ^ 1;
             resamplingConstants.outputBufferIndex = (resamplingConstants.frameIndex & 1u);

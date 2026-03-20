@@ -75,7 +75,7 @@ MonoBehaviour:
     isBaseColorMetalnessAvailable: 1
     planeDistanceSensitivity: 0.02
     maxStabilizedFrameNum: 5
-    showMode: 18
+    showMode: 11
     showMV: 0
     showValidation: 0
     dofAperture: 0
@@ -125,9 +125,9 @@ MonoBehaviour:
     sssAnisotropy: 0.8
     sssMaxSampleRadius: 0.0001
     localLightSamples: 16
-    spatialSamples: 4
+    spatialSamples: 3
     brdfSamples: 0
-    enableResampling: 1
+    resamplingMode: 1
     gShowLight: 0
     useReferencePathTracing: 0
     referenceBounceNum: 2
@@ -137,45 +137,45 @@ MonoBehaviour:
   globalConstants:
     gViewToWorld:
       c0:
-        x: -0.9305407
-        y: 0.0015815785
-        z: 0.36618534
+        x: -0.96305966
+        y: -0.0032064489
+        z: 0.26926968
         w: 0
       c1:
-        x: -0.21524051
-        y: 0.80664676
-        z: -0.5504476
+        x: -0.17426448
+        y: 0.7697475
+        z: -0.6141016
         w: 0
       c2:
-        x: 0.29625282
-        y: 0.5910317
-        z: 0.7502773
+        x: 0.20530061
+        y: 0.6383404
+        z: 0.7418716
         w: 0
       c3:
-        x: 1.9711031
-        y: 3.9223614
-        z: 4.2147045
+        x: 2.0876892
+        y: 3.66589
+        z: 2.6244807
         w: 1
     gViewToWorldPrev:
       c0:
-        x: -0.9305407
-        y: 0.0015815785
-        z: 0.36618534
+        x: -0.96305966
+        y: -0.0032064489
+        z: 0.26926968
         w: 0
       c1:
-        x: -0.21524051
-        y: 0.80664676
-        z: -0.5504476
+        x: -0.17426448
+        y: 0.7697475
+        z: -0.6141016
         w: 0
       c2:
-        x: 0.29625282
-        y: 0.5910317
-        z: 0.7502773
+        x: 0.20530061
+        y: 0.6383404
+        z: 0.7418716
         w: 0
       c3:
-        x: 1.9711031
-        y: 3.9223614
-        z: 4.2147045
+        x: 2.0876892
+        y: 3.66589
+        z: 2.6244807
         w: 1
     gViewToClip:
       c0:
@@ -200,88 +200,88 @@ MonoBehaviour:
         w: 0
     gWorldToView:
       c0:
-        x: -0.93054056
-        y: -0.21524048
-        z: 0.29625276
+        x: -0.9630593
+        y: -0.17426442
+        z: 0.20530051
         w: 0
       c1:
-        x: 0.0015815869
-        y: 0.8066468
-        z: 0.5910317
+        x: -0.0032064319
+        y: 0.76974756
+        z: 0.63834035
         w: 0
       c2:
-        x: 0.36618528
-        y: -0.55044746
-        z: 0.75027704
+        x: 0.2692696
+        y: -0.6141014
+        z: 0.74187124
         w: 0
       c3:
-        x: 0.28462505
-        y: -0.41972584
-        z: -6.06438
+        x: 1.3156302
+        y: -0.8463025
+        z: -4.715716
         w: 1
     gWorldToViewPrev:
       c0:
-        x: -0.93054056
-        y: -0.21524048
-        z: 0.29625276
+        x: -0.9630593
+        y: -0.17426442
+        z: 0.20530051
         w: 0
       c1:
-        x: 0.0015815869
-        y: 0.8066468
-        z: 0.5910317
+        x: -0.0032064319
+        y: 0.76974756
+        z: 0.63834035
         w: 0
       c2:
-        x: 0.36618528
-        y: -0.55044746
-        z: 0.75027704
+        x: 0.2692696
+        y: -0.6141014
+        z: 0.74187124
         w: 0
       c3:
-        x: 0.28462505
-        y: -0.41972584
-        z: -6.06438
+        x: 1.3156302
+        y: -0.8463025
+        z: -4.715716
         w: 1
     gWorldToClip:
       c0:
-        x: -0.8403801
-        y: -0.37280744
-        z: 0.00000090056005
-        w: -0.29625276
+        x: -0.86974806
+        y: -0.30183482
+        z: 0.0000006240801
+        w: -0.20530051
       c1:
-        x: 0.0014283463
-        y: 1.3971533
-        z: 0.0000017966398
-        w: -0.5910317
+        x: -0.0028957592
+        y: 1.3332418
+        z: 0.0000019404506
+        w: -0.63834035
       c2:
-        x: 0.33070543
-        y: -0.95340294
-        z: 0.0000022807199
-        w: -0.75027704
+        x: 0.24317993
+        y: -1.0636548
+        z: 0.0000022551676
+        w: -0.74187124
       c3:
-        x: 0.2570476
-        y: -0.72698647
-        z: 0.029981656
-        w: 6.06438
+        x: 1.1881582
+        y: -1.4658389
+        z: 0.029985756
+        w: 4.715716
     gWorldToClipPrev:
       c0:
-        x: -0.8403801
-        y: -0.37280744
-        z: 0.00000090056005
-        w: -0.29625276
+        x: -0.86974806
+        y: -0.30183482
+        z: 0.0000006240801
+        w: -0.20530051
       c1:
-        x: 0.0014283463
-        y: 1.3971533
-        z: 0.0000017966398
-        w: -0.5910317
+        x: -0.0028957592
+        y: 1.3332418
+        z: 0.0000019404506
+        w: -0.63834035
       c2:
-        x: 0.33070543
-        y: -0.95340294
-        z: 0.0000022807199
-        w: -0.75027704
+        x: 0.24317993
+        y: -1.0636548
+        z: 0.0000022551676
+        w: -0.74187124
       c3:
-        x: 0.2570476
-        y: -0.72698647
-        z: 0.029981656
-        w: 6.06438
+        x: 1.1881582
+        y: -1.4658389
+        z: 0.029985756
+        w: 4.715716
     gHitDistParams:
       x: 3
       y: 0.1
@@ -308,19 +308,19 @@ MonoBehaviour:
       z: -0.2604189
       w: 0
     gCameraGlobalPos:
-      x: 1.971103
-      y: 3.9223611
-      z: 4.214704
+      x: 2.0876894
+      y: 3.66589
+      z: 2.6244807
       w: 0
     gCameraGlobalPosPrev:
-      x: 1.971103
-      y: 3.9223611
-      z: 4.214704
+      x: 2.0876894
+      y: 3.66589
+      z: 2.6244807
       w: 0
     gViewDirection:
-      x: -0.29625276
-      y: -0.5910317
-      z: -0.7502771
+      x: -0.20530051
+      y: -0.63834035
+      z: -0.74187124
       w: 0
     gHairBaseColor:
       x: 0.1
@@ -368,7 +368,7 @@ MonoBehaviour:
     gAperture: 0
     gFocalDistance: 0.71
     gFocalLength: 0.015804417
-    gTAA: 0.2
+    gTAA: 0.4
     gHdrScale: 1
     gExposure: 1
     gMipBias: -0.5
@@ -376,10 +376,10 @@ MonoBehaviour:
     gIndirectDiffuse: 1
     gIndirectSpecular: 1
     gMinProbability: 0
-    gSharcMaxAccumulatedFrameNum: 8
+    gSharcMaxAccumulatedFrameNum: 3
     gDenoiserType: 0
     gDisableShadowsAndEnableImportanceSampling: 0
-    gFrameIndex: 31744
+    gFrameIndex: 27031
     gForcedMaterial: 0
     gUseNormalMap: 1
     gBounceNum: 1
@@ -439,9 +439,64 @@ MonoBehaviour:
       reservoirArrayPitch: 748800
       pad1: 0
       pad2: 0
-    frameIndex: 22805
+    restirDI:
+      reservoirBufferParams:
+        reservoirBlockRowPitch: 19200
+        reservoirArrayPitch: 748800
+        pad1: 0
+        pad2: 0
+      bufferIndices:
+        initialSamplingOutputBufferIndex: 1
+        temporalResamplingInputBufferIndex: 0
+        temporalResamplingOutputBufferIndex: 1
+        spatialResamplingInputBufferIndex: 1
+        spatialResamplingOutputBufferIndex: 2
+        shadingInputBufferIndex: 1
+        pad1: 0
+        pad2: 0
+      initialSamplingParams:
+        numPrimaryLocalLightSamples: 8
+        numPrimaryInfiniteLightSamples: 1
+        numPrimaryEnvironmentSamples: 0
+        numPrimaryBrdfSamples: 1
+        brdfCutoff: 0.0001
+        enableInitialVisibility: 1
+        environmentMapImportanceSampling: 0
+        localLightSamplingMode: 0
+      temporalResamplingParams:
+        temporalDepthThreshold: 0.1
+        temporalNormalThreshold: 0.5
+        maxHistoryLength: 20
+        temporalBiasCorrection: 1
+        enablePermutationSampling: 1
+        permutationSamplingThreshold: 0.9
+        enableBoilingFilter: 1
+        boilingFilterStrength: 0.2
+        discardInvisibleSamples: 0
+        uniformRandomNumber: 2915519480
+        pad2: 0
+        pad3: 0
+      spatialResamplingParams:
+        spatialDepthThreshold: 0.1
+        spatialNormalThreshold: 0.5
+        spatialBiasCorrection: 1
+        numSpatialSamples: 1
+        numDisocclusionBoostSamples: 8
+        spatialSamplingRadius: 32
+        neighborOffsetMask: 0
+        discountNaiveSamples: 0
+      shadingParams:
+        enableFinalVisibility: 1
+        reuseFinalVisibility: 1
+        finalVisibilityMaxAge: 4
+        finalVisibilityMaxDistance: 16
+        enableDenoiserInputPacking: 0
+        pad1: 0
+        pad2: 0
+        pad3: 0
+    frameIndex: 7396
     numInitialSamples: 16
-    numSpatialSamples: 4
+    numSpatialSamples: 3
     useAccurateGBufferNormal: 0
     numInitialBRDFSamples: 0
     brdfCutoff: 0
@@ -450,8 +505,8 @@ MonoBehaviour:
       y: 0
     enableResampling: 1
     unbiasedMode: 1
-    inputBufferIndex: 0
-    outputBufferIndex: 1
+    inputBufferIndex: 1
+    outputBufferIndex: 0
   renderPassEvent: 550
   finalMaterial: {fileID: 2100000, guid: 27695a2bc55ef2f469362b9a2994989e, type: 2}
   sharcUpdateTs: {fileID: 4807578003741378534, guid: 171e2660e0894b3cb5c6c809e595ae5d, type: 3}
