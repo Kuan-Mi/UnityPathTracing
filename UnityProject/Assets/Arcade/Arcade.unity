@@ -131,6 +131,7 @@ GameObject:
   - component: {fileID: 255795360}
   - component: {fileID: 255795359}
   - component: {fileID: 255795358}
+  - component: {fileID: 255795362}
   m_Layer: 0
   m_Name: Cube
   m_TagString: Untagged
@@ -225,12 +226,24 @@ Transform:
   m_GameObject: {fileID: 255795357}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 4.358, y: 0.634, z: -1.097}
+  m_LocalPosition: {x: 0.83, y: 0.634, z: -4.94}
   m_LocalScale: {x: 0.6122578, y: 0.6122578, z: 0.6122578}
   m_ConstrainProportionsScale: 0
   m_Children: []
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &255795362
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 255795357}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: bd46de2334c135c47bafec0a26b90b9a, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::MeshLight
 --- !u!1001 &308568790
 PrefabInstance:
   m_ObjectHideFlags: 0
@@ -325,7 +338,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 1
+  m_IsActive: 0
 --- !u!114 &472025888
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -972,13 +985,13 @@ Transform:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 2135674571}
   serializedVersion: 2
-  m_LocalRotation: {x: 0.40821788, y: -0.23456968, z: 0.10938163, w: 0.8754261}
+  m_LocalRotation: {x: -0.57116127, y: -0.2087232, z: -0.15304218, w: 0.7789657}
   m_LocalPosition: {x: 0, y: 3, z: 0}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
   m_Father: {fileID: 0}
-  m_LocalEulerAnglesHint: {x: 50, y: -30, z: 0}
+  m_LocalEulerAnglesHint: {x: -72.5, y: -30, z: 0}
 --- !u!114 &2135674574
 MonoBehaviour:
   m_ObjectHideFlags: 0

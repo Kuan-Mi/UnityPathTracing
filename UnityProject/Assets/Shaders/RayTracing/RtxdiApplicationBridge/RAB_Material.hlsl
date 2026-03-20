@@ -58,27 +58,24 @@ float GetRoughness(RAB_Material material)
 //     return material;
 // }
 RAB_Material RAB_GetGBufferMaterial(
-    int2 pixelPosition)
+    int2 pixelPosition, float roughness)
 {
     RAB_Material material = RAB_EmptyMaterial();
 
     if (any(pixelPosition >= gRectSize))
         return material;
 
-    float3 BaseColor = Color::FromSrgb(gIn_PrevBaseColorMetalness[pixelPosition].xyz);
-    float Metalness = gIn_PrevBaseColorMetalness[pixelPosition].w;
-    float4 Normal_RoughnessPacked = gIn_PrevNormalRoughness[pixelPosition];
-    float4 Normal_Roughness = NRD_FrontEnd_UnpackNormalAndRoughness(Normal_RoughnessPacked);
-    float3 Normal = Normal_Roughness.xyz;
-    float Roughness = Normal_Roughness.w;
-    
+    float4 packedBaseColorMetalness = gIn_PrevBaseColorMetalness[pixelPosition];
+    float3 BaseColor = Color::FromSrgb(packedBaseColorMetalness.xyz);
+    float Metalness = packedBaseColorMetalness.w;
+
     float3 albedo, Rf0;
     BRDF::ConvertBaseColorMetalnessToAlbedoRf0(BaseColor, Metalness, albedo, Rf0);
 
     
     material.diffuseAlbedo = albedo;
 
-    material.roughness = Roughness;
+    material.roughness = roughness;
     material.specularF0 = Rf0;
 
     return material;
