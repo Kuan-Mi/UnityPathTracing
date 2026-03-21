@@ -907,7 +907,7 @@ namespace PathTracing
                 showMode = pathTracingSetting.showMode,
                 resolutionScale = frameState.resolutionScale,
                 enableDlssRR = pathTracingSetting.RR,
-                showMV = pathTracingSetting.showMV,
+                showMV = pathTracingSetting.showMv,
                 showValidation = pathTracingSetting.showValidation,
                 showReference = pathTracingSetting.useReferencePathTracing,
             };
