@@ -1,9 +1,9 @@
-﻿using Rtxdi;
-using Rtxdi.DI;
-using Unity.Mathematics;
+﻿using Unity.Mathematics;
+using UnityEngine.Rendering;
 
 namespace PathTracing
 {
+    [GenerateHLSL(PackingRules.Exact, needAccessors = false,generateCBuffer = true)]
     public struct GlobalConstants
     {
         public float4x4 gViewToWorld;
@@ -188,28 +188,4 @@ namespace PathTracing
     {{ {m.c3.x:F6}, {m.c3.y:F6}, {m.c3.z:F6}, {m.c3.w:F6} }}";
         }
     }
-
- 
-    public struct ResamplingConstants
-    {
-      public  RTXDI_RuntimeParameters runtimeParams;
-      public  RTXDI_LightBufferParameters lightBufferParams;
-      public  RTXDI_ReservoirBufferParameters restirDIReservoirBufferParams;
-
-      public ReSTIRDI_Parameters restirDI;
-      
-      public  uint frameIndex;
-      public  uint numInitialSamples;
-      public  uint numSpatialSamples;
-      public  uint useAccurateGBufferNormal;
-
-      public  uint numInitialBRDFSamples;
-      public  float brdfCutoff;
-      public  uint2 pad2;
-
-      public  uint enableResampling;
-      public  uint unbiasedMode;
-      public  uint inputBufferIndex;
-      public  uint outputBufferIndex;
-    };
 }

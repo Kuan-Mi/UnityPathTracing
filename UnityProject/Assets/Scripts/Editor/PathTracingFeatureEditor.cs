@@ -12,6 +12,7 @@ namespace PathTracing
     {
         // 用于保存每个 Header 的折叠状态
         // private static Dictionary<string, bool> foldoutStates = new Dictionary<string, bool>();
+        private bool showGlobalDebug = true;
         private bool showDebug = true;
 
         // Asset paths relative to the project root.
@@ -80,24 +81,13 @@ namespace PathTracing
             }
 
             EditorGUILayout.Space(10);
-            showDebug = EditorGUILayout.BeginFoldoutHeaderGroup(showDebug, "Debug Constants (Non-Serialized)");
+            
 
-            if (showDebug)
-            {
-                EditorGUI.BeginDisabledGroup(true); // 设置为灰色只读，因为是 Debug 信息
-
-                // 绘制第一个常量结构体
-                DrawObjectRecursive("Global Constants", feature.globalConstants);
-
-                EditorGUILayout.Space(5);
-
-                // 绘制第二个嵌套常量结构体
-                DrawObjectRecursive("Resampling Constants", feature.resamplingConstants);
-
-                EditorGUI.EndDisabledGroup();
-            }
-
-            EditorGUILayout.EndFoldoutHeaderGroup();
+            DrawObjectRecursive("Global Constants", feature.globalConstants , "GlobalConstants");
+            
+  
+            DrawObjectRecursive("Resampling Constants", feature.resamplingConstants,  "ResamplingConstants");
+            
 
             serializedObject.ApplyModifiedProperties();
         }
@@ -168,37 +158,44 @@ namespace PathTracing
         /// <summary>
         /// 递归绘制对象的所有公有字段
         /// </summary>
-        private void DrawObjectRecursive(string label, object obj)
+        /// <summary>
+        /// 递归绘制对象，增加了 path 参数用于保存折叠状态
+        /// </summary>
+        private void DrawObjectRecursive(string label, object obj, string path)
         {
             if (obj == null) return;
 
-            System.Type type = obj.GetType();
+            Type type = obj.GetType();
 
-            // 如果是基础类型或数学类型，直接绘制
             if (IsSimpleType(type))
             {
                 DrawSimpleField(label, obj);
                 return;
             }
 
-            // 如果是复杂结构体/类，开启一个 Foldout
+            // 为当前层级生成唯一的 SessionState Key
+            string foldoutKey = GetKey(path + "_" + label);
+            bool isExpanded = SessionState.GetBool(foldoutKey, false); // 默认折叠
+
             EditorGUILayout.BeginVertical(EditorStyles.helpBox);
-            label = string.IsNullOrEmpty(label) ? type.Name : label;
+            
+            // 绘制可点击的折叠标签
+            isExpanded = EditorGUILayout.Foldout(isExpanded, label, true, EditorStyles.foldoutHeader);
+            SessionState.SetBool(foldoutKey, isExpanded);
 
-            // 这里使用 LabelField 模拟标题，如果你想要点击折叠，可以加个布尔值字典记录状态
-            EditorGUILayout.LabelField(label, EditorStyles.boldLabel);
-
-            EditorGUI.indentLevel++;
-
-            FieldInfo[] fields = type.GetFields(BindingFlags.Public | BindingFlags.Instance);
-            foreach (var field in fields)
+            if (isExpanded)
             {
-                object value = field.GetValue(obj);
-                // 递归调用
-                DrawObjectRecursive(field.Name, value);
+                EditorGUI.indentLevel++;
+                FieldInfo[] fields = type.GetFields(BindingFlags.Public | BindingFlags.Instance);
+                foreach (var field in fields)
+                {
+                    object value = field.GetValue(obj);
+                    // 递归时将当前 label 加入 path，保证子节点的 key 唯一
+                    DrawObjectRecursive(field.Name, value, path + "_" + label);
+                }
+                EditorGUI.indentLevel--;
             }
 
-            EditorGUI.indentLevel--;
             EditorGUILayout.EndVertical();
         }
 
@@ -209,7 +206,7 @@ namespace PathTracing
                    type == typeof(float) || type == typeof(int) || type == typeof(uint) ||
                    type == typeof(float2) || type == typeof(float3) || type == typeof(float4) ||
                    type == typeof(float4x4) || type == typeof(Vector2) || type == typeof(Vector3) ||
-                   type == typeof(Vector4) || type == typeof(bool) || type == typeof(string);
+                   type == typeof(Vector4) || type == typeof(bool) || type == typeof(string)|| type == typeof(int2) || type == typeof(uint2);
         }
 
         // 绘制具体的字段值
@@ -232,6 +229,9 @@ namespace PathTracing
             else if (value is float f) EditorGUILayout.FloatField(label, f);
             else if (value is int i) EditorGUILayout.IntField(label, i);
             else if (value is bool b) EditorGUILayout.Toggle(label, b);
+            else if (value is string s) EditorGUILayout.TextField(label, s);
+            else if (value is int2 i2) EditorGUILayout.Vector2IntField(label, new Vector2Int(i2.x, i2.y));
+            else if (value is uint2 u2) EditorGUILayout.Vector2IntField(label, new Vector2Int((int)u2.x, (int)u2.y));
             else EditorGUILayout.LabelField(label, value?.ToString() ?? "null");
         }
 

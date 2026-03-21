@@ -18,10 +18,8 @@ namespace PathTracing
     public class PathTracingFeature : ScriptableRendererFeature
     {
         public PathTracingSetting pathTracingSetting;
-        
-        [System.NonSerialized] 
+
         public GlobalConstants globalConstants;
-        [System.NonSerialized] 
         public ResamplingConstants resamplingConstants;
 
         public RenderPassEvent renderPassEvent = RenderPassEvent.BeforeRenderingPostProcessing;
@@ -962,8 +960,6 @@ namespace PathTracing
             resamplingConstants.pad2 = new uint2(0, 0);
             resamplingConstants.enableResampling = pathTracingSetting.enableTemporalResampling ? 1u : 0u;
             resamplingConstants.unbiasedMode = 1;
-            resamplingConstants.inputBufferIndex = (resamplingConstants.frameIndex & 1u) ^ 1;
-            resamplingConstants.outputBufferIndex = (resamplingConstants.frameIndex & 1u);
 
 
             ReSTIRDI_Parameters reStirdiParameters = new ReSTIRDI_Parameters();

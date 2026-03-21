@@ -69,11 +69,11 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::PathTracing.PathTracingFeature
   m_Active: 1
   pathTracingSetting:
-    showMode: 18
+    showMode: 11
     showMv: 0
     showValidation: 0
     sunAngularDiameter: 0.69
-    exposureEv: -2.18
+    exposureEv: 5.15
     upscalerMode: 0
     mipBias: -0.5
     tracingMode: 1
@@ -124,11 +124,11 @@ MonoBehaviour:
     sssScale: 1
     sssAnisotropy: 0.8
     sssMaxSampleRadius: 0.0001
-    enableRtxdi: 0
+    enableRtxdi: 1
     localLightSamples: 16
     spatialSamples: 3
     brdfSamples: 0
-    resamplingMode: 1
+    resamplingMode: 0
     gShowLight: 0
     useReferencePathTracing: 0
     referenceBounceNum: 2
