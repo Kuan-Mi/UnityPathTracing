@@ -1,7 +1,5 @@
 ﻿using System;
 using System.Runtime.InteropServices;
-using Mono.Cecil;
-using Nrd;
 
 namespace DefaultNamespace
 {

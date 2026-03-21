@@ -75,13 +75,13 @@ MonoBehaviour:
     isBaseColorMetalnessAvailable: 1
     planeDistanceSensitivity: 0.02
     maxStabilizedFrameNum: 5
-    showMode: 11
+    showMode: 18
     showMV: 0
     showValidation: 0
     dofAperture: 0
     dofFocalDistance: 0.71
     exposure: 1
-    enableAutoExposure: 0
+    enableAutoExposure: 1
     aeEVMin: -10
     aeEVMax: 10
     aeLowPercent: 0.05
@@ -100,7 +100,7 @@ MonoBehaviour:
     tracingMode: 1
     denoiser: 0
     emissionIntensity: 1
-    cameraJitter: 0
+    cameraJitter: 1
     psr: 1
     emission: 1
     usePrevFrame: 1
@@ -124,6 +124,7 @@ MonoBehaviour:
     sssScale: 1
     sssAnisotropy: 0.8
     sssMaxSampleRadius: 0.0001
+    enableRtxdi: 0
     localLightSamples: 16
     spatialSamples: 3
     brdfSamples: 0
@@ -137,45 +138,45 @@ MonoBehaviour:
   globalConstants:
     gViewToWorld:
       c0:
-        x: -0.96305966
-        y: -0.0032064489
-        z: 0.26926968
+        x: 0.99975026
+        y: -0.0041033444
+        z: 0.021973167
         w: 0
       c1:
-        x: -0.17426448
-        y: 0.7697475
-        z: -0.6141016
+        x: -0.00035256206
+        y: 0.9799897
+        z: 0.19904774
         w: 0
       c2:
-        x: 0.20530061
-        y: 0.6383404
-        z: 0.7418716
+        x: 0.022350239
+        y: 0.19900575
+        z: -0.9797434
         w: 0
       c3:
-        x: 2.0876892
-        y: 3.66589
-        z: 2.6244807
+        x: -9.416759
+        y: 6.2253985
+        z: -7.8868723
         w: 1
     gViewToWorldPrev:
       c0:
-        x: -0.96305966
-        y: -0.0032064489
-        z: 0.26926968
+        x: 0.99975026
+        y: -0.0041033444
+        z: 0.021973167
         w: 0
       c1:
-        x: -0.17426448
-        y: 0.7697475
-        z: -0.6141016
+        x: -0.00035256206
+        y: 0.9799897
+        z: 0.19904774
         w: 0
       c2:
-        x: 0.20530061
-        y: 0.6383404
-        z: 0.7418716
+        x: 0.022350239
+        y: 0.19900575
+        z: -0.9797434
         w: 0
       c3:
-        x: 2.0876892
-        y: 3.66589
-        z: 2.6244807
+        x: -9.416759
+        y: 6.2253985
+        z: -7.8868723
         w: 1
     gViewToClip:
       c0:
@@ -200,88 +201,88 @@ MonoBehaviour:
         w: 0
     gWorldToView:
       c0:
-        x: -0.9630593
-        y: -0.17426442
-        z: 0.20530051
+        x: 0.99975014
+        y: -0.00035256182
+        z: 0.022350239
         w: 0
       c1:
-        x: -0.0032064319
-        y: 0.76974756
-        z: 0.63834035
+        x: -0.004103344
+        y: 0.9799897
+        z: 0.19900575
         w: 0
       c2:
-        x: 0.2692696
-        y: -0.6141014
-        z: 0.74187124
+        x: 0.021973165
+        y: 0.19904774
+        z: -0.9797434
         w: 0
       c3:
-        x: 1.3156302
-        y: -0.8463025
-        z: -4.715716
+        x: 9.61325
+        y: -4.534283
+        z: -8.755534
         w: 1
     gWorldToViewPrev:
       c0:
-        x: -0.9630593
-        y: -0.17426442
-        z: 0.20530051
+        x: 0.99975014
+        y: -0.00035256182
+        z: 0.022350239
         w: 0
       c1:
-        x: -0.0032064319
-        y: 0.76974756
-        z: 0.63834035
+        x: -0.004103344
+        y: 0.9799897
+        z: 0.19900575
         w: 0
       c2:
-        x: 0.2692696
-        y: -0.6141014
-        z: 0.74187124
+        x: 0.021973165
+        y: 0.19904774
+        z: -0.9797434
         w: 0
       c3:
-        x: 1.3156302
-        y: -0.8463025
-        z: -4.715716
+        x: 9.61325
+        y: -4.534283
+        z: -8.755534
         w: 1
     gWorldToClip:
       c0:
-        x: -0.86974806
-        y: -0.30183482
-        z: 0.0000006240801
-        w: -0.20530051
+        x: 0.9028839
+        y: -0.000610655
+        z: 0.00000006794108
+        w: -0.022350239
       c1:
-        x: -0.0028957592
-        y: 1.3332418
-        z: 0.0000019404506
-        w: -0.63834035
+        x: -0.003705769
+        y: 1.697392
+        z: 0.000000604945
+        w: -0.19900575
       c2:
-        x: 0.24317993
-        y: -1.0636548
-        z: 0.0000022551676
-        w: -0.74187124
+        x: 0.019844174
+        y: 0.3447608
+        z: -0.0000029782602
+        w: 0.9797434
       c3:
-        x: 1.1881582
-        y: -1.4658389
-        z: 0.029985756
-        w: 4.715716
+        x: 8.681818
+        y: -7.8536086
+        z: 0.029973475
+        w: 8.755534
     gWorldToClipPrev:
       c0:
-        x: -0.86974806
-        y: -0.30183482
-        z: 0.0000006240801
-        w: -0.20530051
+        x: 0.9028839
+        y: -0.000610655
+        z: 0.00000006794108
+        w: -0.022350239
       c1:
-        x: -0.0028957592
-        y: 1.3332418
-        z: 0.0000019404506
-        w: -0.63834035
+        x: -0.003705769
+        y: 1.697392
+        z: 0.000000604945
+        w: -0.19900575
       c2:
-        x: 0.24317993
-        y: -1.0636548
-        z: 0.0000022551676
-        w: -0.74187124
+        x: 0.019844174
+        y: 0.3447608
+        z: -0.0000029782602
+        w: 0.9797434
       c3:
-        x: 1.1881582
-        y: -1.4658389
-        z: 0.029985756
-        w: 4.715716
+        x: 8.681818
+        y: -7.8536086
+        z: 0.029973475
+        w: 8.755534
     gHitDistParams:
       x: 3
       y: 0.1
@@ -293,34 +294,34 @@ MonoBehaviour:
       z: -2.2145708
       w: 1.1547005
     gSunBasisX:
-      x: -0.86602545
-      y: 0
-      z: -0.5
+      x: 1
+      y: -0
+      z: 0
       w: 0
     gSunBasisY:
-      x: 0.4768585
-      y: 0.30070585
-      z: -0.8259432
+      x: 0
+      y: 0.5262143
+      z: -0.850352
       w: 0
     gSunDirection:
-      x: 0.15035291
-      y: -0.953717
-      z: -0.2604189
+      x: -0
+      y: 0.8503521
+      z: 0.52621436
       w: 0
     gCameraGlobalPos:
-      x: 2.0876894
-      y: 3.66589
-      z: 2.6244807
+      x: -9.416758
+      y: 6.225399
+      z: -7.8868713
       w: 0
     gCameraGlobalPosPrev:
-      x: 2.0876894
-      y: 3.66589
-      z: 2.6244807
+      x: -9.416758
+      y: 6.225399
+      z: -7.8868713
       w: 0
     gViewDirection:
-      x: -0.20530051
-      y: -0.63834035
-      z: -0.74187124
+      x: -0.022350239
+      y: -0.19900575
+      z: 0.9797434
       w: 0
     gHairBaseColor:
       x: 0.1
@@ -352,8 +353,8 @@ MonoBehaviour:
       x: 1191
       y: 621
     gJitter:
-      x: 0
-      y: 0
+      x: -0.000058011585
+      y: 0.0004519705
     gEmissionIntensity: 1
     gNearZ: -0.03
     gSeparator: 0
@@ -368,7 +369,7 @@ MonoBehaviour:
     gAperture: 0
     gFocalDistance: 0.71
     gFocalLength: 0.015804417
-    gTAA: 0.4
+    gTAA: 0.18181819
     gHdrScale: 1
     gExposure: 1
     gMipBias: -0.5
@@ -376,10 +377,10 @@ MonoBehaviour:
     gIndirectDiffuse: 1
     gIndirectSpecular: 1
     gMinProbability: 0
-    gSharcMaxAccumulatedFrameNum: 3
+    gSharcMaxAccumulatedFrameNum: 9
     gDenoiserType: 0
     gDisableShadowsAndEnableImportanceSampling: 0
-    gFrameIndex: 27031
+    gFrameIndex: 1551
     gForcedMaterial: 0
     gUseNormalMap: 1
     gBounceNum: 1
@@ -421,7 +422,7 @@ MonoBehaviour:
     lightBufferParams:
       localLightBufferRegion:
         firstLightIndex: 0
-        numLights: 3976
+        numLights: 0
         pad1: 0
         pad2: 0
       infiniteLightBufferRegion:
@@ -446,12 +447,12 @@ MonoBehaviour:
         pad1: 0
         pad2: 0
       bufferIndices:
-        initialSamplingOutputBufferIndex: 1
-        temporalResamplingInputBufferIndex: 0
-        temporalResamplingOutputBufferIndex: 1
-        spatialResamplingInputBufferIndex: 1
-        spatialResamplingOutputBufferIndex: 2
-        shadingInputBufferIndex: 1
+        initialSamplingOutputBufferIndex: 2
+        temporalResamplingInputBufferIndex: 1
+        temporalResamplingOutputBufferIndex: 2
+        spatialResamplingInputBufferIndex: 2
+        spatialResamplingOutputBufferIndex: 0
+        shadingInputBufferIndex: 2
         pad1: 0
         pad2: 0
       initialSamplingParams:
@@ -473,7 +474,7 @@ MonoBehaviour:
         enableBoilingFilter: 1
         boilingFilterStrength: 0.2
         discardInvisibleSamples: 0
-        uniformRandomNumber: 2915519480
+        uniformRandomNumber: 1173988267
         pad2: 0
         pad3: 0
       spatialResamplingParams:
@@ -494,7 +495,7 @@ MonoBehaviour:
         pad1: 0
         pad2: 0
         pad3: 0
-    frameIndex: 7396
+    frameIndex: 2678
     numInitialSamples: 16
     numSpatialSamples: 3
     useAccurateGBufferNormal: 0

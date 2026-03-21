@@ -213,6 +213,7 @@ namespace PathTracing
         public float sssMaxSampleRadius = 0.004f;
 
         [Header("RTXDI")]
+        public bool enableRtxdi;
         [Range(0, 16)]
         public uint localLightSamples;
         [Range(0, 16)]
