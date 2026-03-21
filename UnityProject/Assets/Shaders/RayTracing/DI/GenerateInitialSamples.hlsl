@@ -15,7 +15,7 @@ Texture2D<uint> gOut_GeoNormal;
 Texture2D<float> gIn_PrevViewZ;
 Texture2D<float4> gIn_PrevNormalRoughness;
 Texture2D<float4> gIn_PrevBaseColorMetalness;
-Texture2D<uint>   gIn_PrevGeoNormal;
+Texture2D<uint> gIn_PrevGeoNormal;
 
 RWTexture2D<float3> gOut_DirectLighting;
 
@@ -33,30 +33,19 @@ RWTexture2D<float3> gOut_DirectLighting;
 [shader("raygeneration")]
 void MainRayGenShader()
 {
-    uint2 pixelPos = DispatchRaysIndex().xy;
-    
-    // Test RTXDI
+    uint2 GlobalIndex = DispatchRaysIndex().xy;
+
+    const RTXDI_RuntimeParameters params = g_Const.runtimeParams;
+
+    uint2 pixelPosition = RTXDI_ReservoirPosToPixelPos(GlobalIndex, params.activeCheckerboardField);
+
+    RAB_RandomSamplerState rng = RAB_InitRandomSampler(pixelPosition, 1);
+    RAB_RandomSamplerState tileRng = RAB_InitRandomSampler(pixelPosition / RTXDI_TILE_SIZE_IN_PIXELS, 1);
+
+    RAB_Surface surface = RAB_GetGBufferSurface(pixelPosition, false);
 
     const RTXDI_LightBufferParameters lightBufferParams = g_Const.lightBufferParams;
 
-    RAB_Surface primarySurface =  RAB_GetGBufferSurface(pixelPos,false);
-
-    RTXDI_DIReservoir reservoir = RTXDI_EmptyDIReservoir();
-
-    RAB_RandomSamplerState rng = RAB_InitRandomSampler(pixelPos, 1);
-
-    // RTXDI_SampleParameters sampleParams = RTXDI_InitSampleParameters(
-    //     g_Const.numInitialSamples, // local light samples 
-    //     // 局部光源采样数
-    //     0, // infinite light samples
-    //     // 无限光源采样数
-    //     0, // environment map samples
-    //     // 环境贴图采样数
-    //     g_Const.numInitialBRDFSamples,
-    //     g_Const.brdfCutoff,
-    //     0.001f);
-    
-    
     RTXDI_SampleParameters sampleParams = RTXDI_InitSampleParameters(
         g_Const.restirDI.initialSamplingParams.numPrimaryLocalLightSamples,
         g_Const.restirDI.initialSamplingParams.numPrimaryInfiniteLightSamples,
@@ -65,42 +54,19 @@ void MainRayGenShader()
         g_Const.restirDI.initialSamplingParams.brdfCutoff,
         0.001f);
 
-    // Generate the initial sample
-    RAB_LightSample lightSample = RAB_EmptyLightSample();
-    RTXDI_DIReservoir localReservoir = RTXDI_SampleLocalLights(rng, rng, primarySurface, sampleParams, ReSTIRDI_LocalLightSamplingMode_UNIFORM, lightBufferParams.localLightBufferRegion, lightSample);
-    RTXDI_CombineDIReservoirs(reservoir, localReservoir, 0.5, localReservoir.targetPdf);
 
+    RAB_LightSample lightSample;
+    RTXDI_DIReservoir reservoir = RTXDI_SampleLightsForSurface(rng, tileRng, surface,
+                                                               sampleParams, g_Const.lightBufferParams, g_Const.restirDI.initialSamplingParams.localLightSamplingMode,
+                                                               lightSample);
 
-    // Resample BRDF samples.
-    RAB_LightSample brdfSample = RAB_EmptyLightSample();
-    RTXDI_DIReservoir brdfReservoir = RTXDI_SampleBrdf(rng, primarySurface, sampleParams, lightBufferParams, brdfSample);
-    bool selectBrdf = RTXDI_CombineDIReservoirs(reservoir, brdfReservoir, RAB_GetNextRandom(rng), brdfReservoir.targetPdf);
-    if (selectBrdf)
+    if (g_Const.restirDI.initialSamplingParams.enableInitialVisibility && RTXDI_IsValidDIReservoir(reservoir))
     {
-        lightSample = brdfSample;
-    }
-
-    RTXDI_FinalizeResampling(reservoir, 1.0, 1.0);
-    reservoir.M = 1;
-
-    // BRDF was generated with a trace so no need to trace visibility again
-    // BRDF 是通过追踪生成的，因此无需再次追踪可见性
-    if (RTXDI_IsValidDIReservoir(reservoir) && !selectBrdf)
-    // if (RTXDI_IsValidDIReservoir(reservoir))
-    {
-        // See if the initial sample is visible from the surface
-        // 查看初始样本对于表面是否可见
-        if (!RAB_GetConservativeVisibility(primarySurface, lightSample))
+        if (!RAB_GetConservativeVisibility(surface, lightSample))
         {
-            // If not visible, discard the sample (but keep the M)
-            // 如果不可见，则丢弃样本（但保留 M 值）
             RTXDI_StoreVisibilityInDIReservoir(reservoir, 0, true);
         }
     }
 
-    RTXDI_StoreDIReservoir(reservoir, g_Const.restirDI.reservoirBufferParams, pixelPos, g_Const.restirDI.bufferIndices.initialSamplingOutputBufferIndex);
-    // RTXDI_StoreDIReservoir(reservoir, g_Const.restirDIReservoirBufferParams, pixelPos, g_Const.outputBufferIndex);
-
-
-    
+    RTXDI_StoreDIReservoir(reservoir, g_Const.restirDI.reservoirBufferParams, GlobalIndex, g_Const.restirDI.bufferIndices.initialSamplingOutputBufferIndex);
 }
