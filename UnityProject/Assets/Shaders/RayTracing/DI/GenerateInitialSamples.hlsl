@@ -45,15 +45,24 @@ void MainRayGenShader()
 
     RAB_RandomSamplerState rng = RAB_InitRandomSampler(pixelPos, 1);
 
+    // RTXDI_SampleParameters sampleParams = RTXDI_InitSampleParameters(
+    //     g_Const.numInitialSamples, // local light samples 
+    //     // 局部光源采样数
+    //     0, // infinite light samples
+    //     // 无限光源采样数
+    //     0, // environment map samples
+    //     // 环境贴图采样数
+    //     g_Const.numInitialBRDFSamples,
+    //     g_Const.brdfCutoff,
+    //     0.001f);
+    
+    
     RTXDI_SampleParameters sampleParams = RTXDI_InitSampleParameters(
-        g_Const.numInitialSamples, // local light samples 
-        // 局部光源采样数
-        0, // infinite light samples
-        // 无限光源采样数
-        0, // environment map samples
-        // 环境贴图采样数
-        g_Const.numInitialBRDFSamples,
-        g_Const.brdfCutoff,
+        g_Const.restirDI.initialSamplingParams.numPrimaryLocalLightSamples,
+        g_Const.restirDI.initialSamplingParams.numPrimaryInfiniteLightSamples,
+        g_Const.restirDI.initialSamplingParams.numPrimaryEnvironmentSamples,
+        g_Const.restirDI.initialSamplingParams.numPrimaryBrdfSamples,
+        g_Const.restirDI.initialSamplingParams.brdfCutoff,
         0.001f);
 
     // Generate the initial sample

@@ -423,6 +423,11 @@ namespace PathTracing
             _constantBuffer.SetData(_globalConstantsArray);
 
             resamplingConstants = GetResamplingConstants(restirDiContext, rtxdiResources, frameState);
+
+            var ss = resamplingConstants.ToString();
+            // Debug.Log($"Resampling Constants:\n{ss}");
+            
+            
             _resamplingConstantsArray[0] = resamplingConstants;
             _resamplingConstantBuffer.SetData(_resamplingConstantsArray);
 
@@ -934,6 +939,11 @@ namespace PathTracing
             restirDiContext.SetFrameIndex(frameState.FrameIndex);
 
             restirDiContext.SetResamplingMode(pathTracingSetting.resamplingMode);
+            restirDiContext.SetInitialSamplingParameters(pathTracingSetting.initialSamplingParams);
+            restirDiContext.SetTemporalResamplingParameters(pathTracingSetting.temporalResamplingParams);
+            restirDiContext.SetSpatialResamplingParameters(pathTracingSetting.spatialResamplingParams);
+            restirDiContext.SetShadingParameters(pathTracingSetting.shadingParams);
+
 
             var resamplingConstants = new ResamplingConstants
             {
@@ -952,21 +962,21 @@ namespace PathTracing
             resamplingConstants.restirDIReservoirBufferParams = restirDiContext.GetReservoirBufferParameters();
 
             resamplingConstants.frameIndex = restirDiContext.GetFrameIndex();
-            resamplingConstants.numInitialSamples = pathTracingSetting.localLightSamples;
-            resamplingConstants.numSpatialSamples = pathTracingSetting.spatialSamples;
-            resamplingConstants.useAccurateGBufferNormal = 0;
-            resamplingConstants.numInitialBRDFSamples = pathTracingSetting.brdfSamples;
-            resamplingConstants.brdfCutoff = 0;
+            // resamplingConstants.numInitialSamples = pathTracingSetting.localLightSamples;
+            // resamplingConstants.numSpatialSamples = pathTracingSetting.spatialSamples;
+            // resamplingConstants.useAccurateGBufferNormal = 0;
+            // resamplingConstants.numInitialBRDFSamples = pathTracingSetting.brdfSamples;
+            // resamplingConstants.brdfCutoff = 0;
             resamplingConstants.pad2 = new uint2(0, 0);
-            resamplingConstants.enableResampling = pathTracingSetting.enableTemporalResampling ? 1u : 0u;
-            resamplingConstants.unbiasedMode = 1;
+            // resamplingConstants.enableResampling = pathTracingSetting.enableTemporalResampling ? 1u : 0u;
+            // resamplingConstants.unbiasedMode = 1;
 
 
-            ReSTIRDI_Parameters reStirdiParameters = new ReSTIRDI_Parameters();
+            var restirDiParameters = new ReSTIRDI_Parameters();
 
-            reStirdiParameters = FillReSTIRDIConstants(reStirdiParameters, restirDiContext, resamplingConstants.lightBufferParams);
+            restirDiParameters = FillReSTIRDIConstants(restirDiParameters, restirDiContext, resamplingConstants.lightBufferParams);
 
-            resamplingConstants.restirDI = reStirdiParameters;
+            resamplingConstants.restirDI = restirDiParameters;
 
             return resamplingConstants;
         }

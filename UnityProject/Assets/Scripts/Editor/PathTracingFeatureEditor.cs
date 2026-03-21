@@ -202,7 +202,7 @@ namespace PathTracing
         // 判断是否是直接绘制的底层类型
         private bool IsSimpleType(System.Type type)
         {
-            return type.IsPrimitive ||
+            return type.IsPrimitive ||type.IsEnum || 
                    type == typeof(float) || type == typeof(int) || type == typeof(uint) ||
                    type == typeof(float2) || type == typeof(float3) || type == typeof(float4) ||
                    type == typeof(float4x4) || type == typeof(Vector2) || type == typeof(Vector3) ||
@@ -212,6 +212,11 @@ namespace PathTracing
         // 绘制具体的字段值
         private void DrawSimpleField(string label, object value)
         {
+            if (value is System.Enum enumValue)
+            {
+                EditorGUILayout.EnumPopup(label, enumValue);
+                return;
+            }
             if (value is float4x4 m)
             {
                 EditorGUILayout.LabelField(label);

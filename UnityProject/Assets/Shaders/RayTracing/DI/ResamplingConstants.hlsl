@@ -1,28 +1,17 @@
-
 #include "Assets/Shaders/Rtxdi/DI/ReSTIRDIParameters.h"
 
 struct ResamplingConstants
 {
     RTXDI_RuntimeParameters runtimeParams;
-    
+
     RTXDI_LightBufferParameters lightBufferParams;
     RTXDI_ReservoirBufferParameters restirDIReservoirBufferParams;
-    
+
     ReSTIRDI_Parameters restirDI;
-    
+
     uint frameIndex;
-    uint numInitialSamples;
-    uint numSpatialSamples;
-    uint useAccurateGBufferNormal;
-
-    uint numInitialBRDFSamples;
-    float brdfCutoff;
     uint2 pad2;
-
-    uint enableResampling;
-    uint unbiasedMode;
-    uint inputBufferIndex;
-    uint outputBufferIndex;
+    uint pad3;
 };
 
 RWStructuredBuffer<ResamplingConstants> ResampleConstants;

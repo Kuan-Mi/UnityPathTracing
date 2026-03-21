@@ -235,6 +235,11 @@ namespace PathTracing
 
         public ReSTIRDI_ResamplingMode resamplingMode;
         public bool gShowLight;
+        
+        public ReSTIRDI_InitialSamplingParameters initialSamplingParams;
+        public ReSTIRDI_TemporalResamplingParameters temporalResamplingParams;
+        public ReSTIRDI_SpatialResamplingParameters spatialResamplingParams;
+        public ReSTIRDI_ShadingParameters shadingParams;
 
         [FoldoutHeader("参考路径追踪")]
         public bool useReferencePathTracing;
