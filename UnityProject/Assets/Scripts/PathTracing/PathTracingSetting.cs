@@ -69,9 +69,11 @@ namespace PathTracing
         [FoldoutHeader("Base Settings")]
         [Range(0.001f, 10f)]
         public float sunAngularDiameter = 0.533f;
-
-        [Range(0.1f, 100f)]
-        public float exposure = 1.0f;
+  
+        [Range(-10f, 10f)] 
+        public float exposureEv = 0.0f;
+        
+        public float exposure => Mathf.Pow(2, exposureEv);
 
         public UpscalerMode upscalerMode = UpscalerMode.NATIVE;
 

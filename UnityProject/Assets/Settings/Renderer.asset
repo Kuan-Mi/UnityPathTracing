@@ -69,33 +69,12 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::PathTracing.PathTracingFeature
   m_Active: 1
   pathTracingSetting:
-    sunAngularDiameter: 0.69
-    denoisingRange: 1000
-    splitScreen: 0
-    isBaseColorMetalnessAvailable: 1
-    planeDistanceSensitivity: 0.02
-    maxStabilizedFrameNum: 5
     showMode: 18
-    showMV: 0
+    showMv: 0
     showValidation: 0
-    dofAperture: 0
-    dofFocalDistance: 0.71
-    exposure: 1
-    enableAutoExposure: 0
-    aeEVMin: -10
-    aeEVMax: 10
-    aeLowPercent: 0.05
-    aeHighPercent: 0.95
-    aeAdaptationSpeedUp: 2
-    aeAdaptationSpeedDown: 1
-    aeExposureCompensation: 0
-    aeMinExposure: 0.01
-    aeMaxExposure: 1000
-    rpp: 1
-    bounceNum: 1
-    sharcDownscale: 4
-    sharcSceneScale: 45
-    sharcDebug: 0
+    sunAngularDiameter: 0.69
+    exposureEv: -2.18
+    upscalerMode: 0
     mipBias: -0.5
     tracingMode: 1
     denoiser: 0
@@ -116,7 +95,28 @@ MonoBehaviour:
     RR: 1
     tmpDisableRR: 0
     resolutionScale: 1
-    upscalerMode: 0
+    denoisingRange: 1000
+    splitScreen: 0
+    isBaseColorMetalnessAvailable: 1
+    planeDistanceSensitivity: 0.02
+    maxStabilizedFrameNum: 5
+    dofAperture: 0
+    dofFocalDistance: 0.71
+    enableAutoExposure: 0
+    aeEVMin: -10
+    aeEVMax: 10
+    aeLowPercent: 0.05
+    aeHighPercent: 0.95
+    aeAdaptationSpeedUp: 2
+    aeAdaptationSpeedDown: 1
+    aeExposureCompensation: 0
+    aeMinExposure: 0.01
+    aeMaxExposure: 1000
+    rpp: 1
+    bounceNum: 1
+    sharcDownscale: 4
+    sharcSceneScale: 45
+    sharcDebug: 0
     sssScatteringColor: {r: 3.5, g: 4, b: 3, a: 1}
     sssMinThreshold: -0.043
     sssTransmissionBsdfSampleCount: 6
