@@ -18,7 +18,10 @@ namespace PathTracing
     public class PathTracingFeature : ScriptableRendererFeature
     {
         public PathTracingSetting pathTracingSetting;
+        
+        [System.NonSerialized] 
         public GlobalConstants globalConstants;
+        [System.NonSerialized] 
         public ResamplingConstants resamplingConstants;
 
         public RenderPassEvent renderPassEvent = RenderPassEvent.BeforeRenderingPostProcessing;
@@ -985,7 +988,7 @@ namespace PathTracing
 
         protected override void Dispose(bool disposing)
         {
-            Debug.LogWarning("PathTracingFeature Dispose");
+            Debug.Log("PathTracingFeature Dispose");
             base.Dispose(disposing);
 
             _accelerationStructure?.Dispose();
