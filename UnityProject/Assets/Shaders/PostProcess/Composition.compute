@@ -12,7 +12,7 @@ Texture2D<float4> gIn_Normal_Roughness;
 Texture2D<float4> gIn_BaseColor_Metalness;
 Texture2D<float3> gIn_DirectLighting;
 Texture2D<float3> gIn_DirectEmission;
-// Texture2D<float3> gIn_SpotDirect;
+
 Texture2D<float3> gIn_PsrThroughput;
 Texture2D<float4> gIn_Shadow;
 Texture2D<float4> gIn_Diff;

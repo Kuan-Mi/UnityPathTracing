@@ -41,6 +41,7 @@ namespace Rtxdi
         public uint pad1;
     }
 
+    [System.Serializable]
     [StructLayout(LayoutKind.Sequential)]
     public struct RTXDI_LightBufferRegion
     {
@@ -50,6 +51,7 @@ namespace Rtxdi
         public uint pad2;
     }
 
+    [System.Serializable]
     [StructLayout(LayoutKind.Sequential)]
     public struct RTXDI_EnvironmentLightBufferParameters
     {
@@ -58,7 +60,8 @@ namespace Rtxdi
         public uint pad1;
         public uint pad2;
     }
-
+    
+    [System.Serializable]
     [StructLayout(LayoutKind.Sequential)]
     public struct RTXDI_RuntimeParameters
     {
@@ -68,6 +71,7 @@ namespace Rtxdi
         public uint pad2;
     }
 
+    [System.Serializable]
     [StructLayout(LayoutKind.Sequential)]
     public struct RTXDI_LightBufferParameters
     {
@@ -76,6 +80,7 @@ namespace Rtxdi
         public RTXDI_EnvironmentLightBufferParameters environmentLightParams;
     }
 
+    [System.Serializable]
     [StructLayout(LayoutKind.Sequential)]
     public struct RTXDI_ReservoirBufferParameters
     {

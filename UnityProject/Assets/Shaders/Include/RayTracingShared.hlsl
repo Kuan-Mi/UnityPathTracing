@@ -252,6 +252,59 @@ float3 GetLighting(GeometryProps geometryProps, MaterialProps materialProps, uin
 // Compile-time flags for "GenerateRayAndUpdateThroughput"
 #define HAIR 0x1
 
+float3 GenerateRayAndUpdateThroughput(inout GeometryProps geometryProps, inout MaterialProps materialProps, inout float3 throughput, bool isDiffuse, float2 rnd)
+{
+    float3x3 mLocalBasis = Geometry::GetBasis(materialProps.N);
+    float3 Vlocal = Geometry::RotateVector(mLocalBasis, geometryProps.V);
+
+    // Importance sampling
+
+    float3 candidateRayLocal;
+
+    if (isDiffuse)
+        candidateRayLocal = ImportanceSampling::Cosine::GetRay(rnd);
+    else
+    {
+        float3 Hlocal = ImportanceSampling::VNDF::GetRay(rnd, materialProps.roughness, Vlocal, PT_SPEC_LOBE_ENERGY);
+        candidateRayLocal = reflect(-Vlocal, Hlocal);
+    }
+
+    float3 rayLocal = candidateRayLocal;
+
+    // Update throughput
+    float3 albedo, Rf0;
+    BRDF::ConvertBaseColorMetalnessToAlbedoRf0(materialProps.baseColor, materialProps.metalness, albedo, Rf0);
+
+    float3 Nlocal = float3(0, 0, 1);
+    float3 Hlocal = normalize(Vlocal + rayLocal);
+
+    float NoL = saturate(dot(Nlocal, rayLocal));
+    float VoH = abs(dot(Vlocal, Hlocal));
+
+    if (isDiffuse)
+    {
+        float NoV = abs(dot(Nlocal, Vlocal));
+
+        // NoL is canceled by "Cosine::GetPDF"
+        throughput *= albedo;
+        throughput *= Math::Pi(1.0) * BRDF::DiffuseTerm_Burley(materialProps.roughness, NoL, NoV, VoH); // PI / PI
+    }
+    else
+    {
+        // See paragraph "Usage in Monte Carlo renderer" from http://jcgt.org/published/0007/04/01/paper.pdf
+        float3 F = BRDF::FresnelTerm_Schlick(Rf0, VoH);
+
+        throughput *= F;
+        throughput *= BRDF::GeometryTerm_Smith(materialProps.roughness, NoL);
+    }
+
+    // Transform to world space
+    float3 ray = Geometry::RotateVectorInverse(mLocalBasis, rayLocal);
+
+    return ray;
+}
+
+
 float3 GenerateRayAndUpdateThroughput(inout GeometryProps geometryProps, inout MaterialProps materialProps, inout float3 throughput, uint sampleMaxNum, bool isDiffuse, float2 rnd, uint flags)
 {
     // bool isHair = ( flags & HAIR ) != 0 && RTXCR_INTEGRATION == 1 && geometryProps.Has( FLAG_HAIR );
@@ -329,7 +382,7 @@ float3 GenerateRayAndUpdateThroughput(inout GeometryProps geometryProps, inout M
         throughput *= float(emissiveHitNum) / float(sampleMaxNum);
 
     // Update throughput
-#if( NRD_MODE < OCCLUSION )
+    #if( NRD_MODE < OCCLUSION )
     float3 albedo, Rf0;
     BRDF::ConvertBaseColorMetalnessToAlbedoRf0(materialProps.baseColor, materialProps.metalness, albedo, Rf0);
 
@@ -383,7 +436,7 @@ float3 GenerateRayAndUpdateThroughput(inout GeometryProps geometryProps, inout M
         else
             throughput /= 1.0 - LEAF_TRANSLUCENCY;
     }
-#endif
+    #endif
 
     // Transform to world space
     float3 ray = Geometry::RotateVectorInverse(mLocalBasis, rayLocal);

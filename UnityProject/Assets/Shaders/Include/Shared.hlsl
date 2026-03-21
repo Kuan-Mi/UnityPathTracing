@@ -29,7 +29,7 @@
 #define USE_IMPORTANCE_SAMPLING             1
 #define USE_SHARC_DITHERING                 1.5 // radius in voxels
 #define USE_TRANSLUCENCY                    1 // translucent foliage
-#define USE_MOVING_EMISSION_FIX             1 // fixes a dark tail, left by an animated emissive object
+#define USE_MOVING_EMISSION_FIX             0 // fixes a dark tail, left by an animated emissive object
 
 // Default = 0
 #define USE_SANITIZATION                    0 // NRD sample is NAN/INF free
@@ -44,7 +44,7 @@
 #define USE_RANDOMIZED_ROUGHNESS            0 // randomize roughness ( a common case in games )
 #define USE_STOCHASTIC_SAMPLING             0 // needed?
 #define USE_LOAD                            0 // Load vs SampleLevel
-#define USE_SHARC_DEBUG                     0 // 1 - show cache, 2 - show grid (NRD sample recompile required)
+#define USE_SHARC_DEBUG                     sharcDebug // 1 - show cache, 2 - show grid (NRD sample recompile required)
 #define USE_TAA_DEBUG                       0 // 1 - show weight
 #define USE_BIAS_FIX                        0 // fixes negligible hair and specular bias
 
@@ -126,8 +126,8 @@
 
 // Spatial HAsh-based Radiance Cache ( SHARC )
 #define SHARC_CAPACITY                      ( 1 << 23 )
-#define SHARC_SCENE_SCALE                   45.0
-#define SHARC_DOWNSCALE                     4
+#define SHARC_SCENE_SCALE                   gSharcSceneScale 
+// #define SHARC_DOWNSCALE                     4
 #define SHARC_ANTI_FIREFLY                  false
 #define SHARC_STALE_FRAME_NUM_MIN           32 // new version uses 8 by default, old value offers more stability in voxels with low number of samples ( critical for glass )
 #define SHARC_SEPARATE_EMISSIVE             1
@@ -252,6 +252,9 @@ cbuffer PathTracingParams : register(b0)
     float gSssMaxSampleRadius;
     float gIsEditor;
     uint gShowLight;
+    float gSharcDownscale;
+    float gSharcSceneScale;
+    uint sharcDebug;
 };
 
 

@@ -126,7 +126,7 @@ void MainRayGenShader()
     Rng::Hash::Initialize(pixelPos, gFrameIndex);
 
     // Sample position
-    float2 sampleUv = (pixelPos + 0.5 + gJitter * gRectSize) * SHARC_DOWNSCALE * gInvRectSize;
+    float2 sampleUv = (pixelPos + 0.5 + gJitter * gRectSize) * gSharcDownscale * gInvRectSize;
 
 
     // Primary ray
@@ -141,7 +141,7 @@ void MainRayGenShader()
     GeometryProps geometryProps;
     MaterialProps materialProps;
     float eta = BRDF::IOR::Air / BRDF::IOR::Glass;
-    float2 mip = GetConeAngleFromAngularRadius(0.0, gTanPixelAngularRadius * SHARC_DOWNSCALE);
+    float2 mip = GetConeAngleFromAngularRadius(0.0, gTanPixelAngularRadius * gSharcDownscale);
 
     
     // CastRay(Xoffset, ray, 0.0, INF, mip, GEOMETRY_ALL, geometryProps, materialProps);

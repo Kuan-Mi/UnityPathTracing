@@ -71,11 +71,51 @@ float getSurfaceDiffuseProbability(RAB_Surface surface)
     // return dot(surface.viewDir, surface.normal);
     RAB_Material material = RAB_GetMaterial(surface);
     float diffuseWeight = calcLuminance(material.diffuseAlbedo);
-    
+
     // return diffuseWeight;
     float specularWeight = calcLuminance(Schlick_Fresnel(material.specularF0, dot(surface.viewDir, surface.normal)));
     float sumWeights = diffuseWeight + specularWeight;
     return sumWeights < 1e-7f ? 1.f : (diffuseWeight / sumWeights);
+}
+
+RAB_Surface GetGBufferSurface(int2 pixelPosition,
+                              float4x4 ViewToWorld,
+                              float3 cameraGlobalPos,
+                              Texture2D<float> viewZ,
+                              Texture2D<float4> normalRoughness,
+                              Texture2D<float4> base_color_metalness,
+                              Texture2D<uint> geo_normal)
+{
+    RAB_Surface surface = RAB_EmptySurface();
+
+
+    surface.viewDepth = viewZ[pixelPosition];
+
+    if (surface.viewDepth == BACKGROUND_DEPTH)
+        return surface;
+
+    float4 Normal_RoughnessPacked = normalRoughness[pixelPosition];
+    float4 Normal_Roughness = NRD_FrontEnd_UnpackNormalAndRoughness(Normal_RoughnessPacked);
+    float3 Normal = Normal_Roughness.xyz;
+    float Roughness = Normal_Roughness.w;
+
+    float3 GeoNormal = octToNdirUnorm32(geo_normal[pixelPosition]);
+
+    surface.normal = Normal;
+    surface.geoNormal = GeoNormal;
+    surface.material = RAB_GetGBufferMaterial(pixelPosition, Roughness,base_color_metalness);
+
+
+    float2 sampleUv = (float2(pixelPosition) + 0.5f) / gRectSize;
+
+    float3 Xv = Geometry::ReconstructViewPosition(sampleUv, gCameraFrustum, surface.viewDepth, gOrthoMode);
+
+    float3 X = Geometry::AffineTransform(ViewToWorld, Xv);
+
+    surface.worldPos = X;
+    surface.viewDir = normalize(cameraGlobalPos - surface.worldPos);
+    surface.diffuseProbability = getSurfaceDiffuseProbability(surface);
+    return surface;
 }
 
 // Load a sample from the previous G-buffer.
@@ -84,61 +124,28 @@ float getSurfaceDiffuseProbability(RAB_Surface surface)
 // 应调用 RAB_GetGBufferMaterial 来填充其 RAB_Material 数据。
 RAB_Surface RAB_GetGBufferSurface(int2 pixelPosition, bool previousFrame)
 {
-    RAB_Surface surface = RAB_EmptySurface();
-
-    // We do not have access to the current G-buffer in this sample because it's using
-    // a single render pass with a fused resampling kernel, so just return an invalid surface.
-    // This should never happen though, as the fused kernel doesn't call RAB_GetGBufferSurface(..., false)
-    
-    // 由于此示例使用的是融合重采样内核的单次渲染通道，因此我们无法访问当前的 G 缓冲区，所以返回的是一个无效的表面。
-    // 但这种情况不应该发生，因为融合内核不会调用 RAB_GetGBufferSurface(..., false)。
-    if (!previousFrame)
-        return surface;
-
-    // const PlanarViewConstants view = g_Const.prevView;
-
-    if (any(pixelPosition >= gRectSize))
-        return surface;
-
-    surface.viewDepth = gIn_PrevViewZ[pixelPosition];
-
-    if(surface.viewDepth == BACKGROUND_DEPTH)
-        return surface;
-    
-    
-    float3 BaseColor = Color::FromSrgb(gIn_PrevBaseColorMetalness[pixelPosition].xyz);
-    float Metalness = gIn_PrevBaseColorMetalness[pixelPosition].w;
-    float4 Normal_RoughnessPacked = gIn_PrevNormalRoughness[pixelPosition];
-    float4 Normal_Roughness = NRD_FrontEnd_UnpackNormalAndRoughness(Normal_RoughnessPacked);
-    float3 Normal = Normal_Roughness.xyz;
-    float Roughness = Normal_Roughness.w;
-    
-    
-    surface.normal = Normal;
-    surface.geoNormal = Normal;
-    surface.material = RAB_GetGBufferMaterial(pixelPosition);
-    
-    
-    float2 sampleUv = (float2(pixelPosition) + 0.5f) / gRectSize;
-    
-    float3 Xv = Geometry::ReconstructViewPosition(sampleUv, gCameraFrustum, surface.viewDepth, gOrthoMode);
-     
-    float3 X = Geometry::AffineTransform(gViewToWorldPrev, Xv);
-    
-    surface.worldPos = X;
-    surface.viewDir = normalize(gCameraGlobalPosPrev - surface.worldPos);
-    surface.diffuseProbability = getSurfaceDiffuseProbability(surface);
-
-
-    // surface.normal = octToNdirUnorm32(t_PrevGBufferNormals[pixelPosition]);
-    // surface.geoNormal = octToNdirUnorm32(t_PrevGBufferGeoNormals[pixelPosition]);
-    // float4 specularRough = Unpack_R8G8B8A8_Gamma_UFLOAT(t_PrevGBufferSpecularRough[pixelPosition]);
-    // surface.material = RAB_GetGBufferMaterial(pixelPosition, view, u_GBufferDiffuseAlbedo, u_GBufferSpecularRough);
-    // surface.worldPos = viewDepthToWorldPos(view, pixelPosition, surface.viewDepth);
-    // surface.viewDir = normalize(g_Const.view.cameraDirectionOrPosition.xyz - surface.worldPos);
-    // surface.diffuseProbability = getSurfaceDiffuseProbability(surface);
-
-    return surface;
+    if (previousFrame)
+    {
+        return GetGBufferSurface(
+            pixelPosition,
+            gViewToWorldPrev,
+            gCameraGlobalPosPrev,
+            gIn_PrevViewZ,
+            gIn_PrevNormalRoughness,
+            gIn_PrevBaseColorMetalness,
+            gIn_PrevGeoNormal);
+    }
+    else
+    {
+        return GetGBufferSurface(
+            pixelPosition,
+            gViewToWorld,
+            gCameraGlobalPos,
+            gOut_ViewZ,
+            gOut_Normal_Roughness,
+            gOut_BaseColor_Metalness,
+            gOut_GeoNormal);
+    }
 }
 
 // 将世界空间方向转换为切线空间方向
@@ -147,7 +154,7 @@ float3 worldToTangent(RAB_Surface surface, float3 w)
     // reconstruct tangent frame based off worldspace normal
     // this is ok for isotropic BRDFs
     // for anisotropic BRDFs, we need a user defined tangent
-    
+
     // 基于世界空间法线重建切线坐标系
     // 这对于各向同性BRDF是可以接受的
     // 对于各向异性BRDF，我们需要用户定义的切线坐标系
@@ -164,7 +171,7 @@ float3 tangentToWorld(RAB_Surface surface, float3 h)
     // reconstruct tangent frame based off worldspace normal
     // this is ok for isotropic BRDFs
     // for anisotropic BRDFs, we need a user defined tangent
-    
+
     // 基于世界空间法线重建切线坐标系
     // 这对于各向同性BRDF是可以接受的
     // 对于各向异性BRDF，我们需要用户定义的切线坐标系

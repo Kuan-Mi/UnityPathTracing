@@ -1001,6 +1001,7 @@ namespace Color
 
     ML_INLINE float3 HdrToLinear_Uncharted( float3 colorMulExposure, float whitePoint = 11.2f )
     {
+        return colorMulExposure;
         // John Hable's Uncharted 2 filmic tone mappping
         return _UnchartedCurve( colorMulExposure ) / _UnchartedCurve( whitePoint ).x;
     }

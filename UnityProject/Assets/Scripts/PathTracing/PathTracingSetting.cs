@@ -1,4 +1,5 @@
-﻿using UnityEngine;
+﻿using Rtxdi.DI;
+using UnityEngine;
 
 namespace PathTracing
 {
@@ -144,6 +145,13 @@ namespace PathTracing
         [Range(1, 4)]
         public uint bounceNum = 1;
 
+        [Header("SHARC")]
+        [Range(1, 8)]
+        public float sharcDownscale = 4;
+        [Range(10, 100)]
+        public float sharcSceneScale = 45;
+        public bool sharcDebug = false;
+
         public float mipBias = -0.5f;
 
         public RESOLUTION tracingMode = RESOLUTION.RESOLUTION_FULL_PROBABILISTIC;
@@ -205,6 +213,7 @@ namespace PathTracing
         public float sssMaxSampleRadius = 0.004f;
 
         [Header("RTXDI")]
+        public bool enableRtxdi;
         [Range(0, 16)]
         public uint localLightSamples;
         [Range(0, 16)]
@@ -213,8 +222,24 @@ namespace PathTracing
         [Range(0, 16)]
         public uint brdfSamples;
 
-        public bool enableResampling;
+        public bool enableSpatialResampling => resamplingMode is ReSTIRDI_ResamplingMode.Spatial or ReSTIRDI_ResamplingMode.TemporalAndSpatial;
+        public bool enableTemporalResampling => resamplingMode is ReSTIRDI_ResamplingMode.Temporal or ReSTIRDI_ResamplingMode.TemporalAndSpatial;
+
+        public ReSTIRDI_ResamplingMode resamplingMode; 
         public bool gShowLight;
- 
+        
+        [Header("参考路径追踪")]
+        
+        public bool useReferencePathTracing;
+        
+        [Range(0, 16)]
+        public int referenceBounceNum = 4;
+        
+        [Range(0.0f, 1.0f)]
+        public float split;
+        
+        public bool accumulateReference = true;
+        public bool accumulate = false;
+
     }
 }

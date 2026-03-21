@@ -33,6 +33,7 @@ namespace Rtxdi.DI
         Raytraced = RtxdiConstants.RTXDI_BIAS_CORRECTION_RAY_TRACED,
     }
 
+    [System.Serializable]
     [StructLayout(LayoutKind.Sequential)]
     public struct ReSTIRDI_BufferIndices
     {
@@ -47,6 +48,7 @@ namespace Rtxdi.DI
         public uint pad2;
     }
 
+    [System.Serializable]
     [StructLayout(LayoutKind.Sequential)]
     public struct ReSTIRDI_InitialSamplingParameters
     {
@@ -61,6 +63,7 @@ namespace Rtxdi.DI
         public ReSTIRDI_LocalLightSamplingMode localLightSamplingMode;
     }
 
+    [System.Serializable]
     [StructLayout(LayoutKind.Sequential)]
     public struct ReSTIRDI_TemporalResamplingParameters
     {
@@ -80,6 +83,7 @@ namespace Rtxdi.DI
         public uint pad3;
     }
 
+    [System.Serializable]
     [StructLayout(LayoutKind.Sequential)]
     public struct ReSTIRDI_SpatialResamplingParameters
     {
@@ -94,6 +98,7 @@ namespace Rtxdi.DI
         public uint discountNaiveSamples;
     }
 
+    [System.Serializable]
     [StructLayout(LayoutKind.Sequential)]
     public struct ReSTIRDI_ShadingParameters
     {
@@ -108,6 +113,7 @@ namespace Rtxdi.DI
         public uint pad3;
     }
 
+    [System.Serializable]
     [StructLayout(LayoutKind.Sequential)]
     public struct ReSTIRDI_Parameters
     {

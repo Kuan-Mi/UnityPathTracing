@@ -10,6 +10,10 @@ RWTexture2D<float4> gOut_Normal_Roughness;
 RWTexture2D<float3> gOut_Composed;
 RWTexture2D<float4> gInOut_Mv;
 
+
+uint g_ConvergenceStep;
+
+
 struct TraceTransparentDesc
 {
     // Geometry properties
@@ -227,6 +231,8 @@ void MainRayGenShader()
     // Apply exposure
     Lsum = ApplyExposure(Lsum);
 
+    gOut_Composed[pixelPos] = float4(Lsum, 1);
+    
     // Output
-    gOut_Composed[pixelPos] = Lsum;
+    // gOut_Composed[pixelPos] = Lsum;
 }

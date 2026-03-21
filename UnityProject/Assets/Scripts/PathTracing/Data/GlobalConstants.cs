@@ -1,8 +1,10 @@
 ﻿using Rtxdi;
+using Rtxdi.DI;
 using Unity.Mathematics;
 
 namespace PathTracing
 {
+    [System.Serializable]
     public struct GlobalConstants
     {
         public float4x4 gViewToWorld;
@@ -82,6 +84,9 @@ namespace PathTracing
         public float gSssMaxSampleRadius;
         public float gIsEditor;
         public uint gShowLight;
+        public float gSharcDownscale;
+        public float gSharcSceneScale;
+        public uint sharcDebug;
 
 
         public override string ToString()
@@ -185,13 +190,16 @@ namespace PathTracing
         }
     }
 
-    
-    struct ResamplingConstants
+ 
+    [System.Serializable]
+    public struct ResamplingConstants
     {
       public  RTXDI_RuntimeParameters runtimeParams;
       public  RTXDI_LightBufferParameters lightBufferParams;
       public  RTXDI_ReservoirBufferParameters restirDIReservoirBufferParams;
 
+      public ReSTIRDI_Parameters restirDI;
+      
       public  uint frameIndex;
       public  uint numInitialSamples;
       public  uint numSpatialSamples;

@@ -49,7 +49,9 @@ namespace PathTracing
 
         public class Settings
         {
-            internal int2 m_RenderResolution;
+            internal int2 m_RenderResolution;        
+            internal int convergenceStep;
+
         }
 
         class PassData
@@ -88,7 +90,10 @@ namespace PathTracing
             natCmd.SetRayTracingBufferParam(data.TransparentTs, gIn_AreaLightsID, data.Resource.AreaLightBuffer);
             natCmd.SetRayTracingBufferParam(data.TransparentTs, gIn_PointLightsID, data.Resource.PointLightBuffer);
             natCmd.SetRayTracingBufferParam(data.TransparentTs, "_AE_ExposureBuffer", data.Resource.AeExposureBuffer);
+            natCmd.SetRayTracingIntParam(data.TransparentTs, "g_ConvergenceStep", data.Settings.convergenceStep);
 
+            
+            
             natCmd.DispatchRays(data.TransparentTs, "MainRayGenShader", (uint)data.Settings.m_RenderResolution.x, (uint)data.Settings.m_RenderResolution.y, 1);
             natCmd.EndSample(transparentTracingMarker);
         }

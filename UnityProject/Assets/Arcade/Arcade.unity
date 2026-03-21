@@ -131,6 +131,7 @@ GameObject:
   - component: {fileID: 255795360}
   - component: {fileID: 255795359}
   - component: {fileID: 255795358}
+  - component: {fileID: 255795362}
   m_Layer: 0
   m_Name: Cube
   m_TagString: Untagged
@@ -225,12 +226,24 @@ Transform:
   m_GameObject: {fileID: 255795357}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 4.358, y: 0.634, z: -1.097}
-  m_LocalScale: {x: 0.6122578, y: 0.6122578, z: 0.6122578}
+  m_LocalPosition: {x: 3.957, y: 1.71, z: -1.363}
+  m_LocalScale: {x: 0.12965171, y: 0.7668856, z: 0.88090104}
   m_ConstrainProportionsScale: 0
   m_Children: []
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &255795362
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 255795357}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: bd46de2334c135c47bafec0a26b90b9a, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::MeshLight
 --- !u!1001 &308568790
 PrefabInstance:
   m_ObjectHideFlags: 0
@@ -281,7 +294,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: -4864833620444741553, guid: 23a7c2d222024b34288d7a9c98990daa, type: 3}
       propertyPath: m_IsActive
-      value: 0
+      value: 1
       objectReference: {fileID: 0}
     - target: {fileID: -3714074880520146989, guid: 23a7c2d222024b34288d7a9c98990daa, type: 3}
       propertyPath: m_IsActive
@@ -306,8 +319,28 @@ PrefabInstance:
     m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
-    m_AddedComponents: []
+    m_AddedComponents:
+    - targetCorrespondingSourceObject: {fileID: -4864833620444741553, guid: 23a7c2d222024b34288d7a9c98990daa, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 308568792}
   m_SourcePrefab: {fileID: 100100000, guid: 23a7c2d222024b34288d7a9c98990daa, type: 3}
+--- !u!1 &308568791 stripped
+GameObject:
+  m_CorrespondingSourceObject: {fileID: -4864833620444741553, guid: 23a7c2d222024b34288d7a9c98990daa, type: 3}
+  m_PrefabInstance: {fileID: 308568790}
+  m_PrefabAsset: {fileID: 0}
+--- !u!114 &308568792
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 308568791}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: bd46de2334c135c47bafec0a26b90b9a, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::MeshLight
 --- !u!1 &472025887
 GameObject:
   m_ObjectHideFlags: 0
@@ -325,7 +358,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 1
+  m_IsActive: 0
 --- !u!114 &472025888
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -700,8 +733,8 @@ Transform:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 892357417}
   serializedVersion: 2
-  m_LocalRotation: {x: -0.0031904909, y: -0.97316706, z: 0.23007776, w: 0.00023695827}
-  m_LocalPosition: {x: 1.616063, y: 1.5353591, z: 1.9322002}
+  m_LocalRotation: {x: -0.1260336, y: 0.8831185, z: -0.2853252, w: -0.35043812}
+  m_LocalPosition: {x: 3.228972, y: 3.51516, z: 2.5563638}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -972,13 +1005,13 @@ Transform:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 2135674571}
   serializedVersion: 2
-  m_LocalRotation: {x: 0.40821788, y: -0.23456968, z: 0.10938163, w: 0.8754261}
+  m_LocalRotation: {x: -0.57116127, y: -0.2087232, z: -0.15304218, w: 0.7789657}
   m_LocalPosition: {x: 0, y: 3, z: 0}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
   m_Father: {fileID: 0}
-  m_LocalEulerAnglesHint: {x: 50, y: -30, z: 0}
+  m_LocalEulerAnglesHint: {x: -72.5, y: -30, z: 0}
 --- !u!114 &2135674574
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -1016,14 +1049,6 @@ PrefabInstance:
     serializedVersion: 3
     m_TransformParent: {fileID: 0}
     m_Modifications:
-    - target: {fileID: 1325900783658903717, guid: 56d33eaae8be245438c278ea6a17804a, type: 3}
-      propertyPath: recorderNames.Array.size
-      value: 12
-      objectReference: {fileID: 0}
-    - target: {fileID: 1325900783658903717, guid: 56d33eaae8be245438c278ea6a17804a, type: 3}
-      propertyPath: 'recorderNames.Array.data[11]'
-      value: Copy GBuffer to Prev
-      objectReference: {fileID: 0}
     - target: {fileID: 3914952754906786439, guid: 56d33eaae8be245438c278ea6a17804a, type: 3}
       propertyPath: m_Name
       value: Profiler

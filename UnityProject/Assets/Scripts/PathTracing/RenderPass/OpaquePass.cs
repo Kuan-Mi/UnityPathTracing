@@ -32,7 +32,6 @@ namespace PathTracing
         public class Resource
         {
             internal GraphicsBuffer ConstantBuffer;
-            internal GraphicsBuffer ResamplingConstantBuffer;
 
             internal GraphicsBuffer HashEntriesBuffer;
             internal GraphicsBuffer AccumulationBuffer;
@@ -50,6 +49,7 @@ namespace PathTracing
             internal RTHandle ViewZ;
             internal RTHandle NormalRoughness;
             internal RTHandle BaseColorMetalness;
+            internal RTHandle GeoNormal;
 
 
             internal RTHandle Penumbra;
@@ -60,16 +60,16 @@ namespace PathTracing
             internal RTHandle PrevViewZ;
             internal RTHandle PrevNormalRoughness;
             internal RTHandle PrevBaseColorMetalness;
+            internal RTHandle PrevGeoNormal;
 
             internal RTHandle PsrThroughput;
-
-            internal RtxdiResources RtxdiResources;
         }
 
         public class Settings
         {
             internal int2 m_RenderResolution;
-            internal float resolutionScale;
+            internal float resolutionScale;     
+            internal int convergenceStep;
         }
 
         class PassData
@@ -99,11 +99,6 @@ namespace PathTracing
 
             natCmd.SetRayTracingShaderPass(data.OpaqueTs, "Test2");
             natCmd.SetRayTracingConstantBufferParam(data.OpaqueTs, paramsID, resource.ConstantBuffer, 0, resource.ConstantBuffer.stride);
-            natCmd.SetRayTracingBufferParam(data.OpaqueTs, "ResampleConstants", resource.ResamplingConstantBuffer);
-
-            natCmd.SetRayTracingBufferParam(data.OpaqueTs, t_LightDataBufferID, resource.RtxdiResources.LightDataBuffer);
-            natCmd.SetRayTracingBufferParam(data.OpaqueTs, t_NeighborOffsetsID, resource.RtxdiResources.NeighborOffsetsBuffer);
-            natCmd.SetRayTracingBufferParam(data.OpaqueTs, u_LightReservoirsID, resource.RtxdiResources.LightReservoirBuffer);
 
             natCmd.SetRayTracingBufferParam(data.OpaqueTs, g_ScramblingRankingID, resource.ScramblingRanking);
             natCmd.SetRayTracingBufferParam(data.OpaqueTs, g_SobolID, resource.Sobol);
@@ -133,6 +128,13 @@ namespace PathTracing
             natCmd.SetRayTracingTextureParam(data.OpaqueTs, gIn_PrevViewZID, resource.PrevViewZ);
             natCmd.SetRayTracingTextureParam(data.OpaqueTs, gIn_PrevNormalRoughnessID, resource.PrevNormalRoughness);
             natCmd.SetRayTracingTextureParam(data.OpaqueTs, gIn_PrevBaseColorMetalnessID, resource.PrevBaseColorMetalness);
+            
+            
+            natCmd.SetRayTracingTextureParam(data.OpaqueTs,"gOut_GeoNormal", resource.GeoNormal);
+            natCmd.SetRayTracingTextureParam(data.OpaqueTs,"gIn_PrevGeoNormal", resource.PrevGeoNormal);
+            
+            
+            
 
             natCmd.SetRayTracingBufferParam(data.OpaqueTs, gIn_SpotLightsID, resource.SpotLightBuffer);
             natCmd.SetRayTracingBufferParam(data.OpaqueTs, gIn_AreaLightsID, resource.AreaLightBuffer);
@@ -148,13 +150,6 @@ namespace PathTracing
             natCmd.DispatchRays(data.OpaqueTs, "MainRayGenShader", rectWmod, rectHmod, 1);
 
             natCmd.EndSample(opaqueTracingMarker);
-
-            // 保存当帧 GBuffer 到 prev 纹理，供下一帧 RTXDI 时间复用读取
-            natCmd.BeginSample(copyGBufferMarker);
-            natCmd.CopyTexture(resource.ViewZ, resource.PrevViewZ);
-            natCmd.CopyTexture(resource.NormalRoughness, resource.PrevNormalRoughness);
-            natCmd.CopyTexture(resource.BaseColorMetalness, resource.PrevBaseColorMetalness);
-            natCmd.EndSample(copyGBufferMarker);
         }
 
 
