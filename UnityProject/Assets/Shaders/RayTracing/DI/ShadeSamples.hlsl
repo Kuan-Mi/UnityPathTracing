@@ -121,13 +121,18 @@ float3 DemodulateSpecular(float3 surfaceSpecularF0, float3 specular)
 [shader("raygeneration")]
 void MainRayGenShader()
 {
-    uint2 pixelPos = DispatchRaysIndex().xy;
-
+    
+    uint2 GlobalIndex = DispatchRaysIndex().xy;
+    
     const RTXDI_RuntimeParameters params = g_Const.runtimeParams;
+    
+    uint2 pixelPosition = RTXDI_ReservoirPosToPixelPos(GlobalIndex, params.activeCheckerboardField);
 
-    RAB_Surface surface = RAB_GetGBufferSurface(pixelPos, false);
 
-    RTXDI_DIReservoir reservoir = RTXDI_LoadDIReservoir(g_Const.restirDI.reservoirBufferParams, pixelPos, g_Const.restirDI.bufferIndices.shadingInputBufferIndex);
+
+    RAB_Surface surface = RAB_GetGBufferSurface(pixelPosition, false);
+
+    RTXDI_DIReservoir reservoir = RTXDI_LoadDIReservoir(g_Const.restirDI.reservoirBufferParams, GlobalIndex, g_Const.restirDI.bufferIndices.shadingInputBufferIndex);
 
     float3 diffuse = 0;
     float3 specular = 0;
@@ -149,16 +154,16 @@ void MainRayGenShader()
 
         specular = DemodulateSpecular(surface.material.specularF0, specular);
 
-        gOut_DirectLighting[pixelPos] = ShadeSurfaceWithLightSample(lightSample, surface)
+        gOut_DirectLighting[pixelPosition] = ShadeSurfaceWithLightSample(lightSample, surface)
             * RTXDI_GetDIReservoirInvPdf(reservoir);
 
         if (needToStore)
         {
-            RTXDI_StoreDIReservoir(reservoir, g_Const.restirDI.reservoirBufferParams, pixelPos, g_Const.restirDI.bufferIndices.shadingInputBufferIndex);
+            RTXDI_StoreDIReservoir(reservoir, g_Const.restirDI.reservoirBufferParams, pixelPosition, g_Const.restirDI.bufferIndices.shadingInputBufferIndex);
         }
     }
     else
     {
-        gOut_DirectLighting[pixelPos] = 0;
+        gOut_DirectLighting[pixelPosition] = 0;
     }
 }

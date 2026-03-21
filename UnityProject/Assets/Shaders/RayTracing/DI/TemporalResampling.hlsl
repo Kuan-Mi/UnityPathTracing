@@ -15,7 +15,7 @@ Texture2D<uint> gOut_GeoNormal;
 Texture2D<float> gIn_PrevViewZ;
 Texture2D<float4> gIn_PrevNormalRoughness;
 Texture2D<float4> gIn_PrevBaseColorMetalness;
-Texture2D<uint>   gIn_PrevGeoNormal;
+Texture2D<uint> gIn_PrevGeoNormal;
 
 RWTexture2D<float3> gOut_DirectLighting;
 
@@ -34,32 +34,33 @@ RWTexture2D<float3> gOut_DirectLighting;
 [shader("raygeneration")]
 void MainRayGenShader()
 {
-    uint2 pixelPos = DispatchRaysIndex().xy;
-    
+    uint2 GlobalIndex = DispatchRaysIndex().xy;
+
     const RTXDI_RuntimeParameters params = g_Const.runtimeParams;
-    
-    RAB_RandomSamplerState rng = RAB_InitRandomSampler(pixelPos, 2);
 
-    RAB_Surface surface = RAB_GetGBufferSurface(pixelPos, false);
+    uint2 pixelPosition = RTXDI_ReservoirPosToPixelPos(GlobalIndex, params.activeCheckerboardField);
 
-    
+    RAB_RandomSamplerState rng = RAB_InitRandomSampler(pixelPosition, 2);
+
+    RAB_Surface surface = RAB_GetGBufferSurface(pixelPosition, false);
+
     bool usePermutationSampling = false;
     if (g_Const.restirDI.temporalResamplingParams.enablePermutationSampling)
     {
         // Permutation sampling makes more noise on thin, high-detail objects.
-        usePermutationSampling = !IsComplexSurface(pixelPos, surface);
+        usePermutationSampling = !IsComplexSurface(pixelPosition, surface);
     }
-    
+
     RTXDI_DIReservoir temporalResult = RTXDI_EmptyDIReservoir();
     int2 temporalSamplePixelPos = -1;
-    
+
     if (RAB_IsSurfaceValid(surface))
     {
         RTXDI_DIReservoir curSample = RTXDI_LoadDIReservoir(g_Const.restirDI.reservoirBufferParams,
-        pixelPos, g_Const.restirDI.bufferIndices.initialSamplingOutputBufferIndex);
+                                                            GlobalIndex, g_Const.restirDI.bufferIndices.initialSamplingOutputBufferIndex);
 
-        
-        float3 motionVector = gOut_Mv[pixelPos].xyz;
+
+        float3 motionVector = gOut_Mv[pixelPosition].xyz;
 
         RTXDI_DITemporalResamplingParameters tparams;
         tparams.screenSpaceMotion = motionVector;
@@ -73,12 +74,17 @@ void MainRayGenShader()
         tparams.uniformRandomNumber = g_Const.restirDI.temporalResamplingParams.uniformRandomNumber;
 
         RAB_LightSample selectedLightSample = (RAB_LightSample)0;
-        
-        temporalResult = RTXDI_DITemporalResampling(pixelPos, surface, curSample, rng, params, g_Const.restirDI.reservoirBufferParams, tparams, temporalSamplePixelPos, selectedLightSample);
-  
+
+        temporalResult = RTXDI_DITemporalResampling(pixelPosition, surface, curSample, rng, params, g_Const.restirDI.reservoirBufferParams, tparams, temporalSamplePixelPos, selectedLightSample);
     }
-    
+
+    #ifdef RTXDI_ENABLE_BOILING_FILTER
+    if (g_Const.restirDI.temporalResamplingParams.enableBoilingFilter)
+    {
+        RTXDI_BoilingFilter(LocalIndex, g_Const.restirDI.temporalResamplingParams.boilingFilterStrength, temporalResult);
+    }
+    #endif
     // u_TemporalSamplePositions[pixelPos] = temporalSamplePixelPos;
-    
-    RTXDI_StoreDIReservoir(temporalResult, g_Const.restirDI.reservoirBufferParams, pixelPos, g_Const.restirDI.bufferIndices.temporalResamplingOutputBufferIndex);
+
+    RTXDI_StoreDIReservoir(temporalResult, g_Const.restirDI.reservoirBufferParams, GlobalIndex, g_Const.restirDI.bufferIndices.temporalResamplingOutputBufferIndex);
 }
