@@ -11,7 +11,7 @@ namespace PathTracing
     public class PathTracingFeatureEditor : Editor
     {
         // 用于保存每个 Header 的折叠状态
-        private static Dictionary<string, bool> foldoutStates = new Dictionary<string, bool>();
+        // private static Dictionary<string, bool> foldoutStates = new Dictionary<string, bool>();
         private bool showDebug = true;
 
         // Asset paths relative to the project root.
@@ -30,6 +30,12 @@ namespace PathTracing
             ("scramblingRankingTex", "Assets/Textures/scrambling_ranking_128x128_2d_4spp.png"),
             ("sobolTex", "Assets/Textures/sobol_256_4d.png"),
         };
+
+        private string GetKey(string headerName)
+        {
+            return $"PT_Foldout_{target.GetInstanceID()}_{headerName}";
+        }
+
 
         public override void OnInspectorGUI()
         {
@@ -92,7 +98,7 @@ namespace PathTracing
             }
 
             EditorGUILayout.EndFoldoutHeaderGroup();
-            
+
             serializedObject.ApplyModifiedProperties();
         }
 
@@ -111,7 +117,6 @@ namespace PathTracing
             SerializedProperty childProp = parentProp.Copy();
             SerializedProperty endProp = childProp.GetEndProperty();
 
-            bool isFirstElement = true;
             bool currentFoldoutState = true;
 
             if (childProp.NextVisible(true)) // 进入对象内部
@@ -129,11 +134,22 @@ namespace PathTracing
                         {
                             // 如果有 Header，创建一个新的折叠组
                             EditorGUILayout.Space(8);
-                            if (!foldoutStates.ContainsKey(header.Name))
-                                foldoutStates[header.Name] = true;
 
-                            foldoutStates[header.Name] = EditorGUILayout.BeginFoldoutHeaderGroup(foldoutStates[header.Name], header.Name);
-                            currentFoldoutState = foldoutStates[header.Name];
+
+                            // 从 SessionState 获取该 Header 的保存状态
+                            string key = GetKey(header.Name);
+                            bool isExpanded = SessionState.GetBool(key, true);
+
+                            // 绘制 Foldout
+                            bool newState = EditorGUILayout.BeginFoldoutHeaderGroup(isExpanded, header.Name);
+
+                            // 如果状态改变，存回 SessionState
+                            if (newState != isExpanded)
+                            {
+                                SessionState.SetBool(key, newState);
+                            }
+
+                            currentFoldoutState = newState;
                             EditorGUILayout.EndFoldoutHeaderGroup();
                         }
                     }
