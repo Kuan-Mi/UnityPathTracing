@@ -143,7 +143,7 @@ MonoBehaviour:
       temporalDepthThreshold: 0.1
       temporalNormalThreshold: 0.5
       maxHistoryLength: 20
-      temporalBiasCorrection: 1
+      temporalBiasCorrection: 2
       enablePermutationSampling: 1
       permutationSamplingThreshold: 0.9
       enableBoilingFilter: 1
@@ -153,12 +153,12 @@ MonoBehaviour:
       pad2: 0
       pad3: 0
     spatialResamplingParams:
-      spatialDepthThreshold: 0
-      spatialNormalThreshold: 0
-      spatialBiasCorrection: 0
-      numSpatialSamples: 0
-      numDisocclusionBoostSamples: 0
-      spatialSamplingRadius: 0
+      spatialDepthThreshold: 0.1
+      spatialNormalThreshold: 0.5
+      spatialBiasCorrection: 1
+      numSpatialSamples: 1
+      numDisocclusionBoostSamples: 8
+      spatialSamplingRadius: 32
       neighborOffsetMask: 0
       discountNaiveSamples: 0
     shadingParams:
