@@ -49,6 +49,11 @@ namespace Rtxdi
         public uint numLights;
         public uint pad1;
         public uint pad2;
+        
+        public override string ToString()
+        {
+            return $"LightBufferRegion: firstLightIndex={firstLightIndex}, numLights={numLights}";
+        }
     }
 
     [System.Serializable]
@@ -59,6 +64,11 @@ namespace Rtxdi
         public uint lightIndex;
         public uint pad1;
         public uint pad2;
+        
+        public override string ToString()
+        {
+            return $"EnvironmentLightBufferParameters: lightPresent={lightPresent}, lightIndex={lightIndex}";
+        }
     }
     
     [System.Serializable]
@@ -69,6 +79,14 @@ namespace Rtxdi
         public uint activeCheckerboardField; // 0 - no checkerboard, 1 - odd pixels, 2 - even pixels
         public uint pad1;
         public uint pad2;
+
+
+        public override string ToString()
+        {
+            return $"RuntimeParameters: " +
+                   $"\nneighborOffsetMask: {neighborOffsetMask}" +
+                   $"\nactiveCheckerboardField: {activeCheckerboardField}";
+        }
     }
 
     [System.Serializable]
@@ -78,6 +96,14 @@ namespace Rtxdi
         public RTXDI_LightBufferRegion localLightBufferRegion;
         public RTXDI_LightBufferRegion infiniteLightBufferRegion;
         public RTXDI_EnvironmentLightBufferParameters environmentLightParams;
+        
+            public override string ToString()
+            {
+                return $"LightBufferParameters: " +
+                    $"\nlocalLightBufferRegion: {localLightBufferRegion.firstLightIndex} - {localLightBufferRegion.numLights} lights" +
+                    $"\ninfiniteLightBufferRegion: {infiniteLightBufferRegion.firstLightIndex} - {infiniteLightBufferRegion.numLights} lights" +
+                    $"\nenvironmentLightParams: lightPresent={environmentLightParams.lightPresent}, lightIndex={environmentLightParams.lightIndex}";
+            }
     }
 
     [System.Serializable]
@@ -88,6 +114,13 @@ namespace Rtxdi
         public uint reservoirArrayPitch;
         public uint pad1;
         public uint pad2;
+        
+        public override string ToString()
+        {
+            return $"ReservoirBufferParameters: " +
+                   $"\nreservoirBlockRowPitch: {reservoirBlockRowPitch}" +
+                   $"\nreservoirArrayPitch: {reservoirArrayPitch}";
+        }
     }
 
     [StructLayout(LayoutKind.Sequential)]

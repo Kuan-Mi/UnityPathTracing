@@ -79,7 +79,7 @@ MonoBehaviour:
     tracingMode: 1
     denoiser: 0
     emissionIntensity: 1
-    cameraJitter: 1
+    cameraJitter: 0
     psr: 1
     emission: 1
     usePrevFrame: 1
@@ -128,8 +128,48 @@ MonoBehaviour:
     localLightSamples: 16
     spatialSamples: 3
     brdfSamples: 0
-    resamplingMode: 0
+    resamplingMode: 1
     gShowLight: 0
+    initialSamplingParams:
+      numPrimaryLocalLightSamples: 8
+      numPrimaryInfiniteLightSamples: 0
+      numPrimaryEnvironmentSamples: 0
+      numPrimaryBrdfSamples: 0
+      brdfCutoff: 0.0001
+      enableInitialVisibility: 1
+      environmentMapImportanceSampling: 0
+      localLightSamplingMode: 0
+    temporalResamplingParams:
+      temporalDepthThreshold: 0.1
+      temporalNormalThreshold: 0.5
+      maxHistoryLength: 20
+      temporalBiasCorrection: 1
+      enablePermutationSampling: 1
+      permutationSamplingThreshold: 0.9
+      enableBoilingFilter: 1
+      boilingFilterStrength: 0.2
+      discardInvisibleSamples: 1
+      uniformRandomNumber: 0
+      pad2: 0
+      pad3: 0
+    spatialResamplingParams:
+      spatialDepthThreshold: 0
+      spatialNormalThreshold: 0
+      spatialBiasCorrection: 0
+      numSpatialSamples: 0
+      numDisocclusionBoostSamples: 0
+      spatialSamplingRadius: 0
+      neighborOffsetMask: 0
+      discountNaiveSamples: 0
+    shadingParams:
+      enableFinalVisibility: 1
+      reuseFinalVisibility: 1
+      finalVisibilityMaxAge: 4
+      finalVisibilityMaxDistance: 16
+      enableDenoiserInputPacking: 1
+      pad1: 0
+      pad2: 0
+      pad3: 0
     useReferencePathTracing: 0
     referenceBounceNum: 2
     split: 0.34
