@@ -15,7 +15,7 @@ Texture2D<uint> gOut_GeoNormal;
 Texture2D<float> gIn_PrevViewZ;
 Texture2D<float4> gIn_PrevNormalRoughness;
 Texture2D<float4> gIn_PrevBaseColorMetalness;
-Texture2D<uint>   gIn_PrevGeoNormal;
+Texture2D<uint> gIn_PrevGeoNormal;
 
 RWTexture2D<float3> gOut_DirectLighting;
 
@@ -34,21 +34,23 @@ RWTexture2D<int2> u_TemporalSamplePositions;
 [shader("raygeneration")]
 void MainRayGenShader()
 {
-    uint2 pixelPos = DispatchRaysIndex().xy;
-    
-    const RTXDI_RuntimeParameters params = g_Const.runtimeParams;
-    
-    RAB_RandomSamplerState rng = RAB_InitRandomSampler(pixelPos, 3);
+    uint2 GlobalIndex = DispatchRaysIndex().xy;
 
-    RAB_Surface surface = RAB_GetGBufferSurface(pixelPos, false);
-    
+    const RTXDI_RuntimeParameters params = g_Const.runtimeParams;
+
+    uint2 pixelPosition = RTXDI_ReservoirPosToPixelPos(GlobalIndex, params.activeCheckerboardField);
+
+    RAB_RandomSamplerState rng = RAB_InitRandomSampler(pixelPosition, 3);
+
+    RAB_Surface surface = RAB_GetGBufferSurface(pixelPosition, false);
+
     RTXDI_DIReservoir spatialResult = RTXDI_EmptyDIReservoir();
-    
+
     
     if (RAB_IsSurfaceValid(surface))
     {
         RTXDI_DIReservoir centerSample = RTXDI_LoadDIReservoir(g_Const.restirDI.reservoirBufferParams,
-            pixelPos, g_Const.restirDI.bufferIndices.spatialResamplingInputBufferIndex);
+            GlobalIndex, g_Const.restirDI.bufferIndices.spatialResamplingInputBufferIndex);
 
         RTXDI_DISpatialResamplingParameters sparams;
         sparams.sourceBufferIndex = g_Const.restirDI.bufferIndices.spatialResamplingInputBufferIndex;
@@ -63,10 +65,9 @@ void MainRayGenShader()
         sparams.discountNaiveSamples = g_Const.restirDI.spatialResamplingParams.discountNaiveSamples;
 
         RAB_LightSample lightSample = (RAB_LightSample)0;
-        spatialResult = RTXDI_DISpatialResampling(pixelPos, surface, centerSample, 
+        spatialResult = RTXDI_DISpatialResampling(pixelPosition, surface, centerSample, 
              rng, params, g_Const.restirDI.reservoirBufferParams, sparams, lightSample);
-  
     }
-    
-    RTXDI_StoreDIReservoir(spatialResult, g_Const.restirDI.reservoirBufferParams, pixelPos, g_Const.restirDI.bufferIndices.spatialResamplingOutputBufferIndex);
+
+    RTXDI_StoreDIReservoir(spatialResult, g_Const.restirDI.reservoirBufferParams, GlobalIndex, g_Const.restirDI.bufferIndices.spatialResamplingOutputBufferIndex);
 }
