@@ -28,12 +28,26 @@ float RAB_EvaluateLocalLightSourcePdf(uint lightIndex)
 
 float3 RAB_GetReflectedRadianceForSurface(float3 incomingRadianceLocation, float3 incomingRadiance, RAB_Surface surface)
 {
-    return float3(0.0, 0.0, 0.0);
+    float3 L = normalize(incomingRadianceLocation - surface.worldPos);
+    float3 N = surface.normal;
+    float3 V = surface.viewDir;
+
+    if (dot(L, surface.geoNormal) <= 0)
+        return 0;
+
+    float d = Lambert(N, -L);
+    float3 s;
+    if (surface.material.roughness == 0)
+        s = 0;
+    else
+        s = GGX_times_NdotL(V, L, N, max(surface.material.roughness, kMinRoughness), surface.material.specularF0);
+
+    return incomingRadiance * (d * surface.material.diffuseAlbedo + s);
 }
 
 float RAB_GetReflectedLuminanceForSurface(float3 incomingRadianceLocation, float3 incomingRadiance, RAB_Surface surface)
 {
-    return 0.0;
+    return RTXDI_Luminance(RAB_GetReflectedRadianceForSurface(incomingRadianceLocation, incomingRadiance, surface));
 }
 
 // Evaluate the surface BRDF and compute the weighted reflected radiance for the given light sample
@@ -52,7 +66,7 @@ float3 ShadeSurfaceWithLightSample(RAB_LightSample lightSample, RAB_Surface surf
 
 
     float3 V = surface.viewDir;
-    
+
     // Evaluate the BRDF
     float diffuse = Lambert(surface.normal, -L);
     float3 specular = GGX_times_NdotL(V, L, surface.normal, max(RAB_GetMaterial(surface).roughness, kMinRoughness), RAB_GetMaterial(surface).specularF0);
@@ -69,25 +83,23 @@ float3 ShadeSurfaceWithLightSample(RAB_LightSample lightSample, RAB_Surface surf
 // 权重的缩放比例可以任意，只要在所有光照和表面上保持一致即可。
 float RAB_GetLightSampleTargetPdfForSurface(RAB_LightSample lightSample, RAB_Surface surface)
 {
-    // Second-best implementation: the PDF is proportional to the reflected radiance.
-    // The best implementation would be taking visibility into account,
-    // but that would be prohibitively expensive.
-    
-    // 次优实现方案：PDF 与反射辐射亮度成正比。
-    // 最佳实现方案应考虑可见性，
-    // 但这将导致计算成本过高。
-    return calcLuminance(ShadeSurfaceWithLightSample(lightSample, surface));
+    if (lightSample.solidAnglePdf <= 0)
+        return 0;
+
+    return RAB_GetReflectedLuminanceForSurface(lightSample.position, lightSample.radiance, surface) / lightSample.solidAnglePdf;
 }
 
 float RAB_GetGISampleTargetPdfForSurface(float3 samplePosition, float3 sampleRadiance, RAB_Surface surface)
 {
-    return 0.0;
+    float3 reflectedRadiance = RAB_GetReflectedRadianceForSurface(samplePosition, sampleRadiance, surface);
+
+    return RTXDI_Luminance(reflectedRadiance);
 }
 
 // 返回表面到光源样本的方向和距离。
 void RAB_GetLightDirDistance(RAB_Surface surface, RAB_LightSample lightSample,
-    out float3 o_lightDir,
-    out float o_lightDistance)
+                             out float3 o_lightDir,
+                             out float o_lightDistance)
 {
     float3 toLight = lightSample.position - surface.worldPos;
     o_lightDistance = length(toLight);
@@ -103,7 +115,8 @@ float3 GetEnvironmentRadiance(float3 direction)
 
 bool IsComplexSurface(int2 pixelPosition, RAB_Surface surface)
 {
-    return true;
+    float originalRoughness = gOut_Normal_Roughness[pixelPosition].a;
+    return originalRoughness < (surface.material.roughness * g_Const.restirDI.temporalResamplingParams.permutationSamplingThreshold);
 }
 
 uint getLightIndex(uint instanceID, uint geometryIndex, uint primitiveIndex)
@@ -112,20 +125,20 @@ uint getLightIndex(uint instanceID, uint geometryIndex, uint primitiveIndex)
     {
         return RTXDI_InvalidLightIndex;
     }
-    
- uint start = t_GeometryInstanceToLight[instanceID];
-    
+
+    uint start = t_GeometryInstanceToLight[instanceID];
+
     if (start == RTXDI_InvalidLightIndex)
     {
         return RTXDI_InvalidLightIndex;
     }
-     
-    
+
+
     // return instanceID;
     return start + primitiveIndex;
-    
+
     return t_GeometryInstanceToLight[instanceID] + primitiveIndex;
-    
+
     // uint lightIndex = RTXDI_InvalidLightIndex;
     // InstanceData hitInstance = t_InstanceData[instanceID];
     // uint geometryInstanceIndex = hitInstance.firstGeometryInstanceIndex + geometryIndex;
@@ -148,16 +161,15 @@ uint getLightIndex(uint instanceID, uint geometryIndex, uint primitiveIndex)
 // 如果击中非光源场景对象，则返回 true 并将 o_lightIndex 设置为 RTXDI_InvalidLightIndex 。
 // 如果未击中任何对象，则返回 false ，RTXDI 将尝试进行环境贴图采样。
 bool RAB_TraceRayForLocalLight(float3 origin, float3 direction, float tMin, float tMax,
-    out uint o_lightIndex, out float2 o_randXY)
+                               out uint o_lightIndex, out float2 o_randXY)
 {
     o_lightIndex = RTXDI_InvalidLightIndex;
     o_randXY = 0;
 
-    
-    
+
     GeometryProps geometryProps0;
     MaterialProps materialProps0;
-    CastRay(origin, direction, tMin, tMax, GetConeAngleFromRoughness(0.0, 0.0),  FLAG_NON_TRANSPARENT, geometryProps0, materialProps0);
+    CastRay(origin, direction, tMin, tMax, GetConeAngleFromRoughness(0.0, 0.0), FLAG_NON_TRANSPARENT, geometryProps0, materialProps0);
 
     bool hitAnything = !geometryProps0.IsMiss();
     if (hitAnything)
@@ -165,13 +177,13 @@ bool RAB_TraceRayForLocalLight(float3 origin, float3 direction, float tMin, floa
         o_lightIndex = getLightIndex(geometryProps0.instanceIndex, 0, geometryProps0.primitiveIndex);
         if (o_lightIndex != RTXDI_InvalidLightIndex)
         {
-            float2 hitUV =  geometryProps0.barycentrics;
+            float2 hitUV = geometryProps0.barycentrics;
             o_randXY = randomFromBarycentric(hitUVToBarycentric(hitUV));
         }
     }
-    
+
     return hitAnything;
-    
+
     // RayDesc ray;
     // ray.Origin = origin;
     // ray.Direction = direction;

@@ -69,7 +69,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::PathTracing.PathTracingFeature
   m_Active: 1
   pathTracingSetting:
-    showMode: 11
+    showMode: 18
     showMv: 0
     showValidation: 0
     sunAngularDiameter: 0.69
@@ -129,10 +129,10 @@ MonoBehaviour:
     resamplingMode: 2
     gShowLight: 0
     initialSamplingParams:
-      numPrimaryLocalLightSamples: 16
+      numPrimaryLocalLightSamples: 1
       numPrimaryInfiniteLightSamples: 0
       numPrimaryEnvironmentSamples: 0
-      numPrimaryBrdfSamples: 16
+      numPrimaryBrdfSamples: 1
       brdfCutoff: 0.0001
       enableInitialVisibility: 1
       environmentMapImportanceSampling: 0
