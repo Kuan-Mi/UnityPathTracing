@@ -144,8 +144,7 @@ void MainRayGenShader()
     {
         RAB_LightInfo lightInfo = RAB_LoadLightInfo(RTXDI_GetDIReservoirLightIndex(reservoir), false);
 
-        RAB_LightSample lightSample = RAB_SamplePolymorphicLight(lightInfo,
-                                                                 surface, RTXDI_GetDIReservoirSampleUV(reservoir));
+        RAB_LightSample lightSample = RAB_SamplePolymorphicLight(lightInfo, surface, RTXDI_GetDIReservoirSampleUV(reservoir));
 
         bool needToStore = ShadeSurfaceWithLightSample(reservoir, surface, lightSample,
                                                        /* previousFrameTLAS = */ false, /* enableVisibilityReuse = */ true, diffuse, specular, lightDistance);
@@ -156,6 +155,8 @@ void MainRayGenShader()
 
         gOut_DirectLighting[pixelPosition] = ShadeSurfaceWithLightSample(lightSample, surface)
             * RTXDI_GetDIReservoirInvPdf(reservoir);
+        
+        // gOut_DirectLighting[pixelPosition] = diffuse + specular;
 
         if (needToStore)
         {
@@ -166,4 +167,36 @@ void MainRayGenShader()
     {
         gOut_DirectLighting[pixelPosition] = 0;
     }
+    
+    
+    //
+    // float3 origin = gCameraGlobalPos;
+    // float3 dir = normalize( surface.worldPos - origin);
+    // uint o_lightIndex;
+    // float2 o_randXY;
+    //
+    // bool hit = RAB_TraceRayForLocalLight(origin,dir,0,1000,o_lightIndex,o_randXY);
+    //
+    //
+    //
+    // // gOut_DirectLighting[pixelPosition] = float3(o_randXY,0);
+    //
+    // if (o_lightIndex == RTXDI_InvalidLightIndex)
+    // {
+    //     gOut_DirectLighting[pixelPosition] = 0;
+    //     
+    // }else
+    // {
+    //     
+    //     
+    //     // gOut_DirectLighting[pixelPosition] = o_lightIndex/12.0;
+    //     
+    //     
+    //     RAB_LightInfo lightInfo = RAB_LoadLightInfo(o_lightIndex, false);
+    //     RAB_LightSample lightSample = RAB_SamplePolymorphicLight(lightInfo,
+    //                                                              surface, o_randXY);
+    //     
+    //     gOut_DirectLighting[pixelPosition] = lightSample.radiance;
+    // }
+    
 }

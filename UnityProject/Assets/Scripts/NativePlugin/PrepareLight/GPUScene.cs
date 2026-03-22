@@ -3,6 +3,7 @@ using System.Linq;
 using System.Runtime.InteropServices;
 using Unity.Mathematics;
 using UnityEngine;
+using UnityEngine.Rendering;
 using Object = UnityEngine.Object;
 
 namespace RTXDI
@@ -45,42 +46,43 @@ namespace RTXDI
         public uint direction2; // oct-encoded
     };
 
+
     public class GPUScene : System.IDisposable
     {
-        
         // MeshLight 缓存
         private static HashSet<MeshLight> MeshLightCache = new HashSet<MeshLight>();
+
         public static void RegisterMeshLight(MeshLight ml)
         {
             MeshLightCache.Add(ml);
             Instance?.MarkSceneDirty();
             Debug.Log($"Registered MeshLight: {ml.name}. Total count: {MeshLightCache.Count}");
         }
+
         public static void UnregisterMeshLight(MeshLight ml)
         {
             MeshLightCache.Remove(ml);
             Instance?.MarkSceneDirty();
             Debug.Log($"Unregistered MeshLight: {ml.name}. Total count: {MeshLightCache.Count}");
         }
+
         // 单例引用（可选，方便通知）
         public static GPUScene Instance { get; private set; }
 
-        public GPUScene() { Instance = this; }
-        
-        
+        public GPUScene()
+        {
+            Instance = this;
+        }
+
+
         public bool isBufferInitialized;
 
         public void InitBuffer()
         {
-#if UNITY_EDITOR
-            UnityEditor.ObjectChangeEvents.changesPublished += (ref UnityEditor.ObjectChangeEventStream stream) => { MarkSceneDirty(); };
-
-#endif
-
-
             _instanceBuffer = new ComputeBuffer(8192, Marshal.SizeOf<InstanceData>());
             _primitiveBuffer = new ComputeBuffer(327680, Marshal.SizeOf<PrimitiveData>());
             _lightInfoBuffer = new GraphicsBuffer(GraphicsBuffer.Target.Structured, 327680, Marshal.SizeOf<RAB_LightInfo>());
+            _geometryInstanceToLight = new GraphicsBuffer(GraphicsBuffer.Target.Structured, 1024, sizeof(uint));
             isBufferInitialized = true;
         }
 
@@ -119,6 +121,7 @@ namespace RTXDI
         public ComputeBuffer _instanceBuffer;
         public ComputeBuffer _primitiveBuffer;
         public GraphicsBuffer _lightInfoBuffer;
+        public GraphicsBuffer _geometryInstanceToLight;
 
         private List<InstanceData> instanceDataList = new List<InstanceData>();
         private List<PrimitiveData> primitiveDataList = new List<PrimitiveData>();
@@ -140,13 +143,18 @@ namespace RTXDI
         private bool _sceneTopologyDirty = true;
 
         /// <summary>场景物体增减、材质/Mesh 变化时调用，触发下一帧完整重建。</summary>
-        public void MarkSceneDirty() => _sceneTopologyDirty = true;
+        public void MarkSceneDirty()
+        {
+            Debug.Log("Scene marked dirty. Will trigger full rebuild on next Build() call.");
+            _sceneTopologyDirty = true;
+        }
 
-        public void Build()
+        public void Build(RayTracingAccelerationStructure ras)
         {
             if (_sceneTopologyDirty)
             {
                 BuildFull();
+                UpdateInstanceID(ras);
                 _sceneTopologyDirty = false;
             }
             else
@@ -154,6 +162,8 @@ namespace RTXDI
                 UpdateTransformsOnly();
             }
         }
+
+        public Dictionary<MeshRenderer, uint> rendererInstanceIdMap = new Dictionary<MeshRenderer, uint>();
 
         // 完整重建：刷新 renderer 列表、primitive 数据、instance 数据，上传两个 buffer
         private void BuildFull()
@@ -163,6 +173,12 @@ namespace RTXDI
             globalTexturePool.Clear();
             textureGroupCache.Clear();
             _emissiveInstanceRenderers.Clear();
+            _meshDataCache.Clear();
+
+            var geometryInstanceToLightArray = new List<uint>();
+
+            uint instanceId = 0;
+
 
             // 只遍历 MeshLightCache
             var meshLights = MeshLightCache.ToList();
@@ -170,6 +186,8 @@ namespace RTXDI
             {
                 if (ml == null || !ml.enabled || ml.Mesh == null || ml.Materials == null)
                     continue;
+
+                rendererInstanceIdMap[ml.Renderer] = instanceId;
                 Mesh mesh = ml.Mesh;
                 int subMeshCount = mesh.subMeshCount;
                 Material[] sharedMaterials = ml.Materials;
@@ -177,6 +195,9 @@ namespace RTXDI
                 Matrix4x4 localToWorld = ml.transform.localToWorldMatrix;
                 for (int subIdx = 0; subIdx < subMeshCount; subIdx++)
                 {
+                    instanceId++;
+                    geometryInstanceToLightArray.Add((uint)primitiveDataList.Count);
+
                     Material mat = subIdx < sharedMaterials.Length ? sharedMaterials[subIdx] : null;
                     if (mat == null && sharedMaterials.Length > 0) mat = sharedMaterials[^1];
                     bool isEmissive = mat != null && mat.IsKeywordEnabled("_EMISSION") && mat.GetColor("_EmissionColor").maxColorComponent > 0.01f;
@@ -184,6 +205,8 @@ namespace RTXDI
                         continue;
                     int[] subMeshTriangles = mc.trianglesPerSubMesh[subIdx];
                     uint instanceIndex = (uint)instanceDataList.Count;
+
+
                     for (int t = 0; t < subMeshTriangles.Length; t += 3)
                     {
                         int i0 = subMeshTriangles[t];
@@ -200,6 +223,7 @@ namespace RTXDI
                             instanceId = instanceIndex
                         });
                     }
+
                     uint baseTextureIndex = GetTextureGroupIndex(mat);
                     var emissiveColor = mat.GetColor("_EmissionColor").linear;
                     instanceDataList.Add(new InstanceData
@@ -211,6 +235,7 @@ namespace RTXDI
                     _emissiveInstanceRenderers.Add(ml.Renderer);
                 }
             }
+
             if (instanceDataList.Count > _instanceBuffer.count)
                 Debug.LogError($"Instance count {instanceDataList.Count} exceeds buffer capacity {_instanceBuffer.count}!");
             if (primitiveDataList.Count > _primitiveBuffer.count)
@@ -219,8 +244,50 @@ namespace RTXDI
             _instanceBuffer.SetData(instanceDataList);
             _primitiveBuffer.SetData(primitiveDataList);
 
+            _geometryInstanceToLight.SetData(geometryInstanceToLightArray);
+            
+            for (var i = 0; i < geometryInstanceToLightArray.Count; i++)
+            {
+                Debug.Log($"{i} starts at Primitive index {geometryInstanceToLightArray[i]}");
+            }
+
             emissiveTriangleCount = (uint)primitiveDataList.Count;
             // Debug.Log($"BuildFull completed: {instanceDataList.Count} instances, {primitiveDataList.Count} primitives, {globalTexturePool.Count} unique emissive textures.");
+        }
+
+        public void UpdateInstanceID(RayTracingAccelerationStructure ras)
+        {
+
+            if (_meshDataCache.Count == 0)
+            {
+                return;
+            }
+            
+            foreach (var keyValuePair in rendererInstanceIdMap)
+            {
+                MeshRenderer renderer = keyValuePair.Key;
+                uint instanceId = keyValuePair.Value;
+
+                if (renderer == null)
+                    continue;
+
+                ras.UpdateInstanceID(renderer, instanceId);
+                Debug.Log($"Updated InstanceID for Renderer {renderer.name} to {instanceId}");
+            }
+
+            var maxInstanceId = rendererInstanceIdMap.Values.Max();
+
+            var otherRenderers = Object.FindObjectsByType<MeshRenderer>(FindObjectsSortMode.None).Where(r => !rendererInstanceIdMap.ContainsKey(r)).ToList();
+
+            foreach (var renderer in otherRenderers)
+            {
+                if (renderer == null)
+                    continue;
+
+                maxInstanceId++;
+                ras.UpdateInstanceID(renderer, maxInstanceId);
+                Debug.Log($"Assigned new InstanceID {maxInstanceId} to Renderer {renderer.name} (not in MeshLightCache)");
+            }
         }
 
         // 仅更新动态 transform，不重建 primitive，每帧开销极小
@@ -234,6 +301,7 @@ namespace RTXDI
                     BuildFull();
                     return;
                 }
+
                 var inst = instanceDataList[i];
                 inst.transform = _emissiveInstanceRenderers[i].transform.localToWorldMatrix;
                 instanceDataList[i] = inst;
@@ -411,6 +479,7 @@ namespace RTXDI
             // Debug.LogWarning(" ~GPUScene ");
             Dispose();
         }
+
         public void Dispose()
         {
             _instanceBuffer?.Dispose();
@@ -419,5 +488,4 @@ namespace RTXDI
             _meshDataCache.Clear();
         }
     }
-
 }

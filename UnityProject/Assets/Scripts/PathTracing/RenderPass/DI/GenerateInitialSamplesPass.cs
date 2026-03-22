@@ -33,6 +33,7 @@ namespace PathTracing
         {
             internal GraphicsBuffer ConstantBuffer;
             internal GraphicsBuffer ResamplingConstantBuffer;
+            internal GraphicsBuffer t_GeometryInstanceToLight;
 
 
             internal RTHandle Mv;
@@ -78,6 +79,7 @@ namespace PathTracing
             natCmd.SetRayTracingShaderPass(data.OpaqueTs, "Test2");
             natCmd.SetRayTracingConstantBufferParam(data.OpaqueTs, paramsID, resource.ConstantBuffer, 0, resource.ConstantBuffer.stride);
             natCmd.SetRayTracingBufferParam(data.OpaqueTs, "ResampleConstants", resource.ResamplingConstantBuffer);
+            natCmd.SetRayTracingBufferParam(data.OpaqueTs, "t_GeometryInstanceToLight", resource.t_GeometryInstanceToLight);
 
             natCmd.SetRayTracingBufferParam(data.OpaqueTs, t_LightDataBufferID, resource.RtxdiResources.LightDataBuffer);
             natCmd.SetRayTracingBufferParam(data.OpaqueTs, t_NeighborOffsetsID, resource.RtxdiResources.NeighborOffsetsBuffer);
