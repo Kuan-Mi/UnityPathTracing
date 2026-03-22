@@ -6,7 +6,7 @@
 #define GLOBALCONSTANTS_CS_HLSL
 // Generated from PathTracing.GlobalConstants
 // PackingRules = Exact
-CBUFFER_START(PathTracingParams)
+CBUFFER_START(GlobalConstants)
     float4x4 gViewToWorld;
     float4x4 gViewToWorldPrev;
     float4x4 gViewToClip;
@@ -75,7 +75,6 @@ CBUFFER_START(PathTracingParams)
     uint gSpotLightCount;
     uint gAreaLightCount;
     uint gPointLightCount;
-    float4 gSssScatteringColor;
     float gSssMinThreshold;
     float gSssTransmissionBsdfSampleCount;
     float gSssTransmissionPerBsdfScatteringSampleCount;

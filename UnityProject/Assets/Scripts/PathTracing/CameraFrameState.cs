@@ -326,7 +326,6 @@ namespace PathTracing
                 gSpotLightCount = (uint)lightCollector.SpotCount,
                 gAreaLightCount = (uint)lightCollector.AreaCount,
                 gPointLightCount = (uint)lightCollector.PointCount,
-                gSssScatteringColor = new float3(settings.sssScatteringColor.r, settings.sssScatteringColor.g, settings.sssScatteringColor.b),
                 gSssMinThreshold = settings.sssMinThreshold,
                 gSssTransmissionBsdfSampleCount = settings.sssTransmissionBsdfSampleCount,
                 gSssTransmissionPerBsdfScatteringSampleCount = settings.sssTransmissionPerBsdfScatteringSampleCount,

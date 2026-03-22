@@ -69,11 +69,11 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::PathTracing.PathTracingFeature
   m_Active: 1
   pathTracingSetting:
-    showMode: 7
+    showMode: 18
     showMv: 0
     showValidation: 0
     sunAngularDiameter: 0.69
-    exposureEv: -2.69
+    exposureEv: -1.71
     upscalerMode: 0
     mipBias: -0.5
     tracingMode: 1

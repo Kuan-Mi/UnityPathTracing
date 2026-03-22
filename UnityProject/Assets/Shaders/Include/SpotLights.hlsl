@@ -93,7 +93,7 @@ float3 EvaluateSpotLights(GeometryProps geo, MaterialProps mat, bool isSSS)
         {
             RTXCR_SubsurfaceMaterialData sssMat = (RTXCR_SubsurfaceMaterialData)0;
             sssMat.transmissionColor = albedo;
-            sssMat.scatteringColor   = gSssScatteringColor;
+            sssMat.scatteringColor   = mat.scatteringColor;
             sssMat.scale             = gSssScale / gUnitToMetersMultiplier;
             sssMat.g                 = 0.0;
 

@@ -5,7 +5,7 @@ namespace PathTracing
     public static class ShaderIDs
     {
         
-        public static readonly int paramsID = Shader.PropertyToID("PathTracingParams");
+        public static readonly int paramsID = Shader.PropertyToID("GlobalConstants");
         
         public static readonly int g_HashEntriesID = Shader.PropertyToID("gInOut_SharcHashEntriesBuffer");
         public static readonly int g_AccumulationBufferID = Shader.PropertyToID("gInOut_SharcAccumulated");
