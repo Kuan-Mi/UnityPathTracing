@@ -22,19 +22,19 @@ RAB_Material RAB_EmptyMaterial()
 // 获取表面的漫反射反照率（albedo）。
 float3 GetDiffuseAlbedo(RAB_Material material)
 {
-    return float3(0.0, 0.0, 0.0);
+    return material.diffuseAlbedo;
 }
 
 // 获取表面的镜面反射F0值。
 float3 GetSpecularF0(RAB_Material material)
 {
-    return float3(0.0, 0.0, 0.0);
+    return material.specularF0;
 }
 
 // 获取表面的粗糙度值。
 float GetRoughness(RAB_Material material)
 {
-    return 0.0;
+    return material.roughness;
 }
 
 // 非必要实现
@@ -87,6 +87,19 @@ RAB_Material RAB_GetGBufferMaterial(
 // 比较两个表面的材质以提高重采样质量。为了简单起见，直接说所有材质都相似。
 bool RAB_AreMaterialsSimilar(RAB_Material a, RAB_Material b)
 {
+    const float roughnessThreshold = 0.5;
+    const float reflectivityThreshold = 0.25;
+    const float albedoThreshold = 0.25;
+
+    if (!RTXDI_CompareRelativeDifference(a.roughness, b.roughness, roughnessThreshold))
+        return false;
+
+    if (abs(calcLuminance(a.specularF0) - calcLuminance(b.specularF0)) > reflectivityThreshold)
+        return false;
+    
+    if (abs(calcLuminance(a.diffuseAlbedo) - calcLuminance(b.diffuseAlbedo)) > albedoThreshold)
+        return false;
+
     return true;
 }
 

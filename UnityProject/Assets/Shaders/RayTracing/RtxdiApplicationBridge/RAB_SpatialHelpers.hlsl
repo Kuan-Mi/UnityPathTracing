@@ -10,11 +10,29 @@
 // 它可以限制位置，也可以将其沿最近的屏幕边缘反射。最简单的实现方式是直接返回输入像素的位置。
 int2 RAB_ClampSamplePositionIntoView(int2 pixelPosition, bool previousFrame)
 {
-    return clamp(pixelPosition, 0, int2(gRectSize) - 1);
+    int width = int(gRectSize.x);
+    int height = int(gRectSize.y);
+
+    // Reflect the position across the screen edges.
+    // Compared to simple clamping, this prevents the spread of colorful blobs from screen edges.
+    if (pixelPosition.x < 0) pixelPosition.x = -pixelPosition.x;
+    if (pixelPosition.y < 0) pixelPosition.y = -pixelPosition.y;
+    if (pixelPosition.x >= width) pixelPosition.x = 2 * width - pixelPosition.x - 1;
+    if (pixelPosition.y >= height) pixelPosition.y = 2 * height - pixelPosition.y - 1;
+
+    return pixelPosition;
 }
 
 bool RAB_ValidateGISampleWithJacobian(inout float jacobian)
 {
+    // Sold angle ratio is too different. Discard the sample.
+    if (jacobian > 10.0 || jacobian < 1 / 10.0) {
+        return false;
+    }
+
+    // clamp Jacobian.
+    jacobian = clamp(jacobian, 1 / 3.0, 3.0);
+
     return true;
 }
 

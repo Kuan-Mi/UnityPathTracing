@@ -113,8 +113,16 @@ uint getLightIndex(uint instanceID, uint geometryIndex, uint primitiveIndex)
         return RTXDI_InvalidLightIndex;
     }
     
+ uint start = t_GeometryInstanceToLight[instanceID];
+    
+    if (start == RTXDI_InvalidLightIndex)
+    {
+        return RTXDI_InvalidLightIndex;
+    }
+     
+    
     // return instanceID;
-    // return primitiveIndex;
+    return start + primitiveIndex;
     
     return t_GeometryInstanceToLight[instanceID] + primitiveIndex;
     

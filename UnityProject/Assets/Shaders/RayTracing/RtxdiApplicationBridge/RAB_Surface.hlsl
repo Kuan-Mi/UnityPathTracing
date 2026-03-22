@@ -71,8 +71,6 @@ float getSurfaceDiffuseProbability(RAB_Surface surface)
     // return dot(surface.viewDir, surface.normal);
     RAB_Material material = RAB_GetMaterial(surface);
     float diffuseWeight = calcLuminance(material.diffuseAlbedo);
-
-    // return diffuseWeight;
     float specularWeight = calcLuminance(Schlick_Fresnel(material.specularF0, dot(surface.viewDir, surface.normal)));
     float sumWeights = diffuseWeight + specularWeight;
     return sumWeights < 1e-7f ? 1.f : (diffuseWeight / sumWeights);
@@ -196,13 +194,18 @@ bool RAB_GetSurfaceBrdfSample(RAB_Surface surface, inout RAB_RandomSamplerState 
     rand.z = RAB_GetNextRandom(rng);
     if (rand.x < surface.diffuseProbability)
     {
+        // if (kSpecularOnly)
+        //     return false;
+
         float pdf;
         float3 h = SampleCosHemisphere(rand.yz, pdf);
         dir = tangentToWorld(surface, h);
     }
     else
     {
-        float3 h = ImportanceSampleGGX(rand.yz, max(surface.material.roughness, kMinRoughness));
+        float3 Ve = normalize(worldToTangent(surface, surface.viewDir));
+        float3 h = ImportanceSampleGGX_VNDF(rand.yz, max(surface.material.roughness, kMinRoughness), Ve, 1.0);
+        h = normalize(h);
         dir = reflect(-surface.viewDir, tangentToWorld(surface, h));
     }
 
