@@ -126,6 +126,9 @@ namespace RTXDI
         private List<InstanceData> instanceDataList = new List<InstanceData>();
         private List<PrimitiveData> primitiveDataList = new List<PrimitiveData>();
 
+
+        List<uint> geometryInstanceToLightArray = new List<uint>();
+
         // Mesh 数据缓存：避免每帧重复分配 vertices/uv/triangles 数组
         private struct MeshCache
         {
@@ -165,6 +168,8 @@ namespace RTXDI
 
         public Dictionary<MeshRenderer, uint> rendererInstanceIdMap = new Dictionary<MeshRenderer, uint>();
 
+        uint instanceId = 0;
+
         // 完整重建：刷新 renderer 列表、primitive 数据、instance 数据，上传两个 buffer
         private void BuildFull()
         {
@@ -174,10 +179,9 @@ namespace RTXDI
             textureGroupCache.Clear();
             _emissiveInstanceRenderers.Clear();
             _meshDataCache.Clear();
+            geometryInstanceToLightArray.Clear();
 
-            var geometryInstanceToLightArray = new List<uint>();
-
-            uint instanceId = 0;
+            instanceId = 0;
 
 
             // 只遍历 MeshLightCache
@@ -244,12 +248,6 @@ namespace RTXDI
             _instanceBuffer.SetData(instanceDataList);
             _primitiveBuffer.SetData(primitiveDataList);
 
-            _geometryInstanceToLight.SetData(geometryInstanceToLightArray);
-            
-            for (var i = 0; i < geometryInstanceToLightArray.Count; i++)
-            {
-                Debug.Log($"{i} starts at Primitive index {geometryInstanceToLightArray[i]}");
-            }
 
             emissiveTriangleCount = (uint)primitiveDataList.Count;
             // Debug.Log($"BuildFull completed: {instanceDataList.Count} instances, {primitiveDataList.Count} primitives, {globalTexturePool.Count} unique emissive textures.");
@@ -257,12 +255,11 @@ namespace RTXDI
 
         public void UpdateInstanceID(RayTracingAccelerationStructure ras)
         {
-
             if (_meshDataCache.Count == 0)
             {
                 return;
             }
-            
+
             foreach (var keyValuePair in rendererInstanceIdMap)
             {
                 MeshRenderer renderer = keyValuePair.Key;
@@ -275,7 +272,6 @@ namespace RTXDI
                 Debug.Log($"Updated InstanceID for Renderer {renderer.name} to {instanceId}");
             }
 
-            var maxInstanceId = rendererInstanceIdMap.Values.Max();
 
             var otherRenderers = Object.FindObjectsByType<MeshRenderer>(FindObjectsSortMode.None).Where(r => !rendererInstanceIdMap.ContainsKey(r)).ToList();
 
@@ -284,9 +280,28 @@ namespace RTXDI
                 if (renderer == null)
                     continue;
 
-                maxInstanceId++;
-                ras.UpdateInstanceID(renderer, maxInstanceId);
-                Debug.Log($"Assigned new InstanceID {maxInstanceId} to Renderer {renderer.name} (not in MeshLightCache)");
+                var meshFilter = renderer.GetComponent<MeshFilter>();
+                if (meshFilter == null || meshFilter.sharedMesh == null)
+                    continue;
+
+                ras.UpdateInstanceID(renderer, instanceId);
+                var subMeshCount = meshFilter.sharedMesh.subMeshCount;
+
+                for (int i = 0; i < subMeshCount; i++)
+                {
+                    geometryInstanceToLightArray.Add(0xffffffffu);
+                }
+
+                instanceId += (uint)subMeshCount;
+                Debug.Log($"Assigned new InstanceID {instanceId} to Renderer {renderer.name} (not in MeshLightCache)");
+            }
+
+
+            _geometryInstanceToLight.SetData(geometryInstanceToLightArray);
+
+            for (var i = 0; i < geometryInstanceToLightArray.Count; i++)
+            {
+                Debug.Log($"{i} starts at Primitive index {geometryInstanceToLightArray[i]}");
             }
         }
 

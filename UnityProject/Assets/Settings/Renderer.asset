@@ -125,14 +125,14 @@ MonoBehaviour:
     sssAnisotropy: 0.8
     sssMaxSampleRadius: 0.0001
     enableRtxdi: 1
-    debugRtxdi: 0
-    resamplingMode: 3
+    debugRtxdi: 1
+    resamplingMode: 2
     gShowLight: 0
     initialSamplingParams:
-      numPrimaryLocalLightSamples: 8
+      numPrimaryLocalLightSamples: 16
       numPrimaryInfiniteLightSamples: 0
       numPrimaryEnvironmentSamples: 0
-      numPrimaryBrdfSamples: 4
+      numPrimaryBrdfSamples: 16
       brdfCutoff: 0.0001
       enableInitialVisibility: 1
       environmentMapImportanceSampling: 0
@@ -153,7 +153,7 @@ MonoBehaviour:
     spatialResamplingParams:
       spatialDepthThreshold: 0.1
       spatialNormalThreshold: 0.5
-      spatialBiasCorrection: 1
+      spatialBiasCorrection: 3
       numSpatialSamples: 1
       numDisocclusionBoostSamples: 8
       spatialSamplingRadius: 32
