@@ -203,8 +203,6 @@ TraceOpaqueResult TraceOpaque(GeometryProps geometryProps0, MaterialProps materi
         // Highlight invalid cells
         // result.diffRadiance = isValid ?  result.diffRadiance : float3( 1.0, 0.0, 0.0 );
         #endif
-        
-        result.diffRadiance = float3(sharcDebug,0,0);
 
         // result.diffRadiance /= diffFactor0;
 
@@ -754,7 +752,7 @@ void MainRayGenShader()
     #endif
 
 
-    gOut_DirectLighting[pixelPos] = float4(Ldirect , 1.0);
+    gOut_DirectLighting[pixelPos] = Ldirect;
 
     // END of test RTXDI
 
