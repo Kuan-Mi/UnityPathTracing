@@ -339,7 +339,7 @@ Shader "RayTracing/Lit"
 
 
                 // Instance
-                payload.SetInstanceIndex(InstanceIndex());
+                payload.SetInstanceIndex(InstanceID() + GeometryIndex());
 
                 // 法线
                 payload.N = Packing::EncodeUnitVector(normalWS);

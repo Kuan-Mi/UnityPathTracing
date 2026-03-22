@@ -23,6 +23,8 @@ Buffer<float2> t_NeighborOffsets;
 
 RWStructuredBuffer<RTXDI_PackedDIReservoir> u_LightReservoirs;
 
+StructuredBuffer<uint> t_GeometryInstanceToLight;
+
 #define RTXDI_LIGHT_RESERVOIR_BUFFER u_LightReservoirs
 #define RTXDI_NEIGHBOR_OFFSETS_BUFFER t_NeighborOffsets
 
