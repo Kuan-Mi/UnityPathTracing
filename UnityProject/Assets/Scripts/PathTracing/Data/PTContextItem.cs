@@ -7,7 +7,7 @@ namespace PathTracing
     {
         
         internal TextureHandle OutputTexture;
-        internal TextureHandle DirectLighting;
+        // internal TextureHandle DirectLighting;
         internal TextureHandle DirectEmission;
         internal TextureHandle ComposedDiff;
         internal TextureHandle ComposedSpecViewZ;
@@ -15,7 +15,7 @@ namespace PathTracing
         public override void Reset()
         {
             OutputTexture = TextureHandle.nullHandle;
-            DirectLighting = TextureHandle.nullHandle;
+            // DirectLighting = TextureHandle.nullHandle;
             DirectEmission = TextureHandle.nullHandle;
             ComposedDiff = TextureHandle.nullHandle;
             ComposedSpecViewZ = TextureHandle.nullHandle;

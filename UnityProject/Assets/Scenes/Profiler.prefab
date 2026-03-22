@@ -50,6 +50,9 @@ MonoBehaviour:
   - Opaque Tracing
   - PrepareLight
   - GIS Tracing
+  - TemporalResampling
+  - SpatialResampling
+  - ShadeSamples
   - Copy GBuffer to Prev
   - NRD Denoise
   - Composition

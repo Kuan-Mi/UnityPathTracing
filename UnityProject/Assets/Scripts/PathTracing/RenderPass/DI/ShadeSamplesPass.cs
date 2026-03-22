@@ -41,6 +41,7 @@ namespace PathTracing
             internal RTHandle NormalRoughness;
             internal RTHandle BaseColorMetalness;
             internal RTHandle GeoNormal;
+            internal RTHandle DirectLighting;
 
 
 
@@ -63,8 +64,6 @@ namespace PathTracing
             internal RayTracingShader OpaqueTs;
             internal Resource Resource;
             internal Settings Settings;
-
-            internal TextureHandle DirectLighting;
         }
 
         static void ExecutePass(PassData data, UnsafeGraphContext context)
@@ -93,7 +92,7 @@ namespace PathTracing
             natCmd.SetRayTracingTextureParam(data.OpaqueTs, g_Normal_RoughnessID, resource.NormalRoughness);
             natCmd.SetRayTracingTextureParam(data.OpaqueTs, g_BaseColor_MetalnessID, resource.BaseColorMetalness);
 
-            natCmd.SetRayTracingTextureParam(data.OpaqueTs, g_DirectLightingID, data.DirectLighting);
+            natCmd.SetRayTracingTextureParam(data.OpaqueTs, g_DirectLightingID, resource.DirectLighting);
 
             natCmd.SetRayTracingTextureParam(data.OpaqueTs, gIn_PrevViewZID, resource.PrevViewZ);
             natCmd.SetRayTracingTextureParam(data.OpaqueTs, gIn_PrevNormalRoughnessID, resource.PrevNormalRoughness);
@@ -152,11 +151,6 @@ namespace PathTracing
             textureDesc.height = _settings.m_RenderResolution.y;
 
             
-            var ptContextItem = frameData.Get<PTContextItem>();
-            
-            passData.DirectLighting = ptContextItem.DirectLighting;
-            
-            builder.UseTexture(passData.DirectLighting,  AccessFlags.ReadWrite);
 
             builder.AllowPassCulling(false);
             builder.SetRenderFunc((PassData data, UnsafeGraphContext context) => { ExecutePass(data, context); });

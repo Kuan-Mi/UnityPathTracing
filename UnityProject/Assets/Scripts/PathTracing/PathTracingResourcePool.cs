@@ -47,6 +47,7 @@ namespace PathTracing
             _nriResources[RenderResourceType.Validation]            = new NriTextureResource(RenderResourceType.Validation,            GraphicsFormat.R8G8B8A8_UNorm,         uavState);
 
             // ── NRI-interop resources (DLSS / composition) ──────────────────────
+            _nriResources[RenderResourceType.DirectLighting]               = new NriTextureResource(RenderResourceType.DirectLighting,               GraphicsFormat.R16G16B16A16_SFloat,    uavState);
             _nriResources[RenderResourceType.Composed]               = new NriTextureResource(RenderResourceType.Composed,               GraphicsFormat.R16G16B16A16_SFloat,    uavState);
             _nriResources[RenderResourceType.DlssOutput]             = new NriTextureResource(RenderResourceType.DlssOutput,             GraphicsFormat.R16G16B16A16_SFloat,    uavState);
             _nriResources[RenderResourceType.RrGuideDiffAlbedo]     = new NriTextureResource(RenderResourceType.RrGuideDiffAlbedo,     GraphicsFormat.A2B10G10R10_UNormPack32, uavState);

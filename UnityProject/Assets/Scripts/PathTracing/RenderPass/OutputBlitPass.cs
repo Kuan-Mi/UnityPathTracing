@@ -39,6 +39,7 @@ namespace PathTracing
             internal RTHandle Validation;
 
             internal RTHandle Composed;
+            internal RTHandle DirectLighting;
 
             internal RTHandle RRGuide_DiffAlbedo;
             internal RTHandle RRGuide_SpecAlbedo;
@@ -71,7 +72,6 @@ namespace PathTracing
             internal TextureHandle CameraTexture;
 
             internal TextureHandle OutputTexture;
-            internal TextureHandle DirectLighting;
             internal TextureHandle DirectEmission;
             internal TextureHandle ComposedDiff;
 
@@ -131,7 +131,7 @@ namespace PathTracing
                     Blitter.BlitTexture(natCmd, data.Resource.DenoisedSpec, scaleOffset, data.BlitMaterial, (int)ShowPass.Radiance);
                     break;
                 case ShowMode.DirectLight:
-                    Blitter.BlitTexture(natCmd, data.DirectLighting, scaleOffset, data.BlitMaterial, (int)ShowPass.Out);
+                    Blitter.BlitTexture(natCmd, data.Resource.DirectLighting, scaleOffset, data.BlitMaterial, (int)ShowPass.Out);
                     break;
                 case ShowMode.Emissive:
                     Blitter.BlitTexture(natCmd, data.DirectEmission, scaleOffset, data.BlitMaterial, (int)ShowPass.Out);
@@ -205,13 +205,11 @@ namespace PathTracing
             var ptContextItem = frameData.Get<PTContextItem>();
 
             passData.OutputTexture = ptContextItem.OutputTexture;
-            passData.DirectLighting = ptContextItem.DirectLighting;
             passData.DirectEmission = ptContextItem.DirectEmission;
             passData.ComposedDiff = ptContextItem.ComposedDiff;
             passData.ComposedSpecViewZ = ptContextItem.ComposedSpecViewZ;
 
             builder.UseTexture(passData.OutputTexture, AccessFlags.ReadWrite);
-            builder.UseTexture(passData.DirectLighting, AccessFlags.ReadWrite);
             builder.UseTexture(passData.DirectEmission, AccessFlags.ReadWrite);
             builder.UseTexture(passData.ComposedDiff, AccessFlags.ReadWrite);
             builder.UseTexture(passData.ComposedSpecViewZ, AccessFlags.ReadWrite);

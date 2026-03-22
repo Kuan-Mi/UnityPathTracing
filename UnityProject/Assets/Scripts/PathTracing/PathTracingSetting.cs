@@ -220,15 +220,7 @@ namespace PathTracing
 
         [FoldoutHeader("RTXDI")]
         public bool enableRtxdi;
-
-        [Range(0, 16)]
-        public uint localLightSamples;
-
-        [Range(0, 16)]
-        public uint spatialSamples;
-
-        [Range(0, 16)]
-        public uint brdfSamples;
+        public bool debugRtxdi;
 
         public bool enableSpatialResampling => resamplingMode is ReSTIRDI_ResamplingMode.Spatial or ReSTIRDI_ResamplingMode.TemporalAndSpatial;
         public bool enableTemporalResampling => resamplingMode is ReSTIRDI_ResamplingMode.Temporal or ReSTIRDI_ResamplingMode.TemporalAndSpatial;

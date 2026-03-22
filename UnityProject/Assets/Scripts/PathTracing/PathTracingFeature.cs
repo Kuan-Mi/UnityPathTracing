@@ -476,6 +476,7 @@ namespace PathTracing
                 NormalRoughness = pool.GetRT(RenderResourceType.NormalRoughness),
                 BaseColorMetalness = pool.GetRT(RenderResourceType.BasecolorMetalness),
                 GeoNormal = pool.GetRT(RenderResourceType.GeoNormal),
+                DirectLighting =  pool.GetRT(RenderResourceType.DirectLighting),
 
                 Penumbra = pool.GetRT(RenderResourceType.Penumbra),
                 Diff = pool.GetRT(RenderResourceType.DiffRadianceHitdist),
@@ -512,6 +513,7 @@ namespace PathTracing
                     NormalRoughness = pool.GetRT(RenderResourceType.NormalRoughness),
                     BaseColorMetalness = pool.GetRT(RenderResourceType.BasecolorMetalness),
                     GeoNormal = pool.GetRT(RenderResourceType.GeoNormal),
+                    DirectLighting =  pool.GetRT(RenderResourceType.DirectLighting),
 
                     PrevViewZ = pool.GetRT(RenderResourceType.PrevViewZ),
                     PrevNormalRoughness = pool.GetRT(RenderResourceType.PrevNormalRoughness),
@@ -544,6 +546,7 @@ namespace PathTracing
                         NormalRoughness = pool.GetRT(RenderResourceType.NormalRoughness),
                         BaseColorMetalness = pool.GetRT(RenderResourceType.BasecolorMetalness),
                         GeoNormal = pool.GetRT(RenderResourceType.GeoNormal),
+                        DirectLighting =  pool.GetRT(RenderResourceType.DirectLighting),
 
                         PrevViewZ = pool.GetRT(RenderResourceType.PrevViewZ),
                         PrevNormalRoughness = pool.GetRT(RenderResourceType.PrevNormalRoughness),
@@ -577,6 +580,7 @@ namespace PathTracing
                         NormalRoughness = pool.GetRT(RenderResourceType.NormalRoughness),
                         BaseColorMetalness = pool.GetRT(RenderResourceType.BasecolorMetalness),
                         GeoNormal = pool.GetRT(RenderResourceType.GeoNormal),
+                        DirectLighting =  pool.GetRT(RenderResourceType.DirectLighting),
 
                         PrevViewZ = pool.GetRT(RenderResourceType.PrevViewZ),
                         PrevNormalRoughness = pool.GetRT(RenderResourceType.PrevNormalRoughness),
@@ -608,6 +612,7 @@ namespace PathTracing
                     NormalRoughness = pool.GetRT(RenderResourceType.NormalRoughness),
                     BaseColorMetalness = pool.GetRT(RenderResourceType.BasecolorMetalness),
                     GeoNormal = pool.GetRT(RenderResourceType.GeoNormal),
+                    DirectLighting =  pool.GetRT(RenderResourceType.DirectLighting),
 
                     PrevViewZ = pool.GetRT(RenderResourceType.PrevViewZ),
                     PrevNormalRoughness = pool.GetRT(RenderResourceType.PrevNormalRoughness),
@@ -662,7 +667,8 @@ namespace PathTracing
                 ViewZ = pool.GetRT(RenderResourceType.Viewz),
                 NormalRoughness = pool.GetRT(RenderResourceType.NormalRoughness),
                 BaseColorMetalness = pool.GetRT(RenderResourceType.BasecolorMetalness),
-                PsrThroughput = pool.GetRT(RenderResourceType.PsrThroughput)
+                PsrThroughput = pool.GetRT(RenderResourceType.PsrThroughput),
+                DirectLighting =  pool.GetRT(RenderResourceType.DirectLighting),
             };
 
             if (pathTracingSetting.RR)
@@ -766,7 +772,7 @@ namespace PathTracing
                 {
                     var accumulateResource = new AccumulatePass.Resource
                     {
-                        noise = pool.GetRT(RenderResourceType.Composed),
+                        noise = pool.GetRT(pathTracingSetting.debugRtxdi?RenderResourceType.DirectLighting:RenderResourceType.Composed),
                         accumulation = pool.GetRT(RenderResourceType.DlssOutput),
                     };
 
@@ -784,7 +790,7 @@ namespace PathTracing
                 {
                     var dlrrRes = new DlrrDenoiser.DlrrResources
                     {
-                        input = pool.GetNriResource(RenderResourceType.Composed),
+                        input = pool.GetNriResource(pathTracingSetting.debugRtxdi?RenderResourceType.DirectLighting:RenderResourceType.Composed),
                         output = pool.GetNriResource(RenderResourceType.DlssOutput),
                         mv = pool.GetNriResource(RenderResourceType.MV),
                         depth = pool.GetNriResource(RenderResourceType.Viewz),
@@ -896,6 +902,7 @@ namespace PathTracing
                 Validation = pool.GetRT(RenderResourceType.Validation),
 
                 Composed = pool.GetRT(RenderResourceType.Composed),
+                DirectLighting =  pool.GetRT(RenderResourceType.DirectLighting),
 
                 RRGuide_DiffAlbedo = pool.GetRT(RenderResourceType.RrGuideDiffAlbedo),
                 RRGuide_SpecAlbedo = pool.GetRT(RenderResourceType.RrGuideSpecAlbedo),

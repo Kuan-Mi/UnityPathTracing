@@ -30,6 +30,7 @@ namespace PathTracing
 
         // ── NRI-interop resources (DLSS / composition) ──────────────────────────
         Composed,
+        DirectLighting,
         DlssOutput,
         RrGuideDiffAlbedo,
         RrGuideSpecAlbedo,
