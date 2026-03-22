@@ -82,7 +82,7 @@ namespace RTXDI
             _instanceBuffer = new ComputeBuffer(8192, Marshal.SizeOf<InstanceData>());
             _primitiveBuffer = new ComputeBuffer(327680, Marshal.SizeOf<PrimitiveData>());
             _lightInfoBuffer = new GraphicsBuffer(GraphicsBuffer.Target.Structured, 327680, Marshal.SizeOf<RAB_LightInfo>());
-            _geometryInstanceToLight = new GraphicsBuffer(GraphicsBuffer.Target.Structured, 1024, sizeof(uint));
+            _geometryInstanceToLight = new GraphicsBuffer(GraphicsBuffer.Target.Structured, 10240, sizeof(uint));
             isBufferInitialized = true;
         }
 
