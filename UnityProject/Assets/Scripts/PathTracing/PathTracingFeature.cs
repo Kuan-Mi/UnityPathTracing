@@ -968,7 +968,7 @@ namespace PathTracing
             resamplingConstants.lightBufferParams.environmentLightParams.lightPresent = 0;
             resamplingConstants.lightBufferParams.environmentLightParams.lightIndex = (0xffffffffu);
 
-            resamplingConstants.restirDIReservoirBufferParams = restirDiContext.GetReservoirBufferParameters();
+            // resamplingConstants.restirDIReservoirBufferParams = restirDiContext.GetReservoirBufferParameters();
 
             resamplingConstants.frameIndex = restirDiContext.GetFrameIndex();
             // resamplingConstants.numInitialSamples = pathTracingSetting.localLightSamples;

@@ -5,13 +5,18 @@ struct ResamplingConstants
     RTXDI_RuntimeParameters runtimeParams;
 
     RTXDI_LightBufferParameters lightBufferParams;
-    RTXDI_ReservoirBufferParameters restirDIReservoirBufferParams;
+    RTXDI_RISBufferSegmentParameters localLightsRISBufferSegmentParams;
+    RTXDI_RISBufferSegmentParameters environmentLightRISBufferSegmentParams;
 
     ReSTIRDI_Parameters restirDI;
 
     uint frameIndex;
     uint2 pad2;
     uint pad3;
+    
+    
+    uint2 environmentPdfTextureSize;
+    uint2 localLightPdfTextureSize;
 };
 
 RWStructuredBuffer<ResamplingConstants> ResampleConstants;
@@ -30,4 +35,4 @@ StructuredBuffer<uint> t_GeometryInstanceToLight;
 
 #define BACKGROUND_DEPTH 65504.f
 
-#define RTXDI_ENABLE_PRESAMPLING 0
+#define RTXDI_ENABLE_PRESAMPLING 1

@@ -127,7 +127,7 @@ RAB_Surface RAB_GetGBufferSurface(int2 pixelPosition, bool previousFrame)
         return GetGBufferSurface(
             pixelPosition,
             gViewToWorldPrev,
-            gCameraGlobalPosPrev,
+            gCameraGlobalPosPrev.xyz,
             gIn_PrevViewZ,
             gIn_PrevNormalRoughness,
             gIn_PrevBaseColorMetalness,
@@ -138,7 +138,7 @@ RAB_Surface RAB_GetGBufferSurface(int2 pixelPosition, bool previousFrame)
         return GetGBufferSurface(
             pixelPosition,
             gViewToWorld,
-            gCameraGlobalPos,
+            gCameraGlobalPos.xyz,
             gOut_ViewZ,
             gOut_Normal_Roughness,
             gOut_BaseColor_Metalness,

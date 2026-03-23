@@ -15,7 +15,7 @@
 #include "Assets/Shaders/Rtxdi/DI/Reservoir.hlsl"
 #include "Assets/Shaders/Rtxdi/LightSampling/LocalLightSelection.hlsl"
 #ifdef RTXDI_RIS_BUFFER_HLSLI
-#include "Assets/Shaders/Rtxdi/LightSampling/RISBuffer.hlsli"
+#include "Assets/Shaders/Rtxdi/LightSampling/RISBuffer.hlsl"
 #if RTXDI_REGIR_MODE != RTXDI_REGIR_DISABLED
 #include "Assets/Shaders/Rtxdi/ReGIR/ReGIRSampling.hlsli"
 #endif

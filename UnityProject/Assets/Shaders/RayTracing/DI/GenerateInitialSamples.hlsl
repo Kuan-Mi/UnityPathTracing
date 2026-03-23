@@ -20,6 +20,10 @@ Texture2D<uint> gIn_PrevGeoNormal;
 RWTexture2D<float3> gOut_DirectLighting;
 
 
+RWBuffer<uint2> u_RisBuffer;
+
+#define RTXDI_RIS_BUFFER u_RisBuffer
+
 #include "Assets/Shaders/Rtxdi/RtxdiParameters.h"
 #include "Assets/Shaders/donut/packing.hlsli"
 #include "Assets/Shaders/donut/brdf.hlsli"
@@ -44,8 +48,6 @@ void MainRayGenShader()
 
     RAB_Surface surface = RAB_GetGBufferSurface(pixelPosition, false);
 
-    const RTXDI_LightBufferParameters lightBufferParams = g_Const.lightBufferParams;
-
     RTXDI_SampleParameters sampleParams = RTXDI_InitSampleParameters(
         g_Const.restirDI.initialSamplingParams.numPrimaryLocalLightSamples,
         g_Const.restirDI.initialSamplingParams.numPrimaryInfiniteLightSamples,
@@ -58,6 +60,10 @@ void MainRayGenShader()
     RAB_LightSample lightSample;
     RTXDI_DIReservoir reservoir = RTXDI_SampleLightsForSurface(rng, tileRng, surface,
                                                                sampleParams, g_Const.lightBufferParams, g_Const.restirDI.initialSamplingParams.localLightSamplingMode,
+
+                                                               #ifdef RTXDI_ENABLE_PRESAMPLING
+                                                               g_Const.localLightsRISBufferSegmentParams, g_Const.environmentLightRISBufferSegmentParams,
+                                                               #endif
                                                                lightSample);
 
     if (g_Const.restirDI.initialSamplingParams.enableInitialVisibility && RTXDI_IsValidDIReservoir(reservoir))

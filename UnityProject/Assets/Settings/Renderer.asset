@@ -125,7 +125,7 @@ MonoBehaviour:
     sssAnisotropy: 0.8
     sssMaxSampleRadius: 0.0001
     enableRtxdi: 1
-    debugRtxdi: 0
+    debugRtxdi: 1
     resamplingMode: 2
     gShowLight: 0
     initialSamplingParams:
