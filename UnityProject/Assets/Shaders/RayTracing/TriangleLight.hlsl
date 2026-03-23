@@ -14,6 +14,8 @@
 #include "HelperFunctions.hlsl"
 #include <Assets/Shaders/donut/packing.hlsli>
 
+static const float c_pi = 3.1415926535;
+
 struct TriangleLight
 {
     float3 base;
@@ -37,6 +39,13 @@ struct TriangleLight
         const float sampleCosTheta = saturate(dot(L, -lightSampleNormal));
 
         return pdfAtoW(areaPdf, Ldist, sampleCosTheta);
+    }
+
+    
+    float getPower()
+    {
+        
+        return surfaceArea * c_pi * calcLuminance(radiance);
     }
 
     // Helper methods

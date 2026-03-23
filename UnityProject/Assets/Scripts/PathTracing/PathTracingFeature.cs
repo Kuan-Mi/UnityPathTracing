@@ -42,6 +42,7 @@ namespace PathTracing
         public ComputeShader sharcResolveCs;
         public ComputeShader autoExposureShader;
         public ComputeShader accumulateCs;
+        public ComputeShader pdfTextureCs;
 
         public Texture2D scramblingRankingTex;
         public Texture2D sobolTex;
@@ -54,6 +55,7 @@ namespace PathTracing
         private TemporalResamplingPass _temporalResamplingPass;
         private SpatialResamplingPass _spatialResamplingPass;
         private ShadeSamplesPass _shadeSamplesPass;
+        private PdfTexturePass _pdfTexturePass;
 
 
         private NrdPass _nrdPass;
@@ -183,6 +185,10 @@ namespace PathTracing
                 renderPassEvent = renderPassEvent
             };
 
+            _pdfTexturePass ??= new PdfTexturePass(pdfTextureCs)
+            {
+                renderPassEvent = renderPassEvent
+            };
 
             _nrdPass ??= new NrdPass()
             {
@@ -454,6 +460,21 @@ namespace PathTracing
 
             _prepareLightPass.Setup(_prepareLightResources);
             renderer.EnqueuePass(_prepareLightPass);
+
+
+            var pdfResource = new PdfTexturePass.Resource
+            {
+                ResamplingConstantBuffer = _resamplingConstantBuffer,
+                u_LocalLightPdfTexture = _gpuScene.localLightPdfTexture,
+                RtxdiResources = rtxdiResources
+            };
+
+            var pdfSettings = new PdfTexturePass.Settings
+            {
+            };
+
+            _pdfTexturePass.Setup(pdfResource, pdfSettings);
+            renderer.EnqueuePass(_pdfTexturePass);
 
             // Opaque Pass
             var opaqueResource = new OpaquePass.Resource
