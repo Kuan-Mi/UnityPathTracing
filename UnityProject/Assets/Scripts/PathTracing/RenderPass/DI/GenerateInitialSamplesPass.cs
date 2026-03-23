@@ -84,6 +84,7 @@ namespace PathTracing
             natCmd.SetRayTracingBufferParam(data.OpaqueTs, t_LightDataBufferID, resource.RtxdiResources.LightDataBuffer);
             natCmd.SetRayTracingBufferParam(data.OpaqueTs, t_NeighborOffsetsID, resource.RtxdiResources.NeighborOffsetsBuffer);
             natCmd.SetRayTracingBufferParam(data.OpaqueTs, u_LightReservoirsID, resource.RtxdiResources.LightReservoirBuffer);
+            natCmd.SetRayTracingBufferParam(data.OpaqueTs, "u_RisBuffer", resource.RtxdiResources.RisBuffer);
 
 
             natCmd.SetRayTracingTextureParam(data.OpaqueTs, g_MvID, resource.Mv);

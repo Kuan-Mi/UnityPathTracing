@@ -43,6 +43,7 @@ namespace PathTracing
         public ComputeShader autoExposureShader;
         public ComputeShader accumulateCs;
         public ComputeShader pdfTextureCs;
+        public ComputeShader presampleCs;
 
         public Texture2D scramblingRankingTex;
         public Texture2D sobolTex;
@@ -56,6 +57,7 @@ namespace PathTracing
         private SpatialResamplingPass _spatialResamplingPass;
         private ShadeSamplesPass _shadeSamplesPass;
         private PdfTexturePass _pdfTexturePass;
+        private PresamplePass _presamplePass;
 
 
         private NrdPass _nrdPass;
@@ -93,8 +95,9 @@ namespace PathTracing
         private readonly Dictionary<long, NrdDenoiser> _nrdDenoisers = new();
         private readonly Dictionary<long, DlrrDenoiser> _dlrrDenoisers = new();
         private readonly Dictionary<long, PathTracingResourcePool> _resourcePools = new();
-        private readonly Dictionary<long, ReSTIRDIContext> _restirDiContexts = new();
+        // private readonly Dictionary<long, ReSTIRDIContext> _restirDiContexts = new();
         private readonly Dictionary<long, RtxdiResources> _rtxdiResources = new();
+        private readonly Dictionary<long, ImportanceSamplingContext> _isContexts = new();
         private readonly Dictionary<long, CameraFrameState> _cameraFrameStates = new();
 
         public override void Create()
@@ -186,6 +189,11 @@ namespace PathTracing
             };
 
             _pdfTexturePass ??= new PdfTexturePass(pdfTextureCs)
+            {
+                renderPassEvent = renderPassEvent
+            };
+            
+            _presamplePass ??= new PresamplePass(presampleCs)
             {
                 renderPassEvent = renderPassEvent
             };
@@ -350,21 +358,31 @@ namespace PathTracing
             _prepareLightResources.SetBuffer(_gpuScene);
             _prepareLightResources.SendTexture(_gpuScene.globalTexturePool);
 
-            if (!_restirDiContexts.TryGetValue(uniqueKey, out var restirDiContext))
+            // if (!_restirDiContexts.TryGetValue(uniqueKey, out var restirDiContext))
+            // {
+            //     var contextParams = ReSTIRDIStaticParameters.Default();
+            //     contextParams.RenderWidth = (uint)cam.pixelWidth;
+            //     contextParams.RenderHeight = (uint)cam.pixelHeight;
+            //
+            //     restirDiContext = new ReSTIRDIContext(contextParams);
+            //     _restirDiContexts.Add(uniqueKey, restirDiContext);
+            // }
+
+            if (!_isContexts.TryGetValue(uniqueKey, out var isContext))
             {
-                var contextParams = ReSTIRDIStaticParameters.Default();
-                contextParams.RenderWidth = (uint)cam.pixelWidth;
-                contextParams.RenderHeight = (uint)cam.pixelHeight;
-
-                restirDiContext = new ReSTIRDIContext(contextParams);
-                _restirDiContexts.Add(uniqueKey, restirDiContext);
+                var isParams = ImportanceSamplingContext_StaticParameters.Default();
+                isParams.renderWidth = (uint)cam.pixelWidth;
+                isParams.renderHeight = (uint)cam.pixelHeight;
+                isContext = new ImportanceSamplingContext(isParams);
+                _isContexts.Add(uniqueKey, isContext);
             }
-
+            
             if (!_rtxdiResources.TryGetValue(uniqueKey, out var rtxdiResources))
             {
-                rtxdiResources = new RtxdiResources(restirDiContext, _gpuScene);
+                rtxdiResources = new RtxdiResources(isContext.GetReSTIRDIContext(), isContext.GetRISBufferSegmentAllocator(),_gpuScene);
                 _rtxdiResources.Add(uniqueKey, rtxdiResources);
             }
+            
 
             if (finalMaterial == null
                 || opaqueTracingShader == null
@@ -428,9 +446,9 @@ namespace PathTracing
             _globalConstantsArray[0] = globalConstants;
             _constantBuffer.SetData(_globalConstantsArray);
 
-            resamplingConstants = GetResamplingConstants(restirDiContext, rtxdiResources, frameState);
+            resamplingConstants = GetResamplingConstants(isContext.GetReSTIRDIContext(), rtxdiResources, frameState);
 
-            var ss = resamplingConstants.ToString();
+            // var ss = resamplingConstants.ToString();
             // Debug.Log($"Resampling Constants:\n{ss}");
 
 
@@ -475,6 +493,35 @@ namespace PathTracing
 
             _pdfTexturePass.Setup(pdfResource, pdfSettings);
             renderer.EnqueuePass(_pdfTexturePass);
+            
+            
+            var preResource = new PresamplePass.Resource
+            {
+                ConstantBuffer = _constantBuffer,
+                ResamplingConstantBuffer = _resamplingConstantBuffer,
+                u_LocalLightPdfTexture = _gpuScene.localLightPdfTexture,
+
+                RtxdiResources = rtxdiResources
+            };
+            var RTXDI_PRESAMPLING_GROUP_SIZE = 256;
+            var x = (isContext.GetLocalLightRISBufferSegmentParams().tileSize + RTXDI_PRESAMPLING_GROUP_SIZE - 1) / RTXDI_PRESAMPLING_GROUP_SIZE;
+            var y = isContext.GetLocalLightRISBufferSegmentParams().tileCount;
+            
+            // dm::int2 presampleDispatchSize = {
+            //     dm::div_ceil(isContext.GetLocalLightRISBufferSegmentParams().tileSize, RTXDI_PRESAMPLING_GROUP_SIZE),
+            //     int(isContext.GetLocalLightRISBufferSegmentParams().tileCount)
+            // };
+
+            
+            var preSettings = new PresamplePass.Settings
+            {
+                x = (int)x,
+                y = (int)y,
+                z = 1
+            };
+            
+            _presamplePass.Setup(preResource, preSettings);
+            renderer.EnqueuePass(_presamplePass);
 
             // Opaque Pass
             var opaqueResource = new OpaquePass.Resource
@@ -1008,6 +1055,8 @@ namespace PathTracing
 
             resamplingConstants.restirDI = restirDiParameters;
 
+
+
             return resamplingConstants;
         }
 
@@ -1066,7 +1115,7 @@ namespace PathTracing
 
             _rtxdiResources.Clear();
 
-            _restirDiContexts.Clear();
+            // _restirDiContexts.Clear();
 
             _lightCollector?.Dispose();
             _lightCollector = null;

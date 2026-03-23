@@ -3,6 +3,7 @@ using System.Runtime.InteropServices;
 using Rtxdi;
 using RTXDI;
 using Rtxdi.DI;
+using Rtxdi.LightSampling;
 using Unity.Mathematics;
 using UnityEngine;
 
@@ -22,6 +23,7 @@ namespace mini
         public GraphicsBuffer LightDataBuffer { get; private set; }
         // public GraphicsBuffer GeometryInstanceToLightBuffer { get; private set; }
         public ComputeBuffer NeighborOffsetsBuffer { get; private set; }
+        public ComputeBuffer RisBuffer { get; private set; }
         public GraphicsBuffer LightReservoirBuffer { get; private set; }
 
         public GPUScene Scene;
@@ -31,7 +33,9 @@ namespace mini
 
         public unsafe  RtxdiResources(
             ReSTIRDIContext context,
+            RISBufferSegmentAllocator risBufferSegmentAllocator,
             GPUScene scene)
+        
         { 
             LightDataBuffer = scene._lightInfoBuffer;
             this.Scene = scene;
@@ -109,6 +113,14 @@ namespace mini
                 );
                 LightReservoirBuffer.name = "LightReservoirBuffer";
             }
+
+            RisBuffer = new ComputeBuffer((int)math.max(risBufferSegmentAllocator.GetTotalSizeInElements(), 1),
+                sizeof(Vector2),
+                ComputeBufferType.Default);
+            RisBuffer.name = "RisBuffer";
+            
+            
+
         }
         
         

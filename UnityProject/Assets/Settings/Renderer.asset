@@ -69,7 +69,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::PathTracing.PathTracingFeature
   m_Active: 1
   pathTracingSetting:
-    showMode: 18
+    showMode: 11
     showMv: 0
     showValidation: 0
     sunAngularDiameter: 0.69
@@ -124,9 +124,9 @@ MonoBehaviour:
     sssScale: 1
     sssAnisotropy: 0.8
     sssMaxSampleRadius: 0.0001
-    enableRtxdi: 0
-    debugRtxdi: 0
-    resamplingMode: 2
+    enableRtxdi: 1
+    debugRtxdi: 1
+    resamplingMode: 0
     gShowLight: 0
     initialSamplingParams:
       numPrimaryLocalLightSamples: 8
@@ -190,5 +190,6 @@ MonoBehaviour:
   autoExposureShader: {fileID: 7200000, guid: dd8e8b3823bdf9c4e987096a78bd2248, type: 3}
   accumulateCs: {fileID: 7200000, guid: c1e50e483fac4de7803cd658d0f9cdd2, type: 3}
   pdfTextureCs: {fileID: 7200000, guid: 6d3d83398dc04a9ea285602128206037, type: 3}
+  presampleCs: {fileID: 7200000, guid: c7795bf09240c4c40bcb2e51042eb5b5, type: 3}
   scramblingRankingTex: {fileID: 2800000, guid: ba45d1e4dcf9022438a4798a5f9e7b80, type: 3}
   sobolTex: {fileID: 2800000, guid: 17e7ce8147355314ea8aab1178a6a43c, type: 3}
