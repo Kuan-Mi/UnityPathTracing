@@ -44,6 +44,7 @@ namespace PathTracing
         public ComputeShader accumulateCs;
         public ComputeShader pdfTextureCs;
         public ComputeShader presampleCs;
+        public ComputeShader genMipsCs;
 
         public Texture2D scramblingRankingTex;
         public Texture2D sobolTex;
@@ -58,6 +59,7 @@ namespace PathTracing
         private ShadeSamplesPass _shadeSamplesPass;
         private PdfTexturePass _pdfTexturePass;
         private PresamplePass _presamplePass;
+        public GenerateMipsPass _generateMipsPass;
 
 
         private NrdPass _nrdPass;
@@ -184,6 +186,11 @@ namespace PathTracing
             };
 
             _shadeSamplesPass ??= new ShadeSamplesPass(shadeSamplesShader)
+            {
+                renderPassEvent = renderPassEvent
+            };
+            
+            _generateMipsPass ??= new GenerateMipsPass(genMipsCs)
             {
                 renderPassEvent = renderPassEvent
             };
@@ -493,6 +500,22 @@ namespace PathTracing
 
             _pdfTexturePass.Setup(pdfResource, pdfSettings);
             renderer.EnqueuePass(_pdfTexturePass);
+            
+            
+            var genMipsResource = new GenerateMipsPass.Resource
+            {
+                u_LocalLightPdfTexture = _gpuScene.localLightPdfTexture,
+            };
+            
+            var genMipsSettings = new GenerateMipsPass.Settings
+            {
+                width = _gpuScene.localLightPdfTexture.rt.width,
+                height = _gpuScene.localLightPdfTexture.rt.height,
+                mipCount = _gpuScene.localLightPdfTexture.rt.mipmapCount
+            };
+            
+            _generateMipsPass.Setup(genMipsResource, genMipsSettings);
+            renderer.EnqueuePass(_generateMipsPass);
             
             
             var preResource = new PresamplePass.Resource
@@ -1036,17 +1059,8 @@ namespace PathTracing
             resamplingConstants.lightBufferParams.environmentLightParams.lightPresent = 0;
             resamplingConstants.lightBufferParams.environmentLightParams.lightIndex = (0xffffffffu);
 
-            // resamplingConstants.restirDIReservoirBufferParams = restirDiContext.GetReservoirBufferParameters();
-
             resamplingConstants.frameIndex = restirDiContext.GetFrameIndex();
-            // resamplingConstants.numInitialSamples = pathTracingSetting.localLightSamples;
-            // resamplingConstants.numSpatialSamples = pathTracingSetting.spatialSamples;
-            // resamplingConstants.useAccurateGBufferNormal = 0;
-            // resamplingConstants.numInitialBRDFSamples = pathTracingSetting.brdfSamples;
-            // resamplingConstants.brdfCutoff = 0;
-            resamplingConstants.pad2 = new uint2(0, 0);
-            // resamplingConstants.enableResampling = pathTracingSetting.enableTemporalResampling ? 1u : 0u;
-            // resamplingConstants.unbiasedMode = 1;
+            resamplingConstants.pad2 = new uint2(0, 0); 
 
 
             var restirDiParameters = new ReSTIRDI_Parameters();
@@ -1057,6 +1071,7 @@ namespace PathTracing
 
 
 
+            resamplingConstants.localLightPdfTextureSize = rtxdiResources.Scene.localLightPdfTextureSize;
             return resamplingConstants;
         }
 

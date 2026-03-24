@@ -173,6 +173,7 @@ namespace RTXDI
         uint instanceId = 0;
 
         public RTHandle localLightPdfTexture;
+        public uint2 localLightPdfTextureSize;
 
         // 完整重建：刷新 renderer 列表、primitive 数据、instance 数据，上传两个 buffer
         private void BuildFull()
@@ -258,19 +259,32 @@ namespace RTXDI
             uint maxLocalLights = emissiveTriangleCount;
             Rtxdi.RtxdiUtils.ComputePdfTextureSize(maxLocalLights, out uint texWidth, out uint texHeight, out uint mipLevels);
 
+            localLightPdfTextureSize= new uint2(texWidth, texHeight);
             localLightPdfTexture?.Release();
+            
+            var textureDesc = new RenderTextureDescriptor((int)texWidth, (int)texHeight, RenderTextureFormat.RFloat)
+            {
+                dimension = TextureDimension.Tex2D,
+                enableRandomWrite = true,
+                useMipMap = true,
+                autoGenerateMips = false,
+                useDynamicScale = false,
+                mipCount =  (int)mipLevels,
+            };
 
-            localLightPdfTexture = RTHandles.Alloc(
-                name: "LocalLightPDFTexture",
-                dimension: TextureDimension.Tex2D,
-                colorFormat: GraphicsFormat.R32_SFloat,
-                width: (int)texWidth,
-                height: (int)texHeight,
-                enableRandomWrite: true,
-                useMipMap: true,
-                autoGenerateMips:false,
-                useDynamicScale: false
-                );
+            localLightPdfTexture = RTHandles.Alloc(textureDesc);
+            
+            // localLightPdfTexture = RTHandles.Alloc(
+            //     name: "LocalLightPDFTexture",
+            //     dimension: TextureDimension.Tex2D,
+            //     colorFormat: GraphicsFormat.R32_SFloat,
+            //     width: (int)texWidth,
+            //     height: (int)texHeight,
+            //     enableRandomWrite: true,
+            //     useMipMap: true,
+            //     autoGenerateMips:false,
+            //     useDynamicScale: false
+            //     );
             
             
             

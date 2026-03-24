@@ -1,0 +1,29 @@
+#pragma kernel CSMain
+
+// 输入 Mip 层级
+Texture2D<float> _SourceMip;
+// 输出 Mip 层级
+RWTexture2D<float> _TargetMip;
+
+// 常量：目标层级的尺寸
+uint2 _TargetSize;
+uint _SrcMipLevel; // 新增：记录当前源 Mip 的索引
+
+[numthreads(8, 8, 1)]
+void CSMain(uint3 id : SV_DispatchThreadID)
+{
+    if (id.x >= _TargetSize.x || id.y >= _TargetSize.y)
+        return;
+
+    uint2 srcCoord = id.xy * 2;
+
+    // 使用 .mips[level][coord] 访问
+    float w0 = _SourceMip.mips[_SrcMipLevel][srcCoord + uint2(0, 0)];
+    float w1 = _SourceMip.mips[_SrcMipLevel][srcCoord + uint2(1, 0)];
+    float w2 = _SourceMip.mips[_SrcMipLevel][srcCoord + uint2(0, 1)];
+    float w3 = _SourceMip.mips[_SrcMipLevel][srcCoord + uint2(1, 1)];
+
+    float result = (w0 + w1 + w2 + w3) * 0.25f;
+
+    _TargetMip[id.xy] = result;
+}

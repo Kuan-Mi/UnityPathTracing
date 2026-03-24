@@ -129,14 +129,14 @@ MonoBehaviour:
     resamplingMode: 0
     gShowLight: 0
     initialSamplingParams:
-      numPrimaryLocalLightSamples: 8
+      numPrimaryLocalLightSamples: 4
       numPrimaryInfiniteLightSamples: 0
       numPrimaryEnvironmentSamples: 0
-      numPrimaryBrdfSamples: 4
+      numPrimaryBrdfSamples: 0
       brdfCutoff: 0.0001
       enableInitialVisibility: 1
       environmentMapImportanceSampling: 0
-      localLightSamplingMode: 0
+      localLightSamplingMode: 1
     temporalResamplingParams:
       temporalDepthThreshold: 0.1
       temporalNormalThreshold: 0.5
@@ -191,5 +191,6 @@ MonoBehaviour:
   accumulateCs: {fileID: 7200000, guid: c1e50e483fac4de7803cd658d0f9cdd2, type: 3}
   pdfTextureCs: {fileID: 7200000, guid: 6d3d83398dc04a9ea285602128206037, type: 3}
   presampleCs: {fileID: 7200000, guid: c7795bf09240c4c40bcb2e51042eb5b5, type: 3}
+  genMipsCs: {fileID: 7200000, guid: 479eb3f98680430492d6af04d7f3ee14, type: 3}
   scramblingRankingTex: {fileID: 2800000, guid: ba45d1e4dcf9022438a4798a5f9e7b80, type: 3}
   sobolTex: {fileID: 2800000, guid: 17e7ce8147355314ea8aab1178a6a43c, type: 3}

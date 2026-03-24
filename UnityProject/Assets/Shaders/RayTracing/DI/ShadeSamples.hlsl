@@ -21,6 +21,9 @@ RWTexture2D<float3> gOut_DirectLighting;
 
 RWTexture2D<int2> u_TemporalSamplePositions;
 
+Texture2D t_LocalLightPdfTexture;
+
+
 #include "Assets/Shaders/Rtxdi/RtxdiParameters.h"
 #include "Assets/Shaders/Rtxdi/DI/ReSTIRDIParameters.h"
 #include "Assets/Shaders/donut/packing.hlsli"
@@ -121,13 +124,11 @@ float3 DemodulateSpecular(float3 surfaceSpecularF0, float3 specular)
 [shader("raygeneration")]
 void MainRayGenShader()
 {
-    
     uint2 GlobalIndex = DispatchRaysIndex().xy;
-    
-    const RTXDI_RuntimeParameters params = g_Const.runtimeParams;
-    
-    uint2 pixelPosition = RTXDI_ReservoirPosToPixelPos(GlobalIndex, params.activeCheckerboardField);
 
+    const RTXDI_RuntimeParameters params = g_Const.runtimeParams;
+
+    uint2 pixelPosition = RTXDI_ReservoirPosToPixelPos(GlobalIndex, params.activeCheckerboardField);
 
 
     RAB_Surface surface = RAB_GetGBufferSurface(pixelPosition, false);
@@ -155,7 +156,7 @@ void MainRayGenShader()
 
         gOut_DirectLighting[pixelPosition] = ShadeSurfaceWithLightSample(lightSample, surface)
             * RTXDI_GetDIReservoirInvPdf(reservoir);
-        
+
         // gOut_DirectLighting[pixelPosition] = diffuse + specular;
 
         if (needToStore)
@@ -167,36 +168,40 @@ void MainRayGenShader()
     {
         gOut_DirectLighting[pixelPosition] = 0;
     }
-    
-    
+
     //
     // float3 origin = gCameraGlobalPos;
-    // float3 dir = normalize( surface.worldPos - origin);
+    // float3 dir = normalize(surface.worldPos - origin);
     // uint o_lightIndex;
     // float2 o_randXY;
     //
-    // bool hit = RAB_TraceRayForLocalLight(origin,dir,0,1000,o_lightIndex,o_randXY);
-    //
+    // bool hit = RAB_TraceRayForLocalLight(origin, dir, 0, 1000, o_lightIndex, o_randXY);
     //
     //
     // // gOut_DirectLighting[pixelPosition] = float3(o_randXY,0);
-    //
+    // //
     // if (o_lightIndex == RTXDI_InvalidLightIndex)
     // {
     //     gOut_DirectLighting[pixelPosition] = 0;
-    //     
-    // }else
-    // {
-    //     
-    //     
-    //     // gOut_DirectLighting[pixelPosition] = o_lightIndex/12.0;
-    //     
-    //     
-    //     RAB_LightInfo lightInfo = RAB_LoadLightInfo(o_lightIndex, false);
-    //     RAB_LightSample lightSample = RAB_SamplePolymorphicLight(lightInfo,
-    //                                                              surface, o_randXY);
-    //     
-    //     gOut_DirectLighting[pixelPosition] = lightSample.radiance;
     // }
-    
+    // else
+    // {
+    //
+    //     uint2 pdfTexturePosition = RTXDI_LinearIndexToZCurve(o_lightIndex);
+    //     float power = t_LocalLightPdfTexture.Load(int3(pdfTexturePosition >> 1 , 1));
+    //     
+    //     float3 color ; 
+    //     color = power;
+    //     
+    //     gOut_DirectLighting[pixelPosition] = color;
+    //     
+    //     // gOut_DirectLighting[pixelPosition] = o_lightIndex / 12.0;
+    //     
+    //     
+    //     // RAB_LightInfo lightInfo = RAB_LoadLightInfo(o_lightIndex, false);
+    //     // RAB_LightSample lightSample = RAB_SamplePolymorphicLight(lightInfo,
+    //     //                                                          surface, o_randXY);
+    //     //
+    //     // gOut_DirectLighting[pixelPosition] = lightSample.radiance;
+    // }
 }

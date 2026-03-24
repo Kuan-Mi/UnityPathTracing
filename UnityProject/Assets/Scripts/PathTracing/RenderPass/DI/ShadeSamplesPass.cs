@@ -105,6 +105,10 @@ namespace PathTracing
             natCmd.SetRayTracingTextureParam(data.OpaqueTs,"gIn_PrevGeoNormal", resource.PrevGeoNormal);
             
 
+            natCmd.SetRayTracingTextureParam(data.OpaqueTs,"t_LocalLightPdfTexture", resource.RtxdiResources.Scene.localLightPdfTexture);
+
+            
+            
             uint rectWmod = (uint)(settings.m_RenderResolution.x * settings.resolutionScale + 0.5f);
             uint rectHmod = (uint)(settings.m_RenderResolution.y * settings.resolutionScale + 0.5f);
 

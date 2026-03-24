@@ -58,13 +58,14 @@ void MainRayGenShader()
 
 
     RAB_LightSample lightSample;
-    RTXDI_DIReservoir reservoir = RTXDI_SampleLightsForSurface(rng, tileRng, surface,
-                                                               sampleParams, g_Const.lightBufferParams, g_Const.restirDI.initialSamplingParams.localLightSamplingMode,
+    RTXDI_DIReservoir reservoir = RTXDI_SampleLightsForSurface(
+        rng, tileRng, surface,
+        sampleParams, g_Const.lightBufferParams, g_Const.restirDI.initialSamplingParams.localLightSamplingMode,
 
-                                                               #ifdef RTXDI_ENABLE_PRESAMPLING
-                                                               g_Const.localLightsRISBufferSegmentParams, g_Const.environmentLightRISBufferSegmentParams,
-                                                               #endif
-                                                               lightSample);
+        #ifdef RTXDI_ENABLE_PRESAMPLING
+        g_Const.localLightsRISBufferSegmentParams, g_Const.environmentLightRISBufferSegmentParams,
+        #endif
+        lightSample);
 
     if (g_Const.restirDI.initialSamplingParams.enableInitialVisibility && RTXDI_IsValidDIReservoir(reservoir))
     {
