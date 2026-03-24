@@ -120,6 +120,9 @@ float3 DemodulateSpecular(float3 surfaceSpecularF0, float3 specular)
     return specular / max(0.01, surfaceSpecularF0);
 }
 
+RWBuffer<uint2> u_RisBuffer;
+
+#define RTXDI_RIS_BUFFER u_RisBuffer
 
 [shader("raygeneration")]
 void MainRayGenShader()
@@ -168,7 +171,76 @@ void MainRayGenShader()
     {
         gOut_DirectLighting[pixelPosition] = 0;
     }
-
+    
+    // uint tileSize = g_Const.localLightsRISBufferSegmentParams.tileSize; // 通常是 128 或 256
+    // uint tileCount = g_Const.localLightsRISBufferSegmentParams.tileCount;
+    //
+    // // 2. 确定每个 Tile 在屏幕上显示的尺寸 (假设显示为正方形)
+    // // 如果 tileSize 是 256，则每个块是 16x16；如果是 128，则大约是 11x11
+    // uint side = (uint)sqrt((float)tileSize); 
+    //
+    // // 3. 计算当前像素属于第几个 Tile，以及是该 Tile 里的第几个采样点
+    // uint2 tileGridPos = pixelPosition / side;  // 屏幕上 Tile 的行列坐标
+    // uint2 inTilePos = pixelPosition % side;    // 在当前 Tile 方块内的像素偏移
+    //
+    // // 计算 tileIndex：假设横向平铺
+    // // 我们需要知道屏幕宽度方向能放多少个 Tile 块
+    // // 注意：RTXDI_GetScreenSize() 需要替换为你引擎中获取分辨率的函数或常量
+    // uint tilesPerRow = 785 / side; 
+    //
+    // uint tileIndex = tileGridPos.y * tilesPerRow + tileGridPos.x;
+    // uint sampleInTile = inTilePos.y * side + inTilePos.x;
+    //
+    //
+    //
+    // // gOut_DirectLighting[pixelPosition] = float3(tileGridPos / 16.0f, 0);
+    // // gOut_DirectLighting[pixelPosition] = tileSize;
+    //
+    //
+    // // 4. 边界检查：确保不越界
+    // if (tileIndex < tileCount && sampleInTile < tileSize)
+    // {
+    //     // 计算 Buffer 指针
+    //     uint risBufferPtr = sampleInTile + tileIndex * tileSize;
+    //
+    //     // 读取数据
+    //     uint2 risData = RTXDI_RIS_BUFFER[risBufferPtr];
+    //     uint lightIndex = risData.x & ~RTXDI_LIGHT_COMPACT_BIT;
+    //     float invSourcePdf = asfloat(risData.y);
+    //
+    //     // 5. 可视化处理
+    //     if (lightIndex == 0 && invSourcePdf == 0)
+    //     {
+    //         // 这里的像素可能是空的（没抽中灯）
+    //         gOut_DirectLighting[pixelPosition] = float3(0.05, 0.05, 0.05); 
+    //     }
+    //     else
+    //     {
+    //         // 使用哈希函数将 lightIndex 转换为鲜艳的颜色，以便区分不同的灯
+    //         float3 color;
+    //         color.r = frac(sin(float(lightIndex) * 12.9898) * 43758.5453);
+    //         color.g = frac(sin(float(lightIndex) * 78.233) * 43758.5453);
+    //         color.b = frac(sin(float(lightIndex) * 45.164) * 43758.5453);
+    //     
+    //         // 为了区分 Tile 边界，给每个块加个微小的边框感
+    //         if (inTilePos.x == 0 || inTilePos.y == 0) color *= 0.5;
+    //
+    //         gOut_DirectLighting[pixelPosition] = color;
+    //     }
+    // }
+    // else
+    // {
+    //     // 超出 Tile 总数或屏幕范围的部分显示为黑色
+    //     gOut_DirectLighting[pixelPosition] = float3(0, 0, 0);
+    // }
+    
+    //     // RAB_LightInfo lightInfo = RAB_LoadLightInfo(o_lightIndex, false);
+    //     // RAB_LightSample lightSample = RAB_SamplePolymorphicLight(lightInfo,
+    //     //                                                          surface, o_randXY);
+    //     //
+    //     // gOut_DirectLighting[pixelPosition] = lightSample.radiance;
+    
+    
     //
     // float3 origin = gCameraGlobalPos;
     // float3 dir = normalize(surface.worldPos - origin);

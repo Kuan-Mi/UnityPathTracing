@@ -19,7 +19,7 @@ RAB_LightInfo RAB_LoadCompactLightInfo(uint linearIndex)
 // 不实现
 bool RAB_StoreCompactLightInfo(uint linearIndex, RAB_LightInfo lightInfo)
 {
-    return true;
+    return false;
 }
 
 // 不实现

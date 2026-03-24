@@ -453,7 +453,7 @@ namespace PathTracing
             _globalConstantsArray[0] = globalConstants;
             _constantBuffer.SetData(_globalConstantsArray);
 
-            resamplingConstants = GetResamplingConstants(isContext.GetReSTIRDIContext(), rtxdiResources, frameState);
+            resamplingConstants = GetResamplingConstants(isContext, rtxdiResources, frameState);
 
             // var ss = resamplingConstants.ToString();
             // Debug.Log($"Resampling Constants:\n{ss}");
@@ -1034,8 +1034,14 @@ namespace PathTracing
             return rparams;
         }
 
-        private ResamplingConstants GetResamplingConstants(ReSTIRDIContext restirDiContext, RtxdiResources rtxdiResources, CameraFrameState frameState)
+        private ResamplingConstants GetResamplingConstants(
+            ImportanceSamplingContext isContext
+            , RtxdiResources rtxdiResources
+            , CameraFrameState frameState)
         {
+            
+            var restirDiContext = isContext.GetReSTIRDIContext();
+            
             restirDiContext.SetFrameIndex(frameState.FrameIndex);
 
             restirDiContext.SetResamplingMode(pathTracingSetting.resamplingMode);
@@ -1045,34 +1051,40 @@ namespace PathTracing
             restirDiContext.SetShadingParameters(pathTracingSetting.shadingParams);
 
 
-            var resamplingConstants = new ResamplingConstants
-            {
-                runtimeParams = restirDiContext.GetRuntimeParams()
-            };
+            var constants = new ResamplingConstants();
+            
+            
+            constants.lightBufferParams = isContext.GetLightBufferParameters();
+            constants.localLightsRISBufferSegmentParams = isContext.GetLocalLightRISBufferSegmentParams();
+            constants.runtimeParams = isContext.GetReSTIRDIContext().GetRuntimeParams();
+            
+            
 
-            resamplingConstants.lightBufferParams.localLightBufferRegion.firstLightIndex = 0;
-            resamplingConstants.lightBufferParams.localLightBufferRegion.numLights = rtxdiResources.Scene.emissiveTriangleCount;
+            constants.lightBufferParams.localLightBufferRegion.firstLightIndex = 0;
+            constants.lightBufferParams.localLightBufferRegion.numLights = rtxdiResources.Scene.emissiveTriangleCount;
 
-            resamplingConstants.lightBufferParams.infiniteLightBufferRegion.firstLightIndex = 0;
-            resamplingConstants.lightBufferParams.infiniteLightBufferRegion.numLights = 0;
+            constants.lightBufferParams.infiniteLightBufferRegion.firstLightIndex = 0;
+            constants.lightBufferParams.infiniteLightBufferRegion.numLights = 0;
 
-            resamplingConstants.lightBufferParams.environmentLightParams.lightPresent = 0;
-            resamplingConstants.lightBufferParams.environmentLightParams.lightIndex = (0xffffffffu);
+            constants.lightBufferParams.environmentLightParams.lightPresent = 0;
+            constants.lightBufferParams.environmentLightParams.lightIndex = (0xffffffffu);
 
-            resamplingConstants.frameIndex = restirDiContext.GetFrameIndex();
-            resamplingConstants.pad2 = new uint2(0, 0); 
+            constants.frameIndex = restirDiContext.GetFrameIndex();
+            constants.pad2 = new uint2(0, 0); 
 
 
             var restirDiParameters = new ReSTIRDI_Parameters();
 
-            restirDiParameters = FillReSTIRDIConstants(restirDiParameters, restirDiContext, resamplingConstants.lightBufferParams);
+            restirDiParameters = FillReSTIRDIConstants(restirDiParameters, restirDiContext, constants.lightBufferParams);
 
-            resamplingConstants.restirDI = restirDiParameters;
+            constants.restirDI = restirDiParameters;
 
 
 
-            resamplingConstants.localLightPdfTextureSize = rtxdiResources.Scene.localLightPdfTextureSize;
-            return resamplingConstants;
+            constants.localLightPdfTextureSize = rtxdiResources.Scene.localLightPdfTextureSize;
+            
+            
+            return constants;
         }
 
         private static int2 ComputeOutputResolution(CameraData cameraData)
