@@ -473,6 +473,7 @@ namespace PathTracing
             {
             };
 
+
             _pdfTexturePass.Setup(pdfResource, pdfSettings);
             renderer.EnqueuePass(_pdfTexturePass);
 
@@ -519,7 +520,7 @@ namespace PathTracing
 
             _opaquePass.Setup(opaqueResource, opaqueSettings);
             renderer.EnqueuePass(_opaquePass);
-
+            
 
             if (pathTracingSetting.enableRtxdi)
             {
