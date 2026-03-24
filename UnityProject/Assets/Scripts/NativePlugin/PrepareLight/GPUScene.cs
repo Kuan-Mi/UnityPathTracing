@@ -527,11 +527,11 @@ namespace RTXDI
 
         #endregion
 
-        ~GPUScene()
-        {
-            // Debug.LogWarning(" ~GPUScene ");
-            Dispose();
-        }
+        // ~GPUScene()
+        // {
+        //     // Debug.LogWarning(" ~GPUScene ");
+        //     // Dispose();
+        // }
 
         public void Dispose()
         {

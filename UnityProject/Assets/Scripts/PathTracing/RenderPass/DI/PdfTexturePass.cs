@@ -34,6 +34,7 @@ namespace PathTracing
             internal GraphicsBuffer ResamplingConstantBuffer;
 
             internal RTHandle u_LocalLightPdfTexture;
+            internal TextureHandle u_LocalLightPdfTextureHandle;
             
             internal RtxdiResources RtxdiResources;
         }
@@ -49,9 +50,10 @@ namespace PathTracing
             internal Settings Settings;
         }
 
-        static void ExecutePass(PassData data, UnsafeGraphContext context)
+        static void ExecutePass(PassData data, ComputeGraphContext context)
         {
-            var natCmd = CommandBufferHelpers.GetNativeCommandBuffer(context.cmd);
+            
+            var natCmd = context.cmd;
 
             var opaqueTracingMarker = new ProfilerMarker(ProfilerCategory.Render, "pdfTexture", MarkerFlags.SampleGPU);
 
@@ -65,8 +67,7 @@ namespace PathTracing
 
             natCmd.SetComputeBufferParam(data.OpaqueTs,0, t_LightDataBufferID, resource.RtxdiResources.LightDataBuffer);
 
-
-            natCmd.SetComputeTextureParam(data.OpaqueTs, 0,"u_LocalLightPdfTexture", resource.u_LocalLightPdfTexture);
+            natCmd.SetComputeTextureParam(data.OpaqueTs, 0,"u_LocalLightPdfTexture", resource.u_LocalLightPdfTextureHandle);
 
             var all = resource.RtxdiResources.Scene.emissiveTriangleCount;
             
@@ -75,26 +76,29 @@ namespace PathTracing
             natCmd.DispatchCompute(data.OpaqueTs, 0, X, 1, 1);
 
             
-            // gen mip
-            natCmd.GenerateMips(resource.u_LocalLightPdfTexture);
-            
             natCmd.EndSample(opaqueTracingMarker);
         }
  
 
 
-
+ 
         public override void RecordRenderGraph(RenderGraph renderGraph, ContextContainer frameData)
         {
-            using var builder = renderGraph.AddUnsafePass<PassData>("pdfTexture", out var passData);
+            using var builder = renderGraph.AddComputePass<PassData>("pdfTexture", out var passData);
 
             passData.OpaqueTs = _opaqueTs;
             passData.Resource = _resource;
             passData.Settings = _settings;
 
+            
+            var pdfTexHandle = renderGraph.ImportTexture(_resource.u_LocalLightPdfTexture);
 
+            _resource.u_LocalLightPdfTextureHandle = pdfTexHandle;
+            
+            builder.UseTexture(_resource.u_LocalLightPdfTextureHandle, AccessFlags.Write);
+            
             builder.AllowPassCulling(false);
-            builder.SetRenderFunc((PassData data, UnsafeGraphContext context) => { ExecutePass(data, context); });
+            builder.SetRenderFunc((PassData data, ComputeGraphContext context) => { ExecutePass(data, context); });
         }
     }
 }
