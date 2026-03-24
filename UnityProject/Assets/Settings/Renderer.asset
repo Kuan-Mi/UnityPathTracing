@@ -80,7 +80,7 @@ MonoBehaviour:
     denoiser: 0
     emissionIntensity: 1
     cameraJitter: 0
-    psr: 1
+    psr: 0
     emission: 1
     usePrevFrame: 1
     TAA: 1
@@ -129,10 +129,10 @@ MonoBehaviour:
     resamplingMode: 2
     gShowLight: 0
     initialSamplingParams:
-      numPrimaryLocalLightSamples: 16
+      numPrimaryLocalLightSamples: 8
       numPrimaryInfiniteLightSamples: 0
       numPrimaryEnvironmentSamples: 0
-      numPrimaryBrdfSamples: 16
+      numPrimaryBrdfSamples: 4
       brdfCutoff: 0.0001
       enableInitialVisibility: 1
       environmentMapImportanceSampling: 0

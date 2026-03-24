@@ -65,6 +65,7 @@ namespace PathTracing
             internal RayTracingShader OpaqueTs;
             internal Resource Resource;
             internal Settings Settings;
+            internal TextureHandle gIn_EmissiveLighting;
         }
 
         static void ExecutePass(PassData data, UnsafeGraphContext context)
@@ -95,6 +96,7 @@ namespace PathTracing
             natCmd.SetRayTracingTextureParam(data.OpaqueTs, g_BaseColor_MetalnessID, resource.BaseColorMetalness);
 
             natCmd.SetRayTracingTextureParam(data.OpaqueTs, g_DirectLightingID, resource.DirectLighting);
+            natCmd.SetRayTracingTextureParam(data.OpaqueTs,"gIn_EmissiveLighting", data.gIn_EmissiveLighting);
 
             natCmd.SetRayTracingTextureParam(data.OpaqueTs, gIn_PrevViewZID, resource.PrevViewZ);
             natCmd.SetRayTracingTextureParam(data.OpaqueTs, gIn_PrevNormalRoughnessID, resource.PrevNormalRoughness);
@@ -147,15 +149,9 @@ namespace PathTracing
             passData.Resource = _resource;
             passData.Settings = _settings;
 
-            var resourceData = frameData.Get<UniversalResourceData>();
+            var resourceData = frameData.Get<PTContextItem>();
 
-            var textureDesc = resourceData.activeColorTexture.GetDescriptor(renderGraph);
-            textureDesc.enableRandomWrite = true;
-            textureDesc.depthBufferBits = 0;
-            textureDesc.clearBuffer = false;
-            textureDesc.discardBuffer = false;
-            textureDesc.width = _settings.m_RenderResolution.x;
-            textureDesc.height = _settings.m_RenderResolution.y;
+            passData.gIn_EmissiveLighting = resourceData.DirectEmission;
 
             
 

@@ -96,7 +96,9 @@ namespace PathTracing
 
         private readonly Dictionary<long, NrdDenoiser> _nrdDenoisers = new();
         private readonly Dictionary<long, DlrrDenoiser> _dlrrDenoisers = new();
+
         private readonly Dictionary<long, PathTracingResourcePool> _resourcePools = new();
+
         // private readonly Dictionary<long, ReSTIRDIContext> _restirDiContexts = new();
         private readonly Dictionary<long, RtxdiResources> _rtxdiResources = new();
         private readonly Dictionary<long, ImportanceSamplingContext> _isContexts = new();
@@ -189,7 +191,7 @@ namespace PathTracing
             {
                 renderPassEvent = renderPassEvent
             };
-            
+
             _generateMipsPass ??= new GenerateMipsPass(genMipsCs)
             {
                 renderPassEvent = renderPassEvent
@@ -199,7 +201,7 @@ namespace PathTracing
             {
                 renderPassEvent = renderPassEvent
             };
-            
+
             _presamplePass ??= new PresamplePass(presampleCs)
             {
                 renderPassEvent = renderPassEvent
@@ -383,13 +385,13 @@ namespace PathTracing
                 isContext = new ImportanceSamplingContext(isParams);
                 _isContexts.Add(uniqueKey, isContext);
             }
-            
+
             if (!_rtxdiResources.TryGetValue(uniqueKey, out var rtxdiResources))
             {
-                rtxdiResources = new RtxdiResources(isContext.GetReSTIRDIContext(), isContext.GetRISBufferSegmentAllocator(),_gpuScene);
+                rtxdiResources = new RtxdiResources(isContext.GetReSTIRDIContext(), isContext.GetRISBufferSegmentAllocator(), _gpuScene);
                 _rtxdiResources.Add(uniqueKey, rtxdiResources);
             }
-            
+
 
             if (finalMaterial == null
                 || opaqueTracingShader == null
@@ -487,7 +489,6 @@ namespace PathTracing
             renderer.EnqueuePass(_prepareLightPass);
 
 
-
             // Opaque Pass
             var opaqueResource = new OpaquePass.Resource
             {
@@ -531,7 +532,7 @@ namespace PathTracing
 
             _opaquePass.Setup(opaqueResource, opaqueSettings);
             renderer.EnqueuePass(_opaquePass);
-            
+
             var pdfResource = new PdfTexturePass.Resource
             {
                 ResamplingConstantBuffer = _resamplingConstantBuffer,
@@ -546,26 +547,24 @@ namespace PathTracing
 
             _pdfTexturePass.Setup(pdfResource, pdfSettings);
             renderer.EnqueuePass(_pdfTexturePass);
-            
-            
-            
-            
+
+
             var genMipsResource = new GenerateMipsPass.Resource
             {
                 u_LocalLightPdfTexture = _gpuScene.localLightPdfTexture,
             };
-            
+
             var genMipsSettings = new GenerateMipsPass.Settings
             {
                 width = _gpuScene.localLightPdfTexture.rt.width,
                 height = _gpuScene.localLightPdfTexture.rt.height,
                 mipCount = _gpuScene.localLightPdfTexture.rt.mipmapCount
             };
-            
+
             _generateMipsPass.Setup(genMipsResource, genMipsSettings);
             renderer.EnqueuePass(_generateMipsPass);
-            
-            
+
+
             var preResource = new PresamplePass.Resource
             {
                 ConstantBuffer = _constantBuffer,
@@ -577,20 +576,20 @@ namespace PathTracing
             var RTXDI_PRESAMPLING_GROUP_SIZE = 256;
             var x = (isContext.GetLocalLightRISBufferSegmentParams().tileSize + RTXDI_PRESAMPLING_GROUP_SIZE - 1) / RTXDI_PRESAMPLING_GROUP_SIZE;
             var y = isContext.GetLocalLightRISBufferSegmentParams().tileCount;
-            
+
             // dm::int2 presampleDispatchSize = {
             //     dm::div_ceil(isContext.GetLocalLightRISBufferSegmentParams().tileSize, RTXDI_PRESAMPLING_GROUP_SIZE),
             //     int(isContext.GetLocalLightRISBufferSegmentParams().tileCount)
             // };
 
-            
+
             var preSettings = new PresamplePass.Settings
             {
                 x = (int)x,
                 y = (int)y,
                 z = 1
             };
-            
+
             _presamplePass.Setup(preResource, preSettings);
             renderer.EnqueuePass(_presamplePass);
 
@@ -1043,9 +1042,8 @@ namespace PathTracing
             , RtxdiResources rtxdiResources
             , CameraFrameState frameState)
         {
-            
             var restirDiContext = isContext.GetReSTIRDIContext();
-            
+
             restirDiContext.SetFrameIndex(frameState.FrameIndex);
 
             restirDiContext.SetResamplingMode(pathTracingSetting.resamplingMode);
@@ -1056,13 +1054,12 @@ namespace PathTracing
 
 
             var constants = new ResamplingConstants();
-            
-            
+
+
             constants.lightBufferParams = isContext.GetLightBufferParameters();
             constants.localLightsRISBufferSegmentParams = isContext.GetLocalLightRISBufferSegmentParams();
             constants.runtimeParams = isContext.GetReSTIRDIContext().GetRuntimeParams();
-            
-            
+
 
             constants.lightBufferParams.localLightBufferRegion.firstLightIndex = 0;
             constants.lightBufferParams.localLightBufferRegion.numLights = rtxdiResources.Scene.emissiveTriangleCount;
@@ -1074,7 +1071,7 @@ namespace PathTracing
             constants.lightBufferParams.environmentLightParams.lightIndex = (0xffffffffu);
 
             constants.frameIndex = restirDiContext.GetFrameIndex();
-            constants.pad2 = new uint2(0, 0); 
+            constants.pad2 = new uint2(0, 0);
 
 
             var restirDiParameters = new ReSTIRDI_Parameters();
@@ -1084,10 +1081,9 @@ namespace PathTracing
             constants.restirDI = restirDiParameters;
 
 
-
             constants.localLightPdfTextureSize = rtxdiResources.Scene.localLightPdfTextureSize;
-            
-            
+
+
             return constants;
         }
 

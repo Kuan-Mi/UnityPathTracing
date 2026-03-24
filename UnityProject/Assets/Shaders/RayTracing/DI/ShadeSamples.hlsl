@@ -17,6 +17,8 @@ Texture2D<float4> gIn_PrevNormalRoughness;
 Texture2D<float4> gIn_PrevBaseColorMetalness;
 Texture2D<uint> gIn_PrevGeoNormal;
 
+Texture2D<float3> gIn_EmissiveLighting;
+
 RWTexture2D<float3> gOut_DirectLighting;
 
 RWTexture2D<int2> u_TemporalSamplePositions;
@@ -157,8 +159,8 @@ void MainRayGenShader()
 
         specular = DemodulateSpecular(surface.material.specularF0, specular);
 
-        gOut_DirectLighting[pixelPosition] = ShadeSurfaceWithLightSample(lightSample, surface)
-            * RTXDI_GetDIReservoirInvPdf(reservoir) * 10;
+        float3 finalColor = ShadeSurfaceWithLightSample(lightSample, surface)  * RTXDI_GetDIReservoirInvPdf(reservoir) * 10;
+        gOut_DirectLighting[pixelPosition] = finalColor + gIn_EmissiveLighting[pixelPosition];
 
         // gOut_DirectLighting[pixelPosition] = diffuse + specular;
 
@@ -169,7 +171,7 @@ void MainRayGenShader()
     }
     else
     {
-        gOut_DirectLighting[pixelPosition] = 0;
+        gOut_DirectLighting[pixelPosition] = float3(0,0,0) + gIn_EmissiveLighting[pixelPosition];
     }
     
     // uint tileSize = g_Const.localLightsRISBufferSegmentParams.tileSize; // 通常是 128 或 256
