@@ -462,20 +462,6 @@ namespace PathTracing
             renderer.EnqueuePass(_prepareLightPass);
 
 
-            var pdfResource = new PdfTexturePass.Resource
-            {
-                ResamplingConstantBuffer = _resamplingConstantBuffer,
-                u_LocalLightPdfTexture = _gpuScene.localLightPdfTexture,
-                RtxdiResources = rtxdiResources
-            };
-
-            var pdfSettings = new PdfTexturePass.Settings
-            {
-            };
-
-
-            _pdfTexturePass.Setup(pdfResource, pdfSettings);
-            renderer.EnqueuePass(_pdfTexturePass);
 
             // Opaque Pass
             var opaqueResource = new OpaquePass.Resource
@@ -521,6 +507,20 @@ namespace PathTracing
             _opaquePass.Setup(opaqueResource, opaqueSettings);
             renderer.EnqueuePass(_opaquePass);
             
+            var pdfResource = new PdfTexturePass.Resource
+            {
+                ResamplingConstantBuffer = _resamplingConstantBuffer,
+                u_LocalLightPdfTexture = _gpuScene.localLightPdfTexture,
+                RtxdiResources = rtxdiResources
+            };
+
+            var pdfSettings = new PdfTexturePass.Settings
+            {
+            };
+
+
+            _pdfTexturePass.Setup(pdfResource, pdfSettings);
+            renderer.EnqueuePass(_pdfTexturePass);
 
             if (pathTracingSetting.enableRtxdi)
             {
