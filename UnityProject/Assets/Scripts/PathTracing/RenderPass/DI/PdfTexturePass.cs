@@ -67,8 +67,8 @@ namespace PathTracing
             natCmd.SetComputeBufferParam(data.OpaqueTs, 0, t_LightDataBufferID, resource.RtxdiResources.LightDataBuffer);
 
             natCmd.SetComputeTextureParam(data.OpaqueTs, 0, "u_LocalLightPdfTexture", resource.u_LocalLightPdfTextureHandle);
-
-            var all = resource.RtxdiResources.Scene.emissiveTriangleCount;
+ 
+            var all = resource.RtxdiResources.Scene.numLights;
 
             var X = (int)(all + 255) / 256;
 

@@ -1062,7 +1062,7 @@ namespace PathTracing
 
 
             constants.lightBufferParams.localLightBufferRegion.firstLightIndex = 0;
-            constants.lightBufferParams.localLightBufferRegion.numLights = rtxdiResources.Scene.emissiveTriangleCount;
+            constants.lightBufferParams.localLightBufferRegion.numLights = rtxdiResources.Scene.numLights;
 
             constants.lightBufferParams.infiniteLightBufferRegion.firstLightIndex = 0;
             constants.lightBufferParams.infiniteLightBufferRegion.numLights = 0;
