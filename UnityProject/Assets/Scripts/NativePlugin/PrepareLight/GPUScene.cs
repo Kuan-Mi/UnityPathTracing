@@ -218,7 +218,7 @@ namespace RTXDI
         {
             // 收集场景内所有启用的点光源，打包成 PolymorphicLightInfo，追加在三角面光之后
             var currentLights = Object.FindObjectsByType<Light>(FindObjectsSortMode.None)
-                .Where(l => l != null && l.enabled && l.type == LightType.Disc)
+                .Where(l => l != null && l.enabled && l.type == LightType.Spot)
                 .ToList();
 
             otherLightCount = (uint)currentLights.Count;
@@ -237,7 +237,7 @@ namespace RTXDI
 
             if (otherLightCount > 0)
             {
-                UpdateDiscLight(currentLights);
+                UpdateSpotLight(currentLights);
             }
         }
 
@@ -402,6 +402,18 @@ namespace RTXDI
             for (var i = 0; i < currentLights.Count; i++)
             {
                 pointLightInfos[i] = PackDiscLightInfo(currentLights[i]);
+            }
+
+            // SetData 支持 offset，将点光源追加在三角灯之后
+            _lightInfoBuffer.SetData(pointLightInfos, 0, (int)emissiveTriangleCount, (int)otherLightCount);
+        }        
+        
+        private void UpdateSpotLight(List<Light> currentLights)
+        {
+            var pointLightInfos = new PolymorphicLightInfo[otherLightCount];
+            for (var i = 0; i < currentLights.Count; i++)
+            {
+                pointLightInfos[i] = PackSpotLightInfo(currentLights[i]);
             }
 
             // SetData 支持 offset，将点光源追加在三角灯之后
@@ -710,6 +722,36 @@ namespace RTXDI
             info.scalars = (uint)(Fp32ToFp16(disc.areaSize.x));
             
             info.direction1 = PackNormalizedVector(transform.forward);
+            
+            return info;
+        }
+        
+        private static PolymorphicLightInfo PackSpotLightInfo(Light spot)
+        {
+            var radius = 0.2f;
+
+            float projectedArea = (float)Math.PI * radius * radius;
+            
+            Color radiance = spot.color * spot.intensity / projectedArea;
+            
+            float softness = math.saturate(1.0f - spot.innerSpotAngle / spot.spotAngle);
+
+            var transform = spot.transform;
+            var right = transform.right;
+            var up = transform.up;
+
+            var info = new PolymorphicLightInfo();
+            info.SetColorAndType(radiance, PolymorphicLightType.kSphere);
+            
+            const uint kPolymorphicLightShapingEnableBit = 1 << 28;
+            info.colorTypeAndFlags |= kPolymorphicLightShapingEnableBit;
+            
+            
+            info.center = transform.position;
+            info.scalars = (uint)(Fp32ToFp16(radius));
+            
+            info.primaryAxis = PackNormalizedVector(transform.forward);
+            info.cosConeAngleAndSoftness = (uint)(Fp32ToFp16(math.cos(math.radians(spot.spotAngle * 0.5f))) | (Fp32ToFp16(softness) << 16));
             
             return info;
         }
