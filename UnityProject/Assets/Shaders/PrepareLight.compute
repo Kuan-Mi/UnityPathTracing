@@ -268,5 +268,6 @@ void main(uint dispatchThreadId : SV_DispatchThreadID)
 
     RAB_LightInfo lightInfo = Store(triLight);
 
+    lightInfo.center.x = 3;
     u_LightDataBuffer[triangleIdx] = lightInfo;
 }

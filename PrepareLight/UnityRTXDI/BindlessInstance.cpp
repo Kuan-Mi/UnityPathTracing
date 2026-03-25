@@ -9,7 +9,6 @@ using namespace nri;
 #define LOG(msg) UNITY_LOG(s_Log, msg)
 
 const char* g_ComputeShaderSource = R"(
-
 struct PrimitiveData
 {
     float2 uv0;
@@ -47,12 +46,19 @@ struct RAB_LightInfo
 {
     // uint4[0]
     float3 center;
-    uint scalars; // 2x float16
+    uint colorTypeAndFlags; // RGB8 + uint8 (see the kPolymorphicLight... constants above)
 
     // uint4[1]
-    uint2 radiance; // fp16x4
     uint direction1; // oct-encoded
     uint direction2; // oct-encoded
+    uint scalars; // 2x float16
+    uint logRadiance; // uint16
+
+    // uint4[2] -- optional, contains only shaping data
+    uint iesProfileIndex;
+    uint primaryAxis; // oct-encoded
+    uint cosConeAngleAndSoftness; // 2x float16
+    uint padding;
 };
 
 struct PrepareLightsConstants
@@ -79,12 +85,6 @@ Texture2D t_BindlessTextures[] : register(t0, space1);
 SamplerState s_MaterialSampler : register(s0);
 
 
-uint Pack_R16G16_FLOAT(float2 rg)
-{
-    uint r = f32tof16(rg.r);
-    uint g = f32tof16(rg.g) << 16;
-    return r | g;
-}
 
 float2 octWrap(float2 v)
 {
@@ -109,21 +109,87 @@ uint ndirToOctUnorm32(float3 n)
     return uint(p.x * 0xfffe) | (uint(p.y * 0xfffe) << 16);
 }
 
-uint2 Pack_R16G16B16A16_FLOAT(float4 rgba)
+enum PolymorphicLightType
 {
-    return uint2(Pack_R16G16_FLOAT(rgba.rg), Pack_R16G16_FLOAT(rgba.ba));
+    kSphere = 0,
+    kCylinder,
+    kDisk,
+    kRect,
+    kTriangle,
+    kDirectional,
+    kEnvironment,
+    kPoint
+};
+
+static const uint kPolymorphicLightTypeShift = 24;
+static const float kPolymorphicLightMinLog2Radiance = -8.f;
+static const float kPolymorphicLightMaxLog2Radiance = 40.f;
+#define uint32_t uint
+
+
+float unpackLightRadiance(uint logRadiance)
+{
+    return (logRadiance == 0) ? 0 : exp2((float(logRadiance - 1) / 65534.0) * (kPolymorphicLightMaxLog2Radiance - kPolymorphicLightMinLog2Radiance) + kPolymorphicLightMinLog2Radiance);
 }
+
+// Pack [0.0, 1.0] float to a uint of a given bit depth
+#define PACK_UFLOAT_TEMPLATE(size)                      \
+uint Pack_R ## size ## _UFLOAT(float r, float d = 0.5f) \
+{                                                       \
+const uint mask = (1U << size) - 1U;                \
+\
+return (uint)floor(r * mask + d) & mask;            \
+}                                                       \
+\
+float Unpack_R ## size ## _UFLOAT(uint r)               \
+{                                                       \
+const uint mask = (1U << size) - 1U;                \
+\
+return (float)(r & mask) / (float)mask;             \
+}
+
+PACK_UFLOAT_TEMPLATE(8)
+
+uint Pack_R8G8B8_UFLOAT(float3 rgb, float3 d = float3(0.5f, 0.5f, 0.5f))
+{
+    uint r = Pack_R8_UFLOAT(rgb.r, d.r);
+    uint g = Pack_R8_UFLOAT(rgb.g, d.g) << 8;
+    uint b = Pack_R8_UFLOAT(rgb.b, d.b) << 16;
+    return r | g | b;
+}
+
+
+void packLightColor(float3 radiance, inout RAB_LightInfo lightInfo)
+{   
+    float intensity = max(radiance.r, max(radiance.g, radiance.b));
+
+    if (intensity > 0.0)
+    {
+        float logRadiance = saturate((log2(intensity) - kPolymorphicLightMinLog2Radiance) 
+            / (kPolymorphicLightMaxLog2Radiance - kPolymorphicLightMinLog2Radiance));
+        uint packedRadiance = min(uint32_t(ceil(logRadiance * 65534.0)) + 1, 0xffffu);
+        float unpackedRadiance = unpackLightRadiance(packedRadiance);
+
+        float3 normalizedRadiance = saturate(radiance.rgb / unpackedRadiance.xxx);
+
+        lightInfo.logRadiance |= packedRadiance;
+        lightInfo.colorTypeAndFlags |= Pack_R8G8B8_UFLOAT(normalizedRadiance);
+    }
+}
+
 
 RAB_LightInfo Store(TriangleLight triLight)
 {
     RAB_LightInfo lightInfo = (RAB_LightInfo)0;
 
-    lightInfo.radiance = Pack_R16G16B16A16_FLOAT(float4(triLight.radiance, 0));
+
+    packLightColor(triLight.radiance, lightInfo);
     lightInfo.center = triLight.base + (triLight.edge1 + triLight.edge2) / 3.0;
     lightInfo.direction1 = ndirToOctUnorm32(normalize(triLight.edge1));
     lightInfo.direction2 = ndirToOctUnorm32(normalize(triLight.edge2));
     lightInfo.scalars = f32tof16(length(triLight.edge1)) | (f32tof16(length(triLight.edge2)) << 16);
-
+    lightInfo.colorTypeAndFlags |= uint(PolymorphicLightType::kTriangle) << kPolymorphicLightTypeShift;
+        
     return lightInfo;
 }
 
@@ -354,14 +420,14 @@ void BindlessInstance::DispatchCompute(FrameData* data)
     instViewDesc.structureStride = 80; 
     m_NRI->CreateBufferView(instViewDesc, m_InstanceBufferView);
     
-    // 创建 Output Buffer View (u0) - Struct size 32
+    // 创建 Output Buffer View (u0) - Struct size 48
     BufferViewDesc outViewDesc = {};
     outViewDesc.buffer = pOutBuffer;
     outViewDesc.viewType = BufferViewType::SHADER_RESOURCE_STORAGE;
     outViewDesc.format = Format::UNKNOWN;
     outViewDesc.offset = 0;
-    outViewDesc.size = data->numPrimitives * 32;
-    outViewDesc.structureStride = 32;
+    outViewDesc.size = data->numPrimitives * 48;
+    outViewDesc.structureStride = 48;
     m_NRI->CreateBufferView(outViewDesc, m_LightOutputView);
 
     // 1. Transition Input Resources (All 100 textures)

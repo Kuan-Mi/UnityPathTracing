@@ -391,7 +391,6 @@ namespace RTXDI
 
         #region Debugging Helpers
 
-
         public void DebugReadback()
         {
             if (_lightInfoBuffer == null || primitiveDataList.Count == 0)
@@ -411,40 +410,62 @@ namespace RTXDI
             for (int i = 0; i < debugData.Length; i++)
             {
                 var info = debugData[i];
-                
-                bool hasData =  math.lengthsq(info.center) > 0;
 
-                if (hasData)
-                {
-                    validCount++;
-                    // if (validCount <= 5) // 只打印前 5 个有效数据避免刷屏
-                    {
-                        var c = xxx;
+                validCount++;
+                // if (validCount <= 5) // 只打印前 5 个有效数据避免刷屏
 
-                        var vv = c.r + c.g + c.b;
-                        if (vv < 0.01f)
-                        {
-                            continue;
-                        }
+                // 解码 radiance：logRadiance 低16位存 log 空间强度，colorTypeAndFlags 低24位存 RGB8 归一化颜色
+                uint logRad = info.logRadiance & 0xFFFFu;
+                float intensity = (logRad == 0) ? 0f : math.exp2(((logRad - 1) / 65534f) * 48f - 8f);
 
-                        var center = xxxx;
-                        var normalDir = xxxx;
- 
+                if (intensity < 0.01f)
+                    continue;
+
+                float normR = (info.colorTypeAndFlags & 0xFFu) / 255f;
+                float normG = ((info.colorTypeAndFlags >> 8) & 0xFFu) / 255f;
+                float normB = ((info.colorTypeAndFlags >> 16) & 0xFFu) / 255f;
+                var c = new Color(normR * intensity, normG * intensity, normB * intensity, 1f);
+
+                // center 已经是 world-space 质心
+                var center = new Vector3(info.center.x, info.center.y, info.center.z);
+
+                // direction1/direction2 存 oct-encoded normalize(edge1) / normalize(edge2)，叉积得法线
+                float3 edge1Dir = OctUnorm32ToDir(info.direction1);
+                float3 edge2Dir = OctUnorm32ToDir(info.direction2);
+                var normalDir = Vector3.Cross(edge1Dir, edge2Dir).normalized;
 
 
-                        Debug.Log($"[Primitive {i}] Center: {center}, Radiance: {c}, " +  $"Normal: {normalDir}, ");
+                Debug.Log($"[P {i}] C: {center}, R: {c}, " + $"N: {normalDir}, ");
 
-                        c.a = 1.0f;
+                c.a = 1.0f;
 
-                        if (c is { r: < 0.01f, g: < 0.01f, b: < 0.01f })
-                            continue;
-                        
-                        Debug.DrawLine(center, center + normalDir, c, 10);
-                    }
-                }
+
+                Debug.DrawLine(center, center + normalDir * intensity / 10, c, 10);
             }
 
             Debug.Log($"Total primitives with data: {validCount} / {debugData.Length}");
+        }
+
+        /// <summary>
+        /// 逆变换 ndirToOctUnorm32：将 oct-encoded uint 解码回单位方向向量。
+        /// 编码：p = ndirToOctSigned(n); p = saturate(p*0.5+0.5); packed = uint(p.x*0xfffe) | (uint(p.y*0xfffe)&lt;&lt;16)
+        /// </summary>
+        private static float3 OctUnorm32ToDir(uint packed)
+        {
+            float px = (packed & 0xFFFFu) / (float)0xFFFEu;
+            float py = (packed >> 16) / (float)0xFFFEu;
+            // 还原到 signed [-1,1]
+            float2 p = new float2(px * 2f - 1f, py * 2f - 1f);
+            float3 n = new float3(p.x, p.y, 1f - math.abs(p.x) - math.abs(p.y));
+            if (n.z < 0f)
+            {
+                // octWrap: (1 - |p.yx|) * sign(p.xy)
+                float2 wrap = (1f - math.abs(p.yx)) * math.select(-1f, 1f, p.xy >= 0f);
+                n.x = wrap.x;
+                n.y = wrap.y;
+            }
+
+            return math.normalize(n);
         }
 
         #endregion
