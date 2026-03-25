@@ -1,5 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using System.Linq;
 using System.Runtime.InteropServices;
 using Rtxdi;
@@ -36,28 +35,21 @@ namespace RTXDI
         public uint emissiveTextureIndex;
     }
 
-    [StructLayout(LayoutKind.Sequential, Pack = 16)]
-    public struct PolymorphicLightInfo
+    [StructLayout(LayoutKind.Sequential)]
+    public struct RAB_LightInfo
     {
         // uint4[0]
         public float3 center;
-        public uint colorTypeAndFlags; // RGB8 + uint8 (see the kPolymorphicLight... constants above)
+        public uint scalars; // 2x float16
 
         // uint4[1]
+        public uint2 radiance; // fp16x4
         public uint direction1; // oct-encoded
         public uint direction2; // oct-encoded
-        public uint scalars; // 2x float16
-        public uint logRadiance; // uint16
-
-        // uint4[2] -- optional, contains only shaping data
-        public uint iesProfileIndex;
-        public uint primaryAxis; // oct-encoded
-        public uint cosConeAngleAndSoftness; // 2x float16
-        public uint padding;
     };
 
- 
-    public class GPUScene : IDisposable
+
+    public class GPUScene : System.IDisposable
     {
         // MeshLight 缓存
         private static HashSet<MeshLight> MeshLightCache = new HashSet<MeshLight>();
@@ -90,8 +82,8 @@ namespace RTXDI
         public void InitBuffer()
         {
             _instanceBuffer = new ComputeBuffer(8192, Marshal.SizeOf<InstanceData>());
-            _primitiveBuffer = new ComputeBuffer(127680, Marshal.SizeOf<PrimitiveData>());
-            _lightInfoBuffer = new GraphicsBuffer(GraphicsBuffer.Target.Structured, 127680, Marshal.SizeOf<PolymorphicLightInfo>());
+            _primitiveBuffer = new ComputeBuffer(327680, Marshal.SizeOf<PrimitiveData>());
+            _lightInfoBuffer = new GraphicsBuffer(GraphicsBuffer.Target.Structured, 327680, Marshal.SizeOf<RAB_LightInfo>());
             _geometryInstanceToLight = new GraphicsBuffer(GraphicsBuffer.Target.Structured, 10240, sizeof(uint));
             isBufferInitialized = true;
         }
@@ -267,9 +259,9 @@ namespace RTXDI
             uint maxLocalLights = emissiveTriangleCount;
             Rtxdi.RtxdiUtils.ComputePdfTextureSize(maxLocalLights, out uint texWidth, out uint texHeight, out uint mipLevels);
 
-            localLightPdfTextureSize = new uint2(texWidth, texHeight);
+            localLightPdfTextureSize= new uint2(texWidth, texHeight);
             localLightPdfTexture?.Release();
-
+            
             var textureDesc = new RenderTextureDescriptor((int)texWidth, (int)texHeight, RenderTextureFormat.RFloat)
             {
                 dimension = TextureDimension.Tex2D,
@@ -277,11 +269,11 @@ namespace RTXDI
                 useMipMap = true,
                 autoGenerateMips = false,
                 useDynamicScale = false,
-                mipCount = (int)mipLevels,
+                mipCount =  (int)mipLevels,
             };
 
             localLightPdfTexture = RTHandles.Alloc(textureDesc);
-
+            
             // localLightPdfTexture = RTHandles.Alloc(
             //     name: "LocalLightPDFTexture",
             //     dimension: TextureDimension.Tex2D,
@@ -293,9 +285,10 @@ namespace RTXDI
             //     autoGenerateMips:false,
             //     useDynamicScale: false
             //     );
-
-
-            Debug.Log($"BuildFull completed: {instanceDataList.Count} instances, {primitiveDataList.Count} primitives, {globalTexturePool.Count} unique emissive textures.");
+            
+            
+            
+            // Debug.Log($"BuildFull completed: {instanceDataList.Count} instances, {primitiveDataList.Count} primitives, {globalTexturePool.Count} unique emissive textures.");
         }
 
         public void UpdateInstanceID(RayTracingAccelerationStructure ras)
@@ -314,7 +307,7 @@ namespace RTXDI
                     continue;
 
                 ras.UpdateInstanceID(renderer, instanceId);
-                // Debug.Log($"Updated InstanceID for Renderer {renderer.name} to {instanceId}");
+                Debug.Log($"Updated InstanceID for Renderer {renderer.name} to {instanceId}");
             }
 
 
@@ -462,147 +455,6 @@ namespace RTXDI
             s2 = math.f16tof32(h2);
         }
 
-        public class TriangleLight
-        {
-            public float3 baseO;
-            public float3 edge1;
-            public float3 edge2;
-            public float3 radiance;
-            public float3 normal;
-            public float surfaceArea;
-
-
-            const float kPolymorphicLightMinLog2Radiance = -8.0f;
-            const float kPolymorphicLightMaxLog2Radiance = 40.0f;
-
-            static float3 octToNdirUnorm32(uint pUnorm)
-            {
-                float2 p;
-                p.x = Math.Clamp((float)(pUnorm & 0xffff) / 0xfffe, 0.0f, 1.0f);
-                p.y = Math.Clamp((float)(pUnorm >> 16) / 0xfffe, 0.0f, 1.0f);
-                p.x = p.x * 2.0f - 1.0f;
-                p.y = p.y * 2.0f - 1.0f;
-                return octToNdirSigned(p);
-            }
-
-            static float3 octToNdirSigned(float2 p)
-            {
-                float3 n = new float3(p.x, p.y, 1.0f - Math.Abs(p.x) - Math.Abs(p.y));
-                float t = Math.Max(0, -n.z);
-
-                n.x += n.x >= 0.0f ? -t : t;
-                n.y += n.y >= 0.0f ? -t : t;
-
-                return normalize(n);
-            }
-
-            static float f16tof32(uint x)
-            {
-                // 对应 F16_M_BITS=10, F16_E_BITS=5, F16_S_MASK=0x8000 的实现
-                uint E_MASK = (1 << 5) - 1;
-                int BIAS = (int)E_MASK >> 1;
-                float DENORM_SCALE = 1.0f / (1 << (14 + 10));
-                float NORM_SCALE = 1.0f / (float)(1 << 10);
-
-                uint s = (x & 0x8000) << 16; // 移位到 32位 float 的符号位
-                uint e = (x >> 10) & E_MASK;
-                uint m = x & ((1 << 10) - 1);
-
-                float result;
-                if (e == 0)
-                {
-                    result = DENORM_SCALE * m;
-                }
-                else if (e == E_MASK)
-                {
-                    // 处理 Infinity 或 NaN
-                    uint resI = s | 0x7F800000 | (m << (23 - 10));
-                    byte[] bytes = BitConverter.GetBytes(resI);
-                    result = BitConverter.ToSingle(bytes, 0);
-                }
-                else
-                {
-                    result = 1.0f + (float)m * NORM_SCALE;
-                    if (e < BIAS)
-                        result /= (float)(1 << (BIAS - (int)e));
-                    else
-                        result *= (float)(1 << ((int)e - BIAS));
-                }
-
-                return (s != 0) ? -result : result;
-            }
-            static float3 unpackLightColor(PolymorphicLightInfo lightInfo)
-            {
-                float3 color = Unpack_R8G8B8_UFLOAT(lightInfo.colorTypeAndFlags);
-                float radianceValue = unpackLightRadiance(lightInfo.logRadiance & 0xffff);
-                return color * radianceValue;
-            }
-
-            static float3 Unpack_R8G8B8_UFLOAT(uint rgb)
-            {
-                float r = (float)(rgb & 0xFF) / 255.0f;
-                float g = (float)((rgb >> 8) & 0xFF) / 255.0f;
-                float b = (float)((rgb >> 16) & 0xFF) / 255.0f;
-                return new float3(r, g, b);
-            }
-            static float3 cross(float3 a, float3 b)
-            {
-                return new float3(
-                    a.y * b.z - a.z * b.y,
-                    a.z * b.x - a.x * b.z,
-                    a.x * b.y - a.y * b.x
-                );
-            }
-
-            static float length(float3 v)
-            {
-                return (float)Math.Sqrt(v.x * v.x + v.y * v.y + v.z * v.z);
-            }
-
-            static float3 normalize(float3 v)
-            {
-                float len = length(v);
-                return len > 0 ? v / len : new float3(0, 0, 0);
-            }
-            static float unpackLightRadiance(uint logRadiance)
-            {
-                if (logRadiance == 0) return 0.0f;
-                float t = (float)(logRadiance - 1) / 65534.0f;
-                float exponent = t * (kPolymorphicLightMaxLog2Radiance - kPolymorphicLightMinLog2Radiance) + kPolymorphicLightMinLog2Radiance;
-                return (float)Math.Pow(2.0, exponent);
-            }
-
-            public static TriangleLight Create(PolymorphicLightInfo lightInfo)
-            {
-                TriangleLight triLight = new TriangleLight();
-
-                triLight.edge1 = octToNdirUnorm32(lightInfo.direction1) ;
-                triLight.edge2 = octToNdirUnorm32(lightInfo.direction2) ;
-                triLight.baseO = lightInfo.center;
-                
-                
-                
-                triLight.radiance = unpackLightColor(lightInfo);
-
-                float3 lightNormal = cross(triLight.edge1, triLight.edge2);
-                float lightNormalLength = length(lightNormal);
-
-                if (lightNormalLength > 0.0)
-                {
-                    triLight.surfaceArea = 0.5f * lightNormalLength;
-                    triLight.normal = lightNormal / lightNormalLength;
-                }
-                else
-                {
-                    triLight.surfaceArea = 0.0f;
-                    triLight.normal = 0.0f;
-                }
-
-                return triLight;
-            }
-        }
-
-
         public void DebugReadback()
         {
             if (_lightInfoBuffer == null || primitiveDataList.Count == 0)
@@ -612,7 +464,7 @@ namespace RTXDI
             }
 
             // 1. 准备接收数组
-            PolymorphicLightInfo[] debugData = new PolymorphicLightInfo[primitiveDataList.Count];
+            RAB_LightInfo[] debugData = new RAB_LightInfo[primitiveDataList.Count];
 
             // 2. 从 GPU 同步回读数据 (注意：这会阻塞 CPU，仅调试用)
             _lightInfoBuffer.GetData(debugData);
@@ -621,23 +473,43 @@ namespace RTXDI
             int validCount = 0;
             for (int i = 0; i < debugData.Length; i++)
             {
-                var lightInfo = debugData[i];
-                
-                var triLight = TriangleLight.Create(lightInfo);
-                
                 // 简单检查：如果 radiance 或 center 有非零值，说明 Shader 跑通了
                 // 注意：lightInfo.radiance 是 uint2 (fp16 packed)，检查 raw value 即可
-                bool hasData =     math.lengthsq(triLight.radiance) > 0;
+                bool hasData = debugData[i].radiance.x != 0 ||
+                               debugData[i].radiance.y != 0 ||
+                               math.lengthsq(debugData[i].center) > 0;
 
                 if (hasData)
                 {
                     validCount++;
                     // if (validCount <= 5) // 只打印前 5 个有效数据避免刷屏
-                    { 
+                    {
+                        var c = UnpackRadiance(debugData[i].radiance);
 
-                        var c = new Color(triLight.radiance.x, triLight.radiance.y, triLight.radiance.z);
-                        
-                        Debug.DrawLine(triLight.baseO, triLight.baseO + triLight.normal, c, 10);
+                        var vv = c.r + c.g + c.b;
+                        if (vv < 0.01f)
+                        {
+                            continue;
+                        }
+
+                        float3 decodedDir1 = UnpackOctDirection(debugData[i].direction1);
+                        float3 decodedDir2 = UnpackOctDirection(debugData[i].direction2);
+
+                        var normalDir = math.cross(decodedDir1, decodedDir2);
+
+                        // --- 解包 Scalars (Edge Lengths) ---
+                        UnpackScalars(debugData[i].scalars, out float len1, out float len2);
+
+
+                        Debug.Log($"[Primitive {i}] Center: {debugData[i].center}, Radiance: {c}, " +
+                                  $"Dir1: {decodedDir1}, Dir2: {decodedDir2}, Normal: {normalDir}, " +
+                                  $"EdgeLengths: ({len1}, {len2})");
+
+                        c.a = 1.0f;
+
+                        if (c is { r: < 0.01f, g: < 0.01f, b: < 0.01f })
+                            continue;
+                        Debug.DrawLine(debugData[i].center, debugData[i].center + normalDir, c, 10);
                     }
                 }
             }
@@ -667,7 +539,7 @@ namespace RTXDI
             _primitiveBuffer?.Dispose();
             _lightInfoBuffer?.Dispose();
             _meshDataCache.Clear();
-
+            
             localLightPdfTexture?.Release();
         }
     }
