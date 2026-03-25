@@ -1,4 +1,5 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Collections.Generic;
 using System.Linq;
 using System.Runtime.InteropServices;
 using Rtxdi;
@@ -35,7 +36,7 @@ namespace RTXDI
         public uint emissiveTextureIndex;
     }
 
-    
+
     public enum PolymorphicLightType
     {
         kSphere = 0,
@@ -49,7 +50,6 @@ namespace RTXDI
     };
 
 
-    
     [StructLayout(LayoutKind.Sequential)]
     public struct PolymorphicLightInfo
     {
@@ -68,14 +68,14 @@ namespace RTXDI
         public uint primaryAxis; // oct-encoded
         public uint cosConeAngleAndSoftness; // 2x float16
         public uint padding;
-        
-        public void SetColorAndType(float3 color, PolymorphicLightType typeCode)
+
+        public void SetColorAndType(Color color, PolymorphicLightType typeCode)
         {
             const float kMinLog2Radiance = -8f;
             const float kMaxLog2Radiance = 40f;
             const uint kTypeShift = 24u;
 
-            float intensity = math.max(color.x, math.max(color.y, color.z));
+            float intensity = math.max(color.r, math.max(color.g, color.b));
             if (intensity > 0f)
             {
                 // log-encode radiance (mirrors packLightColor in HLSL)
@@ -87,7 +87,7 @@ namespace RTXDI
                 // decode back to find actual encoded intensity, then normalize color to [0,1]
                 float unpackedIntensity = math.exp2(
                     ((packedRadiance - 1f) / 65534f) * (kMaxLog2Radiance - kMinLog2Radiance) + kMinLog2Radiance);
-                float3 normalizedColor = math.saturate(color / unpackedIntensity);
+                float3 normalizedColor = math.saturate(new float3(color.r, color.g, color.b) / unpackedIntensity);
 
                 // Pack_R8G8B8_UFLOAT: R in bits[0:7], G in bits[8:15], B in bits[16:23]
                 uint r = (uint)math.round(normalizedColor.x * 255f) & 0xFFu;
@@ -218,7 +218,7 @@ namespace RTXDI
         {
             // 收集场景内所有启用的点光源，打包成 PolymorphicLightInfo，追加在三角面光之后
             var currentLights = Object.FindObjectsByType<Light>(FindObjectsSortMode.None)
-                .Where(l => l != null && l.enabled && l.type == LightType.Point)
+                .Where(l => l != null && l.enabled && l.type == LightType.Rectangle)
                 .ToList();
 
             otherLightCount = (uint)currentLights.Count;
@@ -237,8 +237,7 @@ namespace RTXDI
 
             if (otherLightCount > 0)
             {
-                
-                UpdatePointLight(currentLights);
+                UpdateAreaLight(currentLights);
             }
         }
 
@@ -379,24 +378,19 @@ namespace RTXDI
                 Color linearColor = light.color.linear;
                 float3 flux = new float3(linearColor.r, linearColor.g, linearColor.b) * light.intensity;
 
-                pointLightInfos[i] = PackPointLightInfo(light.transform.position, flux);
+                pointLightInfos[i] = PackPointLightInfo(light);
             }
 
             // SetData 支持 offset，将点光源追加在三角灯之后
             _lightInfoBuffer.SetData(pointLightInfos, 0, (int)emissiveTriangleCount, (int)otherLightCount);
         }
+
         private void UpdateAreaLight(List<Light> currentLights)
         {
             var pointLightInfos = new PolymorphicLightInfo[otherLightCount];
-            for (int i = 0; i < currentLights.Count; i++)
+            for (var i = 0; i < currentLights.Count; i++)
             {
-                Light light = currentLights[i];
-
-                // flux = linear color * intensity（点光源 flux 直接用于 radiance = flux / r²）
-                Color linearColor = light.color.linear;
-                float3 flux = new float3(linearColor.r, linearColor.g, linearColor.b) * light.intensity;
-
-                pointLightInfos[i] = PackPointLightInfo(light.transform.position, flux);
+                pointLightInfos[i] = PackAreaLightInfo(currentLights[i]);
             }
 
             // SetData 支持 offset，将点光源追加在三角灯之后
@@ -468,7 +462,6 @@ namespace RTXDI
             }
 
             _instanceBuffer.SetData(instanceDataList);
-            
         }
 
         private MeshCache GetOrCacheMeshData(Mesh mesh)
@@ -569,21 +562,19 @@ namespace RTXDI
 
             return math.normalize(n);
         }
-        
-        
+
+
         /// <summary>
         /// 将点光源打包成 PolymorphicLightInfo（对应 HLSL 的 packLightColor + type=kPoint）。
         /// 参考 PolymorphicLight.hlsl：packLightColor / PointLight::Store。
         /// kPoint = 7, kPolymorphicLightTypeShift = 24
         /// kPolymorphicLightMinLog2Radiance = -8, kPolymorphicLightMaxLog2Radiance = 40
         /// </summary>
-        private static PolymorphicLightInfo PackPointLightInfo(Vector3 worldPos, float3 flux)
+        private static PolymorphicLightInfo PackPointLightInfo(Light point)
         {
-             
-
             var info = new PolymorphicLightInfo
             {
-                center = new float3(worldPos.x, worldPos.y, worldPos.z),
+                center = point.transform.position,
                 direction1 = 0,
                 direction2 = 0,
                 scalars = 0,
@@ -593,16 +584,103 @@ namespace RTXDI
                 cosConeAngleAndSoftness = 0,
                 padding = 0,
             };
-            
-            info.SetColorAndType(flux, PolymorphicLightType.kPoint);
+
+            info.SetColorAndType(point.color * point.intensity, PolymorphicLightType.kPoint);
 
             return info;
-        }        
-        
-        
-        private static PolymorphicLightInfo PackAreaLightInfo(Vector3 worldPos, float3 flux, Vector3 dirx, Vector3 diry,Vector2 size)
+        }
+
+        [StructLayout(LayoutKind.Explicit)]
+        private struct FloatUIntUnion
         {
+            [FieldOffset(0)] public uint ui;
+            [FieldOffset(0)] public float f;
+        }
+
+        private static readonly FloatUIntUnion Multiple = new FloatUIntUnion { ui = 0x07800000 }; // 2^-112
+
+        public static ushort Fp32ToFp16(float v)
+        {
+            FloatUIntUnion biasedFloat = new FloatUIntUnion {   };
+            biasedFloat.f = v * Multiple.f;
+            uint u = biasedFloat.ui;
+
+            uint sign = u & 0x80000000;
+            uint body = u & 0x0fffffff;
+
+            // C# 中的 uint 右移是逻辑右移（高位补0），与 C++ unsigned 行为一致
+            return (ushort)((sign >> 16 | body >> 13) & 0xFFFF);
+        }
+        /// <summary>
+        /// 将单位向量压缩为 32 位整数 (2x16-bit 格式)
+        /// </summary>
+        public static uint PackNormalizedVector(Vector3 x)
+        {
+            // 1. 将单位向量投影到八面体
+            Vector2 xy = UnitVectorToOctahedron(x);
+
+            // 2. 将范围从 [-1, 1] 映射到 [0, 1]
+            xy.x = xy.x * 0.5f + 0.5f;
+            xy.y = xy.y * 0.5f + 0.5f;
+
+            // 3. 量化为 16 位无符号整数 (0 - 65535)
+            uint ux = FloatToUInt(Saturate(xy.x), (1 << 16) - 1);
+            uint uy = FloatToUInt(Saturate(xy.y), (1 << 16) - 1);
+
+            // 4. 打包：X 占低 16 位，Y 占高 16 位
+            return ux | (uy << 16);
+        }
+
+        /// <summary>
+        /// 八面体投影实现 (Octahedral Mapping)
+        /// 这是原 C++ 中 unitVectorToOctahedron 的典型实现
+        /// </summary>
+        private static Vector2 UnitVectorToOctahedron(Vector3 v)
+        {
+            float invL1Norm = 1.0f / (MathF.Abs(v.x) + MathF.Abs(v.y) + MathF.Abs(v.z));
+            Vector2 res = new Vector2(v.x * invL1Norm, v.y * invL1Norm);
+
+            if (v.z < 0)
+            {
+                // 如果在下半球，进行特殊的折叠处理
+                float oldX = res.x;
+                res.x = (1.0f - MathF.Abs(res.y)) * (res.x >= 0 ? 1.0f : -1.0f);
+                res.y = (1.0f - MathF.Abs(oldX)) * (res.y >= 0 ? 1.0f : -1.0f);
+            }
+            return res;
+        }
+
+        /// <summary>
+        /// 模拟 HLSL 的 saturate 函数，限制在 [0, 1]
+        /// </summary>
+        private static float Saturate(float val) => Math.Clamp(val, 0f, 1f);
+
+        /// <summary>
+        /// 将 0-1 的浮点数转为指定范围的整数
+        /// </summary>
+        private static uint FloatToUInt(float val, uint maxInt)
+        {
+            return (uint)(val * maxInt + 0.5f);
+        }
+
+        private static PolymorphicLightInfo PackAreaLightInfo(Light rect)
+        {
+            float surfaceArea = rect.areaSize.x * rect.areaSize.y;
+
+            var radiance = rect.color * rect.intensity / surfaceArea;
+
+            var transform = rect.transform;
+            var right = transform.right;
+            var up = transform.up;
+
+            var info = new PolymorphicLightInfo();
+            info.SetColorAndType(radiance, PolymorphicLightType.kRect);
+            info.center = transform.position;
+            info.scalars = (uint) (Fp32ToFp16(rect.areaSize.x) |  (Fp32ToFp16(rect.areaSize.y) << 16));
+            info.direction1 = PackNormalizedVector(right);
+            info.direction2 = PackNormalizedVector(up);
             
+            return info;
         }
 
         #endregion
