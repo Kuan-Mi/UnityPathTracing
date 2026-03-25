@@ -35,6 +35,21 @@ namespace RTXDI
         public uint emissiveTextureIndex;
     }
 
+    
+    public enum PolymorphicLightType
+    {
+        kSphere = 0,
+        kCylinder,
+        kDisk,
+        kRect,
+        kTriangle,
+        kDirectional,
+        kEnvironment,
+        kPoint
+    };
+
+
+    
     [StructLayout(LayoutKind.Sequential)]
     public struct PolymorphicLightInfo
     {
@@ -53,6 +68,39 @@ namespace RTXDI
         public uint primaryAxis; // oct-encoded
         public uint cosConeAngleAndSoftness; // 2x float16
         public uint padding;
+        
+        public void SetColorAndType(float3 color, PolymorphicLightType typeCode)
+        {
+            const float kMinLog2Radiance = -8f;
+            const float kMaxLog2Radiance = 40f;
+            const uint kTypeShift = 24u;
+
+            float intensity = math.max(color.x, math.max(color.y, color.z));
+            if (intensity > 0f)
+            {
+                // log-encode radiance (mirrors packLightColor in HLSL)
+                float normalizedLog = math.saturate(
+                    (math.log2(intensity) - kMinLog2Radiance) / (kMaxLog2Radiance - kMinLog2Radiance));
+                uint packedRadiance = (uint)math.min((uint)math.ceil(normalizedLog * 65534f) + 1u, 0xFFFFu);
+                logRadiance = packedRadiance; // stored in low 16 bits
+
+                // decode back to find actual encoded intensity, then normalize color to [0,1]
+                float unpackedIntensity = math.exp2(
+                    ((packedRadiance - 1f) / 65534f) * (kMaxLog2Radiance - kMinLog2Radiance) + kMinLog2Radiance);
+                float3 normalizedColor = math.saturate(color / unpackedIntensity);
+
+                // Pack_R8G8B8_UFLOAT: R in bits[0:7], G in bits[8:15], B in bits[16:23]
+                uint r = (uint)math.round(normalizedColor.x * 255f) & 0xFFu;
+                uint g = (uint)math.round(normalizedColor.y * 255f) & 0xFFu;
+                uint b = (uint)math.round(normalizedColor.z * 255f) & 0xFFu;
+                colorTypeAndFlags = ((uint)typeCode) << (int)kTypeShift | r | (g << 8) | (b << 16);
+            }
+            else
+            {
+                logRadiance = 0;
+                colorTypeAndFlags = ((uint)typeCode) << (int)kTypeShift;
+            }
+        }
     };
 
 
@@ -154,7 +202,7 @@ namespace RTXDI
         // 每个 instance 对应的 Renderer（一个 Renderer 多个自发光 SubMesh 会产生多条记录）
         private List<Renderer> _emissiveInstanceRenderers = new List<Renderer>();
 
-        private List<Light> _pointLightCache = new List<Light>();
+        // private List<Light> _pointLightCache = new List<Light>();
 
         // 场景拓扑脏标记：true 时完整重建，false 时仅更新 transform
         private bool _sceneTopologyDirty = true;
@@ -168,15 +216,15 @@ namespace RTXDI
 
         public void Build(RayTracingAccelerationStructure ras)
         {
+            // 收集场景内所有启用的点光源，打包成 PolymorphicLightInfo，追加在三角面光之后
             var currentLights = Object.FindObjectsByType<Light>(FindObjectsSortMode.None)
                 .Where(l => l != null && l.enabled && l.type == LightType.Point)
                 .ToList();
-            
-            var lightSetChanged = currentLights.Count != _pointLightCache.Count ||
-                               !currentLights.All(l => _pointLightCache.Contains(l));
-            
-            
-            if (_sceneTopologyDirty || lightSetChanged)
+
+            otherLightCount = (uint)currentLights.Count;
+
+
+            if (_sceneTopologyDirty)
             {
                 BuildFull();
                 UpdateInstanceID(ras);
@@ -185,6 +233,12 @@ namespace RTXDI
             else
             {
                 UpdateTransformsOnly();
+            }
+
+            if (otherLightCount > 0)
+            {
+                
+                UpdatePointLight(currentLights);
             }
         }
 
@@ -276,19 +330,6 @@ namespace RTXDI
 
             emissiveTriangleCount = (uint)primitiveDataList.Count;
 
-            // 收集场景内所有启用的点光源，打包成 PolymorphicLightInfo，追加在三角面光之后
-            _pointLightCache = Object.FindObjectsByType<Light>(FindObjectsSortMode.None)
-                .Where(l => l != null && l.enabled && l.type == LightType.Point)
-                .ToList();
-
-            otherLightCount = (uint)_pointLightCache.Count;
-
-            if (otherLightCount > 0)
-            {
-                Debug.Log($"Found {otherLightCount} active point lights in the scene. Adding to light buffer after emissive triangles.");
-                UpdatePointLight();
-            }
-
             uint maxLocalLights = emissiveTriangleCount + otherLightCount;
             Rtxdi.RtxdiUtils.ComputePdfTextureSize(maxLocalLights, out uint texWidth, out uint texHeight, out uint mipLevels);
 
@@ -327,12 +368,29 @@ namespace RTXDI
             // Debug.Log($"BuildFull completed: {instanceDataList.Count} instances, {primitiveDataList.Count} primitives, {globalTexturePool.Count} unique emissive textures.");
         }
 
-        private void UpdatePointLight()
+        private void UpdatePointLight(List<Light> currentLights)
         {
             var pointLightInfos = new PolymorphicLightInfo[otherLightCount];
-            for (int i = 0; i < _pointLightCache.Count; i++)
+            for (int i = 0; i < currentLights.Count; i++)
             {
-                Light light = _pointLightCache[i];
+                Light light = currentLights[i];
+
+                // flux = linear color * intensity（点光源 flux 直接用于 radiance = flux / r²）
+                Color linearColor = light.color.linear;
+                float3 flux = new float3(linearColor.r, linearColor.g, linearColor.b) * light.intensity;
+
+                pointLightInfos[i] = PackPointLightInfo(light.transform.position, flux);
+            }
+
+            // SetData 支持 offset，将点光源追加在三角灯之后
+            _lightInfoBuffer.SetData(pointLightInfos, 0, (int)emissiveTriangleCount, (int)otherLightCount);
+        }
+        private void UpdateAreaLight(List<Light> currentLights)
+        {
+            var pointLightInfos = new PolymorphicLightInfo[otherLightCount];
+            for (int i = 0; i < currentLights.Count; i++)
+            {
+                Light light = currentLights[i];
 
                 // flux = linear color * intensity（点光源 flux 直接用于 radiance = flux / r²）
                 Color linearColor = light.color.linear;
@@ -347,7 +405,6 @@ namespace RTXDI
 
         public void UpdateInstanceID(RayTracingAccelerationStructure ras)
         {
-
             foreach (var keyValuePair in rendererInstanceIdMap)
             {
                 MeshRenderer renderer = keyValuePair.Key;
@@ -411,9 +468,7 @@ namespace RTXDI
             }
 
             _instanceBuffer.SetData(instanceDataList);
-
-
-            UpdatePointLight();
+            
         }
 
         private MeshCache GetOrCacheMeshData(Mesh mesh)
@@ -514,7 +569,8 @@ namespace RTXDI
 
             return math.normalize(n);
         }
-
+        
+        
         /// <summary>
         /// 将点光源打包成 PolymorphicLightInfo（对应 HLSL 的 packLightColor + type=kPoint）。
         /// 参考 PolymorphicLight.hlsl：packLightColor / PointLight::Store。
@@ -523,10 +579,7 @@ namespace RTXDI
         /// </summary>
         private static PolymorphicLightInfo PackPointLightInfo(Vector3 worldPos, float3 flux)
         {
-            const float kMinLog2Radiance = -8f;
-            const float kMaxLog2Radiance = 40f;
-            const uint kTypePoint = 7u; // PolymorphicLightType::kPoint
-            const uint kTypeShift = 24u;
+             
 
             var info = new PolymorphicLightInfo
             {
@@ -540,32 +593,16 @@ namespace RTXDI
                 cosConeAngleAndSoftness = 0,
                 padding = 0,
             };
-
-            // type code in bits [24:27]
-            info.colorTypeAndFlags = kTypePoint << (int)kTypeShift;
-
-            float intensity = math.max(flux.x, math.max(flux.y, flux.z));
-            if (intensity > 0f)
-            {
-                // log-encode radiance (mirrors packLightColor in HLSL)
-                float normalizedLog = math.saturate(
-                    (math.log2(intensity) - kMinLog2Radiance) / (kMaxLog2Radiance - kMinLog2Radiance));
-                uint packedRadiance = (uint)math.min((uint)math.ceil(normalizedLog * 65534f) + 1u, 0xFFFFu);
-                info.logRadiance = packedRadiance; // stored in low 16 bits
-
-                // decode back to find actual encoded intensity, then normalize color to [0,1]
-                float unpackedIntensity = math.exp2(
-                    ((packedRadiance - 1f) / 65534f) * (kMaxLog2Radiance - kMinLog2Radiance) + kMinLog2Radiance);
-                float3 normalizedColor = math.saturate(flux / unpackedIntensity);
-
-                // Pack_R8G8B8_UFLOAT: R in bits[0:7], G in bits[8:15], B in bits[16:23]
-                uint r = (uint)math.round(normalizedColor.x * 255f) & 0xFFu;
-                uint g = (uint)math.round(normalizedColor.y * 255f) & 0xFFu;
-                uint b = (uint)math.round(normalizedColor.z * 255f) & 0xFFu;
-                info.colorTypeAndFlags |= r | (g << 8) | (b << 16);
-            }
+            
+            info.SetColorAndType(flux, PolymorphicLightType.kPoint);
 
             return info;
+        }        
+        
+        
+        private static PolymorphicLightInfo PackAreaLightInfo(Vector3 worldPos, float3 flux, Vector3 dirx, Vector3 diry,Vector2 size)
+        {
+            
         }
 
         #endregion
