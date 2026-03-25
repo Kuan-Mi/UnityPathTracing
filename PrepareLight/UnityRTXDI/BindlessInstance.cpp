@@ -10,19 +10,17 @@ using namespace nri;
 
 const char* g_ComputeShaderSource = R"(
 
-
-
 struct PrimitiveData
 {
-    float2 uv0_packed; 
-    float2 uv1_packed; 
-    float2 uv2_packed;
-    
-    float3 pos0; // offset 12
-    float3 pos1; // offset 24
-    float3 pos2; // offset 36
-    
-    uint instanceId; // offset 48
+    float2 uv0;
+    float2 uv1;
+    float2 uv2;
+
+    float3 pos0; 
+    float3 pos1; 
+    float3 pos2; 
+
+    uint instanceId;
 };
 
 
@@ -50,7 +48,7 @@ struct RAB_LightInfo
     // uint4[0]
     float3 center;
     uint scalars; // 2x float16
-    
+
     // uint4[1]
     uint2 radiance; // fp16x4
     uint direction1; // oct-encoded
@@ -72,7 +70,7 @@ RWStructuredBuffer<RAB_LightInfo> u_LightDataBuffer : register(u0);
 // Inputs (Adapted to C# buffers)
 
 StructuredBuffer<PrimitiveData> t_PrimitiveData : register(t0); // 绑定到 slot t0
-StructuredBuffer<InstanceData> t_InstanceData : register(t2);   // 绑定到 slot t2
+StructuredBuffer<InstanceData> t_InstanceData : register(t2); // 绑定到 slot t2
 
 // Textures
 
@@ -125,14 +123,13 @@ RAB_LightInfo Store(TriangleLight triLight)
     lightInfo.direction1 = ndirToOctUnorm32(normalize(triLight.edge1));
     lightInfo.direction2 = ndirToOctUnorm32(normalize(triLight.edge2));
     lightInfo.scalars = f32tof16(length(triLight.edge1)) | (f32tof16(length(triLight.edge2)) << 16);
-        
+
     return lightInfo;
 }
 
 [numthreads(256, 1, 1)]
 void main(uint dispatchThreadId : SV_DispatchThreadID)
 {
-
     uint triangleIdx = dispatchThreadId;
 
     if (triangleIdx >= g_Const.numTasks)
@@ -153,11 +150,11 @@ void main(uint dispatchThreadId : SV_DispatchThreadID)
         Texture2D emissiveTexture = t_BindlessTextures[NonUniformResourceIndex(instance.emissiveTextureIndex)];
 
         float2 uvs[3];
-        uvs[0] = float2(prim.uv0_packed);
-        uvs[1] = float2(prim.uv1_packed);
-        uvs[2] = float2(prim.uv2_packed);
+        uvs[0] = float2(prim.uv0);
+        uvs[1] = float2(prim.uv1);
+        uvs[2] = float2(prim.uv2);
 
-        
+
         // Calculate the triangle edges and edge lengths in UV space
         float2 edges[3];
         edges[0] = uvs[1] - uvs[0];
@@ -201,8 +198,8 @@ void main(uint dispatchThreadId : SV_DispatchThreadID)
         float2 centerUV = (uvs[0] + uvs[1] + uvs[2]) / 3.0;
         float3 emissiveMask = emissiveTexture.SampleGrad(s_MaterialSampler, centerUV, shortGradient, longGradient).rgb;
 
-//emissiveMask.xy = centerUV;
-//emissiveMask.z = 0;
+        //emissiveMask.xy = centerUV;
+        //emissiveMask.z = 0;
         radiance *= emissiveMask;
     }
 
@@ -218,6 +215,7 @@ void main(uint dispatchThreadId : SV_DispatchThreadID)
 
     u_LightDataBuffer[triangleIdx] = lightInfo;
 }
+
 )";
 
 
