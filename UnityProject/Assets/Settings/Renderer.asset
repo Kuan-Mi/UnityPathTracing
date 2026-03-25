@@ -126,7 +126,7 @@ MonoBehaviour:
     sssMaxSampleRadius: 0.0001
     enableRtxdi: 1
     debugRtxdi: 1
-    resamplingMode: 0
+    resamplingMode: 3
     gShowLight: 0
     initialSamplingParams:
       numPrimaryLocalLightSamples: 6

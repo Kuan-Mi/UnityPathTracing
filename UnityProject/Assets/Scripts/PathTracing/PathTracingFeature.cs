@@ -650,7 +650,8 @@ namespace PathTracing
                         PrevBaseColorMetalness = pool.GetRT(RenderResourceType.PrevBaseColorMetalness),
                         PrevGeoNormal = pool.GetRT(RenderResourceType.PrevGeoNormal),
 
-                        RtxdiResources = rtxdiResources
+                        RtxdiResources = rtxdiResources,
+                        envTexture =  env
                     };
 
                     var temSettings = new TemporalResamplingPass.Settings
@@ -684,7 +685,8 @@ namespace PathTracing
                         PrevBaseColorMetalness = pool.GetRT(RenderResourceType.PrevBaseColorMetalness),
                         PrevGeoNormal = pool.GetRT(RenderResourceType.PrevGeoNormal),
 
-                        RtxdiResources = rtxdiResources
+                        RtxdiResources = rtxdiResources,
+                        envTexture =  env
                     };
 
                     var SpSettings = new SpatialResamplingPass.Settings

@@ -51,6 +51,7 @@ namespace PathTracing
             internal RTHandle PrevGeoNormal;
 
             internal RtxdiResources RtxdiResources;
+            internal Texture2D envTexture;
         }
 
         public class Settings
@@ -97,6 +98,7 @@ namespace PathTracing
             natCmd.SetRayTracingTextureParam(data.OpaqueTs, gIn_PrevViewZID, resource.PrevViewZ);
             natCmd.SetRayTracingTextureParam(data.OpaqueTs, gIn_PrevNormalRoughnessID, resource.PrevNormalRoughness);
             natCmd.SetRayTracingTextureParam(data.OpaqueTs, gIn_PrevBaseColorMetalnessID, resource.PrevBaseColorMetalness);
+            natCmd.SetRayTracingTextureParam(data.OpaqueTs,"_environmentMap", resource.envTexture);
             
             
             natCmd.SetRayTracingTextureParam(data.OpaqueTs,"gOut_GeoNormal", resource.GeoNormal);
