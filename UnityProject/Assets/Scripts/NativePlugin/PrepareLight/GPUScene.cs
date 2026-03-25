@@ -259,9 +259,9 @@ namespace RTXDI
             uint maxLocalLights = emissiveTriangleCount;
             Rtxdi.RtxdiUtils.ComputePdfTextureSize(maxLocalLights, out uint texWidth, out uint texHeight, out uint mipLevels);
 
-            localLightPdfTextureSize= new uint2(texWidth, texHeight);
+            localLightPdfTextureSize = new uint2(texWidth, texHeight);
             localLightPdfTexture?.Release();
-            
+
             var textureDesc = new RenderTextureDescriptor((int)texWidth, (int)texHeight, RenderTextureFormat.RFloat)
             {
                 dimension = TextureDimension.Tex2D,
@@ -269,11 +269,11 @@ namespace RTXDI
                 useMipMap = true,
                 autoGenerateMips = false,
                 useDynamicScale = false,
-                mipCount =  (int)mipLevels,
+                mipCount = (int)mipLevels,
             };
 
             localLightPdfTexture = RTHandles.Alloc(textureDesc);
-            
+
             // localLightPdfTexture = RTHandles.Alloc(
             //     name: "LocalLightPDFTexture",
             //     dimension: TextureDimension.Tex2D,
@@ -285,9 +285,8 @@ namespace RTXDI
             //     autoGenerateMips:false,
             //     useDynamicScale: false
             //     );
-            
-            
-            
+
+
             // Debug.Log($"BuildFull completed: {instanceDataList.Count} instances, {primitiveDataList.Count} primitives, {globalTexturePool.Count} unique emissive textures.");
         }
 
@@ -539,7 +538,7 @@ namespace RTXDI
             _primitiveBuffer?.Dispose();
             _lightInfoBuffer?.Dispose();
             _meshDataCache.Clear();
-            
+
             localLightPdfTexture?.Release();
         }
     }
