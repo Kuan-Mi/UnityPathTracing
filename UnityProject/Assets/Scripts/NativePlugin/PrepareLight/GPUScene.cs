@@ -218,7 +218,7 @@ namespace RTXDI
         {
             // 收集场景内所有启用的点光源，打包成 PolymorphicLightInfo，追加在三角面光之后
             var currentLights = Object.FindObjectsByType<Light>(FindObjectsSortMode.None)
-                .Where(l => l != null && l.enabled && l.type == LightType.Rectangle)
+                .Where(l => l != null && l.enabled && l.type == LightType.Disc)
                 .ToList();
 
             otherLightCount = (uint)currentLights.Count;
@@ -237,7 +237,7 @@ namespace RTXDI
 
             if (otherLightCount > 0)
             {
-                UpdateAreaLight(currentLights);
+                UpdateDiscLight(currentLights);
             }
         }
 
@@ -391,6 +391,17 @@ namespace RTXDI
             for (var i = 0; i < currentLights.Count; i++)
             {
                 pointLightInfos[i] = PackAreaLightInfo(currentLights[i]);
+            }
+
+            // SetData 支持 offset，将点光源追加在三角灯之后
+            _lightInfoBuffer.SetData(pointLightInfos, 0, (int)emissiveTriangleCount, (int)otherLightCount);
+        }
+        private void UpdateDiscLight(List<Light> currentLights)
+        {
+            var pointLightInfos = new PolymorphicLightInfo[otherLightCount];
+            for (var i = 0; i < currentLights.Count; i++)
+            {
+                pointLightInfos[i] = PackDiscLightInfo(currentLights[i]);
             }
 
             // SetData 支持 offset，将点光源追加在三角灯之后
@@ -679,6 +690,26 @@ namespace RTXDI
             info.scalars = (uint) (Fp32ToFp16(rect.areaSize.x) |  (Fp32ToFp16(rect.areaSize.y) << 16));
             info.direction1 = PackNormalizedVector(right);
             info.direction2 = PackNormalizedVector(up);
+            
+            return info;
+        }
+        private static PolymorphicLightInfo PackDiscLightInfo(Light disc)
+        {
+            float surfaceArea = 2.0f * Mathf.PI * disc.areaSize.x * disc.areaSize.x;
+
+            var radiance = disc.color * disc.intensity / surfaceArea;
+
+            var transform = disc.transform;
+            var right = transform.right;
+            var up = transform.up;
+
+            var info = new PolymorphicLightInfo();
+            info.SetColorAndType(radiance, PolymorphicLightType.kDisk);
+            
+            info.center = transform.position;
+            info.scalars = (uint)(Fp32ToFp16(disc.areaSize.x));
+            
+            info.direction1 = PackNormalizedVector(transform.forward);
             
             return info;
         }
