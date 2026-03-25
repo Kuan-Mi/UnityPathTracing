@@ -153,9 +153,12 @@ namespace RTXDI
 
         // public uint emissiveMeshCount;
         public uint emissiveTriangleCount;
-        public uint otherLightCount;
+        private uint otherLocalLightCount;
+        public uint infiniteLightCount;
 
-        public uint numLights => emissiveTriangleCount + otherLightCount;
+        // public uint numLights => emissiveTriangleCount + otherLocalLightCount + infiniteLightCount;
+        public uint maxLocalLights => emissiveTriangleCount + otherLocalLightCount;
+        
         // public uint instanceCount;
 
         private uint GetTextureGroupIndex(Material mat)
@@ -218,10 +221,14 @@ namespace RTXDI
         {
             // 收集场景内所有启用的点光源，打包成 PolymorphicLightInfo，追加在三角面光之后
             var currentLights = Object.FindObjectsByType<Light>(FindObjectsSortMode.None)
-                .Where(l => l != null && l.enabled && l.type != LightType.Directional)
+                .Where(l => l != null && l.enabled)
                 .ToList();
 
-            otherLightCount = (uint)currentLights.Count;
+            var otherLocalLights = currentLights.Where(l => l.type is LightType.Point or LightType.Rectangle or LightType.Disc or LightType.Spot).ToList();
+            var infiniteLights = currentLights.Where(l => l.type == LightType.Directional).ToList();
+
+            otherLocalLightCount = (uint)otherLocalLights.Count;
+            infiniteLightCount = (uint)infiniteLights.Count;
 
 
             if (_sceneTopologyDirty)
@@ -235,10 +242,16 @@ namespace RTXDI
                 UpdateTransformsOnly();
             }
 
-            if (otherLightCount > 0)
+            if (otherLocalLightCount > 0)
             {
-                var lightInfos = currentLights.Select(PackLightInfo).ToArray();
-                _lightInfoBuffer.SetData(lightInfos, 0, (int)emissiveTriangleCount, (int)otherLightCount);
+                var otherLocalLightsInfos = otherLocalLights.Select(PackLightInfo).ToArray();
+                _lightInfoBuffer.SetData(otherLocalLightsInfos, 0, (int)emissiveTriangleCount, (int)otherLocalLightCount);
+            }
+
+            if (infiniteLightCount > 0)
+            {
+                var infiniteLightsInfos = infiniteLights.Select(PackLightInfo).ToArray();
+                _lightInfoBuffer.SetData(infiniteLightsInfos, 0, (int)(emissiveTriangleCount + otherLocalLightCount), (int)infiniteLightCount);
             }
         }
 
@@ -329,8 +342,7 @@ namespace RTXDI
 
 
             emissiveTriangleCount = (uint)primitiveDataList.Count;
-
-            uint maxLocalLights = emissiveTriangleCount + otherLightCount;
+ 
             RtxdiUtils.ComputePdfTextureSize(maxLocalLights, out uint texWidth, out uint texHeight, out uint mipLevels);
 
             if ((localLightPdfTextureSize.x != texWidth || localLightPdfTextureSize.y != texHeight))
@@ -351,19 +363,6 @@ namespace RTXDI
 
                 localLightPdfTexture = RTHandles.Alloc(textureDesc);
             }
-
-            // localLightPdfTexture = RTHandles.Alloc(
-            //     name: "LocalLightPDFTexture",
-            //     dimension: TextureDimension.Tex2D,
-            //     colorFormat: GraphicsFormat.R32_SFloat,
-            //     width: (int)texWidth,
-            //     height: (int)texHeight,
-            //     enableRandomWrite: true,
-            //     useMipMap: true,
-            //     autoGenerateMips:false,
-            //     useDynamicScale: false
-            //     );
-
 
             // Debug.Log($"BuildFull completed: {instanceDataList.Count} instances, {primitiveDataList.Count} primitives, {globalTexturePool.Count} unique emissive textures.");
         }
@@ -540,6 +539,8 @@ namespace RTXDI
         {
             switch (light.type)
             {
+                case LightType.Directional:
+                    return PackDirectionalLightInfo(light);
                 case LightType.Point:
                     return PackPointLightInfo(light);
                 case LightType.Rectangle:
@@ -575,10 +576,10 @@ namespace RTXDI
             {
                 float projectedArea = math.PI * radius * radius;
                 var radiance = point.color * point.intensity / projectedArea;
-                
+
                 var info = new PolymorphicLightInfo();
                 info.SetColorAndType(radiance, PolymorphicLightType.kSphere);
-                
+
                 info.center = point.transform.position;
                 info.scalars = Fp32ToFp16(radius);
 
@@ -701,6 +702,24 @@ namespace RTXDI
             info.scalars = (uint)(Fp32ToFp16(disc.areaSize.x));
 
             info.direction1 = PackNormalizedVector(transform.forward);
+
+            return info;
+        }
+
+        private static PolymorphicLightInfo PackDirectionalLightInfo(Light directional)
+        {
+            var angularSize = directional.bounceIntensity;
+
+            float halfAngularSizeRad = 0.5f * math.radians(angularSize);
+
+            float solidAngle = 2.0f * math.PI * (1.0f - math.cos(halfAngularSizeRad));
+            var radiance = directional.color * directional.intensity / solidAngle;
+
+            var info = new PolymorphicLightInfo();
+            info.SetColorAndType(radiance, PolymorphicLightType.kDirectional);
+            info.direction1 = PackNormalizedVector(directional.transform.forward);
+
+            info.scalars = (uint)(Fp32ToFp16(halfAngularSizeRad) | (Fp32ToFp16(solidAngle) << 16));
 
             return info;
         }

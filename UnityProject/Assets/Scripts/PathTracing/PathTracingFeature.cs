@@ -1067,10 +1067,10 @@ namespace PathTracing
 
 
             constants.lightBufferParams.localLightBufferRegion.firstLightIndex = 0;
-            constants.lightBufferParams.localLightBufferRegion.numLights = rtxdiResources.Scene.numLights;
+            constants.lightBufferParams.localLightBufferRegion.numLights = rtxdiResources.Scene.maxLocalLights;
 
-            constants.lightBufferParams.infiniteLightBufferRegion.firstLightIndex = 0;
-            constants.lightBufferParams.infiniteLightBufferRegion.numLights = 0;
+            constants.lightBufferParams.infiniteLightBufferRegion.firstLightIndex = rtxdiResources.Scene.maxLocalLights;
+            constants.lightBufferParams.infiniteLightBufferRegion.numLights = rtxdiResources.Scene.infiniteLightCount;
 
             constants.lightBufferParams.environmentLightParams.lightPresent = 0;
             constants.lightBufferParams.environmentLightParams.lightIndex = (0xffffffffu);

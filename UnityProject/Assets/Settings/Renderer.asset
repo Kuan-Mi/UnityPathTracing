@@ -73,7 +73,7 @@ MonoBehaviour:
     showMv: 0
     showValidation: 0
     sunAngularDiameter: 0.69
-    exposureEv: 4.4
+    exposureEv: 0.23
     upscalerMode: 0
     mipBias: -0.5
     tracingMode: 1
@@ -126,13 +126,13 @@ MonoBehaviour:
     sssMaxSampleRadius: 0.0001
     enableRtxdi: 1
     debugRtxdi: 1
-    resamplingMode: 3
+    resamplingMode: 2
     gShowLight: 0
     initialSamplingParams:
-      numPrimaryLocalLightSamples: 6
-      numPrimaryInfiniteLightSamples: 0
-      numPrimaryEnvironmentSamples: 0
-      numPrimaryBrdfSamples: 10
+      numPrimaryLocalLightSamples: 8
+      numPrimaryInfiniteLightSamples: 1
+      numPrimaryEnvironmentSamples: 1
+      numPrimaryBrdfSamples: 0
       brdfCutoff: 0.0001
       enableInitialVisibility: 1
       environmentMapImportanceSampling: 0
