@@ -9,17 +9,20 @@ using namespace nri;
 #define LOG(msg) UNITY_LOG(s_Log, msg)
 
 const char* g_ComputeShaderSource = R"(
+
+
+
 struct PrimitiveData
 {
-    float2 uv0;
-    float2 uv1;
-    float2 uv2;
+    float2 uv0_packed; 
+    float2 uv1_packed; 
+    float2 uv2_packed;
     
-    float3 pos0; 
-    float3 pos1; 
-    float3 pos2; 
-
-    uint instanceId;
+    float3 pos0; // offset 12
+    float3 pos1; // offset 24
+    float3 pos2; // offset 36
+    
+    uint instanceId; // offset 48
 };
 
 
@@ -30,25 +33,52 @@ struct InstanceData
     uint emissiveTextureIndex;
 };
 
-struct PolymorphicLightInfo
+
+struct TriangleLight
+{
+    float3 base;
+    float3 edge1;
+    float3 edge2;
+    float3 radiance;
+    float3 normal;
+    float surfaceArea;
+};
+
+
+struct RAB_LightInfo
 {
     // uint4[0]
     float3 center;
-    uint colorTypeAndFlags; // RGB8 + uint8 (see the kPolymorphicLight... constants above)
-
+    uint scalars; // 2x float16
+    
     // uint4[1]
+    uint2 radiance; // fp16x4
     uint direction1; // oct-encoded
     uint direction2; // oct-encoded
-    uint scalars; // 2x float16
-    uint logRadiance; // uint16
-
-    // uint4[2] -- optional, contains only shaping data
-    uint iesProfileIndex;
-    uint primaryAxis; // oct-encoded
-    uint cosConeAngleAndSoftness; // 2x float16
-    uint padding;
 };
 
+struct PrepareLightsConstants
+{
+    uint numTasks;
+};
+
+// Push Constants
+
+ConstantBuffer<PrepareLightsConstants> g_Const : register(b0);
+
+// Outputs
+RWStructuredBuffer<RAB_LightInfo> u_LightDataBuffer : register(u0);
+
+// Inputs (Adapted to C# buffers)
+
+StructuredBuffer<PrimitiveData> t_PrimitiveData : register(t0); // 绑定到 slot t0
+StructuredBuffer<InstanceData> t_InstanceData : register(t2);   // 绑定到 slot t2
+
+// Textures
+
+Texture2D t_BindlessTextures[] : register(t0, space1);
+
+SamplerState s_MaterialSampler : register(s0);
 
 
 uint Pack_R16G16_FLOAT(float2 rg)
@@ -86,126 +116,23 @@ uint2 Pack_R16G16B16A16_FLOAT(float4 rgba)
     return uint2(Pack_R16G16_FLOAT(rgba.rg), Pack_R16G16_FLOAT(rgba.ba));
 }
 
-static const uint kPolymorphicLightTypeShift = 24;
-
-static const float kPolymorphicLightMaxLog2Radiance = 40.f;
-static const float kPolymorphicLightMinLog2Radiance = -8.f;
-
-
-float unpackLightRadiance(uint logRadiance)
+RAB_LightInfo Store(TriangleLight triLight)
 {
-    return (logRadiance == 0) ? 0 : exp2((float(logRadiance - 1) / 65534.0) * (kPolymorphicLightMaxLog2Radiance - kPolymorphicLightMinLog2Radiance) + kPolymorphicLightMinLog2Radiance);
-}
+    RAB_LightInfo lightInfo = (RAB_LightInfo)0;
 
-#define PACK_UFLOAT_TEMPLATE(size)                      \
-uint Pack_R ## size ## _UFLOAT(float r, float d = 0.5f) \
-{                                                       \
-const uint mask = (1U << size) - 1U;                \
-\
-return (uint)floor(r * mask + d) & mask;            \
-}                                                       \
-\
-float Unpack_R ## size ## _UFLOAT(uint r)               \
-{                                                       \
-const uint mask = (1U << size) - 1U;                \
-\
-return (float)(r & mask) / (float)mask;             \
-}
-
-PACK_UFLOAT_TEMPLATE(8)
-
-uint Pack_R8G8B8_UFLOAT(float3 rgb, float3 d = float3(0.5f, 0.5f, 0.5f))
-{
-    uint r = Pack_R8_UFLOAT(rgb.r, d.r);
-    uint g = Pack_R8_UFLOAT(rgb.g, d.g) << 8;
-    uint b = Pack_R8_UFLOAT(rgb.b, d.b) << 16;
-    return r | g | b;
-}
-
-void packLightColor(float3 radiance, inout PolymorphicLightInfo lightInfo)
-{   
-    float intensity = max(radiance.r, max(radiance.g, radiance.b));
-
-    if (intensity > 0.0)
-    {
-        float logRadiance = saturate((log2(intensity) - kPolymorphicLightMinLog2Radiance) 
-            / (kPolymorphicLightMaxLog2Radiance - kPolymorphicLightMinLog2Radiance));
-        uint packedRadiance = min(uint(ceil(logRadiance * 65534.0)) + 1, 0xffffu);
-        float unpackedRadiance = unpackLightRadiance(packedRadiance);
-
-        float3 normalizedRadiance = saturate(radiance.rgb / unpackedRadiance.xxx);
-
-        lightInfo.logRadiance |= packedRadiance;
-        lightInfo.colorTypeAndFlags |= Pack_R8G8B8_UFLOAT(normalizedRadiance);
-    }
-}
-
-enum PolymorphicLightType
-{
-    kSphere = 0,
-    kCylinder,
-    kDisk,
-    kRect,
-    kTriangle,
-    kDirectional,
-    kEnvironment,
-    kPoint
-};
-
-struct TriangleLight
-{
-    float3 base;
-    float3 edge1;
-    float3 edge2;
-    float3 radiance;
-    float3 normal;
-    float surfaceArea;
-    
-    PolymorphicLightInfo Store()
-    {
-        PolymorphicLightInfo lightInfo = (PolymorphicLightInfo)0;
-
-        packLightColor(radiance, lightInfo);
-        lightInfo.center = base + (edge1 + edge2) / 3.0;
-        lightInfo.direction1 = ndirToOctUnorm32(normalize(edge1));
-        lightInfo.direction2 = ndirToOctUnorm32(normalize(edge2));
-        lightInfo.scalars = f32tof16(length(edge1)) | (f32tof16(length(edge2)) << 16);
-        lightInfo.colorTypeAndFlags |= uint(PolymorphicLightType::kTriangle) << kPolymorphicLightTypeShift;
+    lightInfo.radiance = Pack_R16G16B16A16_FLOAT(float4(triLight.radiance, 0));
+    lightInfo.center = triLight.base + (triLight.edge1 + triLight.edge2) / 3.0;
+    lightInfo.direction1 = ndirToOctUnorm32(normalize(triLight.edge1));
+    lightInfo.direction2 = ndirToOctUnorm32(normalize(triLight.edge2));
+    lightInfo.scalars = f32tof16(length(triLight.edge1)) | (f32tof16(length(triLight.edge2)) << 16);
         
-        return lightInfo;
-    }
-    
-};
-
-
-
-struct PrepareLightsConstants
-{
-    uint numTasks;
-};
-
-// Push Constants
-
-ConstantBuffer<PrepareLightsConstants> g_Const : register(b0);
-
-// Outputs
-RWStructuredBuffer<PolymorphicLightInfo> u_LightDataBuffer : register(u0);
-
-// Inputs (Adapted to C# buffers)
-
-StructuredBuffer<PrimitiveData> t_PrimitiveData : register(t0); // 绑定到 slot t0
-StructuredBuffer<InstanceData> t_InstanceData : register(t2); // 绑定到 slot t2
-
-// Textures
-
-Texture2D t_BindlessTextures[] : register(t0, space1);
-
-SamplerState s_MaterialSampler : register(s0);
- 
+    return lightInfo;
+}
 
 [numthreads(256, 1, 1)]
 void main(uint dispatchThreadId : SV_DispatchThreadID)
 {
+
     uint triangleIdx = dispatchThreadId;
 
     if (triangleIdx >= g_Const.numTasks)
@@ -226,11 +153,11 @@ void main(uint dispatchThreadId : SV_DispatchThreadID)
         Texture2D emissiveTexture = t_BindlessTextures[NonUniformResourceIndex(instance.emissiveTextureIndex)];
 
         float2 uvs[3];
-        uvs[0] = prim.uv0;
-        uvs[1] = prim.uv1;
-        uvs[2] = prim.uv2;
+        uvs[0] = float2(prim.uv0_packed);
+        uvs[1] = float2(prim.uv1_packed);
+        uvs[2] = float2(prim.uv2_packed);
 
-
+        
         // Calculate the triangle edges and edge lengths in UV space
         float2 edges[3];
         edges[0] = uvs[1] - uvs[0];
@@ -274,8 +201,8 @@ void main(uint dispatchThreadId : SV_DispatchThreadID)
         float2 centerUV = (uvs[0] + uvs[1] + uvs[2]) / 3.0;
         float3 emissiveMask = emissiveTexture.SampleGrad(s_MaterialSampler, centerUV, shortGradient, longGradient).rgb;
 
-        //emissiveMask.xy = centerUV;
-        //emissiveMask.z = 0;
+//emissiveMask.xy = centerUV;
+//emissiveMask.z = 0;
         radiance *= emissiveMask;
     }
 
@@ -287,12 +214,10 @@ void main(uint dispatchThreadId : SV_DispatchThreadID)
     triLight.edge2 = positions[2] - positions[0];
     triLight.radiance = radiance;
 
-    PolymorphicLightInfo lightInfo =  triLight.Store();
+    RAB_LightInfo lightInfo = Store(triLight);
 
     u_LightDataBuffer[triangleIdx] = lightInfo;
 }
-
-
 )";
 
 
