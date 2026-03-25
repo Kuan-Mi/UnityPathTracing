@@ -18,7 +18,7 @@
 #define DISTANT_LIGHT_DISTANCE 10000.0
 
 #ifndef ENVIRONMENT_SAMPLER
-#define ENVIRONMENT_SAMPLER s_EnvironmentSampler
+#define ENVIRONMENT_SAMPLER sampler_environmentMap
 #endif
 
 Texture2D<float4> _environmentMap;

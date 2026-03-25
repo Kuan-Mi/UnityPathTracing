@@ -236,20 +236,30 @@ void MainRayGenShader()
     //     gOut_DirectLighting[pixelPosition] = float3(0, 0, 0);
     // }
     
-    //     // RAB_LightInfo lightInfo = RAB_LoadLightInfo(o_lightIndex, false);
-    //     // RAB_LightSample lightSample = RAB_SamplePolymorphicLight(lightInfo,
-    //     //                                                          surface, o_randXY);
-    //     //
-    //     // gOut_DirectLighting[pixelPosition] = lightSample.radiance;
     
     
-    //
+    
+    
     // float3 origin = gCameraGlobalPos;
     // float3 dir = normalize(surface.worldPos - origin);
     // uint o_lightIndex;
     // float2 o_randXY;
     //
     // bool hit = RAB_TraceRayForLocalLight(origin, dir, 0, 1000, o_lightIndex, o_randXY);
+    //
+    //
+    // RAB_LightInfo lightInfo = RAB_LoadLightInfo(0, false);
+    // RAB_LightSample lightSample = RAB_SamplePolymorphicLight(lightInfo, surface, o_randXY);
+    //
+    // float3 cc = lightInfo.center;
+    // cc = lightSample.normal;
+    //
+    //
+    // float3 finalColor = ShadeSurfaceWithLightSample(lightSample, surface) ;
+    //
+    // gOut_DirectLighting[pixelPosition] = cc;
+    
+    
     //
     //
     // // gOut_DirectLighting[pixelPosition] = float3(o_randXY,0);

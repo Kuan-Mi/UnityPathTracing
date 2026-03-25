@@ -12,6 +12,7 @@ struct RAB_LightSample
     float3 normal;
     float3 radiance;
     float solidAnglePdf;
+    PolymorphicLightType lightType;
 };
 
 // 返回一个无效的光源样本实例

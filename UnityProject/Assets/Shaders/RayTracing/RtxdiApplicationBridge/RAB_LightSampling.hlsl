@@ -213,8 +213,15 @@ bool RAB_TraceRayForLocalLight(float3 origin, float3 direction, float tMin, floa
 // 对于重要性采样的环境光，“uv”参数具有 PDF 纹理中的纹理坐标，并归一化到 (0..1) 范围内。
 RAB_LightSample RAB_SamplePolymorphicLight(RAB_LightInfo lightInfo, RAB_Surface surface, float2 uv)
 {
-    TriangleLight triLight = TriangleLight::Create(lightInfo);
-    return CalcSample(triLight, uv, surface.worldPos);
+    PolymorphicLightSample pls = PolymorphicLight::calcSample(lightInfo, uv, surface.worldPos);
+
+    RAB_LightSample lightSample;
+    lightSample.position = pls.position;
+    lightSample.normal = pls.normal;
+    lightSample.radiance = pls.radiance;
+    lightSample.solidAnglePdf = pls.solidAnglePdf;
+    lightSample.lightType = getLightType(lightInfo);
+    return lightSample;
 }
 
 #endif // RAB_LIGHT_SAMPLING_HLSLI

@@ -48,6 +48,7 @@ namespace PathTracing
 
         public Texture2D scramblingRankingTex;
         public Texture2D sobolTex;
+        public Texture2D env;
 
         private OutputBlitPass _outputBlitPass;
         private SharcPass _sharcPass;
@@ -615,7 +616,8 @@ namespace PathTracing
                     PrevBaseColorMetalness = pool.GetRT(RenderResourceType.PrevBaseColorMetalness),
                     PrevGeoNormal = pool.GetRT(RenderResourceType.PrevGeoNormal),
 
-                    RtxdiResources = rtxdiResources
+                    RtxdiResources = rtxdiResources,
+                    envTexture =  env
                 };
 
                 var gisSettings = new GenerateInitialSamplesPass.Settings
@@ -715,7 +717,8 @@ namespace PathTracing
                     PrevBaseColorMetalness = pool.GetRT(RenderResourceType.PrevBaseColorMetalness),
                     PrevGeoNormal = pool.GetRT(RenderResourceType.PrevGeoNormal),
 
-                    RtxdiResources = rtxdiResources
+                    RtxdiResources = rtxdiResources,
+                    envTexture =  env
                 };
 
                 var shaSettings = new ShadeSamplesPass.Settings
