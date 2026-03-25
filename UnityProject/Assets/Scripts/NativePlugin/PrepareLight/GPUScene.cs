@@ -40,12 +40,19 @@ namespace RTXDI
     {
         // uint4[0]
         public float3 center;
-        public uint scalars; // 2x float16
+        public uint colorTypeAndFlags; // RGB8 + uint8 (see the kPolymorphicLight... constants above)
 
         // uint4[1]
-        public uint2 radiance; // fp16x4
         public uint direction1; // oct-encoded
         public uint direction2; // oct-encoded
+        public uint scalars; // 2x float16
+        public uint logRadiance; // uint16
+
+        // uint4[2] -- optional, contains only shaping data
+        public uint iesProfileIndex;
+        public uint primaryAxis; // oct-encoded
+        public uint cosConeAngleAndSoftness; // 2x float16
+        public uint padding;
     };
 
 
