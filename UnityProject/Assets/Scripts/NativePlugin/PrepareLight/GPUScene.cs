@@ -391,75 +391,6 @@ namespace RTXDI
 
         #region Debugging Helpers
 
-        public static Color UnpackRadiance(uint2 packed)
-        {
-            // packed.x 包含 R (低16位) 和 G (高16位)
-            // packed.y 包含 B (低16位) 和 A (高16位) - 虽然你的 HLSL 填的是 0，但为了完整性解出来是 Alpha
-
-            // 1. 提取 R (x 的低 16 位)
-            ushort r_bits = (ushort)(packed.x & 0xFFFF);
-
-            // 2. 提取 G (x 的高 16 位)
-            ushort g_bits = (ushort)((packed.x >> 16) & 0xFFFF);
-
-            // 3. 提取 B (y 的低 16 位)
-            ushort b_bits = (ushort)(packed.y & 0xFFFF);
-
-            // 4. 提取 A (y 的高 16 位)
-            ushort a_bits = (ushort)((packed.y >> 16) & 0xFFFF);
-
-            // 5. 转换回 float
-            float r = Mathf.HalfToFloat(r_bits);
-            float g = Mathf.HalfToFloat(g_bits);
-            float b = Mathf.HalfToFloat(b_bits);
-            float a = Mathf.HalfToFloat(a_bits);
-
-            return new Color(r, g, b, a);
-        }
-
-        private float3 UnpackOctDirection(uint packed)
-        {
-            // 1. 提取低16位和高16位
-            uint ux = packed & 0xFFFF;
-            uint uy = (packed >> 16) & 0xFFFF;
-
-            // 2. 归一化回 [0, 1] 范围
-            // Shader 中乘以了 0xfffe (65534.0)，所以这里除以 65534.0
-            float u = ux / 65534.0f;
-            float v = uy / 65534.0f;
-
-            // 3. 映射回 [-1, 1] (Signed Octahedron Space)
-            float x = u * 2.0f - 1.0f;
-            float y = v * 2.0f - 1.0f;
-
-            // 4. 重建 Z 轴
-            // 在八面体表面 |x| + |y| + |z| = 1 => |z| = 1 - (|x| + |y|)
-            float z = 1.0f - (math.abs(x) + math.abs(y));
-
-            // 5. 处理背面 (Z < 0) 的折叠 (Wrap)
-            // 对应 Shader 中的 octWrap
-            if (z < 0)
-            {
-                float tempX = x;
-                // HLSL: (1.f - abs(v.yx)) * select(v.xy >= 0.f, 1.f, -1.f);
-                // 注意：HLSL的 select(>=0) 对 0 返回 1，而 math.sign(0) 返回 0，所以这里需手写判断
-                x = (1.0f - math.abs(y)) * (tempX >= 0 ? 1.0f : -1.0f);
-                y = (1.0f - math.abs(tempX)) * (y >= 0 ? 1.0f : -1.0f);
-            }
-
-            // 6. 归一化 (因为 Octahedral 映射不保长，只保方向)
-            return math.normalize(new float3(x, y, z));
-        }
-
-        // 辅助函数：解包 2x fp16 标量 (Shader 中的 scalars)
-        private void UnpackScalars(uint packed, out float s1, out float s2)
-        {
-            // 这是一个 uint 包含两个 f16
-            ushort h1 = (ushort)(packed & 0xFFFF);
-            ushort h2 = (ushort)(packed >> 16);
-            s1 = math.f16tof32(h1);
-            s2 = math.f16tof32(h2);
-        }
 
         public void DebugReadback()
         {
@@ -479,18 +410,16 @@ namespace RTXDI
             int validCount = 0;
             for (int i = 0; i < debugData.Length; i++)
             {
-                // 简单检查：如果 radiance 或 center 有非零值，说明 Shader 跑通了
-                // 注意：lightInfo.radiance 是 uint2 (fp16 packed)，检查 raw value 即可
-                bool hasData = debugData[i].radiance.x != 0 ||
-                               debugData[i].radiance.y != 0 ||
-                               math.lengthsq(debugData[i].center) > 0;
+                var info = debugData[i];
+                
+                bool hasData =  math.lengthsq(info.center) > 0;
 
                 if (hasData)
                 {
                     validCount++;
                     // if (validCount <= 5) // 只打印前 5 个有效数据避免刷屏
                     {
-                        var c = UnpackRadiance(debugData[i].radiance);
+                        var c = xxx;
 
                         var vv = c.r + c.g + c.b;
                         if (vv < 0.01f)
@@ -498,37 +427,24 @@ namespace RTXDI
                             continue;
                         }
 
-                        float3 decodedDir1 = UnpackOctDirection(debugData[i].direction1);
-                        float3 decodedDir2 = UnpackOctDirection(debugData[i].direction2);
-
-                        var normalDir = math.cross(decodedDir1, decodedDir2);
-
-                        // --- 解包 Scalars (Edge Lengths) ---
-                        UnpackScalars(debugData[i].scalars, out float len1, out float len2);
+                        var center = xxxx;
+                        var normalDir = xxxx;
+ 
 
 
-                        Debug.Log($"[Primitive {i}] Center: {debugData[i].center}, Radiance: {c}, " +
-                                  $"Dir1: {decodedDir1}, Dir2: {decodedDir2}, Normal: {normalDir}, " +
-                                  $"EdgeLengths: ({len1}, {len2})");
+                        Debug.Log($"[Primitive {i}] Center: {center}, Radiance: {c}, " +  $"Normal: {normalDir}, ");
 
                         c.a = 1.0f;
 
                         if (c is { r: < 0.01f, g: < 0.01f, b: < 0.01f })
                             continue;
-                        Debug.DrawLine(debugData[i].center, debugData[i].center + normalDir, c, 10);
+                        
+                        Debug.DrawLine(center, center + normalDir, c, 10);
                     }
                 }
             }
 
             Debug.Log($"Total primitives with data: {validCount} / {debugData.Length}");
-
-            if (validCount == 0)
-            {
-                Debug.LogWarning("Shader execution finished, but all data is ZERO. Possible causes:\n" +
-                                 "1. Shader didn't run (Barrier issue?)\n" +
-                                 "2. Emissive color/texture is black\n" +
-                                 "3. Transform matrix placed objects at (0,0,0)");
-            }
         }
 
         #endregion
