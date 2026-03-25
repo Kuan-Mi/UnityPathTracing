@@ -89,7 +89,7 @@ namespace RTXDI
             _scene = scene;
             nriInstanceBufferPtr = WrapD3D12Buffer(scene._instanceBuffer.GetNativeBufferPtr(), (ushort)Marshal.SizeOf<InstanceData>());
             nriPrimtiveBufferPtr = WrapD3D12Buffer(scene._primitiveBuffer.GetNativeBufferPtr(), (ushort)Marshal.SizeOf<PrimitiveData>());
-            nriLightInfoBufferPtr = WrapD3D12Buffer(scene._lightInfoBuffer.GetNativeBufferPtr(), (ushort)Marshal.SizeOf<RAB_LightInfo>());
+            nriLightInfoBufferPtr = WrapD3D12Buffer(scene._lightInfoBuffer.GetNativeBufferPtr(), (ushort)Marshal.SizeOf<PolymorphicLightInfo>());
         }
         
         public PrepareLightResource()
