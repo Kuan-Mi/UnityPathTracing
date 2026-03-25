@@ -49,17 +49,6 @@ int RAB_TranslateLightIndex(uint lightIndex, bool currentToPrevious)
     return int(lightIndex);
 }
 
-// Load the packed light information from the buffer.
-// Ignore the previousFrame parameter as our lights are static in this sample.
-// 无视 previousFrame 参数，因为我们在这个示例中使用的是静态光源。
 
-// 根据索引，从当前帧或上一帧加载多态光源的信息。有关所需信息的说明，请参阅 RAB_LightInfo 。
-// 传递给此函数的索引将位于 RTXDI_LightBufferParameters 提供的三个范围之一内。
-
-// 这些范围不必连续地打包在一个缓冲区中，也不必从零开始。应用程序可以选择使用光索引中的一些较高位来存储信息。光索引的低 31 位可用；最高位保留供内部使用。
-RAB_LightInfo RAB_LoadLightInfo(uint index, bool previousFrame)
-{
-    return t_LightDataBuffer[index];
-}
 
 #endif // RAB_BUFFER_HLSLI

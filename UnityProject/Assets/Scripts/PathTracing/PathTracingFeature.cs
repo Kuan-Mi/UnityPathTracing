@@ -533,69 +533,69 @@ namespace PathTracing
             _opaquePass.Setup(opaqueResource, opaqueSettings);
             renderer.EnqueuePass(_opaquePass);
 
-            var pdfResource = new PdfTexturePass.Resource
-            {
-                ResamplingConstantBuffer = _resamplingConstantBuffer,
-                u_LocalLightPdfTexture = _gpuScene.localLightPdfTexture,
-                RtxdiResources = rtxdiResources
-            };
-
-            var pdfSettings = new PdfTexturePass.Settings
-            {
-            };
-
-
-            _pdfTexturePass.Setup(pdfResource, pdfSettings);
-            renderer.EnqueuePass(_pdfTexturePass);
-
-
-            var genMipsResource = new GenerateMipsPass.Resource
-            {
-                u_LocalLightPdfTexture = _gpuScene.localLightPdfTexture,
-            };
-
-            var genMipsSettings = new GenerateMipsPass.Settings
-            {
-                width = _gpuScene.localLightPdfTexture.rt.width,
-                height = _gpuScene.localLightPdfTexture.rt.height,
-                mipCount = _gpuScene.localLightPdfTexture.rt.mipmapCount
-            };
-
-            _generateMipsPass.Setup(genMipsResource, genMipsSettings);
-            renderer.EnqueuePass(_generateMipsPass);
-
-
-            var preResource = new PresamplePass.Resource
-            {
-                ConstantBuffer = _constantBuffer,
-                ResamplingConstantBuffer = _resamplingConstantBuffer,
-                u_LocalLightPdfTexture = _gpuScene.localLightPdfTexture,
-
-                RtxdiResources = rtxdiResources
-            };
-            var RTXDI_PRESAMPLING_GROUP_SIZE = 256;
-            var x = (isContext.GetLocalLightRISBufferSegmentParams().tileSize + RTXDI_PRESAMPLING_GROUP_SIZE - 1) / RTXDI_PRESAMPLING_GROUP_SIZE;
-            var y = isContext.GetLocalLightRISBufferSegmentParams().tileCount;
-
-            // dm::int2 presampleDispatchSize = {
-            //     dm::div_ceil(isContext.GetLocalLightRISBufferSegmentParams().tileSize, RTXDI_PRESAMPLING_GROUP_SIZE),
-            //     int(isContext.GetLocalLightRISBufferSegmentParams().tileCount)
-            // };
-
-
-            var preSettings = new PresamplePass.Settings
-            {
-                x = (int)x,
-                y = (int)y,
-                z = 1
-            };
-
-            _presamplePass.Setup(preResource, preSettings);
-            renderer.EnqueuePass(_presamplePass);
-
 
             if (pathTracingSetting.enableRtxdi)
             {
+                var pdfResource = new PdfTexturePass.Resource
+                {
+                    ResamplingConstantBuffer = _resamplingConstantBuffer,
+                    u_LocalLightPdfTexture = _gpuScene.localLightPdfTexture,
+                    RtxdiResources = rtxdiResources
+                };
+
+                var pdfSettings = new PdfTexturePass.Settings
+                {
+                };
+
+
+                _pdfTexturePass.Setup(pdfResource, pdfSettings);
+                renderer.EnqueuePass(_pdfTexturePass);
+
+
+                var genMipsResource = new GenerateMipsPass.Resource
+                {
+                    u_LocalLightPdfTexture = _gpuScene.localLightPdfTexture,
+                };
+
+                var genMipsSettings = new GenerateMipsPass.Settings
+                {
+                    width = _gpuScene.localLightPdfTexture.rt.width,
+                    height = _gpuScene.localLightPdfTexture.rt.height,
+                    mipCount = _gpuScene.localLightPdfTexture.rt.mipmapCount
+                };
+
+                _generateMipsPass.Setup(genMipsResource, genMipsSettings);
+                renderer.EnqueuePass(_generateMipsPass);
+
+
+                var preResource = new PresamplePass.Resource
+                {
+                    ConstantBuffer = _constantBuffer,
+                    ResamplingConstantBuffer = _resamplingConstantBuffer,
+                    u_LocalLightPdfTexture = _gpuScene.localLightPdfTexture,
+
+                    RtxdiResources = rtxdiResources
+                };
+                var RTXDI_PRESAMPLING_GROUP_SIZE = 256;
+                var x = (isContext.GetLocalLightRISBufferSegmentParams().tileSize + RTXDI_PRESAMPLING_GROUP_SIZE - 1) / RTXDI_PRESAMPLING_GROUP_SIZE;
+                var y = isContext.GetLocalLightRISBufferSegmentParams().tileCount;
+
+                // dm::int2 presampleDispatchSize = {
+                //     dm::div_ceil(isContext.GetLocalLightRISBufferSegmentParams().tileSize, RTXDI_PRESAMPLING_GROUP_SIZE),
+                //     int(isContext.GetLocalLightRISBufferSegmentParams().tileCount)
+                // };
+
+
+                var preSettings = new PresamplePass.Settings
+                {
+                    x = (int)x,
+                    y = (int)y,
+                    z = 1
+                };
+
+                _presamplePass.Setup(preResource, preSettings);
+                renderer.EnqueuePass(_presamplePass);
+
                 // GenerateInitialSamplesPass
                 var gisResource = new GenerateInitialSamplesPass.Resource
                 {

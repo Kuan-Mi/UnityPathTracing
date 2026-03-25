@@ -5,45 +5,9 @@
 #pragma target 6.0
 #pragma enable_d3d11_debug_symbols
 
-struct RAB_LightInfo
-{
-    // uint4[0]
-    float3 center;
-    uint scalars; // 2x float16
-
-    // uint4[1]
-    uint2 radiance; // fp16x4
-    uint direction1; // oct-encoded
-    uint direction2; // oct-encoded
-};
-
 #include "Assets/Shaders/Rtxdi/DI/ReSTIRDIParameters.h"
-
-struct ResamplingConstants
-{
-    RTXDI_RuntimeParameters runtimeParams;
-
-    RTXDI_LightBufferParameters lightBufferParams;
-    RTXDI_RISBufferSegmentParameters localLightsRISBufferSegmentParams;
-    RTXDI_RISBufferSegmentParameters environmentLightRISBufferSegmentParams;
-
-    ReSTIRDI_Parameters restirDI;
-
-    uint frameIndex;
-    uint2 pad2;
-    uint pad3;
-
-
-    uint2 environmentPdfTextureSize;
-    uint2 localLightPdfTextureSize;
-};
-
-RWStructuredBuffer<ResamplingConstants> ResampleConstants;
-#define g_Const ResampleConstants[0]
-
-
-StructuredBuffer<RAB_LightInfo> t_LightDataBuffer;
-
+#include "Assets/Shaders/donut/packing.hlsli"
+#include  "Assets/Shaders/RayTracing/DI/ResamplingConstants.hlsl"
 
 RWTexture2D<float> u_LocalLightPdfTexture;
 
@@ -51,6 +15,8 @@ RWTexture2D<float> u_LocalLightPdfTexture;
 
 #include "Assets/Shaders/RTXDI/Utils/Math.hlsl"
 #include "Assets/Shaders/RayTracing/TriangleLight.hlsl"
+
+#include "../PolymorphicLight.hlsl"
 
 [numthreads(256, 1, 1)]
 void CSMain(uint dispatchThreadId : SV_DispatchThreadID, uint groupThreadId : SV_GroupThreadID)
@@ -60,10 +26,9 @@ void CSMain(uint dispatchThreadId : SV_DispatchThreadID, uint groupThreadId : SV
     if (lightBufferPtr >= g_Const.lightBufferParams.localLightBufferRegion.numLights)
         return;
 
-    RAB_LightInfo lightInfo = t_LightDataBuffer[lightBufferPtr];
+    PolymorphicLightInfo lightInfo = t_LightDataBuffer[lightBufferPtr];
 
-    float emissiveFlux = TriangleLight::Create(lightInfo).getPower();
-
+    float emissiveFlux = PolymorphicLight::getPower(lightInfo);
 
     uint2 pdfTexturePosition = RTXDI_LinearIndexToZCurve(lightBufferPtr);
 

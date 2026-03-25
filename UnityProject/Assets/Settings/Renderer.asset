@@ -69,11 +69,11 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::PathTracing.PathTracingFeature
   m_Active: 1
   pathTracingSetting:
-    showMode: 18
+    showMode: 12
     showMv: 0
     showValidation: 0
     sunAngularDiameter: 0.69
-    exposureEv: 3.5
+    exposureEv: 3.53
     upscalerMode: 0
     mipBias: -0.5
     tracingMode: 1
@@ -124,19 +124,19 @@ MonoBehaviour:
     sssScale: 1
     sssAnisotropy: 0.8
     sssMaxSampleRadius: 0.0001
-    enableRtxdi: 1
-    debugRtxdi: 1
-    resamplingMode: 2
+    enableRtxdi: 0
+    debugRtxdi: 0
+    resamplingMode: 0
     gShowLight: 0
     initialSamplingParams:
-      numPrimaryLocalLightSamples: 8
+      numPrimaryLocalLightSamples: 16
       numPrimaryInfiniteLightSamples: 0
       numPrimaryEnvironmentSamples: 0
-      numPrimaryBrdfSamples: 4
+      numPrimaryBrdfSamples: 1
       brdfCutoff: 0.0001
       enableInitialVisibility: 1
       environmentMapImportanceSampling: 0
-      localLightSamplingMode: 1
+      localLightSamplingMode: 0
     temporalResamplingParams:
       temporalDepthThreshold: 0.1
       temporalNormalThreshold: 0.5
@@ -153,7 +153,7 @@ MonoBehaviour:
     spatialResamplingParams:
       spatialDepthThreshold: 0.1
       spatialNormalThreshold: 0.5
-      spatialBiasCorrection: 3
+      spatialBiasCorrection: 0
       numSpatialSamples: 1
       numDisocclusionBoostSamples: 8
       spatialSamplingRadius: 32
@@ -170,7 +170,7 @@ MonoBehaviour:
       pad3: 0
     useReferencePathTracing: 0
     referenceBounceNum: 2
-    split: 0.34
+    split: 0.683
     accumulateReference: 0
     accumulate: 0
   renderPassEvent: 550

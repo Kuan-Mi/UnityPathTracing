@@ -47,9 +47,11 @@ MonoBehaviour:
   recorderNames:
   - Sharc Update
   - Sharc Resolve
-  - Opaque Tracing
   - PrepareLight
-  - GIS Tracing
+  - Opaque Tracing
+  - pdfTexture
+  - PresamplePass
+  - GenerateInitialSamples
   - TemporalResampling
   - SpatialResampling
   - ShadeSamples

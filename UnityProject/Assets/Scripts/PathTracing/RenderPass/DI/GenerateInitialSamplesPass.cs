@@ -69,7 +69,7 @@ namespace PathTracing
         {
             var natCmd = CommandBufferHelpers.GetNativeCommandBuffer(context.cmd);
 
-            var opaqueTracingMarker = new ProfilerMarker(ProfilerCategory.Render, "GIS Tracing", MarkerFlags.SampleGPU);
+            var opaqueTracingMarker = new ProfilerMarker(ProfilerCategory.Render, "GenInitialSamples", MarkerFlags.SampleGPU);
 
             natCmd.BeginSample(opaqueTracingMarker);
 

@@ -14,6 +14,8 @@
 #include <Assets/Shaders/donut/utils.hlsli>
 #include <Assets/Shaders/RTXDI/Utils/Math.hlsl>
 
+static const float c_pi = 3.1415926535;
+
 struct RandomSamplerState
 {
     uint seed;
@@ -117,6 +119,69 @@ float3 basicToneMapping(float3 color, float bias)
     }
 
     return color;
+}
+/*https://graphics.pixar.com/library/OrthonormalB/paper.pdf*/
+void branchlessONB(in float3 n, out float3 b1, out float3 b2)
+{
+    float sign = n.z >= 0.0f ? 1.0f : -1.0f;
+    float a = -1.0f / (sign + n.z);
+    float b = n.x * n.y * a;
+    b1 = float3(1.0f + sign * n.x * n.x * a, sign * b, -sign * n.x);
+    b2 = float3(b, sign + n.y * n.y * a, -n.y);
+}
+
+
+float3 sphericalDirection(float sinTheta, float cosTheta, float sinPhi, float cosPhi, float3 x, float3 y, float3 z)
+{
+    return sinTheta * cosPhi * x + sinTheta * sinPhi * y + cosTheta * z;
+}
+
+
+float2 sampleDisk(float2 rand)
+{
+    float angle = 2 * c_pi * rand.x;
+    return float2(cos(angle), sin(angle)) * sqrt(rand.y);
+}
+
+float3 equirectUVToDirection(float2 uv, out float cosElevation)
+{
+    float azimuth = (uv.x + 0.25) * (2 * c_pi);
+    float elevation = (0.5 - uv.y) * c_pi;
+    cosElevation = cos(elevation);
+
+    return float3(
+        cos(azimuth) * cosElevation,
+        sin(elevation),
+        sin(azimuth) * cosElevation
+    );
+}
+
+float3 sampleSphere(float2 rand, out float solidAnglePdf)
+{
+    // See (6-8) in https://mathworld.wolfram.com/SpherePointPicking.html
+
+    rand.y = rand.y * 2.0 - 1.0;
+
+    float2 tangential = sampleDisk(float2(rand.x, 1.0 - square(rand.y)));
+    float elevation = rand.y;
+
+    solidAnglePdf = 0.25f / c_pi;
+
+    return float3(tangential.xy, elevation);
+}
+
+float2 directionToEquirectUV(float3 normalizedDirection)
+{
+    float elevation = asin(normalizedDirection.y);
+    float azimuth = 0;
+    if (abs(normalizedDirection.y) < 1.0)
+        azimuth = atan2(normalizedDirection.z, normalizedDirection.x);
+
+    float2 uv;
+    uv.x = azimuth / (2 * c_pi) - 0.25;
+    uv.y = 0.5 - elevation / c_pi;
+
+    return uv;
 }
 
 #endif // HELPER_FUNCTIONS_HLSLI

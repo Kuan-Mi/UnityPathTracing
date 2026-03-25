@@ -159,7 +159,7 @@ void MainRayGenShader()
 
         specular = DemodulateSpecular(surface.material.specularF0, specular);
 
-        float3 finalColor = ShadeSurfaceWithLightSample(lightSample, surface)  * RTXDI_GetDIReservoirInvPdf(reservoir) * 10;
+        float3 finalColor = ShadeSurfaceWithLightSample(lightSample, surface)  * RTXDI_GetDIReservoirInvPdf(reservoir);
         gOut_DirectLighting[pixelPosition] = finalColor + gIn_EmissiveLighting[pixelPosition];
 
         // gOut_DirectLighting[pixelPosition] = diffuse + specular;
