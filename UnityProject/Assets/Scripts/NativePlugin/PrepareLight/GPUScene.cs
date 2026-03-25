@@ -218,7 +218,7 @@ namespace RTXDI
         {
             // 收集场景内所有启用的点光源，打包成 PolymorphicLightInfo，追加在三角面光之后
             var currentLights = Object.FindObjectsByType<Light>(FindObjectsSortMode.None)
-                .Where(l => l != null && l.enabled && l.type == LightType.Spot)
+                .Where(l => l != null && l.enabled && l.type != LightType.Directional)
                 .ToList();
 
             otherLightCount = (uint)currentLights.Count;
@@ -237,7 +237,8 @@ namespace RTXDI
 
             if (otherLightCount > 0)
             {
-                UpdateSpotLight(currentLights);
+                var lightInfos = currentLights.Select(PackLightInfo).ToArray();
+                _lightInfoBuffer.SetData(lightInfos, 0, (int)emissiveTriangleCount, (int)otherLightCount);
             }
         }
 
@@ -330,7 +331,7 @@ namespace RTXDI
             emissiveTriangleCount = (uint)primitiveDataList.Count;
 
             uint maxLocalLights = emissiveTriangleCount + otherLightCount;
-            Rtxdi.RtxdiUtils.ComputePdfTextureSize(maxLocalLights, out uint texWidth, out uint texHeight, out uint mipLevels);
+            RtxdiUtils.ComputePdfTextureSize(maxLocalLights, out uint texWidth, out uint texHeight, out uint mipLevels);
 
             if ((localLightPdfTextureSize.x != texWidth || localLightPdfTextureSize.y != texHeight))
             {
@@ -367,58 +368,6 @@ namespace RTXDI
             // Debug.Log($"BuildFull completed: {instanceDataList.Count} instances, {primitiveDataList.Count} primitives, {globalTexturePool.Count} unique emissive textures.");
         }
 
-        private void UpdatePointLight(List<Light> currentLights)
-        {
-            var pointLightInfos = new PolymorphicLightInfo[otherLightCount];
-            for (int i = 0; i < currentLights.Count; i++)
-            {
-                Light light = currentLights[i];
-
-                // flux = linear color * intensity（点光源 flux 直接用于 radiance = flux / r²）
-                Color linearColor = light.color.linear;
-                float3 flux = new float3(linearColor.r, linearColor.g, linearColor.b) * light.intensity;
-
-                pointLightInfos[i] = PackPointLightInfo(light);
-            }
-
-            // SetData 支持 offset，将点光源追加在三角灯之后
-            _lightInfoBuffer.SetData(pointLightInfos, 0, (int)emissiveTriangleCount, (int)otherLightCount);
-        }
-
-        private void UpdateAreaLight(List<Light> currentLights)
-        {
-            var pointLightInfos = new PolymorphicLightInfo[otherLightCount];
-            for (var i = 0; i < currentLights.Count; i++)
-            {
-                pointLightInfos[i] = PackAreaLightInfo(currentLights[i]);
-            }
-
-            // SetData 支持 offset，将点光源追加在三角灯之后
-            _lightInfoBuffer.SetData(pointLightInfos, 0, (int)emissiveTriangleCount, (int)otherLightCount);
-        }
-        private void UpdateDiscLight(List<Light> currentLights)
-        {
-            var pointLightInfos = new PolymorphicLightInfo[otherLightCount];
-            for (var i = 0; i < currentLights.Count; i++)
-            {
-                pointLightInfos[i] = PackDiscLightInfo(currentLights[i]);
-            }
-
-            // SetData 支持 offset，将点光源追加在三角灯之后
-            _lightInfoBuffer.SetData(pointLightInfos, 0, (int)emissiveTriangleCount, (int)otherLightCount);
-        }        
-        
-        private void UpdateSpotLight(List<Light> currentLights)
-        {
-            var pointLightInfos = new PolymorphicLightInfo[otherLightCount];
-            for (var i = 0; i < currentLights.Count; i++)
-            {
-                pointLightInfos[i] = PackSpotLightInfo(currentLights[i]);
-            }
-
-            // SetData 支持 offset，将点光源追加在三角灯之后
-            _lightInfoBuffer.SetData(pointLightInfos, 0, (int)emissiveTriangleCount, (int)otherLightCount);
-        }
 
         public void UpdateInstanceID(RayTracingAccelerationStructure ras)
         {
@@ -587,6 +536,23 @@ namespace RTXDI
         }
 
 
+        private static PolymorphicLightInfo PackLightInfo(Light light)
+        {
+            switch (light.type)
+            {
+                case LightType.Point:
+                    return PackPointLightInfo(light);
+                case LightType.Rectangle:
+                    return PackAreaLightInfo(light);
+                case LightType.Disc:
+                    return PackDiscLightInfo(light);
+                case LightType.Spot:
+                    return PackSpotLightInfo(light);
+                default:
+                    throw new NotSupportedException($"Unsupported light type: {light.type}");
+            }
+        }
+
         /// <summary>
         /// 将点光源打包成 PolymorphicLightInfo（对应 HLSL 的 packLightColor + type=kPoint）。
         /// 参考 PolymorphicLight.hlsl：packLightColor / PointLight::Store。
@@ -595,36 +561,46 @@ namespace RTXDI
         /// </summary>
         private static PolymorphicLightInfo PackPointLightInfo(Light point)
         {
-            var info = new PolymorphicLightInfo
+            var radius = point.bounceIntensity;
+
+            if (radius <= 0)
             {
-                center = point.transform.position,
-                direction1 = 0,
-                direction2 = 0,
-                scalars = 0,
-                logRadiance = 0,
-                iesProfileIndex = 0,
-                primaryAxis = 0,
-                cosConeAngleAndSoftness = 0,
-                padding = 0,
-            };
+                var info = new PolymorphicLightInfo();
+                info.SetColorAndType(point.color * point.intensity, PolymorphicLightType.kPoint);
+                info.center = point.transform.position;
 
-            info.SetColorAndType(point.color * point.intensity, PolymorphicLightType.kPoint);
+                return info;
+            }
+            else
+            {
+                float projectedArea = math.PI * radius * radius;
+                var radiance = point.color * point.intensity / projectedArea;
+                
+                var info = new PolymorphicLightInfo();
+                info.SetColorAndType(radiance, PolymorphicLightType.kSphere);
+                
+                info.center = point.transform.position;
+                info.scalars = Fp32ToFp16(radius);
 
-            return info;
+                return info;
+            }
         }
 
         [StructLayout(LayoutKind.Explicit)]
         private struct FloatUIntUnion
         {
-            [FieldOffset(0)] public uint ui;
-            [FieldOffset(0)] public float f;
+            [FieldOffset(0)]
+            public uint ui;
+
+            [FieldOffset(0)]
+            public float f;
         }
 
         private static readonly FloatUIntUnion Multiple = new FloatUIntUnion { ui = 0x07800000 }; // 2^-112
 
         public static ushort Fp32ToFp16(float v)
         {
-            FloatUIntUnion biasedFloat = new FloatUIntUnion {   };
+            FloatUIntUnion biasedFloat = new FloatUIntUnion { };
             biasedFloat.f = v * Multiple.f;
             uint u = biasedFloat.ui;
 
@@ -634,6 +610,7 @@ namespace RTXDI
             // C# 中的 uint 右移是逻辑右移（高位补0），与 C++ unsigned 行为一致
             return (ushort)((sign >> 16 | body >> 13) & 0xFFFF);
         }
+
         /// <summary>
         /// 将单位向量压缩为 32 位整数 (2x16-bit 格式)
         /// </summary>
@@ -670,6 +647,7 @@ namespace RTXDI
                 res.x = (1.0f - MathF.Abs(res.y)) * (res.x >= 0 ? 1.0f : -1.0f);
                 res.y = (1.0f - MathF.Abs(oldX)) * (res.y >= 0 ? 1.0f : -1.0f);
             }
+
             return res;
         }
 
@@ -699,12 +677,13 @@ namespace RTXDI
             var info = new PolymorphicLightInfo();
             info.SetColorAndType(radiance, PolymorphicLightType.kRect);
             info.center = transform.position;
-            info.scalars = (uint) (Fp32ToFp16(rect.areaSize.x) |  (Fp32ToFp16(rect.areaSize.y) << 16));
+            info.scalars = (uint)(Fp32ToFp16(rect.areaSize.x) | (Fp32ToFp16(rect.areaSize.y) << 16));
             info.direction1 = PackNormalizedVector(right);
             info.direction2 = PackNormalizedVector(up);
-            
+
             return info;
         }
+
         private static PolymorphicLightInfo PackDiscLightInfo(Light disc)
         {
             float surfaceArea = 2.0f * Mathf.PI * disc.areaSize.x * disc.areaSize.x;
@@ -717,23 +696,24 @@ namespace RTXDI
 
             var info = new PolymorphicLightInfo();
             info.SetColorAndType(radiance, PolymorphicLightType.kDisk);
-            
+
             info.center = transform.position;
             info.scalars = (uint)(Fp32ToFp16(disc.areaSize.x));
-            
+
             info.direction1 = PackNormalizedVector(transform.forward);
-            
+
             return info;
         }
-        
+
         private static PolymorphicLightInfo PackSpotLightInfo(Light spot)
         {
-            var radius = 0.2f;
+            // 临时用 bounceIntensity 模拟半径，实际使用时可以自定义扩展 Light 类添加 radius 字段
+            var radius = spot.bounceIntensity;
 
             float projectedArea = (float)Math.PI * radius * radius;
-            
+
             Color radiance = spot.color * spot.intensity / projectedArea;
-            
+
             float softness = math.saturate(1.0f - spot.innerSpotAngle / spot.spotAngle);
 
             var transform = spot.transform;
@@ -742,17 +722,17 @@ namespace RTXDI
 
             var info = new PolymorphicLightInfo();
             info.SetColorAndType(radiance, PolymorphicLightType.kSphere);
-            
+
             const uint kPolymorphicLightShapingEnableBit = 1 << 28;
             info.colorTypeAndFlags |= kPolymorphicLightShapingEnableBit;
-            
-            
+
+
             info.center = transform.position;
             info.scalars = (uint)(Fp32ToFp16(radius));
-            
+
             info.primaryAxis = PackNormalizedVector(transform.forward);
             info.cosConeAngleAndSoftness = (uint)(Fp32ToFp16(math.cos(math.radians(spot.spotAngle * 0.5f))) | (Fp32ToFp16(softness) << 16));
-            
+
             return info;
         }
 

@@ -22,15 +22,18 @@ RWTexture2D<float> u_LocalLightPdfTexture;
 void CSMain(uint dispatchThreadId : SV_DispatchThreadID, uint groupThreadId : SV_GroupThreadID)
 {
     uint lightBufferPtr = dispatchThreadId.x;
+    uint2 pdfTexturePosition = RTXDI_LinearIndexToZCurve(lightBufferPtr);
 
     if (lightBufferPtr >= g_Const.lightBufferParams.localLightBufferRegion.numLights)
+    {
+        u_LocalLightPdfTexture[pdfTexturePosition] = 0;
         return;
+    }
 
     PolymorphicLightInfo lightInfo = t_LightDataBuffer[lightBufferPtr];
 
     float emissiveFlux = PolymorphicLight::getPower(lightInfo);
 
-    uint2 pdfTexturePosition = RTXDI_LinearIndexToZCurve(lightBufferPtr);
 
     u_LocalLightPdfTexture[pdfTexturePosition] = emissiveFlux;
 }

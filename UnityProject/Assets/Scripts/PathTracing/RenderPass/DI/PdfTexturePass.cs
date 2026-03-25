@@ -68,10 +68,12 @@ namespace PathTracing
 
             natCmd.SetComputeTextureParam(data.OpaqueTs, 0, "u_LocalLightPdfTexture", resource.u_LocalLightPdfTextureHandle);
  
-            var all = resource.RtxdiResources.Scene.numLights;
+            // var all = resource.RtxdiResources.Scene.numLights;
+            var all = resource.RtxdiResources.Scene.localLightPdfTextureSize.x * resource.RtxdiResources.Scene.localLightPdfTextureSize.y;
 
             var X = (int)(all + 255) / 256;
 
+            
             if (X > 0)
             {
                 natCmd.DispatchCompute(data.OpaqueTs, 0, X, 1, 1);
