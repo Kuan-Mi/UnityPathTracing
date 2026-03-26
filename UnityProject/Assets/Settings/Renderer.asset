@@ -73,7 +73,7 @@ MonoBehaviour:
     showMv: 0
     showValidation: 0
     sunAngularDiameter: 0.69
-    exposureEv: 0.23
+    exposureEv: 2.9
     upscalerMode: 0
     mipBias: -0.5
     tracingMode: 1
@@ -123,8 +123,8 @@ MonoBehaviour:
     sssScale: 1
     sssAnisotropy: 0.8
     sssMaxSampleRadius: 0.0001
-    enableRtxdi: 1
-    debugRtxdi: 1
+    enableRtxdi: 0
+    debugRtxdi: 0
     resamplingMode: 3
     gShowLight: 0
     initialSamplingParams:
@@ -152,7 +152,7 @@ MonoBehaviour:
     spatialResamplingParams:
       spatialDepthThreshold: 0.1
       spatialNormalThreshold: 0.5
-      spatialBiasCorrection: 0
+      spatialBiasCorrection: 3
       numSpatialSamples: 1
       numDisocclusionBoostSamples: 8
       spatialSamplingRadius: 32
@@ -170,9 +170,9 @@ MonoBehaviour:
     regirDynamicParams:
       regirCellSize: 1
       center:
-        x: 11.811045
-        y: 0.3139648
-        z: -7.647777
+        x: 23.66206
+        y: 6.7551823
+        z: -9.937016
       fallbackSamplingMode: 1
       presamplingMode: 1
       regirSamplingJitter: 1
