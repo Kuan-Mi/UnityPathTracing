@@ -243,6 +243,8 @@ RTXDI_LocalLightSelectionContext RTXDI_InitializeLocalLightSelectionContext(
     if (localLightSamplingMode == ReSTIRDI_LocalLightSamplingMode_REGIR_RIS)
     {
         ctx = RTXDI_InitializeLocalLightSelectionContextReGIRRIS(coherentRng, localLightBufferRegion, localLightRISBufferSegmentParams, regirParams, surface);
+        
+        // ctx = (RTXDI_LocalLightSelectionContext)0;
     }
     else
 #endif // RTXDI_REGIR_MODE != RTXDI_REGIR_DISABLED
