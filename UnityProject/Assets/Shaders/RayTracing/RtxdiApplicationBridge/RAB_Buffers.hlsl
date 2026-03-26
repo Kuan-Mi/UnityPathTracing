@@ -37,6 +37,15 @@
 // #define RTXDI_LIGHT_RESERVOIR_BUFFER u_LightReservoirs
 // #define RTXDI_NEIGHBOR_OFFSETS_BUFFER t_NeighborOffsets
 
+
+
+
+
+
+
+
+Texture2D t_LocalLightPdfTexture;
+
 // Translate the light index between the current and previous frame.
 // Do nothing as our lights are static in this sample.
 

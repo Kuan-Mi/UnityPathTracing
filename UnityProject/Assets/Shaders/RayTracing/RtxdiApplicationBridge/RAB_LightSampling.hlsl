@@ -21,9 +21,18 @@ float RAB_EvaluateEnvironmentMapSamplingPdf(float3 L)
 // 基于局部光 PDF 纹理，使用重要性采样计算从局部光池中采样特定光的概率。
 float RAB_EvaluateLocalLightSourcePdf(uint lightIndex)
 {
-    // Uniform pdf
-    // return 1.0 / gNumLights;
-    return 1.0 / g_Const.lightBufferParams.localLightBufferRegion.numLights;
+    uint2 pdfTextureSize = g_Const.localLightPdfTextureSize.xy;
+    uint2 texelPosition = RTXDI_LinearIndexToZCurve(lightIndex);
+    float texelValue = t_LocalLightPdfTexture[texelPosition].r;
+
+    int lastMipLevel = max(0, int(floor(log2(max(pdfTextureSize.x, pdfTextureSize.y)))));
+    float averageValue = t_LocalLightPdfTexture.mips[lastMipLevel][uint2(0, 0)].x;
+
+    // See the comment at 'sum' in RAB_EvaluateEnvironmentMapSamplingPdf.
+    // The same texture shape considerations apply to local lights.
+    float sum = averageValue * square(1u << lastMipLevel);
+
+    return texelValue / sum;
 }
 
 float3 RAB_GetReflectedRadianceForSurface(float3 incomingRadianceLocation, float3 incomingRadiance, RAB_Surface surface)
@@ -96,14 +105,22 @@ float RAB_GetGISampleTargetPdfForSurface(float3 samplePosition, float3 sampleRad
     return RTXDI_Luminance(reflectedRadiance);
 }
 
-// 返回表面到光源样本的方向和距离。
+
 void RAB_GetLightDirDistance(RAB_Surface surface, RAB_LightSample lightSample,
-                             out float3 o_lightDir,
-                             out float o_lightDistance)
+    out float3 o_lightDir,
+    out float o_lightDistance)
 {
-    float3 toLight = lightSample.position - surface.worldPos;
-    o_lightDistance = length(toLight);
-    o_lightDir = toLight / o_lightDistance;
+    if (lightSample.lightType == PolymorphicLightType::kEnvironment)
+    {
+        o_lightDir = -lightSample.normal;
+        o_lightDistance = DISTANT_LIGHT_DISTANCE;
+    }
+    else
+    {
+        float3 toLight = lightSample.position - surface.worldPos;
+        o_lightDistance = length(toLight);
+        o_lightDir = toLight / o_lightDistance;
+    }
 }
 
 bool RTXDI_CompareRelativeDifference(float reference, float candidate, float threshold);
@@ -136,16 +153,6 @@ uint getLightIndex(uint instanceID, uint geometryIndex, uint primitiveIndex)
 
     // return instanceID;
     return start + primitiveIndex;
-
-    return t_GeometryInstanceToLight[instanceID] + primitiveIndex;
-
-    // uint lightIndex = RTXDI_InvalidLightIndex;
-    // InstanceData hitInstance = t_InstanceData[instanceID];
-    // uint geometryInstanceIndex = hitInstance.firstGeometryInstanceIndex + geometryIndex;
-    // lightIndex = t_GeometryInstanceToLight[geometryInstanceIndex];
-    // if (lightIndex != RTXDI_InvalidLightIndex)
-    //   lightIndex += primitiveIndex;
-    // return lightIndex;
 }
 
 // Return true if anything was hit. If false, RTXDI will do environment map sampling
@@ -183,45 +190,8 @@ bool RAB_TraceRayForLocalLight(float3 origin, float3 direction, float tMin, floa
     }
 
     return hitAnything;
-
-    // RayDesc ray;
-    // ray.Origin = origin;
-    // ray.Direction = direction;
-    // ray.TMin = tMin;
-    // ray.TMax = tMax;
-    //
-    // RayQuery<RAY_FLAG_CULL_NON_OPAQUE | RAY_FLAG_SKIP_PROCEDURAL_PRIMITIVES> rayQuery;
-    // rayQuery.TraceRayInline(SceneBVH, RAY_FLAG_NONE, INSTANCE_MASK_OPAQUE, ray);
-    // rayQuery.Proceed();
-    //
-    // bool hitAnything = rayQuery.CommittedStatus() == COMMITTED_TRIANGLE_HIT;
-    // if (hitAnything)
-    // {
-    //     o_lightIndex = getLightIndex(rayQuery.CommittedInstanceID(), rayQuery.CommittedGeometryIndex(), rayQuery.CommittedPrimitiveIndex());
-    //     if (o_lightIndex != RTXDI_InvalidLightIndex)
-    //     {
-    //         float2 hitUV = rayQuery.CommittedTriangleBarycentrics();
-    //         o_randXY = randomFromBarycentric(hitUVToBarycentric(hitUV));
-    //     }
-    // }
-    //
-    // return hitAnything;
 }
 
-// Compute the position on a triangle light given a pair of random numbers
-// 对相对于给定接收表面的多态光进行采样。对于大多数光照类型，“uv”参数只是一对均匀分布的随机数，最初由 RAB_GetNextRandom 函数生成并存储在光照库中。
-// 对于重要性采样的环境光，“uv”参数具有 PDF 纹理中的纹理坐标，并归一化到 (0..1) 范围内。
-RAB_LightSample RAB_SamplePolymorphicLight(RAB_LightInfo lightInfo, RAB_Surface surface, float2 uv)
-{
-    PolymorphicLightSample pls = PolymorphicLight::calcSample(lightInfo, uv, surface.worldPos);
 
-    RAB_LightSample lightSample;
-    lightSample.position = pls.position;
-    lightSample.normal = pls.normal;
-    lightSample.radiance = pls.radiance;
-    lightSample.solidAnglePdf = pls.solidAnglePdf;
-    lightSample.lightType = getLightType(lightInfo);
-    return lightSample;
-}
 
 #endif // RAB_LIGHT_SAMPLING_HLSLI

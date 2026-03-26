@@ -18,7 +18,6 @@ Texture2D<float4> gIn_PrevNormalRoughness;
 Texture2D<float4> gIn_PrevBaseColorMetalness;
 Texture2D<uint> gIn_PrevGeoNormal;
 
-Texture2D t_LocalLightPdfTexture;
 
 RWTexture2D<float3> gOut_DirectLighting;
 

@@ -40,25 +40,27 @@ bool RAB_StoreCompactLightInfo(uint linearIndex, RAB_LightInfo lightInfo)
     return false;
 }
 
-// 不实现
+
 // 计算给定光照在指定体积内任意表面上的权重。用于世界空间光照网格构建（ReGIR）。
 float RAB_GetLightTargetPdfForVolume(RAB_LightInfo light, float3 volumeCenter, float volumeRadius)
 {
     return PolymorphicLight::getWeightForVolume(light, volumeCenter, volumeRadius);
 }
 
-// // 不是RAB必要函数，只是为了方便将TriangleLight存储到RAB_LightInfo中，供后续加载和使用
-// RAB_LightInfo Store(TriangleLight triLight)
-// {
-//     RAB_LightInfo lightInfo = (RAB_LightInfo)0;
-//
-//     lightInfo.radiance = Pack_R16G16B16A16_FLOAT(float4(triLight.radiance, 0));
-//     lightInfo.center = triLight.base + (triLight.edge1 + triLight.edge2) / 3.0;
-//     lightInfo.direction1 = ndirToOctUnorm32(normalize(triLight.edge1));
-//     lightInfo.direction2 = ndirToOctUnorm32(normalize(triLight.edge2));
-//     lightInfo.scalars = f32tof16(length(triLight.edge1)) | (f32tof16(length(triLight.edge2)) << 16);
-//         
-//     return lightInfo;
-// }
+// Compute the position on a triangle light given a pair of random numbers
+// 对相对于给定接收表面的多态光进行采样。对于大多数光照类型，“uv”参数只是一对均匀分布的随机数，最初由 RAB_GetNextRandom 函数生成并存储在光照库中。
+// 对于重要性采样的环境光，“uv”参数具有 PDF 纹理中的纹理坐标，并归一化到 (0..1) 范围内。
+RAB_LightSample RAB_SamplePolymorphicLight(RAB_LightInfo lightInfo, RAB_Surface surface, float2 uv)
+{
+    PolymorphicLightSample pls = PolymorphicLight::calcSample(lightInfo, uv, surface.worldPos);
+
+    RAB_LightSample lightSample;
+    lightSample.position = pls.position;
+    lightSample.normal = pls.normal;
+    lightSample.radiance = pls.radiance;
+    lightSample.solidAnglePdf = pls.solidAnglePdf;
+    lightSample.lightType = getLightType(lightInfo);
+    return lightSample;
+}
 
 #endif // RAB_LIGHT_INFO_HLSLI

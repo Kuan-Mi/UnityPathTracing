@@ -32,7 +32,7 @@ between the bridge functions.
 // See RtxdiApplicationBridge.hlsli in the full sample app for more information.
 // This is a minimal viable implementation.
 
-//#include "../ShaderParameters.h"
+#include "../ShaderParameters.hlsl"
 //#include "../SceneGeometry.hlsli"
 
 #include "RAB_Buffers.hlsl"

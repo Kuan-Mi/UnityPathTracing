@@ -48,6 +48,7 @@ namespace PathTracing
             internal RTHandle PrevNormalRoughness;
             internal RTHandle PrevBaseColorMetalness;
             internal RTHandle PrevGeoNormal;
+            internal RTHandle u_LocalLightPdfTexture;
 
             internal RtxdiResources RtxdiResources;
             
@@ -96,6 +97,7 @@ namespace PathTracing
 
             natCmd.SetRayTracingTextureParam(data.OpaqueTs, g_DirectLightingID, resource.DirectLighting);
             natCmd.SetRayTracingTextureParam(data.OpaqueTs,"_environmentMap", resource.envTexture);
+            natCmd.SetRayTracingTextureParam(data.OpaqueTs, "t_LocalLightPdfTexture", resource.u_LocalLightPdfTexture);
 
             natCmd.SetRayTracingTextureParam(data.OpaqueTs, gIn_PrevViewZID, resource.PrevViewZ);
             natCmd.SetRayTracingTextureParam(data.OpaqueTs, gIn_PrevNormalRoughnessID, resource.PrevNormalRoughness);

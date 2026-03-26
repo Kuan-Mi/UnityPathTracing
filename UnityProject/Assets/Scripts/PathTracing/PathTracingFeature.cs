@@ -652,6 +652,7 @@ namespace PathTracing
                     PrevNormalRoughness = pool.GetRT(RenderResourceType.PrevNormalRoughness),
                     PrevBaseColorMetalness = pool.GetRT(RenderResourceType.PrevBaseColorMetalness),
                     PrevGeoNormal = pool.GetRT(RenderResourceType.PrevGeoNormal),
+                    u_LocalLightPdfTexture = _gpuScene.localLightPdfTexture,
 
                     RtxdiResources = rtxdiResources,
                     envTexture = env

@@ -23,8 +23,6 @@ RWTexture2D<float3> gOut_DirectLighting;
 
 RWTexture2D<int2> u_TemporalSamplePositions;
 
-Texture2D t_LocalLightPdfTexture;
-
 
 RWBuffer<uint2> u_RisBuffer;
 

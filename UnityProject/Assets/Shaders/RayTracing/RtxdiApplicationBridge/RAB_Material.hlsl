@@ -37,26 +37,6 @@ float GetRoughness(RAB_Material material)
     return material.roughness;
 }
 
-// 非必要实现
-// 根据坐标从 G-buffer 获取表面材质信息。对于无效坐标，返回一个空材质实例。
-// RAB_Material RAB_GetGBufferMaterial(
-//     int2 pixelPosition,
-//     PlanarViewConstants view,
-//     RWTexture2D<uint> diffuseAlbedoTexture,
-//     RWTexture2D<uint> specularRoughTexture)
-// {
-//     RAB_Material material = RAB_EmptyMaterial();
-//
-//     if (any(pixelPosition >= view.viewportSize))
-//         return material;
-//
-//     material.diffuseAlbedo = Unpack_R11G11B10_UFLOAT(diffuseAlbedoTexture[pixelPosition]).rgb;
-//     float4 specularRough = Unpack_R8G8B8A8_Gamma_UFLOAT(specularRoughTexture[pixelPosition]);
-//     material.roughness = specularRough.a;
-//     material.specularF0 = specularRough.rgb;
-//
-//     return material;
-// }
 RAB_Material RAB_GetGBufferMaterial(
     int2 pixelPosition, float roughness, Texture2D<float4> baseColorMetalness)
 {
@@ -81,10 +61,6 @@ RAB_Material RAB_GetGBufferMaterial(
     return material;
 }
 
-// Compare the materials of two surfaces to improve resampling quality.
-// Just say that everything is similar for simplicity.
-
-// 比较两个表面的材质以提高重采样质量。为了简单起见，直接说所有材质都相似。
 bool RAB_AreMaterialsSimilar(RAB_Material a, RAB_Material b)
 {
     const float roughnessThreshold = 0.5;

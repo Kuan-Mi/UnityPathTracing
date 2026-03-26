@@ -68,10 +68,8 @@ float RAB_GetSurfaceLinearDepth(RAB_Surface surface)
 
 float getSurfaceDiffuseProbability(RAB_Surface surface)
 {
-    // return dot(surface.viewDir, surface.normal);
-    RAB_Material material = RAB_GetMaterial(surface);
-    float diffuseWeight = calcLuminance(material.diffuseAlbedo);
-    float specularWeight = calcLuminance(Schlick_Fresnel(material.specularF0, dot(surface.viewDir, surface.normal)));
+    float diffuseWeight = calcLuminance(surface.material.diffuseAlbedo);
+    float specularWeight = calcLuminance(Schlick_Fresnel(surface.material.specularF0, dot(surface.viewDir, surface.normal)));
     float sumWeights = diffuseWeight + specularWeight;
     return sumWeights < 1e-7f ? 1.f : (diffuseWeight / sumWeights);
 }
@@ -85,7 +83,6 @@ RAB_Surface GetGBufferSurface(int2 pixelPosition,
                               Texture2D<uint> geo_normal)
 {
     RAB_Surface surface = RAB_EmptySurface();
-
 
     surface.viewDepth = viewZ[pixelPosition];
 
