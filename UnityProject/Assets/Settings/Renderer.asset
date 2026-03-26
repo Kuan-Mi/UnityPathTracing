@@ -69,7 +69,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::PathTracing.PathTracingFeature
   m_Active: 1
   pathTracingSetting:
-    showMode: 11
+    showMode: 18
     showMv: 0
     showValidation: 0
     sunAngularDiameter: 0.69
@@ -125,7 +125,7 @@ MonoBehaviour:
     sssMaxSampleRadius: 0.0001
     enableRtxdi: 1
     debugRtxdi: 1
-    resamplingMode: 0
+    resamplingMode: 3
     gShowLight: 0
     initialSamplingParams:
       numPrimaryLocalLightSamples: 4
@@ -170,14 +170,14 @@ MonoBehaviour:
     regirDynamicParams:
       regirCellSize: 1
       center:
-        x: 2.4179754
-        y: 2.3864083
-        z: 1.7004445
+        x: 11.811045
+        y: 0.3139648
+        z: -7.647777
       fallbackSamplingMode: 1
       presamplingMode: 1
       regirSamplingJitter: 1
       regirNumBuildSamples: 8
-    showReGIRCell: 1
+    showReGIRCell: 0
     useReferencePathTracing: 0
     referenceBounceNum: 2
     split: 0.683
