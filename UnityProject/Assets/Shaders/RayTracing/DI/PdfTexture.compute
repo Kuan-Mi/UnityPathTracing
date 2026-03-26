@@ -7,6 +7,9 @@
 
 #include "Assets/Shaders/Rtxdi/DI/ReSTIRDIParameters.h"
 #include "Assets/Shaders/donut/packing.hlsli"
+#include "Assets/Shaders/donut/brdf.hlsli"
+#include "Assets/Shaders/Include/Shared.hlsl"
+#include "Assets/Shaders/Include/RayTracingShared.hlsl"
 #include  "Assets/Shaders/RayTracing/DI/ResamplingConstants.hlsl"
 
 RWTexture2D<float> u_LocalLightPdfTexture;
@@ -14,7 +17,7 @@ RWTexture2D<float> u_LocalLightPdfTexture;
 #define RTXDI_PRESAMPLING_GROUP_SIZE 256
 
 #include "Assets/Shaders/RTXDI/Utils/Math.hlsl"
-#include "Assets/Shaders/RayTracing/TriangleLight.hlsl"
+#include "Assets/Shaders/RayTracing/RtxdiApplicationBridge/RtxdiApplicationBridge.hlsl"
 
 #include "../PolymorphicLight.hlsl"
 

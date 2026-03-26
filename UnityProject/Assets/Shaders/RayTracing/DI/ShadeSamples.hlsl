@@ -4,29 +4,10 @@
 #include "Assets/Shaders/NRD/NRD.hlsli"
 
 #pragma max_recursion_depth 1
-Texture2D<float4> gOut_Mv;
-Texture2D<float> gOut_ViewZ;
-Texture2D<float4> gOut_Normal_Roughness;
-Texture2D<float4> gOut_BaseColor_Metalness;
-Texture2D<uint> gOut_GeoNormal;
 
-
-// RTXDI：上一帧 GBuffer
-Texture2D<float> gIn_PrevViewZ;
-Texture2D<float4> gIn_PrevNormalRoughness;
-Texture2D<float4> gIn_PrevBaseColorMetalness;
-Texture2D<uint> gIn_PrevGeoNormal;
 
 Texture2D<float3> gIn_EmissiveLighting;
-
-RWTexture2D<float3> gOut_DirectLighting;
-
 RWTexture2D<int2> u_TemporalSamplePositions;
-
-
-RWBuffer<uint2> u_RisBuffer;
-
-#define RTXDI_RIS_BUFFER u_RisBuffer
 
 #include "Assets/Shaders/Rtxdi/RtxdiParameters.h"
 #include "Assets/Shaders/Rtxdi/DI/ReSTIRDIParameters.h"

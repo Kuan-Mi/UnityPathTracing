@@ -39,8 +39,31 @@
 
 
 
+Texture2D<float> gOut_ViewZ;
+Texture2D<float4> gOut_Normal_Roughness;
+Texture2D<float4> gOut_BaseColor_Metalness;
+Texture2D<uint> gOut_GeoNormal;
 
 
+// RTXDI：上一帧 GBuffer
+Texture2D<float> gIn_PrevViewZ;
+Texture2D<float4> gIn_PrevNormalRoughness;
+Texture2D<float4> gIn_PrevBaseColorMetalness;
+Texture2D<uint> gIn_PrevGeoNormal;
+
+RWTexture2D<float3> gOut_DirectLighting;
+
+Texture2D<float4> gOut_Mv;
+
+RWBuffer<uint2> u_RisBuffer;
+
+#define RTXDI_RIS_BUFFER u_RisBuffer
+
+
+
+
+RWStructuredBuffer<ResamplingConstants> ResampleConstants;
+#define g_Const ResampleConstants[0]
 
 
 

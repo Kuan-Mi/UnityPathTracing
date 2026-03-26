@@ -1,27 +1,6 @@
 #include "Assets/Shaders/Rtxdi/DI/ReSTIRDIParameters.h"
 
-struct ResamplingConstants
-{
-    RTXDI_RuntimeParameters runtimeParams;
 
-    RTXDI_LightBufferParameters lightBufferParams;
-    RTXDI_RISBufferSegmentParameters localLightsRISBufferSegmentParams;
-    RTXDI_RISBufferSegmentParameters environmentLightRISBufferSegmentParams;
-
-    ReSTIRDI_Parameters restirDI;
-    ReGIR_Parameters regir;
-
-    uint frameIndex;
-    uint showReGIRCell;
-    uint2 pad3;
-    
-    
-    uint2 environmentPdfTextureSize;
-    uint2 localLightPdfTextureSize;
-};
-
-RWStructuredBuffer<ResamplingConstants> ResampleConstants;
-#define g_Const ResampleConstants[0]
 
 enum PolymorphicLightType
 {
