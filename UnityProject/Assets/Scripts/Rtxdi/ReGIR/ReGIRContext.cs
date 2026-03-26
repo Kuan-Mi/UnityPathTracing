@@ -96,6 +96,7 @@ namespace Rtxdi.ReGIR
         Power_RIS = ReGIRConstants.REGIR_LOCAL_LIGHT_FALLBACK_MODE_POWER_RIS,
     }
 
+    [Serializable]
     public struct ReGIRDynamicParameters
     {
         public float regirCellSize;

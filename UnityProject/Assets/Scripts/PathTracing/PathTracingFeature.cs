@@ -1144,7 +1144,10 @@ namespace PathTracing
             restirDiContext.SetTemporalResamplingParameters(pathTracingSetting.temporalResamplingParams);
             restirDiContext.SetSpatialResamplingParameters(pathTracingSetting.spatialResamplingParams);
             restirDiContext.SetShadingParameters(pathTracingSetting.shadingParams);
-
+            
+            var regirContext = isContext.GetReGIRContext();
+            pathTracingSetting.regirDynamicParams.center = frameState.camPos;
+            regirContext.SetDynamicParameters(pathTracingSetting.regirDynamicParams);
 
             var constants = new ResamplingConstants();
 
@@ -1156,7 +1159,10 @@ namespace PathTracing
 
 
             constants.frameIndex = restirDiContext.GetFrameIndex();
-            constants.pad2 = new uint2(0, 0);
+            constants.showReGIRCell = pathTracingSetting.showReGIRCell ? 1u : 0u;
+            
+            
+            constants.pad3 = new uint2(0, 0);
 
             FillReSTIRDIConstants(ref constants.restirDI, restirDiContext, constants.lightBufferParams);
             FillReGIRConstants(ref constants.regir, isContext.GetReGIRContext());

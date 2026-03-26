@@ -19,8 +19,8 @@ namespace PathTracing
         public ReGIR_Parameters regir;
 
         public uint frameIndex;
-        public uint2 pad2;
-        public uint pad3;
+        public uint showReGIRCell;
+        public uint2 pad3;
 
         public uint2 environmentPdfTextureSize;
         public uint2 localLightPdfTextureSize;
