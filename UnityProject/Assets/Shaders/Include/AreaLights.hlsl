@@ -3,6 +3,9 @@
 // Mirrors the sun path in GetLighting(): NoL+SmoothStep first, then BRDF,
 // then SSS Burley override of Cdiff + shadow origin, then shadow ray.
 // lightType: 0 = rectangle, 1 = disc
+#ifndef AREA_LIGHTS_HLSL
+#define AREA_LIGHTS_HLSL
+
 
 #define AREA_LIGHT_RECT 0.0
 #define AREA_LIGHT_DISC 1.0
@@ -159,3 +162,5 @@ float3 EvaluateAreaLights(GeometryProps geo, MaterialProps mat, bool isSSS)
 
     return result;
 }
+
+#endif

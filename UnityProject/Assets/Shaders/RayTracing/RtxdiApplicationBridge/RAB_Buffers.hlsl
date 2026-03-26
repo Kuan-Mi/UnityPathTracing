@@ -1,23 +1,17 @@
 #ifndef RAB_BUFFER_HLSLI
 #define RAB_BUFFER_HLSLI
 
+// G-buffer resources
 Texture2D<float> gOut_ViewZ;
 Texture2D<float4> gOut_Normal_Roughness;
 Texture2D<float4> gOut_BaseColor_Metalness;
 Texture2D<uint> gOut_GeoNormal;
-
-
-// RTXDI：上一帧 GBuffer
 Texture2D<float> gIn_PrevViewZ;
 Texture2D<float4> gIn_PrevNormalRoughness;
 Texture2D<float4> gIn_PrevBaseColorMetalness;
 Texture2D<uint> gIn_PrevGeoNormal;
-
 RWTexture2D<float3> gOut_DirectLighting;
-
 Texture2D<float4> gOut_Mv;
-
-
 
 // RTXDI resources
 StructuredBuffer<PolymorphicLightInfo> t_LightDataBuffer;
@@ -33,7 +27,9 @@ RWBuffer<uint2> u_RisBuffer;
 
 
 // Other
-
+// CBUFFER_START(g_Const1)
+//     ResamplingConstants g_Const;
+// CBUFFER_END
 
 #define RTXDI_RIS_BUFFER u_RisBuffer
 #define RTXDI_LIGHT_RESERVOIR_BUFFER u_LightReservoirs
