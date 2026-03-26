@@ -562,7 +562,8 @@ namespace RTXDI
         /// </summary>
         private static PolymorphicLightInfo PackPointLightInfo(Light point)
         {
-            var radius = point.bounceIntensity;
+            point.TryGetComponent<PathTracingAdditionalLightData>(out var additionalData);
+            var radius = additionalData != null ? additionalData.radius : 0f;
 
             if (radius <= 0)
             {
@@ -726,29 +727,32 @@ namespace RTXDI
 
         private static PolymorphicLightInfo PackSpotLightInfo(Light spot)
         {
-            // 临时用 bounceIntensity 模拟半径，实际使用时可以自定义扩展 Light 类添加 radius 字段
-            var radius = spot.bounceIntensity;
-
-            float projectedArea = (float)Math.PI * radius * radius;
-
-            Color radiance = spot.color * spot.intensity / projectedArea;
+            spot.TryGetComponent<PathTracingAdditionalLightData>(out var additionalData);
+            var radius = additionalData != null ? additionalData.radius : 0f;
 
             float softness = math.saturate(1.0f - spot.innerSpotAngle / spot.spotAngle);
 
             var transform = spot.transform;
-            var right = transform.right;
-            var up = transform.up;
 
             var info = new PolymorphicLightInfo();
-            info.SetColorAndType(radiance, PolymorphicLightType.kSphere);
-
             const uint kPolymorphicLightShapingEnableBit = 1 << 28;
+
+            if (radius <= 0)
+            {
+                // Ideal spot light — no area, use luminous intensity directly.
+                info.SetColorAndType(spot.color * spot.intensity, PolymorphicLightType.kSphere);
+                info.scalars = 0;
+            }
+            else
+            {
+                float projectedArea = (float)Math.PI * radius * radius;
+                Color radiance = spot.color * spot.intensity / projectedArea;
+                info.SetColorAndType(radiance, PolymorphicLightType.kSphere);
+                info.scalars = (uint)(Fp32ToFp16(radius));
+            }
+
             info.colorTypeAndFlags |= kPolymorphicLightShapingEnableBit;
-
-
             info.center = transform.position;
-            info.scalars = (uint)(Fp32ToFp16(radius));
-
             info.primaryAxis = PackNormalizedVector(transform.forward);
             info.cosConeAngleAndSoftness = (uint)(Fp32ToFp16(math.cos(math.radians(spot.spotAngle * 0.5f))) | (Fp32ToFp16(softness) << 16));
 
