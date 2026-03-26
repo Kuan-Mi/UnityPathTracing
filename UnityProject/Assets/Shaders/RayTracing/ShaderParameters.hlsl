@@ -1,7 +1,12 @@
-
 #ifndef SHADER_PARAMETERS_H
 #define SHADER_PARAMETERS_H
 
+#include <Assets/Shaders/donut/brdf.hlsli>
+#include <Assets/Shaders/donut/packing.hlsli>
+#include <Assets/Shaders/donut/utils.hlsli>
+
+#include <Assets/Shaders/Include/Shared.hlsl>
+#include <Assets/Shaders/Include/RayTracingShared.hlsl>
 
 #include <Assets/Shaders/Rtxdi/DI/ReSTIRDIParameters.h>
 #include <Assets/Shaders/Rtxdi/GI/ReSTIRGIParameters.h>

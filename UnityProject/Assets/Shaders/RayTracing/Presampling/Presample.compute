@@ -5,21 +5,8 @@
 #pragma target 6.0
 #pragma enable_d3d11_debug_symbols
 
-
-#include "Assets/Shaders/Include/Shared.hlsl"
-#include "Assets/Shaders/Include/RayTracingShared.hlsl"
-
-#include "Assets/Shaders/NRD/NRD.hlsli"
-
-
-#include "Assets/Shaders/Rtxdi/RtxdiParameters.h"
-#include "Assets/Shaders/donut/packing.hlsli"
-#include "Assets/Shaders/donut/brdf.hlsli"
-
 #include "../RtxdiApplicationBridge/RtxdiApplicationBridge.hlsl"
 #include "Assets/Shaders/RTXDI/LightSampling/PresamplingFunctions.hlsl"
-#include <Assets/Shaders/RTXDI/DI/SpatioTemporalResampling.hlsl>
-
 
 #define RTXDI_PRESAMPLING_GROUP_SIZE 256
 

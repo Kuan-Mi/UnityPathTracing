@@ -1,16 +1,6 @@
-#include "Assets/Shaders/Include/Shared.hlsl"
-#include "Assets/Shaders/Include/RayTracingShared.hlsl"
-
-#include "Assets/Shaders/NRD/NRD.hlsli"
-
 #pragma max_recursion_depth 1
 
 RWTexture2D<int2> u_TemporalSamplePositions;
-
-#include "Assets/Shaders/Rtxdi/RtxdiParameters.h"
-#include "Assets/Shaders/Rtxdi/DI/ReSTIRDIParameters.h"
-#include "Assets/Shaders/donut/packing.hlsli"
-#include "Assets/Shaders/donut/brdf.hlsli"
 
 #include "../RtxdiApplicationBridge/RtxdiApplicationBridge.hlsl"
 #include <Assets/Shaders/RTXDI/DI/SpatialResampling.hlsl>
