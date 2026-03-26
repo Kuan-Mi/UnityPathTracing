@@ -1,5 +1,6 @@
 ﻿using Rtxdi;
 using Rtxdi.DI;
+using Rtxdi.ReGIR;
 using Unity.Mathematics;
 using UnityEngine;
 using UnityEngine.Rendering;
@@ -15,6 +16,7 @@ namespace PathTracing
         public RTXDI_RISBufferSegmentParameters environmentLightRISBufferSegmentParams;
 
         public ReSTIRDI_Parameters restirDI;
+        public ReGIR_Parameters regir;
 
         public uint frameIndex;
         public uint2 pad2;

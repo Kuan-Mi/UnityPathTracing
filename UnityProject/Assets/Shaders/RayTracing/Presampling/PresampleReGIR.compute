@@ -1,10 +1,10 @@
 #pragma kernel CSMain
- 
+
 #pragma only_renderers   d3d11
 #pragma use_dxc
 #pragma target 6.0
 #pragma enable_d3d11_debug_symbols
- 
+
 Texture2D<float4> gOut_Mv;
 Texture2D<float> gOut_ViewZ;
 Texture2D<float4> gOut_Normal_Roughness;
@@ -38,7 +38,7 @@ RWBuffer<uint2> u_RisBuffer;
 #include "Assets/Shaders/donut/packing.hlsli"
 #include "Assets/Shaders/donut/brdf.hlsli"
 
-#include "ResamplingConstants.hlsl"
+#include "../DI/ResamplingConstants.hlsl"
 
 #include "../RtxdiApplicationBridge/RtxdiApplicationBridge.hlsl"
 #include "Assets/Shaders/RTXDI/LightSampling/PresamplingFunctions.hlsl"
@@ -47,17 +47,13 @@ RWBuffer<uint2> u_RisBuffer;
 
 #define RTXDI_PRESAMPLING_GROUP_SIZE 256
 
-[numthreads(RTXDI_PRESAMPLING_GROUP_SIZE, 1, 1)] 
-void CSMain(uint2 GlobalIndex : SV_DispatchThreadID) 
+[numthreads(RTXDI_PRESAMPLING_GROUP_SIZE, 1, 1)]
+void CSMain(uint GlobalIndex : SV_DispatchThreadID)
 {
-    RAB_RandomSamplerState rng = RAB_InitRandomSampler(GlobalIndex.xy, 0);
+    
+    RAB_RandomSamplerState rng = RAB_InitRandomSampler(uint2(GlobalIndex & 0xfff, GlobalIndex >> 12), 1);
 
-    RTXDI_PresampleLocalLights(
-        rng,
-        t_LocalLightPdfTexture,
-        g_Const.localLightPdfTextureSize,
-        GlobalIndex.y,
-        GlobalIndex.x,
-        g_Const.lightBufferParams.localLightBufferRegion,
-        g_Const.localLightsRISBufferSegmentParams);
+    RAB_RandomSamplerState coherentRng = RAB_InitRandomSampler(uint2(GlobalIndex >> 8, 0), 1);
+
+    RTXDI_PresampleLocalLightsForReGIR(rng, coherentRng, GlobalIndex, g_Const.lightBufferParams.localLightBufferRegion, g_Const.localLightsRISBufferSegmentParams, g_Const.regir);
 }

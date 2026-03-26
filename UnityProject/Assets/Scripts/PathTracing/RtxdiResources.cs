@@ -114,7 +114,9 @@ namespace mini
                 LightReservoirBuffer.name = "LightReservoirBuffer";
             }
 
-            RisBuffer = new ComputeBuffer((int)math.max(risBufferSegmentAllocator.GetTotalSizeInElements(), 1),
+            var totalSizeInElements = risBufferSegmentAllocator.GetTotalSizeInElements();
+            Debug.Log($"Creating RisBuffer with totalSizeInElements: {totalSizeInElements}");
+            RisBuffer = new ComputeBuffer((int)math.max(totalSizeInElements, 1),
                 sizeof(Vector2),
                 ComputeBufferType.Default);
             RisBuffer.name = "RisBuffer";

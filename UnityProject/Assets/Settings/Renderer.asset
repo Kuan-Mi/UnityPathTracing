@@ -117,7 +117,6 @@ MonoBehaviour:
     sharcDownscale: 4
     sharcSceneScale: 45
     sharcDebug: 0
-    sssScatteringColor: {r: 3.5, g: 4, b: 3, a: 1}
     sssMinThreshold: -0.043
     sssTransmissionBsdfSampleCount: 6
     sssTransmissionPerBsdfScatteringSampleCount: 3
@@ -132,11 +131,11 @@ MonoBehaviour:
       numPrimaryLocalLightSamples: 4
       numPrimaryInfiniteLightSamples: 1
       numPrimaryEnvironmentSamples: 1
-      numPrimaryBrdfSamples: 1
+      numPrimaryBrdfSamples: 0
       brdfCutoff: 0.0001
       enableInitialVisibility: 1
       environmentMapImportanceSampling: 0
-      localLightSamplingMode: 1
+      localLightSamplingMode: 2
     temporalResamplingParams:
       temporalDepthThreshold: 0.1
       temporalNormalThreshold: 0.5
@@ -191,6 +190,7 @@ MonoBehaviour:
   accumulateCs: {fileID: 7200000, guid: c1e50e483fac4de7803cd658d0f9cdd2, type: 3}
   pdfTextureCs: {fileID: 7200000, guid: 6d3d83398dc04a9ea285602128206037, type: 3}
   presampleCs: {fileID: 7200000, guid: c7795bf09240c4c40bcb2e51042eb5b5, type: 3}
+  presampleReGirCS: {fileID: 7200000, guid: d1988516f4f344d6ba595e7e8a8f44ff, type: 3}
   genMipsCs: {fileID: 7200000, guid: 479eb3f98680430492d6af04d7f3ee14, type: 3}
   scramblingRankingTex: {fileID: 2800000, guid: ba45d1e4dcf9022438a4798a5f9e7b80, type: 3}
   sobolTex: {fileID: 2800000, guid: 17e7ce8147355314ea8aab1178a6a43c, type: 3}

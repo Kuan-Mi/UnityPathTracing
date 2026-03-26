@@ -15,7 +15,7 @@
 #include "Assets/Shaders/Rtxdi/LightSampling/LocalLightSelection.hlsl"
 #include "Assets/Shaders/Rtxdi/Utils/Math.hlsl"
 #if RTXDI_REGIR_MODE != RTXDI_REGIR_DISABLED
-#include "Assets/Shaders/Rtxdi/ReGIR/ReGIRSampling.hlsli"
+#include "Assets/Shaders/Rtxdi/ReGIR/ReGIRSampling.hlsl"
 #endif
 
 #if RTXDI_ENABLE_PRESAMPLING && !defined(RTXDI_RIS_BUFFER)

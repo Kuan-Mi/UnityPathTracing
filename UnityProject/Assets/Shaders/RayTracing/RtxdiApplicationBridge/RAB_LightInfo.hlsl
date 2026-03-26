@@ -44,7 +44,7 @@ bool RAB_StoreCompactLightInfo(uint linearIndex, RAB_LightInfo lightInfo)
 // 计算给定光照在指定体积内任意表面上的权重。用于世界空间光照网格构建（ReGIR）。
 float RAB_GetLightTargetPdfForVolume(RAB_LightInfo light, float3 volumeCenter, float volumeRadius)
 {
-    return 0.0;
+    return PolymorphicLight::getWeightForVolume(light, volumeCenter, volumeRadius);
 }
 
 // // 不是RAB必要函数，只是为了方便将TriangleLight存储到RAB_LightInfo中，供后续加载和使用

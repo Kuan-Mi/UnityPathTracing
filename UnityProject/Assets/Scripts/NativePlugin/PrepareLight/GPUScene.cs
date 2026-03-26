@@ -241,6 +241,29 @@ namespace RTXDI
             {
                 UpdateTransformsOnly();
             }
+            
+            
+            RtxdiUtils.ComputePdfTextureSize(maxLocalLights, out uint texWidth, out uint texHeight, out uint mipLevels);
+
+            if ((localLightPdfTextureSize.x != texWidth || localLightPdfTextureSize.y != texHeight))
+            {
+                Debug.Log($"Allocating localLightPdfTexture with size {texWidth}x{texHeight} (was {localLightPdfTextureSize.x}x{localLightPdfTextureSize.y})");
+                localLightPdfTexture?.Release();
+
+                localLightPdfTextureSize = new uint2(texWidth, texHeight);
+
+                var textureDesc = new RenderTextureDescriptor((int)texWidth, (int)texHeight, RenderTextureFormat.RFloat)
+                {
+                    dimension = TextureDimension.Tex2D,
+                    enableRandomWrite = true,
+                    useMipMap = true,
+                    autoGenerateMips = false,
+                    useDynamicScale = false,
+                    mipCount = (int)mipLevels,
+                };
+
+                localLightPdfTexture = RTHandles.Alloc(textureDesc);
+            }
 
             if (otherLocalLightCount > 0)
             {
@@ -343,26 +366,7 @@ namespace RTXDI
 
             emissiveTriangleCount = (uint)primitiveDataList.Count;
  
-            RtxdiUtils.ComputePdfTextureSize(maxLocalLights, out uint texWidth, out uint texHeight, out uint mipLevels);
-
-            if ((localLightPdfTextureSize.x != texWidth || localLightPdfTextureSize.y != texHeight))
-            {
-                localLightPdfTexture?.Release();
-
-                localLightPdfTextureSize = new uint2(texWidth, texHeight);
-
-                var textureDesc = new RenderTextureDescriptor((int)texWidth, (int)texHeight, RenderTextureFormat.RFloat)
-                {
-                    dimension = TextureDimension.Tex2D,
-                    enableRandomWrite = true,
-                    useMipMap = true,
-                    autoGenerateMips = false,
-                    useDynamicScale = false,
-                    mipCount = (int)mipLevels,
-                };
-
-                localLightPdfTexture = RTHandles.Alloc(textureDesc);
-            }
+            
 
             // Debug.Log($"BuildFull completed: {instanceDataList.Count} instances, {primitiveDataList.Count} primitives, {globalTexturePool.Count} unique emissive textures.");
         }
@@ -775,6 +779,23 @@ namespace RTXDI
             _meshDataCache.Clear();
 
             localLightPdfTexture?.Release();
+        }
+
+        public RTXDI_LightBufferParameters GetLightBufferParameters()
+        {
+            RTXDI_LightBufferParameters parameters = new RTXDI_LightBufferParameters();
+            
+            parameters.localLightBufferRegion.firstLightIndex = 0;
+            parameters.localLightBufferRegion.numLights = maxLocalLights;
+
+            parameters.infiniteLightBufferRegion.firstLightIndex = maxLocalLights;
+            parameters.infiniteLightBufferRegion.numLights = infiniteLightCount;
+
+            parameters.environmentLightParams.lightPresent = 0;
+            parameters.environmentLightParams.lightIndex = (0xffffffffu);
+
+            
+            return parameters;
         }
     }
 }

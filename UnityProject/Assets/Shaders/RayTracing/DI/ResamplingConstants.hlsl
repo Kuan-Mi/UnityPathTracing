@@ -9,6 +9,7 @@ struct ResamplingConstants
     RTXDI_RISBufferSegmentParameters environmentLightRISBufferSegmentParams;
 
     ReSTIRDI_Parameters restirDI;
+    ReGIR_Parameters regir;
 
     uint frameIndex;
     uint2 pad2;
@@ -69,6 +70,7 @@ StructuredBuffer<uint> t_GeometryInstanceToLight;
 #define BACKGROUND_DEPTH 65504.f
 
 #define RTXDI_ENABLE_PRESAMPLING 1
+#define RTXDI_REGIR_MODE RTXDI_REGIR_ONION
 
 static const uint kSecondaryGBuffer_IsSpecularRay = 1;
 static const uint kSecondaryGBuffer_IsDeltaSurface = 2;

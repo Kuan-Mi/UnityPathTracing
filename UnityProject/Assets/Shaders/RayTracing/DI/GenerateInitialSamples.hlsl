@@ -64,6 +64,9 @@ void MainRayGenShader()
 
         #ifdef RTXDI_ENABLE_PRESAMPLING
         g_Const.localLightsRISBufferSegmentParams, g_Const.environmentLightRISBufferSegmentParams,
+        #if RTXDI_REGIR_MODE != RTXDI_REGIR_MODE_DISABLED
+        g_Const.regir,
+        #endif
         #endif
         lightSample);
 

@@ -6,6 +6,8 @@
 // distribution of this software and related documentation without an express
 // license agreement from NVIDIA CORPORATION is strictly prohibited.
 
+using UnityEngine;
+
 namespace Rtxdi.LightSampling
 {
     public class RISBufferSegmentAllocator
@@ -24,6 +26,8 @@ namespace Rtxdi.LightSampling
         {
             uint prevSize = m_totalSizeInElements;
             m_totalSizeInElements += sizeInElements;
+            
+            Debug.Log($"Allocated RIS buffer segment: size={sizeInElements} elements, offset={prevSize} elements, totalSize={m_totalSizeInElements} elements");
             return prevSize;
         }
 

@@ -17,7 +17,7 @@
 #ifdef RTXDI_RIS_BUFFER_HLSLI
 #include "Assets/Shaders/Rtxdi/LightSampling/RISBuffer.hlsl"
 #if RTXDI_REGIR_MODE != RTXDI_REGIR_DISABLED
-#include "Assets/Shaders/Rtxdi/ReGIR/ReGIRSampling.hlsli"
+#include "Assets/Shaders/Rtxdi/ReGIR/ReGIRSampling.hlsl"
 #endif
 #endif // RTXDI_RIS_BUFFER_HLSLI
 #include "Assets/Shaders/Rtxdi/LightSampling/UniformSampling.hlsl"

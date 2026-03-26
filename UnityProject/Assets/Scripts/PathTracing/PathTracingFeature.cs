@@ -6,6 +6,7 @@ using Nrd;
 using Rtxdi;
 using RTXDI;
 using Rtxdi.DI;
+using Rtxdi.ReGIR;
 using Unity.Mathematics;
 using UnityEngine;
 using UnityEngine.Rendering;
@@ -44,6 +45,7 @@ namespace PathTracing
         public ComputeShader accumulateCs;
         public ComputeShader pdfTextureCs;
         public ComputeShader presampleCs;
+        public ComputeShader presampleReGirCS;
         public ComputeShader genMipsCs;
 
         public Texture2D scramblingRankingTex;
@@ -60,7 +62,8 @@ namespace PathTracing
         private ShadeSamplesPass _shadeSamplesPass;
         private PdfTexturePass _pdfTexturePass;
         private PresamplePass _presamplePass;
-        public GenerateMipsPass _generateMipsPass;
+        private PresampleReGirLightsPass _presampleReGirLightsPass;
+        private GenerateMipsPass _generateMipsPass;
 
 
         private NrdPass _nrdPass;
@@ -204,6 +207,11 @@ namespace PathTracing
             };
 
             _presamplePass ??= new PresamplePass(presampleCs)
+            {
+                renderPassEvent = renderPassEvent
+            };
+
+            _presampleReGirLightsPass ??= new PresampleReGirLightsPass(presampleReGirCS)
             {
                 renderPassEvent = renderPassEvent
             };
@@ -568,34 +576,63 @@ namespace PathTracing
                 _generateMipsPass.Setup(genMipsResource, genMipsSettings);
                 renderer.EnqueuePass(_generateMipsPass);
 
-
-                var preResource = new PresamplePass.Resource
+                if (pathTracingSetting.initialSamplingParams.localLightSamplingMode != ReSTIRDI_LocalLightSamplingMode.Uniform)
                 {
-                    ConstantBuffer = _constantBuffer,
-                    ResamplingConstantBuffer = _resamplingConstantBuffer,
-                    u_LocalLightPdfTexture = _gpuScene.localLightPdfTexture,
+                    var preResource = new PresamplePass.Resource
+                    {
+                        ConstantBuffer = _constantBuffer,
+                        ResamplingConstantBuffer = _resamplingConstantBuffer,
+                        u_LocalLightPdfTexture = _gpuScene.localLightPdfTexture,
 
-                    RtxdiResources = rtxdiResources
-                };
-                var RTXDI_PRESAMPLING_GROUP_SIZE = 256;
-                var x = (isContext.GetLocalLightRISBufferSegmentParams().tileSize + RTXDI_PRESAMPLING_GROUP_SIZE - 1) / RTXDI_PRESAMPLING_GROUP_SIZE;
-                var y = isContext.GetLocalLightRISBufferSegmentParams().tileCount;
+                        RtxdiResources = rtxdiResources
+                    };
+                    var RTXDI_PRESAMPLING_GROUP_SIZE = 256;
+                    var x = (isContext.GetLocalLightRISBufferSegmentParams().tileSize + RTXDI_PRESAMPLING_GROUP_SIZE - 1) / RTXDI_PRESAMPLING_GROUP_SIZE;
+                    var y = isContext.GetLocalLightRISBufferSegmentParams().tileCount;
 
-                // dm::int2 presampleDispatchSize = {
-                //     dm::div_ceil(isContext.GetLocalLightRISBufferSegmentParams().tileSize, RTXDI_PRESAMPLING_GROUP_SIZE),
-                //     int(isContext.GetLocalLightRISBufferSegmentParams().tileCount)
-                // };
+                    // dm::int2 presampleDispatchSize = {
+                    //     dm::div_ceil(isContext.GetLocalLightRISBufferSegmentParams().tileSize, RTXDI_PRESAMPLING_GROUP_SIZE),
+                    //     int(isContext.GetLocalLightRISBufferSegmentParams().tileCount)
+                    // };
 
 
-                var preSettings = new PresamplePass.Settings
+                    var preSettings = new PresamplePass.Settings
+                    {
+                        x = (int)x,
+                        y = (int)y,
+                        z = 1
+                    };
+
+                    _presamplePass.Setup(preResource, preSettings);
+                    renderer.EnqueuePass(_presamplePass);
+                }
+                
+                if (pathTracingSetting.initialSamplingParams.localLightSamplingMode == ReSTIRDI_LocalLightSamplingMode.ReGIR_RIS)
                 {
-                    x = (int)x,
-                    y = (int)y,
-                    z = 1
-                };
+                    var preReGirResource = new PresampleReGirLightsPass.Resource
+                    {
+                        ConstantBuffer = _constantBuffer,
+                        ResamplingConstantBuffer = _resamplingConstantBuffer,
+                        u_LocalLightPdfTexture = _gpuScene.localLightPdfTexture,
 
-                _presamplePass.Setup(preResource, preSettings);
-                renderer.EnqueuePass(_presamplePass);
+                        RtxdiResources = rtxdiResources
+                    };
+                    var ReGIR_TILE_SIZE = 256;
+                    
+                    var regirContext = isContext.GetReGIRContext();
+                    var x = (regirContext.GetReGIRLightSlotCount() + ReGIR_TILE_SIZE - 1) / ReGIR_TILE_SIZE;
+         
+
+                    var preReGirSettings = new PresampleReGirLightsPass.Settings
+                    {
+                        x = (int)x,
+                        y = 1,
+                        z = 1
+                    };
+
+                    _presampleReGirLightsPass.Setup(preReGirResource, preReGirSettings);
+                    renderer.EnqueuePass(_presampleReGirLightsPass);
+                }
 
                 // GenerateInitialSamplesPass
                 var gisResource = new GenerateInitialSamplesPass.Resource
@@ -617,7 +654,7 @@ namespace PathTracing
                     PrevGeoNormal = pool.GetRT(RenderResourceType.PrevGeoNormal),
 
                     RtxdiResources = rtxdiResources,
-                    envTexture =  env
+                    envTexture = env
                 };
 
                 var gisSettings = new GenerateInitialSamplesPass.Settings
@@ -651,7 +688,7 @@ namespace PathTracing
                         PrevGeoNormal = pool.GetRT(RenderResourceType.PrevGeoNormal),
 
                         RtxdiResources = rtxdiResources,
-                        envTexture =  env
+                        envTexture = env
                     };
 
                     var temSettings = new TemporalResamplingPass.Settings
@@ -686,7 +723,7 @@ namespace PathTracing
                         PrevGeoNormal = pool.GetRT(RenderResourceType.PrevGeoNormal),
 
                         RtxdiResources = rtxdiResources,
-                        envTexture =  env
+                        envTexture = env
                     };
 
                     var SpSettings = new SpatialResamplingPass.Settings
@@ -720,7 +757,7 @@ namespace PathTracing
                     PrevGeoNormal = pool.GetRT(RenderResourceType.PrevGeoNormal),
 
                     RtxdiResources = rtxdiResources,
-                    envTexture =  env
+                    envTexture = env
                 };
 
                 var shaSettings = new ShadeSamplesPass.Settings
@@ -1028,7 +1065,7 @@ namespace PathTracing
         }
 
 
-        ReSTIRDI_Parameters FillReSTIRDIConstants(ReSTIRDI_Parameters rparams, ReSTIRDIContext restirDIContext, RTXDI_LightBufferParameters lightBufferParameters)
+        void FillReSTIRDIConstants(ref ReSTIRDI_Parameters rparams, ReSTIRDIContext restirDIContext, RTXDI_LightBufferParameters lightBufferParameters)
         {
             rparams.reservoirBufferParams = restirDIContext.GetReservoirBufferParameters();
             rparams.bufferIndices = restirDIContext.GetBufferIndices();
@@ -1039,7 +1076,55 @@ namespace PathTracing
             rparams.temporalResamplingParams = restirDIContext.GetTemporalResamplingParameters();
             rparams.spatialResamplingParams = restirDIContext.GetSpatialResamplingParameters();
             rparams.shadingParams = restirDIContext.GetShadingParameters();
-            return rparams;
+        }
+
+
+        void FillReGIRConstants(ref ReGIR_Parameters ReGIRParams, ReGIRContext regirContext)
+        {
+            var staticParams = regirContext.GetReGIRStaticParameters();
+            var dynamicParams = regirContext.GetReGIRDynamicParameters();
+            var gridParams = regirContext.GetReGIRGridCalculatedParameters();
+            var onionParams = regirContext.GetReGIROnionCalculatedParameters();
+
+            ReGIRParams.gridParams.cellsX = staticParams.gridParameters.GridSize.x;
+            ReGIRParams.gridParams.cellsY = staticParams.gridParameters.GridSize.y;
+            ReGIRParams.gridParams.cellsZ = staticParams.gridParameters.GridSize.z;
+
+            ReGIRParams.commonParams.numRegirBuildSamples = dynamicParams.regirNumBuildSamples;
+            ReGIRParams.commonParams.risBufferOffset = regirContext.GetReGIRCellOffset();
+            ReGIRParams.commonParams.lightsPerCell = staticParams.LightsPerCell;
+            ReGIRParams.commonParams.centerX = dynamicParams.center.x;
+            ReGIRParams.commonParams.centerY = dynamicParams.center.y;
+            ReGIRParams.commonParams.centerZ = dynamicParams.center.z;
+            ReGIRParams.commonParams.cellSize = (staticParams.Mode == ReGIRMode.Onion)
+                ? dynamicParams.regirCellSize * 0.5f // Onion operates with radii, while "size" feels more like diameter
+                : dynamicParams.regirCellSize;
+            ReGIRParams.commonParams.localLightSamplingFallbackMode = (uint)(dynamicParams.fallbackSamplingMode);
+            ReGIRParams.commonParams.localLightPresamplingMode = (uint)(dynamicParams.presamplingMode);
+            ReGIRParams.commonParams.samplingJitter = math.max(0.0f, dynamicParams.regirSamplingJitter * 2.0f);
+            ReGIRParams.onionParams.cubicRootFactor = onionParams.regirOnionCubicRootFactor;
+            ReGIRParams.onionParams.linearFactor = onionParams.regirOnionLinearFactor;
+            ReGIRParams.onionParams.numLayerGroups = (uint)(onionParams.regirOnionLayers.Count);
+
+            // assert(onionParams.regirOnionLayers.size() <= RTXDI_ONION_MAX_LAYER_GROUPS);
+            for (int group = 0; group < onionParams.regirOnionLayers.Count; group++)
+            {
+                var layer = onionParams.regirOnionLayers[group];
+                layer.innerRadius *= ReGIRParams.commonParams.cellSize;
+                layer.outerRadius *= ReGIRParams.commonParams.cellSize;
+
+
+                ReGIRParams.onionParams.SetLayer(group, layer);
+            }
+
+            // assert(onionParams.regirOnionRings.size() <= RTXDI_ONION_MAX_RINGS);
+            for (int n = 0; n < (onionParams.regirOnionRings.Count); n++)
+            {
+                // ReGIRParams.onionParams.rings[n] = onionParams.regirOnionRings[n];
+                ReGIRParams.onionParams.SetRing(n, onionParams.regirOnionRings[n]);
+            }
+
+            ReGIRParams.onionParams.cubicRootFactor = regirContext.GetReGIROnionCalculatedParameters().regirOnionCubicRootFactor;
         }
 
         private ResamplingConstants GetResamplingConstants(
@@ -1047,6 +1132,9 @@ namespace PathTracing
             , RtxdiResources rtxdiResources
             , CameraFrameState frameState)
         {
+            RTXDI_LightBufferParameters lightBufferParams = _gpuScene.GetLightBufferParameters();
+            isContext.SetLightBufferParams(lightBufferParams);
+
             var restirDiContext = isContext.GetReSTIRDIContext();
 
             restirDiContext.SetFrameIndex(frameState.FrameIndex);
@@ -1063,28 +1151,15 @@ namespace PathTracing
 
             constants.lightBufferParams = isContext.GetLightBufferParameters();
             constants.localLightsRISBufferSegmentParams = isContext.GetLocalLightRISBufferSegmentParams();
+            constants.environmentLightRISBufferSegmentParams = isContext.GetEnvironmentLightRISBufferSegmentParams();
             constants.runtimeParams = isContext.GetReSTIRDIContext().GetRuntimeParams();
 
-
-            constants.lightBufferParams.localLightBufferRegion.firstLightIndex = 0;
-            constants.lightBufferParams.localLightBufferRegion.numLights = rtxdiResources.Scene.maxLocalLights;
-
-            constants.lightBufferParams.infiniteLightBufferRegion.firstLightIndex = rtxdiResources.Scene.maxLocalLights;
-            constants.lightBufferParams.infiniteLightBufferRegion.numLights = rtxdiResources.Scene.infiniteLightCount;
-
-            constants.lightBufferParams.environmentLightParams.lightPresent = 0;
-            constants.lightBufferParams.environmentLightParams.lightIndex = (0xffffffffu);
 
             constants.frameIndex = restirDiContext.GetFrameIndex();
             constants.pad2 = new uint2(0, 0);
 
-
-            var restirDiParameters = new ReSTIRDI_Parameters();
-
-            restirDiParameters = FillReSTIRDIConstants(restirDiParameters, restirDiContext, constants.lightBufferParams);
-
-            constants.restirDI = restirDiParameters;
-
+            FillReSTIRDIConstants(ref constants.restirDI, restirDiContext, constants.lightBufferParams);
+            FillReGIRConstants(ref constants.regir, isContext.GetReGIRContext());
 
             constants.localLightPdfTextureSize = rtxdiResources.Scene.localLightPdfTextureSize;
 
