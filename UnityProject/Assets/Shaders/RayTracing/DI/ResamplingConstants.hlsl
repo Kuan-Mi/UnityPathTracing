@@ -12,8 +12,8 @@ struct ResamplingConstants
     ReGIR_Parameters regir;
 
     uint frameIndex;
-    uint2 pad2;
-    uint pad3;
+    uint showReGIRCell;
+    uint2 pad3;
     
     
     uint2 environmentPdfTextureSize;

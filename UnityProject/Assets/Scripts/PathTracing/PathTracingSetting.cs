@@ -1,4 +1,5 @@
 ﻿using Rtxdi.DI;
+using Rtxdi.ReGIR;
 using UnityEngine;
 using UnityEngine.Serialization;
 
@@ -229,6 +230,9 @@ namespace PathTracing
         public ReSTIRDI_TemporalResamplingParameters temporalResamplingParams;
         public ReSTIRDI_SpatialResamplingParameters spatialResamplingParams;
         public ReSTIRDI_ShadingParameters shadingParams;
+
+        public ReGIRDynamicParameters regirDynamicParams;
+        public bool showReGIRCell;
 
         [FoldoutHeader("参考路径追踪")]
         public bool useReferencePathTracing;

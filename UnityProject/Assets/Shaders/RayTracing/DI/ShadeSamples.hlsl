@@ -26,7 +26,6 @@ RWTexture2D<int2> u_TemporalSamplePositions;
 Texture2D t_LocalLightPdfTexture;
 
 
-
 RWBuffer<uint2> u_RisBuffer;
 
 #define RTXDI_RIS_BUFFER u_RisBuffer
@@ -164,7 +163,7 @@ void MainRayGenShader()
 
         specular = DemodulateSpecular(surface.material.specularF0, specular);
 
-        float3 finalColor = ShadeSurfaceWithLightSample(lightSample, surface)  * RTXDI_GetDIReservoirInvPdf(reservoir);
+        float3 finalColor = ShadeSurfaceWithLightSample(lightSample, surface) * RTXDI_GetDIReservoirInvPdf(reservoir);
         gOut_DirectLighting[pixelPosition] = finalColor + gIn_EmissiveLighting[pixelPosition];
 
         // gOut_DirectLighting[pixelPosition] = diffuse + specular;
@@ -176,9 +175,9 @@ void MainRayGenShader()
     }
     else
     {
-        gOut_DirectLighting[pixelPosition] = float3(0,0,0) + gIn_EmissiveLighting[pixelPosition];
+        gOut_DirectLighting[pixelPosition] = float3(0, 0, 0) + gIn_EmissiveLighting[pixelPosition];
     }
-    
+
     // uint tileSize = g_Const.localLightsRISBufferSegmentParams.tileSize; // 通常是 128 或 256
     // uint tileCount = g_Const.localLightsRISBufferSegmentParams.tileCount;
     //
@@ -240,11 +239,8 @@ void MainRayGenShader()
     //     // 超出 Tile 总数或屏幕范围的部分显示为黑色
     //     gOut_DirectLighting[pixelPosition] = float3(0, 0, 0);
     // }
-    
-    
-    
-    
-    
+
+
     // float3 origin = gCameraGlobalPos;
     // float3 dir = normalize(surface.worldPos - origin);
     // uint o_lightIndex;
@@ -263,11 +259,17 @@ void MainRayGenShader()
     // float3 finalColor = ShadeSurfaceWithLightSample(lightSample, surface) ;
     //
     // gOut_DirectLighting[pixelPosition] = cc;
-    
+
     // RAB_RandomSamplerState coherentRng = RAB_InitRandomSampler(pixelPosition, 1);
     //
     //
-    // int cellIndex = RTXDI_ReGIR_WorldPosToCellIndex(g_Const.regir, surface.worldPos);
+
+    if (g_Const.showReGIRCell)
+    {
+        float3 visualize = RTXDI_VisualizeReGIRCells(g_Const.regir, surface.worldPos);
+        gOut_DirectLighting[pixelPosition] = visualize;
+    }
+
     //
     // ReGIR_Parameters regirParams = g_Const.regir;
     // float3 cellCenter;
@@ -287,21 +289,18 @@ void MainRayGenShader()
     // uint lightIndex = risData.x & ~RTXDI_LIGHT_COMPACT_BIT;
     // float invSourcePdf = asfloat(risData.y);
     //
-    
+
     // cellIndex += 10;
     // float3 hashColor = float3(
     //     frac(sin(float(cellIndex) * 12.9898) * 43758.5453),
     //     frac(sin(float(cellIndex) * 78.233) * 43758.5453),
     //     frac(sin(float(cellIndex) * 45.164) * 43758.5453)
     // );
-    
-    
-    
-    
+
+
     // gOut_DirectLighting[pixelPosition] = invSourcePdf;
-    
-    
-    
+
+
     // uint tileSize = g_Const.regir.commonParams.lightsPerCell; // 通常是 128 或 256
     // uint tileCount = 100;
     //
@@ -366,7 +365,7 @@ void MainRayGenShader()
     // }
     //
     //
-    
+
     //
     //
     // // gOut_DirectLighting[pixelPosition] = float3(o_randXY,0);
