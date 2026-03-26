@@ -98,21 +98,7 @@ uint ndirToOctUnorm32(float3 n)
     return uint(p.x * 0xfffe) | (uint(p.y * 0xfffe) << 16);
 }
 
-enum PolymorphicLightType
-{
-    kSphere = 0,
-    kCylinder,
-    kDisk,
-    kRect,
-    kTriangle,
-    kDirectional,
-    kEnvironment,
-    kPoint
-};
 
-static const uint kPolymorphicLightTypeShift = 24;
-static const float kPolymorphicLightMinLog2Radiance = -8.f;
-static const float kPolymorphicLightMaxLog2Radiance = 40.f;
 #define uint32_t uint
 
 

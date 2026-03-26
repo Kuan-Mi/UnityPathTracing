@@ -10,8 +10,6 @@
 #include "Assets/Shaders/donut/packing.hlsli"
 #include "Assets/Shaders/donut/brdf.hlsli"
 
-#include "ResamplingConstants.hlsl"
-
 #include "../RtxdiApplicationBridge/RtxdiApplicationBridge.hlsl"
 #include <Assets/Shaders/RTXDI/DI/TemporalResampling.hlsl>
 

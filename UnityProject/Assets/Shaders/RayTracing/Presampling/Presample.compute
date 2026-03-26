@@ -16,8 +16,6 @@
 #include "Assets/Shaders/donut/packing.hlsli"
 #include "Assets/Shaders/donut/brdf.hlsli"
 
-#include "../DI/ResamplingConstants.hlsl"
-
 #include "../RtxdiApplicationBridge/RtxdiApplicationBridge.hlsl"
 #include "Assets/Shaders/RTXDI/LightSampling/PresamplingFunctions.hlsl"
 #include <Assets/Shaders/RTXDI/DI/SpatioTemporalResampling.hlsl>

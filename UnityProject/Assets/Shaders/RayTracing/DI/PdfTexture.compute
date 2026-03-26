@@ -10,7 +10,6 @@
 #include "Assets/Shaders/donut/brdf.hlsli"
 #include "Assets/Shaders/Include/Shared.hlsl"
 #include "Assets/Shaders/Include/RayTracingShared.hlsl"
-#include  "Assets/Shaders/RayTracing/DI/ResamplingConstants.hlsl"
 
 RWTexture2D<float> u_LocalLightPdfTexture;
 
