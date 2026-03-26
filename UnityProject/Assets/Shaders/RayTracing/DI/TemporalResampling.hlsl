@@ -31,7 +31,6 @@ void MainRayGenShader()
         RTXDI_DIReservoir curSample = RTXDI_LoadDIReservoir(g_Const.restirDI.reservoirBufferParams,
                                                             GlobalIndex, g_Const.restirDI.bufferIndices.initialSamplingOutputBufferIndex);
 
-
         float3 motionVector = gOut_Mv[pixelPosition].xyz;
 
         RTXDI_DITemporalResamplingParameters tparams;
@@ -47,7 +46,8 @@ void MainRayGenShader()
 
         RAB_LightSample selectedLightSample = (RAB_LightSample)0;
 
-        temporalResult = RTXDI_DITemporalResampling(pixelPosition, surface, curSample, rng, params, g_Const.restirDI.reservoirBufferParams, tparams, temporalSamplePixelPos, selectedLightSample);
+        temporalResult = RTXDI_DITemporalResampling(pixelPosition, surface, curSample,
+                                                    rng, params, g_Const.restirDI.reservoirBufferParams, tparams, temporalSamplePixelPos, selectedLightSample);
     }
 
     #ifdef RTXDI_ENABLE_BOILING_FILTER

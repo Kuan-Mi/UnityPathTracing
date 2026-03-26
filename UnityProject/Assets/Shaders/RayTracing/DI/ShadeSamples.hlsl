@@ -134,10 +134,10 @@ void MainRayGenShader()
 
         // gOut_DirectLighting[pixelPosition] = diffuse + specular;
 
-        if (needToStore)
-        {
-            RTXDI_StoreDIReservoir(reservoir, g_Const.restirDI.reservoirBufferParams, pixelPosition, g_Const.restirDI.bufferIndices.shadingInputBufferIndex);
-        }
+        // if (needToStore)
+        // {
+        //     RTXDI_StoreDIReservoir(reservoir, g_Const.restirDI.reservoirBufferParams, pixelPosition, g_Const.restirDI.bufferIndices.shadingInputBufferIndex);
+        // }
     }
     else
     {
@@ -235,6 +235,20 @@ void MainRayGenShader()
         float3 visualize = RTXDI_VisualizeReGIRCells(g_Const.regir, surface.worldPos);
         gOut_DirectLighting[pixelPosition] = visualize;
     }
+    
+    
+    RAB_LightSample lightSample;
+    
+    lightSample.position = float3(0,1,0);
+    lightSample.normal = float3(0,-1,0);
+    lightSample.radiance = float3(1,1,1);
+    lightSample.solidAnglePdf = 0.5;
+    
+    
+    float pdf_for_surface = RAB_GetLightSampleTargetPdfForSurface(lightSample,surface);
+    
+    
+    gOut_DirectLighting[pixelPosition] = pdf_for_surface;
 
     //
     // ReGIR_Parameters regirParams = g_Const.regir;

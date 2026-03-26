@@ -27,20 +27,12 @@ RWBuffer<uint2> u_RisBuffer;
 
 
 // Other
-// CBUFFER_START(g_Const1)
-//     ResamplingConstants g_Const;
-// CBUFFER_END
+RWStructuredBuffer<ResamplingConstants> ResampleConstants;
+#define g_Const ResampleConstants[0]
 
 #define RTXDI_RIS_BUFFER u_RisBuffer
 #define RTXDI_LIGHT_RESERVOIR_BUFFER u_LightReservoirs
 #define RTXDI_NEIGHBOR_OFFSETS_BUFFER t_NeighborOffsets
-
-
-
-RWStructuredBuffer<ResamplingConstants> ResampleConstants;
-#define g_Const ResampleConstants[0]
-
-
 
 
 // Translate the light index between the current and previous frame.
@@ -54,7 +46,5 @@ int RAB_TranslateLightIndex(uint lightIndex, bool currentToPrevious)
 {
     return int(lightIndex);
 }
-
-
 
 #endif // RAB_BUFFER_HLSLI

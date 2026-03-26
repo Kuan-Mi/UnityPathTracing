@@ -14,13 +14,16 @@ namespace mini
         private const int c_NumReSTIRDIReservoirBuffers = 3;
 
         private bool m_neighborOffsetsInitialized = false;
+
         private uint m_maxEmissiveMeshes;
+
         // public uint m_maxEmissiveTriangles;
         private uint m_maxGeometryInstances;
 
 
         // public GraphicsBuffer TaskBuffer { get; private set; }
         public GraphicsBuffer LightDataBuffer { get; private set; }
+
         // public GraphicsBuffer GeometryInstanceToLightBuffer { get; private set; }
         public ComputeBuffer NeighborOffsetsBuffer { get; private set; }
         public ComputeBuffer RisBuffer { get; private set; }
@@ -28,21 +31,19 @@ namespace mini
 
         public GPUScene Scene;
 
-  
-        
 
-        public unsafe  RtxdiResources(
+        public unsafe RtxdiResources(
             ReSTIRDIContext context,
             RISBufferSegmentAllocator risBufferSegmentAllocator,
             GPUScene scene)
-        
-        { 
+
+        {
             LightDataBuffer = scene._lightInfoBuffer;
             this.Scene = scene;
             // m_maxEmissiveMeshes = maxEmissiveMeshes;
             // m_maxEmissiveTriangles =scene.emissiveTriangleCount;
             // m_maxGeometryInstances = maxGeometryInstances;
- 
+
 
             // // 1. TaskBuffer
             // // initial state: ShaderResource, canHaveUAVs = true
@@ -91,11 +92,11 @@ namespace mini
 
             NeighborOffsetsBuffer = new ComputeBuffer(
                 (int)staticParams.NeighborOffsetCount,
-                sizeof(Vector2), 
+                sizeof(Vector2),
                 ComputeBufferType.Default
             );
             NeighborOffsetsBuffer.name = "NeighborOffsets";
-            
+
             InitializeNeighborOffsets(staticParams.NeighborOffsetCount);
 
             // 5. LightReservoirBuffer
@@ -120,28 +121,25 @@ namespace mini
                 sizeof(Vector2),
                 ComputeBufferType.Default);
             RisBuffer.name = "RisBuffer";
-            
-            
-
         }
-        
-        
-        void InitializeNeighborOffsets( uint neighborOffsetCount)
+
+
+        void InitializeNeighborOffsets(uint neighborOffsetCount)
         {
             if (m_neighborOffsetsInitialized)
                 return;
 
-            
+
             var offsets = new Vector2[neighborOffsetCount];
             Array.Fill(offsets, Vector2.zero);
-            
+
             {
                 int R = 250;
                 const float phi2 = 1.0f / 1.3247179572447f;
                 uint num = 0;
                 float u = 0.5f;
                 float v = 0.5f;
-                while (num < neighborOffsetCount) 
+                while (num < neighborOffsetCount)
                 {
                     u += phi2;
                     v += phi2 * phi2;
@@ -155,13 +153,13 @@ namespace mini
                     offsets[num++] = new Vector2((u - 0.5f) * R / 128.0f, (v - 0.5f) * R / 128.0f);
                 }
             }
-            
+
             // byte[] offsets = new byte[neighborOffsetCount * 2]; 
             //
             // RtxdiUtils.FillNeighborOffsetBuffer(offsets, neighborOffsetCount);
-            
+
             NeighborOffsetsBuffer.SetData(offsets);
-            
+
             m_neighborOffsetsInitialized = true;
         }
 

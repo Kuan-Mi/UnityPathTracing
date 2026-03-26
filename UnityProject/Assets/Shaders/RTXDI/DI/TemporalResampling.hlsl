@@ -95,6 +95,10 @@ RTXDI_DIReservoir RTXDI_DITemporalResampling(
 
     temporalSamplePixelPos = int2(-1, -1);
 
+    
+    // gOut_DirectLighting[pixelPosition] = curSample.targetPdf;
+    
+    
     RTXDI_DIReservoir state = RTXDI_EmptyDIReservoir();
     RTXDI_CombineDIReservoirs(state, curSample, /* random = */ 0.5, curSample.targetPdf);
 
@@ -207,51 +211,58 @@ RTXDI_DIReservoir RTXDI_DITemporalResampling(
         }
 
         bool sampleSelected = RTXDI_CombineDIReservoirs(state, prevSample, RAB_GetNextRandom(rng), weightAtCurrent);
+        // sampleSelected = true;
         if(sampleSelected)
         {
             selectedPreviousSample = true;
             selectedLightPrevID = int(originalPrevLightID);
             selectedLightSample = candidateLightSample;
         }
+        // state = prevSample;
+        
+        gOut_DirectLighting[pixelPosition] = weightAtCurrent * 10;
+        // gOut_DirectLighting[pixelPosition] = sampleSelected;
+        // gOut_DirectLighting[pixelPosition] = state.weightSum;
+        // gOut_DirectLighting[pixelPosition] = 0.5f;
     }
 
-#if RTXDI_ALLOWED_BIAS_CORRECTION >= RTXDI_BIAS_CORRECTION_BASIC
-    if (tparams.biasCorrectionMode >= RTXDI_BIAS_CORRECTION_BASIC)
-    {
-        // Compute the unbiased normalization term (instead of using 1/M)
-        float pi = state.targetPdf;
-        float piSum = state.targetPdf * curSample.M;
-        
-        if (RTXDI_IsValidDIReservoir(state) && selectedLightPrevID >= 0 && previousM > 0)
-        {
-            float temporalP = 0;
-
-            const RAB_LightInfo selectedLightPrev = RAB_LoadLightInfo(selectedLightPrevID, true);
-
-            // Get the PDF of the sample RIS selected in the first loop, above, *at this neighbor* 
-            const RAB_LightSample selectedSampleAtTemporal = RAB_SamplePolymorphicLight(
-                selectedLightPrev, temporalSurface, RTXDI_GetDIReservoirSampleUV(state));
-        
-            temporalP = RAB_GetLightSampleTargetPdfForSurface(selectedSampleAtTemporal, temporalSurface);
-
-#if RTXDI_ALLOWED_BIAS_CORRECTION >= RTXDI_BIAS_CORRECTION_RAY_TRACED
-            if (tparams.biasCorrectionMode == RTXDI_BIAS_CORRECTION_RAY_TRACED && temporalP > 0 && (!selectedPreviousSample || !tparams.enableVisibilityShortcut))
-            {
-                if (!RAB_GetTemporalConservativeVisibility(surface, temporalSurface, selectedSampleAtTemporal))
-                {
-                    temporalP = 0;
-                }
-            }
-#endif
-
-            pi = selectedPreviousSample ? temporalP : pi;
-            piSum += temporalP * previousM;
-        }
-
-        RTXDI_FinalizeResampling(state, pi, piSum);
-    }
-    else
-#endif
+// #if RTXDI_ALLOWED_BIAS_CORRECTION >= RTXDI_BIAS_CORRECTION_BASIC
+//     if (tparams.biasCorrectionMode >= RTXDI_BIAS_CORRECTION_BASIC)
+//     {
+//         // Compute the unbiased normalization term (instead of using 1/M)
+//         float pi = state.targetPdf;
+//         float piSum = state.targetPdf * curSample.M;
+//         
+//         if (RTXDI_IsValidDIReservoir(state) && selectedLightPrevID >= 0 && previousM > 0)
+//         {
+//             float temporalP = 0;
+//
+//             const RAB_LightInfo selectedLightPrev = RAB_LoadLightInfo(selectedLightPrevID, true);
+//
+//             // Get the PDF of the sample RIS selected in the first loop, above, *at this neighbor* 
+//             const RAB_LightSample selectedSampleAtTemporal = RAB_SamplePolymorphicLight(
+//                 selectedLightPrev, temporalSurface, RTXDI_GetDIReservoirSampleUV(state));
+//         
+//             temporalP = RAB_GetLightSampleTargetPdfForSurface(selectedSampleAtTemporal, temporalSurface);
+//
+// #if RTXDI_ALLOWED_BIAS_CORRECTION >= RTXDI_BIAS_CORRECTION_RAY_TRACED
+//             if (tparams.biasCorrectionMode == RTXDI_BIAS_CORRECTION_RAY_TRACED && temporalP > 0 && (!selectedPreviousSample || !tparams.enableVisibilityShortcut))
+//             {
+//                 if (!RAB_GetTemporalConservativeVisibility(surface, temporalSurface, selectedSampleAtTemporal))
+//                 {
+//                     temporalP = 0;
+//                 }
+//             }
+// #endif
+//
+//             pi = selectedPreviousSample ? temporalP : pi;
+//             piSum += temporalP * previousM;
+//         }
+//
+//         RTXDI_FinalizeResampling(state, pi, piSum);
+//     }
+//     else
+// #endif
     {
         RTXDI_FinalizeResampling(state, 1.0, state.M);
     }

@@ -92,6 +92,7 @@ float3 ShadeSurfaceWithLightSample(RAB_LightSample lightSample, RAB_Surface surf
 // 权重的缩放比例可以任意，只要在所有光照和表面上保持一致即可。
 float RAB_GetLightSampleTargetPdfForSurface(RAB_LightSample lightSample, RAB_Surface surface)
 {
+    // return 1;
     if (lightSample.solidAnglePdf <= 0)
         return 0;
 
