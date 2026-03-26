@@ -10,28 +10,6 @@ namespace PathTracing
     [CustomEditor(typeof(PathTracingFeature))]
     public class PathTracingFeatureEditor : Editor
     {
-        // 用于保存每个 Header 的折叠状态
-        // private static Dictionary<string, bool> foldoutStates = new Dictionary<string, bool>();
-        private bool showGlobalDebug = true;
-        private bool showDebug = true;
-
-        // Asset paths relative to the project root.
-        // Adjust these if assets are moved.
-        private static readonly (string propName, string assetPath)[] AssetMappings =
-        {
-            ("finalMaterial", "Assets/Shaders/Mat/KM_Final.mat"),
-            ("opaqueTracingShader", "Assets/Shaders/RayTracing/TraceOpaque.raytrace"),
-            ("transparentTracingShader", "Assets/Shaders/RayTracing/TraceTransparent.raytrace"),
-            ("compositionComputeShader", "Assets/Shaders/PostProcess/Composition.compute"),
-            ("taaComputeShader", "Assets/Shaders/PostProcess/Taa.compute"),
-            ("dlssBeforeComputeShader", "Assets/Shaders/PostProcess/DlssBefore.compute"),
-            ("sharcResolveCs", "Assets/Shaders/Sharc/SharcResolve.compute"),
-            ("sharcUpdateTs", "Assets/Shaders/Sharc/SharcUpdate.raytrace"),
-            ("autoExposureShader", "Assets/Shaders/PostProcess/AutoExposure.compute"),
-            ("scramblingRankingTex", "Assets/Textures/scrambling_ranking_128x128_2d_4spp.png"),
-            ("sobolTex", "Assets/Textures/sobol_256_4d.png"),
-        };
-
         private string GetKey(string headerName)
         {
             return $"PT_Foldout_{target.GetInstanceID()}_{headerName}";
@@ -51,17 +29,6 @@ namespace PathTracing
                 DrawSettingsWithFoldableHeaders(settingsProp);
             }
 
-
-            EditorGUILayout.Space();
-
-
-            GUI.backgroundColor = new Color(0.5f, 0.9f, 0.5f);
-            if (GUILayout.Button("Auto Configure Assets", GUILayout.Height(30)))
-            {
-                AutoConfigure();
-            }
-
-            GUI.backgroundColor = Color.white;
 
             EditorGUILayout.Space();
 
@@ -238,42 +205,6 @@ namespace PathTracing
             else if (value is int2 i2) EditorGUILayout.Vector2IntField(label, new Vector2Int(i2.x, i2.y));
             else if (value is uint2 u2) EditorGUILayout.Vector2IntField(label, new Vector2Int((int)u2.x, (int)u2.y));
             else EditorGUILayout.LabelField(label, value?.ToString() ?? "null");
-        }
-
-        private void AutoConfigure()
-        {
-            serializedObject.Update();
-
-            int configured = 0;
-            int missing = 0;
-
-            foreach (var (propName, assetPath) in AssetMappings)
-            {
-                var prop = serializedObject.FindProperty(propName);
-                if (prop == null)
-                {
-                    Debug.LogWarning($"[PathTracingFeature] Property '{propName}' not found on serialized object.");
-                    continue;
-                }
-
-                var asset = AssetDatabase.LoadMainAssetAtPath(assetPath);
-                if (asset == null)
-                {
-                    Debug.LogWarning($"[PathTracingFeature] Asset not found at path: {assetPath}");
-                    missing++;
-                }
-                else
-                {
-                    prop.objectReferenceValue = asset;
-                    configured++;
-                }
-            }
-
-            serializedObject.ApplyModifiedProperties();
-            EditorUtility.SetDirty(target);
-            AssetDatabase.SaveAssets();
-
-            Debug.Log($"[PathTracingFeature] Auto Configure complete: {configured} assigned, {missing} missing.");
         }
     }
 }

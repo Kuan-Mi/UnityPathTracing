@@ -126,13 +126,13 @@ MonoBehaviour:
     sssMaxSampleRadius: 0.0001
     enableRtxdi: 1
     debugRtxdi: 1
-    resamplingMode: 2
+    resamplingMode: 0
     gShowLight: 0
     initialSamplingParams:
-      numPrimaryLocalLightSamples: 8
+      numPrimaryLocalLightSamples: 4
       numPrimaryInfiniteLightSamples: 1
       numPrimaryEnvironmentSamples: 1
-      numPrimaryBrdfSamples: 0
+      numPrimaryBrdfSamples: 1
       brdfCutoff: 0.0001
       enableInitialVisibility: 1
       environmentMapImportanceSampling: 0
