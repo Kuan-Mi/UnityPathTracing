@@ -30,12 +30,7 @@ namespace PathTracing
                 DrawSettingsWithFoldableHeaders(settingsProp);
             }
 
-
-            EditorGUILayout.Space();
-
             DrawGroupedAssetFields();
-
-            EditorGUILayout.Space();
 
             if (GUILayout.Button("InitializeBuffers"))
             {

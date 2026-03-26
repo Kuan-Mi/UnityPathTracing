@@ -130,7 +130,7 @@ namespace PathTracing
         public float dofFocalDistance = 5;
 
 
-        [FoldoutHeader("自动曝光 (Histogram Auto Exposure)")]
+        [FoldoutHeader("自动曝光")]
         public bool enableAutoExposure = false;
 
         [Tooltip("Histogram EV range lower bound (log2 luminance)")]
@@ -189,10 +189,7 @@ namespace PathTracing
 
         public bool sharcDebug = false;
 
-        [FoldoutHeader("SSS (次表面散射)")]
-        [Tooltip("皮肤散射颜色，暖橙红色为典型皮肤值")]
-        [ColorUsage(false, true)]
-        public Color sssScatteringColor = new Color(1.0f, 0.3f, 0.1f);
+        [FoldoutHeader("次表面散射")]
 
         [Tooltip("SSS 阴影阈值：皮肤在该 NoL 值以下时开始渐入散射（默认 -0.2，允许背透光）")]
         [Range(-1.0f, 0.1f)]
