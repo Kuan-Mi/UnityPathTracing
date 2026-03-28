@@ -373,8 +373,6 @@ namespace PathTracing
                 _cameraFrameStates.Add(uniqueKey, frameState);
             }
 
-            _prepareLightResources.SetBuffer(_gpuScene);
-            _prepareLightResources.SendTexture(_gpuScene.globalTexturePool);
 
             // if (!_restirDiContexts.TryGetValue(uniqueKey, out var restirDiContext))
             // {
@@ -473,7 +471,8 @@ namespace PathTracing
             _resamplingConstantsArray[0] = resamplingConstants;
             _resamplingConstantBuffer.SetData(_resamplingConstantsArray);
 
-            // Sharc 
+            #region Sharc
+
             var sharcResource = new SharcPass.Resource
             {
                 ConstantBuffer = _constantBuffer,
@@ -494,11 +493,23 @@ namespace PathTracing
             _sharcPass.Setup(sharcResource, sharcSettings);
             renderer.EnqueuePass(_sharcPass);
 
-            _prepareLightPass.Setup(_prepareLightResources);
-            renderer.EnqueuePass(_prepareLightPass);
+            #endregion
 
+            #region prepareLight
 
-            // Opaque Pass
+            if (pathTracingSetting.prepareLight)
+            {
+                _prepareLightResources.SetBuffer(_gpuScene);
+                _prepareLightResources.SendTexture(_gpuScene.globalTexturePool);
+
+                _prepareLightPass.Setup(_prepareLightResources);
+                renderer.EnqueuePass(_prepareLightPass);
+            }
+
+            #endregion
+
+            #region Opaque Pass
+
             var opaqueResource = new OpaquePass.Resource
             {
                 ConstantBuffer = _constantBuffer,
@@ -542,6 +553,7 @@ namespace PathTracing
             _opaquePass.Setup(opaqueResource, opaqueSettings);
             renderer.EnqueuePass(_opaquePass);
 
+            #endregion
 
             if (pathTracingSetting.enableRtxdi)
             {
@@ -606,7 +618,7 @@ namespace PathTracing
                     _presamplePass.Setup(preResource, preSettings);
                     renderer.EnqueuePass(_presamplePass);
                 }
-                
+
                 if (pathTracingSetting.initialSamplingParams.localLightSamplingMode == ReSTIRDI_LocalLightSamplingMode.ReGIR_RIS)
                 {
                     var preReGirResource = new PresampleReGirLightsPass.Resource
@@ -618,10 +630,10 @@ namespace PathTracing
                         RtxdiResources = rtxdiResources
                     };
                     var ReGIR_TILE_SIZE = 256;
-                    
+
                     var regirContext = isContext.GetReGIRContext();
                     var x = (regirContext.GetReGIRLightSlotCount() + ReGIR_TILE_SIZE - 1) / ReGIR_TILE_SIZE;
-         
+
 
                     var preReGirSettings = new PresampleReGirLightsPass.Settings
                     {
@@ -765,11 +777,13 @@ namespace PathTracing
                 {
                     m_RenderResolution = new int2(cam.pixelWidth, cam.pixelHeight),
                     resolutionScale = pathTracingSetting.resolutionScale,
+                    shading = pathTracingSetting.enableFinalShading
                 };
 
                 _shadeSamplesPass.Setup(shaResource, shaSettings);
                 renderer.EnqueuePass(_shadeSamplesPass);
             }
+
 
             if (!pathTracingSetting.RR)
             {
@@ -1145,7 +1159,7 @@ namespace PathTracing
             restirDiContext.SetTemporalResamplingParameters(pathTracingSetting.temporalResamplingParams);
             restirDiContext.SetSpatialResamplingParameters(pathTracingSetting.spatialResamplingParams);
             restirDiContext.SetShadingParameters(pathTracingSetting.shadingParams);
-            
+
             var regirContext = isContext.GetReGIRContext();
             pathTracingSetting.regirDynamicParams.center = frameState.camPos;
             regirContext.SetDynamicParameters(pathTracingSetting.regirDynamicParams);
@@ -1161,8 +1175,8 @@ namespace PathTracing
 
             constants.frameIndex = restirDiContext.GetFrameIndex();
             constants.showReGIRCell = pathTracingSetting.showReGIRCell ? 1u : 0u;
-            
-            
+
+
             constants.pad3 = new uint2(0, 0);
 
             FillReSTIRDIConstants(ref constants.restirDI, restirDiContext, constants.lightBufferParams);

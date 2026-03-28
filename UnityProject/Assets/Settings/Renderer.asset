@@ -69,9 +69,66 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::PathTracing.PathTracingFeature
   m_Active: 1
   pathTracingSetting:
-    showMode: 11
+    showMode: 18
     showMv: 0
     showValidation: 0
+    enableRtxdi: 1
+    debugRtxdi: 1
+    resamplingMode: 3
+    gShowLight: 0
+    initialSamplingParams:
+      numPrimaryLocalLightSamples: 8
+      numPrimaryInfiniteLightSamples: 0
+      numPrimaryEnvironmentSamples: 0
+      numPrimaryBrdfSamples: 4
+      brdfCutoff: 0.0001
+      enableInitialVisibility: 1
+      environmentMapImportanceSampling: 0
+      localLightSamplingMode: 2
+    temporalResamplingParams:
+      temporalDepthThreshold: 0.1
+      temporalNormalThreshold: 0.5
+      maxHistoryLength: 8
+      temporalBiasCorrection: 1
+      enablePermutationSampling: 1
+      permutationSamplingThreshold: 0.9
+      enableBoilingFilter: 1
+      boilingFilterStrength: 0.2
+      discardInvisibleSamples: 1
+      uniformRandomNumber: 0
+      pad2: 0
+      pad3: 0
+    spatialResamplingParams:
+      spatialDepthThreshold: 0.1
+      spatialNormalThreshold: 0.5
+      spatialBiasCorrection: 1
+      numSpatialSamples: 1
+      numDisocclusionBoostSamples: 8
+      spatialSamplingRadius: 32
+      neighborOffsetMask: 0
+      discountNaiveSamples: 0
+    shadingParams:
+      enableFinalVisibility: 1
+      reuseFinalVisibility: 1
+      finalVisibilityMaxAge: 4
+      finalVisibilityMaxDistance: 16
+      enableDenoiserInputPacking: 1
+      pad1: 0
+      pad2: 0
+      pad3: 0
+    regirDynamicParams:
+      regirCellSize: 1
+      center:
+        x: 18.673317
+        y: 9.097723
+        z: -17.565495
+      fallbackSamplingMode: 1
+      presamplingMode: 1
+      regirSamplingJitter: 1
+      regirNumBuildSamples: 8
+    showReGIRCell: 0
+    prepareLight: 1
+    enableFinalShading: 1
     sunAngularDiameter: 0.69
     exposureEv: 2.9
     upscalerMode: 0
@@ -123,61 +180,6 @@ MonoBehaviour:
     sssScale: 1
     sssAnisotropy: 0.8
     sssMaxSampleRadius: 0.0001
-    enableRtxdi: 1
-    debugRtxdi: 1
-    resamplingMode: 1
-    gShowLight: 0
-    initialSamplingParams:
-      numPrimaryLocalLightSamples: 8
-      numPrimaryInfiniteLightSamples: 0
-      numPrimaryEnvironmentSamples: 0
-      numPrimaryBrdfSamples: 0
-      brdfCutoff: 0.0001
-      enableInitialVisibility: 1
-      environmentMapImportanceSampling: 0
-      localLightSamplingMode: 0
-    temporalResamplingParams:
-      temporalDepthThreshold: 0.1
-      temporalNormalThreshold: 0.5
-      maxHistoryLength: 20
-      temporalBiasCorrection: 1
-      enablePermutationSampling: 1
-      permutationSamplingThreshold: 0.9
-      enableBoilingFilter: 1
-      boilingFilterStrength: 0.2
-      discardInvisibleSamples: 1
-      uniformRandomNumber: 0
-      pad2: 0
-      pad3: 0
-    spatialResamplingParams:
-      spatialDepthThreshold: 0.1
-      spatialNormalThreshold: 0.5
-      spatialBiasCorrection: 3
-      numSpatialSamples: 1
-      numDisocclusionBoostSamples: 8
-      spatialSamplingRadius: 32
-      neighborOffsetMask: 0
-      discountNaiveSamples: 0
-    shadingParams:
-      enableFinalVisibility: 1
-      reuseFinalVisibility: 1
-      finalVisibilityMaxAge: 4
-      finalVisibilityMaxDistance: 16
-      enableDenoiserInputPacking: 1
-      pad1: 0
-      pad2: 0
-      pad3: 0
-    regirDynamicParams:
-      regirCellSize: 1
-      center:
-        x: 2.2307718
-        y: 1.2766565
-        z: 2.2048647
-      fallbackSamplingMode: 1
-      presamplingMode: 1
-      regirSamplingJitter: 1
-      regirNumBuildSamples: 8
-    showReGIRCell: 0
     useReferencePathTracing: 0
     referenceBounceNum: 2
     split: 0.683

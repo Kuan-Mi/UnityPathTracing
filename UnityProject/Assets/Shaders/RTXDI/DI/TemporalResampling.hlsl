@@ -220,7 +220,7 @@ RTXDI_DIReservoir RTXDI_DITemporalResampling(
         }
         // state = prevSample;
         
-        gOut_DirectLighting[pixelPosition] = weightAtCurrent * 10;
+        // gOut_DirectLighting[pixelPosition] = weightAtCurrent * 10;
         // gOut_DirectLighting[pixelPosition] = sampleSelected;
         // gOut_DirectLighting[pixelPosition] = state.weightSum;
         // gOut_DirectLighting[pixelPosition] = 0.5f;

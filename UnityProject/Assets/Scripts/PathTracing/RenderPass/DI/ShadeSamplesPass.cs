@@ -7,12 +7,11 @@ using UnityEngine.Experimental.Rendering;
 using UnityEngine.Rendering;
 using UnityEngine.Rendering.RenderGraphModule;
 using UnityEngine.Rendering.Universal;
-
 using static PathTracing.ShaderIDs;
 
 namespace PathTracing
 {
-    public class ShadeSamplesPass: ScriptableRenderPass
+    public class ShadeSamplesPass : ScriptableRenderPass
     {
         private readonly RayTracingShader _opaqueTs;
         private Resource _resource;
@@ -45,7 +44,6 @@ namespace PathTracing
             internal RTHandle DirectLighting;
 
 
-
             internal RTHandle PrevViewZ;
             internal RTHandle PrevNormalRoughness;
             internal RTHandle PrevBaseColorMetalness;
@@ -58,7 +56,8 @@ namespace PathTracing
         public class Settings
         {
             internal int2 m_RenderResolution;
-            internal float resolutionScale;     
+            internal float resolutionScale;
+            internal bool shading;
         }
 
         class PassData
@@ -97,30 +96,30 @@ namespace PathTracing
             natCmd.SetRayTracingTextureParam(data.OpaqueTs, g_BaseColor_MetalnessID, resource.BaseColorMetalness);
 
             natCmd.SetRayTracingTextureParam(data.OpaqueTs, g_DirectLightingID, resource.DirectLighting);
-            natCmd.SetRayTracingTextureParam(data.OpaqueTs,"gIn_EmissiveLighting", data.gIn_EmissiveLighting);
-            natCmd.SetRayTracingTextureParam(data.OpaqueTs,"_environmentMap", resource.envTexture);
+            natCmd.SetRayTracingTextureParam(data.OpaqueTs, "gIn_EmissiveLighting", data.gIn_EmissiveLighting);
+            natCmd.SetRayTracingTextureParam(data.OpaqueTs, "_environmentMap", resource.envTexture);
 
             natCmd.SetRayTracingTextureParam(data.OpaqueTs, gIn_PrevViewZID, resource.PrevViewZ);
             natCmd.SetRayTracingTextureParam(data.OpaqueTs, gIn_PrevNormalRoughnessID, resource.PrevNormalRoughness);
             natCmd.SetRayTracingTextureParam(data.OpaqueTs, gIn_PrevBaseColorMetalnessID, resource.PrevBaseColorMetalness);
-            
-            
-            natCmd.SetRayTracingTextureParam(data.OpaqueTs,"gOut_GeoNormal", resource.GeoNormal);
-            natCmd.SetRayTracingTextureParam(data.OpaqueTs,"gIn_PrevGeoNormal", resource.PrevGeoNormal);
-            
 
-            natCmd.SetRayTracingTextureParam(data.OpaqueTs,"t_LocalLightPdfTexture", resource.RtxdiResources.Scene.localLightPdfTexture);
+
+            natCmd.SetRayTracingTextureParam(data.OpaqueTs, "gOut_GeoNormal", resource.GeoNormal);
+            natCmd.SetRayTracingTextureParam(data.OpaqueTs, "gIn_PrevGeoNormal", resource.PrevGeoNormal);
+
+
+            natCmd.SetRayTracingTextureParam(data.OpaqueTs, "t_LocalLightPdfTexture", resource.RtxdiResources.Scene.localLightPdfTexture);
 
             natCmd.SetRayTracingBufferParam(data.OpaqueTs, "u_RisBuffer", resource.RtxdiResources.RisBuffer);
 
-            
+
             uint rectWmod = (uint)(settings.m_RenderResolution.x * settings.resolutionScale + 0.5f);
             uint rectHmod = (uint)(settings.m_RenderResolution.y * settings.resolutionScale + 0.5f);
 
             // Debug.Log($"Dispatch Rays Size: {rectWmod} x {rectHmod}");
 
-
-            natCmd.DispatchRays(data.OpaqueTs, "MainRayGenShader", rectWmod, rectHmod, 1);
+            if (settings.shading)
+                natCmd.DispatchRays(data.OpaqueTs, "MainRayGenShader", rectWmod, rectHmod, 1);
 
             natCmd.EndSample(opaqueTracingMarker);
 
@@ -155,7 +154,6 @@ namespace PathTracing
 
             passData.gIn_EmissiveLighting = resourceData.DirectEmission;
 
-            
 
             builder.AllowPassCulling(false);
             builder.SetRenderFunc((PassData data, UnsafeGraphContext context) => { ExecutePass(data, context); });

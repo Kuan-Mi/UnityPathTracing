@@ -67,6 +67,26 @@ namespace PathTracing
         public bool showMv;
         public bool showValidation;
 
+        [FoldoutHeader("RTXDI")]
+        public bool enableRtxdi;
+        public bool debugRtxdi;
+
+        public bool enableSpatialResampling => resamplingMode is ReSTIRDI_ResamplingMode.Spatial or ReSTIRDI_ResamplingMode.TemporalAndSpatial;
+        public bool enableTemporalResampling => resamplingMode is ReSTIRDI_ResamplingMode.Temporal or ReSTIRDI_ResamplingMode.TemporalAndSpatial;
+
+        public ReSTIRDI_ResamplingMode resamplingMode;
+        public bool gShowLight;
+        
+        public ReSTIRDI_InitialSamplingParameters initialSamplingParams;
+        public ReSTIRDI_TemporalResamplingParameters temporalResamplingParams;
+        public ReSTIRDI_SpatialResamplingParameters spatialResamplingParams;
+        public ReSTIRDI_ShadingParameters shadingParams;
+
+        public ReGIRDynamicParameters regirDynamicParams;
+        public bool showReGIRCell;
+        public bool prepareLight;
+        public bool enableFinalShading;
+        
         [FoldoutHeader("Base Settings")]
         [Range(0.001f, 10f)]
         public float sunAngularDiameter = 0.533f;
@@ -216,23 +236,6 @@ namespace PathTracing
         [Range(0.0001f, 0.1f)]
         public float sssMaxSampleRadius = 0.004f;
 
-        [FoldoutHeader("RTXDI")]
-        public bool enableRtxdi;
-        public bool debugRtxdi;
-
-        public bool enableSpatialResampling => resamplingMode is ReSTIRDI_ResamplingMode.Spatial or ReSTIRDI_ResamplingMode.TemporalAndSpatial;
-        public bool enableTemporalResampling => resamplingMode is ReSTIRDI_ResamplingMode.Temporal or ReSTIRDI_ResamplingMode.TemporalAndSpatial;
-
-        public ReSTIRDI_ResamplingMode resamplingMode;
-        public bool gShowLight;
-        
-        public ReSTIRDI_InitialSamplingParameters initialSamplingParams;
-        public ReSTIRDI_TemporalResamplingParameters temporalResamplingParams;
-        public ReSTIRDI_SpatialResamplingParameters spatialResamplingParams;
-        public ReSTIRDI_ShadingParameters shadingParams;
-
-        public ReGIRDynamicParameters regirDynamicParams;
-        public bool showReGIRCell;
 
         [FoldoutHeader("参考路径追踪")]
         public bool useReferencePathTracing;

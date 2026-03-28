@@ -248,7 +248,7 @@ void MainRayGenShader()
     float pdf_for_surface = RAB_GetLightSampleTargetPdfForSurface(lightSample,surface);
     
     
-    gOut_DirectLighting[pixelPosition] = pdf_for_surface;
+    // gOut_DirectLighting[pixelPosition] = pdf_for_surface;
 
     //
     // ReGIR_Parameters regirParams = g_Const.regir;

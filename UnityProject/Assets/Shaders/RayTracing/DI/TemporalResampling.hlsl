@@ -23,6 +23,7 @@ void MainRayGenShader()
         usePermutationSampling = !IsComplexSurface(pixelPosition, surface);
     }
 
+    // usePermutationSampling = true;
     RTXDI_DIReservoir temporalResult = RTXDI_EmptyDIReservoir();
     int2 temporalSamplePixelPos = -1;
 
@@ -48,6 +49,15 @@ void MainRayGenShader()
 
         temporalResult = RTXDI_DITemporalResampling(pixelPosition, surface, curSample,
                                                     rng, params, g_Const.restirDI.reservoirBufferParams, tparams, temporalSamplePixelPos, selectedLightSample);
+        //
+        // float3 finalColor = ShadeSurfaceWithLightSample(selectedLightSample, surface) * RTXDI_GetDIReservoirInvPdf(temporalResult);
+        //
+        // RAB_LightInfo lightInfo = RAB_LoadLightInfo(RTXDI_GetDIReservoirLightIndex(temporalResult), false);
+        // RAB_LightSample lightSample = RAB_SamplePolymorphicLight(lightInfo, surface, RTXDI_GetDIReservoirSampleUV(temporalResult));
+        // float3 finalColor2 = ShadeSurfaceWithLightSample(lightSample, surface) * RTXDI_GetDIReservoirInvPdf(temporalResult);
+        //
+        // gOut_DirectLighting[pixelPosition] = finalColor2;
+        //  
     }
 
     #ifdef RTXDI_ENABLE_BOILING_FILTER
