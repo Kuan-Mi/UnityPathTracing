@@ -204,15 +204,9 @@ namespace PathTracing
 
             var ptContextItem = frameData.Get<PTContextItem>();
 
-            passData.OutputTexture = ptContextItem.OutputTexture;
             passData.DirectEmission = ptContextItem.DirectEmission;
-            passData.ComposedDiff = ptContextItem.ComposedDiff;
-            passData.ComposedSpecViewZ = ptContextItem.ComposedSpecViewZ;
 
-            builder.UseTexture(passData.OutputTexture, AccessFlags.ReadWrite);
             builder.UseTexture(passData.DirectEmission, AccessFlags.ReadWrite);
-            builder.UseTexture(passData.ComposedDiff, AccessFlags.ReadWrite);
-            builder.UseTexture(passData.ComposedSpecViewZ, AccessFlags.ReadWrite);
 
             passData.CameraTexture = resourceData.activeColorTexture;
 

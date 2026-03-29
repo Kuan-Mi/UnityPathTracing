@@ -62,8 +62,5 @@ void CSMain(int2 pixelPos : SV_DispatchThreadId)
         gOut_SpecAlbedo[ pixelPos ] = isSky ? 0.0 : Fenv;
         gOut_SpecHitDistance[ pixelPos ] = isSky ? 0.0 : gIndirectSpecular * specHitDistance;
         gOut_Normal_Roughness[ pixelPos ] = float4( N, roughness ); // NGX supports only this encoding
-        
-        // gOut_DiffAlbedo[ pixelPos ] = float4(1,0,0,1);
-        
     }
 }
