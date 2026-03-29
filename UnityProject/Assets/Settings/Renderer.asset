@@ -14,7 +14,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::PathTracing.RtxdiFeature
   m_Active: 1
   pathTracingSetting:
-    showMode: 18
+    showMode: 11
     showMv: 0
     showValidation: 0
     enableRtxdi: 1
@@ -22,10 +22,10 @@ MonoBehaviour:
     resamplingMode: 3
     gShowLight: 0
     initialSamplingParams:
-      numPrimaryLocalLightSamples: 8
+      numPrimaryLocalLightSamples: 0
       numPrimaryInfiniteLightSamples: 1
-      numPrimaryEnvironmentSamples: 1
-      numPrimaryBrdfSamples: 1
+      numPrimaryEnvironmentSamples: 0
+      numPrimaryBrdfSamples: 0
       brdfCutoff: 0.0001
       enableInitialVisibility: 0
       environmentMapImportanceSampling: 0
@@ -64,9 +64,9 @@ MonoBehaviour:
     regirDynamicParams:
       regirCellSize: 1
       center:
-        x: 15.138254
-        y: 11.790981
-        z: 5.9830174
+        x: 2
+        y: 1.577
+        z: 1
       fallbackSamplingMode: 1
       presamplingMode: 1
       regirSamplingJitter: 1
@@ -96,7 +96,7 @@ MonoBehaviour:
     boostFactor: 0.6667
     SR: 0
     RR: 1
-    tmpDisableRR: 0
+    tmpDisableRR: 1
     resolutionScale: 1
     denoisingRange: 1000
     splitScreen: 0
