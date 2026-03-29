@@ -25,7 +25,7 @@ MonoBehaviour:
       numPrimaryLocalLightSamples: 8
       numPrimaryInfiniteLightSamples: 0
       numPrimaryEnvironmentSamples: 0
-      numPrimaryBrdfSamples: 3
+      numPrimaryBrdfSamples: 1
       brdfCutoff: 0.0001
       enableInitialVisibility: 1
       environmentMapImportanceSampling: 0
@@ -62,13 +62,13 @@ MonoBehaviour:
       pad2: 0
       pad3: 0
     regirDynamicParams:
-      regirCellSize: 0
+      regirCellSize: 1
       center:
-        x: -11.212313
-        y: 5.956867
-        z: -5.9197636
+        x: 16.150023
+        y: 6.5580454
+        z: 0.17188549
       fallbackSamplingMode: 1
-      presamplingMode: 0
+      presamplingMode: 1
       regirSamplingJitter: 1
       regirNumBuildSamples: 8
     showReGIRCell: 0
@@ -76,7 +76,7 @@ MonoBehaviour:
     enableFinalShading: 1
     enableEnv: 0
     sunAngularDiameter: 0.533
-    exposureEv: 0
+    exposureEv: 7.06
     upscalerMode: 0
     mipBias: -0.5
     tracingMode: 1

@@ -48,10 +48,13 @@ MonoBehaviour:
   - Sharc Update
   - Sharc Resolve
   - PrepareLight
+  - GBuffer
   - Opaque Tracing
   - pdfTexture
+  - RtxdiGenerateMips
   - PresamplePass
-  - GenerateInitialSamples
+  - PresampleReGir
+  - GenInitialSamples
   - TemporalResampling
   - SpatialResampling
   - ShadeSamples

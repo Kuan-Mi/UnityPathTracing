@@ -174,5 +174,9 @@ public class GPUProfiler : MonoBehaviour
 
             i++;
         }
+        
+        var sum = activeData.Sum(d => d.Value.history.Last().valueMs);
+        GUI.Label(new Rect(startX, headerY + lineHeight + (i * lineHeight), nameWidth, lineHeight), "Total", nameStyle);
+        GUI.Label(new Rect(startX + nameWidth, headerY + lineHeight + (i * lineHeight), currentWidth, lineHeight), $"{sum:F3} ms", valueStyle);
     }
 }

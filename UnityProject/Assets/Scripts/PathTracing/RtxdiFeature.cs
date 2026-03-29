@@ -315,7 +315,6 @@ namespace PathTracing
                 NormalRoughness = pool.GetRT(RenderResourceType.NormalRoughness),
                 BaseColorMetalness = pool.GetRT(RenderResourceType.BasecolorMetalness),
                 GeoNormal = pool.GetRT(RenderResourceType.GeoNormal),
-                
             };
 
             var gBufferSettings = new GBufferPass.Settings
