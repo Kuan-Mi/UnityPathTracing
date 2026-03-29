@@ -137,9 +137,9 @@ Shader "RayTracing/Lit"
                 float _DetailNormalMapScale;
                 float _Surface;
             CBUFFER_END
-            
-                float4 _SSSScatteringColor;
-                float _SSSScatteringScale;
+
+            float4 _SSSScatteringColor;
+            float _SSSScatteringScale;
 
             TEXTURE2D(_BaseMap);
             SAMPLER(sampler_BaseMap);
@@ -207,7 +207,7 @@ Shader "RayTracing/Lit"
 
                 // 3. 计算插值 UV
                 float3 barycentricCoords = float3(1.0 - attribs.barycentrics.x - attribs.barycentrics.y,
-                                                  attribs.barycentrics.x, attribs.barycentrics.y);
+                              attribs.barycentrics.x, attribs.barycentrics.y);
                 float2 uv = uv0 * barycentricCoords.x + uv1 * barycentricCoords.y + uv2 * barycentricCoords.z;
 
                 // 4. 采样 Alpha 通道
@@ -307,14 +307,14 @@ Shader "RayTracing/Lit"
 
                 roughness = 1 - _Smoothness;
                 metallic = _Metallic;
-                 
+
 
                 #endif
 
                 #if _SSS
-                
+
                 float3 scattering = _SSSScatteringColor.xyz * _SSSScatteringScale;
-                
+
                 payload.Lemi = Packing::EncodeRgbe(scattering);
                 #elif _EMISSION
                 float3 emission = _EmissionColor.xyz * _EmissionMap.SampleLevel(sampler_EmissionMap, v.uv, mip).xyz;
@@ -367,13 +367,13 @@ Shader "RayTracing/Lit"
                 #endif
 
                 payload.SetFlag(flag);
-                
+
                 #if _EMISSION
-                
+
                 payload.primitiveIndex = PrimitiveIndex();
-                
+
                 #else
-                
+
                 payload.primitiveIndex = INF;
                 #endif
                 payload.barycentrics = attribs.barycentrics;
@@ -415,45 +415,15 @@ Shader "RayTracing/Lit"
                 float _DetailNormalMapScale;
                 float _Surface;
             CBUFFER_END
-            
-                float4 _SSSScatteringColor;
-                float _SSSScatteringScale;
 
             TEXTURE2D(_BaseMap);
             SAMPLER(sampler_BaseMap);
-            TEXTURE2D(_BumpMap);
-            SAMPLER(sampler_BumpMap);
-            TEXTURE2D(_EmissionMap);
-            SAMPLER(sampler_EmissionMap);
-
-
-            TEXTURE2D(_ParallaxMap);
-            SAMPLER(sampler_ParallaxMap);
-            TEXTURE2D(_OcclusionMap);
-            SAMPLER(sampler_OcclusionMap);
-            TEXTURE2D(_DetailMask);
-            SAMPLER(sampler_DetailMask);
-            TEXTURE2D(_DetailAlbedoMap);
-            SAMPLER(sampler_DetailAlbedoMap);
-            TEXTURE2D(_DetailNormalMap);
-            SAMPLER(sampler_DetailNormalMap);
-            TEXTURE2D(_MetallicGlossMap);
-            SAMPLER(sampler_MetallicGlossMap);
-            TEXTURE2D(_SpecGlossMap);
-            SAMPLER(sampler_SpecGlossMap);
-            TEXTURE2D(_ClearCoatMap);
-            SAMPLER(sampler_ClearCoatMap);
-
 
             #include "Assets/Shaders/Include/Shared.hlsl"
             #include "Assets/Shaders/Include/Payload.hlsl"
 
             #pragma shader_feature_local_raytracing _EMISSION
-            #pragma shader_feature_local_raytracing _NORMALMAP
-            #pragma shader_feature_local_raytracing _METALLICSPECGLOSSMAP
             #pragma shader_feature_local_raytracing _SURFACE_TYPE_TRANSPARENT
-            #pragma shader_feature_local_raytracing _SSS
-            #pragma shader_feature_local_raytracing _SKINNEDMESH
 
             #pragma multi_compile_local RAY_TRACING_PROCEDURAL_GEOMETRY
 
@@ -485,7 +455,7 @@ Shader "RayTracing/Lit"
 
                 // 3. 计算插值 UV
                 float3 barycentricCoords = float3(1.0 - attribs.barycentrics.x - attribs.barycentrics.y,
-                                                  attribs.barycentrics.x, attribs.barycentrics.y);
+                              attribs.barycentrics.x, attribs.barycentrics.y);
                 float2 uv = uv0 * barycentricCoords.x + uv1 * barycentricCoords.y + uv2 * barycentricCoords.z;
 
                 // 4. 采样 Alpha 通道
@@ -505,15 +475,14 @@ Shader "RayTracing/Lit"
             [shader("closesthit")]
             void ClosestHitMain(inout LightPayload payload : SV_RayPayload, AttributeData attribs : SV_IntersectionAttributes)
             {
-                // Instance
-                payload.instanceIndex = (InstanceID() + GeometryIndex());
-                
+                payload.instanceIndex = InstanceID() + GeometryIndex();
+
                 #if _EMISSION
                 payload.primitiveIndex = PrimitiveIndex();
                 #else
                 payload.primitiveIndex = INF;
                 #endif
-                
+
                 payload.barycentrics = attribs.barycentrics;
             }
             ENDHLSL
