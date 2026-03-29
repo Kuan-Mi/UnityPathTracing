@@ -6,7 +6,7 @@
 #include <Assets/Shaders/donut/utils.hlsli>
 
 #include <Assets/Shaders/Include/Shared.hlsl>
-#include <Assets/Shaders/Include/RayTracingShared.hlsl>
+#include <Assets/Shaders/Include/LightRayTracingShared.hlsl>
 
 #include <Assets/Shaders/Rtxdi/DI/ReSTIRDIParameters.h>
 #include <Assets/Shaders/Rtxdi/GI/ReSTIRGIParameters.h>

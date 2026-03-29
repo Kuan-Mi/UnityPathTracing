@@ -380,6 +380,144 @@ Shader "RayTracing/Lit"
             }
             ENDHLSL
         }
+
+
+        Pass
+        {
+            Name "RTXDI"
+
+            Tags
+            {
+                "LightMode"="RayTracing"
+            }
+            HLSLPROGRAM
+            #include "UnityRaytracingMeshUtils.cginc"
+            #include "Assets/Shaders/Include/ml.hlsli"
+            #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
+
+
+            CBUFFER_START(UnityPerMaterial)
+                float4 _BaseMap_ST;
+                float4 _BaseMap_TexelSize;
+                float4 _DetailAlbedoMap_ST;
+                float4 _BaseColor;
+                float4 _SpecColor;
+                float4 _EmissionColor;
+                float _Cutoff;
+                float _Smoothness;
+                float _Metallic;
+                float _BumpScale;
+                float _Parallax;
+                float _OcclusionStrength;
+                float _ClearCoatMask;
+                float _ClearCoatSmoothness;
+                float _DetailAlbedoMapScale;
+                float _DetailNormalMapScale;
+                float _Surface;
+            CBUFFER_END
+            
+                float4 _SSSScatteringColor;
+                float _SSSScatteringScale;
+
+            TEXTURE2D(_BaseMap);
+            SAMPLER(sampler_BaseMap);
+            TEXTURE2D(_BumpMap);
+            SAMPLER(sampler_BumpMap);
+            TEXTURE2D(_EmissionMap);
+            SAMPLER(sampler_EmissionMap);
+
+
+            TEXTURE2D(_ParallaxMap);
+            SAMPLER(sampler_ParallaxMap);
+            TEXTURE2D(_OcclusionMap);
+            SAMPLER(sampler_OcclusionMap);
+            TEXTURE2D(_DetailMask);
+            SAMPLER(sampler_DetailMask);
+            TEXTURE2D(_DetailAlbedoMap);
+            SAMPLER(sampler_DetailAlbedoMap);
+            TEXTURE2D(_DetailNormalMap);
+            SAMPLER(sampler_DetailNormalMap);
+            TEXTURE2D(_MetallicGlossMap);
+            SAMPLER(sampler_MetallicGlossMap);
+            TEXTURE2D(_SpecGlossMap);
+            SAMPLER(sampler_SpecGlossMap);
+            TEXTURE2D(_ClearCoatMap);
+            SAMPLER(sampler_ClearCoatMap);
+
+
+            #include "Assets/Shaders/Include/Shared.hlsl"
+            #include "Assets/Shaders/Include/Payload.hlsl"
+
+            #pragma shader_feature_local_raytracing _EMISSION
+            #pragma shader_feature_local_raytracing _NORMALMAP
+            #pragma shader_feature_local_raytracing _METALLICSPECGLOSSMAP
+            #pragma shader_feature_local_raytracing _SURFACE_TYPE_TRANSPARENT
+            #pragma shader_feature_local_raytracing _SSS
+            #pragma shader_feature_local_raytracing _SKINNEDMESH
+
+            #pragma multi_compile_local RAY_TRACING_PROCEDURAL_GEOMETRY
+
+            #pragma raytracing test
+            #pragma enable_d3d11_debug_symbols
+            #pragma use_dxc
+            #pragma enable_ray_tracing_shader_debug_symbols
+            #pragma require Native16Bit
+            #pragma require int64
+
+            #include "Assets/Shaders/Include/SurfaceRayTracingCommon.hlsl"
+
+            [shader("anyhit")]
+            void AnyHitMain(inout LightPayload payload, AttributeData attribs)
+            {
+                #if _SURFACE_TYPE_TRANSPARENT
+                // if (payload.Has(FLAG_IGNORE_WHEN_TRANSPARENT))
+                {
+                    IgnoreHit();
+                }
+                #else
+                // 1. 获取顶点索引
+                uint3 triangleIndices = UnityRayTracingFetchTriangleIndices(PrimitiveIndex());
+
+                // 2. 获取三个顶点的 UV（为了性能，AnyHit 通常只取 UV，不计算法线等复杂属性）
+                float2 uv0 = UnityRayTracingFetchVertexAttribute2(triangleIndices.x, kVertexAttributeTexCoord0);
+                float2 uv1 = UnityRayTracingFetchVertexAttribute2(triangleIndices.y, kVertexAttributeTexCoord0);
+                float2 uv2 = UnityRayTracingFetchVertexAttribute2(triangleIndices.z, kVertexAttributeTexCoord0);
+
+                // 3. 计算插值 UV
+                float3 barycentricCoords = float3(1.0 - attribs.barycentrics.x - attribs.barycentrics.y,
+                                                  attribs.barycentrics.x, attribs.barycentrics.y);
+                float2 uv = uv0 * barycentricCoords.x + uv1 * barycentricCoords.y + uv2 * barycentricCoords.z;
+
+                // 4. 采样 Alpha 通道
+                // 注意：在 AnyHit 中采样通常使用 SampleLevel 0 以保证性能，或者根据 RayT 计算一个近似 Mip
+                float4 baseColor = _BaseMap.SampleLevel(sampler_BaseMap, _BaseMap_ST.xy * uv + _BaseMap_ST.zw, 0);
+                float alpha = baseColor.a * _BaseColor.a;
+
+                // 5. Alpha Test 判定
+                // 如果透明度小于阈值，则调用 IgnoreHit()，光线将忽略此次相交
+                if (alpha < _Cutoff)
+                {
+                    IgnoreHit();
+                }
+                #endif
+            }
+
+            [shader("closesthit")]
+            void ClosestHitMain(inout LightPayload payload : SV_RayPayload, AttributeData attribs : SV_IntersectionAttributes)
+            {
+                // Instance
+                payload.instanceIndex = (InstanceID() + GeometryIndex());
+                
+                #if _EMISSION
+                payload.primitiveIndex = PrimitiveIndex();
+                #else
+                payload.primitiveIndex = INF;
+                #endif
+                
+                payload.barycentrics = attribs.barycentrics;
+            }
+            ENDHLSL
+        }
     }
     FallBack "Hidden/Universal Render Pipeline/FallbackError"
     CustomEditor "LitRayTracingShader"

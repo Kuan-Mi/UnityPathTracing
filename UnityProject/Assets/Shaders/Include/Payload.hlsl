@@ -46,3 +46,15 @@ struct MainRayPayload
         return (instanceIndexAndFlags & INSTANCE_INDEX_MASK);
     }
 };
+
+struct LightPayload
+{
+    uint instanceIndex;
+    uint primitiveIndex; // 命中的三角形索引
+    float2 barycentrics; // 命中的三角形的重心坐标（uv）
+
+    bool IsMiss()
+    {
+        return instanceIndex == INF;
+    }
+};

@@ -113,17 +113,6 @@ float2 GetConeAngleFromRoughness(float mip, float roughness)
 }
 
 [shader("miss")]
-void MainMissShader(inout MainRayPayload payload : SV_RayPayload)
-{
-    payload.hitT = INF;
-    float3 ray = WorldRayDirection();
-    // payload.X = WorldRayOrigin() + ray * payload.hitT;
-    payload.Xprev = WorldRayOrigin() + ray * payload.hitT;
-
-    payload.Lemi = Packing::EncodeRgbe(GetSkyIntensity(ray));
-}
-
-[shader("miss")]
 void LightMissShader(inout LightPayload payload : SV_RayPayload)
 {
     payload.instanceIndex = INF;
@@ -148,7 +137,7 @@ uint ToRayFlag2(uint flag)
 }
 
 
-float CastVisibilityRay_AnyHit(float3 origin, float3 direction, float Tmin, float Tmax, float2 mipAndCone, RaytracingAccelerationStructure accelerationStructure, uint mask, uint rayFlags)
+bool CastVisibilityRay_AnyHit(float3 origin, float3 direction, float Tmin, float Tmax, float2 mipAndCone, RaytracingAccelerationStructure accelerationStructure, uint mask, uint rayFlags)
 {
     RayDesc rayDesc;
     rayDesc.Origin = origin;
@@ -156,18 +145,17 @@ float CastVisibilityRay_AnyHit(float3 origin, float3 direction, float Tmin, floa
     rayDesc.TMin = Tmin;
     rayDesc.TMax = Tmax;
 
-    MainRayPayload payload = (MainRayPayload)0;
-    payload.mipAndCone = mipAndCone;
+    LightPayload payload = (LightPayload)0;
 
     uint flag = ToRayFlag2(mask);
     flag = flag | RAY_FLAG_SKIP_CLOSEST_HIT_SHADER | RAY_FLAG_ACCEPT_FIRST_HIT_AND_END_SEARCH;
 
     TraceRay(accelerationStructure, flag, mask, 0, 1, 0, rayDesc, payload);
 
-    return payload.hitT;
+    return payload.IsMiss();
 }
 
-void CastRay(float3 origin, float3 direction, float Tmin, float Tmax, float2 mipAndCone, uint mask, out GeometryProps props, out MaterialProps matProps)
+LightPayload CastRayForLight(float3 origin, float3 direction, float Tmin, float Tmax, uint mask)
 {
     RayDesc rayDesc;
     rayDesc.Origin = origin;
@@ -175,85 +163,19 @@ void CastRay(float3 origin, float3 direction, float Tmin, float Tmax, float2 mip
     rayDesc.TMin = Tmin;
     rayDesc.TMax = Tmax;
 
-    MainRayPayload payload = (MainRayPayload)0;
-    payload.mipAndCone = mipAndCone;
-
-    if (mask == FLAG_NON_TRANSPARENT)
-        payload.SetFlag(FLAG_IGNORE_WHEN_TRANSPARENT);
+    LightPayload payload = (LightPayload)0;
+    payload.instanceIndex = INF;
 
     TraceRay(gWorldTlas, ToRayFlag2(mask), mask, 0, 1, 0, rayDesc, payload);
 
-    props = (GeometryProps)0;
-    props.hitT = payload.hitT;
-    props.instanceIndex = payload.GetInstanceIndex();
-    props.N = Packing::DecodeUnitVector(payload.N);
-    props.curvature = payload.curvature;
-
-    props.mip = payload.mipAndCone.x;
-
-    props.T = payload.T;
-    props.X = origin + direction * payload.hitT;
-
-    props.Xprev = payload.Xprev;
-
-    if (gIsEditor)
-    {
-        props.Xprev = props.X;
-    }
-
-    props.V = -direction;
-    props.textureOffsetAndFlags = payload.instanceIndexAndFlags;
-    props.primitiveIndex = payload.primitiveIndex;
-    props.barycentrics = payload.barycentrics;
-
-    matProps = (MaterialProps)0;
-    matProps.baseColor = Packing::UintToRgba(payload.baseColor, 8, 8, 8, 8).xyz;
-
-    float2 rAm = Packing::UintToRg16f(payload.roughnessAndMetalness);
-    matProps.roughness = rAm.r;
-    matProps.metalness = rAm.g;
-
-    if (props.Has(FLAG_SKIN))
-    {
-        matProps.scatteringColor = Packing::DecodeRgbe(payload.Lemi);
-        matProps.Lemi = 0;
-    }
-    else
-    {
-        matProps.Lemi = Packing::DecodeRgbe(payload.Lemi);
-    }
-
-    // 这三个应该从贴图再计算一次
-    matProps.curvature = payload.curvature;
-    matProps.N = Packing::DecodeUnitVector(payload.matN);
-    matProps.T = payload.T.xyz;
+    return payload;
 }
 
-#include "DirectionalLights.hlsl"
-#include "SpotLights.hlsl"
-#include "AreaLights.hlsl"
-#include "PointLights.hlsl"
 
 // Compile-time flags for "GetLighting"
 #define LIGHTING    0x01
 #define SHADOW      0x02
 #define SSS         0x04
-
-float3 GetLighting(GeometryProps geometryProps, MaterialProps materialProps, uint flags)
-{
-    float3 lighting = 0.0;
-
-    if ((flags & LIGHTING) != 0)
-    {
-        bool isSSS = (flags & SSS) != 0 && geometryProps.Has(FLAG_SKIN);
-        lighting += EvaluateDirectionalLights(geometryProps, materialProps, isSSS);
-        lighting += EvaluateSpotLights(geometryProps, materialProps, isSSS);
-        lighting += EvaluateAreaLights(geometryProps, materialProps, isSSS);
-        lighting += EvaluatePointLights(geometryProps, materialProps, isSSS);
-    }
-
-    return lighting;
-}
 
 // Compile-time flags for "GenerateRayAndUpdateThroughput"
 #define HAIR 0x1

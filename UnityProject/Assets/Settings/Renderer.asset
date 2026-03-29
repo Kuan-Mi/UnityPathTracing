@@ -23,11 +23,11 @@ MonoBehaviour:
     gShowLight: 0
     initialSamplingParams:
       numPrimaryLocalLightSamples: 8
-      numPrimaryInfiniteLightSamples: 0
-      numPrimaryEnvironmentSamples: 0
+      numPrimaryInfiniteLightSamples: 1
+      numPrimaryEnvironmentSamples: 1
       numPrimaryBrdfSamples: 1
       brdfCutoff: 0.0001
-      enableInitialVisibility: 1
+      enableInitialVisibility: 0
       environmentMapImportanceSampling: 0
       localLightSamplingMode: 2
     temporalResamplingParams:
@@ -64,9 +64,9 @@ MonoBehaviour:
     regirDynamicParams:
       regirCellSize: 1
       center:
-        x: 16.150023
-        y: 6.5580454
-        z: 0.17188549
+        x: 15.138254
+        y: 11.790981
+        z: 5.9830174
       fallbackSamplingMode: 1
       presamplingMode: 1
       regirSamplingJitter: 1
@@ -74,9 +74,9 @@ MonoBehaviour:
     showReGIRCell: 0
     prepareLight: 1
     enableFinalShading: 1
-    enableEnv: 0
+    enableEnv: 1
     sunAngularDiameter: 0.533
-    exposureEv: 7.06
+    exposureEv: 0.45
     upscalerMode: 0
     mipBias: -0.5
     tracingMode: 1

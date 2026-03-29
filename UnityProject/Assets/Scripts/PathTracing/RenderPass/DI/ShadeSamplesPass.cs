@@ -80,7 +80,7 @@ namespace PathTracing
             var resource = data.Resource;
             var settings = data.Settings;
 
-            natCmd.SetRayTracingShaderPass(data.OpaqueTs, "Test2");
+            natCmd.SetRayTracingShaderPass(data.OpaqueTs, "RTXDI");
             natCmd.SetRayTracingConstantBufferParam(data.OpaqueTs, paramsID, resource.ConstantBuffer, 0, resource.ConstantBuffer.stride);
             natCmd.SetRayTracingBufferParam(data.OpaqueTs, "ResampleConstants", resource.ResamplingConstantBuffer);
             natCmd.SetRayTracingBufferParam(data.OpaqueTs, "t_GeometryInstanceToLight", resource.t_GeometryInstanceToLight);

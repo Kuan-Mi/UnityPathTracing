@@ -19,9 +19,9 @@ bool GetFinalVisibility(RAB_Surface surface,float3 samplePosition)
     float offset = 0.001;
     float TMax = length(L) - offset;
     
-    float hitT = CastVisibilityRay_AnyHit( surface.worldPos, normalize(L), 0.001, TMax, float2(0,0), gWorldTlas,FLAG_NON_TRANSPARENT,0);
+    bool visibility = CastVisibilityRay_AnyHit( surface.worldPos, normalize(L), 0.001, TMax, float2(0,0), gWorldTlas,FLAG_NON_TRANSPARENT,0);
 
-    return  hitT == INF;
+    return  visibility;
 }
 // Tests the visibility between a surface and a light sample.
 // Returns true if there is nothing between them.
@@ -32,9 +32,9 @@ bool RAB_GetConservativeVisibility(RAB_Surface surface, RAB_LightSample lightSam
     float offset = 0.001;
     float TMax = length(L) - offset;
     
-    float hitT = CastVisibilityRay_AnyHit( surface.worldPos, normalize(L), 0.001, TMax, float2(0,0), gWorldTlas,FLAG_NON_TRANSPARENT,0);
+    bool visibility = CastVisibilityRay_AnyHit( surface.worldPos, normalize(L), 0.001, TMax, float2(0,0), gWorldTlas,FLAG_NON_TRANSPARENT,0);
 
-    return  hitT == INF;
+    return  visibility;
     
     // RayDesc ray = setupVisibilityRay(surface, lightSample);
     //
@@ -69,9 +69,9 @@ bool RAB_GetConservativeVisibility(RAB_Surface surface, float3 samplePosition)
     float offset = 0.001;
     float TMax = length(L) - offset;
     
-    float hitT = CastVisibilityRay_AnyHit( surface.worldPos, normalize(L), 0.001, TMax, float2(0,0), gWorldTlas,FLAG_NON_TRANSPARENT,0);
+    bool visibility = CastVisibilityRay_AnyHit( surface.worldPos, normalize(L), 0.001, TMax, float2(0,0), gWorldTlas,FLAG_NON_TRANSPARENT,0);
 
-    return  hitT == INF;
+    return  visibility;
 }
 
 //与 RAB_GetConservativeVisibility 相同的可见性光线追踪，但适用于源自上一帧的表面和光样本。

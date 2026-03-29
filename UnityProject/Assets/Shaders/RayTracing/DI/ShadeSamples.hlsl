@@ -129,9 +129,11 @@ void MainRayGenShader()
 
             // currLuminance = float2(calcLuminance(diffuse * surface.material.diffuseAlbedo), calcLuminance(specular));
 
-            specular = DemodulateSpecular(surface.material.specularF0, specular);
+            // specular = DemodulateSpecular(surface.material.specularF0, specular);
 
-            float3 finalColor = ShadeSurfaceWithLightSample(lightSample, surface) * RTXDI_GetDIReservoirInvPdf(reservoir);
+            // float3 finalColor = ShadeSurfaceWithLightSample(lightSample, surface) * RTXDI_GetDIReservoirInvPdf(reservoir);
+            
+            float3 finalColor = (diffuse * surface.material.diffuseAlbedo) + specular;
             
             finalColor += gIn_EmissiveLighting[pixelPosition];
             finalColor *= gExposure;
@@ -140,10 +142,10 @@ void MainRayGenShader()
 
             // gOut_DirectLighting[pixelPosition] = diffuse + specular;
 
-            // if (needToStore)
-            // {
-            //     RTXDI_StoreDIReservoir(reservoir, g_Const.restirDI.reservoirBufferParams, pixelPosition, g_Const.restirDI.bufferIndices.shadingInputBufferIndex);
-            // }
+            if (needToStore)
+            {
+                RTXDI_StoreDIReservoir(reservoir, g_Const.restirDI.reservoirBufferParams, pixelPosition, g_Const.restirDI.bufferIndices.shadingInputBufferIndex);
+            }
         }
         else
         {
@@ -252,16 +254,16 @@ void MainRayGenShader()
         gOut_DirectLighting[pixelPosition] = visualize;
     }
 
-
-    RAB_LightSample lightSample;
-
-    lightSample.position = float3(0, 1, 0);
-    lightSample.normal = float3(0, -1, 0);
-    lightSample.radiance = float3(1, 1, 1);
-    lightSample.solidAnglePdf = 0.5;
-
-
-    float pdf_for_surface = RAB_GetLightSampleTargetPdfForSurface(lightSample, surface);
+    //
+    // RAB_LightSample lightSample;
+    //
+    // lightSample.position = float3(0, 1, 0);
+    // lightSample.normal = float3(0, -1, 0);
+    // lightSample.radiance = float3(1, 1, 1);
+    // lightSample.solidAnglePdf = 0.5;
+    //
+    //
+    // float pdf_for_surface = RAB_GetLightSampleTargetPdfForSurface(lightSample, surface);
 
 
     // gOut_DirectLighting[pixelPosition] = pdf_for_surface;

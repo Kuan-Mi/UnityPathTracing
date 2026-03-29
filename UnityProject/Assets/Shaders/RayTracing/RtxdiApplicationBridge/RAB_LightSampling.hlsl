@@ -175,18 +175,15 @@ bool RAB_TraceRayForLocalLight(float3 origin, float3 direction, float tMin, floa
     o_lightIndex = RTXDI_InvalidLightIndex;
     o_randXY = 0;
 
+    LightPayload payload = CastRayForLight(origin, direction, tMin, tMax,  FLAG_NON_TRANSPARENT);
 
-    GeometryProps geometryProps0;
-    MaterialProps materialProps0;
-    CastRay(origin, direction, tMin, tMax, GetConeAngleFromRoughness(0.0, 0.0), FLAG_NON_TRANSPARENT, geometryProps0, materialProps0);
-
-    bool hitAnything = !geometryProps0.IsMiss();
+    bool hitAnything = !payload.IsMiss();
     if (hitAnything)
     {
-        o_lightIndex = getLightIndex(geometryProps0.instanceIndex, 0, geometryProps0.primitiveIndex);
+        o_lightIndex = getLightIndex(payload.instanceIndex, 0, payload.primitiveIndex);
         if (o_lightIndex != RTXDI_InvalidLightIndex)
         {
-            float2 hitUV = geometryProps0.barycentrics;
+            float2 hitUV = payload.barycentrics;
             o_randXY = randomFromBarycentric(hitUVToBarycentric(hitUV));
         }
     }
