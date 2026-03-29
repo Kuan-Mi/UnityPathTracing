@@ -86,6 +86,7 @@ namespace PathTracing
         public bool showReGIRCell;
         public bool prepareLight;
         public bool enableFinalShading;
+        public bool enableEnv;
         
         [FoldoutHeader("Base Settings")]
         [Range(0.001f, 10f)]

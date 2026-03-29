@@ -158,7 +158,7 @@ namespace RTXDI
 
         // public uint numLights => emissiveTriangleCount + otherLocalLightCount + infiniteLightCount;
         public uint maxLocalLights => emissiveTriangleCount + otherLocalLightCount;
-        
+
         // public uint instanceCount;
 
         private uint GetTextureGroupIndex(Material mat)
@@ -217,7 +217,7 @@ namespace RTXDI
             _sceneTopologyDirty = true;
         }
 
-        public void Build(RayTracingAccelerationStructure ras)
+        public void Build(RayTracingAccelerationStructure ras, bool enableEnv)
         {
             // 收集场景内所有启用的点光源，打包成 PolymorphicLightInfo，追加在三角面光之后
             var currentLights = Object.FindObjectsByType<Light>(FindObjectsSortMode.None)
@@ -230,6 +230,9 @@ namespace RTXDI
             otherLocalLightCount = (uint)otherLocalLights.Count;
             infiniteLightCount = (uint)infiniteLights.Count;
 
+            // env
+            if (enableEnv)
+                infiniteLightCount += 1;
 
             if (_sceneTopologyDirty)
             {
@@ -241,8 +244,7 @@ namespace RTXDI
             {
                 UpdateTransformsOnly();
             }
-            
-            
+
             RtxdiUtils.ComputePdfTextureSize(maxLocalLights, out uint texWidth, out uint texHeight, out uint mipLevels);
 
             if ((localLightPdfTextureSize.x != texWidth || localLightPdfTextureSize.y != texHeight))
@@ -274,6 +276,23 @@ namespace RTXDI
             if (infiniteLightCount > 0)
             {
                 var infiniteLightsInfos = infiniteLights.Select(PackLightInfo).ToArray();
+
+
+                if (enableEnv)
+                {
+                    var envLightInfo = new PolymorphicLightInfo();
+
+                    envLightInfo.SetColorAndType(Color.white, PolymorphicLightType.kEnvironment);
+                    // textureIndex
+                    envLightInfo.direction1 = 0;
+                    envLightInfo.direction2 = 2048 | (1024 << 16);
+                    envLightInfo.scalars = Fp32ToFp16(0);
+
+
+                    infiniteLightsInfos = infiniteLightsInfos.Append(envLightInfo).ToArray();
+                }
+
+
                 _lightInfoBuffer.SetData(infiniteLightsInfos, 0, (int)(emissiveTriangleCount + otherLocalLightCount), (int)infiniteLightCount);
             }
         }
@@ -365,8 +384,7 @@ namespace RTXDI
 
 
             emissiveTriangleCount = (uint)primitiveDataList.Count;
- 
-            
+
 
             // Debug.Log($"BuildFull completed: {instanceDataList.Count} instances, {primitiveDataList.Count} primitives, {globalTexturePool.Count} unique emissive textures.");
         }
@@ -784,7 +802,7 @@ namespace RTXDI
         public RTXDI_LightBufferParameters GetLightBufferParameters()
         {
             RTXDI_LightBufferParameters parameters = new RTXDI_LightBufferParameters();
-            
+
             parameters.localLightBufferRegion.firstLightIndex = 0;
             parameters.localLightBufferRegion.numLights = maxLocalLights;
 
@@ -794,7 +812,7 @@ namespace RTXDI
             parameters.environmentLightParams.lightPresent = 0;
             parameters.environmentLightParams.lightIndex = (0xffffffffu);
 
-            
+
             return parameters;
         }
     }

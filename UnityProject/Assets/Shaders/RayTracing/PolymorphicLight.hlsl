@@ -778,6 +778,8 @@ struct EnvironmentLight
             // Texture2D texture = t_BindlessTextures[textureIndex];
             Texture2D texture = _environmentMap;
             sampleRadiance *= texture.SampleLevel(ENVIRONMENT_SAMPLER, textureUV, 0).xyz;
+            
+            sampleRadiance = GetSkyIntensity(sampleDirection);
         }
 
         // Inf / NaN guard.

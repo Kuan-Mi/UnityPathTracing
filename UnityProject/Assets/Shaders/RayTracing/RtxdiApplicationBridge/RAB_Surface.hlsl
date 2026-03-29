@@ -29,7 +29,7 @@ struct RAB_Surface
 RAB_Surface RAB_EmptySurface()
 {
     RAB_Surface surface = (RAB_Surface)0;
-    surface.viewDepth = BACKGROUND_DEPTH;
+    surface.viewDepth = -BACKGROUND_DEPTH;
     return surface;
 }
 
@@ -37,7 +37,7 @@ RAB_Surface RAB_EmptySurface()
 // 测试所提供的表面是否包含有效的几何图形。如果表面是从超出边界的像素加载的，或者是从包含天空或其他背景的像素加载的，则此函数应返回 false 。
 bool RAB_IsSurfaceValid(RAB_Surface surface)
 {
-    return surface.viewDepth != BACKGROUND_DEPTH;
+    return surface.viewDepth != -BACKGROUND_DEPTH;
 }
 
 // 获取表面的世界空间位置。

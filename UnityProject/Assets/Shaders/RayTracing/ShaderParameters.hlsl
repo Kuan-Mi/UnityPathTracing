@@ -13,7 +13,7 @@
 #include <Assets/Shaders/Rtxdi/ReGIR/ReGIRParameters.h>
 
 
-#define BACKGROUND_DEPTH 65504.f
+#define BACKGROUND_DEPTH INF
 
 
 struct ResamplingConstants

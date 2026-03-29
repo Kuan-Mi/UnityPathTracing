@@ -326,7 +326,7 @@ namespace PathTracing
             if (eyeIndex == 1)
                 return;
 
-            _gpuScene.Build(_accelerationStructure);
+            _gpuScene.Build(_accelerationStructure,pathTracingSetting.enableEnv);
             // _gpuScene.UpdateInstanceID(_accelerationStructure);
 
             Shader.SetGlobalRayTracingAccelerationStructure(g_AccelStructID, _accelerationStructure);

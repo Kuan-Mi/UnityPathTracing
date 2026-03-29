@@ -241,7 +241,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 1
+  m_IsActive: 0
 --- !u!65 &255795358
 BoxCollider:
   m_ObjectHideFlags: 0
@@ -1577,7 +1577,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 1
+  m_IsActive: 0
 --- !u!114 &1425976086
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -2066,6 +2066,7 @@ GameObject:
   - component: {fileID: 2135674573}
   - component: {fileID: 2135674572}
   - component: {fileID: 2135674574}
+  - component: {fileID: 2135674575}
   m_Layer: 0
   m_Name: Directional Light
   m_TagString: Untagged
@@ -2083,8 +2084,8 @@ Light:
   m_Enabled: 1
   serializedVersion: 12
   m_Type: 1
-  m_Color: {r: 1, g: 1, b: 1, a: 1}
-  m_Intensity: 5.23
+  m_Color: {r: 1.2372451, g: 1.1504098, b: 1.0072685, a: 1}
+  m_Intensity: 1
   m_Range: 10
   m_SpotAngle: 30
   m_InnerSpotAngle: 21.80208
@@ -2126,7 +2127,7 @@ Light:
   m_Lightmapping: 4
   m_LightShadowCasterMode: 0
   m_AreaSize: {x: 1, y: 1}
-  m_BounceIntensity: 6.45
+  m_BounceIntensity: 1
   m_ColorTemperature: 6570
   m_UseColorTemperature: 0
   m_BoundingSphereOverride: {x: 0, y: 0, z: 0, w: 0}
@@ -2146,13 +2147,13 @@ Transform:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 2135674571}
   serializedVersion: 2
-  m_LocalRotation: {x: 0.31715202, y: -0.23275957, z: 0.24697407, w: 0.88557404}
+  m_LocalRotation: {x: -0.60533327, y: -0.60091925, z: 0.06577984, w: -0.51782304}
   m_LocalPosition: {x: 2.368456, y: 0.31057167, z: 2.9381924}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
   m_Father: {fileID: 0}
-  m_LocalEulerAnglesHint: {x: -317.414, y: -20.313, z: 383.178}
+  m_LocalEulerAnglesHint: {x: -315.092, y: -230.02, z: 428.594}
 --- !u!114 &2135674574
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -2182,6 +2183,20 @@ MonoBehaviour:
   m_ShadowLayerMask: 1
   m_RenderingLayers: 1
   m_ShadowRenderingLayers: 1
+--- !u!114 &2135674575
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2135674571}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 1721113d7cbc47c494440938259e7e3b, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::DynamicSunIntensity
+  sunIntensityMultiplier: 1
+  gTanSunAngularRadius: 0.01
 --- !u!1001 &2146369701
 PrefabInstance:
   m_ObjectHideFlags: 0

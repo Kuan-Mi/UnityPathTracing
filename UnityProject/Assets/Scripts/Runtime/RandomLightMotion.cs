@@ -4,6 +4,7 @@
 
 using UnityEngine;
 
+[ExecuteAlways]
 public class RandomLightMotion : MonoBehaviour
 {
     // 由 Spawner 初始化——不在 Inspector 中直接编辑
@@ -32,7 +33,7 @@ public class RandomLightMotion : MonoBehaviour
 
         PickNewTarget();
     }
-
+ 
     private void Update()
     {
         if (spawnerTransform == null) return;

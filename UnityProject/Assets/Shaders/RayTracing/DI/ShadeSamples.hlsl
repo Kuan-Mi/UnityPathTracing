@@ -116,34 +116,50 @@ void MainRayGenShader()
     float2 currLuminance = 0;
 
 
-    if (RTXDI_IsValidDIReservoir(reservoir))
+    // if (RAB_IsSurfaceValid(surface))
     {
-        RAB_LightInfo lightInfo = RAB_LoadLightInfo(RTXDI_GetDIReservoirLightIndex(reservoir), false);
+        if (RTXDI_IsValidDIReservoir(reservoir))
+        {
+            RAB_LightInfo lightInfo = RAB_LoadLightInfo(RTXDI_GetDIReservoirLightIndex(reservoir), false);
 
-        RAB_LightSample lightSample = RAB_SamplePolymorphicLight(lightInfo, surface, RTXDI_GetDIReservoirSampleUV(reservoir));
+            RAB_LightSample lightSample = RAB_SamplePolymorphicLight(lightInfo, surface, RTXDI_GetDIReservoirSampleUV(reservoir));
 
-        bool needToStore = ShadeSurfaceWithLightSample(reservoir, surface, lightSample,
-                                                       /* previousFrameTLAS = */ false, /* enableVisibilityReuse = */ true, diffuse, specular, lightDistance);
+            bool needToStore = ShadeSurfaceWithLightSample(reservoir, surface, lightSample,
+                                                           /* previousFrameTLAS = */ false, /* enableVisibilityReuse = */ true, diffuse, specular, lightDistance);
 
-        // currLuminance = float2(calcLuminance(diffuse * surface.material.diffuseAlbedo), calcLuminance(specular));
+            // currLuminance = float2(calcLuminance(diffuse * surface.material.diffuseAlbedo), calcLuminance(specular));
 
-        specular = DemodulateSpecular(surface.material.specularF0, specular);
+            specular = DemodulateSpecular(surface.material.specularF0, specular);
 
-        float3 finalColor = ShadeSurfaceWithLightSample(lightSample, surface) * RTXDI_GetDIReservoirInvPdf(reservoir);
-        gOut_DirectLighting[pixelPosition] = finalColor + gIn_EmissiveLighting[pixelPosition];
+            float3 finalColor = ShadeSurfaceWithLightSample(lightSample, surface) * RTXDI_GetDIReservoirInvPdf(reservoir);
+            
+            finalColor += gIn_EmissiveLighting[pixelPosition];
+            finalColor *= gExposure;
+            
+            gOut_DirectLighting[pixelPosition] =finalColor;
 
-        // gOut_DirectLighting[pixelPosition] = diffuse + specular;
+            // gOut_DirectLighting[pixelPosition] = diffuse + specular;
 
-        // if (needToStore)
-        // {
-        //     RTXDI_StoreDIReservoir(reservoir, g_Const.restirDI.reservoirBufferParams, pixelPosition, g_Const.restirDI.bufferIndices.shadingInputBufferIndex);
-        // }
+            // if (needToStore)
+            // {
+            //     RTXDI_StoreDIReservoir(reservoir, g_Const.restirDI.reservoirBufferParams, pixelPosition, g_Const.restirDI.bufferIndices.shadingInputBufferIndex);
+            // }
+        }
+        else
+        {
+            float3 finalColor = 0;
+            finalColor += gIn_EmissiveLighting[pixelPosition];
+            finalColor *= gExposure;
+            
+            gOut_DirectLighting[pixelPosition] = finalColor;
+        }
     }
-    else
-    {
-        gOut_DirectLighting[pixelPosition] = float3(0, 0, 0) + gIn_EmissiveLighting[pixelPosition];
-    }
-
+    // else
+    // {
+    //     gOut_DirectLighting[pixelPosition] = float3(1, 0, 0);
+    // }
+    
+    
     // uint tileSize = g_Const.localLightsRISBufferSegmentParams.tileSize; // 通常是 128 或 256
     // uint tileCount = g_Const.localLightsRISBufferSegmentParams.tileCount;
     //
@@ -235,19 +251,19 @@ void MainRayGenShader()
         float3 visualize = RTXDI_VisualizeReGIRCells(g_Const.regir, surface.worldPos);
         gOut_DirectLighting[pixelPosition] = visualize;
     }
-    
-    
+
+
     RAB_LightSample lightSample;
-    
-    lightSample.position = float3(0,1,0);
-    lightSample.normal = float3(0,-1,0);
-    lightSample.radiance = float3(1,1,1);
+
+    lightSample.position = float3(0, 1, 0);
+    lightSample.normal = float3(0, -1, 0);
+    lightSample.radiance = float3(1, 1, 1);
     lightSample.solidAnglePdf = 0.5;
-    
-    
-    float pdf_for_surface = RAB_GetLightSampleTargetPdfForSurface(lightSample,surface);
-    
-    
+
+
+    float pdf_for_surface = RAB_GetLightSampleTargetPdfForSurface(lightSample, surface);
+
+
     // gOut_DirectLighting[pixelPosition] = pdf_for_surface;
 
     //

@@ -7,6 +7,7 @@ using System.Collections.Generic;
 using UnityEngine;
 
 [DisallowMultipleComponent]
+[ExecuteAlways]
 public class RandomLightSpawner : MonoBehaviour
 {
     [Header("生成数量")]
@@ -111,6 +112,8 @@ public class RandomLightSpawner : MonoBehaviour
 
             if (type == LightType.Point || type == LightType.Spot)
             {
+                light.innerSpotAngle = 50;
+                light.spotAngle      = 60;
                 var ptData = go.AddComponent<PathTracingAdditionalLightData>();
                 ptData.radius = Random.Range(minLightRadius, maxLightRadius);
             }
