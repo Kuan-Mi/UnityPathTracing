@@ -1,5 +1,3 @@
-#pragma max_recursion_depth 1
-
 #include "../RtxdiApplicationBridge/RtxdiApplicationBridge.hlsl"
 #include "Assets/Shaders/RTXDI/DI/InitialSampling.hlsl"
 

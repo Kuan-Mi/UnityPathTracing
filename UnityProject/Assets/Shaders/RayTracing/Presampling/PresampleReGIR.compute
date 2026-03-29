@@ -3,7 +3,7 @@
 #pragma only_renderers   d3d11
 #pragma use_dxc
 #pragma target 6.0
-#pragma enable_d3d11_debug_symbols
+// #pragma enable_d3d11_debug_symbols
 
 #define RTXDI_RIS_BUFFER u_RisBuffer
 

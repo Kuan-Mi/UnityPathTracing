@@ -180,7 +180,7 @@ Shader "RayTracing/Lit"
             #pragma multi_compile_local RAY_TRACING_PROCEDURAL_GEOMETRY
 
             #pragma raytracing test
-            #pragma enable_d3d11_debug_symbols
+            // #pragma enable_d3d11_debug_symbols
             #pragma use_dxc
             #pragma enable_ray_tracing_shader_debug_symbols
             #pragma require Native16Bit
@@ -428,9 +428,9 @@ Shader "RayTracing/Lit"
             #pragma multi_compile_local RAY_TRACING_PROCEDURAL_GEOMETRY
 
             #pragma raytracing test
-            #pragma enable_d3d11_debug_symbols
+            // #pragma enable_d3d11_debug_symbols
             #pragma use_dxc
-            #pragma enable_ray_tracing_shader_debug_symbols
+            // #pragma enable_ray_tracing_shader_debug_symbols
             #pragma require Native16Bit
             #pragma require int64
 
