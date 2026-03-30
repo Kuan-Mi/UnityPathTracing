@@ -90,7 +90,7 @@ int RTXDI_ReGIR_WorldPosToCellIndex(ReGIR_Parameters params, float3 worldPos)
     ReGIR_OnionLayerGroup layerGroup;
 
     int layerGroupIndex;
-    for (layerGroupIndex = 0; layerGroupIndex < params.onionParams.numLayerGroups; layerGroupIndex++)
+    for (layerGroupIndex = 0; layerGroupIndex < 5; layerGroupIndex++)
     {
         if (r <= params.onionParams.layers[layerGroupIndex].outerRadius)
         {
@@ -146,7 +146,7 @@ bool RTXDI_ReGIR_CellIndexToWorldPos(ReGIR_Parameters params, int cellIndex, out
     cellIndex -= 1;
 
     int layerGroupIndex;
-    for (layerGroupIndex = 0; layerGroupIndex < params.onionParams.numLayerGroups; layerGroupIndex++)
+    for (layerGroupIndex = 0; layerGroupIndex < 5; layerGroupIndex++)
     {
         layerGroup = params.onionParams.layers[layerGroupIndex];
         int cellsPerGroup = layerGroup.cellsPerLayer * layerGroup.layerCount;

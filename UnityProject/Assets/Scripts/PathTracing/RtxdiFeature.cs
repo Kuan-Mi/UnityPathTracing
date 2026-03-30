@@ -307,11 +307,6 @@ namespace PathTracing
             _constantBuffer.SetData(_globalConstantsArray);
 
             resamplingConstants = GetResamplingConstants(isContext, rtxdiResources, frameState);
-
-            // var ss = resamplingConstants.ToString();
-            // Debug.Log($"Resampling Constants:\n{ss}");
-
-
             _resamplingConstantsArray[0] = resamplingConstants;
             _resamplingConstantBuffer.SetData(_resamplingConstantsArray);
 

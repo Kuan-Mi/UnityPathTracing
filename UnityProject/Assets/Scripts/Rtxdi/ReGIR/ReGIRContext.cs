@@ -60,7 +60,8 @@ namespace Rtxdi.ReGIR
         {
             return new ReGIRStaticParameters
             {
-                Mode = ReGIRMode.Onion,
+                // Mode = ReGIRMode.Onion,
+                Mode = ReGIRMode.Grid,
                 LightsPerCell = 512,
                 gridParameters = ReGIRGridStaticParameters.Default(),
                 onionParameters = ReGIROnionStaticParameters.Default(),

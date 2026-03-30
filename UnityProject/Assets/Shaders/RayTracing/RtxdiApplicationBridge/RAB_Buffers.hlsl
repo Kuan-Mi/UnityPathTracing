@@ -41,6 +41,8 @@ RWBuffer<uint2> u_RisBuffer;
 RWBuffer<uint4> u_RisLightDataBuffer;
 
 // Other
+// ConstantBuffer<ResamplingConstants> g_Const;
+
 RWStructuredBuffer<ResamplingConstants> ResampleConstants;
 #define g_Const ResampleConstants[0]
 

@@ -126,6 +126,7 @@ namespace Rtxdi.ReGIR
         }
     }
 
+    [System.Serializable]
     [StructLayout(LayoutKind.Sequential)]
     public struct ReGIR_Parameters
     {

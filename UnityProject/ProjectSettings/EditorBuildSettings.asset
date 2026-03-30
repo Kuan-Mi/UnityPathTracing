@@ -20,9 +20,12 @@ EditorBuildSettings:
   - enabled: 0
     path: "Assets/ART/\u5929\u7136\u6C14\u884C\u4E1A/Scenes/\u5929\u7136\u6C14\u884C\u4E1A\u6F14\u7EC3.unity"
     guid: 46290435bf4ca7542ab62b0389191e5c
-  - enabled: 1
+  - enabled: 0
     path: Assets/Arcade/Arcade.unity
     guid: d03bdcf0bbcbfca47840e76b073eba1a
+  - enabled: 1
+    path: Assets/Bistro_v5_2/Bistro 1.unity
+    guid: 3ca0e1da70a5ed948ba963b53c948da5
   m_configObjects:
     com.unity.input.settings.actions: {fileID: -944628639613478452, guid: 052faaac586de48259a63d0c4782560b, type: 3}
     com.unity.xr.management.loader_settings: {fileID: 11400000, guid: ef0ce46ed818dba47ac25c34755259b6, type: 2}
