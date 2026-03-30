@@ -36,18 +36,23 @@ namespace PathTracing
             internal GraphicsBuffer t_GeometryInstanceToLight;
 
 
-            internal RTHandle Mv;
-            internal RTHandle ViewZ;
-            internal RTHandle NormalRoughness;
-            internal RTHandle BaseColorMetalness;
-            internal RTHandle GeoNormal;
+            internal RTHandle Emissive;
+            
+            internal RTHandle ViewDepth;
+            internal RTHandle DiffuseAlbedo;
+            internal RTHandle SpecularRough;
+            internal RTHandle Normals;
+            internal RTHandle GeoNormals;
+            
+            
+            internal RTHandle PrevViewDepth;
+            internal RTHandle PrevDiffuseAlbedo;
+            internal RTHandle PrevSpecularRough;
+            internal RTHandle PrevNormals;
+            internal RTHandle PrevGeoNormals;
+
+            
             internal RTHandle DirectLighting;
-
-
-            internal RTHandle PrevViewZ;
-            internal RTHandle PrevNormalRoughness;
-            internal RTHandle PrevBaseColorMetalness;
-            internal RTHandle PrevGeoNormal;
 
             internal RtxdiResources RtxdiResources;
             internal Texture2D envTexture;
@@ -65,7 +70,6 @@ namespace PathTracing
             internal RayTracingShader OpaqueTs;
             internal Resource Resource;
             internal Settings Settings;
-            internal TextureHandle gIn_EmissiveLighting;
         }
 
         static void ExecutePass(PassData data, UnsafeGraphContext context)
@@ -90,25 +94,20 @@ namespace PathTracing
             natCmd.SetRayTracingBufferParam(data.OpaqueTs, u_LightReservoirsID, resource.RtxdiResources.LightReservoirBuffer);
 
 
-            natCmd.SetRayTracingTextureParam(data.OpaqueTs, g_MvID, resource.Mv);
-            natCmd.SetRayTracingTextureParam(data.OpaqueTs, g_ViewZID, resource.ViewZ);
-            natCmd.SetRayTracingTextureParam(data.OpaqueTs, g_Normal_RoughnessID, resource.NormalRoughness);
-            natCmd.SetRayTracingTextureParam(data.OpaqueTs, g_BaseColor_MetalnessID, resource.BaseColorMetalness);
-
             natCmd.SetRayTracingTextureParam(data.OpaqueTs, g_DirectLightingID, resource.DirectLighting);
-            natCmd.SetRayTracingTextureParam(data.OpaqueTs, "gIn_EmissiveLighting", data.gIn_EmissiveLighting);
-            natCmd.SetRayTracingTextureParam(data.OpaqueTs, "_environmentMap", resource.envTexture);
+            
+            natCmd.SetRayTracingTextureParam(data.OpaqueTs, "t_GBufferDepth", resource.ViewDepth);
+            natCmd.SetRayTracingTextureParam(data.OpaqueTs, "t_GBufferDiffuseAlbedo", resource.DiffuseAlbedo);
+            natCmd.SetRayTracingTextureParam(data.OpaqueTs, "t_GBufferSpecularRough", resource.SpecularRough);
+            natCmd.SetRayTracingTextureParam(data.OpaqueTs, "t_GBufferNormals", resource.Normals);
+            natCmd.SetRayTracingTextureParam(data.OpaqueTs, "t_GBufferGeoNormals", resource.GeoNormals);
+            
+            natCmd.SetRayTracingTextureParam(data.OpaqueTs, "gIn_EmissiveLighting", resource.Emissive);
+            
+            
 
-            natCmd.SetRayTracingTextureParam(data.OpaqueTs, gIn_PrevViewZID, resource.PrevViewZ);
-            natCmd.SetRayTracingTextureParam(data.OpaqueTs, gIn_PrevNormalRoughnessID, resource.PrevNormalRoughness);
-            natCmd.SetRayTracingTextureParam(data.OpaqueTs, gIn_PrevBaseColorMetalnessID, resource.PrevBaseColorMetalness);
 
 
-            natCmd.SetRayTracingTextureParam(data.OpaqueTs, "gOut_GeoNormal", resource.GeoNormal);
-            natCmd.SetRayTracingTextureParam(data.OpaqueTs, "gIn_PrevGeoNormal", resource.PrevGeoNormal);
-
-
-            natCmd.SetRayTracingTextureParam(data.OpaqueTs, "t_LocalLightPdfTexture", resource.RtxdiResources.Scene.localLightPdfTexture);
 
             natCmd.SetRayTracingBufferParam(data.OpaqueTs, "u_RisBuffer", resource.RtxdiResources.RisBuffer);
 
@@ -125,10 +124,15 @@ namespace PathTracing
 
             // 保存当帧 GBuffer 到 prev 纹理，供下一帧 RTXDI 时间复用读取
             natCmd.BeginSample(copyGBufferMarker);
-            natCmd.CopyTexture(resource.ViewZ, resource.PrevViewZ);
-            natCmd.CopyTexture(resource.NormalRoughness, resource.PrevNormalRoughness);
-            natCmd.CopyTexture(resource.BaseColorMetalness, resource.PrevBaseColorMetalness);
-            natCmd.CopyTexture(resource.GeoNormal, resource.PrevGeoNormal);
+            
+            
+            natCmd.CopyTexture(resource.ViewDepth, resource.PrevViewDepth);
+            natCmd.CopyTexture(resource.DiffuseAlbedo, resource.PrevDiffuseAlbedo);
+            natCmd.CopyTexture(resource.SpecularRough, resource.PrevSpecularRough);
+            natCmd.CopyTexture(resource.Normals, resource.PrevNormals);
+            natCmd.CopyTexture(resource.GeoNormals, resource.PrevGeoNormals);
+            
+            
             natCmd.EndSample(copyGBufferMarker);
         }
 
@@ -150,10 +154,10 @@ namespace PathTracing
             passData.Resource = _resource;
             passData.Settings = _settings;
 
-            var resourceData = frameData.Get<PTContextItem>();
-
-            passData.gIn_EmissiveLighting = resourceData.DirectEmission;
-
+            // var resourceData = frameData.Get<PTContextItem>();
+            //
+            // passData.gIn_EmissiveLighting = resourceData.DirectEmission;
+            //
 
             builder.AllowPassCulling(false);
             builder.SetRenderFunc((PassData data, UnsafeGraphContext context) => { ExecutePass(data, context); });

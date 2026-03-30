@@ -426,22 +426,18 @@ namespace PathTracing
                     ConstantBuffer = _constantBuffer,
                     ResamplingConstantBuffer = _resamplingConstantBuffer,
                     t_GeometryInstanceToLight = _gpuScene._geometryInstanceToLight,
+                    
+                    ViewDepth = pool.GetRT(RenderResourceType.RtxdiViewDepth),
+                    DiffuseAlbedo = pool.GetRT(RenderResourceType.RtxdiDiffuseAlbedo),
+                    SpecularRough = pool.GetRT(RenderResourceType.RtxdiSpecularRough),
+                    Normals = pool.GetRT(RenderResourceType.RtxdiNormals),
+                    GeoNormals = pool.GetRT(RenderResourceType.RtxdiGeoNormals),
 
-                    Mv = pool.GetRT(RenderResourceType.MV),
-                    ViewZ = pool.GetRT(RenderResourceType.Viewz),
-                    NormalRoughness = pool.GetRT(RenderResourceType.NormalRoughness),
-                    BaseColorMetalness = pool.GetRT(RenderResourceType.BasecolorMetalness),
-                    GeoNormal = pool.GetRT(RenderResourceType.GeoNormal),
-                    DirectLighting = pool.GetRT(RenderResourceType.DirectLighting),
-
-                    PrevViewZ = pool.GetRT(RenderResourceType.PrevViewZ),
-                    PrevNormalRoughness = pool.GetRT(RenderResourceType.PrevNormalRoughness),
-                    PrevBaseColorMetalness = pool.GetRT(RenderResourceType.PrevBaseColorMetalness),
-                    PrevGeoNormal = pool.GetRT(RenderResourceType.PrevGeoNormal),
+                    
+                    
                     u_LocalLightPdfTexture = _gpuScene.localLightPdfTexture,
 
                     RtxdiResources = rtxdiResources,
-                    envTexture = env
                 };
 
                 var gisSettings = new GenerateInitialSamplesPass.Settings
@@ -462,20 +458,25 @@ namespace PathTracing
                         ConstantBuffer = _constantBuffer,
                         ResamplingConstantBuffer = _resamplingConstantBuffer,
 
-                        Mv = pool.GetRT(RenderResourceType.MV),
-                        ViewZ = pool.GetRT(RenderResourceType.Viewz),
-                        NormalRoughness = pool.GetRT(RenderResourceType.NormalRoughness),
-                        BaseColorMetalness = pool.GetRT(RenderResourceType.BasecolorMetalness),
-                        GeoNormal = pool.GetRT(RenderResourceType.GeoNormal),
+                        Mv = pool.GetRT(RenderResourceType.RtxdiMotionVectors),
                         DirectLighting = pool.GetRT(RenderResourceType.DirectLighting),
+                        
+                        
+                        ViewDepth = pool.GetRT(RenderResourceType.RtxdiViewDepth),
+                        DiffuseAlbedo = pool.GetRT(RenderResourceType.RtxdiDiffuseAlbedo),
+                        SpecularRough = pool.GetRT(RenderResourceType.RtxdiSpecularRough),
+                        Normals = pool.GetRT(RenderResourceType.RtxdiNormals),
+                        GeoNormals = pool.GetRT(RenderResourceType.RtxdiGeoNormals),
 
-                        PrevViewZ = pool.GetRT(RenderResourceType.PrevViewZ),
-                        PrevNormalRoughness = pool.GetRT(RenderResourceType.PrevNormalRoughness),
-                        PrevBaseColorMetalness = pool.GetRT(RenderResourceType.PrevBaseColorMetalness),
-                        PrevGeoNormal = pool.GetRT(RenderResourceType.PrevGeoNormal),
-
+                        
+                        PrevViewDepth = pool.GetRT(RenderResourceType.RtxdiPrevViewDepth),
+                        PrevDiffuseAlbedo = pool.GetRT(RenderResourceType.RtxdiPrevDiffuseAlbedo),
+                        PrevSpecularRough = pool.GetRT(RenderResourceType.RtxdiPrevSpecularRough),
+                        PrevNormals = pool.GetRT(RenderResourceType.RtxdiPrevNormals),
+                        PrevGeoNormals = pool.GetRT(RenderResourceType.RtxdiPrevGeoNormals),
+                        
+ 
                         RtxdiResources = rtxdiResources,
-                        envTexture = env
                     };
 
                     var temSettings = new TemporalResamplingPass.Settings
@@ -497,20 +498,15 @@ namespace PathTracing
                         ConstantBuffer = _constantBuffer,
                         ResamplingConstantBuffer = _resamplingConstantBuffer,
 
-                        Mv = pool.GetRT(RenderResourceType.MV),
-                        ViewZ = pool.GetRT(RenderResourceType.Viewz),
-                        NormalRoughness = pool.GetRT(RenderResourceType.NormalRoughness),
-                        BaseColorMetalness = pool.GetRT(RenderResourceType.BasecolorMetalness),
-                        GeoNormal = pool.GetRT(RenderResourceType.GeoNormal),
-                        DirectLighting = pool.GetRT(RenderResourceType.DirectLighting),
+                        
+                        ViewDepth = pool.GetRT(RenderResourceType.RtxdiViewDepth),
+                        DiffuseAlbedo = pool.GetRT(RenderResourceType.RtxdiDiffuseAlbedo),
+                        SpecularRough = pool.GetRT(RenderResourceType.RtxdiSpecularRough),
+                        Normals = pool.GetRT(RenderResourceType.RtxdiNormals),
+                        GeoNormals = pool.GetRT(RenderResourceType.RtxdiGeoNormals),
 
-                        PrevViewZ = pool.GetRT(RenderResourceType.PrevViewZ),
-                        PrevNormalRoughness = pool.GetRT(RenderResourceType.PrevNormalRoughness),
-                        PrevBaseColorMetalness = pool.GetRT(RenderResourceType.PrevBaseColorMetalness),
-                        PrevGeoNormal = pool.GetRT(RenderResourceType.PrevGeoNormal),
-
-                        RtxdiResources = rtxdiResources,
-                        envTexture = env
+                        
+                        RtxdiResources = rtxdiResources, 
                     };
 
                     var SpSettings = new SpatialResamplingPass.Settings
@@ -531,17 +527,20 @@ namespace PathTracing
                     ResamplingConstantBuffer = _resamplingConstantBuffer,
                     t_GeometryInstanceToLight = _gpuScene._geometryInstanceToLight,
 
-                    Mv = pool.GetRT(RenderResourceType.MV),
-                    ViewZ = pool.GetRT(RenderResourceType.Viewz),
-                    NormalRoughness = pool.GetRT(RenderResourceType.NormalRoughness),
-                    BaseColorMetalness = pool.GetRT(RenderResourceType.BasecolorMetalness),
-                    GeoNormal = pool.GetRT(RenderResourceType.GeoNormal),
+                    ViewDepth = pool.GetRT(RenderResourceType.RtxdiViewDepth),
+                    DiffuseAlbedo = pool.GetRT(RenderResourceType.RtxdiDiffuseAlbedo),
+                    SpecularRough = pool.GetRT(RenderResourceType.RtxdiSpecularRough),
+                    Normals = pool.GetRT(RenderResourceType.RtxdiNormals),
+                    GeoNormals = pool.GetRT(RenderResourceType.RtxdiGeoNormals),
+                    
+                    
                     DirectLighting = pool.GetRT(RenderResourceType.DirectLighting),
 
-                    PrevViewZ = pool.GetRT(RenderResourceType.PrevViewZ),
-                    PrevNormalRoughness = pool.GetRT(RenderResourceType.PrevNormalRoughness),
-                    PrevBaseColorMetalness = pool.GetRT(RenderResourceType.PrevBaseColorMetalness),
-                    PrevGeoNormal = pool.GetRT(RenderResourceType.PrevGeoNormal),
+                    PrevViewDepth =  pool.GetRT(RenderResourceType.RtxdiPrevViewDepth),
+                    PrevDiffuseAlbedo = pool.GetRT(RenderResourceType.RtxdiPrevDiffuseAlbedo),
+                    PrevSpecularRough = pool.GetRT(RenderResourceType.RtxdiPrevSpecularRough),
+                    PrevNormals = pool.GetRT(RenderResourceType.RtxdiPrevNormals),
+                    PrevGeoNormals = pool.GetRT(RenderResourceType.RtxdiPrevGeoNormals),
 
                     RtxdiResources = rtxdiResources,
                     envTexture = env

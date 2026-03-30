@@ -36,22 +36,13 @@ namespace PathTracing
             internal GraphicsBuffer ResamplingConstantBuffer;
 
 
-            internal RTHandle Mv;
-            internal RTHandle ViewZ;
-            internal RTHandle NormalRoughness;
-            internal RTHandle BaseColorMetalness;
-            internal RTHandle GeoNormal;
-            internal RTHandle DirectLighting;
-
-
-
-            internal RTHandle PrevViewZ;
-            internal RTHandle PrevNormalRoughness;
-            internal RTHandle PrevBaseColorMetalness;
-            internal RTHandle PrevGeoNormal;
-
+            internal RTHandle ViewDepth;
+            internal RTHandle DiffuseAlbedo;
+            internal RTHandle SpecularRough;
+            internal RTHandle Normals;
+            internal RTHandle GeoNormals;
+ 
             internal RtxdiResources RtxdiResources;
-            internal Texture2D envTexture;
         }
 
         public class Settings
@@ -87,24 +78,12 @@ namespace PathTracing
             natCmd.SetRayTracingBufferParam(data.OpaqueTs, t_NeighborOffsetsID, resource.RtxdiResources.NeighborOffsetsBuffer);
             natCmd.SetRayTracingBufferParam(data.OpaqueTs, u_LightReservoirsID, resource.RtxdiResources.LightReservoirBuffer);
 
+            natCmd.SetRayTracingTextureParam(data.OpaqueTs, "t_GBufferDepth", resource.ViewDepth);
+            natCmd.SetRayTracingTextureParam(data.OpaqueTs, "t_GBufferDiffuseAlbedo", resource.DiffuseAlbedo);
+            natCmd.SetRayTracingTextureParam(data.OpaqueTs, "t_GBufferSpecularRough", resource.SpecularRough);
+            natCmd.SetRayTracingTextureParam(data.OpaqueTs, "t_GBufferNormals", resource.Normals);
+            natCmd.SetRayTracingTextureParam(data.OpaqueTs, "t_GBufferGeoNormals", resource.GeoNormals);
 
-            natCmd.SetRayTracingTextureParam(data.OpaqueTs, g_MvID, resource.Mv);
-            natCmd.SetRayTracingTextureParam(data.OpaqueTs, g_ViewZID, resource.ViewZ);
-            natCmd.SetRayTracingTextureParam(data.OpaqueTs, g_Normal_RoughnessID, resource.NormalRoughness);
-            natCmd.SetRayTracingTextureParam(data.OpaqueTs, g_BaseColor_MetalnessID, resource.BaseColorMetalness);
-
-            natCmd.SetRayTracingTextureParam(data.OpaqueTs, g_DirectLightingID, resource.DirectLighting);
-
-            natCmd.SetRayTracingTextureParam(data.OpaqueTs, gIn_PrevViewZID, resource.PrevViewZ);
-            natCmd.SetRayTracingTextureParam(data.OpaqueTs, gIn_PrevNormalRoughnessID, resource.PrevNormalRoughness);
-            natCmd.SetRayTracingTextureParam(data.OpaqueTs, gIn_PrevBaseColorMetalnessID, resource.PrevBaseColorMetalness);
-            
-            
-            natCmd.SetRayTracingTextureParam(data.OpaqueTs,"_environmentMap", resource.envTexture);
-            
-            natCmd.SetRayTracingTextureParam(data.OpaqueTs,"gOut_GeoNormal", resource.GeoNormal);
-            natCmd.SetRayTracingTextureParam(data.OpaqueTs,"gIn_PrevGeoNormal", resource.PrevGeoNormal);
-            
 
             uint rectWmod = (uint)(settings.m_RenderResolution.x * settings.resolutionScale + 0.5f);
             uint rectHmod = (uint)(settings.m_RenderResolution.y * settings.resolutionScale + 0.5f);

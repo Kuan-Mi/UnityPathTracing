@@ -134,8 +134,8 @@ float3 GetEnvironmentRadiance(float3 direction)
 bool IsComplexSurface(int2 pixelPosition, RAB_Surface surface)
 {
     return false;
-    float originalRoughness = gOut_Normal_Roughness[pixelPosition].a;
-    return originalRoughness < (surface.material.roughness * g_Const.restirDI.temporalResamplingParams.permutationSamplingThreshold);
+    // float originalRoughness = gOut_Normal_Roughness[pixelPosition].a;
+    // return originalRoughness < (surface.material.roughness * g_Const.restirDI.temporalResamplingParams.permutationSamplingThreshold);
 }
 
 uint getLightIndex(uint instanceID, uint geometryIndex, uint primitiveIndex)

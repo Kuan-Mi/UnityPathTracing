@@ -32,7 +32,7 @@ void MainRayGenShader()
         RTXDI_DIReservoir curSample = RTXDI_LoadDIReservoir(g_Const.restirDI.reservoirBufferParams,
                                                             GlobalIndex, g_Const.restirDI.bufferIndices.initialSamplingOutputBufferIndex);
 
-        float3 motionVector = gOut_Mv[pixelPosition].xyz;
+        float3 motionVector = t_MotionVectors[pixelPosition].xyz;
 
         RTXDI_DITemporalResamplingParameters tparams;
         tparams.screenSpaceMotion = motionVector;
