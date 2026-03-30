@@ -438,10 +438,10 @@ namespace RTXDI
 
             _geometryInstanceToLight.SetData(geometryInstanceToLightArray);
 
-            for (var i = 0; i < geometryInstanceToLightArray.Count; i++)
-            {
-                Debug.Log($"{i} starts at Primitive index {geometryInstanceToLightArray[i]}");
-            }
+            // for (var i = 0; i < geometryInstanceToLightArray.Count; i++)
+            // {
+            //     Debug.Log($"{i} starts at Primitive index {geometryInstanceToLightArray[i]}");
+            // }
         }
 
         // 仅更新动态 transform，不重建 primitive，每帧开销极小
