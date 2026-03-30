@@ -74,7 +74,6 @@ namespace PathTracing
             var natCmd = CommandBufferHelpers.GetNativeCommandBuffer(context.cmd);
 
             var marker = new ProfilerMarker(ProfilerCategory.Render, "ShadeSamples_Compute", MarkerFlags.SampleGPU);
-            var copyGBufferMarker = new ProfilerMarker(ProfilerCategory.Render, "Copy GBuffer to Prev", MarkerFlags.SampleGPU);
 
             natCmd.BeginSample(marker);
 
@@ -114,16 +113,6 @@ namespace PathTracing
             }
 
             natCmd.EndSample(marker);
-
-            natCmd.BeginSample(copyGBufferMarker);
-
-            natCmd.CopyTexture(resource.ViewDepth, resource.PrevViewDepth);
-            natCmd.CopyTexture(resource.DiffuseAlbedo, resource.PrevDiffuseAlbedo);
-            natCmd.CopyTexture(resource.SpecularRough, resource.PrevSpecularRough);
-            natCmd.CopyTexture(resource.Normals, resource.PrevNormals);
-            natCmd.CopyTexture(resource.GeoNormals, resource.PrevGeoNormals);
-
-            natCmd.EndSample(copyGBufferMarker);
         }
 
         public override void RecordRenderGraph(RenderGraph renderGraph, ContextContainer frameData)

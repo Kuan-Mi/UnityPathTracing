@@ -19,11 +19,11 @@ MonoBehaviour:
     showValidation: 0
     enableRtxdi: 1
     debugRtxdi: 1
-    useComputeForGIS: 0
-    useComputeForTemporalResampling: 0
-    useComputeForSpatialResampling: 0
+    useComputeForGIS: 1
+    useComputeForTemporalResampling: 1
+    useComputeForSpatialResampling: 1
     useComputeForShadeSamples: 0
-    resamplingMode: 0
+    resamplingMode: 3
     gShowLight: 0
     initialSamplingParams:
       numPrimaryLocalLightSamples: 8
@@ -68,9 +68,9 @@ MonoBehaviour:
     regirDynamicParams:
       regirCellSize: 1
       center:
-        x: 15.801954
-        y: 1.781524
-        z: 3.0097709
+        x: -26.711962
+        y: 3.7970514
+        z: -65.2382
       fallbackSamplingMode: 1
       presamplingMode: 1
       regirSamplingJitter: 1

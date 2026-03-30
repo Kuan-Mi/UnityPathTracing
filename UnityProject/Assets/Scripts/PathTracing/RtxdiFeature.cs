@@ -30,8 +30,8 @@ namespace PathTracing
         public RayTracingShader gBufferTracingShader;
         public RayTracingShader generateInitialShader;
         public ComputeShader generateInitialComputeCs;
-        
-        
+
+
         public RayTracingShader temporalResamplingShader;
         public ComputeShader temporalResamplingComputeCs;
         public RayTracingShader spatialResamplingShader;
@@ -329,17 +329,31 @@ namespace PathTracing
 
             #endregion
 
+            bool isOddFrame = (curFrame % 2) == 1;
+            var viewDepth = isOddFrame ? pool.GetRT(RenderResourceType.RtxdiViewDepth) : pool.GetRT(RenderResourceType.RtxdiPrevViewDepth);
+            var diffuseAlbedo = isOddFrame ? pool.GetRT(RenderResourceType.RtxdiDiffuseAlbedo) : pool.GetRT(RenderResourceType.RtxdiPrevDiffuseAlbedo);
+            var specularRough = isOddFrame ? pool.GetRT(RenderResourceType.RtxdiSpecularRough) : pool.GetRT(RenderResourceType.RtxdiPrevSpecularRough);
+            var normals = isOddFrame ? pool.GetRT(RenderResourceType.RtxdiNormals) : pool.GetRT(RenderResourceType.RtxdiPrevNormals);
+            var geoNormals = isOddFrame ? pool.GetRT(RenderResourceType.RtxdiGeoNormals) : pool.GetRT(RenderResourceType.RtxdiPrevGeoNormals);
+
+            var prevViewDepth = isOddFrame ? pool.GetRT(RenderResourceType.RtxdiPrevViewDepth) : pool.GetRT(RenderResourceType.RtxdiViewDepth);
+            var prevDiffuseAlbedo = isOddFrame ? pool.GetRT(RenderResourceType.RtxdiPrevDiffuseAlbedo) : pool.GetRT(RenderResourceType.RtxdiDiffuseAlbedo);
+            var prevSpecularRough = isOddFrame ? pool.GetRT(RenderResourceType.RtxdiPrevSpecularRough) : pool.GetRT(RenderResourceType.RtxdiSpecularRough);
+            var prevNormals = isOddFrame ? pool.GetRT(RenderResourceType.RtxdiPrevNormals) : pool.GetRT(RenderResourceType.RtxdiNormals);
+            var prevGeoNormals = isOddFrame ? pool.GetRT(RenderResourceType.RtxdiPrevGeoNormals) : pool.GetRT(RenderResourceType.RtxdiGeoNormals);
+
+
             #region gBuffer Pass
 
             var gBufferResource = new GBufferPass.Resource
             {
                 ConstantBuffer = _constantBuffer,
 
-                ViewDepth = pool.GetRT(RenderResourceType.RtxdiViewDepth),
-                DiffuseAlbedo = pool.GetRT(RenderResourceType.RtxdiDiffuseAlbedo),
-                SpecularRough = pool.GetRT(RenderResourceType.RtxdiSpecularRough),
-                Normals = pool.GetRT(RenderResourceType.RtxdiNormals),
-                GeoNormals = pool.GetRT(RenderResourceType.RtxdiGeoNormals),
+                ViewDepth = viewDepth,
+                DiffuseAlbedo = diffuseAlbedo,
+                SpecularRough = specularRough,
+                Normals = normals,
+                GeoNormals = geoNormals,
                 Emissive = pool.GetRT(RenderResourceType.RtxdiEmissive),
                 MotionVectors = pool.GetRT(RenderResourceType.RtxdiMotionVectors),
             };
@@ -452,15 +466,14 @@ namespace PathTracing
                     ConstantBuffer = _constantBuffer,
                     ResamplingConstantBuffer = _resamplingConstantBuffer,
                     t_GeometryInstanceToLight = _gpuScene._geometryInstanceToLight,
-                    
-                    ViewDepth = pool.GetRT(RenderResourceType.RtxdiViewDepth),
-                    DiffuseAlbedo = pool.GetRT(RenderResourceType.RtxdiDiffuseAlbedo),
-                    SpecularRough = pool.GetRT(RenderResourceType.RtxdiSpecularRough),
-                    Normals = pool.GetRT(RenderResourceType.RtxdiNormals),
-                    GeoNormals = pool.GetRT(RenderResourceType.RtxdiGeoNormals),
 
-                    
-                    
+                    ViewDepth = viewDepth,
+                    DiffuseAlbedo = diffuseAlbedo,
+                    SpecularRough = specularRough,
+                    Normals = normals,
+                    GeoNormals = geoNormals,
+
+
                     u_LocalLightPdfTexture = _gpuScene.localLightPdfTexture,
 
                     RtxdiResources = rtxdiResources,
@@ -512,22 +525,20 @@ namespace PathTracing
 
                         Mv = pool.GetRT(RenderResourceType.RtxdiMotionVectors),
                         DirectLighting = pool.GetRT(RenderResourceType.DirectLighting),
-                        
-                        
-                        ViewDepth = pool.GetRT(RenderResourceType.RtxdiViewDepth),
-                        DiffuseAlbedo = pool.GetRT(RenderResourceType.RtxdiDiffuseAlbedo),
-                        SpecularRough = pool.GetRT(RenderResourceType.RtxdiSpecularRough),
-                        Normals = pool.GetRT(RenderResourceType.RtxdiNormals),
-                        GeoNormals = pool.GetRT(RenderResourceType.RtxdiGeoNormals),
 
-                        
-                        PrevViewDepth = pool.GetRT(RenderResourceType.RtxdiPrevViewDepth),
-                        PrevDiffuseAlbedo = pool.GetRT(RenderResourceType.RtxdiPrevDiffuseAlbedo),
-                        PrevSpecularRough = pool.GetRT(RenderResourceType.RtxdiPrevSpecularRough),
-                        PrevNormals = pool.GetRT(RenderResourceType.RtxdiPrevNormals),
-                        PrevGeoNormals = pool.GetRT(RenderResourceType.RtxdiPrevGeoNormals),
-                        
- 
+
+                        ViewDepth = viewDepth,
+                        DiffuseAlbedo = diffuseAlbedo,
+                        SpecularRough = specularRough,
+                        Normals = normals,
+                        GeoNormals = geoNormals,
+
+                        PrevViewDepth = prevViewDepth,
+                        PrevDiffuseAlbedo = prevDiffuseAlbedo,
+                        PrevSpecularRough = prevSpecularRough,
+                        PrevNormals = prevNormals,
+                        PrevGeoNormals = prevGeoNormals,
+
                         RtxdiResources = rtxdiResources,
                     };
 
@@ -581,15 +592,16 @@ namespace PathTracing
                         ConstantBuffer = _constantBuffer,
                         ResamplingConstantBuffer = _resamplingConstantBuffer,
 
-                        
-                        ViewDepth = pool.GetRT(RenderResourceType.RtxdiViewDepth),
-                        DiffuseAlbedo = pool.GetRT(RenderResourceType.RtxdiDiffuseAlbedo),
-                        SpecularRough = pool.GetRT(RenderResourceType.RtxdiSpecularRough),
-                        Normals = pool.GetRT(RenderResourceType.RtxdiNormals),
-                        GeoNormals = pool.GetRT(RenderResourceType.RtxdiGeoNormals),
 
-                        
-                        RtxdiResources = rtxdiResources, 
+                        ViewDepth = viewDepth,
+                        DiffuseAlbedo = diffuseAlbedo,
+                        SpecularRough = specularRough,
+                        Normals = normals,
+                        GeoNormals = geoNormals,
+
+
+
+                        RtxdiResources = rtxdiResources,
                     };
 
                     var SpSettings = new SpatialResamplingPass.Settings
@@ -634,23 +646,16 @@ namespace PathTracing
                     ResamplingConstantBuffer = _resamplingConstantBuffer,
                     t_GeometryInstanceToLight = _gpuScene._geometryInstanceToLight,
 
-                    ViewDepth = pool.GetRT(RenderResourceType.RtxdiViewDepth),
-                    DiffuseAlbedo = pool.GetRT(RenderResourceType.RtxdiDiffuseAlbedo),
-                    SpecularRough = pool.GetRT(RenderResourceType.RtxdiSpecularRough),
-                    Normals = pool.GetRT(RenderResourceType.RtxdiNormals),
-                    GeoNormals = pool.GetRT(RenderResourceType.RtxdiGeoNormals),
-                    
-                    
+                    ViewDepth = viewDepth,
+                    DiffuseAlbedo = diffuseAlbedo,
+                    SpecularRough = specularRough,
+                    Normals = normals,
+                    GeoNormals = geoNormals,
+
                     DirectLighting = pool.GetRT(RenderResourceType.DirectLighting),
 
-                    PrevViewDepth =  pool.GetRT(RenderResourceType.RtxdiPrevViewDepth),
-                    PrevDiffuseAlbedo = pool.GetRT(RenderResourceType.RtxdiPrevDiffuseAlbedo),
-                    PrevSpecularRough = pool.GetRT(RenderResourceType.RtxdiPrevSpecularRough),
-                    PrevNormals = pool.GetRT(RenderResourceType.RtxdiPrevNormals),
-                    PrevGeoNormals = pool.GetRT(RenderResourceType.RtxdiPrevGeoNormals),
 
                     RtxdiResources = rtxdiResources,
-                    envTexture = env
                 };
 
                 var shaSettings = new ShadeSamplesPass.Settings
@@ -673,11 +678,6 @@ namespace PathTracing
                         Normals = shaResource.Normals,
                         GeoNormals = shaResource.GeoNormals,
                         DirectLighting = shaResource.DirectLighting,
-                        PrevViewDepth = shaResource.PrevViewDepth,
-                        PrevDiffuseAlbedo = shaResource.PrevDiffuseAlbedo,
-                        PrevSpecularRough = shaResource.PrevSpecularRough,
-                        PrevNormals = shaResource.PrevNormals,
-                        PrevGeoNormals = shaResource.PrevGeoNormals,
                         RtxdiResources = shaResource.RtxdiResources,
                     };
                     var shaComputeSettings = new ShadeSamplesComputePass.Settings

@@ -44,18 +44,12 @@ namespace PathTracing
             internal RTHandle Normals;
             internal RTHandle GeoNormals;
             
-            
-            internal RTHandle PrevViewDepth;
-            internal RTHandle PrevDiffuseAlbedo;
-            internal RTHandle PrevSpecularRough;
-            internal RTHandle PrevNormals;
-            internal RTHandle PrevGeoNormals;
+             
 
             
             internal RTHandle DirectLighting;
 
             internal RtxdiResources RtxdiResources;
-            internal Texture2D envTexture;
         }
 
         public class Settings
@@ -121,19 +115,6 @@ namespace PathTracing
                 natCmd.DispatchRays(data.OpaqueTs, "MainRayGenShader", rectWmod, rectHmod, 1);
 
             natCmd.EndSample(opaqueTracingMarker);
-
-            // 保存当帧 GBuffer 到 prev 纹理，供下一帧 RTXDI 时间复用读取
-            natCmd.BeginSample(copyGBufferMarker);
-            
-            
-            natCmd.CopyTexture(resource.ViewDepth, resource.PrevViewDepth);
-            natCmd.CopyTexture(resource.DiffuseAlbedo, resource.PrevDiffuseAlbedo);
-            natCmd.CopyTexture(resource.SpecularRough, resource.PrevSpecularRough);
-            natCmd.CopyTexture(resource.Normals, resource.PrevNormals);
-            natCmd.CopyTexture(resource.GeoNormals, resource.PrevGeoNormals);
-            
-            
-            natCmd.EndSample(copyGBufferMarker);
         }
 
 

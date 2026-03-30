@@ -139,13 +139,13 @@ void MainRayGenShader()
             // specular = DemodulateSpecular(surface.material.specularF0, specular);
 
             // float3 finalColor = ShadeSurfaceWithLightSample(lightSample, surface) * RTXDI_GetDIReservoirInvPdf(reservoir);
-            
+
             float3 finalColor = (diffuse * surface.material.diffuseAlbedo) + specular;
-            
+
             finalColor += gIn_EmissiveLighting[pixelPosition];
             finalColor *= gExposure;
-            
-            gOut_DirectLighting[pixelPosition] =finalColor;
+
+            gOut_DirectLighting[pixelPosition] = finalColor;
 
             // gOut_DirectLighting[pixelPosition] = diffuse + specular;
 
@@ -159,7 +159,7 @@ void MainRayGenShader()
             float3 finalColor = 0;
             finalColor += gIn_EmissiveLighting[pixelPosition];
             finalColor *= gExposure;
-            
+
             gOut_DirectLighting[pixelPosition] = finalColor;
         }
     }
@@ -167,8 +167,8 @@ void MainRayGenShader()
     // {
     //     gOut_DirectLighting[pixelPosition] = float3(1, 0, 0);
     // }
-    
-    
+
+
     // uint tileSize = g_Const.localLightsRISBufferSegmentParams.tileSize; // 通常是 128 或 256
     // uint tileCount = g_Const.localLightsRISBufferSegmentParams.tileCount;
     //
@@ -255,7 +255,7 @@ void MainRayGenShader()
     //
     //
 
-    #if RTXDI_REGIR_DISABLED !=RTXDI_REGIR_DISABLED 
+    #if RTXDI_REGIR_DISABLED !=RTXDI_REGIR_DISABLED
     if (g_Const.showReGIRCell)
     {
         float3 visualize = RTXDI_VisualizeReGIRCells(g_Const.regir, surface.worldPos);
