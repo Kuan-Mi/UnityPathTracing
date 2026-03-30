@@ -23,13 +23,13 @@ MonoBehaviour:
     useComputeForTemporalResampling: 0
     useComputeForSpatialResampling: 0
     useComputeForShadeSamples: 1
-    resamplingMode: 3
+    resamplingMode: 0
     gShowLight: 0
     initialSamplingParams:
-      numPrimaryLocalLightSamples: 8
-      numPrimaryInfiniteLightSamples: 1
-      numPrimaryEnvironmentSamples: 1
-      numPrimaryBrdfSamples: 1
+      numPrimaryLocalLightSamples: 1
+      numPrimaryInfiniteLightSamples: 0
+      numPrimaryEnvironmentSamples: 0
+      numPrimaryBrdfSamples: 0
       brdfCutoff: 0.0001
       enableInitialVisibility: 0
       environmentMapImportanceSampling: 0
@@ -37,8 +37,8 @@ MonoBehaviour:
     temporalResamplingParams:
       temporalDepthThreshold: 0.1
       temporalNormalThreshold: 0.5
-      maxHistoryLength: 8
-      temporalBiasCorrection: 1
+      maxHistoryLength: 40
+      temporalBiasCorrection: 2
       enablePermutationSampling: 1
       permutationSamplingThreshold: 0.9
       enableBoilingFilter: 0
@@ -50,7 +50,7 @@ MonoBehaviour:
     spatialResamplingParams:
       spatialDepthThreshold: 0.1
       spatialNormalThreshold: 0.5
-      spatialBiasCorrection: 1
+      spatialBiasCorrection: 2
       numSpatialSamples: 1
       numDisocclusionBoostSamples: 8
       spatialSamplingRadius: 32
@@ -68,19 +68,19 @@ MonoBehaviour:
     regirDynamicParams:
       regirCellSize: 1
       center:
-        x: 0
-        y: 2
-        z: -1
+        x: 6.5686073
+        y: 7.746275
+        z: -13.883385
       fallbackSamplingMode: 1
       presamplingMode: 1
       regirSamplingJitter: 1
       regirNumBuildSamples: 8
-    showReGIRCell: 0
+    showReGIRCell: 1
     prepareLight: 1
     enableFinalShading: 1
     enableEnv: 1
     sunAngularDiameter: 0.533
-    exposureEv: 0.45
+    exposureEv: 3.74
     upscalerMode: 0
     mipBias: -0.5
     tracingMode: 1
