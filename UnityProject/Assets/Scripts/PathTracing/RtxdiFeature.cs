@@ -309,12 +309,13 @@ namespace PathTracing
             {
                 ConstantBuffer = _constantBuffer,
 
-                Mv = pool.GetRT(RenderResourceType.MV),
-
-                ViewZ = pool.GetRT(RenderResourceType.Viewz),
-                NormalRoughness = pool.GetRT(RenderResourceType.NormalRoughness),
-                BaseColorMetalness = pool.GetRT(RenderResourceType.BasecolorMetalness),
-                GeoNormal = pool.GetRT(RenderResourceType.GeoNormal),
+                ViewDepth = pool.GetRT(RenderResourceType.RtxdiViewDepth),
+                DiffuseAlbedo = pool.GetRT(RenderResourceType.RtxdiDiffuseAlbedo),
+                SpecularRough = pool.GetRT(RenderResourceType.RtxdiSpecularRough),
+                Normals = pool.GetRT(RenderResourceType.RtxdiNormals),
+                GeoNormals = pool.GetRT(RenderResourceType.RtxdiGeoNormals),
+                Emissive = pool.GetRT(RenderResourceType.RtxdiEmissive),
+                MotionVectors = pool.GetRT(RenderResourceType.RtxdiMotionVectors),
             };
 
             var gBufferSettings = new GBufferPass.Settings

@@ -3,21 +3,16 @@
 
 #include "Assets/Shaders/NRD/NRD.hlsli"
 #include "Assets/Shaders/donut/utils.hlsli"
+#include "Assets/Shaders/donut/packing.hlsli"
 #pragma max_recursion_depth 1
 
-// 运动矢量（Motion Vector），用于描述像素在当前帧与上一帧之间的运动，以及视深（ViewZ）和TAA遮罩信息。
-RWTexture2D<float4> gOut_Mv;
-// 视空间深度（ViewZ），即像素在视空间中的Z值。
-RWTexture2D<float> gOut_ViewZ;
-// 法线、粗糙度和材质ID的打包信息。用于后续的去噪和材质区分。
-RWTexture2D<float4> gOut_Normal_Roughness;
-// 基础色（BaseColor，已转为sRGB）和金属度（Metalness）。
-RWTexture2D<float4> gOut_BaseColor_Metalness;
-
-RWTexture2D<uint> gOut_GeoNormal;
-
-// 直接自发光（Direct Emission），即材质的自发光分量。
-RWTexture2D<float3> gOut_DirectEmission;
+RWTexture2D<float> u_ViewDepth;
+RWTexture2D<uint> u_DiffuseAlbedo;
+RWTexture2D<uint> u_SpecularRough;
+RWTexture2D<uint> u_Normals;
+RWTexture2D<uint> u_GeoNormals;
+RWTexture2D<float4> u_Emissive;
+RWTexture2D<float4> u_MotionVectors;
 
 float GetMaterialID(GeometryProps geometryProps, MaterialProps materialProps)
 {
@@ -82,16 +77,13 @@ void MainRayGenShader()
     float3 XvirtualPrev = Xvirtual + geometryProps0.Xprev - geometryProps0.X;
     float3 motion = GetMotion(Xvirtual, XvirtualPrev);
 
-    gOut_Mv[pixelPos] = float4(motion, viewZAndTaaMask0); // IMPORTANT: keep viewZ before PSR ( needed for glass )
+    u_MotionVectors[pixelPos] = float4(motion, viewZAndTaaMask0); // IMPORTANT: keep viewZ before PSR ( needed for glass )
 
     // ViewZ
     float viewZ = Geometry::AffineTransform(gWorldToView, Xvirtual).z;
     viewZ = geometryProps0.IsMiss() ? Math::Sign(viewZ) * INF : viewZ;
 
-    gOut_ViewZ[pixelPos] = viewZ;
-
-    // Emission
-    gOut_DirectEmission[pixelPos] = materialProps0.Lemi;
+    u_ViewDepth[pixelPos] = viewZ;
 
     // Early out
     if (geometryProps0.IsMiss())
@@ -106,8 +98,14 @@ void MainRayGenShader()
     // Normal, roughness and material ID
     float3 N = materialProps0.N;
     float materialID = GetMaterialID(geometryProps0, materialProps0);
-
-    gOut_Normal_Roughness[pixelPos] = NRD_FrontEnd_PackNormalAndRoughness(N, materialProps0.roughness, materialID);
-    gOut_GeoNormal[pixelPos] = ndirToOctUnorm32(geometryProps0.N);
-    gOut_BaseColor_Metalness[pixelPos] = float4(Color::ToSrgb(materialProps0.baseColor), materialProps0.metalness);
+    
+    
+    float3 albedo, Rf0;
+    BRDF::ConvertBaseColorMetalnessToAlbedoRf0( materialProps0.baseColor, materialProps0.metalness, albedo, Rf0 );
+    
+    u_DiffuseAlbedo[pixelPos] = Pack_R11G11B10_UFLOAT (albedo);
+    u_SpecularRough[pixelPos] = Pack_R8G8B8A8_Gamma_UFLOAT(float4(Rf0, materialProps0.roughness));
+    u_Normals[pixelPos] = ndirToOctUnorm32(materialProps0.N);
+    u_GeoNormals[pixelPos] = ndirToOctUnorm32(geometryProps0.N);
+    u_Emissive[pixelPos] = float4(materialProps0.Lemi, viewZAndTaaMask0); // viewZ is needed for glass ray tracing
 }

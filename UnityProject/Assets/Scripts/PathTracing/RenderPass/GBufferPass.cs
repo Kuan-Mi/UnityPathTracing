@@ -33,11 +33,13 @@ namespace PathTracing
         {
             internal GraphicsBuffer ConstantBuffer;
 
-            internal RTHandle Mv;
-            internal RTHandle ViewZ;
-            internal RTHandle NormalRoughness;
-            internal RTHandle BaseColorMetalness;
-            internal RTHandle GeoNormal;
+            internal RTHandle ViewDepth;
+            internal RTHandle DiffuseAlbedo;
+            internal RTHandle SpecularRough;
+            internal RTHandle Normals;
+            internal RTHandle GeoNormals;
+            internal RTHandle Emissive;
+            internal RTHandle MotionVectors;
         }
 
         public class Settings
@@ -52,7 +54,6 @@ namespace PathTracing
             internal RayTracingShader gBufferTs;
             internal Resource Resource;
             internal Settings Settings;
-            internal TextureHandle DirectEmission;
         }
 
         static void ExecutePass(PassData data, UnsafeGraphContext context)
@@ -70,14 +71,13 @@ namespace PathTracing
             natCmd.SetRayTracingConstantBufferParam(data.gBufferTs, paramsID, resource.ConstantBuffer, 0, resource.ConstantBuffer.stride);
 
 
-            natCmd.SetRayTracingTextureParam(data.gBufferTs, g_MvID, resource.Mv);
-            natCmd.SetRayTracingTextureParam(data.gBufferTs, g_ViewZID, resource.ViewZ);
-            natCmd.SetRayTracingTextureParam(data.gBufferTs, g_Normal_RoughnessID, resource.NormalRoughness);
-            natCmd.SetRayTracingTextureParam(data.gBufferTs, g_BaseColor_MetalnessID, resource.BaseColorMetalness);
-            natCmd.SetRayTracingTextureParam(data.gBufferTs, "gOut_GeoNormal", resource.GeoNormal);
-
-            natCmd.SetRayTracingTextureParam(data.gBufferTs, g_DirectEmissionID, data.DirectEmission);
-
+            natCmd.SetRayTracingTextureParam(data.gBufferTs, "u_ViewDepth", resource.ViewDepth);
+            natCmd.SetRayTracingTextureParam(data.gBufferTs, "u_DiffuseAlbedo", resource.DiffuseAlbedo);
+            natCmd.SetRayTracingTextureParam(data.gBufferTs, "u_SpecularRough", resource.SpecularRough);
+            natCmd.SetRayTracingTextureParam(data.gBufferTs, "u_Normals", resource.Normals);
+            natCmd.SetRayTracingTextureParam(data.gBufferTs, "u_GeoNormals", resource.GeoNormals);
+            natCmd.SetRayTracingTextureParam(data.gBufferTs, "u_Emissive", resource.Emissive);
+            natCmd.SetRayTracingTextureParam(data.gBufferTs, "u_MotionVectors", resource.MotionVectors);
 
             uint rectWmod = (uint)(settings.m_RenderResolution.x * settings.resolutionScale + 0.5f);
             uint rectHmod = (uint)(settings.m_RenderResolution.y * settings.resolutionScale + 0.5f);
@@ -117,14 +117,6 @@ namespace PathTracing
             textureDesc.discardBuffer = false;
             textureDesc.width = _settings.m_RenderResolution.x;
             textureDesc.height = _settings.m_RenderResolution.y;
-
-            var ptContextItem = frameData.Create<PTContextItem>();
-
-            ptContextItem.DirectEmission = CreateTex(textureDesc, renderGraph, "DirectEmission", GraphicsFormat.B10G11R11_UFloatPack32);
-
-            passData.DirectEmission = ptContextItem.DirectEmission;
-
-            builder.UseTexture(passData.DirectEmission, AccessFlags.ReadWrite);
 
             builder.AllowPassCulling(false);
             builder.SetRenderFunc((PassData data, UnsafeGraphContext context) => { ExecutePass(data, context); });

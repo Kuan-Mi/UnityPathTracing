@@ -47,5 +47,19 @@ namespace PathTracing
         PrevNormalRoughness,
         PrevBaseColorMetalness,
         PrevGeoNormal,
+
+        // rtxdi
+        RtxdiViewDepth,
+        RtxdiDiffuseAlbedo,
+        RtxdiSpecularRough,
+        RtxdiNormals,
+        RtxdiGeoNormals,
+        RtxdiEmissive,
+        RtxdiMotionVectors,
+        RtxdiPrevViewDepth,
+        RtxdiPrevDiffuseAlbedo,
+        RtxdiPrevSpecularRough,
+        RtxdiPrevNormals,
+        RtxdiPrevGeoNormals,
     }
 }
