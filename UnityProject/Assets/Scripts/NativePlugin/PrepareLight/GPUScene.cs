@@ -236,6 +236,7 @@ namespace RTXDI
 
             if (_sceneTopologyDirty)
             {
+                Debug.Log("Scene topology dirty. Performing full build.");
                 BuildFull();
                 UpdateInstanceID(ras);
                 _sceneTopologyDirty = false;
@@ -334,13 +335,18 @@ namespace RTXDI
                 for (int subIdx = 0; subIdx < subMeshCount; subIdx++)
                 {
                     instanceId++;
-                    geometryInstanceToLightArray.Add((uint)primitiveDataList.Count);
 
                     Material mat = subIdx < sharedMaterials.Length ? sharedMaterials[subIdx] : null;
                     if (mat == null && sharedMaterials.Length > 0) mat = sharedMaterials[^1];
                     bool isEmissive = mat != null && mat.IsKeywordEnabled("_EMISSION") && mat.GetColor("_EmissionColor").maxColorComponent > 0.01f;
                     if (!isEmissive)
+                    {
+                        
+                        geometryInstanceToLightArray.Add(0xffffffffu); // 标记为非发光实例
                         continue;
+                    }
+                    
+                    geometryInstanceToLightArray.Add((uint)primitiveDataList.Count);
                     int[] subMeshTriangles = mc.trianglesPerSubMesh[subIdx];
                     uint instanceIndex = (uint)instanceDataList.Count;
 
@@ -404,6 +410,7 @@ namespace RTXDI
                 // Debug.Log($"Updated InstanceID for Renderer {renderer.name} to {instanceId}");
             }
 
+            Debug.Log($"geometryInstanceToLightArray Count before adding other renderers: {geometryInstanceToLightArray.Count}");
 
             var otherRenderers = Object.FindObjectsByType<MeshRenderer>(FindObjectsSortMode.None).Where(r => !rendererInstanceIdMap.ContainsKey(r)).ToList();
 
@@ -431,10 +438,10 @@ namespace RTXDI
 
             _geometryInstanceToLight.SetData(geometryInstanceToLightArray);
 
-            // for (var i = 0; i < geometryInstanceToLightArray.Count; i++)
-            // {
-            //     Debug.Log($"{i} starts at Primitive index {geometryInstanceToLightArray[i]}");
-            // }
+            for (var i = 0; i < geometryInstanceToLightArray.Count; i++)
+            {
+                Debug.Log($"{i} starts at Primitive index {geometryInstanceToLightArray[i]}");
+            }
         }
 
         // 仅更新动态 transform，不重建 primitive，每帧开销极小

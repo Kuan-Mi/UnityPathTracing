@@ -86,6 +86,7 @@ CBUFFER_START(GlobalConstants)
     float gSharcDownscale;
     float gSharcSceneScale;
     uint sharcDebug;
+    uint maxLightIndex;
 CBUFFER_END
 
 

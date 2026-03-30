@@ -85,6 +85,7 @@ namespace PathTracing
         public float gSharcDownscale;
         public float gSharcSceneScale;
         public uint sharcDebug;
+        public uint maxLightIndex;
 
 
         public override string ToString()

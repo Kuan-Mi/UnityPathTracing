@@ -476,13 +476,7 @@ Shader "RayTracing/Lit"
             void ClosestHitMain(inout LightPayload payload : SV_RayPayload, AttributeData attribs : SV_IntersectionAttributes)
             {
                 payload.instanceIndex = InstanceID() + GeometryIndex();
-
-                #if _EMISSION
                 payload.primitiveIndex = PrimitiveIndex();
-                #else
-                payload.primitiveIndex = INF;
-                #endif
-
                 payload.barycentrics = attribs.barycentrics;
             }
             ENDHLSL

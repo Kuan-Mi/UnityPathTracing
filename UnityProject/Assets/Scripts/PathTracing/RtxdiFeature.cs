@@ -653,6 +653,8 @@ namespace PathTracing
                     GeoNormals = geoNormals,
 
                     DirectLighting = pool.GetRT(RenderResourceType.DirectLighting),
+                    
+                    Emissive = pool.GetRT(RenderResourceType.RtxdiEmissive),
 
 
                     RtxdiResources = rtxdiResources,
@@ -679,6 +681,7 @@ namespace PathTracing
                         GeoNormals = shaResource.GeoNormals,
                         DirectLighting = shaResource.DirectLighting,
                         RtxdiResources = shaResource.RtxdiResources,
+                        Emissive = shaResource.Emissive,
                     };
                     var shaComputeSettings = new ShadeSamplesComputePass.Settings
                     {
