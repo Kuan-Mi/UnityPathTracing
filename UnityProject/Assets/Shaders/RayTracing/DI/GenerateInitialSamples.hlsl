@@ -1,3 +1,5 @@
+#define RTXDI_REGIR_MODE 0
+
 #include "../RtxdiApplicationBridge/RtxdiApplicationBridge.hlsl"
 #include "Assets/Shaders/RTXDI/DI/InitialSampling.hlsl"
 

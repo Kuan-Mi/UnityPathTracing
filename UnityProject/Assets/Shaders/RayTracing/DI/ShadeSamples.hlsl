@@ -248,11 +248,13 @@ void MainRayGenShader()
     //
     //
 
+    #if RTXDI_REGIR_DISABLED !=RTXDI_REGIR_DISABLED 
     if (g_Const.showReGIRCell)
     {
         float3 visualize = RTXDI_VisualizeReGIRCells(g_Const.regir, surface.worldPos);
         gOut_DirectLighting[pixelPosition] = visualize;
     }
+    #endif
 
     //
     // RAB_LightSample lightSample;
