@@ -14,6 +14,7 @@
 
 
 #define BACKGROUND_DEPTH INF
+#define RTXDI_SCREEN_SPACE_GROUP_SIZE 8
 
 
 struct ResamplingConstants

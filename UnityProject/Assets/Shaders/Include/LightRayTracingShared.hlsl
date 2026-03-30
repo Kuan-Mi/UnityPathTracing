@@ -136,7 +136,12 @@ uint ToRayFlag2(uint flag)
         return RAY_FLAG_NONE;
 }
 
-
+#ifdef  USE_RAY_QUERY
+bool CastVisibilityRay_AnyHit(float3 origin, float3 direction, float Tmin, float Tmax, float2 mipAndCone, RaytracingAccelerationStructure accelerationStructure, uint mask, uint rayFlags)
+{ 
+    return true;
+}
+#else
 bool CastVisibilityRay_AnyHit(float3 origin, float3 direction, float Tmin, float Tmax, float2 mipAndCone, RaytracingAccelerationStructure accelerationStructure, uint mask, uint rayFlags)
 {
     RayDesc rayDesc;
@@ -155,6 +160,16 @@ bool CastVisibilityRay_AnyHit(float3 origin, float3 direction, float Tmin, float
     return payload.IsMiss();
 }
 
+#endif
+
+
+
+#ifdef  USE_RAY_QUERY
+LightPayload CastRayForLight(float3 origin, float3 direction, float Tmin, float Tmax, uint mask)
+{ 
+    return (LightPayload)0;
+}
+#else
 LightPayload CastRayForLight(float3 origin, float3 direction, float Tmin, float Tmax, uint mask)
 {
     RayDesc rayDesc;
@@ -170,6 +185,7 @@ LightPayload CastRayForLight(float3 origin, float3 direction, float Tmin, float 
 
     return payload;
 }
+#endif
 
 
 // Compile-time flags for "GetLighting"
