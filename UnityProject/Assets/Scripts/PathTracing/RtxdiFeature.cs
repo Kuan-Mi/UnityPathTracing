@@ -29,6 +29,7 @@ namespace PathTracing
 
         public RayTracingShader gBufferTracingShader;
         public RayTracingShader generateInitialShader;
+        public ComputeShader generateInitialComputeCs;
         public RayTracingShader temporalResamplingShader;
         public RayTracingShader spatialResamplingShader;
         public RayTracingShader shadeSamplesShader;
@@ -46,6 +47,7 @@ namespace PathTracing
         private PrepareLightPass _prepareLightPass;
         private GBufferPass _gBufferPass;
         private GenerateInitialSamplesPass _generateInitialSamplesPass;
+        private GenerateInitialSamplesComputePass _generateInitialSamplesComputePass;
         private TemporalResamplingPass _temporalResamplingPass;
         private SpatialResamplingPass _spatialResamplingPass;
         private ShadeSamplesPass _shadeSamplesPass;
@@ -117,6 +119,10 @@ namespace PathTracing
                 renderPassEvent = renderPassEvent
             };
             _generateInitialSamplesPass ??= new GenerateInitialSamplesPass(generateInitialShader)
+            {
+                renderPassEvent = renderPassEvent
+            };
+            _generateInitialSamplesComputePass ??= new GenerateInitialSamplesComputePass(generateInitialComputeCs)
             {
                 renderPassEvent = renderPassEvent
             };
@@ -446,8 +452,34 @@ namespace PathTracing
                     resolutionScale = pathTracingSetting.resolutionScale,
                 };
 
-                _generateInitialSamplesPass.Setup(gisResource, gisSettings);
-                renderer.EnqueuePass(_generateInitialSamplesPass);
+                if (pathTracingSetting.useComputeForGIS)
+                {
+                    var gisComputeResource = new GenerateInitialSamplesComputePass.Resource
+                    {
+                        ConstantBuffer = gisResource.ConstantBuffer,
+                        ResamplingConstantBuffer = gisResource.ResamplingConstantBuffer,
+                        t_GeometryInstanceToLight = gisResource.t_GeometryInstanceToLight,
+                        ViewDepth = gisResource.ViewDepth,
+                        DiffuseAlbedo = gisResource.DiffuseAlbedo,
+                        SpecularRough = gisResource.SpecularRough,
+                        Normals = gisResource.Normals,
+                        GeoNormals = gisResource.GeoNormals,
+                        u_LocalLightPdfTexture = gisResource.u_LocalLightPdfTexture,
+                        RtxdiResources = gisResource.RtxdiResources,
+                    };
+                    var gisComputeSettings = new GenerateInitialSamplesComputePass.Settings
+                    {
+                        m_RenderResolution = gisSettings.m_RenderResolution,
+                        resolutionScale = gisSettings.resolutionScale,
+                    };
+                    _generateInitialSamplesComputePass.Setup(gisComputeResource, gisComputeSettings);
+                    renderer.EnqueuePass(_generateInitialSamplesComputePass);
+                }
+                else
+                {
+                    _generateInitialSamplesPass.Setup(gisResource, gisSettings);
+                    renderer.EnqueuePass(_generateInitialSamplesPass);
+                }
 
 
                 // TemporalResamplingPass
