@@ -69,6 +69,8 @@ namespace PathTracing
 
             
             natCmd.SetComputeBufferParam(data.OpaqueTs, 0,"u_RisBuffer", resource.RtxdiResources.RisBuffer);
+            natCmd.SetComputeBufferParam(data.OpaqueTs, 0,"t_LightDataBuffer", resource.RtxdiResources.LightDataBuffer);
+            natCmd.SetComputeBufferParam(data.OpaqueTs, 0,"u_RisLightDataBuffer", resource.RtxdiResources.RisLightDataBuffer);
 
 
             natCmd.SetComputeTextureParam(data.OpaqueTs, 0,"t_LocalLightPdfTexture", resource.u_LocalLightPdfTexture);

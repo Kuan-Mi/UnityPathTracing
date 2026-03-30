@@ -27,6 +27,8 @@ namespace mini
         // public GraphicsBuffer GeometryInstanceToLightBuffer { get; private set; }
         public ComputeBuffer NeighborOffsetsBuffer { get; private set; }
         public ComputeBuffer RisBuffer { get; private set; }
+        
+        public ComputeBuffer RisLightDataBuffer { get; private set; }
         public GraphicsBuffer LightReservoirBuffer { get; private set; }
 
         public GPUScene Scene;
@@ -117,10 +119,21 @@ namespace mini
 
             var totalSizeInElements = risBufferSegmentAllocator.GetTotalSizeInElements();
             Debug.Log($"Creating RisBuffer with totalSizeInElements: {totalSizeInElements}");
-            RisBuffer = new ComputeBuffer((int)math.max(totalSizeInElements, 1),
+            
+            RisBuffer = new ComputeBuffer(
+                (int)math.max(totalSizeInElements, 1),
                 sizeof(Vector2),
                 ComputeBufferType.Default);
             RisBuffer.name = "RisBuffer";
+            
+            int lightDataStride = sizeof(uint) * 8; 
+
+            RisLightDataBuffer = new ComputeBuffer(
+                (int)math.max(totalSizeInElements, 1), 
+                lightDataStride, 
+                ComputeBufferType.Default
+            );
+            RisLightDataBuffer.name = "RisLightDataBuffer";
         }
 
 

@@ -1,8 +1,6 @@
 #ifndef RAB_LIGHT_INFO_HLSLI
 #define RAB_LIGHT_INFO_HLSLI
 
-//#include "../ShaderParameters.h"
-#include "../TriangleLight.hlsl"
 #include "../PolymorphicLight.hlsl"
 #include "RAB_Surface.hlsl"
 #include "RAB_LightSample.hlsl"
@@ -28,16 +26,26 @@ RAB_LightInfo RAB_LoadLightInfo(uint index, bool previousFrame)
     return t_LightDataBuffer[index];
 }
 
-// 不实现
+
 RAB_LightInfo RAB_LoadCompactLightInfo(uint linearIndex)
 {
-    return RAB_EmptyLightInfo();
+    uint4 packedData1, packedData2;
+    packedData1 = u_RisLightDataBuffer[linearIndex * 2 + 0];
+    packedData2 = u_RisLightDataBuffer[linearIndex * 2 + 1];
+    return unpackCompactLightInfo(packedData1, packedData2);
 }
 
 // 不实现
 bool RAB_StoreCompactLightInfo(uint linearIndex, RAB_LightInfo lightInfo)
 {
-    return false;
+    uint4 data1, data2;
+    if (!packCompactLightInfo(lightInfo, data1, data2))
+        return false;
+
+    u_RisLightDataBuffer[linearIndex * 2 + 0] = data1;
+    u_RisLightDataBuffer[linearIndex * 2 + 1] = data2;
+
+    return true;
 }
 
 
