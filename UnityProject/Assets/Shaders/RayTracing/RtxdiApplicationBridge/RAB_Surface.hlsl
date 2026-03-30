@@ -75,30 +75,34 @@ float getSurfaceDiffuseProbability(RAB_Surface surface)
 }
 
 RAB_Surface GetGBufferSurface(int2 pixelPosition,
+                              bool previousFrame,
                               float4x4 ViewToWorld,
                               float3 cameraGlobalPos,
-                              Texture2D<float> viewZ,
-                              Texture2D<float4> normalRoughness,
-                              Texture2D<float4> base_color_metalness,
-                              Texture2D<uint> geo_normal)
+                              Texture2D<float> depthTexture,
+                              Texture2D<uint> normalsTexture,
+                              Texture2D<uint> geoNormalsTexture)
 {
     RAB_Surface surface = RAB_EmptySurface();
 
-    surface.viewDepth = viewZ[pixelPosition];
+    surface.viewDepth = depthTexture[pixelPosition];
 
-    if (surface.viewDepth == BACKGROUND_DEPTH)
+    if (surface.viewDepth == -BACKGROUND_DEPTH)
         return surface;
 
-    float4 Normal_RoughnessPacked = normalRoughness[pixelPosition];
-    float4 Normal_Roughness = NRD_FrontEnd_UnpackNormalAndRoughness(Normal_RoughnessPacked);
-    float3 Normal = Normal_Roughness.xyz;
-    float Roughness = Normal_Roughness.w;
+    surface.material = RAB_GetGBufferMaterial(pixelPosition, previousFrame);
+    surface.geoNormal = octToNdirUnorm32(geoNormalsTexture[pixelPosition]);
+    surface.normal = octToNdirUnorm32(normalsTexture[pixelPosition]);
+    
+    // float4 Normal_RoughnessPacked = normalRoughness[pixelPosition];
+    // float4 Normal_Roughness = NRD_FrontEnd_UnpackNormalAndRoughness(Normal_RoughnessPacked);
+    // float3 Normal = Normal_Roughness.xyz;
+    // float Roughness = Normal_Roughness.w;
+    //
+    // float3 GeoNormal = octToNdirUnorm32(geo_normal[pixelPosition]);
 
-    float3 GeoNormal = octToNdirUnorm32(geo_normal[pixelPosition]);
-
-    surface.normal = Normal;
-    surface.geoNormal = GeoNormal;
-    surface.material = RAB_GetGBufferMaterial(pixelPosition, Roughness,base_color_metalness);
+    // surface.normal = Normal;
+    // surface.geoNormal = GeoNormal;
+    // surface.material = RAB_GetGBufferMaterial(pixelPosition, Roughness, base_color_metalness);
 
 
     float2 sampleUv = (float2(pixelPosition) + 0.5f) / gRectSize;
@@ -123,23 +127,23 @@ RAB_Surface RAB_GetGBufferSurface(int2 pixelPosition, bool previousFrame)
     {
         return GetGBufferSurface(
             pixelPosition,
+            previousFrame,
             gViewToWorldPrev,
             gCameraGlobalPosPrev.xyz,
-            gIn_PrevViewZ,
-            gIn_PrevNormalRoughness,
-            gIn_PrevBaseColorMetalness,
-            gIn_PrevGeoNormal);
+            t_PrevGBufferDepth,
+            t_PrevGBufferNormals,
+            t_PrevGBufferGeoNormals);
     }
     else
     {
         return GetGBufferSurface(
             pixelPosition,
+            previousFrame,
             gViewToWorld,
             gCameraGlobalPos.xyz,
             t_GBufferDepth,
-            gOut_Normal_Roughness,
-            gOut_BaseColor_Metalness,
-            gOut_GeoNormal);
+            t_GBufferNormals,
+            t_GBufferGeoNormals);
     }
 }
 

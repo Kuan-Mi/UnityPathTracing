@@ -202,11 +202,11 @@ namespace PathTracing
 
             passData.BlitMaterial = _biltMaterial;
 
-            var ptContextItem = frameData.Get<PTContextItem>();
-
-            passData.DirectEmission = ptContextItem.DirectEmission;
-
-            builder.UseTexture(passData.DirectEmission, AccessFlags.ReadWrite);
+            // var ptContextItem = frameData.Get<PTContextItem>();
+            //
+            // passData.DirectEmission = ptContextItem.DirectEmission;
+            //
+            // builder.UseTexture(passData.DirectEmission, AccessFlags.ReadWrite);
 
             passData.CameraTexture = resourceData.activeColorTexture;
 
