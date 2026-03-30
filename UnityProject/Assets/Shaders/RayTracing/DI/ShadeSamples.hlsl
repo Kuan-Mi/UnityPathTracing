@@ -255,7 +255,7 @@ void MainRayGenShader()
     //
     //
 
-    #if RTXDI_REGIR_DISABLED !=RTXDI_REGIR_DISABLED
+    #if RTXDI_REGIR_MODE !=RTXDI_REGIR_DISABLED
     if (g_Const.showReGIRCell)
     {
         float3 visualize = RTXDI_VisualizeReGIRCells(g_Const.regir, surface.worldPos);

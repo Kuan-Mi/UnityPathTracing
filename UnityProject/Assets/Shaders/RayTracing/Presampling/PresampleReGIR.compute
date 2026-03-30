@@ -15,7 +15,7 @@
 [numthreads(RTXDI_PRESAMPLING_GROUP_SIZE, 1, 1)]
 void CSMain(uint GlobalIndex : SV_DispatchThreadID)
 { 
-    #if RTXDI_REGIR_MODE !=RTXDI_REGIR_DISABLED 
+    #if RTXDI_REGIR_MODE != RTXDI_REGIR_DISABLED 
     RAB_RandomSamplerState rng = RAB_InitRandomSampler(uint2(GlobalIndex & 0xfff, GlobalIndex >> 12), 1);
 
     RAB_RandomSamplerState coherentRng = RAB_InitRandomSampler(uint2(GlobalIndex >> 8, 0), 1);
