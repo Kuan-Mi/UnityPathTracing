@@ -57,8 +57,11 @@ MonoBehaviour:
   - GenInitialSamples
   - GenInitialSamples_Compute
   - TemporalResampling
+  - TemporalResampling_Compute
   - SpatialResampling
+  - SpatialResampling_Compute
   - ShadeSamples
+  - ShadeSamples_Compute
   - Copy GBuffer to Prev
   - NRD Denoise
   - Composition

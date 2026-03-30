@@ -71,6 +71,9 @@ namespace PathTracing
         public bool enableRtxdi;
         public bool debugRtxdi;
         public bool useComputeForGIS;
+        public bool useComputeForTemporalResampling;
+        public bool useComputeForSpatialResampling;
+        public bool useComputeForShadeSamples;
 
         public bool enableSpatialResampling => resamplingMode is ReSTIRDI_ResamplingMode.Spatial or ReSTIRDI_ResamplingMode.TemporalAndSpatial;
         public bool enableTemporalResampling => resamplingMode is ReSTIRDI_ResamplingMode.Temporal or ReSTIRDI_ResamplingMode.TemporalAndSpatial;

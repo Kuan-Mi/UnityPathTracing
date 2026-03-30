@@ -30,9 +30,14 @@ namespace PathTracing
         public RayTracingShader gBufferTracingShader;
         public RayTracingShader generateInitialShader;
         public ComputeShader generateInitialComputeCs;
+        
+        
         public RayTracingShader temporalResamplingShader;
+        public ComputeShader temporalResamplingComputeCs;
         public RayTracingShader spatialResamplingShader;
+        public ComputeShader spatialResamplingComputeCs;
         public RayTracingShader shadeSamplesShader;
+        public ComputeShader shadeSamplesComputeCs;
 
         public ComputeShader dlssBeforeCs;
         public ComputeShader pdfTextureCs;
@@ -49,8 +54,11 @@ namespace PathTracing
         private GenerateInitialSamplesPass _generateInitialSamplesPass;
         private GenerateInitialSamplesComputePass _generateInitialSamplesComputePass;
         private TemporalResamplingPass _temporalResamplingPass;
+        private TemporalResamplingComputePass _temporalResamplingComputePass;
         private SpatialResamplingPass _spatialResamplingPass;
+        private SpatialResamplingComputePass _spatialResamplingComputePass;
         private ShadeSamplesPass _shadeSamplesPass;
+        private ShadeSamplesComputePass _shadeSamplesComputePass;
         private PdfTexturePass _pdfTexturePass;
         private PresamplePass _presamplePass;
         private PresampleReGirLightsPass _presampleReGirLightsPass;
@@ -131,13 +139,25 @@ namespace PathTracing
             {
                 renderPassEvent = renderPassEvent
             };
+            _temporalResamplingComputePass ??= new TemporalResamplingComputePass(temporalResamplingComputeCs)
+            {
+                renderPassEvent = renderPassEvent
+            };
 
             _spatialResamplingPass ??= new SpatialResamplingPass(spatialResamplingShader)
             {
                 renderPassEvent = renderPassEvent
             };
+            _spatialResamplingComputePass ??= new SpatialResamplingComputePass(spatialResamplingComputeCs)
+            {
+                renderPassEvent = renderPassEvent
+            };
 
             _shadeSamplesPass ??= new ShadeSamplesPass(shadeSamplesShader)
+            {
+                renderPassEvent = renderPassEvent
+            };
+            _shadeSamplesComputePass ??= new ShadeSamplesComputePass(shadeSamplesComputeCs)
             {
                 renderPassEvent = renderPassEvent
             };
@@ -517,8 +537,39 @@ namespace PathTracing
                         resolutionScale = pathTracingSetting.resolutionScale,
                     };
 
-                    _temporalResamplingPass.Setup(temResource, temSettings);
-                    renderer.EnqueuePass(_temporalResamplingPass);
+                    if (pathTracingSetting.useComputeForTemporalResampling)
+                    {
+                        var temComputeResource = new TemporalResamplingComputePass.Resource
+                        {
+                            ConstantBuffer = temResource.ConstantBuffer,
+                            ResamplingConstantBuffer = temResource.ResamplingConstantBuffer,
+                            Mv = temResource.Mv,
+                            DirectLighting = temResource.DirectLighting,
+                            ViewDepth = temResource.ViewDepth,
+                            DiffuseAlbedo = temResource.DiffuseAlbedo,
+                            SpecularRough = temResource.SpecularRough,
+                            Normals = temResource.Normals,
+                            GeoNormals = temResource.GeoNormals,
+                            PrevViewDepth = temResource.PrevViewDepth,
+                            PrevDiffuseAlbedo = temResource.PrevDiffuseAlbedo,
+                            PrevSpecularRough = temResource.PrevSpecularRough,
+                            PrevNormals = temResource.PrevNormals,
+                            PrevGeoNormals = temResource.PrevGeoNormals,
+                            RtxdiResources = temResource.RtxdiResources,
+                        };
+                        var temComputeSettings = new TemporalResamplingComputePass.Settings
+                        {
+                            m_RenderResolution = temSettings.m_RenderResolution,
+                            resolutionScale = temSettings.resolutionScale,
+                        };
+                        _temporalResamplingComputePass.Setup(temComputeResource, temComputeSettings);
+                        renderer.EnqueuePass(_temporalResamplingComputePass);
+                    }
+                    else
+                    {
+                        _temporalResamplingPass.Setup(temResource, temSettings);
+                        renderer.EnqueuePass(_temporalResamplingPass);
+                    }
                 }
 
 
@@ -547,8 +598,32 @@ namespace PathTracing
                         resolutionScale = pathTracingSetting.resolutionScale,
                     };
 
-                    _spatialResamplingPass.Setup(SpResource, SpSettings);
-                    renderer.EnqueuePass(_spatialResamplingPass);
+                    if (pathTracingSetting.useComputeForSpatialResampling)
+                    {
+                        var spComputeResource = new SpatialResamplingComputePass.Resource
+                        {
+                            ConstantBuffer = SpResource.ConstantBuffer,
+                            ResamplingConstantBuffer = SpResource.ResamplingConstantBuffer,
+                            ViewDepth = SpResource.ViewDepth,
+                            DiffuseAlbedo = SpResource.DiffuseAlbedo,
+                            SpecularRough = SpResource.SpecularRough,
+                            Normals = SpResource.Normals,
+                            GeoNormals = SpResource.GeoNormals,
+                            RtxdiResources = SpResource.RtxdiResources,
+                        };
+                        var spComputeSettings = new SpatialResamplingComputePass.Settings
+                        {
+                            m_RenderResolution = SpSettings.m_RenderResolution,
+                            resolutionScale = SpSettings.resolutionScale,
+                        };
+                        _spatialResamplingComputePass.Setup(spComputeResource, spComputeSettings);
+                        renderer.EnqueuePass(_spatialResamplingComputePass);
+                    }
+                    else
+                    {
+                        _spatialResamplingPass.Setup(SpResource, SpSettings);
+                        renderer.EnqueuePass(_spatialResamplingPass);
+                    }
                 }
 
 
@@ -585,8 +660,40 @@ namespace PathTracing
                     shading = pathTracingSetting.enableFinalShading
                 };
 
-                _shadeSamplesPass.Setup(shaResource, shaSettings);
-                renderer.EnqueuePass(_shadeSamplesPass);
+                if (pathTracingSetting.useComputeForShadeSamples)
+                {
+                    var shaComputeResource = new ShadeSamplesComputePass.Resource
+                    {
+                        ConstantBuffer = shaResource.ConstantBuffer,
+                        ResamplingConstantBuffer = shaResource.ResamplingConstantBuffer,
+                        t_GeometryInstanceToLight = shaResource.t_GeometryInstanceToLight,
+                        ViewDepth = shaResource.ViewDepth,
+                        DiffuseAlbedo = shaResource.DiffuseAlbedo,
+                        SpecularRough = shaResource.SpecularRough,
+                        Normals = shaResource.Normals,
+                        GeoNormals = shaResource.GeoNormals,
+                        DirectLighting = shaResource.DirectLighting,
+                        PrevViewDepth = shaResource.PrevViewDepth,
+                        PrevDiffuseAlbedo = shaResource.PrevDiffuseAlbedo,
+                        PrevSpecularRough = shaResource.PrevSpecularRough,
+                        PrevNormals = shaResource.PrevNormals,
+                        PrevGeoNormals = shaResource.PrevGeoNormals,
+                        RtxdiResources = shaResource.RtxdiResources,
+                    };
+                    var shaComputeSettings = new ShadeSamplesComputePass.Settings
+                    {
+                        m_RenderResolution = shaSettings.m_RenderResolution,
+                        resolutionScale = shaSettings.resolutionScale,
+                        shading = shaSettings.shading,
+                    };
+                    _shadeSamplesComputePass.Setup(shaComputeResource, shaComputeSettings);
+                    renderer.EnqueuePass(_shadeSamplesComputePass);
+                }
+                else
+                {
+                    _shadeSamplesPass.Setup(shaResource, shaSettings);
+                    renderer.EnqueuePass(_shadeSamplesPass);
+                }
             }
 
 

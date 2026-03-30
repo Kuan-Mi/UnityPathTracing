@@ -20,15 +20,18 @@ MonoBehaviour:
     enableRtxdi: 1
     debugRtxdi: 1
     useComputeForGIS: 0
-    resamplingMode: 3
+    useComputeForTemporalResampling: 0
+    useComputeForSpatialResampling: 0
+    useComputeForShadeSamples: 0
+    resamplingMode: 0
     gShowLight: 0
     initialSamplingParams:
       numPrimaryLocalLightSamples: 8
-      numPrimaryInfiniteLightSamples: 1
-      numPrimaryEnvironmentSamples: 1
+      numPrimaryInfiniteLightSamples: 0
+      numPrimaryEnvironmentSamples: 0
       numPrimaryBrdfSamples: 0
       brdfCutoff: 0.0001
-      enableInitialVisibility: 0
+      enableInitialVisibility: 1
       environmentMapImportanceSampling: 0
       localLightSamplingMode: 1
     temporalResamplingParams:
@@ -65,9 +68,9 @@ MonoBehaviour:
     regirDynamicParams:
       regirCellSize: 1
       center:
-        x: -26.711962
-        y: 3.7970514
-        z: -65.2382
+        x: 15.801954
+        y: 1.781524
+        z: 3.0097709
       fallbackSamplingMode: 1
       presamplingMode: 1
       regirSamplingJitter: 1
@@ -138,8 +141,11 @@ MonoBehaviour:
   generateInitialShader: {fileID: 4807578003741378534, guid: d360fd1504e84137ab8253780770f0b6, type: 3}
   generateInitialComputeCs: {fileID: 7200000, guid: 770673c613a448f796dade8286cf87e2, type: 3}
   temporalResamplingShader: {fileID: 4807578003741378534, guid: 190468c66edf4d45b3f8535a3bd6f0d4, type: 3}
+  temporalResamplingComputeCs: {fileID: 7200000, guid: 76541a7a0b21c8d48ac07ef12c709e8f, type: 3}
   spatialResamplingShader: {fileID: 4807578003741378534, guid: d603ddad10874923ab65a70b34fe6a60, type: 3}
+  spatialResamplingComputeCs: {fileID: 7200000, guid: babe3948aa3dbe54db6dd3ca49c4c633, type: 3}
   shadeSamplesShader: {fileID: 4807578003741378534, guid: 78d7660a5ed54d6fa49f9d2ad6265c82, type: 3}
+  shadeSamplesComputeCs: {fileID: 7200000, guid: fbc0f72d4fc11c44983ed086402df26e, type: 3}
   dlssBeforeCs: {fileID: 7200000, guid: b34d979c2031436aad2b456c4456c6eb, type: 3}
   pdfTextureCs: {fileID: 7200000, guid: 6d3d83398dc04a9ea285602128206037, type: 3}
   presampleCs: {fileID: 7200000, guid: c7795bf09240c4c40bcb2e51042eb5b5, type: 3}
@@ -222,6 +228,9 @@ MonoBehaviour:
     enableRtxdi: 0
     debugRtxdi: 0
     useComputeForGIS: 0
+    useComputeForTemporalResampling: 0
+    useComputeForSpatialResampling: 0
+    useComputeForShadeSamples: 0
     resamplingMode: 3
     gShowLight: 1
     initialSamplingParams:

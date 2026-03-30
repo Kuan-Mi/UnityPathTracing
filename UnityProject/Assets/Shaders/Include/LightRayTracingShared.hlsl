@@ -139,7 +139,27 @@ uint ToRayFlag2(uint flag)
 #ifdef  USE_RAY_QUERY
 bool CastVisibilityRay_AnyHit(float3 origin, float3 direction, float Tmin, float Tmax, float2 mipAndCone, RaytracingAccelerationStructure accelerationStructure, uint mask, uint rayFlags)
 { 
-    return true;
+    // return true;
+    RayDesc rayDesc;
+    rayDesc.Origin = origin;
+    rayDesc.Direction = direction;
+    rayDesc.TMin = Tmin;
+    rayDesc.TMax = Tmax;
+
+    
+    uint flag = ToRayFlag2(mask);
+    flag = flag | RAY_FLAG_SKIP_CLOSEST_HIT_SHADER | RAY_FLAG_ACCEPT_FIRST_HIT_AND_END_SEARCH;
+    
+    
+    // FORCE_OPAQUE: skip non-opaque and alpha-clip, ACCEPT_FIRST_HIT: early exit on any hit
+    RayQuery<RAY_FLAG_FORCE_OPAQUE | RAY_FLAG_ACCEPT_FIRST_HIT_AND_END_SEARCH> rayQuery;
+    rayQuery.TraceRayInline(accelerationStructure, flag, mask, rayDesc);
+    while (rayQuery.Proceed())
+    {
+        
+    }
+
+    return rayQuery.CommittedStatus() == COMMITTED_NOTHING;
 }
 #else
 bool CastVisibilityRay_AnyHit(float3 origin, float3 direction, float Tmin, float Tmax, float2 mipAndCone, RaytracingAccelerationStructure accelerationStructure, uint mask, uint rayFlags)
@@ -168,6 +188,28 @@ bool CastVisibilityRay_AnyHit(float3 origin, float3 direction, float Tmin, float
 LightPayload CastRayForLight(float3 origin, float3 direction, float Tmin, float Tmax, uint mask)
 { 
     return (LightPayload)0;
+    LightPayload payload = (LightPayload)0;
+    payload.instanceIndex = INF;
+
+    RayDesc rayDesc;
+    rayDesc.Origin = origin;
+    rayDesc.Direction = direction;
+    rayDesc.TMin = Tmin;
+    rayDesc.TMax = Tmax;
+
+    // FORCE_OPAQUE: skip non-opaque and alpha-clip, find closest opaque hit
+    RayQuery<RAY_FLAG_FORCE_OPAQUE> rayQuery;
+    rayQuery.TraceRayInline(gWorldTlas, ToRayFlag2(mask), mask, rayDesc);
+    while (rayQuery.Proceed()) {}
+
+    if (rayQuery.CommittedStatus() == COMMITTED_TRIANGLE_HIT)
+    {
+        payload.instanceIndex = rayQuery.CommittedInstanceIndex() + rayQuery.CandidateGeometryIndex();
+        payload.primitiveIndex = rayQuery.CommittedPrimitiveIndex();
+        payload.barycentrics  = rayQuery.CommittedTriangleBarycentrics();
+    }
+
+    return payload;
 }
 #else
 LightPayload CastRayForLight(float3 origin, float3 direction, float Tmin, float Tmax, uint mask)

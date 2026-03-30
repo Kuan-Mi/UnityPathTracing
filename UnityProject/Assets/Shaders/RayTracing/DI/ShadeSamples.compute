@@ -1,10 +1,11 @@
 #pragma kernel main
 
-#pragma only_renderers   d3d11
+#pragma only_renderers d3d11
 #pragma use_dxc
 #pragma target 6.0
 #pragma require inlineraytracing
 
+
 #define USE_RAY_QUERY
 
-#include "GenerateInitialSamples.hlsl"
+#include "ShadeSamples.hlsl"

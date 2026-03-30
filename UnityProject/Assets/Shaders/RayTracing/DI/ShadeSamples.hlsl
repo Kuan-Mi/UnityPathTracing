@@ -96,10 +96,17 @@ float3 DemodulateSpecular(float3 surfaceSpecularF0, float3 specular)
 }
 
 
+#ifdef USE_RAY_QUERY
+[numthreads(RTXDI_SCREEN_SPACE_GROUP_SIZE, RTXDI_SCREEN_SPACE_GROUP_SIZE, 1)]
+void main(uint2 GlobalIndex : SV_DispatchThreadID)
+#else
 [shader("raygeneration")]
 void MainRayGenShader()
+#endif
 {
+    #ifndef USE_RAY_QUERY
     uint2 GlobalIndex = DispatchRaysIndex().xy;
+    #endif
 
     const RTXDI_RuntimeParameters params = g_Const.runtimeParams;
 

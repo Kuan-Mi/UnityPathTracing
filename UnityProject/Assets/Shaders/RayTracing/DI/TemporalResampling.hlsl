@@ -3,10 +3,18 @@
 #include "../RtxdiApplicationBridge/RtxdiApplicationBridge.hlsl"
 #include <Assets/Shaders/RTXDI/DI/TemporalResampling.hlsl>
 
+#ifdef USE_RAY_QUERY
+[numthreads(RTXDI_SCREEN_SPACE_GROUP_SIZE, RTXDI_SCREEN_SPACE_GROUP_SIZE, 1)]
+void main(uint2 GlobalIndex : SV_DispatchThreadID, uint LocalIndex : SV_GroupIndex)
+#else
 [shader("raygeneration")]
 void MainRayGenShader()
+#endif
 {
+    #ifndef USE_RAY_QUERY
     uint2 GlobalIndex = DispatchRaysIndex().xy;
+    uint LocalIndex = 0;
+    #endif
 
     const RTXDI_RuntimeParameters params = g_Const.runtimeParams;
 
