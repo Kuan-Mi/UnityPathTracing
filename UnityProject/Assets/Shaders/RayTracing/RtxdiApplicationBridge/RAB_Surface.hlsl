@@ -136,7 +136,7 @@ RAB_Surface RAB_GetGBufferSurface(int2 pixelPosition, bool previousFrame)
             pixelPosition,
             gViewToWorld,
             gCameraGlobalPos.xyz,
-            gOut_ViewZ,
+            t_GBufferDepth,
             gOut_Normal_Roughness,
             gOut_BaseColor_Metalness,
             gOut_GeoNormal);

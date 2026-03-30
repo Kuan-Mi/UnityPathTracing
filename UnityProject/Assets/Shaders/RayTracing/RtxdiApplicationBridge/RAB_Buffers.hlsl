@@ -2,16 +2,21 @@
 #define RAB_BUFFER_HLSLI
 
 // G-buffer resources
-Texture2D<float> gOut_ViewZ;
-Texture2D<float4> gOut_Normal_Roughness;
-Texture2D<float4> gOut_BaseColor_Metalness;
-Texture2D<uint> gOut_GeoNormal;
-Texture2D<float> gIn_PrevViewZ;
-Texture2D<float4> gIn_PrevNormalRoughness;
-Texture2D<float4> gIn_PrevBaseColorMetalness;
-Texture2D<uint> gIn_PrevGeoNormal;
+Texture2D<float> t_GBufferDepth;
+Texture2D<uint> t_GBufferNormals;
+Texture2D<uint> t_GBufferGeoNormals;
+Texture2D<uint> t_GBufferDiffuseAlbedo;
+Texture2D<uint> t_GBufferSpecularRough;
+
+Texture2D<float> t_PrevGBufferDepth;
+Texture2D<uint> t_PrevGBufferNormals;
+Texture2D<uint> t_PrevGBufferGeoNormals;
+Texture2D<uint> t_PrevGBufferDiffuseAlbedo;
+Texture2D<uint> t_PrevGBufferSpecularRough;
+
+Texture2D<float4> t_MotionVectors;
+
 RWTexture2D<float3> gOut_DirectLighting;
-Texture2D<float4> gOut_Mv;
 
 // RTXDI resources
 StructuredBuffer<PolymorphicLightInfo> t_LightDataBuffer;
