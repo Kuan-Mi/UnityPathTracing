@@ -55,6 +55,7 @@ MonoBehaviour:
   - PresamplePass
   - PresampleReGir
   - GenInitialSamples
+  - GenInitialSamples_Compute
   - TemporalResampling
   - SpatialResampling
   - ShadeSamples

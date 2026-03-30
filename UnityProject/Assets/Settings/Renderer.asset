@@ -19,17 +19,18 @@ MonoBehaviour:
     showValidation: 0
     enableRtxdi: 1
     debugRtxdi: 1
+    useComputeForGIS: 0
     resamplingMode: 3
     gShowLight: 0
     initialSamplingParams:
-      numPrimaryLocalLightSamples: 1
+      numPrimaryLocalLightSamples: 8
       numPrimaryInfiniteLightSamples: 1
-      numPrimaryEnvironmentSamples: 0
+      numPrimaryEnvironmentSamples: 1
       numPrimaryBrdfSamples: 0
       brdfCutoff: 0.0001
       enableInitialVisibility: 0
       environmentMapImportanceSampling: 0
-      localLightSamplingMode: 2
+      localLightSamplingMode: 1
     temporalResamplingParams:
       temporalDepthThreshold: 0.1
       temporalNormalThreshold: 0.5
@@ -64,9 +65,9 @@ MonoBehaviour:
     regirDynamicParams:
       regirCellSize: 1
       center:
-        x: 15.138254
-        y: 11.790981
-        z: 5.9830174
+        x: -26.711962
+        y: 3.7970514
+        z: -65.2382
       fallbackSamplingMode: 1
       presamplingMode: 1
       regirSamplingJitter: 1
@@ -135,6 +136,7 @@ MonoBehaviour:
   finalMaterial: {fileID: 2100000, guid: 27695a2bc55ef2f469362b9a2994989e, type: 2}
   gBufferTracingShader: {fileID: 4807578003741378534, guid: 1ab7c2addcb74c5db50a841acde800e9, type: 3}
   generateInitialShader: {fileID: 4807578003741378534, guid: d360fd1504e84137ab8253780770f0b6, type: 3}
+  generateInitialComputeCs: {fileID: 7200000, guid: 770673c613a448f796dade8286cf87e2, type: 3}
   temporalResamplingShader: {fileID: 4807578003741378534, guid: 190468c66edf4d45b3f8535a3bd6f0d4, type: 3}
   spatialResamplingShader: {fileID: 4807578003741378534, guid: d603ddad10874923ab65a70b34fe6a60, type: 3}
   shadeSamplesShader: {fileID: 4807578003741378534, guid: 78d7660a5ed54d6fa49f9d2ad6265c82, type: 3}
@@ -219,6 +221,7 @@ MonoBehaviour:
     showValidation: 0
     enableRtxdi: 0
     debugRtxdi: 0
+    useComputeForGIS: 0
     resamplingMode: 3
     gShowLight: 1
     initialSamplingParams:
