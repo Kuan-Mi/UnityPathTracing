@@ -76,7 +76,7 @@ MonoBehaviour:
       regirSamplingJitter: 1
       regirNumBuildSamples: 8
     showReGIRCell: 0
-    prepareLight: 0
+    prepareLight: 1
     enableFinalShading: 1
     enableEnv: 1
     sunAngularDiameter: 0.533

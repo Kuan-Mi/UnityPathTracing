@@ -322,7 +322,6 @@ namespace PathTracing
             {
                 _prepareLightResources.SetBuffer(_gpuScene);
                 _prepareLightResources.SendTexture(_gpuScene.globalTexturePool);
-
                 _prepareLightPass.Setup(_prepareLightResources);
                 renderer.EnqueuePass(_prepareLightPass);
             }
@@ -600,7 +599,6 @@ namespace PathTracing
                         GeoNormals = geoNormals,
 
 
-
                         RtxdiResources = rtxdiResources,
                     };
 
@@ -653,7 +651,7 @@ namespace PathTracing
                     GeoNormals = geoNormals,
 
                     DirectLighting = pool.GetRT(RenderResourceType.DirectLighting),
-                    
+
                     Emissive = pool.GetRT(RenderResourceType.RtxdiEmissive),
 
 

@@ -96,19 +96,12 @@ void RenderSystem::ProcessDeviceEvent(UnityGfxDeviceEventType type, IUnityInterf
 
         UnityD3D12PluginEventConfig config_1;
         config_1.graphicsQueueAccess = kUnityD3D12GraphicsQueueAccess_DontCare;
-        config_1.flags = kUnityD3D12EventConfigFlag_SyncWorkerThreads |
-            kUnityD3D12EventConfigFlag_ModifiesCommandBuffersState |
-            kUnityD3D12EventConfigFlag_EnsurePreviousFrameSubmission;
-        config_1.ensureActiveRenderTextureIsBound = true;
+        
+        config_1.flags = kUnityD3D12EventConfigFlag_ModifiesCommandBuffersState ;
+        
+        config_1.ensureActiveRenderTextureIsBound = false;
         s_d3d12->ConfigureEvent(1, &config_1);
 
-        UnityD3D12PluginEventConfig config_2;
-        config_2.graphicsQueueAccess = kUnityD3D12GraphicsQueueAccess_DontCare;
-        config_2.flags = kUnityD3D12EventConfigFlag_SyncWorkerThreads |
-            kUnityD3D12EventConfigFlag_ModifiesCommandBuffersState |
-            kUnityD3D12EventConfigFlag_EnsurePreviousFrameSubmission;
-        config_2.ensureActiveRenderTextureIsBound = true;
-        s_d3d12->ConfigureEvent(2, &config_2);
 
         // initialize_and_create_resources();
         break;
