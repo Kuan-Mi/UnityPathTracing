@@ -84,6 +84,9 @@ RAB_Surface GetGBufferSurface(int2 pixelPosition,
 {
     RAB_Surface surface = RAB_EmptySurface();
 
+    if (any(pixelPosition >= gRectSize))
+        return surface;
+
     surface.viewDepth = depthTexture[pixelPosition];
 
     if (surface.viewDepth == -BACKGROUND_DEPTH)
@@ -92,28 +95,15 @@ RAB_Surface GetGBufferSurface(int2 pixelPosition,
     surface.material = RAB_GetGBufferMaterial(pixelPosition, previousFrame);
     surface.geoNormal = octToNdirUnorm32(geoNormalsTexture[pixelPosition]);
     surface.normal = octToNdirUnorm32(normalsTexture[pixelPosition]);
-    
-    // float4 Normal_RoughnessPacked = normalRoughness[pixelPosition];
-    // float4 Normal_Roughness = NRD_FrontEnd_UnpackNormalAndRoughness(Normal_RoughnessPacked);
-    // float3 Normal = Normal_Roughness.xyz;
-    // float Roughness = Normal_Roughness.w;
-    //
-    // float3 GeoNormal = octToNdirUnorm32(geo_normal[pixelPosition]);
-
-    // surface.normal = Normal;
-    // surface.geoNormal = GeoNormal;
-    // surface.material = RAB_GetGBufferMaterial(pixelPosition, Roughness, base_color_metalness);
-
 
     float2 sampleUv = (float2(pixelPosition) + 0.5f) / gRectSize;
-
     float3 Xv = Geometry::ReconstructViewPosition(sampleUv, gCameraFrustum, surface.viewDepth, gOrthoMode);
-
     float3 X = Geometry::AffineTransform(ViewToWorld, Xv);
-
     surface.worldPos = X;
+
     surface.viewDir = normalize(cameraGlobalPos - surface.worldPos);
     surface.diffuseProbability = getSurfaceDiffuseProbability(surface);
+
     return surface;
 }
 

@@ -73,26 +73,6 @@ RAB_Material RAB_GetGBufferMaterial(
             t_GBufferDiffuseAlbedo,
             t_GBufferSpecularRough);
     }
-    //
-    // RAB_Material material = RAB_EmptyMaterial();
-    //
-    // if (any(pixelPosition >= gRectSize))
-    //     return material;
-    //
-    // float4 packedBaseColorMetalness = baseColorMetalness[pixelPosition];
-    // float3 BaseColor = Color::FromSrgb(packedBaseColorMetalness.xyz);
-    // float Metalness = packedBaseColorMetalness.w;
-    //
-    // float3 albedo, Rf0;
-    // BRDF::ConvertBaseColorMetalnessToAlbedoRf0(BaseColor, Metalness, albedo, Rf0);
-    //
-    //
-    // material.diffuseAlbedo = albedo;
-    //
-    // material.roughness = roughness;
-    // material.specularF0 = Rf0;
-    //
-    // return material;
 }
 
 bool RAB_AreMaterialsSimilar(RAB_Material a, RAB_Material b)

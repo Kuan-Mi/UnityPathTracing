@@ -1,14 +1,14 @@
 #ifndef RAB_LIGHT_SAMPLING_HLSLI
 #define RAB_LIGHT_SAMPLING_HLSLI
 
-#include "RAB_Material.hlsl"
 #include "RAB_RayPayload.hlsl"
-#include "RAB_Surface.hlsl"
 
 // 将世界空间方向转换为一对数字，当将这对数字传递给 RAB_SamplePolymorphicLight 作为环境光时，将在同一方向上进行采样。
 float2 RAB_GetEnvironmentMapRandXYFromDir(float3 worldDir)
 {
-    return float2(0.0, 0.0);
+    float2 uv = directionToEquirectUV(worldDir); 
+    uv = frac(uv);
+    return uv;
 }
 
 // 根据环境贴图 PDF 纹理，计算从环境贴图中采样特定方向相对于所有其他可能方向的概率。
@@ -59,32 +59,6 @@ float RAB_GetReflectedLuminanceForSurface(float3 incomingRadianceLocation, float
     return RTXDI_Luminance(RAB_GetReflectedRadianceForSurface(incomingRadianceLocation, incomingRadiance, surface));
 }
 
-// Evaluate the surface BRDF and compute the weighted reflected radiance for the given light sample
-// 评估表面双向反射分布函数 (BRDF) 并计算给定光样本的加权反射辐射度
-float3 ShadeSurfaceWithLightSample(RAB_LightSample lightSample, RAB_Surface surface)
-{
-    // Ignore invalid light samples
-    if (lightSample.solidAnglePdf <= 0)
-        return 0;
-
-    float3 L = normalize(lightSample.position - surface.worldPos);
-
-    // Ignore light samples that are below the geometric surface (but above the normal mapped surface)
-    if (dot(L, surface.geoNormal) <= 0)
-        return 0;
-
-
-    float3 V = surface.viewDir;
-
-    // Evaluate the BRDF
-    float diffuse = Lambert(surface.normal, -L);
-    float3 specular = GGX_times_NdotL(V, L, surface.normal, max(RAB_GetMaterial(surface).roughness, kMinRoughness), RAB_GetMaterial(surface).specularF0);
-
-    float3 reflectedRadiance = lightSample.radiance * (diffuse * surface.material.diffuseAlbedo + specular);
-
-    return reflectedRadiance / lightSample.solidAnglePdf;
-}
-
 // Compute the target PDF (p-hat) for the given light sample relative to a surface
 // 计算给定表面使用该光照样本进行着色时，每个光照样本的权重。
 // 可以使用精确或近似的双向反射分布函数 (BRDF) 计算来计算权重。
@@ -99,13 +73,13 @@ float RAB_GetLightSampleTargetPdfForSurface(RAB_LightSample lightSample, RAB_Sur
     return RAB_GetReflectedLuminanceForSurface(lightSample.position, lightSample.radiance, surface) / lightSample.solidAnglePdf;
 }
 
+// Computes the weight of the given GI sample when the given surface is shaded using that GI sample.
 float RAB_GetGISampleTargetPdfForSurface(float3 samplePosition, float3 sampleRadiance, RAB_Surface surface)
 {
     float3 reflectedRadiance = RAB_GetReflectedRadianceForSurface(samplePosition, sampleRadiance, surface);
 
     return RTXDI_Luminance(reflectedRadiance);
 }
-
 
 void RAB_GetLightDirDistance(RAB_Surface surface, RAB_LightSample lightSample,
     out float3 o_lightDir,
