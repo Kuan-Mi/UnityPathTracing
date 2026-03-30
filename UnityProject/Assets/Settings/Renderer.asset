@@ -14,24 +14,24 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::PathTracing.RtxdiFeature
   m_Active: 1
   pathTracingSetting:
-    showMode: 11
+    showMode: 18
     showMv: 0
     showValidation: 0
     enableRtxdi: 1
     debugRtxdi: 1
-    useComputeForGIS: 0
-    useComputeForTemporalResampling: 1
-    useComputeForSpatialResampling: 1
-    useComputeForShadeSamples: 0
+    useComputeForGIS: 1
+    useComputeForTemporalResampling: 0
+    useComputeForSpatialResampling: 0
+    useComputeForShadeSamples: 1
     resamplingMode: 3
     gShowLight: 0
     initialSamplingParams:
-      numPrimaryLocalLightSamples: 0
-      numPrimaryInfiniteLightSamples: 0
-      numPrimaryEnvironmentSamples: 0
+      numPrimaryLocalLightSamples: 8
+      numPrimaryInfiniteLightSamples: 1
+      numPrimaryEnvironmentSamples: 1
       numPrimaryBrdfSamples: 1
       brdfCutoff: 0.0001
-      enableInitialVisibility: 1
+      enableInitialVisibility: 0
       environmentMapImportanceSampling: 0
       localLightSamplingMode: 0
     temporalResamplingParams:
@@ -41,7 +41,7 @@ MonoBehaviour:
       temporalBiasCorrection: 1
       enablePermutationSampling: 1
       permutationSamplingThreshold: 0.9
-      enableBoilingFilter: 1
+      enableBoilingFilter: 0
       boilingFilterStrength: 0.2
       discardInvisibleSamples: 1
       uniformRandomNumber: 0
@@ -68,15 +68,15 @@ MonoBehaviour:
     regirDynamicParams:
       regirCellSize: 1
       center:
-        x: 11.001001
-        y: 9.590133
-        z: -9.457801
+        x: 0
+        y: 2
+        z: -1
       fallbackSamplingMode: 1
       presamplingMode: 1
       regirSamplingJitter: 1
       regirNumBuildSamples: 8
     showReGIRCell: 0
-    prepareLight: 1
+    prepareLight: 0
     enableFinalShading: 1
     enableEnv: 1
     sunAngularDiameter: 0.533

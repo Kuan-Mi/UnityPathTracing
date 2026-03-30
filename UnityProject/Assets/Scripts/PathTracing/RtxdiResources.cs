@@ -130,6 +130,7 @@ namespace mini
 
             RisLightDataBuffer = new ComputeBuffer(
                 (int)math.max(totalSizeInElements, 1), 
+                // 1, 
                 lightDataStride, 
                 ComputeBufferType.Default
             );

@@ -6,7 +6,7 @@
 // 将世界空间方向转换为一对数字，当将这对数字传递给 RAB_SamplePolymorphicLight 作为环境光时，将在同一方向上进行采样。
 float2 RAB_GetEnvironmentMapRandXYFromDir(float3 worldDir)
 {
-    float2 uv = directionToEquirectUV(worldDir); 
+    float2 uv = directionToEquirectUV(worldDir);
     uv = frac(uv);
     return uv;
 }
@@ -82,8 +82,8 @@ float RAB_GetGISampleTargetPdfForSurface(float3 samplePosition, float3 sampleRad
 }
 
 void RAB_GetLightDirDistance(RAB_Surface surface, RAB_LightSample lightSample,
-    out float3 o_lightDir,
-    out float o_lightDistance)
+                             out float3 o_lightDir,
+                             out float o_lightDistance)
 {
     if (lightSample.lightType == PolymorphicLightType::kEnvironment)
     {
@@ -114,11 +114,6 @@ bool IsComplexSurface(int2 pixelPosition, RAB_Surface surface)
 
 uint getLightIndex(uint instanceID, uint geometryIndex, uint primitiveIndex)
 {
-    if (primitiveIndex == INF)
-    {
-        return RTXDI_InvalidLightIndex;
-    }
-
     uint start = t_GeometryInstanceToLight[instanceID];
 
     if (start == RTXDI_InvalidLightIndex)
@@ -126,8 +121,6 @@ uint getLightIndex(uint instanceID, uint geometryIndex, uint primitiveIndex)
         return RTXDI_InvalidLightIndex;
     }
 
-
-    // return instanceID;
     return start + primitiveIndex;
 }
 
@@ -149,7 +142,7 @@ bool RAB_TraceRayForLocalLight(float3 origin, float3 direction, float tMin, floa
     o_lightIndex = RTXDI_InvalidLightIndex;
     o_randXY = 0;
 
-    LightPayload payload = CastRayForLight(origin, direction, tMin, tMax,  FLAG_NON_TRANSPARENT);
+    LightPayload payload = CastRayForLight(origin, direction, tMin, tMax, FLAG_NON_TRANSPARENT);
 
     bool hitAnything = !payload.IsMiss();
     if (hitAnything)
@@ -164,7 +157,6 @@ bool RAB_TraceRayForLocalLight(float3 origin, float3 direction, float tMin, floa
 
     return hitAnything;
 }
-
 
 
 #endif // RAB_LIGHT_SAMPLING_HLSLI
