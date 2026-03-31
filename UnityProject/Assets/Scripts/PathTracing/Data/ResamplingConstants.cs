@@ -20,7 +20,7 @@ namespace PathTracing
         public uint enableBrdfIndirect;
         public uint enableBrdfAdditiveBlend;
         public uint enableAccumulation; // StoreShadingOutput
-        public uint showReGIRCell;
+        public uint pad1;
 
         public RTXDI_LightBufferParameters lightBufferParams;
         public RTXDI_RISBufferSegmentParameters localLightsRISBufferSegmentParams;
@@ -30,6 +30,9 @@ namespace PathTracing
         public ReGIR_Parameters regir;
         public ReSTIRGI_Parameters restirGI;
         public BRDFPathTracing_Parameters brdfPT;
+
+        public uint visualizeRegirCells;
+        public uint3 pad2;
 
         public uint2 environmentPdfTextureSize;
         public uint2 localLightPdfTextureSize;

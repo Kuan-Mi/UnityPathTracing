@@ -3,31 +3,34 @@ using Rtxdi.DI;
 
 namespace PathTracing
 {
+    [System.Serializable]
     [StructLayout(LayoutKind.Sequential)]
-    struct BRDFPathTracing_MaterialOverrideParameters
+    public struct BRDFPathTracing_MaterialOverrideParameters
     {
-        float roughnessOverride;
-        float metalnessOverride;
-        float minSecondaryRoughness;
-        uint pad1;
+        public float roughnessOverride;
+        public float metalnessOverride;
+        public float minSecondaryRoughness;
+        public uint pad1;
     };
 
+    [System.Serializable]
     [StructLayout(LayoutKind.Sequential)]
-    struct BRDFPathTracing_SecondarySurfaceReSTIRDIParameters
+    public struct BRDFPathTracing_SecondarySurfaceReSTIRDIParameters
     {
-        ReSTIRDI_InitialSamplingParameters initialSamplingParams;
-        ReSTIRDI_SpatialResamplingParameters spatialResamplingParams;
+        public ReSTIRDI_InitialSamplingParameters initialSamplingParams;
+        public ReSTIRDI_SpatialResamplingParameters spatialResamplingParams;
     };
 
+    [System.Serializable]
     [StructLayout(LayoutKind.Sequential)]
     public struct BRDFPathTracing_Parameters
     {
-        uint enableIndirectEmissiveSurfaces;
-        uint enableSecondaryResampling;
-        uint enableReSTIRGI;
-        uint pad1;
+        public uint enableIndirectEmissiveSurfaces;
+        public uint enableSecondaryResampling;
+        public uint enableReSTIRGI;
+        public uint pad1;
 
-        BRDFPathTracing_MaterialOverrideParameters materialOverrideParams;
-        BRDFPathTracing_SecondarySurfaceReSTIRDIParameters secondarySurfaceReSTIRDIParams;
+        public BRDFPathTracing_MaterialOverrideParameters materialOverrideParams;
+        public BRDFPathTracing_SecondarySurfaceReSTIRDIParameters secondarySurfaceReSTIRDIParams;
     }
 }

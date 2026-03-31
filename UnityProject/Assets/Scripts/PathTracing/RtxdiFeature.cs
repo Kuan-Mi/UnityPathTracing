@@ -5,6 +5,7 @@ using mini;
 using Rtxdi;
 using RTXDI;
 using Rtxdi.DI;
+using Rtxdi.GI;
 using Rtxdi.ReGIR;
 using Unity.Mathematics;
 using UnityEngine;
@@ -803,6 +804,14 @@ namespace PathTracing
             rparams.shadingParams = restirDIContext.GetShadingParameters();
         }
 
+        void FillReSTIRGIConstants(ref ReSTIRGI_Parameters constants, ReSTIRGIContext restirGIContext)
+        {
+            constants.reservoirBufferParams = restirGIContext.GetReservoirBufferParameters();
+            constants.bufferIndices = restirGIContext.GetBufferIndices();
+            constants.temporalResamplingParams = restirGIContext.GetTemporalResamplingParameters();
+            constants.spatialResamplingParams = restirGIContext.GetSpatialResamplingParameters();
+            constants.finalShadingParams = restirGIContext.GetFinalShadingParameters();
+        }
 
         void FillReGIRConstants(ref ReGIR_Parameters ReGIRParams, ReGIRContext regirContext)
         {
@@ -852,50 +861,102 @@ namespace PathTracing
             ReGIRParams.onionParams.cubicRootFactor = regirContext.GetReGIROnionCalculatedParameters().regirOnionCubicRootFactor;
         }
 
-        private ResamplingConstants GetResamplingConstants(
-            ImportanceSamplingContext isContext
-            , RtxdiResources rtxdiResources
-            , CameraFrameState frameState)
+
+        private void FillResamplingConstants(ref ResamplingConstants constants, ImportanceSamplingContext isContext)
         {
-            RTXDI_LightBufferParameters lightBufferParams = _gpuScene.GetLightBufferParameters();
-            isContext.SetLightBufferParams(lightBufferParams);
+            // RTXDI_LightBufferParameters lightBufferParameters = isContext.GetLightBufferParameters();
 
-            var restirDiContext = isContext.GetReSTIRDIContext();
-
-            restirDiContext.SetFrameIndex(frameState.FrameIndex);
-
-            restirDiContext.SetResamplingMode(pathTracingSetting.resamplingMode);
-            restirDiContext.SetInitialSamplingParameters(pathTracingSetting.initialSamplingParams);
-            restirDiContext.SetTemporalResamplingParameters(pathTracingSetting.temporalResamplingParams);
-            restirDiContext.SetSpatialResamplingParameters(pathTracingSetting.spatialResamplingParams);
-            restirDiContext.SetShadingParameters(pathTracingSetting.shadingParams);
-
-            var regirContext = isContext.GetReGIRContext();
-            pathTracingSetting.regirDynamicParams.center = frameState.camPos;
-            regirContext.SetDynamicParameters(pathTracingSetting.regirDynamicParams);
-
-            var constants = new ResamplingConstants();
-
+            constants.enablePreviousTLAS = pathTracingSetting.enablePreviousTLAS ? 1u : 0u;
+            constants.denoiserMode = pathTracingSetting.denoiserMode;
+            // constants.sceneConstants.enableAlphaTestedGeometry = lightingSettings.enableAlphaTestedGeometry;
+            // constants.sceneConstants.enableTransparentGeometry = lightingSettings.enableTransparentGeometry;
+            constants.visualizeRegirCells = pathTracingSetting.visualizeRegirCells ? 1u : 0u;
 
             constants.lightBufferParams = isContext.GetLightBufferParameters();
             constants.localLightsRISBufferSegmentParams = isContext.GetLocalLightRISBufferSegmentParams();
             constants.environmentLightRISBufferSegmentParams = isContext.GetEnvironmentLightRISBufferSegmentParams();
             constants.runtimeParams = isContext.GetReSTIRDIContext().GetRuntimeParams();
 
-
-            constants.frameIndex = restirDiContext.GetFrameIndex();
-            constants.showReGIRCell = pathTracingSetting.showReGIRCell ? 1u : 0u;
-
- 
-
-            FillReSTIRDIConstants(ref constants.restirDI, restirDiContext, constants.lightBufferParams);
+            FillReSTIRDIConstants(ref constants.restirDI, isContext.GetReSTIRDIContext(), isContext.GetLightBufferParameters());
             FillReGIRConstants(ref constants.regir, isContext.GetReGIRContext());
+            FillReSTIRGIConstants(ref constants.restirGI, isContext.GetReSTIRGIContext());
 
-            constants.localLightPdfTextureSize = rtxdiResources.Scene.localLightPdfTextureSize;
+
+            constants.localLightPdfTextureSize = _gpuScene.localLightPdfTextureSize;
+
+            // if (lightBufferParameters.environmentLightParams.lightPresent)
+            // {
+            //     constants.environmentPdfTextureSize = m_environmentPdfTextureSize;
+            // }
+
+            // m_currentFrameOutputReservoir = isContext.GetReSTIRDIContext().GetBufferIndices().shadingInputBufferIndex;
+        }
+
+
+        private void FillBRDFPTConstants(ref BRDFPathTracing_Parameters constants, RTXDI_LightBufferParameters getLightBufferParameters)
+        {
+            constants = pathTracingSetting.brdfptParams;
+            constants.materialOverrideParams.minSecondaryRoughness = 0;
+            constants.materialOverrideParams.roughnessOverride = -1.0f;
+            constants.materialOverrideParams.metalnessOverride = -1.0f;
+            constants.secondarySurfaceReSTIRDIParams.initialSamplingParams.environmentMapImportanceSampling = 0;
+            if (constants.secondarySurfaceReSTIRDIParams.initialSamplingParams.environmentMapImportanceSampling == 0)
+                constants.secondarySurfaceReSTIRDIParams.initialSamplingParams.numPrimaryEnvironmentSamples = 0;
+        }
+
+
+        private ResamplingConstants GetResamplingConstants(
+            ImportanceSamplingContext isContext
+            , RtxdiResources rtxdiResources
+            , CameraFrameState frameState)
+        {
+            var restirDIContext = isContext.GetReSTIRDIContext();
+            var restirGIContext = isContext.GetReSTIRGIContext();
+
+
+            RTXDI_LightBufferParameters lightBufferParams = _gpuScene.GetLightBufferParameters();
+            isContext.SetLightBufferParams(lightBufferParams);
+            restirDIContext.SetFrameIndex(frameState.FrameIndex);
+            restirDIContext.SetResamplingMode(pathTracingSetting.resamplingMode);
+            restirDIContext.SetInitialSamplingParameters(pathTracingSetting.initialSamplingParams);
+            restirDIContext.SetTemporalResamplingParameters(pathTracingSetting.temporalResamplingParams);
+            restirDIContext.SetSpatialResamplingParameters(pathTracingSetting.spatialResamplingParams);
+            restirDIContext.SetShadingParameters(pathTracingSetting.shadingParams);
+
+            var regirContext = isContext.GetReGIRContext();
+            pathTracingSetting.regirDynamicParams.center = frameState.camPos;
+            regirContext.SetDynamicParameters(pathTracingSetting.regirDynamicParams);
+
+
+            var constants = new ResamplingConstants();
+
+            constants.frameIndex = restirDIContext.GetFrameIndex();
+            constants.denoiserMode = pathTracingSetting.denoiserMode;
+
+            constants.enableBrdfIndirect = 0;
+            constants.enableBrdfAdditiveBlend = 0;
+            constants.enableAccumulation = 0;
+
+            // constants.sceneConstants.enableEnvironmentMap = (environmentLight.textureIndex >= 0);
+            // constants.sceneConstants.environmentMapTextureIndex = (environmentLight.textureIndex >= 0) ? environmentLight.textureIndex : 0;
+            // constants.sceneConstants.environmentScale = environmentLight.radianceScale.x;
+            // constants.sceneConstants.environmentRotation = environmentLight.rotation;
+
+
+            FillResamplingConstants(ref constants, isContext);
+            FillBRDFPTConstants(ref constants.brdfPT, isContext.GetLightBufferParameters());
+
+            constants.brdfPT.enableIndirectEmissiveSurfaces = 0;
+            constants.brdfPT.enableReSTIRGI = 1;
+
+
+            // ReSTIRGI_BufferIndices restirGIBufferIndices = restirGIContext.GetBufferIndices();
+            // m_currentFrameGIOutputReservoir = restirGIBufferIndices.finalShadingInputBufferIndex;
 
 
             return constants;
         }
+
 
         private static int2 ComputeOutputResolution(CameraData cameraData)
         {

@@ -69,6 +69,7 @@ namespace PathTracing
 
         [FoldoutHeader("RTXDI")]
         public bool enableRtxdi;
+
         public bool debugRtxdi;
         public bool useComputeForGIS;
         public bool useComputeForTemporalResampling;
@@ -80,25 +81,89 @@ namespace PathTracing
 
         public ReSTIRDI_ResamplingMode resamplingMode;
         public bool gShowLight;
-        
+
         public ReSTIRDI_InitialSamplingParameters initialSamplingParams;
         public ReSTIRDI_TemporalResamplingParameters temporalResamplingParams;
         public ReSTIRDI_SpatialResamplingParameters spatialResamplingParams;
         public ReSTIRDI_ShadingParameters shadingParams;
 
         public ReGIRDynamicParameters regirDynamicParams;
-        public bool showReGIRCell;
+
         public bool prepareLight;
         public bool enableFinalShading;
         public bool enableEnv;
-        
+
+
+        public uint denoiserMode = 0;
+
+        public bool enablePreviousTLAS = true;
+        public bool enableAlphaTestedGeometry = true;
+        public bool enableTransparentGeometry = true;
+        public bool enableRayCounts = true;
+        public bool visualizeRegirCells = false;
+
+        public bool enableGradients = true;
+        public float gradientLogDarknessBias = -12.0f;
+        public float gradientSensitivity = 8.0f;
+        public float confidenceHistoryLength = 0.75f;
+
+        public BRDFPathTracing_Parameters brdfptParams = GetDefaultBRDFPathTracingParams();
+
+
+        static BRDFPathTracing_MaterialOverrideParameters GetDefaultBRDFPathTracingMaterialOverrideParams()
+        {
+            BRDFPathTracing_MaterialOverrideParameters p;
+            p.metalnessOverride = 0.5f;
+            p.minSecondaryRoughness = 0.5f;
+            p.roughnessOverride = 0.5f;
+            p.pad1 = 0;
+            return p;
+        }
+
+
+        static BRDFPathTracing_SecondarySurfaceReSTIRDIParameters GetDefaultBRDFPathTracingSecondarySurfaceReSTIRDIParams()
+        {
+            BRDFPathTracing_SecondarySurfaceReSTIRDIParameters p = default;
+
+            p.initialSamplingParams.localLightSamplingMode = ReSTIRDI_LocalLightSamplingMode.ReGIR_RIS;
+            p.initialSamplingParams.numPrimaryLocalLightSamples = 2;
+            p.initialSamplingParams.numPrimaryInfiniteLightSamples = 1;
+            p.initialSamplingParams.numPrimaryEnvironmentSamples = 1;
+            p.initialSamplingParams.numPrimaryBrdfSamples = 0;
+            p.initialSamplingParams.brdfCutoff = 0;
+            p.initialSamplingParams.enableInitialVisibility = 0;
+
+            p.spatialResamplingParams.numSpatialSamples = 1;
+            p.spatialResamplingParams.spatialSamplingRadius = 4.0f;
+            p.spatialResamplingParams.spatialBiasCorrection = ReSTIRDI_SpatialBiasCorrectionMode.Basic;
+            p.spatialResamplingParams.numDisocclusionBoostSamples = 0; // Disabled
+            p.spatialResamplingParams.spatialDepthThreshold = 0.1f;
+            p.spatialResamplingParams.spatialNormalThreshold = 0.9f;
+
+            return p;
+        }
+
+        public static BRDFPathTracing_Parameters GetDefaultBRDFPathTracingParams()
+        {
+            BRDFPathTracing_Parameters p;
+            p.enableIndirectEmissiveSurfaces = 0;
+            p.enableSecondaryResampling = 0;
+            p.enableReSTIRGI = 0;
+            p.pad1 = 0;
+            p.materialOverrideParams = GetDefaultBRDFPathTracingMaterialOverrideParams();
+            p.secondarySurfaceReSTIRDIParams = GetDefaultBRDFPathTracingSecondarySurfaceReSTIRDIParams();
+
+            return p;
+        }
+
+
         [FoldoutHeader("Base Settings")]
         [Range(0.001f, 10f)]
         public float sunAngularDiameter = 0.533f;
-  
-        [Range(-10f, 10f)] 
+
+        [Range(-10f, 10f)]
         public float exposureEv = 0.0f;
-        
+
         public float exposure => Mathf.Pow(2, exposureEv);
 
         public UpscalerMode upscalerMode = UpscalerMode.NATIVE;
@@ -216,7 +281,6 @@ namespace PathTracing
         public bool sharcDebug = false;
 
         [FoldoutHeader("次表面散射")]
-
         [Tooltip("SSS 阴影阈值：皮肤在该 NoL 值以下时开始渐入散射（默认 -0.2，允许背透光）")]
         [Range(-1.0f, 0.1f)]
         public float sssMinThreshold = -0.2f;
