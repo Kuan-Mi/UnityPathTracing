@@ -29,6 +29,7 @@ namespace PathTracing
         public Material finalMaterial;
 
         public RayTracingShader gBufferTracingShader;
+        public RayTracingShader brdfRayTracingShader;
         public RayTracingShader generateInitialShader;
         public ComputeShader generateInitialComputeCs;
 
@@ -45,8 +46,6 @@ namespace PathTracing
         public ComputeShader presampleCs;
         public ComputeShader presampleReGirCs;
         public ComputeShader genMipsCs;
-
-        public Texture2D env;
 
         private OutputBlitPass _outputBlitPass;
 
@@ -65,8 +64,11 @@ namespace PathTracing
         private PresampleReGirLightsPass _presampleReGirLightsPass;
         private GenerateMipsPass _generateMipsPass;
 
+        private BrdfRayTracingPass _brdfRayTracingPass;
+
 
         private DlssRRPass _dlssrrPass;
+        private RxtdiDlssBeforePass _rtxdiDlssBeforePass;
 
 
         private RayTracingAccelerationStructure _accelerationStructure;
@@ -168,6 +170,11 @@ namespace PathTracing
                 renderPassEvent = renderPassEvent
             };
 
+            _brdfRayTracingPass ??= new BrdfRayTracingPass(brdfRayTracingShader)
+            {
+                renderPassEvent = renderPassEvent
+            };
+
             _pdfTexturePass ??= new PdfTexturePass(pdfTextureCs)
             {
                 renderPassEvent = renderPassEvent
@@ -184,10 +191,16 @@ namespace PathTracing
             };
 
 
-            _dlssrrPass ??= new DlssRRPass(dlssBeforeCs)
+            _rtxdiDlssBeforePass ??= new RxtdiDlssBeforePass(dlssBeforeCs)
             {
                 renderPassEvent = renderPassEvent
             };
+
+            _dlssrrPass ??= new DlssRRPass()
+            {
+                renderPassEvent = renderPassEvent
+            };
+
             _outputBlitPass ??= new OutputBlitPass(finalMaterial)
             {
                 renderPassEvent = renderPassEvent
@@ -367,333 +380,331 @@ namespace PathTracing
 
             #endregion
 
-            if (pathTracingSetting.enableRtxdi)
+
+            var pdfResource = new PdfTexturePass.Resource
             {
-                var pdfResource = new PdfTexturePass.Resource
+                ResamplingConstantBuffer = _resamplingConstantBuffer,
+                u_LocalLightPdfTexture = _gpuScene.localLightPdfTexture,
+                RtxdiResources = rtxdiResources
+            };
+
+            var pdfSettings = new PdfTexturePass.Settings
+            {
+            };
+
+
+            _pdfTexturePass.Setup(pdfResource, pdfSettings);
+            renderer.EnqueuePass(_pdfTexturePass);
+
+
+            var genMipsResource = new GenerateMipsPass.Resource
+            {
+                u_LocalLightPdfTexture = _gpuScene.localLightPdfTexture,
+            };
+
+            var genMipsSettings = new GenerateMipsPass.Settings
+            {
+                width = _gpuScene.localLightPdfTexture.rt.width,
+                height = _gpuScene.localLightPdfTexture.rt.height,
+                mipCount = _gpuScene.localLightPdfTexture.rt.mipmapCount
+            };
+
+            _generateMipsPass.Setup(genMipsResource, genMipsSettings);
+            renderer.EnqueuePass(_generateMipsPass);
+
+            if (pathTracingSetting.initialSamplingParams.localLightSamplingMode != ReSTIRDI_LocalLightSamplingMode.Uniform)
+            {
+                var preResource = new PresamplePass.Resource
                 {
+                    ConstantBuffer = _constantBuffer,
                     ResamplingConstantBuffer = _resamplingConstantBuffer,
                     u_LocalLightPdfTexture = _gpuScene.localLightPdfTexture,
+
                     RtxdiResources = rtxdiResources
                 };
+                var RTXDI_PRESAMPLING_GROUP_SIZE = 256;
+                var x = (isContext.GetLocalLightRISBufferSegmentParams().tileSize + RTXDI_PRESAMPLING_GROUP_SIZE - 1) / RTXDI_PRESAMPLING_GROUP_SIZE;
+                var y = isContext.GetLocalLightRISBufferSegmentParams().tileCount;
 
-                var pdfSettings = new PdfTexturePass.Settings
+                // dm::int2 presampleDispatchSize = {
+                //     dm::div_ceil(isContext.GetLocalLightRISBufferSegmentParams().tileSize, RTXDI_PRESAMPLING_GROUP_SIZE),
+                //     int(isContext.GetLocalLightRISBufferSegmentParams().tileCount)
+                // };
+
+
+                var preSettings = new PresamplePass.Settings
                 {
+                    x = (int)x,
+                    y = (int)y,
+                    z = 1
                 };
 
+                _presamplePass.Setup(preResource, preSettings);
+                renderer.EnqueuePass(_presamplePass);
+            }
 
-                _pdfTexturePass.Setup(pdfResource, pdfSettings);
-                renderer.EnqueuePass(_pdfTexturePass);
-
-
-                var genMipsResource = new GenerateMipsPass.Resource
-                {
-                    u_LocalLightPdfTexture = _gpuScene.localLightPdfTexture,
-                };
-
-                var genMipsSettings = new GenerateMipsPass.Settings
-                {
-                    width = _gpuScene.localLightPdfTexture.rt.width,
-                    height = _gpuScene.localLightPdfTexture.rt.height,
-                    mipCount = _gpuScene.localLightPdfTexture.rt.mipmapCount
-                };
-
-                _generateMipsPass.Setup(genMipsResource, genMipsSettings);
-                renderer.EnqueuePass(_generateMipsPass);
-
-                if (pathTracingSetting.initialSamplingParams.localLightSamplingMode != ReSTIRDI_LocalLightSamplingMode.Uniform)
-                {
-                    var preResource = new PresamplePass.Resource
-                    {
-                        ConstantBuffer = _constantBuffer,
-                        ResamplingConstantBuffer = _resamplingConstantBuffer,
-                        u_LocalLightPdfTexture = _gpuScene.localLightPdfTexture,
-
-                        RtxdiResources = rtxdiResources
-                    };
-                    var RTXDI_PRESAMPLING_GROUP_SIZE = 256;
-                    var x = (isContext.GetLocalLightRISBufferSegmentParams().tileSize + RTXDI_PRESAMPLING_GROUP_SIZE - 1) / RTXDI_PRESAMPLING_GROUP_SIZE;
-                    var y = isContext.GetLocalLightRISBufferSegmentParams().tileCount;
-
-                    // dm::int2 presampleDispatchSize = {
-                    //     dm::div_ceil(isContext.GetLocalLightRISBufferSegmentParams().tileSize, RTXDI_PRESAMPLING_GROUP_SIZE),
-                    //     int(isContext.GetLocalLightRISBufferSegmentParams().tileCount)
-                    // };
-
-
-                    var preSettings = new PresamplePass.Settings
-                    {
-                        x = (int)x,
-                        y = (int)y,
-                        z = 1
-                    };
-
-                    _presamplePass.Setup(preResource, preSettings);
-                    renderer.EnqueuePass(_presamplePass);
-                }
-
-                if (pathTracingSetting.initialSamplingParams.localLightSamplingMode == ReSTIRDI_LocalLightSamplingMode.ReGIR_RIS)
-                {
-                    var preReGirResource = new PresampleReGirLightsPass.Resource
-                    {
-                        ConstantBuffer = _constantBuffer,
-                        ResamplingConstantBuffer = _resamplingConstantBuffer,
-                        u_LocalLightPdfTexture = _gpuScene.localLightPdfTexture,
-
-                        RtxdiResources = rtxdiResources
-                    };
-                    var ReGIR_TILE_SIZE = 256;
-
-                    var regirContext = isContext.GetReGIRContext();
-                    var x = (regirContext.GetReGIRLightSlotCount() + ReGIR_TILE_SIZE - 1) / ReGIR_TILE_SIZE;
-
-
-                    var preReGirSettings = new PresampleReGirLightsPass.Settings
-                    {
-                        x = (int)x,
-                        y = 1,
-                        z = 1
-                    };
-
-                    _presampleReGirLightsPass.Setup(preReGirResource, preReGirSettings);
-                    renderer.EnqueuePass(_presampleReGirLightsPass);
-                }
-
-                // GenerateInitialSamplesPass
-                var gisResource = new GenerateInitialSamplesPass.Resource
+            if (pathTracingSetting.initialSamplingParams.localLightSamplingMode == ReSTIRDI_LocalLightSamplingMode.ReGIR_RIS)
+            {
+                var preReGirResource = new PresampleReGirLightsPass.Resource
                 {
                     ConstantBuffer = _constantBuffer,
                     ResamplingConstantBuffer = _resamplingConstantBuffer,
-                    t_GeometryInstanceToLight = _gpuScene._geometryInstanceToLight,
-
-                    ViewDepth = viewDepth,
-                    DiffuseAlbedo = diffuseAlbedo,
-                    SpecularRough = specularRough,
-                    Normals = normals,
-                    GeoNormals = geoNormals,
-
-
                     u_LocalLightPdfTexture = _gpuScene.localLightPdfTexture,
 
-                    RtxdiResources = rtxdiResources,
+                    RtxdiResources = rtxdiResources
+                };
+                var ReGIR_TILE_SIZE = 256;
+
+                var regirContext = isContext.GetReGIRContext();
+                var x = (regirContext.GetReGIRLightSlotCount() + ReGIR_TILE_SIZE - 1) / ReGIR_TILE_SIZE;
+
+
+                var preReGirSettings = new PresampleReGirLightsPass.Settings
+                {
+                    x = (int)x,
+                    y = 1,
+                    z = 1
                 };
 
-                var gisSettings = new GenerateInitialSamplesPass.Settings
+                _presampleReGirLightsPass.Setup(preReGirResource, preReGirSettings);
+                renderer.EnqueuePass(_presampleReGirLightsPass);
+            }
+
+            // GenerateInitialSamplesPass
+            var gisResource = new GenerateInitialSamplesPass.Resource
+            {
+                ConstantBuffer = _constantBuffer,
+                ResamplingConstantBuffer = _resamplingConstantBuffer,
+                t_GeometryInstanceToLight = _gpuScene._geometryInstanceToLight,
+
+                ViewDepth = viewDepth,
+                DiffuseAlbedo = diffuseAlbedo,
+                SpecularRough = specularRough,
+                Normals = normals,
+                GeoNormals = geoNormals,
+
+
+                u_LocalLightPdfTexture = _gpuScene.localLightPdfTexture,
+
+                RtxdiResources = rtxdiResources,
+            };
+
+            var gisSettings = new GenerateInitialSamplesPass.Settings
+            {
+                m_RenderResolution = new int2(cam.pixelWidth, cam.pixelHeight),
+                resolutionScale = pathTracingSetting.resolutionScale,
+            };
+
+            if (pathTracingSetting.useComputeForGIS)
+            {
+                var gisComputeResource = new GenerateInitialSamplesComputePass.Resource
                 {
-                    m_RenderResolution = new int2(cam.pixelWidth, cam.pixelHeight),
-                    resolutionScale = pathTracingSetting.resolutionScale,
+                    ConstantBuffer = gisResource.ConstantBuffer,
+                    ResamplingConstantBuffer = gisResource.ResamplingConstantBuffer,
+                    t_GeometryInstanceToLight = gisResource.t_GeometryInstanceToLight,
+                    ViewDepth = gisResource.ViewDepth,
+                    DiffuseAlbedo = gisResource.DiffuseAlbedo,
+                    SpecularRough = gisResource.SpecularRough,
+                    Normals = gisResource.Normals,
+                    GeoNormals = gisResource.GeoNormals,
+                    u_LocalLightPdfTexture = gisResource.u_LocalLightPdfTexture,
+                    RtxdiResources = gisResource.RtxdiResources,
                 };
-
-                if (pathTracingSetting.useComputeForGIS)
+                var gisComputeSettings = new GenerateInitialSamplesComputePass.Settings
                 {
-                    var gisComputeResource = new GenerateInitialSamplesComputePass.Resource
-                    {
-                        ConstantBuffer = gisResource.ConstantBuffer,
-                        ResamplingConstantBuffer = gisResource.ResamplingConstantBuffer,
-                        t_GeometryInstanceToLight = gisResource.t_GeometryInstanceToLight,
-                        ViewDepth = gisResource.ViewDepth,
-                        DiffuseAlbedo = gisResource.DiffuseAlbedo,
-                        SpecularRough = gisResource.SpecularRough,
-                        Normals = gisResource.Normals,
-                        GeoNormals = gisResource.GeoNormals,
-                        u_LocalLightPdfTexture = gisResource.u_LocalLightPdfTexture,
-                        RtxdiResources = gisResource.RtxdiResources,
-                    };
-                    var gisComputeSettings = new GenerateInitialSamplesComputePass.Settings
-                    {
-                        m_RenderResolution = gisSettings.m_RenderResolution,
-                        resolutionScale = gisSettings.resolutionScale,
-                    };
-                    _generateInitialSamplesComputePass.Setup(gisComputeResource, gisComputeSettings);
-                    renderer.EnqueuePass(_generateInitialSamplesComputePass);
-                }
-                else
-                {
-                    _generateInitialSamplesPass.Setup(gisResource, gisSettings);
-                    renderer.EnqueuePass(_generateInitialSamplesPass);
-                }
+                    m_RenderResolution = gisSettings.m_RenderResolution,
+                    resolutionScale = gisSettings.resolutionScale,
+                };
+                _generateInitialSamplesComputePass.Setup(gisComputeResource, gisComputeSettings);
+                renderer.EnqueuePass(_generateInitialSamplesComputePass);
+            }
+            else
+            {
+                _generateInitialSamplesPass.Setup(gisResource, gisSettings);
+                renderer.EnqueuePass(_generateInitialSamplesPass);
+            }
 
 
-                // TemporalResamplingPass
-                if (pathTracingSetting.enableTemporalResampling)
-                {
-                    var temResource = new TemporalResamplingPass.Resource
-                    {
-                        ConstantBuffer = _constantBuffer,
-                        ResamplingConstantBuffer = _resamplingConstantBuffer,
-
-                        Mv = pool.GetRT(RenderResourceType.RtxdiMotionVectors),
-                        DirectLighting = pool.GetRT(RenderResourceType.DirectLighting),
-
-
-                        ViewDepth = viewDepth,
-                        DiffuseAlbedo = diffuseAlbedo,
-                        SpecularRough = specularRough,
-                        Normals = normals,
-                        GeoNormals = geoNormals,
-
-                        PrevViewDepth = prevViewDepth,
-                        PrevDiffuseAlbedo = prevDiffuseAlbedo,
-                        PrevSpecularRough = prevSpecularRough,
-                        PrevNormals = prevNormals,
-                        PrevGeoNormals = prevGeoNormals,
-
-                        RtxdiResources = rtxdiResources,
-                    };
-
-                    var temSettings = new TemporalResamplingPass.Settings
-                    {
-                        m_RenderResolution = new int2(cam.pixelWidth, cam.pixelHeight),
-                        resolutionScale = pathTracingSetting.resolutionScale,
-                    };
-
-                    if (pathTracingSetting.useComputeForTemporalResampling)
-                    {
-                        var temComputeResource = new TemporalResamplingComputePass.Resource
-                        {
-                            ConstantBuffer = temResource.ConstantBuffer,
-                            ResamplingConstantBuffer = temResource.ResamplingConstantBuffer,
-                            Mv = temResource.Mv,
-                            DirectLighting = temResource.DirectLighting,
-                            ViewDepth = temResource.ViewDepth,
-                            DiffuseAlbedo = temResource.DiffuseAlbedo,
-                            SpecularRough = temResource.SpecularRough,
-                            Normals = temResource.Normals,
-                            GeoNormals = temResource.GeoNormals,
-                            PrevViewDepth = temResource.PrevViewDepth,
-                            PrevDiffuseAlbedo = temResource.PrevDiffuseAlbedo,
-                            PrevSpecularRough = temResource.PrevSpecularRough,
-                            PrevNormals = temResource.PrevNormals,
-                            PrevGeoNormals = temResource.PrevGeoNormals,
-                            RtxdiResources = temResource.RtxdiResources,
-                        };
-                        var temComputeSettings = new TemporalResamplingComputePass.Settings
-                        {
-                            m_RenderResolution = temSettings.m_RenderResolution,
-                            resolutionScale = temSettings.resolutionScale,
-                        };
-                        _temporalResamplingComputePass.Setup(temComputeResource, temComputeSettings);
-                        renderer.EnqueuePass(_temporalResamplingComputePass);
-                    }
-                    else
-                    {
-                        _temporalResamplingPass.Setup(temResource, temSettings);
-                        renderer.EnqueuePass(_temporalResamplingPass);
-                    }
-                }
-
-
-                // SpatialResamplingPass
-                if (pathTracingSetting.enableSpatialResampling)
-                {
-                    var SpResource = new SpatialResamplingPass.Resource
-                    {
-                        ConstantBuffer = _constantBuffer,
-                        ResamplingConstantBuffer = _resamplingConstantBuffer,
-
-
-                        ViewDepth = viewDepth,
-                        DiffuseAlbedo = diffuseAlbedo,
-                        SpecularRough = specularRough,
-                        Normals = normals,
-                        GeoNormals = geoNormals,
-
-
-                        RtxdiResources = rtxdiResources,
-                    };
-
-                    var SpSettings = new SpatialResamplingPass.Settings
-                    {
-                        m_RenderResolution = new int2(cam.pixelWidth, cam.pixelHeight),
-                        resolutionScale = pathTracingSetting.resolutionScale,
-                    };
-
-                    if (pathTracingSetting.useComputeForSpatialResampling)
-                    {
-                        var spComputeResource = new SpatialResamplingComputePass.Resource
-                        {
-                            ConstantBuffer = SpResource.ConstantBuffer,
-                            ResamplingConstantBuffer = SpResource.ResamplingConstantBuffer,
-                            ViewDepth = SpResource.ViewDepth,
-                            DiffuseAlbedo = SpResource.DiffuseAlbedo,
-                            SpecularRough = SpResource.SpecularRough,
-                            Normals = SpResource.Normals,
-                            GeoNormals = SpResource.GeoNormals,
-                            RtxdiResources = SpResource.RtxdiResources,
-                        };
-                        var spComputeSettings = new SpatialResamplingComputePass.Settings
-                        {
-                            m_RenderResolution = SpSettings.m_RenderResolution,
-                            resolutionScale = SpSettings.resolutionScale,
-                        };
-                        _spatialResamplingComputePass.Setup(spComputeResource, spComputeSettings);
-                        renderer.EnqueuePass(_spatialResamplingComputePass);
-                    }
-                    else
-                    {
-                        _spatialResamplingPass.Setup(SpResource, SpSettings);
-                        renderer.EnqueuePass(_spatialResamplingPass);
-                    }
-                }
-
-
-                // ShadeSamplesPass
-                var shaResource = new ShadeSamplesPass.Resource
+            // TemporalResamplingPass
+            if (pathTracingSetting.enableTemporalResampling)
+            {
+                var temResource = new TemporalResamplingPass.Resource
                 {
                     ConstantBuffer = _constantBuffer,
                     ResamplingConstantBuffer = _resamplingConstantBuffer,
-                    t_GeometryInstanceToLight = _gpuScene._geometryInstanceToLight,
 
-                    ViewDepth = viewDepth,
-                    DiffuseAlbedo = diffuseAlbedo,
-                    SpecularRough = specularRough,
-                    Normals = normals,
-                    GeoNormals = geoNormals,
-
+                    Mv = pool.GetRT(RenderResourceType.RtxdiMotionVectors),
                     DirectLighting = pool.GetRT(RenderResourceType.DirectLighting),
 
-                    Emissive = pool.GetRT(RenderResourceType.RtxdiEmissive),
+
+                    ViewDepth = viewDepth,
+                    DiffuseAlbedo = diffuseAlbedo,
+                    SpecularRough = specularRough,
+                    Normals = normals,
+                    GeoNormals = geoNormals,
+
+                    PrevViewDepth = prevViewDepth,
+                    PrevDiffuseAlbedo = prevDiffuseAlbedo,
+                    PrevSpecularRough = prevSpecularRough,
+                    PrevNormals = prevNormals,
+                    PrevGeoNormals = prevGeoNormals,
+
+                    RtxdiResources = rtxdiResources,
+                };
+
+                var temSettings = new TemporalResamplingPass.Settings
+                {
+                    m_RenderResolution = new int2(cam.pixelWidth, cam.pixelHeight),
+                    resolutionScale = pathTracingSetting.resolutionScale,
+                };
+
+                if (pathTracingSetting.useComputeForTemporalResampling)
+                {
+                    var temComputeResource = new TemporalResamplingComputePass.Resource
+                    {
+                        ConstantBuffer = temResource.ConstantBuffer,
+                        ResamplingConstantBuffer = temResource.ResamplingConstantBuffer,
+                        Mv = temResource.Mv,
+                        DirectLighting = temResource.DirectLighting,
+                        ViewDepth = temResource.ViewDepth,
+                        DiffuseAlbedo = temResource.DiffuseAlbedo,
+                        SpecularRough = temResource.SpecularRough,
+                        Normals = temResource.Normals,
+                        GeoNormals = temResource.GeoNormals,
+                        PrevViewDepth = temResource.PrevViewDepth,
+                        PrevDiffuseAlbedo = temResource.PrevDiffuseAlbedo,
+                        PrevSpecularRough = temResource.PrevSpecularRough,
+                        PrevNormals = temResource.PrevNormals,
+                        PrevGeoNormals = temResource.PrevGeoNormals,
+                        RtxdiResources = temResource.RtxdiResources,
+                    };
+                    var temComputeSettings = new TemporalResamplingComputePass.Settings
+                    {
+                        m_RenderResolution = temSettings.m_RenderResolution,
+                        resolutionScale = temSettings.resolutionScale,
+                    };
+                    _temporalResamplingComputePass.Setup(temComputeResource, temComputeSettings);
+                    renderer.EnqueuePass(_temporalResamplingComputePass);
+                }
+                else
+                {
+                    _temporalResamplingPass.Setup(temResource, temSettings);
+                    renderer.EnqueuePass(_temporalResamplingPass);
+                }
+            }
+
+
+            // SpatialResamplingPass
+            if (pathTracingSetting.enableSpatialResampling)
+            {
+                var SpResource = new SpatialResamplingPass.Resource
+                {
+                    ConstantBuffer = _constantBuffer,
+                    ResamplingConstantBuffer = _resamplingConstantBuffer,
+
+
+                    ViewDepth = viewDepth,
+                    DiffuseAlbedo = diffuseAlbedo,
+                    SpecularRough = specularRough,
+                    Normals = normals,
+                    GeoNormals = geoNormals,
 
 
                     RtxdiResources = rtxdiResources,
                 };
 
-                var shaSettings = new ShadeSamplesPass.Settings
+                var SpSettings = new SpatialResamplingPass.Settings
                 {
                     m_RenderResolution = new int2(cam.pixelWidth, cam.pixelHeight),
                     resolutionScale = pathTracingSetting.resolutionScale,
-                    shading = pathTracingSetting.enableFinalShading
                 };
 
-                if (pathTracingSetting.useComputeForShadeSamples)
+                if (pathTracingSetting.useComputeForSpatialResampling)
                 {
-                    var shaComputeResource = new ShadeSamplesComputePass.Resource
+                    var spComputeResource = new SpatialResamplingComputePass.Resource
                     {
-                        ConstantBuffer = shaResource.ConstantBuffer,
-                        ResamplingConstantBuffer = shaResource.ResamplingConstantBuffer,
-                        t_GeometryInstanceToLight = shaResource.t_GeometryInstanceToLight,
-                        ViewDepth = shaResource.ViewDepth,
-                        DiffuseAlbedo = shaResource.DiffuseAlbedo,
-                        SpecularRough = shaResource.SpecularRough,
-                        Normals = shaResource.Normals,
-                        GeoNormals = shaResource.GeoNormals,
-                        DirectLighting = shaResource.DirectLighting,
-                        RtxdiResources = shaResource.RtxdiResources,
-                        Emissive = shaResource.Emissive,
+                        ConstantBuffer = SpResource.ConstantBuffer,
+                        ResamplingConstantBuffer = SpResource.ResamplingConstantBuffer,
+                        ViewDepth = SpResource.ViewDepth,
+                        DiffuseAlbedo = SpResource.DiffuseAlbedo,
+                        SpecularRough = SpResource.SpecularRough,
+                        Normals = SpResource.Normals,
+                        GeoNormals = SpResource.GeoNormals,
+                        RtxdiResources = SpResource.RtxdiResources,
                     };
-                    var shaComputeSettings = new ShadeSamplesComputePass.Settings
+                    var spComputeSettings = new SpatialResamplingComputePass.Settings
                     {
-                        m_RenderResolution = shaSettings.m_RenderResolution,
-                        resolutionScale = shaSettings.resolutionScale,
-                        shading = shaSettings.shading,
+                        m_RenderResolution = SpSettings.m_RenderResolution,
+                        resolutionScale = SpSettings.resolutionScale,
                     };
-                    _shadeSamplesComputePass.Setup(shaComputeResource, shaComputeSettings);
-                    renderer.EnqueuePass(_shadeSamplesComputePass);
+                    _spatialResamplingComputePass.Setup(spComputeResource, spComputeSettings);
+                    renderer.EnqueuePass(_spatialResamplingComputePass);
                 }
                 else
                 {
-                    _shadeSamplesPass.Setup(shaResource, shaSettings);
-                    renderer.EnqueuePass(_shadeSamplesPass);
+                    _spatialResamplingPass.Setup(SpResource, SpSettings);
+                    renderer.EnqueuePass(_spatialResamplingPass);
                 }
+            }
+
+
+            // ShadeSamplesPass
+            var shaResource = new ShadeSamplesPass.Resource
+            {
+                ConstantBuffer = _constantBuffer,
+                ResamplingConstantBuffer = _resamplingConstantBuffer,
+                t_GeometryInstanceToLight = _gpuScene._geometryInstanceToLight,
+
+                ViewDepth = viewDepth,
+                DiffuseAlbedo = diffuseAlbedo,
+                SpecularRough = specularRough,
+                Normals = normals,
+                GeoNormals = geoNormals,
+
+                DirectLighting = pool.GetRT(RenderResourceType.DirectLighting),
+
+                Emissive = pool.GetRT(RenderResourceType.RtxdiEmissive),
+
+
+                RtxdiResources = rtxdiResources,
+            };
+
+            var shaSettings = new ShadeSamplesPass.Settings
+            {
+                m_RenderResolution = new int2(cam.pixelWidth, cam.pixelHeight),
+                resolutionScale = pathTracingSetting.resolutionScale,
+                shading = pathTracingSetting.enableFinalShading
+            };
+
+            if (pathTracingSetting.useComputeForShadeSamples)
+            {
+                var shaComputeResource = new ShadeSamplesComputePass.Resource
+                {
+                    ConstantBuffer = shaResource.ConstantBuffer,
+                    ResamplingConstantBuffer = shaResource.ResamplingConstantBuffer,
+                    t_GeometryInstanceToLight = shaResource.t_GeometryInstanceToLight,
+                    ViewDepth = shaResource.ViewDepth,
+                    DiffuseAlbedo = shaResource.DiffuseAlbedo,
+                    SpecularRough = shaResource.SpecularRough,
+                    Normals = shaResource.Normals,
+                    GeoNormals = shaResource.GeoNormals,
+                    DirectLighting = shaResource.DirectLighting,
+                    RtxdiResources = shaResource.RtxdiResources,
+                    Emissive = shaResource.Emissive,
+                };
+                var shaComputeSettings = new ShadeSamplesComputePass.Settings
+                {
+                    m_RenderResolution = shaSettings.m_RenderResolution,
+                    resolutionScale = shaSettings.resolutionScale,
+                    shading = shaSettings.shading,
+                };
+                _shadeSamplesComputePass.Setup(shaComputeResource, shaComputeSettings);
+                renderer.EnqueuePass(_shadeSamplesComputePass);
+            }
+            else
+            {
+                _shadeSamplesPass.Setup(shaResource, shaSettings);
+                renderer.EnqueuePass(_shadeSamplesPass);
             }
 
 
@@ -701,8 +712,9 @@ namespace PathTracing
             {
                 input = pool.GetNriResource(pathTracingSetting.debugRtxdi ? RenderResourceType.DirectLighting : RenderResourceType.Composed),
                 output = pool.GetNriResource(RenderResourceType.DlssOutput),
-                mv = pool.GetNriResource(RenderResourceType.MV),
-                depth = pool.GetNriResource(RenderResourceType.Viewz),
+                mv = pool.GetNriResource(RenderResourceType.RtxdiMotionVectors),
+                depth = pool.GetNriResource(isOddFrame ? RenderResourceType.RtxdiViewDepth : RenderResourceType.RtxdiPrevViewDepth),
+
                 diffAlbedo = pool.GetNriResource(RenderResourceType.RrGuideDiffAlbedo),
                 specAlbedo = pool.GetNriResource(RenderResourceType.RrGuideSpecAlbedo),
                 normalRoughness = pool.GetNriResource(RenderResourceType.RrGuideNormalRoughness),
@@ -721,14 +733,14 @@ namespace PathTracing
             };
             var dlssDataPtr = dlrr.GetInteropDataPtr(dlrrInput, dlrrRes);
 
-            var dlssResource = new DlssRRPass.Resource
+
+            var rtxdiDlssBeforeResource = new RxtdiDlssBeforePass.Resource
             {
                 ConstantBuffer = _constantBuffer,
-
-                NormalRoughness = pool.GetRT(RenderResourceType.NormalRoughness),
-                BaseColorMetalness = pool.GetRT(RenderResourceType.BasecolorMetalness),
-                Spec = pool.GetRT(RenderResourceType.SpecRadianceHitdist),
-                ViewZ = pool.GetRT(RenderResourceType.Viewz),
+                ViewDepth = viewDepth,
+                DiffuseAlbedo = diffuseAlbedo,
+                SpecularRough = specularRough,
+                Normals = normals,
 
                 RRGuide_DiffAlbedo = pool.GetRT(RenderResourceType.RrGuideDiffAlbedo),
                 RRGuide_SpecAlbedo = pool.GetRT(RenderResourceType.RrGuideSpecAlbedo),
@@ -736,17 +748,25 @@ namespace PathTracing
                 RRGuide_Normal_Roughness = pool.GetRT(RenderResourceType.RrGuideNormalRoughness),
             };
 
+
             var rectGridW = (int)(cam.pixelWidth * pathTracingSetting.resolutionScale + 0.5f + 15) / 16;
             var rectGridH = (int)(cam.pixelHeight * pathTracingSetting.resolutionScale + 0.5f + 15) / 16;
 
-            var dlssSettings = new DlssRRPass.Settings
+            var rtxdiDlssBeforeSettings = new RxtdiDlssBeforePass.Settings
             {
                 rectGridW = rectGridW,
                 rectGridH = rectGridH,
+            };
+
+            _rtxdiDlssBeforePass.Setup(rtxdiDlssBeforeResource, rtxdiDlssBeforeSettings);
+            renderer.EnqueuePass(_rtxdiDlssBeforePass);
+
+            var dlssSettings = new DlssRRPass.Settings
+            {
                 tmpDisableRR = pathTracingSetting.tmpDisableRR
             };
 
-            _dlssrrPass.Setup(dlssDataPtr, dlssResource, dlssSettings);
+            _dlssrrPass.Setup(dlssDataPtr, dlssSettings);
             renderer.EnqueuePass(_dlssrrPass);
 
 

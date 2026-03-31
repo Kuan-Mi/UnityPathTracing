@@ -43,6 +43,7 @@ namespace PathTracing
         private TransparentPass _transparentPass;
         private AutoExposurePass _autoExposurePass;
         private TaaPass _taaPass;
+        private DlssBeforePass _dlssBeforePass;
         private DlssRRPass _dlssrrPass;
         private ReferencePtPass _referencePtPass;
         private AccumulatePass _accumulatePass;
@@ -151,7 +152,11 @@ namespace PathTracing
             {
                 renderPassEvent = renderPassEvent
             };
-            _dlssrrPass ??= new DlssRRPass(dlssBeforeComputeShader)
+            _dlssBeforePass ??= new DlssBeforePass(dlssBeforeComputeShader)
+            {
+                renderPassEvent = renderPassEvent
+            };
+            _dlssrrPass ??= new DlssRRPass()
             {
                 renderPassEvent = renderPassEvent
             };
@@ -610,7 +615,14 @@ namespace PathTracing
                     };
                     var dlssDataPtr = dlrr.GetInteropDataPtr(dlrrInput, dlrrRes);
 
-                    var dlssResource = new DlssRRPass.Resource
+                    var dlssSettings = new DlssRRPass.Settings
+                    {
+                        tmpDisableRR = pathTracingSetting.tmpDisableRR
+                    };
+
+                    
+
+                    var dlssResource = new DlssBeforePass.Resource
                     {
                         ConstantBuffer = _constantBuffer,
 
@@ -625,14 +637,17 @@ namespace PathTracing
                         RRGuide_Normal_Roughness = pool.GetRT(RenderResourceType.RrGuideNormalRoughness),
                     };
 
-                    var dlssSettings = new DlssRRPass.Settings
+                    var dlssBeforeSettings = new DlssBeforePass.Settings
                     {
                         rectGridW = rectGridW,
                         rectGridH = rectGridH,
                         tmpDisableRR = pathTracingSetting.tmpDisableRR
                     };
 
-                    _dlssrrPass.Setup(dlssDataPtr, dlssResource, dlssSettings);
+                    _dlssBeforePass.Setup(dlssResource, dlssBeforeSettings);
+                    renderer.EnqueuePass(_dlssrrPass);
+                    
+                    _dlssrrPass.Setup(dlssDataPtr, dlssSettings);
                     renderer.EnqueuePass(_dlssrrPass);
                 }
             }

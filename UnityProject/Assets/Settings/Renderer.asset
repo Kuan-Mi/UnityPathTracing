@@ -26,10 +26,10 @@ MonoBehaviour:
     resamplingMode: 3
     gShowLight: 0
     initialSamplingParams:
-      numPrimaryLocalLightSamples: 8
+      numPrimaryLocalLightSamples: 16
       numPrimaryInfiniteLightSamples: 0
       numPrimaryEnvironmentSamples: 0
-      numPrimaryBrdfSamples: 0
+      numPrimaryBrdfSamples: 1
       brdfCutoff: 0.0001
       enableInitialVisibility: 0
       environmentMapImportanceSampling: 0
@@ -68,19 +68,57 @@ MonoBehaviour:
     regirDynamicParams:
       regirCellSize: 4
       center:
-        x: 9.291105
-        y: 11.288212
-        z: 5.350853
+        x: 27.975668
+        y: 1.9918904
+        z: -12.300292
       fallbackSamplingMode: 1
       presamplingMode: 1
       regirSamplingJitter: 1
       regirNumBuildSamples: 8
-    showReGIRCell: 0
     prepareLight: 1
     enableFinalShading: 1
     enableEnv: 1
+    denoiserMode: 0
+    enablePreviousTLAS: 0
+    enableAlphaTestedGeometry: 1
+    enableTransparentGeometry: 1
+    enableRayCounts: 0
+    visualizeRegirCells: 0
+    enableGradients: 0
+    gradientLogDarknessBias: -12
+    gradientSensitivity: 8
+    confidenceHistoryLength: 0.75
+    brdfptParams:
+      enableIndirectEmissiveSurfaces: 0
+      enableSecondaryResampling: 0
+      enableReSTIRGI: 0
+      pad1: 0
+      materialOverrideParams:
+        roughnessOverride: 0.5
+        metalnessOverride: 0.5
+        minSecondaryRoughness: 0.5
+        pad1: 0
+      secondarySurfaceReSTIRDIParams:
+        initialSamplingParams:
+          numPrimaryLocalLightSamples: 2
+          numPrimaryInfiniteLightSamples: 1
+          numPrimaryEnvironmentSamples: 1
+          numPrimaryBrdfSamples: 0
+          brdfCutoff: 0
+          enableInitialVisibility: 0
+          environmentMapImportanceSampling: 0
+          localLightSamplingMode: 2
+        spatialResamplingParams:
+          spatialDepthThreshold: 0.1
+          spatialNormalThreshold: 0.9
+          spatialBiasCorrection: 1
+          numSpatialSamples: 1
+          numDisocclusionBoostSamples: 0
+          spatialSamplingRadius: 4
+          neighborOffsetMask: 0
+          discountNaiveSamples: 0
     sunAngularDiameter: 0.533
-    exposureEv: 3.74
+    exposureEv: 1.61
     upscalerMode: 0
     mipBias: -0.5
     tracingMode: 1
@@ -100,7 +138,7 @@ MonoBehaviour:
     boostFactor: 0.6667
     SR: 0
     RR: 1
-    tmpDisableRR: 1
+    tmpDisableRR: 0
     resolutionScale: 1
     denoisingRange: 1000
     splitScreen: 0
@@ -138,6 +176,7 @@ MonoBehaviour:
   renderPassEvent: 550
   finalMaterial: {fileID: 2100000, guid: 27695a2bc55ef2f469362b9a2994989e, type: 2}
   gBufferTracingShader: {fileID: 4807578003741378534, guid: 1ab7c2addcb74c5db50a841acde800e9, type: 3}
+  brdfRayTracingShader: {fileID: 4807578003741378534, guid: 256eb6f36c0a4e8096aaf8a2d1db24b2, type: 3}
   generateInitialShader: {fileID: 4807578003741378534, guid: d360fd1504e84137ab8253780770f0b6, type: 3}
   generateInitialComputeCs: {fileID: 7200000, guid: 770673c613a448f796dade8286cf87e2, type: 3}
   temporalResamplingShader: {fileID: 4807578003741378534, guid: 190468c66edf4d45b3f8535a3bd6f0d4, type: 3}
@@ -146,12 +185,11 @@ MonoBehaviour:
   spatialResamplingComputeCs: {fileID: 7200000, guid: babe3948aa3dbe54db6dd3ca49c4c633, type: 3}
   shadeSamplesShader: {fileID: 4807578003741378534, guid: 78d7660a5ed54d6fa49f9d2ad6265c82, type: 3}
   shadeSamplesComputeCs: {fileID: 7200000, guid: fbc0f72d4fc11c44983ed086402df26e, type: 3}
-  dlssBeforeCs: {fileID: 7200000, guid: b34d979c2031436aad2b456c4456c6eb, type: 3}
+  dlssBeforeCs: {fileID: 7200000, guid: 67dc866d93db4e5cbf0d2d3992691a90, type: 3}
   pdfTextureCs: {fileID: 7200000, guid: 6d3d83398dc04a9ea285602128206037, type: 3}
   presampleCs: {fileID: 7200000, guid: c7795bf09240c4c40bcb2e51042eb5b5, type: 3}
   presampleReGirCs: {fileID: 7200000, guid: d1988516f4f344d6ba595e7e8a8f44ff, type: 3}
   genMipsCs: {fileID: 7200000, guid: 479eb3f98680430492d6af04d7f3ee14, type: 3}
-  env: {fileID: 2800000, guid: 072bdf4259bafe741baab150c3ab7d07, type: 3}
 --- !u!114 &11400000
 MonoBehaviour:
   m_ObjectHideFlags: 0
