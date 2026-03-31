@@ -123,12 +123,6 @@ void MainMissShader(inout MainRayPayload payload : SV_RayPayload)
     payload.Lemi = Packing::EncodeRgbe(GetSkyIntensity(ray));
 }
 
-[shader("miss")]
-void LightMissShader(inout LightPayload payload : SV_RayPayload)
-{
-    payload.instanceIndex = INF;
-}
-
 uint ToRayFlag(uint flag)
 {
     if (flag == FLAG_TRANSPARENT)

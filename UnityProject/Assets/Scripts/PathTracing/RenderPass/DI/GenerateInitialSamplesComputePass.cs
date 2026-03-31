@@ -41,6 +41,8 @@ namespace PathTracing
             internal RTHandle SpecularRough;
             internal RTHandle Normals;
             internal RTHandle GeoNormals;
+            
+            internal RTHandle DirectLighting;
 
             internal RTHandle u_LocalLightPdfTexture;
 
@@ -88,6 +90,10 @@ namespace PathTracing
             natCmd.SetComputeTextureParam(cs, kernel, "t_GBufferSpecularRough", resource.SpecularRough);
             natCmd.SetComputeTextureParam(cs, kernel, "t_GBufferNormals", resource.Normals);
             natCmd.SetComputeTextureParam(cs, kernel, "t_GBufferGeoNormals", resource.GeoNormals);
+            
+            natCmd.SetComputeTextureParam(cs, kernel, g_DirectLightingID, resource.DirectLighting);
+            
+            
 
             natCmd.SetComputeTextureParam(cs, kernel, "t_LocalLightPdfTexture", resource.u_LocalLightPdfTexture);
 

@@ -507,6 +507,7 @@ namespace PathTracing
                     SpecularRough = gisResource.SpecularRough,
                     Normals = gisResource.Normals,
                     GeoNormals = gisResource.GeoNormals,
+                    DirectLighting = pool.GetRT(RenderResourceType.DirectLighting),
                     u_LocalLightPdfTexture = gisResource.u_LocalLightPdfTexture,
                     RtxdiResources = gisResource.RtxdiResources,
                 };

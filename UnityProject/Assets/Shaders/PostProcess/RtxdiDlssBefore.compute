@@ -11,6 +11,8 @@ Texture2D<uint> gIn_DiffuseAlbedo;
 Texture2D<uint> gIn_SpecularRough;
 Texture2D<uint> gIn_Normals;
 
+// Texture2D<float4> gIn_Spec;
+
 
 RWTexture2D<float3> gOut_DiffAlbedo;
 RWTexture2D<float3> gOut_SpecAlbedo;

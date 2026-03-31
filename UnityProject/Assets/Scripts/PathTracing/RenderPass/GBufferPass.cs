@@ -110,13 +110,11 @@ namespace PathTracing
 
             var resourceData = frameData.Get<UniversalResourceData>();
 
-            var textureDesc = resourceData.activeColorTexture.GetDescriptor(renderGraph);
-            textureDesc.enableRandomWrite = true;
-            textureDesc.depthBufferBits = 0;
-            textureDesc.clearBuffer = false;
-            textureDesc.discardBuffer = false;
-            textureDesc.width = _settings.m_RenderResolution.x;
-            textureDesc.height = _settings.m_RenderResolution.y;
+
+            if (!frameData.Contains<PTContextItem>())
+            {
+                var ptContextItem = frameData.Create<PTContextItem>();
+            }
 
             builder.AllowPassCulling(false);
             builder.SetRenderFunc((PassData data, UnsafeGraphContext context) => { ExecutePass(data, context); });

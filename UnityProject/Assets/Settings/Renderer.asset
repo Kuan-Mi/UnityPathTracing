@@ -14,7 +14,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::PathTracing.RtxdiFeature
   m_Active: 0
   pathTracingSetting:
-    showMode: 1
+    showMode: 23
     showMv: 0
     showValidation: 0
     enableRtxdi: 1
@@ -26,10 +26,10 @@ MonoBehaviour:
     resamplingMode: 3
     gShowLight: 0
     initialSamplingParams:
-      numPrimaryLocalLightSamples: 16
+      numPrimaryLocalLightSamples: 8
       numPrimaryInfiniteLightSamples: 0
       numPrimaryEnvironmentSamples: 0
-      numPrimaryBrdfSamples: 1
+      numPrimaryBrdfSamples: 0
       brdfCutoff: 0.0001
       enableInitialVisibility: 0
       environmentMapImportanceSampling: 0
@@ -68,9 +68,9 @@ MonoBehaviour:
     regirDynamicParams:
       regirCellSize: 4
       center:
-        x: 27.975668
-        y: 1.9918904
-        z: -12.300292
+        x: -1.6708541
+        y: 4.0216007
+        z: -23.77635
       fallbackSamplingMode: 1
       presamplingMode: 1
       regirSamplingJitter: 1
@@ -124,7 +124,7 @@ MonoBehaviour:
     tracingMode: 1
     denoiser: 0
     emissionIntensity: 1
-    cameraJitter: 0
+    cameraJitter: 1
     psr: 0
     emission: 1
     usePrevFrame: 1
@@ -215,9 +215,9 @@ MonoBehaviour:
     probeSamplingDebugTexture: {fileID: 2800000, guid: 24ec0e140fb444a44ab96ee80844e18e, type: 3}
     probeVolumeBlendStatesCS: {fileID: 7200000, guid: b9a23f869c4fd45f19c5ada54dd82176, type: 3}
   m_RendererFeatures:
-  - {fileID: -3771720238137462869}
   - {fileID: 6472496777654564436}
-  m_RendererFeatureMap: ab2faa456d28a8cb54f6f5c986edd259
+  - {fileID: -3771720238137462869}
+  m_RendererFeatureMap: 54f6f5c986edd259ab2faa456d28a8cb
   m_UseNativeRenderPass: 1
   xrSystemData: {fileID: 0}
   postProcessData: {fileID: 11400000, guid: 41439944d30ece34e96484bdb6645b55, type: 2}
@@ -258,9 +258,9 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: f50908f0e9bf42149891b36684931380, type: 3}
   m_Name: PathTracingFeature
   m_EditorClassIdentifier: Assembly-CSharp::PathTracing.PathTracingFeature
-  m_Active: 1
+  m_Active: 0
   pathTracingSetting:
-    showMode: 18
+    showMode: 23
     showMv: 0
     showValidation: 0
     enableRtxdi: 0
@@ -364,7 +364,7 @@ MonoBehaviour:
           neighborOffsetMask: 0
           discountNaiveSamples: 0
     sunAngularDiameter: 0.533
-    exposureEv: 6
+    exposureEv: 1.92
     upscalerMode: 0
     mipBias: -0.5
     tracingMode: 1

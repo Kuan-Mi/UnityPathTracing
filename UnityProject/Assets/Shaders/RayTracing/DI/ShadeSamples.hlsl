@@ -112,7 +112,6 @@ void MainRayGenShader()
 
     uint2 pixelPosition = RTXDI_ReservoirPosToPixelPos(GlobalIndex, params.activeCheckerboardField);
 
-
     RAB_Surface surface = RAB_GetGBufferSurface(pixelPosition, false);
 
     RTXDI_DIReservoir reservoir = RTXDI_LoadDIReservoir(g_Const.restirDI.reservoirBufferParams, GlobalIndex, g_Const.restirDI.bufferIndices.shadingInputBufferIndex);
@@ -123,282 +122,282 @@ void MainRayGenShader()
     float2 currLuminance = 0;
 
 
-    // if (RAB_IsSurfaceValid(surface))
+    if (RTXDI_IsValidDIReservoir(reservoir))
     {
-        if (RTXDI_IsValidDIReservoir(reservoir))
+        RAB_LightInfo lightInfo = RAB_LoadLightInfo(RTXDI_GetDIReservoirLightIndex(reservoir), false);
+
+        RAB_LightSample lightSample = RAB_SamplePolymorphicLight(lightInfo, surface, RTXDI_GetDIReservoirSampleUV(reservoir));
+
+        bool needToStore = ShadeSurfaceWithLightSample(reservoir, surface, lightSample,
+                                                       /* previousFrameTLAS = */ false, /* enableVisibilityReuse = */ true, diffuse, specular, lightDistance);
+
+        // currLuminance = float2(calcLuminance(diffuse * surface.material.diffuseAlbedo), calcLuminance(specular));
+
+        // specular = DemodulateSpecular(surface.material.specularF0, specular);
+
+        // float3 finalColor = ShadeSurfaceWithLightSample(lightSample, surface) * RTXDI_GetDIReservoirInvPdf(reservoir);
+
+        float3 finalColor = (diffuse * surface.material.diffuseAlbedo) + specular;
+
+        finalColor += gIn_EmissiveLighting[pixelPosition];
+        finalColor *= gExposure;
+
+        gOut_DirectLighting[pixelPosition] = finalColor;
+
+        // gOut_DirectLighting[pixelPosition] = diffuse + specular;
+
+        if (needToStore)
         {
-            RAB_LightInfo lightInfo = RAB_LoadLightInfo(RTXDI_GetDIReservoirLightIndex(reservoir), false);
-
-            RAB_LightSample lightSample = RAB_SamplePolymorphicLight(lightInfo, surface, RTXDI_GetDIReservoirSampleUV(reservoir));
-
-            bool needToStore = ShadeSurfaceWithLightSample(reservoir, surface, lightSample,
-                                                           /* previousFrameTLAS = */ false, /* enableVisibilityReuse = */ true, diffuse, specular, lightDistance);
-
-            // currLuminance = float2(calcLuminance(diffuse * surface.material.diffuseAlbedo), calcLuminance(specular));
-
-            // specular = DemodulateSpecular(surface.material.specularF0, specular);
-
-            // float3 finalColor = ShadeSurfaceWithLightSample(lightSample, surface) * RTXDI_GetDIReservoirInvPdf(reservoir);
-
-            float3 finalColor = (diffuse * surface.material.diffuseAlbedo) + specular;
-
-            finalColor += gIn_EmissiveLighting[pixelPosition];
-            finalColor *= gExposure;
-
-            gOut_DirectLighting[pixelPosition] = finalColor;
-
-            // gOut_DirectLighting[pixelPosition] = diffuse + specular;
-
-            if (needToStore)
-            {
-                RTXDI_StoreDIReservoir(reservoir, g_Const.restirDI.reservoirBufferParams, pixelPosition, g_Const.restirDI.bufferIndices.shadingInputBufferIndex);
-            }
-        }
-        else
-        {
-            float3 finalColor = 0;
-            finalColor += gIn_EmissiveLighting[pixelPosition];
-            finalColor *= gExposure;
-
-            gOut_DirectLighting[pixelPosition] = finalColor;
+            RTXDI_StoreDIReservoir(reservoir, g_Const.restirDI.reservoirBufferParams, GlobalIndex, g_Const.restirDI.bufferIndices.shadingInputBufferIndex);
         }
     }
-    // else
-    // {
-    //     gOut_DirectLighting[pixelPosition] = float3(1, 0, 0);
-    // }
+    else
+    {
+        float3 finalColor = 0;
+        finalColor += gIn_EmissiveLighting[pixelPosition];
+        finalColor *= gExposure;
+
+        gOut_DirectLighting[pixelPosition] = finalColor;
+    }
+}
 
 
-    // uint tileSize = g_Const.localLightsRISBufferSegmentParams.tileSize; // 通常是 128 或 256
-    // uint tileCount = g_Const.localLightsRISBufferSegmentParams.tileCount;
-    //
-    // // 2. 确定每个 Tile 在屏幕上显示的尺寸 (假设显示为正方形)
-    // // 如果 tileSize 是 256，则每个块是 16x16；如果是 128，则大约是 11x11
-    // uint side = (uint)sqrt((float)tileSize); 
-    //
-    // // 3. 计算当前像素属于第几个 Tile，以及是该 Tile 里的第几个采样点
-    // uint2 tileGridPos = pixelPosition / side;  // 屏幕上 Tile 的行列坐标
-    // uint2 inTilePos = pixelPosition % side;    // 在当前 Tile 方块内的像素偏移
-    //
-    // // 计算 tileIndex：假设横向平铺
-    // // 我们需要知道屏幕宽度方向能放多少个 Tile 块
-    // // 注意：RTXDI_GetScreenSize() 需要替换为你引擎中获取分辨率的函数或常量
-    // uint tilesPerRow = 785 / side; 
-    //
-    // uint tileIndex = tileGridPos.y * tilesPerRow + tileGridPos.x;
-    // uint sampleInTile = inTilePos.y * side + inTilePos.x;
-    //
-    //
-    //
-    // // gOut_DirectLighting[pixelPosition] = float3(tileGridPos / 16.0f, 0);
-    // // gOut_DirectLighting[pixelPosition] = tileSize;
-    //
-    //
-    // // 4. 边界检查：确保不越界
-    // if (tileIndex < tileCount && sampleInTile < tileSize)
-    // {
-    //     // 计算 Buffer 指针
-    //     uint risBufferPtr = sampleInTile + tileIndex * tileSize;
-    //
-    //     // 读取数据
-    //     uint2 risData = RTXDI_RIS_BUFFER[risBufferPtr];
-    //     uint lightIndex = risData.x & ~RTXDI_LIGHT_COMPACT_BIT;
-    //     float invSourcePdf = asfloat(risData.y);
-    //
-    //     // 5. 可视化处理
-    //     if (lightIndex == 0 && invSourcePdf == 0)
-    //     {
-    //         // 这里的像素可能是空的（没抽中灯）
-    //         gOut_DirectLighting[pixelPosition] = float3(0.05, 0.05, 0.05); 
-    //     }
-    //     else
-    //     {
-    //         // 使用哈希函数将 lightIndex 转换为鲜艳的颜色，以便区分不同的灯
-    //         float3 color;
-    //         color.r = frac(sin(float(lightIndex) * 12.9898) * 43758.5453);
-    //         color.g = frac(sin(float(lightIndex) * 78.233) * 43758.5453);
-    //         color.b = frac(sin(float(lightIndex) * 45.164) * 43758.5453);
-    //     
-    //         // 为了区分 Tile 边界，给每个块加个微小的边框感
-    //         if (inTilePos.x == 0 || inTilePos.y == 0) color *= 0.5;
-    //
-    //         gOut_DirectLighting[pixelPosition] = color;
-    //     }
-    // }
-    // else
-    // {
-    //     // 超出 Tile 总数或屏幕范围的部分显示为黑色
-    //     gOut_DirectLighting[pixelPosition] = float3(0, 0, 0);
-    // }
+gOut_DirectLighting [pixelPosition] = RTXDI_IsValidDIReservoir(reservoir);
+
+// uint tileSize = g_Const.localLightsRISBufferSegmentParams.tileSize; // 通常是 128 或 256
+// uint tileCount = g_Const.localLightsRISBufferSegmentParams.tileCount;
+//
+// // 2. 确定每个 Tile 在屏幕上显示的尺寸 (假设显示为正方形)
+// // 如果 tileSize 是 256，则每个块是 16x16；如果是 128，则大约是 11x11
+// uint side = (uint)sqrt((float)tileSize); 
+//
+// // 3. 计算当前像素属于第几个 Tile，以及是该 Tile 里的第几个采样点
+// uint2 tileGridPos = pixelPosition / side;  // 屏幕上 Tile 的行列坐标
+// uint2 inTilePos = pixelPosition % side;    // 在当前 Tile 方块内的像素偏移
+//
+// // 计算 tileIndex：假设横向平铺
+// // 我们需要知道屏幕宽度方向能放多少个 Tile 块
+// // 注意：RTXDI_GetScreenSize() 需要替换为你引擎中获取分辨率的函数或常量
+// uint tilesPerRow = 785 / side; 
+//
+// uint tileIndex = tileGridPos.y * tilesPerRow + tileGridPos.x;
+// uint sampleInTile = inTilePos.y * side + inTilePos.x;
+//
+//
+//
+// // gOut_DirectLighting[pixelPosition] = float3(tileGridPos / 16.0f, 0);
+// // gOut_DirectLighting[pixelPosition] = tileSize;
+//
+//
+// // 4. 边界检查：确保不越界
+// if (tileIndex < tileCount && sampleInTile < tileSize)
+// {
+//     // 计算 Buffer 指针
+//     uint risBufferPtr = sampleInTile + tileIndex * tileSize;
+//
+//     // 读取数据
+//     uint2 risData = RTXDI_RIS_BUFFER[risBufferPtr];
+//     uint lightIndex = risData.x & ~RTXDI_LIGHT_COMPACT_BIT;
+//     float invSourcePdf = asfloat(risData.y);
+//
+//     // 5. 可视化处理
+//     if (lightIndex == 0 && invSourcePdf == 0)
+//     {
+//         // 这里的像素可能是空的（没抽中灯）
+//         gOut_DirectLighting[pixelPosition] = float3(0.05, 0.05, 0.05); 
+//     }
+//     else
+//     {
+//         // 使用哈希函数将 lightIndex 转换为鲜艳的颜色，以便区分不同的灯
+//         float3 color;
+//         color.r = frac(sin(float(lightIndex) * 12.9898) * 43758.5453);
+//         color.g = frac(sin(float(lightIndex) * 78.233) * 43758.5453);
+//         color.b = frac(sin(float(lightIndex) * 45.164) * 43758.5453);
+//     
+//         // 为了区分 Tile 边界，给每个块加个微小的边框感
+//         if (inTilePos.x == 0 || inTilePos.y == 0) color *= 0.5;
+//
+//         gOut_DirectLighting[pixelPosition] = color;
+//     }
+// }
+// else
+// {
+//     // 超出 Tile 总数或屏幕范围的部分显示为黑色
+//     gOut_DirectLighting[pixelPosition] = float3(0, 0, 0);
+// }
 
 
-    // float3 origin = gCameraGlobalPos;
-    // float3 dir = normalize(surface.worldPos - origin);
-    // uint o_lightIndex;
-    // float2 o_randXY;
-    //
-    // bool hit = RAB_TraceRayForLocalLight(origin, dir, 0, 1000, o_lightIndex, o_randXY);
-    //
-    //
-    // RAB_LightInfo lightInfo = RAB_LoadLightInfo(0, false);
-    // RAB_LightSample lightSample = RAB_SamplePolymorphicLight(lightInfo, surface, o_randXY);
-    //
-    // float3 cc = lightInfo.center;
-    // cc = lightSample.normal;
-    //
-    //
-    // float3 finalColor = ShadeSurfaceWithLightSample(lightSample, surface) ;
-    //
-    // gOut_DirectLighting[pixelPosition] = cc;
+// float3 origin = gCameraGlobalPos;
+// float3 dir = normalize(surface.worldPos - origin);
+// uint o_lightIndex;
+// float2 o_randXY;
+//
+// bool hit = RAB_TraceRayForLocalLight(origin, dir, 0, 1000, o_lightIndex, o_randXY);
+//
+//
+// RAB_LightInfo lightInfo = RAB_LoadLightInfo(0, false);
+// RAB_LightSample lightSample = RAB_SamplePolymorphicLight(lightInfo, surface, o_randXY);
+//
+// float3 cc = lightInfo.center;
+// cc = lightSample.normal;
+//
+//
+// float3 finalColor = ShadeSurfaceWithLightSample(lightSample, surface) ;
+//
+// gOut_DirectLighting[pixelPosition] = cc;
 
-    // RAB_RandomSamplerState coherentRng = RAB_InitRandomSampler(pixelPosition, 1);
-    //
-    //
+// RAB_RandomSamplerState coherentRng = RAB_InitRandomSampler(pixelPosition, 1);
+//
+//
 
-    #if RTXDI_REGIR_MODE !=RTXDI_REGIR_DISABLED
-    if (g_Const.visualizeRegirCells)
+#if RTXDI_REGIR_MODE !=RTXDI_REGIR_DISABLED
+if
+(g_Const
+.
+visualizeRegirCells
+)
     {
         float3 visualize = RTXDI_VisualizeReGIRCells(g_Const.regir, surface.worldPos);
         gOut_DirectLighting[pixelPosition] = visualize;
     }
-    #endif
+#endif
 
-    //
-    // RAB_LightSample lightSample;
-    //
-    // lightSample.position = float3(0, 1, 0);
-    // lightSample.normal = float3(0, -1, 0);
-    // lightSample.radiance = float3(1, 1, 1);
-    // lightSample.solidAnglePdf = 0.5;
-    //
-    //
-    // float pdf_for_surface = RAB_GetLightSampleTargetPdfForSurface(lightSample, surface);
-
-
-    // gOut_DirectLighting[pixelPosition] = pdf_for_surface;
-
-    //
-    // ReGIR_Parameters regirParams = g_Const.regir;
-    // float3 cellCenter;
-    // float cellRadius;
-    // if (!RTXDI_ReGIR_CellIndexToWorldPos(regirParams, int(cellIndex), cellCenter, cellRadius))
-    // {
-    //     return;
-    // }
-    // RAB_LightInfo lightInfo = RAB_LoadLightInfo(0, false);
-    //
-    // float targetPdf = RAB_GetLightTargetPdfForVolume(lightInfo, cellCenter, cellRadius);
-    //
-    // uint risBufferPtr = regirParams.commonParams.risBufferOffset + (cellIndex * regirParams.commonParams.lightsPerCell);
-    //
-    // uint2 risData = RTXDI_RIS_BUFFER[risBufferPtr];
-    //
-    // uint lightIndex = risData.x & ~RTXDI_LIGHT_COMPACT_BIT;
-    // float invSourcePdf = asfloat(risData.y);
-    //
-
-    // cellIndex += 10;
-    // float3 hashColor = float3(
-    //     frac(sin(float(cellIndex) * 12.9898) * 43758.5453),
-    //     frac(sin(float(cellIndex) * 78.233) * 43758.5453),
-    //     frac(sin(float(cellIndex) * 45.164) * 43758.5453)
-    // );
+//
+// RAB_LightSample lightSample;
+//
+// lightSample.position = float3(0, 1, 0);
+// lightSample.normal = float3(0, -1, 0);
+// lightSample.radiance = float3(1, 1, 1);
+// lightSample.solidAnglePdf = 0.5;
+//
+//
+// float pdf_for_surface = RAB_GetLightSampleTargetPdfForSurface(lightSample, surface);
 
 
-    // gOut_DirectLighting[pixelPosition] = invSourcePdf;
+// gOut_DirectLighting[pixelPosition] = pdf_for_surface;
+
+//
+// ReGIR_Parameters regirParams = g_Const.regir;
+// float3 cellCenter;
+// float cellRadius;
+// if (!RTXDI_ReGIR_CellIndexToWorldPos(regirParams, int(cellIndex), cellCenter, cellRadius))
+// {
+//     return;
+// }
+// RAB_LightInfo lightInfo = RAB_LoadLightInfo(0, false);
+//
+// float targetPdf = RAB_GetLightTargetPdfForVolume(lightInfo, cellCenter, cellRadius);
+//
+// uint risBufferPtr = regirParams.commonParams.risBufferOffset + (cellIndex * regirParams.commonParams.lightsPerCell);
+//
+// uint2 risData = RTXDI_RIS_BUFFER[risBufferPtr];
+//
+// uint lightIndex = risData.x & ~RTXDI_LIGHT_COMPACT_BIT;
+// float invSourcePdf = asfloat(risData.y);
+//
+
+// cellIndex += 10;
+// float3 hashColor = float3(
+//     frac(sin(float(cellIndex) * 12.9898) * 43758.5453),
+//     frac(sin(float(cellIndex) * 78.233) * 43758.5453),
+//     frac(sin(float(cellIndex) * 45.164) * 43758.5453)
+// );
 
 
-    // uint tileSize = g_Const.regir.commonParams.lightsPerCell; // 通常是 128 或 256
-    // uint tileCount = 100;
-    //
-    // // 2. 确定每个 Tile 在屏幕上显示的尺寸 (假设显示为正方形)
-    // // 如果 tileSize 是 256，则每个块是 16x16；如果是 128，则大约是 11x11
-    // uint side = (uint)sqrt((float)tileSize); 
-    //
-    // // 3. 计算当前像素属于第几个 Tile，以及是该 Tile 里的第几个采样点
-    // uint2 tileGridPos = pixelPosition / side;  // 屏幕上 Tile 的行列坐标
-    // uint2 inTilePos = pixelPosition % side;    // 在当前 Tile 方块内的像素偏移
-    //
-    // // 计算 tileIndex：假设横向平铺
-    // // 我们需要知道屏幕宽度方向能放多少个 Tile 块
-    // // 注意：RTXDI_GetScreenSize() 需要替换为你引擎中获取分辨率的函数或常量
-    // uint tilesPerRow = 1017 / side; 
-    //
-    // uint tileIndex = tileGridPos.y * tilesPerRow + tileGridPos.x;
-    // uint sampleInTile = inTilePos.y * side + inTilePos.x;
-    //
-    //
-    //
-    // // gOut_DirectLighting[pixelPosition] = float3(tileGridPos / 16.0f, 0);
-    // // gOut_DirectLighting[pixelPosition] = tileSize;
-    //
-    //
-    // // 4. 边界检查：确保不越界
-    // if (tileIndex < tileCount && sampleInTile < tileSize)
-    // {
-    //     // 计算 Buffer 指针
-    //     uint risBufferPtr = sampleInTile + tileIndex * tileSize + g_Const.regir.commonParams.risBufferOffset;
-    //
-    //     // 读取数据
-    //     uint2 risData = RTXDI_RIS_BUFFER[risBufferPtr];
-    //     uint lightIndex = risData.x & ~RTXDI_LIGHT_COMPACT_BIT;
-    //     float invSourcePdf = asfloat(risData.y);
-    //
-    //     // 5. 可视化处理
-    //     if (lightIndex == 0 && invSourcePdf == 0)
-    //     {
-    //         // 这里的像素可能是空的（没抽中灯）
-    //         gOut_DirectLighting[pixelPosition] = float3(1, 0.05, 0.05); 
-    //     }
-    //     else
-    //     {
-    //         // 使用哈希函数将 lightIndex 转换为鲜艳的颜色，以便区分不同的灯
-    //         float3 color;
-    //         color.r = frac(sin(float(lightIndex) * 12.9898) * 43758.5453);
-    //         color.g = frac(sin(float(lightIndex) * 78.233) * 43758.5453);
-    //         color.b = frac(sin(float(lightIndex) * 45.164) * 43758.5453);
-    //     
-    //         color = invSourcePdf;
-    //         // 为了区分 Tile 边界，给每个块加个微小的边框感
-    //         if (inTilePos.x == 0 || inTilePos.y == 0) color *= 0.5;
-    //
-    //         gOut_DirectLighting[pixelPosition] = color;
-    //     }
-    // }
-    // else
-    // {
-    //     // 超出 Tile 总数或屏幕范围的部分显示为黑色
-    //     gOut_DirectLighting[pixelPosition] = float3(0, 0, 0);
-    // }
-    //
-    //
+// gOut_DirectLighting[pixelPosition] = invSourcePdf;
 
-    //
-    //
-    // // gOut_DirectLighting[pixelPosition] = float3(o_randXY,0);
-    // //
-    // if (o_lightIndex == RTXDI_InvalidLightIndex)
-    // {
-    //     gOut_DirectLighting[pixelPosition] = 0;
-    // }
-    // else
-    // {
-    //
-    //     uint2 pdfTexturePosition = RTXDI_LinearIndexToZCurve(o_lightIndex);
-    //     float power = t_LocalLightPdfTexture.Load(int3(pdfTexturePosition >> 1 , 1));
-    //     
-    //     float3 color ; 
-    //     color = power;
-    //     
-    //     gOut_DirectLighting[pixelPosition] = color;
-    //     
-    //     // gOut_DirectLighting[pixelPosition] = o_lightIndex / 12.0;
-    //     
-    //     
-    //     // RAB_LightInfo lightInfo = RAB_LoadLightInfo(o_lightIndex, false);
-    //     // RAB_LightSample lightSample = RAB_SamplePolymorphicLight(lightInfo,
-    //     //                                                          surface, o_randXY);
-    //     //
-    //     // gOut_DirectLighting[pixelPosition] = lightSample.radiance;
-    // }
+
+// uint tileSize = g_Const.regir.commonParams.lightsPerCell; // 通常是 128 或 256
+// uint tileCount = 100;
+//
+// // 2. 确定每个 Tile 在屏幕上显示的尺寸 (假设显示为正方形)
+// // 如果 tileSize 是 256，则每个块是 16x16；如果是 128，则大约是 11x11
+// uint side = (uint)sqrt((float)tileSize); 
+//
+// // 3. 计算当前像素属于第几个 Tile，以及是该 Tile 里的第几个采样点
+// uint2 tileGridPos = pixelPosition / side;  // 屏幕上 Tile 的行列坐标
+// uint2 inTilePos = pixelPosition % side;    // 在当前 Tile 方块内的像素偏移
+//
+// // 计算 tileIndex：假设横向平铺
+// // 我们需要知道屏幕宽度方向能放多少个 Tile 块
+// // 注意：RTXDI_GetScreenSize() 需要替换为你引擎中获取分辨率的函数或常量
+// uint tilesPerRow = 1017 / side; 
+//
+// uint tileIndex = tileGridPos.y * tilesPerRow + tileGridPos.x;
+// uint sampleInTile = inTilePos.y * side + inTilePos.x;
+//
+//
+//
+// // gOut_DirectLighting[pixelPosition] = float3(tileGridPos / 16.0f, 0);
+// // gOut_DirectLighting[pixelPosition] = tileSize;
+//
+//
+// // 4. 边界检查：确保不越界
+// if (tileIndex < tileCount && sampleInTile < tileSize)
+// {
+//     // 计算 Buffer 指针
+//     uint risBufferPtr = sampleInTile + tileIndex * tileSize + g_Const.regir.commonParams.risBufferOffset;
+//
+//     // 读取数据
+//     uint2 risData = RTXDI_RIS_BUFFER[risBufferPtr];
+//     uint lightIndex = risData.x & ~RTXDI_LIGHT_COMPACT_BIT;
+//     float invSourcePdf = asfloat(risData.y);
+//
+//     // 5. 可视化处理
+//     if (lightIndex == 0 && invSourcePdf == 0)
+//     {
+//         // 这里的像素可能是空的（没抽中灯）
+//         gOut_DirectLighting[pixelPosition] = float3(1, 0.05, 0.05); 
+//     }
+//     else
+//     {
+//         // 使用哈希函数将 lightIndex 转换为鲜艳的颜色，以便区分不同的灯
+//         float3 color;
+//         color.r = frac(sin(float(lightIndex) * 12.9898) * 43758.5453);
+//         color.g = frac(sin(float(lightIndex) * 78.233) * 43758.5453);
+//         color.b = frac(sin(float(lightIndex) * 45.164) * 43758.5453);
+//     
+//         color = invSourcePdf;
+//         // 为了区分 Tile 边界，给每个块加个微小的边框感
+//         if (inTilePos.x == 0 || inTilePos.y == 0) color *= 0.5;
+//
+//         gOut_DirectLighting[pixelPosition] = color;
+//     }
+// }
+// else
+// {
+//     // 超出 Tile 总数或屏幕范围的部分显示为黑色
+//     gOut_DirectLighting[pixelPosition] = float3(0, 0, 0);
+// }
+//
+//
+
+//
+//
+// // gOut_DirectLighting[pixelPosition] = float3(o_randXY,0);
+// //
+// if (o_lightIndex == RTXDI_InvalidLightIndex)
+// {
+//     gOut_DirectLighting[pixelPosition] = 0;
+// }
+// else
+// {
+//
+//     uint2 pdfTexturePosition = RTXDI_LinearIndexToZCurve(o_lightIndex);
+//     float power = t_LocalLightPdfTexture.Load(int3(pdfTexturePosition >> 1 , 1));
+//     
+//     float3 color ; 
+//     color = power;
+//     
+//     gOut_DirectLighting[pixelPosition] = color;
+//     
+//     // gOut_DirectLighting[pixelPosition] = o_lightIndex / 12.0;
+//     
+//     
+//     // RAB_LightInfo lightInfo = RAB_LoadLightInfo(o_lightIndex, false);
+//     // RAB_LightSample lightSample = RAB_SamplePolymorphicLight(lightInfo,
+//     //                                                          surface, o_randXY);
+//     //
+//     // gOut_DirectLighting[pixelPosition] = lightSample.radiance;
+// }
 }
