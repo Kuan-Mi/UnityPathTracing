@@ -139,6 +139,9 @@ uint getLightIndex(uint instanceID, uint geometryIndex, uint primitiveIndex)
 bool RAB_TraceRayForLocalLight(float3 origin, float3 direction, float tMin, float tMax,
                                out uint o_lightIndex, out float2 o_randXY)
 {
+    #ifdef USE_FULL_RAY
+    return false;
+    #else
     o_lightIndex = RTXDI_InvalidLightIndex;
     o_randXY = 0;
 
@@ -156,6 +159,7 @@ bool RAB_TraceRayForLocalLight(float3 origin, float3 direction, float tMin, floa
     }
 
     return hitAnything;
+    #endif
 }
 
 

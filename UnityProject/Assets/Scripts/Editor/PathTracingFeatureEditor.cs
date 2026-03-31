@@ -42,19 +42,9 @@ namespace PathTracing
                 feature.SetMask();
             }
 
-            if (GUILayout.Button("TestPrepareLight"))
-            {
-                feature.Test();
-            }
-
             EditorGUILayout.Space(10);
-            
 
-            DrawObjectRecursive("Global Constants", feature.globalConstants , "GlobalConstants");
-            
-  
-            DrawObjectRecursive("Resampling Constants", feature.resamplingConstants,  "ResamplingConstants");
-            
+            DrawObjectRecursive("Global Constants", feature.GlobalConstants, "GlobalConstants");
 
             serializedObject.ApplyModifiedProperties();
         }
@@ -75,14 +65,14 @@ namespace PathTracing
             // 类型 → 分组标题
             var groupLabels = new Dictionary<Type, string>
             {
-                { typeof(Material),           "Materials" },
-                { typeof(RayTracingShader),   "Ray Tracing Shaders" },
-                { typeof(ComputeShader),      "Compute Shaders" },
-                { typeof(Texture),            "Textures" },
-                { typeof(Texture2D),          "Textures" },
-                { typeof(Texture3D),          "Textures" },
-                { typeof(RenderTexture),      "Textures" },
-                { typeof(Cubemap),            "Textures" },
+                { typeof(Material), "Materials" },
+                { typeof(RayTracingShader), "Ray Tracing Shaders" },
+                { typeof(ComputeShader), "Compute Shaders" },
+                { typeof(Texture), "Textures" },
+                { typeof(Texture2D), "Textures" },
+                { typeof(Texture3D), "Textures" },
+                { typeof(RenderTexture), "Textures" },
+                { typeof(Cubemap), "Textures" },
             };
 
             // 收集分组
@@ -105,6 +95,7 @@ namespace PathTracing
                         break;
                     }
                 }
+
                 if (groupName == null) groupName = "Other";
 
                 if (!groups.ContainsKey(groupName))
@@ -134,6 +125,7 @@ namespace PathTracing
                         if (prop != null)
                             EditorGUILayout.PropertyField(prop);
                     }
+
                     EditorGUI.indentLevel--;
                 }
 
@@ -226,7 +218,7 @@ namespace PathTracing
             bool isExpanded = SessionState.GetBool(foldoutKey, false); // 默认折叠
 
             EditorGUILayout.BeginVertical();
-            
+
             // 绘制可点击的折叠标签
             isExpanded = EditorGUILayout.Foldout(isExpanded, label, true, EditorStyles.foldoutHeader);
             SessionState.SetBool(foldoutKey, isExpanded);
@@ -241,6 +233,7 @@ namespace PathTracing
                     // 递归时将当前 label 加入 path，保证子节点的 key 唯一
                     DrawObjectRecursive(field.Name, value, path + "_" + label);
                 }
+
                 EditorGUI.indentLevel--;
             }
 
@@ -250,11 +243,11 @@ namespace PathTracing
         // 判断是否是直接绘制的底层类型
         private bool IsSimpleType(System.Type type)
         {
-            return type.IsPrimitive ||type.IsEnum || 
+            return type.IsPrimitive || type.IsEnum ||
                    type == typeof(float) || type == typeof(int) || type == typeof(uint) ||
                    type == typeof(float2) || type == typeof(float3) || type == typeof(float4) ||
                    type == typeof(float4x4) || type == typeof(Vector2) || type == typeof(Vector3) ||
-                   type == typeof(Vector4) || type == typeof(bool) || type == typeof(string)|| type == typeof(int2) || type == typeof(uint2);
+                   type == typeof(Vector4) || type == typeof(bool) || type == typeof(string) || type == typeof(int2) || type == typeof(uint2);
         }
 
         // 绘制具体的字段值
@@ -265,6 +258,7 @@ namespace PathTracing
                 EditorGUILayout.EnumPopup(label, enumValue);
                 return;
             }
+
             if (value is float4x4 m)
             {
                 EditorGUILayout.LabelField(label);

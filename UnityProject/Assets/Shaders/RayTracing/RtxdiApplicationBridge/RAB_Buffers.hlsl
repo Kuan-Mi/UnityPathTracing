@@ -39,6 +39,7 @@ RWStructuredBuffer<RTXDI_PackedDIReservoir> u_LightReservoirs;
 // RTXDI UAVs
 RWBuffer<uint2> u_RisBuffer;
 RWBuffer<uint4> u_RisLightDataBuffer;
+RWStructuredBuffer<SecondaryGBufferData> u_SecondaryGBuffer;
 
 // Other
 // ConstantBuffer<ResamplingConstants> g_Const;
@@ -46,7 +47,7 @@ RWBuffer<uint4> u_RisLightDataBuffer;
 #ifdef USE_RAY_QUERY
 ConstantBuffer<ResamplingConstants> g_Const;
 #else 
-RWStructuredBuffer<ResamplingConstants> ResampleConstants;
+StructuredBuffer<ResamplingConstants> ResampleConstants;
 #define g_Const ResampleConstants[0]
 #endif
 

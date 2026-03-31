@@ -6,12 +6,18 @@
 #include <Assets/Shaders/donut/utils.hlsli>
 
 #include <Assets/Shaders/Include/Shared.hlsl>
+
+#ifdef USE_FULL_RAY
+#include <Assets/Shaders/Include/RayTracingShared.hlsl>
+#else
 #include <Assets/Shaders/Include/LightRayTracingShared.hlsl>
+#endif
 
 #include <Assets/Shaders/Rtxdi/DI/ReSTIRDIParameters.h>
 #include <Assets/Shaders/Rtxdi/GI/ReSTIRGIParameters.h>
 #include <Assets/Shaders/Rtxdi/ReGIR/ReGIRParameters.h>
 
+#include "BRDFPTParameters.h"
 
 #define BACKGROUND_DEPTH INF
 #define RTXDI_SCREEN_SPACE_GROUP_SIZE 8
@@ -20,6 +26,17 @@
 struct ResamplingConstants
 {
     RTXDI_RuntimeParameters runtimeParams;
+    
+    uint frameIndex;
+    uint enablePreviousTLAS;
+    uint denoiserMode;
+    uint discountNaiveSamples;
+    
+    uint enableBrdfIndirect;
+    uint enableBrdfAdditiveBlend;    
+    uint enableAccumulation; // StoreShadingOutput
+    uint showReGIRCell;
+    
 
     RTXDI_LightBufferParameters lightBufferParams;
     RTXDI_RISBufferSegmentParameters localLightsRISBufferSegmentParams;
@@ -27,14 +44,24 @@ struct ResamplingConstants
 
     ReSTIRDI_Parameters restirDI;
     ReGIR_Parameters regir;
-
-    uint frameIndex;
-    uint showReGIRCell;
-    uint2 pad3;
-    
+    ReSTIRGI_Parameters restirGI;
+    BRDFPathTracing_Parameters brdfPT;
     
     uint2 environmentPdfTextureSize;
     uint2 localLightPdfTextureSize;
+};
+
+struct SecondaryGBufferData
+{
+    float3 worldPos;
+    uint normal;
+
+    uint2 throughputAndFlags;   // .x = throughput.rg as float16, .y = throughput.b as float16, flags << 16
+    uint diffuseAlbedo;         // R11G11B10_UFLOAT
+    uint specularAndRoughness;  // R8G8B8A8_Gamma_UFLOAT
+    
+    float3 emission;
+    float pdf;
 };
 
 static const uint kSecondaryGBuffer_IsSpecularRay = 1;

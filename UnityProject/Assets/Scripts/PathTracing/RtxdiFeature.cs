@@ -886,8 +886,7 @@ namespace PathTracing
             constants.frameIndex = restirDiContext.GetFrameIndex();
             constants.showReGIRCell = pathTracingSetting.showReGIRCell ? 1u : 0u;
 
-
-            constants.pad3 = new uint2(0, 0);
+ 
 
             FillReSTIRDIConstants(ref constants.restirDI, restirDiContext, constants.lightBufferParams);
             FillReGIRConstants(ref constants.regir, isContext.GetReGIRContext());

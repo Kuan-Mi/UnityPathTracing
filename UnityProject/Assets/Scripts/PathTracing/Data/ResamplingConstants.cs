@@ -1,5 +1,6 @@
 ﻿using Rtxdi;
 using Rtxdi.DI;
+using Rtxdi.GI;
 using Rtxdi.ReGIR;
 using Unity.Mathematics;
 using UnityEngine;
@@ -11,16 +12,24 @@ namespace PathTracing
     {
         public RTXDI_RuntimeParameters runtimeParams;
 
+        public uint frameIndex;
+        public uint enablePreviousTLAS;
+        public uint denoiserMode;
+        public uint discountNaiveSamples;
+
+        public uint enableBrdfIndirect;
+        public uint enableBrdfAdditiveBlend;
+        public uint enableAccumulation; // StoreShadingOutput
+        public uint showReGIRCell;
+
         public RTXDI_LightBufferParameters lightBufferParams;
         public RTXDI_RISBufferSegmentParameters localLightsRISBufferSegmentParams;
         public RTXDI_RISBufferSegmentParameters environmentLightRISBufferSegmentParams;
 
         public ReSTIRDI_Parameters restirDI;
         public ReGIR_Parameters regir;
-
-        public uint frameIndex;
-        public uint showReGIRCell;
-        public uint2 pad3;
+        public ReSTIRGI_Parameters restirGI;
+        public BRDFPathTracing_Parameters brdfPT;
 
         public uint2 environmentPdfTextureSize;
         public uint2 localLightPdfTextureSize;

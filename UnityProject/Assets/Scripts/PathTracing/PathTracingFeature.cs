@@ -1,12 +1,7 @@
 ﻿using System.Collections.Generic;
 using System.Runtime.InteropServices;
 using DLRR;
-using mini;
 using Nrd;
-using Rtxdi;
-using RTXDI;
-using Rtxdi.DI;
-using Rtxdi.ReGIR;
 using Unity.Mathematics;
 using UnityEngine;
 using UnityEngine.Rendering;
@@ -20,20 +15,13 @@ namespace PathTracing
     {
         public PathTracingSetting pathTracingSetting;
 
-        public GlobalConstants globalConstants;
-        public ResamplingConstants resamplingConstants;
+        public GlobalConstants GlobalConstants;
 
         public RenderPassEvent renderPassEvent = RenderPassEvent.BeforeRenderingPostProcessing;
 
         public Material finalMaterial;
         public RayTracingShader sharcUpdateTs;
         public RayTracingShader opaqueTracingShader;
-        public RayTracingShader generateInitialSShader;
-        public RayTracingShader temporalResamplingShader;
-        public RayTracingShader spatialResamplingShader;
-        public RayTracingShader shadeSamplesShader;
-
-
         public RayTracingShader transparentTracingShader;
         public RayTracingShader referencePtTracingShader;
 
@@ -43,29 +31,13 @@ namespace PathTracing
         public ComputeShader sharcResolveCs;
         public ComputeShader autoExposureShader;
         public ComputeShader accumulateCs;
-        public ComputeShader pdfTextureCs;
-        public ComputeShader presampleCs;
-        public ComputeShader presampleReGirCS;
-        public ComputeShader genMipsCs;
 
         public Texture2D scramblingRankingTex;
         public Texture2D sobolTex;
-        public Texture2D env;
 
         private OutputBlitPass _outputBlitPass;
         private SharcPass _sharcPass;
-        private PrepareLightPass _prepareLightPass;
         private OpaquePass _opaquePass;
-        private GenerateInitialSamplesPass _generateInitialSamplesPass;
-        private TemporalResamplingPass _temporalResamplingPass;
-        private SpatialResamplingPass _spatialResamplingPass;
-        private ShadeSamplesPass _shadeSamplesPass;
-        private PdfTexturePass _pdfTexturePass;
-        private PresamplePass _presamplePass;
-        private PresampleReGirLightsPass _presampleReGirLightsPass;
-        private GenerateMipsPass _generateMipsPass;
-
-
         private NrdPass _nrdPass;
         private CompositionPass _compositionPass;
         private TransparentPass _transparentPass;
@@ -78,7 +50,6 @@ namespace PathTracing
         private RayTracingAccelerationStructure _accelerationStructure;
 
         private GraphicsBuffer _constantBuffer;
-        private GraphicsBuffer _resamplingConstantBuffer;
 
         private GraphicsBuffer _scramblingRankingUintBuffer;
         private GraphicsBuffer _sobolUintBuffer;
@@ -90,12 +61,9 @@ namespace PathTracing
         private GraphicsBuffer _aeHistogramBuffer; // 256 x uint
         private GraphicsBuffer _aeExposureBuffer; // 1 x float  (current exposure multiplier)
 
-        private GPUScene _gpuScene = new();
         private LightCollector _lightCollector = new();
-        private PrepareLightResource _prepareLightResources;
 
         private readonly GlobalConstants[] _globalConstantsArray = new GlobalConstants[1];
-        private readonly ResamplingConstants[] _resamplingConstantsArray = new ResamplingConstants[1];
         private readonly float[] _exposureArray = new float[1];
 
         private readonly Dictionary<long, NrdDenoiser> _nrdDenoisers = new();
@@ -104,8 +72,6 @@ namespace PathTracing
         private readonly Dictionary<long, PathTracingResourcePool> _resourcePools = new();
 
         // private readonly Dictionary<long, ReSTIRDIContext> _restirDiContexts = new();
-        private readonly Dictionary<long, RtxdiResources> _rtxdiResources = new();
-        private readonly Dictionary<long, ImportanceSamplingContext> _isContexts = new();
         private readonly Dictionary<long, CameraFrameState> _cameraFrameStates = new();
 
         public override void Create()
@@ -122,14 +88,7 @@ namespace PathTracing
                 SetMask();
             }
 
-            _gpuScene ??= new GPUScene();
             _lightCollector ??= new LightCollector();
-            _prepareLightResources ??= new PrepareLightResource();
-
-            if (!_gpuScene.isBufferInitialized)
-            {
-                _gpuScene.InitBuffer();
-            }
 
             if (_scramblingRankingUintBuffer == null && scramblingRankingTex != null)
             {
@@ -168,54 +127,10 @@ namespace PathTracing
             {
                 renderPassEvent = renderPassEvent
             };
-            _prepareLightPass ??= new PrepareLightPass()
-            {
-                renderPassEvent = renderPassEvent
-            };
             _opaquePass ??= new OpaquePass(opaqueTracingShader)
             {
                 renderPassEvent = renderPassEvent
             };
-            _generateInitialSamplesPass ??= new GenerateInitialSamplesPass(generateInitialSShader)
-            {
-                renderPassEvent = renderPassEvent
-            };
-
-            _temporalResamplingPass ??= new TemporalResamplingPass(temporalResamplingShader)
-            {
-                renderPassEvent = renderPassEvent
-            };
-
-            _spatialResamplingPass ??= new SpatialResamplingPass(spatialResamplingShader)
-            {
-                renderPassEvent = renderPassEvent
-            };
-
-            _shadeSamplesPass ??= new ShadeSamplesPass(shadeSamplesShader)
-            {
-                renderPassEvent = renderPassEvent
-            };
-
-            _generateMipsPass ??= new GenerateMipsPass(genMipsCs)
-            {
-                renderPassEvent = renderPassEvent
-            };
-
-            _pdfTexturePass ??= new PdfTexturePass(pdfTextureCs)
-            {
-                renderPassEvent = renderPassEvent
-            };
-
-            _presamplePass ??= new PresamplePass(presampleCs)
-            {
-                renderPassEvent = renderPassEvent
-            };
-
-            _presampleReGirLightsPass ??= new PresampleReGirLightsPass(presampleReGirCS)
-            {
-                renderPassEvent = renderPassEvent
-            };
-
             _nrdPass ??= new NrdPass()
             {
                 renderPassEvent = renderPassEvent
@@ -277,7 +192,6 @@ namespace PathTracing
             }
 
             _constantBuffer = new GraphicsBuffer(GraphicsBuffer.Target.Constant, 1, Marshal.SizeOf<GlobalConstants>());
-            _resamplingConstantBuffer = new GraphicsBuffer(GraphicsBuffer.Target.Structured, 1, Marshal.SizeOf<ResamplingConstants>());
 
             _hashEntriesBuffer = new GraphicsBuffer(GraphicsBuffer.Target.Structured, Capacity, sizeof(ulong));
             var clearData = new ulong[Capacity];
@@ -326,8 +240,6 @@ namespace PathTracing
             if (eyeIndex == 1)
                 return;
 
-            _gpuScene.Build(_accelerationStructure,pathTracingSetting.enableEnv);
-            // _gpuScene.UpdateInstanceID(_accelerationStructure);
 
             Shader.SetGlobalRayTracingAccelerationStructure(g_AccelStructID, _accelerationStructure);
 
@@ -383,21 +295,6 @@ namespace PathTracing
             //     restirDiContext = new ReSTIRDIContext(contextParams);
             //     _restirDiContexts.Add(uniqueKey, restirDiContext);
             // }
-
-            if (!_isContexts.TryGetValue(uniqueKey, out var isContext))
-            {
-                var isParams = ImportanceSamplingContext_StaticParameters.Default();
-                isParams.renderWidth = (uint)cam.pixelWidth;
-                isParams.renderHeight = (uint)cam.pixelHeight;
-                isContext = new ImportanceSamplingContext(isParams);
-                _isContexts.Add(uniqueKey, isContext);
-            }
-
-            if (!_rtxdiResources.TryGetValue(uniqueKey, out var rtxdiResources))
-            {
-                rtxdiResources = new RtxdiResources(isContext.GetReSTIRDIContext(), isContext.GetRISBufferSegmentAllocator(), _gpuScene);
-                _rtxdiResources.Add(uniqueKey, rtxdiResources);
-            }
 
 
             if (finalMaterial == null
@@ -458,18 +355,9 @@ namespace PathTracing
             uint curFrame = frameState.FrameIndex;
             frameState.Update(renderingData, pathTracingSetting);
 
-            globalConstants = frameState.GetConstants(renderingData, pathTracingSetting, _lightCollector);
-            _globalConstantsArray[0] = globalConstants;
+            GlobalConstants = frameState.GetConstants(renderingData, pathTracingSetting, _lightCollector);
+            _globalConstantsArray[0] = GlobalConstants;
             _constantBuffer.SetData(_globalConstantsArray);
-
-            resamplingConstants = GetResamplingConstants(isContext, rtxdiResources, frameState);
-
-            // var ss = resamplingConstants.ToString();
-            // Debug.Log($"Resampling Constants:\n{ss}");
-
-
-            _resamplingConstantsArray[0] = resamplingConstants;
-            _resamplingConstantBuffer.SetData(_resamplingConstantsArray);
 
             #region Sharc
 
@@ -492,19 +380,6 @@ namespace PathTracing
 
             _sharcPass.Setup(sharcResource, sharcSettings);
             renderer.EnqueuePass(_sharcPass);
-
-            #endregion
-
-            #region prepareLight
-
-            if (pathTracingSetting.prepareLight)
-            {
-                _prepareLightResources.SetBuffer(_gpuScene);
-                _prepareLightResources.SendTexture(_gpuScene.globalTexturePool);
-
-                _prepareLightPass.Setup(_prepareLightResources);
-                renderer.EnqueuePass(_prepareLightPass);
-            }
 
             #endregion
 
@@ -687,7 +562,7 @@ namespace PathTracing
                 renderer.EnqueuePass(_autoExposurePass);
             }
 
-            var isEven = (globalConstants.gFrameIndex & 1) == 0;
+            var isEven = (GlobalConstants.gFrameIndex & 1) == 0;
 
             if (pathTracingSetting.RR)
             {
@@ -849,115 +724,6 @@ namespace PathTracing
             renderer.EnqueuePass(_outputBlitPass);
         }
 
-
-        void FillReSTIRDIConstants(ref ReSTIRDI_Parameters rparams, ReSTIRDIContext restirDIContext, RTXDI_LightBufferParameters lightBufferParameters)
-        {
-            rparams.reservoirBufferParams = restirDIContext.GetReservoirBufferParameters();
-            rparams.bufferIndices = restirDIContext.GetBufferIndices();
-            rparams.initialSamplingParams = restirDIContext.GetInitialSamplingParameters();
-            rparams.initialSamplingParams.environmentMapImportanceSampling = lightBufferParameters.environmentLightParams.lightPresent;
-            if (rparams.initialSamplingParams.environmentMapImportanceSampling == 0)
-                rparams.initialSamplingParams.numPrimaryEnvironmentSamples = 0;
-            rparams.temporalResamplingParams = restirDIContext.GetTemporalResamplingParameters();
-            rparams.spatialResamplingParams = restirDIContext.GetSpatialResamplingParameters();
-            rparams.shadingParams = restirDIContext.GetShadingParameters();
-        }
-
-
-        void FillReGIRConstants(ref ReGIR_Parameters ReGIRParams, ReGIRContext regirContext)
-        {
-            var staticParams = regirContext.GetReGIRStaticParameters();
-            var dynamicParams = regirContext.GetReGIRDynamicParameters();
-            var gridParams = regirContext.GetReGIRGridCalculatedParameters();
-            var onionParams = regirContext.GetReGIROnionCalculatedParameters();
-
-            ReGIRParams.gridParams.cellsX = staticParams.gridParameters.GridSize.x;
-            ReGIRParams.gridParams.cellsY = staticParams.gridParameters.GridSize.y;
-            ReGIRParams.gridParams.cellsZ = staticParams.gridParameters.GridSize.z;
-
-            ReGIRParams.commonParams.numRegirBuildSamples = dynamicParams.regirNumBuildSamples;
-            ReGIRParams.commonParams.risBufferOffset = regirContext.GetReGIRCellOffset();
-            ReGIRParams.commonParams.lightsPerCell = staticParams.LightsPerCell;
-            ReGIRParams.commonParams.centerX = dynamicParams.center.x;
-            ReGIRParams.commonParams.centerY = dynamicParams.center.y;
-            ReGIRParams.commonParams.centerZ = dynamicParams.center.z;
-            ReGIRParams.commonParams.cellSize = (staticParams.Mode == ReGIRMode.Onion)
-                ? dynamicParams.regirCellSize * 0.5f // Onion operates with radii, while "size" feels more like diameter
-                : dynamicParams.regirCellSize;
-            ReGIRParams.commonParams.localLightSamplingFallbackMode = (uint)(dynamicParams.fallbackSamplingMode);
-            ReGIRParams.commonParams.localLightPresamplingMode = (uint)(dynamicParams.presamplingMode);
-            ReGIRParams.commonParams.samplingJitter = math.max(0.0f, dynamicParams.regirSamplingJitter * 2.0f);
-            ReGIRParams.onionParams.cubicRootFactor = onionParams.regirOnionCubicRootFactor;
-            ReGIRParams.onionParams.linearFactor = onionParams.regirOnionLinearFactor;
-            ReGIRParams.onionParams.numLayerGroups = (uint)(onionParams.regirOnionLayers.Count);
-
-            // assert(onionParams.regirOnionLayers.size() <= RTXDI_ONION_MAX_LAYER_GROUPS);
-            for (int group = 0; group < onionParams.regirOnionLayers.Count; group++)
-            {
-                var layer = onionParams.regirOnionLayers[group];
-                layer.innerRadius *= ReGIRParams.commonParams.cellSize;
-                layer.outerRadius *= ReGIRParams.commonParams.cellSize;
-
-
-                ReGIRParams.onionParams.SetLayer(group, layer);
-            }
-
-            // assert(onionParams.regirOnionRings.size() <= RTXDI_ONION_MAX_RINGS);
-            for (int n = 0; n < (onionParams.regirOnionRings.Count); n++)
-            {
-                // ReGIRParams.onionParams.rings[n] = onionParams.regirOnionRings[n];
-                ReGIRParams.onionParams.SetRing(n, onionParams.regirOnionRings[n]);
-            }
-
-            ReGIRParams.onionParams.cubicRootFactor = regirContext.GetReGIROnionCalculatedParameters().regirOnionCubicRootFactor;
-        }
-
-        private ResamplingConstants GetResamplingConstants(
-            ImportanceSamplingContext isContext
-            , RtxdiResources rtxdiResources
-            , CameraFrameState frameState)
-        {
-            RTXDI_LightBufferParameters lightBufferParams = _gpuScene.GetLightBufferParameters();
-            isContext.SetLightBufferParams(lightBufferParams);
-
-            var restirDiContext = isContext.GetReSTIRDIContext();
-
-            restirDiContext.SetFrameIndex(frameState.FrameIndex);
-
-            restirDiContext.SetResamplingMode(pathTracingSetting.resamplingMode);
-            restirDiContext.SetInitialSamplingParameters(pathTracingSetting.initialSamplingParams);
-            restirDiContext.SetTemporalResamplingParameters(pathTracingSetting.temporalResamplingParams);
-            restirDiContext.SetSpatialResamplingParameters(pathTracingSetting.spatialResamplingParams);
-            restirDiContext.SetShadingParameters(pathTracingSetting.shadingParams);
-
-            var regirContext = isContext.GetReGIRContext();
-            pathTracingSetting.regirDynamicParams.center = frameState.camPos;
-            regirContext.SetDynamicParameters(pathTracingSetting.regirDynamicParams);
-
-            var constants = new ResamplingConstants();
-
-
-            constants.lightBufferParams = isContext.GetLightBufferParameters();
-            constants.localLightsRISBufferSegmentParams = isContext.GetLocalLightRISBufferSegmentParams();
-            constants.environmentLightRISBufferSegmentParams = isContext.GetEnvironmentLightRISBufferSegmentParams();
-            constants.runtimeParams = isContext.GetReSTIRDIContext().GetRuntimeParams();
-
-
-            constants.frameIndex = restirDiContext.GetFrameIndex();
-            constants.showReGIRCell = pathTracingSetting.showReGIRCell ? 1u : 0u;
-
-
-            constants.pad3 = new uint2(0, 0);
-
-            FillReSTIRDIConstants(ref constants.restirDI, restirDiContext, constants.lightBufferParams);
-            FillReGIRConstants(ref constants.regir, isContext.GetReGIRContext());
-
-            constants.localLightPdfTextureSize = rtxdiResources.Scene.localLightPdfTextureSize;
-
-
-            return constants;
-        }
-
         private static int2 ComputeOutputResolution(CameraData cameraData)
         {
             var xrPass = cameraData.xr;
@@ -967,7 +733,6 @@ namespace PathTracing
                 (int)(cameraData.camera.pixelWidth * cameraData.renderScale),
                 (int)(cameraData.camera.pixelHeight * cameraData.renderScale));
         }
-
 
         protected override void Dispose(bool disposing)
         {
@@ -979,9 +744,6 @@ namespace PathTracing
 
             _constantBuffer?.Release();
             _constantBuffer = null;
-
-            _resamplingConstantBuffer?.Release();
-            _resamplingConstantBuffer = null;
 
             foreach (var denoiser in _nrdDenoisers.Values)
             {
@@ -1006,23 +768,8 @@ namespace PathTracing
 
             _resourcePools.Clear();
 
-            foreach (var res in _rtxdiResources.Values)
-            {
-                res.Dispose();
-            }
-
-            _rtxdiResources.Clear();
-
-            // _restirDiContexts.Clear();
-
             _lightCollector?.Dispose();
             _lightCollector = null;
-
-            _gpuScene?.Dispose();
-            _gpuScene = null;
-
-            _prepareLightResources.Dispose();
-            _prepareLightResources = null;
 
             _scramblingRankingUintBuffer?.Release();
             _scramblingRankingUintBuffer = null;
@@ -1046,7 +793,6 @@ namespace PathTracing
             _aeExposureBuffer = null;
 
             _sharcPass = null;
-            _prepareLightPass = null;
             _opaquePass = null;
             _transparentPass = null;
             _compositionPass = null;
@@ -1055,11 +801,6 @@ namespace PathTracing
             _dlssrrPass = null;
             _autoExposurePass = null;
             _outputBlitPass = null;
-        }
-
-        public void Test()
-        {
-            _gpuScene.DebugReadback();
         }
 
         // #define FLAG_NON_TRANSPARENT                0x01 // geometry flag: non-transparent
