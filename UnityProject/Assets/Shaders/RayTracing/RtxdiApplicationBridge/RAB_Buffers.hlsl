@@ -43,8 +43,12 @@ RWBuffer<uint4> u_RisLightDataBuffer;
 // Other
 // ConstantBuffer<ResamplingConstants> g_Const;
 
+#ifdef USE_RAY_QUERY
+ConstantBuffer<ResamplingConstants> g_Const;
+#else 
 RWStructuredBuffer<ResamplingConstants> ResampleConstants;
 #define g_Const ResampleConstants[0]
+#endif
 
 #define RTXDI_RIS_BUFFER u_RisBuffer
 #define RTXDI_LIGHT_RESERVOIR_BUFFER u_LightReservoirs

@@ -5,6 +5,8 @@
 #pragma target 6.0
 // #pragma enable_d3d11_debug_symbols
 
+#define USE_RAY_QUERY
+
 #include "../RtxdiApplicationBridge/RtxdiApplicationBridge.hlsl"
 #include "Assets/Shaders/RTXDI/LightSampling/PresamplingFunctions.hlsl"
 

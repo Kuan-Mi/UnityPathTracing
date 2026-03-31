@@ -198,6 +198,9 @@ namespace PathTracing
         public void InitializeBuffers()
         {
             _constantBuffer = new GraphicsBuffer(GraphicsBuffer.Target.Constant, 1, Marshal.SizeOf<GlobalConstants>());
+
+            var size = Marshal.SizeOf<ResamplingConstants>();
+            Debug.Log($"ResamplingConstants size: {size} bytes");
             _resamplingConstantBuffer = new GraphicsBuffer(GraphicsBuffer.Target.Structured, 1, Marshal.SizeOf<ResamplingConstants>());
         }
 

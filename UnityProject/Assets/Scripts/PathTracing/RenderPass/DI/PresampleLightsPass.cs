@@ -65,7 +65,7 @@ namespace PathTracing
             var settings = data.Settings;
 
             natCmd.SetComputeConstantBufferParam(data.OpaqueTs, paramsID, resource.ConstantBuffer, 0, resource.ConstantBuffer.stride);
-            natCmd.SetComputeBufferParam(data.OpaqueTs, 0,"ResampleConstants", resource.ResamplingConstantBuffer);
+            natCmd.SetComputeConstantBufferParam(data.OpaqueTs, "g_Const", resource.ResamplingConstantBuffer, 0, resource.ResamplingConstantBuffer.stride);
 
             
             natCmd.SetComputeBufferParam(data.OpaqueTs, 0,"u_RisBuffer", resource.RtxdiResources.RisBuffer);

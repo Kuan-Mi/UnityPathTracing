@@ -8,7 +8,7 @@
 RWTexture2D<float> u_LocalLightPdfTexture;
 
 #define RTXDI_PRESAMPLING_GROUP_SIZE 256
-
+#define USE_RAY_QUERY
 #include "Assets/Shaders/RTXDI/Utils/Math.hlsl"
 #include "Assets/Shaders/RayTracing/RtxdiApplicationBridge/RtxdiApplicationBridge.hlsl"
 #include "../PolymorphicLight.hlsl"

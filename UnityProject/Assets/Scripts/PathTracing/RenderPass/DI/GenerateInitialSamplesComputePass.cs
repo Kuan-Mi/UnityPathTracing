@@ -73,7 +73,8 @@ namespace PathTracing
             var settings = data.Settings;
 
             natCmd.SetComputeConstantBufferParam(cs, paramsID, resource.ConstantBuffer, 0, resource.ConstantBuffer.stride);
-            natCmd.SetComputeBufferParam(cs, kernel, "ResampleConstants", resource.ResamplingConstantBuffer);
+            natCmd.SetComputeConstantBufferParam(cs, "g_Const", resource.ResamplingConstantBuffer, 0, resource.ResamplingConstantBuffer.stride);
+            
             natCmd.SetComputeBufferParam(cs, kernel, "t_GeometryInstanceToLight", resource.t_GeometryInstanceToLight);
 
             natCmd.SetComputeBufferParam(cs, kernel, t_LightDataBufferID, resource.RtxdiResources.LightDataBuffer);
