@@ -161,7 +161,7 @@ void MainRayGenShader()
     }
 
 
-    gOut_DirectLighting[pixelPosition] = RTXDI_IsValidDIReservoir(reservoir);
+    // gOut_DirectLighting[pixelPosition] = RTXDI_IsValidDIReservoir(reservoir);
 
     // uint tileSize = g_Const.localLightsRISBufferSegmentParams.tileSize; // 通常是 128 或 256
     // uint tileCount = g_Const.localLightsRISBufferSegmentParams.tileCount;

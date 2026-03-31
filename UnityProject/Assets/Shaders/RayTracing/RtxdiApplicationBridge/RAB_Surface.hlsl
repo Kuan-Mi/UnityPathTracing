@@ -96,7 +96,10 @@ RAB_Surface GetGBufferSurface(int2 pixelPosition,
     surface.geoNormal = octToNdirUnorm32(geoNormalsTexture[pixelPosition]);
     surface.normal = octToNdirUnorm32(normalsTexture[pixelPosition]);
 
-    float2 sampleUv = (float2(pixelPosition) + 0.5f) / gRectSize;
+    float2 pixelUv = float2(pixelPosition + 0.5) / gRectSize;
+    
+    float2 sampleUv = pixelUv + gJitter;
+
     float3 Xv = Geometry::ReconstructViewPosition(sampleUv, gCameraFrustum, surface.viewDepth, gOrthoMode);
     float3 X = Geometry::AffineTransform(ViewToWorld, Xv);
     surface.worldPos = X;
