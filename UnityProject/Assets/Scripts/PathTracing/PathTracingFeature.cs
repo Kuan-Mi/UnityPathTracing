@@ -620,7 +620,6 @@ namespace PathTracing
                         tmpDisableRR = pathTracingSetting.tmpDisableRR
                     };
 
-                    
 
                     var dlssResource = new DlssBeforePass.Resource
                     {
@@ -645,8 +644,8 @@ namespace PathTracing
                     };
 
                     _dlssBeforePass.Setup(dlssResource, dlssBeforeSettings);
-                    renderer.EnqueuePass(_dlssrrPass);
-                    
+                    renderer.EnqueuePass(_dlssBeforePass);
+
                     _dlssrrPass.Setup(dlssDataPtr, dlssSettings);
                     renderer.EnqueuePass(_dlssrrPass);
                 }

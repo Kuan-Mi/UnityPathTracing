@@ -185,7 +185,7 @@ namespace PathTracing
             {
                 Blitter.BlitTexture(natCmd, data.Resource.Validation, new Vector4(1, 1, 0, 0), data.BlitMaterial, (int)ShowPass.Validation);
             }
-            
+
             if (data.Setting.showReference)
             {
                 Blitter.BlitTexture(natCmd, data.OutputTexture, new Vector4(1, 1, 0, 0), data.BlitMaterial, (int)ShowPass.Validation);
@@ -202,11 +202,21 @@ namespace PathTracing
 
             passData.BlitMaterial = _biltMaterial;
 
-            // var ptContextItem = frameData.Get<PTContextItem>();
-            //
-            // passData.DirectEmission = ptContextItem.DirectEmission;
-            //
-            // builder.UseTexture(passData.DirectEmission, AccessFlags.ReadWrite);
+            var ptContextItem = frameData.Get<PTContextItem>();
+
+            passData.DirectEmission = ptContextItem.DirectEmission;
+            passData.ComposedDiff = ptContextItem.ComposedDiff;
+            passData.ComposedSpecViewZ = ptContextItem.ComposedSpecViewZ;
+
+
+            if (passData.DirectEmission.IsValid())
+                builder.UseTexture(passData.DirectEmission, AccessFlags.ReadWrite);
+
+            if (passData.ComposedDiff.IsValid())
+                builder.UseTexture(passData.ComposedDiff, AccessFlags.ReadWrite);
+
+            if (passData.ComposedSpecViewZ.IsValid())
+                builder.UseTexture(passData.ComposedSpecViewZ, AccessFlags.ReadWrite);
 
             passData.CameraTexture = resourceData.activeColorTexture;
 

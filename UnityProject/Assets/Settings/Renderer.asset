@@ -12,9 +12,9 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: ecc60134e0a049db88b485a3406f7b37, type: 3}
   m_Name: RtxdiFeature
   m_EditorClassIdentifier: Assembly-CSharp::PathTracing.RtxdiFeature
-  m_Active: 1
+  m_Active: 0
   pathTracingSetting:
-    showMode: 18
+    showMode: 1
     showMv: 0
     showValidation: 0
     enableRtxdi: 1
@@ -216,7 +216,8 @@ MonoBehaviour:
     probeVolumeBlendStatesCS: {fileID: 7200000, guid: b9a23f869c4fd45f19c5ada54dd82176, type: 3}
   m_RendererFeatures:
   - {fileID: -3771720238137462869}
-  m_RendererFeatureMap: ab2faa456d28a8cb
+  - {fileID: 6472496777654564436}
+  m_RendererFeatureMap: ab2faa456d28a8cb54f6f5c986edd259
   m_UseNativeRenderPass: 1
   xrSystemData: {fileID: 0}
   postProcessData: {fileID: 11400000, guid: 41439944d30ece34e96484bdb6645b55, type: 2}
@@ -245,3 +246,190 @@ MonoBehaviour:
   m_DepthTextureFormat: 0
   m_AccurateGbufferNormals: 0
   m_IntermediateTextureMode: 0
+--- !u!114 &6472496777654564436
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: f50908f0e9bf42149891b36684931380, type: 3}
+  m_Name: PathTracingFeature
+  m_EditorClassIdentifier: Assembly-CSharp::PathTracing.PathTracingFeature
+  m_Active: 1
+  pathTracingSetting:
+    showMode: 18
+    showMv: 0
+    showValidation: 0
+    enableRtxdi: 0
+    debugRtxdi: 0
+    useComputeForGIS: 0
+    useComputeForTemporalResampling: 0
+    useComputeForSpatialResampling: 0
+    useComputeForShadeSamples: 0
+    resamplingMode: 0
+    gShowLight: 0
+    initialSamplingParams:
+      numPrimaryLocalLightSamples: 0
+      numPrimaryInfiniteLightSamples: 0
+      numPrimaryEnvironmentSamples: 0
+      numPrimaryBrdfSamples: 0
+      brdfCutoff: 0
+      enableInitialVisibility: 0
+      environmentMapImportanceSampling: 0
+      localLightSamplingMode: 0
+    temporalResamplingParams:
+      temporalDepthThreshold: 0
+      temporalNormalThreshold: 0
+      maxHistoryLength: 0
+      temporalBiasCorrection: 0
+      enablePermutationSampling: 0
+      permutationSamplingThreshold: 0
+      enableBoilingFilter: 0
+      boilingFilterStrength: 0
+      discardInvisibleSamples: 0
+      uniformRandomNumber: 0
+      pad2: 0
+      pad3: 0
+    spatialResamplingParams:
+      spatialDepthThreshold: 0
+      spatialNormalThreshold: 0
+      spatialBiasCorrection: 0
+      numSpatialSamples: 0
+      numDisocclusionBoostSamples: 0
+      spatialSamplingRadius: 0
+      neighborOffsetMask: 0
+      discountNaiveSamples: 0
+    shadingParams:
+      enableFinalVisibility: 0
+      reuseFinalVisibility: 0
+      finalVisibilityMaxAge: 0
+      finalVisibilityMaxDistance: 0
+      enableDenoiserInputPacking: 0
+      pad1: 0
+      pad2: 0
+      pad3: 0
+    regirDynamicParams:
+      regirCellSize: 0
+      center:
+        x: 0
+        y: 0
+        z: 0
+      fallbackSamplingMode: 0
+      presamplingMode: 0
+      regirSamplingJitter: 0
+      regirNumBuildSamples: 0
+    prepareLight: 0
+    enableFinalShading: 0
+    enableEnv: 0
+    denoiserMode: 0
+    enablePreviousTLAS: 1
+    enableAlphaTestedGeometry: 1
+    enableTransparentGeometry: 1
+    enableRayCounts: 1
+    visualizeRegirCells: 0
+    enableGradients: 1
+    gradientLogDarknessBias: -12
+    gradientSensitivity: 8
+    confidenceHistoryLength: 0.75
+    brdfptParams:
+      enableIndirectEmissiveSurfaces: 0
+      enableSecondaryResampling: 0
+      enableReSTIRGI: 0
+      pad1: 0
+      materialOverrideParams:
+        roughnessOverride: 0.5
+        metalnessOverride: 0.5
+        minSecondaryRoughness: 0.5
+        pad1: 0
+      secondarySurfaceReSTIRDIParams:
+        initialSamplingParams:
+          numPrimaryLocalLightSamples: 2
+          numPrimaryInfiniteLightSamples: 1
+          numPrimaryEnvironmentSamples: 1
+          numPrimaryBrdfSamples: 0
+          brdfCutoff: 0
+          enableInitialVisibility: 0
+          environmentMapImportanceSampling: 0
+          localLightSamplingMode: 2
+        spatialResamplingParams:
+          spatialDepthThreshold: 0.1
+          spatialNormalThreshold: 0.9
+          spatialBiasCorrection: 1
+          numSpatialSamples: 1
+          numDisocclusionBoostSamples: 0
+          spatialSamplingRadius: 4
+          neighborOffsetMask: 0
+          discountNaiveSamples: 0
+    sunAngularDiameter: 0.533
+    exposureEv: 6
+    upscalerMode: 0
+    mipBias: -0.5
+    tracingMode: 1
+    denoiser: 0
+    emissionIntensity: 1
+    cameraJitter: 1
+    psr: 0
+    emission: 1
+    usePrevFrame: 1
+    TAA: 1
+    indirectDiffuse: 1
+    indirectSpecular: 1
+    importanceSampling: 0
+    SHARC: 1
+    specularLobeTrimming: 1
+    boost: 0
+    boostFactor: 0.6667
+    SR: 0
+    RR: 1
+    tmpDisableRR: 0
+    resolutionScale: 1
+    denoisingRange: 1000
+    splitScreen: 0
+    isBaseColorMetalnessAvailable: 1
+    planeDistanceSensitivity: 0.02
+    maxStabilizedFrameNum: 5
+    dofAperture: 0
+    dofFocalDistance: 5
+    enableAutoExposure: 0
+    aeEVMin: -10
+    aeEVMax: 10
+    aeLowPercent: 0.05
+    aeHighPercent: 0.95
+    aeAdaptationSpeedUp: 2
+    aeAdaptationSpeedDown: 1
+    aeExposureCompensation: 0
+    aeMinExposure: 0.01
+    aeMaxExposure: 100
+    rpp: 1
+    bounceNum: 1
+    sharcDownscale: 4
+    sharcSceneScale: 45
+    sharcDebug: 0
+    sssMinThreshold: -0.2
+    sssTransmissionBsdfSampleCount: 4
+    sssTransmissionPerBsdfScatteringSampleCount: 4
+    sssScale: 0.4
+    sssAnisotropy: 0
+    sssMaxSampleRadius: 0.004
+    useReferencePathTracing: 0
+    referenceBounceNum: 4
+    split: 0
+    accumulateReference: 1
+    accumulate: 0
+  renderPassEvent: 550
+  finalMaterial: {fileID: 2100000, guid: 27695a2bc55ef2f469362b9a2994989e, type: 2}
+  sharcUpdateTs: {fileID: 4807578003741378534, guid: 171e2660e0894b3cb5c6c809e595ae5d, type: 3}
+  opaqueTracingShader: {fileID: 4807578003741378534, guid: 71faa22953dc9834daf36cc38966c196, type: 3}
+  transparentTracingShader: {fileID: 4807578003741378534, guid: d207e5fb066a4b579353785310fd0dea, type: 3}
+  referencePtTracingShader: {fileID: 4807578003741378534, guid: e0dfc84565ad452aab99e3b8d28eafb1, type: 3}
+  compositionComputeShader: {fileID: 7200000, guid: 6b0c89c26f4363a4781550cf86801786, type: 3}
+  taaComputeShader: {fileID: 7200000, guid: 6af7363d73bc4764bd8420bb5cc5d306, type: 3}
+  dlssBeforeComputeShader: {fileID: 7200000, guid: b34d979c2031436aad2b456c4456c6eb, type: 3}
+  sharcResolveCs: {fileID: 7200000, guid: 8a8bff82bc5641aaabee502a09792151, type: 3}
+  autoExposureShader: {fileID: 7200000, guid: dd8e8b3823bdf9c4e987096a78bd2248, type: 3}
+  accumulateCs: {fileID: 7200000, guid: c1e50e483fac4de7803cd658d0f9cdd2, type: 3}
+  scramblingRankingTex: {fileID: 2800000, guid: ba45d1e4dcf9022438a4798a5f9e7b80, type: 3}
+  sobolTex: {fileID: 2800000, guid: 17e7ce8147355314ea8aab1178a6a43c, type: 3}
