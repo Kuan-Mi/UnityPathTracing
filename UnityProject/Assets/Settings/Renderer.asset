@@ -29,7 +29,7 @@ MonoBehaviour:
       numPrimaryLocalLightSamples: 8
       numPrimaryInfiniteLightSamples: 0
       numPrimaryEnvironmentSamples: 0
-      numPrimaryBrdfSamples: 1
+      numPrimaryBrdfSamples: 0
       brdfCutoff: 0.0001
       enableInitialVisibility: 0
       environmentMapImportanceSampling: 0
@@ -68,9 +68,9 @@ MonoBehaviour:
     regirDynamicParams:
       regirCellSize: 1
       center:
-        x: -3.5965266
-        y: 3.2605515
-        z: -19.83538
+        x: -5.797733
+        y: 3.7905498
+        z: -22.97136
       fallbackSamplingMode: 1
       presamplingMode: 1
       regirSamplingJitter: 1

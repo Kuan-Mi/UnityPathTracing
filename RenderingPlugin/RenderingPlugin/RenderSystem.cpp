@@ -17,6 +17,11 @@ void RenderSystem::Initialize(IUnityInterfaces* interfaces)
     s_d3d12 = interfaces->Get<IUnityGraphicsD3D12v7>();
     s_Log = interfaces->Get<IUnityLog>();
 
+    if (!s_d3d12)
+    {
+        LOG("[NRD Native] IUnityGraphicsD3D12v7 not available, skipping initialization.");
+        return;
+    }
     device = s_d3d12->GetDevice();
 
     nri::DeviceCreationD3D12Desc deviceDesc = {};
