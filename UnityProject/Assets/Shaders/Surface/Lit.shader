@@ -93,14 +93,6 @@ Shader "RayTracing/Lit"
         LOD 300
 
         UsePass "Universal Render Pipeline/Lit/ForwardLit"
-        UsePass "Universal Render Pipeline/Lit/ShadowCaster"
-        UsePass "Universal Render Pipeline/Lit/GBuffer"
-        UsePass "Universal Render Pipeline/Lit/DepthOnly"
-        UsePass "Universal Render Pipeline/Lit/DepthNormals"
-        UsePass "Universal Render Pipeline/Lit/Meta"
-        UsePass "Universal Render Pipeline/Lit/Universal2D"
-        UsePass "Universal Render Pipeline/Lit/MotionVectors"
-        UsePass "Universal Render Pipeline/Lit/XRMotionVectors"
 
         // ──────────────────────────────────────────────────────────────────────
         // Rasterization G-Buffer pass
@@ -116,9 +108,9 @@ Shader "RayTracing/Lit"
                 "LightMode" = "GBufferRaster"
             }
 
-            Cull   Front
+            Cull Front
             ZWrite On
-            ZTest  LEqual
+            ZTest LEqual
 
             HLSLPROGRAM
             #pragma target 4.5
@@ -162,13 +154,16 @@ Shader "RayTracing/Lit"
             float4 _SSSScatteringColor;
             float  _SSSScatteringScale;
 
-            TEXTURE2D(_BaseMap);          SAMPLER(sampler_BaseMap);
-            TEXTURE2D(_BumpMap);          SAMPLER(sampler_BumpMap);
-            TEXTURE2D(_EmissionMap);      SAMPLER(sampler_EmissionMap);
-            TEXTURE2D(_MetallicGlossMap); SAMPLER(sampler_MetallicGlossMap);
+            TEXTURE2D(_BaseMap);
+            SAMPLER(sampler_BaseMap);
+            TEXTURE2D(_BumpMap);
+            SAMPLER(sampler_BumpMap);
+            TEXTURE2D(_EmissionMap);
+            SAMPLER(sampler_EmissionMap);
+            TEXTURE2D(_MetallicGlossMap);
+            SAMPLER(sampler_MetallicGlossMap);
 
             #include "Assets/Shaders/RayTracing/GBufferRaster.hlsl"
-
             ENDHLSL
         }
     }
@@ -277,7 +272,7 @@ Shader "RayTracing/Lit"
 
                 // 3. 计算插值 UV
                 float3 barycentricCoords = float3(1.0 - attribs.barycentrics.x - attribs.barycentrics.y,
-                              attribs.barycentrics.x, attribs.barycentrics.y);
+                    attribs.barycentrics.x, attribs.barycentrics.y);
                 float2 uv = uv0 * barycentricCoords.x + uv1 * barycentricCoords.y + uv2 * barycentricCoords.z;
 
                 // 4. 采样 Alpha 通道
@@ -525,7 +520,7 @@ Shader "RayTracing/Lit"
 
                 // 3. 计算插值 UV
                 float3 barycentricCoords = float3(1.0 - attribs.barycentrics.x - attribs.barycentrics.y,
-                              attribs.barycentrics.x, attribs.barycentrics.y);
+      attribs.barycentrics.x, attribs.barycentrics.y);
                 float2 uv = uv0 * barycentricCoords.x + uv1 * barycentricCoords.y + uv2 * barycentricCoords.z;
 
                 // 4. 采样 Alpha 通道

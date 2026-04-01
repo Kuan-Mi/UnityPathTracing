@@ -26,6 +26,9 @@ EditorBuildSettings:
   - enabled: 0
     path: Assets/Bistro_v5_2/Bistro 1.unity
     guid: 3ca0e1da70a5ed948ba963b53c948da5
+  - enabled: 0
+    path: Assets/Bistro_v5_2/Test.unity
+    guid: 53c16831364c5c24ab9934c199cbea8a
   m_configObjects:
     com.unity.input.settings.actions: {fileID: -944628639613478452, guid: 052faaac586de48259a63d0c4782560b, type: 3}
     com.unity.xr.management.loader_settings: {fileID: 11400000, guid: ef0ce46ed818dba47ac25c34755259b6, type: 2}

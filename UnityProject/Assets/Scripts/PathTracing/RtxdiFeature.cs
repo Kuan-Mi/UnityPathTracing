@@ -220,8 +220,8 @@ namespace PathTracing
         {
             _constantBuffer = new GraphicsBuffer(GraphicsBuffer.Target.Constant, 1, Marshal.SizeOf<GlobalConstants>());
 
-            var size = Marshal.SizeOf<ResamplingConstants>();
-            Debug.Log($"ResamplingConstants size: {size} bytes");
+            // var size = Marshal.SizeOf<ResamplingConstants>();
+            // Debug.Log($"ResamplingConstants size: {size} bytes");
             _resamplingConstantBuffer = new GraphicsBuffer(GraphicsBuffer.Target.Structured, 1, Marshal.SizeOf<ResamplingConstants>());
         }
 
@@ -789,7 +789,7 @@ namespace PathTracing
 
             var outputBlitResource = new OutputBlitPass.Resource
             {
-                Mv = pool.GetRT(RenderResourceType.MV),
+                Mv = pool.GetRT(RenderResourceType.RtxdiMotionVectors),
                 NormalRoughness = pool.GetRT(RenderResourceType.NormalRoughness),
                 BaseColorMetalness = pool.GetRT(RenderResourceType.BasecolorMetalness),
 
