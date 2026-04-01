@@ -15,7 +15,7 @@ MonoBehaviour:
   m_Active: 1
   pathTracingSetting:
     showMode: 18
-    showMv: 1
+    showMv: 0
     showValidation: 0
     enableRtxdi: 1
     useRasterGBuffer: 1
@@ -69,9 +69,9 @@ MonoBehaviour:
     regirDynamicParams:
       regirCellSize: 1
       center:
-        x: -10.468944
-        y: 4.9176292
-        z: -46.14263
+        x: -10.641963
+        y: 3.9952989
+        z: -44.790257
       fallbackSamplingMode: 1
       presamplingMode: 1
       regirSamplingJitter: 1

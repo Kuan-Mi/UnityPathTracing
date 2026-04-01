@@ -150,7 +150,7 @@ GBR_FragOutput GBufferRasterFrag(GBR_Varyings IN)
     o.normals = ndirToOctUnorm32(matNormalWS);
     o.geoNormals = ndirToOctUnorm32(geoNormalWS);
     o.emissive = float4(emissive, 1);
-    // o.motionVectors = float4(motion, 1);
-    o.motionVectors = 0;
+    o.motionVectors = float4(motion, 1);
+    // o.motionVectors = 0;
     return o;
 }

@@ -123,9 +123,10 @@ namespace PathTracing
 
             var rendererListDesc = new RendererListDesc(k_ShaderTag, renderingData.cullResults, cameraData.camera)
             {
-                sortingCriteria  = SortingCriteria.CommonOpaque,
-                renderQueueRange = RenderQueueRange.opaque,
-                layerMask        = cameraData.camera.cullingMask,
+                sortingCriteria       = SortingCriteria.CommonOpaque,
+                renderQueueRange      = RenderQueueRange.opaque,
+                layerMask             = cameraData.camera.cullingMask,
+                rendererConfiguration = PerObjectData.MotionVectors,
             };
 
             using var builder = renderGraph.AddRasterRenderPass<PassData>("GBufferRaster", out var passData);
