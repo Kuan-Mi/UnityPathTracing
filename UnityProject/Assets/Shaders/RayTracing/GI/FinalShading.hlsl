@@ -106,7 +106,7 @@ void MainRayGenShader()
         
         float3 finalColor = (diffuse * primarySurface.material.diffuseAlbedo) + specular;
         finalColor *= gExposure;
-        gOut_DirectLighting[pixelPosition] = finalColor;
+        gOut_DirectLighting[pixelPosition] += finalColor;
 
         
     }

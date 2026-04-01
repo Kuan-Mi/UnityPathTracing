@@ -14,7 +14,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::PathTracing.RtxdiFeature
   m_Active: 1
   pathTracingSetting:
-    showMode: 11
+    showMode: 18
     showMv: 0
     showValidation: 0
     enableRtxdi: 1
@@ -26,16 +26,16 @@ MonoBehaviour:
     useComputeForTemporalResampling: 1
     useComputeForSpatialResampling: 1
     useComputeForShadeSamples: 1
-    enableGIFinalShading: 1
+    enableGIFinalShading: 0
     useComputeForGITemporalResampling: 1
     useComputeForGISpatialResampling: 1
     useComputeForGIFinalShading: 1
     resamplingMode: 3
-    giResamplingMode: 0
+    giResamplingMode: 3
     gShowLight: 0
     initialSamplingParams:
       numPrimaryLocalLightSamples: 8
-      numPrimaryInfiniteLightSamples: 1
+      numPrimaryInfiniteLightSamples: 0
       numPrimaryEnvironmentSamples: 0
       numPrimaryBrdfSamples: 0
       brdfCutoff: 0.0001
@@ -103,9 +103,9 @@ MonoBehaviour:
     regirDynamicParams:
       regirCellSize: 1
       center:
-        x: 9.29668
-        y: 14.324701
-        z: -18.928179
+        x: -9.019564
+        y: 3.1181872
+        z: -42.698994
       fallbackSamplingMode: 1
       presamplingMode: 1
       regirSamplingJitter: 1
@@ -124,8 +124,8 @@ MonoBehaviour:
     gradientSensitivity: 8
     confidenceHistoryLength: 0.75
     brdfptParams:
-      enableIndirectEmissiveSurfaces: 1
-      enableSecondaryResampling: 1
+      enableIndirectEmissiveSurfaces: 0
+      enableSecondaryResampling: 0
       enableReSTIRGI: 1
       pad1: 0
       materialOverrideParams:
@@ -135,25 +135,25 @@ MonoBehaviour:
         pad1: 0
       secondarySurfaceReSTIRDIParams:
         initialSamplingParams:
-          numPrimaryLocalLightSamples: 1
-          numPrimaryInfiniteLightSamples: 1
+          numPrimaryLocalLightSamples: 8
+          numPrimaryInfiniteLightSamples: 0
           numPrimaryEnvironmentSamples: 0
           numPrimaryBrdfSamples: 0
           brdfCutoff: 0
           enableInitialVisibility: 0
           environmentMapImportanceSampling: 0
-          localLightSamplingMode: 0
+          localLightSamplingMode: 2
         spatialResamplingParams:
           spatialDepthThreshold: 0.1
           spatialNormalThreshold: 0.9
           spatialBiasCorrection: 1
-          numSpatialSamples: 1
+          numSpatialSamples: 18
           numDisocclusionBoostSamples: 0
           spatialSamplingRadius: 4
           neighborOffsetMask: 0
           discountNaiveSamples: 0
     sunAngularDiameter: 0.533
-    exposureEv: -2.93
+    exposureEv: 5.96
     upscalerMode: 0
     mipBias: -0.5
     tracingMode: 1

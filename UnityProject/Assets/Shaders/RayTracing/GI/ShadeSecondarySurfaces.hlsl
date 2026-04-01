@@ -104,14 +104,17 @@ void MainRayGenShader()
             // Try to find this secondary surface in the G-buffer. If found, resample the lights
             // from that G-buffer surface into the reservoir using the spatial resampling function.
         
-            float4 secondaryClipPos = mul(float4(secondaryGBufferData.worldPos, 1.0), gWorldToClip);
+            // float4 secondaryClipPos = mul(float4(secondaryGBufferData.worldPos, 1.0), gWorldToClip);
+            float4 secondaryClipPos = Geometry::ProjectiveTransform( gWorldToClip, secondaryGBufferData.worldPos );
+            
             secondaryClipPos.xyz /= secondaryClipPos.w;
         
             if (all(abs(secondaryClipPos.xy) < 1.0) && secondaryClipPos.w > 0)
             {
-                int2 secondaryPixelPos = int2(secondaryClipPos.xy * float2(0.5, -0.5) * gRectSize + gRectSize * 0.5);
-
-                secondarySurface.viewDepth = secondaryClipPos.w;
+                float2 uv = secondaryClipPos.xy * float2(0.5, -0.5) + 0.5;
+                int2 secondaryPixelPos = int2(uv * gRectSize);
+                
+                secondarySurface.viewDepth = -secondaryClipPos.w;
         
                 RTXDI_DISpatialResamplingParameters sparams;
                 sparams.sourceBufferIndex = g_Const.restirDI.bufferIndices.shadingInputBufferIndex;
@@ -127,6 +130,8 @@ void MainRayGenShader()
         
                 reservoir = RTXDI_DISpatialResampling(secondaryPixelPos, secondarySurface, reservoir,
                     rng, params, g_Const.restirDI.reservoirBufferParams, sparams, lightSample);
+                
+                
             }
         }
 
@@ -182,6 +187,6 @@ void MainRayGenShader()
         // finalColor += gIn_EmissiveLighting[pixelPosition];
         finalColor *= gExposure; 
         
-        gOut_DirectLighting[pixelPosition] += finalColor;
+        // gOut_DirectLighting[pixelPosition] += finalColor;
     }
 }
