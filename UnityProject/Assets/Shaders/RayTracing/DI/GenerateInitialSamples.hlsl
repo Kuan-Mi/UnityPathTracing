@@ -55,6 +55,8 @@ void MainRayGenShader()
     }
 
     gOut_DirectLighting[pixelPosition] = RTXDI_IsValidDIReservoir(reservoir);
+    // gOut_DirectLighting[pixelPosition] = surface.normal;
+    // gOut_DirectLighting[pixelPosition] = surface.geoNormal;
     
     RTXDI_StoreDIReservoir(reservoir, g_Const.restirDI.reservoirBufferParams, GlobalIndex, g_Const.restirDI.bufferIndices.initialSamplingOutputBufferIndex);
 }

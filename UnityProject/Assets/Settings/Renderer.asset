@@ -14,7 +14,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::PathTracing.RtxdiFeature
   m_Active: 1
   pathTracingSetting:
-    showMode: 11
+    showMode: 20
     showMv: 0
     showValidation: 0
     enableRtxdi: 1
@@ -24,7 +24,7 @@ MonoBehaviour:
     useComputeForTemporalResampling: 1
     useComputeForSpatialResampling: 1
     useComputeForShadeSamples: 1
-    resamplingMode: 0
+    resamplingMode: 3
     gShowLight: 0
     initialSamplingParams:
       numPrimaryLocalLightSamples: 8
@@ -34,7 +34,7 @@ MonoBehaviour:
       brdfCutoff: 0.0001
       enableInitialVisibility: 0
       environmentMapImportanceSampling: 0
-      localLightSamplingMode: 0
+      localLightSamplingMode: 2
     temporalResamplingParams:
       temporalDepthThreshold: 0.1
       temporalNormalThreshold: 0.5
@@ -52,7 +52,7 @@ MonoBehaviour:
       spatialDepthThreshold: 0.1
       spatialNormalThreshold: 0.5
       spatialBiasCorrection: 2
-      numSpatialSamples: 4
+      numSpatialSamples: 1
       numDisocclusionBoostSamples: 8
       spatialSamplingRadius: 32
       neighborOffsetMask: 0
@@ -69,15 +69,15 @@ MonoBehaviour:
     regirDynamicParams:
       regirCellSize: 1
       center:
-        x: -19.4596
-        y: 2.5284243
-        z: -43.079906
+        x: -10.642618
+        y: 3.9976556
+        z: -44.775795
       fallbackSamplingMode: 1
       presamplingMode: 1
       regirSamplingJitter: 1
       regirNumBuildSamples: 8
-    prepareLight: 0
-    enableFinalShading: 0
+    prepareLight: 1
+    enableFinalShading: 1
     enableEnv: 1
     denoiserMode: 0
     enablePreviousTLAS: 0
@@ -119,7 +119,7 @@ MonoBehaviour:
           neighborOffsetMask: 0
           discountNaiveSamples: 0
     sunAngularDiameter: 0.533
-    exposureEv: -1.58
+    exposureEv: 3.12
     upscalerMode: 0
     mipBias: -0.5
     tracingMode: 1
@@ -228,7 +228,7 @@ MonoBehaviour:
     m_Bits: 0
   m_OpaqueLayerMask:
     serializedVersion: 2
-    m_Bits: 0
+    m_Bits: 4294967295
   m_TransparentLayerMask:
     serializedVersion: 2
     m_Bits: 0

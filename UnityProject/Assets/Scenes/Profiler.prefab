@@ -49,6 +49,7 @@ MonoBehaviour:
   - Sharc Resolve
   - PrepareLight
   - GBuffer
+  - GBuffer Raster
   - Opaque Tracing
   - pdfTexture
   - RtxdiGenerateMips
