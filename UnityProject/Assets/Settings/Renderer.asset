@@ -26,17 +26,16 @@ MonoBehaviour:
     useComputeForTemporalResampling: 1
     useComputeForSpatialResampling: 1
     useComputeForShadeSamples: 1
-    enableGITemporalResampling: 0
-    enableGISpatialResampling: 0
     enableGIFinalShading: 1
-    useComputeForGITemporalResampling: 0
-    useComputeForGISpatialResampling: 0
-    useComputeForGIFinalShading: 0
+    useComputeForGITemporalResampling: 1
+    useComputeForGISpatialResampling: 1
+    useComputeForGIFinalShading: 1
     resamplingMode: 3
+    giResamplingMode: 3
     gShowLight: 0
     initialSamplingParams:
       numPrimaryLocalLightSamples: 8
-      numPrimaryInfiniteLightSamples: 0
+      numPrimaryInfiniteLightSamples: 1
       numPrimaryEnvironmentSamples: 0
       numPrimaryBrdfSamples: 0
       brdfCutoff: 0.0001
@@ -46,7 +45,7 @@ MonoBehaviour:
     temporalResamplingParams:
       temporalDepthThreshold: 0.1
       temporalNormalThreshold: 0.5
-      maxHistoryLength: 20
+      maxHistoryLength: 8
       temporalBiasCorrection: 2
       enablePermutationSampling: 1
       permutationSamplingThreshold: 0.9
@@ -74,12 +73,39 @@ MonoBehaviour:
       pad1: 0
       pad2: 0
       pad3: 0
+    giTemporalResamplingParams:
+      depthThreshold: 0.1
+      normalThreshold: 0.6
+      enablePermutationSampling: 1
+      maxHistoryLength: 8
+      maxReservoirAge: 30
+      enableBoilingFilter: 1
+      boilingFilterStrength: 0.2
+      enableFallbackSampling: 1
+      temporalBiasCorrectionMode: 1
+      uniformRandomNumber: 0
+      pad2: 0
+      pad3: 0
+    giSpatialResamplingParams:
+      spatialDepthThreshold: 0.1
+      spatialNormalThreshold: 0.6
+      numSpatialSamples: 2
+      spatialSamplingRadius: 32
+      spatialBiasCorrectionMode: 1
+      pad1: 0
+      pad2: 0
+      pad3: 0
+    giFinalShadingParams:
+      enableFinalVisibility: 1
+      enableFinalMIS: 1
+      pad1: 0
+      pad2: 0
     regirDynamicParams:
       regirCellSize: 1
       center:
-        x: -15.113049
-        y: 8.14776
-        z: -48.491405
+        x: 11.183327
+        y: 3.4379046
+        z: -4.7866564
       fallbackSamplingMode: 1
       presamplingMode: 1
       regirSamplingJitter: 1
@@ -110,7 +136,7 @@ MonoBehaviour:
       secondarySurfaceReSTIRDIParams:
         initialSamplingParams:
           numPrimaryLocalLightSamples: 1
-          numPrimaryInfiniteLightSamples: 0
+          numPrimaryInfiniteLightSamples: 1
           numPrimaryEnvironmentSamples: 0
           numPrimaryBrdfSamples: 0
           brdfCutoff: 0
@@ -127,7 +153,7 @@ MonoBehaviour:
           neighborOffsetMask: 0
           discountNaiveSamples: 0
     sunAngularDiameter: 0.533
-    exposureEv: 3.12
+    exposureEv: -2.93
     upscalerMode: 0
     mipBias: -0.5
     tracingMode: 1
@@ -288,13 +314,12 @@ MonoBehaviour:
     useComputeForTemporalResampling: 0
     useComputeForSpatialResampling: 0
     useComputeForShadeSamples: 0
-    enableGITemporalResampling: 0
-    enableGISpatialResampling: 0
     enableGIFinalShading: 0
     useComputeForGITemporalResampling: 0
     useComputeForGISpatialResampling: 0
     useComputeForGIFinalShading: 0
     resamplingMode: 0
+    giResamplingMode: 0
     gShowLight: 0
     initialSamplingParams:
       numPrimaryLocalLightSamples: 0
@@ -336,6 +361,33 @@ MonoBehaviour:
       pad1: 0
       pad2: 0
       pad3: 0
+    giTemporalResamplingParams:
+      depthThreshold: 0.1
+      normalThreshold: 0.6
+      enablePermutationSampling: 0
+      maxHistoryLength: 8
+      maxReservoirAge: 30
+      enableBoilingFilter: 1
+      boilingFilterStrength: 0.2
+      enableFallbackSampling: 1
+      temporalBiasCorrectionMode: 1
+      uniformRandomNumber: 0
+      pad2: 0
+      pad3: 0
+    giSpatialResamplingParams:
+      spatialDepthThreshold: 0.1
+      spatialNormalThreshold: 0.6
+      numSpatialSamples: 2
+      spatialSamplingRadius: 32
+      spatialBiasCorrectionMode: 1
+      pad1: 0
+      pad2: 0
+      pad3: 0
+    giFinalShadingParams:
+      enableFinalVisibility: 1
+      enableFinalMIS: 1
+      pad1: 0
+      pad2: 0
     regirDynamicParams:
       regirCellSize: 0
       center:
