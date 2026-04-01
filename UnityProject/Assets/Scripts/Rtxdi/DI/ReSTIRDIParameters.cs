@@ -159,9 +159,13 @@ namespace Rtxdi.DI
     [StructLayout(LayoutKind.Sequential)]
     public struct ReSTIRDI_SpatialResamplingParameters
     {
+        [Range(0.0f, 1)]
         public float spatialDepthThreshold;
+        [Range(0.0f, 1)]
         public float spatialNormalThreshold;
         public ReSTIRDI_SpatialBiasCorrectionMode spatialBiasCorrection;
+        
+        [Range(0, 40)]
         public uint numSpatialSamples;
 
         public uint numDisocclusionBoostSamples;
