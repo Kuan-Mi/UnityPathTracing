@@ -101,6 +101,76 @@ Shader "RayTracing/Lit"
         UsePass "Universal Render Pipeline/Lit/Universal2D"
         UsePass "Universal Render Pipeline/Lit/MotionVectors"
         UsePass "Universal Render Pipeline/Lit/XRMotionVectors"
+
+        // ──────────────────────────────────────────────────────────────────────
+        // Rasterization G-Buffer pass
+        // Writes the same seven G-Buffer textures as the ray-tracing GBuffer.hlsl
+        // so the downstream NRD / path-tracing passes can be driven by either.
+        // ──────────────────────────────────────────────────────────────────────
+        Pass
+        {
+            Name "GBufferRaster"
+
+            Tags
+            {
+                "LightMode" = "GBufferRaster"
+            }
+
+            Cull   [_Cull]
+            ZWrite On
+            ZTest  LEqual
+
+            HLSLPROGRAM
+            #pragma target 4.5
+
+            #pragma vertex   GBufferRasterVert
+            #pragma fragment GBufferRasterFrag
+
+            #pragma shader_feature_local _NORMALMAP
+            #pragma shader_feature_local _METALLICSPECGLOSSMAP
+            #pragma shader_feature_local _EMISSION
+            #pragma shader_feature_local _SSS
+
+            #pragma multi_compile_instancing
+            #pragma instancing_options renderinglayer
+
+            #pragma use_dxc
+
+            #include "Assets/Shaders/Include/ml.hlsli"
+            #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
+
+            CBUFFER_START(UnityPerMaterial)
+                float4 _BaseMap_ST;
+                float4 _BaseMap_TexelSize;
+                float4 _DetailAlbedoMap_ST;
+                float4 _BaseColor;
+                float4 _SpecColor;
+                float4 _EmissionColor;
+                float _Cutoff;
+                float _Smoothness;
+                float _Metallic;
+                float _BumpScale;
+                float _Parallax;
+                float _OcclusionStrength;
+                float _ClearCoatMask;
+                float _ClearCoatSmoothness;
+                float _DetailAlbedoMapScale;
+                float _DetailNormalMapScale;
+                float _Surface;
+            CBUFFER_END
+
+            float4 _SSSScatteringColor;
+            float  _SSSScatteringScale;
+
+            TEXTURE2D(_BaseMap);          SAMPLER(sampler_BaseMap);
+            TEXTURE2D(_BumpMap);          SAMPLER(sampler_BumpMap);
+            TEXTURE2D(_EmissionMap);      SAMPLER(sampler_EmissionMap);
+            TEXTURE2D(_MetallicGlossMap); SAMPLER(sampler_MetallicGlossMap);
+
+            #include "Assets/Shaders/RayTracing/GBufferRaster.hlsl"
+
+            ENDHLSL
+        }
     }
     SubShader
     {
