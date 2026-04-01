@@ -25,32 +25,32 @@
 // ── Fragment output struct (MRT) ──────────────────────────────────────────────
 struct GBR_FragOutput
 {
-    float  viewDepth     : SV_Target0;
-    uint   diffuseAlbedo : SV_Target1;
-    uint   specularRough : SV_Target2;
-    uint   normals       : SV_Target3;
-    uint   geoNormals    : SV_Target4;
-    float4 emissive      : SV_Target5;
+    float viewDepth : SV_Target0;
+    uint diffuseAlbedo : SV_Target1;
+    uint specularRough : SV_Target2;
+    uint normals : SV_Target3;
+    uint geoNormals : SV_Target4;
+    float4 emissive : SV_Target5;
     float4 motionVectors : SV_Target6;
 };
 
 // ── Vertex input / output ─────────────────────────────────────────────────────
 struct GBR_Attributes
 {
-    float4 positionOS   : POSITION;
-    float3 normalOS     : NORMAL0;
-    float4 tangentOS    : TANGENT;
-    float2 uv           : TEXCOORD0;
+    float4 positionOS : POSITION;
+    float3 normalOS : NORMAL0;
+    float4 tangentOS : TANGENT;
+    float2 uv : TEXCOORD0;
 };
 
 struct GBR_Varyings
 {
-    float4 positionCS     : SV_POSITION;
-    float3 positionWS     : TEXCOORD0;
+    float4 positionCS : SV_POSITION;
+    float3 positionWS : TEXCOORD0;
     float3 prevPositionWS : TEXCOORD1;
-    float3 normalWS       : TEXCOORD2;
-    float4 tangentWS      : TEXCOORD3; // xyz = world tangent, w = bitangent sign
-    float2 uv             : TEXCOORD4;
+    float3 normalWS : TEXCOORD2;
+    float4 tangentWS : TEXCOORD3; // xyz = world tangent, w = bitangent sign
+    float2 uv : TEXCOORD4;
 };
 
 // ── Vertex shader ─────────────────────────────────────────────────────────────
@@ -60,8 +60,8 @@ GBR_Varyings GBufferRasterVert(GBR_Attributes IN)
 
     float3 posOS = IN.positionOS.xyz;
 
-    OUT.positionWS     = mul(GetObjectToWorldMatrix(), float4(posOS, 1.0)).xyz;
-    OUT.positionCS     = TransformWorldToHClip(OUT.positionWS);
+    OUT.positionWS = mul(GetObjectToWorldMatrix(), float4(posOS, 1.0)).xyz;
+    OUT.positionCS = TransformWorldToHClip(OUT.positionWS);
 
     // Previous-frame world position for motion vectors.
     // GetPrevObjectToWorldMatrix() returns unity_MatrixPreviousM, which Unity
@@ -70,9 +70,9 @@ GBR_Varyings GBufferRasterVert(GBR_Attributes IN)
     // exact motion vectors; for rigid bodies this is exact.
     OUT.prevPositionWS = mul(GetPrevObjectToWorldMatrix(), float4(posOS, 1.0)).xyz;
 
-    OUT.normalWS  = TransformObjectToWorldNormal(IN.normalOS);
+    OUT.normalWS = TransformObjectToWorldNormal(IN.normalOS);
     OUT.tangentWS = float4(TransformObjectToWorldDir(IN.tangentOS.xyz), IN.tangentOS.w);
-    OUT.uv        = TRANSFORM_TEX(IN.uv, _BaseMap);
+    OUT.uv = TRANSFORM_TEX(IN.uv, _BaseMap);
 
     // Flip clip-space Y to produce a vertically-inverted image.
     OUT.positionCS.y = -OUT.positionCS.y;
@@ -86,45 +86,44 @@ GBR_FragOutput GBufferRasterFrag(GBR_Varyings IN)
     float2 uv = IN.uv;
 
     // ── Albedo ────────────────────────────────────────────────────────────────
-    float3 albedoRaw = _BaseColor.rgb
-                     * SAMPLE_TEXTURE2D(_BaseMap, sampler_BaseMap, uv).rgb;
+    float3 albedoRaw = _BaseColor.rgb * SAMPLE_TEXTURE2D(_BaseMap, sampler_BaseMap, uv).rgb;
 
     // ── Roughness / Metallic ──────────────────────────────────────────────────
     float roughness, metallic;
-#if _METALLICSPECGLOSSMAP
+    #if _METALLICSPECGLOSSMAP
     float4 metallicSample = SAMPLE_TEXTURE2D(_MetallicGlossMap, sampler_MetallicGlossMap, uv);
     // Bistro channel layout: roughness in G (inverted smoothness), metallic in B.
     // Standard URP layout (commented): smoothness in A, metallic in R.
     float smooth = (1.0 - metallicSample.g) * _Smoothness;
     roughness = 1.0 - smooth;
-    metallic  = metallicSample.b;
-#else
+    metallic = metallicSample.b;
+    #else
     roughness = 1.0 - _Smoothness;
-    metallic  = _Metallic;
-#endif
+    metallic = _Metallic;
+    #endif
 
     // ── Geometry normal (vertex normal, world space) ──────────────────────────
     float3 geoNormalWS = normalize(IN.normalWS);
 
     // ── Material normal (with optional normal map) ────────────────────────────
     float3 matNormalWS;
-#if _NORMALMAP
-    float3 tangentWS   = normalize(IN.tangentWS.xyz);
+    #if _NORMALMAP
+    float3 tangentWS = normalize(IN.tangentWS.xyz);
     float3 bitangentWS = normalize(cross(geoNormalWS, tangentWS)) * IN.tangentWS.w;
-    float3x3 tbn       = float3x3(tangentWS, bitangentWS, geoNormalWS);
-    float4 nSample     = SAMPLE_TEXTURE2D(_BumpMap, sampler_BumpMap, uv);
-    float3 tangentN    = UnpackNormalScale(nSample, _BumpScale);
-    matNormalWS        = normalize(mul(tangentN, tbn));
-#else
+    float3x3 tbn = float3x3(tangentWS, bitangentWS, geoNormalWS);
+    float4 nSample = SAMPLE_TEXTURE2D(_BumpMap, sampler_BumpMap, uv);
+    float3 tangentN = UnpackNormalScale(nSample, _BumpScale);
+    matNormalWS = normalize(mul(tangentN, tbn));
+    #else
     matNormalWS = geoNormalWS;
-#endif
+    #endif
 
     // ── Emissive ──────────────────────────────────────────────────────────────
     float3 emissive = float3(0.0, 0.0, 0.0);
-#if _EMISSION
+    #if _EMISSION
     emissive = _EmissionColor.rgb
-             * SAMPLE_TEXTURE2D(_EmissionMap, sampler_EmissionMap, uv).rgb;
-#endif
+        * SAMPLE_TEXTURE2D(_EmissionMap, sampler_EmissionMap, uv).rgb;
+    #endif
 
     // ── BRDF conversion ───────────────────────────────────────────────────────
     // Matches GBuffer.hlsl: BRDF::ConvertBaseColorMetalnessToAlbedoRf0
@@ -132,10 +131,10 @@ GBR_FragOutput GBufferRasterFrag(GBR_Varyings IN)
     BRDF::ConvertBaseColorMetalnessToAlbedoRf0(albedoRaw, metallic, albedo, Rf0);
 
     // ── View-space depth ──────────────────────────────────────────────────────
-    float3 X     = IN.positionWS;
+    float3 X = IN.positionWS;
     float3 Xprev = IN.prevPositionWS;
-    float  viewZ = Geometry::AffineTransform(gWorldToView, X).z;
-    float  viewZAndTaaMask = abs(viewZ) * FP16_VIEWZ_SCALE;
+    float viewZ = Geometry::AffineTransform(gWorldToView, X).z;
+
 
     // ── Motion vectors ────────────────────────────────────────────────────────
     // GetMotion() replicates the RT version exactly:
@@ -145,12 +144,13 @@ GBR_FragOutput GBufferRasterFrag(GBR_Varyings IN)
 
     // ── MRT output ────────────────────────────────────────────────────────────
     GBR_FragOutput o;
-    o.viewDepth     = viewZ;
+    o.viewDepth = viewZ;
     o.diffuseAlbedo = Pack_R11G11B10_UFLOAT(albedo);
     o.specularRough = Pack_R8G8B8A8_Gamma_UFLOAT(float4(Rf0, roughness));
-    o.normals       = ndirToOctUnorm32(matNormalWS);
-    o.geoNormals    = ndirToOctUnorm32(geoNormalWS);
-    o.emissive      = float4(emissive, viewZAndTaaMask);
-    o.motionVectors = float4(motion,   viewZAndTaaMask);
+    o.normals = ndirToOctUnorm32(matNormalWS);
+    o.geoNormals = ndirToOctUnorm32(geoNormalWS);
+    o.emissive = float4(emissive, 1);
+    // o.motionVectors = float4(motion, 1);
+    o.motionVectors = 0;
     return o;
 }

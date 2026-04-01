@@ -155,6 +155,8 @@ namespace PathTracing
         // ── ExecutePass ───────────────────────────────────────────────────────
         private static void ExecutePass(PassData data, RasterGraphContext context)
         {
+            var marker = new ProfilerMarker(ProfilerCategory.Render, "GBuffer Raster", MarkerFlags.SampleGPU);
+            context.cmd.BeginSample(marker);
             // Bind GlobalConstants so Shared.hlsl globals are available.
             context.cmd.SetGlobalConstantBuffer(
                 data.ConstantBuffer, paramsID,
@@ -165,6 +167,8 @@ namespace PathTracing
 
             // Draw opaque objects using the "GBufferRaster" shader pass.
             context.cmd.DrawRendererList(data.RendererList);
+            
+            context.cmd.EndSample(marker);
         }
     }
 }
