@@ -69,9 +69,9 @@ MonoBehaviour:
     regirDynamicParams:
       regirCellSize: 1
       center:
-        x: -10.641963
-        y: 3.9952989
-        z: -44.790257
+        x: -1.9679563
+        y: 2.1663053
+        z: -35.26039
       fallbackSamplingMode: 1
       presamplingMode: 1
       regirSamplingJitter: 1
@@ -125,7 +125,7 @@ MonoBehaviour:
     tracingMode: 1
     denoiser: 0
     emissionIntensity: 1
-    cameraJitter: 0
+    cameraJitter: 1
     psr: 0
     emission: 1
     usePrevFrame: 1

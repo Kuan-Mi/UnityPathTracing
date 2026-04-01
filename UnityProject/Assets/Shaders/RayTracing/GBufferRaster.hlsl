@@ -77,6 +77,13 @@ GBR_Varyings GBufferRasterVert(GBR_Attributes IN)
     // Flip clip-space Y to produce a vertically-inverted image.
     OUT.positionCS.y = -OUT.positionCS.y;
 
+    // Apply TAA jitter – matches GBuffer.hlsl: sampleUv = pixelUv + gJitter.
+    // gJitter is in UV space; after the Y-flip above, clip-space Y and UV Y
+    // share the same +Y-downward convention, so we scale uniformly by 2
+    // (UV [0,1] → NDC [-1,1]) and multiply by w to stay in clip space.
+    
+    OUT.positionCS.xy += (float2(-gJitter.x,gJitter.y)) *2 * OUT.positionCS.w;
+
     return OUT;
 }
 
@@ -86,7 +93,13 @@ GBR_FragOutput GBufferRasterFrag(GBR_Varyings IN)
     float2 uv = IN.uv;
 
     // ── Albedo ────────────────────────────────────────────────────────────────
-    float3 albedoRaw = _BaseColor.rgb * SAMPLE_TEXTURE2D(_BaseMap, sampler_BaseMap, uv).rgb;
+    float4 baseMapSample = SAMPLE_TEXTURE2D(_BaseMap, sampler_BaseMap, uv);
+    float3 albedoRaw = _BaseColor.rgb * baseMapSample.rgb;
+
+    // ── Alpha test ────────────────────────────────────────────────────────────
+    #if _ALPHATEST_ON
+    clip(baseMapSample.a * _BaseColor.a - _Cutoff);
+    #endif
 
     // ── Roughness / Metallic ──────────────────────────────────────────────────
     float roughness, metallic;

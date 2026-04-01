@@ -60,6 +60,7 @@ Shader "RayTracing/Lit"
         [HideInInspector] _AlphaToMask("__alphaToMask", Float) = 0.0
         [HideInInspector] _AddPrecomputedVelocity("_AddPrecomputedVelocity", Float) = 0.0
         [HideInInspector] _XRMotionVectorsPass("_XRMotionVectorsPass", Float) = 1.0
+        [HideInInspector] _CullGBuffer("__cullgbuffer", Float) = 1.0
 
         [ToggleUI] _ReceiveShadows("Receive Shadows", Float) = 1.0
         [Toggle(_SSS)] _SSS("SSS", Float) = 0.0
@@ -108,7 +109,7 @@ Shader "RayTracing/Lit"
                 "LightMode" = "GBufferRaster"
             }
 
-            Cull Front
+            Cull [_CullGBuffer]
             ZWrite On
             ZTest LEqual
 
@@ -122,6 +123,7 @@ Shader "RayTracing/Lit"
             #pragma shader_feature_local _METALLICSPECGLOSSMAP
             #pragma shader_feature_local _EMISSION
             #pragma shader_feature_local _SSS
+            #pragma shader_feature_local _ALPHATEST_ON
 
             #pragma multi_compile_instancing
             #pragma instancing_options renderinglayer
