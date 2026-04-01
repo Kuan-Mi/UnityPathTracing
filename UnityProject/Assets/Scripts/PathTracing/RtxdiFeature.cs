@@ -51,6 +51,8 @@ namespace PathTracing
 
         private PrepareLightPass _prepareLightPass;
         private GBufferPass _gBufferPass;
+        private GBufferRasterPass _gBufferRasterPass;
+        private GBufferRasterPass.Resource _gBufferRasterResource;
         private GenerateInitialSamplesPass _generateInitialSamplesPass;
         private GenerateInitialSamplesComputePass _generateInitialSamplesComputePass;
         private TemporalResamplingPass _temporalResamplingPass;
@@ -129,6 +131,11 @@ namespace PathTracing
             {
                 renderPassEvent = renderPassEvent
             };
+            _gBufferRasterPass ??= new GBufferRasterPass
+            {
+                renderPassEvent = renderPassEvent
+            };
+            _gBufferRasterResource ??= new GBufferRasterPass.Resource();
             _generateInitialSamplesPass ??= new GenerateInitialSamplesPass(generateInitialShader)
             {
                 renderPassEvent = renderPassEvent
@@ -375,8 +382,17 @@ namespace PathTracing
                 resolutionScale = pathTracingSetting.resolutionScale
             };
 
-            _gBufferPass.Setup(gBufferResource, gBufferSettings);
-            renderer.EnqueuePass(_gBufferPass);
+            if (pathTracingSetting.useRasterGBuffer)
+            {
+                _gBufferRasterResource.EnsureResources(pool.renderResolution);
+                _gBufferRasterPass.Setup(gBufferResource, _gBufferRasterResource, gBufferSettings);
+                renderer.EnqueuePass(_gBufferRasterPass);
+            }
+            else
+            {
+                _gBufferPass.Setup(gBufferResource, gBufferSettings);
+                renderer.EnqueuePass(_gBufferPass);
+            }
 
             #endregion
 
