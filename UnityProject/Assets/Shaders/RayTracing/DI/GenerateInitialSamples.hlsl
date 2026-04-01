@@ -54,7 +54,7 @@ void MainRayGenShader()
         }
     }
 
-    // gOut_DirectLighting[pixelPosition] = RTXDI_IsValidDIReservoir(reservoir);
+    gOut_DirectLighting[pixelPosition] = RTXDI_IsValidDIReservoir(reservoir);
     
     RTXDI_StoreDIReservoir(reservoir, g_Const.restirDI.reservoirBufferParams, GlobalIndex, g_Const.restirDI.bufferIndices.initialSamplingOutputBufferIndex);
 }

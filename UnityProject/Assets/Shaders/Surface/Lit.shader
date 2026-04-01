@@ -116,7 +116,7 @@ Shader "RayTracing/Lit"
                 "LightMode" = "GBufferRaster"
             }
 
-            Cull   [_Cull]
+            Cull   Front
             ZWrite On
             ZTest  LEqual
 

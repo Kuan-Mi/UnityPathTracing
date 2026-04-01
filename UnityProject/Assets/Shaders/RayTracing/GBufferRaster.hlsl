@@ -74,6 +74,9 @@ GBR_Varyings GBufferRasterVert(GBR_Attributes IN)
     OUT.tangentWS = float4(TransformObjectToWorldDir(IN.tangentOS.xyz), IN.tangentOS.w);
     OUT.uv        = TRANSFORM_TEX(IN.uv, _BaseMap);
 
+    // Flip clip-space Y to produce a vertically-inverted image.
+    OUT.positionCS.y = -OUT.positionCS.y;
+
     return OUT;
 }
 

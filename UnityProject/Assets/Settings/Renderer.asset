@@ -14,16 +14,17 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::PathTracing.RtxdiFeature
   m_Active: 1
   pathTracingSetting:
-    showMode: 18
+    showMode: 11
     showMv: 0
     showValidation: 0
     enableRtxdi: 1
+    useRasterGBuffer: 1
     debugRtxdi: 1
     useComputeForGIS: 1
     useComputeForTemporalResampling: 1
     useComputeForSpatialResampling: 1
     useComputeForShadeSamples: 1
-    resamplingMode: 3
+    resamplingMode: 0
     gShowLight: 0
     initialSamplingParams:
       numPrimaryLocalLightSamples: 8
@@ -33,7 +34,7 @@ MonoBehaviour:
       brdfCutoff: 0.0001
       enableInitialVisibility: 0
       environmentMapImportanceSampling: 0
-      localLightSamplingMode: 2
+      localLightSamplingMode: 0
     temporalResamplingParams:
       temporalDepthThreshold: 0.1
       temporalNormalThreshold: 0.5
@@ -68,15 +69,15 @@ MonoBehaviour:
     regirDynamicParams:
       regirCellSize: 1
       center:
-        x: -5.797733
-        y: 3.7905498
-        z: -22.97136
+        x: -19.4596
+        y: 2.5284243
+        z: -43.079906
       fallbackSamplingMode: 1
       presamplingMode: 1
       regirSamplingJitter: 1
       regirNumBuildSamples: 8
-    prepareLight: 1
-    enableFinalShading: 1
+    prepareLight: 0
+    enableFinalShading: 0
     enableEnv: 1
     denoiserMode: 0
     enablePreviousTLAS: 0
@@ -118,13 +119,13 @@ MonoBehaviour:
           neighborOffsetMask: 0
           discountNaiveSamples: 0
     sunAngularDiameter: 0.533
-    exposureEv: 3.99
+    exposureEv: -1.58
     upscalerMode: 0
     mipBias: -0.5
     tracingMode: 1
     denoiser: 0
     emissionIntensity: 1
-    cameraJitter: 1
+    cameraJitter: 0
     psr: 0
     emission: 1
     usePrevFrame: 1
@@ -264,6 +265,7 @@ MonoBehaviour:
     showMv: 0
     showValidation: 0
     enableRtxdi: 0
+    useRasterGBuffer: 0
     debugRtxdi: 0
     useComputeForGIS: 0
     useComputeForTemporalResampling: 0
