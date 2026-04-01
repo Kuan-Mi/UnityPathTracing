@@ -89,6 +89,9 @@ namespace PathTracing
             natCmd.SetRayTracingBufferParam(data.gBufferTs, "t_LightDataBuffer", resource.RtxdiResources.LightDataBuffer);
             natCmd.SetRayTracingBufferParam(data.gBufferTs, "u_RisBuffer", resource.RtxdiResources.RisBuffer);
             natCmd.SetRayTracingBufferParam(data.gBufferTs, "u_RisLightDataBuffer", resource.RtxdiResources.RisLightDataBuffer);
+            
+            natCmd.SetRayTracingBufferParam(data.gBufferTs, "t_NeighborOffsets", resource.RtxdiResources.NeighborOffsetsBuffer);
+            natCmd.SetRayTracingBufferParam(data.gBufferTs, "u_LightReservoirs", resource.RtxdiResources.LightReservoirBuffer);
 
             uint rectWmod = (uint)(settings.m_RenderResolution.x * settings.resolutionScale + 0.5f);
             uint rectHmod = (uint)(settings.m_RenderResolution.y * settings.resolutionScale + 0.5f);

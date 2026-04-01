@@ -14,7 +14,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::PathTracing.RtxdiFeature
   m_Active: 1
   pathTracingSetting:
-    showMode: 18
+    showMode: 11
     showMv: 0
     showValidation: 0
     enableRtxdi: 1
@@ -31,7 +31,7 @@ MonoBehaviour:
     useComputeForGISpatialResampling: 1
     useComputeForGIFinalShading: 1
     resamplingMode: 3
-    giResamplingMode: 3
+    giResamplingMode: 0
     gShowLight: 0
     initialSamplingParams:
       numPrimaryLocalLightSamples: 8
@@ -103,9 +103,9 @@ MonoBehaviour:
     regirDynamicParams:
       regirCellSize: 1
       center:
-        x: 11.183327
-        y: 3.4379046
-        z: -4.7866564
+        x: 9.29668
+        y: 14.324701
+        z: -18.928179
       fallbackSamplingMode: 1
       presamplingMode: 1
       regirSamplingJitter: 1
@@ -124,8 +124,8 @@ MonoBehaviour:
     gradientSensitivity: 8
     confidenceHistoryLength: 0.75
     brdfptParams:
-      enableIndirectEmissiveSurfaces: 0
-      enableSecondaryResampling: 0
+      enableIndirectEmissiveSurfaces: 1
+      enableSecondaryResampling: 1
       enableReSTIRGI: 1
       pad1: 0
       materialOverrideParams:
@@ -142,7 +142,7 @@ MonoBehaviour:
           brdfCutoff: 0
           enableInitialVisibility: 0
           environmentMapImportanceSampling: 0
-          localLightSamplingMode: 2
+          localLightSamplingMode: 0
         spatialResamplingParams:
           spatialDepthThreshold: 0.1
           spatialNormalThreshold: 0.9

@@ -99,35 +99,36 @@ void MainRayGenShader()
             lightSample);
         
         
-        // if (g_Const.brdfPT.enableSecondaryResampling)
-        // {
-        //     // Try to find this secondary surface in the G-buffer. If found, resample the lights
-        //     // from that G-buffer surface into the reservoir using the spatial resampling function.
-        //
-        //     float4 secondaryClipPos = mul(float4(secondaryGBufferData.worldPos, 1.0), g_Const.view.matWorldToClip);
-        //     secondaryClipPos.xyz /= secondaryClipPos.w;
-        //
-        //     if (all(abs(secondaryClipPos.xy) < 1.0) && secondaryClipPos.w > 0)
-        //     {
-        //         int2 secondaryPixelPos = int2(secondaryClipPos.xy * g_Const.view.clipToWindowScale + g_Const.view.clipToWindowBias);
-        //         secondarySurface.viewDepth = secondaryClipPos.w;
-        //
-        //         RTXDI_DISpatialResamplingParameters sparams;
-        //         sparams.sourceBufferIndex = g_Const.restirDI.bufferIndices.shadingInputBufferIndex;
-        //         sparams.numSamples = g_Const.brdfPT.secondarySurfaceReSTIRDIParams.spatialResamplingParams.numSpatialSamples;
-        //         sparams.numDisocclusionBoostSamples = 0;
-        //         sparams.targetHistoryLength = 0;
-        //         sparams.biasCorrectionMode = g_Const.brdfPT.secondarySurfaceReSTIRDIParams.spatialResamplingParams.spatialBiasCorrection;
-        //         sparams.samplingRadius = g_Const.brdfPT.secondarySurfaceReSTIRDIParams.spatialResamplingParams.spatialSamplingRadius;
-        //         sparams.depthThreshold = g_Const.brdfPT.secondarySurfaceReSTIRDIParams.spatialResamplingParams.spatialDepthThreshold;
-        //         sparams.normalThreshold = g_Const.brdfPT.secondarySurfaceReSTIRDIParams.spatialResamplingParams.spatialNormalThreshold;
-        //         sparams.enableMaterialSimilarityTest = false;
-        //         sparams.discountNaiveSamples = false;
-        //
-        //         reservoir = RTXDI_DISpatialResampling(secondaryPixelPos, secondarySurface, reservoir,
-        //             rng, params, g_Const.restirDI.reservoirBufferParams, sparams, lightSample);
-        //     }
-        // }
+        if (g_Const.brdfPT.enableSecondaryResampling)
+        {
+            // Try to find this secondary surface in the G-buffer. If found, resample the lights
+            // from that G-buffer surface into the reservoir using the spatial resampling function.
+        
+            float4 secondaryClipPos = mul(float4(secondaryGBufferData.worldPos, 1.0), gWorldToClip);
+            secondaryClipPos.xyz /= secondaryClipPos.w;
+        
+            if (all(abs(secondaryClipPos.xy) < 1.0) && secondaryClipPos.w > 0)
+            {
+                int2 secondaryPixelPos = int2(secondaryClipPos.xy * float2(0.5, -0.5) * gRectSize + gRectSize * 0.5);
+
+                secondarySurface.viewDepth = secondaryClipPos.w;
+        
+                RTXDI_DISpatialResamplingParameters sparams;
+                sparams.sourceBufferIndex = g_Const.restirDI.bufferIndices.shadingInputBufferIndex;
+                sparams.numSamples = g_Const.brdfPT.secondarySurfaceReSTIRDIParams.spatialResamplingParams.numSpatialSamples;
+                sparams.numDisocclusionBoostSamples = 0;
+                sparams.targetHistoryLength = 0;
+                sparams.biasCorrectionMode = g_Const.brdfPT.secondarySurfaceReSTIRDIParams.spatialResamplingParams.spatialBiasCorrection;
+                sparams.samplingRadius = g_Const.brdfPT.secondarySurfaceReSTIRDIParams.spatialResamplingParams.spatialSamplingRadius;
+                sparams.depthThreshold = g_Const.brdfPT.secondarySurfaceReSTIRDIParams.spatialResamplingParams.spatialDepthThreshold;
+                sparams.normalThreshold = g_Const.brdfPT.secondarySurfaceReSTIRDIParams.spatialResamplingParams.spatialNormalThreshold;
+                sparams.enableMaterialSimilarityTest = false;
+                sparams.discountNaiveSamples = false;
+        
+                reservoir = RTXDI_DISpatialResampling(secondaryPixelPos, secondarySurface, reservoir,
+                    rng, params, g_Const.restirDI.reservoirBufferParams, sparams, lightSample);
+            }
+        }
 
         float3 indirectDiffuse = 0;
         float3 indirectSpecular = 0;
