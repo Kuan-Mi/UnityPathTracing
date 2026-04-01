@@ -34,7 +34,7 @@ RWStructuredBuffer<RTXDI_PackedDIReservoir> u_LightReservoirs;
 // RWTexture2D<int2> u_TemporalSamplePositions;
 // RWTexture2DArray<float4> u_Gradients;
 // RWTexture2D<float2> u_RestirLuminance;
-// RWStructuredBuffer<RTXDI_PackedGIReservoir> u_GIReservoirs;
+RWStructuredBuffer<RTXDI_PackedGIReservoir> u_GIReservoirs;
 
 // RTXDI UAVs
 RWBuffer<uint2> u_RisBuffer;
@@ -54,6 +54,7 @@ StructuredBuffer<ResamplingConstants> ResampleConstants;
 #define RTXDI_RIS_BUFFER u_RisBuffer
 #define RTXDI_LIGHT_RESERVOIR_BUFFER u_LightReservoirs
 #define RTXDI_NEIGHBOR_OFFSETS_BUFFER t_NeighborOffsets
+#define RTXDI_GI_RESERVOIR_BUFFER u_GIReservoirs
 
 
 // Translate the light index between the current and previous frame.

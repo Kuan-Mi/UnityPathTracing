@@ -70,6 +70,11 @@ namespace PathTracing
         [FoldoutHeader("RTXDI")]
         public bool enableRtxdi;
 
+        
+        public bool enableBrdfIndirect;
+        public bool enableBrdfAdditiveBlend;
+        
+        
         [Tooltip("用光栅化 Pass（GBufferRaster）填充 G-Buffer，替代射线追踪 GBuffer Pass。\n启用后 GBufferPass（RT）将被跳过，从而节省 ray tracing 开销。")]
         public bool useRasterGBuffer = false;
 

@@ -127,6 +127,8 @@ void MainRayGenShader()
     CastRay(ray.Origin, ray.Direction, ray.TMin, ray.TMax, GetConeAngleFromRoughness(0.0, 0.0), (gOnScreen == SHOW_INSTANCE_INDEX || gOnScreen == SHOW_NORMAL) ? GEOMETRY_ALL : FLAG_NON_TRANSPARENT, geometryProps0, materialProps0);
 
     
+        // gOut_DirectLighting[pixelPosition] = materialProps0.Lemi;
+        // gOut_DirectLighting[pixelPosition] = surface.normal;
     
     uint gbufferIndex = RTXDI_ReservoirPositionToPointer(g_Const.restirGI.reservoirBufferParams, GlobalIndex, 0);
     
@@ -226,7 +228,7 @@ void MainRayGenShader()
         // finalColor += gIn_EmissiveLighting[pixelPosition];
         finalColor *= gExposure;
 
-        gOut_DirectLighting[pixelPosition] = finalColor;
+        gOut_DirectLighting[pixelPosition] += finalColor;
         
         
         // StoreShadingOutput(GlobalIndex, pixelPosition,

@@ -385,6 +385,7 @@ Shader "RayTracing/Lit"
                 payload.Lemi = Packing::EncodeRgbe(scattering);
                 #elif _EMISSION
                 float3 emission = _EmissionColor.xyz * _EmissionMap.SampleLevel(sampler_EmissionMap, v.uv, mip).xyz;
+                // emission = float3(1,0,0);
                 payload.Lemi = Packing::EncodeRgbe(emission);
                 #else
                 payload.Lemi = Packing::EncodeRgbe(float3(0, 0, 0));

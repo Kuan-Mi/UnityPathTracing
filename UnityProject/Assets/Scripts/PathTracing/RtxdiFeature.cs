@@ -30,6 +30,7 @@ namespace PathTracing
 
         public RayTracingShader gBufferTracingShader;
         public RayTracingShader brdfRayTracingShader;
+        public RayTracingShader shadeSecondarySurfacesShader;
         public RayTracingShader generateInitialShader;
         public ComputeShader generateInitialComputeCs;
 
@@ -67,6 +68,7 @@ namespace PathTracing
         private GenerateMipsPass _generateMipsPass;
 
         private BrdfRayTracingPass _brdfRayTracingPass;
+        private ShadeSecondarySurfacesPass  _shadeSecondarySurfacesPass;
 
 
         private DlssRRPass _dlssrrPass;
@@ -178,6 +180,11 @@ namespace PathTracing
             };
 
             _brdfRayTracingPass ??= new BrdfRayTracingPass(brdfRayTracingShader)
+            {
+                renderPassEvent = renderPassEvent
+            };
+            
+            _shadeSecondarySurfacesPass ??= new ShadeSecondarySurfacesPass(shadeSecondarySurfacesShader)
             {
                 renderPassEvent = renderPassEvent
             };
@@ -723,7 +730,58 @@ namespace PathTracing
                 _shadeSamplesPass.Setup(shaResource, shaSettings);
                 renderer.EnqueuePass(_shadeSamplesPass);
             }
+            
+            
+            // GI
+            
+            var brdfResource = new BrdfRayTracingPass.Resource
+            {
+                ConstantBuffer = _constantBuffer,
+                ViewDepth = shaResource.ViewDepth,
+                DiffuseAlbedo = shaResource.DiffuseAlbedo,
+                SpecularRough = shaResource.SpecularRough,
+                Normals = shaResource.Normals,
+                GeoNormals = shaResource.GeoNormals,
+                DirectLighting = shaResource.DirectLighting,
+                
+                ResamplingConstantBuffer = _resamplingConstantBuffer,
+                RtxdiResources = shaResource.RtxdiResources,
+                
+            };
+            
+            var brdfSettings = new BrdfRayTracingPass.Settings
+            {
+                m_RenderResolution = new int2(cam.pixelWidth, cam.pixelHeight),
+                resolutionScale = pathTracingSetting.resolutionScale,
+            };
+            
+            _brdfRayTracingPass.Setup(brdfResource, brdfSettings);
+            renderer.EnqueuePass(_brdfRayTracingPass);
 
+            var shadeSecondaryResource = new ShadeSecondarySurfacesPass.Resource
+            {
+                ConstantBuffer = _constantBuffer,
+                ViewDepth = shaResource.ViewDepth,
+                DiffuseAlbedo = shaResource.DiffuseAlbedo,
+                SpecularRough = shaResource.SpecularRough,
+                Normals = shaResource.Normals,
+                GeoNormals = shaResource.GeoNormals,
+                DirectLighting = shaResource.DirectLighting,
+
+                ResamplingConstantBuffer = _resamplingConstantBuffer,
+                RtxdiResources = shaResource.RtxdiResources,
+            };
+            
+            var shadeSecondarySettings = new ShadeSecondarySurfacesPass.Settings
+            {
+                m_RenderResolution = new int2(cam.pixelWidth, cam.pixelHeight),
+                resolutionScale = pathTracingSetting.resolutionScale,
+            };
+            
+            _shadeSecondarySurfacesPass.Setup(shadeSecondaryResource, shadeSecondarySettings);
+            renderer.EnqueuePass(_shadeSecondarySurfacesPass);
+            
+            
 
             var dlrrRes = new DlrrDenoiser.DlrrResources
             {
@@ -970,8 +1028,8 @@ namespace PathTracing
             constants.frameIndex = restirDIContext.GetFrameIndex();
             constants.denoiserMode = pathTracingSetting.denoiserMode;
 
-            constants.enableBrdfIndirect = 0;
-            constants.enableBrdfAdditiveBlend = 0;
+            constants.enableBrdfIndirect = pathTracingSetting.enableBrdfIndirect ? 1u : 0u;
+            constants.enableBrdfAdditiveBlend = pathTracingSetting.enableBrdfAdditiveBlend ? 1u : 0u;
             constants.enableAccumulation = 0;
 
             // constants.sceneConstants.enableEnvironmentMap = (environmentLight.textureIndex >= 0);

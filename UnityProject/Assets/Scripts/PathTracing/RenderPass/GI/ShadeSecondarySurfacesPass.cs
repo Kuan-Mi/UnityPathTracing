@@ -11,14 +11,14 @@ using static PathTracing.ShaderIDs;
 
 namespace PathTracing
 {
-    public class BrdfRayTracingPass : ScriptableRenderPass
+    public class ShadeSecondarySurfacesPass : ScriptableRenderPass
     {
         private readonly RayTracingShader _gBufferTs;
         private Resource _resource;
         private Settings _settings;
 
 
-        public BrdfRayTracingPass(RayTracingShader gBufferTs)
+        public ShadeSecondarySurfacesPass(RayTracingShader gBufferTs)
         {
             _gBufferTs = gBufferTs;
         }
@@ -32,18 +32,17 @@ namespace PathTracing
         public class Resource
         {
             internal GraphicsBuffer ConstantBuffer;
-            
+
             internal RTHandle ViewDepth;
             internal RTHandle DiffuseAlbedo;
             internal RTHandle SpecularRough;
             internal RTHandle Normals;
             internal RTHandle GeoNormals;
-            
+
             internal RTHandle DirectLighting;
 
             internal GraphicsBuffer ResamplingConstantBuffer;
             internal RtxdiResources RtxdiResources;
-            
         }
 
         public class Settings
@@ -64,14 +63,14 @@ namespace PathTracing
         {
             var natCmd = CommandBufferHelpers.GetNativeCommandBuffer(context.cmd);
 
-            var gBufferTracingMarker = new ProfilerMarker(ProfilerCategory.Render, "BrdfRayTracing", MarkerFlags.SampleGPU);
+            var gBufferTracingMarker = new ProfilerMarker(ProfilerCategory.Render, "ShadeSecondarySurfaces", MarkerFlags.SampleGPU);
 
             natCmd.BeginSample(gBufferTracingMarker);
 
             var resource = data.Resource;
             var settings = data.Settings;
 
-            natCmd.SetRayTracingShaderPass(data.gBufferTs, "Test2");
+            natCmd.SetRayTracingShaderPass(data.gBufferTs, "RTXDI");
             natCmd.SetRayTracingConstantBufferParam(data.gBufferTs, paramsID, resource.ConstantBuffer, 0, resource.ConstantBuffer.stride);
             natCmd.SetRayTracingBufferParam(data.gBufferTs, "ResampleConstants", resource.ResamplingConstantBuffer);
 
@@ -81,13 +80,16 @@ namespace PathTracing
             natCmd.SetRayTracingTextureParam(data.gBufferTs, "t_GBufferSpecularRough", resource.SpecularRough);
             natCmd.SetRayTracingTextureParam(data.gBufferTs, "t_GBufferNormals", resource.Normals);
             natCmd.SetRayTracingTextureParam(data.gBufferTs, "t_GBufferGeoNormals", resource.GeoNormals);
-            
-            
-            
+
+
             natCmd.SetRayTracingTextureParam(data.gBufferTs, g_DirectLightingID, resource.DirectLighting);
 
             natCmd.SetRayTracingBufferParam(data.gBufferTs, "u_SecondaryGBuffer", resource.RtxdiResources.SecondaryGBuffer);
-            
+            natCmd.SetRayTracingBufferParam(data.gBufferTs, "u_GIReservoirs", resource.RtxdiResources.GIReservoirBuffer);
+            natCmd.SetRayTracingBufferParam(data.gBufferTs, "t_LightDataBuffer", resource.RtxdiResources.LightDataBuffer);
+            natCmd.SetRayTracingBufferParam(data.gBufferTs, "u_RisBuffer", resource.RtxdiResources.RisBuffer);
+            natCmd.SetRayTracingBufferParam(data.gBufferTs, "u_RisLightDataBuffer", resource.RtxdiResources.RisLightDataBuffer);
+
             uint rectWmod = (uint)(settings.m_RenderResolution.x * settings.resolutionScale + 0.5f);
             uint rectHmod = (uint)(settings.m_RenderResolution.y * settings.resolutionScale + 0.5f);
 
@@ -102,7 +104,7 @@ namespace PathTracing
 
         public override void RecordRenderGraph(RenderGraph renderGraph, ContextContainer frameData)
         {
-            using var builder = renderGraph.AddUnsafePass<PassData>("BrdfRayTracing", out var passData);
+            using var builder = renderGraph.AddUnsafePass<PassData>("ShadeSecondarySurfaces", out var passData);
 
             passData.gBufferTs = _gBufferTs;
 
