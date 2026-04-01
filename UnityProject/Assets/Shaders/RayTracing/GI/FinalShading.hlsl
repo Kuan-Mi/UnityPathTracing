@@ -105,12 +105,11 @@ void MainRayGenShader()
         // specular = DemodulateSpecular(primarySurface.material.specularF0, specular);
         
         float3 finalColor = (diffuse * primarySurface.material.diffuseAlbedo) + specular;
-        
+        finalColor *= gExposure;
         gOut_DirectLighting[pixelPosition] = finalColor;
 
         
     }
-
     // StoreShadingOutput(GlobalIndex, pixelPosition,
     //     primarySurface.viewDepth, primarySurface.material.roughness, diffuse, specular, 0, false, true);
 }

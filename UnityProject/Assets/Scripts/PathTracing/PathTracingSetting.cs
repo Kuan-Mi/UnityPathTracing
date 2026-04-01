@@ -1,4 +1,5 @@
 ﻿using Rtxdi.DI;
+using Rtxdi.GI;
 using Rtxdi.ReGIR;
 using UnityEngine;
 using UnityEngine.Serialization;
@@ -96,14 +97,24 @@ namespace PathTracing
         public bool enableTemporalResampling => resamplingMode is ReSTIRDI_ResamplingMode.Temporal or ReSTIRDI_ResamplingMode.TemporalAndSpatial;
 
         public ReSTIRDI_ResamplingMode resamplingMode;
+        public ReSTIRGI_ResamplingMode giResamplingMode;
         public bool gShowLight;
 
-        public ReSTIRDI_InitialSamplingParameters initialSamplingParams;
-        public ReSTIRDI_TemporalResamplingParameters temporalResamplingParams;
-        public ReSTIRDI_SpatialResamplingParameters spatialResamplingParams;
-        public ReSTIRDI_ShadingParameters shadingParams;
+        public ReSTIRDI_InitialSamplingParameters initialSamplingParams = ReSTIRDIDefaults.GetDefaultInitialSamplingParams();
+        public ReSTIRDI_TemporalResamplingParameters temporalResamplingParams = ReSTIRDIDefaults.GetDefaultTemporalResamplingParams();
+        public ReSTIRDI_SpatialResamplingParameters spatialResamplingParams = ReSTIRDIDefaults.GetDefaultSpatialResamplingParams();
+        public ReSTIRDI_ShadingParameters shadingParams = ReSTIRDIDefaults.GetDefaultShadingParams();
 
-        public ReGIRDynamicParameters regirDynamicParams;
+
+
+        public ReSTIRGI_TemporalResamplingParameters giTemporalResamplingParams = ReSTIRGIDefaults.GetDefaultTemporalResamplingParams();
+        public ReSTIRGI_SpatialResamplingParameters giSpatialResamplingParams = ReSTIRGIDefaults.GetDefaultSpatialResamplingParams();
+        public ReSTIRGI_FinalShadingParameters giFinalShadingParams = ReSTIRGIDefaults.GetDefaultFinalShadingParams();
+
+
+
+
+        public ReGIRDynamicParameters regirDynamicParams = ReGIRDynamicParameters.Default();
 
         public bool prepareLight;
         public bool enableFinalShading;

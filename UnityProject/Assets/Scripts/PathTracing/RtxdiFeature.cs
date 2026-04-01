@@ -1230,6 +1230,15 @@ namespace PathTracing
             restirDIContext.SetTemporalResamplingParameters(pathTracingSetting.temporalResamplingParams);
             restirDIContext.SetSpatialResamplingParameters(pathTracingSetting.spatialResamplingParams);
             restirDIContext.SetShadingParameters(pathTracingSetting.shadingParams);
+            
+            
+            restirGIContext.SetFrameIndex(frameState.FrameIndex);
+            restirGIContext.SetResamplingMode(pathTracingSetting.giResamplingMode);
+            restirGIContext.SetTemporalResamplingParameters(pathTracingSetting.giTemporalResamplingParams);
+            restirGIContext.SetSpatialResamplingParameters(pathTracingSetting.giSpatialResamplingParams);
+            restirGIContext.SetFinalShadingParameters(pathTracingSetting.giFinalShadingParams);
+            
+            
 
             var regirContext = isContext.GetReGIRContext();
             pathTracingSetting.regirDynamicParams.center = frameState.camPos;
