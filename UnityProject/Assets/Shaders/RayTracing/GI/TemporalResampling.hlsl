@@ -36,7 +36,7 @@ void MainRayGenShader()
         g_Const.restirGI.bufferIndices.secondarySurfaceReSTIRDIOutputBufferIndex);
 
     float3 motionVector = t_MotionVectors[pixelPosition].xyz;
-    motionVector = convertMotionVectorToPixelSpace(g_Const.view, g_Const.prevView, pixelPosition, motionVector);
+    // motionVector = convertMotionVectorToPixelSpace(g_Const.view, g_Const.prevView, pixelPosition, motionVector);
 
     if (RAB_IsSurfaceValid(primarySurface))
     {

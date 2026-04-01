@@ -1,10 +1,12 @@
 #pragma max_recursion_depth 1
 
 #include "../RtxdiApplicationBridge/RtxdiApplicationBridge.hlsl"
-#include "../ShadingHelpers.hlsl"
 
+
+#include <Assets/Shaders/RTXDI/DI/Reservoir.hlsl>
 #include <Assets/Shaders/RTXDI/GI/Reservoir.hlsl>
 #include <Assets/Shaders/RTXDI/Utils/ReservoirAddressing.hlsl>
+#include "../ShadingHelpers.hlsl"
 
 static const float kMaxBrdfValue = 1e4;
 static const float kMISRoughness = 0.3;
@@ -47,7 +49,7 @@ void MainRayGenShader()
 
     uint2 pixelPosition = RTXDI_ReservoirPosToPixelPos(GlobalIndex, g_Const.runtimeParams.activeCheckerboardField);
 
-    if (any(pixelPosition > int2(g_Const.view.viewportSize)))
+    if (any(pixelPosition > int2(gRectSize)))
         return;
 
     const RAB_Surface primarySurface = RAB_GetGBufferSurface(pixelPosition, false);
@@ -66,7 +68,7 @@ void MainRayGenShader()
         float3 visibility = 1.0;
         if (g_Const.restirGI.finalShadingParams.enableFinalVisibility)
         {
-            visibility = GetFinalVisibility(SceneBVH, primarySurface, reservoir.position);
+            visibility = GetFinalVisibility(primarySurface, reservoir.position);
         }
 
         radiance *= visibility;
@@ -100,9 +102,15 @@ void MainRayGenShader()
             specular = brdf.specular           * radiance;
         }
 
-        specular = DemodulateSpecular(primarySurface.material.specularF0, specular);
+        // specular = DemodulateSpecular(primarySurface.material.specularF0, specular);
+        
+        float3 finalColor = (diffuse * primarySurface.material.diffuseAlbedo) + specular;
+        
+        gOut_DirectLighting[pixelPosition] = finalColor;
+
+        
     }
 
-    StoreShadingOutput(GlobalIndex, pixelPosition,
-        primarySurface.viewDepth, primarySurface.material.roughness, diffuse, specular, 0, false, true);
+    // StoreShadingOutput(GlobalIndex, pixelPosition,
+    //     primarySurface.viewDepth, primarySurface.material.roughness, diffuse, specular, 0, false, true);
 }

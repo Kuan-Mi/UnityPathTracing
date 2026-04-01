@@ -20,7 +20,7 @@ void MainRayGenShader()
 
     uint2 pixelPosition = RTXDI_ReservoirPosToPixelPos(GlobalIndex, params.activeCheckerboardField);
 
-    if (any(pixelPosition > int2(g_Const.view.viewportSize)))
+    if (any(pixelPosition > int2(gRectSize)))
         return;
 
     RAB_RandomSamplerState rng = RAB_InitRandomSampler(pixelPosition, 8);

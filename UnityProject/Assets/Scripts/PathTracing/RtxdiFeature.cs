@@ -76,7 +76,7 @@ namespace PathTracing
         private GenerateMipsPass _generateMipsPass;
 
         private BrdfRayTracingPass _brdfRayTracingPass;
-        private ShadeSecondarySurfacesPass  _shadeSecondarySurfacesPass;
+        private ShadeSecondarySurfacesPass _shadeSecondarySurfacesPass;
 
         // ReSTIR GI passes
         private GITemporalResamplingPass _giTemporalResamplingPass;
@@ -199,7 +199,7 @@ namespace PathTracing
             {
                 renderPassEvent = renderPassEvent
             };
-            
+
             _shadeSecondarySurfacesPass ??= new ShadeSecondarySurfacesPass(shadeSecondarySurfacesShader)
             {
                 renderPassEvent = renderPassEvent
@@ -773,10 +773,10 @@ namespace PathTracing
                 _shadeSamplesPass.Setup(shaResource, shaSettings);
                 renderer.EnqueuePass(_shadeSamplesPass);
             }
-            
-            
+
+
             // GI
-            
+
             var brdfResource = new BrdfRayTracingPass.Resource
             {
                 ConstantBuffer = _constantBuffer,
@@ -786,18 +786,17 @@ namespace PathTracing
                 Normals = shaResource.Normals,
                 GeoNormals = shaResource.GeoNormals,
                 DirectLighting = shaResource.DirectLighting,
-                
+
                 ResamplingConstantBuffer = _resamplingConstantBuffer,
                 RtxdiResources = shaResource.RtxdiResources,
-                
             };
-            
+
             var brdfSettings = new BrdfRayTracingPass.Settings
             {
                 m_RenderResolution = new int2(cam.pixelWidth, cam.pixelHeight),
                 resolutionScale = pathTracingSetting.resolutionScale,
             };
-            
+
             _brdfRayTracingPass.Setup(brdfResource, brdfSettings);
             renderer.EnqueuePass(_brdfRayTracingPass);
 
@@ -814,17 +813,17 @@ namespace PathTracing
                 ResamplingConstantBuffer = _resamplingConstantBuffer,
                 RtxdiResources = shaResource.RtxdiResources,
             };
-            
+
             var shadeSecondarySettings = new ShadeSecondarySurfacesPass.Settings
             {
                 m_RenderResolution = new int2(cam.pixelWidth, cam.pixelHeight),
                 resolutionScale = pathTracingSetting.resolutionScale,
             };
-            
+
             _shadeSecondarySurfacesPass.Setup(shadeSecondaryResource, shadeSecondarySettings);
             renderer.EnqueuePass(_shadeSecondarySurfacesPass);
-            
-            
+
+
             // ReSTIR GI – Temporal Resampling
             if (pathTracingSetting.enableGITemporalResampling)
             {
@@ -995,7 +994,7 @@ namespace PathTracing
                     renderer.EnqueuePass(_giFinalShadingPass);
                 }
             }
-            
+
 
             var dlrrRes = new DlrrDenoiser.DlrrResources
             {
