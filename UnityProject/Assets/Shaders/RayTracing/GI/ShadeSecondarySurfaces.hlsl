@@ -169,7 +169,6 @@ void MainRayGenShader()
         u_SecondaryGBuffer[gbufferIndex] = secondaryGBufferData;
     }
     
-    gOut_DirectLighting[pixelPosition] = outputShadingResult;
     if (outputShadingResult)
     {
         float3 diffuse = isSpecularRay ? 0.0 : radiance * throughput.rgb;
@@ -182,6 +181,6 @@ void MainRayGenShader()
         // finalColor += gIn_EmissiveLighting[pixelPosition];
         finalColor *= gExposure; 
         
-        gOut_DirectLighting[pixelPosition] = finalColor;
+        gOut_DirectLighting[pixelPosition] += finalColor;
     }
 }
