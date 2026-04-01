@@ -1041,8 +1041,7 @@ namespace PathTracing
             FillResamplingConstants(ref constants, isContext);
             FillBRDFPTConstants(ref constants.brdfPT, isContext.GetLightBufferParameters());
 
-            constants.brdfPT.enableIndirectEmissiveSurfaces = 0;
-            constants.brdfPT.enableReSTIRGI = 1;
+            constants.brdfPT = pathTracingSetting.brdfptParams;
 
 
             // ReSTIRGI_BufferIndices restirGIBufferIndices = restirGIContext.GetBufferIndices();

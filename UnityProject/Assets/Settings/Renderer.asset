@@ -18,6 +18,8 @@ MonoBehaviour:
     showMv: 0
     showValidation: 0
     enableRtxdi: 1
+    enableBrdfIndirect: 1
+    enableBrdfAdditiveBlend: 0
     useRasterGBuffer: 1
     debugRtxdi: 1
     useComputeForGIS: 1
@@ -69,9 +71,9 @@ MonoBehaviour:
     regirDynamicParams:
       regirCellSize: 1
       center:
-        x: -1.9679563
-        y: 2.1663053
-        z: -35.26039
+        x: -10.641963
+        y: 3.9952989
+        z: -44.790257
       fallbackSamplingMode: 1
       presamplingMode: 1
       regirSamplingJitter: 1
@@ -101,9 +103,9 @@ MonoBehaviour:
         pad1: 0
       secondarySurfaceReSTIRDIParams:
         initialSamplingParams:
-          numPrimaryLocalLightSamples: 2
-          numPrimaryInfiniteLightSamples: 1
-          numPrimaryEnvironmentSamples: 1
+          numPrimaryLocalLightSamples: 1
+          numPrimaryInfiniteLightSamples: 0
+          numPrimaryEnvironmentSamples: 0
           numPrimaryBrdfSamples: 0
           brdfCutoff: 0
           enableInitialVisibility: 0
@@ -178,6 +180,7 @@ MonoBehaviour:
   finalMaterial: {fileID: 2100000, guid: 27695a2bc55ef2f469362b9a2994989e, type: 2}
   gBufferTracingShader: {fileID: 4807578003741378534, guid: 1ab7c2addcb74c5db50a841acde800e9, type: 3}
   brdfRayTracingShader: {fileID: 4807578003741378534, guid: 256eb6f36c0a4e8096aaf8a2d1db24b2, type: 3}
+  shadeSecondarySurfacesShader: {fileID: 4807578003741378534, guid: c3344e5f7a7944c8b1e9005a028afcfa, type: 3}
   generateInitialShader: {fileID: 4807578003741378534, guid: d360fd1504e84137ab8253780770f0b6, type: 3}
   generateInitialComputeCs: {fileID: 7200000, guid: 770673c613a448f796dade8286cf87e2, type: 3}
   temporalResamplingShader: {fileID: 4807578003741378534, guid: 190468c66edf4d45b3f8535a3bd6f0d4, type: 3}
@@ -265,6 +268,8 @@ MonoBehaviour:
     showMv: 0
     showValidation: 0
     enableRtxdi: 0
+    enableBrdfIndirect: 0
+    enableBrdfAdditiveBlend: 0
     useRasterGBuffer: 0
     debugRtxdi: 0
     useComputeForGIS: 0
