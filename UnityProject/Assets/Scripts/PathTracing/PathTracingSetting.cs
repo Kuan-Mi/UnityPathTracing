@@ -84,6 +84,14 @@ namespace PathTracing
         public bool useComputeForSpatialResampling;
         public bool useComputeForShadeSamples;
 
+        [FoldoutHeader("ReSTIR GI")]
+        public bool enableGITemporalResampling;
+        public bool enableGISpatialResampling;
+        public bool enableGIFinalShading;
+        public bool useComputeForGITemporalResampling;
+        public bool useComputeForGISpatialResampling;
+        public bool useComputeForGIFinalShading;
+
         public bool enableSpatialResampling => resamplingMode is ReSTIRDI_ResamplingMode.Spatial or ReSTIRDI_ResamplingMode.TemporalAndSpatial;
         public bool enableTemporalResampling => resamplingMode is ReSTIRDI_ResamplingMode.Temporal or ReSTIRDI_ResamplingMode.TemporalAndSpatial;
 
