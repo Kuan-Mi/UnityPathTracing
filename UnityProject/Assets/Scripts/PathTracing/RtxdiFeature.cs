@@ -11,6 +11,7 @@ using Unity.Mathematics;
 using UnityEngine;
 using UnityEngine.Rendering;
 using UnityEngine.Rendering.Universal;
+using UnityEngine.Serialization;
 using static UnityEngine.Rendering.RayTracingAccelerationStructure;
 using static PathTracing.ShaderIDs;
 
@@ -18,7 +19,8 @@ namespace PathTracing
 {
     public class RtxdiFeature : ScriptableRendererFeature
     {
-        public PathTracingSetting pathTracingSetting;
+        [FormerlySerializedAs("pathTracingSetting")]
+        public PathTracingSetting setting;
 
         public GlobalConstants     globalConstants;
         public ResamplingConstants resamplingConstants;
@@ -255,7 +257,7 @@ namespace PathTracing
             if (eyeIndex == 1)
                 return;
 
-            _gpuScene.Build(_accelerationStructure, pathTracingSetting.enableEnv);
+            _gpuScene.Build(_accelerationStructure, setting.enableEnv);
             // _gpuScene.UpdateInstanceID(_accelerationStructure);
 
             Shader.SetGlobalRayTracingAccelerationStructure(g_AccelStructID, _accelerationStructure);
@@ -267,7 +269,7 @@ namespace PathTracing
 
             if (!_resourcePools.TryGetValue(uniqueKey, out var pool))
             {
-                pool = new PathTracingResourcePool(pathTracingSetting);
+                pool = new PathTracingResourcePool(setting);
                 _resourcePools.Add(uniqueKey, pool);
             }
 
@@ -279,13 +281,13 @@ namespace PathTracing
                     camName = $"{cam.name}_Eye{eyeIndex}";
                 }
 
-                dlrr = new DlrrDenoiser(pathTracingSetting, camName);
+                dlrr = new DlrrDenoiser(setting, camName);
                 _dlrrDenoisers.Add(uniqueKey, dlrr);
             }
 
             if (!_cameraFrameStates.TryGetValue(uniqueKey, out var frameState))
             {
-                frameState = new CameraFrameState(pathTracingSetting.resolutionScale);
+                frameState = new CameraFrameState(setting.resolutionScale);
                 _cameraFrameStates.Add(uniqueKey, frameState);
             }
 
@@ -335,9 +337,9 @@ namespace PathTracing
 
             // Update per-camera temporal state for this frame
             uint curFrame = frameState.FrameIndex;
-            frameState.Update(renderingData, pathTracingSetting);
+            frameState.Update(renderingData, setting);
 
-            globalConstants          = frameState.GetConstants(renderingData, pathTracingSetting, _lightCollector);
+            globalConstants          = frameState.GetConstants(renderingData, setting, _lightCollector);
             _globalConstantsArray[0] = globalConstants;
             _constantBuffer.SetData(_globalConstantsArray);
 
@@ -348,7 +350,7 @@ namespace PathTracing
 
             #region prepareLight
 
-            if (pathTracingSetting.prepareLight)
+            if (setting.prepareLight)
             {
                 _prepareLightResources.SetBuffer(_gpuScene);
                 _prepareLightResources.SendTexture(_gpuScene.globalTexturePool);
@@ -391,12 +393,12 @@ namespace PathTracing
                 LocalLightPdfTexture     = _gpuScene.localLightPdfTexture,
                 RtxdiResources           = rtxdiResources,
                 RenderResolution         = new int2(cam.pixelWidth, cam.pixelHeight),
-                ResolutionScale          = pathTracingSetting.resolutionScale,
+                ResolutionScale          = setting.resolutionScale,
             };
 
             #region gBuffer Pass
 
-            if (pathTracingSetting.useRasterGBuffer)
+            if (setting.useRasterGBuffer)
             {
                 _gBufferRasterResource.EnsureResources(pool.renderResolution);
                 _gBufferRasterPass.Setup(rtxdiCtx, _gBufferRasterResource);
@@ -418,7 +420,7 @@ namespace PathTracing
             _generateMipsPass.Setup(rtxdiCtx);
             renderer.EnqueuePass(_generateMipsPass);
 
-            if (pathTracingSetting.initialSamplingParams.localLightSamplingMode != ReSTIRDI_LocalLightSamplingMode.Uniform)
+            if (setting.initialSamplingParams.localLightSamplingMode != ReSTIRDI_LocalLightSamplingMode.Uniform)
             {
                 var RTXDI_PRESAMPLING_GROUP_SIZE = 256;
                 var x                            = (isContext.GetLocalLightRISBufferSegmentParams().tileSize + RTXDI_PRESAMPLING_GROUP_SIZE - 1) / RTXDI_PRESAMPLING_GROUP_SIZE;
@@ -428,7 +430,7 @@ namespace PathTracing
                 renderer.EnqueuePass(_presamplePass);
             }
 
-            if (pathTracingSetting.initialSamplingParams.localLightSamplingMode == ReSTIRDI_LocalLightSamplingMode.ReGIR_RIS)
+            if (setting.initialSamplingParams.localLightSamplingMode == ReSTIRDI_LocalLightSamplingMode.ReGIR_RIS)
             {
                 var ReGIR_TILE_SIZE = 256;
 
@@ -440,25 +442,25 @@ namespace PathTracing
             }
 
             // GenerateInitialSamplesPass
-            _generateInitialSamplesPass.Setup(rtxdiCtx, pathTracingSetting.useComputeForGis);
+            _generateInitialSamplesPass.Setup(rtxdiCtx, setting.useComputeForGis);
             renderer.EnqueuePass(_generateInitialSamplesPass);
 
             // TemporalResamplingPass
-            if (pathTracingSetting.diResamplingMode is ReSTIRDI_ResamplingMode.Temporal or ReSTIRDI_ResamplingMode.TemporalAndSpatial)
+            if (setting.diResamplingMode is ReSTIRDI_ResamplingMode.Temporal or ReSTIRDI_ResamplingMode.TemporalAndSpatial)
             {
-                _temporalResamplingPass.Setup(rtxdiCtx, pathTracingSetting.useComputeForTemporalResampling);
+                _temporalResamplingPass.Setup(rtxdiCtx, setting.useComputeForTemporalResampling);
                 renderer.EnqueuePass(_temporalResamplingPass);
             }
 
             // SpatialResamplingPass
-            if (pathTracingSetting.diResamplingMode is ReSTIRDI_ResamplingMode.Spatial or ReSTIRDI_ResamplingMode.TemporalAndSpatial)
+            if (setting.diResamplingMode is ReSTIRDI_ResamplingMode.Spatial or ReSTIRDI_ResamplingMode.TemporalAndSpatial)
             {
-                _spatialResamplingPass.Setup(rtxdiCtx, pathTracingSetting.useComputeForSpatialResampling);
+                _spatialResamplingPass.Setup(rtxdiCtx, setting.useComputeForSpatialResampling);
                 renderer.EnqueuePass(_spatialResamplingPass);
             }
 
             // ShadeSamplesPass
-            _shadeSamplesPass.Setup(rtxdiCtx, pathTracingSetting.enableFinalShading, pathTracingSetting.useComputeForShadeSamples);
+            _shadeSamplesPass.Setup(rtxdiCtx, setting.enableFinalShading, setting.useComputeForShadeSamples);
             renderer.EnqueuePass(_shadeSamplesPass);
 
 
@@ -467,34 +469,34 @@ namespace PathTracing
             _brdfRayTracingPass.Setup(rtxdiCtx);
             renderer.EnqueuePass(_brdfRayTracingPass);
 
-            _shadeSecondarySurfacesPass.Setup(rtxdiCtx, pathTracingSetting.useComputeForShadeSecondarySurfaces);
+            _shadeSecondarySurfacesPass.Setup(rtxdiCtx, setting.useComputeForShadeSecondarySurfaces);
             renderer.EnqueuePass(_shadeSecondarySurfacesPass);
 
 
             // ReSTIR GI – Temporal Resampling
-            if (pathTracingSetting.giResamplingMode is ReSTIRGI_ResamplingMode.Temporal or ReSTIRGI_ResamplingMode.TemporalAndSpatial)
+            if (setting.giResamplingMode is ReSTIRGI_ResamplingMode.Temporal or ReSTIRGI_ResamplingMode.TemporalAndSpatial)
             {
-                _giTemporalResamplingPass.Setup(rtxdiCtx, pathTracingSetting.useComputeForGITemporalResampling);
+                _giTemporalResamplingPass.Setup(rtxdiCtx, setting.useComputeForGITemporalResampling);
                 renderer.EnqueuePass(_giTemporalResamplingPass);
             }
 
             // ReSTIR GI – Spatial Resampling
-            if (pathTracingSetting.giResamplingMode is ReSTIRGI_ResamplingMode.Spatial or ReSTIRGI_ResamplingMode.TemporalAndSpatial)
+            if (setting.giResamplingMode is ReSTIRGI_ResamplingMode.Spatial or ReSTIRGI_ResamplingMode.TemporalAndSpatial)
             {
-                _giSpatialResamplingPass.Setup(rtxdiCtx, pathTracingSetting.useComputeForGISpatialResampling);
+                _giSpatialResamplingPass.Setup(rtxdiCtx, setting.useComputeForGISpatialResampling);
                 renderer.EnqueuePass(_giSpatialResamplingPass);
             }
 
             // ReSTIR GI – Final Shading
             {
-                _giFinalShadingPass.Setup(rtxdiCtx, pathTracingSetting.enableGIFinalShading, pathTracingSetting.useComputeForGIFinalShading);
+                _giFinalShadingPass.Setup(rtxdiCtx, setting.enableGIFinalShading, setting.useComputeForGIFinalShading);
                 renderer.EnqueuePass(_giFinalShadingPass);
             }
 
 
             var dlrrRes = new DlrrDenoiser.DlrrResources
             {
-                input           = pool.GetNriResource(pathTracingSetting.debugRtxdi ? RenderResourceType.DirectLighting : RenderResourceType.Composed),
+                input           = pool.GetNriResource(setting.debugRtxdi ? RenderResourceType.DirectLighting : RenderResourceType.Composed),
                 output          = pool.GetNriResource(RenderResourceType.DlssOutput),
                 mv              = pool.GetNriResource(RenderResourceType.RtxdiMotionVectors),
                 depth           = pool.GetNriResource(isOddFrame ? RenderResourceType.RtxdiViewDepth : RenderResourceType.RtxdiPrevViewDepth),
@@ -516,8 +518,8 @@ namespace PathTracing
             };
             var dlssDataPtr = dlrr.GetInteropDataPtr(dlrrInput, dlrrRes);
 
-            var rectGridW = (int)(cam.pixelWidth * pathTracingSetting.resolutionScale + 0.5f + 15) / 16;
-            var rectGridH = (int)(cam.pixelHeight * pathTracingSetting.resolutionScale + 0.5f + 15) / 16;
+            var rectGridW = (int)(cam.pixelWidth * setting.resolutionScale + 0.5f + 15) / 16;
+            var rectGridH = (int)(cam.pixelHeight * setting.resolutionScale + 0.5f + 15) / 16;
 
             _rtxdiDlssBeforePass.Setup(rtxdiCtx,
                 pool.GetRT(RenderResourceType.RrGuideDiffAlbedo),
@@ -529,7 +531,7 @@ namespace PathTracing
 
             var dlssSettings = new DlssRRPass.Settings
             {
-                tmpDisableRR = pathTracingSetting.tmpDisableRR
+                tmpDisableRR = setting.tmpDisableRR
             };
 
             _dlssrrPass.Setup(dlssDataPtr, dlssSettings);
@@ -558,12 +560,12 @@ namespace PathTracing
 
             var outputBlitSettings = new OutputBlitPass.Settings
             {
-                showMode        = pathTracingSetting.showMode,
+                showMode        = setting.showMode,
                 resolutionScale = frameState.resolutionScale,
-                enableDlssRR    = pathTracingSetting.RR,
-                showMV          = pathTracingSetting.showMv,
-                showValidation  = pathTracingSetting.showValidation,
-                showReference   = pathTracingSetting.useReferencePathTracing,
+                enableDlssRR    = setting.RR,
+                showMV          = setting.showMv,
+                showValidation  = setting.showValidation,
+                showReference   = setting.useReferencePathTracing,
             };
 
             _outputBlitPass.Setup(outputBlitResource, outputBlitSettings);
@@ -647,10 +649,10 @@ namespace PathTracing
             // RTXDI_LightBufferParameters lightBufferParameters = isContext.GetLightBufferParameters();
 
             constants.enablePreviousTLAS = 0u;
-            constants.denoiserMode       = pathTracingSetting.denoiserMode;
+            constants.denoiserMode       = setting.denoiserMode;
             // constants.sceneConstants.enableAlphaTestedGeometry = lightingSettings.enableAlphaTestedGeometry;
             // constants.sceneConstants.enableTransparentGeometry = lightingSettings.enableTransparentGeometry;
-            constants.visualizeRegirCells = pathTracingSetting.visualizeRegirCells ? 1u : 0u;
+            constants.visualizeRegirCells = setting.visualizeRegirCells ? 1u : 0u;
 
             constants.lightBufferParams                      = isContext.GetLightBufferParameters();
             constants.localLightsRISBufferSegmentParams      = isContext.GetLocalLightRISBufferSegmentParams();
@@ -674,7 +676,7 @@ namespace PathTracing
 
         private void FillBRDFPTConstants(ref BRDFPathTracing_Parameters constants, RTXDI_LightBufferParameters getLightBufferParameters)
         {
-            constants = pathTracingSetting.brdfptParams;
+            constants = setting.brdfptParams;
 
             constants.materialOverrideParams.minSecondaryRoughness = 0;
             constants.materialOverrideParams.roughnessOverride     = -1.0f;
@@ -697,32 +699,32 @@ namespace PathTracing
             RTXDI_LightBufferParameters lightBufferParams = _gpuScene.GetLightBufferParameters();
             isContext.SetLightBufferParams(lightBufferParams);
             restirDIContext.SetFrameIndex(frameState.FrameIndex);
-            restirDIContext.SetResamplingMode(pathTracingSetting.diResamplingMode);
-            restirDIContext.SetInitialSamplingParameters(pathTracingSetting.initialSamplingParams);
-            restirDIContext.SetTemporalResamplingParameters(pathTracingSetting.temporalResamplingParams);
-            restirDIContext.SetSpatialResamplingParameters(pathTracingSetting.spatialResamplingParams);
-            restirDIContext.SetShadingParameters(pathTracingSetting.shadingParams);
+            restirDIContext.SetResamplingMode(setting.diResamplingMode);
+            restirDIContext.SetInitialSamplingParameters(setting.initialSamplingParams);
+            restirDIContext.SetTemporalResamplingParameters(setting.temporalResamplingParams);
+            restirDIContext.SetSpatialResamplingParameters(setting.spatialResamplingParams);
+            restirDIContext.SetShadingParameters(setting.shadingParams);
 
 
             restirGIContext.SetFrameIndex(frameState.FrameIndex);
-            restirGIContext.SetResamplingMode(pathTracingSetting.giResamplingMode);
-            restirGIContext.SetTemporalResamplingParameters(pathTracingSetting.giTemporalResamplingParams);
-            restirGIContext.SetSpatialResamplingParameters(pathTracingSetting.giSpatialResamplingParams);
-            restirGIContext.SetFinalShadingParameters(pathTracingSetting.giFinalShadingParams);
+            restirGIContext.SetResamplingMode(setting.giResamplingMode);
+            restirGIContext.SetTemporalResamplingParameters(setting.giTemporalResamplingParams);
+            restirGIContext.SetSpatialResamplingParameters(setting.giSpatialResamplingParams);
+            restirGIContext.SetFinalShadingParameters(setting.giFinalShadingParams);
 
 
             var regirContext = isContext.GetReGIRContext();
-            pathTracingSetting.regirDynamicParams.center = frameState.camPos;
-            regirContext.SetDynamicParameters(pathTracingSetting.regirDynamicParams);
+            setting.regirDynamicParams.center = frameState.camPos;
+            regirContext.SetDynamicParameters(setting.regirDynamicParams);
 
 
             var constants = new ResamplingConstants();
 
             constants.frameIndex   = restirDIContext.GetFrameIndex();
-            constants.denoiserMode = pathTracingSetting.denoiserMode;
+            constants.denoiserMode = setting.denoiserMode;
 
-            constants.enableBrdfIndirect      = pathTracingSetting.enableBrdfIndirect ? 1u : 0u;
-            constants.enableBrdfAdditiveBlend = pathTracingSetting.enableBrdfAdditiveBlend ? 1u : 0u;
+            constants.enableBrdfIndirect      = setting.enableBrdfIndirect ? 1u : 0u;
+            constants.enableBrdfAdditiveBlend = setting.enableBrdfAdditiveBlend ? 1u : 0u;
             constants.enableAccumulation      = 0;
 
             // constants.sceneConstants.enableEnvironmentMap = (environmentLight.textureIndex >= 0);
@@ -734,7 +736,7 @@ namespace PathTracing
             FillResamplingConstants(ref constants, isContext);
             FillBRDFPTConstants(ref constants.brdfPT, isContext.GetLightBufferParameters());
 
-            constants.brdfPT = pathTracingSetting.brdfptParams;
+            constants.brdfPT = setting.brdfptParams;
 
 
             // ReSTIRGI_BufferIndices restirGIBufferIndices = restirGIContext.GetBufferIndices();

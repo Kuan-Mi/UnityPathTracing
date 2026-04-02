@@ -73,6 +73,10 @@ namespace PathTracing
         public bool debugRtxdi;
 
         [FoldoutHeader("RTXDI")]
+
+        public bool enableDi;
+        public bool enableGi;
+        
         public bool enableBrdfIndirect;
 
         public bool enableBrdfAdditiveBlend;
