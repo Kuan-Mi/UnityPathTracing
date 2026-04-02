@@ -55,6 +55,7 @@ namespace PathTracing
             internal ShowMode showMode;
             internal float resolutionScale;
             internal bool enableDlssRR;
+            internal bool tmpDisableRR;
             internal bool showMV;
             internal bool showValidation;
             internal bool showReference;
@@ -153,9 +154,17 @@ namespace PathTracing
                     break;
                 case ShowMode.Final:
                     if (data.Setting.enableDlssRR)
-                        Blitter.BlitTexture(natCmd, data.Resource.DlssOutput, new Vector4(1, 1, 0, 0), data.BlitMaterial, (int)ShowPass.Dlss);
+                        if (data.Setting.tmpDisableRR)
+                        {
+                            Blitter.BlitTexture(natCmd, data.Resource.DirectLighting, scaleOffset, data.BlitMaterial, (int)ShowPass.Out);
+                        }
+                        else
+                        {
+                            Blitter.BlitTexture(natCmd, data.Resource.DlssOutput, new Vector4(1, 1, 0, 0), data.BlitMaterial, (int)ShowPass.Dlss);
+                        }
                     else
                         Blitter.BlitTexture(natCmd, data.Resource.taaDst, scaleOffset, data.BlitMaterial, (int)ShowPass.Out);
+
                     break;
                 case ShowMode.DLSS_DiffuseAlbedo:
                     Blitter.BlitTexture(natCmd, data.Resource.RRGuide_DiffAlbedo, scaleOffset, data.BlitMaterial, (int)ShowPass.Out);

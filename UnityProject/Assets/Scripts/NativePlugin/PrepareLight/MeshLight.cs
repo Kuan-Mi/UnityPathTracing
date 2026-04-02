@@ -7,6 +7,9 @@ using RTXDI;
 [ExecuteAlways]
 public class MeshLight : MonoBehaviour
 {
+    private static readonly int EmissionColor = Shader.PropertyToID("_EmissionColor");
+    private static readonly int EmissionMap = Shader.PropertyToID("_EmissionMap");
+
     private void OnEnable()
     {
         GPUScene.RegisterMeshLight(this);
@@ -18,49 +21,38 @@ public class MeshLight : MonoBehaviour
     }
 
     private List<Color> lastEmitColors = new List<Color>();
-    private List<Texture2D> lastEmitTextures = new List<Texture2D>();
+    private List<Texture> lastEmitTextures = new List<Texture>();
+    
+
+    private List<Color> emitColors = new List<Color>();
+    private List<Texture> emitTextures = new List<Texture>();
     
     
     private void Update()
     {
-        var renderer = Renderer;
-        if (renderer)
+        if (!Renderer) return;
+        
+        var materials = Renderer.sharedMaterials;
+        emitColors.Clear();
+        emitTextures.Clear();
+            
+        foreach (var mat in materials)
         {
-            var materials = renderer.sharedMaterials;
-            var emitColors = new List<Color>();
-            var emitTextures = new List<Texture2D>();
+            emitColors.Add(mat.HasProperty(EmissionColor) ? mat.GetColor(EmissionColor) : Color.black);
+            emitTextures.Add(mat.HasProperty(EmissionMap) ? mat.GetTexture(EmissionMap) : null);
+        }
             
-            foreach (var mat in materials)
-            {
-                if (mat.HasProperty("_EmissionColor"))
-                {
-                    emitColors.Add(mat.GetColor("_EmissionColor"));
-                }
-                else
-                {
-                    emitColors.Add(Color.black);
-                }
-
-                if (mat.HasProperty("_EmissionMap"))
-                {
-                    emitTextures.Add(mat.GetTexture("_EmissionMap") as Texture2D);
-                }
-                else
-                {
-                    emitTextures.Add(null);
-                }
-            }
-            
-            if (!emitColors.SequenceEqual(lastEmitColors) || !emitTextures.SequenceEqual(lastEmitTextures))
-            {
-                GPUScene.Instance?.MarkSceneDirty();
-                lastEmitColors = emitColors;
-                lastEmitTextures = emitTextures;
-            }
+        if (!emitColors.SequenceEqual(lastEmitColors) || !emitTextures.SequenceEqual(lastEmitTextures))
+        {
+            GPUScene.Instance?.MarkSceneDirty();
+            lastEmitColors = emitColors;
+            lastEmitTextures = emitTextures;
         }
     }
+    
+    private MeshRenderer m_renderer;
 
-    public MeshRenderer Renderer => GetComponent<MeshRenderer>();
+    public MeshRenderer Renderer => m_renderer ? m_renderer : (m_renderer = GetComponent<MeshRenderer>());
     public MeshFilter Filter => GetComponent<MeshFilter>();
     public Material[] Materials => Renderer ? Renderer.sharedMaterials : null;
     public Mesh Mesh => Filter ? Filter.sharedMesh : null;
