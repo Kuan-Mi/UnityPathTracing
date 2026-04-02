@@ -14,7 +14,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::PathTracing.RtxdiFeature
   m_Active: 1
   setting:
-    exposureEv: 5.03
+    exposureEv: 5.06
     cameraJitter: 1
     showMode: 18
     showMv: 0
@@ -69,9 +69,9 @@ MonoBehaviour:
     regirDynamicParams:
       regirCellSize: 1
       center:
-        x: -10.641963
-        y: 3.9952989
-        z: -44.790257
+        x: 15.138254
+        y: 11.790981
+        z: 5.9830174
       fallbackSamplingMode: 1
       presamplingMode: 1
       regirSamplingJitter: 1
@@ -130,7 +130,7 @@ MonoBehaviour:
     giTemporalResamplingParams:
       depthThreshold: 0.1
       normalThreshold: 0.6
-      enablePermutationSampling: 1
+      enablePermutationSampling: 0
       maxHistoryLength: 8
       maxReservoirAge: 30
       enableBoilingFilter: 1
@@ -156,7 +156,7 @@ MonoBehaviour:
       pad2: 0
     brdfptParams:
       enableIndirectEmissiveSurfaces: 0
-      enableSecondaryResampling: 0
+      enableSecondaryResampling: 1
       enableReSTIRGI: 1
       pad1: 0
       materialOverrideParams:
@@ -166,7 +166,7 @@ MonoBehaviour:
         pad1: 0
       secondarySurfaceReSTIRDIParams:
         initialSamplingParams:
-          numPrimaryLocalLightSamples: 16
+          numPrimaryLocalLightSamples: 2
           numPrimaryInfiniteLightSamples: 0
           numPrimaryEnvironmentSamples: 0
           numPrimaryBrdfSamples: 0
@@ -178,9 +178,9 @@ MonoBehaviour:
           spatialDepthThreshold: 0.1
           spatialNormalThreshold: 0.9
           spatialBiasCorrection: 1
-          numSpatialSamples: 18
+          numSpatialSamples: 1
           numDisocclusionBoostSamples: 0
-          spatialSamplingRadius: 4
+          spatialSamplingRadius: 1
           neighborOffsetMask: 0
           discountNaiveSamples: 0
     sunAngularDiameter: 0.533
