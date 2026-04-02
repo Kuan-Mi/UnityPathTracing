@@ -46,150 +46,85 @@ namespace PathTracing
 
     public enum DenoiserType
     {
-        DENOISER_REBLUR = 0,
-        DENOISER_RELAX = 1,
+        DENOISER_REBLUR    = 0,
+        DENOISER_RELAX     = 1,
         DENOISER_REFERENCE = 2,
     }
 
     public enum RESOLUTION
     {
-        RESOLUTION_FULL = 0,
+        RESOLUTION_FULL               = 0,
         RESOLUTION_FULL_PROBABILISTIC = 1,
-        RESOLUTION_HALF = 2,
+        RESOLUTION_HALF               = 2,
     }
-
 
     [System.Serializable]
     public class PathTracingSetting
     {
         [FoldoutHeader("显示模式")]
-        public ShowMode showMode = ShowMode.Final;
+        [Range(-10f, 10f)]
+        public float exposureEv = 0.0f;
 
-        public bool showMv;
-        public bool showValidation;
-
-        [FoldoutHeader("RTXDI")]
-        public bool enableRtxdi;
-
-        
-        public bool enableBrdfIndirect;
-        public bool enableBrdfAdditiveBlend;
-        
-        
-        [Tooltip("用光栅化 Pass（GBufferRaster）填充 G-Buffer，替代射线追踪 GBuffer Pass。\n启用后 GBufferPass（RT）将被跳过，从而节省 ray tracing 开销。")]
-        public bool useRasterGBuffer = false;
+        public bool     cameraJitter = true;
+        public ShowMode showMode     = ShowMode.Final;
+        public bool     showMv;
+        public bool     showValidation;
 
         public bool debugRtxdi;
-        public bool useComputeForGIS;
+
+        [FoldoutHeader("RTXDI")]
+        public bool enableBrdfIndirect;
+
+        public bool enableBrdfAdditiveBlend;
+        public bool enableGIFinalShading;
+        public bool gShowLight;
+        public bool prepareLight;
+        public bool enableFinalShading;
+        public bool enableEnv;
+        public uint denoiserMode;
+
+        // public bool  enableAlphaTestedGeometry = true;
+        // public bool  enableTransparentGeometry = true;
+        // public bool  enableRayCounts           = true;
+        public bool visualizeRegirCells = false;
+        // public bool  enableGradients           = true;
+        // public float gradientLogDarknessBias   = -12.0f;
+        // public float gradientSensitivity       = 8.0f;
+        // public float confidenceHistoryLength   = 0.75f;
+
+        public ReGIRDynamicParameters regirDynamicParams = ReGIRDynamicParameters.Default();
+
+        [FoldoutHeader("use cs")]
+        public bool useRasterGBuffer = false;
+
+        public bool useComputeForGis;
         public bool useComputeForTemporalResampling;
         public bool useComputeForSpatialResampling;
         public bool useComputeForShadeSamples;
-
-        public bool enableGITemporalResampling => giResamplingMode is ReSTIRGI_ResamplingMode.Temporal or ReSTIRGI_ResamplingMode.TemporalAndSpatial;
-        public bool enableGISpatialResampling => giResamplingMode is ReSTIRGI_ResamplingMode.Spatial or ReSTIRGI_ResamplingMode.TemporalAndSpatial;
-        public bool enableGIFinalShading;
+        public bool useComputeForShadeSecondarySurfaces;
         public bool useComputeForGITemporalResampling;
         public bool useComputeForGISpatialResampling;
         public bool useComputeForGIFinalShading;
 
-        public bool enableSpatialResampling => resamplingMode is ReSTIRDI_ResamplingMode.Spatial or ReSTIRDI_ResamplingMode.TemporalAndSpatial;
-        public bool enableTemporalResampling => resamplingMode is ReSTIRDI_ResamplingMode.Temporal or ReSTIRDI_ResamplingMode.TemporalAndSpatial;
+        [FoldoutHeader("ReSTIR DI")]
+        public ReSTIRDI_ResamplingMode diResamplingMode = ReSTIRDI_ResamplingMode.TemporalAndSpatial;
 
-        public ReSTIRDI_ResamplingMode resamplingMode;
-        public ReSTIRGI_ResamplingMode giResamplingMode;
-        public bool gShowLight;
-
-        public ReSTIRDI_InitialSamplingParameters initialSamplingParams = ReSTIRDIDefaults.GetDefaultInitialSamplingParams();
+        public ReSTIRDI_InitialSamplingParameters    initialSamplingParams    = ReSTIRDIDefaults.GetDefaultInitialSamplingParams();
         public ReSTIRDI_TemporalResamplingParameters temporalResamplingParams = ReSTIRDIDefaults.GetDefaultTemporalResamplingParams();
-        public ReSTIRDI_SpatialResamplingParameters spatialResamplingParams = ReSTIRDIDefaults.GetDefaultSpatialResamplingParams();
-        public ReSTIRDI_ShadingParameters shadingParams = ReSTIRDIDefaults.GetDefaultShadingParams();
-
+        public ReSTIRDI_SpatialResamplingParameters  spatialResamplingParams  = ReSTIRDIDefaults.GetDefaultSpatialResamplingParams();
+        public ReSTIRDI_ShadingParameters            shadingParams            = ReSTIRDIDefaults.GetDefaultShadingParams();
 
         [FoldoutHeader("ReSTIR GI")]
+        public ReSTIRGI_ResamplingMode giResamplingMode = ReSTIRGI_ResamplingMode.TemporalAndSpatial;
 
         public ReSTIRGI_TemporalResamplingParameters giTemporalResamplingParams = ReSTIRGIDefaults.GetDefaultTemporalResamplingParams();
-        public ReSTIRGI_SpatialResamplingParameters giSpatialResamplingParams = ReSTIRGIDefaults.GetDefaultSpatialResamplingParams();
-        public ReSTIRGI_FinalShadingParameters giFinalShadingParams = ReSTIRGIDefaults.GetDefaultFinalShadingParams();
-
-
-
-
-        public ReGIRDynamicParameters regirDynamicParams = ReGIRDynamicParameters.Default();
-
-        public bool prepareLight;
-        public bool enableFinalShading;
-        public bool enableEnv;
-
-
-        public uint denoiserMode = 0;
-
-        public bool enablePreviousTLAS = true;
-        public bool enableAlphaTestedGeometry = true;
-        public bool enableTransparentGeometry = true;
-        public bool enableRayCounts = true;
-        public bool visualizeRegirCells = false;
-
-        public bool enableGradients = true;
-        public float gradientLogDarknessBias = -12.0f;
-        public float gradientSensitivity = 8.0f;
-        public float confidenceHistoryLength = 0.75f;
-
-        public BRDFPathTracing_Parameters brdfptParams = GetDefaultBRDFPathTracingParams();
-
-
-        static BRDFPathTracing_MaterialOverrideParameters GetDefaultBRDFPathTracingMaterialOverrideParams()
-        {
-            BRDFPathTracing_MaterialOverrideParameters p;
-            p.metalnessOverride = 0.5f;
-            p.minSecondaryRoughness = 0.5f;
-            p.roughnessOverride = 0.5f;
-            p.pad1 = 0;
-            return p;
-        }
-
-
-        static BRDFPathTracing_SecondarySurfaceReSTIRDIParameters GetDefaultBRDFPathTracingSecondarySurfaceReSTIRDIParams()
-        {
-            BRDFPathTracing_SecondarySurfaceReSTIRDIParameters p = default;
-
-            p.initialSamplingParams.localLightSamplingMode = ReSTIRDI_LocalLightSamplingMode.ReGIR_RIS;
-            p.initialSamplingParams.numPrimaryLocalLightSamples = 2;
-            p.initialSamplingParams.numPrimaryInfiniteLightSamples = 1;
-            p.initialSamplingParams.numPrimaryEnvironmentSamples = 1;
-            p.initialSamplingParams.numPrimaryBrdfSamples = 0;
-            p.initialSamplingParams.brdfCutoff = 0;
-            p.initialSamplingParams.enableInitialVisibility = 0;
-
-            p.spatialResamplingParams.numSpatialSamples = 1;
-            p.spatialResamplingParams.spatialSamplingRadius = 4.0f;
-            p.spatialResamplingParams.spatialBiasCorrection = ReSTIRDI_SpatialBiasCorrectionMode.Basic;
-            p.spatialResamplingParams.numDisocclusionBoostSamples = 0; // Disabled
-            p.spatialResamplingParams.spatialDepthThreshold = 0.1f;
-            p.spatialResamplingParams.spatialNormalThreshold = 0.9f;
-
-            return p;
-        }
-
-        public static BRDFPathTracing_Parameters GetDefaultBRDFPathTracingParams()
-        {
-            BRDFPathTracing_Parameters p;
-            p.enableIndirectEmissiveSurfaces = 0;
-            p.enableSecondaryResampling = 0;
-            p.enableReSTIRGI = 0;
-            p.pad1 = 0;
-            p.materialOverrideParams = GetDefaultBRDFPathTracingMaterialOverrideParams();
-            p.secondarySurfaceReSTIRDIParams = GetDefaultBRDFPathTracingSecondarySurfaceReSTIRDIParams();
-
-            return p;
-        }
-
+        public ReSTIRGI_SpatialResamplingParameters  giSpatialResamplingParams  = ReSTIRGIDefaults.GetDefaultSpatialResamplingParams();
+        public ReSTIRGI_FinalShadingParameters       giFinalShadingParams       = ReSTIRGIDefaults.GetDefaultFinalShadingParams();
+        public BRDFPathTracing_Parameters            brdfptParams               = BRDFPathTracing_Parameters.Default();
 
         [FoldoutHeader("Base Settings")]
         [Range(0.001f, 10f)]
         public float sunAngularDiameter = 0.533f;
-
-        [Range(-10f, 10f)]
-        public float exposureEv = 0.0f;
 
         public float exposure => Mathf.Pow(2, exposureEv);
 
@@ -197,28 +132,27 @@ namespace PathTracing
 
         public float mipBias = -0.5f;
 
-        public RESOLUTION tracingMode = RESOLUTION.RESOLUTION_FULL_PROBABILISTIC;
-        public DenoiserType denoiser = DenoiserType.DENOISER_REBLUR;
+        public RESOLUTION   tracingMode = RESOLUTION.RESOLUTION_FULL_PROBABILISTIC;
+        public DenoiserType denoiser    = DenoiserType.DENOISER_REBLUR;
 
         public float emissionIntensity = 1.0f;
 
-        public bool cameraJitter = true;
-        public bool psr = true;
-        public bool emission = true;
-        public bool usePrevFrame = true;
-        public bool TAA = true;
-        public bool indirectDiffuse = true;
-        public bool indirectSpecular = true;
-        public bool importanceSampling = false;
-        public bool SHARC = true;
+        public bool psr                  = true;
+        public bool emission             = true;
+        public bool usePrevFrame         = true;
+        public bool TAA                  = true;
+        public bool indirectDiffuse      = true;
+        public bool indirectSpecular     = true;
+        public bool importanceSampling   = false;
+        public bool SHARC                = true;
         public bool specularLobeTrimming = true;
-        public bool boost = false;
+        public bool boost                = false;
 
         [Range(0.0f, 10.0f)]
         public float boostFactor = 0.6667f;
 
-        public bool SR = false;
-        public bool RR = true;
+        public bool SR           = false;
+        public bool RR           = true;
         public bool tmpDisableRR = false;
 
         [Range(0.5f, 1.0f)]
@@ -343,6 +277,6 @@ namespace PathTracing
         public float split;
 
         public bool accumulateReference = true;
-        public bool accumulate = false;
+        public bool accumulate          = false;
     }
 }

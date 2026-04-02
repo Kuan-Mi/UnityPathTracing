@@ -176,7 +176,7 @@ namespace PathTracing
 
                             // 从 SessionState 获取该 Header 的保存状态
                             string key = GetKey(header.Name);
-                            bool isExpanded = SessionState.GetBool(key, true);
+                            bool isExpanded = SessionState.GetBool(key, false);
 
                             // 绘制 Foldout
                             bool newState = EditorGUILayout.BeginFoldoutHeaderGroup(isExpanded, header.Name);

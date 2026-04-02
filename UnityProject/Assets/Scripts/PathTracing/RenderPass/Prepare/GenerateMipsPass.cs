@@ -33,7 +33,7 @@ namespace PathTracing
         static void ExecutePass(PassData data, UnsafeGraphContext context)
         {
             var natCmd = CommandBufferHelpers.GetNativeCommandBuffer(context.cmd);
-            var marker = RenderPassMarkers.RtxdiGenerateMips;
+            var marker = RenderPassMarkers.GenerateMips;
 
             natCmd.BeginSample(marker);
 

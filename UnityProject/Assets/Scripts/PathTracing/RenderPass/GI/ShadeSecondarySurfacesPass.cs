@@ -13,74 +13,119 @@ namespace PathTracing
 {
     public class ShadeSecondarySurfacesPass : ScriptableRenderPass
     {
-        private readonly RayTracingShader _gBufferTs;
-        private RtxdiPassContext _context;
+        private const int GroupSize = 8;
 
-        public ShadeSecondarySurfacesPass(RayTracingShader gBufferTs)
+        private readonly RayTracingShader _gBufferTs;
+        private readonly ComputeShader _computeShader;
+        private RtxdiPassContext _context;
+        private bool _useCompute;
+
+        public ShadeSecondarySurfacesPass(RayTracingShader gBufferTs, ComputeShader computeShader)
         {
             _gBufferTs = gBufferTs;
+            _computeShader = computeShader;
         }
 
-        public void Setup(RtxdiPassContext ctx)
+        public void Setup(RtxdiPassContext ctx, bool useCompute = false)
         {
             _context = ctx;
+            _useCompute = useCompute;
         }
 
         class PassData
         {
             internal RayTracingShader gBufferTs;
+            internal ComputeShader ComputeShader;
             internal RtxdiPassContext Context;
+            internal bool UseCompute;
         }
 
         static void ExecutePass(PassData data, UnsafeGraphContext context)
         {
             var natCmd = CommandBufferHelpers.GetNativeCommandBuffer(context.cmd);
-
-            var gBufferTracingMarker = RenderPassMarkers.ShadeSecondarySurfaces;
-
-            natCmd.BeginSample(gBufferTracingMarker);
-
             var ctx = data.Context;
 
-            natCmd.SetRayTracingShaderPass(data.gBufferTs, "RTXDI");
-            natCmd.SetRayTracingConstantBufferParam(data.gBufferTs, paramsID, ctx.ConstantBuffer, 0, ctx.ConstantBuffer.stride);
-            natCmd.SetRayTracingBufferParam(data.gBufferTs, ResampleConstantsID, ctx.ResamplingConstantBuffer);
+            if (data.UseCompute)
+            {
+                var marker = RenderPassMarkers.ShadeSecondarySurfacesCompute;
+                natCmd.BeginSample(marker);
 
-            natCmd.SetRayTracingTextureParam(data.gBufferTs, t_GBufferDepthID, ctx.ViewDepth);
-            natCmd.SetRayTracingTextureParam(data.gBufferTs, t_GBufferDiffuseAlbedoID, ctx.DiffuseAlbedo);
-            natCmd.SetRayTracingTextureParam(data.gBufferTs, t_GBufferSpecularRoughID, ctx.SpecularRough);
-            natCmd.SetRayTracingTextureParam(data.gBufferTs, t_GBufferNormalsID, ctx.Normals);
-            natCmd.SetRayTracingTextureParam(data.gBufferTs, t_GBufferGeoNormalsID, ctx.GeoNormals);
+                var cs = data.ComputeShader;
+                int kernel = cs.FindKernel("main");
 
-            natCmd.SetRayTracingTextureParam(data.gBufferTs, g_DirectLightingID, ctx.DirectLighting);
+                natCmd.SetComputeConstantBufferParam(cs, paramsID, ctx.ConstantBuffer, 0, ctx.ConstantBuffer.stride);
+                natCmd.SetComputeConstantBufferParam(cs, g_ConstID, ctx.ResamplingConstantBuffer, 0, ctx.ResamplingConstantBuffer.stride);
 
-            natCmd.SetRayTracingBufferParam(data.gBufferTs, u_SecondaryGBufferID, ctx.RtxdiResources.SecondaryGBuffer);
-            natCmd.SetRayTracingBufferParam(data.gBufferTs, u_GIReservoirsID, ctx.RtxdiResources.GIReservoirBuffer);
-            natCmd.SetRayTracingBufferParam(data.gBufferTs, t_LightDataBufferID, ctx.RtxdiResources.LightDataBuffer);
-            natCmd.SetRayTracingBufferParam(data.gBufferTs, u_RisBufferID, ctx.RtxdiResources.RisBuffer);
-            natCmd.SetRayTracingBufferParam(data.gBufferTs, u_RisLightDataBufferID, ctx.RtxdiResources.RisLightDataBuffer);
+                natCmd.SetComputeTextureParam(cs, kernel, t_GBufferDepthID, ctx.ViewDepth);
+                natCmd.SetComputeTextureParam(cs, kernel, t_GBufferDiffuseAlbedoID, ctx.DiffuseAlbedo);
+                natCmd.SetComputeTextureParam(cs, kernel, t_GBufferSpecularRoughID, ctx.SpecularRough);
+                natCmd.SetComputeTextureParam(cs, kernel, t_GBufferNormalsID, ctx.Normals);
+                natCmd.SetComputeTextureParam(cs, kernel, t_GBufferGeoNormalsID, ctx.GeoNormals);
 
-            natCmd.SetRayTracingBufferParam(data.gBufferTs, t_NeighborOffsetsID, ctx.RtxdiResources.NeighborOffsetsBuffer);
-            natCmd.SetRayTracingBufferParam(data.gBufferTs, u_LightReservoirsID, ctx.RtxdiResources.LightReservoirBuffer);
+                natCmd.SetComputeTextureParam(cs, kernel, g_DirectLightingID, ctx.DirectLighting);
 
-            uint rectWmod = (uint)(ctx.RenderResolution.x * ctx.ResolutionScale + 0.5f);
-            uint rectHmod = (uint)(ctx.RenderResolution.y * ctx.ResolutionScale + 0.5f);
+                natCmd.SetComputeBufferParam(cs, kernel, u_SecondaryGBufferID, ctx.RtxdiResources.SecondaryGBuffer);
+                natCmd.SetComputeBufferParam(cs, kernel, u_GIReservoirsID, ctx.RtxdiResources.GIReservoirBuffer);
+                natCmd.SetComputeBufferParam(cs, kernel, t_LightDataBufferID, ctx.RtxdiResources.LightDataBuffer);
+                natCmd.SetComputeBufferParam(cs, kernel, u_RisBufferID, ctx.RtxdiResources.RisBuffer);
+                natCmd.SetComputeBufferParam(cs, kernel, u_RisLightDataBufferID, ctx.RtxdiResources.RisLightDataBuffer);
 
-            // Debug.Log($"Dispatch Rays Size: {rectWmod} x {rectHmod}");
+                natCmd.SetComputeBufferParam(cs, kernel, t_NeighborOffsetsID, ctx.RtxdiResources.NeighborOffsetsBuffer);
+                natCmd.SetComputeBufferParam(cs, kernel, u_LightReservoirsID, ctx.RtxdiResources.LightReservoirBuffer);
 
+                int rectW = (int)(ctx.RenderResolution.x * ctx.ResolutionScale + 0.5f);
+                int rectH = (int)(ctx.RenderResolution.y * ctx.ResolutionScale + 0.5f);
+                int groupsX = (rectW + GroupSize - 1) / GroupSize;
+                int groupsY = (rectH + GroupSize - 1) / GroupSize;
+                natCmd.DispatchCompute(cs, kernel, groupsX, groupsY, 1);
 
-            natCmd.DispatchRays(data.gBufferTs, "MainRayGenShader", rectWmod, rectHmod, 1);
+                natCmd.EndSample(marker);
+            }
+            else
+            {
+                var marker = RenderPassMarkers.ShadeSecondarySurfaces;
+                natCmd.BeginSample(marker);
 
-            natCmd.EndSample(gBufferTracingMarker);
+                natCmd.SetRayTracingShaderPass(data.gBufferTs, "RTXDI");
+                natCmd.SetRayTracingConstantBufferParam(data.gBufferTs, paramsID, ctx.ConstantBuffer, 0, ctx.ConstantBuffer.stride);
+                natCmd.SetRayTracingBufferParam(data.gBufferTs, ResampleConstantsID, ctx.ResamplingConstantBuffer);
+
+                natCmd.SetRayTracingTextureParam(data.gBufferTs, t_GBufferDepthID, ctx.ViewDepth);
+                natCmd.SetRayTracingTextureParam(data.gBufferTs, t_GBufferDiffuseAlbedoID, ctx.DiffuseAlbedo);
+                natCmd.SetRayTracingTextureParam(data.gBufferTs, t_GBufferSpecularRoughID, ctx.SpecularRough);
+                natCmd.SetRayTracingTextureParam(data.gBufferTs, t_GBufferNormalsID, ctx.Normals);
+                natCmd.SetRayTracingTextureParam(data.gBufferTs, t_GBufferGeoNormalsID, ctx.GeoNormals);
+
+                natCmd.SetRayTracingTextureParam(data.gBufferTs, g_DirectLightingID, ctx.DirectLighting);
+
+                natCmd.SetRayTracingBufferParam(data.gBufferTs, u_SecondaryGBufferID, ctx.RtxdiResources.SecondaryGBuffer);
+                natCmd.SetRayTracingBufferParam(data.gBufferTs, u_GIReservoirsID, ctx.RtxdiResources.GIReservoirBuffer);
+                natCmd.SetRayTracingBufferParam(data.gBufferTs, t_LightDataBufferID, ctx.RtxdiResources.LightDataBuffer);
+                natCmd.SetRayTracingBufferParam(data.gBufferTs, u_RisBufferID, ctx.RtxdiResources.RisBuffer);
+                natCmd.SetRayTracingBufferParam(data.gBufferTs, u_RisLightDataBufferID, ctx.RtxdiResources.RisLightDataBuffer);
+
+                natCmd.SetRayTracingBufferParam(data.gBufferTs, t_NeighborOffsetsID, ctx.RtxdiResources.NeighborOffsetsBuffer);
+                natCmd.SetRayTracingBufferParam(data.gBufferTs, u_LightReservoirsID, ctx.RtxdiResources.LightReservoirBuffer);
+
+                uint rectWmod = (uint)(ctx.RenderResolution.x * ctx.ResolutionScale + 0.5f);
+                uint rectHmod = (uint)(ctx.RenderResolution.y * ctx.ResolutionScale + 0.5f);
+
+                natCmd.DispatchRays(data.gBufferTs, "MainRayGenShader", rectWmod, rectHmod, 1);
+
+                natCmd.EndSample(marker);
+            }
         }
 
 
         public override void RecordRenderGraph(RenderGraph renderGraph, ContextContainer frameData)
         {
-            using var builder = renderGraph.AddUnsafePass<PassData>("ShadeSecondarySurfaces", out var passData);
+            string passName = _useCompute ? "ShadeSecondarySurfaces_Compute" : "ShadeSecondarySurfaces";
+            using var builder = renderGraph.AddUnsafePass<PassData>(passName, out var passData);
 
             passData.gBufferTs = _gBufferTs;
+            passData.ComputeShader = _computeShader;
             passData.Context = _context;
+            passData.UseCompute = _useCompute;
 
             builder.AllowPassCulling(false);
             builder.SetRenderFunc((PassData data, UnsafeGraphContext context) => { ExecutePass(data, context); });

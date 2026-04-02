@@ -13,7 +13,7 @@ public readonly struct NamedMarker
 
     public NamedMarker(ProfilerCategory category, string name, MarkerFlags flags)
     {
-        Name = name;
+        Name    = name;
         _marker = new ProfilerMarker(category, name, flags);
     }
 
@@ -48,7 +48,8 @@ public static class RenderPassMarkers
 
     // ── GI ────────────────────────────────────────────────────────────────────
     public static readonly NamedMarker BrdfRayTracing = new(ProfilerCategory.Render, "BrdfRayTracing", MarkerFlags.SampleGPU);
-    public static readonly NamedMarker ShadeSecondarySurfaces = new(ProfilerCategory.Render, "ShadeSecondarySurfaces", MarkerFlags.SampleGPU);
+    public static readonly NamedMarker ShadeSecondarySurfaces = new(ProfilerCategory.Render, "ShadeSecondarySurfaces RS", MarkerFlags.SampleGPU);
+    public static readonly NamedMarker ShadeSecondarySurfacesCompute = new(ProfilerCategory.Render, "ShadeSecondarySurfaces CS", MarkerFlags.SampleGPU);
     public static readonly NamedMarker GiTemporalResamplingCompute = new(ProfilerCategory.Render, "GI TemporalResampling CS", MarkerFlags.SampleGPU);
     public static readonly NamedMarker GiTemporalResampling = new(ProfilerCategory.Render, "GI TemporalResampling RS", MarkerFlags.SampleGPU);
     public static readonly NamedMarker GiSpatialResamplingCompute = new(ProfilerCategory.Render, "GI SpatialResampling CS", MarkerFlags.SampleGPU);
