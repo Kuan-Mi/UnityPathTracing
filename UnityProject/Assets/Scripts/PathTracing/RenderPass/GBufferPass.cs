@@ -36,7 +36,7 @@ namespace PathTracing
         {
             var natCmd = CommandBufferHelpers.GetNativeCommandBuffer(context.cmd);
 
-            var gBufferTracingMarker = RenderPassMarkers.GBuffer;
+            var gBufferTracingMarker = RenderPassMarkers.GBufferRay;
 
             natCmd.BeginSample(gBufferTracingMarker);
 

@@ -48,7 +48,7 @@ namespace PathTracing
 
             if (data.UseCompute)
             {
-                var marker = RenderPassMarkers.SpatialResamplingCompute;
+                var marker = RenderPassMarkers.DiSpatialResamplingCompute;
                 natCmd.BeginSample(marker);
 
                 var cs = data.ComputeShader;
@@ -77,7 +77,7 @@ namespace PathTracing
             }
             else
             {
-                var marker = RenderPassMarkers.SpatialResampling;
+                var marker = RenderPassMarkers.DiSpatialResampling;
                 natCmd.BeginSample(marker);
 
                 natCmd.SetRayTracingShaderPass(data.RtShader, "RTXDI");
