@@ -78,7 +78,7 @@ namespace Rtxdi.DI
 
         public float brdfCutoff;
 
-        [Range(0, 1)]
+        [Toggle]
         public uint enableInitialVisibility;
 
         [Range(0, 16)]
@@ -115,16 +115,16 @@ namespace Rtxdi.DI
 
         public ReSTIRDI_TemporalBiasCorrectionMode temporalBiasCorrection;
 
-        [Range(0, 1)]
+        [Toggle]
         public uint enablePermutationSampling;
 
-        [Range(0, 1)]
+        [Range(0, 1.0f)]
         public float permutationSamplingThreshold;
 
-        [Range(0, 1)]
+        [Toggle]
         public uint enableBoilingFilter;
 
-        [Range(0, 1)]
+        [Range(0, 1.0f)]
         public float boilingFilterStrength;
 
         [Range(0, 4)]
@@ -191,10 +191,10 @@ namespace Rtxdi.DI
     [StructLayout(LayoutKind.Sequential)]
     public struct ReSTIRDI_ShadingParameters
     {
-        [Range(0, 1)]
+        [Toggle]
         public uint enableFinalVisibility;
 
-        [Range(0, 1)]
+        [Toggle]
         public uint reuseFinalVisibility;
 
         [Range(0, 8)]
@@ -202,7 +202,8 @@ namespace Rtxdi.DI
 
         [Range(0, 32)]
         public float finalVisibilityMaxDistance;
-
+        
+        [Toggle]
         public uint enableDenoiserInputPacking;
 
         [HideInInspector]

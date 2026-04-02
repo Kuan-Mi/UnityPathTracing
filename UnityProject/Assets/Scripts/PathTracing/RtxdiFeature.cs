@@ -239,6 +239,7 @@ namespace PathTracing
         }
 
 
+        [System.Serializable]
         public struct RenderSettings
         {
             public uint denoiserMode;
@@ -540,7 +541,7 @@ namespace PathTracing
                 }
 
                 // ShadeSamplesPass
-                _shadeSamplesPass.Setup(rtxdiCtx, setting.enableFinalShading, setting.useComputeForShadeSamples);
+                _shadeSamplesPass.Setup(rtxdiCtx, setting.enableDIFinalShading, setting.useComputeForShadeSamples);
                 renderer.EnqueuePass(_shadeSamplesPass);
             }
 

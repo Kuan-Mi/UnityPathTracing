@@ -8,11 +8,11 @@ namespace PathTracing
     [StructLayout(LayoutKind.Sequential)]
     public struct BRDFPathTracing_MaterialOverrideParameters
     {
-        [Range(0, 1)]
+        [Range(0, 1.0f)]
         public float roughnessOverride;
-        [Range(0, 1)]
+        [Range(0, 1.0f)]
         public float metalnessOverride;
-        [Range(0, 1)]
+        [Range(0, 1.0f)]
         public float minSecondaryRoughness;
         [HideInInspector]
         public uint pad1;
@@ -63,11 +63,11 @@ namespace PathTracing
     [StructLayout(LayoutKind.Sequential)]
     public struct BRDFPathTracing_Parameters
     {
-        [Range(0, 1)]
+        [HideInInspector]
         public uint enableIndirectEmissiveSurfaces;
-        [Range(0, 1)]
+        [Toggle]
         public uint enableSecondaryResampling;
-        [Range(0, 1)]
+        [HideInInspector]
         public uint enableReSTIRGI;
         [HideInInspector]
         public uint pad1;

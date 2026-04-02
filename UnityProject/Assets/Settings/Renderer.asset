@@ -20,12 +20,52 @@ MonoBehaviour:
     showMv: 0
     showValidation: 0
     debugRtxdi: 1
+    lightingSettings:
+      denoiserMode: 0
+      enablePreviousTLAS: 0
+      enableAlphaTestedGeometry: 1
+      enableTransparentGeometry: 1
+      enableRayCounts: 0
+      visualizeRegirCells: 0
+      enableGradients: 0
+      gradientLogDarknessBias: -12
+      gradientSensitivity: 8
+      confidenceHistoryLength: 0.75
+      brdfptParams:
+        enableIndirectEmissiveSurfaces: 0
+        enableSecondaryResampling: 0
+        enableReSTIRGI: 0
+        pad1: 0
+        materialOverrideParams:
+          roughnessOverride: 0.5
+          metalnessOverride: 0.5
+          minSecondaryRoughness: 0.5
+          pad1: 0
+        secondarySurfaceReSTIRDIParams:
+          initialSamplingParams:
+            numPrimaryLocalLightSamples: 2
+            numPrimaryInfiniteLightSamples: 1
+            numPrimaryEnvironmentSamples: 1
+            numPrimaryBrdfSamples: 0
+            brdfCutoff: 0
+            enableInitialVisibility: 0
+            environmentMapImportanceSampling: 0
+            localLightSamplingMode: 2
+          spatialResamplingParams:
+            spatialDepthThreshold: 0.1
+            spatialNormalThreshold: 0.9
+            spatialBiasCorrection: 1
+            numSpatialSamples: 1
+            numDisocclusionBoostSamples: 0
+            spatialSamplingRadius: 4
+            neighborOffsetMask: 0
+            discountNaiveSamples: 0
     directLightingMode: 2
     indirectLightingMode: 2
     enableGIFinalShading: 1
-    gShowLight: 0
-    enableFinalShading: 1
+    enableDIFinalShading: 1
     enableEnv: 1
+    gShowLight: 0
     regirDynamicParams:
       regirCellSize: 1
       center:
@@ -298,12 +338,52 @@ MonoBehaviour:
     showMv: 0
     showValidation: 0
     debugRtxdi: 0
+    lightingSettings:
+      denoiserMode: 0
+      enablePreviousTLAS: 1
+      enableAlphaTestedGeometry: 1
+      enableTransparentGeometry: 1
+      enableRayCounts: 1
+      visualizeRegirCells: 0
+      enableGradients: 1
+      gradientLogDarknessBias: -12
+      gradientSensitivity: 8
+      confidenceHistoryLength: 0.75
+      brdfptParams:
+        enableIndirectEmissiveSurfaces: 0
+        enableSecondaryResampling: 0
+        enableReSTIRGI: 0
+        pad1: 0
+        materialOverrideParams:
+          roughnessOverride: 0.5
+          metalnessOverride: 0.5
+          minSecondaryRoughness: 0.5
+          pad1: 0
+        secondarySurfaceReSTIRDIParams:
+          initialSamplingParams:
+            numPrimaryLocalLightSamples: 2
+            numPrimaryInfiniteLightSamples: 1
+            numPrimaryEnvironmentSamples: 1
+            numPrimaryBrdfSamples: 0
+            brdfCutoff: 0
+            enableInitialVisibility: 0
+            environmentMapImportanceSampling: 0
+            localLightSamplingMode: 2
+          spatialResamplingParams:
+            spatialDepthThreshold: 0.1
+            spatialNormalThreshold: 0.9
+            spatialBiasCorrection: 1
+            numSpatialSamples: 1
+            numDisocclusionBoostSamples: 0
+            spatialSamplingRadius: 4
+            neighborOffsetMask: 0
+            discountNaiveSamples: 0
     directLightingMode: 2
     indirectLightingMode: 2
     enableGIFinalShading: 0
-    gShowLight: 0
-    enableFinalShading: 0
+    enableDIFinalShading: 1
     enableEnv: 0
+    gShowLight: 0
     regirDynamicParams:
       regirCellSize: 0
       center:

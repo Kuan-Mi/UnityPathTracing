@@ -2,6 +2,7 @@
 using Rtxdi.GI;
 using Rtxdi.ReGIR;
 using UnityEngine;
+using UnityEngine.Serialization;
 
 namespace PathTracing
 {
@@ -92,10 +93,11 @@ namespace PathTracing
         public DirectLightingMode   directLightingMode   = DirectLightingMode.ReStir;
         public IndirectLightingMode indirectLightingMode = IndirectLightingMode.ReStirGI;
 
-        public bool enableGIFinalShading;
-        public bool gShowLight;
-        public bool enableFinalShading;
+        public bool enableGIFinalShading = true;
+        public bool enableDIFinalShading = true;
+        
         public bool enableEnv;
+        public bool gShowLight;
 
         public ReGIRDynamicParameters regirDynamicParams = ReGIRDynamicParameters.Default();
 

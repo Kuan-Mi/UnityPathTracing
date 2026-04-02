@@ -16,17 +16,17 @@ namespace Rtxdi.GI
     public struct RTXDI_PackedGIReservoir
     {
         public float3 position;
-        public uint packed_miscData_age_M;
+        public uint   packed_miscData_age_M;
 
-        public uint packed_radiance; // 32bit LogLUV format
+        public uint  packed_radiance; // 32bit LogLUV format
         public float weight;
-        public uint packed_normal; // 2x 16-bit snorms in octahedral mapping
+        public uint  packed_normal; // 2x 16-bit snorms in octahedral mapping
         public float unused;
     }
 
     public enum ResTIRGI_TemporalBiasCorrectionMode : uint
     {
-        Off = RtxdiConstants.RTXDI_BIAS_CORRECTION_OFF,
+        Off   = RtxdiConstants.RTXDI_BIAS_CORRECTION_OFF,
         Basic = RtxdiConstants.RTXDI_BIAS_CORRECTION_BASIC,
 
         // Pairwise is not supported
@@ -35,7 +35,7 @@ namespace Rtxdi.GI
 
     public enum ResTIRGI_SpatialBiasCorrectionMode : uint
     {
-        Off = RtxdiConstants.RTXDI_BIAS_CORRECTION_OFF,
+        Off   = RtxdiConstants.RTXDI_BIAS_CORRECTION_OFF,
         Basic = RtxdiConstants.RTXDI_BIAS_CORRECTION_BASIC,
 
         // Pairwise is not supported
@@ -51,8 +51,8 @@ namespace Rtxdi.GI
 
         [Range(0.0f, 1)]
         public float normalThreshold;
-
-        [Range(0, 1)]
+        
+        [Toggle]
         public uint enablePermutationSampling;
 
         [Range(0, 40)]
@@ -60,19 +60,25 @@ namespace Rtxdi.GI
 
         [Range(0, 40)]
         public uint maxReservoirAge;
-
-        [Range(0, 1)]
+        
+        [Toggle]
         public uint enableBoilingFilter;
 
         [Range(0.0f, 1)]
         public float boilingFilterStrength;
-
-        [Range(0, 1)]
+        
+        [Toggle]
         public uint enableFallbackSampling;
 
         public ResTIRGI_TemporalBiasCorrectionMode temporalBiasCorrectionMode;
+
+        [HideInInspector]
         public uint uniformRandomNumber;
+
+        [HideInInspector]
         public uint pad2;
+
+        [HideInInspector]
         public uint pad3;
     }
 
@@ -82,16 +88,25 @@ namespace Rtxdi.GI
     {
         [Range(0.0f, 1)]
         public float spatialDepthThreshold;
+
         [Range(0.0f, 1)]
         public float spatialNormalThreshold;
+
         [Range(0, 40)]
         public uint numSpatialSamples;
+
         [Range(0, 64)]
         public float spatialSamplingRadius;
 
         public ResTIRGI_SpatialBiasCorrectionMode spatialBiasCorrectionMode;
+
+        [HideInInspector]
         public uint pad1;
+
+        [HideInInspector]
         public uint pad2;
+
+        [HideInInspector]
         public uint pad3;
     }
 
@@ -99,9 +114,16 @@ namespace Rtxdi.GI
     [StructLayout(LayoutKind.Sequential)]
     public struct ReSTIRGI_FinalShadingParameters
     {
+        [Toggle]
         public uint enableFinalVisibility;
+
+        [Toggle]
         public uint enableFinalMIS;
+
+        [HideInInspector]
         public uint pad1;
+
+        [HideInInspector]
         public uint pad2;
     }
 
@@ -122,10 +144,10 @@ namespace Rtxdi.GI
     [StructLayout(LayoutKind.Sequential)]
     public struct ReSTIRGI_Parameters
     {
-        public RTXDI_ReservoirBufferParameters reservoirBufferParams;
-        public ReSTIRGI_BufferIndices bufferIndices;
+        public RTXDI_ReservoirBufferParameters       reservoirBufferParams;
+        public ReSTIRGI_BufferIndices                bufferIndices;
         public ReSTIRGI_TemporalResamplingParameters temporalResamplingParams;
-        public ReSTIRGI_SpatialResamplingParameters spatialResamplingParams;
-        public ReSTIRGI_FinalShadingParameters finalShadingParams;
+        public ReSTIRGI_SpatialResamplingParameters  spatialResamplingParams;
+        public ReSTIRGI_FinalShadingParameters       finalShadingParams;
     }
 }
