@@ -45,29 +45,30 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::ExampleScript
   recorderNames:
-  - PrepareLight
+  - Prepare Light
   - PdfTexture
-  - GenerateMips
+  - Generate Mips
   - Presample
   - Regir
   - GBuffer Ray
   - GBuffer Raster
-  - GenInitialSamples_CS
-  - GenInitialSamples
-  - DITemporalResampling_CS
-  - DITemporalResampling
-  - DISpatialResampling_CS
-  - DISpatialResampling
-  - DIShadeSamples_CS
-  - DIShadeSamples
+  - GenInitialSamples CS
+  - GenInitialSamples RS
+  - DI TemporalResampling CS
+  - DI TemporalResampling RS
+  - DI SpatialResampling CS
+  - DI SpatialResampling RS
+  - DI ShadeSamples CS
+  - DI ShadeSamples RS
   - BrdfRayTracing
-  - ShadeSecondarySurfaces
-  - GITemporalResampling_CS
-  - GITemporalResampling
-  - GISpatialResampling_CS
-  - GISpatialResampling
-  - GIFinalShading_CS
-  - GIFinalShading
+  - ShadeSecondarySurfaces RS
+  - ShadeSecondarySurfaces CS
+  - GI TemporalResampling CS
+  - GI TemporalResampling RS
+  - GI SpatialResampling CS
+  - GI SpatialResampling RS
+  - GI FinalShading CS
+  - GI FinalShading RS
   - Opaque Tracing
   - Transparent Tracing
   - Reference Pt Tracing
