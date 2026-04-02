@@ -31,6 +31,42 @@ namespace PathTracing
             _settings = settings;
         }
 
+        public void Setup(
+            GraphicsBuffer constantBuffer,
+            GraphicsBuffer resamplingConstantBuffer,
+            RTHandle viewDepth,
+            RTHandle diffuseAlbedo,
+            RTHandle specularRough,
+            RTHandle normals,
+            RTHandle geoNormals,
+            RTHandle directLighting,
+            RtxdiResources rtxdiResources,
+            int2 renderResolution,
+            float resolutionScale,
+            bool shading,
+            bool useCompute)
+        {
+            _resource = new Resource
+            {
+                ConstantBuffer = constantBuffer,
+                ResamplingConstantBuffer = resamplingConstantBuffer,
+                ViewDepth = viewDepth,
+                DiffuseAlbedo = diffuseAlbedo,
+                SpecularRough = specularRough,
+                Normals = normals,
+                GeoNormals = geoNormals,
+                DirectLighting = directLighting,
+                RtxdiResources = rtxdiResources,
+            };
+            _settings = new Settings
+            {
+                m_RenderResolution = renderResolution,
+                resolutionScale = resolutionScale,
+                shading = shading,
+                useCompute = useCompute,
+            };
+        }
+
         public class Resource
         {
             internal GraphicsBuffer ConstantBuffer;
