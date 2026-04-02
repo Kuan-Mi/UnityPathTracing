@@ -46,7 +46,7 @@ namespace PathTracing
 
             if (data.UseCompute)
             {
-                var marker = RenderPassMarkers.GITemporalResamplingCompute;
+                var marker = RenderPassMarkers.GiTemporalResamplingCompute;
                 natCmd.BeginSample(marker);
 
                 var cs = data.ComputeShader;
@@ -82,7 +82,7 @@ namespace PathTracing
             }
             else
             {
-                var marker = RenderPassMarkers.GITemporalResampling;
+                var marker = RenderPassMarkers.GiTemporalResampling;
                 natCmd.BeginSample(marker);
 
                 var shader = data.RtShader;

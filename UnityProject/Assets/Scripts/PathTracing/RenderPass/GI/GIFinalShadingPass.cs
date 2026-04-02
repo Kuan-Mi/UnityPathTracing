@@ -49,7 +49,7 @@ namespace PathTracing
 
             if (data.UseCompute)
             {
-                var marker = RenderPassMarkers.GIFinalShadingCompute;
+                var marker = RenderPassMarkers.GiFinalShadingCompute;
                 natCmd.BeginSample(marker);
 
                 var cs = data.ComputeShader;
@@ -82,7 +82,7 @@ namespace PathTracing
             }
             else
             {
-                var marker = RenderPassMarkers.GIFinalShading;
+                var marker = RenderPassMarkers.GiFinalShading;
                 natCmd.BeginSample(marker);
 
                 var shader = data.RtShader;

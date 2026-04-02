@@ -26,35 +26,35 @@ public readonly struct NamedMarker
 public static class RenderPassMarkers
 {
     // ── Prepare ──────────────────────────────────────────────────────────────
-    public static readonly NamedMarker PrepareLight = new(ProfilerCategory.Render, "PrepareLight", MarkerFlags.SampleGPU);
+    public static readonly NamedMarker PrepareLight = new(ProfilerCategory.Render, "Prepare Light", MarkerFlags.SampleGPU);
     public static readonly NamedMarker PdfTexture = new(ProfilerCategory.Render, "PdfTexture", MarkerFlags.SampleGPU);
-    public static readonly NamedMarker RtxdiGenerateMips = new(ProfilerCategory.Render, "GenerateMips", MarkerFlags.SampleGPU);
-    public static readonly NamedMarker PresamplePass = new(ProfilerCategory.Render, "Presample", MarkerFlags.SampleGPU);
-    public static readonly NamedMarker PresampleReGir = new(ProfilerCategory.Render, "Regir", MarkerFlags.SampleGPU);
+    public static readonly NamedMarker GenerateMips = new(ProfilerCategory.Render, "Generate Mips", MarkerFlags.SampleGPU);
+    public static readonly NamedMarker Presample = new(ProfilerCategory.Render, "Presample", MarkerFlags.SampleGPU);
+    public static readonly NamedMarker ReGir = new(ProfilerCategory.Render, "Regir", MarkerFlags.SampleGPU);
 
     // ── GBuffer ───────────────────────────────────────────────────────────────
-    public static readonly NamedMarker GBuffer = new(ProfilerCategory.Render, "GBuffer Ray", MarkerFlags.SampleGPU);
+    public static readonly NamedMarker GBufferRay = new(ProfilerCategory.Render, "GBuffer Ray", MarkerFlags.SampleGPU);
     public static readonly NamedMarker GBufferRaster = new(ProfilerCategory.Render, "GBuffer Raster", MarkerFlags.SampleGPU);
 
     // ── DI ────────────────────────────────────────────────────────────────────
-    public static readonly NamedMarker GenInitialSamplesCompute = new(ProfilerCategory.Render, "GenInitialSamples_CS", MarkerFlags.SampleGPU);
-    public static readonly NamedMarker GenInitialSamples = new(ProfilerCategory.Render, "GenInitialSamples", MarkerFlags.SampleGPU);
-    public static readonly NamedMarker TemporalResamplingCompute = new(ProfilerCategory.Render, "DITemporalResampling_CS", MarkerFlags.SampleGPU);
-    public static readonly NamedMarker TemporalResampling = new(ProfilerCategory.Render, "DITemporalResampling", MarkerFlags.SampleGPU);
-    public static readonly NamedMarker SpatialResamplingCompute = new(ProfilerCategory.Render, "DISpatialResampling_CS", MarkerFlags.SampleGPU);
-    public static readonly NamedMarker SpatialResampling = new(ProfilerCategory.Render, "DISpatialResampling", MarkerFlags.SampleGPU);
-    public static readonly NamedMarker ShadeSamplesCompute = new(ProfilerCategory.Render, "DIShadeSamples_CS", MarkerFlags.SampleGPU);
-    public static readonly NamedMarker ShadeSamples = new(ProfilerCategory.Render, "DIShadeSamples", MarkerFlags.SampleGPU);
+    public static readonly NamedMarker GenInitialSamplesCompute = new(ProfilerCategory.Render, "GenInitialSamples CS", MarkerFlags.SampleGPU);
+    public static readonly NamedMarker GenInitialSamples = new(ProfilerCategory.Render, "GenInitialSamples RS", MarkerFlags.SampleGPU);
+    public static readonly NamedMarker DiTemporalResamplingCompute = new(ProfilerCategory.Render, "DI TemporalResampling CS", MarkerFlags.SampleGPU);
+    public static readonly NamedMarker DiTemporalResampling = new(ProfilerCategory.Render, "DI TemporalResampling RS", MarkerFlags.SampleGPU);
+    public static readonly NamedMarker DiSpatialResamplingCompute = new(ProfilerCategory.Render, "DI SpatialResampling CS", MarkerFlags.SampleGPU);
+    public static readonly NamedMarker DiSpatialResampling = new(ProfilerCategory.Render, "DI SpatialResampling RS", MarkerFlags.SampleGPU);
+    public static readonly NamedMarker DiShadeSamplesCompute = new(ProfilerCategory.Render, "DI ShadeSamples CS", MarkerFlags.SampleGPU);
+    public static readonly NamedMarker DiShadeSamples = new(ProfilerCategory.Render, "DI ShadeSamples RS", MarkerFlags.SampleGPU);
 
     // ── GI ────────────────────────────────────────────────────────────────────
     public static readonly NamedMarker BrdfRayTracing = new(ProfilerCategory.Render, "BrdfRayTracing", MarkerFlags.SampleGPU);
     public static readonly NamedMarker ShadeSecondarySurfaces = new(ProfilerCategory.Render, "ShadeSecondarySurfaces", MarkerFlags.SampleGPU);
-    public static readonly NamedMarker GITemporalResamplingCompute = new(ProfilerCategory.Render, "GITemporalResampling_CS", MarkerFlags.SampleGPU);
-    public static readonly NamedMarker GITemporalResampling = new(ProfilerCategory.Render, "GITemporalResampling", MarkerFlags.SampleGPU);
-    public static readonly NamedMarker GISpatialResamplingCompute = new(ProfilerCategory.Render, "GISpatialResampling_CS", MarkerFlags.SampleGPU);
-    public static readonly NamedMarker GISpatialResampling = new(ProfilerCategory.Render, "GISpatialResampling", MarkerFlags.SampleGPU);
-    public static readonly NamedMarker GIFinalShadingCompute = new(ProfilerCategory.Render, "GIFinalShading_CS", MarkerFlags.SampleGPU);
-    public static readonly NamedMarker GIFinalShading = new(ProfilerCategory.Render, "GIFinalShading", MarkerFlags.SampleGPU);
+    public static readonly NamedMarker GiTemporalResamplingCompute = new(ProfilerCategory.Render, "GI TemporalResampling CS", MarkerFlags.SampleGPU);
+    public static readonly NamedMarker GiTemporalResampling = new(ProfilerCategory.Render, "GI TemporalResampling RS", MarkerFlags.SampleGPU);
+    public static readonly NamedMarker GiSpatialResamplingCompute = new(ProfilerCategory.Render, "GI SpatialResampling CS", MarkerFlags.SampleGPU);
+    public static readonly NamedMarker GiSpatialResampling = new(ProfilerCategory.Render, "GI SpatialResampling RS", MarkerFlags.SampleGPU);
+    public static readonly NamedMarker GiFinalShadingCompute = new(ProfilerCategory.Render, "GI FinalShading CS", MarkerFlags.SampleGPU);
+    public static readonly NamedMarker GiFinalShading = new(ProfilerCategory.Render, "GI FinalShading RS", MarkerFlags.SampleGPU);
 
     // ── Main passes ───────────────────────────────────────────────────────────
     public static readonly NamedMarker OpaqueTracing = new(ProfilerCategory.Render, "Opaque Tracing", MarkerFlags.SampleGPU);

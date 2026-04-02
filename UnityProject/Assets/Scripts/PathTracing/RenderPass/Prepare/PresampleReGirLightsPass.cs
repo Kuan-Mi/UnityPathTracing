@@ -42,7 +42,7 @@ namespace PathTracing
         {
             var natCmd = CommandBufferHelpers.GetNativeCommandBuffer(context.cmd);
 
-            var opaqueTracingMarker = RenderPassMarkers.PresampleReGir;
+            var opaqueTracingMarker = RenderPassMarkers.ReGir;
 
             natCmd.BeginSample(opaqueTracingMarker);
 
