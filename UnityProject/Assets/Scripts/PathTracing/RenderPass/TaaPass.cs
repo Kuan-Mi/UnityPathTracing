@@ -57,7 +57,7 @@ namespace PathTracing
         {
             var natCmd = CommandBufferHelpers.GetNativeCommandBuffer(context.cmd);
 
-            var taaMarker = new ProfilerMarker(ProfilerCategory.Render, "TAA", MarkerFlags.SampleGPU);
+            var taaMarker = RenderPassMarkers.Taa;
             
             natCmd.BeginSample(taaMarker);
 

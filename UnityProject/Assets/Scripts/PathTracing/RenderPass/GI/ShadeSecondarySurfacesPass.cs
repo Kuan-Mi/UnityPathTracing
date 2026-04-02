@@ -36,7 +36,7 @@ namespace PathTracing
         {
             var natCmd = CommandBufferHelpers.GetNativeCommandBuffer(context.cmd);
 
-            var gBufferTracingMarker = new ProfilerMarker(ProfilerCategory.Render, "ShadeSecondarySurfaces", MarkerFlags.SampleGPU);
+            var gBufferTracingMarker = RenderPassMarkers.ShadeSecondarySurfaces;
 
             natCmd.BeginSample(gBufferTracingMarker);
 

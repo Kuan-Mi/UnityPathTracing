@@ -87,7 +87,7 @@ namespace PathTracing
         {
             var natCmd = CommandBufferHelpers.GetNativeCommandBuffer(context.cmd);
 
-            var outputBlitMarker = new ProfilerMarker(ProfilerCategory.Render, "Output Blit", MarkerFlags.SampleGPU);
+            var outputBlitMarker = RenderPassMarkers.OutputBlit;
 
             // 显示输出
             natCmd.BeginSample(outputBlitMarker);

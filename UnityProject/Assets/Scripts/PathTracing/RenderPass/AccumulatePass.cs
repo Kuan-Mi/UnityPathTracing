@@ -50,7 +50,7 @@ namespace PathTracing
         {
             var natCmd = CommandBufferHelpers.GetNativeCommandBuffer(context.cmd);
 
-            var compositionMarker = new ProfilerMarker(ProfilerCategory.Render, "Acc", MarkerFlags.SampleGPU);
+            var compositionMarker = RenderPassMarkers.Acc;
 
             // 合成
             {

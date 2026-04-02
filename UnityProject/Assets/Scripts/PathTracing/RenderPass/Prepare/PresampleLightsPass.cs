@@ -42,7 +42,7 @@ namespace PathTracing
         {
             var natCmd = CommandBufferHelpers.GetNativeCommandBuffer(context.cmd);
 
-            var opaqueTracingMarker = new ProfilerMarker(ProfilerCategory.Render, "PresamplePass", MarkerFlags.SampleGPU);
+            var opaqueTracingMarker = RenderPassMarkers.PresamplePass;
 
             natCmd.BeginSample(opaqueTracingMarker);
 

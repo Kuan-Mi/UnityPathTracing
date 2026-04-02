@@ -48,7 +48,7 @@ namespace PathTracing
 
             if (data.UseCompute)
             {
-                var marker = new ProfilerMarker(ProfilerCategory.Render, "SpatialResampling_Compute", MarkerFlags.SampleGPU);
+                var marker = RenderPassMarkers.SpatialResamplingCompute;
                 natCmd.BeginSample(marker);
 
                 var cs = data.ComputeShader;
@@ -77,7 +77,7 @@ namespace PathTracing
             }
             else
             {
-                var marker = new ProfilerMarker(ProfilerCategory.Render, "SpatialResampling", MarkerFlags.SampleGPU);
+                var marker = RenderPassMarkers.SpatialResampling;
                 natCmd.BeginSample(marker);
 
                 natCmd.SetRayTracingShaderPass(data.RtShader, "RTXDI");

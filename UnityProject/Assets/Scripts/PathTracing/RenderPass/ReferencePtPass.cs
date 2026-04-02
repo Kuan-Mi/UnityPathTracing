@@ -66,7 +66,7 @@ namespace PathTracing
         {
             var natCmd = CommandBufferHelpers.GetNativeCommandBuffer(context.cmd);
 
-            var referencePtTracingMarker = new ProfilerMarker(ProfilerCategory.Render, "Reference Pt Tracing", MarkerFlags.SampleGPU);
+            var referencePtTracingMarker = RenderPassMarkers.ReferencePtTracing;
 
             natCmd.BeginSample(referencePtTracingMarker);
 

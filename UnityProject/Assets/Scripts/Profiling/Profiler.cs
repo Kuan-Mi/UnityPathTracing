@@ -8,6 +8,12 @@ public class GPUProfiler : MonoBehaviour
 {
     public List<string> recorderNames;
 
+    [ContextMenu("Populate All Render Pass Markers")]
+    void PopulateAllMarkers()
+    {
+        recorderNames = new List<string>(RenderPassMarkers.AllMarkerNames);
+    }
+
     [Tooltip("平均值统计的时间窗口（秒）")]
     public int averageWindowSeconds = 1;
 

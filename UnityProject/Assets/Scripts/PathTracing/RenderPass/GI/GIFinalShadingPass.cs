@@ -49,7 +49,7 @@ namespace PathTracing
 
             if (data.UseCompute)
             {
-                var marker = new ProfilerMarker(ProfilerCategory.Render, "GIFinalShading_Compute", MarkerFlags.SampleGPU);
+                var marker = RenderPassMarkers.GIFinalShadingCompute;
                 natCmd.BeginSample(marker);
 
                 var cs = data.ComputeShader;
@@ -82,7 +82,7 @@ namespace PathTracing
             }
             else
             {
-                var marker = new ProfilerMarker(ProfilerCategory.Render, "GIFinalShading", MarkerFlags.SampleGPU);
+                var marker = RenderPassMarkers.GIFinalShading;
                 natCmd.BeginSample(marker);
 
                 var shader = data.RtShader;

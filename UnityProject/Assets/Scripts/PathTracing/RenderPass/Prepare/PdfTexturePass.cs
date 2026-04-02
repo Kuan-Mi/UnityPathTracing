@@ -37,7 +37,7 @@ namespace PathTracing
         {
             var natCmd = context.cmd;
 
-            var opaqueTracingMarker = new ProfilerMarker(ProfilerCategory.Render, "pdfTexture", MarkerFlags.SampleGPU);
+            var opaqueTracingMarker = RenderPassMarkers.PdfTexture;
 
             natCmd.BeginSample(opaqueTracingMarker);
 
