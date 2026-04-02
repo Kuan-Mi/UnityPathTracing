@@ -12,7 +12,6 @@ RWTexture2D<int2> u_TemporalSamplePositions;
 #include "Assets/Shaders/RayTracing/ShadingHelpers.hlsl"
 
 
-
 #ifdef USE_RAY_QUERY
 [numthreads(RTXDI_SCREEN_SPACE_GROUP_SIZE, RTXDI_SCREEN_SPACE_GROUP_SIZE, 1)]
 void main(uint2 GlobalIndex : SV_DispatchThreadID)
@@ -49,34 +48,21 @@ void MainRayGenShader()
                                                        /* previousFrameTLAS = */ false, /* enableVisibilityReuse = */ true, diffuse, specular, lightDistance);
 
         // currLuminance = float2(calcLuminance(diffuse * surface.material.diffuseAlbedo), calcLuminance(specular));
-
         // specular = DemodulateSpecular(surface.material.specularF0, specular);
-
-        // float3 finalColor = ShadeSurfaceWithLightSample(lightSample, surface) * RTXDI_GetDIReservoirInvPdf(reservoir);
-
-        float3 finalColor = (diffuse * surface.material.diffuseAlbedo) + specular;
-
-        finalColor += gIn_EmissiveLighting[pixelPosition];
-        finalColor *= gExposure;
-
-        gOut_DirectLighting[pixelPosition] = finalColor;
-
-        // gOut_DirectLighting[pixelPosition] = diffuse + specular;
 
         if (needToStore)
         {
             RTXDI_StoreDIReservoir(reservoir, g_Const.restirDI.reservoirBufferParams, GlobalIndex, g_Const.restirDI.bufferIndices.shadingInputBufferIndex);
         }
     }
-    else
-    {
-        float3 finalColor = 0;
-        finalColor += gIn_EmissiveLighting[pixelPosition];
-        finalColor *= gExposure;
 
-        gOut_DirectLighting[pixelPosition] = finalColor;
-    }
 
+    float3 finalColor = (diffuse * surface.material.diffuseAlbedo) + specular;
+
+    finalColor += gIn_EmissiveLighting[pixelPosition];
+    finalColor *= gExposure;
+
+    StoreShadingOutput(finalColor, pixelPosition, true, false);
 
     // gOut_DirectLighting[pixelPosition] = RTXDI_IsValidDIReservoir(reservoir);
 
@@ -167,11 +153,7 @@ void MainRayGenShader()
     //
 
     #if RTXDI_REGIR_MODE !=RTXDI_REGIR_DISABLED
-    if
-    (g_Const
-        .
-        visualizeRegirCells
-    )
+    if (g_Const.visualizeRegirCells)
     {
         float3 visualize = RTXDI_VisualizeReGIRCells(g_Const.regir, surface.worldPos);
         gOut_DirectLighting[pixelPosition] = visualize;

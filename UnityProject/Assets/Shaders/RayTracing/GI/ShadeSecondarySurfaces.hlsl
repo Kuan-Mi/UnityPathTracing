@@ -187,6 +187,8 @@ void MainRayGenShader()
         // finalColor += gIn_EmissiveLighting[pixelPosition];
         finalColor *= gExposure; 
         
+        
+        StoreShadingOutput(finalColor,pixelPosition,false, true);
         // gOut_DirectLighting[pixelPosition] += finalColor;
     }
 }

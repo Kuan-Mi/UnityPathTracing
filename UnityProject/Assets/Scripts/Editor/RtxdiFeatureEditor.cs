@@ -24,7 +24,7 @@ namespace PathTracing
             RtxdiFeature feature = (RtxdiFeature)target;
 
             // 1. 绘制 PathTracingSetting (带折叠 Header)
-            SerializedProperty settingsProp = serializedObject.FindProperty("pathTracingSetting");
+            SerializedProperty settingsProp = serializedObject.FindProperty("setting");
             if (settingsProp != null)
             {
                 DrawSettingsWithFoldableHeaders(settingsProp);

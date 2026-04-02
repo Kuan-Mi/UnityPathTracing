@@ -2,7 +2,6 @@
 using Rtxdi.GI;
 using Rtxdi.ReGIR;
 using UnityEngine;
-using UnityEngine.Serialization;
 
 namespace PathTracing
 {
@@ -58,6 +57,21 @@ namespace PathTracing
         RESOLUTION_HALF               = 2,
     }
 
+    public enum DirectLightingMode
+    {
+        None,
+        Brdf,
+        ReStir
+    }
+
+    public enum IndirectLightingMode
+    {
+        None,
+        Brdf,
+        ReStirGI
+    };
+
+
     [System.Serializable]
     public class PathTracingSetting
     {
@@ -73,28 +87,15 @@ namespace PathTracing
         public bool debugRtxdi;
 
         [FoldoutHeader("RTXDI")]
+        public RtxdiFeature.RenderSettings lightingSettings = RtxdiFeature.RenderSettings.Default();
 
-        public bool enableDi;
-        public bool enableGi;
-        
-        public bool enableBrdfIndirect;
+        public DirectLightingMode   directLightingMode   = DirectLightingMode.ReStir;
+        public IndirectLightingMode indirectLightingMode = IndirectLightingMode.ReStirGI;
 
-        public bool enableBrdfAdditiveBlend;
         public bool enableGIFinalShading;
         public bool gShowLight;
-        public bool prepareLight;
         public bool enableFinalShading;
         public bool enableEnv;
-        public uint denoiserMode;
-
-        // public bool  enableAlphaTestedGeometry = true;
-        // public bool  enableTransparentGeometry = true;
-        // public bool  enableRayCounts           = true;
-        public bool visualizeRegirCells = false;
-        // public bool  enableGradients           = true;
-        // public float gradientLogDarknessBias   = -12.0f;
-        // public float gradientSensitivity       = 8.0f;
-        // public float confidenceHistoryLength   = 0.75f;
 
         public ReGIRDynamicParameters regirDynamicParams = ReGIRDynamicParameters.Default();
 

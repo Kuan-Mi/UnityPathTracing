@@ -3,15 +3,11 @@
 
 #include "Assets/Shaders/RayTracing/RtxdiApplicationBridge/RtxdiApplicationBridge.hlsl"
 #include <Assets/Shaders/RTXDI/DI/Reservoir.hlsl>
+#include "Assets/Shaders/RayTracing/ShadingHelpers.hlsl"
 
 
 #pragma max_recursion_depth 1
 
-
-float3 DemodulateSpecular(float3 surfaceSpecularF0, float3 specular)
-{
-    return specular / max(0.01, surfaceSpecularF0);
-}
 
 //========================================================================================
 // MAIN
@@ -230,8 +226,6 @@ void MainRayGenShader()
 
         gOut_DirectLighting[pixelPosition] += finalColor;
         
-        
-        // StoreShadingOutput(GlobalIndex, pixelPosition,
-        //     surface.viewDepth, surface.material.roughness, diffuse, specular, geometryProps0.hitT, !g_Const.enableBrdfAdditiveBlend, !g_Const.enableBrdfIndirect);
+        StoreShadingOutput(finalColor,pixelPosition,!g_Const.enableBrdfAdditiveBlend, !g_Const.enableBrdfIndirect);
     }
 }

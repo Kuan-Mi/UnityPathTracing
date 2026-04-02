@@ -239,6 +239,45 @@ namespace PathTracing
         }
 
 
+        public struct RenderSettings
+        {
+            public uint denoiserMode;
+
+            public bool enablePreviousTLAS;
+            public bool enableAlphaTestedGeometry;
+            public bool enableTransparentGeometry;
+            public bool enableRayCounts;
+            public bool visualizeRegirCells;
+
+            public bool  enableGradients;
+            public float gradientLogDarknessBias;
+            public float gradientSensitivity;
+            public float confidenceHistoryLength;
+
+            public BRDFPathTracing_Parameters brdfptParams;
+
+            public static RenderSettings Default()
+            {
+                return new RenderSettings
+                {
+                    denoiserMode = 0,
+
+                    enablePreviousTLAS        = true,
+                    enableAlphaTestedGeometry = true,
+                    enableTransparentGeometry = true,
+                    enableRayCounts           = true,
+                    visualizeRegirCells       = false,
+
+                    enableGradients         = true,
+                    gradientLogDarknessBias = -12.0f,
+                    gradientSensitivity     = 8.0f,
+                    confidenceHistoryLength = 0.75f,
+
+                    brdfptParams = BRDFPathTracing_Parameters.Default()
+                };
+            }
+        }
+
         public override void AddRenderPasses(ScriptableRenderer renderer, ref RenderingData renderingData)
         {
             var cam = renderingData.cameraData.camera;
@@ -343,14 +382,36 @@ namespace PathTracing
             _globalConstantsArray[0] = globalConstants;
             _constantBuffer.SetData(_globalConstantsArray);
 
-            resamplingConstants          = GetResamplingConstants(isContext, frameState);
-            _resamplingConstantsArray[0] = resamplingConstants;
-            _resamplingConstantBuffer.SetData(_resamplingConstantsArray);
+
+            var lightingSettings = setting.lightingSettings;
+            lightingSettings.enablePreviousTLAS        = false;
+            lightingSettings.enableAlphaTestedGeometry = false;
+            lightingSettings.enableTransparentGeometry = false;
+
+            lightingSettings.denoiserMode    = 0;
+            lightingSettings.enableGradients = false;
+
+            bool checkerboard = false;
+
+            bool enableDirectReStirPass    = setting.directLightingMode == DirectLightingMode.ReStir;
+            bool enableBrdfAndIndirectPass = setting.directLightingMode == DirectLightingMode.Brdf || setting.indirectLightingMode != IndirectLightingMode.None;
+            bool enableIndirect            = setting.indirectLightingMode != IndirectLightingMode.None;
+
+
+            ReSTIRDI_ShadingParameters restirDIShadingParams = isContext.GetReSTIRDIContext().GetShadingParameters();
+            restirDIShadingParams.enableDenoiserInputPacking = !enableIndirect ? 1u : 0u;
+            isContext.GetReSTIRDIContext().SetShadingParameters(restirDIShadingParams);
+
+            if (!enableDirectReStirPass)
+            {
+                lightingSettings.brdfptParams.enableSecondaryResampling = 0u;
+                lightingSettings.enableGradients                        = false;
+            }
 
 
             #region prepareLight
 
-            if (setting.prepareLight)
+            if (enableDirectReStirPass || enableIndirect)
             {
                 _prepareLightResources.SetBuffer(_gpuScene);
                 _prepareLightResources.SendTexture(_gpuScene.globalTexturePool);
@@ -358,19 +419,31 @@ namespace PathTracing
                 renderer.EnqueuePass(_prepareLightPass);
             }
 
+
+            bool enableReSTIRGI = setting.indirectLightingMode == IndirectLightingMode.ReStirGI;
+
+            bool enableAdditiveBlend    = enableDirectReStirPass;
+            bool enableEmissiveSurfaces = setting.directLightingMode == DirectLightingMode.Brdf;
+            bool enableAccumulation     = false;
+
+            resamplingConstants = GetResamplingConstants(isContext, lightingSettings, frameState, enableIndirect, enableAdditiveBlend, enableEmissiveSurfaces, enableAccumulation, enableReSTIRGI);
+
+            _resamplingConstantsArray[0] = resamplingConstants;
+            _resamplingConstantBuffer.SetData(_resamplingConstantsArray);
+
             #endregion
 
-            bool isOddFrame        = (curFrame % 2) == 1;
-            var  viewDepth         = isOddFrame ? pool.GetRT(RenderResourceType.RtxdiViewDepth) : pool.GetRT(RenderResourceType.RtxdiPrevViewDepth);
-            var  diffuseAlbedo     = isOddFrame ? pool.GetRT(RenderResourceType.RtxdiDiffuseAlbedo) : pool.GetRT(RenderResourceType.RtxdiPrevDiffuseAlbedo);
-            var  specularRough     = isOddFrame ? pool.GetRT(RenderResourceType.RtxdiSpecularRough) : pool.GetRT(RenderResourceType.RtxdiPrevSpecularRough);
-            var  normals           = isOddFrame ? pool.GetRT(RenderResourceType.RtxdiNormals) : pool.GetRT(RenderResourceType.RtxdiPrevNormals);
-            var  geoNormals        = isOddFrame ? pool.GetRT(RenderResourceType.RtxdiGeoNormals) : pool.GetRT(RenderResourceType.RtxdiPrevGeoNormals);
-            var  prevViewDepth     = isOddFrame ? pool.GetRT(RenderResourceType.RtxdiPrevViewDepth) : pool.GetRT(RenderResourceType.RtxdiViewDepth);
-            var  prevDiffuseAlbedo = isOddFrame ? pool.GetRT(RenderResourceType.RtxdiPrevDiffuseAlbedo) : pool.GetRT(RenderResourceType.RtxdiDiffuseAlbedo);
-            var  prevSpecularRough = isOddFrame ? pool.GetRT(RenderResourceType.RtxdiPrevSpecularRough) : pool.GetRT(RenderResourceType.RtxdiSpecularRough);
-            var  prevNormals       = isOddFrame ? pool.GetRT(RenderResourceType.RtxdiPrevNormals) : pool.GetRT(RenderResourceType.RtxdiNormals);
-            var  prevGeoNormals    = isOddFrame ? pool.GetRT(RenderResourceType.RtxdiPrevGeoNormals) : pool.GetRT(RenderResourceType.RtxdiGeoNormals);
+            var isOddFrame        = (curFrame % 2) == 1;
+            var viewDepth         = isOddFrame ? pool.GetRT(RenderResourceType.RtxdiViewDepth) : pool.GetRT(RenderResourceType.RtxdiPrevViewDepth);
+            var diffuseAlbedo     = isOddFrame ? pool.GetRT(RenderResourceType.RtxdiDiffuseAlbedo) : pool.GetRT(RenderResourceType.RtxdiPrevDiffuseAlbedo);
+            var specularRough     = isOddFrame ? pool.GetRT(RenderResourceType.RtxdiSpecularRough) : pool.GetRT(RenderResourceType.RtxdiPrevSpecularRough);
+            var normals           = isOddFrame ? pool.GetRT(RenderResourceType.RtxdiNormals) : pool.GetRT(RenderResourceType.RtxdiPrevNormals);
+            var geoNormals        = isOddFrame ? pool.GetRT(RenderResourceType.RtxdiGeoNormals) : pool.GetRT(RenderResourceType.RtxdiPrevGeoNormals);
+            var prevViewDepth     = isOddFrame ? pool.GetRT(RenderResourceType.RtxdiPrevViewDepth) : pool.GetRT(RenderResourceType.RtxdiViewDepth);
+            var prevDiffuseAlbedo = isOddFrame ? pool.GetRT(RenderResourceType.RtxdiPrevDiffuseAlbedo) : pool.GetRT(RenderResourceType.RtxdiDiffuseAlbedo);
+            var prevSpecularRough = isOddFrame ? pool.GetRT(RenderResourceType.RtxdiPrevSpecularRough) : pool.GetRT(RenderResourceType.RtxdiSpecularRough);
+            var prevNormals       = isOddFrame ? pool.GetRT(RenderResourceType.RtxdiPrevNormals) : pool.GetRT(RenderResourceType.RtxdiNormals);
+            var prevGeoNormals    = isOddFrame ? pool.GetRT(RenderResourceType.RtxdiPrevGeoNormals) : pool.GetRT(RenderResourceType.RtxdiGeoNormals);
 
             var rtxdiCtx = new RtxdiPassContext
             {
@@ -396,7 +469,7 @@ namespace PathTracing
                 ResolutionScale          = setting.resolutionScale,
             };
 
-            #region gBuffer Pass
+            #region GBuffer
 
             if (setting.useRasterGBuffer)
             {
@@ -412,10 +485,10 @@ namespace PathTracing
 
             #endregion
 
+            #region PreSample
 
             _pdfTexturePass.Setup(rtxdiCtx);
             renderer.EnqueuePass(_pdfTexturePass);
-
 
             _generateMipsPass.Setup(rtxdiCtx);
             renderer.EnqueuePass(_generateMipsPass);
@@ -423,8 +496,9 @@ namespace PathTracing
             if (setting.initialSamplingParams.localLightSamplingMode != ReSTIRDI_LocalLightSamplingMode.Uniform)
             {
                 var RTXDI_PRESAMPLING_GROUP_SIZE = 256;
-                var x                            = (isContext.GetLocalLightRISBufferSegmentParams().tileSize + RTXDI_PRESAMPLING_GROUP_SIZE - 1) / RTXDI_PRESAMPLING_GROUP_SIZE;
-                var y                            = isContext.GetLocalLightRISBufferSegmentParams().tileCount;
+
+                var x = (isContext.GetLocalLightRISBufferSegmentParams().tileSize + RTXDI_PRESAMPLING_GROUP_SIZE - 1) / RTXDI_PRESAMPLING_GROUP_SIZE;
+                var y = isContext.GetLocalLightRISBufferSegmentParams().tileCount;
 
                 _presamplePass.Setup(rtxdiCtx, (int)x, (int)y);
                 renderer.EnqueuePass(_presamplePass);
@@ -441,58 +515,75 @@ namespace PathTracing
                 renderer.EnqueuePass(_presampleReGirLightsPass);
             }
 
-            // GenerateInitialSamplesPass
-            _generateInitialSamplesPass.Setup(rtxdiCtx, setting.useComputeForGis);
-            renderer.EnqueuePass(_generateInitialSamplesPass);
+            #endregion
 
-            // TemporalResamplingPass
-            if (setting.diResamplingMode is ReSTIRDI_ResamplingMode.Temporal or ReSTIRDI_ResamplingMode.TemporalAndSpatial)
+            #region DI
+
+            if (enableDirectReStirPass)
             {
-                _temporalResamplingPass.Setup(rtxdiCtx, setting.useComputeForTemporalResampling);
-                renderer.EnqueuePass(_temporalResamplingPass);
+                // GenerateInitialSamplesPass
+                _generateInitialSamplesPass.Setup(rtxdiCtx, setting.useComputeForGis);
+                renderer.EnqueuePass(_generateInitialSamplesPass);
+
+                // TemporalResamplingPass
+                if (setting.diResamplingMode is ReSTIRDI_ResamplingMode.Temporal or ReSTIRDI_ResamplingMode.TemporalAndSpatial)
+                {
+                    _temporalResamplingPass.Setup(rtxdiCtx, setting.useComputeForTemporalResampling);
+                    renderer.EnqueuePass(_temporalResamplingPass);
+                }
+
+                // SpatialResamplingPass
+                if (setting.diResamplingMode is ReSTIRDI_ResamplingMode.Spatial or ReSTIRDI_ResamplingMode.TemporalAndSpatial)
+                {
+                    _spatialResamplingPass.Setup(rtxdiCtx, setting.useComputeForSpatialResampling);
+                    renderer.EnqueuePass(_spatialResamplingPass);
+                }
+
+                // ShadeSamplesPass
+                _shadeSamplesPass.Setup(rtxdiCtx, setting.enableFinalShading, setting.useComputeForShadeSamples);
+                renderer.EnqueuePass(_shadeSamplesPass);
             }
 
-            // SpatialResamplingPass
-            if (setting.diResamplingMode is ReSTIRDI_ResamplingMode.Spatial or ReSTIRDI_ResamplingMode.TemporalAndSpatial)
+            #endregion
+
+            #region GI
+
+            if (enableBrdfAndIndirectPass)
             {
-                _spatialResamplingPass.Setup(rtxdiCtx, setting.useComputeForSpatialResampling);
-                renderer.EnqueuePass(_spatialResamplingPass);
+                _brdfRayTracingPass.Setup(rtxdiCtx);
+                renderer.EnqueuePass(_brdfRayTracingPass);
+
+                if (enableIndirect)
+                {
+                    _shadeSecondarySurfacesPass.Setup(rtxdiCtx, setting.useComputeForShadeSecondarySurfaces);
+                    renderer.EnqueuePass(_shadeSecondarySurfacesPass);
+
+                    if (enableReSTIRGI)
+                    {
+                        // ReSTIR GI – Temporal Resampling
+                        if (setting.giResamplingMode is ReSTIRGI_ResamplingMode.Temporal or ReSTIRGI_ResamplingMode.TemporalAndSpatial)
+                        {
+                            _giTemporalResamplingPass.Setup(rtxdiCtx, setting.useComputeForGITemporalResampling);
+                            renderer.EnqueuePass(_giTemporalResamplingPass);
+                        }
+
+                        // ReSTIR GI – Spatial Resampling
+                        if (setting.giResamplingMode is ReSTIRGI_ResamplingMode.Spatial or ReSTIRGI_ResamplingMode.TemporalAndSpatial)
+                        {
+                            _giSpatialResamplingPass.Setup(rtxdiCtx, setting.useComputeForGISpatialResampling);
+                            renderer.EnqueuePass(_giSpatialResamplingPass);
+                        }
+
+                        // ReSTIR GI – Final Shading
+                        _giFinalShadingPass.Setup(rtxdiCtx, setting.enableGIFinalShading, setting.useComputeForGIFinalShading);
+                        renderer.EnqueuePass(_giFinalShadingPass);
+                    }
+                }
             }
 
-            // ShadeSamplesPass
-            _shadeSamplesPass.Setup(rtxdiCtx, setting.enableFinalShading, setting.useComputeForShadeSamples);
-            renderer.EnqueuePass(_shadeSamplesPass);
+            #endregion
 
-
-            // GI
-
-            _brdfRayTracingPass.Setup(rtxdiCtx);
-            renderer.EnqueuePass(_brdfRayTracingPass);
-
-            _shadeSecondarySurfacesPass.Setup(rtxdiCtx, setting.useComputeForShadeSecondarySurfaces);
-            renderer.EnqueuePass(_shadeSecondarySurfacesPass);
-
-
-            // ReSTIR GI – Temporal Resampling
-            if (setting.giResamplingMode is ReSTIRGI_ResamplingMode.Temporal or ReSTIRGI_ResamplingMode.TemporalAndSpatial)
-            {
-                _giTemporalResamplingPass.Setup(rtxdiCtx, setting.useComputeForGITemporalResampling);
-                renderer.EnqueuePass(_giTemporalResamplingPass);
-            }
-
-            // ReSTIR GI – Spatial Resampling
-            if (setting.giResamplingMode is ReSTIRGI_ResamplingMode.Spatial or ReSTIRGI_ResamplingMode.TemporalAndSpatial)
-            {
-                _giSpatialResamplingPass.Setup(rtxdiCtx, setting.useComputeForGISpatialResampling);
-                renderer.EnqueuePass(_giSpatialResamplingPass);
-            }
-
-            // ReSTIR GI – Final Shading
-            {
-                _giFinalShadingPass.Setup(rtxdiCtx, setting.enableGIFinalShading, setting.useComputeForGIFinalShading);
-                renderer.EnqueuePass(_giFinalShadingPass);
-            }
-
+            #region DLSS
 
             var dlrrRes = new DlrrDenoiser.DlrrResources
             {
@@ -536,6 +627,8 @@ namespace PathTracing
 
             _dlssrrPass.Setup(dlssDataPtr, dlssSettings);
             renderer.EnqueuePass(_dlssrrPass);
+
+            #endregion
 
             var outputBlitResource = new OutputBlitPass.Resource
             {
@@ -644,15 +737,15 @@ namespace PathTracing
             ReGIRParams.onionParams.cubicRootFactor = regirContext.GetReGIROnionCalculatedParameters().regirOnionCubicRootFactor;
         }
 
-        private void FillResamplingConstants(ref ResamplingConstants constants, ImportanceSamplingContext isContext)
+        private void FillResamplingConstants(ref ResamplingConstants constants, RenderSettings localSettings, ImportanceSamplingContext isContext)
         {
             // RTXDI_LightBufferParameters lightBufferParameters = isContext.GetLightBufferParameters();
 
-            constants.enablePreviousTLAS = 0u;
-            constants.denoiserMode       = setting.denoiserMode;
+            constants.enablePreviousTLAS = localSettings.denoiserMode;
+            constants.denoiserMode       = localSettings.denoiserMode;
             // constants.sceneConstants.enableAlphaTestedGeometry = lightingSettings.enableAlphaTestedGeometry;
             // constants.sceneConstants.enableTransparentGeometry = lightingSettings.enableTransparentGeometry;
-            constants.visualizeRegirCells = setting.visualizeRegirCells ? 1u : 0u;
+            constants.visualizeRegirCells = localSettings.visualizeRegirCells ? 1u : 0u;
 
             constants.lightBufferParams                      = isContext.GetLightBufferParameters();
             constants.localLightsRISBufferSegmentParams      = isContext.GetLocalLightRISBufferSegmentParams();
@@ -674,7 +767,7 @@ namespace PathTracing
             // m_currentFrameOutputReservoir = isContext.GetReSTIRDIContext().GetBufferIndices().shadingInputBufferIndex;
         }
 
-        private void FillBRDFPTConstants(ref BRDFPathTracing_Parameters constants, RTXDI_LightBufferParameters getLightBufferParameters)
+        private void FillBRDFPTConstants(ref BRDFPathTracing_Parameters constants, RenderSettings localSettings, RTXDI_LightBufferParameters getLightBufferParameters)
         {
             constants = setting.brdfptParams;
 
@@ -689,8 +782,14 @@ namespace PathTracing
 
 
         private ResamplingConstants GetResamplingConstants(
-            ImportanceSamplingContext isContext
-            , CameraFrameState frameState)
+            ImportanceSamplingContext isContext,
+            RenderSettings localSettings,
+            CameraFrameState frameState,
+            bool enableIndirect,
+            bool enableAdditiveBlend,
+            bool enableEmissiveSurfaces,
+            bool enableAccumulation,
+            bool enableReSTIRGI)
         {
             var restirDIContext = isContext.GetReSTIRDIContext();
             var restirGIContext = isContext.GetReSTIRGIContext();
@@ -721,11 +820,11 @@ namespace PathTracing
             var constants = new ResamplingConstants();
 
             constants.frameIndex   = restirDIContext.GetFrameIndex();
-            constants.denoiserMode = setting.denoiserMode;
+            constants.denoiserMode = localSettings.denoiserMode;
 
-            constants.enableBrdfIndirect      = setting.enableBrdfIndirect ? 1u : 0u;
-            constants.enableBrdfAdditiveBlend = setting.enableBrdfAdditiveBlend ? 1u : 0u;
-            constants.enableAccumulation      = 0;
+            constants.enableBrdfIndirect      = enableIndirect ? 1u : 0u;
+            constants.enableBrdfAdditiveBlend = enableAdditiveBlend ? 1u : 0u;
+            constants.enableAccumulation      = enableAccumulation ? 1u : 0u;
 
             // constants.sceneConstants.enableEnvironmentMap = (environmentLight.textureIndex >= 0);
             // constants.sceneConstants.environmentMapTextureIndex = (environmentLight.textureIndex >= 0) ? environmentLight.textureIndex : 0;
@@ -733,15 +832,16 @@ namespace PathTracing
             // constants.sceneConstants.environmentRotation = environmentLight.rotation;
 
 
-            FillResamplingConstants(ref constants, isContext);
-            FillBRDFPTConstants(ref constants.brdfPT, isContext.GetLightBufferParameters());
+            FillResamplingConstants(ref constants, localSettings, isContext);
+            FillBRDFPTConstants(ref constants.brdfPT, localSettings, isContext.GetLightBufferParameters());
 
             constants.brdfPT = setting.brdfptParams;
 
+            constants.brdfPT.enableIndirectEmissiveSurfaces = enableEmissiveSurfaces ? 1u : 0u;
+            constants.brdfPT.enableReSTIRGI                 = enableReSTIRGI ? 1u : 0u;
 
             // ReSTIRGI_BufferIndices restirGIBufferIndices = restirGIContext.GetBufferIndices();
             // m_currentFrameGIOutputReservoir = restirGIBufferIndices.finalShadingInputBufferIndex;
-
 
             return constants;
         }

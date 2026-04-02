@@ -1,4 +1,3 @@
-
 #ifndef SHADING_HELPERS_HLSLI
 #define SHADING_HELPERS_HLSLI
 
@@ -87,5 +86,22 @@ float3 DemodulateSpecular(float3 surfaceSpecularF0, float3 specular)
     return specular / max(0.01, surfaceSpecularF0);
 }
 
+
+void StoreShadingOutput(
+    float3 finalColor,
+    uint2 pixelPosition,
+    bool isFirstPass,
+    bool isLastPass)
+{
+    if (!isFirstPass)
+    {
+        float3 priorLight = gOut_DirectLighting[pixelPosition];
+        
+        finalColor += priorLight;
+        
+    }
+    
+    gOut_DirectLighting[pixelPosition] = finalColor;
+}
 
 #endif // SHADING_HELPERS_HLSLI
