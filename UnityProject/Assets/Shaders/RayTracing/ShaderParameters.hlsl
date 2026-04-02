@@ -10,7 +10,14 @@
 #ifdef USE_FULL_RAY
 #include <Assets/Shaders/Include/RayTracingShared.hlsl>
 #else
+
+#ifdef SECONDARY_SURFACE_PAYLOAD
+
+#else
+
 #include <Assets/Shaders/Include/LightRayTracingShared.hlsl>
+#endif
+
 #endif
 
 #include <Assets/Shaders/Rtxdi/DI/ReSTIRDIParameters.h>

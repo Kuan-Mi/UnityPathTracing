@@ -23,6 +23,7 @@ SplitBrdf EvaluateBrdf(RAB_Surface surface, float3 samplePosition)
     return brdf;
 }
 
+#ifndef SECONDARY_SURFACE_PAYLOAD
 bool ShadeSurfaceWithLightSample(
     inout RTXDI_DIReservoir reservoir,
     RAB_Surface surface,
@@ -80,6 +81,10 @@ bool ShadeSurfaceWithLightSample(
 
     return needToStore;
 }
+
+#endif
+
+
 
 float3 DemodulateSpecular(float3 surfaceSpecularF0, float3 specular)
 {
