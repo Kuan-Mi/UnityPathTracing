@@ -32,7 +32,7 @@ namespace PathTracing
         {
             var natCmd = CommandBufferHelpers.GetNativeCommandBuffer(context.cmd);
 
-            var prepareLightMarker = new ProfilerMarker(ProfilerCategory.Render, "PrepareLight", MarkerFlags.SampleGPU);
+            var prepareLightMarker = RenderPassMarkers.PrepareLight;
 
             natCmd.BeginSample(prepareLightMarker);
             natCmd.IssuePluginEventAndData(GetRenderEventAndDataFunc(), 1, data.DataPtr);

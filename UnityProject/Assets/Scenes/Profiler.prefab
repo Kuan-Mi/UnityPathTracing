@@ -45,32 +45,40 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::ExampleScript
   recorderNames:
+  - PrepareLight
+  - PdfTexture
+  - GenerateMips
+  - Presample
+  - Regir
+  - GBuffer Ray
+  - GBuffer Raster
+  - GenInitialSamples_CS
+  - GenInitialSamples
+  - DITemporalResampling_CS
+  - DITemporalResampling
+  - DISpatialResampling_CS
+  - DISpatialResampling
+  - DIShadeSamples_CS
+  - DIShadeSamples
+  - BrdfRayTracing
+  - ShadeSecondarySurfaces
+  - GITemporalResampling_CS
+  - GITemporalResampling
+  - GISpatialResampling_CS
+  - GISpatialResampling
+  - GIFinalShading_CS
+  - GIFinalShading
+  - Opaque Tracing
+  - Transparent Tracing
+  - Reference Pt Tracing
   - Sharc Update
   - Sharc Resolve
-  - PrepareLight
-  - GBuffer
-  - GBuffer Raster
-  - Opaque Tracing
-  - pdfTexture
-  - RtxdiGenerateMips
-  - PresamplePass
-  - PresampleReGir
-  - GenInitialSamples
-  - GenInitialSamples_Compute
-  - TemporalResampling
-  - TemporalResampling_Compute
-  - SpatialResampling
-  - SpatialResampling_Compute
-  - ShadeSamples
-  - ShadeSamples_Compute
-  - Copy GBuffer to Prev
   - NRD Denoise
-  - Composition
-  - Auto Exposure
-  - Transparent Tracing
-  - TAA
   - DLSS Before
   - DLSS Denoise
-  - Reference Pt Tracing
+  - Composition
+  - Acc
+  - Auto Exposure
+  - TAA
   - Output Blit
   averageWindowSeconds: 1

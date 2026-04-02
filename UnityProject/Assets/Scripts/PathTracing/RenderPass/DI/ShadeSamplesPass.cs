@@ -50,7 +50,7 @@ namespace PathTracing
 
             if (data.UseCompute)
             {
-                var marker = new ProfilerMarker(ProfilerCategory.Render, "ShadeSamples_Compute", MarkerFlags.SampleGPU);
+                var marker = RenderPassMarkers.ShadeSamplesCompute;
                 natCmd.BeginSample(marker);
 
                 var cs = data.ComputeShader;
@@ -88,7 +88,7 @@ namespace PathTracing
             }
             else
             {
-                var marker = new ProfilerMarker(ProfilerCategory.Render, "ShadeSamples", MarkerFlags.SampleGPU);
+                var marker = RenderPassMarkers.ShadeSamples;
                 natCmd.BeginSample(marker);
 
                 natCmd.SetRayTracingShaderPass(data.RtShader, "RTXDI");

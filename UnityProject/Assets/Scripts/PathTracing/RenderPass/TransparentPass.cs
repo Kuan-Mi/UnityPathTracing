@@ -69,7 +69,7 @@ namespace PathTracing
             var natCmd = CommandBufferHelpers.GetNativeCommandBuffer(context.cmd);
 
 
-            var transparentTracingMarker = new ProfilerMarker(ProfilerCategory.Render, "Transparent Tracing", MarkerFlags.SampleGPU);
+            var transparentTracingMarker = RenderPassMarkers.TransparentTracing;
             natCmd.BeginSample(transparentTracingMarker);
 
             natCmd.SetRayTracingShaderPass(data.TransparentTs, "Test2");

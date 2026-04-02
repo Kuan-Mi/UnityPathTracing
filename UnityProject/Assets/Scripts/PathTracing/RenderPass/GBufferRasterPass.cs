@@ -151,7 +151,7 @@ namespace PathTracing
         // ── ExecutePass ───────────────────────────────────────────────────────
         private static void ExecutePass(PassData data, RasterGraphContext context)
         {
-            var marker = new ProfilerMarker(ProfilerCategory.Render, "GBuffer Raster", MarkerFlags.SampleGPU);
+            var marker = RenderPassMarkers.GBufferRaster;
             context.cmd.BeginSample(marker);
             // Bind GlobalConstants so Shared.hlsl globals are available.
             context.cmd.SetGlobalConstantBuffer(

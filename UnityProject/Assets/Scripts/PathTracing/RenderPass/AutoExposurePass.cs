@@ -66,7 +66,7 @@ namespace PathTracing
             
             var natCmd = CommandBufferHelpers.GetNativeCommandBuffer(context.cmd);
             
-            var aeMarker = new ProfilerMarker(ProfilerCategory.Render, "Auto Exposure", MarkerFlags.SampleGPU);
+            var aeMarker = RenderPassMarkers.AutoExposure;
             
             
             // ── Auto-exposure: histogram build + reduce (after transparent, before TAA) ──

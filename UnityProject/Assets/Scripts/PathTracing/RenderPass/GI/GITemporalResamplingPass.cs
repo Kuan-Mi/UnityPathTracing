@@ -46,7 +46,7 @@ namespace PathTracing
 
             if (data.UseCompute)
             {
-                var marker = new ProfilerMarker(ProfilerCategory.Render, "GITemporalResampling_Compute", MarkerFlags.SampleGPU);
+                var marker = RenderPassMarkers.GITemporalResamplingCompute;
                 natCmd.BeginSample(marker);
 
                 var cs = data.ComputeShader;
@@ -82,7 +82,7 @@ namespace PathTracing
             }
             else
             {
-                var marker = new ProfilerMarker(ProfilerCategory.Render, "GITemporalResampling", MarkerFlags.SampleGPU);
+                var marker = RenderPassMarkers.GITemporalResampling;
                 natCmd.BeginSample(marker);
 
                 var shader = data.RtShader;

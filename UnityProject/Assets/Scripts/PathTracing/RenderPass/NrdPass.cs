@@ -29,7 +29,7 @@ namespace PathTracing
         {
             var natCmd = CommandBufferHelpers.GetNativeCommandBuffer(context.cmd);
 
-            var nrdDenoiseMarker = new ProfilerMarker(ProfilerCategory.Render, "NRD Denoise", MarkerFlags.SampleGPU);
+            var nrdDenoiseMarker = RenderPassMarkers.NrdDenoise;
 
             natCmd.BeginSample(nrdDenoiseMarker);
             natCmd.IssuePluginEventAndData(GetRenderEventAndDataFunc(), 1, data.DataPtr);

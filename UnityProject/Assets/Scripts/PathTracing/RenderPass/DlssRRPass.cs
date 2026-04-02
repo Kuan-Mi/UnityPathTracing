@@ -50,7 +50,7 @@ namespace PathTracing
         {
             var natCmd = CommandBufferHelpers.GetNativeCommandBuffer(context.cmd);
 
-            var dlssDenoiseMarker = new ProfilerMarker(ProfilerCategory.Render, "DLSS Denoise", MarkerFlags.SampleGPU);
+            var dlssDenoiseMarker = RenderPassMarkers.DlssDenoise;
 
             // DLSS调用
 

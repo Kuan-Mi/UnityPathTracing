@@ -22,7 +22,7 @@ MonoBehaviour:
     enableBrdfAdditiveBlend: 0
     useRasterGBuffer: 1
     debugRtxdi: 1
-    useComputeForGIS: 0
+    useComputeForGIS: 1
     useComputeForTemporalResampling: 1
     useComputeForSpatialResampling: 1
     useComputeForShadeSamples: 1
@@ -103,9 +103,9 @@ MonoBehaviour:
     regirDynamicParams:
       regirCellSize: 1
       center:
-        x: -4.5565853
-        y: 3.5850973
-        z: -25.1345
+        x: -10.6473675
+        y: 9.068141
+        z: -12.20344
       fallbackSamplingMode: 1
       presamplingMode: 1
       regirSamplingJitter: 1

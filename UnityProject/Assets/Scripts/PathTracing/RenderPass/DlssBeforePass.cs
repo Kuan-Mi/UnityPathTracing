@@ -67,7 +67,7 @@ namespace PathTracing
         {
             var natCmd = CommandBufferHelpers.GetNativeCommandBuffer(context.cmd);
 
-            var dlssBeforeMarker = new ProfilerMarker(ProfilerCategory.Render, "DLSS Before", MarkerFlags.SampleGPU);
+            var dlssBeforeMarker = RenderPassMarkers.DlssBefore;
             
             // dlss Before
             natCmd.BeginSample(dlssBeforeMarker);
