@@ -14,7 +14,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::PathTracing.RtxdiFeature
   m_Active: 1
   setting:
-    exposureEv: 5.06
+    exposureEv: 0
     cameraJitter: 1
     showMode: 18
     showMv: 0
@@ -64,14 +64,14 @@ MonoBehaviour:
     indirectLightingMode: 2
     enableGIFinalShading: 1
     enableDIFinalShading: 1
-    enableEnv: 1
+    enableEnv: 0
     gShowLight: 0
     regirDynamicParams:
       regirCellSize: 1
       center:
-        x: 15.138254
-        y: 11.790981
-        z: 5.9830174
+        x: 17.690056
+        y: 7.06975
+        z: -2.8758888
       fallbackSamplingMode: 1
       presamplingMode: 1
       regirSamplingJitter: 1
@@ -88,11 +88,11 @@ MonoBehaviour:
     diResamplingMode: 3
     initialSamplingParams:
       numPrimaryLocalLightSamples: 8
-      numPrimaryInfiniteLightSamples: 0
+      numPrimaryInfiniteLightSamples: 1
       numPrimaryEnvironmentSamples: 0
       numPrimaryBrdfSamples: 1
       brdfCutoff: 0.0001
-      enableInitialVisibility: 0
+      enableInitialVisibility: 1
       environmentMapImportanceSampling: 0
       localLightSamplingMode: 2
     temporalResamplingParams:
@@ -332,7 +332,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::PathTracing.PathTracingFeature
   m_Active: 0
   pathTracingSetting:
-    exposureEv: 6.18
+    exposureEv: 0
     cameraJitter: 1
     showMode: 18
     showMv: 0

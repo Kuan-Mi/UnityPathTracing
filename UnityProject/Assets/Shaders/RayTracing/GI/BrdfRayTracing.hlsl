@@ -206,11 +206,14 @@ void MainRayGenShader()
     }
     else
     {
+        // todo why?
         // if (g_Const.sceneConstants.enableEnvironmentMap && includeEmissiveComponent)
-        // {
-        //     float3 environmentRadiance = GetEnvironmentRadiance(ray.Direction);
-        //     radiance += environmentRadiance;
-        // }
+        // if (includeEmissiveComponent)
+        {
+            // float3 environmentRadiance = GetEnvironmentRadiance(ray.Direction);
+            float3 environmentRadiance = GetSkyIntensity(ray.Direction);
+            radiance += environmentRadiance;
+        }
 
         secondarySurface.position = ray.Origin + ray.Direction * DISTANT_LIGHT_DISTANCE;
         secondarySurface.normal = -ray.Direction;
