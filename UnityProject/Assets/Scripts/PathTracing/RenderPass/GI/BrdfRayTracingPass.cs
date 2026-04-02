@@ -42,7 +42,7 @@ namespace PathTracing
 
             var ctx = data.Context;
 
-            natCmd.SetRayTracingShaderPass(data.gBufferTs, "Test2");
+            natCmd.SetRayTracingShaderPass(data.gBufferTs, "SecondSurface");
             natCmd.SetRayTracingConstantBufferParam(data.gBufferTs, paramsID, ctx.ConstantBuffer, 0, ctx.ConstantBuffer.stride);
             natCmd.SetRayTracingBufferParam(data.gBufferTs, ResampleConstantsID, ctx.ResamplingConstantBuffer);
 
