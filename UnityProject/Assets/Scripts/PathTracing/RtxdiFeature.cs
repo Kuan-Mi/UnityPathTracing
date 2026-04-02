@@ -501,67 +501,50 @@ namespace PathTracing
                 renderer.EnqueuePass(_presampleReGirLightsPass);
             }
 
-            // GenerateInitialSamplesPass
-            _generateInitialSamplesPass.Setup(
-                _constantBuffer,
-                _resamplingConstantBuffer,
-                _gpuScene._geometryInstanceToLight,
-                viewDepth, diffuseAlbedo, specularRough, normals, geoNormals,
-                pool.GetRT(RenderResourceType.DirectLighting),
-                _gpuScene.localLightPdfTexture,
-                rtxdiResources,
-                new int2(cam.pixelWidth, cam.pixelHeight),
-                pathTracingSetting.resolutionScale,
-                pathTracingSetting.useComputeForGIS);
-            renderer.EnqueuePass(_generateInitialSamplesPass);
+            var rtxdiCtx = new RtxdiPassContext
+            {
+                ConstantBuffer = _constantBuffer,
+                ResamplingConstantBuffer = _resamplingConstantBuffer,
+                GeometryInstanceToLight = _gpuScene._geometryInstanceToLight,
+                ViewDepth = viewDepth,
+                DiffuseAlbedo = diffuseAlbedo,
+                SpecularRough = specularRough,
+                Normals = normals,
+                GeoNormals = geoNormals,
+                PrevViewDepth = prevViewDepth,
+                PrevDiffuseAlbedo = prevDiffuseAlbedo,
+                PrevSpecularRough = prevSpecularRough,
+                PrevNormals = prevNormals,
+                PrevGeoNormals = prevGeoNormals,
+                DirectLighting = pool.GetRT(RenderResourceType.DirectLighting),
+                Emissive = pool.GetRT(RenderResourceType.RtxdiEmissive),
+                MotionVectors = pool.GetRT(RenderResourceType.RtxdiMotionVectors),
+                LocalLightPdfTexture = _gpuScene.localLightPdfTexture,
+                RtxdiResources = rtxdiResources,
+                RenderResolution = new int2(cam.pixelWidth, cam.pixelHeight),
+                ResolutionScale = pathTracingSetting.resolutionScale,
+            };
 
+            // GenerateInitialSamplesPass
+            _generateInitialSamplesPass.Setup(rtxdiCtx, pathTracingSetting.useComputeForGIS);
+            renderer.EnqueuePass(_generateInitialSamplesPass);
 
             // TemporalResamplingPass
             if (pathTracingSetting.enableTemporalResampling)
             {
-                _temporalResamplingPass.Setup(
-                    _constantBuffer,
-                    _resamplingConstantBuffer,
-                    pool.GetRT(RenderResourceType.RtxdiMotionVectors),
-                    pool.GetRT(RenderResourceType.DirectLighting),
-                    viewDepth, diffuseAlbedo, specularRough, normals, geoNormals,
-                    prevViewDepth, prevDiffuseAlbedo, prevSpecularRough, prevNormals, prevGeoNormals,
-                    rtxdiResources,
-                    new int2(cam.pixelWidth, cam.pixelHeight),
-                    pathTracingSetting.resolutionScale,
-                    pathTracingSetting.useComputeForTemporalResampling);
+                _temporalResamplingPass.Setup(rtxdiCtx, pathTracingSetting.useComputeForTemporalResampling);
                 renderer.EnqueuePass(_temporalResamplingPass);
             }
-
 
             // SpatialResamplingPass
             if (pathTracingSetting.enableSpatialResampling)
             {
-                _spatialResamplingPass.Setup(
-                    _constantBuffer,
-                    _resamplingConstantBuffer,
-                    viewDepth, diffuseAlbedo, specularRough, normals, geoNormals,
-                    rtxdiResources,
-                    new int2(cam.pixelWidth, cam.pixelHeight),
-                    pathTracingSetting.resolutionScale,
-                    pathTracingSetting.useComputeForSpatialResampling);
+                _spatialResamplingPass.Setup(rtxdiCtx, pathTracingSetting.useComputeForSpatialResampling);
                 renderer.EnqueuePass(_spatialResamplingPass);
             }
 
-
             // ShadeSamplesPass
-            _shadeSamplesPass.Setup(
-                _constantBuffer,
-                _resamplingConstantBuffer,
-                _gpuScene._geometryInstanceToLight,
-                viewDepth, diffuseAlbedo, specularRough, normals, geoNormals,
-                pool.GetRT(RenderResourceType.DirectLighting),
-                pool.GetRT(RenderResourceType.RtxdiEmissive),
-                rtxdiResources,
-                new int2(cam.pixelWidth, cam.pixelHeight),
-                pathTracingSetting.resolutionScale,
-                pathTracingSetting.enableFinalShading,
-                pathTracingSetting.useComputeForShadeSamples);
+            _shadeSamplesPass.Setup(rtxdiCtx, pathTracingSetting.enableFinalShading, pathTracingSetting.useComputeForShadeSamples);
             renderer.EnqueuePass(_shadeSamplesPass);
 
 
@@ -617,45 +600,20 @@ namespace PathTracing
             // ReSTIR GI – Temporal Resampling
             if (pathTracingSetting.enableGITemporalResampling)
             {
-                _giTemporalResamplingPass.Setup(
-                    _constantBuffer,
-                    _resamplingConstantBuffer,
-                    pool.GetRT(RenderResourceType.RtxdiMotionVectors),
-                    viewDepth, diffuseAlbedo, specularRough, normals, geoNormals,
-                    prevViewDepth, prevDiffuseAlbedo, prevSpecularRough, prevNormals, prevGeoNormals,
-                    rtxdiResources,
-                    new int2(cam.pixelWidth, cam.pixelHeight),
-                    pathTracingSetting.resolutionScale,
-                    pathTracingSetting.useComputeForGITemporalResampling);
+                _giTemporalResamplingPass.Setup(rtxdiCtx, pathTracingSetting.useComputeForGITemporalResampling);
                 renderer.EnqueuePass(_giTemporalResamplingPass);
             }
 
             // ReSTIR GI – Spatial Resampling
             if (pathTracingSetting.enableGISpatialResampling)
             {
-                _giSpatialResamplingPass.Setup(
-                    _constantBuffer,
-                    _resamplingConstantBuffer,
-                    viewDepth, diffuseAlbedo, specularRough, normals, geoNormals,
-                    rtxdiResources,
-                    new int2(cam.pixelWidth, cam.pixelHeight),
-                    pathTracingSetting.resolutionScale,
-                    pathTracingSetting.useComputeForGISpatialResampling);
+                _giSpatialResamplingPass.Setup(rtxdiCtx, pathTracingSetting.useComputeForGISpatialResampling);
                 renderer.EnqueuePass(_giSpatialResamplingPass);
             }
 
             // ReSTIR GI – Final Shading
             {
-                _giFinalShadingPass.Setup(
-                    _constantBuffer,
-                    _resamplingConstantBuffer,
-                    viewDepth, diffuseAlbedo, specularRough, normals, geoNormals,
-                    pool.GetRT(RenderResourceType.DirectLighting),
-                    rtxdiResources,
-                    new int2(cam.pixelWidth, cam.pixelHeight),
-                    pathTracingSetting.resolutionScale,
-                    pathTracingSetting.enableGIFinalShading,
-                    pathTracingSetting.useComputeForGIFinalShading);
+                _giFinalShadingPass.Setup(rtxdiCtx, pathTracingSetting.enableGIFinalShading, pathTracingSetting.useComputeForGIFinalShading);
                 renderer.EnqueuePass(_giFinalShadingPass);
             }
 

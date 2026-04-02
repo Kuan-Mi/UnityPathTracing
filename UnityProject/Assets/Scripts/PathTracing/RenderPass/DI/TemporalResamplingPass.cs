@@ -18,8 +18,8 @@ namespace PathTracing
 
         private readonly RayTracingShader _rtShader;
         private readonly ComputeShader _computeShader;
-        private Resource _resource;
-        private Settings _settings;
+        private RtxdiPassContext _context;
+        private bool _useCompute;
 
         public TemporalResamplingPass(RayTracingShader rtShader, ComputeShader computeShader)
         {
@@ -27,103 +27,26 @@ namespace PathTracing
             _computeShader = computeShader;
         }
 
-        public void Setup(Resource resource, Settings settings)
+        public void Setup(RtxdiPassContext ctx, bool useCompute)
         {
-            _resource = resource;
-            _settings = settings;
-        }
-
-        public void Setup(
-            GraphicsBuffer constantBuffer,
-            GraphicsBuffer resamplingConstantBuffer,
-            RTHandle mv,
-            RTHandle directLighting,
-            RTHandle viewDepth,
-            RTHandle diffuseAlbedo,
-            RTHandle specularRough,
-            RTHandle normals,
-            RTHandle geoNormals,
-            RTHandle prevViewDepth,
-            RTHandle prevDiffuseAlbedo,
-            RTHandle prevSpecularRough,
-            RTHandle prevNormals,
-            RTHandle prevGeoNormals,
-            RtxdiResources rtxdiResources,
-            int2 renderResolution,
-            float resolutionScale,
-            bool useCompute)
-        {
-            _resource = new Resource
-            {
-                ConstantBuffer = constantBuffer,
-                ResamplingConstantBuffer = resamplingConstantBuffer,
-                Mv = mv,
-                DirectLighting = directLighting,
-                ViewDepth = viewDepth,
-                DiffuseAlbedo = diffuseAlbedo,
-                SpecularRough = specularRough,
-                Normals = normals,
-                GeoNormals = geoNormals,
-                PrevViewDepth = prevViewDepth,
-                PrevDiffuseAlbedo = prevDiffuseAlbedo,
-                PrevSpecularRough = prevSpecularRough,
-                PrevNormals = prevNormals,
-                PrevGeoNormals = prevGeoNormals,
-                RtxdiResources = rtxdiResources,
-            };
-            _settings = new Settings
-            {
-                m_RenderResolution = renderResolution,
-                resolutionScale = resolutionScale,
-                useCompute = useCompute,
-            };
-        }
-
-        public class Resource
-        {
-            internal GraphicsBuffer ConstantBuffer;
-            internal GraphicsBuffer ResamplingConstantBuffer;
-
-            internal RTHandle Mv;
-            internal RTHandle DirectLighting;
-
-            internal RTHandle ViewDepth;
-            internal RTHandle DiffuseAlbedo;
-            internal RTHandle SpecularRough;
-            internal RTHandle Normals;
-            internal RTHandle GeoNormals;
-
-            internal RTHandle PrevViewDepth;
-            internal RTHandle PrevDiffuseAlbedo;
-            internal RTHandle PrevSpecularRough;
-            internal RTHandle PrevNormals;
-            internal RTHandle PrevGeoNormals;
-
-            internal RtxdiResources RtxdiResources;
-        }
-
-        public class Settings
-        {
-            internal int2 m_RenderResolution;
-            internal float resolutionScale;
-            internal bool useCompute;
+            _context = ctx;
+            _useCompute = useCompute;
         }
 
         class PassData
         {
             internal RayTracingShader RtShader;
             internal ComputeShader ComputeShader;
-            internal Resource Resource;
-            internal Settings Settings;
+            internal RtxdiPassContext Context;
+            internal bool UseCompute;
         }
 
         static void ExecutePass(PassData data, UnsafeGraphContext context)
         {
             var natCmd = CommandBufferHelpers.GetNativeCommandBuffer(context.cmd);
-            var resource = data.Resource;
-            var settings = data.Settings;
+            var ctx = data.Context;
 
-            if (settings.useCompute)
+            if (data.UseCompute)
             {
                 var marker = new ProfilerMarker(ProfilerCategory.Render, "TemporalResampling_Compute", MarkerFlags.SampleGPU);
                 natCmd.BeginSample(marker);
@@ -131,31 +54,31 @@ namespace PathTracing
                 var cs = data.ComputeShader;
                 int kernel = cs.FindKernel("main");
 
-                natCmd.SetComputeConstantBufferParam(cs, paramsID, resource.ConstantBuffer, 0, resource.ConstantBuffer.stride);
-                natCmd.SetComputeConstantBufferParam(cs, "g_Const", resource.ResamplingConstantBuffer, 0, resource.ResamplingConstantBuffer.stride);
+                natCmd.SetComputeConstantBufferParam(cs, paramsID, ctx.ConstantBuffer, 0, ctx.ConstantBuffer.stride);
+                natCmd.SetComputeConstantBufferParam(cs, "g_Const", ctx.ResamplingConstantBuffer, 0, ctx.ResamplingConstantBuffer.stride);
 
-                natCmd.SetComputeBufferParam(cs, kernel, t_LightDataBufferID, resource.RtxdiResources.LightDataBuffer);
-                natCmd.SetComputeBufferParam(cs, kernel, t_NeighborOffsetsID, resource.RtxdiResources.NeighborOffsetsBuffer);
-                natCmd.SetComputeBufferParam(cs, kernel, u_LightReservoirsID, resource.RtxdiResources.LightReservoirBuffer);
+                natCmd.SetComputeBufferParam(cs, kernel, t_LightDataBufferID, ctx.RtxdiResources.LightDataBuffer);
+                natCmd.SetComputeBufferParam(cs, kernel, t_NeighborOffsetsID, ctx.RtxdiResources.NeighborOffsetsBuffer);
+                natCmd.SetComputeBufferParam(cs, kernel, u_LightReservoirsID, ctx.RtxdiResources.LightReservoirBuffer);
 
-                natCmd.SetComputeTextureParam(cs, kernel, g_MvID, resource.Mv);
-                natCmd.SetComputeTextureParam(cs, kernel, g_DirectLightingID, resource.DirectLighting);
+                natCmd.SetComputeTextureParam(cs, kernel, g_MvID, ctx.MotionVectors);
+                natCmd.SetComputeTextureParam(cs, kernel, g_DirectLightingID, ctx.DirectLighting);
 
-                natCmd.SetComputeTextureParam(cs, kernel, "t_GBufferDepth", resource.ViewDepth);
-                natCmd.SetComputeTextureParam(cs, kernel, "t_GBufferDiffuseAlbedo", resource.DiffuseAlbedo);
-                natCmd.SetComputeTextureParam(cs, kernel, "t_GBufferSpecularRough", resource.SpecularRough);
-                natCmd.SetComputeTextureParam(cs, kernel, "t_GBufferNormals", resource.Normals);
-                natCmd.SetComputeTextureParam(cs, kernel, "t_GBufferGeoNormals", resource.GeoNormals);
+                natCmd.SetComputeTextureParam(cs, kernel, "t_GBufferDepth", ctx.ViewDepth);
+                natCmd.SetComputeTextureParam(cs, kernel, "t_GBufferDiffuseAlbedo", ctx.DiffuseAlbedo);
+                natCmd.SetComputeTextureParam(cs, kernel, "t_GBufferSpecularRough", ctx.SpecularRough);
+                natCmd.SetComputeTextureParam(cs, kernel, "t_GBufferNormals", ctx.Normals);
+                natCmd.SetComputeTextureParam(cs, kernel, "t_GBufferGeoNormals", ctx.GeoNormals);
 
-                natCmd.SetComputeTextureParam(cs, kernel, "t_PrevGBufferDepth", resource.PrevViewDepth);
-                natCmd.SetComputeTextureParam(cs, kernel, "t_PrevGBufferDiffuseAlbedo", resource.PrevDiffuseAlbedo);
-                natCmd.SetComputeTextureParam(cs, kernel, "t_PrevGBufferSpecularRough", resource.PrevSpecularRough);
-                natCmd.SetComputeTextureParam(cs, kernel, "t_PrevGBufferNormals", resource.PrevNormals);
-                natCmd.SetComputeTextureParam(cs, kernel, "t_PrevGBufferGeoNormals", resource.PrevGeoNormals);
-                natCmd.SetComputeTextureParam(cs, kernel, "t_MotionVectors", resource.Mv);
+                natCmd.SetComputeTextureParam(cs, kernel, "t_PrevGBufferDepth", ctx.PrevViewDepth);
+                natCmd.SetComputeTextureParam(cs, kernel, "t_PrevGBufferDiffuseAlbedo", ctx.PrevDiffuseAlbedo);
+                natCmd.SetComputeTextureParam(cs, kernel, "t_PrevGBufferSpecularRough", ctx.PrevSpecularRough);
+                natCmd.SetComputeTextureParam(cs, kernel, "t_PrevGBufferNormals", ctx.PrevNormals);
+                natCmd.SetComputeTextureParam(cs, kernel, "t_PrevGBufferGeoNormals", ctx.PrevGeoNormals);
+                natCmd.SetComputeTextureParam(cs, kernel, "t_MotionVectors", ctx.MotionVectors);
 
-                int rectW = (int)(settings.m_RenderResolution.x * settings.resolutionScale + 0.5f);
-                int rectH = (int)(settings.m_RenderResolution.y * settings.resolutionScale + 0.5f);
+                int rectW = (int)(ctx.RenderResolution.x * ctx.ResolutionScale + 0.5f);
+                int rectH = (int)(ctx.RenderResolution.y * ctx.ResolutionScale + 0.5f);
                 int groupsX = (rectW + GroupSize - 1) / GroupSize;
                 int groupsY = (rectH + GroupSize - 1) / GroupSize;
                 natCmd.DispatchCompute(cs, kernel, groupsX, groupsY, 1);
@@ -168,31 +91,31 @@ namespace PathTracing
                 natCmd.BeginSample(marker);
 
                 natCmd.SetRayTracingShaderPass(data.RtShader, "RTXDI");
-                natCmd.SetRayTracingConstantBufferParam(data.RtShader, paramsID, resource.ConstantBuffer, 0, resource.ConstantBuffer.stride);
-                natCmd.SetRayTracingBufferParam(data.RtShader, "ResampleConstants", resource.ResamplingConstantBuffer);
+                natCmd.SetRayTracingConstantBufferParam(data.RtShader, paramsID, ctx.ConstantBuffer, 0, ctx.ConstantBuffer.stride);
+                natCmd.SetRayTracingBufferParam(data.RtShader, "ResampleConstants", ctx.ResamplingConstantBuffer);
 
-                natCmd.SetRayTracingBufferParam(data.RtShader, t_LightDataBufferID, resource.RtxdiResources.LightDataBuffer);
-                natCmd.SetRayTracingBufferParam(data.RtShader, t_NeighborOffsetsID, resource.RtxdiResources.NeighborOffsetsBuffer);
-                natCmd.SetRayTracingBufferParam(data.RtShader, u_LightReservoirsID, resource.RtxdiResources.LightReservoirBuffer);
+                natCmd.SetRayTracingBufferParam(data.RtShader, t_LightDataBufferID, ctx.RtxdiResources.LightDataBuffer);
+                natCmd.SetRayTracingBufferParam(data.RtShader, t_NeighborOffsetsID, ctx.RtxdiResources.NeighborOffsetsBuffer);
+                natCmd.SetRayTracingBufferParam(data.RtShader, u_LightReservoirsID, ctx.RtxdiResources.LightReservoirBuffer);
 
-                natCmd.SetRayTracingTextureParam(data.RtShader, g_MvID, resource.Mv);
-                natCmd.SetRayTracingTextureParam(data.RtShader, g_DirectLightingID, resource.DirectLighting);
+                natCmd.SetRayTracingTextureParam(data.RtShader, g_MvID, ctx.MotionVectors);
+                natCmd.SetRayTracingTextureParam(data.RtShader, g_DirectLightingID, ctx.DirectLighting);
 
-                natCmd.SetRayTracingTextureParam(data.RtShader, "t_GBufferDepth", resource.ViewDepth);
-                natCmd.SetRayTracingTextureParam(data.RtShader, "t_GBufferDiffuseAlbedo", resource.DiffuseAlbedo);
-                natCmd.SetRayTracingTextureParam(data.RtShader, "t_GBufferSpecularRough", resource.SpecularRough);
-                natCmd.SetRayTracingTextureParam(data.RtShader, "t_GBufferNormals", resource.Normals);
-                natCmd.SetRayTracingTextureParam(data.RtShader, "t_GBufferGeoNormals", resource.GeoNormals);
+                natCmd.SetRayTracingTextureParam(data.RtShader, "t_GBufferDepth", ctx.ViewDepth);
+                natCmd.SetRayTracingTextureParam(data.RtShader, "t_GBufferDiffuseAlbedo", ctx.DiffuseAlbedo);
+                natCmd.SetRayTracingTextureParam(data.RtShader, "t_GBufferSpecularRough", ctx.SpecularRough);
+                natCmd.SetRayTracingTextureParam(data.RtShader, "t_GBufferNormals", ctx.Normals);
+                natCmd.SetRayTracingTextureParam(data.RtShader, "t_GBufferGeoNormals", ctx.GeoNormals);
 
-                natCmd.SetRayTracingTextureParam(data.RtShader, "t_PrevGBufferDepth", resource.PrevViewDepth);
-                natCmd.SetRayTracingTextureParam(data.RtShader, "t_PrevGBufferDiffuseAlbedo", resource.PrevDiffuseAlbedo);
-                natCmd.SetRayTracingTextureParam(data.RtShader, "t_PrevGBufferSpecularRough", resource.PrevSpecularRough);
-                natCmd.SetRayTracingTextureParam(data.RtShader, "t_PrevGBufferNormals", resource.PrevNormals);
-                natCmd.SetRayTracingTextureParam(data.RtShader, "t_PrevGBufferGeoNormals", resource.PrevGeoNormals);
-                natCmd.SetRayTracingTextureParam(data.RtShader, "t_MotionVectors", resource.Mv);
+                natCmd.SetRayTracingTextureParam(data.RtShader, "t_PrevGBufferDepth", ctx.PrevViewDepth);
+                natCmd.SetRayTracingTextureParam(data.RtShader, "t_PrevGBufferDiffuseAlbedo", ctx.PrevDiffuseAlbedo);
+                natCmd.SetRayTracingTextureParam(data.RtShader, "t_PrevGBufferSpecularRough", ctx.PrevSpecularRough);
+                natCmd.SetRayTracingTextureParam(data.RtShader, "t_PrevGBufferNormals", ctx.PrevNormals);
+                natCmd.SetRayTracingTextureParam(data.RtShader, "t_PrevGBufferGeoNormals", ctx.PrevGeoNormals);
+                natCmd.SetRayTracingTextureParam(data.RtShader, "t_MotionVectors", ctx.MotionVectors);
 
-                uint rectWmod = (uint)(settings.m_RenderResolution.x * settings.resolutionScale + 0.5f);
-                uint rectHmod = (uint)(settings.m_RenderResolution.y * settings.resolutionScale + 0.5f);
+                uint rectWmod = (uint)(ctx.RenderResolution.x * ctx.ResolutionScale + 0.5f);
+                uint rectHmod = (uint)(ctx.RenderResolution.y * ctx.ResolutionScale + 0.5f);
                 natCmd.DispatchRays(data.RtShader, "MainRayGenShader", rectWmod, rectHmod, 1);
 
                 natCmd.EndSample(marker);
@@ -201,13 +124,13 @@ namespace PathTracing
 
         public override void RecordRenderGraph(RenderGraph renderGraph, ContextContainer frameData)
         {
-            string passName = _settings.useCompute ? "TemporalResampling_Compute" : "TemporalResampling";
+            string passName = _useCompute ? "TemporalResampling_Compute" : "TemporalResampling";
             using var builder = renderGraph.AddUnsafePass<PassData>(passName, out var passData);
 
             passData.RtShader = _rtShader;
             passData.ComputeShader = _computeShader;
-            passData.Resource = _resource;
-            passData.Settings = _settings;
+            passData.Context = _context;
+            passData.UseCompute = _useCompute;
 
             builder.AllowPassCulling(false);
             builder.SetRenderFunc((PassData data, UnsafeGraphContext context) => { ExecutePass(data, context); });
