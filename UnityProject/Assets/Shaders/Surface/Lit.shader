@@ -516,13 +516,8 @@ Shader "RayTracing/Lit"
             #include "Assets/Shaders/Include/Payload.hlsl"
 
             #pragma shader_feature_local_raytracing _EMISSION
-            #pragma shader_feature_local_raytracing _NORMALMAP
             #pragma shader_feature_local_raytracing _METALLICSPECGLOSSMAP
             #pragma shader_feature_local_raytracing _SURFACE_TYPE_TRANSPARENT
-            #pragma shader_feature_local_raytracing _SSS
-            #pragma shader_feature_local_raytracing _SKINNEDMESH
-
-            #pragma multi_compile_local RAY_TRACING_PROCEDURAL_GEOMETRY
 
             #pragma raytracing test
             // #pragma enable_d3d11_debug_symbols
@@ -533,40 +528,40 @@ Shader "RayTracing/Lit"
 
             #include "Assets/Shaders/Include/SurfaceRayTracingCommon.hlsl"
 
-            [shader("anyhit")]
-            void AnyHitMain(inout SecondarySurfacePayload payload, AttributeData attribs)
-            {
-                #if _SURFACE_TYPE_TRANSPARENT
-                {
-                    IgnoreHit();
-                }
-                #else
-                // 1. 获取顶点索引
-                uint3 triangleIndices = UnityRayTracingFetchTriangleIndices(PrimitiveIndex());
-
-                // 2. 获取三个顶点的 UV（为了性能，AnyHit 通常只取 UV，不计算法线等复杂属性）
-                float2 uv0 = UnityRayTracingFetchVertexAttribute2(triangleIndices.x, kVertexAttributeTexCoord0);
-                float2 uv1 = UnityRayTracingFetchVertexAttribute2(triangleIndices.y, kVertexAttributeTexCoord0);
-                float2 uv2 = UnityRayTracingFetchVertexAttribute2(triangleIndices.z, kVertexAttributeTexCoord0);
-
-                // 3. 计算插值 UV
-                float3 barycentricCoords = float3(1.0 - attribs.barycentrics.x - attribs.barycentrics.y,
-                    attribs.barycentrics.x, attribs.barycentrics.y);
-                float2 uv = uv0 * barycentricCoords.x + uv1 * barycentricCoords.y + uv2 * barycentricCoords.z;
-
-                // 4. 采样 Alpha 通道
-                // 注意：在 AnyHit 中采样通常使用 SampleLevel 0 以保证性能，或者根据 RayT 计算一个近似 Mip
-                float4 baseColor = _BaseMap.SampleLevel(sampler_BaseMap, _BaseMap_ST.xy * uv + _BaseMap_ST.zw, 0);
-                float alpha = baseColor.a * _BaseColor.a;
-
-                // 5. Alpha Test 判定
-                // 如果透明度小于阈值，则调用 IgnoreHit()，光线将忽略此次相交
-                if (alpha < _Cutoff)
-                {
-                    IgnoreHit();
-                }
-                #endif
-            }
+            // [shader("anyhit")]
+            // void AnyHitMain(inout SecondarySurfacePayload payload, AttributeData attribs)
+            // {
+            //     #if _SURFACE_TYPE_TRANSPARENT
+            //     {
+            //         IgnoreHit();
+            //     }
+            //     #else
+            //     // 1. 获取顶点索引
+            //     uint3 triangleIndices = UnityRayTracingFetchTriangleIndices(PrimitiveIndex());
+            //
+            //     // 2. 获取三个顶点的 UV（为了性能，AnyHit 通常只取 UV，不计算法线等复杂属性）
+            //     float2 uv0 = UnityRayTracingFetchVertexAttribute2(triangleIndices.x, kVertexAttributeTexCoord0);
+            //     float2 uv1 = UnityRayTracingFetchVertexAttribute2(triangleIndices.y, kVertexAttributeTexCoord0);
+            //     float2 uv2 = UnityRayTracingFetchVertexAttribute2(triangleIndices.z, kVertexAttributeTexCoord0);
+            //
+            //     // 3. 计算插值 UV
+            //     float3 barycentricCoords = float3(1.0 - attribs.barycentrics.x - attribs.barycentrics.y,
+            //         attribs.barycentrics.x, attribs.barycentrics.y);
+            //     float2 uv = uv0 * barycentricCoords.x + uv1 * barycentricCoords.y + uv2 * barycentricCoords.z;
+            //
+            //     // 4. 采样 Alpha 通道
+            //     // 注意：在 AnyHit 中采样通常使用 SampleLevel 0 以保证性能，或者根据 RayT 计算一个近似 Mip
+            //     float4 baseColor = _BaseMap.SampleLevel(sampler_BaseMap, _BaseMap_ST.xy * uv + _BaseMap_ST.zw, 0);
+            //     float alpha = baseColor.a * _BaseColor.a;
+            //
+            //     // 5. Alpha Test 判定
+            //     // 如果透明度小于阈值，则调用 IgnoreHit()，光线将忽略此次相交
+            //     if (alpha < _Cutoff)
+            //     {
+            //         IgnoreHit();
+            //     }
+            //     #endif
+            // }
 
             [shader("closesthit")]
             void ClosestHitMain(inout SecondarySurfacePayload payload : SV_RayPayload, AttributeData attribs : SV_IntersectionAttributes)
@@ -589,24 +584,22 @@ Shader "RayTracing/Lit"
                 bool isFrontFace = HitKind() == HIT_KIND_TRIANGLE_FRONT_FACE;
                 float3 normalOS = isFrontFace ? v.normal : -v.normal;
                 float3 normalWS = normalize(mul(normalOS, (float3x3)WorldToObject()));
-
-                float3 rayDir = WorldRayDirection();
                 
                 payload.hitT = RayTCurrent();
-
+                
+                uint mip = 10;
                 
                 // ----------------------------------------------------------
                 // 7. Albedo 计算
                 // ----------------------------------------------------------
-                float3 albedo = _BaseColor.xyz * _BaseMap.SampleLevel(sampler_BaseMap, _BaseMap_ST.xy * v.uv + _BaseMap_ST.zw, 0).xyz;
-
+                float3 albedo = _BaseColor.xyz * _BaseMap.SampleLevel(sampler_BaseMap, _BaseMap_ST.xy * v.uv + _BaseMap_ST.zw, mip).xyz;
 
                 float roughness;
                 float metallic;
 
                 #if _METALLICSPECGLOSSMAP
 
-                float4 vv = _MetallicGlossMap.SampleLevel(sampler_MetallicGlossMap, _BaseMap_ST.xy * v.uv + _BaseMap_ST.zw, 0);
+                float4 vv = _MetallicGlossMap.SampleLevel(sampler_MetallicGlossMap, _BaseMap_ST.xy * v.uv + _BaseMap_ST.zw, mip);
 
                 // float smooth = vv.a * _Smoothness;
                 // roughness = 1 - smooth;
@@ -626,7 +619,7 @@ Shader "RayTracing/Lit"
                 #endif
 
                 #if _EMISSION
-                float3 emission = _EmissionColor.xyz * _EmissionMap.SampleLevel(sampler_EmissionMap, v.uv, 0).xyz;
+                float3 emission = _EmissionColor.xyz * _EmissionMap.SampleLevel(sampler_EmissionMap, v.uv, mip).xyz;
                 // emission = float3(1,0,0);
                 payload.Lemi = Packing::EncodeRgbe(emission);
                 #else

@@ -657,9 +657,11 @@ namespace PathTracing
                 showMode        = setting.showMode,
                 resolutionScale = frameState.resolutionScale,
                 enableDlssRR    = setting.RR,
+                tmpDisableRR    = setting.tmpDisableRR,
                 showMV          = setting.showMv,
                 showValidation  = setting.showValidation,
                 showReference   = setting.useReferencePathTracing,
+                
             };
 
             _outputBlitPass.Setup(outputBlitResource, outputBlitSettings);
