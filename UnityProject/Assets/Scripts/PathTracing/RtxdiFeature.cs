@@ -57,7 +57,6 @@ namespace PathTracing
         public ComputeShader genMipsCs;
 
         private OutputBlitPass _outputBlitPass;
-
         private PrepareLightPass _prepareLightPass;
         private GBufferPass _gBufferPass;
         private GBufferRasterPass _gBufferRasterPass;
@@ -70,7 +69,6 @@ namespace PathTracing
         private PresamplePass _presamplePass;
         private PresampleReGirLightsPass _presampleReGirLightsPass;
         private GenerateMipsPass _generateMipsPass;
-
         private BrdfRayTracingPass _brdfRayTracingPass;
         private ShadeSecondarySurfacesPass _shadeSecondarySurfacesPass;
 
@@ -345,7 +343,7 @@ namespace PathTracing
             _globalConstantsArray[0] = globalConstants;
             _constantBuffer.SetData(_globalConstantsArray);
 
-            resamplingConstants = GetResamplingConstants(isContext, rtxdiResources, frameState);
+            resamplingConstants = GetResamplingConstants(isContext, frameState);
             _resamplingConstantsArray[0] = resamplingConstants;
             _resamplingConstantBuffer.SetData(_resamplingConstantsArray);
 
@@ -375,132 +373,6 @@ namespace PathTracing
             var prevNormals = isOddFrame ? pool.GetRT(RenderResourceType.RtxdiPrevNormals) : pool.GetRT(RenderResourceType.RtxdiNormals);
             var prevGeoNormals = isOddFrame ? pool.GetRT(RenderResourceType.RtxdiPrevGeoNormals) : pool.GetRT(RenderResourceType.RtxdiGeoNormals);
 
-
-            #region gBuffer Pass
-
-            var gBufferResource = new GBufferPass.Resource
-            {
-                ConstantBuffer = _constantBuffer,
-
-                ViewDepth = viewDepth,
-                DiffuseAlbedo = diffuseAlbedo,
-                SpecularRough = specularRough,
-                Normals = normals,
-                GeoNormals = geoNormals,
-                Emissive = pool.GetRT(RenderResourceType.RtxdiEmissive),
-                MotionVectors = pool.GetRT(RenderResourceType.RtxdiMotionVectors),
-            };
-
-            var gBufferSettings = new GBufferPass.Settings
-            {
-                m_RenderResolution = new int2(cam.pixelWidth, cam.pixelHeight),
-                resolutionScale = pathTracingSetting.resolutionScale
-            };
-
-            if (pathTracingSetting.useRasterGBuffer)
-            {
-                _gBufferRasterResource.EnsureResources(pool.renderResolution);
-                _gBufferRasterPass.Setup(gBufferResource, _gBufferRasterResource, gBufferSettings);
-                renderer.EnqueuePass(_gBufferRasterPass);
-            }
-            else
-            {
-                _gBufferPass.Setup(gBufferResource, gBufferSettings);
-                renderer.EnqueuePass(_gBufferPass);
-            }
-
-            #endregion
-
-
-            var pdfResource = new PdfTexturePass.Resource
-            {
-                ResamplingConstantBuffer = _resamplingConstantBuffer,
-                u_LocalLightPdfTexture = _gpuScene.localLightPdfTexture,
-                RtxdiResources = rtxdiResources
-            };
-
-            var pdfSettings = new PdfTexturePass.Settings
-            {
-            };
-
-
-            _pdfTexturePass.Setup(pdfResource, pdfSettings);
-            renderer.EnqueuePass(_pdfTexturePass);
-
-
-            var genMipsResource = new GenerateMipsPass.Resource
-            {
-                u_LocalLightPdfTexture = _gpuScene.localLightPdfTexture,
-            };
-
-            var genMipsSettings = new GenerateMipsPass.Settings
-            {
-                width = _gpuScene.localLightPdfTexture.rt.width,
-                height = _gpuScene.localLightPdfTexture.rt.height,
-                mipCount = _gpuScene.localLightPdfTexture.rt.mipmapCount
-            };
-
-            _generateMipsPass.Setup(genMipsResource, genMipsSettings);
-            renderer.EnqueuePass(_generateMipsPass);
-
-            if (pathTracingSetting.initialSamplingParams.localLightSamplingMode != ReSTIRDI_LocalLightSamplingMode.Uniform)
-            {
-                var preResource = new PresamplePass.Resource
-                {
-                    ConstantBuffer = _constantBuffer,
-                    ResamplingConstantBuffer = _resamplingConstantBuffer,
-                    u_LocalLightPdfTexture = _gpuScene.localLightPdfTexture,
-
-                    RtxdiResources = rtxdiResources
-                };
-                var RTXDI_PRESAMPLING_GROUP_SIZE = 256;
-                var x = (isContext.GetLocalLightRISBufferSegmentParams().tileSize + RTXDI_PRESAMPLING_GROUP_SIZE - 1) / RTXDI_PRESAMPLING_GROUP_SIZE;
-                var y = isContext.GetLocalLightRISBufferSegmentParams().tileCount;
-
-                // dm::int2 presampleDispatchSize = {
-                //     dm::div_ceil(isContext.GetLocalLightRISBufferSegmentParams().tileSize, RTXDI_PRESAMPLING_GROUP_SIZE),
-                //     int(isContext.GetLocalLightRISBufferSegmentParams().tileCount)
-                // };
-
-
-                var preSettings = new PresamplePass.Settings
-                {
-                    x = (int)x,
-                    y = (int)y,
-                    z = 1
-                };
-
-                _presamplePass.Setup(preResource, preSettings);
-                renderer.EnqueuePass(_presamplePass);
-            }
-
-            if (pathTracingSetting.initialSamplingParams.localLightSamplingMode == ReSTIRDI_LocalLightSamplingMode.ReGIR_RIS)
-            {
-                var preReGirResource = new PresampleReGirLightsPass.Resource
-                {
-                    ConstantBuffer = _constantBuffer,
-                    ResamplingConstantBuffer = _resamplingConstantBuffer,
-                    u_LocalLightPdfTexture = _gpuScene.localLightPdfTexture,
-
-                    RtxdiResources = rtxdiResources
-                };
-                var ReGIR_TILE_SIZE = 256;
-
-                var regirContext = isContext.GetReGIRContext();
-                var x = (regirContext.GetReGIRLightSlotCount() + ReGIR_TILE_SIZE - 1) / ReGIR_TILE_SIZE;
-
-
-                var preReGirSettings = new PresampleReGirLightsPass.Settings
-                {
-                    x = (int)x,
-                    y = 1,
-                    z = 1
-                };
-
-                _presampleReGirLightsPass.Setup(preReGirResource, preReGirSettings);
-                renderer.EnqueuePass(_presampleReGirLightsPass);
-            }
-
             var rtxdiCtx = new RtxdiPassContext
             {
                 ConstantBuffer = _constantBuffer,
@@ -524,6 +396,51 @@ namespace PathTracing
                 RenderResolution = new int2(cam.pixelWidth, cam.pixelHeight),
                 ResolutionScale = pathTracingSetting.resolutionScale,
             };
+
+            #region gBuffer Pass
+
+            if (pathTracingSetting.useRasterGBuffer)
+            {
+                _gBufferRasterResource.EnsureResources(pool.renderResolution);
+                _gBufferRasterPass.Setup(rtxdiCtx, _gBufferRasterResource);
+                renderer.EnqueuePass(_gBufferRasterPass);
+            }
+            else
+            {
+                _gBufferPass.Setup(rtxdiCtx);
+                renderer.EnqueuePass(_gBufferPass);
+            }
+
+            #endregion
+
+
+            _pdfTexturePass.Setup(rtxdiCtx);
+            renderer.EnqueuePass(_pdfTexturePass);
+
+
+            _generateMipsPass.Setup(rtxdiCtx);
+            renderer.EnqueuePass(_generateMipsPass);
+
+            if (pathTracingSetting.initialSamplingParams.localLightSamplingMode != ReSTIRDI_LocalLightSamplingMode.Uniform)
+            {
+                var RTXDI_PRESAMPLING_GROUP_SIZE = 256;
+                var x = (isContext.GetLocalLightRISBufferSegmentParams().tileSize + RTXDI_PRESAMPLING_GROUP_SIZE - 1) / RTXDI_PRESAMPLING_GROUP_SIZE;
+                var y = isContext.GetLocalLightRISBufferSegmentParams().tileCount;
+
+                _presamplePass.Setup(rtxdiCtx, (int)x, (int)y);
+                renderer.EnqueuePass(_presamplePass);
+            }
+
+            if (pathTracingSetting.initialSamplingParams.localLightSamplingMode == ReSTIRDI_LocalLightSamplingMode.ReGIR_RIS)
+            {
+                var ReGIR_TILE_SIZE = 256;
+
+                var regirContext = isContext.GetReGIRContext();
+                var x = (regirContext.GetReGIRLightSlotCount() + ReGIR_TILE_SIZE - 1) / ReGIR_TILE_SIZE;
+
+                _presampleReGirLightsPass.Setup(rtxdiCtx, (int)x, 1);
+                renderer.EnqueuePass(_presampleReGirLightsPass);
+            }
 
             // GenerateInitialSamplesPass
             _generateInitialSamplesPass.Setup(rtxdiCtx, pathTracingSetting.useComputeForGIS);
@@ -550,50 +467,10 @@ namespace PathTracing
 
             // GI
 
-            var brdfResource = new BrdfRayTracingPass.Resource
-            {
-                ConstantBuffer = _constantBuffer,
-                ViewDepth = viewDepth,
-                DiffuseAlbedo = diffuseAlbedo,
-                SpecularRough = specularRough,
-                Normals = normals,
-                GeoNormals = geoNormals,
-                DirectLighting = pool.GetRT(RenderResourceType.DirectLighting),
-
-                ResamplingConstantBuffer = _resamplingConstantBuffer,
-                RtxdiResources = rtxdiResources,
-            };
-
-            var brdfSettings = new BrdfRayTracingPass.Settings
-            {
-                m_RenderResolution = new int2(cam.pixelWidth, cam.pixelHeight),
-                resolutionScale = pathTracingSetting.resolutionScale,
-            };
-
-            _brdfRayTracingPass.Setup(brdfResource, brdfSettings);
+            _brdfRayTracingPass.Setup(rtxdiCtx);
             renderer.EnqueuePass(_brdfRayTracingPass);
 
-            var shadeSecondaryResource = new ShadeSecondarySurfacesPass.Resource
-            {
-                ConstantBuffer = _constantBuffer,
-                ViewDepth = viewDepth,
-                DiffuseAlbedo = diffuseAlbedo,
-                SpecularRough = specularRough,
-                Normals = normals,
-                GeoNormals = geoNormals,
-                DirectLighting = pool.GetRT(RenderResourceType.DirectLighting),
-
-                ResamplingConstantBuffer = _resamplingConstantBuffer,
-                RtxdiResources = rtxdiResources,
-            };
-
-            var shadeSecondarySettings = new ShadeSecondarySurfacesPass.Settings
-            {
-                m_RenderResolution = new int2(cam.pixelWidth, cam.pixelHeight),
-                resolutionScale = pathTracingSetting.resolutionScale,
-            };
-
-            _shadeSecondarySurfacesPass.Setup(shadeSecondaryResource, shadeSecondarySettings);
+            _shadeSecondarySurfacesPass.Setup(rtxdiCtx);
             renderer.EnqueuePass(_shadeSecondarySurfacesPass);
 
 
@@ -643,32 +520,15 @@ namespace PathTracing
             };
             var dlssDataPtr = dlrr.GetInteropDataPtr(dlrrInput, dlrrRes);
 
-
-            var rtxdiDlssBeforeResource = new RxtdiDlssBeforePass.Resource
-            {
-                ConstantBuffer = _constantBuffer,
-                ViewDepth = viewDepth,
-                DiffuseAlbedo = diffuseAlbedo,
-                SpecularRough = specularRough,
-                Normals = normals,
-
-                RRGuide_DiffAlbedo = pool.GetRT(RenderResourceType.RrGuideDiffAlbedo),
-                RRGuide_SpecAlbedo = pool.GetRT(RenderResourceType.RrGuideSpecAlbedo),
-                RRGuide_SpecHitDistance = pool.GetRT(RenderResourceType.RrGuideSpecHitDistance),
-                RRGuide_Normal_Roughness = pool.GetRT(RenderResourceType.RrGuideNormalRoughness),
-            };
-
-
             var rectGridW = (int)(cam.pixelWidth * pathTracingSetting.resolutionScale + 0.5f + 15) / 16;
             var rectGridH = (int)(cam.pixelHeight * pathTracingSetting.resolutionScale + 0.5f + 15) / 16;
 
-            var rtxdiDlssBeforeSettings = new RxtdiDlssBeforePass.Settings
-            {
-                rectGridW = rectGridW,
-                rectGridH = rectGridH,
-            };
-
-            _rtxdiDlssBeforePass.Setup(rtxdiDlssBeforeResource, rtxdiDlssBeforeSettings);
+            _rtxdiDlssBeforePass.Setup(rtxdiCtx,
+                pool.GetRT(RenderResourceType.RrGuideDiffAlbedo),
+                pool.GetRT(RenderResourceType.RrGuideSpecAlbedo),
+                pool.GetRT(RenderResourceType.RrGuideSpecHitDistance),
+                pool.GetRT(RenderResourceType.RrGuideNormalRoughness),
+                rectGridW, rectGridH);
             renderer.EnqueuePass(_rtxdiDlssBeforePass);
 
             var dlssSettings = new DlssRRPass.Settings
@@ -678,7 +538,6 @@ namespace PathTracing
 
             _dlssrrPass.Setup(dlssDataPtr, dlssSettings);
             renderer.EnqueuePass(_dlssrrPass);
-
 
             var outputBlitResource = new OutputBlitPass.Resource
             {
@@ -791,7 +650,6 @@ namespace PathTracing
             ReGIRParams.onionParams.cubicRootFactor = regirContext.GetReGIROnionCalculatedParameters().regirOnionCubicRootFactor;
         }
 
-
         private void FillResamplingConstants(ref ResamplingConstants constants, ImportanceSamplingContext isContext)
         {
             // RTXDI_LightBufferParameters lightBufferParameters = isContext.GetLightBufferParameters();
@@ -822,7 +680,6 @@ namespace PathTracing
             // m_currentFrameOutputReservoir = isContext.GetReSTIRDIContext().GetBufferIndices().shadingInputBufferIndex;
         }
 
-
         private void FillBRDFPTConstants(ref BRDFPathTracing_Parameters constants, RTXDI_LightBufferParameters getLightBufferParameters)
         {
             constants = pathTracingSetting.brdfptParams;
@@ -837,7 +694,6 @@ namespace PathTracing
 
         private ResamplingConstants GetResamplingConstants(
             ImportanceSamplingContext isContext
-            , RtxdiResources rtxdiResources
             , CameraFrameState frameState)
         {
             var restirDIContext = isContext.GetReSTIRDIContext();

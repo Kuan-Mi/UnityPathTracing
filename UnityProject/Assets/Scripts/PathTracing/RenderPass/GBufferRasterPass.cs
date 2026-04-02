@@ -31,7 +31,7 @@ namespace PathTracing
     ///   1. Add a GBufferRasterPass field and instantiate it in Create().
     ///   2. Call pass.Setup(gBufferResource, rasterResource, settings) each frame.
     ///   3. Call renderer.EnqueuePass(_gBufferRasterPass) in AddRenderPasses().
-    ///   The pass reuses the same GBufferPass.Resource RTHandles so it writes
+    ///   The pass reuses the same RtxdiPassContext RTHandles so it writes
     ///   directly into the buffers that NRD / path tracing already reads from.
     /// </summary>
     public class GBufferRasterPass : ScriptableRenderPass
@@ -40,27 +40,22 @@ namespace PathTracing
         private static readonly ShaderTagId k_ShaderTag = new ShaderTagId("GBufferRaster");
 
         // ── Resources ──────────────────────────────────────────────────────────
-        private GBufferPass.Resource _gBufferResource;
-        private Resource             _rasterResource;
-        private GBufferPass.Settings _settings;
+        private RtxdiPassContext _context;
+        private Resource         _rasterResource;
 
         public GBufferRasterPass()
         {
         }
 
-        public void Setup(
-            GBufferPass.Resource gBufferResource,
-            Resource             rasterResource,
-            GBufferPass.Settings settings)
+        public void Setup(RtxdiPassContext ctx, Resource rasterResource)
         {
-            _gBufferResource = gBufferResource;
-            _rasterResource  = rasterResource;
-            _settings        = settings;
+            _context        = ctx;
+            _rasterResource = rasterResource;
         }
 
         // ── Per-pass resources ────────────────────────────────────────────────
         /// <summary>
-        /// Resources owned by GBufferRasterPass (separate from GBufferPass.Resource).
+        /// Resources owned by GBufferRasterPass (separate from RtxdiPassContext).
         /// </summary>
         public class Resource
         {
@@ -131,20 +126,20 @@ namespace PathTracing
 
             using var builder = renderGraph.AddRasterRenderPass<PassData>("GBufferRaster", out var passData);
 
-            passData.ConstantBuffer = _gBufferResource.ConstantBuffer;
+            passData.ConstantBuffer = _context.ConstantBuffer;
             passData.RendererList   = renderGraph.CreateRendererList(rendererListDesc);
 
-            var gb = _gBufferResource;
-            var rs = _rasterResource;
+            var ctx = _context;
+            var rs  = _rasterResource;
 
             // Import external RTHandles and bind as MRT (order must match SV_TargetN in GBufferRaster.hlsl)
-            builder.SetRenderAttachment(renderGraph.ImportTexture(gb.ViewDepth),     0, AccessFlags.Write);
-            builder.SetRenderAttachment(renderGraph.ImportTexture(gb.DiffuseAlbedo), 1, AccessFlags.Write);
-            builder.SetRenderAttachment(renderGraph.ImportTexture(gb.SpecularRough), 2, AccessFlags.Write);
-            builder.SetRenderAttachment(renderGraph.ImportTexture(gb.Normals),       3, AccessFlags.Write);
-            builder.SetRenderAttachment(renderGraph.ImportTexture(gb.GeoNormals),    4, AccessFlags.Write);
-            builder.SetRenderAttachment(renderGraph.ImportTexture(gb.Emissive),      5, AccessFlags.Write);
-            builder.SetRenderAttachment(renderGraph.ImportTexture(gb.MotionVectors), 6, AccessFlags.Write);
+            builder.SetRenderAttachment(renderGraph.ImportTexture(ctx.ViewDepth),     0, AccessFlags.Write);
+            builder.SetRenderAttachment(renderGraph.ImportTexture(ctx.DiffuseAlbedo), 1, AccessFlags.Write);
+            builder.SetRenderAttachment(renderGraph.ImportTexture(ctx.SpecularRough), 2, AccessFlags.Write);
+            builder.SetRenderAttachment(renderGraph.ImportTexture(ctx.Normals),       3, AccessFlags.Write);
+            builder.SetRenderAttachment(renderGraph.ImportTexture(ctx.GeoNormals),    4, AccessFlags.Write);
+            builder.SetRenderAttachment(renderGraph.ImportTexture(ctx.Emissive),      5, AccessFlags.Write);
+            builder.SetRenderAttachment(renderGraph.ImportTexture(ctx.MotionVectors), 6, AccessFlags.Write);
             builder.SetRenderAttachmentDepth(renderGraph.ImportTexture(rs.DepthBuffer), AccessFlags.Write);
 
             builder.UseRendererList(passData.RendererList);

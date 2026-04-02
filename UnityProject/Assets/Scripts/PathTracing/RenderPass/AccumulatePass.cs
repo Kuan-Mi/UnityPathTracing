@@ -4,6 +4,7 @@ using UnityEngine;
 using UnityEngine.Rendering;
 using UnityEngine.Rendering.RenderGraphModule;
 using UnityEngine.Rendering.Universal;
+using static PathTracing.ShaderIDs;
 
 namespace PathTracing
 {
@@ -54,9 +55,9 @@ namespace PathTracing
             // 合成
             {
                 natCmd.BeginSample(compositionMarker);
-                 natCmd.SetComputeTextureParam(data.AccCs, 0, "gIn_noise", data.Resource.noise);
-                natCmd.SetComputeTextureParam(data.AccCs, 0, "gIn_Accumulated", data.Resource.accumulation);
-                natCmd.SetComputeIntParam(data.AccCs, "g_ConvergenceStep", data.Settings.convergenceStep);
+                 natCmd.SetComputeTextureParam(data.AccCs, 0, gIn_noiseID, data.Resource.noise);
+                natCmd.SetComputeTextureParam(data.AccCs, 0, gIn_AccumulatedID, data.Resource.accumulation);
+                natCmd.SetComputeIntParam(data.AccCs, g_ConvergenceStepID, data.Settings.convergenceStep);
 
                 natCmd.DispatchCompute(data.AccCs, 0, (int)data.Settings.rectGridW, (int)data.Settings.rectGridH, 1);
 

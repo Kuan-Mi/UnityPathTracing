@@ -54,22 +54,22 @@ namespace PathTracing
                 int kernel = cs.FindKernel("main");
 
                 natCmd.SetComputeConstantBufferParam(cs, paramsID, ctx.ConstantBuffer, 0, ctx.ConstantBuffer.stride);
-                natCmd.SetComputeConstantBufferParam(cs, "g_Const", ctx.ResamplingConstantBuffer, 0, ctx.ResamplingConstantBuffer.stride);
+                natCmd.SetComputeConstantBufferParam(cs, g_ConstID, ctx.ResamplingConstantBuffer, 0, ctx.ResamplingConstantBuffer.stride);
 
-                natCmd.SetComputeBufferParam(cs, kernel, "t_GeometryInstanceToLight", ctx.GeometryInstanceToLight);
+                natCmd.SetComputeBufferParam(cs, kernel, t_GeometryInstanceToLightID, ctx.GeometryInstanceToLight);
                 natCmd.SetComputeBufferParam(cs, kernel, t_LightDataBufferID, ctx.RtxdiResources.LightDataBuffer);
                 natCmd.SetComputeBufferParam(cs, kernel, t_NeighborOffsetsID, ctx.RtxdiResources.NeighborOffsetsBuffer);
                 natCmd.SetComputeBufferParam(cs, kernel, u_LightReservoirsID, ctx.RtxdiResources.LightReservoirBuffer);
-                natCmd.SetComputeBufferParam(cs, kernel, "u_RisBuffer", ctx.RtxdiResources.RisBuffer);
-                natCmd.SetComputeBufferParam(cs, kernel, "u_RisLightDataBuffer", ctx.RtxdiResources.RisLightDataBuffer);
+                natCmd.SetComputeBufferParam(cs, kernel, u_RisBufferID, ctx.RtxdiResources.RisBuffer);
+                natCmd.SetComputeBufferParam(cs, kernel, u_RisLightDataBufferID, ctx.RtxdiResources.RisLightDataBuffer);
 
-                natCmd.SetComputeTextureParam(cs, kernel, "t_GBufferDepth", ctx.ViewDepth);
-                natCmd.SetComputeTextureParam(cs, kernel, "t_GBufferDiffuseAlbedo", ctx.DiffuseAlbedo);
-                natCmd.SetComputeTextureParam(cs, kernel, "t_GBufferSpecularRough", ctx.SpecularRough);
-                natCmd.SetComputeTextureParam(cs, kernel, "t_GBufferNormals", ctx.Normals);
-                natCmd.SetComputeTextureParam(cs, kernel, "t_GBufferGeoNormals", ctx.GeoNormals);
+                natCmd.SetComputeTextureParam(cs, kernel, t_GBufferDepthID, ctx.ViewDepth);
+                natCmd.SetComputeTextureParam(cs, kernel, t_GBufferDiffuseAlbedoID, ctx.DiffuseAlbedo);
+                natCmd.SetComputeTextureParam(cs, kernel, t_GBufferSpecularRoughID, ctx.SpecularRough);
+                natCmd.SetComputeTextureParam(cs, kernel, t_GBufferNormalsID, ctx.Normals);
+                natCmd.SetComputeTextureParam(cs, kernel, t_GBufferGeoNormalsID, ctx.GeoNormals);
                 natCmd.SetComputeTextureParam(cs, kernel, g_DirectLightingID, ctx.DirectLighting);
-                natCmd.SetComputeTextureParam(cs, kernel, "t_LocalLightPdfTexture", ctx.LocalLightPdfTexture);
+                natCmd.SetComputeTextureParam(cs, kernel, t_LocalLightPdfTextureID, ctx.LocalLightPdfTexture);
 
                 int rectW = (int)(ctx.RenderResolution.x * ctx.ResolutionScale + 0.5f);
                 int rectH = (int)(ctx.RenderResolution.y * ctx.ResolutionScale + 0.5f);
@@ -86,22 +86,22 @@ namespace PathTracing
 
                 natCmd.SetRayTracingShaderPass(data.RtShader, "RTXDI");
                 natCmd.SetRayTracingConstantBufferParam(data.RtShader, paramsID, ctx.ConstantBuffer, 0, ctx.ConstantBuffer.stride);
-                natCmd.SetRayTracingBufferParam(data.RtShader, "ResampleConstants", ctx.ResamplingConstantBuffer);
-                natCmd.SetRayTracingBufferParam(data.RtShader, "t_GeometryInstanceToLight", ctx.GeometryInstanceToLight);
+                natCmd.SetRayTracingBufferParam(data.RtShader, ResampleConstantsID, ctx.ResamplingConstantBuffer);
+                natCmd.SetRayTracingBufferParam(data.RtShader, t_GeometryInstanceToLightID, ctx.GeometryInstanceToLight);
 
                 natCmd.SetRayTracingBufferParam(data.RtShader, t_LightDataBufferID, ctx.RtxdiResources.LightDataBuffer);
                 natCmd.SetRayTracingBufferParam(data.RtShader, t_NeighborOffsetsID, ctx.RtxdiResources.NeighborOffsetsBuffer);
                 natCmd.SetRayTracingBufferParam(data.RtShader, u_LightReservoirsID, ctx.RtxdiResources.LightReservoirBuffer);
-                natCmd.SetRayTracingBufferParam(data.RtShader, "u_RisBuffer", ctx.RtxdiResources.RisBuffer);
-                natCmd.SetRayTracingBufferParam(data.RtShader, "u_RisLightDataBuffer", ctx.RtxdiResources.RisLightDataBuffer);
+                natCmd.SetRayTracingBufferParam(data.RtShader, u_RisBufferID, ctx.RtxdiResources.RisBuffer);
+                natCmd.SetRayTracingBufferParam(data.RtShader, u_RisLightDataBufferID, ctx.RtxdiResources.RisLightDataBuffer);
 
-                natCmd.SetRayTracingTextureParam(data.RtShader, "t_GBufferDepth", ctx.ViewDepth);
-                natCmd.SetRayTracingTextureParam(data.RtShader, "t_GBufferDiffuseAlbedo", ctx.DiffuseAlbedo);
-                natCmd.SetRayTracingTextureParam(data.RtShader, "t_GBufferSpecularRough", ctx.SpecularRough);
-                natCmd.SetRayTracingTextureParam(data.RtShader, "t_GBufferNormals", ctx.Normals);
-                natCmd.SetRayTracingTextureParam(data.RtShader, "t_GBufferGeoNormals", ctx.GeoNormals);
+                natCmd.SetRayTracingTextureParam(data.RtShader, t_GBufferDepthID, ctx.ViewDepth);
+                natCmd.SetRayTracingTextureParam(data.RtShader, t_GBufferDiffuseAlbedoID, ctx.DiffuseAlbedo);
+                natCmd.SetRayTracingTextureParam(data.RtShader, t_GBufferSpecularRoughID, ctx.SpecularRough);
+                natCmd.SetRayTracingTextureParam(data.RtShader, t_GBufferNormalsID, ctx.Normals);
+                natCmd.SetRayTracingTextureParam(data.RtShader, t_GBufferGeoNormalsID, ctx.GeoNormals);
                 natCmd.SetRayTracingTextureParam(data.RtShader, g_DirectLightingID, ctx.DirectLighting);
-                natCmd.SetRayTracingTextureParam(data.RtShader, "t_LocalLightPdfTexture", ctx.LocalLightPdfTexture);
+                natCmd.SetRayTracingTextureParam(data.RtShader, t_LocalLightPdfTextureID, ctx.LocalLightPdfTexture);
 
                 uint rectWmod = (uint)(ctx.RenderResolution.x * ctx.ResolutionScale + 0.5f);
                 uint rectHmod = (uint)(ctx.RenderResolution.y * ctx.ResolutionScale + 0.5f);

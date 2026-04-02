@@ -14,40 +14,23 @@ namespace PathTracing
     public class PdfTexturePass : ScriptableRenderPass
     {
         private readonly ComputeShader _opaqueTs;
-        private Resource _resource;
-        private Settings _settings;
-
+        private RtxdiPassContext _context;
 
         public PdfTexturePass(ComputeShader opaqueTs)
         {
             _opaqueTs = opaqueTs;
         }
 
-        public void Setup(Resource sharcResource, Settings sharcSettings)
+        public void Setup(RtxdiPassContext ctx)
         {
-            _resource = sharcResource;
-            _settings = sharcSettings;
-        }
-
-        public class Resource
-        {
-            internal GraphicsBuffer ResamplingConstantBuffer;
-
-            internal RTHandle u_LocalLightPdfTexture;
-            internal TextureHandle u_LocalLightPdfTextureHandle;
-
-            internal RtxdiResources RtxdiResources;
-        }
-
-        public class Settings
-        {
+            _context = ctx;
         }
 
         class PassData
         {
             internal ComputeShader OpaqueTs;
-            internal Resource Resource;
-            internal Settings Settings;
+            internal RtxdiPassContext Context;
+            internal TextureHandle LocalLightPdfTextureHandle;
         }
 
         static void ExecutePass(PassData data, ComputeGraphContext context)
@@ -58,16 +41,15 @@ namespace PathTracing
 
             natCmd.BeginSample(opaqueTracingMarker);
 
-            var resource = data.Resource;
+            var ctx = data.Context;
 
-            natCmd.SetComputeConstantBufferParam(data.OpaqueTs, "g_Const", resource.ResamplingConstantBuffer, 0, resource.ResamplingConstantBuffer.stride);
+            natCmd.SetComputeConstantBufferParam(data.OpaqueTs, g_ConstID, ctx.ResamplingConstantBuffer, 0, ctx.ResamplingConstantBuffer.stride);
 
-            natCmd.SetComputeBufferParam(data.OpaqueTs, 0, t_LightDataBufferID, resource.RtxdiResources.LightDataBuffer);
+            natCmd.SetComputeBufferParam(data.OpaqueTs, 0, t_LightDataBufferID, ctx.RtxdiResources.LightDataBuffer);
 
-            natCmd.SetComputeTextureParam(data.OpaqueTs, 0, "u_LocalLightPdfTexture", resource.u_LocalLightPdfTextureHandle);
- 
-            // var all = resource.RtxdiResources.Scene.numLights;
-            var all = resource.RtxdiResources.Scene.localLightPdfTextureSize.x * resource.RtxdiResources.Scene.localLightPdfTextureSize.y;
+            natCmd.SetComputeTextureParam(data.OpaqueTs, 0, u_LocalLightPdfTextureID, data.LocalLightPdfTextureHandle);
+
+            var all = ctx.RtxdiResources.Scene.localLightPdfTextureSize.x * ctx.RtxdiResources.Scene.localLightPdfTextureSize.y;
 
             var X = (int)(all + 255) / 256;
 
@@ -87,15 +69,11 @@ namespace PathTracing
             using var builder = renderGraph.AddComputePass<PassData>("pdfTexture", out var passData);
 
             passData.OpaqueTs = _opaqueTs;
-            passData.Resource = _resource;
-            passData.Settings = _settings;
+            passData.Context = _context;
 
-
-            var pdfTexHandle = renderGraph.ImportTexture(_resource.u_LocalLightPdfTexture);
-
-            _resource.u_LocalLightPdfTextureHandle = pdfTexHandle;
-
-            builder.UseTexture(_resource.u_LocalLightPdfTextureHandle, AccessFlags.Write);
+            var pdfTexHandle = renderGraph.ImportTexture(_context.LocalLightPdfTexture);
+            passData.LocalLightPdfTextureHandle = pdfTexHandle;
+            builder.UseTexture(pdfTexHandle, AccessFlags.Write);
 
             builder.AllowPassCulling(false);
             builder.SetRenderFunc((PassData data, ComputeGraphContext context) => { ExecutePass(data, context); });

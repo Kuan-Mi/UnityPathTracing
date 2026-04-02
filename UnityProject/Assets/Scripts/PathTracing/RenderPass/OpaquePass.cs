@@ -130,8 +130,8 @@ namespace PathTracing
             natCmd.SetRayTracingTextureParam(data.OpaqueTs, gIn_PrevBaseColorMetalnessID, resource.PrevBaseColorMetalness);
             
             
-            natCmd.SetRayTracingTextureParam(data.OpaqueTs,"gOut_GeoNormal", resource.GeoNormal);
-            natCmd.SetRayTracingTextureParam(data.OpaqueTs,"gIn_PrevGeoNormal", resource.PrevGeoNormal);
+            natCmd.SetRayTracingTextureParam(data.OpaqueTs, gOut_GeoNormalID, resource.GeoNormal);
+            natCmd.SetRayTracingTextureParam(data.OpaqueTs, gIn_PrevGeoNormalID, resource.PrevGeoNormal);
             
             
             
