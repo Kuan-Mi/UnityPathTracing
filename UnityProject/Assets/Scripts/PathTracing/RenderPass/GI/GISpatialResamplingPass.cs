@@ -53,16 +53,16 @@ namespace PathTracing
                 int kernel = cs.FindKernel("main");
 
                 natCmd.SetComputeConstantBufferParam(cs, paramsID, ctx.ConstantBuffer, 0, ctx.ConstantBuffer.stride);
-                natCmd.SetComputeConstantBufferParam(cs, "g_Const", ctx.ResamplingConstantBuffer, 0, ctx.ResamplingConstantBuffer.stride);
+                natCmd.SetComputeConstantBufferParam(cs, g_ConstID, ctx.ResamplingConstantBuffer, 0, ctx.ResamplingConstantBuffer.stride);
 
-                natCmd.SetComputeBufferParam(cs, kernel, "u_GIReservoirs", ctx.RtxdiResources.GIReservoirBuffer);
+                natCmd.SetComputeBufferParam(cs, kernel, u_GIReservoirsID, ctx.RtxdiResources.GIReservoirBuffer);
                 natCmd.SetComputeBufferParam(cs, kernel, t_NeighborOffsetsID, ctx.RtxdiResources.NeighborOffsetsBuffer);
 
-                natCmd.SetComputeTextureParam(cs, kernel, "t_GBufferDepth", ctx.ViewDepth);
-                natCmd.SetComputeTextureParam(cs, kernel, "t_GBufferDiffuseAlbedo", ctx.DiffuseAlbedo);
-                natCmd.SetComputeTextureParam(cs, kernel, "t_GBufferSpecularRough", ctx.SpecularRough);
-                natCmd.SetComputeTextureParam(cs, kernel, "t_GBufferNormals", ctx.Normals);
-                natCmd.SetComputeTextureParam(cs, kernel, "t_GBufferGeoNormals", ctx.GeoNormals);
+                natCmd.SetComputeTextureParam(cs, kernel, t_GBufferDepthID, ctx.ViewDepth);
+                natCmd.SetComputeTextureParam(cs, kernel, t_GBufferDiffuseAlbedoID, ctx.DiffuseAlbedo);
+                natCmd.SetComputeTextureParam(cs, kernel, t_GBufferSpecularRoughID, ctx.SpecularRough);
+                natCmd.SetComputeTextureParam(cs, kernel, t_GBufferNormalsID, ctx.Normals);
+                natCmd.SetComputeTextureParam(cs, kernel, t_GBufferGeoNormalsID, ctx.GeoNormals);
 
                 int rectW = (int)(ctx.RenderResolution.x * ctx.ResolutionScale + 0.5f);
                 int rectH = (int)(ctx.RenderResolution.y * ctx.ResolutionScale + 0.5f);
@@ -81,16 +81,16 @@ namespace PathTracing
 
                 natCmd.SetRayTracingShaderPass(shader, "RTXDI");
                 natCmd.SetRayTracingConstantBufferParam(shader, paramsID, ctx.ConstantBuffer, 0, ctx.ConstantBuffer.stride);
-                natCmd.SetRayTracingBufferParam(shader, "ResampleConstants", ctx.ResamplingConstantBuffer);
+                natCmd.SetRayTracingBufferParam(shader, ResampleConstantsID, ctx.ResamplingConstantBuffer);
 
-                natCmd.SetRayTracingBufferParam(shader, "u_GIReservoirs", ctx.RtxdiResources.GIReservoirBuffer);
+                natCmd.SetRayTracingBufferParam(shader, u_GIReservoirsID, ctx.RtxdiResources.GIReservoirBuffer);
                 natCmd.SetRayTracingBufferParam(shader, t_NeighborOffsetsID, ctx.RtxdiResources.NeighborOffsetsBuffer);
 
-                natCmd.SetRayTracingTextureParam(shader, "t_GBufferDepth", ctx.ViewDepth);
-                natCmd.SetRayTracingTextureParam(shader, "t_GBufferDiffuseAlbedo", ctx.DiffuseAlbedo);
-                natCmd.SetRayTracingTextureParam(shader, "t_GBufferSpecularRough", ctx.SpecularRough);
-                natCmd.SetRayTracingTextureParam(shader, "t_GBufferNormals", ctx.Normals);
-                natCmd.SetRayTracingTextureParam(shader, "t_GBufferGeoNormals", ctx.GeoNormals);
+                natCmd.SetRayTracingTextureParam(shader, t_GBufferDepthID, ctx.ViewDepth);
+                natCmd.SetRayTracingTextureParam(shader, t_GBufferDiffuseAlbedoID, ctx.DiffuseAlbedo);
+                natCmd.SetRayTracingTextureParam(shader, t_GBufferSpecularRoughID, ctx.SpecularRough);
+                natCmd.SetRayTracingTextureParam(shader, t_GBufferNormalsID, ctx.Normals);
+                natCmd.SetRayTracingTextureParam(shader, t_GBufferGeoNormalsID, ctx.GeoNormals);
 
                 uint rectW = (uint)(ctx.RenderResolution.x * ctx.ResolutionScale + 0.5f);
                 uint rectH = (uint)(ctx.RenderResolution.y * ctx.ResolutionScale + 0.5f);

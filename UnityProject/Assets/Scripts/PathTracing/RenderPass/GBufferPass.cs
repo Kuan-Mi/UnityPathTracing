@@ -14,46 +14,22 @@ namespace PathTracing
     public class GBufferPass : ScriptableRenderPass
     {
         private readonly RayTracingShader _gBufferTs;
-        private Resource _resource;
-        private Settings _settings;
-
+        private RtxdiPassContext _context;
 
         public GBufferPass(RayTracingShader gBufferTs)
         {
             _gBufferTs = gBufferTs;
         }
 
-        public void Setup(Resource sharcResource, Settings sharcSettings)
+        public void Setup(RtxdiPassContext ctx)
         {
-            _resource = sharcResource;
-            _settings = sharcSettings;
-        }
-
-        public class Resource
-        {
-            internal GraphicsBuffer ConstantBuffer;
-
-            internal RTHandle ViewDepth;
-            internal RTHandle DiffuseAlbedo;
-            internal RTHandle SpecularRough;
-            internal RTHandle Normals;
-            internal RTHandle GeoNormals;
-            internal RTHandle Emissive;
-            internal RTHandle MotionVectors;
-        }
-
-        public class Settings
-        {
-            internal int2 m_RenderResolution;
-            internal float resolutionScale;
-            internal int convergenceStep;
+            _context = ctx;
         }
 
         class PassData
         {
             internal RayTracingShader gBufferTs;
-            internal Resource Resource;
-            internal Settings Settings;
+            internal RtxdiPassContext Context;
         }
 
         static void ExecutePass(PassData data, UnsafeGraphContext context)
@@ -64,23 +40,21 @@ namespace PathTracing
 
             natCmd.BeginSample(gBufferTracingMarker);
 
-            var resource = data.Resource;
-            var settings = data.Settings;
+            var ctx = data.Context;
 
             natCmd.SetRayTracingShaderPass(data.gBufferTs, "Test2");
-            natCmd.SetRayTracingConstantBufferParam(data.gBufferTs, paramsID, resource.ConstantBuffer, 0, resource.ConstantBuffer.stride);
+            natCmd.SetRayTracingConstantBufferParam(data.gBufferTs, paramsID, ctx.ConstantBuffer, 0, ctx.ConstantBuffer.stride);
 
+            natCmd.SetRayTracingTextureParam(data.gBufferTs, u_ViewDepthID, ctx.ViewDepth);
+            natCmd.SetRayTracingTextureParam(data.gBufferTs, u_DiffuseAlbedoID, ctx.DiffuseAlbedo);
+            natCmd.SetRayTracingTextureParam(data.gBufferTs, u_SpecularRoughID, ctx.SpecularRough);
+            natCmd.SetRayTracingTextureParam(data.gBufferTs, u_NormalsID, ctx.Normals);
+            natCmd.SetRayTracingTextureParam(data.gBufferTs, u_GeoNormalsID, ctx.GeoNormals);
+            natCmd.SetRayTracingTextureParam(data.gBufferTs, u_EmissiveID, ctx.Emissive);
+            natCmd.SetRayTracingTextureParam(data.gBufferTs, u_MotionVectorsID, ctx.MotionVectors);
 
-            natCmd.SetRayTracingTextureParam(data.gBufferTs, "u_ViewDepth", resource.ViewDepth);
-            natCmd.SetRayTracingTextureParam(data.gBufferTs, "u_DiffuseAlbedo", resource.DiffuseAlbedo);
-            natCmd.SetRayTracingTextureParam(data.gBufferTs, "u_SpecularRough", resource.SpecularRough);
-            natCmd.SetRayTracingTextureParam(data.gBufferTs, "u_Normals", resource.Normals);
-            natCmd.SetRayTracingTextureParam(data.gBufferTs, "u_GeoNormals", resource.GeoNormals);
-            natCmd.SetRayTracingTextureParam(data.gBufferTs, "u_Emissive", resource.Emissive);
-            natCmd.SetRayTracingTextureParam(data.gBufferTs, "u_MotionVectors", resource.MotionVectors);
-
-            uint rectWmod = (uint)(settings.m_RenderResolution.x * settings.resolutionScale + 0.5f);
-            uint rectHmod = (uint)(settings.m_RenderResolution.y * settings.resolutionScale + 0.5f);
+            uint rectWmod = (uint)(ctx.RenderResolution.x * ctx.ResolutionScale + 0.5f);
+            uint rectHmod = (uint)(ctx.RenderResolution.y * ctx.ResolutionScale + 0.5f);
 
             // Debug.Log($"Dispatch Rays Size: {rectWmod} x {rectHmod}");
 
@@ -104,9 +78,7 @@ namespace PathTracing
             using var builder = renderGraph.AddUnsafePass<PassData>("GBuffer", out var passData);
 
             passData.gBufferTs = _gBufferTs;
-
-            passData.Resource = _resource;
-            passData.Settings = _settings;
+            passData.Context = _context;
 
             var resourceData = frameData.Get<UniversalResourceData>();
 

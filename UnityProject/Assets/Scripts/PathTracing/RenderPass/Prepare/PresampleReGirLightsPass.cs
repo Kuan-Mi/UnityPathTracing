@@ -14,43 +14,28 @@ namespace PathTracing
     public class PresampleReGirLightsPass : ScriptableRenderPass
     {
         private readonly ComputeShader _opaqueTs;
-        private Resource _resource;
-        private Settings _settings;
-
+        private RtxdiPassContext _context;
+        private int _dispatchX;
+        private int _dispatchY;
 
         public PresampleReGirLightsPass(ComputeShader opaqueTs)
         {
             _opaqueTs = opaqueTs;
         }
 
-        public void Setup(Resource sharcResource, Settings sharcSettings)
+        public void Setup(RtxdiPassContext ctx, int x, int y)
         {
-            _resource = sharcResource;
-            _settings = sharcSettings;
-        }
-
-        public class Resource
-        {
-            internal GraphicsBuffer ConstantBuffer;
-            internal GraphicsBuffer ResamplingConstantBuffer;
-
-            internal RTHandle u_LocalLightPdfTexture;
-
-            internal RtxdiResources RtxdiResources;
-        }
-
-        public class Settings
-        {
-            internal int x;
-            internal int y;
-            internal int z;
+            _context = ctx;
+            _dispatchX = x;
+            _dispatchY = y;
         }
 
         class PassData
         {
             internal ComputeShader OpaqueTs;
-            internal Resource Resource;
-            internal Settings Settings;
+            internal RtxdiPassContext Context;
+            internal int DispatchX;
+            internal int DispatchY;
         }
 
         static void ExecutePass(PassData data, UnsafeGraphContext context)
@@ -61,22 +46,18 @@ namespace PathTracing
 
             natCmd.BeginSample(opaqueTracingMarker);
 
-            var resource = data.Resource;
-            var settings = data.Settings;
+            var ctx = data.Context;
 
-            natCmd.SetComputeConstantBufferParam(data.OpaqueTs, paramsID, resource.ConstantBuffer, 0, resource.ConstantBuffer.stride);
-            natCmd.SetComputeConstantBufferParam(data.OpaqueTs, "g_Const", resource.ResamplingConstantBuffer, 0, resource.ResamplingConstantBuffer.stride);
+            natCmd.SetComputeConstantBufferParam(data.OpaqueTs, paramsID, ctx.ConstantBuffer, 0, ctx.ConstantBuffer.stride);
+            natCmd.SetComputeConstantBufferParam(data.OpaqueTs, g_ConstID, ctx.ResamplingConstantBuffer, 0, ctx.ResamplingConstantBuffer.stride);
 
+            natCmd.SetComputeBufferParam(data.OpaqueTs, 0, u_RisBufferID, ctx.RtxdiResources.RisBuffer);
+            natCmd.SetComputeBufferParam(data.OpaqueTs, 0, t_LightDataBufferID, ctx.RtxdiResources.LightDataBuffer);
+            natCmd.SetComputeBufferParam(data.OpaqueTs, 0, u_RisLightDataBufferID, ctx.RtxdiResources.RisLightDataBuffer);
 
-            natCmd.SetComputeBufferParam(data.OpaqueTs, 0, "u_RisBuffer", resource.RtxdiResources.RisBuffer);
-            natCmd.SetComputeBufferParam(data.OpaqueTs, 0, "t_LightDataBuffer", resource.RtxdiResources.LightDataBuffer);
-            natCmd.SetComputeBufferParam(data.OpaqueTs, 0, "u_RisLightDataBuffer", resource.RtxdiResources.RisLightDataBuffer);
+            natCmd.SetComputeTextureParam(data.OpaqueTs, 0, t_LocalLightPdfTextureID, ctx.LocalLightPdfTexture);
 
-
-            natCmd.SetComputeTextureParam(data.OpaqueTs, 0, "t_LocalLightPdfTexture", resource.u_LocalLightPdfTexture);
-
-
-            natCmd.DispatchCompute(data.OpaqueTs, 0, settings.x, settings.y, 1);
+            natCmd.DispatchCompute(data.OpaqueTs, 0, data.DispatchX, data.DispatchY, 1);
 
             natCmd.EndSample(opaqueTracingMarker);
         }
@@ -87,9 +68,9 @@ namespace PathTracing
             using var builder = renderGraph.AddUnsafePass<PassData>("PresampleReGirLightsPass", out var passData);
 
             passData.OpaqueTs = _opaqueTs;
-
-            passData.Resource = _resource;
-            passData.Settings = _settings;
+            passData.Context = _context;
+            passData.DispatchX = _dispatchX;
+            passData.DispatchY = _dispatchY;
 
 
             builder.AllowPassCulling(false);

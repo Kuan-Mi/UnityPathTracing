@@ -14,48 +14,40 @@ namespace PathTracing
     {
         private readonly ComputeShader DlssBeforeCs;
 
-        private Resource _resource;
-        private Settings _settings;
+        private RtxdiPassContext _context;
+        private RTHandle _rrDiffAlbedo;
+        private RTHandle _rrSpecAlbedo;
+        private RTHandle _rrSpecHitDist;
+        private RTHandle _rrNormalRoughness;
+        private int _rectGridW;
+        private int _rectGridH;
 
         public RxtdiDlssBeforePass(ComputeShader dlssBeforeCs)
         {
             DlssBeforeCs = dlssBeforeCs;
         }
 
-        public void Setup(Resource resource, Settings settings)
+        public void Setup(RtxdiPassContext ctx, RTHandle rrDiffAlbedo, RTHandle rrSpecAlbedo, RTHandle rrSpecHitDist, RTHandle rrNormalRoughness, int rectGridW, int rectGridH)
         {
-            _resource = resource;
-            _settings = settings;
-        }
-
-
-        public class Resource
-        {
-            internal GraphicsBuffer ConstantBuffer;
-
-
-            internal RTHandle ViewDepth;
-            internal RTHandle DiffuseAlbedo;
-            internal RTHandle SpecularRough;
-            internal RTHandle Normals;
-
-            internal RTHandle RRGuide_DiffAlbedo;
-            internal RTHandle RRGuide_SpecAlbedo;
-            internal RTHandle RRGuide_SpecHitDistance;
-            internal RTHandle RRGuide_Normal_Roughness;
-        }
-
-        public class Settings
-        {
-            internal int rectGridW;
-            internal int rectGridH;
+            _context = ctx;
+            _rrDiffAlbedo = rrDiffAlbedo;
+            _rrSpecAlbedo = rrSpecAlbedo;
+            _rrSpecHitDist = rrSpecHitDist;
+            _rrNormalRoughness = rrNormalRoughness;
+            _rectGridW = rectGridW;
+            _rectGridH = rectGridH;
         }
 
         class PassData
         {
             internal ComputeShader DlssBeforeCs;
-            internal Resource Resource;
-            internal Settings Setting;
+            internal RtxdiPassContext Context;
+            internal RTHandle RRDiffAlbedo;
+            internal RTHandle RRSpecAlbedo;
+            internal RTHandle RRSpecHitDist;
+            internal RTHandle RRNormalRoughness;
+            internal int RectGridW;
+            internal int RectGridH;
         }
 
         [DllImport("RenderingPlugin")]
@@ -69,21 +61,20 @@ namespace PathTracing
 
             // dlss Before
             natCmd.BeginSample(dlssBeforeMarker);
-            natCmd.SetComputeConstantBufferParam(data.DlssBeforeCs, paramsID, data.Resource.ConstantBuffer, 0, data.Resource.ConstantBuffer.stride);
+            var ctx = data.Context;
+            natCmd.SetComputeConstantBufferParam(data.DlssBeforeCs, paramsID, ctx.ConstantBuffer, 0, ctx.ConstantBuffer.stride);
 
-            natCmd.SetComputeTextureParam(data.DlssBeforeCs, 0, "gIn_ViewDepth", data.Resource.ViewDepth);
-            natCmd.SetComputeTextureParam(data.DlssBeforeCs, 0, "gIn_DiffuseAlbedo", data.Resource.DiffuseAlbedo);
-            natCmd.SetComputeTextureParam(data.DlssBeforeCs, 0, "gIn_SpecularRough", data.Resource.SpecularRough);
-            natCmd.SetComputeTextureParam(data.DlssBeforeCs, 0, "gIn_Normals", data.Resource.Normals);
+            natCmd.SetComputeTextureParam(data.DlssBeforeCs, 0, gIn_ViewDepthID, ctx.ViewDepth);
+            natCmd.SetComputeTextureParam(data.DlssBeforeCs, 0, gIn_DiffuseAlbedoID, ctx.DiffuseAlbedo);
+            natCmd.SetComputeTextureParam(data.DlssBeforeCs, 0, gIn_SpecularRoughID, ctx.SpecularRough);
+            natCmd.SetComputeTextureParam(data.DlssBeforeCs, 0, gIn_NormalsID, ctx.Normals);
 
+            natCmd.SetComputeTextureParam(data.DlssBeforeCs, 0, gOut_DiffAlbedoID, data.RRDiffAlbedo);
+            natCmd.SetComputeTextureParam(data.DlssBeforeCs, 0, gOut_SpecAlbedoID, data.RRSpecAlbedo);
+            natCmd.SetComputeTextureParam(data.DlssBeforeCs, 0, gOut_SpecHitDistanceID, data.RRSpecHitDist);
+            natCmd.SetComputeTextureParam(data.DlssBeforeCs, 0, g_Normal_RoughnessID, data.RRNormalRoughness);
 
-            natCmd.SetComputeTextureParam(data.DlssBeforeCs, 0, "gOut_DiffAlbedo", data.Resource.RRGuide_DiffAlbedo);
-            natCmd.SetComputeTextureParam(data.DlssBeforeCs, 0, "gOut_SpecAlbedo", data.Resource.RRGuide_SpecAlbedo);
-            natCmd.SetComputeTextureParam(data.DlssBeforeCs, 0, "gOut_SpecHitDistance", data.Resource.RRGuide_SpecHitDistance);
-            natCmd.SetComputeTextureParam(data.DlssBeforeCs, 0, "gOut_Normal_Roughness", data.Resource.RRGuide_Normal_Roughness);
-
-
-            natCmd.DispatchCompute(data.DlssBeforeCs, 0, (int)data.Setting.rectGridW, (int)data.Setting.rectGridH, 1);
+            natCmd.DispatchCompute(data.DlssBeforeCs, 0, data.RectGridW, data.RectGridH, 1);
             natCmd.EndSample(dlssBeforeMarker);
         }
 
@@ -92,8 +83,13 @@ namespace PathTracing
             using var builder = renderGraph.AddUnsafePass<PassData>("DLSS RR Before", out var passData);
 
             passData.DlssBeforeCs = DlssBeforeCs;
-            passData.Resource = _resource;
-            passData.Setting = _settings;
+            passData.Context = _context;
+            passData.RRDiffAlbedo = _rrDiffAlbedo;
+            passData.RRSpecAlbedo = _rrSpecAlbedo;
+            passData.RRSpecHitDist = _rrSpecHitDist;
+            passData.RRNormalRoughness = _rrNormalRoughness;
+            passData.RectGridW = _rectGridW;
+            passData.RectGridH = _rectGridH;
 
             builder.AllowPassCulling(false);
             builder.SetRenderFunc((PassData data, UnsafeGraphContext context) => { ExecutePass(data, context); });
