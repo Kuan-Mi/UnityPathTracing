@@ -256,6 +256,7 @@ namespace PathTracing
             if (!_resourcePools.TryGetValue(uniqueKey, out var pool))
             {
                 pool = new PathTracingResourcePool(pathTracingSetting);
+                pool.InitPathTracingResources();
                 _resourcePools.Add(uniqueKey, pool);
             }
 

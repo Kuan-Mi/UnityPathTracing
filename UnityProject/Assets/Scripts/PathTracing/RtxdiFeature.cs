@@ -310,6 +310,7 @@ namespace PathTracing
             if (!_resourcePools.TryGetValue(uniqueKey, out var pool))
             {
                 pool = new PathTracingResourcePool(setting);
+                pool.InitRtxdiResources();
                 _resourcePools.Add(uniqueKey, pool);
             }
 
@@ -634,16 +635,6 @@ namespace PathTracing
             var outputBlitResource = new OutputBlitPass.Resource
             {
                 Mv                       = pool.GetRT(RenderResourceType.RtxdiMotionVectors),
-                NormalRoughness          = pool.GetRT(RenderResourceType.NormalRoughness),
-                BaseColorMetalness       = pool.GetRT(RenderResourceType.BasecolorMetalness),
-                Penumbra                 = pool.GetRT(RenderResourceType.Penumbra),
-                Diff                     = pool.GetRT(RenderResourceType.DiffRadianceHitdist),
-                Spec                     = pool.GetRT(RenderResourceType.SpecRadianceHitdist),
-                ShadowTranslucency       = pool.GetRT(RenderResourceType.OutShadowTranslucency),
-                DenoisedDiff             = pool.GetRT(RenderResourceType.OutDiffRadianceHitdist),
-                DenoisedSpec             = pool.GetRT(RenderResourceType.OutSpecRadianceHitdist),
-                Validation               = pool.GetRT(RenderResourceType.Validation),
-                Composed                 = pool.GetRT(RenderResourceType.Composed),
                 DirectLighting           = pool.GetRT(RenderResourceType.DirectLighting),
                 RRGuide_DiffAlbedo       = pool.GetRT(RenderResourceType.RrGuideDiffAlbedo),
                 RRGuide_SpecAlbedo       = pool.GetRT(RenderResourceType.RrGuideSpecAlbedo),

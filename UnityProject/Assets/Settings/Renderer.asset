@@ -69,9 +69,9 @@ MonoBehaviour:
     regirDynamicParams:
       regirCellSize: 1
       center:
-        x: -10.6473675
-        y: 9.068141
-        z: -12.20344
+        x: -8.146484
+        y: 4.0495596
+        z: 8.457276
       fallbackSamplingMode: 1
       presamplingMode: 1
       regirSamplingJitter: 1
