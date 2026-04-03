@@ -32,6 +32,12 @@ namespace PathTracing
 
             DrawGroupedAssetFields();
 
+            if (GUILayout.Button("Auto Fill Shaders & Materials"))
+            {
+                Undo.RecordObject(feature, "Auto Fill Shaders");
+                feature.AutoFillShaders();
+            }
+
             if (GUILayout.Button("InitializeBuffers"))
             {
                 feature.InitializeBuffers();

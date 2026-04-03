@@ -95,8 +95,8 @@ namespace PathTracing
 
         public bool enableGIFinalShading = true;
         public bool enableDIFinalShading = true;
-        
-        public bool enableEnv;
+
+        public bool enableEnv = true;
         public bool gShowLight;
 
         public ReGIRDynamicParameters regirDynamicParams = ReGIRDynamicParameters.Default();
