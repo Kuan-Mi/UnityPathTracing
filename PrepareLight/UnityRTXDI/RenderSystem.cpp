@@ -19,6 +19,12 @@ void RenderSystem::Initialize(IUnityInterfaces* interfaces)
 
     device = s_d3d12->GetDevice();
 
+    if (device == nullptr)
+    {
+        LOG("[Bindless] D3D12 device is null, skipping NRI initialization.");
+        return;
+    }
+
     nri::DeviceCreationD3D12Desc deviceDesc = {};
     deviceDesc.d3d12Device = device;
     deviceDesc.disableD3D12EnhancedBarriers = true;
@@ -93,6 +99,10 @@ void RenderSystem::ProcessDeviceEvent(UnityGfxDeviceEventType type, IUnityInterf
         s_Log = interfaces->Get<IUnityLog>();
 
         LOG("[Bindless] ProcessDeviceEvent kUnityGfxDeviceEventInitialize");
+
+        // 检查D3D12设备是否就绪，Asset Import Worker中设备为null，跳过ConfigureEvent避免崩溃
+        if (s_d3d12->GetDevice() == nullptr)
+            break;
 
         UnityD3D12PluginEventConfig config_1;
         config_1.graphicsQueueAccess = kUnityD3D12GraphicsQueueAccess_DontCare;
