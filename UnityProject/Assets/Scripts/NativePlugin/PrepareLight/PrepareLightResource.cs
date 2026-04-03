@@ -96,6 +96,7 @@ namespace RTXDI
 
         public PrepareLightResource()
         {
+            Debug.Log("Creating PrepareLightResource");
             instanceId = CreateDenoiserInstance();
 
             buffer = new NativeArray<PrepareLightFrameData>(BufferCount, Allocator.Persistent);

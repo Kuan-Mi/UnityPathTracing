@@ -589,7 +589,7 @@ namespace PathTracing
 
             var dlrrRes = new DlrrDenoiser.DlrrResources
             {
-                input           = pool.GetNriResource(setting.debugRtxdi ? RenderResourceType.DirectLighting : RenderResourceType.Composed),
+                input           = pool.GetNriResource(RenderResourceType.DirectLighting),
                 output          = pool.GetNriResource(RenderResourceType.DlssOutput),
                 mv              = pool.GetNriResource(RenderResourceType.RtxdiMotionVectors),
                 depth           = pool.GetNriResource(isOddFrame ? RenderResourceType.RtxdiViewDepth : RenderResourceType.RtxdiPrevViewDepth),
@@ -652,7 +652,6 @@ namespace PathTracing
                 showMV          = setting.showMv,
                 showValidation  = setting.showValidation,
                 showReference   = setting.useReferencePathTracing,
-                
             };
 
             _outputBlitPass.Setup(outputBlitResource, outputBlitSettings);
@@ -897,9 +896,9 @@ namespace PathTracing
             _gpuScene?.Dispose();
             _gpuScene = null;
 
-            _prepareLightResources.Dispose();
+            _prepareLightResources?.Dispose();
             _prepareLightResources = null;
-            ;
+
             _prepareLightPass = null;
             _gBufferPass      = null;
             _dlssrrPass       = null;
@@ -910,6 +909,46 @@ namespace PathTracing
         {
             _gpuScene.DebugReadback();
         }
+
+#if UNITY_EDITOR
+        private void Reset()
+        {
+            setting = new PathTracingSetting();
+            AutoFillShaders();
+        }
+
+        public void AutoFillShaders()
+        {
+            finalMaterial = UnityEditor.AssetDatabase.LoadAssetAtPath<Material>("Assets/Shaders/Mat/KM_Final.mat");
+
+            gBufferTracingShader         = UnityEditor.AssetDatabase.LoadAssetAtPath<RayTracingShader>("Assets/Shaders/RayTracing/GBuffer.raytrace");
+            brdfRayTracingShader         = UnityEditor.AssetDatabase.LoadAssetAtPath<RayTracingShader>("Assets/Shaders/RayTracing/GI/BrdfRayTracing.raytrace");
+            shadeSecondarySurfacesShader = UnityEditor.AssetDatabase.LoadAssetAtPath<RayTracingShader>("Assets/Shaders/RayTracing/GI/ShadeSecondarySurfaces.raytrace");
+            generateInitialShader        = UnityEditor.AssetDatabase.LoadAssetAtPath<RayTracingShader>("Assets/Shaders/RayTracing/DI/GenerateInitialSamples.raytrace");
+            giTemporalResamplingShader   = UnityEditor.AssetDatabase.LoadAssetAtPath<RayTracingShader>("Assets/Shaders/RayTracing/GI/TemporalResampling.raytrace");
+            giSpatialResamplingShader    = UnityEditor.AssetDatabase.LoadAssetAtPath<RayTracingShader>("Assets/Shaders/RayTracing/GI/SpatialResampling.raytrace");
+            giFinalShadingShader         = UnityEditor.AssetDatabase.LoadAssetAtPath<RayTracingShader>("Assets/Shaders/RayTracing/GI/FinalShading.raytrace");
+            temporalResamplingShader     = UnityEditor.AssetDatabase.LoadAssetAtPath<RayTracingShader>("Assets/Shaders/RayTracing/DI/TemporalResampling.raytrace");
+            spatialResamplingShader      = UnityEditor.AssetDatabase.LoadAssetAtPath<RayTracingShader>("Assets/Shaders/RayTracing/DI/SpatialResampling.raytrace");
+            shadeSamplesShader           = UnityEditor.AssetDatabase.LoadAssetAtPath<RayTracingShader>("Assets/Shaders/RayTracing/DI/ShadeSamples.raytrace");
+
+            shadeSecondarySurfacesComputeCs = UnityEditor.AssetDatabase.LoadAssetAtPath<ComputeShader>("Assets/Shaders/RayTracing/GI/ShadeSecondarySurfaces.compute");
+            generateInitialComputeCs        = UnityEditor.AssetDatabase.LoadAssetAtPath<ComputeShader>("Assets/Shaders/RayTracing/DI/GenerateInitialSamples.compute");
+            giTemporalResamplingComputeCs   = UnityEditor.AssetDatabase.LoadAssetAtPath<ComputeShader>("Assets/Shaders/RayTracing/GI/TemporalResampling.compute");
+            giSpatialResamplingComputeCs    = UnityEditor.AssetDatabase.LoadAssetAtPath<ComputeShader>("Assets/Shaders/RayTracing/GI/SpatialResampling.compute");
+            giFinalShadingComputeCs         = UnityEditor.AssetDatabase.LoadAssetAtPath<ComputeShader>("Assets/Shaders/RayTracing/GI/FinalShading.compute");
+            temporalResamplingComputeCs     = UnityEditor.AssetDatabase.LoadAssetAtPath<ComputeShader>("Assets/Shaders/RayTracing/DI/TemporalResampling.compute");
+            spatialResamplingComputeCs      = UnityEditor.AssetDatabase.LoadAssetAtPath<ComputeShader>("Assets/Shaders/RayTracing/DI/SpatialResampling.compute");
+            shadeSamplesComputeCs           = UnityEditor.AssetDatabase.LoadAssetAtPath<ComputeShader>("Assets/Shaders/RayTracing/DI/ShadeSamples.compute");
+            dlssBeforeCs                    = UnityEditor.AssetDatabase.LoadAssetAtPath<ComputeShader>("Assets/Shaders/PostProcess/RtxdiDlssBefore.compute");
+            pdfTextureCs                    = UnityEditor.AssetDatabase.LoadAssetAtPath<ComputeShader>("Assets/Shaders/RayTracing/Presampling/PdfTexture.compute");
+            presampleCs                     = UnityEditor.AssetDatabase.LoadAssetAtPath<ComputeShader>("Assets/Shaders/RayTracing/Presampling/Presample.compute");
+            presampleReGirCs                = UnityEditor.AssetDatabase.LoadAssetAtPath<ComputeShader>("Assets/Shaders/RayTracing/Presampling/PresampleReGIR.compute");
+            genMipsCs                       = UnityEditor.AssetDatabase.LoadAssetAtPath<ComputeShader>("Assets/Shaders/RayTracing/DI/GenerateMips.compute");
+
+            UnityEditor.EditorUtility.SetDirty(this);
+        }
+#endif
 
         // #define FLAG_NON_TRANSPARENT                0x01 // geometry flag: non-transparent
         // #define FLAG_TRANSPARENT                    0x02 // geometry flag: transparent
