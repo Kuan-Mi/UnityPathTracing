@@ -1,75 +1,56 @@
-/***************************************************************************
- # Copyright (c) 2020-2023, NVIDIA CORPORATION.  All rights reserved.
- #
- # NVIDIA CORPORATION and its licensors retain all intellectual property
- # and proprietary rights in and to this software, related documentation
- # and any modifications thereto.  Any use, reproduction, disclosure or
- # distribution of this software and related documentation without an express
- # license agreement from NVIDIA CORPORATION is strictly prohibited.
- **************************************************************************/
+/*
+ * SPDX-FileCopyrightText: Copyright (c) 2020-2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * SPDX-License-Identifier: LicenseRef-NvidiaProprietary
+ *
+ * NVIDIA CORPORATION, its affiliates and licensors retain all intellectual
+ * property and proprietary rights in and to this material, related
+ * documentation and any modifications thereto. Any use, reproduction,
+ * disclosure or distribution of this material and related documentation
+ * without an express license agreement from NVIDIA CORPORATION or
+ * its affiliates is strictly prohibited.
+ */
 
 #ifndef INITIAL_SAMPLING_FUNCTIONS_HLSLI
 #define INITIAL_SAMPLING_FUNCTIONS_HLSLI
 
-#include "Assets/Shaders/Rtxdi/DI/ReSTIRDIParameters.h"
-#include "Assets/Shaders/Rtxdi/DI/Reservoir.hlsl"
-#include "Assets/Shaders/Rtxdi/LightSampling/LocalLightSelection.hlsl"
+#include "Rtxdi/DI/ReSTIRDIParameters.h"
+#include "Rtxdi/DI/Reservoir.hlsli"
+#include "Rtxdi/LightSampling/LocalLightSelection.hlsli"
 #ifdef RTXDI_RIS_BUFFER_HLSLI
-#include "Assets/Shaders/Rtxdi/LightSampling/RISBuffer.hlsl"
+#include "Rtxdi/LightSampling/RISBuffer.hlsli"
 #if RTXDI_REGIR_MODE != RTXDI_REGIR_DISABLED
-#include "Assets/Shaders/Rtxdi/ReGIR/ReGIRSampling.hlsl"
+#include "Rtxdi/ReGIR/ReGIRSampling.hlsli"
 #endif
 #endif // RTXDI_RIS_BUFFER_HLSLI
-#include "Assets/Shaders/Rtxdi/LightSampling/UniformSampling.hlsl"
+#include "Rtxdi/LightSampling/UniformSampling.hlsli"
 
-#ifndef RTXDI_TILE_SIZE_IN_PIXELS
-#define RTXDI_TILE_SIZE_IN_PIXELS 16
-#endif
-
-struct RTXDI_SampleParameters
-{    
-    uint numLocalLightSamples;
-    uint numInfiniteLightSamples;
-    uint numEnvironmentMapSamples;
-    uint numBrdfSamples;
-
-    uint numMisSamples;
-    float localLightMisWeight;
-    float environmentMapMisWeight;
-    float brdfMisWeight;
-    float brdfCutoff;
-    float brdfRayMinT;
-};
+#define RTXDI_STRATIFY_LOCAL_SAMPLING 1
 
 //
 // MIS functions
 //
 
-// Sample parameters struct
-// Defined so that so these can be compile time constants as defined by the user
-// brdfCutoff Value in range [0,1] to determine how much to shorten BRDF rays. 0 to disable shortening
-RTXDI_SampleParameters RTXDI_InitSampleParameters(
-    uint numLocalLightSamples,
-    uint numInfiniteLightSamples,
-    uint numEnvironmentMapSamples,
-    uint numBrdfSamples,
-    float brdfCutoff RTXDI_DEFAULT(0.0f),
-    float brdfRayMinT RTXDI_DEFAULT(0.001f))
+struct RTXDI_InitialSamplingMisData
 {
-    RTXDI_SampleParameters result;
-    result.numLocalLightSamples = numLocalLightSamples;
-    result.numInfiniteLightSamples = numInfiniteLightSamples;
-    result.numEnvironmentMapSamples = numEnvironmentMapSamples;
-    result.numBrdfSamples = numBrdfSamples;
+	uint numMisSamples;
+	float localLightMisWeight;
+	float environmentMapMisWeight;
+	float brdfMisWeight;
+};
 
-    result.numMisSamples = numLocalLightSamples + numEnvironmentMapSamples + numBrdfSamples;
-    result.localLightMisWeight = float(numLocalLightSamples) / result.numMisSamples;
-    result.environmentMapMisWeight = float(numEnvironmentMapSamples) / result.numMisSamples;
-    result.brdfMisWeight = float(numBrdfSamples) / result.numMisSamples;
-    result.brdfCutoff = brdfCutoff;
-    result.brdfRayMinT = brdfRayMinT;
+RTXDI_InitialSamplingMisData RTXDI_ComputeInitialSamplingMisData(RTXDI_DIInitialSamplingParameters initialSamplingParams)
+{
+	RTXDI_InitialSamplingMisData result;
 
-    return result;
+	result.numMisSamples = initialSamplingParams.numLocalLightSamples +
+		initialSamplingParams.numEnvironmentSamples +
+		initialSamplingParams.numBrdfSamples;
+
+	result.localLightMisWeight = float(initialSamplingParams.numLocalLightSamples) / result.numMisSamples;
+	result.environmentMapMisWeight = float(initialSamplingParams.numEnvironmentSamples) / result.numMisSamples;
+	result.brdfMisWeight = float(initialSamplingParams.numBrdfSamples) / result.numMisSamples;
+
+	return result;
 }
 
 // Heuristic to determine a max visibility ray length from a PDF wrt. solid angle.
@@ -84,10 +65,10 @@ float RTXDI_BrdfMaxDistanceFromPdf(float brdfCutoff, float pdf)
 //      lightSelectionPdf is a dimensionless selection pdf
 float RTXDI_LightBrdfMisWeight(RAB_Surface surface, RAB_LightSample lightSample,
     float lightSelectionPdf, float lightMisWeight, bool isEnvironmentMap,
-    RTXDI_SampleParameters sampleParams)
+    float brdfMisWeight, float brdfCutoff)
 {
     float lightSolidAnglePdf = RAB_LightSampleSolidAnglePdf(lightSample);
-    if (sampleParams.brdfMisWeight == 0 || RAB_IsAnalyticLightSample(lightSample) ||
+    if (brdfMisWeight == 0 || RAB_IsAnalyticLightSample(lightSample) ||
         lightSolidAnglePdf <= 0 || isinf(lightSolidAnglePdf) || isnan(lightSolidAnglePdf))
     {
         // BRDF samples disabled or we can't trace BRDF rays MIS with analytical lights
@@ -99,8 +80,8 @@ float RTXDI_LightBrdfMisWeight(RAB_Surface surface, RAB_LightSample lightSample,
     RAB_GetLightDirDistance(surface, lightSample, lightDir, lightDistance);
 
     // Compensate for ray shortening due to brdf cutoff, does not apply to environment map sampling
-    float brdfPdf = RAB_GetSurfaceBrdfPdf(surface, lightDir);
-    float maxDistance = RTXDI_BrdfMaxDistanceFromPdf(sampleParams.brdfCutoff, brdfPdf);
+    float brdfPdf = RAB_SurfaceEvaluateBrdfPdf(surface, lightDir);
+    float maxDistance = RTXDI_BrdfMaxDistanceFromPdf(brdfCutoff, brdfPdf);
     if (!isEnvironmentMap && lightDistance > maxDistance)
         brdfPdf = 0.f;
 
@@ -108,7 +89,7 @@ float RTXDI_LightBrdfMisWeight(RAB_Surface surface, RAB_LightSample lightSample,
     float sourcePdfWrtSolidAngle = lightSelectionPdf * lightSolidAnglePdf;
 
     // MIS blending against solid angle pdfs.
-    float blendedPdfWrtSolidangle = lightMisWeight * sourcePdfWrtSolidAngle + sampleParams.brdfMisWeight * brdfPdf;
+    float blendedPdfWrtSolidangle = lightMisWeight * sourcePdfWrtSolidAngle + brdfMisWeight * brdfPdf;
 
     // Convert back, RTXDI divides shading again by this term later
     return blendedPdfWrtSolidangle / lightSolidAnglePdf;
@@ -118,18 +99,20 @@ float RTXDI_LightBrdfMisWeight(RAB_Surface surface, RAB_LightSample lightSample,
 // Local light UV selection and reservoir streaming
 //
 
-float2 RTXDI_RandomlySelectLocalLightUV(inout RAB_RandomSamplerState rng)
+float2 RTXDI_RandomlySelectLocalLightUV(inout RTXDI_RandomSamplerState rng)
 {
     float2 uv;
-    uv.x = RAB_GetNextRandom(rng);
-    uv.y = RAB_GetNextRandom(rng);
+    uv.x = RTXDI_GetNextRandom(rng);
+    uv.y = RTXDI_GetNextRandom(rng);
     return uv;
 }
 
 bool RTXDI_StreamLocalLightAtUVIntoReservoir(
-    inout RAB_RandomSamplerState rng,
-    RTXDI_SampleParameters sampleParams,
+    inout RTXDI_RandomSamplerState rng,
+    RTXDI_InitialSamplingMisData misData,
     RAB_Surface surface,
+	float brdfCutoff,
+	float localLightMisWeight,
     uint lightIndex,
     float2 uv,
     float invSourcePdf,
@@ -139,9 +122,9 @@ bool RTXDI_StreamLocalLightAtUVIntoReservoir(
 {
     RAB_LightSample candidateSample = RAB_SamplePolymorphicLight(lightInfo, surface, uv);
     float blendedSourcePdf = RTXDI_LightBrdfMisWeight(surface, candidateSample, 1.0 / invSourcePdf,
-        sampleParams.localLightMisWeight, false, sampleParams);
+        misData.localLightMisWeight, false, misData.brdfMisWeight, brdfCutoff);
     float targetPdf = RAB_GetLightSampleTargetPdfForSurface(candidateSample, surface);
-    float risRnd = RAB_GetNextRandom(rng);
+    float risRnd = RTXDI_GetNextRandom(rng);
 
     if (blendedSourcePdf == 0)
     {
@@ -163,15 +146,15 @@ bool RTXDI_StreamLocalLightAtUVIntoReservoir(
 #if RTXDI_REGIR_MODE != RTXDI_REGIR_DISABLED
 
 int RTXDI_CalculateReGIRCellIndex(
-    inout RAB_RandomSamplerState coherentRng,
+    inout RTXDI_RandomSamplerState coherentRng,
     ReGIR_Parameters regirParams,
     RAB_Surface surface)
 {
     int cellIndex = -1;
     float3 cellJitter = float3(
-        RAB_GetNextRandom(coherentRng),
-        RAB_GetNextRandom(coherentRng),
-        RAB_GetNextRandom(coherentRng));
+        RTXDI_GetNextRandom(coherentRng),
+        RTXDI_GetNextRandom(coherentRng),
+        RTXDI_GetNextRandom(coherentRng));
     cellJitter -= 0.5;
 
     float3 samplingPos = RAB_GetSurfaceWorldPos(surface);
@@ -199,7 +182,7 @@ RTXDI_RISTileInfo RTXDI_SelectLocalLightReGIRRISTile(
 #if RTXDI_ENABLE_PRESAMPLING
 #if RTXDI_REGIR_MODE != RTXDI_REGIR_DISABLED
 RTXDI_LocalLightSelectionContext RTXDI_InitializeLocalLightSelectionContextReGIRRIS(
-    inout RAB_RandomSamplerState coherentRng,
+    inout RTXDI_RandomSamplerState coherentRng,
     RTXDI_LightBufferRegion localLightBufferRegion,
     RTXDI_RISBufferSegmentParameters localLightRISBufferSegmentParams,
     ReGIR_Parameters regirParams,
@@ -225,7 +208,7 @@ RTXDI_LocalLightSelectionContext RTXDI_InitializeLocalLightSelectionContextReGIR
 #endif // RTXDI_ENABLE_PRESAMPLING
 
 RTXDI_LocalLightSelectionContext RTXDI_InitializeLocalLightSelectionContext(
-    inout RAB_RandomSamplerState coherentRng,
+    inout RTXDI_RandomSamplerState coherentRng,
     ReSTIRDI_LocalLightSamplingMode localLightSamplingMode,
     RTXDI_LightBufferRegion localLightBufferRegion
 #if RTXDI_ENABLE_PRESAMPLING
@@ -243,8 +226,6 @@ RTXDI_LocalLightSelectionContext RTXDI_InitializeLocalLightSelectionContext(
     if (localLightSamplingMode == ReSTIRDI_LocalLightSamplingMode_REGIR_RIS)
     {
         ctx = RTXDI_InitializeLocalLightSelectionContextReGIRRIS(coherentRng, localLightBufferRegion, localLightRISBufferSegmentParams, regirParams, surface);
-        
-        // ctx = (RTXDI_LocalLightSelectionContext)0;
     }
     else
 #endif // RTXDI_REGIR_MODE != RTXDI_REGIR_DISABLED
@@ -261,10 +242,11 @@ RTXDI_LocalLightSelectionContext RTXDI_InitializeLocalLightSelectionContext(
 }
 
 RTXDI_DIReservoir RTXDI_SampleLocalLightsInternal(
-    inout RAB_RandomSamplerState rng,
-    inout RAB_RandomSamplerState coherentRng,
+    inout RTXDI_RandomSamplerState rng,
+    inout RTXDI_RandomSamplerState coherentRng,
     RAB_Surface surface,
-    RTXDI_SampleParameters sampleParams,
+    RTXDI_DIInitialSamplingParameters sampleParams,
+	RTXDI_InitialSamplingMisData misData,
     ReSTIRDI_LocalLightSamplingMode localLightSamplingMode,
     RTXDI_LightBufferRegion localLightBufferRegion,
 #if RTXDI_ENABLE_PRESAMPLING
@@ -273,7 +255,7 @@ RTXDI_DIReservoir RTXDI_SampleLocalLightsInternal(
     ReGIR_Parameters regirParams,
 #endif
 #endif
-    inout RAB_LightSample o_selectedSample)
+    out RAB_LightSample o_selectedSample)
 {
     RTXDI_DIReservoir state = RTXDI_EmptyDIReservoir();
 
@@ -293,15 +275,20 @@ RTXDI_DIReservoir RTXDI_SampleLocalLightsInternal(
         RAB_LightInfo lightInfo;
         float invSourcePdf;
 
-        RTXDI_SelectNextLocalLight(lightSelectionContext, rng, lightInfo, lightIndex, invSourcePdf);
+        float rnd = RTXDI_GetNextRandom(rng);
+#if RTXDI_STRATIFY_LOCAL_SAMPLING
+        rnd = (rnd + i) / sampleParams.numLocalLightSamples;
+#endif // RTXDI_STRATIFY_LOCAL_SAMPLING
+
+        RTXDI_SelectNextLocalLight(lightSelectionContext, rnd, lightInfo, lightIndex, invSourcePdf);
         float2 uv = RTXDI_RandomlySelectLocalLightUV(rng);
-        bool zeroPdf = RTXDI_StreamLocalLightAtUVIntoReservoir(rng, sampleParams, surface, lightIndex, uv, invSourcePdf, lightInfo, state, o_selectedSample);
+        bool zeroPdf = RTXDI_StreamLocalLightAtUVIntoReservoir(rng, misData, surface, sampleParams.brdfCutoff, misData.localLightMisWeight, lightIndex, uv, invSourcePdf, lightInfo, state, o_selectedSample);
 
         if (zeroPdf)
             continue;
     }
 
-    RTXDI_FinalizeResampling(state, 1.0, sampleParams.numMisSamples);
+    RTXDI_FinalizeResampling(state, 1.0, misData.numMisSamples);
     state.M = 1;
 
     return state;
@@ -312,10 +299,11 @@ RTXDI_DIReservoir RTXDI_SampleLocalLightsInternal(
 //
 
 RTXDI_DIReservoir RTXDI_SampleLocalLights(
-    inout RAB_RandomSamplerState rng,
-    inout RAB_RandomSamplerState coherentRng,
+    inout RTXDI_RandomSamplerState rng,
+    inout RTXDI_RandomSamplerState coherentRng,
     RAB_Surface surface,
-    RTXDI_SampleParameters sampleParams,
+    RTXDI_DIInitialSamplingParameters sampleParams,
+	RTXDI_InitialSamplingMisData misData,
     ReSTIRDI_LocalLightSamplingMode localLightSamplingMode,
     RTXDI_LightBufferRegion localLightBufferRegion,
 #if RTXDI_ENABLE_PRESAMPLING
@@ -324,7 +312,7 @@ RTXDI_DIReservoir RTXDI_SampleLocalLights(
     ReGIR_Parameters regirParams,
 #endif
 #endif
-    inout RAB_LightSample o_selectedSample)
+    out RAB_LightSample o_selectedSample)
 {
     o_selectedSample = RAB_EmptyLightSample();
 
@@ -334,7 +322,7 @@ RTXDI_DIReservoir RTXDI_SampleLocalLights(
     if (sampleParams.numLocalLightSamples == 0)
         return RTXDI_EmptyDIReservoir();
 
-    return RTXDI_SampleLocalLightsInternal(rng, coherentRng, surface, sampleParams, localLightSamplingMode, localLightBufferRegion,
+    return RTXDI_SampleLocalLightsInternal(rng, coherentRng, surface, sampleParams, misData, localLightSamplingMode, localLightBufferRegion,
 #if RTXDI_ENABLE_PRESAMPLING
     localLightRISBufferSegmentParams,
 #if RTXDI_REGIR_MODE != RTXDI_REGIR_DISABLED
@@ -348,16 +336,16 @@ RTXDI_DIReservoir RTXDI_SampleLocalLights(
 // Uniform sampling for infinite lights
 //
 
-float2 RTXDI_RandomlySelectInfiniteLightUV(inout RAB_RandomSamplerState rng)
+float2 RTXDI_RandomlySelectInfiniteLightUV(inout RTXDI_RandomSamplerState rng)
 {
     float2 uv;
-    uv.x = RAB_GetNextRandom(rng);
-    uv.y = RAB_GetNextRandom(rng);
+    uv.x = RTXDI_GetNextRandom(rng);
+    uv.y = RTXDI_GetNextRandom(rng);
     return uv;
 }
 
 void RTXDI_StreamInfiniteLightAtUVIntoReservoir(
-    inout RAB_RandomSamplerState rng,
+    inout RTXDI_RandomSamplerState rng,
     RAB_LightInfo lightInfo,
     RAB_Surface surface,
     uint lightIndex,
@@ -368,7 +356,7 @@ void RTXDI_StreamInfiniteLightAtUVIntoReservoir(
 {
     RAB_LightSample candidateSample = RAB_SamplePolymorphicLight(lightInfo, surface, uv);
     float targetPdf = RAB_GetLightSampleTargetPdfForSurface(candidateSample, surface);
-    float risRnd = RAB_GetNextRandom(rng);
+    float risRnd = RTXDI_GetNextRandom(rng);
     bool selected = RTXDI_StreamSample(state, lightIndex, uv, risRnd, targetPdf, invSourcePdf);
 
     if (selected)
@@ -378,7 +366,7 @@ void RTXDI_StreamInfiniteLightAtUVIntoReservoir(
 }
 
 RTXDI_DIReservoir RTXDI_SampleInfiniteLights(
-    inout RAB_RandomSamplerState rng,
+    inout RTXDI_RandomSamplerState rng,
     RAB_Surface surface,
     uint numSamples,
     RTXDI_LightBufferRegion infiniteLightBufferRegion,
@@ -398,8 +386,9 @@ RTXDI_DIReservoir RTXDI_SampleInfiniteLights(
         float invSourcePdf;
         uint lightIndex;
         RAB_LightInfo lightInfo;
+        float rnd = RTXDI_GetNextRandom(rng);
 
-        RTXDI_RandomlySelectLightUniformly(rng, infiniteLightBufferRegion, lightInfo, lightIndex, invSourcePdf);
+        RTXDI_RandomlySelectLightUniformly(rnd, infiniteLightBufferRegion, lightInfo, lightIndex, invSourcePdf);
         float2 uv = RTXDI_RandomlySelectInfiniteLightUV(rng);
         RTXDI_StreamInfiniteLightAtUVIntoReservoir(rng, lightInfo, surface, lightIndex, uv, invSourcePdf, state, o_selectedSample);
     }
@@ -428,7 +417,7 @@ void RTXDI_UnpackEnvironmentLightDataFromRISData(
 }
 
 void RTXDI_RandomlySelectEnvironmentLightUVFromRISTile(
-    inout RAB_RandomSamplerState rng,
+    inout RTXDI_RandomSamplerState rng,
     RTXDI_RISTileInfo risTileInfo,
     out float2 uv,
     out float invSourcePdf
@@ -436,13 +425,15 @@ void RTXDI_RandomlySelectEnvironmentLightUVFromRISTile(
 {
     uint2 tileData;
     uint risBufferPtr;
-    RTXDI_RandomlySelectLightDataFromRISTile(rng, risTileInfo, tileData, risBufferPtr);
+    float rnd = RTXDI_GetNextRandom(rng);
+    RTXDI_RandomlySelectLightDataFromRISTile(rnd, risTileInfo, tileData, risBufferPtr);
     RTXDI_UnpackEnvironmentLightDataFromRISData(tileData, uv, invSourcePdf);
 }
 
 void RTXDI_StreamEnvironmentLightAtUVIntoReservoir(
-    inout RAB_RandomSamplerState rng,
-    RTXDI_SampleParameters sampleParams,
+    inout RTXDI_RandomSamplerState rng,
+    RTXDI_DIInitialSamplingParameters sampleParams,
+	RTXDI_InitialSamplingMisData misData,
     RAB_Surface surface,
     RAB_LightInfo lightInfo,
     uint environmentLightIndex,
@@ -453,9 +444,9 @@ void RTXDI_StreamEnvironmentLightAtUVIntoReservoir(
 {
     RAB_LightSample candidateSample = RAB_SamplePolymorphicLight(lightInfo, surface, uv);
     float blendedSourcePdf = RTXDI_LightBrdfMisWeight(surface, candidateSample, 1.0 / invSourcePdf,
-        sampleParams.environmentMapMisWeight, true, sampleParams);
+        misData.environmentMapMisWeight, true, misData.brdfMisWeight, sampleParams.brdfCutoff);
     float targetPdf = RAB_GetLightSampleTargetPdfForSurface(candidateSample, surface);
-    float risRnd = RAB_GetNextRandom(rng);
+    float risRnd = RTXDI_GetNextRandom(rng);
 
     bool selected = RTXDI_StreamSample(state, environmentLightIndex, uv, risRnd, targetPdf, 1.0 / blendedSourcePdf);
 
@@ -465,10 +456,11 @@ void RTXDI_StreamEnvironmentLightAtUVIntoReservoir(
 }
 
 RTXDI_DIReservoir RTXDI_SampleEnvironmentMap(
-    inout RAB_RandomSamplerState rng,
-    inout RAB_RandomSamplerState coherentRng,
+    inout RTXDI_RandomSamplerState rng,
+    inout RTXDI_RandomSamplerState coherentRng,
     RAB_Surface surface,
-    RTXDI_SampleParameters sampleParams,
+    RTXDI_DIInitialSamplingParameters sampleParams,
+	RTXDI_InitialSamplingMisData misData,
     RTXDI_EnvironmentLightBufferParameters params,
     RTXDI_RISBufferSegmentParameters risBufferSegmentParams,
     out RAB_LightSample o_selectedSample)
@@ -479,22 +471,22 @@ RTXDI_DIReservoir RTXDI_SampleEnvironmentMap(
     if (params.lightPresent == 0)
         return state;
 
-    if (sampleParams.numEnvironmentMapSamples == 0)
+    if (sampleParams.numEnvironmentSamples == 0)
         return state;
 
     RTXDI_RISTileInfo risTileInfo = RTXDI_RandomlySelectRISTile(coherentRng, risBufferSegmentParams);
 
     RAB_LightInfo lightInfo = RAB_LoadLightInfo(params.lightIndex, false);
 
-    for (uint i = 0; i < sampleParams.numEnvironmentMapSamples; i++)
+    for (uint i = 0; i < sampleParams.numEnvironmentSamples; i++)
     {
         float2 uv;
         float invSourcePdf;
         RTXDI_RandomlySelectEnvironmentLightUVFromRISTile(rng, risTileInfo, uv, invSourcePdf);
-        RTXDI_StreamEnvironmentLightAtUVIntoReservoir(rng, sampleParams, surface, lightInfo, params.lightIndex, uv, invSourcePdf, state, o_selectedSample);
+        RTXDI_StreamEnvironmentLightAtUVIntoReservoir(rng, sampleParams, misData, surface, lightInfo, params.lightIndex, uv, invSourcePdf, state, o_selectedSample);
     }
 
-    RTXDI_FinalizeResampling(state, 1.0, sampleParams.numMisSamples);
+    RTXDI_FinalizeResampling(state, 1.0, misData.numMisSamples);
     state.M = 1;
 
     return state;
@@ -507,15 +499,19 @@ RTXDI_DIReservoir RTXDI_SampleEnvironmentMap(
 //
 
 RTXDI_DIReservoir RTXDI_SampleBrdf(
-    inout RAB_RandomSamplerState rng,
+    inout RTXDI_RandomSamplerState rng,
     RAB_Surface surface,
-    RTXDI_SampleParameters sampleParams,
+	uint numBrdfSamples,
+	float brdfCutoff,
+	float brdfRayMinT,
+	RTXDI_InitialSamplingMisData misData,
+	inout RTXDI_RandomSamplerState coherentRng,
     RTXDI_LightBufferParameters lightBufferParams,
     out RAB_LightSample o_selectedSample)
 {
     RTXDI_DIReservoir state = RTXDI_EmptyDIReservoir();
     
-    for (uint i = 0; i < sampleParams.numBrdfSamples; ++i)
+    for (uint i = 0; i < numBrdfSamples; ++i)
     {
         float lightSourcePdf = 0;
         float3 sampleDir;
@@ -523,20 +519,20 @@ RTXDI_DIReservoir RTXDI_SampleBrdf(
         float2 randXY = float2(0, 0);
         RAB_LightSample candidateSample = RAB_EmptyLightSample();
 
-        if (RAB_GetSurfaceBrdfSample(surface, rng, sampleDir))
+        if (RAB_SurfaceImportanceSampleBrdf(surface, rng, sampleDir))
         {
-            float brdfPdf = RAB_GetSurfaceBrdfPdf(surface, sampleDir);
-            float maxDistance = RTXDI_BrdfMaxDistanceFromPdf(sampleParams.brdfCutoff, brdfPdf);
+            float brdfPdf = RAB_SurfaceEvaluateBrdfPdf(surface, sampleDir);
+            float maxDistance = RTXDI_BrdfMaxDistanceFromPdf(brdfCutoff, brdfPdf);
             
             bool hitAnything = RAB_TraceRayForLocalLight(RAB_GetSurfaceWorldPos(surface), sampleDir,
-                sampleParams.brdfRayMinT, maxDistance, lightIndex, randXY);
+                brdfRayMinT, maxDistance, lightIndex, randXY);
 
             if (lightIndex != RTXDI_InvalidLightIndex)
             {
                 RAB_LightInfo lightInfo = RAB_LoadLightInfo(lightIndex, false);
                 candidateSample = RAB_SamplePolymorphicLight(lightInfo, surface, randXY);
                     
-                if (sampleParams.brdfCutoff > 0.f)
+                if (brdfCutoff > 0.f)
                 {
                     // If Mis cutoff is used, we need to evaluate the sample and make sure it actually could have been
                     // generated by the area sampling technique. This is due to numerical precision.
@@ -544,8 +540,8 @@ RTXDI_DIReservoir RTXDI_SampleBrdf(
                     float lightDistance;
                     RAB_GetLightDirDistance(surface, candidateSample, lightDir, lightDistance);
 
-                    float brdfPdf = RAB_GetSurfaceBrdfPdf(surface, lightDir);
-                    float maxDistance = RTXDI_BrdfMaxDistanceFromPdf(sampleParams.brdfCutoff, brdfPdf);
+                    float brdfPdf = RAB_SurfaceEvaluateBrdfPdf(surface, lightDir);
+                    float maxDistance = RTXDI_BrdfMaxDistanceFromPdf(brdfCutoff, brdfPdf);
                     if (lightDistance > maxDistance)
                         lightIndex = RTXDI_InvalidLightIndex;
                 }
@@ -575,10 +571,10 @@ RTXDI_DIReservoir RTXDI_SampleBrdf(
         bool isEnvMapSample = lightIndex == lightBufferParams.environmentLightParams.lightIndex;
         float targetPdf = RAB_GetLightSampleTargetPdfForSurface(candidateSample, surface);
         float blendedSourcePdf = RTXDI_LightBrdfMisWeight(surface, candidateSample, lightSourcePdf,
-            isEnvMapSample ? sampleParams.environmentMapMisWeight : sampleParams.localLightMisWeight, 
+            isEnvMapSample ? misData.environmentMapMisWeight : misData.localLightMisWeight, 
             isEnvMapSample,
-            sampleParams);
-        float risRnd = RAB_GetNextRandom(rng);
+            misData.brdfMisWeight, brdfCutoff);
+        float risRnd = RTXDI_GetNextRandom(rng);
 
         bool selected = RTXDI_StreamSample(state, lightIndex, randXY, risRnd, targetPdf, 1.0f / blendedSourcePdf);
         if (selected) {
@@ -586,7 +582,7 @@ RTXDI_DIReservoir RTXDI_SampleBrdf(
         }
     }
 
-    RTXDI_FinalizeResampling(state, 1.0, sampleParams.numMisSamples);
+    RTXDI_FinalizeResampling(state, 1.0, misData.numMisSamples);
     state.M = 1;
 
     return state;
@@ -594,12 +590,11 @@ RTXDI_DIReservoir RTXDI_SampleBrdf(
 
 // Samples the local, infinite, and environment lights for a given surface
 RTXDI_DIReservoir RTXDI_SampleLightsForSurface(
-    inout RAB_RandomSamplerState rng,
-    inout RAB_RandomSamplerState coherentRng,
+    inout RTXDI_RandomSamplerState rng,
+    inout RTXDI_RandomSamplerState coherentRng,
     RAB_Surface surface,
-    RTXDI_SampleParameters sampleParams,
+    RTXDI_DIInitialSamplingParameters sampleParams,
     RTXDI_LightBufferParameters lightBufferParams,
-    ReSTIRDI_LocalLightSamplingMode localLightSamplingMode,
 #if RTXDI_ENABLE_PRESAMPLING
     RTXDI_RISBufferSegmentParameters localLightRISBufferSegmentParams,
     RTXDI_RISBufferSegmentParameters environmentLightRISBufferSegmentParams,
@@ -614,8 +609,10 @@ RTXDI_DIReservoir RTXDI_SampleLightsForSurface(
     RTXDI_DIReservoir localReservoir;
     RAB_LightSample localSample = RAB_EmptyLightSample();
 
+	RTXDI_InitialSamplingMisData misData = RTXDI_ComputeInitialSamplingMisData(sampleParams);
+
     localReservoir = RTXDI_SampleLocalLights(rng, coherentRng, surface,
-        sampleParams, localLightSamplingMode, lightBufferParams.localLightBufferRegion,
+        sampleParams, misData, sampleParams.localLightSamplingMode, lightBufferParams.localLightBufferRegion,
 #if RTXDI_ENABLE_PRESAMPLING
     localLightRISBufferSegmentParams,
 #if RTXDI_REGIR_MODE != RTXDI_REGIR_DISABLED
@@ -631,19 +628,19 @@ localSample);
 #if RTXDI_ENABLE_PRESAMPLING
     RAB_LightSample environmentSample = RAB_EmptyLightSample();
     RTXDI_DIReservoir environmentReservoir = RTXDI_SampleEnvironmentMap(rng, coherentRng, surface,
-        sampleParams, lightBufferParams.environmentLightParams, environmentLightRISBufferSegmentParams, environmentSample);
+        sampleParams, misData, lightBufferParams.environmentLightParams, environmentLightRISBufferSegmentParams, environmentSample);
 #endif // RTXDI_ENABLE_PRESAMPLING
 
     RAB_LightSample brdfSample = RAB_EmptyLightSample();
-    RTXDI_DIReservoir brdfReservoir = RTXDI_SampleBrdf(rng, surface, sampleParams, lightBufferParams, brdfSample);
+    RTXDI_DIReservoir brdfReservoir = RTXDI_SampleBrdf(rng, surface, sampleParams.numBrdfSamples, sampleParams.brdfCutoff, sampleParams.brdfRayMinT, misData, coherentRng, lightBufferParams, brdfSample);
 
     RTXDI_DIReservoir state = RTXDI_EmptyDIReservoir();
     RTXDI_CombineDIReservoirs(state, localReservoir, 0.5, localReservoir.targetPdf);
-    bool selectInfinite = RTXDI_CombineDIReservoirs(state, infiniteReservoir, RAB_GetNextRandom(rng), infiniteReservoir.targetPdf);
+    bool selectInfinite = RTXDI_CombineDIReservoirs(state, infiniteReservoir, RTXDI_GetNextRandom(rng), infiniteReservoir.targetPdf);
 #if RTXDI_ENABLE_PRESAMPLING
-    bool selectEnvironment = RTXDI_CombineDIReservoirs(state, environmentReservoir, RAB_GetNextRandom(rng), environmentReservoir.targetPdf);
+    bool selectEnvironment = RTXDI_CombineDIReservoirs(state, environmentReservoir, RTXDI_GetNextRandom(rng), environmentReservoir.targetPdf);
 #endif // RTXDI_ENABLE_PRESAMPLING
-    bool selectBrdf = RTXDI_CombineDIReservoirs(state, brdfReservoir, RAB_GetNextRandom(rng), brdfReservoir.targetPdf);
+    bool selectBrdf = RTXDI_CombineDIReservoirs(state, brdfReservoir, RTXDI_GetNextRandom(rng), brdfReservoir.targetPdf);
     
     RTXDI_FinalizeResampling(state, 1.0, 1.0);
     state.M = 1;
@@ -660,6 +657,15 @@ localSample);
         o_lightSample = infiniteSample;
     else
         o_lightSample = localSample;
+
+	if(sampleParams.enableInitialVisibility && RTXDI_IsValidDIReservoir(state))
+	{
+		if (!RAB_GetConservativeVisibility(surface, o_lightSample))
+        {
+            RTXDI_StoreVisibilityInDIReservoir(state, 0, true);
+        }
+
+	}
 
     return state;
 }

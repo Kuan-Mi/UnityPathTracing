@@ -1,18 +1,22 @@
-/***************************************************************************
- # Copyright (c) 2023, NVIDIA CORPORATION.  All rights reserved.
- #
- # NVIDIA CORPORATION and its licensors retain all intellectual property
- # and proprietary rights in and to this software, related documentation
- # and any modifications thereto.  Any use, reproduction, disclosure or
- # distribution of this software and related documentation without an express
- # license agreement from NVIDIA CORPORATION is strictly prohibited.
- **************************************************************************/
+/*
+ * SPDX-FileCopyrightText: Copyright (c) 2023-2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * SPDX-License-Identifier: LicenseRef-NvidiaProprietary
+ *
+ * NVIDIA CORPORATION, its affiliates and licensors retain all intellectual
+ * property and proprietary rights in and to this material, related
+ * documentation and any modifications thereto. Any use, reproduction,
+ * disclosure or distribution of this material and related documentation
+ * without an express license agreement from NVIDIA CORPORATION or
+ * its affiliates is strictly prohibited.
+ */
 
 #ifndef RTXDI_GI_RESERVOIR_HLSLI
 #define RTXDI_GI_RESERVOIR_HLSLI
 
-#include "Assets/Shaders/Rtxdi/GI/ReSTIRGIParameters.h"
-#include "Assets/Shaders/Rtxdi/Utils/ReservoirAddressing.hlsl"
+#include "Rtxdi/GI/ReSTIRGIParameters.h"
+#include "Rtxdi/Utils/Color.hlsli"
+#include "Rtxdi/Utils/ReservoirAddressing.hlsli"
+#include "Rtxdi/Utils/TypePacking.hlsli"
 
 // Define this macro to 0 if your shader needs read-only access to the reservoirs, 
 // to avoid compile errors in the RTXDI_StoreDIReservoir function

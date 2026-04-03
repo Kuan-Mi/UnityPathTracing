@@ -1,20 +1,21 @@
-/***************************************************************************
- # Copyright (c) 2023-2024, NVIDIA CORPORATION.  All rights reserved.
- #
- # NVIDIA CORPORATION and its licensors retain all intellectual property
- # and proprietary rights in and to this software, related documentation
- # and any modifications thereto.  Any use, reproduction, disclosure or
- # distribution of this software and related documentation without an express
- # license agreement from NVIDIA CORPORATION is strictly prohibited.
- **************************************************************************/
+/*
+ * SPDX-FileCopyrightText: Copyright (c) 2023-2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * SPDX-License-Identifier: LicenseRef-NvidiaProprietary
+ *
+ * NVIDIA CORPORATION, its affiliates and licensors retain all intellectual
+ * property and proprietary rights in and to this material, related
+ * documentation and any modifications thereto. Any use, reproduction,
+ * disclosure or distribution of this material and related documentation
+ * without an express license agreement from NVIDIA CORPORATION or
+ * its affiliates is strictly prohibited.
+ */
 
 #ifndef RTXDI_GI_TEMPORAL_RESAMPLING_HLSLI
 #define RTXDI_GI_TEMPORAL_RESAMPLING_HLSLI
 
-#include "Assets/Shaders/Rtxdi/GI/JacobianMath.hlsl"
-#include "Assets/Shaders/Rtxdi/GI/Reservoir.hlsl"
-#include "Assets/Shaders/Rtxdi/Utils/Checkerboard.hlsl"
-#include "Assets/Shaders/Rtxdi/Utils/ReservoirAddressing.hlsl"
+#include "Rtxdi/GI/Reservoir.hlsli"
+#include "Rtxdi/Utils/Checkerboard.hlsli"
+#include "Rtxdi/Utils/ReservoirAddressing.hlsli"
 
 // Enabled by default. Application code need to define those macros appropriately to optimize shaders.
 #ifndef RTXDI_GI_ALLOWED_BIAS_CORRECTION
@@ -40,72 +41,27 @@ int2 RTXDI_CalculateTemporalResamplingOffset(int sampleIdx, int radius)
     return int2(tmp0, tmp0 * tmp1) * int2(tmp2, tmp3) * radius;
 }
 
-// A structure that groups the application-provided settings for spatio-temporal resampling.
-struct RTXDI_GITemporalResamplingParameters
-{
-    // Screen-space motion vector, computed as (previousPosition - currentPosition).
-    // The X and Y components are measured in pixels.
-    // The Z component is in linear depth units.
-    float3 screenSpaceMotion;
-
-    // The index of the reservoir buffer to pull the temporal samples from.
-    uint sourceBufferIndex;
-
-    // Maximum history length for reuse, measured in frames.
-    // Higher values result in more stable and high quality sampling, at the cost of slow reaction to changes.
-    uint maxHistoryLength;
-
-    // Controls the bias correction math for temporal reuse. Depending on the setting, it can add
-    // some shader cost and one approximate shadow ray per pixel (or per two pixels if checkerboard sampling is enabled).
-    // Ideally, these rays should be traced through the previous frame's BVH to get fully unbiased results.
-    uint biasCorrectionMode;
-
-    // Surface depth similarity threshold for temporal reuse.
-    // If the previous frame surface's depth is within this threshold from the current frame surface's depth,
-    // the surfaces are considered similar. The threshold is relative, i.e. 0.1 means 10% of the current depth.
-    // Otherwise, the pixel is not reused, and the resampling shader will look for a different one.
-    float depthThreshold;
-
-    // Surface normal similarity threshold for temporal reuse.
-    // If the dot product of two surfaces' normals is higher than this threshold, the surfaces are considered similar.
-    // Otherwise, the pixel is not reused, and the resampling shader will look for a different one.
-    float normalThreshold;
-
-    // Discard the reservoir if its age exceeds this value.
-    uint maxReservoirAge;
-
-    // Enables permuting the pixels sampled from the previous frame in order to add temporal
-    // variation to the output signal and make it more denoiser friendly.
-    bool enablePermutationSampling;
-
-    // Enables resampling from a location around the current pixel instead of what the motion vector points at,
-    // in case no surface near the motion vector matches the current surface (e.g. disocclusion).
-    // This behavoir makes disocclusion areas less noisy but locally biased, usually darker.
-    bool enableFallbackSampling;
-
-    // Random number for permutation sampling that is the same for all pixels in the frame
-    uint uniformRandomNumber;
-};
-
 // Temporal resampling for GI reservoir pass.
 RTXDI_GIReservoir RTXDI_GITemporalResampling(
     const uint2 pixelPosition,
     const RAB_Surface surface,
+	float3 screenSpaceMotion,
+	uint sourceBufferIndex,
     const RTXDI_GIReservoir inputReservoir,
-    inout RAB_RandomSamplerState rng,
+    inout RTXDI_RandomSamplerState rng,
     const RTXDI_RuntimeParameters params,
     const RTXDI_ReservoirBufferParameters reservoirParams,
     const RTXDI_GITemporalResamplingParameters tparams)
 {
     // Backproject this pixel to last frame
-    int2 prevPos = int2(round(float2(pixelPosition) + tparams.screenSpaceMotion.xy));
-    const float expectedPrevLinearDepth = RAB_GetSurfaceLinearDepth(surface) + tparams.screenSpaceMotion.z;
+    int2 prevPos = int2(round(float2(pixelPosition) + screenSpaceMotion.xy));
+    const float expectedPrevLinearDepth = RAB_GetSurfaceLinearDepth(surface) + screenSpaceMotion.z;
     const int radius = (params.activeCheckerboardField == 0) ? 1 : 2;
 
     RTXDI_GIReservoir temporalReservoir;
     bool foundTemporalReservoir = false;
 
-    const int temporalSampleStartIdx = int(RAB_GetNextRandom(rng) * 8);
+    const int temporalSampleStartIdx = int(RTXDI_GetNextRandom(rng) * 8);
 
     RAB_Surface temporalSurface = RAB_EmptySurface();
 
@@ -164,7 +120,7 @@ RTXDI_GIReservoir RTXDI_GITemporalResampling(
 
         // Read temporal reservoir.
         uint2 prevReservoirPos = RTXDI_PixelPosToReservoirPos(idx, params.activeCheckerboardField);
-        temporalReservoir = RTXDI_LoadGIReservoir(reservoirParams, prevReservoirPos, tparams.sourceBufferIndex);
+        temporalReservoir = RTXDI_LoadGIReservoir(reservoirParams, prevReservoirPos, sourceBufferIndex);
 
         // Check if the reservoir is a valid one.
         if (!RTXDI_IsValidGIReservoir(temporalReservoir))
@@ -191,7 +147,8 @@ RTXDI_GIReservoir RTXDI_GITemporalResampling(
         // Found a valid temporal surface and its GI reservoir.
 
         // Calculate Jacobian determinant to adjust weight.
-        float jacobian = RTXDI_CalculateJacobian(RAB_GetSurfaceWorldPos(surface), RAB_GetSurfaceWorldPos(temporalSurface), temporalReservoir);
+        //float jacobian = RTXDI_CalculateJacobian(RAB_GetSurfaceWorldPos(surface), RAB_GetSurfaceWorldPos(temporalSurface), temporalReservoir);
+		float jacobian = RTXDI_CalculateJacobian(RAB_GetSurfaceWorldPos(surface), RAB_GetSurfaceWorldPos(temporalSurface), temporalReservoir.position, temporalReservoir.normal);
 
         if (!RAB_ValidateGISampleWithJacobian(jacobian))
             foundTemporalReservoir = false;
@@ -215,7 +172,7 @@ RTXDI_GIReservoir RTXDI_GITemporalResampling(
         float targetPdf = RAB_GetGISampleTargetPdfForSurface(temporalReservoir.position, temporalReservoir.radiance, surface);
         
         // Combine the temporalReservoir into the curReservoir
-        selectedPreviousSample = RTXDI_CombineGIReservoirs(curReservoir, temporalReservoir, RAB_GetNextRandom(rng), targetPdf);
+        selectedPreviousSample = RTXDI_CombineGIReservoirs(curReservoir, temporalReservoir, RTXDI_GetNextRandom(rng), targetPdf);
         if (selectedPreviousSample)
         {
             selectedTargetPdf = targetPdf;

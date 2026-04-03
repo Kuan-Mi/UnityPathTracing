@@ -1,18 +1,20 @@
-/***************************************************************************
- # Copyright (c) 2020-2023, NVIDIA CORPORATION.  All rights reserved.
- #
- # NVIDIA CORPORATION and its licensors retain all intellectual property
- # and proprietary rights in and to this software, related documentation
- # and any modifications thereto.  Any use, reproduction, disclosure or
- # distribution of this software and related documentation without an express
- # license agreement from NVIDIA CORPORATION is strictly prohibited.
- **************************************************************************/
+/*
+ * SPDX-FileCopyrightText: Copyright (c) 2020-2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * SPDX-License-Identifier: LicenseRef-NvidiaProprietary
+ *
+ * NVIDIA CORPORATION, its affiliates and licensors retain all intellectual
+ * property and proprietary rights in and to this material, related
+ * documentation and any modifications thereto. Any use, reproduction,
+ * disclosure or distribution of this material and related documentation
+ * without an express license agreement from NVIDIA CORPORATION or
+ * its affiliates is strictly prohibited.
+ */
 
 #pragma once
 
 #include <stdint.h>
-#include "Assets/Shaders/Rtxdi/RtxdiUtils.h"
-#include "Assets/Shaders/Rtxdi/GI/ReSTIRGIParameters.h"
+#include "Rtxdi/RtxdiUtils.h"
+#include "Rtxdi/GI/ReSTIRGIParameters.h"
 
 namespace rtxdi
 {
@@ -35,10 +37,12 @@ enum class ReSTIRGI_ResamplingMode : uint32_t
     FusedSpatiotemporal = 4,
 };
 
-ReSTIRGI_BufferIndices GetDefaultReSTIRGIBufferIndices();
-ReSTIRGI_TemporalResamplingParameters GetDefaultReSTIRGITemporalResamplingParams();
-ReSTIRGI_SpatialResamplingParameters GetDefaultReSTIRGISpatialResamplingParams();
-ReSTIRGI_FinalShadingParameters GetDefaultReSTIRGIFinalShadingParams();
+RTXDI_GIBufferIndices GetDefaultReSTIRGIBufferIndices();
+RTXDI_GITemporalResamplingParameters GetDefaultReSTIRGITemporalResamplingParams();
+RTXDI_BoilingFilterParameters GetDefaultReSTIRGIBoilingFilterParams();
+RTXDI_GISpatialResamplingParameters GetDefaultReSTIRGISpatialResamplingParams();
+RTXDI_GISpatioTemporalResamplingParameters GetDefaultReSTIRGISpatioTemporalResamplingParams();
+RTXDI_GIFinalShadingParameters GetDefaultReSTIRGIFinalShadingParams();
 
 class ReSTIRGIContext
 {
@@ -50,18 +54,20 @@ public:
     uint32_t GetFrameIndex() const;
     RTXDI_ReservoirBufferParameters GetReservoirBufferParameters() const;
     ReSTIRGI_ResamplingMode GetResamplingMode() const;
-    ReSTIRGI_BufferIndices GetBufferIndices() const;
-    ReSTIRGI_TemporalResamplingParameters GetTemporalResamplingParameters() const;
-    ReSTIRGI_SpatialResamplingParameters GetSpatialResamplingParameters() const;
-    ReSTIRGI_FinalShadingParameters GetFinalShadingParameters() const;
+    RTXDI_GIBufferIndices GetBufferIndices() const;
+    RTXDI_GITemporalResamplingParameters GetTemporalResamplingParameters() const;
+    RTXDI_BoilingFilterParameters GetBoilingFilterParameters() const;
+    RTXDI_GISpatialResamplingParameters GetSpatialResamplingParameters() const;
+    RTXDI_GISpatioTemporalResamplingParameters GetSpatioTemporalResamplingParameters() const;
+    RTXDI_GIFinalShadingParameters GetFinalShadingParameters() const;
 
     void SetFrameIndex(uint32_t frameIndex);
     void SetResamplingMode(ReSTIRGI_ResamplingMode resamplingMode);
-    void SetTemporalResamplingParameters(const ReSTIRGI_TemporalResamplingParameters& temporalResamplingParams);
-    void SetSpatialResamplingParameters(const ReSTIRGI_SpatialResamplingParameters& spatialResamplingParams);
-    void SetFinalShadingParameters(const ReSTIRGI_FinalShadingParameters& finalShadingParams);
-
-    static uint32_t numReservoirBuffers;
+    void SetTemporalResamplingParameters(const RTXDI_GITemporalResamplingParameters& temporalResamplingParams);
+    void SetBoilingFilterParameters(const RTXDI_BoilingFilterParameters& boilingFilterParams);
+    void SetSpatialResamplingParameters(const RTXDI_GISpatialResamplingParameters& spatialResamplingParams);
+    void SetSpatioTemporalResamplingParameters(const RTXDI_GISpatioTemporalResamplingParameters& spatioTemporalParams);
+    void SetFinalShadingParameters(const RTXDI_GIFinalShadingParameters& finalShadingParams);
 
 private:
     ReSTIRGIStaticParameters m_staticParams;
@@ -69,10 +75,12 @@ private:
     uint32_t m_frameIndex;
     RTXDI_ReservoirBufferParameters m_reservoirBufferParams;
     ReSTIRGI_ResamplingMode m_resamplingMode;
-    ReSTIRGI_BufferIndices m_bufferIndices;
-    ReSTIRGI_TemporalResamplingParameters m_temporalResamplingParams;
-    ReSTIRGI_SpatialResamplingParameters m_spatialResamplingParams;
-    ReSTIRGI_FinalShadingParameters m_finalShadingParams;
+    RTXDI_GIBufferIndices m_bufferIndices;
+    RTXDI_GITemporalResamplingParameters m_temporalResamplingParams;
+    RTXDI_BoilingFilterParameters m_boilingFilterParams;
+    RTXDI_GISpatialResamplingParameters m_spatialResamplingParams;
+    RTXDI_GISpatioTemporalResamplingParameters m_spatioTemporalResamplingParams;
+    RTXDI_GIFinalShadingParameters m_finalShadingParams;
 
     void UpdateBufferIndices();
 };

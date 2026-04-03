@@ -1,12 +1,14 @@
-/***************************************************************************
- # Copyright (c) 2020-2023, NVIDIA CORPORATION.  All rights reserved.
- #
- # NVIDIA CORPORATION and its licensors retain all intellectual property
- # and proprietary rights in and to this software, related documentation
- # and any modifications thereto.  Any use, reproduction, disclosure or
- # distribution of this software and related documentation without an express
- # license agreement from NVIDIA CORPORATION is strictly prohibited.
- **************************************************************************/
+/*
+ * SPDX-FileCopyrightText: Copyright (c) 2020-2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * SPDX-License-Identifier: LicenseRef-NvidiaProprietary
+ *
+ * NVIDIA CORPORATION, its affiliates and licensors retain all intellectual
+ * property and proprietary rights in and to this material, related
+ * documentation and any modifications thereto. Any use, reproduction,
+ * disclosure or distribution of this material and related documentation
+ * without an express license agreement from NVIDIA CORPORATION or
+ * its affiliates is strictly prohibited.
+ */
 
 #ifndef RTXDI_REGIR_SAMPLING_FUNCTIONS_HLSLI
 #define RTXDI_REGIR_SAMPLING_FUNCTIONS_HLSLI
@@ -90,7 +92,7 @@ int RTXDI_ReGIR_WorldPosToCellIndex(ReGIR_Parameters params, float3 worldPos)
     ReGIR_OnionLayerGroup layerGroup;
 
     int layerGroupIndex;
-    for (layerGroupIndex = 0; layerGroupIndex < 5; layerGroupIndex++)
+    for (layerGroupIndex = 0; layerGroupIndex < params.onionParams.numLayerGroups; layerGroupIndex++)
     {
         if (r <= params.onionParams.layers[layerGroupIndex].outerRadius)
         {
@@ -146,7 +148,7 @@ bool RTXDI_ReGIR_CellIndexToWorldPos(ReGIR_Parameters params, int cellIndex, out
     cellIndex -= 1;
 
     int layerGroupIndex;
-    for (layerGroupIndex = 0; layerGroupIndex < 5; layerGroupIndex++)
+    for (layerGroupIndex = 0; layerGroupIndex < params.onionParams.numLayerGroups; layerGroupIndex++)
     {
         layerGroup = params.onionParams.layers[layerGroupIndex];
         int cellsPerGroup = layerGroup.cellsPerLayer * layerGroup.layerCount;
