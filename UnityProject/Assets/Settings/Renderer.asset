@@ -12,7 +12,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: ecc60134e0a049db88b485a3406f7b37, type: 3}
   m_Name: RtxdiFeature
   m_EditorClassIdentifier: Assembly-CSharp::PathTracing.RtxdiFeature
-  m_Active: 0
+  m_Active: 1
   setting:
     exposureEv: 0
     cameraJitter: 1
@@ -43,23 +43,31 @@ MonoBehaviour:
           pad1: 0
         secondarySurfaceReSTIRDIParams:
           initialSamplingParams:
-            numPrimaryLocalLightSamples: 2
-            numPrimaryInfiniteLightSamples: 1
-            numPrimaryEnvironmentSamples: 1
-            numPrimaryBrdfSamples: 0
+            numLocalLightSamples: 2
+            numInfiniteLightSamples: 1
+            numEnvironmentSamples: 1
+            numBrdfSamples: 0
             brdfCutoff: 0
+            brdfRayMinT: 0
+            localLightSamplingMode: 2
             enableInitialVisibility: 0
             environmentMapImportanceSampling: 0
-            localLightSamplingMode: 2
+            pad1: 0
+            pad2: 0
+            pad3: 0
           spatialResamplingParams:
-            spatialDepthThreshold: 0.1
-            spatialNormalThreshold: 0.9
-            spatialBiasCorrection: 1
-            numSpatialSamples: 1
+            numSamples: 1
             numDisocclusionBoostSamples: 0
-            spatialSamplingRadius: 4
-            neighborOffsetMask: 0
+            samplingRadius: 4
+            biasCorrectionMode: 1
+            depthThreshold: 0.1
+            normalThreshold: 0.9
+            targetHistoryLength: 0
+            enableMaterialSimilarityTest: 0
             discountNaiveSamples: 0
+            pad1: 0
+            pad2: 0
+            pad3: 0
     directLightingMode: 2
     indirectLightingMode: 2
     enableGIFinalShading: 1
@@ -69,54 +77,58 @@ MonoBehaviour:
     regirDynamicParams:
       regirCellSize: 1
       center:
-        x: 0.39646968
-        y: 2.2851274
-        z: 7.638987
+        x: -5.248151
+        y: 3.8202906
+        z: -23.099953
       fallbackSamplingMode: 1
       presamplingMode: 1
       regirSamplingJitter: 1
       regirNumBuildSamples: 8
-    useRasterGBuffer: 0
-    useComputeForGis: 0
-    useComputeForTemporalResampling: 0
-    useComputeForSpatialResampling: 0
-    useComputeForShadeSamples: 0
-    useComputeForShadeSecondarySurfaces: 0
-    useComputeForGITemporalResampling: 0
-    useComputeForGISpatialResampling: 0
-    useComputeForGIFinalShading: 0
+    useRasterGBuffer: 1
+    useComputeForGis: 1
+    useComputeForTemporalResampling: 1
+    useComputeForSpatialResampling: 1
+    useComputeForShadeSamples: 1
+    useComputeForShadeSecondarySurfaces: 1
+    useComputeForGITemporalResampling: 1
+    useComputeForGISpatialResampling: 1
+    useComputeForGIFinalShading: 1
     diResamplingMode: 3
     initialSamplingParams:
-      numPrimaryLocalLightSamples: 8
-      numPrimaryInfiniteLightSamples: 1
-      numPrimaryEnvironmentSamples: 1
-      numPrimaryBrdfSamples: 1
+      numLocalLightSamples: 8
+      numInfiniteLightSamples: 1
+      numEnvironmentSamples: 0
+      numBrdfSamples: 0
       brdfCutoff: 0.0001
-      enableInitialVisibility: 1
-      environmentMapImportanceSampling: 1
+      brdfRayMinT: 0.001
       localLightSamplingMode: 0
-    temporalResamplingParams:
-      temporalDepthThreshold: 0.1
-      temporalNormalThreshold: 0.5
-      maxHistoryLength: 20
-      temporalBiasCorrection: 1
-      enablePermutationSampling: 1
-      permutationSamplingThreshold: 0.9
-      enableBoilingFilter: 1
-      boilingFilterStrength: 0.2
-      discardInvisibleSamples: 0
-      uniformRandomNumber: 0
+      enableInitialVisibility: 0
+      environmentMapImportanceSampling: 1
+      pad1: 0
       pad2: 0
       pad3: 0
+    temporalResamplingParams:
+      maxHistoryLength: 20
+      biasCorrectionMode: 1
+      depthThreshold: 0.1
+      normalThreshold: 0.5
+      enableVisibilityShortcut: 0
+      enablePermutationSampling: 1
+      uniformRandomNumber: 0
+      permutationSamplingThreshold: 0.9
     spatialResamplingParams:
-      spatialDepthThreshold: 0.1
-      spatialNormalThreshold: 0.5
-      spatialBiasCorrection: 1
-      numSpatialSamples: 1
+      numSamples: 1
       numDisocclusionBoostSamples: 8
-      spatialSamplingRadius: 32
-      neighborOffsetMask: 0
+      samplingRadius: 32
+      biasCorrectionMode: 1
+      depthThreshold: 0.1
+      normalThreshold: 0.5
+      targetHistoryLength: 0
+      enableMaterialSimilarityTest: 1
       discountNaiveSamples: 0
+      pad1: 0
+      pad2: 0
+      pad3: 0
     shadingParams:
       enableFinalVisibility: 1
       reuseFinalVisibility: 1
@@ -130,22 +142,18 @@ MonoBehaviour:
     giTemporalResamplingParams:
       depthThreshold: 0.1
       normalThreshold: 0.6
-      enablePermutationSampling: 0
       maxHistoryLength: 8
-      maxReservoirAge: 30
-      enableBoilingFilter: 1
-      boilingFilterStrength: 0.2
       enableFallbackSampling: 1
-      temporalBiasCorrectionMode: 1
+      biasCorrectionMode: 1
+      maxReservoirAge: 30
+      enablePermutationSampling: 0
       uniformRandomNumber: 0
-      pad2: 0
-      pad3: 0
     giSpatialResamplingParams:
-      spatialDepthThreshold: 0.1
-      spatialNormalThreshold: 0.6
-      numSpatialSamples: 2
-      spatialSamplingRadius: 32
-      spatialBiasCorrectionMode: 1
+      depthThreshold: 0.1
+      normalThreshold: 0.6
+      numSamples: 2
+      samplingRadius: 32
+      biasCorrectionMode: 1
       pad1: 0
       pad2: 0
       pad3: 0
@@ -166,23 +174,31 @@ MonoBehaviour:
         pad1: 0
       secondarySurfaceReSTIRDIParams:
         initialSamplingParams:
-          numPrimaryLocalLightSamples: 2
-          numPrimaryInfiniteLightSamples: 1
-          numPrimaryEnvironmentSamples: 1
-          numPrimaryBrdfSamples: 0
+          numLocalLightSamples: 2
+          numInfiniteLightSamples: 1
+          numEnvironmentSamples: 1
+          numBrdfSamples: 0
           brdfCutoff: 0
+          brdfRayMinT: 0
+          localLightSamplingMode: 2
           enableInitialVisibility: 0
           environmentMapImportanceSampling: 0
-          localLightSamplingMode: 2
+          pad1: 0
+          pad2: 0
+          pad3: 0
         spatialResamplingParams:
-          spatialDepthThreshold: 0.1
-          spatialNormalThreshold: 0.9
-          spatialBiasCorrection: 1
-          numSpatialSamples: 1
+          numSamples: 1
           numDisocclusionBoostSamples: 0
-          spatialSamplingRadius: 4
-          neighborOffsetMask: 0
+          samplingRadius: 4
+          biasCorrectionMode: 1
+          depthThreshold: 0.1
+          normalThreshold: 0.9
+          targetHistoryLength: 0
+          enableMaterialSimilarityTest: 0
           discountNaiveSamples: 0
+          pad1: 0
+          pad2: 0
+          pad3: 0
     sunAngularDiameter: 0.533
     upscalerMode: 0
     mipBias: -0.5

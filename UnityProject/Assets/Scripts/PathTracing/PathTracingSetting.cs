@@ -104,14 +104,14 @@ namespace PathTracing
         [FoldoutHeader("use cs")]
         public bool useRasterGBuffer = false;
 
-        public bool useComputeForGis;
-        public bool useComputeForTemporalResampling;
-        public bool useComputeForSpatialResampling;
-        public bool useComputeForShadeSamples;
-        public bool useComputeForShadeSecondarySurfaces;
-        public bool useComputeForGITemporalResampling;
-        public bool useComputeForGISpatialResampling;
-        public bool useComputeForGIFinalShading;
+        public bool useComputeForGis                    = true;
+        public bool useComputeForTemporalResampling     = true;
+        public bool useComputeForSpatialResampling      = true;
+        public bool useComputeForShadeSamples           = true;
+        public bool useComputeForShadeSecondarySurfaces = true;
+        public bool useComputeForGITemporalResampling   = true;
+        public bool useComputeForGISpatialResampling    = true;
+        public bool useComputeForGIFinalShading         = true;
 
         [FoldoutHeader("ReSTIR DI")]
         public ReSTIRDI_ResamplingMode diResamplingMode = ReSTIRDI_ResamplingMode.TemporalAndSpatial;
