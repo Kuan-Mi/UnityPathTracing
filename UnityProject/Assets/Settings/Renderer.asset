@@ -12,7 +12,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: ecc60134e0a049db88b485a3406f7b37, type: 3}
   m_Name: RtxdiFeature
   m_EditorClassIdentifier: Assembly-CSharp::PathTracing.RtxdiFeature
-  m_Active: 0
+  m_Active: 1
   setting:
     exposureEv: -2
     cameraJitter: 1
@@ -69,9 +69,9 @@ MonoBehaviour:
     regirDynamicParams:
       regirCellSize: 1
       center:
-        x: -10.13138
-        y: 1.4567231
-        z: -2.0140357
+        x: -10.6473675
+        y: 9.068141
+        z: -12.20344
       fallbackSamplingMode: 1
       presamplingMode: 1
       regirSamplingJitter: 1
@@ -330,7 +330,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: f50908f0e9bf42149891b36684931380, type: 3}
   m_Name: PathTracingFeature
   m_EditorClassIdentifier: Assembly-CSharp::PathTracing.PathTracingFeature
-  m_Active: 1
+  m_Active: 0
   pathTracingSetting:
     exposureEv: -2
     cameraJitter: 1

@@ -72,6 +72,9 @@ public class GPUProfiler : MonoBehaviour
 
     private void Update()
     {
+        if (Input.GetKeyDown(toggleKey))
+            _visible = !_visible;
+        
         float currentTime = Time.unscaledTime;
 
         foreach (var item in _recorderMap)
@@ -114,76 +117,95 @@ public class GPUProfiler : MonoBehaviour
         }
     }
 
+    [Tooltip("切换面板的按键（默认 F2）")]
+    public KeyCode toggleKey = KeyCode.F2;
+
+    private bool _visible;
+    private Rect _windowRect;
+    private bool _windowRectInited;
+    private Vector2 _scrollPos;
+ 
+
     void OnGUI()
     {
-        // 过滤出有数据的Recorder
-        var activeData = _recorderMap.Where(r => r.Value.recorder.isValid && r.Value.history.Count > 0).ToList();
-        if (activeData.Count == 0) return;
-
-
         int h = Screen.height;
-        var fontSize = h * 2 / 100;
+        var fontSize = h * 2 / 120;
 
-        GUIStyle nameStyle = new GUIStyle(GUI.skin.label);
-        nameStyle.fontSize = fontSize;
-        nameStyle.alignment = TextAnchor.MiddleLeft;
+        GUIStyle btnStyle = new GUIStyle(GUI.skin.button);
+        btnStyle.fontSize = fontSize;
 
-        GUIStyle valueStyle = new GUIStyle(nameStyle);
-        valueStyle.alignment = TextAnchor.MiddleRight;
+        if (GUI.Button(new Rect(10, 10, fontSize * 10, fontSize * 1.8f), $"GPU Profiler [{toggleKey}]", btnStyle))
+            _visible = !_visible;
 
-        float v = fontSize / 12f;
-        // 布局参数
-        float startX = v * 20;
-        float startY = v * 40;
-        float nameWidth = v * 180; // 第一列：名称
-        float currentWidth = v * 80; // 第二列：当前值
-        float averageWidth = v * 80; // 第三列：平均值
-        float lineHeight = fontSize * 1.6f;
+        if (!_visible) return;
 
-        float totalWidth = nameWidth + currentWidth + averageWidth + startX * 2;
-        float totalHeight = (activeData.Count + 1) * lineHeight + 50; // +1 是为了表头
-
-        GUIStyle boxStyle = new GUIStyle(GUI.skin.box);
-        boxStyle.fontSize = fontSize;
-        boxStyle.normal.background = Texture2D.blackTexture;
-        boxStyle.normal.textColor = Color.white;
-        boxStyle.padding = new RectOffset(10, 10, 10, 10);
-
-
-        var content = new GUIContent($"GPU Profiler ({averageWindowSeconds}s Avg)", Texture2D.blackTexture, "This is a tooltip");
-
-        GUI.Box(new Rect(10, 10, totalWidth, totalHeight), $"GPU Profiler ({averageWindowSeconds}s Avg)", boxStyle);
-
-        // 绘制表头
-        float headerY = startY;
-        GUI.contentColor = Color.yellow;
-        GUI.Label(new Rect(startX, headerY, nameWidth, lineHeight), "Pass Name", nameStyle);
-        GUI.Label(new Rect(startX + nameWidth, headerY, currentWidth, lineHeight), "Current", valueStyle);
-        GUI.Label(new Rect(startX + nameWidth + currentWidth, headerY, averageWidth, lineHeight), "Average", valueStyle);
-        GUI.contentColor = Color.white;
-
-        // 绘制数据行
-        int i = 0;
-        foreach (var item in activeData)
+        if (!_windowRectInited)
         {
-            if (item.Value.history.Count == 0)
-                continue;
-
-            float y = headerY + lineHeight + (i * lineHeight);
-            var data = item.Value;
-
-            // 获取最新一帧的值
-            float curMs = data.history.Last().valueMs;
-
-            GUI.Label(new Rect(startX, y, nameWidth, lineHeight), item.Key, nameStyle);
-            GUI.Label(new Rect(startX + nameWidth, y, currentWidth, lineHeight), $"{curMs:F3} ms", valueStyle);
-            GUI.Label(new Rect(startX + nameWidth + currentWidth, y, averageWidth, lineHeight), $"{data.currentAverage:F3} ms", valueStyle);
-
-            i++;
+            _windowRect       = new Rect(10, (int)(fontSize * 2.2f) + 10, fontSize * 28, h - (int)(fontSize * 2.2f) - 30);
+            _windowRectInited = true;
         }
 
-        var sum = activeData.Sum(d => d.Value.history.Last().valueMs);
-        GUI.Label(new Rect(startX, headerY + lineHeight + (i * lineHeight), nameWidth, lineHeight), "Total", nameStyle);
-        GUI.Label(new Rect(startX + nameWidth, headerY + lineHeight + (i * lineHeight), currentWidth, lineHeight), $"{sum:F3} ms", valueStyle);
+        _windowRect = GUI.Window(0xBEEF + 1, _windowRect, DrawWindow, $"GPU Profiler  ({averageWindowSeconds}s Avg)  [{toggleKey}]");
+    }
+
+    private void DrawWindow(int id)
+    {
+        var activeData = _recorderMap.Where(r => r.Value.recorder.isValid && r.Value.history.Count > 0).ToList();
+
+        int h = Screen.height;
+        var fontSize = h * 2 / 120;
+        float lineHeight = fontSize * 1.6f;
+
+        GUIStyle nameStyle = new GUIStyle(GUI.skin.label) { fontSize = fontSize, alignment = TextAnchor.MiddleLeft };
+        GUIStyle valueStyle = new GUIStyle(nameStyle) { alignment = TextAnchor.MiddleRight };
+        GUIStyle headerStyle = new GUIStyle(nameStyle) { fontStyle = FontStyle.Bold, normal = { textColor = Color.yellow } };
+        GUIStyle headerValueStyle = new GUIStyle(headerStyle) { alignment = TextAnchor.MiddleRight };
+
+        float v = fontSize / 12f;
+        float nameWidth  = v * 180;
+        float curWidth   = v * 80;
+        float avgWidth   = v * 80;
+        float rowWidth   = nameWidth + curWidth + avgWidth;
+
+        _scrollPos = GUILayout.BeginScrollView(_scrollPos);
+
+        // 表头
+        GUILayout.BeginHorizontal();
+        GUILayout.Label("Pass Name", headerStyle,      GUILayout.Width(nameWidth));
+        GUILayout.Label("Current",   headerValueStyle, GUILayout.Width(curWidth));
+        GUILayout.Label("Average",   headerValueStyle, GUILayout.Width(avgWidth));
+        GUILayout.EndHorizontal();
+
+        if (activeData.Count == 0)
+        {
+            GUILayout.Label("No active recorders.", nameStyle);
+        }
+        else
+        {
+            foreach (var item in activeData)
+            {
+                float curMs = item.Value.history.Last().valueMs;
+                float avg   = item.Value.currentAverage;
+
+                GUILayout.BeginHorizontal();
+                GUILayout.Label(item.Key,               nameStyle,  GUILayout.Width(nameWidth));
+                GUILayout.Label($"{curMs:F3} ms",       valueStyle, GUILayout.Width(curWidth));
+                GUILayout.Label($"{avg:F3} ms",         valueStyle, GUILayout.Width(avgWidth));
+                GUILayout.EndHorizontal();
+            }
+
+            // Total 行
+            float totalCur = activeData.Sum(d => d.Value.history.Last().valueMs);
+            float totalAvg = activeData.Sum(d => d.Value.currentAverage);
+            GUILayout.BeginHorizontal();
+            GUILayout.Label("Total",               headerStyle,      GUILayout.Width(nameWidth));
+            GUILayout.Label($"{totalCur:F3} ms",   headerValueStyle, GUILayout.Width(curWidth));
+            GUILayout.Label($"{totalAvg:F3} ms",   headerValueStyle, GUILayout.Width(avgWidth));
+            GUILayout.EndHorizontal();
+        }
+
+        GUILayout.EndScrollView();
+
+        GUI.DragWindow(new Rect(0, 0, _windowRect.width, lineHeight));
     }
 }
