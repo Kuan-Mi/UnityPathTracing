@@ -400,7 +400,7 @@ namespace PathTracing
             bool enableIndirect            = setting.indirectLightingMode != IndirectLightingMode.None;
 
 
-            ReSTIRDI_ShadingParameters restirDIShadingParams = isContext.GetReSTIRDIContext().GetShadingParameters();
+            RTXDI_ShadingParameters restirDIShadingParams = isContext.GetReSTIRDIContext().GetShadingParameters();
             restirDIShadingParams.enableDenoiserInputPacking = !enableIndirect ? 1u : 0u;
             isContext.GetReSTIRDIContext().SetShadingParameters(restirDIShadingParams);
 
@@ -659,7 +659,7 @@ namespace PathTracing
         }
 
 
-        void FillReSTIRDIConstants(ref ReSTIRDI_Parameters rparams, ReSTIRDIContext restirDIContext, RTXDI_LightBufferParameters lightBufferParameters)
+        void FillReSTIRDIConstants(ref RTXDI_Parameters rparams, ReSTIRDIContext restirDIContext, RTXDI_LightBufferParameters lightBufferParameters)
         {
             rparams.reservoirBufferParams = restirDIContext.GetReservoirBufferParameters();
             rparams.bufferIndices         = restirDIContext.GetBufferIndices();
@@ -667,13 +667,13 @@ namespace PathTracing
 
             rparams.initialSamplingParams.environmentMapImportanceSampling = lightBufferParameters.environmentLightParams.lightPresent;
             if (rparams.initialSamplingParams.environmentMapImportanceSampling == 0)
-                rparams.initialSamplingParams.numPrimaryEnvironmentSamples = 0;
+                rparams.initialSamplingParams.numEnvironmentSamples = 0;
             rparams.temporalResamplingParams = restirDIContext.GetTemporalResamplingParameters();
             rparams.spatialResamplingParams  = restirDIContext.GetSpatialResamplingParameters();
             rparams.shadingParams            = restirDIContext.GetShadingParameters();
         }
 
-        void FillReSTIRGIConstants(ref ReSTIRGI_Parameters constants, ReSTIRGIContext restirGIContext)
+        void FillReSTIRGIConstants(ref RTXDI_GIParameters constants, ReSTIRGIContext restirGIContext)
         {
             constants.reservoirBufferParams    = restirGIContext.GetReservoirBufferParameters();
             constants.bufferIndices            = restirGIContext.GetBufferIndices();
@@ -770,7 +770,7 @@ namespace PathTracing
 
             constants.secondarySurfaceReSTIRDIParams.initialSamplingParams.environmentMapImportanceSampling = 0;
             if (constants.secondarySurfaceReSTIRDIParams.initialSamplingParams.environmentMapImportanceSampling == 0)
-                constants.secondarySurfaceReSTIRDIParams.initialSamplingParams.numPrimaryEnvironmentSamples = 0;
+                constants.secondarySurfaceReSTIRDIParams.initialSamplingParams.numEnvironmentSamples = 0;
         }
 
 

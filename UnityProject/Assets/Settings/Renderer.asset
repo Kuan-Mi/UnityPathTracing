@@ -12,7 +12,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: ecc60134e0a049db88b485a3406f7b37, type: 3}
   m_Name: RtxdiFeature
   m_EditorClassIdentifier: Assembly-CSharp::PathTracing.RtxdiFeature
-  m_Active: 1
+  m_Active: 0
   setting:
     exposureEv: 0
     cameraJitter: 1
