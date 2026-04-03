@@ -61,5 +61,5 @@ void CSMain(int2 pixelPos : SV_DispatchThreadId)
     gOut_DiffAlbedo[pixelPos] = isSky ? 0.0 : gIndirectDiffuse * albedo * (1.0 - Fenv); // NGX doesn't support sRGB, manual linearization needed
     gOut_SpecAlbedo[pixelPos] = isSky ? 0.0 : Fenv;
     gOut_SpecHitDistance[pixelPos] = isSky ? 0.0 : gIndirectSpecular * specHitDistance;
-    gOut_Normal_Roughness[pixelPos] = float4(N, roughness); // NGX supports only this encoding
+    gOut_Normal_Roughness[pixelPos] = isSky ?  0  :float4(N, roughness); // NGX supports only this encoding
 }

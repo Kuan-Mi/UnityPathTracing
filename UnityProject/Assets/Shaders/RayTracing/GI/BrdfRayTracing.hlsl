@@ -206,9 +206,8 @@ void MainRayGenShader()
     }
     else
     {
-        // todo why?
         // if (g_Const.sceneConstants.enableEnvironmentMap && includeEmissiveComponent)
-        // if (includeEmissiveComponent)
+        if (includeEmissiveComponent)
         {
             // float3 environmentRadiance = GetEnvironmentRadiance(ray.Direction);
             float3 environmentRadiance = GetSkyIntensity(ray.Direction);

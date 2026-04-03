@@ -776,8 +776,8 @@ struct EnvironmentLight
         if (textureIndex >= 0)
         {
             // Texture2D texture = t_BindlessTextures[textureIndex];
-            Texture2D texture = _environmentMap;
-            sampleRadiance *= texture.SampleLevel(ENVIRONMENT_SAMPLER, textureUV, 0).xyz;
+            // Texture2D texture = _environmentMap;
+            // sampleRadiance *= texture.SampleLevel(ENVIRONMENT_SAMPLER, textureUV, 0).xyz;
             
             sampleRadiance = GetSkyIntensity(sampleDirection);
         }

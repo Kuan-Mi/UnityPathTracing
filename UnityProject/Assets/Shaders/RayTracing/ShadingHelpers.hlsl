@@ -85,7 +85,6 @@ bool ShadeSurfaceWithLightSample(
 #endif
 
 
-
 float3 DemodulateSpecular(float3 surfaceSpecularF0, float3 specular)
 {
     return specular / max(0.01, surfaceSpecularF0);
@@ -101,11 +100,34 @@ void StoreShadingOutput(
     if (!isFirstPass)
     {
         float3 priorLight = gOut_DirectLighting[pixelPosition];
-        
+
         finalColor += priorLight;
-        
     }
-    
+
+    if (isLastPass)
+    {
+        RAB_Surface surface = RAB_GetGBufferSurface(pixelPosition, false);
+        if (!RAB_IsSurfaceValid(surface))
+        {
+
+            float2 pixelUv = float2(pixelPosition + 0.5) / gRectSize;
+            float2 sampleUv = pixelUv + gJitter;
+
+
+            float3 cameraRayOrigin = 0;
+            float3 cameraRayDirection = 0;
+            
+            
+            GetCameraRay(cameraRayOrigin, cameraRayDirection, sampleUv);
+            
+            
+            finalColor = GetSkyIntensity(cameraRayDirection);
+        }
+    }
+
+    //
+    // finalColor = RAB_IsSurfaceValid(surface);
+    // // finalColor = -surface.viewDepth /INF ;
     gOut_DirectLighting[pixelPosition] = finalColor;
 }
 
