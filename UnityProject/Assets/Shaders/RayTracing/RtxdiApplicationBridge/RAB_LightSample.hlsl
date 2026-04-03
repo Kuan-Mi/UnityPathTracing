@@ -15,6 +15,11 @@ RAB_LightSample RAB_EmptyLightSample()
     return (RAB_LightSample)0;
 }
 
+float3 RAB_LightSamplePosition(RAB_LightSample lightSample)
+{
+    return lightSample.position;
+}
+
 bool RAB_IsAnalyticLightSample(RAB_LightSample lightSample)
 {
     return lightSample.lightType != PolymorphicLightType::kTriangle && 
@@ -24,6 +29,11 @@ bool RAB_IsAnalyticLightSample(RAB_LightSample lightSample)
 float RAB_LightSampleSolidAnglePdf(RAB_LightSample lightSample)
 {
     return lightSample.solidAnglePdf;
+}
+
+float3 RAB_LightSampleRadiance(RAB_LightSample lightSample)
+{
+    return lightSample.radiance;
 }
 
 #endif // RTXDI_RAB_LIGHT_INFO_HLSLI

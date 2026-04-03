@@ -1,4 +1,5 @@
 #include "../RtxdiApplicationBridge/RtxdiApplicationBridge.hlsl"
+
 #include "Assets/Shaders/RTXDI/DI/InitialSampling.hlsl"
 #include "Assets/Shaders/RTXDI/DI/ReservoirStorage.hlsl"
 
@@ -35,21 +36,6 @@ void MainRayGenShader()
 #endif
 #endif
         lightSample);
-
-
-
-    // if (g_Const.restirDI.initialSamplingParams.enableInitialVisibility && RTXDI_IsValidDIReservoir(reservoir))
-    // {
-    //     if (!RAB_GetConservativeVisibility(surface, lightSample))
-    //     {
-    //         RTXDI_StoreVisibilityInDIReservoir(reservoir, 0, true);
-    //     }
-    // }
-    //
-    // // gOut_DirectLighting[pixelPosition] = RTXDI_IsValidDIReservoir(reservoir);
-    // gOut_DirectLighting[pixelPosition] = 0;
-    // // gOut_DirectLighting[pixelPosition] = surface.normal;
-    // // gOut_DirectLighting[pixelPosition] = surface.geoNormal;
     
     RTXDI_StoreDIReservoir(reservoir, g_Const.restirDI.reservoirBufferParams, GlobalIndex, g_Const.restirDI.bufferIndices.initialSamplingOutputBufferIndex);
 }

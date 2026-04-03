@@ -8,7 +8,6 @@
 #include "Assets/Shaders/RayTracing/RtxdiApplicationBridge/RAB_LightInfo.hlsl"
 #include "Assets/Shaders/RayTracing/RtxdiApplicationBridge/RAB_LightSample.hlsl"
 #include "Assets/Shaders/RayTracing/RtxdiApplicationBridge/RAB_Material.hlsl"
-#include "Assets/Shaders/RayTracing/RtxdiApplicationBridge/RAB_RandomSamplerState.hlsl"
 #include "Assets/Shaders/RayTracing/RtxdiApplicationBridge/RAB_RayPayload.hlsl"
 #include "Assets/Shaders/RayTracing/RtxdiApplicationBridge/RAB_RTShaders.hlsl"
 #include "Assets/Shaders/RayTracing/RtxdiApplicationBridge/RAB_SpatialHelpers.hlsl"
@@ -70,7 +69,7 @@ void MainRayGenShader()
     if (!RAB_IsSurfaceValid(surface))
         return;
 
-    RAB_RandomSamplerState rng = RAB_InitRandomSampler(GlobalIndex, 5);
+    RTXDI_RandomSamplerState rng = RTXDI_InitRandomSampler(GlobalIndex, g_Const.runtimeParams.frameIndex, RTXDI_GI_GENERATE_INITIAL_SAMPLES_RANDOM_SEED);
 
     float3 tangent, bitangent;
     branchlessONB(surface.normal, tangent, bitangent);
@@ -84,14 +83,14 @@ void MainRayGenShader()
 
 
     float2 Rand;
-    Rand.x = RAB_GetNextRandom(rng);
-    Rand.y = RAB_GetNextRandom(rng);
+    Rand.x = RTXDI_GetNextRandom(rng);
+    Rand.y = RTXDI_GetNextRandom(rng);
 
     float3 V = normalize(gCameraGlobalPos.xyz - surface.worldPos);
 
 
     bool isSpecularRay = false;
-    bool isDeltaSurface = surface.material.roughness == 0;
+    bool isDeltaSurface = surface.material.roughness < kMinRoughness;
     float specular_PDF;
     float3 BRDF_over_PDF;
     float overall_PDF;
@@ -121,10 +120,12 @@ void MainRayGenShader()
             diffuse_BRDF_over_PDF = 1.0;
         }
 
+        // Ignores PDF of specular or diffuse
+        // Chooses PDF based on relative luminance
         specular_PDF = saturate(calcLuminance(specular_BRDF_over_PDF) /
             calcLuminance(specular_BRDF_over_PDF + diffuse_BRDF_over_PDF * surface.material.diffuseAlbedo));
 
-        isSpecularRay = RAB_GetNextRandom(rng) < specular_PDF;
+        isSpecularRay = RTXDI_GetNextRandom(rng) < specular_PDF;
 
         if (isSpecularRay)
         {

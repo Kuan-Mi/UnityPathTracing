@@ -1,7 +1,7 @@
 #ifndef RAB_MATERIAL_HLSLI
 #define RAB_MATERIAL_HLSLI
 
-static const float kMinRoughness = 0.05f;
+static const float kMinRoughness = 0.03f;
 #include "Assets/Shaders/Rtxdi/Utils/RandomSamplerstate.hlsl"
 
 // 存储表面的材质信息
@@ -10,6 +10,7 @@ struct RAB_Material
     float3 diffuseAlbedo;
     float3 specularF0;
     float roughness;
+	float3 emissiveColor;
 };
 
 // 返回一个空的材质实例
@@ -36,6 +37,16 @@ float3 GetSpecularF0(RAB_Material material)
 float GetRoughness(RAB_Material material)
 {
     return material.roughness;
+}
+
+float RAB_GetRoughness(RAB_Material material)
+{
+    return GetRoughness(material);
+}
+
+float3 RAB_GetEmissiveColor(RAB_Material material)
+{
+    return material.emissiveColor;
 }
 
 RAB_Material GetGBufferMaterial(

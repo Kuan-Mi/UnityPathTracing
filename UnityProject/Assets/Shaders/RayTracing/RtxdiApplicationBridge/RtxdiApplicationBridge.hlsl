@@ -42,7 +42,6 @@ between the bridge functions.
 #include "RAB_LightSample.hlsl"
 #include "RAB_LightSampling.hlsl"
 #include "RAB_Material.hlsl"
-#include "RAB_RandomSamplerState.hlsl"
 #include "RAB_RayPayload.hlsl"
 #include "RAB_RTShaders.hlsl"
 #include "RAB_SpatialHelpers.hlsl"

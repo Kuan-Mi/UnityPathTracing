@@ -45,9 +45,10 @@ void MainRayGenShader()
         RAB_LightSample lightSample = RAB_SamplePolymorphicLight(lightInfo, surface, RTXDI_GetDIReservoirSampleUV(reservoir));
 
         bool needToStore = ShadeSurfaceWithLightSample(reservoir, surface, lightSample,
-                                                       /* previousFrameTLAS = */ false, /* enableVisibilityReuse = */ true,
-                                                       
-                                                       /* enableVisibilityReuse = */ true, diffuse, specular, lightDistance);
+                                                       /* previousFrameTLAS = */ false,
+                                                       /* enableVisibilityReuse = */ true,
+                                                       /* enableVisibilityReuse = */ true,
+                                                       diffuse, specular, lightDistance);
 
         // currLuminance = float2(calcLuminance(diffuse * surface.material.diffuseAlbedo), calcLuminance(specular));
         // specular = DemodulateSpecular(surface.material.specularF0, specular);
@@ -58,6 +59,12 @@ void MainRayGenShader()
         }
     }
 
+    #if RTXDI_REGIR_MODE !=RTXDI_REGIR_DISABLED
+    if (g_Const.visualizeRegirCells)
+    {
+        diffuse *= RTXDI_VisualizeReGIRCells(g_Const.regir, surface.worldPos);
+    }
+    #endif
 
     float3 finalColor = (diffuse * surface.material.diffuseAlbedo) + specular;
 
@@ -154,13 +161,6 @@ void MainRayGenShader()
     //
     //
 
-    #if RTXDI_REGIR_MODE !=RTXDI_REGIR_DISABLED
-    if (g_Const.visualizeRegirCells)
-    {
-        float3 visualize = RTXDI_VisualizeReGIRCells(g_Const.regir, surface.worldPos);
-        gOut_DirectLighting[pixelPosition] = visualize;
-    }
-    #endif
 
     //
     // RAB_LightSample lightSample;

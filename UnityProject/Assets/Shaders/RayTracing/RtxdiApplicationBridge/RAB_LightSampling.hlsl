@@ -35,29 +35,6 @@ float RAB_EvaluateLocalLightSourcePdf(uint lightIndex)
     return texelValue / sum;
 }
 
-float3 RAB_GetReflectedRadianceForSurface(float3 incomingRadianceLocation, float3 incomingRadiance, RAB_Surface surface)
-{
-    float3 L = normalize(incomingRadianceLocation - surface.worldPos);
-    float3 N = surface.normal;
-    float3 V = surface.viewDir;
-
-    if (dot(L, surface.geoNormal) <= 0)
-        return 0;
-
-    float d = Lambert(N, -L);
-    float3 s;
-    if (surface.material.roughness == 0)
-        s = 0;
-    else
-        s = GGX_times_NdotL(V, L, N, max(surface.material.roughness, kMinRoughness), surface.material.specularF0);
-
-    return incomingRadiance * (d * surface.material.diffuseAlbedo + s);
-}
-
-// float RAB_GetReflectedLuminanceForSurface(float3 incomingRadianceLocation, float3 incomingRadiance, RAB_Surface surface)
-// {
-//     return RTXDI_Luminance(RAB_GetReflectedRadianceForSurface(incomingRadianceLocation, incomingRadiance, surface));
-// }
 
 // Compute the target PDF (p-hat) for the given light sample relative to a surface
 // 计算给定表面使用该光照样本进行着色时，每个光照样本的权重。
@@ -76,10 +53,19 @@ float RAB_GetLightSampleTargetPdfForSurface(RAB_LightSample lightSample, RAB_Sur
 // Computes the weight of the given GI sample when the given surface is shaded using that GI sample.
 float RAB_GetGISampleTargetPdfForSurface(float3 samplePosition, float3 sampleRadiance, RAB_Surface surface)
 {
-    float3 reflectedRadiance = RAB_GetReflectedRadianceForSurface(samplePosition, sampleRadiance, surface);
+    float3 reflectedRadiance = RAB_GetReflectedBrdfRadianceForSurface(samplePosition, sampleRadiance, surface);
 
     return RTXDI_Luminance(reflectedRadiance);
 }
+
+// Computes the weight of the given PT sample when the given surface is shaded using that GI sample.
+float3 RAB_GetPTSampleTargetPdfForSurface(float3 samplePosition, float3 sampleRadiance, RAB_Surface surface)
+{
+    float3 reflectedRadiance = RAB_GetReflectedBsdfRadianceForSurface(samplePosition, sampleRadiance, surface);
+
+    return max(reflectedRadiance, 0.0);
+}
+
 
 void RAB_GetLightDirDistance(RAB_Surface surface, RAB_LightSample lightSample,
                              out float3 o_lightDir,
@@ -102,8 +88,15 @@ bool RTXDI_CompareRelativeDifference(float reference, float candidate, float thr
 
 float3 GetEnvironmentRadiance(float3 direction)
 {
-    return float3(0.0, 0.0, 0.0);
+    return GetSkyIntensity(direction);
 }
+
+
+float3 RAB_GetEnvironmentRadiance(float3 direction)
+{
+    return GetEnvironmentRadiance(direction);
+}
+
 
 bool IsComplexSurface(int2 pixelPosition, RAB_Surface surface)
 {

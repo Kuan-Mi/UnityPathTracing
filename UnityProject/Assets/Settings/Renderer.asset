@@ -14,7 +14,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::PathTracing.RtxdiFeature
   m_Active: 1
   setting:
-    exposureEv: 0
+    exposureEv: 2.5
     cameraJitter: 1
     showMode: 18
     showMv: 0
@@ -77,9 +77,9 @@ MonoBehaviour:
     regirDynamicParams:
       regirCellSize: 1
       center:
-        x: -5.248151
-        y: 3.8202906
-        z: -23.099953
+        x: 18.827583
+        y: 7.5412374
+        z: 1.787386
       fallbackSamplingMode: 1
       presamplingMode: 1
       regirSamplingJitter: 1
@@ -98,17 +98,17 @@ MonoBehaviour:
       numLocalLightSamples: 8
       numInfiniteLightSamples: 1
       numEnvironmentSamples: 0
-      numBrdfSamples: 0
+      numBrdfSamples: 1
       brdfCutoff: 0.0001
       brdfRayMinT: 0.001
-      localLightSamplingMode: 0
+      localLightSamplingMode: 2
       enableInitialVisibility: 0
       environmentMapImportanceSampling: 1
       pad1: 0
       pad2: 0
       pad3: 0
     temporalResamplingParams:
-      maxHistoryLength: 20
+      maxHistoryLength: 10
       biasCorrectionMode: 1
       depthThreshold: 0.1
       normalThreshold: 0.5
@@ -118,12 +118,12 @@ MonoBehaviour:
       permutationSamplingThreshold: 0.9
     spatialResamplingParams:
       numSamples: 1
-      numDisocclusionBoostSamples: 8
-      samplingRadius: 32
+      numDisocclusionBoostSamples: 16
+      samplingRadius: 64
       biasCorrectionMode: 1
       depthThreshold: 0.1
       normalThreshold: 0.5
-      targetHistoryLength: 0
+      targetHistoryLength: 5
       enableMaterialSimilarityTest: 1
       discountNaiveSamples: 0
       pad1: 0
@@ -158,7 +158,7 @@ MonoBehaviour:
       pad2: 0
       pad3: 0
     giFinalShadingParams:
-      enableFinalVisibility: 1
+      enableFinalVisibility: 0
       enableFinalMIS: 1
       pad1: 0
       pad2: 0

@@ -156,11 +156,14 @@ void MainRayGenShader()
     
     if (outputShadingResult)
     {
-        float3 diffuse = isSpecularRay ? 0.0 : radiance * throughput.rgb;
-        float3 specular = isSpecularRay ? radiance * throughput.rgb : 0.0;
-
-        // specular = DemodulateSpecular(primarySurface.material.specularF0, specular);
-
+        float3 diffuse = 0;
+        float3 specular = 0;
+        if (!isDeltaSurface)
+        {
+            diffuse = isSpecularRay ? 0.0 : radiance * throughput.rgb;
+            specular = isSpecularRay ? radiance * throughput.rgb : 0.0;
+            // specular = DemodulateSpecular(primarySurface.material.specularF0, specular);
+        }
         float3 finalColor = (diffuse * secondarySurface.material.diffuseAlbedo) + specular;
 
         // finalColor += gIn_EmissiveLighting[pixelPosition];

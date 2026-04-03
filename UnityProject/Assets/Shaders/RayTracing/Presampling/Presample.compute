@@ -15,7 +15,7 @@
 [numthreads(RTXDI_PRESAMPLING_GROUP_SIZE, 1, 1)] 
 void CSMain(uint2 GlobalIndex : SV_DispatchThreadID) 
 {
-    RAB_RandomSamplerState rng = RAB_InitRandomSampler(GlobalIndex.xy, 0);
+    RTXDI_RandomSamplerState rng = RTXDI_InitRandomSampler(GlobalIndex.xy, g_Const.runtimeParams.frameIndex, 0);
 
     RTXDI_PresampleLocalLights(
         rng,
