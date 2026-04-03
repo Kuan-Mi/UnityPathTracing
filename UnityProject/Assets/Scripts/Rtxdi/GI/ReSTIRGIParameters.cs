@@ -1,4 +1,4 @@
-// Copyright (c) 2020-2023, NVIDIA CORPORATION. All rights reserved.
+// Copyright (c) 2020-2026, NVIDIA CORPORATION. All rights reserved.
 //
 // NVIDIA CORPORATION and its licensors retain all intellectual property
 // and proprietary rights in and to this software, related documentation
@@ -12,123 +12,43 @@ using UnityEngine;
 
 namespace Rtxdi.GI
 {
+    // -------------------------------------------------------------------------
+    // Enum
+    // -------------------------------------------------------------------------
+
+    /// <summary>
+    /// Pairwise mode is NOT supported for GI bias correction.
+    /// </summary>
+    public enum RTXDI_GIBiasCorrectionMode : uint
+    {
+        Off       = RtxdiConstants.RTXDI_BIAS_CORRECTION_OFF,
+        Basic     = RtxdiConstants.RTXDI_BIAS_CORRECTION_BASIC,
+        Raytraced = RtxdiConstants.RTXDI_BIAS_CORRECTION_RAY_TRACED,
+    }
+
+    // -------------------------------------------------------------------------
+    // Packed reservoir
+    // -------------------------------------------------------------------------
+
     [StructLayout(LayoutKind.Sequential)]
     public struct RTXDI_PackedGIReservoir
     {
         public float3 position;
         public uint   packed_miscData_age_M;
 
-        public uint  packed_radiance; // 32bit LogLUV format
+        public uint  packed_radiance; // 32-bit LogLUV format
         public float weight;
-        public uint  packed_normal; // 2x 16-bit snorms in octahedral mapping
+        public uint  packed_normal;   // 2x 16-bit snorms in octahedral mapping
         public float unused;
     }
 
-    public enum ResTIRGI_TemporalBiasCorrectionMode : uint
-    {
-        Off   = RtxdiConstants.RTXDI_BIAS_CORRECTION_OFF,
-        Basic = RtxdiConstants.RTXDI_BIAS_CORRECTION_BASIC,
-
-        // Pairwise is not supported
-        Raytraced = RtxdiConstants.RTXDI_BIAS_CORRECTION_RAY_TRACED,
-    }
-
-    public enum ResTIRGI_SpatialBiasCorrectionMode : uint
-    {
-        Off   = RtxdiConstants.RTXDI_BIAS_CORRECTION_OFF,
-        Basic = RtxdiConstants.RTXDI_BIAS_CORRECTION_BASIC,
-
-        // Pairwise is not supported
-        Raytraced = RtxdiConstants.RTXDI_BIAS_CORRECTION_RAY_TRACED,
-    }
+    // -------------------------------------------------------------------------
+    // Structs  (layout matches RTXDI-Library/Include/Rtxdi/GI/ReSTIRGIParameters.h)
+    // -------------------------------------------------------------------------
 
     [System.Serializable]
     [StructLayout(LayoutKind.Sequential)]
-    public struct ReSTIRGI_TemporalResamplingParameters
-    {
-        [Range(0.0f, 1)]
-        public float depthThreshold;
-
-        [Range(0.0f, 1)]
-        public float normalThreshold;
-        
-        [Toggle]
-        public uint enablePermutationSampling;
-
-        [Range(0, 40)]
-        public uint maxHistoryLength;
-
-        [Range(0, 40)]
-        public uint maxReservoirAge;
-        
-        [Toggle]
-        public uint enableBoilingFilter;
-
-        [Range(0.0f, 1)]
-        public float boilingFilterStrength;
-        
-        [Toggle]
-        public uint enableFallbackSampling;
-
-        public ResTIRGI_TemporalBiasCorrectionMode temporalBiasCorrectionMode;
-
-        [HideInInspector]
-        public uint uniformRandomNumber;
-
-        [HideInInspector]
-        public uint pad2;
-
-        [HideInInspector]
-        public uint pad3;
-    }
-
-    [System.Serializable]
-    [StructLayout(LayoutKind.Sequential)]
-    public struct ReSTIRGI_SpatialResamplingParameters
-    {
-        [Range(0.0f, 1)]
-        public float spatialDepthThreshold;
-
-        [Range(0.0f, 1)]
-        public float spatialNormalThreshold;
-
-        [Range(0, 40)]
-        public uint numSpatialSamples;
-
-        [Range(0, 64)]
-        public float spatialSamplingRadius;
-
-        public ResTIRGI_SpatialBiasCorrectionMode spatialBiasCorrectionMode;
-
-        [HideInInspector]
-        public uint pad1;
-
-        [HideInInspector]
-        public uint pad2;
-
-        [HideInInspector]
-        public uint pad3;
-    }
-
-    [System.Serializable]
-    [StructLayout(LayoutKind.Sequential)]
-    public struct ReSTIRGI_FinalShadingParameters
-    {
-        [Toggle]
-        public uint enableFinalVisibility;
-
-        [Toggle]
-        public uint enableFinalMIS;
-
-        [HideInInspector]
-        public uint pad1;
-
-        [HideInInspector]
-        public uint pad2;
-    }
-
-    [StructLayout(LayoutKind.Sequential)]
-    public struct ReSTIRGI_BufferIndices
+    public struct RTXDI_GIBufferIndices
     {
         public uint secondarySurfaceReSTIRDIOutputBufferIndex;
         public uint temporalResamplingInputBufferIndex;
@@ -141,13 +61,89 @@ namespace Rtxdi.GI
         public uint pad2;
     }
 
+    [System.Serializable]
     [StructLayout(LayoutKind.Sequential)]
-    public struct ReSTIRGI_Parameters
+    public struct RTXDI_GITemporalResamplingParameters
     {
-        public RTXDI_ReservoirBufferParameters       reservoirBufferParams;
-        public ReSTIRGI_BufferIndices                bufferIndices;
-        public ReSTIRGI_TemporalResamplingParameters temporalResamplingParams;
-        public ReSTIRGI_SpatialResamplingParameters  spatialResamplingParams;
-        public ReSTIRGI_FinalShadingParameters       finalShadingParams;
+        [Range(0f, 1f)] public float depthThreshold;
+        [Range(0f, 1f)] public float normalThreshold;
+        [Range(0, 40)]  public uint  maxHistoryLength;
+
+        // Resample from a region around current pixel when motion vector finds no match.
+        public uint enableFallbackSampling;
+
+        public RTXDI_GIBiasCorrectionMode biasCorrectionMode;
+
+        // Discard reservoirs older than this age.
+        public uint maxReservoirAge;
+
+        // Permutation sampling for denoiser-friendly output.
+        public uint enablePermutationSampling;
+
+        // Per-frame uniform random number (set by SetFrameIndex).
+        [HideInInspector] public uint uniformRandomNumber;
+    }
+
+    [System.Serializable]
+    [StructLayout(LayoutKind.Sequential)]
+    public struct RTXDI_GISpatialResamplingParameters
+    {
+        [Range(0f, 1f)]  public float depthThreshold;
+        [Range(0f, 1f)]  public float normalThreshold;
+        [Range(0, 32)]   public uint  numSamples;
+        public float samplingRadius;
+
+        public RTXDI_GIBiasCorrectionMode biasCorrectionMode;
+        [HideInInspector] public uint pad1;
+        [HideInInspector] public uint pad2;
+        [HideInInspector] public uint pad3;
+    }
+
+    [System.Serializable]
+    [StructLayout(LayoutKind.Sequential)]
+    public struct RTXDI_GISpatioTemporalResamplingParameters
+    {
+        [Range(0f, 1f)] public float depthThreshold;
+        [Range(0f, 1f)] public float normalThreshold;
+
+        public RTXDI_GIBiasCorrectionMode biasCorrectionMode;
+
+        [Range(0, 32)]  public uint  numSamples;
+        public float samplingRadius;
+
+        [Range(0, 40)]  public uint  maxHistoryLength;
+        public uint enableFallbackSampling;
+        public uint maxReservoirAge;
+        public uint enablePermutationSampling;
+
+        [HideInInspector] public uint uniformRandomNumber;
+        [HideInInspector] public uint pad1;
+        [HideInInspector] public uint pad2;
+    }
+
+    [System.Serializable]
+    [StructLayout(LayoutKind.Sequential)]
+    public struct RTXDI_GIFinalShadingParameters
+    {
+        public uint enableFinalVisibility;
+        public uint enableFinalMIS;
+        [HideInInspector] public uint pad1;
+        [HideInInspector] public uint pad2;
+    }
+
+    /// <summary>
+    /// Full GI parameter block passed to shaders each frame.
+    /// </summary>
+    [System.Serializable]
+    [StructLayout(LayoutKind.Sequential)]
+    public struct RTXDI_GIParameters
+    {
+        public RTXDI_ReservoirBufferParameters         reservoirBufferParams;
+        public RTXDI_GIBufferIndices                   bufferIndices;
+        public RTXDI_GITemporalResamplingParameters    temporalResamplingParams;
+        public RTXDI_BoilingFilterParameters           boilingFilterParams;
+        public RTXDI_GISpatialResamplingParameters     spatialResamplingParams;
+        public RTXDI_GISpatioTemporalResamplingParameters spatioTemporalResamplingParams;
+        public RTXDI_GIFinalShadingParameters          finalShadingParams;
     }
 }

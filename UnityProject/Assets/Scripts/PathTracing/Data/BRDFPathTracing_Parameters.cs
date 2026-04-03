@@ -33,27 +33,27 @@ namespace PathTracing
     [StructLayout(LayoutKind.Sequential)]
     public struct BRDFPathTracing_SecondarySurfaceReSTIRDIParameters
     {
-        public ReSTIRDI_InitialSamplingParameters initialSamplingParams;
-        public ReSTIRDI_SpatialResamplingParameters spatialResamplingParams;
+        public RTXDI_DIInitialSamplingParameters   initialSamplingParams;
+        public RTXDI_DISpatialResamplingParameters spatialResamplingParams;
 
         public static BRDFPathTracing_SecondarySurfaceReSTIRDIParameters Default()
         {
             BRDFPathTracing_SecondarySurfaceReSTIRDIParameters p = default;
 
             p.initialSamplingParams.localLightSamplingMode         = ReSTIRDI_LocalLightSamplingMode.ReGIR_RIS;
-            p.initialSamplingParams.numPrimaryLocalLightSamples    = 2;
-            p.initialSamplingParams.numPrimaryInfiniteLightSamples = 1;
-            p.initialSamplingParams.numPrimaryEnvironmentSamples   = 1;
-            p.initialSamplingParams.numPrimaryBrdfSamples          = 0;
+            p.initialSamplingParams.numLocalLightSamples    = 2;
+            p.initialSamplingParams.numInfiniteLightSamples = 1;
+            p.initialSamplingParams.numEnvironmentSamples   = 1;
+            p.initialSamplingParams.numBrdfSamples          = 0;
             p.initialSamplingParams.brdfCutoff                     = 0;
             p.initialSamplingParams.enableInitialVisibility        = 0;
 
-            p.spatialResamplingParams.numSpatialSamples           = 1;
-            p.spatialResamplingParams.spatialSamplingRadius       = 4.0f;
-            p.spatialResamplingParams.spatialBiasCorrection       = ReSTIRDI_SpatialBiasCorrectionMode.Basic;
+            p.spatialResamplingParams.numSamples                  = 1;
+            p.spatialResamplingParams.samplingRadius              = 4.0f;
+            p.spatialResamplingParams.biasCorrectionMode          = ReSTIRDI_SpatialBiasCorrectionMode.Basic;
             p.spatialResamplingParams.numDisocclusionBoostSamples = 0; // Disabled
-            p.spatialResamplingParams.spatialDepthThreshold       = 0.1f;
-            p.spatialResamplingParams.spatialNormalThreshold      = 0.9f;
+            p.spatialResamplingParams.depthThreshold       = 0.1f;
+            p.spatialResamplingParams.normalThreshold      = 0.9f;
 
             return p;
         }

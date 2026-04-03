@@ -26,9 +26,9 @@ namespace PathTracing
         public RTXDI_RISBufferSegmentParameters localLightsRISBufferSegmentParams;
         public RTXDI_RISBufferSegmentParameters environmentLightRISBufferSegmentParams;
 
-        public ReSTIRDI_Parameters restirDI;
-        public ReGIR_Parameters regir;
-        public ReSTIRGI_Parameters restirGI;
+        public RTXDI_Parameters           restirDI;
+        public ReGIR_Parameters           regir;
+        public RTXDI_GIParameters         restirGI;
         public BRDFPathTracing_Parameters brdfPT;
 
         public uint visualizeRegirCells;

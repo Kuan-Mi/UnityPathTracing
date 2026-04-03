@@ -116,18 +116,18 @@ namespace PathTracing
         [FoldoutHeader("ReSTIR DI")]
         public ReSTIRDI_ResamplingMode diResamplingMode = ReSTIRDI_ResamplingMode.TemporalAndSpatial;
 
-        public ReSTIRDI_InitialSamplingParameters    initialSamplingParams    = ReSTIRDIDefaults.GetDefaultInitialSamplingParams();
-        public ReSTIRDI_TemporalResamplingParameters temporalResamplingParams = ReSTIRDIDefaults.GetDefaultTemporalResamplingParams();
-        public ReSTIRDI_SpatialResamplingParameters  spatialResamplingParams  = ReSTIRDIDefaults.GetDefaultSpatialResamplingParams();
-        public ReSTIRDI_ShadingParameters            shadingParams            = ReSTIRDIDefaults.GetDefaultShadingParams();
+        public RTXDI_DIInitialSamplingParameters    initialSamplingParams    = ReSTIRDIDefaults.GetDefaultInitialSamplingParams();
+        public RTXDI_DITemporalResamplingParameters temporalResamplingParams = ReSTIRDIDefaults.GetDefaultTemporalResamplingParams();
+        public RTXDI_DISpatialResamplingParameters  spatialResamplingParams  = ReSTIRDIDefaults.GetDefaultSpatialResamplingParams();
+        public RTXDI_ShadingParameters              shadingParams            = ReSTIRDIDefaults.GetDefaultShadingParams();
 
         [FoldoutHeader("ReSTIR GI")]
         public ReSTIRGI_ResamplingMode giResamplingMode = ReSTIRGI_ResamplingMode.TemporalAndSpatial;
 
-        public ReSTIRGI_TemporalResamplingParameters giTemporalResamplingParams = ReSTIRGIDefaults.GetDefaultTemporalResamplingParams();
-        public ReSTIRGI_SpatialResamplingParameters  giSpatialResamplingParams  = ReSTIRGIDefaults.GetDefaultSpatialResamplingParams();
-        public ReSTIRGI_FinalShadingParameters       giFinalShadingParams       = ReSTIRGIDefaults.GetDefaultFinalShadingParams();
-        public BRDFPathTracing_Parameters            brdfptParams               = BRDFPathTracing_Parameters.Default();
+        public RTXDI_GITemporalResamplingParameters giTemporalResamplingParams = ReSTIRGIDefaults.GetDefaultTemporalResamplingParams();
+        public RTXDI_GISpatialResamplingParameters  giSpatialResamplingParams  = ReSTIRGIDefaults.GetDefaultSpatialResamplingParams();
+        public RTXDI_GIFinalShadingParameters       giFinalShadingParams       = ReSTIRGIDefaults.GetDefaultFinalShadingParams();
+        public BRDFPathTracing_Parameters           brdfptParams               = BRDFPathTracing_Parameters.Default();
 
         [FoldoutHeader("Base Settings")]
         [Range(0.001f, 10f)]

@@ -1,4 +1,4 @@
-// Copyright (c) 2020-2023, NVIDIA CORPORATION. All rights reserved.
+// Copyright (c) 2020-2026, NVIDIA CORPORATION. All rights reserved.
 //
 // NVIDIA CORPORATION and its licensors retain all intellectual property
 // and proprietary rights in and to this software, related documentation
@@ -11,32 +11,50 @@ using UnityEngine;
 
 namespace Rtxdi.DI
 {
+    // -------------------------------------------------------------------------
+    // Enums
+    // -------------------------------------------------------------------------
+
     public enum ReSTIRDI_LocalLightSamplingMode : uint
     {
-        Uniform = RtxdiConstants.ReSTIRDI_LocalLightSamplingMode_UNIFORM,
+        Uniform   = RtxdiConstants.ReSTIRDI_LocalLightSamplingMode_UNIFORM,
         Power_RIS = RtxdiConstants.ReSTIRDI_LocalLightSamplingMode_POWER_RIS,
         ReGIR_RIS = RtxdiConstants.ReSTIRDI_LocalLightSamplingMode_REGIR_RIS,
     }
 
+    /// <summary>
+    /// Note: Pairwise mode is not supported for temporal resampling in the new API.
+    /// </summary>
     public enum ReSTIRDI_TemporalBiasCorrectionMode : uint
     {
-        Off = RtxdiConstants.RTXDI_BIAS_CORRECTION_OFF,
-        Basic = RtxdiConstants.RTXDI_BIAS_CORRECTION_BASIC,
-        Pairwise = RtxdiConstants.RTXDI_BIAS_CORRECTION_PAIRWISE,
+        Off       = RtxdiConstants.RTXDI_BIAS_CORRECTION_OFF,
+        Basic     = RtxdiConstants.RTXDI_BIAS_CORRECTION_BASIC,
         Raytraced = RtxdiConstants.RTXDI_BIAS_CORRECTION_RAY_TRACED,
     }
 
     public enum ReSTIRDI_SpatialBiasCorrectionMode : uint
     {
-        Off = RtxdiConstants.RTXDI_BIAS_CORRECTION_OFF,
-        Basic = RtxdiConstants.RTXDI_BIAS_CORRECTION_BASIC,
-        Pairwise = RtxdiConstants.RTXDI_BIAS_CORRECTION_PAIRWISE,
+        Off       = RtxdiConstants.RTXDI_BIAS_CORRECTION_OFF,
+        Basic     = RtxdiConstants.RTXDI_BIAS_CORRECTION_BASIC,
+        Pairwise  = RtxdiConstants.RTXDI_BIAS_CORRECTION_PAIRWISE,
         Raytraced = RtxdiConstants.RTXDI_BIAS_CORRECTION_RAY_TRACED,
     }
 
+    public enum ReSTIRDI_SpatioTemporalBiasCorrectionMode : uint
+    {
+        Off       = RtxdiConstants.RTXDI_BIAS_CORRECTION_OFF,
+        Basic     = RtxdiConstants.RTXDI_BIAS_CORRECTION_BASIC,
+        Pairwise  = RtxdiConstants.RTXDI_BIAS_CORRECTION_PAIRWISE,
+        Raytraced = RtxdiConstants.RTXDI_BIAS_CORRECTION_RAY_TRACED,
+    }
+
+    // -------------------------------------------------------------------------
+    // Structs  (layout matches RTXDI-Library/Include/Rtxdi/DI/ReSTIRDIParameters.h)
+    // -------------------------------------------------------------------------
+
     [System.Serializable]
     [StructLayout(LayoutKind.Sequential)]
-    public struct ReSTIRDI_BufferIndices
+    public struct RTXDI_DIBufferIndices
     {
         public uint initialSamplingOutputBufferIndex;
         public uint temporalResamplingInputBufferIndex;
@@ -47,205 +65,147 @@ namespace Rtxdi.DI
         public uint shadingInputBufferIndex;
         public uint pad1;
         public uint pad2;
-
-        public override string ToString()
-        {
-            return $"BufferIndices: " +
-                   $"initialSamplingOutputBufferIndex={initialSamplingOutputBufferIndex}, " +
-                   $"temporalResamplingInputBufferIndex={temporalResamplingInputBufferIndex}, " +
-                   $"temporalResamplingOutputBufferIndex={temporalResamplingOutputBufferIndex}, " +
-                   $"spatialResamplingInputBufferIndex={spatialResamplingInputBufferIndex}, " +
-                   $"spatialResamplingOutputBufferIndex={spatialResamplingOutputBufferIndex}, " +
-                   $"shadingInputBufferIndex={shadingInputBufferIndex}";
-        }
     }
 
     [System.Serializable]
     [StructLayout(LayoutKind.Sequential)]
-    public struct ReSTIRDI_InitialSamplingParameters
+    public struct RTXDI_DIInitialSamplingParameters
     {
-        [Range(0, 16)]
-        public uint numPrimaryLocalLightSamples;
-
-        [Range(0, 16)]
-        public uint numPrimaryInfiniteLightSamples;
-
-        [Range(0, 16)]
-        public uint numPrimaryEnvironmentSamples;
-
-        [Range(0, 16)]
-        public uint numPrimaryBrdfSamples;
+        [Range(0, 16)] public uint numLocalLightSamples;
+        [Range(0, 16)] public uint numInfiniteLightSamples;
+        [Range(0, 16)] public uint numEnvironmentSamples;
+        [Range(0, 16)] public uint numBrdfSamples;
 
         public float brdfCutoff;
-
-        [Toggle]
-        public uint enableInitialVisibility;
-
-        [Range(0, 16)]
-        public uint environmentMapImportanceSampling;
-
+        public float brdfRayMinT;
         public ReSTIRDI_LocalLightSamplingMode localLightSamplingMode;
+        public uint  enableInitialVisibility;
 
-        public override string ToString()
-        {
-            return $"InitialSamplingParameters: " +
-                   $"numPrimaryLocalLightSamples={numPrimaryLocalLightSamples}, " +
-                   $"numPrimaryInfiniteLightSamples={numPrimaryInfiniteLightSamples}, " +
-                   $"numPrimaryEnvironmentSamples={numPrimaryEnvironmentSamples}, " +
-                   $"numPrimaryBrdfSamples={numPrimaryBrdfSamples}, " +
-                   $"brdfCutoff={brdfCutoff}, " +
-                   $"enableInitialVisibility={enableInitialVisibility}, " +
-                   $"environmentMapImportanceSampling={environmentMapImportanceSampling}, " +
-                   $"localLightSamplingMode={localLightSamplingMode}";
-        }
+        public uint  environmentMapImportanceSampling;
+        public uint  pad1;
+        public uint  pad2;
+        public uint  pad3;
     }
 
     [System.Serializable]
     [StructLayout(LayoutKind.Sequential)]
-    public struct ReSTIRDI_TemporalResamplingParameters
+    public struct RTXDI_DITemporalResamplingParameters
     {
-        [Range(0.0f, 1)]
-        public float temporalDepthThreshold;
+        // Maximum history length for temporal reuse, measured in frames.
+        [Range(0, 40)] public uint maxHistoryLength;
 
-        [Range(0.0f, 1)]
-        public float temporalNormalThreshold;
+        // Bias correction mode for temporal reuse.
+        public ReSTIRDI_TemporalBiasCorrectionMode biasCorrectionMode;
 
-        [Range(0, 40)]
-        public uint maxHistoryLength;
+        // Surface depth similarity threshold (relative). 0.1 = 10% of current depth.
+        [Range(0f, 1f)] public float depthThreshold;
 
-        public ReSTIRDI_TemporalBiasCorrectionMode temporalBiasCorrection;
+        // Surface normal similarity threshold (dot product).
+        [Range(0f, 1f)] public float normalThreshold;
 
-        [Toggle]
+        // Skip bias correction ray trace when invisible samples are discarded.
+        public uint enableVisibilityShortcut;
+
+        // Permutation sampling for denoiser-friendly temporal variation.
         public uint enablePermutationSampling;
 
-        [Range(0, 1.0f)]
+        // Per-frame uniform random number for permutation sampling (set by SetFrameIndex).
+        [HideInInspector] public uint uniformRandomNumber;
+
+        // Not used inside TemporalResampling.hlsli directly, but stored here for completeness.
         public float permutationSamplingThreshold;
-
-        [Toggle]
-        public uint enableBoilingFilter;
-
-        [Range(0, 1.0f)]
-        public float boilingFilterStrength;
-
-        [Range(0, 4)]
-        public uint discardInvisibleSamples;
-
-        [HideInInspector]
-        public uint uniformRandomNumber;
-
-        [HideInInspector]
-        public uint pad2;
-
-        [HideInInspector]
-        public uint pad3;
-
-        public override string ToString()
-        {
-            return $"TemporalResamplingParameters: " +
-                   $"temporalDepthThreshold={temporalDepthThreshold}, " +
-                   $"temporalNormalThreshold={temporalNormalThreshold}, " +
-                   $"maxHistoryLength={maxHistoryLength}, " +
-                   $"temporalBiasCorrection={temporalBiasCorrection}, " +
-                   $"enablePermutationSampling={enablePermutationSampling}, " +
-                   $"permutationSamplingThreshold={permutationSamplingThreshold}, " +
-                   $"enableBoilingFilter={enableBoilingFilter}, " +
-                   $"boilingFilterStrength={boilingFilterStrength}, " +
-                   $"discardInvisibleSamples={discardInvisibleSamples}, " +
-                   $"uniformRandomNumber={uniformRandomNumber}";
-        }
     }
 
     [System.Serializable]
     [StructLayout(LayoutKind.Sequential)]
-    public struct ReSTIRDI_SpatialResamplingParameters
+    public struct RTXDI_DISpatialResamplingParameters
     {
-        [Range(0.0f, 1)]
-        public float spatialDepthThreshold;
-        [Range(0.0f, 1)]
-        public float spatialNormalThreshold;
-        public ReSTIRDI_SpatialBiasCorrectionMode spatialBiasCorrection;
-        
-        [Range(0, 40)]
-        public uint numSpatialSamples;
+        // Number of spatial neighbor samples (1-32).
+        [Range(0, 32)] public uint numSamples;
 
+        // Neighbor samples used when history is insufficient (disocclusion boost).
         public uint numDisocclusionBoostSamples;
-        public float spatialSamplingRadius;
-        public uint neighborOffsetMask;
+
+        // Screen-space sampling radius in pixels.
+        public float samplingRadius;
+
+        // Bias correction mode for spatial reuse.
+        public ReSTIRDI_SpatialBiasCorrectionMode biasCorrectionMode;
+
+        // Surface depth similarity threshold (relative).
+        [Range(0f, 1f)] public float depthThreshold;
+
+        // Surface normal similarity threshold.
+        [Range(0f, 1f)] public float normalThreshold;
+
+        // Disocclusion boost activated when current reservoir M < targetHistoryLength.
+        public uint targetHistoryLength;
+
+        // Compare surface materials before accepting a spatial sample.
+        public uint enableMaterialSimilarityTest;
+
+        // Do not spread current-frame or low-history samples to neighbors.
         public uint discountNaiveSamples;
 
-        public override string ToString()
-        {
-            return $"SpatialResamplingParameters: " +
-                   $"spatialDepthThreshold={spatialDepthThreshold}, " +
-                   $"spatialNormalThreshold={spatialNormalThreshold}, " +
-                   $"spatialBiasCorrection={spatialBiasCorrection}, " +
-                   $"numSpatialSamples={numSpatialSamples}, " +
-                   $"numDisocclusionBoostSamples={numDisocclusionBoostSamples}, " +
-                   $"spatialSamplingRadius={spatialSamplingRadius}, " +
-                   $"neighborOffsetMask={neighborOffsetMask}, " +
-                   $"discountNaiveSamples={discountNaiveSamples}";
-        }
+        [HideInInspector] public uint pad1;
+        [HideInInspector] public uint pad2;
+        [HideInInspector] public uint pad3;
     }
 
     [System.Serializable]
     [StructLayout(LayoutKind.Sequential)]
-    public struct ReSTIRDI_ShadingParameters
+    public struct RTXDI_DISpatioTemporalResamplingParameters
     {
-        [Toggle]
-        public uint enableFinalVisibility;
+        // Common surface similarity thresholds
+        [Range(0f, 1f)] public float depthThreshold;
+        [Range(0f, 1f)] public float normalThreshold;
 
-        [Toggle]
-        public uint reuseFinalVisibility;
+        public ReSTIRDI_SpatioTemporalBiasCorrectionMode biasCorrectionMode;
 
-        [Range(0, 8)]
-        public uint finalVisibilityMaxAge;
+        // Temporal parameters
+        [Range(0, 40)] public uint maxHistoryLength;
 
-        [Range(0, 32)]
-        public float finalVisibilityMaxDistance;
-        
-        [Toggle]
-        public uint enableDenoiserInputPacking;
+        public uint enablePermutationSampling;
+        [HideInInspector] public uint uniformRandomNumber;
+        public uint enableVisibilityShortcut;
 
-        [HideInInspector]
-        public uint pad1;
-
-        [HideInInspector]
-        public uint pad2;
-
-        [HideInInspector]
-        public uint pad3;
-
-        public override string ToString()
-        {
-            return $"ShadingParameters: " +
-                   $"enableFinalVisibility={enableFinalVisibility}, " +
-                   $"reuseFinalVisibility={reuseFinalVisibility}, " +
-                   $"finalVisibilityMaxAge={finalVisibilityMaxAge}, " +
-                   $"finalVisibilityMaxDistance={finalVisibilityMaxDistance}, " +
-                   $"enableDenoiserInputPacking={enableDenoiserInputPacking}";
-        }
+        // Spatial parameters
+        [Range(0, 32)] public uint numSamples;
+        public uint  numDisocclusionBoostSamples;
+        public float samplingRadius;
+        public uint  enableMaterialSimilarityTest;
+        public uint  discountNaiveSamples;
     }
 
     [System.Serializable]
     [StructLayout(LayoutKind.Sequential)]
-    public struct ReSTIRDI_Parameters
+    public struct RTXDI_ShadingParameters
     {
-        public RTXDI_ReservoirBufferParameters reservoirBufferParams;
-        public ReSTIRDI_BufferIndices bufferIndices;
-        public ReSTIRDI_InitialSamplingParameters initialSamplingParams;
-        public ReSTIRDI_TemporalResamplingParameters temporalResamplingParams;
-        public ReSTIRDI_SpatialResamplingParameters spatialResamplingParams;
-        public ReSTIRDI_ShadingParameters shadingParams;
+        public uint  enableFinalVisibility;
+        public uint  reuseFinalVisibility;
+        [Range(0, 8)]   public uint  finalVisibilityMaxAge;
+        [Range(0, 32f)] public float finalVisibilityMaxDistance;
 
-        public override string ToString()
-        {
-            return $"ReSTIRDI_Parameters: " +
-                   $"\n{reservoirBufferParams}" +
-                   $"\n{bufferIndices}" +
-                   $"\n{initialSamplingParams}" +
-                   $"\n{temporalResamplingParams}" +
-                   $"\n{spatialResamplingParams}" +
-                   $"\n{shadingParams}";
-        }
+        public uint  enableDenoiserInputPacking;
+        [HideInInspector] public uint pad1;
+        [HideInInspector] public uint pad2;
+        [HideInInspector] public uint pad3;
+    }
+
+    /// <summary>
+    /// Full DI parameter block passed to shaders each frame.
+    /// </summary>
+    [System.Serializable]
+    [StructLayout(LayoutKind.Sequential)]
+    public struct RTXDI_Parameters
+    {
+        public RTXDI_ReservoirBufferParameters          reservoirBufferParams;
+        public RTXDI_DIBufferIndices                    bufferIndices;
+        public RTXDI_DIInitialSamplingParameters        initialSamplingParams;
+        public RTXDI_DITemporalResamplingParameters     temporalResamplingParams;
+        public RTXDI_BoilingFilterParameters            boilingFilterParams;
+        public RTXDI_DISpatialResamplingParameters      spatialResamplingParams;
+        public RTXDI_DISpatioTemporalResamplingParameters spatioTemporalResamplingParams;
+        public RTXDI_ShadingParameters                  shadingParams;
     }
 }
