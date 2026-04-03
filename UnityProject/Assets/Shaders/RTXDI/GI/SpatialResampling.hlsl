@@ -13,8 +13,8 @@
 #ifndef RTXDI_GI_SPATIAL_RESAMPLING_HLSLI
 #define RTXDI_GI_SPATIAL_RESAMPLING_HLSLI
 
-#include "Rtxdi/GI/Reservoir.hlsli"
-#include "Rtxdi/Utils/Checkerboard.hlsli"
+#include "Assets/Shaders/Rtxdi/GI/Reservoir.hlsl"
+#include "Assets/Shaders/Rtxdi/Utils/Checkerboard.hlsl"
 
 // Enabled by default. Application code need to define those macros appropriately to optimize shaders.
 #ifndef RTXDI_GI_ALLOWED_BIAS_CORRECTION

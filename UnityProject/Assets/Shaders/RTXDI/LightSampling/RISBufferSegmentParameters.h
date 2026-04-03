@@ -13,7 +13,7 @@
 #ifndef RTXDI_RIS_BUFFER_SEGMENT_PARAMETERS
 #define RTXDI_RIS_BUFFER_SEGMENT_PARAMETERS
 
-#include "Rtxdi/RtxdiTypes.h"
+#include "Assets/Shaders/Rtxdi/RtxdiTypes.h"
 
 struct RTXDI_RISBufferSegmentParameters
 {

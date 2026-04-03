@@ -63,6 +63,7 @@ namespace PathTracing
                 natCmd.SetComputeTextureParam(cs, kernel, t_GBufferGeoNormalsID, ctx.GeoNormals);
 
                 natCmd.SetComputeTextureParam(cs, kernel, g_DirectLightingID, ctx.DirectLighting);
+                natCmd.SetComputeTextureParam(cs, kernel, t_LocalLightPdfTextureID, ctx.LocalLightPdfTexture);
 
                 natCmd.SetComputeBufferParam(cs, kernel, u_SecondaryGBufferID, ctx.RtxdiResources.SecondaryGBuffer);
                 natCmd.SetComputeBufferParam(cs, kernel, u_GIReservoirsID, ctx.RtxdiResources.GIReservoirBuffer);
@@ -72,6 +73,7 @@ namespace PathTracing
 
                 natCmd.SetComputeBufferParam(cs, kernel, t_NeighborOffsetsID, ctx.RtxdiResources.NeighborOffsetsBuffer);
                 natCmd.SetComputeBufferParam(cs, kernel, u_LightReservoirsID, ctx.RtxdiResources.LightReservoirBuffer);
+                natCmd.SetComputeBufferParam(cs, kernel, t_GeometryInstanceToLightID, ctx.GeometryInstanceToLight);
 
                 int rectW = (int)(ctx.RenderResolution.x * ctx.ResolutionScale + 0.5f);
                 int rectH = (int)(ctx.RenderResolution.y * ctx.ResolutionScale + 0.5f);
@@ -97,6 +99,7 @@ namespace PathTracing
                 natCmd.SetRayTracingTextureParam(data.gBufferTs, t_GBufferGeoNormalsID, ctx.GeoNormals);
 
                 natCmd.SetRayTracingTextureParam(data.gBufferTs, g_DirectLightingID, ctx.DirectLighting);
+                natCmd.SetRayTracingTextureParam(data.gBufferTs, t_LocalLightPdfTextureID, ctx.LocalLightPdfTexture);
 
                 natCmd.SetRayTracingBufferParam(data.gBufferTs, u_SecondaryGBufferID, ctx.RtxdiResources.SecondaryGBuffer);
                 natCmd.SetRayTracingBufferParam(data.gBufferTs, u_GIReservoirsID, ctx.RtxdiResources.GIReservoirBuffer);
@@ -106,6 +109,7 @@ namespace PathTracing
 
                 natCmd.SetRayTracingBufferParam(data.gBufferTs, t_NeighborOffsetsID, ctx.RtxdiResources.NeighborOffsetsBuffer);
                 natCmd.SetRayTracingBufferParam(data.gBufferTs, u_LightReservoirsID, ctx.RtxdiResources.LightReservoirBuffer);
+                natCmd.SetRayTracingBufferParam(data.gBufferTs, t_GeometryInstanceToLightID, ctx.GeometryInstanceToLight);
 
                 uint rectWmod = (uint)(ctx.RenderResolution.x * ctx.ResolutionScale + 0.5f);
                 uint rectHmod = (uint)(ctx.RenderResolution.y * ctx.ResolutionScale + 0.5f);

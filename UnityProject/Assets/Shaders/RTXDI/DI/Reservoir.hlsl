@@ -13,7 +13,7 @@
 #ifndef RTXDI_DIRESERVOIR_HLSLI
 #define RTXDI_DIRESERVOIR_HLSLI
 
-#include "Rtxdi/RtxdiParameters.h"
+#include "Assets/Shaders/Rtxdi/RtxdiParameters.h"
 
 // This structure represents a single light reservoir that stores the weights, the sample ref,
 // sample count (M), and visibility for reuse. It can be serialized into RTXDI_PackedDIReservoir for storage.

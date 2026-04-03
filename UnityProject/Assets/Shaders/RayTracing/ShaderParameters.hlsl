@@ -48,9 +48,9 @@ struct ResamplingConstants
     RTXDI_RISBufferSegmentParameters localLightsRISBufferSegmentParams;
     RTXDI_RISBufferSegmentParameters environmentLightRISBufferSegmentParams;
 
-    ReSTIRDI_Parameters restirDI;
+    RTXDI_Parameters restirDI;
     ReGIR_Parameters regir;
-    ReSTIRGI_Parameters restirGI;
+    RTXDI_GIParameters restirGI;
     BRDFPathTracing_Parameters brdfPT;
 
     uint visualizeRegirCells;

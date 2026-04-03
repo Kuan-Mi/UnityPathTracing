@@ -1,5 +1,6 @@
 #include "../RtxdiApplicationBridge/RtxdiApplicationBridge.hlsl"
 #include "Assets/Shaders/RTXDI/DI/InitialSampling.hlsl"
+#include "Assets/Shaders/RTXDI/DI/ReservoirStorage.hlsl"
 
 #ifdef USE_RAY_QUERY
 [numthreads(RTXDI_SCREEN_SPACE_GROUP_SIZE, RTXDI_SCREEN_SPACE_GROUP_SIZE, 1)]
@@ -19,45 +20,36 @@ void MainRayGenShader()
 
     uint2 pixelPosition = RTXDI_ReservoirPosToPixelPos(GlobalIndex, params.activeCheckerboardField);
 
-    RAB_RandomSamplerState rng = RAB_InitRandomSampler(pixelPosition, 1);
-    RAB_RandomSamplerState tileRng = RAB_InitRandomSampler(pixelPosition / RTXDI_TILE_SIZE_IN_PIXELS, 1);
+    RTXDI_RandomSamplerState rng = RTXDI_InitRandomSampler(pixelPosition, g_Const.runtimeParams.frameIndex, RTXDI_DI_GENERATE_INITIAL_SAMPLES_RANDOM_SEED);
+    RTXDI_RandomSamplerState tileRng = RTXDI_InitRandomSampler(pixelPosition / RTXDI_TILE_SIZE_IN_PIXELS, g_Const.runtimeParams.frameIndex, RTXDI_DI_GENERATE_INITIAL_SAMPLES_RANDOM_SEED);
+
 
     RAB_Surface surface = RAB_GetGBufferSurface(pixelPosition, false);
-
-    RTXDI_SampleParameters sampleParams = RTXDI_InitSampleParameters(
-        g_Const.restirDI.initialSamplingParams.numPrimaryLocalLightSamples,
-        g_Const.restirDI.initialSamplingParams.numPrimaryInfiniteLightSamples,
-        g_Const.restirDI.initialSamplingParams.numPrimaryEnvironmentSamples,
-        g_Const.restirDI.initialSamplingParams.numPrimaryBrdfSamples,
-        g_Const.restirDI.initialSamplingParams.brdfCutoff,
-        0.001f);
-
-
     RAB_LightSample lightSample;
-    RTXDI_DIReservoir reservoir = RTXDI_SampleLightsForSurface(
-        rng, tileRng, surface,
-        sampleParams, g_Const.lightBufferParams, g_Const.restirDI.initialSamplingParams.localLightSamplingMode,
-
-        #ifdef RTXDI_ENABLE_PRESAMPLING
+    RTXDI_DIReservoir reservoir = RTXDI_SampleLightsForSurface(rng, tileRng, surface,
+        g_Const.restirDI.initialSamplingParams, g_Const.lightBufferParams,
+#ifdef RTXDI_ENABLE_PRESAMPLING
         g_Const.localLightsRISBufferSegmentParams, g_Const.environmentLightRISBufferSegmentParams,
-        #if RTXDI_REGIR_MODE != RTXDI_REGIR_MODE_DISABLED
+#if RTXDI_REGIR_MODE != RTXDI_REGIR_MODE_DISABLED
         g_Const.regir,
-        #endif
-        #endif
+#endif
+#endif
         lightSample);
 
-    if (g_Const.restirDI.initialSamplingParams.enableInitialVisibility && RTXDI_IsValidDIReservoir(reservoir))
-    {
-        if (!RAB_GetConservativeVisibility(surface, lightSample))
-        {
-            RTXDI_StoreVisibilityInDIReservoir(reservoir, 0, true);
-        }
-    }
 
-    // gOut_DirectLighting[pixelPosition] = RTXDI_IsValidDIReservoir(reservoir);
-    gOut_DirectLighting[pixelPosition] = 0;
-    // gOut_DirectLighting[pixelPosition] = surface.normal;
-    // gOut_DirectLighting[pixelPosition] = surface.geoNormal;
+
+    // if (g_Const.restirDI.initialSamplingParams.enableInitialVisibility && RTXDI_IsValidDIReservoir(reservoir))
+    // {
+    //     if (!RAB_GetConservativeVisibility(surface, lightSample))
+    //     {
+    //         RTXDI_StoreVisibilityInDIReservoir(reservoir, 0, true);
+    //     }
+    // }
+    //
+    // // gOut_DirectLighting[pixelPosition] = RTXDI_IsValidDIReservoir(reservoir);
+    // gOut_DirectLighting[pixelPosition] = 0;
+    // // gOut_DirectLighting[pixelPosition] = surface.normal;
+    // // gOut_DirectLighting[pixelPosition] = surface.geoNormal;
     
     RTXDI_StoreDIReservoir(reservoir, g_Const.restirDI.reservoirBufferParams, GlobalIndex, g_Const.restirDI.bufferIndices.initialSamplingOutputBufferIndex);
 }

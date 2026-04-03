@@ -13,9 +13,9 @@
 #ifndef RTXDI_PT_SPATIAL_RESAMPLING_HLSLI
 #define RTXDI_PT_SPATIAL_RESAMPLING_HLSLI
 
-#include "Rtxdi/PT/HybridShift.hlsli"
-#include "Rtxdi/PT/Reservoir.hlsli"
-#include "Rtxdi/Utils/Math.hlsli"
+#include "Assets/Shaders/Rtxdi/PT/HybridShift.hlsl"
+#include "Assets/Shaders/Rtxdi/PT/Reservoir.hlsl"
+#include "Assets/Shaders/Rtxdi/Utils/Math.hlsl"
 
 // using uint mask to track samples, so absolute limit is 32
 static const uint RTXDI_MAX_SPATIAL_RESAMPLING_COUNT = 32;

@@ -13,10 +13,10 @@
 #ifndef RTXDI_PT_TEMPORAL_RESAMPLING_HLSLI
 #define RTXDI_PT_TEMPORAL_RESAMPLING_HLSLI
 
-#include "Rtxdi/Utils/Math.hlsli"
+#include "Assets/Shaders/Rtxdi/Utils/Math.hlsl"
 #define RTXDI_RESTIR_PT_HYBRID_SHIFT
-#include "Rtxdi/PT/HybridShift.hlsli"
-#include "Rtxdi/Utils/Checkerboard.hlsli"
+#include "Assets/Shaders/Rtxdi/PT/HybridShift.hlsl"
+#include "Assets/Shaders/Rtxdi/Utils/Checkerboard.hlsl"
 
 #define NEIGHBOR_FIND_MODE_GI 1
 #define NEIGHBOR_FIND_MODE_IDENTITY 2

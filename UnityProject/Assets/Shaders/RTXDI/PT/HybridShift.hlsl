@@ -20,9 +20,9 @@
 //
 #define RTXDI_RESTIR_PT_HYBRID_SHIFT
 
-#include "Rtxdi/PT/PathTracerContext.hlsli"
-#include "Rtxdi/PT/PathReconnectibility.hlsli"
-#include "Rtxdi/PT/Reservoir.hlsli"
+#include "Assets/Shaders/Rtxdi/PT/PathTracerContext.hlsl"
+#include "Assets/Shaders/Rtxdi/PT/PathReconnectibility.hlsl"
+#include "Assets/Shaders/Rtxdi/PT/Reservoir.hlsl"
 
 struct RTXDI_PTHybridShiftRuntimeParameters
 {

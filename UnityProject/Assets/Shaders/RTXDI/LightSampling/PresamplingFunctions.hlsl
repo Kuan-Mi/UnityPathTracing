@@ -13,11 +13,11 @@
 #ifndef RTXDI_PRESAMPLING_FUNCTIONS_HLSLI
 #define RTXDI_PRESAMPLING_FUNCTIONS_HLSLI
 
-#include "Rtxdi/RtxdiParameters.h"
-#include "Rtxdi/LightSampling/LocalLightSelection.hlsli"
-#include "Rtxdi/Utils/Math.hlsli"
+#include "Assets/Shaders/Rtxdi/RtxdiParameters.h"
+#include "Assets/Shaders/Rtxdi/LightSampling/LocalLightSelection.hlsl"
+#include "Assets/Shaders/Rtxdi/Utils/Math.hlsl"
 #if RTXDI_REGIR_MODE != RTXDI_REGIR_DISABLED
-#include "Rtxdi/ReGIR/ReGIRSampling.hlsli"
+#include "Assets/Shaders/Rtxdi/ReGIR/ReGIRSampling.hlsl"
 #endif
 
 #if RTXDI_ENABLE_PRESAMPLING && !defined(RTXDI_RIS_BUFFER)

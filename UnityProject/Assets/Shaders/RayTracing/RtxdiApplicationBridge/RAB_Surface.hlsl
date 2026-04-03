@@ -2,6 +2,8 @@
 #define RTXDI_RAB_SURFACE_HLSLI
 
 // #include "../GBufferHelpers.hlsli"
+#include "Assets/Shaders/Rtxdi/Utils/RandomSamplerstate.hlsl"
+#include "Assets/Shaders/Rtxdi/Utils/Color.hlsl"
 
 #include "RAB_RandomSamplerState.hlsl"
 #include "RAB_Material.hlsl"
@@ -180,12 +182,12 @@ float3 tangentToWorld(RAB_Surface surface, float3 h)
 // 根据给定的视图，从 BRDF 中输出一个重要的采样反射方向
 // 如果返回的方向在表面上方，则返回 true
 // 对表面的双向反射分布函数进行重要性采样，并返回采样方向。
-bool RAB_GetSurfaceBrdfSample(RAB_Surface surface, inout RAB_RandomSamplerState rng, out float3 dir)
+bool RAB_SurfaceImportanceSampleBrdf(RAB_Surface surface, inout RTXDI_RandomSamplerState rng, out float3 dir)
 {
     float3 rand;
-    rand.x = RAB_GetNextRandom(rng);
-    rand.y = RAB_GetNextRandom(rng);
-    rand.z = RAB_GetNextRandom(rng);
+    rand.x = RTXDI_GetNextRandom(rng);
+    rand.y = RTXDI_GetNextRandom(rng);
+    rand.z = RTXDI_GetNextRandom(rng);
     if (rand.x < surface.diffuseProbability)
     {
         // if (kSpecularOnly)
@@ -208,7 +210,7 @@ bool RAB_GetSurfaceBrdfSample(RAB_Surface surface, inout RAB_RandomSamplerState 
 
 // Return PDF wrt solid angle for the BRDF in the given dir
 // 返回给定方向上 BRDF 的关于立体角的 PDF
-float RAB_GetSurfaceBrdfPdf(RAB_Surface surface, float3 dir)
+float RAB_SurfaceEvaluateBrdfPdf(RAB_Surface surface, float3 dir)
 {
     float cosTheta = saturate(dot(surface.normal, dir));
     float diffusePdf = cosTheta / M_PI;
@@ -216,5 +218,40 @@ float RAB_GetSurfaceBrdfPdf(RAB_Surface surface, float3 dir)
     float pdf = cosTheta > 0.f ? lerp(specularPdf, diffusePdf, surface.diffuseProbability) : 0.f;
     return pdf;
 }
+
+/*
+ * Evaluate the BRDF for the surface given the outgoing direction
+ * Used by ReSTIR DI
+ */
+float3 RAB_SurfaceEvaluateBrdfTimesNoL(RAB_Surface surface, float3 L)
+{
+    float3 N = surface.normal;
+    float3 V = surface.viewDir;
+
+    if (dot(L, surface.geoNormal) <= 0)
+        return 0;
+
+    float d = Lambert(N, -L);
+    float3 s = float3(0.0f, 0.0f, 0.0f);
+    if (surface.material.roughness >= kMinRoughness)
+        s = GGX_times_NdotL(V, L, N, max(surface.material.roughness, kMinRoughness), surface.material.specularF0);
+
+    return d * surface.material.diffuseAlbedo + s;
+}
+
+float3 RAB_GetReflectedBrdfRadianceForSurface(float3 incomingRadianceLocation, float3 incomingRadiance, RAB_Surface surface)
+{
+    float3 L = normalize(incomingRadianceLocation - surface.worldPos);
+    float3 brdfTimesNoL = RAB_SurfaceEvaluateBrdfTimesNoL(surface, L);
+    return incomingRadiance * brdfTimesNoL;
+}
+
+
+float RAB_GetReflectedBrdfLuminanceForSurface(float3 incomingRadianceLocation, float3 incomingRadiance, RAB_Surface surface)
+{
+    return RTXDI_Luminance(RAB_GetReflectedBrdfRadianceForSurface(incomingRadianceLocation, incomingRadiance, surface));
+}
+
+
 
 #endif // RTXDI_RAB_SURFACE_HLSLI

@@ -2,6 +2,7 @@
 #define RAB_MATERIAL_HLSLI
 
 static const float kMinRoughness = 0.05f;
+#include "Assets/Shaders/Rtxdi/Utils/RandomSamplerstate.hlsl"
 
 // 存储表面的材质信息
 struct RAB_Material

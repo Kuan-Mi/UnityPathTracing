@@ -54,10 +54,10 @@ float3 RAB_GetReflectedRadianceForSurface(float3 incomingRadianceLocation, float
     return incomingRadiance * (d * surface.material.diffuseAlbedo + s);
 }
 
-float RAB_GetReflectedLuminanceForSurface(float3 incomingRadianceLocation, float3 incomingRadiance, RAB_Surface surface)
-{
-    return RTXDI_Luminance(RAB_GetReflectedRadianceForSurface(incomingRadianceLocation, incomingRadiance, surface));
-}
+// float RAB_GetReflectedLuminanceForSurface(float3 incomingRadianceLocation, float3 incomingRadiance, RAB_Surface surface)
+// {
+//     return RTXDI_Luminance(RAB_GetReflectedRadianceForSurface(incomingRadianceLocation, incomingRadiance, surface));
+// }
 
 // Compute the target PDF (p-hat) for the given light sample relative to a surface
 // 计算给定表面使用该光照样本进行着色时，每个光照样本的权重。
@@ -70,7 +70,7 @@ float RAB_GetLightSampleTargetPdfForSurface(RAB_LightSample lightSample, RAB_Sur
     if (lightSample.solidAnglePdf <= 0)
         return 0;
 
-    return RAB_GetReflectedLuminanceForSurface(lightSample.position, lightSample.radiance, surface) / lightSample.solidAnglePdf;
+    return RAB_GetReflectedBrdfLuminanceForSurface(lightSample.position, lightSample.radiance, surface) / lightSample.solidAnglePdf;
 }
 
 // Computes the weight of the given GI sample when the given surface is shaded using that GI sample.

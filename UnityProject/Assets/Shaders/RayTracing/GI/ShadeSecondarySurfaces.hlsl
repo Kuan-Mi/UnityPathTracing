@@ -35,8 +35,8 @@ void MainRayGenShader()
     if (any(pixelPosition > int2(gRectSize)))
         return;
 
-    RAB_RandomSamplerState rng = RAB_InitRandomSampler(GlobalIndex, 6);
-    RAB_RandomSamplerState tileRng = RAB_InitRandomSampler(GlobalIndex / RTXDI_TILE_SIZE_IN_PIXELS, 1);
+    RTXDI_RandomSamplerState rng = RTXDI_InitRandomSampler(GlobalIndex, g_Const.runtimeParams.frameIndex, RTXDI_SECONDARY_DI_GENERATE_INITIAL_SAMPLES_RANDOM_SEED);
+    RTXDI_RandomSamplerState tileRng = RTXDI_InitRandomSampler(GlobalIndex / RTXDI_TILE_SIZE_IN_PIXELS, g_Const.runtimeParams.frameIndex, RTXDI_SECONDARY_DI_GENERATE_INITIAL_SAMPLES_RANDOM_SEED);
 
     const RTXDI_RuntimeParameters params = g_Const.runtimeParams;
     const uint gbufferIndex = RTXDI_ReservoirPositionToPointer(g_Const.restirDI.reservoirBufferParams, GlobalIndex, 0);
@@ -77,27 +77,17 @@ void MainRayGenShader()
     // Shade the secondary surface.
     if (isValidSecondarySurface && !isEnvironmentMap)
     {
-        RTXDI_SampleParameters sampleParams = RTXDI_InitSampleParameters(
-            g_Const.brdfPT.secondarySurfaceReSTIRDIParams.initialSamplingParams.numPrimaryLocalLightSamples,
-            g_Const.brdfPT.secondarySurfaceReSTIRDIParams.initialSamplingParams.numPrimaryInfiniteLightSamples,
-            g_Const.brdfPT.secondarySurfaceReSTIRDIParams.initialSamplingParams.numPrimaryEnvironmentSamples,
-            0, // numBrdfSamples
-            0.f, // brdfCutoff 
-            0.f); // brdfMinRayT
-
 
         RAB_LightSample lightSample;
-        RTXDI_DIReservoir reservoir = RTXDI_SampleLightsForSurface(
-            rng, tileRng, secondarySurface,
-            sampleParams, g_Const.lightBufferParams, g_Const.brdfPT.secondarySurfaceReSTIRDIParams.initialSamplingParams.localLightSamplingMode,
-            #if RTXDI_ENABLE_PRESAMPLING
-            g_Const.localLightsRISBufferSegmentParams, g_Const.environmentLightRISBufferSegmentParams,
-            #if RTXDI_REGIR_MODE != RTXDI_REGIR_MODE_DISABLED
-            g_Const.regir,
-            #endif
-            #endif
-            lightSample);
-        
+        RTXDI_DIReservoir reservoir = RTXDI_SampleLightsForSurface(rng, tileRng, secondarySurface,
+            g_Const.brdfPT.secondarySurfaceReSTIRDIParams.initialSamplingParams, g_Const.lightBufferParams,
+#if RTXDI_ENABLE_PRESAMPLING
+        g_Const.localLightsRISBufferSegmentParams, g_Const.environmentLightRISBufferSegmentParams,
+#if RTXDI_REGIR_MODE != RTXDI_REGIR_MODE_DISABLED
+        g_Const.regir,
+#endif
+#endif
+        lightSample);
         
         if (g_Const.brdfPT.enableSecondaryResampling)
         {
@@ -114,22 +104,11 @@ void MainRayGenShader()
                 float2 uv = secondaryClipPos.xy * float2(0.5, -0.5) + 0.5;
                 int2 secondaryPixelPos = int2(uv * gRectSize);
                 
+                uint sourceBufferIndex = g_Const.restirDI.bufferIndices.shadingInputBufferIndex;
                 secondarySurface.viewDepth = -secondaryClipPos.w;
-        
-                RTXDI_DISpatialResamplingParameters sparams;
-                sparams.sourceBufferIndex = g_Const.restirDI.bufferIndices.shadingInputBufferIndex;
-                sparams.numSamples = g_Const.brdfPT.secondarySurfaceReSTIRDIParams.spatialResamplingParams.numSpatialSamples;
-                sparams.numDisocclusionBoostSamples = 0;
-                sparams.targetHistoryLength = 0;
-                sparams.biasCorrectionMode = g_Const.brdfPT.secondarySurfaceReSTIRDIParams.spatialResamplingParams.spatialBiasCorrection;
-                sparams.samplingRadius = g_Const.brdfPT.secondarySurfaceReSTIRDIParams.spatialResamplingParams.spatialSamplingRadius;
-                sparams.depthThreshold = g_Const.brdfPT.secondarySurfaceReSTIRDIParams.spatialResamplingParams.spatialDepthThreshold;
-                sparams.normalThreshold = g_Const.brdfPT.secondarySurfaceReSTIRDIParams.spatialResamplingParams.spatialNormalThreshold;
-                sparams.enableMaterialSimilarityTest = false;
-                sparams.discountNaiveSamples = false;
-        
                 reservoir = RTXDI_DISpatialResampling(secondaryPixelPos, secondarySurface, reservoir,
-                    rng, params, g_Const.restirDI.reservoirBufferParams, sparams, lightSample);
+                          rng, params, g_Const.restirDI.reservoirBufferParams, sourceBufferIndex, g_Const.brdfPT.secondarySurfaceReSTIRDIParams.spatialResamplingParams, lightSample);
+
                 
                 
             }
@@ -139,7 +118,7 @@ void MainRayGenShader()
         float3 indirectSpecular = 0;
         float lightDistance = 0;
         ShadeSurfaceWithLightSample(reservoir, secondarySurface, lightSample, /* previousFrameTLAS = */ false,
-            /* enableVisibilityReuse = */ false, indirectDiffuse, indirectSpecular, lightDistance);
+            /* enableVisibilityReuse = */ false, /* enableVisibilityShortcut */ false, indirectDiffuse, indirectSpecular, lightDistance);
         
         
         radiance += indirectDiffuse * secondarySurface.material.diffuseAlbedo + indirectSpecular;

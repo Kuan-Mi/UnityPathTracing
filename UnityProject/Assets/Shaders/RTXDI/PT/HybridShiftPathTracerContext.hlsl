@@ -13,10 +13,10 @@
 #ifndef RTXDI_HYBRID_SHIFT_PATH_TRACING_CONTEXT_HLSLI
 #define RTXDI_HYBRID_SHIFT_PATH_TRACING_CONTEXT_HLSLI
 
-#include "PathReconnectibility.hlsli"
-#include "PathTracerContextParameters.hlsli"
-#include "PathTracerRandomContext.hlsli"
-#include "PathTracerState.hlsli"
+#include "PathReconnectibility.hlsl"
+#include "PathTracerContextParameters.hlsl"
+#include "PathTracerRandomContext.hlsl"
+#include "PathTracerState.hlsl"
 
 struct RTXDI_HybridShiftPathTracerContext
 {

@@ -45,7 +45,9 @@ void MainRayGenShader()
         RAB_LightSample lightSample = RAB_SamplePolymorphicLight(lightInfo, surface, RTXDI_GetDIReservoirSampleUV(reservoir));
 
         bool needToStore = ShadeSurfaceWithLightSample(reservoir, surface, lightSample,
-                                                       /* previousFrameTLAS = */ false, /* enableVisibilityReuse = */ true, diffuse, specular, lightDistance);
+                                                       /* previousFrameTLAS = */ false, /* enableVisibilityReuse = */ true,
+                                                       
+                                                       /* enableVisibilityReuse = */ true, diffuse, specular, lightDistance);
 
         // currLuminance = float2(calcLuminance(diffuse * surface.material.diffuseAlbedo), calcLuminance(specular));
         // specular = DemodulateSpecular(surface.material.specularF0, specular);

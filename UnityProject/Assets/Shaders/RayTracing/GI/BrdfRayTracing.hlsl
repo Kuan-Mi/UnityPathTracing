@@ -17,6 +17,7 @@
 #include <Assets/Shaders/RTXDI/DI/Reservoir.hlsl>
 #include "Assets/Shaders/RayTracing/ShadingHelpers.hlsl"
 #include "Assets/Shaders/Include/Payload.hlsl"
+#include "Assets/Shaders/RTXDI/DI/ReservoirStorage.hlsl"
 
 #pragma max_recursion_depth 1
 
