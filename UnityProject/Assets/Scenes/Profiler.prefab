@@ -83,3 +83,4 @@ MonoBehaviour:
   - TAA
   - Output Blit
   averageWindowSeconds: 1
+  toggleKey: 284
