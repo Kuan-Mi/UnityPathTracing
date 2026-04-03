@@ -13,11 +13,11 @@
 #ifndef RTXDI_PT_PATH_TRACING_CONTEXT_HLSLI
 #define RTXDI_PT_PATH_TRACING_CONTEXT_HLSLI
 
-#include "Rtxdi/DI/Reservoir.hlsli"
-#include "Rtxdi/PT/PathTracerContextParameters.hlsli"
-#include "Rtxdi/Utils/BrdfRaySample.hlsli"
-#include "Rtxdi/Utils/Math.hlsli"
-#include "Rtxdi/Utils/SampledLightData.hlsli"
+#include "Assets/Shaders/Rtxdi/DI/Reservoir.hlsl"
+#include "Assets/Shaders/Rtxdi/PT/PathTracerContextParameters.hlsl"
+#include "Assets/Shaders/Rtxdi/Utils/BrdfRaySample.hlsl"
+#include "Assets/Shaders/Rtxdi/Utils/Math.hlsl"
+#include "Assets/Shaders/Rtxdi/Utils/SampledLightData.hlsl"
 
 //
 // define-style interface for broad compatibility
@@ -26,9 +26,9 @@
 //
 
 #if defined(RTXDI_RESTIR_PT_INITIAL_SAMPLING)
-#include "InitialSamplingPathTracerContext.hlsli"
+#include "InitialSamplingPathTracerContext.hlsl"
 #elif defined(RTXDI_RESTIR_PT_HYBRID_SHIFT)
-#include "HybridShiftPathTracerContext.hlsli"
+#include "HybridShiftPathTracerContext.hlsl"
 #else
 #define RTXDI_NO_RESTIR_PT_CONTEXT
 #endif

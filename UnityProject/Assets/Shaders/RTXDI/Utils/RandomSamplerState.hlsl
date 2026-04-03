@@ -13,8 +13,8 @@
 #ifndef RTXDI_RANDOM_SAMPLER_STATE_HLSLI
 #define RTXDI_RANDOM_SAMPLER_STATE_HLSLI
 
-#include <Rtxdi/Utils/Math.hlsli>
-#include <Rtxdi/Utils/RandomSamplerPerPassSeeds.hlsli>
+#include <Assets/Shaders/Rtxdi/Utils/Math.hlsl>
+#include <Assets/Shaders/Rtxdi/Utils/RandomSamplerPerPassSeeds.hlsl>
 
 struct RTXDI_RandomSamplerState
 {

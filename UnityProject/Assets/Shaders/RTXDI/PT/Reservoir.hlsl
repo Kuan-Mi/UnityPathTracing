@@ -19,11 +19,11 @@
 
 #define TARGET_FUNCTION_TYPE float3
 
-#include "../Utils/Color.hlsli"
-#include "../Utils/RandomSamplerState.hlsli"
-#include "../Utils/ReservoirAddressing.hlsli"
-#include "../Utils/SampledLightData.hlsli"
-#include "../Utils/Math.hlsli"
+#include "../Utils/Color.hlsl"
+#include "../Utils/RandomSamplerState.hlsl"
+#include "../Utils/ReservoirAddressing.hlsl"
+#include "../Utils/SampledLightData.hlsl"
+#include "../Utils/Math.hlsl"
 
 #ifndef RTXDI_PT_RESERVOIR_BUFFER
 #error "RTXDI_PT_RESERVOIR_BUFFER must be defined to point to a RWStructuredBuffer<RTXDI_PackedPTReservoir> type resource"

@@ -13,7 +13,7 @@
 #ifndef RTXDI_PATH_TRACING_CONTEXT_PARAMETERS_HLSLI
 #define RTXDI_PATH_TRACING_CONTEXT_PARAMETERS_HLSLI
 
-#include "PathReconnectibility.hlsli"
+#include "PathReconnectibility.hlsl"
 
 struct RTXDI_PathTracerContextParameters
 {

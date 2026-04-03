@@ -14,9 +14,9 @@
 #define RTXDI_PATH_RECONNECTIBILITY_HLSLI
 
 #include "ReSTIRPTParameters.h"
-#include "PathTracerRandomContext.hlsli"
-#include "Rtxdi/Utils/BrdfRaySample.hlsli"
-#include "Rtxdi/Utils/Math.hlsli"
+#include "PathTracerRandomContext.hlsl"
+#include "Assets/Shaders/Rtxdi/Utils/BrdfRaySample.hlsl"
+#include "Assets/Shaders/Rtxdi/Utils/Math.hlsl"
 
 struct RTXDI_PTReconnectionRuntimeParameters
 {

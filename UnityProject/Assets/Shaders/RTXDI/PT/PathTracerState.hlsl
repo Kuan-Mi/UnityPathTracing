@@ -13,8 +13,8 @@
 #ifndef RTXDI_PT_PATH_TRACING_STATE_HLSLI
 #define RTXDI_PT_PATH_TRACING_STATE_HLSLI
 
-#include "Rtxdi/Utils/BrdfRaySample.hlsli"
-#include "Rtxdi/Utils/SampledLightData.hlsli"
+#include "Assets/Shaders/Rtxdi/Utils/BrdfRaySample.hlsl"
+#include "Assets/Shaders/Rtxdi/Utils/SampledLightData.hlsl"
 
 // Path Tracing flag bits
 #define PT_STATE_LAST_VERTEX_FAR           0x02

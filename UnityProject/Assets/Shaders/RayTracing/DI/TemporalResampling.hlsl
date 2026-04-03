@@ -20,7 +20,7 @@ void MainRayGenShader()
 
     uint2 pixelPosition = RTXDI_ReservoirPosToPixelPos(GlobalIndex, params.activeCheckerboardField);
 
-    RAB_RandomSamplerState rng = RAB_InitRandomSampler(pixelPosition, 2);
+    RTXDI_RandomSamplerState rng = RTXDI_InitRandomSampler(pixelPosition, g_Const.runtimeParams.frameIndex, RTXDI_DI_TEMPORAL_RESAMPLING_RANDOM_SEED);
 
     RAB_Surface surface = RAB_GetGBufferSurface(pixelPosition, false);
 
@@ -31,6 +31,9 @@ void MainRayGenShader()
         usePermutationSampling = !IsComplexSurface(pixelPosition, surface);
     }
 
+    RTXDI_DITemporalResamplingParameters tParams = g_Const.restirDI.temporalResamplingParams;
+    tParams.enablePermutationSampling = usePermutationSampling;
+    
     // usePermutationSampling = true;
     RTXDI_DIReservoir temporalResult = RTXDI_EmptyDIReservoir();
     int2 temporalSamplePixelPos = -1;
@@ -42,30 +45,14 @@ void MainRayGenShader()
 
         float3 motionVector = t_MotionVectors[pixelPosition].xyz;
 
-        RTXDI_DITemporalResamplingParameters tparams;
-        tparams.screenSpaceMotion = motionVector;
-        tparams.sourceBufferIndex = g_Const.restirDI.bufferIndices.temporalResamplingInputBufferIndex;
-        tparams.maxHistoryLength = g_Const.restirDI.temporalResamplingParams.maxHistoryLength;
-        tparams.biasCorrectionMode = g_Const.restirDI.temporalResamplingParams.temporalBiasCorrection;
-        tparams.depthThreshold = g_Const.restirDI.temporalResamplingParams.temporalDepthThreshold;
-        tparams.normalThreshold = g_Const.restirDI.temporalResamplingParams.temporalNormalThreshold;
-        tparams.enableVisibilityShortcut = g_Const.restirDI.temporalResamplingParams.discardInvisibleSamples;
-        tparams.enablePermutationSampling = usePermutationSampling;
-        tparams.uniformRandomNumber = g_Const.restirDI.temporalResamplingParams.uniformRandomNumber;
-
+        
+        uint sourceBufferIndex = g_Const.restirDI.bufferIndices.temporalResamplingInputBufferIndex;
+        
+        
         RAB_LightSample selectedLightSample = (RAB_LightSample)0;
-
+        
         temporalResult = RTXDI_DITemporalResampling(pixelPosition, surface, curSample,
-                                                    rng, params, g_Const.restirDI.reservoirBufferParams, tparams, temporalSamplePixelPos, selectedLightSample);
-        //
-        // float3 finalColor = ShadeSurfaceWithLightSample(selectedLightSample, surface) * RTXDI_GetDIReservoirInvPdf(temporalResult);
-        //
-        // RAB_LightInfo lightInfo = RAB_LoadLightInfo(RTXDI_GetDIReservoirLightIndex(temporalResult), false);
-        // RAB_LightSample lightSample = RAB_SamplePolymorphicLight(lightInfo, surface, RTXDI_GetDIReservoirSampleUV(temporalResult));
-        // float3 finalColor2 = ShadeSurfaceWithLightSample(lightSample, surface) * RTXDI_GetDIReservoirInvPdf(temporalResult);
-        //
-        // gOut_DirectLighting[pixelPosition] = finalColor2;
-        //  
+            rng, params, g_Const.restirDI.reservoirBufferParams, motionVector, sourceBufferIndex, tParams, temporalSamplePixelPos, selectedLightSample);
     }
 
     #ifdef RTXDI_ENABLE_BOILING_FILTER

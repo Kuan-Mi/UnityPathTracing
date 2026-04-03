@@ -13,9 +13,9 @@
 #ifndef RTXDI_DI_TEMPORAL_RESAMPLING_HLSLI
 #define RTXDI_DI_TEMPORAL_RESAMPLING_HLSLI
 
-#include "Rtxdi/DI/Reservoir.hlsli"
-#include <Rtxdi/DI/ReservoirStorage.hlsli>
-#include "Rtxdi/Utils/Checkerboard.hlsli"
+#include "Assets/Shaders/Rtxdi/DI/Reservoir.hlsl"
+#include <Assets/Shaders/Rtxdi/DI/ReservoirStorage.hlsl>
+#include "Assets/Shaders/Rtxdi/Utils/Checkerboard.hlsl"
 
 // Temporal resampling pass.
 // Takes the previous G-buffer, motion vectors, and two light reservoir buffers as inputs.

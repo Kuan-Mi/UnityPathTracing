@@ -30,6 +30,7 @@ bool ShadeSurfaceWithLightSample(
     RAB_LightSample lightSample,
     bool previousFrameTLAS,
     bool enableVisibilityReuse,
+    bool enableVisibilityShortcut,
     out float3 diffuse,
     out float3 specular,
     out float lightDistance)
@@ -60,7 +61,9 @@ bool ShadeSurfaceWithLightSample(
         {
             visibility = GetFinalVisibility(surface, lightSample.position);
             // visibility = GetFinalVisibility(SceneBVH, surface, lightSample.position);
-            RTXDI_StoreVisibilityInDIReservoir(reservoir, visibility, g_Const.restirDI.temporalResamplingParams.discardInvisibleSamples);
+            RTXDI_StoreVisibilityInDIReservoir(reservoir, visibility, enableVisibilityShortcut);
+
+            // RTXDI_StoreVisibilityInDIReservoir(reservoir, visibility, g_Const.restirDI.temporalResamplingParams.discardInvisibleSamples);
             needToStore = true;
         }
 

@@ -13,10 +13,10 @@
 #ifndef RTXDI_INITIAL_SAMPLING_PATH_TRACING_CONTEXT_HLSLI
 #define RTXDI_INITIAL_SAMPLING_PATH_TRACING_CONTEXT_HLSLI
 
-#include "PathReconnectibility.hlsli"
-#include "PathTracerContextParameters.hlsli"
-#include "PathTracerState.hlsli"
-#include "Rtxdi/Utils/Color.hlsli"
+#include "PathReconnectibility.hlsl"
+#include "PathTracerContextParameters.hlsl"
+#include "PathTracerState.hlsl"
+#include "Assets/Shaders/Rtxdi/Utils/Color.hlsl"
 
 struct RTXDI_InitialSamplingPathTracerContext
 {

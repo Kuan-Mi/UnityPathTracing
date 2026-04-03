@@ -25,8 +25,8 @@ struct BRDFPathTracing_MaterialOverrideParameters
 // Spatial resampling is only enabled if the secondary hit is in the gbuffer (determined via projection)
 struct BRDFPathTracing_SecondarySurfaceReSTIRDIParameters
 {
-    ReSTIRDI_InitialSamplingParameters initialSamplingParams;
-    ReSTIRDI_SpatialResamplingParameters spatialResamplingParams;
+    RTXDI_DIInitialSamplingParameters initialSamplingParams;
+    RTXDI_DISpatialResamplingParameters spatialResamplingParams;
 };
 
 struct BRDFPathTracing_Parameters

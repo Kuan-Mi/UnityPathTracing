@@ -13,8 +13,8 @@
 #ifndef RTXDI_GI_BOILING_FILTER_HLSLI
 #define RTXDI_GI_BOILING_FILTER_HLSLI
 
-#include "Rtxdi/GI/Reservoir.hlsli"
-#include "Rtxdi/Utils/BoilingFilter.hlsli"
+#include "Assets/Shaders/Rtxdi/GI/Reservoir.hlsl"
+#include "Assets/Shaders/Rtxdi/Utils/BoilingFilter.hlsl"
 
 #ifdef RTXDI_ENABLE_BOILING_FILTER
 

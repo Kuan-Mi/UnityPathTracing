@@ -13,9 +13,9 @@
 #ifndef RTXDI_GI_SPATIOTEMPORAL_RESAMPLING_HLSLI
 #define RTXDI_GI_SPATIOTEMPORAL_RESAMPLING_HLSLI
 
-#include "Rtxdi/GI/Reservoir.hlsli"
-#include "Rtxdi/GI/SpatialResampling.hlsli"
-#include "Rtxdi/GI/TemporalResampling.hlsli"
+#include "Assets/Shaders/Rtxdi/GI/Reservoir.hlsl"
+#include "Assets/Shaders/Rtxdi/GI/SpatialResampling.hlsl"
+#include "Assets/Shaders/Rtxdi/GI/TemporalResampling.hlsl"
 
 RTXDI_GIReservoir RTXDI_GISpatioTemporalResampling(
     const uint2 pixelPosition,

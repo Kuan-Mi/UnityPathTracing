@@ -13,8 +13,8 @@
 #ifndef RAB_PT_RANDOM_CONTEXT_HLSLI
 #define RAB_PT_RANDOM_CONTEXT_HLSLI
 
-#include "Rtxdi/RtxdiParameters.h"
-#include "Rtxdi/Utils/RandomSamplerstate.hlsli"
+#include "Assets/Shaders/Rtxdi/RtxdiParameters.h"
+#include "Assets/Shaders/Rtxdi/Utils/RandomSamplerstate.hlsl"
 
 struct RTXDI_PathTracerRandomContext
 {
