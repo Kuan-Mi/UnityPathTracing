@@ -158,8 +158,9 @@ namespace PathTracing
                 data.ConstantBuffer, paramsID,
                 0, data.ConstantBuffer.stride);
 
-            // Clear only depth (MRT color targets are written by geometry below).
-            context.cmd.ClearRenderTarget(true, false, Color.clear, 1.0f);
+            // Clear ViewDepth (color0) to BACKGROUND_DEPTH (1e5) and reset hardware depth to 1.0.
+            context.cmd.ClearRenderTarget(RTClearFlags.Color0 | RTClearFlags.Depth, new Color(-1e5f, 0, 0, 0), 1.0f, 0);
+            
 
             // Draw opaque objects using the "GBufferRaster" shader pass.
             context.cmd.DrawRendererList(data.RendererList);

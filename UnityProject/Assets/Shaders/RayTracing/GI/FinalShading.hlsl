@@ -104,10 +104,10 @@ void MainRayGenShader()
 
         // specular = DemodulateSpecular(primarySurface.material.specularF0, specular);
         
-        float3 finalColor = (diffuse * primarySurface.material.diffuseAlbedo) + specular;
-        finalColor *= gExposure; 
         
-        StoreShadingOutput(finalColor,pixelPosition,false,true);
         
     }
+        float3 finalColor = (diffuse * primarySurface.material.diffuseAlbedo) + specular;
+        finalColor *= gExposure; 
+        StoreShadingOutput(finalColor,pixelPosition,false,true);
 }

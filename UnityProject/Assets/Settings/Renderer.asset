@@ -12,9 +12,9 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: ecc60134e0a049db88b485a3406f7b37, type: 3}
   m_Name: RtxdiFeature
   m_EditorClassIdentifier: Assembly-CSharp::PathTracing.RtxdiFeature
-  m_Active: 1
+  m_Active: 0
   setting:
-    exposureEv: 0
+    exposureEv: -2
     cameraJitter: 1
     showMode: 18
     showMv: 0
@@ -64,14 +64,14 @@ MonoBehaviour:
     indirectLightingMode: 2
     enableGIFinalShading: 1
     enableDIFinalShading: 1
-    enableEnv: 0
+    enableEnv: 1
     gShowLight: 0
     regirDynamicParams:
       regirCellSize: 1
       center:
-        x: 17.690056
-        y: 7.06975
-        z: -2.8758888
+        x: -10.13138
+        y: 1.4567231
+        z: -2.0140357
       fallbackSamplingMode: 1
       presamplingMode: 1
       regirSamplingJitter: 1
@@ -90,9 +90,9 @@ MonoBehaviour:
       numPrimaryLocalLightSamples: 8
       numPrimaryInfiniteLightSamples: 1
       numPrimaryEnvironmentSamples: 0
-      numPrimaryBrdfSamples: 1
+      numPrimaryBrdfSamples: 0
       brdfCutoff: 0.0001
-      enableInitialVisibility: 1
+      enableInitialVisibility: 0
       environmentMapImportanceSampling: 0
       localLightSamplingMode: 2
     temporalResamplingParams:
@@ -112,7 +112,7 @@ MonoBehaviour:
       spatialDepthThreshold: 0.1
       spatialNormalThreshold: 0.5
       spatialBiasCorrection: 2
-      numSpatialSamples: 4
+      numSpatialSamples: 1
       numDisocclusionBoostSamples: 8
       spatialSamplingRadius: 32
       neighborOffsetMask: 0
@@ -167,7 +167,7 @@ MonoBehaviour:
       secondarySurfaceReSTIRDIParams:
         initialSamplingParams:
           numPrimaryLocalLightSamples: 1
-          numPrimaryInfiniteLightSamples: 0
+          numPrimaryInfiniteLightSamples: 1
           numPrimaryEnvironmentSamples: 0
           numPrimaryBrdfSamples: 0
           brdfCutoff: 0
@@ -330,9 +330,9 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: f50908f0e9bf42149891b36684931380, type: 3}
   m_Name: PathTracingFeature
   m_EditorClassIdentifier: Assembly-CSharp::PathTracing.PathTracingFeature
-  m_Active: 0
+  m_Active: 1
   pathTracingSetting:
-    exposureEv: 0
+    exposureEv: -2
     cameraJitter: 1
     showMode: 18
     showMv: 0
@@ -507,7 +507,7 @@ MonoBehaviour:
     tracingMode: 1
     denoiser: 0
     emissionIntensity: 1
-    psr: 0
+    psr: 1
     emission: 1
     usePrevFrame: 1
     TAA: 1
