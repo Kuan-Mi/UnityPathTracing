@@ -11,6 +11,8 @@ namespace PathTracing
     [CustomEditor(typeof(RtxdiFeature))]
     public class RtxdiFeatureEditor : Editor
     {
+        private RtxdiSettingPreset _presetTarget;
+
         private string GetKey(string headerName)
         {
             return $"PT_Foldout_{target.GetInstanceID()}_{headerName}";
@@ -54,7 +56,8 @@ namespace PathTracing
             }
 
             EditorGUILayout.Space(10);
-            
+            DrawPresetUI(feature);
+            EditorGUILayout.Space(10);
 
             DrawObjectRecursive("Global Constants", feature.globalConstants , "GlobalConstants");
             
@@ -145,6 +148,75 @@ namespace PathTracing
 
                 EditorGUILayout.EndFoldoutHeaderGroup();
             }
+        }
+
+        /// <summary>
+        /// 绘制预设保存/加载 UI
+        /// </summary>
+        private void DrawPresetUI(RtxdiFeature feature)
+        {
+            string foldoutKey = GetKey("PresetFoldout");
+            bool isExpanded = SessionState.GetBool(foldoutKey, true);
+            bool newExpanded = EditorGUILayout.BeginFoldoutHeaderGroup(isExpanded, "Presets");
+            if (newExpanded != isExpanded)
+                SessionState.SetBool(foldoutKey, newExpanded);
+
+            if (newExpanded)
+            {
+                EditorGUI.indentLevel++;
+
+                _presetTarget = (RtxdiSettingPreset)EditorGUILayout.ObjectField(
+                    "Preset Asset", _presetTarget, typeof(RtxdiSettingPreset), false);
+
+                EditorGUILayout.BeginHorizontal();
+
+                GUI.enabled = _presetTarget != null;
+                if (GUILayout.Button("Load Preset"))
+                {
+                    Undo.RecordObject(feature, "Load Rtxdi Setting Preset");
+                    CopySettings(_presetTarget.setting, feature.setting);
+                    EditorUtility.SetDirty(feature);
+                }
+
+                if (GUILayout.Button("Save to Preset"))
+                {
+                    Undo.RecordObject(_presetTarget, "Save Rtxdi Setting Preset");
+                    CopySettings(feature.setting, _presetTarget.setting);
+                    EditorUtility.SetDirty(_presetTarget);
+                    AssetDatabase.SaveAssets();
+                }
+                GUI.enabled = true;
+
+                if (GUILayout.Button("New Preset..."))
+                {
+                    string path = EditorUtility.SaveFilePanelInProject(
+                        "Save Rtxdi Setting Preset",
+                        "RtxdiSettingPreset",
+                        "asset",
+                        "Choose location to save preset");
+                    if (!string.IsNullOrEmpty(path))
+                    {
+                        var newPreset = CreateInstance<RtxdiSettingPreset>();
+                        CopySettings(feature.setting, newPreset.setting);
+                        AssetDatabase.CreateAsset(newPreset, path);
+                        AssetDatabase.SaveAssets();
+                        _presetTarget = newPreset;
+                    }
+                }
+
+                EditorGUILayout.EndHorizontal();
+                EditorGUI.indentLevel--;
+            }
+
+            EditorGUILayout.EndFoldoutHeaderGroup();
+        }
+
+        /// <summary>
+        /// 通过 JSON 序列化在两个 RtxdiSetting 实例之间深拷贝
+        /// </summary>
+        private static void CopySettings(RtxdiSetting src, RtxdiSetting dst)
+        {
+            JsonUtility.FromJsonOverwrite(JsonUtility.ToJson(src), dst);
         }
 
         /// <summary>

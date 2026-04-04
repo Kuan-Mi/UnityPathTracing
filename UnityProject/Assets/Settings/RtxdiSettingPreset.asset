@@ -1,0 +1,199 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: b14719b9c31c9bd419ad26c6b18ad161, type: 3}
+  m_Name: RtxdiSettingPreset
+  m_EditorClassIdentifier: Assembly-CSharp::PathTracing.RtxdiSettingPreset
+  setting:
+    exposureEv: 4.38
+    cameraJitter: 1
+    showMode: 18
+    showMv: 0
+    upscalerMode: 0
+    tmpDisableRR: 0
+    lightingSettings:
+      denoiserMode: 0
+      enablePreviousTLAS: 1
+      enableAlphaTestedGeometry: 1
+      enableTransparentGeometry: 1
+      enableRayCounts: 1
+      visualizeRegirCells: 0
+      enableGradients: 1
+      gradientLogDarknessBias: -12
+      gradientSensitivity: 8
+      confidenceHistoryLength: 0.75
+      brdfptParams:
+        enableIndirectEmissiveSurfaces: 0
+        enableSecondaryResampling: 0
+        enableReSTIRGI: 0
+        pad1: 0
+        materialOverrideParams:
+          roughnessOverride: 0.5
+          metalnessOverride: 0.5
+          minSecondaryRoughness: 0.5
+          pad1: 0
+        secondarySurfaceReSTIRDIParams:
+          initialSamplingParams:
+            numLocalLightSamples: 2
+            numInfiniteLightSamples: 1
+            numEnvironmentSamples: 1
+            numBrdfSamples: 0
+            brdfCutoff: 0
+            brdfRayMinT: 0
+            localLightSamplingMode: 2
+            enableInitialVisibility: 0
+            environmentMapImportanceSampling: 0
+            pad1: 0
+            pad2: 0
+            pad3: 0
+          spatialResamplingParams:
+            numSamples: 1
+            numDisocclusionBoostSamples: 0
+            samplingRadius: 4
+            biasCorrectionMode: 1
+            depthThreshold: 0.1
+            normalThreshold: 0.9
+            targetHistoryLength: 0
+            enableMaterialSimilarityTest: 0
+            discountNaiveSamples: 0
+            pad1: 0
+            pad2: 0
+            pad3: 0
+    directLightingMode: 2
+    indirectLightingMode: 2
+    enableGIFinalShading: 1
+    enableDIFinalShading: 1
+    enableEnv: 1
+    useRasterGBuffer: 1
+    regirDynamicParams:
+      regirCellSize: 1
+      center:
+        x: -2.3668613
+        y: 3.8409238
+        z: -20.805328
+      fallbackSamplingMode: 1
+      presamplingMode: 1
+      regirSamplingJitter: 1
+      regirNumBuildSamples: 8
+    useComputeForGis: 1
+    useComputeForTemporalResampling: 1
+    useComputeForSpatialResampling: 1
+    useComputeForShadeSamples: 1
+    useComputeForShadeSecondarySurfaces: 1
+    useComputeForGITemporalResampling: 1
+    useComputeForGISpatialResampling: 1
+    useComputeForGIFinalShading: 1
+    diResamplingMode: 3
+    initialSamplingParams:
+      numLocalLightSamples: 8
+      numInfiniteLightSamples: 1
+      numEnvironmentSamples: 1
+      numBrdfSamples: 1
+      brdfCutoff: 0.0001
+      brdfRayMinT: 0.001
+      localLightSamplingMode: 2
+      enableInitialVisibility: 1
+      environmentMapImportanceSampling: 0
+      pad1: 0
+      pad2: 0
+      pad3: 0
+    temporalResamplingParams:
+      maxHistoryLength: 20
+      biasCorrectionMode: 1
+      depthThreshold: 0.1
+      normalThreshold: 0.5
+      enableVisibilityShortcut: 0
+      enablePermutationSampling: 1
+      uniformRandomNumber: 0
+      permutationSamplingThreshold: 0.9
+    spatialResamplingParams:
+      numSamples: 2
+      numDisocclusionBoostSamples: 16
+      samplingRadius: 32
+      biasCorrectionMode: 1
+      depthThreshold: 0.4
+      normalThreshold: 0
+      targetHistoryLength: 4
+      enableMaterialSimilarityTest: 0
+      discountNaiveSamples: 0
+      pad1: 0
+      pad2: 0
+      pad3: 0
+    shadingParams:
+      enableFinalVisibility: 1
+      reuseFinalVisibility: 1
+      finalVisibilityMaxAge: 4
+      finalVisibilityMaxDistance: 16
+      enableDenoiserInputPacking: 0
+      pad1: 0
+      pad2: 0
+      pad3: 0
+    giResamplingMode: 3
+    giTemporalResamplingParams:
+      depthThreshold: 0
+      normalThreshold: 0
+      maxHistoryLength: 20
+      enableFallbackSampling: 1
+      biasCorrectionMode: 1
+      maxReservoirAge: 30
+      enablePermutationSampling: 1
+      uniformRandomNumber: 0
+    giSpatialResamplingParams:
+      depthThreshold: 0
+      normalThreshold: 0
+      numSamples: 2
+      samplingRadius: 64
+      biasCorrectionMode: 1
+      pad1: 0
+      pad2: 0
+      pad3: 0
+    giFinalShadingParams:
+      enableFinalVisibility: 1
+      enableFinalMIS: 1
+      pad1: 0
+      pad2: 0
+    brdfptParams:
+      enableIndirectEmissiveSurfaces: 0
+      enableSecondaryResampling: 1
+      enableReSTIRGI: 0
+      pad1: 0
+      materialOverrideParams:
+        roughnessOverride: 0.5
+        metalnessOverride: 0.5
+        minSecondaryRoughness: 0.5
+        pad1: 0
+      secondarySurfaceReSTIRDIParams:
+        initialSamplingParams:
+          numLocalLightSamples: 2
+          numInfiniteLightSamples: 1
+          numEnvironmentSamples: 1
+          numBrdfSamples: 0
+          brdfCutoff: 0
+          brdfRayMinT: 0
+          localLightSamplingMode: 2
+          enableInitialVisibility: 0
+          environmentMapImportanceSampling: 0
+          pad1: 0
+          pad2: 0
+          pad3: 0
+        spatialResamplingParams:
+          numSamples: 1
+          numDisocclusionBoostSamples: 0
+          samplingRadius: 4
+          biasCorrectionMode: 1
+          depthThreshold: 0
+          normalThreshold: 0
+          targetHistoryLength: 0
+          enableMaterialSimilarityTest: 0
+          discountNaiveSamples: 0
+          pad1: 0
+          pad2: 0
+          pad3: 0
