@@ -22,8 +22,6 @@ namespace DLRR
         private const int BufferCount = 3;
         private readonly string _cameraName;
 
-        private readonly PathTracingSetting _setting;
-
         /// <summary>
         /// Per-frame camera data filled by PathTracingFeature from CameraFrameState.
         /// DLRRDenoiser does not depend on CameraFrameState directly.
@@ -54,19 +52,18 @@ namespace DLRR
             public NriTextureResource specHitDistance; // RRGuide_SpecHitDistance
         }
 
-        public DlrrDenoiser(PathTracingSetting setting, string camName)
+        public DlrrDenoiser(string camName)
         {
-            _setting = setting;
             _instanceId = CreateDLRRInstance();
             _cameraName = camName;
             _buffer = new NativeArray<DlrrFrameData>(BufferCount, Allocator.Persistent);
                 Debug.Log($"[DLSS RR] Created Denoiser Instance {_instanceId} for Camera {_cameraName}");
         }
 
-        private DlrrFrameData GetData(DlrrFrameInput fi, DlrrResources res)
+        private DlrrFrameData GetData(DlrrFrameInput fi, DlrrResources res, float resolutionScale, UpscalerMode upscalerMode)
         {
-            ushort rectW = (ushort)(fi.renderResolution.x * _setting.resolutionScale + 0.5f);
-            ushort rectH = (ushort)(fi.renderResolution.y * _setting.resolutionScale + 0.5f);
+            ushort rectW = (ushort)(fi.renderResolution.x * resolutionScale + 0.5f);
+            ushort rectH = (ushort)(fi.renderResolution.y * resolutionScale + 0.5f);
 
             var data = new DlrrFrameData
             {
@@ -84,7 +81,7 @@ namespace DLRR
                 outputHeight = fi.outputHeight,
                 currentWidth = rectW,
                 currentHeight = rectH,
-                upscalerMode = _setting.upscalerMode,
+                upscalerMode = upscalerMode,
                 cameraJitter = fi.viewportJitter,
                 instanceId = _instanceId
             };
@@ -92,10 +89,10 @@ namespace DLRR
             return data;
         }
 
-        public IntPtr GetInteropDataPtr(DlrrFrameInput fi, DlrrResources res)
+        public IntPtr GetInteropDataPtr(DlrrFrameInput fi, DlrrResources res, float resolutionScale, UpscalerMode upscalerMode)
         {
             var index = (int)(fi.frameIndex % BufferCount);
-            _buffer[index] = GetData(fi, res);
+            _buffer[index] = GetData(fi, res, resolutionScale, upscalerMode);
             unsafe
             {
                 return (IntPtr)_buffer.GetUnsafePtr() + index * sizeof(DlrrFrameData);

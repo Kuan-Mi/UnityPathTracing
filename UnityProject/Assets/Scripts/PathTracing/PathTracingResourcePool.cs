@@ -21,7 +21,6 @@ namespace PathTracing
     /// </summary>
     public class PathTracingResourcePool : System.IDisposable
     {
-        private readonly PathTracingSetting _setting;
 
         private readonly Dictionary<RenderResourceType, NriTextureResource> _nriResources = new();
         private readonly Dictionary<RenderResourceType, RTHandle>           _rtResources  = new();
@@ -31,10 +30,7 @@ namespace PathTracing
 
         public int2 renderResolution { get; private set; }
 
-        public PathTracingResourcePool(PathTracingSetting setting)
-        {
-            _setting = setting;
-        }
+
 
         // ── Resource initialisation ─────────────────────────────────────────────
 
@@ -145,7 +141,7 @@ namespace PathTracing
         /// Ensures all resources are allocated at the correct resolution.
         /// Returns true when resources were (re)allocated — callers must re-snapshot NRD resources.
         /// </summary>
-        public bool EnsureResources(int2 outputResolution)
+        public bool EnsureResources(int2 outputResolution,UpscalerMode mode)
         {
             bool invalid = false;
             foreach (var res in _nriResources.Values)
@@ -163,7 +159,7 @@ namespace PathTracing
                         break;
                     }
 
-            int2 target = GetUpscaledResolution(outputResolution, _setting.upscalerMode);
+            int2 target = GetUpscaledResolution(outputResolution,mode);
             if (!invalid && target.x == renderResolution.x && target.y == renderResolution.y)
                 return false;
 

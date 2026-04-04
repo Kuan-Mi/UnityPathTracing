@@ -11,7 +11,6 @@ using Unity.Mathematics;
 using UnityEngine;
 using UnityEngine.Rendering;
 using UnityEngine.Rendering.Universal;
-using UnityEngine.Serialization;
 using static UnityEngine.Rendering.RayTracingAccelerationStructure;
 using static PathTracing.ShaderIDs;
 
@@ -19,8 +18,7 @@ namespace PathTracing
 {
     public class RtxdiFeature : ScriptableRendererFeature
     {
-        [FormerlySerializedAs("pathTracingSetting")]
-        public PathTracingSetting setting;
+        public RtxdiSetting setting;
 
         public GlobalConstants     globalConstants;
         public ResamplingConstants resamplingConstants;
@@ -309,7 +307,7 @@ namespace PathTracing
 
             if (!_resourcePools.TryGetValue(uniqueKey, out var pool))
             {
-                pool = new PathTracingResourcePool(setting);
+                pool = new PathTracingResourcePool();
                 pool.InitRtxdiResources();
                 _resourcePools.Add(uniqueKey, pool);
             }
@@ -322,13 +320,13 @@ namespace PathTracing
                     camName = $"{cam.name}_Eye{eyeIndex}";
                 }
 
-                dlrr = new DlrrDenoiser(setting, camName);
+                dlrr = new DlrrDenoiser(camName);
                 _dlrrDenoisers.Add(uniqueKey, dlrr);
             }
 
             if (!_cameraFrameStates.TryGetValue(uniqueKey, out var frameState))
             {
-                frameState = new CameraFrameState(setting.resolutionScale);
+                frameState = new CameraFrameState(1);
                 _cameraFrameStates.Add(uniqueKey, frameState);
             }
 
@@ -368,17 +366,17 @@ namespace PathTracing
             _lightCollector.Collect();
 
             var  outputResolution = ComputeOutputResolution(renderingData.cameraData);
-            bool resourcesChanged = pool.EnsureResources(outputResolution);
+            bool resourcesChanged = pool.EnsureResources(outputResolution, setting.upscalerMode);
 
             if (resourcesChanged)
             {
                 frameState.renderResolution = pool.renderResolution;
-                frameState.FrameIndex       = 0;
+                frameState.frameIndex       = 0;
             }
 
             // Update per-camera temporal state for this frame
-            uint curFrame = frameState.FrameIndex;
-            frameState.Update(renderingData, setting);
+            uint curFrame = frameState.frameIndex;
+            frameState.Update(renderingData, false, 1);
 
             globalConstants          = frameState.GetConstants(renderingData, setting, _lightCollector);
             _globalConstantsArray[0] = globalConstants;
@@ -468,7 +466,7 @@ namespace PathTracing
                 LocalLightPdfTexture     = _gpuScene.localLightPdfTexture,
                 RtxdiResources           = rtxdiResources,
                 RenderResolution         = new int2(cam.pixelWidth, cam.pixelHeight),
-                ResolutionScale          = setting.resolutionScale,
+                ResolutionScale          = 1,
             };
 
             #region GBuffer
@@ -603,16 +601,16 @@ namespace PathTracing
             {
                 worldToView      = frameState.worldToView,
                 viewToClip       = frameState.viewToClip,
-                viewportJitter   = frameState.ViewportJitter,
+                viewportJitter   = frameState.viewportJitter,
                 renderResolution = frameState.renderResolution,
                 frameIndex       = curFrame,
                 outputWidth      = (ushort)outputResolution.x,
                 outputHeight     = (ushort)outputResolution.y,
             };
-            var dlssDataPtr = dlrr.GetInteropDataPtr(dlrrInput, dlrrRes);
+            var dlssDataPtr = dlrr.GetInteropDataPtr(dlrrInput, dlrrRes, 1, setting.upscalerMode);
 
-            var rectGridW = (int)(cam.pixelWidth * setting.resolutionScale + 0.5f + 15) / 16;
-            var rectGridH = (int)(cam.pixelHeight * setting.resolutionScale + 0.5f + 15) / 16;
+            var rectGridW = (int)(cam.pixelWidth * 1 + 0.5f + 15) / 16;
+            var rectGridH = (int)(cam.pixelHeight * 1 + 0.5f + 15) / 16;
 
             _rtxdiDlssBeforePass.Setup(rtxdiCtx,
                 pool.GetRT(RenderResourceType.RrGuideDiffAlbedo),
@@ -647,11 +645,11 @@ namespace PathTracing
             {
                 showMode        = setting.showMode,
                 resolutionScale = frameState.resolutionScale,
-                enableDlssRR    = setting.RR,
+                enableDlssRR    = true,
                 tmpDisableRR    = setting.tmpDisableRR,
                 showMV          = setting.showMv,
-                showValidation  = setting.showValidation,
-                showReference   = setting.useReferencePathTracing,
+                showValidation  = false,
+                showReference   = false,
             };
 
             _outputBlitPass.Setup(outputBlitResource, outputBlitSettings);
@@ -790,7 +788,7 @@ namespace PathTracing
 
             RTXDI_LightBufferParameters lightBufferParams = _gpuScene.GetLightBufferParameters();
             isContext.SetLightBufferParams(lightBufferParams);
-            restirDIContext.SetFrameIndex(frameState.FrameIndex);
+            restirDIContext.SetFrameIndex(frameState.frameIndex);
             restirDIContext.SetResamplingMode(setting.diResamplingMode);
             restirDIContext.SetInitialSamplingParameters(setting.initialSamplingParams);
             restirDIContext.SetTemporalResamplingParameters(setting.temporalResamplingParams);
@@ -798,7 +796,7 @@ namespace PathTracing
             restirDIContext.SetShadingParameters(setting.shadingParams);
 
 
-            restirGIContext.SetFrameIndex(frameState.FrameIndex);
+            restirGIContext.SetFrameIndex(frameState.frameIndex);
             restirGIContext.SetResamplingMode(setting.giResamplingMode);
             restirGIContext.SetTemporalResamplingParameters(setting.giTemporalResamplingParams);
             restirGIContext.SetSpatialResamplingParameters(setting.giSpatialResamplingParams);
@@ -913,7 +911,7 @@ namespace PathTracing
 #if UNITY_EDITOR
         private void Reset()
         {
-            setting = new PathTracingSetting();
+            setting = new RtxdiSetting();
             AutoFillShaders();
         }
 

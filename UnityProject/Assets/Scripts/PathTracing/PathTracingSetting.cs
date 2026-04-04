@@ -74,18 +74,20 @@ namespace PathTracing
 
 
     [System.Serializable]
-    public class PathTracingSetting
+    public class RtxdiSetting
     {
-        [FoldoutHeader("显示模式")]
+        [FoldoutHeader("Base Settings")]
         [Range(-10f, 10f)]
         public float exposureEv = 0.0f;
 
-        public bool     cameraJitter = true;
-        public ShowMode showMode     = ShowMode.Final;
-        public bool     showMv;
-        public bool     showValidation;
+        public float exposure => Mathf.Pow(2, exposureEv);
 
-        public bool debugRtxdi;
+        public bool         cameraJitter = true;
+        public ShowMode     showMode     = ShowMode.Final;
+        public bool         showMv;
+        public UpscalerMode upscalerMode = UpscalerMode.NATIVE;
+
+        public bool tmpDisableRR;
 
         [FoldoutHeader("RTXDI")]
         public RtxdiFeature.RenderSettings lightingSettings = RtxdiFeature.RenderSettings.Default();
@@ -97,14 +99,13 @@ namespace PathTracing
         public bool enableDIFinalShading = true;
 
         public bool enableEnv = true;
-        public bool gShowLight;
+        public bool useRasterGBuffer = true;
 
         public ReGIRDynamicParameters regirDynamicParams = ReGIRDynamicParameters.Default();
 
-        [FoldoutHeader("use cs")]
-        public bool useRasterGBuffer = false;
+        [FoldoutHeader("Compute OR Raster")]
+        public bool useComputeForGis = true;
 
-        public bool useComputeForGis                    = true;
         public bool useComputeForTemporalResampling     = true;
         public bool useComputeForSpatialResampling      = true;
         public bool useComputeForShadeSamples           = true;
@@ -128,6 +129,21 @@ namespace PathTracing
         public RTXDI_GISpatialResamplingParameters  giSpatialResamplingParams  = ReSTIRGIDefaults.GetDefaultSpatialResamplingParams();
         public RTXDI_GIFinalShadingParameters       giFinalShadingParams       = ReSTIRGIDefaults.GetDefaultFinalShadingParams();
         public BRDFPathTracing_Parameters           brdfptParams               = BRDFPathTracing_Parameters.Default();
+    }
+
+    [System.Serializable]
+    public class PathTracingSetting
+    {
+        [FoldoutHeader("显示模式")]
+        [Range(-10f, 10f)]
+        public float exposureEv = 0.0f;
+
+        public bool     cameraJitter = true;
+        public ShowMode showMode     = ShowMode.Final;
+        public bool     showMv;
+        public bool     showValidation;
+
+        public bool debugRtxdi;
 
         [FoldoutHeader("Base Settings")]
         [Range(0.001f, 10f)]

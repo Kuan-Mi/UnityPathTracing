@@ -75,7 +75,7 @@ namespace PathTracing
             // 已在其他地方单独处理的字段名，跳过
             var skip = new HashSet<string>
             {
-                "pathTracingSetting", "globalConstants", "resamplingConstants", "renderPassEvent"
+                "pathTracingSetting", "globalConstants", "resamplingConstants", "renderPassEvent", "setting"
             };
 
             // 类型 → 分组标题
@@ -155,7 +155,7 @@ namespace PathTracing
             EditorGUILayout.LabelField("Settings", EditorStyles.boldLabel);
 
             // 获取实际的类型以通过反射读取 Header
-            Type type = typeof(PathTracingSetting);
+            Type type = typeof(RtxdiSetting);
 
             // 迭代所有子属性
             SerializedProperty childProp = parentProp.Copy();

@@ -126,6 +126,9 @@ GBR_FragOutput GBufferRasterFrag(GBR_Varyings IN)
     float3x3 tbn = float3x3(tangentWS, bitangentWS, geoNormalWS);
     float4 nSample = SAMPLE_TEXTURE2D(_BumpMap, sampler_BumpMap, uv);
     float3 tangentN = UnpackNormalScale(nSample, _BumpScale);
+    // Compensate for the clip-space Y-flip: the vertical mirror reverses the
+    // bitangent direction (tangent-space Y / green channel), so negate it here.
+    tangentN.y = -tangentN.y;
     matNormalWS = normalize(mul(tangentN, tbn));
     #else
     matNormalWS = geoNormalWS;
