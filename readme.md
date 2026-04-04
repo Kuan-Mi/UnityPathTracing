@@ -21,6 +21,7 @@ Blog post: [NRDSample Implementation in Unity](https://www.kuanmi.top/2026/01/22
 - [x] **NRD Denoising**: NVIDIA NRD integrated via native C++ plugin, supporting REBLUR and SIGMA
 - [x] **DLSS Ray Reconstruction**: DLSS RR integrated via native plugin for upscaling and ray reconstruction
 - [x] **ReSTIR DI/GI**: Compute shader version matches the original in performance but cannot handle alpha clipping. Ray tracing version supports alpha clipping but incurs a 4ms performance cost.
+- [x] **Textured Emissive Light Sampling**: Enables bindless-based emissive light gathering with texture support by passing textures to the native plugin.
 - [x] **Multiple Light Types**: Point lights, spot lights, and area lights
 - [x] **Dynamic Scenes**: Skinned mesh animation and dynamic objects
 - [x] **Primary Surface Replacement**: High-quality specular reflection via PSR
@@ -69,6 +70,7 @@ Thanks to [inedelcu](https://github.com/INedelcu) for the great help with writin
 - [x] **NRD 降噪**：通过原生 C++ 插件集成 NVIDIA NRD，支持 REBLUR 和 SIGMA
 - [x] **DLSS Ray Reconstruction**：通过原生插件集成 DLSS RR，实现超分辨率和重建功能
 - [x] **ReSTIR DI/GI**：计算着色器版本和原版性能一致，但无法处理透明度裁切。光追版本可以处理透明度裁切，但性能差了4ms。
+- [x] **纹理灯光收集**：通过将纹理传至NativePlugin，实现了基于Bindless的自发光带纹理的灯光收集。
 - [x] **多种光源支持**：点光源、聚光灯、区域光源支持
 - [x] **动态场景**：支持动态物体和蒙皮动画
 - [x] **主表面替换**：通过主表面替换实现高质量的镜面反射
