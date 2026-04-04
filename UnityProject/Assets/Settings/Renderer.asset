@@ -14,7 +14,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::PathTracing.RtxdiFeature
   m_Active: 1
   setting:
-    exposureEv: 2.5
+    exposureEv: 4.38
     cameraJitter: 1
     showMode: 18
     showMv: 0
@@ -69,7 +69,7 @@ MonoBehaviour:
             pad2: 0
             pad3: 0
     directLightingMode: 2
-    indirectLightingMode: 0
+    indirectLightingMode: 2
     enableGIFinalShading: 1
     enableDIFinalShading: 1
     enableEnv: 1
@@ -77,9 +77,9 @@ MonoBehaviour:
     regirDynamicParams:
       regirCellSize: 1
       center:
-        x: -4.954382
-        y: 3.6835957
-        z: -18.996569
+        x: -2.3668613
+        y: 3.8409238
+        z: -20.805328
       fallbackSamplingMode: 1
       presamplingMode: 1
       regirSamplingJitter: 1
@@ -96,7 +96,7 @@ MonoBehaviour:
     initialSamplingParams:
       numLocalLightSamples: 8
       numInfiniteLightSamples: 1
-      numEnvironmentSamples: 0
+      numEnvironmentSamples: 1
       numBrdfSamples: 1
       brdfCutoff: 0.0001
       brdfRayMinT: 0.001
@@ -120,10 +120,10 @@ MonoBehaviour:
       numDisocclusionBoostSamples: 16
       samplingRadius: 32
       biasCorrectionMode: 1
-      depthThreshold: 0.1
-      normalThreshold: 0.5
-      targetHistoryLength: 15
-      enableMaterialSimilarityTest: 1
+      depthThreshold: 0.4
+      normalThreshold: 0
+      targetHistoryLength: 4
+      enableMaterialSimilarityTest: 0
       discountNaiveSamples: 0
       pad1: 0
       pad2: 0
@@ -139,31 +139,31 @@ MonoBehaviour:
       pad3: 0
     giResamplingMode: 3
     giTemporalResamplingParams:
-      depthThreshold: 0.1
-      normalThreshold: 0.6
-      maxHistoryLength: 8
+      depthThreshold: 0
+      normalThreshold: 0
+      maxHistoryLength: 20
       enableFallbackSampling: 1
       biasCorrectionMode: 1
       maxReservoirAge: 30
-      enablePermutationSampling: 0
+      enablePermutationSampling: 1
       uniformRandomNumber: 0
     giSpatialResamplingParams:
-      depthThreshold: 0.1
-      normalThreshold: 0.6
+      depthThreshold: 0
+      normalThreshold: 0
       numSamples: 2
-      samplingRadius: 32
+      samplingRadius: 64
       biasCorrectionMode: 1
       pad1: 0
       pad2: 0
       pad3: 0
     giFinalShadingParams:
-      enableFinalVisibility: 0
+      enableFinalVisibility: 1
       enableFinalMIS: 1
       pad1: 0
       pad2: 0
     brdfptParams:
       enableIndirectEmissiveSurfaces: 0
-      enableSecondaryResampling: 0
+      enableSecondaryResampling: 1
       enableReSTIRGI: 0
       pad1: 0
       materialOverrideParams:
@@ -190,8 +190,8 @@ MonoBehaviour:
           numDisocclusionBoostSamples: 0
           samplingRadius: 4
           biasCorrectionMode: 1
-          depthThreshold: 0.1
-          normalThreshold: 0.9
+          depthThreshold: 0
+          normalThreshold: 0
           targetHistoryLength: 0
           enableMaterialSimilarityTest: 0
           discountNaiveSamples: 0
