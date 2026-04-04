@@ -36,7 +36,6 @@ namespace PathTracing
             _spotLightList.Clear();
 
             var allLights = UnityEngine.Object.FindObjectsByType<Light>(FindObjectsSortMode.None);
-            allLights = Array.Empty<Light>();
             foreach (var light in allLights)
             {
                 if (!light.enabled || !light.gameObject.activeInHierarchy) continue;
@@ -79,7 +78,6 @@ namespace PathTracing
             _areaLightList.Clear();
 
             var allLights = UnityEngine.Object.FindObjectsByType<Light>(FindObjectsSortMode.None);
-            allLights = Array.Empty<Light>();
             foreach (var light in allLights)
             {
                 if (!light.enabled || !light.gameObject.activeInHierarchy) continue;
@@ -121,7 +119,6 @@ namespace PathTracing
             _pointLightList.Clear();
 
             var allLights = UnityEngine.Object.FindObjectsByType<Light>(FindObjectsSortMode.None);
-            allLights = Array.Empty<Light>();
             foreach (var light in allLights)
             {
                 if (!light.enabled || !light.gameObject.activeInHierarchy) continue;

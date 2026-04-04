@@ -143,8 +143,6 @@ namespace PathTracing
         public bool     showMv;
         public bool     showValidation;
 
-        public bool debugRtxdi;
-
         [FoldoutHeader("Base Settings")]
         [Range(0.001f, 10f)]
         public float sunAngularDiameter = 0.533f;

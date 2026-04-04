@@ -338,7 +338,7 @@ namespace PathTracing
 
             return globalConstants;
         }
-        public GlobalConstants GetConstants(RenderingData renderingData, RtxdiSetting settings,LightCollector lightCollector)
+        public GlobalConstants GetConstants(RenderingData renderingData, RtxdiSetting settings)
         {
             var cameraData = renderingData.cameraData;
 
@@ -462,9 +462,9 @@ namespace PathTracing
                 gPSR = 0,
                 gSHARC = 0,
                 gTrimLobe = 0,
-                gSpotLightCount = (uint)lightCollector.SpotCount,
-                gAreaLightCount = (uint)lightCollector.AreaCount,
-                gPointLightCount = (uint)lightCollector.PointCount,
+                gSpotLightCount = 0,
+                gAreaLightCount = 0,
+                gPointLightCount = 0,
                 gSssMinThreshold = 0,
                 gSssTransmissionBsdfSampleCount = 0,
                 gSssTransmissionPerBsdfScatteringSampleCount = 0,

@@ -576,7 +576,7 @@ namespace PathTracing
                 {
                     var accumulateResource = new AccumulatePass.Resource
                     {
-                        noise        = pool.GetRT(pathTracingSetting.debugRtxdi ? RenderResourceType.DirectLighting : RenderResourceType.Composed),
+                        noise        = pool.GetRT(RenderResourceType.Composed),
                         accumulation = pool.GetRT(RenderResourceType.DlssOutput),
                     };
 
@@ -594,7 +594,7 @@ namespace PathTracing
                 {
                     var dlrrRes = new DlrrDenoiser.DlrrResources
                     {
-                        input           = pool.GetNriResource(pathTracingSetting.debugRtxdi ? RenderResourceType.DirectLighting : RenderResourceType.Composed),
+                        input           = pool.GetNriResource(RenderResourceType.Composed),
                         output          = pool.GetNriResource(RenderResourceType.DlssOutput),
                         mv              = pool.GetNriResource(RenderResourceType.MV),
                         depth           = pool.GetNriResource(RenderResourceType.Viewz),
@@ -872,5 +872,35 @@ namespace PathTracing
                 _accelerationStructure.UpdateInstanceMask(r, mask); // 1 表示包含在内
             }
         }
+
+#if UNITY_EDITOR
+        private void Reset()
+        {
+            pathTracingSetting = new PathTracingSetting();
+            AutoFillShaders();
+        }
+
+        public void AutoFillShaders()
+        {
+            finalMaterial             = UnityEditor.AssetDatabase.LoadAssetAtPath<Material>("Assets/Shaders/Mat/KM_Final.mat");
+
+            sharcUpdateTs             = UnityEditor.AssetDatabase.LoadAssetAtPath<RayTracingShader>("Assets/Shaders/Sharc/SharcUpdate.raytrace");
+            opaqueTracingShader       = UnityEditor.AssetDatabase.LoadAssetAtPath<RayTracingShader>("Assets/Shaders/RayTracing/TraceOpaque.raytrace");
+            transparentTracingShader  = UnityEditor.AssetDatabase.LoadAssetAtPath<RayTracingShader>("Assets/Shaders/RayTracing/TraceTransparent.raytrace");
+            referencePtTracingShader  = UnityEditor.AssetDatabase.LoadAssetAtPath<RayTracingShader>("Assets/Shaders/RayTracing/ReferencePt.raytrace");
+
+            compositionComputeShader  = UnityEditor.AssetDatabase.LoadAssetAtPath<ComputeShader>("Assets/Shaders/PostProcess/Composition.compute");
+            taaComputeShader          = UnityEditor.AssetDatabase.LoadAssetAtPath<ComputeShader>("Assets/Shaders/PostProcess/Taa.compute");
+            dlssBeforeComputeShader   = UnityEditor.AssetDatabase.LoadAssetAtPath<ComputeShader>("Assets/Shaders/PostProcess/DlssBefore.compute");
+            sharcResolveCs            = UnityEditor.AssetDatabase.LoadAssetAtPath<ComputeShader>("Assets/Shaders/Sharc/SharcResolve.compute");
+            autoExposureShader        = UnityEditor.AssetDatabase.LoadAssetAtPath<ComputeShader>("Assets/Shaders/PostProcess/AutoExposure.compute");
+            accumulateCs              = UnityEditor.AssetDatabase.LoadAssetAtPath<ComputeShader>("Assets/Shaders/PostProcess/Accumulate.compute");
+
+            scramblingRankingTex      = UnityEditor.AssetDatabase.LoadAssetAtPath<Texture2D>("Assets/Textures/scrambling_ranking_128x128_2d_4spp.png");
+            sobolTex                  = UnityEditor.AssetDatabase.LoadAssetAtPath<Texture2D>("Assets/Textures/sobol_256_4d.png");
+
+            UnityEditor.EditorUtility.SetDirty(this);
+        }
+#endif
     }
 }

@@ -88,7 +88,6 @@ namespace PathTracing
         private GraphicsBuffer _resamplingConstantBuffer;
 
         private GPUScene             _gpuScene       = new();
-        private LightCollector       _lightCollector = new();
         private PrepareLightResource _prepareLightResources;
 
         private readonly GlobalConstants[]     _globalConstantsArray     = new GlobalConstants[1];
@@ -115,7 +114,6 @@ namespace PathTracing
             }
 
             _gpuScene              ??= new GPUScene();
-            _lightCollector        ??= new LightCollector();
             _prepareLightResources ??= new PrepareLightResource();
 
             if (!_gpuScene.isBufferInitialized)
@@ -363,8 +361,6 @@ namespace PathTracing
 
             _accelerationStructure.Build();
 
-            _lightCollector.Collect();
-
             var  outputResolution = ComputeOutputResolution(renderingData.cameraData);
             bool resourcesChanged = pool.EnsureResources(outputResolution, setting.upscalerMode);
 
@@ -378,7 +374,7 @@ namespace PathTracing
             uint curFrame = frameState.frameIndex;
             frameState.Update(renderingData, false, 1);
 
-            globalConstants          = frameState.GetConstants(renderingData, setting, _lightCollector);
+            globalConstants          = frameState.GetConstants(renderingData, setting);
             _globalConstantsArray[0] = globalConstants;
             _constantBuffer.SetData(_globalConstantsArray);
 
@@ -885,11 +881,6 @@ namespace PathTracing
             }
 
             _rtxdiResources.Clear();
-
-            // _restirDiContexts.Clear();
-
-            _lightCollector?.Dispose();
-            _lightCollector = null;
 
             _gpuScene?.Dispose();
             _gpuScene = null;
