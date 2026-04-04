@@ -19,9 +19,9 @@ bool GetFinalVisibility(RAB_Surface surface,float3 samplePosition)
     float offset = 0.001;
     float TMax = length(L) - offset;
     
-    float hitT = CastVisibilityRay_AnyHit( surface.worldPos, normalize(L), 0.001, TMax, float2(0,0), gWorldTlas,FLAG_NON_TRANSPARENT,0);
+    bool visibility = CastVisibilityRay_AnyHit( surface.worldPos, normalize(L), 0.001, TMax, float2(0,0), gWorldTlas,FLAG_NON_TRANSPARENT,0);
 
-    return  hitT == INF;
+    return  visibility;
 }
 // Tests the visibility between a surface and a light sample.
 // Returns true if there is nothing between them.
@@ -32,9 +32,9 @@ bool RAB_GetConservativeVisibility(RAB_Surface surface, RAB_LightSample lightSam
     float offset = 0.001;
     float TMax = length(L) - offset;
     
-    float hitT = CastVisibilityRay_AnyHit( surface.worldPos, normalize(L), 0.001, TMax, float2(0,0), gWorldTlas,FLAG_NON_TRANSPARENT,0);
+    bool visibility = CastVisibilityRay_AnyHit( surface.worldPos, normalize(L), 0.001, TMax, float2(0,0), gWorldTlas,FLAG_NON_TRANSPARENT,0);
 
-    return  hitT == INF;
+    return  visibility;
     
     // RayDesc ray = setupVisibilityRay(surface, lightSample);
     //
@@ -64,7 +64,14 @@ bool RAB_GetTemporalConservativeVisibility(RAB_Surface currentSurface, RAB_Surfa
 // 此函数用于光线追踪偏差校正的空间重采样函数中。为了保持结果无偏，还应根据以相同方式计算的可见性来保留或丢弃初始样本。
 bool RAB_GetConservativeVisibility(RAB_Surface surface, float3 samplePosition)
 {
-    return true;
+    
+    float3 L = samplePosition - surface.worldPos;
+    float offset = 0.001;
+    float TMax = length(L) - offset;
+    
+    bool visibility = CastVisibilityRay_AnyHit( surface.worldPos, normalize(L), 0.001, TMax, float2(0,0), gWorldTlas,FLAG_NON_TRANSPARENT,0);
+
+    return  visibility;
 }
 
 //与 RAB_GetConservativeVisibility 相同的可见性光线追踪，但适用于源自上一帧的表面和光样本。
@@ -74,7 +81,7 @@ bool RAB_GetConservativeVisibility(RAB_Surface surface, float3 samplePosition)
 //具体来说，融合时空重采样算法在处理动画对象时会产生非常明显的噪声结果。
 bool RAB_GetTemporalConservativeVisibility(RAB_Surface currentSurface, RAB_Surface previousSurface, float3 samplePosition)
 {
-    return true;
+    return  RAB_GetConservativeVisibility(currentSurface, samplePosition);
 }
 
 #endif // RAB_VISIBILITY_TEST_HLSLI

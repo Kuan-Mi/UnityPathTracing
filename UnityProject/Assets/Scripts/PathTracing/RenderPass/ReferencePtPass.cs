@@ -66,7 +66,7 @@ namespace PathTracing
         {
             var natCmd = CommandBufferHelpers.GetNativeCommandBuffer(context.cmd);
 
-            var referencePtTracingMarker = new ProfilerMarker(ProfilerCategory.Render, "Reference Pt Tracing", MarkerFlags.SampleGPU);
+            var referencePtTracingMarker = RenderPassMarkers.ReferencePtTracing;
 
             natCmd.BeginSample(referencePtTracingMarker);
 
@@ -76,7 +76,7 @@ namespace PathTracing
             natCmd.SetRayTracingShaderPass(data.ReferencePtTs, "Test2");
             natCmd.SetRayTracingConstantBufferParam(data.ReferencePtTs, paramsID, resource.ConstantBuffer, 0, resource.ConstantBuffer.stride);
 
-            natCmd.SetRayTracingBufferParam(data.ReferencePtTs, "_AE_ExposureBuffer", data.Resource.AeExposureBuffer);
+            natCmd.SetRayTracingBufferParam(data.ReferencePtTs, _AE_ExposureBufferID, data.Resource.AeExposureBuffer);
 
 
 
@@ -88,9 +88,9 @@ namespace PathTracing
             natCmd.SetRayTracingBufferParam(data.ReferencePtTs, gIn_AreaLightsID, resource.AreaLightBuffer);
             natCmd.SetRayTracingBufferParam(data.ReferencePtTs, gIn_PointLightsID, resource.PointLightBuffer);
 
-            natCmd.SetRayTracingIntParam(data.ReferencePtTs, "_ReferenceBounceNum", settings.referenceBounceNum);
-            natCmd.SetRayTracingIntParam(data.ReferencePtTs, "g_ConvergenceStep", settings.convergenceStep);
-            natCmd.SetRayTracingFloatParam(data.ReferencePtTs, "g_split", settings.split);
+            natCmd.SetRayTracingIntParam(data.ReferencePtTs, _ReferenceBounceNumID, settings.referenceBounceNum);
+            natCmd.SetRayTracingIntParam(data.ReferencePtTs, g_ConvergenceStepID, settings.convergenceStep);
+            natCmd.SetRayTracingFloatParam(data.ReferencePtTs, g_splitID, settings.split);
 
             uint rectWmod = (uint)(settings.m_RenderResolution.x * settings.resolutionScale + 0.5f);
             uint rectHmod = (uint)(settings.m_RenderResolution.y * settings.resolutionScale + 0.5f);

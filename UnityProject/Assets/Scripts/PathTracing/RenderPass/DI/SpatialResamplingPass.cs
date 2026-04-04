@@ -12,143 +12,105 @@ using static PathTracing.ShaderIDs;
 
 namespace PathTracing
 {
-    public class SpatialResamplingPass: ScriptableRenderPass
+    public class SpatialResamplingPass : ScriptableRenderPass
     {
-        private readonly RayTracingShader _opaqueTs;
-        private Resource _resource;
-        private Settings _settings;
+        private const int GroupSize = 8;
 
+        private readonly RayTracingShader _rtShader;
+        private readonly ComputeShader _computeShader;
+        private RtxdiPassContext _context;
+        private bool _useCompute;
 
-        public SpatialResamplingPass(RayTracingShader opaqueTs)
+        public SpatialResamplingPass(RayTracingShader rtShader, ComputeShader computeShader)
         {
-            _opaqueTs = opaqueTs;
+            _rtShader = rtShader;
+            _computeShader = computeShader;
         }
 
-        public void Setup(Resource sharcResource, Settings sharcSettings)
+        public void Setup(RtxdiPassContext ctx, bool useCompute)
         {
-            _resource = sharcResource;
-            _settings = sharcSettings;
-        }
-
-        public class Resource
-        {
-            internal GraphicsBuffer ConstantBuffer;
-            internal GraphicsBuffer ResamplingConstantBuffer;
-
-
-            internal RTHandle Mv;
-            internal RTHandle ViewZ;
-            internal RTHandle NormalRoughness;
-            internal RTHandle BaseColorMetalness;
-            internal RTHandle GeoNormal;
-
-
-
-            internal RTHandle PrevViewZ;
-            internal RTHandle PrevNormalRoughness;
-            internal RTHandle PrevBaseColorMetalness;
-            internal RTHandle PrevGeoNormal;
-
-            internal RtxdiResources RtxdiResources;
-        }
-
-        public class Settings
-        {
-            internal int2 m_RenderResolution;
-            internal float resolutionScale;     
+            _context = ctx;
+            _useCompute = useCompute;
         }
 
         class PassData
         {
-            internal RayTracingShader OpaqueTs;
-            internal Resource Resource;
-            internal Settings Settings;
-
-            internal TextureHandle DirectLighting;
+            internal RayTracingShader RtShader;
+            internal ComputeShader ComputeShader;
+            internal RtxdiPassContext Context;
+            internal bool UseCompute;
         }
 
         static void ExecutePass(PassData data, UnsafeGraphContext context)
         {
             var natCmd = CommandBufferHelpers.GetNativeCommandBuffer(context.cmd);
+            var ctx = data.Context;
 
-            var opaqueTracingMarker = new ProfilerMarker(ProfilerCategory.Render, "SpatialResampling", MarkerFlags.SampleGPU);
+            if (data.UseCompute)
+            {
+                var marker = RenderPassMarkers.DiSpatialResamplingCompute;
+                natCmd.BeginSample(marker);
 
-            natCmd.BeginSample(opaqueTracingMarker);
+                var cs = data.ComputeShader;
+                int kernel = cs.FindKernel("main");
 
-            var resource = data.Resource;
-            var settings = data.Settings;
+                natCmd.SetComputeConstantBufferParam(cs, paramsID, ctx.ConstantBuffer, 0, ctx.ConstantBuffer.stride);
+                natCmd.SetComputeConstantBufferParam(cs, g_ConstID, ctx.ResamplingConstantBuffer, 0, ctx.ResamplingConstantBuffer.stride);
 
-            natCmd.SetRayTracingShaderPass(data.OpaqueTs, "Test2");
-            natCmd.SetRayTracingConstantBufferParam(data.OpaqueTs, paramsID, resource.ConstantBuffer, 0, resource.ConstantBuffer.stride);
-            natCmd.SetRayTracingBufferParam(data.OpaqueTs, "ResampleConstants", resource.ResamplingConstantBuffer);
+                natCmd.SetComputeBufferParam(cs, kernel, t_LightDataBufferID, ctx.RtxdiResources.LightDataBuffer);
+                natCmd.SetComputeBufferParam(cs, kernel, t_NeighborOffsetsID, ctx.RtxdiResources.NeighborOffsetsBuffer);
+                natCmd.SetComputeBufferParam(cs, kernel, u_LightReservoirsID, ctx.RtxdiResources.LightReservoirBuffer);
 
-            natCmd.SetRayTracingBufferParam(data.OpaqueTs, t_LightDataBufferID, resource.RtxdiResources.LightDataBuffer);
-            natCmd.SetRayTracingBufferParam(data.OpaqueTs, t_NeighborOffsetsID, resource.RtxdiResources.NeighborOffsetsBuffer);
-            natCmd.SetRayTracingBufferParam(data.OpaqueTs, u_LightReservoirsID, resource.RtxdiResources.LightReservoirBuffer);
+                natCmd.SetComputeTextureParam(cs, kernel, t_GBufferDepthID, ctx.ViewDepth);
+                natCmd.SetComputeTextureParam(cs, kernel, t_GBufferDiffuseAlbedoID, ctx.DiffuseAlbedo);
+                natCmd.SetComputeTextureParam(cs, kernel, t_GBufferSpecularRoughID, ctx.SpecularRough);
+                natCmd.SetComputeTextureParam(cs, kernel, t_GBufferNormalsID, ctx.Normals);
+                natCmd.SetComputeTextureParam(cs, kernel, t_GBufferGeoNormalsID, ctx.GeoNormals);
 
+                int rectW = (int)(ctx.RenderResolution.x * ctx.ResolutionScale + 0.5f);
+                int rectH = (int)(ctx.RenderResolution.y * ctx.ResolutionScale + 0.5f);
+                int groupsX = (rectW + GroupSize - 1) / GroupSize;
+                int groupsY = (rectH + GroupSize - 1) / GroupSize;
+                natCmd.DispatchCompute(cs, kernel, groupsX, groupsY, 1);
 
-            natCmd.SetRayTracingTextureParam(data.OpaqueTs, g_MvID, resource.Mv);
-            natCmd.SetRayTracingTextureParam(data.OpaqueTs, g_ViewZID, resource.ViewZ);
-            natCmd.SetRayTracingTextureParam(data.OpaqueTs, g_Normal_RoughnessID, resource.NormalRoughness);
-            natCmd.SetRayTracingTextureParam(data.OpaqueTs, g_BaseColor_MetalnessID, resource.BaseColorMetalness);
+                natCmd.EndSample(marker);
+            }
+            else
+            {
+                var marker = RenderPassMarkers.DiSpatialResampling;
+                natCmd.BeginSample(marker);
 
-            natCmd.SetRayTracingTextureParam(data.OpaqueTs, g_DirectLightingID, data.DirectLighting);
+                natCmd.SetRayTracingShaderPass(data.RtShader, "RTXDI");
+                natCmd.SetRayTracingConstantBufferParam(data.RtShader, paramsID, ctx.ConstantBuffer, 0, ctx.ConstantBuffer.stride);
+                natCmd.SetRayTracingBufferParam(data.RtShader, ResampleConstantsID, ctx.ResamplingConstantBuffer);
 
-            natCmd.SetRayTracingTextureParam(data.OpaqueTs, gIn_PrevViewZID, resource.PrevViewZ);
-            natCmd.SetRayTracingTextureParam(data.OpaqueTs, gIn_PrevNormalRoughnessID, resource.PrevNormalRoughness);
-            natCmd.SetRayTracingTextureParam(data.OpaqueTs, gIn_PrevBaseColorMetalnessID, resource.PrevBaseColorMetalness);
-            
-            
-            natCmd.SetRayTracingTextureParam(data.OpaqueTs,"gOut_GeoNormal", resource.GeoNormal);
-            natCmd.SetRayTracingTextureParam(data.OpaqueTs,"gIn_PrevGeoNormal", resource.PrevGeoNormal);
-            
+                natCmd.SetRayTracingBufferParam(data.RtShader, t_LightDataBufferID, ctx.RtxdiResources.LightDataBuffer);
+                natCmd.SetRayTracingBufferParam(data.RtShader, t_NeighborOffsetsID, ctx.RtxdiResources.NeighborOffsetsBuffer);
+                natCmd.SetRayTracingBufferParam(data.RtShader, u_LightReservoirsID, ctx.RtxdiResources.LightReservoirBuffer);
 
-            uint rectWmod = (uint)(settings.m_RenderResolution.x * settings.resolutionScale + 0.5f);
-            uint rectHmod = (uint)(settings.m_RenderResolution.y * settings.resolutionScale + 0.5f);
+                natCmd.SetRayTracingTextureParam(data.RtShader, t_GBufferDepthID, ctx.ViewDepth);
+                natCmd.SetRayTracingTextureParam(data.RtShader, t_GBufferDiffuseAlbedoID, ctx.DiffuseAlbedo);
+                natCmd.SetRayTracingTextureParam(data.RtShader, t_GBufferSpecularRoughID, ctx.SpecularRough);
+                natCmd.SetRayTracingTextureParam(data.RtShader, t_GBufferNormalsID, ctx.Normals);
+                natCmd.SetRayTracingTextureParam(data.RtShader, t_GBufferGeoNormalsID, ctx.GeoNormals);
 
-            // Debug.Log($"Dispatch Rays Size: {rectWmod} x {rectHmod}");
+                uint rectWmod = (uint)(ctx.RenderResolution.x * ctx.ResolutionScale + 0.5f);
+                uint rectHmod = (uint)(ctx.RenderResolution.y * ctx.ResolutionScale + 0.5f);
+                natCmd.DispatchRays(data.RtShader, "MainRayGenShader", rectWmod, rectHmod, 1);
 
-
-            natCmd.DispatchRays(data.OpaqueTs, "MainRayGenShader", rectWmod, rectHmod, 1);
-
-            natCmd.EndSample(opaqueTracingMarker);
-
+                natCmd.EndSample(marker);
+            }
         }
-
-
-        private TextureHandle CreateTex(TextureDesc textureDesc, RenderGraph renderGraph, string name, GraphicsFormat format)
-        {
-            textureDesc.format = format;
-            textureDesc.name = name;
-            return renderGraph.CreateTexture(textureDesc);
-        }
-
 
         public override void RecordRenderGraph(RenderGraph renderGraph, ContextContainer frameData)
         {
-            using var builder = renderGraph.AddUnsafePass<PassData>("SpatialResampling", out var passData);
+            string passName = _useCompute ? "SpatialResampling_Compute" : "SpatialResampling";
+            using var builder = renderGraph.AddUnsafePass<PassData>(passName, out var passData);
 
-            passData.OpaqueTs = _opaqueTs;
-
-            passData.Resource = _resource;
-            passData.Settings = _settings;
-
-            var resourceData = frameData.Get<UniversalResourceData>();
-
-            var textureDesc = resourceData.activeColorTexture.GetDescriptor(renderGraph);
-            textureDesc.enableRandomWrite = true;
-            textureDesc.depthBufferBits = 0;
-            textureDesc.clearBuffer = false;
-            textureDesc.discardBuffer = false;
-            textureDesc.width = _settings.m_RenderResolution.x;
-            textureDesc.height = _settings.m_RenderResolution.y;
-
-            
-            var ptContextItem = frameData.Get<PTContextItem>();
-            
-            passData.DirectLighting = ptContextItem.DirectLighting;
-            
-            builder.UseTexture(passData.DirectLighting,  AccessFlags.ReadWrite);
+            passData.RtShader = _rtShader;
+            passData.ComputeShader = _computeShader;
+            passData.Context = _context;
+            passData.UseCompute = _useCompute;
 
             builder.AllowPassCulling(false);
             builder.SetRenderFunc((PassData data, UnsafeGraphContext context) => { ExecutePass(data, context); });

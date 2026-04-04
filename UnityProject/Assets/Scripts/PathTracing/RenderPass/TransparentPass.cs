@@ -69,7 +69,7 @@ namespace PathTracing
             var natCmd = CommandBufferHelpers.GetNativeCommandBuffer(context.cmd);
 
 
-            var transparentTracingMarker = new ProfilerMarker(ProfilerCategory.Render, "Transparent Tracing", MarkerFlags.SampleGPU);
+            var transparentTracingMarker = RenderPassMarkers.TransparentTracing;
             natCmd.BeginSample(transparentTracingMarker);
 
             natCmd.SetRayTracingShaderPass(data.TransparentTs, "Test2");
@@ -89,8 +89,8 @@ namespace PathTracing
             natCmd.SetRayTracingBufferParam(data.TransparentTs, gIn_SpotLightsID, data.Resource.SpotLightBuffer);
             natCmd.SetRayTracingBufferParam(data.TransparentTs, gIn_AreaLightsID, data.Resource.AreaLightBuffer);
             natCmd.SetRayTracingBufferParam(data.TransparentTs, gIn_PointLightsID, data.Resource.PointLightBuffer);
-            natCmd.SetRayTracingBufferParam(data.TransparentTs, "_AE_ExposureBuffer", data.Resource.AeExposureBuffer);
-            natCmd.SetRayTracingIntParam(data.TransparentTs, "g_ConvergenceStep", data.Settings.convergenceStep);
+            natCmd.SetRayTracingBufferParam(data.TransparentTs, _AE_ExposureBufferID, data.Resource.AeExposureBuffer);
+            natCmd.SetRayTracingIntParam(data.TransparentTs, g_ConvergenceStepID, data.Settings.convergenceStep);
 
             
             

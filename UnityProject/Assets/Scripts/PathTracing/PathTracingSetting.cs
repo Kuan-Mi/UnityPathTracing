@@ -1,5 +1,8 @@
 ﻿using Rtxdi.DI;
+using Rtxdi.GI;
+using Rtxdi.ReGIR;
 using UnityEngine;
+using UnityEngine.Serialization;
 
 namespace PathTracing
 {
@@ -43,26 +46,140 @@ namespace PathTracing
 
     public enum DenoiserType
     {
-        DENOISER_REBLUR = 0,
-        DENOISER_RELAX = 1,
+        DENOISER_REBLUR    = 0,
+        DENOISER_RELAX     = 1,
         DENOISER_REFERENCE = 2,
     }
 
     public enum RESOLUTION
     {
-        RESOLUTION_FULL = 0,
+        RESOLUTION_FULL               = 0,
         RESOLUTION_FULL_PROBABILISTIC = 1,
-        RESOLUTION_HALF = 2,
+        RESOLUTION_HALF               = 2,
     }
 
+    public enum DirectLightingMode
+    {
+        None,
+        Brdf,
+        ReStir
+    }
+
+    public enum IndirectLightingMode
+    {
+        None,
+        Brdf,
+        ReStirGI
+    };
+
+
+    [System.Serializable]
+    public class RtxdiSetting
+    {
+        [FoldoutHeader("Base Settings")]
+        [Range(-10f, 10f)]
+        public float exposureEv = 0.0f;
+
+        public float exposure => Mathf.Pow(2, exposureEv);
+
+        public bool         cameraJitter = true;
+        public ShowMode     showMode     = ShowMode.Final;
+        public bool         showMv;
+        public UpscalerMode upscalerMode = UpscalerMode.NATIVE;
+
+        public bool tmpDisableRR;
+
+        [FoldoutHeader("RTXDI")]
+        public RtxdiFeature.RenderSettings lightingSettings = RtxdiFeature.RenderSettings.Default();
+
+        public DirectLightingMode   directLightingMode   = DirectLightingMode.ReStir;
+        public IndirectLightingMode indirectLightingMode = IndirectLightingMode.ReStirGI;
+
+        public bool enableGIFinalShading = true;
+        public bool enableDIFinalShading = true;
+
+        public bool enableEnv = true;
+        public bool useRasterGBuffer = true;
+
+        public ReGIRDynamicParameters regirDynamicParams = ReGIRDynamicParameters.Default();
+
+        [FoldoutHeader("Compute OR Raster")]
+        public bool useComputeForGis = true;
+
+        public bool useComputeForTemporalResampling     = true;
+        public bool useComputeForSpatialResampling      = true;
+        public bool useComputeForShadeSamples           = true;
+        public bool useComputeForShadeSecondarySurfaces = true;
+        public bool useComputeForGITemporalResampling   = true;
+        public bool useComputeForGISpatialResampling    = true;
+        public bool useComputeForGIFinalShading         = true;
+
+        [FoldoutHeader("ReSTIR DI")]
+        public ReSTIRDI_ResamplingMode diResamplingMode = ReSTIRDI_ResamplingMode.TemporalAndSpatial;
+
+        public RTXDI_DIInitialSamplingParameters    initialSamplingParams    = ReSTIRDIDefaults.GetDefaultInitialSamplingParams();
+        public RTXDI_DITemporalResamplingParameters temporalResamplingParams = ReSTIRDIDefaults.GetDefaultTemporalResamplingParams();
+        public RTXDI_DISpatialResamplingParameters  spatialResamplingParams  = ReSTIRDIDefaults.GetDefaultSpatialResamplingParams();
+        public RTXDI_ShadingParameters              shadingParams            = ReSTIRDIDefaults.GetDefaultShadingParams();
+
+        [FoldoutHeader("ReSTIR GI")]
+        public ReSTIRGI_ResamplingMode giResamplingMode = ReSTIRGI_ResamplingMode.TemporalAndSpatial;
+
+        public RTXDI_GITemporalResamplingParameters giTemporalResamplingParams = ReSTIRGIDefaults.GetDefaultTemporalResamplingParams();
+        public RTXDI_GISpatialResamplingParameters  giSpatialResamplingParams  = ReSTIRGIDefaults.GetDefaultSpatialResamplingParams();
+        public RTXDI_GIFinalShadingParameters       giFinalShadingParams       = ReSTIRGIDefaults.GetDefaultFinalShadingParams();
+        public BRDFPathTracing_Parameters           brdfptParams               = BRDFPathTracing_Parameters.Default();
+    }
 
     [System.Serializable]
     public class PathTracingSetting
     {
+        [FoldoutHeader("显示模式")]
+        [Range(-10f, 10f)]
+        public float exposureEv = 0.0f;
+
+        public bool     cameraJitter = true;
+        public ShowMode showMode     = ShowMode.Final;
+        public bool     showMv;
+        public bool     showValidation;
+
+        [FoldoutHeader("Base Settings")]
         [Range(0.001f, 10f)]
         public float sunAngularDiameter = 0.533f;
 
-        [Header("NRD Common Settings")]
+        public float exposure => Mathf.Pow(2, exposureEv);
+
+        public UpscalerMode upscalerMode = UpscalerMode.NATIVE;
+
+        public float mipBias = -0.5f;
+
+        public RESOLUTION   tracingMode = RESOLUTION.RESOLUTION_FULL_PROBABILISTIC;
+        public DenoiserType denoiser    = DenoiserType.DENOISER_REBLUR;
+
+        public float emissionIntensity = 1.0f;
+
+        public bool psr                  = true;
+        public bool emission             = true;
+        public bool usePrevFrame         = true;
+        public bool TAA                  = true;
+        public bool indirectDiffuse      = true;
+        public bool indirectSpecular     = true;
+        public bool importanceSampling   = false;
+        public bool SHARC                = true;
+        public bool specularLobeTrimming = true;
+        public bool boost                = false;
+
+        [Range(0.0f, 10.0f)]
+        public float boostFactor = 0.6667f;
+
+        public bool SR           = false;
+        public bool RR           = true;
+        public bool tmpDisableRR = false;
+
+        [Range(0.5f, 1.0f)]
+        public float resolutionScale = 1.0f;
+
+        [FoldoutHeader("NRD Common Settings")]
         [Range(0.1f, 10000.0f)]
         public float denoisingRange = 1000;
 
@@ -71,31 +188,22 @@ namespace PathTracing
 
         public bool isBaseColorMetalnessAvailable = true;
 
-        [Header("NRD Sigma Settings")]
+        [FoldoutHeader("NRD Sigma Settings")]
         [Range(0.0f, 1.0f)]
         public float planeDistanceSensitivity = 0.02f;
 
         [Range(0, 7)]
         public uint maxStabilizedFrameNum = 5;
 
-        [Header("显示模式")]
-        public ShowMode showMode = ShowMode.Final;
-
-        public bool showMV;
-        public bool showValidation;
-
-        [Header("景深")]
+        [FoldoutHeader("景深")]
         [Range(0, 100f)]
         public float dofAperture;
 
         [Range(0.1f, 10f)]
         public float dofFocalDistance = 5;
 
-        [Header("曝光")]
-        [Range(0.1f, 100f)]
-        public float exposure = 1.0f;
 
-        [Header("自动曝光 (Histogram Auto Exposure)")]
+        [FoldoutHeader("自动曝光")]
         public bool enableAutoExposure = false;
 
         [Tooltip("Histogram EV range lower bound (log2 luminance)")]
@@ -134,60 +242,27 @@ namespace PathTracing
         [Range(1f, 1000f)]
         public float aeMaxExposure = 100f;
 
-        // [Header("TAA")]
+        // [FoldoutHeader("TAA")]
         // [Range(0f, 1f)]
         // public float taa = 1.0f;
 
-        [Header("采样")]
+        [FoldoutHeader("采样")]
         [Range(1, 4)]
         public uint rpp = 1;
 
         [Range(1, 4)]
         public uint bounceNum = 1;
 
-        [Header("SHARC")]
+        [FoldoutHeader("SHARC")]
         [Range(1, 8)]
         public float sharcDownscale = 4;
+
         [Range(10, 100)]
         public float sharcSceneScale = 45;
+
         public bool sharcDebug = false;
 
-        public float mipBias = -0.5f;
-
-        public RESOLUTION tracingMode = RESOLUTION.RESOLUTION_FULL_PROBABILISTIC;
-        public DenoiserType denoiser = DenoiserType.DENOISER_REBLUR;
-
-        public float emissionIntensity = 1.0f;
-
-        public bool cameraJitter = true;
-        public bool psr = true;
-        public bool emission = true;
-        public bool usePrevFrame = true;
-        public bool TAA = true;
-        public bool indirectDiffuse = true;
-        public bool indirectSpecular = true;
-        public bool importanceSampling = false;
-        public bool SHARC = true;
-        public bool specularLobeTrimming = true;
-        public bool boost = false;
-
-        [Range(0.0f, 10.0f)]
-        public float boostFactor = 0.6667f;
-
-        public bool SR = false;
-        public bool RR = true;
-        public bool tmpDisableRR = false;
-
-        [Range(0.5f, 1.0f)]
-        public float resolutionScale = 1.0f;
-
-        public UpscalerMode upscalerMode = UpscalerMode.NATIVE;
-
-        [Header("SSS (次表面散射)")]
-        [Tooltip("皮肤散射颜色，暖橙红色为典型皮肤值")]
-        [ColorUsage(false, true)]
-        public Color sssScatteringColor = new Color(1.0f, 0.3f, 0.1f);
-
+        [FoldoutHeader("次表面散射")]
         [Tooltip("SSS 阴影阈值：皮肤在该 NoL 值以下时开始渐入散射（默认 -0.2，允许背透光）")]
         [Range(-1.0f, 0.1f)]
         public float sssMinThreshold = -0.2f;
@@ -212,34 +287,17 @@ namespace PathTracing
         [Range(0.0001f, 0.1f)]
         public float sssMaxSampleRadius = 0.004f;
 
-        [Header("RTXDI")]
-        public bool enableRtxdi;
-        [Range(0, 16)]
-        public uint localLightSamples;
-        [Range(0, 16)]
-        public uint spatialSamples;
 
-        [Range(0, 16)]
-        public uint brdfSamples;
-
-        public bool enableSpatialResampling => resamplingMode is ReSTIRDI_ResamplingMode.Spatial or ReSTIRDI_ResamplingMode.TemporalAndSpatial;
-        public bool enableTemporalResampling => resamplingMode is ReSTIRDI_ResamplingMode.Temporal or ReSTIRDI_ResamplingMode.TemporalAndSpatial;
-
-        public ReSTIRDI_ResamplingMode resamplingMode; 
-        public bool gShowLight;
-        
-        [Header("参考路径追踪")]
-        
+        [FoldoutHeader("参考路径追踪")]
         public bool useReferencePathTracing;
-        
+
         [Range(0, 16)]
         public int referenceBounceNum = 4;
-        
+
         [Range(0.0f, 1.0f)]
         public float split;
-        
-        public bool accumulateReference = true;
-        public bool accumulate = false;
 
+        public bool accumulateReference = true;
+        public bool accumulate          = false;
     }
 }

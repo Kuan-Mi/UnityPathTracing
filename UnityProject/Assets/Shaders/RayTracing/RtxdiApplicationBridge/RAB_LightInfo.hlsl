@@ -1,46 +1,73 @@
 #ifndef RAB_LIGHT_INFO_HLSLI
 #define RAB_LIGHT_INFO_HLSLI
 
-//#include "../ShaderParameters.h"
-#include "../TriangleLight.hlsl"
+#include "../PolymorphicLight.hlsl"
+#include "RAB_Surface.hlsl"
+#include "RAB_LightSample.hlsl"
 
-// 返回一个无效的光源实例
+typedef PolymorphicLightInfo RAB_LightInfo;
+
 RAB_LightInfo RAB_EmptyLightInfo()
 {
     return (RAB_LightInfo)0;
 }
 
-// 不实现
-RAB_LightInfo RAB_LoadCompactLightInfo(uint linearIndex)
+// Loads polymorphic light data from the global light buffer.
+RAB_LightInfo RAB_LoadLightInfo(uint index, bool previousFrame)
 {
-    return RAB_EmptyLightInfo();
+    return t_LightDataBuffer[index];
 }
 
-// 不实现
+// Loads triangle light data from a tile produced by the presampling pass.
+RAB_LightInfo RAB_LoadCompactLightInfo(uint linearIndex)
+{
+    uint4 packedData1, packedData2;
+    packedData1 = u_RisLightDataBuffer[linearIndex * 2 + 0];
+    packedData2 = u_RisLightDataBuffer[linearIndex * 2 + 1];
+    return unpackCompactLightInfo(packedData1, packedData2);
+}
+
+// Stores triangle light data into a tile.
+// Returns true if this light can be stored in a tile (i.e. compacted).
+// If it cannot, for example it's a shaped light, this function returns false and doesn't store.
+// A basic implementation can ignore this feature and always return false, which is just slower.
 bool RAB_StoreCompactLightInfo(uint linearIndex, RAB_LightInfo lightInfo)
 {
+    uint4 data1, data2;
+    if (!packCompactLightInfo(lightInfo, data1, data2))
+        return false;
+
+    u_RisLightDataBuffer[linearIndex * 2 + 0] = data1;
+    u_RisLightDataBuffer[linearIndex * 2 + 1] = data2;
+
     return true;
 }
 
-// 不实现
-// 计算给定光照在指定体积内任意表面上的权重。用于世界空间光照网格构建（ReGIR）。
+// Computes the weight of the given light for arbitrary surfaces located inside 
+// the specified volume. Used for world-space light grid construction.
 float RAB_GetLightTargetPdfForVolume(RAB_LightInfo light, float3 volumeCenter, float volumeRadius)
 {
-    return 0.0;
+    return PolymorphicLight::getWeightForVolume(light, volumeCenter, volumeRadius);
 }
 
-// 不是RAB必要函数，只是为了方便将TriangleLight存储到RAB_LightInfo中，供后续加载和使用
-RAB_LightInfo Store(TriangleLight triLight)
+// Samples a polymorphic light relative to the given receiver surface.
+// For most light types, the "uv" parameter is just a pair of uniform random numbers, originally
+// produced by the RAB_GetNextRandom function and then stored in light reservoirs.
+// For importance sampled environment lights, the "uv" parameter has the texture coordinates
+// in the PDF texture, normalized to the (0..1) range.
+RAB_LightSample RAB_SamplePolymorphicLight(RAB_LightInfo lightInfo, RAB_Surface surface, float2 uv)
 {
-    RAB_LightInfo lightInfo = (RAB_LightInfo)0;
+    PolymorphicLightSample pls = PolymorphicLight::calcSample(lightInfo, uv, surface.worldPos);
 
-    lightInfo.radiance = Pack_R16G16B16A16_FLOAT(float4(triLight.radiance, 0));
-    lightInfo.center = triLight.base + (triLight.edge1 + triLight.edge2) / 3.0;
-    lightInfo.direction1 = ndirToOctUnorm32(normalize(triLight.edge1));
-    lightInfo.direction2 = ndirToOctUnorm32(normalize(triLight.edge2));
-    lightInfo.scalars = f32tof16(length(triLight.edge1)) | (f32tof16(length(triLight.edge2)) << 16);
-        
-    return lightInfo;
+    RAB_LightSample lightSample;
+    lightSample.position = pls.position;
+    lightSample.normal = pls.normal;
+    lightSample.radiance = pls.radiance;
+    lightSample.solidAnglePdf = pls.solidAnglePdf;
+    lightSample.lightType = getLightType(lightInfo);
+    return lightSample;
 }
+
+
 
 #endif // RAB_LIGHT_INFO_HLSLI

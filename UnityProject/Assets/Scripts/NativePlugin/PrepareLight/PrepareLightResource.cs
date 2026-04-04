@@ -20,7 +20,7 @@ namespace RTXDI
 
         [DllImport("UnityRTXDI")]
         private static extern IntPtr WrapD3D12Texture(IntPtr resource, DXGI_FORMAT format);
-        
+
         [DllImport("UnityRTXDI")]
         private static extern IntPtr WrapD3D12Buffer(IntPtr resource, ushort stride);
 
@@ -32,21 +32,20 @@ namespace RTXDI
 
         private readonly int instanceId;
 
-        
+
         // private IntPtr inputNriTex;
 
         private NativeArray<EmissionResourceInput> m_ResourceCache;
-        
+
         private List<Texture2D> lastSentTextures = new List<Texture2D>();
 
         public unsafe void SendTexture(List<Texture2D> textures)
         {
-
             if (lastSentTextures.SequenceEqual(textures))
             {
                 return; // No change in textures, skip updating
             }
-            
+
             if (m_ResourceCache.IsCreated) m_ResourceCache.Dispose();
             m_ResourceCache = new NativeArray<EmissionResourceInput>(textures.Count, Allocator.Persistent);
 
@@ -54,31 +53,31 @@ namespace RTXDI
             {
                 var tex = textures[i];
                 IntPtr nativePtr = tex.GetNativeTexturePtr();
-                
-                
+
+
                 var format = tex.graphicsFormat;
                 var dxgiFormat = NriUtil.GetDXGIFormat(format);
-                 
+
                 // Debug.Log($"Sending Texture {i}: {tex.name}, Format: {format}, DXGI Format: {dxgiFormat}");
-                
+
                 IntPtr nriTex = WrapD3D12Texture(nativePtr, dxgiFormat);
 
                 EmissionResourceInput resourceInput = new EmissionResourceInput
                 {
                     texture = nriTex,
-                    format =  NriUtil.GetNriFormat(format)
+                    format = NriUtil.GetNriFormat(format)
                 };
                 m_ResourceCache[i] = resourceInput;
             }
- 
+
             EmissionResourceInput* ptr = (EmissionResourceInput*)m_ResourceCache.GetUnsafePtr();
 
             UpdateDenoiserResources(instanceId, (IntPtr)ptr, m_ResourceCache.Length);
-            
+
             lastSentTextures = new List<Texture2D>(textures);
         }
-        
-        
+
+
         private IntPtr nriInstanceBufferPtr;
         private IntPtr nriPrimtiveBufferPtr;
         private IntPtr nriLightInfoBufferPtr;
@@ -86,19 +85,21 @@ namespace RTXDI
 
         public void SetBuffer(GPUScene scene)
         {
-            _scene = scene;
-            nriInstanceBufferPtr = WrapD3D12Buffer(scene._instanceBuffer.GetNativeBufferPtr(), (ushort)Marshal.SizeOf<InstanceData>());
-            nriPrimtiveBufferPtr = WrapD3D12Buffer(scene._primitiveBuffer.GetNativeBufferPtr(), (ushort)Marshal.SizeOf<PrimitiveData>());
-            nriLightInfoBufferPtr = WrapD3D12Buffer(scene._lightInfoBuffer.GetNativeBufferPtr(), (ushort)Marshal.SizeOf<RAB_LightInfo>());
+            if (_scene == null)
+            {
+                _scene = scene;
+                nriInstanceBufferPtr = WrapD3D12Buffer(scene._instanceBuffer.GetNativeBufferPtr(), (ushort)Marshal.SizeOf<InstanceData>());
+                nriPrimtiveBufferPtr = WrapD3D12Buffer(scene._primitiveBuffer.GetNativeBufferPtr(), (ushort)Marshal.SizeOf<PrimitiveData>());
+                nriLightInfoBufferPtr = WrapD3D12Buffer(scene._lightInfoBuffer.GetNativeBufferPtr(), (ushort)Marshal.SizeOf<PolymorphicLightInfo>());
+            }
         }
-        
+
         public PrepareLightResource()
         {
+            Debug.Log("Creating PrepareLightResource");
             instanceId = CreateDenoiserInstance();
 
             buffer = new NativeArray<PrepareLightFrameData>(BufferCount, Allocator.Persistent);
-            
-             
         }
 
         public void Dispose()
@@ -121,6 +122,8 @@ namespace RTXDI
                 InstanceCount = _scene._instanceBuffer.count,
                 instanceId = instanceId
             };
+
+            // Debug.Log($"numPrimitives = {data.numPrimitives}, instanceCount = {data.InstanceCount}");
 
             return data;
         }

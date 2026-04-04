@@ -1,12 +1,14 @@
-/***************************************************************************
- # Copyright (c) 2020-2023, NVIDIA CORPORATION.  All rights reserved.
- #
- # NVIDIA CORPORATION and its licensors retain all intellectual property
- # and proprietary rights in and to this software, related documentation
- # and any modifications thereto.  Any use, reproduction, disclosure or
- # distribution of this software and related documentation without an express
- # license agreement from NVIDIA CORPORATION is strictly prohibited.
- **************************************************************************/
+/*
+ * SPDX-FileCopyrightText: Copyright (c) 2020-2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * SPDX-License-Identifier: LicenseRef-NvidiaProprietary
+ *
+ * NVIDIA CORPORATION, its affiliates and licensors retain all intellectual
+ * property and proprietary rights in and to this material, related
+ * documentation and any modifications thereto. Any use, reproduction,
+ * disclosure or distribution of this material and related documentation
+ * without an express license agreement from NVIDIA CORPORATION or
+ * its affiliates is strictly prohibited.
+ */
 
 #ifndef RTXDI_PRESAMPLING_FUNCTIONS_HLSLI
 #define RTXDI_PRESAMPLING_FUNCTIONS_HLSLI
@@ -15,7 +17,7 @@
 #include "Assets/Shaders/Rtxdi/LightSampling/LocalLightSelection.hlsl"
 #include "Assets/Shaders/Rtxdi/Utils/Math.hlsl"
 #if RTXDI_REGIR_MODE != RTXDI_REGIR_DISABLED
-#include "Assets/Shaders/Rtxdi/ReGIR/ReGIRSampling.hlsli"
+#include "Assets/Shaders/Rtxdi/ReGIR/ReGIRSampling.hlsl"
 #endif
 
 #if RTXDI_ENABLE_PRESAMPLING && !defined(RTXDI_RIS_BUFFER)
@@ -27,7 +29,7 @@
 #endif
 
 void RTXDI_SamplePdfMipmap(
-    inout RAB_RandomSamplerState rng,
+    inout RTXDI_RandomSamplerState rng,
     RTXDI_TEX2D pdfTexture, // full mip chain starting from unnormalized sampling pdf in mip 0
     uint2 pdfTextureSize,   // dimensions of pdfTexture at mip 0; must be 16k or less
     out uint2 position,
@@ -56,7 +58,7 @@ void RTXDI_SamplePdfMipmap(
 
         samples /= weightSum;
 
-        float rnd = RAB_GetNextRandom(rng);
+        float rnd = RTXDI_GetNextRandom(rng);
 
         int2 selectedOffset;
 
@@ -93,7 +95,7 @@ void RTXDI_SamplePdfMipmap(
 }
 
 void RTXDI_PresampleLocalLights(
-    inout RAB_RandomSamplerState rng,
+    inout RTXDI_RandomSamplerState rng,
     RTXDI_TEX2D pdfTexture,
     uint2 pdfTextureSize,
     uint tileIndex,
@@ -132,7 +134,7 @@ void RTXDI_PresampleLocalLights(
 }
 
 void RTXDI_PresampleEnvironmentMap(
-    inout RAB_RandomSamplerState rng,
+    inout RTXDI_RandomSamplerState rng,
     RTXDI_TEX2D pdfTexture,
     uint2 pdfTextureSize,
     uint tileIndex,
@@ -145,8 +147,8 @@ void RTXDI_PresampleEnvironmentMap(
 
     // Uniform sampling inside the pixels
     float2 fPos = float2(texelPosition);
-    fPos.x += RAB_GetNextRandom(rng);
-    fPos.y += RAB_GetNextRandom(rng);
+    fPos.x += RTXDI_GetNextRandom(rng);
+    fPos.y += RTXDI_GetNextRandom(rng);
 
     // Convert texel position to UV and pack it
     float2 uv = fPos / float2(pdfTextureSize);
@@ -165,8 +167,8 @@ void RTXDI_PresampleEnvironmentMap(
 // ReGIR grid build pass.
 // Each thread populates one light slot in a grid cell.
 void RTXDI_PresampleLocalLightsForReGIR(
-    inout RAB_RandomSamplerState rng,
-    inout RAB_RandomSamplerState coherentRng,
+    inout RTXDI_RandomSamplerState rng,
+    inout RTXDI_RandomSamplerState coherentRng,
     uint lightSlot,
     RTXDI_LightBufferRegion localLightBufferRegion,
     RTXDI_RISBufferSegmentParameters localLightRISBufferSegmentParams,
@@ -212,14 +214,14 @@ void RTXDI_PresampleLocalLightsForReGIR(
         uint rndLight;
         RAB_LightInfo lightInfo = RAB_EmptyLightInfo();
         float invSourcePdf;
-        float rand = RAB_GetNextRandom(rng);
+        float rand = RTXDI_GetNextRandom(rng);
         bool lightLoaded = false;
 
-        RTXDI_SelectNextLocalLight(ctx, rng, lightInfo, rndLight, invSourcePdf);
+        RTXDI_SelectNextLocalLight(ctx, rand, lightInfo, rndLight, invSourcePdf);
         invSourcePdf *= invNumSamples;
 
         float targetPdf = RAB_GetLightTargetPdfForVolume(lightInfo, cellCenter, cellRadius);
-        float risRnd = RAB_GetNextRandom(rng);
+        float risRnd = RTXDI_GetNextRandom(rng);
 
         float risWeight = targetPdf * invSourcePdf;
         weightSum += risWeight;

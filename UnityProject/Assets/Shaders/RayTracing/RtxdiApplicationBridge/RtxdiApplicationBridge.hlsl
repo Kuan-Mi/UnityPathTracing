@@ -32,7 +32,8 @@ between the bridge functions.
 // See RtxdiApplicationBridge.hlsli in the full sample app for more information.
 // This is a minimal viable implementation.
 
-//#include "../ShaderParameters.h"
+#include "Assets/Shaders/Rtxdi/Utils/RandomSamplerstate.hlsl"
+#include "../ShaderParameters.hlsl"
 //#include "../SceneGeometry.hlsli"
 
 #include "RAB_Buffers.hlsl"
@@ -41,7 +42,6 @@ between the bridge functions.
 #include "RAB_LightSample.hlsl"
 #include "RAB_LightSampling.hlsl"
 #include "RAB_Material.hlsl"
-#include "RAB_RandomSamplerState.hlsl"
 #include "RAB_RayPayload.hlsl"
 #include "RAB_RTShaders.hlsl"
 #include "RAB_SpatialHelpers.hlsl"

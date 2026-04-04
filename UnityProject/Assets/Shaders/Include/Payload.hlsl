@@ -6,16 +6,16 @@ struct MainRayPayload
     float2 N; // 法线向量（世界空间）
     float hitT; // 光线命中的距离（t值），INF表示未命中
     float curvature; // 曲率估算值（用于材质、去噪等）
-    
+
     float2 mipAndCone;
     uint instanceIndexAndFlags;
     uint Lemi;
-    
+
     float2 matN;
     uint baseColor;
     uint roughnessAndMetalness;
     // float metalness;
-    
+
     uint primitiveIndex; // 命中的三角形索引
     float2 barycentrics; // 命中的三角形的重心坐标（uv）
 
@@ -44,5 +44,32 @@ struct MainRayPayload
     uint GetInstanceIndex()
     {
         return (instanceIndexAndFlags & INSTANCE_INDEX_MASK);
+    }
+};
+
+struct LightPayload
+{
+    uint instanceIndex;
+    uint primitiveIndex; // 命中的三角形索引
+    float2 barycentrics; // 命中的三角形的重心坐标（uv）
+
+    bool IsMiss()
+    {
+        return instanceIndex == INF;
+    }
+};
+
+struct SecondarySurfacePayload
+{
+    float2 normal;
+    float hitT;
+    uint baseColor;
+    
+    float3 Lemi;
+    uint roughnessAndMetalness;
+    
+    bool IsMiss()
+    {
+        return hitT == INF;
     }
 };

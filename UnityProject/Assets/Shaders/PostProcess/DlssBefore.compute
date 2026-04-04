@@ -1,5 +1,5 @@
 #pragma kernel CSMain
-#pragma enable_d3d11_debug_symbols
+// #pragma enable_d3d11_debug_symbols
 #pragma use_dxc
 
 #include "Assets/Shaders/Include/Shared.hlsl"
@@ -62,8 +62,5 @@ void CSMain(int2 pixelPos : SV_DispatchThreadId)
         gOut_SpecAlbedo[ pixelPos ] = isSky ? 0.0 : Fenv;
         gOut_SpecHitDistance[ pixelPos ] = isSky ? 0.0 : gIndirectSpecular * specHitDistance;
         gOut_Normal_Roughness[ pixelPos ] = float4( N, roughness ); // NGX supports only this encoding
-        
-        // gOut_DiffAlbedo[ pixelPos ] = float4(1,0,0,1);
-        
     }
 }

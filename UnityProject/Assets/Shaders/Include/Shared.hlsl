@@ -171,93 +171,10 @@
 #define GEOMETRY_ALL                        ( FLAG_NON_TRANSPARENT | FLAG_TRANSPARENT )
 
  
+#define CBUFFER_START(name) cbuffer name {
+#define CBUFFER_END };
 
-
-cbuffer PathTracingParams : register(b0)
-{
-    float4x4 gViewToWorld;
-    float4x4 gViewToWorldPrev;
-    float4x4 gViewToClip;
-    float4x4 gWorldToView;
-    float4x4 gWorldToViewPrev;
-    float4x4 gWorldToClip;
-    float4x4 gWorldToClipPrev;
-    float4 gHitDistParams;
-    float4 gCameraFrustum;
-    float4 gSunBasisX;
-    float4 gSunBasisY;
-    float4 gSunDirection;
-    float4 gCameraGlobalPos;
-    float4 gCameraGlobalPosPrev;
-    float4 gViewDirection;
-    float4 gHairBaseColor;
-    float2 gHairBetas;
-    float2 gOutputSize; // represents native resolution ( >= gRenderSize )
-    float2 gRenderSize; // up to native resolution ( >= gRectSize )
-    float2 gRectSize; // dynamic resolution scaling
-    float2 gInvOutputSize;
-    float2 gInvRenderSize;
-    float2 gInvRectSize;
-    float2 gRectSizePrev;
-    float2 gJitter;
-    float gEmissionIntensity;
-    float gNearZ;
-    float gSeparator;
-    float gRoughnessOverride;
-    float gMetalnessOverride;
-    float gUnitToMetersMultiplier;
-    float gTanSunAngularRadius;
-    float gTanPixelAngularRadius;
-    float gDebug;
-    float gPrevFrameConfidence;
-    float gUnproject;
-    float gAperture;
-    float gFocalDistance;
-    float gFocalLength;
-    float gTAA;
-    float gHdrScale;
-    float gExposure;
-    float gMipBias;
-    float gOrthoMode;
-    float gIndirectDiffuse;
-    float gIndirectSpecular;
-    float gMinProbability;
-    uint gSharcMaxAccumulatedFrameNum;
-    uint gDenoiserType;
-    uint gDisableShadowsAndEnableImportanceSampling; // TODO: remove - modify GetSunIntensity to return 0 if sun is below horizon
-    uint gFrameIndex;
-    uint gForcedMaterial;
-    uint gUseNormalMap;
-    uint gBounceNum;
-    uint gResolve;
-    uint gValidation;
-    uint gSR;
-    uint gRR;
-    uint gIsSrgb;
-    uint gOnScreen;
-    uint gTracingMode;
-    uint gSampleNum;
-    uint gPSR;
-    uint gSHARC;
-    uint gTrimLobe;
-    uint gSpotLightCount;
-    uint gAreaLightCount;
-    uint gPointLightCount;
-    float3 gSssScatteringColor;
-    float gSssMinThreshold;
-    float gSssTransmissionBsdfSampleCount;
-    float gSsTransmissionPerBsdfScatteringSampleCount;
-    float gSssScale;
-    float gSssAnisotropy;
-    float gSssMaxSampleRadius;
-    float gIsEditor;
-    uint gShowLight;
-    float gSharcDownscale;
-    float gSharcSceneScale;
-    uint sharcDebug;
-};
-
-
+#include "GlobalConstants.cs.hlsl"
 
 
 // RTXDI_ReservoirBufferParameters restirDIReservoirBufferParams;
@@ -485,16 +402,3 @@ float SIGMA_FrontEnd_UnpackPenumbra( float packedPenumbra, float tanOfLightAngul
 
     return distanceToOccluder;
 }
-
-
-struct RAB_LightInfo
-{
-    // uint4[0]
-    float3 center;
-    uint scalars; // 2x float16
-    
-    // uint4[1]
-    uint2 radiance; // fp16x4
-    uint direction1; // oct-encoded
-    uint direction2; // oct-encoded
-};

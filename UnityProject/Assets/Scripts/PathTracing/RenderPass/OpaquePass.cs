@@ -50,6 +50,7 @@ namespace PathTracing
             internal RTHandle NormalRoughness;
             internal RTHandle BaseColorMetalness;
             internal RTHandle GeoNormal;
+            internal RTHandle DirectLighting;
 
 
             internal RTHandle Penumbra;
@@ -79,7 +80,6 @@ namespace PathTracing
             internal Settings Settings;
 
             internal TextureHandle OutputTexture;
-            internal TextureHandle DirectLighting;
             internal TextureHandle DirectEmission;
             internal TextureHandle ComposedDiff;
             internal TextureHandle ComposedSpecViewZ;
@@ -89,8 +89,7 @@ namespace PathTracing
         {
             var natCmd = CommandBufferHelpers.GetNativeCommandBuffer(context.cmd);
 
-            var opaqueTracingMarker = new ProfilerMarker(ProfilerCategory.Render, "Opaque Tracing", MarkerFlags.SampleGPU);
-            var copyGBufferMarker = new ProfilerMarker(ProfilerCategory.Render, "Copy GBuffer to Prev", MarkerFlags.SampleGPU);
+            var opaqueTracingMarker = RenderPassMarkers.OpaqueTracing;
 
             natCmd.BeginSample(opaqueTracingMarker);
 
@@ -114,7 +113,7 @@ namespace PathTracing
             natCmd.SetRayTracingTextureParam(data.OpaqueTs, g_Normal_RoughnessID, resource.NormalRoughness);
             natCmd.SetRayTracingTextureParam(data.OpaqueTs, g_BaseColor_MetalnessID, resource.BaseColorMetalness);
 
-            natCmd.SetRayTracingTextureParam(data.OpaqueTs, g_DirectLightingID, data.DirectLighting);
+            natCmd.SetRayTracingTextureParam(data.OpaqueTs, g_DirectLightingID, resource.DirectLighting);
             natCmd.SetRayTracingTextureParam(data.OpaqueTs, g_DirectEmissionID, data.DirectEmission);
             natCmd.SetRayTracingTextureParam(data.OpaqueTs, g_PsrThroughputID, resource.PsrThroughput);
 
@@ -130,8 +129,8 @@ namespace PathTracing
             natCmd.SetRayTracingTextureParam(data.OpaqueTs, gIn_PrevBaseColorMetalnessID, resource.PrevBaseColorMetalness);
             
             
-            natCmd.SetRayTracingTextureParam(data.OpaqueTs,"gOut_GeoNormal", resource.GeoNormal);
-            natCmd.SetRayTracingTextureParam(data.OpaqueTs,"gIn_PrevGeoNormal", resource.PrevGeoNormal);
+            natCmd.SetRayTracingTextureParam(data.OpaqueTs, gOut_GeoNormalID, resource.GeoNormal);
+            natCmd.SetRayTracingTextureParam(data.OpaqueTs, gIn_PrevGeoNormalID, resource.PrevGeoNormal);
             
             
             
@@ -184,19 +183,16 @@ namespace PathTracing
             var ptContextItem = frameData.Create<PTContextItem>();
             
             ptContextItem.OutputTexture = CreateTex(textureDesc, renderGraph, "PathTracingOutput", GraphicsFormat.R16G16B16A16_SFloat);
-            ptContextItem.DirectLighting = CreateTex(textureDesc, renderGraph, "DirectLighting", GraphicsFormat.B10G11R11_UFloatPack32);
             ptContextItem.DirectEmission = CreateTex(textureDesc, renderGraph, "DirectEmission", GraphicsFormat.B10G11R11_UFloatPack32);
             ptContextItem.ComposedDiff = CreateTex(textureDesc, renderGraph, "ComposedDiff", GraphicsFormat.R16G16B16A16_SFloat);
             ptContextItem.ComposedSpecViewZ = CreateTex(textureDesc, renderGraph, "ComposedSpec_ViewZ", GraphicsFormat.R16G16B16A16_SFloat);
             
             passData.OutputTexture = ptContextItem.OutputTexture;
-            passData.DirectLighting = ptContextItem.DirectLighting;
             passData.DirectEmission = ptContextItem.DirectEmission;
             passData.ComposedDiff = ptContextItem.ComposedDiff;
             passData.ComposedSpecViewZ = ptContextItem.ComposedSpecViewZ;
             
             builder.UseTexture(passData.OutputTexture,  AccessFlags.ReadWrite);
-            builder.UseTexture(passData.DirectLighting,  AccessFlags.ReadWrite);
             builder.UseTexture(passData.DirectEmission,  AccessFlags.ReadWrite);
             builder.UseTexture(passData.ComposedDiff,  AccessFlags.ReadWrite);
             builder.UseTexture(passData.ComposedSpecViewZ,  AccessFlags.ReadWrite);

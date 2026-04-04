@@ -1,5 +1,92 @@
 %YAML 1.1
 %TAG !u! tag:unity3d.com,2011:
+--- !u!114 &-2006250351800377744
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: f50908f0e9bf42149891b36684931380, type: 3}
+  m_Name: PathTracingFeature
+  m_EditorClassIdentifier: Assembly-CSharp::PathTracing.PathTracingFeature
+  m_Active: 1
+  pathTracingSetting:
+    exposureEv: -2.7
+    cameraJitter: 1
+    showMode: 18
+    showMv: 0
+    showValidation: 0
+    sunAngularDiameter: 0.533
+    upscalerMode: 0
+    mipBias: -0.5
+    tracingMode: 1
+    denoiser: 0
+    emissionIntensity: 1
+    psr: 1
+    emission: 1
+    usePrevFrame: 1
+    TAA: 1
+    indirectDiffuse: 1
+    indirectSpecular: 1
+    importanceSampling: 0
+    SHARC: 1
+    specularLobeTrimming: 1
+    boost: 0
+    boostFactor: 0.6667
+    SR: 0
+    RR: 1
+    tmpDisableRR: 0
+    resolutionScale: 1
+    denoisingRange: 1000
+    splitScreen: 0
+    isBaseColorMetalnessAvailable: 1
+    planeDistanceSensitivity: 0.02
+    maxStabilizedFrameNum: 5
+    dofAperture: 0
+    dofFocalDistance: 1.02
+    enableAutoExposure: 0
+    aeEVMin: -10
+    aeEVMax: 10
+    aeLowPercent: 0.05
+    aeHighPercent: 0.95
+    aeAdaptationSpeedUp: 2
+    aeAdaptationSpeedDown: 1
+    aeExposureCompensation: -2.24
+    aeMinExposure: 0.01
+    aeMaxExposure: 100
+    rpp: 1
+    bounceNum: 1
+    sharcDownscale: 4
+    sharcSceneScale: 45
+    sharcDebug: 0
+    sssMinThreshold: -0.2
+    sssTransmissionBsdfSampleCount: 4
+    sssTransmissionPerBsdfScatteringSampleCount: 4
+    sssScale: 0.4
+    sssAnisotropy: 0
+    sssMaxSampleRadius: 0.004
+    useReferencePathTracing: 0
+    referenceBounceNum: 4
+    split: 0
+    accumulateReference: 1
+    accumulate: 0
+  renderPassEvent: 550
+  finalMaterial: {fileID: 2100000, guid: 27695a2bc55ef2f469362b9a2994989e, type: 2}
+  sharcUpdateTs: {fileID: 4807578003741378534, guid: 171e2660e0894b3cb5c6c809e595ae5d, type: 3}
+  opaqueTracingShader: {fileID: 4807578003741378534, guid: 71faa22953dc9834daf36cc38966c196, type: 3}
+  transparentTracingShader: {fileID: 4807578003741378534, guid: d207e5fb066a4b579353785310fd0dea, type: 3}
+  referencePtTracingShader: {fileID: 4807578003741378534, guid: e0dfc84565ad452aab99e3b8d28eafb1, type: 3}
+  compositionComputeShader: {fileID: 7200000, guid: 6b0c89c26f4363a4781550cf86801786, type: 3}
+  taaComputeShader: {fileID: 7200000, guid: 6af7363d73bc4764bd8420bb5cc5d306, type: 3}
+  dlssBeforeComputeShader: {fileID: 7200000, guid: b34d979c2031436aad2b456c4456c6eb, type: 3}
+  sharcResolveCs: {fileID: 7200000, guid: 8a8bff82bc5641aaabee502a09792151, type: 3}
+  autoExposureShader: {fileID: 7200000, guid: dd8e8b3823bdf9c4e987096a78bd2248, type: 3}
+  accumulateCs: {fileID: 7200000, guid: c1e50e483fac4de7803cd658d0f9cdd2, type: 3}
+  scramblingRankingTex: {fileID: 2800000, guid: ba45d1e4dcf9022438a4798a5f9e7b80, type: 3}
+  sobolTex: {fileID: 2800000, guid: 17e7ce8147355314ea8aab1178a6a43c, type: 3}
 --- !u!114 &11400000
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -25,8 +112,8 @@ MonoBehaviour:
     probeSamplingDebugTexture: {fileID: 2800000, guid: 24ec0e140fb444a44ab96ee80844e18e, type: 3}
     probeVolumeBlendStatesCS: {fileID: 7200000, guid: b9a23f869c4fd45f19c5ada54dd82176, type: 3}
   m_RendererFeatures:
-  - {fileID: 7213446213844144994}
-  m_RendererFeatureMap: 621391ee1c4f1b64
+  - {fileID: -2006250351800377744}
+  m_RendererFeatureMap: 709e6f42ef5d28e4
   m_UseNativeRenderPass: 1
   xrSystemData: {fileID: 0}
   postProcessData: {fileID: 11400000, guid: 41439944d30ece34e96484bdb6645b55, type: 2}
@@ -55,474 +142,3 @@ MonoBehaviour:
   m_DepthTextureFormat: 0
   m_AccurateGbufferNormals: 0
   m_IntermediateTextureMode: 0
---- !u!114 &7213446213844144994
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 0}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: f50908f0e9bf42149891b36684931380, type: 3}
-  m_Name: PathTracingFeature
-  m_EditorClassIdentifier: Assembly-CSharp::PathTracing.PathTracingFeature
-  m_Active: 1
-  pathTracingSetting:
-    sunAngularDiameter: 0.69
-    denoisingRange: 1000
-    splitScreen: 0
-    isBaseColorMetalnessAvailable: 1
-    planeDistanceSensitivity: 0.02
-    maxStabilizedFrameNum: 5
-    showMode: 18
-    showMV: 0
-    showValidation: 0
-    dofAperture: 0
-    dofFocalDistance: 0.71
-    exposure: 1
-    enableAutoExposure: 1
-    aeEVMin: -10
-    aeEVMax: 10
-    aeLowPercent: 0.05
-    aeHighPercent: 0.95
-    aeAdaptationSpeedUp: 2
-    aeAdaptationSpeedDown: 1
-    aeExposureCompensation: 0
-    aeMinExposure: 0.01
-    aeMaxExposure: 1000
-    rpp: 1
-    bounceNum: 1
-    sharcDownscale: 4
-    sharcSceneScale: 45
-    sharcDebug: 0
-    mipBias: -0.5
-    tracingMode: 1
-    denoiser: 0
-    emissionIntensity: 1
-    cameraJitter: 1
-    psr: 1
-    emission: 1
-    usePrevFrame: 1
-    TAA: 1
-    indirectDiffuse: 1
-    indirectSpecular: 1
-    importanceSampling: 0
-    SHARC: 1
-    specularLobeTrimming: 1
-    boost: 1
-    boostFactor: 1
-    SR: 0
-    RR: 1
-    tmpDisableRR: 0
-    resolutionScale: 1
-    upscalerMode: 0
-    sssScatteringColor: {r: 3.5, g: 4, b: 3, a: 1}
-    sssMinThreshold: -0.043
-    sssTransmissionBsdfSampleCount: 6
-    sssTransmissionPerBsdfScatteringSampleCount: 3
-    sssScale: 1
-    sssAnisotropy: 0.8
-    sssMaxSampleRadius: 0.0001
-    enableRtxdi: 0
-    localLightSamples: 16
-    spatialSamples: 3
-    brdfSamples: 0
-    resamplingMode: 1
-    gShowLight: 0
-    useReferencePathTracing: 0
-    referenceBounceNum: 2
-    split: 0.34
-    accumulateReference: 0
-    accumulate: 0
-  globalConstants:
-    gViewToWorld:
-      c0:
-        x: 0.99975026
-        y: -0.0041033444
-        z: 0.021973167
-        w: 0
-      c1:
-        x: -0.00035256206
-        y: 0.9799897
-        z: 0.19904774
-        w: 0
-      c2:
-        x: 0.022350239
-        y: 0.19900575
-        z: -0.9797434
-        w: 0
-      c3:
-        x: -9.416759
-        y: 6.2253985
-        z: -7.8868723
-        w: 1
-    gViewToWorldPrev:
-      c0:
-        x: 0.99975026
-        y: -0.0041033444
-        z: 0.021973167
-        w: 0
-      c1:
-        x: -0.00035256206
-        y: 0.9799897
-        z: 0.19904774
-        w: 0
-      c2:
-        x: 0.022350239
-        y: 0.19900575
-        z: -0.9797434
-        w: 0
-      c3:
-        x: -9.416759
-        y: 6.2253985
-        z: -7.8868723
-        w: 1
-    gViewToClip:
-      c0:
-        x: 0.90310955
-        y: 0
-        z: 0
-        w: 0
-      c1:
-        x: 0
-        y: 1.7320508
-        z: 0
-        w: 0
-      c2:
-        x: 0
-        y: 0
-        z: 0.0000030398369
-        w: -1
-      c3:
-        x: 0
-        y: 0
-        z: 0.03000009
-        w: 0
-    gWorldToView:
-      c0:
-        x: 0.99975014
-        y: -0.00035256182
-        z: 0.022350239
-        w: 0
-      c1:
-        x: -0.004103344
-        y: 0.9799897
-        z: 0.19900575
-        w: 0
-      c2:
-        x: 0.021973165
-        y: 0.19904774
-        z: -0.9797434
-        w: 0
-      c3:
-        x: 9.61325
-        y: -4.534283
-        z: -8.755534
-        w: 1
-    gWorldToViewPrev:
-      c0:
-        x: 0.99975014
-        y: -0.00035256182
-        z: 0.022350239
-        w: 0
-      c1:
-        x: -0.004103344
-        y: 0.9799897
-        z: 0.19900575
-        w: 0
-      c2:
-        x: 0.021973165
-        y: 0.19904774
-        z: -0.9797434
-        w: 0
-      c3:
-        x: 9.61325
-        y: -4.534283
-        z: -8.755534
-        w: 1
-    gWorldToClip:
-      c0:
-        x: 0.9028839
-        y: -0.000610655
-        z: 0.00000006794108
-        w: -0.022350239
-      c1:
-        x: -0.003705769
-        y: 1.697392
-        z: 0.000000604945
-        w: -0.19900575
-      c2:
-        x: 0.019844174
-        y: 0.3447608
-        z: -0.0000029782602
-        w: 0.9797434
-      c3:
-        x: 8.681818
-        y: -7.8536086
-        z: 0.029973475
-        w: 8.755534
-    gWorldToClipPrev:
-      c0:
-        x: 0.9028839
-        y: -0.000610655
-        z: 0.00000006794108
-        w: -0.022350239
-      c1:
-        x: -0.003705769
-        y: 1.697392
-        z: 0.000000604945
-        w: -0.19900575
-      c2:
-        x: 0.019844174
-        y: 0.3447608
-        z: -0.0000029782602
-        w: 0.9797434
-      c3:
-        x: 8.681818
-        y: -7.8536086
-        z: 0.029973475
-        w: 8.755534
-    gHitDistParams:
-      x: 3
-      y: 0.1
-      z: 20
-      w: -25
-    gCameraFrustum:
-      x: 1.1072854
-      y: -0.57735026
-      z: -2.2145708
-      w: 1.1547005
-    gSunBasisX:
-      x: 1
-      y: -0
-      z: 0
-      w: 0
-    gSunBasisY:
-      x: 0
-      y: 0.5262143
-      z: -0.850352
-      w: 0
-    gSunDirection:
-      x: -0
-      y: 0.8503521
-      z: 0.52621436
-      w: 0
-    gCameraGlobalPos:
-      x: -9.416758
-      y: 6.225399
-      z: -7.8868713
-      w: 0
-    gCameraGlobalPosPrev:
-      x: -9.416758
-      y: 6.225399
-      z: -7.8868713
-      w: 0
-    gViewDirection:
-      x: -0.022350239
-      y: -0.19900575
-      z: 0.9797434
-      w: 0
-    gHairBaseColor:
-      x: 0.1
-      y: 0.1
-      z: 0.1
-      w: 1
-    gHairBetas:
-      x: 0.25
-      y: 0.3
-    gOutputSize:
-      x: 1191
-      y: 621
-    gRenderSize:
-      x: 1191
-      y: 621
-    gRectSize:
-      x: 1191
-      y: 621
-    gInvOutputSize:
-      x: 0.00083963055
-      y: 0.001610306
-    gInvRenderSize:
-      x: 0.00083963055
-      y: 0.001610306
-    gInvRectSize:
-      x: 0.00083963055
-      y: 0.001610306
-    gRectSizePrev:
-      x: 1191
-      y: 621
-    gJitter:
-      x: -0.000058011585
-      y: 0.0004519705
-    gEmissionIntensity: 1
-    gNearZ: -0.03
-    gSeparator: 0
-    gRoughnessOverride: 0
-    gMetalnessOverride: 0
-    gUnitToMetersMultiplier: 1
-    gTanSunAngularRadius: 0.0060214587
-    gTanPixelAngularRadius: 0.00070215453
-    gDebug: 0
-    gPrevFrameConfidence: 0
-    gUnproject: 0.0018594211
-    gAperture: 0
-    gFocalDistance: 0.71
-    gFocalLength: 0.015804417
-    gTAA: 0.18181819
-    gHdrScale: 1
-    gExposure: 1
-    gMipBias: -0.5
-    gOrthoMode: 0
-    gIndirectDiffuse: 1
-    gIndirectSpecular: 1
-    gMinProbability: 0
-    gSharcMaxAccumulatedFrameNum: 9
-    gDenoiserType: 0
-    gDisableShadowsAndEnableImportanceSampling: 0
-    gFrameIndex: 1551
-    gForcedMaterial: 0
-    gUseNormalMap: 1
-    gBounceNum: 1
-    gResolve: 1
-    gValidation: 1
-    gSR: 0
-    gRR: 1
-    gIsSrgb: 0
-    gOnScreen: 0
-    gTracingMode: 1
-    gSampleNum: 1
-    gPSR: 1
-    gSHARC: 1
-    gTrimLobe: 1
-    gSpotLightCount: 0
-    gAreaLightCount: 0
-    gPointLightCount: 0
-    gSssScatteringColor:
-      x: 3.5
-      y: 4
-      z: 3
-    gSssMinThreshold: -0.043
-    gSssTransmissionBsdfSampleCount: 6
-    gSssTransmissionPerBsdfScatteringSampleCount: 3
-    gSssScale: 1
-    gSssAnisotropy: 0.8
-    gSssMaxSampleRadius: 0.0001
-    gIsEditor: 1
-    gShowLight: 0
-    gSharcDownscale: 4
-    gSharcSceneScale: 45
-    sharcDebug: 0
-  resamplingConstants:
-    runtimeParams:
-      neighborOffsetMask: 8191
-      activeCheckerboardField: 0
-      pad1: 0
-      pad2: 0
-    lightBufferParams:
-      localLightBufferRegion:
-        firstLightIndex: 0
-        numLights: 0
-        pad1: 0
-        pad2: 0
-      infiniteLightBufferRegion:
-        firstLightIndex: 0
-        numLights: 0
-        pad1: 0
-        pad2: 0
-      environmentLightParams:
-        lightPresent: 0
-        lightIndex: 4294967295
-        pad1: 0
-        pad2: 0
-    restirDIReservoirBufferParams:
-      reservoirBlockRowPitch: 19200
-      reservoirArrayPitch: 748800
-      pad1: 0
-      pad2: 0
-    restirDI:
-      reservoirBufferParams:
-        reservoirBlockRowPitch: 19200
-        reservoirArrayPitch: 748800
-        pad1: 0
-        pad2: 0
-      bufferIndices:
-        initialSamplingOutputBufferIndex: 2
-        temporalResamplingInputBufferIndex: 1
-        temporalResamplingOutputBufferIndex: 2
-        spatialResamplingInputBufferIndex: 2
-        spatialResamplingOutputBufferIndex: 0
-        shadingInputBufferIndex: 2
-        pad1: 0
-        pad2: 0
-      initialSamplingParams:
-        numPrimaryLocalLightSamples: 8
-        numPrimaryInfiniteLightSamples: 1
-        numPrimaryEnvironmentSamples: 0
-        numPrimaryBrdfSamples: 1
-        brdfCutoff: 0.0001
-        enableInitialVisibility: 1
-        environmentMapImportanceSampling: 0
-        localLightSamplingMode: 0
-      temporalResamplingParams:
-        temporalDepthThreshold: 0.1
-        temporalNormalThreshold: 0.5
-        maxHistoryLength: 20
-        temporalBiasCorrection: 1
-        enablePermutationSampling: 1
-        permutationSamplingThreshold: 0.9
-        enableBoilingFilter: 1
-        boilingFilterStrength: 0.2
-        discardInvisibleSamples: 0
-        uniformRandomNumber: 1173988267
-        pad2: 0
-        pad3: 0
-      spatialResamplingParams:
-        spatialDepthThreshold: 0.1
-        spatialNormalThreshold: 0.5
-        spatialBiasCorrection: 1
-        numSpatialSamples: 1
-        numDisocclusionBoostSamples: 8
-        spatialSamplingRadius: 32
-        neighborOffsetMask: 0
-        discountNaiveSamples: 0
-      shadingParams:
-        enableFinalVisibility: 1
-        reuseFinalVisibility: 1
-        finalVisibilityMaxAge: 4
-        finalVisibilityMaxDistance: 16
-        enableDenoiserInputPacking: 0
-        pad1: 0
-        pad2: 0
-        pad3: 0
-    frameIndex: 2678
-    numInitialSamples: 16
-    numSpatialSamples: 3
-    useAccurateGBufferNormal: 0
-    numInitialBRDFSamples: 0
-    brdfCutoff: 0
-    pad2:
-      x: 0
-      y: 0
-    enableResampling: 1
-    unbiasedMode: 1
-    inputBufferIndex: 1
-    outputBufferIndex: 0
-  renderPassEvent: 550
-  finalMaterial: {fileID: 2100000, guid: 27695a2bc55ef2f469362b9a2994989e, type: 2}
-  sharcUpdateTs: {fileID: 4807578003741378534, guid: 171e2660e0894b3cb5c6c809e595ae5d, type: 3}
-  opaqueTracingShader: {fileID: 4807578003741378534, guid: 71faa22953dc9834daf36cc38966c196, type: 3}
-  generateInitialSShader: {fileID: 4807578003741378534, guid: d360fd1504e84137ab8253780770f0b6, type: 3}
-  temporalResamplingShader: {fileID: 4807578003741378534, guid: 190468c66edf4d45b3f8535a3bd6f0d4, type: 3}
-  spatialResamplingShader: {fileID: 4807578003741378534, guid: d603ddad10874923ab65a70b34fe6a60, type: 3}
-  shadeSamplesShader: {fileID: 4807578003741378534, guid: 78d7660a5ed54d6fa49f9d2ad6265c82, type: 3}
-  transparentTracingShader: {fileID: 4807578003741378534, guid: d207e5fb066a4b579353785310fd0dea, type: 3}
-  referencePtTracingShader: {fileID: 4807578003741378534, guid: e0dfc84565ad452aab99e3b8d28eafb1, type: 3}
-  compositionComputeShader: {fileID: 7200000, guid: 6b0c89c26f4363a4781550cf86801786, type: 3}
-  taaComputeShader: {fileID: 7200000, guid: 6af7363d73bc4764bd8420bb5cc5d306, type: 3}
-  dlssBeforeComputeShader: {fileID: 7200000, guid: b34d979c2031436aad2b456c4456c6eb, type: 3}
-  sharcResolveCs: {fileID: 7200000, guid: 8a8bff82bc5641aaabee502a09792151, type: 3}
-  autoExposureShader: {fileID: 7200000, guid: dd8e8b3823bdf9c4e987096a78bd2248, type: 3}
-  accumulateCs: {fileID: 7200000, guid: c1e50e483fac4de7803cd658d0f9cdd2, type: 3}
-  scramblingRankingTex: {fileID: 2800000, guid: ba45d1e4dcf9022438a4798a5f9e7b80, type: 3}
-  sobolTex: {fileID: 2800000, guid: 17e7ce8147355314ea8aab1178a6a43c, type: 3}

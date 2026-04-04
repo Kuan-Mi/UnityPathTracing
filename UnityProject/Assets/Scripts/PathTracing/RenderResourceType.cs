@@ -30,6 +30,7 @@ namespace PathTracing
 
         // ── NRI-interop resources (DLSS / composition) ──────────────────────────
         Composed,
+        DirectLighting,
         DlssOutput,
         RrGuideDiffAlbedo,
         RrGuideSpecAlbedo,
@@ -46,5 +47,19 @@ namespace PathTracing
         PrevNormalRoughness,
         PrevBaseColorMetalness,
         PrevGeoNormal,
+
+        // rtxdi
+        RtxdiViewDepth,
+        RtxdiDiffuseAlbedo,
+        RtxdiSpecularRough,
+        RtxdiNormals,
+        RtxdiGeoNormals,
+        RtxdiEmissive,
+        RtxdiMotionVectors,
+        RtxdiPrevViewDepth,
+        RtxdiPrevDiffuseAlbedo,
+        RtxdiPrevSpecularRough,
+        RtxdiPrevNormals,
+        RtxdiPrevGeoNormals,
     }
 }

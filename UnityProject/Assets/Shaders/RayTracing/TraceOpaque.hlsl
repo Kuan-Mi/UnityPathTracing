@@ -209,6 +209,7 @@ TraceOpaqueResult TraceOpaque(GeometryProps geometryProps0, MaterialProps materi
         return result;
     }
 
+    
 
     // uint checkerboard = Sequence::CheckerBoard(pixelPos, g_FrameIndex) != 0;
 
@@ -751,7 +752,7 @@ void MainRayGenShader()
     #endif
 
 
-    gOut_DirectLighting[pixelPos] = float4(Ldirect , 1.0);
+    gOut_DirectLighting[pixelPos] = Ldirect;
 
     // END of test RTXDI
 

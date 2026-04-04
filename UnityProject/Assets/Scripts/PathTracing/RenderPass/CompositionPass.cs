@@ -38,6 +38,7 @@ namespace PathTracing
             internal RTHandle NormalRoughness;
             internal RTHandle BaseColorMetalness;
             internal RTHandle PsrThroughput;
+            internal RTHandle DirectLighting;
 
             internal RTHandle Shadow;
             internal RTHandle Diff;
@@ -56,7 +57,6 @@ namespace PathTracing
             internal Resource Resource;
             internal Settings Settings;
 
-            internal TextureHandle DirectLighting;
             internal TextureHandle DirectEmission;
             internal TextureHandle ComposedDiff;
             internal TextureHandle ComposedSpecViewZ;
@@ -66,7 +66,7 @@ namespace PathTracing
         {
             var natCmd = CommandBufferHelpers.GetNativeCommandBuffer(context.cmd);
 
-            var compositionMarker = new ProfilerMarker(ProfilerCategory.Render, "Composition", MarkerFlags.SampleGPU);
+            var compositionMarker = RenderPassMarkers.Composition;
 
             // 合成
             {
@@ -75,7 +75,7 @@ namespace PathTracing
                 natCmd.SetComputeTextureParam(data.CompositionCs, 0, gIn_ViewZID, data.Resource.ViewZ);
                 natCmd.SetComputeTextureParam(data.CompositionCs, 0, gIn_Normal_RoughnessID, data.Resource.NormalRoughness);
                 natCmd.SetComputeTextureParam(data.CompositionCs, 0, gIn_BaseColor_MetalnessID, data.Resource.BaseColorMetalness);
-                natCmd.SetComputeTextureParam(data.CompositionCs, 0, gIn_DirectLightingID, data.DirectLighting);
+                natCmd.SetComputeTextureParam(data.CompositionCs, 0, gIn_DirectLightingID, data.Resource.DirectLighting);
                 natCmd.SetComputeTextureParam(data.CompositionCs, 0, gIn_DirectEmissionID, data.DirectEmission);
 
                 natCmd.SetComputeTextureParam(data.CompositionCs, 0, gIn_ShadowID, data.Resource.Shadow);
@@ -105,12 +105,10 @@ namespace PathTracing
             
             var ptContextItem = frameData.Get<PTContextItem>();
 
-            passData.DirectLighting = ptContextItem.DirectLighting;
             passData.DirectEmission = ptContextItem.DirectEmission;
             passData.ComposedDiff = ptContextItem.ComposedDiff;
             passData.ComposedSpecViewZ = ptContextItem.ComposedSpecViewZ;
 
-            builder.UseTexture(passData.DirectLighting,  AccessFlags.ReadWrite);
             builder.UseTexture(passData.DirectEmission,  AccessFlags.ReadWrite);
             builder.UseTexture(passData.ComposedDiff,  AccessFlags.ReadWrite);
             builder.UseTexture(passData.ComposedSpecViewZ,  AccessFlags.ReadWrite);

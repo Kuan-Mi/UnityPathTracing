@@ -61,11 +61,11 @@ float3 evalSingleScatteringTransmission(
             }
         }
         // Step 4.2: single scattering — uniform stepping along the refraction ray
-        float stepSize = thickness / (gSsTransmissionPerBsdfScatteringSampleCount + 1);
+        float stepSize = thickness / (gSssTransmissionPerBsdfScatteringSampleCount + 1);
         float accumulatedT = 0.0;
         float3 scatteringThroughput = 0.0;
 
-        for (int sampleIndex = 0; sampleIndex < gSsTransmissionPerBsdfScatteringSampleCount; ++sampleIndex)
+        for (int sampleIndex = 0; sampleIndex < gSssTransmissionPerBsdfScatteringSampleCount; ++sampleIndex)
         {
             const float currentT = accumulatedT + stepSize;
             accumulatedT = currentT;

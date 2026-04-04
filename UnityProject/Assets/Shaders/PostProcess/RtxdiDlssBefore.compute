@@ -1,0 +1,65 @@
+#pragma kernel CSMain
+// #pragma enable_d3d11_debug_symbols
+#pragma use_dxc
+
+#include "Assets/Shaders/Include/Shared.hlsl"
+#include "Assets/Shaders/donut/packing.hlsli"
+#include "Assets/Shaders/donut/utils.hlsli"
+
+Texture2D<float> gIn_ViewDepth;
+Texture2D<uint> gIn_DiffuseAlbedo;
+Texture2D<uint> gIn_SpecularRough;
+Texture2D<uint> gIn_Normals;
+
+// Texture2D<float4> gIn_Spec;
+
+
+RWTexture2D<float3> gOut_DiffAlbedo;
+RWTexture2D<float3> gOut_SpecAlbedo;
+RWTexture2D<float> gOut_SpecHitDistance;
+RWTexture2D<float4> gOut_Normal_Roughness;
+
+
+[numthreads( 16, 16, 1 )]
+void CSMain(int2 pixelPos : SV_DispatchThreadId)
+{
+    float2 pixelUv = (float2(pixelPos) + 0.5) * gInvRenderSize;
+
+    // Do not generate NANs for unused threads
+    if (pixelUv.x > 1.0 || pixelUv.y > 1.0)
+        return;
+
+    float viewZ = gIn_ViewDepth[pixelPos];
+    float4 specularRough = Unpack_R8G8B8A8_Gamma_UFLOAT(gIn_SpecularRough[pixelPos]);
+    float3 diffuseAlbedo = Unpack_R11G11B10_UFLOAT(gIn_DiffuseAlbedo[pixelPos]);
+    float3 N = octToNdirUnorm32(gIn_Normals[pixelPos]);
+
+
+    float3 specularAlbedo = specularRough.rgb;
+    float roughness = specularRough.a;
+
+    float3 Xv = Geometry::ReconstructViewPosition(pixelUv, gCameraFrustum, viewZ, gOrthoMode);
+
+
+    float3 albedo = diffuseAlbedo;
+
+    float3 Rf0 = specularAlbedo;
+
+
+    // float3 X = Geometry::AffineTransform(gViewToWorld, Xv);
+    float3 V = gOrthoMode == 0 ? Geometry::RotateVector(gViewToWorld, normalize(Xv)) : gViewDirection.xyz;
+
+    float NoV = abs(dot(N, V));
+    float3 Fenv = BRDF::EnvironmentTerm_Rtg(Rf0, NoV, roughness);
+
+    float scaleHitDistance = gDenoiserType == DENOISER_RELAX ? 1.0 : _REBLUR_GetHitDistanceNormalization(viewZ, gHitDistParams, roughness);
+    // float specHitDistance = gIn_Spec[pixelPos].w * scaleHitDistance;
+    float specHitDistance = 0;
+
+    bool isSky = abs(viewZ) == INF;
+
+    gOut_DiffAlbedo[pixelPos] = isSky ? 0.0 : albedo * (1.0 - Fenv); // NGX doesn't support sRGB, manual linearization needed
+    gOut_SpecAlbedo[pixelPos] = isSky ? 0.0 : Fenv;
+    gOut_SpecHitDistance[pixelPos] = isSky ? 0.0 : specHitDistance;
+    gOut_Normal_Roughness[pixelPos] = isSky ? 0 : float4(N, roughness); // NGX supports only this encoding
+}

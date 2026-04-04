@@ -1,12 +1,14 @@
-/***************************************************************************
- # Copyright (c) 2020-2023, NVIDIA CORPORATION.  All rights reserved.
- #
- # NVIDIA CORPORATION and its licensors retain all intellectual property
- # and proprietary rights in and to this software, related documentation
- # and any modifications thereto.  Any use, reproduction, disclosure or
- # distribution of this software and related documentation without an express
- # license agreement from NVIDIA CORPORATION is strictly prohibited.
- **************************************************************************/
+/*
+ * SPDX-FileCopyrightText: Copyright (c) 2020-2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * SPDX-License-Identifier: LicenseRef-NvidiaProprietary
+ *
+ * NVIDIA CORPORATION, its affiliates and licensors retain all intellectual
+ * property and proprietary rights in and to this material, related
+ * documentation and any modifications thereto. Any use, reproduction,
+ * disclosure or distribution of this material and related documentation
+ * without an express license agreement from NVIDIA CORPORATION or
+ * its affiliates is strictly prohibited.
+ */
 
 #pragma once
 
@@ -47,11 +49,13 @@ namespace rtxdi
         CheckerboardMode CheckerboardSamplingMode = CheckerboardMode::Off;
     };
 
-    ReSTIRDI_BufferIndices GetDefaultReSTIRDIBufferIndices();
-    ReSTIRDI_InitialSamplingParameters GetDefaultReSTIRDIInitialSamplingParams();
-    ReSTIRDI_TemporalResamplingParameters GetDefaultReSTIRDITemporalResamplingParams();
-    ReSTIRDI_SpatialResamplingParameters GetDefaultReSTIRDISpatialResamplingParams();
-    ReSTIRDI_ShadingParameters GetDefaultReSTIRDIShadingParams();
+    RTXDI_DIBufferIndices GetDefaultReSTIRDIBufferIndices();
+    RTXDI_DIInitialSamplingParameters GetDefaultReSTIRDIInitialSamplingParams();
+    RTXDI_DITemporalResamplingParameters GetDefaultReSTIRDITemporalResamplingParams();
+    RTXDI_BoilingFilterParameters GetDefaultReSTIRDIBoilingFilterParams();
+    RTXDI_DISpatialResamplingParameters GetDefaultReSTIRDISpatialResamplingParams();
+    RTXDI_DISpatioTemporalResamplingParameters GetDefaultReSTIRDISpatioTemporalResamplingParams();
+    RTXDI_ShadingParameters GetDefaultReSTIRDIShadingParams();
 
     // Make this constructor take static RTXDI params, update its dynamic ones
     class ReSTIRDIContext
@@ -62,41 +66,43 @@ namespace rtxdi
         RTXDI_ReservoirBufferParameters GetReservoirBufferParameters() const;
         ReSTIRDI_ResamplingMode GetResamplingMode() const;
         RTXDI_RuntimeParameters GetRuntimeParams() const;
-        ReSTIRDI_BufferIndices GetBufferIndices() const;
-        ReSTIRDI_InitialSamplingParameters GetInitialSamplingParameters() const;
-        ReSTIRDI_TemporalResamplingParameters GetTemporalResamplingParameters() const;
-        ReSTIRDI_SpatialResamplingParameters GetSpatialResamplingParameters() const;
-        ReSTIRDI_ShadingParameters GetShadingParameters() const;
+        RTXDI_DIBufferIndices GetBufferIndices() const;
+        RTXDI_DIInitialSamplingParameters GetInitialSamplingParameters() const;
+        RTXDI_DITemporalResamplingParameters GetTemporalResamplingParameters() const;
+        RTXDI_BoilingFilterParameters GetBoilingFilterParameters() const;
+        RTXDI_DISpatialResamplingParameters GetSpatialResamplingParameters() const;
+        RTXDI_DISpatioTemporalResamplingParameters GetSpatioTemporalResamplingParameters() const;
+        RTXDI_ShadingParameters GetShadingParameters() const;
 
         uint32_t GetFrameIndex() const;
         const ReSTIRDIStaticParameters& GetStaticParameters() const;
 
         void SetFrameIndex(uint32_t frameIndex);
         void SetResamplingMode(ReSTIRDI_ResamplingMode resamplingMode);
-        void SetInitialSamplingParameters(const ReSTIRDI_InitialSamplingParameters& initialSamplingParams);
-        void SetTemporalResamplingParameters(const ReSTIRDI_TemporalResamplingParameters& temporalResamplingParams);
-        void SetSpatialResamplingParameters(const ReSTIRDI_SpatialResamplingParameters& spatialResamplingParams);
-        void SetShadingParameters(const ReSTIRDI_ShadingParameters& shadingParams);
-
-        static const uint32_t NumReservoirBuffers;
+        void SetInitialSamplingParameters(const RTXDI_DIInitialSamplingParameters& initialSamplingParams);
+        void SetTemporalResamplingParameters(const RTXDI_DITemporalResamplingParameters& temporalResamplingParams);
+        void SetBoilingFilterParameters(const RTXDI_BoilingFilterParameters& boilingFilterParams);
+        void SetSpatialResamplingParameters(const RTXDI_DISpatialResamplingParameters& spatialResamplingParams);
+        void SetSpatioTemporalResamplingParameters(const RTXDI_DISpatioTemporalResamplingParameters& spatioTemporalResamplingParams);
+        void SetShadingParameters(const RTXDI_ShadingParameters& shadingParams);
 
     private:
         uint32_t m_lastFrameOutputReservoir;
         uint32_t m_currentFrameOutputReservoir;
-
-        uint32_t m_frameIndex;
 
         ReSTIRDIStaticParameters m_staticParams;
 
         ReSTIRDI_ResamplingMode m_resamplingMode;
         RTXDI_ReservoirBufferParameters m_reservoirBufferParams;
         RTXDI_RuntimeParameters m_runtimeParams;
-        ReSTIRDI_BufferIndices m_bufferIndices;
+        RTXDI_DIBufferIndices m_bufferIndices;
         
-        ReSTIRDI_InitialSamplingParameters m_initialSamplingParams;
-        ReSTIRDI_TemporalResamplingParameters m_temporalResamplingParams;
-        ReSTIRDI_SpatialResamplingParameters m_spatialResamplingParams;
-        ReSTIRDI_ShadingParameters m_shadingParams;
+        RTXDI_DIInitialSamplingParameters m_initialSamplingParams;
+        RTXDI_DITemporalResamplingParameters m_temporalResamplingParams;
+        RTXDI_BoilingFilterParameters m_boilingFilterParams;
+        RTXDI_DISpatialResamplingParameters m_spatialResamplingParams;
+        RTXDI_DISpatioTemporalResamplingParameters m_spatioTemporalResamplingParams;
+        RTXDI_ShadingParameters m_shadingParams;
 
         void UpdateBufferIndices();
         void UpdateCheckerboardField();

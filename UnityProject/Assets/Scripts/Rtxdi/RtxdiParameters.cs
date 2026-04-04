@@ -1,4 +1,4 @@
-// Copyright (c) 2020-2023, NVIDIA CORPORATION. All rights reserved.
+// Copyright (c) 2020-2026, NVIDIA CORPORATION. All rights reserved.
 //
 // NVIDIA CORPORATION and its licensors retain all intellectual property
 // and proprietary rights in and to this software, related documentation
@@ -11,25 +11,29 @@ using System.Runtime.InteropServices;
 namespace Rtxdi
 {
     /// <summary>
-    /// Constants from RtxdiParameters.h and RISBufferSegmentParameters.h.
+    /// Constants from RtxdiParameters.h and related headers.
     /// </summary>
     public static class RtxdiConstants
     {
-        public const uint RTXDI_LIGHT_COMPACT_BIT       = 0x80000000u;
-        public const uint RTXDI_LIGHT_INDEX_MASK        = 0x7fffffff;
-        public const uint RTXDI_RESERVOIR_BLOCK_SIZE     = 16;
-        public const uint RTXDI_BIAS_CORRECTION_OFF      = 0;
-        public const uint RTXDI_BIAS_CORRECTION_BASIC    = 1;
-        public const uint RTXDI_BIAS_CORRECTION_PAIRWISE = 2;
-        public const uint RTXDI_BIAS_CORRECTION_RAY_TRACED = 3;
+        public const uint RTXDI_LIGHT_COMPACT_BIT                           = 0x80000000u;
+        public const uint RTXDI_LIGHT_INDEX_MASK                            = 0x7fffffff;
+        public const uint RTXDI_RESERVOIR_BLOCK_SIZE                        = 16;
 
-        public const uint ReSTIRDI_LocalLightSamplingMode_UNIFORM   = 0;
-        public const uint ReSTIRDI_LocalLightSamplingMode_POWER_RIS = 1;
-        public const uint ReSTIRDI_LocalLightSamplingMode_REGIR_RIS = 2;
+        public const uint RTXDI_BIAS_CORRECTION_OFF                         = 0;
+        public const uint RTXDI_BIAS_CORRECTION_BASIC                       = 1;
+        public const uint RTXDI_BIAS_CORRECTION_PAIRWISE                    = 2;
+        public const uint RTXDI_BIAS_CORRECTION_RAY_TRACED                  = 3;
 
-        public const uint RTXDI_NAIVE_SAMPLING_M_THRESHOLD = 2;
-        public const uint RTXDI_ENABLE_PRESAMPLING         = 1;
-        public const uint RTXDI_INVALID_LIGHT_INDEX        = 0xffffffffu;
+        public const uint ReSTIRDI_LocalLightSamplingMode_UNIFORM           = 0;
+        public const uint ReSTIRDI_LocalLightSamplingMode_POWER_RIS         = 1;
+        public const uint ReSTIRDI_LocalLightSamplingMode_REGIR_RIS         = 2;
+
+        public const uint RTXDI_RESTIRPT_RECONNECTION_MODE_FIXED_THRESHOLD  = 0;
+        public const uint RTXDI_RESTIRPT_RECONNECTION_MODE_FOOTPRINT        = 1;
+
+        public const uint RTXDI_NAIVE_SAMPLING_M_THRESHOLD                  = 2;
+        public const uint RTXDI_ENABLE_PRESAMPLING                          = 1;
+        public const uint RTXDI_INVALID_LIGHT_INDEX                         = 0xffffffffu;
     }
 
     [StructLayout(LayoutKind.Sequential)]
@@ -60,14 +64,18 @@ namespace Rtxdi
         public uint pad1;
         public uint pad2;
     }
-    
+
+    /// <summary>
+    /// Per-frame runtime parameters passed to the shader.
+    /// frameIndex is used to drive checkerboard field and permutation sampling.
+    /// </summary>
     [System.Serializable]
     [StructLayout(LayoutKind.Sequential)]
     public struct RTXDI_RuntimeParameters
     {
-        public uint neighborOffsetMask;
-        public uint activeCheckerboardField; // 0 - no checkerboard, 1 - odd pixels, 2 - even pixels
-        public uint pad1;
+        public uint neighborOffsetMask;      // spatial neighbor lookup mask
+        public uint activeCheckerboardField; // 0 = off, 1 = odd pixels, 2 = even pixels
+        public uint frameIndex;
         public uint pad2;
     }
 
@@ -90,13 +98,23 @@ namespace Rtxdi
         public uint pad2;
     }
 
+    [System.Serializable]
+    [StructLayout(LayoutKind.Sequential)]
+    public struct RTXDI_BoilingFilterParameters
+    {
+        public uint  enableBoilingFilter;
+        public float boilingFilterStrength;
+        public uint  pad1;
+        public uint  pad2;
+    }
+
     [StructLayout(LayoutKind.Sequential)]
     public struct RTXDI_PackedDIReservoir
     {
-        public uint lightData;
-        public uint uvData;
-        public uint mVisibility;
-        public uint distanceAge;
+        public uint  lightData;
+        public uint  uvData;
+        public uint  mVisibility;
+        public uint  distanceAge;
         public float targetPdf;
         public float weight;
     }

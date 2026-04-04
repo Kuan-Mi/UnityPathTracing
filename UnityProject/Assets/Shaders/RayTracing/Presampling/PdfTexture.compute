@@ -1,0 +1,34 @@
+#pragma kernel CSMain
+
+#pragma only_renderers   d3d11
+#pragma use_dxc
+#pragma target 6.0
+// #pragma enable_d3d11_debug_symbols
+
+RWTexture2D<float> u_LocalLightPdfTexture;
+
+#define RTXDI_PRESAMPLING_GROUP_SIZE 256
+#define USE_RAY_QUERY
+#include "Assets/Shaders/RTXDI/Utils/Math.hlsl"
+#include "Assets/Shaders/RayTracing/RtxdiApplicationBridge/RtxdiApplicationBridge.hlsl"
+#include "../PolymorphicLight.hlsl"
+
+[numthreads(256, 1, 1)]
+void CSMain(uint dispatchThreadId : SV_DispatchThreadID, uint groupThreadId : SV_GroupThreadID)
+{
+    uint lightBufferPtr = dispatchThreadId.x;
+    uint2 pdfTexturePosition = RTXDI_LinearIndexToZCurve(lightBufferPtr);
+
+    if (lightBufferPtr >= g_Const.lightBufferParams.localLightBufferRegion.numLights)
+    {
+        u_LocalLightPdfTexture[pdfTexturePosition] = 0;
+        return;
+    }
+
+    PolymorphicLightInfo lightInfo = t_LightDataBuffer[lightBufferPtr];
+
+    float emissiveFlux = PolymorphicLight::getPower(lightInfo);
+
+
+    u_LocalLightPdfTexture[pdfTexturePosition] = emissiveFlux;
+}

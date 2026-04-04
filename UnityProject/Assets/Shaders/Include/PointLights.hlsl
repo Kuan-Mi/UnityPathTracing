@@ -3,7 +3,7 @@
 // Mirrors the sun path in GetLighting(): NoL+SmoothStep first, then BRDF,
 // then SSS Burley override of Cdiff + shadow origin, then shadow ray.
 
-struct PointLight
+struct PointLightInfo
 {
     float3 position; // World-space position
     float range; // Maximum range (hard cutoff)
@@ -11,7 +11,7 @@ struct PointLight
     float radius; // Sphere radius (0 = hard point light)
 };
 
-StructuredBuffer<PointLight> gIn_PointLights;
+StructuredBuffer<PointLightInfo> gIn_PointLights;
 
 // Evaluate the direct lighting contribution of all point lights at a surface point.
 // When radius > 0, a single stochastic shadow ray is cast per light per frame;
@@ -39,7 +39,7 @@ float3 EvaluatePointLights(GeometryProps geo, MaterialProps mat, bool isSSS)
     {
         RTXCR_SubsurfaceMaterialData sssMat = (RTXCR_SubsurfaceMaterialData)0;
         sssMat.transmissionColor = albedo;
-        sssMat.scatteringColor = gSssScatteringColor;
+        sssMat.scatteringColor = mat.scatteringColor;
         sssMat.scale = gSssScale / gUnitToMetersMultiplier;
         sssMat.g = 0.0;
 
@@ -61,7 +61,7 @@ float3 EvaluatePointLights(GeometryProps geo, MaterialProps mat, bool isSSS)
     [loop]
     for (uint i = 0; i < gPointLightCount; i++)
     {
-        PointLight light = gIn_PointLights[i];
+        PointLightInfo light = gIn_PointLights[i];
 
         float3 L;
         float dist;

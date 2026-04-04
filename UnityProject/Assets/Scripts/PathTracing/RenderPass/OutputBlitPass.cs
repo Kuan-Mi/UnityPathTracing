@@ -39,6 +39,7 @@ namespace PathTracing
             internal RTHandle Validation;
 
             internal RTHandle Composed;
+            internal RTHandle DirectLighting;
 
             internal RTHandle RRGuide_DiffAlbedo;
             internal RTHandle RRGuide_SpecAlbedo;
@@ -54,6 +55,7 @@ namespace PathTracing
             internal ShowMode showMode;
             internal float resolutionScale;
             internal bool enableDlssRR;
+            internal bool tmpDisableRR;
             internal bool showMV;
             internal bool showValidation;
             internal bool showReference;
@@ -71,7 +73,6 @@ namespace PathTracing
             internal TextureHandle CameraTexture;
 
             internal TextureHandle OutputTexture;
-            internal TextureHandle DirectLighting;
             internal TextureHandle DirectEmission;
             internal TextureHandle ComposedDiff;
 
@@ -87,7 +88,7 @@ namespace PathTracing
         {
             var natCmd = CommandBufferHelpers.GetNativeCommandBuffer(context.cmd);
 
-            var outputBlitMarker = new ProfilerMarker(ProfilerCategory.Render, "Output Blit", MarkerFlags.SampleGPU);
+            var outputBlitMarker = RenderPassMarkers.OutputBlit;
 
             // 显示输出
             natCmd.BeginSample(outputBlitMarker);
@@ -131,7 +132,7 @@ namespace PathTracing
                     Blitter.BlitTexture(natCmd, data.Resource.DenoisedSpec, scaleOffset, data.BlitMaterial, (int)ShowPass.Radiance);
                     break;
                 case ShowMode.DirectLight:
-                    Blitter.BlitTexture(natCmd, data.DirectLighting, scaleOffset, data.BlitMaterial, (int)ShowPass.Out);
+                    Blitter.BlitTexture(natCmd, data.Resource.DirectLighting, scaleOffset, data.BlitMaterial, (int)ShowPass.Out);
                     break;
                 case ShowMode.Emissive:
                     Blitter.BlitTexture(natCmd, data.DirectEmission, scaleOffset, data.BlitMaterial, (int)ShowPass.Out);
@@ -153,9 +154,17 @@ namespace PathTracing
                     break;
                 case ShowMode.Final:
                     if (data.Setting.enableDlssRR)
-                        Blitter.BlitTexture(natCmd, data.Resource.DlssOutput, new Vector4(1, 1, 0, 0), data.BlitMaterial, (int)ShowPass.Dlss);
+                        if (data.Setting.tmpDisableRR)
+                        {
+                            Blitter.BlitTexture(natCmd, data.Resource.DirectLighting, scaleOffset, data.BlitMaterial, (int)ShowPass.Out);
+                        }
+                        else
+                        {
+                            Blitter.BlitTexture(natCmd, data.Resource.DlssOutput, new Vector4(1, 1, 0, 0), data.BlitMaterial, (int)ShowPass.Dlss);
+                        }
                     else
                         Blitter.BlitTexture(natCmd, data.Resource.taaDst, scaleOffset, data.BlitMaterial, (int)ShowPass.Out);
+
                     break;
                 case ShowMode.DLSS_DiffuseAlbedo:
                     Blitter.BlitTexture(natCmd, data.Resource.RRGuide_DiffAlbedo, scaleOffset, data.BlitMaterial, (int)ShowPass.Out);
@@ -185,7 +194,7 @@ namespace PathTracing
             {
                 Blitter.BlitTexture(natCmd, data.Resource.Validation, new Vector4(1, 1, 0, 0), data.BlitMaterial, (int)ShowPass.Validation);
             }
-            
+
             if (data.Setting.showReference)
             {
                 Blitter.BlitTexture(natCmd, data.OutputTexture, new Vector4(1, 1, 0, 0), data.BlitMaterial, (int)ShowPass.Validation);
@@ -204,17 +213,19 @@ namespace PathTracing
 
             var ptContextItem = frameData.Get<PTContextItem>();
 
-            passData.OutputTexture = ptContextItem.OutputTexture;
-            passData.DirectLighting = ptContextItem.DirectLighting;
             passData.DirectEmission = ptContextItem.DirectEmission;
             passData.ComposedDiff = ptContextItem.ComposedDiff;
             passData.ComposedSpecViewZ = ptContextItem.ComposedSpecViewZ;
 
-            builder.UseTexture(passData.OutputTexture, AccessFlags.ReadWrite);
-            builder.UseTexture(passData.DirectLighting, AccessFlags.ReadWrite);
-            builder.UseTexture(passData.DirectEmission, AccessFlags.ReadWrite);
-            builder.UseTexture(passData.ComposedDiff, AccessFlags.ReadWrite);
-            builder.UseTexture(passData.ComposedSpecViewZ, AccessFlags.ReadWrite);
+
+            if (passData.DirectEmission.IsValid())
+                builder.UseTexture(passData.DirectEmission, AccessFlags.ReadWrite);
+
+            if (passData.ComposedDiff.IsValid())
+                builder.UseTexture(passData.ComposedDiff, AccessFlags.ReadWrite);
+
+            if (passData.ComposedSpecViewZ.IsValid())
+                builder.UseTexture(passData.ComposedSpecViewZ, AccessFlags.ReadWrite);
 
             passData.CameraTexture = resourceData.activeColorTexture;
 

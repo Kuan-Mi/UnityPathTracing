@@ -61,8 +61,8 @@ namespace PathTracing
         {
             
             var natCmd = CommandBufferHelpers.GetNativeCommandBuffer(context.cmd);
-            var sharcUpdateMarker = new ProfilerMarker(ProfilerCategory.Render, "Sharc Update", MarkerFlags.SampleGPU);
-            var sharcResolveMarker = new ProfilerMarker(ProfilerCategory.Render, "Sharc Resolve", MarkerFlags.SampleGPU);
+            var sharcUpdateMarker = RenderPassMarkers.SharcUpdate;
+            var sharcResolveMarker = RenderPassMarkers.SharcResolve;
             
             // Sharc update
             // if (data.passIndex == 0)

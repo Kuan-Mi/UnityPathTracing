@@ -1,62 +1,21 @@
-/***************************************************************************
- # Copyright (c) 2020-2024, NVIDIA CORPORATION.  All rights reserved.
- #
- # NVIDIA CORPORATION and its licensors retain all intellectual property
- # and proprietary rights in and to this software, related documentation
- # and any modifications thereto.  Any use, reproduction, disclosure or
- # distribution of this software and related documentation without an express
- # license agreement from NVIDIA CORPORATION is strictly prohibited.
- **************************************************************************/
+/*
+ * SPDX-FileCopyrightText: Copyright (c) 2020-2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * SPDX-License-Identifier: LicenseRef-NvidiaProprietary
+ *
+ * NVIDIA CORPORATION, its affiliates and licensors retain all intellectual
+ * property and proprietary rights in and to this material, related
+ * documentation and any modifications thereto. Any use, reproduction,
+ * disclosure or distribution of this material and related documentation
+ * without an express license agreement from NVIDIA CORPORATION or
+ * its affiliates is strictly prohibited.
+ */
 
 #ifndef RTXDI_DI_TEMPORAL_RESAMPLING_HLSLI
 #define RTXDI_DI_TEMPORAL_RESAMPLING_HLSLI
 
 #include "Assets/Shaders/Rtxdi/DI/Reservoir.hlsl"
+#include <Assets/Shaders/Rtxdi/DI/ReservoirStorage.hlsl>
 #include "Assets/Shaders/Rtxdi/Utils/Checkerboard.hlsl"
-
- // A structure that groups the application-provided settings for temporal resampling.
-struct RTXDI_DITemporalResamplingParameters
-{
-    // Screen-space motion vector, computed as (previousPosition - currentPosition).
-    // The X and Y components are measured in pixels.
-    // The Z component is in linear depth units.
-    float3 screenSpaceMotion;
-
-    // The index of the reservoir buffer to pull the temporal samples from.
-    uint sourceBufferIndex;
-
-    // Maximum history length for temporal reuse, measured in frames.
-    // Higher values result in more stable and high quality sampling, at the cost of slow reaction to changes.
-    uint maxHistoryLength;
-
-    // Controls the bias correction math for temporal reuse. Depending on the setting, it can add
-    // some shader cost and one approximate shadow ray per pixel (or per two pixels if checkerboard sampling is enabled).
-    // Ideally, these rays should be traced through the previous frame's BVH to get fully unbiased results.
-    uint biasCorrectionMode;
-
-    // Surface depth similarity threshold for temporal reuse.
-    // If the previous frame surface's depth is within this threshold from the current frame surface's depth,
-    // the surfaces are considered similar. The threshold is relative, i.e. 0.1 means 10% of the current depth.
-    // Otherwise, the pixel is not reused, and the resampling shader will look for a different one.
-    float depthThreshold;
-
-    // Surface normal similarity threshold for temporal reuse.
-    // If the dot product of two surfaces' normals is higher than this threshold, the surfaces are considered similar.
-    // Otherwise, the pixel is not reused, and the resampling shader will look for a different one.
-    float normalThreshold;
-
-    // Allows the temporal resampling logic to skip the bias correction ray trace for light samples
-    // reused from the previous frame. Only safe to use when invisible light samples are discarded
-    // on the previous frame, then any sample coming from the previous frame can be assumed visible.
-    bool enableVisibilityShortcut;
-
-    // Enables permuting the pixels sampled from the previous frame in order to add temporal
-    // variation to the output signal and make it more denoiser friendly.
-    bool enablePermutationSampling;
-
-    // Random number for permutation sampling that is the same for all pixels in the frame
-    uint uniformRandomNumber;
-};
 
 // Temporal resampling pass.
 // Takes the previous G-buffer, motion vectors, and two light reservoir buffers as inputs.
@@ -71,19 +30,15 @@ RTXDI_DIReservoir RTXDI_DITemporalResampling(
     uint2 pixelPosition,
     RAB_Surface surface,
     RTXDI_DIReservoir curSample,
-    inout RAB_RandomSamplerState rng,
+    inout RTXDI_RandomSamplerState rng,
     RTXDI_RuntimeParameters params,
     RTXDI_ReservoirBufferParameters reservoirParams,
+	float3 screenSpaceMotion,
+	uint sourceBufferIndex,
     RTXDI_DITemporalResamplingParameters tparams,
     out int2 temporalSamplePixelPos,
     inout RAB_LightSample selectedLightSample)
 {
-    // For temporal reuse, there's only a pair of samples; pairwise and basic MIS are essentially identical
-    if (tparams.biasCorrectionMode == RTXDI_BIAS_CORRECTION_PAIRWISE)
-    {
-        tparams.biasCorrectionMode = RTXDI_BIAS_CORRECTION_BASIC;
-    }
-
     uint historyLimit = min(RTXDI_PackedDIReservoir_MaxM, uint(tparams.maxHistoryLength * curSample.M));
 
     int selectedLightPrevID = -1;
@@ -99,11 +54,11 @@ RTXDI_DIReservoir RTXDI_DITemporalResampling(
     RTXDI_CombineDIReservoirs(state, curSample, /* random = */ 0.5, curSample.targetPdf);
 
     // Backproject this pixel to last frame
-    float3 motion = tparams.screenSpaceMotion;
+    float3 motion = screenSpaceMotion;
     
     if (!tparams.enablePermutationSampling)
     {
-        motion.xy += float2(RAB_GetNextRandom(rng), RAB_GetNextRandom(rng)) - 0.5;
+        motion.xy += float2(RTXDI_GetNextRandom(rng), RTXDI_GetNextRandom(rng)) - 0.5;
     }
 
     float2 reprojectedSamplePosition = float2(pixelPosition) + motion.xy;
@@ -122,8 +77,8 @@ RTXDI_DIReservoir RTXDI_DITemporalResampling(
         int2 offset = int2(0, 0);
         if(i > 0)
         {
-            offset.x = int((RAB_GetNextRandom(rng) - 0.5) * radius);
-            offset.y = int((RAB_GetNextRandom(rng) - 0.5) * radius);
+            offset.x = int((RTXDI_GetNextRandom(rng) - 0.5) * radius);
+            offset.y = int((RTXDI_GetNextRandom(rng) - 0.5) * radius);
         }
 
         int2 idx = prevPos + offset;
@@ -162,7 +117,7 @@ RTXDI_DIReservoir RTXDI_DITemporalResampling(
         // according to the bilinear weight of the current pixel
         uint2 prevReservoirPos = RTXDI_PixelPosToReservoirPos(prevPos, params.activeCheckerboardField);
         RTXDI_DIReservoir prevSample = RTXDI_LoadDIReservoir(reservoirParams,
-            prevReservoirPos, tparams.sourceBufferIndex);
+            prevReservoirPos, sourceBufferIndex);
         prevSample.M = min(prevSample.M, historyLimit);
         prevSample.spatialDistance += spatialOffset;
         prevSample.age += 1;
@@ -206,7 +161,7 @@ RTXDI_DIReservoir RTXDI_DITemporalResampling(
             weightAtCurrent = RAB_GetLightSampleTargetPdfForSurface(candidateLightSample, surface);
         }
 
-        bool sampleSelected = RTXDI_CombineDIReservoirs(state, prevSample, RAB_GetNextRandom(rng), weightAtCurrent);
+        bool sampleSelected = RTXDI_CombineDIReservoirs(state, prevSample, RTXDI_GetNextRandom(rng), weightAtCurrent);
         if(sampleSelected)
         {
             selectedPreviousSample = true;

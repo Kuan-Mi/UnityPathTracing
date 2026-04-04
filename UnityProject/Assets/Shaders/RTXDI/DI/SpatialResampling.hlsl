@@ -1,18 +1,21 @@
-/***************************************************************************
- # Copyright (c) 2020-2024, NVIDIA CORPORATION.  All rights reserved.
- #
- # NVIDIA CORPORATION and its licensors retain all intellectual property
- # and proprietary rights in and to this software, related documentation
- # and any modifications thereto.  Any use, reproduction, disclosure or
- # distribution of this software and related documentation without an express
- # license agreement from NVIDIA CORPORATION is strictly prohibited.
- **************************************************************************/
+/*
+ * SPDX-FileCopyrightText: Copyright (c) 2020-2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * SPDX-License-Identifier: LicenseRef-NvidiaProprietary
+ *
+ * NVIDIA CORPORATION, its affiliates and licensors retain all intellectual
+ * property and proprietary rights in and to this material, related
+ * documentation and any modifications thereto. Any use, reproduction,
+ * disclosure or distribution of this material and related documentation
+ * without an express license agreement from NVIDIA CORPORATION or
+ * its affiliates is strictly prohibited.
+ */
 
 #ifndef RTXDI_DI_SPATIAL_RESAMPLING_HLSLI
 #define RTXDI_DI_SPATIAL_RESAMPLING_HLSLI
 
 #include "Assets/Shaders/Rtxdi/RtxdiParameters.h"
 #include "Assets/Shaders/Rtxdi/DI/PairwiseStreaming.hlsl"
+#include <Assets/Shaders/Rtxdi/DI/ReservoirStorage.hlsl>
 #include "Assets/Shaders/Rtxdi/Utils/Checkerboard.hlsl"
 
 #ifndef RTXDI_NEIGHBOR_OFFSETS_BUFFER
@@ -26,48 +29,6 @@
 #define RTXDI_ALLOWED_BIAS_CORRECTION RTXDI_BIAS_CORRECTION_RAY_TRACED
 #endif
 
-// A structure that groups the application-provided settings for spatial resampling.
-struct RTXDI_DISpatialResamplingParameters
-{
-    // The index of the reservoir buffer to pull the spatial samples from.
-    uint sourceBufferIndex;
-    
-    // Number of neighbor pixels considered for resampling (1-32)
-    // Some of the may be skipped if they fail the surface similarity test.
-    uint numSamples;
-
-    // Number of neighbor pixels considered when there is not enough history data (1-32)
-    // Setting this parameter equal or lower than `numSpatialSamples` effectively
-    // disables the disocclusion boost.
-    uint numDisocclusionBoostSamples;
-
-    // Disocclusion boost is activated when the current reservoir's M value
-    // is less than targetHistoryLength.
-    uint targetHistoryLength;
-
-    // Controls the bias correction math for spatial reuse. Depending on the setting, it can add
-    // some shader cost and one approximate shadow ray *per every spatial sample* per pixel 
-    // (or per two pixels if checkerboard sampling is enabled).
-    uint biasCorrectionMode;
-
-    // Screen-space radius for spatial resampling, measured in pixels.
-    float samplingRadius;
-
-    // Surface depth similarity threshold for spatial reuse.
-    // See 'RTXDI_TemporalResamplingParameters::depthThreshold' for more information.
-    float depthThreshold;
-
-    // Surface normal similarity threshold for spatial reuse.
-    // See 'RTXDI_TemporalResamplingParameters::normalThreshold' for more information.
-    float normalThreshold;
-
-    // Enables the comparison of surface materials before taking a surface into resampling.
-    bool enableMaterialSimilarityTest;
-
-    // Prevents samples which are from the current frame or have no reasonable temporal history merged being spread to neighbors
-    bool discountNaiveSamples;
-};
-
 // Spatial resampling pass, using pairwise MIS.  
 // Inputs and outputs equivalent to RTXDI_SpatialResampling(), but only uses pairwise MIS.
 // Can call this directly, or call RTXDI_SpatialResampling() with sparams.biasCorrectionMode 
@@ -76,9 +37,10 @@ RTXDI_DIReservoir RTXDI_DISpatialResamplingWithPairwiseMIS(
     uint2 pixelPosition,
     RAB_Surface centerSurface,
     RTXDI_DIReservoir centerSample,
-    inout RAB_RandomSamplerState rng,
+    inout RTXDI_RandomSamplerState rng,
     RTXDI_RuntimeParameters params,
     RTXDI_ReservoirBufferParameters reservoirParams,
+	uint sourceBufferIndex,
     RTXDI_DISpatialResamplingParameters sparams,
     inout RAB_LightSample selectedLightSample)
 {
@@ -92,7 +54,7 @@ RTXDI_DIReservoir RTXDI_DISpatialResamplingWithPairwiseMIS(
         : sparams.numSamples;
 
     // Walk the specified number of neighbors, resampling using RIS
-    uint startIdx = uint(RAB_GetNextRandom(rng) * params.neighborOffsetMask);
+    uint startIdx = uint(RTXDI_GetNextRandom(rng) * params.neighborOffsetMask);
     uint validSpatialSamples = 0;
     uint i;
     for (i = 0; i < numSpatialSamples; ++i)
@@ -121,7 +83,7 @@ RTXDI_DIReservoir RTXDI_DISpatialResamplingWithPairwiseMIS(
 
         // The surfaces are similar enough so we *can* reuse a neighbor from this pixel, so load it.
         RTXDI_DIReservoir neighborSample = RTXDI_LoadDIReservoir(reservoirParams,
-            RTXDI_PixelPosToReservoirPos(idx, params.activeCheckerboardField), sparams.sourceBufferIndex);
+            RTXDI_PixelPosToReservoirPos(idx, params.activeCheckerboardField), sourceBufferIndex);
         neighborSample.spatialDistance += spatialOffset;
 
         if (RTXDI_IsValidDIReservoir(neighborSample))
@@ -136,7 +98,7 @@ RTXDI_DIReservoir RTXDI_DISpatialResamplingWithPairwiseMIS(
         if (neighborSample.M <= 0) continue;
 
         // Stream this light through the reservoir using pairwise MIS
-        RTXDI_StreamNeighborWithPairwiseMIS(state, RAB_GetNextRandom(rng),
+        RTXDI_StreamNeighborWithPairwiseMIS(state, RTXDI_GetNextRandom(rng),
             neighborSample, neighborSurface,   // The spatial neighbor
             centerSample, centerSurface,       // The canonical (center) sample
             numSpatialSamples);
@@ -146,7 +108,7 @@ RTXDI_DIReservoir RTXDI_DISpatialResamplingWithPairwiseMIS(
     state.canonicalWeight = (validSpatialSamples <= 0) ? 1.0f : state.canonicalWeight;
 
     // Stream the canonical sample (i.e., from prior computations at this pixel in this frame) using pairwise MIS.
-    RTXDI_StreamCanonicalWithPairwiseStep(state, RAB_GetNextRandom(rng), centerSample, centerSurface);
+    RTXDI_StreamCanonicalWithPairwiseStep(state, RTXDI_GetNextRandom(rng), centerSample, centerSurface);
 
     RTXDI_FinalizeResampling(state, 1.0, float(max(1, validSpatialSamples)));
 
@@ -171,16 +133,17 @@ RTXDI_DIReservoir RTXDI_DISpatialResampling(
     uint2 pixelPosition,
     RAB_Surface centerSurface,
     RTXDI_DIReservoir centerSample,
-    inout RAB_RandomSamplerState rng,
+    inout RTXDI_RandomSamplerState rng,
     RTXDI_RuntimeParameters params,
     RTXDI_ReservoirBufferParameters reservoirParams,
+    uint sourceBufferIndex,
     RTXDI_DISpatialResamplingParameters sparams,
     inout RAB_LightSample selectedLightSample)
 {
     if (sparams.biasCorrectionMode == RTXDI_BIAS_CORRECTION_PAIRWISE)
     {
         return RTXDI_DISpatialResamplingWithPairwiseMIS(pixelPosition, centerSurface, 
-            centerSample, rng, params, reservoirParams, sparams, selectedLightSample);
+            centerSample, rng, params, reservoirParams, sourceBufferIndex, sparams, selectedLightSample);
     }
 
     RTXDI_DIReservoir state = RTXDI_EmptyDIReservoir();
@@ -200,7 +163,7 @@ RTXDI_DIReservoir RTXDI_DISpatialResampling(
 
     RTXDI_CombineDIReservoirs(state, centerSample, /* random = */ 0.5f, centerSample.targetPdf);
 
-    uint startIdx = uint(RAB_GetNextRandom(rng) * params.neighborOffsetMask);
+    uint startIdx = uint(RTXDI_GetNextRandom(rng) * params.neighborOffsetMask);
     
     uint i;
     uint numSpatialSamples = sparams.numSamples;
@@ -242,7 +205,7 @@ RTXDI_DIReservoir RTXDI_DISpatialResampling(
         uint2 neighborReservoirPos = RTXDI_PixelPosToReservoirPos(idx, params.activeCheckerboardField);
 
         RTXDI_DIReservoir neighborSample = RTXDI_LoadDIReservoir(reservoirParams,
-            neighborReservoirPos, sparams.sourceBufferIndex);
+            neighborReservoirPos, sourceBufferIndex);
         neighborSample.spatialDistance += spatialOffset;
 
         cachedResult |= (1u << uint(i));
@@ -265,7 +228,7 @@ RTXDI_DIReservoir RTXDI_DISpatialResampling(
             neighborWeight = RAB_GetLightSampleTargetPdfForSurface(candidateLightSample, centerSurface);
         }
         
-        if (RTXDI_CombineDIReservoirs(state, neighborSample, RAB_GetNextRandom(rng), neighborWeight))
+        if (RTXDI_CombineDIReservoirs(state, neighborSample, RTXDI_GetNextRandom(rng), neighborWeight))
         {
             selected = int(i);
             selectedLight = candidateLight;
@@ -319,7 +282,7 @@ RTXDI_DIReservoir RTXDI_DISpatialResampling(
                 uint2 neighborReservoirPos = RTXDI_PixelPosToReservoirPos(idx, params.activeCheckerboardField);
 
                 RTXDI_DIReservoir neighborSample = RTXDI_LoadDIReservoir(reservoirParams,
-                    neighborReservoirPos, sparams.sourceBufferIndex);
+                    neighborReservoirPos, sourceBufferIndex);
 
                 // Select this sample for the (normalization) numerator if this particular neighbor pixel
                 //     was the one we selected via RIS in the first loop, above.

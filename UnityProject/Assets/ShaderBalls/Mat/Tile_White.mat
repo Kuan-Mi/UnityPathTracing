@@ -130,6 +130,7 @@ Material:
     - _ClearCoatMask: 0
     - _ClearCoatSmoothness: 0
     - _Cull: 0
+    - _CullGBuffer: 0
     - _Cutoff: 0.5
     - _DetailAlbedoMapScale: 1
     - _DetailNormalMapScale: 1
@@ -150,7 +151,7 @@ Material:
     - _SSS: 0
     - _SSSScatteringScale: 1
     - _Skin: 0
-    - _Smoothness: 1
+    - _Smoothness: 0.655
     - _SmoothnessTextureChannel: 0
     - _SpecularHighlights: 1
     - _SrcBlend: 1

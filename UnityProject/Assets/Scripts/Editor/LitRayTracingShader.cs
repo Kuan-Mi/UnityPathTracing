@@ -39,6 +39,14 @@ public class LitRayTracingShader : BaseShaderGUI
         SetMaterialKeywords(material, LitGUI.SetMaterialKeywords, LitRayDetailGUI.SetMaterialKeywords);
         CoreUtils.SetKeyword(material, "_SSS", material.HasProperty("_SSS") && material.GetFloat("_SSS") > 0.5f);
         CoreUtils.SetKeyword(material, "_SKINNEDMESH", material.HasProperty("_SKINNEDMESH") && material.GetFloat("_SKINNEDMESH") > 0.5f);
+
+        // GBufferRaster Y-flip: swap Front<->Back, keep Off unchanged
+        if (material.HasProperty("_Cull") && material.HasProperty("_CullGBuffer"))
+        {
+            int cull = (int)material.GetFloat("_Cull");
+            int cullGBuffer = cull == 0 ? 0 : (3 - cull); // 1->2, 2->1, 0->0
+            material.SetFloat("_CullGBuffer", cullGBuffer);
+        }
     }
 
     // material main surface options

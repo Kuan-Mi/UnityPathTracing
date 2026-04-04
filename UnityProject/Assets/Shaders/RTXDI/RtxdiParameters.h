@@ -1,17 +1,23 @@
-/***************************************************************************
- # Copyright (c) 2020-2023, NVIDIA CORPORATION.  All rights reserved.
- #
- # NVIDIA CORPORATION and its licensors retain all intellectual property
- # and proprietary rights in and to this software, related documentation
- # and any modifications thereto.  Any use, reproduction, disclosure or
- # distribution of this software and related documentation without an express
- # license agreement from NVIDIA CORPORATION is strictly prohibited.
- **************************************************************************/
+/*
+ * SPDX-FileCopyrightText: Copyright (c) 2020-2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * SPDX-License-Identifier: LicenseRef-NvidiaProprietary
+ *
+ * NVIDIA CORPORATION, its affiliates and licensors retain all intellectual
+ * property and proprietary rights in and to this material, related
+ * documentation and any modifications thereto. Any use, reproduction,
+ * disclosure or distribution of this material and related documentation
+ * without an express license agreement from NVIDIA CORPORATION or
+ * its affiliates is strictly prohibited.
+ */
 
 #ifndef RTXDI_PARAMETERS_H
 #define RTXDI_PARAMETERS_H
 
 #include "RtxdiTypes.h"
+
+// Set this to 1 to enable debug functionality, such as
+//   temporal and spatial path retrace for ReSTIR PT
+#define RTXDI_DEBUG 0
 
 // Flag that is used in the RIS buffer to identify that a light is 
 // stored in a compact form.
@@ -41,6 +47,11 @@
 // Use ReGIR based RIS to select local lights during initial sampling.
 #define ReSTIRDI_LocalLightSamplingMode_REGIR_RIS 2
 
+// Uses fixed roughness and distance thresholds to determine reconnectibility
+#define RTXDI_RESTIRPT_RECONNECTION_MODE_FIXED_THRESHOLD 0
+// Uses a more dynamic ray + brdf calculation to determine reconnectibility
+#define RTXDI_RESTIRPT_RECONNECTION_MODE_FOOTPRINT 1
+
 // When neighboring samples have less than the naive sampling M threshold, they are ignored during spatial resampling
 #define RTXDI_NAIVE_SAMPLING_M_THRESHOLD 2
 
@@ -49,7 +60,16 @@
 #define RTXDI_ENABLE_PRESAMPLING 1
 #endif
 
+// Square tile side length for coherent rng.
+// Pixel xy is divided by this value so that each block selects the same RIS tile.
+#ifndef RTXDI_TILE_SIZE_IN_PIXELS
+#define RTXDI_TILE_SIZE_IN_PIXELS 16
+#endif
+
 #define RTXDI_INVALID_LIGHT_INDEX (0xffffffffu)
+
+// FLT_MAX
+#define RTXDI_MAX_FLOAT32 3.402823466e+38F 
 
 #ifndef __cplusplus
 static const uint RTXDI_InvalidLightIndex = RTXDI_INVALID_LIGHT_INDEX;
@@ -78,7 +98,7 @@ struct RTXDI_RuntimeParameters
 {
     uint32_t neighborOffsetMask; // Spatial
     uint32_t activeCheckerboardField; // 0 - no checkerboard, 1 - odd pixels, 2 - even pixels
-    uint32_t pad1;
+    uint32_t frameIndex;
     uint32_t pad2;
 };
 
@@ -93,6 +113,14 @@ struct RTXDI_ReservoirBufferParameters
 {
     uint32_t reservoirBlockRowPitch;
     uint32_t reservoirArrayPitch;
+    uint32_t pad1;
+    uint32_t pad2;
+};
+
+struct RTXDI_BoilingFilterParameters
+{
+    uint32_t enableBoilingFilter;
+    float boilingFilterStrength;
     uint32_t pad1;
     uint32_t pad2;
 };

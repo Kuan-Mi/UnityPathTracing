@@ -1,4 +1,4 @@
-// Copyright (c) 2020-2023, NVIDIA CORPORATION. All rights reserved.
+// Copyright (c) 2020-2026, NVIDIA CORPORATION. All rights reserved.
 //
 // NVIDIA CORPORATION and its licensors retain all intellectual property
 // and proprietary rights in and to this software, related documentation
@@ -12,8 +12,8 @@ namespace Rtxdi.ReGIR
 {
     public static class ReGIRConstants
     {
-        public const int RTXDI_ONION_MAX_LAYER_GROUPS = 8;
-        public const int RTXDI_ONION_MAX_RINGS        = 52;
+        public const int  RTXDI_ONION_MAX_LAYER_GROUPS = 8;
+        public const int  RTXDI_ONION_MAX_RINGS        = 52;
 
         public const uint RTXDI_REGIR_DISABLED = 0;
         public const uint RTXDI_REGIR_GRID     = 1;
@@ -32,17 +32,17 @@ namespace Rtxdi.ReGIR
         public float innerRadius;
         public float outerRadius;
         public float invLogLayerScale;
-        public int layerCount;
+        public int   layerCount;
 
         public float invEquatorialCellAngle;
-        public int cellsPerLayer;
-        public int ringOffset;
-        public int ringCount;
+        public int   cellsPerLayer;
+        public int   ringOffset;
+        public int   ringCount;
 
         public float equatorialCellAngle;
         public float layerScale;
-        public int layerCellOffset;
-        public int pad1;
+        public int   layerCellOffset;
+        public int   pad1;
     }
 
     [StructLayout(LayoutKind.Sequential)]
@@ -50,27 +50,27 @@ namespace Rtxdi.ReGIR
     {
         public float cellAngle;
         public float invCellAngle;
-        public int cellOffset;
-        public int cellCount;
+        public int   cellOffset;
+        public int   cellCount;
     }
 
     [StructLayout(LayoutKind.Sequential)]
     public struct ReGIR_CommonParameters
     {
-        public uint localLightSamplingFallbackMode;
+        public uint  localLightSamplingFallbackMode;
         public float centerX;
         public float centerY;
         public float centerZ;
 
-        public uint risBufferOffset;
-        public uint lightsPerCell;
+        public uint  risBufferOffset;
+        public uint  lightsPerCell;
         public float cellSize;
         public float samplingJitter;
 
-        public uint localLightPresamplingMode;
-        public uint numRegirBuildSamples;
-        public uint pad1;
-        public uint pad2;
+        public uint  localLightPresamplingMode;
+        public uint  numRegirBuildSamples;
+        public uint  pad1;
+        public uint  pad2;
     }
 
     [StructLayout(LayoutKind.Sequential)]
@@ -86,9 +86,9 @@ namespace Rtxdi.ReGIR
     public unsafe struct ReGIR_OnionParameters
     {
         public fixed byte _layers[ReGIRConstants.RTXDI_ONION_MAX_LAYER_GROUPS * 48]; // sizeof(ReGIR_OnionLayerGroup) = 48
-        public fixed byte _rings[ReGIRConstants.RTXDI_ONION_MAX_RINGS * 16];         // sizeof(ReGIR_OnionRing) = 16
+        public fixed byte _rings [ReGIRConstants.RTXDI_ONION_MAX_RINGS         * 16]; // sizeof(ReGIR_OnionRing) = 16
 
-        public uint numLayerGroups;
+        public uint  numLayerGroups;
         public float cubicRootFactor;
         public float linearFactor;
         public float pad1;
@@ -96,41 +96,34 @@ namespace Rtxdi.ReGIR
         public ReGIR_OnionLayerGroup GetLayer(int index)
         {
             fixed (byte* ptr = _layers)
-            {
                 return ((ReGIR_OnionLayerGroup*)ptr)[index];
-            }
         }
 
         public void SetLayer(int index, ReGIR_OnionLayerGroup value)
         {
             fixed (byte* ptr = _layers)
-            {
                 ((ReGIR_OnionLayerGroup*)ptr)[index] = value;
-            }
         }
 
         public ReGIR_OnionRing GetRing(int index)
         {
             fixed (byte* ptr = _rings)
-            {
                 return ((ReGIR_OnionRing*)ptr)[index];
-            }
         }
 
         public void SetRing(int index, ReGIR_OnionRing value)
         {
             fixed (byte* ptr = _rings)
-            {
                 ((ReGIR_OnionRing*)ptr)[index] = value;
-            }
         }
     }
 
+    [System.Serializable]
     [StructLayout(LayoutKind.Sequential)]
     public struct ReGIR_Parameters
     {
         public ReGIR_CommonParameters commonParams;
-        public ReGIR_GridParameters gridParams;
-        public ReGIR_OnionParameters onionParams;
+        public ReGIR_GridParameters   gridParams;
+        public ReGIR_OnionParameters  onionParams;
     }
 }

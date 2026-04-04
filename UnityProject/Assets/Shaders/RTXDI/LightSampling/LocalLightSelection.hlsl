@@ -1,12 +1,14 @@
-/***************************************************************************
- # Copyright (c) 2020-2023, NVIDIA CORPORATION.  All rights reserved.
- #
- # NVIDIA CORPORATION and its licensors retain all intellectual property
- # and proprietary rights in and to this software, related documentation
- # and any modifications thereto.  Any use, reproduction, disclosure or
- # distribution of this software and related documentation without an express
- # license agreement from NVIDIA CORPORATION is strictly prohibited.
- **************************************************************************/
+/*
+ * SPDX-FileCopyrightText: Copyright (c) 2020-2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * SPDX-License-Identifier: LicenseRef-NvidiaProprietary
+ *
+ * NVIDIA CORPORATION, its affiliates and licensors retain all intellectual
+ * property and proprietary rights in and to this material, related
+ * documentation and any modifications thereto. Any use, reproduction,
+ * disclosure or distribution of this material and related documentation
+ * without an express license agreement from NVIDIA CORPORATION or
+ * its affiliates is strictly prohibited.
+ */
 
 #ifndef RTXDI_LOCAL_LIGHT_SELECTION_CONTEXT_HLSLI
 #define RTXDI_LOCAL_LIGHT_SELECTION_CONTEXT_HLSLI
@@ -50,7 +52,7 @@ RTXDI_LocalLightSelectionContext RTXDI_InitializeLocalLightSelectionContextRIS(R
 }
 
 RTXDI_LocalLightSelectionContext RTXDI_InitializeLocalLightSelectionContextRIS(
-    inout RAB_RandomSamplerState coherentRng,
+    inout RTXDI_RandomSamplerState coherentRng,
     RTXDI_RISBufferSegmentParameters risBufferSegmentParams)
 {
     RTXDI_LocalLightSelectionContext ctx;
@@ -80,7 +82,7 @@ void RTXDI_UnpackLocalLightFromRISLightData(
 }
 
 void RTXDI_RandomlySelectLocalLightFromRISTile(
-    inout RAB_RandomSamplerState rng,
+    float rnd,
     const RTXDI_RISTileInfo risTileInfo,
     out RAB_LightInfo lightInfo,
     out uint lightIndex,
@@ -88,14 +90,14 @@ void RTXDI_RandomlySelectLocalLightFromRISTile(
 {
     uint2 risTileData;
     uint risBufferPtr;
-    RTXDI_RandomlySelectLightDataFromRISTile(rng, risTileInfo, risTileData, risBufferPtr);
+    RTXDI_RandomlySelectLightDataFromRISTile(rnd, risTileInfo, risTileData, risBufferPtr);
     RTXDI_UnpackLocalLightFromRISLightData(risTileData, risBufferPtr, lightInfo, lightIndex, invSourcePdf);
 }
 #endif
 
 void RTXDI_SelectNextLocalLight(
     RTXDI_LocalLightSelectionContext ctx,
-    inout RAB_RandomSamplerState rng,
+    float rnd,
     out RAB_LightInfo lightInfo,
     out uint lightIndex,
     out float invSourcePdf)
@@ -104,12 +106,12 @@ void RTXDI_SelectNextLocalLight(
     {
 #if RTXDI_ENABLE_PRESAMPLING
     case RTXDI_LocalLightContextSamplingMode_RIS:
-        RTXDI_RandomlySelectLocalLightFromRISTile(rng, ctx.risTileInfo, lightInfo, lightIndex, invSourcePdf);
+        RTXDI_RandomlySelectLocalLightFromRISTile(rnd, ctx.risTileInfo, lightInfo, lightIndex, invSourcePdf);
         break;
 #endif // RTXDI_ENABLE_PRESAMPLING
     default:
     case RTXDI_LocalLightContextSamplingMode_UNIFORM:
-        RTXDI_RandomlySelectLightUniformly(rng, ctx.lightBufferRegion, lightInfo, lightIndex, invSourcePdf);
+        RTXDI_RandomlySelectLightUniformly(rnd, ctx.lightBufferRegion, lightInfo, lightIndex, invSourcePdf);
         break;
     }
 }

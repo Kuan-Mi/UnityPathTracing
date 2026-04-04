@@ -5,7 +5,7 @@ namespace PathTracing
     public static class ShaderIDs
     {
         
-        public static readonly int paramsID = Shader.PropertyToID("PathTracingParams");
+        public static readonly int paramsID = Shader.PropertyToID("GlobalConstants");
         
         public static readonly int g_HashEntriesID = Shader.PropertyToID("gInOut_SharcHashEntriesBuffer");
         public static readonly int g_AccumulationBufferID = Shader.PropertyToID("gInOut_SharcAccumulated");
@@ -98,5 +98,86 @@ namespace PathTracing
         
         
         public static readonly int GInOutMv = Shader.PropertyToID("gInOut_Mv");
+
+        // GBuffer 输入纹理 (t_ = texture read)
+        public static int t_GBufferDepthID = Shader.PropertyToID("t_GBufferDepth");
+        public static int t_GBufferDiffuseAlbedoID = Shader.PropertyToID("t_GBufferDiffuseAlbedo");
+        public static int t_GBufferSpecularRoughID = Shader.PropertyToID("t_GBufferSpecularRough");
+        public static int t_GBufferNormalsID = Shader.PropertyToID("t_GBufferNormals");
+        public static int t_GBufferGeoNormalsID = Shader.PropertyToID("t_GBufferGeoNormals");
+        public static int t_LocalLightPdfTextureID = Shader.PropertyToID("t_LocalLightPdfTexture");
+        public static int t_PrevGBufferDepthID = Shader.PropertyToID("t_PrevGBufferDepth");
+        public static int t_PrevGBufferDiffuseAlbedoID = Shader.PropertyToID("t_PrevGBufferDiffuseAlbedo");
+        public static int t_PrevGBufferSpecularRoughID = Shader.PropertyToID("t_PrevGBufferSpecularRough");
+        public static int t_PrevGBufferNormalsID = Shader.PropertyToID("t_PrevGBufferNormals");
+        public static int t_PrevGBufferGeoNormalsID = Shader.PropertyToID("t_PrevGBufferGeoNormals");
+        public static int t_MotionVectorsID = Shader.PropertyToID("t_MotionVectors");
+
+        // GBuffer 输出纹理 (u_ = UAV write)
+        public static int u_ViewDepthID = Shader.PropertyToID("u_ViewDepth");
+        public static int u_DiffuseAlbedoID = Shader.PropertyToID("u_DiffuseAlbedo");
+        public static int u_SpecularRoughID = Shader.PropertyToID("u_SpecularRough");
+        public static int u_NormalsID = Shader.PropertyToID("u_Normals");
+        public static int u_GeoNormalsID = Shader.PropertyToID("u_GeoNormals");
+        public static int u_EmissiveID = Shader.PropertyToID("u_Emissive");
+        public static int u_MotionVectorsID = Shader.PropertyToID("u_MotionVectors");
+        public static int u_LocalLightPdfTextureID = Shader.PropertyToID("u_LocalLightPdfTexture");
+        public static int gOut_GeoNormalID = Shader.PropertyToID("gOut_GeoNormal");
+        public static int gIn_PrevGeoNormalID = Shader.PropertyToID("gIn_PrevGeoNormal");
+
+        // GI 辐照度与自发光
+        public static int gIn_EmissiveLightingID = Shader.PropertyToID("gIn_EmissiveLighting");
+
+        // DLSS RR 输入/输出纹理
+        public static int gIn_ViewDepthID = Shader.PropertyToID("gIn_ViewDepth");
+        public static int gIn_DiffuseAlbedoID = Shader.PropertyToID("gIn_DiffuseAlbedo");
+        public static int gIn_SpecularRoughID = Shader.PropertyToID("gIn_SpecularRough");
+        public static int gIn_NormalsID = Shader.PropertyToID("gIn_Normals");
+        public static int gOut_DiffAlbedoID = Shader.PropertyToID("gOut_DiffAlbedo");
+        public static int gOut_SpecAlbedoID = Shader.PropertyToID("gOut_SpecAlbedo");
+        public static int gOut_SpecHitDistanceID = Shader.PropertyToID("gOut_SpecHitDistance");
+
+        // RTXDI 缓冲区
+        public static int t_GeometryInstanceToLightID = Shader.PropertyToID("t_GeometryInstanceToLight");
+        public static int u_RisBufferID = Shader.PropertyToID("u_RisBuffer");
+        public static int u_RisLightDataBufferID = Shader.PropertyToID("u_RisLightDataBuffer");
+        public static int ResampleConstantsID = Shader.PropertyToID("ResampleConstants");
+        public static int u_GIReservoirsID = Shader.PropertyToID("u_GIReservoirs");
+        public static int u_SecondaryGBufferID = Shader.PropertyToID("u_SecondaryGBuffer");
+
+        // 常量缓冲区
+        public static int g_ConstID = Shader.PropertyToID("g_Const");
+
+        // Mip 生成参数
+        public static int _SourceMipID = Shader.PropertyToID("_SourceMip");
+        public static int _TargetMipID = Shader.PropertyToID("_TargetMip");
+        public static int _SrcMipLevelID = Shader.PropertyToID("_SrcMipLevel");
+        public static int _TargetSizeID = Shader.PropertyToID("_TargetSize");
+
+        // 参考 Path Tracing 参数
+        public static int _ReferenceBounceNumID = Shader.PropertyToID("_ReferenceBounceNum");
+        public static int g_ConvergenceStepID = Shader.PropertyToID("g_ConvergenceStep");
+        public static int g_splitID = Shader.PropertyToID("g_split");
+
+        // 自动曝光 (AE) 参数
+        public static int _AE_ExposureBufferID = Shader.PropertyToID("_AE_ExposureBuffer");
+        public static int _AE_HistogramBufferID = Shader.PropertyToID("_AE_HistogramBuffer");
+        public static int _AE_ComposedTextureID = Shader.PropertyToID("_AE_ComposedTexture");
+        public static int _AE_TexWidthID = Shader.PropertyToID("_AE_TexWidth");
+        public static int _AE_TexHeightID = Shader.PropertyToID("_AE_TexHeight");
+        public static int _AE_EVMinID = Shader.PropertyToID("_AE_EVMin");
+        public static int _AE_EVMaxID = Shader.PropertyToID("_AE_EVMax");
+        public static int _AE_LowPercentID = Shader.PropertyToID("_AE_LowPercent");
+        public static int _AE_HighPercentID = Shader.PropertyToID("_AE_HighPercent");
+        public static int _AE_SpeedUpID = Shader.PropertyToID("_AE_SpeedUp");
+        public static int _AE_SpeedDownID = Shader.PropertyToID("_AE_SpeedDown");
+        public static int _AE_DeltaTimeID = Shader.PropertyToID("_AE_DeltaTime");
+        public static int _AE_ExposureCompensationID = Shader.PropertyToID("_AE_ExposureCompensation");
+        public static int _AE_MinExposureID = Shader.PropertyToID("_AE_MinExposure");
+        public static int _AE_MaxExposureID = Shader.PropertyToID("_AE_MaxExposure");
+
+        // 累积 Pass 参数
+        public static int gIn_noiseID = Shader.PropertyToID("gIn_noise");
+        public static int gIn_AccumulatedID = Shader.PropertyToID("gIn_Accumulated");
     }
 }

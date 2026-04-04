@@ -1,20 +1,23 @@
-/***************************************************************************
- # Copyright (c) 2020-2023, NVIDIA CORPORATION.  All rights reserved.
- #
- # NVIDIA CORPORATION and its licensors retain all intellectual property
- # and proprietary rights in and to this software, related documentation
- # and any modifications thereto.  Any use, reproduction, disclosure or
- # distribution of this software and related documentation without an express
- # license agreement from NVIDIA CORPORATION is strictly prohibited.
- **************************************************************************/
+/*
+ * SPDX-FileCopyrightText: Copyright (c) 2020-2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * SPDX-License-Identifier: LicenseRef-NvidiaProprietary
+ *
+ * NVIDIA CORPORATION, its affiliates and licensors retain all intellectual
+ * property and proprietary rights in and to this material, related
+ * documentation and any modifications thereto. Any use, reproduction,
+ * disclosure or distribution of this material and related documentation
+ * without an express license agreement from NVIDIA CORPORATION or
+ * its affiliates is strictly prohibited.
+ */
 
 #pragma once
 
 #include <memory>
 
-#include "Assets/Shaders/Rtxdi/DI/ReSTIRDI.h"
-#include "Assets/Shaders/Rtxdi/GI/ReSTIRGI.h"
-#include "Assets/Shaders/Rtxdi/ReGIR/ReGIR.h"
+#include "Rtxdi/DI/ReSTIRDI.h"
+#include "Rtxdi/GI/ReSTIRGI.h"
+#include "Rtxdi/PT/ReSTIRPT.h"
+#include "Rtxdi/ReGIR/ReGIR.h"
 
 namespace rtxdi
 {
@@ -23,6 +26,7 @@ class RISBufferSegmentAllocator;
 struct ReSTIRDIStaticParameters;
 struct ReGIRStaticParameters;
 struct ReSTIRGIStaticParameters;
+struct ReSTIRPTStaticParameters;
 
 struct ImportanceSamplingContext_StaticParameters
 {
@@ -45,7 +49,9 @@ class ImportanceSamplingContext
 public:
     ImportanceSamplingContext(const ImportanceSamplingContext_StaticParameters& isParams);
     ImportanceSamplingContext(const ImportanceSamplingContext&) = delete;
-    ImportanceSamplingContext operator=(const ImportanceSamplingContext&) = delete;
+    ImportanceSamplingContext& operator=(const ImportanceSamplingContext&) = delete;
+    ImportanceSamplingContext(ImportanceSamplingContext&&) = default;
+    ImportanceSamplingContext& operator=(ImportanceSamplingContext&&) = default;
     ~ImportanceSamplingContext();
 
     ReSTIRDIContext& GetReSTIRDIContext();
@@ -54,6 +60,8 @@ public:
     const ReGIRContext& GetReGIRContext() const;
     ReSTIRGIContext& GetReSTIRGIContext();
     const ReSTIRGIContext& GetReSTIRGIContext() const;
+    ReSTIRPTContext& GetReSTIRPTContext();
+    const ReSTIRPTContext& GetReSTIRPTContext() const;
 
     const RISBufferSegmentAllocator& GetRISBufferSegmentAllocator() const;
 
@@ -72,6 +80,7 @@ private:
     std::unique_ptr<ReSTIRDIContext> m_restirDIContext;
     std::unique_ptr<ReGIRContext> m_regirContext;
     std::unique_ptr<ReSTIRGIContext> m_restirGIContext;
+    std::unique_ptr<ReSTIRPTContext> m_restirPTContext;
 
     // Common buffer params
     RTXDI_LightBufferParameters m_lightBufferParams;

@@ -3,42 +3,66 @@ using System.Runtime.InteropServices;
 using Rtxdi;
 using RTXDI;
 using Rtxdi.DI;
+using Rtxdi.GI;
+using Rtxdi.LightSampling;
 using Unity.Mathematics;
 using UnityEngine;
 
 namespace mini
 {
+    public struct SecondaryGBufferData
+    {
+        float3 worldPos;
+        uint normal;
+
+        uint2 throughputAndFlags; // .x = throughput.rg as float16, .y = throughput.b as float16, flags << 16
+        uint diffuseAlbedo; // R11G11B10_UFLOAT
+        uint specularAndRoughness; // R8G8B8A8_Gamma_UFLOAT
+
+        float3 emission;
+        float pdf;
+    };
+
     public class RtxdiResources : IDisposable
     {
         private const int c_NumReSTIRDIReservoirBuffers = 3;
+        private const int c_NumReSTIRGIReservoirBuffers = 2;
 
         private bool m_neighborOffsetsInitialized = false;
+
         private uint m_maxEmissiveMeshes;
+
         // public uint m_maxEmissiveTriangles;
         private uint m_maxGeometryInstances;
 
 
         // public GraphicsBuffer TaskBuffer { get; private set; }
         public GraphicsBuffer LightDataBuffer { get; private set; }
+
         // public GraphicsBuffer GeometryInstanceToLightBuffer { get; private set; }
         public ComputeBuffer NeighborOffsetsBuffer { get; private set; }
+        public ComputeBuffer RisBuffer { get; private set; }
+
+        public ComputeBuffer RisLightDataBuffer { get; private set; }
         public GraphicsBuffer LightReservoirBuffer { get; private set; }
+        public GraphicsBuffer GIReservoirBuffer { get; private set; }
+        public GraphicsBuffer SecondaryGBuffer { get; private set; }
 
         public GPUScene Scene;
 
-  
-        
 
-        public unsafe  RtxdiResources(
+        public unsafe RtxdiResources(
             ReSTIRDIContext context,
+            RISBufferSegmentAllocator risBufferSegmentAllocator,
             GPUScene scene)
-        { 
+
+        {
             LightDataBuffer = scene._lightInfoBuffer;
             this.Scene = scene;
             // m_maxEmissiveMeshes = maxEmissiveMeshes;
             // m_maxEmissiveTriangles =scene.emissiveTriangleCount;
             // m_maxGeometryInstances = maxGeometryInstances;
- 
+
 
             // // 1. TaskBuffer
             // // initial state: ShaderResource, canHaveUAVs = true
@@ -87,11 +111,11 @@ namespace mini
 
             NeighborOffsetsBuffer = new ComputeBuffer(
                 (int)staticParams.NeighborOffsetCount,
-                sizeof(Vector2), 
+                sizeof(Vector2),
                 ComputeBufferType.Default
             );
             NeighborOffsetsBuffer.name = "NeighborOffsets";
-            
+
             InitializeNeighborOffsets(staticParams.NeighborOffsetCount);
 
             // 5. LightReservoirBuffer
@@ -109,25 +133,67 @@ namespace mini
                 );
                 LightReservoirBuffer.name = "LightReservoirBuffer";
             }
+
+            int giReservoirStride = Marshal.SizeOf<RTXDI_PackedGIReservoir>();
+            int totalGIReservoirs = (int)reservoirParams.reservoirArrayPitch * c_NumReSTIRGIReservoirBuffers;
+
+            Debug.Log($"Creating GIReservoirBuffer with totalGIReservoirs: {totalGIReservoirs}, giReservoirStride: {giReservoirStride}");
+            if (totalGIReservoirs > 0)
+            {
+                GIReservoirBuffer = new GraphicsBuffer(
+                    GraphicsBuffer.Target.Structured,
+                    totalGIReservoirs,
+                    giReservoirStride
+                );
+                GIReservoirBuffer.name = "GIReservoirBuffer";
+            }
+
+            int secondaryGBufferStride = Marshal.SizeOf<SecondaryGBufferData>();
+            int totalSecondaryGBuffers = (int)reservoirParams.reservoirArrayPitch;
+            SecondaryGBuffer = new GraphicsBuffer(
+                GraphicsBuffer.Target.Structured,
+                totalSecondaryGBuffers,
+                secondaryGBufferStride
+            );
+            SecondaryGBuffer.name = "SecondaryGBuffer";
+
+
+            var totalSizeInElements = risBufferSegmentAllocator.GetTotalSizeInElements();
+            Debug.Log($"Creating RisBuffer with totalSizeInElements: {totalSizeInElements}");
+
+            RisBuffer = new ComputeBuffer(
+                (int)math.max(totalSizeInElements, 1),
+                sizeof(Vector2),
+                ComputeBufferType.Default);
+            RisBuffer.name = "RisBuffer";
+
+            int lightDataStride = sizeof(uint) * 8;
+
+            RisLightDataBuffer = new ComputeBuffer(
+                (int)math.max(totalSizeInElements, 1),
+                lightDataStride,
+                ComputeBufferType.Default
+            );
+            RisLightDataBuffer.name = "RisLightDataBuffer";
         }
-        
-        
-        void InitializeNeighborOffsets( uint neighborOffsetCount)
+
+
+        void InitializeNeighborOffsets(uint neighborOffsetCount)
         {
             if (m_neighborOffsetsInitialized)
                 return;
 
-            
+
             var offsets = new Vector2[neighborOffsetCount];
             Array.Fill(offsets, Vector2.zero);
-            
+
             {
                 int R = 250;
                 const float phi2 = 1.0f / 1.3247179572447f;
                 uint num = 0;
                 float u = 0.5f;
                 float v = 0.5f;
-                while (num < neighborOffsetCount) 
+                while (num < neighborOffsetCount)
                 {
                     u += phi2;
                     v += phi2 * phi2;
@@ -141,13 +207,13 @@ namespace mini
                     offsets[num++] = new Vector2((u - 0.5f) * R / 128.0f, (v - 0.5f) * R / 128.0f);
                 }
             }
-            
+
             // byte[] offsets = new byte[neighborOffsetCount * 2]; 
             //
             // RtxdiUtils.FillNeighborOffsetBuffer(offsets, neighborOffsetCount);
-            
+
             NeighborOffsetsBuffer.SetData(offsets);
-            
+
             m_neighborOffsetsInitialized = true;
         }
 

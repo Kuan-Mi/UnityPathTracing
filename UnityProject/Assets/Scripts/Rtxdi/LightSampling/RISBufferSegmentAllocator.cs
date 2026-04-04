@@ -1,10 +1,12 @@
-// Copyright (c) 2020-2023, NVIDIA CORPORATION. All rights reserved.
+// Copyright (c) 2020-2026, NVIDIA CORPORATION. All rights reserved.
 //
 // NVIDIA CORPORATION and its licensors retain all intellectual property
 // and proprietary rights in and to this software, related documentation
 // and any modifications thereto. Any use, reproduction, disclosure or
 // distribution of this software and related documentation without an express
 // license agreement from NVIDIA CORPORATION is strictly prohibited.
+
+using UnityEngine;
 
 namespace Rtxdi.LightSampling
 {
@@ -18,7 +20,8 @@ namespace Rtxdi.LightSampling
         }
 
         /// <summary>
-        /// Returns starting offset of segment in buffer.
+        /// Allocates a contiguous segment in the RIS buffer.
+        /// Returns the starting offset of the segment in buffer elements.
         /// </summary>
         public uint AllocateSegment(uint sizeInElements)
         {

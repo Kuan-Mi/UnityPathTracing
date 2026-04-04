@@ -1,17 +1,18 @@
-/***************************************************************************
- # Copyright (c) 2023-2024, NVIDIA CORPORATION.  All rights reserved.
- #
- # NVIDIA CORPORATION and its licensors retain all intellectual property
- # and proprietary rights in and to this software, related documentation
- # and any modifications thereto.  Any use, reproduction, disclosure or
- # distribution of this software and related documentation without an express
- # license agreement from NVIDIA CORPORATION is strictly prohibited.
- **************************************************************************/
+/*
+ * SPDX-FileCopyrightText: Copyright (c) 2023-2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * SPDX-License-Identifier: LicenseRef-NvidiaProprietary
+ *
+ * NVIDIA CORPORATION, its affiliates and licensors retain all intellectual
+ * property and proprietary rights in and to this material, related
+ * documentation and any modifications thereto. Any use, reproduction,
+ * disclosure or distribution of this material and related documentation
+ * without an express license agreement from NVIDIA CORPORATION or
+ * its affiliates is strictly prohibited.
+ */
 
 #ifndef RTXDI_GI_SPATIAL_RESAMPLING_HLSLI
 #define RTXDI_GI_SPATIAL_RESAMPLING_HLSLI
 
-#include "Assets/Shaders/Rtxdi/GI/JacobianMath.hlsl"
 #include "Assets/Shaders/Rtxdi/GI/Reservoir.hlsl"
 #include "Assets/Shaders/Rtxdi/Utils/Checkerboard.hlsl"
 
@@ -26,41 +27,12 @@ int2 RTXDI_CalculateSpatialResamplingOffset(int sampleIdx, float radius, const u
     return int2(float2(RTXDI_NEIGHBOR_OFFSETS_BUFFER[sampleIdx].xy) * radius);
 }
 
-// A structure that groups the application-provided settings for spatial resampling.
-struct RTXDI_GISpatialResamplingParameters
-{
-    // The index of the reservoir buffer to pull the spatial samples from.
-    uint sourceBufferIndex;
-
-    // Surface depth similarity threshold for temporal reuse.
-    // If the previous frame surface's depth is within this threshold from the current frame surface's depth,
-    // the surfaces are considered similar. The threshold is relative, i.e. 0.1 means 10% of the current depth.
-    // Otherwise, the pixel is not reused, and the resampling shader will look for a different one.
-    float depthThreshold;
-
-    // Surface normal similarity threshold for temporal reuse.
-    // If the dot product of two surfaces' normals is higher than this threshold, the surfaces are considered similar.
-    // Otherwise, the pixel is not reused, and the resampling shader will look for a different one.
-    float normalThreshold;
-
-    // Number of neighbor pixels considered for resampling (1-32)
-    // Some of the may be skipped if they fail the surface similarity test.
-    uint numSamples;
-
-    // Screen-space radius for spatial resampling, measured in pixels.
-    float samplingRadius;
-
-    // Controls the bias correction math for temporal reuse. Depending on the setting, it can add
-    // some shader cost and one approximate shadow ray per pixel (or per two pixels if checkerboard sampling is enabled).
-    // Ideally, these rays should be traced through the previous frame's BVH to get fully unbiased results.
-    uint biasCorrectionMode;
-};
-
 RTXDI_GIReservoir RTXDI_GISpatialResampling(
     const uint2 pixelPosition,
     const RAB_Surface surface,
+	uint sourceBufferIndex,
     const RTXDI_GIReservoir inputReservoir,
-    inout RAB_RandomSamplerState rng,
+    inout RTXDI_RandomSamplerState rng,
     const RTXDI_RuntimeParameters params,
     const RTXDI_ReservoirBufferParameters reservoirParams,
     const RTXDI_GISpatialResamplingParameters sparams)
@@ -84,7 +56,7 @@ RTXDI_GIReservoir RTXDI_GISpatialResampling(
     // Since we're using our bias correction scheme, we need to remember which light selection we made
     int selected = -1;
 
-    const int neighborSampleStartIdx = int(RAB_GetNextRandom(rng) * params.neighborOffsetMask);
+    const int neighborSampleStartIdx = int(RTXDI_GetNextRandom(rng) * params.neighborOffsetMask);
 
     // Walk the specified number of spatial neighbors, resampling using RIS
     for (int i = 0; i < numSamples; ++i)
@@ -114,7 +86,7 @@ RTXDI_GIReservoir RTXDI_GISpatialResampling(
         }
 
         const uint2 neighborReservoirPos = RTXDI_PixelPosToReservoirPos(idx, params.activeCheckerboardField);
-        RTXDI_GIReservoir neighborReservoir = RTXDI_LoadGIReservoir(reservoirParams, neighborReservoirPos, sparams.sourceBufferIndex);
+        RTXDI_GIReservoir neighborReservoir = RTXDI_LoadGIReservoir(reservoirParams, neighborReservoirPos, sourceBufferIndex);
 
         if (!RTXDI_IsValidGIReservoir(neighborReservoir))
         {
@@ -122,7 +94,8 @@ RTXDI_GIReservoir RTXDI_GISpatialResampling(
         }
 
         // Calculate Jacobian determinant to adjust weight.
-        float jacobian = RTXDI_CalculateJacobian(RAB_GetSurfaceWorldPos(surface), RAB_GetSurfaceWorldPos(neighborSurface), neighborReservoir);
+        // float jacobian = RTXDI_CalculateJacobian(RAB_GetSurfaceWorldPos(surface), RAB_GetSurfaceWorldPos(neighborSurface), neighborReservoir);
+		float jacobian = RTXDI_CalculateJacobian(RAB_GetSurfaceWorldPos(surface), RAB_GetSurfaceWorldPos(neighborSurface), neighborReservoir.position, neighborReservoir.normal);
 
         // Compute reuse weight.
         float targetPdf = RAB_GetGISampleTargetPdfForSurface(neighborReservoir.position, neighborReservoir.radiance, surface);
@@ -139,7 +112,7 @@ RTXDI_GIReservoir RTXDI_GISpatialResampling(
         cachedResult |= (1u << uint(i));
 
         // Combine
-        bool isUpdated = RTXDI_CombineGIReservoirs(curReservoir, neighborReservoir, RAB_GetNextRandom(rng), targetPdf * jacobian);
+        bool isUpdated = RTXDI_CombineGIReservoirs(curReservoir, neighborReservoir, RTXDI_GetNextRandom(rng), targetPdf * jacobian);
         if (isUpdated) {
             selected = i;
             selectedTargetPdf = targetPdf;
@@ -174,7 +147,7 @@ RTXDI_GIReservoir RTXDI_GISpatialResampling(
             RAB_Surface neighborSurface = RAB_GetGBufferSurface(idx, false);
 
             const uint2 neighborReservoirPos = RTXDI_PixelPosToReservoirPos(idx, params.activeCheckerboardField);
-            RTXDI_GIReservoir neighborReservoir = RTXDI_LoadGIReservoir(reservoirParams, neighborReservoirPos, sparams.sourceBufferIndex);
+            RTXDI_GIReservoir neighborReservoir = RTXDI_LoadGIReservoir(reservoirParams, neighborReservoirPos, sourceBufferIndex);
 
             // Get the PDF of the sample RIS selected in the first loop, above, *at this neighbor*
             float ps = RAB_GetGISampleTargetPdfForSurface(curReservoir.position, curReservoir.radiance, neighborSurface);

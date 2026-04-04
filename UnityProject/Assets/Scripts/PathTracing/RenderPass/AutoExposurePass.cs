@@ -66,7 +66,7 @@ namespace PathTracing
             
             var natCmd = CommandBufferHelpers.GetNativeCommandBuffer(context.cmd);
             
-            var aeMarker = new ProfilerMarker(ProfilerCategory.Render, "Auto Exposure", MarkerFlags.SampleGPU);
+            var aeMarker = RenderPassMarkers.AutoExposure;
             
             
             // ── Auto-exposure: histogram build + reduce (after transparent, before TAA) ──
@@ -79,33 +79,33 @@ namespace PathTracing
                 int kernelReduce = data.AeCs.FindKernel("ReduceHistogram");
 
                 // -- Kernel 0: Clear --
-                natCmd.SetComputeBufferParam(data.AeCs, kernelClear, "_AE_HistogramBuffer", data.Resource.AeHistogramBuffer);
+                natCmd.SetComputeBufferParam(data.AeCs, kernelClear, _AE_HistogramBufferID, data.Resource.AeHistogramBuffer);
                 natCmd.DispatchCompute(data.AeCs, kernelClear, 1, 1, 1);
 
                 // -- Kernel 1: Build --
-                natCmd.SetComputeTextureParam(data.AeCs, kernelBuild, "_AE_ComposedTexture", data.Resource.Composed);
-                natCmd.SetComputeBufferParam(data.AeCs, kernelBuild, "_AE_HistogramBuffer", data.Resource.AeHistogramBuffer);
-                natCmd.SetComputeIntParam(data.AeCs, "_AE_TexWidth",  (int)data.Settings.AeTexWidth);
-                natCmd.SetComputeIntParam(data.AeCs, "_AE_TexHeight", (int)data.Settings.AeTexHeight);
-                natCmd.SetComputeFloatParam(data.AeCs, "_AE_EVMin", data.Settings.AeEVMin);
-                natCmd.SetComputeFloatParam(data.AeCs, "_AE_EVMax", data.Settings.AeEVMax);
+                natCmd.SetComputeTextureParam(data.AeCs, kernelBuild, _AE_ComposedTextureID, data.Resource.Composed);
+                natCmd.SetComputeBufferParam(data.AeCs, kernelBuild, _AE_HistogramBufferID, data.Resource.AeHistogramBuffer);
+                natCmd.SetComputeIntParam(data.AeCs, _AE_TexWidthID,  (int)data.Settings.AeTexWidth);
+                natCmd.SetComputeIntParam(data.AeCs, _AE_TexHeightID, (int)data.Settings.AeTexHeight);
+                natCmd.SetComputeFloatParam(data.AeCs, _AE_EVMinID, data.Settings.AeEVMin);
+                natCmd.SetComputeFloatParam(data.AeCs, _AE_EVMaxID, data.Settings.AeEVMax);
                 uint buildX = (data.Settings.AeTexWidth  + 15u) / 16u;
                 uint buildY = (data.Settings.AeTexHeight + 15u) / 16u;
                 natCmd.DispatchCompute(data.AeCs, kernelBuild, (int)buildX, (int)buildY, 1);
 
                 // -- Kernel 2: Reduce --
-                natCmd.SetComputeBufferParam(data.AeCs, kernelReduce, "_AE_HistogramBuffer", data.Resource.AeHistogramBuffer);
-                natCmd.SetComputeBufferParam(data.AeCs, kernelReduce, "_AE_ExposureBuffer",  data.Resource.AeExposureBuffer);
-                natCmd.SetComputeFloatParam(data.AeCs, "_AE_EVMin",                data.Settings.AeEVMin);
-                natCmd.SetComputeFloatParam(data.AeCs, "_AE_EVMax",                data.Settings.AeEVMax);
-                natCmd.SetComputeFloatParam(data.AeCs, "_AE_LowPercent",           data.Settings.AeLowPercent);
-                natCmd.SetComputeFloatParam(data.AeCs, "_AE_HighPercent",          data.Settings.AeHighPercent);
-                natCmd.SetComputeFloatParam(data.AeCs, "_AE_SpeedUp",              data.Settings.AeSpeedUp);
-                natCmd.SetComputeFloatParam(data.AeCs, "_AE_SpeedDown",            data.Settings.AeSpeedDown);
-                natCmd.SetComputeFloatParam(data.AeCs, "_AE_DeltaTime",            data.Settings.AeDeltaTime);
-                natCmd.SetComputeFloatParam(data.AeCs, "_AE_ExposureCompensation", data.Settings.AeExposureCompensation);
-                natCmd.SetComputeFloatParam(data.AeCs, "_AE_MinExposure",          data.Settings.AeMinExposure);
-                natCmd.SetComputeFloatParam(data.AeCs, "_AE_MaxExposure",          data.Settings.AeMaxExposure);
+                natCmd.SetComputeBufferParam(data.AeCs, kernelReduce, _AE_HistogramBufferID, data.Resource.AeHistogramBuffer);
+                natCmd.SetComputeBufferParam(data.AeCs, kernelReduce, _AE_ExposureBufferID,  data.Resource.AeExposureBuffer);
+                natCmd.SetComputeFloatParam(data.AeCs, _AE_EVMinID,                data.Settings.AeEVMin);
+                natCmd.SetComputeFloatParam(data.AeCs, _AE_EVMaxID,                data.Settings.AeEVMax);
+                natCmd.SetComputeFloatParam(data.AeCs, _AE_LowPercentID,           data.Settings.AeLowPercent);
+                natCmd.SetComputeFloatParam(data.AeCs, _AE_HighPercentID,          data.Settings.AeHighPercent);
+                natCmd.SetComputeFloatParam(data.AeCs, _AE_SpeedUpID,              data.Settings.AeSpeedUp);
+                natCmd.SetComputeFloatParam(data.AeCs, _AE_SpeedDownID,            data.Settings.AeSpeedDown);
+                natCmd.SetComputeFloatParam(data.AeCs, _AE_DeltaTimeID,            data.Settings.AeDeltaTime);
+                natCmd.SetComputeFloatParam(data.AeCs, _AE_ExposureCompensationID, data.Settings.AeExposureCompensation);
+                natCmd.SetComputeFloatParam(data.AeCs, _AE_MinExposureID,          data.Settings.AeMinExposure);
+                natCmd.SetComputeFloatParam(data.AeCs, _AE_MaxExposureID,          data.Settings.AeMaxExposure);
                 natCmd.DispatchCompute(data.AeCs, kernelReduce, 1, 1, 1);
 
                 natCmd.EndSample(aeMarker);

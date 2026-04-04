@@ -1,0 +1,259 @@
+struct PrimitiveData
+{
+    float2 uv0;
+    float2 uv1;
+    float2 uv2;
+
+    float3 pos0; 
+    float3 pos1; 
+    float3 pos2; 
+
+    uint instanceId;
+};
+
+
+struct InstanceData
+{
+    float4x4 transform;
+    float3 emissiveColor;
+    uint emissiveTextureIndex;
+};
+
+
+struct TriangleLight
+{
+    float3 base;
+    float3 edge1;
+    float3 edge2;
+    float3 radiance;
+    float3 normal;
+    float surfaceArea;
+};
+
+
+struct RAB_LightInfo
+{
+    // uint4[0]
+    float3 center;
+    uint colorTypeAndFlags; // RGB8 + uint8 (see the kPolymorphicLight... constants above)
+
+    // uint4[1]
+    uint direction1; // oct-encoded
+    uint direction2; // oct-encoded
+    uint scalars; // 2x float16
+    uint logRadiance; // uint16
+
+    // uint4[2] -- optional, contains only shaping data
+    uint iesProfileIndex;
+    uint primaryAxis; // oct-encoded
+    uint cosConeAngleAndSoftness; // 2x float16
+    uint padding;
+};
+
+struct PrepareLightsConstants
+{
+    uint numTasks;
+};
+
+// Push Constants
+
+ConstantBuffer<PrepareLightsConstants> g_Const : register(b0);
+
+// Outputs
+RWStructuredBuffer<RAB_LightInfo> u_LightDataBuffer : register(u0);
+
+// Inputs (Adapted to C# buffers)
+
+StructuredBuffer<PrimitiveData> t_PrimitiveData : register(t0); // 绑定到 slot t0
+StructuredBuffer<InstanceData> t_InstanceData : register(t2); // 绑定到 slot t2
+
+// Textures
+
+Texture2D t_BindlessTextures[] : register(t0, space1);
+
+SamplerState s_MaterialSampler : register(s0);
+
+
+
+float2 octWrap(float2 v)
+{
+    #if __HLSL_VERSION >= 2021 || __SLANG__
+    return (1.f - abs(v.yx)) * select(v.xy >= 0.f, 1.f, -1.f);
+    #else
+    return (1.f - abs(v.yx)) * (v.xy >= 0.f ? 1.f : -1.f);
+    #endif
+}
+
+float2 ndirToOctSigned(float3 n)
+{
+    // Project the sphere onto the octahedron (|x|+|y|+|z| = 1) and then onto the xy-plane
+    float2 p = n.xy * (1.f / (abs(n.x) + abs(n.y) + abs(n.z)));
+    return (n.z < 0.f) ? octWrap(p) : p;
+}
+
+uint ndirToOctUnorm32(float3 n)
+{
+    float2 p = ndirToOctSigned(n);
+    p = saturate(p.xy * 0.5 + 0.5);
+    return uint(p.x * 0xfffe) | (uint(p.y * 0xfffe) << 16);
+}
+
+
+#define uint32_t uint
+
+
+float unpackLightRadiance(uint logRadiance)
+{
+    return (logRadiance == 0) ? 0 : exp2((float(logRadiance - 1) / 65534.0) * (kPolymorphicLightMaxLog2Radiance - kPolymorphicLightMinLog2Radiance) + kPolymorphicLightMinLog2Radiance);
+}
+
+// Pack [0.0, 1.0] float to a uint of a given bit depth
+#define PACK_UFLOAT_TEMPLATE(size)                      \
+uint Pack_R ## size ## _UFLOAT(float r, float d = 0.5f) \
+{                                                       \
+const uint mask = (1U << size) - 1U;                \
+\
+return (uint)floor(r * mask + d) & mask;            \
+}                                                       \
+\
+float Unpack_R ## size ## _UFLOAT(uint r)               \
+{                                                       \
+const uint mask = (1U << size) - 1U;                \
+\
+return (float)(r & mask) / (float)mask;             \
+}
+
+PACK_UFLOAT_TEMPLATE(8)
+
+uint Pack_R8G8B8_UFLOAT(float3 rgb, float3 d = float3(0.5f, 0.5f, 0.5f))
+{
+    uint r = Pack_R8_UFLOAT(rgb.r, d.r);
+    uint g = Pack_R8_UFLOAT(rgb.g, d.g) << 8;
+    uint b = Pack_R8_UFLOAT(rgb.b, d.b) << 16;
+    return r | g | b;
+}
+
+
+void packLightColor(float3 radiance, inout RAB_LightInfo lightInfo)
+{   
+    float intensity = max(radiance.r, max(radiance.g, radiance.b));
+
+    if (intensity > 0.0)
+    {
+        float logRadiance = saturate((log2(intensity) - kPolymorphicLightMinLog2Radiance) 
+            / (kPolymorphicLightMaxLog2Radiance - kPolymorphicLightMinLog2Radiance));
+        uint packedRadiance = min(uint32_t(ceil(logRadiance * 65534.0)) + 1, 0xffffu);
+        float unpackedRadiance = unpackLightRadiance(packedRadiance);
+
+        float3 normalizedRadiance = saturate(radiance.rgb / unpackedRadiance.xxx);
+
+        lightInfo.logRadiance |= packedRadiance;
+        lightInfo.colorTypeAndFlags |= Pack_R8G8B8_UFLOAT(normalizedRadiance);
+    }
+}
+
+
+RAB_LightInfo Store(TriangleLight triLight)
+{
+    RAB_LightInfo lightInfo = (RAB_LightInfo)0;
+
+
+    packLightColor(triLight.radiance, lightInfo);
+    lightInfo.center = triLight.base + (triLight.edge1 + triLight.edge2) / 3.0;
+    lightInfo.direction1 = ndirToOctUnorm32(normalize(triLight.edge1));
+    lightInfo.direction2 = ndirToOctUnorm32(normalize(triLight.edge2));
+    lightInfo.scalars = f32tof16(length(triLight.edge1)) | (f32tof16(length(triLight.edge2)) << 16);
+    lightInfo.colorTypeAndFlags |= uint(PolymorphicLightType::kTriangle) << kPolymorphicLightTypeShift;
+        
+    return lightInfo;
+}
+
+[numthreads(256, 1, 1)]
+void main(uint dispatchThreadId : SV_DispatchThreadID)
+{
+    uint triangleIdx = dispatchThreadId;
+
+    if (triangleIdx >= g_Const.numTasks)
+        return;
+
+    PrimitiveData prim = t_PrimitiveData[triangleIdx];
+
+    InstanceData instance = t_InstanceData[prim.instanceId];
+
+    float3 positions[3];
+    positions[0] = mul(instance.transform, float4(prim.pos0, 1.0)).xyz;
+    positions[1] = mul(instance.transform, float4(prim.pos1, 1.0)).xyz;
+    positions[2] = mul(instance.transform, float4(prim.pos2, 1.0)).xyz;
+
+    float3 radiance = instance.emissiveColor;
+
+    {
+        Texture2D emissiveTexture = t_BindlessTextures[NonUniformResourceIndex(instance.emissiveTextureIndex)];
+
+        float2 uvs[3];
+        uvs[0] = float2(prim.uv0);
+        uvs[1] = float2(prim.uv1);
+        uvs[2] = float2(prim.uv2);
+
+
+        // Calculate the triangle edges and edge lengths in UV space
+        float2 edges[3];
+        edges[0] = uvs[1] - uvs[0];
+        edges[1] = uvs[2] - uvs[1];
+        edges[2] = uvs[0] - uvs[2];
+
+        float3 edgeLengths;
+        edgeLengths[0] = length(edges[0]);
+        edgeLengths[1] = length(edges[1]);
+        edgeLengths[2] = length(edges[2]);
+
+        // Find the shortest edge and the other two (longer) edges
+        float2 shortEdge;
+        float2 longEdge1;
+        float2 longEdge2;
+
+        if (edgeLengths[0] < edgeLengths[1] && edgeLengths[0] < edgeLengths[2])
+        {
+            shortEdge = edges[0];
+            longEdge1 = edges[1];
+            longEdge2 = edges[2];
+        }
+        else if (edgeLengths[1] < edgeLengths[2])
+        {
+            shortEdge = edges[1];
+            longEdge1 = edges[2];
+            longEdge2 = edges[0];
+        }
+        else
+        {
+            shortEdge = edges[2];
+            longEdge1 = edges[0];
+            longEdge2 = edges[1];
+        }
+
+        // Use anisotropic sampling
+        float2 shortGradient = shortEdge * (2.0 / 3.0);
+        float2 longGradient = (longEdge1 + longEdge2) / 3.0;
+
+        // Sample
+        float2 centerUV = (uvs[0] + uvs[1] + uvs[2]) / 3.0;
+        float3 emissiveMask = emissiveTexture.SampleGrad(s_MaterialSampler, centerUV, shortGradient, longGradient).rgb;
+
+        //emissiveMask.xy = centerUV;
+        //emissiveMask.z = 0;
+        radiance *= emissiveMask;
+    }
+
+    radiance.rgb = max(0, radiance.rgb);
+
+    TriangleLight triLight;
+    triLight.base = positions[0];
+    triLight.edge1 = positions[1] - positions[0];
+    triLight.edge2 = positions[2] - positions[0];
+    triLight.radiance = radiance;
+
+    RAB_LightInfo lightInfo = Store(triLight);
+
+    lightInfo.center.x = 3;
+    u_LightDataBuffer[triangleIdx] = lightInfo;
+}

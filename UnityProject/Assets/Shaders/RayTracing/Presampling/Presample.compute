@@ -1,0 +1,28 @@
+#pragma kernel CSMain
+ 
+#pragma only_renderers   d3d11
+#pragma use_dxc
+#pragma target 6.0
+// #pragma enable_d3d11_debug_symbols
+
+#define USE_RAY_QUERY
+
+#include "../RtxdiApplicationBridge/RtxdiApplicationBridge.hlsl"
+#include "Assets/Shaders/RTXDI/LightSampling/PresamplingFunctions.hlsl"
+
+#define RTXDI_PRESAMPLING_GROUP_SIZE 256
+
+[numthreads(RTXDI_PRESAMPLING_GROUP_SIZE, 1, 1)] 
+void CSMain(uint2 GlobalIndex : SV_DispatchThreadID) 
+{
+    RTXDI_RandomSamplerState rng = RTXDI_InitRandomSampler(GlobalIndex.xy, g_Const.runtimeParams.frameIndex, 0);
+
+    RTXDI_PresampleLocalLights(
+        rng,
+        t_LocalLightPdfTexture,
+        g_Const.localLightPdfTextureSize,
+        GlobalIndex.y,
+        GlobalIndex.x,
+        g_Const.lightBufferParams.localLightBufferRegion,
+        g_Const.localLightsRISBufferSegmentParams);
+}

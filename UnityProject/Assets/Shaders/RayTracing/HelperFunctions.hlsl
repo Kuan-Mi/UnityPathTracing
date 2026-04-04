@@ -14,6 +14,8 @@
 #include <Assets/Shaders/donut/utils.hlsli>
 #include <Assets/Shaders/RTXDI/Utils/Math.hlsl>
 
+static const float c_pi = 3.1415926535;
+
 struct RandomSamplerState
 {
     uint seed;
@@ -118,5 +120,104 @@ float3 basicToneMapping(float3 color, float bias)
 
     return color;
 }
+/*https://graphics.pixar.com/library/OrthonormalB/paper.pdf*/
+void branchlessONB(in float3 n, out float3 b1, out float3 b2)
+{
+    float sign = n.z >= 0.0f ? 1.0f : -1.0f;
+    float a = -1.0f / (sign + n.z);
+    float b = n.x * n.y * a;
+    b1 = float3(1.0f + sign * n.x * n.x * a, sign * b, -sign * n.x);
+    b2 = float3(b, sign + n.y * n.y * a, -n.y);
+}
 
+
+float3 sphericalDirection(float sinTheta, float cosTheta, float sinPhi, float cosPhi, float3 x, float3 y, float3 z)
+{
+    return sinTheta * cosPhi * x + sinTheta * sinPhi * y + cosTheta * z;
+}
+
+
+float2 sampleDisk(float2 rand)
+{
+    float angle = 2 * c_pi * rand.x;
+    return float2(cos(angle), sin(angle)) * sqrt(rand.y);
+}
+
+
+float3 sampleCosHemisphere(float2 rand, out float solidAnglePdf)
+{
+    float2 tangential = sampleDisk(rand);
+    float elevation = sqrt(saturate(1.0 - rand.y));
+
+    solidAnglePdf = elevation / c_pi;
+
+    return float3(tangential.xy, elevation);
+}
+
+float3 sampleSphere(float2 rand, out float solidAnglePdf)
+{
+    // See (6-8) in https://mathworld.wolfram.com/SpherePointPicking.html
+
+    rand.y = rand.y * 2.0 - 1.0;
+
+    float2 tangential = sampleDisk(float2(rand.x, 1.0 - square(rand.y)));
+    float elevation = rand.y;
+
+    solidAnglePdf = 0.25f / c_pi;
+
+    return float3(tangential.xy, elevation);
+}
+
+
+float3 sampleGGX_VNDF(float3 Ve, float roughness, float2 random)
+{
+    float alpha = square(roughness);
+
+    float3 Vh = normalize(float3(alpha * Ve.x, alpha * Ve.y, Ve.z));
+
+    float lensq = square(Vh.x) + square(Vh.y);
+    float3 T1 = lensq > 0.0 ? float3(-Vh.y, Vh.x, 0.0) / sqrt(lensq) : float3(1.0, 0.0, 0.0);
+    float3 T2 = cross(Vh, T1);
+
+    float r = sqrt(random.x);
+    float phi = 2.0 * c_pi * random.y;
+    float t1 = r * cos(phi);
+    float t2 = r * sin(phi);
+    float s = 0.5 * (1.0 + Vh.z);
+    t2 = (1.0 - s) * sqrt(1.0 - square(t1)) + s * t2;
+
+    float3 Nh = t1 * T1 + t2 * T2 + sqrt(max(0.0, 1.0 - square(t1) - square(t2))) * Vh;
+
+    // Tangent space H
+    float3 Ne = float3(alpha * Nh.x, alpha * Nh.y, max(0.0, Nh.z));
+    return Ne;
+}
+
+
+float2 directionToEquirectUV(float3 normalizedDirection)
+{
+    float elevation = asin(normalizedDirection.y);
+    float azimuth = 0;
+    if (abs(normalizedDirection.y) < 1.0)
+        azimuth = atan2(normalizedDirection.z, normalizedDirection.x);
+
+    float2 uv;
+    uv.x = azimuth / (2 * c_pi) - 0.25;
+    uv.y = 0.5 - elevation / c_pi;
+
+    return uv;
+}
+
+float3 equirectUVToDirection(float2 uv, out float cosElevation)
+{
+    float azimuth = (uv.x + 0.25) * (2 * c_pi);
+    float elevation = (0.5 - uv.y) * c_pi;
+    cosElevation = cos(elevation);
+
+    return float3(
+        cos(azimuth) * cosElevation,
+        sin(elevation),
+        sin(azimuth) * cosElevation
+    );
+}
 #endif // HELPER_FUNCTIONS_HLSLI
