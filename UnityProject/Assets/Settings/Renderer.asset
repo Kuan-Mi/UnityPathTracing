@@ -19,7 +19,6 @@ MonoBehaviour:
     showMode: 18
     showMv: 0
     showValidation: 0
-    debugRtxdi: 0
     sunAngularDiameter: 0.533
     upscalerMode: 0
     mipBias: -0.5

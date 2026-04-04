@@ -137,7 +137,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 1
+  m_IsActive: 0
 --- !u!114 &116095154
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -576,7 +576,7 @@ Light:
   serializedVersion: 12
   m_Type: 1
   m_Color: {r: 1.2355534, g: 1.1409429, b: 0.99371785, a: 1}
-  m_Intensity: 10
+  m_Intensity: 1
   m_Range: 10
   m_SpotAngle: 30
   m_InnerSpotAngle: 21.80208
@@ -686,7 +686,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 1721113d7cbc47c494440938259e7e3b, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::DynamicSunIntensity
-  sunIntensityMultiplier: 10
+  sunIntensityMultiplier: 1
   gTanSunAngularRadius: 0.01
 --- !u!1 &550365710
 GameObject:
