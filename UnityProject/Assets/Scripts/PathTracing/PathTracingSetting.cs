@@ -88,6 +88,7 @@ namespace PathTracing
         public UpscalerMode upscalerMode = UpscalerMode.NATIVE;
 
         public bool tmpDisableRR;
+        public bool skipRightEyeInVR = true;
 
         [FoldoutHeader("RTXDI")]
         public RtxdiFeature.RenderSettings lightingSettings = RtxdiFeature.RenderSettings.Default();

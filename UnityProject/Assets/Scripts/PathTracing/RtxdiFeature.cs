@@ -290,7 +290,7 @@ namespace PathTracing
             var eyeIndex = renderingData.cameraData.xr.enabled ? renderingData.cameraData.xr.multipassId : 0;
 
 
-            if (eyeIndex == 1)
+            if (eyeIndex == 1 && setting.skipRightEyeInVR)
                 return;
 
             _gpuScene.Build(_accelerationStructure, setting.enableEnv);
@@ -327,12 +327,17 @@ namespace PathTracing
                 frameState = new CameraFrameState(1);
                 _cameraFrameStates.Add(uniqueKey, frameState);
             }
+            
+            
+            var outputResolution = ComputeOutputResolution(renderingData.cameraData);
+            var resourcesChanged = pool.EnsureResources(outputResolution, setting.upscalerMode);
+            var renderResolution = pool.renderResolution;
 
             if (!_isContexts.TryGetValue(uniqueKey, out var isContext))
             {
                 var isParams = ImportanceSamplingContext_StaticParameters.Default();
-                isParams.renderWidth  = (uint)cam.pixelWidth;
-                isParams.renderHeight = (uint)cam.pixelHeight;
+                isParams.renderWidth  = (uint)renderResolution.x;
+                isParams.renderHeight = (uint)renderResolution.y;
                 isContext             = new ImportanceSamplingContext(isParams);
                 _isContexts.Add(uniqueKey, isContext);
             }
@@ -361,8 +366,6 @@ namespace PathTracing
 
             _accelerationStructure.Build();
 
-            var  outputResolution = ComputeOutputResolution(renderingData.cameraData);
-            bool resourcesChanged = pool.EnsureResources(outputResolution, setting.upscalerMode);
 
             if (resourcesChanged)
             {
@@ -461,7 +464,7 @@ namespace PathTracing
                 MotionVectors            = pool.GetRT(RenderResourceType.RtxdiMotionVectors),
                 LocalLightPdfTexture     = _gpuScene.localLightPdfTexture,
                 RtxdiResources           = rtxdiResources,
-                RenderResolution         = new int2(cam.pixelWidth, cam.pixelHeight),
+                RenderResolution         = renderResolution,
                 ResolutionScale          = 1,
             };
 
@@ -605,8 +608,8 @@ namespace PathTracing
             };
             var dlssDataPtr = dlrr.GetInteropDataPtr(dlrrInput, dlrrRes, 1, setting.upscalerMode);
 
-            var rectGridW = (int)(cam.pixelWidth * 1 + 0.5f + 15) / 16;
-            var rectGridH = (int)(cam.pixelHeight * 1 + 0.5f + 15) / 16;
+            var rectGridW = (int)(renderResolution.x * 1 + 0.5f + 15) / 16;
+            var rectGridH = (int)(renderResolution.y * 1 + 0.5f + 15) / 16;
 
             _rtxdiDlssBeforePass.Setup(rtxdiCtx,
                 pool.GetRT(RenderResourceType.RrGuideDiffAlbedo),

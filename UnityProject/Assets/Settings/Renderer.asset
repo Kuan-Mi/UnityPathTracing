@@ -1,6 +1,6 @@
 %YAML 1.1
 %TAG !u! tag:unity3d.com,2011:
---- !u!114 &-2006250351800377744
+--- !u!114 &-2927663481866360234
 MonoBehaviour:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
@@ -14,14 +14,14 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::PathTracing.PathTracingFeature
   m_Active: 1
   pathTracingSetting:
-    exposureEv: -2.7
+    exposureEv: 0
     cameraJitter: 1
     showMode: 18
     showMv: 0
     showValidation: 0
     skipRightEyeInVR: 1
     sunAngularDiameter: 0.533
-    upscalerMode: 2
+    upscalerMode: 0
     mipBias: -0.5
     tracingMode: 1
     denoiser: 0
@@ -47,7 +47,7 @@ MonoBehaviour:
     planeDistanceSensitivity: 0.02
     maxStabilizedFrameNum: 5
     dofAperture: 0
-    dofFocalDistance: 1.02
+    dofFocalDistance: 5
     enableAutoExposure: 0
     aeEVMin: -10
     aeEVMax: 10
@@ -55,7 +55,7 @@ MonoBehaviour:
     aeHighPercent: 0.95
     aeAdaptationSpeedUp: 2
     aeAdaptationSpeedDown: 1
-    aeExposureCompensation: -2.24
+    aeExposureCompensation: 0
     aeMinExposure: 0.01
     aeMaxExposure: 100
     rpp: 1
@@ -113,8 +113,8 @@ MonoBehaviour:
     probeSamplingDebugTexture: {fileID: 2800000, guid: 24ec0e140fb444a44ab96ee80844e18e, type: 3}
     probeVolumeBlendStatesCS: {fileID: 7200000, guid: b9a23f869c4fd45f19c5ada54dd82176, type: 3}
   m_RendererFeatures:
-  - {fileID: -2006250351800377744}
-  m_RendererFeatureMap: 709e6f42ef5d28e4
+  - {fileID: -2927663481866360234}
+  m_RendererFeatureMap: 56ea781d93d95ed7
   m_UseNativeRenderPass: 1
   xrSystemData: {fileID: 0}
   postProcessData: {fileID: 11400000, guid: 41439944d30ece34e96484bdb6645b55, type: 2}
