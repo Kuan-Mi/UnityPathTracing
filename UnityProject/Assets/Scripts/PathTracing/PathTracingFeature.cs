@@ -257,7 +257,7 @@ namespace PathTracing
             var eyeIndex = renderingData.cameraData.xr.enabled ? renderingData.cameraData.xr.multipassId : 0;
 
 
-            if (eyeIndex == 1)
+            if (eyeIndex == 1 && pathTracingSetting.skipRightEyeInVR)
                 return;
 
 

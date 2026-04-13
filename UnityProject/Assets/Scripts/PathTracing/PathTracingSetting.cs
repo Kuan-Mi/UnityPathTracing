@@ -142,6 +142,7 @@ namespace PathTracing
         public ShowMode showMode     = ShowMode.Final;
         public bool     showMv;
         public bool     showValidation;
+        public bool     skipRightEyeInVR    = true;
 
         [FoldoutHeader("Base Settings")]
         [Range(0.001f, 10f)]
