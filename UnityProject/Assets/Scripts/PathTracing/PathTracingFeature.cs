@@ -226,6 +226,21 @@ namespace PathTracing
             }
         }
 
+        public static int2 GetUpscaledResolution(int2 outputRes, UpscalerMode mode)
+        {
+            float scale = mode switch
+            {
+                UpscalerMode.NATIVE => 1.0f,
+                UpscalerMode.ULTRA_QUALITY => 1.3f,
+                UpscalerMode.QUALITY => 1.5f,
+                UpscalerMode.BALANCED => 1.7f,
+                UpscalerMode.PERFORMANCE => 2.0f,
+                UpscalerMode.ULTRA_PERFORMANCE => 3.0f,
+                _ => 1.0f
+            };
+            return new int2((int)(outputRes.x / scale + 0.5f), (int)(outputRes.y / scale + 0.5f));
+        }
+
 
         public override void AddRenderPasses(ScriptableRenderer renderer, ref RenderingData renderingData)
         {
@@ -331,6 +346,7 @@ namespace PathTracing
 
             var  outputResolution = ComputeOutputResolution(renderingData.cameraData);
             bool resourcesChanged = pool.EnsureResources(outputResolution, pathTracingSetting.upscalerMode);
+            var  renderResolution = pool.renderResolution;
 
             if (resourcesChanged)
             {
@@ -380,7 +396,7 @@ namespace PathTracing
 
             var sharcSettings = new SharcPass.Settings
             {
-                RenderResolution = new int2(cam.pixelWidth, cam.pixelHeight),
+                RenderResolution = renderResolution,
                 sharcDownscale   = pathTracingSetting.sharcDownscale
             };
 
@@ -427,7 +443,7 @@ namespace PathTracing
 
             var opaqueSettings = new OpaquePass.Settings
             {
-                m_RenderResolution = new int2(cam.pixelWidth, cam.pixelHeight),
+                m_RenderResolution = renderResolution,
                 resolutionScale    = pathTracingSetting.resolutionScale
             };
 
@@ -488,8 +504,8 @@ namespace PathTracing
                 compositionResource.Spec   = pool.GetRT(RenderResourceType.OutSpecRadianceHitdist);
             }
 
-            var rectGridW = (int)(cam.pixelWidth * pathTracingSetting.resolutionScale + 0.5f + 15) / 16;
-            var rectGridH = (int)(cam.pixelHeight * pathTracingSetting.resolutionScale + 0.5f + 15) / 16;
+            var rectGridW = (int)(renderResolution.x * pathTracingSetting.resolutionScale + 0.5f + 15) / 16;
+            var rectGridH = (int)(renderResolution.y * pathTracingSetting.resolutionScale + 0.5f + 15) / 16;
 
             var compositionSettings = new CompositionPass.Settings
             {
@@ -522,7 +538,7 @@ namespace PathTracing
 
             var transparentSettings = new TransparentPass.Settings
             {
-                m_RenderResolution = new int2(cam.pixelWidth, cam.pixelHeight),
+                m_RenderResolution = renderResolution,
 
                 convergenceStep = frameState.convergenceStep,
             };
@@ -537,7 +553,6 @@ namespace PathTracing
                 Composed          = pool.GetRT(RenderResourceType.Composed)
             };
 
-            var renderResolution = pool.renderResolution;
 
             var aeSettings = new AutoExposurePass.Settings
             {
@@ -687,7 +702,7 @@ namespace PathTracing
 
                 var referencePtSettings = new ReferencePtPass.Settings
                 {
-                    m_RenderResolution = new int2(cam.pixelWidth, cam.pixelHeight),
+                    m_RenderResolution = renderResolution,
                     resolutionScale    = pathTracingSetting.resolutionScale,
                     referenceBounceNum = pathTracingSetting.referenceBounceNum,
                     convergenceStep    = pathTracingSetting.accumulateReference ? frameState.convergenceStep : 0,
@@ -882,22 +897,22 @@ namespace PathTracing
 
         public void AutoFillShaders()
         {
-            finalMaterial             = UnityEditor.AssetDatabase.LoadAssetAtPath<Material>("Assets/Shaders/Mat/KM_Final.mat");
+            finalMaterial = UnityEditor.AssetDatabase.LoadAssetAtPath<Material>("Assets/Shaders/Mat/KM_Final.mat");
 
-            sharcUpdateTs             = UnityEditor.AssetDatabase.LoadAssetAtPath<RayTracingShader>("Assets/Shaders/Sharc/SharcUpdate.raytrace");
-            opaqueTracingShader       = UnityEditor.AssetDatabase.LoadAssetAtPath<RayTracingShader>("Assets/Shaders/RayTracing/TraceOpaque.raytrace");
-            transparentTracingShader  = UnityEditor.AssetDatabase.LoadAssetAtPath<RayTracingShader>("Assets/Shaders/RayTracing/TraceTransparent.raytrace");
-            referencePtTracingShader  = UnityEditor.AssetDatabase.LoadAssetAtPath<RayTracingShader>("Assets/Shaders/RayTracing/ReferencePt.raytrace");
+            sharcUpdateTs            = UnityEditor.AssetDatabase.LoadAssetAtPath<RayTracingShader>("Assets/Shaders/Sharc/SharcUpdate.raytrace");
+            opaqueTracingShader      = UnityEditor.AssetDatabase.LoadAssetAtPath<RayTracingShader>("Assets/Shaders/RayTracing/TraceOpaque.raytrace");
+            transparentTracingShader = UnityEditor.AssetDatabase.LoadAssetAtPath<RayTracingShader>("Assets/Shaders/RayTracing/TraceTransparent.raytrace");
+            referencePtTracingShader = UnityEditor.AssetDatabase.LoadAssetAtPath<RayTracingShader>("Assets/Shaders/RayTracing/ReferencePt.raytrace");
 
-            compositionComputeShader  = UnityEditor.AssetDatabase.LoadAssetAtPath<ComputeShader>("Assets/Shaders/PostProcess/Composition.compute");
-            taaComputeShader          = UnityEditor.AssetDatabase.LoadAssetAtPath<ComputeShader>("Assets/Shaders/PostProcess/Taa.compute");
-            dlssBeforeComputeShader   = UnityEditor.AssetDatabase.LoadAssetAtPath<ComputeShader>("Assets/Shaders/PostProcess/DlssBefore.compute");
-            sharcResolveCs            = UnityEditor.AssetDatabase.LoadAssetAtPath<ComputeShader>("Assets/Shaders/Sharc/SharcResolve.compute");
-            autoExposureShader        = UnityEditor.AssetDatabase.LoadAssetAtPath<ComputeShader>("Assets/Shaders/PostProcess/AutoExposure.compute");
-            accumulateCs              = UnityEditor.AssetDatabase.LoadAssetAtPath<ComputeShader>("Assets/Shaders/PostProcess/Accumulate.compute");
+            compositionComputeShader = UnityEditor.AssetDatabase.LoadAssetAtPath<ComputeShader>("Assets/Shaders/PostProcess/Composition.compute");
+            taaComputeShader         = UnityEditor.AssetDatabase.LoadAssetAtPath<ComputeShader>("Assets/Shaders/PostProcess/Taa.compute");
+            dlssBeforeComputeShader  = UnityEditor.AssetDatabase.LoadAssetAtPath<ComputeShader>("Assets/Shaders/PostProcess/DlssBefore.compute");
+            sharcResolveCs           = UnityEditor.AssetDatabase.LoadAssetAtPath<ComputeShader>("Assets/Shaders/Sharc/SharcResolve.compute");
+            autoExposureShader       = UnityEditor.AssetDatabase.LoadAssetAtPath<ComputeShader>("Assets/Shaders/PostProcess/AutoExposure.compute");
+            accumulateCs             = UnityEditor.AssetDatabase.LoadAssetAtPath<ComputeShader>("Assets/Shaders/PostProcess/Accumulate.compute");
 
-            scramblingRankingTex      = UnityEditor.AssetDatabase.LoadAssetAtPath<Texture2D>("Assets/Textures/scrambling_ranking_128x128_2d_4spp.png");
-            sobolTex                  = UnityEditor.AssetDatabase.LoadAssetAtPath<Texture2D>("Assets/Textures/sobol_256_4d.png");
+            scramblingRankingTex = UnityEditor.AssetDatabase.LoadAssetAtPath<Texture2D>("Assets/Textures/scrambling_ranking_128x128_2d_4spp.png");
+            sobolTex             = UnityEditor.AssetDatabase.LoadAssetAtPath<Texture2D>("Assets/Textures/sobol_256_4d.png");
 
             UnityEditor.EditorUtility.SetDirty(this);
         }
