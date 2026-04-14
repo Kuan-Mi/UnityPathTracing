@@ -1,5 +1,18 @@
 ﻿.vs/
 .idea/
+.vscode/
 
+# CMake build output
+_Build/
+
+# MSVC build output
 x64/
+*.user
+
+# Compiled binaries
+*.dll
+*.lib
+*.exp
+*.pdb
+*.ilk
 
