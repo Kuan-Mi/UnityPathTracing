@@ -1,6 +1,8 @@
 [submodule "RenderingPlugin/External/NRD"]
 	path = RenderingPlugin/External/NRD
 	url = https://github.com/NVIDIA-RTX/NRD.git
+	branch = v4.17.2
 [submodule "RenderingPlugin/External/NRI"]
 	path = RenderingPlugin/External/NRI
 	url = https://github.com/NVIDIA-RTX/NRI.git
+	branch = v178

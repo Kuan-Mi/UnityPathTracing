@@ -99,7 +99,6 @@ namespace Nrd
             Add(ResourceType.IN_MV,                    res.inMv);
             Add(ResourceType.IN_VIEWZ,                 res.inViewZ);
             Add(ResourceType.IN_NORMAL_ROUGHNESS,      res.inNormalRoughness);
-            Add(ResourceType.IN_BASECOLOR_METALNESS,   res.inBaseColorMetalness);
             Add(ResourceType.IN_PENUMBRA,              res.inPenumbra);
             Add(ResourceType.IN_DIFF_RADIANCE_HITDIST, res.inDiffRadianceHitDist);
             Add(ResourceType.IN_SPEC_RADIANCE_HITDIST, res.inSpecRadianceHitDist);
@@ -156,7 +155,6 @@ namespace Nrd
             // Common 设置
             data.commonSettings.denoisingRange                = _setting.denoisingRange;
             data.commonSettings.splitScreen                   = _setting.splitScreen;
-            data.commonSettings.isBaseColorMetalnessAvailable = _setting.isBaseColorMetalnessAvailable;
             data.commonSettings.enableValidation              = _setting.showValidation;
 
             // Sigma 设置
