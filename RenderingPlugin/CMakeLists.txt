@@ -40,6 +40,7 @@ option(NRI_ENABLE_AMDAGS "" OFF)
 option(NRI_ENABLE_NVAPI "" OFF)
 option(NRI_ENABLE_NIS_SDK "" OFF)
 option(NRI_ENABLE_IMGUI_EXTENSION "" OFF)
+option(NRI_ENABLE_NGX_SDK "" ON)
 
 add_subdirectory(External/NRI NRI_build)
 
