@@ -11,13 +11,13 @@ namespace Nrd
 {
     public class NrdDenoiser : IDisposable
     {
-        [DllImport("RenderingPlugin")]
+        [DllImport("Denoiser")]
         private static extern int CreateDenoiserInstance();
 
-        [DllImport("RenderingPlugin")]
+        [DllImport("Denoiser")]
         private static extern void DestroyDenoiserInstance(int id);
 
-        [DllImport("RenderingPlugin")]
+        [DllImport("Denoiser")]
         private static extern void UpdateDenoiserResources(int instanceId, IntPtr resources, int count);
 
         private NativeArray<NrdResourceInput> _resourceCache;

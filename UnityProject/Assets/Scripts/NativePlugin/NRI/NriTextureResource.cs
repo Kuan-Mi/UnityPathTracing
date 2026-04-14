@@ -11,10 +11,10 @@ namespace Nri
 {
     public class NriTextureResource
     {
-        [DllImport("RenderingPlugin")]
+        [DllImport("Denoiser")]
         private static extern IntPtr WrapD3D12Texture(IntPtr resource, DXGI_FORMAT format);
 
-        [DllImport("RenderingPlugin")]
+        [DllImport("Denoiser")]
         private static extern void ReleaseTexture(IntPtr nriTex);
 
         public RTHandle Handle; // Unity RTHandle封装
