@@ -400,8 +400,7 @@ void BindlessInstance::DispatchCompute(FrameData* data)
     // 创建 Primitive Buffer View (t0) - Struct size 64
     BufferViewDesc primViewDesc = {};
     primViewDesc.buffer = pPrimBuffer;
-    primViewDesc.viewType = BufferViewType::SHADER_RESOURCE;
-    primViewDesc.format = Format::UNKNOWN; // Structured Buffer
+    primViewDesc.type = BufferView::STRUCTURED_BUFFER;
     primViewDesc.offset = 0;
     primViewDesc.size = data->numPrimitives * 64; // Size in bytes
     primViewDesc.structureStride = 64; 
@@ -413,8 +412,7 @@ void BindlessInstance::DispatchCompute(FrameData* data)
     // 这里简单假设 size 足够大，实际应由 FrameData 传入 InstanceCount
     BufferViewDesc instViewDesc = {};
     instViewDesc.buffer = pInstBuffer;
-    instViewDesc.viewType = BufferViewType::SHADER_RESOURCE;
-    instViewDesc.format = Format::UNKNOWN;
+    instViewDesc.type = BufferView::STRUCTURED_BUFFER;
     instViewDesc.offset = 0;
     instViewDesc.size = (data->InstanceCount * 80);
     instViewDesc.structureStride = 80; 
@@ -423,8 +421,7 @@ void BindlessInstance::DispatchCompute(FrameData* data)
     // 创建 Output Buffer View (u0) - Struct size 48
     BufferViewDesc outViewDesc = {};
     outViewDesc.buffer = pOutBuffer;
-    outViewDesc.viewType = BufferViewType::SHADER_RESOURCE_STORAGE;
-    outViewDesc.format = Format::UNKNOWN;
+    outViewDesc.type = BufferView::STORAGE_STRUCTURED_BUFFER;
     outViewDesc.offset = 0;
     outViewDesc.size = data->numPrimitives * 48;
     outViewDesc.structureStride = 48;
@@ -535,13 +532,13 @@ void BindlessInstance::UpdateResources(const ResourceInput* resources, int count
             continue;
         }
 
-        Texture2DViewDesc srvDesc = {};
+        TextureViewDesc srvDesc = {};
         srvDesc.texture = tex;
-        srvDesc.viewType = Texture2DViewType::SHADER_RESOURCE_2D;
+        srvDesc.type = TextureView::TEXTURE;
         srvDesc.format = resources[i].format;
 
         nri::Descriptor* view = nullptr;
-        m_NRI->CreateTexture2DView(srvDesc, view);
+        m_NRI->CreateTextureView(srvDesc, view);
 
         m_InputTextureViews.push_back(view);
 

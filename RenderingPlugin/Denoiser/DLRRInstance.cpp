@@ -45,18 +45,18 @@ nri::Descriptor* DLRRInstance::GetOrCreateDescriptor(nri::Texture* texture, bool
     // 3. 缓存未命中，创建新的视图
     const nri::TextureDesc& texDesc = nriCore.GetTextureDesc(*texture);
 
-    nri::Texture2DViewDesc viewDesc = {};
+    nri::TextureViewDesc viewDesc = {};
     viewDesc.texture = texture;
     // 根据是否是存储纹理（UAV）选择类型
-    viewDesc.viewType = isStorage
-                            ? nri::Texture2DViewType::SHADER_RESOURCE_STORAGE_2D
-                            : nri::Texture2DViewType::SHADER_RESOURCE_2D;
+    viewDesc.type = isStorage
+                            ? nri::TextureView::STORAGE_TEXTURE
+                            : nri::TextureView::TEXTURE;
     viewDesc.format = texDesc.format;
     viewDesc.mipOffset = 0;
     viewDesc.mipNum = 1;
 
     nri::Descriptor* descriptor = nullptr;
-    nri::Result res = nriCore.CreateTexture2DView(viewDesc, descriptor);
+    nri::Result res = nriCore.CreateTextureView(viewDesc, descriptor);
 
     if (res == nri::Result::SUCCESS)
     {

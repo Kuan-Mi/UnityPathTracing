@@ -64,11 +64,19 @@ namespace Nrd
         public fixed ushort rectSizePrev[2];
 
         // Scalars
-        [Range(0.0f, 2.0f)] public float viewZScale; // Default: 1.0f
+        [Range(0.0f, 2.0f)]
+        public float viewZScale; // Default: 1.0f
+
         public float timeDeltaBetweenFrames; // Default: 0.0f
-        [Range(0.0f, 1000000.0f)] public float denoisingRange; // Default: 500000.0f
-        [Range(0.01f, 0.02f)] public float disocclusionThreshold; // Default: 0.01f
-        [Range(0.02f, 0.2f)] public float disocclusionThresholdAlternate; // Default: 0.05f
+
+        [Range(0.0f, 1000000.0f)]
+        public float denoisingRange; // Default: 500000.0f
+
+        [Range(0.01f, 0.02f)]
+        public float disocclusionThreshold; // Default: 0.01f
+
+        [Range(0.02f, 0.2f)]
+        public float disocclusionThresholdAlternate; // Default: 0.05f
 
         // Material IDs
         public float cameraAttachedReflectionMaterialID; // Default: 999.0f
@@ -76,11 +84,12 @@ namespace Nrd
         public float historyFixAlternatePixelStrideMaterialID; // Default: 999.0f
 
         public float strandThickness; // Default: 80e-6f
-        [Range(0.0f, 1.0f)] 
+
+        [Range(0.0f, 1.0f)]
         public float splitScreen; // Default: 0.0f
 
         public fixed ushort printfAt[2]; // Default: {9999, 9999}
-        public float debug; // Default: 0.0f
+        public       float  debug; // Default: 0.0f
 
         public fixed uint rectOrigin[2];
 
@@ -92,7 +101,6 @@ namespace Nrd
         private byte _isMotionVectorInWorldSpace; // Default: false
         private byte _isHistoryConfidenceAvailable; // Default: false
         private byte _isDisocclusionThresholdMixAvailable; // Default: false
-        private byte _isBaseColorMetalnessAvailable; // Default: false
         private byte _enableValidation; // Default: false
 
         // -----------------------------------------------------------------------
@@ -116,18 +124,12 @@ namespace Nrd
             set => _isDisocclusionThresholdMixAvailable = value ? (byte)1 : (byte)0;
         }
 
-        public bool isBaseColorMetalnessAvailable
-        {
-            get => _isBaseColorMetalnessAvailable != 0;
-            set => _isBaseColorMetalnessAvailable = value ? (byte)1 : (byte)0;
-        }
-
         public bool enableValidation
         {
             get => _enableValidation != 0;
             set => _enableValidation = value ? (byte)1 : (byte)0;
         }
-        
+
         public static readonly CommonSettings _default = CreateDefault();
 
         // -----------------------------------------------------------------------
@@ -139,32 +141,32 @@ namespace Nrd
 
             s.worldPrevToWorldMatrix = Matrix4x4.identity;
 
-            s.motionVectorScale[0] = 1.0f;
-            s.motionVectorScale[1] = 1.0f;
-            s.motionVectorScale[2] = -1.0f;
+            s.motionVectorScale[0]       = 1.0f;
+            s.motionVectorScale[1]       = 1.0f;
+            s.motionVectorScale[2]       = -1.0f;
             s.isMotionVectorInWorldSpace = true;
 
             // Scalars
-            s.viewZScale = 1.0f;
-            s.timeDeltaBetweenFrames = 0.0f;
-            s.denoisingRange = 500000.0f;
-            s.disocclusionThreshold = 0.01f;
+            s.viewZScale                     = 1.0f;
+            s.timeDeltaBetweenFrames         = 0.0f;
+            s.denoisingRange                 = 500000.0f;
+            s.disocclusionThreshold          = 0.01f;
             s.disocclusionThresholdAlternate = 0.05f;
 
             // Material IDs
-            s.cameraAttachedReflectionMaterialID = 999.0f;
-            s.strandMaterialID = 999.0f;
+            s.cameraAttachedReflectionMaterialID       = 999.0f;
+            s.strandMaterialID                         = 999.0f;
             s.historyFixAlternatePixelStrideMaterialID = 999.0f;
 
             s.strandThickness = 0.00008f; // 80e-6f
-            s.splitScreen = 0.0f;
+            s.splitScreen     = 0.0f;
 
             // printfAt = {9999, 9999}
             s.printfAt[0] = 9999;
             s.printfAt[1] = 9999;
 
-            s.debug = 0.0f;
-            s.frameIndex = 0;
+            s.debug            = 0.0f;
+            s.frameIndex       = 0;
             s.accumulationMode = AccumulationMode.CONTINUE;
 
             return s;
@@ -180,8 +182,13 @@ namespace Nrd
     public struct SigmaSettings
     {
         public Vector3 lightDirection; // Default: {0.0, 0.0, 0.0}
-        [Range(0.0f, 1.0f)] public float planeDistanceSensitivity; // Default: 0.02f
-        [Range(0, 7)] public uint maxStabilizedFrameNum; // Default: 5
+
+        [Range(0.0f, 1.0f)]
+        public float planeDistanceSensitivity; // Default: 0.02f
+
+        [Range(0, 7)]
+        public uint maxStabilizedFrameNum; // Default: 5
+
         public static SigmaSettings _default = CreateDefault();
 
         // -----------------------------------------------------------------------
@@ -194,35 +201,33 @@ namespace Nrd
             // lightDirection defaults to 0,0,0 which is correct by default initialization
 
             s.planeDistanceSensitivity = 0.02f;
-            s.maxStabilizedFrameNum = 5;
+            s.maxStabilizedFrameNum    = 5;
 
             return s;
         }
     }
-    
+
     // ===================================================================================
     // REBLUR SETTINGS
     // ===================================================================================
 
     [Serializable]
     [StructLayout(LayoutKind.Sequential)]
-    public struct HitDistanceParameters
+    public struct ReblurHitDistanceParameters
     {
         public float A; // Default: 3.0f
         public float B; // Default: 0.1f
         public float C; // Default: 20.0f
-        public float D; // Default: -25.0f
 
-        public static readonly HitDistanceParameters _default = CreateDefault();
+        public static readonly ReblurHitDistanceParameters _default = CreateDefault();
 
-        private static HitDistanceParameters CreateDefault()
+        private static ReblurHitDistanceParameters CreateDefault()
         {
-            return new HitDistanceParameters
+            return new ReblurHitDistanceParameters
             {
                 A = 3.0f,
                 B = 0.1f,
-                C = 20.0f,
-                D = -25.0f
+                C = 20.0f
             };
         }
     }
@@ -240,7 +245,7 @@ namespace Nrd
         {
             return new ReblurAntilagSettings
             {
-                luminanceSigmaScale = 4.0f,
+                luminanceSigmaScale  = 4.0f,
                 luminanceSensitivity = 3.0f
             };
         }
@@ -251,7 +256,7 @@ namespace Nrd
     public struct ResponsiveAccumulationSettings
     {
         public float roughnessThreshold; // Default: 0.0f
-        public uint minAccumulatedFrameNum; // Default: 3
+        public uint  minAccumulatedFrameNum; // Default: 3
 
         public static readonly ResponsiveAccumulationSettings _default = CreateDefault();
 
@@ -259,7 +264,7 @@ namespace Nrd
         {
             return new ResponsiveAccumulationSettings
             {
-                roughnessThreshold = 0.0f,
+                roughnessThreshold     = 0.0f,
                 minAccumulatedFrameNum = 3
             };
         }
@@ -267,11 +272,23 @@ namespace Nrd
 
     [Serializable]
     [StructLayout(LayoutKind.Sequential)]
+    public struct ReblurConvergenceSettings
+    {
+        public float s; // Default: 1.0f
+        public float b; // Default: 0.2f
+        public float p; // Default: 0.8f
+
+        public static readonly ReblurConvergenceSettings _default = new ReblurConvergenceSettings { s = 1.0f, b = 0.2f, p = 0.8f };
+    }
+
+    [Serializable]
+    [StructLayout(LayoutKind.Sequential)]
     public unsafe struct ReblurSettings
     {
-        public HitDistanceParameters hitDistanceParameters;
-        public ReblurAntilagSettings antilagSettings;
+        public ReblurHitDistanceParameters    hitDistanceParameters;
+        public ReblurAntilagSettings          antilagSettings;
         public ResponsiveAccumulationSettings responsiveAccumulationSettings;
+        public ReblurConvergenceSettings      convergenceSettings;
 
         public uint maxAccumulatedFrameNum; // Default: 30
         public uint maxFastAccumulatedFrameNum; // Default: 6
@@ -297,14 +314,14 @@ namespace Nrd
         public float minMaterialForDiffuse; // Default: 4.0f
         public float minMaterialForSpecular; // Default: 4.0f
 
-        public CheckerboardMode checkerboardMode; // Default: OFF
+        public CheckerboardMode              checkerboardMode; // Default: OFF
         public HitDistanceReconstructionMode hitDistanceReconstructionMode; // Default: OFF
 
         // Bools (mapped to byte for interop safety)
         private byte _enableAntiFirefly; // Default: false
         private byte _usePrepassOnlyForSpecularMotionEstimation; // Default: false
         private byte _returnHistoryLengthInsteadOfOcclusion; // Default: false
-        
+
         // -----------------------------------------------------------------------
         // Boolean Properties
         // -----------------------------------------------------------------------
@@ -334,47 +351,47 @@ namespace Nrd
         private static ReblurSettings CreateDefault()
         {
             var s = new ReblurSettings();
-            
-            s.hitDistanceParameters = HitDistanceParameters._default;
-            s.antilagSettings = ReblurAntilagSettings._default;
+
+            s.hitDistanceParameters          = ReblurHitDistanceParameters._default;
+            s.antilagSettings                = ReblurAntilagSettings._default;
             s.responsiveAccumulationSettings = ResponsiveAccumulationSettings._default;
+            s.convergenceSettings            = ReblurConvergenceSettings._default;
 
-            s.maxAccumulatedFrameNum = 30;
+            s.maxAccumulatedFrameNum     = 30;
             s.maxFastAccumulatedFrameNum = 6;
-            s.maxStabilizedFrameNum = 63; // REBLUR_MAX_HISTORY_FRAME_NUM
+            s.maxStabilizedFrameNum      = 63; // REBLUR_MAX_HISTORY_FRAME_NUM
 
-            s.historyFixFrameNum = 3;
-            s.historyFixBasePixelStride = 14;
+            s.historyFixFrameNum             = 3;
+            s.historyFixBasePixelStride      = 14;
             s.historyFixAlternatePixelStride = 14;
 
             s.fastHistoryClampingSigmaScale = 2.0f;
-            s.diffusePrepassBlurRadius = 30.0f;
-            s.specularPrepassBlurRadius = 50.0f;
+            s.diffusePrepassBlurRadius      = 30.0f;
+            s.specularPrepassBlurRadius     = 50.0f;
 
             s.minHitDistanceWeight = 0.1f;
-            s.minBlurRadius = 1.0f;
-            s.maxBlurRadius = 30.0f;
+            s.minBlurRadius        = 1.0f;
+            s.maxBlurRadius        = 30.0f;
 
-            s.lobeAngleFraction = 0.15f;
-            s.roughnessFraction = 0.15f;
+            s.lobeAngleFraction        = 0.15f;
+            s.roughnessFraction        = 0.15f;
             s.planeDistanceSensitivity = 0.02f;
 
             s.specularProbabilityThresholdsForMvModification[0] = 0.5f;
             s.specularProbabilityThresholdsForMvModification[1] = 0.9f;
 
             s.fireflySuppressorMinRelativeScale = 2.0f;
-            s.minMaterialForDiffuse = 4.0f;
-            s.minMaterialForSpecular = 4.0f;
+            s.minMaterialForDiffuse             = 4.0f;
+            s.minMaterialForSpecular            = 4.0f;
 
-            s.checkerboardMode = CheckerboardMode.OFF;
+            s.checkerboardMode              = CheckerboardMode.OFF;
             s.hitDistanceReconstructionMode = HitDistanceReconstructionMode.OFF;
 
-            s.enableAntiFirefly = false;
+            s.enableAntiFirefly                         = false;
             s.usePrepassOnlyForSpecularMotionEstimation = false;
-            s.returnHistoryLengthInsteadOfOcclusion = false;
+            s.returnHistoryLengthInsteadOfOcclusion     = false;
 
             return s;
         }
     }
-
 }
