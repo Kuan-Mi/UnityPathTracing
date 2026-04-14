@@ -111,20 +111,20 @@ macro(setup_unity_plugin TARGET)
             # dxcompiler.dll + dxil.dll
             add_custom_command(TARGET ${TARGET} POST_BUILD
                 COMMAND ${CMAKE_COMMAND} -E copy_if_different
-                    "${CMAKE_CURRENT_SOURCE_DIR}/_deps/dxc-src/bin/x64/dxcompiler.dll"
+                    "${FETCHCONTENT_BASE_DIR}/dxc-src/bin/x64/dxcompiler.dll"
                     "${UNITY_PLUGINS_DIR}/dxcompiler.dll"
                 COMMAND ${CMAKE_COMMAND} -E copy_if_different
-                    "${CMAKE_CURRENT_SOURCE_DIR}/_deps/dxc-src/bin/x64/dxil.dll"
+                    "${FETCHCONTENT_BASE_DIR}/dxc-src/bin/x64/dxil.dll"
                     "${UNITY_PLUGINS_DIR}/dxil.dll"
                 COMMENT "Copying dxcompiler.dll and dxil.dll to Unity Plugins"
             )
             # nvngx_dlss.dll / nvngx_dlssd.dll  (rel in Release, dev in Debug)
             add_custom_command(TARGET ${TARGET} POST_BUILD
                 COMMAND ${CMAKE_COMMAND} -E copy_if_different
-                    "${CMAKE_CURRENT_SOURCE_DIR}/_deps/ngx-src/lib/Windows_x86_64/$<IF:$<CONFIG:Debug>,dev,rel>/nvngx_dlss.dll"
+                    "${FETCHCONTENT_BASE_DIR}/ngx-src/lib/Windows_x86_64/$<IF:$<CONFIG:Debug>,dev,rel>/nvngx_dlss.dll"
                     "${UNITY_PLUGINS_DIR}/nvngx_dlss.dll"
                 COMMAND ${CMAKE_COMMAND} -E copy_if_different
-                    "${CMAKE_CURRENT_SOURCE_DIR}/_deps/ngx-src/lib/Windows_x86_64/$<IF:$<CONFIG:Debug>,dev,rel>/nvngx_dlssd.dll"
+                    "${FETCHCONTENT_BASE_DIR}/ngx-src/lib/Windows_x86_64/$<IF:$<CONFIG:Debug>,dev,rel>/nvngx_dlssd.dll"
                     "${UNITY_PLUGINS_DIR}/nvngx_dlssd.dll"
                 COMMENT "Copying nvngx_dlss.dll and nvngx_dlssd.dll to Unity Plugins"
             )
@@ -147,8 +147,8 @@ target_include_directories(Denoiser PRIVATE
     # NRD Integration helper (NRDIntegration.h, NRDIntegration.hpp)
     "${CMAKE_CURRENT_SOURCE_DIR}/External/NRD/Integration"
     # Agility SDK headers MUST come before Windows SDK so its d3d12.h overrides the older system one
-    "${CMAKE_BINARY_DIR}/_deps/agilitysdk-src/build/native/include"
-    "${CMAKE_BINARY_DIR}/_deps/agilitysdk-src/build/native/include/d3dx12"
+    "${FETCHCONTENT_BASE_DIR}/agilitysdk-src/build/native/include"
+    "${FETCHCONTENT_BASE_DIR}/agilitysdk-src/build/native/include/d3dx12"
     "${WIN_SDK_INC}/um"
     "${WIN_SDK_INC}/shared"
 )
@@ -172,8 +172,8 @@ add_library(PrepareLight SHARED
 
 target_include_directories(PrepareLight PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}
-    "${CMAKE_BINARY_DIR}/_deps/agilitysdk-src/build/native/include"
-    "${CMAKE_BINARY_DIR}/_deps/agilitysdk-src/build/native/include/d3dx12"
+    "${FETCHCONTENT_BASE_DIR}/agilitysdk-src/build/native/include"
+    "${FETCHCONTENT_BASE_DIR}/agilitysdk-src/build/native/include/d3dx12"
     "${WIN_SDK_INC}/um"
     "${WIN_SDK_INC}/shared"
 )
