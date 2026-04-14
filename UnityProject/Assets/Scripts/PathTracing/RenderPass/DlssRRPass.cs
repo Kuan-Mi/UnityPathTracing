@@ -43,7 +43,7 @@ namespace PathTracing
             internal IntPtr RRDataPtr;
         }
 
-        [DllImport("RenderingPlugin")]
+        [DllImport("Denoiser")]
         private static extern IntPtr GetRenderEventAndDataFunc();
 
         static void ExecutePass(PassData data, UnsafeGraphContext context)

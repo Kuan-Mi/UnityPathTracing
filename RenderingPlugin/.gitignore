@@ -5,6 +5,12 @@
 # CMake build output
 _Build/
 
+# External dependencies build cache (NRI/NRD compiled artifacts)
+_ExternalBuild/
+
+# FetchContent download cache (persists across builds, not for VCS)
+_deps/
+
 # MSVC build output
 x64/
 *.user

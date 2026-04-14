@@ -28,7 +28,12 @@ message(STATUS "Windows SDK: ${WIN_SDK_PATH} version ${WIN_SDK_VERSION}")
 set(WIN_SDK_INC "${WIN_SDK_PATH}/Include/${WIN_SDK_VERSION}")
 
 # ---------------------------------------------------------------------------
-# NRI – D3D12 only, disable unnecessary backends and SDKs
+# Keep FetchContent downloads outside _Build so they survive cache resets
+# ---------------------------------------------------------------------------
+set(FETCHCONTENT_BASE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/_deps" CACHE PATH "FetchContent download cache")
+
+# ---------------------------------------------------------------------------
+# NRI – D3D12 only, shared by both plugin targets
 # ---------------------------------------------------------------------------
 option(NRI_STATIC_LIBRARY "" OFF)
 option(NRI_ENABLE_VK_SUPPORT "" OFF)
@@ -42,30 +47,103 @@ option(NRI_ENABLE_NIS_SDK "" OFF)
 option(NRI_ENABLE_IMGUI_EXTENSION "" OFF)
 option(NRI_ENABLE_NGX_SDK "" ON)
 
-add_subdirectory(External/NRI NRI_build)
+add_subdirectory(External/NRI "${CMAKE_CURRENT_SOURCE_DIR}/_ExternalBuild/NRI_build")
 
 # ---------------------------------------------------------------------------
-# NRD – NRI target already present, no FetchContent needed
+# NRD – used by Denoiser only; NRI target already present above
 # ---------------------------------------------------------------------------
-option(NRD_NRI "" OFF)           # NRI target already exists above
+option(NRD_NRI "" OFF)
 option(NRD_STATIC_LIBRARY "" OFF)
 option(NRD_EMBEDS_SPIRV_SHADERS "" OFF)
 option(NRD_EMBEDS_DXBC_SHADERS "" OFF)
 
-add_subdirectory(External/NRD NRD_build)
+add_subdirectory(External/NRD "${CMAKE_CURRENT_SOURCE_DIR}/_ExternalBuild/NRD_build")
 
 # ---------------------------------------------------------------------------
-# RenderingPlugin DLL
+# Output / copy option
 # ---------------------------------------------------------------------------
-add_library(RenderingPlugin SHARED
-    RenderingPlugin/DLRRInstance.cpp
-    RenderingPlugin/NrdInstance.cpp
-    RenderingPlugin/RenderingPlugin.cpp
-    RenderingPlugin/RenderSystem.cpp
+option(NR_SKIP_UNITY_COPY "Build only; do not copy output to the Unity project" OFF)
+
+set(UNITY_PLUGINS_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../UnityProject/Assets/Plugins/x86_64")
+
+# Helper macro: configure output dir and post-build DLL copy for a plugin target
+# Usage: setup_unity_plugin(<target> [COPY_NRD])
+macro(setup_unity_plugin TARGET)
+    cmake_parse_arguments(_P "COPY_NRD" "" "" ${ARGN})
+
+    if(NR_SKIP_UNITY_COPY)
+        message(STATUS "NR_SKIP_UNITY_COPY=ON: output for ${TARGET} stays in build dir.")
+    else()
+        set_target_properties(${TARGET} PROPERTIES
+            RUNTIME_OUTPUT_DIRECTORY         "${UNITY_PLUGINS_DIR}"
+            RUNTIME_OUTPUT_DIRECTORY_RELEASE "${UNITY_PLUGINS_DIR}"
+            RUNTIME_OUTPUT_DIRECTORY_DEBUG   "${UNITY_PLUGINS_DIR}"
+            PDB_OUTPUT_DIRECTORY             "${UNITY_PLUGINS_DIR}"
+            PDB_OUTPUT_DIRECTORY_RELEASE     "${UNITY_PLUGINS_DIR}"
+            PDB_OUTPUT_DIRECTORY_DEBUG       "${UNITY_PLUGINS_DIR}"
+        )
+
+        add_custom_command(TARGET ${TARGET} POST_BUILD
+            COMMAND ${CMAKE_COMMAND} -E make_directory "${UNITY_PLUGINS_DIR}"
+            COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                $<TARGET_FILE:NRI>
+                "${UNITY_PLUGINS_DIR}/$<TARGET_FILE_NAME:NRI>"
+            COMMAND ${CMAKE_COMMAND} -E $<IF:$<CONFIG:Debug>,copy_if_different,true>
+                "$<$<CONFIG:Debug>:$<TARGET_PDB_FILE:${TARGET}>>"
+                "$<$<CONFIG:Debug>:${UNITY_PLUGINS_DIR}/$<TARGET_PDB_FILE_NAME:${TARGET}>>"
+            COMMAND ${CMAKE_COMMAND} -E $<IF:$<CONFIG:Debug>,copy_if_different,true>
+                "$<$<CONFIG:Debug>:$<TARGET_PDB_FILE:NRI>>"
+                "$<$<CONFIG:Debug>:${UNITY_PLUGINS_DIR}/$<TARGET_PDB_FILE_NAME:NRI>>"
+            COMMENT "Copying ${TARGET} and NRI DLLs (and PDBs in Debug) to Unity Plugins"
+        )
+
+        if(_P_COPY_NRD)
+            # NRD.dll + PDB
+            add_custom_command(TARGET ${TARGET} POST_BUILD
+                COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                    $<TARGET_FILE:NRD>
+                    "${UNITY_PLUGINS_DIR}/$<TARGET_FILE_NAME:NRD>"
+                COMMAND ${CMAKE_COMMAND} -E $<IF:$<CONFIG:Debug>,copy_if_different,true>
+                    "$<$<CONFIG:Debug>:$<TARGET_PDB_FILE:NRD>>"
+                    "$<$<CONFIG:Debug>:${UNITY_PLUGINS_DIR}/$<TARGET_PDB_FILE_NAME:NRD>>"
+                COMMENT "Copying NRD DLL (and PDB in Debug) to Unity Plugins"
+            )
+            # dxcompiler.dll + dxil.dll
+            add_custom_command(TARGET ${TARGET} POST_BUILD
+                COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                    "${CMAKE_CURRENT_SOURCE_DIR}/_deps/dxc-src/bin/x64/dxcompiler.dll"
+                    "${UNITY_PLUGINS_DIR}/dxcompiler.dll"
+                COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                    "${CMAKE_CURRENT_SOURCE_DIR}/_deps/dxc-src/bin/x64/dxil.dll"
+                    "${UNITY_PLUGINS_DIR}/dxil.dll"
+                COMMENT "Copying dxcompiler.dll and dxil.dll to Unity Plugins"
+            )
+            # nvngx_dlss.dll / nvngx_dlssd.dll  (rel in Release, dev in Debug)
+            add_custom_command(TARGET ${TARGET} POST_BUILD
+                COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                    "${CMAKE_CURRENT_SOURCE_DIR}/_deps/ngx-src/lib/Windows_x86_64/$<IF:$<CONFIG:Debug>,dev,rel>/nvngx_dlss.dll"
+                    "${UNITY_PLUGINS_DIR}/nvngx_dlss.dll"
+                COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                    "${CMAKE_CURRENT_SOURCE_DIR}/_deps/ngx-src/lib/Windows_x86_64/$<IF:$<CONFIG:Debug>,dev,rel>/nvngx_dlssd.dll"
+                    "${UNITY_PLUGINS_DIR}/nvngx_dlssd.dll"
+                COMMENT "Copying nvngx_dlss.dll and nvngx_dlssd.dll to Unity Plugins"
+            )
+        endif()
+    endif()
+endmacro()
+
+# ---------------------------------------------------------------------------
+# Denoiser DLL  (NRD + NRI denoising plugin)
+# ---------------------------------------------------------------------------
+add_library(Denoiser SHARED
+    Denoiser/DLRRInstance.cpp
+    Denoiser/NrdInstance.cpp
+    Denoiser/RenderingPlugin.cpp
+    Denoiser/RenderSystem.cpp
 )
 
-target_include_directories(RenderingPlugin PRIVATE
-    RenderingPlugin/Unity
+target_include_directories(Denoiser PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}
     # NRD Integration helper (NRDIntegration.h, NRDIntegration.hpp)
     "${CMAKE_CURRENT_SOURCE_DIR}/External/NRD/Integration"
     # Agility SDK headers MUST come before Windows SDK so its d3d12.h overrides the older system one
@@ -76,49 +154,33 @@ target_include_directories(RenderingPlugin PRIVATE
 )
 
 # Suppress C4819: treat source and execution character set as UTF-8
-target_compile_options(RenderingPlugin PRIVATE /utf-8)
+target_compile_options(Denoiser PRIVATE /utf-8)
 
 # NRD and NRI CMake targets carry their public include dirs transitively
-target_link_libraries(RenderingPlugin PRIVATE NRD NRI)
+target_link_libraries(Denoiser PRIVATE NRD NRI)
+
+setup_unity_plugin(Denoiser COPY_NRD)
 
 # ---------------------------------------------------------------------------
-# Output – copy DLLs to Unity Plugins folder unless skipped (CI)
+# PrepareLight DLL  (NRI bindless light-preparation plugin)
 # ---------------------------------------------------------------------------
-option(NR_SKIP_UNITY_COPY "Build only; do not copy output to the Unity project" OFF)
+add_library(PrepareLight SHARED
+    PrepareLight/BindlessInstance.cpp
+    PrepareLight/RenderingPlugin.cpp
+    PrepareLight/RenderSystem.cpp
+)
 
-set(UNITY_PLUGINS_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../UnityProject/Assets/Plugins/x86_64")
+target_include_directories(PrepareLight PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}
+    "${CMAKE_BINARY_DIR}/_deps/agilitysdk-src/build/native/include"
+    "${CMAKE_BINARY_DIR}/_deps/agilitysdk-src/build/native/include/d3dx12"
+    "${WIN_SDK_INC}/um"
+    "${WIN_SDK_INC}/shared"
+)
 
-if(NR_SKIP_UNITY_COPY)
-    message(STATUS "NR_SKIP_UNITY_COPY=ON: output stays in build dir, Unity folder untouched.")
-else()
-    set_target_properties(RenderingPlugin PROPERTIES
-        RUNTIME_OUTPUT_DIRECTORY         "${UNITY_PLUGINS_DIR}"
-        RUNTIME_OUTPUT_DIRECTORY_RELEASE "${UNITY_PLUGINS_DIR}"
-        RUNTIME_OUTPUT_DIRECTORY_DEBUG   "${UNITY_PLUGINS_DIR}"
-        PDB_OUTPUT_DIRECTORY             "${UNITY_PLUGINS_DIR}"
-        PDB_OUTPUT_DIRECTORY_RELEASE     "${UNITY_PLUGINS_DIR}"
-        PDB_OUTPUT_DIRECTORY_DEBUG       "${UNITY_PLUGINS_DIR}"
-    )
+target_compile_options(PrepareLight PRIVATE /utf-8)
 
-    # Copy NRD.dll and NRI.dll after build
-    add_custom_command(TARGET RenderingPlugin POST_BUILD
-        COMMAND ${CMAKE_COMMAND} -E make_directory "${UNITY_PLUGINS_DIR}"
-        COMMAND ${CMAKE_COMMAND} -E copy_if_different
-            $<TARGET_FILE:NRD>
-            "${UNITY_PLUGINS_DIR}/$<TARGET_FILE_NAME:NRD>"
-        COMMAND ${CMAKE_COMMAND} -E copy_if_different
-            $<TARGET_FILE:NRI>
-            "${UNITY_PLUGINS_DIR}/$<TARGET_FILE_NAME:NRI>"
-        # Copy PDB files in Debug config (cmake -E true is a no-op in Release)
-        COMMAND ${CMAKE_COMMAND} -E $<IF:$<CONFIG:Debug>,copy_if_different,true>
-            "$<$<CONFIG:Debug>:$<TARGET_PDB_FILE:RenderingPlugin>>"
-            "$<$<CONFIG:Debug>:${UNITY_PLUGINS_DIR}/$<TARGET_PDB_FILE_NAME:RenderingPlugin>>"
-        COMMAND ${CMAKE_COMMAND} -E $<IF:$<CONFIG:Debug>,copy_if_different,true>
-            "$<$<CONFIG:Debug>:$<TARGET_PDB_FILE:NRD>>"
-            "$<$<CONFIG:Debug>:${UNITY_PLUGINS_DIR}/$<TARGET_PDB_FILE_NAME:NRD>>"
-        COMMAND ${CMAKE_COMMAND} -E $<IF:$<CONFIG:Debug>,copy_if_different,true>
-            "$<$<CONFIG:Debug>:$<TARGET_PDB_FILE:NRI>>"
-            "$<$<CONFIG:Debug>:${UNITY_PLUGINS_DIR}/$<TARGET_PDB_FILE_NAME:NRI>>"
-        COMMENT "Copying RenderingPlugin, NRD, NRI DLLs (and PDBs in Debug) to Unity Plugins"
-    )
-endif()
+# NRI carries its public include dirs transitively
+target_link_libraries(PrepareLight PRIVATE NRI)
+
+setup_unity_plugin(PrepareLight)
