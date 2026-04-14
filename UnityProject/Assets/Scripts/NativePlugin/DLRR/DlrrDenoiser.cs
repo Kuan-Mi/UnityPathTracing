@@ -11,10 +11,10 @@ namespace DLRR
 {
     public class DlrrDenoiser : IDisposable
     {
-        [DllImport("RenderingPlugin")]
+        [DllImport("Denoiser")]
         private static extern int CreateDLRRInstance();
 
-        [DllImport("RenderingPlugin")]
+        [DllImport("Denoiser")]
         private static extern void DestroyDLRRInstance(int id);
 
         private readonly int _instanceId;

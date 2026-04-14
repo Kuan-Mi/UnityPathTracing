@@ -2,4 +2,14 @@
 .idea/
 .vscode/
 
+# Unity generated
+UnityProject/Library/
+UnityProject/Temp/
+UnityProject/obj/
+UnityProject/Builds/
+UnityProject/Logs/
+UnityProject/UserSettings/
+UnityProject/ProfilerCaptures/
+UnityProject/*.sln
+UnityProject/*.csproj
 
