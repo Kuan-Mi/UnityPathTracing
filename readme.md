@@ -12,6 +12,8 @@ Due to the lack of Bindless and SER support, there are still gaps in performance
 
 Blog post: [NRDSample Implementation in Unity](https://www.kuanmi.top/2026/01/22/UnityNRD)
 
+Blog post: [RTXDI Implementation in Unity](https://www.kuanmi.top/2026/04/14/UnityRtxdi/)
+
 ---
 
 ## Features
@@ -30,6 +32,16 @@ Blog post: [NRDSample Implementation in Unity](https://www.kuanmi.top/2026/01/22
 - [x] **Auto Exposure**: Histogram-based auto exposure
 - [x] **Subsurface Scattering**: RTXCR integrated, supports transmission (direct light)
 - [ ] **Volumetric Lighting**: Planned
+
+---
+
+## How to Run
+
+```bash
+git clone https://github.com/Kuan-Mi/UnityPathTracing
+cd UnityPathTracing
+build.bat
+```
 
 ---
 
@@ -61,6 +73,8 @@ Thanks to [inedelcu](https://github.com/INedelcu) for the great help with writin
 
 详见博客：[NRDSample 在 Unity 中的实现](https://www.kuanmi.top/2026/01/22/UnityNRD)
 
+详见博客：[RTXDI 在 Unity 中的实现](https://www.kuanmi.top/2026/04/14/UnityRtxdi/)
+
 ---
 
 ## 功能特性
@@ -79,6 +93,16 @@ Thanks to [inedelcu](https://github.com/INedelcu) for the great help with writin
 - [x] **自动曝光**：基于直方图的自动曝光
 - [x] **次表面散射**：集成 RTXCR，支持透射（直接光）
 - [ ] **体积光**：待实现
+
+---
+
+## 如何运行
+
+```bash
+git clone https://github.com/Kuan-Mi/UnityPathTracing
+cd UnityPathTracing
+build.bat
+```
 
 ---
 
