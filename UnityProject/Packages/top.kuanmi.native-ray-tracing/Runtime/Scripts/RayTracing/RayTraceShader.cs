@@ -241,6 +241,11 @@ namespace NativeRender
             if (!IsValid) return;
             NativeRenderPlugin.NR_RTS_SetConstantBuffer(_handle, name, buffer.GetNativeBufferPtr());
         }
+        public void SetConstantBuffer(string name, GraphicsBuffer buffer)
+        {
+            if (!IsValid) return;
+            NativeRenderPlugin.NR_RTS_SetConstantBuffer(_handle, name, buffer.GetNativeBufferPtr());
+        }
 
         /// <summary>Binds a GraphicsBuffer as a StructuredBuffer SRV (provides stride and count automatically).</summary>
         public void SetStructuredBuffer(string name, GraphicsBuffer buffer)

@@ -2,61 +2,79 @@
 setlocal enabledelayedexpansion
 
 echo ============================================================
-echo  RenderingPlugin Build
+echo  NativeRenderPlugin Build
 echo ============================================================
 echo.
 
-:: Initialize / update git submodules (NRD + NRI)
-echo Initializing git submodules...
-git submodule update --init --recursive
-if %ERRORLEVEL% NEQ 0 (
-    echo [ERROR] git submodule update failed.
-    exit /b %ERRORLEVEL%
+:: Check for Unity Plugin API headers
+set UNITY_HEADERS=NativePlugin\shared\include\unity\IUnityInterface.h
+if not exist "%UNITY_HEADERS%" (
+    echo [ERROR] Unity Plugin API headers not found.
+    echo.
+    echo Please copy the following files from your Unity installation:
+    echo   ^<UnityInstall^>\Editor\Data\PluginAPI\IUnityInterface.h
+    echo   ^<UnityInstall^>\Editor\Data\PluginAPI\IUnityGraphics.h
+    echo   ^<UnityInstall^>\Editor\Data\PluginAPI\IUnityGraphicsD3D12.h
+    echo   ^<UnityInstall^>\Editor\Data\PluginAPI\IUnityRenderingExtensions.h
+    echo.
+    echo To: NativePlugin\shared\include\unity\
+    echo.
+
+    :: Try to auto-locate Unity
+    set UNITY_COMMON="C:\Program Files\Unity\Hub\Editor"
+    if exist !UNITY_COMMON! (
+        echo Attempting to auto-copy from latest Unity installation...
+        for /f "delims=" %%v in ('dir /b /ad /o-n "!UNITY_COMMON!"') do (
+            set UNITY_PLUGIN_API=!UNITY_COMMON!\%%v\Editor\Data\PluginAPI
+            if exist "!UNITY_PLUGIN_API!\IUnityInterface.h" (
+                echo Found: !UNITY_PLUGIN_API!
+                mkdir NativePlugin\shared\include\unity 2>nul
+                copy "!UNITY_PLUGIN_API!\IUnityInterface.h"           NativePlugin\shared\include\unity\ >nul
+                copy "!UNITY_PLUGIN_API!\IUnityGraphics.h"            NativePlugin\shared\include\unity\ >nul
+                copy "!UNITY_PLUGIN_API!\IUnityGraphicsD3D12.h"       NativePlugin\shared\include\unity\ >nul
+                copy "!UNITY_PLUGIN_API!\IUnityRenderingExtensions.h" NativePlugin\shared\include\unity\ >nul
+                echo Headers copied successfully.
+                goto :headers_ok
+            )
+        )
+    )
+
+    echo Could not auto-locate Unity. Please copy headers manually.
+    exit /b 1
 )
-echo [OK] Submodules ready.
+
+:headers_ok
+echo [OK] Unity Plugin API headers found.
 echo.
 
-:: Allow overriding config via first argument, e.g.: build.bat Debug
-:: Pass --reconfigure as second argument to force a full CMake reconfigure
-set BUILD_CONFIG=Release
-if not "%~1"=="" set BUILD_CONFIG=%~1
+:: Configure CMake
+echo Configuring CMake...
+cd NativePlugin
+if not exist build mkdir build
+cd build
 
-set BUILD_DIR=RenderingPlugin\_Build
-set FORCE_RECONFIGURE=0
-if /i "%~2"=="--reconfigure" set FORCE_RECONFIGURE=1
-
-:: Configure only when necessary (first run, or --reconfigure requested)
-if not exist "%BUILD_DIR%\CMakeCache.txt" set FORCE_RECONFIGURE=1
-
-if "%FORCE_RECONFIGURE%"=="0" goto :skip_configure
-
-echo Configuring CMake (config: %BUILD_CONFIG%)...
-if exist "%BUILD_DIR%\CMakeCache.txt" del /f /q "%BUILD_DIR%\CMakeCache.txt"
-cmake -S RenderingPlugin -B "%BUILD_DIR%" -G "Visual Studio 17 2022" -A x64
-if %ERRORLEVEL% NEQ 0 (
+cmake .. -G "Visual Studio 17 2022" -A x64 -DNR_SKIP_UNITY_COPY=ON
+if errorlevel 1 (
     echo [ERROR] CMake configuration failed.
-    exit /b %ERRORLEVEL%
+    cd ..\..
+    exit /b 1
 )
-goto :build
 
-:skip_configure
-echo [SKIP] CMake already configured. Pass --reconfigure to force.
-
-:build
-
-:: Build
 echo.
-echo Building (%BUILD_CONFIG%)...
-cmake --build "%BUILD_DIR%" --config %BUILD_CONFIG% -j %NUMBER_OF_PROCESSORS%
-if %ERRORLEVEL% NEQ 0 (
+echo Building...
+cmake --build . --config Debug
+if errorlevel 1 (
     echo [ERROR] Build failed.
-    exit /b %ERRORLEVEL%
+    cd ..\..
+    exit /b 1
 )
+
+cd ..\..
 
 echo.
 echo ============================================================
-echo  Build successful!  [%BUILD_CONFIG%]
-echo  DLLs copied to: UnityProject\Assets\Plugins\x86_64\
+echo  Build successful!
+echo  Output: NativePlugin\build\Debug\
 echo ============================================================
 echo.
 exit /b 0
