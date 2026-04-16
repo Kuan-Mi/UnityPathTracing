@@ -439,11 +439,14 @@ bool RayTraceShader::ReflectUserBindings(IDxcBlob* shaderLib)
 // -------------------------------------------------------------------------
 bool RayTraceShader::BuildRootSignature()
 {
+    std::vector<D3D12_DESCRIPTOR_RANGE1> allRanges;
+    allRanges.reserve(m_numSRV + m_numUAV + m_numSRVArray);
+    Logf(kUnityLogTypeLog, "RayTraceShader::BuildRootSignature: %u SRV, %u UAV, %u SRV_ARRAY bindings",
+         m_numSRV, m_numUAV, m_numSRVArray);
+
+
     // --- SRV descriptor ranges (one per SRV/TLAS binding) ---
-    std::vector<D3D12_DESCRIPTOR_RANGE1> srvRanges;
-    std::vector<std::string>             srvRangeNames; // parallel: binding name per range
-    srvRanges.reserve(m_numSRV);
-    srvRangeNames.reserve(m_numSRV);
+    const size_t srvRangesOffset = allRanges.size();
     for (const auto& b : m_userBindings)
     {
         if (b.type != UserBindingType::SRV && b.type != UserBindingType::TLAS) continue;
@@ -454,15 +457,13 @@ bool RayTraceShader::BuildRootSignature()
         r.RegisterSpace                     = b.space;
         r.Flags                             = D3D12_DESCRIPTOR_RANGE_FLAG_DATA_VOLATILE;
         r.OffsetInDescriptorsFromTableStart = b.heapOffset;
-        srvRanges.push_back(r);
-        srvRangeNames.push_back(b.name);
+        allRanges.push_back(r);
+        Logf(kUnityLogTypeLog, "  SRV/TLAS binding: name='%s' t%u space%u heapOffset=%u",
+             b.name.c_str(), b.registerIndex, b.space, b.heapOffset);
     }
 
     // --- UAV descriptor ranges (one per UAV binding) ---
-    std::vector<D3D12_DESCRIPTOR_RANGE1> uavRanges;
-    std::vector<std::string>             uavRangeNames; // parallel: binding name per range
-    uavRanges.reserve(m_numUAV);
-    uavRangeNames.reserve(m_numUAV);
+    const size_t uavRangesOffset = allRanges.size();
     for (const auto& b : m_userBindings)
     {
         if (b.type != UserBindingType::UAV) continue;
@@ -473,13 +474,13 @@ bool RayTraceShader::BuildRootSignature()
         r.RegisterSpace                     = b.space;
         r.Flags                             = D3D12_DESCRIPTOR_RANGE_FLAG_DATA_VOLATILE;
         r.OffsetInDescriptorsFromTableStart = b.heapOffset;
-        uavRanges.push_back(r);
-        uavRangeNames.push_back(b.name);
+        allRanges.push_back(r);
+        Logf(kUnityLogTypeLog, "  UAV binding: name='%s' t%u space%u heapOffset=%u",
+             b.name.c_str(), b.registerIndex, b.space, b.heapOffset);
     }
 
     // --- SRV_ARRAY descriptor ranges (one per unbounded array binding) ---
-    std::vector<D3D12_DESCRIPTOR_RANGE1> srvArrayRanges;
-    srvArrayRanges.reserve(m_numSRVArray);
+    const size_t srvArrayRangesOffset = allRanges.size();
     for (const auto& b : m_userBindings)
     {
         if (b.type != UserBindingType::SRV_ARRAY) continue;
@@ -490,7 +491,9 @@ bool RayTraceShader::BuildRootSignature()
         r.RegisterSpace                     = b.space;
         r.Flags                             = D3D12_DESCRIPTOR_RANGE_FLAG_DESCRIPTORS_VOLATILE | D3D12_DESCRIPTOR_RANGE_FLAG_DATA_VOLATILE;
         r.OffsetInDescriptorsFromTableStart = 0;
-        srvArrayRanges.push_back(r);
+        allRanges.push_back(r);
+        Logf(kUnityLogTypeLog, "  SRV_ARRAY binding: name='%s' t%u space%u heapOffset=%u",
+             b.name.c_str(), b.registerIndex, b.space, b.heapOffset);
     }
 
     std::vector<D3D12_ROOT_PARAMETER1> params;
@@ -502,10 +505,11 @@ bool RayTraceShader::BuildRootSignature()
         m_rootParamSRV = static_cast<uint32_t>(params.size());
         D3D12_ROOT_PARAMETER1 p = {};
         p.ParameterType                       = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
-        p.DescriptorTable.NumDescriptorRanges = static_cast<UINT>(srvRanges.size());
-        p.DescriptorTable.pDescriptorRanges   = srvRanges.data();
+        p.DescriptorTable.NumDescriptorRanges = m_numSRV;
+        p.DescriptorTable.pDescriptorRanges   = &allRanges[srvRangesOffset];
         p.ShaderVisibility                    = D3D12_SHADER_VISIBILITY_ALL;
         params.push_back(p);
+        Logf(kUnityLogTypeLog, "  Root param %u: SRV table with %u descriptors", m_rootParamSRV, m_numSRV);
     }
     // Optional - UAV table
     if (m_numUAV > 0)
@@ -513,10 +517,11 @@ bool RayTraceShader::BuildRootSignature()
         m_rootParamUAV = static_cast<uint32_t>(params.size());
         D3D12_ROOT_PARAMETER1 p = {};
         p.ParameterType                       = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
-        p.DescriptorTable.NumDescriptorRanges = static_cast<UINT>(uavRanges.size());
-        p.DescriptorTable.pDescriptorRanges   = uavRanges.data();
+        p.DescriptorTable.NumDescriptorRanges = m_numUAV;
+        p.DescriptorTable.pDescriptorRanges   = &allRanges[uavRangesOffset];
         p.ShaderVisibility                    = D3D12_SHADER_VISIBILITY_ALL;
         params.push_back(p);
+        Logf(kUnityLogTypeLog, "  Root param %u: UAV table with %u descriptors", m_rootParamUAV, m_numUAV);
     }
     // One table per SRV_ARRAY
     {
@@ -528,9 +533,11 @@ bool RayTraceShader::BuildRootSignature()
             D3D12_ROOT_PARAMETER1 p = {};
             p.ParameterType                       = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
             p.DescriptorTable.NumDescriptorRanges = 1;
-            p.DescriptorTable.pDescriptorRanges   = &srvArrayRanges[arrayIdx++];
+            p.DescriptorTable.pDescriptorRanges   = &allRanges[srvArrayRangesOffset + arrayIdx++];
             p.ShaderVisibility                    = D3D12_SHADER_VISIBILITY_ALL;
             params.push_back(p);
+            Logf(kUnityLogTypeLog, "  Root param %u: SRV_ARRAY '%s' with unbounded descriptors",
+                 b.rootParam, b.name.c_str());
         }
     }
     // One root CBV per CBV binding
@@ -546,6 +553,7 @@ bool RayTraceShader::BuildRootSignature()
             p.Descriptor.RegisterSpace  = b.space;
             p.ShaderVisibility          = D3D12_SHADER_VISIBILITY_ALL;
             params.push_back(p);
+            Logf(kUnityLogTypeLog, "  Root param %u: CBV '%s'", b.rootParam, b.name.c_str());
         }
     }
 
@@ -590,6 +598,7 @@ bool RayTraceShader::BuildRootSignature()
         sd.RegisterSpace    = sr.space;
         sd.ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
         samplers.push_back(sd);
+        
     }
 
     D3D12_ROOT_SIGNATURE_DESC1 rsDesc1 = {};
@@ -606,73 +615,75 @@ bool RayTraceShader::BuildRootSignature()
     // --- Debug: dump all root parameters and their descriptor ranges ---
     Logf(kUnityLogTypeLog, "BuildRootSignature: %u root param(s), %u static sampler(s)",
          rsDesc1.NumParameters, rsDesc1.NumStaticSamplers);
-    for (UINT pi = 0; pi < rsDesc1.NumParameters; ++pi)
-    {
-        const D3D12_ROOT_PARAMETER1& rp = rsDesc1.pParameters[pi];
-        if (rp.ParameterType == D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE)
-        {
-            Logf(kUnityLogTypeLog, "  Param[%u] DESCRIPTOR_TABLE, %u range(s)", pi, rp.DescriptorTable.NumDescriptorRanges);
-            for (UINT ri = 0; ri < rp.DescriptorTable.NumDescriptorRanges; ++ri)
-            {
-                const D3D12_DESCRIPTOR_RANGE1& dr = rp.DescriptorTable.pDescriptorRanges[ri];
-                const char* typeName =
-                    (dr.RangeType == D3D12_DESCRIPTOR_RANGE_TYPE_SRV) ? "SRV" :
-                    (dr.RangeType == D3D12_DESCRIPTOR_RANGE_TYPE_UAV) ? "UAV" :
-                    (dr.RangeType == D3D12_DESCRIPTOR_RANGE_TYPE_CBV) ? "CBV" : "SAMPLER";
-                // Resolve binding name from parallel name vectors
-                const char* bindName = "?";
-                if (rp.DescriptorTable.pDescriptorRanges == srvRanges.data() && ri < srvRangeNames.size())
-                    bindName = srvRangeNames[ri].c_str();
-                else if (rp.DescriptorTable.pDescriptorRanges == uavRanges.data() && ri < uavRangeNames.size())
-                    bindName = uavRangeNames[ri].c_str();
-                Logf(kUnityLogTypeLog,
-                     "    Range[%u] type=%s t/u/b%u space%u numDesc=%u heapOffset=%u  name='%s'",
-                     ri, typeName, dr.BaseShaderRegister, dr.RegisterSpace,
-                     dr.NumDescriptors, dr.OffsetInDescriptorsFromTableStart, bindName);
-            }
-        }
-        else if (rp.ParameterType == D3D12_ROOT_PARAMETER_TYPE_CBV)
-        {
-            Logf(kUnityLogTypeLog, "  Param[%u] ROOT_CBV b%u space%u", pi,
-                 rp.Descriptor.ShaderRegister, rp.Descriptor.RegisterSpace);
-        }
-        else
-        {
-            Logf(kUnityLogTypeLog, "  Param[%u] type=%u", pi, (UINT)rp.ParameterType);
-        }
-    }
+    // for (UINT pi = 0; pi < rsDesc1.NumParameters; ++pi)
+    // {
+    //     const D3D12_ROOT_PARAMETER1& rp = rsDesc1.pParameters[pi];
+    //     if (rp.ParameterType == D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE)
+    //     {
+    //         const size_t tableOffset = static_cast<size_t>(rp.DescriptorTable.pDescriptorRanges - allRanges.data());
+    //         Logf(kUnityLogTypeLog, "  Param[%u] DESCRIPTOR_TABLE, %u range(s)", pi, rp.DescriptorTable.NumDescriptorRanges);
+    //         for (UINT ri = 0; ri < rp.DescriptorTable.NumDescriptorRanges; ++ri)
+    //         {
+    //             const D3D12_DESCRIPTOR_RANGE1& dr = rp.DescriptorTable.pDescriptorRanges[ri];
+    //             const char* typeName =
+    //                 (dr.RangeType == D3D12_DESCRIPTOR_RANGE_TYPE_SRV) ? "SRV" :
+    //                 (dr.RangeType == D3D12_DESCRIPTOR_RANGE_TYPE_UAV) ? "UAV" :
+    //                 (dr.RangeType == D3D12_DESCRIPTOR_RANGE_TYPE_CBV) ? "CBV" : "SAMPLER";
+    //             // Resolve binding name from parallel name vectors
+    //             const char* bindName = "?";
+    //             if (tableOffset == srvRangesOffset && ri < srvRangeNames.size())
+    //                 bindName = srvRangeNames[ri].c_str();
+    //             else if (tableOffset == uavRangesOffset && ri < uavRangeNames.size())
+    //                 bindName = uavRangeNames[ri].c_str();
+    //             Logf(kUnityLogTypeLog,
+    //                  "    Range[%u] type=%s t/u/b%u space%u numDesc=%u heapOffset=%u  name='%s'",
+    //                  ri, typeName, dr.BaseShaderRegister, dr.RegisterSpace,
+    //                  dr.NumDescriptors, dr.OffsetInDescriptorsFromTableStart, bindName);
+    //         }
+    //     }
+    //     else if (rp.ParameterType == D3D12_ROOT_PARAMETER_TYPE_CBV)
+    //     {
+    //         Logf(kUnityLogTypeLog, "  Param[%u] ROOT_CBV b%u space%u", pi,
+    //              rp.Descriptor.ShaderRegister, rp.Descriptor.RegisterSpace);
+    //     }
+    //     else
+    //     {
+    //         Logf(kUnityLogTypeLog, "  Param[%u] type=%u", pi, (UINT)rp.ParameterType);
+    //     }
+    // }
 
-    // --- Debug: check for duplicate (register, space) pairs within SRV ranges ---
-    {
-        struct RegKey { UINT reg; UINT space; UINT rangeIdx; std::string name; };
-        std::vector<RegKey> srvSeen;
-        for (UINT pi = 0; pi < rsDesc1.NumParameters; ++pi)
-        {
-            const D3D12_ROOT_PARAMETER1& rp = rsDesc1.pParameters[pi];
-            if (rp.ParameterType != D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE) continue;
-            for (UINT ri = 0; ri < rp.DescriptorTable.NumDescriptorRanges; ++ri)
-            {
-                const D3D12_DESCRIPTOR_RANGE1& dr = rp.DescriptorTable.pDescriptorRanges[ri];
-                if (dr.RangeType != D3D12_DESCRIPTOR_RANGE_TYPE_SRV) continue;
-                const char* bindName = "?";
-                if (rp.DescriptorTable.pDescriptorRanges == srvRanges.data() && ri < srvRangeNames.size())
-                    bindName = srvRangeNames[ri].c_str();
-                UINT count = (dr.NumDescriptors == UINT_MAX) ? 1 : dr.NumDescriptors;
-                for (UINT k = 0; k < count; ++k)
-                {
-                    UINT reg = dr.BaseShaderRegister + k;
-                    for (const auto& seen : srvSeen)
-                    {
-                        if (seen.reg == reg && seen.space == dr.RegisterSpace)
-                            Logf(kUnityLogTypeError,
-                                 "BuildRootSignature: DUPLICATE SRV t%u space%u: range[%u]='%s' conflicts with range[%u]='%s' -- missing register() decoration?",
-                                 reg, dr.RegisterSpace, pi, bindName, seen.rangeIdx, seen.name.c_str());
-                    }
-                    srvSeen.push_back({ reg, dr.RegisterSpace, ri, bindName });
-                }
-            }
-        }
-    }
+    // // --- Debug: check for duplicate (register, space) pairs within SRV ranges ---
+    // {
+    //     struct RegKey { UINT reg; UINT space; UINT rangeIdx; std::string name; };
+    //     std::vector<RegKey> srvSeen;
+    //     for (UINT pi = 0; pi < rsDesc1.NumParameters; ++pi)
+    //     {
+    //         const D3D12_ROOT_PARAMETER1& rp = rsDesc1.pParameters[pi];
+    //         if (rp.ParameterType != D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE) continue;
+    //         const size_t tableOffset = static_cast<size_t>(rp.DescriptorTable.pDescriptorRanges - allRanges.data());
+    //         for (UINT ri = 0; ri < rp.DescriptorTable.NumDescriptorRanges; ++ri)
+    //         {
+    //             const D3D12_DESCRIPTOR_RANGE1& dr = rp.DescriptorTable.pDescriptorRanges[ri];
+    //             if (dr.RangeType != D3D12_DESCRIPTOR_RANGE_TYPE_SRV) continue;
+    //             const char* bindName = "?";
+    //             if (tableOffset == srvRangesOffset && ri < srvRangeNames.size())
+    //                 bindName = srvRangeNames[ri].c_str();
+    //             UINT count = (dr.NumDescriptors == UINT_MAX) ? 1 : dr.NumDescriptors;
+    //             for (UINT k = 0; k < count; ++k)
+    //             {
+    //                 UINT reg = dr.BaseShaderRegister + k;
+    //                 for (const auto& seen : srvSeen)
+    //                 {
+    //                     if (seen.reg == reg && seen.space == dr.RegisterSpace)
+    //                         Logf(kUnityLogTypeError,
+    //                              "BuildRootSignature: DUPLICATE SRV t%u space%u: range[%u]='%s' conflicts with range[%u]='%s' -- missing register() decoration?",
+    //                              reg, dr.RegisterSpace, pi, bindName, seen.rangeIdx, seen.name.c_str());
+    //                 }
+    //                 srvSeen.push_back({ reg, dr.RegisterSpace, ri, bindName });
+    //             }
+    //         }
+    //     }
+    // }
 
     ComPtr<ID3DBlob> sigBlob, errBlob;
     HRESULT hr = D3D12SerializeVersionedRootSignature(&vrsDesc, &sigBlob, &errBlob);
@@ -683,8 +694,14 @@ bool RayTraceShader::BuildRootSignature()
         return false;
     }
 
-    hr = m_device->CreateRootSignature(0,
-        sigBlob->GetBufferPointer(), sigBlob->GetBufferSize(), IID_PPV_ARGS(&m_rootSig));
+    for(const auto& range : allRanges) {
+        if (range.RegisterSpace >= 0xfffffff0) {
+            Logf(kUnityLogTypeError, "RayTraceShader: Register space %u is too large and may cause overflow issues.", range.RegisterSpace);
+            return false;
+        }
+    }
+
+    hr = m_device->CreateRootSignature(0, sigBlob->GetBufferPointer(), sigBlob->GetBufferSize(), IID_PPV_ARGS(&m_rootSig));
     if (FAILED(hr))
     {
         Logf(kUnityLogTypeError, "RayTraceShader: CreateRootSignature failed (hr=0x%08X)", hr);
