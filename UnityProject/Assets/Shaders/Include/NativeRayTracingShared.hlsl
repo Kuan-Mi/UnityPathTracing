@@ -391,7 +391,20 @@ uint ToRayFlag2(uint flag)
     else
         return RAY_FLAG_NONE;
 }
+struct AttributeData
+{
+    float2 barycentrics;
+};
 
+[shader("closesthit")]
+void ClosestHit_0_Shader(inout RayPayload payload, AttributeData attribs : SV_IntersectionAttributes)
+{
+    payload.instanceID = InstanceID();
+    payload.geometryIndex = GeometryIndex();
+    payload.triangleIndex = PrimitiveIndex();
+    payload.barycentrics = attribs.barycentrics;
+    payload.committedRayT = RayTCurrent();
+}
 
 float CastVisibilityRay_AnyHit(float3 origin, float3 direction, float Tmin, float Tmax, float2 mipAndCone, RaytracingAccelerationStructure accelerationStructure, uint mask, uint rayFlags)
 {
