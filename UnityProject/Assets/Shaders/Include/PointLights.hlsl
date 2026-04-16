@@ -11,7 +11,7 @@ struct PointLightInfo
     float radius; // Sphere radius (0 = hard point light)
 };
 
-StructuredBuffer<PointLightInfo> gIn_PointLights;
+StructuredBuffer<PointLightInfo> gIn_PointLights:register(t14, space1);
 
 // Evaluate the direct lighting contribution of all point lights at a surface point.
 // When radius > 0, a single stochastic shadow ray is cast per light per frame;

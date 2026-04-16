@@ -1,0 +1,13 @@
+fileFormatVersion: 2
+guid: 5efb1156c4c846c7861243171a99dd41
+ScriptedImporter:
+  internalIDToNameTable: []
+  externalObjects: {}
+  serializedVersion: 2
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+  script: {fileID: 11500000, guid: edebcba6c71d5754a859601f2a711697, type: 3}
+  isRayTraceShader: 1
+  additionalIncludePaths: []
+  extraArgs: -disable-payload-qualifiers

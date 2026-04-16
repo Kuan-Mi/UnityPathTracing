@@ -22,7 +22,7 @@ struct AreaLight
     float  pad2;
 };
 
-StructuredBuffer<AreaLight> gIn_AreaLights;
+StructuredBuffer<AreaLight> gIn_AreaLights: register(t13, space1);
 
 // Evaluate the direct lighting contribution of all area lights (rect + disc) at a surface point.
 // A single stochastic shadow ray is cast per light per frame; soft shadows emerge via accumulation.

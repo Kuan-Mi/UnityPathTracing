@@ -13,7 +13,7 @@ struct SpotLight
     float  cosInnerAngle;  // cos(inner half-angle), for smooth penumbra edge
 };
 
-StructuredBuffer<SpotLight> gIn_SpotLights;
+StructuredBuffer<SpotLight> gIn_SpotLights:register(t15, space1);
 
 // Evaluate the direct lighting contribution of all spot lights at a surface point.
 // Shadow rays are hard (single ray, no angular jitter) since these are ideal point lights.

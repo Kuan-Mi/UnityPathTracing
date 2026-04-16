@@ -86,14 +86,22 @@ namespace PathTracing
             internal TextureHandle ComposedSpecViewZ;
         }
 
-        static void ExecutePass(PassData data, UnsafeGraphContext context)
+        void ExecutePass(PassData data, UnsafeGraphContext context)
         {
             var natCmd = CommandBufferHelpers.GetNativeCommandBuffer(context.cmd);
 
+            
             var opaqueTracingMarker = RenderPassMarkers.OpaqueTracing;
 
             natCmd.BeginSample(opaqueTracingMarker);
 
+            
+            _gpuScene.BuildAccelerationStructure(natCmd);
+            
+            data.OpaqueTs.SetAccelerationStructure("gWorldTlas", _gpuScene.AccelerationStructure);
+            
+            
+            
             var resource = data.Resource;
             var settings = data.Settings;
 
@@ -101,47 +109,49 @@ namespace PathTracing
             data.OpaqueTs.SetConstantBuffer("GlobalConstants", resource.ConstantBuffer);
             // natCmd.SetRayTracingConstantBufferParam(data.OpaqueTs, paramsID, resource.ConstantBuffer, 0, resource.ConstantBuffer.stride);
 
-            data.OpaqueTs.SetBuffer("gIn_ScramblingRanking", resource.ConstantBuffer);
+            data.OpaqueTs.SetBuffer("gIn_ScramblingRanking", resource.ScramblingRanking);
+            // natCmd.SetRayTracingBufferParam(data.OpaqueTs, g_ScramblingRankingID, resource.ScramblingRanking);
             
-            natCmd.SetRayTracingBufferParam(data.OpaqueTs, g_ScramblingRankingID, resource.ScramblingRanking);
-            natCmd.SetRayTracingBufferParam(data.OpaqueTs, g_SobolID, resource.Sobol);
+            data.OpaqueTs.SetBuffer("gIn_Sobol", resource.Sobol);
+            // natCmd.SetRayTracingBufferParam(data.OpaqueTs, g_SobolID, resource.Sobol);
 
-            natCmd.SetRayTracingBufferParam(data.OpaqueTs, g_HashEntriesID, resource.HashEntriesBuffer);
-            natCmd.SetRayTracingBufferParam(data.OpaqueTs, g_AccumulationBufferID, resource.AccumulationBuffer);
-            natCmd.SetRayTracingBufferParam(data.OpaqueTs, g_ResolvedBufferID, resource.ResolvedBuffer);
+            data.OpaqueTs.SetRWBuffer("gInOut_SharcHashEntriesBuffer", resource.HashEntriesBuffer);
+            data.OpaqueTs.SetRWBuffer("gInOut_SharcAccumulated",      resource.AccumulationBuffer);
+            data.OpaqueTs.SetRWBuffer("gInOut_SharcResolved",         resource.ResolvedBuffer);
 
-            natCmd.SetRayTracingTextureParam(data.OpaqueTs, g_OutputID, data.OutputTexture);
+            var outputTex   =  data.OutputTexture;
+            var directEmitTex = data.DirectEmission;
+            var composedDiffTex = data.ComposedDiff;
+            var composedSpecViewZTex = data.ComposedSpecViewZ;
 
-            natCmd.SetRayTracingTextureParam(data.OpaqueTs, g_MvID, resource.Mv);
-            natCmd.SetRayTracingTextureParam(data.OpaqueTs, g_ViewZID, resource.ViewZ);
-            natCmd.SetRayTracingTextureParam(data.OpaqueTs, g_Normal_RoughnessID, resource.NormalRoughness);
-            natCmd.SetRayTracingTextureParam(data.OpaqueTs, g_BaseColor_MetalnessID, resource.BaseColorMetalness);
+            data.OpaqueTs.SetRWTexture("g_Output",              outputTex);
 
-            natCmd.SetRayTracingTextureParam(data.OpaqueTs, g_DirectLightingID, resource.DirectLighting);
-            natCmd.SetRayTracingTextureParam(data.OpaqueTs, g_DirectEmissionID, data.DirectEmission);
-            natCmd.SetRayTracingTextureParam(data.OpaqueTs, g_PsrThroughputID, resource.PsrThroughput);
+            data.OpaqueTs.SetRWTexture("gOut_Mv",               resource.Mv.rt);
+            data.OpaqueTs.SetRWTexture("gOut_ViewZ",            resource.ViewZ.rt);
+            data.OpaqueTs.SetRWTexture("gOut_Normal_Roughness", resource.NormalRoughness.rt);
+            data.OpaqueTs.SetRWTexture("gOut_BaseColor_Metalness", resource.BaseColorMetalness.rt);
 
-            natCmd.SetRayTracingTextureParam(data.OpaqueTs, g_ShadowDataID, resource.Penumbra);
-            natCmd.SetRayTracingTextureParam(data.OpaqueTs, g_DiffID, resource.Diff);
-            natCmd.SetRayTracingTextureParam(data.OpaqueTs, g_SpecID, resource.Spec);
+            data.OpaqueTs.SetRWTexture("gOut_DirectLighting",   resource.DirectLighting.rt);
+            data.OpaqueTs.SetRWTexture("gOut_DirectEmission",   directEmitTex);
+            data.OpaqueTs.SetRWTexture("gOut_PsrThroughput",    resource.PsrThroughput.rt);
 
-            natCmd.SetRayTracingTextureParam(data.OpaqueTs, gIn_PrevComposedDiffID, data.ComposedDiff);
-            natCmd.SetRayTracingTextureParam(data.OpaqueTs, gIn_PrevComposedSpec_PrevViewZID, data.ComposedSpecViewZ);
+            data.OpaqueTs.SetRWTexture("gOut_ShadowData",       resource.Penumbra.rt);
+            data.OpaqueTs.SetRWTexture("gOut_Diff",             resource.Diff.rt);
+            data.OpaqueTs.SetRWTexture("gOut_Spec",             resource.Spec.rt);
 
-            natCmd.SetRayTracingTextureParam(data.OpaqueTs, gIn_PrevViewZID, resource.PrevViewZ);
-            natCmd.SetRayTracingTextureParam(data.OpaqueTs, gIn_PrevNormalRoughnessID, resource.PrevNormalRoughness);
-            natCmd.SetRayTracingTextureParam(data.OpaqueTs, gIn_PrevBaseColorMetalnessID, resource.PrevBaseColorMetalness);
-            
-            
-            natCmd.SetRayTracingTextureParam(data.OpaqueTs, gOut_GeoNormalID, resource.GeoNormal);
-            natCmd.SetRayTracingTextureParam(data.OpaqueTs, gIn_PrevGeoNormalID, resource.PrevGeoNormal);
-            
-            
-            
+            data.OpaqueTs.SetTexture("gIn_PrevComposedDiff",         composedDiffTex);
+            data.OpaqueTs.SetTexture("gIn_PrevComposedSpec_PrevViewZ", composedSpecViewZTex);
 
-            natCmd.SetRayTracingBufferParam(data.OpaqueTs, gIn_SpotLightsID, resource.SpotLightBuffer);
-            natCmd.SetRayTracingBufferParam(data.OpaqueTs, gIn_AreaLightsID, resource.AreaLightBuffer);
-            natCmd.SetRayTracingBufferParam(data.OpaqueTs, gIn_PointLightsID, resource.PointLightBuffer);
+            data.OpaqueTs.SetTexture("gIn_PrevViewZ",            resource.PrevViewZ.rt);
+            data.OpaqueTs.SetTexture("gIn_PrevNormalRoughness",  resource.PrevNormalRoughness.rt);
+            data.OpaqueTs.SetTexture("gIn_PrevBaseColorMetalness", resource.PrevBaseColorMetalness.rt);
+
+            data.OpaqueTs.SetRWTexture("gOut_GeoNormal",         resource.GeoNormal.rt);
+            data.OpaqueTs.SetTexture("gIn_PrevGeoNormal",        resource.PrevGeoNormal.rt);
+
+            data.OpaqueTs.SetStructuredBuffer("gIn_SpotLights",  resource.SpotLightBuffer);
+            data.OpaqueTs.SetStructuredBuffer("gIn_AreaLights",  resource.AreaLightBuffer);
+            data.OpaqueTs.SetStructuredBuffer("gIn_PointLights", resource.PointLightBuffer);
 
 
             uint rectWmod = (uint)(settings.m_RenderResolution.x * settings.resolutionScale + 0.5f);
@@ -150,12 +160,16 @@ namespace PathTracing
             // Debug.Log($"Dispatch Rays Size: {rectWmod} x {rectHmod}");
 
 
-            natCmd.DispatchRays(data.OpaqueTs, "MainRayGenShader", rectWmod, rectHmod, 1);
+            _gpuScene.BindToShader(data.OpaqueTs);
+            data.OpaqueTs.Dispatch(natCmd, rectWmod, rectHmod);
 
             natCmd.EndSample(opaqueTracingMarker);
         }
-
-
+        private GPUScene _gpuScene;
+        public void SetGPUScene(GPUScene scene)
+        {
+            _gpuScene = scene;
+        }
         private TextureHandle CreateTex(TextureDesc textureDesc, RenderGraph renderGraph, string name, GraphicsFormat format)
         {
             textureDesc.format = format;
