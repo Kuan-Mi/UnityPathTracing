@@ -14,6 +14,9 @@ bool DescriptorHeapAllocator::Initialize(ID3D12Device* device)
         printf("[DescriptorHeapAllocator] CreateDescriptorHeap failed\n");
         return false;
     }
+    //Set Name for debugging
+    m_heap->SetName(L"DescriptorHeapAllocator::m_heap");
+
     m_incSize  = device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
     m_bumpNext = 0;
     m_freeList.clear();

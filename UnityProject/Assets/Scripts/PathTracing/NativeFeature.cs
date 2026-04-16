@@ -527,7 +527,7 @@ namespace PathTracing
             };
 
             _compositionPass.Setup(compositionResource, compositionSettings);
-            renderer.EnqueuePass(_compositionPass);
+            // renderer.EnqueuePass(_compositionPass);
 
 
             var transparentResource = new TransparentPass.Resource
