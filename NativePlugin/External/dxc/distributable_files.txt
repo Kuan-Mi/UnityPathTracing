@@ -1,0 +1,13 @@
+You may distribute the following files:
+
+dxcompiler.dll
+dxc.exe
+dxil.dll
+dxv.exe
+LICENSE.txt
+README.txt
+opcode_selector.h
+spirv.h
+cooperative_matrix.h
+cooperative_matrix.impl
+linalg.h
