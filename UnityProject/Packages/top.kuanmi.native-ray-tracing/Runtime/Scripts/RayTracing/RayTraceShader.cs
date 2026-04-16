@@ -33,7 +33,7 @@ namespace NativeRender
         [SerializeField, HideInInspector]
         private byte[] _compiledDxil;
 
-        private ulong  _handle;
+        private ulong _handle;
 
         // Event data buffer reused each frame
         private NativeArray<NativeRenderPlugin.RTS_RenderEventData> _eventData;
@@ -75,7 +75,7 @@ namespace NativeRender
         {
             if (HasCompiledBytes) return;
 
-            string hlslPath = GetHlslPath();
+            string hlslPath    = GetHlslPath();
             string includeDirs = BuildIncludeDirs(hlslPath);
 
             bool ok = NativeRenderPlugin.ShaderCompilerPlugin.NR_SC_Compile(
@@ -124,12 +124,13 @@ namespace NativeRender
             if (IsValid) return true;
 
             if (!HasCompiledBytes)
-            { 
+            {
                 if (string.IsNullOrEmpty(GetHlslPath()))
                 {
                     Debug.LogError("[RayTraceShader] CreatePipeline: cannot resolve hlsl path");
                     return false;
                 }
+
                 CompileOnly();
             }
 
@@ -148,6 +149,7 @@ namespace NativeRender
                 Debug.LogError($"[RayTraceShader] CreatePipeline failed: {GetHlslPath()}");
                 return false;
             }
+
             return true;
         }
 
@@ -159,6 +161,7 @@ namespace NativeRender
                 NativeRenderPlugin.NR_DestroyRayTraceShader(_handle);
                 _handle = 0;
             }
+
             if (_eventData.IsCreated)
                 _eventData.Dispose();
         }
@@ -190,7 +193,6 @@ namespace NativeRender
         // -------------------------------------------------------------------
 
         /// <summary>Binds a ComputeBuffer (or GraphicsBuffer) as a read-only structured/byte-address buffer (SRV).</summary>
-
         public void SetBuffer(string name, ComputeBuffer buffer)
         {
             if (!IsValid) return;
@@ -241,6 +243,7 @@ namespace NativeRender
             if (!IsValid) return;
             NativeRenderPlugin.NR_RTS_SetConstantBuffer(_handle, name, buffer.GetNativeBufferPtr());
         }
+
         public void SetConstantBuffer(string name, GraphicsBuffer buffer)
         {
             if (!IsValid) return;
@@ -254,7 +257,7 @@ namespace NativeRender
             // Passing null clears the binding on the C++ side (writes a null SRV),
             // which prevents stale/dangling resource pointers after buffers are disposed.
             IntPtr ptr    = buffer != null ? buffer.GetNativeBufferPtr() : IntPtr.Zero;
-            uint   count  = buffer != null ? (uint)buffer.count  : 0;
+            uint   count  = buffer != null ? (uint)buffer.count : 0;
             uint   stride = buffer != null ? (uint)buffer.stride : 0;
             NativeRenderPlugin.NR_RTS_SetStructuredBuffer(_handle, name, ptr, count, stride);
         }
@@ -264,7 +267,7 @@ namespace NativeRender
         {
             if (!IsValid) return;
             IntPtr ptr    = buffer != null ? buffer.GetNativeBufferPtr() : IntPtr.Zero;
-            uint   count  = buffer != null ? (uint)elementCount  : 0;
+            uint   count  = buffer != null ? (uint)elementCount : 0;
             uint   stride = buffer != null ? (uint)elementStride : 0;
             NativeRenderPlugin.NR_RTS_SetStructuredBuffer(_handle, name, ptr, count, stride);
         }
@@ -322,7 +325,7 @@ namespace NativeRender
             ed.shaderHandle = _handle;
             ed.width        = width;
             ed.height       = height;
-            _eventData[0] = ed;
+            _eventData[0]   = ed;
 
             unsafe
             {
@@ -332,6 +335,5 @@ namespace NativeRender
                     (IntPtr)_eventData.GetUnsafePtr());
             }
         }
-
     }
 }

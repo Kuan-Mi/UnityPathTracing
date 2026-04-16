@@ -76,9 +76,15 @@ namespace PathTracing
 
         // private readonly Dictionary<long, ReSTIRDIContext> _restirDiContexts = new();
         private readonly Dictionary<long, CameraFrameState> _cameraFrameStates = new();
+        
+        
+        private GPUScene             _gpuScene;
 
         public override void Create()
         {
+            if (_gpuScene == null)
+                _gpuScene = new GPUScene();
+            
             if (_accelerationStructure == null)
             {
                 var settings = new Settings
@@ -262,6 +268,11 @@ namespace PathTracing
             if (eyeIndex == 1 && pathTracingSetting.skipRightEyeInVR)
                 return;
 
+            
+            _gpuScene?.UpdateForFrame();
+            _opaquePass.SetGPUScene(_gpuScene);
+            opaqueTracingShader?.CreatePipeline();
+            
 
             Shader.SetGlobalRayTracingAccelerationStructure(g_AccelStructID, _accelerationStructure);
 
