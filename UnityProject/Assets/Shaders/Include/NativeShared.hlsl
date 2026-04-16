@@ -185,7 +185,7 @@
 
 SamplerState sampler_Trilinear_Repeat;
 SamplerState sampler_Linear_Repeat;
-SamplerState sampler_Point_Repeat;
+SamplerState sampler_Point_Repeat: register(s2);
 
 #define gLinearMipmapLinearSampler  sampler_Trilinear_Repeat
 #define gLinearMipmapNearestSampler  sampler_Linear_Repeat

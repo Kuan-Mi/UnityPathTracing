@@ -547,13 +547,14 @@ bool RayTraceShader::BuildRootSignature()
         for (auto& b : m_userBindings)
         {
             if (b.type != UserBindingType::CBV) continue;
+            b.rootParam = static_cast<uint32_t>(params.size());
             D3D12_ROOT_PARAMETER1 p = {};
             p.ParameterType             = D3D12_ROOT_PARAMETER_TYPE_CBV;
             p.Descriptor.ShaderRegister = b.registerIndex;
             p.Descriptor.RegisterSpace  = b.space;
             p.ShaderVisibility          = D3D12_SHADER_VISIBILITY_ALL;
             params.push_back(p);
-            Logf(kUnityLogTypeLog, "  Root param %u: CBV '%s'", b.rootParam, b.name.c_str());
+            Logf(kUnityLogTypeLog, "  Root param %u: CBV '%s' b%u space%u", b.rootParam, b.name.c_str(), b.registerIndex, b.space);
         }
     }
 
@@ -598,7 +599,8 @@ bool RayTraceShader::BuildRootSignature()
         sd.RegisterSpace    = sr.space;
         sd.ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
         samplers.push_back(sd);
-        
+        Logf(kUnityLogTypeLog, "  Static sampler: name='%s' filter=%u address=%u reg%u space%u",
+             sr.name.c_str(), filter, addr, sr.reg, sr.space);
     }
 
     D3D12_ROOT_SIGNATURE_DESC1 rsDesc1 = {};
@@ -685,6 +687,53 @@ bool RayTraceShader::BuildRootSignature()
     //     }
     // }
 
+    // Validate all register spaces before serialization to catch HLSL bindings missing explicit register() decorations.
+    bool spaceValid = true;
+    for (const auto& range : allRanges)
+    {
+        if (range.RegisterSpace >= 0xfffffff0)
+        {
+            // Find the binding name for a better error message
+            const char* bindName = "?";
+            for (const auto& b : m_userBindings)
+            {
+                if (b.registerIndex == range.BaseShaderRegister && b.space == range.RegisterSpace)
+                    { bindName = b.name.c_str(); break; }
+            }
+            Logf(kUnityLogTypeError,
+                 "RayTraceShader: binding '%s' has invalid RegisterSpace=0x%08X -- add an explicit register(xN, spaceM) decoration in HLSL",
+                 bindName, range.RegisterSpace);
+            spaceValid = false;
+        }
+    }
+    for (const auto& p : params)
+    {
+        if (p.ParameterType == D3D12_ROOT_PARAMETER_TYPE_CBV ||
+            p.ParameterType == D3D12_ROOT_PARAMETER_TYPE_SRV ||
+            p.ParameterType == D3D12_ROOT_PARAMETER_TYPE_UAV)
+        {
+            if (p.Descriptor.RegisterSpace >= 0xfffffff0)
+            {
+                Logf(kUnityLogTypeError,
+                     "RayTraceShader: root descriptor has invalid RegisterSpace=0x%08X -- add an explicit register() decoration in HLSL",
+                     p.Descriptor.RegisterSpace);
+                spaceValid = false;
+            }
+        }
+    }
+    for (const auto& sd : samplers)
+    {
+        if (sd.RegisterSpace >= 0xfffffff0)
+        {
+            Logf(kUnityLogTypeError,
+                 "RayTraceShader: static sampler s%u has invalid RegisterSpace=0x%08X -- add an explicit register() decoration in HLSL",
+                 sd.ShaderRegister, sd.RegisterSpace);
+            spaceValid = false;
+        }
+    }
+    if (!spaceValid)
+        return false;
+
     ComPtr<ID3DBlob> sigBlob, errBlob;
     HRESULT hr = D3D12SerializeVersionedRootSignature(&vrsDesc, &sigBlob, &errBlob);
     if (FAILED(hr))
@@ -692,13 +741,6 @@ bool RayTraceShader::BuildRootSignature()
         Logf(kUnityLogTypeError, "RayTraceShader: D3D12SerializeVersionedRootSignature failed (hr=0x%08X): %s",
              hr, errBlob ? (char*)errBlob->GetBufferPointer() : "");
         return false;
-    }
-
-    for(const auto& range : allRanges) {
-        if (range.RegisterSpace >= 0xfffffff0) {
-            Logf(kUnityLogTypeError, "RayTraceShader: Register space %u is too large and may cause overflow issues.", range.RegisterSpace);
-            return false;
-        }
     }
 
     hr = m_device->CreateRootSignature(0, sigBlob->GetBufferPointer(), sigBlob->GetBufferSize(), IID_PPV_ARGS(&m_rootSig));
