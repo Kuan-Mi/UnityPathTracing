@@ -248,7 +248,7 @@ float normalMapScale = 1.0)
             Texture2D<float4> metalRoughTex = t_BindlessTextures[NonUniformResourceIndex(gs.material.metalRoughOrSpecularTextureIndex)];
             float4 mrSample = metalRoughTex.SampleLevel(materialSampler, gs.texcoord, 0);
             props.roughness *= mrSample.g;
-            props.metalness *= mrSample.b;
+            props.metalness = mrSample.b;
         }
     }
     

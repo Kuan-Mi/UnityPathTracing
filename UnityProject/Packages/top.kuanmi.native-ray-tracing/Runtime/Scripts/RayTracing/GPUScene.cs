@@ -46,6 +46,11 @@ namespace NativeRender
         private readonly Dictionary<int, int>              _materialSlots   = new();
         private readonly Dictionary<int, int>              _textureSlots    = new();
 
+        // Meshes with vertex attributes split across multiple streams are cloned
+        // into a single-stream layout for bindless sampling. Keyed by source mesh instanceID.
+        private readonly Dictionary<int, Mesh> _normalizedMeshCache = new();
+        private readonly List<Mesh>            _ownedMeshes         = new();
+
         // Dirty flags
         private bool _sceneGpuDirty = true;
         private bool _forceRebuild  = false;
@@ -153,8 +158,18 @@ namespace NativeRender
             _meshBufferSlots.Clear();
             _materialSlots.Clear();
             _textureSlots.Clear();
-        }
 
+            for (int i = 0; i < _ownedMeshes.Count; i++)
+            {
+                var m = _ownedMeshes[i];
+                if (m == null) continue;
+                if (Application.isPlaying) UnityEngine.Object.Destroy(m);
+                else UnityEngine.Object.DestroyImmediate(m);
+            }
+            _ownedMeshes.Clear();
+            _normalizedMeshCache.Clear();
+        }
+ 
         private void RebuildSceneGpuData(IReadOnlyList<NativeRayTracingTarget> targets)
         {
             DisposeSceneGpuBuffers();
@@ -172,8 +187,9 @@ namespace NativeRender
                 var mf = mr.GetComponent<MeshFilter>();
                 if (mf == null || mf.sharedMesh == null) continue;
 
-                Mesh mesh    = mf.sharedMesh;
-                int  meshKey = mesh.GetInstanceID();
+                Mesh mesh = GetOrCreateSingleStreamMesh(mf.sharedMesh);
+                if (mesh == null) continue;
+                int meshKey = mesh.GetInstanceID();
                 mesh.UploadMeshData(false);
 
                 if (!_meshBufferSlots.TryGetValue(meshKey, out var slots))
@@ -427,6 +443,76 @@ namespace NativeRender
                 if (ok)
                     _accelStructure.SetInstanceTransform(meshRenderer, target.transform.localToWorldMatrix);
             }
+        }
+
+        /// <summary>
+        /// Returns a mesh whose vertex attributes are all packed into stream 0. If the source
+        /// mesh already uses a single stream, it is returned as-is. Otherwise a cached clone
+        /// is produced (and owned by this GPUScene, destroyed on Dispose). This is required
+        /// because the bindless sampling path assumes one VB per mesh with a single stride,
+        /// and uses per-attribute byte offsets relative to stream 0.
+        /// </summary>
+        private Mesh GetOrCreateSingleStreamMesh(Mesh src)
+        {
+            if (src == null) return null;
+
+            int id = src.GetInstanceID();
+            if (_normalizedMeshCache.TryGetValue(id, out var cached) && cached != null)
+                return cached;
+
+            var attrs = src.GetVertexAttributes();
+            bool multiStream = false;
+            for (int i = 0; i < attrs.Length; i++)
+            {
+                if (attrs[i].stream != 0) { multiStream = true; break; }
+            }
+
+            if (!multiStream)
+            {
+                _normalizedMeshCache[id] = src;
+                return src;
+            }
+
+            // Read managed attribute arrays from the source BEFORE reformatting the clone's VB,
+            // since SetVertexBufferParams invalidates the existing vertex buffer contents.
+            var positions = src.vertices;
+            var normals   = src.normals;
+            var tangents  = src.tangents;
+            var colors    = src.colors;
+            var uv0 = new List<Vector4>(); src.GetUVs(0, uv0);
+            var uv1 = new List<Vector4>(); src.GetUVs(1, uv1);
+            var uv2 = new List<Vector4>(); src.GetUVs(2, uv2);
+            var uv3 = new List<Vector4>(); src.GetUVs(3, uv3);
+
+            var clone = UnityEngine.Object.Instantiate(src);
+            clone.name = src.name + " (GPUScene SingleStream)";
+
+            // Force every descriptor onto stream 0, preserving attribute/format/dimension.
+            var newDescs = new VertexAttributeDescriptor[attrs.Length];
+            for (int i = 0; i < attrs.Length; i++)
+            {
+                var a = attrs[i];
+                newDescs[i] = new VertexAttributeDescriptor(a.attribute, a.format, a.dimension, 0);
+            }
+            clone.SetVertexBufferParams(clone.vertexCount, newDescs);
+
+            // Re-populate vertex data through managed setters so Unity packs them into the new layout.
+            if (positions != null && positions.Length > 0) clone.vertices = positions;
+            if (normals   != null && normals.Length   > 0) clone.normals  = normals;
+            if (tangents  != null && tangents.Length  > 0) clone.tangents = tangents;
+            if (colors    != null && colors.Length    > 0) clone.colors   = colors;
+            if (uv0.Count > 0) clone.SetUVs(0, uv0);
+            if (uv1.Count > 0) clone.SetUVs(1, uv1);
+            if (uv2.Count > 0) clone.SetUVs(2, uv2);
+            if (uv3.Count > 0) clone.SetUVs(3, uv3);
+
+            clone.UploadMeshData(false);
+
+            Debug.Log($"[GPUScene] Mesh '{src.name}' has multi-stream vertex layout; cloned into single-stream for bindless sampling.");
+
+            _normalizedMeshCache[id] = clone;
+            _ownedMeshes.Add(clone);
+            return clone;
         }
 
         private static Texture TryGetTex(Material mat, string prop) =>
