@@ -616,7 +616,12 @@ void MainRayGenShader()
     // );
     //
     //
-    
+    // MaterialProps mat = sampleGeometryMaterial(geo, s_LinearRepeat);
+    //
+    // float3 ccc = mat.metalness;
+    // // ccc = float3(0.5,0.1,0.1);
+    //
+    // gOut_BaseColor_Metalness[pixelPos] = float4(  ccc,  1);
     
     GeometryProps geometryProps0;
     MaterialProps materialProps0;

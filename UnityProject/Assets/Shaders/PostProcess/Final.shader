@@ -327,7 +327,8 @@
 
                 // float3 normal = X.rgb ;
 
-                float3 n = float3(-X.r, -X.b, X.g);
+                // float3 n = float3(-X.r, -X.b, X.g);
+                float3 n = X.rgb;
 
                 float3 normal = n * 0.5 + 0.5; // [-1,1] -> [0,1]
 
