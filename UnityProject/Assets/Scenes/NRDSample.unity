@@ -1028,6 +1028,132 @@ Transform:
   m_Children: []
   m_Father: {fileID: 2088091275}
   m_LocalEulerAnglesHint: {x: -83.906, y: 0, z: 0}
+--- !u!1 &1154397538
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1154397543}
+  - component: {fileID: 1154397542}
+  - component: {fileID: 1154397541}
+  - component: {fileID: 1154397540}
+  - component: {fileID: 1154397539}
+  m_Layer: 0
+  m_Name: Cube
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!114 &1154397539
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1154397538}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 7765801a50bd3ca4cbfacd1f313497a2, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: NativeRayTracing.Runtime::NativeRender.NativeRayTracingTarget
+  ommCaches: []
+--- !u!65 &1154397540
+BoxCollider:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1154397538}
+  m_Material: {fileID: 0}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_LayerOverridePriority: 0
+  m_IsTrigger: 0
+  m_ProvidesContacts: 0
+  m_Enabled: 1
+  serializedVersion: 3
+  m_Size: {x: 1, y: 1, z: 1}
+  m_Center: {x: 0, y: 0, z: 0}
+--- !u!23 &1154397541
+MeshRenderer:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1154397538}
+  m_Enabled: 1
+  m_CastShadows: 1
+  m_ReceiveShadows: 1
+  m_DynamicOccludee: 1
+  m_StaticShadowCaster: 0
+  m_MotionVectors: 1
+  m_LightProbeUsage: 1
+  m_ReflectionProbeUsage: 1
+  m_RayTracingMode: 2
+  m_RayTraceProcedural: 0
+  m_RayTracingAccelStructBuildFlagsOverride: 0
+  m_RayTracingAccelStructBuildFlags: 1
+  m_SmallMeshCulling: 1
+  m_ForceMeshLod: -1
+  m_MeshLodSelectionBias: 0
+  m_RenderingLayerMask: 1
+  m_RendererPriority: 0
+  m_Materials:
+  - {fileID: 2100000, guid: 31321ba15b8f8eb4c954353edc038b1d, type: 2}
+  m_StaticBatchInfo:
+    firstSubMesh: 0
+    subMeshCount: 0
+  m_StaticBatchRoot: {fileID: 0}
+  m_ProbeAnchor: {fileID: 0}
+  m_LightProbeVolumeOverride: {fileID: 0}
+  m_ScaleInLightmap: 1
+  m_ReceiveGI: 1
+  m_PreserveUVs: 0
+  m_IgnoreNormalsForChartDetection: 0
+  m_ImportantGI: 0
+  m_StitchLightmapSeams: 1
+  m_SelectedEditorRenderState: 3
+  m_MinimumChartSize: 4
+  m_AutoUVMaxDistance: 0.5
+  m_AutoUVMaxAngle: 89
+  m_LightmapParameters: {fileID: 0}
+  m_GlobalIlluminationMeshLod: 0
+  m_SortingLayerID: 0
+  m_SortingLayer: 0
+  m_SortingOrder: 0
+  m_MaskInteraction: 0
+  m_AdditionalVertexStreams: {fileID: 0}
+--- !u!33 &1154397542
+MeshFilter:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1154397538}
+  m_Mesh: {fileID: 10202, guid: 0000000000000000e000000000000000, type: 0}
+--- !u!4 &1154397543
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1154397538}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: -11.96884, y: 1.13068, z: -0.06699}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &1197495795
 GameObject:
   m_ObjectHideFlags: 0
@@ -1395,6 +1521,7 @@ GameObject:
   - component: {fileID: 1672218822}
   - component: {fileID: 1672218824}
   - component: {fileID: 1672218823}
+  - component: {fileID: 1672218825}
   m_Layer: 0
   m_Name: ShaderBall_Concrete_Shimizu_ShaderBall (1)
   m_TagString: Untagged
@@ -1474,6 +1601,19 @@ MeshFilter:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1672218821}
   m_Mesh: {fileID: 6639483930795213293, guid: 9c2e154e190f89945a49f6b86fc55b2a, type: 3}
+--- !u!114 &1672218825
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1672218821}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 7765801a50bd3ca4cbfacd1f313497a2, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: NativeRayTracing.Runtime::NativeRender.NativeRayTracingTarget
+  ommCaches: []
 --- !u!1 &1687737116
 GameObject:
   m_ObjectHideFlags: 0
@@ -1485,6 +1625,7 @@ GameObject:
   - component: {fileID: 1687737117}
   - component: {fileID: 1687737119}
   - component: {fileID: 1687737118}
+  - component: {fileID: 1687737120}
   m_Layer: 0
   m_Name: ShaderBall_Concrete_Shimizu_ShaderBall (3)
   m_TagString: Untagged
@@ -1564,6 +1705,19 @@ MeshFilter:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1687737116}
   m_Mesh: {fileID: 6639483930795213293, guid: 9c2e154e190f89945a49f6b86fc55b2a, type: 3}
+--- !u!114 &1687737120
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1687737116}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 7765801a50bd3ca4cbfacd1f313497a2, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: NativeRayTracing.Runtime::NativeRender.NativeRayTracingTarget
+  ommCaches: []
 --- !u!1 &1712532248
 GameObject:
   m_ObjectHideFlags: 0
@@ -1575,6 +1729,7 @@ GameObject:
   - component: {fileID: 1712532249}
   - component: {fileID: 1712532251}
   - component: {fileID: 1712532250}
+  - component: {fileID: 1712532252}
   m_Layer: 0
   m_Name: Floor (3)
   m_TagString: Untagged
@@ -1654,6 +1809,19 @@ MeshFilter:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1712532248}
   m_Mesh: {fileID: 2636336197179252740, guid: 9c2e154e190f89945a49f6b86fc55b2a, type: 3}
+--- !u!114 &1712532252
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1712532248}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 7765801a50bd3ca4cbfacd1f313497a2, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: NativeRayTracing.Runtime::NativeRender.NativeRayTracingTarget
+  ommCaches: []
 --- !u!1 &1748554751
 GameObject:
   m_ObjectHideFlags: 0
@@ -1665,6 +1833,7 @@ GameObject:
   - component: {fileID: 1748554752}
   - component: {fileID: 1748554754}
   - component: {fileID: 1748554753}
+  - component: {fileID: 1748554755}
   m_Layer: 0
   m_Name: ShaderBall_Concrete_Shimizu_ShaderBall (4)
   m_TagString: Untagged
@@ -1744,6 +1913,19 @@ MeshFilter:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1748554751}
   m_Mesh: {fileID: 6639483930795213293, guid: 9c2e154e190f89945a49f6b86fc55b2a, type: 3}
+--- !u!114 &1748554755
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1748554751}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 7765801a50bd3ca4cbfacd1f313497a2, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: NativeRayTracing.Runtime::NativeRender.NativeRayTracingTarget
+  ommCaches: []
 --- !u!1 &1858160348
 GameObject:
   m_ObjectHideFlags: 0
@@ -1755,6 +1937,7 @@ GameObject:
   - component: {fileID: 1858160349}
   - component: {fileID: 1858160351}
   - component: {fileID: 1858160350}
+  - component: {fileID: 1858160352}
   m_Layer: 0
   m_Name: ShaderBall_Concrete_Shimizu_ShaderBall (2)
   m_TagString: Untagged
@@ -1834,6 +2017,19 @@ MeshFilter:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1858160348}
   m_Mesh: {fileID: 6639483930795213293, guid: 9c2e154e190f89945a49f6b86fc55b2a, type: 3}
+--- !u!114 &1858160352
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1858160348}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 7765801a50bd3ca4cbfacd1f313497a2, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: NativeRayTracing.Runtime::NativeRender.NativeRayTracingTarget
+  ommCaches: []
 --- !u!1 &1914419601
 GameObject:
   m_ObjectHideFlags: 0
@@ -1845,6 +2041,7 @@ GameObject:
   - component: {fileID: 1914419602}
   - component: {fileID: 1914419604}
   - component: {fileID: 1914419603}
+  - component: {fileID: 1914419605}
   m_Layer: 0
   m_Name: ShaderBall_Concrete_Shimizu_ShaderBall (5)
   m_TagString: Untagged
@@ -1924,6 +2121,19 @@ MeshFilter:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1914419601}
   m_Mesh: {fileID: 6639483930795213293, guid: 9c2e154e190f89945a49f6b86fc55b2a, type: 3}
+--- !u!114 &1914419605
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1914419601}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 7765801a50bd3ca4cbfacd1f313497a2, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: NativeRayTracing.Runtime::NativeRender.NativeRayTracingTarget
+  ommCaches: []
 --- !u!1 &1991282384
 GameObject:
   m_ObjectHideFlags: 0
@@ -2099,6 +2309,7 @@ GameObject:
   - component: {fileID: 3448000038563234584}
   - component: {fileID: 7962309624657857162}
   - component: {fileID: 2271256860194622473}
+  - component: {fileID: 7962309624657857163}
   m_Layer: 0
   m_Name: ShaderBall_Brick_Cinder_ShaderBall
   m_TagString: Untagged
@@ -2182,6 +2393,7 @@ GameObject:
   - component: {fileID: 6715563498675587330}
   - component: {fileID: 2749951466009784007}
   - component: {fileID: 4175926269525833774}
+  - component: {fileID: 6715563498675587331}
   m_Layer: 0
   m_Name: ShaderBall_Concrete_Shimizu_ShaderBall
   m_TagString: Untagged
@@ -2249,6 +2461,7 @@ GameObject:
   - component: {fileID: 4882022542845902555}
   - component: {fileID: 3105976023136790401}
   - component: {fileID: 4387901216462066796}
+  - component: {fileID: 4882022542845902556}
   m_Layer: 0
   m_Name: LupaPupa_Icosphere
   m_TagString: Untagged
@@ -2485,6 +2698,7 @@ GameObject:
   - component: {fileID: 4251704872986112001}
   - component: {fileID: 665640636627901621}
   - component: {fileID: 4316629808157788574}
+  - component: {fileID: 4316629808157788575}
   m_Layer: 0
   m_Name: ShaderBall_Glass_ShaderBall
   m_TagString: Untagged
@@ -2518,6 +2732,7 @@ GameObject:
   - component: {fileID: 2947742990384961623}
   - component: {fileID: 1718396412193515484}
   - component: {fileID: 4898057470769292634}
+  - component: {fileID: 4898057470769292635}
   m_Layer: 0
   m_Name: ShaderBall_Brick_Concrete_ShaderBall
   m_TagString: Untagged
@@ -2600,6 +2815,7 @@ GameObject:
   - component: {fileID: 7125193275615016595}
   - component: {fileID: 8066999598948552797}
   - component: {fileID: 1393697188820824965}
+  - component: {fileID: 8066999598948552798}
   m_Layer: 0
   m_Name: Floor
   m_TagString: Untagged
@@ -2656,6 +2872,19 @@ MeshRenderer:
   m_SortingOrder: 0
   m_MaskInteraction: 0
   m_AdditionalVertexStreams: {fileID: 0}
+--- !u!114 &4316629808157788575
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 3430537964665352109}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 7765801a50bd3ca4cbfacd1f313497a2, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: NativeRayTracing.Runtime::NativeRender.NativeRayTracingTarget
+  ommCaches: []
 --- !u!23 &4329397002389103357
 MeshRenderer:
   m_ObjectHideFlags: 0
@@ -2769,6 +2998,19 @@ Transform:
   m_Children: []
   m_Father: {fileID: 5312381281301409343}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &4882022542845902556
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1570873999953517968}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 7765801a50bd3ca4cbfacd1f313497a2, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: NativeRayTracing.Runtime::NativeRender.NativeRayTracingTarget
+  ommCaches: []
 --- !u!23 &4898057470769292634
 MeshRenderer:
   m_ObjectHideFlags: 0
@@ -2818,6 +3060,19 @@ MeshRenderer:
   m_SortingOrder: 0
   m_MaskInteraction: 0
   m_AdditionalVertexStreams: {fileID: 0}
+--- !u!114 &4898057470769292635
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 3640935991427062392}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 7765801a50bd3ca4cbfacd1f313497a2, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: NativeRayTracing.Runtime::NativeRender.NativeRayTracingTarget
+  ommCaches: []
 --- !u!4 &5312381281301409343
 Transform:
   m_ObjectHideFlags: 0
@@ -2859,6 +3114,7 @@ GameObject:
   - component: {fileID: 6175568359103846732}
   - component: {fileID: 1639097768920550510}
   - component: {fileID: 8021470151075589969}
+  - component: {fileID: 8021470151075589970}
   m_Layer: 0
   m_Name: PupaLupa_Icosphere
   m_TagString: Untagged
@@ -2904,6 +3160,19 @@ Transform:
   m_Children: []
   m_Father: {fileID: 5312381281301409343}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &6715563498675587331
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1118723105524715310}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 7765801a50bd3ca4cbfacd1f313497a2, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: NativeRayTracing.Runtime::NativeRender.NativeRayTracingTarget
+  ommCaches: []
 --- !u!1 &7118363089034152835
 GameObject:
   m_ObjectHideFlags: 0
@@ -2915,6 +3184,7 @@ GameObject:
   - component: {fileID: 9191577787864500305}
   - component: {fileID: 7305319908105505033}
   - component: {fileID: 4329397002389103357}
+  - component: {fileID: 9191577787864500306}
   m_Layer: 0
   m_Name: ShaderBall_Brick_Beige_ShaderBall
   m_TagString: Untagged
@@ -2956,6 +3226,7 @@ GameObject:
   - component: {fileID: 7643626533740539658}
   - component: {fileID: 5801719651233477330}
   - component: {fileID: 1595013579286618807}
+  - component: {fileID: 7643626533740539659}
   m_Layer: 0
   m_Name: ShaderBall_Brick_Yellow_ShaderBall
   m_TagString: Untagged
@@ -2978,6 +3249,19 @@ Transform:
   m_Children: []
   m_Father: {fileID: 5312381281301409343}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &7643626533740539659
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 7395786787795234232}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 7765801a50bd3ca4cbfacd1f313497a2, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: NativeRayTracing.Runtime::NativeRender.NativeRayTracingTarget
+  ommCaches: []
 --- !u!33 &7962309624657857162
 MeshFilter:
   m_ObjectHideFlags: 0
@@ -2986,6 +3270,19 @@ MeshFilter:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 53720163407341116}
   m_Mesh: {fileID: 2253105149633723326, guid: 9c2e154e190f89945a49f6b86fc55b2a, type: 3}
+--- !u!114 &7962309624657857163
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 53720163407341116}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 7765801a50bd3ca4cbfacd1f313497a2, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: NativeRayTracing.Runtime::NativeRender.NativeRayTracingTarget
+  ommCaches: []
 --- !u!23 &8021470151075589969
 MeshRenderer:
   m_ObjectHideFlags: 0
@@ -3035,6 +3332,19 @@ MeshRenderer:
   m_SortingOrder: 0
   m_MaskInteraction: 0
   m_AdditionalVertexStreams: {fileID: 0}
+--- !u!114 &8021470151075589970
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 5750893071686526031}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 7765801a50bd3ca4cbfacd1f313497a2, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: NativeRayTracing.Runtime::NativeRender.NativeRayTracingTarget
+  ommCaches: []
 --- !u!33 &8066999598948552797
 MeshFilter:
   m_ObjectHideFlags: 0
@@ -3043,6 +3353,19 @@ MeshFilter:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 4252634802048852028}
   m_Mesh: {fileID: 2636336197179252740, guid: 9c2e154e190f89945a49f6b86fc55b2a, type: 3}
+--- !u!114 &8066999598948552798
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 4252634802048852028}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 7765801a50bd3ca4cbfacd1f313497a2, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: NativeRayTracing.Runtime::NativeRender.NativeRayTracingTarget
+  ommCaches: []
 --- !u!1 &8771091788108555836
 GameObject:
   m_ObjectHideFlags: 0
@@ -3074,6 +3397,19 @@ Transform:
   m_Children: []
   m_Father: {fileID: 5312381281301409343}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &9191577787864500306
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 7118363089034152835}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 7765801a50bd3ca4cbfacd1f313497a2, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: NativeRayTracing.Runtime::NativeRender.NativeRayTracingTarget
+  ommCaches: []
 --- !u!1660057539 &9223372036854775807
 SceneRoots:
   m_ObjectHideFlags: 0
@@ -3089,3 +3425,4 @@ SceneRoots:
   - {fileID: 382038759}
   - {fileID: 667211478}
   - {fileID: 1600345164}
+  - {fileID: 1154397543}

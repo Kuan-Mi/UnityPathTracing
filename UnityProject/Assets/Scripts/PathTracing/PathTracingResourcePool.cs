@@ -47,7 +47,7 @@ namespace PathTracing
             _nriResources[RenderResourceType.MV]                    = new NriTextureResource(RenderResourceType.MV,                    GraphicsFormat.R16G16B16A16_SFloat,    srvState);
             _nriResources[RenderResourceType.Viewz]                 = new NriTextureResource(RenderResourceType.Viewz,                 GraphicsFormat.R32_SFloat,             srvState);
             _nriResources[RenderResourceType.NormalRoughness]       = new NriTextureResource(RenderResourceType.NormalRoughness,       GraphicsFormat.A2B10G10R10_UNormPack32, srvState);
-            _nriResources[RenderResourceType.BasecolorMetalness]    = new NriTextureResource(RenderResourceType.BasecolorMetalness,    GraphicsFormat.B8G8R8A8_SRGB,          srvState, true);
+            _nriResources[RenderResourceType.BasecolorMetalness]    = new NriTextureResource(RenderResourceType.BasecolorMetalness,    GraphicsFormat.R8G8B8A8_UNorm,         srvState);
             _nriResources[RenderResourceType.GeoNormal]             = new NriTextureResource(RenderResourceType.GeoNormal,             GraphicsFormat.R32_UInt,               srvState);
             _nriResources[RenderResourceType.Penumbra]              = new NriTextureResource(RenderResourceType.Penumbra,              GraphicsFormat.R16_SFloat,             srvState);
             _nriResources[RenderResourceType.DiffRadianceHitdist]   = new NriTextureResource(RenderResourceType.DiffRadianceHitdist,   GraphicsFormat.R16G16B16A16_SFloat,    srvState);
@@ -72,7 +72,7 @@ namespace PathTracing
             _rtResourceDefs.Add((RenderResourceType.PsrThroughput,         GraphicsFormat.R16G16B16A16_SFloat,    false));
             _rtResourceDefs.Add((RenderResourceType.PrevViewZ,             GraphicsFormat.R32_SFloat,             false));
             _rtResourceDefs.Add((RenderResourceType.PrevNormalRoughness,   GraphicsFormat.A2B10G10R10_UNormPack32, false));
-            _rtResourceDefs.Add((RenderResourceType.PrevBaseColorMetalness,GraphicsFormat.B8G8R8A8_SRGB,          true));
+            _rtResourceDefs.Add((RenderResourceType.PrevBaseColorMetalness,GraphicsFormat.R8G8B8A8_UNorm,         false));
             _rtResourceDefs.Add((RenderResourceType.PrevGeoNormal,         GraphicsFormat.R32_UInt,               false));
         }
 

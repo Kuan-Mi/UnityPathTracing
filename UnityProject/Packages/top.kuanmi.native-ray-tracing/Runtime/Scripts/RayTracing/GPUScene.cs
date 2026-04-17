@@ -112,6 +112,7 @@ namespace NativeRender
         {
             if (shader == null || !shader.IsValid) return;
             shader.SetStructuredBuffer("t_InstanceData", _instanceGpuBuf);
+            Debug.Log($"t_InstanceData {_instanceGpuBuf}");
             shader.SetStructuredBuffer("t_GeometryData", _geometryGpuBuf);
             shader.SetStructuredBuffer("t_MaterialConstants", _materialGpuBuf);
             if (_sceneBuffers != null) shader.SetBindlessBuffer("t_BindlessBuffers", _sceneBuffers);
