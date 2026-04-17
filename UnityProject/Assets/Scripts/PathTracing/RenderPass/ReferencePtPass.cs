@@ -41,7 +41,8 @@ namespace PathTracing
             internal GraphicsBuffer PointLightBuffer;
             
             internal GraphicsBuffer AeExposureBuffer;
-            
+
+            internal RTHandle Output;
         }
 
         public class Settings
@@ -122,21 +123,8 @@ namespace PathTracing
             passData.Resource = _resource;
             passData.Settings = _settings;
 
-            var resourceData = frameData.Get<UniversalResourceData>();
+            passData.OutputTexture = renderGraph.ImportTexture(_resource.Output);
 
-            var textureDesc = resourceData.activeColorTexture.GetDescriptor(renderGraph);
-            textureDesc.enableRandomWrite = true;
-            textureDesc.depthBufferBits = 0;
-            textureDesc.clearBuffer = false;
-            textureDesc.discardBuffer = false;
-            textureDesc.width = _settings.m_RenderResolution.x;
-            textureDesc.height = _settings.m_RenderResolution.y;
-
-            
-            var ptContextItem = frameData.Get<PTContextItem>();
-
-            passData.OutputTexture = ptContextItem.OutputTexture;
-            
             builder.UseTexture(passData.OutputTexture,  AccessFlags.ReadWrite);
 
             builder.AllowPassCulling(false);

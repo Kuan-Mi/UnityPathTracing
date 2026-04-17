@@ -83,11 +83,6 @@ namespace PathTracing
             var resourceData = frameData.Get<UniversalResourceData>();
 
 
-            if (!frameData.Contains<PTContextItem>())
-            {
-                var ptContextItem = frameData.Create<PTContextItem>();
-            }
-
             builder.AllowPassCulling(false);
             builder.SetRenderFunc((PassData data, UnsafeGraphContext context) => { ExecutePass(data, context); });
         }

@@ -74,6 +74,12 @@ namespace PathTracing
             _rtResourceDefs.Add((RenderResourceType.PrevNormalRoughness,   GraphicsFormat.A2B10G10R10_UNormPack32, false));
             _rtResourceDefs.Add((RenderResourceType.PrevBaseColorMetalness,GraphicsFormat.R8G8B8A8_UNorm,         false));
             _rtResourceDefs.Add((RenderResourceType.PrevGeoNormal,         GraphicsFormat.R32_UInt,               false));
+
+            // Per-frame pass textures (previously created via RenderGraph in PTContextItem).
+            _rtResourceDefs.Add((RenderResourceType.PtOutput,              GraphicsFormat.R16G16B16A16_SFloat,    false));
+            _rtResourceDefs.Add((RenderResourceType.PtDirectEmission,      GraphicsFormat.B10G11R11_UFloatPack32, false));
+            _rtResourceDefs.Add((RenderResourceType.PtComposedDiff,        GraphicsFormat.R16G16B16A16_SFloat,    false));
+            _rtResourceDefs.Add((RenderResourceType.PtComposedSpecViewZ,   GraphicsFormat.R16G16B16A16_SFloat,    false));
         }
 
         /// <summary>

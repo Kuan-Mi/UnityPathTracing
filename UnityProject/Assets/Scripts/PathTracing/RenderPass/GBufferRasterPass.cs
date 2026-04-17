@@ -113,9 +113,6 @@ namespace PathTracing
             var renderingData = frameData.Get<UniversalRenderingData>();
             var cameraData    = frameData.Get<UniversalCameraData>();
 
-            if (!frameData.Contains<PTContextItem>())
-                frameData.Create<PTContextItem>();
-
             var rendererListDesc = new RendererListDesc(k_ShaderTag, renderingData.cullResults, cameraData.camera)
             {
                 sortingCriteria       = SortingCriteria.CommonOpaque,

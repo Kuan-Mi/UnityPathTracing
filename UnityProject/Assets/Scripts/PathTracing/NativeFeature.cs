@@ -452,6 +452,11 @@ namespace PathTracing
                 PrevGeoNormal          = pool.GetRT(RenderResourceType.PrevGeoNormal),
 
                 PsrThroughput = pool.GetRT(RenderResourceType.PsrThroughput),
+
+                Output             = pool.GetRT(RenderResourceType.PtOutput),
+                DirectEmission     = pool.GetRT(RenderResourceType.PtDirectEmission),
+                ComposedDiff       = pool.GetRT(RenderResourceType.PtComposedDiff),
+                ComposedSpecViewZ  = pool.GetRT(RenderResourceType.PtComposedSpecViewZ),
             };
 
             var opaqueSettings = new NativeOpaquePass.Settings
@@ -517,6 +522,10 @@ namespace PathTracing
                 compositionResource.Spec   = pool.GetRT(RenderResourceType.OutSpecRadianceHitdist);
             }
 
+            compositionResource.DirectEmission    = pool.GetRT(RenderResourceType.PtDirectEmission);
+            compositionResource.ComposedDiff      = pool.GetRT(RenderResourceType.PtComposedDiff);
+            compositionResource.ComposedSpecViewZ = pool.GetRT(RenderResourceType.PtComposedSpecViewZ);
+
             var rectGridW = (int)(renderResolution.x * pathTracingSetting.resolutionScale + 0.5f + 15) / 16;
             var rectGridH = (int)(renderResolution.y * pathTracingSetting.resolutionScale + 0.5f + 15) / 16;
 
@@ -546,7 +555,10 @@ namespace PathTracing
                 AreaLightBuffer  = _lightCollector.AreaLightBuffer,
                 SpotLightBuffer  = _lightCollector.SpotLightBuffer,
 
-                AeExposureBuffer = _aeExposureBuffer
+                AeExposureBuffer = _aeExposureBuffer,
+
+                ComposedDiff      = pool.GetRT(RenderResourceType.PtComposedDiff),
+                ComposedSpecViewZ = pool.GetRT(RenderResourceType.PtComposedSpecViewZ),
             };
 
             var transparentSettings = new TransparentPass.Settings
@@ -688,7 +700,8 @@ namespace PathTracing
                     Mv       = pool.GetRT(RenderResourceType.MV),
                     Composed = pool.GetRT(RenderResourceType.Composed),
                     taaSrc   = pool.GetRT(isEven ? RenderResourceType.TaaHistoryPrev : RenderResourceType.TaaHistory),
-                    taaDst   = pool.GetRT(isEven ? RenderResourceType.TaaHistory : RenderResourceType.TaaHistoryPrev)
+                    taaDst   = pool.GetRT(isEven ? RenderResourceType.TaaHistory : RenderResourceType.TaaHistoryPrev),
+                    Output   = pool.GetRT(RenderResourceType.PtOutput),
                 };
 
                 var taaSettings = new TaaPass.Settings
@@ -710,7 +723,9 @@ namespace PathTracing
                     PointLightBuffer = _lightCollector.PointLightBuffer,
                     AreaLightBuffer  = _lightCollector.AreaLightBuffer,
                     SpotLightBuffer  = _lightCollector.SpotLightBuffer,
-                    AeExposureBuffer = _aeExposureBuffer
+                    AeExposureBuffer = _aeExposureBuffer,
+
+                    Output = pool.GetRT(RenderResourceType.PtOutput),
                 };
 
                 var referencePtSettings = new ReferencePtPass.Settings
@@ -751,6 +766,11 @@ namespace PathTracing
                 RRGuide_SpecHitDistance  = pool.GetRT(RenderResourceType.RrGuideSpecHitDistance),
                 DlssOutput               = pool.GetRT(RenderResourceType.DlssOutput),
                 taaDst                   = pool.GetRT(isEven ? RenderResourceType.TaaHistory : RenderResourceType.TaaHistoryPrev),
+
+                Output             = pool.GetRT(RenderResourceType.PtOutput),
+                DirectEmission     = pool.GetRT(RenderResourceType.PtDirectEmission),
+                ComposedDiff       = pool.GetRT(RenderResourceType.PtComposedDiff),
+                ComposedSpecViewZ  = pool.GetRT(RenderResourceType.PtComposedSpecViewZ),
             };
 
             var outputBlitSettings = new OutputBlitPass.Settings

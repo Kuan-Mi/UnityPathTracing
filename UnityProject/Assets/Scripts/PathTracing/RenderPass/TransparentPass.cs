@@ -45,6 +45,9 @@ namespace PathTracing
             internal GraphicsBuffer PointLightBuffer;
 
             internal GraphicsBuffer AeExposureBuffer;
+
+            internal RTHandle ComposedDiff;
+            internal RTHandle ComposedSpecViewZ;
         }
 
         public class Settings
@@ -108,10 +111,8 @@ namespace PathTracing
             passData.Resource = _resource;
             passData.Settings = _settings;
 
-            var ptContextItem = frameData.Get<PTContextItem>();
-
-            passData.ComposedDiff = ptContextItem.ComposedDiff;
-            passData.ComposedSpecViewZ = ptContextItem.ComposedSpecViewZ;
+            passData.ComposedDiff      = renderGraph.ImportTexture(_resource.ComposedDiff);
+            passData.ComposedSpecViewZ = renderGraph.ImportTexture(_resource.ComposedSpecViewZ);
 
             builder.UseTexture(passData.ComposedDiff, AccessFlags.ReadWrite);
             builder.UseTexture(passData.ComposedSpecViewZ, AccessFlags.ReadWrite);

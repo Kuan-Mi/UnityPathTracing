@@ -65,6 +65,11 @@ namespace PathTracing
             internal RTHandle PrevGeoNormal;
 
             internal RTHandle PsrThroughput;
+
+            internal RTHandle Output;
+            internal RTHandle DirectEmission;
+            internal RTHandle ComposedDiff;
+            internal RTHandle ComposedSpecViewZ;
         }
 
         public class Settings
@@ -187,29 +192,11 @@ namespace PathTracing
             passData.Resource = _resource;
             passData.Settings = _settings;
 
-            var resourceData = frameData.Get<UniversalResourceData>();
+            passData.OutputTexture     = renderGraph.ImportTexture(_resource.Output);
+            passData.DirectEmission    = renderGraph.ImportTexture(_resource.DirectEmission);
+            passData.ComposedDiff      = renderGraph.ImportTexture(_resource.ComposedDiff);
+            passData.ComposedSpecViewZ = renderGraph.ImportTexture(_resource.ComposedSpecViewZ);
 
-            var textureDesc = resourceData.activeColorTexture.GetDescriptor(renderGraph);
-            textureDesc.enableRandomWrite = true;
-            textureDesc.depthBufferBits = 0;
-            textureDesc.clearBuffer = false;
-            textureDesc.discardBuffer = false;
-            textureDesc.width = _settings.m_RenderResolution.x;
-            textureDesc.height = _settings.m_RenderResolution.y;
-
-            
-            var ptContextItem = frameData.Create<PTContextItem>();
-            
-            ptContextItem.OutputTexture = CreateTex(textureDesc, renderGraph, "PathTracingOutput", GraphicsFormat.R16G16B16A16_SFloat);
-            ptContextItem.DirectEmission = CreateTex(textureDesc, renderGraph, "DirectEmission", GraphicsFormat.B10G11R11_UFloatPack32);
-            ptContextItem.ComposedDiff = CreateTex(textureDesc, renderGraph, "ComposedDiff", GraphicsFormat.R16G16B16A16_SFloat);
-            ptContextItem.ComposedSpecViewZ = CreateTex(textureDesc, renderGraph, "ComposedSpec_ViewZ", GraphicsFormat.R16G16B16A16_SFloat);
-            
-            passData.OutputTexture = ptContextItem.OutputTexture;
-            passData.DirectEmission = ptContextItem.DirectEmission;
-            passData.ComposedDiff = ptContextItem.ComposedDiff;
-            passData.ComposedSpecViewZ = ptContextItem.ComposedSpecViewZ;
-            
             builder.UseTexture(passData.OutputTexture,  AccessFlags.ReadWrite);
             builder.UseTexture(passData.DirectEmission,  AccessFlags.ReadWrite);
             builder.UseTexture(passData.ComposedDiff,  AccessFlags.ReadWrite);

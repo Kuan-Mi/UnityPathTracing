@@ -43,6 +43,10 @@ namespace PathTracing
             internal RTHandle Shadow;
             internal RTHandle Diff;
             internal RTHandle Spec;
+
+            internal RTHandle DirectEmission;
+            internal RTHandle ComposedDiff;
+            internal RTHandle ComposedSpecViewZ;
         }
 
         public class Settings
@@ -101,13 +105,10 @@ namespace PathTracing
 
             passData.Resource = _resource;
             passData.Settings = _settings;
-            
-            
-            var ptContextItem = frameData.Get<PTContextItem>();
 
-            passData.DirectEmission = ptContextItem.DirectEmission;
-            passData.ComposedDiff = ptContextItem.ComposedDiff;
-            passData.ComposedSpecViewZ = ptContextItem.ComposedSpecViewZ;
+            passData.DirectEmission    = renderGraph.ImportTexture(_resource.DirectEmission);
+            passData.ComposedDiff      = renderGraph.ImportTexture(_resource.ComposedDiff);
+            passData.ComposedSpecViewZ = renderGraph.ImportTexture(_resource.ComposedSpecViewZ);
 
             builder.UseTexture(passData.DirectEmission,  AccessFlags.ReadWrite);
             builder.UseTexture(passData.ComposedDiff,  AccessFlags.ReadWrite);

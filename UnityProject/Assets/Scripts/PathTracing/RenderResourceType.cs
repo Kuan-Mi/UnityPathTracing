@@ -41,7 +41,11 @@ namespace PathTracing
         TaaHistory,
         TaaHistoryPrev,
         PsrThroughput,
-
+        // Per-frame PathTracing pass textures (previously stored in PTContextItem)
+        PtOutput,
+        PtDirectEmission,
+        PtComposedDiff,
+        PtComposedSpecViewZ,
         // Previous-frame GBuffer for RTXDI temporal reuse
         PrevViewZ,
         PrevNormalRoughness,
