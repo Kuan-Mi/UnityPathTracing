@@ -35,6 +35,8 @@ namespace PathTracing
             internal RTHandle Composed;
             internal RTHandle taaSrc;
             internal RTHandle taaDst;
+
+            internal RTHandle Output;
         }
 
         public class Settings
@@ -80,11 +82,8 @@ namespace PathTracing
 
             passData.Resource = _resource;
             passData.Settings = _settings;
-            
-            
-            var ptContextItem = frameData.Get<PTContextItem>();
 
-            passData.OutputTexture = ptContextItem.OutputTexture; 
+            passData.OutputTexture = renderGraph.ImportTexture(_resource.Output);
 
             builder.UseTexture(passData.OutputTexture,  AccessFlags.ReadWrite); 
 

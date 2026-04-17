@@ -12,7 +12,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 0f25d8b7df3c4782ac2ea70cbedd720b, type: 3}
   m_Name: NativeFeature
   m_EditorClassIdentifier: Assembly-CSharp::PathTracing.NativeFeature
-  m_Active: 1
+  m_Active: 0
   pathTracingSetting:
     exposureEv: 0
     cameraJitter: 1
@@ -39,7 +39,7 @@ MonoBehaviour:
     boostFactor: 0.6667
     SR: 0
     RR: 1
-    tmpDisableRR: 0
+    tmpDisableRR: 1
     resolutionScale: 1
     denoisingRange: 1000
     splitScreen: 0
@@ -100,11 +100,11 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: f50908f0e9bf42149891b36684931380, type: 3}
   m_Name: PathTracingFeature
   m_EditorClassIdentifier: Assembly-CSharp::PathTracing.PathTracingFeature
-  m_Active: 0
+  m_Active: 1
   pathTracingSetting:
     exposureEv: -2.34
     cameraJitter: 1
-    showMode: 18
+    showMode: 1
     showMv: 0
     showValidation: 0
     skipRightEyeInVR: 1
@@ -114,7 +114,7 @@ MonoBehaviour:
     tracingMode: 1
     denoiser: 0
     emissionIntensity: 1
-    psr: 1
+    psr: 0
     emission: 1
     usePrevFrame: 1
     TAA: 1
@@ -127,7 +127,7 @@ MonoBehaviour:
     boostFactor: 0.6667
     SR: 0
     RR: 1
-    tmpDisableRR: 0
+    tmpDisableRR: 1
     resolutionScale: 1
     denoisingRange: 1000
     splitScreen: 0

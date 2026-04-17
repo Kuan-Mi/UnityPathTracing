@@ -48,6 +48,11 @@ namespace PathTracing
             internal RTHandle DlssOutput;
 
             internal RTHandle taaDst;
+
+            internal RTHandle Output;
+            internal RTHandle DirectEmission;
+            internal RTHandle ComposedDiff;
+            internal RTHandle ComposedSpecViewZ;
         }
 
         public class Settings
@@ -211,11 +216,10 @@ namespace PathTracing
 
             passData.BlitMaterial = _biltMaterial;
 
-            var ptContextItem = frameData.Get<PTContextItem>();
-
-            passData.DirectEmission = ptContextItem.DirectEmission;
-            passData.ComposedDiff = ptContextItem.ComposedDiff;
-            passData.ComposedSpecViewZ = ptContextItem.ComposedSpecViewZ;
+            passData.OutputTexture     = _resource.Output != null ? renderGraph.ImportTexture(_resource.Output) : TextureHandle.nullHandle;
+            passData.DirectEmission    = _resource.DirectEmission != null ? renderGraph.ImportTexture(_resource.DirectEmission) : TextureHandle.nullHandle;
+            passData.ComposedDiff      = _resource.ComposedDiff != null ? renderGraph.ImportTexture(_resource.ComposedDiff) : TextureHandle.nullHandle;
+            passData.ComposedSpecViewZ = _resource.ComposedSpecViewZ != null ? renderGraph.ImportTexture(_resource.ComposedSpecViewZ) : TextureHandle.nullHandle;
 
 
             if (passData.DirectEmission.IsValid())
@@ -226,6 +230,9 @@ namespace PathTracing
 
             if (passData.ComposedSpecViewZ.IsValid())
                 builder.UseTexture(passData.ComposedSpecViewZ, AccessFlags.ReadWrite);
+
+            if (passData.OutputTexture.IsValid())
+                builder.UseTexture(passData.OutputTexture, AccessFlags.ReadWrite);
 
             passData.CameraTexture = resourceData.activeColorTexture;
 
