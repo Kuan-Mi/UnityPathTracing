@@ -129,7 +129,7 @@ namespace PathTracing
             data.OpaqueTs.SetRWTexture("gOut_Mv",               resource.Mv.rt);
             data.OpaqueTs.SetRWTexture("gOut_ViewZ",            resource.ViewZ.rt);
             data.OpaqueTs.SetRWTexture("gOut_Normal_Roughness", resource.NormalRoughness.rt);
-            // data.OpaqueTs.SetRWTexture("gOut_BaseColor_Metalness", resource.BaseColorMetalness.rt);
+            data.OpaqueTs.SetRWTexture("gOut_BaseColor_Metalness", resource.BaseColorMetalness.rt);
 
             data.OpaqueTs.SetRWTexture("gOut_DirectLighting",   resource.DirectLighting.rt);
             data.OpaqueTs.SetRWTexture("gOut_DirectEmission",   directEmitTex);

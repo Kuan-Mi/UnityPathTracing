@@ -455,7 +455,7 @@ bool RayTraceShader::BuildRootSignature()
         r.NumDescriptors                    = 1;
         r.BaseShaderRegister                = b.registerIndex;
         r.RegisterSpace                     = b.space;
-        r.Flags                             = D3D12_DESCRIPTOR_RANGE_FLAG_DATA_VOLATILE;
+        r.Flags                             = D3D12_DESCRIPTOR_RANGE_FLAG_DESCRIPTORS_VOLATILE | D3D12_DESCRIPTOR_RANGE_FLAG_DATA_VOLATILE;
         r.OffsetInDescriptorsFromTableStart = b.heapOffset;
         allRanges.push_back(r);
         Logf(kUnityLogTypeLog, "  SRV/TLAS binding: name='%s' t%u space%u heapOffset=%u",
@@ -472,7 +472,7 @@ bool RayTraceShader::BuildRootSignature()
         r.NumDescriptors                    = 1;
         r.BaseShaderRegister                = b.registerIndex;
         r.RegisterSpace                     = b.space;
-        r.Flags                             = D3D12_DESCRIPTOR_RANGE_FLAG_DATA_VOLATILE;
+        r.Flags                             = D3D12_DESCRIPTOR_RANGE_FLAG_DESCRIPTORS_VOLATILE | D3D12_DESCRIPTOR_RANGE_FLAG_DATA_VOLATILE;
         r.OffsetInDescriptorsFromTableStart = b.heapOffset;
         allRanges.push_back(r);
         Logf(kUnityLogTypeLog, "  UAV binding: name='%s' t%u space%u heapOffset=%u",
@@ -1190,6 +1190,50 @@ void RayTraceShader::Dispatch(
     UINT width, UINT height)
 {
     if (!m_pso || !m_rootSig || !m_allocator) return;
+
+    // --- Validate all user bindings are set from C# ---
+    // Catches forgotten SetTexture/SetBuffer/SetCBV/SetAccelerationStructure/Set*Array calls
+    // before we issue DispatchRays with null descriptors / unset root parameters.
+    {
+        bool anyMissing = false;
+        for (const auto& b : m_userBindings)
+        {
+            bool ok = false;
+            const char* kind = "?";
+            switch (b.type)
+            {
+            case UserBindingType::TLAS:
+                kind = "TLAS";
+                ok = (b.boundAS != nullptr) || (b.boundResource != nullptr);
+                break;
+            case UserBindingType::SRV:
+                kind = "SRV";
+                ok = (b.boundResource != nullptr);
+                break;
+            case UserBindingType::UAV:
+                kind = "UAV";
+                ok = (b.boundResource != nullptr);
+                break;
+            case UserBindingType::CBV:
+                kind = "CBV";
+                ok = (b.boundResource != nullptr);
+                break;
+            case UserBindingType::SRV_ARRAY:
+                kind = "SRV_ARRAY";
+                ok = (b.boundBT != nullptr) || (b.boundBB != nullptr);
+                break;
+            }
+            if (!ok)
+            {
+                Logf(kUnityLogTypeError,
+                     "RayTraceShader::Dispatch: binding '%s' (%s, space%u, reg%u) is not set - "
+                     "did you forget a SetXxx call from C#?",
+                     b.name.c_str(), kind, b.space, b.registerIndex);
+                anyMissing = true;
+            }
+        }
+        if (anyMissing) return;
+    }
 
     // Allocate heap slots on first call, then write all descriptors every frame
     if ((m_numSRV > 0 && m_srvAllocBase == kInvalidAlloc) ||

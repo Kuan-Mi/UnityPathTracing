@@ -21,6 +21,7 @@
 #include "DescriptorHeapAllocator.h"
 #include "BindlessTexture.h"
 #include "BindlessBuffer.h"
+#include "D3D12HeapHook.h"
 
 using Microsoft::WRL::ComPtr;
 
@@ -53,6 +54,15 @@ static void FlushGpuAndWait();
 #define NR_WARN(msg)    PluginLog(kUnityLogTypeWarning, (msg), __FILE__, __LINE__)
 #define NR_ERROR(msg)   PluginLog(kUnityLogTypeError,   (msg), __FILE__, __LINE__)
 
+// Bridge D3D12HeapHook logs into Unity's log (called from any thread).
+static void HeapHookLogBridge(int level, const char* msg)
+{
+    UnityLogType type = (level == 2) ? kUnityLogTypeError
+                      : (level == 1) ? kUnityLogTypeWarning
+                                     : kUnityLogTypeLog;
+    PluginLog(type, msg, __FILE__, __LINE__);
+}
+
 // ---------------------------------------------------------------------------
 // Device lifecycle callback
 // ---------------------------------------------------------------------------
@@ -60,6 +70,10 @@ static void UNITY_INTERFACE_API OnGraphicsDeviceEvent(UnityGfxDeviceEventType ev
 {
     if (eventType == kUnityGfxDeviceEventInitialize)
     {
+        // Attach our heap-hook logger to Unity's log (best-effort; falls back
+        // to OutputDebugStringA if IUnityLog is unavailable).
+        D3D12HeapHook::SetLogger(&HeapHookLogBridge);
+
         // Acquire v7 for core API (GetDevice, CommandRecordingState).
         // Also try v8 for NotifyResourceState to keep Unity's resource state tracker in sync.
         s_D3D12   = s_Interfaces->Get<IUnityGraphicsD3D12v7>();
@@ -76,6 +90,11 @@ static void UNITY_INTERFACE_API OnGraphicsDeviceEvent(UnityGfxDeviceEventType ev
             NR_ERROR("GetDevice() returned nullptr");
             return;
         }
+
+        // Patch the SetDescriptorHeaps vtable slot NOW, before Unity records
+        // any more commands. If we wait until our first render callback, we
+        // will miss Unity's earlier SetDescriptorHeaps calls in the same frame.
+        D3D12HeapHook::InstallHookFromDevice(device);
 
         // Check DXR (ID3D12Device5) support
         ComPtr<ID3D12Device5> dev5;
@@ -473,7 +492,14 @@ static void UNITY_INTERFACE_API RtsRenderCallback(int /*eventId*/, void* data)
     auto* shader  = reinterpret_cast<RayTraceShader*>(ed->shaderHandle);
     auto* cmdList = static_cast<ID3D12GraphicsCommandList4*>(recordingState.commandList);
 
+    D3D12HeapHook::BeginPluginDispatch();
     shader->Dispatch(cmdList, ed->width, ed->height);
+    D3D12HeapHook::EndPluginDispatch();
+
+    // Our Dispatch bound a private descriptor heap. Restore Unity's heaps so
+    // Unity's subsequent SetComputeRootDescriptorTable does not trip D3D12
+    // validation (category 9, id 708).
+    D3D12HeapHook::RestoreUnityHeaps(cmdList);
 }
 
 // ---------------------------------------------------------------------------
@@ -859,7 +885,15 @@ static void UNITY_INTERFACE_API CsDispatchCallback(int /*eventId*/, void* data)
     auto* cs      = reinterpret_cast<ComputeShader*>(ed->shaderHandle);
     auto* cmdList = static_cast<ID3D12GraphicsCommandList*>(recordingState.commandList);
 
+    // Install vtable hook on first call so we can capture Unity's descriptor heaps.
+    D3D12HeapHook::InstallHook(cmdList);
+
+    D3D12HeapHook::BeginPluginDispatch();
     cs->Dispatch(cmdList, ed->threadGroupX, ed->threadGroupY, ed->threadGroupZ);
+    D3D12HeapHook::EndPluginDispatch();
+
+    // Restore Unity's descriptor heaps (our Dispatch rebinds a private heap).
+    D3D12HeapHook::RestoreUnityHeaps(cmdList);
 }
 
 extern "C" UnityRenderingEventAndData UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API

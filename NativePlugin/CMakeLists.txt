@@ -134,6 +134,7 @@ add_library(NativeRenderPlugin SHARED
     NativeRenderPlugin/src/DescriptorHeapAllocator.cpp
     NativeRenderPlugin/src/BindlessTexture.cpp
     NativeRenderPlugin/src/BindlessBuffer.cpp
+    NativeRenderPlugin/src/D3D12HeapHook.cpp
 )
 
 target_include_directories(NativeRenderPlugin PRIVATE
