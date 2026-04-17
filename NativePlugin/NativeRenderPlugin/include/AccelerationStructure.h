@@ -167,6 +167,11 @@ public:
     // Called from the renderer before dispatch. Builds/updates BLAS+TLAS as needed.
     bool BuildOrUpdate(ID3D12GraphicsCommandList4* cmdList);
 
+    // Debug: dump every active instance's state to the Unity log.  Also verifies
+    // handle<->slot map consistency and flags duplicate vb+ib pairs across slots.
+    // Safe to call every frame; intended for diagnostics only.
+    void DumpInstances(const char* tag = nullptr) const;
+
     ID3D12Resource* GetTLAS() const { return m_tlasResources[m_frameIndex].tlas.Get(); }
 
     // Dense list of active InstanceDefs in TLAS order — used by Renderer for bindless VB/IB SRVs.

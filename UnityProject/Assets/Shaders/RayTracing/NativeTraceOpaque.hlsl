@@ -589,39 +589,39 @@ void MainRayGenShader()
     float3 cameraRayDirection = 0;
     GetCameraRay(cameraRayOrigin, cameraRayDirection, sampleUv);
 
-    // RayDesc rayDesc;
-    // rayDesc.Origin = cameraRayOrigin;
-    // rayDesc.Direction = cameraRayDirection;
-    // rayDesc.TMin = 0.0;
-    // rayDesc.TMax = 1000.0;
-    //
-    //
-    // RayPayload payload = (RayPayload)0;
-    //
-    // TraceRay(gWorldTlas, ToRayFlag2(GEOMETRY_ALL), GEOMETRY_ALL, 0, 1, 0, rayDesc, payload);
-    //
-    //
-    // GeometryData geomData = t_GeometryData[t_InstanceData[payload.instanceID].firstGeometryIndex + payload.geometryIndex];
-    // MaterialConstants matConst = t_MaterialConstants[geomData.materialIndex];
-    //
-    //
-    // GeometrySample geo = getGeometryFromHit (
-    //     payload.instanceID,
-    //     payload.geometryIndex,
-    //     payload.triangleIndex,
-    //     payload.barycentrics,
-    //     t_InstanceData,
-    //     t_GeometryData,
-    //     t_MaterialConstants
-    // );
-    //
-    //
-    // MaterialProps mat = sampleGeometryMaterial(geo, s_LinearRepeat);
-    //
-    // float3 ccc = mat.metalness;
-    // // ccc = float3(0.5,0.1,0.1);
-    //
-    // gOut_BaseColor_Metalness[pixelPos] = float4(  ccc,  1);
+    RayDesc rayDesc;
+    rayDesc.Origin = cameraRayOrigin;
+    rayDesc.Direction = cameraRayDirection;
+    rayDesc.TMin = 0.0;
+    rayDesc.TMax = 1000.0;
+    
+    
+    RayPayload payload = (RayPayload)0;
+    
+    TraceRay(gWorldTlas, ToRayFlag2(GEOMETRY_ALL), GEOMETRY_ALL, 0, 1, 0, rayDesc, payload);
+    
+    
+    GeometryData geomData = t_GeometryData[t_InstanceData[payload.instanceID].firstGeometryIndex + payload.geometryIndex];
+    MaterialConstants matConst = t_MaterialConstants[geomData.materialIndex];
+    
+    
+    GeometrySample geo = getGeometryFromHit (
+        payload.instanceID,
+        payload.geometryIndex,
+        payload.triangleIndex,
+        payload.barycentrics,
+        t_InstanceData,
+        t_GeometryData,
+        t_MaterialConstants
+    );
+    
+    
+    MaterialProps mat = sampleGeometryMaterial(geo, s_LinearRepeat);
+    
+    float3 ccc = (payload.instanceID) / 10.0;
+    // ccc = float3(0.5,0.1,0.1);
+    
+    gOut_BaseColor_Metalness[pixelPos] = float4(  ccc,  1);
     
     GeometryProps geometryProps0;
     MaterialProps materialProps0;
@@ -727,7 +727,7 @@ void MainRayGenShader()
 
     gOut_GeoNormal[pixelPos] = ndirToOctUnorm32(geometryProps0.N);
     // Base color and metalness
-    gOut_BaseColor_Metalness[pixelPos] = float4(Color::ToSrgb(materialProps0.baseColor), materialProps0.metalness);
+    // gOut_BaseColor_Metalness[pixelPos] = float4(Color::ToSrgb(materialProps0.baseColor), materialProps0.metalness);
 
     // Direct lighting
     // float3 Xshadow;
