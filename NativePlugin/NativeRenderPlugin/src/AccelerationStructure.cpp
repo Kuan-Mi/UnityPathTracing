@@ -618,6 +618,95 @@ bool AccelerationStructure::BuildTLAS(
 // ===========================================================================
 
 // ---------------------------------------------------------------------------
+// DumpInstances  -  per-frame diagnostic dump.
+//
+//   For every active slot prints:
+//     slot index, userHandle (reverse-looked up from m_handleToSlot),
+//     customInstanceID, mask, needsBLAS, submesh count, vb/ib pointers,
+//     cached BLAS GPU VA, BLAS refCount, and translation part of the transform.
+//
+//   Also performs two self-checks:
+//     1. handle<->slot map bidirectional consistency
+//     2. duplicate (vbPtr, ibPtr) keys across slots (same mesh shared by
+//        multiple renderers is legitimate, but logged so it can be correlated
+//        with InstanceID() collisions in shader output).
+// ---------------------------------------------------------------------------
+void AccelerationStructure::DumpInstances(const char* tag) const
+{
+    const char* t = tag ? tag : "Dump";
+    AccelLogf(m_log, kUnityLogTypeLog,
+        "[AS][%s] ===== instances: active=%u slots=%zu free=%zu handles=%zu cache=%zu pendingRebuild=%d frame=%u =====",
+        t, m_activeCount, m_slots.size(), m_freeSlots.size(),
+        m_handleToSlot.size(), m_blasCache.size(),
+        m_tlasRebuildPendingSlots, m_frameIndex);
+
+    // Build reverse map: slotIndex -> userHandle (expect 1:1 for active slots).
+    std::unordered_map<uint32_t, uint32_t> slotToHandle;
+    slotToHandle.reserve(m_handleToSlot.size());
+    for (const auto& kv : m_handleToSlot)
+    {
+        auto ins = slotToHandle.emplace(kv.second, kv.first);
+        if (!ins.second)
+        {
+            AccelLogf(m_log, kUnityLogTypeError,
+                "[AS][%s] DUPLICATE slot %u mapped from handles %u and %u",
+                t, kv.second, ins.first->second, kv.first);
+        }
+    }
+
+    // Track (vb,ib) duplicates across active slots.
+    std::unordered_map<MeshKey, uint32_t, MeshKeyHash> seenKey;
+
+    for (uint32_t i = 0; i < m_slots.size(); ++i)
+    {
+        const InstanceSlot& s = m_slots[i];
+        if (!s.active) continue;
+
+        uint32_t handle = 0xFFFFFFFFu;
+        auto itH = slotToHandle.find(i);
+        if (itH != slotToHandle.end()) handle = itH->second;
+        else
+        {
+            AccelLogf(m_log, kUnityLogTypeError,
+                "[AS][%s] slot %u active but has no handle in m_handleToSlot", t, i);
+        }
+
+        // Cross-check: handleToSlot should round-trip.
+        if (handle != 0xFFFFFFFFu)
+        {
+            auto itBack = m_handleToSlot.find(handle);
+            if (itBack == m_handleToSlot.end() || itBack->second != i)
+            {
+                AccelLogf(m_log, kUnityLogTypeError,
+                    "[AS][%s] handleToSlot round-trip failed: handle=%u expects slot=%u got=%d",
+                    t, handle, i,
+                    itBack == m_handleToSlot.end() ? -1 : (int)itBack->second);
+            }
+        }
+
+        D3D12_GPU_VIRTUAL_ADDRESS blasVA = GetBLASVA(s.meshKey);
+        int refCount = 0;
+        auto itC = m_blasCache.find(s.meshKey);
+        if (itC != m_blasCache.end()) refCount = itC->second.refCount;
+
+        // Flag duplicated (vb,ib) across slots.
+        auto dupIt = seenKey.find(s.meshKey);
+        bool dup = (dupIt != seenKey.end());
+        if (!dup) seenKey.emplace(s.meshKey, i);
+
+        AccelLogf(m_log, kUnityLogTypeLog,
+            "[AS][%s] slot=%-4u handle=%-10u cid=%-6u mask=0x%02X needsBLAS=%d sub=%-3zu "
+            "vb=%p ib=%p blasVA=0x%llx blasRef=%d T=(%.2f,%.2f,%.2f)%s",
+            t, i, handle, s.customInstanceID, s.mask,
+            (int)s.needsBLAS, s.mesh.submeshes.size(),
+            (void*)s.meshKey.vbPtr, (void*)s.meshKey.ibPtr,
+            (unsigned long long)blasVA, refCount,
+            s.transform[3], s.transform[7], s.transform[11],
+            dup ? "  [DUP vb+ib shared with earlier slot]" : "");
+    }
+}
+
+// ---------------------------------------------------------------------------
 // Clear
 // ---------------------------------------------------------------------------
 void AccelerationStructure::Clear()
@@ -841,6 +930,9 @@ void AccelerationStructure::SetInstanceID(uint32_t handle, uint32_t id)
 bool AccelerationStructure::BuildOrUpdate(ID3D12GraphicsCommandList4* cmdList)
 {
     TickDeferredDeletes();
+
+    // Per-frame diagnostic dump (one line per active instance).
+    DumpInstances("BuildOrUpdate");
 
     // Advance to the next double-buffer slot each frame.
     // The GPU is currently consuming the previous slot; we now own this slot.

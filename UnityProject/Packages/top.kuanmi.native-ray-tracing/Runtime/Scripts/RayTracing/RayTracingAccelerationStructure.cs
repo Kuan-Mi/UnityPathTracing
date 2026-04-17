@@ -248,6 +248,8 @@ namespace NativeRender
         public void SetInstanceID(MeshRenderer meshRenderer, uint id)
         {
             if (_handle == 0 || meshRenderer == null) return;
+            Debug.Log($"[NativeRayTracing] SetInstanceID for '{meshRenderer.name}' to {id}");
+            
             NativeRenderPlugin.NR_AS_SetInstanceID(_handle, (uint)meshRenderer.GetInstanceID(), id);
         }
 
