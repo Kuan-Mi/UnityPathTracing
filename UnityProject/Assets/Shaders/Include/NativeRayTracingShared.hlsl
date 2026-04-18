@@ -348,6 +348,7 @@ MaterialProps sampleGeometryMaterial(
             props.baseColor = tex.SampleLevel(materialSampler, gs.texcoord, 0).rgb * props.baseColor;
             props.alpha *= tex.SampleLevel(materialSampler, gs.texcoord, 0).a;
         }
+        // props.baseColor = 1;
     }
 
     {
@@ -356,9 +357,8 @@ MaterialProps sampleGeometryMaterial(
             gs.material.normalTextureIndex >= 0)
         {
             Texture2D<float4> normalTex = t_BindlessTextures[NonUniformResourceIndex(gs.material.normalTextureIndex)];
-            float4 n = normalTex.SampleLevel(materialSampler, gs.texcoord, 0);
-            // float3 tangentNormal = UnpackNormalMapRGorAG(n, normalMapScale);
-            float3 tangentNormal = UnpackNormalMapRGorAG(n, normalMapScale);
+            float4 packedNormal = normalTex.SampleLevel(materialSampler, gs.texcoord, 0);
+            float3 tangentNormal = UnpackNormalMapRGorAG(packedNormal, 1);
 
             float3 T = normalize(gs.T.xyz);
             float3 B = - cross(props.N, T) *  sign(gs.T.w);
@@ -367,7 +367,8 @@ MaterialProps sampleGeometryMaterial(
             float3 matWorldNormal = TransformTangentToWorld(tangentNormal, tangentToWorld);
 
             props.N = matWorldNormal;
-            // props.N = gs.geometryNormal;
+            // props.N = gs.N + matWorldNormal * 0.0000001;
+            // props.N = gs.N;
         }
     }
 
@@ -392,6 +393,8 @@ MaterialProps sampleGeometryMaterial(
             props.roughness = 1 - (1 - mrSample.g) * (1 - props.roughness);
             props.metalness = mrSample.b;
         }
+        // props.roughness = 0;
+        // props.metalness = 1;
     }
 
 
