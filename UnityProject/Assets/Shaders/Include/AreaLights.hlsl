@@ -128,10 +128,16 @@ float3 EvaluateAreaLights(GeometryProps geo, MaterialProps mat, bool isSSS)
             RTXCR_EvalBurleyDiffusionProfile(sssMat, sssInteraction,
                 gSssMaxSampleRadius / gUnitToMetersMultiplier, false, Rng::Hash::GetFloat2(), sssSample);
 
+            #ifdef USE_NATIVE
+            
+            GeometryProps sssProps = CastRay(sssSample.samplePosition, -sssInteraction.normal,
+                    0.0, INF, float2(geo.mip, 0.0), FLAG_NON_TRANSPARENT);
+            #else
             GeometryProps sssProps;
             MaterialProps sssMaterialProps;
             CastRay(sssSample.samplePosition, -sssInteraction.normal,
                     0.0, INF, float2(geo.mip, 0.0), FLAG_NON_TRANSPARENT, sssProps, sssMaterialProps);
+            #endif
 
             if (!sssProps.IsMiss() && sssProps.Has(FLAG_SKIN))
             {
@@ -141,7 +147,7 @@ float3 EvaluateAreaLights(GeometryProps geo, MaterialProps mat, bool isSSS)
                 dist_shadow = length(toLightExit);
                 L_shadow = dist_shadow > 0.0001 ? toLightExit / dist_shadow : L;
 
-                float NoL_sss = saturate(dot(sssMaterialProps.N, L_shadow));
+                float NoL_sss = saturate(dot(sssProps.N, L_shadow));
                 Cdiff = RTXCR_EvalBssrdf(sssSample, Clinc, NoL_sss);
             }
         }

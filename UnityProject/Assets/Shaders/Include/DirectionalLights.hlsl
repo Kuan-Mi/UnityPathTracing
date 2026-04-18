@@ -24,11 +24,20 @@ float3 evalSingleScatteringTransmission(
         {
             // Trace the refraction ray to find the backface exit
             // 追踪折射射线找到背面出口
+            #ifdef USE_NATIVE
+            
+            float3 transmissionRayOrigin = geo.GetXoffset(-geo.N, PT_BOUNCE_RAY_OFFSET);
+            GeometryProps refrProps = CastRay(transmissionRayOrigin, refractedRayDirection, 0.0, INF, mipConeRefr, FLAG_NON_TRANSPARENT);
+            
+            #else
+            
             GeometryProps refrProps;
             MaterialProps refrMatProps;
             float3 transmissionRayOrigin = geo.GetXoffset(-geo.N, PT_BOUNCE_RAY_OFFSET);
             CastRay(transmissionRayOrigin, refractedRayDirection, 0.0, INF, mipConeRefr, FLAG_NON_TRANSPARENT, refrProps, refrMatProps);
-
+            
+            #endif
+            
             // if (refrProps.IsMiss()) {
             //     return float3(1.0, 1.0, 0.0); // 【测试2】纯黄色！如果物体变黄了，说明射线穿透了体积但没有碰到任何东西！(99%是背面剔除或者模型不是闭合的)
             // } else {
@@ -40,7 +49,7 @@ float3 evalSingleScatteringTransmission(
 
             thickness = refrProps.hitT;
             backPosition = transmissionRayOrigin + thickness * refractedRayDirection;
-            float3 backN = -refrMatProps.N;
+            float3 backN = -refrProps.N;
 
             // Offset exit point along backface normal for shadow ray
             float3 backPositionOffset = refrProps.GetXoffset(backN, PT_BOUNCE_RAY_OFFSET);
@@ -81,10 +90,14 @@ float3 evalSingleScatteringTransmission(
 
             // Trace scattering ray to find exit boundary
             // 追踪散射射线找到出口边界
+            
+            #ifdef USE_NATIVE
+            GeometryProps scatteringGeoProps = CastRay(samplePosition, scatteringDirection, 0.0, INF, mipConeRefr, FLAG_NON_TRANSPARENT);
+            #else
             GeometryProps scatteringGeoProps;
             MaterialProps scatteringMatProps;
             CastRay(samplePosition, scatteringDirection, 0.0, INF, mipConeRefr, FLAG_NON_TRANSPARENT, scatteringGeoProps, scatteringMatProps);
-
+            #endif
 
             // 找到散射出口了
             if (!scatteringGeoProps.IsMiss() && scatteringGeoProps.instanceIndex == geo.instanceIndex)
@@ -207,17 +220,23 @@ float3 EvaluateDirectionalLights(GeometryProps geo, MaterialProps mat, bool isSS
 
         // 从采样点向太阳方向投射锥形光线，找到第一个交点（如果有的话）
         float2 mipConeSSS = GetConeAngleFromRoughness(geo.mip, 0.0);
+        
+        #ifdef USE_NATIVE
+        GeometryProps sssProps = CastRay(subsurfaceSample.samplePosition, -subsurfaceInteraction.normal, 0.0, INF, mipConeSSS, FLAG_NON_TRANSPARENT);
+        #else
+        
         GeometryProps sssProps;
         MaterialProps sssMaterialProps;
         CastRay(subsurfaceSample.samplePosition, -subsurfaceInteraction.normal,
                 0.0, INF, mipConeSSS, FLAG_NON_TRANSPARENT, sssProps, sssMaterialProps);
+        #endif
 
         // 如果交点有效且是皮肤材质，使用这个交点来计算SSS贡献并更新阴影原点
         if (!sssProps.IsMiss() && sssProps.instanceIndex == geo.instanceIndex)
         {
             Xshadow = sssProps.X;
             shadowGeo = sssProps;
-            float NoL_sss = saturate(dot(sssMaterialProps.N, L));
+            float NoL_sss = saturate(dot(sssProps.N, L));
             Cdiff = RTXCR_EvalBssrdf(subsurfaceSample, Csun, NoL_sss);
         }
 

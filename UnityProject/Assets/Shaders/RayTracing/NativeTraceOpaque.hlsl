@@ -1,3 +1,5 @@
+#define USE_NATIVE
+
 #include "Assets/Shaders/Include/NativeGlobalConstants.cs.hlsl"
 #include "Assets/Shaders/Include/NativeShared.hlsl"
 #include "Assets/Shaders/donut/utils.hlsli"
@@ -340,7 +342,8 @@ TraceOpaqueResult TraceOpaque(GeometryProps geometryProps0, MaterialProps materi
 
                 float2 mipAndCone = GetConeAngleFromRoughness(geometryProps.mip, isDiffuse ? 1.0 : materialProps.roughness);
 
-                CastRay(geometryProps.GetXoffset(geometryProps.N), ray, 0.0, INF, mipAndCone, FLAG_NON_TRANSPARENT, geometryProps, materialProps);
+                geometryProps = CastRay(geometryProps.GetXoffset(geometryProps.N), ray, 0.0, INF, mipAndCone, FLAG_NON_TRANSPARENT);
+                materialProps = GetMaterialProps( geometryProps );
             }
 
             //=============================================================================================================================================================
@@ -588,11 +591,10 @@ void MainRayGenShader()
     float3 cameraRayOrigin = 0;
     float3 cameraRayDirection = 0;
     GetCameraRay(cameraRayOrigin, cameraRayDirection, sampleUv);
-    
-    GeometryProps geometryProps0;
-    MaterialProps materialProps0;
-    CastRay(cameraRayOrigin, cameraRayDirection, 0.0, 1000.0, GetConeAngleFromRoughness(0.0, 0.0), (gOnScreen == SHOW_INSTANCE_INDEX || gOnScreen == SHOW_NORMAL) ? GEOMETRY_ALL : FLAG_NON_TRANSPARENT, geometryProps0, materialProps0);
 
+    GeometryProps geometryProps0 = CastRay(cameraRayOrigin, cameraRayDirection, 0.0, 1000.0, GetConeAngleFromRoughness(0.0, 0.0), (gOnScreen == SHOW_INSTANCE_INDEX || gOnScreen == SHOW_NORMAL) ? GEOMETRY_ALL : FLAG_NON_TRANSPARENT);
+    MaterialProps materialProps0 = GetMaterialProps( geometryProps0 );
+    
     //================================================================================================================================================================================
     // Primary surface replacement ( aka jump through mirrors )
     //================================================================================================================================================================================
@@ -638,7 +640,8 @@ void MainRayGenShader()
             float2 mipAndCone = GetConeAngleFromRoughness(geometryProps0.mip, materialProps0.roughness);
 
 
-            CastRay(geometryProps0.GetXoffset(geometryProps0.N), ray, 0.0, INF, mipAndCone, GEOMETRY_ALL, geometryProps0, materialProps0);
+            geometryProps0 = CastRay(geometryProps0.GetXoffset(geometryProps0.N), ray, 0.0, INF, mipAndCone, GEOMETRY_ALL);
+            materialProps0 = GetMaterialProps( geometryProps0 );
         }
 
         {
