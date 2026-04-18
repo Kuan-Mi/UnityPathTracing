@@ -20,5 +20,6 @@
         Radiance,
         NoiseShadow,
         Dlss,
+        ViewZ,
     }
 }

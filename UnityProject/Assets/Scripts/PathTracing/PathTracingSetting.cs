@@ -32,6 +32,7 @@ namespace PathTracing
         DLSS_SpecularHitDistance,
         DLSS_NormalRoughness,
         DLSS_Output,
+        ViewZ,
     }
 
     public enum UpscalerMode : byte // Scaling factor       // Min jitter phases (or just use unclamped Halton2D)
