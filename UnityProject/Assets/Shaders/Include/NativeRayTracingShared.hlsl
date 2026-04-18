@@ -1,4 +1,6 @@
 #include "../Sharc/SharcCommon.h"
+
+
 RaytracingAccelerationStructure gWorldTlas : register(t0, space2);
 
 ByteAddressBuffer t_BindlessBuffers[] : register(t0, space3);
@@ -193,6 +195,43 @@ static const int MaterialFlags_UseBaseOrDiffuseTexture = 0x00000008;
 static const int MaterialFlags_UseEmissiveTexture = 0x00000010;
 static const int MaterialFlags_UseNormalTexture = 0x00000020;
 
+float3 UnpackNormalAG(float4 packedNormal, float scale = 1.0)
+{
+    float3 normal;
+    normal.xy = packedNormal.ag * 2.0 - 1.0;
+    normal.z = max(1.0e-16, sqrt(1.0 - saturate(dot(normal.xy, normal.xy))));
+
+    // must scale after reconstruction of normal.z which also
+    // mirrors UnpackNormalRGB(). This does imply normal is not returned
+    // as a unit length vector but doesn't need it since it will get normalized after TBN transformation.
+    // If we ever need to blend contributions with built-in shaders for URP
+    // then we should consider using UnpackDerivativeNormalAG() instead like
+    // HDRP does since derivatives do not use renormalization and unlike tangent space
+    // normals allow you to blend, accumulate and scale contributions correctly.
+    normal.xy *= scale;
+    return normal;
+}
+
+float3 UnpackNormalMapRGorAG(float4 packedNormal, float scale = 1.0)
+{
+    // Convert to (?, y, 0, x)
+    // packedNormal.a *= packedNormal.r;
+    return UnpackNormalAG(packedNormal, scale);
+} 
+float3 SafeNormalize(float3 inVec)
+{
+    float dp3 = max(1.175494351e-38, dot(inVec, inVec));
+    return inVec * rsqrt(dp3);
+}
+
+float3 TransformTangentToWorld(float3 normalTS, float3x3 tangentToWorld, bool doNormalize = false)
+{
+    // Note matrix is in row major convention with left multiplication as it is build on the fly
+    float3 result = mul(normalTS, tangentToWorld);
+    if (doNormalize)
+        return SafeNormalize(result);
+    return result;
+}
 MaterialProps sampleGeometryMaterial(
     GeometrySample gs,
     SamplerState materialSampler,
@@ -219,11 +258,16 @@ MaterialProps sampleGeometryMaterial(
             gs.material.normalTextureIndex >= 0)
         {
             Texture2D<float4> normalTex = t_BindlessTextures[NonUniformResourceIndex(gs.material.normalTextureIndex)];
-            float3 normalSample = normalTex.SampleLevel(materialSampler, gs.texcoord, 0).xyz * 2.0f - 1.0f;
-            normalSample.xy *= normalMapScale;
+            float4 n = normalTex.SampleLevel(materialSampler, gs.texcoord, 0);
+            float3 tangentNormal = UnpackNormalMapRGorAG(n, normalMapScale);
+
             float3 T = normalize(gs.tangent.xyz);
-            float3 B = cross(props.N, T) * gs.tangent.w;
-            props.N = normalize(normalSample.x * T + normalSample.y * B + normalSample.z * props.N);
+            float3 B =- cross(props.N, T) * gs.tangent.w;
+            half3x3 tangentToWorld = half3x3(T, B, props.N);
+            
+            float3 matWorldNormal = TransformTangentToWorld(tangentNormal, tangentToWorld);
+
+            props.N = matWorldNormal;
         }
     }
 
@@ -245,7 +289,7 @@ MaterialProps sampleGeometryMaterial(
         {
             Texture2D<float4> metalRoughTex = t_BindlessTextures[NonUniformResourceIndex(gs.material.metalRoughOrSpecularTextureIndex)];
             float4 mrSample = metalRoughTex.SampleLevel(materialSampler, gs.texcoord, 0);
-            props.roughness *= mrSample.g;
+            props.roughness = 1 - (1 - mrSample.g) * (1 - props.roughness);
             props.metalness = mrSample.b;
         }
     }

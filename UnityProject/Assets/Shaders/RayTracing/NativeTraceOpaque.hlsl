@@ -718,6 +718,7 @@ void MainRayGenShader()
 
     // Normal, roughness and material ID
     float3 N = Geometry::RotateVectorInverse(mirrorMatrix, materialProps0.N);
+    // N = geometryProps0.N;
     float materialID = GetMaterialID(geometryProps0, materialProps0);
     #if( USE_SIMULATED_MATERIAL_ID_TEST == 1 )
     materialID = frac(geometryProps0.X).x < 0.05 ? MATERIAL_ID_HAIR : materialID;
