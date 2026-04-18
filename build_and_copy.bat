@@ -31,12 +31,12 @@ if errorlevel 1 (
 
 :: Copy DLLs to Unity
 echo Copying DLLs to Unity...
-copy /Y "NativePlugin\build\Debug\NativeRenderPlugin.dll" "%UNITY_PLUGINS%\" >nul
-copy /Y "NativePlugin\build\Debug\NativeRenderPlugin.pdb" "%UNITY_PLUGINS%\" >nul
-copy /Y "NativePlugin\build\Debug\OMMBakerPlugin.dll"        "%UNITY_PLUGINS%\" >nul
-copy /Y "NativePlugin\build\Debug\OMMBakerPlugin.pdb"        "%UNITY_PLUGINS%\" >nul
-copy /Y "NativePlugin\build\Debug\ShaderCompilerPlugin.dll"  "%UNITY_PLUGINS%\" >nul
-copy /Y "NativePlugin\build\Debug\ShaderCompilerPlugin.pdb"  "%UNITY_PLUGINS%\" >nul
+copy /Y "RenderingPlugin\_Build\Debug\NativeRenderPlugin.dll" "%UNITY_PLUGINS%\" >nul
+copy /Y "RenderingPlugin\_Build\Debug\NativeRenderPlugin.pdb" "%UNITY_PLUGINS%\" >nul
+copy /Y "RenderingPlugin\_Build\Debug\OMMBakerPlugin.dll"        "%UNITY_PLUGINS%\" >nul
+copy /Y "RenderingPlugin\_Build\Debug\OMMBakerPlugin.pdb"        "%UNITY_PLUGINS%\" >nul
+copy /Y "RenderingPlugin\_Build\Debug\ShaderCompilerPlugin.dll"  "%UNITY_PLUGINS%\" >nul
+copy /Y "RenderingPlugin\_Build\Debug\ShaderCompilerPlugin.pdb"  "%UNITY_PLUGINS%\" >nul
 
 echo.
 echo ============================================================
