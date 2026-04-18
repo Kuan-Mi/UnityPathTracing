@@ -15,7 +15,7 @@ namespace PathTracing
     {
         private PrepareLightResource _prepareLightResource;
 
-        [DllImport("UnityRTXDI")]
+        [DllImport("PrepareLight")]
         private static extern IntPtr GetRenderEventAndDataFunc();
 
         public void Setup(PrepareLightResource prepareLightResource)

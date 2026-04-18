@@ -12,22 +12,22 @@ namespace RTXDI
 {
     public class PrepareLightResource : IDisposable
     {
-        [DllImport("UnityRTXDI")]
+        [DllImport("PrepareLight")]
         private static extern int CreateDenoiserInstance();
 
-        [DllImport("UnityRTXDI")]
+        [DllImport("PrepareLight")]
         private static extern void DestroyDenoiserInstance(int id);
 
-        [DllImport("UnityRTXDI")]
+        [DllImport("PrepareLight")]
         private static extern IntPtr WrapD3D12Texture(IntPtr resource, DXGI_FORMAT format);
 
-        [DllImport("UnityRTXDI")]
+        [DllImport("PrepareLight")]
         private static extern IntPtr WrapD3D12Buffer(IntPtr resource, ushort stride);
 
-        [DllImport("UnityRTXDI")]
+        [DllImport("PrepareLight")]
         private static extern void ReleaseTexture(IntPtr nriTex);
 
-        [DllImport("UnityRTXDI")]
+        [DllImport("PrepareLight")]
         private static extern void UpdateDenoiserResources(int instanceId, IntPtr resources, int count);
 
         private readonly int instanceId;
