@@ -274,10 +274,9 @@ bool AccelerationStructure::EnsureBLAS(
             td.VertexBuffer.StrideInBytes = def.vertexStride;
             td.VertexCount                = def.vertexCount;
             td.VertexFormat               = DXGI_FORMAT_R32G32B32_FLOAT;
-            td.IndexBuffer                = def.indexBuffer
-                ? def.indexBuffer->GetGPUVirtualAddress() + sub.indexByteOffset : 0;
-            td.IndexCount                 = def.indexBuffer ? sub.indexCount : 0;
-            td.IndexFormat                = def.indexBuffer ? def.indexFormat : DXGI_FORMAT_UNKNOWN;
+            td.IndexBuffer                = def.indexBuffer->GetGPUVirtualAddress() + sub.indexByteOffset;
+            td.IndexCount                 = sub.indexCount;
+            td.IndexFormat                = def.indexFormat;
             td.Transform3x4               = 0;
 
             D3D12_RAYTRACING_GEOMETRY_OMM_LINKAGE_DESC& ol = ommLinkages[j];
@@ -300,18 +299,17 @@ bool AccelerationStructure::EnsureBLAS(
             geomDesc.Triangles.VertexBuffer.StrideInBytes = def.vertexStride;
             geomDesc.Triangles.VertexCount                = def.vertexCount;
             geomDesc.Triangles.VertexFormat               = DXGI_FORMAT_R32G32B32_FLOAT;
-            geomDesc.Triangles.IndexBuffer                = def.indexBuffer
-                ? def.indexBuffer->GetGPUVirtualAddress() + sub.indexByteOffset : 0;
-            geomDesc.Triangles.IndexCount                 = def.indexBuffer ? sub.indexCount : 0;
-            geomDesc.Triangles.IndexFormat                = def.indexBuffer ? def.indexFormat : DXGI_FORMAT_UNKNOWN;
+            geomDesc.Triangles.IndexBuffer                = def.indexBuffer->GetGPUVirtualAddress() + sub.indexByteOffset;
+            geomDesc.Triangles.IndexCount                 = sub.indexCount;
+            geomDesc.Triangles.IndexFormat                = def.indexFormat;
             geomDesc.Triangles.Transform3x4               = 0;
         }
     }
 
-    D3D12_RAYTRACING_ACCELERATION_STRUCTURE_BUILD_FLAGS blasFlags =
-        D3D12_RAYTRACING_ACCELERATION_STRUCTURE_BUILD_FLAG_PREFER_FAST_TRACE;
+    D3D12_RAYTRACING_ACCELERATION_STRUCTURE_BUILD_FLAGS blasFlags = D3D12_RAYTRACING_ACCELERATION_STRUCTURE_BUILD_FLAG_PREFER_FAST_TRACE;
     if (instanceHasOMM)
         blasFlags |= D3D12_RAYTRACING_ACCELERATION_STRUCTURE_BUILD_FLAG_ALLOW_DISABLE_OMMS;
+    blasFlags |= D3D12_RAYTRACING_ACCELERATION_STRUCTURE_BUILD_FLAG_ALLOW_COMPACTION;
 
     D3D12_BUILD_RAYTRACING_ACCELERATION_STRUCTURE_INPUTS inputs = {};
     inputs.Type           = D3D12_RAYTRACING_ACCELERATION_STRUCTURE_TYPE_BOTTOM_LEVEL;
