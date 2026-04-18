@@ -1,11 +1,13 @@
 ﻿using System.Collections.Generic;
 using System.Runtime.InteropServices;
 using DLRR;
+using NativeRender;
 using Nrd;
 using Unity.Mathematics;
 using UnityEngine;
 using UnityEngine.Rendering;
 using UnityEngine.Rendering.Universal;
+using RayTracingAccelerationStructure = UnityEngine.Rendering.RayTracingAccelerationStructure;
 using static UnityEngine.Rendering.RayTracingAccelerationStructure;
 using static PathTracing.ShaderIDs;
 
@@ -19,9 +21,12 @@ namespace PathTracing
 
         public RenderPassEvent renderPassEvent = RenderPassEvent.BeforeRenderingPostProcessing;
 
+        public bool useNativeOpaquePass = false;
+
         public Material         finalMaterial;
         public RayTracingShader sharcUpdateTs;
         public RayTracingShader opaqueTracingShader;
+        public RayTraceShader   nativeOpaqueTracingShader;
         public RayTracingShader transparentTracingShader;
         public RayTracingShader referencePtTracingShader;
 
@@ -38,6 +43,7 @@ namespace PathTracing
         private OutputBlitPass   _outputBlitPass;
         private SharcPass        _sharcPass;
         private OpaquePass       _opaquePass;
+        private NativeOpaquePass _nativeOpaquePass;
         private NrdPass          _nrdPass;
         private CompositionPass  _compositionPass;
         private TransparentPass  _transparentPass;
@@ -49,6 +55,8 @@ namespace PathTracing
         private AccumulatePass   _accumulatePass;
 
         private RayTracingAccelerationStructure _accelerationStructure;
+
+        private GPUScene _gpuScene;
 
         private GraphicsBuffer _constantBuffer;
 
@@ -77,6 +85,9 @@ namespace PathTracing
 
         public override void Create()
         {
+            if (useNativeOpaquePass && _gpuScene == null)
+                _gpuScene = new GPUScene();
+
             if (_accelerationStructure == null)
             {
                 var settings = new Settings
@@ -128,10 +139,20 @@ namespace PathTracing
             {
                 renderPassEvent = renderPassEvent
             };
-            _opaquePass ??= new OpaquePass(opaqueTracingShader)
+            if (useNativeOpaquePass)
             {
-                renderPassEvent = renderPassEvent
-            };
+                _nativeOpaquePass ??= new NativeOpaquePass(nativeOpaqueTracingShader)
+                {
+                    renderPassEvent = renderPassEvent
+                };
+            }
+            else
+            {
+                _opaquePass ??= new OpaquePass(opaqueTracingShader)
+                {
+                    renderPassEvent = renderPassEvent
+                };
+            }
             _nrdPass ??= new NrdPass()
             {
                 renderPassEvent = renderPassEvent
@@ -260,6 +281,13 @@ namespace PathTracing
             if (eyeIndex == 1 && pathTracingSetting.skipRightEyeInVR)
                 return;
 
+
+            if (useNativeOpaquePass)
+            {
+                _gpuScene?.UpdateForFrame();
+                _nativeOpaquePass.SetGPUScene(_gpuScene);
+                nativeOpaqueTracingShader?.CreatePipeline();
+            }
 
             Shader.SetGlobalRayTracingAccelerationStructure(g_AccelStructID, _accelerationStructure);
 
@@ -407,53 +435,106 @@ namespace PathTracing
 
             #region Opaque Pass
 
-            var opaqueResource = new OpaquePass.Resource
+            if (useNativeOpaquePass)
             {
-                ConstantBuffer = _constantBuffer,
+                var nativeOpaqueResource = new NativeOpaquePass.Resource
+                {
+                    ConstantBuffer = _constantBuffer,
 
-                AccumulationBuffer = _accumulationBuffer,
-                HashEntriesBuffer  = _hashEntriesBuffer,
-                ResolvedBuffer     = _resolvedBuffer,
+                    AccumulationBuffer = _accumulationBuffer,
+                    HashEntriesBuffer  = _hashEntriesBuffer,
+                    ResolvedBuffer     = _resolvedBuffer,
 
-                PointLightBuffer = _lightCollector.PointLightBuffer,
-                AreaLightBuffer  = _lightCollector.AreaLightBuffer,
-                SpotLightBuffer  = _lightCollector.SpotLightBuffer,
+                    PointLightBuffer = _lightCollector.PointLightBuffer,
+                    AreaLightBuffer  = _lightCollector.AreaLightBuffer,
+                    SpotLightBuffer  = _lightCollector.SpotLightBuffer,
 
-                ScramblingRanking = _scramblingRankingUintBuffer,
-                Sobol             = _sobolUintBuffer,
+                    ScramblingRanking = _scramblingRankingUintBuffer,
+                    Sobol             = _sobolUintBuffer,
 
-                Mv                 = pool.GetRT(RenderResourceType.MV),
-                ViewZ              = pool.GetRT(RenderResourceType.Viewz),
-                NormalRoughness    = pool.GetRT(RenderResourceType.NormalRoughness),
-                BaseColorMetalness = pool.GetRT(RenderResourceType.BasecolorMetalness),
-                GeoNormal          = pool.GetRT(RenderResourceType.GeoNormal),
-                DirectLighting     = pool.GetRT(RenderResourceType.DirectLighting),
+                    Mv                 = pool.GetRT(RenderResourceType.MV),
+                    ViewZ              = pool.GetRT(RenderResourceType.Viewz),
+                    NormalRoughness    = pool.GetRT(RenderResourceType.NormalRoughness),
+                    BaseColorMetalness = pool.GetRT(RenderResourceType.BasecolorMetalness),
+                    GeoNormal          = pool.GetRT(RenderResourceType.GeoNormal),
+                    DirectLighting     = pool.GetRT(RenderResourceType.DirectLighting),
 
-                Penumbra = pool.GetRT(RenderResourceType.Penumbra),
-                Diff     = pool.GetRT(RenderResourceType.DiffRadianceHitdist),
-                Spec     = pool.GetRT(RenderResourceType.SpecRadianceHitdist),
+                    Penumbra = pool.GetRT(RenderResourceType.Penumbra),
+                    Diff     = pool.GetRT(RenderResourceType.DiffRadianceHitdist),
+                    Spec     = pool.GetRT(RenderResourceType.SpecRadianceHitdist),
 
-                PrevViewZ              = pool.GetRT(RenderResourceType.PrevViewZ),
-                PrevNormalRoughness    = pool.GetRT(RenderResourceType.PrevNormalRoughness),
-                PrevBaseColorMetalness = pool.GetRT(RenderResourceType.PrevBaseColorMetalness),
-                PrevGeoNormal          = pool.GetRT(RenderResourceType.PrevGeoNormal),
+                    PrevViewZ              = pool.GetRT(RenderResourceType.PrevViewZ),
+                    PrevNormalRoughness    = pool.GetRT(RenderResourceType.PrevNormalRoughness),
+                    PrevBaseColorMetalness = pool.GetRT(RenderResourceType.PrevBaseColorMetalness),
+                    PrevGeoNormal          = pool.GetRT(RenderResourceType.PrevGeoNormal),
 
-                PsrThroughput = pool.GetRT(RenderResourceType.PsrThroughput),
+                    PsrThroughput = pool.GetRT(RenderResourceType.PsrThroughput),
 
-                Output             = pool.GetRT(RenderResourceType.PtOutput),
-                DirectEmission     = pool.GetRT(RenderResourceType.PtDirectEmission),
-                ComposedDiff       = pool.GetRT(RenderResourceType.PtComposedDiff),
-                ComposedSpecViewZ  = pool.GetRT(RenderResourceType.PtComposedSpecViewZ),
-            };
+                    Output            = pool.GetRT(RenderResourceType.PtOutput),
+                    DirectEmission    = pool.GetRT(RenderResourceType.PtDirectEmission),
+                    ComposedDiff      = pool.GetRT(RenderResourceType.PtComposedDiff),
+                    ComposedSpecViewZ = pool.GetRT(RenderResourceType.PtComposedSpecViewZ),
+                };
 
-            var opaqueSettings = new OpaquePass.Settings
+                var nativeOpaqueSettings = new NativeOpaquePass.Settings
+                {
+                    m_RenderResolution = renderResolution,
+                    resolutionScale    = pathTracingSetting.resolutionScale
+                };
+
+                _nativeOpaquePass.Setup(nativeOpaqueResource, nativeOpaqueSettings);
+                renderer.EnqueuePass(_nativeOpaquePass);
+            }
+            else
             {
-                m_RenderResolution = renderResolution,
-                resolutionScale    = pathTracingSetting.resolutionScale
-            };
+                var opaqueResource = new OpaquePass.Resource
+                {
+                    ConstantBuffer = _constantBuffer,
 
-            _opaquePass.Setup(opaqueResource, opaqueSettings);
-            renderer.EnqueuePass(_opaquePass);
+                    AccumulationBuffer = _accumulationBuffer,
+                    HashEntriesBuffer  = _hashEntriesBuffer,
+                    ResolvedBuffer     = _resolvedBuffer,
+
+                    PointLightBuffer = _lightCollector.PointLightBuffer,
+                    AreaLightBuffer  = _lightCollector.AreaLightBuffer,
+                    SpotLightBuffer  = _lightCollector.SpotLightBuffer,
+
+                    ScramblingRanking = _scramblingRankingUintBuffer,
+                    Sobol             = _sobolUintBuffer,
+
+                    Mv                 = pool.GetRT(RenderResourceType.MV),
+                    ViewZ              = pool.GetRT(RenderResourceType.Viewz),
+                    NormalRoughness    = pool.GetRT(RenderResourceType.NormalRoughness),
+                    BaseColorMetalness = pool.GetRT(RenderResourceType.BasecolorMetalness),
+                    GeoNormal          = pool.GetRT(RenderResourceType.GeoNormal),
+                    DirectLighting     = pool.GetRT(RenderResourceType.DirectLighting),
+
+                    Penumbra = pool.GetRT(RenderResourceType.Penumbra),
+                    Diff     = pool.GetRT(RenderResourceType.DiffRadianceHitdist),
+                    Spec     = pool.GetRT(RenderResourceType.SpecRadianceHitdist),
+
+                    PrevViewZ              = pool.GetRT(RenderResourceType.PrevViewZ),
+                    PrevNormalRoughness    = pool.GetRT(RenderResourceType.PrevNormalRoughness),
+                    PrevBaseColorMetalness = pool.GetRT(RenderResourceType.PrevBaseColorMetalness),
+                    PrevGeoNormal          = pool.GetRT(RenderResourceType.PrevGeoNormal),
+
+                    PsrThroughput = pool.GetRT(RenderResourceType.PsrThroughput),
+
+                    Output             = pool.GetRT(RenderResourceType.PtOutput),
+                    DirectEmission     = pool.GetRT(RenderResourceType.PtDirectEmission),
+                    ComposedDiff       = pool.GetRT(RenderResourceType.PtComposedDiff),
+                    ComposedSpecViewZ  = pool.GetRT(RenderResourceType.PtComposedSpecViewZ),
+                };
+
+                var opaqueSettings = new OpaquePass.Settings
+                {
+                    m_RenderResolution = renderResolution,
+                    resolutionScale    = pathTracingSetting.resolutionScale
+                };
+
+                _opaquePass.Setup(opaqueResource, opaqueSettings);
+                renderer.EnqueuePass(_opaquePass);
+            }
 
             #endregion
 
@@ -842,8 +923,10 @@ namespace PathTracing
             _aeExposureBuffer?.Release();
             _aeExposureBuffer = null;
 
+            _gpuScene         = null;
             _sharcPass        = null;
             _opaquePass       = null;
+            _nativeOpaquePass = null;
             _transparentPass  = null;
             _compositionPass  = null;
             _nrdPass          = null;
