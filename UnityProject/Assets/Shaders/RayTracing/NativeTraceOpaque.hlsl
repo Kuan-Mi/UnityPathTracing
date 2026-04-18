@@ -588,47 +588,11 @@ void MainRayGenShader()
     float3 cameraRayOrigin = 0;
     float3 cameraRayDirection = 0;
     GetCameraRay(cameraRayOrigin, cameraRayDirection, sampleUv);
-
-    RayDesc rayDesc;
-    rayDesc.Origin = cameraRayOrigin;
-    rayDesc.Direction = cameraRayDirection;
-    rayDesc.TMin = 0.0;
-    rayDesc.TMax = 1000.0;
-    
-    
-    RayPayload payload = (RayPayload)0;
-    
-    TraceRay(gWorldTlas, ToRayFlag2(GEOMETRY_ALL), GEOMETRY_ALL, 0, 0, 0, rayDesc, payload);
-    
-    
-    // GeometryData geomData = t_GeometryData[t_InstanceData[payload.instanceID].firstGeometryIndex + payload.geometryIndex];
-    // MaterialConstants matConst = t_MaterialConstants[geomData.materialIndex];
-    //
-    //
-    // GeometrySample geo = getGeometryFromHit (
-    //     payload.instanceID,
-    //     payload.geometryIndex,
-    //     payload.triangleIndex,
-    //     payload.barycentrics,
-    //     t_InstanceData,
-    //     t_GeometryData,
-    //     t_MaterialConstants
-    // );
-    
-    
-    // MaterialProps mat = sampleGeometryMaterial(geo, s_LinearRepeat);
-    
-    // float3 ccc = (payload.instanceID/2.0);
-    // ccc = float3(0.5,0.1,0.1);
-    
-    // gOut_BaseColor_Metalness[pixelPos] = float4(  ccc,  1);
     
     GeometryProps geometryProps0;
     MaterialProps materialProps0;
     CastRay(cameraRayOrigin, cameraRayDirection, 0.0, 1000.0, GetConeAngleFromRoughness(0.0, 0.0), (gOnScreen == SHOW_INSTANCE_INDEX || gOnScreen == SHOW_NORMAL) ? GEOMETRY_ALL : FLAG_NON_TRANSPARENT, geometryProps0, materialProps0);
 
-    //
-    // gOut_BaseColor_Metalness[pixelPos] = float4(materialProps0.baseColor,1);
     //================================================================================================================================================================================
     // Primary surface replacement ( aka jump through mirrors )
     //================================================================================================================================================================================

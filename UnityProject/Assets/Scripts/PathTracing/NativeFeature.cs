@@ -49,7 +49,7 @@ namespace PathTracing
         private DlssRRPass       _dlssrrPass;
         private ReferencePtPass  _referencePtPass;
         private AccumulatePass   _accumulatePass;
-
+        
         private RayTracingAccelerationStructure _accelerationStructure;
 
         private GraphicsBuffer _constantBuffer;
