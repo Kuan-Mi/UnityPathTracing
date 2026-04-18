@@ -252,6 +252,7 @@ namespace PathTracing
 
         public override void AddRenderPasses(ScriptableRenderer renderer, ref RenderingData renderingData)
         {
+            // return;
             var cam = renderingData.cameraData.camera;
             if (cam.cameraType is CameraType.Preview or CameraType.Reflection)
                 return;
@@ -536,7 +537,7 @@ namespace PathTracing
             };
 
             _compositionPass.Setup(compositionResource, compositionSettings);
-            // renderer.EnqueuePass(_compositionPass);
+            renderer.EnqueuePass(_compositionPass);
 
 
             var transparentResource = new TransparentPass.Resource

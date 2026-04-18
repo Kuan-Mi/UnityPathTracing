@@ -16,7 +16,7 @@ MonoBehaviour:
   pathTracingSetting:
     exposureEv: 0
     cameraJitter: 1
-    showMode: 1
+    showMode: 18
     showMv: 0
     showValidation: 0
     skipRightEyeInVR: 1
@@ -39,7 +39,7 @@ MonoBehaviour:
     boostFactor: 0.6667
     SR: 0
     RR: 1
-    tmpDisableRR: 1
+    tmpDisableRR: 0
     resolutionScale: 1
     denoisingRange: 1000
     splitScreen: 0
@@ -104,7 +104,7 @@ MonoBehaviour:
   pathTracingSetting:
     exposureEv: -2.34
     cameraJitter: 1
-    showMode: 3
+    showMode: 18
     showMv: 0
     showValidation: 0
     skipRightEyeInVR: 1
@@ -127,7 +127,7 @@ MonoBehaviour:
     boostFactor: 0.6667
     SR: 0
     RR: 1
-    tmpDisableRR: 1
+    tmpDisableRR: 0
     resolutionScale: 1
     denoisingRange: 1000
     splitScreen: 0
@@ -203,8 +203,7 @@ MonoBehaviour:
   m_RendererFeatures:
   - {fileID: -6201891753500756691}
   - {fileID: -1093908681099559453}
-  - {fileID: 6993200410383894201}
-  m_RendererFeatureMap: 2db529294f74eea9e33d58aed9a7d1f0b9460cc0b8d60c61
+  m_RendererFeatureMap: 2db529294f74eea9e33d58aed9a7d1f0
   m_UseNativeRenderPass: 1
   xrSystemData: {fileID: 0}
   postProcessData: {fileID: 11400000, guid: 41439944d30ece34e96484bdb6645b55, type: 2}
@@ -233,21 +232,3 @@ MonoBehaviour:
   m_DepthTextureFormat: 0
   m_AccurateGbufferNormals: 0
   m_IntermediateTextureMode: 0
---- !u!114 &6993200410383894201
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 0}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 5da3310e207b4e84a897e43fcf4526bb, type: 3}
-  m_Name: NativeRayTracingFeature
-  m_EditorClassIdentifier: NativeRayTracing.Runtime::NativeRender.NativeRayTracingFeature
-  m_Active: 0
-  renderPassEvent: 550
-  shaderSourceAsset: {fileID: -6676421132958364438, guid: f1eda622c85845b46a5a70470a2e02cc, type: 3}
-  testConstants:
-    dummy: {x: 1, y: 1, z: 1, w: 1}
-  testBindlessTextures: []
