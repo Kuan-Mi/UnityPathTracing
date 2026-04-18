@@ -1,0 +1,46 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+
+  <PropertyGroup>
+    <Microsoft_Direct3D_DXC_SkipIncludeDir Condition="$(Platform.Contains('Gaming.Xbox.'))">true</Microsoft_Direct3D_DXC_SkipIncludeDir>
+  </PropertyGroup>
+
+  <ItemDefinitionGroup Condition="'$(Microsoft_Direct3D_DXC_SkipIncludeDir)' != 'true'">
+    <ClCompile>
+      <AdditionalIncludeDirectories>$(MSBuildThisFileDirectory)include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+    </ClCompile>
+    <Link> 
+      <AdditionalLibraryDirectories>$(MSBuildThisFileDirectory)lib\$(PlatformTarget);%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalDependencies>dxcompiler.lib;%(AdditionalDependencies)</AdditionalDependencies>
+    </Link>
+  </ItemDefinitionGroup>
+
+  <PropertyGroup  Condition="'$(Microsoft_Direct3D_DXC_SkipIncludeDir)' != 'true'">
+    <FXCToolPath Condition="'$(PreferredToolArchitecture)'=='arm64'">$(MSBuildThisFileDirectory)bin\arm64\</FXCToolPath>
+    <ExecutablePath Condition="'$(PreferredToolArchitecture)'=='arm64'">$(MSBuildThisFileDirectory)bin\arm64;$(ExecutablePath)</ExecutablePath>
+
+    <FXCToolPath Condition="'$(PreferredToolArchitecture)'!='arm64'">$(MSBuildThisFileDirectory)bin\x64\</FXCToolPath>
+    <ExecutablePath Condition="'$(PreferredToolArchitecture)'!='arm64'">$(MSBuildThisFileDirectory)bin\x64;$(ExecutablePath)</ExecutablePath>
+  </PropertyGroup>  
+
+  <ItemGroup>
+    <Content Include="$(MSBuildThisFileDirectory)bin\$(PlatformTarget)\dxcompiler.dll" Condition="'$(Microsoft_Direct3D_DXC_SkipLibraryCopy)' != 'true'">
+      <Link>$(Microsoft_Direct3D_DXC_CopyLocation)%(FileName)%(Extension)</Link>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="$(MSBuildThisFileDirectory)bin\$(PlatformTarget)\dxcompiler.pdb" Condition="'$(Microsoft_Direct3D_DXC_SkipLibraryCopy)' != 'true'">
+      <Link>$(Microsoft_Direct3D_DXC_CopyLocation)%(FileName)%(Extension)</Link>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="$(MSBuildThisFileDirectory)bin\$(PlatformTarget)\dxil.dll" Condition="'$(Microsoft_Direct3D_DXC_SkipLibraryCopy)' != 'true'">
+      <Link>$(Microsoft_Direct3D_DXC_CopyLocation)%(FileName)%(Extension)</Link>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="$(MSBuildThisFileDirectory)bin\$(PlatformTarget)\dxil.pdb" Condition="'$(Microsoft_Direct3D_DXC_SkipLibraryCopy)' != 'true'">
+      <Link>$(Microsoft_Direct3D_DXC_CopyLocation)%(FileName)%(Extension)</Link>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+  </ItemGroup>
+</Project>
+
+
