@@ -212,10 +212,18 @@ float3 UnpackNormalAG(float4 packedNormal, float scale = 1.0)
     return normal;
 }
 
+float3 UnpackNormalRGB(float4 packedNormal, float scale = 1.0)
+{
+    float3 normal;
+    normal.xyz = packedNormal.rgb * 2.0 - 1.0;
+    normal.xy *= scale;
+    return normal;
+}
+
 float3 UnpackNormalMapRGorAG(float4 packedNormal, float scale = 1.0)
 {
     // Convert to (?, y, 0, x)
-    // packedNormal.a *= packedNormal.r;
+    packedNormal.a *= packedNormal.r;
     return UnpackNormalAG(packedNormal, scale);
 }
 
@@ -261,15 +269,17 @@ MaterialProps sampleGeometryMaterial(
         {
             Texture2D<float4> normalTex = t_BindlessTextures[NonUniformResourceIndex(gs.material.normalTextureIndex)];
             float4 n = normalTex.SampleLevel(materialSampler, gs.texcoord, 0);
+            // float3 tangentNormal = UnpackNormalMapRGorAG(n, normalMapScale);
             float3 tangentNormal = UnpackNormalMapRGorAG(n, normalMapScale);
 
             float3 T = normalize(gs.tangent.xyz);
-            float3 B = -cross(props.N, T) * gs.tangent.w;
+            float3 B = - cross(props.N, T) *  sign(gs.tangent.w);
             half3x3 tangentToWorld = half3x3(T, B, props.N);
 
             float3 matWorldNormal = TransformTangentToWorld(tangentNormal, tangentToWorld);
 
             props.N = matWorldNormal;
+            // props.N = gs.geometryNormal;
         }
     }
 
