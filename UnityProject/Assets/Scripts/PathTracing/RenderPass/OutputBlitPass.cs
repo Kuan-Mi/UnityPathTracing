@@ -48,6 +48,7 @@ namespace PathTracing
             internal RTHandle DlssOutput;
 
             internal RTHandle taaDst;
+            internal RTHandle ViewZ;
 
             internal RTHandle Output;
             internal RTHandle DirectEmission;
@@ -185,6 +186,9 @@ namespace PathTracing
                     break;
                 case ShowMode.DLSS_Output:
                     Blitter.BlitTexture(natCmd, data.Resource.DlssOutput, new Vector4(1, 1, 0, 0), data.BlitMaterial, (int)ShowPass.Out);
+                    break;
+                case ShowMode.ViewZ:
+                    Blitter.BlitTexture(natCmd, data.Resource.ViewZ, scaleOffset, data.BlitMaterial, (int)ShowPass.ViewZ);
                     break;
                 default:
                     throw new ArgumentOutOfRangeException();

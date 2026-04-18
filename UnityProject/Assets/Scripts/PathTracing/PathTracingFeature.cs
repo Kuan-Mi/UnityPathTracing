@@ -834,6 +834,7 @@ namespace PathTracing
                 RRGuide_SpecHitDistance  = pool.GetRT(RenderResourceType.RrGuideSpecHitDistance),
                 DlssOutput               = pool.GetRT(RenderResourceType.DlssOutput),
                 taaDst                   = pool.GetRT(isEven ? RenderResourceType.TaaHistory : RenderResourceType.TaaHistoryPrev),
+                ViewZ                    = pool.GetRT(RenderResourceType.Viewz),
 
                 Output             = pool.GetRT(RenderResourceType.PtOutput),
                 DirectEmission     = pool.GetRT(RenderResourceType.PtDirectEmission),
