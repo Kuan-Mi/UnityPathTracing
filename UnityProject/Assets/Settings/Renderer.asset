@@ -14,9 +14,9 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::PathTracing.NativeFeature
   m_Active: 1
   pathTracingSetting:
-    exposureEv: 0
+    exposureEv: -2.34
     cameraJitter: 1
-    showMode: 7
+    showMode: 18
     showMv: 0
     showValidation: 0
     skipRightEyeInVR: 1
@@ -39,7 +39,7 @@ MonoBehaviour:
     boostFactor: 0.6667
     SR: 0
     RR: 1
-    tmpDisableRR: 1
+    tmpDisableRR: 0
     resolutionScale: 1
     denoisingRange: 1000
     splitScreen: 0
@@ -104,8 +104,8 @@ MonoBehaviour:
   pathTracingSetting:
     exposureEv: -2.34
     cameraJitter: 1
-    showMode: 7
-    showMv: 0
+    showMode: 16
+    showMv: 1
     showValidation: 0
     skipRightEyeInVR: 1
     sunAngularDiameter: 0.533
