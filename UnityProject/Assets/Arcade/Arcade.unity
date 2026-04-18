@@ -397,9 +397,17 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: -4864833620444741553, guid: 23a7c2d222024b34288d7a9c98990daa, type: 3}
       propertyPath: m_IsActive
-      value: 1
+      value: 0
       objectReference: {fileID: 0}
     - target: {fileID: -3714074880520146989, guid: 23a7c2d222024b34288d7a9c98990daa, type: 3}
+      propertyPath: m_IsActive
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: -3433374748859648377, guid: 23a7c2d222024b34288d7a9c98990daa, type: 3}
+      propertyPath: m_IsActive
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: -877593755064287766, guid: 23a7c2d222024b34288d7a9c98990daa, type: 3}
       propertyPath: m_IsActive
       value: 1
       objectReference: {fileID: 0}
@@ -416,6 +424,14 @@ PrefabInstance:
       value: Arcade
       objectReference: {fileID: 0}
     - target: {fileID: 919132149155446097, guid: 23a7c2d222024b34288d7a9c98990daa, type: 3}
+      propertyPath: m_IsActive
+      value: 1
+      objectReference: {fileID: 0}
+    - target: {fileID: 2550463727306718371, guid: 23a7c2d222024b34288d7a9c98990daa, type: 3}
+      propertyPath: m_IsActive
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 8493015188241380710, guid: 23a7c2d222024b34288d7a9c98990daa, type: 3}
       propertyPath: m_IsActive
       value: 1
       objectReference: {fileID: 0}
@@ -2499,6 +2515,10 @@ PrefabInstance:
     - target: {fileID: 3914952754906786439, guid: 56d33eaae8be245438c278ea6a17804a, type: 3}
       propertyPath: m_Name
       value: Profiler
+      objectReference: {fileID: 0}
+    - target: {fileID: 3914952754906786439, guid: 56d33eaae8be245438c278ea6a17804a, type: 3}
+      propertyPath: m_IsActive
+      value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 7156807329378698681, guid: 56d33eaae8be245438c278ea6a17804a, type: 3}
       propertyPath: m_LocalPosition.x

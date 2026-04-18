@@ -76,15 +76,15 @@ namespace PathTracing
 
         // private readonly Dictionary<long, ReSTIRDIContext> _restirDiContexts = new();
         private readonly Dictionary<long, CameraFrameState> _cameraFrameStates = new();
-        
-        
-        private GPUScene             _gpuScene;
+
+
+        private GPUScene _gpuScene;
 
         public override void Create()
         {
             if (_gpuScene == null)
                 _gpuScene = new GPUScene();
-            
+
             if (_accelerationStructure == null)
             {
                 var settings = new Settings
@@ -268,11 +268,11 @@ namespace PathTracing
             if (eyeIndex == 1 && pathTracingSetting.skipRightEyeInVR)
                 return;
 
-            
+
             _gpuScene?.UpdateForFrame();
             _opaquePass.SetGPUScene(_gpuScene);
             opaqueTracingShader?.CreatePipeline();
-            
+
 
             Shader.SetGlobalRayTracingAccelerationStructure(g_AccelStructID, _accelerationStructure);
 
@@ -453,10 +453,10 @@ namespace PathTracing
 
                 PsrThroughput = pool.GetRT(RenderResourceType.PsrThroughput),
 
-                Output             = pool.GetRT(RenderResourceType.PtOutput),
-                DirectEmission     = pool.GetRT(RenderResourceType.PtDirectEmission),
-                ComposedDiff       = pool.GetRT(RenderResourceType.PtComposedDiff),
-                ComposedSpecViewZ  = pool.GetRT(RenderResourceType.PtComposedSpecViewZ),
+                Output            = pool.GetRT(RenderResourceType.PtOutput),
+                DirectEmission    = pool.GetRT(RenderResourceType.PtDirectEmission),
+                ComposedDiff      = pool.GetRT(RenderResourceType.PtComposedDiff),
+                ComposedSpecViewZ = pool.GetRT(RenderResourceType.PtComposedSpecViewZ),
             };
 
             var opaqueSettings = new NativeOpaquePass.Settings
@@ -767,10 +767,10 @@ namespace PathTracing
                 DlssOutput               = pool.GetRT(RenderResourceType.DlssOutput),
                 taaDst                   = pool.GetRT(isEven ? RenderResourceType.TaaHistory : RenderResourceType.TaaHistoryPrev),
 
-                Output             = pool.GetRT(RenderResourceType.PtOutput),
-                DirectEmission     = pool.GetRT(RenderResourceType.PtDirectEmission),
-                ComposedDiff       = pool.GetRT(RenderResourceType.PtComposedDiff),
-                ComposedSpecViewZ  = pool.GetRT(RenderResourceType.PtComposedSpecViewZ),
+                Output            = pool.GetRT(RenderResourceType.PtOutput),
+                DirectEmission    = pool.GetRT(RenderResourceType.PtDirectEmission),
+                ComposedDiff      = pool.GetRT(RenderResourceType.PtComposedDiff),
+                ComposedSpecViewZ = pool.GetRT(RenderResourceType.PtComposedSpecViewZ),
             };
 
             var outputBlitSettings = new OutputBlitPass.Settings

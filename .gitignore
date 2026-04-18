@@ -1,6 +1,7 @@
 ﻿.vs/
 .idea/
 .vscode/
+build/
 
 # Unity generated
 UnityProject/Library/
