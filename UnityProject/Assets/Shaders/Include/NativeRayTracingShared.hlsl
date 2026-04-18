@@ -499,11 +499,9 @@ GeometryProps CastRay(float3 origin, float3 direction, float Tmin, float Tmax, f
 
     TraceRay(gWorldTlas, ToRayFlag2(mask), mask, 0, 0, 0, rayDesc, payload);
     GeometryProps props = (GeometryProps)0;
-    if (payload.committedRayT == INF)
-    {
-        props.hitT = INF;
-    }
-    else
+    props.hitT = payload.committedRayT;
+    
+    if (payload.committedRayT != INF)
     {
         GeometrySample geo = getGeometryFromHit(
             payload.instanceID,
@@ -515,8 +513,6 @@ GeometryProps CastRay(float3 origin, float3 direction, float Tmin, float Tmax, f
             t_MaterialConstants
         );
 
-        props = (GeometryProps)0;
-        props.hitT = payload.committedRayT;
         props.instanceIndex = payload.instanceID;
         props.N = geo.geometryNormal;
         props.curvature = 1;
