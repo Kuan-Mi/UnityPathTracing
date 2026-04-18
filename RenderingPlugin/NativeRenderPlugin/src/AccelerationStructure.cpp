@@ -932,7 +932,7 @@ bool AccelerationStructure::BuildOrUpdate(ID3D12GraphicsCommandList4* cmdList)
     TickDeferredDeletes();
 
     // Per-frame diagnostic dump (one line per active instance).
-    DumpInstances("BuildOrUpdate");
+    // DumpInstances("BuildOrUpdate");
 
     // Advance to the next double-buffer slot each frame.
     // The GPU is currently consuming the previous slot; we now own this slot.

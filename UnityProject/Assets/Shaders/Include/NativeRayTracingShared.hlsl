@@ -9,17 +9,17 @@ struct GeometryData
 {
     uint numIndices;
     uint numVertices;
-    int  indexBufferIndex;   // index into t_BindlessBuffers
-    uint indexOffset;        // byte offset into index buffer
+    int indexBufferIndex; // index into t_BindlessBuffers
+    uint indexOffset; // byte offset into index buffer
 
-    int  vertexBufferIndex;  // index into t_BindlessBuffers
-    uint positionOffset;     // byte offset to first position (float3 per vertex)
-    uint normalOffset;       // byte offset to first normal  (float3 per vertex, or ~0u if absent)
-    uint texCoord1Offset;    // byte offset to first texcoord (float2 per vertex, or ~0u if absent)
+    int vertexBufferIndex; // index into t_BindlessBuffers
+    uint positionOffset; // byte offset to first position (float3 per vertex)
+    uint normalOffset; // byte offset to first normal  (float3 per vertex, or ~0u if absent)
+    uint texCoord1Offset; // byte offset to first texcoord (float2 per vertex, or ~0u if absent)
 
-    uint tangentOffset;      // byte offset to first tangent (float4 per vertex, or ~0u if absent)
-    uint vertexStride;       // stride in bytes between consecutive vertices
-    uint indexStride;        // 2 (16-bit) or 4 (32-bit)
+    uint tangentOffset; // byte offset to first tangent (float4 per vertex, or ~0u if absent)
+    uint vertexStride; // stride in bytes between consecutive vertices
+    uint indexStride; // 2 (16-bit) or 4 (32-bit)
     uint materialIndex;
 };
 
@@ -29,44 +29,42 @@ struct InstanceData
     uint numGeometries;
     uint pad0;
     uint pad1;
-    row_major float3x4 transform;      // object-to-world (row-major)
+    row_major float3x4 transform; // object-to-world (row-major)
 };
 
 struct MaterialConstants
 {
     // row 0
     float3 baseOrDiffuseColor;
-    int    flags;
+    int flags;
 
     // row 1
     float3 emissiveColor;
-    int    domain;
+    int domain;
 
     // row 2
-    float  opacity;
-    float  roughness;
-    float  metalness;
-    float  normalTextureScale;
+    float opacity;
+    float roughness;
+    float metalness;
+    float normalTextureScale;
 
     // row 3
-    float  occlusionStrength;
-    float  alphaCutoff;
-    float  transmissionFactor;
-    int    baseOrDiffuseTextureIndex;   // index into t_BindlessTextures[], -1 = none
+    float occlusionStrength;
+    float alphaCutoff;
+    float transmissionFactor;
+    int baseOrDiffuseTextureIndex; // index into t_BindlessTextures[], -1 = none
 
     // row 4
-    int    metalRoughOrSpecularTextureIndex;
-    int    emissiveTextureIndex;
-    int    normalTextureIndex;          // index into t_BindlessTextures[], -1 = none
-    int    occlusionTextureIndex;
+    int metalRoughOrSpecularTextureIndex;
+    int emissiveTextureIndex;
+    int normalTextureIndex; // index into t_BindlessTextures[], -1 = none
+    int occlusionTextureIndex;
 };
 
 
-StructuredBuffer<InstanceData>     t_InstanceData : register(t3, space2);
-StructuredBuffer<GeometryData>     t_GeometryData : register(t4, space2);
+StructuredBuffer<InstanceData> t_InstanceData : register(t3, space2);
+StructuredBuffer<GeometryData> t_GeometryData : register(t4, space2);
 StructuredBuffer<MaterialConstants> t_MaterialConstants : register(t5, space2);
-
-
 
 
 uint LoadIndex(ByteAddressBuffer buf, uint byteOffset, uint stride)
@@ -86,8 +84,8 @@ uint LoadIndex(ByteAddressBuffer buf, uint byteOffset, uint stride)
 
 struct GeometrySample
 {
-    InstanceData     instance;
-    GeometryData     geometry;
+    InstanceData instance;
+    GeometryData geometry;
     MaterialConstants material;
 
     float3 vertexPositions[3];
@@ -108,7 +106,7 @@ GeometrySample getGeometryFromHit(
     StructuredBuffer<InstanceData> instanceBuffer,
     StructuredBuffer<GeometryData> geometryBuffer,
     StructuredBuffer<MaterialConstants> materialBuffer
-    )
+)
 {
     GeometrySample gs = (GeometrySample)0;
 
@@ -116,19 +114,19 @@ GeometrySample getGeometryFromHit(
     gs.geometry = geometryBuffer[gs.instance.firstGeometryIndex + geometryIndex];
     gs.material = materialBuffer[gs.geometry.materialIndex];
 
-    ByteAddressBuffer indexBuffer  = t_BindlessBuffers[NonUniformResourceIndex(gs.geometry.indexBufferIndex)];
+    ByteAddressBuffer indexBuffer = t_BindlessBuffers[NonUniformResourceIndex(gs.geometry.indexBufferIndex)];
     ByteAddressBuffer vertexBuffer = t_BindlessBuffers[NonUniformResourceIndex(gs.geometry.vertexBufferIndex)];
 
     // Load triangle indices
     uint baseByteIdx = gs.geometry.indexOffset + triangleIndex * 3u * gs.geometry.indexStride;
-    uint i0 = LoadIndex(indexBuffer, baseByteIdx,                                gs.geometry.indexStride);
-    uint i1 = LoadIndex(indexBuffer, baseByteIdx + gs.geometry.indexStride,      gs.geometry.indexStride);
+    uint i0 = LoadIndex(indexBuffer, baseByteIdx, gs.geometry.indexStride);
+    uint i1 = LoadIndex(indexBuffer, baseByteIdx + gs.geometry.indexStride, gs.geometry.indexStride);
     uint i2 = LoadIndex(indexBuffer, baseByteIdx + gs.geometry.indexStride * 2u, gs.geometry.indexStride);
 
     // Barycentrics
     float3 barycentrics;
     barycentrics.yz = rayBarycentrics;
-    barycentrics.x  = 1.0f - barycentrics.y - barycentrics.z;
+    barycentrics.x = 1.0f - barycentrics.y - barycentrics.z;
 
     {
         gs.vertexPositions[0] = asfloat(vertexBuffer.Load3(gs.geometry.positionOffset + i0 * gs.geometry.vertexStride));
@@ -162,7 +160,7 @@ GeometrySample getGeometryFromHit(
         gs.tangent.xyz = interpolate(tangents, barycentrics).xyz;
         gs.tangent.xyz = mul(gs.instance.transform, float4(gs.tangent.xyz, 0.0f)).xyz;
         gs.tangent.xyz = normalize(gs.tangent.xyz);
-        gs.tangent.w   = tangents[0].w;
+        gs.tangent.w = tangents[0].w;
     }
 
     {
@@ -188,21 +186,21 @@ struct MaterialProps
     float curvature;
 };
 
-SamplerState s_LinearRepeat  : register(s1);
-static const int MaterialFlags_DoubleSided                      = 0x00000002;
-static const int MaterialFlags_UseMetalRoughOrSpecularTexture   = 0x00000004;
-static const int MaterialFlags_UseBaseOrDiffuseTexture          = 0x00000008;
-static const int MaterialFlags_UseEmissiveTexture               = 0x00000010;
-static const int MaterialFlags_UseNormalTexture                 = 0x00000020;
+SamplerState s_LinearRepeat : register(s1);
+static const int MaterialFlags_DoubleSided = 0x00000002;
+static const int MaterialFlags_UseMetalRoughOrSpecularTexture = 0x00000004;
+static const int MaterialFlags_UseBaseOrDiffuseTexture = 0x00000008;
+static const int MaterialFlags_UseEmissiveTexture = 0x00000010;
+static const int MaterialFlags_UseNormalTexture = 0x00000020;
 
 MaterialProps sampleGeometryMaterial(
-GeometrySample gs, 
-SamplerState materialSampler,
-float normalMapScale = 1.0)
+    GeometrySample gs,
+    SamplerState materialSampler,
+    float normalMapScale = 1.0)
 {
     MaterialProps props = (MaterialProps)0;
-    
-    
+
+
     {
         props.baseColor = gs.material.baseOrDiffuseColor;
         props.alpha = 1;
@@ -214,7 +212,7 @@ float normalMapScale = 1.0)
             props.alpha *= tex.SampleLevel(materialSampler, gs.texcoord, 0).a;
         }
     }
-    
+
     {
         props.N = gs.geometryNormal;
         if ((gs.material.flags & MaterialFlags_UseNormalTexture) != 0 &&
@@ -228,7 +226,7 @@ float normalMapScale = 1.0)
             props.N = normalize(normalSample.x * T + normalSample.y * B + normalSample.z * props.N);
         }
     }
-    
+
     {
         props.Lemi = gs.material.emissiveColor;
         if ((gs.material.flags & MaterialFlags_UseEmissiveTexture) != 0 &&
@@ -238,7 +236,7 @@ float normalMapScale = 1.0)
             props.Lemi *= emissiveTex.SampleLevel(materialSampler, gs.texcoord, 0).rgb;
         }
     }
-    
+
     {
         props.roughness = gs.material.roughness;
         props.metalness = gs.material.metalness;
@@ -251,13 +249,10 @@ float normalMapScale = 1.0)
             props.metalness = mrSample.b;
         }
     }
-    
-    
+
+
     return props;
 }
-
-
-
 
 
 RWStructuredBuffer<uint64_t> gInOut_SharcHashEntriesBuffer: register(u12, space1);
@@ -359,12 +354,12 @@ float2 GetConeAngleFromRoughness(float mip, float roughness)
     return GetConeAngleFromAngularRadius(mip, tanConeAngle);
 }
 
-struct  RayPayload
+struct RayPayload
 {
     float committedRayT;
-    uint instanceID ;
-    uint geometryIndex ;
-    uint triangleIndex ;
+    uint instanceID;
+    uint geometryIndex;
+    uint triangleIndex;
     float2 barycentrics;
 };
 
@@ -391,6 +386,7 @@ uint ToRayFlag2(uint flag)
     else
         return RAY_FLAG_NONE;
 }
+
 struct AttributeData
 {
     float2 barycentrics;
@@ -420,7 +416,7 @@ float CastVisibilityRay_AnyHit(float3 origin, float3 direction, float Tmin, floa
     uint flag = ToRayFlag2(mask);
     flag = flag | RAY_FLAG_SKIP_CLOSEST_HIT_SHADER | RAY_FLAG_ACCEPT_FIRST_HIT_AND_END_SEARCH;
 
-    TraceRay(accelerationStructure, flag, mask, 0, 1, 0, rayDesc, payload);
+    TraceRay(accelerationStructure, flag, mask, 0, 0, 0, rayDesc, payload);
 
     return payload.committedRayT;
 }
@@ -439,14 +435,14 @@ void CastRay(float3 origin, float3 direction, float Tmin, float Tmax, float2 mip
     // if (mask == FLAG_NON_TRANSPARENT)
     //     payload.SetFlag(FLAG_IGNORE_WHEN_TRANSPARENT);
 
-    TraceRay(gWorldTlas, ToRayFlag2(mask), mask, 0, 1, 0, rayDesc, payload);
+    TraceRay(gWorldTlas, ToRayFlag2(mask), mask, 0, 0, 0, rayDesc, payload);
 
-    
+
     GeometryData geomData = t_GeometryData[t_InstanceData[payload.instanceID].firstGeometryIndex + payload.geometryIndex];
     MaterialConstants matConst = t_MaterialConstants[geomData.materialIndex];
 
-    
-    GeometrySample geo = getGeometryFromHit (
+
+    GeometrySample geo = getGeometryFromHit(
         payload.instanceID,
         payload.geometryIndex,
         payload.triangleIndex,
@@ -455,7 +451,7 @@ void CastRay(float3 origin, float3 direction, float Tmin, float Tmax, float2 mip
         t_GeometryData,
         t_MaterialConstants
     );
-    
+
     props = (GeometryProps)0;
     props.hitT = payload.committedRayT;
     props.instanceIndex = payload.instanceID;
@@ -475,8 +471,8 @@ void CastRay(float3 origin, float3 direction, float Tmin, float Tmax, float2 mip
     }
 
     MaterialProps mat = sampleGeometryMaterial(geo, s_LinearRepeat);
-    
-    
+
+
     props.V = -direction;
     props.textureOffsetAndFlags = 0;
     props.primitiveIndex = payload.triangleIndex;
@@ -484,7 +480,7 @@ void CastRay(float3 origin, float3 direction, float Tmin, float Tmax, float2 mip
 
     matProps = (MaterialProps)0;
     matProps.baseColor = mat.baseColor;
- 
+
     matProps.roughness = mat.roughness;
     matProps.metalness = mat.metalness;
 
@@ -497,7 +493,7 @@ void CastRay(float3 origin, float3 direction, float Tmin, float Tmax, float2 mip
     // {
     //     matProps.Lemi = Packing::DecodeRgbe(payload.Lemi);
     // }
-        matProps.Lemi = mat.Lemi;
+    matProps.Lemi = mat.Lemi;
 
     // 这三个应该从贴图再计算一次
     matProps.curvature = mat.curvature;
