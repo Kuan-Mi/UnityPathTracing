@@ -217,7 +217,8 @@ float3 UnpackNormalMapRGorAG(float4 packedNormal, float scale = 1.0)
     // Convert to (?, y, 0, x)
     // packedNormal.a *= packedNormal.r;
     return UnpackNormalAG(packedNormal, scale);
-} 
+}
+
 float3 SafeNormalize(float3 inVec)
 {
     float dp3 = max(1.175494351e-38, dot(inVec, inVec));
@@ -232,6 +233,7 @@ float3 TransformTangentToWorld(float3 normalTS, float3x3 tangentToWorld, bool do
         return SafeNormalize(result);
     return result;
 }
+
 MaterialProps sampleGeometryMaterial(
     GeometrySample gs,
     SamplerState materialSampler,
@@ -262,9 +264,9 @@ MaterialProps sampleGeometryMaterial(
             float3 tangentNormal = UnpackNormalMapRGorAG(n, normalMapScale);
 
             float3 T = normalize(gs.tangent.xyz);
-            float3 B =- cross(props.N, T) * gs.tangent.w;
+            float3 B = -cross(props.N, T) * gs.tangent.w;
             half3x3 tangentToWorld = half3x3(T, B, props.N);
-            
+
             float3 matWorldNormal = TransformTangentToWorld(tangentNormal, tangentToWorld);
 
             props.N = matWorldNormal;
@@ -411,6 +413,7 @@ struct RayPayload
 void MainMissShader(inout RayPayload payload : SV_RayPayload)
 {
     payload.instanceID = ~0u;
+    payload.committedRayT = INF;
 }
 
 uint ToRayFlag(uint flag)
@@ -481,68 +484,77 @@ void CastRay(float3 origin, float3 direction, float Tmin, float Tmax, float2 mip
 
     TraceRay(gWorldTlas, ToRayFlag2(mask), mask, 0, 0, 0, rayDesc, payload);
 
-
-    GeometryData geomData = t_GeometryData[t_InstanceData[payload.instanceID].firstGeometryIndex + payload.geometryIndex];
-    MaterialConstants matConst = t_MaterialConstants[geomData.materialIndex];
-
-
-    GeometrySample geo = getGeometryFromHit(
-        payload.instanceID,
-        payload.geometryIndex,
-        payload.triangleIndex,
-        payload.barycentrics,
-        t_InstanceData,
-        t_GeometryData,
-        t_MaterialConstants
-    );
-
-    props = (GeometryProps)0;
-    props.hitT = payload.committedRayT;
-    props.instanceIndex = payload.instanceID;
-    props.N = geo.geometryNormal;
-    props.curvature = 1;
-
-    props.mip = 0;
-
-    props.T = geo.tangent;
-    props.X = origin + direction * payload.committedRayT;
-
-    props.Xprev = props.X;
-
-    if (gIsEditor)
+    if (payload.committedRayT == INF)
     {
-        props.Xprev = props.X;
+        props = (GeometryProps)0;
+        props.hitT = INF;
+        
+        matProps.Lemi = GetSkyIntensity(direction);
     }
+    else
+    {
+        GeometryData geomData = t_GeometryData[t_InstanceData[payload.instanceID].firstGeometryIndex + payload.geometryIndex];
+        MaterialConstants matConst = t_MaterialConstants[geomData.materialIndex];
 
-    MaterialProps mat = sampleGeometryMaterial(geo, s_LinearRepeat);
+
+        GeometrySample geo = getGeometryFromHit(
+            payload.instanceID,
+            payload.geometryIndex,
+            payload.triangleIndex,
+            payload.barycentrics,
+            t_InstanceData,
+            t_GeometryData,
+            t_MaterialConstants
+        );
+
+        props = (GeometryProps)0;
+        props.hitT = payload.committedRayT;
+        props.instanceIndex = payload.instanceID;
+        props.N = geo.geometryNormal;
+        props.curvature = 1;
+
+        props.mip = 0;
+
+        props.T = geo.tangent;
+        props.X = origin + direction * payload.committedRayT;
+
+        props.Xprev = props.X;
+
+        if (gIsEditor)
+        {
+            props.Xprev = props.X;
+        }
+
+        MaterialProps mat = sampleGeometryMaterial(geo, s_LinearRepeat);
 
 
-    props.V = -direction;
-    props.textureOffsetAndFlags = 0;
-    props.primitiveIndex = payload.triangleIndex;
-    props.barycentrics = payload.barycentrics;
+        props.V = -direction;
+        props.textureOffsetAndFlags = 0;
+        props.primitiveIndex = payload.triangleIndex;
+        props.barycentrics = payload.barycentrics;
 
-    matProps = (MaterialProps)0;
-    matProps.baseColor = mat.baseColor;
+        matProps = (MaterialProps)0;
+        matProps.baseColor = mat.baseColor;
 
-    matProps.roughness = mat.roughness;
-    matProps.metalness = mat.metalness;
+        matProps.roughness = mat.roughness;
+        matProps.metalness = mat.metalness;
 
-    // if (props.Has(FLAG_SKIN))
-    // {
-    //     matProps.scatteringColor = Packing::DecodeRgbe(payload.Lemi);
-    //     matProps.Lemi = 0;
-    // }
-    // else
-    // {
-    //     matProps.Lemi = Packing::DecodeRgbe(payload.Lemi);
-    // }
-    matProps.Lemi = mat.Lemi;
+        // if (props.Has(FLAG_SKIN))
+        // {
+        //     matProps.scatteringColor = Packing::DecodeRgbe(payload.Lemi);
+        //     matProps.Lemi = 0;
+        // }
+        // else
+        // {
+        //     matProps.Lemi = Packing::DecodeRgbe(payload.Lemi);
+        // }
+        matProps.Lemi = mat.Lemi;
 
-    // 这三个应该从贴图再计算一次
-    matProps.curvature = mat.curvature;
-    matProps.N = mat.N;
-    matProps.T = mat.T;
+        // 这三个应该从贴图再计算一次
+        matProps.curvature = mat.curvature;
+        matProps.N = mat.N;
+        matProps.T = mat.T;
+    }
 }
 
 #include "DirectionalLights.hlsl"
