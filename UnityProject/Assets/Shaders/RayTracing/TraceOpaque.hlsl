@@ -1,44 +1,49 @@
+#ifdef USE_NATIVE
+#include "Assets/Shaders/Include/Shared.hlsl"
+#include "Assets/Shaders/donut/utils.hlsli"
+#include "Assets/Shaders/Include/RayTracingShared.hlsl"
+#else
 #include "Assets/Shaders/Include/Shared.hlsl"
 #include "Assets/Shaders/Include/RayTracingShared.hlsl"
-
 #include "Assets/Shaders/NRD/NRD.hlsli"
 #include "Assets/Shaders/donut/utils.hlsli"
+#endif
 #pragma max_recursion_depth 1
 
 // Input
-StructuredBuffer<uint4> gIn_ScramblingRanking;
-StructuredBuffer<uint4> gIn_Sobol;
-Texture2D<float3> gIn_PrevComposedDiff;
-Texture2D<float4> gIn_PrevComposedSpec_PrevViewZ;
+StructuredBuffer<uint4> gIn_ScramblingRanking REG(t0, space1);
+StructuredBuffer<uint4> gIn_Sobol REG(t1, space1);
+Texture2D<float3> gIn_PrevComposedDiff REG(t2, space1);
+Texture2D<float4> gIn_PrevComposedSpec_PrevViewZ REG(t3, space1);
 
 // Output
-RWTexture2D<float3> g_Output;
+RWTexture2D<float3> g_Output REG(u0, space1);
 
-// 运动矢量（Motion Vector），用于描述像素在当前帧与上一帧之间的运动，以及视深（ViewZ）和TAA遮罩信息。
-RWTexture2D<float4> gOut_Mv;
+// 运动矢量（Motion Vector），用于描述像素在当前帧与上一帧之间的运动，以及视深（ViewZ）和TAA遮罩信息�?
+RWTexture2D<float4> gOut_Mv REG(u1, space1);
 // 视空间深度（ViewZ），即像素在视空间中的Z值。
-RWTexture2D<float> gOut_ViewZ;
+RWTexture2D<float> gOut_ViewZ REG(u2, space1);
 // 法线、粗糙度和材质ID的打包信息。用于后续的去噪和材质区分。
-RWTexture2D<float4> gOut_Normal_Roughness;
+RWTexture2D<float4> gOut_Normal_Roughness REG(u3, space1);
 // 基础色（BaseColor，已转为sRGB）和金属度（Metalness）。
-RWTexture2D<float4> gOut_BaseColor_Metalness;
+RWTexture2D<float4> gOut_BaseColor_Metalness REG(u4, space1);
 
-RWTexture2D<uint> gOut_GeoNormal;
+RWTexture2D<uint> gOut_GeoNormal REG(u5, space1);
 
 // 路径追踪累积通量（Path Traced Throughput），用于存储路径追踪过程中光线的累积贡献。
-RWTexture2D<float3> gOut_PsrThroughput;
+RWTexture2D<float3> gOut_PsrThroughput REG(u6, space1);
 
 // 直接光照（Direct Lighting），即主光线命中点的直接光照结果。
-RWTexture2D<float3> gOut_DirectLighting;
+RWTexture2D<float3> gOut_DirectLighting REG(u7, space1);
 // 直接自发光（Direct Emission），即材质的自发光分量。
-RWTexture2D<float3> gOut_DirectEmission;
+RWTexture2D<float3> gOut_DirectEmission REG(u8, space1);
 
 // 阴影数据（Shadow Data），如半影宽度等，用于软阴影和去噪。
-RWTexture2D<float> gOut_ShadowData;
+RWTexture2D<float> gOut_ShadowData REG(u9, space1);
 // 漫反射光照结果（Diffuse Radiance），包含噪声和打包后的信息。
-RWTexture2D<float4> gOut_Diff;
+RWTexture2D<float4> gOut_Diff REG(u10, space1);
 // 高光反射光照结果（Specular Radiance），包含噪声和打包后的信息。
-RWTexture2D<float4> gOut_Spec;
+RWTexture2D<float4> gOut_Spec REG(u11, space1);
 
 
 // 所有射灯直接光照的累加结果（不经 NRD 降噪，在 Composition 直接叠加）
@@ -339,7 +344,12 @@ TraceOpaqueResult TraceOpaque(GeometryProps geometryProps0, MaterialProps materi
 
                 float2 mipAndCone = GetConeAngleFromRoughness(geometryProps.mip, isDiffuse ? 1.0 : materialProps.roughness);
 
+#ifdef USE_NATIVE
+                geometryProps = CastRay(geometryProps.GetXoffset(geometryProps.N), ray, 0.0, INF, mipAndCone, FLAG_NON_TRANSPARENT);
+                materialProps = GetMaterialProps(geometryProps);
+#else
                 CastRay(geometryProps.GetXoffset(geometryProps.N), ray, 0.0, INF, mipAndCone, FLAG_NON_TRANSPARENT, geometryProps, materialProps);
+#endif
             }
 
             //=============================================================================================================================================================
@@ -590,7 +600,12 @@ void MainRayGenShader()
 
     GeometryProps geometryProps0;
     MaterialProps materialProps0;
+#ifdef USE_NATIVE
+    geometryProps0 = CastRay(cameraRayOrigin, cameraRayDirection, 0.0, 1000.0, GetConeAngleFromRoughness(0.0, 0.0), (gOnScreen == SHOW_INSTANCE_INDEX || gOnScreen == SHOW_NORMAL) ? GEOMETRY_ALL : FLAG_NON_TRANSPARENT);
+    materialProps0 = GetMaterialProps(geometryProps0);
+#else
     CastRay(cameraRayOrigin, cameraRayDirection, 0.0, 1000.0, GetConeAngleFromRoughness(0.0, 0.0), (gOnScreen == SHOW_INSTANCE_INDEX || gOnScreen == SHOW_NORMAL) ? GEOMETRY_ALL : FLAG_NON_TRANSPARENT, geometryProps0, materialProps0);
+#endif
 
     //================================================================================================================================================================================
     // Primary surface replacement ( aka jump through mirrors )
@@ -636,8 +651,12 @@ void MainRayGenShader()
             // Trace to the next hit
             float2 mipAndCone = GetConeAngleFromRoughness(geometryProps0.mip, materialProps0.roughness);
 
-
+#ifdef USE_NATIVE
+            geometryProps0 = CastRay(geometryProps0.GetXoffset(geometryProps0.N), ray, 0.0, INF, mipAndCone, GEOMETRY_ALL);
+            materialProps0 = GetMaterialProps(geometryProps0);
+#else
             CastRay(geometryProps0.GetXoffset(geometryProps0.N), ray, 0.0, INF, mipAndCone, GEOMETRY_ALL, geometryProps0, materialProps0);
+#endif
         }
 
         {
