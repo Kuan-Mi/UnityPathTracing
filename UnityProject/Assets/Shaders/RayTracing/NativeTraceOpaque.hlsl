@@ -341,7 +341,6 @@ TraceOpaqueResult TraceOpaque(GeometryProps geometryProps0, MaterialProps materi
                 lobeTanHalfAngleAtOrigin = roughnessTemp * roughnessTemp / (1.0 + roughnessTemp * roughnessTemp);
 
                 float2 mipAndCone = GetConeAngleFromRoughness(geometryProps.mip, isDiffuse ? 1.0 : materialProps.roughness);
-
                 geometryProps = CastRay(geometryProps.GetXoffset(geometryProps.N), ray, 0.0, INF, mipAndCone, FLAG_NON_TRANSPARENT);
                 materialProps = GetMaterialProps( geometryProps );
             }
@@ -638,8 +637,6 @@ void MainRayGenShader()
 
             // Trace to the next hit
             float2 mipAndCone = GetConeAngleFromRoughness(geometryProps0.mip, materialProps0.roughness);
-
-
             geometryProps0 = CastRay(geometryProps0.GetXoffset(geometryProps0.N), ray, 0.0, INF, mipAndCone, GEOMETRY_ALL);
             materialProps0 = GetMaterialProps( geometryProps0 );
         }
@@ -685,7 +682,7 @@ void MainRayGenShader()
 
     // Normal, roughness and material ID
     float3 N = Geometry::RotateVectorInverse(mirrorMatrix, materialProps0.N);
-    // N = geometryProps0.N;
+
     float materialID = GetMaterialID(geometryProps0, materialProps0);
     #if( USE_SIMULATED_MATERIAL_ID_TEST == 1 )
     materialID = frac(geometryProps0.X).x < 0.05 ? MATERIAL_ID_HAIR : materialID;
@@ -722,7 +719,6 @@ void MainRayGenShader()
     }
 
     gOut_DirectLighting[pixelPos] = Ldirect; // "psrThroughput" applied in "Composition"
-
     gOut_PsrThroughput[pixelPos] = psrThroughput;
 
     // Lighting at PSR hit, if found
