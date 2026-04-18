@@ -231,7 +231,7 @@ void MainRayGenShader()
     // Apply exposure
     Lsum = ApplyExposure(Lsum);
 
-    gOut_Composed[pixelPos] = float4(Lsum, 1);
+    gOut_Composed[pixelPos] = Lsum;
     
     // Output
     // gOut_Composed[pixelPos] = Lsum;

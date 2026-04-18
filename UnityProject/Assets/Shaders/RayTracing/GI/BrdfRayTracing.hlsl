@@ -75,7 +75,7 @@ void MainRayGenShader()
     branchlessONB(surface.normal, tangent, bitangent);
 
 
-    float distance = max(1, 0.1 * length(surface.worldPos - gCameraGlobalPos));
+    float distance = max(1, 0.1 * length(surface.worldPos - gCameraGlobalPos.xyz));
 
     RayDesc ray;
     ray.TMin = 0.001f * distance;

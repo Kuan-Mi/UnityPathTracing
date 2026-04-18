@@ -1,9 +1,232 @@
 #include "../Sharc/SharcCommon.h"
-RaytracingAccelerationStructure gWorldTlas : register(t0, space1);
 
-RWStructuredBuffer<uint64_t> gInOut_SharcHashEntriesBuffer;
-RWStructuredBuffer<SharcAccumulationData> gInOut_SharcAccumulated;
-RWStructuredBuffer<SharcPackedData> gInOut_SharcResolved;
+#ifdef USE_NATIVE
+RaytracingAccelerationStructure gWorldTlas : register(t0, space2);
+
+ByteAddressBuffer t_BindlessBuffers[] : register(t0, space3);
+Texture2D<float4> t_BindlessTextures[] : register(t0, space4);
+
+
+struct GeometryData
+{
+    uint numIndices;
+    uint numVertices;
+    int indexBufferIndex;
+    uint indexOffset;
+
+    int vertexBufferIndex;
+    uint positionOffset;
+    uint normalOffset;
+    uint texCoord1Offset;
+
+    uint tangentOffset;
+    uint vertexStride;
+    uint indexStride;
+    uint materialIndex;
+};
+
+struct InstanceData
+{
+    uint firstGeometryIndex;
+    uint numGeometries;
+    uint pad0;
+    uint pad1;
+    row_major float3x4 transform;
+};
+
+struct MaterialConstants
+{
+    // row 0
+    float3 baseOrDiffuseColor;
+    int flags;
+
+    // row 1
+    float3 emissiveColor;
+    int domain;
+
+    // row 2
+    float opacity;
+    float roughness;
+    float metalness;
+    float normalTextureScale;
+
+    // row 3
+    float occlusionStrength;
+    float alphaCutoff;
+    float transmissionFactor;
+    int baseOrDiffuseTextureIndex;
+
+    // row 4
+    int metalRoughOrSpecularTextureIndex;
+    int emissiveTextureIndex;
+    int normalTextureIndex;
+    int occlusionTextureIndex;
+};
+
+
+StructuredBuffer<InstanceData> t_InstanceData : register(t3, space2);
+StructuredBuffer<GeometryData> t_GeometryData : register(t4, space2);
+StructuredBuffer<MaterialConstants> t_MaterialConstants : register(t5, space2);
+
+
+uint LoadIndex(ByteAddressBuffer buf, uint byteOffset, uint stride)
+{
+    if (stride == 4u)
+    {
+        return buf.Load(byteOffset);
+    }
+    else
+    {
+        uint aligned = byteOffset & ~3u;
+        uint dw = buf.Load(aligned);
+        return (byteOffset & 2u) ? (dw >> 16u) : (dw & 0xFFFFu);
+    }
+}
+
+struct GeometrySample
+{
+    InstanceData instance;
+    GeometryData geometry;
+    MaterialConstants material;
+
+    float3 vertexPositions[3];
+    float2 vertexTexcoords[3];
+
+    float3 objectSpacePosition;
+    float2 texcoord;
+    float3 flatNormal;
+    float3 geometryNormal;
+    float4 tangent;
+};
+
+GeometrySample getGeometryFromHit(
+    uint instanceIndex,
+    uint geometryIndex,
+    uint triangleIndex,
+    float2 rayBarycentrics,
+    StructuredBuffer<InstanceData> instanceBuffer,
+    StructuredBuffer<GeometryData> geometryBuffer,
+    StructuredBuffer<MaterialConstants> materialBuffer
+)
+{
+    GeometrySample gs = (GeometrySample)0;
+
+    gs.instance = instanceBuffer[instanceIndex];
+    gs.geometry = geometryBuffer[gs.instance.firstGeometryIndex + geometryIndex];
+    gs.material = materialBuffer[gs.geometry.materialIndex];
+
+    ByteAddressBuffer indexBuffer = t_BindlessBuffers[NonUniformResourceIndex(gs.geometry.indexBufferIndex)];
+    ByteAddressBuffer vertexBuffer = t_BindlessBuffers[NonUniformResourceIndex(gs.geometry.vertexBufferIndex)];
+
+    uint baseByteIdx = gs.geometry.indexOffset + triangleIndex * 3u * gs.geometry.indexStride;
+    uint i0 = LoadIndex(indexBuffer, baseByteIdx, gs.geometry.indexStride);
+    uint i1 = LoadIndex(indexBuffer, baseByteIdx + gs.geometry.indexStride, gs.geometry.indexStride);
+    uint i2 = LoadIndex(indexBuffer, baseByteIdx + gs.geometry.indexStride * 2u, gs.geometry.indexStride);
+
+    float3 barycentrics;
+    barycentrics.yz = rayBarycentrics;
+    barycentrics.x = 1.0f - barycentrics.y - barycentrics.z;
+
+    {
+        gs.vertexPositions[0] = asfloat(vertexBuffer.Load3(gs.geometry.positionOffset + i0 * gs.geometry.vertexStride));
+        gs.vertexPositions[1] = asfloat(vertexBuffer.Load3(gs.geometry.positionOffset + i1 * gs.geometry.vertexStride));
+        gs.vertexPositions[2] = asfloat(vertexBuffer.Load3(gs.geometry.positionOffset + i2 * gs.geometry.vertexStride));
+        gs.objectSpacePosition = interpolate(gs.vertexPositions, barycentrics);
+    }
+
+    {
+        gs.vertexTexcoords[0] = asfloat(vertexBuffer.Load2(gs.geometry.texCoord1Offset + i0 * gs.geometry.vertexStride));
+        gs.vertexTexcoords[1] = asfloat(vertexBuffer.Load2(gs.geometry.texCoord1Offset + i1 * gs.geometry.vertexStride));
+        gs.vertexTexcoords[2] = asfloat(vertexBuffer.Load2(gs.geometry.texCoord1Offset + i2 * gs.geometry.vertexStride));
+        gs.texcoord = interpolate(gs.vertexTexcoords, barycentrics);
+    }
+
+    {
+        float3 normals[3];
+        normals[0] = asfloat(vertexBuffer.Load3(gs.geometry.normalOffset + i0 * gs.geometry.vertexStride));
+        normals[1] = asfloat(vertexBuffer.Load3(gs.geometry.normalOffset + i1 * gs.geometry.vertexStride));
+        normals[2] = asfloat(vertexBuffer.Load3(gs.geometry.normalOffset + i2 * gs.geometry.vertexStride));
+        gs.geometryNormal = interpolate(normals, barycentrics);
+        gs.geometryNormal = mul(gs.instance.transform, float4(gs.geometryNormal, 0.0f)).xyz;
+        gs.geometryNormal = normalize(gs.geometryNormal);
+    }
+
+    {
+        float4 tangents[3];
+        tangents[0] = asfloat(vertexBuffer.Load4(gs.geometry.tangentOffset + i0 * gs.geometry.vertexStride));
+        tangents[1] = asfloat(vertexBuffer.Load4(gs.geometry.tangentOffset + i1 * gs.geometry.vertexStride));
+        tangents[2] = asfloat(vertexBuffer.Load4(gs.geometry.tangentOffset + i2 * gs.geometry.vertexStride));
+        gs.tangent.xyz = interpolate(tangents, barycentrics).xyz;
+        gs.tangent.xyz = mul(gs.instance.transform, float4(gs.tangent.xyz, 0.0f)).xyz;
+        gs.tangent.xyz = normalize(gs.tangent.xyz);
+        gs.tangent.w = tangents[0].w;
+    }
+
+    {
+        float3 objectSpaceFlatNormal = normalize(cross(
+            gs.vertexPositions[1] - gs.vertexPositions[0],
+            gs.vertexPositions[2] - gs.vertexPositions[0]));
+        gs.flatNormal = normalize(mul(gs.instance.transform, float4(objectSpaceFlatNormal, 0.0f)).xyz);
+    }
+
+    return gs;
+}
+
+RWStructuredBuffer<uint64_t> gInOut_SharcHashEntriesBuffer REG(u12, space1);
+RWStructuredBuffer<SharcAccumulationData> gInOut_SharcAccumulated REG(u13, space1);
+RWStructuredBuffer<SharcPackedData> gInOut_SharcResolved REG(u14, space1);
+
+SamplerState s_LinearRepeat REG(s1, space1);
+static const int MaterialFlags_DoubleSided = 0x00000002;
+static const int MaterialFlags_UseMetalRoughOrSpecularTexture = 0x00000004;
+static const int MaterialFlags_UseBaseOrDiffuseTexture = 0x00000008;
+static const int MaterialFlags_UseEmissiveTexture = 0x00000010;
+static const int MaterialFlags_UseNormalTexture = 0x00000020;
+
+float3 UnpackNormalAG(float4 packedNormal, float scale = 1.0)
+{
+    float3 normal;
+    normal.xy = packedNormal.ag * 2.0 - 1.0;
+    normal.z = max(1.0e-16, sqrt(1.0 - saturate(dot(normal.xy, normal.xy))));
+    normal.xy *= scale;
+    return normal;
+}
+
+float3 UnpackNormalRGB(float4 packedNormal, float scale = 1.0)
+{
+    float3 normal;
+    normal.xyz = packedNormal.rgb * 2.0 - 1.0;
+    normal.xy *= scale;
+    return normal;
+}
+
+float3 UnpackNormalMapRGorAG(float4 packedNormal, float scale = 1.0)
+{
+    packedNormal.a *= packedNormal.r;
+    return UnpackNormalAG(packedNormal, scale);
+}
+
+float3 SafeNormalize(float3 inVec)
+{
+    float dp3 = max(1.175494351e-38, dot(inVec, inVec));
+    return inVec * rsqrt(dp3);
+}
+
+float3 TransformTangentToWorld(float3 normalTS, float3x3 tangentToWorld, bool doNormalize = false)
+{
+    float3 result = mul(normalTS, tangentToWorld);
+    if (doNormalize)
+        return SafeNormalize(result);
+    return result;
+}
+
+#else
+RaytracingAccelerationStructure gWorldTlas REG(t0, space1);
+
+RWStructuredBuffer<uint64_t> gInOut_SharcHashEntriesBuffer REG(u12, space1);
+RWStructuredBuffer<SharcAccumulationData> gInOut_SharcAccumulated REG(u13, space1);
+RWStructuredBuffer<SharcPackedData> gInOut_SharcResolved REG(u14, space1);
+#endif
 
 #define RTXCR_INTEGRATION 1
 
@@ -38,7 +261,9 @@ float3x3 Hair_GetBasis(float3 N, float3 T)
     return float3x3(T, B, N);
 }
 
+#ifndef USE_NATIVE
 #include "Payload.hlsl"
+#endif
 
 struct GeometryProps
 {
@@ -54,6 +279,10 @@ struct GeometryProps
     uint instanceIndex; // 命中的实例索引（用于查找InstanceData）
     uint primitiveIndex; // 命中的三角形索引
     float2 barycentrics; // 命中的三角形的重心坐标（uv）
+#ifdef USE_NATIVE
+    float2 texcoord;
+    MaterialConstants material;
+#endif
 
     float3 GetXoffset(float3 offsetDir, float amount = PT_BOUNCE_RAY_OFFSET)
     {
@@ -91,11 +320,77 @@ struct MaterialProps
     float3 N;
     float3 T;
     float3 baseColor;
+#ifdef USE_NATIVE
+    float alpha;
+#endif
     float roughness;
     float metalness;
     float curvature;
 };
 
+#ifdef USE_NATIVE
+MaterialProps sampleGeometryMaterial(
+    GeometryProps gs,
+    SamplerState materialSampler,
+    float normalMapScale = 1.0)
+{
+    MaterialProps props = (MaterialProps)0;
+
+    {
+        props.baseColor = gs.material.baseOrDiffuseColor;
+        props.alpha = 1;
+        if ((gs.material.flags & MaterialFlags_UseBaseOrDiffuseTexture) != 0 &&
+            gs.material.baseOrDiffuseTextureIndex >= 0)
+        {
+            Texture2D<float4> tex = t_BindlessTextures[NonUniformResourceIndex(gs.material.baseOrDiffuseTextureIndex)];
+            props.baseColor = tex.SampleLevel(materialSampler, gs.texcoord, 0).rgb * props.baseColor;
+            props.alpha *= tex.SampleLevel(materialSampler, gs.texcoord, 0).a;
+        }
+    }
+
+    {
+        props.N = gs.N;
+        if ((gs.material.flags & MaterialFlags_UseNormalTexture) != 0 &&
+            gs.material.normalTextureIndex >= 0)
+        {
+            Texture2D<float4> normalTex = t_BindlessTextures[NonUniformResourceIndex(gs.material.normalTextureIndex)];
+            float4 packedNormal = normalTex.SampleLevel(materialSampler, gs.texcoord, 0);
+            float3 tangentNormal = UnpackNormalMapRGorAG(packedNormal, 1);
+
+            float3 T = normalize(gs.T.xyz);
+            float3 B = -cross(props.N, T) * sign(gs.T.w);
+            half3x3 tangentToWorld = half3x3(T, B, props.N);
+            props.N = TransformTangentToWorld(tangentNormal, tangentToWorld);
+        }
+    }
+
+    {
+        props.Lemi = gs.material.emissiveColor;
+        if ((gs.material.flags & MaterialFlags_UseEmissiveTexture) != 0 &&
+            gs.material.emissiveTextureIndex >= 0)
+        {
+            Texture2D<float4> emissiveTex = t_BindlessTextures[NonUniformResourceIndex(gs.material.emissiveTextureIndex)];
+            props.Lemi *= emissiveTex.SampleLevel(materialSampler, gs.texcoord, 0).rgb;
+        }
+    }
+
+    {
+        props.roughness = gs.material.roughness;
+        props.metalness = gs.material.metalness;
+        if ((gs.material.flags & MaterialFlags_UseMetalRoughOrSpecularTexture) != 0 &&
+            gs.material.metalRoughOrSpecularTextureIndex >= 0)
+        {
+            Texture2D<float4> metalRoughTex = t_BindlessTextures[NonUniformResourceIndex(gs.material.metalRoughOrSpecularTextureIndex)];
+            float4 mrSample = metalRoughTex.SampleLevel(materialSampler, gs.texcoord, 0);
+            props.roughness = 1 - (1 - mrSample.g) * (1 - props.roughness);
+            props.metalness = mrSample.b;
+        }
+        props.roughness = 1;
+    }
+
+    return props;
+}
+#endif
 
 float2 GetConeAngleFromAngularRadius(float mip, float tanConeAngle)
 {
@@ -112,6 +407,40 @@ float2 GetConeAngleFromRoughness(float mip, float roughness)
     return GetConeAngleFromAngularRadius(mip, tanConeAngle);
 }
 
+#ifdef USE_NATIVE
+struct RayPayload
+{
+    float committedRayT;
+    uint instanceID;
+    uint geometryIndex;
+    uint triangleIndex;
+    float2 barycentrics;
+};
+
+struct AttributeData
+{
+    float2 barycentrics;
+};
+
+[shader("closesthit")]
+void ClosestHit_0_Shader(inout RayPayload payload, AttributeData attribs : SV_IntersectionAttributes)
+{
+    payload.instanceID = InstanceID();
+    payload.geometryIndex = GeometryIndex();
+    payload.triangleIndex = PrimitiveIndex();
+    payload.barycentrics = attribs.barycentrics;
+    payload.committedRayT = RayTCurrent();
+}
+#endif
+
+#ifdef USE_NATIVE
+[shader("miss")]
+void MainMissShader(inout RayPayload payload : SV_RayPayload)
+{
+    payload.instanceID = ~0u;
+    payload.committedRayT = INF;
+}
+#else
 [shader("miss")]
 void MainMissShader(inout MainRayPayload payload : SV_RayPayload)
 {
@@ -122,6 +451,7 @@ void MainMissShader(inout MainRayPayload payload : SV_RayPayload)
 
     payload.Lemi = Packing::EncodeRgbe(GetSkyIntensity(ray));
 }
+#endif
 
 uint ToRayFlag(uint flag)
 {
@@ -142,6 +472,98 @@ uint ToRayFlag2(uint flag)
 }
 
 
+#ifdef USE_NATIVE
+float CastVisibilityRay_AnyHit(float3 origin, float3 direction, float Tmin, float Tmax, float2 mipAndCone, RaytracingAccelerationStructure accelerationStructure, uint mask, uint rayFlags)
+{
+    RayDesc rayDesc;
+    rayDesc.Origin = origin;
+    rayDesc.Direction = direction;
+    rayDesc.TMin = Tmin;
+    rayDesc.TMax = Tmax;
+
+    RayPayload payload = (RayPayload)0;
+
+    uint flag = ToRayFlag2(mask);
+    flag = flag | RAY_FLAG_SKIP_CLOSEST_HIT_SHADER | RAY_FLAG_ACCEPT_FIRST_HIT_AND_END_SEARCH;
+
+    TraceRay(accelerationStructure, flag, mask, 0, 0, 0, rayDesc, payload);
+
+    return payload.committedRayT;
+}
+
+GeometryProps CastRay(float3 origin, float3 direction, float Tmin, float Tmax, float2 mipAndCone, uint mask)
+{
+    RayDesc rayDesc;
+    rayDesc.Origin = origin;
+    rayDesc.Direction = direction;
+    rayDesc.TMin = Tmin;
+    rayDesc.TMax = Tmax;
+
+    RayPayload payload = (RayPayload)0;
+
+    TraceRay(gWorldTlas, ToRayFlag2(mask), mask, 0, 0, 0, rayDesc, payload);
+    GeometryProps props = (GeometryProps)0;
+    props.hitT = payload.committedRayT;
+
+    if (payload.committedRayT != INF)
+    {
+        GeometrySample geo = getGeometryFromHit(
+            payload.instanceID,
+            payload.geometryIndex,
+            payload.triangleIndex,
+            payload.barycentrics,
+            t_InstanceData,
+            t_GeometryData,
+            t_MaterialConstants
+        );
+
+        props.instanceIndex = payload.instanceID;
+        props.N = geo.geometryNormal;
+        props.curvature = 1;
+        props.mip = 0;
+        props.T = geo.tangent;
+        props.X = origin + direction * payload.committedRayT;
+        props.Xprev = props.X;
+
+        if (gIsEditor)
+            props.Xprev = props.X;
+
+        props.V = -direction;
+        props.textureOffsetAndFlags = 0;
+        props.primitiveIndex = payload.triangleIndex;
+        props.barycentrics = payload.barycentrics;
+        props.texcoord = geo.texcoord;
+        props.material = geo.material;
+    }
+    return props;
+}
+
+MaterialProps GetMaterialProps(GeometryProps geometryProps)
+{
+    MaterialProps props = (MaterialProps)0;
+
+    [branch]
+    if (geometryProps.IsMiss())
+    {
+        props.Lemi = GetSkyIntensity(-geometryProps.V);
+        return props;
+    }
+
+    MaterialProps mat = sampleGeometryMaterial(geometryProps, s_LinearRepeat);
+
+    props = (MaterialProps)0;
+    props.baseColor = mat.baseColor;
+    props.roughness = mat.roughness;
+    props.metalness = mat.metalness;
+    props.Lemi = mat.Lemi;
+    props.curvature = mat.curvature;
+    props.N = mat.N;
+    props.T = mat.T;
+
+    return props;
+}
+
+#else
 float CastVisibilityRay_AnyHit(float3 origin, float3 direction, float Tmin, float Tmax, float2 mipAndCone, RaytracingAccelerationStructure accelerationStructure, uint mask, uint rayFlags)
 {
     RayDesc rayDesc;
@@ -222,6 +644,7 @@ void CastRay(float3 origin, float3 direction, float Tmin, float Tmax, float2 mip
     matProps.N = Packing::DecodeUnitVector(payload.matN);
     matProps.T = payload.T.xyz;
 }
+#endif
 
 #include "DirectionalLights.hlsl"
 #include "SpotLights.hlsl"
