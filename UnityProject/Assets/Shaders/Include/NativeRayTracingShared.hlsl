@@ -393,7 +393,7 @@ MaterialProps sampleGeometryMaterial(
             props.roughness = 1 - (1 - mrSample.g) * (1 - props.roughness);
             props.metalness = mrSample.b;
         }
-        // props.roughness = 0;
+        props.roughness = 1;
         // props.metalness = 1;
     }
 
