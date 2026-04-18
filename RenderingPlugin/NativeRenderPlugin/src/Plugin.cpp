@@ -221,32 +221,15 @@ NR_AS_Clear(uint64_t handle)
 extern "C" bool UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API
 NR_AS_AddInstance(
     uint64_t handle,
-    uint32_t instanceHandle,
-    void*    vbPtr,
-    uint32_t vertexCount,
-    uint32_t vertexStride,
-    uint32_t positionOffset,
-    uint32_t normalOffset,
-    uint32_t texCoord1Offset,
-    uint32_t tangentOffset,
-    void*    ibPtr,
-    uint32_t indexStride,
-    const NR_SubmeshDesc*    submeshDescs,
-    uint32_t                 submeshCount,
-    const NR_SubmeshOMMDesc* ommDescs)
+    const NR_AddInstanceDesc* desc)
 {
-    if (!handle || !vbPtr || !ibPtr || !submeshDescs || submeshCount == 0)
+    if (!handle || !desc || !desc->vbPtr || !desc->ibPtr || !desc->submeshDescs || desc->submeshCount == 0)
     {
         NR_WARN("NR_AS_AddInstance: invalid arguments");
         return false;
     }
     auto* as = reinterpret_cast<AccelerationStructure*>(handle);
-    auto* vb = static_cast<ID3D12Resource*>(vbPtr);
-    auto* ib = static_cast<ID3D12Resource*>(ibPtr);
-    return as->AddInstance(instanceHandle, vb, vertexCount, vertexStride,
-                           positionOffset, normalOffset, texCoord1Offset, tangentOffset,
-                           ib, indexStride,
-                           submeshDescs, submeshCount, ommDescs);
+    return as->AddInstance(*desc);
 }
 
 // ---------------------------------------------------------------------------

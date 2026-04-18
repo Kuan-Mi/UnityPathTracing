@@ -176,20 +176,44 @@ namespace NativeRender
                     {
                         fixed (NativeRenderPlugin.SubmeshOMMDesc* pOMM = ommDescs)
                         {
-                            ok = NativeRenderPlugin.NR_AS_AddInstance(
-                                _handle, instanceHandle, vbPtr, vertexCount, vertexStride,
-                                posOff, normOff, uvOff, tanOff,
-                                ibPtr, indexStride,
-                                (IntPtr)pDescs, (uint)subMeshCount, (IntPtr)pOMM);
+                            var desc = new NativeRenderPlugin.AddInstanceDesc
+                            {
+                                instanceHandle      = instanceHandle,
+                                vertexBufferNativePtr = vbPtr,
+                                vertexCount         = vertexCount,
+                                vertexStride        = vertexStride,
+                                positionOffset      = posOff,
+                                normalOffset        = normOff,
+                                texCoord1Offset     = uvOff,
+                                tangentOffset       = tanOff,
+                                indexBufferNativePtr = ibPtr,
+                                indexStride         = indexStride,
+                                submeshDescs        = (IntPtr)pDescs,
+                                submeshCount        = (uint)subMeshCount,
+                                ommDescs            = (IntPtr)pOMM,
+                            };
+                            ok = NativeRenderPlugin.NR_AS_AddInstance(_handle, ref desc);
                         }
                     }
                     else
                     {
-                        ok = NativeRenderPlugin.NR_AS_AddInstance(
-                            _handle, instanceHandle, vbPtr, vertexCount, vertexStride,
-                            posOff, normOff, uvOff, tanOff,
-                            ibPtr, indexStride,
-                            (IntPtr)pDescs, (uint)subMeshCount, IntPtr.Zero);
+                        var desc = new NativeRenderPlugin.AddInstanceDesc
+                        {
+                            instanceHandle      = instanceHandle,
+                            vertexBufferNativePtr = vbPtr,
+                            vertexCount         = vertexCount,
+                            vertexStride        = vertexStride,
+                            positionOffset      = posOff,
+                            normalOffset        = normOff,
+                            texCoord1Offset     = uvOff,
+                            tangentOffset       = tanOff,
+                            indexBufferNativePtr = ibPtr,
+                            indexStride         = indexStride,
+                            submeshDescs        = (IntPtr)pDescs,
+                            submeshCount        = (uint)subMeshCount,
+                            ommDescs            = IntPtr.Zero,
+                        };
+                        ok = NativeRenderPlugin.NR_AS_AddInstance(_handle, ref desc);
                     }
 
                     if (!ok)

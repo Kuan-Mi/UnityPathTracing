@@ -63,28 +63,43 @@ namespace NativeRender
         }
 
         /// <summary>
+        /// All per-instance parameters for NR_AS_AddInstance (excluding the AS handle).
+        /// Must match the C++ NR_AddInstanceDesc struct layout exactly.
+        /// submeshDescs and ommDescs must remain pinned for the duration of the call.
+        /// </summary>
+        [StructLayout(LayoutKind.Sequential)]
+        public struct AddInstanceDesc
+        {
+            public uint   instanceHandle;       // unique handle (e.g. MeshRenderer.GetInstanceID())
+            public uint   _pad0;
+
+            public IntPtr vertexBufferNativePtr;
+            public uint   vertexCount;
+            public uint   vertexStride;
+            public uint   positionOffset;
+            public uint   normalOffset;
+            public uint   texCoord1Offset;
+            public uint   tangentOffset;
+            public uint   _pad1;
+
+            public IntPtr indexBufferNativePtr;
+            public uint   indexStride;
+            public uint   _pad2;
+
+            public IntPtr submeshDescs;         // NR_SubmeshDesc*
+            public uint   submeshCount;
+            public uint   _pad3;
+
+            public IntPtr ommDescs;             // NR_SubmeshOMMDesc* or IntPtr.Zero
+        }
+
+        /// <summary>
         /// Adds one instance (all submeshes at once) to an acceleration structure.
-        /// submeshDescs: pinned pointer to SubmeshDesc[submeshCount].
-        /// ommDescs:     pinned pointer to SubmeshOMMDesc[submeshCount], or IntPtr.Zero for no OMM.
-        /// instanceHandle must be unique among active instances (e.g. MeshRenderer.GetInstanceID()).
+        /// desc.submeshDescs and desc.ommDescs must be pinned for the duration of the call.
         /// Returns true on success.
         /// </summary>
         [DllImport(DllName)]
-        public static extern bool NR_AS_AddInstance(
-            ulong  handle,
-            uint   instanceHandle,
-            IntPtr vertexBufferNativePtr,
-            uint   vertexCount,
-            uint   vertexStride,
-            uint   positionOffset,
-            uint   normalOffset,
-            uint   texCoord1Offset,
-            uint   tangentOffset,
-            IntPtr indexBufferNativePtr,
-            uint   indexStride,
-            IntPtr submeshDescs,
-            uint   submeshCount,
-            IntPtr ommDescs);   // NR_SubmeshOMMDesc* or null
+        public static extern bool NR_AS_AddInstance(ulong handle, ref AddInstanceDesc desc);
 
         /// <summary>
         /// Updates the world transform of an existing instance.

@@ -618,7 +618,7 @@ void MainRayGenShader()
     
     MaterialProps mat = sampleGeometryMaterial(geo, s_LinearRepeat);
     
-    float3 ccc = (payload.instanceID) / 10.0;
+    float3 ccc = (payload.instanceID/2.0);
     // ccc = float3(0.5,0.1,0.1);
     
     gOut_BaseColor_Metalness[pixelPos] = float4(  ccc,  1);

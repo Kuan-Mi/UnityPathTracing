@@ -48,22 +48,44 @@ struct NR_SubmeshOMMDesc
 };
 
 // ---------------------------------------------------------------------------
-// MeshData  –  one sub-mesh with GPU buffer references and optional OMM data.
+// NR_AddInstanceDesc
+//   All per-instance parameters for NR_AS_AddInstance, except the AS handle.
+//   Must match the C# NativeRenderPlugin.AddInstanceDesc struct layout exactly.
 // ---------------------------------------------------------------------------
-struct MeshData
+struct NR_AddInstanceDesc
 {
-    ComPtr<ID3D12Resource> vertexBuffer;
-    UINT vertexCount;
-    UINT vertexStride;
-    UINT positionOffset;   // byte offset of Position within the vertex
-    UINT normalOffset;     // byte offset of Normal, or ~0u if absent
-    UINT texCoord1Offset;  // byte offset of TexCoord0, or ~0u if absent
-    UINT tangentOffset;    // byte offset of Tangent, or ~0u if absent
-    ComPtr<ID3D12Resource> indexBuffer;
-    UINT indexCount;
-    UINT indexByteOffset;    // byte offset of this sub-mesh's first index within the shared index buffer
-    DXGI_FORMAT indexFormat; // DXGI_FORMAT_R16_UINT or DXGI_FORMAT_R32_UINT
-    UINT materialIndex;      // index into MaterialConstants buffer
+    uint32_t instanceHandle;      // unique handle (e.g. MeshRenderer.GetInstanceID())
+    uint32_t _pad0;
+
+    void*    vbPtr;               // ID3D12Resource* vertex buffer
+    uint32_t vertexCount;
+    uint32_t vertexStride;
+    uint32_t positionOffset;
+    uint32_t normalOffset;
+    uint32_t texCoord1Offset;
+    uint32_t tangentOffset;
+    uint32_t _pad1;
+
+    void*    ibPtr;               // ID3D12Resource* index buffer
+    uint32_t indexStride;
+    uint32_t _pad2;
+
+    const NR_SubmeshDesc*    submeshDescs;  // pointer to NR_SubmeshDesc array
+    uint32_t                 submeshCount;
+    uint32_t                 _pad3;
+
+    const NR_SubmeshOMMDesc* ommDescs;      // nullable
+};
+
+// ---------------------------------------------------------------------------
+// SubMeshData  –  per-submesh data (indices, material, optional OMM).
+//   Fields shared across all submeshes of the same instance live in InstanceDef.
+// ---------------------------------------------------------------------------
+struct SubMeshData
+{
+    UINT        indexCount;
+    UINT        indexByteOffset;  // byte offset of this sub-mesh's first index in the shared IB
+    UINT        materialIndex;    // index into MaterialConstants buffer
 
     bool hasBakedOMM = false;
     struct OMMBakedData
@@ -80,9 +102,21 @@ struct MeshData
 };
 
 // Groups all sub-meshes belonging to one GameObject/Instance.
-struct InstanceDef
+// The vertex/index buffer and layout fields are shared by all submeshes.
+struct MeshInfo
 {
-    std::vector<MeshData> submeshes;
+    // Shared per-instance GPU buffers and vertex layout
+    ComPtr<ID3D12Resource> vertexBuffer;
+    UINT vertexCount;
+    UINT vertexStride;
+    UINT positionOffset;   // byte offset of Position within the vertex
+    UINT normalOffset;     // byte offset of Normal, or ~0u if absent
+    UINT texCoord1Offset;  // byte offset of TexCoord0, or ~0u if absent
+    UINT tangentOffset;    // byte offset of Tangent, or ~0u if absent
+    ComPtr<ID3D12Resource> indexBuffer;
+    DXGI_FORMAT indexFormat; // DXGI_FORMAT_R16_UINT or DXGI_FORMAT_R32_UINT
+
+    std::vector<SubMeshData> submeshes;
 };
 
 // ---------------------------------------------------------------------------
@@ -135,15 +169,9 @@ public:
     void Clear();
 
     // Add one instance (one GameObject) with all its sub-meshes.
-    //   userHandle : caller-assigned opaque ID (e.g. Unity MeshRenderer.GetInstanceID()).
-    //                Must be unique among active instances; no-op if already registered.
-    bool AddInstance(
-        uint32_t userHandle,
-        ID3D12Resource* vb, uint32_t vertexCount, uint32_t vertexStride,
-        uint32_t posOff, uint32_t normOff, uint32_t uvOff, uint32_t tanOff,
-        ID3D12Resource* ib, uint32_t indexStride,
-        const NR_SubmeshDesc* submeshes, uint32_t submeshCount,
-        const NR_SubmeshOMMDesc* ommDescs = nullptr);
+    //   desc.instanceHandle : caller-assigned opaque ID (e.g. Unity MeshRenderer.GetInstanceID()).
+    //                         Must be unique among active instances; no-op if already registered.
+    bool AddInstance(const NR_AddInstanceDesc& desc);
 
     // Remove instance identified by handle. No-op if handle is invalid.
     void RemoveInstance(uint32_t handle);
@@ -175,7 +203,7 @@ public:
     ID3D12Resource* GetTLAS() const { return m_tlasResources[m_frameIndex].tlas.Get(); }
 
     // Dense list of active InstanceDefs in TLAS order — used by Renderer for bindless VB/IB SRVs.
-    const std::vector<InstanceDef>& GetInstanceDefs() const { return m_activeDefs; }
+    const std::vector<MeshInfo>& GetInstanceDefs() const { return m_activeDefs; }
 
 private:
     // -----------------------------------------------------------------------
@@ -212,7 +240,7 @@ private:
     // -----------------------------------------------------------------------
     struct InstanceSlot
     {
-        InstanceDef mesh;
+        MeshInfo meshInfo;
         MeshKey     meshKey;
         float       transform[12] = {
             1,0,0,0,
@@ -235,11 +263,11 @@ private:
     // -----------------------------------------------------------------------
     // BLAS helpers
     // -----------------------------------------------------------------------
-    bool EnsureBLAS(ID3D12GraphicsCommandList4* cmdList, const MeshKey& key, const InstanceDef& def);
+    bool EnsureBLAS(ID3D12GraphicsCommandList4* cmdList, const MeshKey& key, const MeshInfo& def);
     void ReleaseBLAS(const MeshKey& key);
     D3D12_GPU_VIRTUAL_ADDRESS GetBLASVA(const MeshKey& key) const;
     bool BuildOMMForSubmesh(ID3D12GraphicsCommandList4* cmdList,
-                            BLASEntry& entry, size_t subIdx, const MeshData& mesh);
+                            BLASEntry& entry, size_t subIdx, const SubMeshData& mesh);
 
     // TLAS helpers
     bool BuildTLAS(ID3D12GraphicsCommandList4* cmdList, const std::vector<TLASInstanceEntry>& entries);
@@ -280,7 +308,7 @@ private:
     uint32_t m_activeCount = 0;
 
     // Dense active list (TLAS order)
-    std::vector<InstanceDef>       m_activeDefs;
+    std::vector<MeshInfo>       m_activeDefs;
     std::vector<TLASInstanceEntry> m_tlasEntries;
 
     // Dirty flags

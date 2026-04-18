@@ -80,9 +80,9 @@ void AccelerationStructure::TickDeferredDeletes()
 // ---------------------------------------------------------------------------
 bool AccelerationStructure::BuildOMMForSubmesh(
     ID3D12GraphicsCommandList4* cmdList,
-    BLASEntry& entry, size_t subIdx, const MeshData& mesh)
+    BLASEntry& entry, size_t subIdx, const SubMeshData& mesh)
 {
-    const MeshData::OMMBakedData& baked = mesh.ommBaked;
+    const SubMeshData::OMMBakedData& baked = mesh.ommBaked;
     AccelLogf(m_log, kUnityLogTypeLog,
         "[OMM] BuildOMMForSubmesh[%zu]: arrayData=%zu bytes, descs=%u, indices=%u",
         subIdx, baked.arrayData.size(), baked.descArrayCount, baked.indexCount);
@@ -209,7 +209,7 @@ bool AccelerationStructure::BuildOMMForSubmesh(
 // ---------------------------------------------------------------------------
 bool AccelerationStructure::EnsureBLAS(
     ID3D12GraphicsCommandList4* cmdList,
-    const MeshKey& key, const InstanceDef& def)
+    const MeshKey& key, const MeshInfo& def)
 {
     auto it = m_blasCache.find(key);
     if (it != m_blasCache.end())
@@ -236,7 +236,6 @@ bool AccelerationStructure::EnsureBLAS(
     entry.ommIndexFormats.resize(subCount, DXGI_FORMAT_R16_UINT);
     entry.ommIndexStrides.resize(subCount, 2);
 
-    const MeshData& firstSub = def.submeshes[0];
     std::vector<D3D12_RAYTRACING_GEOMETRY_DESC>             geomDescs(subCount);
     std::vector<D3D12_RAYTRACING_GEOMETRY_TRIANGLES_DESC>   ommTriDescs(subCount);
     std::vector<D3D12_RAYTRACING_GEOMETRY_OMM_LINKAGE_DESC> ommLinkages(subCount);
@@ -244,7 +243,7 @@ bool AccelerationStructure::EnsureBLAS(
 
     for (size_t j = 0; j < subCount; ++j)
     {
-        const MeshData& sub = def.submeshes[j];
+        const SubMeshData& sub = def.submeshes[j];
         D3D12_RAYTRACING_GEOMETRY_DESC& geomDesc = geomDescs[j];
         geomDesc = {};
 
@@ -271,14 +270,14 @@ bool AccelerationStructure::EnsureBLAS(
 
             D3D12_RAYTRACING_GEOMETRY_TRIANGLES_DESC& td = ommTriDescs[j];
             td = {};
-            td.VertexBuffer.StartAddress  = firstSub.vertexBuffer->GetGPUVirtualAddress();
-            td.VertexBuffer.StrideInBytes = firstSub.vertexStride;
-            td.VertexCount                = firstSub.vertexCount;
+            td.VertexBuffer.StartAddress  = def.vertexBuffer->GetGPUVirtualAddress();
+            td.VertexBuffer.StrideInBytes = def.vertexStride;
+            td.VertexCount                = def.vertexCount;
             td.VertexFormat               = DXGI_FORMAT_R32G32B32_FLOAT;
-            td.IndexBuffer                = firstSub.indexBuffer
-                ? firstSub.indexBuffer->GetGPUVirtualAddress() + sub.indexByteOffset : 0;
-            td.IndexCount                 = firstSub.indexBuffer ? sub.indexCount : 0;
-            td.IndexFormat                = firstSub.indexBuffer ? sub.indexFormat : DXGI_FORMAT_UNKNOWN;
+            td.IndexBuffer                = def.indexBuffer
+                ? def.indexBuffer->GetGPUVirtualAddress() + sub.indexByteOffset : 0;
+            td.IndexCount                 = def.indexBuffer ? sub.indexCount : 0;
+            td.IndexFormat                = def.indexBuffer ? def.indexFormat : DXGI_FORMAT_UNKNOWN;
             td.Transform3x4               = 0;
 
             D3D12_RAYTRACING_GEOMETRY_OMM_LINKAGE_DESC& ol = ommLinkages[j];
@@ -297,14 +296,14 @@ bool AccelerationStructure::EnsureBLAS(
         {
             geomDesc.Type  = D3D12_RAYTRACING_GEOMETRY_TYPE_TRIANGLES;
             geomDesc.Flags = D3D12_RAYTRACING_GEOMETRY_FLAG_OPAQUE;
-            geomDesc.Triangles.VertexBuffer.StartAddress  = firstSub.vertexBuffer->GetGPUVirtualAddress();
-            geomDesc.Triangles.VertexBuffer.StrideInBytes = firstSub.vertexStride;
-            geomDesc.Triangles.VertexCount                = firstSub.vertexCount;
+            geomDesc.Triangles.VertexBuffer.StartAddress  = def.vertexBuffer->GetGPUVirtualAddress();
+            geomDesc.Triangles.VertexBuffer.StrideInBytes = def.vertexStride;
+            geomDesc.Triangles.VertexCount                = def.vertexCount;
             geomDesc.Triangles.VertexFormat               = DXGI_FORMAT_R32G32B32_FLOAT;
-            geomDesc.Triangles.IndexBuffer                = firstSub.indexBuffer
-                ? firstSub.indexBuffer->GetGPUVirtualAddress() + sub.indexByteOffset : 0;
-            geomDesc.Triangles.IndexCount                 = firstSub.indexBuffer ? sub.indexCount : 0;
-            geomDesc.Triangles.IndexFormat                = firstSub.indexBuffer ? sub.indexFormat : DXGI_FORMAT_UNKNOWN;
+            geomDesc.Triangles.IndexBuffer                = def.indexBuffer
+                ? def.indexBuffer->GetGPUVirtualAddress() + sub.indexByteOffset : 0;
+            geomDesc.Triangles.IndexCount                 = def.indexBuffer ? sub.indexCount : 0;
+            geomDesc.Triangles.IndexFormat                = def.indexBuffer ? def.indexFormat : DXGI_FORMAT_UNKNOWN;
             geomDesc.Triangles.Transform3x4               = 0;
         }
     }
@@ -348,11 +347,11 @@ bool AccelerationStructure::EnsureBLAS(
     if (m_d3d12v8)
     {
         m_d3d12v8->RequestResourceState(
-            firstSub.vertexBuffer.Get(),
+            def.vertexBuffer.Get(),
             D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
-        if (firstSub.indexBuffer)
+        if (def.indexBuffer)
             m_d3d12v8->RequestResourceState(
-                firstSub.indexBuffer.Get(),
+                def.indexBuffer.Get(),
                 D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
     }
 
@@ -431,7 +430,7 @@ bool AccelerationStructure::HasAnyOMM() const
     // Also check pending slots not yet built
     for (const auto& slot : m_slots)
         if (slot.active)
-            for (const auto& sub : slot.mesh.submeshes)
+            for (const auto& sub : slot.meshInfo.submeshes)
                 if (sub.hasBakedOMM) return true;
     return false;
 }
@@ -698,7 +697,7 @@ void AccelerationStructure::DumpInstances(const char* tag) const
             "[AS][%s] slot=%-4u handle=%-10u cid=%-6u mask=0x%02X needsBLAS=%d sub=%-3zu "
             "vb=%p ib=%p blasVA=0x%llx blasRef=%d T=(%.2f,%.2f,%.2f)%s",
             t, i, handle, s.customInstanceID, s.mask,
-            (int)s.needsBLAS, s.mesh.submeshes.size(),
+            (int)s.needsBLAS, s.meshInfo.submeshes.size(),
             (void*)s.meshKey.vbPtr, (void*)s.meshKey.ibPtr,
             (unsigned long long)blasVA, refCount,
             s.transform[3], s.transform[7], s.transform[11],
@@ -772,14 +771,14 @@ void AccelerationStructure::Clear()
 // ---------------------------------------------------------------------------
 // AddInstance
 // ---------------------------------------------------------------------------
-bool AccelerationStructure::AddInstance(
-    uint32_t userHandle,
-    ID3D12Resource* vb, uint32_t vertexCount, uint32_t vertexStride,
-    uint32_t posOff, uint32_t normOff, uint32_t uvOff, uint32_t tanOff,
-    ID3D12Resource* ib, uint32_t indexStride,
-    const NR_SubmeshDesc* submeshes, uint32_t submeshCount,
-    const NR_SubmeshOMMDesc* ommDescs)
+bool AccelerationStructure::AddInstance(const NR_AddInstanceDesc& desc)
 {
+    auto* vb          = static_cast<ID3D12Resource*>(desc.vbPtr);
+    auto* ib          = static_cast<ID3D12Resource*>(desc.ibPtr);
+    const auto* submeshes   = desc.submeshDescs;
+    const uint32_t submeshCount = desc.submeshCount;
+    const uint32_t userHandle   = desc.instanceHandle;
+
     if (!vb || !ib || !submeshes || submeshCount == 0)
     {
         AccelLogf(m_log, kUnityLogTypeError, "AddInstance: null buffer or empty submesh list");
@@ -791,7 +790,7 @@ bool AccelerationStructure::AddInstance(
         return false;
     }
 
-    const DXGI_FORMAT idxFmt = (indexStride == 4) ? DXGI_FORMAT_R32_UINT : DXGI_FORMAT_R16_UINT;
+    const DXGI_FORMAT idxFmt = (desc.indexStride == 4) ? DXGI_FORMAT_R32_UINT : DXGI_FORMAT_R16_UINT;
 
     InstanceSlot slot;
     slot.active    = true;
@@ -801,27 +800,28 @@ bool AccelerationStructure::AddInstance(
     float identity[12] = { 1,0,0,0, 0,1,0,0, 0,0,1,0 };
     memcpy(slot.transform, identity, 48);
 
-    slot.mesh.submeshes.resize(submeshCount);
+    slot.meshInfo.vertexBuffer    = vb;
+    slot.meshInfo.vertexCount     = desc.vertexCount;
+    slot.meshInfo.vertexStride    = desc.vertexStride;
+    slot.meshInfo.positionOffset  = desc.positionOffset;
+    slot.meshInfo.normalOffset    = desc.normalOffset;
+    slot.meshInfo.texCoord1Offset = desc.texCoord1Offset;
+    slot.meshInfo.tangentOffset   = desc.tangentOffset;
+    slot.meshInfo.indexBuffer     = ib;
+    slot.meshInfo.indexFormat     = idxFmt;
+
+    slot.meshInfo.submeshes.resize(submeshCount);
     for (uint32_t j = 0; j < submeshCount; ++j)
     {
-        MeshData& md       = slot.mesh.submeshes[j];
-        md.vertexBuffer    = vb;
-        md.vertexCount     = vertexCount;
-        md.vertexStride    = vertexStride;
-        md.positionOffset  = posOff;
-        md.normalOffset    = normOff;
-        md.texCoord1Offset = uvOff;
-        md.tangentOffset   = tanOff;
-        md.indexBuffer     = ib;
+        SubMeshData& md    = slot.meshInfo.submeshes[j];
         md.indexCount      = submeshes[j].indexCount;
         md.indexByteOffset = submeshes[j].indexByteOffset;
-        md.indexFormat     = idxFmt;
         md.materialIndex   = submeshes[j].materialIndex;
         md.hasBakedOMM     = false;
 
-        if (ommDescs && ommDescs[j].arrayData && ommDescs[j].arrayDataSize > 0)
+        if (desc.ommDescs && desc.ommDescs[j].arrayData && desc.ommDescs[j].arrayDataSize > 0)
         {
-            const NR_SubmeshOMMDesc& o = ommDescs[j];
+            const NR_SubmeshOMMDesc& o = desc.ommDescs[j];
             md.hasBakedOMM = true;
             auto& baked = md.ommBaked;
             const uint8_t* pArray = static_cast<const uint8_t*>(o.arrayData);
@@ -881,7 +881,7 @@ void AccelerationStructure::RemoveInstance(uint32_t handle)
 
     slot.active    = false;
     slot.needsBLAS = false;
-    slot.mesh.submeshes.clear();
+    slot.meshInfo.submeshes.clear();
     m_freeSlots.push_back(slotIndex);
     m_handleToSlot.erase(it);
     --m_activeCount;
@@ -958,7 +958,7 @@ bool AccelerationStructure::BuildOrUpdate(ID3D12GraphicsCommandList4* cmdList)
             m_tlasRebuildPendingSlots = (std::max)(m_tlasRebuildPendingSlots, 1);
             break;
         }
-        if (!EnsureBLAS(cmdList, slot.meshKey, slot.mesh))
+        if (!EnsureBLAS(cmdList, slot.meshKey, slot.meshInfo))
         {
             AccelLogf(m_log, kUnityLogTypeError, "BuildOrUpdate: EnsureBLAS failed");
             return false;
@@ -981,7 +981,7 @@ bool AccelerationStructure::BuildOrUpdate(ID3D12GraphicsCommandList4* cmdList)
         for (const auto& slot : m_slots)
         {
             if (!slot.active) continue;
-            m_activeDefs.push_back(slot.mesh);
+            m_activeDefs.push_back(slot.meshInfo);
             TLASInstanceEntry e;
             e.blasVA     = GetBLASVA(slot.meshKey);
             e.instanceID = slot.customInstanceID;
