@@ -242,74 +242,6 @@ float3 TransformTangentToWorld(float3 normalTS, float3x3 tangentToWorld, bool do
     return result;
 }
 
-MaterialProps sampleGeometryMaterial(
-    GeometrySample gs,
-    SamplerState materialSampler,
-    float normalMapScale = 1.0)
-{
-    MaterialProps props = (MaterialProps)0;
-
-
-    {
-        props.baseColor = gs.material.baseOrDiffuseColor;
-        props.alpha = 1;
-        if ((gs.material.flags & MaterialFlags_UseBaseOrDiffuseTexture) != 0 &&
-            gs.material.baseOrDiffuseTextureIndex >= 0)
-        {
-            Texture2D<float4> tex = t_BindlessTextures[NonUniformResourceIndex(gs.material.baseOrDiffuseTextureIndex)];
-            props.baseColor = tex.SampleLevel(materialSampler, gs.texcoord, 0).rgb * props.baseColor;
-            props.alpha *= tex.SampleLevel(materialSampler, gs.texcoord, 0).a;
-        }
-    }
-
-    {
-        props.N = gs.geometryNormal;
-        if ((gs.material.flags & MaterialFlags_UseNormalTexture) != 0 &&
-            gs.material.normalTextureIndex >= 0)
-        {
-            Texture2D<float4> normalTex = t_BindlessTextures[NonUniformResourceIndex(gs.material.normalTextureIndex)];
-            float4 n = normalTex.SampleLevel(materialSampler, gs.texcoord, 0);
-            // float3 tangentNormal = UnpackNormalMapRGorAG(n, normalMapScale);
-            float3 tangentNormal = UnpackNormalMapRGorAG(n, normalMapScale);
-
-            float3 T = normalize(gs.tangent.xyz);
-            float3 B = - cross(props.N, T) *  sign(gs.tangent.w);
-            half3x3 tangentToWorld = half3x3(T, B, props.N);
-
-            float3 matWorldNormal = TransformTangentToWorld(tangentNormal, tangentToWorld);
-
-            props.N = matWorldNormal;
-            // props.N = gs.geometryNormal;
-        }
-    }
-
-    {
-        props.Lemi = gs.material.emissiveColor;
-        if ((gs.material.flags & MaterialFlags_UseEmissiveTexture) != 0 &&
-            gs.material.emissiveTextureIndex >= 0)
-        {
-            Texture2D<float4> emissiveTex = t_BindlessTextures[NonUniformResourceIndex(gs.material.emissiveTextureIndex)];
-            props.Lemi *= emissiveTex.SampleLevel(materialSampler, gs.texcoord, 0).rgb;
-        }
-    }
-
-    {
-        props.roughness = gs.material.roughness;
-        props.metalness = gs.material.metalness;
-        if ((gs.material.flags & MaterialFlags_UseMetalRoughOrSpecularTexture) != 0 &&
-            gs.material.metalRoughOrSpecularTextureIndex >= 0)
-        {
-            Texture2D<float4> metalRoughTex = t_BindlessTextures[NonUniformResourceIndex(gs.material.metalRoughOrSpecularTextureIndex)];
-            float4 mrSample = metalRoughTex.SampleLevel(materialSampler, gs.texcoord, 0);
-            props.roughness = 1 - (1 - mrSample.g) * (1 - props.roughness);
-            props.metalness = mrSample.b;
-        }
-    }
-
-
-    return props;
-}
-
 
 RWStructuredBuffer<uint64_t> gInOut_SharcHashEntriesBuffer: register(u12, space1);
 RWStructuredBuffer<SharcAccumulationData> gInOut_SharcAccumulated: register(u13, space1);
@@ -364,6 +296,8 @@ struct GeometryProps
     uint instanceIndex; // 命中的实例索引（用于查找InstanceData）
     uint primitiveIndex; // 命中的三角形索引
     float2 barycentrics; // 命中的三角形的重心坐标（uv）
+    float2 texcoord;
+    MaterialConstants material;
 
     float3 GetXoffset(float3 offsetDir, float amount = PT_BOUNCE_RAY_OFFSET)
     {
@@ -393,6 +327,77 @@ struct GeometryProps
         return hitT == INF;
     }
 };
+
+
+
+MaterialProps sampleGeometryMaterial(
+    GeometryProps gs,
+    SamplerState materialSampler,
+    float normalMapScale = 1.0)
+{
+    MaterialProps props = (MaterialProps)0;
+
+
+    {
+        props.baseColor = gs.material.baseOrDiffuseColor;
+        props.alpha = 1;
+        if ((gs.material.flags & MaterialFlags_UseBaseOrDiffuseTexture) != 0 &&
+            gs.material.baseOrDiffuseTextureIndex >= 0)
+        {
+            Texture2D<float4> tex = t_BindlessTextures[NonUniformResourceIndex(gs.material.baseOrDiffuseTextureIndex)];
+            props.baseColor = tex.SampleLevel(materialSampler, gs.texcoord, 0).rgb * props.baseColor;
+            props.alpha *= tex.SampleLevel(materialSampler, gs.texcoord, 0).a;
+        }
+    }
+
+    {
+        props.N = gs.N;
+        if ((gs.material.flags & MaterialFlags_UseNormalTexture) != 0 &&
+            gs.material.normalTextureIndex >= 0)
+        {
+            Texture2D<float4> normalTex = t_BindlessTextures[NonUniformResourceIndex(gs.material.normalTextureIndex)];
+            float4 n = normalTex.SampleLevel(materialSampler, gs.texcoord, 0);
+            // float3 tangentNormal = UnpackNormalMapRGorAG(n, normalMapScale);
+            float3 tangentNormal = UnpackNormalMapRGorAG(n, normalMapScale);
+
+            float3 T = normalize(gs.T.xyz);
+            float3 B = - cross(props.N, T) *  sign(gs.T.w);
+            half3x3 tangentToWorld = half3x3(T, B, props.N);
+
+            float3 matWorldNormal = TransformTangentToWorld(tangentNormal, tangentToWorld);
+
+            props.N = matWorldNormal;
+            // props.N = gs.geometryNormal;
+        }
+    }
+
+    {
+        props.Lemi = gs.material.emissiveColor;
+        if ((gs.material.flags & MaterialFlags_UseEmissiveTexture) != 0 &&
+            gs.material.emissiveTextureIndex >= 0)
+        {
+            Texture2D<float4> emissiveTex = t_BindlessTextures[NonUniformResourceIndex(gs.material.emissiveTextureIndex)];
+            props.Lemi *= emissiveTex.SampleLevel(materialSampler, gs.texcoord, 0).rgb;
+        }
+    }
+
+    {
+        props.roughness = gs.material.roughness;
+        props.metalness = gs.material.metalness;
+        if ((gs.material.flags & MaterialFlags_UseMetalRoughOrSpecularTexture) != 0 &&
+            gs.material.metalRoughOrSpecularTextureIndex >= 0)
+        {
+            Texture2D<float4> metalRoughTex = t_BindlessTextures[NonUniformResourceIndex(gs.material.metalRoughOrSpecularTextureIndex)];
+            float4 mrSample = metalRoughTex.SampleLevel(materialSampler, gs.texcoord, 0);
+            props.roughness = 1 - (1 - mrSample.g) * (1 - props.roughness);
+            props.metalness = mrSample.b;
+        }
+    }
+
+
+    return props;
+}
+
 
 
 float2 GetConeAngleFromAngularRadius(float mip, float tanConeAngle)
@@ -478,7 +483,7 @@ float CastVisibilityRay_AnyHit(float3 origin, float3 direction, float Tmin, floa
     return payload.committedRayT;
 }
 
-void CastRay(float3 origin, float3 direction, float Tmin, float Tmax, float2 mipAndCone, uint mask, out GeometryProps props, out MaterialProps matProps)
+GeometryProps CastRay(float3 origin, float3 direction, float Tmin, float Tmax, float2 mipAndCone, uint mask)
 {
     RayDesc rayDesc;
     rayDesc.Origin = origin;
@@ -493,20 +498,13 @@ void CastRay(float3 origin, float3 direction, float Tmin, float Tmax, float2 mip
     //     payload.SetFlag(FLAG_IGNORE_WHEN_TRANSPARENT);
 
     TraceRay(gWorldTlas, ToRayFlag2(mask), mask, 0, 0, 0, rayDesc, payload);
-
+    GeometryProps props = (GeometryProps)0;
     if (payload.committedRayT == INF)
     {
-        props = (GeometryProps)0;
         props.hitT = INF;
-        
-        matProps.Lemi = GetSkyIntensity(direction);
     }
     else
     {
-        GeometryData geomData = t_GeometryData[t_InstanceData[payload.instanceID].firstGeometryIndex + payload.geometryIndex];
-        MaterialConstants matConst = t_MaterialConstants[geomData.materialIndex];
-
-
         GeometrySample geo = getGeometryFromHit(
             payload.instanceID,
             payload.geometryIndex,
@@ -535,36 +533,56 @@ void CastRay(float3 origin, float3 direction, float Tmin, float Tmax, float2 mip
             props.Xprev = props.X;
         }
 
-        MaterialProps mat = sampleGeometryMaterial(geo, s_LinearRepeat);
-
-
         props.V = -direction;
         props.textureOffsetAndFlags = 0;
         props.primitiveIndex = payload.triangleIndex;
         props.barycentrics = payload.barycentrics;
-
-        matProps = (MaterialProps)0;
-        matProps.baseColor = mat.baseColor;
-
-        matProps.roughness = mat.roughness;
-        matProps.metalness = mat.metalness;
-
-        // if (props.Has(FLAG_SKIN))
-        // {
-        //     matProps.scatteringColor = Packing::DecodeRgbe(payload.Lemi);
-        //     matProps.Lemi = 0;
-        // }
-        // else
-        // {
-        //     matProps.Lemi = Packing::DecodeRgbe(payload.Lemi);
-        // }
-        matProps.Lemi = mat.Lemi;
-
-        // 这三个应该从贴图再计算一次
-        matProps.curvature = mat.curvature;
-        matProps.N = mat.N;
-        matProps.T = mat.T;
+        props.texcoord = geo.texcoord;
+        props.material = geo.material;
     }
+    return props;
+}
+
+
+MaterialProps GetMaterialProps( GeometryProps geometryProps )
+{
+    
+    MaterialProps props = ( MaterialProps )0;
+    
+    [branch]
+    if( geometryProps.IsMiss( ) )
+    {
+        props.Lemi = GetSkyIntensity( -geometryProps.V );
+
+        return props;
+    }
+    
+    MaterialProps mat = sampleGeometryMaterial(geometryProps, s_LinearRepeat);
+    
+    props = (MaterialProps)0;
+    props.baseColor = mat.baseColor;
+
+    props.roughness = mat.roughness;
+    props.metalness = mat.metalness;
+
+    // if (props.Has(FLAG_SKIN))
+    // {
+    //     matProps.scatteringColor = Packing::DecodeRgbe(payload.Lemi);
+    //     matProps.Lemi = 0;
+    // }
+    // else
+    // {
+    //     matProps.Lemi = Packing::DecodeRgbe(payload.Lemi);
+    // }
+    props.Lemi = mat.Lemi;
+
+    // 这三个应该从贴图再计算一次
+    props.curvature = mat.curvature;
+    props.N = mat.N;
+    props.T = mat.T;
+    
+    
+    return  props;
 }
 
 #include "DirectionalLights.hlsl"

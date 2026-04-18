@@ -975,7 +975,7 @@ namespace PathTracing
                         // }
                     }
                 }
-
+ 
                 uint mask = 0;
 
                 if (hasOpaque)
