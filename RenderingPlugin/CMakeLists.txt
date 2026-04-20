@@ -222,11 +222,11 @@ endfunction()
 # ---------------------------------------------------------------------------
 CheckAndDownloadPackage(
     "OMM SDK" "v1.9.1"
-    "${CMAKE_CURRENT_SOURCE_DIR}/External/omm"
+    "${FETCHCONTENT_BASE_DIR}/omm-src"
     "https://github.com/NVIDIA-RTX/OMM/releases/download/v1.9.1/Opacity.Micro-Map.SDK.Windows.zip"
     "zip"
 )
-set(OMM_INSTALL_DIR "${CMAKE_CURRENT_SOURCE_DIR}/External/omm")
+set(OMM_INSTALL_DIR "${FETCHCONTENT_BASE_DIR}/omm-src")
 
 add_library(omm-lib SHARED IMPORTED GLOBAL)
 set_target_properties(omm-lib PROPERTIES
@@ -240,11 +240,11 @@ set_target_properties(omm-lib PROPERTIES
 # ---------------------------------------------------------------------------
 CheckAndDownloadPackage(
     "DXC" "v1.9.2602.17"
-    "${CMAKE_CURRENT_SOURCE_DIR}/External/dxc"
+    "${FETCHCONTENT_BASE_DIR}/dxc-nuget"
     "https://www.nuget.org/api/v2/package/Microsoft.Direct3D.DXC/1.9.2602.17"
     "zip"
 )
-set(DXC_DIR "${CMAKE_CURRENT_SOURCE_DIR}/External/dxc")
+set(DXC_DIR "${FETCHCONTENT_BASE_DIR}/dxc-nuget")
 set(DXC_INC "${DXC_DIR}/build/native/inc")
 set(DXC_LIB "${DXC_DIR}/build/native/lib/x64")
 set(DXC_BIN "${DXC_DIR}/build/native/bin/x64")
