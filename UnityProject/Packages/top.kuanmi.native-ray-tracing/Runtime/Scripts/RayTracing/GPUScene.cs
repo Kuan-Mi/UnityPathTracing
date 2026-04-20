@@ -269,8 +269,9 @@ namespace NativeRender
 
             if (instList.Count == 0)
             {
-                _sceneGpuDirty = false;
-                return;
+                instList.Add(default);
+                geomList.Add(default);
+                matList.Add(default);
             }
 
             _instanceCpu = instList.ToArray();
@@ -418,6 +419,37 @@ namespace NativeRender
 
         private void RegisterScene(IReadOnlyList<NativeRayTracingTarget> targets)
         {
+            // If any previously registered target has been destroyed we can no
+            // longer obtain its MeshRenderer to call RemoveInstance, so we must
+            // tear down the whole acceleration structure and rebuild from scratch.
+            bool hasDestroyed = false;
+            foreach (var target in _registeredTargets)
+            {
+                if (target == null) { hasDestroyed = true; break; }
+            }
+
+            if (hasDestroyed)
+            {
+                _accelStructure?.Dispose();
+                _accelStructure = new RayTracingAccelerationStructure();
+
+                foreach (var target in targets)
+                {
+                    if (target == null) continue;
+                    var meshRenderer = target.GetComponent<MeshRenderer>();
+                    if (meshRenderer == null)
+                    {
+                        Debug.LogWarning($"[GPUScene] Target '{target.name}' has no MeshRenderer — skipping");
+                        continue;
+                    }
+
+                    bool ok = _accelStructure.AddInstance(meshRenderer, target.ommCaches);
+                    if (ok)
+                        _accelStructure.SetInstanceTransform(meshRenderer, target.transform.localToWorldMatrix);
+                }
+                return;
+            }
+
             var incoming = new HashSet<NativeRayTracingTarget>(targets);
 
             foreach (var target in _registeredTargets)

@@ -14,7 +14,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::PathTracing.PathTracingFeature
   m_Active: 1
   pathTracingSetting:
-    exposureEv: -2.34
+    exposureEv: -1.26
     cameraJitter: 1
     showMode: 18
     showMv: 0
@@ -38,7 +38,7 @@ MonoBehaviour:
     boost: 1
     boostFactor: 0
     SR: 0
-    RR: 0
+    RR: 1
     tmpDisableRR: 0
     resolutionScale: 1
     denoisingRange: 1000
