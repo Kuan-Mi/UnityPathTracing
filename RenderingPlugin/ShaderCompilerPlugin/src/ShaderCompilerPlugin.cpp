@@ -331,6 +331,7 @@ extern "C" __declspec(dllexport)
 bool NR_SC_Compile(
     const char* hlslPath,
     const char* includeDirs,
+    const char* defines,
     const char* extraArgs,
     uint8_t**   outBytes,
     uint32_t*   outSize)
@@ -364,10 +365,11 @@ bool NR_SC_Compile(
                         std::istreambuf_iterator<char>());
 
     std::vector<std::wstring> dirs     = ParseIncludeDirs(hlslPath, includeDirs);
+    std::vector<std::wstring> defs     = ParseSemicolonList(defines);
     std::vector<std::wstring> dxcArgs  = ParseSemicolonList(extraArgs);
 
     ComPtr<IDxcBlob> blob = s_Plugin.CompileShader(
-        source.c_str(), L"", L"lib_6_9", {}, dirs, dxcArgs);
+        source.c_str(), L"", L"lib_6_9", defs, dirs, dxcArgs);
 
     if (!blob)
     {
@@ -380,6 +382,91 @@ bool NR_SC_Compile(
     if (!buf)
     {
         SCLogError("NR_SC_Compile: out of memory");
+        return false;
+    }
+    memcpy(buf, blob->GetBufferPointer(), size);
+
+    *outBytes = buf;
+    *outSize  = static_cast<uint32_t>(size);
+    return true;
+}
+
+// ---------------------------------------------------------------------------
+// NR_SC_CompileCS
+//   Compiles a compute shader HLSL file to DXIL bytecode with a caller-
+//   specified entry point and target profile (e.g. "main", "cs_6_6").
+//   Otherwise identical to NR_SC_Compile.
+// ---------------------------------------------------------------------------
+extern "C" __declspec(dllexport)
+bool NR_SC_CompileCS(
+    const char* hlslPath,
+    const char* entryPoint,
+    const char* target,
+    const char* includeDirs,
+    const char* defines,
+    const char* extraArgs,
+    uint8_t**   outBytes,
+    uint32_t*   outSize)
+{
+    if (!outBytes || !outSize)
+    {
+        SCLogError("NR_SC_CompileCS: null output pointers");
+        return false;
+    }
+    *outBytes = nullptr;
+    *outSize  = 0;
+
+    if (!hlslPath || hlslPath[0] == '\0')
+    {
+        SCLogError("NR_SC_CompileCS: empty hlslPath");
+        return false;
+    }
+    if (!entryPoint || entryPoint[0] == '\0')
+    {
+        SCLogError("NR_SC_CompileCS: empty entryPoint");
+        return false;
+    }
+    if (!target || target[0] == '\0')
+    {
+        SCLogError("NR_SC_CompileCS: empty target");
+        return false;
+    }
+
+    if (!EnsureInitialized()) return false;
+
+    // Read source file
+    std::ifstream file(hlslPath, std::ios::binary);
+    if (!file.is_open())
+    {
+        char msg[512];
+        snprintf(msg, sizeof(msg), "NR_SC_CompileCS: cannot open '%s'", hlslPath);
+        SCLogError(msg);
+        return false;
+    }
+    std::string source((std::istreambuf_iterator<char>(file)),
+                        std::istreambuf_iterator<char>());
+
+    std::vector<std::wstring> dirs    = ParseIncludeDirs(hlslPath, includeDirs);
+    std::vector<std::wstring> defs    = ParseSemicolonList(defines);
+    std::vector<std::wstring> dxcArgs = ParseSemicolonList(extraArgs);
+
+    std::wstring wEntry  = Utf8ToWide(entryPoint);
+    std::wstring wTarget = Utf8ToWide(target);
+
+    ComPtr<IDxcBlob> blob = s_Plugin.CompileShader(
+        source.c_str(), wEntry, wTarget, defs, dirs, dxcArgs);
+
+    if (!blob)
+    {
+        SCLogError("NR_SC_CompileCS: compilation failed");
+        return false;
+    }
+
+    const SIZE_T size = blob->GetBufferSize();
+    uint8_t* buf = static_cast<uint8_t*>(malloc(size));
+    if (!buf)
+    {
+        SCLogError("NR_SC_CompileCS: out of memory");
         return false;
     }
     memcpy(buf, blob->GetBufferPointer(), size);

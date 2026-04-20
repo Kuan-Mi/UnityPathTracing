@@ -310,6 +310,96 @@ namespace NativeRender
         [DllImport(DllName)]
         public static extern uint NR_BB_GetCapacity(ulong handle);
 
+        // -------------------------------------------------------------------
+        // ComputeShader API  (generic compute pipeline, cs_6_x)
+        // -------------------------------------------------------------------
+
+        /// <summary>
+        /// Builds a compute pipeline from pre-compiled DXIL bytes (cs_6_x).
+        /// Returns an opaque handle on success, 0 on failure.
+        /// </summary>
+        [DllImport(DllName)]
+        public static extern ulong NR_CreateComputeShader(byte[] dxilBytes, uint size);
+
+        /// <summary>Destroys a ComputeShader created by NR_CreateComputeShader.</summary>
+        [DllImport(DllName)]
+        public static extern void NR_DestroyComputeShader(ulong handle);
+
+        /// <summary>Binds a raw/structured buffer (SRV) by HLSL variable name. Returns 1 on success.</summary>
+        [DllImport(DllName)]
+        public static extern int NR_CS_SetBuffer(ulong handle,
+            [MarshalAs(UnmanagedType.LPStr)] string name, IntPtr d3d12ResourcePtr);
+
+        /// <summary>Binds an RW buffer (UAV) by HLSL variable name. Returns 1 on success.</summary>
+        [DllImport(DllName)]
+        public static extern int NR_CS_SetRWBuffer(ulong handle,
+            [MarshalAs(UnmanagedType.LPStr)] string name, IntPtr d3d12ResourcePtr);
+
+        /// <summary>Binds a texture (SRV) by HLSL variable name. Returns 1 on success.</summary>
+        [DllImport(DllName)]
+        public static extern int NR_CS_SetTexture(ulong handle,
+            [MarshalAs(UnmanagedType.LPStr)] string name, IntPtr d3d12ResourcePtr);
+
+        /// <summary>Binds an RW texture (UAV) by HLSL variable name. Returns 1 on success.</summary>
+        [DllImport(DllName)]
+        public static extern int NR_CS_SetRWTexture(ulong handle,
+            [MarshalAs(UnmanagedType.LPStr)] string name, IntPtr d3d12ResourcePtr);
+
+        /// <summary>Binds a constant buffer (CBV) by HLSL variable name. Returns 1 on success.</summary>
+        [DllImport(DllName)]
+        public static extern int NR_CS_SetConstantBuffer(ulong handle,
+            [MarshalAs(UnmanagedType.LPStr)] string name, IntPtr d3d12ResourcePtr);
+
+        /// <summary>Binds a StructuredBuffer by HLSL variable name, with explicit element count and stride. Returns 1 on success.</summary>
+        [DllImport(DllName)]
+        public static extern int NR_CS_SetStructuredBuffer(ulong handle,
+            [MarshalAs(UnmanagedType.LPStr)] string name, IntPtr d3d12ResourcePtr,
+            uint elementCount, uint elementStride);
+
+        /// <summary>Binds a BindlessTexture to an unbounded Texture2D[] variable by name. Returns 1 on success.</summary>
+        [DllImport(DllName)]
+        public static extern int NR_CS_SetBindlessTexture(ulong handle,
+            [MarshalAs(UnmanagedType.LPStr)] string name, ulong btHandle);
+
+        /// <summary>Binds a BindlessBuffer to an unbounded ByteAddressBuffer[] variable by name. Returns 1 on success.</summary>
+        [DllImport(DllName)]
+        public static extern int NR_CS_SetBindlessBuffer(ulong handle,
+            [MarshalAs(UnmanagedType.LPStr)] string name, ulong bbHandle);
+
+        /// <summary>Binds a RaytracingAccelerationStructure (TLAS) by HLSL variable name. Returns 1 on success.</summary>
+        [DllImport(DllName)]
+        public static extern int NR_CS_SetAccelerationStructure(ulong handle,
+            [MarshalAs(UnmanagedType.LPStr)] string name, IntPtr tlasd3d12Ptr);
+
+        /// <summary>
+        /// Preferred: binds by AccelerationStructure handle. The TLAS pointer is resolved dynamically at
+        /// Dispatch time, so a full TLAS rebuild (new buffer) is always picked up in the same frame.
+        /// </summary>
+        [DllImport(DllName)]
+        public static extern int NR_CS_SetAccelerationStructureHandle(ulong shaderHandle,
+            [MarshalAs(UnmanagedType.LPStr)] string name, ulong asHandle);
+
+        /// <summary>Returns the render event callback pointer for compute dispatches.</summary>
+        [DllImport(DllName)]
+        public static extern IntPtr NR_CS_GetRenderEventFunc();
+
+        /// <summary>Returns sizeof(CS_RenderEventData) for buffer allocation.</summary>
+        [DllImport(DllName)]
+        public static extern uint NR_CS_GetRenderEventDataSize();
+
+        /// <summary>
+        /// Event data for NR_CS_GetRenderEventFunc dispatches.
+        /// Must match C++ CS_RenderEventData exactly (Pack=4).
+        /// </summary>
+        [StructLayout(LayoutKind.Sequential, Pack = 4)]
+        public struct CS_RenderEventData
+        {
+            public ulong  shaderHandle;
+            public uint   threadGroupX;
+            public uint   threadGroupY;
+            public uint   threadGroupZ;
+        }
+
         // -----------------------------------------------------------------------
         // ShaderCompilerPlugin — standalone HLSL-to-DXIL compiler DLL.
         // No Unity runtime dependency.
@@ -330,11 +420,29 @@ namespace NativeRender
         public static extern bool NR_SC_Compile(
             [MarshalAs(UnmanagedType.LPStr)] string hlslPath,
             [MarshalAs(UnmanagedType.LPStr)] string includeDirs,
+            [MarshalAs(UnmanagedType.LPStr)] string defines,
             [MarshalAs(UnmanagedType.LPStr)] string extraArgs,
             out IntPtr outBytes,
             out uint   outSize);
 
-        /// <summary>Frees the buffer allocated by <see cref="NR_SC_Compile"/>.</summary>
+        /// <summary>Frees the buffer allocated by <see cref="NR_SC_Compile"/> or <see cref="NR_SC_CompileCS"/>.</summary>
         [DllImport(DllName)]
-        public static extern void NR_SC_Free(IntPtr ptr);        }    }
+        public static extern void NR_SC_Free(IntPtr ptr);
+
+        /// <summary>
+        /// Compiles a compute shader HLSL file to DXIL bytecode with a specified entry point and target profile.
+        /// On success returns true and sets <paramref name="outBytes"/> / <paramref name="outSize"/>;
+        /// the caller must free the buffer with <see cref="NR_SC_Free"/>.
+        /// </summary>
+        [DllImport(DllName)]
+        public static extern bool NR_SC_CompileCS(
+            [MarshalAs(UnmanagedType.LPStr)] string hlslPath,
+            [MarshalAs(UnmanagedType.LPStr)] string entryPoint,
+            [MarshalAs(UnmanagedType.LPStr)] string target,
+            [MarshalAs(UnmanagedType.LPStr)] string includeDirs,
+            [MarshalAs(UnmanagedType.LPStr)] string defines,
+            [MarshalAs(UnmanagedType.LPStr)] string extraArgs,
+            out IntPtr outBytes,
+            out uint   outSize);
+        }    }
 }
