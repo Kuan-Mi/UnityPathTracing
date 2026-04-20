@@ -81,9 +81,9 @@ namespace RTXDI
         private IntPtr nriInstanceBufferPtr;
         private IntPtr nriPrimtiveBufferPtr;
         private IntPtr nriLightInfoBufferPtr;
-        private GPUScene _scene;
+        private LightScene _scene;
 
-        public void SetBuffer(GPUScene scene)
+        public void SetBuffer(LightScene scene)
         {
             if (_scene == null)
             {
