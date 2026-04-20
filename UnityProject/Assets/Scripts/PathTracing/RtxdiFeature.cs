@@ -87,7 +87,7 @@ namespace PathTracing
         private GraphicsBuffer _constantBuffer;
         private GraphicsBuffer _resamplingConstantBuffer;
 
-        private GPUScene             _gpuScene       = new();
+        private LightScene             _lightScene       = new();
         private PrepareLightResource _prepareLightResources;
 
         private readonly GlobalConstants[]     _globalConstantsArray     = new GlobalConstants[1];
@@ -113,12 +113,12 @@ namespace PathTracing
                 SetMask();
             }
 
-            _gpuScene              ??= new GPUScene();
+            _lightScene              ??= new LightScene();
             _prepareLightResources ??= new PrepareLightResource();
 
-            if (!_gpuScene.isBufferInitialized)
+            if (!_lightScene.isBufferInitialized)
             {
-                _gpuScene.InitBuffer();
+                _lightScene.InitBuffer();
             }
 
 
@@ -293,7 +293,7 @@ namespace PathTracing
             if (eyeIndex == 1 && setting.skipRightEyeInVR)
                 return;
 
-            _gpuScene.Build(_accelerationStructure, setting.enableEnv);
+            _lightScene.Build(_accelerationStructure, setting.enableEnv);
             // _gpuScene.UpdateInstanceID(_accelerationStructure);
 
             Shader.SetGlobalRayTracingAccelerationStructure(g_AccelStructID, _accelerationStructure);
@@ -344,7 +344,7 @@ namespace PathTracing
 
             if (!_rtxdiResources.TryGetValue(uniqueKey, out var rtxdiResources))
             {
-                rtxdiResources = new RtxdiResources(isContext.GetReSTIRDIContext(), isContext.GetRISBufferSegmentAllocator(), _gpuScene);
+                rtxdiResources = new RtxdiResources(isContext.GetReSTIRDIContext(), isContext.GetRISBufferSegmentAllocator(), _lightScene);
                 _rtxdiResources.Add(uniqueKey, rtxdiResources);
             }
 
@@ -412,8 +412,8 @@ namespace PathTracing
 
             if (enableDirectReStirPass || enableIndirect)
             {
-                _prepareLightResources.SetBuffer(_gpuScene);
-                _prepareLightResources.SendTexture(_gpuScene.globalTexturePool);
+                _prepareLightResources.SetBuffer(_lightScene);
+                _prepareLightResources.SendTexture(_lightScene.globalTexturePool);
                 _prepareLightPass.Setup(_prepareLightResources);
                 renderer.EnqueuePass(_prepareLightPass);
             }
@@ -448,7 +448,7 @@ namespace PathTracing
             {
                 ConstantBuffer           = _constantBuffer,
                 ResamplingConstantBuffer = _resamplingConstantBuffer,
-                GeometryInstanceToLight  = _gpuScene._geometryInstanceToLight,
+                GeometryInstanceToLight  = _lightScene._geometryInstanceToLight,
                 ViewDepth                = viewDepth,
                 DiffuseAlbedo            = diffuseAlbedo,
                 SpecularRough            = specularRough,
@@ -462,7 +462,7 @@ namespace PathTracing
                 DirectLighting           = pool.GetRT(RenderResourceType.DirectLighting),
                 Emissive                 = pool.GetRT(RenderResourceType.RtxdiEmissive),
                 MotionVectors            = pool.GetRT(RenderResourceType.RtxdiMotionVectors),
-                LocalLightPdfTexture     = _gpuScene.localLightPdfTexture,
+                LocalLightPdfTexture     = _lightScene.localLightPdfTexture,
                 RtxdiResources           = rtxdiResources,
                 RenderResolution         = renderResolution,
                 ResolutionScale          = 1,
@@ -747,7 +747,7 @@ namespace PathTracing
             FillReSTIRGIConstants(ref constants.restirGI, isContext.GetReSTIRGIContext());
 
 
-            constants.localLightPdfTextureSize = _gpuScene.localLightPdfTextureSize;
+            constants.localLightPdfTextureSize = _lightScene.localLightPdfTextureSize;
 
             // if (lightBufferParameters.environmentLightParams.lightPresent)
             // {
@@ -785,7 +785,7 @@ namespace PathTracing
             var restirGIContext = isContext.GetReSTIRGIContext();
 
 
-            RTXDI_LightBufferParameters lightBufferParams = _gpuScene.GetLightBufferParameters();
+            RTXDI_LightBufferParameters lightBufferParams = _lightScene.GetLightBufferParameters();
             isContext.SetLightBufferParams(lightBufferParams);
             restirDIContext.SetFrameIndex(frameState.frameIndex);
             restirDIContext.SetResamplingMode(setting.diResamplingMode);
@@ -885,8 +885,8 @@ namespace PathTracing
 
             _rtxdiResources.Clear();
 
-            _gpuScene?.Dispose();
-            _gpuScene = null;
+            _lightScene?.Dispose();
+            _lightScene = null;
 
             _prepareLightResources?.Dispose();
             _prepareLightResources = null;
@@ -899,7 +899,7 @@ namespace PathTracing
 
         public void Test()
         {
-            _gpuScene.DebugReadback();
+            _lightScene.DebugReadback();
         }
 
 #if UNITY_EDITOR

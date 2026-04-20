@@ -12,12 +12,12 @@ public class MeshLight : MonoBehaviour
 
     private void OnEnable()
     {
-        GPUScene.RegisterMeshLight(this);
+        LightScene.RegisterMeshLight(this);
     }
 
     private void OnDisable()
     {
-        GPUScene.UnregisterMeshLight(this);
+        LightScene.UnregisterMeshLight(this);
     }
 
     private List<Color> lastEmitColors = new List<Color>();
@@ -44,7 +44,7 @@ public class MeshLight : MonoBehaviour
             
         if (!emitColors.SequenceEqual(lastEmitColors) || !emitTextures.SequenceEqual(lastEmitTextures))
         {
-            GPUScene.Instance?.MarkSceneDirty();
+            LightScene.Instance?.MarkSceneDirty();
             lastEmitColors = emitColors;
             lastEmitTextures = emitTextures;
         }

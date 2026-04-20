@@ -48,13 +48,13 @@ namespace mini
         public GraphicsBuffer GIReservoirBuffer { get; private set; }
         public GraphicsBuffer SecondaryGBuffer { get; private set; }
 
-        public GPUScene Scene;
+        public LightScene Scene;
 
 
         public unsafe RtxdiResources(
             ReSTIRDIContext context,
             RISBufferSegmentAllocator risBufferSegmentAllocator,
-            GPUScene scene)
+            LightScene scene)
 
         {
             LightDataBuffer = scene._lightInfoBuffer;

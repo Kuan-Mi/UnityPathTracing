@@ -104,7 +104,7 @@ namespace RTXDI
     };
 
 
-    public class GPUScene : System.IDisposable
+    public class LightScene : System.IDisposable
     {
         // MeshLight 缓存
         private static HashSet<MeshLight> MeshLightCache = new HashSet<MeshLight>();
@@ -124,9 +124,9 @@ namespace RTXDI
         }
 
         // 单例引用（可选，方便通知）
-        public static GPUScene Instance { get; private set; }
+        public static LightScene Instance { get; private set; }
 
-        public GPUScene()
+        public LightScene()
         {
             Instance = this;
         }
