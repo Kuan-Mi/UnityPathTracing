@@ -75,7 +75,7 @@ MonoBehaviour:
     accumulateReference: 1
     accumulate: 0
   renderPassEvent: 550
-  useNativeOpaquePass: 0
+  useNativeOpaquePass: 1
   finalMaterial: {fileID: 2100000, guid: 27695a2bc55ef2f469362b9a2994989e, type: 2}
   sharcUpdateTs: {fileID: 4807578003741378534, guid: 171e2660e0894b3cb5c6c809e595ae5d, type: 3}
   opaqueTracingShader: {fileID: 4807578003741378534, guid: 71faa22953dc9834daf36cc38966c196, type: 3}

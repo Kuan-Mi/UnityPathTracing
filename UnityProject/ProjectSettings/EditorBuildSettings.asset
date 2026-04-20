@@ -14,13 +14,13 @@ EditorBuildSettings:
   - enabled: 0
     path: Assets/Bistro_v5_2/BistroInterior_Wine.unity
     guid: ef50fabb6ef397b4a9f5933104d9372b
-  - enabled: 1
+  - enabled: 0
     path: Assets/Bistro_v5_2/BistroExterior.unity
     guid: 549d9878f9080b2428784bfee138dae6
   - enabled: 0
     path: "Assets/ART/\u5929\u7136\u6C14\u884C\u4E1A/Scenes/\u5929\u7136\u6C14\u884C\u4E1A\u6F14\u7EC3.unity"
     guid: 46290435bf4ca7542ab62b0389191e5c
-  - enabled: 0
+  - enabled: 1
     path: Assets/Arcade/Arcade.unity
     guid: d03bdcf0bbcbfca47840e76b073eba1a
   - enabled: 0
