@@ -762,7 +762,7 @@ NR_CreateComputeShader(const uint8_t* dxilBytes, uint32_t size)
         return 0;
     }
     auto* cs = new ComputeShader();
-    if (!cs->Initialize(device, s_Log, &s_DescHeap) ||
+    if (!cs->Initialize(device, s_Log, &s_DescHeap, s_D3D12v8) ||
         !cs->LoadShaderFromBytes(dxilBytes, size))
     {
         delete cs;
@@ -849,6 +849,25 @@ NR_CS_SetBindlessBuffer(uint64_t handle, const char* name, uint64_t bbHandle)
     if (!handle) return 0;
     return reinterpret_cast<ComputeShader*>(handle)
         ->SetBindlessBuffer(name, reinterpret_cast<BindlessBuffer*>(bbHandle)) ? 1 : 0;
+}
+
+extern "C" int32_t UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API
+NR_CS_SetAccelerationStructure(uint64_t handle, const char* name, void* tlasd3d12Ptr)
+{
+    if (!handle) return 0;
+    return reinterpret_cast<ComputeShader*>(handle)
+        ->SetAccelerationStructure(name, static_cast<ID3D12Resource*>(tlasd3d12Ptr)) ? 1 : 0;
+}
+
+// Preferred variant: binds by AccelerationStructure object — TLAS ptr is resolved dynamically at Dispatch time.
+// asHandle is the uint64_t returned by NR_CreateAccelerationStructure.
+extern "C" int32_t UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API
+NR_CS_SetAccelerationStructureHandle(uint64_t shaderHandle, const char* name, uint64_t asHandle)
+{
+    if (!shaderHandle) return 0;
+    return reinterpret_cast<ComputeShader*>(shaderHandle)
+        ->SetAccelerationStructureObject(name,
+            asHandle ? reinterpret_cast<AccelerationStructure*>(asHandle) : nullptr) ? 1 : 0;
 }
 
 // ---------------------------------------------------------------------------
