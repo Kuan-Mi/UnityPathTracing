@@ -44,11 +44,17 @@ copy /Y "RenderingPlugin\_Build\Debug\ShaderCompilerPlugin.pdb"  "%UNITY_PLUGINS
 copy /Y "RenderingPlugin\_Build\Debug\D3D12HeapHook.dll"         "%UNITY_PLUGINS%\" >nul
 copy /Y "RenderingPlugin\_Build\Debug\D3D12HeapHook.pdb"         "%UNITY_PLUGINS%\" >nul
 
+:: DXC (dxcompiler / dxil)
+copy /Y "RenderingPlugin\_deps\dxc-nuget\build\native\bin\x64\dxcompiler.dll" "%UNITY_PLUGINS%\" >nul
+copy /Y "RenderingPlugin\_deps\dxc-nuget\build\native\bin\x64\dxil.dll"       "%UNITY_PLUGINS%\" >nul
+
 :: Denoiser / PrepareLight -> Assets\Plugins\x86_64
 copy /Y "RenderingPlugin\_Build\Debug\Denoiser.dll"              "%UNITY_ASSETS_PLUGINS%\" >nul
 copy /Y "RenderingPlugin\_Build\Debug\Denoiser.pdb"              "%UNITY_ASSETS_PLUGINS%\" >nul
 copy /Y "RenderingPlugin\_Build\Debug\PrepareLight.dll"          "%UNITY_ASSETS_PLUGINS%\" >nul
 copy /Y "RenderingPlugin\_Build\Debug\PrepareLight.pdb"          "%UNITY_ASSETS_PLUGINS%\" >nul
+copy /Y "RenderingPlugin\_Build\Debug\D3D12HeapHook.dll"         "%UNITY_ASSETS_PLUGINS%\" >nul
+copy /Y "RenderingPlugin\_Build\Debug\D3D12HeapHook.pdb"         "%UNITY_ASSETS_PLUGINS%\" >nul
 
 :: NRD / NRI -> Assets\Plugins\x86_64
 copy /Y "RenderingPlugin\_ExternalBuild\NRD_build\Debug\NRD.dll" "%UNITY_ASSETS_PLUGINS%\" >nul
@@ -59,11 +65,6 @@ copy /Y "RenderingPlugin\_ExternalBuild\NRI_build\Debug\NRI.pdb" "%UNITY_ASSETS_
 :: DLSS / DLSS-D -> Assets\Plugins\x86_64
 copy /Y "RenderingPlugin\_ExternalBuild\NRI_build\Debug\nvngx_dlss.dll"  "%UNITY_ASSETS_PLUGINS%\" >nul
 copy /Y "RenderingPlugin\_ExternalBuild\NRI_build\Debug\nvngx_dlssd.dll" "%UNITY_ASSETS_PLUGINS%\" >nul
-
-
-:: DXC (dxcompiler / dxil)
-copy /Y "RenderingPlugin\_deps\dxc-nuget\build\native\bin\x64\dxcompiler.dll" "%UNITY_PLUGINS%\" >nul
-copy /Y "RenderingPlugin\_deps\dxc-nuget\build\native\bin\x64\dxil.dll"       "%UNITY_PLUGINS%\" >nul
 
 echo.
 echo ============================================================
@@ -78,6 +79,7 @@ echo    dxil.dll
 echo  Assets Plugins:  %UNITY_ASSETS_PLUGINS%\
 echo    Denoiser.dll
 echo    PrepareLight.dll
+echo    D3D12HeapHook.dll
 echo    NRD.dll
 echo    NRI.dll
 echo    nvngx_dlss.dll
