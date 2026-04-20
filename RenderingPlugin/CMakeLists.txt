@@ -134,6 +134,27 @@ macro(setup_unity_plugin TARGET)
 endmacro()
 
 # ---------------------------------------------------------------------------
+# D3D12HeapHook – shared DLL for SetDescriptorHeaps vtable hook
+# Both NativeRenderPlugin and Denoiser link against this so they share
+# a single set of globals (one hook, one cache, one TLS counter).
+# ---------------------------------------------------------------------------
+add_library(D3D12HeapHook SHARED
+    D3D12HeapHook/D3D12HeapHook.cpp
+)
+
+target_include_directories(D3D12HeapHook PRIVATE
+    D3D12HeapHook
+    "${WIN_SDK_INC}/um"
+    "${WIN_SDK_INC}/shared"
+)
+
+target_compile_definitions(D3D12HeapHook PRIVATE D3D12HEAPHOOK_EXPORTS)
+target_compile_options(D3D12HeapHook PRIVATE /utf-8)
+
+target_link_directories(D3D12HeapHook PRIVATE "${WIN_SDK_LIB}")
+target_link_libraries(D3D12HeapHook PRIVATE d3d12.lib)
+
+# ---------------------------------------------------------------------------
 # Denoiser DLL  (NRD + NRI denoising plugin)
 # ---------------------------------------------------------------------------
 add_library(Denoiser SHARED
@@ -145,6 +166,7 @@ add_library(Denoiser SHARED
 
 target_include_directories(Denoiser PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}
+    D3D12HeapHook
     # NRD Integration helper (NRDIntegration.h, NRDIntegration.hpp)
     "${CMAKE_CURRENT_SOURCE_DIR}/External/NRD/Integration"
     # Agility SDK headers MUST come before Windows SDK so its d3d12.h overrides the older system one
@@ -158,7 +180,7 @@ target_include_directories(Denoiser PRIVATE
 target_compile_options(Denoiser PRIVATE /utf-8)
 
 # NRD and NRI CMake targets carry their public include dirs transitively
-target_link_libraries(Denoiser PRIVATE NRD NRI)
+target_link_libraries(Denoiser PRIVATE NRD NRI D3D12HeapHook)
 
 setup_unity_plugin(Denoiser COPY_NRD)
 
@@ -291,11 +313,11 @@ add_library(NativeRenderPlugin SHARED
     NativeRenderPlugin/src/DescriptorHeapAllocator.cpp
     NativeRenderPlugin/src/BindlessTexture.cpp
     NativeRenderPlugin/src/BindlessBuffer.cpp
-    NativeRenderPlugin/src/D3D12HeapHook.cpp
 )
 
 target_include_directories(NativeRenderPlugin PRIVATE
     NativeRenderPlugin/include
+    D3D12HeapHook
     "${UNITY_PLUGIN_API_DIR}"
     "${DXC_INC}"
     "${WIN_SDK_INC}/um"
@@ -314,6 +336,7 @@ target_link_libraries(NativeRenderPlugin PRIVATE
     dxgi.lib
     dxguid.lib
     dxcompiler.lib
+    D3D12HeapHook
 )
 
 # ---------------------------------------------------------------------------
@@ -356,6 +379,25 @@ if(NOT NR_SKIP_UNITY_COPY)
             PDB_OUTPUT_DIRECTORY_DEBUG       "${NATIVE_PLUGINS_UNITY_DIR}"
         )
     endforeach()
+
+    # D3D12HeapHook.dll (copy to both plugin directories)
+    add_custom_command(TARGET D3D12HeapHook POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E make_directory "${NATIVE_PLUGINS_UNITY_DIR}"
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different
+            $<TARGET_FILE:D3D12HeapHook>
+            "${NATIVE_PLUGINS_UNITY_DIR}/$<TARGET_FILE_NAME:D3D12HeapHook>"
+        COMMAND ${CMAKE_COMMAND} -E make_directory "${UNITY_PLUGINS_DIR}"
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different
+            $<TARGET_FILE:D3D12HeapHook>
+            "${UNITY_PLUGINS_DIR}/$<TARGET_FILE_NAME:D3D12HeapHook>"
+        COMMAND ${CMAKE_COMMAND} -E $<IF:$<CONFIG:Debug>,copy_if_different,true>
+            "$<$<CONFIG:Debug>:$<TARGET_PDB_FILE:D3D12HeapHook>>"
+            "$<$<CONFIG:Debug>:${NATIVE_PLUGINS_UNITY_DIR}/$<TARGET_PDB_FILE_NAME:D3D12HeapHook>>"
+        COMMAND ${CMAKE_COMMAND} -E $<IF:$<CONFIG:Debug>,copy_if_different,true>
+            "$<$<CONFIG:Debug>:$<TARGET_PDB_FILE:D3D12HeapHook>>"
+            "$<$<CONFIG:Debug>:${UNITY_PLUGINS_DIR}/$<TARGET_PDB_FILE_NAME:D3D12HeapHook>>"
+        COMMENT "Copying D3D12HeapHook DLL (and PDB in Debug) to Unity plugin directories"
+    )
 
     # dxcompiler.dll + dxil.dll (copy on NativeRenderPlugin build)
     add_custom_command(TARGET NativeRenderPlugin POST_BUILD

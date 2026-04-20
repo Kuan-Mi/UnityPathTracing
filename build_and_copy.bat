@@ -41,6 +41,8 @@ copy /Y "RenderingPlugin\_Build\Debug\OMMBakerPlugin.dll"        "%UNITY_PLUGINS
 copy /Y "RenderingPlugin\_Build\Debug\OMMBakerPlugin.pdb"        "%UNITY_PLUGINS%\" >nul
 copy /Y "RenderingPlugin\_Build\Debug\ShaderCompilerPlugin.dll"  "%UNITY_PLUGINS%\" >nul
 copy /Y "RenderingPlugin\_Build\Debug\ShaderCompilerPlugin.pdb"  "%UNITY_PLUGINS%\" >nul
+copy /Y "RenderingPlugin\_Build\Debug\D3D12HeapHook.dll"         "%UNITY_PLUGINS%\" >nul
+copy /Y "RenderingPlugin\_Build\Debug\D3D12HeapHook.pdb"         "%UNITY_PLUGINS%\" >nul
 
 :: Denoiser / PrepareLight -> Assets\Plugins\x86_64
 copy /Y "RenderingPlugin\_Build\Debug\Denoiser.dll"              "%UNITY_ASSETS_PLUGINS%\" >nul
@@ -70,6 +72,7 @@ echo  Package Plugins: %UNITY_PLUGINS%\
 echo    NativeRenderPlugin.dll
 echo    OMMBakerPlugin.dll
 echo    ShaderCompilerPlugin.dll
+echo    D3D12HeapHook.dll
 echo    dxcompiler.dll
 echo    dxil.dll
 echo  Assets Plugins:  %UNITY_ASSETS_PLUGINS%\

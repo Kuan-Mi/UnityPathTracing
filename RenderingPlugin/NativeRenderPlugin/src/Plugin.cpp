@@ -375,7 +375,7 @@ NR_CreateRayTraceShaderFromBytes(const uint8_t* dxilBytes, uint32_t size)
         return 0;
     }
     auto* shader = new RayTraceShader();
-    if (!shader->Initialize(dev5, s_Log, &s_DescHeap) ||
+    if (!shader->Initialize(dev5, s_Log, &s_DescHeap, s_D3D12v8) ||
         !shader->LoadShaderFromBytes(dxilBytes, size))
     {
         delete shader;
@@ -867,9 +867,6 @@ static void UNITY_INTERFACE_API CsDispatchCallback(int /*eventId*/, void* data)
 
     auto* cs      = reinterpret_cast<ComputeShader*>(ed->shaderHandle);
     auto* cmdList = static_cast<ID3D12GraphicsCommandList*>(recordingState.commandList);
-
-    // Install vtable hook on first call so we can capture Unity's descriptor heaps.
-    D3D12HeapHook::InstallHook(cmdList);
 
     D3D12HeapHook::BeginPluginDispatch();
     cs->Dispatch(cmdList, ed->threadGroupX, ed->threadGroupY, ed->threadGroupZ);

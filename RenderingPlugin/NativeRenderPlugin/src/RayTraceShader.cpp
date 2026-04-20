@@ -70,11 +70,12 @@ void RayTraceShader::Logf(UnityLogType type, const char* fmt, ...) const
     Log(type, buf);
 }
 
-bool RayTraceShader::Initialize(ID3D12Device5* device, IUnityLog* log, DescriptorHeapAllocator* allocator)
+bool RayTraceShader::Initialize(ID3D12Device5* device, IUnityLog* log, DescriptorHeapAllocator* allocator, IUnityGraphicsD3D12v8* d3d12v8)
 {
     m_log       = log;
     m_device    = device;
     m_allocator = allocator;
+    m_d3d12v8   = d3d12v8;
     return true;
 }
 
@@ -1283,6 +1284,24 @@ void RayTraceShader::Dispatch(
             D3D12_GPU_VIRTUAL_ADDRESS addr = b.boundResource
                 ? b.boundResource->GetGPUVirtualAddress() : 0;
             cmdList->SetComputeRootConstantBufferView(m_rootParamCBVBase + b.heapOffset, addr);
+        }
+    }
+
+    // --- Request resource states ---
+    // TLAS is managed externally (built with the correct state); SRV_ARRAY is managed
+    // by BindlessTexture/BindlessBuffer; CBV stays in GENERIC_READ.
+    for (const auto& b : m_userBindings)
+    {
+        if (!b.boundResource) continue;
+        if (b.type == UserBindingType::SRV)
+        {
+            m_d3d12v8->RequestResourceState(b.boundResource, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
+            // Logf(kUnityLogTypeLog, "RayTraceShader::Dispatch: RequestResourceState '%s' SRV -> NON_PIXEL_SHADER_RESOURCE (res=%p)", b.name.c_str(), b.boundResource);
+        }
+        else if (b.type == UserBindingType::UAV)
+        {
+            m_d3d12v8->RequestResourceState(b.boundResource, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
+            // Logf(kUnityLogTypeLog, "RayTraceShader::Dispatch: RequestResourceState '%s' UAV -> UNORDERED_ACCESS (res=%p)", b.name.c_str(), b.boundResource);
         }
     }
 

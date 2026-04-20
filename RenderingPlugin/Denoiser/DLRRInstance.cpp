@@ -67,7 +67,7 @@ nri::Descriptor* DLRRInstance::GetOrCreateDescriptor(nri::Texture* texture, bool
     return nullptr;
 }
 
-nri::UpscalerResource&& DLRRInstance::GetPair(nri::Texture* texture, bool isUAV)
+nri::UpscalerResource DLRRInstance::GetPair(nri::Texture* texture, bool isUAV)
 {
     nri::Descriptor* desc = GetOrCreateDescriptor(texture, isUAV);
     return {texture, desc};

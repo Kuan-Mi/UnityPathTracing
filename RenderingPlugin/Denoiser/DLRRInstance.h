@@ -26,7 +26,7 @@ public:
     DLRRInstance(IUnityInterfaces* interfaces,int instanceId);
     ~DLRRInstance();
     nri::Descriptor* GetOrCreateDescriptor(nri::Texture* texture, bool isStorage);
-    nri::UpscalerResource&& GetPair(nri::Texture* texture, bool cond);  
+    nri::UpscalerResource GetPair(nri::Texture* texture, bool cond);  
     void DispatchCompute(RRFrameData* data);
     void initialize_and_create_resources();
     void release_resources();

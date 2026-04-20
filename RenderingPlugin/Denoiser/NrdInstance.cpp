@@ -1,5 +1,6 @@
 ﻿#include "NrdInstance.h"
 #include "RenderSystem.h"
+#include "D3D12HeapHook.h"
 
 #undef  max
 #undef  min
@@ -171,7 +172,10 @@ void NrdInstance::DispatchCompute(FrameData* data)
 
     const nrd::Identifier denoisers[] = {m_SigmaId, m_ReblurId};
 
+    D3D12HeapHook::BeginPluginDispatch();
     m_NrdIntegration.Denoise(denoisers, 2, *nriCmdBuffer, snapshot);
+    D3D12HeapHook::EndPluginDispatch();
+    D3D12HeapHook::RestoreUnityHeaps(recording_state.commandList);
 
     for (size_t i = 0; i < snapshot.uniqueNum; i++)
     {

@@ -1,12 +1,14 @@
 #pragma once
 #include <cstdint>
 #include <d3d12.h>
+#include <dxgi1_6.h>
 #include <dxcapi.h>
 #include <wrl/client.h>
 #include <string>
 #include <vector>
 #include <unordered_map>
 #include "IUnityLog.h"
+#include "IUnityGraphicsD3D12.h"
 #include "DescriptorHeapAllocator.h"
 
 using Microsoft::WRL::ComPtr;
@@ -63,7 +65,7 @@ public:
     RayTraceShader();
     ~RayTraceShader();
 
-    bool Initialize(ID3D12Device5* device, IUnityLog* log, DescriptorHeapAllocator* allocator);
+    bool Initialize(ID3D12Device5* device, IUnityLog* log, DescriptorHeapAllocator* allocator, IUnityGraphicsD3D12v8* d3d12v8);
 
     // Build pipeline from pre-compiled DXIL bytes (e.g. deserialized from Unity asset cache).
     // Skips file I/O and shader compilation entirely.
@@ -120,6 +122,7 @@ private:
     IUnityLog*               m_log       = nullptr;
     ComPtr<ID3D12Device5>    m_device;
     DescriptorHeapAllocator* m_allocator = nullptr;
+    IUnityGraphicsD3D12v8*   m_d3d12v8   = nullptr;
 
     // Pipeline
     ComPtr<ID3D12StateObject>   m_pso;
