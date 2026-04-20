@@ -85,4 +85,28 @@ namespace NativeRender
         public const int UseEmissiveTexture             = 0x00000010;
         public const int UseNormalTexture               = 0x00000020;
     }
+
+    /// <summary>
+    /// Per-triangle data, populated once for static scenes.
+    /// Layout uses float4 for positions to avoid HLSL float3 alignment ambiguity
+    /// inside StructuredBuffer&lt;PrimitiveData&gt;.
+    /// Size: 96 bytes.
+    /// </summary>
+    [StructLayout(LayoutKind.Sequential, Pack = 4)]
+    public struct PrimitiveDataGPU
+    {
+        public Vector2 uv0;          // +0
+        public Vector2 uv1;          // +8
+        public Vector2 uv2;          // +16
+        public Vector2 _pad0;        // +24
+
+        public Vector4 pos0;         // +32   .xyz = position
+        public Vector4 pos1;         // +48
+        public Vector4 pos2;         // +64
+
+        public uint    instanceId;   // +80
+        public uint    _pad1;        // +84
+        public uint    _pad2;        // +88
+        public uint    _pad3;        // +92
+    }   // Total: 96 bytes
 }
