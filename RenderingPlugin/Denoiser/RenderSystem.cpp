@@ -1,4 +1,5 @@
 ﻿#include "RenderSystem.h"
+#include "D3D12HeapHook.h"
 
 #define LOG(msg) UNITY_LOG(s_Log, msg)
 
@@ -23,6 +24,11 @@ void RenderSystem::Initialize(IUnityInterfaces* interfaces)
         return;
     }
     device = s_d3d12->GetDevice();
+
+    // Install the SetDescriptorHeaps vtable hook so we can restore Unity's
+    // heaps after NRD/DLRR dispatches. Idempotent — safe even if
+    // NativeRenderPlugin already installed it (shared DLL, single globals).
+    D3D12HeapHook::InstallHookFromDevice(device);
 
     nri::DeviceCreationD3D12Desc deviceDesc = {};
     deviceDesc.d3d12Device = device;
