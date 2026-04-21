@@ -52,16 +52,6 @@ namespace NativeRender
         public string ReflectionJson => _reflectionJson ?? "";
 
         // -------------------------------------------------------------------
-        // ScriptableObject lifecycle
-        // -------------------------------------------------------------------
-
-        private void OnEnable()
-        {
-            if (!string.IsNullOrEmpty(GetHlslPath()))
-                EnsureCompiled();
-        }
-
-        // -------------------------------------------------------------------
         // Compilation  (ShaderCompilerPlugin — no D3D12 needed)
         // -------------------------------------------------------------------
 
@@ -70,11 +60,13 @@ namespace NativeRender
         /// If bytes are already present this is a no-op; call <see cref="ForceRecompile"/>
         /// to discard the cache and recompile.
         /// </summary>
-        internal void EnsureCompiled()
+        /// <param name="hlslPath">Absolute path to the HLSL file. If null, resolved via AssetDatabase.</param>
+        internal void EnsureCompiled(string hlslPath = null)
         {
             if (HasCompiledBytes) return;
 
-            string hlslPath    = GetHlslPath();
+            if (string.IsNullOrEmpty(hlslPath))
+                hlslPath = GetHlslPath();
             string includeDirs = BuildIncludeDirs(hlslPath);
             string entryPoint  = string.IsNullOrEmpty(_entryPoint)     ? "main"   : _entryPoint;
             string target      = string.IsNullOrEmpty(_targetProfile)  ? "cs_6_6" : _targetProfile;
@@ -117,11 +109,12 @@ namespace NativeRender
         /// Any existing <see cref="NativeComputePipeline"/> instances created from this asset
         /// are unaffected; new pipelines will use the freshly compiled bytes.
         /// </summary>
+        /// <param name="hlslPath">Absolute path to the HLSL file. If null, resolved via AssetDatabase.</param>
         [ContextMenu("Recompile")]
-        public void ForceRecompile()
+        public void ForceRecompile(string hlslPath = null)
         {
             _compiledDxil = null;
-            EnsureCompiled();
+            EnsureCompiled(hlslPath);
         }
 
         // -------------------------------------------------------------------
