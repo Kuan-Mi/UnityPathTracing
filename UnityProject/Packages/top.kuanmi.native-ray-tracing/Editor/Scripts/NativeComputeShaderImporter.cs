@@ -364,4 +364,26 @@ namespace NativeRender
             }
         }
     }
+
+    /// <summary>
+    /// Notifies any live <see cref="NativeComputePipeline"/> instances that a .computeshader asset
+    /// has been reimported so they can rebuild their native D3D12 handles using the new DXIL bytes.
+    /// </summary>
+    internal class NativeComputeShaderPostprocessor : AssetPostprocessor
+    {
+        static void OnPostprocessAllAssets(
+            string[] importedAssets, string[] deletedAssets,
+            string[] movedAssets,    string[] movedFromAssetPaths)
+        {
+            foreach (string path in importedAssets)
+            {
+                if (!path.EndsWith(".computeshader", System.StringComparison.OrdinalIgnoreCase))
+                    continue;
+
+                var shader = AssetDatabase.LoadAssetAtPath<NativeComputeShader>(path);
+                if (shader != null)
+                    NativeComputeShader.InvokeOnRecompiled(shader);
+            }
+        }
+    }
 }

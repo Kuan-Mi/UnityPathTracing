@@ -19,6 +19,7 @@ namespace NativeRender
     {
         private ulong _handle;
         private NativeArray<NativeRenderPlugin.RTS_RenderEventData> _eventData;
+        private RayTraceShader _shader;
 
         /// <summary>True if the underlying D3D12 pipeline is valid and ready to dispatch.</summary>
         public bool IsValid => _handle != 0;
@@ -37,6 +38,14 @@ namespace NativeRender
             if (shader == null)
                 throw new ArgumentNullException(nameof(shader));
 
+            _shader = shader;
+            BuildNativeHandle(shader);
+            _eventData = new NativeArray<NativeRenderPlugin.RTS_RenderEventData>(1, Allocator.Persistent);
+            RayTraceShader.OnRecompiled += OnShaderRecompiled;
+        }
+
+        private void BuildNativeHandle(RayTraceShader shader)
+        {
             byte[] dxil = shader.GetOrCompileDxil();
             if (dxil == null || dxil.Length == 0)
                 throw new InvalidOperationException(
@@ -46,8 +55,29 @@ namespace NativeRender
             if (_handle == 0)
                 throw new InvalidOperationException(
                     $"[RayTracePipeline] NR_CreateRayTraceShaderFromBytes returned 0 for: {shader.name}");
+        }
 
-            _eventData = new NativeArray<NativeRenderPlugin.RTS_RenderEventData>(1, Allocator.Persistent);
+        private void OnShaderRecompiled(RayTraceShader shader)
+        {
+            if (shader != _shader) return;
+
+            // Destroy the old native pipeline and rebuild from the freshly compiled DXIL.
+            if (_handle != 0)
+            {
+                GL.Flush();
+                NativeRenderPlugin.NR_DestroyRayTraceShader(_handle);
+                _handle = 0;
+            }
+
+            try
+            {
+                BuildNativeHandle(shader);
+                Debug.Log($"[RayTracePipeline] Rebuilt pipeline for: {shader.name}");
+            }
+            catch (Exception e)
+            {
+                Debug.LogError(e.Message);
+            }
         }
 
         // -------------------------------------------------------------------
@@ -56,6 +86,8 @@ namespace NativeRender
 
         public void Dispose()
         {
+            RayTraceShader.OnRecompiled -= OnShaderRecompiled;
+
             if (_handle != 0)
             {
                 GL.Flush();

@@ -33,6 +33,18 @@ namespace NativeRender
         /// <summary>True when compiled DXIL bytes are available.</summary>
         public bool HasCompiledBytes => _compiledDxil is { Length: > 0 };
 
+        /// <summary>
+        /// Fired after this shader asset has been successfully (re)compiled.
+        /// <see cref="RayTracePipeline"/> instances subscribe to this to rebuild their native handles.
+        /// </summary>
+        public static event Action<RayTraceShader> OnRecompiled;
+
+        /// <summary>
+        /// Allows the Editor-side AssetPostprocessor to fire <see cref="OnRecompiled"/> with the
+        /// persistent asset instance after a reimport completes.
+        /// </summary>
+        public static void InvokeOnRecompiled(RayTraceShader shader) => OnRecompiled?.Invoke(shader);
+
         /// <summary>Size in bytes of the cached DXIL bytecode, or 0 if not compiled.</summary>
         public int CompiledByteCount => _compiledDxil?.Length ?? 0;
 
@@ -75,6 +87,7 @@ namespace NativeRender
             UnityEditor.EditorUtility.SetDirty(this);
 #endif
             Debug.Log($"[RayTraceShader] Compiled {nativeSize} bytes: {hlslPath}");
+            OnRecompiled?.Invoke(this);
         }
 
         /// <summary>

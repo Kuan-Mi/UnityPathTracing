@@ -19,6 +19,7 @@ namespace NativeRender
     {
         private ulong _handle;
         private NativeArray<NativeRenderPlugin.CS_RenderEventData> _eventData;
+        private NativeComputeShader _shader;
 
         /// <summary>True if the underlying D3D12 pipeline is valid and ready to dispatch.</summary>
         public bool IsValid => _handle != 0;
@@ -37,6 +38,14 @@ namespace NativeRender
             if (shader == null)
                 throw new ArgumentNullException(nameof(shader));
 
+            _shader = shader;
+            BuildNativeHandle(shader);
+            _eventData = new NativeArray<NativeRenderPlugin.CS_RenderEventData>(1, Allocator.Persistent);
+            NativeComputeShader.OnRecompiled += OnShaderRecompiled;
+        }
+
+        private void BuildNativeHandle(NativeComputeShader shader)
+        {
             byte[] dxil = shader.GetOrCompileDxil();
             if (dxil == null || dxil.Length == 0)
                 throw new InvalidOperationException(
@@ -46,8 +55,28 @@ namespace NativeRender
             if (_handle == 0)
                 throw new InvalidOperationException(
                     $"[NativeComputePipeline] NR_CreateComputeShader returned 0 for: {shader.name}");
+        }
 
-            _eventData = new NativeArray<NativeRenderPlugin.CS_RenderEventData>(1, Allocator.Persistent);
+        private void OnShaderRecompiled(NativeComputeShader shader)
+        {
+            if (shader != _shader) return;
+
+            if (_handle != 0)
+            {
+                GL.Flush();
+                NativeRenderPlugin.NR_DestroyComputeShader(_handle);
+                _handle = 0;
+            }
+
+            try
+            {
+                BuildNativeHandle(shader);
+                Debug.Log($"[NativeComputePipeline] Rebuilt pipeline for: {shader.name}");
+            }
+            catch (Exception e)
+            {
+                Debug.LogError(e.Message);
+            }
         }
 
         // -------------------------------------------------------------------
@@ -56,6 +85,8 @@ namespace NativeRender
 
         public void Dispose()
         {
+            NativeComputeShader.OnRecompiled -= OnShaderRecompiled;
+
             if (_handle != 0)
             {
                 GL.Flush();
