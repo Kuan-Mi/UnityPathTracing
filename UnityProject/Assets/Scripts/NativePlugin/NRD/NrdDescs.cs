@@ -116,4 +116,52 @@
 
         MAX_NUM,
     };
+
+    // Must match "nrd::Denoiser" in NRDDescs.h (order-sensitive).
+    public enum Denoiser : uint
+    {
+        // REBLUR
+        REBLUR_DIFFUSE = 0,
+        REBLUR_DIFFUSE_OCCLUSION,
+        REBLUR_DIFFUSE_SH,
+        REBLUR_SPECULAR,
+        REBLUR_SPECULAR_OCCLUSION,
+        REBLUR_SPECULAR_SH,
+        REBLUR_DIFFUSE_SPECULAR,
+        REBLUR_DIFFUSE_SPECULAR_OCCLUSION,
+        REBLUR_DIFFUSE_SPECULAR_SH,
+        REBLUR_DIFFUSE_DIRECTIONAL_OCCLUSION,
+
+        // RELAX
+        RELAX_DIFFUSE,
+        RELAX_DIFFUSE_SH,
+        RELAX_SPECULAR,
+        RELAX_SPECULAR_SH,
+        RELAX_DIFFUSE_SPECULAR,
+        RELAX_DIFFUSE_SPECULAR_SH,
+
+        // SIGMA
+        SIGMA_SHADOW,
+        SIGMA_SHADOW_TRANSLUCENCY,
+
+        // REFERENCE
+        REFERENCE,
+
+        MAX_NUM
+    }
+
+    // Creation-time denoiser descriptor passed to CreateDenoiserInstance.
+    [System.Serializable]
+    [System.Runtime.InteropServices.StructLayout(System.Runtime.InteropServices.LayoutKind.Sequential, Pack = 1)]
+    public struct NrdDenoiserDesc
+    {
+        public uint     identifier;
+        public Denoiser denoiser;
+
+        public NrdDenoiserDesc(uint identifier, Denoiser denoiser)
+        {
+            this.identifier = identifier;
+            this.denoiser   = denoiser;
+        }
+    }
 }
