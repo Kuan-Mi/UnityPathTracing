@@ -22,7 +22,7 @@ MonoBehaviour:
     skipRightEyeInVR: 1
     sunAngularDiameter: 0.533
     upscalerMode: 0
-    mipBias: -0.5
+    mipBias: -5
     tracingMode: 1
     denoiser: 0
     emissionIntensity: 1

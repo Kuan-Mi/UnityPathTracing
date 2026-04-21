@@ -99,7 +99,6 @@ namespace PathTracing
         // Execution
         // -------------------------------------------------------------------------
 
- 
 
         void ExecutePass(PassData data, UnsafeGraphContext context)
         {
@@ -121,14 +120,14 @@ namespace PathTracing
             cs.SetAccelerationStructure("gLightTlas", nrd.LightAS);
 
             // 3. Scene structured buffers
-            cs.SetStructuredBuffer("gIn_InstanceData",                nrd.InstanceDataBuf);
-            cs.SetStructuredBuffer("gIn_PrimitiveData",               nrd.PrimitiveDataBuf);
+            cs.SetStructuredBuffer("gIn_InstanceData", nrd.InstanceDataBuf);
+            cs.SetStructuredBuffer("gIn_PrimitiveData", nrd.PrimitiveDataBuf);
             cs.SetStructuredBuffer("gIn_MorphPrimitivePositionsPrev", nrd.MorphPrimitivePositionsPrevBuf);
 
             // 4. SHARC UAVs
             cs.SetRWBuffer("gInOut_SharcHashEntriesBuffer", res.HashEntriesBuffer);
-            cs.SetRWBuffer("gInOut_SharcAccumulated",       res.AccumulationBuffer);
-            cs.SetRWBuffer("gInOut_SharcResolved",          res.ResolvedBuffer);
+            cs.SetRWBuffer("gInOut_SharcAccumulated", res.AccumulationBuffer);
+            cs.SetRWBuffer("gInOut_SharcResolved", res.ResolvedBuffer);
 
             // 5. Bindless material textures
             cs.SetBindlessTexture("gIn_Textures", nrd.Textures);
@@ -138,28 +137,28 @@ namespace PathTracing
 
             // 7. Stochastic sampling (Texture2D<uint4> in shader)
             cs.SetTexture("gIn_ScramblingRanking", res.ScramblingRanking);
-            cs.SetTexture("gIn_Sobol",             res.Sobol);
+            cs.SetTexture("gIn_Sobol", res.Sobol);
 
             // 8. UAV outputs
-            cs.SetRWTexture("gOut_Mv",                  res.Mv.rt);
-            cs.SetRWTexture("gOut_ViewZ",               res.ViewZ.rt);
-            cs.SetRWTexture("gOut_Normal_Roughness",    res.NormalRoughness.rt);
+            cs.SetRWTexture("gOut_Mv", res.Mv.rt);
+            cs.SetRWTexture("gOut_ViewZ", res.ViewZ.rt);
+            cs.SetRWTexture("gOut_Normal_Roughness", res.NormalRoughness.rt);
             cs.SetRWTexture("gOut_BaseColor_Metalness", res.BaseColorMetalness.rt);
-            cs.SetRWTexture("gOut_DirectLighting",      res.DirectLighting.rt);
-            cs.SetRWTexture("gOut_DirectEmission",      data.DirectEmission);
-            cs.SetRWTexture("gOut_PsrThroughput",       res.PsrThroughput.rt);
-            cs.SetRWTexture("gOut_ShadowData",          res.ShadowData.rt);
+            cs.SetRWTexture("gOut_DirectLighting", res.DirectLighting.rt);
+            cs.SetRWTexture("gOut_DirectEmission", data.DirectEmission);
+            cs.SetRWTexture("gOut_PsrThroughput", res.PsrThroughput.rt);
+            cs.SetRWTexture("gOut_ShadowData", res.ShadowData.rt);
             cs.SetRWTexture("gOut_Shadow_Translucency", res.ShadowTranslucency.rt);
-            cs.SetRWTexture("gOut_Diff",                res.Diff.rt);
-            cs.SetRWTexture("gOut_Spec",                res.Spec.rt);
+            cs.SetRWTexture("gOut_Diff", res.Diff.rt);
+            cs.SetRWTexture("gOut_Spec", res.Spec.rt);
 
             // 9. History SRVs
-            cs.SetTexture("gIn_PrevComposedDiff",            data.PrevComposedDiff);
-            cs.SetTexture("gIn_PrevComposedSpec_PrevViewZ",  data.PrevComposedSpecViewZ);
+            cs.SetTexture("gIn_PrevComposedDiff", data.PrevComposedDiff);
+            cs.SetTexture("gIn_PrevComposedSpec_PrevViewZ", data.PrevComposedSpecViewZ);
 
             // 10. Dispatch — numthreads [16, 16, 1]
-            uint w = (uint)(settings.m_RenderResolution.x * settings.resolutionScale + 0.5f);
-            uint h = (uint)(settings.m_RenderResolution.y * settings.resolutionScale + 0.5f);
+            uint w       = (uint)(settings.m_RenderResolution.x * settings.resolutionScale + 0.5f);
+            uint h       = (uint)(settings.m_RenderResolution.y * settings.resolutionScale + 0.5f);
             uint groupsX = (w + 15u) / 16u;
             uint groupsY = (h + 15u) / 16u;
 
@@ -185,8 +184,8 @@ namespace PathTracing
             passData.PrevComposedDiff      = renderGraph.ImportTexture(_resource.PrevComposedDiff);
             passData.PrevComposedSpecViewZ = renderGraph.ImportTexture(_resource.PrevComposedSpecViewZ);
 
-            builder.UseTexture(passData.DirectEmission,        AccessFlags.ReadWrite);
-            builder.UseTexture(passData.PrevComposedDiff,      AccessFlags.Read);
+            builder.UseTexture(passData.DirectEmission, AccessFlags.ReadWrite);
+            builder.UseTexture(passData.PrevComposedDiff, AccessFlags.Read);
             builder.UseTexture(passData.PrevComposedSpecViewZ, AccessFlags.Read);
 
             builder.AllowPassCulling(false);

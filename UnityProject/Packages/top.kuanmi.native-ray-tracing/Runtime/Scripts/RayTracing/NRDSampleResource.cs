@@ -645,7 +645,7 @@ namespace NativeRender
             Color emission       = TryGetColor(mat, "_EmissionColor", Color.black);
             float metal          = TryGetFloat(mat, "_Metallic", 0f);
             float smooth         = TryGetFloat(mat, "_Smoothness", 0.5f);
-            float roughnessScale = smooth;
+  
             float normScale      = TryGetFloat(mat, "_BumpScale", 1f);
 
             inst.baseColorAndMetalnessScale.x = new half(baseColor.r);
@@ -656,7 +656,8 @@ namespace NativeRender
             inst.emissionAndRoughnessScale.x = new half(emission.r);
             inst.emissionAndRoughnessScale.y = new half(emission.g);
             inst.emissionAndRoughnessScale.z = new half(emission.b);
-            inst.emissionAndRoughnessScale.w = new half(roughnessScale);
+            // 这里实际传入的是光滑度
+            inst.emissionAndRoughnessScale.w = new half(smooth);
             
             inst.normalUvScale.x = new half(normScale);
             inst.normalUvScale.y = new half(normScale);
