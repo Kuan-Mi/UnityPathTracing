@@ -29,6 +29,8 @@ namespace PathTracing
         public RayTracingShader opaqueTracingShader;
         public RayTraceShader        nativeOpaqueTracingShader;
         public NativeComputeShader  nrdOpaqueTracingShader;
+        public NativeComputeShader  nrdSharcResolve;
+        public NativeComputeShader  nrdSharcUpdate;
         public RayTracingShader transparentTracingShader;
         public RayTracingShader referencePtTracingShader;
 
@@ -47,6 +49,7 @@ namespace PathTracing
         private OpaquePass       _opaquePass;
         private NativeOpaquePass _nativeOpaquePass;
         private NRDOpaquePass    _nrdOpaquePass;
+        private NRDSharcPass     _nrdSharcPass;
         private NrdPass          _nrdPass;
         private CompositionPass  _compositionPass;
         private TransparentPass  _transparentPass;
@@ -144,10 +147,20 @@ namespace PathTracing
                 InitializeBuffers();
             }
 
-            _sharcPass ??= new SharcPass(sharcResolveCs, sharcUpdateTs)
+            if (useNRDOpaquePass)
             {
-                renderPassEvent = renderPassEvent
-            };
+                _nrdSharcPass ??= new NRDSharcPass(nrdSharcResolve, nrdSharcUpdate)
+                {
+                    renderPassEvent = renderPassEvent
+                };
+            }
+            else
+            {
+                _sharcPass ??= new SharcPass(sharcResolveCs, sharcUpdateTs)
+                {
+                    renderPassEvent = renderPassEvent
+                };
+            }
             if (useNRDOpaquePass)
             {
                 _nrdOpaquePass ??= new NRDOpaquePass(nrdOpaqueTracingShader)
@@ -302,6 +315,8 @@ namespace PathTracing
             {
                 _nrdSampleResource?.UpdateForFrame();
                 nrdOpaqueTracingShader?.CreatePipeline();
+                nrdSharcResolve?.CreatePipeline();
+                nrdSharcUpdate?.CreatePipeline();
             }
             else if (useNativeOpaquePass)
             {
@@ -438,26 +453,61 @@ namespace PathTracing
             }
 
             #region Sharc
+            bool isEven = (GlobalConstants.gFrameIndex & 1) == 0;
 
-            var sharcResource = new SharcPass.Resource
+            if (useNRDOpaquePass)
             {
-                ConstantBuffer     = _constantBuffer,
-                AccumulationBuffer = _accumulationBuffer,
-                HashEntriesBuffer  = _hashEntriesBuffer,
-                ResolvedBuffer     = _resolvedBuffer,
-                PointLightBuffer   = _lightCollector.PointLightBuffer,
-                AreaLightBuffer    = _lightCollector.AreaLightBuffer,
-                SpotLightBuffer    = _lightCollector.SpotLightBuffer
-            };
+                // Compute SHARC dims = 16 * ceil(renderResolution / sharcDownscale / 16)
+                int sharcW = 16 * ((int)(renderResolution.x / pathTracingSetting.sharcDownscale + 15) / 16);
+                int sharcH = 16 * ((int)(renderResolution.y / pathTracingSetting.sharcDownscale + 15) / 16);
+                pool.EnsureSharcGradientResources(new Unity.Mathematics.int2(sharcW, sharcH));
 
-            var sharcSettings = new SharcPass.Settings
+
+                var nrdSharcResource = new NRDSharcPass.Resource
+                {
+                    ConstantBuffer     = _nrdConstantBuffer,
+                    HashEntriesBuffer  = _hashEntriesBuffer,
+                    AccumulationBuffer = _accumulationBuffer,
+                    ResolvedBuffer     = _resolvedBuffer,
+
+                    GradientStoredPing = pool.GetRT(RenderResourceType.SharcGradientStoredPing),
+                    GradientStoredPong = pool.GetRT(RenderResourceType.SharcGradientStoredPong),
+                    GradientPing       = pool.GetRT(RenderResourceType.SharcGradientPing),
+                };
+
+                var nrdSharcSettings = new NRDSharcPass.Settings
+                {
+                    RenderResolution = renderResolution,
+                    sharcDownscale   = pathTracingSetting.sharcDownscale,
+                    isEven           = isEven,
+                };
+
+                _nrdSharcPass.SetNRDSampleResource(_nrdSampleResource);
+                _nrdSharcPass.Setup(nrdSharcResource, nrdSharcSettings);
+                renderer.EnqueuePass(_nrdSharcPass);
+            }
+            else
             {
-                RenderResolution = renderResolution,
-                sharcDownscale   = pathTracingSetting.sharcDownscale
-            };
+                var sharcResource = new SharcPass.Resource
+                {
+                    ConstantBuffer     = _constantBuffer,
+                    AccumulationBuffer = _accumulationBuffer,
+                    HashEntriesBuffer  = _hashEntriesBuffer,
+                    ResolvedBuffer     = _resolvedBuffer,
+                    PointLightBuffer   = _lightCollector.PointLightBuffer,
+                    AreaLightBuffer    = _lightCollector.AreaLightBuffer,
+                    SpotLightBuffer    = _lightCollector.SpotLightBuffer
+                };
 
-            _sharcPass.Setup(sharcResource, sharcSettings);
-            renderer.EnqueuePass(_sharcPass);
+                var sharcSettings = new SharcPass.Settings
+                {
+                    RenderResolution = renderResolution,
+                    sharcDownscale   = pathTracingSetting.sharcDownscale
+                };
+
+                _sharcPass.Setup(sharcResource, sharcSettings);
+                renderer.EnqueuePass(_sharcPass);
+            }
 
             #endregion
 
@@ -743,8 +793,6 @@ namespace PathTracing
                 renderer.EnqueuePass(_autoExposurePass);
             }
 
-            var isEven = (GlobalConstants.gFrameIndex & 1) == 0;
-
             if (pathTracingSetting.RR)
             {
                 if (pathTracingSetting.accumulate)
@@ -997,6 +1045,7 @@ namespace PathTracing
             _nrdConstantBuffer?.Release();
             _nrdConstantBuffer = null;
             _sharcPass         = null;
+            _nrdSharcPass      = null;
             _opaquePass        = null;
             _nativeOpaquePass  = null;
             _nrdOpaquePass     = null;

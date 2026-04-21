@@ -21,7 +21,7 @@ MonoBehaviour:
     showValidation: 0
     skipRightEyeInVR: 1
     sunAngularDiameter: 0.533
-    upscalerMode: 0
+    upscalerMode: 2
     mipBias: -5
     tracingMode: 1
     denoiser: 0
@@ -38,7 +38,7 @@ MonoBehaviour:
     boost: 1
     boostFactor: 0
     SR: 0
-    RR: 0
+    RR: 1
     tmpDisableRR: 0
     resolutionScale: 1
     denoisingRange: 1000
@@ -82,6 +82,8 @@ MonoBehaviour:
   opaqueTracingShader: {fileID: 4807578003741378534, guid: 71faa22953dc9834daf36cc38966c196, type: 3}
   nativeOpaqueTracingShader: {fileID: -6676421132958364438, guid: 5efb1156c4c846c7861243171a99dd41, type: 3}
   nrdOpaqueTracingShader: {fileID: -2368575503658470205, guid: 317f1945d390e3d40b100508cc1e2544, type: 3}
+  nrdSharcResolve: {fileID: -2368575503658470205, guid: 7c20265b003288c49842d62c8ce69e27, type: 3}
+  nrdSharcUpdate: {fileID: -2368575503658470205, guid: e1a3da821ed1c744a8dcfc18fb0f7530, type: 3}
   transparentTracingShader: {fileID: 4807578003741378534, guid: d207e5fb066a4b579353785310fd0dea, type: 3}
   referencePtTracingShader: {fileID: 4807578003741378534, guid: e0dfc84565ad452aab99e3b8d28eafb1, type: 3}
   compositionComputeShader: {fileID: 7200000, guid: 6b0c89c26f4363a4781550cf86801786, type: 3}
