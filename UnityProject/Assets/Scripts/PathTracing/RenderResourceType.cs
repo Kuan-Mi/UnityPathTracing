@@ -52,6 +52,12 @@ namespace PathTracing
         PrevBaseColorMetalness,
         PrevGeoNormal,
 
+        // ── SHARC gradient textures (at SHARC resolution, managed by EnsureSharcGradientResources) ─
+        SharcGradientStoredPing, // gIn_PrevGradient (even) / gOut_CurrGradient (odd)
+        SharcGradientStoredPong, // gOut_CurrGradient (even) / gIn_PrevGradient (odd)
+        SharcGradientPing,       // gOut_Gradient (always)
+        SharcGradientPong,       // reserved for downstream ConfidenceBlur
+
         // rtxdi
         RtxdiViewDepth,
         RtxdiDiffuseAlbedo,

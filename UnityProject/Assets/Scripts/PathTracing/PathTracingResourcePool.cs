@@ -213,6 +213,33 @@ namespace PathTracing
             _rtResources[type] = RTHandles.Alloc(rt);
         }
 
+        /// <summary>
+        /// Allocates (or reallocates) the four SHARC gradient textures at SHARC resolution.
+        /// Must be called each frame after the SHARC dims are known; is a no-op when
+        /// size and allocation are already correct.
+        /// </summary>
+        public void EnsureSharcGradientResources(int2 sharcDims)
+        {
+            var types = new[]
+            {
+                RenderResourceType.SharcGradientStoredPing,
+                RenderResourceType.SharcGradientStoredPong,
+                RenderResourceType.SharcGradientPing,
+                RenderResourceType.SharcGradientPong,
+            };
+
+            foreach (var type in types)
+            {
+                if (_rtResources.TryGetValue(type, out var existing)
+                    && existing?.rt != null
+                    && existing.rt.width  == sharcDims.x
+                    && existing.rt.height == sharcDims.y)
+                    continue;
+
+                AllocateRT(type, GraphicsFormat.R16G16B16A16_SFloat, sharcDims);
+            }
+        }
+
         public void Dispose()
         {
             // Wait for GPU before releasing any NRI texture
