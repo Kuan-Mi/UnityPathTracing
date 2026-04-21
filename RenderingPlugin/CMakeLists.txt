@@ -43,7 +43,7 @@ FetchContent_Declare(
     DOWNLOAD_EXTRACT_TIMESTAMP 1
     DOWNLOAD_NO_PROGRESS 1
     SOURCE_SUBDIR "ignore CMakeLists.txt"
-    URL https://github.com/NVIDIA-RTX/SHARC/archive/refs/tags/v1.6.5.0.zip
+    URL https://github.com/NVIDIA-RTX/SHARC/archive/6893c9af2a16df07de0cd1b70a85404e2f8fc5e8.zip
 )
 FetchContent_MakeAvailable(sharc)
 message(STATUS "SHARC include path: ${sharc_SOURCE_DIR}/include")
