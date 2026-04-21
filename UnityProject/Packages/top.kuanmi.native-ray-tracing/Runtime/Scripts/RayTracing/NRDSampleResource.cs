@@ -393,12 +393,6 @@ namespace NativeRender
                 for (int k = 0; k < src.Length; k++)
                     positions[vWrite++] = xform.MultiplyPoint3x4(src[k]);
 
-                // Material / texture slot for this whole target.
-                Material mat    = GetRepresentativeMaterial(mr);
-                int      matIdx = GetOrAddMaterial(mat, texPtrs);
-
-                uint primitiveOffsetForInstance = primitiveCursor;
-
                 // Normal-space transform (handles non-uniform scale).
                 Matrix4x4 normalMatrix = xform.inverse.transpose;
                 bool      leftHanded   = xform.determinant < 0f;
@@ -408,9 +402,17 @@ namespace NativeRender
                     new Vector3(xform.m02, xform.m12, xform.m22).magnitude);
                 float scaleMax = Mathf.Max(s.x, Mathf.Max(s.y, s.z));
 
+                Material[] sharedMaterials = mr.sharedMaterials;
+
                 int subCnt = mesh.subMeshCount;
                 for (int sub = 0; sub < subCnt; sub++)
                 {
+                    // Each submesh gets its own InstanceDataNRD with its own primitiveOffset and material.
+                    uint primitiveOffsetForSubMesh = primitiveCursor;
+
+                    Material subMat    = (sub < sharedMaterials.Length) ? sharedMaterials[sub] : GetRepresentativeMaterial(mr);
+                    int      subMatIdx = GetOrAddMaterial(subMat, texPtrs);
+
                     int[] tris = mesh.GetTriangles(sub);
 
                     // Record this submesh's IB offset/length inside the merged IB
@@ -471,25 +473,25 @@ namespace NativeRender
                         });
                         primitiveCursor++;
                     }
+
+                    // Emit one InstanceDataNRD per submesh.
+                    uint baseTextureIndex = (uint)(subMatIdx * TexturesPerMaterial);
+                    var inst = new InstanceDataNRD
+                    {
+                        // Vertices are already world-space → mOverloadedMatrix encodes identity.
+                        mOverloadedMatrix0 = new Vector4(1f, 0f, 0f, 0f),
+                        mOverloadedMatrix1 = new Vector4(0f, 1f, 0f, 0f),
+                        mOverloadedMatrix2 = new Vector4(0f, 0f, 1f, 0f),
+
+                        textureOffsetAndFlags = baseTextureIndex | (baseFlags << FlagFirstBit),
+                        primitiveOffset       = primitiveOffsetForSubMesh,
+                        scale                 = (leftHanded ? -1f : 1f) * scaleMax,
+                        morphPrimitiveOffset  = 0,
+                    };
+                    EncodeMaterial(subMat, ref inst);
+                    instList.Add(inst);
+                    instanceCursor++;
                 }
-
-                // Emit one InstanceData per target (one slot per sub-instance inside the merged BLAS).
-                uint baseTextureIndex = (uint)(matIdx * TexturesPerMaterial);
-                var inst = new InstanceDataNRD
-                {
-                    // Vertices are already world-space → mOverloadedMatrix encodes identity.
-                    mOverloadedMatrix0 = new Vector4(1f, 0f, 0f, 0f),
-                    mOverloadedMatrix1 = new Vector4(0f, 1f, 0f, 0f),
-                    mOverloadedMatrix2 = new Vector4(0f, 0f, 1f, 0f),
-
-                    textureOffsetAndFlags = baseTextureIndex | (baseFlags << FlagFirstBit),
-                    primitiveOffset       = primitiveOffsetForInstance,
-                    scale                 = (leftHanded ? -1f : 1f) * scaleMax,
-                    morphPrimitiveOffset  = 0,
-                };
-                EncodeMaterial(mat, ref inst);
-                instList.Add(inst);
-                instanceCursor++;
             }
 
             // Upload merged VB/IB.
