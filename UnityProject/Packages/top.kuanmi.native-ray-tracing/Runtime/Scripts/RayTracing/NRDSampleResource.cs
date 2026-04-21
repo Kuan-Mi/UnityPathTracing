@@ -109,10 +109,10 @@ namespace NativeRender
         public RayTracingAccelerationStructure WorldAS => _worldAS;
         public RayTracingAccelerationStructure LightAS => _lightAS;
 
-        public GraphicsBuffer InstanceDataBuf               => _instanceDataBuf;
-        public GraphicsBuffer PrimitiveDataBuf              => _primitiveDataBuf;
+        public GraphicsBuffer InstanceDataBuf => _instanceDataBuf;
+        public GraphicsBuffer PrimitiveDataBuf => _primitiveDataBuf;
         public GraphicsBuffer MorphPrimitivePositionsPrevBuf => _morphPrimitivePositionsPrevBuf;
-        public BindlessTexture Textures                     => _textures;
+        public BindlessTexture Textures => _textures;
 
         public NRDSampleResource()
         {
@@ -287,8 +287,9 @@ namespace NativeRender
                 bool     isEmissive    = IsMaterialEmissive(rep);
 
                 if (isTransparent) transparent.Add(t);
-                else if (isEmissive) emissive.Add(t);
                 else opaque.Add(t);
+
+                if (isEmissive) emissive.Add(t);
             }
 
             // Running primitive / instance offsets (NRDSample orders opaque → transparent → emissive).
@@ -383,6 +384,8 @@ namespace NativeRender
 
             foreach (var target in group)
             {
+                Debug.Log($"Processing target '{target.name}' for merged BLAS with handle 0x{kHandleOpaque:X8}': " +
+                          $"{totalVerts} total verts, {totalIndices} total indices across {target.GetComponent<MeshFilter>().sharedMesh.subMeshCount} submeshes");
                 var       mr    = target.GetComponent<MeshRenderer>();
                 var       mesh  = mr.GetComponent<MeshFilter>().sharedMesh;
                 Matrix4x4 xform = target.transform.localToWorldMatrix;
@@ -412,6 +415,7 @@ namespace NativeRender
                 int subCnt = mesh.subMeshCount;
                 for (int sub = 0; sub < subCnt; sub++)
                 {
+                    Debug.Log($"  Processing submesh {sub} with {mesh.GetIndexCount(sub)} indices and material slot {(sub < sharedMaterials.Length ? sub : -1)}");
                     // Each submesh gets its own InstanceDataNRD with its own primitiveOffset and material.
                     uint primitiveOffsetForSubMesh = primitiveCursor;
 
@@ -474,7 +478,7 @@ namespace NativeRender
                             t0            = EncodeUnitVectorSigned(new Vector3(t0.x, t0.y, t0.z)),
                             t1            = EncodeUnitVectorSigned(new Vector3(t1.x, t1.y, t1.z)),
                             t2            = EncodeUnitVectorSigned(new Vector3(t2.x, t2.y, t2.z)),
-                            bitangentSign = t0.w,
+                            bitangentSign = -t0.w,
                         });
                         primitiveCursor++;
                     }
@@ -575,8 +579,8 @@ namespace NativeRender
             if (mat != null) _materialSlots[mat] = idx;
 
             AppendTexture(TryGetTex(mat, "_BaseMap"), PlaceholderKind.White, texPtrs);
-            AppendTexture(TryGetTex(mat, "_BumpMap"), PlaceholderKind.FlatNormal, texPtrs);
             AppendTexture(TryGetTex(mat, "_MetallicGlossMap"), PlaceholderKind.Black, texPtrs);
+            AppendTexture(TryGetTex(mat, "_BumpMap"), PlaceholderKind.FlatNormal, texPtrs);
             AppendTexture(TryGetTex(mat, "_EmissionMap"), PlaceholderKind.Black, texPtrs);
             return idx;
         }
@@ -637,25 +641,25 @@ namespace NativeRender
 
         private static void EncodeMaterial(Material mat, ref InstanceDataNRD inst)
         {
-            Color baseColor = TryGetColor(mat, "_BaseColor", Color.white);
-            Color emission  = TryGetColor(mat, "_EmissionColor", Color.black);
-            float metal     = TryGetFloat(mat, "_Metallic", 0f);
-            float smooth    = TryGetFloat(mat, "_Smoothness", 0.5f);
-            float roughness = 1f - smooth;
-            float normScale = TryGetFloat(mat, "_BumpScale", 1f);
+            Color baseColor      = TryGetColor(mat, "_BaseColor", Color.white);
+            Color emission       = TryGetColor(mat, "_EmissionColor", Color.black);
+            float metal          = TryGetFloat(mat, "_Metallic", 0f);
+            float smooth         = TryGetFloat(mat, "_Smoothness", 0.5f);
+            float roughnessScale = smooth;
+            float normScale      = TryGetFloat(mat, "_BumpScale", 1f);
 
-            inst.baseColorR      = Mathf.FloatToHalf(baseColor.r);
-            inst.baseColorG      = Mathf.FloatToHalf(baseColor.g);
-            inst.baseColorB      = Mathf.FloatToHalf(baseColor.b);
-            inst.metalnessScaleH = Mathf.FloatToHalf(metal);
-
-            inst.emissionR       = Mathf.FloatToHalf(emission.r);
-            inst.emissionG       = Mathf.FloatToHalf(emission.g);
-            inst.emissionB       = Mathf.FloatToHalf(emission.b);
-            inst.roughnessScaleH = Mathf.FloatToHalf(roughness);
-
-            inst.normalUvScaleX = Mathf.FloatToHalf(normScale);
-            inst.normalUvScaleY = Mathf.FloatToHalf(normScale);
+            inst.baseColorAndMetalnessScale.x = new half(baseColor.r);
+            inst.baseColorAndMetalnessScale.y = new half(baseColor.g);
+            inst.baseColorAndMetalnessScale.z = new half(baseColor.b);
+            inst.baseColorAndMetalnessScale.w = new half(metal);
+            
+            inst.emissionAndRoughnessScale.x = new half(emission.r);
+            inst.emissionAndRoughnessScale.y = new half(emission.g);
+            inst.emissionAndRoughnessScale.z = new half(emission.b);
+            inst.emissionAndRoughnessScale.w = new half(roughnessScale);
+            
+            inst.normalUvScale.x = new half(normScale);
+            inst.normalUvScale.y = new half(normScale);
         }
 
         private static bool IsMaterialTransparent(Material mat)

@@ -103,13 +103,10 @@ namespace NativeRender
         public Vector4 mOverloadedMatrix1;        // +16
         public Vector4 mOverloadedMatrix2;        // +32
 
-        // float16_t4 baseColorAndMetalnessScale  (+48, 8 B)
-        public ushort baseColorR, baseColorG, baseColorB, metalnessScaleH;
-        // float16_t4 emissionAndRoughnessScale   (+56, 8 B)
-        public ushort emissionR,  emissionG,  emissionB,  roughnessScaleH;
-        // float16_t2 normalUvScale               (+64, 4 B)
-        public ushort normalUvScaleX, normalUvScaleY;
+        public half4 baseColorAndMetalnessScale;
+        public half4 emissionAndRoughnessScale;
 
+        public half2 normalUvScale;
         public uint  textureOffsetAndFlags;       // +68
         public uint  primitiveOffset;             // +72
         public float scale;                       // +76  sign = winding, magnitude = max scale
