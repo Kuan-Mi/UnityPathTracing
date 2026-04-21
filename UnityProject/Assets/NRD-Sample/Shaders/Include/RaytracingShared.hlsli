@@ -439,9 +439,11 @@ MaterialProps GetMaterialProps( GeometryProps geometryProps )
     // Roughness and metalness
     coords = GetSamplingCoords( baseTexture + 1, geometryProps.uv, geometryProps.mip, MIP_SHARP );
     float3 materialProps = gIn_Textures[ NonUniformResourceIndex( baseTexture + 1 ) ].SAMPLE( coords ).xyz;
-    // CHANGE: Unity's metallic map is actually roughness in the G channel, and metalness in the R channel. 
-    float roughness = saturate( materialProps.y * instanceData.emissionAndRoughnessScale.w );
-    float metalness = saturate( materialProps.z  );
+
+
+    float smoothFromTexture = 1.0 - materialProps.g;
+    float roughness = saturate( 1 - smoothFromTexture * instanceData.emissionAndRoughnessScale.w );
+    float metalness = saturate( materialProps.b );
 
     // Normal
     coords = GetSamplingCoords( baseTexture + 2, geometryProps.uv * instanceData.normalUvScale, geometryProps.mip, MIP_LESS_SHARP );
