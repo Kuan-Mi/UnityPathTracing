@@ -109,4 +109,27 @@ namespace NativeRender
                 EditorGUILayout.HelpBox("No compiled DXIL – click Compile to build.", MessageType.Warning);
         }
     }
+
+    /// <summary>
+    /// Notifies any live <see cref="RayTracePipeline"/> instances that a .rayshader asset has been
+    /// reimported so they can rebuild their native D3D12 handles using the new DXIL bytes.
+    /// </summary>
+    internal class RayTraceShaderPostprocessor : AssetPostprocessor
+    {
+        static void OnPostprocessAllAssets(
+            string[] importedAssets, string[] deletedAssets,
+            string[] movedAssets,    string[] movedFromAssetPaths)
+        {
+            foreach (string path in importedAssets)
+            {
+                if (!path.EndsWith(".rayshader", System.StringComparison.OrdinalIgnoreCase))
+                    continue;
+
+                // Load the now-persisted asset and fire the event so RayTracePipeline can rebuild.
+                var shader = AssetDatabase.LoadAssetAtPath<RayTraceShader>(path);
+                if (shader != null)
+                    RayTraceShader.InvokeOnRecompiled(shader);
+            }
+        }
+    }
 }
