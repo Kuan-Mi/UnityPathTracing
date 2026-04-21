@@ -1,4 +1,5 @@
 using System.Runtime.InteropServices;
+using Unity.Mathematics;
 using UnityEngine;
 
 namespace NativeRender
@@ -127,22 +128,22 @@ namespace NativeRender
     public struct PrimitiveDataNRD
     {
         // float16_t2 uv0/uv1/uv2 + float worldArea
-        public ushort uv0x, uv0y;
-        public ushort uv1x, uv1y;
-        public ushort uv2x, uv2y;
-        public float  worldArea;
+        public half2 uv0;
+        public half2 uv1;
+        public half2 uv2;
+        public float worldArea;
 
         // float16_t2 n0/n1/n2 (octahedral-signed encoded) + float uvArea
-        public ushort n0x, n0y;
-        public ushort n1x, n1y;
-        public ushort n2x, n2y;
-        public float  uvArea;
+        public half2 n0;
+        public half2 n1;
+        public half2 n2;
+        public float uvArea;
 
         // float16_t2 t0/t1/t2 (octahedral-signed encoded) + float bitangentSign
-        public ushort t0x, t0y;
-        public ushort t1x, t1y;
-        public ushort t2x, t2y;
-        public float  bitangentSign;
+        public half2 t0;
+        public half2 t1;
+        public half2 t2;
+        public float bitangentSign;
     }   // Total: 48 bytes
 
     /// <summary>

@@ -19,6 +19,7 @@ namespace NativeRender
 
         // Shared GPU scene — owned by NativeRayTracingFeature, injected each frame.
         private GPUScene _gpuScene;
+        private NRDSampleResource _sampleResource;
 
         // Persistent RenderTexture so we can call GetNativeTexturePtr() before recording.
         private RenderTexture m_PersistentRT;
@@ -49,6 +50,11 @@ namespace NativeRender
         public void SetGPUScene(GPUScene scene)
         {
             _gpuScene = scene;
+        }
+        
+        public void SetSampleResource(NRDSampleResource sampleResource)
+        {
+            _sampleResource = sampleResource;
         }
 
         /// <summary>Assigns the RayTraceShader asset. The asset manages its own native handle.</summary>
@@ -115,6 +121,7 @@ namespace NativeRender
 
             // GPUScene lifetime is managed by NativeRayTracingFeature — do not dispose here.
             _gpuScene = null;
+            _sampleResource = null;
         }
 
         public override void RecordRenderGraph(RenderGraph renderGraph, ContextContainer frameData)
@@ -203,9 +210,10 @@ namespace NativeRender
 
             // Build / update the acceleration structure before dispatch
             _gpuScene.BuildAccelerationStructure(cmd);
+            _sampleResource.BuildAccelerationStructures(cmd);
 
             // Bind TLAS – after BuildOrUpdate the TLAS pointer is valid
-            _shader.SetAccelerationStructure("SceneBVH", _gpuScene.AccelerationStructure);
+            // _shader.SetAccelerationStructure("SceneBVH", _gpuScene.AccelerationStructure);
 
             // Bind output RenderTexture (UAV) — C# owns the resource lifetime
             _shader.SetRWTexture("OutputTexture", m_PersistentRT);
@@ -226,6 +234,7 @@ namespace NativeRender
             _shader.SetConstantBuffer("SceneConstants", m_SceneConstantsCB);
 
             _gpuScene.BindToShader(_shader);
+            _sampleResource.BindToShader(_shader);
 
             _shader.Dispatch(cmd, (uint)m_PersistentRT.width, (uint)m_PersistentRT.height);
         }
@@ -244,5 +253,6 @@ namespace NativeRender
             public TextureHandle source;
             public TextureHandle destination;
         }
+
     }
 }
