@@ -22,6 +22,8 @@
 
 #include "ShaderCompilerPlugin.h"
 
+#include <d3d12shader.h>
+
 #include "IUnityInterface.h"
 #include "IUnityLog.h"
 
@@ -473,6 +475,190 @@ bool NR_SC_CompileCS(
 
     *outBytes = buf;
     *outSize  = static_cast<uint32_t>(size);
+    return true;
+}
+
+// ---------------------------------------------------------------------------
+// NR_SC_ReflectCS helpers
+// ---------------------------------------------------------------------------
+
+static const char* SrvDimensionToString(D3D_SRV_DIMENSION dim)
+{
+    switch (dim)
+    {
+    case D3D_SRV_DIMENSION_BUFFER:           return "Buffer";
+    case D3D_SRV_DIMENSION_TEXTURE1D:        return "Texture1D";
+    case D3D_SRV_DIMENSION_TEXTURE1DARRAY:   return "Texture1DArray";
+    case D3D_SRV_DIMENSION_TEXTURE2D:        return "Texture2D";
+    case D3D_SRV_DIMENSION_TEXTURE2DARRAY:   return "Texture2DArray";
+    case D3D_SRV_DIMENSION_TEXTURE2DMS:      return "Texture2DMS";
+    case D3D_SRV_DIMENSION_TEXTURE2DMSARRAY: return "Texture2DMSArray";
+    case D3D_SRV_DIMENSION_TEXTURE3D:        return "Texture3D";
+    case D3D_SRV_DIMENSION_TEXTURECUBE:      return "TextureCube";
+    case D3D_SRV_DIMENSION_TEXTURECUBEARRAY: return "TextureCubeArray";
+    case D3D_SRV_DIMENSION_BUFFEREX:         return "ByteAddressBuffer";
+    default:                                 return "";
+    }
+}
+
+static const char* ReturnTypeToString(D3D_RESOURCE_RETURN_TYPE rt)
+{
+    switch (rt)
+    {
+    case D3D_RETURN_TYPE_UNORM:   return "unorm float";
+    case D3D_RETURN_TYPE_SNORM:   return "snorm float";
+    case D3D_RETURN_TYPE_SINT:    return "int";
+    case D3D_RETURN_TYPE_UINT:    return "uint";
+    case D3D_RETURN_TYPE_FLOAT:   return "float";
+    case D3D_RETURN_TYPE_MIXED:   return "mixed";
+    case D3D_RETURN_TYPE_DOUBLE:  return "double";
+    case D3D_RETURN_TYPE_CONTINUED: return "continued";
+    default:                      return "";
+    }
+}
+
+// ---------------------------------------------------------------------------
+// NR_SC_ReflectCS
+//   Reflects a compiled DXIL compute shader blob and returns a JSON string
+//   describing all bound resources (SRV / UAV / CBV / Sampler) and the
+//   thread group size.
+//
+//   JSON layout:
+//   {
+//     "numthreads": [X, Y, Z],
+//     "bindings": [
+//       { "name": "gInput", "type": "SRV", "space": 0, "reg": 0 },
+//       ...
+//     ]
+//   }
+//
+//   The caller must free the returned buffer with NR_SC_Free.
+// ---------------------------------------------------------------------------
+extern "C" __declspec(dllexport)
+bool NR_SC_ReflectCS(
+    const uint8_t* dxilBytes,
+    uint32_t       dxilSize,
+    char**         outJson,
+    uint32_t*      outJsonLen)
+{
+    if (!outJson || !outJsonLen)
+    {
+        SCLogError("NR_SC_ReflectCS: null output pointers");
+        return false;
+    }
+    *outJson    = nullptr;
+    *outJsonLen = 0;
+
+    if (!dxilBytes || dxilSize == 0)
+    {
+        SCLogError("NR_SC_ReflectCS: empty DXIL blob");
+        return false;
+    }
+
+    // Create a local IDxcUtils (lightweight, no compiler needed)
+    ComPtr<IDxcUtils> utils;
+    HRESULT hr = DxcCreateInstance(CLSID_DxcUtils, IID_PPV_ARGS(&utils));
+    if (FAILED(hr))
+    {
+        SCLogError("NR_SC_ReflectCS: failed to create IDxcUtils");
+        return false;
+    }
+
+    // Wrap the raw bytes in a blob
+    ComPtr<IDxcBlobEncoding> blobEnc;
+    hr = utils->CreateBlob(dxilBytes, dxilSize, DXC_CP_ACP, &blobEnc);
+    if (FAILED(hr))
+    {
+        SCLogError("NR_SC_ReflectCS: failed to create DXIL blob");
+        return false;
+    }
+
+    DxcBuffer buf{};
+    buf.Ptr      = blobEnc->GetBufferPointer();
+    buf.Size     = blobEnc->GetBufferSize();
+    buf.Encoding = DXC_CP_ACP;
+
+    ComPtr<ID3D12ShaderReflection> refl;
+    hr = utils->CreateReflection(&buf, IID_PPV_ARGS(&refl));
+    if (FAILED(hr))
+    {
+        SCLogError("NR_SC_ReflectCS: CreateReflection failed");
+        return false;
+    }
+
+    D3D12_SHADER_DESC shDesc{};
+    refl->GetDesc(&shDesc);
+
+    // Thread group sizes
+    UINT tgX = 0, tgY = 0, tgZ = 0;
+    refl->GetThreadGroupSize(&tgX, &tgY, &tgZ);
+
+    // Build JSON
+    std::string json;
+    json.reserve(1024);
+    json += "{\n  \"numthreads\": [";
+    json += std::to_string(tgX) + ", " + std::to_string(tgY) + ", " + std::to_string(tgZ);
+    json += "],\n  \"bindings\": [\n";
+
+    for (UINT i = 0; i < shDesc.BoundResources; ++i)
+    {
+        D3D12_SHADER_INPUT_BIND_DESC bd{};
+        refl->GetResourceBindingDesc(i, &bd);
+
+        const char* typeName = "Unknown";
+        switch (bd.Type)
+        {
+        case D3D_SIT_CBUFFER:              typeName = "CBV";     break;
+        case D3D_SIT_TBUFFER:              typeName = "CBV";     break;
+        case D3D_SIT_TEXTURE:              typeName = "SRV";     break;
+        case D3D_SIT_SAMPLER:              typeName = "Sampler"; break;
+        case D3D_SIT_UAV_RWTYPED:          typeName = "UAV";     break;
+        case D3D_SIT_STRUCTURED:           typeName = "SRV";     break;
+        case D3D_SIT_UAV_RWSTRUCTURED:     typeName = "UAV";     break;
+        case D3D_SIT_BYTEADDRESS:          typeName = "SRV";     break;
+        case D3D_SIT_UAV_RWBYTEADDRESS:    typeName = "UAV";     break;
+        case D3D_SIT_UAV_APPEND_STRUCTURED:typeName = "UAV";     break;
+        case D3D_SIT_UAV_CONSUME_STRUCTURED:typeName= "UAV";     break;
+        case D3D_SIT_UAV_RWSTRUCTURED_WITH_COUNTER: typeName = "UAV"; break;
+        case D3D_SIT_RTACCELERATIONSTRUCTURE: typeName = "TLAS"; break;
+        default: break;
+        }
+
+        // Escape the name (most HLSL names are safe ASCII)
+        std::string name = bd.Name ? bd.Name : "";
+
+        const char* dim     = SrvDimensionToString(bd.Dimension);
+        const char* retType = ReturnTypeToString(bd.ReturnType);
+
+        if (i > 0) json += ",\n";
+        json += "    { \"name\": \"";
+        json += name;
+        json += "\", \"type\": \"";
+        json += typeName;
+        json += "\", \"space\": ";
+        json += std::to_string(bd.Space);
+        json += ", \"reg\": ";
+        json += std::to_string(bd.BindPoint);
+        json += ", \"dim\": \"";
+        json += dim;
+        json += "\", \"retType\": \"";
+        json += retType;
+        json += "\" }";
+    }
+
+    json += "\n  ]\n}";
+
+    const size_t len = json.size();
+    char* buf2 = static_cast<char*>(malloc(len + 1));
+    if (!buf2)
+    {
+        SCLogError("NR_SC_ReflectCS: out of memory");
+        return false;
+    }
+    memcpy(buf2, json.c_str(), len + 1);
+
+    *outJson    = buf2;
+    *outJsonLen = static_cast<uint32_t>(len);
     return true;
 }
 

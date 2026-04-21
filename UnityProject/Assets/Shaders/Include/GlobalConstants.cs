@@ -3,7 +3,7 @@ using UnityEngine.Rendering;
 
 namespace PathTracing
 {
-    [GenerateHLSL(PackingRules.Exact, needAccessors = false,generateCBuffer = true)]
+    [GenerateHLSL(PackingRules.Exact, needAccessors = false, generateCBuffer = true)]
     public struct GlobalConstants
     {
         public float4x4 gViewToWorld;
@@ -13,79 +13,79 @@ namespace PathTracing
         public float4x4 gWorldToViewPrev;
         public float4x4 gWorldToClip;
         public float4x4 gWorldToClipPrev;
-        public float4 gHitDistParams;
-        public float4 gCameraFrustum;
-        public float4 gSunBasisX;
-        public float4 gSunBasisY;
-        public float4 gSunDirection;
-        public float4 gCameraGlobalPos;
-        public float4 gCameraGlobalPosPrev;
-        public float4 gViewDirection;
-        public float4 gHairBaseColor;
-        public float2 gHairBetas;
-        public float2 gOutputSize; // represents native resolution ( >= gRenderSize )
-        public float2 gRenderSize; // up to native resolution ( >= gRectSize )
-        public float2 gRectSize; // dynamic resolution scaling
-        public float2 gInvOutputSize;
-        public float2 gInvRenderSize;
-        public float2 gInvRectSize;
-        public float2 gRectSizePrev;
-        public float2 gJitter;
-        public float gEmissionIntensity;
-        public float gNearZ;
-        public float gSeparator;
-        public float gRoughnessOverride;
-        public float gMetalnessOverride;
-        public float gUnitToMetersMultiplier;
-        public float gTanSunAngularRadius;
-        public float gTanPixelAngularRadius;
-        public float gDebug;
-        public float gPrevFrameConfidence;
-        public float gUnproject;
-        public float gAperture;
-        public float gFocalDistance;
-        public float gFocalLength;
-        public float gTAA;
-        public float gHdrScale;
-        public float gExposure;
-        public float gMipBias;
-        public float gOrthoMode;
-        public float gIndirectDiffuse;
-        public float gIndirectSpecular;
-        public float gMinProbability;
-        public uint gSharcMaxAccumulatedFrameNum;
-        public uint gDenoiserType;
-        public uint gDisableShadowsAndEnableImportanceSampling; // TODO: remove - modify GetSunIntensity to return 0 if sun is below horizon
-        public uint gFrameIndex;
-        public uint gForcedMaterial;
-        public uint gUseNormalMap;
-        public uint gBounceNum;
-        public uint gResolve;
-        public uint gValidation;
-        public uint gSR;
-        public uint gRR;
-        public uint gIsSrgb;
-        public uint gOnScreen;
-        public uint gTracingMode;
-        public uint gSampleNum;
-        public uint gPSR;
-        public uint gSHARC;
-        public uint gTrimLobe;
-        public uint gSpotLightCount;
-        public uint gAreaLightCount;
-        public uint gPointLightCount;
-        public float gSssMinThreshold;
-        public float gSssTransmissionBsdfSampleCount;
-        public float gSssTransmissionPerBsdfScatteringSampleCount;
-        public float gSssScale;
-        public float gSssAnisotropy;
-        public float gSssMaxSampleRadius;
-        public float gIsEditor;
-        public uint gShowLight;
-        public float gSharcDownscale;
-        public float gSharcSceneScale;
-        public uint sharcDebug;
-        public uint maxLightIndex;
+        public float4   gHitDistParams;
+        public float4   gCameraFrustum;
+        public float4   gSunBasisX;
+        public float4   gSunBasisY;
+        public float4   gSunDirection;
+        public float4   gCameraGlobalPos;
+        public float4   gCameraGlobalPosPrev;
+        public float4   gViewDirection;
+        public float4   gHairBaseColor;
+        public float2   gHairBetas;
+        public float2   gOutputSize; // represents native resolution ( >= gRenderSize )
+        public float2   gRenderSize; // up to native resolution ( >= gRectSize )
+        public float2   gRectSize; // dynamic resolution scaling
+        public float2   gInvOutputSize;
+        public float2   gInvRenderSize;
+        public float2   gInvRectSize;
+        public float2   gRectSizePrev;
+        public float2   gJitter;
+        public float    gEmissionIntensity;
+        public float    gNearZ;
+        public float    gSeparator;
+        public float    gRoughnessOverride;
+        public float    gMetalnessOverride;
+        public float    gUnitToMetersMultiplier;
+        public float    gTanSunAngularRadius;
+        public float    gTanPixelAngularRadius;
+        public float    gDebug;
+        public float    gPrevFrameConfidence;
+        public float    gUnproject;
+        public float    gAperture;
+        public float    gFocalDistance;
+        public float    gFocalLength;
+        public float    gTAA;
+        public float    gHdrScale;
+        public float    gExposure;
+        public float    gMipBias;
+        public float    gOrthoMode;
+        public float    gIndirectDiffuse;
+        public float    gIndirectSpecular;
+        public float    gMinProbability;
+        public uint     gSharcMaxAccumulatedFrameNum;
+        public uint     gDenoiserType;
+        public uint     gDisableShadowsAndEnableImportanceSampling; // TODO: remove - modify GetSunIntensity to return 0 if sun is below horizon
+        public uint     gFrameIndex;
+        public uint     gForcedMaterial;
+        public uint     gUseNormalMap;
+        public uint     gBounceNum;
+        public uint     gResolve;
+        public uint     gValidation;
+        public uint     gSR;
+        public uint     gRR;
+        public uint     gIsSrgb;
+        public uint     gOnScreen;
+        public uint     gTracingMode;
+        public uint     gSampleNum;
+        public uint     gPSR;
+        public uint     gSHARC;
+        public uint     gTrimLobe;
+        public uint     gSpotLightCount;
+        public uint     gAreaLightCount;
+        public uint     gPointLightCount;
+        public float    gSssMinThreshold;
+        public float    gSssTransmissionBsdfSampleCount;
+        public float    gSssTransmissionPerBsdfScatteringSampleCount;
+        public float    gSssScale;
+        public float    gSssAnisotropy;
+        public float    gSssMaxSampleRadius;
+        public float    gIsEditor;
+        public uint     gShowLight;
+        public float    gSharcDownscale;
+        public float    gSharcSceneScale;
+        public uint     sharcDebug;
+        public uint     maxLightIndex;
 
 
         public override string ToString()
@@ -188,4 +188,76 @@ namespace PathTracing
     {{ {m.c3.x:F6}, {m.c3.y:F6}, {m.c3.z:F6}, {m.c3.w:F6} }}";
         }
     }
+
+    public struct NRDGlobalConstants
+    {
+        public float4x4 gViewToWorld;
+        public float4x4 gViewToClip;
+        public float4x4 gWorldToView;
+        public float4x4 gWorldToClip;
+        public float4x4 gWorldToViewPrev;
+        public float4x4 gWorldToClipPrev;
+        public float4x4 gViewToWorldPrev;
+        public float4   gHitDistSettings;
+        public float4   gCameraFrustum;
+        public float4   gSunBasisX;
+        public float4   gSunBasisY;
+        public float4   gSunDirection;
+        public float4   gCameraGlobalPos;
+        public float4   gCameraGlobalPosPrev;
+        public float4   gViewDirection;
+        public float4   gHairBaseColor;
+        public float2   gHairBetas;
+        public float2   gOutputSize; // represents native resolution ( >= gRenderSize )
+        public float2   gRenderSize; // up to native resolution ( >= gRectSize )
+        public float2   gRectSize; // dynamic resolution scaling
+        public float2   gInvOutputSize;
+        public float2   gInvRenderSize;
+        public float2   gInvRectSize;
+        public float2   gRectSizePrev;
+        public float2   gInvSharcRenderSize;
+        public float2   gJitter;
+        public float2   gJitterPrev;
+        public float    gEmissionIntensityLights;
+        public float    gEmissionIntensityCubes;
+        public float    gNearZ;
+        public float    gSeparator;
+        public float    gRoughnessOverride;
+        public float    gMetalnessOverride;
+        public float    gUnitToMetersMultiplier;
+        public float    gTanSunAngularRadius;
+        public float    gTanPixelAngularRadius;
+        public float    gDebug;
+        public float    gPrevFrameConfidence;
+        public float    gUnproject;
+        public float    gAperture;
+        public float    gFocalDistance;
+        public float    gFocalLength;
+        public float    gTAA;
+        public float    gHdrScale;
+        public float    gExposure;
+        public float    gMipBias;
+        public float    gOrthoMode;
+        public float    gIndirectDiffuse;
+        public float    gIndirectSpecular;
+        public float    gMinProbability;
+        public uint     gMaxAccumulatedFrameNum;
+        public uint     gDenoiserType;
+        public uint     gDisableShadowsAndEnableImportanceSampling; // TODO: remove - modify GetSunIntensity to return 0 if sun is below horizon
+        public uint     gFrameIndex;
+        public uint     gForcedMaterial;
+        public uint     gUseNormalMap;
+        public uint     gBounceNum;
+        public uint     gResolve;
+        public uint     gValidation;
+        public uint     gSR;
+        public uint     gRR;
+        public uint     gIsSrgb;
+        public uint     gOnScreen;
+        public uint     gTracingMode;
+        public uint     gSampleNum;
+        public uint     gPSR;
+        public uint     gSHARC;
+        public uint     gTrimLobe;
+    };
 }
