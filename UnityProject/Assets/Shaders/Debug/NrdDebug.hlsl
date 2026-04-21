@@ -201,6 +201,93 @@ struct GeometryProps
 #define FLAG_SKIN                           0x40 // skin
 #define FLAG_MORPH                          0x80 // morph
 
+
+struct MaterialProps
+{
+    float3 Lemi;
+    float3 N;
+    float3 T;
+    float3 baseColor;
+    float roughness;
+    float metalness;
+    float curvature;
+};
+#define MAX_MIP_LEVEL                       11.0
+#define MIP_VISIBILITY                      0 // for visibility: emission, shadow and alpha mask
+#define MIP_LESS_SHARP                      1 // for normal
+#define MIP_SHARP                           2 // for albedo and roughness
+
+float3 GetSamplingCoords( uint textureIndex, float2 uv, float mip, int mode )
+{
+    float2 texSize;
+    gIn_Textures[ NonUniformResourceIndex( textureIndex ) ].GetDimensions( texSize.x, texSize.y ); // TODO: if I only had it as a constant...
+
+    // Recalculate for the current texture
+    float mipNum = log2( max( texSize.x, texSize.y ) );
+    mip += mipNum - MAX_MIP_LEVEL;
+    if( mode == MIP_VISIBILITY )
+    {
+        // We must avoid using lower mips because it can lead to significant increase in AHS invocations. Mips lower than 128x128 are skipped!
+        mip = min( mip, mipNum - 7.0 );
+    }
+    else
+        mip += 1 * ( mode == MIP_LESS_SHARP ? 0.5 : 1.0 );
+    mip = clamp( mip, 0.0, mipNum - 1.0 );
+
+    #if( USE_STOCHASTIC_SAMPLING == 1 )
+    mip = floor( mip ) + step( Rng::Hash::GetFloat( ), frac( mip ) );
+    #elif( USE_LOAD == 1 )
+    mip = round( mip );
+    #endif
+
+    texSize *= exp2( -mip );
+
+    // Uv coordinates
+    #if( USE_STOCHASTIC_SAMPLING == 1 )
+    uv = STF_Bilinear( uv, texSize );
+    #endif
+
+    #if( USE_LOAD == 1 )
+    uv = frac( uv ) * texSize;
+    #endif
+
+    return float3( uv, mip );
+}
+
+SamplerState s_LinearRepeat  : register(s1);
+
+#define TEX_SAMPLER s_LinearRepeat
+#define SAMPLE( coords ) SampleLevel( TEX_SAMPLER, coords.xy, coords.z )
+
+MaterialProps GetMaterialProps( GeometryProps geometryProps )
+{
+    
+    MaterialProps props = ( MaterialProps )0;
+
+    // Fast path for miss and hair
+    [branch]
+    if( geometryProps.IsMiss( ) )
+    {
+        props.Lemi = 0;
+
+        return props;
+    }
+    
+    uint baseTexture = geometryProps.GetBaseTexture( );
+    InstanceData instanceData = gIn_InstanceData[ geometryProps.instanceIndex ];
+    
+    // Base color
+    float3 coords = GetSamplingCoords( baseTexture, geometryProps.uv, geometryProps.mip, MIP_SHARP );
+    float4 color = gIn_Textures[ NonUniformResourceIndex( baseTexture ) ].SAMPLE( coords );
+    color.xyz *= instanceData.baseColorAndMetalnessScale.xyz;
+    color.xyz *= geometryProps.Has( FLAG_TRANSPARENT ) ? 1.0 : Math::PositiveRcp( color.w ); // Correct handling of BC1 with pre-multiplied alpha
+    float3 baseColor = saturate( color.xyz );
+    
+    props.baseColor = baseColor;
+    
+    return  props;
+}
+
 [shader("raygeneration")]
 void RayGenShader()
 {
@@ -302,9 +389,40 @@ void RayGenShader()
         props.N = -N; // TODO: why negated?
         
         
+        // Curvature
+        float dnSq0 = Math::LengthSquared( n0 - n1 );
+        float dnSq1 = Math::LengthSquared( n1 - n2 );
+        float dnSq2 = Math::LengthSquared( n2 - n0 );
+        float dnSq = max( dnSq0, max( dnSq1, dnSq2 ) );
+        props.curvature = sqrt( dnSq / worldArea );
+        
+        
+        // Uv
+        props.uv = barycentrics.x * primitiveData.uv0 + barycentrics.y * primitiveData.uv1 + barycentrics.z * primitiveData.uv2;
+        
+        // Tangent
+        float3 t0 = Packing::DecodeUnitVector( primitiveData.t0, true );
+        float3 t1 = Packing::DecodeUnitVector( primitiveData.t1, true );
+        float3 t2 = Packing::DecodeUnitVector( primitiveData.t2, true );
+        
+        
+        float3 T = barycentrics.x * t0 + barycentrics.y * t1 + barycentrics.z * t2;
+        T = Geometry::RotateVector( mObjectToWorld, T );
+        T = normalize( T );
+        props.T = float4( T, primitiveData.bitangentSign );
+        
+        
+        props.X = ray.Origin + ray.Direction * props.hitT;
+        props.Xprev = props.X;
+        
+         
+        MaterialProps matProps = GetMaterialProps( props );
+        
+        
+        
         
         color = HashColor( instanceIndex + primitiveIndex * 9973 + hit.GetPrimitiveIndex( ) * 99991 );
-        color = N;
+        color = matProps.baseColor;
         
         // {
         //     GeometryData geomData = t_GeometryData[t_InstanceData[payload.instanceID].firstGeometryIndex + payload.geometryIndex];
