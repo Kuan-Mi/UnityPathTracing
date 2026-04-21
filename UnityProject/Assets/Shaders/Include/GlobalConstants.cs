@@ -260,4 +260,105 @@ namespace PathTracing
         public uint     gSHARC;
         public uint     gTrimLobe;
     };
+
+    public static class GlobalConstantsExtensions
+    {
+        /// <summary>
+        /// Constructs an <see cref="NRDGlobalConstants"/> from a <see cref="GlobalConstants"/> instance.
+        /// Fields that differ between the two structs are mapped explicitly; fields that share the same
+        /// name and type are copied directly.
+        /// </summary>
+        public static NRDGlobalConstants ToNRDGlobalConstants(this GlobalConstants g)
+        {
+            return new NRDGlobalConstants
+            {
+                gViewToWorld             = g.gViewToWorld,
+                gViewToClip              = g.gViewToClip,
+                gWorldToView             = g.gWorldToView,
+                gWorldToClip             = g.gWorldToClip,
+                gWorldToViewPrev         = g.gWorldToViewPrev,
+                gWorldToClipPrev         = g.gWorldToClipPrev,
+                gViewToWorldPrev         = g.gViewToWorldPrev,
+
+                // GlobalConstants uses gHitDistParams; NRDGlobalConstants calls it gHitDistSettings.
+                gHitDistSettings         = g.gHitDistParams,
+
+                gCameraFrustum           = g.gCameraFrustum,
+                gSunBasisX               = g.gSunBasisX,
+                gSunBasisY               = g.gSunBasisY,
+                gSunDirection            = g.gSunDirection,
+                gCameraGlobalPos         = g.gCameraGlobalPos,
+                gCameraGlobalPosPrev     = g.gCameraGlobalPosPrev,
+                gViewDirection           = g.gViewDirection,
+                gHairBaseColor           = g.gHairBaseColor,
+                gHairBetas               = g.gHairBetas,
+
+                gOutputSize              = g.gOutputSize,
+                gRenderSize              = g.gRenderSize,
+                gRectSize                = g.gRectSize,
+                gInvOutputSize           = g.gInvOutputSize,
+                gInvRenderSize           = g.gInvRenderSize,
+                gInvRectSize             = g.gInvRectSize,
+                gRectSizePrev            = g.gRectSizePrev,
+
+                // NRD adds gInvSharcRenderSize; derive from gSharcDownscale if non-zero.
+                gInvSharcRenderSize      = g.gSharcDownscale > 0f
+                    ? new Unity.Mathematics.float2(
+                        g.gInvRectSize.x / g.gSharcDownscale,
+                        g.gInvRectSize.y / g.gSharcDownscale)
+                    : g.gInvRectSize,
+
+                gJitter                  = g.gJitter,
+                // NRD adds gJitterPrev — zero-init (not available in base struct).
+                gJitterPrev              = Unity.Mathematics.float2.zero,
+
+                // NRD splits gEmissionIntensity into two fields; map to both.
+                gEmissionIntensityLights = g.gEmissionIntensity,
+                gEmissionIntensityCubes  = g.gEmissionIntensity,
+
+                gNearZ                                       = g.gNearZ,
+                gSeparator                                   = g.gSeparator,
+                gRoughnessOverride                           = g.gRoughnessOverride,
+                gMetalnessOverride                           = g.gMetalnessOverride,
+                gUnitToMetersMultiplier                      = g.gUnitToMetersMultiplier,
+                gTanSunAngularRadius                         = g.gTanSunAngularRadius,
+                gTanPixelAngularRadius                       = g.gTanPixelAngularRadius,
+                gDebug                                       = g.gDebug,
+                gPrevFrameConfidence                         = g.gPrevFrameConfidence,
+                gUnproject                                   = g.gUnproject,
+                gAperture                                    = g.gAperture,
+                gFocalDistance                               = g.gFocalDistance,
+                gFocalLength                                 = g.gFocalLength,
+                gTAA                                         = g.gTAA,
+                gHdrScale                                    = g.gHdrScale,
+                gExposure                                    = g.gExposure,
+                gMipBias                                     = g.gMipBias,
+                gOrthoMode                                   = g.gOrthoMode,
+                gIndirectDiffuse                             = g.gIndirectDiffuse,
+                gIndirectSpecular                            = g.gIndirectSpecular,
+                gMinProbability                              = g.gMinProbability,
+
+                // GlobalConstants: gSharcMaxAccumulatedFrameNum; NRD: gMaxAccumulatedFrameNum.
+                gMaxAccumulatedFrameNum                      = g.gSharcMaxAccumulatedFrameNum,
+
+                gDenoiserType                                = g.gDenoiserType,
+                gDisableShadowsAndEnableImportanceSampling   = g.gDisableShadowsAndEnableImportanceSampling,
+                gFrameIndex                                  = g.gFrameIndex,
+                gForcedMaterial                              = g.gForcedMaterial,
+                gUseNormalMap                                = g.gUseNormalMap,
+                gBounceNum                                   = g.gBounceNum,
+                gResolve                                     = g.gResolve,
+                gValidation                                  = g.gValidation,
+                gSR                                          = g.gSR,
+                gRR                                          = g.gRR,
+                gIsSrgb                                      = g.gIsSrgb,
+                gOnScreen                                    = g.gOnScreen,
+                gTracingMode                                 = g.gTracingMode,
+                gSampleNum                                   = g.gSampleNum,
+                gPSR                                         = g.gPSR,
+                gSHARC                                       = g.gSHARC,
+                gTrimLobe                                    = g.gTrimLobe,
+            };
+        }
+    }
 }

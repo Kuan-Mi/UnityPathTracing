@@ -109,6 +109,11 @@ namespace NativeRender
         public RayTracingAccelerationStructure WorldAS => _worldAS;
         public RayTracingAccelerationStructure LightAS => _lightAS;
 
+        public GraphicsBuffer InstanceDataBuf               => _instanceDataBuf;
+        public GraphicsBuffer PrimitiveDataBuf              => _primitiveDataBuf;
+        public GraphicsBuffer MorphPrimitivePositionsPrevBuf => _morphPrimitivePositionsPrevBuf;
+        public BindlessTexture Textures                     => _textures;
+
         public NRDSampleResource()
         {
             _worldAS = new RayTracingAccelerationStructure();

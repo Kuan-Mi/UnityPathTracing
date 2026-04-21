@@ -22,11 +22,13 @@ namespace PathTracing
         public RenderPassEvent renderPassEvent = RenderPassEvent.BeforeRenderingPostProcessing;
 
         public bool useNativeOpaquePass = false;
+        public bool useNRDOpaquePass    = false;
 
         public Material         finalMaterial;
         public RayTracingShader sharcUpdateTs;
         public RayTracingShader opaqueTracingShader;
-        public RayTraceShader   nativeOpaqueTracingShader;
+        public RayTraceShader        nativeOpaqueTracingShader;
+        public NativeComputeShader  nrdOpaqueTracingShader;
         public RayTracingShader transparentTracingShader;
         public RayTracingShader referencePtTracingShader;
 
@@ -44,6 +46,7 @@ namespace PathTracing
         private SharcPass        _sharcPass;
         private OpaquePass       _opaquePass;
         private NativeOpaquePass _nativeOpaquePass;
+        private NRDOpaquePass    _nrdOpaquePass;
         private NrdPass          _nrdPass;
         private CompositionPass  _compositionPass;
         private TransparentPass  _transparentPass;
@@ -56,7 +59,8 @@ namespace PathTracing
 
         private RayTracingAccelerationStructure _accelerationStructure;
 
-        private GPUScene _gpuScene;
+        private GPUScene          _gpuScene;
+        private NRDSampleResource _nrdSampleResource;
 
         private GraphicsBuffer _constantBuffer;
 
@@ -72,8 +76,10 @@ namespace PathTracing
 
         private LightCollector _lightCollector = new();
 
-        private readonly GlobalConstants[] _globalConstantsArray = new GlobalConstants[1];
-        private readonly float[]           _exposureArray        = new float[1];
+        private readonly GlobalConstants[]    _globalConstantsArray    = new GlobalConstants[1];
+        private readonly NRDGlobalConstants[]  _nrdGlobalConstantsArray = new NRDGlobalConstants[1];
+        private GraphicsBuffer                 _nrdConstantBuffer;
+        private readonly float[]               _exposureArray           = new float[1];
 
         private readonly Dictionary<long, NrdDenoiser>  _nrdDenoisers  = new();
         private readonly Dictionary<long, DlrrDenoiser> _dlrrDenoisers = new();
@@ -87,6 +93,9 @@ namespace PathTracing
         {
             if (useNativeOpaquePass && _gpuScene == null)
                 _gpuScene = new GPUScene();
+
+            if (useNRDOpaquePass && _nrdSampleResource == null)
+                _nrdSampleResource = new NRDSampleResource();
 
             if (_accelerationStructure == null)
             {
@@ -139,7 +148,14 @@ namespace PathTracing
             {
                 renderPassEvent = renderPassEvent
             };
-            if (useNativeOpaquePass)
+            if (useNRDOpaquePass)
+            {
+                _nrdOpaquePass ??= new NRDOpaquePass(nrdOpaqueTracingShader)
+                {
+                    renderPassEvent = renderPassEvent
+                };
+            }
+            else if (useNativeOpaquePass)
             {
                 _nativeOpaquePass ??= new NativeOpaquePass(nativeOpaqueTracingShader)
                 {
@@ -282,7 +298,12 @@ namespace PathTracing
                 return;
 
 
-            if (useNativeOpaquePass)
+            if (useNRDOpaquePass)
+            {
+                _nrdSampleResource?.UpdateForFrame();
+                nrdOpaqueTracingShader?.CreatePipeline();
+            }
+            else if (useNativeOpaquePass)
             {
                 _gpuScene?.UpdateForFrame();
                 _nativeOpaquePass.SetGPUScene(_gpuScene);
@@ -409,6 +430,13 @@ namespace PathTracing
             _globalConstantsArray[0] = GlobalConstants;
             _constantBuffer.SetData(_globalConstantsArray);
 
+            if (useNRDOpaquePass)
+            {
+                _nrdConstantBuffer             ??= new GraphicsBuffer(GraphicsBuffer.Target.Constant, 1, System.Runtime.InteropServices.Marshal.SizeOf<NRDGlobalConstants>());
+                _nrdGlobalConstantsArray[0]      = GlobalConstants.ToNRDGlobalConstants();
+                _nrdConstantBuffer.SetData(_nrdGlobalConstantsArray);
+            }
+
             #region Sharc
 
             var sharcResource = new SharcPass.Resource
@@ -435,7 +463,46 @@ namespace PathTracing
 
             #region Opaque Pass
 
-            if (useNativeOpaquePass)
+            if (useNRDOpaquePass)
+            {
+                var nrdOpaqueResource = new NRDOpaquePass.Resource
+                {
+                    ConstantBuffer     = _nrdConstantBuffer,
+
+                    HashEntriesBuffer  = _hashEntriesBuffer,
+                    AccumulationBuffer = _accumulationBuffer,
+                    ResolvedBuffer     = _resolvedBuffer,
+
+                    ScramblingRanking = scramblingRankingTex,
+                    Sobol             = sobolTex,
+
+                    Mv                 = pool.GetRT(RenderResourceType.MV),
+                    ViewZ              = pool.GetRT(RenderResourceType.Viewz),
+                    NormalRoughness    = pool.GetRT(RenderResourceType.NormalRoughness),
+                    BaseColorMetalness = pool.GetRT(RenderResourceType.BasecolorMetalness),
+                    DirectLighting     = pool.GetRT(RenderResourceType.DirectLighting),
+                    DirectEmission     = pool.GetRT(RenderResourceType.PtDirectEmission),
+                    PsrThroughput      = pool.GetRT(RenderResourceType.PsrThroughput),
+                    ShadowData         = pool.GetRT(RenderResourceType.Penumbra),
+                    ShadowTranslucency = pool.GetRT(RenderResourceType.OutShadowTranslucency),
+                    Diff               = pool.GetRT(RenderResourceType.DiffRadianceHitdist),
+                    Spec               = pool.GetRT(RenderResourceType.SpecRadianceHitdist),
+
+                    PrevComposedDiff      = pool.GetRT(RenderResourceType.PtComposedDiff),
+                    PrevComposedSpecViewZ = pool.GetRT(RenderResourceType.PtComposedSpecViewZ),
+                };
+
+                var nrdOpaqueSettings = new NRDOpaquePass.Settings
+                {
+                    m_RenderResolution = renderResolution,
+                    resolutionScale    = pathTracingSetting.resolutionScale,
+                };
+
+                _nrdOpaquePass.SetNRDSampleResource(_nrdSampleResource);
+                _nrdOpaquePass.Setup(nrdOpaqueResource, nrdOpaqueSettings);
+                renderer.EnqueuePass(_nrdOpaquePass);
+            }
+            else if (useNativeOpaquePass)
             {
                 var nativeOpaqueResource = new NativeOpaquePass.Resource
                 {
@@ -925,9 +992,14 @@ namespace PathTracing
             _aeExposureBuffer = null;
 
             _gpuScene         = null;
-            _sharcPass        = null;
-            _opaquePass       = null;
-            _nativeOpaquePass = null;
+            _nrdSampleResource?.Dispose();
+            _nrdSampleResource = null;
+            _nrdConstantBuffer?.Release();
+            _nrdConstantBuffer = null;
+            _sharcPass         = null;
+            _opaquePass        = null;
+            _nativeOpaquePass  = null;
+            _nrdOpaquePass     = null;
             _transparentPass  = null;
             _compositionPass  = null;
             _nrdPass          = null;
