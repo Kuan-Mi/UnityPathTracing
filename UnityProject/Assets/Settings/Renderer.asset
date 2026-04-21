@@ -1,23 +1,5 @@
 %YAML 1.1
 %TAG !u! tag:unity3d.com,2011:
---- !u!114 &-1479564615027907688
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 0}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 5da3310e207b4e84a897e43fcf4526bb, type: 3}
-  m_Name: NativeRayTracingFeature
-  m_EditorClassIdentifier: NativeRayTracing.Runtime::NativeRender.NativeRayTracingFeature
-  m_Active: 1
-  renderPassEvent: 550
-  shaderSourceAsset: {fileID: -6676421132958364438, guid: 2c8f71e0cfac4a8cafc650af57ebc0e0, type: 3}
-  testConstants:
-    dummy: {x: 1, y: 1, z: 1, w: 1}
-  testBindlessTextures: []
 --- !u!114 &-1093908681099559453
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -30,11 +12,11 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: f50908f0e9bf42149891b36684931380, type: 3}
   m_Name: PathTracingFeature
   m_EditorClassIdentifier: Assembly-CSharp::PathTracing.PathTracingFeature
-  m_Active: 0
+  m_Active: 1
   pathTracingSetting:
     exposureEv: -1.26
     cameraJitter: 1
-    showMode: 18
+    showMode: 1
     showMv: 0
     showValidation: 0
     skipRightEyeInVR: 1
@@ -93,11 +75,13 @@ MonoBehaviour:
     accumulateReference: 1
     accumulate: 0
   renderPassEvent: 550
-  useNativeOpaquePass: 1
+  useNativeOpaquePass: 0
+  useNRDOpaquePass: 1
   finalMaterial: {fileID: 2100000, guid: 27695a2bc55ef2f469362b9a2994989e, type: 2}
   sharcUpdateTs: {fileID: 4807578003741378534, guid: 171e2660e0894b3cb5c6c809e595ae5d, type: 3}
   opaqueTracingShader: {fileID: 4807578003741378534, guid: 71faa22953dc9834daf36cc38966c196, type: 3}
   nativeOpaqueTracingShader: {fileID: -6676421132958364438, guid: 5efb1156c4c846c7861243171a99dd41, type: 3}
+  nrdOpaqueTracingShader: {fileID: -2368575503658470205, guid: 317f1945d390e3d40b100508cc1e2544, type: 3}
   transparentTracingShader: {fileID: 4807578003741378534, guid: d207e5fb066a4b579353785310fd0dea, type: 3}
   referencePtTracingShader: {fileID: 4807578003741378534, guid: e0dfc84565ad452aab99e3b8d28eafb1, type: 3}
   compositionComputeShader: {fileID: 7200000, guid: 6b0c89c26f4363a4781550cf86801786, type: 3}
@@ -134,8 +118,7 @@ MonoBehaviour:
     probeVolumeBlendStatesCS: {fileID: 7200000, guid: b9a23f869c4fd45f19c5ada54dd82176, type: 3}
   m_RendererFeatures:
   - {fileID: -1093908681099559453}
-  - {fileID: -1479564615027907688}
-  m_RendererFeatureMap: e33d58aed9a7d1f09823065bd28777eb
+  m_RendererFeatureMap: e33d58aed9a7d1f0
   m_UseNativeRenderPass: 1
   xrSystemData: {fileID: 0}
   postProcessData: {fileID: 11400000, guid: 41439944d30ece34e96484bdb6645b55, type: 2}
