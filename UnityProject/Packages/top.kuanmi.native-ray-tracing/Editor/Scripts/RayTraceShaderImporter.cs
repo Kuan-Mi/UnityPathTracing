@@ -69,6 +69,8 @@ namespace NativeRender
             so.ApplyModifiedPropertiesWithoutUndo();
 
             ctx.AddObjectToAsset("RayTraceShader", asset);
+            var filePath = Path.GetFullPath(ctx.assetPath);
+            asset.ForceRecompile(filePath);
             ctx.SetMainObject(asset);
         }
     }

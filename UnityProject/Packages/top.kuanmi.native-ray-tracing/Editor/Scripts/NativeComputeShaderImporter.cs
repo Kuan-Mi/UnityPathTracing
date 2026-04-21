@@ -4,6 +4,7 @@ using System.IO;
 using UnityEditor;
 using UnityEditor.AssetImporters;
 using UnityEngine;
+using Object = UnityEngine.Object;
 
 namespace NativeRender
 {
@@ -82,6 +83,8 @@ namespace NativeRender
             so.ApplyModifiedPropertiesWithoutUndo();
 
             ctx.AddObjectToAsset("NativeComputeShader", asset);
+            var filePath = Path.GetFullPath(ctx.assetPath);
+            asset.ForceRecompile(filePath);
             ctx.SetMainObject(asset);
         }
     }
