@@ -40,8 +40,8 @@ namespace NativeRender
         // Persistent unmanaged memory for the RenderEventData struct.
         private IntPtr m_EventDataPtr = IntPtr.Zero;
 
-        // RayTraceShader asset — lifetime managed by the asset itself.
-        private RayTraceShader _shader;
+        // RayTracePipeline — lifetime managed by NativeRayTracingFeature.
+        private RayTracePipeline _shader;
 
         // Constant buffer for TestConstants (b1)
         private ComputeBuffer _testConstantsCB;
@@ -57,13 +57,13 @@ namespace NativeRender
             _sampleResource = sampleResource;
         }
 
-        /// <summary>Assigns the RayTraceShader asset. The asset manages its own native handle.</summary>
-        public void SetShaderAsset(RayTraceShader asset)
+        /// <summary>Assigns the pipeline to use for ray tracing. Lifetime is owned by the caller.</summary>
+        public void SetPipeline(RayTracePipeline pipeline)
         {
-            _shader = asset;
+            _shader = pipeline;
         }
 
-        /// <summary>Syncs <paramref name="textures"/> into a <see cref="BindlessTexture"/> and binds it to the shader as t_TestBindless.</summary>
+        /// <summary>Syncs <paramref name="textures"/> into a <see cref="BindlessTexture"/> and binds it to the pipeline as t_TestBindless.</summary>
         public void SetTestBindless(Texture[] textures, ref BindlessTexture bt)
         {
             if (_shader == null || !_shader.IsValid) return;
@@ -83,7 +83,7 @@ namespace NativeRender
             _shader.SetBindlessTexture("t_TestBindless", bt);
         }
 
-        /// <summary>Uploads a Vector4 to testConstants (b1) and binds it to the shader.</summary>
+        /// <summary>Uploads a Vector4 to testConstants (b1) and binds it to the pipeline.</summary>
         public void SetTestConstants(Vector4 dummy)
         {
             if (_shader == null || !_shader.IsValid) return;
@@ -110,7 +110,7 @@ namespace NativeRender
                 m_EventDataPtr = IntPtr.Zero;
             }
 
-            // _shader is a ScriptableObject asset — do not destroy it here.
+            // _shader pipeline lifetime is owned by NativeRayTracingFeature — do not dispose here.
             _shader = null;
 
             _testConstantsCB?.Release();
@@ -192,7 +192,7 @@ namespace NativeRender
 
             if (_shader == null || !_shader.IsValid)
             {
-                Debug.LogWarning("[NativeRayTracing] No valid RayTraceShader — assign a shader asset in the Renderer Feature.");
+                Debug.LogWarning("[NativeRayTracing] No valid RayTracePipeline — ensure a shader asset is assigned in the Renderer Feature.");
                 return;
             }
 

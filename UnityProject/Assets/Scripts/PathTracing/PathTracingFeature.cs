@@ -314,15 +314,15 @@ namespace PathTracing
             if (useNRDOpaquePass)
             {
                 _nrdSampleResource?.UpdateForFrame();
-                nrdOpaqueTracingShader?.CreatePipeline();
-                nrdSharcResolve?.CreatePipeline();
-                nrdSharcUpdate?.CreatePipeline();
+                // nrdOpaqueTracingShader?.CreatePipeline();
+                // nrdSharcResolve?.CreatePipeline();
+                // nrdSharcUpdate?.CreatePipeline();
             }
             else if (useNativeOpaquePass)
             {
                 _gpuScene?.UpdateForFrame();
                 _nativeOpaquePass.SetGPUScene(_gpuScene);
-                nativeOpaqueTracingShader?.CreatePipeline();
+                // nativeOpaqueTracingShader?.CreatePipeline();
             }
 
             Shader.SetGlobalRayTracingAccelerationStructure(g_AccelStructID, _accelerationStructure);
@@ -1045,9 +1045,12 @@ namespace PathTracing
             _nrdConstantBuffer?.Release();
             _nrdConstantBuffer = null;
             _sharcPass         = null;
+            _nrdSharcPass?.Dispose();
             _nrdSharcPass      = null;
             _opaquePass        = null;
+            _nativeOpaquePass?.Dispose();
             _nativeOpaquePass  = null;
+            _nrdOpaquePass?.Dispose();
             _nrdOpaquePass     = null;
             _transparentPass  = null;
             _compositionPass  = null;

@@ -36,6 +36,7 @@ namespace NativeRender
         private BindlessTexture _testBT;
 
         private NativeRayTracingPass m_RenderPass;
+        private RayTracePipeline     _pipeline;
         private GPUScene             _gpuScene;
         private NRDSampleResource    _sampleResource;
 
@@ -54,13 +55,16 @@ namespace NativeRender
             _gpuScene?.UpdateForFrame();
             _sampleResource.UpdateForFrame();
 
-            m_RenderPass.SetShaderAsset(shaderSourceAsset);
+            // (Re-)create the pipeline if the asset changed or hasn't been built yet.
+            if (_pipeline == null && shaderSourceAsset != null)
+            {
+                try { _pipeline = new RayTracePipeline(shaderSourceAsset); }
+                catch (Exception e) { Debug.LogError(e.Message); }
+            }
+
+            m_RenderPass.SetPipeline(_pipeline);
             m_RenderPass.SetGPUScene(_gpuScene);
             m_RenderPass.SetSampleResource(_sampleResource);
-
-            // Ensure the DXR pipeline is created from cached DXIL bytes.
-            // CreatePipeline() is idempotent – no-op if pipeline already exists.
-            shaderSourceAsset?.CreatePipeline();
 
             var camera = renderingData.cameraData.camera;
             if (camera == null)
@@ -78,6 +82,8 @@ namespace NativeRender
         {
             _testBT?.Dispose();
             _testBT = null;
+            _pipeline?.Dispose();
+            _pipeline = null;
             m_RenderPass?.Dispose();
             _gpuScene?.Dispose();
             _gpuScene = null;

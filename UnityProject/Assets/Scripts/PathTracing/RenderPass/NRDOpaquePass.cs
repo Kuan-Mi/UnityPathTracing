@@ -1,3 +1,4 @@
+using System;
 using NativeRender;
 using Unity.Mathematics;
 using Unity.Profiling;
@@ -15,16 +16,21 @@ namespace PathTracing
     /// Scene TLAS / instance-data / SHARC UAVs are sourced from an <see cref="NRDSampleResource"/>
     /// and bound directly inside ExecutePass (not delegated to NRDSampleResource).
     /// </summary>
-    public class NRDOpaquePass : ScriptableRenderPass
+    public class NRDOpaquePass : ScriptableRenderPass, IDisposable
     {
-        private readonly NativeComputeShader _cs;
-        private          Resource            _resource;
-        private          Settings            _settings;
-        private          NRDSampleResource   _nrdResource;
+        private readonly NativeComputePipeline _cs;
+        private          Resource              _resource;
+        private          Settings              _settings;
+        private          NRDSampleResource     _nrdResource;
 
         public NRDOpaquePass(NativeComputeShader cs)
         {
-            _cs = cs;
+            _cs = new NativeComputePipeline(cs);
+        }
+
+        public void Dispose()
+        {
+            _cs?.Dispose();
         }
 
         public void Setup(Resource resource, Settings settings)
@@ -85,10 +91,10 @@ namespace PathTracing
 
         class PassData
         {
-            internal NativeComputeShader Cs;
-            internal NRDSampleResource   NrdResource;
-            internal Resource            Resource;
-            internal Settings            Settings;
+            internal NativeComputePipeline Cs;
+            internal NRDSampleResource     NrdResource;
+            internal Resource              Resource;
+            internal Settings              Settings;
 
             internal TextureHandle DirectEmission;
             internal TextureHandle PrevComposedDiff;
