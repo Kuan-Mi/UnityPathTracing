@@ -50,7 +50,13 @@ namespace NativeRender
             string projectRoot = Path.GetFullPath(Path.Combine(Application.dataPath, ".."));
             var allPaths = new string[1 + additionalIncludePaths.Length];
             allPaths[0] = projectRoot;
-            additionalIncludePaths.CopyTo(allPaths, 1);
+            for (int i = 0; i < additionalIncludePaths.Length; i++)
+            {
+                string p = Environment.ExpandEnvironmentVariables(additionalIncludePaths[i]);
+                if (!Path.IsPathRooted(p))
+                    p = Path.GetFullPath(Path.Combine(projectRoot, p));
+                allPaths[1 + i] = p;
+            }
 
             var pathsProp = so.FindProperty("additionalIncludePaths");
             pathsProp.arraySize = allPaths.Length;

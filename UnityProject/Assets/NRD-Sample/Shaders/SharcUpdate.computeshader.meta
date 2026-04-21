@@ -10,11 +10,11 @@ ScriptedImporter:
   script: {fileID: 11500000, guid: ea13329833ed16543aa33a7c88f8c5bf, type: 3}
   isComputeShader: 1
   additionalIncludePaths:
-  - F:\UnityNRD\RenderingPlugin\External\NRI\Include
-  - F:\UnityNRD\RenderingPlugin\External\NRD\Include
-  - F:\UnityNRD\RenderingPlugin\External\NRD\Shaders
-  - F:\NRD-Sample\External\NRIFramework\External\MathLib
-  - F:\NRD-Sample\_Build\_deps\sharc-src\include
+  - ../RenderingPlugin/External/NRI/Include
+  - ../RenderingPlugin/External/NRD/Include
+  - ../RenderingPlugin/External/NRD/Shaders
+  - ../RenderingPlugin/_deps/mathlib-src
+  - ../RenderingPlugin/_deps/sharc-src/include
   extraArgs:
   - -enable-16bit-types
   defines:
