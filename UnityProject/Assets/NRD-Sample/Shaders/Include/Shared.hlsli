@@ -499,14 +499,14 @@ float3 GetSunIntensity( float3 v )
     float a = Math::Sqrt01( 1.0 - b * b ) / b;
     float sun = 1.0 - Math::SmoothStep( gTanSunAngularRadius * 0.9, gTanSunAngularRadius * 1.66 + 0.01, a );
     sun *= float( b > 0.0 );
-    sun *= 1.0 - Math::Pow01( 1.0 - v.z, 4.85 );
-    sun *= Math::SmoothStep( 0.0, 0.1, gSunDirection.z );
+    sun *= 1.0 - Math::Pow01( 1.0 - v.y, 4.85 );
+    sun *= Math::SmoothStep( 0.0, 0.1, gSunDirection.y );
     sun += glow;
 
     float3 sunColor = lerp( float3( 1.0, 0.6, 0.3 ), float3( 1.0, 0.9, 0.7 ), Math::Sqrt01( gSunDirection.z ) );
     sunColor *= sun;
 
-    sunColor *= Math::SmoothStep( -0.01, 0.05, gSunDirection.z );
+    sunColor *= Math::SmoothStep( -0.01, 0.05, gSunDirection.y );
 
 #if USE_WHITE_FURNACE
     return 0.0;
@@ -517,16 +517,16 @@ float3 GetSunIntensity( float3 v )
 
 float3 GetSkyIntensity( float3 v )
 {
-    float atmosphere = sqrt( 1.0 - saturate( v.z ) );
+    float atmosphere = sqrt( 1.0 - saturate( v.y ) );
 
-    float scatter = pow( saturate( gSunDirection.z ), 1.0 / 15.0 );
+    float scatter = pow( saturate( gSunDirection.y ), 1.0 / 15.0 );
     scatter = 1.0 - clamp( scatter, 0.8, 1.0 );
 
     float3 scatterColor = lerp( float3( 1.0, 1.0, 1.0 ), float3( 1.0, 0.3, 0.0 ) * 1.5, scatter );
     float3 skyColor = lerp( float3( 0.2, 0.4, 0.8 ), float3( scatterColor ), atmosphere / 1.3 );
-    skyColor *= saturate( 1.0 + gSunDirection.z );
+    skyColor *= saturate( 1.0 + gSunDirection.y );
 
-    float ground = 0.5 + 0.5 * Math::SmoothStep( -1.0, 0.0, v.z );
+    float ground = 0.5 + 0.5 * Math::SmoothStep( -1.0, 0.0, v.y );
     skyColor *= ground;
 
 #if USE_WHITE_FURNACE
