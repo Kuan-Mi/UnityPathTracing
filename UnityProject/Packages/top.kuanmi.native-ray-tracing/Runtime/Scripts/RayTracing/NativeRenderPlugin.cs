@@ -30,18 +30,17 @@ namespace NativeRender
         [DllImport(DllName)]
         public static extern void NR_AS_Clear(ulong handle);
 
-        /// <summary>Per-submesh descriptor. Must match C++ NR_SubmeshDesc exactly (Pack=4).</summary>
-        [StructLayout(LayoutKind.Sequential, Pack = 4)]
+        /// <summary>Per-submesh descriptor. Must match C++ NR_SubmeshDesc exactly.</summary>
+        [StructLayout(LayoutKind.Sequential)]
         public struct SubmeshDesc
         {
             public uint indexCount;
             public uint indexByteOffset;
-            public uint materialIndex;
         }
 
         /// <summary>
         /// Per-submesh pre-baked OMM descriptor passed inline to NR_AS_AddInstance.
-        /// Must match C++ NR_SubmeshOMMDesc exactly (natural 8-byte pointer alignment).
+        /// Must match C++ NR_SubmeshOMMDesc exactly (pointers first, then u32s — no pad needed).
         /// Set arrayData = IntPtr.Zero to skip OMM for this submesh.
         /// All pointers must remain pinned for the duration of the NR_AS_AddInstance call.
         /// </summary>
@@ -49,48 +48,36 @@ namespace NativeRender
         public struct SubmeshOMMDesc
         {
             public IntPtr arrayData;        // nullable
-            public uint   arrayDataSize;
-            public uint   _pad0;
             public IntPtr descArray;
-            public uint   descArrayCount;
-            public uint   _pad1;
             public IntPtr indexBuffer;
+            public IntPtr histogramFlat;    // uint32[] of {count, subdivLevel, format} * histogramCount
+
+            public uint   arrayDataSize;
+            public uint   descArrayCount;
             public uint   indexCount;
             public uint   indexStride;
-            public IntPtr histogramFlat;    // uint32[] of {count, subdivLevel, format} * histogramCount
             public uint   histogramCount;
-            public uint   _pad2;
         }
 
         /// <summary>
         /// All per-instance parameters for NR_AS_AddInstance (excluding the AS handle).
-        /// Must match the C++ NR_AddInstanceDesc struct layout exactly.
+        /// Must match the C++ NR_AddInstanceDesc struct layout exactly
+        /// (pointers first, then u32s — no pad needed).
         /// submeshDescs and ommDescs must remain pinned for the duration of the call.
         /// </summary>
         [StructLayout(LayoutKind.Sequential)]
         public struct AddInstanceDesc
         {
-            public uint   instanceHandle;       // unique handle (e.g. MeshRenderer.GetInstanceID())
-            public uint   _pad0;
-
             public IntPtr vertexBufferNativePtr;
+            public IntPtr indexBufferNativePtr;
+            public IntPtr submeshDescs;         // NR_SubmeshDesc*
+            public IntPtr ommDescs;             // NR_SubmeshOMMDesc* or IntPtr.Zero
+
+            public uint   instanceHandle;       // unique handle (e.g. MeshRenderer.GetInstanceID())
             public uint   vertexCount;
             public uint   vertexStride;
-            public uint   positionOffset;
-            public uint   normalOffset;
-            public uint   texCoord1Offset;
-            public uint   tangentOffset;
-            public uint   _pad1;
-
-            public IntPtr indexBufferNativePtr;
             public uint   indexStride;
-            public uint   _pad2;
-
-            public IntPtr submeshDescs;         // NR_SubmeshDesc*
             public uint   submeshCount;
-            public uint   _pad3;
-
-            public IntPtr ommDescs;             // NR_SubmeshOMMDesc* or IntPtr.Zero
         }
 
         /// <summary>

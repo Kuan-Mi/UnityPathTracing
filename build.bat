@@ -25,7 +25,7 @@ goto :build
 
 :configure
 echo Configuring CMake...
-cmake -S RenderingPlugin -B "%BUILD_DIR%" -G "Visual Studio 17 2022" -A x64 -DNR_SKIP_UNITY_COPY=ON
+cmake -S RenderingPlugin -B "%BUILD_DIR%" -G "Visual Studio 17 2022" -A x64 -T host=x64 -DNR_SKIP_UNITY_COPY=ON
 if errorlevel 1 (
     echo [ERROR] CMake configuration failed.
     exit /b 1

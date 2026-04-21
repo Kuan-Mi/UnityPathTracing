@@ -7,53 +7,57 @@ using UnityEngine.Rendering;
 namespace NativeRender
 {
     /// <summary>
-    /// Scene-resident resources mirroring NRDSample.cpp's resource taxonomy:
-    /// dual TLAS (world + emissive), per-instance / per-geometry / per-material
-    /// structured buffers, per-triangle primitive buffer, SHARC ring buffers,
-    /// Morph stubs (kept as 1-element allocations for a fully static scene),
-    /// and bindless VB/IB + texture arrays.
+    /// Scene-resident resources mirroring NRDSample.cpp's resource taxonomy and
+    /// binding names: two TLAS (world/light), InstanceData + PrimitiveData
+    /// structured buffers, SHARC UAV ring buffers, a MorphPrimitivePositions stub
+    /// (static scene), and a bindless material texture array.
     ///
-    /// Usage mirrors <see cref="GPUScene"/>: call <see cref="UpdateForFrame"/>
-    /// from the feature, <see cref="BuildAccelerationStructures"/> inside the
-    /// command buffer, then <see cref="BindToShader"/> on any ray-tracing shader.
+    /// Data layouts match the <c>InstanceData</c> / <c>PrimitiveData</c> /
+    /// <c>MorphPrimitivePositions</c> structs in NRDSample.cpp exactly.
     /// </summary>
     public sealed class NRDSampleResource : IDisposable
     {
         // Matches "#define SHARC_CAPACITY ( 1 << 23 )" in Shared.hlsl.
         public const int SharcCapacity = 1 << 23;
 
+        // Matches "constexpr uint32_t TEXTURES_PER_MATERIAL = 4;" in NRDSample.cpp.
+        public const int TexturesPerMaterial = 4;
+
+        // Matches "#define FLAG_FIRST_BIT 24" in Shared.hlsl.
+        public const int FlagFirstBit = 24;
+
+        // Scene flag constants (Shared.hlsl).
+        public const uint FLAG_NON_TRANSPARENT = 0x01;
+        public const uint FLAG_TRANSPARENT     = 0x02;
+        public const uint FLAG_EMISSIVE        = 0x04;
+        public const uint FLAG_STATIC          = 0x08;
+        public const uint FLAG_MORPH           = 0x10;
+
         // ----- Acceleration structures -----
-        private RayTracingAccelerationStructure _worldAS;
-        private RayTracingAccelerationStructure _emissiveAS;
+        private RayTracingAccelerationStructure _worldAS;   // gWorldTlas
+        private RayTracingAccelerationStructure _lightAS;   // gLightTlas
 
-        // ----- Scene structured buffers (matches GPUScene layout) -----
-        private GraphicsBuffer _instanceBuf;
-        private GraphicsBuffer _geometryBuf;
-        private GraphicsBuffer _materialBuf;
-        private GraphicsBuffer _primitiveBuf;
+        // ----- Structured buffers (NRDSample names) -----
+        private GraphicsBuffer _instanceDataBuf;                 // gIn_InstanceData
+        private GraphicsBuffer _primitiveDataBuf;                // gIn_PrimitiveData
+        private GraphicsBuffer _morphPrimitivePositionsPrevBuf;  // gIn_MorphPrimitivePositionsPrev (stub)
 
-        // ----- SHARC ring buffers -----
-        private GraphicsBuffer _sharcHashEntries;     // uint64 per entry
-        private GraphicsBuffer _sharcAccumulated;     // uint4 per entry
-        private GraphicsBuffer _sharcResolved;        // uint4 per entry
+        // ----- SHARC UAV ring buffers -----
+        private GraphicsBuffer _sharcHashEntries;   // gInOut_SharcHashEntriesBuffer
+        private GraphicsBuffer _sharcAccumulated;   // gInOut_SharcAccumulated
+        private GraphicsBuffer _sharcResolved;      // gInOut_SharcResolved
 
-        // ----- Morph resource stubs (static scene => size 1) -----
-        private GraphicsBuffer _morphMeshIndices;
-        private GraphicsBuffer _morphMeshVertices;
-        private GraphicsBuffer _morphPositions;
-        private GraphicsBuffer _morphAttributes;
-        private GraphicsBuffer _morphPrimitivePositions;
-        private GraphicsBuffer _morphMeshScratch;
-
-        // ----- Bindless arrays (VB/IB + textures) -----
-        private BindlessBuffer  _sceneBuffers;
-        private BindlessTexture _sceneTextures;
+        // ----- Material texture array (gIn_Textures) -----
+        // Interleaved TEXTURES_PER_MATERIAL per material, per NRDSample layout:
+        // slot [matIdx*4 + 0] = baseColor
+        //      [matIdx*4 + 1] = normal
+        //      [matIdx*4 + 2] = roughness/metallic
+        //      [matIdx*4 + 3] = emissive
+        private BindlessTexture _textures;
 
         // ----- CPU mirrors -----
-        private InstanceDataGPU[]      _instanceCpu;
-        private GeometryDataGPU[]      _geometryCpu;
-        private MaterialConstantsGPU[] _materialCpu;
-        private PrimitiveDataGPU[]     _primitiveCpu;
+        private InstanceDataNRD[]  _instanceCpu;
+        private PrimitiveDataNRD[] _primitiveCpu;
 
         // ----- Per-instance tracking -----
         private struct SceneInstance
@@ -62,30 +66,26 @@ namespace NativeRender
             public Transform    transform;
             public bool         isEmissive;
         }
-        private readonly List<SceneInstance>               _sceneInstances  = new();
-        private readonly Dictionary<int, (int vb, int ib)> _meshBufferSlots = new();
-        private readonly Dictionary<int, int>              _materialSlots   = new();
-        private readonly Dictionary<int, int>              _textureSlots    = new();
-        private readonly List<NativeRayTracingTarget>      _registeredTargets = new();
+        private readonly List<SceneInstance>           _sceneInstances    = new();
+        private readonly Dictionary<Material, int>     _materialSlots     = new();
+        private readonly Dictionary<int, int>          _textureSlots      = new();
+        private readonly List<NativeRayTracingTarget>  _registeredTargets = new();
+        private readonly Dictionary<int, Mesh>         _normalizedMeshCache = new();
+        private readonly List<Mesh>                    _ownedMeshes         = new();
 
-        // Single-stream mesh normalisation cache.
-        private readonly Dictionary<int, Mesh> _normalizedMeshCache = new();
-        private readonly List<Mesh>            _ownedMeshes         = new();
-
-        // Dirty flags.
         private bool _sceneGpuDirty = true;
-        private bool _forceRebuild  = false;
+        private bool _forceRebuild;
         private readonly HashSet<Material> _dirtyMaterials = new();
 
         private bool _disposed;
 
-        public RayTracingAccelerationStructure WorldAS    => _worldAS;
-        public RayTracingAccelerationStructure EmissiveAS => _emissiveAS;
+        public RayTracingAccelerationStructure WorldAS => _worldAS;
+        public RayTracingAccelerationStructure LightAS => _lightAS;
 
         public NRDSampleResource()
         {
-            _worldAS    = new RayTracingAccelerationStructure();
-            _emissiveAS = new RayTracingAccelerationStructure();
+            _worldAS = new RayTracingAccelerationStructure();
+            _lightAS = new RayTracingAccelerationStructure();
             AllocateStaticResources();
         }
 
@@ -94,12 +94,9 @@ namespace NativeRender
             if (mat != null) _dirtyMaterials.Add(mat);
         }
 
-        public void MarkRebuildDirty()
-        {
-            _forceRebuild = true;
-        }
+        public void MarkRebuildDirty() => _forceRebuild = true;
 
-        /// <summary>Dirty detection + incremental scene registration + GPU data rebuild + transform update.</summary>
+        /// <summary>Dirty detection + scene registration + GPU rebuild + transform update.</summary>
         public void UpdateForFrame()
         {
             var targets = NativeRayTracingTarget.All;
@@ -128,35 +125,27 @@ namespace NativeRender
         public void BuildAccelerationStructures(CommandBuffer cmd)
         {
             _worldAS.BuildOrUpdate(cmd);
-            _emissiveAS.BuildOrUpdate(cmd);
+            _lightAS.BuildOrUpdate(cmd);
         }
 
-        /// <summary>Bind all scene GPU resources to a ray tracing shader.</summary>
+        /// <summary>Bind all scene GPU resources to a ray tracing shader using NRDSample names.</summary>
         public void BindToShader(RayTraceShader shader)
         {
             if (shader == null || !shader.IsValid) return;
 
-            shader.SetAccelerationStructure("gWorldTlas",    _worldAS);
-            shader.SetAccelerationStructure("gEmissiveTlas", _emissiveAS);
+            shader.SetAccelerationStructure("gWorldTlas", _worldAS);
+            shader.SetAccelerationStructure("gLightTlas", _lightAS);
 
-            shader.SetStructuredBuffer("t_InstanceData",      _instanceBuf);
-            shader.SetStructuredBuffer("t_GeometryData",      _geometryBuf);
-            shader.SetStructuredBuffer("t_MaterialConstants", _materialBuf);
-            shader.SetStructuredBuffer("t_PrimitiveData",     _primitiveBuf);
+            shader.SetStructuredBuffer("gIn_InstanceData",               _instanceDataBuf);
+            shader.SetStructuredBuffer("gIn_PrimitiveData",              _primitiveDataBuf);
+            shader.SetStructuredBuffer("gIn_MorphPrimitivePositionsPrev", _morphPrimitivePositionsPrevBuf);
 
-            shader.SetStructuredBuffer("t_SharcHashEntries", _sharcHashEntries);
-            shader.SetStructuredBuffer("t_SharcAccumulated", _sharcAccumulated);
-            shader.SetStructuredBuffer("t_SharcResolved",    _sharcResolved);
+            // SHARC UAV bindings.
+            shader.SetRWBuffer("gInOut_SharcHashEntriesBuffer", _sharcHashEntries);
+            shader.SetRWBuffer("gInOut_SharcAccumulated",       _sharcAccumulated);
+            shader.SetRWBuffer("gInOut_SharcResolved",          _sharcResolved);
 
-            shader.SetStructuredBuffer("t_MorphMeshIndices",        _morphMeshIndices);
-            shader.SetStructuredBuffer("t_MorphMeshVertices",       _morphMeshVertices);
-            shader.SetStructuredBuffer("t_MorphPositions",          _morphPositions);
-            shader.SetStructuredBuffer("t_MorphAttributes",         _morphAttributes);
-            shader.SetStructuredBuffer("t_MorphPrimitivePositions", _morphPrimitivePositions);
-            shader.SetStructuredBuffer("t_MorphMeshScratch",        _morphMeshScratch);
-
-            if (_sceneBuffers  != null) shader.SetBindlessBuffer ("t_BindlessBuffers",  _sceneBuffers);
-            if (_sceneTextures != null) shader.SetBindlessTexture("t_BindlessTextures", _sceneTextures);
+            if (_textures != null) shader.SetBindlessTexture("gIn_Textures", _textures);
         }
 
         public void Dispose()
@@ -167,46 +156,35 @@ namespace NativeRender
             DisposeSceneGpuBuffers();
             DisposeStaticResources();
 
-            _worldAS?.Dispose();    _worldAS    = null;
-            _emissiveAS?.Dispose(); _emissiveAS = null;
+            _worldAS?.Dispose(); _worldAS = null;
+            _lightAS?.Dispose(); _lightAS = null;
         }
 
         // =====================================================================
-        // Static (size-invariant) resource allocation
+        // Static resources
         // =====================================================================
 
         private void AllocateStaticResources()
         {
-            // SHARC buffers — NRDSample uses these sizes in Buffer::Sharc*.
-            _sharcHashEntries = new GraphicsBuffer(GraphicsBuffer.Target.Structured,
-                SharcCapacity, sizeof(ulong));
-            _sharcAccumulated = new GraphicsBuffer(GraphicsBuffer.Target.Structured,
-                SharcCapacity, sizeof(uint) * 4);
-            _sharcResolved = new GraphicsBuffer(GraphicsBuffer.Target.Structured,
-                SharcCapacity, sizeof(uint) * 4);
+            const GraphicsBuffer.Target rwTarget = GraphicsBuffer.Target.Structured;
 
-            // Morph stubs — scene is fully static so we keep a single-element
-            // allocation per buffer to satisfy shader bindings without wasting memory.
-            _morphMeshIndices        = new GraphicsBuffer(GraphicsBuffer.Target.Structured, 1, sizeof(uint));
-            _morphMeshVertices       = new GraphicsBuffer(GraphicsBuffer.Target.Structured, 1, sizeof(uint) * 4);
-            _morphPositions          = new GraphicsBuffer(GraphicsBuffer.Target.Structured, 1, sizeof(float) * 4);
-            _morphAttributes         = new GraphicsBuffer(GraphicsBuffer.Target.Structured, 1, sizeof(uint) * 4);
-            _morphPrimitivePositions = new GraphicsBuffer(GraphicsBuffer.Target.Structured, 1, sizeof(float) * 4);
-            _morphMeshScratch        = new GraphicsBuffer(GraphicsBuffer.Target.Structured, 1, sizeof(uint) * 4);
+            _sharcHashEntries = new GraphicsBuffer(rwTarget, SharcCapacity, sizeof(ulong));
+            _sharcAccumulated = new GraphicsBuffer(rwTarget, SharcCapacity, sizeof(uint) * 4);
+            _sharcResolved    = new GraphicsBuffer(rwTarget, SharcCapacity, sizeof(uint) * 4);
+
+            // Static scene: single-element stub buffer so the binding is never null.
+            _morphPrimitivePositionsPrevBuf = new GraphicsBuffer(
+                GraphicsBuffer.Target.Structured, 1, Marshal.SizeOf<MorphPrimitivePositionsNRD>());
+            var stub = new MorphPrimitivePositionsNRD[1];
+            _morphPrimitivePositionsPrevBuf.SetData(stub);
         }
 
         private void DisposeStaticResources()
         {
-            _sharcHashEntries?.Release(); _sharcHashEntries = null;
-            _sharcAccumulated?.Release(); _sharcAccumulated = null;
-            _sharcResolved?.Release();    _sharcResolved    = null;
-
-            _morphMeshIndices?.Release();        _morphMeshIndices        = null;
-            _morphMeshVertices?.Release();       _morphMeshVertices       = null;
-            _morphPositions?.Release();          _morphPositions          = null;
-            _morphAttributes?.Release();         _morphAttributes         = null;
-            _morphPrimitivePositions?.Release(); _morphPrimitivePositions = null;
-            _morphMeshScratch?.Release();        _morphMeshScratch        = null;
+            _sharcHashEntries?.Release();               _sharcHashEntries               = null;
+            _sharcAccumulated?.Release();               _sharcAccumulated               = null;
+            _sharcResolved?.Release();                  _sharcResolved                  = null;
+            _morphPrimitivePositionsPrevBuf?.Release(); _morphPrimitivePositionsPrevBuf = null;
         }
 
         // =====================================================================
@@ -215,21 +193,14 @@ namespace NativeRender
 
         private void DisposeSceneGpuBuffers()
         {
-            _instanceBuf?.Release();  _instanceBuf  = null;
-            _geometryBuf?.Release();  _geometryBuf  = null;
-            _materialBuf?.Release();  _materialBuf  = null;
-            _primitiveBuf?.Release(); _primitiveBuf = null;
-
-            _sceneBuffers?.Dispose();  _sceneBuffers  = null;
-            _sceneTextures?.Dispose(); _sceneTextures = null;
+            _instanceDataBuf?.Release();  _instanceDataBuf  = null;
+            _primitiveDataBuf?.Release(); _primitiveDataBuf = null;
+            _textures?.Dispose();         _textures         = null;
 
             _instanceCpu  = null;
-            _geometryCpu  = null;
-            _materialCpu  = null;
             _primitiveCpu = null;
 
             _sceneInstances.Clear();
-            _meshBufferSlots.Clear();
             _materialSlots.Clear();
             _textureSlots.Clear();
 
@@ -255,68 +226,54 @@ namespace NativeRender
 
         private void RegisterScene(IReadOnlyList<NativeRayTracingTarget> targets)
         {
-            // If any previously registered target was destroyed we cannot call
-            // RemoveInstance (no live MeshRenderer), so tear down and rebuild both AS.
             bool hasDestroyed = false;
             foreach (var target in _registeredTargets)
-            {
                 if (target == null) { hasDestroyed = true; break; }
-            }
 
             if (hasDestroyed)
             {
-                _worldAS?.Dispose();    _worldAS    = new RayTracingAccelerationStructure();
-                _emissiveAS?.Dispose(); _emissiveAS = new RayTracingAccelerationStructure();
+                _worldAS?.Dispose(); _worldAS = new RayTracingAccelerationStructure();
+                _lightAS?.Dispose(); _lightAS = new RayTracingAccelerationStructure();
 
                 foreach (var target in targets)
-                {
-                    if (target == null) continue;
-                    var mr = target.GetComponent<MeshRenderer>();
-                    if (mr == null)
-                    {
-                        Debug.LogWarning($"[NRDSampleResource] Target '{target.name}' has no MeshRenderer — skipping");
-                        continue;
-                    }
-
-                    Matrix4x4 xform = target.transform.localToWorldMatrix;
-                    if (_worldAS.AddInstance(mr, target.ommCaches))
-                        _worldAS.SetInstanceTransform(mr, xform);
-
-                    if (IsTargetEmissive(target) && _emissiveAS.AddInstance(mr, target.ommCaches))
-                        _emissiveAS.SetInstanceTransform(mr, xform);
-                }
+                    AddToAS(target);
                 return;
             }
 
             var incoming = new HashSet<NativeRayTracingTarget>(targets);
-
             foreach (var target in _registeredTargets)
             {
                 if (incoming.Contains(target)) continue;
                 var mr = target.GetComponent<MeshRenderer>();
                 if (mr == null) continue;
                 _worldAS.RemoveInstance(mr);
-                _emissiveAS.RemoveInstance(mr);
+                _lightAS.RemoveInstance(mr);
             }
 
             var registered = new HashSet<NativeRayTracingTarget>(_registeredTargets);
             foreach (var target in targets)
             {
                 if (registered.Contains(target)) continue;
-                var mr = target.GetComponent<MeshRenderer>();
-                if (mr == null)
-                {
-                    Debug.LogWarning($"[NRDSampleResource] Target '{target.name}' has no MeshRenderer — skipping");
-                    continue;
-                }
-
-                Matrix4x4 xform = target.transform.localToWorldMatrix;
-                if (_worldAS.AddInstance(mr, target.ommCaches))
-                    _worldAS.SetInstanceTransform(mr, xform);
-
-                if (IsTargetEmissive(target) && _emissiveAS.AddInstance(mr, target.ommCaches))
-                    _emissiveAS.SetInstanceTransform(mr, xform);
+                AddToAS(target);
             }
+        }
+
+        private void AddToAS(NativeRayTracingTarget target)
+        {
+            if (target == null) return;
+            var mr = target.GetComponent<MeshRenderer>();
+            if (mr == null)
+            {
+                Debug.LogWarning($"[NRDSampleResource] Target '{target.name}' has no MeshRenderer — skipping");
+                return;
+            }
+
+            Matrix4x4 xform = target.transform.localToWorldMatrix;
+            if (_worldAS.AddInstance(mr, target.ommCaches))
+                _worldAS.SetInstanceTransform(mr, xform);
+
+            if (IsTargetEmissive(target) && _lightAS.AddInstance(mr, target.ommCaches))
+                _lightAS.SetInstanceTransform(mr, xform);
         }
 
         private static bool IsTargetEmissive(NativeRayTracingTarget target)
@@ -327,14 +284,14 @@ namespace NativeRender
             if (mats == null) return false;
             for (int i = 0; i < mats.Length; i++)
             {
-                var mat = mats[i];
-                if (mat == null) continue;
-                if (mat.HasProperty("_EmissionColor"))
+                var m = mats[i];
+                if (m == null) continue;
+                if (m.HasProperty("_EmissionColor"))
                 {
-                    Color e = mat.GetColor("_EmissionColor").linear;
+                    Color e = m.GetColor("_EmissionColor").linear;
                     if (e.r > 0f || e.g > 0f || e.b > 0f) return true;
                 }
-                if (mat.HasProperty("_EmissionMap") && mat.GetTexture("_EmissionMap") != null)
+                if (m.HasProperty("_EmissionMap") && m.GetTexture("_EmissionMap") != null)
                     return true;
             }
             return false;
@@ -344,14 +301,13 @@ namespace NativeRender
         {
             DisposeSceneGpuBuffers();
 
-            var instList = new List<InstanceDataGPU>();
-            var geomList = new List<GeometryDataGPU>();
-            var matList  = new List<MaterialConstantsGPU>();
-            var primList = new List<PrimitiveDataGPU>();
-            var bufPtrs  = new List<IntPtr>();
+            var instList = new List<InstanceDataNRD>();
+            var primList = new List<PrimitiveDataNRD>();
             var texPtrs  = new List<IntPtr>();
 
-            int emissiveSlot = 0;   // index within _emissiveAS
+            int lightInstanceSlot = 0;
+            uint primitiveRunning = 0;
+
             foreach (var target in targets)
             {
                 var mr = target.GetComponent<MeshRenderer>();
@@ -361,129 +317,214 @@ namespace NativeRender
 
                 Mesh mesh = GetOrCreateSingleStreamMesh(mf.sharedMesh);
                 if (mesh == null) continue;
-                int meshKey = mesh.GetInstanceID();
-                mesh.UploadMeshData(false);
 
-                if (!_meshBufferSlots.TryGetValue(meshKey, out var slots))
+                // Use the first submesh's material as the "representative" material
+                // (NRDSample stores one Material per Instance). Multi-submesh renderers
+                // all share the same instance slot; additional material variation can be
+                // added later by splitting into multiple NativeRayTracingTargets.
+                Material[] mats = mr.sharedMaterials ?? Array.Empty<Material>();
+                Material   mat  = mats.Length > 0 ? mats[0] : null;
+                int        matIdx = GetOrAddMaterial(mat, texPtrs);
+
+                uint flags = FLAG_STATIC | FLAG_NON_TRANSPARENT;
+                bool isEmissive = IsMaterialEmissive(mat);
+                if (isEmissive) flags |= FLAG_EMISSIVE;
+
+                uint baseTextureIndex = (uint)(matIdx * TexturesPerMaterial);
+
+                // Append PrimitiveData for every triangle of the mesh.
+                uint primitiveOffset = primitiveRunning;
+                AppendPrimitiveData(mesh, primList);
+                uint triCount = (uint)(primList.Count - (int)primitiveOffset);
+                primitiveRunning += triCount;
+
+                // Build InstanceData.
+                Matrix4x4 local = target.transform.localToWorldMatrix;
+                Vector3   s     = new Vector3(
+                    new Vector3(local.m00, local.m10, local.m20).magnitude,
+                    new Vector3(local.m01, local.m11, local.m21).magnitude,
+                    new Vector3(local.m02, local.m12, local.m22).magnitude);
+                float     scaleMax    = Mathf.Max(s.x, Mathf.Max(s.y, s.z));
+                bool      leftHanded  = Vector3.Dot(Vector3.Cross(
+                                          new Vector3(local.m00, local.m10, local.m20),
+                                          new Vector3(local.m01, local.m11, local.m21)),
+                                          new Vector3(local.m02, local.m12, local.m22)) < 0f;
+
+                var inst = new InstanceDataNRD
                 {
-                    IntPtr vbPtr = mesh.GetNativeVertexBufferPtr(0);
-                    IntPtr ibPtr = mesh.GetNativeIndexBufferPtr();
-                    if (vbPtr == IntPtr.Zero || ibPtr == IntPtr.Zero)
-                    {
-                        Debug.LogWarning($"[NRDSampleResource] '{mesh.name}': failed to get GPU buffer ptrs — skipping");
-                        continue;
-                    }
+                    mOverloadedMatrix0   = TransposedCol(local, 0),
+                    mOverloadedMatrix1   = TransposedCol(local, 1),
+                    mOverloadedMatrix2   = TransposedCol(local, 2),
+                    textureOffsetAndFlags = baseTextureIndex | (flags << FlagFirstBit),
+                    primitiveOffset       = primitiveOffset,
+                    scale                 = (leftHanded ? -1f : 1f) * scaleMax,
+                    morphPrimitiveOffset  = 0,
+                };
+                EncodeMaterial(mat, ref inst);
 
-                    slots = (bufPtrs.Count, bufPtrs.Count + 1);
-                    bufPtrs.Add(vbPtr);
-                    bufPtrs.Add(ibPtr);
-                    _meshBufferSlots[meshKey] = slots;
-                }
+                uint instanceIdx = (uint)instList.Count;
+                _worldAS.SetInstanceID(mr, instanceIdx);
+                instList.Add(inst);
 
-                uint vertexStride = (uint)mesh.GetVertexBufferStride(0);
-                uint indexStride  = mesh.indexFormat == IndexFormat.UInt16 ? 2u : 4u;
-                uint posOff       = mesh.HasVertexAttribute(VertexAttribute.Position)  ? (uint)mesh.GetVertexAttributeOffset(VertexAttribute.Position)  : 0u;
-                uint normOff      = mesh.HasVertexAttribute(VertexAttribute.Normal)    ? (uint)mesh.GetVertexAttributeOffset(VertexAttribute.Normal)    : 0xFFFFFFFFu;
-                uint uvOff        = mesh.HasVertexAttribute(VertexAttribute.TexCoord0) ? (uint)mesh.GetVertexAttributeOffset(VertexAttribute.TexCoord0) : 0xFFFFFFFFu;
-                uint tanOff       = mesh.HasVertexAttribute(VertexAttribute.Tangent)   ? (uint)mesh.GetVertexAttributeOffset(VertexAttribute.Tangent)   : 0xFFFFFFFFu;
-
-                Material[] mats       = mr.sharedMaterials ?? Array.Empty<Material>();
-                int        subMeshCnt = mesh.subMeshCount;
-                int        firstGeom  = geomList.Count;
-                int        instanceIdx = instList.Count;
-
-                for (int s = 0; s < subMeshCnt; s++)
-                {
-                    SubMeshDescriptor sub    = mesh.GetSubMesh(s);
-                    Material          mat    = s < mats.Length ? mats[s] : (mats.Length > 0 ? mats[^1] : null);
-                    int               matIdx = GetOrAddMaterialGpu(mat, matList, texPtrs);
-
-                    geomList.Add(new GeometryDataGPU
-                    {
-                        numIndices        = (uint)sub.indexCount,
-                        numVertices       = (uint)mesh.vertexCount,
-                        indexBufferIndex  = slots.ib,
-                        indexOffset       = (uint)sub.indexStart * indexStride,
-                        vertexBufferIndex = slots.vb,
-                        positionOffset    = posOff,
-                        normalOffset      = normOff,
-                        texCoord1Offset   = uvOff,
-                        tangentOffset     = tanOff,
-                        vertexStride      = vertexStride,
-                        indexStride       = indexStride,
-                        materialIndex     = (uint)matIdx,
-                    });
-                }
-
-                // Per-triangle PrimitiveData (walk the managed index buffer for each submesh).
-                AppendPrimitiveData(mesh, (uint)instanceIdx, primList);
-
-                Matrix4x4 m = target.transform.localToWorldMatrix;
-                _worldAS.SetInstanceID(mr, (uint)instanceIdx);
-                instList.Add(new InstanceDataGPU
-                {
-                    firstGeometryIndex = (uint)firstGeom,
-                    numGeometries      = (uint)subMeshCnt,
-                    pad0               = 0, pad1 = 0,
-                    transformRow0      = new Vector4(m.m00, m.m01, m.m02, m.m03),
-                    transformRow1      = new Vector4(m.m10, m.m11, m.m12, m.m13),
-                    transformRow2      = new Vector4(m.m20, m.m21, m.m22, m.m23),
-                });
-
-                bool isEmissive = IsTargetEmissive(target);
                 if (isEmissive)
                 {
-                    _emissiveAS.SetInstanceID(mr, (uint)emissiveSlot);
-                    emissiveSlot++;
+                    _lightAS.SetInstanceID(mr, (uint)lightInstanceSlot);
+                    lightInstanceSlot++;
                 }
-                _sceneInstances.Add(new SceneInstance { renderer = mr, transform = mr.transform, isEmissive = isEmissive });
-            }
 
-            _sceneBuffers = new BindlessBuffer(Mathf.Max(bufPtrs.Count, 1));
-            for (int i = 0; i < bufPtrs.Count; i++)
-                _sceneBuffers.SetNativePtr(i, bufPtrs[i]);
+                _sceneInstances.Add(new SceneInstance
+                {
+                    renderer   = mr,
+                    transform  = mr.transform,
+                    isEmissive = isEmissive,
+                });
+            }
 
             int texCount = Mathf.Max(texPtrs.Count, 1);
-            _sceneTextures = new BindlessTexture(texCount);
+            _textures = new BindlessTexture(texCount);
             for (int i = 0; i < texPtrs.Count; i++)
-                _sceneTextures.SetNativePtr(i, texPtrs[i]);
+                _textures.SetNativePtr(i, texPtrs[i]);
 
-            if (instList.Count == 0)
-            {
-                instList.Add(default);
-                geomList.Add(default);
-                matList.Add(default);
-            }
+            if (instList.Count == 0) instList.Add(default);
             if (primList.Count == 0) primList.Add(default);
 
             _instanceCpu  = instList.ToArray();
-            _geometryCpu  = geomList.ToArray();
-            _materialCpu  = matList.ToArray();
             _primitiveCpu = primList.ToArray();
 
-            _instanceBuf = new GraphicsBuffer(GraphicsBuffer.Target.Structured,
-                _instanceCpu.Length, Marshal.SizeOf<InstanceDataGPU>());
-            _instanceBuf.SetData(_instanceCpu);
+            _instanceDataBuf = new GraphicsBuffer(GraphicsBuffer.Target.Structured,
+                _instanceCpu.Length, Marshal.SizeOf<InstanceDataNRD>());
+            _instanceDataBuf.SetData(_instanceCpu);
 
-            _geometryBuf = new GraphicsBuffer(GraphicsBuffer.Target.Structured,
-                _geometryCpu.Length, Marshal.SizeOf<GeometryDataGPU>());
-            _geometryBuf.SetData(_geometryCpu);
-
-            _materialBuf = new GraphicsBuffer(GraphicsBuffer.Target.Structured,
-                _materialCpu.Length, Marshal.SizeOf<MaterialConstantsGPU>());
-            _materialBuf.SetData(_materialCpu);
-
-            _primitiveBuf = new GraphicsBuffer(GraphicsBuffer.Target.Structured,
-                _primitiveCpu.Length, Marshal.SizeOf<PrimitiveDataGPU>());
-            _primitiveBuf.SetData(_primitiveCpu);
+            _primitiveDataBuf = new GraphicsBuffer(GraphicsBuffer.Target.Structured,
+                _primitiveCpu.Length, Marshal.SizeOf<PrimitiveDataNRD>());
+            _primitiveDataBuf.SetData(_primitiveCpu);
 
             _sceneGpuDirty = false;
         }
 
-        private static void AppendPrimitiveData(Mesh mesh, uint instanceId, List<PrimitiveDataGPU> dst)
+        private static Vector4 TransposedCol(Matrix4x4 m, int col)
         {
-            Vector3[] verts = mesh.vertices;
-            Vector2[] uvs   = mesh.uv;
+            // Transpose3x4: column `col` of the transposed matrix is row `col` of original,
+            // i.e. (m[col,0], m[col,1], m[col,2], m[col,3]).
+            switch (col)
+            {
+                case 0: return new Vector4(m.m00, m.m01, m.m02, m.m03);
+                case 1: return new Vector4(m.m10, m.m11, m.m12, m.m13);
+                case 2: return new Vector4(m.m20, m.m21, m.m22, m.m23);
+            }
+            return Vector4.zero;
+        }
+
+        private static void EncodeMaterial(Material mat, ref InstanceDataNRD inst)
+        {
+            Color baseColor = TryGetColor(mat, "_BaseColor",     Color.white);
+            Color emission  = TryGetColor(mat, "_EmissionColor", Color.black);
+            float metal     = TryGetFloat(mat, "_Metallic",   0f);
+            float smooth    = TryGetFloat(mat, "_Smoothness", 0.5f);
+            float roughness = 1f - smooth;
+            float normScale = TryGetFloat(mat, "_BumpScale",  1f);
+
+            inst.baseColorR      = Mathf.FloatToHalf(baseColor.r);
+            inst.baseColorG      = Mathf.FloatToHalf(baseColor.g);
+            inst.baseColorB      = Mathf.FloatToHalf(baseColor.b);
+            inst.metalnessScaleH = Mathf.FloatToHalf(metal);
+
+            inst.emissionR       = Mathf.FloatToHalf(emission.r);
+            inst.emissionG       = Mathf.FloatToHalf(emission.g);
+            inst.emissionB       = Mathf.FloatToHalf(emission.b);
+            inst.roughnessScaleH = Mathf.FloatToHalf(roughness);
+
+            inst.normalUvScaleX  = Mathf.FloatToHalf(normScale);
+            inst.normalUvScaleY  = Mathf.FloatToHalf(normScale);
+        }
+
+        private int GetOrAddMaterial(Material mat, List<IntPtr> texPtrs)
+        {
+            // Use a sentinel key for null materials so they all share slot 0.
+            if (mat != null && _materialSlots.TryGetValue(mat, out int existing))
+                return existing;
+
+            int idx = _materialSlots.Count;
+            if (mat != null) _materialSlots[mat] = idx;
+
+            // Emit 4 texture slots per material — null textures become IntPtr.Zero.
+            Texture baseTex     = TryGetTex(mat, "_BaseMap");
+            Texture normalTex   = TryGetTex(mat, "_BumpMap");
+            Texture metalTex    = TryGetTex(mat, "_MetallicGlossMap");
+            Texture emissiveTex = TryGetTex(mat, "_EmissionMap");
+
+            AppendTexture(baseTex,     texPtrs);
+            AppendTexture(normalTex,   texPtrs);
+            AppendTexture(metalTex,    texPtrs);
+            AppendTexture(emissiveTex, texPtrs);
+
+            return idx;
+        }
+
+        private static void AppendTexture(Texture tex, List<IntPtr> texPtrs)
+        {
+            texPtrs.Add(tex != null ? tex.GetNativeTexturePtr() : IntPtr.Zero);
+        }
+
+        private static bool IsMaterialEmissive(Material mat)
+        {
+            if (mat == null) return false;
+            if (mat.HasProperty("_EmissionColor"))
+            {
+                Color e = mat.GetColor("_EmissionColor").linear;
+                if (e.r > 0f || e.g > 0f || e.b > 0f) return true;
+            }
+            if (mat.HasProperty("_EmissionMap") && mat.GetTexture("_EmissionMap") != null) return true;
+            return false;
+        }
+
+        private void UpdateInstanceTransforms()
+        {
+            if (_instanceCpu == null || _instanceDataBuf == null) return;
+
+            int instanceCount = Mathf.Min(_sceneInstances.Count, _instanceCpu.Length);
+            int dirtyStart = -1;
+
+            for (int i = 0; i < instanceCount; i++)
+            {
+                Transform t = _sceneInstances[i].transform;
+                if (t == null || !t.hasChanged)
+                {
+                    if (dirtyStart >= 0)
+                    {
+                        _instanceDataBuf.SetData(_instanceCpu, dirtyStart, dirtyStart, i - dirtyStart);
+                        dirtyStart = -1;
+                    }
+                    continue;
+                }
+
+                Matrix4x4 m = t.localToWorldMatrix;
+                _instanceCpu[i].mOverloadedMatrix0 = TransposedCol(m, 0);
+                _instanceCpu[i].mOverloadedMatrix1 = TransposedCol(m, 1);
+                _instanceCpu[i].mOverloadedMatrix2 = TransposedCol(m, 2);
+
+                var inst = _sceneInstances[i];
+                _worldAS.SetInstanceTransform(inst.renderer, m);
+                if (inst.isEmissive)
+                    _lightAS.SetInstanceTransform(inst.renderer, m);
+
+                if (dirtyStart < 0) dirtyStart = i;
+            }
+
+            if (dirtyStart >= 0)
+                _instanceDataBuf.SetData(_instanceCpu, dirtyStart, dirtyStart, instanceCount - dirtyStart);
+        }
+
+        // =====================================================================
+        // PrimitiveData construction
+        // =====================================================================
+
+        private static void AppendPrimitiveData(Mesh mesh, List<PrimitiveDataNRD> dst)
+        {
+            Vector3[] verts   = mesh.vertices;
+            Vector3[] normals = mesh.normals;
+            Vector4[] tangs   = mesh.tangents;
+            Vector2[] uvs     = mesh.uv;
             if (verts == null || verts.Length == 0) return;
 
             int subCnt = mesh.subMeshCount;
@@ -493,138 +534,76 @@ namespace NativeRender
                 for (int i = 0; i + 2 < tris.Length; i += 3)
                 {
                     int i0 = tris[i + 0], i1 = tris[i + 1], i2 = tris[i + 2];
-                    var p = new PrimitiveDataGPU
+
+                    Vector3 p0 = verts[i0], p1 = verts[i1], p2 = verts[i2];
+                    Vector2 uv0 = (uvs != null && i0 < uvs.Length) ? uvs[i0] : Vector2.zero;
+                    Vector2 uv1 = (uvs != null && i1 < uvs.Length) ? uvs[i1] : Vector2.zero;
+                    Vector2 uv2 = (uvs != null && i2 < uvs.Length) ? uvs[i2] : Vector2.zero;
+
+                    Vector3 e1 = p1 - p0, e2 = p2 - p0;
+                    float worldArea = 0.5f * Vector3.Cross(e1, e2).magnitude;
+
+                    Vector2 du1 = uv1 - uv0, du2 = uv2 - uv0;
+                    float uvArea = 0.5f * Mathf.Abs(du1.x * du2.y - du1.y * du2.x);
+
+                    Vector3 n0v = (normals != null && i0 < normals.Length) ? normals[i0].normalized : Vector3.up;
+                    Vector3 n1v = (normals != null && i1 < normals.Length) ? normals[i1].normalized : Vector3.up;
+                    Vector3 n2v = (normals != null && i2 < normals.Length) ? normals[i2].normalized : Vector3.up;
+
+                    Vector4 t0v = (tangs != null && i0 < tangs.Length) ? tangs[i0] : new Vector4(1, 0, 0, 1);
+                    Vector4 t1v = (tangs != null && i1 < tangs.Length) ? tangs[i1] : new Vector4(1, 0, 0, 1);
+                    Vector4 t2v = (tangs != null && i2 < tangs.Length) ? tangs[i2] : new Vector4(1, 0, 0, 1);
+
+                    Vector2 n0e = EncodeUnitVectorSigned(n0v);
+                    Vector2 n1e = EncodeUnitVectorSigned(n1v);
+                    Vector2 n2e = EncodeUnitVectorSigned(n2v);
+
+                    Vector3 t0d = new Vector3(t0v.x, t0v.y, t0v.z);
+                    Vector3 t1d = new Vector3(t1v.x, t1v.y, t1v.z);
+                    Vector3 t2d = new Vector3(t2v.x, t2v.y, t2v.z);
+                    Vector2 t0e = EncodeUnitVectorSigned(t0d.sqrMagnitude > 0f ? t0d.normalized : Vector3.right);
+                    Vector2 t1e = EncodeUnitVectorSigned(t1d.sqrMagnitude > 0f ? t1d.normalized : Vector3.right);
+                    Vector2 t2e = EncodeUnitVectorSigned(t2d.sqrMagnitude > 0f ? t2d.normalized : Vector3.right);
+
+                    var d = new PrimitiveDataNRD
                     {
-                        uv0 = (uvs != null && i0 < uvs.Length) ? uvs[i0] : Vector2.zero,
-                        uv1 = (uvs != null && i1 < uvs.Length) ? uvs[i1] : Vector2.zero,
-                        uv2 = (uvs != null && i2 < uvs.Length) ? uvs[i2] : Vector2.zero,
-                        pos0 = new Vector4(verts[i0].x, verts[i0].y, verts[i0].z, 0f),
-                        pos1 = new Vector4(verts[i1].x, verts[i1].y, verts[i1].z, 0f),
-                        pos2 = new Vector4(verts[i2].x, verts[i2].y, verts[i2].z, 0f),
-                        instanceId = instanceId,
+                        uv0x = Mathf.FloatToHalf(uv0.x), uv0y = Mathf.FloatToHalf(uv0.y),
+                        uv1x = Mathf.FloatToHalf(uv1.x), uv1y = Mathf.FloatToHalf(uv1.y),
+                        uv2x = Mathf.FloatToHalf(uv2.x), uv2y = Mathf.FloatToHalf(uv2.y),
+                        worldArea = worldArea,
+
+                        n0x = Mathf.FloatToHalf(n0e.x), n0y = Mathf.FloatToHalf(n0e.y),
+                        n1x = Mathf.FloatToHalf(n1e.x), n1y = Mathf.FloatToHalf(n1e.y),
+                        n2x = Mathf.FloatToHalf(n2e.x), n2y = Mathf.FloatToHalf(n2e.y),
+                        uvArea = uvArea,
+
+                        t0x = Mathf.FloatToHalf(t0e.x), t0y = Mathf.FloatToHalf(t0e.y),
+                        t1x = Mathf.FloatToHalf(t1e.x), t1y = Mathf.FloatToHalf(t1e.y),
+                        t2x = Mathf.FloatToHalf(t2e.x), t2y = Mathf.FloatToHalf(t2e.y),
+                        bitangentSign = t0v.w,
                     };
-                    dst.Add(p);
+                    dst.Add(d);
                 }
             }
         }
 
-        private int GetOrAddMaterialGpu(Material mat,
-            List<MaterialConstantsGPU> matList,
-            List<IntPtr> texPtrs)
+        /// <summary>Signed octahedral unit-vector encoding, matching MathLib Packing::EncodeUnitVector(v, true).</summary>
+        private static Vector2 EncodeUnitVectorSigned(Vector3 v)
         {
-            int matId = mat != null ? mat.GetInstanceID() : -1;
-            if (_materialSlots.TryGetValue(matId, out int existing))
-                return existing;
-
-            int idx = matList.Count;
-            _materialSlots[matId] = idx;
-
-            Texture baseTex       = TryGetTex(mat, "_BaseMap");
-            Texture normalTex     = TryGetTex(mat, "_BumpMap");
-            Texture metalRoughTex = TryGetTex(mat, "_MetallicGlossMap");
-            Texture emissiveTex   = TryGetTex(mat, "_EmissionMap");
-            Texture occlusionTex  = TryGetTex(mat, "_OcclusionMap");
-
-            int baseTexIdx       = AddTexture(baseTex, texPtrs);
-            int normalTexIdx     = AddTexture(normalTex, texPtrs);
-            int metalRoughTexIdx = AddTexture(metalRoughTex, texPtrs);
-            int emissiveTexIdx   = AddTexture(emissiveTex, texPtrs);
-            int occlusionTexIdx  = AddTexture(occlusionTex, texPtrs);
-
-            Color baseColor   = TryGetColor(mat, "_BaseColor",     Color.white);
-            Color emissive    = TryGetColor(mat, "_EmissionColor", Color.black);
-            float roughness   = 1f - TryGetFloat(mat, "_Smoothness", 0.5f);
-            float metalness   = TryGetFloat(mat, "_Metallic",           0f);
-            float alphaCutoff = TryGetFloat(mat, "_Cutoff",             0f);
-            float normalScale = TryGetFloat(mat, "_BumpScale",          1f);
-            float occStr      = TryGetFloat(mat, "_OcclusionStrength",  1f);
-
-            int domain = 0;
-            if (mat != null && mat.HasProperty("_Surface"))
-                domain = (int)mat.GetFloat("_Surface");
-            else if (alphaCutoff > 0f)
-                domain = 1;
-
-            int flags = 0;
-            if (baseTexIdx       >= 0) flags |= MaterialFlags.UseBaseOrDiffuseTexture;
-            if (normalTexIdx     >= 0) flags |= MaterialFlags.UseNormalTexture;
-            if (metalRoughTexIdx >= 0) flags |= MaterialFlags.UseMetalRoughOrSpecularTexture;
-            if (emissiveTexIdx   >= 0) flags |= MaterialFlags.UseEmissiveTexture;
-
-            matList.Add(new MaterialConstantsGPU
-            {
-                baseOrDiffuseColor               = new Vector3(baseColor.r, baseColor.g, baseColor.b),
-                flags                            = flags,
-                emissiveColor                    = new Vector3(emissive.r, emissive.g, emissive.b),
-                domain                           = domain,
-                opacity                          = baseColor.a,
-                roughness                        = roughness,
-                metalness                        = metalness,
-                normalTextureScale               = normalScale,
-                occlusionStrength                = occStr,
-                alphaCutoff                      = alphaCutoff,
-                transmissionFactor               = 0f,
-                baseOrDiffuseTextureIndex        = baseTexIdx,
-                metalRoughOrSpecularTextureIndex = metalRoughTexIdx,
-                emissiveTextureIndex             = emissiveTexIdx,
-                normalTextureIndex               = normalTexIdx,
-                occlusionTextureIndex            = occlusionTexIdx,
-            });
-
-            return idx;
+            float absSum = Mathf.Abs(v.x) + Mathf.Abs(v.y) + Mathf.Abs(v.z);
+            if (absSum < 1e-8f) return Vector2.zero;
+            v /= absSum;
+            if (v.z >= 0f)
+                return new Vector2(v.x, v.y);
+            float sx = v.x >= 0f ?  1f : -1f;
+            float sy = v.y >= 0f ?  1f : -1f;
+            return new Vector2((1f - Mathf.Abs(v.y)) * sx, (1f - Mathf.Abs(v.x)) * sy);
         }
 
-        private int AddTexture(Texture tex, List<IntPtr> texPtrs)
-        {
-            if (tex == null) return -1;
-            int texId = tex.GetInstanceID();
-            if (_textureSlots.TryGetValue(texId, out int slot))
-                return slot;
-            slot = texPtrs.Count;
-            texPtrs.Add(tex.GetNativeTexturePtr());
-            _textureSlots[texId] = slot;
-            return slot;
-        }
+        // =====================================================================
+        // Single-stream mesh normalisation
+        // =====================================================================
 
-        private void UpdateInstanceTransforms()
-        {
-            if (_instanceCpu == null || _instanceBuf == null) return;
-
-            int instanceCount = Mathf.Min(_sceneInstances.Count, _instanceCpu.Length);
-
-            int dirtyStart = -1;
-            for (int i = 0; i < instanceCount; i++)
-            {
-                Transform t = _sceneInstances[i].transform;
-                if (t == null || !t.hasChanged)
-                {
-                    if (dirtyStart >= 0)
-                    {
-                        _instanceBuf.SetData(_instanceCpu, dirtyStart, dirtyStart, i - dirtyStart);
-                        dirtyStart = -1;
-                    }
-                    continue;
-                }
-
-                Matrix4x4 m = t.localToWorldMatrix;
-                _instanceCpu[i].transformRow0 = new Vector4(m.m00, m.m01, m.m02, m.m03);
-                _instanceCpu[i].transformRow1 = new Vector4(m.m10, m.m11, m.m12, m.m13);
-                _instanceCpu[i].transformRow2 = new Vector4(m.m20, m.m21, m.m22, m.m23);
-
-                var inst = _sceneInstances[i];
-                _worldAS.SetInstanceTransform(inst.renderer, m);
-                if (inst.isEmissive)
-                    _emissiveAS.SetInstanceTransform(inst.renderer, m);
-
-                if (dirtyStart < 0) dirtyStart = i;
-            }
-
-            if (dirtyStart >= 0)
-                _instanceBuf.SetData(_instanceCpu, dirtyStart, dirtyStart, instanceCount - dirtyStart);
-        }
-
-        // Clones multi-stream source meshes into a single-stream layout (required for
-        // bindless sampling that assumes one VB per mesh with a single stride).
         private Mesh GetOrCreateSingleStreamMesh(Mesh src)
         {
             if (src == null) return null;
@@ -636,9 +615,7 @@ namespace NativeRender
             var attrs = src.GetVertexAttributes();
             bool multiStream = false;
             for (int i = 0; i < attrs.Length; i++)
-            {
                 if (attrs[i].stream != 0) { multiStream = true; break; }
-            }
 
             if (!multiStream)
             {

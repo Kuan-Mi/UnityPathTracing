@@ -208,7 +208,6 @@ NR_AS_Clear(uint64_t handle)
 //
 //   vbPtr / ibPtr      : ID3D12Resource* native GPU buffer pointers
 //   vertexCount/Stride : total vertex count and stride for the shared VB
-//   posOff - tanOff    : byte offsets within each vertex (~0u = absent)
 //   indexStride        : 2 or 4
 //   submeshDescs       : pointer to array of NR_SubmeshDesc (one per sub-mesh)
 //   submeshCount       : length of submeshDescs

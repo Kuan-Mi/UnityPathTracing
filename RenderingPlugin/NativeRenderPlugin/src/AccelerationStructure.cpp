@@ -500,15 +500,6 @@ bool AccelerationStructure::BuildTLAS(
             inst.Flags                               = D3D12_RAYTRACING_INSTANCE_FLAG_NONE;
             inst.AccelerationStructure               = e.blasVA;
         }
-
-        m_lastTransforms.resize(count * 12);
-        for (uint32_t i = 0; i < count; ++i)
-            memcpy(m_lastTransforms.data() + i * 12, entries[i].transform, 12 * sizeof(float));
-    }
-    else
-    {
-        // count == 0: no instance-desc buffer needed; keep any existing allocation.
-        m_lastTransforms.clear();
     }
 
     // ------------------------------------------------------------------
@@ -761,7 +752,6 @@ void AccelerationStructure::Clear()
     m_activeCount      = 0;
     m_activeDefs.clear();
     m_tlasEntries.clear();
-    m_lastTransforms.clear();
     m_tlasRebuildPendingSlots = 3;
     m_transformsDirty         = false;
 }
@@ -801,10 +791,6 @@ bool AccelerationStructure::AddInstance(const NR_AddInstanceDesc& desc)
     slot.meshInfo.vertexBuffer    = vb;
     slot.meshInfo.vertexCount     = desc.vertexCount;
     slot.meshInfo.vertexStride    = desc.vertexStride;
-    slot.meshInfo.positionOffset  = desc.positionOffset;
-    slot.meshInfo.normalOffset    = desc.normalOffset;
-    slot.meshInfo.texCoord1Offset = desc.texCoord1Offset;
-    slot.meshInfo.tangentOffset   = desc.tangentOffset;
     slot.meshInfo.indexBuffer     = ib;
     slot.meshInfo.indexFormat     = idxFmt;
 
@@ -814,7 +800,6 @@ bool AccelerationStructure::AddInstance(const NR_AddInstanceDesc& desc)
         SubMeshData& md    = slot.meshInfo.submeshes[j];
         md.indexCount      = submeshes[j].indexCount;
         md.indexByteOffset = submeshes[j].indexByteOffset;
-        md.materialIndex   = submeshes[j].materialIndex;
         md.hasBakedOMM     = false;
 
         if (desc.ommDescs && desc.ommDescs[j].arrayData && desc.ommDescs[j].arrayDataSize > 0)
