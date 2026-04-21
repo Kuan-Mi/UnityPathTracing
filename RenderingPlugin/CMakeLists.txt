@@ -1,6 +1,8 @@
 cmake_minimum_required(VERSION 3.22)
 project(RenderingPlugin)
 
+include(FetchContent)
+
 set(CMAKE_CXX_STANDARD 20)
 
 # ---------------------------------------------------------------------------
@@ -32,6 +34,19 @@ set(WIN_SDK_LIB "${WIN_SDK_PATH}/Lib/${WIN_SDK_VERSION}/um/x64")
 # Keep FetchContent downloads outside _Build so they survive cache resets
 # ---------------------------------------------------------------------------
 set(FETCHCONTENT_BASE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/_deps" CACHE PATH "FetchContent download cache")
+
+# ---------------------------------------------------------------------------
+# SHARC – header-only, downloaded once into _deps/sharc-src
+# ---------------------------------------------------------------------------
+FetchContent_Declare(
+    sharc
+    DOWNLOAD_EXTRACT_TIMESTAMP 1
+    DOWNLOAD_NO_PROGRESS 1
+    SOURCE_SUBDIR "ignore CMakeLists.txt"
+    URL https://github.com/NVIDIA-RTX/SHARC/archive/refs/tags/v1.6.5.0.zip
+)
+FetchContent_MakeAvailable(sharc)
+message(STATUS "SHARC include path: ${sharc_SOURCE_DIR}/include")
 
 # ---------------------------------------------------------------------------
 # NRI – D3D12 only, shared by both plugin targets

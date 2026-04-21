@@ -10,7 +10,7 @@ ScriptedImporter:
   script: {fileID: 11500000, guid: edebcba6c71d5754a859601f2a711697, type: 3}
   isRayTraceShader: 1
   additionalIncludePaths:
-  - F:\NRD-Sample\External\NRIFramework\External\MathLib
+  - ../RenderingPlugin/_deps/mathlib-src
   extraArgs:
   - -disable-payload-qualifiers
   - -enable-16bit-types
