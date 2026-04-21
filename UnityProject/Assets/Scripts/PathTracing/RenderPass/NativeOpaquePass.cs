@@ -70,6 +70,8 @@ namespace PathTracing
             internal RTHandle DirectEmission;
             internal RTHandle ComposedDiff;
             internal RTHandle ComposedSpecViewZ;
+            
+            // internal TextureHandle OutputTexture;
         }
 
         public class Settings
@@ -85,10 +87,6 @@ namespace PathTracing
             internal Resource       Resource;
             internal Settings       Settings;
 
-            internal TextureHandle OutputTexture;
-            internal TextureHandle DirectEmission;
-            internal TextureHandle ComposedDiff;
-            internal TextureHandle ComposedSpecViewZ;
         }
 
         void ExecutePass(PassData data, UnsafeGraphContext context)
@@ -124,12 +122,8 @@ namespace PathTracing
             data.OpaqueTs.SetRWBuffer("gInOut_SharcAccumulated",      resource.AccumulationBuffer);
             data.OpaqueTs.SetRWBuffer("gInOut_SharcResolved",         resource.ResolvedBuffer);
 
-            var outputTex   =  data.OutputTexture;
-            var directEmitTex = data.DirectEmission;
-            var composedDiffTex = data.ComposedDiff;
-            var composedSpecViewZTex = data.ComposedSpecViewZ;
 
-            data.OpaqueTs.SetRWTexture("g_Output",              outputTex);
+            data.OpaqueTs.SetRWTexture("g_Output",              resource.Output.rt);
 
             data.OpaqueTs.SetRWTexture("gOut_Mv",               resource.Mv.rt);
             data.OpaqueTs.SetRWTexture("gOut_ViewZ",            resource.ViewZ.rt);
@@ -137,15 +131,15 @@ namespace PathTracing
             data.OpaqueTs.SetRWTexture("gOut_BaseColor_Metalness", resource.BaseColorMetalness.rt);
 
             data.OpaqueTs.SetRWTexture("gOut_DirectLighting",   resource.DirectLighting.rt);
-            data.OpaqueTs.SetRWTexture("gOut_DirectEmission",   directEmitTex);
+            data.OpaqueTs.SetRWTexture("gOut_DirectEmission",   resource.DirectEmission.rt);
             data.OpaqueTs.SetRWTexture("gOut_PsrThroughput",    resource.PsrThroughput.rt);
 
             data.OpaqueTs.SetRWTexture("gOut_ShadowData",       resource.Penumbra.rt);
             data.OpaqueTs.SetRWTexture("gOut_Diff",             resource.Diff.rt);
             data.OpaqueTs.SetRWTexture("gOut_Spec",             resource.Spec.rt);
 
-            data.OpaqueTs.SetTexture("gIn_PrevComposedDiff",         composedDiffTex);
-            data.OpaqueTs.SetTexture("gIn_PrevComposedSpec_PrevViewZ", composedSpecViewZTex);
+            data.OpaqueTs.SetTexture("gIn_PrevComposedDiff",         resource.ComposedDiff.rt);
+            data.OpaqueTs.SetTexture("gIn_PrevComposedSpec_PrevViewZ", resource.ComposedSpecViewZ.rt);
 
             data.OpaqueTs.SetTexture("gIn_PrevViewZ",            resource.PrevViewZ.rt);
             data.OpaqueTs.SetTexture("gIn_PrevNormalRoughness",  resource.PrevNormalRoughness.rt);
@@ -191,17 +185,6 @@ namespace PathTracing
 
             passData.Resource = _resource;
             passData.Settings = _settings;
-
-            passData.OutputTexture     = renderGraph.ImportTexture(_resource.Output);
-            passData.DirectEmission    = renderGraph.ImportTexture(_resource.DirectEmission);
-            passData.ComposedDiff      = renderGraph.ImportTexture(_resource.ComposedDiff);
-            passData.ComposedSpecViewZ = renderGraph.ImportTexture(_resource.ComposedSpecViewZ);
-
-            builder.UseTexture(passData.OutputTexture,  AccessFlags.ReadWrite);
-            builder.UseTexture(passData.DirectEmission,  AccessFlags.ReadWrite);
-            builder.UseTexture(passData.ComposedDiff,  AccessFlags.ReadWrite);
-            builder.UseTexture(passData.ComposedSpecViewZ,  AccessFlags.ReadWrite);
-            
 
             builder.AllowPassCulling(false);
             builder.SetRenderFunc((PassData data, UnsafeGraphContext context) => { ExecutePass(data, context); });

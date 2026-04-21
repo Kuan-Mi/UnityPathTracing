@@ -141,6 +141,8 @@
 #define SHARC_MATERIAL_DEMODULATION         1
 #define SHARC_USE_FP16                      0
 
+#define SHARC_RADIANCE_SCALE                100.0 // matches max emission intensity range ( must be > SUN_INTENSITY )
+
 // Blue noise
 #define BLUE_NOISE_SPATIAL_DIM              128 // see StaticTexture::ScramblingRanking
 #define BLUE_NOISE_TEMPORAL_DIM             4 // good values: 4-8 for shadows, 8-16 for occlusion, 8-32 for lighting
