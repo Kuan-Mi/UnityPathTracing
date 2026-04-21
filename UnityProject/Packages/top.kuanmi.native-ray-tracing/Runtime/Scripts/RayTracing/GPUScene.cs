@@ -112,16 +112,16 @@ namespace NativeRender
             _accelStructure.BuildOrUpdate(cmd);
         }
 
-        /// <summary>Binds all scene GPU buffers to the given shader.</summary>
-        public void BindToShader(RayTraceShader shader)
+        /// <summary>Binds all scene GPU buffers to the given pipeline.</summary>
+        public void BindToShader(RayTracePipeline pipeline)
         {
-            if (shader == null || !shader.IsValid) return;
-            shader.SetStructuredBuffer("t_InstanceData", _instanceGpuBuf);
+            if (pipeline == null || !pipeline.IsValid) return;
+            pipeline.SetStructuredBuffer("t_InstanceData", _instanceGpuBuf);
             // Debug.Log($"t_InstanceData {_instanceGpuBuf}");
-            shader.SetStructuredBuffer("t_GeometryData", _geometryGpuBuf);
-            shader.SetStructuredBuffer("t_MaterialConstants", _materialGpuBuf);
-            if (_sceneBuffers != null) shader.SetBindlessBuffer("t_BindlessBuffers", _sceneBuffers);
-            if (_sceneTextures != null) shader.SetBindlessTexture("t_BindlessTextures", _sceneTextures);
+            pipeline.SetStructuredBuffer("t_GeometryData", _geometryGpuBuf);
+            pipeline.SetStructuredBuffer("t_MaterialConstants", _materialGpuBuf);
+            if (_sceneBuffers != null) pipeline.SetBindlessBuffer("t_BindlessBuffers", _sceneBuffers);
+            if (_sceneTextures != null) pipeline.SetBindlessTexture("t_BindlessTextures", _sceneTextures);
         }
 
         public void Dispose()

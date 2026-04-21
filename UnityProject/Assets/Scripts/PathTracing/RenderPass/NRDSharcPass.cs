@@ -1,3 +1,4 @@
+using System;
 using NativeRender;
 using Unity.Mathematics;
 using UnityEngine;
@@ -18,18 +19,24 @@ namespace PathTracing
     ///   Odd:  gIn_PrevGradient = StoredPong,  gOut_CurrGradient = StoredPing
     ///   Always: gOut_Gradient = GradientPing
     /// </summary>
-    public class NRDSharcPass : ScriptableRenderPass
+    public class NRDSharcPass : ScriptableRenderPass, IDisposable
     {
-        private readonly NativeComputeShader _resolve;
-        private readonly NativeComputeShader _update;
-        private          Resource            _resource;
-        private          Settings            _settings;
-        private          NRDSampleResource   _nrdResource;
+        private readonly NativeComputePipeline _resolve;
+        private readonly NativeComputePipeline _update;
+        private          Resource              _resource;
+        private          Settings              _settings;
+        private          NRDSampleResource     _nrdResource;
 
         public NRDSharcPass(NativeComputeShader resolve, NativeComputeShader update)
         {
-            _resolve = resolve;
-            _update  = update;
+            _resolve = new NativeComputePipeline(resolve);
+            _update  = new NativeComputePipeline(update);
+        }
+
+        public void Dispose()
+        {
+            _resolve?.Dispose();
+            _update?.Dispose();
         }
 
         public void Setup(Resource resource, Settings settings)
@@ -73,11 +80,11 @@ namespace PathTracing
 
         class PassData
         {
-            internal NativeComputeShader Resolve;
-            internal NativeComputeShader Update;
-            internal NRDSampleResource   NrdResource;
-            internal Resource            Resource;
-            internal Settings            Settings;
+            internal NativeComputePipeline Resolve;
+            internal NativeComputePipeline Update;
+            internal NRDSampleResource     NrdResource;
+            internal Resource              Resource;
+            internal Settings              Settings;
 
             internal TextureHandle GradientStoredPing;
             internal TextureHandle GradientStoredPong;

@@ -1,4 +1,5 @@
-﻿using mini;
+﻿using System;
+using mini;
 using NativeRender;
 using Unity.Mathematics;
 using Unity.Profiling;
@@ -12,16 +13,21 @@ using static PathTracing.ShaderIDs;
 
 namespace PathTracing
 {
-    public class NativeOpaquePass : ScriptableRenderPass
+    public class NativeOpaquePass : ScriptableRenderPass, IDisposable
     {
-        private readonly RayTraceShader _opaqueTs;
+        private readonly RayTracePipeline _opaqueTs;
         private          Resource       _resource;
         private          Settings       _settings;
 
 
         public NativeOpaquePass(RayTraceShader opaqueTs)
         {
-            _opaqueTs = opaqueTs;
+            _opaqueTs = new RayTracePipeline(opaqueTs);
+        }
+
+        public void Dispose()
+        {
+            _opaqueTs?.Dispose();
         }
 
         public void Setup(Resource sharcResource, Settings sharcSettings)
@@ -83,7 +89,7 @@ namespace PathTracing
 
         class PassData
         {
-            internal RayTraceShader OpaqueTs;
+            internal RayTracePipeline OpaqueTs;
             internal Resource       Resource;
             internal Settings       Settings;
 

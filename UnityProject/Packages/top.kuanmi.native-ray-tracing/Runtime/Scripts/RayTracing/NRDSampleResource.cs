@@ -149,23 +149,23 @@ namespace NativeRender
             _lightAS.BuildOrUpdate(cmd);
         }
 
-        /// <summary>Bind all scene GPU resources to a ray tracing shader using NRDSample names.</summary>
-        public void BindToShader(RayTraceShader shader)
+        /// <summary>Bind all scene GPU resources to a ray tracing pipeline using NRDSample names.</summary>
+        public void BindToShader(RayTracePipeline pipeline)
         {
-            if (shader == null || !shader.IsValid) return;
+            if (pipeline == null || !pipeline.IsValid) return;
 
-            shader.SetAccelerationStructure("gWorldTlas", _worldAS);
-            shader.SetAccelerationStructure("gLightTlas", _lightAS);
+            pipeline.SetAccelerationStructure("gWorldTlas", _worldAS);
+            pipeline.SetAccelerationStructure("gLightTlas", _lightAS);
 
-            shader.SetStructuredBuffer("gIn_InstanceData", _instanceDataBuf);
-            shader.SetStructuredBuffer("gIn_PrimitiveData", _primitiveDataBuf);
-            shader.SetStructuredBuffer("gIn_MorphPrimitivePositionsPrev", _morphPrimitivePositionsPrevBuf);
+            pipeline.SetStructuredBuffer("gIn_InstanceData", _instanceDataBuf);
+            pipeline.SetStructuredBuffer("gIn_PrimitiveData", _primitiveDataBuf);
+            pipeline.SetStructuredBuffer("gIn_MorphPrimitivePositionsPrev", _morphPrimitivePositionsPrevBuf);
 
-            shader.SetRWBuffer("gInOut_SharcHashEntriesBuffer", _sharcHashEntries);
-            shader.SetRWBuffer("gInOut_SharcAccumulated", _sharcAccumulated);
-            shader.SetRWBuffer("gInOut_SharcResolved", _sharcResolved);
+            pipeline.SetRWBuffer("gInOut_SharcHashEntriesBuffer", _sharcHashEntries);
+            pipeline.SetRWBuffer("gInOut_SharcAccumulated", _sharcAccumulated);
+            pipeline.SetRWBuffer("gInOut_SharcResolved", _sharcResolved);
 
-            shader.SetBindlessTexture("gIn_Textures", _textures);
+            pipeline.SetBindlessTexture("gIn_Textures", _textures);
         }
 
         public void Dispose()

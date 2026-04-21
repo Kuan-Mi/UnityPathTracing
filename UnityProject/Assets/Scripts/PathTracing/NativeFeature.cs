@@ -272,7 +272,7 @@ namespace PathTracing
 
             _gpuScene?.UpdateForFrame();
             _opaquePass.SetGPUScene(_gpuScene);
-            opaqueTracingShader?.CreatePipeline();
+            // opaqueTracingShader?.CreatePipeline();
 
 
             Shader.SetGlobalRayTracingAccelerationStructure(g_AccelStructID, _accelerationStructure);
@@ -857,6 +857,7 @@ namespace PathTracing
             _aeExposureBuffer = null;
 
             _sharcPass        = null;
+            _opaquePass?.Dispose();
             _opaquePass       = null;
             _transparentPass  = null;
             _compositionPass  = null;
