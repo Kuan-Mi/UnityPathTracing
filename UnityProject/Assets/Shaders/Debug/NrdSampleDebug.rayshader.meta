@@ -1,0 +1,17 @@
+fileFormatVersion: 2
+guid: 2c8f71e0cfac4a8cafc650af57ebc0e0
+ScriptedImporter:
+  internalIDToNameTable: []
+  externalObjects: {}
+  serializedVersion: 2
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+  script: {fileID: 11500000, guid: edebcba6c71d5754a859601f2a711697, type: 3}
+  isRayTraceShader: 1
+  additionalIncludePaths:
+  - F:\NRD-Sample\External\NRIFramework\External\MathLib
+  extraArgs:
+  - -disable-payload-qualifiers
+  - -enable-16bit-types
+  defines: []

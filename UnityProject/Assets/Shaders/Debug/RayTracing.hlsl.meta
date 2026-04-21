@@ -1,0 +1,12 @@
+fileFormatVersion: 2
+guid: 263efef72cdc48a4d868d332b34358b9
+ScriptedImporter:
+  internalIDToNameTable: []
+  externalObjects: {}
+  serializedVersion: 2
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+  script: {fileID: 11500000, guid: edebcba6c71d5754a859601f2a711697, type: 3}
+  isRayTraceShader: 1
+  additionalIncludePaths: []

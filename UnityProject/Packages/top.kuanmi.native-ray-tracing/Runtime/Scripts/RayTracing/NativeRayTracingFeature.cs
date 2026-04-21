@@ -37,6 +37,7 @@ namespace NativeRender
 
         private NativeRayTracingPass m_RenderPass;
         private GPUScene             _gpuScene;
+        private NRDSampleResource    _sampleResource;
 
         public override void Create()
         {
@@ -44,14 +45,18 @@ namespace NativeRender
                 m_RenderPass = new NativeRayTracingPass(renderPassEvent);
             if (_gpuScene == null)
                 _gpuScene = new GPUScene();
+            if (_sampleResource == null)
+                _sampleResource = new NRDSampleResource();
         }
 
         public override void AddRenderPasses(ScriptableRenderer renderer, ref RenderingData renderingData)
         {
             _gpuScene?.UpdateForFrame();
-            
+            _sampleResource.UpdateForFrame();
+
             m_RenderPass.SetShaderAsset(shaderSourceAsset);
             m_RenderPass.SetGPUScene(_gpuScene);
+            m_RenderPass.SetSampleResource(_sampleResource);
 
             // Ensure the DXR pipeline is created from cached DXIL bytes.
             // CreatePipeline() is idempotent – no-op if pipeline already exists.
@@ -76,10 +81,12 @@ namespace NativeRender
             m_RenderPass?.Dispose();
             _gpuScene?.Dispose();
             _gpuScene = null;
+            _sampleResource?.Dispose();
+            _sampleResource = null;
         }
 
 #if UNITY_EDITOR
-        private void OnEnable() => ObjectChangeEvents.changesPublished += OnObjectChangesPublished;
+        private void OnEnable()  => ObjectChangeEvents.changesPublished += OnObjectChangesPublished;
         private void OnDisable() => ObjectChangeEvents.changesPublished -= OnObjectChangesPublished;
 
         private void OnObjectChangesPublished(ref ObjectChangeEventStream stream)
