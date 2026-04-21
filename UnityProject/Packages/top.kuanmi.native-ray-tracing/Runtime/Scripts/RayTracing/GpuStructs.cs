@@ -86,27 +86,74 @@ namespace NativeRender
         public const int UseNormalTexture               = 0x00000020;
     }
 
+    // =====================================================================
+    // NRDSample-compatible layouts (strict match of NRDSample.cpp structs)
+    // =====================================================================
+
     /// <summary>
-    /// Per-triangle data, populated once for static scenes.
-    /// Layout uses float4 for positions to avoid HLSL float3 alignment ambiguity
-    /// inside StructuredBuffer&lt;PrimitiveData&gt;.
+    /// Per-instance data matching NRDSample.cpp's <c>InstanceData</c> exactly.
     /// Size: 96 bytes.
     /// </summary>
     [StructLayout(LayoutKind.Sequential, Pack = 4)]
-    public struct PrimitiveDataGPU
+    public struct InstanceDataNRD
     {
-        public Vector2 uv0;          // +0
-        public Vector2 uv1;          // +8
-        public Vector2 uv2;          // +16
-        public Vector2 _pad0;        // +24
+        // For static: mObjectToWorld; for dynamic: mWorldToWorldPrev.
+        public Vector4 mOverloadedMatrix0;        // +0   (col 0 of transposed 3x4)
+        public Vector4 mOverloadedMatrix1;        // +16
+        public Vector4 mOverloadedMatrix2;        // +32
 
-        public Vector4 pos0;         // +32   .xyz = position
-        public Vector4 pos1;         // +48
-        public Vector4 pos2;         // +64
+        // float16_t4 baseColorAndMetalnessScale  (+48, 8 B)
+        public ushort baseColorR, baseColorG, baseColorB, metalnessScaleH;
+        // float16_t4 emissionAndRoughnessScale   (+56, 8 B)
+        public ushort emissionR,  emissionG,  emissionB,  roughnessScaleH;
+        // float16_t2 normalUvScale               (+64, 4 B)
+        public ushort normalUvScaleX, normalUvScaleY;
 
-        public uint    instanceId;   // +80
-        public uint    _pad1;        // +84
-        public uint    _pad2;        // +88
-        public uint    _pad3;        // +92
+        public uint  textureOffsetAndFlags;       // +68
+        public uint  primitiveOffset;             // +72
+        public float scale;                       // +76  sign = winding, magnitude = max scale
+
+        public uint morphPrimitiveOffset;         // +80
+        public uint unused1;                      // +84
+        public uint unused2;                      // +88
+        public uint unused3;                      // +92
     }   // Total: 96 bytes
+
+    /// <summary>
+    /// Per-triangle data matching NRDSample.cpp's <c>PrimitiveData</c> exactly.
+    /// Size: 48 bytes.
+    /// </summary>
+    [StructLayout(LayoutKind.Sequential, Pack = 4)]
+    public struct PrimitiveDataNRD
+    {
+        // float16_t2 uv0/uv1/uv2 + float worldArea
+        public ushort uv0x, uv0y;
+        public ushort uv1x, uv1y;
+        public ushort uv2x, uv2y;
+        public float  worldArea;
+
+        // float16_t2 n0/n1/n2 (octahedral-signed encoded) + float uvArea
+        public ushort n0x, n0y;
+        public ushort n1x, n1y;
+        public ushort n2x, n2y;
+        public float  uvArea;
+
+        // float16_t2 t0/t1/t2 (octahedral-signed encoded) + float bitangentSign
+        public ushort t0x, t0y;
+        public ushort t1x, t1y;
+        public ushort t2x, t2y;
+        public float  bitangentSign;
+    }   // Total: 48 bytes
+
+    /// <summary>
+    /// Morph primitive positions stub matching NRDSample.cpp's
+    /// <c>MorphPrimitivePositions</c>. Size: 24 bytes.
+    /// </summary>
+    [StructLayout(LayoutKind.Sequential, Pack = 4)]
+    public struct MorphPrimitivePositionsNRD
+    {
+        public ushort p0x, p0y, p0z, p0w;   // float16_t4
+        public ushort p1x, p1y, p1z, p1w;
+        public ushort p2x, p2y, p2z, p2w;
+    }   // Total: 24 bytes
 }

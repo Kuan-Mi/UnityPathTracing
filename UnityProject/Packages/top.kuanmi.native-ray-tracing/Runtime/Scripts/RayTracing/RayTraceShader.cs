@@ -180,10 +180,6 @@ namespace NativeRender
             string assetPath = UnityEditor.AssetDatabase.GetAssetPath(this);
             if (!string.IsNullOrEmpty(assetPath))
                 return Path.GetFullPath(assetPath);
-            else
-            {
-                Debug.LogError($"[RayTraceShader] GetHlslPath: cannot find asset path for {name}");
-            }
 #endif
             return string.Empty;
         }

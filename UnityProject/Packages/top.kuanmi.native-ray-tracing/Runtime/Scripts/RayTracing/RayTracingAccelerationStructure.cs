@@ -105,11 +105,6 @@ namespace NativeRender
             uint vertexStride = (uint)mesh.GetVertexBufferStride(0);
             uint indexStride  = mesh.indexFormat == IndexFormat.UInt16 ? 2u : 4u;
 
-            uint posOff  = mesh.HasVertexAttribute(VertexAttribute.Position) ? (uint)mesh.GetVertexAttributeOffset(VertexAttribute.Position) : 0u;
-            uint normOff = mesh.HasVertexAttribute(VertexAttribute.Normal) ? (uint)mesh.GetVertexAttributeOffset(VertexAttribute.Normal) : 0xFFFFFFFFu;
-            uint uvOff   = mesh.HasVertexAttribute(VertexAttribute.TexCoord0) ? (uint)mesh.GetVertexAttributeOffset(VertexAttribute.TexCoord0) : 0xFFFFFFFFu;
-            uint tanOff  = mesh.HasVertexAttribute(VertexAttribute.Tangent) ? (uint)mesh.GetVertexAttributeOffset(VertexAttribute.Tangent) : 0xFFFFFFFFu;
-
             int subMeshCount = mesh.subMeshCount;
 
             // Build SubmeshDesc array.
@@ -124,7 +119,6 @@ namespace NativeRender
                 {
                     indexCount      = (uint)sub.indexCount,
                     indexByteOffset = (uint)sub.indexStart * indexStride,
-                    materialIndex   = 0, // material indexing managed by C# scene GPU data
                 };
 
                 if (ommCaches != null && s < ommCaches.Length && ommCaches[s] != null && ommCaches[s].IsValid)
@@ -182,10 +176,6 @@ namespace NativeRender
                                 vertexBufferNativePtr = vbPtr,
                                 vertexCount         = vertexCount,
                                 vertexStride        = vertexStride,
-                                positionOffset      = posOff,
-                                normalOffset        = normOff,
-                                texCoord1Offset     = uvOff,
-                                tangentOffset       = tanOff,
                                 indexBufferNativePtr = ibPtr,
                                 indexStride         = indexStride,
                                 submeshDescs        = (IntPtr)pDescs,
@@ -203,10 +193,6 @@ namespace NativeRender
                             vertexBufferNativePtr = vbPtr,
                             vertexCount         = vertexCount,
                             vertexStride        = vertexStride,
-                            positionOffset      = posOff,
-                            normalOffset        = normOff,
-                            texCoord1Offset     = uvOff,
-                            tangentOffset       = tanOff,
                             indexBufferNativePtr = ibPtr,
                             indexStride         = indexStride,
                             submeshDescs        = (IntPtr)pDescs,

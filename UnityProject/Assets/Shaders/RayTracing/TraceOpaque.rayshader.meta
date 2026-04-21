@@ -10,4 +10,6 @@ ScriptedImporter:
   script: {fileID: 11500000, guid: edebcba6c71d5754a859601f2a711697, type: 3}
   isRayTraceShader: 1
   additionalIncludePaths: []
-  extraArgs: -disable-payload-qualifiers
+  extraArgs:
+  - -disable-payload-qualifiers
+  defines: []

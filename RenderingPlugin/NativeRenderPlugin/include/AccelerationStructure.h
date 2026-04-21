@@ -16,65 +16,52 @@ using Microsoft::WRL::ComPtr;
 //   Plain data descriptor for one sub-mesh within an AddInstance call.
 //   Must match the C# NativeRenderPlugin.SubmeshDesc struct layout exactly.
 // ---------------------------------------------------------------------------
-#pragma pack(push, 4)
 struct NR_SubmeshDesc
 {
     uint32_t indexCount;      // number of indices in this sub-mesh
     uint32_t indexByteOffset; // byte offset of this sub-mesh's first index in the shared IB
-    uint32_t materialIndex;   // index returned by NR_AddMaterial
 };
-#pragma pack(pop)
 
 // ---------------------------------------------------------------------------
 // NR_SubmeshOMMDesc
 //   Per-submesh pre-baked Opacity Micromap data passed inline to AddInstance.
 //   Set arrayData = nullptr to indicate "no OMM for this submesh".
-//   Natural struct alignment — pointers are 8 bytes on 64-bit.
+//   Layout: all pointers first (8-byte aligned), then all u32s packed together,
+//   so no explicit padding is needed on 64-bit.
 // ---------------------------------------------------------------------------
 struct NR_SubmeshOMMDesc
 {
     const void* arrayData;        // OMM array blob; nullptr = no OMM
-    uint32_t    arrayDataSize;
-    uint32_t    _pad0;
     const void* descArray;        // OMM descriptor array blob
-    uint32_t    descArrayCount;
-    uint32_t    _pad1;
     const void* indexBuffer;      // OMM index buffer blob
+    const void* histogramFlat;    // uint32[histogramCount * 3]: {count, subdivLevel, format}
+
+    uint32_t    arrayDataSize;
+    uint32_t    descArrayCount;
     uint32_t    indexCount;
     uint32_t    indexStride;      // 2 or 4
-    const void* histogramFlat;    // uint32[histogramCount * 3]: {count, subdivLevel, format}
     uint32_t    histogramCount;
-    uint32_t    _pad2;
 };
 
 // ---------------------------------------------------------------------------
 // NR_AddInstanceDesc
 //   All per-instance parameters for NR_AS_AddInstance, except the AS handle.
 //   Must match the C# NativeRenderPlugin.AddInstanceDesc struct layout exactly.
+//   Layout: all pointers first (8-byte aligned), then all u32s packed together,
+//   so no explicit padding is needed on 64-bit.
 // ---------------------------------------------------------------------------
 struct NR_AddInstanceDesc
 {
-    uint32_t instanceHandle;      // unique handle (e.g. MeshRenderer.GetInstanceID())
-    uint32_t _pad0;
-
-    void*    vbPtr;               // ID3D12Resource* vertex buffer
-    uint32_t vertexCount;
-    uint32_t vertexStride;
-    uint32_t positionOffset;
-    uint32_t normalOffset;
-    uint32_t texCoord1Offset;
-    uint32_t tangentOffset;
-    uint32_t _pad1;
-
-    void*    ibPtr;               // ID3D12Resource* index buffer
-    uint32_t indexStride;
-    uint32_t _pad2;
-
+    void*                    vbPtr;         // ID3D12Resource* vertex buffer
+    void*                    ibPtr;         // ID3D12Resource* index buffer
     const NR_SubmeshDesc*    submeshDescs;  // pointer to NR_SubmeshDesc array
-    uint32_t                 submeshCount;
-    uint32_t                 _pad3;
-
     const NR_SubmeshOMMDesc* ommDescs;      // nullable
+
+    uint32_t                 instanceHandle;// unique handle (e.g. MeshRenderer.GetInstanceID())
+    uint32_t                 vertexCount;
+    uint32_t                 vertexStride;
+    uint32_t                 indexStride;
+    uint32_t                 submeshCount;
 };
 
 // ---------------------------------------------------------------------------
@@ -85,7 +72,6 @@ struct SubMeshData
 {
     UINT        indexCount;
     UINT        indexByteOffset;  // byte offset of this sub-mesh's first index in the shared IB
-    UINT        materialIndex;    // index into MaterialConstants buffer
 
     bool hasBakedOMM = false;
     struct OMMBakedData
@@ -109,10 +95,6 @@ struct MeshInfo
     ComPtr<ID3D12Resource> vertexBuffer;
     UINT vertexCount;
     UINT vertexStride;
-    UINT positionOffset;   // byte offset of Position within the vertex
-    UINT normalOffset;     // byte offset of Normal, or ~0u if absent
-    UINT texCoord1Offset;  // byte offset of TexCoord0, or ~0u if absent
-    UINT tangentOffset;    // byte offset of Tangent, or ~0u if absent
     ComPtr<ID3D12Resource> indexBuffer;
     DXGI_FORMAT indexFormat; // DXGI_FORMAT_R16_UINT or DXGI_FORMAT_R32_UINT
 
@@ -299,7 +281,6 @@ private:
     // TLAS triple-buffered resources (indexed by m_frameIndex)
     TLASFrameResources     m_tlasResources[3];
     uint32_t               m_frameIndex           = 0;
-    std::vector<float>     m_lastTransforms;
 
     // Slot system
     std::vector<InstanceSlot>              m_slots;
