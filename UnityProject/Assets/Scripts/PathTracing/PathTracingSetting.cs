@@ -100,7 +100,7 @@ namespace PathTracing
         public bool enableGIFinalShading = true;
         public bool enableDIFinalShading = true;
 
-        public bool enableEnv = true;
+        public bool enableEnv        = true;
         public bool useRasterGBuffer = true;
 
         public ReGIRDynamicParameters regirDynamicParams = ReGIRDynamicParameters.Default();
@@ -133,6 +133,31 @@ namespace PathTracing
         public BRDFPathTracing_Parameters           brdfptParams               = BRDFPathTracing_Parameters.Default();
     }
 
+    public enum OnScreen
+    {
+        // - HDR,
+        SHOW_FINAL,
+        SHOW_DENOISED_DIFFUSE,
+        SHOW_DENOISED_SPECULAR,
+
+        // - LDR,
+        SHOW_AMBIENT_OCCLUSION,
+        SHOW_SPECULAR_OCCLUSION,
+        SHOW_SHADOW,
+        SHOW_BASE_COLOR,
+        SHOW_NORMAL,
+        SHOW_ROUGHNESS,
+        SHOW_METALNESS,
+        SHOW_MATERIAL_ID,
+        SHOW_PSR_THROUGHPUT,
+        SHOW_WORLD_UNITS,
+        SHOW_INSTANCE_INDEX,
+        SHOW_UV,
+        SHOW_CURVATURE,
+        SHOW_MIP_PRIMARY,
+        SHOW_MIP_SPECULAR,
+    }
+
     [System.Serializable]
     public class PathTracingSetting
     {
@@ -144,7 +169,7 @@ namespace PathTracing
         public ShowMode showMode     = ShowMode.Final;
         public bool     showMv;
         public bool     showValidation;
-        public bool     skipRightEyeInVR    = true;
+        public bool     skipRightEyeInVR = true;
 
         [FoldoutHeader("Base Settings")]
         [Range(0.001f, 10f)]
@@ -300,7 +325,8 @@ namespace PathTracing
         [Range(0.0f, 1.0f)]
         public float split;
 
-        public bool accumulateReference = true;
-        public bool accumulate          = false;
+        public bool     accumulateReference = true;
+        public bool     accumulate          = false;
+        public OnScreen gOnScreen;
     }
 }

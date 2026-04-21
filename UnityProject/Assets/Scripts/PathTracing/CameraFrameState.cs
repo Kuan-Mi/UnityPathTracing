@@ -314,7 +314,7 @@ namespace PathTracing
                 gSR = (settings.SR && !settings.RR) ? 1u : 0u,
                 gRR = settings.RR ? 1u : 0,
                 gIsSrgb = 0,
-                gOnScreen = 0,
+                gOnScreen = (uint)settings.gOnScreen,
                 gTracingMode = settings.RR ? (uint)RESOLUTION.RESOLUTION_FULL_PROBABILISTIC : (uint)settings.tracingMode,
                 gSampleNum = settings.rpp,
                 gPSR = settings.psr ? (uint)1 : 0,
