@@ -16,7 +16,7 @@ MonoBehaviour:
   pathTracingSetting:
     exposureEv: -1.26
     cameraJitter: 1
-    showMode: 1
+    showMode: 18
     showMv: 0
     showValidation: 0
     skipRightEyeInVR: 1

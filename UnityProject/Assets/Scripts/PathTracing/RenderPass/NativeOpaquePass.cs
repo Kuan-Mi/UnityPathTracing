@@ -108,15 +108,11 @@ namespace PathTracing
             var resource = data.Resource;
             var settings = data.Settings;
 
-            // natCmd.SetRayTracingShaderPass(data.OpaqueTs, "Test2");
+
             data.OpaqueTs.SetConstantBuffer("GlobalConstants", resource.ConstantBuffer);
-            // natCmd.SetRayTracingConstantBufferParam(data.OpaqueTs, paramsID, resource.ConstantBuffer, 0, resource.ConstantBuffer.stride);
 
             data.OpaqueTs.SetBuffer("gIn_ScramblingRanking", resource.ScramblingRanking);
-            // natCmd.SetRayTracingBufferParam(data.OpaqueTs, g_ScramblingRankingID, resource.ScramblingRanking);
-            
             data.OpaqueTs.SetBuffer("gIn_Sobol", resource.Sobol);
-            // natCmd.SetRayTracingBufferParam(data.OpaqueTs, g_SobolID, resource.Sobol);
 
             data.OpaqueTs.SetRWBuffer("gInOut_SharcHashEntriesBuffer", resource.HashEntriesBuffer);
             data.OpaqueTs.SetRWBuffer("gInOut_SharcAccumulated",      resource.AccumulationBuffer);
@@ -155,9 +151,6 @@ namespace PathTracing
 
             uint rectWmod = (uint)(settings.m_RenderResolution.x * settings.resolutionScale + 0.5f);
             uint rectHmod = (uint)(settings.m_RenderResolution.y * settings.resolutionScale + 0.5f);
-
-            // Debug.Log($"Dispatch Rays Size: {rectWmod} x {rectHmod}");
-
 
             _gpuScene.BindToShader(data.OpaqueTs);
             data.OpaqueTs.Dispatch(natCmd, rectWmod, rectHmod);

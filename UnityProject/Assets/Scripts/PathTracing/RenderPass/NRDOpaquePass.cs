@@ -99,15 +99,14 @@ namespace PathTracing
         // Execution
         // -------------------------------------------------------------------------
 
-        private static readonly ProfilerMarker s_OpaqueTracingMarker =
-            new ProfilerMarker(ProfilerCategory.Render, "NRDOpaqueTracing",
-                MarkerFlags.SampleGPU);
+ 
 
         void ExecutePass(PassData data, UnsafeGraphContext context)
         {
             var cmd = CommandBufferHelpers.GetNativeCommandBuffer(context.cmd);
 
-            cmd.BeginSample(s_OpaqueTracingMarker);
+            var opaqueTracingMarker = RenderPassMarkers.OpaqueTracing;
+            cmd.BeginSample(opaqueTracingMarker);
 
             var cs       = data.Cs;
             var res      = data.Resource;
@@ -166,7 +165,7 @@ namespace PathTracing
 
             cs.Dispatch(cmd, groupsX, groupsY, 1);
 
-            cmd.EndSample(s_OpaqueTracingMarker);
+            cmd.EndSample(opaqueTracingMarker);
         }
 
         // -------------------------------------------------------------------------
