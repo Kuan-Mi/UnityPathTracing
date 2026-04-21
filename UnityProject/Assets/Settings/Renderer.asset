@@ -84,6 +84,9 @@ MonoBehaviour:
   nrdOpaqueTracingShader: {fileID: -2368575503658470205, guid: 317f1945d390e3d40b100508cc1e2544, type: 3}
   nrdSharcResolve: {fileID: -2368575503658470205, guid: 7c20265b003288c49842d62c8ce69e27, type: 3}
   nrdSharcUpdate: {fileID: -2368575503658470205, guid: e1a3da821ed1c744a8dcfc18fb0f7530, type: 3}
+  nrdTransparentShader: {fileID: -2368575503658470205, guid: 7957299d34ac3e943926d9f401406336, type: 3}
+  nrdCompositionShader: {fileID: -2368575503658470205, guid: 86da1103c52cad44bae7fd3fef15beea, type: 3}
+  nrdTaaShader: {fileID: -2368575503658470205, guid: 45b3301336e00c442aaed94343a0413a, type: 3}
   transparentTracingShader: {fileID: 4807578003741378534, guid: d207e5fb066a4b579353785310fd0dea, type: 3}
   referencePtTracingShader: {fileID: 4807578003741378534, guid: e0dfc84565ad452aab99e3b8d28eafb1, type: 3}
   compositionComputeShader: {fileID: 7200000, guid: 6b0c89c26f4363a4781550cf86801786, type: 3}
