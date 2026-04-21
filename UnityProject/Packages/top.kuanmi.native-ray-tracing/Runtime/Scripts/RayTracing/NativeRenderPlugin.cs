@@ -412,9 +412,22 @@ namespace NativeRender
             out IntPtr outBytes,
             out uint   outSize);
 
-        /// <summary>Frees the buffer allocated by <see cref="NR_SC_Compile"/> or <see cref="NR_SC_CompileCS"/>.</summary>
+        /// <summary>Frees the buffer allocated by <see cref="NR_SC_Compile"/>, <see cref="NR_SC_CompileCS"/>, or <see cref="NR_SC_ReflectCS"/>.</summary>
         [DllImport(DllName)]
         public static extern void NR_SC_Free(IntPtr ptr);
+
+        /// <summary>
+        /// Reflects a compiled DXIL compute shader blob and returns a JSON string describing
+        /// bound resources (SRV / UAV / CBV / Sampler) and the numthreads declaration.
+        /// On success returns true and sets <paramref name="outJson"/> / <paramref name="outJsonLen"/>;
+        /// the caller must free the buffer with <see cref="NR_SC_Free"/>.
+        /// </summary>
+        [DllImport(DllName)]
+        public static extern bool NR_SC_ReflectCS(
+            byte[]     dxilBytes,
+            uint       size,
+            out IntPtr outJson,
+            out uint   outJsonLen);
 
         /// <summary>
         /// Compiles a compute shader HLSL file to DXIL bytecode with a specified entry point and target profile.

@@ -41,6 +41,10 @@ namespace NativeRender
         [SerializeField, HideInInspector]
         private byte[] _compiledDxil;
 
+        /// <summary>JSON reflection data produced after each successful compilation. Persisted for editor display.</summary>
+        [SerializeField, HideInInspector]
+        private string _reflectionJson = "";
+
         private ulong _handle;
 
         // Event data buffer reused each frame
@@ -53,6 +57,9 @@ namespace NativeRender
 
         /// <summary>Size in bytes of the cached DXIL bytecode, or 0 if not compiled.</summary>
         public int CompiledByteCount => _compiledDxil?.Length ?? 0;
+
+        /// <summary>JSON reflection data produced after the last successful compilation. Empty when not yet compiled.</summary>
+        public string ReflectionJson => _reflectionJson ?? "";
 
         // -------------------------------------------------------------------
         // ScriptableObject lifecycle
@@ -104,6 +111,16 @@ namespace NativeRender
             _compiledDxil = new byte[nativeSize];
             Marshal.Copy(nativePtr, _compiledDxil, 0, (int)nativeSize);
             NativeRenderPlugin.ShaderCompilerPlugin.NR_SC_Free(nativePtr);
+
+            // Reflect bound resources from the freshly compiled DXIL
+            _reflectionJson = "";
+            if (NativeRenderPlugin.ShaderCompilerPlugin.NR_SC_ReflectCS(
+                    _compiledDxil, (uint)_compiledDxil.Length, out IntPtr jsonPtr, out uint jsonLen)
+                && jsonPtr != IntPtr.Zero && jsonLen > 0)
+            {
+                _reflectionJson = Marshal.PtrToStringAnsi(jsonPtr, (int)jsonLen);
+                NativeRenderPlugin.ShaderCompilerPlugin.NR_SC_Free(jsonPtr);
+            }
 
 #if UNITY_EDITOR
             UnityEditor.EditorUtility.SetDirty(this);

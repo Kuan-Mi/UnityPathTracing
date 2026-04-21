@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
 using UnityEditor;
 using UnityEditor.AssetImporters;
@@ -82,6 +83,14 @@ namespace NativeRender
     [CustomEditor(typeof(NativeComputeShaderImporter))]
     public class NativeComputeShaderImporterEditor : ScriptedImporterEditor
     {
+        // Foldout state — not persisted, resets on selection change (fine for a dev tool)
+        private bool _showSRV     = true;
+        private bool _showUAV     = true;
+        private bool _showCBV     = true;
+        private bool _showSampler = true;
+        private bool _showTLAS    = true;
+        private bool _showReflection = true;
+
         public override void OnInspectorGUI()
         {
             base.OnInspectorGUI();
@@ -111,6 +120,239 @@ namespace NativeRender
                 EditorGUILayout.HelpBox($"DXIL cached ({shader.CompiledByteCount:N0} bytes)", MessageType.Info);
             else
                 EditorGUILayout.HelpBox("No compiled DXIL – click Compile to build.", MessageType.Warning);
+
+            // ---------------------------------------------------------------
+            // Reflection panel
+            // ---------------------------------------------------------------
+            string json = shader.ReflectionJson;
+            if (string.IsNullOrEmpty(json)) return;
+
+            var info = ShaderReflectionInfo.Parse(json);
+            if (info == null) return;
+
+            EditorGUILayout.Space(6);
+            _showReflection = EditorGUILayout.BeginFoldoutHeaderGroup(_showReflection, "Shader Reflection");
+            if (_showReflection)
+            {
+                EditorGUI.indentLevel++;
+
+                // Thread group size
+                EditorGUILayout.LabelField("numthreads",
+                    $"[{info.NumThreadsX}, {info.NumThreadsY}, {info.NumThreadsZ}]",
+                    EditorStyles.boldLabel);
+
+                DrawBindingGroup(ref _showSRV,     "SRV",     info.SRV);
+                DrawBindingGroup(ref _showUAV,     "UAV",     info.UAV);
+                DrawBindingGroup(ref _showCBV,     "CBV",     info.CBV);
+                DrawBindingGroup(ref _showSampler, "Sampler", info.Sampler);
+                DrawBindingGroup(ref _showTLAS,    "TLAS",    info.TLAS);
+
+                EditorGUILayout.Space(4);
+                if (GUILayout.Button("Print to Console"))
+                    PrintReflectionToConsole(importer.assetPath, info);
+
+                EditorGUI.indentLevel--;
+            }
+            EditorGUILayout.EndFoldoutHeaderGroup();
+        }
+
+        private static void PrintReflectionToConsole(string assetPath, ShaderReflectionInfo info)
+        {
+            var sb = new System.Text.StringBuilder();
+            sb.AppendLine($"=== Shader Reflection: {System.IO.Path.GetFileName(assetPath)} ===");
+            sb.AppendLine($"numthreads  [{info.NumThreadsX}, {info.NumThreadsY}, {info.NumThreadsZ}]");
+            sb.AppendLine();
+
+            void AppendGroup(string label, List<ShaderBindingEntry> entries)
+            {
+                if (entries.Count == 0) return;
+                sb.AppendLine($"-- {label} ({entries.Count}) --");
+                foreach (var e in entries)
+                    sb.AppendLine($"  {e.Name,-32}  {e.HlslType,-36}  space{e.Space}:{ResourcePrefix(label)}{e.Reg}");
+                sb.AppendLine();
+            }
+
+            AppendGroup("SRV",     info.SRV);
+            AppendGroup("UAV",     info.UAV);
+            AppendGroup("CBV",     info.CBV);
+            AppendGroup("Sampler", info.Sampler);
+            AppendGroup("TLAS",    info.TLAS);
+
+            Debug.Log(sb.ToString());
+        }
+
+        private static void DrawBindingGroup(ref bool foldout, string label, List<ShaderBindingEntry> entries)
+        {
+            if (entries.Count == 0) return;
+
+            foldout = EditorGUILayout.Foldout(foldout, $"{label}  ({entries.Count})", true);
+            if (!foldout) return;
+
+            EditorGUI.indentLevel++;
+            foreach (var e in entries)
+                EditorGUILayout.LabelField(e.Name, $"{e.HlslType}    space{e.Space}:{ResourcePrefix(label)}{e.Reg}");
+            EditorGUI.indentLevel--;
+        }
+
+        private static string ResourcePrefix(string type) => type switch
+        {
+            "SRV"     => "t",
+            "UAV"     => "u",
+            "CBV"     => "b",
+            "Sampler" => "s",
+            "TLAS"    => "t",
+            _         => ""
+        };
+
+        // -------------------------------------------------------------------
+        // Minimal JSON parser for our fixed reflection JSON shape.
+        // Avoids a dependency on System.Text.Json / Newtonsoft.
+        // -------------------------------------------------------------------
+        private class ShaderBindingEntry
+        {
+            public string Name;
+            public string Type;
+            public int    Space;
+            public int    Reg;
+            public string Dim;     // e.g. "Texture2D", "Buffer", "ByteAddressBuffer"
+            public string RetType; // e.g. "float", "uint", ""
+
+            /// <summary>Human-readable HLSL-like type string, e.g. "Texture2D&lt;float4&gt;" or "StructuredBuffer".</summary>
+            public string HlslType
+            {
+                get
+                {
+                    if (Type == "CBV")     return "ConstantBuffer";
+                    if (Type == "Sampler") return "SamplerState";
+                    if (Type == "TLAS")   return "RaytracingAccelerationStructure";
+
+                    string prefix = Type == "UAV" ? "RW" : "";
+                    string dim    = string.IsNullOrEmpty(Dim) ? "Buffer" : Dim;
+
+                    // ByteAddressBuffer has no element type
+                    if (dim == "ByteAddressBuffer")
+                        return prefix + "ByteAddressBuffer";
+
+                    // Buffers without a return type are StructuredBuffers
+                    if (string.IsNullOrEmpty(RetType))
+                        return prefix + (dim == "Buffer" ? "StructuredBuffer" : dim);
+
+                    return prefix + dim + "<" + RetType + "4>";
+                }
+            }
+        }
+
+        private class ShaderReflectionInfo
+        {
+            public int NumThreadsX, NumThreadsY, NumThreadsZ;
+            public List<ShaderBindingEntry> SRV     = new();
+            public List<ShaderBindingEntry> UAV     = new();
+            public List<ShaderBindingEntry> CBV     = new();
+            public List<ShaderBindingEntry> Sampler = new();
+            public List<ShaderBindingEntry> TLAS    = new();
+
+            public static ShaderReflectionInfo Parse(string json)
+            {
+                try
+                {
+                    var result = new ShaderReflectionInfo();
+
+                    // numthreads: [X, Y, Z]
+                    int ntIdx = json.IndexOf("\"numthreads\"", StringComparison.Ordinal);
+                    if (ntIdx >= 0)
+                    {
+                        int lb = json.IndexOf('[', ntIdx);
+                        int rb = json.IndexOf(']', lb);
+                        if (lb >= 0 && rb > lb)
+                        {
+                            var parts = json.Substring(lb + 1, rb - lb - 1).Split(',');
+                            if (parts.Length >= 3)
+                            {
+                                int.TryParse(parts[0].Trim(), out result.NumThreadsX);
+                                int.TryParse(parts[1].Trim(), out result.NumThreadsY);
+                                int.TryParse(parts[2].Trim(), out result.NumThreadsZ);
+                            }
+                        }
+                    }
+
+                    // bindings array — iterate over { ... } objects
+                    int bindingsIdx = json.IndexOf("\"bindings\"", StringComparison.Ordinal);
+                    if (bindingsIdx < 0) return result;
+
+                    int arrayStart = json.IndexOf('[', bindingsIdx);
+                    int arrayEnd   = json.LastIndexOf(']');
+                    if (arrayStart < 0 || arrayEnd <= arrayStart) return result;
+
+                    string arrayBody = json.Substring(arrayStart + 1, arrayEnd - arrayStart - 1);
+                    int pos = 0;
+                    while (pos < arrayBody.Length)
+                    {
+                        int objStart = arrayBody.IndexOf('{', pos);
+                        if (objStart < 0) break;
+                        int objEnd = arrayBody.IndexOf('}', objStart);
+                        if (objEnd < 0) break;
+
+                        string obj = arrayBody.Substring(objStart + 1, objEnd - objStart - 1);
+                        var entry = new ShaderBindingEntry
+                        {
+                            Name    = ExtractString(obj, "name"),
+                            Type    = ExtractString(obj, "type"),
+                            Space   = ExtractInt   (obj, "space"),
+                            Reg     = ExtractInt   (obj, "reg"),
+                            Dim     = ExtractString(obj, "dim"),
+                            RetType = ExtractString(obj, "retType"),
+                        };
+
+                        var list = entry.Type switch
+                        {
+                            "SRV"     => result.SRV,
+                            "UAV"     => result.UAV,
+                            "CBV"     => result.CBV,
+                            "Sampler" => result.Sampler,
+                            "TLAS"    => result.TLAS,
+                            _         => null
+                        };
+                        list?.Add(entry);
+
+                        pos = objEnd + 1;
+                    }
+
+                    return result;
+                }
+                catch
+                {
+                    return null;
+                }
+            }
+
+            private static string ExtractString(string obj, string key)
+            {
+                string search = $"\"{key}\"";
+                int ki = obj.IndexOf(search, StringComparison.Ordinal);
+                if (ki < 0) return "";
+                int colon = obj.IndexOf(':', ki + search.Length);
+                if (colon < 0) return "";
+                int q1 = obj.IndexOf('"', colon + 1);
+                if (q1 < 0) return "";
+                int q2 = obj.IndexOf('"', q1 + 1);
+                if (q2 < 0) return "";
+                return obj.Substring(q1 + 1, q2 - q1 - 1);
+            }
+
+            private static int ExtractInt(string obj, string key)
+            {
+                string search = $"\"{key}\"";
+                int ki = obj.IndexOf(search, StringComparison.Ordinal);
+                if (ki < 0) return 0;
+                int colon = obj.IndexOf(':', ki + search.Length);
+                if (colon < 0) return 0;
+                int start = colon + 1;
+                while (start < obj.Length && (obj[start] == ' ' || obj[start] == '\t')) start++;
+                int end = start;
+                while (end < obj.Length && (char.IsDigit(obj[end]) || obj[end] == '-')) end++;
+                int.TryParse(obj.Substring(start, end - start), out int val);
+                return val;
+            }
         }
     }
 }
