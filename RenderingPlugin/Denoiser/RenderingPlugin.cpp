@@ -114,11 +114,11 @@ UnityRenderingEventAndData UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API GetRenderE
 }
 
 // C# 构造时调用
-UNITY_INTERFACE_EXPORT int UNITY_INTERFACE_API CreateDenoiserInstance()
+UNITY_INTERFACE_EXPORT int UNITY_INTERFACE_API CreateDenoiserInstance(NrdDenoiserDesc* denoisers, int count)
 {
     std::scoped_lock lock(g_NrdInstanceMutex);
     int id = g_NrdNextInstanceId++;
-    g_NrdInstances[id] = new NrdInstance(s_UnityInterfaces, id);
+    g_NrdInstances[id] = new NrdInstance(s_UnityInterfaces, id, denoisers, count);
     return id;
 }
 

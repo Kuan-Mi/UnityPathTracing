@@ -8,11 +8,29 @@
 
 #define LOG(msg) UNITY_LOG(s_Log, msg)
 
-NrdInstance::NrdInstance(IUnityInterfaces* interfaces, int instanceId)
+NrdInstance::NrdInstance(IUnityInterfaces* interfaces, int instanceId, const NrdDenoiserDesc* denoisers, int denoiserCount)
 {
     s_d3d12 = interfaces->Get<IUnityGraphicsD3D12v8>();
     s_Log = interfaces->Get<IUnityLog>();
     id = instanceId;
+
+    if (denoisers == nullptr || denoiserCount <= 0)
+    {
+        LOG(("[NRD Native] id:" + std::to_string(id) + " - NrdInstance created with no denoisers.").c_str());
+    }
+    else
+    {
+        if (denoiserCount > static_cast<int>(kMaxDenoisersPerInstance))
+        {
+            LOG(("[NRD Native] id:" + std::to_string(id) + " - denoiserCount exceeds kMaxDenoisersPerInstance, clamping.").c_str());
+            denoiserCount = static_cast<int>(kMaxDenoisersPerInstance);
+        }
+
+        m_Denoisers.assign(denoisers, denoisers + denoiserCount);
+        m_DenoiserIds.reserve(denoiserCount);
+        for (const auto& d : m_Denoisers)
+            m_DenoiserIds.push_back(static_cast<nrd::Identifier>(d.identifier));
+    }
 
     initialize_and_create_resources();
 }
@@ -145,8 +163,16 @@ void NrdInstance::DispatchCompute(FrameData* data)
     frameIndex++;
 
     m_NrdIntegration.SetCommonSettings(data->commonSettings);
-    m_NrdIntegration.SetDenoiserSettings(m_SigmaId, &data->sigmaSettings);
-    m_NrdIntegration.SetDenoiserSettings(m_ReblurId, &data->reblurSettings);
+
+    // Fan out per-denoiser settings from FrameData entries[].
+    const uint32_t entryCount = data->denoiserCount > kMaxDenoisersPerInstance
+                                    ? kMaxDenoisersPerInstance
+                                    : data->denoiserCount;
+    for (uint32_t i = 0; i < entryCount; ++i)
+    {
+        const DenoiserSettingsEntry& e = data->entries[i];
+        m_NrdIntegration.SetDenoiserSettings(static_cast<nrd::Identifier>(e.identifier), e.settings);
+    }
 
     m_NrdIntegration.NewFrame();
 
@@ -170,10 +196,11 @@ void NrdInstance::DispatchCompute(FrameData* data)
         snapshot.SetResource(input.type, r);
     }
 
-    const nrd::Identifier denoisers[] = {m_SigmaId, m_ReblurId};
+    const nrd::Identifier* denoiserIds  = m_DenoiserIds.empty() ? nullptr : m_DenoiserIds.data();
+    const uint32_t         denoiserNums = static_cast<uint32_t>(m_DenoiserIds.size());
 
     D3D12HeapHook::BeginPluginDispatch();
-    m_NrdIntegration.Denoise(denoisers, 2, *nriCmdBuffer, snapshot);
+    m_NrdIntegration.Denoise(denoiserIds, denoiserNums, *nriCmdBuffer, snapshot);
     D3D12HeapHook::EndPluginDispatch();
     D3D12HeapHook::RestoreUnityHeaps(recording_state.commandList);
 
@@ -209,6 +236,12 @@ void NrdInstance::CreateNrd()
 {
     m_NrdIntegration.Destroy();
 
+    if (m_Denoisers.empty())
+    {
+        LOG(("[NRD Native] id:" + std::to_string(id) + " - CreateNrd() called with empty denoiser list, skipping.").c_str());
+        return;
+    }
+
     // 1. 配置 NRD Integration
     nrd::IntegrationCreationDesc integrationDesc = {};
     integrationDesc.resourceWidth = static_cast<uint16_t>(TextureWidth);
@@ -218,17 +251,23 @@ void NrdInstance::CreateNrd()
     integrationDesc.autoWaitForIdle = false;
     integrationDesc.enableWholeLifetimeDescriptorCaching = true; // 推荐开启以提高性能
 
-    // 2. 配置 NRD Denoiser
-    nrd::DenoiserDesc denoisers[] = {
-        {0, nrd::Denoiser::SIGMA_SHADOW},
-        {1, nrd::Denoiser::REBLUR_DIFFUSE_SPECULAR} // Identifier设为1，类型为 REBLUR_DIFFUSE
-    };
-    m_SigmaId = denoisers[0].identifier;
-    m_ReblurId = denoisers[1].identifier; // [NEW] 保存 Reblur ID
+    // 2. 按 C# 传入的列表构造 DenoiserDesc
+    std::vector<nrd::DenoiserDesc> denoiserDescs;
+    denoiserDescs.reserve(m_Denoisers.size());
+    std::string summary;
+    for (const auto& d : m_Denoisers)
+    {
+        nrd::DenoiserDesc dd{};
+        dd.identifier = static_cast<nrd::Identifier>(d.identifier);
+        dd.denoiser   = static_cast<nrd::Denoiser>(d.denoiser);
+        denoiserDescs.push_back(dd);
+
+        summary += " (id=" + std::to_string(d.identifier) + ", type=" + std::to_string(d.denoiser) + ")";
+    }
 
     nrd::InstanceCreationDesc instanceDesc = {};
-    instanceDesc.denoisers = denoisers;
-    instanceDesc.denoisersNum = 2;
+    instanceDesc.denoisers = denoiserDescs.data();
+    instanceDesc.denoisersNum = static_cast<uint32_t>(denoiserDescs.size());
 
     nrd::Result result = m_NrdIntegration.Recreate(integrationDesc, instanceDesc, RenderSystem::Get().GetNriDevice());
 
@@ -238,7 +277,9 @@ void NrdInstance::CreateNrd()
         throw std::runtime_error("NRD Integration Init Failed");
     }
 
-    LOG(("[NRD Native] id:" + std::to_string(id) + " - NRD Instance Created/Updated.").c_str());
+    LOG(("[NRD Native] id:" + std::to_string(id)
+        + " - NRD Instance Created/Updated with " + std::to_string(m_Denoisers.size())
+        + " denoiser(s):" + summary).c_str());
 }
 
 void NrdInstance::initialize_and_create_resources()

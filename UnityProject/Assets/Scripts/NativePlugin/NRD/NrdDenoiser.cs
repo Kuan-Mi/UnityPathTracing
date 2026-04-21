@@ -12,7 +12,7 @@ namespace Nrd
     public class NrdDenoiser : IDisposable
     {
         [DllImport("Denoiser")]
-        private static extern int CreateDenoiserInstance();
+        private static extern int CreateDenoiserInstance(IntPtr denoisers, int count);
 
         [DllImport("Denoiser")]
         private static extern void DestroyDenoiserInstance(int id);
@@ -24,6 +24,9 @@ namespace Nrd
 
         private readonly int _nrdInstanceId;
         private readonly string _cameraName;
+
+        // Denoiser list captured at construction, used to populate each frame's entries[].
+        private readonly NrdDenoiserDesc[] _denoisers;
 
         private NativeArray<NrdFrameData> _buffer;
         private const int BufferCount = 3;
@@ -68,13 +71,42 @@ namespace Nrd
             public NriTextureResource outValidation;
         }
 
-        public NrdDenoiser(PathTracingSetting setting, string camName)
+        public NrdDenoiser(PathTracingSetting setting, string camName, NrdDenoiserDesc[] denoisers)
         {
-            _setting = setting;
-            _nrdInstanceId = CreateDenoiserInstance();
+            if (denoisers == null || denoisers.Length == 0)
+                throw new ArgumentException("At least one denoiser must be specified.", nameof(denoisers));
+            if (denoisers.Length > NrdLayout.MaxDenoisersPerInstance)
+                throw new ArgumentException(
+                    $"denoisers.Length={denoisers.Length} exceeds max {NrdLayout.MaxDenoisersPerInstance}",
+                    nameof(denoisers));
+
+            _setting    = setting;
             _cameraName = camName;
+            _denoisers  = (NrdDenoiserDesc[])denoisers.Clone();
+
+            unsafe
+            {
+                fixed (NrdDenoiserDesc* p = _denoisers)
+                {
+                    _nrdInstanceId = CreateDenoiserInstance((IntPtr)p, _denoisers.Length);
+                }
+            }
+
             _buffer = new NativeArray<NrdFrameData>(BufferCount, Allocator.Persistent);
-            Debug.Log($"[NRD] Created Denoiser Instance {_nrdInstanceId} for Camera {_cameraName}");
+            Debug.Log($"[NRD] Created Denoiser Instance {_nrdInstanceId} for Camera {_cameraName} with {_denoisers.Length} denoiser(s)");
+        }
+
+        /// <summary>
+        /// Default factory matching legacy behaviour: SIGMA_SHADOW (id 0) + REBLUR_DIFFUSE_SPECULAR (id 1).
+        /// </summary>
+        public static NrdDenoiser CreateDefault(PathTracingSetting setting, string camName)
+        {
+            var descs = new[]
+            {
+                new NrdDenoiserDesc(0, Denoiser.SIGMA_SHADOW),
+                new NrdDenoiserDesc(1, Denoiser.REBLUR_DIFFUSE_SPECULAR),
+            };
+            return new NrdDenoiser(setting, camName, descs);
         }
 
         /// <summary>
@@ -145,26 +177,77 @@ namespace Nrd
             data.commonSettings.accumulationMode           = AccumulationMode.CONTINUE;
             data.commonSettings.frameIndex                 = fi.frameIndex;
 
-            // --- Sigma 设置 (光照) ---
-            data.sigmaSettings.lightDirection = fi.lightDirection;
-
             data.instanceId = _nrdInstanceId;
             data.width      = (ushort)fi.renderResolution.x;
             data.height     = (ushort)fi.renderResolution.y;
 
             // Common 设置
-            data.commonSettings.denoisingRange                = _setting.denoisingRange;
-            data.commonSettings.splitScreen                   = _setting.splitScreen;
-            data.commonSettings.enableValidation              = _setting.showValidation;
+            data.commonSettings.denoisingRange   = _setting.denoisingRange;
+            data.commonSettings.splitScreen      = _setting.splitScreen;
+            data.commonSettings.enableValidation = _setting.showValidation;
 
-            // Sigma 设置
-            data.sigmaSettings.planeDistanceSensitivity = _setting.planeDistanceSensitivity;
-            data.sigmaSettings.maxStabilizedFrameNum    = _setting.maxStabilizedFrameNum;
+            // --- Per-denoiser settings (entries[]) ---
+            data.denoiserCount = (uint)_denoisers.Length;
+            for (int i = 0; i < _denoisers.Length; i++)
+            {
+                ref DenoiserSettingsEntry entry = ref NrdFrameData.GetEntry(ref data, i);
+                entry.identifier = _denoisers[i].identifier;
+                entry.denoiser   = _denoisers[i].denoiser;
 
-            // Reblur 设置
-            data.reblurSettings.checkerboardMode       = CheckerboardMode.OFF;
-            data.reblurSettings.minMaterialForDiffuse  = 0;
-            data.reblurSettings.minMaterialForSpecular = 1;
+                switch (_denoisers[i].denoiser)
+                {
+                    case Denoiser.SIGMA_SHADOW:
+                    case Denoiser.SIGMA_SHADOW_TRANSLUCENCY:
+                    {
+                        var s = SigmaSettings._default;
+                        s.lightDirection            = fi.lightDirection;
+                        s.planeDistanceSensitivity  = _setting.planeDistanceSensitivity;
+                        s.maxStabilizedFrameNum     = _setting.maxStabilizedFrameNum;
+                        entry.Write(s);
+                        break;
+                    }
+
+                    case Denoiser.REBLUR_DIFFUSE:
+                    case Denoiser.REBLUR_DIFFUSE_OCCLUSION:
+                    case Denoiser.REBLUR_DIFFUSE_SH:
+                    case Denoiser.REBLUR_SPECULAR:
+                    case Denoiser.REBLUR_SPECULAR_OCCLUSION:
+                    case Denoiser.REBLUR_SPECULAR_SH:
+                    case Denoiser.REBLUR_DIFFUSE_SPECULAR:
+                    case Denoiser.REBLUR_DIFFUSE_SPECULAR_OCCLUSION:
+                    case Denoiser.REBLUR_DIFFUSE_SPECULAR_SH:
+                    case Denoiser.REBLUR_DIFFUSE_DIRECTIONAL_OCCLUSION:
+                    {
+                        var s = ReblurSettings._default;
+                        s.checkerboardMode       = CheckerboardMode.OFF;
+                        s.minMaterialForDiffuse  = 0;
+                        s.minMaterialForSpecular = 1;
+                        entry.Write(s);
+                        break;
+                    }
+
+                    case Denoiser.RELAX_DIFFUSE:
+                    case Denoiser.RELAX_DIFFUSE_SH:
+                    case Denoiser.RELAX_SPECULAR:
+                    case Denoiser.RELAX_SPECULAR_SH:
+                    case Denoiser.RELAX_DIFFUSE_SPECULAR:
+                    case Denoiser.RELAX_DIFFUSE_SPECULAR_SH:
+                    {
+                        entry.Write(RelaxSettings._default);
+                        break;
+                    }
+
+                    case Denoiser.REFERENCE:
+                    {
+                        entry.Write(ReferenceSettings._default);
+                        break;
+                    }
+
+                    default:
+                        // Zero-initialized blob (default defaults); still safe for NRD to consume.
+                        break;
+                }
+            }
 
             return data;
         }

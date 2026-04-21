@@ -12,4 +12,5 @@ ScriptedImporter:
   additionalIncludePaths: []
   extraArgs:
   - -disable-payload-qualifiers
+  - -enable-16bit-types
   defines: []

@@ -23,7 +23,7 @@
 class NrdInstance
 {
 public:
-    NrdInstance(IUnityInterfaces* interfaces,int instanceId);
+    NrdInstance(IUnityInterfaces* interfaces, int instanceId, const NrdDenoiserDesc* denoisers, int denoiserCount);
     ~NrdInstance();
 
     void DispatchCompute( FrameData* data);
@@ -46,14 +46,16 @@ private:
     nrd::Integration m_NrdIntegration = {};
     
     std::vector<NrdResourceInput> m_CachedResources;
-    
+
+    // Denoiser list (identifier + type) provided at construction time. Immutable afterwards.
+    std::vector<NrdDenoiserDesc>  m_Denoisers;
+    std::vector<nrd::Identifier>  m_DenoiserIds;
+
     uint32_t frameIndex = 0;
 
     UINT TextureWidth = 0;
     UINT TextureHeight = 0;
 
-    nrd::Identifier m_SigmaId = 0;
-    nrd::Identifier m_ReblurId = 0;
     std::atomic<bool> m_are_resources_initialized{false};
     
 };

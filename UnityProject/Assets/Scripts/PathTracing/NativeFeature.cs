@@ -297,7 +297,7 @@ namespace PathTracing
                     camName = $"{cam.name}_Eye{eyeIndex}";
                 }
 
-                nrd = new NrdDenoiser(pathTracingSetting, camName);
+                nrd = NrdDenoiser.CreateDefault(pathTracingSetting, camName);
                 _nrdDenoisers.Add(uniqueKey, nrd);
             }
 
