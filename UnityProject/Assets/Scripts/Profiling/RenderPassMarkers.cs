@@ -74,6 +74,8 @@ public static class RenderPassMarkers
     public static readonly NamedMarker Acc = new(ProfilerCategory.Render, "Acc", MarkerFlags.SampleGPU);
     public static readonly NamedMarker AutoExposure = new(ProfilerCategory.Render, "Auto Exposure", MarkerFlags.SampleGPU);
     public static readonly NamedMarker Taa = new(ProfilerCategory.Render, "TAA", MarkerFlags.SampleGPU);
+    public static readonly NamedMarker ConfidenceBlur = new(ProfilerCategory.Render, "Confidence Blur", MarkerFlags.SampleGPU);
+    public static readonly NamedMarker Final = new(ProfilerCategory.Render, "Final", MarkerFlags.SampleGPU);
     public static readonly NamedMarker OutputBlit = new(ProfilerCategory.Render, "Output Blit", MarkerFlags.SampleGPU);
 
     // ── All marker names (for GPUProfiler inspector population) ──────────────

@@ -96,7 +96,6 @@ namespace NativeRender
         /// are unaffected; new pipelines will use the freshly compiled bytes.
         /// </summary>
         /// <param name="hlslPath">Absolute path to the HLSL file. If null, resolved via AssetDatabase.</param>
-        [ContextMenu("Recompile")]
         public void ForceRecompile(string hlslPath = null)
         {
             _compiledDxil = null;

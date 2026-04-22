@@ -11,52 +11,57 @@ namespace PathTracing
     public enum RenderResourceType
     {
         // ── NRD standard non-noisy inputs ──────────────────────────────────────
+        Viewz,
         MV,
         NormalRoughness,
-        Viewz,
-        BasecolorMetalness,
+        PsrThroughput,
+        BaseColorMetalness,
+        DirectLighting,
+        DirectEmission,
+        Shadow,
+        Diff,
+        Spec,
+
         GeoNormal,
 
         // ── NRD standard noisy inputs ───────────────────────────────────────────
-        DiffRadianceHitdist,
-        SpecRadianceHitdist,
-        Penumbra,
+        Unfiltered_Penumbra,
+        Unfiltered_Diff,
+        Unfiltered_Spec,
+        Unfiltered_Translucency,
 
-        // ── NRD standard outputs ────────────────────────────────────────────────
-        OutDiffRadianceHitdist,
-        OutSpecRadianceHitdist,
-        OutShadowTranslucency,
         Validation,
-
-        // ── NRI-interop resources (DLSS / composition) ──────────────────────────
         Composed,
-        DirectLighting,
+
+        Gradient_StoredPing, // gIn_PrevGradient (even) / gOut_CurrGradient (odd)
+        Gradient_StoredPong, // gOut_CurrGradient (even) / gIn_PrevGradient (odd)
+        Gradient_Ping, // gOut_Gradient (always)
+        Gradient_Pong, // reserved for downstream ConfidenceBlur
+
+        // History
+        ComposedDiff,
+        ComposedSpecViewZ,
+        TaaHistory,
+        TaaHistoryPrev,
+
         DlssOutput,
+        PreFinal,
+        
+        Final,
+        
+        // RR guides
         RrGuideDiffAlbedo,
         RrGuideSpecAlbedo,
         RrGuideSpecHitDistance,
         RrGuideNormalRoughness,
 
-        // ── Cross-frame RTHandle-only resources ─────────────────────────────────
-        TaaHistory,
-        TaaHistoryPrev,
-        PsrThroughput,
-        // Per-frame PathTracing pass textures (previously stored in PTContextItem)
-        PtOutput,
-        PtDirectEmission,
-        PtComposedDiff,
-        PtComposedSpecViewZ,
+
         // Previous-frame GBuffer for RTXDI temporal reuse
         PrevViewZ,
         PrevNormalRoughness,
         PrevBaseColorMetalness,
         PrevGeoNormal,
 
-        // ── SHARC gradient textures (at SHARC resolution, managed by EnsureSharcGradientResources) ─
-        SharcGradientStoredPing, // gIn_PrevGradient (even) / gOut_CurrGradient (odd)
-        SharcGradientStoredPong, // gOut_CurrGradient (even) / gIn_PrevGradient (odd)
-        SharcGradientPing,       // gOut_Gradient (always)
-        SharcGradientPong,       // reserved for downstream ConfidenceBlur
 
         // rtxdi
         RtxdiViewDepth,

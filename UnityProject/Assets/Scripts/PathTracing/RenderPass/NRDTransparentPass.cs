@@ -52,12 +52,8 @@ namespace PathTracing
             internal GraphicsBuffer HashEntriesBuffer;
             internal GraphicsBuffer ResolvedBuffer;
 
-            internal RTHandle ComposedDiff;
-            internal RTHandle ComposedSpecViewZ;
-
-            internal RTHandle Composed;
-            internal RTHandle Mv;
-            internal RTHandle NormalRoughness;
+            // RT textures sourced from the pool inside ExecutePass
+            internal PathTracingResourcePool Pool;
         }
 
         public class Settings
@@ -72,10 +68,11 @@ namespace PathTracing
 
         class PassData
         {
-            internal NativeComputePipeline Cs;
-            internal NRDSampleResource     NrdResource;
-            internal Resource              Resource;
-            internal Settings              Settings;
+            internal NativeComputePipeline   Cs;
+            internal NRDSampleResource       NrdResource;
+            internal Resource                Resource;
+            internal Settings                Settings;
+            internal PathTracingResourcePool Pool;
 
             internal TextureHandle ComposedDiff;
             internal TextureHandle ComposedSpecViewZ;
@@ -95,10 +92,7 @@ namespace PathTracing
             var res  = data.Resource;
             var nrd  = data.NrdResource;
 
-            // 1. Build TLAS
-            nrd.BuildAccelerationStructures(cmd);
-
-            // 2. Acceleration structures
+            // 1. Acceleration structures
             cs.SetAccelerationStructure("gWorldTlas", nrd.WorldAS);
 
             // 3. Scene structured buffers
@@ -113,14 +107,16 @@ namespace PathTracing
             cs.SetRWBuffer("gInOut_SharcHashEntriesBuffer", res.HashEntriesBuffer);
             cs.SetRWBuffer("gInOut_SharcResolved",          res.ResolvedBuffer);
 
+            var pool = data.Pool;
+
             // 6. SRV inputs
             cs.SetTexture("gIn_ComposedDiff",       data.ComposedDiff);
             cs.SetTexture("gIn_ComposedSpec_ViewZ", data.ComposedSpecViewZ);
 
             // 7. UAV outputs
-            cs.SetRWTexture("gOut_Composed",      res.Composed.rt);
-            cs.SetRWTexture("gInOut_Mv",          res.Mv.rt);
-            cs.SetRWTexture("gOut_Normal_Roughness", res.NormalRoughness.rt);
+            cs.SetRWTexture("gOut_Composed",         pool.GetRT(RenderResourceType.Composed).rt);
+            cs.SetRWTexture("gInOut_Mv",             pool.GetRT(RenderResourceType.MV).rt);
+            cs.SetRWTexture("gOut_Normal_Roughness", pool.GetRT(RenderResourceType.NormalRoughness).rt);
 
             // 8. Constant buffer
             cs.SetConstantBuffer("GlobalConstants", res.ConstantBuffer);
@@ -148,9 +144,10 @@ namespace PathTracing
             passData.NrdResource = _nrdResource;
             passData.Resource    = _resource;
             passData.Settings    = _settings;
+            passData.Pool        = _resource.Pool;
 
-            passData.ComposedDiff      = renderGraph.ImportTexture(_resource.ComposedDiff);
-            passData.ComposedSpecViewZ = renderGraph.ImportTexture(_resource.ComposedSpecViewZ);
+            passData.ComposedDiff      = renderGraph.ImportTexture(_resource.Pool.GetRT(RenderResourceType.ComposedDiff));
+            passData.ComposedSpecViewZ = renderGraph.ImportTexture(_resource.Pool.GetRT(RenderResourceType.ComposedSpecViewZ));
 
             builder.UseTexture(passData.ComposedDiff,      AccessFlags.ReadWrite);
             builder.UseTexture(passData.ComposedSpecViewZ, AccessFlags.ReadWrite);

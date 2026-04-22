@@ -208,6 +208,7 @@ namespace PathTracing
         public float4   gViewDirection;
         public float4   gHairBaseColor;
         public float2   gHairBetas;
+        
         public float2   gOutputSize; // represents native resolution ( >= gRenderSize )
         public float2   gRenderSize; // up to native resolution ( >= gRectSize )
         public float2   gRectSize; // dynamic resolution scaling
@@ -218,6 +219,7 @@ namespace PathTracing
         public float2   gInvSharcRenderSize;
         public float2   gJitter;
         public float2   gJitterPrev;
+        
         public float    gEmissionIntensityLights;
         public float    gEmissionIntensityCubes;
         public float    gNearZ;

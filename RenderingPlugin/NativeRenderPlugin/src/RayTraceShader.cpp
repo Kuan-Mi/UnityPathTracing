@@ -1303,6 +1303,10 @@ void RayTraceShader::Dispatch(
             m_d3d12v8->RequestResourceState(b.boundResource, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
             // Logf(kUnityLogTypeLog, "RayTraceShader::Dispatch: RequestResourceState '%s' UAV -> UNORDERED_ACCESS (res=%p)", b.name.c_str(), b.boundResource);
         }
+        else if (b.type == UserBindingType::CBV)
+        {
+            m_d3d12v8->RequestResourceState(b.boundResource, D3D12_RESOURCE_STATE_VERTEX_AND_CONSTANT_BUFFER);
+        }
     }
 
     // DispatchRays

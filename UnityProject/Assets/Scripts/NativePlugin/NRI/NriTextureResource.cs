@@ -24,7 +24,6 @@ namespace Nri
 
         public string Name;
         public NriResourceState ResourceState;
-        public RenderResourceType ResourceType;
         public GraphicsFormat GraphicsFormat;
         public bool SRGB;
         
@@ -34,7 +33,6 @@ namespace Nri
         public NriTextureResource(RenderResourceType resourceType, GraphicsFormat graphicsFormat, NriResourceState initialState, bool srgb = false)
         {
             Name = resourceType.ToString();
-            ResourceType = resourceType;
             ResourceState = initialState;
             GraphicsFormat = graphicsFormat;
             SRGB = srgb;

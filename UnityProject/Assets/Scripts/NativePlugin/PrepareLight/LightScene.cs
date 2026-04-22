@@ -113,14 +113,14 @@ namespace RTXDI
         {
             MeshLightCache.Add(ml);
             Instance?.MarkSceneDirty();
-            Debug.Log($"Registered MeshLight: {ml.name}. Total count: {MeshLightCache.Count}");
+            // Debug.Log($"Registered MeshLight: {ml.name}. Total count: {MeshLightCache.Count}");
         }
 
         public static void UnregisterMeshLight(MeshLight ml)
         {
             MeshLightCache.Remove(ml);
             Instance?.MarkSceneDirty();
-            Debug.Log($"Unregistered MeshLight: {ml.name}. Total count: {MeshLightCache.Count}");
+            // Debug.Log($"Unregistered MeshLight: {ml.name}. Total count: {MeshLightCache.Count}");
         }
 
         // 单例引用（可选，方便通知）

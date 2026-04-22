@@ -858,6 +858,11 @@ void ComputeShader::Dispatch(
             {
                 m_d3d12v8->RequestResourceState(b.boundResource, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
             }
+            else if (b.type == ComputeBindingType::CBV)
+            {
+                m_d3d12v8->RequestResourceState(b.boundResource,
+                    D3D12_RESOURCE_STATE_VERTEX_AND_CONSTANT_BUFFER);
+            }
         }
     }
 

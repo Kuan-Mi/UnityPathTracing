@@ -22,16 +22,16 @@ namespace Nrd
 
         private NativeArray<NrdResourceInput> _resourceCache;
 
-        private readonly int _nrdInstanceId;
+        private readonly int    _nrdInstanceId;
         private readonly string _cameraName;
 
         // Denoiser list captured at construction, used to populate each frame's entries[].
         private readonly NrdDenoiserDesc[] _denoisers;
 
-        private NativeArray<NrdFrameData> _buffer;
-        private const int BufferCount = 3;
+        private       NativeArray<NrdFrameData> _buffer;
+        private const int                       BufferCount = 3;
 
-        private readonly PathTracingSetting _setting;
+        // private readonly PathTracingSetting _setting;
 
         /// <summary>
         /// Per-frame camera data filled by PathTracingFeature from CameraFrameState.
@@ -50,28 +50,12 @@ namespace Nrd
             public int2      renderResolution;
             public uint      frameIndex;
             public float3    lightDirection;
+            
         }
 
-        /// <summary>
-        /// NRD-required textures packed by PathTracingFeature and passed on each resource refresh.
-        /// </summary>
-        public struct NrdResources
-        {
-            public NriTextureResource inMv;
-            public NriTextureResource inViewZ;
-            public NriTextureResource inNormalRoughness;
-            public NriTextureResource inBaseColorMetalness;
-            public NriTextureResource inPenumbra;
-            public NriTextureResource inDiffRadianceHitDist;
-            public NriTextureResource inSpecRadianceHitDist;
 
-            public NriTextureResource outShadowTranslucency;
-            public NriTextureResource outDiffRadianceHitDist;
-            public NriTextureResource outSpecRadianceHitDist;
-            public NriTextureResource outValidation;
-        }
 
-        public NrdDenoiser(PathTracingSetting setting, string camName, NrdDenoiserDesc[] denoisers)
+        public NrdDenoiser(string camName, NrdDenoiserDesc[] denoisers)
         {
             if (denoisers == null || denoisers.Length == 0)
                 throw new ArgumentException("At least one denoiser must be specified.", nameof(denoisers));
@@ -80,7 +64,7 @@ namespace Nrd
                     $"denoisers.Length={denoisers.Length} exceeds max {NrdLayout.MaxDenoisersPerInstance}",
                     nameof(denoisers));
 
-            _setting    = setting;
+            // _setting    = setting;
             _cameraName = camName;
             _denoisers  = (NrdDenoiserDesc[])denoisers.Clone();
 
@@ -99,45 +83,39 @@ namespace Nrd
         /// <summary>
         /// Default factory matching legacy behaviour: SIGMA_SHADOW (id 0) + REBLUR_DIFFUSE_SPECULAR (id 1).
         /// </summary>
-        public static NrdDenoiser CreateDefault(PathTracingSetting setting, string camName)
+        public static NrdDenoiser CreateDefault(string camName)
         {
             var descs = new[]
             {
                 new NrdDenoiserDesc(0, Denoiser.SIGMA_SHADOW),
                 new NrdDenoiserDesc(1, Denoiser.REBLUR_DIFFUSE_SPECULAR),
             };
-            return new NrdDenoiser(setting, camName, descs);
+            return new NrdDenoiser(camName, descs);
         }
 
         /// <summary>
-        /// Pushes the current NRD texture snapshot to the C++ denoiser.
+        /// Pushes NRD texture bindings to the C++ denoiser.
         /// Called by PathTracingFeature whenever textures are reallocated.
+        /// Each entry is a (ResourceType, NriTextureResource) pair; null textures are skipped.
         /// </summary>
-        public unsafe void UpdateResources(NrdResources res)
+        public unsafe void UpdateResources(params (ResourceType type, NriTextureResource resource)[] entries)
         {
-            const int count = 11;
-            if (!_resourceCache.IsCreated || _resourceCache.Length < count)
+            if (entries == null || entries.Length == 0) return;
+
+            if (!_resourceCache.IsCreated || _resourceCache.Length < entries.Length)
             {
                 if (_resourceCache.IsCreated) _resourceCache.Dispose();
-                _resourceCache = new NativeArray<NrdResourceInput>(count, Allocator.Persistent);
+                _resourceCache = new NativeArray<NrdResourceInput>(entries.Length, Allocator.Persistent);
             }
 
             int idx = 0;
             var ptr = (NrdResourceInput*)_resourceCache.GetUnsafePtr();
 
-            void Add(ResourceType t, NriTextureResource r) =>
-                ptr[idx++] = new NrdResourceInput { type = t, texture = r.NriPtr, state = r.ResourceState };
-
-            Add(ResourceType.IN_MV,                    res.inMv);
-            Add(ResourceType.IN_VIEWZ,                 res.inViewZ);
-            Add(ResourceType.IN_NORMAL_ROUGHNESS,      res.inNormalRoughness);
-            Add(ResourceType.IN_PENUMBRA,              res.inPenumbra);
-            Add(ResourceType.IN_DIFF_RADIANCE_HITDIST, res.inDiffRadianceHitDist);
-            Add(ResourceType.IN_SPEC_RADIANCE_HITDIST, res.inSpecRadianceHitDist);
-            Add(ResourceType.OUT_SHADOW_TRANSLUCENCY,  res.outShadowTranslucency);
-            Add(ResourceType.OUT_DIFF_RADIANCE_HITDIST,res.outDiffRadianceHitDist);
-            Add(ResourceType.OUT_SPEC_RADIANCE_HITDIST,res.outSpecRadianceHitDist);
-            Add(ResourceType.OUT_VALIDATION,           res.outValidation);
+            foreach (var (type, resource) in entries)
+            {
+                if (resource == null) continue;
+                ptr[idx++] = new NrdResourceInput { type = type, texture = resource.NriPtr, state = resource.ResourceState };
+            }
 
             UpdateDenoiserResources(_nrdInstanceId, (IntPtr)ptr, idx);
             Debug.Log($"[NRD] Updated Resources for Denoiser Instance {_nrdInstanceId} with {idx} resources.");
@@ -148,18 +126,18 @@ namespace Nrd
             NrdFrameData data = NrdFrameData._default;
 
             // --- 矩阵赋值 ---
-            data.commonSettings.viewToClipMatrix     = fi.viewToClip;
-            data.commonSettings.viewToClipMatrixPrev = fi.prevViewToClip;
+            data.commonSettings.viewToClipMatrix      = fi.viewToClip;
+            data.commonSettings.viewToClipMatrixPrev  = fi.prevViewToClip;
             data.commonSettings.worldToViewMatrix     = fi.worldToView;
             data.commonSettings.worldToViewMatrixPrev = fi.prevWorldToView;
 
             // --- Jitter ---
-            data.commonSettings.cameraJitter     = _setting.cameraJitter ? fi.viewportJitter     : float2.zero;
-            data.commonSettings.cameraJitterPrev = _setting.cameraJitter ? fi.prevViewportJitter : float2.zero;
+            data.commonSettings.cameraJitter     =  fi.viewportJitter;
+            data.commonSettings.cameraJitterPrev =  fi.prevViewportJitter;
 
             // --- 分辨率 ---
-            ushort rectW     = (ushort)(fi.renderResolution.x * fi.resolutionScale     + 0.5f);
-            ushort rectH     = (ushort)(fi.renderResolution.y * fi.resolutionScale     + 0.5f);
+            ushort rectW     = (ushort)(fi.renderResolution.x * fi.resolutionScale + 0.5f);
+            ushort rectH     = (ushort)(fi.renderResolution.y * fi.resolutionScale + 0.5f);
             ushort prevRectW = (ushort)(fi.renderResolution.x * fi.prevResolutionScale + 0.5f);
             ushort prevRectH = (ushort)(fi.renderResolution.y * fi.prevResolutionScale + 0.5f);
 
@@ -182,9 +160,9 @@ namespace Nrd
             data.height     = (ushort)fi.renderResolution.y;
 
             // Common 设置
-            data.commonSettings.denoisingRange   = _setting.denoisingRange;
-            data.commonSettings.splitScreen      = _setting.splitScreen;
-            data.commonSettings.enableValidation = _setting.showValidation;
+            data.commonSettings.denoisingRange   = 1000;
+            data.commonSettings.splitScreen      = 0;
+            data.commonSettings.enableValidation = true;
 
             // --- Per-denoiser settings (entries[]) ---
             data.denoiserCount = (uint)_denoisers.Length;
@@ -200,9 +178,9 @@ namespace Nrd
                     case Denoiser.SIGMA_SHADOW_TRANSLUCENCY:
                     {
                         var s = SigmaSettings._default;
-                        s.lightDirection            = fi.lightDirection;
-                        s.planeDistanceSensitivity  = _setting.planeDistanceSensitivity;
-                        s.maxStabilizedFrameNum     = _setting.maxStabilizedFrameNum;
+                        s.lightDirection           = fi.lightDirection;
+                        s.planeDistanceSensitivity = 0.02f;
+                        s.maxStabilizedFrameNum    = 5;
                         entry.Write(s);
                         break;
                     }

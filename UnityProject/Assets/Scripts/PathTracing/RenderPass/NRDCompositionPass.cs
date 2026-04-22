@@ -1,11 +1,9 @@
 using System;
 using NativeRender;
-using Unity.Mathematics;
 using UnityEngine;
 using UnityEngine.Rendering;
 using UnityEngine.Rendering.RenderGraphModule;
 using UnityEngine.Rendering.Universal;
-using static PathTracing.ShaderIDs;
 
 namespace PathTracing
 {
@@ -43,19 +41,8 @@ namespace PathTracing
         {
             internal GraphicsBuffer ConstantBuffer;
 
-            internal RTHandle ViewZ;
-            internal RTHandle NormalRoughness;
-            internal RTHandle BaseColorMetalness;
-            internal RTHandle PsrThroughput;
-            internal RTHandle DirectLighting;
-
-            internal RTHandle Shadow;
-            internal RTHandle Diff;
-            internal RTHandle Spec;
-
-            internal RTHandle DirectEmission;
-            internal RTHandle ComposedDiff;
-            internal RTHandle ComposedSpecViewZ;
+            // RT textures sourced from the pool inside ExecutePass
+            internal PathTracingResourcePool Pool;
         }
 
         public class Settings
@@ -70,13 +57,10 @@ namespace PathTracing
 
         class PassData
         {
-            internal NativeComputePipeline Cs;
-            internal Resource              Resource;
-            internal Settings              Settings;
-
-            internal TextureHandle DirectEmission;
-            internal TextureHandle ComposedDiff;
-            internal TextureHandle ComposedSpecViewZ;
+            internal NativeComputePipeline   Cs;
+            internal Resource                Resource;
+            internal Settings                Settings;
+            internal PathTracingResourcePool Pool;
         }
 
         // -------------------------------------------------------------------------
@@ -91,20 +75,22 @@ namespace PathTracing
 
             cmd.BeginSample(RenderPassMarkers.Composition);
 
+            var pool = data.Pool;
+
             // SRV inputs
-            cs.SetTexture("gIn_ViewZ",              res.ViewZ.rt);
-            cs.SetTexture("gIn_Normal_Roughness",   res.NormalRoughness.rt);
-            cs.SetTexture("gIn_BaseColor_Metalness",res.BaseColorMetalness.rt);
-            cs.SetTexture("gIn_DirectLighting",     res.DirectLighting.rt);
-            cs.SetTexture("gIn_DirectEmission",     data.DirectEmission);
-            cs.SetTexture("gIn_PsrThroughput",      res.PsrThroughput.rt);
-            cs.SetTexture("gIn_Shadow",             res.Shadow.rt);
-            cs.SetTexture("gIn_Diff",               res.Diff.rt);
-            cs.SetTexture("gIn_Spec",               res.Spec.rt);
+            cs.SetTexture("gIn_ViewZ", pool.GetRT(RenderResourceType.Viewz).rt);
+            cs.SetTexture("gIn_Normal_Roughness", pool.GetRT(RenderResourceType.NormalRoughness).rt);
+            cs.SetTexture("gIn_BaseColor_Metalness", pool.GetRT(RenderResourceType.BaseColorMetalness).rt);
+            cs.SetTexture("gIn_DirectLighting", pool.GetRT(RenderResourceType.DirectLighting).rt);
+            cs.SetTexture("gIn_DirectEmission", pool.GetRT(RenderResourceType.DirectEmission).rt);
+            cs.SetTexture("gIn_PsrThroughput", pool.GetRT(RenderResourceType.PsrThroughput).rt);
+            cs.SetTexture("gIn_Shadow", pool.GetRT(RenderResourceType.Shadow).rt);
+            cs.SetTexture("gIn_Diff", pool.GetRT(RenderResourceType.Diff).rt);
+            cs.SetTexture("gIn_Spec", pool.GetRT(RenderResourceType.Spec).rt);
 
             // UAV outputs
-            cs.SetRWTexture("gOut_ComposedDiff",      data.ComposedDiff);
-            cs.SetRWTexture("gOut_ComposedSpec_ViewZ", data.ComposedSpecViewZ);
+            cs.SetRWTexture("gOut_ComposedDiff", pool.GetRT(RenderResourceType.ComposedDiff).rt);
+            cs.SetRWTexture("gOut_ComposedSpec_ViewZ", pool.GetRT(RenderResourceType.ComposedSpecViewZ).rt);
 
             // Constant buffer
             cs.SetConstantBuffer("GlobalConstants", res.ConstantBuffer);
@@ -126,14 +112,8 @@ namespace PathTracing
             passData.Cs       = _cs;
             passData.Resource = _resource;
             passData.Settings = _settings;
+            passData.Pool     = _resource.Pool;
 
-            passData.DirectEmission    = renderGraph.ImportTexture(_resource.DirectEmission);
-            passData.ComposedDiff      = renderGraph.ImportTexture(_resource.ComposedDiff);
-            passData.ComposedSpecViewZ = renderGraph.ImportTexture(_resource.ComposedSpecViewZ);
-
-            builder.UseTexture(passData.DirectEmission,    AccessFlags.ReadWrite);
-            builder.UseTexture(passData.ComposedDiff,      AccessFlags.ReadWrite);
-            builder.UseTexture(passData.ComposedSpecViewZ, AccessFlags.ReadWrite);
 
             builder.AllowPassCulling(false);
             builder.SetRenderFunc((PassData data, UnsafeGraphContext context) => { ExecutePass(data, context); });

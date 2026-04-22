@@ -329,4 +329,82 @@ namespace PathTracing
         public bool     accumulate          = false;
         public OnScreen gOnScreen;
     }
+
+    /// <summary>
+    /// Direct C# port of the C++ <c>Settings</c> struct in NRDSample.cpp.
+    /// All fields match the original defaults.  Use this with
+    /// <c>CameraFrameState.GetNrdConstants(renderingData, NrdSampleSetting)</c>
+    /// which faithfully follows the C++ <c>UpdateConstantBuffer</c> logic.
+    /// </summary>
+    [System.Serializable]
+    public class NrdSampleSetting
+    {
+        // ── Animation / timing (not used by shader, kept for completeness) ──
+        // public double motionStartTime        = 0.0;
+        // public float  emulateMotionSpeed     = 1.0f;
+        // public float  animatedObjectScale    = 1.0f;
+        // public float  animationProgress      = 0.0f;
+        // public float  animationSpeed         = 0.0f;
+        // public int    animatedObjectNum      = 5;
+        // public uint   activeAnimation        = 0;
+        // public int    motionMode             = 0;
+        // public bool   animatedObjects        = false;
+        // public bool   animateScene           = false;
+        // public bool   animateSun             = false;
+        // public bool   nineBrothers           = false;
+        // public bool   blink                  = false;
+        // public bool   pauseAnimation         = true;
+        // public bool   linearMotion           = true;
+        // public bool   emissiveObjects        = false;
+        // public bool   windowAlignment        = true;
+
+        // ── Camera ───────────────────────────────────────────────────────
+        // public float maxFps          = 60.0f;
+        // public float camFov          = 90.0f;        // horizontal FOV in degrees
+        // public bool  limitFps        = false;
+        // public bool  ortho           = false;
+        public bool  cameraJitter    = true;
+        // public int   mvType          = 1;            // 0 = MV_2D, 1 = MV_25D
+
+        // ── Sun ──────────────────────────────────────────────────────────
+        public float sunAngularDiameter = 0.533f;   // degrees
+
+        // ── Rendering ────────────────────────────────────────────────────
+        public float exposure               = 80.0f;
+        public float roughnessOverride      = 0.0f;
+        public float metalnessOverride      = 0.0f;
+        public float emissionIntensityLights = 1.0f;
+        public float emissionIntensityCubes  = 1.0f;
+        public float debug                  = 0.0f;
+        public float meterToUnitsMultiplier = 1.0f;
+        public float separator              = 0.0f;
+        public float hitDistScale           = 3.0f;
+        public float resolutionScale        = 1.0f;
+        // public float sharpness              = 0.15f;
+
+        public int      maxAccumulatedFrameNum     = 31;
+        public int      maxFastAccumulatedFrameNum = 7;
+        public OnScreen onScreen                   = 0;
+        public int      forcedMaterial             = 0;
+        public int      denoiser                   = 0;  // 0 = DENOISER_REBLUR
+        public int      rpp                        = 1;
+        public int      bounceNum                  = 1;
+        public int      tracingMode                = 2;  // RESOLUTION_HALF
+        public bool     SHARC                      = true;
+        public bool     PSR                        = false;
+        public bool     indirectDiffuse            = true;
+        public bool     indirectSpecular           = true;
+        public bool     normalMap                  = true;
+        public bool     TAA                        = true;
+        public bool     emission                   = true;
+        public bool     importanceSampling         = true;
+        public bool     specularLobeTrimming       = true;
+        public bool     adaptiveAccumulation       = true;
+        public bool     usePrevFrame               = true;
+        public bool     boost                      = false;
+        public bool     SR                         = false;
+        public bool     RR                         = false;
+        public bool     confidence                 = true;
+
+    }
 }
