@@ -118,9 +118,12 @@
 
                 i.uv = i.uv * _BlitScaleBias.xy + _BlitScaleBias.zw;
 
-                float OUT_SHADOW_TRANSLUCENCY = SAMPLE_TEXTURE2D(_BlitTexture, sampler_BlitTexture, i.uv).r;
-                float shadow = SIGMA_BackEnd_UnpackShadow(OUT_SHADOW_TRANSLUCENCY);
+                float4 shadowData = SAMPLE_TEXTURE2D(_BlitTexture, sampler_BlitTexture, i.uv);
+                float shadow = SIGMA_BackEnd_UnpackShadow(shadowData).x;
                 float4 color = float4(shadow, shadow, shadow, 1);
+                
+                // float3 shadow = SIGMA_BackEnd_UnpackShadow(shadowData).yzw;
+                // float4 color = float4(shadow,  1);
 
                 return color;
             }

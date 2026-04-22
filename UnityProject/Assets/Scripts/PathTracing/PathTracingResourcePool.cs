@@ -21,7 +21,6 @@ namespace PathTracing
     /// </summary>
     public class PathTracingResourcePool : System.IDisposable
     {
-
         private readonly Dictionary<RenderResourceType, NriTextureResource> _nriResources = new();
         private readonly Dictionary<RenderResourceType, RTHandle>           _rtResources  = new();
 
@@ -29,7 +28,6 @@ namespace PathTracing
         private readonly List<(RenderResourceType type, GraphicsFormat format, bool srgb)> _rtResourceDefs = new();
 
         public int2 renderResolution { get; private set; }
-
 
 
         // ── Resource initialisation ─────────────────────────────────────────────
@@ -40,46 +38,46 @@ namespace PathTracing
         /// </summary>
         public void InitPathTracingResources()
         {
-            var srvState = new NriResourceState { accessBits = AccessBits.SHADER_RESOURCE,         layout = Layout.SHADER_RESOURCE,         stageBits = 1 << 7  };
+            var srvState = new NriResourceState { accessBits = AccessBits.SHADER_RESOURCE, layout         = Layout.SHADER_RESOURCE, stageBits         = 1 << 7 };
             var uavState = new NriResourceState { accessBits = AccessBits.SHADER_RESOURCE_STORAGE, layout = Layout.SHADER_RESOURCE_STORAGE, stageBits = 1 << 10 };
 
             // ── NRD standard I/O ────────────────────────────────────────────────
-            _nriResources[RenderResourceType.MV]                    = new NriTextureResource(RenderResourceType.MV,                    GraphicsFormat.R16G16B16A16_SFloat,    srvState);
-            _nriResources[RenderResourceType.Viewz]                 = new NriTextureResource(RenderResourceType.Viewz,                 GraphicsFormat.R32_SFloat,             srvState);
-            _nriResources[RenderResourceType.NormalRoughness]       = new NriTextureResource(RenderResourceType.NormalRoughness,       GraphicsFormat.A2B10G10R10_UNormPack32, srvState);
-            _nriResources[RenderResourceType.BasecolorMetalness]    = new NriTextureResource(RenderResourceType.BasecolorMetalness,    GraphicsFormat.R8G8B8A8_UNorm,         srvState);
-            _nriResources[RenderResourceType.GeoNormal]             = new NriTextureResource(RenderResourceType.GeoNormal,             GraphicsFormat.R32_UInt,               srvState);
-            _nriResources[RenderResourceType.Penumbra]              = new NriTextureResource(RenderResourceType.Penumbra,              GraphicsFormat.R16_SFloat,             srvState);
-            _nriResources[RenderResourceType.DiffRadianceHitdist]   = new NriTextureResource(RenderResourceType.DiffRadianceHitdist,   GraphicsFormat.R16G16B16A16_SFloat,    srvState);
-            _nriResources[RenderResourceType.SpecRadianceHitdist]   = new NriTextureResource(RenderResourceType.SpecRadianceHitdist,   GraphicsFormat.R16G16B16A16_SFloat,    srvState);
-            _nriResources[RenderResourceType.OutShadowTranslucency] = new NriTextureResource(RenderResourceType.OutShadowTranslucency, GraphicsFormat.R16_SFloat,             uavState);
-            _nriResources[RenderResourceType.OutDiffRadianceHitdist]= new NriTextureResource(RenderResourceType.OutDiffRadianceHitdist,GraphicsFormat.R16G16B16A16_SFloat,    uavState);
-            _nriResources[RenderResourceType.OutSpecRadianceHitdist]= new NriTextureResource(RenderResourceType.OutSpecRadianceHitdist,GraphicsFormat.R16G16B16A16_SFloat,    uavState);
-            _nriResources[RenderResourceType.Validation]            = new NriTextureResource(RenderResourceType.Validation,            GraphicsFormat.R8G8B8A8_UNorm,         uavState);
+            _nriResources[RenderResourceType.MV]                  = new NriTextureResource(RenderResourceType.MV, GraphicsFormat.R16G16B16A16_SFloat, srvState);
+            _nriResources[RenderResourceType.Viewz]               = new NriTextureResource(RenderResourceType.Viewz, GraphicsFormat.R32_SFloat, srvState);
+            _nriResources[RenderResourceType.NormalRoughness]     = new NriTextureResource(RenderResourceType.NormalRoughness, GraphicsFormat.A2B10G10R10_UNormPack32, srvState);
+            _nriResources[RenderResourceType.BaseColorMetalness]  = new NriTextureResource(RenderResourceType.BaseColorMetalness, GraphicsFormat.R8G8B8A8_UNorm, srvState);
+            _nriResources[RenderResourceType.GeoNormal]           = new NriTextureResource(RenderResourceType.GeoNormal, GraphicsFormat.R32_UInt, srvState);
+            _nriResources[RenderResourceType.Unfiltered_Penumbra] = new NriTextureResource(RenderResourceType.Unfiltered_Penumbra, GraphicsFormat.R16_SFloat, srvState);
+            _nriResources[RenderResourceType.Unfiltered_Diff]     = new NriTextureResource(RenderResourceType.Unfiltered_Diff, GraphicsFormat.R16G16B16A16_SFloat, srvState);
+            _nriResources[RenderResourceType.Unfiltered_Spec]     = new NriTextureResource(RenderResourceType.Unfiltered_Spec, GraphicsFormat.R16G16B16A16_SFloat, srvState);
+            _nriResources[RenderResourceType.Shadow]              = new NriTextureResource(RenderResourceType.Shadow, GraphicsFormat.R16_SFloat, uavState);
+            _nriResources[RenderResourceType.Diff]                = new NriTextureResource(RenderResourceType.Diff, GraphicsFormat.R16G16B16A16_SFloat, uavState);
+            _nriResources[RenderResourceType.Spec]                = new NriTextureResource(RenderResourceType.Spec, GraphicsFormat.R16G16B16A16_SFloat, uavState);
+            _nriResources[RenderResourceType.Validation]          = new NriTextureResource(RenderResourceType.Validation, GraphicsFormat.R8G8B8A8_UNorm, uavState);
 
             // ── NRI-interop resources (DLSS / composition) ──────────────────────
-            _nriResources[RenderResourceType.DirectLighting]        = new NriTextureResource(RenderResourceType.DirectLighting,        GraphicsFormat.R16G16B16A16_SFloat,    uavState);
-            _nriResources[RenderResourceType.Composed]              = new NriTextureResource(RenderResourceType.Composed,              GraphicsFormat.R16G16B16A16_SFloat,    uavState);
-            _nriResources[RenderResourceType.DlssOutput]            = new NriTextureResource(RenderResourceType.DlssOutput,            GraphicsFormat.R16G16B16A16_SFloat,    uavState);
-            _nriResources[RenderResourceType.RrGuideDiffAlbedo]     = new NriTextureResource(RenderResourceType.RrGuideDiffAlbedo,     GraphicsFormat.A2B10G10R10_UNormPack32, uavState);
-            _nriResources[RenderResourceType.RrGuideSpecAlbedo]     = new NriTextureResource(RenderResourceType.RrGuideSpecAlbedo,     GraphicsFormat.A2B10G10R10_UNormPack32, uavState);
-            _nriResources[RenderResourceType.RrGuideSpecHitDistance]= new NriTextureResource(RenderResourceType.RrGuideSpecHitDistance, GraphicsFormat.R16_SFloat,            uavState);
-            _nriResources[RenderResourceType.RrGuideNormalRoughness]= new NriTextureResource(RenderResourceType.RrGuideNormalRoughness, GraphicsFormat.R16G16B16A16_SFloat,   uavState);
+            _nriResources[RenderResourceType.DirectLighting]         = new NriTextureResource(RenderResourceType.DirectLighting, GraphicsFormat.R16G16B16A16_SFloat, uavState);
+            _nriResources[RenderResourceType.Composed]               = new NriTextureResource(RenderResourceType.Composed, GraphicsFormat.R16G16B16A16_SFloat, uavState);
+            _nriResources[RenderResourceType.DlssOutput]             = new NriTextureResource(RenderResourceType.DlssOutput, GraphicsFormat.R16G16B16A16_SFloat, uavState);
+            _nriResources[RenderResourceType.RrGuideDiffAlbedo]      = new NriTextureResource(RenderResourceType.RrGuideDiffAlbedo, GraphicsFormat.A2B10G10R10_UNormPack32, uavState);
+            _nriResources[RenderResourceType.RrGuideSpecAlbedo]      = new NriTextureResource(RenderResourceType.RrGuideSpecAlbedo, GraphicsFormat.A2B10G10R10_UNormPack32, uavState);
+            _nriResources[RenderResourceType.RrGuideSpecHitDistance] = new NriTextureResource(RenderResourceType.RrGuideSpecHitDistance, GraphicsFormat.R16_SFloat, uavState);
+            _nriResources[RenderResourceType.RrGuideNormalRoughness] = new NriTextureResource(RenderResourceType.RrGuideNormalRoughness, GraphicsFormat.R16G16B16A16_SFloat, uavState);
 
             // ── RTHandle-only (cross-frame) ──────────────────────────────────────
-            _rtResourceDefs.Add((RenderResourceType.TaaHistory,            GraphicsFormat.R16G16B16A16_SFloat,    false));
-            _rtResourceDefs.Add((RenderResourceType.TaaHistoryPrev,        GraphicsFormat.R16G16B16A16_SFloat,    false));
-            _rtResourceDefs.Add((RenderResourceType.PsrThroughput,         GraphicsFormat.R16G16B16A16_SFloat,    false));
-            _rtResourceDefs.Add((RenderResourceType.PrevViewZ,             GraphicsFormat.R32_SFloat,             false));
-            _rtResourceDefs.Add((RenderResourceType.PrevNormalRoughness,   GraphicsFormat.A2B10G10R10_UNormPack32, false));
-            _rtResourceDefs.Add((RenderResourceType.PrevBaseColorMetalness,GraphicsFormat.R8G8B8A8_UNorm,         false));
-            _rtResourceDefs.Add((RenderResourceType.PrevGeoNormal,         GraphicsFormat.R32_UInt,               false));
+            _rtResourceDefs.Add((RenderResourceType.TaaHistory, GraphicsFormat.R16G16B16A16_SFloat, false));
+            _rtResourceDefs.Add((RenderResourceType.TaaHistoryPrev, GraphicsFormat.R16G16B16A16_SFloat, false));
+            _rtResourceDefs.Add((RenderResourceType.PsrThroughput, GraphicsFormat.R16G16B16A16_SFloat, false));
+            _rtResourceDefs.Add((RenderResourceType.PrevViewZ, GraphicsFormat.R32_SFloat, false));
+            _rtResourceDefs.Add((RenderResourceType.PrevNormalRoughness, GraphicsFormat.A2B10G10R10_UNormPack32, false));
+            _rtResourceDefs.Add((RenderResourceType.PrevBaseColorMetalness, GraphicsFormat.R8G8B8A8_UNorm, false));
+            _rtResourceDefs.Add((RenderResourceType.PrevGeoNormal, GraphicsFormat.R32_UInt, false));
 
             // Per-frame pass textures (previously created via RenderGraph in PTContextItem).
-            _rtResourceDefs.Add((RenderResourceType.PtOutput,              GraphicsFormat.R16G16B16A16_SFloat,    false));
-            _rtResourceDefs.Add((RenderResourceType.PtDirectEmission,      GraphicsFormat.B10G11R11_UFloatPack32, false));
-            _rtResourceDefs.Add((RenderResourceType.PtComposedDiff,        GraphicsFormat.R16G16B16A16_SFloat,    false));
-            _rtResourceDefs.Add((RenderResourceType.PtComposedSpecViewZ,   GraphicsFormat.R16G16B16A16_SFloat,    false));
+            _rtResourceDefs.Add((RenderResourceType.Final, GraphicsFormat.R16G16B16A16_SFloat, false));
+            _rtResourceDefs.Add((RenderResourceType.DirectEmission, GraphicsFormat.B10G11R11_UFloatPack32, false));
+            _rtResourceDefs.Add((RenderResourceType.ComposedDiff, GraphicsFormat.R16G16B16A16_SFloat, false));
+            _rtResourceDefs.Add((RenderResourceType.ComposedSpecViewZ, GraphicsFormat.R16G16B16A16_SFloat, false));
         }
 
         /// <summary>
@@ -88,30 +86,90 @@ namespace PathTracing
         /// </summary>
         public void InitRtxdiResources()
         {
-            var srvState = new NriResourceState { accessBits = AccessBits.SHADER_RESOURCE,         layout = Layout.SHADER_RESOURCE,         stageBits = 1 << 7  };
+            var srvState = new NriResourceState { accessBits = AccessBits.SHADER_RESOURCE, layout         = Layout.SHADER_RESOURCE, stageBits         = 1 << 7 };
             var uavState = new NriResourceState { accessBits = AccessBits.SHADER_RESOURCE_STORAGE, layout = Layout.SHADER_RESOURCE_STORAGE, stageBits = 1 << 10 };
 
             // ── NRI-interop resources (DLSS / composition) ──────────────────────
-            _nriResources[RenderResourceType.DirectLighting]         = new NriTextureResource(RenderResourceType.DirectLighting,         GraphicsFormat.R16G16B16A16_SFloat,     uavState);
-            _nriResources[RenderResourceType.DlssOutput]             = new NriTextureResource(RenderResourceType.DlssOutput,             GraphicsFormat.R16G16B16A16_SFloat,     uavState);
-            _nriResources[RenderResourceType.RrGuideDiffAlbedo]      = new NriTextureResource(RenderResourceType.RrGuideDiffAlbedo,      GraphicsFormat.A2B10G10R10_UNormPack32, uavState);
-            _nriResources[RenderResourceType.RrGuideSpecAlbedo]      = new NriTextureResource(RenderResourceType.RrGuideSpecAlbedo,      GraphicsFormat.A2B10G10R10_UNormPack32, uavState);
-            _nriResources[RenderResourceType.RrGuideSpecHitDistance] = new NriTextureResource(RenderResourceType.RrGuideSpecHitDistance, GraphicsFormat.R16_SFloat,              uavState);
-            _nriResources[RenderResourceType.RrGuideNormalRoughness] = new NriTextureResource(RenderResourceType.RrGuideNormalRoughness, GraphicsFormat.R16G16B16A16_SFloat,     uavState);
+            _nriResources[RenderResourceType.DirectLighting]         = new NriTextureResource(RenderResourceType.DirectLighting, GraphicsFormat.R16G16B16A16_SFloat, uavState);
+            _nriResources[RenderResourceType.DlssOutput]             = new NriTextureResource(RenderResourceType.DlssOutput, GraphicsFormat.R16G16B16A16_SFloat, uavState);
+            _nriResources[RenderResourceType.RrGuideDiffAlbedo]      = new NriTextureResource(RenderResourceType.RrGuideDiffAlbedo, GraphicsFormat.A2B10G10R10_UNormPack32, uavState);
+            _nriResources[RenderResourceType.RrGuideSpecAlbedo]      = new NriTextureResource(RenderResourceType.RrGuideSpecAlbedo, GraphicsFormat.A2B10G10R10_UNormPack32, uavState);
+            _nriResources[RenderResourceType.RrGuideSpecHitDistance] = new NriTextureResource(RenderResourceType.RrGuideSpecHitDistance, GraphicsFormat.R16_SFloat, uavState);
+            _nriResources[RenderResourceType.RrGuideNormalRoughness] = new NriTextureResource(RenderResourceType.RrGuideNormalRoughness, GraphicsFormat.R16G16B16A16_SFloat, uavState);
 
             // ── RTXDI GBuffer ping-pong textures ────────────────────────────────
-            _nriResources[RenderResourceType.RtxdiViewDepth]         = new NriTextureResource(RenderResourceType.RtxdiViewDepth,         GraphicsFormat.R32_SFloat,              uavState);
-            _nriResources[RenderResourceType.RtxdiPrevViewDepth]     = new NriTextureResource(RenderResourceType.RtxdiPrevViewDepth,     GraphicsFormat.R32_SFloat,              uavState);
-            _nriResources[RenderResourceType.RtxdiDiffuseAlbedo]     = new NriTextureResource(RenderResourceType.RtxdiDiffuseAlbedo,     GraphicsFormat.R32_UInt,                uavState);
-            _nriResources[RenderResourceType.RtxdiPrevDiffuseAlbedo] = new NriTextureResource(RenderResourceType.RtxdiPrevDiffuseAlbedo, GraphicsFormat.R32_UInt,                uavState);
-            _nriResources[RenderResourceType.RtxdiSpecularRough]     = new NriTextureResource(RenderResourceType.RtxdiSpecularRough,     GraphicsFormat.R32_UInt,                uavState);
-            _nriResources[RenderResourceType.RtxdiPrevSpecularRough] = new NriTextureResource(RenderResourceType.RtxdiPrevSpecularRough, GraphicsFormat.R32_UInt,                uavState);
-            _nriResources[RenderResourceType.RtxdiNormals]           = new NriTextureResource(RenderResourceType.RtxdiNormals,           GraphicsFormat.R32_UInt,                uavState);
-            _nriResources[RenderResourceType.RtxdiPrevNormals]       = new NriTextureResource(RenderResourceType.RtxdiPrevNormals,       GraphicsFormat.R32_UInt,                uavState);
-            _nriResources[RenderResourceType.RtxdiGeoNormals]        = new NriTextureResource(RenderResourceType.RtxdiGeoNormals,        GraphicsFormat.R32_UInt,                uavState);
-            _nriResources[RenderResourceType.RtxdiPrevGeoNormals]    = new NriTextureResource(RenderResourceType.RtxdiPrevGeoNormals,    GraphicsFormat.R32_UInt,                uavState);
-            _nriResources[RenderResourceType.RtxdiEmissive]          = new NriTextureResource(RenderResourceType.RtxdiEmissive,          GraphicsFormat.R16G16B16A16_SFloat,     uavState);
-            _nriResources[RenderResourceType.RtxdiMotionVectors]     = new NriTextureResource(RenderResourceType.RtxdiMotionVectors,     GraphicsFormat.R16G16B16A16_SFloat,     uavState);
+            _nriResources[RenderResourceType.RtxdiViewDepth]         = new NriTextureResource(RenderResourceType.RtxdiViewDepth, GraphicsFormat.R32_SFloat, uavState);
+            _nriResources[RenderResourceType.RtxdiPrevViewDepth]     = new NriTextureResource(RenderResourceType.RtxdiPrevViewDepth, GraphicsFormat.R32_SFloat, uavState);
+            _nriResources[RenderResourceType.RtxdiDiffuseAlbedo]     = new NriTextureResource(RenderResourceType.RtxdiDiffuseAlbedo, GraphicsFormat.R32_UInt, uavState);
+            _nriResources[RenderResourceType.RtxdiPrevDiffuseAlbedo] = new NriTextureResource(RenderResourceType.RtxdiPrevDiffuseAlbedo, GraphicsFormat.R32_UInt, uavState);
+            _nriResources[RenderResourceType.RtxdiSpecularRough]     = new NriTextureResource(RenderResourceType.RtxdiSpecularRough, GraphicsFormat.R32_UInt, uavState);
+            _nriResources[RenderResourceType.RtxdiPrevSpecularRough] = new NriTextureResource(RenderResourceType.RtxdiPrevSpecularRough, GraphicsFormat.R32_UInt, uavState);
+            _nriResources[RenderResourceType.RtxdiNormals]           = new NriTextureResource(RenderResourceType.RtxdiNormals, GraphicsFormat.R32_UInt, uavState);
+            _nriResources[RenderResourceType.RtxdiPrevNormals]       = new NriTextureResource(RenderResourceType.RtxdiPrevNormals, GraphicsFormat.R32_UInt, uavState);
+            _nriResources[RenderResourceType.RtxdiGeoNormals]        = new NriTextureResource(RenderResourceType.RtxdiGeoNormals, GraphicsFormat.R32_UInt, uavState);
+            _nriResources[RenderResourceType.RtxdiPrevGeoNormals]    = new NriTextureResource(RenderResourceType.RtxdiPrevGeoNormals, GraphicsFormat.R32_UInt, uavState);
+            _nriResources[RenderResourceType.RtxdiEmissive]          = new NriTextureResource(RenderResourceType.RtxdiEmissive, GraphicsFormat.R16G16B16A16_SFloat, uavState);
+            _nriResources[RenderResourceType.RtxdiMotionVectors]     = new NriTextureResource(RenderResourceType.RtxdiMotionVectors, GraphicsFormat.R16G16B16A16_SFloat, uavState);
+        }
+
+        /// <summary>
+        /// Registers all textures required by <see cref="NRDFeature"/>.
+        /// Formats mirror NRDSample.cpp CreateResourcesAndDescriptors with:
+        ///   shadowFormat      = RGBA8_UNORM  (SIGMA_TRANSLUCENCY = 1)
+        ///   dataFormat        = RGBA16_SFLOAT (NRD_MODE = NORMAL)
+        ///   colorFormat       = R11_G11_B10_UFLOAT (USE_LOW_PRECISION_FP_FORMATS = true)
+        ///   criticalColorFormat = RGBA16_SFLOAT
+        ///   normalFormat      = R10_G10_B10_A2_UNORM
+        /// </summary>
+        public void InitNrdSampleResources()
+        {
+            var srvState = new NriResourceState { accessBits = AccessBits.SHADER_RESOURCE, layout         = Layout.SHADER_RESOURCE, stageBits         = 1 << 7 };
+            var uavState = new NriResourceState { accessBits = AccessBits.SHADER_RESOURCE_STORAGE, layout = Layout.SHADER_RESOURCE_STORAGE, stageBits = 1 << 10 };
+
+            // ── NRD standard I/O ────────────────────────────────────────────────
+            // shadowFormat = RGBA8_UNORM because SIGMA_TRANSLUCENCY = 1
+            // dataFormat   = RGBA16_SFLOAT because NRD_MODE = NORMAL
+            // normalFormat = R10_G10_B10_A2_UNORM
+
+            _nriResources[RenderResourceType.Viewz]              = new NriTextureResource(RenderResourceType.Viewz, GraphicsFormat.R32_SFloat, srvState);
+            _nriResources[RenderResourceType.MV]                 = new NriTextureResource(RenderResourceType.MV, GraphicsFormat.R16G16B16A16_SFloat, srvState);
+            _nriResources[RenderResourceType.NormalRoughness]    = new NriTextureResource(RenderResourceType.NormalRoughness, GraphicsFormat.A2B10G10R10_UNormPack32, srvState);
+            _nriResources[RenderResourceType.BaseColorMetalness] = new NriTextureResource(RenderResourceType.BaseColorMetalness, GraphicsFormat.R8G8B8A8_UNorm, srvState);
+
+
+            _nriResources[RenderResourceType.Unfiltered_Penumbra]     = new NriTextureResource(RenderResourceType.Unfiltered_Penumbra, GraphicsFormat.R16_SFloat, srvState);
+            _nriResources[RenderResourceType.Unfiltered_Diff]         = new NriTextureResource(RenderResourceType.Unfiltered_Diff, GraphicsFormat.R16G16B16A16_SFloat, srvState);
+            _nriResources[RenderResourceType.Unfiltered_Spec]         = new NriTextureResource(RenderResourceType.Unfiltered_Spec, GraphicsFormat.R16G16B16A16_SFloat, srvState);
+            _nriResources[RenderResourceType.Unfiltered_Translucency] = new NriTextureResource(RenderResourceType.Unfiltered_Translucency, GraphicsFormat.R8G8B8A8_UNorm, srvState);
+            _nriResources[RenderResourceType.Shadow]                  = new NriTextureResource(RenderResourceType.Shadow, GraphicsFormat.R8G8B8A8_UNorm, uavState); // SIGMA_TRANSLUCENCY=1 → RGBA8_UNORM
+            _nriResources[RenderResourceType.Diff]                    = new NriTextureResource(RenderResourceType.Diff, GraphicsFormat.R16G16B16A16_SFloat, uavState);
+            _nriResources[RenderResourceType.Spec]                    = new NriTextureResource(RenderResourceType.Spec, GraphicsFormat.R16G16B16A16_SFloat, uavState);
+            _nriResources[RenderResourceType.Validation]              = new NriTextureResource(RenderResourceType.Validation, GraphicsFormat.R8G8B8A8_UNorm, uavState);
+
+
+            _nriResources[RenderResourceType.Gradient_StoredPing] = new NriTextureResource(RenderResourceType.Gradient_StoredPing, GraphicsFormat.R16G16B16A16_SFloat, uavState);
+            _nriResources[RenderResourceType.Gradient_StoredPong] = new NriTextureResource(RenderResourceType.Gradient_StoredPong, GraphicsFormat.R16G16B16A16_SFloat, uavState);
+            _nriResources[RenderResourceType.Gradient_Ping]       = new NriTextureResource(RenderResourceType.Gradient_Ping, GraphicsFormat.R16G16B16A16_SFloat, uavState);
+            _nriResources[RenderResourceType.Gradient_Pong]       = new NriTextureResource(RenderResourceType.Gradient_Pong, GraphicsFormat.R16G16B16A16_SFloat, uavState);
+
+            // ── NRI-interop resources (composition / DLSS / RR) ─────────────────
+            // colorFormat = B10G11R11_UFloatPack32 (USE_LOW_PRECISION_FP_FORMATS = true)
+            _nriResources[RenderResourceType.DirectLighting]         = new NriTextureResource(RenderResourceType.DirectLighting, GraphicsFormat.B10G11R11_UFloatPack32, uavState);
+            _nriResources[RenderResourceType.Composed]               = new NriTextureResource(RenderResourceType.Composed, GraphicsFormat.R16G16B16A16_SFloat, uavState);
+            _nriResources[RenderResourceType.DlssOutput]             = new NriTextureResource(RenderResourceType.DlssOutput, GraphicsFormat.R16G16B16A16_SFloat, uavState);
+            _nriResources[RenderResourceType.RrGuideDiffAlbedo]      = new NriTextureResource(RenderResourceType.RrGuideDiffAlbedo, GraphicsFormat.A2B10G10R10_UNormPack32, uavState);
+            _nriResources[RenderResourceType.RrGuideSpecAlbedo]      = new NriTextureResource(RenderResourceType.RrGuideSpecAlbedo, GraphicsFormat.A2B10G10R10_UNormPack32, uavState);
+            _nriResources[RenderResourceType.RrGuideSpecHitDistance] = new NriTextureResource(RenderResourceType.RrGuideSpecHitDistance, GraphicsFormat.R16_SFloat, uavState);
+            _nriResources[RenderResourceType.RrGuideNormalRoughness] = new NriTextureResource(RenderResourceType.RrGuideNormalRoughness, GraphicsFormat.R16G16B16A16_SFloat, uavState);
+
+            // ── RTHandle-only (cross-frame) ──────────────────────────────────────
+            _rtResourceDefs.Add((RenderResourceType.TaaHistory, GraphicsFormat.R16G16B16A16_SFloat, false));
+            _rtResourceDefs.Add((RenderResourceType.TaaHistoryPrev, GraphicsFormat.R16G16B16A16_SFloat, false));
+            _rtResourceDefs.Add((RenderResourceType.PsrThroughput, GraphicsFormat.A2B10G10R10_UNormPack32, false)); // R10_G10_B10_A2_UNORM
+            _rtResourceDefs.Add((RenderResourceType.Final, GraphicsFormat.R16G16B16A16_SFloat, false));
+            _rtResourceDefs.Add((RenderResourceType.DirectEmission, GraphicsFormat.B10G11R11_UFloatPack32, false)); // colorFormat
+            _rtResourceDefs.Add((RenderResourceType.ComposedDiff, GraphicsFormat.B10G11R11_UFloatPack32, false)); // colorFormat
+            _rtResourceDefs.Add((RenderResourceType.ComposedSpecViewZ, GraphicsFormat.R16G16B16A16_SFloat, false));
         }
 
         // ── Public accessors ────────────────────────────────────────────────────
@@ -147,7 +205,7 @@ namespace PathTracing
         /// Ensures all resources are allocated at the correct resolution.
         /// Returns true when resources were (re)allocated — callers must re-snapshot NRD resources.
         /// </summary>
-        public bool EnsureResources(int2 outputResolution,UpscalerMode mode)
+        public bool EnsureResources(int2 outputResolution, UpscalerMode mode)
         {
             bool invalid = false;
             foreach (var res in _nriResources.Values)
@@ -165,7 +223,7 @@ namespace PathTracing
                         break;
                     }
 
-            int2 target = GetUpscaledResolution(outputResolution,mode);
+            int2 target = GetUpscaledResolution(outputResolution, mode);
             if (!invalid && target.x == renderResolution.x && target.y == renderResolution.y)
                 return false;
 
@@ -173,6 +231,13 @@ namespace PathTracing
 
             foreach (var kvp in _nriResources)
             {
+                // Gradient textures are sized by sharcDims — allocated separately in EnsureSharcGradientResources.
+                if (kvp.Key == RenderResourceType.Gradient_StoredPing ||
+                    kvp.Key == RenderResourceType.Gradient_StoredPong ||
+                    kvp.Key == RenderResourceType.Gradient_Ping ||
+                    kvp.Key == RenderResourceType.Gradient_Pong)
+                    continue;
+
                 int2 res = kvp.Key == RenderResourceType.DlssOutput ? outputResolution : renderResolution;
                 kvp.Value.Allocate(res);
             }
@@ -199,44 +264,42 @@ namespace PathTracing
             var desc = new RenderTextureDescriptor(resolution.x, resolution.y, format, 0)
             {
                 enableRandomWrite = true,
-                useMipMap = false,
-                msaaSamples = 1,
-                sRGB = srgb
+                useMipMap         = false,
+                msaaSamples       = 1,
+                sRGB              = srgb
             };
             var rt = new RenderTexture(desc)
             {
-                name = type.ToString(),
+                name       = type.ToString(),
                 filterMode = FilterMode.Point,
-                wrapMode = TextureWrapMode.Clamp
+                wrapMode   = TextureWrapMode.Clamp
             };
             rt.Create();
             _rtResources[type] = RTHandles.Alloc(rt);
         }
 
         /// <summary>
-        /// Allocates (or reallocates) the four SHARC gradient textures at SHARC resolution.
-        /// Must be called each frame after the SHARC dims are known; is a no-op when
-        /// size and allocation are already correct.
+        /// Allocates (or reallocates) the four SHARC gradient NRI textures at SHARC resolution.
+        /// Must be called after the SHARC dims are known each frame; is a no-op when already correct.
         /// </summary>
         public void EnsureSharcGradientResources(int2 sharcDims)
         {
             var types = new[]
             {
-                RenderResourceType.SharcGradientStoredPing,
-                RenderResourceType.SharcGradientStoredPong,
-                RenderResourceType.SharcGradientPing,
-                RenderResourceType.SharcGradientPong,
+                RenderResourceType.Gradient_StoredPing,
+                RenderResourceType.Gradient_StoredPong,
+                RenderResourceType.Gradient_Ping,
+                RenderResourceType.Gradient_Pong,
             };
 
             foreach (var type in types)
             {
-                if (_rtResources.TryGetValue(type, out var existing)
-                    && existing?.rt != null
-                    && existing.rt.width  == sharcDims.x
-                    && existing.rt.height == sharcDims.y)
+                var nriRes = _nriResources[type];
+                var rt     = nriRes.Handle?.rt;
+                if (rt != null && rt.width == sharcDims.x && rt.height == sharcDims.y)
                     continue;
 
-                AllocateRT(type, GraphicsFormat.R16G16B16A16_SFloat, sharcDims);
+                nriRes.Allocate(sharcDims);
             }
         }
 

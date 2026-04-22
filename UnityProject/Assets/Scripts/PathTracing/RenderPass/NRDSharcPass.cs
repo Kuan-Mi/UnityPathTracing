@@ -61,10 +61,8 @@ namespace PathTracing
             internal GraphicsBuffer AccumulationBuffer;
             internal GraphicsBuffer ResolvedBuffer;
 
-            // Gradient textures at SHARC resolution (from PathTracingResourcePool)
-            internal RTHandle GradientStoredPing;
-            internal RTHandle GradientStoredPong;
-            internal RTHandle GradientPing;
+            // Gradient textures sourced from the pool inside ExecutePass
+            internal PathTracingResourcePool Pool;
         }
 
         public class Settings
@@ -85,10 +83,8 @@ namespace PathTracing
             internal NRDSampleResource     NrdResource;
             internal Resource              Resource;
             internal Settings              Settings;
-
-            internal TextureHandle GradientStoredPing;
-            internal TextureHandle GradientStoredPong;
-            internal TextureHandle GradientPing;
+            internal PathTracingResourcePool Pool;
+ 
         }
 
         // -------------------------------------------------------------------------
@@ -121,10 +117,7 @@ namespace PathTracing
             // ── SharcUpdate [numthreads(16,16,1)] ─────────────────────────────────
             cmd.BeginSample(RenderPassMarkers.SharcUpdate);
 
-            // 1. Build TLAS
-            nrd.BuildAccelerationStructures(cmd);
-
-            // 2. Acceleration structures
+            // 1. Acceleration structures
             update.SetAccelerationStructure("gWorldTlas", nrd.WorldAS);
             update.SetAccelerationStructure("gLightTlas", nrd.LightAS);
 
@@ -147,12 +140,13 @@ namespace PathTracing
             //    isEven = !(frameIndex & 1)
             //    Even: PrevGradient = StoredPing (SRV), CurrGradient = StoredPong (UAV)
             //    Odd:  PrevGradient = StoredPong (SRV), CurrGradient = StoredPing (UAV)
-            var prevGradient = settings.isEven ? res.GradientStoredPing.rt : res.GradientStoredPong.rt;
-            var currGradient = settings.isEven ? res.GradientStoredPong.rt : res.GradientStoredPing.rt;
+            var pool         = data.Pool;
+            var prevGradient = settings.isEven ? pool.GetRT(RenderResourceType.Gradient_StoredPing).rt : pool.GetRT(RenderResourceType.Gradient_StoredPong).rt;
+            var currGradient = settings.isEven ? pool.GetRT(RenderResourceType.Gradient_StoredPong).rt : pool.GetRT(RenderResourceType.Gradient_StoredPing).rt;
 
             update.SetTexture("gIn_PrevGradient",   prevGradient);
             update.SetRWTexture("gOut_CurrGradient", currGradient);
-            update.SetRWTexture("gOut_Gradient",     res.GradientPing.rt);
+            update.SetRWTexture("gOut_Gradient",     pool.GetRT(RenderResourceType.Gradient_Ping).rt);
 
             // 8. Dispatch at SHARC resolution
             //    sharcDims = 16 * ceil(renderRes / sharcDownscale / 16)
@@ -180,13 +174,7 @@ namespace PathTracing
             passData.Resource    = _resource;
             passData.Settings    = _settings;
 
-            passData.GradientStoredPing = renderGraph.ImportTexture(_resource.GradientStoredPing);
-            passData.GradientStoredPong = renderGraph.ImportTexture(_resource.GradientStoredPong);
-            passData.GradientPing       = renderGraph.ImportTexture(_resource.GradientPing);
-
-            builder.UseTexture(passData.GradientStoredPing, AccessFlags.ReadWrite);
-            builder.UseTexture(passData.GradientStoredPong, AccessFlags.ReadWrite);
-            builder.UseTexture(passData.GradientPing,       AccessFlags.ReadWrite);
+            passData.Pool = _resource.Pool; 
 
             builder.AllowPassCulling(false);
             builder.SetRenderFunc((PassData data, UnsafeGraphContext context) => ExecutePass(data, context));

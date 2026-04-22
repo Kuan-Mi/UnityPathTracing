@@ -8,20 +8,20 @@ using UnityEngine.Rendering;
 namespace NativeRender
 {
     /// <summary>
-    /// Scene-resident resources mirroring NRDSample.cpp's resource taxonomy and
-    /// merged-BLAS acceleration-structure layout:
+    /// Scene-resident resources mirroring NRDSample.cpp's resource taxonomy.
     ///
-    ///     BLAS_MergedOpaque      – non-transparent, non-emissive geometry (pre-transformed)
-    ///     BLAS_MergedTransparent – transparent geometry                   (pre-transformed)
-    ///     BLAS_MergedEmissive    – emissive geometry                      (pre-transformed)
+    /// Two modes (selected at construction time via <c>mergeBlas</c>):
     ///
-    ///     gWorldTlas (one instance each for MergedOpaque + MergedTransparent)
-    ///     gLightTlas (one instance for MergedEmissive)
+    /// <b>Merged mode</b> (mergeBlas = true, default):
+    ///     BLAS_MergedOpaque / MergedTransparent / MergedEmissive – one merged
+    ///     pre-transformed VB/IB per category, identity TLAS transform.
     ///
-    /// For each merged BLAS we build, on the CPU, one tightly-packed float3
-    /// vertex buffer whose positions are already in world space and one uint32
-    /// index buffer. The BLAS is then constructed from those buffers with an
-    /// identity TLAS transform, exactly like <c>Sample::CreateBottomLevelAccelerationStructures</c>.
+    /// <b>Separate mode</b> (mergeBlas = false):
+    ///     One BLAS per MeshRenderer, using the mesh's native VB/IB.
+    ///     TLAS transform = localToWorldMatrix; InstanceID set so that
+    ///     InstanceID() + GeometryIndex() indexes into _instanceDataBuf.
+    ///     Transform-only changes skip BLAS rebuild (only TLAS transform +
+    ///     mOverloadedMatrix in the instance buffer are updated).
     ///
     /// Binding names (<c>BindToShader</c>) exactly match NRDSample.cpp.
     /// </summary>
@@ -45,6 +45,9 @@ namespace NativeRender
         private const uint kHandleOpaque      = 0xFFFF0001u;
         private const uint kHandleTransparent = 0xFFFF0002u;
         private const uint kHandleEmissive    = 0xFFFF0003u;
+
+        // ----- Mode -----
+        private readonly bool _mergeBlas;
 
         // Identity 3x4 row-major transform (12 floats).
         private static readonly float[] kIdentity3x4 =
@@ -99,6 +102,30 @@ namespace NativeRender
         private InstanceDataNRD[]  _instanceCpu;
         private PrimitiveDataNRD[] _primitiveCpu;
 
+        // ----- Separate-BLAS per-target tracking -----
+
+        /// <summary>Tracks per-renderer state when running in separate (non-merged) BLAS mode.</summary>
+        private sealed class PerTargetBlas
+        {
+            /// <summary>Which TLAS this renderer belongs to (worldAS or lightAS).</summary>
+            public RayTracingAccelerationStructure tlas;
+
+            /// <summary>Index of this renderer's first submesh in _instanceDataBuf.</summary>
+            public uint firstInstanceDataIndex;
+
+            /// <summary>Number of submeshes (= number of InstanceDataNRD entries).</summary>
+            public int submeshCount;
+
+            /// <summary>Cached transform to detect changes.</summary>
+            public Matrix4x4 lastTransform;
+
+            /// <summary>Category flags used when the instance data was last written.</summary>
+            public uint baseFlags;
+        }
+
+        // Keyed by MeshRenderer.GetInstanceID()
+        private readonly Dictionary<int, PerTargetBlas> _perTargetBlas = new();
+
         // ----- Tracking for dirty-detection -----
         private readonly List<NativeRayTracingTarget> _registeredTargets = new();
         private readonly Dictionary<Material, int>    _materialSlots     = new();
@@ -114,10 +141,11 @@ namespace NativeRender
         public GraphicsBuffer MorphPrimitivePositionsPrevBuf => _morphPrimitivePositionsPrevBuf;
         public BindlessTexture Textures => _textures;
 
-        public NRDSampleResource()
+        public NRDSampleResource(bool mergeBlas = true)
         {
-            _worldAS = new RayTracingAccelerationStructure();
-            _lightAS = new RayTracingAccelerationStructure();
+            _mergeBlas = mergeBlas;
+            _worldAS   = new RayTracingAccelerationStructure();
+            _lightAS   = new RayTracingAccelerationStructure();
             AllocateStaticResources();
         }
 
@@ -128,18 +156,38 @@ namespace NativeRender
         {
             var targets = NativeRayTracingTarget.All;
 
-            if (!_sceneDirty && !TargetSetChanged(targets) && !AnyTransformChanged(targets))
+            if (_sceneDirty || TargetSetChanged(targets))
+            {
+                // Full rebuild required (structure changed or forced dirty).
+                RebuildScene(targets);
+                _registeredTargets.Clear();
+                _registeredTargets.AddRange(targets);
+                foreach (var t in targets)
+                    if (t != null)
+                        t.transform.hasChanged = false;
+                _sceneDirty = false;
                 return;
+            }
 
-            RebuildScene(targets);
+            if (AnyTransformChanged(targets))
+            {
+                if (_mergeBlas)
+                {
+                    // Merged mode: vertices are pre-transformed → must rebuild geometry.
+                    RebuildScene(targets);
+                    _registeredTargets.Clear();
+                    _registeredTargets.AddRange(targets);
+                }
+                else
+                {
+                    // Separate mode: only update TLAS transforms + mOverloadedMatrix.
+                    UpdateTransformsOnly(targets);
+                }
 
-            _registeredTargets.Clear();
-            _registeredTargets.AddRange(targets);
-            foreach (var t in targets)
-                if (t != null)
-                    t.transform.hasChanged = false;
-
-            _sceneDirty = false;
+                foreach (var t in targets)
+                    if (t != null)
+                        t.transform.hasChanged = false;
+            }
         }
 
         /// <summary>Build / update both TLASes (call inside a CommandBuffer).</summary>
@@ -230,6 +278,8 @@ namespace NativeRender
             _blasEmissive?.Dispose();
             _blasEmissive = null;
 
+            _perTargetBlas.Clear();
+
             _instanceCpu  = null;
             _primitiveCpu = null;
             _materialSlots.Clear();
@@ -300,20 +350,84 @@ namespace NativeRender
             var primList = new List<PrimitiveDataNRD>();
             var texPtrs  = new List<IntPtr>();
 
-            uint opaqueFirstInstance = instanceCursor;
-            _blasOpaque = BuildMergedBlas(opaque, ref instanceCursor, ref primitiveCursor,
-                instList, primList, texPtrs,
-                FLAG_STATIC | FLAG_NON_TRANSPARENT);
+            if (_mergeBlas)
+            {
+                uint opaqueFirstInstance = instanceCursor;
+                _blasOpaque = BuildMergedBlas(opaque, ref instanceCursor, ref primitiveCursor,
+                    instList, primList, texPtrs,
+                    FLAG_STATIC | FLAG_NON_TRANSPARENT);
 
-            uint transparentFirstInstance = instanceCursor;
-            _blasTransparent = BuildMergedBlas(transparent, ref instanceCursor, ref primitiveCursor,
-                instList, primList, texPtrs,
-                FLAG_STATIC | FLAG_TRANSPARENT);
+                uint transparentFirstInstance = instanceCursor;
+                _blasTransparent = BuildMergedBlas(transparent, ref instanceCursor, ref primitiveCursor,
+                    instList, primList, texPtrs,
+                    FLAG_STATIC | FLAG_TRANSPARENT);
 
-            uint emissiveFirstInstance = instanceCursor;
-            _blasEmissive = BuildMergedBlas(emissive, ref instanceCursor, ref primitiveCursor,
-                instList, primList, texPtrs,
-                FLAG_STATIC | FLAG_NON_TRANSPARENT | FLAG_EMISSIVE);
+                uint emissiveFirstInstance = instanceCursor;
+                _blasEmissive = BuildMergedBlas(emissive, ref instanceCursor, ref primitiveCursor,
+                    instList, primList, texPtrs,
+                    FLAG_STATIC | FLAG_NON_TRANSPARENT | FLAG_EMISSIVE);
+
+                // Texture array.
+                int texCount = Mathf.Max(texPtrs.Count, 1);
+                _textures = new BindlessTexture(texCount);
+                for (int i = 0; i < texPtrs.Count; i++)
+                    _textures.SetNativePtr(i, texPtrs[i]);
+
+                // Instance / primitive GPU buffers.
+                if (instList.Count == 0) instList.Add(default);
+                if (primList.Count == 0) primList.Add(default);
+                _instanceCpu  = instList.ToArray();
+                _primitiveCpu = primList.ToArray();
+
+                _instanceDataBuf = new GraphicsBuffer(GraphicsBuffer.Target.Structured,
+                    _instanceCpu.Length, Marshal.SizeOf<InstanceDataNRD>());
+                _instanceDataBuf.SetData(_instanceCpu);
+
+                _primitiveDataBuf = new GraphicsBuffer(GraphicsBuffer.Target.Structured,
+                    _primitiveCpu.Length, Marshal.SizeOf<PrimitiveDataNRD>());
+                _primitiveDataBuf.SetData(_primitiveCpu);
+
+                // Register each merged BLAS with the appropriate TLAS.
+                if (_blasOpaque != null)
+                    RegisterMergedBlas(_worldAS, _blasOpaque, kHandleOpaque,
+                        opaqueFirstInstance, (byte)FLAG_NON_TRANSPARENT);
+                if (_blasTransparent != null)
+                    RegisterMergedBlas(_worldAS, _blasTransparent, kHandleTransparent,
+                        transparentFirstInstance, (byte)FLAG_TRANSPARENT);
+                if (_blasEmissive != null)
+                    RegisterMergedBlas(_lightAS, _blasEmissive, kHandleEmissive,
+                        emissiveFirstInstance, (byte)FLAG_NON_TRANSPARENT);
+            }
+            else
+            {
+                BuildSeparateBlas(opaque, transparent, emissive,
+                    ref instanceCursor, ref primitiveCursor,
+                    instList, primList, texPtrs);
+            }
+        }
+
+        /// <summary>
+        /// Non-merged path: one BLAS per MeshRenderer (using the mesh's native VB/IB).
+        /// TLAS transform = localToWorldMatrix. InstanceID = firstSubmeshIndex in _instanceDataBuf.
+        /// </summary>
+        private void BuildSeparateBlas(
+            List<NativeRayTracingTarget> opaque,
+            List<NativeRayTracingTarget> transparent,
+            List<NativeRayTracingTarget> emissive,
+            ref uint instanceCursor,
+            ref uint primitiveCursor,
+            List<InstanceDataNRD> instList,
+            List<PrimitiveDataNRD> primList,
+            List<IntPtr> texPtrs)
+        {
+            // Process ordered opaque → transparent → emissive (emissive targets were also added to
+            // opaque already; they get a second separate entry in the light TLAS).
+            ProcessSeparateGroup(opaque, _worldAS, FLAG_STATIC | FLAG_NON_TRANSPARENT,
+                ref instanceCursor, ref primitiveCursor, instList, primList, texPtrs);
+            ProcessSeparateGroup(transparent, _worldAS, FLAG_STATIC | FLAG_TRANSPARENT,
+                ref instanceCursor, ref primitiveCursor, instList, primList, texPtrs);
+            ProcessSeparateGroup(emissive, _lightAS, FLAG_STATIC | FLAG_NON_TRANSPARENT | FLAG_EMISSIVE,
+                ref instanceCursor, ref primitiveCursor, instList, primList, texPtrs);
 
             // Texture array.
             int texCount = Mathf.Max(texPtrs.Count, 1);
@@ -334,17 +448,190 @@ namespace NativeRender
             _primitiveDataBuf = new GraphicsBuffer(GraphicsBuffer.Target.Structured,
                 _primitiveCpu.Length, Marshal.SizeOf<PrimitiveDataNRD>());
             _primitiveDataBuf.SetData(_primitiveCpu);
+        }
 
-            // Register each merged BLAS with the appropriate TLAS.
-            if (_blasOpaque != null)
-                RegisterMergedBlas(_worldAS, _blasOpaque, kHandleOpaque,
-                    opaqueFirstInstance, (byte)FLAG_NON_TRANSPARENT);
-            if (_blasTransparent != null)
-                RegisterMergedBlas(_worldAS, _blasTransparent, kHandleTransparent,
-                    transparentFirstInstance, (byte)FLAG_TRANSPARENT);
-            if (_blasEmissive != null)
-                RegisterMergedBlas(_lightAS, _blasEmissive, kHandleEmissive,
-                    emissiveFirstInstance, (byte)FLAG_NON_TRANSPARENT);
+        private void ProcessSeparateGroup(
+            List<NativeRayTracingTarget> group,
+            RayTracingAccelerationStructure tlas,
+            uint baseFlags,
+            ref uint instanceCursor,
+            ref uint primitiveCursor,
+            List<InstanceDataNRD> instList,
+            List<PrimitiveDataNRD> primList,
+            List<IntPtr> texPtrs)
+        {
+            foreach (var target in group)
+            {
+                if (target == null) continue;
+                var mr = target.GetComponent<MeshRenderer>();
+                if (mr == null) continue;
+                var mf = mr.GetComponent<MeshFilter>();
+                if (mf == null || mf.sharedMesh == null) continue;
+
+                Mesh      mesh  = mf.sharedMesh;
+                Matrix4x4 xform = target.transform.localToWorldMatrix;
+
+                // Use the encapsulated AddInstance — it uses the mesh's native VB/IB.
+                if (!tlas.AddInstance(mr))
+                {
+                    Debug.LogWarning($"[NRDSampleResource] AddInstance failed for '{mr.name}' — skipping");
+                    continue;
+                }
+
+                // InstanceID in HLSL = firstInstanceDataIndex so that InstanceID() + GeometryIndex()
+                // correctly indexes into _instanceDataBuf.
+                uint firstInstanceDataIndex = instanceCursor;
+                tlas.SetInstanceID(mr, firstInstanceDataIndex);
+                tlas.SetInstanceTransform(mr, xform);
+                tlas.SetInstanceMask(mr, GetMaskForFlags(baseFlags));
+
+                // Compute scale/handedness once for this renderer.
+                bool      leftHanded   = xform.determinant < 0f;
+                Vector3 s = new Vector3(
+                    new Vector3(xform.m00, xform.m10, xform.m20).magnitude,
+                    new Vector3(xform.m01, xform.m11, xform.m21).magnitude,
+                    new Vector3(xform.m02, xform.m12, xform.m22).magnitude);
+                float scaleMax = Mathf.Max(s.x, Mathf.Max(s.y, s.z));
+
+                Vector3[]  srcPos          = mesh.vertices;
+                Vector3[]  srcN            = mesh.normals;
+                Vector4[]  srcT            = mesh.tangents;
+                Vector2[]  srcUV           = mesh.uv;
+                Material[] sharedMaterials = mr.sharedMaterials;
+                int        subCnt          = mesh.subMeshCount;
+ 
+                for (int sub = 0; sub < subCnt; sub++)
+                {
+                    uint primitiveOffsetForSubMesh = primitiveCursor;
+
+                    Material subMat    = (sub < sharedMaterials.Length) ? sharedMaterials[sub] : GetRepresentativeMaterial(mr);
+                    int      subMatIdx = GetOrAddMaterial(subMat, texPtrs);
+
+                    int[] tris = mesh.GetTriangles(sub);
+
+                    for (int i = 0; i + 2 < tris.Length; i += 3)
+                    {
+                        int i0 = tris[i], i1 = tris[i + 1], i2 = tris[i + 2];
+
+                        Vector3 p0 = srcPos[i0];
+                        Vector3 p1 = srcPos[i1];
+                        Vector3 p2 = srcPos[i2];
+
+                        Vector2 uv0 = (srcUV != null && i0 < srcUV.Length) ? srcUV[i0] : Vector2.zero;
+                        Vector2 uv1 = (srcUV != null && i1 < srcUV.Length) ? srcUV[i1] : Vector2.zero;
+                        Vector2 uv2 = (srcUV != null && i2 < srcUV.Length) ? srcUV[i2] : Vector2.zero;
+
+                        float   worldArea = 0.5f * Vector3.Cross(p1 - p0, p2 - p0).magnitude;
+                        Vector2 du1       = uv1 - uv0, du2 = uv2 - uv0;
+                        float   uvArea    = 0.5f * Mathf.Abs(du1.x * du2.y - du1.y * du2.x);
+
+                        // Object-space normals/tangents — shader uses mOverloadedMatrix to transform them.
+                        Vector3 n0 = GetNormal(srcN, i0);
+                        Vector3 n1 = GetNormal(srcN, i1);
+                        Vector3 n2 = GetNormal(srcN, i2);
+
+                        Vector4 t0 = GetTangent(srcT, i0);
+                        Vector4 t1 = GetTangent(srcT, i1);
+                        Vector4 t2 = GetTangent(srcT, i2);
+
+                        primList.Add(new PrimitiveDataNRD
+                        {
+                            uv0           = new half2(uv0),
+                            uv1           = new half2(uv1),
+                            uv2           = new half2(uv2),
+                            worldArea     = worldArea,
+                            n0            = EncodeUnitVectorSigned(n0),
+                            n1            = EncodeUnitVectorSigned(n1),
+                            n2            = EncodeUnitVectorSigned(n2),
+                            uvArea        = uvArea,
+                            t0            = EncodeUnitVectorSigned(new Vector3(t0.x, t0.y, t0.z)),
+                            t1            = EncodeUnitVectorSigned(new Vector3(t1.x, t1.y, t1.z)),
+                            t2            = EncodeUnitVectorSigned(new Vector3(t2.x, t2.y, t2.z)),
+                            bitangentSign = -t0.w,
+                        });
+                        primitiveCursor++;
+                    }
+
+                    // InstanceDataNRD: mOverloadedMatrix = localToWorldMatrix (object-space VB).
+                    uint baseTextureIndex = (uint)(subMatIdx * TexturesPerMaterial);
+                    var inst = new InstanceDataNRD
+                    {
+                        mOverloadedMatrix0 = new Vector4(xform.m00, xform.m01, xform.m02, xform.m03),
+                        mOverloadedMatrix1 = new Vector4(xform.m10, xform.m11, xform.m12, xform.m13),
+                        mOverloadedMatrix2 = new Vector4(xform.m20, xform.m21, xform.m22, xform.m23),
+
+                        textureOffsetAndFlags = baseTextureIndex | (baseFlags << FlagFirstBit),
+                        primitiveOffset       = primitiveOffsetForSubMesh,
+                        scale                 = (leftHanded ? -1f : 1f) * scaleMax,
+                        morphPrimitiveOffset  = 0,
+                    };
+                    EncodeMaterial(subMat, ref inst);
+                    instList.Add(inst);
+                    instanceCursor++;
+                }
+
+                // Record per-target state for transform-only updates.
+                _perTargetBlas[(int)(uint)mr.GetInstanceID()] = new PerTargetBlas
+                {
+                    tlas                   = tlas,
+                    firstInstanceDataIndex = firstInstanceDataIndex,
+                    submeshCount           = subCnt,
+                    lastTransform          = xform,
+                    baseFlags              = baseFlags,
+                };
+            }
+        }
+
+        /// <summary>
+        /// Transform-only update for separate-BLAS mode.
+        /// Updates TLAS transforms and mOverloadedMatrix in the instance buffer;
+        /// does not rebuild any BLAS or re-upload primitive data.
+        /// </summary>
+        private void UpdateTransformsOnly(IReadOnlyList<NativeRayTracingTarget> targets)
+        {
+            if (_instanceCpu == null) return;
+
+            bool anyChanged = false;
+            foreach (var target in targets)
+            {
+                if (target == null) continue;
+                var mr = target.GetComponent<MeshRenderer>();
+                if (mr == null) continue;
+
+                int key = mr.GetInstanceID();
+                if (!_perTargetBlas.TryGetValue(key, out var info)) continue;
+
+                Matrix4x4 xform = target.transform.localToWorldMatrix;
+                if (xform == info.lastTransform) continue;
+
+                // Update TLAS transform.
+                info.tlas.SetInstanceTransform(mr, xform);
+
+                // Recompute per-submesh scale/sign for mOverloadedMatrix.
+                Vector3 s = new Vector3(
+                    new Vector3(xform.m00, xform.m10, xform.m20).magnitude,
+                    new Vector3(xform.m01, xform.m11, xform.m21).magnitude,
+                    new Vector3(xform.m02, xform.m12, xform.m22).magnitude);
+                float scaleMax = Mathf.Max(s.x, Mathf.Max(s.y, s.z));
+
+                // Patch mOverloadedMatrix and scale in every submesh InstanceDataNRD entry.
+                for (int sub = 0; sub < info.submeshCount; sub++)
+                {
+                    int idx = (int)info.firstInstanceDataIndex + sub;
+                    if (idx >= _instanceCpu.Length) break;
+
+                    _instanceCpu[idx].mOverloadedMatrix0 = new Vector4(xform.m00, xform.m01, xform.m02, xform.m03);
+                    _instanceCpu[idx].mOverloadedMatrix1 = new Vector4(xform.m10, xform.m11, xform.m12, xform.m13);
+                    _instanceCpu[idx].mOverloadedMatrix2 = new Vector4(xform.m20, xform.m21, xform.m22, xform.m23);
+                    _instanceCpu[idx].scale              = scaleMax;
+                }
+
+                info.lastTransform = xform;
+                anyChanged         = true;
+            }
+
+            if (anyChanged)
+                _instanceDataBuf?.SetData(_instanceCpu);
         }
 
         /// <summary>
@@ -564,6 +851,12 @@ namespace NativeRender
         // Material / texture helpers
         // =====================================================================
 
+        private static byte GetMaskForFlags(uint flags)
+        {
+            // Use FLAG bits 0–2 as the visibility mask (matches merged-BLAS usage).
+            return (byte)(flags & 0xFF);
+        }
+
         private static Material GetRepresentativeMaterial(MeshRenderer mr)
         {
             var mats = mr.sharedMaterials;
@@ -641,24 +934,24 @@ namespace NativeRender
 
         private static void EncodeMaterial(Material mat, ref InstanceDataNRD inst)
         {
-            Color baseColor      = TryGetColor(mat, "_BaseColor", Color.white);
-            Color emission       = TryGetColor(mat, "_EmissionColor", Color.black);
-            float metal          = TryGetFloat(mat, "_Metallic", 0f);
-            float smooth         = TryGetFloat(mat, "_Smoothness", 0.5f);
-  
-            float normScale      = TryGetFloat(mat, "_BumpScale", 1f);
+            Color baseColor = TryGetColor(mat, "_BaseColor", Color.white);
+            Color emission  = TryGetColor(mat, "_EmissionColor", Color.black);
+            float metal     = TryGetFloat(mat, "_Metallic", 0f);
+            float smooth    = TryGetFloat(mat, "_Smoothness", 0.5f);
+
+            float normScale = TryGetFloat(mat, "_BumpScale", 1f);
 
             inst.baseColorAndMetalnessScale.x = new half(baseColor.r);
             inst.baseColorAndMetalnessScale.y = new half(baseColor.g);
             inst.baseColorAndMetalnessScale.z = new half(baseColor.b);
             inst.baseColorAndMetalnessScale.w = new half(metal);
-            
+
             inst.emissionAndRoughnessScale.x = new half(emission.r);
             inst.emissionAndRoughnessScale.y = new half(emission.g);
             inst.emissionAndRoughnessScale.z = new half(emission.b);
             // 这里实际传入的是光滑度
             inst.emissionAndRoughnessScale.w = new half(smooth);
-            
+
             inst.normalUvScale.x = new half(normScale);
             inst.normalUvScale.y = new half(normScale);
         }
@@ -701,6 +994,18 @@ namespace NativeRender
             Vector3 td = xform.MultiplyVector(new Vector3(tt.x, tt.y, tt.z));
             Vector3 n  = td.sqrMagnitude > 1e-12f ? td.normalized : Vector3.right;
             return new Vector4(n.x, n.y, n.z, tt.w);
+        }
+
+        // Raw object-space accessors for the non-merged path (shader transforms via mOverloadedMatrix).
+        private static Vector3 GetNormal(Vector3[] arr, int idx)
+        {
+            Vector3 n = (arr != null && idx < arr.Length) ? arr[idx] : Vector3.up;
+            return n.sqrMagnitude > 1e-12f ? n.normalized : Vector3.up;
+        }
+
+        private static Vector4 GetTangent(Vector4[] arr, int idx)
+        {
+            return (arr != null && idx < arr.Length) ? arr[idx] : new Vector4(1f, 0f, 0f, 1f);
         }
 
         /// <summary>Signed octahedral unit-vector encoding, matching MathLib Packing::EncodeUnitVector(v, true).</summary>

@@ -443,7 +443,7 @@ namespace NativeRender
                         continue;
                     }
 
-                    bool ok = _accelStructure.AddInstance(meshRenderer, target.ommCaches);
+                    bool ok = _accelStructure.AddInstance(meshRenderer);
                     if (ok)
                         _accelStructure.SetInstanceTransform(meshRenderer, target.transform.localToWorldMatrix);
                 }
@@ -471,7 +471,7 @@ namespace NativeRender
                     continue;
                 }
 
-                bool ok = _accelStructure.AddInstance(meshRenderer, target.ommCaches);
+                bool ok = _accelStructure.AddInstance(meshRenderer);
                 if (ok)
                     _accelStructure.SetInstanceTransform(meshRenderer, target.transform.localToWorldMatrix);
             }

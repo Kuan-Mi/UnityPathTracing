@@ -503,7 +503,7 @@ float3 GetSunIntensity( float3 v )
     sun *= Math::SmoothStep( 0.0, 0.1, gSunDirection.y );
     sun += glow;
 
-    float3 sunColor = lerp( float3( 1.0, 0.6, 0.3 ), float3( 1.0, 0.9, 0.7 ), Math::Sqrt01( gSunDirection.z ) );
+    float3 sunColor = lerp( float3( 1.0, 0.6, 0.3 ), float3( 1.0, 0.9, 0.7 ), Math::Sqrt01( gSunDirection.y ) );
     sunColor *= sun;
 
     sunColor *= Math::SmoothStep( -0.01, 0.05, gSunDirection.y );

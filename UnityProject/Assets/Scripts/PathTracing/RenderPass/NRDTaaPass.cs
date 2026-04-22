@@ -42,12 +42,9 @@ namespace PathTracing
         {
             internal GraphicsBuffer ConstantBuffer;
 
-            internal RTHandle Mv;
-            internal RTHandle Composed;
-            internal RTHandle taaSrc;
-            internal RTHandle taaDst;
-
-            internal RTHandle Output;
+            // RT textures sourced from the pool inside ExecutePass
+            internal PathTracingResourcePool Pool;
+            internal bool                    isEven;
         }
 
         public class Settings
@@ -62,11 +59,11 @@ namespace PathTracing
 
         class PassData
         {
-            internal NativeComputePipeline Cs;
-            internal Resource              Resource;
-            internal Settings              Settings;
-
-            internal TextureHandle OutputTexture;
+            internal NativeComputePipeline   Cs;
+            internal Resource                Resource;
+            internal Settings                Settings;
+            internal PathTracingResourcePool Pool;
+            internal bool                    IsEven;
         }
 
         // -------------------------------------------------------------------------
@@ -81,16 +78,16 @@ namespace PathTracing
 
             cmd.BeginSample(RenderPassMarkers.Taa);
 
+            var pool   = data.Pool;
+            var isEven = data.IsEven;
+
             // SRV inputs
-            cs.SetTexture("gIn_Mv",       res.Mv.rt);
-            cs.SetTexture("gIn_Composed", res.Composed.rt);
-            cs.SetTexture("gIn_History",  res.taaSrc.rt);
+            cs.SetTexture("gIn_Mv",       pool.GetRT(RenderResourceType.MV).rt);
+            cs.SetTexture("gIn_Composed", pool.GetRT(RenderResourceType.Composed).rt);
+            cs.SetTexture("gIn_History",  pool.GetRT(isEven ? RenderResourceType.TaaHistoryPrev : RenderResourceType.TaaHistory).rt);
 
             // UAV output
-            cs.SetRWTexture("gOut_Result", res.taaDst.rt);
-
-            // Debug output (matches original TaaPass gOut_Debug → Output)
-            cs.SetRWTexture("gOut_Debug", data.OutputTexture);
+            cs.SetRWTexture("gOut_Result", pool.GetRT(isEven ? RenderResourceType.TaaHistory : RenderResourceType.TaaHistoryPrev).rt);
 
             // Constant buffer
             cs.SetConstantBuffer("GlobalConstants", res.ConstantBuffer);
@@ -112,10 +109,9 @@ namespace PathTracing
             passData.Cs       = _cs;
             passData.Resource = _resource;
             passData.Settings = _settings;
-
-            passData.OutputTexture = renderGraph.ImportTexture(_resource.Output);
-
-            builder.UseTexture(passData.OutputTexture, AccessFlags.ReadWrite);
+            passData.Pool     = _resource.Pool;
+            passData.IsEven   = _resource.isEven;
+ 
 
             builder.AllowPassCulling(false);
             builder.SetRenderFunc((PassData data, UnsafeGraphContext context) => { ExecutePass(data, context); });

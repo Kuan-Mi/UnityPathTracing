@@ -61,22 +61,8 @@ namespace PathTracing
             internal Texture2D ScramblingRanking;
             internal Texture2D Sobol;
 
-            // Output G-buffer / denoising inputs (UAVs)
-            internal RTHandle Mv;
-            internal RTHandle ViewZ;
-            internal RTHandle NormalRoughness;
-            internal RTHandle BaseColorMetalness;
-            internal RTHandle DirectLighting;
-            internal RTHandle DirectEmission;
-            internal RTHandle PsrThroughput;
-            internal RTHandle ShadowData;
-            internal RTHandle ShadowTranslucency;
-            internal RTHandle Diff;
-            internal RTHandle Spec;
-
-            // History SRVs
-            internal RTHandle PrevComposedDiff;
-            internal RTHandle PrevComposedSpecViewZ;
+            // RT textures sourced from the pool inside ExecutePass
+            internal PathTracingResourcePool Pool;
         }
 
         public class Settings
@@ -91,20 +77,58 @@ namespace PathTracing
 
         class PassData
         {
-            internal NativeComputePipeline Cs;
-            internal NRDSampleResource     NrdResource;
-            internal Resource              Resource;
-            internal Settings              Settings;
-
-            internal TextureHandle DirectEmission;
-            internal TextureHandle PrevComposedDiff;
-            internal TextureHandle PrevComposedSpecViewZ;
+            internal NativeComputePipeline  Cs;
+            internal NRDSampleResource      NrdResource;
+            internal Resource               Resource;
+            internal Settings               Settings;
+            internal PathTracingResourcePool Pool;
         }
 
         // -------------------------------------------------------------------------
         // Execution
         // -------------------------------------------------------------------------
 
+        
+
+// numthreads  [16, 16, 1]
+//
+// -- SRV (8) --
+//   gIn_InstanceData                  Buffer<mixed4>                        space4:t2
+//   gIn_PrimitiveData                 Buffer<mixed4>                        space4:t3
+//   gIn_MorphPrimitivePositionsPrev   Buffer<mixed4>                        space4:t4
+//   gIn_Textures                      Texture2D<float4>                     space1:t0
+//   gIn_PrevComposedDiff              Texture2D<float4>                     space0:t0
+//   gIn_PrevComposedSpec_PrevViewZ    Texture2D<float4>                     space0:t1
+//   gIn_ScramblingRanking             Texture2D<uint4>                      space0:t2
+//   gIn_Sobol                         Texture2D<uint4>                      space0:t3
+//
+// -- UAV (13) --
+//   gInOut_SharcHashEntriesBuffer     RWBuffer<mixed4>                      space2:u0
+//   gInOut_SharcResolved              RWBuffer<mixed4>                      space2:u2
+//   gOut_Mv                           RWTexture2D<float4>                   space0:u0
+//   gOut_ViewZ                        RWTexture2D<float4>                   space0:u1
+//   gOut_Normal_Roughness             RWTexture2D<float4>                   space0:u2
+//   gOut_BaseColor_Metalness          RWTexture2D<float4>                   space0:u3
+//   gOut_DirectLighting               RWTexture2D<float4>                   space0:u4
+//   gOut_DirectEmission               RWTexture2D<float4>                   space0:u5
+//   gOut_PsrThroughput                RWTexture2D<float4>                   space0:u6
+//   gOut_ShadowData                   RWTexture2D<float4>                   space0:u7
+//   gOut_Shadow_Translucency          RWTexture2D<float4>                   space0:u8
+//   gOut_Diff                         RWTexture2D<float4>                   space0:u9
+//   gOut_Spec                         RWTexture2D<float4>                   space0:u10
+//
+// -- CBV (1) --
+//   GlobalConstants                   ConstantBuffer                        space4:b0
+//
+// -- Sampler (2) --
+//   gLinearMipmapLinearSampler        SamplerState                          space4:s0
+//   gNearestClamp                     SamplerState                          space4:s4
+//
+// -- TLAS (2) --
+//   gWorldTlas                        RaytracingAccelerationStructure       space4:t0
+//   gLightTlas                        RaytracingAccelerationStructure       space4:t1
+
+        
 
         void ExecutePass(PassData data, UnsafeGraphContext context)
         {
@@ -118,10 +142,7 @@ namespace PathTracing
             var settings = data.Settings;
             var nrd      = data.NrdResource;
 
-            // 1. Build TLAS (must happen before binding)
-            nrd.BuildAccelerationStructures(cmd);
-
-            // 2. Scene TLAS
+            // 1. Scene TLAS
             cs.SetAccelerationStructure("gWorldTlas", nrd.WorldAS);
             cs.SetAccelerationStructure("gLightTlas", nrd.LightAS);
 
@@ -141,26 +162,28 @@ namespace PathTracing
             // 6. Constant buffer
             cs.SetConstantBuffer("GlobalConstants", res.ConstantBuffer);
 
-            // 7. Stochastic sampling (Texture2D<uint4> in shader)
+            var pool = data.Pool;
+            
+            // SRV
+            cs.SetTexture("gIn_PrevComposedDiff",           pool.GetRT(RenderResourceType.ComposedDiff).rt);
+            cs.SetTexture("gIn_PrevComposedSpec_PrevViewZ", pool.GetRT(RenderResourceType.ComposedSpecViewZ).rt);
             cs.SetTexture("gIn_ScramblingRanking", res.ScramblingRanking);
             cs.SetTexture("gIn_Sobol", res.Sobol);
 
-            // 8. UAV outputs
-            cs.SetRWTexture("gOut_Mv", res.Mv.rt);
-            cs.SetRWTexture("gOut_ViewZ", res.ViewZ.rt);
-            cs.SetRWTexture("gOut_Normal_Roughness", res.NormalRoughness.rt);
-            cs.SetRWTexture("gOut_BaseColor_Metalness", res.BaseColorMetalness.rt);
-            cs.SetRWTexture("gOut_DirectLighting", res.DirectLighting.rt);
-            cs.SetRWTexture("gOut_DirectEmission", data.DirectEmission);
-            cs.SetRWTexture("gOut_PsrThroughput", res.PsrThroughput.rt);
-            cs.SetRWTexture("gOut_ShadowData", res.ShadowData.rt);
-            cs.SetRWTexture("gOut_Shadow_Translucency", res.ShadowTranslucency.rt);
-            cs.SetRWTexture("gOut_Diff", res.Diff.rt);
-            cs.SetRWTexture("gOut_Spec", res.Spec.rt);
 
-            // 9. History SRVs
-            cs.SetTexture("gIn_PrevComposedDiff", data.PrevComposedDiff);
-            cs.SetTexture("gIn_PrevComposedSpec_PrevViewZ", data.PrevComposedSpecViewZ);
+            // UAV
+            cs.SetRWTexture("gOut_Mv",                  pool.GetRT(RenderResourceType.MV).rt);
+            cs.SetRWTexture("gOut_ViewZ",               pool.GetRT(RenderResourceType.Viewz).rt);
+            cs.SetRWTexture("gOut_Normal_Roughness",    pool.GetRT(RenderResourceType.NormalRoughness).rt);
+            cs.SetRWTexture("gOut_BaseColor_Metalness", pool.GetRT(RenderResourceType.BaseColorMetalness).rt);
+            cs.SetRWTexture("gOut_DirectLighting",      pool.GetRT(RenderResourceType.DirectLighting).rt);
+            cs.SetRWTexture("gOut_DirectEmission",      pool.GetRT(RenderResourceType.DirectEmission).rt);
+            cs.SetRWTexture("gOut_PsrThroughput",       pool.GetRT(RenderResourceType.PsrThroughput).rt);
+            cs.SetRWTexture("gOut_ShadowData",          pool.GetRT(RenderResourceType.Unfiltered_Penumbra).rt);
+            cs.SetRWTexture("gOut_Shadow_Translucency", pool.GetRT(RenderResourceType.Unfiltered_Translucency).rt);
+            cs.SetRWTexture("gOut_Diff",                pool.GetRT(RenderResourceType.Unfiltered_Diff).rt);
+            cs.SetRWTexture("gOut_Spec",                pool.GetRT(RenderResourceType.Unfiltered_Spec).rt);
+
 
             // 10. Dispatch — numthreads [16, 16, 1]
             uint w       = (uint)(settings.m_RenderResolution.x * settings.resolutionScale + 0.5f);
@@ -185,14 +208,7 @@ namespace PathTracing
             passData.NrdResource = _nrdResource;
             passData.Resource    = _resource;
             passData.Settings    = _settings;
-
-            passData.DirectEmission        = renderGraph.ImportTexture(_resource.DirectEmission);
-            passData.PrevComposedDiff      = renderGraph.ImportTexture(_resource.PrevComposedDiff);
-            passData.PrevComposedSpecViewZ = renderGraph.ImportTexture(_resource.PrevComposedSpecViewZ);
-
-            builder.UseTexture(passData.DirectEmission, AccessFlags.ReadWrite);
-            builder.UseTexture(passData.PrevComposedDiff, AccessFlags.Read);
-            builder.UseTexture(passData.PrevComposedSpecViewZ, AccessFlags.Read);
+            passData.Pool        = _resource.Pool;
 
             builder.AllowPassCulling(false);
             builder.SetRenderFunc((PassData data, UnsafeGraphContext context) => ExecutePass(data, context));

@@ -31,9 +31,10 @@ namespace NativeRender
             if (_handle == 0) return;
             if (!_buildEventData.IsCreated)
             {
-                _buildEventData = new NativeArray<NativeRenderPlugin.AS_BuildEventData>(1, Allocator.Persistent);
+                _buildEventData    = new NativeArray<NativeRenderPlugin.AS_BuildEventData>(1, Allocator.Persistent);
                 _buildEventData[0] = new NativeRenderPlugin.AS_BuildEventData { asHandle = _handle };
             }
+
             unsafe
             {
                 cmd.IssuePluginEventAndData(
@@ -79,7 +80,7 @@ namespace NativeRender
         /// the mesh's subMeshCount.
         /// </summary>
         /// <returns>True on success.</returns>
-        public unsafe bool AddInstance(MeshRenderer meshRenderer, OMMCache[] ommCaches = null)
+        public unsafe bool AddInstance(MeshRenderer meshRenderer)
         {
             if (_handle == 0 || meshRenderer == null) return false;
 
@@ -92,6 +93,13 @@ namespace NativeRender
 
             Mesh mesh = meshFilter.sharedMesh;
             mesh.UploadMeshData(false);
+
+            OMMCache[] ommCaches = null;
+            var nativeTarget = meshFilter.GetComponent<NativeRayTracingTarget>();
+            if (nativeTarget != null)
+            {
+                ommCaches = nativeTarget.ommCaches;
+            }
 
             IntPtr vbPtr = mesh.GetNativeVertexBufferPtr(0);
             IntPtr ibPtr = mesh.GetNativeIndexBufferPtr();
@@ -172,15 +180,15 @@ namespace NativeRender
                         {
                             var desc = new NativeRenderPlugin.AddInstanceDesc
                             {
-                                instanceHandle      = instanceHandle,
+                                instanceHandle        = instanceHandle,
                                 vertexBufferNativePtr = vbPtr,
-                                vertexCount         = vertexCount,
-                                vertexStride        = vertexStride,
-                                indexBufferNativePtr = ibPtr,
-                                indexStride         = indexStride,
-                                submeshDescs        = (IntPtr)pDescs,
-                                submeshCount        = (uint)subMeshCount,
-                                ommDescs            = (IntPtr)pOMM,
+                                vertexCount           = vertexCount,
+                                vertexStride          = vertexStride,
+                                indexBufferNativePtr  = ibPtr,
+                                indexStride           = indexStride,
+                                submeshDescs          = (IntPtr)pDescs,
+                                submeshCount          = (uint)subMeshCount,
+                                ommDescs              = (IntPtr)pOMM,
                             };
                             ok = NativeRenderPlugin.NR_AS_AddInstance(_handle, ref desc);
                         }
@@ -189,15 +197,15 @@ namespace NativeRender
                     {
                         var desc = new NativeRenderPlugin.AddInstanceDesc
                         {
-                            instanceHandle      = instanceHandle,
+                            instanceHandle        = instanceHandle,
                             vertexBufferNativePtr = vbPtr,
-                            vertexCount         = vertexCount,
-                            vertexStride        = vertexStride,
-                            indexBufferNativePtr = ibPtr,
-                            indexStride         = indexStride,
-                            submeshDescs        = (IntPtr)pDescs,
-                            submeshCount        = (uint)subMeshCount,
-                            ommDescs            = IntPtr.Zero,
+                            vertexCount           = vertexCount,
+                            vertexStride          = vertexStride,
+                            indexBufferNativePtr  = ibPtr,
+                            indexStride           = indexStride,
+                            submeshDescs          = (IntPtr)pDescs,
+                            submeshCount          = (uint)subMeshCount,
+                            ommDescs              = IntPtr.Zero,
                         };
                         ok = NativeRenderPlugin.NR_AS_AddInstance(_handle, ref desc);
                     }
@@ -258,8 +266,8 @@ namespace NativeRender
         public void SetInstanceID(MeshRenderer meshRenderer, uint id)
         {
             if (_handle == 0 || meshRenderer == null) return;
-            Debug.Log($"[NativeRayTracing] SetInstanceID for '{meshRenderer.name}' to {id}");
-            
+            // Debug.Log($"[NativeRayTracing] SetInstanceID for '{meshRenderer.name}' to {id}");
+
             NativeRenderPlugin.NR_AS_SetInstanceID(_handle, (uint)meshRenderer.GetInstanceID(), id);
         }
 
