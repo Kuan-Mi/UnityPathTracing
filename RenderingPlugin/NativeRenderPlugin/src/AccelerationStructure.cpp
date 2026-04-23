@@ -924,7 +924,7 @@ bool AccelerationStructure::BuildOrUpdate(ID3D12GraphicsCommandList4* cmdList)
     // -------------------------------------------------------------------
     // Step A: Build any pending new BLASes (throttled to avoid GPU TDR)
     // -------------------------------------------------------------------
-    static constexpr int kMaxBLASBuildsPerFrame = 100;
+    static constexpr int kMaxBLASBuildsPerFrame = 10000;
     bool anyNewBLAS = false;
     int  blasBuildsThisFrame = 0;
     for (auto& slot : m_slots)

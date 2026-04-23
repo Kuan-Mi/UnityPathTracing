@@ -449,11 +449,11 @@ namespace NativeRender
             // Process ordered opaque → transparent → emissive (emissive targets were also added to
             // opaque already; they get a second separate entry in the light TLAS).
             ProcessSeparateGroup(opaque, _worldAS, FLAG_STATIC | FLAG_NON_TRANSPARENT,
-                ref instanceCursor, ref primitiveCursor, instList, _primitiveCpu, texPtrs);
+                ref instanceCursor, ref primitiveCursor, instList, texPtrs);
             ProcessSeparateGroup(transparent, _worldAS, FLAG_STATIC | FLAG_TRANSPARENT,
-                ref instanceCursor, ref primitiveCursor, instList, _primitiveCpu, texPtrs);
+                ref instanceCursor, ref primitiveCursor, instList, texPtrs);
             ProcessSeparateGroup(emissive, _lightAS, FLAG_STATIC | FLAG_NON_TRANSPARENT | FLAG_EMISSIVE,
-                ref instanceCursor, ref primitiveCursor, instList, _primitiveCpu, texPtrs);
+                ref instanceCursor, ref primitiveCursor, instList, texPtrs);
 
             // Texture array.
             int texCount = Mathf.Max(texPtrs.Count, 1);
@@ -481,7 +481,6 @@ namespace NativeRender
             ref uint instanceCursor,
             ref uint primitiveCursor,
             List<InstanceDataNRD> instList,
-            NativeArray<PrimitiveDataNRD> primOutput,
             List<IntPtr> texPtrs)
         {
             var swTotal = Stopwatch.StartNew();
@@ -604,7 +603,7 @@ namespace NativeRender
                         HasN      = hasN,
                         HasT      = hasT,
                         HasUV     = hasUV,
-                        Output    = primOutput.GetSubArray((int)primitiveOffsetForSubMesh, triCount),
+                        Output    = _primitiveCpu.GetSubArray((int)primitiveOffsetForSubMesh, triCount),
                     };
                     jobHandles.Add(job.Schedule(triCount, 64));
 

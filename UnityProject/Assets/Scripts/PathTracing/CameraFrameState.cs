@@ -846,7 +846,7 @@ namespace PathTracing
                 gUseNormalMap                              = settings.normalMap ? 1u : 0u,
                 gBounceNum                                 = (uint)settings.bounceNum,
                 gResolve                                   = resolve,
-                gValidation                                = 0u,
+                gValidation                                = 1u,
                 gSR                                        = (settings.SR && !settings.RR) ? 1u : 0u,
                 gRR                                        = settings.RR ? 1u : 0u,
                 gIsSrgb                                    = 0u,
