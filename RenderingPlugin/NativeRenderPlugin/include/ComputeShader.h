@@ -32,18 +32,39 @@ enum class ComputeBindingType
 struct ComputeBinding
 {
     std::string       name;             // HLSL variable name
-    ComputeBindingType type;            // SRV / UAV / CBV / SRV_ARRAY
+    ComputeBindingType type;            // SRV / UAV / CBV / SRV_ARRAY / TLAS
     uint32_t          space;            // register space
     uint32_t          registerIndex;    // tn / un / bn number
     uint32_t          heapOffset;       // offset within the shared SRV/UAV alloc range
     uint32_t          rootParam;        // root parameter index (SRV_ARRAY: own; others: shared table)
-    ID3D12Resource*   boundResource;    // currently bound resource (non-owning)
-    AccelerationStructure* boundAS;     // bound AccelerationStructure for dynamic TLAS lookup (non-owning)
-    BindlessTexture*  boundBT;          // bound BindlessTexture (SRV_ARRAY, texture)
-    BindlessBuffer*   boundBB;          // bound BindlessBuffer  (SRV_ARRAY, buffer)
-    UINT              boundCount;       // element count for StructuredBuffer SRVs
-    UINT              boundStride;      // element stride (0 = raw ByteAddressBuffer)
+    // NOTE: No bound* fields here — bindings are passed per-dispatch via CS_BindingSlot[].
 };
+
+// ---------------------------------------------------------------------------
+// CS_BindingSlot
+//   One slot per reflected binding, passed from C# via IssuePluginEventAndData.
+//   C# fills these on the main thread and the render-thread callback reads them.
+//   Must match NativeRenderPlugin.CS_BindingSlot exactly (Pack=4, 32 bytes).
+// ---------------------------------------------------------------------------
+#pragma pack(push, 4)
+enum class CS_BindingObjectKind : uint32_t
+{
+    None            = 0,
+    AccelStruct     = 1,
+    BindlessTexture = 2,
+    BindlessBuffer  = 3,
+};
+
+struct CS_BindingSlot
+{
+    uint64_t             resourcePtr;   // ID3D12Resource* (may be 0)
+    uint64_t             objectPtr;     // AccelerationStructure* | BindlessTexture* | BindlessBuffer*
+    uint32_t             count;         // element count  (StructuredBuffer)
+    uint32_t             stride;        // element stride (StructuredBuffer; 0 = raw)
+    CS_BindingObjectKind objectKind;    // what objectPtr points to
+    uint32_t             _pad;
+}; // 32 bytes
+#pragma pack(pop)
 
 // ---------------------------------------------------------------------------
 // ComputeShader
@@ -71,35 +92,21 @@ public:
     // name is used as the D3D12 debug name for the PSO and root signature (optional).
     bool LoadShaderFromBytes(const uint8_t* dxilBytes, uint32_t size, const char* name = nullptr);
 
-    // --- Resource binding (all spaces) ---
-    // Bind by HLSL variable name. Returns false if name not found or type mismatch.
+    // --- Binding metadata queries (called from C# on main thread to build slot arrays) ---
 
-    // ByteAddressBuffer / unstructured SRV
-    bool SetBuffer          (const char* name, ID3D12Resource* resource);
-    // StructuredBuffer<T> SRV — caller must supply element count and byte stride
-    bool SetStructuredBuffer(const char* name, ID3D12Resource* resource, UINT elementCount, UINT elementStride);
-    // RaytracingAccelerationStructure (maps to TLAS binding)
-    bool SetAccelerationStructure(const char* name, ID3D12Resource* tlas);
-    // Preferred: binds by AccelerationStructure object — TLAS ptr is read dynamically at Dispatch time.
-    bool SetAccelerationStructureObject(const char* name, AccelerationStructure* as);
-    // Texture SRV
-    bool SetTexture         (const char* name, ID3D12Resource* resource);
-    // UAV
-    bool SetRWBuffer           (const char* name, ID3D12Resource* resource);
-    bool SetRWStructuredBuffer (const char* name, ID3D12Resource* resource, UINT elementCount, UINT elementStride);
-    bool SetRWTexture          (const char* name, ID3D12Resource* resource);
-    // CBV
-    bool SetConstantBuffer  (const char* name, ID3D12Resource* resource);
-
-    // Unbounded array bindings (via BindlessTexture / BindlessBuffer)
-    bool SetBindlessTexture (const char* name, BindlessTexture* bt);
-    bool SetBindlessBuffer  (const char* name, BindlessBuffer*  bb);
+    // Total number of reflected bindings (excluding samplers).
+    uint32_t    GetBindingCount() const;
+    // Returns the slot index for a given HLSL variable name, or UINT32_MAX if not found.
+    uint32_t    GetSlotIndex(const char* name) const;
+    // Returns the HLSL variable name for a given slot index, or nullptr if out of range.
+    const char* GetBindingName(uint32_t index) const;
 
     // --- Dispatch ---
-    // All resources must be bound by name via SetXxx before calling Dispatch each frame.
-    // threadGroupX/Y/Z are the number of thread groups (not threads) to dispatch.
+    // slots[i] carries the binding for the i-th reflected binding (indexed by GetSlotIndex).
+    // slotCount must equal GetBindingCount().
     void Dispatch(ID3D12GraphicsCommandList* cmdList,
-                  UINT threadGroupX, UINT threadGroupY, UINT threadGroupZ);
+                  UINT threadGroupX, UINT threadGroupY, UINT threadGroupZ,
+                  const CS_BindingSlot* slots, uint32_t slotCount);
 
 private:
     bool ReflectBindings(IDxcBlob* shaderBlob);
@@ -108,10 +115,10 @@ private:
 
     // Allocate global-heap slots and write all descriptors.
     // Called once (first Dispatch) or after shader reload.
-    bool AllocateAndWriteDescriptors();
+    bool AllocateAndWriteDescriptors(const CS_BindingSlot* slots, uint32_t slotCount);
 
     // Re-write all mutable descriptors every frame.
-    void UpdateDescriptors();
+    void UpdateDescriptors(const CS_BindingSlot* slots, uint32_t slotCount);
 
     void FreeAllAllocations();
 

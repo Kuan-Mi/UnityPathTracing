@@ -163,14 +163,8 @@ bool ComputeShader::ReflectBindings(IDxcBlob* shaderBlob)
         cb.name          = name;
         cb.space         = bind.Space;
         cb.registerIndex = bind.BindPoint;
-        cb.boundResource = nullptr;
-        cb.boundAS       = nullptr;
-        cb.boundBT       = nullptr;
-        cb.boundBB       = nullptr;
         cb.heapOffset    = 0;
         cb.rootParam     = kInvalidAlloc;
-        cb.boundCount    = 0;
-        cb.boundStride   = 0;
 
         switch (bind.Type)
         {
@@ -501,137 +495,24 @@ bool ComputeShader::BuildPipeline(IDxcBlob* shaderBlob)
 }
 
 // ---------------------------------------------------------------------------
-// Resource setters
+// Binding metadata queries
 // ---------------------------------------------------------------------------
-bool ComputeShader::SetBuffer(const char* name, ID3D12Resource* res)
+uint32_t ComputeShader::GetBindingCount() const
 {
-    if (!name) return false;
-    auto it = m_bindingIndex.find(name);
-    if (it == m_bindingIndex.end()) return false;
-    ComputeBinding& b = m_bindings[it->second];
-    if (b.type != ComputeBindingType::SRV) return false;
-    b.boundResource = res;
-    b.boundStride   = 0; // raw ByteAddressBuffer
-    return true;
+    return static_cast<uint32_t>(m_bindings.size());
 }
 
-bool ComputeShader::SetStructuredBuffer(const char* name, ID3D12Resource* res, UINT count, UINT stride)
+uint32_t ComputeShader::GetSlotIndex(const char* name) const
 {
-    if (!name) return false;
+    if (!name) return UINT32_MAX;
     auto it = m_bindingIndex.find(name);
-    if (it == m_bindingIndex.end()) return false;
-    ComputeBinding& b = m_bindings[it->second];
-    if (b.type != ComputeBindingType::SRV) return false;
-    b.boundResource = res;
-    b.boundCount    = count;
-    b.boundStride   = stride;
-    return true;
+    return (it != m_bindingIndex.end()) ? static_cast<uint32_t>(it->second) : UINT32_MAX;
 }
 
-bool ComputeShader::SetAccelerationStructure(const char* name, ID3D12Resource* tlas)
+const char* ComputeShader::GetBindingName(uint32_t index) const
 {
-    if (!name) return false;
-    auto it = m_bindingIndex.find(name);
-    if (it == m_bindingIndex.end()) return false;
-    ComputeBinding& b = m_bindings[it->second];
-    if (b.type != ComputeBindingType::TLAS) return false;
-    b.boundResource = tlas;
-    b.boundAS       = nullptr; // clear dynamic binding if explicitly setting raw ptr
-    return true;
-}
-
-bool ComputeShader::SetAccelerationStructureObject(const char* name, AccelerationStructure* as)
-{
-    if (!name) return false;
-    auto it = m_bindingIndex.find(name);
-    if (it == m_bindingIndex.end()) return false;
-    ComputeBinding& b = m_bindings[it->second];
-    if (b.type != ComputeBindingType::TLAS) return false;
-    b.boundAS       = as;     // store object pointer; TLAS will be read dynamically at Dispatch
-    b.boundResource = nullptr;
-    return true;
-}
-
-bool ComputeShader::SetTexture(const char* name, ID3D12Resource* res)
-{
-    if (!name) return false;
-    auto it = m_bindingIndex.find(name);
-    if (it == m_bindingIndex.end()) return false;
-    ComputeBinding& b = m_bindings[it->second];
-    if (b.type != ComputeBindingType::SRV) return false;
-    b.boundResource = res;
-    b.boundStride   = 0;
-    return true;
-}
-
-bool ComputeShader::SetRWBuffer(const char* name, ID3D12Resource* res)
-{
-    if (!name) return false;
-    auto it = m_bindingIndex.find(name);
-    if (it == m_bindingIndex.end()) return false;
-    ComputeBinding& b = m_bindings[it->second];
-    if (b.type != ComputeBindingType::UAV) return false;
-    b.boundResource = res;
-    b.boundStride   = 0;
-    b.boundCount    = 0;
-    return true;
-}
-
-bool ComputeShader::SetRWStructuredBuffer(const char* name, ID3D12Resource* res, UINT elementCount, UINT elementStride)
-{
-    if (!name) return false;
-    auto it = m_bindingIndex.find(name);
-    if (it == m_bindingIndex.end()) return false;
-    ComputeBinding& b = m_bindings[it->second];
-    if (b.type != ComputeBindingType::UAV) return false;
-    b.boundResource = res;
-    b.boundCount    = elementCount;
-    b.boundStride   = elementStride;
-    return true;
-}
-
-bool ComputeShader::SetRWTexture(const char* name, ID3D12Resource* res)
-{
-    if (!name) return false;
-    auto it = m_bindingIndex.find(name);
-    if (it == m_bindingIndex.end()) return false;
-    ComputeBinding& b = m_bindings[it->second];
-    if (b.type != ComputeBindingType::UAV) return false;
-    b.boundResource = res;
-    return true;
-}
-
-bool ComputeShader::SetConstantBuffer(const char* name, ID3D12Resource* res)
-{
-    if (!name) return false;
-    auto it = m_bindingIndex.find(name);
-    if (it == m_bindingIndex.end()) return false;
-    ComputeBinding& b = m_bindings[it->second];
-    if (b.type != ComputeBindingType::CBV) return false;
-    b.boundResource = res;
-    return true;
-}
-
-bool ComputeShader::SetBindlessTexture(const char* name, BindlessTexture* bt)
-{
-    if (!name) return false;
-    auto it = m_bindingIndex.find(name);
-    if (it == m_bindingIndex.end()) return false;
-    ComputeBinding& b = m_bindings[it->second];
-    if (b.type != ComputeBindingType::SRV_ARRAY) return false;
-    b.boundBT = bt;
-    return true;
-}
-
-bool ComputeShader::SetBindlessBuffer(const char* name, BindlessBuffer* bb)
-{
-    if (!name) return false;
-    auto it = m_bindingIndex.find(name);
-    if (it == m_bindingIndex.end()) return false;
-    ComputeBinding& b = m_bindings[it->second];
-    if (b.type != ComputeBindingType::SRV_ARRAY) return false;
-    b.boundBB = bb;
-    return true;
+    if (index >= m_bindings.size()) return nullptr;
+    return m_bindings[index].name.c_str();
 }
 
 // ---------------------------------------------------------------------------
@@ -647,7 +528,7 @@ void ComputeShader::FreeAllAllocations()
 // ---------------------------------------------------------------------------
 // AllocateAndWriteDescriptors
 // ---------------------------------------------------------------------------
-bool ComputeShader::AllocateAndWriteDescriptors()
+bool ComputeShader::AllocateAndWriteDescriptors(const CS_BindingSlot* slots, uint32_t slotCount)
 {
     if (!m_allocator) return false;
 
@@ -656,31 +537,45 @@ bool ComputeShader::AllocateAndWriteDescriptors()
     if (m_uavAllocBase == kInvalidAlloc && m_numUAV > 0)
         m_uavAllocBase = m_allocator->Allocate(m_numUAV);
 
-    UpdateDescriptors();
+    UpdateDescriptors(slots, slotCount);
     return true;
 }
 
 // ---------------------------------------------------------------------------
 // UpdateDescriptors
-//   Writes all SRV/UAV descriptors every frame.
+//   Writes all SRV/UAV descriptors every frame using the per-dispatch slot array.
 //   CBVs are bound as inline root descriptors in Dispatch.
 //   SRV_ARRAY bindings own their heap slots in BindlessTexture/BindlessBuffer.
 // ---------------------------------------------------------------------------
-void ComputeShader::UpdateDescriptors()
+void ComputeShader::UpdateDescriptors(const CS_BindingSlot* slots, uint32_t slotCount)
 {
+    // Helper: get resource from slot
+    auto GetResource = [&](uint32_t idx) -> ID3D12Resource* {
+        if (idx >= slotCount) return nullptr;
+        return reinterpret_cast<ID3D12Resource*>(slots[idx].resourcePtr);
+    };
+
     // --- SRV / TLAS ---
     if (m_srvAllocBase != kInvalidAlloc)
     {
-        for (const auto& b : m_bindings)
+        for (size_t i = 0; i < m_bindings.size(); ++i)
         {
+            const auto& b = m_bindings[i];
+            const CS_BindingSlot& slot = (i < slotCount) ? slots[i] : CS_BindingSlot{};
+
             if (b.type == ComputeBindingType::TLAS)
             {
                 D3D12_SHADER_RESOURCE_VIEW_DESC s = {};
-                s.ViewDimension                            = D3D12_SRV_DIMENSION_RAYTRACING_ACCELERATION_STRUCTURE;
-                s.Shader4ComponentMapping                  = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
-                ID3D12Resource* tlas = b.boundAS ? b.boundAS->GetTLAS() : b.boundResource;
-                s.RaytracingAccelerationStructure.Location = tlas
-                    ? tlas->GetGPUVirtualAddress() : 0;
+                s.ViewDimension           = D3D12_SRV_DIMENSION_RAYTRACING_ACCELERATION_STRUCTURE;
+                s.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+
+                ID3D12Resource* tlas = nullptr;
+                if (slot.objectKind == CS_BindingObjectKind::AccelStruct && slot.objectPtr)
+                    tlas = reinterpret_cast<AccelerationStructure*>(slot.objectPtr)->GetTLAS();
+                else
+                    tlas = reinterpret_cast<ID3D12Resource*>(slot.resourcePtr);
+
+                s.RaytracingAccelerationStructure.Location = tlas ? tlas->GetGPUVirtualAddress() : 0;
                 m_device->CreateShaderResourceView(nullptr, &s,
                     m_allocator->GetCPUHandle(m_srvAllocBase + b.heapOffset));
             }
@@ -689,17 +584,18 @@ void ComputeShader::UpdateDescriptors()
                 D3D12_CPU_DESCRIPTOR_HANDLE h = m_allocator->GetCPUHandle(m_srvAllocBase + b.heapOffset);
                 D3D12_SHADER_RESOURCE_VIEW_DESC s = {};
                 s.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
-                if (b.boundResource)
+                ID3D12Resource* res = reinterpret_cast<ID3D12Resource*>(slot.resourcePtr);
+                if (res)
                 {
-                    auto rd = b.boundResource->GetDesc();
+                    auto rd = res->GetDesc();
                     if (rd.Dimension == D3D12_RESOURCE_DIMENSION_BUFFER)
                     {
-                        if (b.boundStride > 0 && b.boundCount > 0)
+                        if (slot.stride > 0 && slot.count > 0)
                         {
                             s.ViewDimension              = D3D12_SRV_DIMENSION_BUFFER;
                             s.Format                     = DXGI_FORMAT_UNKNOWN;
-                            s.Buffer.NumElements         = b.boundCount;
-                            s.Buffer.StructureByteStride = b.boundStride;
+                            s.Buffer.NumElements         = slot.count;
+                            s.Buffer.StructureByteStride = slot.stride;
                         }
                         else
                         {
@@ -715,7 +611,7 @@ void ComputeShader::UpdateDescriptors()
                         s.Format              = rd.Format;
                         s.Texture2D.MipLevels = rd.MipLevels;
                     }
-                    m_device->CreateShaderResourceView(b.boundResource, &s, h);
+                    m_device->CreateShaderResourceView(res, &s, h);
                 }
                 else
                 {
@@ -732,22 +628,25 @@ void ComputeShader::UpdateDescriptors()
     // --- UAV ---
     if (m_uavAllocBase != kInvalidAlloc)
     {
-        for (const auto& b : m_bindings)
+        for (size_t i = 0; i < m_bindings.size(); ++i)
         {
+            const auto& b = m_bindings[i];
             if (b.type != ComputeBindingType::UAV) continue;
+            const CS_BindingSlot& slot = (i < slotCount) ? slots[i] : CS_BindingSlot{};
+            ID3D12Resource* res = reinterpret_cast<ID3D12Resource*>(slot.resourcePtr);
             D3D12_CPU_DESCRIPTOR_HANDLE h = m_allocator->GetCPUHandle(m_uavAllocBase + b.heapOffset);
             D3D12_UNORDERED_ACCESS_VIEW_DESC u = {};
-            if (b.boundResource)
+            if (res)
             {
-                auto rd = b.boundResource->GetDesc();
+                auto rd = res->GetDesc();
                 if (rd.Dimension == D3D12_RESOURCE_DIMENSION_BUFFER)
                 {
                     u.ViewDimension = D3D12_UAV_DIMENSION_BUFFER;
-                    if (b.boundStride > 0 && b.boundCount > 0)
+                    if (slot.stride > 0 && slot.count > 0)
                     {
                         u.Format                     = DXGI_FORMAT_UNKNOWN;
-                        u.Buffer.NumElements         = b.boundCount;
-                        u.Buffer.StructureByteStride = b.boundStride;
+                        u.Buffer.NumElements         = slot.count;
+                        u.Buffer.StructureByteStride = slot.stride;
                     }
                     else
                     {
@@ -761,7 +660,7 @@ void ComputeShader::UpdateDescriptors()
                     u.ViewDimension = D3D12_UAV_DIMENSION_TEXTURE2D;
                     u.Format        = rd.Format;
                 }
-                m_device->CreateUnorderedAccessView(b.boundResource, nullptr, &u, h);
+                m_device->CreateUnorderedAccessView(res, nullptr, &u, h);
             }
             else
             {
@@ -777,50 +676,55 @@ void ComputeShader::UpdateDescriptors()
 
 // ---------------------------------------------------------------------------
 // Dispatch
+//   slots[] carries all per-dispatch bindings passed from C# via the event data.
 //   Caller is responsible for resource state transitions.
-//   No internal intermediate texture – C# owns all input/output resources.
 // ---------------------------------------------------------------------------
 void ComputeShader::Dispatch(
     ID3D12GraphicsCommandList* cmdList,
-    UINT threadGroupX, UINT threadGroupY, UINT threadGroupZ)
+    UINT threadGroupX, UINT threadGroupY, UINT threadGroupZ,
+    const CS_BindingSlot* slots, uint32_t slotCount)
 {
     if (!m_pso || !m_rootSig || !m_allocator) return;
+    if (!slots && slotCount > 0) return;
 
-    // --- Validate all bindings are set from C# ---
+    // --- Validate all bindings ---
     {
         bool anyMissing = false;
-        for (const auto& b : m_bindings)
+        for (size_t i = 0; i < m_bindings.size(); ++i)
         {
+            const auto& b = m_bindings[i];
+            const CS_BindingSlot& slot = (i < slotCount) ? slots[i] : CS_BindingSlot{};
             bool ok = false;
             const char* kind = "?";
             switch (b.type)
             {
             case ComputeBindingType::TLAS:
                 kind = "TLAS";
-                ok = (b.boundAS != nullptr) || (b.boundResource != nullptr);
+                ok = slot.resourcePtr != 0 ||
+                     (slot.objectKind == CS_BindingObjectKind::AccelStruct && slot.objectPtr != 0);
                 break;
             case ComputeBindingType::SRV:
                 kind = "SRV";
-                ok = (b.boundResource != nullptr);
+                ok = slot.resourcePtr != 0;
                 break;
             case ComputeBindingType::UAV:
                 kind = "UAV";
-                ok = (b.boundResource != nullptr);
+                ok = slot.resourcePtr != 0;
                 break;
             case ComputeBindingType::CBV:
                 kind = "CBV";
-                ok = (b.boundResource != nullptr);
+                ok = slot.resourcePtr != 0;
                 break;
             case ComputeBindingType::SRV_ARRAY:
                 kind = "SRV_ARRAY";
-                ok = (b.boundBT != nullptr) || (b.boundBB != nullptr);
+                ok = (slot.objectKind == CS_BindingObjectKind::BindlessTexture && slot.objectPtr != 0) ||
+                     (slot.objectKind == CS_BindingObjectKind::BindlessBuffer  && slot.objectPtr != 0);
                 break;
             }
             if (!ok)
             {
                 Logf(kUnityLogTypeError,
-                     "ComputeShader::Dispatch: binding '%s' (%s, space%u, reg%u) is not set - "
-                     "did you forget a SetXxx call from C#?",
+                     "ComputeShader::Dispatch: binding '%s' (%s, space%u, reg%u) is not set",
                      b.name.c_str(), kind, b.space, b.registerIndex);
                 anyMissing = true;
             }
@@ -828,15 +732,15 @@ void ComputeShader::Dispatch(
         if (anyMissing) return;
     }
 
-    // Allocate heap slots on first call, then write all descriptors every frame
+    // Allocate heap slots on first call, then write all descriptors every dispatch
     if ((m_numSRV > 0 && m_srvAllocBase == kInvalidAlloc) ||
         (m_numUAV > 0 && m_uavAllocBase == kInvalidAlloc))
     {
-        if (!AllocateAndWriteDescriptors()) return;
+        if (!AllocateAndWriteDescriptors(slots, slotCount)) return;
     }
     else
     {
-        UpdateDescriptors();
+        UpdateDescriptors(slots, slotCount);
     }
 
     // Bind the global shared heap (D3D12 allows only one GPU-visible heap at a time)
@@ -857,24 +761,30 @@ void ComputeShader::Dispatch(
             m_allocator->GetGPUHandle(m_uavAllocBase));
 
     // SRV_ARRAY bindings – each has its own root parameter
-    for (const auto& b : m_bindings)
+    for (size_t i = 0; i < m_bindings.size(); ++i)
     {
+        const auto& b = m_bindings[i];
         if (b.type != ComputeBindingType::SRV_ARRAY) continue;
         if (b.rootParam == kInvalidAlloc) continue;
-        if (b.boundBT)
-            cmdList->SetComputeRootDescriptorTable(b.rootParam, b.boundBT->GetGPUHandle());
-        else if (b.boundBB)
-            cmdList->SetComputeRootDescriptorTable(b.rootParam, b.boundBB->GetGPUHandle());
+        const CS_BindingSlot& slot = (i < slotCount) ? slots[i] : CS_BindingSlot{};
+        if (slot.objectKind == CS_BindingObjectKind::BindlessTexture && slot.objectPtr)
+            cmdList->SetComputeRootDescriptorTable(b.rootParam,
+                reinterpret_cast<BindlessTexture*>(slot.objectPtr)->GetGPUHandle());
+        else if (slot.objectKind == CS_BindingObjectKind::BindlessBuffer && slot.objectPtr)
+            cmdList->SetComputeRootDescriptorTable(b.rootParam,
+                reinterpret_cast<BindlessBuffer*>(slot.objectPtr)->GetGPUHandle());
     }
 
     // Root CBV per CBV binding
     if (m_rootParamCBVBase != kInvalidAlloc)
     {
-        for (const auto& b : m_bindings)
+        for (size_t i = 0; i < m_bindings.size(); ++i)
         {
+            const auto& b = m_bindings[i];
             if (b.type != ComputeBindingType::CBV) continue;
-            D3D12_GPU_VIRTUAL_ADDRESS addr = b.boundResource
-                ? b.boundResource->GetGPUVirtualAddress() : 0;
+            const CS_BindingSlot& slot = (i < slotCount) ? slots[i] : CS_BindingSlot{};
+            ID3D12Resource* res = reinterpret_cast<ID3D12Resource*>(slot.resourcePtr);
+            D3D12_GPU_VIRTUAL_ADDRESS addr = res ? res->GetGPUVirtualAddress() : 0;
             cmdList->SetComputeRootConstantBufferView(m_rootParamCBVBase + b.heapOffset, addr);
         }
     }
@@ -882,35 +792,41 @@ void ComputeShader::Dispatch(
     // --- Request resource states ---
     if (m_d3d12v8)
     {
-        for (const auto& b : m_bindings)
+        for (size_t i = 0; i < m_bindings.size(); ++i)
         {
-            if (b.type == ComputeBindingType::SRV && b.boundResource)
+            const auto& b = m_bindings[i];
+            const CS_BindingSlot& slot = (i < slotCount) ? slots[i] : CS_BindingSlot{};
+            ID3D12Resource* res = reinterpret_cast<ID3D12Resource*>(slot.resourcePtr);
+            if (b.type == ComputeBindingType::SRV && res)
             {
-                m_d3d12v8->RequestResourceState(b.boundResource, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
+                m_d3d12v8->RequestResourceState(res, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
             }
-            else if (b.type == ComputeBindingType::UAV && b.boundResource)
+            else if (b.type == ComputeBindingType::UAV && res)
             {
-                m_d3d12v8->RequestResourceState(b.boundResource, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
+                m_d3d12v8->RequestResourceState(res, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
             }
-            else if (b.type == ComputeBindingType::CBV && b.boundResource)
+            else if (b.type == ComputeBindingType::CBV && res)
             {
-                m_d3d12v8->RequestResourceState(b.boundResource,
-                    D3D12_RESOURCE_STATE_VERTEX_AND_CONSTANT_BUFFER);
+                m_d3d12v8->RequestResourceState(res, D3D12_RESOURCE_STATE_VERTEX_AND_CONSTANT_BUFFER);
             }
-            else if (b.type == ComputeBindingType::SRV_ARRAY && b.boundBT)
+            else if (b.type == ComputeBindingType::SRV_ARRAY &&
+                     slot.objectKind == CS_BindingObjectKind::BindlessTexture && slot.objectPtr)
             {
-                for (uint32_t i = 0; i < b.boundBT->Capacity(); ++i)
+                auto* bt = reinterpret_cast<BindlessTexture*>(slot.objectPtr);
+                for (uint32_t k = 0; k < bt->Capacity(); ++k)
                 {
-                    ID3D12Resource* tex = b.boundBT->GetTexture(i);
+                    ID3D12Resource* tex = bt->GetTexture(k);
                     if (tex)
                         m_d3d12v8->RequestResourceState(tex, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
                 }
             }
-            else if (b.type == ComputeBindingType::SRV_ARRAY && b.boundBB)
+            else if (b.type == ComputeBindingType::SRV_ARRAY &&
+                     slot.objectKind == CS_BindingObjectKind::BindlessBuffer && slot.objectPtr)
             {
-                for (uint32_t i = 0; i < b.boundBB->Capacity(); ++i)
+                auto* bb = reinterpret_cast<BindlessBuffer*>(slot.objectPtr);
+                for (uint32_t k = 0; k < bb->Capacity(); ++k)
                 {
-                    ID3D12Resource* buf = b.boundBB->GetBuffer(i);
+                    ID3D12Resource* buf = bb->GetBuffer(k);
                     if (buf)
                         m_d3d12v8->RequestResourceState(buf, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
                 }

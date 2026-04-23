@@ -333,65 +333,17 @@ namespace NativeRender
         [DllImport(DllName)]
         public static extern void NR_DestroyComputeShader(ulong handle);
 
-        /// <summary>Binds a raw/structured buffer (SRV) by HLSL variable name. Returns 1 on success.</summary>
+        /// <summary>Returns the total number of reflected bindings for a compute shader handle.</summary>
         [DllImport(DllName)]
-        public static extern int NR_CS_SetBuffer(ulong handle,
-            [MarshalAs(UnmanagedType.LPStr)] string name, IntPtr d3d12ResourcePtr);
-
-        /// <summary>Binds an RW buffer (UAV) by HLSL variable name. Returns 1 on success.</summary>
-        [DllImport(DllName)]
-        public static extern int NR_CS_SetRWBuffer(ulong handle,
-            [MarshalAs(UnmanagedType.LPStr)] string name, IntPtr d3d12ResourcePtr);
-
-        /// <summary>Binds a texture (SRV) by HLSL variable name. Returns 1 on success.</summary>
-        [DllImport(DllName)]
-        public static extern int NR_CS_SetTexture(ulong handle,
-            [MarshalAs(UnmanagedType.LPStr)] string name, IntPtr d3d12ResourcePtr);
-
-        /// <summary>Binds an RW texture (UAV) by HLSL variable name. Returns 1 on success.</summary>
-        [DllImport(DllName)]
-        public static extern int NR_CS_SetRWTexture(ulong handle,
-            [MarshalAs(UnmanagedType.LPStr)] string name, IntPtr d3d12ResourcePtr);
-
-        /// <summary>Binds a constant buffer (CBV) by HLSL variable name. Returns 1 on success.</summary>
-        [DllImport(DllName)]
-        public static extern int NR_CS_SetConstantBuffer(ulong handle,
-            [MarshalAs(UnmanagedType.LPStr)] string name, IntPtr d3d12ResourcePtr);
-
-        /// <summary>Binds a StructuredBuffer by HLSL variable name, with explicit element count and stride. Returns 1 on success.</summary>
-        [DllImport(DllName)]
-        public static extern int NR_CS_SetStructuredBuffer(ulong handle,
-            [MarshalAs(UnmanagedType.LPStr)] string name, IntPtr d3d12ResourcePtr,
-            uint elementCount, uint elementStride);
-
-        /// <summary>Binds an RWStructuredBuffer (UAV) by HLSL variable name, with explicit element count and stride. Returns 1 on success.</summary>
-        [DllImport(DllName)]
-        public static extern int NR_CS_SetRWStructuredBuffer(ulong handle,
-            [MarshalAs(UnmanagedType.LPStr)] string name, IntPtr d3d12ResourcePtr,
-            uint elementCount, uint elementStride);
-
-        /// <summary>Binds a BindlessTexture to an unbounded Texture2D[] variable by name. Returns 1 on success.</summary>
-        [DllImport(DllName)]
-        public static extern int NR_CS_SetBindlessTexture(ulong handle,
-            [MarshalAs(UnmanagedType.LPStr)] string name, ulong btHandle);
-
-        /// <summary>Binds a BindlessBuffer to an unbounded ByteAddressBuffer[] variable by name. Returns 1 on success.</summary>
-        [DllImport(DllName)]
-        public static extern int NR_CS_SetBindlessBuffer(ulong handle,
-            [MarshalAs(UnmanagedType.LPStr)] string name, ulong bbHandle);
-
-        /// <summary>Binds a RaytracingAccelerationStructure (TLAS) by HLSL variable name. Returns 1 on success.</summary>
-        [DllImport(DllName)]
-        public static extern int NR_CS_SetAccelerationStructure(ulong handle,
-            [MarshalAs(UnmanagedType.LPStr)] string name, IntPtr tlasd3d12Ptr);
+        public static extern uint NR_CS_GetBindingCount(ulong handle);
 
         /// <summary>
-        /// Preferred: binds by AccelerationStructure handle. The TLAS pointer is resolved dynamically at
-        /// Dispatch time, so a full TLAS rebuild (new buffer) is always picked up in the same frame.
+        /// Returns the slot index (0-based) for a given HLSL variable name.
+        /// Returns uint.MaxValue if the name is not found.
         /// </summary>
         [DllImport(DllName)]
-        public static extern int NR_CS_SetAccelerationStructureHandle(ulong shaderHandle,
-            [MarshalAs(UnmanagedType.LPStr)] string name, ulong asHandle);
+        public static extern uint NR_CS_GetSlotIndex(ulong handle,
+            [MarshalAs(UnmanagedType.LPStr)] string name);
 
         /// <summary>Returns the render event callback pointer for compute dispatches.</summary>
         [DllImport(DllName)]
@@ -401,9 +353,28 @@ namespace NativeRender
         [DllImport(DllName)]
         public static extern uint NR_CS_GetRenderEventDataSize();
 
+        // -----------------------------------------------------------------------
+        // CS data structures passed through IssuePluginEventAndData
+        // -----------------------------------------------------------------------
+
+        /// <summary>
+        /// One slot per reflected binding. Filled on the main thread; read on the render thread.
+        /// Must match C++ CS_BindingSlot exactly (Pack=4, 32 bytes).
+        /// </summary>
+        [StructLayout(LayoutKind.Sequential, Pack = 4)]
+        public struct CS_BindingSlot
+        {
+            public ulong  resourcePtr;   // ID3D12Resource* (may be 0)
+            public ulong  objectPtr;     // AccelerationStructure* | BindlessTexture* | BindlessBuffer*
+            public uint   count;         // element count  (StructuredBuffer)
+            public uint   stride;        // element stride (StructuredBuffer; 0 = raw)
+            public uint   objectKind;    // 0=none, 1=AccelStruct, 2=BindlessTexture, 3=BindlessBuffer
+            public uint   _pad;
+        }
+
         /// <summary>
         /// Event data for NR_CS_GetRenderEventFunc dispatches.
-        /// Must match C++ CS_RenderEventData exactly (Pack=4).
+        /// Must match C++ CS_RenderEventData exactly (Pack=4, 32 bytes).
         /// </summary>
         [StructLayout(LayoutKind.Sequential, Pack = 4)]
         public struct CS_RenderEventData
@@ -412,6 +383,8 @@ namespace NativeRender
             public uint   threadGroupX;
             public uint   threadGroupY;
             public uint   threadGroupZ;
+            public uint   bindingCount;
+            public ulong  bindingSlotsPtr; // pointer to CS_BindingSlot[] in pinned NativeArray
         }
 
         // -----------------------------------------------------------------------
