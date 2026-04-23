@@ -107,4 +107,130 @@ namespace NativeRender
             };
         }
     }
+
+    // =========================================================================
+    // Merged-BLAS jobs
+    // =========================================================================
+
+    /// <summary>
+    /// Transforms local-space positions to world space and writes them into a
+    /// contiguous sub-array of the merged VB.
+    /// </summary>
+    [BurstCompile]
+    internal struct TransformVerticesJob : IJobParallelFor
+    {
+        [ReadOnly] public NativeArray<float3> LocalPositions;
+        public float4x4 LocalToWorld;
+
+        [NativeDisableContainerSafetyRestriction]
+        public NativeArray<float3> Output; // mergedVB.GetSubArray(vertBase, vertCount)
+
+        public void Execute(int i)
+        {
+            Output[i] = math.transform(LocalToWorld, LocalPositions[i]);
+        }
+    }
+
+    /// <summary>
+    /// Remaps submesh-local indices to global merged-VB indices
+    /// (output[i] = vertBase + localIndices[i]).
+    /// </summary>
+    [BurstCompile]
+    internal struct RemapIndicesJob : IJobParallelFor
+    {
+        [ReadOnly] public NativeArray<int> LocalIndices;
+        public int VertBase;
+
+        [NativeDisableContainerSafetyRestriction]
+        public NativeArray<uint> Output; // mergedIB.GetSubArray(iBase, indexCount)
+
+        public void Execute(int i)
+        {
+            Output[i] = (uint)(VertBase + LocalIndices[i]);
+        }
+    }
+
+    /// <summary>
+    /// Fills <see cref="PrimitiveDataNRD"/> for merged-BLAS geometry.
+    /// Normals are transformed to world space via <see cref="NormalMatrix"/>
+    /// (inverse-transpose of LocalToWorld); tangents via the upper-3×3 of
+    /// <see cref="LocalToWorld"/>.
+    /// </summary>
+    [BurstCompile]
+    internal struct BuildMergedPrimitivesJob : IJobParallelFor
+    {
+        [ReadOnly] public NativeArray<int>    Indices;        // local submesh indices
+        [ReadOnly] public NativeArray<float3> LocalPositions;
+        [ReadOnly] public NativeArray<float3> LocalNormals;
+        [ReadOnly] public NativeArray<float4> LocalTangents;
+        [ReadOnly] public NativeArray<float2> UVs;
+
+        public bool HasN;
+        public bool HasT;
+        public bool HasUV;
+
+        public float4x4 LocalToWorld;   // for positions + tangent direction
+        public float4x4 NormalMatrix;   // inverse-transpose, for normal direction
+
+        [NativeDisableContainerSafetyRestriction]
+        public NativeArray<PrimitiveDataNRD> Output;
+
+        public void Execute(int triIdx)
+        {
+            int i0 = Indices[triIdx * 3];
+            int i1 = Indices[triIdx * 3 + 1];
+            int i2 = Indices[triIdx * 3 + 2];
+
+            // World-space positions.
+            float3 p0 = math.transform(LocalToWorld, LocalPositions[i0]);
+            float3 p1 = math.transform(LocalToWorld, LocalPositions[i1]);
+            float3 p2 = math.transform(LocalToWorld, LocalPositions[i2]);
+
+            float2 uv0 = HasUV ? UVs[i0] : float2.zero;
+            float2 uv1 = HasUV ? UVs[i1] : float2.zero;
+            float2 uv2 = HasUV ? UVs[i2] : float2.zero;
+
+            float  worldArea = 0.5f * math.length(math.cross(p1 - p0, p2 - p0));
+            float2 du1       = uv1 - uv0;
+            float2 du2       = uv2 - uv0;
+            float  uvArea    = 0.5f * math.abs(du1.x * du2.y - du1.y * du2.x);
+
+            // World-space normals via normal matrix (inverse-transpose).
+            float3x3 nm  = new float3x3(NormalMatrix);
+            float3   rn0 = HasN ? math.mul(nm, LocalNormals[i0]) : new float3(0f, 1f, 0f);
+            float3   rn1 = HasN ? math.mul(nm, LocalNormals[i1]) : new float3(0f, 1f, 0f);
+            float3   rn2 = HasN ? math.mul(nm, LocalNormals[i2]) : new float3(0f, 1f, 0f);
+            float3   n0  = math.lengthsq(rn0) > 1e-12f ? math.normalize(rn0) : new float3(0f, 1f, 0f);
+            float3   n1  = math.lengthsq(rn1) > 1e-12f ? math.normalize(rn1) : new float3(0f, 1f, 0f);
+            float3   n2  = math.lengthsq(rn2) > 1e-12f ? math.normalize(rn2) : new float3(0f, 1f, 0f);
+
+            // World-space tangent directions via upper-3×3 of LocalToWorld.
+            float3x3 m33  = new float3x3(LocalToWorld);
+            float4   t0Raw = HasT ? LocalTangents[i0] : new float4(1f, 0f, 0f, 1f);
+            float4   t1Raw = HasT ? LocalTangents[i1] : new float4(1f, 0f, 0f, 1f);
+            float4   t2Raw = HasT ? LocalTangents[i2] : new float4(1f, 0f, 0f, 1f);
+            float3   td0   = math.mul(m33, t0Raw.xyz);
+            float3   td1   = math.mul(m33, t1Raw.xyz);
+            float3   td2   = math.mul(m33, t2Raw.xyz);
+            float3   t0    = math.lengthsq(td0) > 1e-12f ? math.normalize(td0) : new float3(1f, 0f, 0f);
+            float3   t1    = math.lengthsq(td1) > 1e-12f ? math.normalize(td1) : new float3(1f, 0f, 0f);
+            float3   t2    = math.lengthsq(td2) > 1e-12f ? math.normalize(td2) : new float3(1f, 0f, 0f);
+
+            Output[triIdx] = new PrimitiveDataNRD
+            {
+                uv0           = new half2(uv0),
+                uv1           = new half2(uv1),
+                uv2           = new half2(uv2),
+                worldArea     = worldArea,
+                n0            = PrimitiveMathUtil.EncodeUnitVectorSigned(n0),
+                n1            = PrimitiveMathUtil.EncodeUnitVectorSigned(n1),
+                n2            = PrimitiveMathUtil.EncodeUnitVectorSigned(n2),
+                uvArea        = uvArea,
+                t0            = PrimitiveMathUtil.EncodeUnitVectorSigned(t0),
+                t1            = PrimitiveMathUtil.EncodeUnitVectorSigned(t1),
+                t2            = PrimitiveMathUtil.EncodeUnitVectorSigned(t2),
+                bitangentSign = -t0Raw.w,
+            };
+        }
+    }
 }

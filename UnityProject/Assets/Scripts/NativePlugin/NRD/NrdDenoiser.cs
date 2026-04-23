@@ -39,18 +39,19 @@ namespace Nrd
         /// </summary>
         public struct NrdFrameInput
         {
-            public Matrix4x4 worldToView;
-            public Matrix4x4 prevWorldToView;
-            public Matrix4x4 viewToClip;
-            public Matrix4x4 prevViewToClip;
-            public float2    viewportJitter;
-            public float2    prevViewportJitter;
-            public float     resolutionScale;
-            public float     prevResolutionScale;
-            public int2      renderResolution;
-            public uint      frameIndex;
-            public float3    lightDirection;
-            
+            public Matrix4x4        worldToView;
+            public Matrix4x4        prevWorldToView;
+            public Matrix4x4        viewToClip;
+            public Matrix4x4        prevViewToClip;
+            public float2           viewportJitter;
+            public float2           prevViewportJitter;
+            public float            resolutionScale;
+            public float            prevResolutionScale;
+            public int2             renderResolution;
+            public uint             frameIndex;
+            public float3           lightDirection;
+            public CheckerboardMode checkerboardMode;
+
         }
 
 
@@ -197,7 +198,7 @@ namespace Nrd
                     case Denoiser.REBLUR_DIFFUSE_DIRECTIONAL_OCCLUSION:
                     {
                         var s = ReblurSettings._default;
-                        s.checkerboardMode       = CheckerboardMode.OFF;
+                        s.checkerboardMode       = fi.checkerboardMode;
                         s.minMaterialForDiffuse  = 0;
                         s.minMaterialForSpecular = 1;
                         entry.Write(s);

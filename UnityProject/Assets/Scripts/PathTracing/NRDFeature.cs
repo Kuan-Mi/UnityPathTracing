@@ -69,7 +69,7 @@ namespace PathTracing
         public override void Create()
         {
             if (_nrdSampleResource == null)
-                _nrdSampleResource = new NRDSampleResource(false);
+                _nrdSampleResource = new NRDSampleResource(setting.mergeBlas);
 
             if (_hashEntriesBuffer == null)
                 InitializeBuffers();
@@ -172,6 +172,7 @@ namespace PathTracing
                 return;
             }
 
+            _nrdSampleResource.MergeBlas = setting.mergeBlas;
             _nrdSampleResource?.UpdateForFrame();
 
             var uniqueKey = cam.GetInstanceID() + (eyeIndex * 100000L);
@@ -355,6 +356,7 @@ namespace PathTracing
                     renderResolution    = frameState.renderResolution,
                     frameIndex          = curFrame,
                     lightDirection      = lightDir,
+                    checkerboardMode    = setting.tracingMode == RESOLUTION.RESOLUTION_HALF? CheckerboardMode.BLACK : CheckerboardMode.OFF,
                 };
 
                 _nrdPass.Setup(nrd.GetInteropDataPtr(nrdInput));
@@ -472,7 +474,7 @@ namespace PathTracing
                     resolutionScale = frameState.resolutionScale,
                     enableDlssRR    = false,
                     showMV          = false,
-                    showValidation  = true,
+                    showValidation  = setting.showValidation,
                     showReference   = false,
                 });
                 renderer.EnqueuePass(_outputBlitPass);
