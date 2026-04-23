@@ -103,8 +103,8 @@ namespace NativeRender
         private BindlessTexture _textures;
 
         // ----- CPU mirrors -----
-        private InstanceDataNRD[]  _instanceCpu;
-        private PrimitiveDataNRD[] _primitiveCpu;
+        private InstanceDataNRD[]                _instanceCpu;
+        private NativeArray<PrimitiveDataNRD> _primitiveCpu;
 
         // ----- Separate-BLAS per-target tracking -----
 
@@ -284,8 +284,8 @@ namespace NativeRender
 
             _perTargetBlas.Clear();
 
-            _instanceCpu  = null;
-            _primitiveCpu = null;
+            _instanceCpu = null;
+            if (_primitiveCpu.IsCreated) { _primitiveCpu.Dispose(); _primitiveCpu = default; }
             _materialSlots.Clear();
         }
 
@@ -381,7 +381,7 @@ namespace NativeRender
                 if (instList.Count == 0) instList.Add(default);
                 if (primList.Count == 0) primList.Add(default);
                 _instanceCpu  = instList.ToArray();
-                _primitiveCpu = primList.ToArray();
+                _primitiveCpu = new NativeArray<PrimitiveDataNRD>(primList.ToArray(), Allocator.Persistent);
 
                 _instanceDataBuf = new GraphicsBuffer(GraphicsBuffer.Target.Structured,
                     _instanceCpu.Length, Marshal.SizeOf<InstanceDataNRD>());
@@ -412,26 +412,48 @@ namespace NativeRender
         /// Non-merged path: one BLAS per MeshRenderer (using the mesh's native VB/IB).
         /// TLAS transform = localToWorldMatrix. InstanceID = firstSubmeshIndex in _instanceDataBuf.
         /// </summary>
+        // Count triangles for a group without building full validPairs — used to pre-allocate _primitiveCpu.
+        private static int CountGroupTriangles(List<NativeRayTracingTarget> group)
+        {
+            int count = 0;
+            foreach (var t in group)
+            {
+                if (t == null) continue;
+                var mf = t.GetComponent<MeshFilter>();
+                if (mf == null || mf.sharedMesh == null) continue;
+                Mesh mesh = mf.sharedMesh;
+                for (int s = 0; s < mesh.subMeshCount; s++)
+                    count += (int)mesh.GetIndexCount(s) / 3;
+            }
+            return count;
+        }
+
         private void BuildSeparateBlas(
             List<NativeRayTracingTarget> opaque,
             List<NativeRayTracingTarget> transparent,
             List<NativeRayTracingTarget> emissive
         )
         {
-            uint                   instanceCursor  = 0;
-            uint                   primitiveCursor = 0;
-            List<InstanceDataNRD>  instList        = new List<InstanceDataNRD>();
-            List<PrimitiveDataNRD> primList        = new List<PrimitiveDataNRD>();
-            List<IntPtr>           texPtrs         = new List<IntPtr>();
-            
+            uint                  instanceCursor  = 0;
+            uint                  primitiveCursor = 0;
+            List<InstanceDataNRD> instList        = new List<InstanceDataNRD>();
+            List<IntPtr>          texPtrs         = new List<IntPtr>();
+
+            // Pre-allocate _primitiveCpu so jobs can write directly into it.
+            int totalPrims = CountGroupTriangles(opaque)
+                           + CountGroupTriangles(transparent)
+                           + CountGroupTriangles(emissive);
+            _primitiveCpu = new NativeArray<PrimitiveDataNRD>(
+                Mathf.Max(totalPrims, 1), Allocator.Persistent, NativeArrayOptions.UninitializedMemory);
+
             // Process ordered opaque → transparent → emissive (emissive targets were also added to
             // opaque already; they get a second separate entry in the light TLAS).
             ProcessSeparateGroup(opaque, _worldAS, FLAG_STATIC | FLAG_NON_TRANSPARENT,
-                ref instanceCursor, ref primitiveCursor, instList, primList, texPtrs);
+                ref instanceCursor, ref primitiveCursor, instList, _primitiveCpu, texPtrs);
             ProcessSeparateGroup(transparent, _worldAS, FLAG_STATIC | FLAG_TRANSPARENT,
-                ref instanceCursor, ref primitiveCursor, instList, primList, texPtrs);
+                ref instanceCursor, ref primitiveCursor, instList, _primitiveCpu, texPtrs);
             ProcessSeparateGroup(emissive, _lightAS, FLAG_STATIC | FLAG_NON_TRANSPARENT | FLAG_EMISSIVE,
-                ref instanceCursor, ref primitiveCursor, instList, primList, texPtrs);
+                ref instanceCursor, ref primitiveCursor, instList, _primitiveCpu, texPtrs);
 
             // Texture array.
             int texCount = Mathf.Max(texPtrs.Count, 1);
@@ -441,9 +463,7 @@ namespace NativeRender
 
             // Instance / primitive GPU buffers.
             if (instList.Count == 0) instList.Add(default);
-            if (primList.Count == 0) primList.Add(default);
-            _instanceCpu  = instList.ToArray();
-            _primitiveCpu = primList.ToArray();
+            _instanceCpu = instList.ToArray();
 
             _instanceDataBuf = new GraphicsBuffer(GraphicsBuffer.Target.Structured,
                 _instanceCpu.Length, Marshal.SizeOf<InstanceDataNRD>());
@@ -461,12 +481,12 @@ namespace NativeRender
             ref uint instanceCursor,
             ref uint primitiveCursor,
             List<InstanceDataNRD> instList,
-            List<PrimitiveDataNRD> primList,
+            NativeArray<PrimitiveDataNRD> primOutput,
             List<IntPtr> texPtrs)
         {
             var swTotal = Stopwatch.StartNew();
 
-            // First pass: collect valid pairs, build mesh list, count total triangles.
+            // First pass: collect valid pairs and build mesh list.
             var validPairs    = new List<(NativeRayTracingTarget target, MeshRenderer mr, Mesh mesh, int meshIndex)>(group.Count);
             var meshList      = new List<Mesh>(group.Count);
             int totalTriCount = 0;
@@ -487,9 +507,6 @@ namespace NativeRender
                 meshList.Add(mesh);
             }
 
-            if (primList.Capacity < primList.Count + totalTriCount)
-                primList.Capacity = primList.Count + totalTriCount;
-
             if (validPairs.Count == 0)
             {
                 swTotal.Stop();
@@ -497,17 +514,12 @@ namespace NativeRender
                 return;
             }
 
-            // Flat output array for all primitives in this group — filled by Burst jobs.
-            var primNative = new NativeArray<PrimitiveDataNRD>(
-                totalTriCount, Allocator.TempJob, NativeArrayOptions.UninitializedMemory);
-
             // Single AcquireReadOnlyMeshData call for all meshes.
             var meshDataArr = Mesh.AcquireReadOnlyMeshData(meshList);
 
             // Per-job tracking — kept alive until all jobs Complete().
             var jobHandles = new List<JobHandle>(validPairs.Count * 4);
             var tempArrays = new List<System.IDisposable>(validPairs.Count * 5);
-            int localPrimOffset = 0; // local offset within primNative for the current submesh
 
             foreach (var (target, mr, mesh, meshIndex) in validPairs)
             {
@@ -581,6 +593,7 @@ namespace NativeRender
                     tempArrays.Add(nativeTris);
 
                     // Schedule Burst job for this submesh's triangle range.
+                    // primitiveOffsetForSubMesh is the absolute offset into _primitiveCpu.
                     var job = new BuildPrimitivesJob
                     {
                         Indices   = nativeTris,
@@ -591,12 +604,11 @@ namespace NativeRender
                         HasN      = hasN,
                         HasT      = hasT,
                         HasUV     = hasUV,
-                        Output    = primNative.GetSubArray(localPrimOffset, triCount),
+                        Output    = primOutput.GetSubArray((int)primitiveOffsetForSubMesh, triCount),
                     };
                     jobHandles.Add(job.Schedule(triCount, 64));
 
-                    localPrimOffset  += triCount;
-                    primitiveCursor  += (uint)triCount;
+                    primitiveCursor += (uint)triCount;
 
                     // InstanceDataNRD is built on the main thread (depends on material + transform).
                     uint baseTextureIndex = (uint)(subMatIdx * TexturesPerMaterial);
@@ -639,12 +651,6 @@ namespace NativeRender
                 arr.Dispose();
 
             meshDataArr.Dispose();
-
-            // Append the Burst-computed primitives to the managed list.
-            for (int i = 0; i < primNative.Length; i++)
-                primList.Add(primNative[i]);
-
-            primNative.Dispose();
 
             swTotal.Stop();
             Debug.Log($"[ProcessSeparateGroup] Total: {swTotal.Elapsed.TotalMilliseconds:F2} ms  ({validPairs.Count} renderers, {totalTriCount} tris, flags=0x{baseFlags:X})");
