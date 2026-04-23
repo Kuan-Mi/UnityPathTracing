@@ -24,6 +24,7 @@
 #include "BindlessTexture.h"
 #include "BindlessBuffer.h"
 #include "D3D12HeapHook.h"
+#include "PluginInternal.h"
 
 using Microsoft::WRL::ComPtr;
 
@@ -85,6 +86,19 @@ static void EnqueueDeferredDelete(void* ptr, DeferredType type)
     s_DeferredDeleteQueue.push_back({ ptr, type, s_DeletionFenceValue + kDeleteDelay });
 }
 
+// ---------------------------------------------------------------------------
+// Deferred descriptor-range free queue — same fence, separate from object
+// deletion so BindlessTexture::Resize() doesn't need to know about DeferredType.
+// ---------------------------------------------------------------------------
+struct DeferredRangeFreeEntry
+{
+    DescriptorHeapAllocator* alloc;
+    uint32_t                 base;
+    uint32_t                 count;
+    uint64_t                 safeAfterValue;
+};
+static std::list<DeferredRangeFreeEntry> s_DeferredRangeFreeQueue; // guarded by s_DeferredDeleteMutex
+
 static void DrainDeferredDeletes(bool force = false)
 {
     std::lock_guard<std::mutex> lk(s_DeferredDeleteMutex);
@@ -99,6 +113,32 @@ static void DrainDeferredDeletes(bool force = false)
         else
             ++it;
     }
+    for (auto it = s_DeferredRangeFreeQueue.begin(); it != s_DeferredRangeFreeQueue.end(); )
+    {
+        if (force || it->safeAfterValue <= completed)
+        {
+            it->alloc->Free(it->base, it->count);
+            it = s_DeferredRangeFreeQueue.erase(it);
+        }
+        else
+            ++it;
+    }
+}
+
+void NR_EnqueueDescriptorRangeFree(DescriptorHeapAllocator* alloc,
+                                   uint32_t                 base,
+                                   uint32_t                 count)
+{
+    if (!alloc || count == 0) return;
+    if (!s_DeletionFence)
+    {
+        // Fence not yet available (pre-init path) — free immediately.
+        alloc->Free(base, count);
+        return;
+    }
+    std::lock_guard<std::mutex> lk(s_DeferredDeleteMutex);
+    s_DeferredRangeFreeQueue.push_back({ alloc, base, count,
+                                         s_DeletionFenceValue + kDeleteDelay });
 }
 
 // ---------------------------------------------------------------------------

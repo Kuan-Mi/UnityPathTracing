@@ -118,7 +118,7 @@ namespace NativeRender
         private BindlessTexture _textures;
 
         // ----- CPU mirrors -----
-        private InstanceDataNRD[]                _instanceCpu;
+        private InstanceDataNRD[]             _instanceCpu;
         private NativeArray<PrimitiveDataNRD> _primitiveCpu;
 
         // ----- Separate-BLAS per-target tracking -----
@@ -146,6 +146,9 @@ namespace NativeRender
 
             /// <summary>Triangle count for each submesh (matches primitiveOffsets length).</summary>
             public int[] primitiveCounts;
+
+            /// <summary>Material for each submesh — used to release material refs when the target is removed.</summary>
+            public Material[] submeshMaterials;
         }
 
         // Keyed by MeshRenderer.GetInstanceID()
@@ -161,7 +164,13 @@ namespace NativeRender
         private const uint  kFragMinFreeCount = 10_000;
 
         // ----- Tracking for dirty-detection -----
-        private readonly Dictionary<Material, int>    _materialSlots     = new();
+        private readonly Dictionary<Material, int> _materialSlots = new();
+
+        // Reference counts per material slot (how many submeshes reference it).
+        private readonly Dictionary<Material, int> _materialRefCounts = new();
+
+        // Freed material slot indices available for reuse (each slot = TexturesPerMaterial descriptors).
+        private readonly Queue<int> _freeMatSlots = new();
 
         private bool _sceneDirty = true;
         private bool _disposed;
@@ -189,8 +198,17 @@ namespace NativeRender
         {
             var targets = NativeRayTracingTarget.All;
 
-            // Consume all pending Add/Remove events submitted by NativeRayTracingTarget lifecycle callbacks.
-            DrainChangeQueue();
+            if (_mergeBlas)
+            {
+                // Merged mode: any structural change needs a full rebuild.
+                // Drain both queues without inspecting contents.
+                if (NativeRayTracingTarget.RemoveQueue.Count > 0 || NativeRayTracingTarget.AddQueue.Count > 0)
+                {
+                    NativeRayTracingTarget.RemoveQueue.Clear();
+                    NativeRayTracingTarget.AddQueue.Clear();
+                    _sceneDirty = true;
+                }
+            }
 
             if (_sceneDirty)
             {
@@ -199,8 +217,14 @@ namespace NativeRender
                     if (t != null)
                         t.transform.hasChanged = false;
                 _sceneDirty = false;
+                
+                NativeRayTracingTarget.RemoveQueue.Clear();
+                NativeRayTracingTarget.AddQueue.Clear();
                 return;
             }
+
+            // Consume all pending Add/Remove events submitted by NativeRayTracingTarget lifecycle callbacks.
+            DrainChangeQueue();
 
             if (AnyTransformChanged(targets))
             {
@@ -230,19 +254,6 @@ namespace NativeRender
         /// </summary>
         private void DrainChangeQueue()
         {
-            if (_mergeBlas)
-            {
-                // Merged mode: any structural change needs a full rebuild.
-                // Drain both queues without inspecting contents.
-                if (NativeRayTracingTarget.RemoveQueue.Count > 0 || NativeRayTracingTarget.AddQueue.Count > 0)
-                {
-                    NativeRayTracingTarget.RemoveQueue.Clear();
-                    NativeRayTracingTarget.AddQueue.Clear();
-                    _sceneDirty = true;
-                }
-                return;
-            }
-
             // Separate mode — process removals first so freed slots can be reused by additions.
             while (NativeRayTracingTarget.RemoveQueue.Count > 0)
             {
@@ -257,19 +268,8 @@ namespace NativeRender
                 // Target or Renderer may be null if the object was destroyed before we consumed the event.
                 if (ev.Target == null || ev.Renderer == null) continue;
 
-                // If the target introduces a new material we can't grow _textures
-                // incrementally — fall back to a full rebuild.
-                bool hasNewMaterial = false;
-                foreach (var mat in ev.Renderer.sharedMaterials)
-                    if (mat != null && !_materialSlots.ContainsKey(mat)) { hasNewMaterial = true; break; }
-
-                if (hasNewMaterial)
-                {
-                    _sceneDirty = true;
-                    // Drain the rest of the add queue — rebuild will cover them all.
-                    NativeRayTracingTarget.AddQueue.Clear();
-                    return;
-                }
+                // New materials are handled incrementally by GetOrAddMaterial (called inside
+                // AddTargetIncremental), which grows _textures in-place if needed — no full rebuild.
 
                 Material rep           = GetRepresentativeMaterial(ev.Renderer);
                 bool     isTransparent = IsMaterialTransparent(rep);
@@ -284,7 +284,7 @@ namespace NativeRender
 
             // Auto-schedule full rebuild when fragmentation becomes excessive.
             if (_primAlloc.FragmentationRatio > kFragThreshold &&
-                _primAlloc.TotalFreeCount     > kFragMinFreeCount)
+                _primAlloc.TotalFreeCount > kFragMinFreeCount)
             {
                 Debug.Log($"[NRDSampleResource] Primitive buffer fragmentation {_primAlloc.FragmentationRatio:P0} — scheduling full rebuild.");
                 _sceneDirty = true;
@@ -386,13 +386,21 @@ namespace NativeRender
             _perTargetBlas.Clear();
 
             _instanceCpu = null;
-            if (_primitiveCpu.IsCreated) { _primitiveCpu.Dispose(); _primitiveCpu = default; }
+            if (_primitiveCpu.IsCreated)
+            {
+                _primitiveCpu.Dispose();
+                _primitiveCpu = default;
+            }
 
             _instanceAlloc.Reset(0);
             _primAlloc.Reset(0);
 
             if (!preserveTextures)
+            {
                 _materialSlots.Clear();
+                _materialRefCounts.Clear();
+                _freeMatSlots.Clear();
+            }
         }
 
         private static bool AnyTransformChanged(IReadOnlyList<NativeRayTracingTarget> targets)
@@ -450,13 +458,13 @@ namespace NativeRender
 
             if (_mergeBlas)
             {
-                var  instList = new List<InstanceDataNRD>();
-                var  texPtrs  = new List<IntPtr>();
+                var instList = new List<InstanceDataNRD>();
+                var texPtrs  = new List<IntPtr>();
 
                 // Pre-allocate _primitiveCpu so Burst jobs write directly into it.
                 int totalPrimsMerged = CountGroupTriangles(opaque)
-                                     + CountGroupTriangles(transparent)
-                                     + CountGroupTriangles(emissive);
+                                       + CountGroupTriangles(transparent)
+                                       + CountGroupTriangles(emissive);
                 _primitiveCpu = new NativeArray<PrimitiveDataNRD>(
                     Mathf.Max(totalPrimsMerged, 1), Allocator.Persistent, NativeArrayOptions.UninitializedMemory);
 
@@ -530,6 +538,7 @@ namespace NativeRender
                 for (int s = 0; s < mesh.subMeshCount; s++)
                     count += (int)mesh.GetIndexCount(s) / 3;
             }
+
             return count;
         }
 
@@ -546,8 +555,8 @@ namespace NativeRender
 
             // Pre-allocate _primitiveCpu so jobs can write directly into it.
             int totalPrims = CountGroupTriangles(opaque)
-                           + CountGroupTriangles(transparent)
-                           + CountGroupTriangles(emissive);
+                             + CountGroupTriangles(transparent)
+                             + CountGroupTriangles(emissive);
             _primitiveCpu = new NativeArray<PrimitiveDataNRD>(
                 Mathf.Max(totalPrims, 1), Allocator.Persistent, NativeArrayOptions.UninitializedMemory);
 
@@ -645,8 +654,8 @@ namespace NativeRender
                 tlas.SetInstanceTransform(mr, xform);
                 tlas.SetInstanceMask(mr, GetMaskForFlags(baseFlags));
 
-                bool    leftHanded = xform.determinant < 0f;
-                Vector3 sc         = new Vector3(
+                bool leftHanded = xform.determinant < 0f;
+                Vector3 sc = new Vector3(
                     new Vector3(xform.m00, xform.m10, xform.m20).magnitude,
                     new Vector3(xform.m01, xform.m11, xform.m21).magnitude,
                     new Vector3(xform.m02, xform.m12, xform.m22).magnitude);
@@ -668,8 +677,8 @@ namespace NativeRender
                 bool hasT  = meshData.HasVertexAttribute(VertexAttribute.Tangent);
                 bool hasUV = meshData.HasVertexAttribute(VertexAttribute.TexCoord0);
 
-                if (hasN)  meshData.GetNormals(nativeN);
-                if (hasT)  meshData.GetTangents(nativeT);
+                if (hasN) meshData.GetNormals(nativeN);
+                if (hasT) meshData.GetTangents(nativeT);
                 if (hasUV) meshData.GetUVs(0, nativeUV);
 
                 // Reinterpret vertex buffers as Unity.Mathematics types for the Burst job.
@@ -685,15 +694,17 @@ namespace NativeRender
                 tempArrays.Add(nativeUV);
 
                 Material[] sharedMaterials = mr.sharedMaterials;
-                var subPrimOffsets = new uint[subCnt];
-                var subPrimCounts  = new int[subCnt];
+                var        subPrimOffsets  = new uint[subCnt];
+                var        subPrimCounts   = new int[subCnt];
+                var        subMats         = new Material[subCnt];
 
                 for (int sub = 0; sub < subCnt; sub++)
                 {
                     uint primitiveOffsetForSubMesh = primitiveCursor;
 
-                    Material subMat    = (sub < sharedMaterials.Length) ? sharedMaterials[sub] : GetRepresentativeMaterial(mr);
-                    int      subMatIdx = GetOrAddMaterial(subMat, texPtrs);
+                    Material subMat = (sub < sharedMaterials.Length) ? sharedMaterials[sub] : GetRepresentativeMaterial(mr);
+                    subMats[sub] = subMat;
+                    int subMatIdx = GetOrAddMaterial(subMat, texPtrs);
 
                     int indexCount = (int)mesh.GetIndexCount(sub);
                     int triCount   = indexCount / 3;
@@ -751,6 +762,7 @@ namespace NativeRender
                     baseFlags              = baseFlags,
                     primitiveOffsets       = subPrimOffsets,
                     primitiveCounts        = subPrimCounts,
+                    submeshMaterials       = subMats,
                 };
             }
 
@@ -853,6 +865,11 @@ namespace NativeRender
                 for (int sub = 0; sub < info.primitiveOffsets.Length; sub++)
                     _primAlloc.Free(info.primitiveOffsets[sub], info.primitiveCounts[sub]);
 
+            // Release material reference counts; free slots when count reaches zero.
+            if (info.submeshMaterials != null)
+                foreach (var mat in info.submeshMaterials)
+                    ReleaseMaterial(mat);
+
             _perTargetBlas.Remove(rendererInstanceId);
 
             // Upload zeroed instance slots. Partial upload over the contiguous block.
@@ -891,8 +908,8 @@ namespace NativeRender
             tlas.SetInstanceTransform(mr, xform);
             tlas.SetInstanceMask(mr, GetMaskForFlags(baseFlags));
 
-            bool    leftHanded = xform.determinant < 0f;
-            Vector3 sc         = new Vector3(
+            bool leftHanded = xform.determinant < 0f;
+            Vector3 sc = new Vector3(
                 new Vector3(xform.m00, xform.m10, xform.m20).magnitude,
                 new Vector3(xform.m01, xform.m11, xform.m21).magnitude,
                 new Vector3(xform.m02, xform.m12, xform.m22).magnitude);
@@ -905,7 +922,7 @@ namespace NativeRender
             if (instBase == PrimitiveSlotAllocator.InvalidOffset)
             {
                 int newInstCap = Mathf.Max((int)_instanceAlloc.Capacity * 2,
-                                            (int)_instanceAlloc.Capacity + subCnt);
+                    (int)_instanceAlloc.Capacity + subCnt);
                 EnsureInstanceCapacity(newInstCap);
                 instBase = _instanceAlloc.Allocate(subCnt);
             }
@@ -931,8 +948,8 @@ namespace NativeRender
             bool hasN  = meshData.HasVertexAttribute(VertexAttribute.Normal);
             bool hasT  = meshData.HasVertexAttribute(VertexAttribute.Tangent);
             bool hasUV = meshData.HasVertexAttribute(VertexAttribute.TexCoord0);
-            if (hasN)  meshData.GetNormals(nativeN);
-            if (hasT)  meshData.GetTangents(nativeT);
+            if (hasN) meshData.GetNormals(nativeN);
+            if (hasT) meshData.GetTangents(nativeT);
             if (hasUV) meshData.GetUVs(0, nativeUV);
 
             var posF3 = nativePos.Reinterpret<float3>(sizeof(float) * 3);
@@ -944,25 +961,36 @@ namespace NativeRender
             var tempTris   = new List<NativeArray<int>>(subCnt);
 
             Material[] sharedMaterials = mr.sharedMaterials;
+            var        subMaterials    = new Material[subCnt];
+
+            // Pre-calculate total tri count across all submeshes and grow _primitiveCpu
+            // once before scheduling any Burst jobs. Growing inside the loop would
+            // Dispose the NativeArray while already-scheduled jobs still hold pointers
+            // into it, causing NullReferenceException on worker threads.
+            {
+                int totalTriCount = 0;
+                for (int s = 0; s < subCnt; s++)
+                    totalTriCount += (int)(mesh.GetIndexCount(s) / 3);
+                if (_primAlloc.TotalFreeCount < (uint)totalTriCount)
+                {
+                    int newPrimCap = Mathf.Max((int)_primAlloc.Capacity * 2,
+                        (int)_primAlloc.Capacity + totalTriCount);
+                    EnsurePrimitiveCapacity(newPrimCap);
+                }
+            }
 
             for (int sub = 0; sub < subCnt; sub++)
             {
-                Material subMat    = (sub < sharedMaterials.Length) ? sharedMaterials[sub] : GetRepresentativeMaterial(mr);
-                // GetOrAddMaterial with an empty texPtrs list — all materials are already registered.
-                int      subMatIdx = _materialSlots.TryGetValue(subMat, out int existing) ? existing : 0;
+                Material subMat = (sub < sharedMaterials.Length) ? sharedMaterials[sub] : GetRepresentativeMaterial(mr);
+                subMaterials[sub] = subMat;
+                // GetOrAddMaterial(null texPtrs) = incremental path: grows _textures in-place if needed.
+                int subMatIdx = GetOrAddMaterial(subMat, null);
 
-                int  indexCount = (int)mesh.GetIndexCount(sub);
-                int  triCount   = indexCount / 3;
+                int indexCount = (int)mesh.GetIndexCount(sub);
+                int triCount   = indexCount / 3;
 
-                // Allocate primitive slot (may grow the buffer).
+                // Allocate primitive slot — capacity is guaranteed above, should never fail.
                 uint primOffset = _primAlloc.Allocate(triCount);
-                if (primOffset == PrimitiveSlotAllocator.InvalidOffset)
-                {
-                    int newPrimCap = Mathf.Max((int)_primAlloc.Capacity * 2,
-                                               (int)_primAlloc.Capacity + triCount);
-                    EnsurePrimitiveCapacity(newPrimCap);
-                    primOffset = _primAlloc.Allocate(triCount);
-                }
 
                 subPrimOffsets[sub] = primOffset;
                 subPrimCounts[sub]  = triCount;
@@ -1000,13 +1028,16 @@ namespace NativeRender
             }
 
             // Wait for all Burst jobs.
-            var allHandles = new NativeArray<JobHandle>(jobHandles.Count, Allocator.Temp);
+            var allHandles                                           = new NativeArray<JobHandle>(jobHandles.Count, Allocator.Temp);
             for (int i = 0; i < jobHandles.Count; i++) allHandles[i] = jobHandles[i];
             JobHandle.CombineDependencies(allHandles).Complete();
             allHandles.Dispose();
 
             foreach (var arr in tempTris) arr.Dispose();
-            nativePos.Dispose(); nativeN.Dispose(); nativeT.Dispose(); nativeUV.Dispose();
+            nativePos.Dispose();
+            nativeN.Dispose();
+            nativeT.Dispose();
+            nativeUV.Dispose();
             meshDataArr.Dispose();
 
             // Partial GPU uploads — only the ranges we touched.
@@ -1024,6 +1055,7 @@ namespace NativeRender
                 baseFlags              = baseFlags,
                 primitiveOffsets       = subPrimOffsets,
                 primitiveCounts        = subPrimCounts,
+                submeshMaterials       = subMaterials,
             };
         }
 
@@ -1065,6 +1097,7 @@ namespace NativeRender
                 NativeArray<PrimitiveDataNRD>.Copy(_primitiveCpu, newArr, _primitiveCpu.Length);
                 _primitiveCpu.Dispose();
             }
+
             _primitiveCpu = newArr;
 
             _primAlloc.GrowTo(cap);
@@ -1109,7 +1142,7 @@ namespace NativeRender
                 var mf = mr.GetComponent<MeshFilter>();
                 if (mf == null || mf.sharedMesh == null) continue;
                 var mesh = mf.sharedMesh;
-                totalVerts   += mesh.vertexCount;
+                totalVerts += mesh.vertexCount;
                 for (int s = 0; s < mesh.subMeshCount; s++)
                     totalIndices += (int)mesh.GetIndexCount(s);
                 validTargets.Add((t, mr));
@@ -1119,8 +1152,8 @@ namespace NativeRender
             if (totalVerts == 0 || totalIndices == 0) return null;
 
             // Allocate merged VB/IB as NativeArrays so Burst jobs can write into them.
-            var mergedPos = new NativeArray<float3>(totalVerts,   Allocator.TempJob, NativeArrayOptions.UninitializedMemory);
-            var mergedIdx = new NativeArray<uint>  (totalIndices, Allocator.TempJob, NativeArrayOptions.UninitializedMemory);
+            var mergedPos = new NativeArray<float3>(totalVerts, Allocator.TempJob, NativeArrayOptions.UninitializedMemory);
+            var mergedIdx = new NativeArray<uint>(totalIndices, Allocator.TempJob, NativeArrayOptions.UninitializedMemory);
 
             var meshDataArr  = Mesh.AcquireReadOnlyMeshData(meshList);
             var submeshDescs = new List<NativeRenderPlugin.SubmeshDesc>();
@@ -1138,7 +1171,7 @@ namespace NativeRender
                 Matrix4x4 xform        = target.transform.localToWorldMatrix;
                 Matrix4x4 normalMatrix = xform.inverse.transpose;
                 bool      leftHanded   = xform.determinant < 0f;
-                Vector3   sc           = new Vector3(
+                Vector3 sc = new Vector3(
                     new Vector3(xform.m00, xform.m10, xform.m20).magnitude,
                     new Vector3(xform.m01, xform.m11, xform.m21).magnitude,
                     new Vector3(xform.m02, xform.m12, xform.m22).magnitude);
@@ -1156,8 +1189,8 @@ namespace NativeRender
                 bool hasN  = meshData.HasVertexAttribute(VertexAttribute.Normal);
                 bool hasT  = meshData.HasVertexAttribute(VertexAttribute.Tangent);
                 bool hasUV = meshData.HasVertexAttribute(VertexAttribute.TexCoord0);
-                if (hasN)  meshData.GetNormals(localN);
-                if (hasT)  meshData.GetTangents(localT);
+                if (hasN) meshData.GetNormals(localN);
+                if (hasT) meshData.GetTangents(localT);
                 if (hasUV) meshData.GetUVs(0, localUV);
 
                 var posF3 = localPos.Reinterpret<float3>(sizeof(float) * 3);
@@ -1252,7 +1285,7 @@ namespace NativeRender
             }
 
             // Wait for all jobs.
-            var allHandles = new NativeArray<JobHandle>(jobHandles.Count, Allocator.Temp);
+            var allHandles                                           = new NativeArray<JobHandle>(jobHandles.Count, Allocator.Temp);
             for (int i = 0; i < jobHandles.Count; i++) allHandles[i] = jobHandles[i];
             JobHandle.CombineDependencies(allHandles).Complete();
             allHandles.Dispose();
@@ -1265,7 +1298,7 @@ namespace NativeRender
             {
                 vertexCount  = (uint)totalVerts,
                 submeshDescs = submeshDescs.ToArray(),
-                vb           = new GraphicsBuffer(GraphicsBuffer.Target.Structured, totalVerts,   sizeof(float) * 3),
+                vb           = new GraphicsBuffer(GraphicsBuffer.Target.Structured, totalVerts, sizeof(float) * 3),
                 ib           = new GraphicsBuffer(GraphicsBuffer.Target.Structured, totalIndices, sizeof(uint)),
             };
             blas.vb.SetData(mergedPos);
@@ -1337,19 +1370,115 @@ namespace NativeRender
             return (mats != null && mats.Length > 0) ? mats[0] : null;
         }
 
+        /// <summary>
+        /// Returns the material slot index for <paramref name="mat"/>, registering it if new.
+        /// <para>
+        /// <b>Bulk path</b> (<paramref name="texPtrs"/> != null): appends 4 native texture pointers
+        /// to <paramref name="texPtrs"/>; the caller creates <see cref="_textures"/> afterwards.
+        /// </para>
+        /// <para>
+        /// <b>Incremental path</b> (<paramref name="texPtrs"/> == null): writes directly into
+        /// <see cref="_textures"/>, growing it via <see cref="BindlessTexture.Resize"/> as needed.
+        /// Reuses freed slots from <see cref="_freeMatSlots"/> before appending.
+        /// </para>
+        /// Always increments the material reference count.
+        /// </summary>
         private int GetOrAddMaterial(Material mat, List<IntPtr> texPtrs)
         {
+            // Already registered — bump ref count and return existing slot.
             if (mat != null && _materialSlots.TryGetValue(mat, out int existing))
+            {
+                _materialRefCounts[mat] = (_materialRefCounts.TryGetValue(mat, out int rc) ? rc : 0) + 1;
                 return existing;
+            }
 
-            int idx                              = _materialSlots.Count;
-            if (mat != null) _materialSlots[mat] = idx;
+            // Determine slot index: reuse a freed slot if one is available.
+            int idx;
+            if (_freeMatSlots.Count > 0)
+            {
+                idx = _freeMatSlots.Dequeue();
+            }
+            else if (texPtrs != null)
+            {
+                // Bulk build path: next sequential slot based on how many materials are already known.
+                idx = _materialSlots.Count;
+            }
+            else
+            {
+                // Incremental path: derive from current _textures capacity.
+                idx = _textures != null ? _textures.Capacity / TexturesPerMaterial : _materialSlots.Count;
+            }
 
-            AppendTexture(TryGetTex(mat, "_BaseMap"), PlaceholderKind.White, texPtrs);
-            AppendTexture(TryGetTex(mat, "_MetallicGlossMap"), PlaceholderKind.Black, texPtrs);
-            AppendTexture(TryGetTex(mat, "_BumpMap"), PlaceholderKind.FlatNormal, texPtrs);
-            AppendTexture(TryGetTex(mat, "_EmissionMap"), PlaceholderKind.Black, texPtrs);
+            if (mat != null)
+            {
+                _materialSlots[mat]     = idx;
+                _materialRefCounts[mat] = 1;
+            }
+
+            if (texPtrs != null)
+            {
+                // Bulk build path: append raw pointers; caller will create _textures.
+                AppendTexture(TryGetTex(mat, "_BaseMap"), PlaceholderKind.White, texPtrs);
+                AppendTexture(TryGetTex(mat, "_MetallicGlossMap"), PlaceholderKind.Black, texPtrs);
+                AppendTexture(TryGetTex(mat, "_BumpMap"), PlaceholderKind.FlatNormal, texPtrs);
+                AppendTexture(TryGetTex(mat, "_EmissionMap"), PlaceholderKind.Black, texPtrs);
+            }
+            else if (_textures != null)
+            {
+                // Incremental path: write directly into the live descriptor array.
+                int base4 = idx * TexturesPerMaterial;
+                int need  = base4 + TexturesPerMaterial;
+                if (need > _textures.Capacity)
+                {
+                    Debug.Log($"[NRDSampleResource] Growing _textures from capacity {_textures.Capacity} to {need} to accommodate new material '{mat.name}'");
+                    _textures.Resize(need);
+                }
+
+                _textures.SetNativePtr(base4 + 0, NativePtrOf(TryGetTex(mat, "_BaseMap"), PlaceholderKind.White));
+                _textures.SetNativePtr(base4 + 1, NativePtrOf(TryGetTex(mat, "_MetallicGlossMap"), PlaceholderKind.Black));
+                _textures.SetNativePtr(base4 + 2, NativePtrOf(TryGetTex(mat, "_BumpMap"), PlaceholderKind.FlatNormal));
+                _textures.SetNativePtr(base4 + 3, NativePtrOf(TryGetTex(mat, "_EmissionMap"), PlaceholderKind.Black));
+            }
+
             return idx;
+        }
+
+        /// <summary>
+        /// Decrements the reference count for <paramref name="mat"/>.
+        /// When the count reaches zero, the material slot is freed:
+        /// its 4 descriptor entries are cleared to null SRVs and the slot index
+        /// is enqueued in <see cref="_freeMatSlots"/> for future reuse.
+        /// </summary>
+        private void ReleaseMaterial(Material mat)
+        {
+            if (mat == null || !_materialSlots.TryGetValue(mat, out int slotIdx)) return;
+
+            int newRc = _materialRefCounts.GetValueOrDefault(mat, 1) - 1;
+            if (newRc > 0)
+            {
+                _materialRefCounts[mat] = newRc;
+                return;
+            }
+
+            // Reference count hit zero — free the slot.
+            _materialSlots.Remove(mat);
+            _materialRefCounts.Remove(mat);
+            _freeMatSlots.Enqueue(slotIdx);
+
+            // Write null SRVs so stale GPU resources don't linger.
+            if (_textures != null)
+            {
+                int base4 = slotIdx * TexturesPerMaterial;
+                for (int i = 0; i < TexturesPerMaterial; i++)
+                    _textures.SetNativePtr(base4 + i, IntPtr.Zero);
+            }
+        }
+
+        /// <summary>Returns the native texture pointer for <paramref name="tex"/>, or the placeholder if null.</summary>
+        private static IntPtr NativePtrOf(Texture tex, PlaceholderKind fallback)
+        {
+            var t = tex != null ? tex : (Texture)GetPlaceholder(fallback);
+            return t.GetNativeTexturePtr();
         }
 
         // 1x1 placeholder textures so missing material slots never bind null to gIn_Textures.

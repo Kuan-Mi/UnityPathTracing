@@ -111,8 +111,6 @@ namespace NativeRender
 
             if (s_All.Count == 0)
                 SceneManager.sceneUnloaded -= OnSceneUnloaded;
-
-            Debug.Log($"Removing {name} from ray tracing targets");
         }
 
         private static void OnSceneUnloaded(Scene scene)

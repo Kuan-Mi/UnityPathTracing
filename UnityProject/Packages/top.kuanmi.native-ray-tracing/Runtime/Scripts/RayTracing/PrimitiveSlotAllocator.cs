@@ -199,7 +199,7 @@ namespace NativeRender
             if (bestIndex < 0)
             {
                 if (LogLevel >= Verbosity.Verbose)
-                    Debug.LogWarning($"{Prefix} Allocate({count}) FAILED — no block large enough" +
+                    Debug.Log($"{Prefix} Allocate({count}) FAILED — no block large enough" +
                         $"  capacity={Capacity}  used={UsedCount}  freeBlocks={_freeBlocks.Count}" +
                         $"  largestFree={LargestFreeBlock}");
                 return InvalidOffset;
@@ -311,11 +311,20 @@ namespace NativeRender
             if (newCapacity <= (int)Capacity) return;
             uint oldCap = Capacity;
             Capacity = (uint)newCapacity;
-            // Free the new range — this handles merging with an existing tail block automatically.
-            Free(oldCap, newCapacity - (int)oldCap);
-            // GrowTo does not represent real freed allocations, so restore UsedCount.
-            // Free() decrements UsedCount, but the new range was never "used".
-            UsedCount += (uint)(newCapacity - (int)oldCap);
+            // Add the new range directly as a free block without touching UsedCount
+            // (calling Free() would underflow UsedCount since the new range was never allocated).
+            uint delta = (uint)newCapacity - oldCap;
+            // Merge with existing tail free block if contiguous, otherwise insert.
+            int last = _freeBlocks.Count - 1;
+            if (last >= 0 && _freeBlocks[last].Offset + _freeBlocks[last].Count == oldCap)
+            {
+                var tail = _freeBlocks[last];
+                _freeBlocks[last] = new FreeBlock { Offset = tail.Offset, Count = tail.Count + delta };
+            }
+            else
+            {
+                _freeBlocks.Add(new FreeBlock { Offset = oldCap, Count = delta });
+            }
             if (LogLevel >= Verbosity.Structural)
                 Debug.Log($"{Prefix} GrowTo  {oldCap} → {newCapacity}" +
                     $"  used={UsedCount}  freeBlocks={_freeBlocks.Count}  largestFree={LargestFreeBlock}");
