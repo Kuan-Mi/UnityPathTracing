@@ -193,7 +193,8 @@ namespace NativeRender
                 if (_mergeBlas)
                 {
                     // Merged mode: vertices are pre-transformed → must rebuild geometry.
-                    RebuildScene(targets);
+                    // But textures/materials are unchanged, so we can preserve them.
+                    RebuildScene(targets, preserveTextures: true);
                     _registeredTargets.Clear();
                     _registeredTargets.AddRange(targets);
                 }
@@ -281,14 +282,18 @@ namespace NativeRender
         // Dynamic scene GPU data + merged BLAS construction
         // =====================================================================
 
-        private void DisposeSceneGpuBuffers()
+        private void DisposeSceneGpuBuffers(bool preserveTextures = false)
         {
             _instanceDataBuf?.Release();
             _instanceDataBuf = null;
             _primitiveDataBuf?.Release();
             _primitiveDataBuf = null;
-            _textures?.Dispose();
-            _textures = null;
+
+            if (!preserveTextures)
+            {
+                _textures?.Dispose();
+                _textures = null;
+            }
 
             _blasOpaque?.Dispose();
             _blasOpaque = null;
@@ -301,7 +306,9 @@ namespace NativeRender
 
             _instanceCpu = null;
             if (_primitiveCpu.IsCreated) { _primitiveCpu.Dispose(); _primitiveCpu = default; }
-            _materialSlots.Clear();
+
+            if (!preserveTextures)
+                _materialSlots.Clear();
         }
 
         private bool TargetSetChanged(IReadOnlyList<NativeRayTracingTarget> current)
@@ -331,9 +338,9 @@ namespace NativeRender
         /// primitive data, and registers each merged BLAS as a single TLAS
         /// instance with identity transform (matching NRDSample).
         /// </summary>
-        private void RebuildScene(IReadOnlyList<NativeRayTracingTarget> targets)
+        private void RebuildScene(IReadOnlyList<NativeRayTracingTarget> targets, bool preserveTextures = false)
         {
-            DisposeSceneGpuBuffers();
+            DisposeSceneGpuBuffers(preserveTextures);
 
             _worldAS?.Clear();
             _lightAS?.Clear();
@@ -393,11 +400,14 @@ namespace NativeRender
                     instList, _primitiveCpu, texPtrs,
                     FLAG_STATIC | FLAG_NON_TRANSPARENT | FLAG_EMISSIVE);
 
-                // Texture array.
-                int texCount = Mathf.Max(texPtrs.Count, 1);
-                _textures = new BindlessTexture(texCount);
-                for (int i = 0; i < texPtrs.Count; i++)
-                    _textures.SetNativePtr(i, texPtrs[i]);
+                // Texture array — skip when preserving existing textures (transform-only rebuild).
+                if (!preserveTextures)
+                {
+                    int texCount = Mathf.Max(texPtrs.Count, 1);
+                    _textures = new BindlessTexture(texCount);
+                    for (int i = 0; i < texPtrs.Count; i++)
+                        _textures.SetNativePtr(i, texPtrs[i]);
+                }
 
                 // Instance / primitive GPU buffers.
                 if (instList.Count == 0) instList.Add(default);
