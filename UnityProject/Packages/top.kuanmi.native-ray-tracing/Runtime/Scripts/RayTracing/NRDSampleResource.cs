@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Runtime.InteropServices;
+using Unity.Collections;
 using Unity.Mathematics;
 using UnityEngine;
 using UnityEngine.Rendering;
@@ -460,6 +461,20 @@ namespace NativeRender
             List<PrimitiveDataNRD> primList,
             List<IntPtr> texPtrs)
         {
+            // Pre-allocate primList capacity to avoid repeated internal resizing.
+            int totalTriCount = 0;
+            foreach (var t in group)
+            {
+                if (t == null) continue;
+                var mf2 = t.GetComponent<MeshFilter>();
+                if (mf2 == null || mf2.sharedMesh == null) continue;
+                var m2 = mf2.sharedMesh;
+                for (int s = 0; s < m2.subMeshCount; s++)
+                    totalTriCount += (int)m2.GetIndexCount(s) / 3;
+            }
+            if (primList.Capacity < primList.Count + totalTriCount)
+                primList.Capacity = primList.Count + totalTriCount;
+
             foreach (var target in group)
             {
                 if (target == null) continue;
@@ -486,20 +501,38 @@ namespace NativeRender
                 tlas.SetInstanceMask(mr, GetMaskForFlags(baseFlags));
 
                 // Compute scale/handedness once for this renderer.
-                bool      leftHanded   = xform.determinant < 0f;
-                Vector3 s = new Vector3(
+                bool    leftHanded = xform.determinant < 0f;
+                Vector3 sc         = new Vector3(
                     new Vector3(xform.m00, xform.m10, xform.m20).magnitude,
                     new Vector3(xform.m01, xform.m11, xform.m21).magnitude,
                     new Vector3(xform.m02, xform.m12, xform.m22).magnitude);
-                float scaleMax = Mathf.Max(s.x, Mathf.Max(s.y, s.z));
+                float scaleMax = Mathf.Max(sc.x, Mathf.Max(sc.y, sc.z));
 
-                Vector3[]  srcPos          = mesh.vertices;
-                Vector3[]  srcN            = mesh.normals;
-                Vector4[]  srcT            = mesh.tangents;
-                Vector2[]  srcUV           = mesh.uv;
+                int vertCount = mesh.vertexCount;
+                int subCnt    = mesh.subMeshCount;
+
+                // AcquireReadOnlyMeshData: zero-copy, no managed-array allocation per attribute.
+                var meshDataArr = Mesh.AcquireReadOnlyMeshData(mesh);
+                var meshData    = meshDataArr[0];
+
+                var nativePos = new NativeArray<Vector3>(vertCount, Allocator.Temp, NativeArrayOptions.UninitializedMemory);
+                var nativeN   = new NativeArray<Vector3>(vertCount, Allocator.Temp, NativeArrayOptions.UninitializedMemory);
+                var nativeT   = new NativeArray<Vector4>(vertCount, Allocator.Temp, NativeArrayOptions.UninitializedMemory);
+                var nativeUV  = new NativeArray<Vector2>(vertCount, Allocator.Temp, NativeArrayOptions.UninitializedMemory);
+
+                meshData.GetVertices(nativePos);
+
+                // Hoist attribute-presence checks outside the inner triangle loop.
+                bool hasN  = meshData.HasVertexAttribute(VertexAttribute.Normal);
+                bool hasT  = meshData.HasVertexAttribute(VertexAttribute.Tangent);
+                bool hasUV = meshData.HasVertexAttribute(VertexAttribute.TexCoord0);
+
+                if (hasN)  meshData.GetNormals(nativeN);
+                if (hasT)  meshData.GetTangents(nativeT);
+                if (hasUV) meshData.GetUVs(0, nativeUV);
+
                 Material[] sharedMaterials = mr.sharedMaterials;
-                int        subCnt          = mesh.subMeshCount;
- 
+
                 for (int sub = 0; sub < subCnt; sub++)
                 {
                     uint primitiveOffsetForSubMesh = primitiveCursor;
@@ -507,32 +540,37 @@ namespace NativeRender
                     Material subMat    = (sub < sharedMaterials.Length) ? sharedMaterials[sub] : GetRepresentativeMaterial(mr);
                     int      subMatIdx = GetOrAddMaterial(subMat, texPtrs);
 
-                    int[] tris = mesh.GetTriangles(sub);
+                    int indexCount = (int)mesh.GetIndexCount(sub);
+                    var nativeTris = new NativeArray<int>(indexCount, Allocator.Temp, NativeArrayOptions.UninitializedMemory);
+                    meshData.GetIndices(nativeTris, sub);
 
-                    for (int i = 0; i + 2 < tris.Length; i += 3)
+                    for (int i = 0; i + 2 < indexCount; i += 3)
                     {
-                        int i0 = tris[i], i1 = tris[i + 1], i2 = tris[i + 2];
+                        int i0 = nativeTris[i], i1 = nativeTris[i + 1], i2 = nativeTris[i + 2];
 
-                        Vector3 p0 = srcPos[i0];
-                        Vector3 p1 = srcPos[i1];
-                        Vector3 p2 = srcPos[i2];
+                        Vector3 p0 = nativePos[i0];
+                        Vector3 p1 = nativePos[i1];
+                        Vector3 p2 = nativePos[i2];
 
-                        Vector2 uv0 = (srcUV != null && i0 < srcUV.Length) ? srcUV[i0] : Vector2.zero;
-                        Vector2 uv1 = (srcUV != null && i1 < srcUV.Length) ? srcUV[i1] : Vector2.zero;
-                        Vector2 uv2 = (srcUV != null && i2 < srcUV.Length) ? srcUV[i2] : Vector2.zero;
+                        Vector2 uv0 = hasUV ? nativeUV[i0] : Vector2.zero;
+                        Vector2 uv1 = hasUV ? nativeUV[i1] : Vector2.zero;
+                        Vector2 uv2 = hasUV ? nativeUV[i2] : Vector2.zero;
 
                         float   worldArea = 0.5f * Vector3.Cross(p1 - p0, p2 - p0).magnitude;
                         Vector2 du1       = uv1 - uv0, du2 = uv2 - uv0;
                         float   uvArea    = 0.5f * Mathf.Abs(du1.x * du2.y - du1.y * du2.x);
 
                         // Object-space normals/tangents — shader uses mOverloadedMatrix to transform them.
-                        Vector3 n0 = GetNormal(srcN, i0);
-                        Vector3 n1 = GetNormal(srcN, i1);
-                        Vector3 n2 = GetNormal(srcN, i2);
+                        Vector3 rn0 = hasN ? nativeN[i0] : Vector3.up;
+                        Vector3 rn1 = hasN ? nativeN[i1] : Vector3.up;
+                        Vector3 rn2 = hasN ? nativeN[i2] : Vector3.up;
+                        Vector3 n0  = rn0.sqrMagnitude > 1e-12f ? rn0.normalized : Vector3.up;
+                        Vector3 n1  = rn1.sqrMagnitude > 1e-12f ? rn1.normalized : Vector3.up;
+                        Vector3 n2  = rn2.sqrMagnitude > 1e-12f ? rn2.normalized : Vector3.up;
 
-                        Vector4 t0 = GetTangent(srcT, i0);
-                        Vector4 t1 = GetTangent(srcT, i1);
-                        Vector4 t2 = GetTangent(srcT, i2);
+                        Vector4 t0 = hasT ? nativeT[i0] : new Vector4(1f, 0f, 0f, 1f);
+                        Vector4 t1 = hasT ? nativeT[i1] : new Vector4(1f, 0f, 0f, 1f);
+                        Vector4 t2 = hasT ? nativeT[i2] : new Vector4(1f, 0f, 0f, 1f);
 
                         primList.Add(new PrimitiveDataNRD
                         {
@@ -552,6 +590,8 @@ namespace NativeRender
                         primitiveCursor++;
                     }
 
+                    nativeTris.Dispose();
+
                     // InstanceDataNRD: mOverloadedMatrix = localToWorldMatrix (object-space VB).
                     uint baseTextureIndex = (uint)(subMatIdx * TexturesPerMaterial);
                     var inst = new InstanceDataNRD
@@ -569,6 +609,12 @@ namespace NativeRender
                     instList.Add(inst);
                     instanceCursor++;
                 }
+
+                nativePos.Dispose();
+                nativeN.Dispose();
+                nativeT.Dispose();
+                nativeUV.Dispose();
+                meshDataArr.Dispose();
 
                 // Record per-target state for transform-only updates.
                 _perTargetBlas[(int)(uint)mr.GetInstanceID()] = new PerTargetBlas
