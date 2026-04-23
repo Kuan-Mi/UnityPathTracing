@@ -1170,12 +1170,6 @@ namespace NativeRender
 
                 Matrix4x4 xform        = target.transform.localToWorldMatrix;
                 Matrix4x4 normalMatrix = xform.inverse.transpose;
-                bool      leftHanded   = xform.determinant < 0f;
-                Vector3 sc = new Vector3(
-                    new Vector3(xform.m00, xform.m10, xform.m20).magnitude,
-                    new Vector3(xform.m01, xform.m11, xform.m21).magnitude,
-                    new Vector3(xform.m02, xform.m12, xform.m22).magnitude);
-                float scaleMax = Mathf.Max(sc.x, Mathf.Max(sc.y, sc.z));
 
                 int vertCount = mesh.vertexCount;
 
@@ -1207,7 +1201,7 @@ namespace NativeRender
                 jobHandles.Add(new TransformVerticesJob
                 {
                     LocalPositions = posF3,
-                    LocalToWorld   = (float4x4)xform,
+                    LocalToWorld   = xform,
                     Output         = mergedPos.GetSubArray(vertBase, vertCount),
                 }.Schedule(vertCount, 64));
 
@@ -1254,8 +1248,8 @@ namespace NativeRender
                         HasN           = hasN,
                         HasT           = hasT,
                         HasUV          = hasUV,
-                        LocalToWorld   = (float4x4)xform,
-                        NormalMatrix   = (float4x4)normalMatrix,
+                        LocalToWorld   = xform,
+                        NormalMatrix   = normalMatrix,
                         Output         = primOutput.GetSubArray((int)primitiveOffsetForSubMesh, triCount),
                     }.Schedule(triCount, 64));
 
@@ -1273,7 +1267,7 @@ namespace NativeRender
 
                         textureOffsetAndFlags = baseTextureIndex | (baseFlags << FlagFirstBit),
                         primitiveOffset       = primitiveOffsetForSubMesh,
-                        scale                 = (leftHanded ? -1f : 1f) * scaleMax,
+                        scale                 = 1f,
                         morphPrimitiveOffset  = 0,
                     };
                     EncodeMaterial(subMat, ref inst);
@@ -1477,7 +1471,7 @@ namespace NativeRender
         /// <summary>Returns the native texture pointer for <paramref name="tex"/>, or the placeholder if null.</summary>
         private static IntPtr NativePtrOf(Texture tex, PlaceholderKind fallback)
         {
-            var t = tex != null ? tex : (Texture)GetPlaceholder(fallback);
+            var t = tex != null ? tex : GetPlaceholder(fallback);
             return t.GetNativeTexturePtr();
         }
 
@@ -1531,7 +1525,7 @@ namespace NativeRender
 
         private static void AppendTexture(Texture tex, PlaceholderKind fallback, List<IntPtr> texPtrs)
         {
-            var t = tex != null ? tex : (Texture)GetPlaceholder(fallback);
+            var t = tex != null ? tex : GetPlaceholder(fallback);
             texPtrs.Add(t.GetNativeTexturePtr());
         }
 
