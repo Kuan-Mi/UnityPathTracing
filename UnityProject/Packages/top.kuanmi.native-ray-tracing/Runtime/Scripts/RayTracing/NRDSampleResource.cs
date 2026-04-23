@@ -209,9 +209,9 @@ namespace NativeRender
             pipeline.SetStructuredBuffer("gIn_PrimitiveData", _primitiveDataBuf);
             pipeline.SetStructuredBuffer("gIn_MorphPrimitivePositionsPrev", _morphPrimitivePositionsPrevBuf);
 
-            pipeline.SetRWBuffer("gInOut_SharcHashEntriesBuffer", _sharcHashEntries);
-            pipeline.SetRWBuffer("gInOut_SharcAccumulated", _sharcAccumulated);
-            pipeline.SetRWBuffer("gInOut_SharcResolved", _sharcResolved);
+            pipeline.SetRWStructuredBuffer("gInOut_SharcHashEntriesBuffer", _sharcHashEntries);
+            pipeline.SetRWStructuredBuffer("gInOut_SharcAccumulated", _sharcAccumulated);
+            pipeline.SetRWStructuredBuffer("gInOut_SharcResolved", _sharcResolved);
 
             pipeline.SetBindlessTexture("gIn_Textures", _textures);
         }

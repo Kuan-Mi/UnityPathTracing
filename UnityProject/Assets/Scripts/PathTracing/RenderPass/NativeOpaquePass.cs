@@ -120,9 +120,9 @@ namespace PathTracing
             data.OpaqueTs.SetBuffer("gIn_ScramblingRanking", resource.ScramblingRanking);
             data.OpaqueTs.SetBuffer("gIn_Sobol", resource.Sobol);
 
-            data.OpaqueTs.SetRWBuffer("gInOut_SharcHashEntriesBuffer", resource.HashEntriesBuffer);
-            data.OpaqueTs.SetRWBuffer("gInOut_SharcAccumulated",      resource.AccumulationBuffer);
-            data.OpaqueTs.SetRWBuffer("gInOut_SharcResolved",         resource.ResolvedBuffer);
+            data.OpaqueTs.SetRWStructuredBuffer("gInOut_SharcHashEntriesBuffer", resource.HashEntriesBuffer);
+            data.OpaqueTs.SetRWStructuredBuffer("gInOut_SharcAccumulated",      resource.AccumulationBuffer);
+            data.OpaqueTs.SetRWStructuredBuffer("gInOut_SharcResolved",         resource.ResolvedBuffer);
 
 
             data.OpaqueTs.SetRWTexture("g_Output",              resource.Output.rt);

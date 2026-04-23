@@ -152,9 +152,9 @@ namespace PathTracing
             cs.SetStructuredBuffer("gIn_MorphPrimitivePositionsPrev", nrd.MorphPrimitivePositionsPrevBuf);
 
             // 4. SHARC UAVs
-            cs.SetRWBuffer("gInOut_SharcHashEntriesBuffer", res.HashEntriesBuffer);
-            cs.SetRWBuffer("gInOut_SharcAccumulated", res.AccumulationBuffer);
-            cs.SetRWBuffer("gInOut_SharcResolved", res.ResolvedBuffer);
+            cs.SetRWStructuredBuffer("gInOut_SharcHashEntriesBuffer", res.HashEntriesBuffer);
+            cs.SetRWStructuredBuffer("gInOut_SharcAccumulated", res.AccumulationBuffer);
+            cs.SetRWStructuredBuffer("gInOut_SharcResolved", res.ResolvedBuffer);
 
             // 5. Bindless material textures
             cs.SetBindlessTexture("gIn_Textures", nrd.Textures);

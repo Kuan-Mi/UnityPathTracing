@@ -84,8 +84,9 @@ public:
     // Texture SRV
     bool SetTexture         (const char* name, ID3D12Resource* resource);
     // UAV
-    bool SetRWBuffer        (const char* name, ID3D12Resource* resource);
-    bool SetRWTexture       (const char* name, ID3D12Resource* resource);
+    bool SetRWBuffer           (const char* name, ID3D12Resource* resource);
+    bool SetRWStructuredBuffer (const char* name, ID3D12Resource* resource, UINT elementCount, UINT elementStride);
+    bool SetRWTexture          (const char* name, ID3D12Resource* resource);
     // CBV
     bool SetConstantBuffer  (const char* name, ID3D12Resource* resource);
 

@@ -83,8 +83,9 @@ public:
     // Preferred: binds by AccelerationStructure object — TLAS ptr is read dynamically at Dispatch time.
     bool SetAccelerationStructureObject(const char* name, AccelerationStructure* as);
     // UAV
-    bool SetRWBuffer     (const char* name, ID3D12Resource* resource);
-    bool SetRWTexture    (const char* name, ID3D12Resource* resource);
+    bool SetRWBuffer           (const char* name, ID3D12Resource* resource);
+    bool SetRWStructuredBuffer (const char* name, ID3D12Resource* resource, UINT elementCount, UINT elementStride);
+    bool SetRWTexture          (const char* name, ID3D12Resource* resource);
     // Texture SRV
     bool SetTexture      (const char* name, ID3D12Resource* resource);
     // CBV

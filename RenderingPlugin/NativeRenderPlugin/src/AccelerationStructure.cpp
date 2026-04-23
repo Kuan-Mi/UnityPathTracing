@@ -359,11 +359,6 @@ bool AccelerationStructure::EnsureBLAS(
     buildDesc.ScratchAccelerationStructureData = entry.blasScratch->GetGPUVirtualAddress();
     cmdList->BuildRaytracingAccelerationStructure(&buildDesc, 0, nullptr);
 
-    D3D12_RESOURCE_BARRIER barrier = {};
-    barrier.Type          = D3D12_RESOURCE_BARRIER_TYPE_UAV;
-    barrier.UAV.pResource = entry.blas.Get();
-    cmdList->ResourceBarrier(1, &barrier);
-
     // Scratch is only needed during the build command; release it after 3 frames.
     {
         PendingDelete pd;
@@ -929,7 +924,7 @@ bool AccelerationStructure::BuildOrUpdate(ID3D12GraphicsCommandList4* cmdList)
     // -------------------------------------------------------------------
     // Step A: Build any pending new BLASes (throttled to avoid GPU TDR)
     // -------------------------------------------------------------------
-    static constexpr int kMaxBLASBuildsPerFrame = 50;
+    static constexpr int kMaxBLASBuildsPerFrame = 100;
     bool anyNewBLAS = false;
     int  blasBuildsThisFrame = 0;
     for (auto& slot : m_slots)
@@ -950,9 +945,15 @@ bool AccelerationStructure::BuildOrUpdate(ID3D12GraphicsCommandList4* cmdList)
         anyNewBLAS     = true;
         ++blasBuildsThisFrame;
     }
-    // New BLASes require all slots to rebuild; reset the counter to 3.
+    // Emit a single global UAV barrier covering all newly-built BLASes.
     if (anyNewBLAS)
+    {
+        D3D12_RESOURCE_BARRIER blasBarrier = {};
+        blasBarrier.Type          = D3D12_RESOURCE_BARRIER_TYPE_UAV;
+        blasBarrier.UAV.pResource = nullptr;   // nullptr = all UAV resources
+        cmdList->ResourceBarrier(1, &blasBarrier);
         m_tlasRebuildPendingSlots = 3;
+    }
 
     // -------------------------------------------------------------------
     // Step B: Structural change - full TLAS rebuild

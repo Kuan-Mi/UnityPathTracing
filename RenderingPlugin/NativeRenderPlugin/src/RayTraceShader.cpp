@@ -990,6 +990,21 @@ bool RayTraceShader::SetRWBuffer(const char* name, ID3D12Resource* res)
     UserBinding& b = m_userBindings[it->second];
     if (b.type != UserBindingType::UAV) return false;
     b.boundResource = res;
+    b.boundStride   = 0;
+    b.boundCount    = 0;
+    return true;
+}
+
+bool RayTraceShader::SetRWStructuredBuffer(const char* name, ID3D12Resource* res, UINT elementCount, UINT elementStride)
+{
+    if (!name) return false;
+    auto it = m_bindingIndex.find(name);
+    if (it == m_bindingIndex.end()) return false;
+    UserBinding& b = m_userBindings[it->second];
+    if (b.type != UserBindingType::UAV) return false;
+    b.boundResource = res;
+    b.boundCount    = elementCount;
+    b.boundStride   = elementStride;
     return true;
 }
 
@@ -1157,10 +1172,19 @@ void RayTraceShader::UpdateUserDescriptors()
                 auto rd = b.boundResource->GetDesc();
                 if (rd.Dimension == D3D12_RESOURCE_DIMENSION_BUFFER)
                 {
-                    u.ViewDimension      = D3D12_UAV_DIMENSION_BUFFER;
-                    u.Format             = DXGI_FORMAT_R32_TYPELESS;
-                    u.Buffer.Flags       = D3D12_BUFFER_UAV_FLAG_RAW;
-                    u.Buffer.NumElements = static_cast<UINT>(rd.Width / 4);
+                    u.ViewDimension = D3D12_UAV_DIMENSION_BUFFER;
+                    if (b.boundStride > 0 && b.boundCount > 0)
+                    {
+                        u.Format                     = DXGI_FORMAT_UNKNOWN;
+                        u.Buffer.NumElements         = b.boundCount;
+                        u.Buffer.StructureByteStride = b.boundStride;
+                    }
+                    else
+                    {
+                        u.Format             = DXGI_FORMAT_R32_TYPELESS;
+                        u.Buffer.Flags       = D3D12_BUFFER_UAV_FLAG_RAW;
+                        u.Buffer.NumElements = static_cast<UINT>(rd.Width / 4);
+                    }
                 }
                 else
                 {
@@ -1288,24 +1312,31 @@ void RayTraceShader::Dispatch(
     }
 
     // --- Request resource states ---
-    // TLAS is managed externally (built with the correct state); SRV_ARRAY is managed
-    // by BindlessTexture/BindlessBuffer; CBV stays in GENERIC_READ.
+    // TLAS is managed externally; CBV stays in GENERIC_READ.
     for (const auto& b : m_userBindings)
     {
-        if (!b.boundResource) continue;
-        if (b.type == UserBindingType::SRV)
+        if (b.type == UserBindingType::SRV && b.boundResource)
         {
             m_d3d12v8->RequestResourceState(b.boundResource, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
-            // Logf(kUnityLogTypeLog, "RayTraceShader::Dispatch: RequestResourceState '%s' SRV -> NON_PIXEL_SHADER_RESOURCE (res=%p)", b.name.c_str(), b.boundResource);
         }
-        else if (b.type == UserBindingType::UAV)
+        else if (b.type == UserBindingType::UAV && b.boundResource)
         {
             m_d3d12v8->RequestResourceState(b.boundResource, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
-            // Logf(kUnityLogTypeLog, "RayTraceShader::Dispatch: RequestResourceState '%s' UAV -> UNORDERED_ACCESS (res=%p)", b.name.c_str(), b.boundResource);
         }
-        else if (b.type == UserBindingType::CBV)
+        else if (b.type == UserBindingType::CBV && b.boundResource)
         {
             m_d3d12v8->RequestResourceState(b.boundResource, D3D12_RESOURCE_STATE_VERTEX_AND_CONSTANT_BUFFER);
+        }
+        else if (b.type == UserBindingType::SRV_ARRAY && b.boundBT)
+        {
+            // Transition every non-null texture in the bindless array so it is
+            // accessible from the ray tracing / compute stage.
+            for (uint32_t i = 0; i < b.boundBT->Capacity(); ++i)
+            {
+                ID3D12Resource* tex = b.boundBT->GetTexture(i);
+                if (tex)
+                    m_d3d12v8->RequestResourceState(tex, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
+            }
         }
     }
 
