@@ -284,5 +284,11 @@ namespace NativeRender
             NativeRenderPlugin.NR_AS_RemoveInstance(_handle, instanceHandle);
             // Debug.Log($"[NativeRayTracing] Removed instance handle={instanceHandle} for '{meshRenderer.name}'");
         }
+        
+        public void RemoveInstance(int meshRendererId)
+        {
+            if (_handle == 0 ) return;
+            NativeRenderPlugin.NR_AS_RemoveInstance(_handle, (uint)meshRendererId);
+        }
     }
 }
