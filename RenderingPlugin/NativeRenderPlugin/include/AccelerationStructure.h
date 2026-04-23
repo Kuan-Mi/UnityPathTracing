@@ -5,6 +5,7 @@
 #include <vector>
 #include <list>
 #include <unordered_map>
+#include <mutex>
 #include <cstdint>
 #include "IUnityLog.h"
 #include "IUnityGraphicsD3D12.h"
@@ -301,4 +302,8 @@ private:
 
     // Deferred deletion queue
     std::list<PendingDelete> m_pendingDeletes;
+
+    // Mutex protecting shared state accessed from both Main Thread (Clear, AddInstance,
+    // RemoveInstance, SetInstance*) and Render Thread (BuildOrUpdate / BuildTLAS).
+    std::mutex m_stateMutex;
 };

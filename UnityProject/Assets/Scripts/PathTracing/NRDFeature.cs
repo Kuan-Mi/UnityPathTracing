@@ -173,6 +173,7 @@ namespace PathTracing
             }
 
             _nrdSampleResource.MergeBlas = setting.mergeBlas;
+            NativeRender.NativeRenderPlugin.NR_FrameTick();
             _nrdSampleResource?.UpdateForFrame();
 
             var uniqueKey = cam.GetInstanceID() + (eyeIndex * 100000L);

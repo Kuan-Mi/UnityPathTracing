@@ -12,6 +12,19 @@ namespace NativeRender
         private const string DllName = "NativeRenderPlugin";
 
         // -------------------------------------------------------------------
+        // Frame lifecycle
+        // -------------------------------------------------------------------
+
+        /// <summary>
+        /// Must be called once per frame (main thread) before submitting rendering commands.
+        /// Advances the internal deletion fence and frees any GPU objects whose
+        /// deferred-destroy delay has elapsed (BindlessTexture, BindlessBuffer,
+        /// AccelerationStructure, RayTraceShader, ComputeShader).
+        /// </summary>
+        [DllImport(DllName)]
+        public static extern void NR_FrameTick();
+
+        // -------------------------------------------------------------------
         // Acceleration Structure API
         // -------------------------------------------------------------------
 
