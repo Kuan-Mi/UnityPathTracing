@@ -865,6 +865,13 @@ NR_BB_GetCapacity(uint64_t handle)
 // ===========================================================================
 
 // ---------------------------------------------------------------------------
+// CS_BindingSlot
+//   One slot per reflected binding. Mirrors ComputeShader.h CS_BindingSlot.
+//   (Redeclared here for Plugin.cpp; the authoritative definition is in ComputeShader.h)
+// ---------------------------------------------------------------------------
+// (CS_BindingSlot and CS_BindingObjectKind are included via ComputeShader.h)
+
+// ---------------------------------------------------------------------------
 // CS_RenderEventData
 //   Passed from C# via IssuePluginEventAndData for per-shader dispatches.
 //   Must match NativeRenderPlugin.CS_RenderEventData exactly (Pack=4).
@@ -872,11 +879,13 @@ NR_BB_GetCapacity(uint64_t handle)
 #pragma pack(push, 4)
 struct CS_RenderEventData
 {
-    uint64_t shaderHandle;    // +0 (8B): pointer to ComputeShader
-    uint32_t threadGroupX;    // +8 (4B)
+    uint64_t shaderHandle;    // +0  (8B): pointer to ComputeShader
+    uint32_t threadGroupX;    // +8  (4B)
     uint32_t threadGroupY;    // +12 (4B)
     uint32_t threadGroupZ;    // +16 (4B)
-};  // Total: 20 bytes
+    uint32_t bindingCount;    // +20 (4B): number of CS_BindingSlot entries
+    uint64_t bindingSlotsPtr; // +24 (8B): pointer to CS_BindingSlot[]
+};  // Total: 32 bytes
 #pragma pack(pop)
 
 // ---------------------------------------------------------------------------
@@ -919,101 +928,27 @@ NR_DestroyComputeShader(uint64_t handle)
 }
 
 // ---------------------------------------------------------------------------
-// Resource binding helpers
+// Resource binding queries (slot layout discovery)
 // ---------------------------------------------------------------------------
-extern "C" int32_t UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API
-NR_CS_SetBuffer(uint64_t handle, const char* name, void* d3d12ResourcePtr)
+extern "C" uint32_t UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API
+NR_CS_GetBindingCount(uint64_t handle)
 {
     if (!handle) return 0;
-    return reinterpret_cast<ComputeShader*>(handle)
-        ->SetBuffer(name, static_cast<ID3D12Resource*>(d3d12ResourcePtr)) ? 1 : 0;
+    return reinterpret_cast<ComputeShader*>(handle)->GetBindingCount();
 }
 
-extern "C" int32_t UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API
-NR_CS_SetRWBuffer(uint64_t handle, const char* name, void* d3d12ResourcePtr)
+extern "C" uint32_t UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API
+NR_CS_GetSlotIndex(uint64_t handle, const char* name)
 {
-    if (!handle) return 0;
-    return reinterpret_cast<ComputeShader*>(handle)
-        ->SetRWBuffer(name, static_cast<ID3D12Resource*>(d3d12ResourcePtr)) ? 1 : 0;
+    if (!handle) return UINT32_MAX;
+    return reinterpret_cast<ComputeShader*>(handle)->GetSlotIndex(name);
 }
 
-extern "C" int32_t UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API
-NR_CS_SetTexture(uint64_t handle, const char* name, void* d3d12ResourcePtr)
+extern "C" UNITY_INTERFACE_EXPORT const char* UNITY_INTERFACE_API
+NR_CS_GetBindingName(uint64_t handle, uint32_t index)
 {
-    if (!handle) return 0;
-    return reinterpret_cast<ComputeShader*>(handle)
-        ->SetTexture(name, static_cast<ID3D12Resource*>(d3d12ResourcePtr)) ? 1 : 0;
-}
-
-extern "C" int32_t UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API
-NR_CS_SetRWTexture(uint64_t handle, const char* name, void* d3d12ResourcePtr)
-{
-    if (!handle) return 0;
-    return reinterpret_cast<ComputeShader*>(handle)
-        ->SetRWTexture(name, static_cast<ID3D12Resource*>(d3d12ResourcePtr)) ? 1 : 0;
-}
-
-extern "C" int32_t UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API
-NR_CS_SetConstantBuffer(uint64_t handle, const char* name, void* d3d12ResourcePtr)
-{
-    if (!handle) return 0;
-    return reinterpret_cast<ComputeShader*>(handle)
-        ->SetConstantBuffer(name, static_cast<ID3D12Resource*>(d3d12ResourcePtr)) ? 1 : 0;
-}
-
-extern "C" int32_t UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API
-NR_CS_SetStructuredBuffer(uint64_t handle, const char* name, void* d3d12ResourcePtr,
-                           uint32_t elementCount, uint32_t elementStride)
-{
-    if (!handle) return 0;
-    return reinterpret_cast<ComputeShader*>(handle)
-        ->SetStructuredBuffer(name, static_cast<ID3D12Resource*>(d3d12ResourcePtr),
-                              elementCount, elementStride) ? 1 : 0;
-}
-
-extern "C" int32_t UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API
-NR_CS_SetRWStructuredBuffer(uint64_t handle, const char* name, void* d3d12ResourcePtr,
-                             uint32_t elementCount, uint32_t elementStride)
-{
-    if (!handle) return 0;
-    return reinterpret_cast<ComputeShader*>(handle)
-        ->SetRWStructuredBuffer(name, static_cast<ID3D12Resource*>(d3d12ResourcePtr),
-                                elementCount, elementStride) ? 1 : 0;
-}
-
-extern "C" int32_t UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API
-NR_CS_SetBindlessTexture(uint64_t handle, const char* name, uint64_t btHandle)
-{
-    if (!handle) return 0;
-    return reinterpret_cast<ComputeShader*>(handle)
-        ->SetBindlessTexture(name, reinterpret_cast<BindlessTexture*>(btHandle)) ? 1 : 0;
-}
-
-extern "C" int32_t UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API
-NR_CS_SetBindlessBuffer(uint64_t handle, const char* name, uint64_t bbHandle)
-{
-    if (!handle) return 0;
-    return reinterpret_cast<ComputeShader*>(handle)
-        ->SetBindlessBuffer(name, reinterpret_cast<BindlessBuffer*>(bbHandle)) ? 1 : 0;
-}
-
-extern "C" int32_t UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API
-NR_CS_SetAccelerationStructure(uint64_t handle, const char* name, void* tlasd3d12Ptr)
-{
-    if (!handle) return 0;
-    return reinterpret_cast<ComputeShader*>(handle)
-        ->SetAccelerationStructure(name, static_cast<ID3D12Resource*>(tlasd3d12Ptr)) ? 1 : 0;
-}
-
-// Preferred variant: binds by AccelerationStructure object — TLAS ptr is resolved dynamically at Dispatch time.
-// asHandle is the uint64_t returned by NR_CreateAccelerationStructure.
-extern "C" int32_t UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API
-NR_CS_SetAccelerationStructureHandle(uint64_t shaderHandle, const char* name, uint64_t asHandle)
-{
-    if (!shaderHandle) return 0;
-    return reinterpret_cast<ComputeShader*>(shaderHandle)
-        ->SetAccelerationStructureObject(name,
-            asHandle ? reinterpret_cast<AccelerationStructure*>(asHandle) : nullptr) ? 1 : 0;
+    if (!handle) return nullptr;
+    return reinterpret_cast<ComputeShader*>(handle)->GetBindingName(index);
 }
 
 // ---------------------------------------------------------------------------
@@ -1032,9 +967,11 @@ static void UNITY_INTERFACE_API CsDispatchCallback(int /*eventId*/, void* data)
 
     auto* cs      = reinterpret_cast<ComputeShader*>(ed->shaderHandle);
     auto* cmdList = static_cast<ID3D12GraphicsCommandList*>(recordingState.commandList);
+    auto* slots   = reinterpret_cast<CS_BindingSlot*>(ed->bindingSlotsPtr);
 
     D3D12HeapHook::BeginPluginDispatch();
-    cs->Dispatch(cmdList, ed->threadGroupX, ed->threadGroupY, ed->threadGroupZ);
+    cs->Dispatch(cmdList, ed->threadGroupX, ed->threadGroupY, ed->threadGroupZ,
+                 slots, ed->bindingCount);
     D3D12HeapHook::EndPluginDispatch();
 
     // Restore Unity's descriptor heaps (our Dispatch rebinds a private heap).
