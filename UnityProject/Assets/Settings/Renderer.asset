@@ -106,6 +106,7 @@ MonoBehaviour:
     SR: 0
     RR: 0
     confidence: 1
+    showMode: 13
   renderPassEvent: 550
   finalMaterial: {fileID: 2100000, guid: 27695a2bc55ef2f469362b9a2994989e, type: 2}
   nrdOpaqueTracingShader: {fileID: -2368575503658470205, guid: 317f1945d390e3d40b100508cc1e2544, type: 3}
