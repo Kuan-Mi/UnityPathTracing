@@ -104,8 +104,8 @@ namespace PathTracing
             cs.SetBindlessTexture("gIn_Textures", nrd.Textures);
 
             // 5. SHARC UAVs (only hash entries + resolved; no accumulation in transparent shader)
-            cs.SetRWBuffer("gInOut_SharcHashEntriesBuffer", res.HashEntriesBuffer);
-            cs.SetRWBuffer("gInOut_SharcResolved",          res.ResolvedBuffer);
+            cs.SetRWStructuredBuffer("gInOut_SharcHashEntriesBuffer", res.HashEntriesBuffer);
+            cs.SetRWStructuredBuffer("gInOut_SharcResolved",          res.ResolvedBuffer);
 
             var pool = data.Pool;
 

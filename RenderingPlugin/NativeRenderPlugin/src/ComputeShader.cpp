@@ -560,6 +560,21 @@ bool ComputeShader::SetRWBuffer(const char* name, ID3D12Resource* res)
     ComputeBinding& b = m_bindings[it->second];
     if (b.type != ComputeBindingType::UAV) return false;
     b.boundResource = res;
+    b.boundStride   = 0;
+    b.boundCount    = 0;
+    return true;
+}
+
+bool ComputeShader::SetRWStructuredBuffer(const char* name, ID3D12Resource* res, UINT elementCount, UINT elementStride)
+{
+    if (!name) return false;
+    auto it = m_bindingIndex.find(name);
+    if (it == m_bindingIndex.end()) return false;
+    ComputeBinding& b = m_bindings[it->second];
+    if (b.type != ComputeBindingType::UAV) return false;
+    b.boundResource = res;
+    b.boundCount    = elementCount;
+    b.boundStride   = elementStride;
     return true;
 }
 
@@ -715,10 +730,19 @@ void ComputeShader::UpdateDescriptors()
                 auto rd = b.boundResource->GetDesc();
                 if (rd.Dimension == D3D12_RESOURCE_DIMENSION_BUFFER)
                 {
-                    u.ViewDimension      = D3D12_UAV_DIMENSION_BUFFER;
-                    u.Format             = DXGI_FORMAT_R32_TYPELESS;
-                    u.Buffer.Flags       = D3D12_BUFFER_UAV_FLAG_RAW;
-                    u.Buffer.NumElements = static_cast<UINT>(rd.Width / 4);
+                    u.ViewDimension = D3D12_UAV_DIMENSION_BUFFER;
+                    if (b.boundStride > 0 && b.boundCount > 0)
+                    {
+                        u.Format                     = DXGI_FORMAT_UNKNOWN;
+                        u.Buffer.NumElements         = b.boundCount;
+                        u.Buffer.StructureByteStride = b.boundStride;
+                    }
+                    else
+                    {
+                        u.Format             = DXGI_FORMAT_R32_TYPELESS;
+                        u.Buffer.Flags       = D3D12_BUFFER_UAV_FLAG_RAW;
+                        u.Buffer.NumElements = static_cast<UINT>(rd.Width / 4);
+                    }
                 }
                 else
                 {
@@ -844,24 +868,34 @@ void ComputeShader::Dispatch(
     }
 
     // --- Request resource states ---
-    // SRV_ARRAY is managed by BindlessTexture/BindlessBuffer; CBV stays in GENERIC_READ.
     if (m_d3d12v8)
     {
         for (const auto& b : m_bindings)
         {
-            if (!b.boundResource) continue;
-            if (b.type == ComputeBindingType::SRV)
+            if (b.type == ComputeBindingType::SRV && b.boundResource)
             {
                 m_d3d12v8->RequestResourceState(b.boundResource, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
             }
-            else if (b.type == ComputeBindingType::UAV)
+            else if (b.type == ComputeBindingType::UAV && b.boundResource)
             {
                 m_d3d12v8->RequestResourceState(b.boundResource, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
             }
-            else if (b.type == ComputeBindingType::CBV)
+            else if (b.type == ComputeBindingType::CBV && b.boundResource)
             {
                 m_d3d12v8->RequestResourceState(b.boundResource,
                     D3D12_RESOURCE_STATE_VERTEX_AND_CONSTANT_BUFFER);
+            }
+            else if (b.type == ComputeBindingType::SRV_ARRAY && b.boundBT)
+            {
+                // Transition every non-null texture in the bindless array to a state
+                // visible from the compute stage.  Unity typically leaves textures in
+                // LEGACY_PIXEL_SHADER_RESOURCE which is incompatible with compute.
+                for (uint32_t i = 0; i < b.boundBT->Capacity(); ++i)
+                {
+                    ID3D12Resource* tex = b.boundBT->GetTexture(i);
+                    if (tex)
+                        m_d3d12v8->RequestResourceState(tex, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
+                }
             }
         }
     }

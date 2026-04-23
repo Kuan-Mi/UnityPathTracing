@@ -101,19 +101,6 @@ namespace PathTracing
             var settings  = data.Settings;
             var nrd       = data.NrdResource;
 
-            // ── SharcResolve [numthreads(256,1,1)] ────────────────────────────────
-            cmd.BeginSample(RenderPassMarkers.SharcResolve);
-
-            resolve.SetConstantBuffer("GlobalConstants", res.ConstantBuffer);
-            resolve.SetRWBuffer("gInOut_SharcHashEntriesBuffer", res.HashEntriesBuffer);
-            resolve.SetRWBuffer("gInOut_SharcAccumulated",       res.AccumulationBuffer);
-            resolve.SetRWBuffer("gInOut_SharcResolved",          res.ResolvedBuffer);
-
-            uint resolveGroups = (uint)((PathTracingFeature.Capacity + 255) / 256);
-            resolve.Dispatch(cmd, resolveGroups, 1, 1);
-
-            cmd.EndSample(RenderPassMarkers.SharcResolve);
-
             // ── SharcUpdate [numthreads(16,16,1)] ─────────────────────────────────
             cmd.BeginSample(RenderPassMarkers.SharcUpdate);
 
@@ -126,9 +113,9 @@ namespace PathTracing
             update.SetStructuredBuffer("gIn_PrimitiveData", nrd.PrimitiveDataBuf);
 
             // 4. SHARC UAVs
-            update.SetRWBuffer("gInOut_SharcHashEntriesBuffer", res.HashEntriesBuffer);
-            update.SetRWBuffer("gInOut_SharcAccumulated",       res.AccumulationBuffer);
-            update.SetRWBuffer("gInOut_SharcResolved",          res.ResolvedBuffer);
+            update.SetRWStructuredBuffer("gInOut_SharcHashEntriesBuffer", res.HashEntriesBuffer);
+            update.SetRWStructuredBuffer("gInOut_SharcAccumulated",       res.AccumulationBuffer);
+            update.SetRWStructuredBuffer("gInOut_SharcResolved",          res.ResolvedBuffer);
 
             // 5. Bindless material textures
             update.SetBindlessTexture("gIn_Textures", nrd.Textures);
@@ -158,6 +145,21 @@ namespace PathTracing
             update.Dispatch(cmd, groupsX, groupsY, 1);
 
             cmd.EndSample(RenderPassMarkers.SharcUpdate);
+
+            
+            
+            // ── SharcResolve [numthreads(256,1,1)] ────────────────────────────────
+            cmd.BeginSample(RenderPassMarkers.SharcResolve);
+
+            resolve.SetConstantBuffer("GlobalConstants", res.ConstantBuffer);
+            resolve.SetRWStructuredBuffer("gInOut_SharcHashEntriesBuffer", res.HashEntriesBuffer);
+            resolve.SetRWStructuredBuffer("gInOut_SharcAccumulated",       res.AccumulationBuffer);
+            resolve.SetRWStructuredBuffer("gInOut_SharcResolved",          res.ResolvedBuffer);
+
+            uint resolveGroups = (uint)((PathTracingFeature.Capacity + 255) / 256);
+            resolve.Dispatch(cmd, resolveGroups, 1, 1);
+
+            cmd.EndSample(RenderPassMarkers.SharcResolve);
         }
 
         // -------------------------------------------------------------------------

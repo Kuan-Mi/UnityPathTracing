@@ -138,6 +138,12 @@ namespace NativeRender
         public static extern int NR_RTS_SetRWBuffer(ulong handle,
             [MarshalAs(UnmanagedType.LPStr)] string name, IntPtr d3d12ResourcePtr);
 
+        /// <summary>Binds an RWStructuredBuffer (UAV) by HLSL variable name, with explicit element count and stride. Returns 1 on success.</summary>
+        [DllImport(DllName)]
+        public static extern int NR_RTS_SetRWStructuredBuffer(ulong handle,
+            [MarshalAs(UnmanagedType.LPStr)] string name, IntPtr d3d12ResourcePtr,
+            uint elementCount, uint elementStride);
+
         /// <summary>Binds a texture (SRV) by HLSL variable name. Returns 1 on success.</summary>
         [DllImport(DllName)]
         public static extern int NR_RTS_SetTexture(ulong handle,
@@ -340,6 +346,12 @@ namespace NativeRender
         /// <summary>Binds a StructuredBuffer by HLSL variable name, with explicit element count and stride. Returns 1 on success.</summary>
         [DllImport(DllName)]
         public static extern int NR_CS_SetStructuredBuffer(ulong handle,
+            [MarshalAs(UnmanagedType.LPStr)] string name, IntPtr d3d12ResourcePtr,
+            uint elementCount, uint elementStride);
+
+        /// <summary>Binds an RWStructuredBuffer (UAV) by HLSL variable name, with explicit element count and stride. Returns 1 on success.</summary>
+        [DllImport(DllName)]
+        public static extern int NR_CS_SetRWStructuredBuffer(ulong handle,
             [MarshalAs(UnmanagedType.LPStr)] string name, IntPtr d3d12ResourcePtr,
             uint elementCount, uint elementStride);
 

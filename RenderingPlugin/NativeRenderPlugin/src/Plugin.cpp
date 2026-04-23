@@ -405,6 +405,16 @@ NR_RTS_SetRWBuffer(uint64_t handle, const char* name, void* d3d12ResourcePtr)
 }
 
 extern "C" int32_t UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API
+NR_RTS_SetRWStructuredBuffer(uint64_t handle, const char* name, void* d3d12ResourcePtr,
+                              uint32_t elementCount, uint32_t elementStride)
+{
+    if (!handle) return 0;
+    return reinterpret_cast<RayTraceShader*>(handle)
+        ->SetRWStructuredBuffer(name, static_cast<ID3D12Resource*>(d3d12ResourcePtr),
+                                elementCount, elementStride) ? 1 : 0;
+}
+
+extern "C" int32_t UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API
 NR_RTS_SetTexture(uint64_t handle, const char* name, void* d3d12ResourcePtr)
 {
     if (!handle) return 0;
@@ -832,6 +842,16 @@ NR_CS_SetStructuredBuffer(uint64_t handle, const char* name, void* d3d12Resource
     return reinterpret_cast<ComputeShader*>(handle)
         ->SetStructuredBuffer(name, static_cast<ID3D12Resource*>(d3d12ResourcePtr),
                               elementCount, elementStride) ? 1 : 0;
+}
+
+extern "C" int32_t UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API
+NR_CS_SetRWStructuredBuffer(uint64_t handle, const char* name, void* d3d12ResourcePtr,
+                             uint32_t elementCount, uint32_t elementStride)
+{
+    if (!handle) return 0;
+    return reinterpret_cast<ComputeShader*>(handle)
+        ->SetRWStructuredBuffer(name, static_cast<ID3D12Resource*>(d3d12ResourcePtr),
+                                elementCount, elementStride) ? 1 : 0;
 }
 
 extern "C" int32_t UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API

@@ -131,6 +131,16 @@ namespace NativeRender
             NativeRenderPlugin.NR_RTS_SetRWBuffer(_handle, name, buffer.GetNativeBufferPtr());
         }
 
+        /// <summary>Binds a GraphicsBuffer as an RWStructuredBuffer UAV with explicit element count and stride.</summary>
+        public void SetRWStructuredBuffer(string name, GraphicsBuffer buffer)
+        {
+            if (!IsValid) return;
+            IntPtr ptr    = buffer != null ? buffer.GetNativeBufferPtr() : IntPtr.Zero;
+            uint   count  = buffer != null ? (uint)buffer.count  : 0;
+            uint   stride = buffer != null ? (uint)buffer.stride : 0;
+            NativeRenderPlugin.NR_RTS_SetRWStructuredBuffer(_handle, name, ptr, count, stride);
+        }
+
         /// <summary>Binds a Texture2D or RenderTexture as a read-only texture (SRV).</summary>
         public void SetTexture(string name, Texture texture)
         {
