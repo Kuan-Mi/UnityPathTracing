@@ -84,8 +84,9 @@ bool RayTraceShader::Initialize(ID3D12Device5* device, IUnityLog* log, Descripto
 //   Build the pipeline from pre-compiled DXIL bytes.
 //   Identical to the back half of LoadShaderFile (post-compilation).
 // -------------------------------------------------------------------------
-bool RayTraceShader::LoadShaderFromBytes(const uint8_t* dxilBytes, uint32_t size)
+bool RayTraceShader::LoadShaderFromBytes(const uint8_t* dxilBytes, uint32_t size, const char* name)
 {
+    m_name = (name && name[0]) ? name : "RayTraceShader";
     if (!dxilBytes || size == 0)
     {
         Log(kUnityLogTypeError, "RayTraceShader::LoadShaderFromBytes: empty input");
@@ -750,6 +751,11 @@ bool RayTraceShader::BuildRootSignature()
         Logf(kUnityLogTypeError, "RayTraceShader: CreateRootSignature failed (hr=0x%08X)", hr);
         return false;
     }
+    {
+        std::wstring wname(m_name.begin(), m_name.end());
+        wname += L"_RootSig";
+        m_rootSig->SetName(wname.c_str());
+    }
     return true;
 }
 
@@ -832,6 +838,11 @@ bool RayTraceShader::BuildPipeline(IDxcBlob* shaderLib)
     {
         Logf(kUnityLogTypeError, "RayTraceShader: CreateStateObject failed (hr=0x%08X)", hr);
         return false;
+    }
+    {
+        std::wstring wname(m_name.begin(), m_name.end());
+        wname += L"_PSO";
+        m_pso->SetName(wname.c_str());
     }
 
     Logf(kUnityLogTypeLog,

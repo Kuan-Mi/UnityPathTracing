@@ -51,7 +51,7 @@ namespace NativeRender
                 throw new InvalidOperationException(
                     $"[RayTracePipeline] Shader compilation failed for: {shader.GetHlslPath()}");
 
-            _handle = NativeRenderPlugin.NR_CreateRayTraceShaderFromBytes(dxil, (uint)dxil.Length);
+            _handle = NativeRenderPlugin.NR_CreateRayTraceShaderFromBytes(dxil, (uint)dxil.Length, shader.name);
             if (_handle == 0)
                 throw new InvalidOperationException(
                     $"[RayTracePipeline] NR_CreateRayTraceShaderFromBytes returned 0 for: {shader.name}");

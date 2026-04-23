@@ -489,7 +489,7 @@ NR_DestroyRayTraceShader(uint64_t handle)
 //   Caller owns the lifetime; call NR_DestroyRayTraceShader when done.
 // ---------------------------------------------------------------------------
 extern "C" uint64_t UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API
-NR_CreateRayTraceShaderFromBytes(const uint8_t* dxilBytes, uint32_t size)
+NR_CreateRayTraceShaderFromBytes(const uint8_t* dxilBytes, uint32_t size, const char* name)
 {
     if (!s_RendererReady)
     {
@@ -505,7 +505,7 @@ NR_CreateRayTraceShaderFromBytes(const uint8_t* dxilBytes, uint32_t size)
     }
     auto* shader = new RayTraceShader();
     if (!shader->Initialize(dev5, s_Log, &s_DescHeap, s_D3D12v8) ||
-        !shader->LoadShaderFromBytes(dxilBytes, size))
+        !shader->LoadShaderFromBytes(dxilBytes, size, name))
     {
         delete shader;
         dev5->Release();
@@ -885,7 +885,7 @@ struct CS_RenderEventData
 //   Returns an opaque uint64 handle on success, 0 on failure.
 // ---------------------------------------------------------------------------
 extern "C" uint64_t UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API
-NR_CreateComputeShader(const uint8_t* dxilBytes, uint32_t size)
+NR_CreateComputeShader(const uint8_t* dxilBytes, uint32_t size, const char* name)
 {
     if (!s_RendererReady)
     {
@@ -900,7 +900,7 @@ NR_CreateComputeShader(const uint8_t* dxilBytes, uint32_t size)
     }
     auto* cs = new ComputeShader();
     if (!cs->Initialize(device, s_Log, &s_DescHeap, s_D3D12v8) ||
-        !cs->LoadShaderFromBytes(dxilBytes, size))
+        !cs->LoadShaderFromBytes(dxilBytes, size, name))
     {
         delete cs;
         return 0;

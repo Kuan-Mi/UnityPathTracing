@@ -68,9 +68,6 @@ namespace PathTracing
 
         public override void Create()
         {
-            if (_nrdSampleResource == null)
-                _nrdSampleResource = new NRDSampleResource(setting.mergeBlas);
-
             if (_hashEntriesBuffer == null)
                 InitializeBuffers();
 
@@ -171,6 +168,11 @@ namespace PathTracing
                 Debug.LogWarning("NRDFeature: Missing required assets, skipping pass.");
                 return;
             }
+            
+            
+            if (_nrdSampleResource == null)
+                _nrdSampleResource = new NRDSampleResource(setting.mergeBlas);
+
 
             _nrdSampleResource.MergeBlas = setting.mergeBlas;
             NativeRender.NativeRenderPlugin.NR_FrameTick();
@@ -462,16 +464,18 @@ namespace PathTracing
                     DlssOutput               = pool.GetRT(RenderResourceType.DlssOutput),
                     taaDst                   = pool.GetRT(isEven ? RenderResourceType.TaaHistory : RenderResourceType.TaaHistoryPrev),
                     ViewZ                    = pool.GetRT(RenderResourceType.Viewz),
+                    Gradient = pool.GetRT(RenderResourceType.Gradient_Pong),
 
                     Output            = pool.GetRT(RenderResourceType.Final),
                     DirectEmission    = pool.GetRT(RenderResourceType.DirectEmission),
                     ComposedDiff      = pool.GetRT(RenderResourceType.ComposedDiff),
                     ComposedSpecViewZ = pool.GetRT(RenderResourceType.ComposedSpecViewZ),
+                    
                 };
 
                 _outputBlitPass.Setup(outputBlitResource, new OutputBlitPass.Settings
                 {
-                    showMode        = ShowMode.Out,
+                    showMode        = setting.showMode,
                     resolutionScale = frameState.resolutionScale,
                     enableDlssRR    = false,
                     showMV          = false,

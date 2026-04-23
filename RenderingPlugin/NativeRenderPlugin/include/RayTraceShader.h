@@ -69,7 +69,8 @@ public:
 
     // Build pipeline from pre-compiled DXIL bytes (e.g. deserialized from Unity asset cache).
     // Skips file I/O and shader compilation entirely.
-    bool LoadShaderFromBytes(const uint8_t* dxilBytes, uint32_t size);
+    // name is used as the D3D12 debug name for the PSO and root signature (optional).
+    bool LoadShaderFromBytes(const uint8_t* dxilBytes, uint32_t size, const char* name = nullptr);
 
     // --- Resource binding (all spaces) ---
     // Bind by HLSL variable name. Returns false if name not found or type mismatch.
@@ -124,6 +125,7 @@ private:
     ComPtr<ID3D12Device5>    m_device;
     DescriptorHeapAllocator* m_allocator = nullptr;
     IUnityGraphicsD3D12v8*   m_d3d12v8   = nullptr;
+    std::string              m_name;       // D3D12 debug name (set from C# via LoadShaderFromBytes)
 
     // Pipeline
     ComPtr<ID3D12StateObject>   m_pso;

@@ -49,6 +49,7 @@ namespace PathTracing
 
             internal RTHandle taaDst;
             internal RTHandle ViewZ;
+            internal RTHandle Gradient;
 
             internal RTHandle Output;
             internal RTHandle DirectEmission;
@@ -189,6 +190,10 @@ namespace PathTracing
                     break;
                 case ShowMode.ViewZ:
                     Blitter.BlitTexture(natCmd, data.Resource.ViewZ, scaleOffset, data.BlitMaterial, (int)ShowPass.ViewZ);
+                    break;
+                
+                case ShowMode.Gradient:
+                    Blitter.BlitTexture(natCmd, data.Resource.Gradient, scaleOffset, data.BlitMaterial, (int)ShowPass.Out);
                     break;
                 default:
                     throw new ArgumentOutOfRangeException();

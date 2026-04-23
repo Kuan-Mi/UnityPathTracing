@@ -51,7 +51,7 @@ namespace NativeRender
                 throw new InvalidOperationException(
                     $"[NativeComputePipeline] Shader compilation failed for: {shader.GetHlslPath()}");
 
-            _handle = NativeRenderPlugin.NR_CreateComputeShader(dxil, (uint)dxil.Length);
+            _handle = NativeRenderPlugin.NR_CreateComputeShader(dxil, (uint)dxil.Length, shader.name);
             if (_handle == 0)
                 throw new InvalidOperationException(
                     $"[NativeComputePipeline] NR_CreateComputeShader returned 0 for: {shader.name}");

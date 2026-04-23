@@ -33,6 +33,7 @@ namespace PathTracing
         DLSS_NormalRoughness,
         DLSS_Output,
         ViewZ,
+        Gradient,
     }
 
     public enum UpscalerMode : byte // Scaling factor       // Min jitter phases (or just use unclamped Halton2D)
@@ -407,6 +408,6 @@ namespace PathTracing
         public bool         SR                         = false;
         public bool         RR                         = false;
         public bool         confidence                 = true;
-
+        public ShowMode     showMode;
     }
 }
