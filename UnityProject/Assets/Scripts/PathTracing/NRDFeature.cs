@@ -472,7 +472,7 @@ namespace PathTracing
                     resolutionScale = frameState.resolutionScale,
                     enableDlssRR    = false,
                     showMV          = false,
-                    showValidation  = false,
+                    showValidation  = true,
                     showReference   = false,
                 });
                 renderer.EnqueuePass(_outputBlitPass);
