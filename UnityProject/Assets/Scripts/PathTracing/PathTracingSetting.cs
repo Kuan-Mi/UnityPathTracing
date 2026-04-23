@@ -339,6 +339,8 @@ namespace PathTracing
     [System.Serializable]
     public class NrdSampleSetting
     {
+        public bool showValidation = false;
+        public bool mergeBlas      = false;
         // ── Animation / timing (not used by shader, kept for completeness) ──
         // public double motionStartTime        = 0.0;
         // public float  emulateMotionSpeed     = 1.0f;
@@ -382,29 +384,29 @@ namespace PathTracing
         public float resolutionScale        = 1.0f;
         // public float sharpness              = 0.15f;
 
-        public int      maxAccumulatedFrameNum     = 31;
-        public int      maxFastAccumulatedFrameNum = 7;
-        public OnScreen onScreen                   = 0;
-        public int      forcedMaterial             = 0;
-        public int      denoiser                   = 0;  // 0 = DENOISER_REBLUR
-        public int      rpp                        = 1;
-        public int      bounceNum                  = 1;
-        public int      tracingMode                = 2;  // RESOLUTION_HALF
-        public bool     SHARC                      = true;
-        public bool     PSR                        = false;
-        public bool     indirectDiffuse            = true;
-        public bool     indirectSpecular           = true;
-        public bool     normalMap                  = true;
-        public bool     TAA                        = true;
-        public bool     emission                   = true;
-        public bool     importanceSampling         = true;
-        public bool     specularLobeTrimming       = true;
-        public bool     adaptiveAccumulation       = true;
-        public bool     usePrevFrame               = true;
-        public bool     boost                      = false;
-        public bool     SR                         = false;
-        public bool     RR                         = false;
-        public bool     confidence                 = true;
+        public int          maxAccumulatedFrameNum     = 31;
+        public int          maxFastAccumulatedFrameNum = 7;
+        public OnScreen     onScreen                   = 0;
+        public int          forcedMaterial             = 0;
+        public DenoiserType denoiser                   = 0;  // 0 = DENOISER_REBLUR
+        public int          rpp                        = 1;
+        public int          bounceNum                  = 1;
+        public RESOLUTION   tracingMode                = RESOLUTION.RESOLUTION_HALF;  // RESOLUTION_HALF
+        public bool         SHARC                      = true;
+        public bool         PSR                        = false;
+        public bool         indirectDiffuse            = true;
+        public bool         indirectSpecular           = true;
+        public bool         normalMap                  = true;
+        public bool         TAA                        = true;
+        public bool         emission                   = true;
+        public bool         importanceSampling         = true;
+        public bool         specularLobeTrimming       = true;
+        public bool         adaptiveAccumulation       = true;
+        public bool         usePrevFrame               = true;
+        public bool         boost                      = false;
+        public bool         SR                         = false;
+        public bool         RR                         = false;
+        public bool         confidence                 = true;
 
     }
 }

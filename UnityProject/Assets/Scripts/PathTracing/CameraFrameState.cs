@@ -755,21 +755,20 @@ namespace PathTracing
 
             // ── gPrevFrameConfidence ──────────────────────────────────────────────
             // C++: usePrevFrame && NRD_MODE < OCCLUSION && !RR && denoiser != REFERENCE
-            const int DENOISER_REFERENCE = 2;
-            float prevFrameConfidence = (settings.usePrevFrame && !settings.RR && settings.denoiser != DENOISER_REFERENCE)
+            float prevFrameConfidence = (settings.usePrevFrame && !settings.RR && settings.denoiser != DenoiserType.DENOISER_REFERENCE)
                 ? prevFrameMaxAccum / (1.0f + prevFrameMaxAccum)
                 : 0.0f;
 
             // ── gResolve ─────────────────────────────────────────────────────────
             // C++: (denoiser == REFERENCE || RR) ? false : m_Resolve
-            uint resolve = (settings.denoiser == DENOISER_REFERENCE || settings.RR) ? 0u : 1u;
+            uint resolve = (settings.denoiser == DenoiserType.DENOISER_REFERENCE || settings.RR) ? 0u : 1u;
 
             // ── gOrthoMode ───────────────────────────────────────────────────────
             // C++: (flags & PROJ_ORTHO) == 0 ? 0.0 : -1.0
             float orthoMode = cameraData.camera.orthographic ? 1.0f : 0f;
 
             // ── gTAA ─────────────────────────────────────────────────────────────
-            float taa = (settings.denoiser != DENOISER_REFERENCE && settings.TAA)
+            float taa = (settings.denoiser != DenoiserType.DENOISER_REFERENCE && settings.TAA)
                 ? 1.0f / (1.0f + taaMaxAccum)
                 : 1.0f;
 
@@ -846,7 +845,7 @@ namespace PathTracing
                 gUseNormalMap                              = settings.normalMap ? 1u : 0u,
                 gBounceNum                                 = (uint)settings.bounceNum,
                 gResolve                                   = resolve,
-                gValidation                                = 1u,
+                gValidation                                = settings.showValidation? 1u : 0u,
                 gSR                                        = (settings.SR && !settings.RR) ? 1u : 0u,
                 gRR                                        = settings.RR ? 1u : 0u,
                 gIsSrgb                                    = 0u,

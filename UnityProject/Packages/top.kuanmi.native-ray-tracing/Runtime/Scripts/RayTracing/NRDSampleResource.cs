@@ -51,7 +51,22 @@ namespace NativeRender
         private const uint kHandleEmissive    = 0xFFFF0003u;
 
         // ----- Mode -----
-        private readonly bool _mergeBlas;
+        private bool _mergeBlas;
+
+        /// <summary>
+        /// Switches between merged-BLAS and separate-BLAS mode at runtime.
+        /// Setting this triggers a full scene rebuild on the next <see cref="UpdateForFrame"/> call.
+        /// </summary>
+        public bool MergeBlas
+        {
+            get => _mergeBlas;
+            set
+            {
+                if (_mergeBlas == value) return;
+                _mergeBlas  = value;
+                _sceneDirty = true;
+            }
+        }
 
         // Identity 3x4 row-major transform (12 floats).
         private static readonly float[] kIdentity3x4 =
@@ -353,22 +368,29 @@ namespace NativeRender
 
             if (_mergeBlas)
             {
-                var  instList            = new List<InstanceDataNRD>();
-                var  primList            = new List<PrimitiveDataNRD>();
-                var  texPtrs             = new List<IntPtr>();
+                var  instList = new List<InstanceDataNRD>();
+                var  texPtrs  = new List<IntPtr>();
+
+                // Pre-allocate _primitiveCpu so Burst jobs write directly into it.
+                int totalPrimsMerged = CountGroupTriangles(opaque)
+                                     + CountGroupTriangles(transparent)
+                                     + CountGroupTriangles(emissive);
+                _primitiveCpu = new NativeArray<PrimitiveDataNRD>(
+                    Mathf.Max(totalPrimsMerged, 1), Allocator.Persistent, NativeArrayOptions.UninitializedMemory);
+
                 uint opaqueFirstInstance = instanceCursor;
                 _blasOpaque = BuildMergedBlas(opaque, ref instanceCursor, ref primitiveCursor,
-                    instList, primList, texPtrs,
+                    instList, _primitiveCpu, texPtrs,
                     FLAG_STATIC | FLAG_NON_TRANSPARENT);
 
                 uint transparentFirstInstance = instanceCursor;
                 _blasTransparent = BuildMergedBlas(transparent, ref instanceCursor, ref primitiveCursor,
-                    instList, primList, texPtrs,
+                    instList, _primitiveCpu, texPtrs,
                     FLAG_STATIC | FLAG_TRANSPARENT);
 
                 uint emissiveFirstInstance = instanceCursor;
                 _blasEmissive = BuildMergedBlas(emissive, ref instanceCursor, ref primitiveCursor,
-                    instList, primList, texPtrs,
+                    instList, _primitiveCpu, texPtrs,
                     FLAG_STATIC | FLAG_NON_TRANSPARENT | FLAG_EMISSIVE);
 
                 // Texture array.
@@ -379,9 +401,7 @@ namespace NativeRender
 
                 // Instance / primitive GPU buffers.
                 if (instList.Count == 0) instList.Add(default);
-                if (primList.Count == 0) primList.Add(default);
-                _instanceCpu  = instList.ToArray();
-                _primitiveCpu = new NativeArray<PrimitiveDataNRD>(primList.ToArray(), Allocator.Persistent);
+                _instanceCpu = instList.ToArray();
 
                 _instanceDataBuf = new GraphicsBuffer(GraphicsBuffer.Target.Structured,
                     _instanceCpu.Length, Marshal.SizeOf<InstanceDataNRD>());
@@ -719,131 +739,145 @@ namespace NativeRender
             ref uint instanceCursor,
             ref uint primitiveCursor,
             List<InstanceDataNRD> instList,
-            List<PrimitiveDataNRD> primList,
+            NativeArray<PrimitiveDataNRD> primOutput,
             List<IntPtr> texPtrs,
             uint baseFlags)
         {
             if (group.Count == 0) return null;
 
-            // First pass – sum sizes.
-            int totalVerts = 0, totalIndices = 0;
+            // First pass – sum sizes and build mesh list for AcquireReadOnlyMeshData.
+            var meshList     = new List<Mesh>(group.Count);
+            var validTargets = new List<(NativeRayTracingTarget target, MeshRenderer mr)>(group.Count);
+            int totalVerts   = 0, totalIndices = 0;
             foreach (var t in group)
             {
-                var mesh = t.GetComponent<MeshFilter>().sharedMesh;
-                totalVerts += mesh.vertexCount;
+                if (t == null) continue;
+                var mr = t.GetComponent<MeshRenderer>();
+                if (mr == null) continue;
+                var mf = mr.GetComponent<MeshFilter>();
+                if (mf == null || mf.sharedMesh == null) continue;
+                var mesh = mf.sharedMesh;
+                totalVerts   += mesh.vertexCount;
                 for (int s = 0; s < mesh.subMeshCount; s++)
                     totalIndices += (int)mesh.GetIndexCount(s);
+                validTargets.Add((t, mr));
+                meshList.Add(mesh);
             }
 
             if (totalVerts == 0 || totalIndices == 0) return null;
 
-            var positions    = new Vector3[totalVerts];
-            var indices      = new uint[totalIndices];
+            // Allocate merged VB/IB as NativeArrays so Burst jobs can write into them.
+            var mergedPos = new NativeArray<float3>(totalVerts,   Allocator.TempJob, NativeArrayOptions.UninitializedMemory);
+            var mergedIdx = new NativeArray<uint>  (totalIndices, Allocator.TempJob, NativeArrayOptions.UninitializedMemory);
+
+            var meshDataArr  = Mesh.AcquireReadOnlyMeshData(meshList);
             var submeshDescs = new List<NativeRenderPlugin.SubmeshDesc>();
-            int vWrite       = 0, iWrite = 0;
+            var jobHandles   = new List<JobHandle>(validTargets.Count * 4);
+            var tempArrays   = new List<System.IDisposable>(validTargets.Count * 5);
 
-            foreach (var target in group)
+            int vertBase = 0, iBase = 0;
+
+            for (int mi = 0; mi < validTargets.Count; mi++)
             {
-                Debug.Log($"Processing target '{target.name}' for merged BLAS with handle 0x{kHandleOpaque:X8}': " +
-                          $"{totalVerts} total verts, {totalIndices} total indices across {target.GetComponent<MeshFilter>().sharedMesh.subMeshCount} submeshes");
-                var       mr    = target.GetComponent<MeshRenderer>();
-                var       mesh  = mr.GetComponent<MeshFilter>().sharedMesh;
-                Matrix4x4 xform = target.transform.localToWorldMatrix;
+                var (target, mr) = validTargets[mi];
+                var mesh     = meshList[mi];
+                var meshData = meshDataArr[mi];
 
-                Vector3[] src   = mesh.vertices;
-                Vector3[] srcN  = mesh.normals;
-                Vector4[] srcT  = mesh.tangents;
-                Vector2[] srcUV = mesh.uv;
-
-                int vertBase = vWrite;
-
-                // Pre-transform positions into world space.
-                for (int k = 0; k < src.Length; k++)
-                    positions[vWrite++] = xform.MultiplyPoint3x4(src[k]);
-
-                // Normal-space transform (handles non-uniform scale).
+                Matrix4x4 xform        = target.transform.localToWorldMatrix;
                 Matrix4x4 normalMatrix = xform.inverse.transpose;
                 bool      leftHanded   = xform.determinant < 0f;
-                Vector3 s = new Vector3(
+                Vector3   sc           = new Vector3(
                     new Vector3(xform.m00, xform.m10, xform.m20).magnitude,
                     new Vector3(xform.m01, xform.m11, xform.m21).magnitude,
                     new Vector3(xform.m02, xform.m12, xform.m22).magnitude);
-                float scaleMax = Mathf.Max(s.x, Mathf.Max(s.y, s.z));
+                float scaleMax = Mathf.Max(sc.x, Mathf.Max(sc.y, sc.z));
+
+                int vertCount = mesh.vertexCount;
+
+                // Local vertex attribute arrays (TempJob lifetime spans job scheduling).
+                var localPos = new NativeArray<Vector3>(vertCount, Allocator.TempJob, NativeArrayOptions.UninitializedMemory);
+                var localN   = new NativeArray<Vector3>(vertCount, Allocator.TempJob, NativeArrayOptions.UninitializedMemory);
+                var localT   = new NativeArray<Vector4>(vertCount, Allocator.TempJob, NativeArrayOptions.UninitializedMemory);
+                var localUV  = new NativeArray<Vector2>(vertCount, Allocator.TempJob, NativeArrayOptions.UninitializedMemory);
+
+                meshData.GetVertices(localPos);
+                bool hasN  = meshData.HasVertexAttribute(VertexAttribute.Normal);
+                bool hasT  = meshData.HasVertexAttribute(VertexAttribute.Tangent);
+                bool hasUV = meshData.HasVertexAttribute(VertexAttribute.TexCoord0);
+                if (hasN)  meshData.GetNormals(localN);
+                if (hasT)  meshData.GetTangents(localT);
+                if (hasUV) meshData.GetUVs(0, localUV);
+
+                var posF3 = localPos.Reinterpret<float3>(sizeof(float) * 3);
+                var norF3 = localN.Reinterpret<float3>(sizeof(float) * 3);
+                var tanF4 = localT.Reinterpret<float4>(sizeof(float) * 4);
+                var uvF2  = localUV.Reinterpret<float2>(sizeof(float) * 2);
+
+                tempArrays.Add(localPos);
+                tempArrays.Add(localN);
+                tempArrays.Add(localT);
+                tempArrays.Add(localUV);
+
+                // Transform positions into world space → merged VB slice.
+                jobHandles.Add(new TransformVerticesJob
+                {
+                    LocalPositions = posF3,
+                    LocalToWorld   = (float4x4)xform,
+                    Output         = mergedPos.GetSubArray(vertBase, vertCount),
+                }.Schedule(vertCount, 64));
 
                 Material[] sharedMaterials = mr.sharedMaterials;
+                int        subCnt          = mesh.subMeshCount;
 
-                int subCnt = mesh.subMeshCount;
                 for (int sub = 0; sub < subCnt; sub++)
                 {
-                    Debug.Log($"  Processing submesh {sub} with {mesh.GetIndexCount(sub)} indices and material slot {(sub < sharedMaterials.Length ? sub : -1)}");
-                    // Each submesh gets its own InstanceDataNRD with its own primitiveOffset and material.
                     uint primitiveOffsetForSubMesh = primitiveCursor;
 
                     Material subMat    = (sub < sharedMaterials.Length) ? sharedMaterials[sub] : GetRepresentativeMaterial(mr);
                     int      subMatIdx = GetOrAddMaterial(subMat, texPtrs);
 
-                    int[] tris = mesh.GetTriangles(sub);
+                    int indexCount = (int)mesh.GetIndexCount(sub);
+                    int triCount   = indexCount / 3;
 
-                    // Record this submesh's IB offset/length inside the merged IB
-                    // (NRDSample stores one geometry per submesh in the merged BLAS).
-                    int submeshIndexStart = iWrite;
+                    var localTris = new NativeArray<int>(indexCount, Allocator.TempJob, NativeArrayOptions.UninitializedMemory);
+                    meshData.GetIndices(localTris, sub);
+                    tempArrays.Add(localTris);
+
+                    // Record submesh descriptor (IB offset inside merged IB, before remapping).
                     submeshDescs.Add(new NativeRenderPlugin.SubmeshDesc
                     {
-                        indexCount      = (uint)tris.Length,
-                        indexByteOffset = (uint)(submeshIndexStart * sizeof(uint)),
+                        indexCount      = (uint)indexCount,
+                        indexByteOffset = (uint)(iBase * sizeof(uint)),
                     });
 
-                    for (int i = 0; i + 2 < tris.Length; i += 3)
+                    // Remap local indices to global merged-VB space.
+                    jobHandles.Add(new RemapIndicesJob
                     {
-                        int i0 = tris[i + 0], i1 = tris[i + 1], i2 = tris[i + 2];
+                        LocalIndices = localTris,
+                        VertBase     = vertBase,
+                        Output       = mergedIdx.GetSubArray(iBase, indexCount),
+                    }.Schedule(indexCount, 128));
 
-                        // Append to merged IB (remap to global vertex space).
-                        indices[iWrite++] = (uint)(vertBase + i0);
-                        indices[iWrite++] = (uint)(vertBase + i1);
-                        indices[iWrite++] = (uint)(vertBase + i2);
+                    // Compute world-space PrimitiveDataNRD for this submesh.
+                    jobHandles.Add(new BuildMergedPrimitivesJob
+                    {
+                        Indices        = localTris,
+                        LocalPositions = posF3,
+                        LocalNormals   = norF3,
+                        LocalTangents  = tanF4,
+                        UVs            = uvF2,
+                        HasN           = hasN,
+                        HasT           = hasT,
+                        HasUV          = hasUV,
+                        LocalToWorld   = (float4x4)xform,
+                        NormalMatrix   = (float4x4)normalMatrix,
+                        Output         = primOutput.GetSubArray((int)primitiveOffsetForSubMesh, triCount),
+                    }.Schedule(triCount, 64));
 
-                        // PrimitiveData uses world-space normals / tangents / area.
-                        Vector3 p0 = positions[vertBase + i0];
-                        Vector3 p1 = positions[vertBase + i1];
-                        Vector3 p2 = positions[vertBase + i2];
+                    iBase           += indexCount;
+                    primitiveCursor += (uint)triCount;
 
-                        Vector2 uv0 = (srcUV != null && i0 < srcUV.Length) ? srcUV[i0] : Vector2.zero;
-                        Vector2 uv1 = (srcUV != null && i1 < srcUV.Length) ? srcUV[i1] : Vector2.zero;
-                        Vector2 uv2 = (srcUV != null && i2 < srcUV.Length) ? srcUV[i2] : Vector2.zero;
-
-                        float   worldArea = 0.5f * Vector3.Cross(p1 - p0, p2 - p0).magnitude;
-                        Vector2 du1       = uv1 - uv0, du2 = uv2 - uv0;
-                        float   uvArea    = 0.5f * Mathf.Abs(du1.x * du2.y - du1.y * du2.x);
-
-                        Vector3 n0 = TransformNormal(normalMatrix, srcN, i0);
-                        Vector3 n1 = TransformNormal(normalMatrix, srcN, i1);
-                        Vector3 n2 = TransformNormal(normalMatrix, srcN, i2);
-
-                        Vector4 t0 = TransformTangent(xform, srcT, i0);
-                        Vector4 t1 = TransformTangent(xform, srcT, i1);
-                        Vector4 t2 = TransformTangent(xform, srcT, i2);
-
-                        primList.Add(new PrimitiveDataNRD
-                        {
-                            uv0       = new half2(uv0),
-                            uv1       = new half2(uv1),
-                            uv2       = new half2(uv2),
-                            worldArea = worldArea,
-
-                            n0     = EncodeUnitVectorSigned(n0),
-                            n1     = EncodeUnitVectorSigned(n1),
-                            n2     = EncodeUnitVectorSigned(n2),
-                            uvArea = uvArea,
-
-                            t0            = EncodeUnitVectorSigned(new Vector3(t0.x, t0.y, t0.z)),
-                            t1            = EncodeUnitVectorSigned(new Vector3(t1.x, t1.y, t1.z)),
-                            t2            = EncodeUnitVectorSigned(new Vector3(t2.x, t2.y, t2.z)),
-                            bitangentSign = -t0.w,
-                        });
-                        primitiveCursor++;
-                    }
-
-                    // Emit one InstanceDataNRD per submesh.
+                    // InstanceDataNRD is built on the main thread.
                     uint baseTextureIndex = (uint)(subMatIdx * TexturesPerMaterial);
                     var inst = new InstanceDataNRD
                     {
@@ -861,18 +895,33 @@ namespace NativeRender
                     instList.Add(inst);
                     instanceCursor++;
                 }
+
+                vertBase += vertCount;
             }
 
-            // Upload merged VB/IB.
+            // Wait for all jobs.
+            var allHandles = new NativeArray<JobHandle>(jobHandles.Count, Allocator.Temp);
+            for (int i = 0; i < jobHandles.Count; i++) allHandles[i] = jobHandles[i];
+            JobHandle.CombineDependencies(allHandles).Complete();
+            allHandles.Dispose();
+
+            foreach (var arr in tempArrays) arr.Dispose();
+            meshDataArr.Dispose();
+
+            // Upload merged VB/IB to GPU buffers.
             var blas = new MergedBlas
             {
                 vertexCount  = (uint)totalVerts,
                 submeshDescs = submeshDescs.ToArray(),
-                vb           = new GraphicsBuffer(GraphicsBuffer.Target.Structured, totalVerts, sizeof(float) * 3),
+                vb           = new GraphicsBuffer(GraphicsBuffer.Target.Structured, totalVerts,   sizeof(float) * 3),
                 ib           = new GraphicsBuffer(GraphicsBuffer.Target.Structured, totalIndices, sizeof(uint)),
             };
-            blas.vb.SetData(positions);
-            blas.ib.SetData(indices);
+            blas.vb.SetData(mergedPos);
+            blas.ib.SetData(mergedIdx);
+
+            mergedPos.Dispose();
+            mergedIdx.Dispose();
+
             return blas;
         }
 
