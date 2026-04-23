@@ -46,8 +46,9 @@ bool ComputeShader::Initialize(ID3D12Device* device, IUnityLog* log, DescriptorH
 // LoadShaderFromBytes
 //   Build the pipeline from pre-compiled DXIL bytes.
 // ---------------------------------------------------------------------------
-bool ComputeShader::LoadShaderFromBytes(const uint8_t* dxilBytes, uint32_t size)
+bool ComputeShader::LoadShaderFromBytes(const uint8_t* dxilBytes, uint32_t size, const char* name)
 {
+    m_name = (name && name[0]) ? name : "ComputeShader";
     if (!dxilBytes || size == 0)
     {
         Log(kUnityLogTypeError, "ComputeShader::LoadShaderFromBytes: empty input");
@@ -97,7 +98,8 @@ bool ComputeShader::LoadShaderFromBytes(const uint8_t* dxilBytes, uint32_t size)
     if (!BuildRootSignature())              return false;
     if (!BuildPipeline(shaderBlob.Get()))   return false;
 
-    Logf(kUnityLogTypeLog, "ComputeShader: pipeline ready from bytes (%u SRV, %u UAV, %u CBV, %u SRV_ARRAY)",
+    Logf(kUnityLogTypeLog, "ComputeShader '%s': pipeline ready from bytes (%u SRV, %u UAV, %u CBV, %u SRV_ARRAY)",
+         m_name.c_str(),
          m_numSRV, m_numUAV, m_numCBV, m_numSRVArray);
     return true;
 }
@@ -466,6 +468,11 @@ bool ComputeShader::BuildRootSignature()
         Logf(kUnityLogTypeError, "ComputeShader: CreateRootSignature failed (hr=0x%08X)", hr);
         return false;
     }
+    {
+        std::wstring wname(m_name.begin(), m_name.end());
+        wname += L"_RootSig";
+        m_rootSig->SetName(wname.c_str());
+    }
     return true;
 }
 
@@ -484,6 +491,11 @@ bool ComputeShader::BuildPipeline(IDxcBlob* shaderBlob)
     {
         Logf(kUnityLogTypeError, "ComputeShader: CreateComputePipelineState failed (hr=0x%08X)", hr);
         return false;
+    }
+    {
+        std::wstring wname(m_name.begin(), m_name.end());
+        wname += L"_PSO";
+        m_pso->SetName(wname.c_str());
     }
     return true;
 }
@@ -887,9 +899,6 @@ void ComputeShader::Dispatch(
             }
             else if (b.type == ComputeBindingType::SRV_ARRAY && b.boundBT)
             {
-                // Transition every non-null texture in the bindless array to a state
-                // visible from the compute stage.  Unity typically leaves textures in
-                // LEGACY_PIXEL_SHADER_RESOURCE which is incompatible with compute.
                 for (uint32_t i = 0; i < b.boundBT->Capacity(); ++i)
                 {
                     ID3D12Resource* tex = b.boundBT->GetTexture(i);

@@ -137,9 +137,10 @@ namespace NativeRender
         /// Builds a DXR pipeline from pre-compiled DXIL bytes.  Returns an opaque handle
         /// on success, 0 on failure.  The byte array is copied internally; the caller does
         /// not need to keep it alive after this call returns.
+        /// name is used as the D3D12 debug name visible in PIX / RenderDoc (optional, can be null).
         /// </summary>
         [DllImport(DllName)]
-        public static extern ulong NR_CreateRayTraceShaderFromBytes(byte[] dxilBytes, uint size);
+        public static extern ulong NR_CreateRayTraceShaderFromBytes(byte[] dxilBytes, uint size, string name);
 
         /// <summary>Binds a raw/structured buffer (SRV) by HLSL variable name. Returns 1 on success.</summary>
         [DllImport(DllName)]
@@ -323,9 +324,10 @@ namespace NativeRender
         /// <summary>
         /// Builds a compute pipeline from pre-compiled DXIL bytes (cs_6_x).
         /// Returns an opaque handle on success, 0 on failure.
+        /// name is used as the D3D12 debug name visible in PIX / RenderDoc (optional, can be null).
         /// </summary>
         [DllImport(DllName)]
-        public static extern ulong NR_CreateComputeShader(byte[] dxilBytes, uint size);
+        public static extern ulong NR_CreateComputeShader(byte[] dxilBytes, uint size, string name);
 
         /// <summary>Destroys a ComputeShader created by NR_CreateComputeShader.</summary>
         [DllImport(DllName)]
