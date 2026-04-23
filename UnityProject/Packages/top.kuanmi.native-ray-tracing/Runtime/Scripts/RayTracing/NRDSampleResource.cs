@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.Runtime.InteropServices;
 using Unity.Collections;
+using Unity.Jobs;
 using Unity.Mathematics;
 using UnityEngine;
 using UnityEngine.Rendering;
@@ -465,7 +466,7 @@ namespace NativeRender
         {
             var swTotal = Stopwatch.StartNew();
 
-            // First pass: collect valid pairs, build mesh list, pre-allocate primList capacity.
+            // First pass: collect valid pairs, build mesh list, count total triangles.
             var validPairs    = new List<(NativeRayTracingTarget target, MeshRenderer mr, Mesh mesh, int meshIndex)>(group.Count);
             var meshList      = new List<Mesh>(group.Count);
             int totalTriCount = 0;
@@ -496,28 +497,34 @@ namespace NativeRender
                 return;
             }
 
-            // Single AcquireReadOnlyMeshData call for all meshes — avoids per-mesh tracking overhead.
+            // Flat output array for all primitives in this group — filled by Burst jobs.
+            var primNative = new NativeArray<PrimitiveDataNRD>(
+                totalTriCount, Allocator.TempJob, NativeArrayOptions.UninitializedMemory);
+
+            // Single AcquireReadOnlyMeshData call for all meshes.
             var meshDataArr = Mesh.AcquireReadOnlyMeshData(meshList);
+
+            // Per-job tracking — kept alive until all jobs Complete().
+            var jobHandles = new List<JobHandle>(validPairs.Count * 4);
+            var tempArrays = new List<System.IDisposable>(validPairs.Count * 5);
+            int localPrimOffset = 0; // local offset within primNative for the current submesh
 
             foreach (var (target, mr, mesh, meshIndex) in validPairs)
             {
                 Matrix4x4 xform = target.transform.localToWorldMatrix;
 
-                // Use the encapsulated AddInstance — it uses the mesh's native VB/IB.
+                // TLAS calls must happen on the main thread.
                 if (!tlas.AddInstance(mr))
                 {
                     Debug.LogWarning($"[NRDSampleResource] AddInstance failed for '{mr.name}' — skipping");
                     continue;
                 }
 
-                // InstanceID in HLSL = firstInstanceDataIndex so that InstanceID() + GeometryIndex()
-                // correctly indexes into _instanceDataBuf.
                 uint firstInstanceDataIndex = instanceCursor;
                 tlas.SetInstanceID(mr, firstInstanceDataIndex);
                 tlas.SetInstanceTransform(mr, xform);
                 tlas.SetInstanceMask(mr, GetMaskForFlags(baseFlags));
 
-                // Compute scale/handedness once for this renderer.
                 bool    leftHanded = xform.determinant < 0f;
                 Vector3 sc         = new Vector3(
                     new Vector3(xform.m00, xform.m10, xform.m20).magnitude,
@@ -525,18 +532,18 @@ namespace NativeRender
                     new Vector3(xform.m02, xform.m12, xform.m22).magnitude);
                 float scaleMax = Mathf.Max(sc.x, Mathf.Max(sc.y, sc.z));
 
-                int      vertCount = mesh.vertexCount;
-                int      subCnt    = mesh.subMeshCount;
-                var      meshData  = meshDataArr[meshIndex];
+                int vertCount = mesh.vertexCount;
+                int subCnt    = mesh.subMeshCount;
+                var meshData  = meshDataArr[meshIndex];
 
-                var nativePos = new NativeArray<Vector3>(vertCount, Allocator.Temp, NativeArrayOptions.UninitializedMemory);
-                var nativeN   = new NativeArray<Vector3>(vertCount, Allocator.Temp, NativeArrayOptions.UninitializedMemory);
-                var nativeT   = new NativeArray<Vector4>(vertCount, Allocator.Temp, NativeArrayOptions.UninitializedMemory);
-                var nativeUV  = new NativeArray<Vector2>(vertCount, Allocator.Temp, NativeArrayOptions.UninitializedMemory);
+                // Vertex attribute arrays — TempJob so they stay valid across job scheduling.
+                var nativePos = new NativeArray<Vector3>(vertCount, Allocator.TempJob, NativeArrayOptions.UninitializedMemory);
+                var nativeN   = new NativeArray<Vector3>(vertCount, Allocator.TempJob, NativeArrayOptions.UninitializedMemory);
+                var nativeT   = new NativeArray<Vector4>(vertCount, Allocator.TempJob, NativeArrayOptions.UninitializedMemory);
+                var nativeUV  = new NativeArray<Vector2>(vertCount, Allocator.TempJob, NativeArrayOptions.UninitializedMemory);
 
                 meshData.GetVertices(nativePos);
 
-                // Hoist attribute-presence checks outside the inner triangle loop.
                 bool hasN  = meshData.HasVertexAttribute(VertexAttribute.Normal);
                 bool hasT  = meshData.HasVertexAttribute(VertexAttribute.Tangent);
                 bool hasUV = meshData.HasVertexAttribute(VertexAttribute.TexCoord0);
@@ -544,6 +551,18 @@ namespace NativeRender
                 if (hasN)  meshData.GetNormals(nativeN);
                 if (hasT)  meshData.GetTangents(nativeT);
                 if (hasUV) meshData.GetUVs(0, nativeUV);
+
+                // Reinterpret vertex buffers as Unity.Mathematics types for the Burst job.
+                var posF3 = nativePos.Reinterpret<float3>(sizeof(float) * 3);
+                var norF3 = nativeN.Reinterpret<float3>(sizeof(float) * 3);
+                var tanF4 = nativeT.Reinterpret<float4>(sizeof(float) * 4);
+                var uvF2  = nativeUV.Reinterpret<float2>(sizeof(float) * 2);
+
+                // Track for disposal after Complete().
+                tempArrays.Add(nativePos);
+                tempArrays.Add(nativeN);
+                tempArrays.Add(nativeT);
+                tempArrays.Add(nativeUV);
 
                 Material[] sharedMaterials = mr.sharedMaterials;
 
@@ -555,58 +574,31 @@ namespace NativeRender
                     int      subMatIdx = GetOrAddMaterial(subMat, texPtrs);
 
                     int indexCount = (int)mesh.GetIndexCount(sub);
-                    var nativeTris = new NativeArray<int>(indexCount, Allocator.Temp, NativeArrayOptions.UninitializedMemory);
+                    int triCount   = indexCount / 3;
+
+                    var nativeTris = new NativeArray<int>(indexCount, Allocator.TempJob, NativeArrayOptions.UninitializedMemory);
                     meshData.GetIndices(nativeTris, sub);
+                    tempArrays.Add(nativeTris);
 
-                    for (int i = 0; i + 2 < indexCount; i += 3)
+                    // Schedule Burst job for this submesh's triangle range.
+                    var job = new BuildPrimitivesJob
                     {
-                        int i0 = nativeTris[i], i1 = nativeTris[i + 1], i2 = nativeTris[i + 2];
+                        Indices   = nativeTris,
+                        Positions = posF3,
+                        Normals   = norF3,
+                        Tangents  = tanF4,
+                        UVs       = uvF2,
+                        HasN      = hasN,
+                        HasT      = hasT,
+                        HasUV     = hasUV,
+                        Output    = primNative.GetSubArray(localPrimOffset, triCount),
+                    };
+                    jobHandles.Add(job.Schedule(triCount, 64));
 
-                        Vector3 p0 = nativePos[i0];
-                        Vector3 p1 = nativePos[i1];
-                        Vector3 p2 = nativePos[i2];
+                    localPrimOffset  += triCount;
+                    primitiveCursor  += (uint)triCount;
 
-                        Vector2 uv0 = hasUV ? nativeUV[i0] : Vector2.zero;
-                        Vector2 uv1 = hasUV ? nativeUV[i1] : Vector2.zero;
-                        Vector2 uv2 = hasUV ? nativeUV[i2] : Vector2.zero;
-
-                        float   worldArea = 0.5f * Vector3.Cross(p1 - p0, p2 - p0).magnitude;
-                        Vector2 du1       = uv1 - uv0, du2 = uv2 - uv0;
-                        float   uvArea    = 0.5f * Mathf.Abs(du1.x * du2.y - du1.y * du2.x);
-
-                        // Object-space normals/tangents — shader uses mOverloadedMatrix to transform them.
-                        Vector3 rn0 = hasN ? nativeN[i0] : Vector3.up;
-                        Vector3 rn1 = hasN ? nativeN[i1] : Vector3.up;
-                        Vector3 rn2 = hasN ? nativeN[i2] : Vector3.up;
-                        Vector3 n0  = rn0.sqrMagnitude > 1e-12f ? rn0.normalized : Vector3.up;
-                        Vector3 n1  = rn1.sqrMagnitude > 1e-12f ? rn1.normalized : Vector3.up;
-                        Vector3 n2  = rn2.sqrMagnitude > 1e-12f ? rn2.normalized : Vector3.up;
-
-                        Vector4 t0 = hasT ? nativeT[i0] : new Vector4(1f, 0f, 0f, 1f);
-                        Vector4 t1 = hasT ? nativeT[i1] : new Vector4(1f, 0f, 0f, 1f);
-                        Vector4 t2 = hasT ? nativeT[i2] : new Vector4(1f, 0f, 0f, 1f);
-
-                        primList.Add(new PrimitiveDataNRD
-                        {
-                            uv0           = new half2(uv0),
-                            uv1           = new half2(uv1),
-                            uv2           = new half2(uv2),
-                            worldArea     = worldArea,
-                            n0            = EncodeUnitVectorSigned(n0),
-                            n1            = EncodeUnitVectorSigned(n1),
-                            n2            = EncodeUnitVectorSigned(n2),
-                            uvArea        = uvArea,
-                            t0            = EncodeUnitVectorSigned(new Vector3(t0.x, t0.y, t0.z)),
-                            t1            = EncodeUnitVectorSigned(new Vector3(t1.x, t1.y, t1.z)),
-                            t2            = EncodeUnitVectorSigned(new Vector3(t2.x, t2.y, t2.z)),
-                            bitangentSign = -t0.w,
-                        });
-                        primitiveCursor++;
-                    }
-
-                    nativeTris.Dispose();
-
-                    // InstanceDataNRD: mOverloadedMatrix = localToWorldMatrix (object-space VB).
+                    // InstanceDataNRD is built on the main thread (depends on material + transform).
                     uint baseTextureIndex = (uint)(subMatIdx * TexturesPerMaterial);
                     var inst = new InstanceDataNRD
                     {
@@ -624,11 +616,6 @@ namespace NativeRender
                     instanceCursor++;
                 }
 
-                nativePos.Dispose();
-                nativeN.Dispose();
-                nativeT.Dispose();
-                nativeUV.Dispose();
-
                 // Record per-target state for transform-only updates.
                 _perTargetBlas[(int)(uint)mr.GetInstanceID()] = new PerTargetBlas
                 {
@@ -640,7 +627,24 @@ namespace NativeRender
                 };
             }
 
+            // Wait for all Burst jobs to finish.
+            var allHandles = new NativeArray<JobHandle>(jobHandles.Count, Allocator.Temp);
+            for (int i = 0; i < jobHandles.Count; i++)
+                allHandles[i] = jobHandles[i];
+            JobHandle.CombineDependencies(allHandles).Complete();
+            allHandles.Dispose();
+
+            // Dispose all temporary vertex / index arrays.
+            foreach (var arr in tempArrays)
+                arr.Dispose();
+
             meshDataArr.Dispose();
+
+            // Append the Burst-computed primitives to the managed list.
+            for (int i = 0; i < primNative.Length; i++)
+                primList.Add(primNative[i]);
+
+            primNative.Dispose();
 
             swTotal.Stop();
             Debug.Log($"[ProcessSeparateGroup] Total: {swTotal.Elapsed.TotalMilliseconds:F2} ms  ({validPairs.Count} renderers, {totalTriCount} tris, flags=0x{baseFlags:X})");
