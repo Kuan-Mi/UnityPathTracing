@@ -1,4 +1,5 @@
 #include "BindlessTexture.h"
+#include "PluginInternal.h"
 #include <cstdio>
 #include <cassert>
 
@@ -74,8 +75,8 @@ void BindlessTexture::Resize(uint32_t newCapacity)
     if (newCapacity == 0) newCapacity = 1;
     if (newCapacity == m_capacity) return;
 
-    // Free old range and allocate new one
-    m_allocator->Free(m_allocBase, m_capacity);
+    // Defer freeing the old descriptor range until the GPU is done with it.
+    NR_EnqueueDescriptorRangeFree(m_allocator, m_allocBase, m_capacity);
     m_allocBase = m_allocator->Allocate(newCapacity);
 
     // Resize texture pointer array (preserving existing entries up to min)
