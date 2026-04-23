@@ -129,7 +129,7 @@ namespace NativeRender
             /// <summary>Which TLAS this renderer belongs to (worldAS or lightAS).</summary>
             public RayTracingAccelerationStructure tlas;
 
-            /// <summary>Index of this renderer's first submesh in _instanceDataBuf.</summary>
+            /// <summary>Index of this renderer's first submesh in _instanceDataBuf (= first contiguous slot).</summary>
             public uint firstInstanceDataIndex;
 
             /// <summary>Number of submeshes (= number of InstanceDataNRD entries).</summary>
@@ -140,13 +140,27 @@ namespace NativeRender
 
             /// <summary>Category flags used when the instance data was last written.</summary>
             public uint baseFlags;
+
+            /// <summary>Starting element index in _primitiveCpu for each submesh.</summary>
+            public uint[] primitiveOffsets;
+
+            /// <summary>Triangle count for each submesh (matches primitiveOffsets length).</summary>
+            public int[] primitiveCounts;
         }
 
         // Keyed by MeshRenderer.GetInstanceID()
         private readonly Dictionary<int, PerTargetBlas> _perTargetBlas = new();
 
+        // ----- Separate-BLAS incremental slot management -----
+        // One allocator per buffer; both track element-level free/used ranges.
+        private readonly PrimitiveSlotAllocator _instanceAlloc = new PrimitiveSlotAllocator { Name = "InstanceAlloc" };
+        private readonly PrimitiveSlotAllocator _primAlloc     = new PrimitiveSlotAllocator { Name = "PrimitiveAlloc" };
+
+        // Fragmentation thresholds: trigger MarkRebuildDirty when both conditions are met.
+        private const float kFragThreshold    = 0.5f;
+        private const uint  kFragMinFreeCount = 10_000;
+
         // ----- Tracking for dirty-detection -----
-        private readonly List<NativeRayTracingTarget> _registeredTargets = new();
         private readonly Dictionary<Material, int>    _materialSlots     = new();
 
         private bool _sceneDirty = true;
@@ -175,12 +189,12 @@ namespace NativeRender
         {
             var targets = NativeRayTracingTarget.All;
 
-            if (_sceneDirty || TargetSetChanged(targets))
+            // Consume all pending Add/Remove events submitted by NativeRayTracingTarget lifecycle callbacks.
+            DrainChangeQueue();
+
+            if (_sceneDirty)
             {
-                // Full rebuild required (structure changed or forced dirty).
                 RebuildScene(targets);
-                _registeredTargets.Clear();
-                _registeredTargets.AddRange(targets);
                 foreach (var t in targets)
                     if (t != null)
                         t.transform.hasChanged = false;
@@ -195,8 +209,6 @@ namespace NativeRender
                     // Merged mode: vertices are pre-transformed → must rebuild geometry.
                     // But textures/materials are unchanged, so we can preserve them.
                     RebuildScene(targets, preserveTextures: true);
-                    _registeredTargets.Clear();
-                    _registeredTargets.AddRange(targets);
                 }
                 else
                 {
@@ -207,6 +219,75 @@ namespace NativeRender
                 foreach (var t in targets)
                     if (t != null)
                         t.transform.hasChanged = false;
+            }
+        }
+
+        /// <summary>
+        /// Drains all pending <see cref="TargetChange"/> events from
+        /// <see cref="NativeRayTracingTarget.ChangeQueue"/> and applies them.
+        /// <para>In merged mode, any structural change sets <see cref="_sceneDirty"/>.</para>
+        /// <para>In separate mode, additions and removals are applied incrementally.</para>
+        /// </summary>
+        private void DrainChangeQueue()
+        {
+            if (_mergeBlas)
+            {
+                // Merged mode: any structural change needs a full rebuild.
+                // Drain both queues without inspecting contents.
+                if (NativeRayTracingTarget.RemoveQueue.Count > 0 || NativeRayTracingTarget.AddQueue.Count > 0)
+                {
+                    NativeRayTracingTarget.RemoveQueue.Clear();
+                    NativeRayTracingTarget.AddQueue.Clear();
+                    _sceneDirty = true;
+                }
+                return;
+            }
+
+            // Separate mode — process removals first so freed slots can be reused by additions.
+            while (NativeRayTracingTarget.RemoveQueue.Count > 0)
+            {
+                var ev = NativeRayTracingTarget.RemoveQueue.Dequeue();
+                RemoveTargetIncremental(ev.RendererInstanceId);
+            }
+
+            while (NativeRayTracingTarget.AddQueue.Count > 0)
+            {
+                var ev = NativeRayTracingTarget.AddQueue.Dequeue();
+
+                // Target or Renderer may be null if the object was destroyed before we consumed the event.
+                if (ev.Target == null || ev.Renderer == null) continue;
+
+                // If the target introduces a new material we can't grow _textures
+                // incrementally — fall back to a full rebuild.
+                bool hasNewMaterial = false;
+                foreach (var mat in ev.Renderer.sharedMaterials)
+                    if (mat != null && !_materialSlots.ContainsKey(mat)) { hasNewMaterial = true; break; }
+
+                if (hasNewMaterial)
+                {
+                    _sceneDirty = true;
+                    // Drain the rest of the add queue — rebuild will cover them all.
+                    NativeRayTracingTarget.AddQueue.Clear();
+                    return;
+                }
+
+                Material rep           = GetRepresentativeMaterial(ev.Renderer);
+                bool     isTransparent = IsMaterialTransparent(rep);
+                bool     isEmissive    = IsMaterialEmissive(rep);
+
+                uint worldFlags = FLAG_STATIC | (isTransparent ? FLAG_TRANSPARENT : FLAG_NON_TRANSPARENT);
+                AddTargetIncremental(ev.Target, _worldAS, worldFlags);
+
+                if (isEmissive)
+                    AddTargetIncremental(ev.Target, _lightAS, FLAG_STATIC | FLAG_NON_TRANSPARENT | FLAG_EMISSIVE);
+            }
+
+            // Auto-schedule full rebuild when fragmentation becomes excessive.
+            if (_primAlloc.FragmentationRatio > kFragThreshold &&
+                _primAlloc.TotalFreeCount     > kFragMinFreeCount)
+            {
+                Debug.Log($"[NRDSampleResource] Primitive buffer fragmentation {_primAlloc.FragmentationRatio:P0} — scheduling full rebuild.");
+                _sceneDirty = true;
             }
         }
 
@@ -307,17 +388,11 @@ namespace NativeRender
             _instanceCpu = null;
             if (_primitiveCpu.IsCreated) { _primitiveCpu.Dispose(); _primitiveCpu = default; }
 
+            _instanceAlloc.Reset(0);
+            _primAlloc.Reset(0);
+
             if (!preserveTextures)
                 _materialSlots.Clear();
-        }
-
-        private bool TargetSetChanged(IReadOnlyList<NativeRayTracingTarget> current)
-        {
-            if (current.Count != _registeredTargets.Count) return true;
-            for (int i = 0; i < current.Count; i++)
-                if (current[i] != _registeredTargets[i])
-                    return true;
-            return false;
         }
 
         private static bool AnyTransformChanged(IReadOnlyList<NativeRayTracingTarget> targets)
@@ -502,6 +577,10 @@ namespace NativeRender
             _primitiveDataBuf = new GraphicsBuffer(GraphicsBuffer.Target.Structured,
                 _primitiveCpu.Length, Marshal.SizeOf<PrimitiveDataNRD>());
             _primitiveDataBuf.SetData(_primitiveCpu);
+
+            // Initialize slot allocators to reflect the just-built fully-packed layout.
+            _instanceAlloc.ResetFullyAllocated(_instanceCpu.Length);
+            _primAlloc.ResetFullyAllocated(Mathf.Max(totalPrims, 1));
         }
 
         private void ProcessSeparateGroup(
@@ -606,6 +685,8 @@ namespace NativeRender
                 tempArrays.Add(nativeUV);
 
                 Material[] sharedMaterials = mr.sharedMaterials;
+                var subPrimOffsets = new uint[subCnt];
+                var subPrimCounts  = new int[subCnt];
 
                 for (int sub = 0; sub < subCnt; sub++)
                 {
@@ -616,6 +697,9 @@ namespace NativeRender
 
                     int indexCount = (int)mesh.GetIndexCount(sub);
                     int triCount   = indexCount / 3;
+
+                    subPrimOffsets[sub] = primitiveOffsetForSubMesh;
+                    subPrimCounts[sub]  = triCount;
 
                     var nativeTris = new NativeArray<int>(indexCount, Allocator.TempJob, NativeArrayOptions.UninitializedMemory);
                     meshData.GetIndices(nativeTris, sub);
@@ -665,6 +749,8 @@ namespace NativeRender
                     submeshCount           = subCnt,
                     lastTransform          = xform,
                     baseFlags              = baseFlags,
+                    primitiveOffsets       = subPrimOffsets,
+                    primitiveCounts        = subPrimCounts,
                 };
             }
 
@@ -736,6 +822,262 @@ namespace NativeRender
             if (anyChanged)
                 _instanceDataBuf?.SetData(_instanceCpu);
         }
+
+        // =====================================================================
+        // Incremental add / remove (separate-BLAS mode only)
+        // =====================================================================
+
+        /// <summary>
+        /// Diffs <paramref name="current"/> against <see cref="_registeredTargets"/>, removes
+        /// <summary>
+        /// Removes a single target's TLAS instance and returns its GPU slots to the free pools.
+        /// </summary>
+        private void RemoveTargetIncremental(int rendererInstanceId)
+        {
+            if (!_perTargetBlas.TryGetValue(rendererInstanceId, out var info)) return;
+
+            // Use the MeshRenderer stored at registration time.
+            info.tlas.RemoveInstance(rendererInstanceId);
+
+            // Return contiguous instance slots.
+            _instanceAlloc.Free(info.firstInstanceDataIndex, info.submeshCount);
+            for (int sub = 0; sub < info.submeshCount; sub++)
+            {
+                int slotIdx = (int)info.firstInstanceDataIndex + sub;
+                if (slotIdx < _instanceCpu.Length)
+                    _instanceCpu[slotIdx] = default; // zero-out tombstone
+            }
+
+            // Return per-submesh primitive slots.
+            if (info.primitiveOffsets != null)
+                for (int sub = 0; sub < info.primitiveOffsets.Length; sub++)
+                    _primAlloc.Free(info.primitiveOffsets[sub], info.primitiveCounts[sub]);
+
+            _perTargetBlas.Remove(rendererInstanceId);
+
+            // Upload zeroed instance slots. Partial upload over the contiguous block.
+            _instanceDataBuf?.SetData(_instanceCpu,
+                (int)info.firstInstanceDataIndex,
+                (int)info.firstInstanceDataIndex,
+                info.submeshCount);
+        }
+
+        /// <summary>
+        /// Adds a single target to <paramref name="tlas"/> without touching any other renderer.
+        /// Allocates contiguous instance and primitive slots, grows backing buffers if needed,
+        /// schedules a Burst job for primitive data, then partial-uploads changed ranges to the GPU.
+        /// </summary>
+        private void AddTargetIncremental(
+            NativeRayTracingTarget target,
+            RayTracingAccelerationStructure tlas,
+            uint baseFlags)
+        {
+            if (target == null) return;
+            var mr = target.GetComponent<MeshRenderer>();
+            if (mr == null) return;
+            var mf = mr.GetComponent<MeshFilter>();
+            if (mf == null || mf.sharedMesh == null) return;
+
+            Mesh mesh   = mf.sharedMesh;
+            int  subCnt = mesh.subMeshCount;
+
+            if (!tlas.AddInstance(mr))
+            {
+                Debug.LogWarning($"[NRDSampleResource] AddTargetIncremental: AddInstance failed for '{mr.name}'");
+                return;
+            }
+
+            Matrix4x4 xform = target.transform.localToWorldMatrix;
+            tlas.SetInstanceTransform(mr, xform);
+            tlas.SetInstanceMask(mr, GetMaskForFlags(baseFlags));
+
+            bool    leftHanded = xform.determinant < 0f;
+            Vector3 sc         = new Vector3(
+                new Vector3(xform.m00, xform.m10, xform.m20).magnitude,
+                new Vector3(xform.m01, xform.m11, xform.m21).magnitude,
+                new Vector3(xform.m02, xform.m12, xform.m22).magnitude);
+            float scaleMax = Mathf.Max(sc.x, Mathf.Max(sc.y, sc.z));
+
+            // ------------------------------------------------------------------
+            // Allocate a contiguous block of instance slots.
+            // ------------------------------------------------------------------
+            uint instBase = _instanceAlloc.Allocate(subCnt);
+            if (instBase == PrimitiveSlotAllocator.InvalidOffset)
+            {
+                int newInstCap = Mathf.Max((int)_instanceAlloc.Capacity * 2,
+                                            (int)_instanceAlloc.Capacity + subCnt);
+                EnsureInstanceCapacity(newInstCap);
+                instBase = _instanceAlloc.Allocate(subCnt);
+            }
+
+            tlas.SetInstanceID(mr, instBase);
+
+            // ------------------------------------------------------------------
+            // Build per-submesh primitive + instance data.
+            // ------------------------------------------------------------------
+            var subPrimOffsets = new uint[subCnt];
+            var subPrimCounts  = new int[subCnt];
+
+            var meshDataArr = Mesh.AcquireReadOnlyMeshData(mesh);
+            var meshData    = meshDataArr[0];
+
+            int vertCount = mesh.vertexCount;
+            var nativePos = new NativeArray<Vector3>(vertCount, Allocator.TempJob, NativeArrayOptions.UninitializedMemory);
+            var nativeN   = new NativeArray<Vector3>(vertCount, Allocator.TempJob, NativeArrayOptions.UninitializedMemory);
+            var nativeT   = new NativeArray<Vector4>(vertCount, Allocator.TempJob, NativeArrayOptions.UninitializedMemory);
+            var nativeUV  = new NativeArray<Vector2>(vertCount, Allocator.TempJob, NativeArrayOptions.UninitializedMemory);
+
+            meshData.GetVertices(nativePos);
+            bool hasN  = meshData.HasVertexAttribute(VertexAttribute.Normal);
+            bool hasT  = meshData.HasVertexAttribute(VertexAttribute.Tangent);
+            bool hasUV = meshData.HasVertexAttribute(VertexAttribute.TexCoord0);
+            if (hasN)  meshData.GetNormals(nativeN);
+            if (hasT)  meshData.GetTangents(nativeT);
+            if (hasUV) meshData.GetUVs(0, nativeUV);
+
+            var posF3 = nativePos.Reinterpret<float3>(sizeof(float) * 3);
+            var norF3 = nativeN.Reinterpret<float3>(sizeof(float) * 3);
+            var tanF4 = nativeT.Reinterpret<float4>(sizeof(float) * 4);
+            var uvF2  = nativeUV.Reinterpret<float2>(sizeof(float) * 2);
+
+            var jobHandles = new List<JobHandle>(subCnt);
+            var tempTris   = new List<NativeArray<int>>(subCnt);
+
+            Material[] sharedMaterials = mr.sharedMaterials;
+
+            for (int sub = 0; sub < subCnt; sub++)
+            {
+                Material subMat    = (sub < sharedMaterials.Length) ? sharedMaterials[sub] : GetRepresentativeMaterial(mr);
+                // GetOrAddMaterial with an empty texPtrs list — all materials are already registered.
+                int      subMatIdx = _materialSlots.TryGetValue(subMat, out int existing) ? existing : 0;
+
+                int  indexCount = (int)mesh.GetIndexCount(sub);
+                int  triCount   = indexCount / 3;
+
+                // Allocate primitive slot (may grow the buffer).
+                uint primOffset = _primAlloc.Allocate(triCount);
+                if (primOffset == PrimitiveSlotAllocator.InvalidOffset)
+                {
+                    int newPrimCap = Mathf.Max((int)_primAlloc.Capacity * 2,
+                                               (int)_primAlloc.Capacity + triCount);
+                    EnsurePrimitiveCapacity(newPrimCap);
+                    primOffset = _primAlloc.Allocate(triCount);
+                }
+
+                subPrimOffsets[sub] = primOffset;
+                subPrimCounts[sub]  = triCount;
+
+                var nativeTris = new NativeArray<int>(indexCount, Allocator.TempJob, NativeArrayOptions.UninitializedMemory);
+                meshData.GetIndices(nativeTris, sub);
+                tempTris.Add(nativeTris);
+
+                jobHandles.Add(new BuildPrimitivesJob
+                {
+                    Indices   = nativeTris,
+                    Positions = posF3,
+                    Normals   = norF3,
+                    Tangents  = tanF4,
+                    UVs       = uvF2,
+                    HasN      = hasN,
+                    HasT      = hasT,
+                    HasUV     = hasUV,
+                    Output    = _primitiveCpu.GetSubArray((int)primOffset, triCount),
+                }.Schedule(triCount, 64));
+
+                uint instSlot         = instBase + (uint)sub;
+                uint baseTextureIndex = (uint)(subMatIdx * TexturesPerMaterial);
+                _instanceCpu[instSlot] = new InstanceDataNRD
+                {
+                    mOverloadedMatrix0    = new Vector4(xform.m00, xform.m01, xform.m02, xform.m03),
+                    mOverloadedMatrix1    = new Vector4(xform.m10, xform.m11, xform.m12, xform.m13),
+                    mOverloadedMatrix2    = new Vector4(xform.m20, xform.m21, xform.m22, xform.m23),
+                    textureOffsetAndFlags = baseTextureIndex | (baseFlags << FlagFirstBit),
+                    primitiveOffset       = primOffset,
+                    scale                 = (leftHanded ? -1f : 1f) * scaleMax,
+                    morphPrimitiveOffset  = 0,
+                };
+                EncodeMaterial(subMat, ref _instanceCpu[instSlot]);
+            }
+
+            // Wait for all Burst jobs.
+            var allHandles = new NativeArray<JobHandle>(jobHandles.Count, Allocator.Temp);
+            for (int i = 0; i < jobHandles.Count; i++) allHandles[i] = jobHandles[i];
+            JobHandle.CombineDependencies(allHandles).Complete();
+            allHandles.Dispose();
+
+            foreach (var arr in tempTris) arr.Dispose();
+            nativePos.Dispose(); nativeN.Dispose(); nativeT.Dispose(); nativeUV.Dispose();
+            meshDataArr.Dispose();
+
+            // Partial GPU uploads — only the ranges we touched.
+            _instanceDataBuf.SetData(_instanceCpu, (int)instBase, (int)instBase, subCnt);
+            for (int sub = 0; sub < subCnt; sub++)
+                _primitiveDataBuf.SetData(_primitiveCpu,
+                    (int)subPrimOffsets[sub], (int)subPrimOffsets[sub], subPrimCounts[sub]);
+
+            _perTargetBlas[mr.GetInstanceID()] = new PerTargetBlas
+            {
+                tlas                   = tlas,
+                firstInstanceDataIndex = instBase,
+                submeshCount           = subCnt,
+                lastTransform          = xform,
+                baseFlags              = baseFlags,
+                primitiveOffsets       = subPrimOffsets,
+                primitiveCounts        = subPrimCounts,
+            };
+        }
+
+        /// <summary>
+        /// Grows <see cref="_instanceCpu"/> and <see cref="_instanceDataBuf"/> to at least
+        /// <paramref name="newCapacity"/> elements, and updates <see cref="_instanceAlloc"/>.
+        /// </summary>
+        private void EnsureInstanceCapacity(int newCapacity)
+        {
+            if (_instanceCpu != null && _instanceCpu.Length >= newCapacity) return;
+
+            int cap = Mathf.Max(newCapacity, _instanceCpu != null ? _instanceCpu.Length * 2 : newCapacity);
+
+            var newArr = new InstanceDataNRD[cap];
+            if (_instanceCpu != null) Array.Copy(_instanceCpu, newArr, _instanceCpu.Length);
+            _instanceCpu = newArr;
+
+            _instanceAlloc.GrowTo(cap);
+
+            _instanceDataBuf?.Release();
+            _instanceDataBuf = new GraphicsBuffer(GraphicsBuffer.Target.Structured,
+                cap, Marshal.SizeOf<InstanceDataNRD>());
+            _instanceDataBuf.SetData(_instanceCpu);
+        }
+
+        /// <summary>
+        /// Grows <see cref="_primitiveCpu"/> and <see cref="_primitiveDataBuf"/> to at least
+        /// <paramref name="newCapacity"/> elements, and updates <see cref="_primAlloc"/>.
+        /// </summary>
+        private void EnsurePrimitiveCapacity(int newCapacity)
+        {
+            if (_primitiveCpu.IsCreated && _primitiveCpu.Length >= newCapacity) return;
+
+            int cap = Mathf.Max(newCapacity, _primitiveCpu.IsCreated ? _primitiveCpu.Length * 2 : newCapacity);
+
+            var newArr = new NativeArray<PrimitiveDataNRD>(cap, Allocator.Persistent, NativeArrayOptions.ClearMemory);
+            if (_primitiveCpu.IsCreated)
+            {
+                NativeArray<PrimitiveDataNRD>.Copy(_primitiveCpu, newArr, _primitiveCpu.Length);
+                _primitiveCpu.Dispose();
+            }
+            _primitiveCpu = newArr;
+
+            _primAlloc.GrowTo(cap);
+
+            _primitiveDataBuf?.Release();
+            _primitiveDataBuf = new GraphicsBuffer(GraphicsBuffer.Target.Structured,
+                cap, Marshal.SizeOf<PrimitiveDataNRD>());
+            _primitiveDataBuf.SetData(_primitiveCpu);
+        }
+
+        // =====================================================================
+        // Merged BLAS construction
+        // =====================================================================
 
         /// <summary>
         /// Builds one merged BLAS for the given list of targets. Returns null when the list is empty.
