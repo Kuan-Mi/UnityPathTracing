@@ -1,7 +1,7 @@
 // © 2022 NVIDIA Corporation
 
 #include "Include/Shared.hlsli"
-   
+
 // Inputs
 NRI_RESOURCE( Texture2D<float>, gIn_ViewZ, t, 0, SET_OTHER );
 NRI_RESOURCE( Texture2D<float4>, gIn_Normal_Roughness, t, 1, SET_OTHER );

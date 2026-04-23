@@ -694,6 +694,7 @@ void AccelerationStructure::DumpInstances(const char* tag) const
 // ---------------------------------------------------------------------------
 void AccelerationStructure::Clear()
 {
+    std::lock_guard<std::mutex> lock(m_stateMutex);
     // Release all BLAS ref-counts (deferred GPU delete when they reach 0)
     for (const auto& slot : m_slots)
     {
@@ -756,6 +757,7 @@ void AccelerationStructure::Clear()
 // ---------------------------------------------------------------------------
 bool AccelerationStructure::AddInstance(const NR_AddInstanceDesc& desc)
 {
+    std::lock_guard<std::mutex> lock(m_stateMutex);
     auto* vb          = static_cast<ID3D12Resource*>(desc.vbPtr);
     auto* ib          = static_cast<ID3D12Resource*>(desc.ibPtr);
     const auto* submeshes   = desc.submeshDescs;
@@ -847,6 +849,7 @@ bool AccelerationStructure::AddInstance(const NR_AddInstanceDesc& desc)
 // ---------------------------------------------------------------------------
 void AccelerationStructure::RemoveInstance(uint32_t handle)
 {
+    std::lock_guard<std::mutex> lock(m_stateMutex);
     auto it = m_handleToSlot.find(handle);
     if (it == m_handleToSlot.end()) return;
 
@@ -871,6 +874,7 @@ void AccelerationStructure::RemoveInstance(uint32_t handle)
 // ---------------------------------------------------------------------------
 void AccelerationStructure::SetInstanceTransform(uint32_t handle, const float transform[12])
 {
+    std::lock_guard<std::mutex> lock(m_stateMutex);
     auto it = m_handleToSlot.find(handle);
     if (it == m_handleToSlot.end()) return;
     InstanceSlot& slot = m_slots[it->second];
@@ -884,6 +888,7 @@ void AccelerationStructure::SetInstanceTransform(uint32_t handle, const float tr
 
 void AccelerationStructure::SetInstanceMask(uint32_t handle, uint8_t mask)
 {
+    std::lock_guard<std::mutex> lock(m_stateMutex);
     auto it = m_handleToSlot.find(handle);
     if (it == m_handleToSlot.end()) return;
     InstanceSlot& slot = m_slots[it->second];
@@ -894,6 +899,7 @@ void AccelerationStructure::SetInstanceMask(uint32_t handle, uint8_t mask)
 
 void AccelerationStructure::SetInstanceID(uint32_t handle, uint32_t id)
 {
+    std::lock_guard<std::mutex> lock(m_stateMutex);
     auto it = m_handleToSlot.find(handle);
     if (it == m_handleToSlot.end()) return;
     InstanceSlot& slot = m_slots[it->second];
@@ -907,6 +913,7 @@ void AccelerationStructure::SetInstanceID(uint32_t handle, uint32_t id)
 // ---------------------------------------------------------------------------
 bool AccelerationStructure::BuildOrUpdate(ID3D12GraphicsCommandList4* cmdList)
 {
+    std::lock_guard<std::mutex> lock(m_stateMutex);
     TickDeferredDeletes();
 
     // Per-frame diagnostic dump (one line per active instance).

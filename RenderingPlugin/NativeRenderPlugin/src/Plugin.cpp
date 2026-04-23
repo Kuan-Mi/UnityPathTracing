@@ -9,6 +9,8 @@
 #include <wrl/client.h>
 #include <cstdint>
 #include <cstdio>
+#include <list>
+#include <mutex>
 
 #include "IUnityInterface.h"
 #include "IUnityGraphics.h"
@@ -36,6 +38,68 @@ static IUnityGraphicsD3D12v8*    s_D3D12v8     = nullptr;
 static IUnityLog*                s_Log         = nullptr;
 static DescriptorHeapAllocator   s_DescHeap;   // global shared GPU-visible CBV/SRV/UAV heap
 static bool                      s_RendererReady = false;
+
+// ---------------------------------------------------------------------------
+// Deferred delete queue — delays destruction of GPU-facing objects until the
+// GPU has finished executing all commands that may reference them.
+//
+// Each frame NR_FrameTick() signals s_DeletionFence with an incrementing value.
+// Destroy functions push entries tagged with (current fence value + kDeleteDelay)
+// instead of immediately deleting.  DrainDeferredDeletes() frees entries whose
+// safeAfterValue <= fence->GetCompletedValue().
+// ---------------------------------------------------------------------------
+enum class DeferredType { BindlessTexture, BindlessBuffer, AccelStruct, RayTraceShader, ComputeShader };
+
+struct DeferredDeleteEntry
+{
+    void*        ptr;
+    DeferredType type;
+    uint64_t     safeAfterValue; // delete when fence->GetCompletedValue() >= this
+};
+
+static ComPtr<ID3D12Fence>         s_DeletionFence;
+static uint64_t                    s_DeletionFenceValue = 0;
+static std::list<DeferredDeleteEntry> s_DeferredDeleteQueue;
+static std::mutex                  s_DeferredDeleteMutex;
+
+// kDeleteDelay: number of frames to wait before freeing.
+// Unity D3D12 uses up to 2 frames in flight; 3 provides a safe margin.
+static constexpr int kDeleteDelay = 3;
+
+static void ImmediateDelete(DeferredDeleteEntry& e)
+{
+    switch (e.type)
+    {
+    case DeferredType::BindlessTexture: delete reinterpret_cast<BindlessTexture*>(e.ptr); break;
+    case DeferredType::BindlessBuffer:  delete reinterpret_cast<BindlessBuffer*>(e.ptr);  break;
+    case DeferredType::AccelStruct:     delete reinterpret_cast<AccelerationStructure*>(e.ptr); break;
+    case DeferredType::RayTraceShader:  delete reinterpret_cast<RayTraceShader*>(e.ptr);  break;
+    case DeferredType::ComputeShader:   delete reinterpret_cast<ComputeShader*>(e.ptr);   break;
+    }
+}
+
+static void EnqueueDeferredDelete(void* ptr, DeferredType type)
+{
+    if (!ptr) return;
+    std::lock_guard<std::mutex> lk(s_DeferredDeleteMutex);
+    s_DeferredDeleteQueue.push_back({ ptr, type, s_DeletionFenceValue + kDeleteDelay });
+}
+
+static void DrainDeferredDeletes(bool force = false)
+{
+    std::lock_guard<std::mutex> lk(s_DeferredDeleteMutex);
+    uint64_t completed = s_DeletionFence ? s_DeletionFence->GetCompletedValue() : 0;
+    for (auto it = s_DeferredDeleteQueue.begin(); it != s_DeferredDeleteQueue.end(); )
+    {
+        if (force || it->safeAfterValue <= completed)
+        {
+            ImmediateDelete(*it);
+            it = s_DeferredDeleteQueue.erase(it);
+        }
+        else
+            ++it;
+    }
+}
 
 // ---------------------------------------------------------------------------
 // Logging helpers - fall back to printf when IUnityLog isn't available yet
@@ -103,6 +167,13 @@ static void UNITY_INTERFACE_API OnGraphicsDeviceEvent(UnityGfxDeviceEventType ev
         {
             if (!s_DescHeap.Initialize(device))
                 NR_ERROR("DescriptorHeapAllocator initialization failed");
+
+            // Create the fence used by the deferred-delete queue.
+            s_DeletionFenceValue = 0;
+            if (FAILED(device->CreateFence(0, D3D12_FENCE_FLAG_NONE,
+                                           IID_PPV_ARGS(&s_DeletionFence))))
+                NR_ERROR("Failed to create deletion fence");
+
             NR_LOG("Plugin initialized (DXR device confirmed)");
         }
         else
@@ -111,11 +182,32 @@ static void UNITY_INTERFACE_API OnGraphicsDeviceEvent(UnityGfxDeviceEventType ev
     else if (eventType == kUnityGfxDeviceEventShutdown)
     {
         NR_LOG("Plugin shutdown");
+        // Force-drain any pending deferred deletes before tearing down.
+        DrainDeferredDeletes(true);
+        s_DeletionFence.Reset();
+        s_DeletionFenceValue = 0;
         s_DescHeap.Shutdown();
         s_RendererReady = false;
         s_D3D12         = nullptr;
         s_D3D12v8       = nullptr;
     }
+}
+
+// ---------------------------------------------------------------------------
+// NR_FrameTick
+//   Must be called once per frame from the CPU (main thread) before submitting
+//   rendering commands.  Signals the deletion fence with the next value, then
+//   drains any deferred-delete entries whose fence value has been passed.
+// ---------------------------------------------------------------------------
+extern "C" void UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API
+NR_FrameTick()
+{
+    if (!s_D3D12 || !s_DeletionFence) return;
+    ID3D12CommandQueue* queue = s_D3D12->GetCommandQueue();
+    if (!queue) return;
+    ++s_DeletionFenceValue;
+    queue->Signal(s_DeletionFence.Get(), s_DeletionFenceValue);
+    DrainDeferredDeletes();
 }
 
 // ---------------------------------------------------------------------------
@@ -179,17 +271,16 @@ NR_CreateAccelerationStructure()
 // ---------------------------------------------------------------------------
 // NR_DestroyAccelerationStructure
 //   Destroys a previously created acceleration structure.
-//   The object is deleted immediately; ensure the GPU is idle or that the
-//   AS was not bound to an in-flight frame before calling this.
-//   (The AccelerationStructure's own deferred-delete queue handles
-//    internal BLAS/TLAS resources safely.)
+//   The object is destroyed after a kDeleteDelay-frame delay so the GPU
+//   finishes all commands that may reference it before the memory is freed.
+//   The AccelerationStructure's own deferred-delete queue handles internal
+//   BLAS/TLAS resources safely.
 // ---------------------------------------------------------------------------
 extern "C" void UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API
 NR_DestroyAccelerationStructure(uint64_t handle)
 {
     if (!handle) return;
-    FlushGpuAndWait();
-    delete reinterpret_cast<AccelerationStructure*>(handle);
+    EnqueueDeferredDelete(reinterpret_cast<void*>(handle), DeferredType::AccelStruct);
 }
 
 // ---------------------------------------------------------------------------
@@ -348,8 +439,7 @@ extern "C" void UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API
 NR_DestroyRayTraceShader(uint64_t handle)
 {
     if (!handle) return;
-    FlushGpuAndWait();
-    delete reinterpret_cast<RayTraceShader*>(handle);
+    EnqueueDeferredDelete(reinterpret_cast<void*>(handle), DeferredType::RayTraceShader);
 }
 
 // ---------------------------------------------------------------------------
@@ -587,13 +677,12 @@ NR_CreateBindlessTexture(uint32_t capacity)
 
 // ---------------------------------------------------------------------------
 // NR_DestroyBindlessTexture
-//   Destroys a BindlessTexture and returns its descriptor slots to the pool.
-//   Ensure no in-flight GPU work references it before calling.
+//   Enqueues destruction after a kDeleteDelay-frame GPU fence delay.
 // ---------------------------------------------------------------------------
 extern "C" void UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API
 NR_DestroyBindlessTexture(uint64_t handle)
 {
-    if (handle) delete reinterpret_cast<BindlessTexture*>(handle);
+    if (handle) EnqueueDeferredDelete(reinterpret_cast<void*>(handle), DeferredType::BindlessTexture);
 }
 
 // ---------------------------------------------------------------------------
@@ -683,13 +772,12 @@ NR_CreateBindlessBuffer(uint32_t capacity)
 
 // ---------------------------------------------------------------------------
 // NR_DestroyBindlessBuffer
-//   Destroys a BindlessBuffer and returns its descriptor slots to the pool.
-//   Ensure no in-flight GPU work references it before calling.
+//   Enqueues destruction after a kDeleteDelay-frame GPU fence delay.
 // ---------------------------------------------------------------------------
 extern "C" void UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API
 NR_DestroyBindlessBuffer(uint64_t handle)
 {
-    if (handle) delete reinterpret_cast<BindlessBuffer*>(handle);
+    if (handle) EnqueueDeferredDelete(reinterpret_cast<void*>(handle), DeferredType::BindlessBuffer);
 }
 
 // ---------------------------------------------------------------------------
@@ -787,8 +875,7 @@ extern "C" void UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API
 NR_DestroyComputeShader(uint64_t handle)
 {
     if (!handle) return;
-    FlushGpuAndWait();
-    delete reinterpret_cast<ComputeShader*>(handle);
+    EnqueueDeferredDelete(reinterpret_cast<void*>(handle), DeferredType::ComputeShader);
 }
 
 // ---------------------------------------------------------------------------
