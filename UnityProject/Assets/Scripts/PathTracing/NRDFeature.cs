@@ -471,7 +471,7 @@ namespace PathTracing
 
                 _outputBlitPass.Setup(outputBlitResource, new OutputBlitPass.Settings
                 {
-                    showMode        = ShowMode.Final,
+                    showMode        = ShowMode.Out,
                     resolutionScale = frameState.resolutionScale,
                     enableDlssRR    = false,
                     showMV          = false,
