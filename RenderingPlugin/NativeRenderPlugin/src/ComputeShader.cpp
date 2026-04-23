@@ -897,6 +897,15 @@ void ComputeShader::Dispatch(
                         m_d3d12v8->RequestResourceState(tex, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
                 }
             }
+            else if (b.type == ComputeBindingType::SRV_ARRAY && b.boundBB)
+            {
+                for (uint32_t i = 0; i < b.boundBB->Capacity(); ++i)
+                {
+                    ID3D12Resource* buf = b.boundBB->GetBuffer(i);
+                    if (buf)
+                        m_d3d12v8->RequestResourceState(buf, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
+                }
+            }
         }
     }
 
