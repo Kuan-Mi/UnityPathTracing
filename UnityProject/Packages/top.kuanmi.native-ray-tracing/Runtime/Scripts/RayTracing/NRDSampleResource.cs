@@ -138,9 +138,6 @@ namespace NativeRender
             /// <summary>Cached transform to detect changes.</summary>
             public Matrix4x4 lastTransform;
 
-            /// <summary>Category flags used when the instance data was last written.</summary>
-            public uint baseFlags;
-
             /// <summary>Starting element index in _primitiveCpu for each submesh.</summary>
             public uint[] primitiveOffsets;
 
