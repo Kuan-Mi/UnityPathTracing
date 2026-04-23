@@ -1,10 +1,12 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Runtime.InteropServices;
 using Unity.Collections;
 using Unity.Mathematics;
 using UnityEngine;
 using UnityEngine.Rendering;
+using Debug = UnityEngine.Debug;
 
 namespace NativeRender
 {
@@ -347,12 +349,12 @@ namespace NativeRender
             uint primitiveCursor = 0;
             uint instanceCursor  = 0;
 
-            var instList = new List<InstanceDataNRD>();
-            var primList = new List<PrimitiveDataNRD>();
-            var texPtrs  = new List<IntPtr>();
 
             if (_mergeBlas)
             {
+                var  instList            = new List<InstanceDataNRD>();
+                var  primList            = new List<PrimitiveDataNRD>();
+                var  texPtrs             = new List<IntPtr>();
                 uint opaqueFirstInstance = instanceCursor;
                 _blasOpaque = BuildMergedBlas(opaque, ref instanceCursor, ref primitiveCursor,
                     instList, primList, texPtrs,
@@ -401,9 +403,7 @@ namespace NativeRender
             }
             else
             {
-                BuildSeparateBlas(opaque, transparent, emissive,
-                    ref instanceCursor, ref primitiveCursor,
-                    instList, primList, texPtrs);
+                BuildSeparateBlas(opaque, transparent, emissive);
             }
         }
 
@@ -414,13 +414,15 @@ namespace NativeRender
         private void BuildSeparateBlas(
             List<NativeRayTracingTarget> opaque,
             List<NativeRayTracingTarget> transparent,
-            List<NativeRayTracingTarget> emissive,
-            ref uint instanceCursor,
-            ref uint primitiveCursor,
-            List<InstanceDataNRD> instList,
-            List<PrimitiveDataNRD> primList,
-            List<IntPtr> texPtrs)
+            List<NativeRayTracingTarget> emissive
+        )
         {
+            uint                   instanceCursor  = 0;
+            uint                   primitiveCursor = 0;
+            List<InstanceDataNRD>  instList        = new List<InstanceDataNRD>();
+            List<PrimitiveDataNRD> primList        = new List<PrimitiveDataNRD>();
+            List<IntPtr>           texPtrs         = new List<IntPtr>();
+            
             // Process ordered opaque → transparent → emissive (emissive targets were also added to
             // opaque already; they get a second separate entry in the light TLAS).
             ProcessSeparateGroup(opaque, _worldAS, FLAG_STATIC | FLAG_NON_TRANSPARENT,
@@ -461,29 +463,44 @@ namespace NativeRender
             List<PrimitiveDataNRD> primList,
             List<IntPtr> texPtrs)
         {
-            // Pre-allocate primList capacity to avoid repeated internal resizing.
+            var swTotal = Stopwatch.StartNew();
+
+            // First pass: collect valid pairs, build mesh list, pre-allocate primList capacity.
+            var validPairs    = new List<(NativeRayTracingTarget target, MeshRenderer mr, Mesh mesh, int meshIndex)>(group.Count);
+            var meshList      = new List<Mesh>(group.Count);
             int totalTriCount = 0;
+
             foreach (var t in group)
             {
                 if (t == null) continue;
-                var mf2 = t.GetComponent<MeshFilter>();
-                if (mf2 == null || mf2.sharedMesh == null) continue;
-                var m2 = mf2.sharedMesh;
-                for (int s = 0; s < m2.subMeshCount; s++)
-                    totalTriCount += (int)m2.GetIndexCount(s) / 3;
-            }
-            if (primList.Capacity < primList.Count + totalTriCount)
-                primList.Capacity = primList.Count + totalTriCount;
-
-            foreach (var target in group)
-            {
-                if (target == null) continue;
-                var mr = target.GetComponent<MeshRenderer>();
+                var mr = t.GetComponent<MeshRenderer>();
                 if (mr == null) continue;
                 var mf = mr.GetComponent<MeshFilter>();
                 if (mf == null || mf.sharedMesh == null) continue;
 
-                Mesh      mesh  = mf.sharedMesh;
+                Mesh mesh = mf.sharedMesh;
+                for (int s = 0; s < mesh.subMeshCount; s++)
+                    totalTriCount += (int)mesh.GetIndexCount(s) / 3;
+
+                validPairs.Add((t, mr, mesh, meshList.Count));
+                meshList.Add(mesh);
+            }
+
+            if (primList.Capacity < primList.Count + totalTriCount)
+                primList.Capacity = primList.Count + totalTriCount;
+
+            if (validPairs.Count == 0)
+            {
+                swTotal.Stop();
+                Debug.Log($"[ProcessSeparateGroup] Total: {swTotal.Elapsed.TotalMilliseconds:F2} ms  (0 renderers, flags=0x{baseFlags:X})");
+                return;
+            }
+
+            // Single AcquireReadOnlyMeshData call for all meshes — avoids per-mesh tracking overhead.
+            var meshDataArr = Mesh.AcquireReadOnlyMeshData(meshList);
+
+            foreach (var (target, mr, mesh, meshIndex) in validPairs)
+            {
                 Matrix4x4 xform = target.transform.localToWorldMatrix;
 
                 // Use the encapsulated AddInstance — it uses the mesh's native VB/IB.
@@ -508,12 +525,9 @@ namespace NativeRender
                     new Vector3(xform.m02, xform.m12, xform.m22).magnitude);
                 float scaleMax = Mathf.Max(sc.x, Mathf.Max(sc.y, sc.z));
 
-                int vertCount = mesh.vertexCount;
-                int subCnt    = mesh.subMeshCount;
-
-                // AcquireReadOnlyMeshData: zero-copy, no managed-array allocation per attribute.
-                var meshDataArr = Mesh.AcquireReadOnlyMeshData(mesh);
-                var meshData    = meshDataArr[0];
+                int      vertCount = mesh.vertexCount;
+                int      subCnt    = mesh.subMeshCount;
+                var      meshData  = meshDataArr[meshIndex];
 
                 var nativePos = new NativeArray<Vector3>(vertCount, Allocator.Temp, NativeArrayOptions.UninitializedMemory);
                 var nativeN   = new NativeArray<Vector3>(vertCount, Allocator.Temp, NativeArrayOptions.UninitializedMemory);
@@ -614,7 +628,6 @@ namespace NativeRender
                 nativeN.Dispose();
                 nativeT.Dispose();
                 nativeUV.Dispose();
-                meshDataArr.Dispose();
 
                 // Record per-target state for transform-only updates.
                 _perTargetBlas[(int)(uint)mr.GetInstanceID()] = new PerTargetBlas
@@ -626,6 +639,11 @@ namespace NativeRender
                     baseFlags              = baseFlags,
                 };
             }
+
+            meshDataArr.Dispose();
+
+            swTotal.Stop();
+            Debug.Log($"[ProcessSeparateGroup] Total: {swTotal.Elapsed.TotalMilliseconds:F2} ms  ({validPairs.Count} renderers, {totalTriCount} tris, flags=0x{baseFlags:X})");
         }
 
         /// <summary>
