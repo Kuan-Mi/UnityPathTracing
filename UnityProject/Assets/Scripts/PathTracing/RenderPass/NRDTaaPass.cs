@@ -15,19 +15,22 @@ namespace PathTracing
     public class NRDTaaPass : ScriptableRenderPass, IDisposable
     {
         private readonly NativeComputePipeline      _cs;
-        private readonly NativeComputeDescriptorSet _ds;
+        private readonly NativeComputeDescriptorSet _dsPing; // isEven:  gIn_History=TaaHistoryPrev, gOut_Result=TaaHistory
+        private readonly NativeComputeDescriptorSet _dsPong; // !isEven: gIn_History=TaaHistory,     gOut_Result=TaaHistoryPrev
         private          Resource              _resource;
         private          Settings              _settings;
 
         public NRDTaaPass(NativeComputeShader cs)
         {
-            _cs = new NativeComputePipeline(cs);
-            _ds = new NativeComputeDescriptorSet(_cs);
+            _cs     = new NativeComputePipeline(cs);
+            _dsPing = new NativeComputeDescriptorSet(_cs);
+            _dsPong = new NativeComputeDescriptorSet(_cs);
         }
 
         public void Dispose()
         {
-            _ds?.Dispose();
+            _dsPing?.Dispose();
+            _dsPong?.Dispose();
             _cs?.Dispose();
         }
 
@@ -63,7 +66,8 @@ namespace PathTracing
         class PassData
         {
             internal NativeComputePipeline      Cs;
-            internal NativeComputeDescriptorSet Ds;
+            internal NativeComputeDescriptorSet DsPing;
+            internal NativeComputeDescriptorSet DsPong;
             internal Resource                   Resource;
             internal Settings                   Settings;
             internal PathTracingResourcePool    Pool;
@@ -78,26 +82,20 @@ namespace PathTracing
         {
             var cmd = CommandBufferHelpers.GetNativeCommandBuffer(context.cmd);
             var cs  = data.Cs;
-            var ds  = data.Ds;
             var res = data.Resource;
 
             cmd.BeginSample(RenderPassMarkers.Taa);
 
-            var pool   = data.Pool;
-            var isEven = data.IsEven;
+            var pool = data.Pool;
+            // Select the pre-configured ping/pong descriptor set.
+            // History texture bindings were pre-baked in RecordRenderGraph.
+            var ds = data.IsEven ? data.DsPing : data.DsPong;
 
-            // SRV inputs
+            // Dynamic per-frame bindings (same regardless of ping/pong)
             ds.SetTexture("gIn_Mv",       pool.GetRT(RenderResourceType.MV).rt);
             ds.SetTexture("gIn_Composed", pool.GetRT(RenderResourceType.Composed).rt);
-            ds.SetTexture("gIn_History",  pool.GetRT(isEven ? RenderResourceType.TaaHistoryPrev : RenderResourceType.TaaHistory).rt);
-
-            // UAV output
-            ds.SetRWTexture("gOut_Result", pool.GetRT(isEven ? RenderResourceType.TaaHistory : RenderResourceType.TaaHistoryPrev).rt);
-
-            // Constant buffer
             ds.SetConstantBuffer("GlobalConstants", res.ConstantBuffer);
 
-            // Dispatch — numthreads [16, 16, 1]
             cs.Dispatch(cmd, ds, (uint)data.Settings.rectGridW, (uint)data.Settings.rectGridH, 1);
 
             cmd.EndSample(RenderPassMarkers.Taa);
@@ -112,11 +110,22 @@ namespace PathTracing
             using var builder = renderGraph.AddUnsafePass<PassData>("NRDTaaPass", out var passData);
 
             passData.Cs       = _cs;
-            passData.Ds       = _ds;
+            passData.DsPing   = _dsPing;
+            passData.DsPong   = _dsPong;
             passData.Resource = _resource;
             passData.Settings = _settings;
             passData.Pool     = _resource.Pool;
             passData.IsEven   = _resource.isEven;
+
+            // Pre-bake history texture bindings.
+            // Ping (isEven):  gIn_History = TaaHistoryPrev, gOut_Result = TaaHistory
+            // Pong (!isEven): gIn_History = TaaHistory,     gOut_Result = TaaHistoryPrev
+            var pool = _resource.Pool;
+            _dsPing.SetTexture ("gIn_History",  pool.GetRT(RenderResourceType.TaaHistoryPrev).rt);
+            _dsPing.SetRWTexture("gOut_Result", pool.GetRT(RenderResourceType.TaaHistory).rt);
+
+            _dsPong.SetTexture ("gIn_History",  pool.GetRT(RenderResourceType.TaaHistory).rt);
+            _dsPong.SetRWTexture("gOut_Result", pool.GetRT(RenderResourceType.TaaHistoryPrev).rt);
  
 
             builder.AllowPassCulling(false);

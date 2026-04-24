@@ -24,23 +24,26 @@ namespace PathTracing
         private readonly NativeComputePipeline       _resolve;
         private readonly NativeComputePipeline       _update;
         private readonly NativeComputeDescriptorSet  _resolveDs;
-        private readonly NativeComputeDescriptorSet  _updateDs;
+        private readonly NativeComputeDescriptorSet  _updateDsPing; // isEven: StoredPing→in, StoredPong→out
+        private readonly NativeComputeDescriptorSet  _updateDsPong; // !isEven: StoredPong→in, StoredPing→out
         private          Resource              _resource;
         private          Settings              _settings;
         private          NRDSampleResource     _nrdResource;
 
         public NRDSharcPass(NativeComputeShader resolve, NativeComputeShader update)
         {
-            _resolve   = new NativeComputePipeline(resolve);
-            _update    = new NativeComputePipeline(update);
-            _resolveDs = new NativeComputeDescriptorSet(_resolve);
-            _updateDs  = new NativeComputeDescriptorSet(_update);
+            _resolve      = new NativeComputePipeline(resolve);
+            _update       = new NativeComputePipeline(update);
+            _resolveDs    = new NativeComputeDescriptorSet(_resolve);
+            _updateDsPing = new NativeComputeDescriptorSet(_update);
+            _updateDsPong = new NativeComputeDescriptorSet(_update);
         }
 
         public void Dispose()
         {
             _resolveDs?.Dispose();
-            _updateDs?.Dispose();
+            _updateDsPing?.Dispose();
+            _updateDsPong?.Dispose();
             _resolve?.Dispose();
             _update?.Dispose();
         }
@@ -87,7 +90,8 @@ namespace PathTracing
             internal NativeComputePipeline      Resolve;
             internal NativeComputePipeline      Update;
             internal NativeComputeDescriptorSet ResolveDs;
-            internal NativeComputeDescriptorSet UpdateDs;
+            internal NativeComputeDescriptorSet UpdateDsPing;
+            internal NativeComputeDescriptorSet UpdateDsPong;
             internal NRDSampleResource          NrdResource;
             internal Resource                   Resource;
             internal Settings                   Settings;
@@ -102,52 +106,33 @@ namespace PathTracing
         {
             var cmd = CommandBufferHelpers.GetNativeCommandBuffer(context.cmd);
 
-            var resolve    = data.Resolve;
-            var update     = data.Update;
-            var resolveDs  = data.ResolveDs;
-            var updateDs   = data.UpdateDs;
-            var res        = data.Resource;
-            var settings   = data.Settings;
-            var nrd        = data.NrdResource;
+            var resolve   = data.Resolve;
+            var update    = data.Update;
+            var resolveDs = data.ResolveDs;
+            var res       = data.Resource;
+            var settings  = data.Settings;
+            var nrd       = data.NrdResource;
 
             // ── SharcUpdate [numthreads(16,16,1)] ─────────────────────────────────
+            // Select the pre-configured ping or pong descriptor set.
+            // Gradient texture bindings were pre-baked in RecordRenderGraph.
             cmd.BeginSample(RenderPassMarkers.SharcUpdate);
 
-            // 1. Acceleration structures
+            var updateDs = settings.isEven ? data.UpdateDsPing : data.UpdateDsPong;
+
+            // Dynamic per-frame bindings (same regardless of ping/pong)
             updateDs.SetAccelerationStructure("gWorldTlas", nrd.WorldAS);
             updateDs.SetAccelerationStructure("gLightTlas", nrd.LightAS);
-
-            // 3. Scene structured buffers
             updateDs.SetStructuredBuffer("gIn_InstanceData",  nrd.InstanceDataBuf);
             updateDs.SetStructuredBuffer("gIn_PrimitiveData", nrd.PrimitiveDataBuf);
-
-            // 4. SHARC UAVs
             updateDs.SetRWStructuredBuffer("gInOut_SharcHashEntriesBuffer", res.HashEntriesBuffer);
             updateDs.SetRWStructuredBuffer("gInOut_SharcAccumulated",       res.AccumulationBuffer);
             updateDs.SetRWStructuredBuffer("gInOut_SharcResolved",          res.ResolvedBuffer);
-
-            // 5. Bindless material textures
             updateDs.SetBindlessTexture("gIn_Textures", nrd.Textures);
-
-            // 6. Constant buffer
             updateDs.SetConstantBuffer("GlobalConstants", res.ConstantBuffer);
 
-            // 7. Gradient ping-pong (NRDSample.cpp line 4062+4400)
-            //    isEven = !(frameIndex & 1)
-            //    Even: PrevGradient = StoredPing (SRV), CurrGradient = StoredPong (UAV)
-            //    Odd:  PrevGradient = StoredPong (SRV), CurrGradient = StoredPing (UAV)
-            var pool         = data.Pool;
-            var prevGradient = settings.isEven ? pool.GetRT(RenderResourceType.Gradient_StoredPing).rt : pool.GetRT(RenderResourceType.Gradient_StoredPong).rt;
-            var currGradient = settings.isEven ? pool.GetRT(RenderResourceType.Gradient_StoredPong).rt : pool.GetRT(RenderResourceType.Gradient_StoredPing).rt;
-
-            updateDs.SetTexture("gIn_PrevGradient",   prevGradient);
-            updateDs.SetRWTexture("gOut_CurrGradient", currGradient);
-            updateDs.SetRWTexture("gOut_Gradient",     pool.GetRT(RenderResourceType.Gradient_Ping).rt);
-
-            // 8. Dispatch at SHARC resolution
-            //    sharcDims = 16 * ceil(renderRes / sharcDownscale / 16)
-            uint sharcW = (uint)(settings.RenderResolution.x / settings.sharcDownscale);
-            uint sharcH = (uint)(settings.RenderResolution.y / settings.sharcDownscale);
+            uint sharcW  = (uint)(settings.RenderResolution.x / settings.sharcDownscale);
+            uint sharcH  = (uint)(settings.RenderResolution.y / settings.sharcDownscale);
             uint groupsX = (sharcW + 15u) / 16u;
             uint groupsY = (sharcH + 15u) / 16u;
 
@@ -178,15 +163,29 @@ namespace PathTracing
         {
             using var builder = renderGraph.AddUnsafePass<PassData>("NRDSharcPass", out var passData);
 
-            passData.Resolve     = _resolve;
-            passData.Update      = _update;
-            passData.ResolveDs   = _resolveDs;
-            passData.UpdateDs    = _updateDs;
-            passData.NrdResource = _nrdResource;
-            passData.Resource    = _resource;
-            passData.Settings    = _settings;
+            passData.Resolve      = _resolve;
+            passData.Update       = _update;
+            passData.ResolveDs    = _resolveDs;
+            passData.UpdateDsPing = _updateDsPing;
+            passData.UpdateDsPong = _updateDsPong;
+            passData.NrdResource  = _nrdResource;
+            passData.Resource     = _resource;
+            passData.Settings     = _settings;
 
-            passData.Pool = _resource.Pool; 
+            passData.Pool = _resource.Pool;
+
+            // Pre-bake gradient texture bindings into the Ping/Pong descriptor sets.
+            // Even frame (Ping): StoredPing → in,  StoredPong → out
+            // Odd  frame (Pong): StoredPong → in,  StoredPing → out
+            // gOut_Gradient always writes to Gradient_Ping.
+            var pool = _resource.Pool;
+            _updateDsPing.SetTexture ("gIn_PrevGradient",   pool.GetRT(RenderResourceType.Gradient_StoredPing).rt);
+            _updateDsPing.SetRWTexture("gOut_CurrGradient", pool.GetRT(RenderResourceType.Gradient_StoredPong).rt);
+            _updateDsPing.SetRWTexture("gOut_Gradient",     pool.GetRT(RenderResourceType.Gradient_Ping).rt);
+
+            _updateDsPong.SetTexture ("gIn_PrevGradient",   pool.GetRT(RenderResourceType.Gradient_StoredPong).rt);
+            _updateDsPong.SetRWTexture("gOut_CurrGradient", pool.GetRT(RenderResourceType.Gradient_StoredPing).rt);
+            _updateDsPong.SetRWTexture("gOut_Gradient",     pool.GetRT(RenderResourceType.Gradient_Ping).rt);
 
             builder.AllowPassCulling(false);
             builder.SetRenderFunc((PassData data, UnsafeGraphContext context) => ExecutePass(data, context));
