@@ -1,9 +1,11 @@
+using System;
 using System.Collections.Generic;
 using Nri;
 using Unity.Mathematics;
 using UnityEngine;
 using UnityEngine.Experimental.Rendering;
 using UnityEngine.Rendering;
+using Object = UnityEngine.Object;
 
 namespace PathTracing
 {
@@ -182,6 +184,12 @@ namespace PathTracing
         {
             if (_nriResources.TryGetValue(type, out var nriRes)) return nriRes.Handle;
             return _rtResources[type];
+        }      
+        
+        public IntPtr GetPoint(RenderResourceType type)
+        {
+            if (_nriResources.TryGetValue(type, out var nriRes)) return nriRes.NativePtr;
+            return _rtResources[type].rt.GetNativeTexturePtr();
         }
 
         // ── Resolution/allocation ───────────────────────────────────────────────

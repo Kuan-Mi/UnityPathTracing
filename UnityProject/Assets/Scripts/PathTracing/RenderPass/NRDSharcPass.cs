@@ -125,9 +125,9 @@ namespace PathTracing
             updateDs.SetAccelerationStructure("gLightTlas", nrd.LightAS);
             updateDs.SetStructuredBuffer("gIn_InstanceData",  nrd.InstanceDataBuf);
             updateDs.SetStructuredBuffer("gIn_PrimitiveData", nrd.PrimitiveDataBuf);
-            updateDs.SetRWStructuredBuffer("gInOut_SharcHashEntriesBuffer", res.HashEntriesBuffer);
-            updateDs.SetRWStructuredBuffer("gInOut_SharcAccumulated",       res.AccumulationBuffer);
-            updateDs.SetRWStructuredBuffer("gInOut_SharcResolved",          res.ResolvedBuffer);
+            updateDs.SetRWStructuredBuffer("gInOut_SharcHashEntriesBuffer", res.HashEntriesBuffer.GetNativeBufferPtr(),res.HashEntriesBuffer.count,res.HashEntriesBuffer.stride);
+            updateDs.SetRWStructuredBuffer("gInOut_SharcAccumulated",       res.AccumulationBuffer.GetNativeBufferPtr(),res.AccumulationBuffer.count,res.AccumulationBuffer.stride);
+            updateDs.SetRWStructuredBuffer("gInOut_SharcResolved",          res.ResolvedBuffer.GetNativeBufferPtr(),res.ResolvedBuffer.count,res.ResolvedBuffer.stride);
             updateDs.SetBindlessTexture("gIn_Textures", nrd.Textures);
             updateDs.SetConstantBuffer("GlobalConstants", res.ConstantBuffer);
 
@@ -145,9 +145,9 @@ namespace PathTracing
             cmd.BeginSample(RenderPassMarkers.SharcResolve);
 
             resolveDs.SetConstantBuffer("GlobalConstants", res.ConstantBuffer);
-            resolveDs.SetRWStructuredBuffer("gInOut_SharcHashEntriesBuffer", res.HashEntriesBuffer);
-            resolveDs.SetRWStructuredBuffer("gInOut_SharcAccumulated",       res.AccumulationBuffer);
-            resolveDs.SetRWStructuredBuffer("gInOut_SharcResolved",          res.ResolvedBuffer);
+            resolveDs.SetRWStructuredBuffer("gInOut_SharcHashEntriesBuffer",  res.HashEntriesBuffer.GetNativeBufferPtr(),res.HashEntriesBuffer.count,res.HashEntriesBuffer.stride);
+            resolveDs.SetRWStructuredBuffer("gInOut_SharcAccumulated",        res.AccumulationBuffer.GetNativeBufferPtr(),res.AccumulationBuffer.count,res.AccumulationBuffer.stride);
+            resolveDs.SetRWStructuredBuffer("gInOut_SharcResolved",           res.ResolvedBuffer.GetNativeBufferPtr(),res.ResolvedBuffer.count,res.ResolvedBuffer.stride);
 
             uint resolveGroups = (uint)((PathTracingFeature.Capacity + 255) / 256);
             resolve.Dispatch(cmd, resolveDs, resolveGroups, 1, 1);
@@ -179,13 +179,13 @@ namespace PathTracing
             // Odd  frame (Pong): StoredPong → in,  StoredPing → out
             // gOut_Gradient always writes to Gradient_Ping.
             var pool = _resource.Pool;
-            _updateDsPing.SetTexture ("gIn_PrevGradient",   pool.GetRT(RenderResourceType.Gradient_StoredPing).rt);
-            _updateDsPing.SetRWTexture("gOut_CurrGradient", pool.GetRT(RenderResourceType.Gradient_StoredPong).rt);
-            _updateDsPing.SetRWTexture("gOut_Gradient",     pool.GetRT(RenderResourceType.Gradient_Ping).rt);
+            _updateDsPing.SetTexture ("gIn_PrevGradient",   pool.GetPoint(RenderResourceType.Gradient_StoredPing));
+            _updateDsPing.SetRWTexture("gOut_CurrGradient", pool.GetPoint(RenderResourceType.Gradient_StoredPong));
+            _updateDsPing.SetRWTexture("gOut_Gradient",     pool.GetPoint(RenderResourceType.Gradient_Ping));
 
-            _updateDsPong.SetTexture ("gIn_PrevGradient",   pool.GetRT(RenderResourceType.Gradient_StoredPong).rt);
-            _updateDsPong.SetRWTexture("gOut_CurrGradient", pool.GetRT(RenderResourceType.Gradient_StoredPing).rt);
-            _updateDsPong.SetRWTexture("gOut_Gradient",     pool.GetRT(RenderResourceType.Gradient_Ping).rt);
+            _updateDsPong.SetTexture ("gIn_PrevGradient",   pool.GetPoint(RenderResourceType.Gradient_StoredPong));
+            _updateDsPong.SetRWTexture("gOut_CurrGradient", pool.GetPoint(RenderResourceType.Gradient_StoredPing));
+            _updateDsPong.SetRWTexture("gOut_Gradient",     pool.GetPoint(RenderResourceType.Gradient_Ping));
 
             builder.AllowPassCulling(false);
             builder.SetRenderFunc((PassData data, UnsafeGraphContext context) => ExecutePass(data, context));

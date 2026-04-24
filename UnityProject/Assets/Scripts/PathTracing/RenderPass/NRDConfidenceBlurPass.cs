@@ -138,8 +138,8 @@ namespace PathTracing
             for (int i = 0; i < IterationCount; i++)
             {
                 bool isPing = (i % 2 == 0);
-                _ds[i].SetTexture ("gIn_Gradient",  pool.GetRT(isPing ? RenderResourceType.Gradient_Ping : RenderResourceType.Gradient_Pong).rt);
-                _ds[i].SetRWTexture("gOut_Gradient", pool.GetRT(isPing ? RenderResourceType.Gradient_Pong : RenderResourceType.Gradient_Ping).rt);
+                _ds[i].SetTexture ("gIn_Gradient",  pool.GetPoint(isPing ? RenderResourceType.Gradient_Ping : RenderResourceType.Gradient_Pong));
+                _ds[i].SetRWTexture("gOut_Gradient", pool.GetPoint(isPing ? RenderResourceType.Gradient_Pong : RenderResourceType.Gradient_Ping));
             }
 
             builder.AllowPassCulling(false);

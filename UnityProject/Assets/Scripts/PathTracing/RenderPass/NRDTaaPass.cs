@@ -92,8 +92,8 @@ namespace PathTracing
             var ds = data.IsEven ? data.DsPing : data.DsPong;
 
             // Dynamic per-frame bindings (same regardless of ping/pong)
-            ds.SetTexture("gIn_Mv",       pool.GetRT(RenderResourceType.MV).rt);
-            ds.SetTexture("gIn_Composed", pool.GetRT(RenderResourceType.Composed).rt);
+            ds.SetTexture("gIn_Mv",       pool.GetPoint(RenderResourceType.MV));
+            ds.SetTexture("gIn_Composed", pool.GetPoint(RenderResourceType.Composed));
             ds.SetConstantBuffer("GlobalConstants", res.ConstantBuffer);
 
             cs.Dispatch(cmd, ds, (uint)data.Settings.rectGridW, (uint)data.Settings.rectGridH, 1);
@@ -121,11 +121,11 @@ namespace PathTracing
             // Ping (isEven):  gIn_History = TaaHistoryPrev, gOut_Result = TaaHistory
             // Pong (!isEven): gIn_History = TaaHistory,     gOut_Result = TaaHistoryPrev
             var pool = _resource.Pool;
-            _dsPing.SetTexture ("gIn_History",  pool.GetRT(RenderResourceType.TaaHistoryPrev).rt);
-            _dsPing.SetRWTexture("gOut_Result", pool.GetRT(RenderResourceType.TaaHistory).rt);
+            _dsPing.SetTexture ("gIn_History",  pool.GetPoint(RenderResourceType.TaaHistoryPrev));
+            _dsPing.SetRWTexture("gOut_Result", pool.GetPoint(RenderResourceType.TaaHistory));
 
-            _dsPong.SetTexture ("gIn_History",  pool.GetRT(RenderResourceType.TaaHistory).rt);
-            _dsPong.SetRWTexture("gOut_Result", pool.GetRT(RenderResourceType.TaaHistoryPrev).rt);
+            _dsPong.SetTexture ("gIn_History",  pool.GetPoint(RenderResourceType.TaaHistory));
+            _dsPong.SetRWTexture("gOut_Result", pool.GetPoint(RenderResourceType.TaaHistoryPrev));
  
 
             builder.AllowPassCulling(false);

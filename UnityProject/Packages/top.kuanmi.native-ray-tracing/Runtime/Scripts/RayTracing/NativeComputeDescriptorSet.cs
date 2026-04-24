@@ -28,7 +28,7 @@ namespace NativeRender
         private const int RingSize = 8;
 
         // objectKind constants matching C++ CS_BindingObjectKind
-        private const uint ObjKindNone           = 0;
+        private const uint ObjKindNone            = 0;
         private const uint ObjKindAccelStruct     = 1;
         private const uint ObjKindBindlessTexture = 2;
         private const uint ObjKindBindlessBuffer  = 3;
@@ -41,15 +41,15 @@ namespace NativeRender
 
         // Slot layout mirrored from the pipeline (refreshed on hot-reload)
         private Dictionary<string, uint> _nameToSlot;
-        private uint _slotCount;
+        private uint                     _slotCount;
 
         // Staging array written by Set* on the main thread (not pinned)
         private NativeRenderPlugin.CS_BindingSlot[] _stagingSlots;
 
         // Ring buffer of pinned NativeArrays (Persistent)
-        private NativeArray<NativeRenderPlugin.CS_BindingSlot>[] _slotRing;
+        private NativeArray<NativeRenderPlugin.CS_BindingSlot>[]     _slotRing;
         private NativeArray<NativeRenderPlugin.CS_RenderEventData>[] _headerRing;
-        private int _ringIdx;
+        private int                                                  _ringIdx;
 
         // -------------------------------------------------------------------
         // Construction
@@ -68,8 +68,8 @@ namespace NativeRender
             _pipeline = pipeline;
             CopySlotLayout(pipeline);
             AllocateRingBuffers();
-            _descriptorSetHandle = NativeRenderPlugin.NR_CS_CreateDescriptorSet(pipeline.Handle);
-            pipeline.OnRebuilt += OnPipelineRebuilt;
+            _descriptorSetHandle =  NativeRenderPlugin.NR_CS_CreateDescriptorSet(pipeline.Handle);
+            pipeline.OnRebuilt   += OnPipelineRebuilt;
         }
 
         private void CopySlotLayout(NativeComputePipeline pipeline)
@@ -87,11 +87,12 @@ namespace NativeRender
             _headerRing = new NativeArray<NativeRenderPlugin.CS_RenderEventData>[RingSize];
             for (int i = 0; i < RingSize; i++)
             {
-                _slotRing[i]   = new NativeArray<NativeRenderPlugin.CS_BindingSlot>(
+                _slotRing[i] = new NativeArray<NativeRenderPlugin.CS_BindingSlot>(
                     (int)(_slotCount > 0 ? _slotCount : 1), Allocator.Persistent);
                 _headerRing[i] = new NativeArray<NativeRenderPlugin.CS_RenderEventData>(
                     1, Allocator.Persistent);
             }
+
             _ringIdx = 0;
         }
 
@@ -100,9 +101,10 @@ namespace NativeRender
             if (_slotRing == null) return;
             for (int i = 0; i < RingSize; i++)
             {
-                if (_slotRing[i].IsCreated)   _slotRing[i].Dispose();
+                if (_slotRing[i].IsCreated) _slotRing[i].Dispose();
                 if (_headerRing[i].IsCreated) _headerRing[i].Dispose();
             }
+
             _slotRing   = null;
             _headerRing = null;
         }
@@ -115,6 +117,7 @@ namespace NativeRender
                 NativeRenderPlugin.NR_CS_DestroyDescriptorSet(_descriptorSetHandle);
                 _descriptorSetHandle = 0;
             }
+
             FreeRingBuffers();
             CopySlotLayout(pipeline);
             AllocateRingBuffers();
@@ -133,6 +136,7 @@ namespace NativeRender
                 NativeRenderPlugin.NR_CS_DestroyDescriptorSet(_descriptorSetHandle);
                 _descriptorSetHandle = 0;
             }
+
             FreeRingBuffers();
         }
 
@@ -149,70 +153,50 @@ namespace NativeRender
         }
 
         /// <summary>Binds a ComputeBuffer as a read-only structured/byte-address buffer (SRV).</summary>
-        public void SetBuffer(string name, ComputeBuffer buffer)
+        public void SetBuffer(string name, IntPtr bufferPtr)
         {
             if (!TryGetSlot(name, out uint i)) return;
-            _stagingSlots[i].resourcePtr = (ulong)buffer.GetNativeBufferPtr();
-            _stagingSlots[i].objectKind  = ObjKindNone;
-            _stagingSlots[i].count       = 0;
-            _stagingSlots[i].stride      = 0;
-        }
-
-        /// <summary>Binds a GraphicsBuffer as a read-only structured/byte-address buffer (SRV).</summary>
-        public void SetBuffer(string name, GraphicsBuffer buffer)
-        {
-            if (!TryGetSlot(name, out uint i)) return;
-            _stagingSlots[i].resourcePtr = (ulong)buffer.GetNativeBufferPtr();
+            _stagingSlots[i].resourcePtr = (ulong)bufferPtr;
             _stagingSlots[i].objectKind  = ObjKindNone;
             _stagingSlots[i].count       = 0;
             _stagingSlots[i].stride      = 0;
         }
 
         /// <summary>Binds a ComputeBuffer as an RW (read-write) buffer (UAV).</summary>
-        public void SetRWBuffer(string name, ComputeBuffer buffer)
+        public void SetRWBuffer(string name, IntPtr bufferPtr)
         {
             if (!TryGetSlot(name, out uint i)) return;
-            _stagingSlots[i].resourcePtr = (ulong)buffer.GetNativeBufferPtr();
-            _stagingSlots[i].objectKind  = ObjKindNone;
-            _stagingSlots[i].count       = 0;
-            _stagingSlots[i].stride      = 0;
-        }
-
-        /// <summary>Binds a GraphicsBuffer as an RW (read-write) buffer (UAV).</summary>
-        public void SetRWBuffer(string name, GraphicsBuffer buffer)
-        {
-            if (!TryGetSlot(name, out uint i)) return;
-            _stagingSlots[i].resourcePtr = (ulong)buffer.GetNativeBufferPtr();
+            _stagingSlots[i].resourcePtr = (ulong)bufferPtr;
             _stagingSlots[i].objectKind  = ObjKindNone;
             _stagingSlots[i].count       = 0;
             _stagingSlots[i].stride      = 0;
         }
 
         /// <summary>Binds a GraphicsBuffer as an RWStructuredBuffer UAV with explicit element count and stride.</summary>
-        public void SetRWStructuredBuffer(string name, GraphicsBuffer buffer)
+        public void SetRWStructuredBuffer(string name, IntPtr bufferPtr, int count, int stride)
         {
             if (!TryGetSlot(name, out uint i)) return;
-            _stagingSlots[i].resourcePtr = buffer != null ? (ulong)buffer.GetNativeBufferPtr() : 0;
+            _stagingSlots[i].resourcePtr = (ulong) bufferPtr;
             _stagingSlots[i].objectKind  = ObjKindNone;
-            _stagingSlots[i].count       = buffer != null ? (uint)buffer.count  : 0;
-            _stagingSlots[i].stride      = buffer != null ? (uint)buffer.stride : 0;
+            _stagingSlots[i].count       = (uint)count;
+            _stagingSlots[i].stride      = (uint)stride;
         }
 
         /// <summary>Binds a Texture2D or RenderTexture as a read-only texture (SRV).</summary>
-        public void SetTexture(string name, Texture texture)
+        public void SetTexture(string name, IntPtr texturePtr)
         {
             if (!TryGetSlot(name, out uint i)) return;
-            _stagingSlots[i].resourcePtr = texture != null ? (ulong)texture.GetNativeTexturePtr() : 0;
+            _stagingSlots[i].resourcePtr = (ulong)texturePtr;
             _stagingSlots[i].objectKind  = ObjKindNone;
             _stagingSlots[i].count       = 0;
             _stagingSlots[i].stride      = 0;
         }
 
         /// <summary>Binds a RenderTexture as a read-write texture (UAV).</summary>
-        public void SetRWTexture(string name, RenderTexture texture)
+        public void SetRWTexture(string name, IntPtr texturePtr)
         {
             if (!TryGetSlot(name, out uint i)) return;
-            _stagingSlots[i].resourcePtr = texture != null ? (ulong)texture.GetNativeTexturePtr() : 0;
+            _stagingSlots[i].resourcePtr = (ulong)texturePtr;
             _stagingSlots[i].objectKind  = ObjKindNone;
             _stagingSlots[i].count       = 0;
             _stagingSlots[i].stride      = 0;
@@ -250,7 +234,7 @@ namespace NativeRender
             if (!TryGetSlot(name, out uint i)) return;
             _stagingSlots[i].resourcePtr = buffer != null ? (ulong)buffer.GetNativeBufferPtr() : 0;
             _stagingSlots[i].objectKind  = ObjKindNone;
-            _stagingSlots[i].count       = buffer != null ? (uint)buffer.count  : 0;
+            _stagingSlots[i].count       = buffer != null ? (uint)buffer.count : 0;
             _stagingSlots[i].stride      = buffer != null ? (uint)buffer.stride : 0;
         }
 
@@ -260,7 +244,7 @@ namespace NativeRender
             if (!TryGetSlot(name, out uint i)) return;
             _stagingSlots[i].resourcePtr = buffer != null ? (ulong)buffer.GetNativeBufferPtr() : 0;
             _stagingSlots[i].objectKind  = ObjKindNone;
-            _stagingSlots[i].count       = buffer != null ? (uint)elementCount  : 0;
+            _stagingSlots[i].count       = buffer != null ? (uint)elementCount : 0;
             _stagingSlots[i].stride      = buffer != null ? (uint)elementStride : 0;
         }
 
@@ -365,11 +349,11 @@ namespace NativeRender
             var header = new NativeRenderPlugin.CS_RenderEventData
             {
                 descriptorSetHandle = _descriptorSetHandle,
-                threadGroupX    = threadGroupX,
-                threadGroupY    = threadGroupY,
-                threadGroupZ    = threadGroupZ,
-                bindingCount    = _slotCount,
-                bindingSlotsPtr = (ulong)slotArray.GetUnsafePtr(),
+                threadGroupX        = threadGroupX,
+                threadGroupY        = threadGroupY,
+                threadGroupZ        = threadGroupZ,
+                bindingCount        = _slotCount,
+                bindingSlotsPtr     = (ulong)slotArray.GetUnsafePtr(),
             };
             _headerRing[ring][0] = header;
 
