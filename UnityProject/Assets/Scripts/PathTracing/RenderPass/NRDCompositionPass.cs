@@ -15,8 +15,8 @@ namespace PathTracing
     {
         private readonly NativeComputePipeline      _cs;
         private readonly NativeComputeDescriptorSet _ds;
-        private          Resource              _resource;
-        private          Settings              _settings;
+        private          Resource                   _resource;
+        private          Settings                   _settings;
 
         public NRDCompositionPass(NativeComputeShader cs)
         {
@@ -50,8 +50,9 @@ namespace PathTracing
 
         public class Settings
         {
-            internal int rectGridW;
-            internal int rectGridH;
+            internal int  rectGridW;
+            internal int  rectGridH;
+            internal bool useRR;
         }
 
         // -------------------------------------------------------------------------
@@ -89,9 +90,12 @@ namespace PathTracing
             ds.SetTexture("gIn_DirectLighting", pool.GetPoint(RenderResourceType.DirectLighting));
             ds.SetTexture("gIn_DirectEmission", pool.GetPoint(RenderResourceType.DirectEmission));
             ds.SetTexture("gIn_PsrThroughput", pool.GetPoint(RenderResourceType.PsrThroughput));
-            ds.SetTexture("gIn_Shadow", pool.GetPoint(RenderResourceType.Shadow));
-            ds.SetTexture("gIn_Diff", pool.GetPoint(RenderResourceType.Diff));
-            ds.SetTexture("gIn_Spec", pool.GetPoint(RenderResourceType.Spec));
+
+            bool useRR = data.Settings.useRR;
+
+            ds.SetTexture("gIn_Shadow", pool.GetPoint(useRR ? RenderResourceType.Unfiltered_Translucency : RenderResourceType.Shadow));
+            ds.SetTexture("gIn_Diff", pool.GetPoint(useRR ? RenderResourceType.Unfiltered_Diff : RenderResourceType.Diff));
+            ds.SetTexture("gIn_Spec", pool.GetPoint(useRR ? RenderResourceType.Unfiltered_Spec : RenderResourceType.Spec));
 
             // UAV outputs
             ds.SetRWTexture("gOut_ComposedDiff", pool.GetPoint(RenderResourceType.ComposedDiff));
