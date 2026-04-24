@@ -212,7 +212,7 @@ namespace PathTracing
             }
 
             var  outputResolution = ComputeOutputResolution(renderingData.cameraData);
-            bool resourcesChanged = pool.EnsureResources(outputResolution, UpscalerMode.NATIVE);
+            bool resourcesChanged = pool.EnsureResources(outputResolution, setting.upscalerMode);
             var  renderResolution = pool.renderResolution;
 
             if (resourcesChanged)
