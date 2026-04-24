@@ -298,6 +298,7 @@ namespace PathTracing
             }
 
             // Confidence Blur (5 ping-pong iterations over SHARC gradient)
+            if(!setting.RR)
             {
                 int sharcW = 16 * ((int)(renderResolution.x / sharcDownscale + 15) / 16);
                 int sharcH = 16 * ((int)(renderResolution.y / sharcDownscale + 15) / 16);
@@ -339,7 +340,8 @@ namespace PathTracing
                 renderer.EnqueuePass(_nrdOpaquePass);
             }
 
-            // NRD Denoiser
+            // NRD Denoiser (skip when DLSS-RR is active — it handles denoising internally)
+            if (!setting.RR)
             {
                 var lightData = renderingData.lightData;
                 var mainLight = lightData.mainLightIndex >= 0 ? lightData.visibleLights[lightData.mainLightIndex] : default;
@@ -380,6 +382,7 @@ namespace PathTracing
                 {
                     rectGridW = rectGridW,
                     rectGridH = rectGridH,
+                    useRR = setting.RR
                 });
                 renderer.EnqueuePass(_nrdCompositionPass);
             }
@@ -519,7 +522,8 @@ namespace PathTracing
                     RRGuide_Normal_Roughness = pool.GetRT(RenderResourceType.RrGuideNormalRoughness),
                     RRGuide_SpecHitDistance  = pool.GetRT(RenderResourceType.RrGuideSpecHitDistance),
                     DlssOutput               = pool.GetRT(RenderResourceType.DlssOutput),
-                    taaDst                   = pool.GetRT(isEven ? RenderResourceType.TaaHistory : RenderResourceType.TaaHistoryPrev),
+                    // todo
+                    taaDst                   = pool.GetRT(RenderResourceType.Final),
                     ViewZ                    = pool.GetRT(RenderResourceType.Viewz),
                     Gradient                 = pool.GetRT(RenderResourceType.Gradient_Pong),
 
