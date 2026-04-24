@@ -183,7 +183,6 @@ namespace NativeRender
         public IntPtr PrimitiveDataBufPtr { get; private set; }
         public IntPtr MorphPrimitivePositionsPrevBufPtr { get; private set; }
 
-
         public BindlessTexture Textures => _textures;
 
         public GraphicsBuffer HashEntriesBuffer => _sharcHashEntries;
@@ -515,13 +514,13 @@ namespace NativeRender
 
                 _instanceDataBuf = new GraphicsBuffer(GraphicsBuffer.Target.Structured,
                     _instanceCpu.Length, Marshal.SizeOf<InstanceDataNRD>());
-                InstanceDataBufPtr = _instanceDataBuf.GetNativeBufferPtr();
                 _instanceDataBuf.SetData(_instanceCpu);
+                InstanceDataBufPtr = _instanceDataBuf.GetNativeBufferPtr();
 
                 _primitiveDataBuf = new GraphicsBuffer(GraphicsBuffer.Target.Structured,
                     _primitiveCpu.Length, Marshal.SizeOf<PrimitiveDataNRD>());
-                PrimitiveDataBufPtr = _primitiveDataBuf.GetNativeBufferPtr();
                 _primitiveDataBuf.SetData(_primitiveCpu);
+                PrimitiveDataBufPtr  = _primitiveDataBuf.GetNativeBufferPtr();
 
                 // Register each merged BLAS with the appropriate TLAS.
                 if (_blasOpaque != null)
@@ -600,13 +599,13 @@ namespace NativeRender
 
             _instanceDataBuf = new GraphicsBuffer(GraphicsBuffer.Target.Structured,
                 _instanceCpu.Length, Marshal.SizeOf<InstanceDataNRD>());
-            InstanceDataBufPtr = _instanceDataBuf.GetNativeBufferPtr();
             _instanceDataBuf.SetData(_instanceCpu);
+            InstanceDataBufPtr = _instanceDataBuf.GetNativeBufferPtr();
 
             _primitiveDataBuf = new GraphicsBuffer(GraphicsBuffer.Target.Structured,
                 _primitiveCpu.Length, Marshal.SizeOf<PrimitiveDataNRD>());
-            PrimitiveDataBufPtr = _primitiveDataBuf.GetNativeBufferPtr();
             _primitiveDataBuf.SetData(_primitiveCpu);
+            PrimitiveDataBufPtr = _primitiveDataBuf.GetNativeBufferPtr();
 
             // Initialize slot allocators to reflect the just-built fully-packed layout.
             _instanceAlloc.ResetFullyAllocated(_instanceCpu.Length);
@@ -1066,6 +1065,10 @@ namespace NativeRender
                 _primitiveDataBuf.SetData(_primitiveCpu,
                     (int)subPrimOffsets[sub], (int)subPrimOffsets[sub], subPrimCounts[sub]);
 
+            InstanceDataBufPtr = _instanceDataBuf.GetNativeBufferPtr();
+            PrimitiveDataBufPtr = _primitiveDataBuf.GetNativeBufferPtr();
+            
+            
             _perTargetBlas[mr.GetInstanceID()] = new PerTargetBlas
             {
                 tlas                   = tlas,
@@ -1097,8 +1100,8 @@ namespace NativeRender
             _instanceDataBuf?.Release();
             _instanceDataBuf = new GraphicsBuffer(GraphicsBuffer.Target.Structured,
                 cap, Marshal.SizeOf<InstanceDataNRD>());
-            InstanceDataBufPtr = _instanceDataBuf.GetNativeBufferPtr();
             _instanceDataBuf.SetData(_instanceCpu);
+            InstanceDataBufPtr = _instanceDataBuf.GetNativeBufferPtr();
         }
 
         /// <summary>
@@ -1125,8 +1128,8 @@ namespace NativeRender
             _primitiveDataBuf?.Release();
             _primitiveDataBuf = new GraphicsBuffer(GraphicsBuffer.Target.Structured,
                 cap, Marshal.SizeOf<PrimitiveDataNRD>());
-            PrimitiveDataBufPtr = _primitiveDataBuf.GetNativeBufferPtr();
             _primitiveDataBuf.SetData(_primitiveCpu);
+            PrimitiveDataBufPtr = _primitiveDataBuf.GetNativeBufferPtr();
         }
 
         // =====================================================================

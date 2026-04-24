@@ -41,6 +41,10 @@ namespace PathTracing
         public Texture2D scramblingRankingTex;
         public Texture2D sobolTex;
 
+        private IntPtr scramblingRankingTexPtr;
+        private IntPtr sobolTexPtr;
+        
+
         private NRDTlasUpdatePass     _nrdTlasUpdatePass;
         private NRDSharcPass          _nrdSharcPass;
         private NRDOpaquePass         _nrdOpaquePass;
@@ -199,15 +203,12 @@ namespace PathTracing
 
             globalConstants = frameState.GetNrdConstants(renderingData, setting);
 
-            if (_nrdConstantBuffer == null)
-            {
-                _nrdConstantBuffer    = new GraphicsBuffer(GraphicsBuffer.Target.Constant, 1, Marshal.SizeOf<NRDGlobalConstants>());
-                _nrdConstantBufferPtr = _nrdConstantBuffer.GetNativeBufferPtr();
-            }
+            _nrdConstantBuffer    ??= new GraphicsBuffer(GraphicsBuffer.Target.Constant, 1, Marshal.SizeOf<NRDGlobalConstants>());
 
             _nrdGlobalConstantsArray[0] = globalConstants;
             _nrdConstantBuffer.SetData(_nrdGlobalConstantsArray);
-
+            _nrdConstantBufferPtr =   _nrdConstantBuffer.GetNativeBufferPtr();
+            
             bool isEven = (globalConstants.gFrameIndex & 1) == 0;
 
             // TLAS update
@@ -297,8 +298,8 @@ namespace PathTracing
                 var nrdOpaqueResource = new NRDOpaquePass.Resource
                 {
                     ConstantBuffer    = _nrdConstantBufferPtr,
-                    ScramblingRanking = scramblingRankingTex,
-                    Sobol             = sobolTex,
+                    ScramblingRanking = scramblingRankingTexPtr,
+                    Sobol             = sobolTexPtr,
                     Pool              = pool,
                 };
 
