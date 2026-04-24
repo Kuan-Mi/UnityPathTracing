@@ -341,6 +341,7 @@ namespace PathTracing
     public class NrdSampleSetting
     {
         public bool showValidation = false;
+        public bool showMV = false;
         public bool mergeBlas      = false;
         // ── Animation / timing (not used by shader, kept for completeness) ──
         // public double motionStartTime        = 0.0;

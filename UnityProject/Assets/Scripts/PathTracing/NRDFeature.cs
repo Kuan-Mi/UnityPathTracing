@@ -168,10 +168,10 @@ namespace PathTracing
 
 
             if (_nrdSampleResource == null)
-                _nrdSampleResource = new NRDSampleResource(setting.mergeBlas);
+                _nrdSampleResource = new NRDSampleResource();
 
-
-            _nrdSampleResource.MergeBlas = setting.mergeBlas;
+            // MergeBlas is no longer a runtime property; merging is determined automatically
+            // based on Application.isPlaying and gameObject.isStatic per-object.
             NativeRender.NativeRenderPlugin.NR_FrameTick();
             _nrdSampleResource?.UpdateForFrame();
 
@@ -529,7 +529,7 @@ namespace PathTracing
                     resolutionScale = frameState.resolutionScale,
                     enableDlssRR    = setting.RR,
                     tmpDisableRR    = setting.tmpDisableRR,
-                    showMV          = false,
+                    showMV          = setting.showMV,
                     showValidation  = setting.showValidation,
                     showReference   = false,
                 });

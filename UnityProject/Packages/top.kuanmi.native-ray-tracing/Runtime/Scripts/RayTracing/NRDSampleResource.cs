@@ -14,18 +14,13 @@ namespace NativeRender
     /// <summary>
     /// Scene-resident resources mirroring NRDSample.cpp's resource taxonomy.
     ///
-    /// Two modes (selected at construction time via <c>mergeBlas</c>):
+    /// In play mode, Unity-static objects are batched into merged pre-transformed
+    /// BLASes (FLAG_STATIC set; mOverloaded = identity). Non-static (dynamic)
+    /// objects get one BLAS each; mOverloaded stores the previous-frame motion
+    /// matrix (prevT * inv(currT)) so the shader can compute correct Xprev.
     ///
-    /// <b>Merged mode</b> (mergeBlas = true, default):
-    ///     BLAS_MergedOpaque / MergedTransparent / MergedEmissive – one merged
-    ///     pre-transformed VB/IB per category, identity TLAS transform.
-    ///
-    /// <b>Separate mode</b> (mergeBlas = false):
-    ///     One BLAS per MeshRenderer, using the mesh's native VB/IB.
-    ///     TLAS transform = localToWorldMatrix; InstanceID set so that
-    ///     InstanceID() + GeometryIndex() indexes into _instanceDataBuf.
-    ///     Transform-only changes skip BLAS rebuild (only TLAS transform +
-    ///     mOverloadedMatrix in the instance buffer are updated).
+    /// In editor non-play mode, all objects use separate BLASes with FLAG_STATIC
+    /// (no motion vectors needed; mOverloaded = current rotation matrix).
     ///
     /// Binding names (<c>BindToShader</c>) exactly match NRDSample.cpp.
     /// </summary>
@@ -50,23 +45,11 @@ namespace NativeRender
         private const uint kHandleTransparent = 0xFFFF0002u;
         private const uint kHandleEmissive    = 0xFFFF0003u;
 
-        // ----- Mode -----
-        private bool _mergeBlas;
+        // ----- Mode helpers -----
+        // Static objects are merged into one BLAS in play mode only.
+        private static bool ShouldMerge() => Application.isPlaying;
+        private static bool IsStaticObject(NativeRayTracingTarget t) => t.gameObject.isStatic;
 
-        /// <summary>
-        /// Switches between merged-BLAS and separate-BLAS mode at runtime.
-        /// Setting this triggers a full scene rebuild on the next <see cref="UpdateForFrame"/> call.
-        /// </summary>
-        public bool MergeBlas
-        {
-            get => _mergeBlas;
-            set
-            {
-                if (_mergeBlas == value) return;
-                _mergeBlas  = value;
-                _sceneDirty = true;
-            }
-        }
 
         // Identity 3x4 row-major transform (12 floats).
         private static readonly float[] kIdentity3x4 =
@@ -127,7 +110,7 @@ namespace NativeRender
         private sealed class PerTargetBlas
         {
             /// <summary>Which TLAS this renderer belongs to (worldAS or lightAS).</summary>
-            public RayTracingAccelerationStructure tlas;
+            public List<RayTracingAccelerationStructure> tlasList;
 
             /// <summary>Index of this renderer's first submesh in _instanceDataBuf (= first contiguous slot).</summary>
             public uint firstInstanceDataIndex;
@@ -146,6 +129,13 @@ namespace NativeRender
 
             /// <summary>Material for each submesh — used to release material refs when the target is removed.</summary>
             public Material[] submeshMaterials;
+
+            /// <summary>
+            /// True when this entry uses FLAG_STATIC semantics:
+            /// in edit mode all objects, in play mode nothing (dynamic only reach separate BLAS).
+            /// Controls mOverloaded update strategy in UpdateTransformsOnly.
+            /// </summary>
+            public bool isStatic;
         }
 
         // Keyed by MeshRenderer.GetInstanceID()
@@ -175,30 +165,29 @@ namespace NativeRender
         public RayTracingAccelerationStructure WorldAS => _worldAS;
         public RayTracingAccelerationStructure LightAS => _lightAS;
 
-        public GraphicsBuffer InstanceDataBuf => _instanceDataBuf;
-        public GraphicsBuffer PrimitiveDataBuf => _primitiveDataBuf;
+        public GraphicsBuffer InstanceDataBuf                => _instanceDataBuf;
+        public GraphicsBuffer PrimitiveDataBuf               => _primitiveDataBuf;
         public GraphicsBuffer MorphPrimitivePositionsPrevBuf => _morphPrimitivePositionsPrevBuf;
 
-        public IntPtr InstanceDataBufPtr { get; private set; }
-        public IntPtr PrimitiveDataBufPtr { get; private set; }
+        public IntPtr InstanceDataBufPtr                { get; private set; }
+        public IntPtr PrimitiveDataBufPtr               { get; private set; }
         public IntPtr MorphPrimitivePositionsPrevBufPtr { get; private set; }
 
         public BindlessTexture Textures => _textures;
 
-        public GraphicsBuffer HashEntriesBuffer => _sharcHashEntries;
+        public GraphicsBuffer HashEntriesBuffer  => _sharcHashEntries;
         public GraphicsBuffer AccumulationBuffer => _sharcAccumulated;
-        public GraphicsBuffer ResolvedBuffer => _sharcResolved;
+        public GraphicsBuffer ResolvedBuffer     => _sharcResolved;
 
         // Cached native pointers (valid for the lifetime of the buffers, set once in AllocateStaticResources).
-        public IntPtr HashEntriesBufferPtr { get; private set; }
+        public IntPtr HashEntriesBufferPtr  { get; private set; }
         public IntPtr AccumulationBufferPtr { get; private set; }
-        public IntPtr ResolvedBufferPtr { get; private set; }
+        public IntPtr ResolvedBufferPtr     { get; private set; }
 
-        public NRDSampleResource(bool mergeBlas = true)
+        public NRDSampleResource(bool mergeBlas = true) // mergeBlas param retained for call-site compat but ignored
         {
-            _mergeBlas = mergeBlas;
-            _worldAS   = new RayTracingAccelerationStructure();
-            _lightAS   = new RayTracingAccelerationStructure();
+            _worldAS = new RayTracingAccelerationStructure();
+            _lightAS = new RayTracingAccelerationStructure();
             AllocateStaticResources();
         }
 
@@ -208,18 +197,6 @@ namespace NativeRender
         public void UpdateForFrame()
         {
             var targets = NativeRayTracingTarget.All;
-
-            if (_mergeBlas)
-            {
-                // Merged mode: any structural change needs a full rebuild.
-                // Drain both queues without inspecting contents.
-                if (NativeRayTracingTarget.RemoveQueue.Count > 0 || NativeRayTracingTarget.AddQueue.Count > 0)
-                {
-                    NativeRayTracingTarget.RemoveQueue.Clear();
-                    NativeRayTracingTarget.AddQueue.Clear();
-                    _sceneDirty = true;
-                }
-            }
 
             if (_sceneDirty)
             {
@@ -234,63 +211,61 @@ namespace NativeRender
                 return;
             }
 
-            // Consume all pending Add/Remove events submitted by NativeRayTracingTarget lifecycle callbacks.
+            // Consume Add/Remove events. Static objects in play mode trigger a full rebuild;
+            // dynamic objects are handled incrementally.
             DrainChangeQueue();
 
-            if (AnyTransformChanged(targets))
-            {
-                if (_mergeBlas)
-                {
-                    // Merged mode: vertices are pre-transformed → must rebuild geometry.
-                    // But textures/materials are unchanged, so we can preserve them.
-                    RebuildScene(targets, preserveTextures: true);
-                }
-                else
-                {
-                    // Separate mode: only update TLAS transforms + mOverloadedMatrix.
-                    UpdateTransformsOnly(targets);
-                }
-
-                foreach (var t in targets)
-                    if (t != null)
-                        t.transform.hasChanged = false;
-            }
+            // UpdateTransformsOnly is called every frame:
+            //   - Edit-mode (isStatic=true) entries: only patched when hasChanged.
+            //   - Dynamic (isStatic=false) entries: mOverloaded is written every frame
+            //     (motion matrix when moved, identity when stationary) so Xprev is always correct.
+            UpdateTransformsOnly(targets);
+            foreach (var t in targets)
+                if (t != null)
+                    t.transform.hasChanged = false;
         }
 
         /// <summary>
-        /// Drains all pending <see cref="TargetChange"/> events from
-        /// <see cref="NativeRayTracingTarget.ChangeQueue"/> and applies them.
-        /// <para>In merged mode, any structural change sets <see cref="_sceneDirty"/>.</para>
-        /// <para>In separate mode, additions and removals are applied incrementally.</para>
+        /// Drains all pending <see cref="TargetAddEvent"/> / <see cref="TargetRemoveEvent"/> events.
+        /// <para>
+        /// In play mode, static objects trigger a full scene rebuild (they belong to merged BLASes).
+        /// Dynamic objects are handled incrementally without FLAG_STATIC.
+        /// </para>
+        /// <para>In editor non-play mode all objects are treated as dynamic separate BLASes.</para>
         /// </summary>
         private void DrainChangeQueue()
         {
-            // Separate mode — process removals first so freed slots can be reused by additions.
+            // Process removals first so freed slots can be reused by additions.
             while (NativeRayTracingTarget.RemoveQueue.Count > 0)
             {
                 var ev = NativeRayTracingTarget.RemoveQueue.Dequeue();
-                RemoveTargetIncremental(ev.RendererInstanceId);
+
+                if (!_perTargetBlas.ContainsKey(ev.RendererInstanceId))
+                {
+                    // Not tracked in separate BLAS → was part of a merged (static) BLAS; need full rebuild.
+                    _sceneDirty = true;
+                }
+                else
+                {
+                    RemoveTargetIncremental(ev.RendererInstanceId);
+                }
             }
 
             while (NativeRayTracingTarget.AddQueue.Count > 0)
             {
                 var ev = NativeRayTracingTarget.AddQueue.Dequeue();
 
-                // Target or Renderer may be null if the object was destroyed before we consumed the event.
                 if (ev.Target == null || ev.Renderer == null) continue;
 
-                // New materials are handled incrementally by GetOrAddMaterial (called inside
-                // AddTargetIncremental), which grows _textures in-place if needed — no full rebuild.
+                // Static objects in play mode live in merged BLASes → full rebuild required.
+                if (ShouldMerge() && IsStaticObject(ev.Target))
+                {
+                    _sceneDirty = true;
+                    continue;
+                }
 
-                Material rep           = GetRepresentativeMaterial(ev.Renderer);
-                bool     isTransparent = IsMaterialTransparent(rep);
-                bool     isEmissive    = IsMaterialEmissive(rep);
-
-                uint worldFlags = FLAG_STATIC | (isTransparent ? FLAG_TRANSPARENT : FLAG_NON_TRANSPARENT);
-                AddTargetIncremental(ev.Target, _worldAS, worldFlags);
-
-                if (isEmissive)
-                    AddTargetIncremental(ev.Target, _lightAS, FLAG_STATIC | FLAG_NON_TRANSPARENT | FLAG_EMISSIVE);
+                // Dynamic objects (or any object in edit mode): add incrementally without FLAG_STATIC.
+                AddTargetIncremental(ev.Target);
             }
 
             // Auto-schedule full rebuild when fragmentation becomes excessive.
@@ -419,23 +394,16 @@ namespace NativeRender
             }
         }
 
-        private static bool AnyTransformChanged(IReadOnlyList<NativeRayTracingTarget> targets)
-        {
-            for (int i = 0; i < targets.Count; i++)
-            {
-                var t = targets[i];
-                if (t == null) continue;
-                if (t.transform.hasChanged) return true;
-            }
-
-            return false;
-        }
-
         /// <summary>
-        /// Classifies targets into opaque / transparent / emissive, builds one
-        /// merged pre-transformed VB/IB per category, uploads instance &amp;
-        /// primitive data, and registers each merged BLAS as a single TLAS
-        /// instance with identity transform (matching NRDSample).
+        /// Classifies targets into static (merged BLAS in play mode) and dynamic (separate BLAS),
+        /// builds GPU resources, and registers all BLASes with the appropriate TLAS.
+        ///
+        /// Play mode:
+        ///   Unity-static objects → merged pre-transformed BLASes with FLAG_STATIC (mOverloaded = identity).
+        ///   Dynamic objects → separate BLAS per renderer, no FLAG_STATIC (mOverloaded = identity first frame).
+        ///
+        /// Editor non-play mode:
+        ///   All objects → separate BLAS with FLAG_STATIC (mOverloaded = current transform for normals).
         /// </summary>
         private void RebuildScene(IReadOnlyList<NativeRayTracingTarget> targets, bool preserveTextures = false)
         {
@@ -444,10 +412,14 @@ namespace NativeRender
             _worldAS?.Clear();
             _lightAS?.Clear();
 
-            // Bucket targets by category.
-            var opaque      = new List<NativeRayTracingTarget>();
-            var transparent = new List<NativeRayTracingTarget>();
-            var emissive    = new List<NativeRayTracingTarget>();
+            bool mergeStatics = ShouldMerge();
+
+            // Bucket targets: in play mode statics go to merged lists; everything else to separate lists.
+            var staticOpaque      = new List<NativeRayTracingTarget>();
+            var staticTransparent = new List<NativeRayTracingTarget>();
+            var staticEmissive    = new List<NativeRayTracingTarget>();
+
+            var dyn = new List<NativeRayTracingTarget>();
 
             foreach (var t in targets)
             {
@@ -460,83 +432,104 @@ namespace NativeRender
                 Material rep           = GetRepresentativeMaterial(mr);
                 bool     isTransparent = IsMaterialTransparent(rep);
                 bool     isEmissive    = IsMaterialEmissive(rep);
+                bool     goesToMerged  = mergeStatics && IsStaticObject(t);
 
-                if (isTransparent) transparent.Add(t);
-                else opaque.Add(t);
-
-                if (isEmissive) emissive.Add(t);
+                if (goesToMerged)
+                {
+                    if (isTransparent) staticTransparent.Add(t);
+                    else staticOpaque.Add(t);
+                    if (isEmissive) staticEmissive.Add(t);
+                }
+                else
+                {
+                    dyn.Add(t);
+                }
             }
 
-            // Running primitive / instance offsets (NRDSample orders opaque → transparent → emissive).
+            // Pre-allocate _primitiveCpu for the combined total (merged statics + separate dynamics).
+            int totalPrims = CountGroupTriangles(staticOpaque)
+                             + CountGroupTriangles(staticTransparent)
+                             + CountGroupTriangles(staticEmissive)
+                             + CountGroupTriangles(dyn);
+
+            _primitiveCpu = new NativeArray<PrimitiveDataNRD>(
+                Mathf.Max(totalPrims, 1), Allocator.Persistent, NativeArrayOptions.UninitializedMemory);
+
             uint primitiveCursor = 0;
             uint instanceCursor  = 0;
 
+            var instList = new List<InstanceDataNRD>();
+            var texPtrs  = new List<IntPtr>();
 
-            if (_mergeBlas)
+            // ---- Merged BLASes for static objects (play mode only) ----
+            uint staticOpaqueFirstInstance      = instanceCursor;
+            uint staticTransparentFirstInstance = 0;
+            uint staticEmissiveFirstInstance    = 0;
+
+            if (mergeStatics)
             {
-                var instList = new List<InstanceDataNRD>();
-                var texPtrs  = new List<IntPtr>();
+                _blasOpaque = BuildMergedBlas(staticOpaque, ref instanceCursor, ref primitiveCursor,
+                    instList, _primitiveCpu, texPtrs, FLAG_STATIC | FLAG_NON_TRANSPARENT);
 
-                // Pre-allocate _primitiveCpu so Burst jobs write directly into it.
-                int totalPrimsMerged = CountGroupTriangles(opaque)
-                                       + CountGroupTriangles(transparent)
-                                       + CountGroupTriangles(emissive);
-                _primitiveCpu = new NativeArray<PrimitiveDataNRD>(
-                    Mathf.Max(totalPrimsMerged, 1), Allocator.Persistent, NativeArrayOptions.UninitializedMemory);
+                staticTransparentFirstInstance = instanceCursor;
+                _blasTransparent = BuildMergedBlas(staticTransparent, ref instanceCursor, ref primitiveCursor,
+                    instList, _primitiveCpu, texPtrs, FLAG_STATIC | FLAG_TRANSPARENT);
 
-                uint opaqueFirstInstance = instanceCursor;
-                _blasOpaque = BuildMergedBlas(opaque, ref instanceCursor, ref primitiveCursor,
-                    instList, _primitiveCpu, texPtrs,
-                    FLAG_STATIC | FLAG_NON_TRANSPARENT);
+                staticEmissiveFirstInstance = instanceCursor;
+                _blasEmissive = BuildMergedBlas(staticEmissive, ref instanceCursor, ref primitiveCursor,
+                    instList, _primitiveCpu, texPtrs, FLAG_STATIC | FLAG_NON_TRANSPARENT | FLAG_EMISSIVE);
+            }
 
-                uint transparentFirstInstance = instanceCursor;
-                _blasTransparent = BuildMergedBlas(transparent, ref instanceCursor, ref primitiveCursor,
-                    instList, _primitiveCpu, texPtrs,
-                    FLAG_STATIC | FLAG_TRANSPARENT);
+            // ---- Separate BLASes for dynamic objects (or all objects in edit mode) ----
+            // In edit mode every object is "dynamic" in this path but gets FLAG_STATIC
+            // so that HLSL uses mOverloaded as the rotation matrix for normals.
 
-                uint emissiveFirstInstance = instanceCursor;
-                _blasEmissive = BuildMergedBlas(emissive, ref instanceCursor, ref primitiveCursor,
-                    instList, _primitiveCpu, texPtrs,
-                    FLAG_STATIC | FLAG_NON_TRANSPARENT | FLAG_EMISSIVE);
+            ProcessSeparateGroup(dyn, ref instanceCursor, ref primitiveCursor, instList, texPtrs);
 
-                // Texture array — skip when preserving existing textures (transform-only rebuild).
-                if (!preserveTextures)
-                {
-                    int texCount = Mathf.Max(texPtrs.Count, 1);
-                    _textures = new BindlessTexture(texCount);
-                    for (int i = 0; i < texPtrs.Count; i++)
-                        _textures.SetNativePtr(i, texPtrs[i]);
-                }
 
-                // Instance / primitive GPU buffers.
-                if (instList.Count == 0) instList.Add(default);
-                _instanceCpu = instList.ToArray();
+            // ProcessSeparateGroup(dynTransparent, _worldAS, FLAG_TRANSPARENT, ref instanceCursor, ref primitiveCursor, instList, texPtrs);
+            // ProcessSeparateGroup(dynEmissive, _lightAS, FLAG_NON_TRANSPARENT | FLAG_EMISSIVE, ref instanceCursor, ref primitiveCursor, instList, texPtrs);
 
-                _instanceDataBuf = new GraphicsBuffer(GraphicsBuffer.Target.Structured,
-                    _instanceCpu.Length, Marshal.SizeOf<InstanceDataNRD>());
-                _instanceDataBuf.SetData(_instanceCpu);
-                InstanceDataBufPtr = _instanceDataBuf.GetNativeBufferPtr();
+            // ---- Texture array ----
+            if (!preserveTextures)
+            {
+                int texCount = Mathf.Max(texPtrs.Count, 1);
+                _textures = new BindlessTexture(texCount);
+                for (int i = 0; i < texPtrs.Count; i++)
+                    _textures.SetNativePtr(i, texPtrs[i]);
+            }
 
-                _primitiveDataBuf = new GraphicsBuffer(GraphicsBuffer.Target.Structured,
-                    _primitiveCpu.Length, Marshal.SizeOf<PrimitiveDataNRD>());
-                _primitiveDataBuf.SetData(_primitiveCpu);
-                PrimitiveDataBufPtr  = _primitiveDataBuf.GetNativeBufferPtr();
+            // ---- GPU buffers ----
+            if (instList.Count == 0) instList.Add(default);
+            _instanceCpu = instList.ToArray();
 
-                // Register each merged BLAS with the appropriate TLAS.
+            _instanceDataBuf = new GraphicsBuffer(GraphicsBuffer.Target.Structured,
+                _instanceCpu.Length, Marshal.SizeOf<InstanceDataNRD>());
+            _instanceDataBuf.SetData(_instanceCpu);
+            InstanceDataBufPtr = _instanceDataBuf.GetNativeBufferPtr();
+
+            _primitiveDataBuf = new GraphicsBuffer(GraphicsBuffer.Target.Structured,
+                _primitiveCpu.Length, Marshal.SizeOf<PrimitiveDataNRD>());
+            _primitiveDataBuf.SetData(_primitiveCpu);
+            PrimitiveDataBufPtr = _primitiveDataBuf.GetNativeBufferPtr();
+
+            // ---- Register merged BLASes with TLAS (play mode only) ----
+            if (mergeStatics)
+            {
                 if (_blasOpaque != null)
                     RegisterMergedBlas(_worldAS, _blasOpaque, kHandleOpaque,
-                        opaqueFirstInstance, (byte)FLAG_NON_TRANSPARENT);
+                        staticOpaqueFirstInstance, (byte)FLAG_NON_TRANSPARENT);
                 if (_blasTransparent != null)
                     RegisterMergedBlas(_worldAS, _blasTransparent, kHandleTransparent,
-                        transparentFirstInstance, (byte)FLAG_TRANSPARENT);
+                        staticTransparentFirstInstance, (byte)FLAG_TRANSPARENT);
                 if (_blasEmissive != null)
                     RegisterMergedBlas(_lightAS, _blasEmissive, kHandleEmissive,
-                        emissiveFirstInstance, (byte)FLAG_NON_TRANSPARENT);
+                        staticEmissiveFirstInstance, (byte)FLAG_NON_TRANSPARENT);
             }
-            else
-            {
-                BuildSeparateBlas(opaque, transparent, emissive);
-            }
+
+            // ---- Initialize slot allocators for incremental updates (dynamic objects) ----
+            _instanceAlloc.ResetFullyAllocated(_instanceCpu.Length);
+            _primAlloc.ResetFullyAllocated(Mathf.Max(totalPrims, 1));
         }
 
         /// <summary>
@@ -560,62 +553,8 @@ namespace NativeRender
             return count;
         }
 
-        private void BuildSeparateBlas(
-            List<NativeRayTracingTarget> opaque,
-            List<NativeRayTracingTarget> transparent,
-            List<NativeRayTracingTarget> emissive
-        )
-        {
-            uint                  instanceCursor  = 0;
-            uint                  primitiveCursor = 0;
-            List<InstanceDataNRD> instList        = new List<InstanceDataNRD>();
-            List<IntPtr>          texPtrs         = new List<IntPtr>();
-
-            // Pre-allocate _primitiveCpu so jobs can write directly into it.
-            int totalPrims = CountGroupTriangles(opaque)
-                             + CountGroupTriangles(transparent)
-                             + CountGroupTriangles(emissive);
-            _primitiveCpu = new NativeArray<PrimitiveDataNRD>(
-                Mathf.Max(totalPrims, 1), Allocator.Persistent, NativeArrayOptions.UninitializedMemory);
-
-            // Process ordered opaque → transparent → emissive (emissive targets were also added to
-            // opaque already; they get a second separate entry in the light TLAS).
-            ProcessSeparateGroup(opaque, _worldAS, FLAG_STATIC | FLAG_NON_TRANSPARENT,
-                ref instanceCursor, ref primitiveCursor, instList, texPtrs);
-            ProcessSeparateGroup(transparent, _worldAS, FLAG_STATIC | FLAG_TRANSPARENT,
-                ref instanceCursor, ref primitiveCursor, instList, texPtrs);
-            ProcessSeparateGroup(emissive, _lightAS, FLAG_STATIC | FLAG_NON_TRANSPARENT | FLAG_EMISSIVE,
-                ref instanceCursor, ref primitiveCursor, instList, texPtrs);
-
-            // Texture array.
-            int texCount = Mathf.Max(texPtrs.Count, 1);
-            _textures = new BindlessTexture(texCount);
-            for (int i = 0; i < texPtrs.Count; i++)
-                _textures.SetNativePtr(i, texPtrs[i]);
-
-            // Instance / primitive GPU buffers.
-            if (instList.Count == 0) instList.Add(default);
-            _instanceCpu = instList.ToArray();
-
-            _instanceDataBuf = new GraphicsBuffer(GraphicsBuffer.Target.Structured,
-                _instanceCpu.Length, Marshal.SizeOf<InstanceDataNRD>());
-            _instanceDataBuf.SetData(_instanceCpu);
-            InstanceDataBufPtr = _instanceDataBuf.GetNativeBufferPtr();
-
-            _primitiveDataBuf = new GraphicsBuffer(GraphicsBuffer.Target.Structured,
-                _primitiveCpu.Length, Marshal.SizeOf<PrimitiveDataNRD>());
-            _primitiveDataBuf.SetData(_primitiveCpu);
-            PrimitiveDataBufPtr = _primitiveDataBuf.GetNativeBufferPtr();
-
-            // Initialize slot allocators to reflect the just-built fully-packed layout.
-            _instanceAlloc.ResetFullyAllocated(_instanceCpu.Length);
-            _primAlloc.ResetFullyAllocated(Mathf.Max(totalPrims, 1));
-        }
-
         private void ProcessSeparateGroup(
             List<NativeRayTracingTarget> group,
-            RayTracingAccelerationStructure tlas,
-            uint baseFlags,
             ref uint instanceCursor,
             ref uint primitiveCursor,
             List<InstanceDataNRD> instList,
@@ -647,7 +586,7 @@ namespace NativeRender
             if (validPairs.Count == 0)
             {
                 swTotal.Stop();
-                Debug.Log($"[ProcessSeparateGroup] Total: {swTotal.Elapsed.TotalMilliseconds:F2} ms  (0 renderers, flags=0x{baseFlags:X})");
+                Debug.Log($"[ProcessSeparateGroup] Total: {swTotal.Elapsed.TotalMilliseconds:F2} ms  (0 renderers)");
                 return;
             }
 
@@ -662,17 +601,40 @@ namespace NativeRender
             {
                 Matrix4x4 xform = target.transform.localToWorldMatrix;
 
+
+                Material rep           = GetRepresentativeMaterial(mr);
+                bool     isTransparent = IsMaterialTransparent(rep);
+                bool     isEmissive    = IsMaterialEmissive(rep);
+
+                uint baseFlags = isTransparent ? FLAG_TRANSPARENT : FLAG_NON_TRANSPARENT;
+                if (isEmissive)
+                    baseFlags |= FLAG_EMISSIVE;
+
+
                 // TLAS calls must happen on the main thread.
-                if (!tlas.AddInstance(mr))
+                if (!_worldAS.AddInstance(mr))
                 {
                     Debug.LogWarning($"[NRDSampleResource] AddInstance failed for '{mr.name}' — skipping");
                     continue;
                 }
 
                 uint firstInstanceDataIndex = instanceCursor;
-                tlas.SetInstanceID(mr, firstInstanceDataIndex);
-                tlas.SetInstanceTransform(mr, xform);
-                tlas.SetInstanceMask(mr, GetMaskForFlags(baseFlags));
+                _worldAS.SetInstanceID(mr, firstInstanceDataIndex);
+                _worldAS.SetInstanceTransform(mr, xform);
+                _worldAS.SetInstanceMask(mr, GetMaskForFlags(baseFlags));
+
+                if (isEmissive)
+                {
+                    if (!_lightAS.AddInstance(mr))
+                    {
+                        Debug.LogWarning($"[NRDSampleResource] AddInstance failed for '{mr.name}' on light AS — skipping emissive instance");
+                    }
+
+                    _lightAS.SetInstanceID(mr, firstInstanceDataIndex);
+                    _lightAS.SetInstanceTransform(mr, xform);
+                    _lightAS.SetInstanceMask(mr, GetMaskForFlags(baseFlags));
+                }
+
 
                 bool leftHanded = xform.determinant < 0f;
                 Vector3 sc = new Vector3(
@@ -756,11 +718,18 @@ namespace NativeRender
 
                     // InstanceDataNRD is built on the main thread (depends on material + transform).
                     uint baseTextureIndex = (uint)(subMatIdx * TexturesPerMaterial);
+
+                    // FLAG_STATIC set: HLSL uses mOverloaded as the rotation matrix for normals.
+                    // FLAG_STATIC clear: HLSL computes Xprev = AffineTransform(mOverloaded, X).
+                    //   On the first frame (no previous position), initialise to identity so Xprev = X.
+
+                    Matrix4x4 mOverloaded = xform;
+
                     var inst = new InstanceDataNRD
                     {
-                        mOverloadedMatrix0 = new Vector4(xform.m00, xform.m01, xform.m02, xform.m03),
-                        mOverloadedMatrix1 = new Vector4(xform.m10, xform.m11, xform.m12, xform.m13),
-                        mOverloadedMatrix2 = new Vector4(xform.m20, xform.m21, xform.m22, xform.m23),
+                        mOverloadedMatrix0 = new Vector4(mOverloaded.m00, mOverloaded.m01, mOverloaded.m02, mOverloaded.m03),
+                        mOverloadedMatrix1 = new Vector4(mOverloaded.m10, mOverloaded.m11, mOverloaded.m12, mOverloaded.m13),
+                        mOverloadedMatrix2 = new Vector4(mOverloaded.m20, mOverloaded.m21, mOverloaded.m22, mOverloaded.m23),
 
                         textureOffsetAndFlags = baseTextureIndex | (baseFlags << FlagFirstBit),
                         primitiveOffset       = primitiveOffsetForSubMesh,
@@ -773,15 +742,23 @@ namespace NativeRender
                 }
 
                 // Record per-target state for transform-only updates.
-                _perTargetBlas[(int)(uint)mr.GetInstanceID()] = new PerTargetBlas
+
+                var tlasList = new List<RayTracingAccelerationStructure>();
+
+                tlasList.Add(_worldAS);
+                if (isEmissive)
+                    tlasList.Add(_lightAS);
+
+                _perTargetBlas[mr.GetInstanceID()] = new PerTargetBlas
                 {
-                    tlas                   = tlas,
+                    tlasList               = tlasList,
                     firstInstanceDataIndex = firstInstanceDataIndex,
                     submeshCount           = subCnt,
                     lastTransform          = xform,
                     primitiveOffsets       = subPrimOffsets,
                     primitiveCounts        = subPrimCounts,
                     submeshMaterials       = subMats,
+                    isStatic               = false,
                 };
             }
 
@@ -799,13 +776,20 @@ namespace NativeRender
             meshDataArr.Dispose();
 
             swTotal.Stop();
-            Debug.Log($"[ProcessSeparateGroup] Total: {swTotal.Elapsed.TotalMilliseconds:F2} ms  ({validPairs.Count} renderers, {totalTriCount} tris, flags=0x{baseFlags:X})");
+            Debug.Log($"[ProcessSeparateGroup] Total: {swTotal.Elapsed.TotalMilliseconds:F2} ms  ({validPairs.Count} renderers, {totalTriCount} tris)");
         }
 
         /// <summary>
-        /// Transform-only update for separate-BLAS mode.
-        /// Updates TLAS transforms and mOverloadedMatrix in the instance buffer;
-        /// does not rebuild any BLAS or re-upload primitive data.
+        /// Per-frame transform update for separate-BLAS entries.
+        ///
+        /// Static entries (editor non-play mode, FLAG_STATIC set):
+        ///   Only patched when the transform actually changed.
+        ///   mOverloaded = current localToWorld (HLSL uses it as rotation matrix for normals).
+        ///
+        /// Dynamic entries (play mode, FLAG_STATIC clear):
+        ///   Written every frame regardless of movement so Xprev is always valid.
+        ///   mOverloaded = prevT * inv(currT)  (motion matrix; identity when stationary).
+        ///   HLSL: Xprev = AffineTransform(mOverloaded, X) = correct previous world position.
         /// </summary>
         private void UpdateTransformsOnly(IReadOnlyList<NativeRayTracingTarget> targets)
         {
@@ -822,32 +806,79 @@ namespace NativeRender
                 if (!_perTargetBlas.TryGetValue(key, out var info)) continue;
 
                 Matrix4x4 xform = target.transform.localToWorldMatrix;
-                if (xform == info.lastTransform) continue;
+                bool      moved = (xform != info.lastTransform);
 
-                // Update TLAS transform.
-                info.tlas.SetInstanceTransform(mr, xform);
-
-                // Recompute per-submesh scale/sign for mOverloadedMatrix.
-                Vector3 s = new Vector3(
-                    new Vector3(xform.m00, xform.m10, xform.m20).magnitude,
-                    new Vector3(xform.m01, xform.m11, xform.m21).magnitude,
-                    new Vector3(xform.m02, xform.m12, xform.m22).magnitude);
-                float scaleMax = Mathf.Max(s.x, Mathf.Max(s.y, s.z));
-
-                // Patch mOverloadedMatrix and scale in every submesh InstanceDataNRD entry.
-                for (int sub = 0; sub < info.submeshCount; sub++)
+                if (info.isStatic)
                 {
-                    int idx = (int)info.firstInstanceDataIndex + sub;
-                    if (idx >= _instanceCpu.Length) break;
+                    // Edit-mode static: skip unless the transform actually changed.
+                    if (!moved) continue;
 
-                    _instanceCpu[idx].mOverloadedMatrix0 = new Vector4(xform.m00, xform.m01, xform.m02, xform.m03);
-                    _instanceCpu[idx].mOverloadedMatrix1 = new Vector4(xform.m10, xform.m11, xform.m12, xform.m13);
-                    _instanceCpu[idx].mOverloadedMatrix2 = new Vector4(xform.m20, xform.m21, xform.m22, xform.m23);
-                    _instanceCpu[idx].scale              = scaleMax;
+                    foreach (var accelerationStructure in info.tlasList)
+                    {
+                        accelerationStructure.SetInstanceTransform(mr, xform);
+                    }
+
+                    for (int sub = 0; sub < info.submeshCount; sub++)
+                    {
+                        int idx = (int)info.firstInstanceDataIndex + sub;
+                        if (idx >= _instanceCpu.Length) break;
+
+                        // mOverloaded = current transform (HLSL uses 3×3 part as rotation matrix for normals).
+                        _instanceCpu[idx].mOverloadedMatrix0 = new Vector4(xform.m00, xform.m01, xform.m02, xform.m03);
+                        _instanceCpu[idx].mOverloadedMatrix1 = new Vector4(xform.m10, xform.m11, xform.m12, xform.m13);
+                        _instanceCpu[idx].mOverloadedMatrix2 = new Vector4(xform.m20, xform.m21, xform.m22, xform.m23);
+                        // scale is constant for static objects in edit mode — leave unchanged.
+                    }
+
+                    info.lastTransform = xform;
+                    anyChanged         = true;
                 }
+                else
+                {
+                    // Dynamic: compute motion matrix = prevT * inv(currT).
+                    // When stationary, this evaluates to identity → Xprev = X (no motion).
+                    Matrix4x4 motionMatrix = moved
+                        ? info.lastTransform * xform.inverse
+                        : Matrix4x4.identity;
 
-                info.lastTransform = xform;
-                anyChanged         = true;
+                    for (int sub = 0; sub < info.submeshCount; sub++)
+                    {
+                        int idx = (int)info.firstInstanceDataIndex + sub;
+                        if (idx >= _instanceCpu.Length) break;
+
+                        _instanceCpu[idx].mOverloadedMatrix0 = new Vector4(motionMatrix.m00, motionMatrix.m01, motionMatrix.m02, motionMatrix.m03);
+                        _instanceCpu[idx].mOverloadedMatrix1 = new Vector4(motionMatrix.m10, motionMatrix.m11, motionMatrix.m12, motionMatrix.m13);
+                        _instanceCpu[idx].mOverloadedMatrix2 = new Vector4(motionMatrix.m20, motionMatrix.m21, motionMatrix.m22, motionMatrix.m23);
+                    }
+
+                    if (moved)
+                    {
+                        
+                        foreach (var accelerationStructure in info.tlasList)
+                        {
+                            accelerationStructure.SetInstanceTransform(mr, xform);
+                        }
+
+                        // Recompute scale from new transform.
+                        Vector3 s = new Vector3(
+                            new Vector3(xform.m00, xform.m10, xform.m20).magnitude,
+                            new Vector3(xform.m01, xform.m11, xform.m21).magnitude,
+                            new Vector3(xform.m02, xform.m12, xform.m22).magnitude);
+                        float scaleMax   = Mathf.Max(s.x, Mathf.Max(s.y, s.z));
+                        bool  leftHanded = xform.determinant < 0f;
+
+                        for (int sub = 0; sub < info.submeshCount; sub++)
+                        {
+                            int idx = (int)info.firstInstanceDataIndex + sub;
+                            if (idx >= _instanceCpu.Length) break;
+                            _instanceCpu[idx].scale = (leftHanded ? -1f : 1f) * scaleMax;
+                        }
+
+                        info.lastTransform = xform;
+                    }
+
+                    anyChanged = true; // always upload so the GPU sees the fresh motion matrix
+                }
             }
 
             if (anyChanged)
@@ -870,8 +901,10 @@ namespace NativeRender
         {
             if (!_perTargetBlas.TryGetValue(rendererInstanceId, out var info)) return;
 
-            // Use the MeshRenderer stored at registration time.
-            info.tlas.RemoveInstance(rendererInstanceId);
+            foreach (var accelerationStructure in info.tlasList)
+            {
+                accelerationStructure.RemoveInstance(rendererInstanceId);
+            }
 
             // Return contiguous instance slots.
             _instanceAlloc.Free(info.firstInstanceDataIndex, info.submeshCount);
@@ -908,9 +941,7 @@ namespace NativeRender
         /// schedules a Burst job for primitive data, then partial-uploads changed ranges to the GPU.
         /// </summary>
         private void AddTargetIncremental(
-            NativeRayTracingTarget target,
-            RayTracingAccelerationStructure tlas,
-            uint baseFlags)
+            NativeRayTracingTarget target)
         {
             if (target == null) return;
             var mr = target.GetComponent<MeshRenderer>();
@@ -920,16 +951,33 @@ namespace NativeRender
 
             Mesh mesh   = mf.sharedMesh;
             int  subCnt = mesh.subMeshCount;
+            
+            
+            Material rep           = GetRepresentativeMaterial(mr);
+            bool     isTransparent = IsMaterialTransparent(rep);
+            bool     isEmissive    = IsMaterialEmissive(rep);
 
-            if (!tlas.AddInstance(mr))
+            uint flags = isTransparent ? FLAG_TRANSPARENT : FLAG_NON_TRANSPARENT;
+            
+            if (isEmissive)
+                flags |= FLAG_EMISSIVE;
+            
+            if (!_worldAS.AddInstance(mr))
             {
                 Debug.LogWarning($"[NRDSampleResource] AddTargetIncremental: AddInstance failed for '{mr.name}'");
                 return;
             }
 
             Matrix4x4 xform = target.transform.localToWorldMatrix;
-            tlas.SetInstanceTransform(mr, xform);
-            tlas.SetInstanceMask(mr, GetMaskForFlags(baseFlags));
+            _worldAS.SetInstanceTransform(mr, xform);
+            _worldAS.SetInstanceMask(mr, GetMaskForFlags(flags));
+
+            if (isEmissive)
+            {
+                _lightAS.AddInstance(mr);
+                _lightAS.SetInstanceTransform(mr, xform);
+                _lightAS.SetInstanceMask(mr, GetMaskForFlags(flags));
+            }
 
             bool leftHanded = xform.determinant < 0f;
             Vector3 sc = new Vector3(
@@ -950,7 +998,9 @@ namespace NativeRender
                 instBase = _instanceAlloc.Allocate(subCnt);
             }
 
-            tlas.SetInstanceID(mr, instBase);
+            _worldAS.SetInstanceID(mr, instBase);
+            if(isEmissive)
+                _lightAS.SetInstanceID(mr, instBase);
 
             // ------------------------------------------------------------------
             // Build per-submesh primitive + instance data.
@@ -1037,12 +1087,14 @@ namespace NativeRender
 
                 uint instSlot         = instBase + (uint)sub;
                 uint baseTextureIndex = (uint)(subMatIdx * TexturesPerMaterial);
+                // Dynamic object (incremental path is only for non-static objects):
+                // initialise mOverloaded to identity so Xprev = X on the first frame (no motion yet).
                 _instanceCpu[instSlot] = new InstanceDataNRD
                 {
-                    mOverloadedMatrix0    = new Vector4(xform.m00, xform.m01, xform.m02, xform.m03),
-                    mOverloadedMatrix1    = new Vector4(xform.m10, xform.m11, xform.m12, xform.m13),
-                    mOverloadedMatrix2    = new Vector4(xform.m20, xform.m21, xform.m22, xform.m23),
-                    textureOffsetAndFlags = baseTextureIndex | (baseFlags << FlagFirstBit),
+                    mOverloadedMatrix0    = new Vector4(1f, 0f, 0f, 0f),
+                    mOverloadedMatrix1    = new Vector4(0f, 1f, 0f, 0f),
+                    mOverloadedMatrix2    = new Vector4(0f, 0f, 1f, 0f),
+                    textureOffsetAndFlags = baseTextureIndex | (flags << FlagFirstBit),
                     primitiveOffset       = primOffset,
                     scale                 = (leftHanded ? -1f : 1f) * scaleMax,
                     morphPrimitiveOffset  = 0,
@@ -1069,19 +1121,24 @@ namespace NativeRender
                 _primitiveDataBuf.SetData(_primitiveCpu,
                     (int)subPrimOffsets[sub], (int)subPrimOffsets[sub], subPrimCounts[sub]);
 
-            InstanceDataBufPtr = _instanceDataBuf.GetNativeBufferPtr();
+            InstanceDataBufPtr  = _instanceDataBuf.GetNativeBufferPtr();
             PrimitiveDataBufPtr = _primitiveDataBuf.GetNativeBufferPtr();
-            
-            
+
+            var tlasList = new List<RayTracingAccelerationStructure>();
+            tlasList.Add(_worldAS);
+            if(isEmissive)
+                tlasList.Add(LightAS);
+
             _perTargetBlas[mr.GetInstanceID()] = new PerTargetBlas
             {
-                tlas                   = tlas,
+                tlasList               = tlasList,
                 firstInstanceDataIndex = instBase,
                 submeshCount           = subCnt,
                 lastTransform          = xform,
                 primitiveOffsets       = subPrimOffsets,
                 primitiveCounts        = subPrimCounts,
                 submeshMaterials       = subMaterials,
+                isStatic               = false, // incremental path is dynamic-only
             };
         }
 

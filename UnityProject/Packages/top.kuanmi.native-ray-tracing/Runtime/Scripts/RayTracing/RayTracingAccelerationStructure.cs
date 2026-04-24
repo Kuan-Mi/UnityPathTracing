@@ -231,7 +231,11 @@ namespace NativeRender
         /// </summary>
         public unsafe void SetInstanceTransform(MeshRenderer meshRenderer, Matrix4x4 objectToWorld)
         {
-            if (_handle == 0 || meshRenderer == null) return;
+            if (_handle == 0 || meshRenderer == null)
+            {
+                Debug.LogError($"[NativeRayTracing] SetInstanceTransform failed: invalid handle or meshRenderer");
+                return;
+            }
             uint idx = (uint)meshRenderer.GetInstanceID();
 
             float* m = stackalloc float[12];
