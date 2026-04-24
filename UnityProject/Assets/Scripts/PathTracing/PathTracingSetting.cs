@@ -407,6 +407,8 @@ namespace PathTracing
         public bool         boost                      = false;
         public bool         SR                         = false;
         public bool         RR                         = false;
+        public bool         tmpDisableRR               = false;
+        public UpscalerMode upscalerMode               = UpscalerMode.NATIVE;
         public bool         confidence                 = true;
         public ShowMode     showMode;
     }
