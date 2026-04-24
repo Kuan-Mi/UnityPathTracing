@@ -324,6 +324,7 @@ add_library(NativeRenderPlugin SHARED
     NativeRenderPlugin/src/Plugin.cpp
     NativeRenderPlugin/src/RayTraceShader.cpp
     NativeRenderPlugin/src/ComputeShader.cpp
+    NativeRenderPlugin/src/ComputeDescriptorSet.cpp
     NativeRenderPlugin/src/AccelerationStructure.cpp
     NativeRenderPlugin/src/DescriptorHeapAllocator.cpp
     NativeRenderPlugin/src/BindlessTexture.cpp

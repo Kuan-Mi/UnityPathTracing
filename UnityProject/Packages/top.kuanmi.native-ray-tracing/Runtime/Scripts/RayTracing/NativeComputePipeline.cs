@@ -165,17 +165,14 @@ namespace NativeRender
         {
             if (!IsValid || descriptorSet == null) return;
 
-            unsafe
-            {
-                IntPtr headerPtr = descriptorSet.SnapshotAndBuildHeader(
-                    _handle, threadGroupX, threadGroupY, threadGroupZ);
-                if (headerPtr == IntPtr.Zero) return;
+            IntPtr headerPtr = descriptorSet.SnapshotAndBuildHeader(
+                threadGroupX, threadGroupY, threadGroupZ);
+            if (headerPtr == IntPtr.Zero) return;
 
-                cmd.IssuePluginEventAndData(
-                    NativeRenderPlugin.NR_CS_GetRenderEventFunc(),
-                    1,
-                    headerPtr);
-            }
+            cmd.IssuePluginEventAndData(
+                NativeRenderPlugin.NR_CS_GetRenderEventFunc(),
+                1,
+                headerPtr);
         }
 
         // -------------------------------------------------------------------

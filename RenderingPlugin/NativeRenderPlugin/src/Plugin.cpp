@@ -20,6 +20,7 @@
 #include "AccelerationStructure.h"
 #include "RayTraceShader.h"
 #include "ComputeShader.h"
+#include "ComputeDescriptorSet.h"
 #include "DescriptorHeapAllocator.h"
 #include "BindlessTexture.h"
 #include "BindlessBuffer.h"
@@ -49,7 +50,7 @@ static bool                      s_RendererReady = false;
 // instead of immediately deleting.  DrainDeferredDeletes() frees entries whose
 // safeAfterValue <= fence->GetCompletedValue().
 // ---------------------------------------------------------------------------
-enum class DeferredType { BindlessTexture, BindlessBuffer, AccelStruct, RayTraceShader, ComputeShader };
+enum class DeferredType { BindlessTexture, BindlessBuffer, AccelStruct, RayTraceShader, ComputeShader, ComputeDescriptorSet };
 
 struct DeferredDeleteEntry
 {
@@ -75,7 +76,8 @@ static void ImmediateDelete(DeferredDeleteEntry& e)
     case DeferredType::BindlessBuffer:  delete reinterpret_cast<BindlessBuffer*>(e.ptr);  break;
     case DeferredType::AccelStruct:     delete reinterpret_cast<AccelerationStructure*>(e.ptr); break;
     case DeferredType::RayTraceShader:  delete reinterpret_cast<RayTraceShader*>(e.ptr);  break;
-    case DeferredType::ComputeShader:   delete reinterpret_cast<ComputeShader*>(e.ptr);   break;
+    case DeferredType::ComputeShader:        delete reinterpret_cast<ComputeShader*>(e.ptr);           break;
+    case DeferredType::ComputeDescriptorSet: delete reinterpret_cast<ComputeDescriptorSet*>(e.ptr);    break;
     }
 }
 
@@ -879,7 +881,7 @@ NR_BB_GetCapacity(uint64_t handle)
 #pragma pack(push, 4)
 struct CS_RenderEventData
 {
-    uint64_t shaderHandle;    // +0  (8B): pointer to ComputeShader
+    uint64_t descriptorSetHandle; // +0  (8B): pointer to ComputeDescriptorSet
     uint32_t threadGroupX;    // +8  (4B)
     uint32_t threadGroupY;    // +12 (4B)
     uint32_t threadGroupZ;    // +16 (4B)
@@ -928,6 +930,28 @@ NR_DestroyComputeShader(uint64_t handle)
 }
 
 // ---------------------------------------------------------------------------
+// NR_CS_CreateDescriptorSet / NR_CS_DestroyDescriptorSet
+//   Each NativeComputeDescriptorSet on the C# side owns a ComputeDescriptorSet
+//   here.  The descriptor set holds its own GPU-heap slice so multiple
+//   dispatches of the same ComputeShader per frame are fully independent.
+// ---------------------------------------------------------------------------
+extern "C" uint64_t UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API
+NR_CS_CreateDescriptorSet(uint64_t shaderHandle)
+{
+    if (!shaderHandle || !s_RendererReady) return 0;
+    auto* cs = reinterpret_cast<ComputeShader*>(shaderHandle);
+    auto* ds = new ComputeDescriptorSet(cs, s_D3D12->GetDevice(), s_Log, &s_DescHeap, s_D3D12v8);
+    return reinterpret_cast<uint64_t>(ds);
+}
+
+extern "C" void UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API
+NR_CS_DestroyDescriptorSet(uint64_t handle)
+{
+    if (!handle) return;
+    EnqueueDeferredDelete(reinterpret_cast<void*>(handle), DeferredType::ComputeDescriptorSet);
+}
+
+// ---------------------------------------------------------------------------
 // Resource binding queries (slot layout discovery)
 // ---------------------------------------------------------------------------
 extern "C" uint32_t UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API
@@ -960,17 +984,17 @@ static void UNITY_INTERFACE_API CsDispatchCallback(int /*eventId*/, void* data)
     if (!s_RendererReady || !s_D3D12 || !data) return;
 
     auto* ed = static_cast<CS_RenderEventData*>(data);
-    if (!ed->shaderHandle) return;
+    if (!ed->descriptorSetHandle) return;
 
     UnityGraphicsD3D12RecordingState recordingState = {};
     if (!s_D3D12->CommandRecordingState(&recordingState) || !recordingState.commandList) return;
 
-    auto* cs      = reinterpret_cast<ComputeShader*>(ed->shaderHandle);
+    auto* ds      = reinterpret_cast<ComputeDescriptorSet*>(ed->descriptorSetHandle);
     auto* cmdList = static_cast<ID3D12GraphicsCommandList*>(recordingState.commandList);
     auto* slots   = reinterpret_cast<CS_BindingSlot*>(ed->bindingSlotsPtr);
 
     D3D12HeapHook::BeginPluginDispatch();
-    cs->Dispatch(cmdList, ed->threadGroupX, ed->threadGroupY, ed->threadGroupZ,
+    ds->Dispatch(cmdList, ed->threadGroupX, ed->threadGroupY, ed->threadGroupZ,
                  slots, ed->bindingCount);
     D3D12HeapHook::EndPluginDispatch();
 

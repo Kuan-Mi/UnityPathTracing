@@ -35,6 +35,9 @@ namespace NativeRender
 
         private readonly NativeComputePipeline _pipeline;
 
+        // Native C++ ComputeDescriptorSet handle — owns the GPU heap slice for this set.
+        private ulong _descriptorSetHandle;
+
         // Slot layout mirrored from the pipeline (refreshed on hot-reload)
         private Dictionary<string, uint> _nameToSlot;
         private uint _slotCount;
@@ -64,6 +67,7 @@ namespace NativeRender
             _pipeline = pipeline;
             CopySlotLayout(pipeline);
             AllocateRingBuffers();
+            _descriptorSetHandle = NativeRenderPlugin.NR_CS_CreateDescriptorSet(pipeline.Handle);
             pipeline.OnRebuilt += OnPipelineRebuilt;
         }
 
@@ -104,9 +108,16 @@ namespace NativeRender
 
         private void OnPipelineRebuilt(NativeComputePipeline pipeline)
         {
+            // Destroy the old C++ descriptor set (its heap slice is now stale)
+            if (_descriptorSetHandle != 0)
+            {
+                NativeRenderPlugin.NR_CS_DestroyDescriptorSet(_descriptorSetHandle);
+                _descriptorSetHandle = 0;
+            }
             FreeRingBuffers();
             CopySlotLayout(pipeline);
             AllocateRingBuffers();
+            _descriptorSetHandle = NativeRenderPlugin.NR_CS_CreateDescriptorSet(pipeline.Handle);
         }
 
         // -------------------------------------------------------------------
@@ -116,6 +127,11 @@ namespace NativeRender
         public void Dispose()
         {
             _pipeline.OnRebuilt -= OnPipelineRebuilt;
+            if (_descriptorSetHandle != 0)
+            {
+                NativeRenderPlugin.NR_CS_DestroyDescriptorSet(_descriptorSetHandle);
+                _descriptorSetHandle = 0;
+            }
             FreeRingBuffers();
         }
 
@@ -296,7 +312,7 @@ namespace NativeRender
         /// <c>IssuePluginEventAndData</c>.  Returns <see cref="IntPtr.Zero"/> on failure.
         /// </summary>
         internal unsafe IntPtr SnapshotAndBuildHeader(
-            ulong shaderHandle, uint threadGroupX, uint threadGroupY, uint threadGroupZ)
+            uint threadGroupX, uint threadGroupY, uint threadGroupZ)
         {
             if (_slotRing == null) return IntPtr.Zero;
 
@@ -310,7 +326,7 @@ namespace NativeRender
 
             var header = new NativeRenderPlugin.CS_RenderEventData
             {
-                shaderHandle    = shaderHandle,
+                descriptorSetHandle = _descriptorSetHandle,
                 threadGroupX    = threadGroupX,
                 threadGroupY    = threadGroupY,
                 threadGroupZ    = threadGroupZ,
