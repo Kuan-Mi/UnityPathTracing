@@ -359,8 +359,8 @@ namespace NativeRender
 
             _morphPrimitivePositionsPrevBuf = new GraphicsBuffer(
                 GraphicsBuffer.Target.Structured, 1, Marshal.SizeOf<MorphPrimitivePositionsNRD>());
-            MorphPrimitivePositionsPrevBufPtr = _morphPrimitivePositionsPrevBuf.GetNativeBufferPtr();
             _morphPrimitivePositionsPrevBuf.SetData(new MorphPrimitivePositionsNRD[1]);
+            MorphPrimitivePositionsPrevBufPtr = _morphPrimitivePositionsPrevBuf.GetNativeBufferPtr();
         }
 
         private void DisposeStaticResources()
@@ -851,7 +851,10 @@ namespace NativeRender
             }
 
             if (anyChanged)
+            {
                 _instanceDataBuf?.SetData(_instanceCpu);
+                InstanceDataBufPtr = _instanceDataBuf.GetNativeBufferPtr();
+            }
         }
 
         // =====================================================================
@@ -896,6 +899,7 @@ namespace NativeRender
                 (int)info.firstInstanceDataIndex,
                 (int)info.firstInstanceDataIndex,
                 info.submeshCount);
+            InstanceDataBufPtr = _instanceDataBuf.GetNativeBufferPtr();
         }
 
         /// <summary>
