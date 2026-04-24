@@ -83,19 +83,19 @@ namespace PathTracing
             var pool = data.Pool;
 
             // SRV inputs
-            ds.SetTexture("gIn_ViewZ", pool.GetRT(RenderResourceType.Viewz).rt);
-            ds.SetTexture("gIn_Normal_Roughness", pool.GetRT(RenderResourceType.NormalRoughness).rt);
-            ds.SetTexture("gIn_BaseColor_Metalness", pool.GetRT(RenderResourceType.BaseColorMetalness).rt);
-            ds.SetTexture("gIn_DirectLighting", pool.GetRT(RenderResourceType.DirectLighting).rt);
-            ds.SetTexture("gIn_DirectEmission", pool.GetRT(RenderResourceType.DirectEmission).rt);
-            ds.SetTexture("gIn_PsrThroughput", pool.GetRT(RenderResourceType.PsrThroughput).rt);
-            ds.SetTexture("gIn_Shadow", pool.GetRT(RenderResourceType.Shadow).rt);
-            ds.SetTexture("gIn_Diff", pool.GetRT(RenderResourceType.Diff).rt);
-            ds.SetTexture("gIn_Spec", pool.GetRT(RenderResourceType.Spec).rt);
+            ds.SetTexture("gIn_ViewZ", pool.GetPoint(RenderResourceType.Viewz));
+            ds.SetTexture("gIn_Normal_Roughness", pool.GetPoint(RenderResourceType.NormalRoughness));
+            ds.SetTexture("gIn_BaseColor_Metalness", pool.GetPoint(RenderResourceType.BaseColorMetalness));
+            ds.SetTexture("gIn_DirectLighting", pool.GetPoint(RenderResourceType.DirectLighting));
+            ds.SetTexture("gIn_DirectEmission", pool.GetPoint(RenderResourceType.DirectEmission));
+            ds.SetTexture("gIn_PsrThroughput", pool.GetPoint(RenderResourceType.PsrThroughput));
+            ds.SetTexture("gIn_Shadow", pool.GetPoint(RenderResourceType.Shadow));
+            ds.SetTexture("gIn_Diff", pool.GetPoint(RenderResourceType.Diff));
+            ds.SetTexture("gIn_Spec", pool.GetPoint(RenderResourceType.Spec));
 
             // UAV outputs
-            ds.SetRWTexture("gOut_ComposedDiff", pool.GetRT(RenderResourceType.ComposedDiff).rt);
-            ds.SetRWTexture("gOut_ComposedSpec_ViewZ", pool.GetRT(RenderResourceType.ComposedSpecViewZ).rt);
+            ds.SetRWTexture("gOut_ComposedDiff", pool.GetPoint(RenderResourceType.ComposedDiff));
+            ds.SetRWTexture("gOut_ComposedSpec_ViewZ", pool.GetPoint(RenderResourceType.ComposedSpecViewZ));
 
             // Constant buffer
             ds.SetConstantBuffer("GlobalConstants", res.ConstantBuffer);

@@ -77,9 +77,6 @@ namespace PathTracing
             internal Resource                   Resource;
             internal Settings                   Settings;
             internal PathTracingResourcePool    Pool;
-
-            internal TextureHandle ComposedDiff;
-            internal TextureHandle ComposedSpecViewZ;
         }
 
         // -------------------------------------------------------------------------
@@ -109,19 +106,19 @@ namespace PathTracing
             ds.SetBindlessTexture("gIn_Textures", nrd.Textures);
 
             // 5. SHARC UAVs (only hash entries + resolved; no accumulation in transparent shader)
-            ds.SetRWStructuredBuffer("gInOut_SharcHashEntriesBuffer", res.HashEntriesBuffer);
-            ds.SetRWStructuredBuffer("gInOut_SharcResolved",          res.ResolvedBuffer);
+            ds.SetRWStructuredBuffer("gInOut_SharcHashEntriesBuffer", res.HashEntriesBuffer.GetNativeBufferPtr(),res.HashEntriesBuffer.count,res.HashEntriesBuffer.stride);
+            ds.SetRWStructuredBuffer("gInOut_SharcResolved",          res.ResolvedBuffer.GetNativeBufferPtr(),res.ResolvedBuffer.count,res.ResolvedBuffer.stride);
 
             var pool = data.Pool;
 
             // 6. SRV inputs
-            ds.SetTexture("gIn_ComposedDiff",       data.ComposedDiff);
-            ds.SetTexture("gIn_ComposedSpec_ViewZ", data.ComposedSpecViewZ);
+            ds.SetTexture("gIn_ComposedDiff", pool.GetPoint(RenderResourceType.ComposedDiff));
+            ds.SetTexture("gIn_ComposedSpec_ViewZ", pool.GetPoint(RenderResourceType.ComposedSpecViewZ));
 
             // 7. UAV outputs
-            ds.SetRWTexture("gOut_Composed",         pool.GetRT(RenderResourceType.Composed).rt);
-            ds.SetRWTexture("gInOut_Mv",             pool.GetRT(RenderResourceType.MV).rt);
-            ds.SetRWTexture("gOut_Normal_Roughness", pool.GetRT(RenderResourceType.NormalRoughness).rt);
+            ds.SetRWTexture("gOut_Composed",         pool.GetPoint(RenderResourceType.Composed));
+            ds.SetRWTexture("gInOut_Mv",             pool.GetPoint(RenderResourceType.MV));
+            ds.SetRWTexture("gOut_Normal_Roughness", pool.GetPoint(RenderResourceType.NormalRoughness));
 
             // 8. Constant buffer
             ds.SetConstantBuffer("GlobalConstants", res.ConstantBuffer);
@@ -151,12 +148,6 @@ namespace PathTracing
             passData.Resource    = _resource;
             passData.Settings    = _settings;
             passData.Pool        = _resource.Pool;
-
-            passData.ComposedDiff      = renderGraph.ImportTexture(_resource.Pool.GetRT(RenderResourceType.ComposedDiff));
-            passData.ComposedSpecViewZ = renderGraph.ImportTexture(_resource.Pool.GetRT(RenderResourceType.ComposedSpecViewZ));
-
-            builder.UseTexture(passData.ComposedDiff,      AccessFlags.ReadWrite);
-            builder.UseTexture(passData.ComposedSpecViewZ, AccessFlags.ReadWrite);
 
             builder.AllowPassCulling(false);
             builder.SetRenderFunc((PassData data, UnsafeGraphContext context) => { ExecutePass(data, context); });

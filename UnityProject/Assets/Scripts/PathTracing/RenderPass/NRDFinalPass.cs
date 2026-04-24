@@ -91,15 +91,15 @@ namespace PathTracing
 
             // TAA output is the history texture written this frame.
             // NRDTaaPass writes: isEven → TaaHistory, !isEven → TaaHistoryPrev
-            var taaOutput = pool.GetRT(data.IsEven ? RenderResourceType.TaaHistory : RenderResourceType.TaaHistoryPrev);
+            var taaOutput = pool.GetPoint(data.IsEven ? RenderResourceType.TaaHistory : RenderResourceType.TaaHistoryPrev);
 
             ds.SetConstantBuffer("GlobalConstants", res.ConstantBuffer);
 
-            ds.SetTexture("gIn_PostAA",     taaOutput.rt);
-            ds.SetTexture("gIn_PreAA",      pool.GetRT(RenderResourceType.Composed).rt);
-            ds.SetTexture("gIn_Validation", pool.GetRT(RenderResourceType.Validation).rt);
+            ds.SetTexture("gIn_PostAA",     taaOutput);
+            ds.SetTexture("gIn_PreAA",      pool.GetPoint(RenderResourceType.Composed));
+            ds.SetTexture("gIn_Validation", pool.GetPoint(RenderResourceType.Validation));
 
-            ds.SetRWTexture("gOut_Final", pool.GetRT(RenderResourceType.Final).rt);
+            ds.SetRWTexture("gOut_Final", pool.GetPoint(RenderResourceType.Final));
 
             uint groupsX = ((uint)data.Settings.OutputResolution.x + 15u) / 16u;
             uint groupsY = ((uint)data.Settings.OutputResolution.y + 15u) / 16u;
