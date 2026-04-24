@@ -43,7 +43,7 @@ namespace PathTracing
 
         private IntPtr scramblingRankingTexPtr;
         private IntPtr sobolTexPtr;
-        
+
 
         private NRDTlasUpdatePass     _nrdTlasUpdatePass;
         private NRDSharcPass          _nrdSharcPass;
@@ -120,6 +120,8 @@ namespace PathTracing
             {
                 renderPassEvent = renderPassEvent
             };
+            scramblingRankingTexPtr = scramblingRankingTex.GetNativeTexturePtr();
+            sobolTexPtr             = sobolTex.GetNativeTexturePtr();
         }
 
         public override void AddRenderPasses(ScriptableRenderer renderer, ref RenderingData renderingData)
@@ -203,12 +205,14 @@ namespace PathTracing
 
             globalConstants = frameState.GetNrdConstants(renderingData, setting);
 
-            _nrdConstantBuffer    ??= new GraphicsBuffer(GraphicsBuffer.Target.Constant, 1, Marshal.SizeOf<NRDGlobalConstants>());
+            _nrdConstantBuffer ??= new GraphicsBuffer(GraphicsBuffer.Target.Constant, 1, Marshal.SizeOf<NRDGlobalConstants>());
 
             _nrdGlobalConstantsArray[0] = globalConstants;
+
+            // todo : 这里可以考虑自己在C++端管理，避免GetNativeBufferPtr的开销
             _nrdConstantBuffer.SetData(_nrdGlobalConstantsArray);
-            _nrdConstantBufferPtr =   _nrdConstantBuffer.GetNativeBufferPtr();
-            
+            _nrdConstantBufferPtr = _nrdConstantBuffer.GetNativeBufferPtr();
+
             bool isEven = (globalConstants.gFrameIndex & 1) == 0;
 
             // TLAS update
