@@ -22,18 +22,16 @@ namespace PathTracing
     /// After 5 iterations (i = 0..4, last i = 4 → even) the final confidence
     /// value ends up in Gradient_Pong.
     ///
-    /// The "step" push-constant (value = 1 + i) is supplied via five pre-allocated
-    /// 16-byte constant buffers (minimum D3D12 CBV size).
+    /// Each iteration uses its own dedicated NativeComputeDescriptorSet (_ds[0..4]).
     /// </summary>
     public class NRDConfidenceBlurPass : ScriptableRenderPass, IDisposable
     {
         private const int IterationCount = 5; // must be odd per NRDSample
 
-        private readonly NativeComputePipeline      _cs;
-        private readonly NativeComputeDescriptorSet _dsPing; // i%2==0: gIn=Gradient_Ping,  gOut=Gradient_Pong
-        private readonly NativeComputeDescriptorSet _dsPong; // i%2==1: gIn=Gradient_Pong,  gOut=Gradient_Ping
-        private          Resource              _resource;
-        private          Settings              _settings;
+        private readonly NativeComputePipeline        _cs;
+        private readonly NativeComputeDescriptorSet[] _ds; // one per iteration [0..4]
+        private          Resource                     _resource;
+        private          Settings                     _settings;
 
         [StructLayout(LayoutKind.Sequential)]
         private struct PushConstants
@@ -43,15 +41,17 @@ namespace PathTracing
 
         public NRDConfidenceBlurPass(NativeComputeShader cs)
         {
-            _cs     = new NativeComputePipeline(cs);
-            _dsPing = new NativeComputeDescriptorSet(_cs);
-            _dsPong = new NativeComputeDescriptorSet(_cs);
+            _cs = new NativeComputePipeline(cs);
+            _ds = new NativeComputeDescriptorSet[IterationCount];
+            for (int i = 0; i < IterationCount; i++)
+                _ds[i] = new NativeComputeDescriptorSet(_cs);
         }
 
         public void Dispose()
         {
-            _dsPing?.Dispose();
-            _dsPong?.Dispose();
+            if (_ds != null)
+                foreach (var ds in _ds)
+                    ds?.Dispose();
             _cs?.Dispose();
         }
 
@@ -83,12 +83,11 @@ namespace PathTracing
 
         class PassData
         {
-            internal NativeComputePipeline      Cs;
-            internal NativeComputeDescriptorSet DsPing;
-            internal NativeComputeDescriptorSet DsPong;
-            internal Resource                   Resource;
-            internal Settings                   Settings;
-            internal PathTracingResourcePool    Pool;
+            internal NativeComputePipeline        Cs;
+            internal NativeComputeDescriptorSet[] Ds;  // [0..4], one per iteration
+            internal Resource                     Resource;
+            internal Settings                     Settings;
+            internal PathTracingResourcePool      Pool;
         }
 
         // -------------------------------------------------------------------------
@@ -105,9 +104,7 @@ namespace PathTracing
 
             for (int i = 0; i < IterationCount; i++)
             {
-                // Select the pre-configured ping/pong descriptor set.
-                // Gradient texture bindings were pre-baked in RecordRenderGraph.
-                var ds = (i % 2 == 0) ? data.DsPing : data.DsPong;
+                var ds = data.Ds[i];
 
                 ds.SetConstantBuffer("GlobalConstants", res.ConstantBuffer);
 
@@ -129,21 +126,21 @@ namespace PathTracing
             using var builder = renderGraph.AddUnsafePass<PassData>("NRDConfidenceBlurPass", out var passData);
 
             passData.Cs          = _cs;
-            passData.DsPing      = _dsPing;
-            passData.DsPong      = _dsPong;
+            passData.Ds          = _ds;
             passData.Resource    = _resource;
             passData.Settings    = _settings;
             passData.Pool        = _resource.Pool;
 
-            // Pre-bake gradient texture bindings.
-            // Ping (i%2==0): gIn=Gradient_Ping,  gOut=Gradient_Pong
-            // Pong (i%2==1): gIn=Gradient_Pong,  gOut=Gradient_Ping
+            // Pre-bake gradient texture bindings for each iteration.
+            // i%2==0: gIn=Gradient_Ping,  gOut=Gradient_Pong
+            // i%2==1: gIn=Gradient_Pong,  gOut=Gradient_Ping
             var pool = _resource.Pool;
-            _dsPing.SetTexture ("gIn_Gradient",  pool.GetRT(RenderResourceType.Gradient_Ping).rt);
-            _dsPing.SetRWTexture("gOut_Gradient", pool.GetRT(RenderResourceType.Gradient_Pong).rt);
-
-            _dsPong.SetTexture ("gIn_Gradient",  pool.GetRT(RenderResourceType.Gradient_Pong).rt);
-            _dsPong.SetRWTexture("gOut_Gradient", pool.GetRT(RenderResourceType.Gradient_Ping).rt);
+            for (int i = 0; i < IterationCount; i++)
+            {
+                bool isPing = (i % 2 == 0);
+                _ds[i].SetTexture ("gIn_Gradient",  pool.GetRT(isPing ? RenderResourceType.Gradient_Ping : RenderResourceType.Gradient_Pong).rt);
+                _ds[i].SetRWTexture("gOut_Gradient", pool.GetRT(isPing ? RenderResourceType.Gradient_Pong : RenderResourceType.Gradient_Ping).rt);
+            }
 
             builder.AllowPassCulling(false);
             builder.SetRenderFunc((PassData data, UnsafeGraphContext context) => ExecutePass(data, context));

@@ -212,20 +212,20 @@ void ComputeDescriptorSet::RequestResourceStates(const CS_BindingSlot* slots, ui
         ID3D12Resource* res = reinterpret_cast<ID3D12Resource*>(slot.resourcePtr);
         if (b.type == ComputeBindingType::SRV && res)
         {
-            Logf(kUnityLogTypeLog, "  [%s] RequestResourceState: '%s' (SRV) res=%p -> NON_PIXEL_SHADER_RESOURCE (0x%X)",
-                 shaderName, b.name.c_str(), (void*)res, (UINT)D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
+            // Logf(kUnityLogTypeLog, "  [%s] RequestResourceState: '%s' (SRV) res=%p -> NON_PIXEL_SHADER_RESOURCE (0x%X)",
+            //      shaderName, b.name.c_str(), (void*)res, (UINT)D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
             m_d3d12v8->RequestResourceState(res, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
         }
         else if (b.type == ComputeBindingType::UAV && res)
         {
-            Logf(kUnityLogTypeLog, "  [%s] RequestResourceState: '%s' (UAV) res=%p -> UNORDERED_ACCESS (0x%X)",
-                 shaderName, b.name.c_str(), (void*)res, (UINT)D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
+            // Logf(kUnityLogTypeLog, "  [%s] RequestResourceState: '%s' (UAV) res=%p -> UNORDERED_ACCESS (0x%X)",
+            //      shaderName, b.name.c_str(), (void*)res, (UINT)D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
             m_d3d12v8->RequestResourceState(res, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
         }
         else if (b.type == ComputeBindingType::CBV && res)
         {
-            Logf(kUnityLogTypeLog, "  [%s] RequestResourceState: '%s' (CBV) res=%p -> VERTEX_AND_CONSTANT_BUFFER (0x%X)",
-                 shaderName, b.name.c_str(), (void*)res, (UINT)D3D12_RESOURCE_STATE_VERTEX_AND_CONSTANT_BUFFER);
+            // Logf(kUnityLogTypeLog, "  [%s] RequestResourceState: '%s' (CBV) res=%p -> VERTEX_AND_CONSTANT_BUFFER (0x%X)",
+            //      shaderName, b.name.c_str(), (void*)res, (UINT)D3D12_RESOURCE_STATE_VERTEX_AND_CONSTANT_BUFFER);
             m_d3d12v8->RequestResourceState(res, D3D12_RESOURCE_STATE_VERTEX_AND_CONSTANT_BUFFER);
         }
         else if (b.type == ComputeBindingType::SRV_ARRAY &&
