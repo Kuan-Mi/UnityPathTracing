@@ -1,7 +1,4 @@
 #include "ComputeShader.h"
-#include "AccelerationStructure.h"
-#include "BindlessTexture.h"
-#include "BindlessBuffer.h"
 #include <d3d12shader.h>
 #include <cstdio>
 #include <cstdarg>
@@ -12,10 +9,7 @@
 
 ComputeShader::ComputeShader() = default;
 
-ComputeShader::~ComputeShader()
-{
-    FreeAllAllocations();
-}
+ComputeShader::~ComputeShader() = default;
 
 void ComputeShader::Log(UnityLogType type, const char* msg) const
 {
@@ -80,20 +74,6 @@ bool ComputeShader::LoadShaderFromBytes(const uint8_t* dxilBytes, uint32_t size,
     m_numSRV = m_numUAV = m_numCBV = m_numSRVArray = 0;
     m_rootParamSRV = m_rootParamUAV = m_rootParamCBVBase = kInvalidAlloc;
 
-    if (m_allocator)
-    {
-        if (m_srvAllocBase != kInvalidAlloc)
-        {
-            m_allocator->Free(m_srvAllocBase, m_numSRV);
-            m_srvAllocBase = kInvalidAlloc;
-        }
-        if (m_uavAllocBase != kInvalidAlloc)
-        {
-            m_allocator->Free(m_uavAllocBase, m_numUAV);
-            m_uavAllocBase = kInvalidAlloc;
-        }
-    }
-
     if (!ReflectBindings(shaderBlob.Get())) return false;
     if (!BuildRootSignature())              return false;
     if (!BuildPipeline(shaderBlob.Get()))   return false;
@@ -108,7 +88,7 @@ bool ComputeShader::LoadShaderFromBytes(const uint8_t* dxilBytes, uint32_t size,
 // ReflectBindings
 //   Collects ALL resource bindings from HLSL (all registers, all spaces).
 //   Uses ID3D12ShaderReflection for a single-entrypoint compute shader.
-//   No registers are skipped — C# controls everything via SetXxx by name.
+//   No registers are skipped �?C# controls everything via SetXxx by name.
 // ---------------------------------------------------------------------------
 bool ComputeShader::ReflectBindings(IDxcBlob* shaderBlob)
 {
@@ -216,7 +196,7 @@ bool ComputeShader::ReflectBindings(IDxcBlob* shaderBlob)
 
 // ---------------------------------------------------------------------------
 // BuildRootSignature
-//   Fully dynamic — no hardcoded registers or spaces.
+//   Fully dynamic �?no hardcoded registers or spaces.
 //   Param 0: SRV table (one range per SRV binding)          optional
 //   Param 1: UAV table (one range per UAV binding)           optional
 //   Params+: one table per SRV_ARRAY binding
@@ -343,11 +323,11 @@ bool ComputeShader::BuildRootSignature()
         }
     }
 
-    // Static samplers — built dynamically from reflected SamplerState names.
+    // Static samplers �?built dynamically from reflected SamplerState names.
     // Properties are parsed from the variable name using Unity's inline sampler convention:
-    //   Filter  : "point" → POINT  |  "trilinear"/"linear" → LINEAR (default)  |  "aniso" → ANISOTROPIC
-    //   Address : "clamp" → CLAMP  |  "repeat" → WRAP  |  "mirroronce" → MIRROR_ONCE  |  "mirror" → MIRROR
-    //             default → WRAP
+    //   Filter  : "point" �?POINT  |  "trilinear"/"linear" �?LINEAR (default)  |  "aniso" �?ANISOTROPIC
+    //   Address : "clamp" �?CLAMP  |  "repeat" �?WRAP  |  "mirroronce" �?MIRROR_ONCE  |  "mirror" �?MIRROR
+    //             default �?WRAP
     auto ToLower = [](std::string s) {
         std::transform(s.begin(), s.end(), s.begin(), [](unsigned char c){ return (char)tolower(c); });
         return s;
@@ -515,324 +495,4 @@ const char* ComputeShader::GetBindingName(uint32_t index) const
     return m_bindings[index].name.c_str();
 }
 
-// ---------------------------------------------------------------------------
-// FreeAllAllocations
-// ---------------------------------------------------------------------------
-void ComputeShader::FreeAllAllocations()
-{
-    if (!m_allocator) return;
-    if (m_srvAllocBase != kInvalidAlloc && m_numSRV > 0) { m_allocator->Free(m_srvAllocBase, m_numSRV); m_srvAllocBase = kInvalidAlloc; }
-    if (m_uavAllocBase != kInvalidAlloc && m_numUAV > 0) { m_allocator->Free(m_uavAllocBase, m_numUAV); m_uavAllocBase = kInvalidAlloc; }
-}
 
-// ---------------------------------------------------------------------------
-// AllocateAndWriteDescriptors
-// ---------------------------------------------------------------------------
-bool ComputeShader::AllocateAndWriteDescriptors(const CS_BindingSlot* slots, uint32_t slotCount)
-{
-    if (!m_allocator) return false;
-
-    if (m_srvAllocBase == kInvalidAlloc && m_numSRV > 0)
-        m_srvAllocBase = m_allocator->Allocate(m_numSRV);
-    if (m_uavAllocBase == kInvalidAlloc && m_numUAV > 0)
-        m_uavAllocBase = m_allocator->Allocate(m_numUAV);
-
-    UpdateDescriptors(slots, slotCount);
-    return true;
-}
-
-// ---------------------------------------------------------------------------
-// UpdateDescriptors
-//   Writes all SRV/UAV descriptors every frame using the per-dispatch slot array.
-//   CBVs are bound as inline root descriptors in Dispatch.
-//   SRV_ARRAY bindings own their heap slots in BindlessTexture/BindlessBuffer.
-// ---------------------------------------------------------------------------
-void ComputeShader::UpdateDescriptors(const CS_BindingSlot* slots, uint32_t slotCount)
-{
-    // Helper: get resource from slot
-    auto GetResource = [&](uint32_t idx) -> ID3D12Resource* {
-        if (idx >= slotCount) return nullptr;
-        return reinterpret_cast<ID3D12Resource*>(slots[idx].resourcePtr);
-    };
-
-    // --- SRV / TLAS ---
-    if (m_srvAllocBase != kInvalidAlloc)
-    {
-        for (size_t i = 0; i < m_bindings.size(); ++i)
-        {
-            const auto& b = m_bindings[i];
-            const CS_BindingSlot& slot = (i < slotCount) ? slots[i] : CS_BindingSlot{};
-
-            if (b.type == ComputeBindingType::TLAS)
-            {
-                D3D12_SHADER_RESOURCE_VIEW_DESC s = {};
-                s.ViewDimension           = D3D12_SRV_DIMENSION_RAYTRACING_ACCELERATION_STRUCTURE;
-                s.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
-
-                ID3D12Resource* tlas = nullptr;
-                if (slot.objectKind == CS_BindingObjectKind::AccelStruct && slot.objectPtr)
-                    tlas = reinterpret_cast<AccelerationStructure*>(slot.objectPtr)->GetTLAS();
-                else
-                    tlas = reinterpret_cast<ID3D12Resource*>(slot.resourcePtr);
-
-                s.RaytracingAccelerationStructure.Location = tlas ? tlas->GetGPUVirtualAddress() : 0;
-                m_device->CreateShaderResourceView(nullptr, &s,
-                    m_allocator->GetCPUHandle(m_srvAllocBase + b.heapOffset));
-            }
-            else if (b.type == ComputeBindingType::SRV)
-            {
-                D3D12_CPU_DESCRIPTOR_HANDLE h = m_allocator->GetCPUHandle(m_srvAllocBase + b.heapOffset);
-                D3D12_SHADER_RESOURCE_VIEW_DESC s = {};
-                s.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
-                ID3D12Resource* res = reinterpret_cast<ID3D12Resource*>(slot.resourcePtr);
-                if (res)
-                {
-                    auto rd = res->GetDesc();
-                    if (rd.Dimension == D3D12_RESOURCE_DIMENSION_BUFFER)
-                    {
-                        if (slot.stride > 0 && slot.count > 0)
-                        {
-                            s.ViewDimension              = D3D12_SRV_DIMENSION_BUFFER;
-                            s.Format                     = DXGI_FORMAT_UNKNOWN;
-                            s.Buffer.NumElements         = slot.count;
-                            s.Buffer.StructureByteStride = slot.stride;
-                        }
-                        else
-                        {
-                            s.ViewDimension      = D3D12_SRV_DIMENSION_BUFFER;
-                            s.Format             = DXGI_FORMAT_R32_TYPELESS;
-                            s.Buffer.Flags       = D3D12_BUFFER_SRV_FLAG_RAW;
-                            s.Buffer.NumElements = static_cast<UINT>(rd.Width / 4);
-                        }
-                    }
-                    else
-                    {
-                        s.ViewDimension       = D3D12_SRV_DIMENSION_TEXTURE2D;
-                        s.Format              = rd.Format;
-                        s.Texture2D.MipLevels = rd.MipLevels;
-                    }
-                    m_device->CreateShaderResourceView(res, &s, h);
-                }
-                else
-                {
-                    s.ViewDimension      = D3D12_SRV_DIMENSION_BUFFER;
-                    s.Format             = DXGI_FORMAT_R32_TYPELESS;
-                    s.Buffer.Flags       = D3D12_BUFFER_SRV_FLAG_RAW;
-                    s.Buffer.NumElements = 1;
-                    m_device->CreateShaderResourceView(nullptr, &s, h);
-                }
-            }
-        }
-    }
-
-    // --- UAV ---
-    if (m_uavAllocBase != kInvalidAlloc)
-    {
-        for (size_t i = 0; i < m_bindings.size(); ++i)
-        {
-            const auto& b = m_bindings[i];
-            if (b.type != ComputeBindingType::UAV) continue;
-            const CS_BindingSlot& slot = (i < slotCount) ? slots[i] : CS_BindingSlot{};
-            ID3D12Resource* res = reinterpret_cast<ID3D12Resource*>(slot.resourcePtr);
-            D3D12_CPU_DESCRIPTOR_HANDLE h = m_allocator->GetCPUHandle(m_uavAllocBase + b.heapOffset);
-            D3D12_UNORDERED_ACCESS_VIEW_DESC u = {};
-            if (res)
-            {
-                auto rd = res->GetDesc();
-                if (rd.Dimension == D3D12_RESOURCE_DIMENSION_BUFFER)
-                {
-                    u.ViewDimension = D3D12_UAV_DIMENSION_BUFFER;
-                    if (slot.stride > 0 && slot.count > 0)
-                    {
-                        u.Format                     = DXGI_FORMAT_UNKNOWN;
-                        u.Buffer.NumElements         = slot.count;
-                        u.Buffer.StructureByteStride = slot.stride;
-                    }
-                    else
-                    {
-                        u.Format             = DXGI_FORMAT_R32_TYPELESS;
-                        u.Buffer.Flags       = D3D12_BUFFER_UAV_FLAG_RAW;
-                        u.Buffer.NumElements = static_cast<UINT>(rd.Width / 4);
-                    }
-                }
-                else
-                {
-                    u.ViewDimension = D3D12_UAV_DIMENSION_TEXTURE2D;
-                    u.Format        = rd.Format;
-                }
-                m_device->CreateUnorderedAccessView(res, nullptr, &u, h);
-            }
-            else
-            {
-                u.ViewDimension      = D3D12_UAV_DIMENSION_BUFFER;
-                u.Format             = DXGI_FORMAT_R32_TYPELESS;
-                u.Buffer.Flags       = D3D12_BUFFER_UAV_FLAG_RAW;
-                u.Buffer.NumElements = 1;
-                m_device->CreateUnorderedAccessView(nullptr, nullptr, &u, h);
-            }
-        }
-    }
-}
-
-// ---------------------------------------------------------------------------
-// Dispatch
-//   slots[] carries all per-dispatch bindings passed from C# via the event data.
-//   Caller is responsible for resource state transitions.
-// ---------------------------------------------------------------------------
-void ComputeShader::Dispatch(
-    ID3D12GraphicsCommandList* cmdList,
-    UINT threadGroupX, UINT threadGroupY, UINT threadGroupZ,
-    const CS_BindingSlot* slots, uint32_t slotCount)
-{
-    if (!m_pso || !m_rootSig || !m_allocator) return;
-    if (!slots && slotCount > 0) return;
-
-    // --- Validate all bindings ---
-    {
-        bool anyMissing = false;
-        for (size_t i = 0; i < m_bindings.size(); ++i)
-        {
-            const auto& b = m_bindings[i];
-            const CS_BindingSlot& slot = (i < slotCount) ? slots[i] : CS_BindingSlot{};
-            bool ok = false;
-            const char* kind = "?";
-            switch (b.type)
-            {
-            case ComputeBindingType::TLAS:
-                kind = "TLAS";
-                ok = slot.resourcePtr != 0 ||
-                     (slot.objectKind == CS_BindingObjectKind::AccelStruct && slot.objectPtr != 0);
-                break;
-            case ComputeBindingType::SRV:
-                kind = "SRV";
-                ok = slot.resourcePtr != 0;
-                break;
-            case ComputeBindingType::UAV:
-                kind = "UAV";
-                ok = slot.resourcePtr != 0;
-                break;
-            case ComputeBindingType::CBV:
-                kind = "CBV";
-                ok = slot.resourcePtr != 0;
-                break;
-            case ComputeBindingType::SRV_ARRAY:
-                kind = "SRV_ARRAY";
-                ok = (slot.objectKind == CS_BindingObjectKind::BindlessTexture && slot.objectPtr != 0) ||
-                     (slot.objectKind == CS_BindingObjectKind::BindlessBuffer  && slot.objectPtr != 0);
-                break;
-            }
-            if (!ok)
-            {
-                Logf(kUnityLogTypeError,
-                     "ComputeShader::Dispatch: binding '%s' (%s, space%u, reg%u) is not set",
-                     b.name.c_str(), kind, b.space, b.registerIndex);
-                anyMissing = true;
-            }
-        }
-        if (anyMissing) return;
-    }
-
-    // Allocate heap slots on first call, then write all descriptors every dispatch
-    if ((m_numSRV > 0 && m_srvAllocBase == kInvalidAlloc) ||
-        (m_numUAV > 0 && m_uavAllocBase == kInvalidAlloc))
-    {
-        if (!AllocateAndWriteDescriptors(slots, slotCount)) return;
-    }
-    else
-    {
-        UpdateDescriptors(slots, slotCount);
-    }
-
-    // Bind the global shared heap (D3D12 allows only one GPU-visible heap at a time)
-    ID3D12DescriptorHeap* heapsToBind[1] = { m_allocator->GetHeap() };
-    cmdList->SetDescriptorHeaps(1, heapsToBind);
-
-    cmdList->SetPipelineState(m_pso.Get());
-    cmdList->SetComputeRootSignature(m_rootSig.Get());
-
-    // SRV table
-    if (m_rootParamSRV != kInvalidAlloc && m_srvAllocBase != kInvalidAlloc)
-        cmdList->SetComputeRootDescriptorTable(m_rootParamSRV,
-            m_allocator->GetGPUHandle(m_srvAllocBase));
-
-    // UAV table
-    if (m_rootParamUAV != kInvalidAlloc && m_uavAllocBase != kInvalidAlloc)
-        cmdList->SetComputeRootDescriptorTable(m_rootParamUAV,
-            m_allocator->GetGPUHandle(m_uavAllocBase));
-
-    // SRV_ARRAY bindings – each has its own root parameter
-    for (size_t i = 0; i < m_bindings.size(); ++i)
-    {
-        const auto& b = m_bindings[i];
-        if (b.type != ComputeBindingType::SRV_ARRAY) continue;
-        if (b.rootParam == kInvalidAlloc) continue;
-        const CS_BindingSlot& slot = (i < slotCount) ? slots[i] : CS_BindingSlot{};
-        if (slot.objectKind == CS_BindingObjectKind::BindlessTexture && slot.objectPtr)
-            cmdList->SetComputeRootDescriptorTable(b.rootParam,
-                reinterpret_cast<BindlessTexture*>(slot.objectPtr)->GetGPUHandle());
-        else if (slot.objectKind == CS_BindingObjectKind::BindlessBuffer && slot.objectPtr)
-            cmdList->SetComputeRootDescriptorTable(b.rootParam,
-                reinterpret_cast<BindlessBuffer*>(slot.objectPtr)->GetGPUHandle());
-    }
-
-    // Root CBV per CBV binding
-    if (m_rootParamCBVBase != kInvalidAlloc)
-    {
-        for (size_t i = 0; i < m_bindings.size(); ++i)
-        {
-            const auto& b = m_bindings[i];
-            if (b.type != ComputeBindingType::CBV) continue;
-            const CS_BindingSlot& slot = (i < slotCount) ? slots[i] : CS_BindingSlot{};
-            ID3D12Resource* res = reinterpret_cast<ID3D12Resource*>(slot.resourcePtr);
-            D3D12_GPU_VIRTUAL_ADDRESS addr = res ? res->GetGPUVirtualAddress() : 0;
-            cmdList->SetComputeRootConstantBufferView(m_rootParamCBVBase + b.heapOffset, addr);
-        }
-    }
-
-    // --- Request resource states ---
-    if (m_d3d12v8)
-    {
-        for (size_t i = 0; i < m_bindings.size(); ++i)
-        {
-            const auto& b = m_bindings[i];
-            const CS_BindingSlot& slot = (i < slotCount) ? slots[i] : CS_BindingSlot{};
-            ID3D12Resource* res = reinterpret_cast<ID3D12Resource*>(slot.resourcePtr);
-            if (b.type == ComputeBindingType::SRV && res)
-            {
-                m_d3d12v8->RequestResourceState(res, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
-            }
-            else if (b.type == ComputeBindingType::UAV && res)
-            {
-                m_d3d12v8->RequestResourceState(res, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
-            }
-            else if (b.type == ComputeBindingType::CBV && res)
-            {
-                m_d3d12v8->RequestResourceState(res, D3D12_RESOURCE_STATE_VERTEX_AND_CONSTANT_BUFFER);
-            }
-            else if (b.type == ComputeBindingType::SRV_ARRAY &&
-                     slot.objectKind == CS_BindingObjectKind::BindlessTexture && slot.objectPtr)
-            {
-                auto* bt = reinterpret_cast<BindlessTexture*>(slot.objectPtr);
-                for (uint32_t k = 0; k < bt->Capacity(); ++k)
-                {
-                    ID3D12Resource* tex = bt->GetTexture(k);
-                    if (tex)
-                        m_d3d12v8->RequestResourceState(tex, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
-                }
-            }
-            else if (b.type == ComputeBindingType::SRV_ARRAY &&
-                     slot.objectKind == CS_BindingObjectKind::BindlessBuffer && slot.objectPtr)
-            {
-                auto* bb = reinterpret_cast<BindlessBuffer*>(slot.objectPtr);
-                for (uint32_t k = 0; k < bb->Capacity(); ++k)
-                {
-                    ID3D12Resource* buf = bb->GetBuffer(k);
-                    if (buf)
-                        m_d3d12v8->RequestResourceState(buf, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
-                }
-            }
-        }
-    }
-
-    cmdList->Dispatch(threadGroupX, threadGroupY, threadGroupZ);
-}

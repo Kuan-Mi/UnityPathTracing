@@ -353,6 +353,16 @@ namespace NativeRender
         [DllImport(DllName)]
         public static extern uint NR_CS_GetRenderEventDataSize();
 
+        /// <summary>Creates a ComputeDescriptorSet for the given ComputeShader handle.
+        /// Each C# NativeComputeDescriptorSet must own one of these so multiple
+        /// dispatches of the same shader per frame use independent heap slices.</summary>
+        [DllImport(DllName)]
+        public static extern ulong NR_CS_CreateDescriptorSet(ulong shaderHandle);
+
+        /// <summary>Destroys a ComputeDescriptorSet (deferred until GPU is done).</summary>
+        [DllImport(DllName)]
+        public static extern void NR_CS_DestroyDescriptorSet(ulong handle);
+
         // -----------------------------------------------------------------------
         // CS data structures passed through IssuePluginEventAndData
         // -----------------------------------------------------------------------
@@ -379,7 +389,7 @@ namespace NativeRender
         [StructLayout(LayoutKind.Sequential, Pack = 4)]
         public struct CS_RenderEventData
         {
-            public ulong  shaderHandle;
+            public ulong  descriptorSetHandle; // pointer to ComputeDescriptorSet
             public uint   threadGroupX;
             public uint   threadGroupY;
             public uint   threadGroupZ;

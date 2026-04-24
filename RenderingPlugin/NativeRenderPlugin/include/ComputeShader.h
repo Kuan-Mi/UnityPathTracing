@@ -101,26 +101,23 @@ public:
     // Returns the HLSL variable name for a given slot index, or nullptr if out of range.
     const char* GetBindingName(uint32_t index) const;
 
-    // --- Dispatch ---
-    // slots[i] carries the binding for the i-th reflected binding (indexed by GetSlotIndex).
-    // slotCount must equal GetBindingCount().
-    void Dispatch(ID3D12GraphicsCommandList* cmdList,
-                  UINT threadGroupX, UINT threadGroupY, UINT threadGroupZ,
-                  const CS_BindingSlot* slots, uint32_t slotCount);
+    // --- Accessors for ComputeDescriptorSet ---
+    ID3D12PipelineState*              GetPSO()            const { return m_pso.Get(); }
+    ID3D12RootSignature*              GetRootSignature()  const { return m_rootSig.Get(); }
+    const std::vector<ComputeBinding>& GetBindings()      const { return m_bindings; }
+    uint32_t GetRootParamSRV()     const { return m_rootParamSRV; }
+    uint32_t GetRootParamUAV()     const { return m_rootParamUAV; }
+    uint32_t GetRootParamCBVBase() const { return m_rootParamCBVBase; }
+    uint32_t GetNumSRV()           const { return m_numSRV; }
+    uint32_t GetNumUAV()           const { return m_numUAV; }
+    const char* GetName()          const { return m_name.c_str(); }
+
+    static constexpr uint32_t kInvalidAlloc = UINT32_MAX;
 
 private:
     bool ReflectBindings(IDxcBlob* shaderBlob);
     bool BuildRootSignature();
     bool BuildPipeline(IDxcBlob* shaderBlob);
-
-    // Allocate global-heap slots and write all descriptors.
-    // Called once (first Dispatch) or after shader reload.
-    bool AllocateAndWriteDescriptors(const CS_BindingSlot* slots, uint32_t slotCount);
-
-    // Re-write all mutable descriptors every frame.
-    void UpdateDescriptors(const CS_BindingSlot* slots, uint32_t slotCount);
-
-    void FreeAllAllocations();
 
     void Log (UnityLogType type, const char* msg) const;
     void Logf(UnityLogType type, const char* fmt, ...) const;
@@ -142,11 +139,6 @@ private:
         uint32_t    reg;
         uint32_t    space;
     };
-
-    // Global-heap allocations
-    static constexpr uint32_t kInvalidAlloc = UINT32_MAX;
-    uint32_t m_srvAllocBase = kInvalidAlloc;
-    uint32_t m_uavAllocBase = kInvalidAlloc;
 
     // All reflected bindings (all spaces, all types except samplers)
     std::vector<ComputeBinding>             m_bindings;
