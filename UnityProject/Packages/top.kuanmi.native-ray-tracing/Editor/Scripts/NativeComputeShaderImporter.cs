@@ -37,6 +37,11 @@ namespace NativeRender
         [Tooltip("DXC target profile (e.g. cs_6_6).")]
         public string targetProfile = "cs_6_6";
 
+        [Tooltip("Promote these ConstantBuffer bindings to root 32-bit constants (SetComputeRoot32BitConstants). " +
+                 "\"Name\" must match the HLSL variable name exactly. " +
+                 "\"Count\" is the total number of 32-bit values in the buffer.")]
+        public RootConstantsHint[] rootConstantsHints = Array.Empty<RootConstantsHint>();
+
         public override void OnImportAsset(AssetImportContext ctx)
         {
             if (!isComputeShader)
@@ -80,6 +85,15 @@ namespace NativeRender
             var targetProfileProp = so.FindProperty("_targetProfile");
             targetProfileProp.stringValue = string.IsNullOrEmpty(targetProfile) ? "cs_6_6" : targetProfile;
 
+            var hintsProp = so.FindProperty("_rootConstantsHints");
+            hintsProp.arraySize = rootConstantsHints?.Length ?? 0;
+            for (int i = 0; i < (rootConstantsHints?.Length ?? 0); i++)
+            {
+                var elem = hintsProp.GetArrayElementAtIndex(i);
+                elem.FindPropertyRelative("Name").stringValue  = rootConstantsHints[i].Name ?? "";
+                elem.FindPropertyRelative("Count").intValue    = (int)rootConstantsHints[i].Count;
+            }
+
             so.ApplyModifiedPropertiesWithoutUndo();
 
             ctx.AddObjectToAsset("NativeComputeShader", asset);
@@ -93,12 +107,13 @@ namespace NativeRender
     public class NativeComputeShaderImporterEditor : ScriptedImporterEditor
     {
         // Foldout state — not persisted, resets on selection change (fine for a dev tool)
-        private bool _showSRV     = true;
-        private bool _showUAV     = true;
-        private bool _showCBV     = true;
-        private bool _showSampler = true;
-        private bool _showTLAS    = true;
-        private bool _showReflection = true;
+        private bool _showSRV          = true;
+        private bool _showUAV          = true;
+        private bool _showCBV          = true;
+        private bool _showSampler      = true;
+        private bool _showTLAS         = true;
+        private bool _showReflection   = true;
+        private bool _showRootConstants = true;
 
         public override void OnInspectorGUI()
         {
@@ -140,7 +155,7 @@ namespace NativeRender
             if (info == null) return;
 
             EditorGUILayout.Space(6);
-            _showReflection = EditorGUILayout.BeginFoldoutHeaderGroup(_showReflection, "Shader Reflection");
+            _showReflection = EditorGUILayout.Foldout(_showReflection, "Shader Reflection", true, EditorStyles.foldoutHeader);
             if (_showReflection)
             {
                 EditorGUI.indentLevel++;
@@ -156,17 +171,78 @@ namespace NativeRender
                 DrawBindingGroup(ref _showSampler, "Sampler", info.Sampler);
                 DrawBindingGroup(ref _showTLAS,    "TLAS",    info.TLAS);
 
+                // Root Constants section — only shown when there are CBV or TLAS bindings to promote
+                if (info.CBV.Count > 0)
+                {
+                    EditorGUILayout.Space(4);
+                    _showRootConstants = EditorGUILayout.Foldout(_showRootConstants, "Root Constants Hints", true);
+                    if (_showRootConstants)
+                    {
+                        EditorGUI.indentLevel++;
+
+                        var importerSO = new SerializedObject(importer);
+                        var hintsProp  = importerSO.FindProperty("rootConstantsHints");
+                        if (hintsProp != null)
+                        {
+                            EditorGUILayout.HelpBox(
+                                "Promote a ConstantBuffer binding to inline root 32-bit constants " +
+                                "(no GPU buffer required). Name must match the HLSL variable exactly. " +
+                                "Count = total number of 32-bit values (e.g. 4 floats = 4).",
+                                MessageType.None);
+
+                            // Quick-add buttons for each reflected CBV
+                            EditorGUILayout.LabelField("Add from reflected CBV:", EditorStyles.miniLabel);
+                            foreach (var cbv in info.CBV)
+                            {
+                                // Check if already present
+                                bool alreadyAdded = false;
+                                for (int hi = 0; hi < hintsProp.arraySize; hi++)
+                                {
+                                    var e = hintsProp.GetArrayElementAtIndex(hi);
+                                    if (e.FindPropertyRelative("Name").stringValue == cbv.Name)
+                                    { alreadyAdded = true; break; }
+                                }
+
+                                using (new EditorGUI.DisabledScope(alreadyAdded))
+                                {
+                                    if (GUILayout.Button($"+ {cbv.Name}  (b{cbv.Reg} space{cbv.Space})",
+                                                         EditorStyles.miniButton))
+                                    {
+                                        importerSO.Update();
+                                        int idx = hintsProp.arraySize;
+                                        hintsProp.InsertArrayElementAtIndex(idx);
+                                        var newElem = hintsProp.GetArrayElementAtIndex(idx);
+                                        newElem.FindPropertyRelative("Name").stringValue = cbv.Name;
+                                        newElem.FindPropertyRelative("Count").intValue   = 0;
+                                        importerSO.ApplyModifiedProperties();
+                                    }
+                                }
+                            }
+
+                            EditorGUILayout.Space(2);
+                            EditorGUILayout.PropertyField(hintsProp, new GUIContent("Hints"), true);
+                            if (importerSO.ApplyModifiedProperties())
+                                ApplyAndImport(importer);
+                        }
+
+                        EditorGUI.indentLevel--;
+                    }
+                }
+
                 EditorGUILayout.Space(4);
                 if (GUILayout.Button("Print to Console"))
                     PrintReflectionToConsole(importer.assetPath, info);
 
                 EditorGUI.indentLevel--;
             }
-            EditorGUILayout.EndFoldoutHeaderGroup();
         }
 
-        private static void PrintReflectionToConsole(string assetPath, ShaderReflectionInfo info)
+        private static void ApplyAndImport(NativeComputeShaderImporter importer)
         {
+            importer.SaveAndReimport();
+        }
+
+        private static void PrintReflectionToConsole(string assetPath, ShaderReflectionInfo info)        {
             var sb = new System.Text.StringBuilder();
             sb.AppendLine($"=== Shader Reflection: {System.IO.Path.GetFileName(assetPath)} ===");
             sb.AppendLine($"numthreads  [{info.NumThreadsX}, {info.NumThreadsY}, {info.NumThreadsZ}]");

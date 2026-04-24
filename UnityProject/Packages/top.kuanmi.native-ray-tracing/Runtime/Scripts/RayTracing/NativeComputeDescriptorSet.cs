@@ -32,6 +32,7 @@ namespace NativeRender
         private const uint ObjKindAccelStruct     = 1;
         private const uint ObjKindBindlessTexture = 2;
         private const uint ObjKindBindlessBuffer  = 3;
+        private const uint ObjKindRootConstants   = 4;
 
         private readonly NativeComputePipeline _pipeline;
 
@@ -300,6 +301,43 @@ namespace NativeRender
             _stagingSlots[i].objectKind  = ObjKindBindlessBuffer;
             _stagingSlots[i].count       = 0;
             _stagingSlots[i].stride      = 0;
+        }
+
+        /// <summary>
+        /// Pushes inline 32-bit constants directly into the root signature (no GPU buffer needed).
+        /// The CBV binding named <paramref name="name"/> must have been declared as a
+        /// <see cref="RootConstantsHint"/> when the pipeline was created.
+        /// <paramref name="dataPtr"/>: pointer to the source data (must remain valid until Dispatch returns on the render thread).
+        /// <paramref name="count32"/>: number of 32-bit values to upload (0 = use the full count from the hint).
+        /// <paramref name="destOffset32"/>: destination offset in 32-bit values within the root constants slot.
+        /// </summary>
+        public unsafe void SetRootConstants<T>(
+            string name, T* dataPtr, uint count32 = 0, uint destOffset32 = 0)
+            where T : unmanaged
+        {
+            if (!TryGetSlot(name, out uint i)) return;
+            _stagingSlots[i].resourcePtr = 0;
+            _stagingSlots[i].objectPtr   = (ulong)dataPtr;
+            _stagingSlots[i].count       = count32;
+            _stagingSlots[i].stride      = destOffset32;
+            _stagingSlots[i].objectKind  = ObjKindRootConstants;
+        }
+
+        /// <summary>
+        /// Pushes inline 32-bit constants from a <see cref="NativeArray{T}"/>.
+        /// See <see cref="SetRootConstants{T}(string,T*,uint,uint)"/> for parameter documentation.
+        /// </summary>
+        public unsafe void SetRootConstants<T>(
+            string name, NativeArray<T> data, uint count32 = 0, uint destOffset32 = 0)
+            where T : unmanaged
+        {
+            if (!TryGetSlot(name, out uint i)) return;
+            void* ptr = Unity.Collections.LowLevel.Unsafe.NativeArrayUnsafeUtility.GetUnsafeReadOnlyPtr(data);
+            _stagingSlots[i].resourcePtr = 0;
+            _stagingSlots[i].objectPtr   = (ulong)ptr;
+            _stagingSlots[i].count       = count32;
+            _stagingSlots[i].stride      = destOffset32;
+            _stagingSlots[i].objectKind  = ObjKindRootConstants;
         }
 
         // -------------------------------------------------------------------

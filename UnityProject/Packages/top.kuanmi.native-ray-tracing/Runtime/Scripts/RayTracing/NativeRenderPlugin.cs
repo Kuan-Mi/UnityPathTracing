@@ -329,6 +329,19 @@ namespace NativeRender
         [DllImport(DllName)]
         public static extern ulong NR_CreateComputeShader(byte[] dxilBytes, uint size, string name);
 
+        /// <summary>
+        /// Like NR_CreateComputeShader, but accepts a hintsJson string that promotes selected
+        /// CBV bindings to root 32-bit constants (SetComputeRoot32BitConstants).
+        /// hintsJson format: [{"name":"MyConstants","count":4}, ...]
+        /// Must be called before resource bindings are set up.
+        /// Returns an opaque handle on success, 0 on failure.
+        /// </summary>
+        [DllImport(DllName)]
+        public static extern ulong NR_CreateComputeShaderEx(
+            byte[] dxilBytes, uint size,
+            [MarshalAs(UnmanagedType.LPStr)] string name,
+            [MarshalAs(UnmanagedType.LPStr)] string hintsJson);
+
         /// <summary>Destroys a ComputeShader created by NR_CreateComputeShader.</summary>
         [DllImport(DllName)]
         public static extern void NR_DestroyComputeShader(ulong handle);

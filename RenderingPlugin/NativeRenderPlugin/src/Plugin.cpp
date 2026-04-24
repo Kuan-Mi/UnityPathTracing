@@ -920,7 +920,66 @@ NR_CreateComputeShader(const uint8_t* dxilBytes, uint32_t size, const char* name
 }
 
 // ---------------------------------------------------------------------------
-// NR_DestroyComputeShader
+// NR_CreateComputeShaderEx
+//   Like NR_CreateComputeShader but accepts a hintsJson string that promotes
+//   selected CBV bindings to root 32-bit constants.
+//   hintsJson format: [{"name":"MyConstants","count":4}, ...]
+//   Must be called before Unity sets up resource bindings.
+// ---------------------------------------------------------------------------
+static void ApplyRootConstantsHints(ComputeShader* cs, const char* hintsJson)
+{
+    if (!hintsJson || hintsJson[0] == '\0') return;
+    // Lightweight JSON array parser: find {"name":"...","count":N} objects
+    const char* p = hintsJson;
+    while (*p)
+    {
+        const char* nameStart = strstr(p, "\"name\"");
+        if (!nameStart) break;
+        const char* q1 = strchr(nameStart + 6, '"');
+        if (!q1) break;
+        const char* q2 = strchr(q1 + 1, '"');
+        if (!q2) break;
+        std::string name(q1 + 1, q2);
+
+        const char* countTag = strstr(q2 + 1, "\"count\"");
+        if (!countTag) break;
+        const char* colon = strchr(countTag + 7, ':');
+        if (!colon) break;
+        uint32_t count = static_cast<uint32_t>(atoi(colon + 1));
+
+        cs->SetRootConstantsHint(name.c_str(), count);
+        p = colon + 1;
+    }
+}
+
+extern "C" uint64_t UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API
+NR_CreateComputeShaderEx(const uint8_t* dxilBytes, uint32_t size, const char* name, const char* hintsJson)
+{
+    if (!s_RendererReady)
+    {
+        NR_WARN("NR_CreateComputeShaderEx: renderer not ready");
+        return 0;
+    }
+    ID3D12Device* device = s_D3D12->GetDevice();
+    if (!device)
+    {
+        NR_ERROR("NR_CreateComputeShaderEx: failed to obtain ID3D12Device");
+        return 0;
+    }
+    auto* cs = new ComputeShader();
+    if (!cs->Initialize(device, s_Log, &s_DescHeap, s_D3D12v8))
+    {
+        delete cs;
+        return 0;
+    }
+    ApplyRootConstantsHints(cs, hintsJson);
+    if (!cs->LoadShaderFromBytes(dxilBytes, size, name))
+    {
+        delete cs;
+        return 0;
+    }
+    return reinterpret_cast<uint64_t>(cs);
+}
 // ---------------------------------------------------------------------------
 extern "C" void UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API
 NR_DestroyComputeShader(uint64_t handle)

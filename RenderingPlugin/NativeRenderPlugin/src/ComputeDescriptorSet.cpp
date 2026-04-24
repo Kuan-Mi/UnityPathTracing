@@ -299,6 +299,10 @@ void ComputeDescriptorSet::Dispatch(
                 ok = (slot.objectKind == CS_BindingObjectKind::BindlessTexture && slot.objectPtr != 0) ||
                      (slot.objectKind == CS_BindingObjectKind::BindlessBuffer  && slot.objectPtr != 0);
                 break;
+            case ComputeBindingType::ROOT_CONSTANTS:
+                kind = "ROOT_CONSTANTS";
+                ok = slot.objectPtr != 0;
+                break;
             }
             if (!ok)
             {
@@ -372,6 +376,23 @@ void ComputeDescriptorSet::Dispatch(
             D3D12_GPU_VIRTUAL_ADDRESS addr = res ? res->GetGPUVirtualAddress() : 0;
             cmdList->SetComputeRootConstantBufferView(rootParamCBVBase + b.heapOffset, addr);
         }
+    }
+
+    // Root 32-bit constants per ROOT_CONSTANTS binding
+    for (size_t i = 0; i < bindings.size(); ++i)
+    {
+        const auto& b = bindings[i];
+        if (b.type != ComputeBindingType::ROOT_CONSTANTS) continue;
+        if (b.rootParam == kInvalidAlloc) continue;
+        const CS_BindingSlot& slot = (i < slotCount) ? slots[i] : CS_BindingSlot{};
+        if (!slot.objectPtr) continue;
+        UINT num32      = slot.count > 0 ? slot.count : b.num32BitValues;
+        UINT destOffset = slot.stride; // destOffsetIn32BitValues
+        cmdList->SetComputeRoot32BitConstants(
+            b.rootParam,
+            num32,
+            reinterpret_cast<const void*>(static_cast<uintptr_t>(slot.objectPtr)),
+            destOffset);
     }
 
     // Resource state requests

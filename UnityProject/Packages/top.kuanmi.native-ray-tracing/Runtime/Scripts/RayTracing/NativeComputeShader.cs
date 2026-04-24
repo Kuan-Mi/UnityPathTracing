@@ -34,6 +34,10 @@ namespace NativeRender
         [SerializeField, HideInInspector]
         private string _targetProfile = "cs_6_6";
 
+        /// <summary>Root constants hints. Written by the ScriptedImporter. Consumed by NativeComputePipeline.</summary>
+        [SerializeField, HideInInspector]
+        private RootConstantsHint[] _rootConstantsHints = Array.Empty<RootConstantsHint>();
+
         /// <summary>Pre-compiled DXIL bytecode. Populated by EnsureCompiled(); persisted by Unity serialization.</summary>
         [SerializeField, HideInInspector]
         private byte[] _compiledDxil;
@@ -62,6 +66,9 @@ namespace NativeRender
 
         /// <summary>JSON reflection data produced after the last successful compilation. Empty when not yet compiled.</summary>
         public string ReflectionJson => _reflectionJson ?? "";
+
+        /// <summary>Root constants hints stored by the importer. Read by <see cref="NativeComputePipeline"/>.</summary>
+        internal RootConstantsHint[] RootConstantsHints => _rootConstantsHints ?? Array.Empty<RootConstantsHint>();
 
         // -------------------------------------------------------------------
         // Compilation  (ShaderCompilerPlugin — no D3D12 needed)

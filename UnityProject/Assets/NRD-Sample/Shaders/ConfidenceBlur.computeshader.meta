@@ -20,3 +20,6 @@ ScriptedImporter:
   defines: []
   entryPoint: main
   targetProfile: cs_6_6
+  rootConstantsHints:
+  - Name: g_PushConstants
+    Count: 1
