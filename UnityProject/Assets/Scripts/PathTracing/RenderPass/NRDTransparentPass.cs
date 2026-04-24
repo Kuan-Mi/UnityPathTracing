@@ -15,7 +15,8 @@ namespace PathTracing
     /// </summary>
     public class NRDTransparentPass : ScriptableRenderPass, IDisposable
     {
-        private readonly NativeComputePipeline _cs;
+        private readonly NativeComputePipeline      _cs;
+        private readonly NativeComputeDescriptorSet _ds;
         private          Resource              _resource;
         private          Settings              _settings;
         private          NRDSampleResource     _nrdResource;
@@ -23,10 +24,12 @@ namespace PathTracing
         public NRDTransparentPass(NativeComputeShader cs)
         {
             _cs = new NativeComputePipeline(cs);
+            _ds = new NativeComputeDescriptorSet(_cs);
         }
 
         public void Dispose()
         {
+            _ds?.Dispose();
             _cs?.Dispose();
         }
 
@@ -68,11 +71,12 @@ namespace PathTracing
 
         class PassData
         {
-            internal NativeComputePipeline   Cs;
-            internal NRDSampleResource       NrdResource;
-            internal Resource                Resource;
-            internal Settings                Settings;
-            internal PathTracingResourcePool Pool;
+            internal NativeComputePipeline      Cs;
+            internal NativeComputeDescriptorSet Ds;
+            internal NRDSampleResource          NrdResource;
+            internal Resource                   Resource;
+            internal Settings                   Settings;
+            internal PathTracingResourcePool    Pool;
 
             internal TextureHandle ComposedDiff;
             internal TextureHandle ComposedSpecViewZ;
@@ -89,37 +93,38 @@ namespace PathTracing
             cmd.BeginSample(RenderPassMarkers.TransparentTracing);
 
             var cs   = data.Cs;
+            var ds   = data.Ds;
             var res  = data.Resource;
             var nrd  = data.NrdResource;
 
             // 1. Acceleration structures
-            cs.SetAccelerationStructure("gWorldTlas", nrd.WorldAS);
+            ds.SetAccelerationStructure("gWorldTlas", nrd.WorldAS);
 
             // 3. Scene structured buffers
-            cs.SetStructuredBuffer("gIn_InstanceData",                nrd.InstanceDataBuf);
-            cs.SetStructuredBuffer("gIn_PrimitiveData",               nrd.PrimitiveDataBuf);
-            cs.SetStructuredBuffer("gIn_MorphPrimitivePositionsPrev", nrd.MorphPrimitivePositionsPrevBuf);
+            ds.SetStructuredBuffer("gIn_InstanceData",                nrd.InstanceDataBuf);
+            ds.SetStructuredBuffer("gIn_PrimitiveData",               nrd.PrimitiveDataBuf);
+            ds.SetStructuredBuffer("gIn_MorphPrimitivePositionsPrev", nrd.MorphPrimitivePositionsPrevBuf);
 
             // 4. Bindless material textures
-            cs.SetBindlessTexture("gIn_Textures", nrd.Textures);
+            ds.SetBindlessTexture("gIn_Textures", nrd.Textures);
 
             // 5. SHARC UAVs (only hash entries + resolved; no accumulation in transparent shader)
-            cs.SetRWStructuredBuffer("gInOut_SharcHashEntriesBuffer", res.HashEntriesBuffer);
-            cs.SetRWStructuredBuffer("gInOut_SharcResolved",          res.ResolvedBuffer);
+            ds.SetRWStructuredBuffer("gInOut_SharcHashEntriesBuffer", res.HashEntriesBuffer);
+            ds.SetRWStructuredBuffer("gInOut_SharcResolved",          res.ResolvedBuffer);
 
             var pool = data.Pool;
 
             // 6. SRV inputs
-            cs.SetTexture("gIn_ComposedDiff",       data.ComposedDiff);
-            cs.SetTexture("gIn_ComposedSpec_ViewZ", data.ComposedSpecViewZ);
+            ds.SetTexture("gIn_ComposedDiff",       data.ComposedDiff);
+            ds.SetTexture("gIn_ComposedSpec_ViewZ", data.ComposedSpecViewZ);
 
             // 7. UAV outputs
-            cs.SetRWTexture("gOut_Composed",         pool.GetRT(RenderResourceType.Composed).rt);
-            cs.SetRWTexture("gInOut_Mv",             pool.GetRT(RenderResourceType.MV).rt);
-            cs.SetRWTexture("gOut_Normal_Roughness", pool.GetRT(RenderResourceType.NormalRoughness).rt);
+            ds.SetRWTexture("gOut_Composed",         pool.GetRT(RenderResourceType.Composed).rt);
+            ds.SetRWTexture("gInOut_Mv",             pool.GetRT(RenderResourceType.MV).rt);
+            ds.SetRWTexture("gOut_Normal_Roughness", pool.GetRT(RenderResourceType.NormalRoughness).rt);
 
             // 8. Constant buffer
-            cs.SetConstantBuffer("GlobalConstants", res.ConstantBuffer);
+            ds.SetConstantBuffer("GlobalConstants", res.ConstantBuffer);
 
             // 9. Dispatch — numthreads [16, 16, 1]
             uint w       = (uint)(data.Settings.m_RenderResolution.x * data.Settings.resolutionScale + 0.5f);
@@ -127,7 +132,7 @@ namespace PathTracing
             uint groupsX = (w + 15u) / 16u;
             uint groupsY = (h + 15u) / 16u;
 
-            cs.Dispatch(cmd, groupsX, groupsY, 1);
+            cs.Dispatch(cmd, ds, groupsX, groupsY, 1);
 
             cmd.EndSample(RenderPassMarkers.TransparentTracing);
         }
@@ -141,6 +146,7 @@ namespace PathTracing
             using var builder = renderGraph.AddUnsafePass<PassData>("NRDTransparentPass", out var passData);
 
             passData.Cs          = _cs;
+            passData.Ds          = _ds;
             passData.NrdResource = _nrdResource;
             passData.Resource    = _resource;
             passData.Settings    = _settings;

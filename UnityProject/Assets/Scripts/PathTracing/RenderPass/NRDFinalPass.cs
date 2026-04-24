@@ -22,17 +22,20 @@ namespace PathTracing
     /// </summary>
     public class NRDFinalPass : ScriptableRenderPass, IDisposable
     {
-        private readonly NativeComputePipeline _cs;
+        private readonly NativeComputePipeline      _cs;
+        private readonly NativeComputeDescriptorSet _ds;
         private          Resource              _resource;
         private          Settings              _settings;
 
         public NRDFinalPass(NativeComputeShader cs)
         {
             _cs = new NativeComputePipeline(cs);
+            _ds = new NativeComputeDescriptorSet(_cs);
         }
 
         public void Dispose()
         {
+            _ds?.Dispose();
             _cs?.Dispose();
         }
 
@@ -64,11 +67,12 @@ namespace PathTracing
 
         class PassData
         {
-            internal NativeComputePipeline   Cs;
-            internal Resource                Resource;
-            internal Settings                Settings;
-            internal PathTracingResourcePool Pool;
-            internal bool                    IsEven;
+            internal NativeComputePipeline      Cs;
+            internal NativeComputeDescriptorSet Ds;
+            internal Resource                   Resource;
+            internal Settings                   Settings;
+            internal PathTracingResourcePool    Pool;
+            internal bool                       IsEven;
         }
 
         // -------------------------------------------------------------------------
@@ -79,6 +83,7 @@ namespace PathTracing
         {
             var cmd  = CommandBufferHelpers.GetNativeCommandBuffer(context.cmd);
             var cs   = data.Cs;
+            var ds   = data.Ds;
             var pool = data.Pool;
             var res  = data.Resource;
 
@@ -88,17 +93,17 @@ namespace PathTracing
             // NRDTaaPass writes: isEven → TaaHistory, !isEven → TaaHistoryPrev
             var taaOutput = pool.GetRT(data.IsEven ? RenderResourceType.TaaHistory : RenderResourceType.TaaHistoryPrev);
 
-            cs.SetConstantBuffer("GlobalConstants", res.ConstantBuffer);
+            ds.SetConstantBuffer("GlobalConstants", res.ConstantBuffer);
 
-            cs.SetTexture("gIn_PostAA",     taaOutput.rt);
-            cs.SetTexture("gIn_PreAA",      pool.GetRT(RenderResourceType.Composed).rt);
-            cs.SetTexture("gIn_Validation", pool.GetRT(RenderResourceType.Validation).rt);
+            ds.SetTexture("gIn_PostAA",     taaOutput.rt);
+            ds.SetTexture("gIn_PreAA",      pool.GetRT(RenderResourceType.Composed).rt);
+            ds.SetTexture("gIn_Validation", pool.GetRT(RenderResourceType.Validation).rt);
 
-            cs.SetRWTexture("gOut_Final", pool.GetRT(RenderResourceType.Final).rt);
+            ds.SetRWTexture("gOut_Final", pool.GetRT(RenderResourceType.Final).rt);
 
             uint groupsX = ((uint)data.Settings.OutputResolution.x + 15u) / 16u;
             uint groupsY = ((uint)data.Settings.OutputResolution.y + 15u) / 16u;
-            cs.Dispatch(cmd, groupsX, groupsY, 1);
+            cs.Dispatch(cmd, ds, groupsX, groupsY, 1);
 
             cmd.EndSample(RenderPassMarkers.Final);
         }
@@ -112,6 +117,7 @@ namespace PathTracing
             using var builder = renderGraph.AddUnsafePass<PassData>("NRDFinalPass", out var passData);
 
             passData.Cs       = _cs;
+            passData.Ds       = _ds;
             passData.Resource = _resource;
             passData.Settings = _settings;
             passData.Pool     = _resource.Pool;

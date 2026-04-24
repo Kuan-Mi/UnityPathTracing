@@ -13,17 +13,20 @@ namespace PathTracing
     /// </summary>
     public class NRDCompositionPass : ScriptableRenderPass, IDisposable
     {
-        private readonly NativeComputePipeline _cs;
+        private readonly NativeComputePipeline      _cs;
+        private readonly NativeComputeDescriptorSet _ds;
         private          Resource              _resource;
         private          Settings              _settings;
 
         public NRDCompositionPass(NativeComputeShader cs)
         {
             _cs = new NativeComputePipeline(cs);
+            _ds = new NativeComputeDescriptorSet(_cs);
         }
 
         public void Dispose()
         {
+            _ds?.Dispose();
             _cs?.Dispose();
         }
 
@@ -57,10 +60,11 @@ namespace PathTracing
 
         class PassData
         {
-            internal NativeComputePipeline   Cs;
-            internal Resource                Resource;
-            internal Settings                Settings;
-            internal PathTracingResourcePool Pool;
+            internal NativeComputePipeline      Cs;
+            internal NativeComputeDescriptorSet Ds;
+            internal Resource                   Resource;
+            internal Settings                   Settings;
+            internal PathTracingResourcePool    Pool;
         }
 
         // -------------------------------------------------------------------------
@@ -71,6 +75,7 @@ namespace PathTracing
         {
             var cmd = CommandBufferHelpers.GetNativeCommandBuffer(context.cmd);
             var cs  = data.Cs;
+            var ds  = data.Ds;
             var res = data.Resource;
 
             cmd.BeginSample(RenderPassMarkers.Composition);
@@ -78,25 +83,25 @@ namespace PathTracing
             var pool = data.Pool;
 
             // SRV inputs
-            cs.SetTexture("gIn_ViewZ", pool.GetRT(RenderResourceType.Viewz).rt);
-            cs.SetTexture("gIn_Normal_Roughness", pool.GetRT(RenderResourceType.NormalRoughness).rt);
-            cs.SetTexture("gIn_BaseColor_Metalness", pool.GetRT(RenderResourceType.BaseColorMetalness).rt);
-            cs.SetTexture("gIn_DirectLighting", pool.GetRT(RenderResourceType.DirectLighting).rt);
-            cs.SetTexture("gIn_DirectEmission", pool.GetRT(RenderResourceType.DirectEmission).rt);
-            cs.SetTexture("gIn_PsrThroughput", pool.GetRT(RenderResourceType.PsrThroughput).rt);
-            cs.SetTexture("gIn_Shadow", pool.GetRT(RenderResourceType.Shadow).rt);
-            cs.SetTexture("gIn_Diff", pool.GetRT(RenderResourceType.Diff).rt);
-            cs.SetTexture("gIn_Spec", pool.GetRT(RenderResourceType.Spec).rt);
+            ds.SetTexture("gIn_ViewZ", pool.GetRT(RenderResourceType.Viewz).rt);
+            ds.SetTexture("gIn_Normal_Roughness", pool.GetRT(RenderResourceType.NormalRoughness).rt);
+            ds.SetTexture("gIn_BaseColor_Metalness", pool.GetRT(RenderResourceType.BaseColorMetalness).rt);
+            ds.SetTexture("gIn_DirectLighting", pool.GetRT(RenderResourceType.DirectLighting).rt);
+            ds.SetTexture("gIn_DirectEmission", pool.GetRT(RenderResourceType.DirectEmission).rt);
+            ds.SetTexture("gIn_PsrThroughput", pool.GetRT(RenderResourceType.PsrThroughput).rt);
+            ds.SetTexture("gIn_Shadow", pool.GetRT(RenderResourceType.Shadow).rt);
+            ds.SetTexture("gIn_Diff", pool.GetRT(RenderResourceType.Diff).rt);
+            ds.SetTexture("gIn_Spec", pool.GetRT(RenderResourceType.Spec).rt);
 
             // UAV outputs
-            cs.SetRWTexture("gOut_ComposedDiff", pool.GetRT(RenderResourceType.ComposedDiff).rt);
-            cs.SetRWTexture("gOut_ComposedSpec_ViewZ", pool.GetRT(RenderResourceType.ComposedSpecViewZ).rt);
+            ds.SetRWTexture("gOut_ComposedDiff", pool.GetRT(RenderResourceType.ComposedDiff).rt);
+            ds.SetRWTexture("gOut_ComposedSpec_ViewZ", pool.GetRT(RenderResourceType.ComposedSpecViewZ).rt);
 
             // Constant buffer
-            cs.SetConstantBuffer("GlobalConstants", res.ConstantBuffer);
+            ds.SetConstantBuffer("GlobalConstants", res.ConstantBuffer);
 
             // Dispatch — numthreads [16, 16, 1]
-            cs.Dispatch(cmd, (uint)data.Settings.rectGridW, (uint)data.Settings.rectGridH, 1);
+            cs.Dispatch(cmd, ds, (uint)data.Settings.rectGridW, (uint)data.Settings.rectGridH, 1);
 
             cmd.EndSample(RenderPassMarkers.Composition);
         }
@@ -110,6 +115,7 @@ namespace PathTracing
             using var builder = renderGraph.AddUnsafePass<PassData>("NRDCompositionPass", out var passData);
 
             passData.Cs       = _cs;
+            passData.Ds       = _ds;
             passData.Resource = _resource;
             passData.Settings = _settings;
             passData.Pool     = _resource.Pool;
