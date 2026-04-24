@@ -38,7 +38,7 @@ namespace PathTracing
         public NativeComputeShader nrdTaaShader;
         public NativeComputeShader nrdConfidenceBlurShader;
         public NativeComputeShader nrdFinalShader;
-        public ComputeShader        dlssBeforeComputeShader;
+        public NativeComputeShader nrdDlssBeforeShader;
 
         public Texture2D scramblingRankingTex;
         public Texture2D sobolTex;
@@ -56,7 +56,7 @@ namespace PathTracing
         private NRDConfidenceBlurPass _nrdConfidenceBlurPass;
         private NRDFinalPass          _nrdFinalPass;
         private NrdPass               _nrdPass;
-        private DlssBeforePass        _dlssBeforePass;
+        private NRDDlssBeforePass     _nrdDlssBeforePass;
         private DlssRRPass            _dlssrrPass;
         private OutputBlitPass        _outputBlitPass;
 
@@ -67,7 +67,7 @@ namespace PathTracing
         private readonly NRDGlobalConstants[] _nrdGlobalConstantsArray = new NRDGlobalConstants[1];
 
         private readonly Dictionary<long, NrdDenoiser>             _nrdDenoisers      = new();
-        private readonly Dictionary<long, DlrrDenoiser>             _dlrrDenoisers     = new();
+        private readonly Dictionary<long, DlrrDenoiser>            _dlrrDenoisers     = new();
         private readonly Dictionary<long, PathTracingResourcePool> _resourcePools     = new();
         private readonly Dictionary<long, CameraFrameState>        _cameraFrameStates = new();
 
@@ -121,7 +121,7 @@ namespace PathTracing
                 renderPassEvent = renderPassEvent
             };
 
-            _dlssBeforePass ??= new DlssBeforePass(dlssBeforeComputeShader)
+            _nrdDlssBeforePass ??= new NRDDlssBeforePass(nrdDlssBeforeShader)
             {
                 renderPassEvent = renderPassEvent
             };
@@ -298,7 +298,7 @@ namespace PathTracing
             }
 
             // Confidence Blur (5 ping-pong iterations over SHARC gradient)
-            if(!setting.RR)
+            if (!setting.RR)
             {
                 int sharcW = 16 * ((int)(renderResolution.x / sharcDownscale + 15) / 16);
                 int sharcH = 16 * ((int)(renderResolution.y / sharcDownscale + 15) / 16);
@@ -382,7 +382,7 @@ namespace PathTracing
                 {
                     rectGridW = rectGridW,
                     rectGridH = rectGridH,
-                    useRR = setting.RR
+                    useRR     = setting.RR
                 });
                 renderer.EnqueuePass(_nrdCompositionPass);
             }
@@ -407,28 +407,18 @@ namespace PathTracing
             if (setting.RR)
             {
                 // DLSS-RR: DlssBefore → DlssRR (replaces TAA + Final)
-                var dlssBeforeResource = new DlssBeforePass.Resource
+                var nrdDlssBeforeResource = new NRDDlssBeforePass.Resource
                 {
-                    ConstantBuffer = _nrdConstantBuffer,
-
-                    NormalRoughness    = pool.GetRT(RenderResourceType.NormalRoughness),
-                    BaseColorMetalness = pool.GetRT(RenderResourceType.BaseColorMetalness),
-                    Spec               = pool.GetRT(RenderResourceType.Unfiltered_Spec),
-                    ViewZ              = pool.GetRT(RenderResourceType.Viewz),
-
-                    RRGuide_DiffAlbedo       = pool.GetRT(RenderResourceType.RrGuideDiffAlbedo),
-                    RRGuide_SpecAlbedo       = pool.GetRT(RenderResourceType.RrGuideSpecAlbedo),
-                    RRGuide_SpecHitDistance  = pool.GetRT(RenderResourceType.RrGuideSpecHitDistance),
-                    RRGuide_Normal_Roughness = pool.GetRT(RenderResourceType.RrGuideNormalRoughness),
+                    ConstantBuffer = _nrdConstantBufferPtr,
+                    Pool           = pool,
                 };
 
-                _dlssBeforePass.Setup(dlssBeforeResource, new DlssBeforePass.Settings
+                _nrdDlssBeforePass.Setup(nrdDlssBeforeResource, new NRDDlssBeforePass.Settings
                 {
-                    rectGridW    = rectGridW,
-                    rectGridH    = rectGridH,
-                    tmpDisableRR = setting.tmpDisableRR,
+                    rectGridW = rectGridW,
+                    rectGridH = rectGridH,
                 });
-                renderer.EnqueuePass(_dlssBeforePass);
+                renderer.EnqueuePass(_nrdDlssBeforePass);
 
                 var dlrrRes = new DlrrDenoiser.DlrrResources
                 {
@@ -523,9 +513,9 @@ namespace PathTracing
                     RRGuide_SpecHitDistance  = pool.GetRT(RenderResourceType.RrGuideSpecHitDistance),
                     DlssOutput               = pool.GetRT(RenderResourceType.DlssOutput),
                     // todo
-                    taaDst                   = pool.GetRT(RenderResourceType.Final),
-                    ViewZ                    = pool.GetRT(RenderResourceType.Viewz),
-                    Gradient                 = pool.GetRT(RenderResourceType.Gradient_Pong),
+                    taaDst   = pool.GetRT(RenderResourceType.Final),
+                    ViewZ    = pool.GetRT(RenderResourceType.Viewz),
+                    Gradient = pool.GetRT(RenderResourceType.Gradient_Pong),
 
                     Output            = pool.GetRT(RenderResourceType.Final),
                     DirectEmission    = pool.GetRT(RenderResourceType.DirectEmission),
@@ -595,11 +585,12 @@ namespace PathTracing
             _nrdConfidenceBlurPass?.Dispose();
             _nrdConfidenceBlurPass = null;
             _nrdFinalPass?.Dispose();
-            _nrdFinalPass   = null;
-            _nrdPass        = null;
-            _dlssBeforePass = null;
-            _dlssrrPass     = null;
-            _outputBlitPass = null;
+            _nrdFinalPass = null;
+            _nrdPass      = null;
+            _nrdDlssBeforePass?.Dispose();
+            _nrdDlssBeforePass = null;
+            _dlssrrPass        = null;
+            _outputBlitPass    = null;
         }
 
 #if UNITY_EDITOR
@@ -621,7 +612,7 @@ namespace PathTracing
             nrdTaaShader            = UnityEditor.AssetDatabase.LoadAssetAtPath<NativeComputeShader>("Assets/NRD-Sample/Shaders/Taa.computeshader");
             nrdConfidenceBlurShader = UnityEditor.AssetDatabase.LoadAssetAtPath<NativeComputeShader>("Assets/NRD-Sample/Shaders/ConfidenceBlur.computeshader");
             nrdFinalShader          = UnityEditor.AssetDatabase.LoadAssetAtPath<NativeComputeShader>("Assets/NRD-Sample/Shaders/Final.computeshader");
-            dlssBeforeComputeShader = UnityEditor.AssetDatabase.LoadAssetAtPath<ComputeShader>("Assets/Shaders/PostProcess/DlssBefore.compute");
+            nrdDlssBeforeShader     = UnityEditor.AssetDatabase.LoadAssetAtPath<NativeComputeShader>("Assets/NRD-Sample/Shaders/DlssBefore.computeshader");
 
             scramblingRankingTex = UnityEditor.AssetDatabase.LoadAssetAtPath<Texture2D>("Assets/Textures/scrambling_ranking_128x128_2d_4spp.png");
             sobolTex             = UnityEditor.AssetDatabase.LoadAssetAtPath<Texture2D>("Assets/Textures/sobol_256_4d.png");
