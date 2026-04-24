@@ -22,21 +22,23 @@ class AccelerationStructure;
 // ---------------------------------------------------------------------------
 enum class ComputeBindingType
 {
-    SRV,        // single StructuredBuffer<T> or ByteAddressBuffer or Texture (SRV)
-    UAV,        // single RWTexture2D / RWStructuredBuffer / RWBuffer (UAV)
-    CBV,        // ConstantBuffer<T>
-    SRV_ARRAY,  // unbounded array[] bound via BindlessTexture or BindlessBuffer
-    TLAS,       // RaytracingAccelerationStructure
+    SRV,            // single StructuredBuffer<T> or ByteAddressBuffer or Texture (SRV)
+    UAV,            // single RWTexture2D / RWStructuredBuffer / RWBuffer (UAV)
+    CBV,            // ConstantBuffer<T> bound as inline root CBV descriptor
+    SRV_ARRAY,      // unbounded array[] bound via BindlessTexture or BindlessBuffer
+    TLAS,           // RaytracingAccelerationStructure
+    ROOT_CONSTANTS, // ConstantBuffer<T> pushed via SetComputeRoot32BitConstants
 };
 
 struct ComputeBinding
 {
     std::string       name;             // HLSL variable name
-    ComputeBindingType type;            // SRV / UAV / CBV / SRV_ARRAY / TLAS
+    ComputeBindingType type;            // SRV / UAV / CBV / SRV_ARRAY / TLAS / ROOT_CONSTANTS
     uint32_t          space;            // register space
     uint32_t          registerIndex;    // tn / un / bn number
     uint32_t          heapOffset;       // offset within the shared SRV/UAV alloc range
     uint32_t          rootParam;        // root parameter index (SRV_ARRAY: own; others: shared table)
+    uint32_t          num32BitValues;   // ROOT_CONSTANTS only: total DWORD count from hint
     // NOTE: No bound* fields here — bindings are passed per-dispatch via CS_BindingSlot[].
 };
 
@@ -79,6 +81,7 @@ struct CS_BindingSlot
 //   1   – UAV descriptor table (one range per UAV binding)            optional
 //   2+  – one descriptor table per SRV_ARRAY (unbounded) binding
 //   N+  – one root CBV descriptor per CBV binding
+//   M+  – one root 32-bit constants slot per ROOT_CONSTANTS binding
 // ---------------------------------------------------------------------------
 class ComputeShader
 {
@@ -91,6 +94,10 @@ public:
     // Build pipeline from pre-compiled DXIL bytes (compiled as cs_6_x).
     // name is used as the D3D12 debug name for the PSO and root signature (optional).
     bool LoadShaderFromBytes(const uint8_t* dxilBytes, uint32_t size, const char* name = nullptr);
+
+    // Must be called BEFORE LoadShaderFromBytes to promote a CBV to root 32-bit constants.
+    // num32BitValues: total number of 32-bit values in the constant buffer.
+    void SetRootConstantsHint(const char* name, uint32_t num32BitValues);
 
     // --- Binding metadata queries (called from C# on main thread to build slot arrays) ---
 
@@ -110,6 +117,7 @@ public:
     uint32_t GetRootParamCBVBase() const { return m_rootParamCBVBase; }
     uint32_t GetNumSRV()           const { return m_numSRV; }
     uint32_t GetNumUAV()           const { return m_numUAV; }
+    uint32_t GetNumRootConstants() const { return m_numRootConstants; }
     const char* GetName()          const { return m_name.c_str(); }
 
     static constexpr uint32_t kInvalidAlloc = UINT32_MAX;
@@ -149,11 +157,15 @@ private:
     uint32_t m_rootParamSRV     = kInvalidAlloc; // SRV table
     uint32_t m_rootParamUAV     = kInvalidAlloc; // UAV table
     uint32_t m_rootParamCBVBase = kInvalidAlloc; // first root CBV (sequential)
-    // SRV_ARRAY bindings store their root param inside ComputeBinding::rootParam.
+    // SRV_ARRAY and ROOT_CONSTANTS bindings store their root param inside ComputeBinding::rootParam.
 
     // Binding counts
-    uint32_t m_numSRV      = 0;
-    uint32_t m_numUAV      = 0;
-    uint32_t m_numCBV      = 0;
-    uint32_t m_numSRVArray = 0;
+    uint32_t m_numSRV          = 0;
+    uint32_t m_numUAV          = 0;
+    uint32_t m_numCBV          = 0;
+    uint32_t m_numSRVArray     = 0;
+    uint32_t m_numRootConstants = 0;
+
+    // Pre-load hints: name → num32BitValues.  Set before LoadShaderFromBytes.
+    std::unordered_map<std::string, uint32_t> m_rootConstantsHints;
 };

@@ -140,11 +140,12 @@ bool ComputeShader::ReflectBindings(IDxcBlob* shaderBlob)
         if (m_bindingIndex.count(name)) continue; // de-duplicate
 
         ComputeBinding cb;
-        cb.name          = name;
-        cb.space         = bind.Space;
-        cb.registerIndex = bind.BindPoint;
-        cb.heapOffset    = 0;
-        cb.rootParam     = kInvalidAlloc;
+        cb.name           = name;
+        cb.space          = bind.Space;
+        cb.registerIndex  = bind.BindPoint;
+        cb.heapOffset     = 0;
+        cb.rootParam      = kInvalidAlloc;
+        cb.num32BitValues = 0;
 
         switch (bind.Type)
         {
@@ -153,9 +154,21 @@ bool ComputeShader::ReflectBindings(IDxcBlob* shaderBlob)
             ++m_numSRV; // TLAS shares the SRV descriptor table
             break;
         case D3D_SIT_CBUFFER:
-            cb.type = ComputeBindingType::CBV;
-            ++m_numCBV;
+        {
+            auto hint = m_rootConstantsHints.find(name);
+            if (hint != m_rootConstantsHints.end())
+            {
+                cb.type           = ComputeBindingType::ROOT_CONSTANTS;
+                cb.num32BitValues = hint->second;
+                ++m_numRootConstants;
+            }
+            else
+            {
+                cb.type = ComputeBindingType::CBV;
+                ++m_numCBV;
+            }
             break;
+        }
         case D3D_SIT_TBUFFER:
         case D3D_SIT_TEXTURE:
         case D3D_SIT_STRUCTURED:
@@ -183,12 +196,14 @@ bool ComputeShader::ReflectBindings(IDxcBlob* shaderBlob)
 
     // Assign consecutive heap offsets per type group
     // TLAS shares the SRV descriptor table (same as RayTraceShader)
+    // ROOT_CONSTANTS bindings need no heap slot.
     uint32_t srvOff = 0, uavOff = 0, cbvOff = 0;
     for (auto& b : m_bindings)
     {
         if      (b.type == ComputeBindingType::SRV || b.type == ComputeBindingType::TLAS)  b.heapOffset = srvOff++;
-        else if (b.type == ComputeBindingType::UAV)  b.heapOffset = uavOff++;
-        else if (b.type == ComputeBindingType::CBV)  b.heapOffset = cbvOff++;
+        else if (b.type == ComputeBindingType::UAV)           b.heapOffset = uavOff++;
+        else if (b.type == ComputeBindingType::CBV)           b.heapOffset = cbvOff++;
+        // ROOT_CONSTANTS: heapOffset stays 0, not used
     }
 
     return true;
@@ -321,6 +336,21 @@ bool ComputeShader::BuildRootSignature()
             Logf(kUnityLogTypeLog, "  Root param %u: CBV '%s' b%u space%u",
                  b.rootParam, b.name.c_str(), b.registerIndex, b.space);
         }
+    }
+    // One root 32-bit constants slot per ROOT_CONSTANTS binding
+    for (auto& b : m_bindings)
+    {
+        if (b.type != ComputeBindingType::ROOT_CONSTANTS) continue;
+        b.rootParam = static_cast<uint32_t>(params.size());
+        D3D12_ROOT_PARAMETER1 p = {};
+        p.ParameterType                  = D3D12_ROOT_PARAMETER_TYPE_32BIT_CONSTANTS;
+        p.Constants.ShaderRegister       = b.registerIndex;
+        p.Constants.RegisterSpace        = b.space;
+        p.Constants.Num32BitValues       = b.num32BitValues;
+        p.ShaderVisibility               = D3D12_SHADER_VISIBILITY_ALL;
+        params.push_back(p);
+        Logf(kUnityLogTypeLog, "  Root param %u: ROOT_CONSTANTS '%s' b%u space%u num32=%u",
+             b.rootParam, b.name.c_str(), b.registerIndex, b.space, b.num32BitValues);
     }
 
     // Static samplers �?built dynamically from reflected SamplerState names.
@@ -472,6 +502,14 @@ bool ComputeShader::BuildPipeline(IDxcBlob* shaderBlob)
         m_pso->SetName(wname.c_str());
     }
     return true;
+}
+
+// ---------------------------------------------------------------------------
+// SetRootConstantsHint
+// ---------------------------------------------------------------------------
+void ComputeShader::SetRootConstantsHint(const char* name, uint32_t num32BitValues)
+{
+    if (name) m_rootConstantsHints[name] = num32BitValues;
 }
 
 // ---------------------------------------------------------------------------

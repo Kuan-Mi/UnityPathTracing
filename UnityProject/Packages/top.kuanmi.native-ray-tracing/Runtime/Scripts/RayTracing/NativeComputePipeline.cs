@@ -6,6 +6,19 @@ using UnityEngine.Rendering;
 namespace NativeRender
 {
     /// <summary>
+    /// Describes a CBV binding that should be promoted to root 32-bit constants
+    /// (bound via SetComputeRoot32BitConstants instead of a root CBV descriptor).
+    /// </summary>
+    [Serializable]
+    public struct RootConstantsHint
+    {
+        /// <summary>The HLSL variable name of the ConstantBuffer.</summary>
+        public string Name;
+        /// <summary>Total number of 32-bit values in the constant buffer.</summary>
+        public uint   Count;
+    }
+
+    /// <summary>
     /// Manages the D3D12 compute pipeline state (PSO + root signature + slot layout)
     /// created from a <see cref="NativeComputeShader"/> asset.
     ///
@@ -20,6 +33,7 @@ namespace NativeRender
     {
         private ulong _handle;
         private NativeComputeShader _shader;
+        private RootConstantsHint[] _rootConstantsHints; // may be null
 
         // Slot layout: name → slot index as reported by NR_CS_GetSlotIndex
         private Dictionary<string, uint> _nameToSlot;
@@ -45,15 +59,26 @@ namespace NativeRender
 
         /// <summary>
         /// Creates a new compute pipeline from the given shader asset.
+        /// Root constants hints defined on the asset (via the importer) are applied automatically.
         /// Triggers HLSL compilation if the asset has not been compiled yet.
         /// Throws <see cref="InvalidOperationException"/> if pipeline creation fails.
         /// </summary>
         public NativeComputePipeline(NativeComputeShader shader)
+            : this(shader, shader != null ? shader.RootConstantsHints : null) { }
+
+        /// <summary>
+        /// Creates a new compute pipeline, promoting the specified CBV bindings to
+        /// root 32-bit constants (SetComputeRoot32BitConstants).
+        /// Must be called before any <see cref="NativeComputeDescriptorSet"/> is created
+        /// for this pipeline.
+        /// </summary>
+        public NativeComputePipeline(NativeComputeShader shader, RootConstantsHint[] rootConstantsHints)
         {
             if (shader == null)
                 throw new ArgumentNullException(nameof(shader));
 
             _shader = shader;
+            _rootConstantsHints = rootConstantsHints;
             BuildNativeHandle(shader);
             BuildSlotLayout(shader);
             NativeComputeShader.OnRecompiled += OnShaderRecompiled;
@@ -66,10 +91,33 @@ namespace NativeRender
                 throw new InvalidOperationException(
                     $"[NativeComputePipeline] Shader compilation failed for: {shader.GetHlslPath()}");
 
-            _handle = NativeRenderPlugin.NR_CreateComputeShader(dxil, (uint)dxil.Length, shader.name);
+            string hintsJson = BuildHintsJson(_rootConstantsHints);
+            if (hintsJson != null)
+                _handle = NativeRenderPlugin.NR_CreateComputeShaderEx(dxil, (uint)dxil.Length, shader.name, hintsJson);
+            else
+                _handle = NativeRenderPlugin.NR_CreateComputeShader(dxil, (uint)dxil.Length, shader.name);
+
             if (_handle == 0)
                 throw new InvalidOperationException(
-                    $"[NativeComputePipeline] NR_CreateComputeShader returned 0 for: {shader.name}");
+                    $"[NativeComputePipeline] NR_CreateComputeShader(Ex) returned 0 for: {shader.name}");
+        }
+
+        private static string BuildHintsJson(RootConstantsHint[] hints)
+        {
+            if (hints == null || hints.Length == 0) return null;
+            var sb = new System.Text.StringBuilder();
+            sb.Append('[');
+            for (int i = 0; i < hints.Length; i++)
+            {
+                if (i > 0) sb.Append(',');
+                sb.Append("{\"name\":\"");
+                sb.Append(hints[i].Name);
+                sb.Append("\",\"count\":");
+                sb.Append(hints[i].Count);
+                sb.Append('}');
+            }
+            sb.Append(']');
+            return sb.ToString();
         }
 
         private void BuildSlotLayout(NativeComputeShader shader)

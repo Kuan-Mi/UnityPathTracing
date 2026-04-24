@@ -1,6 +1,8 @@
 using System;
 using System.Runtime.InteropServices;
 using NativeRender;
+using Unity.Collections;
+using Unity.Collections.LowLevel.Unsafe;
 using Unity.Mathematics;
 using UnityEngine;
 using UnityEngine.Rendering;
@@ -33,18 +35,10 @@ namespace PathTracing
         private          Resource              _resource;
         private          Settings              _settings;
 
-        // Five tiny constant buffers, one per iteration, pre-filled with step = 1..5.
-        // MinimumD3D12 CBV size = 256 bytes, but Unity's GraphicsBuffer manages alignment.
-        // We store one int + 3 padding ints (16 bytes stride) to meet constant-buffer rules.
-        private readonly GraphicsBuffer[] _stepBuffers = new GraphicsBuffer[IterationCount];
-
         [StructLayout(LayoutKind.Sequential)]
-        private struct StepConstants
+        private struct PushConstants
         {
-            public int   step;
-            public int   _pad0;
-            public int   _pad1;
-            public int   _pad2;
+            public int step;
         }
 
         public NRDConfidenceBlurPass(NativeComputeShader cs)
@@ -52,14 +46,6 @@ namespace PathTracing
             _cs     = new NativeComputePipeline(cs);
             _dsPing = new NativeComputeDescriptorSet(_cs);
             _dsPong = new NativeComputeDescriptorSet(_cs);
-
-            var data = new StepConstants[1];
-            for (int i = 0; i < IterationCount; i++)
-            {
-                _stepBuffers[i] = new GraphicsBuffer(GraphicsBuffer.Target.Constant, 1, Marshal.SizeOf<StepConstants>());
-                data[0].step    = 1 + i;
-                _stepBuffers[i].SetData(data);
-            }
         }
 
         public void Dispose()
@@ -67,8 +53,6 @@ namespace PathTracing
             _dsPing?.Dispose();
             _dsPong?.Dispose();
             _cs?.Dispose();
-            foreach (var buf in _stepBuffers)
-                buf?.Release();
         }
 
         public void Setup(Resource resource, Settings settings)
@@ -102,7 +86,6 @@ namespace PathTracing
             internal NativeComputePipeline      Cs;
             internal NativeComputeDescriptorSet DsPing;
             internal NativeComputeDescriptorSet DsPong;
-            internal GraphicsBuffer[]           StepBuffers;
             internal Resource                   Resource;
             internal Settings                   Settings;
             internal PathTracingResourcePool    Pool;
@@ -112,7 +95,7 @@ namespace PathTracing
         // Execution
         // -------------------------------------------------------------------------
 
-        static void ExecutePass(PassData data, UnsafeGraphContext context)
+        static unsafe void ExecutePass(PassData data, UnsafeGraphContext context)
         {
             var cmd  = CommandBufferHelpers.GetNativeCommandBuffer(context.cmd);
             var cs   = data.Cs;
@@ -127,7 +110,9 @@ namespace PathTracing
                 var ds = (i % 2 == 0) ? data.DsPing : data.DsPong;
 
                 ds.SetConstantBuffer("GlobalConstants", res.ConstantBuffer);
-                ds.SetConstantBuffer("g_PushConstants", data.StepBuffers[i]);
+
+                var push = new PushConstants { step = 1 + i };
+                ds.SetRootConstants("g_PushConstants", &push);
 
                 cs.Dispatch(cmd, ds, data.Settings.GroupsX, data.Settings.GroupsY, 1);
             }
@@ -146,7 +131,6 @@ namespace PathTracing
             passData.Cs          = _cs;
             passData.DsPing      = _dsPing;
             passData.DsPong      = _dsPong;
-            passData.StepBuffers = _stepBuffers;
             passData.Resource    = _resource;
             passData.Settings    = _settings;
             passData.Pool        = _resource.Pool;
