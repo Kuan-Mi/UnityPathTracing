@@ -2,32 +2,23 @@ using System;
 using System.Collections.Generic;
 using Nri;
 using Unity.Mathematics;
-using UnityEngine;
 using UnityEngine.Experimental.Rendering;
 using UnityEngine.Rendering;
-using Object = UnityEngine.Object;
 
 namespace PathTracing
 {
     /// <summary>
     /// Central owner of all per-camera render textures used by the path tracing pipeline.
     ///
-    /// Resources are split into two buckets:
-    ///   _nriResources  – All textures that require a native NRI/D3D12 pointer
-    ///                    (NRD standard I/O + DLSS/RR interop textures).
-    ///   _rtResources   – Cross-frame RTHandle-only resources (TAA history, prev GBuffer, etc.)
-    ///                    that are only bound as Unity render targets.
+    /// All render textures are stored in _nriResources as NriTextureResource entries,
+    /// covering NRD standard I/O, DLSS/RR interop, cross-frame history, and per-frame pass textures.
     ///
     /// Call InitPathTracingResources() from PathTracingFeature, or
     /// InitRtxdiResources() from RtxdiFeature, to register only the textures each pipeline needs.
     /// </summary>
-    public class PathTracingResourcePool : System.IDisposable
+    public class PathTracingResourcePool : IDisposable
     {
         private readonly Dictionary<RenderResourceType, NriTextureResource> _nriResources = new();
-        private readonly Dictionary<RenderResourceType, RTHandle>           _rtResources  = new();
-
-        // Deferred RT-only allocations registered by Init* methods and executed in EnsureResources.
-        private readonly List<(RenderResourceType type, GraphicsFormat format, bool srgb)> _rtResourceDefs = new();
 
         public int2 renderResolution { get; private set; }
 
@@ -66,20 +57,18 @@ namespace PathTracing
             _nriResources[RenderResourceType.RrGuideSpecHitDistance] = new NriTextureResource(RenderResourceType.RrGuideSpecHitDistance, GraphicsFormat.R16_SFloat, uavState);
             _nriResources[RenderResourceType.RrGuideNormalRoughness] = new NriTextureResource(RenderResourceType.RrGuideNormalRoughness, GraphicsFormat.R16G16B16A16_SFloat, uavState);
 
-            // ── RTHandle-only (cross-frame) ──────────────────────────────────────
-            _rtResourceDefs.Add((RenderResourceType.TaaHistory, GraphicsFormat.R16G16B16A16_SFloat, false));
-            _rtResourceDefs.Add((RenderResourceType.TaaHistoryPrev, GraphicsFormat.R16G16B16A16_SFloat, false));
-            _rtResourceDefs.Add((RenderResourceType.PsrThroughput, GraphicsFormat.R16G16B16A16_SFloat, false));
-            _rtResourceDefs.Add((RenderResourceType.PrevViewZ, GraphicsFormat.R32_SFloat, false));
-            _rtResourceDefs.Add((RenderResourceType.PrevNormalRoughness, GraphicsFormat.A2B10G10R10_UNormPack32, false));
-            _rtResourceDefs.Add((RenderResourceType.PrevBaseColorMetalness, GraphicsFormat.R8G8B8A8_UNorm, false));
-            _rtResourceDefs.Add((RenderResourceType.PrevGeoNormal, GraphicsFormat.R32_UInt, false));
-
-            // Per-frame pass textures (previously created via RenderGraph in PTContextItem).
-            _rtResourceDefs.Add((RenderResourceType.Final, GraphicsFormat.R16G16B16A16_SFloat, false));
-            _rtResourceDefs.Add((RenderResourceType.DirectEmission, GraphicsFormat.B10G11R11_UFloatPack32, false));
-            _rtResourceDefs.Add((RenderResourceType.ComposedDiff, GraphicsFormat.R16G16B16A16_SFloat, false));
-            _rtResourceDefs.Add((RenderResourceType.ComposedSpecViewZ, GraphicsFormat.R16G16B16A16_SFloat, false));
+            // ── Cross-frame / per-frame pass textures ────────────────────────────
+            _nriResources[RenderResourceType.TaaHistory]              = new NriTextureResource(RenderResourceType.TaaHistory, GraphicsFormat.R16G16B16A16_SFloat, uavState);
+            _nriResources[RenderResourceType.TaaHistoryPrev]          = new NriTextureResource(RenderResourceType.TaaHistoryPrev, GraphicsFormat.R16G16B16A16_SFloat, uavState);
+            _nriResources[RenderResourceType.PsrThroughput]           = new NriTextureResource(RenderResourceType.PsrThroughput, GraphicsFormat.R16G16B16A16_SFloat, uavState);
+            _nriResources[RenderResourceType.PrevViewZ]               = new NriTextureResource(RenderResourceType.PrevViewZ, GraphicsFormat.R32_SFloat, uavState);
+            _nriResources[RenderResourceType.PrevNormalRoughness]     = new NriTextureResource(RenderResourceType.PrevNormalRoughness, GraphicsFormat.A2B10G10R10_UNormPack32, uavState);
+            _nriResources[RenderResourceType.PrevBaseColorMetalness]  = new NriTextureResource(RenderResourceType.PrevBaseColorMetalness, GraphicsFormat.R8G8B8A8_UNorm, uavState);
+            _nriResources[RenderResourceType.PrevGeoNormal]           = new NriTextureResource(RenderResourceType.PrevGeoNormal, GraphicsFormat.R32_UInt, uavState);
+            _nriResources[RenderResourceType.Final]                   = new NriTextureResource(RenderResourceType.Final, GraphicsFormat.R16G16B16A16_SFloat, uavState);
+            _nriResources[RenderResourceType.DirectEmission]          = new NriTextureResource(RenderResourceType.DirectEmission, GraphicsFormat.B10G11R11_UFloatPack32, uavState);
+            _nriResources[RenderResourceType.ComposedDiff]            = new NriTextureResource(RenderResourceType.ComposedDiff, GraphicsFormat.R16G16B16A16_SFloat, uavState);
+            _nriResources[RenderResourceType.ComposedSpecViewZ]       = new NriTextureResource(RenderResourceType.ComposedSpecViewZ, GraphicsFormat.R16G16B16A16_SFloat, uavState);
         }
 
         /// <summary>
@@ -164,14 +153,14 @@ namespace PathTracing
             _nriResources[RenderResourceType.RrGuideSpecHitDistance] = new NriTextureResource(RenderResourceType.RrGuideSpecHitDistance, GraphicsFormat.R16_SFloat, uavState);
             _nriResources[RenderResourceType.RrGuideNormalRoughness] = new NriTextureResource(RenderResourceType.RrGuideNormalRoughness, GraphicsFormat.R16G16B16A16_SFloat, uavState);
 
-            // ── RTHandle-only (cross-frame) ──────────────────────────────────────
-            _rtResourceDefs.Add((RenderResourceType.TaaHistory, GraphicsFormat.R16G16B16A16_SFloat, false));
-            _rtResourceDefs.Add((RenderResourceType.TaaHistoryPrev, GraphicsFormat.R16G16B16A16_SFloat, false));
-            _rtResourceDefs.Add((RenderResourceType.PsrThroughput, GraphicsFormat.A2B10G10R10_UNormPack32, false)); // R10_G10_B10_A2_UNORM
-            _rtResourceDefs.Add((RenderResourceType.Final, GraphicsFormat.R16G16B16A16_SFloat, false));
-            _rtResourceDefs.Add((RenderResourceType.DirectEmission, GraphicsFormat.B10G11R11_UFloatPack32, false)); // colorFormat
-            _rtResourceDefs.Add((RenderResourceType.ComposedDiff, GraphicsFormat.B10G11R11_UFloatPack32, false)); // colorFormat
-            _rtResourceDefs.Add((RenderResourceType.ComposedSpecViewZ, GraphicsFormat.R16G16B16A16_SFloat, false));
+            // ── Cross-frame / per-frame pass textures ────────────────────────────
+            _nriResources[RenderResourceType.TaaHistory]        = new NriTextureResource(RenderResourceType.TaaHistory, GraphicsFormat.R16G16B16A16_SFloat, uavState);
+            _nriResources[RenderResourceType.TaaHistoryPrev]    = new NriTextureResource(RenderResourceType.TaaHistoryPrev, GraphicsFormat.R16G16B16A16_SFloat, uavState);
+            _nriResources[RenderResourceType.PsrThroughput]     = new NriTextureResource(RenderResourceType.PsrThroughput, GraphicsFormat.A2B10G10R10_UNormPack32, uavState); // R10_G10_B10_A2_UNORM
+            _nriResources[RenderResourceType.Final]             = new NriTextureResource(RenderResourceType.Final, GraphicsFormat.R16G16B16A16_SFloat, uavState);
+            _nriResources[RenderResourceType.DirectEmission]    = new NriTextureResource(RenderResourceType.DirectEmission, GraphicsFormat.B10G11R11_UFloatPack32, uavState); // colorFormat
+            _nriResources[RenderResourceType.ComposedDiff]      = new NriTextureResource(RenderResourceType.ComposedDiff, GraphicsFormat.B10G11R11_UFloatPack32, uavState); // colorFormat
+            _nriResources[RenderResourceType.ComposedSpecViewZ] = new NriTextureResource(RenderResourceType.ComposedSpecViewZ, GraphicsFormat.R16G16B16A16_SFloat, uavState);
         }
 
         // ── Public accessors ────────────────────────────────────────────────────
@@ -179,18 +168,10 @@ namespace PathTracing
         /// <summary>Returns the NriTextureResource (RTHandle + NriPtr) for a given resource type.</summary>
         public NriTextureResource GetNriResource(RenderResourceType type) => _nriResources[type];
 
-        /// <summary>Returns the RTHandle for any resource, whether NRI-interop or RTHandle-only.</summary>
-        public RTHandle GetRT(RenderResourceType type)
-        {
-            if (_nriResources.TryGetValue(type, out var nriRes)) return nriRes.Handle;
-            return _rtResources[type];
-        }      
-        
-        public IntPtr GetPoint(RenderResourceType type)
-        {
-            if (_nriResources.TryGetValue(type, out var nriRes)) return nriRes.NativePtr;
-            return _rtResources[type].rt.GetNativeTexturePtr();
-        }
+        /// <summary>Returns the RTHandle for any resource.</summary>
+        public RTHandle GetRT(RenderResourceType type) => _nriResources[type].Handle;
+
+        public IntPtr GetPoint(RenderResourceType type) => _nriResources[type].NativePtr;
 
         // ── Resolution/allocation ───────────────────────────────────────────────
 
@@ -223,14 +204,6 @@ namespace PathTracing
                     break;
                 }
 
-            if (!invalid)
-                foreach (var h in _rtResources.Values)
-                    if (h == null || h.rt == null)
-                    {
-                        invalid = true;
-                        break;
-                    }
-
             int2 target = GetUpscaledResolution(outputResolution, mode);
             if (!invalid && target.x == renderResolution.x && target.y == renderResolution.y)
                 return false;
@@ -250,40 +223,7 @@ namespace PathTracing
                 kvp.Value.Allocate(res);
             }
 
-            foreach (var (type, format, srgb) in _rtResourceDefs)
-                AllocateRT(type, format, renderResolution, srgb);
-
             return true;
-        }
-
-        private void AllocateRT(RenderResourceType type, GraphicsFormat format, int2 resolution, bool srgb = false)
-        {
-            if (_rtResources.TryGetValue(type, out var existing) && existing != null)
-            {
-                var oldRt = existing.rt;
-                RTHandles.Release(existing);
-                if (oldRt != null)
-                {
-                    if (Application.isPlaying) Object.Destroy(oldRt);
-                    else Object.DestroyImmediate(oldRt);
-                }
-            }
-
-            var desc = new RenderTextureDescriptor(resolution.x, resolution.y, format, 0)
-            {
-                enableRandomWrite = true,
-                useMipMap         = false,
-                msaaSamples       = 1,
-                sRGB              = srgb
-            };
-            var rt = new RenderTexture(desc)
-            {
-                name       = type.ToString(),
-                filterMode = FilterMode.Point,
-                wrapMode   = TextureWrapMode.Clamp
-            };
-            rt.Create();
-            _rtResources[type] = RTHandles.Alloc(rt);
         }
 
         /// <summary>
@@ -327,20 +267,6 @@ namespace PathTracing
 
             foreach (var res in _nriResources.Values) res.Release();
             _nriResources.Clear();
-
-            foreach (var handle in _rtResources.Values)
-            {
-                if (handle == null) continue;
-                var rt = handle.rt;
-                RTHandles.Release(handle);
-                if (rt != null)
-                {
-                    if (Application.isPlaying) Object.Destroy(rt);
-                    else Object.DestroyImmediate(rt);
-                }
-            }
-
-            _rtResources.Clear();
         }
     }
 }
