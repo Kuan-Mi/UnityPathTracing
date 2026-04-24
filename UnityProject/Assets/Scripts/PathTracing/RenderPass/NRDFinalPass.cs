@@ -51,9 +51,9 @@ namespace PathTracing
 
         public class Resource
         {
-            internal GraphicsBuffer ConstantBuffer;  // GlobalConstants CBV
+            internal IntPtr                  ConstantBuffer;  // GlobalConstants CBV
             internal PathTracingResourcePool Pool;
-            internal bool IsEven; // !(frameIndex & 1) — selects which TAA history is the output
+            internal bool                    IsEven; // !(frameIndex & 1) — selects which TAA history is the output
         }
 
         public class Settings

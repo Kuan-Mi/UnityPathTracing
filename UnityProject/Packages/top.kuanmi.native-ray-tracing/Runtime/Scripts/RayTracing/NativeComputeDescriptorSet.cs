@@ -202,50 +202,26 @@ namespace NativeRender
             _stagingSlots[i].stride      = 0;
         }
 
-        /// <summary>
-        /// Binds a ComputeBuffer as a constant buffer (CBV).
-        /// The buffer must have been created with ComputeBufferType.Constant.
-        /// </summary>
-        public void SetConstantBuffer(string name, ComputeBuffer buffer)
-        {
-            if (!TryGetSlot(name, out uint i)) return;
-            _stagingSlots[i].resourcePtr = buffer != null ? (ulong)buffer.GetNativeBufferPtr() : 0;
-            _stagingSlots[i].objectKind  = ObjKindNone;
-            _stagingSlots[i].count       = 0;
-            _stagingSlots[i].stride      = 0;
-        }
-
         /// <summary>Binds a GraphicsBuffer as a constant buffer (CBV).</summary>
-        public void SetConstantBuffer(string name, GraphicsBuffer buffer)
+        public void SetConstantBuffer(string name, IntPtr bufferPtr)
         {
             if (!TryGetSlot(name, out uint i)) return;
-            _stagingSlots[i].resourcePtr = buffer != null ? (ulong)buffer.GetNativeBufferPtr() : 0;
+            _stagingSlots[i].resourcePtr = (ulong)bufferPtr;
             _stagingSlots[i].objectKind  = ObjKindNone;
             _stagingSlots[i].count       = 0;
             _stagingSlots[i].stride      = 0;
         }
 
-        /// <summary>
-        /// Binds a GraphicsBuffer as a StructuredBuffer SRV.
-        /// Passing null clears the binding.
-        /// </summary>
-        public void SetStructuredBuffer(string name, GraphicsBuffer buffer)
-        {
-            if (!TryGetSlot(name, out uint i)) return;
-            _stagingSlots[i].resourcePtr = buffer != null ? (ulong)buffer.GetNativeBufferPtr() : 0;
-            _stagingSlots[i].objectKind  = ObjKindNone;
-            _stagingSlots[i].count       = buffer != null ? (uint)buffer.count : 0;
-            _stagingSlots[i].stride      = buffer != null ? (uint)buffer.stride : 0;
-        }
+
 
         /// <summary>Binds a ComputeBuffer as a StructuredBuffer SRV with explicit element count and stride.</summary>
-        public void SetStructuredBuffer(string name, ComputeBuffer buffer, int elementCount, int elementStride)
+        public void SetStructuredBuffer(string name, IntPtr bufferPtr, int elementCount, int elementStride)
         {
             if (!TryGetSlot(name, out uint i)) return;
-            _stagingSlots[i].resourcePtr = buffer != null ? (ulong)buffer.GetNativeBufferPtr() : 0;
+            _stagingSlots[i].resourcePtr = (ulong)bufferPtr ;
             _stagingSlots[i].objectKind  = ObjKindNone;
-            _stagingSlots[i].count       = buffer != null ? (uint)elementCount : 0;
-            _stagingSlots[i].stride      = buffer != null ? (uint)elementStride : 0;
+            _stagingSlots[i].count       = (uint)elementCount ;
+            _stagingSlots[i].stride      = (uint)elementStride ;
         }
 
         /// <summary>Binds the TLAS of an acceleration structure by HLSL variable name.</summary>

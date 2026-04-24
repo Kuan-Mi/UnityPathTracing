@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Runtime.InteropServices;
 using NativeRender;
@@ -18,8 +19,8 @@ namespace PathTracing
     public class NRDFeature : ScriptableRendererFeature
     {
         private const uint sharcDownscale = 5;
-        
-        
+
+
         [FormerlySerializedAs("pathTracingSetting")]
         public NrdSampleSetting setting;
 
@@ -53,24 +54,16 @@ namespace PathTracing
 
         private NRDSampleResource _nrdSampleResource;
 
-        private GraphicsBuffer _hashEntriesBuffer;
-        private GraphicsBuffer _accumulationBuffer;
-        private GraphicsBuffer _resolvedBuffer;
-
         private          GraphicsBuffer       _nrdConstantBuffer;
+        private          IntPtr               _nrdConstantBufferPtr;
         private readonly NRDGlobalConstants[] _nrdGlobalConstantsArray = new NRDGlobalConstants[1];
 
         private readonly Dictionary<long, NrdDenoiser>             _nrdDenoisers      = new();
         private readonly Dictionary<long, PathTracingResourcePool> _resourcePools     = new();
         private readonly Dictionary<long, CameraFrameState>        _cameraFrameStates = new();
 
-        public static readonly int Capacity = 1 << 23;
-
         public override void Create()
         {
-            if (_hashEntriesBuffer == null)
-                InitializeBuffers();
-
             _nrdTlasUpdatePass ??= new NRDTlasUpdatePass
             {
                 renderPassEvent = renderPassEvent
@@ -125,22 +118,6 @@ namespace PathTracing
             };
         }
 
-        public void InitializeBuffers()
-        {
-            _hashEntriesBuffer?.Release();
-            _accumulationBuffer?.Release();
-            _resolvedBuffer?.Release();
-
-            _hashEntriesBuffer = new GraphicsBuffer(GraphicsBuffer.Target.Structured, Capacity, sizeof(ulong));
-            _hashEntriesBuffer.SetData(new ulong[Capacity]);
-
-            _accumulationBuffer = new GraphicsBuffer(GraphicsBuffer.Target.Structured, Capacity, sizeof(uint) * 4);
-            _accumulationBuffer.SetData(new uint4[Capacity]);
-
-            _resolvedBuffer = new GraphicsBuffer(GraphicsBuffer.Target.Structured, Capacity, sizeof(uint) * 4);
-            _resolvedBuffer.SetData(new uint4[Capacity]);
-        }
-
         public override void AddRenderPasses(ScriptableRenderer renderer, ref RenderingData renderingData)
         {
             var cam = renderingData.cameraData.camera;
@@ -168,8 +145,8 @@ namespace PathTracing
                 Debug.LogWarning("NRDFeature: Missing required assets, skipping pass.");
                 return;
             }
-            
-            
+
+
             if (_nrdSampleResource == null)
                 _nrdSampleResource = new NRDSampleResource(setting.mergeBlas);
 
@@ -222,8 +199,13 @@ namespace PathTracing
 
             globalConstants = frameState.GetNrdConstants(renderingData, setting);
 
-            _nrdConstantBuffer          ??= new GraphicsBuffer(GraphicsBuffer.Target.Constant, 1, Marshal.SizeOf<NRDGlobalConstants>());
-            _nrdGlobalConstantsArray[0] =   globalConstants;
+            if (_nrdConstantBuffer == null)
+            {
+                _nrdConstantBuffer    = new GraphicsBuffer(GraphicsBuffer.Target.Constant, 1, Marshal.SizeOf<NRDGlobalConstants>());
+                _nrdConstantBufferPtr = _nrdConstantBuffer.GetNativeBufferPtr();
+            }
+
+            _nrdGlobalConstantsArray[0] = globalConstants;
             _nrdConstantBuffer.SetData(_nrdGlobalConstantsArray);
 
             bool isEven = (globalConstants.gFrameIndex & 1) == 0;
@@ -240,11 +222,8 @@ namespace PathTracing
 
                 var nrdSharcResource = new NRDSharcPass.Resource
                 {
-                    ConstantBuffer     = _nrdConstantBuffer,
-                    HashEntriesBuffer  = _hashEntriesBuffer,
-                    AccumulationBuffer = _accumulationBuffer,
-                    ResolvedBuffer     = _resolvedBuffer,
-                    Pool               = pool,
+                    ConstantBuffer = _nrdConstantBufferPtr,
+                    Pool           = pool,
                 };
 
                 var nrdSharcSettings = new NRDSharcPass.Settings
@@ -299,7 +278,7 @@ namespace PathTracing
 
                 var nrdConfidenceBlurResource = new NRDConfidenceBlurPass.Resource
                 {
-                    ConstantBuffer = _nrdConstantBuffer,
+                    ConstantBuffer = _nrdConstantBufferPtr,
                     Pool           = pool,
                 };
 
@@ -317,16 +296,10 @@ namespace PathTracing
             {
                 var nrdOpaqueResource = new NRDOpaquePass.Resource
                 {
-                    ConstantBuffer = _nrdConstantBuffer,
-
-                    HashEntriesBuffer  = _hashEntriesBuffer,
-                    AccumulationBuffer = _accumulationBuffer,
-                    ResolvedBuffer     = _resolvedBuffer,
-
+                    ConstantBuffer    = _nrdConstantBufferPtr,
                     ScramblingRanking = scramblingRankingTex,
                     Sobol             = sobolTex,
-
-                    Pool = pool,
+                    Pool              = pool,
                 };
 
                 var nrdOpaqueSettings = new NRDOpaquePass.Settings
@@ -359,7 +332,7 @@ namespace PathTracing
                     renderResolution    = frameState.renderResolution,
                     frameIndex          = curFrame,
                     lightDirection      = lightDir,
-                    checkerboardMode    = setting.tracingMode == RESOLUTION.RESOLUTION_HALF? CheckerboardMode.BLACK : CheckerboardMode.OFF,
+                    checkerboardMode    = setting.tracingMode == RESOLUTION.RESOLUTION_HALF ? CheckerboardMode.BLACK : CheckerboardMode.OFF,
                 };
 
                 _nrdPass.Setup(nrd.GetInteropDataPtr(nrdInput));
@@ -373,7 +346,7 @@ namespace PathTracing
             {
                 var nrdCompositionResource = new NRDCompositionPass.Resource
                 {
-                    ConstantBuffer = _nrdConstantBuffer,
+                    ConstantBuffer = _nrdConstantBufferPtr,
                     Pool           = pool,
                 };
 
@@ -389,10 +362,8 @@ namespace PathTracing
             {
                 var nrdTransparentResource = new NRDTransparentPass.Resource
                 {
-                    ConstantBuffer    = _nrdConstantBuffer,
-                    HashEntriesBuffer = _hashEntriesBuffer,
-                    ResolvedBuffer    = _resolvedBuffer,
-                    Pool              = pool,
+                    ConstantBuffer = _nrdConstantBufferPtr,
+                    Pool           = pool,
                 };
 
                 _nrdTransparentPass.SetNRDSampleResource(_nrdSampleResource);
@@ -408,7 +379,7 @@ namespace PathTracing
             {
                 var nrdTaaResource = new NRDTaaPass.Resource
                 {
-                    ConstantBuffer = _nrdConstantBuffer,
+                    ConstantBuffer = _nrdConstantBufferPtr,
                     Pool           = pool,
                     isEven         = isEven,
                 };
@@ -425,7 +396,7 @@ namespace PathTracing
             {
                 var nrdFinalResource = new NRDFinalPass.Resource
                 {
-                    ConstantBuffer = _nrdConstantBuffer,
+                    ConstantBuffer = _nrdConstantBufferPtr,
                     Pool           = pool,
                     IsEven         = isEven,
                 };
@@ -464,13 +435,12 @@ namespace PathTracing
                     DlssOutput               = pool.GetRT(RenderResourceType.DlssOutput),
                     taaDst                   = pool.GetRT(isEven ? RenderResourceType.TaaHistory : RenderResourceType.TaaHistoryPrev),
                     ViewZ                    = pool.GetRT(RenderResourceType.Viewz),
-                    Gradient = pool.GetRT(RenderResourceType.Gradient_Pong),
+                    Gradient                 = pool.GetRT(RenderResourceType.Gradient_Pong),
 
                     Output            = pool.GetRT(RenderResourceType.Final),
                     DirectEmission    = pool.GetRT(RenderResourceType.DirectEmission),
                     ComposedDiff      = pool.GetRT(RenderResourceType.ComposedDiff),
                     ComposedSpecViewZ = pool.GetRT(RenderResourceType.ComposedSpecViewZ),
-                    
                 };
 
                 _outputBlitPass.Setup(outputBlitResource, new OutputBlitPass.Settings
@@ -505,15 +475,6 @@ namespace PathTracing
 
             _nrdConstantBuffer?.Release();
             _nrdConstantBuffer = null;
-
-            _hashEntriesBuffer?.Release();
-            _hashEntriesBuffer = null;
-
-            _accumulationBuffer?.Release();
-            _accumulationBuffer = null;
-
-            _resolvedBuffer?.Release();
-            _resolvedBuffer = null;
 
             foreach (var denoiser in _nrdDenoisers.Values)
                 denoiser.Dispose();

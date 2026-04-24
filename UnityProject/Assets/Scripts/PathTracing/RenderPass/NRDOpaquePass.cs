@@ -53,12 +53,7 @@ namespace PathTracing
 
         public class Resource
         {
-            internal GraphicsBuffer ConstantBuffer;
-
-            // SHARC (passed in from PathTracingFeature, same as NativeOpaquePass)
-            internal GraphicsBuffer HashEntriesBuffer;
-            internal GraphicsBuffer AccumulationBuffer;
-            internal GraphicsBuffer ResolvedBuffer;
+            internal IntPtr ConstantBuffer;
 
             // Stochastic sampling textures
             internal Texture2D ScramblingRanking;
@@ -150,14 +145,14 @@ namespace PathTracing
             ds.SetAccelerationStructure("gLightTlas", nrd.LightAS);
 
             // 3. Scene structured buffers
-            ds.SetStructuredBuffer("gIn_InstanceData", nrd.InstanceDataBuf);
-            ds.SetStructuredBuffer("gIn_PrimitiveData", nrd.PrimitiveDataBuf);
-            ds.SetStructuredBuffer("gIn_MorphPrimitivePositionsPrev", nrd.MorphPrimitivePositionsPrevBuf);
+            ds.SetStructuredBuffer("gIn_InstanceData", nrd.InstanceDataBufPtr, nrd.InstanceDataBuf.count, nrd.InstanceDataBuf.stride);
+            ds.SetStructuredBuffer("gIn_PrimitiveData", nrd.PrimitiveDataBufPtr, nrd.PrimitiveDataBuf.count, nrd.PrimitiveDataBuf.stride);
+            ds.SetStructuredBuffer("gIn_MorphPrimitivePositionsPrev", nrd.MorphPrimitivePositionsPrevBufPtr, nrd.MorphPrimitivePositionsPrevBuf.count, nrd.MorphPrimitivePositionsPrevBuf.stride);
 
             // 4. SHARC UAVs
-            ds.SetRWStructuredBuffer("gInOut_SharcHashEntriesBuffer", res.HashEntriesBuffer.GetNativeBufferPtr(),res.HashEntriesBuffer.count,res.HashEntriesBuffer.stride);
-            ds.SetRWStructuredBuffer("gInOut_SharcAccumulated",       res.AccumulationBuffer.GetNativeBufferPtr(),res.AccumulationBuffer.count,res.AccumulationBuffer.stride);
-            ds.SetRWStructuredBuffer("gInOut_SharcResolved",          res.ResolvedBuffer.GetNativeBufferPtr(),res.ResolvedBuffer.count,res.ResolvedBuffer.stride);
+            ds.SetRWStructuredBuffer("gInOut_SharcHashEntriesBuffer", nrd.HashEntriesBufferPtr, nrd.HashEntriesBuffer.count, nrd.HashEntriesBuffer.stride);
+            ds.SetRWStructuredBuffer("gInOut_SharcAccumulated", nrd.AccumulationBufferPtr, nrd.AccumulationBuffer.count, nrd.AccumulationBuffer.stride);
+            ds.SetRWStructuredBuffer("gInOut_SharcResolved", nrd.ResolvedBufferPtr, nrd.ResolvedBuffer.count, nrd.ResolvedBuffer.stride);
 
             // 5. Bindless material textures
             ds.SetBindlessTexture("gIn_Textures", nrd.Textures);

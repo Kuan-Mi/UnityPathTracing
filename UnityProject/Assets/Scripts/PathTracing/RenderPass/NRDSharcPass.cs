@@ -65,10 +65,7 @@ namespace PathTracing
 
         public class Resource
         {
-            internal GraphicsBuffer ConstantBuffer;
-            internal GraphicsBuffer HashEntriesBuffer;
-            internal GraphicsBuffer AccumulationBuffer;
-            internal GraphicsBuffer ResolvedBuffer;
+            internal IntPtr ConstantBuffer;
 
             // Gradient textures sourced from the pool inside ExecutePass
             internal PathTracingResourcePool Pool;
@@ -123,11 +120,12 @@ namespace PathTracing
             // Dynamic per-frame bindings (same regardless of ping/pong)
             updateDs.SetAccelerationStructure("gWorldTlas", nrd.WorldAS);
             updateDs.SetAccelerationStructure("gLightTlas", nrd.LightAS);
-            updateDs.SetStructuredBuffer("gIn_InstanceData",  nrd.InstanceDataBuf);
-            updateDs.SetStructuredBuffer("gIn_PrimitiveData", nrd.PrimitiveDataBuf);
-            updateDs.SetRWStructuredBuffer("gInOut_SharcHashEntriesBuffer", res.HashEntriesBuffer.GetNativeBufferPtr(),res.HashEntriesBuffer.count,res.HashEntriesBuffer.stride);
-            updateDs.SetRWStructuredBuffer("gInOut_SharcAccumulated",       res.AccumulationBuffer.GetNativeBufferPtr(),res.AccumulationBuffer.count,res.AccumulationBuffer.stride);
-            updateDs.SetRWStructuredBuffer("gInOut_SharcResolved",          res.ResolvedBuffer.GetNativeBufferPtr(),res.ResolvedBuffer.count,res.ResolvedBuffer.stride);
+            
+            updateDs.SetStructuredBuffer("gIn_InstanceData",  nrd.InstanceDataBufPtr, nrd.InstanceDataBuf.count, nrd.InstanceDataBuf.stride);
+            updateDs.SetStructuredBuffer("gIn_PrimitiveData", nrd.PrimitiveDataBufPtr, nrd.PrimitiveDataBuf.count, nrd.PrimitiveDataBuf.stride);
+            updateDs.SetRWStructuredBuffer("gInOut_SharcHashEntriesBuffer", nrd.HashEntriesBufferPtr, nrd.HashEntriesBuffer.count, nrd.HashEntriesBuffer.stride);
+            updateDs.SetRWStructuredBuffer("gInOut_SharcAccumulated",       nrd.AccumulationBufferPtr, nrd.AccumulationBuffer.count, nrd.AccumulationBuffer.stride);
+            updateDs.SetRWStructuredBuffer("gInOut_SharcResolved",          nrd.ResolvedBufferPtr, nrd.ResolvedBuffer.count, nrd.ResolvedBuffer.stride);
             updateDs.SetBindlessTexture("gIn_Textures", nrd.Textures);
             updateDs.SetConstantBuffer("GlobalConstants", res.ConstantBuffer);
 
@@ -145,11 +143,11 @@ namespace PathTracing
             cmd.BeginSample(RenderPassMarkers.SharcResolve);
 
             resolveDs.SetConstantBuffer("GlobalConstants", res.ConstantBuffer);
-            resolveDs.SetRWStructuredBuffer("gInOut_SharcHashEntriesBuffer",  res.HashEntriesBuffer.GetNativeBufferPtr(),res.HashEntriesBuffer.count,res.HashEntriesBuffer.stride);
-            resolveDs.SetRWStructuredBuffer("gInOut_SharcAccumulated",        res.AccumulationBuffer.GetNativeBufferPtr(),res.AccumulationBuffer.count,res.AccumulationBuffer.stride);
-            resolveDs.SetRWStructuredBuffer("gInOut_SharcResolved",           res.ResolvedBuffer.GetNativeBufferPtr(),res.ResolvedBuffer.count,res.ResolvedBuffer.stride);
+            resolveDs.SetRWStructuredBuffer("gInOut_SharcHashEntriesBuffer",  nrd.HashEntriesBufferPtr, nrd.HashEntriesBuffer.count, nrd.HashEntriesBuffer.stride);
+            resolveDs.SetRWStructuredBuffer("gInOut_SharcAccumulated",        nrd.AccumulationBufferPtr, nrd.AccumulationBuffer.count, nrd.AccumulationBuffer.stride);
+            resolveDs.SetRWStructuredBuffer("gInOut_SharcResolved",           nrd.ResolvedBufferPtr, nrd.ResolvedBuffer.count, nrd.ResolvedBuffer.stride);
 
-            uint resolveGroups = (uint)((PathTracingFeature.Capacity + 255) / 256);
+            uint resolveGroups = (uint)((NRDSampleResource.SharcCapacity + 255) / 256);
             resolve.Dispatch(cmd, resolveDs, resolveGroups, 1, 1);
 
             cmd.EndSample(RenderPassMarkers.SharcResolve);

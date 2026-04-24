@@ -50,10 +50,7 @@ namespace PathTracing
 
         public class Resource
         {
-            internal GraphicsBuffer ConstantBuffer;
-
-            internal GraphicsBuffer HashEntriesBuffer;
-            internal GraphicsBuffer ResolvedBuffer;
+            internal IntPtr ConstantBuffer;
 
             // RT textures sourced from the pool inside ExecutePass
             internal PathTracingResourcePool Pool;
@@ -98,16 +95,16 @@ namespace PathTracing
             ds.SetAccelerationStructure("gWorldTlas", nrd.WorldAS);
 
             // 3. Scene structured buffers
-            ds.SetStructuredBuffer("gIn_InstanceData",                nrd.InstanceDataBuf);
-            ds.SetStructuredBuffer("gIn_PrimitiveData",               nrd.PrimitiveDataBuf);
-            ds.SetStructuredBuffer("gIn_MorphPrimitivePositionsPrev", nrd.MorphPrimitivePositionsPrevBuf);
+            ds.SetStructuredBuffer("gIn_InstanceData", nrd.InstanceDataBufPtr, nrd.InstanceDataBuf.count, nrd.InstanceDataBuf.stride);
+            ds.SetStructuredBuffer("gIn_PrimitiveData", nrd.PrimitiveDataBufPtr, nrd.PrimitiveDataBuf.count, nrd.PrimitiveDataBuf.stride);
+            ds.SetStructuredBuffer("gIn_MorphPrimitivePositionsPrev", nrd.MorphPrimitivePositionsPrevBufPtr, nrd.MorphPrimitivePositionsPrevBuf.count, nrd.MorphPrimitivePositionsPrevBuf.stride);
 
             // 4. Bindless material textures
             ds.SetBindlessTexture("gIn_Textures", nrd.Textures);
 
             // 5. SHARC UAVs (only hash entries + resolved; no accumulation in transparent shader)
-            ds.SetRWStructuredBuffer("gInOut_SharcHashEntriesBuffer", res.HashEntriesBuffer.GetNativeBufferPtr(),res.HashEntriesBuffer.count,res.HashEntriesBuffer.stride);
-            ds.SetRWStructuredBuffer("gInOut_SharcResolved",          res.ResolvedBuffer.GetNativeBufferPtr(),res.ResolvedBuffer.count,res.ResolvedBuffer.stride);
+            ds.SetRWStructuredBuffer("gInOut_SharcHashEntriesBuffer", nrd.HashEntriesBufferPtr, nrd.HashEntriesBuffer.count, nrd.HashEntriesBuffer.stride);
+            ds.SetRWStructuredBuffer("gInOut_SharcResolved",          nrd.ResolvedBufferPtr, nrd.ResolvedBuffer.count, nrd.ResolvedBuffer.stride);
 
             var pool = data.Pool;
 

@@ -178,7 +178,22 @@ namespace NativeRender
         public GraphicsBuffer InstanceDataBuf => _instanceDataBuf;
         public GraphicsBuffer PrimitiveDataBuf => _primitiveDataBuf;
         public GraphicsBuffer MorphPrimitivePositionsPrevBuf => _morphPrimitivePositionsPrevBuf;
+
+        public IntPtr InstanceDataBufPtr { get; private set; }
+        public IntPtr PrimitiveDataBufPtr { get; private set; }
+        public IntPtr MorphPrimitivePositionsPrevBufPtr { get; private set; }
+
+
         public BindlessTexture Textures => _textures;
+
+        public GraphicsBuffer HashEntriesBuffer => _sharcHashEntries;
+        public GraphicsBuffer AccumulationBuffer => _sharcAccumulated;
+        public GraphicsBuffer ResolvedBuffer => _sharcResolved;
+
+        // Cached native pointers (valid for the lifetime of the buffers, set once in AllocateStaticResources).
+        public IntPtr HashEntriesBufferPtr { get; private set; }
+        public IntPtr AccumulationBufferPtr { get; private set; }
+        public IntPtr ResolvedBufferPtr { get; private set; }
 
         public NRDSampleResource(bool mergeBlas = true)
         {
@@ -214,7 +229,7 @@ namespace NativeRender
                     if (t != null)
                         t.transform.hasChanged = false;
                 _sceneDirty = false;
-                
+
                 NativeRayTracingTarget.RemoveQueue.Clear();
                 NativeRayTracingTarget.AddQueue.Clear();
                 return;
@@ -339,8 +354,13 @@ namespace NativeRender
             _sharcAccumulated = new GraphicsBuffer(t, SharcCapacity, sizeof(uint) * 4);
             _sharcResolved    = new GraphicsBuffer(t, SharcCapacity, sizeof(uint) * 4);
 
+            HashEntriesBufferPtr  = _sharcHashEntries.GetNativeBufferPtr();
+            AccumulationBufferPtr = _sharcAccumulated.GetNativeBufferPtr();
+            ResolvedBufferPtr     = _sharcResolved.GetNativeBufferPtr();
+
             _morphPrimitivePositionsPrevBuf = new GraphicsBuffer(
                 GraphicsBuffer.Target.Structured, 1, Marshal.SizeOf<MorphPrimitivePositionsNRD>());
+            MorphPrimitivePositionsPrevBufPtr = _morphPrimitivePositionsPrevBuf.GetNativeBufferPtr();
             _morphPrimitivePositionsPrevBuf.SetData(new MorphPrimitivePositionsNRD[1]);
         }
 
@@ -495,10 +515,12 @@ namespace NativeRender
 
                 _instanceDataBuf = new GraphicsBuffer(GraphicsBuffer.Target.Structured,
                     _instanceCpu.Length, Marshal.SizeOf<InstanceDataNRD>());
+                InstanceDataBufPtr = _instanceDataBuf.GetNativeBufferPtr();
                 _instanceDataBuf.SetData(_instanceCpu);
 
                 _primitiveDataBuf = new GraphicsBuffer(GraphicsBuffer.Target.Structured,
                     _primitiveCpu.Length, Marshal.SizeOf<PrimitiveDataNRD>());
+                PrimitiveDataBufPtr = _primitiveDataBuf.GetNativeBufferPtr();
                 _primitiveDataBuf.SetData(_primitiveCpu);
 
                 // Register each merged BLAS with the appropriate TLAS.
@@ -578,10 +600,12 @@ namespace NativeRender
 
             _instanceDataBuf = new GraphicsBuffer(GraphicsBuffer.Target.Structured,
                 _instanceCpu.Length, Marshal.SizeOf<InstanceDataNRD>());
+            InstanceDataBufPtr = _instanceDataBuf.GetNativeBufferPtr();
             _instanceDataBuf.SetData(_instanceCpu);
 
             _primitiveDataBuf = new GraphicsBuffer(GraphicsBuffer.Target.Structured,
                 _primitiveCpu.Length, Marshal.SizeOf<PrimitiveDataNRD>());
+            PrimitiveDataBufPtr = _primitiveDataBuf.GetNativeBufferPtr();
             _primitiveDataBuf.SetData(_primitiveCpu);
 
             // Initialize slot allocators to reflect the just-built fully-packed layout.
@@ -1073,6 +1097,7 @@ namespace NativeRender
             _instanceDataBuf?.Release();
             _instanceDataBuf = new GraphicsBuffer(GraphicsBuffer.Target.Structured,
                 cap, Marshal.SizeOf<InstanceDataNRD>());
+            InstanceDataBufPtr = _instanceDataBuf.GetNativeBufferPtr();
             _instanceDataBuf.SetData(_instanceCpu);
         }
 
@@ -1100,6 +1125,7 @@ namespace NativeRender
             _primitiveDataBuf?.Release();
             _primitiveDataBuf = new GraphicsBuffer(GraphicsBuffer.Target.Structured,
                 cap, Marshal.SizeOf<PrimitiveDataNRD>());
+            PrimitiveDataBufPtr = _primitiveDataBuf.GetNativeBufferPtr();
             _primitiveDataBuf.SetData(_primitiveCpu);
         }
 

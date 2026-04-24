@@ -46,7 +46,7 @@ namespace PathTracing
 
         public class Resource
         {
-            internal GraphicsBuffer ConstantBuffer;
+            internal IntPtr ConstantBuffer;
 
             // RT textures sourced from the pool inside ExecutePass
             internal PathTracingResourcePool Pool;
