@@ -38,7 +38,7 @@ namespace NativeRender
         // Scene flag constants (Shared.hlsl).
         public const uint FLAG_NON_TRANSPARENT = 0x01;
         public const uint FLAG_TRANSPARENT     = 0x02;
-        public const uint FLAG_EMISSIVE        = 0x04;
+        // public const uint FLAG_EMISSIVE        = 0x04;
         public const uint FLAG_STATIC          = 0x08;
 
         private const uint kHandleOpaque      = 0xFFFF0001u;
@@ -438,6 +438,7 @@ namespace NativeRender
                 {
                     if (isTransparent) staticTransparent.Add(t);
                     else staticOpaque.Add(t);
+                    
                     if (isEmissive) staticEmissive.Add(t);
                 }
                 else
@@ -452,6 +453,8 @@ namespace NativeRender
                              + CountGroupTriangles(staticEmissive)
                              + CountGroupTriangles(dyn);
 
+            Debug.Log($"[RebuildScene] Total triangles: {totalPrims}  (Opaque: {CountGroupTriangles(staticOpaque)}, Transparent: {CountGroupTriangles(staticTransparent)}, Emissive: {CountGroupTriangles(staticEmissive)}, Dynamic: {CountGroupTriangles(dyn)})");
+            
             _primitiveCpu = new NativeArray<PrimitiveDataNRD>(
                 Mathf.Max(totalPrims, 1), Allocator.Persistent, NativeArrayOptions.UninitializedMemory);
 
@@ -477,7 +480,7 @@ namespace NativeRender
 
                 staticEmissiveFirstInstance = instanceCursor;
                 _blasEmissive = BuildMergedBlas(staticEmissive, ref instanceCursor, ref primitiveCursor,
-                    instList, _primitiveCpu, texPtrs, FLAG_STATIC | FLAG_NON_TRANSPARENT | FLAG_EMISSIVE);
+                    instList, _primitiveCpu, texPtrs, FLAG_STATIC | FLAG_NON_TRANSPARENT);
             }
 
             // ---- Separate BLASes for dynamic objects (or all objects in edit mode) ----
@@ -607,8 +610,6 @@ namespace NativeRender
                 bool     isEmissive    = IsMaterialEmissive(rep);
 
                 uint baseFlags = isTransparent ? FLAG_TRANSPARENT : FLAG_NON_TRANSPARENT;
-                if (isEmissive)
-                    baseFlags |= FLAG_EMISSIVE;
 
 
                 // TLAS calls must happen on the main thread.
@@ -958,9 +959,6 @@ namespace NativeRender
             bool     isEmissive    = IsMaterialEmissive(rep);
 
             uint flags = isTransparent ? FLAG_TRANSPARENT : FLAG_NON_TRANSPARENT;
-            
-            if (isEmissive)
-                flags |= FLAG_EMISSIVE;
             
             if (!_worldAS.AddInstance(mr))
             {
