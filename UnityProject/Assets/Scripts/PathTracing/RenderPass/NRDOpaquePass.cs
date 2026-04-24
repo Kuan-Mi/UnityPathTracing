@@ -56,8 +56,8 @@ namespace PathTracing
             internal IntPtr ConstantBuffer;
 
             // Stochastic sampling textures
-            internal Texture2D ScramblingRanking;
-            internal Texture2D Sobol;
+            internal IntPtr ScramblingRanking;
+            internal IntPtr Sobol;
 
             // RT textures sourced from the pool inside ExecutePass
             internal PathTracingResourcePool Pool;
@@ -165,8 +165,8 @@ namespace PathTracing
             // SRV
             ds.SetTexture("gIn_PrevComposedDiff", pool.GetPoint(RenderResourceType.ComposedDiff));
             ds.SetTexture("gIn_PrevComposedSpec_PrevViewZ", pool.GetPoint(RenderResourceType.ComposedSpecViewZ));
-            ds.SetTexture("gIn_ScramblingRanking", res.ScramblingRanking.GetNativeTexturePtr());
-            ds.SetTexture("gIn_Sobol", res.Sobol.GetNativeTexturePtr());
+            ds.SetTexture("gIn_ScramblingRanking", res.ScramblingRanking);
+            ds.SetTexture("gIn_Sobol", res.Sobol);
 
 
             // UAV
