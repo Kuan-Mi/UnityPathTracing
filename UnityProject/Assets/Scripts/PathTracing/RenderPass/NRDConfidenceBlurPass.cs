@@ -27,7 +27,8 @@ namespace PathTracing
     {
         private const int IterationCount = 5; // must be odd per NRDSample
 
-        private readonly NativeComputePipeline _cs;
+        private readonly NativeComputePipeline      _cs;
+        private readonly NativeComputeDescriptorSet _ds;
         private          Resource              _resource;
         private          Settings              _settings;
 
@@ -48,6 +49,7 @@ namespace PathTracing
         public NRDConfidenceBlurPass(NativeComputeShader cs)
         {
             _cs = new NativeComputePipeline(cs);
+            _ds = new NativeComputeDescriptorSet(_cs);
 
             var data = new StepConstants[1];
             for (int i = 0; i < IterationCount; i++)
@@ -60,6 +62,7 @@ namespace PathTracing
 
         public void Dispose()
         {
+            _ds?.Dispose();
             _cs?.Dispose();
             foreach (var buf in _stepBuffers)
                 buf?.Release();
@@ -93,11 +96,12 @@ namespace PathTracing
 
         class PassData
         {
-            internal NativeComputePipeline   Cs;
-            internal GraphicsBuffer[]        StepBuffers;
-            internal Resource                Resource;
-            internal Settings                Settings;
-            internal PathTracingResourcePool Pool;
+            internal NativeComputePipeline      Cs;
+            internal NativeComputeDescriptorSet Ds;
+            internal GraphicsBuffer[]           StepBuffers;
+            internal Resource                   Resource;
+            internal Settings                   Settings;
+            internal PathTracingResourcePool    Pool;
         }
 
         // -------------------------------------------------------------------------
@@ -108,6 +112,7 @@ namespace PathTracing
         {
             var cmd  = CommandBufferHelpers.GetNativeCommandBuffer(context.cmd);
             var cs   = data.Cs;
+            var ds   = data.Ds;
             var pool = data.Pool;
             var res  = data.Resource;
 
@@ -120,13 +125,13 @@ namespace PathTracing
                 var inTex  = pool.GetRT(isPing ? RenderResourceType.Gradient_Ping : RenderResourceType.Gradient_Pong);
                 var outTex = pool.GetRT(isPing ? RenderResourceType.Gradient_Pong : RenderResourceType.Gradient_Ping);
 
-                cs.SetConstantBuffer("GlobalConstants",   res.ConstantBuffer);
-                cs.SetConstantBuffer("g_PushConstants",   data.StepBuffers[i]);
+                ds.SetConstantBuffer("GlobalConstants",   res.ConstantBuffer);
+                ds.SetConstantBuffer("g_PushConstants",   data.StepBuffers[i]);
 
-                cs.SetTexture  ("gIn_Gradient",  inTex.rt);
-                cs.SetRWTexture("gOut_Gradient", outTex.rt);
+                ds.SetTexture  ("gIn_Gradient",  inTex.rt);
+                ds.SetRWTexture("gOut_Gradient", outTex.rt);
 
-                cs.Dispatch(cmd, data.Settings.GroupsX, data.Settings.GroupsY, 1);
+                cs.Dispatch(cmd, ds, data.Settings.GroupsX, data.Settings.GroupsY, 1);
             }
 
             cmd.EndSample(RenderPassMarkers.ConfidenceBlur);
@@ -141,6 +146,7 @@ namespace PathTracing
             using var builder = renderGraph.AddUnsafePass<PassData>("NRDConfidenceBlurPass", out var passData);
 
             passData.Cs          = _cs;
+            passData.Ds          = _ds;
             passData.StepBuffers = _stepBuffers;
             passData.Resource    = _resource;
             passData.Settings    = _settings;

@@ -18,7 +18,8 @@ namespace PathTracing
     /// </summary>
     public class NRDOpaquePass : ScriptableRenderPass, IDisposable
     {
-        private readonly NativeComputePipeline _cs;
+        private readonly NativeComputePipeline      _cs;
+        private readonly NativeComputeDescriptorSet _ds;
         private          Resource              _resource;
         private          Settings              _settings;
         private          NRDSampleResource     _nrdResource;
@@ -26,10 +27,12 @@ namespace PathTracing
         public NRDOpaquePass(NativeComputeShader cs)
         {
             _cs = new NativeComputePipeline(cs);
+            _ds = new NativeComputeDescriptorSet(_cs);
         }
 
         public void Dispose()
         {
+            _ds?.Dispose();
             _cs?.Dispose();
         }
 
@@ -77,11 +80,12 @@ namespace PathTracing
 
         class PassData
         {
-            internal NativeComputePipeline  Cs;
-            internal NRDSampleResource      NrdResource;
-            internal Resource               Resource;
-            internal Settings               Settings;
-            internal PathTracingResourcePool Pool;
+            internal NativeComputePipeline      Cs;
+            internal NativeComputeDescriptorSet Ds;
+            internal NRDSampleResource          NrdResource;
+            internal Resource                   Resource;
+            internal Settings                   Settings;
+            internal PathTracingResourcePool    Pool;
         }
 
         // -------------------------------------------------------------------------
@@ -138,51 +142,52 @@ namespace PathTracing
             cmd.BeginSample(opaqueTracingMarker);
 
             var cs       = data.Cs;
+            var ds       = data.Ds;
             var res      = data.Resource;
             var settings = data.Settings;
             var nrd      = data.NrdResource;
 
             // 1. Scene TLAS
-            cs.SetAccelerationStructure("gWorldTlas", nrd.WorldAS);
-            cs.SetAccelerationStructure("gLightTlas", nrd.LightAS);
+            ds.SetAccelerationStructure("gWorldTlas", nrd.WorldAS);
+            ds.SetAccelerationStructure("gLightTlas", nrd.LightAS);
 
             // 3. Scene structured buffers
-            cs.SetStructuredBuffer("gIn_InstanceData", nrd.InstanceDataBuf);
-            cs.SetStructuredBuffer("gIn_PrimitiveData", nrd.PrimitiveDataBuf);
-            cs.SetStructuredBuffer("gIn_MorphPrimitivePositionsPrev", nrd.MorphPrimitivePositionsPrevBuf);
+            ds.SetStructuredBuffer("gIn_InstanceData", nrd.InstanceDataBuf);
+            ds.SetStructuredBuffer("gIn_PrimitiveData", nrd.PrimitiveDataBuf);
+            ds.SetStructuredBuffer("gIn_MorphPrimitivePositionsPrev", nrd.MorphPrimitivePositionsPrevBuf);
 
             // 4. SHARC UAVs
-            cs.SetRWStructuredBuffer("gInOut_SharcHashEntriesBuffer", res.HashEntriesBuffer);
-            cs.SetRWStructuredBuffer("gInOut_SharcAccumulated", res.AccumulationBuffer);
-            cs.SetRWStructuredBuffer("gInOut_SharcResolved", res.ResolvedBuffer);
+            ds.SetRWStructuredBuffer("gInOut_SharcHashEntriesBuffer", res.HashEntriesBuffer);
+            ds.SetRWStructuredBuffer("gInOut_SharcAccumulated", res.AccumulationBuffer);
+            ds.SetRWStructuredBuffer("gInOut_SharcResolved", res.ResolvedBuffer);
 
             // 5. Bindless material textures
-            cs.SetBindlessTexture("gIn_Textures", nrd.Textures);
+            ds.SetBindlessTexture("gIn_Textures", nrd.Textures);
 
             // 6. Constant buffer
-            cs.SetConstantBuffer("GlobalConstants", res.ConstantBuffer);
+            ds.SetConstantBuffer("GlobalConstants", res.ConstantBuffer);
 
             var pool = data.Pool;
             
             // SRV
-            cs.SetTexture("gIn_PrevComposedDiff",           pool.GetRT(RenderResourceType.ComposedDiff).rt);
-            cs.SetTexture("gIn_PrevComposedSpec_PrevViewZ", pool.GetRT(RenderResourceType.ComposedSpecViewZ).rt);
-            cs.SetTexture("gIn_ScramblingRanking", res.ScramblingRanking);
-            cs.SetTexture("gIn_Sobol", res.Sobol);
+            ds.SetTexture("gIn_PrevComposedDiff",           pool.GetRT(RenderResourceType.ComposedDiff).rt);
+            ds.SetTexture("gIn_PrevComposedSpec_PrevViewZ", pool.GetRT(RenderResourceType.ComposedSpecViewZ).rt);
+            ds.SetTexture("gIn_ScramblingRanking", res.ScramblingRanking);
+            ds.SetTexture("gIn_Sobol", res.Sobol);
 
 
             // UAV
-            cs.SetRWTexture("gOut_Mv",                  pool.GetRT(RenderResourceType.MV).rt);
-            cs.SetRWTexture("gOut_ViewZ",               pool.GetRT(RenderResourceType.Viewz).rt);
-            cs.SetRWTexture("gOut_Normal_Roughness",    pool.GetRT(RenderResourceType.NormalRoughness).rt);
-            cs.SetRWTexture("gOut_BaseColor_Metalness", pool.GetRT(RenderResourceType.BaseColorMetalness).rt);
-            cs.SetRWTexture("gOut_DirectLighting",      pool.GetRT(RenderResourceType.DirectLighting).rt);
-            cs.SetRWTexture("gOut_DirectEmission",      pool.GetRT(RenderResourceType.DirectEmission).rt);
-            cs.SetRWTexture("gOut_PsrThroughput",       pool.GetRT(RenderResourceType.PsrThroughput).rt);
-            cs.SetRWTexture("gOut_ShadowData",          pool.GetRT(RenderResourceType.Unfiltered_Penumbra).rt);
-            cs.SetRWTexture("gOut_Shadow_Translucency", pool.GetRT(RenderResourceType.Unfiltered_Translucency).rt);
-            cs.SetRWTexture("gOut_Diff",                pool.GetRT(RenderResourceType.Unfiltered_Diff).rt);
-            cs.SetRWTexture("gOut_Spec",                pool.GetRT(RenderResourceType.Unfiltered_Spec).rt);
+            ds.SetRWTexture("gOut_Mv",                  pool.GetRT(RenderResourceType.MV).rt);
+            ds.SetRWTexture("gOut_ViewZ",               pool.GetRT(RenderResourceType.Viewz).rt);
+            ds.SetRWTexture("gOut_Normal_Roughness",    pool.GetRT(RenderResourceType.NormalRoughness).rt);
+            ds.SetRWTexture("gOut_BaseColor_Metalness", pool.GetRT(RenderResourceType.BaseColorMetalness).rt);
+            ds.SetRWTexture("gOut_DirectLighting",      pool.GetRT(RenderResourceType.DirectLighting).rt);
+            ds.SetRWTexture("gOut_DirectEmission",      pool.GetRT(RenderResourceType.DirectEmission).rt);
+            ds.SetRWTexture("gOut_PsrThroughput",       pool.GetRT(RenderResourceType.PsrThroughput).rt);
+            ds.SetRWTexture("gOut_ShadowData",          pool.GetRT(RenderResourceType.Unfiltered_Penumbra).rt);
+            ds.SetRWTexture("gOut_Shadow_Translucency", pool.GetRT(RenderResourceType.Unfiltered_Translucency).rt);
+            ds.SetRWTexture("gOut_Diff",                pool.GetRT(RenderResourceType.Unfiltered_Diff).rt);
+            ds.SetRWTexture("gOut_Spec",                pool.GetRT(RenderResourceType.Unfiltered_Spec).rt);
 
 
             // 10. Dispatch — numthreads [16, 16, 1]
@@ -191,7 +196,7 @@ namespace PathTracing
             uint groupsX = (w + 15u) / 16u;
             uint groupsY = (h + 15u) / 16u;
 
-            cs.Dispatch(cmd, groupsX, groupsY, 1);
+            cs.Dispatch(cmd, ds, groupsX, groupsY, 1);
 
             cmd.EndSample(opaqueTracingMarker);
         }
@@ -205,6 +210,7 @@ namespace PathTracing
             using var builder = renderGraph.AddUnsafePass<PassData>("NRDOpaquePass", out var passData);
 
             passData.Cs          = _cs;
+            passData.Ds          = _ds;
             passData.NrdResource = _nrdResource;
             passData.Resource    = _resource;
             passData.Settings    = _settings;
