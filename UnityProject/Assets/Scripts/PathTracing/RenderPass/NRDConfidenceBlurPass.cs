@@ -67,7 +67,7 @@ namespace PathTracing
 
         public class Resource
         {
-            internal GraphicsBuffer ConstantBuffer;   // GlobalConstants CBV
+            internal IntPtr                  ConstantBuffer;   // GlobalConstants CBV
             internal PathTracingResourcePool Pool;
         }
 
