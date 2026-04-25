@@ -394,8 +394,6 @@ GeometryProps CastRay( float3 origin, float3 direction, float Tmin, float Tmax, 
         else
             props.Xprev = props.X;
 
-        // debug
-        props.Xprev = props.X;
     }
 
     props.V = -direction;
