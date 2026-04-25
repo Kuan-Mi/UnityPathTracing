@@ -457,8 +457,8 @@ namespace NativeRender
             InstanceDataBufPtr  = _instanceDataBuf.GetNativeBufferPtr();
             PrimitiveDataBufPtr = _primitiveDataBuf.GetNativeBufferPtr();
 
-            // Enable previous-frame vertex buffer access.
-            smr.skinnedMotionVectors = true;
+            // Note: vertexBufferTarget and skinnedMotionVectors are now set in
+            // NativeRayTracingSkinnedTarget.OnEnable() to ensure they're set before the first render.
 
             _skinnedInstances[id] = new SkinnedEntry
             {

@@ -160,7 +160,7 @@ MonoBehaviour:
   m_Active: 1
   setting:
     showValidation: 0
-    showMV: 1
+    showMV: 0
     mergeBlas: 1
     cameraJitter: 1
     sunAngularDiameter: 0.533

@@ -329,12 +329,20 @@ namespace NativeRender
             mesh.UploadMeshData(false);
 
             // Current-frame skinned vertex buffer
+            // Note: After setting vertexBufferTarget, Unity may need to recreate the buffer.
             GraphicsBuffer skinnedVB = smr.GetVertexBuffer();
             if (skinnedVB == null)
             {
-                Debug.LogError($"[NativeRayTracing] SkinnedMeshRenderer '{smr.name}': GetVertexBuffer() returned null. " +
-                               "Ensure vertexBufferTarget is set before the first render.");
-                return false;
+                // Try to force buffer creation
+                smr.forceMatrixRecalculationPerRender = true;
+                skinnedVB = smr.GetVertexBuffer();
+
+                if (skinnedVB == null)
+                {
+                    Debug.LogWarning($"[NativeRayTracing] SkinnedMeshRenderer '{smr.name}': GetVertexBuffer() returned null. " +
+                                   "This can happen when toggling the renderer. Will retry next frame.");
+                    return false;
+                }
             }
 
             IntPtr vbPtr = skinnedVB.GetNativeBufferPtr();

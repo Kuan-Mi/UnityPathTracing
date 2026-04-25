@@ -75,6 +75,14 @@ namespace NativeRender
                 s_All.Add(this);
 
             var smr = GetComponent<SkinnedMeshRenderer>();
+            if (smr != null)
+            {
+                // CRITICAL: Set vertexBufferTarget BEFORE the first render so Unity creates
+                // the double-buffered vertex buffers needed for GetPreviousVertexBuffer().
+                smr.vertexBufferTarget |= GraphicsBuffer.Target.Raw;
+                smr.skinnedMotionVectors = true;
+            }
+
             AddQueue.Enqueue(new SkinnedTargetAddEvent(this, smr, smr != null ? smr.GetInstanceID() : 0));
         }
 
