@@ -141,6 +141,17 @@ namespace NativeRender
         // Keyed by MeshRenderer.GetInstanceID()
         private readonly Dictionary<int, PerTargetBlas> _perTargetBlas = new();
 
+        // ----- SkinnedMeshRenderer tracking -----
+        // Keyed by SkinnedMeshRenderer.GetInstanceID()
+        private sealed class SkinnedEntry
+        {
+            public SkinnedMeshRenderer smr;
+            public List<RayTracingAccelerationStructure> tlasList;
+            public Matrix4x4 lastRootTransform;
+        }
+
+        private readonly Dictionary<int, SkinnedEntry> _skinnedInstances = new();
+
         // ----- Separate-BLAS incremental slot management -----
         // One allocator per buffer; both track element-level free/used ranges.
         private readonly PrimitiveSlotAllocator _instanceAlloc = new PrimitiveSlotAllocator { Name = "InstanceAlloc" };
@@ -208,6 +219,8 @@ namespace NativeRender
 
                 NativeRayTracingTarget.RemoveQueue.Clear();
                 NativeRayTracingTarget.AddQueue.Clear();
+                NativeRayTracingSkinnedTarget.RemoveQueue.Clear();
+                NativeRayTracingSkinnedTarget.AddQueue.Clear();
                 return;
             }
 
@@ -223,6 +236,116 @@ namespace NativeRender
             foreach (var t in targets)
                 if (t != null)
                     t.transform.hasChanged = false;
+
+            // Update skinned mesh vertex buffers (must happen after Unity's skinning pass).
+            UpdateSkinnedInstances();
+        }
+
+        // =====================================================================
+        // SkinnedMeshRenderer public API
+        // =====================================================================
+
+        /// <summary>
+        /// Registers a <see cref="SkinnedMeshRenderer"/> into <see cref="WorldAS"/> (and optionally
+        /// <see cref="LightAS"/> when the representative material is emissive). The BLAS is rebuilt
+        /// every frame via <see cref="UpdateSkinnedInstances"/>.
+        /// </summary>
+        public void AddSkinnedInstance(SkinnedMeshRenderer smr)
+        {
+            if (smr == null) return;
+            int id = smr.GetInstanceID();
+            if (_skinnedInstances.ContainsKey(id))
+            {
+                Debug.LogWarning($"[NRDSampleResource] SkinnedMeshRenderer '{smr.name}' already registered.");
+                return;
+            }
+
+            if (!_worldAS.AddInstance(smr))
+            {
+                Debug.LogError($"[NRDSampleResource] AddSkinnedInstance: AddInstance failed for '{smr.name}'");
+                return;
+            }
+
+            // GPU-skinned vertices are in root-bone space (or smr.transform space if no rootBone).
+            // Use that transform so the TLAS places geometry correctly in world space.
+            Matrix4x4 xform = GetSkinnedRootTransform(smr);
+            _worldAS.SetInstanceTransform(smr, xform);
+
+            Material rep       = smr.sharedMaterials != null && smr.sharedMaterials.Length > 0 ? smr.sharedMaterials[0] : null;
+            bool     isEmissive = rep != null && IsMaterialEmissive(rep);
+            bool     isTransparent = rep != null && IsMaterialTransparent(rep);
+            uint     flags     = isTransparent ? FLAG_TRANSPARENT : FLAG_NON_TRANSPARENT;
+            _worldAS.SetInstanceMask(smr, GetMaskForFlags(flags));
+
+            var tlasList = new List<RayTracingAccelerationStructure> { _worldAS };
+
+            if (isEmissive)
+            {
+                if (_lightAS.AddInstance(smr))
+                {
+                    _lightAS.SetInstanceTransform(smr, xform);
+                    _lightAS.SetInstanceMask(smr, GetMaskForFlags(flags));
+                    tlasList.Add(_lightAS);
+                }
+            }
+
+            _skinnedInstances[id] = new SkinnedEntry
+            {
+                smr               = smr,
+                tlasList          = tlasList,
+                lastRootTransform = xform,
+            };
+        }
+
+        /// <summary>Removes a previously registered <see cref="SkinnedMeshRenderer"/> from all TLASes.</summary>
+        public void RemoveSkinnedInstance(SkinnedMeshRenderer smr)
+        {
+            if (smr == null) return;
+            int id = smr.GetInstanceID();
+            if (!_skinnedInstances.TryGetValue(id, out var entry)) return;
+
+            foreach (var tlas in entry.tlasList)
+                tlas.RemoveInstance(smr);
+
+            _skinnedInstances.Remove(id);
+        }
+
+        // =====================================================================
+        // Private: per-frame skinned update
+        // =====================================================================
+
+        /// <summary>
+        /// Returns the transform that maps GPU-skinned vertices (root-bone space) to world space.
+        /// Unity's skinning uses <c>bone.localToWorldMatrix * bindpose</c>, so outputs are in
+        /// root-bone local space. If no root bone is assigned, falls back to the renderer's own transform.
+        /// </summary>
+        private static Matrix4x4 GetSkinnedRootTransform(SkinnedMeshRenderer smr)
+        {
+            Transform root = smr.rootBone != null ? smr.rootBone : smr.transform;
+            return root.localToWorldMatrix;
+        }
+
+        private void UpdateSkinnedInstances()
+        {
+            foreach (var kv in _skinnedInstances)
+            {
+                var entry = kv.Value;
+                var smr   = entry.smr;
+                if (smr == null) continue;
+
+                // Refresh the GPU vertex buffer to the current frame's skinning result.
+                foreach (var tlas in entry.tlasList)
+                    tlas.UpdateSkinnedInstance(smr);
+
+                // Update TLAS instance transform when the root bone moves.
+                Matrix4x4 rootXform = GetSkinnedRootTransform(smr);
+                if (rootXform != entry.lastRootTransform)
+                {
+                    foreach (var tlas in entry.tlasList)
+                        tlas.SetInstanceTransform(smr, rootXform);
+                    entry.lastRootTransform = rootXform;
+                }
+            }
         }
 
         /// <summary>
@@ -266,6 +389,25 @@ namespace NativeRender
 
                 // Dynamic objects (or any object in edit mode): add incrementally without FLAG_STATIC.
                 AddTargetIncremental(ev.Target);
+            }
+
+            // ---- Skinned add/remove events ----
+            while (NativeRayTracingSkinnedTarget.RemoveQueue.Count > 0)
+            {
+                var ev = NativeRayTracingSkinnedTarget.RemoveQueue.Dequeue();
+                if (_skinnedInstances.TryGetValue(ev.RendererInstanceId, out var entry))
+                {
+                    foreach (var tlas in entry.tlasList)
+                        tlas.RemoveInstance(entry.smr);
+                    _skinnedInstances.Remove(ev.RendererInstanceId);
+                }
+            }
+
+            while (NativeRayTracingSkinnedTarget.AddQueue.Count > 0)
+            {
+                var ev = NativeRayTracingSkinnedTarget.AddQueue.Dequeue();
+                if (ev.Target == null || ev.Renderer == null) continue;
+                AddSkinnedInstance(ev.Renderer);
             }
 
             // Auto-schedule full rebuild when fragmentation becomes excessive.
@@ -375,6 +517,14 @@ namespace NativeRender
             _blasEmissive = null;
 
             _perTargetBlas.Clear();
+
+            // Remove all skinned instances from both TLASes and clear tracking.
+            foreach (var kv in _skinnedInstances)
+            {
+                foreach (var tlas in kv.Value.tlasList)
+                    tlas.RemoveInstance(kv.Value.smr);
+            }
+            _skinnedInstances.Clear();
 
             _instanceCpu = null;
             if (_primitiveCpu.IsCreated)
@@ -533,6 +683,13 @@ namespace NativeRender
             // ---- Initialize slot allocators for incremental updates (dynamic objects) ----
             _instanceAlloc.ResetFullyAllocated(_instanceCpu.Length);
             _primAlloc.ResetFullyAllocated(Mathf.Max(totalPrims, 1));
+
+            // ---- Register skinned targets from NativeRayTracingSkinnedTarget.All ----
+            foreach (var st in NativeRayTracingSkinnedTarget.All)
+            {
+                if (st != null)
+                    AddSkinnedInstance(st.GetComponent<SkinnedMeshRenderer>());
+            }
         }
 
         /// <summary>

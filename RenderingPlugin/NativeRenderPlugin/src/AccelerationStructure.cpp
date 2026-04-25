@@ -780,10 +780,19 @@ bool AccelerationStructure::AddInstance(const NR_AddInstanceDesc& desc)
     InstanceSlot slot;
     slot.active    = true;
     slot.needsBLAS = true;
-    slot.meshKey   = { reinterpret_cast<uintptr_t>(vb), reinterpret_cast<uintptr_t>(ib) };
+    slot.isDynamic = (desc.isDynamic != 0);
     slot.mask      = 0xFF;
     float identity[12] = { 1,0,0,0, 0,1,0,0, 0,0,1,0 };
     memcpy(slot.transform, identity, 48);
+
+    // Dynamic (skinned) instances use a per-instance key derived from the handle
+    // with the high bit set, so multiple skinned instances sharing the same index
+    // buffer do not alias the same BLAS cache entry.
+    if (slot.isDynamic)
+        slot.meshKey = { static_cast<uintptr_t>(userHandle) | (static_cast<uintptr_t>(1) << 63),
+                         reinterpret_cast<uintptr_t>(ib) };
+    else
+        slot.meshKey = { reinterpret_cast<uintptr_t>(vb), reinterpret_cast<uintptr_t>(ib) };
 
     slot.meshInfo.vertexBuffer    = vb;
     slot.meshInfo.vertexCount     = desc.vertexCount;
@@ -867,6 +876,53 @@ void AccelerationStructure::RemoveInstance(uint32_t handle)
     m_handleToSlot.erase(it);
     --m_activeCount;
     m_tlasRebuildPendingSlots = 3;
+}
+
+// ---------------------------------------------------------------------------
+// UpdateDynamicVertexBuffer
+//   For SkinnedMeshRenderer instances: swap in the new GPU vertex buffer
+//   produced by Unity's skinning pass, discard the stale BLAS (deferred GPU
+//   delete after 3 frames), and schedule a rebuild for next BuildOrUpdate.
+// ---------------------------------------------------------------------------
+void AccelerationStructure::UpdateDynamicVertexBuffer(
+    uint32_t handle, void* vbPtr, uint32_t vertexCount, uint32_t vertexStride)
+{
+    std::lock_guard<std::mutex> lock(m_stateMutex);
+    auto it = m_handleToSlot.find(handle);
+    if (it == m_handleToSlot.end()) return;
+
+    InstanceSlot& slot = m_slots[it->second];
+    if (!slot.active || !slot.isDynamic) return;
+
+    auto* newVb = static_cast<ID3D12Resource*>(vbPtr);
+    if (!newVb) return;
+
+    // Discard any previously-built BLAS for this dynamic instance.
+    // The key is per-instance (high-bit handle), so erasing it only affects
+    // this instance — no other slots share this BLAS.
+    auto cacheIt = m_blasCache.find(slot.meshKey);
+    if (cacheIt != m_blasCache.end())
+    {
+        PendingDelete pd;
+        pd.framesRemaining = 3;
+        BLASEntry& e = cacheIt->second;
+        if (e.blas) pd.resources.push_back(std::move(e.blas));
+        if (e.blasScratch) pd.resources.push_back(std::move(e.blasScratch));
+        for (auto& r : e.ommArrays)           if (r) pd.resources.push_back(std::move(r));
+        for (auto& r : e.ommArrayScratch)     if (r) pd.resources.push_back(std::move(r));
+        for (auto& r : e.ommIndexBuffers)     if (r) pd.resources.push_back(std::move(r));
+        for (auto& r : e.ommDescArrayBuffers) if (r) pd.resources.push_back(std::move(r));
+        for (auto& r : e.ommArrayDataBuffers) if (r) pd.resources.push_back(std::move(r));
+        if (!pd.resources.empty())
+            m_pendingDeletes.push_back(std::move(pd));
+        m_blasCache.erase(cacheIt);
+    }
+
+    slot.meshInfo.vertexBuffer = newVb;
+    slot.meshInfo.vertexCount  = vertexCount;
+    slot.meshInfo.vertexStride = vertexStride;
+    slot.needsBLAS             = true;
+    m_tlasRebuildPendingSlots  = 3;
 }
 
 // ---------------------------------------------------------------------------
@@ -980,7 +1036,7 @@ bool AccelerationStructure::BuildOrUpdate(ID3D12GraphicsCommandList4* cmdList)
             memcpy(e.transform, slot.transform, 48);
             m_tlasEntries.push_back(e);
         }
-        AccelLogf(m_log, kUnityLogTypeLog, "BuildOrUpdate: rebuilding TLAS (pending=%d)...", m_tlasRebuildPendingSlots);
+        // AccelLogf(m_log, kUnityLogTypeLog, "BuildOrUpdate: rebuilding TLAS (pending=%d)...", m_tlasRebuildPendingSlots);
         if (!BuildTLAS(cmdList, m_tlasEntries))
         {
             AccelLogf(m_log, kUnityLogTypeError, "BuildOrUpdate: BuildTLAS failed");

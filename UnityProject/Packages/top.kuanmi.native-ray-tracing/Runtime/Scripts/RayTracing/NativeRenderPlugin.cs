@@ -91,6 +91,7 @@ namespace NativeRender
             public uint   vertexStride;
             public uint   indexStride;
             public uint   submeshCount;
+            public uint   isDynamic;             // 1 = SkinnedMeshRenderer (BLAS rebuilt every frame)
         }
 
         /// <summary>
@@ -124,6 +125,16 @@ namespace NativeRender
         /// </summary>
         [DllImport(DllName)]
         public static extern void NR_AS_RemoveInstance(ulong handle, uint instanceHandle);
+
+        /// <summary>
+        /// For SkinnedMeshRenderer instances: updates the GPU vertex buffer pointer
+        /// to the current-frame skinned result. Discards the stale BLAS (deferred
+        /// 3-frame GPU delete) and schedules a BLAS rebuild on the next BuildOrUpdate.
+        /// vbPtr must be GraphicsBuffer.GetNativeBufferPtr() for the skinned VB.
+        /// </summary>
+        [DllImport(DllName)]
+        public static extern void NR_AS_UpdateDynamicVertexBuffer(
+            ulong handle, uint instanceHandle, IntPtr vbPtr, uint vertexCount, uint vertexStride);
 
         // -------------------------------------------------------------------
         // RayTraceShader API  (multi-shader, per-instance DXR pipelines)

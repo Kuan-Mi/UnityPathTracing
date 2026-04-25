@@ -417,6 +417,24 @@ NR_AS_RemoveInstance(uint64_t handle, uint32_t instanceHandle)
         ->RemoveInstance(instanceHandle);
 }
 
+// ---------------------------------------------------------------------------
+// NR_AS_UpdateDynamicVertexBuffer
+//   For SkinnedMeshRenderer instances: provide the current-frame GPU vertex
+//   buffer (from SkinnedMeshRenderer.GetVertexBuffer) so the BLAS is rebuilt
+//   with up-to-date skinned geometry on the next BuildOrUpdate call.
+//   vbPtr       : ID3D12Resource* returned by GraphicsBuffer.GetNativeBufferPtr()
+//   vertexCount : current vertex count (may match original registration)
+//   vertexStride: vertex stride in bytes
+// ---------------------------------------------------------------------------
+extern "C" void UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API
+NR_AS_UpdateDynamicVertexBuffer(uint64_t handle, uint32_t instanceHandle,
+                                 void* vbPtr, uint32_t vertexCount, uint32_t vertexStride)
+{
+    if (!handle || !vbPtr) return;
+    reinterpret_cast<AccelerationStructure*>(handle)
+        ->UpdateDynamicVertexBuffer(instanceHandle, vbPtr, vertexCount, vertexStride);
+}
+
 // ===========================================================================
 // RayTraceShader  -  multi-shader, per-instance ray tracing pipeline
 // ===========================================================================

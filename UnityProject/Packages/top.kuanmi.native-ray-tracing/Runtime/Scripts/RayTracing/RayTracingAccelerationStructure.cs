@@ -294,5 +294,150 @@ namespace NativeRender
             if (_handle == 0 ) return;
             NativeRenderPlugin.NR_AS_RemoveInstance(_handle, (uint)meshRendererId);
         }
+
+        // ===================================================================
+        // SkinnedMeshRenderer support
+        //   Each SkinnedMeshRenderer gets its own dedicated BLAS (not shared
+        //   with other instances) that is rebuilt every frame to reflect the
+        //   current GPU skinning result.
+        //
+        //   Usage (per-frame):
+        //     1. AddInstance(smr)            — once, on enable
+        //     2. UpdateSkinnedInstance(smr)  — every frame, before BuildOrUpdate
+        //     3. RemoveInstance(smr)         — once, on disable
+        // ===================================================================
+ 
+        /// <summary>
+        /// Registers a <see cref="SkinnedMeshRenderer"/> as a dynamic BLAS instance.
+        /// The vertex buffer is obtained via <c>GetVertexBuffer()</c> each frame;
+        /// the index buffer is taken from <c>sharedMesh</c> (static).
+        /// </summary>
+        public unsafe bool AddInstance(SkinnedMeshRenderer smr)
+        {
+            if (_handle == 0 || smr == null) return false;
+
+            Mesh mesh = smr.sharedMesh;
+            if (mesh == null)
+            {
+                Debug.LogWarning($"[NativeRayTracing] SkinnedMeshRenderer '{smr.name}' has no sharedMesh — skipping");
+                return false;
+            }
+
+            // Ensure the vertex buffer is accessible as a raw GPU resource.
+            smr.vertexBufferTarget |= GraphicsBuffer.Target.Raw;
+
+            mesh.UploadMeshData(false);
+
+            // Current-frame skinned vertex buffer
+            GraphicsBuffer skinnedVB = smr.GetVertexBuffer();
+            if (skinnedVB == null)
+            {
+                Debug.LogError($"[NativeRayTracing] SkinnedMeshRenderer '{smr.name}': GetVertexBuffer() returned null. " +
+                               "Ensure vertexBufferTarget is set before the first render.");
+                return false;
+            }
+
+            IntPtr vbPtr = skinnedVB.GetNativeBufferPtr();
+            IntPtr ibPtr = mesh.GetNativeIndexBufferPtr();
+            if (vbPtr == IntPtr.Zero || ibPtr == IntPtr.Zero)
+            {
+                Debug.LogError($"[NativeRayTracing] SkinnedMeshRenderer '{smr.name}': failed to get GPU buffer pointers");
+                return false;
+            }
+
+            uint vertexCount  = (uint)mesh.vertexCount;
+            uint vertexStride = (uint)mesh.GetVertexBufferStride(0);
+            uint indexStride  = mesh.indexFormat == IndexFormat.UInt16 ? 2u : 4u;
+            int  subMeshCount = mesh.subMeshCount;
+
+            var submeshDescs = new NativeRenderPlugin.SubmeshDesc[subMeshCount];
+            for (int s = 0; s < subMeshCount; s++)
+            {
+                SubMeshDescriptor sub = mesh.GetSubMesh(s);
+                submeshDescs[s] = new NativeRenderPlugin.SubmeshDesc
+                {
+                    indexCount      = (uint)sub.indexCount,
+                    indexByteOffset = (uint)sub.indexStart * indexStride,
+                };
+            }
+
+            uint instanceHandle = (uint)smr.GetInstanceID();
+            fixed (NativeRenderPlugin.SubmeshDesc* pDescs = submeshDescs)
+            {
+                var desc = new NativeRenderPlugin.AddInstanceDesc
+                {
+                    instanceHandle        = instanceHandle,
+                    vertexBufferNativePtr = vbPtr,
+                    vertexCount           = vertexCount,
+                    vertexStride          = vertexStride,
+                    indexBufferNativePtr  = ibPtr,
+                    indexStride           = indexStride,
+                    submeshDescs          = (IntPtr)pDescs,
+                    submeshCount          = (uint)subMeshCount,
+                    ommDescs              = IntPtr.Zero,
+                    isDynamic             = 1,
+                };
+                if (!NativeRenderPlugin.NR_AS_AddInstance(_handle, ref desc))
+                {
+                    Debug.LogError($"[NativeRayTracing] AddInstance (skinned) failed for '{smr.name}'");
+                    return false;
+                }
+            }
+            return true;
+        }
+
+        /// <summary>
+        /// Updates the GPU vertex buffer for a skinned instance to the current frame's
+        /// skinning result. Call every frame before <see cref="BuildOrUpdate"/>.
+        /// </summary>
+        public void UpdateSkinnedInstance(SkinnedMeshRenderer smr)
+        {
+            if (_handle == 0 || smr == null) return;
+
+            GraphicsBuffer skinnedVB = smr.GetVertexBuffer();
+            if (skinnedVB == null) return;
+
+            IntPtr vbPtr = skinnedVB.GetNativeBufferPtr();
+            if (vbPtr == IntPtr.Zero) return;
+
+            Mesh mesh = smr.sharedMesh;
+            uint vertexCount  = mesh != null ? (uint)mesh.vertexCount  : 0u;
+            uint vertexStride = mesh != null ? (uint)mesh.GetVertexBufferStride(0) : 0u;
+
+            NativeRenderPlugin.NR_AS_UpdateDynamicVertexBuffer(
+                _handle, (uint)smr.GetInstanceID(), vbPtr, vertexCount, vertexStride);
+        }
+
+        /// <summary>Removes the skinned instance associated with <paramref name="smr"/>.</summary>
+        public void RemoveInstance(SkinnedMeshRenderer smr)
+        {
+            if (_handle == 0 || smr == null) return;
+            NativeRenderPlugin.NR_AS_RemoveInstance(_handle, (uint)smr.GetInstanceID());
+        }
+
+        /// <summary>Updates the world transform for a skinned instance.</summary>
+        public unsafe void SetInstanceTransform(SkinnedMeshRenderer smr, Matrix4x4 objectToWorld)
+        {
+            if (_handle == 0 || smr == null) return;
+            float* m = stackalloc float[12];
+            m[0]  = objectToWorld.m00; m[1]  = objectToWorld.m01; m[2]  = objectToWorld.m02; m[3]  = objectToWorld.m03;
+            m[4]  = objectToWorld.m10; m[5]  = objectToWorld.m11; m[6]  = objectToWorld.m12; m[7]  = objectToWorld.m13;
+            m[8]  = objectToWorld.m20; m[9]  = objectToWorld.m21; m[10] = objectToWorld.m22; m[11] = objectToWorld.m23;
+            NativeRenderPlugin.NR_AS_SetInstanceTransform(_handle, (uint)smr.GetInstanceID(), (IntPtr)m);
+        }
+
+        /// <summary>Sets the visibility mask for a skinned instance (default 0xFF).</summary>
+        public void SetInstanceMask(SkinnedMeshRenderer smr, byte mask)
+        {
+            if (_handle == 0 || smr == null) return;
+            NativeRenderPlugin.NR_AS_SetInstanceMask(_handle, (uint)smr.GetInstanceID(), mask);
+        }
+
+        /// <summary>Sets the custom InstanceID for a skinned instance.</summary>
+        public void SetInstanceID(SkinnedMeshRenderer smr, uint id)
+        {
+            if (_handle == 0 || smr == null) return;
+            NativeRenderPlugin.NR_AS_SetInstanceID(_handle, (uint)smr.GetInstanceID(), id);
+        }
     }
 }
