@@ -533,14 +533,15 @@ namespace NativeRender
                     anyInstChanged = true;
                 }
 
-                // Update TLAS instance transform when the root bone moves.
+                // Update TLAS instance transform and save current transform for next frame.
                 Matrix4x4 rootXform = GetSkinnedRootTransform(smr);
                 if (rootXform != entry.lastRootTransform)
                 {
                     foreach (var tlas in entry.tlasList)
                         tlas.SetInstanceTransform(smr, rootXform);
-                    entry.lastRootTransform = rootXform;
                 }
+                // CRITICAL: Always update lastRootTransform so it's used as prevXform next frame
+                entry.lastRootTransform = rootXform;
             }
 
             if (anyInstChanged && _instanceCpu != null && _instanceDataBuf != null)
