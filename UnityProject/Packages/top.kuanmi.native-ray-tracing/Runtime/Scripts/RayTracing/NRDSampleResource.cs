@@ -396,6 +396,10 @@ namespace NativeRender
 
                 // Schedule Burst job to initialise UV / worldArea from the rest-pose mesh.
                 // Normals + tangents will be overwritten every frame by the compute shader.
+                // For skinned meshes, we skip writing normals/tangents here because:
+                // - Rest-pose normals are in local space
+                // - But mObjectToWorld is root-bone's localToWorldMatrix
+                // - UpdateSkinnedPrimitives.compute will write root-bone space normals
                 var nativeTris = new NativeArray<int>(indexCount, Allocator.TempJob, NativeArrayOptions.UninitializedMemory);
                 meshData.GetIndices(nativeTris, sub);
                 tempTris.Add(nativeTris);
@@ -407,8 +411,8 @@ namespace NativeRender
                     Normals   = norF3,
                     Tangents  = tanF4,
                     UVs       = uvF2,
-                    HasN      = hasN,
-                    HasT      = hasT,
+                    HasN      = false,  // Skip normals for skinned meshes (wrong space)
+                    HasT      = false,  // Skip tangents for skinned meshes (wrong space)
                     HasUV     = hasUV,
                     Output    = _primitiveCpu.GetSubArray((int)primOffset, triCount),
                 }.Schedule(triCount, 64));
@@ -570,9 +574,9 @@ namespace NativeRender
 
             int kernel = cs.FindKernel("UpdateSkinnedPrimitives");
 
-            // Buffers that are the same for all SMRs.
-            cs.SetBuffer(kernel, "gInOut_PrimitiveData",         _primitiveDataBuf);
-            cs.SetBuffer(kernel, "gOut_MorphPrimitivePositions", _morphPrimitivePositionsPrevBuf);
+            // Buffers that are the same for all SMRs - use CommandBuffer API
+            cmd.SetComputeBufferParam(cs, kernel, "gInOut_PrimitiveData",         _primitiveDataBuf);
+            cmd.SetComputeBufferParam(cs, kernel, "gOut_MorphPrimitivePositions", _morphPrimitivePositionsPrevBuf);
 
             foreach (var kv in _skinnedInstances)
             {
@@ -607,15 +611,15 @@ namespace NativeRender
                     continue;
                 }
 
-                cs.SetBuffer(kernel, "gIn_VB_Curr", vbCurr);
-                cs.SetBuffer(kernel, "gIn_VB_Prev", vbPrev);
-                cs.SetBuffer(kernel, "gIn_IB",      ib);
+                cmd.SetComputeBufferParam(cs, kernel, "gIn_VB_Curr", vbCurr);
+                cmd.SetComputeBufferParam(cs, kernel, "gIn_VB_Prev", vbPrev);
+                cmd.SetComputeBufferParam(cs, kernel, "gIn_IB",      ib);
 
-                cs.SetInt("gVertexStride",  vertexStride);
-                cs.SetInt("gPositionOffset", posOff);
-                cs.SetInt("gNormalOffset",   normOff);
-                cs.SetInt("gTangentOffset",  tanOff);
-                cs.SetInt("gIndexStride",    entry.indexStride);
+                cmd.SetComputeIntParam(cs, "gVertexStride",  vertexStride);
+                cmd.SetComputeIntParam(cs, "gPositionOffset", posOff);
+                cmd.SetComputeIntParam(cs, "gNormalOffset",   normOff);
+                cmd.SetComputeIntParam(cs, "gTangentOffset",  tanOff);
+                cmd.SetComputeIntParam(cs, "gIndexStride",    entry.indexStride);
 
 
                 for (int sub = 0; sub < entry.submeshCount; sub++)
@@ -625,11 +629,11 @@ namespace NativeRender
                     int    triCount        = entry.primitiveCounts[sub];
                     if (triCount <= 0) continue;
 
-                    cs.SetInt("gIndexOffset",         indexByteOffset);
-                    cs.SetInt("gBaseVertex",          sm.baseVertex);
-                    cs.SetInt("gNumPrimitives",       triCount);
-                    cs.SetInt("gPrimitiveOffset",     (int)entry.primitiveOffsets[sub]);
-                    cs.SetInt("gMorphPrimitiveOffset", (int)entry.morphPrimitiveOffsets[sub]);
+                    cmd.SetComputeIntParam(cs, "gIndexOffset",         indexByteOffset);
+                    cmd.SetComputeIntParam(cs, "gBaseVertex",          sm.baseVertex);
+                    cmd.SetComputeIntParam(cs, "gNumPrimitives",       triCount);
+                    cmd.SetComputeIntParam(cs, "gPrimitiveOffset",     (int)entry.primitiveOffsets[sub]);
+                    cmd.SetComputeIntParam(cs, "gMorphPrimitiveOffset", (int)entry.morphPrimitiveOffsets[sub]);
 
                     cmd.DispatchCompute(cs, kernel, (triCount + 63) / 64, 1, 1);
                 }
