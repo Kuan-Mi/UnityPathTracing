@@ -4,6 +4,9 @@
 #include <cstring>
 #include <algorithm>
 
+// Forward declaration of global deferred resource delete function from Plugin.cpp
+extern void EnqueueDeferredResourceDelete(ComPtr<ID3D12Resource>&& resource);
+
 // ---------------------------------------------------------------------------
 // Internal buffer helper
 // ---------------------------------------------------------------------------
@@ -12,7 +15,8 @@ static ComPtr<ID3D12Resource> CreateBuffer(
     UINT64 size,
     D3D12_RESOURCE_FLAGS flags,
     D3D12_RESOURCE_STATES initialState,
-    const D3D12_HEAP_PROPERTIES& heapProps)
+    const D3D12_HEAP_PROPERTIES& heapProps,
+    const wchar_t* name = nullptr)
 {
     D3D12_RESOURCE_DESC desc = {};
     desc.Dimension          = D3D12_RESOURCE_DIMENSION_BUFFER;
@@ -31,6 +35,10 @@ static ComPtr<ID3D12Resource> CreateBuffer(
         &heapProps, D3D12_HEAP_FLAG_NONE,
         &desc, initialState,
         nullptr, IID_PPV_ARGS(&resource));
+    if (SUCCEEDED(hr) && resource && name)
+    {
+        resource->SetName(name);
+    }
     return SUCCEEDED(hr) ? resource : nullptr;
 }
 
@@ -51,12 +59,49 @@ static void AccelLogf(IUnityLog* log, UnityLogType type, const char* fmt, ...)
 }
 
 // ---------------------------------------------------------------------------
-// Constructor
+// Constructor / Destructor
 // ---------------------------------------------------------------------------
 AccelerationStructure::AccelerationStructure(ID3D12Device5* device, IUnityLog* log)
     : m_device(device)
     , m_log(log)
 {
+}
+
+AccelerationStructure::~AccelerationStructure()
+{
+    AccelLogf(m_log, kUnityLogTypeLog,
+        "[AccelerationStructure::~AccelerationStructure] Destructor called, pendingDeletes=%zu",
+        m_pendingDeletes.size());
+
+    // CRITICAL: When the AccelerationStructure is destroyed, m_pendingDeletes may still
+    // contain resources with framesRemaining > 0. We must transfer these to the global
+    // deferred resource delete queue to ensure they're not released while GPU operations
+    // are still in flight.
+
+    if (!m_pendingDeletes.empty())
+    {
+        int totalResources = 0;
+        for (auto& pd : m_pendingDeletes)
+        {
+            for (auto& resource : pd.resources)
+            {
+                if (resource)
+                {
+                    EnqueueDeferredResourceDelete(std::move(resource));
+                    totalResources++;
+                }
+            }
+        }
+
+        AccelLogf(m_log, kUnityLogTypeLog,
+            "[AccelerationStructure::~AccelerationStructure] Transferred %d resources from %d pending delete entries to global deferred queue",
+            totalResources, (int)m_pendingDeletes.size());
+
+        m_pendingDeletes.clear();
+    }
+
+    AccelLogf(m_log, kUnityLogTypeLog,
+        "[AccelerationStructure::~AccelerationStructure] Destructor complete");
 }
 
 // ---------------------------------------------------------------------------
@@ -103,7 +148,8 @@ bool AccelerationStructure::BuildOMMForSubmesh(
     // 1. Upload raw OMM array data
     auto arrayDataBuf = CreateBuffer(m_device.Get(),
         !baked.arrayData.empty() ? (UINT64)baked.arrayData.size() : 1,
-        D3D12_RESOURCE_FLAG_NONE, D3D12_RESOURCE_STATE_GENERIC_READ, uploadHeap);
+        D3D12_RESOURCE_FLAG_NONE, D3D12_RESOURCE_STATE_GENERIC_READ, uploadHeap,
+        L"OMM_ArrayData");
     if (!arrayDataBuf)
     {
         AccelLogf(m_log, kUnityLogTypeError,
@@ -118,7 +164,8 @@ bool AccelerationStructure::BuildOMMForSubmesh(
     UINT64 descArrayBytes = (UINT64)baked.descArrayCount * sizeof(D3D12_RAYTRACING_OPACITY_MICROMAP_DESC);
     auto descArrayBuf = CreateBuffer(m_device.Get(),
         descArrayBytes ? descArrayBytes : 1,
-        D3D12_RESOURCE_FLAG_NONE, D3D12_RESOURCE_STATE_GENERIC_READ, uploadHeap);
+        D3D12_RESOURCE_FLAG_NONE, D3D12_RESOURCE_STATE_GENERIC_READ, uploadHeap,
+        L"OMM_DescArray");
     if (!descArrayBuf)
     {
         AccelLogf(m_log, kUnityLogTypeError,
@@ -137,7 +184,8 @@ bool AccelerationStructure::BuildOMMForSubmesh(
     UINT ommIdxBytes = baked.indexCount * baked.indexStride;
     auto ommIdxBuf = CreateBuffer(m_device.Get(),
         ommIdxBytes ? ommIdxBytes : 1,
-        D3D12_RESOURCE_FLAG_NONE, D3D12_RESOURCE_STATE_GENERIC_READ, uploadHeap);
+        D3D12_RESOURCE_FLAG_NONE, D3D12_RESOURCE_STATE_GENERIC_READ, uploadHeap,
+        L"OMM_IndexBuffer");
     if (!ommIdxBuf)
     {
         AccelLogf(m_log, kUnityLogTypeError,
@@ -168,11 +216,13 @@ bool AccelerationStructure::BuildOMMForSubmesh(
 
     entry.ommArrayScratch[subIdx] = CreateBuffer(m_device.Get(),
         prebuildInfo.ScratchDataSizeInBytes,
-        D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_COMMON, defaultHeap);
+        D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_COMMON, defaultHeap,
+        L"OMM_ArrayScratch");
     entry.ommArrays[subIdx] = CreateBuffer(m_device.Get(),
         prebuildInfo.ResultDataMaxSizeInBytes,
         D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS,
-        D3D12_RESOURCE_STATE_RAYTRACING_ACCELERATION_STRUCTURE, defaultHeap);
+        D3D12_RESOURCE_STATE_RAYTRACING_ACCELERATION_STRUCTURE, defaultHeap,
+        L"OMM_Array");
     if (!entry.ommArrayScratch[subIdx] || !entry.ommArrays[subIdx])
     {
         AccelLogf(m_log, kUnityLogTypeError,
@@ -206,10 +256,11 @@ bool AccelerationStructure::BuildOMMForSubmesh(
 // EnsureBLAS
 //   Cache hit:  increment refCount, return immediately (no GPU work).
 //   Cache miss: build BLAS (+ OMM) and cache it.
+//   isDynamic:  true for SkinnedMeshRenderer (rebuilt every frame with ALLOW_UPDATE flag)
 // ---------------------------------------------------------------------------
 bool AccelerationStructure::EnsureBLAS(
     ID3D12GraphicsCommandList4* cmdList,
-    const MeshKey& key, const MeshInfo& def)
+    const MeshKey& key, const MeshInfo& def, bool isDynamic)
 {
     auto it = m_blasCache.find(key);
     if (it != m_blasCache.end())
@@ -227,6 +278,24 @@ bool AccelerationStructure::EnsureBLAS(
         AccelLogf(m_log, kUnityLogTypeError, "EnsureBLAS: instance has no submeshes");
         return false;
     }
+
+    // CRITICAL: Request resource state transitions BEFORE accessing Unity's buffers.
+    // Unity's skinning compute shader may leave vertex buffers in UNORDERED_ACCESS state,
+    // but we need NON_PIXEL_SHADER_RESOURCE for BLAS builds. RequestResourceState ensures
+    // Unity inserts the necessary barrier in the command list before our BLAS build command.
+    //
+    // NOTE: For dynamic meshes, we request state every time because the vertex buffer changes
+    // each frame. Unity's state tracker should handle redundant requests efficiently.
+    AccelLogf(m_log, kUnityLogTypeLog,
+        "[EnsureBLAS] Building %s BLAS for VB=%p IB=%p",
+        isDynamic ? "DYNAMIC" : "STATIC", (void*)def.vertexBuffer, (void*)def.indexBuffer);
+    m_d3d12v8->RequestResourceState(
+        def.vertexBuffer,
+        D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
+    if (def.indexBuffer)
+        m_d3d12v8->RequestResourceState(
+            def.indexBuffer,
+            D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
 
     entry.ommArrays.resize(subCount);
     entry.ommArrayScratch.resize(subCount);
@@ -306,10 +375,27 @@ bool AccelerationStructure::EnsureBLAS(
         }
     }
 
-    D3D12_RAYTRACING_ACCELERATION_STRUCTURE_BUILD_FLAGS blasFlags = D3D12_RAYTRACING_ACCELERATION_STRUCTURE_BUILD_FLAG_PREFER_FAST_TRACE;
+    D3D12_RAYTRACING_ACCELERATION_STRUCTURE_BUILD_FLAGS blasFlags;
+
+    // Dynamic BLAS (SkinnedMesh): rebuilt every frame, use ALLOW_UPDATE for efficient updates
+    // Static BLAS: built once, use PREFER_FAST_TRACE for optimal ray tracing performance
+    if (isDynamic)
+    {
+        blasFlags = D3D12_RAYTRACING_ACCELERATION_STRUCTURE_BUILD_FLAG_ALLOW_UPDATE;
+        AccelLogf(m_log, kUnityLogTypeLog,
+            "[BLAS] Building dynamic BLAS with ALLOW_UPDATE flag (vb=%p)", (void*)key.vbPtr);
+    }
+    else
+    {
+        blasFlags = D3D12_RAYTRACING_ACCELERATION_STRUCTURE_BUILD_FLAG_PREFER_FAST_TRACE;
+    }
+
     if (instanceHasOMM)
         blasFlags |= D3D12_RAYTRACING_ACCELERATION_STRUCTURE_BUILD_FLAG_ALLOW_DISABLE_OMMS;
-    blasFlags |= D3D12_RAYTRACING_ACCELERATION_STRUCTURE_BUILD_FLAG_ALLOW_COMPACTION;
+
+    // Note: ALLOW_COMPACTION is incompatible with ALLOW_UPDATE, so only add it for static BLAS
+    if (!isDynamic)
+        blasFlags |= D3D12_RAYTRACING_ACCELERATION_STRUCTURE_BUILD_FLAG_ALLOW_COMPACTION;
 
     D3D12_BUILD_RAYTRACING_ACCELERATION_STRUCTURE_INPUTS inputs = {};
     inputs.Type           = D3D12_RAYTRACING_ACCELERATION_STRUCTURE_TYPE_BOTTOM_LEVEL;
@@ -324,33 +410,31 @@ bool AccelerationStructure::EnsureBLAS(
     D3D12_HEAP_PROPERTIES defaultHeap = {};
     defaultHeap.Type = D3D12_HEAP_TYPE_DEFAULT;
 
+    // Create BLAS buffers with descriptive names (mark dynamic BLAS for debugging)
+    wchar_t blasName[64], scratchName[64];
+    if (isDynamic)
+    {
+        swprintf(blasName, 64, L"BLAS_Dynamic_VB_%p", (void*)key.vbPtr);
+        swprintf(scratchName, 64, L"BLASScratch_Dynamic_VB_%p", (void*)key.vbPtr);
+    }
+    else
+    {
+        swprintf(blasName, 64, L"BLAS_Static_VB_%p", (void*)key.vbPtr);
+        swprintf(scratchName, 64, L"BLASScratch_Static_VB_%p", (void*)key.vbPtr);
+    }
+
     entry.blasScratch = CreateBuffer(m_device.Get(),
         prebuildInfo.ScratchDataSizeInBytes,
         D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS,
-        D3D12_RESOURCE_STATE_COMMON, defaultHeap);
+        D3D12_RESOURCE_STATE_COMMON, defaultHeap, scratchName);
     entry.blas = CreateBuffer(m_device.Get(),
         prebuildInfo.ResultDataMaxSizeInBytes,
         D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS,
-        D3D12_RESOURCE_STATE_RAYTRACING_ACCELERATION_STRUCTURE, defaultHeap);
+        D3D12_RESOURCE_STATE_RAYTRACING_ACCELERATION_STRUCTURE, defaultHeap, blasName);
     if (!entry.blasScratch || !entry.blas)
     {
         AccelLogf(m_log, kUnityLogTypeError, "EnsureBLAS: buffer allocation failed");
         return false;
-    }
-
-    // Use RequestResourceState to insert an explicit COMMON→NON_PIXEL_SHADER_RESOURCE barrier
-    // into Unity's current command list BEFORE the BLAS build. This prevents Unity's parallel
-    // (async) command lists from recording a barrier that assumes COMMON state for these
-    // buffers — which would fail validation when submitted after the implicit promotion.
-    if (m_d3d12v8)
-    {
-        m_d3d12v8->RequestResourceState(
-            def.vertexBuffer.Get(),
-            D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
-        if (def.indexBuffer)
-            m_d3d12v8->RequestResourceState(
-                def.indexBuffer.Get(),
-                D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
     }
 
     D3D12_BUILD_RAYTRACING_ACCELERATION_STRUCTURE_DESC buildDesc = {};
@@ -467,8 +551,11 @@ bool AccelerationStructure::BuildTLAS(
             // Over-allocate by 1.5x to reduce future reallocations.
             const uint32_t newCapacity = static_cast<uint32_t>(count * 3 / 2) + 1;
             UINT64 instanceDescSize = sizeof(D3D12_RAYTRACING_INSTANCE_DESC) * newCapacity;
+
+            wchar_t name[64];
+            swprintf(name, 64, L"TLAS_InstanceDesc_Frame%u", m_frameIndex);
             res.instanceDesc = CreateBuffer(m_device.Get(), instanceDescSize,
-                D3D12_RESOURCE_FLAG_NONE, D3D12_RESOURCE_STATE_GENERIC_READ, uploadHeap);
+                D3D12_RESOURCE_FLAG_NONE, D3D12_RESOURCE_STATE_GENERIC_READ, uploadHeap, name);
             if (!res.instanceDesc)
             {
                 AccelLogf(m_log, kUnityLogTypeError, "BuildTLAS: instance desc buffer allocation failed");
@@ -539,9 +626,11 @@ bool AccelerationStructure::BuildTLAS(
         D3D12_HEAP_PROPERTIES defaultHeap = {};
         defaultHeap.Type = D3D12_HEAP_TYPE_DEFAULT;
 
+        wchar_t name[64];
+        swprintf(name, 64, L"TLAS_Result_Frame%u", m_frameIndex);
         res.tlas = CreateBuffer(m_device.Get(), neededResult,
             D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS,
-            D3D12_RESOURCE_STATE_RAYTRACING_ACCELERATION_STRUCTURE, defaultHeap);
+            D3D12_RESOURCE_STATE_RAYTRACING_ACCELERATION_STRUCTURE, defaultHeap, name);
         res.tlasResultCapacity = neededResult;
 
         if (!res.tlas)
@@ -568,9 +657,11 @@ bool AccelerationStructure::BuildTLAS(
         D3D12_HEAP_PROPERTIES defaultHeap = {};
         defaultHeap.Type = D3D12_HEAP_TYPE_DEFAULT;
 
+        wchar_t name[64];
+        swprintf(name, 64, L"TLAS_Scratch_Frame%u", m_frameIndex);
         res.tlasScratch = CreateBuffer(m_device.Get(), neededScratch,
             D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS,
-            D3D12_RESOURCE_STATE_COMMON, defaultHeap);
+            D3D12_RESOURCE_STATE_COMMON, defaultHeap, name);
         res.tlasScratchCapacity = neededScratch;
 
         if (!res.tlasScratch)
@@ -695,12 +786,21 @@ void AccelerationStructure::DumpInstances(const char* tag) const
 void AccelerationStructure::Clear()
 {
     std::lock_guard<std::mutex> lock(m_stateMutex);
+    AccelLogf(m_log, kUnityLogTypeLog,
+        "[AS::Clear] BEGIN - activeSlots=%u, blasCache=%zu, pendingDeletes=%zu",
+        m_activeCount, m_blasCache.size(), m_pendingDeletes.size());
+
     // Release all BLAS ref-counts (deferred GPU delete when they reach 0)
+    int releasedBLAS = 0;
     for (const auto& slot : m_slots)
     {
         if (slot.active && !slot.needsBLAS)
+        {
             ReleaseBLAS(slot.meshKey);
+            releasedBLAS++;
+        }
     }
+    AccelLogf(m_log, kUnityLogTypeLog, "[AS::Clear] Released %d BLAS entries", releasedBLAS);
 
     // Move TLAS resources to pending delete (both frame slots + shared scratch).
     {
@@ -717,7 +817,12 @@ void AccelerationStructure::Clear()
             r.tlasScratchCapacity  = 0;
         }
         if (!pd.resources.empty())
+        {
+            AccelLogf(m_log, kUnityLogTypeLog,
+                "[AS::Clear] Moving %zu TLAS resources to pending delete",
+                pd.resources.size());
             m_pendingDeletes.push_back(std::move(pd));
+        }
     }
     m_frameIndex = 0;
 
@@ -739,9 +844,18 @@ void AccelerationStructure::Clear()
             for (auto& r : e.ommArrayDataBuffers) if (r) pd.resources.push_back(std::move(r));
         }
         if (!pd.resources.empty())
+        {
+            AccelLogf(m_log, kUnityLogTypeLog,
+                "[AS::Clear] Moving %zu BLAS cache resources to pending delete",
+                pd.resources.size());
             m_pendingDeletes.push_back(std::move(pd));
+        }
     }
     m_blasCache.clear();
+
+    // NOTE: We no longer defer deletion of vertex/index buffers from slots because we don't own them.
+    // Unity manages these resources, and we only store raw pointers without AddRef.
+    // Simply clear the slots - the pointers will be nulled out automatically.
     m_slots.clear();
     m_freeSlots.clear();
     m_handleToSlot.clear();
@@ -750,6 +864,10 @@ void AccelerationStructure::Clear()
     m_tlasEntries.clear();
     m_tlasRebuildPendingSlots = 3;
     m_transformsDirty         = false;
+
+    AccelLogf(m_log, kUnityLogTypeLog,
+        "[AS::Clear] END - pendingDeletes now=%zu",
+        m_pendingDeletes.size());
 }
 
 // ---------------------------------------------------------------------------
@@ -793,6 +911,24 @@ bool AccelerationStructure::AddInstance(const NR_AddInstanceDesc& desc)
                          reinterpret_cast<uintptr_t>(ib) };
     else
         slot.meshKey = { reinterpret_cast<uintptr_t>(vb), reinterpret_cast<uintptr_t>(ib) };
+
+    // Set descriptive names for Unity-provided buffers to aid debugging
+    wchar_t vbName[64], ibName[64];
+    if (slot.isDynamic)
+    {
+        swprintf(vbName, 64, L"Unity_VB_Dynamic_Handle%u", userHandle);
+        swprintf(ibName, 64, L"Unity_IB_Dynamic_Handle%u", userHandle);
+    }
+    else
+    {
+        swprintf(vbName, 64, L"Unity_VB_Static_%p", (void*)vb);
+        swprintf(ibName, 64, L"Unity_IB_Static_%p", (void*)ib);
+    }
+    vb->SetName(vbName);
+    ib->SetName(ibName);
+    AccelLogf(m_log, kUnityLogTypeLog,
+        "[AddInstance] Set names: VB=%p '%ls', IB=%p '%ls', isDynamic=%d",
+        (void*)vb, vbName, (void*)ib, ibName, (int)slot.isDynamic);
 
     slot.meshInfo.vertexBuffer    = vb;
     slot.meshInfo.vertexCount     = desc.vertexCount;
@@ -869,9 +1005,13 @@ void AccelerationStructure::RemoveInstance(uint32_t handle)
     if (!slot.needsBLAS)
         ReleaseBLAS(slot.meshKey);
 
+    // NOTE: We no longer defer deletion of vertex/index buffers because we don't own them.
+    // Unity manages these resources, and we only store raw pointers without AddRef.
     slot.active    = false;
     slot.needsBLAS = false;
     slot.meshInfo.submeshes.clear();
+    slot.meshInfo.vertexBuffer = nullptr;
+    slot.meshInfo.indexBuffer  = nullptr;
     m_freeSlots.push_back(slotIndex);
     m_handleToSlot.erase(it);
     --m_activeCount;
@@ -917,6 +1057,16 @@ void AccelerationStructure::UpdateDynamicVertexBuffer(
             m_pendingDeletes.push_back(std::move(pd));
         m_blasCache.erase(cacheIt);
     }
+
+    // NOTE: We no longer defer deletion of the old vertex buffer because we don't own it.
+    // Unity manages the vertex buffer lifetime. We only update our raw pointer.
+    // Set descriptive name for the new vertex buffer
+    wchar_t vbName[64];
+    swprintf(vbName, 64, L"Unity_VB_Dynamic_Handle%u_Updated", handle);
+    newVb->SetName(vbName);
+    AccelLogf(m_log, kUnityLogTypeLog,
+        "[UpdateDynamicVB] Handle=%u, oldVB=%p, newVB=%p '%ls'",
+        handle, (void*)slot.meshInfo.vertexBuffer, (void*)newVb, vbName);
 
     slot.meshInfo.vertexBuffer = newVb;
     slot.meshInfo.vertexCount  = vertexCount;
@@ -999,7 +1149,7 @@ bool AccelerationStructure::BuildOrUpdate(ID3D12GraphicsCommandList4* cmdList)
             m_tlasRebuildPendingSlots = (std::max)(m_tlasRebuildPendingSlots, 1);
             break;
         }
-        if (!EnsureBLAS(cmdList, slot.meshKey, slot.meshInfo))
+        if (!EnsureBLAS(cmdList, slot.meshKey, slot.meshInfo, slot.isDynamic))
         {
             AccelLogf(m_log, kUnityLogTypeError, "BuildOrUpdate: EnsureBLAS failed");
             return false;

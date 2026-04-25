@@ -96,10 +96,13 @@ struct SubMeshData
 struct MeshInfo
 {
     // Shared per-instance GPU buffers and vertex layout
-    ComPtr<ID3D12Resource> vertexBuffer;
+    // NOTE: These are Unity-managed resources. We store raw pointers without AddRef
+    // because Unity controls their lifetime. Using ComPtr would interfere with Unity's
+    // resource management and cause premature or delayed deletion.
+    ID3D12Resource* vertexBuffer = nullptr;
     UINT vertexCount;
     UINT vertexStride;
-    ComPtr<ID3D12Resource> indexBuffer;
+    ID3D12Resource* indexBuffer = nullptr;
     DXGI_FORMAT indexFormat; // DXGI_FORMAT_R16_UINT or DXGI_FORMAT_R32_UINT
 
     std::vector<SubMeshData> submeshes;
@@ -145,7 +148,7 @@ class AccelerationStructure
 {
 public:
     AccelerationStructure(ID3D12Device5* device, IUnityLog* log);
-    ~AccelerationStructure() = default;
+    ~AccelerationStructure();
 
     // Optional: supply v8 interface so the AS can notify Unity of resource state changes
     // caused by implicit BLAS input buffer promotions.
@@ -255,7 +258,7 @@ private:
     // -----------------------------------------------------------------------
     // BLAS helpers
     // -----------------------------------------------------------------------
-    bool EnsureBLAS(ID3D12GraphicsCommandList4* cmdList, const MeshKey& key, const MeshInfo& def);
+    bool EnsureBLAS(ID3D12GraphicsCommandList4* cmdList, const MeshKey& key, const MeshInfo& def, bool isDynamic);
     void ReleaseBLAS(const MeshKey& key);
     D3D12_GPU_VIRTUAL_ADDRESS GetBLASVA(const MeshKey& key) const;
     bool BuildOMMForSubmesh(ID3D12GraphicsCommandList4* cmdList,

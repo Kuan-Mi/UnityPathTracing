@@ -11,6 +11,7 @@
 #include <cstdio>
 #include <list>
 #include <mutex>
+#include <string>
 
 #include "IUnityInterface.h"
 #include "IUnityGraphics.h"
@@ -64,9 +65,23 @@ static uint64_t                    s_DeletionFenceValue = 0;
 static std::list<DeferredDeleteEntry> s_DeferredDeleteQueue;
 static std::mutex                  s_DeferredDeleteMutex;
 
+// Global deferred resource delete queue for ID3D12Resource objects.
+// Used by AccelerationStructure destructor to safely release resources
+// that may still be referenced by in-flight GPU commands.
+struct DeferredResourceEntry
+{
+    ComPtr<ID3D12Resource> resource;
+    uint64_t               safeAfterValue;
+};
+static std::list<DeferredResourceEntry> s_DeferredResourceQueue;
+static std::mutex                       s_DeferredResourceMutex;
+
 // kDeleteDelay: number of frames to wait before freeing.
 // Unity D3D12 uses up to 2 frames in flight; 3 provides a safe margin.
 static constexpr int kDeleteDelay = 3;
+
+// Forward declarations
+static void PluginLog(UnityLogType type, const char* msg, const char* file, int line);
 
 static void ImmediateDelete(DeferredDeleteEntry& e)
 {
@@ -88,6 +103,31 @@ static void EnqueueDeferredDelete(void* ptr, DeferredType type)
     s_DeferredDeleteQueue.push_back({ ptr, type, s_DeletionFenceValue + kDeleteDelay });
 }
 
+// Enqueue a D3D12 resource for deferred deletion.
+// Called by AccelerationStructure destructor to safely release resources.
+// Note: This is a global function (not static) so it can be called from AccelerationStructure.cpp
+void EnqueueDeferredResourceDelete(ComPtr<ID3D12Resource>&& resource)
+{
+    if (!resource) return;
+    std::lock_guard<std::mutex> lk(s_DeferredResourceMutex);
+
+    // Log resource details for debugging
+    wchar_t name[128] = L"<unnamed>";
+    UINT nameLen = sizeof(name);
+    resource->GetPrivateData(WKPDID_D3DDebugObjectNameW, &nameLen, name);
+
+    char nameUtf8[256];
+    WideCharToMultiByte(CP_UTF8, 0, name, -1, nameUtf8, sizeof(nameUtf8), nullptr, nullptr);
+
+    char logMsg[512];
+    snprintf(logMsg, sizeof(logMsg),
+        "EnqueueDeferredResourceDelete: resource=0x%p name='%s' safeAfter=%llu",
+        resource.Get(), nameUtf8, s_DeletionFenceValue + kDeleteDelay);
+    PluginLog(kUnityLogTypeLog, logMsg, __FILE__, __LINE__);
+
+    s_DeferredResourceQueue.push_back({ std::move(resource), s_DeletionFenceValue + kDeleteDelay });
+}
+
 // ---------------------------------------------------------------------------
 // Deferred descriptor-range free queue — same fence, separate from object
 // deletion so BindlessTexture::Resize() doesn't need to know about DeferredType.
@@ -105,25 +145,72 @@ static void DrainDeferredDeletes(bool force = false)
 {
     std::lock_guard<std::mutex> lk(s_DeferredDeleteMutex);
     uint64_t completed = s_DeletionFence ? s_DeletionFence->GetCompletedValue() : 0;
+
+    int deletedObjects = 0;
     for (auto it = s_DeferredDeleteQueue.begin(); it != s_DeferredDeleteQueue.end(); )
     {
         if (force || it->safeAfterValue <= completed)
         {
             ImmediateDelete(*it);
             it = s_DeferredDeleteQueue.erase(it);
+            deletedObjects++;
         }
         else
             ++it;
     }
+
+    int freedRanges = 0;
     for (auto it = s_DeferredRangeFreeQueue.begin(); it != s_DeferredRangeFreeQueue.end(); )
     {
         if (force || it->safeAfterValue <= completed)
         {
             it->alloc->Free(it->base, it->count);
             it = s_DeferredRangeFreeQueue.erase(it);
+            freedRanges++;
         }
         else
             ++it;
+    }
+
+    // Drain deferred resource deletes (ID3D12Resource objects from AccelerationStructure destructors)
+    int deletedResources = 0;
+    {
+        std::lock_guard<std::mutex> rlk(s_DeferredResourceMutex);
+        for (auto it = s_DeferredResourceQueue.begin(); it != s_DeferredResourceQueue.end(); )
+        {
+            if (force || it->safeAfterValue <= completed)
+            {
+                // Log before releasing
+                wchar_t name[128] = L"<unnamed>";
+                UINT nameLen = sizeof(name);
+                if (it->resource)
+                    it->resource->GetPrivateData(WKPDID_D3DDebugObjectNameW, &nameLen, name);
+
+                char nameUtf8[256];
+                WideCharToMultiByte(CP_UTF8, 0, name, -1, nameUtf8, sizeof(nameUtf8), nullptr, nullptr);
+
+                char logMsg[512];
+                snprintf(logMsg, sizeof(logMsg),
+                    "DrainDeferredDeletes: releasing resource=0x%p name='%s' force=%s",
+                    it->resource.Get(), nameUtf8, force ? "true" : "false");
+                PluginLog(kUnityLogTypeLog, logMsg, __FILE__, __LINE__);
+
+                // ComPtr destructor will release the resource
+                it = s_DeferredResourceQueue.erase(it);
+                deletedResources++;
+            }
+            else
+                ++it;
+        }
+    }
+
+    if (deletedObjects > 0 || freedRanges > 0 || deletedResources > 0)
+    {
+        char logMsg[256];
+        snprintf(logMsg, sizeof(logMsg),
+            "DrainDeferredDeletes: deleted %d objects, %d ranges, %d resources (force=%s, completed=%llu)",
+            deletedObjects, freedRanges, deletedResources, force ? "true" : "false", completed);
+        PluginLog(kUnityLogTypeLog, logMsg, __FILE__, __LINE__);
     }
 }
 
@@ -223,15 +310,33 @@ static void UNITY_INTERFACE_API OnGraphicsDeviceEvent(UnityGfxDeviceEventType ev
     }
     else if (eventType == kUnityGfxDeviceEventShutdown)
     {
-        NR_LOG("Plugin shutdown");
+        NR_LOG("Plugin shutdown - BEGIN");
+        NR_LOG("Plugin shutdown - calling FlushGpuAndWait to sync GPU...");
+        // CRITICAL: Wait for all GPU operations to complete before releasing resources.
+        // This prevents D3D12 validation errors when resources are released while still
+        // referenced by in-flight GPU commands (especially BLAS builds for skinned meshes).
+        FlushGpuAndWait();
+        NR_LOG("Plugin shutdown - GPU sync complete");
+
         // Force-drain any pending deferred deletes before tearing down.
+        // CRITICAL: Use force=true to release ALL resources regardless of fence value,
+        // because we're about to reset s_DeletionFenceValue to 0. If we don't force-drain,
+        // resources with high safeAfterValue will remain in the queue and be incorrectly
+        // released when the fence value wraps around on the next play mode entry.
+        NR_LOG("Plugin shutdown - draining deferred deletes (force=true)...");
         DrainDeferredDeletes(true);
+        NR_LOG("Plugin shutdown - deferred deletes drained");
+
+        // Clear the deletion fence and reset the fence value.
+        // After force-draining above, the queues should be empty.
         s_DeletionFence.Reset();
         s_DeletionFenceValue = 0;
+
         s_DescHeap.Shutdown();
         s_RendererReady = false;
         s_D3D12         = nullptr;
         s_D3D12v8       = nullptr;
+        NR_LOG("Plugin shutdown - COMPLETE");
     }
 }
 
@@ -466,30 +571,69 @@ struct AS_BuildEventData
 // ---------------------------------------------------------------------------
 static void FlushGpuAndWait()
 {
-    if (!s_D3D12) return;
+    NR_LOG("FlushGpuAndWait - START");
+    if (!s_D3D12) {
+        NR_WARN("FlushGpuAndWait - s_D3D12 is null");
+        return;
+    }
     ID3D12CommandQueue* queue = s_D3D12->GetCommandQueue();
-    if (!queue) return;
+    if (!queue) {
+        NR_WARN("FlushGpuAndWait - queue is null");
+        return;
+    }
 
     ID3D12Device* device = s_D3D12->GetDevice();
-    if (!device) return;
+    if (!device) {
+        NR_WARN("FlushGpuAndWait - device is null");
+        return;
+    }
 
     ComPtr<ID3D12Fence> fence;
     if (FAILED(device->CreateFence(0, D3D12_FENCE_FLAG_NONE, IID_PPV_ARGS(&fence))))
+    {
+        NR_ERROR("FlushGpuAndWait - CreateFence failed");
         return;
+    }
 
     if (FAILED(queue->Signal(fence.Get(), 1)))
+    {
+        NR_ERROR("FlushGpuAndWait - Signal failed");
         return;
+    }
 
+    NR_LOG("FlushGpuAndWait - waiting for GPU completion...");
     if (fence->GetCompletedValue() < 1)
     {
         HANDLE ev = CreateEventW(nullptr, FALSE, FALSE, nullptr);
         if (ev)
         {
             fence->SetEventOnCompletion(1, ev);
-            WaitForSingleObject(ev, INFINITE);
+            // Use a 10-second timeout instead of INFINITE to avoid hanging forever
+            DWORD waitResult = WaitForSingleObject(ev, 10000);
             CloseHandle(ev);
+            if (waitResult == WAIT_OBJECT_0)
+            {
+                NR_LOG("FlushGpuAndWait - GPU wait completed");
+            }
+            else if (waitResult == WAIT_TIMEOUT)
+            {
+                NR_ERROR("FlushGpuAndWait - GPU wait TIMEOUT after 10 seconds!");
+            }
+            else
+            {
+                NR_ERROR("FlushGpuAndWait - GPU wait FAILED");
+            }
+        }
+        else
+        {
+            NR_ERROR("FlushGpuAndWait - CreateEvent failed");
         }
     }
+    else
+    {
+        NR_LOG("FlushGpuAndWait - GPU already completed");
+    }
+    NR_LOG("FlushGpuAndWait - END");
 }
 
 // ---------------------------------------------------------------------------
