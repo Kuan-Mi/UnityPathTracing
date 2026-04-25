@@ -393,6 +393,9 @@ GeometryProps CastRay( float3 origin, float3 direction, float Tmin, float Tmax, 
             props.Xprev = Geometry::AffineTransform( mOverloaded, props.X );
         else
             props.Xprev = props.X;
+
+        // debug
+        props.Xprev = props.X;
     }
 
     props.V = -direction;
@@ -528,7 +531,7 @@ MaterialProps GetMaterialProps( GeometryProps geometryProps )
 
     // Output
     props.Lemi = Lemi;
-    props.N = N;
+    props.N =  geometryProps.N;
     props.T = T;
     props.baseColor = baseColor;
     props.roughness = roughness;

@@ -40,6 +40,7 @@ namespace NativeRender
         public const uint FLAG_TRANSPARENT     = 0x02;
         // public const uint FLAG_EMISSIVE        = 0x04;
         public const uint FLAG_STATIC          = 0x08;
+        public const uint FLAG_MORPH            = 0x80;
 
         private const uint kHandleOpaque      = 0xFFFF0001u;
         private const uint kHandleTransparent = 0xFFFF0002u;
@@ -148,6 +149,14 @@ namespace NativeRender
             public SkinnedMeshRenderer smr;
             public List<RayTracingAccelerationStructure> tlasList;
             public Matrix4x4 lastRootTransform;
+
+            // GPU buffer slot tracking (populated by AddSkinnedInstance)
+            public uint   firstInstanceDataIndex;
+            public int    submeshCount;
+            public uint[] morphPrimitiveOffsets; // per-submesh offset into _morphPrimitivePositionsPrevBuf
+            public uint[] primitiveOffsets;      // per-submesh offset into _primitiveDataBuf
+            public int[]  primitiveCounts;       // per-submesh triangle count
+            public int    indexStride;           // 2 (UInt16) or 4 (UInt32)
         }
 
         private readonly Dictionary<int, SkinnedEntry> _skinnedInstances = new();
@@ -156,6 +165,9 @@ namespace NativeRender
         // One allocator per buffer; both track element-level free/used ranges.
         private readonly PrimitiveSlotAllocator _instanceAlloc = new PrimitiveSlotAllocator { Name = "InstanceAlloc" };
         private readonly PrimitiveSlotAllocator _primAlloc     = new PrimitiveSlotAllocator { Name = "PrimitiveAlloc" };
+
+        // Next free slot in _morphPrimitivePositionsPrevBuf; reset on scene rebuild.
+        private uint _morphPrimCursor;
 
         // Fragmentation thresholds: trigger MarkRebuildDirty when both conditions are met.
         private const float kFragThreshold    = 0.5f;
@@ -260,6 +272,9 @@ namespace NativeRender
                 return;
             }
 
+            Mesh mesh = smr.sharedMesh;
+            if (mesh == null) return;
+
             if (!_worldAS.AddInstance(smr))
             {
                 Debug.LogError($"[NRDSampleResource] AddSkinnedInstance: AddInstance failed for '{smr.name}'");
@@ -271,11 +286,11 @@ namespace NativeRender
             Matrix4x4 xform = GetSkinnedRootTransform(smr);
             _worldAS.SetInstanceTransform(smr, xform);
 
-            Material rep       = smr.sharedMaterials != null && smr.sharedMaterials.Length > 0 ? smr.sharedMaterials[0] : null;
-            bool     isEmissive = rep != null && IsMaterialEmissive(rep);
+            Material rep        = smr.sharedMaterials != null && smr.sharedMaterials.Length > 0 ? smr.sharedMaterials[0] : null;
+            bool     isEmissive    = rep != null && IsMaterialEmissive(rep);
             bool     isTransparent = rep != null && IsMaterialTransparent(rep);
-            uint     flags     = isTransparent ? FLAG_TRANSPARENT : FLAG_NON_TRANSPARENT;
-            _worldAS.SetInstanceMask(smr, GetMaskForFlags(flags));
+            uint     baseFlags  = isTransparent ? FLAG_TRANSPARENT : FLAG_NON_TRANSPARENT;
+            _worldAS.SetInstanceMask(smr, GetMaskForFlags(baseFlags));
 
             var tlasList = new List<RayTracingAccelerationStructure> { _worldAS };
 
@@ -284,16 +299,174 @@ namespace NativeRender
                 if (_lightAS.AddInstance(smr))
                 {
                     _lightAS.SetInstanceTransform(smr, xform);
-                    _lightAS.SetInstanceMask(smr, GetMaskForFlags(flags));
+                    _lightAS.SetInstanceMask(smr, GetMaskForFlags(baseFlags));
                     tlasList.Add(_lightAS);
                 }
             }
 
+            // ------------------------------------------------------------------
+            // Allocate GPU buffer slots and initialise PrimitiveData / InstanceData.
+            // ------------------------------------------------------------------
+            int subCnt = mesh.subMeshCount;
+
+            // Count total triangles so we can pre-grow the primitive buffer.
+            int totalTris = 0;
+            for (int s = 0; s < subCnt; s++)
+                totalTris += (int)mesh.GetIndexCount(s) / 3;
+
+            // Allocate a contiguous block of instance slots.
+            uint instBase = _instanceAlloc.Allocate(subCnt);
+            if (instBase == PrimitiveSlotAllocator.InvalidOffset)
+            {
+                int newInstCap = Mathf.Max((int)_instanceAlloc.Capacity * 2,
+                    (int)_instanceAlloc.Capacity + subCnt);
+                EnsureInstanceCapacity(newInstCap);
+                instBase = _instanceAlloc.Allocate(subCnt);
+            }
+
+            _worldAS.SetInstanceID(smr, instBase);
+            if (isEmissive)
+                _lightAS.SetInstanceID(smr, instBase);
+
+            // Ensure primitive buffer has room for all triangles.
+            if (_primAlloc.TotalFreeCount < (uint)totalTris)
+            {
+                int newPrimCap = Mathf.Max((int)_primAlloc.Capacity * 2,
+                    (int)_primAlloc.Capacity + totalTris);
+                EnsurePrimitiveCapacity(newPrimCap);
+            }
+
+            // Ensure morph primitive buffer has room.
+            EnsureMorphPrimCapacity(_morphPrimCursor + (uint)totalTris);
+
+            // Uniform scale from the root transform (for worldArea scaling in shader).
+            Vector3 sc = new Vector3(
+                new Vector3(xform.m00, xform.m10, xform.m20).magnitude,
+                new Vector3(xform.m01, xform.m11, xform.m21).magnitude,
+                new Vector3(xform.m02, xform.m12, xform.m22).magnitude);
+            float scaleMax   = Mathf.Max(sc.x, Mathf.Max(sc.y, sc.z));
+            bool  leftHanded = xform.determinant < 0f;
+
+            // Read base-mesh data (rest pose) for UV / worldArea initialisation.
+            var meshDataArr = Mesh.AcquireReadOnlyMeshData(mesh);
+            var meshData    = meshDataArr[0];
+
+            int vertCount = mesh.vertexCount;
+            var nativePos = new NativeArray<Vector3>(vertCount, Allocator.TempJob, NativeArrayOptions.UninitializedMemory);
+            var nativeN   = new NativeArray<Vector3>(vertCount, Allocator.TempJob, NativeArrayOptions.UninitializedMemory);
+            var nativeT   = new NativeArray<Vector4>(vertCount, Allocator.TempJob, NativeArrayOptions.UninitializedMemory);
+            var nativeUV  = new NativeArray<Vector2>(vertCount, Allocator.TempJob, NativeArrayOptions.UninitializedMemory);
+
+            meshData.GetVertices(nativePos);
+            bool hasN  = meshData.HasVertexAttribute(VertexAttribute.Normal);
+            bool hasT  = meshData.HasVertexAttribute(VertexAttribute.Tangent);
+            bool hasUV = meshData.HasVertexAttribute(VertexAttribute.TexCoord0);
+            if (hasN)  meshData.GetNormals(nativeN);
+            if (hasT)  meshData.GetTangents(nativeT);
+            if (hasUV) meshData.GetUVs(0, nativeUV);
+
+            var posF3 = nativePos.Reinterpret<float3>(sizeof(float) * 3);
+            var norF3 = nativeN.Reinterpret<float3>(sizeof(float) * 3);
+            var tanF4 = nativeT.Reinterpret<float4>(sizeof(float) * 4);
+            var uvF2  = nativeUV.Reinterpret<float2>(sizeof(float) * 2);
+
+            var jobHandles = new List<JobHandle>(subCnt);
+            var tempTris   = new List<NativeArray<int>>(subCnt);
+
+            Material[] sharedMats = smr.sharedMaterials;
+            var subPrimOffsets  = new uint[subCnt];
+            var subPrimCounts   = new int[subCnt];
+            var subMorphOffsets = new uint[subCnt];
+
+            for (int sub = 0; sub < subCnt; sub++)
+            {
+                Material subMat   = (sub < sharedMats.Length) ? sharedMats[sub] : GetRepresentativeMaterial(smr.GetComponent<MeshRenderer>() ?? null);
+                int      subMatIdx = GetOrAddMaterial(subMat, null); // incremental path: grows _textures in-place
+
+                int indexCount = (int)mesh.GetIndexCount(sub);
+                int triCount   = indexCount / 3;
+
+                uint primOffset  = _primAlloc.Allocate(triCount);
+                uint morphOffset = _morphPrimCursor;
+                _morphPrimCursor += (uint)triCount;
+
+                subPrimOffsets[sub]  = primOffset;
+                subPrimCounts[sub]   = triCount;
+                subMorphOffsets[sub] = morphOffset;
+
+                // Schedule Burst job to initialise UV / worldArea from the rest-pose mesh.
+                // Normals + tangents will be overwritten every frame by the compute shader.
+                var nativeTris = new NativeArray<int>(indexCount, Allocator.TempJob, NativeArrayOptions.UninitializedMemory);
+                meshData.GetIndices(nativeTris, sub);
+                tempTris.Add(nativeTris);
+
+                jobHandles.Add(new BuildPrimitivesJob
+                {
+                    Indices   = nativeTris,
+                    Positions = posF3,
+                    Normals   = norF3,
+                    Tangents  = tanF4,
+                    UVs       = uvF2,
+                    HasN      = hasN,
+                    HasT      = hasT,
+                    HasUV     = hasUV,
+                    Output    = _primitiveCpu.GetSubArray((int)primOffset, triCount),
+                }.Schedule(triCount, 64));
+
+                // Build InstanceDataNRD for this sub-mesh.
+                uint instSlot         = instBase + (uint)sub;
+                uint baseTextureIndex = (uint)(subMatIdx * TexturesPerMaterial);
+                // FLAG_MORPH: shader uses gIn_MorphPrimitivePositionsPrev for Xprev;
+                //             mOverloaded holds prev root-bone-to-world (written each frame).
+                // On the first frame mOverloaded = identity → Xprev = X (no motion).
+                _instanceCpu[instSlot] = new InstanceDataNRD
+                {
+                    mOverloadedMatrix0    = new Vector4(1f, 0f, 0f, 0f),
+                    mOverloadedMatrix1    = new Vector4(0f, 1f, 0f, 0f),
+                    mOverloadedMatrix2    = new Vector4(0f, 0f, 1f, 0f),
+                    textureOffsetAndFlags = baseTextureIndex | ((baseFlags | FLAG_MORPH) << FlagFirstBit),
+                    primitiveOffset       = primOffset,
+                    scale                 = (leftHanded ? -1f : 1f) * scaleMax,
+                    morphPrimitiveOffset  = morphOffset,
+                };
+                EncodeMaterial(subMat, ref _instanceCpu[instSlot]);
+            }
+
+            // Wait for all Burst jobs.
+            var allHandles = new NativeArray<JobHandle>(jobHandles.Count, Allocator.Temp);
+            for (int i = 0; i < jobHandles.Count; i++) allHandles[i] = jobHandles[i];
+            JobHandle.CombineDependencies(allHandles).Complete();
+            allHandles.Dispose();
+
+            foreach (var arr in tempTris) arr.Dispose();
+            nativePos.Dispose();
+            nativeN.Dispose();
+            nativeT.Dispose();
+            nativeUV.Dispose();
+            meshDataArr.Dispose();
+
+            // Partial GPU uploads.
+            _instanceDataBuf.SetData(_instanceCpu, (int)instBase, (int)instBase, subCnt);
+            for (int sub = 0; sub < subCnt; sub++)
+                _primitiveDataBuf.SetData(_primitiveCpu,
+                    (int)subPrimOffsets[sub], (int)subPrimOffsets[sub], subPrimCounts[sub]);
+            InstanceDataBufPtr  = _instanceDataBuf.GetNativeBufferPtr();
+            PrimitiveDataBufPtr = _primitiveDataBuf.GetNativeBufferPtr();
+
+            // Enable previous-frame vertex buffer access.
+            smr.skinnedMotionVectors = true;
+
             _skinnedInstances[id] = new SkinnedEntry
             {
-                smr               = smr,
-                tlasList          = tlasList,
-                lastRootTransform = xform,
+                smr                   = smr,
+                tlasList              = tlasList,
+                lastRootTransform     = xform,
+                firstInstanceDataIndex = instBase,
+                submeshCount          = subCnt,
+                morphPrimitiveOffsets = subMorphOffsets,
+                primitiveOffsets      = subPrimOffsets,
+                primitiveCounts       = subPrimCounts,
+                indexStride           = mesh.indexFormat == UnityEngine.Rendering.IndexFormat.UInt16 ? 2 : 4,
             };
         }
 
@@ -327,6 +500,8 @@ namespace NativeRender
 
         private void UpdateSkinnedInstances()
         {
+            bool anyInstChanged = false;
+
             foreach (var kv in _skinnedInstances)
             {
                 var entry = kv.Value;
@@ -337,6 +512,23 @@ namespace NativeRender
                 foreach (var tlas in entry.tlasList)
                     tlas.UpdateSkinnedInstance(smr);
 
+                // Store the PREVIOUS frame's root-bone-to-world transform into mOverloaded.
+                // The FLAG_MORPH path in HLSL uses mOverloaded to transform Xprev from
+                // local (root-bone) space to world space: Xprev = AffineTransform(mOverloaded, prevLocalPos).
+                if (_instanceCpu != null && entry.submeshCount > 0)
+                {
+                    Matrix4x4 prevXform = entry.lastRootTransform;
+                    for (int sub = 0; sub < entry.submeshCount; sub++)
+                    {
+                        int idx = (int)entry.firstInstanceDataIndex + sub;
+                        if (idx >= _instanceCpu.Length) break;
+                        _instanceCpu[idx].mOverloadedMatrix0 = new Vector4(prevXform.m00, prevXform.m01, prevXform.m02, prevXform.m03);
+                        _instanceCpu[idx].mOverloadedMatrix1 = new Vector4(prevXform.m10, prevXform.m11, prevXform.m12, prevXform.m13);
+                        _instanceCpu[idx].mOverloadedMatrix2 = new Vector4(prevXform.m20, prevXform.m21, prevXform.m22, prevXform.m23);
+                    }
+                    anyInstChanged = true;
+                }
+
                 // Update TLAS instance transform when the root bone moves.
                 Matrix4x4 rootXform = GetSkinnedRootTransform(smr);
                 if (rootXform != entry.lastRootTransform)
@@ -345,6 +537,104 @@ namespace NativeRender
                         tlas.SetInstanceTransform(smr, rootXform);
                     entry.lastRootTransform = rootXform;
                 }
+            }
+
+            if (anyInstChanged && _instanceCpu != null && _instanceDataBuf != null)
+            {
+                foreach (var kv in _skinnedInstances)
+                {
+                    var entry = kv.Value;
+                    if (entry.submeshCount > 0)
+                        _instanceDataBuf.SetData(_instanceCpu,
+                            (int)entry.firstInstanceDataIndex,
+                            (int)entry.firstInstanceDataIndex,
+                            entry.submeshCount);
+                }
+                InstanceDataBufPtr = _instanceDataBuf.GetNativeBufferPtr();
+            }
+        }
+
+        /// <summary>
+        /// Records compute-shader dispatches that, for each registered <see cref="SkinnedMeshRenderer"/>:
+        /// <list type="bullet">
+        ///   <item>Writes current-frame normals + tangents into <see cref="_primitiveDataBuf"/>.</item>
+        ///   <item>Writes previous-frame vertex positions into <see cref="_morphPrimitivePositionsPrevBuf"/>.</item>
+        /// </list>
+        /// Call this every frame inside a <see cref="CommandBuffer"/> <b>before</b> the ray-tracing dispatches,
+        /// passing the <c>UpdateSkinnedPrimitives.compute</c> shader asset.
+        /// </summary>
+        public void RecordSkinnedMorphUpdate(CommandBuffer cmd, ComputeShader cs)
+        {
+            if (cs == null || _skinnedInstances.Count == 0) return;
+            if (_primitiveDataBuf == null || _morphPrimitivePositionsPrevBuf == null) return;
+
+            int kernel = cs.FindKernel("UpdateSkinnedPrimitives");
+
+            // Buffers that are the same for all SMRs.
+            cs.SetBuffer(kernel, "gInOut_PrimitiveData",         _primitiveDataBuf);
+            cs.SetBuffer(kernel, "gOut_MorphPrimitivePositions", _morphPrimitivePositionsPrevBuf);
+
+            foreach (var kv in _skinnedInstances)
+            {
+                var entry = kv.Value;
+                var smr   = entry.smr;
+                if (smr == null || entry.submeshCount == 0) continue;
+
+                Mesh mesh = smr.sharedMesh;
+                if (mesh == null) continue;
+
+                GraphicsBuffer vbCurr = smr.GetVertexBuffer();
+                if (vbCurr == null) continue;
+
+                // GetPreviousVertexBuffer() returns null on the very first frame or when
+                // skinnedMotionVectors is off; fall back to the current buffer (Xprev = X).
+                GraphicsBuffer vbPrev = smr.GetPreviousVertexBuffer() ?? vbCurr;
+
+                // Expose the index buffer as a ByteAddressBuffer for the compute shader.
+                mesh.indexBufferTarget |= GraphicsBuffer.Target.Raw;
+                GraphicsBuffer ib = mesh.GetIndexBuffer();
+                if (ib == null) continue;
+
+                int vertexStride = mesh.GetVertexBufferStride(0);
+                int posOff       = mesh.GetVertexAttributeOffset(VertexAttribute.Position);
+                int normOff      = mesh.GetVertexAttributeOffset(VertexAttribute.Normal);
+                int tanOff       = mesh.GetVertexAttributeOffset(VertexAttribute.Tangent);
+
+                if (normOff < 0 || tanOff < 0)
+                {
+                    // Mesh has no normals or tangents — skip morph update for this SMR.
+                    ib.Release();
+                    continue;
+                }
+
+                cs.SetBuffer(kernel, "gIn_VB_Curr", vbCurr);
+                cs.SetBuffer(kernel, "gIn_VB_Prev", vbPrev);
+                cs.SetBuffer(kernel, "gIn_IB",      ib);
+
+                cs.SetInt("gVertexStride",  vertexStride);
+                cs.SetInt("gPositionOffset", posOff);
+                cs.SetInt("gNormalOffset",   normOff);
+                cs.SetInt("gTangentOffset",  tanOff);
+                cs.SetInt("gIndexStride",    entry.indexStride);
+
+
+                for (int sub = 0; sub < entry.submeshCount; sub++)
+                {
+                    var    sm              = mesh.GetSubMesh(sub);
+                    int    indexByteOffset = sm.indexStart * entry.indexStride;
+                    int    triCount        = entry.primitiveCounts[sub];
+                    if (triCount <= 0) continue;
+
+                    cs.SetInt("gIndexOffset",         indexByteOffset);
+                    cs.SetInt("gBaseVertex",          sm.baseVertex);
+                    cs.SetInt("gNumPrimitives",       triCount);
+                    cs.SetInt("gPrimitiveOffset",     (int)entry.primitiveOffsets[sub]);
+                    cs.SetInt("gMorphPrimitiveOffset", (int)entry.morphPrimitiveOffsets[sub]);
+
+                    cmd.DispatchCompute(cs, kernel, (triCount + 63) / 64, 1, 1);
+                }
+
+                ib.Release();
             }
         }
 
@@ -474,9 +764,11 @@ namespace NativeRender
             AccumulationBufferPtr = _sharcAccumulated.GetNativeBufferPtr();
             ResolvedBufferPtr     = _sharcResolved.GetNativeBufferPtr();
 
+            // Allocate a 1-element stub so the shader binding is never null.
+            // EnsureMorphPrimCapacity() will grow this when skinned instances are registered.
             _morphPrimitivePositionsPrevBuf = new GraphicsBuffer(
-                GraphicsBuffer.Target.Structured, 1, Marshal.SizeOf<MorphPrimitivePositionsNRD>());
-            _morphPrimitivePositionsPrevBuf.SetData(new MorphPrimitivePositionsNRD[1]);
+                GraphicsBuffer.Target.Structured | GraphicsBuffer.Target.Raw, 1,
+                Marshal.SizeOf<MorphPrimitivePositionsNRD>());
             MorphPrimitivePositionsPrevBufPtr = _morphPrimitivePositionsPrevBuf.GetNativeBufferPtr();
         }
 
@@ -488,8 +780,6 @@ namespace NativeRender
             _sharcAccumulated = null;
             _sharcResolved?.Release();
             _sharcResolved = null;
-            _morphPrimitivePositionsPrevBuf?.Release();
-            _morphPrimitivePositionsPrevBuf = null;
         }
 
         // =====================================================================
@@ -502,6 +792,12 @@ namespace NativeRender
             _instanceDataBuf = null;
             _primitiveDataBuf?.Release();
             _primitiveDataBuf = null;
+
+            // Morph primitive positions buffer is sized to match registered skinned instances;
+            // release here so it is rebuilt fresh after the next scene build.
+            _morphPrimitivePositionsPrevBuf?.Release();
+            _morphPrimitivePositionsPrevBuf = null;
+            _morphPrimCursor = 0;
 
             if (!preserveTextures)
             {
@@ -661,7 +957,8 @@ namespace NativeRender
             _instanceDataBuf.SetData(_instanceCpu);
             InstanceDataBufPtr = _instanceDataBuf.GetNativeBufferPtr();
 
-            _primitiveDataBuf = new GraphicsBuffer(GraphicsBuffer.Target.Structured,
+            _primitiveDataBuf = new GraphicsBuffer(
+                GraphicsBuffer.Target.Structured | GraphicsBuffer.Target.Raw,
                 _primitiveCpu.Length, Marshal.SizeOf<PrimitiveDataNRD>());
             _primitiveDataBuf.SetData(_primitiveCpu);
             PrimitiveDataBufPtr = _primitiveDataBuf.GetNativeBufferPtr();
@@ -1298,6 +1595,27 @@ namespace NativeRender
         }
 
         /// <summary>
+        /// Grows <see cref="_morphPrimitivePositionsPrevBuf"/> to hold at least
+        /// <paramref name="requiredCount"/> elements, preserving existing content.
+        /// </summary>
+        private void EnsureMorphPrimCapacity(uint requiredCount)
+        {
+            int needed = (int)requiredCount;
+            if (_morphPrimitivePositionsPrevBuf != null && _morphPrimitivePositionsPrevBuf.count >= needed)
+                return;
+
+            int cap = _morphPrimitivePositionsPrevBuf != null
+                ? Mathf.Max(needed, _morphPrimitivePositionsPrevBuf.count * 2)
+                : Mathf.Max(needed, 64);
+
+            _morphPrimitivePositionsPrevBuf?.Release();
+            _morphPrimitivePositionsPrevBuf = new GraphicsBuffer(
+                GraphicsBuffer.Target.Structured | GraphicsBuffer.Target.Raw, cap,
+                Marshal.SizeOf<MorphPrimitivePositionsNRD>());
+            MorphPrimitivePositionsPrevBufPtr = _morphPrimitivePositionsPrevBuf.GetNativeBufferPtr();
+        }
+
+        /// <summary>
         /// Grows <see cref="_instanceCpu"/> and <see cref="_instanceDataBuf"/> to at least
         /// <paramref name="newCapacity"/> elements, and updates <see cref="_instanceAlloc"/>.
         /// </summary>
@@ -1342,7 +1660,8 @@ namespace NativeRender
             _primAlloc.GrowTo(cap);
 
             _primitiveDataBuf?.Release();
-            _primitiveDataBuf = new GraphicsBuffer(GraphicsBuffer.Target.Structured,
+            _primitiveDataBuf = new GraphicsBuffer(
+                GraphicsBuffer.Target.Structured | GraphicsBuffer.Target.Raw,
                 cap, Marshal.SizeOf<PrimitiveDataNRD>());
             _primitiveDataBuf.SetData(_primitiveCpu);
             PrimitiveDataBufPtr = _primitiveDataBuf.GetNativeBufferPtr();

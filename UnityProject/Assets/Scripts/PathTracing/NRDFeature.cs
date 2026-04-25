@@ -39,6 +39,7 @@ namespace PathTracing
         public NativeComputeShader nrdConfidenceBlurShader;
         public NativeComputeShader nrdFinalShader;
         public NativeComputeShader nrdDlssBeforeShader;
+        public ComputeShader updateSkinnedPrimitivesCS;
 
         public Texture2D scramblingRankingTex;
         public Texture2D sobolTex;
@@ -75,6 +76,7 @@ namespace PathTracing
         {
             _nrdTlasUpdatePass ??= new NRDTlasUpdatePass
             {
+                updateSkinnedPrimitivesCS = this.updateSkinnedPrimitivesCS,
                 renderPassEvent = renderPassEvent
             };
 

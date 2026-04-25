@@ -1,0 +1,216 @@
+// UpdateSkinnedPrimitives.compute
+// Reads the current and previous frame skinned vertex buffers (from SkinnedMeshRenderer.GetVertexBuffer /
+// GetPreviousVertexBuffer), then for each triangle:
+//   1. Encodes the current-frame normals + tangents into PrimitiveData (so the ray-tracing shader sees
+//      the correct shading normal for the current skeleton pose).
+//   2. Stores the previous-frame vertex positions into MorphPrimitivePositions so the FLAG_MORPH path in
+//      RaytracingShared.hlsli can reconstruct Xprev for motion vectors / denoising.
+//
+// Dispatch once per submesh, per frame, before the ray-tracing passes.
+
+#pragma kernel UpdateSkinnedPrimitives
+
+// -------------------------------------------------------------------------
+// Per-dispatch constants (set via ComputeShader.SetInt / SetBuffer from C#)
+// -------------------------------------------------------------------------
+uint gVertexStride;      // bytes per vertex in the skinned VB
+uint gPositionOffset;    // byte offset of float3 position within each vertex
+uint gNormalOffset;      // byte offset of float3 normal  within each vertex
+uint gTangentOffset;     // byte offset of float4 tangent within each vertex (w = bitangent sign)
+uint gIndexOffset;       // byte offset into the IB where this sub-mesh starts
+uint gIndexStride;       // 2 (UInt16) or 4 (UInt32)
+uint gBaseVertex;        // base vertex for this sub-mesh (added to raw IB values)
+uint gNumPrimitives;     // number of triangles in this sub-mesh dispatch
+uint gPrimitiveOffset;   // element offset into gInOut_PrimitiveData for this sub-mesh
+uint gMorphPrimitiveOffset; // element offset into gOut_MorphPrimitivePositions
+
+// -------------------------------------------------------------------------
+// Inputs
+// -------------------------------------------------------------------------
+ByteAddressBuffer gIn_VB_Curr;   // current-frame GPU-skinned vertex buffer  (Raw target)
+ByteAddressBuffer gIn_VB_Prev;   // previous-frame GPU-skinned vertex buffer (Raw target), or == Curr on first frame
+ByteAddressBuffer gIn_IB;        // index buffer (Raw target)
+
+// -------------------------------------------------------------------------
+// Outputs
+// -------------------------------------------------------------------------
+// PrimitiveData layout (48 bytes, exactly matches Shared.hlsli / GpuStructs.PrimitiveDataNRD):
+//   float16_t2 uv0, uv1, uv2;   float worldArea;   // bytes  0-15
+//   float16_t2 n0,  n1,  n2;    float uvArea;       // bytes 16-31
+//   float16_t2 t0,  t1,  t2;    float bitangentSign;// bytes 32-47
+//
+// MorphPrimitivePositions layout (24 bytes, matches GpuStructs.MorphPrimitivePositionsNRD):
+//   float16_t4 pos0, pos1, pos2;                    // bytes  0-23
+//
+// NOTE: Do NOT use min16float2/min16float4 in a struct written to a buffer —
+// min16float is a "minimum precision" hint that maps to float32 on desktop,
+// making each field 8 bytes instead of 4 and completely breaking the layout.
+// Use RWByteAddressBuffer + f32tof16 to guarantee exact 16-bit packing.
+
+RWByteAddressBuffer gInOut_PrimitiveData;         // stride = 48 bytes
+RWByteAddressBuffer gOut_MorphPrimitivePositions; // stride = 24 bytes
+
+// -------------------------------------------------------------------------
+// Vertex buffer helpers
+// -------------------------------------------------------------------------
+
+float3 LoadFloat3(ByteAddressBuffer buf, uint byteAddr)
+{
+    // ByteAddressBuffer.Load3 requires 4-byte alignment; float attributes are always aligned.
+    uint3 raw = buf.Load3(byteAddr);
+    return asfloat(raw);
+}
+
+float4 LoadFloat4(ByteAddressBuffer buf, uint byteAddr)
+{
+    uint4 raw = buf.Load4(byteAddr);
+    return asfloat(raw);
+}
+
+float3 LoadPosition(ByteAddressBuffer vb, uint vertIndex)
+{
+    return LoadFloat3(vb, vertIndex * gVertexStride + gPositionOffset);
+}
+
+float3 LoadNormal(ByteAddressBuffer vb, uint vertIndex)
+{
+    return LoadFloat3(vb, vertIndex * gVertexStride + gNormalOffset);
+}
+
+float4 LoadTangent(ByteAddressBuffer vb, uint vertIndex)
+{
+    return LoadFloat4(vb, vertIndex * gVertexStride + gTangentOffset);
+}
+
+// -------------------------------------------------------------------------
+// Index buffer helper — handles both 16-bit and 32-bit indices,
+// adds gBaseVertex (sub-mesh relative → absolute vertex index).
+// -------------------------------------------------------------------------
+uint LoadIndex(uint i)
+{
+    uint idx;
+    if (gIndexStride == 2u)
+    {
+        // Read the aligned 4-byte word containing the desired 16-bit index.
+        uint byteAddr   = gIndexOffset + i * 2u;
+        uint alignedAddr = byteAddr & ~3u;
+        uint shift       = (byteAddr & 2u) * 8u;
+        idx = (gIn_IB.Load(alignedAddr) >> shift) & 0xFFFFu;
+    }
+    else
+    {
+        idx = gIn_IB.Load(gIndexOffset + i * 4u);
+    }
+    return idx + gBaseVertex;
+}
+
+// -------------------------------------------------------------------------
+// Half-precision packing helpers
+// f32tof16 is a D3D intrinsic available on SM 5.0+.
+// Packs two floats into the lower/upper 16 bits of one uint.
+// -------------------------------------------------------------------------
+uint PackHalf2(float a, float b)
+{
+    return f32tof16(a) | (f32tof16(b) << 16u);
+}
+
+// -------------------------------------------------------------------------
+// Octahedral-signed encoding  (matches ml.hlsl Packing::EncodeUnitVector(v, true))
+// Output range: [-1, 1]^2, stored as float16_t2 (two float16 in one uint).
+// -------------------------------------------------------------------------
+float2 EncodeUnitVector(float3 v)
+{
+    v /= dot(abs(v), 1.0);
+
+    float2 octWrap = (1.0 - abs(v.yx)) * sign(v.xy);
+    v.xy = (v.z >= 0.0) ? v.xy : octWrap;
+    return v.xy;
+}
+
+// -------------------------------------------------------------------------
+// Kernel
+// -------------------------------------------------------------------------
+[numthreads(64, 1, 1)]
+void UpdateSkinnedPrimitives(uint tid : SV_DispatchThreadID)
+{
+    if (tid >= gNumPrimitives)
+        return;
+
+    uint i0 = LoadIndex(tid * 3u + 0u);
+    uint i1 = LoadIndex(tid * 3u + 1u);
+    uint i2 = LoadIndex(tid * 3u + 2u);
+
+    // ------------------------------------------------------------------
+    // Current-frame normals + tangents → write into PrimitiveData
+    //
+    // PrimitiveData byte layout (48 bytes total):
+    //   [0 ]  float16×2  uv0          ← written once by Burst job, not touched here
+    //   [4 ]  float16×2  uv1          ← not touched
+    //   [8 ]  float16×2  uv2          ← not touched
+    //   [12]  float32    worldArea     ← not touched
+    //   [16]  float16×2  n0           ← written here (packed uint)
+    //   [20]  float16×2  n1
+    //   [24]  float16×2  n2
+    //   [28]  float32    uvArea        ← not touched
+    //   [32]  float16×2  t0
+    //   [36]  float16×2  t1
+    //   [40]  float16×2  t2
+    //   [44]  float32    bitangentSign ← written here (float32)
+    // ------------------------------------------------------------------
+    // Load normals from GPU-skinned vertex buffer (already in root-bone space)
+    float3 rn0 = LoadNormal(gIn_VB_Curr, i0);
+    float3 rn1 = LoadNormal(gIn_VB_Curr, i1);
+    float3 rn2 = LoadNormal(gIn_VB_Curr, i2);
+
+    float3 n0 = normalize(LoadNormal(gIn_VB_Curr, i0));
+    float3 n1 = normalize(LoadNormal(gIn_VB_Curr, i1));
+    float3 n2 = normalize(LoadNormal(gIn_VB_Curr, i2));
+
+    float4 tan0 = LoadTangent(gIn_VB_Curr, i0);
+    float4 tan1 = LoadTangent(gIn_VB_Curr, i1);
+    float4 tan2 = LoadTangent(gIn_VB_Curr, i2);
+
+    float2 en0 = EncodeUnitVector(n0);
+    float2 en1 = EncodeUnitVector(n1);
+    float2 en2 = EncodeUnitVector(n2);
+
+    float2 et0 = EncodeUnitVector(normalize(tan0.xyz));
+    float2 et1 = EncodeUnitVector(normalize(tan1.xyz));
+    float2 et2 = EncodeUnitVector(normalize(tan2.xyz));
+
+    uint primBase = (gPrimitiveOffset + tid) * 48u; // 48 bytes per PrimitiveData element
+
+    gInOut_PrimitiveData.Store(primBase + 16u, PackHalf2(en0.x, en0.y));
+    gInOut_PrimitiveData.Store(primBase + 20u, PackHalf2(en1.x, en1.y));
+    gInOut_PrimitiveData.Store(primBase + 24u, PackHalf2(en2.x, en2.y));
+
+    gInOut_PrimitiveData.Store(primBase + 32u, PackHalf2(et0.x, et0.y));
+    gInOut_PrimitiveData.Store(primBase + 36u, PackHalf2(et1.x, et1.y));
+    gInOut_PrimitiveData.Store(primBase + 40u, PackHalf2(et2.x, et2.y));
+
+    // bitangentSign: use tangent.w from vertex 0 (per primitive, not per vertex in NRD).
+    gInOut_PrimitiveData.Store(primBase + 44u, asuint(tan0.w));
+
+    // ------------------------------------------------------------------
+    // Previous-frame positions → MorphPrimitivePositions
+    //
+    // Layout (24 bytes total):
+    //   [0 ]  float16×4  pos0   (xyz stored; w = 1 to help with homogeneous transforms)
+    //   [8 ]  float16×4  pos1
+    //   [16]  float16×4  pos2
+    // ------------------------------------------------------------------
+    float3 p0 = LoadPosition(gIn_VB_Prev, i0);
+    float3 p1 = LoadPosition(gIn_VB_Prev, i1);
+    float3 p2 = LoadPosition(gIn_VB_Prev, i2);
+
+    uint morphBase = (gMorphPrimitiveOffset + tid) * 24u; // 24 bytes per element
+
+    gOut_MorphPrimitivePositions.Store(morphBase +  0u, PackHalf2(p0.x, p0.y));
+    gOut_MorphPrimitivePositions.Store(morphBase +  4u, PackHalf2(p0.z, 1.0));
+
+    gOut_MorphPrimitivePositions.Store(morphBase +  8u, PackHalf2(p1.x, p1.y));
+    gOut_MorphPrimitivePositions.Store(morphBase + 12u, PackHalf2(p1.z, 1.0));
+
+    gOut_MorphPrimitivePositions.Store(morphBase + 16u, PackHalf2(p2.x, p2.y));
+    gOut_MorphPrimitivePositions.Store(morphBase + 20u, PackHalf2(p2.z, 1.0));
+}

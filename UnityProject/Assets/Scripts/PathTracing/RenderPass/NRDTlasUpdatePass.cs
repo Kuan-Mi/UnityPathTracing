@@ -1,4 +1,5 @@
 using NativeRender;
+using UnityEngine;
 using UnityEngine.Rendering;
 using UnityEngine.Rendering.RenderGraphModule;
 using UnityEngine.Rendering.Universal;
@@ -12,6 +13,7 @@ namespace PathTracing
     public class NRDTlasUpdatePass : ScriptableRenderPass
     {
         private NRDSampleResource _nrdResource;
+        public ComputeShader updateSkinnedPrimitivesCS;
 
         public void SetNRDSampleResource(NRDSampleResource nrdResource)
         {
@@ -25,6 +27,7 @@ namespace PathTracing
         class PassData
         {
             internal NRDSampleResource NrdResource;
+            internal ComputeShader updateSkinnedPrimitivesCS;
         }
 
         // -------------------------------------------------------------------------
@@ -35,6 +38,7 @@ namespace PathTracing
         {
             var cmd = CommandBufferHelpers.GetNativeCommandBuffer(context.cmd);
             data.NrdResource.BuildAccelerationStructures(cmd);
+            data.NrdResource.RecordSkinnedMorphUpdate(cmd, data.updateSkinnedPrimitivesCS);
         }
 
         public override void RecordRenderGraph(RenderGraph renderGraph, ContextContainer frameData)
@@ -42,6 +46,7 @@ namespace PathTracing
             using var builder = renderGraph.AddUnsafePass<PassData>("NRDTlasUpdatePass", out var passData);
 
             passData.NrdResource = _nrdResource;
+            passData.updateSkinnedPrimitivesCS = updateSkinnedPrimitivesCS;
 
             builder.AllowPassCulling(false);
             builder.SetRenderFunc((PassData data, UnsafeGraphContext context) => ExecutePass(data, context));
