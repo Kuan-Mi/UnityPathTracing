@@ -1,7 +1,8 @@
 {
   "permissions": {
     "allow": [
-      "Bash(cmake --build build --config Release --target NativeRenderPlugin)"
+      "Bash(cmake --build build --config Release --target NativeRenderPlugin)",
+      "Bash(xargs grep:*)"
     ]
   }
 }
