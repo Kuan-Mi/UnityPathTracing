@@ -860,6 +860,11 @@ namespace NativeRender
         {
             DisposeSceneGpuBuffers(preserveTextures);
 
+            _morphPrimitivePositionsPrevBuf = new GraphicsBuffer(
+                GraphicsBuffer.Target.Structured | GraphicsBuffer.Target.Raw, 1,
+                Marshal.SizeOf<MorphPrimitivePositionsNRD>());
+            MorphPrimitivePositionsPrevBufPtr = _morphPrimitivePositionsPrevBuf.GetNativeBufferPtr();
+            
             _worldAS?.Clear();
             _lightAS?.Clear();
 
