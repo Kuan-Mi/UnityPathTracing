@@ -38,7 +38,7 @@ namespace PathTracing
         {
             var cmd = CommandBufferHelpers.GetNativeCommandBuffer(context.cmd);
             data.NrdResource.BuildAccelerationStructures(cmd);
-            data.NrdResource.RecordSkinnedMorphUpdate(cmd, data.updateSkinnedPrimitivesCS);
+            // data.NrdResource.RecordSkinnedMorphUpdate(cmd, data.updateSkinnedPrimitivesCS);
         }
 
         public override void RecordRenderGraph(RenderGraph renderGraph, ContextContainer frameData)

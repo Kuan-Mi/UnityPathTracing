@@ -51,6 +51,12 @@ namespace NativeRender
 
             // Retry adding pending SkinnedMeshRenderers (runs on main thread during cmd recording)
             RetryPendingSkinnedInstances();
+            
+            foreach (var t in NativeRayTracingSkinnedTarget.All)
+            {
+                var smr = t.GetComponent<SkinnedMeshRenderer>();
+                UpdateSkinnedInstance(smr);  // 强制更新buffer指针
+            }
 
             if (!_buildEventData.IsCreated)
             {

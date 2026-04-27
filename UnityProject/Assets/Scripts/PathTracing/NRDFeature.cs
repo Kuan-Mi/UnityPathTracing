@@ -140,6 +140,8 @@ namespace PathTracing
             sobolTexPtr             = sobolTex.GetNativeTexturePtr();
         }
 
+        public int cc;
+
         public override void AddRenderPasses(ScriptableRenderer renderer, ref RenderingData renderingData)
         {
             var cam = renderingData.cameraData.camera;
@@ -239,9 +241,14 @@ namespace PathTracing
             bool isEven = (globalConstants.gFrameIndex & 1) == 0;
 
             // TLAS update
-            _nrdTlasUpdatePass.SetNRDSampleResource(_nrdSampleResource);
-            renderer.EnqueuePass(_nrdTlasUpdatePass);
 
+            if (setting.update)
+            {
+                Debug.Log($"Enqueueing TLAS update pass {Time.frameCount} {++cc} {cam.name} {DateTime.Now} | Feature:{GetInstanceID()} Renderer:{renderer.GetType()} Stack:{new System.Diagnostics.StackTrace(1, true).GetFrame(0)?.GetMethod()?.Name}");
+                _nrdTlasUpdatePass.SetNRDSampleResource(_nrdSampleResource);
+                renderer.EnqueuePass(_nrdTlasUpdatePass);
+            }
+            
             // SHARC
             {
                 int sharcW = 16 * ((int)(renderResolution.x / sharcDownscale + 15) / 16);

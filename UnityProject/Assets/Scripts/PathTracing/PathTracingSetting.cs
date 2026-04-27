@@ -412,5 +412,6 @@ namespace PathTracing
         public UpscalerMode upscalerMode               = UpscalerMode.NATIVE;
         public bool         confidence                 = true;
         public ShowMode     showMode;
+        public bool         update;
     }
 }

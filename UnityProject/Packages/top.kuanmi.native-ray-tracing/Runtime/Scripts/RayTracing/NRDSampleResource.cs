@@ -505,6 +505,7 @@ namespace NativeRender
         private void UpdateSkinnedInstances()
         {
             bool anyInstChanged = false;
+            Debug.Log("UpdateSkinnedInstances " + _skinnedInstances.Count);
 
             foreach (var kv in _skinnedInstances)
             {
@@ -717,6 +718,8 @@ namespace NativeRender
         /// <summary>Build / update both TLASes (call inside a CommandBuffer).</summary>
         public void BuildAccelerationStructures(CommandBuffer cmd)
         {
+
+
             _worldAS.BuildOrUpdate(cmd);
             _lightAS.BuildOrUpdate(cmd);
         }
