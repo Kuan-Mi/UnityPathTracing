@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Runtime.InteropServices;
 using Unity.Collections;
@@ -22,13 +23,35 @@ namespace NativeRender
         // Persisted event data for AS build dispatches
         private NativeArray<NativeRenderPlugin.AS_BuildEventData> _buildEventData;
 
+        // Thread-safe collections for pending SkinnedMeshRenderers
+        // Key: SkinnedMeshRenderer.GetInstanceID()
+        // (vertex buffer not ready on first frame, will retry on subsequent frames)
+        private readonly ConcurrentDictionary<int, SkinnedMeshRenderer> _pendingSkinnedInstances = new();
+        private readonly ConcurrentDictionary<int, PendingSkinnedSetup> _pendingSetups = new();
+        private readonly ConcurrentDictionary<int, int> _pendingRetryCount = new();
+        private const int MaxRetryCount = 60; // Max 60 frames (~1 second at 60fps)
+
+        private class PendingSkinnedSetup
+        {
+            public Matrix4x4? transform;
+            public byte? mask;
+            public uint? instanceID;
+        }
+
         /// <summary>
         /// Issues a GPU command to build or update the acceleration structure.
         /// Must be called before the ray trace Dispatch each frame.
+        /// Also retries adding any pending SkinnedMeshRenderers that failed on previous frames.
+        /// NOTE: This method is called during CommandBuffer recording (main thread), not execution.
+        /// RetryPendingSkinnedInstances runs on the main thread, so no thread safety issues.
         /// </summary>
         public void BuildOrUpdate(CommandBuffer cmd)
         {
             if (_handle == 0) return;
+
+            // Retry adding pending SkinnedMeshRenderers (runs on main thread during cmd recording)
+            RetryPendingSkinnedInstances();
+
             if (!_buildEventData.IsCreated)
             {
                 _buildEventData    = new NativeArray<NativeRenderPlugin.AS_BuildEventData>(1, Allocator.Persistent);
@@ -311,6 +334,9 @@ namespace NativeRender
         /// Registers a <see cref="SkinnedMeshRenderer"/> as a dynamic BLAS instance.
         /// The vertex buffer is obtained via <c>GetVertexBuffer()</c> each frame;
         /// the index buffer is taken from <c>sharedMesh</c> (static).
+        /// If the vertex buffer is not ready (e.g., first frame), the instance is queued
+        /// and will be retried automatically on subsequent frames.
+        /// Returns true if successfully added OR queued for retry (allowing caller to proceed with setup).
         /// </summary>
         public unsafe bool AddInstance(SkinnedMeshRenderer smr)
         {
@@ -331,6 +357,7 @@ namespace NativeRender
             // Current-frame skinned vertex buffer
             // Note: After setting vertexBufferTarget, Unity may need to recreate the buffer.
             GraphicsBuffer skinnedVB = smr.GetVertexBuffer();
+            int id = smr.GetInstanceID();
             if (skinnedVB == null)
             {
                 // Try to force buffer creation
@@ -339,9 +366,15 @@ namespace NativeRender
 
                 if (skinnedVB == null)
                 {
-                    Debug.LogWarning($"[NativeRayTracing] SkinnedMeshRenderer '{smr.name}': GetVertexBuffer() returned null. " +
-                                   "This can happen when toggling the renderer. Will retry next frame.");
-                    return false;
+                    // Queue for retry on next frame
+                    if (_pendingSkinnedInstances.TryAdd(id, smr))
+                    {
+                        _pendingSetups.TryAdd(id, new PendingSkinnedSetup());
+                        _pendingRetryCount.TryAdd(id, 0);
+                        Debug.Log($"[NativeRayTracing] SkinnedMeshRenderer '{smr.name}': vertex buffer not ready, queued for retry.");
+                    }
+                    // Return true so caller can proceed with buffer allocation and setup
+                    return true;
                 }
             }
 
@@ -391,7 +424,34 @@ namespace NativeRender
                     return false;
                 }
             }
+
+            // Successfully added, remove from pending collections and apply cached setup
+            _pendingSkinnedInstances.TryRemove(id, out _);
+            _pendingRetryCount.TryRemove(id, out _);
+
+            // Retrieve and remove cached setup BEFORE calling Set methods
+            // (otherwise Set methods will see it's still pending and cache again)
+            if (_pendingSetups.TryRemove(id, out var setup))
+            {
+                // Apply the cached setup
+                if (setup.transform.HasValue)
+                    SetInstanceTransform(smr, setup.transform.Value);
+                if (setup.mask.HasValue)
+                    SetInstanceMask(smr, setup.mask.Value);
+                if (setup.instanceID.HasValue)
+                    SetInstanceID(smr, setup.instanceID.Value);
+            }
+
             return true;
+        }
+
+        /// <summary>
+        /// Checks if a SkinnedMeshRenderer is queued for retry (vertex buffer not ready yet).
+        /// </summary>
+        public bool IsSkinnedInstancePending(SkinnedMeshRenderer smr)
+        {
+            if (smr == null) return false;
+            return _pendingSkinnedInstances.ContainsKey(smr.GetInstanceID());
         }
 
         /// <summary>
@@ -420,32 +480,110 @@ namespace NativeRender
         public void RemoveInstance(SkinnedMeshRenderer smr)
         {
             if (_handle == 0 || smr == null) return;
-            NativeRenderPlugin.NR_AS_RemoveInstance(_handle, (uint)smr.GetInstanceID());
+            int id = smr.GetInstanceID();
+            NativeRenderPlugin.NR_AS_RemoveInstance(_handle, (uint)id);
+
+            // Also remove from pending collections if it was queued
+            _pendingSkinnedInstances.TryRemove(id, out _);
+            _pendingSetups.TryRemove(id, out _);
+            _pendingRetryCount.TryRemove(id, out _);
         }
 
         /// <summary>Updates the world transform for a skinned instance.</summary>
         public unsafe void SetInstanceTransform(SkinnedMeshRenderer smr, Matrix4x4 objectToWorld)
         {
             if (_handle == 0 || smr == null) return;
+
+            int id = smr.GetInstanceID();
+            // If instance is pending, cache the transform for later
+            if (_pendingSetups.TryGetValue(id, out var setup))
+            {
+                setup.transform = objectToWorld;
+                return;
+            }
+
             float* m = stackalloc float[12];
             m[0]  = objectToWorld.m00; m[1]  = objectToWorld.m01; m[2]  = objectToWorld.m02; m[3]  = objectToWorld.m03;
             m[4]  = objectToWorld.m10; m[5]  = objectToWorld.m11; m[6]  = objectToWorld.m12; m[7]  = objectToWorld.m13;
             m[8]  = objectToWorld.m20; m[9]  = objectToWorld.m21; m[10] = objectToWorld.m22; m[11] = objectToWorld.m23;
-            NativeRenderPlugin.NR_AS_SetInstanceTransform(_handle, (uint)smr.GetInstanceID(), (IntPtr)m);
+            NativeRenderPlugin.NR_AS_SetInstanceTransform(_handle, (uint)id, (IntPtr)m);
         }
 
         /// <summary>Sets the visibility mask for a skinned instance (default 0xFF).</summary>
         public void SetInstanceMask(SkinnedMeshRenderer smr, byte mask)
         {
             if (_handle == 0 || smr == null) return;
-            NativeRenderPlugin.NR_AS_SetInstanceMask(_handle, (uint)smr.GetInstanceID(), mask);
+
+            int id = smr.GetInstanceID();
+            // If instance is pending, cache the mask for later
+            if (_pendingSetups.TryGetValue(id, out var setup))
+            {
+                setup.mask = mask;
+                return;
+            }
+
+            NativeRenderPlugin.NR_AS_SetInstanceMask(_handle, (uint)id, mask);
         }
 
         /// <summary>Sets the custom InstanceID for a skinned instance.</summary>
         public void SetInstanceID(SkinnedMeshRenderer smr, uint id)
         {
             if (_handle == 0 || smr == null) return;
-            NativeRenderPlugin.NR_AS_SetInstanceID(_handle, (uint)smr.GetInstanceID(), id);
+
+            int instanceId = smr.GetInstanceID();
+            // If instance is pending, cache the instanceID for later
+            if (_pendingSetups.TryGetValue(instanceId, out var setup))
+            {
+                setup.instanceID = id;
+                return;
+            }
+
+            NativeRenderPlugin.NR_AS_SetInstanceID(_handle, (uint)instanceId, id);
+        }
+
+        /// <summary>
+        /// Retries adding SkinnedMeshRenderers that failed on previous frames
+        /// (typically because their vertex buffer wasn't ready yet).
+        /// Called automatically by <see cref="BuildOrUpdate"/>.
+        /// </summary>
+        private void RetryPendingSkinnedInstances()
+        {
+            if (_pendingSkinnedInstances.IsEmpty) return;
+
+            // Iterate over pending instances (thread-safe snapshot)
+            foreach (var kvp in _pendingSkinnedInstances)
+            {
+                int id = kvp.Key;
+                SkinnedMeshRenderer smr = kvp.Value;
+
+                // Skip if the renderer was destroyed
+                if (smr == null)
+                {
+                    _pendingSkinnedInstances.TryRemove(id, out _);
+                    _pendingSetups.TryRemove(id, out _);
+                    _pendingRetryCount.TryRemove(id, out _);
+                    continue;
+                }
+
+                // Check retry count
+                int retryCount = _pendingRetryCount.GetOrAdd(id, 0);
+                if (retryCount >= MaxRetryCount)
+                {
+                    Debug.LogWarning($"[NativeRayTracing] SkinnedMeshRenderer '{smr.name}' failed to add after {MaxRetryCount} retries. " +
+                                   $"Vertex buffer may not be available. Removing from retry queue.");
+                    _pendingSkinnedInstances.TryRemove(id, out _);
+                    _pendingSetups.TryRemove(id, out _);
+                    _pendingRetryCount.TryRemove(id, out _);
+                    continue;
+                }
+
+                // Increment retry count
+                _pendingRetryCount[id] = retryCount + 1;
+
+                Debug.Log($"[NativeRayTracing] Retrying SkinnedMeshRenderer '{smr.name}' (retry {retryCount + 1}/{MaxRetryCount})");
+                // Try adding again (AddInstance will remove from pending collections if successful)
+                AddInstance(smr);
+            }
         }
     }
 }

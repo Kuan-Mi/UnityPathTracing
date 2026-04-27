@@ -46,15 +46,15 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: -8679921383154817045, guid: de926825f0840584db0f9890040354ed, type: 3}
       propertyPath: m_LocalPosition.x
-      value: 5.151
+      value: -1.17987
       objectReference: {fileID: 0}
     - target: {fileID: -8679921383154817045, guid: de926825f0840584db0f9890040354ed, type: 3}
       propertyPath: m_LocalPosition.y
-      value: 0.427
+      value: 8.88885
       objectReference: {fileID: 0}
     - target: {fileID: -8679921383154817045, guid: de926825f0840584db0f9890040354ed, type: 3}
       propertyPath: m_LocalPosition.z
-      value: -15.117518
+      value: 0.46863
       objectReference: {fileID: 0}
     - target: {fileID: -8679921383154817045, guid: de926825f0840584db0f9890040354ed, type: 3}
       propertyPath: m_LocalRotation.w
@@ -958,7 +958,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: -3920878106566231747, guid: de926825f0840584db0f9890040354ed, type: 3}
       propertyPath: m_UpdateWhenOffscreen
-      value: 0
+      value: 1
       objectReference: {fileID: 0}
     - target: {fileID: -3868152960911955797, guid: de926825f0840584db0f9890040354ed, type: 3}
       propertyPath: m_LocalEulerAnglesHint.x
@@ -1166,7 +1166,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: -2875362031276283167, guid: de926825f0840584db0f9890040354ed, type: 3}
       propertyPath: m_UpdateWhenOffscreen
-      value: 0
+      value: 1
       objectReference: {fileID: 0}
     - target: {fileID: -2867405004791084302, guid: de926825f0840584db0f9890040354ed, type: 3}
       propertyPath: m_LocalEulerAnglesHint.x
@@ -1662,7 +1662,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: -328558124244931208, guid: de926825f0840584db0f9890040354ed, type: 3}
       propertyPath: m_UpdateWhenOffscreen
-      value: 0
+      value: 1
       objectReference: {fileID: 0}
     - target: {fileID: -293616279311666583, guid: de926825f0840584db0f9890040354ed, type: 3}
       propertyPath: m_LocalEulerAnglesHint.x
@@ -1702,7 +1702,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: -134047764947879175, guid: de926825f0840584db0f9890040354ed, type: 3}
       propertyPath: m_UpdateWhenOffscreen
-      value: 0
+      value: 1
       objectReference: {fileID: 0}
     - target: {fileID: -12538433460500129, guid: de926825f0840584db0f9890040354ed, type: 3}
       propertyPath: m_LocalEulerAnglesHint.x
@@ -1754,7 +1754,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 433007316295851997, guid: de926825f0840584db0f9890040354ed, type: 3}
       propertyPath: m_UpdateWhenOffscreen
-      value: 0
+      value: 1
       objectReference: {fileID: 0}
     - target: {fileID: 476418040420186319, guid: de926825f0840584db0f9890040354ed, type: 3}
       propertyPath: m_LocalEulerAnglesHint.x
@@ -2294,7 +2294,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 3484063510133964806, guid: de926825f0840584db0f9890040354ed, type: 3}
       propertyPath: m_UpdateWhenOffscreen
-      value: 0
+      value: 1
       objectReference: {fileID: 0}
     - target: {fileID: 3615859177358533577, guid: de926825f0840584db0f9890040354ed, type: 3}
       propertyPath: m_LocalEulerAnglesHint.x
@@ -2334,7 +2334,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 3845818063956743435, guid: de926825f0840584db0f9890040354ed, type: 3}
       propertyPath: m_UpdateWhenOffscreen
-      value: 0
+      value: 1
       objectReference: {fileID: 0}
     - target: {fileID: 3885878380524489583, guid: de926825f0840584db0f9890040354ed, type: 3}
       propertyPath: m_LocalEulerAnglesHint.x
