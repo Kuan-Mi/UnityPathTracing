@@ -32,6 +32,7 @@ namespace NativeRender
 
 
         private readonly Dictionary<uint, IntPtr> skinedPtr     = new();
+        private readonly Dictionary<uint, IntPtr> skinedIPtr     = new();
         private const    int                      MaxRetryCount = 60; // Max 60 frames (~1 second at 60fps)
 
         private class PendingSkinnedSetup
@@ -492,19 +493,38 @@ namespace NativeRender
                 Debug.LogError($"[NativeRayTracing] UpdateSkinnedInstance: failed to get vertex buffer pointer for '{smr.name}'");
                 return;
             }
+            var ibPtr = smr.sharedMesh != null ? smr.sharedMesh.GetNativeIndexBufferPtr() : IntPtr.Zero;
+            if (ibPtr == IntPtr.Zero)            {
+                Debug.LogError($"[NativeRayTracing] UpdateSkinnedInstance: failed to get index buffer pointer for '{smr.name}'");
+                return;
+            }
 
 
             Mesh mesh         = smr.sharedMesh;
             uint vertexCount  = mesh != null ? (uint)mesh.vertexCount : 0u;
             uint vertexStride = mesh != null ? (uint)mesh.GetVertexBufferStride(0) : 0u;
 
+            if (skinedIPtr.TryGetValue((uint)smr.GetInstanceID(), out var existingIBPtr2))
+            {
+                if(existingIBPtr2 != ibPtr)
+                {
+                    Debug.LogError($"[NativeRayTracing] UpdateSkinnedInstance: index buffer pointer changed for '{smr.name}' (was {existingIBPtr2}, now {ibPtr})");
+                }
+            }
+
 
             if (skinedPtr.TryGetValue((uint)smr.GetInstanceID(), out var existingPtr) && existingPtr == vbPtr)
             {
             }
             else
-            {
+            { 
+                Debug.Log($"Old VB Ptr: {(existingPtr != IntPtr.Zero ? existingPtr.ToString("X") : "null")}, New VB Ptr: {vbPtr.ToString("X")} for '{smr.name}'");
+                
+                // 这里验证了 IB是不会改变的
+                Debug.Log($"Old IB Ptr: {(existingIBPtr2 != IntPtr.Zero ? existingIBPtr2.ToString("X") : "null")}, New IB Ptr: {ibPtr.ToString("X")} for '{smr.name}'");
+                
                 skinedPtr[(uint)smr.GetInstanceID()] = vbPtr;
+                skinedIPtr[(uint)smr.GetInstanceID()] = ibPtr;
                 NativeRenderPlugin.NR_AS_UpdateDynamicVertexBuffer(
                     _handle, (uint)smr.GetInstanceID(), vbPtr, vertexCount, vertexStride);
             }
