@@ -968,36 +968,6 @@ void AccelerationStructure::UpdateDynamicVertexBuffer(uint32_t handle, void *vbP
     if (!newVb)
         return;
 
-    // Discard any previously-built BLAS for this dynamic instance.
-    // The key is per-instance (high-bit handle), so erasing it only affects
-    // this instance — no other slots share this BLAS.
-    auto cacheIt = m_blasCache.find(slot.meshKey);
-    if (cacheIt != m_blasCache.end())
-    {
-        BLASEntry &e = cacheIt->second;
-        if (e.blas)
-            SafeReleaseResource(std::move(e.blas));
-        if (e.blasScratch)
-            SafeReleaseResource(std::move(e.blasScratch));
-        for (auto &r : e.ommArrays)
-            if (r)
-                SafeReleaseResource(std::move(r));
-        for (auto &r : e.ommArrayScratch)
-            if (r)
-                SafeReleaseResource(std::move(r));
-        for (auto &r : e.ommIndexBuffers)
-            if (r)
-                SafeReleaseResource(std::move(r));
-        for (auto &r : e.ommDescArrayBuffers)
-            if (r)
-                SafeReleaseResource(std::move(r));
-        for (auto &r : e.ommArrayDataBuffers)
-            if (r)
-                SafeReleaseResource(std::move(r));
-        m_blasCache.erase(cacheIt);
-    }
-
-    // Set descriptive name for the new vertex buffer
     wchar_t vbName[64];
     swprintf(vbName, 64, L"Unity_VB_Dynamic_Handle%u_Updated", handle);
     newVb->SetName(vbName);

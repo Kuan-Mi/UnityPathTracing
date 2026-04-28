@@ -413,5 +413,6 @@ namespace PathTracing
         public bool         confidence                 = true;
         public ShowMode     showMode;
         public bool         update;
+        public bool         updateTick;
     }
 }

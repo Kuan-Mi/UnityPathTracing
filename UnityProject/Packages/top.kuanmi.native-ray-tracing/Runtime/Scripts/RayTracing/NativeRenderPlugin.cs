@@ -15,15 +15,6 @@ namespace NativeRender
         // Frame lifecycle
         // -------------------------------------------------------------------
 
-        /// <summary>
-        /// Must be called once per frame (main thread) before submitting rendering commands.
-        /// Advances the internal deletion fence and frees any GPU objects whose
-        /// deferred-destroy delay has elapsed (BindlessTexture, BindlessBuffer,
-        /// AccelerationStructure, RayTraceShader, ComputeShader).
-        /// </summary>
-        [DllImport(DllName)]
-        public static extern void NR_FrameTick();
-
         // -------------------------------------------------------------------
         // Acceleration Structure API
         // -------------------------------------------------------------------
@@ -222,7 +213,10 @@ namespace NativeRender
 
         /// <summary>Returns the render event callback pointer for AS BuildOrUpdate.</summary>
         [DllImport(DllName)]
-        public static extern IntPtr NR_AS_GetBuildRenderEventFunc();
+        public static extern IntPtr NR_AS_GetBuildRenderEventFunc();       
+
+        [DllImport(DllName)]
+        public static extern IntPtr NR_GetFrameTickEventFunc();
 
         /// <summary>Returns sizeof(AS_BuildEventData) for buffer allocation.</summary>
         [DllImport(DllName)]

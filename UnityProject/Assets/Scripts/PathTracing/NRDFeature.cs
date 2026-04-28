@@ -60,6 +60,7 @@ namespace PathTracing
         private NRDDlssBeforePass     _nrdDlssBeforePass;
         private DlssRRPass            _dlssrrPass;
         private OutputBlitPass        _outputBlitPass;
+        private NativeFrameTick       _nativeFrameTickPass;
 
         private NRDSampleResource _nrdSampleResource;
 
@@ -136,6 +137,12 @@ namespace PathTracing
             {
                 renderPassEvent = renderPassEvent
             };
+            
+            _nativeFrameTickPass ??= new NativeFrameTick()
+            {
+                renderPassEvent = renderPassEvent,
+            };
+            
             scramblingRankingTexPtr = scramblingRankingTex.GetNativeTexturePtr();
             sobolTexPtr             = sobolTex.GetNativeTexturePtr();
         }
@@ -176,8 +183,11 @@ namespace PathTracing
 
             // MergeBlas is no longer a runtime property; merging is determined automatically
             // based on Application.isPlaying and gameObject.isStatic per-object.
-            NativeRender.NativeRenderPlugin.NR_FrameTick();
-            _nrdSampleResource?.UpdateForFrame();
+         
+
+            {
+                _nrdSampleResource?.UpdateForFrame();
+            }
 
             var uniqueKey = cam.GetInstanceID() + (eyeIndex * 100000L);
             var isVR      = renderingData.cameraData.xrRendering;
@@ -242,7 +252,7 @@ namespace PathTracing
 
             // TLAS update
 
-            if (setting.update)
+            // if (setting.update)
             {
                 // Debug.Log($"Enqueueing TLAS update pass {Time.frameCount} {++cc} {cam.name} {DateTime.Now} | Feature:{GetInstanceID()} Renderer:{renderer.GetType()} Stack:{new System.Diagnostics.StackTrace(1, true).GetFrame(0)?.GetMethod()?.Name}");
                 _nrdTlasUpdatePass.SetNRDSampleResource(_nrdSampleResource);
@@ -543,6 +553,9 @@ namespace PathTracing
                     showReference   = false,
                 });
                 renderer.EnqueuePass(_outputBlitPass);
+                
+                if (setting.updateTick)
+                    renderer.EnqueuePass(_nativeFrameTickPass);
             }
         }
 
@@ -597,9 +610,10 @@ namespace PathTracing
             _nrdFinalPass = null;
             _nrdPass      = null;
             _nrdDlssBeforePass?.Dispose();
-            _nrdDlssBeforePass = null;
-            _dlssrrPass        = null;
-            _outputBlitPass    = null;
+            _nrdDlssBeforePass   = null;
+            _dlssrrPass          = null;
+            _outputBlitPass      = null;
+            _nativeFrameTickPass = null;
         }
 
 #if UNITY_EDITOR

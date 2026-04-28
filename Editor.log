@@ -11761,3 +11761,4 @@ Enqueued Cleanup: ptr=0x00000228ECC8CEF0, type=6
 [EnsureBLAS] Building DYNAMIC BLAS for VB=00000228BF854490 IB=00000224B65CFA60
 Enqueueing Cleanup Task for Fence Value: 640
 Enqueued Cleanup: ptr=0x00000228ECC8B0F0, type=6
+TrimDiskCacheJob: Current cache size 793mb

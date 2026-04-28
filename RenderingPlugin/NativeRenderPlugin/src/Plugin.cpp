@@ -75,6 +75,11 @@ void EnqueueCleanup(std::function<void()>&& cleanupTask)
 
     uint64_t fenceValue = s_D3D12->GetNextFrameFenceValue() + kDeleteDelay;
 
+    
+    char logMsg[128];
+    snprintf(logMsg, sizeof(logMsg), "Enqueueing Cleanup Task for Fence Value: %llu", fenceValue);
+    PluginLog(kUnityLogTypeLog, logMsg, __FILE__, __LINE__);
+
     std::lock_guard<std::mutex> lk(s_DeletionMutex);
     s_DeletionQueue[fenceValue].emplace_back(std::move(cleanupTask));
 }
@@ -143,7 +148,7 @@ static void DrainDeferredDeletes(bool force = false)
     for (const auto& batch : tasksToExecute)
         countTasks += batch.size();
 
-    snprintf(logMsg, sizeof(logMsg), "Draining Deferred Deletes: executing %zu batches, %d tasks", tasksToExecute.size(), countTasks);
+    snprintf(logMsg, sizeof(logMsg), "Draining Deferred Deletes: executing %zu batches, %d tasks in Frame %llu (force=%d)", tasksToExecute.size(), countTasks, completedValue, force);
     PluginLog(kUnityLogTypeLog, logMsg, __FILE__, __LINE__);
 
 
@@ -311,18 +316,6 @@ static void UNITY_INTERFACE_API OnGraphicsDeviceEvent(UnityGfxDeviceEventType ev
         s_D3D12v8       = nullptr;
         NR_LOG("Plugin shutdown - COMPLETE");
     }
-}
-
-// ---------------------------------------------------------------------------
-// NR_FrameTick
-//   Must be called once per frame from the CPU (main thread) before submitting
-//   rendering commands.  Signals the deletion fence with the next value, then
-//   drains any deferred-delete entries whose fence value has been passed.
-// ---------------------------------------------------------------------------
-extern "C" void UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API
-NR_FrameTick()
-{
-    DrainDeferredDeletes();
 }
 
 // ---------------------------------------------------------------------------
@@ -783,10 +776,22 @@ NR_RTS_GetRenderEventDataSize()
     return static_cast<uint32_t>(sizeof(RTS_RenderEventData));
 }
 
+
+static void UNITY_INTERFACE_API FrameTickCallback(int /*eventId*/)
+{
+    DrainDeferredDeletes();
+}
+
 extern "C" UnityRenderingEventAndData UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API
 NR_AS_GetBuildRenderEventFunc()
 {
     return AsBuildRenderCallback;
+}
+
+extern "C" UnityRenderingEvent UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API
+NR_GetFrameTickEventFunc()
+{
+    return FrameTickCallback;
 }
 
 extern "C" uint32_t UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API
