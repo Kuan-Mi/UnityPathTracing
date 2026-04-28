@@ -65,50 +65,7 @@ AccelerationStructure::AccelerationStructure(ID3D12Device5 *device, IUnityLog *l
 
 AccelerationStructure::~AccelerationStructure()
 {
-    AccelLogf(m_log, kUnityLogTypeLog, "[AccelerationStructure::~AccelerationStructure] Destructor called, pendingDeletes=%zu", m_pendingDeletes.size());
-
-    // CRITICAL: When the AccelerationStructure is destroyed, m_pendingDeletes may still
-    // contain resources with framesRemaining > 0. We must transfer these to the global
-    // deferred resource delete queue to ensure they're not released while GPU operations
-    // are still in flight.
-
-    if (!m_pendingDeletes.empty())
-    {
-        int totalResources = 0;
-        for (auto &pd : m_pendingDeletes)
-        {
-            for (auto &resource : pd.resources)
-            {
-                if (resource)
-                {
-                    EnqueueDeferredResourceDelete(std::move(resource));
-                    totalResources++;
-                }
-            }
-        }
-
-        AccelLogf(m_log, kUnityLogTypeLog,
-                  "[AccelerationStructure::~AccelerationStructure] Transferred %d resources from %d pending delete entries to global deferred queue",
-                  totalResources, (int)m_pendingDeletes.size());
-
-        m_pendingDeletes.clear();
-    }
-
-    AccelLogf(m_log, kUnityLogTypeLog,  "[AccelerationStructure::~AccelerationStructure] Destructor complete");
-}
-
-// ---------------------------------------------------------------------------
-// TickDeferredDeletes  -  age GPU resource delete queue each frame.
-// ---------------------------------------------------------------------------
-void AccelerationStructure::TickDeferredDeletes()
-{
-    for (auto it = m_pendingDeletes.begin(); it != m_pendingDeletes.end();)
-    {
-        if (--it->framesRemaining <= 0)
-            it = m_pendingDeletes.erase(it);
-        else
-            ++it;
-    }
+    AccelLogf(m_log, kUnityLogTypeLog, "[AccelerationStructure::~AccelerationStructure] Destructor complete");
 }
 
 // ---------------------------------------------------------------------------
@@ -116,7 +73,7 @@ void AccelerationStructure::TickDeferredDeletes()
 //   Uploads OMM data to GPU and records a BuildRaytracingAccelerationStructure
 //   command for the OMM Array AS into cmdList.
 // ---------------------------------------------------------------------------
-bool AccelerationStructure::BuildOMMForSubmesh( ID3D12GraphicsCommandList4 *cmdList, BLASEntry &entry, size_t subIdx, const SubMeshData &mesh)
+bool AccelerationStructure::BuildOMMForSubmesh(ID3D12GraphicsCommandList4 *cmdList, BLASEntry &entry, size_t subIdx, const SubMeshData &mesh)
 {
     const SubMeshData::OMMBakedData &baked = mesh.ommBaked;
     AccelLogf(m_log, kUnityLogTypeLog,
@@ -249,7 +206,7 @@ bool AccelerationStructure::BuildOMMForSubmesh( ID3D12GraphicsCommandList4 *cmdL
 //   Cache miss: build BLAS (+ OMM) and cache it.
 //   isDynamic:  true for SkinnedMeshRenderer (rebuilt every frame with ALLOW_UPDATE flag)
 // ---------------------------------------------------------------------------
-bool AccelerationStructure::EnsureBLAS(ID3D12GraphicsCommandList4 *cmdList,const MeshKey &key, const MeshInfo &def, bool isDynamic)
+bool AccelerationStructure::EnsureBLAS(ID3D12GraphicsCommandList4 *cmdList, const MeshKey &key, const MeshInfo &def, bool isDynamic)
 {
     auto it = m_blasCache.find(key);
     if (it != m_blasCache.end())
@@ -308,7 +265,7 @@ bool AccelerationStructure::EnsureBLAS(ID3D12GraphicsCommandList4 *cmdList,const
             }
             else
             {
-                AccelLogf(m_log, kUnityLogTypeWarning,   "EnsureBLAS: submesh[%zu] OMM build failed, falling back to opaque", j);
+                AccelLogf(m_log, kUnityLogTypeWarning, "EnsureBLAS: submesh[%zu] OMM build failed, falling back to opaque", j);
             }
         }
 
@@ -421,14 +378,8 @@ bool AccelerationStructure::EnsureBLAS(ID3D12GraphicsCommandList4 *cmdList,const
     buildDesc.Inputs = inputs;
     buildDesc.ScratchAccelerationStructureData = entry.blasScratch->GetGPUVirtualAddress();
     cmdList->BuildRaytracingAccelerationStructure(&buildDesc, 0, nullptr);
-
-    // Scratch is only needed during the build command; release it after 3 frames.
-    {
-        PendingDelete pd;
-        pd.framesRemaining = 3;
-        pd.resources.push_back(std::move(entry.blasScratch));
-        m_pendingDeletes.push_back(std::move(pd));
-    }
+    
+    EnqueueDeferredResourceDelete(std::move(entry.blasScratch));
 
     entry.refCount = 1;
     // AccelLogf(m_log, kUnityLogTypeLog, "[BLAS] Add     vb=%p refCount=1 (new, anyOMM=%d)",
@@ -455,28 +406,25 @@ void AccelerationStructure::ReleaseBLAS(const MeshKey &key)
 
     // AccelLogf(m_log, kUnityLogTypeLog,
     //     "[BLAS] Release vb=%p refCount=0 \u2192 deferred GPU delete", (void*)key.vbPtr);
-
-    PendingDelete pd;
-    pd.framesRemaining = 3;
+    
     BLASEntry &e = it->second;
-    pd.resources.push_back(std::move(e.blas));
+    EnqueueDeferredResourceDelete(std::move(e.blas));
     // e.blasScratch was already moved to pending delete at build time
     for (auto &r : e.ommArrays)
         if (r)
-            pd.resources.push_back(std::move(r));
+            EnqueueDeferredResourceDelete(std::move(r));
     for (auto &r : e.ommArrayScratch)
         if (r)
-            pd.resources.push_back(std::move(r));
+            EnqueueDeferredResourceDelete(std::move(r));
     for (auto &r : e.ommIndexBuffers)
         if (r)
-            pd.resources.push_back(std::move(r));
+            EnqueueDeferredResourceDelete(std::move(r));
     for (auto &r : e.ommDescArrayBuffers)
         if (r)
-            pd.resources.push_back(std::move(r));
+            EnqueueDeferredResourceDelete(std::move(r));
     for (auto &r : e.ommArrayDataBuffers)
         if (r)
-            pd.resources.push_back(std::move(r));
-    m_pendingDeletes.push_back(std::move(pd));
+            EnqueueDeferredResourceDelete(std::move(r));
     m_blasCache.erase(it);
 }
 
@@ -510,7 +458,7 @@ bool AccelerationStructure::HasAnyOMM() const
 //     existing capacities.  Only when capacity is exceeded are old buffers
 //     moved to the deferred-delete queue and new (larger) ones allocated.
 // ---------------------------------------------------------------------------
-bool AccelerationStructure::BuildTLAS( ID3D12GraphicsCommandList4 *cmdList, const std::vector<TLASInstanceEntry> &entries)
+bool AccelerationStructure::BuildTLAS(ID3D12GraphicsCommandList4 *cmdList, const std::vector<TLASInstanceEntry> &entries)
 {
     const uint32_t count = static_cast<uint32_t>(entries.size());
     TLASFrameResources &res = m_tlasResources[m_frameIndex];
@@ -526,12 +474,9 @@ bool AccelerationStructure::BuildTLAS( ID3D12GraphicsCommandList4 *cmdList, cons
         {
             if (res.instanceDesc)
             {
-                PendingDelete pd;
-                pd.framesRemaining = 3;
-                pd.resources.push_back(std::move(res.instanceDesc));
+                EnqueueDeferredResourceDelete(std::move(res.instanceDesc));
                 res.mappedInstanceDesc = nullptr;
                 res.instanceDescCapacity = 0;
-                m_pendingDeletes.push_back(std::move(pd));
             }
 
             D3D12_HEAP_PROPERTIES uploadHeap = {};
@@ -602,10 +547,7 @@ bool AccelerationStructure::BuildTLAS( ID3D12GraphicsCommandList4 *cmdList, cons
     {
         if (res.tlas)
         {
-            PendingDelete pd;
-            pd.framesRemaining = 3;
-            pd.resources.push_back(std::move(res.tlas));
-            m_pendingDeletes.push_back(std::move(pd));
+            EnqueueDeferredResourceDelete(std::move(res.tlas));
         }
 
         D3D12_HEAP_PROPERTIES defaultHeap = {};
@@ -633,10 +575,7 @@ bool AccelerationStructure::BuildTLAS( ID3D12GraphicsCommandList4 *cmdList, cons
     {
         if (res.tlasScratch)
         {
-            PendingDelete pd;
-            pd.framesRemaining = 3;
-            pd.resources.push_back(std::move(res.tlasScratch));
-            m_pendingDeletes.push_back(std::move(pd));
+            EnqueueDeferredResourceDelete(std::move(res.tlasScratch));
         }
 
         D3D12_HEAP_PROPERTIES defaultHeap = {};
@@ -774,7 +713,7 @@ void AccelerationStructure::DumpInstances(const char *tag) const
 void AccelerationStructure::Clear()
 {
     std::lock_guard<std::mutex> lock(m_stateMutex);
-    AccelLogf(m_log, kUnityLogTypeLog,  "[AS::Clear] BEGIN - activeSlots=%u, blasCache=%zu, pendingDeletes=%zu",  m_activeCount, m_blasCache.size(), m_pendingDeletes.size());
+    AccelLogf(m_log, kUnityLogTypeLog, "[AS::Clear] BEGIN - activeSlots=%u, blasCache=%zu", m_activeCount, m_blasCache.size());
 
     // Release all BLAS ref-counts (deferred GPU delete when they reach 0)
     int releasedBLAS = 0;
@@ -790,27 +729,18 @@ void AccelerationStructure::Clear()
 
     // Move TLAS resources to pending delete (both frame slots + shared scratch).
     {
-        PendingDelete pd;
-        pd.framesRemaining = 3;
         for (auto &r : m_tlasResources)
         {
             if (r.instanceDesc)
-                pd.resources.push_back(std::move(r.instanceDesc));
+                EnqueueDeferredResourceDelete(std::move(r.instanceDesc));
             if (r.tlas)
-                pd.resources.push_back(std::move(r.tlas));
+                EnqueueDeferredResourceDelete(std::move(r.tlas));
             if (r.tlasScratch)
-                pd.resources.push_back(std::move(r.tlasScratch));
+                EnqueueDeferredResourceDelete(std::move(r.tlasScratch));
             r.mappedInstanceDesc = nullptr;
             r.instanceDescCapacity = 0;
             r.tlasResultCapacity = 0;
             r.tlasScratchCapacity = 0;
-        }
-        if (!pd.resources.empty())
-        {
-            AccelLogf(m_log, kUnityLogTypeLog,
-                      "[AS::Clear] Moving %zu TLAS resources to pending delete",
-                      pd.resources.size());
-            m_pendingDeletes.push_back(std::move(pd));
         }
     }
     m_frameIndex = 0;
@@ -819,37 +749,28 @@ void AccelerationStructure::Clear()
     // (ReleaseBLAS only handles slots whose BLAS was already built;
     //  m_blasCache may still hold entries from shared meshes or ref > 0)
     {
-        PendingDelete pd;
-        pd.framesRemaining = 3;
         for (auto &kv : m_blasCache)
         {
             BLASEntry &e = kv.second;
             if (e.blas)
-                pd.resources.push_back(std::move(e.blas));
+                EnqueueDeferredResourceDelete(std::move(e.blas));
             if (e.blasScratch)
-                pd.resources.push_back(std::move(e.blasScratch));
+                EnqueueDeferredResourceDelete(std::move(e.blasScratch));
             for (auto &r : e.ommArrays)
                 if (r)
-                    pd.resources.push_back(std::move(r));
+                    EnqueueDeferredResourceDelete(std::move(r));
             for (auto &r : e.ommArrayScratch)
                 if (r)
-                    pd.resources.push_back(std::move(r));
+                    EnqueueDeferredResourceDelete(std::move(r));
             for (auto &r : e.ommIndexBuffers)
                 if (r)
-                    pd.resources.push_back(std::move(r));
+                    EnqueueDeferredResourceDelete(std::move(r));
             for (auto &r : e.ommDescArrayBuffers)
                 if (r)
-                    pd.resources.push_back(std::move(r));
+                    EnqueueDeferredResourceDelete(std::move(r));
             for (auto &r : e.ommArrayDataBuffers)
                 if (r)
-                    pd.resources.push_back(std::move(r));
-        }
-        if (!pd.resources.empty())
-        {
-            AccelLogf(m_log, kUnityLogTypeLog,
-                      "[AS::Clear] Moving %zu BLAS cache resources to pending delete",
-                      pd.resources.size());
-            m_pendingDeletes.push_back(std::move(pd));
+                    EnqueueDeferredResourceDelete(std::move(r));
         }
     }
     m_blasCache.clear();
@@ -864,8 +785,7 @@ void AccelerationStructure::Clear()
     m_tlasEntries.clear();
 
     AccelLogf(m_log, kUnityLogTypeLog,
-              "[AS::Clear] END - pendingDeletes now=%zu",
-              m_pendingDeletes.size());
+              "[AS::Clear] END");
 }
 
 // ---------------------------------------------------------------------------
@@ -924,7 +844,7 @@ bool AccelerationStructure::AddInstance(const NR_AddInstanceDesc &desc)
     }
     vb->SetName(vbName);
     ib->SetName(ibName);
-    AccelLogf(m_log, kUnityLogTypeLog,  "[AddInstance] Set names: VB=%p '%ls', IB=%p '%ls', isDynamic=%d", (void *)vb, vbName, (void *)ib, ibName, (int)slot.isDynamic);
+    AccelLogf(m_log, kUnityLogTypeLog, "[AddInstance] Set names: VB=%p '%ls', IB=%p '%ls', isDynamic=%d", (void *)vb, vbName, (void *)ib, ibName, (int)slot.isDynamic);
 
     slot.meshInfo.vertexBuffer = vb;
     slot.meshInfo.vertexCount = desc.vertexCount;
@@ -1041,30 +961,26 @@ void AccelerationStructure::UpdateDynamicVertexBuffer(uint32_t handle, void *vbP
     auto cacheIt = m_blasCache.find(slot.meshKey);
     if (cacheIt != m_blasCache.end())
     {
-        PendingDelete pd;
-        pd.framesRemaining = 3;
         BLASEntry &e = cacheIt->second;
         if (e.blas)
-            pd.resources.push_back(std::move(e.blas));
+            EnqueueDeferredResourceDelete(std::move(e.blas));
         if (e.blasScratch)
-            pd.resources.push_back(std::move(e.blasScratch));
+            EnqueueDeferredResourceDelete(std::move(e.blasScratch));
         for (auto &r : e.ommArrays)
             if (r)
-                pd.resources.push_back(std::move(r));
+                EnqueueDeferredResourceDelete(std::move(r));
         for (auto &r : e.ommArrayScratch)
             if (r)
-                pd.resources.push_back(std::move(r));
+                EnqueueDeferredResourceDelete(std::move(r));
         for (auto &r : e.ommIndexBuffers)
             if (r)
-                pd.resources.push_back(std::move(r));
+                EnqueueDeferredResourceDelete(std::move(r));
         for (auto &r : e.ommDescArrayBuffers)
             if (r)
-                pd.resources.push_back(std::move(r));
+                EnqueueDeferredResourceDelete(std::move(r));
         for (auto &r : e.ommArrayDataBuffers)
             if (r)
-                pd.resources.push_back(std::move(r));
-        if (!pd.resources.empty())
-            m_pendingDeletes.push_back(std::move(pd));
+                EnqueueDeferredResourceDelete(std::move(r));
         m_blasCache.erase(cacheIt);
     }
 
@@ -1126,7 +1042,6 @@ void AccelerationStructure::SetInstanceID(uint32_t handle, uint32_t id)
 bool AccelerationStructure::BuildOrUpdate(ID3D12GraphicsCommandList4 *cmdList)
 {
     std::lock_guard<std::mutex> lock(m_stateMutex);
-    TickDeferredDeletes();
 
     // Per-frame diagnostic dump (one line per active instance).
     // DumpInstances("BuildOrUpdate");
@@ -1166,7 +1081,7 @@ bool AccelerationStructure::BuildOrUpdate(ID3D12GraphicsCommandList4 *cmdList)
         blasBarrier.UAV.pResource = nullptr; // nullptr = all UAV resources
         cmdList->ResourceBarrier(1, &blasBarrier);
     }
-    
+
     m_tlasEntries.clear();
     for (const auto &slot : m_slots)
     {

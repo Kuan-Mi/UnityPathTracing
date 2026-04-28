@@ -245,13 +245,6 @@ private:
         bool    isDynamic = false; // SkinnedMeshRenderer: BLAS rebuilt each frame
     };
 
-    // Deferred deletion of GPU resources (3-frame delay).
-    struct PendingDelete
-    {
-        std::vector<ComPtr<ID3D12Resource>> resources;
-        int framesRemaining;
-    };
-
     // -----------------------------------------------------------------------
     // BLAS helpers
     // -----------------------------------------------------------------------
@@ -276,8 +269,6 @@ private:
         UINT64                 tlasScratchCapacity  = 0;   // bytes allocated for tlasScratch
     };
 
-    void TickDeferredDeletes();
-
     // -----------------------------------------------------------------------
     // Members
     // -----------------------------------------------------------------------
@@ -299,9 +290,6 @@ private:
     uint32_t m_activeCount = 0;
 
     std::vector<TLASInstanceEntry> m_tlasEntries;
-
-    // Deferred deletion queue
-    std::list<PendingDelete> m_pendingDeletes;
 
     // Mutex protecting shared state accessed from both Main Thread (Clear, AddInstance,
     // RemoveInstance, SetInstance*) and Render Thread (BuildOrUpdate / BuildTLAS).
