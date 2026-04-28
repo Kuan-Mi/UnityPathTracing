@@ -6,7 +6,7 @@
 #include <algorithm>
 
 // Forward declaration of global deferred resource delete function from Plugin.cpp
-extern void EnqueueDeferredResourceDelete(ComPtr<ID3D12Resource> &&resource);
+extern void SafeReleaseResource(ComPtr<ID3D12Resource> resource);
 extern void EnqueueDeferredDelete(void* ptr, DeferredType type);
 
 // ---------------------------------------------------------------------------
@@ -391,7 +391,7 @@ bool AccelerationStructure::EnsureBLAS(ID3D12GraphicsCommandList4 *cmdList, Inst
     if(isDynamic){
         EnqueueDeferredDelete(new BLASEntry(std::move(blas)), DeferredType::AccelStructBlas);
     }else{
-        EnqueueDeferredResourceDelete(std::move(blas.blasScratch));
+        SafeReleaseResource(std::move(blas.blasScratch));
         blas.refCount = 1;
         // AccelLogf(m_log, kUnityLogTypeLog, "[BLAS] Add     vb=%p refCount=1 (new, anyOMM=%d)",
         //           (void*)key.vbPtr, (int)blas.anyOMM);
@@ -421,23 +421,23 @@ void AccelerationStructure::ReleaseBLAS(const MeshKey &key)
     //     "[BLAS] Release vb=%p refCount=0 \u2192 deferred GPU delete", (void*)key.vbPtr);
     
     BLASEntry &e = it->second;
-    EnqueueDeferredResourceDelete(std::move(e.blas));
+    SafeReleaseResource(std::move(e.blas));
     // e.blasScratch was already moved to pending delete at build time
     for (auto &r : e.ommArrays)
         if (r)
-            EnqueueDeferredResourceDelete(std::move(r));
+            SafeReleaseResource(std::move(r));
     for (auto &r : e.ommArrayScratch)
         if (r)
-            EnqueueDeferredResourceDelete(std::move(r));
+            SafeReleaseResource(std::move(r));
     for (auto &r : e.ommIndexBuffers)
         if (r)
-            EnqueueDeferredResourceDelete(std::move(r));
+            SafeReleaseResource(std::move(r));
     for (auto &r : e.ommDescArrayBuffers)
         if (r)
-            EnqueueDeferredResourceDelete(std::move(r));
+            SafeReleaseResource(std::move(r));
     for (auto &r : e.ommArrayDataBuffers)
         if (r)
-            EnqueueDeferredResourceDelete(std::move(r));
+            SafeReleaseResource(std::move(r));
     m_blasCache.erase(it);
 }
 
@@ -487,7 +487,7 @@ bool AccelerationStructure::BuildTLAS(ID3D12GraphicsCommandList4 *cmdList, const
         {
             if (res.instanceDesc)
             {
-                EnqueueDeferredResourceDelete(std::move(res.instanceDesc));
+                SafeReleaseResource(std::move(res.instanceDesc));
                 res.mappedInstanceDesc = nullptr;
                 res.instanceDescCapacity = 0;
             }
@@ -560,7 +560,7 @@ bool AccelerationStructure::BuildTLAS(ID3D12GraphicsCommandList4 *cmdList, const
     {
         if (res.tlas)
         {
-            EnqueueDeferredResourceDelete(std::move(res.tlas));
+            SafeReleaseResource(std::move(res.tlas));
         }
 
         D3D12_HEAP_PROPERTIES defaultHeap = {};
@@ -588,7 +588,7 @@ bool AccelerationStructure::BuildTLAS(ID3D12GraphicsCommandList4 *cmdList, const
     {
         if (res.tlasScratch)
         {
-            EnqueueDeferredResourceDelete(std::move(res.tlasScratch));
+            SafeReleaseResource(std::move(res.tlasScratch));
         }
 
         D3D12_HEAP_PROPERTIES defaultHeap = {};
@@ -745,11 +745,11 @@ void AccelerationStructure::Clear()
         for (auto &r : m_tlasResources)
         {
             if (r.instanceDesc)
-                EnqueueDeferredResourceDelete(std::move(r.instanceDesc));
+                SafeReleaseResource(std::move(r.instanceDesc));
             if (r.tlas)
-                EnqueueDeferredResourceDelete(std::move(r.tlas));
+                SafeReleaseResource(std::move(r.tlas));
             if (r.tlasScratch)
-                EnqueueDeferredResourceDelete(std::move(r.tlasScratch));
+                SafeReleaseResource(std::move(r.tlasScratch));
             r.mappedInstanceDesc = nullptr;
             r.instanceDescCapacity = 0;
             r.tlasResultCapacity = 0;
@@ -766,24 +766,24 @@ void AccelerationStructure::Clear()
         {
             BLASEntry &e = kv.second;
             if (e.blas)
-                EnqueueDeferredResourceDelete(std::move(e.blas));
+                SafeReleaseResource(std::move(e.blas));
             if (e.blasScratch)
-                EnqueueDeferredResourceDelete(std::move(e.blasScratch));
+                SafeReleaseResource(std::move(e.blasScratch));
             for (auto &r : e.ommArrays)
                 if (r)
-                    EnqueueDeferredResourceDelete(std::move(r));
+                    SafeReleaseResource(std::move(r));
             for (auto &r : e.ommArrayScratch)
                 if (r)
-                    EnqueueDeferredResourceDelete(std::move(r));
+                    SafeReleaseResource(std::move(r));
             for (auto &r : e.ommIndexBuffers)
                 if (r)
-                    EnqueueDeferredResourceDelete(std::move(r));
+                    SafeReleaseResource(std::move(r));
             for (auto &r : e.ommDescArrayBuffers)
                 if (r)
-                    EnqueueDeferredResourceDelete(std::move(r));
+                    SafeReleaseResource(std::move(r));
             for (auto &r : e.ommArrayDataBuffers)
                 if (r)
-                    EnqueueDeferredResourceDelete(std::move(r));
+                    SafeReleaseResource(std::move(r));
         }
     }
     m_blasCache.clear();
@@ -976,24 +976,24 @@ void AccelerationStructure::UpdateDynamicVertexBuffer(uint32_t handle, void *vbP
     {
         BLASEntry &e = cacheIt->second;
         if (e.blas)
-            EnqueueDeferredResourceDelete(std::move(e.blas));
+            SafeReleaseResource(std::move(e.blas));
         if (e.blasScratch)
-            EnqueueDeferredResourceDelete(std::move(e.blasScratch));
+            SafeReleaseResource(std::move(e.blasScratch));
         for (auto &r : e.ommArrays)
             if (r)
-                EnqueueDeferredResourceDelete(std::move(r));
+                SafeReleaseResource(std::move(r));
         for (auto &r : e.ommArrayScratch)
             if (r)
-                EnqueueDeferredResourceDelete(std::move(r));
+                SafeReleaseResource(std::move(r));
         for (auto &r : e.ommIndexBuffers)
             if (r)
-                EnqueueDeferredResourceDelete(std::move(r));
+                SafeReleaseResource(std::move(r));
         for (auto &r : e.ommDescArrayBuffers)
             if (r)
-                EnqueueDeferredResourceDelete(std::move(r));
+                SafeReleaseResource(std::move(r));
         for (auto &r : e.ommArrayDataBuffers)
             if (r)
-                EnqueueDeferredResourceDelete(std::move(r));
+                SafeReleaseResource(std::move(r));
         m_blasCache.erase(cacheIt);
     }
 

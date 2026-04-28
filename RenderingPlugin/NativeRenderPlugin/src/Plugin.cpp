@@ -27,6 +27,10 @@
 #include "BindlessBuffer.h"
 #include "D3D12HeapHook.h"
 #include "PluginInternal.h"
+#include <map>
+#include <vector>
+#include <functional>
+#include <mutex>
 
 using Microsoft::WRL::ComPtr;
 
@@ -52,190 +56,163 @@ static bool                      s_RendererReady = false;
 // safeAfterValue <= fence->GetCompletedValue().
 // ---------------------------------------------------------------------------
 
-struct DeferredDeleteEntry
-{
-    void*        ptr;
-    DeferredType type;
-    uint64_t     safeAfterValue; // delete when fence->GetCompletedValue() >= this
-};
+using DeletionTask = std::function<void()>;
 
-static ComPtr<ID3D12Fence>         s_DeletionFence;
-static uint64_t                    s_DeletionFenceValue = 0;
-static std::list<DeferredDeleteEntry> s_DeferredDeleteQueue;
-static std::mutex                  s_DeferredDeleteMutex;
+static std::map<uint64_t, std::vector<DeletionTask>> s_DeletionQueue;
+static std::mutex s_DeletionMutex;
 
-// Global deferred resource delete queue for ID3D12Resource objects.
-// Used by AccelerationStructure destructor to safely release resources
-// that may still be referenced by in-flight GPU commands.
-struct DeferredResourceEntry
-{
-    ComPtr<ID3D12Resource> resource;
-    uint64_t               safeAfterValue;
-};
-static std::list<DeferredResourceEntry> s_DeferredResourceQueue;
-static std::mutex                       s_DeferredResourceMutex;
+// Forward declarations
+static void PluginLog(UnityLogType type, const char* msg, const char* file, int line);
 
 // kDeleteDelay: number of frames to wait before freeing.
 // Unity D3D12 uses up to 2 frames in flight; 3 provides a safe margin.
 static constexpr int kDeleteDelay = 3;
 
-// Forward declarations
-static void PluginLog(UnityLogType type, const char* msg, const char* file, int line);
 
-static void ImmediateDelete(DeferredDeleteEntry& e)
+void EnqueueCleanup(std::function<void()>&& cleanupTask)
 {
-    switch (e.type)
-    {
-    case DeferredType::BindlessTexture: delete reinterpret_cast<BindlessTexture*>(e.ptr); break;
-    case DeferredType::BindlessBuffer:  delete reinterpret_cast<BindlessBuffer*>(e.ptr);  break;
-    case DeferredType::AccelStruct:     delete reinterpret_cast<AccelerationStructure*>(e.ptr); break;
-    case DeferredType::RayTraceShader:  delete reinterpret_cast<RayTraceShader*>(e.ptr);  break;
-    case DeferredType::ComputeShader:        delete reinterpret_cast<ComputeShader*>(e.ptr);           break;
-    case DeferredType::ComputeDescriptorSet: delete reinterpret_cast<ComputeDescriptorSet*>(e.ptr);    break;
-    case DeferredType::AccelStructBlas:      delete reinterpret_cast<BLASEntry*>(e.ptr); break;
+    if (!cleanupTask) return;
 
+    uint64_t fenceValue = s_D3D12->GetNextFrameFenceValue() + kDeleteDelay;
+
+    std::lock_guard<std::mutex> lk(s_DeletionMutex);
+    s_DeletionQueue[fenceValue].emplace_back(std::move(cleanupTask));
+}
+
+template<typename T>
+void SafeDelete(T*& ptr)
+{
+    if (!ptr) return;
+    T* rawPtr = ptr;
+    ptr = nullptr; // 立即置空防止野指针
+    EnqueueCleanup([rawPtr]() {
+        delete rawPtr;
+    });
+}
+
+void SafeReleaseResource(ComPtr<ID3D12Resource> resource)
+{
+    if (!resource) return;
+
+    
+        wchar_t name[128]; UINT size = sizeof(name);
+        resource->GetPrivateData(WKPDID_D3DDebugObjectNameW, &size, name);
+        char logMsg[256];
+        snprintf(logMsg, sizeof(logMsg), "Deferred Resource Released: %ls", name);
+        PluginLog(kUnityLogTypeLog, logMsg, __FILE__, __LINE__);
+
+
+    // 利用 Lambda 捕获 ComPtr，增加引用计数，等 Lambda 执行完自动释放
+    EnqueueCleanup([res = std::move(resource)]() {
+        // res 在此处超出作用域，自动调用 Release()
+    });
+}
+
+void NR_EnqueueDescriptorRangeFree(DescriptorHeapAllocator* alloc, uint32_t base, uint32_t count)
+{
+    if (!alloc || count == 0) return;
+    EnqueueCleanup([alloc, base, count]() {
+        alloc->Free(base, count);
+    });
+}
+
+static void DrainDeferredDeletes(bool force = false)
+{
+    // 获取当前 GPU 已完成的 Fence 值
+    uint64_t completedValue = (s_D3D12 && !force) ? s_D3D12->GetFrameFence()->GetCompletedValue() : UINT64_MAX;
+
+    std::vector<std::vector<DeletionTask>> tasksToExecute;
+
+    {
+        std::lock_guard<std::mutex> lk(s_DeletionMutex);
+        auto it = s_DeletionQueue.begin();
+        while (it != s_DeletionQueue.end())
+        {
+            // 因为 map 是有序的，如果当前 key > 已完成值，后面所有的都没完成
+            if (!force && it->first > completedValue)
+                break;
+
+            tasksToExecute.emplace_back(std::move(it->second));
+            it = s_DeletionQueue.erase(it);
+        }
+    }
+
+    char logMsg[256];
+
+    auto countTasks = 0;
+    for (const auto& batch : tasksToExecute)
+        countTasks += batch.size();
+
+    snprintf(logMsg, sizeof(logMsg), "Draining Deferred Deletes: executing %zu batches, %d tasks", tasksToExecute.size(), countTasks);
+    PluginLog(kUnityLogTypeLog, logMsg, __FILE__, __LINE__);
+
+
+    // 在锁外执行真正的析构操作，防止死锁并减少锁占用时间
+    for (auto& batch : tasksToExecute)
+    {
+        for (auto& task : batch)
+        {
+            if (task) task();
+        }
     }
 }
 
 void EnqueueDeferredDelete(void* ptr, DeferredType type)
 {
     if (!ptr) return;
-    std::lock_guard<std::mutex> lk(s_DeferredDeleteMutex);
-    s_DeferredDeleteQueue.push_back({ ptr, type, s_DeletionFenceValue + kDeleteDelay });
-    
-    char logMsg[512];
-    snprintf(logMsg, sizeof(logMsg),
-        "EnqueueDeferredDelete: ptr=0x%p type=%d safeAfter=%llu",
-        ptr, (int)type, s_DeletionFenceValue + kDeleteDelay);
+
+    // 根据类型将 void* 强转回具体指针，并包装成 Lambda
+    // 这里使用 Lambda 捕获，可以在销毁时正确触发各个类的析构函数
+    switch (type)
+    {
+    case DeferredType::BindlessTexture:
+        EnqueueCleanup([p = static_cast<BindlessTexture*>(ptr)] { delete p; });
+        break;
+
+    case DeferredType::BindlessBuffer:
+        EnqueueCleanup([p = static_cast<BindlessBuffer*>(ptr)] { delete p; });
+        break;
+
+    case DeferredType::AccelStruct:
+        EnqueueCleanup([p = static_cast<AccelerationStructure*>(ptr)] { delete p; });
+        break;
+
+    case DeferredType::RayTraceShader:
+        EnqueueCleanup([p = static_cast<RayTraceShader*>(ptr)] { delete p; });
+        break;
+
+    case DeferredType::ComputeShader:
+        EnqueueCleanup([p = static_cast<ComputeShader*>(ptr)] { delete p; });
+        break;
+
+    case DeferredType::ComputeDescriptorSet:
+        EnqueueCleanup([p = static_cast<ComputeDescriptorSet*>(ptr)] { delete p; });
+        break;
+
+    case DeferredType::AccelStructBlas:
+        EnqueueCleanup([p = static_cast<BLASEntry*>(ptr)] { delete p; });
+        break;
+
+    default:
+        // 如果进入了未定义的类型，为了安全起见，尝试直接 delete 
+        // 但注意：void* 是不能直接 delete 的，这里最好记录一个错误日志
+        if (s_Log) {
+            char buf[256];
+            snprintf(buf, sizeof(buf), "Unknown DeferredType %d for ptr 0x%p", (int)type, ptr);
+            s_Log->Log(kUnityLogTypeWarning, buf, __FILE__, __LINE__);
+        }
+        break;
+    }
+
+    // 可选：调试用 Log（建议只在 Debug 模式开启，避免性能抖动）
+// #ifdef _DEBUG
+    char logMsg[128];
+    snprintf(logMsg, sizeof(logMsg), "Enqueued Cleanup: ptr=0x%p, type=%d", ptr, (int)type);
     PluginLog(kUnityLogTypeLog, logMsg, __FILE__, __LINE__);
+// #endif
 }
 
-// Enqueue a D3D12 resource for deferred deletion.
-// Called by AccelerationStructure destructor to safely release resources.
-// Note: This is a global function (not static) so it can be called from AccelerationStructure.cpp
-void EnqueueDeferredResourceDelete(ComPtr<ID3D12Resource>&& resource)
-{
-    if (!resource) return;
-    std::lock_guard<std::mutex> lk(s_DeferredResourceMutex);
 
-    // Log resource details for debugging
-    wchar_t name[128] = L"<unnamed>";
-    UINT nameLen = sizeof(name);
-    resource->GetPrivateData(WKPDID_D3DDebugObjectNameW, &nameLen, name);
-
-    char nameUtf8[256];
-    WideCharToMultiByte(CP_UTF8, 0, name, -1, nameUtf8, sizeof(nameUtf8), nullptr, nullptr);
-
-    char logMsg[512];
-    snprintf(logMsg, sizeof(logMsg),
-        "EnqueueDeferredResourceDelete: resource=0x%p name='%s' safeAfter=%llu",
-        resource.Get(), nameUtf8, s_DeletionFenceValue + kDeleteDelay);
-    PluginLog(kUnityLogTypeLog, logMsg, __FILE__, __LINE__);
-
-    s_DeferredResourceQueue.push_back({ std::move(resource), s_DeletionFenceValue + kDeleteDelay });
-}
-
-// ---------------------------------------------------------------------------
-// Deferred descriptor-range free queue — same fence, separate from object
-// deletion so BindlessTexture::Resize() doesn't need to know about DeferredType.
-// ---------------------------------------------------------------------------
-struct DeferredRangeFreeEntry
-{
-    DescriptorHeapAllocator* alloc;
-    uint32_t                 base;
-    uint32_t                 count;
-    uint64_t                 safeAfterValue;
-};
-static std::list<DeferredRangeFreeEntry> s_DeferredRangeFreeQueue; // guarded by s_DeferredDeleteMutex
-
-static void DrainDeferredDeletes(bool force = false)
-{
-    std::lock_guard<std::mutex> lk(s_DeferredDeleteMutex);
-    uint64_t completed = s_DeletionFence ? s_DeletionFence->GetCompletedValue() : 0;
-
-    int deletedObjects = 0;
-    for (auto it = s_DeferredDeleteQueue.begin(); it != s_DeferredDeleteQueue.end(); )
-    {
-        if (force || it->safeAfterValue <= completed)
-        {
-            ImmediateDelete(*it);
-            it = s_DeferredDeleteQueue.erase(it);
-            deletedObjects++;
-        }
-        else
-            ++it;
-    }
-
-    int freedRanges = 0;
-    for (auto it = s_DeferredRangeFreeQueue.begin(); it != s_DeferredRangeFreeQueue.end(); )
-    {
-        if (force || it->safeAfterValue <= completed)
-        {
-            it->alloc->Free(it->base, it->count);
-            it = s_DeferredRangeFreeQueue.erase(it);
-            freedRanges++;
-        }
-        else
-            ++it;
-    }
-
-    // Drain deferred resource deletes (ID3D12Resource objects from AccelerationStructure destructors)
-    int deletedResources = 0;
-    {
-        std::lock_guard<std::mutex> rlk(s_DeferredResourceMutex);
-        for (auto it = s_DeferredResourceQueue.begin(); it != s_DeferredResourceQueue.end(); )
-        {
-            if (force || it->safeAfterValue <= completed)
-            {
-                // Log before releasing
-                wchar_t name[128] = L"<unnamed>";
-                UINT nameLen = sizeof(name);
-                if (it->resource)
-                    it->resource->GetPrivateData(WKPDID_D3DDebugObjectNameW, &nameLen, name);
-
-                char nameUtf8[256];
-                WideCharToMultiByte(CP_UTF8, 0, name, -1, nameUtf8, sizeof(nameUtf8), nullptr, nullptr);
-
-                char logMsg[512];
-                snprintf(logMsg, sizeof(logMsg),
-                    "DrainDeferredDeletes: releasing resource=0x%p name='%s' force=%s",
-                    it->resource.Get(), nameUtf8, force ? "true" : "false");
-                PluginLog(kUnityLogTypeLog, logMsg, __FILE__, __LINE__);
-
-                // ComPtr destructor will release the resource
-                it = s_DeferredResourceQueue.erase(it);
-                deletedResources++;
-            }
-            else
-                ++it;
-        }
-    }
-
-    if (deletedObjects > 0 || freedRanges > 0 || deletedResources > 0)
-    {
-        char logMsg[256];
-        snprintf(logMsg, sizeof(logMsg),
-            "DrainDeferredDeletes: deleted %d objects, %d ranges, %d resources (force=%s, completed=%llu)",
-            deletedObjects, freedRanges, deletedResources, force ? "true" : "false", completed);
-        PluginLog(kUnityLogTypeLog, logMsg, __FILE__, __LINE__);
-    }
-}
-
-void NR_EnqueueDescriptorRangeFree(DescriptorHeapAllocator* alloc,
-                                   uint32_t                 base,
-                                   uint32_t                 count)
-{
-    if (!alloc || count == 0) return;
-    if (!s_DeletionFence)
-    {
-        // Fence not yet available (pre-init path) — free immediately.
-        alloc->Free(base, count);
-        return;
-    }
-    std::lock_guard<std::mutex> lk(s_DeferredDeleteMutex);
-    s_DeferredRangeFreeQueue.push_back({ alloc, base, count,
-                                         s_DeletionFenceValue + kDeleteDelay });
-}
 
 // ---------------------------------------------------------------------------
 // Logging helpers - fall back to printf when IUnityLog isn't available yet
@@ -304,12 +281,6 @@ static void UNITY_INTERFACE_API OnGraphicsDeviceEvent(UnityGfxDeviceEventType ev
             if (!s_DescHeap.Initialize(device))
                 NR_ERROR("DescriptorHeapAllocator initialization failed");
 
-            // Create the fence used by the deferred-delete queue.
-            s_DeletionFenceValue = 0;
-            if (FAILED(device->CreateFence(0, D3D12_FENCE_FLAG_NONE,
-                                           IID_PPV_ARGS(&s_DeletionFence))))
-                NR_ERROR("Failed to create deletion fence");
-
             NR_LOG("Plugin initialized (DXR device confirmed)");
         }
         else
@@ -334,11 +305,6 @@ static void UNITY_INTERFACE_API OnGraphicsDeviceEvent(UnityGfxDeviceEventType ev
         DrainDeferredDeletes(true);
         NR_LOG("Plugin shutdown - deferred deletes drained");
 
-        // Clear the deletion fence and reset the fence value.
-        // After force-draining above, the queues should be empty.
-        s_DeletionFence.Reset();
-        s_DeletionFenceValue = 0;
-
         s_DescHeap.Shutdown();
         s_RendererReady = false;
         s_D3D12         = nullptr;
@@ -356,11 +322,6 @@ static void UNITY_INTERFACE_API OnGraphicsDeviceEvent(UnityGfxDeviceEventType ev
 extern "C" void UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API
 NR_FrameTick()
 {
-    if (!s_D3D12 || !s_DeletionFence) return;
-    ID3D12CommandQueue* queue = s_D3D12->GetCommandQueue();
-    if (!queue) return;
-    ++s_DeletionFenceValue;
-    queue->Signal(s_DeletionFence.Get(), s_DeletionFenceValue);
     DrainDeferredDeletes();
 }
 
