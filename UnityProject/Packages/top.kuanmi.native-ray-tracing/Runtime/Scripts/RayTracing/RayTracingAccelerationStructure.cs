@@ -22,6 +22,9 @@ namespace NativeRender
 
         // Persisted event data for AS build dispatches
         private NativeArray<NativeRenderPlugin.AS_BuildEventData> _buildEventData;
+        
+        
+        private List<SkinnedMeshRenderer> skinnedMeshRenderers = new List<SkinnedMeshRenderer>();
 
         // Thread-safe collections for pending SkinnedMeshRenderers
         // Key: SkinnedMeshRenderer.GetInstanceID()
@@ -56,9 +59,8 @@ namespace NativeRender
             // Retry adding pending SkinnedMeshRenderers (runs on main thread during cmd recording)
             RetryPendingSkinnedInstances();
 
-            foreach (var t in NativeRayTracingSkinnedTarget.All)
+            foreach (var smr in skinnedMeshRenderers)
             {
-                var smr = t.GetComponent<SkinnedMeshRenderer>();
                 UpdateSkinnedInstance(smr); // 强制更新buffer指针
             }
 
@@ -453,7 +455,9 @@ namespace NativeRender
                 if (setup.instanceID.HasValue)
                     SetInstanceID(smr, setup.instanceID.Value);
             }
-
+            
+            if(!skinnedMeshRenderers.Contains(smr))
+                skinnedMeshRenderers.Add(smr);
             return true;
         }
 
@@ -475,6 +479,7 @@ namespace NativeRender
             if (_handle == 0 || smr == null) return;
 
             GraphicsBuffer skinnedVB = smr.GetVertexBuffer();
+            skinnedVB.name = $"{smr.name}_SkinnedVB";
             if (skinnedVB == null)
             {
                 Debug.LogError($"[NativeRayTracing] UpdateSkinnedInstance: vertex buffer not available for '{smr.name}'");
@@ -493,7 +498,12 @@ namespace NativeRender
                 Debug.LogError($"[NativeRayTracing] UpdateSkinnedInstance: failed to get vertex buffer pointer for '{smr.name}'");
                 return;
             }
-            var ibPtr = smr.sharedMesh != null ? smr.sharedMesh.GetNativeIndexBufferPtr() : IntPtr.Zero;
+
+            var indexBuffer = smr.sharedMesh.GetIndexBuffer();
+            indexBuffer.name = $"{smr.sharedMesh.name}_IndexBuffer";
+            
+            
+            var ibPtr          = smr.sharedMesh != null ? indexBuffer.GetNativeBufferPtr() : IntPtr.Zero;
             if (ibPtr == IntPtr.Zero)            {
                 Debug.LogError($"[NativeRayTracing] UpdateSkinnedInstance: failed to get index buffer pointer for '{smr.name}'");
                 return;
@@ -541,6 +551,8 @@ namespace NativeRender
             _pendingSkinnedInstances.TryRemove(id, out _);
             _pendingSetups.TryRemove(id, out _);
             _pendingRetryCount.TryRemove(id, out _);
+
+            skinnedMeshRenderers.Remove(smr);
         }
 
         /// <summary>Updates the world transform for a skinned instance.</summary>

@@ -951,7 +951,7 @@ void AccelerationStructure::RemoveInstance(uint32_t handle)
 // UpdateDynamicVertexBuffer
 //   For SkinnedMeshRenderer instances: swap in the new GPU vertex buffer
 //   produced by Unity's skinning pass, discard the stale BLAS (deferred GPU
-//   delete after 3 frames), and schedule a rebuild for next BuildOrUpdate.
+//   delete after 4 frames), and schedule a rebuild for next BuildOrUpdate.
 // ---------------------------------------------------------------------------
 void AccelerationStructure::UpdateDynamicVertexBuffer(uint32_t handle, void *vbPtr, uint32_t vertexCount, uint32_t vertexStride)
 {
@@ -1031,7 +1031,10 @@ bool AccelerationStructure::BuildOrUpdate(ID3D12GraphicsCommandList4 *cmdList)
 
     // Advance to the next double-buffer slot each frame.
     // The GPU is currently consuming the previous slot; we now own this slot.
-    m_frameIndex = (m_frameIndex + 1) % 3;
+    m_frameIndex = (m_frameIndex + 1) % 4;
+
+    AccelLogf(m_log, kUnityLogTypeLog, "BuildOrUpdate: frame=%u", m_frameIndex);
+
 
     // -------------------------------------------------------------------
     // Step A: Build any pending new BLASes (throttled to avoid GPU TDR)

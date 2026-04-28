@@ -145,12 +145,16 @@ namespace PathTracing
             
             scramblingRankingTexPtr = scramblingRankingTex.GetNativeTexturePtr();
             sobolTexPtr             = sobolTex.GetNativeTexturePtr();
+
+            Debug.Log($"QualitySettings.maxQueuedFrames {QualitySettings.maxQueuedFrames}");
         }
 
         public int cc;
 
         public override void AddRenderPasses(ScriptableRenderer renderer, ref RenderingData renderingData)
         {
+            
+            
             var cam = renderingData.cameraData.camera;
             if (cam.cameraType is CameraType.Preview or CameraType.Reflection)
                 return;

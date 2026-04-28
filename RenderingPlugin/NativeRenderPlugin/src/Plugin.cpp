@@ -66,7 +66,7 @@ static void PluginLog(UnityLogType type, const char* msg, const char* file, int 
 
 // kDeleteDelay: number of frames to wait before freeing.
 // Unity D3D12 uses up to 2 frames in flight; 3 provides a safe margin.
-static constexpr int kDeleteDelay = 3;
+static constexpr int kDeleteDelay = 0;
 
 
 void EnqueueCleanup(std::function<void()>&& cleanupTask)

@@ -281,8 +281,8 @@ private:
     // BLAS cache
     std::unordered_map<MeshKey, BLASEntry, MeshKeyHash> m_blasCache;
 
-    // TLAS triple-buffered resources (indexed by m_frameIndex)
-    TLASFrameResources     m_tlasResources[3];
+    // TLAS quadruple-buffered resources (indexed by m_frameIndex)
+    TLASFrameResources     m_tlasResources[4];
     uint32_t               m_frameIndex           = 0;
 
     // Slot system

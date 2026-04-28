@@ -513,10 +513,6 @@ namespace NativeRender
                 var smr   = entry.smr;
                 if (smr == null) continue;
 
-                // Refresh the GPU vertex buffer to the current frame's skinning result.
-                foreach (var tlas in entry.tlasList)
-                    tlas.UpdateSkinnedInstance(smr);
-
                 // Store the PREVIOUS frame's root-bone-to-world transform into mOverloaded.
                 // The FLAG_MORPH path in HLSL uses mOverloaded to transform Xprev from
                 // local (root-bone) space to world space: Xprev = AffineTransform(mOverloaded, prevLocalPos).
@@ -718,8 +714,6 @@ namespace NativeRender
         /// <summary>Build / update both TLASes (call inside a CommandBuffer).</summary>
         public void BuildAccelerationStructures(CommandBuffer cmd)
         {
-
-
             _worldAS.BuildOrUpdate(cmd);
             _lightAS.BuildOrUpdate(cmd);
         }
