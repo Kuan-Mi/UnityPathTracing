@@ -94,8 +94,7 @@ AccelerationStructure::~AccelerationStructure()
         m_pendingDeletes.clear();
     }
 
-    AccelLogf(m_log, kUnityLogTypeLog,
-              "[AccelerationStructure::~AccelerationStructure] Destructor complete");
+    AccelLogf(m_log, kUnityLogTypeLog,  "[AccelerationStructure::~AccelerationStructure] Destructor complete");
 }
 
 // ---------------------------------------------------------------------------
@@ -117,9 +116,7 @@ void AccelerationStructure::TickDeferredDeletes()
 //   Uploads OMM data to GPU and records a BuildRaytracingAccelerationStructure
 //   command for the OMM Array AS into cmdList.
 // ---------------------------------------------------------------------------
-bool AccelerationStructure::BuildOMMForSubmesh(
-    ID3D12GraphicsCommandList4 *cmdList,
-    BLASEntry &entry, size_t subIdx, const SubMeshData &mesh)
+bool AccelerationStructure::BuildOMMForSubmesh( ID3D12GraphicsCommandList4 *cmdList, BLASEntry &entry, size_t subIdx, const SubMeshData &mesh)
 {
     const SubMeshData::OMMBakedData &baked = mesh.ommBaked;
     AccelLogf(m_log, kUnityLogTypeLog,
@@ -128,8 +125,7 @@ bool AccelerationStructure::BuildOMMForSubmesh(
 
     if (baked.histogram.empty())
     {
-        AccelLogf(m_log, kUnityLogTypeError,
-                  "[OMM] BuildOMMForSubmesh[%zu]: histogram is empty, cannot build OMM array", subIdx);
+        AccelLogf(m_log, kUnityLogTypeError, "[OMM] BuildOMMForSubmesh[%zu]: histogram is empty, cannot build OMM array", subIdx);
         return false;
     }
 
@@ -146,8 +142,7 @@ bool AccelerationStructure::BuildOMMForSubmesh(
                                      L"OMM_ArrayData");
     if (!arrayDataBuf)
     {
-        AccelLogf(m_log, kUnityLogTypeError,
-                  "[OMM] BuildOMMForSubmesh[%zu]: arrayData buf alloc failed", subIdx);
+        AccelLogf(m_log, kUnityLogTypeError, "[OMM] BuildOMMForSubmesh[%zu]: arrayData buf alloc failed", subIdx);
         return false;
     }
     arrayDataBuf->Map(0, nullptr, &mapped);
@@ -254,16 +249,13 @@ bool AccelerationStructure::BuildOMMForSubmesh(
 //   Cache miss: build BLAS (+ OMM) and cache it.
 //   isDynamic:  true for SkinnedMeshRenderer (rebuilt every frame with ALLOW_UPDATE flag)
 // ---------------------------------------------------------------------------
-bool AccelerationStructure::EnsureBLAS(
-    ID3D12GraphicsCommandList4 *cmdList,
-    const MeshKey &key, const MeshInfo &def, bool isDynamic)
+bool AccelerationStructure::EnsureBLAS(ID3D12GraphicsCommandList4 *cmdList,const MeshKey &key, const MeshInfo &def, bool isDynamic)
 {
     auto it = m_blasCache.find(key);
     if (it != m_blasCache.end())
     {
         it->second.refCount++;
-        AccelLogf(m_log, kUnityLogTypeLog,
-                  "[BLAS] AddRef  vb=%p refCount=%d", (void *)key.vbPtr, it->second.refCount);
+        AccelLogf(m_log, kUnityLogTypeLog, "[BLAS] AddRef  vb=%p refCount=%d", (void *)key.vbPtr, it->second.refCount);
         return true;
     }
 
@@ -282,16 +274,9 @@ bool AccelerationStructure::EnsureBLAS(
     //
     // NOTE: For dynamic meshes, we request state every time because the vertex buffer changes
     // each frame. Unity's state tracker should handle redundant requests efficiently.
-    AccelLogf(m_log, kUnityLogTypeLog,
-              "[EnsureBLAS] Building %s BLAS for VB=%p IB=%p",
-              isDynamic ? "DYNAMIC" : "STATIC", (void *)def.vertexBuffer, (void *)def.indexBuffer);
-    m_d3d12v8->RequestResourceState(
-        def.vertexBuffer,
-        D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
-    if (def.indexBuffer)
-        m_d3d12v8->RequestResourceState(
-            def.indexBuffer,
-            D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
+    AccelLogf(m_log, kUnityLogTypeLog, "[EnsureBLAS] Building %s BLAS for VB=%p IB=%p", isDynamic ? "DYNAMIC" : "STATIC", (void *)def.vertexBuffer, (void *)def.indexBuffer);
+    m_d3d12v8->RequestResourceState(def.vertexBuffer, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
+    m_d3d12v8->RequestResourceState(def.indexBuffer, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
 
     entry.ommArrays.resize(subCount);
     entry.ommArrayScratch.resize(subCount);
@@ -323,8 +308,7 @@ bool AccelerationStructure::EnsureBLAS(
             }
             else
             {
-                AccelLogf(m_log, kUnityLogTypeWarning,
-                          "EnsureBLAS: submesh[%zu] OMM build failed, falling back to opaque", j);
+                AccelLogf(m_log, kUnityLogTypeWarning,   "EnsureBLAS: submesh[%zu] OMM build failed, falling back to opaque", j);
             }
         }
 
@@ -378,8 +362,7 @@ bool AccelerationStructure::EnsureBLAS(
     if (isDynamic)
     {
         blasFlags = D3D12_RAYTRACING_ACCELERATION_STRUCTURE_BUILD_FLAG_ALLOW_UPDATE;
-        AccelLogf(m_log, kUnityLogTypeLog,
-                  "[BLAS] Building dynamic BLAS with ALLOW_UPDATE flag (vb=%p)", (void *)key.vbPtr);
+        AccelLogf(m_log, kUnityLogTypeLog, "[BLAS] Building dynamic BLAS with ALLOW_UPDATE flag (vb=%p)", (void *)key.vbPtr);
     }
     else
     {
@@ -503,9 +486,7 @@ void AccelerationStructure::ReleaseBLAS(const MeshKey &key)
 D3D12_GPU_VIRTUAL_ADDRESS AccelerationStructure::GetBLASVA(const MeshKey &key) const
 {
     auto it = m_blasCache.find(key);
-    return (it != m_blasCache.end() && it->second.blas)
-               ? it->second.blas->GetGPUVirtualAddress()
-               : 0;
+    return (it != m_blasCache.end() && it->second.blas) ? it->second.blas->GetGPUVirtualAddress() : 0;
 }
 
 bool AccelerationStructure::HasAnyOMM() const
@@ -529,9 +510,7 @@ bool AccelerationStructure::HasAnyOMM() const
 //     existing capacities.  Only when capacity is exceeded are old buffers
 //     moved to the deferred-delete queue and new (larger) ones allocated.
 // ---------------------------------------------------------------------------
-bool AccelerationStructure::BuildTLAS(
-    ID3D12GraphicsCommandList4 *cmdList,
-    const std::vector<TLASInstanceEntry> &entries)
+bool AccelerationStructure::BuildTLAS( ID3D12GraphicsCommandList4 *cmdList, const std::vector<TLASInstanceEntry> &entries)
 {
     const uint32_t count = static_cast<uint32_t>(entries.size());
     TLASFrameResources &res = m_tlasResources[m_frameIndex];
@@ -564,8 +543,7 @@ bool AccelerationStructure::BuildTLAS(
 
             wchar_t name[64];
             swprintf(name, 64, L"TLAS_InstanceDesc_Frame%u", m_frameIndex);
-            res.instanceDesc = CreateBuffer(m_device.Get(), instanceDescSize,
-                                            D3D12_RESOURCE_FLAG_NONE, D3D12_RESOURCE_STATE_GENERIC_READ, uploadHeap, name);
+            res.instanceDesc = CreateBuffer(m_device.Get(), instanceDescSize, D3D12_RESOURCE_FLAG_NONE, D3D12_RESOURCE_STATE_GENERIC_READ, uploadHeap, name);
             if (!res.instanceDesc)
             {
                 AccelLogf(m_log, kUnityLogTypeError, "BuildTLAS: instance desc buffer allocation failed");
@@ -614,8 +592,7 @@ bool AccelerationStructure::BuildTLAS(
     m_device->GetRaytracingAccelerationStructurePrebuildInfo(&inputsForUpdate, &prebuildInfoUpdate);
 
     const UINT64 neededResult = prebuildInfo.ResultDataMaxSizeInBytes;
-    const UINT64 neededScratch = max(prebuildInfo.ScratchDataSizeInBytes,
-                                     prebuildInfoUpdate.UpdateScratchDataSizeInBytes);
+    const UINT64 neededScratch = max(prebuildInfo.ScratchDataSizeInBytes, prebuildInfoUpdate.UpdateScratchDataSizeInBytes);
 
     // ------------------------------------------------------------------
     // 3a. TLAS result buffer: reuse current frame's slot or reallocate.
@@ -717,10 +694,9 @@ void AccelerationStructure::DumpInstances(const char *tag) const
 {
     const char *t = tag ? tag : "Dump";
     AccelLogf(m_log, kUnityLogTypeLog,
-              "[AS][%s] ===== instances: active=%u slots=%zu free=%zu handles=%zu cache=%zu pendingRebuild=%d frame=%u =====",
+              "[AS][%s] ===== instances: active=%u slots=%zu free=%zu handles=%zu cache=%zu frame=%u =====",
               t, m_activeCount, m_slots.size(), m_freeSlots.size(),
-              m_handleToSlot.size(), m_blasCache.size(),
-              m_tlasRebuildPendingSlots, m_frameIndex);
+              m_handleToSlot.size(), m_blasCache.size(), m_frameIndex);
 
     // Build reverse map: slotIndex -> userHandle (expect 1:1 for active slots).
     std::unordered_map<uint32_t, uint32_t> slotToHandle;
@@ -798,9 +774,7 @@ void AccelerationStructure::DumpInstances(const char *tag) const
 void AccelerationStructure::Clear()
 {
     std::lock_guard<std::mutex> lock(m_stateMutex);
-    AccelLogf(m_log, kUnityLogTypeLog,
-              "[AS::Clear] BEGIN - activeSlots=%u, blasCache=%zu, pendingDeletes=%zu",
-              m_activeCount, m_blasCache.size(), m_pendingDeletes.size());
+    AccelLogf(m_log, kUnityLogTypeLog,  "[AS::Clear] BEGIN - activeSlots=%u, blasCache=%zu, pendingDeletes=%zu",  m_activeCount, m_blasCache.size(), m_pendingDeletes.size());
 
     // Release all BLAS ref-counts (deferred GPU delete when they reach 0)
     int releasedBLAS = 0;
@@ -887,10 +861,7 @@ void AccelerationStructure::Clear()
     m_freeSlots.clear();
     m_handleToSlot.clear();
     m_activeCount = 0;
-    m_activeDefs.clear();
     m_tlasEntries.clear();
-    m_tlasRebuildPendingSlots = 3;
-    m_transformsDirty = false;
 
     AccelLogf(m_log, kUnityLogTypeLog,
               "[AS::Clear] END - pendingDeletes now=%zu",
@@ -953,9 +924,7 @@ bool AccelerationStructure::AddInstance(const NR_AddInstanceDesc &desc)
     }
     vb->SetName(vbName);
     ib->SetName(ibName);
-    AccelLogf(m_log, kUnityLogTypeLog,
-              "[AddInstance] Set names: VB=%p '%ls', IB=%p '%ls', isDynamic=%d",
-              (void *)vb, vbName, (void *)ib, ibName, (int)slot.isDynamic);
+    AccelLogf(m_log, kUnityLogTypeLog,  "[AddInstance] Set names: VB=%p '%ls', IB=%p '%ls', isDynamic=%d", (void *)vb, vbName, (void *)ib, ibName, (int)slot.isDynamic);
 
     slot.meshInfo.vertexBuffer = vb;
     slot.meshInfo.vertexCount = desc.vertexCount;
@@ -1012,7 +981,6 @@ bool AccelerationStructure::AddInstance(const NR_AddInstanceDesc &desc)
     }
     m_handleToSlot[userHandle] = slotIndex;
     ++m_activeCount;
-    m_tlasRebuildPendingSlots = 3;
     return true;
 }
 
@@ -1044,7 +1012,6 @@ void AccelerationStructure::RemoveInstance(uint32_t handle)
     m_freeSlots.push_back(slotIndex);
     m_handleToSlot.erase(it);
     --m_activeCount;
-    m_tlasRebuildPendingSlots = 3;
 }
 
 // ---------------------------------------------------------------------------
@@ -1053,8 +1020,7 @@ void AccelerationStructure::RemoveInstance(uint32_t handle)
 //   produced by Unity's skinning pass, discard the stale BLAS (deferred GPU
 //   delete after 3 frames), and schedule a rebuild for next BuildOrUpdate.
 // ---------------------------------------------------------------------------
-void AccelerationStructure::UpdateDynamicVertexBuffer(
-    uint32_t handle, void *vbPtr, uint32_t vertexCount, uint32_t vertexStride)
+void AccelerationStructure::UpdateDynamicVertexBuffer(uint32_t handle, void *vbPtr, uint32_t vertexCount, uint32_t vertexStride)
 {
     std::lock_guard<std::mutex> lock(m_stateMutex);
     auto it = m_handleToSlot.find(handle);
@@ -1102,21 +1068,17 @@ void AccelerationStructure::UpdateDynamicVertexBuffer(
         m_blasCache.erase(cacheIt);
     }
 
-    // NOTE: We no longer defer deletion of the old vertex buffer because we don't own it.
-    // Unity manages the vertex buffer lifetime. We only update our raw pointer.
     // Set descriptive name for the new vertex buffer
     wchar_t vbName[64];
     swprintf(vbName, 64, L"Unity_VB_Dynamic_Handle%u_Updated", handle);
     newVb->SetName(vbName);
-    AccelLogf(m_log, kUnityLogTypeLog,
-              "[UpdateDynamicVB] Handle=%u, oldVB=%p, newVB=%p '%ls'",
-              handle, (void *)slot.meshInfo.vertexBuffer, (void *)newVb, vbName);
+
+    AccelLogf(m_log, kUnityLogTypeLog, "[UpdateDynamicVB] Handle=%u, oldVB=%p, newVB=%p '%ls'", handle, (void *)slot.meshInfo.vertexBuffer, (void *)newVb, vbName);
 
     slot.meshInfo.vertexBuffer = newVb;
     slot.meshInfo.vertexCount = vertexCount;
     slot.meshInfo.vertexStride = vertexStride;
     slot.needsBLAS = true;
-    m_tlasRebuildPendingSlots = 3;
 }
 
 // ---------------------------------------------------------------------------
@@ -1131,11 +1093,7 @@ void AccelerationStructure::SetInstanceTransform(uint32_t handle, const float tr
     InstanceSlot &slot = m_slots[it->second];
     if (!slot.active)
         return;
-    if (memcmp(slot.transform, transform, 48) != 0)
-    {
-        memcpy(slot.transform, transform, 48);
-        m_transformsDirty = true;
-    }
+    memcpy(slot.transform, transform, 48);
 }
 
 void AccelerationStructure::SetInstanceMask(uint32_t handle, uint8_t mask)
@@ -1148,7 +1106,6 @@ void AccelerationStructure::SetInstanceMask(uint32_t handle, uint8_t mask)
     if (!slot.active || slot.mask == mask)
         return;
     slot.mask = mask;
-    m_tlasRebuildPendingSlots = 3;
 }
 
 void AccelerationStructure::SetInstanceID(uint32_t handle, uint32_t id)
@@ -1161,7 +1118,6 @@ void AccelerationStructure::SetInstanceID(uint32_t handle, uint32_t id)
     if (!slot.active || slot.customInstanceID == id)
         return;
     slot.customInstanceID = id;
-    m_tlasRebuildPendingSlots = 3;
 }
 
 // ---------------------------------------------------------------------------
@@ -1179,11 +1135,6 @@ bool AccelerationStructure::BuildOrUpdate(ID3D12GraphicsCommandList4 *cmdList)
     // The GPU is currently consuming the previous slot; we now own this slot.
     m_frameIndex = (m_frameIndex + 1) % 3;
 
-    // If a structural rebuild is pending for this slot, mark it as needed now.
-    // m_tlasRebuildPendingSlots is set to 2 on any structural change so that
-    // BOTH slots are brought up to date before we fall back to refit-only.
-    const bool tlasNeedsRebuild = (m_tlasRebuildPendingSlots > 0);
-
     // -------------------------------------------------------------------
     // Step A: Build any pending new BLASes (throttled to avoid GPU TDR)
     // -------------------------------------------------------------------
@@ -1196,8 +1147,6 @@ bool AccelerationStructure::BuildOrUpdate(ID3D12GraphicsCommandList4 *cmdList)
             continue;
         if (blasBuildsThisFrame >= kMaxBLASBuildsPerFrame)
         {
-            // More BLASes remain; ensure we keep rebuilding next frame.
-            m_tlasRebuildPendingSlots = (std::max)(m_tlasRebuildPendingSlots, 1);
             break;
         }
         if (!EnsureBLAS(cmdList, slot.meshKey, slot.meshInfo, slot.isDynamic))
@@ -1216,57 +1165,25 @@ bool AccelerationStructure::BuildOrUpdate(ID3D12GraphicsCommandList4 *cmdList)
         blasBarrier.Type = D3D12_RESOURCE_BARRIER_TYPE_UAV;
         blasBarrier.UAV.pResource = nullptr; // nullptr = all UAV resources
         cmdList->ResourceBarrier(1, &blasBarrier);
-        m_tlasRebuildPendingSlots = 3;
+    }
+    
+    m_tlasEntries.clear();
+    for (const auto &slot : m_slots)
+    {
+        if (!slot.active)
+            continue;
+        TLASInstanceEntry e;
+        e.blasVA = GetBLASVA(slot.meshKey);
+        e.instanceID = slot.customInstanceID;
+        e.mask = slot.mask;
+        memcpy(e.transform, slot.transform, 48);
+        m_tlasEntries.push_back(e);
     }
 
-    // -------------------------------------------------------------------
-    // Step B: Structural change - full TLAS rebuild
-    // -------------------------------------------------------------------
-    if (m_tlasRebuildPendingSlots > 0)
+    if (!BuildTLAS(cmdList, m_tlasEntries))
     {
-        m_activeDefs.clear();
-        m_tlasEntries.clear();
-        for (const auto &slot : m_slots)
-        {
-            if (!slot.active)
-                continue;
-            m_activeDefs.push_back(slot.meshInfo);
-            TLASInstanceEntry e;
-            e.blasVA = GetBLASVA(slot.meshKey);
-            e.instanceID = slot.customInstanceID;
-            e.mask = slot.mask;
-            memcpy(e.transform, slot.transform, 48);
-            m_tlasEntries.push_back(e);
-        }
-        // AccelLogf(m_log, kUnityLogTypeLog, "BuildOrUpdate: rebuilding TLAS (pending=%d)...", m_tlasRebuildPendingSlots);
-        if (!BuildTLAS(cmdList, m_tlasEntries))
-        {
-            AccelLogf(m_log, kUnityLogTypeError, "BuildOrUpdate: BuildTLAS failed");
-            return false;
-        }
-        --m_tlasRebuildPendingSlots;
-        m_transformsDirty = false;
-        return true;
+        AccelLogf(m_log, kUnityLogTypeError, "BuildOrUpdate: BuildTLAS failed");
+        return false;
     }
-
-    // -------------------------------------------------------------------
-    // Step C: No structural change — update transforms if dirty, then
-    // always call BuildTLAS to write the current state into this frame's
-    // slot.  With triple buffering each slot has its own instanceDesc
-    // buffer, so skipping BuildTLAS would leave stale data in the slot.
-    // -------------------------------------------------------------------
-    if (m_transformsDirty)
-    {
-        uint32_t denseIdx = 0;
-        for (const auto &slot : m_slots)
-        {
-            if (!slot.active)
-                continue;
-            memcpy(m_tlasEntries[denseIdx].transform, slot.transform, 48);
-            ++denseIdx;
-        }
-        m_transformsDirty = false;
-    }
-    BuildTLAS(cmdList, m_tlasEntries);
     return true;
 }

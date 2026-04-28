@@ -196,9 +196,6 @@ public:
 
     ID3D12Resource* GetTLAS() const { return m_tlasResources[m_frameIndex].tlas.Get(); }
 
-    // Dense list of active InstanceDefs in TLAS order — used by Renderer for bindless VB/IB SRVs.
-    const std::vector<MeshInfo>& GetInstanceDefs() const { return m_activeDefs; }
-
 private:
     // -----------------------------------------------------------------------
     // Internal BLAS types
@@ -301,16 +298,7 @@ private:
     std::unordered_map<uint32_t, uint32_t> m_handleToSlot;
     uint32_t m_activeCount = 0;
 
-    // Dense active list (TLAS order)
-    std::vector<MeshInfo>       m_activeDefs;
     std::vector<TLASInstanceEntry> m_tlasEntries;
-
-    // Dirty flags
-    // m_tlasRebuildPendingSlots counts how many double-buffer slots still need a
-    // full structural rebuild.  Set to 2 on any structural change so that BOTH
-    // slots are rebuilt before we fall back to refit-only updates.
-    int  m_tlasRebuildPendingSlots = 3;  // start at 3: all slots need initial build
-    bool m_transformsDirty         = false;
 
     // Deferred deletion queue
     std::list<PendingDelete> m_pendingDeletes;
