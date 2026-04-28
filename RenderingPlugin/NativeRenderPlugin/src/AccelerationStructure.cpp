@@ -1,4 +1,5 @@
 ﻿#include "AccelerationStructure.h"
+#include "PluginInternal.h"
 #include <cstdio>
 #include <cstdarg>
 #include <cstring>
@@ -6,6 +7,7 @@
 
 // Forward declaration of global deferred resource delete function from Plugin.cpp
 extern void EnqueueDeferredResourceDelete(ComPtr<ID3D12Resource> &&resource);
+extern void EnqueueDeferredDelete(void* ptr, DeferredType type);
 
 // ---------------------------------------------------------------------------
 // Internal buffer helper
@@ -206,17 +208,24 @@ bool AccelerationStructure::BuildOMMForSubmesh(ID3D12GraphicsCommandList4 *cmdLi
 //   Cache miss: build BLAS (+ OMM) and cache it.
 //   isDynamic:  true for SkinnedMeshRenderer (rebuilt every frame with ALLOW_UPDATE flag)
 // ---------------------------------------------------------------------------
-bool AccelerationStructure::EnsureBLAS(ID3D12GraphicsCommandList4 *cmdList, const MeshKey &key, const MeshInfo &def, bool isDynamic)
+bool AccelerationStructure::EnsureBLAS(ID3D12GraphicsCommandList4 *cmdList, InstanceSlot &slot)
 {
-    auto it = m_blasCache.find(key);
-    if (it != m_blasCache.end())
-    {
-        it->second.refCount++;
-        AccelLogf(m_log, kUnityLogTypeLog, "[BLAS] AddRef  vb=%p refCount=%d", (void *)key.vbPtr, it->second.refCount);
-        return true;
+    if(!slot.isDynamic){
+        auto it = m_blasCache.find(slot.meshKey);
+        if (it != m_blasCache.end())
+        {
+            it->second.refCount++;
+            slot.blasVA = it->second.blas->GetGPUVirtualAddress();
+            AccelLogf(m_log, kUnityLogTypeLog, "[BLAS] AddRef  vb=%p refCount=%d", (void *)slot.meshInfo.vertexBuffer, it->second.refCount);
+            return true;
+        }
     }
 
-    BLASEntry entry;
+    auto &def = slot.meshInfo;
+    auto isDynamic = slot.isDynamic;
+    auto &key = slot.meshKey;
+
+    BLASEntry blas;
     const size_t subCount = def.submeshes.size();
     if (subCount == 0)
     {
@@ -235,13 +244,13 @@ bool AccelerationStructure::EnsureBLAS(ID3D12GraphicsCommandList4 *cmdList, cons
     m_d3d12v8->RequestResourceState(def.vertexBuffer, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
     m_d3d12v8->RequestResourceState(def.indexBuffer, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
 
-    entry.ommArrays.resize(subCount);
-    entry.ommArrayScratch.resize(subCount);
-    entry.ommIndexBuffers.resize(subCount);
-    entry.ommDescArrayBuffers.resize(subCount);
-    entry.ommArrayDataBuffers.resize(subCount);
-    entry.ommIndexFormats.resize(subCount, DXGI_FORMAT_R16_UINT);
-    entry.ommIndexStrides.resize(subCount, 2);
+    blas.ommArrays.resize(subCount);
+    blas.ommArrayScratch.resize(subCount);
+    blas.ommIndexBuffers.resize(subCount);
+    blas.ommDescArrayBuffers.resize(subCount);
+    blas.ommArrayDataBuffers.resize(subCount);
+    blas.ommIndexFormats.resize(subCount, DXGI_FORMAT_R16_UINT);
+    blas.ommIndexStrides.resize(subCount, 2);
 
     std::vector<D3D12_RAYTRACING_GEOMETRY_DESC> geomDescs(subCount);
     std::vector<D3D12_RAYTRACING_GEOMETRY_TRIANGLES_DESC> ommTriDescs(subCount);
@@ -257,10 +266,10 @@ bool AccelerationStructure::EnsureBLAS(ID3D12GraphicsCommandList4 *cmdList, cons
         bool subUseOMM = false;
         if (sub.hasBakedOMM)
         {
-            subUseOMM = BuildOMMForSubmesh(cmdList, entry, j, sub);
+            subUseOMM = BuildOMMForSubmesh(cmdList, blas, j, sub);
             if (subUseOMM)
             {
-                entry.anyOMM = true;
+                blas.anyOMM = true;
                 AccelLogf(m_log, kUnityLogTypeLog, "EnsureBLAS: submesh[%zu] OMM active", j);
             }
             else
@@ -287,11 +296,11 @@ bool AccelerationStructure::EnsureBLAS(ID3D12GraphicsCommandList4 *cmdList, cons
 
             D3D12_RAYTRACING_GEOMETRY_OMM_LINKAGE_DESC &ol = ommLinkages[j];
             ol = {};
-            ol.OpacityMicromapArray = entry.ommArrays[j]->GetGPUVirtualAddress();
+            ol.OpacityMicromapArray = blas.ommArrays[j]->GetGPUVirtualAddress();
             ol.OpacityMicromapBaseLocation = 0;
-            ol.OpacityMicromapIndexBuffer.StartAddress = entry.ommIndexBuffers[j]->GetGPUVirtualAddress();
-            ol.OpacityMicromapIndexBuffer.StrideInBytes = entry.ommIndexStrides[j];
-            ol.OpacityMicromapIndexFormat = entry.ommIndexFormats[j];
+            ol.OpacityMicromapIndexBuffer.StartAddress = blas.ommIndexBuffers[j]->GetGPUVirtualAddress();
+            ol.OpacityMicromapIndexBuffer.StrideInBytes = blas.ommIndexStrides[j];
+            ol.OpacityMicromapIndexFormat = blas.ommIndexFormats[j];
 
             geomDesc.OmmTriangles.pTriangles = &td;
             geomDesc.OmmTriangles.pOmmLinkage = &ol;
@@ -319,7 +328,6 @@ bool AccelerationStructure::EnsureBLAS(ID3D12GraphicsCommandList4 *cmdList, cons
     if (isDynamic)
     {
         blasFlags = D3D12_RAYTRACING_ACCELERATION_STRUCTURE_BUILD_FLAG_ALLOW_UPDATE;
-        AccelLogf(m_log, kUnityLogTypeLog, "[BLAS] Building dynamic BLAS with ALLOW_UPDATE flag (vb=%p)", (void *)key.vbPtr);
     }
     else
     {
@@ -359,32 +367,37 @@ bool AccelerationStructure::EnsureBLAS(ID3D12GraphicsCommandList4 *cmdList, cons
         swprintf(scratchName, 64, L"BLASScratch_Static_VB_%p", (void *)key.vbPtr);
     }
 
-    entry.blasScratch = CreateBuffer(m_device.Get(),
+    blas.blasScratch = CreateBuffer(m_device.Get(),
                                      prebuildInfo.ScratchDataSizeInBytes,
                                      D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS,
                                      D3D12_RESOURCE_STATE_COMMON, defaultHeap, scratchName);
-    entry.blas = CreateBuffer(m_device.Get(),
+    blas.blas = CreateBuffer(m_device.Get(),
                               prebuildInfo.ResultDataMaxSizeInBytes,
                               D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS,
                               D3D12_RESOURCE_STATE_RAYTRACING_ACCELERATION_STRUCTURE, defaultHeap, blasName);
-    if (!entry.blasScratch || !entry.blas)
+    if (!blas.blasScratch || !blas.blas)
     {
         AccelLogf(m_log, kUnityLogTypeError, "EnsureBLAS: buffer allocation failed");
         return false;
     }
 
     D3D12_BUILD_RAYTRACING_ACCELERATION_STRUCTURE_DESC buildDesc = {};
-    buildDesc.DestAccelerationStructureData = entry.blas->GetGPUVirtualAddress();
+    buildDesc.DestAccelerationStructureData = blas.blas->GetGPUVirtualAddress();
     buildDesc.Inputs = inputs;
-    buildDesc.ScratchAccelerationStructureData = entry.blasScratch->GetGPUVirtualAddress();
+    buildDesc.ScratchAccelerationStructureData = blas.blasScratch->GetGPUVirtualAddress();
     cmdList->BuildRaytracingAccelerationStructure(&buildDesc, 0, nullptr);
-    
-    EnqueueDeferredResourceDelete(std::move(entry.blasScratch));
 
-    entry.refCount = 1;
-    // AccelLogf(m_log, kUnityLogTypeLog, "[BLAS] Add     vb=%p refCount=1 (new, anyOMM=%d)",
-    //           (void*)key.vbPtr, (int)entry.anyOMM);
-    m_blasCache.emplace(key, std::move(entry));
+    slot.blasVA = blas.blas->GetGPUVirtualAddress();
+    if(isDynamic){
+        EnqueueDeferredDelete(new BLASEntry(std::move(blas)), DeferredType::AccelStructBlas);
+    }else{
+        EnqueueDeferredResourceDelete(std::move(blas.blasScratch));
+        blas.refCount = 1;
+        // AccelLogf(m_log, kUnityLogTypeLog, "[BLAS] Add     vb=%p refCount=1 (new, anyOMM=%d)",
+        //           (void*)key.vbPtr, (int)blas.anyOMM);
+        m_blasCache.emplace(key, std::move(blas));
+    }
+
     return true;
 }
 
@@ -1060,16 +1073,17 @@ bool AccelerationStructure::BuildOrUpdate(ID3D12GraphicsCommandList4 *cmdList)
     {
         if (!slot.active || !slot.needsBLAS)
             continue;
+
         if (blasBuildsThisFrame >= kMaxBLASBuildsPerFrame)
-        {
             break;
-        }
-        if (!EnsureBLAS(cmdList, slot.meshKey, slot.meshInfo, slot.isDynamic))
+
+        if (!EnsureBLAS(cmdList, slot))
         {
             AccelLogf(m_log, kUnityLogTypeError, "BuildOrUpdate: EnsureBLAS failed");
             return false;
         }
-        slot.needsBLAS = false;
+        if(!slot.isDynamic)
+            slot.needsBLAS = false;
         anyNewBLAS = true;
         ++blasBuildsThisFrame;
     }
@@ -1088,7 +1102,7 @@ bool AccelerationStructure::BuildOrUpdate(ID3D12GraphicsCommandList4 *cmdList)
         if (!slot.active)
             continue;
         TLASInstanceEntry e;
-        e.blasVA = GetBLASVA(slot.meshKey);
+        e.blasVA = slot.blasVA;
         e.instanceID = slot.customInstanceID;
         e.mask = slot.mask;
         memcpy(e.transform, slot.transform, 48);

@@ -129,6 +129,22 @@ struct MeshKeyHash
     }
 };
 
+struct BLASEntry
+{
+    ComPtr<ID3D12Resource> blas;
+    ComPtr<ID3D12Resource> blasScratch;
+
+    std::vector<ComPtr<ID3D12Resource>> ommArrays;
+    std::vector<ComPtr<ID3D12Resource>> ommArrayScratch;
+    std::vector<ComPtr<ID3D12Resource>> ommIndexBuffers;
+    std::vector<ComPtr<ID3D12Resource>> ommDescArrayBuffers;
+    std::vector<ComPtr<ID3D12Resource>> ommArrayDataBuffers;
+    std::vector<DXGI_FORMAT>            ommIndexFormats;
+    std::vector<UINT>                   ommIndexStrides;
+
+    bool anyOMM   = false;
+    int  refCount = 0;
+};
 // ---------------------------------------------------------------------------
 // AccelerationStructure
 //   Unified class that manages the full instance lifecycle, BLAS cache, and TLAS.
@@ -200,22 +216,7 @@ private:
     // -----------------------------------------------------------------------
     // Internal BLAS types
     // -----------------------------------------------------------------------
-    struct BLASEntry
-    {
-        ComPtr<ID3D12Resource> blas;
-        ComPtr<ID3D12Resource> blasScratch;
 
-        std::vector<ComPtr<ID3D12Resource>> ommArrays;
-        std::vector<ComPtr<ID3D12Resource>> ommArrayScratch;
-        std::vector<ComPtr<ID3D12Resource>> ommIndexBuffers;
-        std::vector<ComPtr<ID3D12Resource>> ommDescArrayBuffers;
-        std::vector<ComPtr<ID3D12Resource>> ommArrayDataBuffers;
-        std::vector<DXGI_FORMAT>            ommIndexFormats;
-        std::vector<UINT>                   ommIndexStrides;
-
-        bool anyOMM   = false;
-        int  refCount = 0;
-    };
 
     struct TLASInstanceEntry
     {
@@ -243,12 +244,13 @@ private:
         bool    active    = false;
         bool    needsBLAS = false;
         bool    isDynamic = false; // SkinnedMeshRenderer: BLAS rebuilt each frame
+        D3D12_GPU_VIRTUAL_ADDRESS blasVA;
     };
 
     // -----------------------------------------------------------------------
     // BLAS helpers
     // -----------------------------------------------------------------------
-    bool EnsureBLAS(ID3D12GraphicsCommandList4* cmdList, const MeshKey& key, const MeshInfo& def, bool isDynamic);
+    bool EnsureBLAS(ID3D12GraphicsCommandList4* cmdList, InstanceSlot& slot);
     void ReleaseBLAS(const MeshKey& key);
     D3D12_GPU_VIRTUAL_ADDRESS GetBLASVA(const MeshKey& key) const;
     bool BuildOMMForSubmesh(ID3D12GraphicsCommandList4* cmdList,

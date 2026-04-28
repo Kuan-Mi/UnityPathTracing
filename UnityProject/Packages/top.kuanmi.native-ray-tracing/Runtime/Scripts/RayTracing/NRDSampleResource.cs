@@ -505,7 +505,7 @@ namespace NativeRender
         private void UpdateSkinnedInstances()
         {
             bool anyInstChanged = false;
-            Debug.Log("UpdateSkinnedInstances " + _skinnedInstances.Count);
+            // Debug.Log("UpdateSkinnedInstances " + _skinnedInstances.Count);
 
             foreach (var kv in _skinnedInstances)
             {

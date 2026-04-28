@@ -2074,6 +2074,18 @@ PrefabInstance:
       propertyPath: m_IsActive
       value: 1
       objectReference: {fileID: 0}
+    - target: {fileID: 2437108026532723580, guid: fbb6d5bcbdb728547bcaeb4d19b4c3d4, type: 3}
+      propertyPath: m_LocalPosition.x
+      value: -0.599
+      objectReference: {fileID: 0}
+    - target: {fileID: 2437108026532723580, guid: fbb6d5bcbdb728547bcaeb4d19b4c3d4, type: 3}
+      propertyPath: m_LocalPosition.y
+      value: 0.317
+      objectReference: {fileID: 0}
+    - target: {fileID: 2437108026532723580, guid: fbb6d5bcbdb728547bcaeb4d19b4c3d4, type: 3}
+      propertyPath: m_LocalPosition.z
+      value: -0.028
+      objectReference: {fileID: 0}
     - target: {fileID: 3856141144039505491, guid: fbb6d5bcbdb728547bcaeb4d19b4c3d4, type: 3}
       propertyPath: m_IsActive
       value: 1
@@ -2088,7 +2100,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 3911554141288783347, guid: fbb6d5bcbdb728547bcaeb4d19b4c3d4, type: 3}
       propertyPath: m_LocalPosition.z
-      value: 0.914
+      value: 0.938
       objectReference: {fileID: 0}
     - target: {fileID: 3911554141288783347, guid: fbb6d5bcbdb728547bcaeb4d19b4c3d4, type: 3}
       propertyPath: m_LocalRotation.w
@@ -2145,6 +2157,18 @@ PrefabInstance:
     - target: {fileID: 5756124780136497377, guid: fbb6d5bcbdb728547bcaeb4d19b4c3d4, type: 3}
       propertyPath: m_UpdateWhenOffscreen
       value: 1
+      objectReference: {fileID: 0}
+    - target: {fileID: 5938181906465893183, guid: fbb6d5bcbdb728547bcaeb4d19b4c3d4, type: 3}
+      propertyPath: m_LocalPosition.x
+      value: -0.012
+      objectReference: {fileID: 0}
+    - target: {fileID: 5938181906465893183, guid: fbb6d5bcbdb728547bcaeb4d19b4c3d4, type: 3}
+      propertyPath: m_LocalPosition.y
+      value: 0.138
+      objectReference: {fileID: 0}
+    - target: {fileID: 5938181906465893183, guid: fbb6d5bcbdb728547bcaeb4d19b4c3d4, type: 3}
+      propertyPath: m_LocalPosition.z
+      value: 0.088
       objectReference: {fileID: 0}
     - target: {fileID: 7627604419854799097, guid: fbb6d5bcbdb728547bcaeb4d19b4c3d4, type: 3}
       propertyPath: m_UpdateWhenOffscreen

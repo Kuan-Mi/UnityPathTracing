@@ -51,7 +51,6 @@ static bool                      s_RendererReady = false;
 // instead of immediately deleting.  DrainDeferredDeletes() frees entries whose
 // safeAfterValue <= fence->GetCompletedValue().
 // ---------------------------------------------------------------------------
-enum class DeferredType { BindlessTexture, BindlessBuffer, AccelStruct, RayTraceShader, ComputeShader, ComputeDescriptorSet };
 
 struct DeferredDeleteEntry
 {
@@ -93,14 +92,22 @@ static void ImmediateDelete(DeferredDeleteEntry& e)
     case DeferredType::RayTraceShader:  delete reinterpret_cast<RayTraceShader*>(e.ptr);  break;
     case DeferredType::ComputeShader:        delete reinterpret_cast<ComputeShader*>(e.ptr);           break;
     case DeferredType::ComputeDescriptorSet: delete reinterpret_cast<ComputeDescriptorSet*>(e.ptr);    break;
+    case DeferredType::AccelStructBlas:      delete reinterpret_cast<BLASEntry*>(e.ptr); break;
+
     }
 }
 
-static void EnqueueDeferredDelete(void* ptr, DeferredType type)
+void EnqueueDeferredDelete(void* ptr, DeferredType type)
 {
     if (!ptr) return;
     std::lock_guard<std::mutex> lk(s_DeferredDeleteMutex);
     s_DeferredDeleteQueue.push_back({ ptr, type, s_DeletionFenceValue + kDeleteDelay });
+    
+    char logMsg[512];
+    snprintf(logMsg, sizeof(logMsg),
+        "EnqueueDeferredDelete: ptr=0x%p type=%d safeAfter=%llu",
+        ptr, (int)type, s_DeletionFenceValue + kDeleteDelay);
+    PluginLog(kUnityLogTypeLog, logMsg, __FILE__, __LINE__);
 }
 
 // Enqueue a D3D12 resource for deferred deletion.

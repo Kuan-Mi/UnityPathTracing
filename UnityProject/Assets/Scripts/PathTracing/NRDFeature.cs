@@ -244,7 +244,7 @@ namespace PathTracing
 
             if (setting.update)
             {
-                Debug.Log($"Enqueueing TLAS update pass {Time.frameCount} {++cc} {cam.name} {DateTime.Now} | Feature:{GetInstanceID()} Renderer:{renderer.GetType()} Stack:{new System.Diagnostics.StackTrace(1, true).GetFrame(0)?.GetMethod()?.Name}");
+                // Debug.Log($"Enqueueing TLAS update pass {Time.frameCount} {++cc} {cam.name} {DateTime.Now} | Feature:{GetInstanceID()} Renderer:{renderer.GetType()} Stack:{new System.Diagnostics.StackTrace(1, true).GetFrame(0)?.GetMethod()?.Name}");
                 _nrdTlasUpdatePass.SetNRDSampleResource(_nrdSampleResource);
                 renderer.EnqueuePass(_nrdTlasUpdatePass);
             }
