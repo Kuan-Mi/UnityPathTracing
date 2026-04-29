@@ -575,6 +575,7 @@ namespace PathTracing
 
         protected override void Dispose(bool disposing)
         {
+            Debug.LogError("Dispose");
             base.Dispose(disposing);
 
             _nrdSampleResource?.Dispose();
@@ -623,6 +624,7 @@ namespace PathTracing
 #if UNITY_EDITOR
         private void Reset()
         {
+            Debug.LogError("Reset");
             setting = new NrdSampleSetting();
             AutoFillShaders();
         }

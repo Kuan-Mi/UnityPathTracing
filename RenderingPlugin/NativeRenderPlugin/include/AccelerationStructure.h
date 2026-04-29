@@ -233,7 +233,6 @@ private:
     struct InstanceSlot
     {
         MeshInfo meshInfo;
-        MeshKey     meshKey;
         float       transform[12] = {
             1,0,0,0,
             0,1,0,0,
@@ -251,10 +250,13 @@ private:
     // BLAS helpers
     // -----------------------------------------------------------------------
     bool EnsureBLAS(ID3D12GraphicsCommandList4* cmdList, InstanceSlot& slot);
-    void ReleaseBLAS(const MeshKey& key);
+    
     D3D12_GPU_VIRTUAL_ADDRESS GetBLASVA(const MeshKey& key) const;
-    bool BuildOMMForSubmesh(ID3D12GraphicsCommandList4* cmdList,
-                            BLASEntry& entry, size_t subIdx, const SubMeshData& mesh);
+
+    
+
+                            
+    void wait_on_fence(UINT64 fence_value, ID3D12Fence* fence, HANDLE fence_event);
 
     // TLAS helpers
     bool BuildTLAS(ID3D12GraphicsCommandList4* cmdList, const std::vector<TLASInstanceEntry>& entries);
@@ -278,11 +280,10 @@ private:
     IUnityGraphicsD3D12v8*   m_d3d12v8 = nullptr;
     ComPtr<ID3D12Device5> m_device;
 
-    // BLAS cache
-    std::unordered_map<MeshKey, BLASEntry, MeshKeyHash> m_blasCache;
 
     // TLAS quadruple-buffered resources (indexed by m_frameIndex)
-    TLASFrameResources     m_tlasResources[4];
+    TLASFrameResources     m_tlasResources[10];
+    UINT64                 m_tlasFenceValues[10] = {0}; // GPU fence value when each TLAS slot will be ready for reuse
     uint32_t               m_frameIndex           = 0;
 
     // Slot system

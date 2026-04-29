@@ -70,160 +70,10 @@ AccelerationStructure::~AccelerationStructure()
     AccelLogf(m_log, kUnityLogTypeLog, "[AccelerationStructure::~AccelerationStructure] Destructor complete");
 }
 
-// ---------------------------------------------------------------------------
-// BuildOMMForSubmesh
-//   Uploads OMM data to GPU and records a BuildRaytracingAccelerationStructure
-//   command for the OMM Array AS into cmdList.
-// ---------------------------------------------------------------------------
-bool AccelerationStructure::BuildOMMForSubmesh(ID3D12GraphicsCommandList4 *cmdList, BLASEntry &entry, size_t subIdx, const SubMeshData &mesh)
-{
-    const SubMeshData::OMMBakedData &baked = mesh.ommBaked;
-    AccelLogf(m_log, kUnityLogTypeLog,
-              "[OMM] BuildOMMForSubmesh[%zu]: arrayData=%zu bytes, descs=%u, indices=%u",
-              subIdx, baked.arrayData.size(), baked.descArrayCount, baked.indexCount);
-
-    if (baked.histogram.empty())
-    {
-        AccelLogf(m_log, kUnityLogTypeError, "[OMM] BuildOMMForSubmesh[%zu]: histogram is empty, cannot build OMM array", subIdx);
-        return false;
-    }
-
-    D3D12_HEAP_PROPERTIES uploadHeap = {};
-    uploadHeap.Type = D3D12_HEAP_TYPE_UPLOAD;
-    D3D12_HEAP_PROPERTIES defaultHeap = {};
-    defaultHeap.Type = D3D12_HEAP_TYPE_DEFAULT;
-    void *mapped = nullptr;
-
-    // 1. Upload raw OMM array data
-    auto arrayDataBuf = CreateBuffer(m_device.Get(),
-                                     !baked.arrayData.empty() ? (UINT64)baked.arrayData.size() : 1,
-                                     D3D12_RESOURCE_FLAG_NONE, D3D12_RESOURCE_STATE_GENERIC_READ, uploadHeap,
-                                     L"OMM_ArrayData");
-    if (!arrayDataBuf)
-    {
-        AccelLogf(m_log, kUnityLogTypeError, "[OMM] BuildOMMForSubmesh[%zu]: arrayData buf alloc failed", subIdx);
-        return false;
-    }
-    arrayDataBuf->Map(0, nullptr, &mapped);
-    if (!baked.arrayData.empty())
-        memcpy(mapped, baked.arrayData.data(), baked.arrayData.size());
-    arrayDataBuf->Unmap(0, nullptr);
-
-    // 2. Upload OMM desc array
-    UINT64 descArrayBytes = (UINT64)baked.descArrayCount * sizeof(D3D12_RAYTRACING_OPACITY_MICROMAP_DESC);
-    auto descArrayBuf = CreateBuffer(m_device.Get(),
-                                     descArrayBytes ? descArrayBytes : 1,
-                                     D3D12_RESOURCE_FLAG_NONE, D3D12_RESOURCE_STATE_GENERIC_READ, uploadHeap,
-                                     L"OMM_DescArray");
-    if (!descArrayBuf)
-    {
-        AccelLogf(m_log, kUnityLogTypeError,
-                  "[OMM] BuildOMMForSubmesh[%zu]: descArray buf alloc failed", subIdx);
-        return false;
-    }
-    descArrayBuf->Map(0, nullptr, &mapped);
-    if (!baked.descArray.empty())
-    {
-        size_t copyBytes = (std::min)((size_t)descArrayBytes, baked.descArray.size());
-        memcpy(mapped, baked.descArray.data(), copyBytes);
-    }
-    descArrayBuf->Unmap(0, nullptr);
-
-    // 3. Upload OMM index buffer
-    UINT ommIdxBytes = baked.indexCount * baked.indexStride;
-    auto ommIdxBuf = CreateBuffer(m_device.Get(),
-                                  ommIdxBytes ? ommIdxBytes : 1,
-                                  D3D12_RESOURCE_FLAG_NONE, D3D12_RESOURCE_STATE_GENERIC_READ, uploadHeap,
-                                  L"OMM_IndexBuffer");
-    if (!ommIdxBuf)
-    {
-        AccelLogf(m_log, kUnityLogTypeError,
-                  "[OMM] BuildOMMForSubmesh[%zu]: OMM index buf alloc failed", subIdx);
-        return false;
-    }
-    ommIdxBuf->Map(0, nullptr, &mapped);
-    if (ommIdxBytes)
-        memcpy(mapped, baked.indexBuffer.data(), ommIdxBytes);
-    ommIdxBuf->Unmap(0, nullptr);
-
-    // 4. Build OMM Array AS
-    D3D12_RAYTRACING_OPACITY_MICROMAP_ARRAY_DESC ommArrayDesc = {};
-    ommArrayDesc.NumOmmHistogramEntries = (UINT)baked.histogram.size();
-    ommArrayDesc.pOmmHistogram = baked.histogram.data();
-    ommArrayDesc.InputBuffer = arrayDataBuf->GetGPUVirtualAddress();
-    ommArrayDesc.PerOmmDescs.StartAddress = descArrayBuf->GetGPUVirtualAddress();
-    ommArrayDesc.PerOmmDescs.StrideInBytes = sizeof(D3D12_RAYTRACING_OPACITY_MICROMAP_DESC);
-
-    D3D12_BUILD_RAYTRACING_ACCELERATION_STRUCTURE_INPUTS ommInputs = {};
-    ommInputs.Type = D3D12_RAYTRACING_ACCELERATION_STRUCTURE_TYPE_OPACITY_MICROMAP_ARRAY;
-    ommInputs.Flags = D3D12_RAYTRACING_ACCELERATION_STRUCTURE_BUILD_FLAG_PREFER_FAST_TRACE;
-    ommInputs.NumDescs = 1;
-    ommInputs.DescsLayout = D3D12_ELEMENTS_LAYOUT_ARRAY;
-    ommInputs.pOpacityMicromapArrayDesc = &ommArrayDesc;
-
-    D3D12_RAYTRACING_ACCELERATION_STRUCTURE_PREBUILD_INFO prebuildInfo = {};
-    m_device->GetRaytracingAccelerationStructurePrebuildInfo(&ommInputs, &prebuildInfo);
-
-    entry.ommArrayScratch[subIdx] = CreateBuffer(m_device.Get(),
-                                                 prebuildInfo.ScratchDataSizeInBytes,
-                                                 D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_COMMON, defaultHeap,
-                                                 L"OMM_ArrayScratch");
-    entry.ommArrays[subIdx] = CreateBuffer(m_device.Get(),
-                                           prebuildInfo.ResultDataMaxSizeInBytes,
-                                           D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS,
-                                           D3D12_RESOURCE_STATE_RAYTRACING_ACCELERATION_STRUCTURE, defaultHeap,
-                                           L"OMM_Array");
-    if (!entry.ommArrayScratch[subIdx] || !entry.ommArrays[subIdx])
-    {
-        AccelLogf(m_log, kUnityLogTypeError,
-                  "[OMM] BuildOMMForSubmesh[%zu]: OMM array buf alloc failed", subIdx);
-        return false;
-    }
-
-    D3D12_BUILD_RAYTRACING_ACCELERATION_STRUCTURE_DESC buildDesc = {};
-    buildDesc.DestAccelerationStructureData = entry.ommArrays[subIdx]->GetGPUVirtualAddress();
-    buildDesc.Inputs = ommInputs;
-    buildDesc.ScratchAccelerationStructureData = entry.ommArrayScratch[subIdx]->GetGPUVirtualAddress();
-    cmdList->BuildRaytracingAccelerationStructure(&buildDesc, 0, nullptr);
-
-    D3D12_RESOURCE_BARRIER barrier = {};
-    barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_UAV;
-    barrier.UAV.pResource = entry.ommArrays[subIdx].Get();
-    cmdList->ResourceBarrier(1, &barrier);
-
-    entry.ommIndexBuffers[subIdx] = std::move(ommIdxBuf);
-    entry.ommDescArrayBuffers[subIdx] = std::move(descArrayBuf);
-    entry.ommArrayDataBuffers[subIdx] = std::move(arrayDataBuf);
-    entry.ommIndexFormats[subIdx] = baked.indexFormat;
-    entry.ommIndexStrides[subIdx] = baked.indexStride;
-
-    AccelLogf(m_log, kUnityLogTypeLog,
-              "[OMM] BuildOMMForSubmesh[%zu]: OMM Array AS recorded on cmdlist", subIdx);
-    return true;
-}
-
-// ---------------------------------------------------------------------------
-// EnsureBLAS
-//   Cache hit:  increment refCount, return immediately (no GPU work).
-//   Cache miss: build BLAS (+ OMM) and cache it.
-//   isDynamic:  true for SkinnedMeshRenderer (rebuilt every frame with ALLOW_UPDATE flag)
-// ---------------------------------------------------------------------------
 bool AccelerationStructure::EnsureBLAS(ID3D12GraphicsCommandList4 *cmdList, InstanceSlot &slot)
 {
-    if(!slot.isDynamic){
-        auto it = m_blasCache.find(slot.meshKey);
-        if (it != m_blasCache.end())
-        {
-            it->second.refCount++;
-            slot.blasVA = it->second.blas->GetGPUVirtualAddress();
-            AccelLogf(m_log, kUnityLogTypeLog, "[BLAS] AddRef  vb=%p refCount=%d", (void *)slot.meshInfo.vertexBuffer, it->second.refCount);
-            return true;
-        }
-    }
-
     auto &def = slot.meshInfo;
     auto isDynamic = slot.isDynamic;
-    auto &key = slot.meshKey;
 
     BLASEntry blas;
     const size_t subCount = def.submeshes.size();
@@ -263,51 +113,7 @@ bool AccelerationStructure::EnsureBLAS(ID3D12GraphicsCommandList4 *cmdList, Inst
         D3D12_RAYTRACING_GEOMETRY_DESC &geomDesc = geomDescs[j];
         geomDesc = {};
 
-        bool subUseOMM = false;
-        if (sub.hasBakedOMM)
-        {
-            subUseOMM = BuildOMMForSubmesh(cmdList, blas, j, sub);
-            if (subUseOMM)
-            {
-                blas.anyOMM = true;
-                AccelLogf(m_log, kUnityLogTypeLog, "EnsureBLAS: submesh[%zu] OMM active", j);
-            }
-            else
-            {
-                AccelLogf(m_log, kUnityLogTypeWarning, "EnsureBLAS: submesh[%zu] OMM build failed, falling back to opaque", j);
-            }
-        }
 
-        if (subUseOMM)
-        {
-            geomDesc.Type = D3D12_RAYTRACING_GEOMETRY_TYPE_OMM_TRIANGLES;
-            geomDesc.Flags = D3D12_RAYTRACING_GEOMETRY_FLAG_NONE;
-
-            D3D12_RAYTRACING_GEOMETRY_TRIANGLES_DESC &td = ommTriDescs[j];
-            td = {};
-            td.VertexBuffer.StartAddress = def.vertexBuffer->GetGPUVirtualAddress();
-            td.VertexBuffer.StrideInBytes = def.vertexStride;
-            td.VertexCount = def.vertexCount;
-            td.VertexFormat = DXGI_FORMAT_R32G32B32_FLOAT;
-            td.IndexBuffer = def.indexBuffer->GetGPUVirtualAddress() + sub.indexByteOffset;
-            td.IndexCount = sub.indexCount;
-            td.IndexFormat = def.indexFormat;
-            td.Transform3x4 = 0;
-
-            D3D12_RAYTRACING_GEOMETRY_OMM_LINKAGE_DESC &ol = ommLinkages[j];
-            ol = {};
-            ol.OpacityMicromapArray = blas.ommArrays[j]->GetGPUVirtualAddress();
-            ol.OpacityMicromapBaseLocation = 0;
-            ol.OpacityMicromapIndexBuffer.StartAddress = blas.ommIndexBuffers[j]->GetGPUVirtualAddress();
-            ol.OpacityMicromapIndexBuffer.StrideInBytes = blas.ommIndexStrides[j];
-            ol.OpacityMicromapIndexFormat = blas.ommIndexFormats[j];
-
-            geomDesc.OmmTriangles.pTriangles = &td;
-            geomDesc.OmmTriangles.pOmmLinkage = &ol;
-            instanceHasOMM = true;
-        }
-        else
-        {
             geomDesc.Type = D3D12_RAYTRACING_GEOMETRY_TYPE_TRIANGLES;
             geomDesc.Flags = D3D12_RAYTRACING_GEOMETRY_FLAG_OPAQUE;
             geomDesc.Triangles.VertexBuffer.StartAddress = def.vertexBuffer->GetGPUVirtualAddress();
@@ -318,7 +124,7 @@ bool AccelerationStructure::EnsureBLAS(ID3D12GraphicsCommandList4 *cmdList, Inst
             geomDesc.Triangles.IndexCount = sub.indexCount;
             geomDesc.Triangles.IndexFormat = def.indexFormat;
             geomDesc.Triangles.Transform3x4 = 0;
-        }
+
     }
 
     D3D12_RAYTRACING_ACCELERATION_STRUCTURE_BUILD_FLAGS blasFlags;
@@ -358,13 +164,13 @@ bool AccelerationStructure::EnsureBLAS(ID3D12GraphicsCommandList4 *cmdList, Inst
     wchar_t blasName[64], scratchName[64];
     if (isDynamic)
     {
-        swprintf(blasName, 64, L"BLAS_Dynamic_VB_%p", (void *)key.vbPtr);
-        swprintf(scratchName, 64, L"BLASScratch_Dynamic_VB_%p", (void *)key.vbPtr);
+        swprintf(blasName, 64, L"BLAS_Dynamic_VB_%u", slot.customInstanceID);
+        swprintf(scratchName, 64, L"BLASScratch_Dynamic_VB_%u", slot.customInstanceID);
     }
     else
     {
-        swprintf(blasName, 64, L"BLAS_Static_VB_%p", (void *)key.vbPtr);
-        swprintf(scratchName, 64, L"BLASScratch_Static_VB_%p", (void *)key.vbPtr);
+        swprintf(blasName, 64, L"BLAS_Static_VB_%u", slot.customInstanceID);
+        swprintf(scratchName, 64, L"BLASScratch_Static_VB_%u", slot.customInstanceID);
     }
 
     blas.blasScratch = CreateBuffer(m_device.Get(),
@@ -388,80 +194,9 @@ bool AccelerationStructure::EnsureBLAS(ID3D12GraphicsCommandList4 *cmdList, Inst
     cmdList->BuildRaytracingAccelerationStructure(&buildDesc, 0, nullptr);
 
     slot.blasVA = blas.blas->GetGPUVirtualAddress();
-    if(isDynamic){
-        EnqueueDeferredDelete(new BLASEntry(std::move(blas)), DeferredType::AccelStructBlas);
-    }else{
-        SafeReleaseResource(std::move(blas.blasScratch));
-        blas.refCount = 1;
-        // AccelLogf(m_log, kUnityLogTypeLog, "[BLAS] Add     vb=%p refCount=1 (new, anyOMM=%d)",
-        //           (void*)key.vbPtr, (int)blas.anyOMM);
-        m_blasCache.emplace(key, std::move(blas));
-    }
+    EnqueueDeferredDelete(new BLASEntry(std::move(blas)), DeferredType::AccelStructBlas);
 
     return true;
-}
-
-// ---------------------------------------------------------------------------
-// ReleaseBLAS
-// ---------------------------------------------------------------------------
-void AccelerationStructure::ReleaseBLAS(const MeshKey &key)
-{
-    auto it = m_blasCache.find(key);
-    if (it == m_blasCache.end())
-        return;
-
-    if (--it->second.refCount > 0)
-    {
-        // AccelLogf(m_log, kUnityLogTypeLog, "[BLAS] Release vb=%p refCount=%d (still alive)",
-        //           (void*)key.vbPtr, it->second.refCount);
-        return;
-    }
-
-    // AccelLogf(m_log, kUnityLogTypeLog,
-    //     "[BLAS] Release vb=%p refCount=0 \u2192 deferred GPU delete", (void*)key.vbPtr);
-    
-    BLASEntry &e = it->second;
-    SafeReleaseResource(std::move(e.blas));
-    // e.blasScratch was already moved to pending delete at build time
-    for (auto &r : e.ommArrays)
-        if (r)
-            SafeReleaseResource(std::move(r));
-    for (auto &r : e.ommArrayScratch)
-        if (r)
-            SafeReleaseResource(std::move(r));
-    for (auto &r : e.ommIndexBuffers)
-        if (r)
-            SafeReleaseResource(std::move(r));
-    for (auto &r : e.ommDescArrayBuffers)
-        if (r)
-            SafeReleaseResource(std::move(r));
-    for (auto &r : e.ommArrayDataBuffers)
-        if (r)
-            SafeReleaseResource(std::move(r));
-    m_blasCache.erase(it);
-}
-
-// ---------------------------------------------------------------------------
-// GetBLASVA / HasAnyOMM
-// ---------------------------------------------------------------------------
-D3D12_GPU_VIRTUAL_ADDRESS AccelerationStructure::GetBLASVA(const MeshKey &key) const
-{
-    auto it = m_blasCache.find(key);
-    return (it != m_blasCache.end() && it->second.blas) ? it->second.blas->GetGPUVirtualAddress() : 0;
-}
-
-bool AccelerationStructure::HasAnyOMM() const
-{
-    for (const auto &kv : m_blasCache)
-        if (kv.second.anyOMM)
-            return true;
-    // Also check pending slots not yet built
-    for (const auto &slot : m_slots)
-        if (slot.active)
-            for (const auto &sub : slot.meshInfo.submeshes)
-                if (sub.hasBakedOMM)
-                    return true;
-    return false;
 }
 
 // ---------------------------------------------------------------------------
@@ -628,97 +363,6 @@ bool AccelerationStructure::BuildTLAS(ID3D12GraphicsCommandList4 *cmdList, const
 // High-level instance management
 // ===========================================================================
 
-// ---------------------------------------------------------------------------
-// DumpInstances  -  per-frame diagnostic dump.
-//
-//   For every active slot prints:
-//     slot index, userHandle (reverse-looked up from m_handleToSlot),
-//     customInstanceID, mask, needsBLAS, submesh count, vb/ib pointers,
-//     cached BLAS GPU VA, BLAS refCount, and translation part of the transform.
-//
-//   Also performs two self-checks:
-//     1. handle<->slot map bidirectional consistency
-//     2. duplicate (vbPtr, ibPtr) keys across slots (same mesh shared by
-//        multiple renderers is legitimate, but logged so it can be correlated
-//        with InstanceID() collisions in shader output).
-// ---------------------------------------------------------------------------
-void AccelerationStructure::DumpInstances(const char *tag) const
-{
-    const char *t = tag ? tag : "Dump";
-    AccelLogf(m_log, kUnityLogTypeLog,
-              "[AS][%s] ===== instances: active=%u slots=%zu free=%zu handles=%zu cache=%zu frame=%u =====",
-              t, m_activeCount, m_slots.size(), m_freeSlots.size(),
-              m_handleToSlot.size(), m_blasCache.size(), m_frameIndex);
-
-    // Build reverse map: slotIndex -> userHandle (expect 1:1 for active slots).
-    std::unordered_map<uint32_t, uint32_t> slotToHandle;
-    slotToHandle.reserve(m_handleToSlot.size());
-    for (const auto &kv : m_handleToSlot)
-    {
-        auto ins = slotToHandle.emplace(kv.second, kv.first);
-        if (!ins.second)
-        {
-            AccelLogf(m_log, kUnityLogTypeError,
-                      "[AS][%s] DUPLICATE slot %u mapped from handles %u and %u",
-                      t, kv.second, ins.first->second, kv.first);
-        }
-    }
-
-    // Track (vb,ib) duplicates across active slots.
-    std::unordered_map<MeshKey, uint32_t, MeshKeyHash> seenKey;
-
-    for (uint32_t i = 0; i < m_slots.size(); ++i)
-    {
-        const InstanceSlot &s = m_slots[i];
-        if (!s.active)
-            continue;
-
-        uint32_t handle = 0xFFFFFFFFu;
-        auto itH = slotToHandle.find(i);
-        if (itH != slotToHandle.end())
-            handle = itH->second;
-        else
-        {
-            AccelLogf(m_log, kUnityLogTypeError,
-                      "[AS][%s] slot %u active but has no handle in m_handleToSlot", t, i);
-        }
-
-        // Cross-check: handleToSlot should round-trip.
-        if (handle != 0xFFFFFFFFu)
-        {
-            auto itBack = m_handleToSlot.find(handle);
-            if (itBack == m_handleToSlot.end() || itBack->second != i)
-            {
-                AccelLogf(m_log, kUnityLogTypeError,
-                          "[AS][%s] handleToSlot round-trip failed: handle=%u expects slot=%u got=%d",
-                          t, handle, i,
-                          itBack == m_handleToSlot.end() ? -1 : (int)itBack->second);
-            }
-        }
-
-        D3D12_GPU_VIRTUAL_ADDRESS blasVA = GetBLASVA(s.meshKey);
-        int refCount = 0;
-        auto itC = m_blasCache.find(s.meshKey);
-        if (itC != m_blasCache.end())
-            refCount = itC->second.refCount;
-
-        // Flag duplicated (vb,ib) across slots.
-        auto dupIt = seenKey.find(s.meshKey);
-        bool dup = (dupIt != seenKey.end());
-        if (!dup)
-            seenKey.emplace(s.meshKey, i);
-
-        AccelLogf(m_log, kUnityLogTypeLog,
-                  "[AS][%s] slot=%-4u handle=%-10u cid=%-6u mask=0x%02X needsBLAS=%d sub=%-3zu "
-                  "vb=%p ib=%p blasVA=0x%llx blasRef=%d T=(%.2f,%.2f,%.2f)%s",
-                  t, i, handle, s.customInstanceID, s.mask,
-                  (int)s.needsBLAS, s.meshInfo.submeshes.size(),
-                  (void *)s.meshKey.vbPtr, (void *)s.meshKey.ibPtr,
-                  (unsigned long long)blasVA, refCount,
-                  s.transform[3], s.transform[7], s.transform[11],
-                  dup ? "  [DUP vb+ib shared with earlier slot]" : "");
-    }
-}
 
 // ---------------------------------------------------------------------------
 // Clear
@@ -726,19 +370,8 @@ void AccelerationStructure::DumpInstances(const char *tag) const
 void AccelerationStructure::Clear()
 {
     std::lock_guard<std::mutex> lock(m_stateMutex);
-    AccelLogf(m_log, kUnityLogTypeLog, "[AS::Clear] BEGIN - activeSlots=%u, blasCache=%zu", m_activeCount, m_blasCache.size());
+    AccelLogf(m_log, kUnityLogTypeLog, "[AS::Clear] BEGIN - activeSlots=%u", m_activeCount);
 
-    // Release all BLAS ref-counts (deferred GPU delete when they reach 0)
-    int releasedBLAS = 0;
-    for (const auto &slot : m_slots)
-    {
-        if (slot.active && !slot.needsBLAS)
-        {
-            ReleaseBLAS(slot.meshKey);
-            releasedBLAS++;
-        }
-    }
-    AccelLogf(m_log, kUnityLogTypeLog, "[AS::Clear] Released %d BLAS entries", releasedBLAS);
 
     // Move TLAS resources to pending delete (both frame slots + shared scratch).
     {
@@ -757,36 +390,6 @@ void AccelerationStructure::Clear()
         }
     }
     m_frameIndex = 0;
-
-    // Move remaining BLAS resources to deferred-delete queue
-    // (ReleaseBLAS only handles slots whose BLAS was already built;
-    //  m_blasCache may still hold entries from shared meshes or ref > 0)
-    {
-        for (auto &kv : m_blasCache)
-        {
-            BLASEntry &e = kv.second;
-            if (e.blas)
-                SafeReleaseResource(std::move(e.blas));
-            if (e.blasScratch)
-                SafeReleaseResource(std::move(e.blasScratch));
-            for (auto &r : e.ommArrays)
-                if (r)
-                    SafeReleaseResource(std::move(r));
-            for (auto &r : e.ommArrayScratch)
-                if (r)
-                    SafeReleaseResource(std::move(r));
-            for (auto &r : e.ommIndexBuffers)
-                if (r)
-                    SafeReleaseResource(std::move(r));
-            for (auto &r : e.ommDescArrayBuffers)
-                if (r)
-                    SafeReleaseResource(std::move(r));
-            for (auto &r : e.ommArrayDataBuffers)
-                if (r)
-                    SafeReleaseResource(std::move(r));
-        }
-    }
-    m_blasCache.clear();
 
     // NOTE: We no longer defer deletion of vertex/index buffers from slots because we don't own them.
     // Unity manages these resources, and we only store raw pointers without AddRef.
@@ -833,15 +436,6 @@ bool AccelerationStructure::AddInstance(const NR_AddInstanceDesc &desc)
     slot.mask = 0xFF;
     float identity[12] = {1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0};
     memcpy(slot.transform, identity, 48);
-
-    // Dynamic (skinned) instances use a per-instance key derived from the handle
-    // with the high bit set, so multiple skinned instances sharing the same index
-    // buffer do not alias the same BLAS cache entry.
-    if (slot.isDynamic)
-        slot.meshKey = {static_cast<uintptr_t>(userHandle) | (static_cast<uintptr_t>(1) << 63),
-                        reinterpret_cast<uintptr_t>(ib)};
-    else
-        slot.meshKey = {reinterpret_cast<uintptr_t>(vb), reinterpret_cast<uintptr_t>(ib)};
 
     // Set descriptive names for Unity-provided buffers to aid debugging
     wchar_t vbName[64], ibName[64];
@@ -932,8 +526,6 @@ void AccelerationStructure::RemoveInstance(uint32_t handle)
     if (!slot.active)
         return;
 
-    if (!slot.needsBLAS)
-        ReleaseBLAS(slot.meshKey);
 
     // NOTE: We no longer defer deletion of vertex/index buffers because we don't own them.
     // Unity manages these resources, and we only store raw pointers without AddRef.
@@ -1019,6 +611,7 @@ void AccelerationStructure::SetInstanceID(uint32_t handle, uint32_t id)
     slot.customInstanceID = id;
 }
 
+
 // ---------------------------------------------------------------------------
 // BuildOrUpdate  -  called every frame before ray dispatch.
 // ---------------------------------------------------------------------------
@@ -1031,9 +624,29 @@ bool AccelerationStructure::BuildOrUpdate(ID3D12GraphicsCommandList4 *cmdList)
 
     // Advance to the next double-buffer slot each frame.
     // The GPU is currently consuming the previous slot; we now own this slot.
-    m_frameIndex = (m_frameIndex + 1) % 4;
+    m_frameIndex = (m_frameIndex + 1) % 10;
 
-    AccelLogf(m_log, kUnityLogTypeLog, "BuildOrUpdate: frame=%u", m_frameIndex);
+    ID3D12Fence* frameFence = m_d3d12v8->GetFrameFence();
+
+    auto completedValue = frameFence->GetCompletedValue();
+
+    AccelLogf(m_log, kUnityLogTypeLog, "BuildOrUpdate: frame=%u, wait fence value=%llu, completed value=%llu", m_frameIndex, m_tlasFenceValues[m_frameIndex], completedValue);
+
+    if (completedValue < m_tlasFenceValues[m_frameIndex])
+    {
+
+        AccelLogf(m_log, kUnityLogTypeError, "BuildOrUpdate: waiting for GPU to finish with frame %u (fence value %llu, completed value %llu)", m_frameIndex, m_tlasFenceValues[m_frameIndex], completedValue);
+        // 如果 GPU 还没跑完，必须等待。
+        // 使用 Event 阻塞 CPU，防止篡改正在被 GPU 读取的 TLAS
+        HANDLE event = CreateEventEx(nullptr, nullptr, 0, EVENT_ALL_ACCESS);
+        frameFence->SetEventOnCompletion(m_tlasFenceValues[m_frameIndex], event);
+        WaitForSingleObject(event, INFINITE);
+        CloseHandle(event);
+    }
+
+    m_tlasFenceValues[m_frameIndex] = m_d3d12v8->GetNextFrameFenceValue();
+    
+    AccelLogf(m_log, kUnityLogTypeLog, "BuildOrUpdate: frame=%u, NextFrameFenceValue %llu", m_frameIndex, m_tlasFenceValues[m_frameIndex]);
 
 
     // -------------------------------------------------------------------

@@ -400,6 +400,8 @@ namespace NativeRender
                 return false;
             }
 
+            vbPtr = mesh.GetVertexBuffer(0).GetNativeBufferPtr();
+
             uint vertexCount  = (uint)mesh.vertexCount;
             uint vertexStride = (uint)mesh.GetVertexBufferStride(0);
             uint indexStride  = mesh.indexFormat == IndexFormat.UInt16 ? 2u : 4u;
@@ -501,7 +503,8 @@ namespace NativeRender
 
             var indexBuffer = smr.sharedMesh.GetIndexBuffer();
             indexBuffer.name = $"{smr.sharedMesh.name}_IndexBuffer";
-            
+
+            vbPtr = smr.sharedMesh.GetVertexBuffer(0).GetNativeBufferPtr();
             
             var ibPtr          = smr.sharedMesh != null ? indexBuffer.GetNativeBufferPtr() : IntPtr.Zero;
             if (ibPtr == IntPtr.Zero)            {
