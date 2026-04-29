@@ -194,9 +194,9 @@ void EnqueueDeferredDelete(void* ptr, DeferredType type)
         EnqueueCleanup([p = static_cast<ComputeDescriptorSet*>(ptr)] { delete p; });
         break;
 
-    case DeferredType::AccelStructBlas:
-        EnqueueCleanup([p = static_cast<BLASEntry*>(ptr)] { delete p; });
-        break;
+    // case DeferredType::AccelStructBlas:
+    //     EnqueueCleanup([p = static_cast<BLASEntry*>(ptr)] { delete p; });
+    //     break;
 
     default:
         // 如果进入了未定义的类型，为了安全起见，尝试直接 delete 

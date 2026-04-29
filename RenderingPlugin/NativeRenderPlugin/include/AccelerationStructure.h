@@ -129,11 +129,11 @@ struct MeshKeyHash
     }
 };
 
-struct BLASEntry
-{
-    ComPtr<ID3D12Resource> blas;
-    ComPtr<ID3D12Resource> blasScratch;
-};
+// struct BLASEntry
+// {
+//     ComPtr<ID3D12Resource> blas;
+//     ComPtr<ID3D12Resource> blasScratch;
+// };
 // ---------------------------------------------------------------------------
 // AccelerationStructure
 //   Unified class that manages the full instance lifecycle, BLAS cache, and TLAS.
@@ -228,6 +228,10 @@ private:
         uint32_t customInstanceID = 0;
         uint8_t mask = 0xFF;
         bool active = false;
+        
+    ComPtr<ID3D12Resource> blas[10];
+    ComPtr<ID3D12Resource> blasScratch[10];
+
         D3D12_GPU_VIRTUAL_ADDRESS blasVA;
     };
 

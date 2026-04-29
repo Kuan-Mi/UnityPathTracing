@@ -25,6 +25,7 @@ namespace NativeRender
         
         
         private List<SkinnedMeshRenderer> skinnedMeshRenderers = new List<SkinnedMeshRenderer>();
+        private List<MeshRenderer> meshRenderers = new List<MeshRenderer>();
 
         // Thread-safe collections for pending SkinnedMeshRenderers
         // Key: SkinnedMeshRenderer.GetInstanceID()
@@ -63,6 +64,10 @@ namespace NativeRender
             {
                 UpdateSkinnedInstance(smr); // 强制更新buffer指针
             }
+            // foreach (var mr in meshRenderers)
+            // {
+            //     UpdateInstance(mr); // 强制更新buffer指针
+            // }
 
             if (!_buildEventData.IsCreated)
             {
@@ -256,6 +261,8 @@ namespace NativeRender
             {
                 foreach (var h in handles) h.Free();
             }
+            
+            meshRenderers.Add(meshRenderer);
 
             // Debug.Log($"[NativeRayTracing] Added '{mesh.name}' subMeshCount={subMeshCount} verts={vertexCount} → handle={(uint)meshRenderer.GetInstanceID()}");
             return true;
@@ -322,6 +329,7 @@ namespace NativeRender
             if (_handle == 0 || meshRenderer == null) return;
             uint instanceHandle = (uint)meshRenderer.GetInstanceID();
             NativeRenderPlugin.NR_AS_RemoveInstance(_handle, instanceHandle);
+            meshRenderers.Remove(meshRenderer);
             // Debug.Log($"[NativeRayTracing] Removed instance handle={instanceHandle} for '{meshRenderer.name}'");
         }
 

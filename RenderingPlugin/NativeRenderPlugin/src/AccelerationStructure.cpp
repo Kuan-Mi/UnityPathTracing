@@ -74,13 +74,22 @@ bool AccelerationStructure::EnsureBLAS(ID3D12GraphicsCommandList4 *cmdList, Inst
 {
     auto &def = slot.meshInfo;
 
-    BLASEntry blas;
+    // BLASEntry blas;
     const size_t subCount = def.submeshes.size();
     if (subCount == 0)
     {
         AccelLogf(m_log, kUnityLogTypeError, "EnsureBLAS: instance has no submeshes");
         return false;
     }
+
+
+    auto& currentBlas = slot.blas[m_frameIndex];
+    auto& currentScratch = slot.blasScratch[m_frameIndex];
+
+    currentBlas.Reset();
+    currentScratch.Reset();
+
+
 
     AccelLogf(m_log, kUnityLogTypeLog, "[EnsureBLAS] Building BLAS for VB=%p IB=%p", (void *)def.vertexBuffer, (void *)def.indexBuffer);
     m_d3d12v8->RequestResourceState(def.vertexBuffer, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
@@ -127,29 +136,27 @@ bool AccelerationStructure::EnsureBLAS(ID3D12GraphicsCommandList4 *cmdList, Inst
     swprintf(blasName, 64, L"BLAS_VB_%u", slot.customInstanceID);
     swprintf(scratchName, 64, L"BLASScratch_VB_%u", slot.customInstanceID);
 
-    blas.blasScratch = CreateBuffer(m_device.Get(),
+    currentScratch  = CreateBuffer(m_device.Get(),
                                     prebuildInfo.ScratchDataSizeInBytes,
                                     D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS,
                                     D3D12_RESOURCE_STATE_COMMON, defaultHeap, scratchName);
-    blas.blas = CreateBuffer(m_device.Get(),
+    currentBlas  = CreateBuffer(m_device.Get(),
                              prebuildInfo.ResultDataMaxSizeInBytes,
                              D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS,
                              D3D12_RESOURCE_STATE_RAYTRACING_ACCELERATION_STRUCTURE, defaultHeap, blasName);
-    if (!blas.blasScratch || !blas.blas)
+    if (!currentScratch || !currentBlas)
     {
         AccelLogf(m_log, kUnityLogTypeError, "EnsureBLAS: buffer allocation failed");
         return false;
     }
 
     D3D12_BUILD_RAYTRACING_ACCELERATION_STRUCTURE_DESC buildDesc = {};
-    buildDesc.DestAccelerationStructureData = blas.blas->GetGPUVirtualAddress();
+    buildDesc.DestAccelerationStructureData = currentBlas->GetGPUVirtualAddress();
     buildDesc.Inputs = inputs;
-    buildDesc.ScratchAccelerationStructureData = blas.blasScratch->GetGPUVirtualAddress();
+    buildDesc.ScratchAccelerationStructureData = currentScratch->GetGPUVirtualAddress();
     cmdList->BuildRaytracingAccelerationStructure(&buildDesc, 0, nullptr);
 
-    slot.blasVA = blas.blas->GetGPUVirtualAddress();
-    EnqueueDeferredDelete(new BLASEntry(std::move(blas)), DeferredType::AccelStructBlas);
-
+    slot.blasVA = currentBlas->GetGPUVirtualAddress();
     return true;
 }
 
@@ -536,7 +543,7 @@ bool AccelerationStructure::BuildOrUpdate(ID3D12GraphicsCommandList4 *cmdList)
 
     // Advance to the next double-buffer slot each frame.
     // The GPU is currently consuming the previous slot; we now own this slot.
-    m_frameIndex = (m_frameIndex + 1) % 10;
+    m_frameIndex = (m_frameIndex + 1) % 4;
 
     ID3D12Fence *frameFence = m_d3d12v8->GetFrameFence();
 
@@ -554,6 +561,10 @@ bool AccelerationStructure::BuildOrUpdate(ID3D12GraphicsCommandList4 *cmdList)
         frameFence->SetEventOnCompletion(m_tlasFenceValues[m_frameIndex], event);
         WaitForSingleObject(event, INFINITE);
         CloseHandle(event);
+    }
+
+    if(completedValue == m_tlasFenceValues[m_frameIndex]){
+        AccelLogf(m_log, kUnityLogTypeError, "GPU finished with frame %u (fence value %llu)", m_frameIndex, m_tlasFenceValues[m_frameIndex]);
     }
 
     m_tlasFenceValues[m_frameIndex] = m_d3d12v8->GetNextFrameFenceValue();
