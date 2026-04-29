@@ -7,7 +7,7 @@
 
 // Forward declaration of global deferred resource delete function from Plugin.cpp
 extern void SafeReleaseResource(ComPtr<ID3D12Resource> resource);
-extern void EnqueueDeferredDelete(void* ptr, DeferredType type);
+extern void EnqueueDeferredDelete(void *ptr, DeferredType type);
 
 // ---------------------------------------------------------------------------
 // Internal buffer helper
@@ -73,7 +73,6 @@ AccelerationStructure::~AccelerationStructure()
 bool AccelerationStructure::EnsureBLAS(ID3D12GraphicsCommandList4 *cmdList, InstanceSlot &slot)
 {
     auto &def = slot.meshInfo;
-    auto isDynamic = slot.isDynamic;
 
     BLASEntry blas;
     const size_t subCount = def.submeshes.size();
@@ -83,29 +82,11 @@ bool AccelerationStructure::EnsureBLAS(ID3D12GraphicsCommandList4 *cmdList, Inst
         return false;
     }
 
-    // CRITICAL: Request resource state transitions BEFORE accessing Unity's buffers.
-    // Unity's skinning compute shader may leave vertex buffers in UNORDERED_ACCESS state,
-    // but we need NON_PIXEL_SHADER_RESOURCE for BLAS builds. RequestResourceState ensures
-    // Unity inserts the necessary barrier in the command list before our BLAS build command.
-    //
-    // NOTE: For dynamic meshes, we request state every time because the vertex buffer changes
-    // each frame. Unity's state tracker should handle redundant requests efficiently.
-    AccelLogf(m_log, kUnityLogTypeLog, "[EnsureBLAS] Building %s BLAS for VB=%p IB=%p", isDynamic ? "DYNAMIC" : "STATIC", (void *)def.vertexBuffer, (void *)def.indexBuffer);
+    AccelLogf(m_log, kUnityLogTypeLog, "[EnsureBLAS] Building BLAS for VB=%p IB=%p", (void *)def.vertexBuffer, (void *)def.indexBuffer);
     m_d3d12v8->RequestResourceState(def.vertexBuffer, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
     m_d3d12v8->RequestResourceState(def.indexBuffer, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
 
-    blas.ommArrays.resize(subCount);
-    blas.ommArrayScratch.resize(subCount);
-    blas.ommIndexBuffers.resize(subCount);
-    blas.ommDescArrayBuffers.resize(subCount);
-    blas.ommArrayDataBuffers.resize(subCount);
-    blas.ommIndexFormats.resize(subCount, DXGI_FORMAT_R16_UINT);
-    blas.ommIndexStrides.resize(subCount, 2);
-
     std::vector<D3D12_RAYTRACING_GEOMETRY_DESC> geomDescs(subCount);
-    std::vector<D3D12_RAYTRACING_GEOMETRY_TRIANGLES_DESC> ommTriDescs(subCount);
-    std::vector<D3D12_RAYTRACING_GEOMETRY_OMM_LINKAGE_DESC> ommLinkages(subCount);
-    bool instanceHasOMM = false;
 
     for (size_t j = 0; j < subCount; ++j)
     {
@@ -113,39 +94,20 @@ bool AccelerationStructure::EnsureBLAS(ID3D12GraphicsCommandList4 *cmdList, Inst
         D3D12_RAYTRACING_GEOMETRY_DESC &geomDesc = geomDescs[j];
         geomDesc = {};
 
-
-            geomDesc.Type = D3D12_RAYTRACING_GEOMETRY_TYPE_TRIANGLES;
-            geomDesc.Flags = D3D12_RAYTRACING_GEOMETRY_FLAG_OPAQUE;
-            geomDesc.Triangles.VertexBuffer.StartAddress = def.vertexBuffer->GetGPUVirtualAddress();
-            geomDesc.Triangles.VertexBuffer.StrideInBytes = def.vertexStride;
-            geomDesc.Triangles.VertexCount = def.vertexCount;
-            geomDesc.Triangles.VertexFormat = DXGI_FORMAT_R32G32B32_FLOAT;
-            geomDesc.Triangles.IndexBuffer = def.indexBuffer->GetGPUVirtualAddress() + sub.indexByteOffset;
-            geomDesc.Triangles.IndexCount = sub.indexCount;
-            geomDesc.Triangles.IndexFormat = def.indexFormat;
-            geomDesc.Triangles.Transform3x4 = 0;
-
+        geomDesc.Type = D3D12_RAYTRACING_GEOMETRY_TYPE_TRIANGLES;
+        geomDesc.Flags = D3D12_RAYTRACING_GEOMETRY_FLAG_OPAQUE;
+        geomDesc.Triangles.VertexBuffer.StartAddress = def.vertexBuffer->GetGPUVirtualAddress();
+        geomDesc.Triangles.VertexBuffer.StrideInBytes = def.vertexStride;
+        geomDesc.Triangles.VertexCount = def.vertexCount;
+        geomDesc.Triangles.VertexFormat = DXGI_FORMAT_R32G32B32_FLOAT;
+        geomDesc.Triangles.IndexBuffer = def.indexBuffer->GetGPUVirtualAddress() + sub.indexByteOffset;
+        geomDesc.Triangles.IndexCount = sub.indexCount;
+        geomDesc.Triangles.IndexFormat = def.indexFormat;
+        geomDesc.Triangles.Transform3x4 = 0;
     }
 
     D3D12_RAYTRACING_ACCELERATION_STRUCTURE_BUILD_FLAGS blasFlags;
-
-    // Dynamic BLAS (SkinnedMesh): rebuilt every frame, use ALLOW_UPDATE for efficient updates
-    // Static BLAS: built once, use PREFER_FAST_TRACE for optimal ray tracing performance
-    if (isDynamic)
-    {
-        blasFlags = D3D12_RAYTRACING_ACCELERATION_STRUCTURE_BUILD_FLAG_ALLOW_UPDATE;
-    }
-    else
-    {
-        blasFlags = D3D12_RAYTRACING_ACCELERATION_STRUCTURE_BUILD_FLAG_PREFER_FAST_TRACE;
-    }
-
-    if (instanceHasOMM)
-        blasFlags |= D3D12_RAYTRACING_ACCELERATION_STRUCTURE_BUILD_FLAG_ALLOW_DISABLE_OMMS;
-
-    // Note: ALLOW_COMPACTION is incompatible with ALLOW_UPDATE, so only add it for static BLAS
-    if (!isDynamic)
-        blasFlags |= D3D12_RAYTRACING_ACCELERATION_STRUCTURE_BUILD_FLAG_ALLOW_COMPACTION;
+    blasFlags = D3D12_RAYTRACING_ACCELERATION_STRUCTURE_BUILD_FLAG_PREFER_FAST_TRACE;
 
     D3D12_BUILD_RAYTRACING_ACCELERATION_STRUCTURE_INPUTS inputs = {};
     inputs.Type = D3D12_RAYTRACING_ACCELERATION_STRUCTURE_TYPE_BOTTOM_LEVEL;
@@ -160,27 +122,19 @@ bool AccelerationStructure::EnsureBLAS(ID3D12GraphicsCommandList4 *cmdList, Inst
     D3D12_HEAP_PROPERTIES defaultHeap = {};
     defaultHeap.Type = D3D12_HEAP_TYPE_DEFAULT;
 
-    // Create BLAS buffers with descriptive names (mark dynamic BLAS for debugging)
     wchar_t blasName[64], scratchName[64];
-    if (isDynamic)
-    {
-        swprintf(blasName, 64, L"BLAS_Dynamic_VB_%u", slot.customInstanceID);
-        swprintf(scratchName, 64, L"BLASScratch_Dynamic_VB_%u", slot.customInstanceID);
-    }
-    else
-    {
-        swprintf(blasName, 64, L"BLAS_Static_VB_%u", slot.customInstanceID);
-        swprintf(scratchName, 64, L"BLASScratch_Static_VB_%u", slot.customInstanceID);
-    }
+
+    swprintf(blasName, 64, L"BLAS_VB_%u", slot.customInstanceID);
+    swprintf(scratchName, 64, L"BLASScratch_VB_%u", slot.customInstanceID);
 
     blas.blasScratch = CreateBuffer(m_device.Get(),
-                                     prebuildInfo.ScratchDataSizeInBytes,
-                                     D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS,
-                                     D3D12_RESOURCE_STATE_COMMON, defaultHeap, scratchName);
+                                    prebuildInfo.ScratchDataSizeInBytes,
+                                    D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS,
+                                    D3D12_RESOURCE_STATE_COMMON, defaultHeap, scratchName);
     blas.blas = CreateBuffer(m_device.Get(),
-                              prebuildInfo.ResultDataMaxSizeInBytes,
-                              D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS,
-                              D3D12_RESOURCE_STATE_RAYTRACING_ACCELERATION_STRUCTURE, defaultHeap, blasName);
+                             prebuildInfo.ResultDataMaxSizeInBytes,
+                             D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS,
+                             D3D12_RESOURCE_STATE_RAYTRACING_ACCELERATION_STRUCTURE, defaultHeap, blasName);
     if (!blas.blasScratch || !blas.blas)
     {
         AccelLogf(m_log, kUnityLogTypeError, "EnsureBLAS: buffer allocation failed");
@@ -363,7 +317,6 @@ bool AccelerationStructure::BuildTLAS(ID3D12GraphicsCommandList4 *cmdList, const
 // High-level instance management
 // ===========================================================================
 
-
 // ---------------------------------------------------------------------------
 // Clear
 // ---------------------------------------------------------------------------
@@ -371,7 +324,6 @@ void AccelerationStructure::Clear()
 {
     std::lock_guard<std::mutex> lock(m_stateMutex);
     AccelLogf(m_log, kUnityLogTypeLog, "[AS::Clear] BEGIN - activeSlots=%u", m_activeCount);
-
 
     // Move TLAS resources to pending delete (both frame slots + shared scratch).
     {
@@ -431,27 +383,19 @@ bool AccelerationStructure::AddInstance(const NR_AddInstanceDesc &desc)
 
     InstanceSlot slot;
     slot.active = true;
-    slot.needsBLAS = true;
-    slot.isDynamic = (desc.isDynamic != 0);
     slot.mask = 0xFF;
     float identity[12] = {1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0};
     memcpy(slot.transform, identity, 48);
 
     // Set descriptive names for Unity-provided buffers to aid debugging
     wchar_t vbName[64], ibName[64];
-    if (slot.isDynamic)
-    {
-        swprintf(vbName, 64, L"Unity_VB_Dynamic_Handle%u", userHandle);
-        swprintf(ibName, 64, L"Unity_IB_Dynamic_Handle%u", userHandle);
-    }
-    else
-    {
-        swprintf(vbName, 64, L"Unity_VB_Static_%p", (void *)vb);
-        swprintf(ibName, 64, L"Unity_IB_Static_%p", (void *)ib);
-    }
+
+    swprintf(vbName, 64, L"Unity_VB_%p", (void *)vb);
+    swprintf(ibName, 64, L"Unity_IB_%p", (void *)ib);
+
     vb->SetName(vbName);
     ib->SetName(ibName);
-    AccelLogf(m_log, kUnityLogTypeLog, "[AddInstance] Set names: VB=%p '%ls', IB=%p '%ls', isDynamic=%d", (void *)vb, vbName, (void *)ib, ibName, (int)slot.isDynamic);
+    AccelLogf(m_log, kUnityLogTypeLog, "[AddInstance] Set names: VB=%p '%ls', IB=%p '%ls'", (void *)vb, vbName, (void *)ib, ibName);
 
     slot.meshInfo.vertexBuffer = vb;
     slot.meshInfo.vertexCount = desc.vertexCount;
@@ -526,11 +470,9 @@ void AccelerationStructure::RemoveInstance(uint32_t handle)
     if (!slot.active)
         return;
 
-
     // NOTE: We no longer defer deletion of vertex/index buffers because we don't own them.
     // Unity manages these resources, and we only store raw pointers without AddRef.
     slot.active = false;
-    slot.needsBLAS = false;
     slot.meshInfo.submeshes.clear();
     slot.meshInfo.vertexBuffer = nullptr;
     slot.meshInfo.indexBuffer = nullptr;
@@ -539,37 +481,8 @@ void AccelerationStructure::RemoveInstance(uint32_t handle)
     --m_activeCount;
 }
 
-// ---------------------------------------------------------------------------
-// UpdateDynamicVertexBuffer
-//   For SkinnedMeshRenderer instances: swap in the new GPU vertex buffer
-//   produced by Unity's skinning pass, discard the stale BLAS (deferred GPU
-//   delete after 4 frames), and schedule a rebuild for next BuildOrUpdate.
-// ---------------------------------------------------------------------------
 void AccelerationStructure::UpdateDynamicVertexBuffer(uint32_t handle, void *vbPtr, uint32_t vertexCount, uint32_t vertexStride)
 {
-    std::lock_guard<std::mutex> lock(m_stateMutex);
-    auto it = m_handleToSlot.find(handle);
-    if (it == m_handleToSlot.end())
-        return;
-
-    InstanceSlot &slot = m_slots[it->second];
-    if (!slot.active || !slot.isDynamic)
-        return;
-
-    auto *newVb = static_cast<ID3D12Resource *>(vbPtr);
-    if (!newVb)
-        return;
-
-    wchar_t vbName[64];
-    swprintf(vbName, 64, L"Unity_VB_Dynamic_Handle%u_Updated", handle);
-    newVb->SetName(vbName);
-
-    AccelLogf(m_log, kUnityLogTypeLog, "[UpdateDynamicVB] Handle=%u, oldVB=%p, newVB=%p '%ls'", handle, (void *)slot.meshInfo.vertexBuffer, (void *)newVb, vbName);
-
-    slot.meshInfo.vertexBuffer = newVb;
-    slot.meshInfo.vertexCount = vertexCount;
-    slot.meshInfo.vertexStride = vertexStride;
-    slot.needsBLAS = true;
 }
 
 // ---------------------------------------------------------------------------
@@ -611,7 +524,6 @@ void AccelerationStructure::SetInstanceID(uint32_t handle, uint32_t id)
     slot.customInstanceID = id;
 }
 
-
 // ---------------------------------------------------------------------------
 // BuildOrUpdate  -  called every frame before ray dispatch.
 // ---------------------------------------------------------------------------
@@ -626,7 +538,7 @@ bool AccelerationStructure::BuildOrUpdate(ID3D12GraphicsCommandList4 *cmdList)
     // The GPU is currently consuming the previous slot; we now own this slot.
     m_frameIndex = (m_frameIndex + 1) % 10;
 
-    ID3D12Fence* frameFence = m_d3d12v8->GetFrameFence();
+    ID3D12Fence *frameFence = m_d3d12v8->GetFrameFence();
 
     auto completedValue = frameFence->GetCompletedValue();
 
@@ -645,9 +557,8 @@ bool AccelerationStructure::BuildOrUpdate(ID3D12GraphicsCommandList4 *cmdList)
     }
 
     m_tlasFenceValues[m_frameIndex] = m_d3d12v8->GetNextFrameFenceValue();
-    
-    AccelLogf(m_log, kUnityLogTypeLog, "BuildOrUpdate: frame=%u, NextFrameFenceValue %llu", m_frameIndex, m_tlasFenceValues[m_frameIndex]);
 
+    AccelLogf(m_log, kUnityLogTypeLog, "BuildOrUpdate: frame=%u, NextFrameFenceValue %llu", m_frameIndex, m_tlasFenceValues[m_frameIndex]);
 
     // -------------------------------------------------------------------
     // Step A: Build any pending new BLASes (throttled to avoid GPU TDR)
@@ -657,7 +568,7 @@ bool AccelerationStructure::BuildOrUpdate(ID3D12GraphicsCommandList4 *cmdList)
     int blasBuildsThisFrame = 0;
     for (auto &slot : m_slots)
     {
-        if (!slot.active || !slot.needsBLAS)
+        if (!slot.active)
             continue;
 
         if (blasBuildsThisFrame >= kMaxBLASBuildsPerFrame)
@@ -668,8 +579,6 @@ bool AccelerationStructure::BuildOrUpdate(ID3D12GraphicsCommandList4 *cmdList)
             AccelLogf(m_log, kUnityLogTypeError, "BuildOrUpdate: EnsureBLAS failed");
             return false;
         }
-        if(!slot.isDynamic)
-            slot.needsBLAS = false;
         anyNewBLAS = true;
         ++blasBuildsThisFrame;
     }

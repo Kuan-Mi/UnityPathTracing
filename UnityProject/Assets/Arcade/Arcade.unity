@@ -421,7 +421,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 919132149155446097, guid: 23a7c2d222024b34288d7a9c98990daa, type: 3}
       propertyPath: m_Name
-      value: Arcade
+      value: ' 11'
       objectReference: {fileID: 0}
     - target: {fileID: 919132149155446097, guid: 23a7c2d222024b34288d7a9c98990daa, type: 3}
       propertyPath: m_IsActive
@@ -2148,7 +2148,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 4396482356987922249, guid: fbb6d5bcbdb728547bcaeb4d19b4c3d4, type: 3}
       propertyPath: m_IsActive
-      value: 1
+      value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 4646533459963750250, guid: fbb6d5bcbdb728547bcaeb4d19b4c3d4, type: 3}
       propertyPath: m_IsActive
