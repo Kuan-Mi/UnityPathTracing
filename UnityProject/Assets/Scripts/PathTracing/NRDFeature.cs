@@ -634,7 +634,6 @@ namespace PathTracing
                 {
                     ConstantBuffer = _nrdConstantBuffer.NativePtr,
                     Pool           = pool,
-                    IsEven         = isEven,
                 };
 
                 _nrdFinalPass.Setup(nrdFinalResource, new NRDFinalPass.Settings

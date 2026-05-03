@@ -53,7 +53,6 @@ namespace PathTracing
         {
             internal IntPtr                  ConstantBuffer;  // GlobalConstants CBV
             internal PathTracingResourcePool Pool;
-            internal bool                    IsEven; // !(frameIndex & 1) — selects which TAA history is the output
         }
 
         public class Settings
@@ -72,7 +71,6 @@ namespace PathTracing
             internal Resource                   Resource;
             internal Settings                   Settings;
             internal PathTracingResourcePool    Pool;
-            internal bool                       IsEven;
         }
 
         // -------------------------------------------------------------------------
@@ -117,7 +115,6 @@ namespace PathTracing
             passData.Resource = _resource;
             passData.Settings = _settings;
             passData.Pool     = _resource.Pool;
-            passData.IsEven   = _resource.IsEven;
 
             builder.AllowPassCulling(false);
             builder.SetRenderFunc((PassData data, UnsafeGraphContext context) => ExecutePass(data, context));
