@@ -66,6 +66,7 @@ namespace PathTracing
             _nriResources[RenderResourceType.PrevBaseColorMetalness]  = new NriTextureResource(RenderResourceType.PrevBaseColorMetalness, GraphicsFormat.R8G8B8A8_UNorm, uavState);
             _nriResources[RenderResourceType.PrevGeoNormal]           = new NriTextureResource(RenderResourceType.PrevGeoNormal, GraphicsFormat.R32_UInt, uavState);
             _nriResources[RenderResourceType.Final]                   = new NriTextureResource(RenderResourceType.Final, GraphicsFormat.R16G16B16A16_SFloat, uavState);
+            _nriResources[RenderResourceType.PreFinal]                = new NriTextureResource(RenderResourceType.PreFinal, GraphicsFormat.R16G16B16A16_SFloat, uavState);
             _nriResources[RenderResourceType.DirectEmission]          = new NriTextureResource(RenderResourceType.DirectEmission, GraphicsFormat.B10G11R11_UFloatPack32, uavState);
             _nriResources[RenderResourceType.ComposedDiff]            = new NriTextureResource(RenderResourceType.ComposedDiff, GraphicsFormat.R16G16B16A16_SFloat, uavState);
             _nriResources[RenderResourceType.ComposedSpecViewZ]       = new NriTextureResource(RenderResourceType.ComposedSpecViewZ, GraphicsFormat.R16G16B16A16_SFloat, uavState);
@@ -154,10 +155,13 @@ namespace PathTracing
             _nriResources[RenderResourceType.RrGuideNormalRoughness] = new NriTextureResource(RenderResourceType.RrGuideNormalRoughness, GraphicsFormat.R16G16B16A16_SFloat, uavState);
 
             // ── Cross-frame / per-frame pass textures ────────────────────────────
-            _nriResources[RenderResourceType.TaaHistory]        = new NriTextureResource(RenderResourceType.TaaHistory, GraphicsFormat.R16G16B16A16_SFloat, uavState);
-            _nriResources[RenderResourceType.TaaHistoryPrev]    = new NriTextureResource(RenderResourceType.TaaHistoryPrev, GraphicsFormat.R16G16B16A16_SFloat, uavState);
-            _nriResources[RenderResourceType.PsrThroughput]     = new NriTextureResource(RenderResourceType.PsrThroughput, GraphicsFormat.A2B10G10R10_UNormPack32, uavState); // R10_G10_B10_A2_UNORM
-            _nriResources[RenderResourceType.Final]             = new NriTextureResource(RenderResourceType.Final, GraphicsFormat.R16G16B16A16_SFloat, uavState);
+            _nriResources[RenderResourceType.TaaHistory]     = new NriTextureResource(RenderResourceType.TaaHistory, GraphicsFormat.R16G16B16A16_SFloat, uavState);
+            _nriResources[RenderResourceType.TaaHistoryPrev] = new NriTextureResource(RenderResourceType.TaaHistoryPrev, GraphicsFormat.R16G16B16A16_SFloat, uavState);
+            _nriResources[RenderResourceType.PsrThroughput]  = new NriTextureResource(RenderResourceType.PsrThroughput, GraphicsFormat.A2B10G10R10_UNormPack32, uavState); // R10_G10_B10_A2_UNORM
+            _nriResources[RenderResourceType.Final]          = new NriTextureResource(RenderResourceType.Final, GraphicsFormat.R16G16B16A16_SFloat, uavState);
+            _nriResources[RenderResourceType.PreFinal]       = new NriTextureResource(RenderResourceType.PreFinal, GraphicsFormat.R16G16B16A16_SFloat, uavState);
+            
+            
             _nriResources[RenderResourceType.DirectEmission]    = new NriTextureResource(RenderResourceType.DirectEmission, GraphicsFormat.B10G11R11_UFloatPack32, uavState); // colorFormat
             _nriResources[RenderResourceType.ComposedDiff]      = new NriTextureResource(RenderResourceType.ComposedDiff, GraphicsFormat.B10G11R11_UFloatPack32, uavState); // colorFormat
             _nriResources[RenderResourceType.ComposedSpecViewZ] = new NriTextureResource(RenderResourceType.ComposedSpecViewZ, GraphicsFormat.R16G16B16A16_SFloat, uavState);
@@ -219,7 +223,7 @@ namespace PathTracing
                     kvp.Key == RenderResourceType.Gradient_Pong)
                     continue;
 
-                int2 res = kvp.Key == RenderResourceType.DlssOutput ? outputResolution : renderResolution;
+                int2 res = (kvp.Key == RenderResourceType.DlssOutput || kvp.Key == RenderResourceType.PreFinal || kvp.Key == RenderResourceType.Final) ? outputResolution : renderResolution;
                 kvp.Value.Allocate(res);
             }
 

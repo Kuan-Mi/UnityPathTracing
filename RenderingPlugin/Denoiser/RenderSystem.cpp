@@ -30,8 +30,18 @@ void RenderSystem::Initialize(IUnityInterfaces* interfaces)
     // NativeRenderPlugin already installed it (shared DLL, single globals).
     D3D12HeapHook::InstallHookFromDevice(device);
 
+    // Provide Unity's graphics command queue to NRI so GetQueue(GRAPHICS) works
+    ID3D12CommandQueue* d3d12GraphicsQueue = s_d3d12->GetCommandQueue();
+
+    nri::QueueFamilyD3D12Desc queueFamily = {};
+    queueFamily.d3d12Queues = &d3d12GraphicsQueue;
+    queueFamily.queueNum    = 1;
+    queueFamily.queueType   = nri::QueueType::GRAPHICS;
+
     nri::DeviceCreationD3D12Desc deviceDesc = {};
-    deviceDesc.d3d12Device = device;
+    deviceDesc.d3d12Device     = device;
+    deviceDesc.queueFamilies   = &queueFamily;
+    deviceDesc.queueFamilyNum  = 1;
     deviceDesc.disableD3D12EnhancedBarriers = true;
     deviceDesc.enableNRIValidation = true;
 
@@ -116,6 +126,8 @@ void RenderSystem::ProcessDeviceEvent(UnityGfxDeviceEventType type, IUnityInterf
         config_2.flags = kUnityD3D12EventConfigFlag_ModifiesCommandBuffersState;
         config_2.ensureActiveRenderTextureIsBound = true;
         s_d3d12->ConfigureEvent(2, &config_2);
+        s_d3d12->ConfigureEvent(3, &config_2);
+        s_d3d12->ConfigureEvent(4, &config_2);
 
         // initialize_and_create_resources();
         break;

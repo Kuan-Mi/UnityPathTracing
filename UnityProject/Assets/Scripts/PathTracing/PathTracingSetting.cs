@@ -392,30 +392,33 @@ namespace PathTracing
         public uint         maxAccumulatedFrameNum     = 31;
         [Range(1f, 20f)]
         public uint         maxFastAccumulatedFrameNum = 7;
-        public OnScreen     onScreen                   = 0;
-        public int          forcedMaterial             = 0;
-        public DenoiserType denoiser                   = 0;  // 0 = DENOISER_REBLUR
-        public int          rpp                        = 1;
-        public int          bounceNum                  = 1;
-        public RESOLUTION   tracingMode                = RESOLUTION.RESOLUTION_HALF;  // RESOLUTION_HALF
-        public bool         SHARC                      = true;
-        public bool         PSR                        = false;
-        public bool         normalMap                  = true;
-        public bool         TAA                        = true;
-        public bool         emission                   = true;
-        public bool         importanceSampling         = true;
-        public bool         specularLobeTrimming       = true;
-        public bool         adaptiveAccumulation       = true;
-        public bool         usePrevFrame               = true;
-        public bool         boost                      = false;
-        public bool         SR                         = false;
-        public bool         RR                         = false;
-        public bool         tmpDisableRR               = false;
-        public UpscalerMode upscalerMode               = UpscalerMode.NATIVE;
-        public bool         confidence                 = true;
+        public OnScreen     onScreen             = 0;
+        public int          forcedMaterial       = 0;
+        public DenoiserType denoiser             = 0;  // 0 = DENOISER_REBLUR
+        public int          rpp                  = 1;
+        public int          bounceNum            = 1;
+        public RESOLUTION   tracingMode          = RESOLUTION.RESOLUTION_HALF;  // RESOLUTION_HALF
+        public bool         SHARC                = true;
+        public bool         PSR                  = false;
+        public bool         normalMap            = true;
+        public bool         TAA                  = true;
+        public bool         emission             = true;
+        public bool         importanceSampling   = true;
+        public bool         specularLobeTrimming = true;
+        public bool         adaptiveAccumulation = true;
+        public bool         usePrevFrame         = true;
+        public bool         boost                = false;
+        public bool         SR                   = false;
+        public bool         RR                   = false;
+        public bool         tmpDisableRR         = false;
+        public UpscalerMode upscalerMode         = UpscalerMode.NATIVE;
+        public bool         confidence           = true;
         public ShowMode     showMode;
         public bool         update;
         public bool         updateTick;
         public float        denoisingRange = 1000f;
+
+        [Range(0.0f, 1.0f)]
+        public float nisSharpness = 0.2f;
     }
 }

@@ -77,11 +77,14 @@ MonoBehaviour:
   - NRD Denoise
   - NRD Denoise Shadow
   - NRD Denoise Opaque
+  - Composition
   - 'Tracing transparent '
   - Reference Pt Tracing
   - DLSS Before
   - DLSS Denoise
-  - Composition
+  - DLSS Upscale
+  - DLSS After
+  - NIS Sharpening
   - Acc
   - Auto Exposure
   - TAA

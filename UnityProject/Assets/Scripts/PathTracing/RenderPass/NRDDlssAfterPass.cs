@@ -70,14 +70,14 @@ namespace PathTracing
             var ds  = data.Ds;
             var res = data.Resource;
 
-            cmd.BeginSample(RenderPassMarkers.DlssUpscale);
+            cmd.BeginSample(RenderPassMarkers.DlssAfter);
 
             ds.SetRWTexture("gOut_Image", res.Pool.GetPoint(RenderResourceType.DlssOutput));
             ds.SetConstantBuffer("GlobalConstants", res.ConstantBuffer);
 
             cs.Dispatch(cmd, ds, (uint)data.Settings.outputGridW, (uint)data.Settings.outputGridH, 1);
 
-            cmd.EndSample(RenderPassMarkers.DlssUpscale);
+            cmd.EndSample(RenderPassMarkers.DlssAfter);
         }
 
         public override void RecordRenderGraph(RenderGraph renderGraph, ContextContainer frameData)

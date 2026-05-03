@@ -59,7 +59,7 @@ option(NRI_ENABLE_VALIDATION_SUPPORT "" OFF)
 option(NRI_ENABLE_NVTX_SUPPORT "" OFF)
 option(NRI_ENABLE_AMDAGS "" OFF)
 option(NRI_ENABLE_NVAPI "" OFF)
-option(NRI_ENABLE_NIS_SDK "" OFF)
+option(NRI_ENABLE_NIS_SDK "" ON)
 option(NRI_ENABLE_IMGUI_EXTENSION "" OFF)
 option(NRI_ENABLE_NGX_SDK "" ON)
 
@@ -175,6 +175,7 @@ target_link_libraries(D3D12HeapHook PRIVATE d3d12.lib)
 add_library(Denoiser SHARED
     Denoiser/DLRRInstance.cpp
     Denoiser/DLSRInstance.cpp
+    Denoiser/NISInstance.cpp
     Denoiser/NrdInstance.cpp
     Denoiser/RenderingPlugin.cpp
     Denoiser/RenderSystem.cpp

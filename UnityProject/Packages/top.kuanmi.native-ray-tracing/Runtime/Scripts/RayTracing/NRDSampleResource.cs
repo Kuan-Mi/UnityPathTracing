@@ -932,11 +932,9 @@ namespace NativeRender
 
                         var sr = new SubmeshRef(t, s);
                         if (isTrans)
-                        {
                             staticTransparent.Add(sr);
-                            Debug.Log($"[RebuildScene] Adding to staticTransparent: {t.name} submesh {s} (mat: {subMat?.name ?? "null"})");
-                        }
-                        else staticOpaque.Add(sr);
+                        else
+                            staticOpaque.Add(sr);
 
                         if (isEmissive) staticEmissive.Add(sr);
                     }
@@ -2073,7 +2071,8 @@ namespace NativeRender
                     AppendTexture(TryGetTex(mat, "_MetallicGlossMap"), PlaceholderKind.Black, texPtrs);
                     AppendTexture(TryGetTex(mat, "_BumpMap"), PlaceholderKind.FlatNormal, texPtrs);
                     AppendTexture(TryGetTex(mat, "_EmissionMap"), PlaceholderKind.Black, texPtrs);
-                }else if (mat.shader.name == "Shader Graphs/glTF-pbrMetallicRoughness")
+                }
+                else if (mat.shader.name == "Shader Graphs/glTF-pbrMetallicRoughness")
                 {
                     AppendTexture(TryGetTex(mat, "baseColorTexture"), PlaceholderKind.White, texPtrs);
                     AppendTexture(TryGetTex(mat, "metallicRoughnessTexture"), PlaceholderKind.Black, texPtrs);
@@ -2207,16 +2206,16 @@ namespace NativeRender
             Color emission       = TryGetColor(mat, "_EmissionColor", Color.black);
             float metal          = TryGetFloat(mat, "_Metallic", 0f);
             float smooth         = TryGetFloat(mat, "_Smoothness", 0.5f);
-            float roughnessScale = 1f - smooth; 
+            float roughnessScale = 1f - smooth;
 
             float normScale = TryGetFloat(mat, "_BumpScale", 1f);
-            
-            if(mat.shader.name == "Shader Graphs/glTF-pbrMetallicRoughness")
+
+            if (mat.shader.name == "Shader Graphs/glTF-pbrMetallicRoughness")
             {
                 baseColor      = TryGetColor(mat, "baseColorFactor", Color.white);
                 emission       = TryGetColor(mat, "emissiveFactor", Color.black);
                 metal          = TryGetFloat(mat, "metallicFactor", 0f);
-                roughnessScale = TryGetFloat(mat, "roughnessFactor", 0.5f);    
+                roughnessScale = TryGetFloat(mat, "roughnessFactor", 0.5f);
             }
 
             inst.baseColorAndMetalnessScale.x = new half(baseColor.r);

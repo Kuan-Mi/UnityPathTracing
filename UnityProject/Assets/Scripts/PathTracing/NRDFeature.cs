@@ -4,7 +4,9 @@ using System.Runtime.InteropServices;
 using DLRR;
 using DLSR;
 using NativeRender;
+using NIS;
 using Nrd;
+using Nri;
 using Unity.Mathematics;
 using UnityEngine;
 using UnityEngine.Rendering.Universal;
@@ -64,6 +66,7 @@ namespace PathTracing
         private NRDDlssAfterPass      _nrdDlssAfterPass;
         private DlssRRPass            _dlssrrPass;
         private DlssSRPass            _dlssrPass;
+        private NisPass               _nisPass;
         private OutputBlitPass        _outputBlitPass;
         private NativeFrameTick       _nativeFrameTickPass;
 
@@ -75,6 +78,7 @@ namespace PathTracing
         private readonly Dictionary<long, NrdDenoiser>             _nrdReblurDenoisers = new();
         private readonly Dictionary<long, DlrrDenoiser>            _dlrrDenoisers      = new();
         private readonly Dictionary<long, DlsrUpscaler>            _dlsrUpscalers      = new();
+        private readonly Dictionary<long, NisUpscaler>             _nisUpscalers       = new();
         private readonly Dictionary<long, PathTracingResourcePool> _resourcePools      = new();
         private readonly Dictionary<long, CameraFrameState>        _cameraFrameStates  = new();
 
@@ -148,6 +152,11 @@ namespace PathTracing
             };
 
             _dlssrPass ??= new DlssSRPass()
+            {
+                renderPassEvent = renderPassEvent
+            };
+
+            _nisPass ??= new NisPass()
             {
                 renderPassEvent = renderPassEvent
             };
@@ -556,37 +565,81 @@ namespace PathTracing
             else
             {
                 // TAA
+                var nrdTaaResource = new NRDTaaPass.Resource
                 {
-                    var nrdTaaResource = new NRDTaaPass.Resource
-                    {
-                        ConstantBuffer = _nrdConstantBuffer.NativePtr,
-                        Pool           = pool,
-                        isEven         = isEven,
-                    };
+                    ConstantBuffer = _nrdConstantBuffer.NativePtr,
+                    Pool           = pool,
+                    isEven         = isEven,
+                };
 
-                    _nrdTaaPass.Setup(nrdTaaResource, new NRDTaaPass.Settings
-                    {
-                        rectGridW = rectGridW,
-                        rectGridH = rectGridH,
-                    });
-                    renderer.EnqueuePass(_nrdTaaPass);
+                _nrdTaaPass.Setup(nrdTaaResource, new NRDTaaPass.Settings
+                {
+                    rectGridW = rectGridW,
+                    rectGridH = rectGridH,
+                });
+                renderer.EnqueuePass(_nrdTaaPass);
+            }
+
+            // NIS — always runs: DLSS/TAA output → PreFinal
+            {
+                if (!_nisUpscalers.TryGetValue(uniqueKey, out var nis))
+                {
+                    var camName = isVR ? $"{cam.name}_Eye{eyeIndex}" : cam.name;
+                    nis = new NisUpscaler(camName);
+                    _nisUpscalers.Add(uniqueKey, nis);
                 }
 
-                // Final (tone-map + validation overlay → Final RT)
+                bool               isDlss = setting.RR || setting.SR;
+                ushort             currentW, currentH;
+                NriTextureResource nisInput;
+                if (isDlss)
                 {
-                    var nrdFinalResource = new NRDFinalPass.Resource
-                    {
-                        ConstantBuffer = _nrdConstantBuffer.NativePtr,
-                        Pool           = pool,
-                        IsEven         = isEven,
-                    };
-
-                    _nrdFinalPass.Setup(nrdFinalResource, new NRDFinalPass.Settings
-                    {
-                        OutputResolution = outputResolution,
-                    });
-                    renderer.EnqueuePass(_nrdFinalPass);
+                    nisInput = pool.GetNriResource(RenderResourceType.DlssOutput);
+                    currentW = (ushort)outputResolution.x;
+                    currentH = (ushort)outputResolution.y;
                 }
+                else
+                {
+                    nisInput = pool.GetNriResource(isEven ? RenderResourceType.TaaHistory : RenderResourceType.TaaHistoryPrev);
+                    currentW = (ushort)(renderResolution.x * setting.resolutionScale + 0.5f);
+                    currentH = (ushort)(renderResolution.y * setting.resolutionScale + 0.5f);
+                }
+
+                var nisInput_ = new NisUpscaler.NisFrameInput
+                {
+                    outputWidth   = (ushort)outputResolution.x,
+                    outputHeight  = (ushort)outputResolution.y,
+                    currentWidth  = currentW,
+                    currentHeight = currentH,
+                    frameIndex    = curFrame,
+                };
+
+                var nisRes = new NisUpscaler.NisResources
+                {
+                    input  = nisInput,
+                    output = pool.GetNriResource(RenderResourceType.PreFinal),
+                };
+
+                var nisSettings = new NisUpscaler.NisSettings { sharpness = setting.nisSharpness };
+
+                _nisPass.Setup(nis.GetInteropDataPtr(nisInput_, nisRes, nisSettings));
+                renderer.EnqueuePass(_nisPass);
+            }
+
+            // Final (tone-map + validation overlay → Final RT)
+            {
+                var nrdFinalResource = new NRDFinalPass.Resource
+                {
+                    ConstantBuffer = _nrdConstantBuffer.NativePtr,
+                    Pool           = pool,
+                    IsEven         = isEven,
+                };
+
+                _nrdFinalPass.Setup(nrdFinalResource, new NRDFinalPass.Settings
+                {
+                    OutputResolution = outputResolution,
+                });
+                renderer.EnqueuePass(_nrdFinalPass);
             }
 
             // Output Blit
@@ -694,6 +747,10 @@ namespace PathTracing
                 upscaler.Dispose();
             _dlsrUpscalers.Clear();
 
+            foreach (var upscaler in _nisUpscalers.Values)
+                upscaler.Dispose();
+            _nisUpscalers.Clear();
+
             _cameraFrameStates.Clear();
 
             foreach (var p in _resourcePools.Values)
@@ -723,6 +780,7 @@ namespace PathTracing
             _nrdDlssAfterPass    = null;
             _dlssrrPass          = null;
             _dlssrPass           = null;
+            _nisPass             = null;
             _outputBlitPass      = null;
             _nativeFrameTickPass = null;
         }

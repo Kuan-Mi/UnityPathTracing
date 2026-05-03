@@ -70,17 +70,19 @@ public static class RenderPassMarkers
     public static readonly NamedMarker NrdDenoiseShadow = new(ProfilerCategory.Render, "NRD Denoise Shadow", MarkerFlags.SampleGPU);
     public static readonly NamedMarker NrdDenoiseOpaque = new(ProfilerCategory.Render, "NRD Denoise Opaque", MarkerFlags.SampleGPU);
     
+    public static readonly NamedMarker Composition = new(ProfilerCategory.Render, "Composition", MarkerFlags.SampleGPU);
     
     public static readonly NamedMarker TransparentTracing = new(ProfilerCategory.Render, "Tracing transparent ", MarkerFlags.SampleGPU);
     public static readonly NamedMarker ReferencePtTracing = new(ProfilerCategory.Render, "Reference Pt Tracing", MarkerFlags.SampleGPU);
 
-    // ── Denoising / Upscaling ─────────────────────────────────────────────────
+    
     public static readonly NamedMarker DlssBefore  = new(ProfilerCategory.Render, "DLSS Before",   MarkerFlags.SampleGPU);
     public static readonly NamedMarker DlssDenoise = new(ProfilerCategory.Render, "DLSS Denoise",  MarkerFlags.SampleGPU);
-    public static readonly NamedMarker DlssUpscale = new(ProfilerCategory.Render, "DLSS Upscale",  MarkerFlags.SampleGPU);
+    public static readonly NamedMarker DlssUpscale   = new(ProfilerCategory.Render, "DLSS Upscale",    MarkerFlags.SampleGPU);
+    public static readonly NamedMarker DlssAfter  = new(ProfilerCategory.Render, "DLSS After",   MarkerFlags.SampleGPU);
+    public static readonly NamedMarker NisSharpening = new(ProfilerCategory.Render, "NIS Sharpening", MarkerFlags.SampleGPU);
 
-    // ── Post-process / Output ─────────────────────────────────────────────────
-    public static readonly NamedMarker Composition = new(ProfilerCategory.Render, "Composition", MarkerFlags.SampleGPU);
+    
     public static readonly NamedMarker Acc = new(ProfilerCategory.Render, "Acc", MarkerFlags.SampleGPU);
     public static readonly NamedMarker AutoExposure = new(ProfilerCategory.Render, "Auto Exposure", MarkerFlags.SampleGPU);
     public static readonly NamedMarker Taa = new(ProfilerCategory.Render, "TAA", MarkerFlags.SampleGPU);
