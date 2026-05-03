@@ -2,9 +2,11 @@
 #include <mutex>
 
 #include "DLRRInstance.h"
+#include "DLSRInstance.h"
 #include "RenderSystem.h"
 #include "NrdInstance.h"
 #include "RRFrameData.h"
+#include "DLSRFrameData.h"
 #include "Unity/IUnityLog.h"
 
 
@@ -28,6 +30,10 @@ namespace
     std::unordered_map<int32_t, DLRRInstance*> g_DLRRInstances;
     std::mutex g_DLRRInstanceMutex;
     int32_t g_DLRRNextInstanceId = 1;
+
+    std::unordered_map<int32_t, DLSRInstance*> g_DLSRInstances;
+    std::mutex g_DLSRInstanceMutex;
+    int32_t g_DLSRNextInstanceId = 1;
 
 
     // 图形设备事件回调
@@ -69,12 +75,24 @@ namespace
         }
         else if (eventID == 2)
         {
-            // DLRR 事件处理（如果需要）
+            // DLRR 事件处理
             RRFrameData* frameData = static_cast<RRFrameData*>(data);
 
             std::scoped_lock lock(g_DLRRInstanceMutex);
             auto it = g_DLRRInstances.find(frameData->instanceId);
             if (it != g_DLRRInstances.end())
+            {
+                it->second->DispatchCompute(frameData);
+            }
+        }
+        else if (eventID == 3)
+        {
+            // DLSR 事件处理
+            DLSRFrameData* frameData = static_cast<DLSRFrameData*>(data);
+
+            std::scoped_lock lock(g_DLSRInstanceMutex);
+            auto it = g_DLSRInstances.find(frameData->instanceId);
+            if (it != g_DLSRInstances.end())
             {
                 it->second->DispatchCompute(frameData);
             }
@@ -150,6 +168,25 @@ UNITY_INTERFACE_EXPORT void UNITY_INTERFACE_API DestroyDLRRInstance(int id)
     {
         delete it->second;
         g_DLRRInstances.erase(it);
+    }
+}
+
+UNITY_INTERFACE_EXPORT int UNITY_INTERFACE_API CreateDLSRInstance()
+{
+    std::scoped_lock lock(g_DLSRInstanceMutex);
+    int id = g_DLSRNextInstanceId++;
+    g_DLSRInstances[id] = new DLSRInstance(s_UnityInterfaces, id);
+    return id;
+}
+
+UNITY_INTERFACE_EXPORT void UNITY_INTERFACE_API DestroyDLSRInstance(int id)
+{
+    std::scoped_lock lock(g_DLSRInstanceMutex);
+    auto it = g_DLSRInstances.find(id);
+    if (it != g_DLSRInstances.end())
+    {
+        delete it->second;
+        g_DLSRInstances.erase(it);
     }
 }
 

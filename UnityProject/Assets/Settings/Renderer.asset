@@ -102,10 +102,10 @@ MonoBehaviour:
     adaptiveAccumulation: 1
     usePrevFrame: 1
     boost: 0
-    SR: 0
+    SR: 1
     RR: 0
     tmpDisableRR: 0
-    upscalerMode: 0
+    upscalerMode: 2
     confidence: 0
     showMode: 18
     update: 1
@@ -122,6 +122,7 @@ MonoBehaviour:
   nrdConfidenceBlurShader: {fileID: -2368575503658470205, guid: 929c736cc18b2104480622d169c7adf2, type: 3}
   nrdFinalShader: {fileID: -2368575503658470205, guid: 605dffff832546846a67b4ebeb7109df, type: 3}
   nrdDlssBeforeShader: {fileID: -2368575503658470205, guid: f5e21f2594d12fc49b4fd26c01c33415, type: 3}
+  nrdDlssAfterShader: {fileID: -2368575503658470205, guid: ccb470348255bd1489d6a9752f36b77d, type: 3}
   updateSkinnedPrimitivesCS: {fileID: 7200000, guid: 2d589790ec726d548addcbbeb7a17477, type: 3}
   scramblingRankingTex: {fileID: 2800000, guid: ba45d1e4dcf9022438a4798a5f9e7b80, type: 3}
   sobolTex: {fileID: 2800000, guid: 17e7ce8147355314ea8aab1178a6a43c, type: 3}

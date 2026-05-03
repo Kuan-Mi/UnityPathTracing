@@ -75,8 +75,9 @@ public static class RenderPassMarkers
     public static readonly NamedMarker ReferencePtTracing = new(ProfilerCategory.Render, "Reference Pt Tracing", MarkerFlags.SampleGPU);
 
     // ── Denoising / Upscaling ─────────────────────────────────────────────────
-    public static readonly NamedMarker DlssBefore = new(ProfilerCategory.Render, "DLSS Before", MarkerFlags.SampleGPU);
-    public static readonly NamedMarker DlssDenoise = new(ProfilerCategory.Render, "DLSS Denoise", MarkerFlags.SampleGPU);
+    public static readonly NamedMarker DlssBefore  = new(ProfilerCategory.Render, "DLSS Before",   MarkerFlags.SampleGPU);
+    public static readonly NamedMarker DlssDenoise = new(ProfilerCategory.Render, "DLSS Denoise",  MarkerFlags.SampleGPU);
+    public static readonly NamedMarker DlssUpscale = new(ProfilerCategory.Render, "DLSS Upscale",  MarkerFlags.SampleGPU);
 
     // ── Post-process / Output ─────────────────────────────────────────────────
     public static readonly NamedMarker Composition = new(ProfilerCategory.Render, "Composition", MarkerFlags.SampleGPU);

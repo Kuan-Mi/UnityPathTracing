@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Runtime.InteropServices;
 using DLRR;
+using DLSR;
 using NativeRender;
 using Nrd;
 using Unity.Mathematics;
@@ -39,6 +40,7 @@ namespace PathTracing
         public NativeComputeShader nrdConfidenceBlurShader;
         public NativeComputeShader nrdFinalShader;
         public NativeComputeShader nrdDlssBeforeShader;
+        public NativeComputeShader nrdDlssAfterShader;
         public ComputeShader       updateSkinnedPrimitivesCS;
 
         public Texture2D scramblingRankingTex;
@@ -59,7 +61,9 @@ namespace PathTracing
         private NrdPass               _nrdShadowDenoisePass;
         private NrdPass               _nrdOpaqueDenoisePass;
         private NRDDlssBeforePass     _nrdDlssBeforePass;
+        private NRDDlssAfterPass      _nrdDlssAfterPass;
         private DlssRRPass            _dlssrrPass;
+        private DlssSRPass            _dlssrPass;
         private OutputBlitPass        _outputBlitPass;
         private NativeFrameTick       _nativeFrameTickPass;
 
@@ -69,9 +73,10 @@ namespace PathTracing
 
         private readonly Dictionary<long, NrdDenoiser>             _nrdSigmaDenoisers  = new();
         private readonly Dictionary<long, NrdDenoiser>             _nrdReblurDenoisers = new();
-        private readonly Dictionary<long, DlrrDenoiser>            _dlrrDenoisers     = new();
-        private readonly Dictionary<long, PathTracingResourcePool> _resourcePools     = new();
-        private readonly Dictionary<long, CameraFrameState>        _cameraFrameStates = new();
+        private readonly Dictionary<long, DlrrDenoiser>            _dlrrDenoisers      = new();
+        private readonly Dictionary<long, DlsrUpscaler>            _dlsrUpscalers      = new();
+        private readonly Dictionary<long, PathTracingResourcePool> _resourcePools      = new();
+        private readonly Dictionary<long, CameraFrameState>        _cameraFrameStates  = new();
 
         public override void Create()
         {
@@ -133,7 +138,16 @@ namespace PathTracing
             {
                 renderPassEvent = renderPassEvent
             };
+            _nrdDlssAfterPass ??= new NRDDlssAfterPass(nrdDlssAfterShader)
+            {
+                renderPassEvent = renderPassEvent
+            };
             _dlssrrPass ??= new DlssRRPass()
+            {
+                renderPassEvent = renderPassEvent
+            };
+
+            _dlssrPass ??= new DlssSRPass()
             {
                 renderPassEvent = renderPassEvent
             };
@@ -379,24 +393,24 @@ namespace PathTracing
 
                 var nrdInput = new NrdDenoiser.NrdFrameInput
                 {
-                    worldToView         = frameState.worldToView,
-                    prevWorldToView     = frameState.prevWorldToView,
-                    viewToClip          = frameState.viewToClip,
-                    prevViewToClip      = frameState.prevViewToClip,
-                    viewportJitter      = frameState.viewportJitter,
-                    prevViewportJitter  = frameState.prevViewportJitter,
-                    resolutionScale     = frameState.resolutionScale,
-                    prevResolutionScale = frameState.prevResolutionScale,
-                    renderResolution    = frameState.renderResolution,
-                    frameIndex          = curFrame,
-                    lightDirection      = lightDir,
-                    checkerboardMode    = setting.tracingMode == RESOLUTION.RESOLUTION_HALF ? CheckerboardMode.BLACK : CheckerboardMode.OFF,
-                    hitDistanceReconstructionMode = setting.tracingMode == RESOLUTION.RESOLUTION_FULL_PROBABILISTIC? HitDistanceReconstructionMode.AREA_3X3 : HitDistanceReconstructionMode.OFF,
-                    maxAccumulatedFrameNum = setting.maxAccumulatedFrameNum,
-                    maxFastAccumulatedFrameNum =  setting.maxFastAccumulatedFrameNum,
-                    maxStabilizedFrameNum = setting.maxAccumulatedFrameNum,
-                    
-                    enableValidation             =  setting.showValidation,
+                    worldToView                   = frameState.worldToView,
+                    prevWorldToView               = frameState.prevWorldToView,
+                    viewToClip                    = frameState.viewToClip,
+                    prevViewToClip                = frameState.prevViewToClip,
+                    viewportJitter                = frameState.viewportJitter,
+                    prevViewportJitter            = frameState.prevViewportJitter,
+                    resolutionScale               = frameState.resolutionScale,
+                    prevResolutionScale           = frameState.prevResolutionScale,
+                    renderResolution              = frameState.renderResolution,
+                    frameIndex                    = curFrame,
+                    lightDirection                = lightDir,
+                    checkerboardMode              = setting.tracingMode == RESOLUTION.RESOLUTION_HALF ? CheckerboardMode.BLACK : CheckerboardMode.OFF,
+                    hitDistanceReconstructionMode = setting.tracingMode == RESOLUTION.RESOLUTION_FULL_PROBABILISTIC ? HitDistanceReconstructionMode.AREA_3X3 : HitDistanceReconstructionMode.OFF,
+                    maxAccumulatedFrameNum        = setting.maxAccumulatedFrameNum,
+                    maxFastAccumulatedFrameNum    = setting.maxFastAccumulatedFrameNum,
+                    maxStabilizedFrameNum         = setting.maxAccumulatedFrameNum,
+
+                    enableValidation             = setting.showValidation,
                     isHistoryConfidenceAvailable = setting.confidence,
                     splitScreen                  = setting.separator,
                     denoisingRange               = setting.denoisingRange,
@@ -494,6 +508,50 @@ namespace PathTracing
                     tmpDisableRR = setting.tmpDisableRR,
                 });
                 renderer.EnqueuePass(_dlssrrPass);
+
+                EnqueueDlssAfterPass(renderer, pool, outputResolution);
+            }
+            else if (setting.SR)
+            {
+                // DLSS-SR: upscale Composed → DlssOutput (replaces TAA + Final)
+                if (!_dlsrUpscalers.TryGetValue(uniqueKey, out var dlsr))
+                {
+                    var camName = isVR ? $"{cam.name}_Eye{eyeIndex}" : cam.name;
+                    dlsr = new DlsrUpscaler(camName);
+                    _dlsrUpscalers.Add(uniqueKey, dlsr);
+                }
+
+                var dlsrRes = new DlsrUpscaler.DlsrResources
+                {
+                    input    = pool.GetNriResource(RenderResourceType.Composed),
+                    output   = pool.GetNriResource(RenderResourceType.DlssOutput),
+                    mv       = pool.GetNriResource(RenderResourceType.MV),
+                    depth    = pool.GetNriResource(RenderResourceType.Viewz),
+                    exposure = default,
+                    reactive = default,
+                };
+
+                var dlsrInput = new DlsrUpscaler.DlsrFrameInput
+                {
+                    viewportJitter   = frameState.viewportJitter,
+                    renderResolution = frameState.renderResolution,
+                    frameIndex       = curFrame,
+                    outputWidth      = (ushort)outputResolution.x,
+                    outputHeight     = (ushort)outputResolution.y,
+                };
+
+                var dlsrSettings = new DlsrUpscaler.DlsrSettings
+                {
+                    upscalerMode = setting.upscalerMode,
+                    preset       = 0,
+                    resetHistory = resourcesChanged,
+                };
+
+                var dlsrDataPtr = dlsr.GetInteropDataPtr(dlsrInput, dlsrRes, setting.resolutionScale, dlsrSettings);
+                _dlssrPass.Setup(dlsrDataPtr);
+                renderer.EnqueuePass(_dlssrPass);
+
+                EnqueueDlssAfterPass(renderer, pool, outputResolution);
             }
             else
             {
@@ -571,7 +629,7 @@ namespace PathTracing
                 {
                     showMode        = setting.showMode,
                     resolutionScale = frameState.resolutionScale,
-                    enableDlssRR    = setting.RR,
+                    enableDlssRR    = setting.RR || setting.SR,
                     tmpDisableRR    = setting.tmpDisableRR,
                     showMV          = setting.showMV,
                     showValidation  = setting.showValidation,
@@ -582,6 +640,23 @@ namespace PathTracing
                 if (setting.updateTick)
                     renderer.EnqueuePass(_nativeFrameTickPass);
             }
+        }
+
+        private void EnqueueDlssAfterPass(ScriptableRenderer renderer, PathTracingResourcePool pool, int2 outputResolution)
+        {
+            var outputGridW = (outputResolution.x + 15) / 16;
+            var outputGridH = (outputResolution.y + 15) / 16;
+
+            _nrdDlssAfterPass.Setup(new NRDDlssAfterPass.Resource
+            {
+                ConstantBuffer = _nrdConstantBuffer.NativePtr,
+                Pool           = pool,
+            }, new NRDDlssAfterPass.Settings
+            {
+                outputGridW = outputGridW,
+                outputGridH = outputGridH,
+            });
+            renderer.EnqueuePass(_nrdDlssAfterPass);
         }
 
         private static int2 ComputeOutputResolution(CameraData cameraData)
@@ -615,6 +690,10 @@ namespace PathTracing
                 denoiser.Dispose();
             _dlrrDenoisers.Clear();
 
+            foreach (var upscaler in _dlsrUpscalers.Values)
+                upscaler.Dispose();
+            _dlsrUpscalers.Clear();
+
             _cameraFrameStates.Clear();
 
             foreach (var p in _resourcePools.Values)
@@ -639,8 +718,11 @@ namespace PathTracing
             _nrdShadowDenoisePass = null;
             _nrdOpaqueDenoisePass = null;
             _nrdDlssBeforePass?.Dispose();
-            _nrdDlssBeforePass   = null;
+            _nrdDlssBeforePass = null;
+            _nrdDlssAfterPass?.Dispose();
+            _nrdDlssAfterPass    = null;
             _dlssrrPass          = null;
+            _dlssrPass           = null;
             _outputBlitPass      = null;
             _nativeFrameTickPass = null;
         }
@@ -665,6 +747,7 @@ namespace PathTracing
             nrdConfidenceBlurShader = UnityEditor.AssetDatabase.LoadAssetAtPath<NativeComputeShader>("Assets/NRD-Sample/Shaders/ConfidenceBlur.computeshader");
             nrdFinalShader          = UnityEditor.AssetDatabase.LoadAssetAtPath<NativeComputeShader>("Assets/NRD-Sample/Shaders/Final.computeshader");
             nrdDlssBeforeShader     = UnityEditor.AssetDatabase.LoadAssetAtPath<NativeComputeShader>("Assets/NRD-Sample/Shaders/DlssBefore.computeshader");
+            nrdDlssAfterShader      = UnityEditor.AssetDatabase.LoadAssetAtPath<NativeComputeShader>("Assets/NRD-Sample/Shaders/DlssAfter.computeshader");
 
             scramblingRankingTex = UnityEditor.AssetDatabase.LoadAssetAtPath<Texture2D>("Assets/Textures/scrambling_ranking_128x128_2d_4spp.png");
             sobolTex             = UnityEditor.AssetDatabase.LoadAssetAtPath<Texture2D>("Assets/Textures/sobol_256_4d.png");

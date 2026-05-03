@@ -174,6 +174,7 @@ target_link_libraries(D3D12HeapHook PRIVATE d3d12.lib)
 # ---------------------------------------------------------------------------
 add_library(Denoiser SHARED
     Denoiser/DLRRInstance.cpp
+    Denoiser/DLSRInstance.cpp
     Denoiser/NrdInstance.cpp
     Denoiser/RenderingPlugin.cpp
     Denoiser/RenderSystem.cpp
