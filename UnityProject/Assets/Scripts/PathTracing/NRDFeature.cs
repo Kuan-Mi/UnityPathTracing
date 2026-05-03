@@ -471,9 +471,8 @@ namespace PathTracing
                 renderer.EnqueuePass(_nrdTransparentPass);
             }
 
-            if (setting.RR)
+            if (setting.SR || setting.RR)
             {
-                // DLSS-RR: DlssBefore → DlssRR (replaces TAA + Final)
                 var nrdDlssBeforeResource = new NRDDlssBeforePass.Resource
                 {
                     ConstantBuffer = _nrdConstantBuffer.NativePtr,
@@ -486,7 +485,10 @@ namespace PathTracing
                     rectGridH = rectGridH,
                 });
                 renderer.EnqueuePass(_nrdDlssBeforePass);
+            }
 
+            if (setting.RR)
+            {
                 var dlrrRes = new DlrrDenoiser.DlrrResources
                 {
                     input           = pool.GetNriResource(RenderResourceType.Composed),
@@ -666,7 +668,7 @@ namespace PathTracing
                     RRGuide_SpecAlbedo       = pool.GetRT(RenderResourceType.RrGuideSpecAlbedo),
                     RRGuide_Normal_Roughness = pool.GetRT(RenderResourceType.RrGuideNormalRoughness),
                     RRGuide_SpecHitDistance  = pool.GetRT(RenderResourceType.RrGuideSpecHitDistance),
-                    DlssOutput               = pool.GetRT(RenderResourceType.DlssOutput),
+                    DlssOutput               = pool.GetRT(RenderResourceType.Final),
                     // todo
                     taaDst   = pool.GetRT(RenderResourceType.Final),
                     ViewZ    = pool.GetRT(RenderResourceType.Viewz),
