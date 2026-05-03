@@ -11,6 +11,7 @@
 #include <cstdio>
 #include <list>
 #include <mutex>
+#include <string>
 
 #include "IUnityInterface.h"
 #include "IUnityGraphics.h"
@@ -24,8 +25,14 @@
 #include "DescriptorHeapAllocator.h"
 #include "BindlessTexture.h"
 #include "BindlessBuffer.h"
+#include "NativeBuffer.h"
+#include "NativeStructuredBuffer.h"
 #include "D3D12HeapHook.h"
 #include "PluginInternal.h"
+#include <map>
+#include <vector>
+#include <functional>
+#include <mutex>
 
 using Microsoft::WRL::ComPtr;
 
@@ -41,6 +48,11 @@ static IUnityLog*                s_Log         = nullptr;
 static DescriptorHeapAllocator   s_DescHeap;   // global shared GPU-visible CBV/SRV/UAV heap
 static bool                      s_RendererReady = false;
 
+// Global triple-buffer frame index — advanced once per frame by AccelerationStructure::BuildOrUpdate().
+// All subsystems (AccelerationStructure, ComputeDescriptorSet, …) index into their
+// per-frame ring buffers using this value so they stay in sync.
+uint32_t g_frameIndex = 0;
+
 // ---------------------------------------------------------------------------
 // Deferred delete queue — delays destruction of GPU-facing objects until the
 // GPU has finished executing all commands that may reference them.
@@ -50,98 +62,184 @@ static bool                      s_RendererReady = false;
 // instead of immediately deleting.  DrainDeferredDeletes() frees entries whose
 // safeAfterValue <= fence->GetCompletedValue().
 // ---------------------------------------------------------------------------
-enum class DeferredType { BindlessTexture, BindlessBuffer, AccelStruct, RayTraceShader, ComputeShader, ComputeDescriptorSet };
 
-struct DeferredDeleteEntry
-{
-    void*        ptr;
-    DeferredType type;
-    uint64_t     safeAfterValue; // delete when fence->GetCompletedValue() >= this
-};
+using DeletionTask = std::function<void()>;
 
-static ComPtr<ID3D12Fence>         s_DeletionFence;
-static uint64_t                    s_DeletionFenceValue = 0;
-static std::list<DeferredDeleteEntry> s_DeferredDeleteQueue;
-static std::mutex                  s_DeferredDeleteMutex;
+static std::map<uint64_t, std::vector<DeletionTask>> s_DeletionQueue;
+static std::mutex s_DeletionMutex;
+
+// Forward declarations
+static void PluginLog(UnityLogType type, const char* msg, const char* file, int line);
 
 // kDeleteDelay: number of frames to wait before freeing.
 // Unity D3D12 uses up to 2 frames in flight; 3 provides a safe margin.
 static constexpr int kDeleteDelay = 3;
 
-static void ImmediateDelete(DeferredDeleteEntry& e)
+
+void EnqueueCleanup(std::function<void()>&& cleanupTask)
 {
-    switch (e.type)
-    {
-    case DeferredType::BindlessTexture: delete reinterpret_cast<BindlessTexture*>(e.ptr); break;
-    case DeferredType::BindlessBuffer:  delete reinterpret_cast<BindlessBuffer*>(e.ptr);  break;
-    case DeferredType::AccelStruct:     delete reinterpret_cast<AccelerationStructure*>(e.ptr); break;
-    case DeferredType::RayTraceShader:  delete reinterpret_cast<RayTraceShader*>(e.ptr);  break;
-    case DeferredType::ComputeShader:        delete reinterpret_cast<ComputeShader*>(e.ptr);           break;
-    case DeferredType::ComputeDescriptorSet: delete reinterpret_cast<ComputeDescriptorSet*>(e.ptr);    break;
+    if (!cleanupTask) return;
+
+    uint64_t fenceValue = s_D3D12->GetNextFrameFenceValue() + kDeleteDelay;
+
+    if(fenceValue == 4){
+        fenceValue = 20; 
     }
+    // char logMsg[128];
+    // snprintf(logMsg, sizeof(logMsg), "Enqueueing Cleanup Task for Fence Value: %llu", fenceValue);
+    // PluginLog(kUnityLogTypeLog, logMsg, __FILE__, __LINE__);
+
+    std::lock_guard<std::mutex> lk(s_DeletionMutex);
+    s_DeletionQueue[fenceValue].emplace_back(std::move(cleanupTask));
 }
 
-static void EnqueueDeferredDelete(void* ptr, DeferredType type)
+template<typename T>
+void SafeDelete(T*& ptr)
 {
     if (!ptr) return;
-    std::lock_guard<std::mutex> lk(s_DeferredDeleteMutex);
-    s_DeferredDeleteQueue.push_back({ ptr, type, s_DeletionFenceValue + kDeleteDelay });
+    T* rawPtr = ptr;
+    ptr = nullptr; // 立即置空防止野指针
+    EnqueueCleanup([rawPtr]() {
+        delete rawPtr;
+    });
 }
 
-// ---------------------------------------------------------------------------
-// Deferred descriptor-range free queue — same fence, separate from object
-// deletion so BindlessTexture::Resize() doesn't need to know about DeferredType.
-// ---------------------------------------------------------------------------
-struct DeferredRangeFreeEntry
+void SafeReleaseResource(ComPtr<ID3D12Resource> resource)
 {
-    DescriptorHeapAllocator* alloc;
-    uint32_t                 base;
-    uint32_t                 count;
-    uint64_t                 safeAfterValue;
-};
-static std::list<DeferredRangeFreeEntry> s_DeferredRangeFreeQueue; // guarded by s_DeferredDeleteMutex
+    if (!resource) return;
+
+    
+        // wchar_t name[128]; UINT size = sizeof(name);
+        // resource->GetPrivateData(WKPDID_D3DDebugObjectNameW, &size, name);
+        // char logMsg[256];
+        // snprintf(logMsg, sizeof(logMsg), "Deferred Resource Released: %ls", name);
+        // PluginLog(kUnityLogTypeLog, logMsg, __FILE__, __LINE__);
+
+
+    // 利用 Lambda 捕获 ComPtr，增加引用计数，等 Lambda 执行完自动释放
+    EnqueueCleanup([res = std::move(resource)]() {
+        // res 在此处超出作用域，自动调用 Release()
+    });
+}
+
+void NR_EnqueueDescriptorRangeFree(DescriptorHeapAllocator* alloc, uint32_t base, uint32_t count)
+{
+    if (!alloc || count == 0) return;
+    EnqueueCleanup([alloc, base, count]() {
+        alloc->Free(base, count);
+    });
+}
 
 static void DrainDeferredDeletes(bool force = false)
 {
-    std::lock_guard<std::mutex> lk(s_DeferredDeleteMutex);
-    uint64_t completed = s_DeletionFence ? s_DeletionFence->GetCompletedValue() : 0;
-    for (auto it = s_DeferredDeleteQueue.begin(); it != s_DeferredDeleteQueue.end(); )
+    // Advance the global triple-buffer frame index at the start of each frame tick.
+    // Skipped when force=true (shutdown path) to avoid disturbing the index during teardown.
+    if (!force)
+        g_frameIndex = (g_frameIndex + 1) % kGlobalNumFrames;
+
+    // 获取当前 GPU 已完成的 Fence 值
+    uint64_t completedValue = (s_D3D12 && !force) ? s_D3D12->GetFrameFence()->GetCompletedValue() : UINT64_MAX;
+
+    std::vector<std::vector<DeletionTask>> tasksToExecute;
+
     {
-        if (force || it->safeAfterValue <= completed)
+        std::lock_guard<std::mutex> lk(s_DeletionMutex);
+        auto it = s_DeletionQueue.begin();
+        while (it != s_DeletionQueue.end())
         {
-            ImmediateDelete(*it);
-            it = s_DeferredDeleteQueue.erase(it);
+            // 因为 map 是有序的，如果当前 key > 已完成值，后面所有的都没完成
+            if (!force && it->first > completedValue)
+                break;
+
+            tasksToExecute.emplace_back(std::move(it->second));
+            it = s_DeletionQueue.erase(it);
         }
-        else
-            ++it;
     }
-    for (auto it = s_DeferredRangeFreeQueue.begin(); it != s_DeferredRangeFreeQueue.end(); )
+
+    char logMsg[256];
+
+    auto countTasks = 0;
+    for (const auto& batch : tasksToExecute)
+        countTasks += batch.size();
+
+    // snprintf(logMsg, sizeof(logMsg), "Draining Deferred Deletes: executing %zu batches, %d tasks in Frame %llu (force=%d)", tasksToExecute.size(), countTasks, completedValue, force);
+    // PluginLog(kUnityLogTypeLog, logMsg, __FILE__, __LINE__);
+
+
+    // 在锁外执行真正的析构操作，防止死锁并减少锁占用时间
+    for (auto& batch : tasksToExecute)
     {
-        if (force || it->safeAfterValue <= completed)
+        for (auto& task : batch)
         {
-            it->alloc->Free(it->base, it->count);
-            it = s_DeferredRangeFreeQueue.erase(it);
+            if (task) task();
         }
-        else
-            ++it;
     }
 }
 
-void NR_EnqueueDescriptorRangeFree(DescriptorHeapAllocator* alloc,
-                                   uint32_t                 base,
-                                   uint32_t                 count)
+void EnqueueDeferredDelete(void* ptr, DeferredType type)
 {
-    if (!alloc || count == 0) return;
-    if (!s_DeletionFence)
+    if (!ptr) return;
+
+    // 根据类型将 void* 强转回具体指针，并包装成 Lambda
+    // 这里使用 Lambda 捕获，可以在销毁时正确触发各个类的析构函数
+    switch (type)
     {
-        // Fence not yet available (pre-init path) — free immediately.
-        alloc->Free(base, count);
-        return;
+    case DeferredType::BindlessTexture:
+        EnqueueCleanup([p = static_cast<BindlessTexture*>(ptr)] { delete p; });
+        break;
+
+    case DeferredType::BindlessBuffer:
+        EnqueueCleanup([p = static_cast<BindlessBuffer*>(ptr)] { delete p; });
+        break;
+
+    case DeferredType::AccelStruct:
+        EnqueueCleanup([p = static_cast<AccelerationStructure*>(ptr)] { delete p; });
+        break;
+
+    case DeferredType::RayTraceShader:
+        EnqueueCleanup([p = static_cast<RayTraceShader*>(ptr)] { delete p; });
+        break;
+
+    case DeferredType::ComputeShader:
+        EnqueueCleanup([p = static_cast<ComputeShader*>(ptr)] { delete p; });
+        break;
+
+    case DeferredType::ComputeDescriptorSet:
+        EnqueueCleanup([p = static_cast<ComputeDescriptorSet*>(ptr)] { delete p; });
+        break;
+
+    case DeferredType::AccelStructBlas:
+        EnqueueCleanup([p = static_cast<BLASEntry*>(ptr)] { delete p; });
+        break;
+
+    case DeferredType::NativeBuffer:
+        EnqueueCleanup([p = static_cast<NativeBuffer*>(ptr)] { delete p; });
+        break;
+
+    case DeferredType::NativeStructuredBuffer:
+        EnqueueCleanup([p = static_cast<NativeStructuredBuffer*>(ptr)] { delete p; });
+        break;
+
+    default:
+        // 如果进入了未定义的类型，为了安全起见，尝试直接 delete 
+        // 但注意：void* 是不能直接 delete 的，这里最好记录一个错误日志
+        if (s_Log) {
+            char buf[256];
+            snprintf(buf, sizeof(buf), "Unknown DeferredType %d for ptr 0x%p", (int)type, ptr);
+            s_Log->Log(kUnityLogTypeWarning, buf, __FILE__, __LINE__);
+        }
+        break;
     }
-    std::lock_guard<std::mutex> lk(s_DeferredDeleteMutex);
-    s_DeferredRangeFreeQueue.push_back({ alloc, base, count,
-                                         s_DeletionFenceValue + kDeleteDelay });
+
+    // 可选：调试用 Log（建议只在 Debug 模式开启，避免性能抖动）
+// #ifdef _DEBUG
+    // char logMsg[128];
+    // snprintf(logMsg, sizeof(logMsg), "Enqueued Cleanup: ptr=0x%p, type=%d", ptr, (int)type);
+    // PluginLog(kUnityLogTypeLog, logMsg, __FILE__, __LINE__);
+// #endif
 }
+
+
 
 // ---------------------------------------------------------------------------
 // Logging helpers - fall back to printf when IUnityLog isn't available yet
@@ -210,12 +308,6 @@ static void UNITY_INTERFACE_API OnGraphicsDeviceEvent(UnityGfxDeviceEventType ev
             if (!s_DescHeap.Initialize(device))
                 NR_ERROR("DescriptorHeapAllocator initialization failed");
 
-            // Create the fence used by the deferred-delete queue.
-            s_DeletionFenceValue = 0;
-            if (FAILED(device->CreateFence(0, D3D12_FENCE_FLAG_NONE,
-                                           IID_PPV_ARGS(&s_DeletionFence))))
-                NR_ERROR("Failed to create deletion fence");
-
             NR_LOG("Plugin initialized (DXR device confirmed)");
         }
         else
@@ -223,33 +315,29 @@ static void UNITY_INTERFACE_API OnGraphicsDeviceEvent(UnityGfxDeviceEventType ev
     }
     else if (eventType == kUnityGfxDeviceEventShutdown)
     {
-        NR_LOG("Plugin shutdown");
+        NR_LOG("Plugin shutdown - BEGIN");
+        NR_LOG("Plugin shutdown - calling FlushGpuAndWait to sync GPU...");
+        // CRITICAL: Wait for all GPU operations to complete before releasing resources.
+        // This prevents D3D12 validation errors when resources are released while still
+        // referenced by in-flight GPU commands (especially BLAS builds for skinned meshes).
+        FlushGpuAndWait();
+        NR_LOG("Plugin shutdown - GPU sync complete");
+
         // Force-drain any pending deferred deletes before tearing down.
+        // CRITICAL: Use force=true to release ALL resources regardless of fence value,
+        // because we're about to reset s_DeletionFenceValue to 0. If we don't force-drain,
+        // resources with high safeAfterValue will remain in the queue and be incorrectly
+        // released when the fence value wraps around on the next play mode entry.
+        NR_LOG("Plugin shutdown - draining deferred deletes (force=true)...");
         DrainDeferredDeletes(true);
-        s_DeletionFence.Reset();
-        s_DeletionFenceValue = 0;
+        NR_LOG("Plugin shutdown - deferred deletes drained");
+
         s_DescHeap.Shutdown();
         s_RendererReady = false;
         s_D3D12         = nullptr;
         s_D3D12v8       = nullptr;
+        NR_LOG("Plugin shutdown - COMPLETE");
     }
-}
-
-// ---------------------------------------------------------------------------
-// NR_FrameTick
-//   Must be called once per frame from the CPU (main thread) before submitting
-//   rendering commands.  Signals the deletion fence with the next value, then
-//   drains any deferred-delete entries whose fence value has been passed.
-// ---------------------------------------------------------------------------
-extern "C" void UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API
-NR_FrameTick()
-{
-    if (!s_D3D12 || !s_DeletionFence) return;
-    ID3D12CommandQueue* queue = s_D3D12->GetCommandQueue();
-    if (!queue) return;
-    ++s_DeletionFenceValue;
-    queue->Signal(s_DeletionFence.Get(), s_DeletionFenceValue);
-    DrainDeferredDeletes();
 }
 
 // ---------------------------------------------------------------------------
@@ -417,6 +505,24 @@ NR_AS_RemoveInstance(uint64_t handle, uint32_t instanceHandle)
         ->RemoveInstance(instanceHandle);
 }
 
+// ---------------------------------------------------------------------------
+// NR_AS_UpdateDynamicVertexBuffer
+//   For SkinnedMeshRenderer instances: provide the current-frame GPU vertex
+//   buffer (from SkinnedMeshRenderer.GetVertexBuffer) so the BLAS is rebuilt
+//   with up-to-date skinned geometry on the next BuildOrUpdate call.
+//   vbPtr       : ID3D12Resource* returned by GraphicsBuffer.GetNativeBufferPtr()
+//   vertexCount : current vertex count (may match original registration)
+//   vertexStride: vertex stride in bytes
+// ---------------------------------------------------------------------------
+extern "C" void UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API
+NR_AS_UpdateDynamicVertexBuffer(uint64_t handle, uint32_t instanceHandle,
+                                 void* vbPtr, uint32_t vertexCount, uint32_t vertexStride)
+{
+    if (!handle || !vbPtr) return;
+    reinterpret_cast<AccelerationStructure*>(handle)
+        ->UpdateDynamicVertexBuffer(instanceHandle, vbPtr, vertexCount, vertexStride);
+}
+
 // ===========================================================================
 // RayTraceShader  -  multi-shader, per-instance ray tracing pipeline
 // ===========================================================================
@@ -448,30 +554,69 @@ struct AS_BuildEventData
 // ---------------------------------------------------------------------------
 static void FlushGpuAndWait()
 {
-    if (!s_D3D12) return;
+    NR_LOG("FlushGpuAndWait - START");
+    if (!s_D3D12) {
+        NR_WARN("FlushGpuAndWait - s_D3D12 is null");
+        return;
+    }
     ID3D12CommandQueue* queue = s_D3D12->GetCommandQueue();
-    if (!queue) return;
+    if (!queue) {
+        NR_WARN("FlushGpuAndWait - queue is null");
+        return;
+    }
 
     ID3D12Device* device = s_D3D12->GetDevice();
-    if (!device) return;
+    if (!device) {
+        NR_WARN("FlushGpuAndWait - device is null");
+        return;
+    }
 
     ComPtr<ID3D12Fence> fence;
     if (FAILED(device->CreateFence(0, D3D12_FENCE_FLAG_NONE, IID_PPV_ARGS(&fence))))
+    {
+        NR_ERROR("FlushGpuAndWait - CreateFence failed");
         return;
+    }
 
     if (FAILED(queue->Signal(fence.Get(), 1)))
+    {
+        NR_ERROR("FlushGpuAndWait - Signal failed");
         return;
+    }
 
+    NR_LOG("FlushGpuAndWait - waiting for GPU completion...");
     if (fence->GetCompletedValue() < 1)
     {
         HANDLE ev = CreateEventW(nullptr, FALSE, FALSE, nullptr);
         if (ev)
         {
             fence->SetEventOnCompletion(1, ev);
-            WaitForSingleObject(ev, INFINITE);
+            // Use a 10-second timeout instead of INFINITE to avoid hanging forever
+            DWORD waitResult = WaitForSingleObject(ev, 10000);
             CloseHandle(ev);
+            if (waitResult == WAIT_OBJECT_0)
+            {
+                NR_LOG("FlushGpuAndWait - GPU wait completed");
+            }
+            else if (waitResult == WAIT_TIMEOUT)
+            {
+                NR_ERROR("FlushGpuAndWait - GPU wait TIMEOUT after 10 seconds!");
+            }
+            else
+            {
+                NR_ERROR("FlushGpuAndWait - GPU wait FAILED");
+            }
+        }
+        else
+        {
+            NR_ERROR("FlushGpuAndWait - CreateEvent failed");
         }
     }
+    else
+    {
+        NR_LOG("FlushGpuAndWait - GPU already completed");
+    }
+    NR_LOG("FlushGpuAndWait - END");
 }
 
 // ---------------------------------------------------------------------------
@@ -653,10 +798,22 @@ NR_RTS_GetRenderEventDataSize()
     return static_cast<uint32_t>(sizeof(RTS_RenderEventData));
 }
 
+
+static void UNITY_INTERFACE_API FrameTickCallback(int /*eventId*/)
+{
+    DrainDeferredDeletes();
+}
+
 extern "C" UnityRenderingEventAndData UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API
 NR_AS_GetBuildRenderEventFunc()
 {
     return AsBuildRenderCallback;
+}
+
+extern "C" UnityRenderingEvent UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API
+NR_GetFrameTickEventFunc()
+{
+    return FrameTickCallback;
 }
 
 extern "C" uint32_t UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API
@@ -863,6 +1020,183 @@ NR_BB_GetCapacity(uint64_t handle)
 }
 
 // ===========================================================================
+// NativeBuffer  -  triple-buffered upload-heap constant buffer
+// ===========================================================================
+
+// ---------------------------------------------------------------------------
+// NR_CreateNativeBuffer
+//   Allocates a triple-buffered upload-heap buffer of |sizeInBytes|.
+//   Returns opaque handle (NativeBuffer*) or 0 on failure.
+// ---------------------------------------------------------------------------
+extern "C" uint64_t UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API
+NR_CreateNativeBuffer(uint32_t sizeInBytes)
+{
+    if (!s_D3D12)
+    {
+        NR_WARN("NR_CreateNativeBuffer: renderer not ready");
+        return 0;
+    }
+    ID3D12Device* device = s_D3D12->GetDevice();
+    if (!device)
+    {
+        NR_WARN("NR_CreateNativeBuffer: no D3D12 device");
+        return 0;
+    }
+    auto* nb = new NativeBuffer();
+    if (!nb->Initialize(device, sizeInBytes))
+    {
+        delete nb;
+        NR_WARN("NR_CreateNativeBuffer: Initialize failed");
+        return 0;
+    }
+    return reinterpret_cast<uint64_t>(nb);
+}
+
+// ---------------------------------------------------------------------------
+// NR_DestroyNativeBuffer
+//   Enqueues destruction after a GPU fence delay (same as other objects).
+// ---------------------------------------------------------------------------
+extern "C" void UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API
+NR_DestroyNativeBuffer(uint64_t handle)
+{
+    if (handle) EnqueueDeferredDelete(reinterpret_cast<void*>(handle), DeferredType::NativeBuffer);
+}
+
+// ---------------------------------------------------------------------------
+// NR_NB_Upload
+//   Copies |bytes| bytes from |data| into the current frame's mapped slot.
+//   Must be called from the main thread before issuing GPU work.
+// ---------------------------------------------------------------------------
+extern "C" void UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API
+NR_NB_Upload(uint64_t handle, const void* data, uint32_t bytes)
+{
+    if (!handle || !data) return;
+    reinterpret_cast<NativeBuffer*>(handle)->Upload(data, bytes);
+}
+
+// ---------------------------------------------------------------------------
+// NR_NB_GetNativePtr
+//   Returns the ID3D12Resource* for the current frame slot as intptr_t.
+//   Provided as a compatibility/debug path; the preferred usage is to pass
+//   the handle as objectPtr with objectKind = NativeBuffer in CS_BindingSlot.
+// ---------------------------------------------------------------------------
+extern "C" intptr_t UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API
+NR_NB_GetNativePtr(uint64_t handle)
+{
+    if (!handle) return 0;
+    return reinterpret_cast<intptr_t>(reinterpret_cast<NativeBuffer*>(handle)->GetResource());
+}
+
+// ===========================================================================
+// NativeStructuredBuffer — single upload-heap SRV buffer
+// ===========================================================================
+
+// ---------------------------------------------------------------------------
+// NR_CreateNativeStructuredBuffer
+//   Allocates an upload-heap structured buffer with |capacity| elements of
+//   |elementStride| bytes each. Returns opaque handle or 0 on failure.
+// ---------------------------------------------------------------------------
+extern "C" uint64_t UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API
+NR_CreateNativeStructuredBuffer(uint32_t capacity, uint32_t elementStride)
+{
+    if (!s_D3D12) { NR_WARN("NR_CreateNativeStructuredBuffer: renderer not ready"); return 0; }
+    ID3D12Device* device = s_D3D12->GetDevice();
+    if (!device)  { NR_WARN("NR_CreateNativeStructuredBuffer: no D3D12 device"); return 0; }
+    auto* nsb = new NativeStructuredBuffer();
+    if (!nsb->Initialize(device, capacity, elementStride, s_Log))
+    {
+        delete nsb;
+        NR_WARN("NR_CreateNativeStructuredBuffer: Initialize failed");
+        return 0;
+    }
+    return reinterpret_cast<uint64_t>(nsb);
+}
+
+// ---------------------------------------------------------------------------
+// NR_DestroyNativeStructuredBuffer
+// ---------------------------------------------------------------------------
+extern "C" void UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API
+NR_DestroyNativeStructuredBuffer(uint64_t handle)
+{
+    if (handle) EnqueueDeferredDelete(reinterpret_cast<void*>(handle), DeferredType::NativeStructuredBuffer);
+}
+
+// ---------------------------------------------------------------------------
+// NR_NSB_UploadRange
+//   Copies |elementCount| elements from |data| starting at |elementOffset|.
+// ---------------------------------------------------------------------------
+extern "C" void UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API
+NR_NSB_UploadRange(uint64_t handle, const void* data, uint32_t elementOffset, uint32_t elementCount)
+{
+    if (!handle || !data) return;
+    reinterpret_cast<NativeStructuredBuffer*>(handle)->UploadRange(data, elementOffset, elementCount);
+}
+
+// ---------------------------------------------------------------------------
+// NR_NSB_Grow
+//   Grows the buffer to at least |newCapacity| elements.
+//   Old GPU and staging resources are enqueued for deferred deletion.
+// ---------------------------------------------------------------------------
+extern "C" void UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API
+NR_NSB_Grow(uint64_t handle, uint32_t newCapacity)
+{
+    if (!handle) return;
+    auto* nsb = reinterpret_cast<NativeStructuredBuffer*>(handle);
+    NativeStructuredBuffer::GrowResult old;
+    if (nsb->Grow(newCapacity, old))
+    {
+        // Defer deletion of superseded resources until the GPU is done with them.
+        if (old.oldBuffer)
+            EnqueueCleanup([buf = std::move(old.oldBuffer)] {});
+        for (auto& s : old.oldStaging)
+            if (s) EnqueueCleanup([res = std::move(s)] {});
+    }
+}
+
+// ---------------------------------------------------------------------------
+// NR_NSB_GetNativePtr
+//   Returns the ID3D12Resource* as intptr_t for binding as an SRV.
+// ---------------------------------------------------------------------------
+extern "C" intptr_t UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API
+NR_NSB_GetNativePtr(uint64_t handle)
+{
+    if (!handle) return 0;
+    return reinterpret_cast<intptr_t>(reinterpret_cast<NativeStructuredBuffer*>(handle)->GetResource());
+}
+
+// ---------------------------------------------------------------------------
+// NR_NSB_GetCapacity
+// ---------------------------------------------------------------------------
+extern "C" uint32_t UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API
+NR_NSB_GetCapacity(uint64_t handle)
+{
+    if (!handle) return 0;
+    return reinterpret_cast<NativeStructuredBuffer*>(handle)->GetCapacity();
+}
+
+// ---------------------------------------------------------------------------
+// NR_NSB_FlushPendingCopies render-event callback
+//   Called via CommandBuffer.IssuePluginEventAndData.
+//   data = opaque NativeStructuredBuffer* (passed as IntPtr from C#).
+// ---------------------------------------------------------------------------
+static void UNITY_INTERFACE_API NsbFlushCallback(int /*eventId*/, void* data)
+{
+    if (!s_RendererReady || !s_D3D12 || !data) return;
+    UnityGraphicsD3D12RecordingState recordingState = {};
+    if (!s_D3D12->CommandRecordingState(&recordingState) || !recordingState.commandList) return;
+    auto* nsb     = static_cast<NativeStructuredBuffer*>(data);
+    auto* cmdList = static_cast<ID3D12GraphicsCommandList*>(recordingState.commandList);
+    nsb->FlushPendingCopies(cmdList);
+}
+
+/// <summary>Returns the render-event function pointer for FlushPendingCopies.</summary>
+extern "C" UnityRenderingEventAndData UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API
+NR_NSB_GetFlushEventFunc()
+{
+    return NsbFlushCallback;
+}
+
+// ===========================================================================
 // ComputeShader  -  generic compute pipeline (cs_6_x)
 // ===========================================================================
 
@@ -952,6 +1286,33 @@ static void ApplyRootConstantsHints(ComputeShader* cs, const char* hintsJson)
     }
 }
 
+// Parses "rootSRV":["name1","name2",...] from a JSON object.
+static void ApplyRootSRVHints(ComputeShader* cs, const char* hintsJson)
+{
+    if (!hintsJson || hintsJson[0] == '\0') return;
+    const char* tag = strstr(hintsJson, "\"rootSRV\"");
+    if (!tag) return;
+    const char* arrStart = strchr(tag + 9, '[');
+    if (!arrStart) return;
+    const char* p = arrStart + 1;
+    while (*p)
+    {
+        const char* q1 = strchr(p, '"');
+        if (!q1) break;
+        const char* q2 = strchr(q1 + 1, '"');
+        if (!q2) break;
+        std::string name(q1 + 1, q2);
+        if (!name.empty())
+            cs->SetRootSRVHint(name.c_str());
+        p = q2 + 1;
+        // stop at end of array
+        const char* nextComma    = strchr(p, ',');
+        const char* arrEnd       = strchr(p, ']');
+        if (!arrEnd) break;
+        if (!nextComma || arrEnd < nextComma) break;
+    }
+}
+
 extern "C" uint64_t UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API
 NR_CreateComputeShaderEx(const uint8_t* dxilBytes, uint32_t size, const char* name, const char* hintsJson)
 {
@@ -973,6 +1334,7 @@ NR_CreateComputeShaderEx(const uint8_t* dxilBytes, uint32_t size, const char* na
         return 0;
     }
     ApplyRootConstantsHints(cs, hintsJson);
+    ApplyRootSRVHints(cs, hintsJson);
     if (!cs->LoadShaderFromBytes(dxilBytes, size, name))
     {
         delete cs;

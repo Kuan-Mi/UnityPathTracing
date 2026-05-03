@@ -561,7 +561,7 @@ namespace PathTracing
 
                 var nrdDataPtr = nrd.GetInteropDataPtr(nrdInput);
 
-                _nrdPass.Setup(nrdDataPtr);
+                _nrdPass.Setup(nrdDataPtr,RenderPassMarkers.NrdDenoise);
                 renderer.EnqueuePass(_nrdPass);
             }
 

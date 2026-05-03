@@ -21,6 +21,8 @@ struct NR_SubmeshDesc
 {
     uint32_t indexCount;      // number of indices in this sub-mesh
     uint32_t indexByteOffset; // byte offset of this sub-mesh's first index in the shared IB
+    uint32_t baseVertex;      // value added to each index before reading a vertex (Unity SubMeshDescriptor.baseVertex)
+    uint32_t _pad;            // padding to keep 8-byte alignment
 };
 
 // ---------------------------------------------------------------------------
@@ -63,7 +65,10 @@ struct NR_AddInstanceDesc
     uint32_t                 vertexStride;
     uint32_t                 indexStride;
     uint32_t                 submeshCount;
+    uint32_t                 isDynamic;     // 1 = SkinnedMeshRenderer (BLAS rebuilt every frame)
 };
+
+static_assert(sizeof(NR_AddInstanceDesc) == 56, "NR_AddInstanceDesc size mismatch with C# AddInstanceDesc");
 
 // ---------------------------------------------------------------------------
 // SubMeshData  –  per-submesh data (indices, material, optional OMM).
@@ -73,6 +78,7 @@ struct SubMeshData
 {
     UINT        indexCount;
     UINT        indexByteOffset;  // byte offset of this sub-mesh's first index in the shared IB
+    INT         baseVertex = 0;  // value added to each index before reading a vertex (BaseVertexLocation in D3D12)
 
     bool hasBakedOMM = false;
     struct OMMBakedData
@@ -93,10 +99,13 @@ struct SubMeshData
 struct MeshInfo
 {
     // Shared per-instance GPU buffers and vertex layout
-    ComPtr<ID3D12Resource> vertexBuffer;
+    // NOTE: These are Unity-managed resources. We store raw pointers without AddRef
+    // because Unity controls their lifetime. Using ComPtr would interfere with Unity's
+    // resource management and cause premature or delayed deletion.
+    ID3D12Resource* vertexBuffer = nullptr;
     UINT vertexCount;
     UINT vertexStride;
-    ComPtr<ID3D12Resource> indexBuffer;
+    ID3D12Resource* indexBuffer = nullptr;
     DXGI_FORMAT indexFormat; // DXGI_FORMAT_R16_UINT or DXGI_FORMAT_R32_UINT
 
     std::vector<SubMeshData> submeshes;
@@ -123,6 +132,22 @@ struct MeshKeyHash
     }
 };
 
+struct BLASEntry
+{
+    ComPtr<ID3D12Resource> blas;
+    ComPtr<ID3D12Resource> blasScratch;
+
+    std::vector<ComPtr<ID3D12Resource>> ommArrays;
+    std::vector<ComPtr<ID3D12Resource>> ommArrayScratch;
+    std::vector<ComPtr<ID3D12Resource>> ommIndexBuffers;
+    std::vector<ComPtr<ID3D12Resource>> ommDescArrayBuffers;
+    std::vector<ComPtr<ID3D12Resource>> ommArrayDataBuffers;
+    std::vector<DXGI_FORMAT>            ommIndexFormats;
+    std::vector<UINT>                   ommIndexStrides;
+
+    bool anyOMM   = false;
+    int  refCount = 0;
+};
 // ---------------------------------------------------------------------------
 // AccelerationStructure
 //   Unified class that manages the full instance lifecycle, BLAS cache, and TLAS.
@@ -142,7 +167,7 @@ class AccelerationStructure
 {
 public:
     AccelerationStructure(ID3D12Device5* device, IUnityLog* log);
-    ~AccelerationStructure() = default;
+    ~AccelerationStructure();
 
     // Optional: supply v8 interface so the AS can notify Unity of resource state changes
     // caused by implicit BLAS input buffer promotions.
@@ -158,6 +183,11 @@ public:
 
     // Remove instance identified by handle. No-op if handle is invalid.
     void RemoveInstance(uint32_t handle);
+
+    // Update the vertex buffer pointer for a dynamic (SkinnedMeshRenderer) instance.
+    // Discards the old BLAS (deferred 3-frame GPU delete) and schedules a rebuild.
+    // vbPtr must be the current-frame ID3D12Resource* from GetVertexBuffer().
+    void UpdateDynamicVertexBuffer(uint32_t handle, void* vbPtr, uint32_t vertexCount, uint32_t vertexStride);
 
     // Per-frame update: set world transform (row-major 3x4).
     void SetInstanceTransform(uint32_t handle, const float transform[12]);
@@ -183,30 +213,27 @@ public:
     // Safe to call every frame; intended for diagnostics only.
     void DumpInstances(const char* tag = nullptr) const;
 
-    ID3D12Resource* GetTLAS() const { return m_tlasResources[m_frameIndex].tlas.Get(); }
-
-    // Dense list of active InstanceDefs in TLAS order — used by Renderer for bindless VB/IB SRVs.
-    const std::vector<MeshInfo>& GetInstanceDefs() const { return m_activeDefs; }
+    ID3D12Resource* GetTLAS() const;
 
 private:
     // -----------------------------------------------------------------------
     // Internal BLAS types
     // -----------------------------------------------------------------------
-    struct BLASEntry
+
+    // Deferred BLAS compaction entry.
+    // After EnsureBLAS records a build command, we simultaneously record
+    // EmitRaytracingAccelerationStructurePostbuildInfo (compacted size) and
+    // copy its result to a CPU-readable READBACK buffer.  Three frames later
+    // (by which time the GPU has definitely consumed the data) we read the
+    // size, allocate a smaller result buffer, record CopyRaytracingAccelerationStructure
+    // (COMPACT), and swap the cache entry.
+    struct PendingCompaction
     {
-        ComPtr<ID3D12Resource> blas;
-        ComPtr<ID3D12Resource> blasScratch;
-
-        std::vector<ComPtr<ID3D12Resource>> ommArrays;
-        std::vector<ComPtr<ID3D12Resource>> ommArrayScratch;
-        std::vector<ComPtr<ID3D12Resource>> ommIndexBuffers;
-        std::vector<ComPtr<ID3D12Resource>> ommDescArrayBuffers;
-        std::vector<ComPtr<ID3D12Resource>> ommArrayDataBuffers;
-        std::vector<DXGI_FORMAT>            ommIndexFormats;
-        std::vector<UINT>                   ommIndexStrides;
-
-        bool anyOMM   = false;
-        int  refCount = 0;
+        MeshKey key;
+        ComPtr<ID3D12Resource> sizeBuffer;     // DEFAULT UAV, target of EmitPostbuildInfo
+        ComPtr<ID3D12Resource> readbackBuffer; // READBACK, CPU reads the compacted size
+        void*    mappedReadback = nullptr;     // persistently-mapped readback pointer
+        uint32_t buildFrame     = 0;           // value of m_frameCounter when submitted
     };
 
     struct TLASInstanceEntry
@@ -234,23 +261,19 @@ private:
         uint8_t mask      = 0xFF;
         bool    active    = false;
         bool    needsBLAS = false;
-    };
-
-    // Deferred deletion of GPU resources (3-frame delay).
-    struct PendingDelete
-    {
-        std::vector<ComPtr<ID3D12Resource>> resources;
-        int framesRemaining;
+        bool    isDynamic = false; // SkinnedMeshRenderer: BLAS rebuilt each frame
+        D3D12_GPU_VIRTUAL_ADDRESS blasVA;
     };
 
     // -----------------------------------------------------------------------
     // BLAS helpers
     // -----------------------------------------------------------------------
-    bool EnsureBLAS(ID3D12GraphicsCommandList4* cmdList, const MeshKey& key, const MeshInfo& def);
+    bool EnsureBLAS(ID3D12GraphicsCommandList4* cmdList, InstanceSlot& slot);
     void ReleaseBLAS(const MeshKey& key);
     D3D12_GPU_VIRTUAL_ADDRESS GetBLASVA(const MeshKey& key) const;
     bool BuildOMMForSubmesh(ID3D12GraphicsCommandList4* cmdList,
                             BLASEntry& entry, size_t subIdx, const SubMeshData& mesh);
+    void ProcessPendingCompactions(ID3D12GraphicsCommandList4* cmdList);
 
     // TLAS helpers
     bool BuildTLAS(ID3D12GraphicsCommandList4* cmdList, const std::vector<TLASInstanceEntry>& entries);
@@ -267,8 +290,6 @@ private:
         UINT64                 tlasScratchCapacity  = 0;   // bytes allocated for tlasScratch
     };
 
-    void TickDeferredDeletes();
-
     // -----------------------------------------------------------------------
     // Members
     // -----------------------------------------------------------------------
@@ -279,9 +300,12 @@ private:
     // BLAS cache
     std::unordered_map<MeshKey, BLASEntry, MeshKeyHash> m_blasCache;
 
-    // TLAS triple-buffered resources (indexed by m_frameIndex)
+    // Deferred compaction queue (static BLASes only)
+    std::vector<PendingCompaction> m_pendingCompactions;
+    uint32_t m_frameCounter = 0;
+
+    // TLAS triple-buffered resources (indexed by g_frameIndex)
     TLASFrameResources     m_tlasResources[3];
-    uint32_t               m_frameIndex           = 0;
 
     // Slot system
     std::vector<InstanceSlot>              m_slots;
@@ -289,19 +313,7 @@ private:
     std::unordered_map<uint32_t, uint32_t> m_handleToSlot;
     uint32_t m_activeCount = 0;
 
-    // Dense active list (TLAS order)
-    std::vector<MeshInfo>       m_activeDefs;
     std::vector<TLASInstanceEntry> m_tlasEntries;
-
-    // Dirty flags
-    // m_tlasRebuildPendingSlots counts how many double-buffer slots still need a
-    // full structural rebuild.  Set to 2 on any structural change so that BOTH
-    // slots are rebuilt before we fall back to refit-only updates.
-    int  m_tlasRebuildPendingSlots = 3;  // start at 3: all slots need initial build
-    bool m_transformsDirty         = false;
-
-    // Deferred deletion queue
-    std::list<PendingDelete> m_pendingDeletes;
 
     // Mutex protecting shared state accessed from both Main Thread (Clear, AddInstance,
     // RemoveInstance, SetInstance*) and Render Thread (BuildOrUpdate / BuildTLAS).

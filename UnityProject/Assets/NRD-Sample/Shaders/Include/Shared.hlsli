@@ -22,6 +22,7 @@
 #define USE_TRANSLUCENCY                    1 // translucent foliage
 #define USE_MOVING_EMISSION_FIX             1 // fixes a dark tail, left by an animated emissive object
 #define USE_IS_FOR_ALL_BOUNCES              1 // slower, but better lighting for 2nd+ bounces
+#define USE_BLUE_NOISE_FOR_SHADOWS          ( 1 && !gRR && gDenoiserType != DENOISER_REFERENCE ) // a must have for SIGMA
 
 // Default = 0
 #define USE_SANITIZATION                    0 // NRD sample is NAN/INF free
@@ -41,6 +42,7 @@
 #define USE_WHITE_FURNACE                   0 // energy conservation test
 #define USE_CAMERA_ATTACHED_REFLECTION_TEST 0 // test special treatment for reflections of objects attached to the camera
 #define USE_RUSSIAN_ROULETTE                0 // bad practice for real-time denoising
+#define USE_BLUE_NOISE_FOR_RADIANCE         ( 0 && !gRR && gDenoiserType != DENOISER_REFERENCE ) // helps to reduce residual boiling, but worsens IQ due to limited coverage of all possible directions
 
 //=============================================================================================
 // CONSTANTS
@@ -134,7 +136,6 @@
 
 // Blue noise
 #define BLUE_NOISE_SPATIAL_DIM              128 // see StaticTexture::ScramblingRanking
-#define BLUE_NOISE_TEMPORAL_DIM             4 // good values: 4-8 for shadows, 8-16 for occlusion, 8-32 for lighting
 
 // Other
 #define FP16_MAX                            65504.0
@@ -288,8 +289,6 @@ NRI_RESOURCE( cbuffer, GlobalConstants, b, 0, SET_ROOT )
     float gExposure;
     float gMipBias;
     float gOrthoMode;
-    float gIndirectDiffuse;
-    float gIndirectSpecular;
     float gMinProbability;
     uint32_t gMaxAccumulatedFrameNum;
     uint32_t gDenoiserType;

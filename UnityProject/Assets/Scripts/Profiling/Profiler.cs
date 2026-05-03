@@ -29,6 +29,7 @@ public class GPUProfiler : MonoBehaviour
             public float time;
             public float valueMs;
         }
+        
     }
 
     Dictionary<string, RecorderData> _recorderMap = new Dictionary<string, RecorderData>();

@@ -245,7 +245,7 @@ namespace Nrd
         {
             return new ReblurAntilagSettings
             {
-                luminanceSigmaScale  = 4.0f,
+                luminanceSigmaScale  = 2.0f,
                 luminanceSensitivity = 3.0f
             };
         }
@@ -387,7 +387,7 @@ namespace Nrd
             s.checkerboardMode              = CheckerboardMode.OFF;
             s.hitDistanceReconstructionMode = HitDistanceReconstructionMode.OFF;
 
-            s.enableAntiFirefly                         = false;
+            s.enableAntiFirefly                         = true;
             s.usePrepassOnlyForSpecularMotionEstimation = false;
             s.returnHistoryLengthInsteadOfOcclusion     = false;
 

@@ -240,8 +240,6 @@ namespace PathTracing
         public float    gExposure;
         public float    gMipBias;
         public float    gOrthoMode;
-        public float    gIndirectDiffuse;
-        public float    gIndirectSpecular;
         public float    gMinProbability;
         public uint     gMaxAccumulatedFrameNum;
         public uint     gDenoiserType;
@@ -336,8 +334,6 @@ namespace PathTracing
                 gExposure                                    = g.gExposure,
                 gMipBias                                     = g.gMipBias,
                 gOrthoMode                                   = g.gOrthoMode,
-                gIndirectDiffuse                             = g.gIndirectDiffuse,
-                gIndirectSpecular                            = g.gIndirectSpecular,
                 gMinProbability                              = g.gMinProbability,
 
                 // GlobalConstants: gSharcMaxAccumulatedFrameNum; NRD: gMaxAccumulatedFrameNum.

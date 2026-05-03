@@ -2,6 +2,8 @@
 #include "AccelerationStructure.h"
 #include "BindlessTexture.h"
 #include "BindlessBuffer.h"
+#include "NativeBuffer.h"
+#include "PluginInternal.h"
 #include <cstdio>
 #include <cstdarg>
 
@@ -47,8 +49,11 @@ void ComputeDescriptorSet::FreeAllocations()
     if (!m_allocator) return;
     uint32_t numSRV = m_cs ? m_cs->GetNumSRV() : 0;
     uint32_t numUAV = m_cs ? m_cs->GetNumUAV() : 0;
-    if (m_srvAllocBase != kInvalidAlloc && numSRV > 0) { m_allocator->Free(m_srvAllocBase, numSRV); m_srvAllocBase = kInvalidAlloc; }
-    if (m_uavAllocBase != kInvalidAlloc && numUAV > 0) { m_allocator->Free(m_uavAllocBase, numUAV); m_uavAllocBase = kInvalidAlloc; }
+    for (uint32_t f = 0; f < kNumFrames; ++f)
+    {
+        if (m_srvAllocBase[f] != kInvalidAlloc && numSRV > 0) { m_allocator->Free(m_srvAllocBase[f], numSRV); m_srvAllocBase[f] = kInvalidAlloc; }
+        if (m_uavAllocBase[f] != kInvalidAlloc && numUAV > 0) { m_allocator->Free(m_uavAllocBase[f], numUAV); m_uavAllocBase[f] = kInvalidAlloc; }
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -59,10 +64,11 @@ bool ComputeDescriptorSet::AllocateAndWriteDescriptors(const CS_BindingSlot* slo
     if (!m_allocator) return false;
     uint32_t numSRV = m_cs->GetNumSRV();
     uint32_t numUAV = m_cs->GetNumUAV();
-    if (m_srvAllocBase == kInvalidAlloc && numSRV > 0)
-        m_srvAllocBase = m_allocator->Allocate(numSRV);
-    if (m_uavAllocBase == kInvalidAlloc && numUAV > 0)
-        m_uavAllocBase = m_allocator->Allocate(numUAV);
+    uint32_t f = g_frameIndex;
+    if (m_srvAllocBase[f] == kInvalidAlloc && numSRV > 0)
+        m_srvAllocBase[f] = m_allocator->Allocate(numSRV);
+    if (m_uavAllocBase[f] == kInvalidAlloc && numUAV > 0)
+        m_uavAllocBase[f] = m_allocator->Allocate(numUAV);
     UpdateDescriptors(slots, slotCount);
     return true;
 }
@@ -78,14 +84,19 @@ void ComputeDescriptorSet::UpdateDescriptors(const CS_BindingSlot* slots, uint32
     const auto& bindings = m_cs->GetBindings();
 
     // --- SRV / TLAS ---
-    if (m_srvAllocBase != kInvalidAlloc)
+    const uint32_t f = g_frameIndex;
+    if (m_srvAllocBase[f] != kInvalidAlloc)
     {
         for (size_t i = 0; i < bindings.size(); ++i)
         {
             const auto& b = bindings[i];
             const CS_BindingSlot& slot = (i < slotCount) ? slots[i] : CS_BindingSlot{};
 
-            if (b.type == ComputeBindingType::TLAS)
+            if (b.type == ComputeBindingType::ROOT_SRV)
+            {
+                continue; // handled as inline root descriptor in Dispatch
+            }
+            else if (b.type == ComputeBindingType::TLAS)
             {
                 D3D12_SHADER_RESOURCE_VIEW_DESC s = {};
                 s.ViewDimension           = D3D12_SRV_DIMENSION_RAYTRACING_ACCELERATION_STRUCTURE;
@@ -97,13 +108,14 @@ void ComputeDescriptorSet::UpdateDescriptors(const CS_BindingSlot* slots, uint32
                 else
                     tlas = reinterpret_cast<ID3D12Resource*>(slot.resourcePtr);
 
-                s.RaytracingAccelerationStructure.Location = tlas ? tlas->GetGPUVirtualAddress() : 0;
+                auto tlasVA = tlas ? tlas->GetGPUVirtualAddress() : 0;
+                s.RaytracingAccelerationStructure.Location = tlasVA;
                 m_device->CreateShaderResourceView(nullptr, &s,
-                    m_allocator->GetCPUHandle(m_srvAllocBase + b.heapOffset));
+                    m_allocator->GetCPUHandle(m_srvAllocBase[f] + b.heapOffset));
             }
             else if (b.type == ComputeBindingType::SRV)
             {
-                D3D12_CPU_DESCRIPTOR_HANDLE h = m_allocator->GetCPUHandle(m_srvAllocBase + b.heapOffset);
+                D3D12_CPU_DESCRIPTOR_HANDLE h = m_allocator->GetCPUHandle(m_srvAllocBase[f] + b.heapOffset);
                 D3D12_SHADER_RESOURCE_VIEW_DESC s = {};
                 s.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
                 ID3D12Resource* res = reinterpret_cast<ID3D12Resource*>(slot.resourcePtr);
@@ -148,7 +160,7 @@ void ComputeDescriptorSet::UpdateDescriptors(const CS_BindingSlot* slots, uint32
     }
 
     // --- UAV ---
-    if (m_uavAllocBase != kInvalidAlloc)
+    if (m_uavAllocBase[f] != kInvalidAlloc)
     {
         for (size_t i = 0; i < bindings.size(); ++i)
         {
@@ -156,7 +168,7 @@ void ComputeDescriptorSet::UpdateDescriptors(const CS_BindingSlot* slots, uint32
             if (b.type != ComputeBindingType::UAV) continue;
             const CS_BindingSlot& slot = (i < slotCount) ? slots[i] : CS_BindingSlot{};
             ID3D12Resource* res = reinterpret_cast<ID3D12Resource*>(slot.resourcePtr);
-            D3D12_CPU_DESCRIPTOR_HANDLE h = m_allocator->GetCPUHandle(m_uavAllocBase + b.heapOffset);
+            D3D12_CPU_DESCRIPTOR_HANDLE h = m_allocator->GetCPUHandle(m_uavAllocBase[f] + b.heapOffset);
             D3D12_UNORDERED_ACCESS_VIEW_DESC u = {};
             if (res)
             {
@@ -212,9 +224,17 @@ void ComputeDescriptorSet::RequestResourceStates(const CS_BindingSlot* slots, ui
         ID3D12Resource* res = reinterpret_cast<ID3D12Resource*>(slot.resourcePtr);
         if (b.type == ComputeBindingType::SRV && res)
         {
-            // Logf(kUnityLogTypeLog, "  [%s] RequestResourceState: '%s' (SRV) res=%p -> NON_PIXEL_SHADER_RESOURCE (0x%X)",
-            //      shaderName, b.name.c_str(), (void*)res, (UINT)D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
             m_d3d12v8->RequestResourceState(res, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
+        }
+        else if (b.type == ComputeBindingType::ROOT_SRV)
+        {
+            ID3D12Resource* srvRes = nullptr;
+            if (slot.objectKind == CS_BindingObjectKind::AccelStruct && slot.objectPtr)
+                srvRes = reinterpret_cast<AccelerationStructure*>(slot.objectPtr)->GetTLAS();
+            else
+                srvRes = res;
+            if (srvRes)
+                m_d3d12v8->RequestResourceState(srvRes, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
         }
         else if (b.type == ComputeBindingType::UAV && res)
         {
@@ -222,11 +242,17 @@ void ComputeDescriptorSet::RequestResourceStates(const CS_BindingSlot* slots, ui
             //      shaderName, b.name.c_str(), (void*)res, (UINT)D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
             m_d3d12v8->RequestResourceState(res, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
         }
-        else if (b.type == ComputeBindingType::CBV && res)
+        else if (b.type == ComputeBindingType::CBV)
         {
-            // Logf(kUnityLogTypeLog, "  [%s] RequestResourceState: '%s' (CBV) res=%p -> VERTEX_AND_CONSTANT_BUFFER (0x%X)",
-            //      shaderName, b.name.c_str(), (void*)res, (UINT)D3D12_RESOURCE_STATE_VERTEX_AND_CONSTANT_BUFFER);
-            m_d3d12v8->RequestResourceState(res, D3D12_RESOURCE_STATE_VERTEX_AND_CONSTANT_BUFFER);
+            ID3D12Resource* cbvRes = (slot.objectKind == CS_BindingObjectKind::NativeBuffer && slot.objectPtr)
+                ? reinterpret_cast<::NativeBuffer*>(slot.objectPtr)->GetResource()
+                : res;
+            if (cbvRes)
+            {
+                // Logf(kUnityLogTypeLog, "  [%s] RequestResourceState: '%s' (CBV) res=%p -> VERTEX_AND_CONSTANT_BUFFER (0x%X)",
+                //      shaderName, b.name.c_str(), (void*)cbvRes, (UINT)D3D12_RESOURCE_STATE_VERTEX_AND_CONSTANT_BUFFER);
+                m_d3d12v8->RequestResourceState(cbvRes, D3D12_RESOURCE_STATE_VERTEX_AND_CONSTANT_BUFFER);
+            }
         }
         else if (b.type == ComputeBindingType::SRV_ARRAY &&
                  slot.objectKind == CS_BindingObjectKind::BindlessTexture && slot.objectPtr)
@@ -290,9 +316,15 @@ void ComputeDescriptorSet::Dispatch(
                 kind = "UAV";
                 ok = slot.resourcePtr != 0;
                 break;
+            case ComputeBindingType::ROOT_SRV:
+                kind = "ROOT_SRV";
+                ok = slot.resourcePtr != 0 ||
+                     (slot.objectKind == CS_BindingObjectKind::AccelStruct && slot.objectPtr != 0);
+                break;
             case ComputeBindingType::CBV:
                 kind = "CBV";
-                ok = slot.resourcePtr != 0;
+                ok = slot.resourcePtr != 0 ||
+                     (slot.objectKind == CS_BindingObjectKind::NativeBuffer && slot.objectPtr != 0);
                 break;
             case ComputeBindingType::SRV_ARRAY:
                 kind = "SRV_ARRAY";
@@ -315,11 +347,13 @@ void ComputeDescriptorSet::Dispatch(
         if (anyMissing) return;
     }
 
-    // Allocate heap slots on first call, then write all descriptors every dispatch
+    // Advance to the next triple-buffer slot: done globally by DrainDeferredDeletes each frame.
+
+    // Allocate heap slots for this frame slot on first use, then write descriptors
     uint32_t numSRV = m_cs->GetNumSRV();
     uint32_t numUAV = m_cs->GetNumUAV();
-    if ((numSRV > 0 && m_srvAllocBase == kInvalidAlloc) ||
-        (numUAV > 0 && m_uavAllocBase == kInvalidAlloc))
+    if ((numSRV > 0 && m_srvAllocBase[g_frameIndex] == kInvalidAlloc) ||
+        (numUAV > 0 && m_uavAllocBase[g_frameIndex] == kInvalidAlloc))
     {
         if (!AllocateAndWriteDescriptors(slots, slotCount)) return;
     }
@@ -340,14 +374,14 @@ void ComputeDescriptorSet::Dispatch(
     uint32_t rootParamCBVBase = m_cs->GetRootParamCBVBase();
 
     // SRV table
-    if (rootParamSRV != kInvalidAlloc && m_srvAllocBase != kInvalidAlloc)
+    if (rootParamSRV != kInvalidAlloc && m_srvAllocBase[g_frameIndex] != kInvalidAlloc)
         cmdList->SetComputeRootDescriptorTable(rootParamSRV,
-            m_allocator->GetGPUHandle(m_srvAllocBase));
+            m_allocator->GetGPUHandle(m_srvAllocBase[g_frameIndex]));
 
     // UAV table
-    if (rootParamUAV != kInvalidAlloc && m_uavAllocBase != kInvalidAlloc)
+    if (rootParamUAV != kInvalidAlloc && m_uavAllocBase[g_frameIndex] != kInvalidAlloc)
         cmdList->SetComputeRootDescriptorTable(rootParamUAV,
-            m_allocator->GetGPUHandle(m_uavAllocBase));
+            m_allocator->GetGPUHandle(m_uavAllocBase[g_frameIndex]));
 
     // SRV_ARRAY bindings – each has its own root parameter
     for (size_t i = 0; i < bindings.size(); ++i)
@@ -372,9 +406,37 @@ void ComputeDescriptorSet::Dispatch(
             const auto& b = bindings[i];
             if (b.type != ComputeBindingType::CBV) continue;
             const CS_BindingSlot& slot = (i < slotCount) ? slots[i] : CS_BindingSlot{};
-            ID3D12Resource* res = reinterpret_cast<ID3D12Resource*>(slot.resourcePtr);
+            ID3D12Resource* res = nullptr;
+            if (slot.objectKind == CS_BindingObjectKind::NativeBuffer && slot.objectPtr)
+                res = reinterpret_cast<::NativeBuffer*>(slot.objectPtr)->GetResource();
+            else
+                res = reinterpret_cast<ID3D12Resource*>(slot.resourcePtr);
             D3D12_GPU_VIRTUAL_ADDRESS addr = res ? res->GetGPUVirtualAddress() : 0;
             cmdList->SetComputeRootConstantBufferView(rootParamCBVBase + b.heapOffset, addr);
+        }
+    }
+
+    // Root inline SRV per ROOT_SRV binding
+    if (m_cs->GetRootParamRootSRVBase() != kInvalidAlloc)
+    {
+        for (size_t i = 0; i < bindings.size(); ++i)
+        {
+            const auto& b = bindings[i];
+            if (b.type != ComputeBindingType::ROOT_SRV) continue;
+            if (b.rootParam == kInvalidAlloc) continue;
+            const CS_BindingSlot& slot = (i < slotCount) ? slots[i] : CS_BindingSlot{};
+            D3D12_GPU_VIRTUAL_ADDRESS va = 0;
+            if (slot.objectKind == CS_BindingObjectKind::AccelStruct && slot.objectPtr)
+            {
+                ID3D12Resource* tlas = reinterpret_cast<AccelerationStructure*>(slot.objectPtr)->GetTLAS();
+                if (tlas) va = tlas->GetGPUVirtualAddress();
+            }
+            else
+            {
+                auto* res = reinterpret_cast<ID3D12Resource*>(slot.resourcePtr);
+                if (res) va = res->GetGPUVirtualAddress();
+            }
+            if (va) cmdList->SetComputeRootShaderResourceView(b.rootParam, va);
         }
     }
 

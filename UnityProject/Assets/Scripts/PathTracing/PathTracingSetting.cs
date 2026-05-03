@@ -341,6 +341,7 @@ namespace PathTracing
     public class NrdSampleSetting
     {
         public bool showValidation = false;
+        public bool showMV = false;
         public bool mergeBlas      = false;
         // ── Animation / timing (not used by shader, kept for completeness) ──
         // public double motionStartTime        = 0.0;
@@ -380,13 +381,17 @@ namespace PathTracing
         public float emissionIntensityCubes  = 1.0f;
         public float debug                  = 0.0f;
         public float meterToUnitsMultiplier = 1.0f;
+        
+        [Range(0.0f, 1.0f)]
         public float separator              = 0.0f;
         public float hitDistScale           = 3.0f;
         public float resolutionScale        = 1.0f;
         // public float sharpness              = 0.15f;
 
-        public int          maxAccumulatedFrameNum     = 31;
-        public int          maxFastAccumulatedFrameNum = 7;
+        [Range(1f, 120f)]
+        public uint         maxAccumulatedFrameNum     = 31;
+        [Range(1f, 20f)]
+        public uint         maxFastAccumulatedFrameNum = 7;
         public OnScreen     onScreen                   = 0;
         public int          forcedMaterial             = 0;
         public DenoiserType denoiser                   = 0;  // 0 = DENOISER_REBLUR
@@ -395,8 +400,6 @@ namespace PathTracing
         public RESOLUTION   tracingMode                = RESOLUTION.RESOLUTION_HALF;  // RESOLUTION_HALF
         public bool         SHARC                      = true;
         public bool         PSR                        = false;
-        public bool         indirectDiffuse            = true;
-        public bool         indirectSpecular           = true;
         public bool         normalMap                  = true;
         public bool         TAA                        = true;
         public bool         emission                   = true;
@@ -411,5 +414,8 @@ namespace PathTracing
         public UpscalerMode upscalerMode               = UpscalerMode.NATIVE;
         public bool         confidence                 = true;
         public ShowMode     showMode;
+        public bool         update;
+        public bool         updateTick;
+        public float        denoisingRange = 1000f;
     }
 }

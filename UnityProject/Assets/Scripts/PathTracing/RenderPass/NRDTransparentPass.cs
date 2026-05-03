@@ -95,7 +95,7 @@ namespace PathTracing
             ds.SetAccelerationStructure("gWorldTlas", nrd.WorldAS);
 
             // 3. Scene structured buffers
-            ds.SetStructuredBuffer("gIn_InstanceData", nrd.InstanceDataBufPtr, nrd.InstanceDataBuf.count, nrd.InstanceDataBuf.stride);
+            ds.SetStructuredBuffer("gIn_InstanceData", nrd.InstanceDataBufPtr, nrd.InstanceDataBuf.Capacity, nrd.InstanceDataBuf.Stride);
             ds.SetStructuredBuffer("gIn_PrimitiveData", nrd.PrimitiveDataBufPtr, nrd.PrimitiveDataBuf.count, nrd.PrimitiveDataBuf.stride);
             ds.SetStructuredBuffer("gIn_MorphPrimitivePositionsPrev", nrd.MorphPrimitivePositionsPrevBufPtr, nrd.MorphPrimitivePositionsPrevBuf.count, nrd.MorphPrimitivePositionsPrevBuf.stride);
 

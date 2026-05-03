@@ -33,7 +33,7 @@ set(WIN_SDK_LIB "${WIN_SDK_PATH}/Lib/${WIN_SDK_VERSION}/um/x64")
 # ---------------------------------------------------------------------------
 # Keep FetchContent downloads outside _Build so they survive cache resets
 # ---------------------------------------------------------------------------
-set(FETCHCONTENT_BASE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/_deps" CACHE PATH "FetchContent download cache")
+set(FETCHCONTENT_BASE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/_deps" CACHE PATH "FetchContent download cache" FORCE)
 
 # ---------------------------------------------------------------------------
 # SHARC – header-only, downloaded once into _deps/sharc-src
@@ -329,6 +329,8 @@ add_library(NativeRenderPlugin SHARED
     NativeRenderPlugin/src/DescriptorHeapAllocator.cpp
     NativeRenderPlugin/src/BindlessTexture.cpp
     NativeRenderPlugin/src/BindlessBuffer.cpp
+    NativeRenderPlugin/src/NativeBuffer.cpp
+    NativeRenderPlugin/src/NativeStructuredBuffer.cpp
 )
 
 target_include_directories(NativeRenderPlugin PRIVATE

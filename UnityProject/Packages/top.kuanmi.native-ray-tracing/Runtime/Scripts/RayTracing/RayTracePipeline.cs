@@ -195,6 +195,16 @@ namespace NativeRender
             NativeRenderPlugin.NR_RTS_SetStructuredBuffer(_handle, name, ptr, count, stride);
         }
 
+        /// <summary>Binds a <see cref="NativeStructuredBuffer"/> as a StructuredBuffer SRV.</summary>
+        public void SetStructuredBuffer(string name, NativeStructuredBuffer buffer)
+        {
+            if (!IsValid) return;
+            IntPtr ptr    = buffer != null ? buffer.NativePtr : IntPtr.Zero;
+            uint   count  = buffer != null ? (uint)buffer.Capacity : 0;
+            uint   stride = buffer != null ? (uint)buffer.Stride   : 0;
+            NativeRenderPlugin.NR_RTS_SetStructuredBuffer(_handle, name, ptr, count, stride);
+        }
+
         /// <summary>Binds the TLAS of an acceleration structure by HLSL variable name.</summary>
         public void SetAccelerationStructure(string name, RayTracingAccelerationStructure accelStructure)
         {
@@ -246,10 +256,7 @@ namespace NativeRender
 
             unsafe
             {
-                cmd.IssuePluginEventAndData(
-                    NativeRenderPlugin.NR_RTS_GetRenderEventFunc(),
-                    1,
-                    (IntPtr)_eventData.GetUnsafePtr());
+                cmd.IssuePluginEventAndData(NativeRenderPlugin.NR_RTS_GetRenderEventFunc(), 1, (IntPtr)_eventData.GetUnsafePtr());
             }
         }
     }

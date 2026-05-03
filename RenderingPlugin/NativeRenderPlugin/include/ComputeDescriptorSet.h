@@ -51,7 +51,9 @@ private:
     DescriptorHeapAllocator* m_allocator = nullptr;
     IUnityGraphicsD3D12v8*   m_d3d12v8   = nullptr;
 
-    static constexpr uint32_t kInvalidAlloc = UINT32_MAX;
-    uint32_t m_srvAllocBase = kInvalidAlloc;
-    uint32_t m_uavAllocBase = kInvalidAlloc;
+    static constexpr uint32_t kInvalidAlloc  = UINT32_MAX;
+    static constexpr uint32_t kNumFrames      = 3;          // triple-buffering
+
+    uint32_t m_srvAllocBase[kNumFrames] = { kInvalidAlloc, kInvalidAlloc, kInvalidAlloc };
+    uint32_t m_uavAllocBase[kNumFrames] = { kInvalidAlloc, kInvalidAlloc, kInvalidAlloc };
 };

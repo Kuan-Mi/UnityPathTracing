@@ -15,15 +15,6 @@ namespace NativeRender
         // Frame lifecycle
         // -------------------------------------------------------------------
 
-        /// <summary>
-        /// Must be called once per frame (main thread) before submitting rendering commands.
-        /// Advances the internal deletion fence and frees any GPU objects whose
-        /// deferred-destroy delay has elapsed (BindlessTexture, BindlessBuffer,
-        /// AccelerationStructure, RayTraceShader, ComputeShader).
-        /// </summary>
-        [DllImport(DllName)]
-        public static extern void NR_FrameTick();
-
         // -------------------------------------------------------------------
         // Acceleration Structure API
         // -------------------------------------------------------------------
@@ -49,6 +40,8 @@ namespace NativeRender
         {
             public uint indexCount;
             public uint indexByteOffset;
+            public uint baseVertex;      // Unity SubMeshDescriptor.baseVertex
+            public uint _pad;            // padding to keep 8-byte alignment
         }
 
         /// <summary>
@@ -91,6 +84,7 @@ namespace NativeRender
             public uint   vertexStride;
             public uint   indexStride;
             public uint   submeshCount;
+            public uint   isDynamic;             // 1 = SkinnedMeshRenderer (BLAS rebuilt every frame)
         }
 
         /// <summary>
@@ -124,6 +118,16 @@ namespace NativeRender
         /// </summary>
         [DllImport(DllName)]
         public static extern void NR_AS_RemoveInstance(ulong handle, uint instanceHandle);
+
+        /// <summary>
+        /// For SkinnedMeshRenderer instances: updates the GPU vertex buffer pointer
+        /// to the current-frame skinned result. Discards the stale BLAS (deferred
+        /// 3-frame GPU delete) and schedules a BLAS rebuild on the next BuildOrUpdate.
+        /// vbPtr must be GraphicsBuffer.GetNativeBufferPtr() for the skinned VB.
+        /// </summary>
+        [DllImport(DllName)]
+        public static extern void NR_AS_UpdateDynamicVertexBuffer(
+            ulong handle, uint instanceHandle, IntPtr vbPtr, uint vertexCount, uint vertexStride);
 
         // -------------------------------------------------------------------
         // RayTraceShader API  (multi-shader, per-instance DXR pipelines)
@@ -211,7 +215,10 @@ namespace NativeRender
 
         /// <summary>Returns the render event callback pointer for AS BuildOrUpdate.</summary>
         [DllImport(DllName)]
-        public static extern IntPtr NR_AS_GetBuildRenderEventFunc();
+        public static extern IntPtr NR_AS_GetBuildRenderEventFunc();       
+
+        [DllImport(DllName)]
+        public static extern IntPtr NR_GetFrameTickEventFunc();
 
         /// <summary>Returns sizeof(AS_BuildEventData) for buffer allocation.</summary>
         [DllImport(DllName)]
@@ -316,6 +323,72 @@ namespace NativeRender
         /// <summary>Returns the current capacity of the BindlessBuffer.</summary>
         [DllImport(DllName)]
         public static extern uint NR_BB_GetCapacity(ulong handle);
+
+        // -------------------------------------------------------------------
+        // NativeBuffer API  (triple-buffered upload-heap constant buffer)
+        // -------------------------------------------------------------------
+
+        /// <summary>
+        /// Allocates a triple-buffered upload-heap buffer of <paramref name="sizeInBytes"/>.
+        /// Returns an opaque handle; caller must call NR_DestroyNativeBuffer when done.
+        /// </summary>
+        [DllImport(DllName)]
+        public static extern ulong NR_CreateNativeBuffer(uint sizeInBytes);
+
+        /// <summary>Enqueues destruction after a GPU fence delay.</summary>
+        [DllImport(DllName)]
+        public static extern void NR_DestroyNativeBuffer(ulong handle);
+
+        /// <summary>
+        /// Copies <paramref name="bytes"/> bytes from <paramref name="data"/> into the
+        /// current frame's mapped slot.  Call each frame before issuing GPU work.
+        /// </summary>
+        [DllImport(DllName)]
+        public static extern unsafe void NR_NB_Upload(ulong handle, void* data, uint bytes);
+
+        /// <summary>
+        /// Returns the ID3D12Resource* for the current frame slot as IntPtr.
+        /// Compatibility/debug path; prefer passing the handle as objectPtr with
+        /// objectKind = NativeBuffer in CS_BindingSlot.
+        /// </summary>
+        [DllImport(DllName)]
+        public static extern IntPtr NR_NB_GetNativePtr(ulong handle);
+
+        // -------------------------------------------------------------------
+        // NativeStructuredBuffer API  (single upload-heap SRV buffer)
+        // -------------------------------------------------------------------
+
+        /// <summary>Allocates an upload-heap structured buffer with <paramref name="capacity"/> elements.</summary>
+        [DllImport(DllName)]
+        public static extern ulong NR_CreateNativeStructuredBuffer(uint capacity, uint elementStride);
+
+        /// <summary>Enqueues destruction after a GPU fence delay.</summary>
+        [DllImport(DllName)]
+        public static extern void NR_DestroyNativeStructuredBuffer(ulong handle);
+
+        /// <summary>Copies <paramref name="elementCount"/> elements from <paramref name="data"/> starting at <paramref name="elementOffset"/>.</summary>
+        [DllImport(DllName)]
+        public static extern unsafe void NR_NSB_UploadRange(ulong handle, void* data, uint elementOffset, uint elementCount);
+
+        /// <summary>Grows the buffer to at least <paramref name="newCapacity"/> elements, preserving existing data.</summary>
+        [DllImport(DllName)]
+        public static extern void NR_NSB_Grow(ulong handle, uint newCapacity);
+
+        /// <summary>Returns the ID3D12Resource* as IntPtr for binding as an SRV.</summary>
+        [DllImport(DllName)]
+        public static extern IntPtr NR_NSB_GetNativePtr(ulong handle);
+
+        /// <summary>Returns the current element capacity of the buffer.</summary>
+        [DllImport(DllName)]
+        public static extern uint NR_NSB_GetCapacity(ulong handle);
+
+        /// <summary>
+        /// Returns the <c>UnityRenderingEventAndData</c> function pointer for flushing staged
+        /// instance data into the GPU-resident buffer via <c>CopyBufferRegion</c>.
+        /// Pass the buffer handle as the data pointer to <c>CommandBuffer.IssuePluginEventAndData</c>.
+        /// </summary>
+        [DllImport(DllName)]
+        public static extern IntPtr NR_NSB_GetFlushEventFunc();
 
         // -------------------------------------------------------------------
         // ComputeShader API  (generic compute pipeline, cs_6_x)

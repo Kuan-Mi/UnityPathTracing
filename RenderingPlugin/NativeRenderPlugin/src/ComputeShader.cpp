@@ -71,8 +71,8 @@ bool ComputeShader::LoadShaderFromBytes(const uint8_t* dxilBytes, uint32_t size,
     m_bindings.clear();
     m_bindingIndex.clear();
     m_samplerBindings.clear();
-    m_numSRV = m_numUAV = m_numCBV = m_numSRVArray = 0;
-    m_rootParamSRV = m_rootParamUAV = m_rootParamCBVBase = kInvalidAlloc;
+    m_numSRV = m_numUAV = m_numCBV = m_numSRVArray = m_numRootSRV = 0;
+    m_rootParamSRV = m_rootParamUAV = m_rootParamCBVBase = m_rootParamRootSRVBase = kInvalidAlloc;
 
     if (!ReflectBindings(shaderBlob.Get())) return false;
     if (!BuildRootSignature())              return false;
@@ -150,8 +150,16 @@ bool ComputeShader::ReflectBindings(IDxcBlob* shaderBlob)
         switch (bind.Type)
         {
         case D3D_SIT_RTACCELERATIONSTRUCTURE:
-            cb.type = ComputeBindingType::TLAS;
-            ++m_numSRV; // TLAS shares the SRV descriptor table
+            if (m_rootSRVHints.count(name))
+            {
+                cb.type = ComputeBindingType::ROOT_SRV;
+                ++m_numRootSRV;
+            }
+            else
+            {
+                cb.type = ComputeBindingType::TLAS;
+                ++m_numSRV; // TLAS shares the SRV descriptor table
+            }
             break;
         case D3D_SIT_CBUFFER:
         {
@@ -178,6 +186,11 @@ bool ComputeShader::ReflectBindings(IDxcBlob* shaderBlob)
                 cb.type = ComputeBindingType::SRV_ARRAY;
                 ++m_numSRVArray;
             }
+            else if (m_rootSRVHints.count(name))
+            {
+                cb.type = ComputeBindingType::ROOT_SRV;
+                ++m_numRootSRV;
+            }
             else
             {
                 cb.type = ComputeBindingType::SRV;
@@ -203,7 +216,7 @@ bool ComputeShader::ReflectBindings(IDxcBlob* shaderBlob)
         if      (b.type == ComputeBindingType::SRV || b.type == ComputeBindingType::TLAS)  b.heapOffset = srvOff++;
         else if (b.type == ComputeBindingType::UAV)           b.heapOffset = uavOff++;
         else if (b.type == ComputeBindingType::CBV)           b.heapOffset = cbvOff++;
-        // ROOT_CONSTANTS: heapOffset stays 0, not used
+        // ROOT_CONSTANTS, ROOT_SRV: heapOffset stays 0, not used
     }
 
     return true;
@@ -337,6 +350,25 @@ bool ComputeShader::BuildRootSignature()
                  b.rootParam, b.name.c_str(), b.registerIndex, b.space);
         }
     }
+    // One inline root SRV per ROOT_SRV binding (SetComputeRootShaderResourceView)
+    if (m_numRootSRV > 0)
+    {
+        m_rootParamRootSRVBase = static_cast<uint32_t>(params.size());
+        for (auto& b : m_bindings)
+        {
+            if (b.type != ComputeBindingType::ROOT_SRV) continue;
+            b.rootParam = static_cast<uint32_t>(params.size());
+            D3D12_ROOT_PARAMETER1 p = {};
+            p.ParameterType             = D3D12_ROOT_PARAMETER_TYPE_SRV;
+            p.Descriptor.ShaderRegister = b.registerIndex;
+            p.Descriptor.RegisterSpace  = b.space;
+            p.Descriptor.Flags          = D3D12_ROOT_DESCRIPTOR_FLAG_DATA_VOLATILE;
+            p.ShaderVisibility          = D3D12_SHADER_VISIBILITY_ALL;
+            params.push_back(p);
+            Logf(kUnityLogTypeLog, "  Root param %u: ROOT_SRV '%s' t%u space%u",
+                 b.rootParam, b.name.c_str(), b.registerIndex, b.space);
+        }
+    }
     // One root 32-bit constants slot per ROOT_CONSTANTS binding
     for (auto& b : m_bindings)
     {
@@ -366,7 +398,7 @@ bool ComputeShader::BuildRootSignature()
         return haystack.find(needle) != std::string::npos;
     };
 
-    std::vector<D3D12_STATIC_SAMPLER_DESC> samplers;
+    std::vector<D3D12_STATIC_SAMPLER_DESC1> samplers;
     samplers.reserve(m_samplerBindings.size());
     for (const auto& sr : m_samplerBindings)
     {
@@ -375,6 +407,8 @@ bool ComputeShader::BuildRootSignature()
         D3D12_FILTER filter = D3D12_FILTER_MIN_MAG_MIP_LINEAR; // default
         if      (Contains(lower, "point")) filter = D3D12_FILTER_MIN_MAG_MIP_POINT;
         else if (Contains(lower, "aniso")) filter = D3D12_FILTER_ANISOTROPIC;
+        else if (Contains(lower, "nearest")) filter = D3D12_FILTER_MIN_MAG_MIP_POINT; // alias for "point"
+        else if (Contains(lower, "linear"))  filter = D3D12_FILTER_MIN_MAG_MIP_LINEAR;
 
         D3D12_TEXTURE_ADDRESS_MODE addr = D3D12_TEXTURE_ADDRESS_MODE_WRAP; // default
         if      (Contains(lower, "mirroronce")) addr = D3D12_TEXTURE_ADDRESS_MODE_MIRROR_ONCE;
@@ -382,34 +416,38 @@ bool ComputeShader::BuildRootSignature()
         else if (Contains(lower, "clamp"))      addr = D3D12_TEXTURE_ADDRESS_MODE_CLAMP;
         else if (Contains(lower, "repeat"))     addr = D3D12_TEXTURE_ADDRESS_MODE_WRAP;
 
-        D3D12_STATIC_SAMPLER_DESC sd = {};
+        // maxLod
+        FLOAT maxLod = 0; // default
+        if (Contains(lower, "mipmap")) maxLod = 16;
+
+        D3D12_STATIC_SAMPLER_DESC1 sd = {};
         sd.Filter           = filter;
         sd.AddressU = sd.AddressV = sd.AddressW = addr;
-        sd.MaxAnisotropy    = (filter == D3D12_FILTER_ANISOTROPIC) ? 16 : 1;
-        sd.ComparisonFunc   = D3D12_COMPARISON_FUNC_NEVER;
-        sd.BorderColor      = D3D12_STATIC_BORDER_COLOR_OPAQUE_WHITE;
-        sd.MaxLOD           = D3D12_FLOAT32_MAX;
+        sd.MaxAnisotropy    = (filter == D3D12_FILTER_ANISOTROPIC) ? 16 : 0;
+        sd.ComparisonFunc   = D3D12_COMPARISON_FUNC_NONE;
+        sd.BorderColor      = D3D12_STATIC_BORDER_COLOR_TRANSPARENT_BLACK;
+        sd.MaxLOD           = maxLod;
         sd.ShaderRegister   = sr.reg;
         sd.RegisterSpace    = sr.space;
         sd.ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
         samplers.push_back(sd);
-        Logf(kUnityLogTypeLog, "  Static sampler: name='%s' filter=%u address=%u reg%u space%u",
-             sr.name.c_str(), filter, addr, sr.reg, sr.space);
+        Logf(kUnityLogTypeLog, "  Static sampler: name='%s' filter=%u address=%u reg%u space%u maxLod=%g",
+             sr.name.c_str(), filter, addr, sr.reg, sr.space, maxLod);
     }
 
-    D3D12_ROOT_SIGNATURE_DESC1 rsDesc1 = {};
-    rsDesc1.NumParameters     = static_cast<UINT>(params.size());
-    rsDesc1.pParameters       = params.empty() ? nullptr : params.data();
-    rsDesc1.NumStaticSamplers = static_cast<UINT>(samplers.size());
-    rsDesc1.pStaticSamplers   = samplers.empty() ? nullptr : samplers.data();
-    rsDesc1.Flags             = D3D12_ROOT_SIGNATURE_FLAG_NONE;
+    D3D12_ROOT_SIGNATURE_DESC2 rsDesc2 = {};
+    rsDesc2.NumParameters     = static_cast<UINT>(params.size());
+    rsDesc2.pParameters       = params.empty() ? nullptr : params.data();
+    rsDesc2.NumStaticSamplers = static_cast<UINT>(samplers.size());
+    rsDesc2.pStaticSamplers   = samplers.empty() ? nullptr : samplers.data();
+    rsDesc2.Flags             = D3D12_ROOT_SIGNATURE_FLAG_NONE;
 
     D3D12_VERSIONED_ROOT_SIGNATURE_DESC vrsDesc = {};
-    vrsDesc.Version  = D3D_ROOT_SIGNATURE_VERSION_1_1;
-    vrsDesc.Desc_1_1 = rsDesc1;
+    vrsDesc.Version  = D3D_ROOT_SIGNATURE_VERSION_1_2;
+    vrsDesc.Desc_1_2 = rsDesc2;
 
     Logf(kUnityLogTypeLog, "BuildRootSignature: %u root param(s), %u static sampler(s)",
-         rsDesc1.NumParameters, rsDesc1.NumStaticSamplers);
+         rsDesc2.NumParameters, rsDesc2.NumStaticSamplers);
 
     // Validate all register spaces before serialization to catch HLSL bindings missing explicit register() decorations.
     bool spaceValid = true;
@@ -510,6 +548,11 @@ bool ComputeShader::BuildPipeline(IDxcBlob* shaderBlob)
 void ComputeShader::SetRootConstantsHint(const char* name, uint32_t num32BitValues)
 {
     if (name) m_rootConstantsHints[name] = num32BitValues;
+}
+
+void ComputeShader::SetRootSRVHint(const char* name)
+{
+    if (name) m_rootSRVHints.insert(name);
 }
 
 // ---------------------------------------------------------------------------

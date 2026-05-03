@@ -10,16 +10,19 @@ namespace PathTracing
 {
     public class NrdPass : ScriptableRenderPass
     {
-        private IntPtr DataPtr;
+        private IntPtr       DataPtr;
+        private NamedMarker  _marker;
 
-        public void Setup(IntPtr DataPtr)
+        public void Setup(IntPtr dataPtr, NamedMarker marker)
         {
-            this.DataPtr = DataPtr;
+            DataPtr  = dataPtr;
+            _marker  = marker;
         }
 
         class PassData
         {
-            internal IntPtr DataPtr;
+            internal IntPtr      DataPtr;
+            internal NamedMarker Marker;
         }
 
         [DllImport("Denoiser")]
@@ -29,11 +32,9 @@ namespace PathTracing
         {
             var natCmd = CommandBufferHelpers.GetNativeCommandBuffer(context.cmd);
 
-            var nrdDenoiseMarker = RenderPassMarkers.NrdDenoise;
-
-            natCmd.BeginSample(nrdDenoiseMarker);
+            natCmd.BeginSample(data.Marker);
             natCmd.IssuePluginEventAndData(GetRenderEventAndDataFunc(), 1, data.DataPtr);
-            natCmd.EndSample(nrdDenoiseMarker);
+            natCmd.EndSample(data.Marker);
         }
 
         public override void RecordRenderGraph(RenderGraph renderGraph, ContextContainer frameData)
@@ -41,6 +42,7 @@ namespace PathTracing
             using var builder = renderGraph.AddUnsafePass<PassData>("Nrd", out var passData);
 
             passData.DataPtr = DataPtr;
+            passData.Marker  = _marker;
 
             builder.AllowPassCulling(false);
             builder.SetRenderFunc((PassData data, UnsafeGraphContext context) => { ExecutePass(data, context); });

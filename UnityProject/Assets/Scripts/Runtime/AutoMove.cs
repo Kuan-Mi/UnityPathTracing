@@ -3,6 +3,7 @@ using UnityEngine;
 
 namespace DefaultNamespace
 {
+    [ExecuteAlways]
     public class AutoMove : MonoBehaviour
     {
         public Vector3 center;

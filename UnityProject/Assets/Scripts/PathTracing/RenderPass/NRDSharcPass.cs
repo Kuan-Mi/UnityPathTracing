@@ -121,7 +121,7 @@ namespace PathTracing
             updateDs.SetAccelerationStructure("gWorldTlas", nrd.WorldAS);
             updateDs.SetAccelerationStructure("gLightTlas", nrd.LightAS);
             
-            updateDs.SetStructuredBuffer("gIn_InstanceData",  nrd.InstanceDataBufPtr, nrd.InstanceDataBuf.count, nrd.InstanceDataBuf.stride);
+            updateDs.SetStructuredBuffer("gIn_InstanceData",  nrd.InstanceDataBufPtr, nrd.InstanceDataBuf.Capacity, nrd.InstanceDataBuf.Stride);
             updateDs.SetStructuredBuffer("gIn_PrimitiveData", nrd.PrimitiveDataBufPtr, nrd.PrimitiveDataBuf.count, nrd.PrimitiveDataBuf.stride);
             updateDs.SetRWStructuredBuffer("gInOut_SharcHashEntriesBuffer", nrd.HashEntriesBufferPtr, nrd.HashEntriesBuffer.count, nrd.HashEntriesBuffer.stride);
             updateDs.SetRWStructuredBuffer("gInOut_SharcAccumulated",       nrd.AccumulationBufferPtr, nrd.AccumulationBuffer.count, nrd.AccumulationBuffer.stride);

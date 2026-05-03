@@ -6,8 +6,6 @@
 // Inputs
 NRI_RESOURCE( Texture2D<float3>, gIn_PrevComposedDiff, t, 0, SET_OTHER );
 NRI_RESOURCE( Texture2D<float4>, gIn_PrevComposedSpec_PrevViewZ, t, 1, SET_OTHER );
-NRI_RESOURCE( Texture2D<uint3>, gIn_ScramblingRanking, t, 2, SET_OTHER );
-NRI_RESOURCE( Texture2D<uint4>, gIn_Sobol, t, 3, SET_OTHER );
 
 // Outputs
 NRI_FORMAT("unknown") NRI_RESOURCE( RWTexture2D<float4>, gOut_Mv, u, 0, SET_OTHER );
@@ -26,33 +24,6 @@ NRI_FORMAT("unknown") NRI_RESOURCE( RWTexture2D<float4>, gOut_Spec, u, 10, SET_O
 NRI_FORMAT("unknown") NRI_RESOURCE( RWTexture2D<float4>, gOut_DiffSh, u, 11, SET_OTHER );
 NRI_FORMAT("unknown") NRI_RESOURCE( RWTexture2D<float4>, gOut_SpecSh, u, 12, SET_OTHER );
 #endif
-
-float2 GetBlueNoise( uint2 pixelPos, bool isCheckerboard, uint seed = 0 )
-{
-    // https://eheitzresearch.wordpress.com/772-2/
-    // https://belcour.github.io/blog/research/publication/2019/06/17/sampling-bluenoise.html
-
-    // Sample index
-    uint sampleIndex = ( ( isCheckerboard ? ( gFrameIndex >> 1 ) : gFrameIndex ) + seed ) & ( BLUE_NOISE_TEMPORAL_DIM - 1 );
-
-    // The algorithm
-    uint3 A = gIn_ScramblingRanking[ pixelPos & ( BLUE_NOISE_SPATIAL_DIM - 1 ) ];
-    uint rankedSampleIndex = sampleIndex ^ A.z;
-    uint4 B = gIn_Sobol[ uint2( rankedSampleIndex & 255, 0 ) ];
-    float4 blue = ( float4( B ^ A.xyxy ) + 0.5 ) * ( 1.0 / 256.0 );
-
-    // ( Optional ) Randomize in [ 0; 1 / 256 ] area to get rid of possible banding
-    uint d = Sequence::Bayer4x4ui( pixelPos, gFrameIndex );
-    float2 dither = ( float2( d & 3, d >> 2 ) + 0.5 ) * ( 1.0 / 4.0 );
-    blue += ( dither.xyxy - 0.5 ) * ( 1.0 / 256.0 );
-
-    // Don't use blue noise in these cases
-    [flatten]
-    if( gDenoiserType == DENOISER_REFERENCE || gRR || gTracingMode == RESOLUTION_FULL_PROBABILISTIC )
-        blue.xy = Rng::Hash::GetFloat2( );
-
-    return saturate( blue.xy );
-}
 
 float4 GetRadianceFromPreviousFrame( GeometryProps geometryProps, MaterialProps materialProps, uint2 pixelPos )
 {
@@ -215,16 +186,23 @@ for( uint path = 0; path < pathNum; path++ )
             // Diffuse probability
             float diffuseProbability = EstimateDiffuseProbability( geometryProps, materialProps );
 
-            float rnd = Rng::Hash::GetFloat( );
-            if( gTracingMode == RESOLUTION_FULL_PROBABILISTIC && bounce == 1 && !gRR )
-            {
-                // Clamp probability to a sane range to guarantee a sample in 3x3 area ( see NRD docs )
-                diffuseProbability = float( diffuseProbability != 0.0 ) * clamp( diffuseProbability, gMinProbability, 1.0 - gMinProbability );
-                rnd = Sequence::Bayer4x4( pixelPos, gFrameIndex ) + rnd / 16.0;
-            }
+            // Clamp probability to a sane range ( for all bounces ) to reduce noise
+            diffuseProbability = float( diffuseProbability != 0.0 ) * clamp( diffuseProbability, 0.25, 0.75 );
 
             // Diffuse or specular?
-            isDiffuse = rnd < diffuseProbability; // TODO: if "diffuseProbability" is clamped, "pathThroughput" should be adjusted too
+            float rnd = Rng::Hash::GetFloat( );
+            if( bounce == 1 && !gRR && gTracingMode == RESOLUTION_FULL_PROBABILISTIC )
+            {
+                // Guarantee a sample in 3x3 area ( for the 1st bounce, see NRD docs )
+                float bayer = Sequence::Bayer4x4( pixelPos, gFrameIndex );
+                float jitter = Sequence::Weyl1D( rsqrt( 7.0 ), gFrameIndex ); // screen-uniform
+
+                // Fix harmonic interference of "bayer" and "blue noise" ( i.e. decorrelate ), which are both "pow-of-2" structures ( it doesn't break white noise )
+                rnd = frac( bayer + jitter );
+            }
+
+            isDiffuse = rnd < diffuseProbability;
+
             if( gTracingMode == RESOLUTION_FULL_PROBABILISTIC || bounce > 1 )
                 pathThroughput /= isDiffuse ? diffuseProbability : ( 1.0 - diffuseProbability );
             else
@@ -240,14 +218,7 @@ for( uint path = 0; path < pathNum; path++ )
                 sampleMaxNum = PT_IMPORTANCE_SAMPLES_NUM * ( isDiffuse ? 1.0 : GetSpecMagicCurve( materialProps.roughness ) );
             sampleMaxNum = max( sampleMaxNum, 1 );
 
-        #if( NRD_MODE < OCCLUSION )
-            float2 rnd2 = Rng::Hash::GetFloat2( );
-        #else
-            uint2 blueNoisePos = pixelPos + uint2( Sequence::Weyl2D( 0.0, path * gBounceNum + bounce ) * ( BLUE_NOISE_SPATIAL_DIM - 1 ) );
-            float2 rnd2 = GetBlueNoise( blueNoisePos, gTracingMode == RESOLUTION_HALF );
-        #endif
-
-            float3 ray = GenerateRayAndUpdateThroughput( geometryProps, materialProps, pathThroughput, sampleMaxNum, isDiffuse, rnd2, HAIR );
+            float3 ray = GenerateRayAndUpdateThroughput( geometryProps, materialProps, pathThroughput, sampleMaxNum, isDiffuse, pixelPos, path, bounce, GR_HAIR | GR_ALLOW_BN  );
 
             // Special case for primary surface ( 1st bounce starts here )
             if( bounce == 1 )
@@ -453,7 +424,7 @@ for( uint path = 0; path < pathNum; path++ )
     // Normalize hit distances for REBLUR before averaging
     float normHitDist = accumulatedHitDist;
     if( gDenoiserType != DENOISER_RELAX )
-        normHitDist = REBLUR_FrontEnd_GetNormHitDist( accumulatedHitDist, viewZ0, gHitDistSettings, isDiffusePath ? 1.0 : roughness0 );
+        normHitDist = REBLUR_FrontEnd_GetNormHitDist( accumulatedHitDist, viewZ0, gHitDistSettings.xyz, isDiffusePath ? 1.0 : roughness0 );
 
     // Accumulate diffuse and specular separately for denoising
     if( !USE_SANITIZATION || NRD_IsValidRadiance( Lsum ) )
@@ -736,7 +707,7 @@ void main( uint2 pixelPos : SV_DispatchThreadId )
         Lpsr.xyz = max( Lpsr.xyz - L, 0.0 );
 
         // TODO: it's not a 100% fix
-        if( gTracingMode == RESOLUTION_HALF && ( gIndirectDiffuse + gIndirectSpecular ) > 1.5 )
+        if( gTracingMode == RESOLUTION_HALF )
             Lpsr *= 0.5;
 
         // This is important!
@@ -802,7 +773,10 @@ void main( uint2 pixelPos : SV_DispatchThreadId )
     // Sun shadow
     //================================================================================================================================================================================
 
-    float2 rnd = GetBlueNoise( pixelPos, false );
+    float2 rnd = Rng::Hash::GetFloat2( );
+    if( USE_BLUE_NOISE_FOR_SHADOWS )
+        rnd = GetBlueNoise( pixelPos, gIn_ScramblingRanking4, 4, gFrameIndex );
+
     rnd = ImportanceSampling::Cosine::GetRay( rnd ).xy;
     rnd *= gTanSunAngularRadius;
 

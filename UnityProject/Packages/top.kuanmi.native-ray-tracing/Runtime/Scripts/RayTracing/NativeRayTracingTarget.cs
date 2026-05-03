@@ -77,6 +77,17 @@ namespace NativeRender
         /// <summary>Per-submesh OMM caches. Index matches the submesh index on the Mesh.</summary>
         public OMMCache[] ommCaches;
 
+        /// <summary>
+        /// Cached static flag — serialized so it survives a build (GameObject.isStatic is editor-only).
+        /// </summary>
+        [SerializeField] private bool _isStaticObject;
+
+        /// <summary>True when this target should be treated as a static (immovable) object.</summary>
+        public bool IsStatic => _isStaticObject;
+
+        public MeshRenderer meshRenderer;
+        public int instanceId;
+
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
         private static void ResetStatics()
         {
@@ -94,18 +105,28 @@ namespace NativeRender
                 s_All.Add(this);
 
             // Object is alive here — safe to capture component references.
-            var mr = GetComponent<MeshRenderer>();
-            AddQueue.Enqueue(new TargetAddEvent(this, mr, mr != null ? mr.GetInstanceID() : 0));
+            meshRenderer = GetComponent<MeshRenderer>();
+            instanceId = meshRenderer != null ? meshRenderer.GetInstanceID() : 0;
+            AddQueue.Enqueue(new TargetAddEvent(this, meshRenderer, instanceId));
         }
+
+#if UNITY_EDITOR
+        private void OnValidate()
+        {
+            // Bake the static flag into the serialized field while in the editor
+            // so the correct value survives a build (gameObject.isStatic is editor-only).
+            _isStaticObject = gameObject.isStatic;
+        }
+
+        private void Reset()
+        {
+            _isStaticObject = gameObject.isStatic;
+        }
+#endif
 
         private void OnDisable()
         {
-            // Capture RendererInstanceId BEFORE the object is potentially destroyed.
-            // No Unity object references are stored in TargetRemoveEvent.
-            var mr   = GetComponent<MeshRenderer>();
-            int mrId = mr != null ? mr.GetInstanceID() : 0;
-
-            RemoveQueue.Enqueue(new TargetRemoveEvent(mrId));
+            RemoveQueue.Enqueue(new TargetRemoveEvent(instanceId));
 
             s_All.Remove(this);
 

@@ -38,6 +38,11 @@ namespace NativeRender
         [SerializeField, HideInInspector]
         private RootConstantsHint[] _rootConstantsHints = Array.Empty<RootConstantsHint>();
 
+        /// <summary>Root SRV hints. Written by the ScriptedImporter. Consumed by NativeComputePipeline.
+        /// Names buffer SRV / TLAS bindings to promote to inline root descriptors.</summary>
+        [SerializeField, HideInInspector]
+        private string[] _rootSRVHints = Array.Empty<string>();
+
         /// <summary>Pre-compiled DXIL bytecode. Populated by EnsureCompiled(); persisted by Unity serialization.</summary>
         [SerializeField, HideInInspector]
         private byte[] _compiledDxil;
@@ -69,6 +74,9 @@ namespace NativeRender
 
         /// <summary>Root constants hints stored by the importer. Read by <see cref="NativeComputePipeline"/>.</summary>
         internal RootConstantsHint[] RootConstantsHints => _rootConstantsHints ?? Array.Empty<RootConstantsHint>();
+
+        /// <summary>Root SRV hints stored by the importer. Read by <see cref="NativeComputePipeline"/>.</summary>
+        internal string[] RootSRVHints => _rootSRVHints ?? Array.Empty<string>();
 
         // -------------------------------------------------------------------
         // Compilation  (ShaderCompilerPlugin — no D3D12 needed)

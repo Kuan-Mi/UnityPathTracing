@@ -22,3 +22,10 @@ ScriptedImporter:
   - RTXCR_INTEGRATION=0
   entryPoint: main
   targetProfile: cs_6_6
+  rootConstantsHints: []
+  rootSRVHints:
+  - gIn_InstanceData
+  - gIn_PrimitiveData
+  - gIn_MorphPrimitivePositionsPrev
+  - gWorldTlas
+  - gLightTlas

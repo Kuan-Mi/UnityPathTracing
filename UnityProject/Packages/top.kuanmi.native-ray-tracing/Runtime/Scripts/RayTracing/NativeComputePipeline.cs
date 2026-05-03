@@ -34,6 +34,7 @@ namespace NativeRender
         private ulong _handle;
         private NativeComputeShader _shader;
         private RootConstantsHint[] _rootConstantsHints; // may be null
+        private string[]            _rootSRVHints;       // may be null
 
         // Slot layout: name → slot index as reported by NR_CS_GetSlotIndex
         private Dictionary<string, uint> _nameToSlot;
@@ -64,7 +65,9 @@ namespace NativeRender
         /// Throws <see cref="InvalidOperationException"/> if pipeline creation fails.
         /// </summary>
         public NativeComputePipeline(NativeComputeShader shader)
-            : this(shader, shader != null ? shader.RootConstantsHints : null) { }
+            : this(shader,
+                   shader != null ? shader.RootConstantsHints : null,
+                   shader != null ? shader.RootSRVHints        : null) { }
 
         /// <summary>
         /// Creates a new compute pipeline, promoting the specified CBV bindings to
@@ -73,12 +76,22 @@ namespace NativeRender
         /// for this pipeline.
         /// </summary>
         public NativeComputePipeline(NativeComputeShader shader, RootConstantsHint[] rootConstantsHints)
+            : this(shader, rootConstantsHints, null) { }
+
+        /// <summary>
+        /// Creates a new compute pipeline with both root constants and root SRV hints.
+        /// <paramref name="rootSRVHints"/> names buffer SRV / TLAS bindings to promote to
+        /// inline root descriptors (SetComputeRootShaderResourceView) instead of a
+        /// descriptor-table entry, reducing shader execution overhead.
+        /// </summary>
+        public NativeComputePipeline(NativeComputeShader shader, RootConstantsHint[] rootConstantsHints, string[] rootSRVHints)
         {
             if (shader == null)
                 throw new ArgumentNullException(nameof(shader));
 
-            _shader = shader;
+            _shader             = shader;
             _rootConstantsHints = rootConstantsHints;
+            _rootSRVHints       = rootSRVHints;
             BuildNativeHandle(shader);
             BuildSlotLayout(shader);
             NativeComputeShader.OnRecompiled += OnShaderRecompiled;
@@ -91,7 +104,7 @@ namespace NativeRender
                 throw new InvalidOperationException(
                     $"[NativeComputePipeline] Shader compilation failed for: {shader.GetHlslPath()}");
 
-            string hintsJson = BuildHintsJson(_rootConstantsHints);
+            string hintsJson = BuildHintsJson(_rootConstantsHints, _rootSRVHints);
             if (hintsJson != null)
                 _handle = NativeRenderPlugin.NR_CreateComputeShaderEx(dxil, (uint)dxil.Length, shader.name, hintsJson);
             else
@@ -102,21 +115,47 @@ namespace NativeRender
                     $"[NativeComputePipeline] NR_CreateComputeShader(Ex) returned 0 for: {shader.name}");
         }
 
-        private static string BuildHintsJson(RootConstantsHint[] hints)
+        private static string BuildHintsJson(RootConstantsHint[] rcHints, string[] srvHints)
         {
-            if (hints == null || hints.Length == 0) return null;
+            bool hasRC  = rcHints  != null && rcHints.Length  > 0;
+            bool hasSRV = srvHints != null && srvHints.Length > 0;
+            if (!hasRC && !hasSRV) return null;
+
             var sb = new System.Text.StringBuilder();
-            sb.Append('[');
-            for (int i = 0; i < hints.Length; i++)
+            sb.Append('{');
+
+            if (hasRC)
             {
-                if (i > 0) sb.Append(',');
-                sb.Append("{\"name\":\"");
-                sb.Append(hints[i].Name);
-                sb.Append("\",\"count\":");
-                sb.Append(hints[i].Count);
-                sb.Append('}');
+                sb.Append("\"rootConstants\":");
+                sb.Append('[');
+                for (int i = 0; i < rcHints.Length; i++)
+                {
+                    if (i > 0) sb.Append(',');
+                    sb.Append("{\"name\":\"");
+                    sb.Append(rcHints[i].Name);
+                    sb.Append("\",\"count\":");
+                    sb.Append(rcHints[i].Count);
+                    sb.Append('}');
+                }
+                sb.Append(']');
             }
-            sb.Append(']');
+
+            if (hasSRV)
+            {
+                if (hasRC) sb.Append(',');
+                sb.Append("\"rootSRV\":");
+                sb.Append('[');
+                for (int i = 0; i < srvHints.Length; i++)
+                {
+                    if (i > 0) sb.Append(',');
+                    sb.Append('"');
+                    sb.Append(srvHints[i]);
+                    sb.Append('"');
+                }
+                sb.Append(']');
+            }
+
+            sb.Append('}');
             return sb.ToString();
         }
 

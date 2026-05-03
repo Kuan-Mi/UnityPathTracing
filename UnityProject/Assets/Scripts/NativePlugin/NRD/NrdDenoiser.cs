@@ -39,19 +39,26 @@ namespace Nrd
         /// </summary>
         public struct NrdFrameInput
         {
-            public Matrix4x4        worldToView;
-            public Matrix4x4        prevWorldToView;
-            public Matrix4x4        viewToClip;
-            public Matrix4x4        prevViewToClip;
-            public float2           viewportJitter;
-            public float2           prevViewportJitter;
-            public float            resolutionScale;
-            public float            prevResolutionScale;
-            public int2             renderResolution;
-            public uint             frameIndex;
-            public float3           lightDirection;
-            public CheckerboardMode checkerboardMode;
-
+            public Matrix4x4                     worldToView;
+            public Matrix4x4                     prevWorldToView;
+            public Matrix4x4                     viewToClip;
+            public Matrix4x4                     prevViewToClip;
+            public float2                        viewportJitter;
+            public float2                        prevViewportJitter;
+            public float                         resolutionScale;
+            public float                         prevResolutionScale;
+            public int2                          renderResolution;
+            public uint                          frameIndex;
+            public float3                        lightDirection;
+            public CheckerboardMode              checkerboardMode;
+            public HitDistanceReconstructionMode hitDistanceReconstructionMode;
+            public uint                          maxAccumulatedFrameNum;
+            public uint                          maxFastAccumulatedFrameNum;
+            public uint                          maxStabilizedFrameNum;
+            public bool                          enableValidation;
+            public bool                          isHistoryConfidenceAvailable;
+            public float                         splitScreen;
+            public float                         denoisingRange;
         }
 
 
@@ -161,10 +168,14 @@ namespace Nrd
             data.height     = (ushort)fi.renderResolution.y;
 
             // Common 设置
-            data.commonSettings.denoisingRange   = 1000;
-            data.commonSettings.splitScreen      = 0;
-            data.commonSettings.enableValidation = true;
+            data.commonSettings.denoisingRange                 = fi.denoisingRange;
+            data.commonSettings.splitScreen                    = fi.splitScreen;
+            data.commonSettings.strandMaterialID               = 2;
+            data.commonSettings.enableValidation               = fi.enableValidation;
+            data.commonSettings.disocclusionThresholdAlternate = 0.1f;
+            data.commonSettings.isHistoryConfidenceAvailable   = fi.isHistoryConfidenceAvailable;
 
+            // PrintCommonSettings(data.commonSettings);
             // --- Per-denoiser settings (entries[]) ---
             data.denoiserCount = (uint)_denoisers.Length;
             for (int i = 0; i < _denoisers.Length; i++)
@@ -198,9 +209,16 @@ namespace Nrd
                     case Denoiser.REBLUR_DIFFUSE_DIRECTIONAL_OCCLUSION:
                     {
                         var s = ReblurSettings._default;
-                        s.checkerboardMode       = fi.checkerboardMode;
-                        s.minMaterialForDiffuse  = 0;
-                        s.minMaterialForSpecular = 1;
+                        s.checkerboardMode              = fi.checkerboardMode;
+                        s.minMaterialForDiffuse         = 0;
+                        s.minMaterialForSpecular        = 1;
+                        s.hitDistanceReconstructionMode = fi.hitDistanceReconstructionMode;
+                        s.maxAccumulatedFrameNum = fi.maxAccumulatedFrameNum;
+                        s.maxFastAccumulatedFrameNum = fi.maxFastAccumulatedFrameNum;
+                        s.maxStabilizedFrameNum  = fi.maxStabilizedFrameNum;
+                        s.fastHistoryClampingSigmaScale = 1.5f;
+                        // PrintReblurSettings(s);
+                        
                         entry.Write(s);
                         break;
                     }
@@ -239,6 +257,109 @@ namespace Nrd
             {
                 return (IntPtr)_buffer.GetUnsafePtr() + index * sizeof(NrdFrameData);
             }
+        }
+
+        
+        public static unsafe void PrintCommonSettings(CommonSettings s)
+        {
+            Debug.Log(
+                $"[CommonSettings]\n" +
+                // Matrices
+                $"  viewToClipMatrix =\n{s.viewToClipMatrix}\n" +
+                $"  viewToClipMatrixPrev =\n{s.viewToClipMatrixPrev}\n" +
+                $"  worldToViewMatrix =\n{s.worldToViewMatrix}\n" +
+                $"  worldToViewMatrixPrev =\n{s.worldToViewMatrixPrev}\n" +
+                $"  worldPrevToWorldMatrix =\n{s.worldPrevToWorldMatrix}\n" +
+                // Motion / Jitter
+                $"  motionVectorScale           = {s.motionVectorScale}\n" +
+                $"  cameraJitter                = {s.cameraJitter}\n" +
+                $"  cameraJitterPrev            = {s.cameraJitterPrev}\n" +
+                // Resolution (fixed arrays read via unsafe)
+                $"  resourceSize      = ({s.resourceSize[0]}, {s.resourceSize[1]})\n" +
+                $"  resourceSizePrev  = ({s.resourceSizePrev[0]}, {s.resourceSizePrev[1]})\n" +
+                $"  rectSize          = ({s.rectSize[0]}, {s.rectSize[1]})\n" +
+                $"  rectSizePrev      = ({s.rectSizePrev[0]}, {s.rectSizePrev[1]})\n" +
+                // Scalars
+                $"  viewZScale                                 = {s.viewZScale}\n" +
+                $"  timeDeltaBetweenFrames                     = {s.timeDeltaBetweenFrames}\n" +
+                $"  denoisingRange                             = {s.denoisingRange}\n" +
+                $"  disocclusionThreshold                      = {s.disocclusionThreshold}\n" +
+                $"  disocclusionThresholdAlternate             = {s.disocclusionThresholdAlternate}\n" +
+                // Material IDs
+                $"  cameraAttachedReflectionMaterialID         = {s.cameraAttachedReflectionMaterialID}\n" +
+                $"  strandMaterialID                           = {s.strandMaterialID}\n" +
+                $"  historyFixAlternatePixelStrideMaterialID   = {s.historyFixAlternatePixelStrideMaterialID}\n" +
+                $"  strandThickness                            = {s.strandThickness}\n" +
+                // Debug / display
+                $"  splitScreen  = {s.splitScreen}\n" +
+                $"  debug        = {s.debug}\n" +
+                $"  printfAt     = ({s.printfAt[0]}, {s.printfAt[1]})\n" +
+                $"  rectOrigin        = ({s.rectOrigin[0]}, {s.rectOrigin[1]})\n" +
+                $"  frameIndex       = {s.frameIndex}\n" +
+                $"  accumulationMode = {s.accumulationMode}\n" +
+                // Bools
+                $"  isMotionVectorInWorldSpace             = {s.isMotionVectorInWorldSpace}\n" +
+                $"  isHistoryConfidenceAvailable           = {s.isHistoryConfidenceAvailable}\n" +
+                $"  isDisocclusionThresholdMixAvailable    = {s.isDisocclusionThresholdMixAvailable}\n" +
+                $"  enableValidation                       = {s.enableValidation}"
+            );
+        }
+
+        
+        public static unsafe void PrintReblurSettings(ReblurSettings s)
+        {
+            float specThresh0 = s.specularProbabilityThresholdsForMvModification[0];
+            float specThresh1 = s.specularProbabilityThresholdsForMvModification[1];
+            Debug.Log(
+                $"[ReblurSettings]\n" +
+                // HitDistanceParameters
+                $"  hitDistanceParameters.A = {s.hitDistanceParameters.A}\n" +
+                $"  hitDistanceParameters.B = {s.hitDistanceParameters.B}\n" +
+                $"  hitDistanceParameters.C = {s.hitDistanceParameters.C}\n" +
+                // AntilagSettings
+                $"  antilagSettings.luminanceSigmaScale  = {s.antilagSettings.luminanceSigmaScale}\n" +
+                $"  antilagSettings.luminanceSensitivity = {s.antilagSettings.luminanceSensitivity}\n" +
+                // ResponsiveAccumulationSettings
+                $"  responsiveAccumulationSettings.roughnessThreshold     = {s.responsiveAccumulationSettings.roughnessThreshold}\n" +
+                $"  responsiveAccumulationSettings.minAccumulatedFrameNum = {s.responsiveAccumulationSettings.minAccumulatedFrameNum}\n" +
+                // ConvergenceSettings
+                $"  convergenceSettings.s = {s.convergenceSettings.s}\n" +
+                $"  convergenceSettings.b = {s.convergenceSettings.b}\n" +
+                $"  convergenceSettings.p = {s.convergenceSettings.p}\n" +
+                // Accumulation
+                $"  maxAccumulatedFrameNum     = {s.maxAccumulatedFrameNum}\n" +
+                $"  maxFastAccumulatedFrameNum = {s.maxFastAccumulatedFrameNum}\n" +
+                $"  maxStabilizedFrameNum      = {s.maxStabilizedFrameNum}\n" +
+                // History fix
+                $"  historyFixFrameNum             = {s.historyFixFrameNum}\n" +
+                $"  historyFixBasePixelStride      = {s.historyFixBasePixelStride}\n" +
+                $"  historyFixAlternatePixelStride = {s.historyFixAlternatePixelStride}\n" +
+                // Blur
+                $"  fastHistoryClampingSigmaScale = {s.fastHistoryClampingSigmaScale}\n" +
+                $"  diffusePrepassBlurRadius      = {s.diffusePrepassBlurRadius}\n" +
+                $"  specularPrepassBlurRadius     = {s.specularPrepassBlurRadius}\n" +
+                $"  minHitDistanceWeight          = {s.minHitDistanceWeight}\n" +
+                $"  minBlurRadius                 = {s.minBlurRadius}\n" +
+                $"  maxBlurRadius                 = {s.maxBlurRadius}\n" +
+                // Material / lobe
+                $"  lobeAngleFraction        = {s.lobeAngleFraction}\n" +
+                $"  roughnessFraction        = {s.roughnessFraction}\n" +
+                $"  planeDistanceSensitivity = {s.planeDistanceSensitivity}\n" +
+                // Specular probability thresholds (fixed array, read via unsafe)
+                $"  specularProbabilityThresholdsForMvModification[0] = {specThresh0}\n" +
+                $"  specularProbabilityThresholdsForMvModification[1] = {specThresh1}\n" +
+                // Firefly / material
+                $"  fireflySuppressorMinRelativeScale = {s.fireflySuppressorMinRelativeScale}\n" +
+                $"  minMaterialForDiffuse             = {s.minMaterialForDiffuse}\n" +
+                $"  minMaterialForSpecular            = {s.minMaterialForSpecular}\n" +
+                // Enums
+                $"  checkerboardMode              = {s.checkerboardMode}\n" +
+                $"  hitDistanceReconstructionMode = {s.hitDistanceReconstructionMode}\n" +
+                // Bools
+                $"  enableAntiFirefly                         = {s.enableAntiFirefly}\n" +
+                $"  usePrepassOnlyForSpecularMotionEstimation = {s.usePrepassOnlyForSpecularMotionEstimation}\n" +
+                $"  returnHistoryLengthInsteadOfOcclusion     = {s.returnHistoryLengthInsteadOfOcclusion}"
+            );
         }
 
         public void Dispose()

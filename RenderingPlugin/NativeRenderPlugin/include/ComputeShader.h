@@ -7,6 +7,7 @@
 #include <string>
 #include <vector>
 #include <unordered_map>
+#include <unordered_set>
 #include "IUnityLog.h"
 #include "IUnityGraphicsD3D12.h"
 #include "DescriptorHeapAllocator.h"
@@ -16,6 +17,7 @@ using Microsoft::WRL::ComPtr;
 class BindlessTexture;
 class BindlessBuffer;
 class AccelerationStructure;
+class NativeBuffer;
 
 // ---------------------------------------------------------------------------
 // Describes one resource binding discovered via DXC reflection.
@@ -28,6 +30,7 @@ enum class ComputeBindingType
     SRV_ARRAY,      // unbounded array[] bound via BindlessTexture or BindlessBuffer
     TLAS,           // RaytracingAccelerationStructure
     ROOT_CONSTANTS, // ConstantBuffer<T> pushed via SetComputeRoot32BitConstants
+    ROOT_SRV,       // buffer SRV / TLAS promoted to inline root descriptor (SetComputeRootShaderResourceView)
 };
 
 struct ComputeBinding
@@ -55,6 +58,7 @@ enum class CS_BindingObjectKind : uint32_t
     AccelStruct     = 1,
     BindlessTexture = 2,
     BindlessBuffer  = 3,
+    NativeBuffer    = 5,
 };
 
 struct CS_BindingSlot
@@ -99,6 +103,11 @@ public:
     // num32BitValues: total number of 32-bit values in the constant buffer.
     void SetRootConstantsHint(const char* name, uint32_t num32BitValues);
 
+    // Must be called BEFORE LoadShaderFromBytes to promote a buffer SRV or TLAS binding
+    // to an inline root SRV descriptor (SetComputeRootShaderResourceView).
+    // Only valid for buffer resources (StructuredBuffer, ByteAddressBuffer, TLAS).
+    void SetRootSRVHint(const char* name);
+
     // --- Binding metadata queries (called from C# on main thread to build slot arrays) ---
 
     // Total number of reflected bindings (excluding samplers).
@@ -112,12 +121,14 @@ public:
     ID3D12PipelineState*              GetPSO()            const { return m_pso.Get(); }
     ID3D12RootSignature*              GetRootSignature()  const { return m_rootSig.Get(); }
     const std::vector<ComputeBinding>& GetBindings()      const { return m_bindings; }
-    uint32_t GetRootParamSRV()     const { return m_rootParamSRV; }
-    uint32_t GetRootParamUAV()     const { return m_rootParamUAV; }
-    uint32_t GetRootParamCBVBase() const { return m_rootParamCBVBase; }
-    uint32_t GetNumSRV()           const { return m_numSRV; }
-    uint32_t GetNumUAV()           const { return m_numUAV; }
-    uint32_t GetNumRootConstants() const { return m_numRootConstants; }
+    uint32_t GetRootParamSRV()           const { return m_rootParamSRV; }
+    uint32_t GetRootParamUAV()           const { return m_rootParamUAV; }
+    uint32_t GetRootParamCBVBase()       const { return m_rootParamCBVBase; }
+    uint32_t GetRootParamRootSRVBase()   const { return m_rootParamRootSRVBase; }
+    uint32_t GetNumSRV()                 const { return m_numSRV; }
+    uint32_t GetNumUAV()                 const { return m_numUAV; }
+    uint32_t GetNumRootConstants()       const { return m_numRootConstants; }
+    uint32_t GetNumRootSRV()             const { return m_numRootSRV; }
     const char* GetName()          const { return m_name.c_str(); }
 
     static constexpr uint32_t kInvalidAlloc = UINT32_MAX;
@@ -154,18 +165,21 @@ private:
     std::vector<SamplerReflection>          m_samplerBindings;
 
     // Root parameter indices (set during BuildRootSignature)
-    uint32_t m_rootParamSRV     = kInvalidAlloc; // SRV table
-    uint32_t m_rootParamUAV     = kInvalidAlloc; // UAV table
-    uint32_t m_rootParamCBVBase = kInvalidAlloc; // first root CBV (sequential)
-    // SRV_ARRAY and ROOT_CONSTANTS bindings store their root param inside ComputeBinding::rootParam.
+    uint32_t m_rootParamSRV         = kInvalidAlloc; // SRV table
+    uint32_t m_rootParamUAV         = kInvalidAlloc; // UAV table
+    uint32_t m_rootParamCBVBase     = kInvalidAlloc; // first root CBV (sequential)
+    uint32_t m_rootParamRootSRVBase = kInvalidAlloc; // first inline root SRV (sequential)
+    // SRV_ARRAY, ROOT_CONSTANTS, and ROOT_SRV bindings store their root param inside ComputeBinding::rootParam.
 
     // Binding counts
-    uint32_t m_numSRV          = 0;
-    uint32_t m_numUAV          = 0;
-    uint32_t m_numCBV          = 0;
-    uint32_t m_numSRVArray     = 0;
+    uint32_t m_numSRV           = 0;
+    uint32_t m_numUAV           = 0;
+    uint32_t m_numCBV           = 0;
+    uint32_t m_numSRVArray      = 0;
     uint32_t m_numRootConstants = 0;
+    uint32_t m_numRootSRV       = 0;
 
-    // Pre-load hints: name → num32BitValues.  Set before LoadShaderFromBytes.
-    std::unordered_map<std::string, uint32_t> m_rootConstantsHints;
+    // Pre-load hints
+    std::unordered_map<std::string, uint32_t> m_rootConstantsHints; // name → num32BitValues
+    std::unordered_set<std::string>           m_rootSRVHints;       // names to promote to root SRV
 };

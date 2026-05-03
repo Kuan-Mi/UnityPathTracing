@@ -33,6 +33,7 @@ namespace NativeRender
         private const uint ObjKindBindlessTexture = 2;
         private const uint ObjKindBindlessBuffer  = 3;
         private const uint ObjKindRootConstants   = 4;
+        private const uint ObjKindNativeBuffer    = 5;
 
         private readonly NativeComputePipeline _pipeline;
 
@@ -208,6 +209,21 @@ namespace NativeRender
             if (!TryGetSlot(name, out uint i)) return;
             _stagingSlots[i].resourcePtr = (ulong)bufferPtr;
             _stagingSlots[i].objectKind  = ObjKindNone;
+            _stagingSlots[i].count       = 0;
+            _stagingSlots[i].stride      = 0;
+        }
+
+        /// <summary>
+        /// Binds a <see cref="NativeBuffer"/> as a constant buffer (CBV).
+        /// The native plugin resolves the current frame's D3D12 resource at Dispatch time,
+        /// so this only needs to be called once (or when the NativeBuffer instance changes).
+        /// </summary>
+        public void SetNativeBuffer(string name, NativeBuffer nb)
+        {
+            if (!TryGetSlot(name, out uint i)) return;
+            _stagingSlots[i].resourcePtr = 0;
+            _stagingSlots[i].objectPtr   = nb != null ? nb.Handle : 0;
+            _stagingSlots[i].objectKind  = ObjKindNativeBuffer;
             _stagingSlots[i].count       = 0;
             _stagingSlots[i].stride      = 0;
         }

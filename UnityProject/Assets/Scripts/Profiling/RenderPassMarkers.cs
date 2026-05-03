@@ -58,14 +58,23 @@ public static class RenderPassMarkers
     public static readonly NamedMarker GiFinalShading = new(ProfilerCategory.Render, "GI FinalShading RS", MarkerFlags.SampleGPU);
 
     // ── Main passes ───────────────────────────────────────────────────────────
-    public static readonly NamedMarker OpaqueTracing = new(ProfilerCategory.Render, "Opaque Tracing", MarkerFlags.SampleGPU);
-    public static readonly NamedMarker TransparentTracing = new(ProfilerCategory.Render, "Transparent Tracing", MarkerFlags.SampleGPU);
-    public static readonly NamedMarker ReferencePtTracing = new(ProfilerCategory.Render, "Reference Pt Tracing", MarkerFlags.SampleGPU);
+    public static readonly NamedMarker Streamer = new(ProfilerCategory.Render, "Streamer", MarkerFlags.SampleGPU);
+    public static readonly NamedMarker TLAS = new(ProfilerCategory.Render, "TLAS", MarkerFlags.SampleGPU);
+    
     public static readonly NamedMarker SharcUpdate = new(ProfilerCategory.Render, "Sharc Update", MarkerFlags.SampleGPU);
     public static readonly NamedMarker SharcResolve = new(ProfilerCategory.Render, "Sharc Resolve", MarkerFlags.SampleGPU);
+    
+    public static readonly NamedMarker OpaqueTracing = new(ProfilerCategory.Render, "Tracing opaque ", MarkerFlags.SampleGPU);
+    
+    public static readonly NamedMarker NrdDenoise = new(ProfilerCategory.Render, "NRD Denoise", MarkerFlags.SampleGPU);
+    public static readonly NamedMarker NrdDenoiseShadow = new(ProfilerCategory.Render, "NRD Denoise Shadow", MarkerFlags.SampleGPU);
+    public static readonly NamedMarker NrdDenoiseOpaque = new(ProfilerCategory.Render, "NRD Denoise Opaque", MarkerFlags.SampleGPU);
+    
+    
+    public static readonly NamedMarker TransparentTracing = new(ProfilerCategory.Render, "Tracing transparent ", MarkerFlags.SampleGPU);
+    public static readonly NamedMarker ReferencePtTracing = new(ProfilerCategory.Render, "Reference Pt Tracing", MarkerFlags.SampleGPU);
 
     // ── Denoising / Upscaling ─────────────────────────────────────────────────
-    public static readonly NamedMarker NrdDenoise = new(ProfilerCategory.Render, "NRD Denoise", MarkerFlags.SampleGPU);
     public static readonly NamedMarker DlssBefore = new(ProfilerCategory.Render, "DLSS Before", MarkerFlags.SampleGPU);
     public static readonly NamedMarker DlssDenoise = new(ProfilerCategory.Render, "DLSS Denoise", MarkerFlags.SampleGPU);
 

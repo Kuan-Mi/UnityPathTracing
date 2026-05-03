@@ -42,6 +42,11 @@ namespace NativeRender
                  "\"Count\" is the total number of 32-bit values in the buffer.")]
         public RootConstantsHint[] rootConstantsHints = Array.Empty<RootConstantsHint>();
 
+        [Tooltip("Promote these buffer SRV / TLAS bindings to inline root descriptors (SetComputeRootShaderResourceView) " +
+                 "instead of a descriptor-table entry. Only valid for buffer resources. " +
+                 "Each string must match the HLSL variable name exactly.")]
+        public string[] rootSRVHints = Array.Empty<string>();
+
         public override void OnImportAsset(AssetImportContext ctx)
         {
             if (!isComputeShader)
@@ -94,6 +99,11 @@ namespace NativeRender
                 elem.FindPropertyRelative("Count").intValue    = (int)rootConstantsHints[i].Count;
             }
 
+            var srvHintsProp = so.FindProperty("_rootSRVHints");
+            srvHintsProp.arraySize = rootSRVHints?.Length ?? 0;
+            for (int i = 0; i < (rootSRVHints?.Length ?? 0); i++)
+                srvHintsProp.GetArrayElementAtIndex(i).stringValue = rootSRVHints[i] ?? "";
+
             so.ApplyModifiedPropertiesWithoutUndo();
 
             ctx.AddObjectToAsset("NativeComputeShader", asset);
@@ -114,6 +124,7 @@ namespace NativeRender
         private bool _showTLAS         = true;
         private bool _showReflection   = true;
         private bool _showRootConstants = true;
+        private bool _showRootSRV       = true;
 
         public override void OnInspectorGUI()
         {
@@ -221,6 +232,65 @@ namespace NativeRender
 
                             EditorGUILayout.Space(2);
                             EditorGUILayout.PropertyField(hintsProp, new GUIContent("Hints"), true);
+                            if (importerSO.ApplyModifiedProperties())
+                                ApplyAndImport(importer);
+                        }
+
+                        EditorGUI.indentLevel--;
+                    }
+                }
+
+                // Root SRV Hints section — shown when there are SRV or TLAS bindings to promote
+                if (info.SRV.Count > 0 || info.TLAS.Count > 0)
+                {
+                    EditorGUILayout.Space(4);
+                    _showRootSRV = EditorGUILayout.Foldout(_showRootSRV, "Root SRV Hints", true);
+                    if (_showRootSRV)
+                    {
+                        EditorGUI.indentLevel++;
+
+                        var importerSO   = new SerializedObject(importer);
+                        var srvHintsProp = importerSO.FindProperty("rootSRVHints");
+                        if (srvHintsProp != null)
+                        {
+                            EditorGUILayout.HelpBox(
+                                "Promote a buffer SRV or TLAS binding to an inline root descriptor " +
+                                "(SetComputeRootShaderResourceView). Only valid for buffer resources. " +
+                                "Name must match the HLSL variable exactly.",
+                                MessageType.None);
+
+                            // Quick-add buttons for reflected SRV bindings
+                            var candidates = new List<ShaderBindingEntry>();
+                            candidates.AddRange(info.SRV);
+                            candidates.AddRange(info.TLAS);
+
+                            EditorGUILayout.LabelField("Add from reflected SRV / TLAS:", EditorStyles.miniLabel);
+                            foreach (var srv in candidates)
+                            {
+                                bool alreadyAdded = false;
+                                for (int hi = 0; hi < srvHintsProp.arraySize; hi++)
+                                {
+                                    if (srvHintsProp.GetArrayElementAtIndex(hi).stringValue == srv.Name)
+                                    { alreadyAdded = true; break; }
+                                }
+
+                                string prefix = srv.Type == "TLAS" ? "TLAS" : "SRV";
+                                using (new EditorGUI.DisabledScope(alreadyAdded))
+                                {
+                                    if (GUILayout.Button($"+ {srv.Name}  [{prefix}  space{srv.Space}:t{srv.Reg}]",
+                                                         EditorStyles.miniButton))
+                                    {
+                                        importerSO.Update();
+                                        int idx = srvHintsProp.arraySize;
+                                        srvHintsProp.InsertArrayElementAtIndex(idx);
+                                        srvHintsProp.GetArrayElementAtIndex(idx).stringValue = srv.Name;
+                                        importerSO.ApplyModifiedProperties();
+                                    }
+                                }
+                            }
+
+                            EditorGUILayout.Space(2);
+                            EditorGUILayout.PropertyField(srvHintsProp, new GUIContent("Hints"), true);
                             if (importerSO.ApplyModifiedProperties())
                                 ApplyAndImport(importer);
                         }

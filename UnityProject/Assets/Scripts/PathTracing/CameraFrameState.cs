@@ -138,7 +138,7 @@ namespace PathTracing
             return v;
         }
 
-        public static float Halton2(uint n)  => ReverseBits32(n) * 2.3283064365386963e-10f;
+        public static float Halton2(uint n) => ReverseBits32(n) * 2.3283064365386963e-10f;
         public static float Halton1D(uint n) => Halton2(n);
 
         public static float2 Halton2D(uint n) => new float2(Halton2(n), Halton(n, 3));
@@ -625,12 +625,10 @@ namespace PathTracing
                 gExposure                = settings.exposure,
                 gMipBias                 = settings.mipBias,
                 gOrthoMode               = cameraData.camera.orthographic ? 1.0f : 0f,
-                gIndirectDiffuse         = settings.indirectDiffuse ? 1.0f : 0.0f,
-                gIndirectSpecular        = settings.indirectSpecular ? 1.0f : 0.0f,
                 gMinProbability          = minProbability,
 
-                gMaxAccumulatedFrameNum                    = sharcMaxAccumulatedFrameNum,
-                
+                gMaxAccumulatedFrameNum = sharcMaxAccumulatedFrameNum,
+
                 gDenoiserType                              = (uint)settings.denoiser,
                 gDisableShadowsAndEnableImportanceSampling = settings.importanceSampling ? 1u : 0u,
                 gFrameIndex                                = (uint)Time.frameCount,
@@ -661,7 +659,7 @@ namespace PathTracing
         public NRDGlobalConstants GetNrdConstants(RenderingData renderingData, NrdSampleSetting settings)
         {
             // ── Sun direction from azimuth / elevation (mirrors GetSunDirection()) ──
- 
+
             var cameraData = renderingData.cameraData;
 
             var     lightData    = renderingData.lightData;
@@ -675,11 +673,10 @@ namespace PathTracing
             var gSunBasisY    = math.normalize(math.cross(new float3(gSunDirection.x, gSunDirection.y, gSunDirection.z), gSunBasisX));
 
 
-
             // ── Camera / projection ───────────────────────────────────────────────
-            var xrPass     = cameraData.xr;
-            var isXr       = xrPass.enabled;
-            var proj       = isXr ? xrPass.GetProjMatrix() : cameraData.camera.projectionMatrix;
+            var xrPass = cameraData.xr;
+            var isXr   = xrPass.enabled;
+            var proj   = isXr ? xrPass.GetProjMatrix() : cameraData.camera.projectionMatrix;
 
             // project[1] in C++ == proj.m11 (cotangent of half vertical FOV)
             float project1 = proj.m11;
@@ -698,7 +695,7 @@ namespace PathTracing
             float2 rectSizePrev = new float2(rectWprev, rectHprev);
 
             // ── Jitter ───────────────────────────────────────────────────────────
-            float2 jitter     = (settings.cameraJitter ? viewportJitter     : float2.zero) / rectSize;
+            float2 jitter     = (settings.cameraJitter ? viewportJitter : float2.zero) / rectSize;
             float2 jitterPrev = (settings.cameraJitter ? prevViewportJitter : float2.zero) / rectSizePrev;
 
             // ── Near Z (extracted from projection matrix, negated for Unity convention) ──
@@ -710,15 +707,15 @@ namespace PathTracing
             float mipBias       = baseMipBias + math.log2(renderSize.x / outputSize.x);
 
             // ── Accumulated frame counters ───────────────────────────────────────
-            int   maxAccum         = settings.maxAccumulatedFrameNum;
-            float taaMaxAccum      = maxAccum * 0.5f;
+            int   maxAccum          = (int)settings.maxAccumulatedFrameNum;
+            float taaMaxAccum       = maxAccum * 0.5f;
             float prevFrameMaxAccum = maxAccum * 0.3f;
 
             // ── HitDist parameters (nrd::ReblurHitDistanceParameters) ───────────
             // C++: hitDistanceParameters.A = hitDistScale * meterToUnitsMultiplier; B/C/D are defaults (0.1, 20, -25)
             float4 hitDistSettings = new float4(
                 settings.hitDistScale * settings.meterToUnitsMultiplier,
-                0.1f, 20.0f, -25.0f);
+                0.1f, 20.0f, 0f);
 
             // ── minProbability ───────────────────────────────────────────────────
             // Mirrors C++ logic: RESOLUTION_FULL_PROBABILISTIC → read denoiser HitDistReconstructionMode.
@@ -729,24 +726,24 @@ namespace PathTracing
             // ── onScreen offset (NRD_MODE < OCCLUSION in C++ → no offset needed) ──
             uint onScreen = (uint)settings.onScreen;
 
-            
+
             var fovXRad               = math.atan(1.0f / proj.m00) * 2.0f;
             var horizontalFieldOfView = fovXRad * Mathf.Rad2Deg;
-            
-            
+
+
             // ── FOV-derived values using settings.camFov ─────────────────────────
             float tanPixelAngularRadius = math.tan(0.5f * math.radians(horizontalFieldOfView) / rectSize.x);
             float focalLength           = (0.5f * (35.0f * 0.001f)) / math.tan(math.radians(horizontalFieldOfView * 0.5f));
 
             uint sharcDownscale = 5;
-            
+
             // ── gInvSharcRenderSize ───────────────────────────────────────────────
             // Mirrors GetSharcDims(): 16 * round_up16(renderRes / sharcDownscale)
             float sharcW = 16.0f * math.ceil(renderSize.x / (sharcDownscale * 16.0f)) * 16.0f / 16.0f;
             float sharcH = 16.0f * math.ceil(renderSize.y / (sharcDownscale * 16.0f)) * 16.0f / 16.0f;
             // Simpler: align to 16
-            int sharcDimX = 16 * ((int)(renderResolution.x / sharcDownscale + 15) / 16);
-            int sharcDimY = 16 * ((int)(renderResolution.y / sharcDownscale + 15) / 16);
+            int    sharcDimX          = 16 * ((int)(renderResolution.x / sharcDownscale + 15) / 16);
+            int    sharcDimY          = 16 * ((int)(renderResolution.y / sharcDownscale + 15) / 16);
             float2 invSharcRenderSize = new float2(1.0f / sharcDimX, 1.0f / sharcDimY);
 
             // ── gDisableShadowsAndEnableImportanceSampling ────────────────────────
@@ -778,7 +775,7 @@ namespace PathTracing
 
             // ── View direction ────────────────────────────────────────────────────
             // C++: float3(mViewToWorld[2].xyz) * (m_PositiveZ ? -1 : 1)  → camera forward (Unity = -Z)
-            float3 viewDir = cameraData.camera.transform.forward;  // Unity cameras look down -Z
+            float3 viewDir = cameraData.camera.transform.forward; // Unity cameras look down -Z
 
             // ── Assemble constants ────────────────────────────────────────────────
             return new NRDGlobalConstants
@@ -796,7 +793,7 @@ namespace PathTracing
                 gSunBasisX           = new float4(gSunBasisX, 0.0f),
                 gSunBasisY           = new float4(gSunBasisY, 0.0f),
                 gSunDirection        = new float4(gSunDirection, 0.0f),
-                gCameraGlobalPos     = new float4(camPos, 0.0f),      // w=CAMERA_RELATIVE=true
+                gCameraGlobalPos     = new float4(camPos, 0.0f), // w=CAMERA_RELATIVE=true
                 gCameraGlobalPosPrev = new float4(prevCamPos, 0.0f),
                 gViewDirection       = new float4(viewDir, 0.0f),
                 gHairBaseColor       = new float4(0.1f, 0.1f, 0.1f, 1.0f),
@@ -814,8 +811,8 @@ namespace PathTracing
                 gJitterPrev         = jitterPrev,
 
                 gEmissionIntensityLights = settings.emission ? settings.emissionIntensityLights : 0.0f,
-                gEmissionIntensityCubes  = settings.emission ? settings.emissionIntensityCubes  : 0.0f,
-                gNearZ                   = -nearZ,          // C++ uses signed NEAR_Z * meterToUnitsMultiplier; here we use proj-derived value
+                gEmissionIntensityCubes  = settings.emission ? settings.emissionIntensityCubes : 0.0f,
+                gNearZ                   = -nearZ, // C++ uses signed NEAR_Z * meterToUnitsMultiplier; here we use proj-derived value
                 gSeparator               = separator,
                 gRoughnessOverride       = settings.roughnessOverride,
                 gMetalnessOverride       = settings.metalnessOverride,
@@ -825,16 +822,14 @@ namespace PathTracing
                 gDebug                   = settings.debug,
                 gPrevFrameConfidence     = prevFrameConfidence,
                 gUnproject               = 1.0f / (0.5f * rectH * project1),
-                gAperture                = 0.0f,           // C++ uses m_DofAperture (UI state); not in NrdSampleSetting
-                gFocalDistance           = 1.0f,           // C++ uses m_DofFocalDistance (UI state)
+                gAperture                = 0.0f, // C++ uses m_DofAperture (UI state); not in NrdSampleSetting
+                gFocalDistance           = 1.0f, // C++ uses m_DofFocalDistance (UI state)
                 gFocalLength             = focalLength,
                 gTAA                     = taa,
-                gHdrScale                = 1.0f,           // C++ reads from display descriptor; default to SDR
+                gHdrScale                = 1.0f, // C++ reads from display descriptor; default to SDR
                 gExposure                = settings.exposure,
                 gMipBias                 = mipBias,
                 gOrthoMode               = orthoMode,
-                gIndirectDiffuse         = settings.indirectDiffuse  ? 1.0f : 0.0f,
-                gIndirectSpecular        = settings.indirectSpecular ? 1.0f : 0.0f,
                 gMinProbability          = minProbability,
 
                 gMaxAccumulatedFrameNum                    = (uint)maxAccum,
@@ -845,7 +840,7 @@ namespace PathTracing
                 gUseNormalMap                              = settings.normalMap ? 1u : 0u,
                 gBounceNum                                 = (uint)settings.bounceNum,
                 gResolve                                   = resolve,
-                gValidation                                = settings.showValidation? 1u : 0u,
+                gValidation                                = settings.showValidation ? 1u : 0u,
                 gSR                                        = (settings.SR && !settings.RR) ? 1u : 0u,
                 gRR                                        = settings.RR ? 1u : 0u,
                 gIsSrgb                                    = 0u,

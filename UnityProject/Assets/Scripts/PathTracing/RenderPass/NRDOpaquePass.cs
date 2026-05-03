@@ -88,17 +88,18 @@ namespace PathTracing
         // -------------------------------------------------------------------------
 
 
+// === Shader Reflection: TraceOpaque.computeshader ===
 // numthreads  [16, 16, 1]
 //
 // -- SRV (8) --
 //   gIn_InstanceData                  Buffer<mixed4>                        space4:t2
 //   gIn_PrimitiveData                 Buffer<mixed4>                        space4:t3
 //   gIn_MorphPrimitivePositionsPrev   Buffer<mixed4>                        space4:t4
-//   gIn_Textures                      Texture2D<float4>                     space1:t0
+//   gIn_ScramblingRanking4            Texture2D<uint4>                      space1:t0
+//   gIn_Sobol                         Texture2D<uint4>                      space1:t3
+//   gIn_Textures                      Texture2D<float4>                     space1:t4
 //   gIn_PrevComposedDiff              Texture2D<float4>                     space0:t0
 //   gIn_PrevComposedSpec_PrevViewZ    Texture2D<float4>                     space0:t1
-//   gIn_ScramblingRanking             Texture2D<uint4>                      space0:t2
-//   gIn_Sobol                         Texture2D<uint4>                      space0:t3
 //
 // -- UAV (13) --
 //   gInOut_SharcHashEntriesBuffer     RWBuffer<mixed4>                      space2:u0
@@ -145,7 +146,7 @@ namespace PathTracing
             ds.SetAccelerationStructure("gLightTlas", nrd.LightAS);
 
             // 3. Scene structured buffers
-            ds.SetStructuredBuffer("gIn_InstanceData", nrd.InstanceDataBufPtr, nrd.InstanceDataBuf.count, nrd.InstanceDataBuf.stride);
+            ds.SetStructuredBuffer("gIn_InstanceData", nrd.InstanceDataBufPtr, nrd.InstanceDataBuf.Capacity, nrd.InstanceDataBuf.Stride);
             ds.SetStructuredBuffer("gIn_PrimitiveData", nrd.PrimitiveDataBufPtr, nrd.PrimitiveDataBuf.count, nrd.PrimitiveDataBuf.stride);
             ds.SetStructuredBuffer("gIn_MorphPrimitivePositionsPrev", nrd.MorphPrimitivePositionsPrevBufPtr, nrd.MorphPrimitivePositionsPrevBuf.count, nrd.MorphPrimitivePositionsPrevBuf.stride);
 
@@ -165,7 +166,7 @@ namespace PathTracing
             // SRV
             ds.SetTexture("gIn_PrevComposedDiff", pool.GetPoint(RenderResourceType.ComposedDiff));
             ds.SetTexture("gIn_PrevComposedSpec_PrevViewZ", pool.GetPoint(RenderResourceType.ComposedSpecViewZ));
-            ds.SetTexture("gIn_ScramblingRanking", res.ScramblingRanking);
+            ds.SetTexture("gIn_ScramblingRanking4", res.ScramblingRanking);
             ds.SetTexture("gIn_Sobol", res.Sobol);
 
 

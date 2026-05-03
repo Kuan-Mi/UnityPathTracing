@@ -15,3 +15,24 @@
 void NR_EnqueueDescriptorRangeFree(DescriptorHeapAllocator* alloc,
                                    uint32_t                 base,
                                    uint32_t                 count);
+
+enum class DeferredType {
+    BindlessTexture,
+    BindlessBuffer,
+    AccelStruct,
+    RayTraceShader,
+    ComputeShader,
+    ComputeDescriptorSet,
+    AccelStructBlas,
+    NativeBuffer,
+    NativeStructuredBuffer,
+};
+
+// ---------------------------------------------------------------------------
+// g_frameIndex
+//   Global triple-buffer frame index shared by all subsystems (AccelerationStructure,
+//   ComputeDescriptorSet, etc.).  Advanced exactly once per frame by
+//   AccelerationStructure::BuildOrUpdate().  Cycles 0..2.
+// ---------------------------------------------------------------------------
+static constexpr uint32_t kGlobalNumFrames = 3;
+extern uint32_t g_frameIndex;
