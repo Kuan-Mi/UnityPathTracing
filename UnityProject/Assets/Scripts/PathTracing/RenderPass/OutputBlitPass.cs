@@ -193,7 +193,7 @@ namespace PathTracing
                     break;
                 
                 case ShowMode.Gradient:
-                    Blitter.BlitTexture(natCmd, data.Resource.Gradient, scaleOffset, data.BlitMaterial, (int)ShowPass.Out);
+                    Blitter.BlitTexture(natCmd, data.Resource.Gradient, scaleOffset, data.BlitMaterial, (int)ShowPass.Gradient);
                     break;
                 default:
                     throw new ArgumentOutOfRangeException();

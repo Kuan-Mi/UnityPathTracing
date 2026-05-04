@@ -791,6 +791,59 @@
             }
             ENDHLSL
         }
+        // 11
+        Pass
+        {
+            Name "ShowGradient"
+            ZWrite Off
+            ZTest Always
+            Cull Off
+            Blend SrcAlpha OneMinusSrcAlpha
+
+            HLSLPROGRAM
+            #pragma vertex Vert
+            #pragma fragment Frag
+            #pragma target 4.5
+
+            #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
+
+            TEXTURE2D(_BlitTexture);
+            SAMPLER(sampler_BlitTexture);
+            float4 _BlitScaleBias;
+
+            struct Attributes
+            {
+                uint vertexID : SV_VertexID;
+            };
+
+            struct Varyings
+            {
+                float4 positionCS : SV_POSITION;
+                float2 uv : TEXCOORD0;
+            };
+
+            Varyings Vert(Attributes input)
+            {
+                Varyings o;
+                o.positionCS = GetFullScreenTriangleVertexPosition(input.vertexID);
+                o.uv = GetFullScreenTriangleTexCoord(input.vertexID);
+                return o;
+            }
+
+            float4 Frag(Varyings i) : SV_Target
+            {
+                #ifdef UNITY_UV_STARTS_AT_TOP
+                i.uv.y = 1.0 - i.uv.y;
+                #endif
+                i.uv = i.uv * _BlitScaleBias.xy + _BlitScaleBias.zw;
+
+                float Gradient = SAMPLE_TEXTURE2D(_BlitTexture, sampler_BlitTexture, i.uv).r;
+
+
+                return float4(Gradient, Gradient, Gradient, 1);
+            }
+            ENDHLSL
+        }
 
     }
 }

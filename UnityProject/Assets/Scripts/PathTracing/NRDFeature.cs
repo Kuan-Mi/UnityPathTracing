@@ -84,6 +84,12 @@ namespace PathTracing
 
         public override void Create()
         {
+            scramblingRankingTexPtr = scramblingRankingTex.GetNativeTexturePtr();
+            sobolTexPtr             = sobolTex.GetNativeTexturePtr();
+        }
+
+        public void CreatePass()
+        {
             _nrdTlasUpdatePass ??= new NRDTlasUpdatePass
             {
                 updateSkinnedPrimitivesCS = this.updateSkinnedPrimitivesCS,
@@ -170,12 +176,7 @@ namespace PathTracing
             {
                 renderPassEvent = renderPassEvent,
             };
-
-            scramblingRankingTexPtr = scramblingRankingTex.GetNativeTexturePtr();
-            sobolTexPtr             = sobolTex.GetNativeTexturePtr();
         }
-
-        public int cc;
 
         public override void AddRenderPasses(ScriptableRenderer renderer, ref RenderingData renderingData)
         {
@@ -184,6 +185,7 @@ namespace PathTracing
                 return;
             if (cam.cameraType != CameraType.Game && cam.cameraType != CameraType.SceneView)
                 return;
+            CreatePass();
 
             cam.depthTextureMode = DepthTextureMode.Depth | DepthTextureMode.MotionVectors;
 
@@ -213,7 +215,7 @@ namespace PathTracing
             // based on Application.isPlaying and gameObject.isStatic per-object.
 
 
-            if(eyeIndex == 0)
+            if (eyeIndex == 0)
             {
                 _nrdSampleResource?.UpdateForFrame();
             }
@@ -281,12 +283,13 @@ namespace PathTracing
                 nrdConstantBuffer = new NativeBuffer(Marshal.SizeOf<NRDGlobalConstants>());
                 _nrdConstantBuffers.Add(uniqueKey, nrdConstantBuffer);
             }
+
             nrdConstantBuffer.Upload(globalConstants);
 
             bool isEven = (globalConstants.gFrameIndex & 1) == 0;
 
             // TLAS update
-            if(eyeIndex == 0)
+            if (eyeIndex == 0)
             {
                 _nrdTlasUpdatePass.SetNRDSampleResource(_nrdSampleResource);
                 renderer.EnqueuePass(_nrdTlasUpdatePass);
@@ -648,6 +651,9 @@ namespace PathTracing
 
             // Output Blit
             {
+                var currrentGradient = isEven ? RenderResourceType.Gradient_StoredPong : RenderResourceType.Gradient_StoredPing;
+
+
                 var outputBlitResource = new OutputBlitPass.Resource
                 {
                     Mv                 = pool.GetRT(RenderResourceType.MV),
@@ -696,7 +702,7 @@ namespace PathTracing
 
                 if (renderingData.cameraData.xr.enabled)
                 {
-                    if(setting.skipRightEyeInVR || eyeIndex == 1)
+                    if (setting.skipRightEyeInVR || eyeIndex == 1)
                         renderer.EnqueuePass(_nativeFrameTickPass);
                 }
                 else

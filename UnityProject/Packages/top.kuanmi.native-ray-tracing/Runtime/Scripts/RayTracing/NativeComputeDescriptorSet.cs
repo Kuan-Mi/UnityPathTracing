@@ -27,6 +27,9 @@ namespace NativeRender
         // from a single descriptor set per frame before the ring wraps.
         private const int RingSize = 8;
 
+        // DX12 hard limit: 64 DWORDs = 256 bytes per root-constants slot.
+        private const int MaxRootConstantBytes = 256;
+
         // objectKind constants matching C++ CS_BindingObjectKind
         private const uint ObjKindNone            = 0;
         private const uint ObjKindAccelStruct     = 1;
@@ -47,9 +50,15 @@ namespace NativeRender
         // Staging array written by Set* on the main thread (not pinned)
         private NativeRenderPlugin.CS_BindingSlot[] _stagingSlots;
 
+        // Staging byte buffer for root-constants data (main thread, not pinned).
+        // Layout: slot[i] occupies [i * MaxRootConstantBytes .. (i+1) * MaxRootConstantBytes).
+        private byte[] _stagingConstants;
+
         // Ring buffer of pinned NativeArrays (Persistent)
         private NativeArray<NativeRenderPlugin.CS_BindingSlot>[]     _slotRing;
         private NativeArray<NativeRenderPlugin.CS_RenderEventData>[] _headerRing;
+        // Pinned ring for root-constants data — the render thread reads from here.
+        private NativeArray<byte>[]                                  _constantsRing;
         private int                                                  _ringIdx;
 
         // -------------------------------------------------------------------
@@ -79,19 +88,25 @@ namespace NativeRender
             _nameToSlot = new Dictionary<string, uint>(_slotCount > 0 ? (int)_slotCount : 0);
             foreach (var kv in pipeline.NameToSlot)
                 _nameToSlot[kv.Key] = kv.Value;
-            _stagingSlots = new NativeRenderPlugin.CS_BindingSlot[_slotCount > 0 ? _slotCount : 1];
+            int effectiveSlots   = _slotCount > 0 ? (int)_slotCount : 1;
+            _stagingSlots        = new NativeRenderPlugin.CS_BindingSlot[effectiveSlots];
+            _stagingConstants    = new byte[effectiveSlots * MaxRootConstantBytes];
         }
 
         private void AllocateRingBuffers()
         {
-            _slotRing   = new NativeArray<NativeRenderPlugin.CS_BindingSlot>[RingSize];
-            _headerRing = new NativeArray<NativeRenderPlugin.CS_RenderEventData>[RingSize];
+            int effectiveSlots = _slotCount > 0 ? (int)_slotCount : 1;
+            _slotRing      = new NativeArray<NativeRenderPlugin.CS_BindingSlot>[RingSize];
+            _headerRing    = new NativeArray<NativeRenderPlugin.CS_RenderEventData>[RingSize];
+            _constantsRing = new NativeArray<byte>[RingSize];
             for (int i = 0; i < RingSize; i++)
             {
-                _slotRing[i] = new NativeArray<NativeRenderPlugin.CS_BindingSlot>(
-                    (int)(_slotCount > 0 ? _slotCount : 1), Allocator.Persistent);
-                _headerRing[i] = new NativeArray<NativeRenderPlugin.CS_RenderEventData>(
+                _slotRing[i]      = new NativeArray<NativeRenderPlugin.CS_BindingSlot>(
+                    effectiveSlots, Allocator.Persistent);
+                _headerRing[i]    = new NativeArray<NativeRenderPlugin.CS_RenderEventData>(
                     1, Allocator.Persistent);
+                _constantsRing[i] = new NativeArray<byte>(
+                    effectiveSlots * MaxRootConstantBytes, Allocator.Persistent);
             }
 
             _ringIdx = 0;
@@ -102,12 +117,14 @@ namespace NativeRender
             if (_slotRing == null) return;
             for (int i = 0; i < RingSize; i++)
             {
-                if (_slotRing[i].IsCreated) _slotRing[i].Dispose();
-                if (_headerRing[i].IsCreated) _headerRing[i].Dispose();
+                if (_slotRing[i].IsCreated)      _slotRing[i].Dispose();
+                if (_headerRing[i].IsCreated)    _headerRing[i].Dispose();
+                if (_constantsRing[i].IsCreated) _constantsRing[i].Dispose();
             }
 
-            _slotRing   = null;
-            _headerRing = null;
+            _slotRing      = null;
+            _headerRing    = null;
+            _constantsRing = null;
         }
 
         private void OnPipelineRebuilt(NativeComputePipeline pipeline)
@@ -283,8 +300,9 @@ namespace NativeRender
         /// Pushes inline 32-bit constants directly into the root signature (no GPU buffer needed).
         /// The CBV binding named <paramref name="name"/> must have been declared as a
         /// <see cref="RootConstantsHint"/> when the pipeline was created.
-        /// <paramref name="dataPtr"/>: pointer to the source data (must remain valid until Dispatch returns on the render thread).
-        /// <paramref name="count32"/>: number of 32-bit values to upload (0 = use the full count from the hint).
+        /// <paramref name="dataPtr"/>: pointer to the source data. The data is <b>copied immediately</b>
+        /// into an internal staging buffer so the pointer need not remain valid after this call returns.
+        /// <paramref name="count32"/>: number of 32-bit values to upload (0 = derive from sizeof(T)).
         /// <paramref name="destOffset32"/>: destination offset in 32-bit values within the root constants slot.
         /// </summary>
         public unsafe void SetRootConstants<T>(
@@ -292,8 +310,15 @@ namespace NativeRender
             where T : unmanaged
         {
             if (!TryGetSlot(name, out uint i)) return;
+            uint byteCount      = count32 == 0 ? (uint)sizeof(T) : count32 * 4u;
+            uint destByteOffset = destOffset32 * 4u;
+            fixed (byte* dst = _stagingConstants)
+                Buffer.MemoryCopy(dataPtr,
+                    dst + i * MaxRootConstantBytes + destByteOffset,
+                    MaxRootConstantBytes - destByteOffset,
+                    byteCount);
             _stagingSlots[i].resourcePtr = 0;
-            _stagingSlots[i].objectPtr   = (ulong)dataPtr;
+            _stagingSlots[i].objectPtr   = 0; // resolved to pinned ring ptr at Snapshot time
             _stagingSlots[i].count       = count32;
             _stagingSlots[i].stride      = destOffset32;
             _stagingSlots[i].objectKind  = ObjKindRootConstants;
@@ -301,6 +326,7 @@ namespace NativeRender
 
         /// <summary>
         /// Pushes inline 32-bit constants from a <see cref="NativeArray{T}"/>.
+        /// The data is <b>copied immediately</b> into an internal staging buffer.
         /// See <see cref="SetRootConstants{T}(string,T*,uint,uint)"/> for parameter documentation.
         /// </summary>
         public unsafe void SetRootConstants<T>(
@@ -308,9 +334,16 @@ namespace NativeRender
             where T : unmanaged
         {
             if (!TryGetSlot(name, out uint i)) return;
-            void* ptr = Unity.Collections.LowLevel.Unsafe.NativeArrayUnsafeUtility.GetUnsafeReadOnlyPtr(data);
+            void* src           = NativeArrayUnsafeUtility.GetUnsafeReadOnlyPtr(data);
+            uint byteCount      = count32 == 0 ? (uint)(data.Length * sizeof(T)) : count32 * 4u;
+            uint destByteOffset = destOffset32 * 4u;
+            fixed (byte* dst = _stagingConstants)
+                Buffer.MemoryCopy(src,
+                    dst + i * MaxRootConstantBytes + destByteOffset,
+                    MaxRootConstantBytes - destByteOffset,
+                    byteCount);
             _stagingSlots[i].resourcePtr = 0;
-            _stagingSlots[i].objectPtr   = (ulong)ptr;
+            _stagingSlots[i].objectPtr   = 0; // resolved to pinned ring ptr at Snapshot time
             _stagingSlots[i].count       = count32;
             _stagingSlots[i].stride      = destOffset32;
             _stagingSlots[i].objectKind  = ObjKindRootConstants;
@@ -337,6 +370,24 @@ namespace NativeRender
             var slotArray = _slotRing[ring];
             for (int k = 0; k < (int)_slotCount; k++)
                 slotArray[k] = _stagingSlots[k];
+
+            // Copy root-constants staging data → pinned constants ring and fix up objectPtrs.
+            // This ensures the render thread always reads from stable, pinned memory.
+            var constArray = _constantsRing[ring];
+            fixed (byte* src = _stagingConstants)
+                Buffer.MemoryCopy(src, constArray.GetUnsafePtr(),
+                    constArray.Length, _stagingConstants.Length);
+
+            byte* constBase = (byte*)constArray.GetUnsafePtr();
+            for (int k = 0; k < (int)_slotCount; k++)
+            {
+                if (slotArray[k].objectKind == ObjKindRootConstants)
+                {
+                    var s = slotArray[k];
+                    s.objectPtr = (ulong)(constBase + k * MaxRootConstantBytes);
+                    slotArray[k] = s;
+                }
+            }
 
             var header = new NativeRenderPlugin.CS_RenderEventData
             {

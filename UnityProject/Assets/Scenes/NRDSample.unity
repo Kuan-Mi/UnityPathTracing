@@ -934,6 +934,8 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: NativeRayTracing.Runtime::NativeRender.NativeRayTracingTarget
   ommCaches: []
+  _isStaticObject: 0
+  meshRenderer: {fileID: 1015431882}
 --- !u!65 &1015431881
 BoxCollider:
   m_ObjectHideFlags: 0
@@ -1187,6 +1189,8 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: NativeRayTracing.Runtime::NativeRender.NativeRayTracingTarget
   ommCaches: []
+  _isStaticObject: 0
+  meshRenderer: {fileID: 1154397541}
 --- !u!65 &1154397540
 BoxCollider:
   m_ObjectHideFlags: 0
@@ -1740,6 +1744,8 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: NativeRayTracing.Runtime::NativeRender.NativeRayTracingTarget
   ommCaches: []
+  _isStaticObject: 0
+  meshRenderer: {fileID: 1672218823}
 --- !u!1 &1687737116
 GameObject:
   m_ObjectHideFlags: 0
@@ -1844,6 +1850,8 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: NativeRayTracing.Runtime::NativeRender.NativeRayTracingTarget
   ommCaches: []
+  _isStaticObject: 0
+  meshRenderer: {fileID: 1687737118}
 --- !u!1 &1712532248
 GameObject:
   m_ObjectHideFlags: 0
@@ -1948,6 +1956,8 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: NativeRayTracing.Runtime::NativeRender.NativeRayTracingTarget
   ommCaches: []
+  _isStaticObject: 0
+  meshRenderer: {fileID: 1712532250}
 --- !u!1 &1748554751
 GameObject:
   m_ObjectHideFlags: 0
@@ -2052,132 +2062,8 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: NativeRayTracing.Runtime::NativeRender.NativeRayTracingTarget
   ommCaches: []
---- !u!1 &1813118927
-GameObject:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  serializedVersion: 6
-  m_Component:
-  - component: {fileID: 1813118932}
-  - component: {fileID: 1813118931}
-  - component: {fileID: 1813118930}
-  - component: {fileID: 1813118929}
-  - component: {fileID: 1813118928}
-  m_Layer: 0
-  m_Name: Cube (1)
-  m_TagString: Untagged
-  m_Icon: {fileID: 0}
-  m_NavMeshLayer: 0
-  m_StaticEditorFlags: 0
-  m_IsActive: 1
---- !u!114 &1813118928
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1813118927}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 7765801a50bd3ca4cbfacd1f313497a2, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: NativeRayTracing.Runtime::NativeRender.NativeRayTracingTarget
-  ommCaches: []
---- !u!65 &1813118929
-BoxCollider:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1813118927}
-  m_Material: {fileID: 0}
-  m_IncludeLayers:
-    serializedVersion: 2
-    m_Bits: 0
-  m_ExcludeLayers:
-    serializedVersion: 2
-    m_Bits: 0
-  m_LayerOverridePriority: 0
-  m_IsTrigger: 0
-  m_ProvidesContacts: 0
-  m_Enabled: 1
-  serializedVersion: 3
-  m_Size: {x: 1, y: 1, z: 1}
-  m_Center: {x: 0, y: 0, z: 0}
---- !u!23 &1813118930
-MeshRenderer:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1813118927}
-  m_Enabled: 1
-  m_CastShadows: 1
-  m_ReceiveShadows: 1
-  m_DynamicOccludee: 1
-  m_StaticShadowCaster: 0
-  m_MotionVectors: 1
-  m_LightProbeUsage: 1
-  m_ReflectionProbeUsage: 1
-  m_RayTracingMode: 2
-  m_RayTraceProcedural: 0
-  m_RayTracingAccelStructBuildFlagsOverride: 0
-  m_RayTracingAccelStructBuildFlags: 1
-  m_SmallMeshCulling: 1
-  m_ForceMeshLod: -1
-  m_MeshLodSelectionBias: 0
-  m_RenderingLayerMask: 1
-  m_RendererPriority: 0
-  m_Materials:
-  - {fileID: 2100000, guid: 31321ba15b8f8eb4c954353edc038b1d, type: 2}
-  m_StaticBatchInfo:
-    firstSubMesh: 0
-    subMeshCount: 0
-  m_StaticBatchRoot: {fileID: 0}
-  m_ProbeAnchor: {fileID: 0}
-  m_LightProbeVolumeOverride: {fileID: 0}
-  m_ScaleInLightmap: 1
-  m_ReceiveGI: 1
-  m_PreserveUVs: 0
-  m_IgnoreNormalsForChartDetection: 0
-  m_ImportantGI: 0
-  m_StitchLightmapSeams: 1
-  m_SelectedEditorRenderState: 3
-  m_MinimumChartSize: 4
-  m_AutoUVMaxDistance: 0.5
-  m_AutoUVMaxAngle: 89
-  m_LightmapParameters: {fileID: 0}
-  m_GlobalIlluminationMeshLod: 0
-  m_SortingLayerID: 0
-  m_SortingLayer: 0
-  m_SortingOrder: 0
-  m_MaskInteraction: 0
-  m_AdditionalVertexStreams: {fileID: 0}
---- !u!33 &1813118931
-MeshFilter:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1813118927}
-  m_Mesh: {fileID: 2762543540592498897, guid: 61fd5e70416b3364fb9679904b8547e9, type: 3}
---- !u!4 &1813118932
-Transform:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1813118927}
-  serializedVersion: 2
-  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: -13.505, y: 1.13068, z: -0.191}
-  m_LocalScale: {x: 1, y: 1, z: 1}
-  m_ConstrainProportionsScale: 0
-  m_Children: []
-  m_Father: {fileID: 0}
-  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+  _isStaticObject: 0
+  meshRenderer: {fileID: 1748554753}
 --- !u!1 &1816539103
 GameObject:
   m_ObjectHideFlags: 0
@@ -2314,6 +2200,8 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: NativeRayTracing.Runtime::NativeRender.NativeRayTracingTarget
   ommCaches: []
+  _isStaticObject: 0
+  meshRenderer: {fileID: 1858160350}
 --- !u!1 &1914419601
 GameObject:
   m_ObjectHideFlags: 0
@@ -2418,6 +2306,8 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: NativeRayTracing.Runtime::NativeRender.NativeRayTracingTarget
   ommCaches: []
+  _isStaticObject: 0
+  meshRenderer: {fileID: 1914419603}
 --- !u!1 &1991282384
 GameObject:
   m_ObjectHideFlags: 0
@@ -3169,6 +3059,8 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: NativeRayTracing.Runtime::NativeRender.NativeRayTracingTarget
   ommCaches: []
+  _isStaticObject: 0
+  meshRenderer: {fileID: 4316629808157788574}
 --- !u!23 &4329397002389103357
 MeshRenderer:
   m_ObjectHideFlags: 0
@@ -3295,6 +3187,8 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: NativeRayTracing.Runtime::NativeRender.NativeRayTracingTarget
   ommCaches: []
+  _isStaticObject: 0
+  meshRenderer: {fileID: 4387901216462066796}
 --- !u!23 &4898057470769292634
 MeshRenderer:
   m_ObjectHideFlags: 0
@@ -3357,6 +3251,8 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: NativeRayTracing.Runtime::NativeRender.NativeRayTracingTarget
   ommCaches: []
+  _isStaticObject: 0
+  meshRenderer: {fileID: 4898057470769292634}
 --- !u!4 &5312381281301409343
 Transform:
   m_ObjectHideFlags: 0
@@ -3457,6 +3353,8 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: NativeRayTracing.Runtime::NativeRender.NativeRayTracingTarget
   ommCaches: []
+  _isStaticObject: 0
+  meshRenderer: {fileID: 4175926269525833774}
 --- !u!1 &7118363089034152835
 GameObject:
   m_ObjectHideFlags: 0
@@ -3546,6 +3444,8 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: NativeRayTracing.Runtime::NativeRender.NativeRayTracingTarget
   ommCaches: []
+  _isStaticObject: 0
+  meshRenderer: {fileID: 1595013579286618807}
 --- !u!33 &7962309624657857162
 MeshFilter:
   m_ObjectHideFlags: 0
@@ -3567,6 +3467,8 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: NativeRayTracing.Runtime::NativeRender.NativeRayTracingTarget
   ommCaches: []
+  _isStaticObject: 0
+  meshRenderer: {fileID: 0}
 --- !u!23 &8021470151075589969
 MeshRenderer:
   m_ObjectHideFlags: 0
@@ -3629,6 +3531,8 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: NativeRayTracing.Runtime::NativeRender.NativeRayTracingTarget
   ommCaches: []
+  _isStaticObject: 0
+  meshRenderer: {fileID: 8021470151075589969}
 --- !u!33 &8066999598948552797
 MeshFilter:
   m_ObjectHideFlags: 0
@@ -3650,6 +3554,8 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: NativeRayTracing.Runtime::NativeRender.NativeRayTracingTarget
   ommCaches: []
+  _isStaticObject: 0
+  meshRenderer: {fileID: 1393697188820824965}
 --- !u!1 &8771091788108555836
 GameObject:
   m_ObjectHideFlags: 0
@@ -3694,6 +3600,8 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: NativeRayTracing.Runtime::NativeRender.NativeRayTracingTarget
   ommCaches: []
+  _isStaticObject: 0
+  meshRenderer: {fileID: 4329397002389103357}
 --- !u!1660057539 &9223372036854775807
 SceneRoots:
   m_ObjectHideFlags: 0
@@ -3711,4 +3619,3 @@ SceneRoots:
   - {fileID: 1600345164}
   - {fileID: 1154397543}
   - {fileID: 1816539104}
-  - {fileID: 1813118932}

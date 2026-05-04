@@ -21,5 +21,6 @@
         NoiseShadow,
         Dlss,
         ViewZ,
+        Gradient,
     }
 }
