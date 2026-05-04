@@ -72,7 +72,7 @@ namespace PathTracing
 
         private NRDSampleResource _nrdSampleResource;
 
-        private NativeBuffer _nrdConstantBuffer;
+        private readonly Dictionary<long, NativeBuffer> _nrdConstantBuffers = new();
 
         private readonly Dictionary<long, NrdDenoiser>             _nrdSigmaDenoisers  = new();
         private readonly Dictionary<long, NrdDenoiser>             _nrdReblurDenoisers = new();
@@ -189,8 +189,8 @@ namespace PathTracing
 
             var eyeIndex = renderingData.cameraData.xr.enabled ? renderingData.cameraData.xr.multipassId : 0;
 
-            // if (eyeIndex == 1 && pathTracingSetting.skipRightEyeInVR)
-            //     return;
+            if (eyeIndex == 1 && setting.skipRightEyeInVR)
+                return;
 
             if (finalMaterial == null
                 || nrdOpaqueTracingShader == null
@@ -213,6 +213,7 @@ namespace PathTracing
             // based on Application.isPlaying and gameObject.isStatic per-object.
 
 
+            if(eyeIndex == 0)
             {
                 _nrdSampleResource?.UpdateForFrame();
             }
@@ -275,16 +276,18 @@ namespace PathTracing
 
             globalConstants = frameState.GetNrdConstants(renderingData, setting);
 
-            _nrdConstantBuffer ??= new NativeBuffer(Marshal.SizeOf<NRDGlobalConstants>());
-            _nrdConstantBuffer.Upload(globalConstants);
+            if (!_nrdConstantBuffers.TryGetValue(uniqueKey, out var nrdConstantBuffer))
+            {
+                nrdConstantBuffer = new NativeBuffer(Marshal.SizeOf<NRDGlobalConstants>());
+                _nrdConstantBuffers.Add(uniqueKey, nrdConstantBuffer);
+            }
+            nrdConstantBuffer.Upload(globalConstants);
 
             bool isEven = (globalConstants.gFrameIndex & 1) == 0;
 
             // TLAS update
-
-            // if (setting.update)
+            if(eyeIndex == 0)
             {
-                // Debug.Log($"Enqueueing TLAS update pass {Time.frameCount} {++cc} {cam.name} {DateTime.Now} | Feature:{GetInstanceID()} Renderer:{renderer.GetType()} Stack:{new System.Diagnostics.StackTrace(1, true).GetFrame(0)?.GetMethod()?.Name}");
                 _nrdTlasUpdatePass.SetNRDSampleResource(_nrdSampleResource);
                 renderer.EnqueuePass(_nrdTlasUpdatePass);
             }
@@ -297,7 +300,7 @@ namespace PathTracing
 
                 var nrdSharcResource = new NRDSharcPass.Resource
                 {
-                    ConstantBuffer = _nrdConstantBuffer.NativePtr,
+                    ConstantBuffer = nrdConstantBuffer.NativePtr,
                     Pool           = pool,
                 };
 
@@ -358,7 +361,7 @@ namespace PathTracing
 
                 var nrdConfidenceBlurResource = new NRDConfidenceBlurPass.Resource
                 {
-                    ConstantBuffer = _nrdConstantBuffer.NativePtr,
+                    ConstantBuffer = nrdConstantBuffer.NativePtr,
                     Pool           = pool,
                 };
 
@@ -376,7 +379,7 @@ namespace PathTracing
             {
                 var nrdOpaqueResource = new NRDOpaquePass.Resource
                 {
-                    ConstantBuffer    = _nrdConstantBuffer.NativePtr,
+                    ConstantBuffer    = nrdConstantBuffer.NativePtr,
                     ScramblingRanking = scramblingRankingTexPtr,
                     Sobol             = sobolTexPtr,
                     Pool              = pool,
@@ -441,7 +444,7 @@ namespace PathTracing
             {
                 var nrdCompositionResource = new NRDCompositionPass.Resource
                 {
-                    ConstantBuffer = _nrdConstantBuffer.NativePtr,
+                    ConstantBuffer = nrdConstantBuffer.NativePtr,
                     Pool           = pool,
                 };
 
@@ -458,7 +461,7 @@ namespace PathTracing
             {
                 var nrdTransparentResource = new NRDTransparentPass.Resource
                 {
-                    ConstantBuffer = _nrdConstantBuffer.NativePtr,
+                    ConstantBuffer = nrdConstantBuffer.NativePtr,
                     Pool           = pool,
                 };
 
@@ -475,7 +478,7 @@ namespace PathTracing
             {
                 var nrdDlssBeforeResource = new NRDDlssBeforePass.Resource
                 {
-                    ConstantBuffer = _nrdConstantBuffer.NativePtr,
+                    ConstantBuffer = nrdConstantBuffer.NativePtr,
                     Pool           = pool,
                 };
 
@@ -520,7 +523,7 @@ namespace PathTracing
                 });
                 renderer.EnqueuePass(_dlssrrPass);
 
-                EnqueueDlssAfterPass(renderer, pool, outputResolution);
+                EnqueueDlssAfterPass(renderer, pool, outputResolution, nrdConstantBuffer);
             }
             else if (setting.SR)
             {
@@ -562,14 +565,14 @@ namespace PathTracing
                 _dlssrPass.Setup(dlsrDataPtr);
                 renderer.EnqueuePass(_dlssrPass);
 
-                EnqueueDlssAfterPass(renderer, pool, outputResolution);
+                EnqueueDlssAfterPass(renderer, pool, outputResolution, nrdConstantBuffer);
             }
             else
             {
                 // TAA
                 var nrdTaaResource = new NRDTaaPass.Resource
                 {
-                    ConstantBuffer = _nrdConstantBuffer.NativePtr,
+                    ConstantBuffer = nrdConstantBuffer.NativePtr,
                     Pool           = pool,
                     isEven         = isEven,
                 };
@@ -632,7 +635,7 @@ namespace PathTracing
             {
                 var nrdFinalResource = new NRDFinalPass.Resource
                 {
-                    ConstantBuffer = _nrdConstantBuffer.NativePtr,
+                    ConstantBuffer = nrdConstantBuffer.NativePtr,
                     Pool           = pool,
                 };
 
@@ -691,19 +694,26 @@ namespace PathTracing
                 });
                 renderer.EnqueuePass(_outputBlitPass);
 
-                if (setting.updateTick)
+                if (renderingData.cameraData.xr.enabled)
+                {
+                    if(setting.skipRightEyeInVR || eyeIndex == 1)
+                        renderer.EnqueuePass(_nativeFrameTickPass);
+                }
+                else
+                {
                     renderer.EnqueuePass(_nativeFrameTickPass);
+                }
             }
         }
 
-        private void EnqueueDlssAfterPass(ScriptableRenderer renderer, PathTracingResourcePool pool, int2 outputResolution)
+        private void EnqueueDlssAfterPass(ScriptableRenderer renderer, PathTracingResourcePool pool, int2 outputResolution, NativeBuffer nrdConstantBuffer)
         {
             var outputGridW = (outputResolution.x + 15) / 16;
             var outputGridH = (outputResolution.y + 15) / 16;
 
             _nrdDlssAfterPass.Setup(new NRDDlssAfterPass.Resource
             {
-                ConstantBuffer = _nrdConstantBuffer.NativePtr,
+                ConstantBuffer = nrdConstantBuffer.NativePtr,
                 Pool           = pool,
             }, new NRDDlssAfterPass.Settings
             {
@@ -730,8 +740,9 @@ namespace PathTracing
             _nrdSampleResource?.Dispose();
             _nrdSampleResource = null;
 
-            _nrdConstantBuffer?.Dispose();
-            _nrdConstantBuffer = null;
+            foreach (var cb in _nrdConstantBuffers.Values)
+                cb.Dispose();
+            _nrdConstantBuffers.Clear();
 
             foreach (var denoiser in _nrdSigmaDenoisers.Values)
                 denoiser.Dispose();

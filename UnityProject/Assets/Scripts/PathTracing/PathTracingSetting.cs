@@ -420,5 +420,7 @@ namespace PathTracing
 
         [Range(0.0f, 1.0f)]
         public float nisSharpness = 0.2f;
+
+        public bool skipRightEyeInVR;
     }
 }

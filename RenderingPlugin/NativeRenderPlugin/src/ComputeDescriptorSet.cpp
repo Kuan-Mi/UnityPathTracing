@@ -49,7 +49,7 @@ void ComputeDescriptorSet::FreeAllocations()
     if (!m_allocator) return;
     uint32_t numSRV = m_cs ? m_cs->GetNumSRV() : 0;
     uint32_t numUAV = m_cs ? m_cs->GetNumUAV() : 0;
-    for (uint32_t f = 0; f < kNumFrames; ++f)
+    for (uint32_t f = 0; f < kNumSlots; ++f)
     {
         if (m_srvAllocBase[f] != kInvalidAlloc && numSRV > 0) { m_allocator->Free(m_srvAllocBase[f], numSRV); m_srvAllocBase[f] = kInvalidAlloc; }
         if (m_uavAllocBase[f] != kInvalidAlloc && numUAV > 0) { m_allocator->Free(m_uavAllocBase[f], numUAV); m_uavAllocBase[f] = kInvalidAlloc; }
@@ -59,17 +59,16 @@ void ComputeDescriptorSet::FreeAllocations()
 // ---------------------------------------------------------------------------
 // AllocateAndWriteDescriptors
 // ---------------------------------------------------------------------------
-bool ComputeDescriptorSet::AllocateAndWriteDescriptors(const CS_BindingSlot* slots, uint32_t slotCount)
+bool ComputeDescriptorSet::AllocateAndWriteDescriptors(const CS_BindingSlot* slots, uint32_t slotCount, uint32_t slotIdx)
 {
     if (!m_allocator) return false;
     uint32_t numSRV = m_cs->GetNumSRV();
     uint32_t numUAV = m_cs->GetNumUAV();
-    uint32_t f = g_frameIndex;
-    if (m_srvAllocBase[f] == kInvalidAlloc && numSRV > 0)
-        m_srvAllocBase[f] = m_allocator->Allocate(numSRV);
-    if (m_uavAllocBase[f] == kInvalidAlloc && numUAV > 0)
-        m_uavAllocBase[f] = m_allocator->Allocate(numUAV);
-    UpdateDescriptors(slots, slotCount);
+    if (m_srvAllocBase[slotIdx] == kInvalidAlloc && numSRV > 0)
+        m_srvAllocBase[slotIdx] = m_allocator->Allocate(numSRV);
+    if (m_uavAllocBase[slotIdx] == kInvalidAlloc && numUAV > 0)
+        m_uavAllocBase[slotIdx] = m_allocator->Allocate(numUAV);
+    UpdateDescriptors(slots, slotCount, slotIdx);
     return true;
 }
 
@@ -79,12 +78,12 @@ bool ComputeDescriptorSet::AllocateAndWriteDescriptors(const CS_BindingSlot* slo
 //   CBVs are bound as inline root descriptors in Dispatch.
 //   SRV_ARRAY bindings use their own heap in BindlessTexture/BindlessBuffer.
 // ---------------------------------------------------------------------------
-void ComputeDescriptorSet::UpdateDescriptors(const CS_BindingSlot* slots, uint32_t slotCount)
+void ComputeDescriptorSet::UpdateDescriptors(const CS_BindingSlot* slots, uint32_t slotCount, uint32_t slotIdx)
 {
     const auto& bindings = m_cs->GetBindings();
 
     // --- SRV / TLAS ---
-    const uint32_t f = g_frameIndex;
+    const uint32_t f = slotIdx;
     if (m_srvAllocBase[f] != kInvalidAlloc)
     {
         for (size_t i = 0; i < bindings.size(); ++i)
@@ -347,19 +346,36 @@ void ComputeDescriptorSet::Dispatch(
         if (anyMissing) return;
     }
 
-    // Advance to the next triple-buffer slot: done globally by DrainDeferredDeletes each frame.
+    // Compute per-eye slot index: resets each new frame, increments each Dispatch call.
+    // This gives eye0 and eye1 independent GPU heap descriptor slices within the same frame.
+    if (g_frameIndex != m_lastFrameIndex)
+    {
+        m_subFrameIdx    = 0;
+        m_lastFrameIndex = g_frameIndex;
+    }
+    if (m_subFrameIdx >= kMaxEyesPerFrame)
+    {
+        Logf(kUnityLogTypeError,
+             "ComputeDescriptorSet::Dispatch [%s]: more than %u dispatches in one frame "
+             "(g_frameIndex=%u). Increase kMaxEyesPerFrame or check for unexpected re-use.",
+             m_cs ? m_cs->GetName() : "?", kMaxEyesPerFrame, g_frameIndex);
+        // Clamp to last valid slot to avoid out-of-bounds access.
+        m_subFrameIdx = kMaxEyesPerFrame - 1;
+    }
+    const uint32_t slotIdx = g_frameIndex * kMaxEyesPerFrame + m_subFrameIdx;
+    ++m_subFrameIdx;
 
-    // Allocate heap slots for this frame slot on first use, then write descriptors
+    // Allocate heap slots for this slot on first use, then write descriptors
     uint32_t numSRV = m_cs->GetNumSRV();
     uint32_t numUAV = m_cs->GetNumUAV();
-    if ((numSRV > 0 && m_srvAllocBase[g_frameIndex] == kInvalidAlloc) ||
-        (numUAV > 0 && m_uavAllocBase[g_frameIndex] == kInvalidAlloc))
+    if ((numSRV > 0 && m_srvAllocBase[slotIdx] == kInvalidAlloc) ||
+        (numUAV > 0 && m_uavAllocBase[slotIdx] == kInvalidAlloc))
     {
-        if (!AllocateAndWriteDescriptors(slots, slotCount)) return;
+        if (!AllocateAndWriteDescriptors(slots, slotCount, slotIdx)) return;
     }
     else
     {
-        UpdateDescriptors(slots, slotCount);
+        UpdateDescriptors(slots, slotCount, slotIdx);
     }
 
     // Bind the global shared heap
@@ -374,14 +390,14 @@ void ComputeDescriptorSet::Dispatch(
     uint32_t rootParamCBVBase = m_cs->GetRootParamCBVBase();
 
     // SRV table
-    if (rootParamSRV != kInvalidAlloc && m_srvAllocBase[g_frameIndex] != kInvalidAlloc)
+    if (rootParamSRV != kInvalidAlloc && m_srvAllocBase[slotIdx] != kInvalidAlloc)
         cmdList->SetComputeRootDescriptorTable(rootParamSRV,
-            m_allocator->GetGPUHandle(m_srvAllocBase[g_frameIndex]));
+            m_allocator->GetGPUHandle(m_srvAllocBase[slotIdx]));
 
     // UAV table
-    if (rootParamUAV != kInvalidAlloc && m_uavAllocBase[g_frameIndex] != kInvalidAlloc)
+    if (rootParamUAV != kInvalidAlloc && m_uavAllocBase[slotIdx] != kInvalidAlloc)
         cmdList->SetComputeRootDescriptorTable(rootParamUAV,
-            m_allocator->GetGPUHandle(m_uavAllocBase[g_frameIndex]));
+            m_allocator->GetGPUHandle(m_uavAllocBase[slotIdx]));
 
     // SRV_ARRAY bindings – each has its own root parameter
     for (size_t i = 0; i < bindings.size(); ++i)

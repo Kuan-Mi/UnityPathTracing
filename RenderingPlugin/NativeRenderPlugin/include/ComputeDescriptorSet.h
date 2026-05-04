@@ -37,8 +37,8 @@ public:
                   const CS_BindingSlot* slots, uint32_t slotCount);
 
 private:
-    bool AllocateAndWriteDescriptors(const CS_BindingSlot* slots, uint32_t slotCount);
-    void UpdateDescriptors          (const CS_BindingSlot* slots, uint32_t slotCount);
+    bool AllocateAndWriteDescriptors(const CS_BindingSlot* slots, uint32_t slotCount, uint32_t slotIdx);
+    void UpdateDescriptors          (const CS_BindingSlot* slots, uint32_t slotCount, uint32_t slotIdx);
     void FreeAllocations();
     void RequestResourceStates(const CS_BindingSlot* slots, uint32_t slotCount);
 
@@ -51,9 +51,21 @@ private:
     DescriptorHeapAllocator* m_allocator = nullptr;
     IUnityGraphicsD3D12v8*   m_d3d12v8   = nullptr;
 
-    static constexpr uint32_t kInvalidAlloc  = UINT32_MAX;
-    static constexpr uint32_t kNumFrames      = 3;          // triple-buffering
+    static constexpr uint32_t kInvalidAlloc    = UINT32_MAX;
+    static constexpr uint32_t kNumFrames        = 3;  // triple-buffering
+    static constexpr uint32_t kMaxEyesPerFrame  = 2;  // XR stereo
+    static constexpr uint32_t kNumSlots         = kNumFrames * kMaxEyesPerFrame; // 6
 
-    uint32_t m_srvAllocBase[kNumFrames] = { kInvalidAlloc, kInvalidAlloc, kInvalidAlloc };
-    uint32_t m_uavAllocBase[kNumFrames] = { kInvalidAlloc, kInvalidAlloc, kInvalidAlloc };
+    // Per-dispatch slot index: slotIdx = g_frameIndex * kMaxEyesPerFrame + m_subFrameIdx
+    // m_subFrameIdx resets to 0 when g_frameIndex changes (new frame), then increments
+    // each Dispatch call so eye0 and eye1 use independent GPU heap slices.
+    uint32_t m_lastFrameIndex = UINT32_MAX;
+    uint32_t m_subFrameIdx    = 0;
+
+    uint32_t m_srvAllocBase[kNumSlots] = {
+        kInvalidAlloc, kInvalidAlloc, kInvalidAlloc,
+        kInvalidAlloc, kInvalidAlloc, kInvalidAlloc };
+    uint32_t m_uavAllocBase[kNumSlots] = {
+        kInvalidAlloc, kInvalidAlloc, kInvalidAlloc,
+        kInvalidAlloc, kInvalidAlloc, kInvalidAlloc };
 };

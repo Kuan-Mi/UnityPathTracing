@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.SceneManagement;
@@ -86,6 +87,7 @@ namespace NativeRender
         public bool IsStatic => _isStaticObject;
 
         public MeshRenderer meshRenderer;
+        [NonSerialized]
         public int instanceId;
 
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]

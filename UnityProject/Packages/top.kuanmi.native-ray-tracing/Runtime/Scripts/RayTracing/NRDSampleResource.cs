@@ -1576,7 +1576,14 @@ namespace NativeRender
 
             for (int sub = 0; sub < subCnt; sub++)
             {
-                Material subMat = (sub < sharedMaterials.Length) ? sharedMaterials[sub] : GetRepresentativeMaterial(mr);
+                Material subMat = (sub < sharedMaterials.Length) ? sharedMaterials[sub] : null;
+
+                if (subMat == null)
+                {
+                    Debug.LogError($"[NRDSampleResource] Submesh {sub} of '{mr.name}' has no material assigned; using default material");
+                    continue;
+                }
+                
                 subMaterials[sub] = subMat;
                 // GetOrAddMaterial(null texPtrs) = incremental path: grows _textures in-place if needed.
                 int subMatIdx = GetOrAddMaterial(subMat, null);
@@ -2064,7 +2071,7 @@ namespace NativeRender
 
             if (texPtrs != null)
             {
-                if (mat.shader.name == "Universal Render Pipeline/Lit")
+                if (mat.shader.name is "Universal Render Pipeline/Lit" or "RayTracing/Lit")
                 {
                     // Bulk build path: append raw pointers; caller will create _textures.
                     AppendTexture(TryGetTex(mat, "_BaseMap"), PlaceholderKind.White, texPtrs);
@@ -2237,7 +2244,7 @@ namespace NativeRender
         {
             if (mat == null) return false;
 
-            if (mat.shader.name == "Universal Render Pipeline/Lit")
+            if (mat.shader.name is "Universal Render Pipeline/Lit" or "RayTracing/Lit")
             {
                 // URP lit: _Surface = 1 → Transparent.
                 if (mat.HasProperty("_Surface") && mat.GetFloat("_Surface") > 0.5f) return true;
@@ -2257,7 +2264,7 @@ namespace NativeRender
         {
             if (mat == null) return false;
 
-            if (mat.shader.name == "Universal Render Pipeline/Lit")
+            if (mat.shader.name is "Universal Render Pipeline/Lit" or "RayTracing/Lit")
             {
                 // URP lit: _EmissionColor > black → emissive.
                 if (mat.HasProperty("_EmissionColor"))

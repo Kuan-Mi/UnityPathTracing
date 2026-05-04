@@ -543,6 +543,19 @@ void main( uint2 pixelPos : SV_DispatchThreadId )
 
         return;
     }
+    
+    // Occlusion Mesh
+    float2 distenceToCenter = abs( pixelUv*2.0 - 1.0 );
+    if (dot( distenceToCenter, distenceToCenter ) > 1.0 )
+    {
+        gOut_ViewZ[ pixelPos ] = -INF;
+        
+        #if( USE_DRS_STRESS_TEST == 1 )
+        WriteResult( pixelPos, GARBAGE, GARBAGE, GARBAGE, GARBAGE );
+        #endif
+
+        return;
+    }
 
     // Initialize RNG
     Rng::Hash::Initialize( pixelPos, gFrameIndex );
