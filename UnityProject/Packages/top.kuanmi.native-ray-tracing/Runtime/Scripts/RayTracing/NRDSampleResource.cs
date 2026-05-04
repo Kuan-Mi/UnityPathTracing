@@ -108,29 +108,51 @@ namespace NativeRender
 
         // ----- Separate-BLAS per-target tracking -----
 
+        /// <summary>
+        /// Represents one group of submeshes that share the same (isTransparent, isEmissive) pair
+        /// and are therefore registered as a single TLAS entry with a unique customHandle.
+        /// </summary>
+        private sealed class SubmeshGroup
+        {
+            /// <summary>Whether all submeshes in this group are transparent.</summary>
+            public bool isTransparent;
+
+            /// <summary>Whether all submeshes in this group are emissive.</summary>
+            public bool isEmissive;
+
+            /// <summary>Indices into the original mesh.subMeshCount.</summary>
+            public int[] submeshIndices;
+
+            /// <summary>Materials for each submesh (parallel to submeshIndices).</summary>
+            public Material[] materials;
+
+            /// <summary>
+            /// Unique handle used for all TLAS Set*/Remove calls.
+            /// Encoded as: high-4-bits = groupIndex, low-28-bits = mrInstanceId.
+            /// </summary>
+            public uint customHandle;
+
+            /// <summary>First contiguous slot in _instanceCpu/_instanceDataBuf for this group.</summary>
+            public uint firstInstanceIdx;
+
+            /// <summary>Starting element index in _primitiveCpu for each submesh (parallel to submeshIndices).</summary>
+            public uint[] primitiveOffsets;
+
+            /// <summary>Triangle count for each submesh (parallel to submeshIndices).</summary>
+            public int[] primitiveCounts;
+
+            /// <summary>Which TLAS(es) this group was registered in.</summary>
+            public List<RayTracingAccelerationStructure> tlasList;
+        }
+
         /// <summary>Tracks per-renderer state when running in separate (non-merged) BLAS mode.</summary>
         private sealed class PerTargetBlas
         {
-            /// <summary>Which TLAS this renderer belongs to (worldAS or lightAS).</summary>
-            public List<RayTracingAccelerationStructure> tlasList;
-
-            /// <summary>Index of this renderer's first submesh in _instanceDataBuf (= first contiguous slot).</summary>
-            public uint firstInstanceDataIndex;
-
-            /// <summary>Number of submeshes (= number of InstanceDataNRD entries).</summary>
-            public int submeshCount;
+            /// <summary>All submesh groups for this renderer, each potentially in different TLAS(es).</summary>
+            public List<SubmeshGroup> groups;
 
             /// <summary>Cached transform to detect changes.</summary>
             public Matrix4x4 lastTransform;
-
-            /// <summary>Starting element index in _primitiveCpu for each submesh.</summary>
-            public uint[] primitiveOffsets;
-
-            /// <summary>Triangle count for each submesh (matches primitiveOffsets length).</summary>
-            public int[] primitiveCounts;
-
-            /// <summary>Material for each submesh — used to release material refs when the target is removed.</summary>
-            public Material[] submeshMaterials;
 
             /// <summary>
             /// True when this entry uses FLAG_STATIC semantics:
@@ -400,7 +422,13 @@ namespace NativeRender
 
             for (int sub = 0; sub < subCnt; sub++)
             {
-                Material subMat    = (sub < sharedMats.Length) ? sharedMats[sub] : GetRepresentativeMaterial(smr.GetComponent<MeshRenderer>() ?? null);
+                if (sub >= sharedMats.Length)
+                {
+                    Debug.LogError($"[NRDSampleResource] Submesh {sub} of skinned '{smr.name}' has no material assigned; skipping submesh");
+                    continue;
+                }
+
+                Material subMat    = sharedMats[sub];
                 int      subMatIdx = GetOrAddMaterial(subMat, null); // incremental path: grows _textures in-place
 
                 int indexCount = (int)mesh.GetIndexCount(sub);
@@ -926,7 +954,13 @@ namespace NativeRender
                     int        subCnt = mesh.subMeshCount;
                     for (int s = 0; s < subCnt; s++)
                     {
-                        Material subMat     = (s < mats.Length) ? mats[s] : GetRepresentativeMaterial(mr);
+                        if (s >= mats.Length)
+                        {
+                            Debug.LogError($"[NRDSampleResource] Submesh {s} of '{mr.name}' has no material assigned; skipping submesh");
+                            continue;
+                        }
+
+                        Material subMat     = mats[s];
                         bool     isTrans    = IsMaterialTransparent(subMat);
                         bool     isEmissive = IsMaterialEmissive(subMat);
 
@@ -1132,40 +1166,12 @@ namespace NativeRender
 
             foreach (var (target, mr, mesh, meshIndex) in validPairs)
             {
-                Matrix4x4 xform = target.transform.localToWorldMatrix;
+                Matrix4x4 xform       = target.transform.localToWorldMatrix;
+                int       mrId        = mr.GetInstanceID();
+                uint      indexStride = mesh.indexFormat == UnityEngine.Rendering.IndexFormat.UInt16 ? 2u : 4u;
 
-
-                Material rep           = GetRepresentativeMaterial(mr);
-                bool     isTransparent = IsMaterialTransparent(rep);
-                bool     isEmissive    = IsMaterialEmissive(rep);
-
-                uint baseFlags = isTransparent ? FLAG_TRANSPARENT : FLAG_NON_TRANSPARENT;
-
-
-                // TLAS calls must happen on the main thread.
-                if (!_worldAS.AddInstance(mr))
-                {
-                    Debug.LogWarning($"[NRDSampleResource] AddInstance failed for '{mr.name}' — skipping");
-                    continue;
-                }
-
-                uint firstInstanceDataIndex = instanceCursor;
-                _worldAS.SetInstanceID(mr, firstInstanceDataIndex);
-                _worldAS.SetInstanceTransform(mr, xform);
-                _worldAS.SetInstanceMask(mr, GetMaskForFlags(baseFlags));
-
-                if (isEmissive)
-                {
-                    if (!_lightAS.AddInstance(mr))
-                    {
-                        Debug.LogWarning($"[NRDSampleResource] AddInstance failed for '{mr.name}' on light AS — skipping emissive instance");
-                    }
-
-                    _lightAS.SetInstanceID(mr, firstInstanceDataIndex);
-                    _lightAS.SetInstanceTransform(mr, xform);
-                    _lightAS.SetInstanceMask(mr, GetMaskForFlags(baseFlags));
-                }
-
+                List<SubmeshGroup> groups = ClassifySubmeshGroups(mr, mesh, mrId);
+                if (groups.Count == 0) continue;
 
                 bool leftHanded = xform.determinant < 0f;
                 Vector3 sc = new Vector3(
@@ -1175,7 +1181,6 @@ namespace NativeRender
                 float scaleMax = Mathf.Max(sc.x, Mathf.Max(sc.y, sc.z));
 
                 int vertCount = mesh.vertexCount;
-                int subCnt    = mesh.subMeshCount;
                 var meshData  = meshDataArr[meshIndex];
 
                 // Vertex attribute arrays — TempJob so they stay valid across job scheduling.
@@ -1185,111 +1190,133 @@ namespace NativeRender
                 var nativeUV  = new NativeArray<Vector2>(vertCount, Allocator.TempJob, NativeArrayOptions.UninitializedMemory);
 
                 meshData.GetVertices(nativePos);
-
                 bool hasN  = meshData.HasVertexAttribute(VertexAttribute.Normal);
                 bool hasT  = meshData.HasVertexAttribute(VertexAttribute.Tangent);
                 bool hasUV = meshData.HasVertexAttribute(VertexAttribute.TexCoord0);
-
                 if (hasN) meshData.GetNormals(nativeN);
                 if (hasT) meshData.GetTangents(nativeT);
                 if (hasUV) meshData.GetUVs(0, nativeUV);
 
-                // Reinterpret vertex buffers as Unity.Mathematics types for the Burst job.
                 var posF3 = nativePos.Reinterpret<float3>(sizeof(float) * 3);
                 var norF3 = nativeN.Reinterpret<float3>(sizeof(float) * 3);
                 var tanF4 = nativeT.Reinterpret<float4>(sizeof(float) * 4);
                 var uvF2  = nativeUV.Reinterpret<float2>(sizeof(float) * 2);
 
-                // Track for disposal after Complete().
                 tempArrays.Add(nativePos);
                 tempArrays.Add(nativeN);
                 tempArrays.Add(nativeT);
                 tempArrays.Add(nativeUV);
 
-                Material[] sharedMaterials = mr.sharedMaterials;
-                var        subPrimOffsets  = new uint[subCnt];
-                var        subPrimCounts   = new int[subCnt];
-                var        subMats         = new Material[subCnt];
+                bool anyGroupRegistered = false;
 
-                for (int sub = 0; sub < subCnt; sub++)
+                foreach (var grp in groups)
                 {
-                    uint primitiveOffsetForSubMesh = primitiveCursor;
-
-                    Material subMat = (sub < sharedMaterials.Length) ? sharedMaterials[sub] : GetRepresentativeMaterial(mr);
-                    subMats[sub] = subMat;
-                    int subMatIdx = GetOrAddMaterial(subMat, texPtrs);
-
-                    int indexCount = (int)mesh.GetIndexCount(sub);
-                    int triCount   = indexCount / 3;
-
-                    subPrimOffsets[sub] = primitiveOffsetForSubMesh;
-                    subPrimCounts[sub]  = triCount;
-
-                    var nativeTris = new NativeArray<int>(indexCount, Allocator.TempJob, NativeArrayOptions.UninitializedMemory);
-                    meshData.GetIndices(nativeTris, sub);
-                    tempArrays.Add(nativeTris);
-
-                    // Schedule Burst job for this submesh's triangle range.
-                    // primitiveOffsetForSubMesh is the absolute offset into _primitiveCpu.
-                    var job = new BuildPrimitivesJob
+                    // Build SubmeshDesc array for just this group's submeshes.
+                    var groupDescs = new NativeRenderPlugin.SubmeshDesc[grp.submeshIndices.Length];
+                    for (int gi = 0; gi < grp.submeshIndices.Length; gi++)
                     {
-                        Indices   = nativeTris,
-                        Positions = posF3,
-                        Normals   = norF3,
-                        Tangents  = tanF4,
-                        UVs       = uvF2,
-                        HasN      = hasN,
-                        HasT      = hasT,
-                        HasUV     = hasUV,
-                        Output    = _primitiveCpu.GetSubArray((int)primitiveOffsetForSubMesh, triCount),
-                    };
-                    jobHandles.Add(job.Schedule(triCount, 64));
+                        int               sub = grp.submeshIndices[gi];
+                        SubMeshDescriptor sd  = mesh.GetSubMesh(sub);
+                        groupDescs[gi] = new NativeRenderPlugin.SubmeshDesc
+                        {
+                            indexCount      = (uint)sd.indexCount,
+                            indexByteOffset = (uint)sd.indexStart * indexStride,
+                            baseVertex      = (uint)sd.baseVertex,
+                        };
+                    }
 
-                    primitiveCursor += (uint)triCount;
+                    uint groupFlags = grp.isTransparent ? FLAG_TRANSPARENT : FLAG_NON_TRANSPARENT;
+                    byte groupMask  = GetMaskForFlags(groupFlags);
 
-                    // InstanceDataNRD is built on the main thread (depends on material + transform).
-                    uint baseTextureIndex = (uint)(subMatIdx * TexturesPerMaterial);
-
-                    // FLAG_STATIC set: HLSL uses mOverloaded as the rotation matrix for normals.
-                    // FLAG_STATIC clear: HLSL computes Xprev = AffineTransform(mOverloaded, X).
-                    //   On the first frame (no previous position), initialise to identity so Xprev = X.
-
-                    Matrix4x4 mOverloaded = xform;
-
-                    var inst = new InstanceDataNRD
+                    if (!_worldAS.AddInstanceGroup(mesh, groupDescs, grp.customHandle))
                     {
-                        mOverloadedMatrix0 = new Vector4(mOverloaded.m00, mOverloaded.m01, mOverloaded.m02, mOverloaded.m03),
-                        mOverloadedMatrix1 = new Vector4(mOverloaded.m10, mOverloaded.m11, mOverloaded.m12, mOverloaded.m13),
-                        mOverloadedMatrix2 = new Vector4(mOverloaded.m20, mOverloaded.m21, mOverloaded.m22, mOverloaded.m23),
+                        Debug.LogWarning($"[NRDSampleResource] AddInstanceGroup failed for '{mr.name}' group handle={grp.customHandle} — skipping group");
+                        continue;
+                    }
 
-                        textureOffsetAndFlags = baseTextureIndex | (baseFlags << FlagFirstBit),
-                        primitiveOffset       = primitiveOffsetForSubMesh,
-                        scale                 = (leftHanded ? -1f : 1f) * scaleMax,
-                        morphPrimitiveOffset  = 0,
-                    };
-                    EncodeMaterial(subMat, ref inst);
-                    instList.Add(inst);
-                    instanceCursor++;
+                    grp.firstInstanceIdx = instanceCursor;
+                    _worldAS.SetInstanceID(grp.customHandle, instanceCursor);
+                    _worldAS.SetInstanceTransform(grp.customHandle, xform);
+                    _worldAS.SetInstanceMask(grp.customHandle, groupMask);
+                    grp.tlasList.Add(_worldAS);
+
+                    if (grp.isEmissive)
+                    {
+                        if (_lightAS.AddInstanceGroup(mesh, groupDescs, grp.customHandle))
+                        {
+                            _lightAS.SetInstanceID(grp.customHandle, instanceCursor);
+                            _lightAS.SetInstanceTransform(grp.customHandle, xform);
+                            _lightAS.SetInstanceMask(grp.customHandle, groupMask);
+                            grp.tlasList.Add(_lightAS);
+                        }
+                        else
+                        {
+                            Debug.LogWarning($"[NRDSampleResource] AddInstanceGroup on lightAS failed for '{mr.name}' group handle={grp.customHandle}");
+                        }
+                    }
+
+                    // Build per-submesh primitive + instance data for this group.
+                    for (int gi = 0; gi < grp.submeshIndices.Length; gi++)
+                    {
+                        int      sub    = grp.submeshIndices[gi];
+                        Material subMat = grp.materials[gi];
+
+                        uint subFlags  = grp.isTransparent ? FLAG_TRANSPARENT : FLAG_NON_TRANSPARENT;
+                        int  subMatIdx = GetOrAddMaterial(subMat, texPtrs);
+
+                        int indexCount = (int)mesh.GetIndexCount(sub);
+                        int triCount   = indexCount / 3;
+
+                        grp.primitiveOffsets[gi] = primitiveCursor;
+                        grp.primitiveCounts[gi]  = triCount;
+
+                        var nativeTris = new NativeArray<int>(indexCount, Allocator.TempJob, NativeArrayOptions.UninitializedMemory);
+                        meshData.GetIndices(nativeTris, sub);
+                        tempArrays.Add(nativeTris);
+
+                        jobHandles.Add(new BuildPrimitivesJob
+                        {
+                            Indices   = nativeTris,
+                            Positions = posF3,
+                            Normals   = norF3,
+                            Tangents  = tanF4,
+                            UVs       = uvF2,
+                            HasN      = hasN,
+                            HasT      = hasT,
+                            HasUV     = hasUV,
+                            Output    = _primitiveCpu.GetSubArray((int)primitiveCursor, triCount),
+                        }.Schedule(triCount, 64));
+
+                        primitiveCursor += (uint)triCount;
+
+                        uint      baseTextureIndex = (uint)(subMatIdx * TexturesPerMaterial);
+                        Matrix4x4 mOverloaded      = xform;
+                        var inst = new InstanceDataNRD
+                        {
+                            mOverloadedMatrix0    = new Vector4(mOverloaded.m00, mOverloaded.m01, mOverloaded.m02, mOverloaded.m03),
+                            mOverloadedMatrix1    = new Vector4(mOverloaded.m10, mOverloaded.m11, mOverloaded.m12, mOverloaded.m13),
+                            mOverloadedMatrix2    = new Vector4(mOverloaded.m20, mOverloaded.m21, mOverloaded.m22, mOverloaded.m23),
+                            textureOffsetAndFlags = baseTextureIndex | (subFlags << FlagFirstBit),
+                            primitiveOffset       = grp.primitiveOffsets[gi],
+                            scale                 = (leftHanded ? -1f : 1f) * scaleMax,
+                            morphPrimitiveOffset  = 0,
+                        };
+                        EncodeMaterial(subMat, ref inst);
+                        instList.Add(inst);
+                        instanceCursor++;
+                    }
+
+                    anyGroupRegistered = true;
                 }
 
+                if (!anyGroupRegistered) continue;
+
                 // Record per-target state for transform-only updates.
-
-                var tlasList = new List<RayTracingAccelerationStructure>();
-
-                tlasList.Add(_worldAS);
-                if (isEmissive)
-                    tlasList.Add(_lightAS);
-
-                _perTargetBlas[mr.GetInstanceID()] = new PerTargetBlas
+                _perTargetBlas[mrId] = new PerTargetBlas
                 {
-                    tlasList               = tlasList,
-                    firstInstanceDataIndex = firstInstanceDataIndex,
-                    submeshCount           = subCnt,
-                    lastTransform          = xform,
-                    primitiveOffsets       = subPrimOffsets,
-                    primitiveCounts        = subPrimCounts,
-                    submeshMaterials       = subMats,
-                    isStatic               = false,
+                    groups        = groups,
+                    lastTransform = xform,
+                    isStatic      = false,
                 };
             }
 
@@ -1346,21 +1373,19 @@ namespace NativeRender
                     if (!moved) continue;
 
                     Matrix4x4 xform = target.transform.localToWorldMatrix;
-                    foreach (var accelerationStructure in info.tlasList)
+                    foreach (var grp in info.groups)
                     {
-                        accelerationStructure.SetInstanceTransform(mr, xform);
-                    }
+                        foreach (var tlas in grp.tlasList)
+                            tlas.SetInstanceTransform(grp.customHandle, xform);
 
-                    for (int sub = 0; sub < info.submeshCount; sub++)
-                    {
-                        int idx = (int)info.firstInstanceDataIndex + sub;
-                        if (idx >= _instanceCpu.Length) break;
-
-                        // mOverloaded = current transform (HLSL uses 3×3 part as rotation matrix for normals).
-                        _instanceCpu[idx].mOverloadedMatrix0 = new Vector4(xform.m00, xform.m01, xform.m02, xform.m03);
-                        _instanceCpu[idx].mOverloadedMatrix1 = new Vector4(xform.m10, xform.m11, xform.m12, xform.m13);
-                        _instanceCpu[idx].mOverloadedMatrix2 = new Vector4(xform.m20, xform.m21, xform.m22, xform.m23);
-                        // scale is constant for static objects in edit mode — leave unchanged.
+                        for (int gi = 0; gi < grp.submeshIndices.Length; gi++)
+                        {
+                            int idx = (int)grp.firstInstanceIdx + gi;
+                            if (idx >= _instanceCpu.Length) break;
+                            _instanceCpu[idx].mOverloadedMatrix0 = new Vector4(xform.m00, xform.m01, xform.m02, xform.m03);
+                            _instanceCpu[idx].mOverloadedMatrix1 = new Vector4(xform.m10, xform.m11, xform.m12, xform.m13);
+                            _instanceCpu[idx].mOverloadedMatrix2 = new Vector4(xform.m20, xform.m21, xform.m22, xform.m23);
+                        }
                     }
 
                     info.lastTransform = xform;
@@ -1368,28 +1393,11 @@ namespace NativeRender
                 else
                 {
                     // Dynamic: compute motion matrix = prevT * inv(currT).
-                    // When stationary, this evaluates to identity → Xprev = X (no motion)
                     if (moved || info.wasMoving)
                     {
                         Matrix4x4 xform        = target.transform.localToWorldMatrix;
                         Matrix4x4 motionMatrix = info.lastTransform * xform.inverse;
 
-                        for (int sub = 0; sub < info.submeshCount; sub++)
-                        {
-                            int idx = (int)info.firstInstanceDataIndex + sub;
-                            if (idx >= _instanceCpu.Length) break;
-
-                            _instanceCpu[idx].mOverloadedMatrix0 = new Vector4(motionMatrix.m00, motionMatrix.m01, motionMatrix.m02, motionMatrix.m03);
-                            _instanceCpu[idx].mOverloadedMatrix1 = new Vector4(motionMatrix.m10, motionMatrix.m11, motionMatrix.m12, motionMatrix.m13);
-                            _instanceCpu[idx].mOverloadedMatrix2 = new Vector4(motionMatrix.m20, motionMatrix.m21, motionMatrix.m22, motionMatrix.m23);
-                        }
-
-                        foreach (var accelerationStructure in info.tlasList)
-                        {
-                            accelerationStructure.SetInstanceTransform(mr, xform);
-                        }
-
-                        // Recompute scale from new transform.
                         Vector3 s = new Vector3(
                             new Vector3(xform.m00, xform.m10, xform.m20).magnitude,
                             new Vector3(xform.m01, xform.m11, xform.m21).magnitude,
@@ -1397,18 +1405,27 @@ namespace NativeRender
                         float scaleMax   = Mathf.Max(s.x, Mathf.Max(s.y, s.z));
                         bool  leftHanded = xform.determinant < 0f;
 
-                        for (int sub = 0; sub < info.submeshCount; sub++)
+                        foreach (var grp in info.groups)
                         {
-                            int idx = (int)info.firstInstanceDataIndex + sub;
-                            if (idx >= _instanceCpu.Length) break;
-                            _instanceCpu[idx].scale = (leftHanded ? -1f : 1f) * scaleMax;
+                            foreach (var tlas in grp.tlasList)
+                                tlas.SetInstanceTransform(grp.customHandle, xform);
+
+                            for (int gi = 0; gi < grp.submeshIndices.Length; gi++)
+                            {
+                                int idx = (int)grp.firstInstanceIdx + gi;
+                                if (idx >= _instanceCpu.Length) break;
+                                _instanceCpu[idx].mOverloadedMatrix0 = new Vector4(motionMatrix.m00, motionMatrix.m01, motionMatrix.m02, motionMatrix.m03);
+                                _instanceCpu[idx].mOverloadedMatrix1 = new Vector4(motionMatrix.m10, motionMatrix.m11, motionMatrix.m12, motionMatrix.m13);
+                                _instanceCpu[idx].mOverloadedMatrix2 = new Vector4(motionMatrix.m20, motionMatrix.m21, motionMatrix.m22, motionMatrix.m23);
+                                _instanceCpu[idx].scale              = (leftHanded ? -1f : 1f) * scaleMax;
+                            }
+
+                            // Upload changed instance slots for this group.
+                            _instanceDataBuf.UploadRange(_instanceCpu, (int)grp.firstInstanceIdx, grp.submeshIndices.Length);
                         }
 
                         info.lastTransform = xform;
                         info.wasMoving     = moved;
-
-                        _instanceDataBuf.UploadRange(_instanceCpu, (int)info.firstInstanceDataIndex, info.submeshCount);
-                        // Debug.Log($"[UpdateTransformsOnly] Updated instance {mr.name} (moving: {moved})");
                     }
                 }
             }
@@ -1427,36 +1444,36 @@ namespace NativeRender
         {
             if (!_perTargetBlas.TryGetValue(rendererInstanceId, out var info)) return;
 
-            foreach (var accelerationStructure in info.tlasList)
+            foreach (var grp in info.groups)
             {
-                accelerationStructure.RemoveInstance(rendererInstanceId);
-            }
+                foreach (var tlas in grp.tlasList)
+                    tlas.RemoveInstance(grp.customHandle);
 
-            // Return contiguous instance slots.
-            _instanceAlloc.Free(info.firstInstanceDataIndex, info.submeshCount);
-            for (int sub = 0; sub < info.submeshCount; sub++)
-            {
-                int slotIdx = (int)info.firstInstanceDataIndex + sub;
-                if (slotIdx < _instanceCpu.Length)
-                    _instanceCpu[slotIdx] = default; // zero-out tombstone
-            }
+                // Return contiguous instance slots.
+                int grpSubCount = grp.submeshIndices.Length;
+                _instanceAlloc.Free(grp.firstInstanceIdx, grpSubCount);
+                for (int gi = 0; gi < grpSubCount; gi++)
+                {
+                    int slotIdx = (int)grp.firstInstanceIdx + gi;
+                    if (slotIdx < _instanceCpu.Length)
+                        _instanceCpu[slotIdx] = default;
+                }
 
-            // Return per-submesh primitive slots.
-            if (info.primitiveOffsets != null)
-                for (int sub = 0; sub < info.primitiveOffsets.Length; sub++)
-                    _primAlloc.Free(info.primitiveOffsets[sub], info.primitiveCounts[sub]);
+                // Return per-submesh primitive slots.
+                for (int gi = 0; gi < grp.primitiveOffsets.Length; gi++)
+                    _primAlloc.Free(grp.primitiveOffsets[gi], grp.primitiveCounts[gi]);
 
-            // Release material reference counts; free slots when count reaches zero.
-            if (info.submeshMaterials != null)
-                foreach (var mat in info.submeshMaterials)
+                // Release material reference counts.
+                foreach (var mat in grp.materials)
                     ReleaseMaterial(mat);
+            }
 
             _perTargetBlas.Remove(rendererInstanceId);
 
-            // Upload zeroed instance slots. Partial upload over the contiguous block.
-            _instanceDataBuf?.UploadRange(_instanceCpu,
-                (int)info.firstInstanceDataIndex,
-                info.submeshCount);
+            // Upload zeroed instance slots. We do per-group uploads since slots may not be contiguous.
+            foreach (var grp in info.groups)
+                _instanceDataBuf?.UploadRange(_instanceCpu, (int)grp.firstInstanceIdx, grp.submeshIndices.Length);
+
             InstanceDataBufPtr = _instanceDataBuf?.NativePtr ?? IntPtr.Zero;
         }
 
@@ -1465,8 +1482,7 @@ namespace NativeRender
         /// Allocates contiguous instance and primitive slots, grows backing buffers if needed,
         /// schedules a Burst job for primitive data, then partial-uploads changed ranges to the GPU.
         /// </summary>
-        private void AddTargetIncremental(
-            NativeRayTracingTarget target)
+        private void AddTargetIncremental(NativeRayTracingTarget target)
         {
             if (target == null) return;
             var mr = target.GetComponent<MeshRenderer>();
@@ -1474,32 +1490,15 @@ namespace NativeRender
             var mf = mr.GetComponent<MeshFilter>();
             if (mf == null || mf.sharedMesh == null) return;
 
-            Mesh mesh   = mf.sharedMesh;
-            int  subCnt = mesh.subMeshCount;
+            Mesh mesh        = mf.sharedMesh;
+            int  subCnt      = mesh.subMeshCount;
+            int  mrId        = mr.GetInstanceID();
+            uint indexStride = mesh.indexFormat == UnityEngine.Rendering.IndexFormat.UInt16 ? 2u : 4u;
 
-
-            Material rep           = GetRepresentativeMaterial(mr);
-            bool     isTransparent = IsMaterialTransparent(rep);
-            bool     isEmissive    = IsMaterialEmissive(rep);
-
-            uint flags = isTransparent ? FLAG_TRANSPARENT : FLAG_NON_TRANSPARENT;
-
-            if (!_worldAS.AddInstance(mr))
-            {
-                Debug.LogWarning($"[NRDSampleResource] AddTargetIncremental: AddInstance failed for '{mr.name}'");
-                return;
-            }
+            List<SubmeshGroup> groups = ClassifySubmeshGroups(mr, mesh, mrId);
+            if (groups.Count == 0) return;
 
             Matrix4x4 xform = target.transform.localToWorldMatrix;
-            _worldAS.SetInstanceTransform(mr, xform);
-            _worldAS.SetInstanceMask(mr, GetMaskForFlags(flags));
-
-            if (isEmissive)
-            {
-                _lightAS.AddInstance(mr);
-                _lightAS.SetInstanceTransform(mr, xform);
-                _lightAS.SetInstanceMask(mr, GetMaskForFlags(flags));
-            }
 
             bool leftHanded = xform.determinant < 0f;
             Vector3 sc = new Vector3(
@@ -1509,27 +1508,22 @@ namespace NativeRender
             float scaleMax = Mathf.Max(sc.x, Mathf.Max(sc.y, sc.z));
 
             // ------------------------------------------------------------------
-            // Allocate a contiguous block of instance slots.
+            // Compute total submesh count across all groups to pre-allocate instance slots.
             // ------------------------------------------------------------------
-            uint instBase = _instanceAlloc.Allocate(subCnt);
+            int totalSubCount = subCnt; // same as mesh.subMeshCount
+
+            uint instBase = _instanceAlloc.Allocate(totalSubCount);
             if (instBase == PrimitiveSlotAllocator.InvalidOffset)
             {
                 int newInstCap = Mathf.Max((int)_instanceAlloc.Capacity * 2,
-                    (int)_instanceAlloc.Capacity + subCnt);
+                    (int)_instanceAlloc.Capacity + totalSubCount);
                 EnsureInstanceCapacity(newInstCap);
-                instBase = _instanceAlloc.Allocate(subCnt);
+                instBase = _instanceAlloc.Allocate(totalSubCount);
             }
-
-            _worldAS.SetInstanceID(mr, instBase);
-            if (isEmissive)
-                _lightAS.SetInstanceID(mr, instBase);
 
             // ------------------------------------------------------------------
             // Build per-submesh primitive + instance data.
             // ------------------------------------------------------------------
-            var subPrimOffsets = new uint[subCnt];
-            var subPrimCounts  = new int[subCnt];
-
             var meshDataArr = Mesh.AcquireReadOnlyMeshData(mesh);
             var meshData    = meshDataArr[0];
 
@@ -1555,13 +1549,7 @@ namespace NativeRender
             var jobHandles = new List<JobHandle>(subCnt);
             var tempTris   = new List<NativeArray<int>>(subCnt);
 
-            Material[] sharedMaterials = mr.sharedMaterials;
-            var        subMaterials    = new Material[subCnt];
-
-            // Pre-calculate total tri count across all submeshes and grow _primitiveCpu
-            // once before scheduling any Burst jobs. Growing inside the loop would
-            // Dispose the NativeArray while already-scheduled jobs still hold pointers
-            // into it, causing NullReferenceException on worker threads.
+            // Pre-calculate total tri count and grow _primitiveCpu once.
             {
                 int totalTriCount = 0;
                 for (int s = 0; s < subCnt; s++)
@@ -1574,61 +1562,102 @@ namespace NativeRender
                 }
             }
 
-            for (int sub = 0; sub < subCnt; sub++)
-            {
-                Material subMat = (sub < sharedMaterials.Length) ? sharedMaterials[sub] : null;
+            // Track the next instance slot — groups are processed in order, submeshes in order.
+            uint instCursor = instBase;
 
-                if (subMat == null)
+            foreach (var grp in groups)
+            {
+                // Build SubmeshDesc array for this group.
+                var groupDescs = new NativeRenderPlugin.SubmeshDesc[grp.submeshIndices.Length];
+                for (int gi = 0; gi < grp.submeshIndices.Length; gi++)
                 {
-                    Debug.LogError($"[NRDSampleResource] Submesh {sub} of '{mr.name}' has no material assigned; using default material");
+                    int               sub = grp.submeshIndices[gi];
+                    SubMeshDescriptor sd  = mesh.GetSubMesh(sub);
+                    groupDescs[gi] = new NativeRenderPlugin.SubmeshDesc
+                    {
+                        indexCount      = (uint)sd.indexCount,
+                        indexByteOffset = (uint)sd.indexStart * indexStride,
+                        baseVertex      = (uint)sd.baseVertex,
+                    };
+                }
+
+                uint groupFlags = grp.isTransparent ? FLAG_TRANSPARENT : FLAG_NON_TRANSPARENT;
+                byte groupMask  = GetMaskForFlags(groupFlags);
+
+                if (!_worldAS.AddInstanceGroup(mesh, groupDescs, grp.customHandle))
+                {
+                    Debug.LogWarning($"[NRDSampleResource] AddTargetIncremental: AddInstanceGroup failed for '{mr.name}' handle={grp.customHandle}");
                     continue;
                 }
-                
-                subMaterials[sub] = subMat;
-                // GetOrAddMaterial(null texPtrs) = incremental path: grows _textures in-place if needed.
-                int subMatIdx = GetOrAddMaterial(subMat, null);
 
-                int indexCount = (int)mesh.GetIndexCount(sub);
-                int triCount   = indexCount / 3;
+                grp.firstInstanceIdx = instCursor;
+                _worldAS.SetInstanceID(grp.customHandle, instCursor);
+                _worldAS.SetInstanceTransform(grp.customHandle, xform);
+                _worldAS.SetInstanceMask(grp.customHandle, groupMask);
+                grp.tlasList.Add(_worldAS);
 
-                // Allocate primitive slot — capacity is guaranteed above, should never fail.
-                uint primOffset = _primAlloc.Allocate(triCount);
-
-                subPrimOffsets[sub] = primOffset;
-                subPrimCounts[sub]  = triCount;
-
-                var nativeTris = new NativeArray<int>(indexCount, Allocator.TempJob, NativeArrayOptions.UninitializedMemory);
-                meshData.GetIndices(nativeTris, sub);
-                tempTris.Add(nativeTris);
-
-                jobHandles.Add(new BuildPrimitivesJob
+                if (grp.isEmissive)
                 {
-                    Indices   = nativeTris,
-                    Positions = posF3,
-                    Normals   = norF3,
-                    Tangents  = tanF4,
-                    UVs       = uvF2,
-                    HasN      = hasN,
-                    HasT      = hasT,
-                    HasUV     = hasUV,
-                    Output    = _primitiveCpu.GetSubArray((int)primOffset, triCount),
-                }.Schedule(triCount, 64));
+                    if (_lightAS.AddInstanceGroup(mesh, groupDescs, grp.customHandle))
+                    {
+                        _lightAS.SetInstanceID(grp.customHandle, instCursor);
+                        _lightAS.SetInstanceTransform(grp.customHandle, xform);
+                        _lightAS.SetInstanceMask(grp.customHandle, groupMask);
+                        grp.tlasList.Add(_lightAS);
+                    }
+                    else
+                    {
+                        Debug.LogWarning($"[NRDSampleResource] AddTargetIncremental: AddInstanceGroup on lightAS failed for '{mr.name}' handle={grp.customHandle}");
+                    }
+                }
 
-                uint instSlot         = instBase + (uint)sub;
-                uint baseTextureIndex = (uint)(subMatIdx * TexturesPerMaterial);
-                // Dynamic object (incremental path is only for non-static objects):
-                // initialise mOverloaded to identity so Xprev = X on the first frame (no motion yet).
-                _instanceCpu[instSlot] = new InstanceDataNRD
+                for (int gi = 0; gi < grp.submeshIndices.Length; gi++)
                 {
-                    mOverloadedMatrix0    = new Vector4(1f, 0f, 0f, 0f),
-                    mOverloadedMatrix1    = new Vector4(0f, 1f, 0f, 0f),
-                    mOverloadedMatrix2    = new Vector4(0f, 0f, 1f, 0f),
-                    textureOffsetAndFlags = baseTextureIndex | (flags << FlagFirstBit),
-                    primitiveOffset       = primOffset,
-                    scale                 = (leftHanded ? -1f : 1f) * scaleMax,
-                    morphPrimitiveOffset  = 0,
-                };
-                EncodeMaterial(subMat, ref _instanceCpu[instSlot]);
+                    int      sub    = grp.submeshIndices[gi];
+                    Material subMat = grp.materials[gi];
+
+                    uint subFlags  = grp.isTransparent ? FLAG_TRANSPARENT : FLAG_NON_TRANSPARENT;
+                    int  subMatIdx = GetOrAddMaterial(subMat, null);
+
+                    int indexCount = (int)mesh.GetIndexCount(sub);
+                    int triCount   = indexCount / 3;
+
+                    uint primOffset = _primAlloc.Allocate(triCount);
+                    grp.primitiveOffsets[gi] = primOffset;
+                    grp.primitiveCounts[gi]  = triCount;
+
+                    var nativeTris = new NativeArray<int>(indexCount, Allocator.TempJob, NativeArrayOptions.UninitializedMemory);
+                    meshData.GetIndices(nativeTris, sub);
+                    tempTris.Add(nativeTris);
+
+                    jobHandles.Add(new BuildPrimitivesJob
+                    {
+                        Indices   = nativeTris,
+                        Positions = posF3,
+                        Normals   = norF3,
+                        Tangents  = tanF4,
+                        UVs       = uvF2,
+                        HasN      = hasN,
+                        HasT      = hasT,
+                        HasUV     = hasUV,
+                        Output    = _primitiveCpu.GetSubArray((int)primOffset, triCount),
+                    }.Schedule(triCount, 64));
+
+                    uint instSlot         = instCursor;
+                    uint baseTextureIndex = (uint)(subMatIdx * TexturesPerMaterial);
+                    _instanceCpu[instSlot] = new InstanceDataNRD
+                    {
+                        mOverloadedMatrix0    = new Vector4(1f, 0f, 0f, 0f),
+                        mOverloadedMatrix1    = new Vector4(0f, 1f, 0f, 0f),
+                        mOverloadedMatrix2    = new Vector4(0f, 0f, 1f, 0f),
+                        textureOffsetAndFlags = baseTextureIndex | (subFlags << FlagFirstBit),
+                        primitiveOffset       = primOffset,
+                        scale                 = (leftHanded ? -1f : 1f) * scaleMax,
+                        morphPrimitiveOffset  = 0,
+                    };
+                    EncodeMaterial(subMat, ref _instanceCpu[instSlot]);
+                    instCursor++;
+                }
             }
 
             // Wait for all Burst jobs.
@@ -1645,29 +1674,20 @@ namespace NativeRender
             meshDataArr.Dispose();
 
             // Partial GPU uploads — only the ranges we touched.
-            _instanceDataBuf.UploadRange(_instanceCpu, (int)instBase, subCnt);
-            for (int sub = 0; sub < subCnt; sub++)
-                _primitiveDataBuf.SetData(_primitiveCpu,
-                    (int)subPrimOffsets[sub], (int)subPrimOffsets[sub], subPrimCounts[sub]);
+            _instanceDataBuf.UploadRange(_instanceCpu, (int)instBase, totalSubCount);
+            foreach (var grp in groups)
+                for (int gi = 0; gi < grp.submeshIndices.Length; gi++)
+                    _primitiveDataBuf.SetData(_primitiveCpu,
+                        (int)grp.primitiveOffsets[gi], (int)grp.primitiveOffsets[gi], grp.primitiveCounts[gi]);
 
             InstanceDataBufPtr  = _instanceDataBuf.NativePtr;
             PrimitiveDataBufPtr = _primitiveDataBuf.GetNativeBufferPtr();
 
-            var tlasList = new List<RayTracingAccelerationStructure>();
-            tlasList.Add(_worldAS);
-            if (isEmissive)
-                tlasList.Add(LightAS);
-
-            _perTargetBlas[mr.GetInstanceID()] = new PerTargetBlas
+            _perTargetBlas[mrId] = new PerTargetBlas
             {
-                tlasList               = tlasList,
-                firstInstanceDataIndex = instBase,
-                submeshCount           = subCnt,
-                lastTransform          = xform,
-                primitiveOffsets       = subPrimOffsets,
-                primitiveCounts        = subPrimCounts,
-                submeshMaterials       = subMaterials,
-                isStatic               = false, // incremental path is dynamic-only
+                groups        = groups,
+                lastTransform = xform,
+                isStatic      = false,
             };
         }
 
@@ -1872,7 +1892,13 @@ namespace NativeRender
                 {
                     uint primitiveOffsetForSubMesh = primitiveCursor;
 
-                    Material subMat    = (sub < sharedMaterials.Length) ? sharedMaterials[sub] : GetRepresentativeMaterial(mr);
+                    if (sub >= sharedMaterials.Length)
+                    {
+                        Debug.LogError($"[NRDSampleResource] Submesh {sub} of '{mr.name}' has no material assigned; skipping submesh");
+                        continue;
+                    }
+
+                    Material subMat    = sharedMaterials[sub];
                     int      subMatIdx = GetOrAddMaterial(subMat, texPtrs);
 
                     int indexCount = (int)mesh.GetIndexCount(sub);
@@ -2016,12 +2042,6 @@ namespace NativeRender
         {
             // Use FLAG bits 0–2 as the visibility mask (matches merged-BLAS usage).
             return (byte)(flags & 0xFF);
-        }
-
-        private static Material GetRepresentativeMaterial(MeshRenderer mr)
-        {
-            var mats = mr.sharedMaterials;
-            return (mats != null && mats.Length > 0) ? mats[0] : null;
         }
 
         /// <summary>
@@ -2238,6 +2258,75 @@ namespace NativeRender
 
             inst.normalUvScale.x = new half(normScale);
             inst.normalUvScale.y = new half(normScale);
+        }
+
+        // =====================================================================
+        // Submesh-group helpers
+        // =====================================================================
+
+        /// <summary>
+        /// Encodes a unique TLAS instance handle for a specific submesh group of a MeshRenderer.
+        /// High 4 bits = groupIndex (max 16 groups per renderer), low 28 bits = mrInstanceId.
+        /// </summary>
+        private static uint MakeGroupHandle(int mrInstanceId, int groupIndex)
+            => (uint)(mrInstanceId & 0x0FFFFFFF) | ((uint)groupIndex << 28);
+
+        /// <summary>
+        /// Partitions all submeshes of <paramref name="mr"/> into groups where submeshes
+        /// sharing the same (isTransparent, isEmissive) pair are in the same group.
+        /// Each group receives a unique <see cref="SubmeshGroup.customHandle"/>.
+        /// </summary>
+        private static List<SubmeshGroup> ClassifySubmeshGroups(MeshRenderer mr, Mesh mesh, int mrInstanceId)
+        {
+            var        dict   = new Dictionary<(bool, bool), SubmeshGroup>();
+            Material[] mats   = mr.sharedMaterials;
+            int        subCnt = mesh.subMeshCount;
+
+            for (int s = 0; s < subCnt; s++)
+            {
+                if (s >= mats.Length)
+                {
+                    Debug.LogError($"[NRDSampleResource] Submesh {s} of '{mr.name}' has no material assigned; skipping submesh");
+                    continue;
+                }
+
+                Material mat     = mats[s];
+                bool     isTrans = IsMaterialTransparent(mat);
+                bool     isEmit  = IsMaterialEmissive(mat);
+                var      key     = (isTrans, isEmit);
+
+                if (!dict.TryGetValue(key, out var grp))
+                {
+                    grp = new SubmeshGroup
+                    {
+                        isTransparent  = isTrans,
+                        isEmissive     = isEmit,
+                        submeshIndices = new int[0],
+                        materials      = new Material[0],
+                        tlasList       = new List<RayTracingAccelerationStructure>(),
+                    };
+                    dict[key] = grp;
+                }
+
+                // Grow arrays
+                int n = grp.submeshIndices.Length;
+                Array.Resize(ref grp.submeshIndices, n + 1);
+                Array.Resize(ref grp.materials, n + 1);
+                grp.submeshIndices[n] = s;
+                grp.materials[n]      = mat;
+            }
+
+            int gi     = 0;
+            var result = new List<SubmeshGroup>(dict.Count);
+            foreach (var g in dict.Values)
+            {
+                g.customHandle     = MakeGroupHandle(mrInstanceId, gi++);
+                g.primitiveOffsets = new uint[g.submeshIndices.Length];
+                g.primitiveCounts  = new int[g.submeshIndices.Length];
+                result.Add(g);
+            }
+
+            return result;
         }
 
         private static bool IsMaterialTransparent(Material mat)

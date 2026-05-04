@@ -74,7 +74,7 @@ MonoBehaviour:
     mergeBlas: 1
     cameraJitter: 1
     sunAngularDiameter: 0.533
-    exposure: 1
+    exposure: 30
     roughnessOverride: 0
     metalnessOverride: 0
     emissionIntensityLights: 1
@@ -105,13 +105,13 @@ MonoBehaviour:
     SR: 1
     RR: 0
     tmpDisableRR: 0
-    upscalerMode: 2
+    upscalerMode: 0
     confidence: 1
     showMode: 18
     update: 1
     updateTick: 1
     denoisingRange: 1000
-    nisSharpness: 0.411
+    nisSharpness: 0.229
     skipRightEyeInVR: 0
   renderPassEvent: 550
   finalMaterial: {fileID: 2100000, guid: 27695a2bc55ef2f469362b9a2994989e, type: 2}

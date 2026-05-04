@@ -10,6 +10,26 @@ extern void SafeReleaseResource(ComPtr<ID3D12Resource> resource);
 extern void EnqueueDeferredDelete(void* ptr, DeferredType type);
 
 // ---------------------------------------------------------------------------
+// HashSubmeshDescs
+//   Produces a stable 64-bit hash from the (indexCount, indexByteOffset,
+//   baseVertex) tuple of each submesh passed to AddInstance.  Used as the
+//   third component of MeshKey so that different submesh subsets of the same
+//   VB+IB (e.g. transparent vs. opaque SubmeshGroups) are cached separately.
+//   Returns at least 1 (0 is reserved as an unset sentinel).
+// ---------------------------------------------------------------------------
+static uint64_t HashSubmeshDescs(const NR_SubmeshDesc* descs, uint32_t count)
+{
+    uint64_t h = static_cast<uint64_t>(count);
+    for (uint32_t i = 0; i < count; ++i)
+    {
+        h ^= static_cast<uint64_t>(descs[i].indexCount)      * 2654435761ULL + (h << 7) + (h >> 5);
+        h ^= static_cast<uint64_t>(descs[i].indexByteOffset) * 2246822519ULL + (h << 7) + (h >> 5);
+        h ^= static_cast<uint64_t>(descs[i].baseVertex)      * 3266489917ULL + (h << 7) + (h >> 5);
+    }
+    return h ? h : 1u;
+}
+
+// ---------------------------------------------------------------------------
 // Internal buffer helper
 // ---------------------------------------------------------------------------
 static ComPtr<ID3D12Resource> CreateBuffer(
@@ -1004,7 +1024,11 @@ bool AccelerationStructure::AddInstance(const NR_AddInstanceDesc &desc)
         slot.meshKey = {static_cast<uintptr_t>(userHandle) | (static_cast<uintptr_t>(1) << 63),
                         reinterpret_cast<uintptr_t>(ib)};
     else
-        slot.meshKey = {reinterpret_cast<uintptr_t>(vb), reinterpret_cast<uintptr_t>(ib)};
+        slot.meshKey = {
+            reinterpret_cast<uintptr_t>(vb),
+            reinterpret_cast<uintptr_t>(ib),
+            HashSubmeshDescs(submeshes, submeshCount)
+        };
 
     // Set descriptive names for Unity-provided buffers to aid debugging
     wchar_t vbName[64], ibName[64];

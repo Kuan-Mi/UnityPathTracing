@@ -260,6 +260,88 @@ namespace NativeRender
         }
 
         /// <summary>
+        /// Adds a subset of submeshes from <paramref name="mesh"/> as one BLAS instance using
+        /// a caller-supplied <paramref name="customHandle"/> instead of MeshRenderer.GetInstanceID().
+        /// Use this when you need multiple TLAS registrations from the same MeshRenderer
+        /// (e.g. transparent vs. opaque submesh groups).
+        /// </summary>
+        public unsafe bool AddInstanceGroup(
+            Mesh                            mesh,
+            NativeRenderPlugin.SubmeshDesc[] groupSubmeshDescs,
+            uint                            customHandle,
+            bool                            isDynamic = false)
+        {
+            if (_handle == 0 || mesh == null || groupSubmeshDescs == null || groupSubmeshDescs.Length == 0)
+                return false;
+
+            mesh.UploadMeshData(false);
+            IntPtr vbPtr = mesh.GetNativeVertexBufferPtr(0);
+            IntPtr ibPtr = mesh.GetNativeIndexBufferPtr();
+            if (vbPtr == IntPtr.Zero || ibPtr == IntPtr.Zero)
+            {
+                Debug.LogError($"[NativeRayTracing] AddInstanceGroup: failed to get GPU buffers for '{mesh.name}'");
+                return false;
+            }
+
+            uint vertexCount  = (uint)mesh.vertexCount;
+            uint vertexStride = (uint)mesh.GetVertexBufferStride(0);
+            uint indexStride  = mesh.indexFormat == IndexFormat.UInt16 ? 2u : 4u;
+
+            fixed (NativeRenderPlugin.SubmeshDesc* pDescs = groupSubmeshDescs)
+            {
+                var desc = new NativeRenderPlugin.AddInstanceDesc
+                {
+                    instanceHandle        = customHandle,
+                    vertexBufferNativePtr = vbPtr,
+                    vertexCount           = vertexCount,
+                    vertexStride          = vertexStride,
+                    indexBufferNativePtr  = ibPtr,
+                    indexStride           = indexStride,
+                    submeshDescs          = (IntPtr)pDescs,
+                    submeshCount          = (uint)groupSubmeshDescs.Length,
+                    ommDescs              = IntPtr.Zero,
+                    isDynamic             = isDynamic ? 1u : 0u,
+                };
+                bool ok = NativeRenderPlugin.NR_AS_AddInstance(_handle, ref desc);
+                if (!ok)
+                    Debug.LogError($"[NativeRayTracing] AddInstanceGroup failed for '{mesh.name}' handle={customHandle}");
+                return ok;
+            }
+        }
+
+        /// <summary>Sets the per-instance visibility mask using a raw <paramref name="handle"/>.</summary>
+        public void SetInstanceMask(uint handle, byte mask)
+        {
+            if (_handle == 0) return;
+            NativeRenderPlugin.NR_AS_SetInstanceMask(_handle, handle, mask);
+        }
+
+        /// <summary>Sets the custom InstanceID (HLSL InstanceID()) using a raw <paramref name="handle"/>.</summary>
+        public void SetInstanceID(uint handle, uint id)
+        {
+            if (_handle == 0) return;
+            NativeRenderPlugin.NR_AS_SetInstanceID(_handle, handle, id);
+        }
+
+        /// <summary>Removes an instance by raw <paramref name="handle"/>.</summary>
+        public void RemoveInstance(uint handle)
+        {
+            if (_handle == 0) return;
+            NativeRenderPlugin.NR_AS_RemoveInstance(_handle, handle);
+        }
+
+        /// <summary>Updates the world transform for an instance identified by raw <paramref name="handle"/>.</summary>
+        public unsafe void SetInstanceTransform(uint handle, Matrix4x4 objectToWorld)
+        {
+            if (_handle == 0) return;
+            float* m = stackalloc float[12];
+            m[0]  = objectToWorld.m00; m[1]  = objectToWorld.m01; m[2]  = objectToWorld.m02; m[3]  = objectToWorld.m03;
+            m[4]  = objectToWorld.m10; m[5]  = objectToWorld.m11; m[6]  = objectToWorld.m12; m[7]  = objectToWorld.m13;
+            m[8]  = objectToWorld.m20; m[9]  = objectToWorld.m21; m[10] = objectToWorld.m22; m[11] = objectToWorld.m23;
+            NativeRenderPlugin.NR_AS_SetInstanceTransform(_handle, handle, (IntPtr)m);
+        }
+
+        /// <summary>
         /// Updates the world transform of the instance associated with <paramref name="meshRenderer"/>.
         /// </summary>
         public unsafe void SetInstanceTransform(MeshRenderer meshRenderer, Matrix4x4 objectToWorld)
