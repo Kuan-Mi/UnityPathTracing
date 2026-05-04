@@ -90,6 +90,52 @@ namespace NativeRender
         [NonSerialized]
         public int instanceId;
 
+        /// <summary>Pre-computed per-submesh material data. Rebuilt in OnEnable and OnValidate.</summary>
+        public SubmeshMaterialData[] SubmeshMaterialInfos;
+
+        /// <summary>Submeshes grouped by (isTransparent, isEmissive) pair. Rebuilt alongside SubmeshMaterialInfos.</summary>
+        public SubmeshGroupDesc[] SubmeshGroups;
+
+        /// <summary>
+        /// Reads sharedMaterials from the attached MeshRenderer, pre-computes material flags,
+        /// texture native pointers, scalar properties, and classifies submeshes into groups.
+        /// Must be called on the main thread.
+        /// </summary>
+        public void RebuildMaterialData()
+        {
+            var mr = meshRenderer != null ? meshRenderer : GetComponent<MeshRenderer>();
+            if (mr == null)
+            {
+                SubmeshMaterialInfos = Array.Empty<SubmeshMaterialData>();
+                SubmeshGroups        = Array.Empty<SubmeshGroupDesc>();
+                return;
+            }
+
+            var mf = GetComponent<MeshFilter>();
+            if (mf == null || mf.sharedMesh == null)
+            {
+                SubmeshMaterialInfos = Array.Empty<SubmeshMaterialData>();
+                SubmeshGroups        = Array.Empty<SubmeshGroupDesc>();
+                return;
+            }
+
+            Mesh       mesh   = mf.sharedMesh;
+            Material[] mats   = mr.sharedMaterials;
+            int        subCnt = mesh.subMeshCount;
+
+            var infos = new SubmeshMaterialData[subCnt];
+            for (int s = 0; s < subCnt; s++)
+            {
+                Material mat = s < mats.Length ? mats[s] : null;
+                if (mat == null)
+                    Debug.LogError($"[NativeRayTracingTarget] Submesh {s} of '{name}' has no material assigned.");
+                infos[s] = RayTracingMaterialHelper.BuildSubmeshMaterialData(mat);
+            }
+
+            SubmeshMaterialInfos = infos;
+            SubmeshGroups        = RayTracingMaterialHelper.BuildSubmeshGroupDescs(infos);
+        }
+
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
         private static void ResetStatics()
         {
@@ -109,6 +155,7 @@ namespace NativeRender
             // Object is alive here — safe to capture component references.
             meshRenderer = GetComponent<MeshRenderer>();
             instanceId = meshRenderer != null ? meshRenderer.GetInstanceID() : 0;
+            RebuildMaterialData();
             AddQueue.Enqueue(new TargetAddEvent(this, meshRenderer, instanceId));
         }
 
@@ -118,6 +165,7 @@ namespace NativeRender
             // Bake the static flag into the serialized field while in the editor
             // so the correct value survives a build (gameObject.isStatic is editor-only).
             _isStaticObject = gameObject.isStatic;
+            RebuildMaterialData();
         }
 
         private void Reset()

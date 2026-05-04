@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.SceneManagement;
@@ -58,6 +59,39 @@ namespace NativeRender
         /// <summary>Pending remove events — consumed by <see cref="NRDSampleResource"/> each frame.</summary>
         public static readonly Queue<SkinnedTargetRemoveEvent> RemoveQueue = new();
 
+        /// <summary>Pre-computed per-submesh material data. Rebuilt in OnEnable.</summary>
+        public SubmeshMaterialData[] SubmeshMaterialInfos { get; private set; } = Array.Empty<SubmeshMaterialData>();
+
+        /// <summary>
+        /// Reads sharedMaterials from the attached SkinnedMeshRenderer, pre-computes material flags,
+        /// texture native pointers, and scalar properties.
+        /// Must be called on the main thread.
+        /// </summary>
+        public void RebuildMaterialData()
+        {
+            var smr = GetComponent<SkinnedMeshRenderer>();
+            if (smr == null || smr.sharedMesh == null)
+            {
+                SubmeshMaterialInfos = Array.Empty<SubmeshMaterialData>();
+                return;
+            }
+
+            Mesh       mesh   = smr.sharedMesh;
+            Material[] mats   = smr.sharedMaterials;
+            int        subCnt = mesh.subMeshCount;
+
+            var infos = new SubmeshMaterialData[subCnt];
+            for (int s = 0; s < subCnt; s++)
+            {
+                Material mat = s < mats.Length ? mats[s] : null;
+                if (mat == null)
+                    Debug.LogError($"[NativeRayTracingSkinnedTarget] Submesh {s} of '{name}' has no material assigned.");
+                infos[s] = RayTracingMaterialHelper.BuildSubmeshMaterialData(mat);
+            }
+
+            SubmeshMaterialInfos = infos;
+        }
+
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
         private static void ResetStatics()
         {
@@ -75,6 +109,7 @@ namespace NativeRender
                 s_All.Add(this);
 
             var smr = GetComponent<SkinnedMeshRenderer>();
+            RebuildMaterialData();
             if (smr != null)
             {
                 // CRITICAL: Set vertexBufferTarget BEFORE the first render so Unity creates

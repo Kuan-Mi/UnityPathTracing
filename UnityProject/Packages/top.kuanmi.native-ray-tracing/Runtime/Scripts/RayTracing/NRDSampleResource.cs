@@ -304,7 +304,7 @@ namespace NativeRender
         /// <see cref="LightAS"/> when the representative material is emissive). The BLAS is rebuilt
         /// every frame via <see cref="UpdateSkinnedInstances"/>.
         /// </summary>
-        public void AddSkinnedInstance(SkinnedMeshRenderer smr)
+        public void AddSkinnedInstance(SkinnedMeshRenderer smr, NativeRayTracingSkinnedTarget stTarget)
         {
             if (smr == null) return;
             int id = smr.GetInstanceID();
@@ -328,9 +328,9 @@ namespace NativeRender
             Matrix4x4 xform = GetSkinnedRootTransform(smr);
             _worldAS.SetInstanceTransform(smr, xform);
 
-            Material rep           = smr.sharedMaterials != null && smr.sharedMaterials.Length > 0 ? smr.sharedMaterials[0] : null;
-            bool     isEmissive    = rep != null && IsMaterialEmissive(rep);
-            bool     isTransparent = rep != null && IsMaterialTransparent(rep);
+            var      smi           = stTarget?.SubmeshMaterialInfos;
+            bool     isEmissive    = smi != null && smi.Length > 0 && smi[0].isEmissive;
+            bool     isTransparent = smi != null && smi.Length > 0 && smi[0].isTransparent;
             uint     baseFlags     = isTransparent ? FLAG_TRANSPARENT : FLAG_NON_TRANSPARENT;
             _worldAS.SetInstanceMask(smr, GetMaskForFlags(baseFlags));
 
@@ -429,7 +429,9 @@ namespace NativeRender
                 }
 
                 Material subMat    = sharedMats[sub];
-                int      subMatIdx = GetOrAddMaterial(subMat, null); // incremental path: grows _textures in-place
+                int      subMatIdx = stTarget != null && sub < stTarget.SubmeshMaterialInfos.Length
+                    ? GetOrAddMaterial(stTarget.SubmeshMaterialInfos[sub], null)
+                    : GetOrAddMaterial(subMat, null); // incremental path: grows _textures in-place
 
                 int indexCount = (int)mesh.GetIndexCount(sub);
                 int triCount   = indexCount / 3;
@@ -481,7 +483,10 @@ namespace NativeRender
                     scale                 = (leftHanded ? -1f : 1f) * scaleMax,
                     morphPrimitiveOffset  = morphOffset,
                 };
-                EncodeMaterial(subMat, ref _instanceCpu[instSlot]);
+                if (stTarget != null && sub < stTarget.SubmeshMaterialInfos.Length)
+                    EncodeMaterial(stTarget.SubmeshMaterialInfos[sub], ref _instanceCpu[instSlot]);
+                else
+                    EncodeMaterial(subMat, ref _instanceCpu[instSlot]);
             }
 
             // Wait for all Burst jobs.
@@ -753,7 +758,7 @@ namespace NativeRender
             {
                 var ev = NativeRayTracingSkinnedTarget.AddQueue.Dequeue();
                 if (ev.Target == null || ev.Renderer == null) continue;
-                AddSkinnedInstance(ev.Renderer);
+                AddSkinnedInstance(ev.Renderer, ev.Target);
             }
 
             // Auto-schedule full rebuild when fragmentation becomes excessive.
@@ -961,8 +966,8 @@ namespace NativeRender
                         }
 
                         Material subMat     = mats[s];
-                        bool     isTrans    = IsMaterialTransparent(subMat);
-                        bool     isEmissive = IsMaterialEmissive(subMat);
+                        bool     isTrans    = t.SubmeshMaterialInfos[s].isTransparent;
+                        bool     isEmissive = t.SubmeshMaterialInfos[s].isEmissive;
 
                         var sr = new SubmeshRef(t, s);
                         if (isTrans)
@@ -1080,7 +1085,7 @@ namespace NativeRender
             foreach (var st in NativeRayTracingSkinnedTarget.All)
             {
                 if (st != null)
-                    AddSkinnedInstance(st.GetComponent<SkinnedMeshRenderer>());
+                    AddSkinnedInstance(st.GetComponent<SkinnedMeshRenderer>(), st);
             }
         }
 
@@ -1170,7 +1175,7 @@ namespace NativeRender
                 int       mrId        = mr.GetInstanceID();
                 uint      indexStride = mesh.indexFormat == UnityEngine.Rendering.IndexFormat.UInt16 ? 2u : 4u;
 
-                List<SubmeshGroup> groups = ClassifySubmeshGroups(mr, mesh, mrId);
+                List<SubmeshGroup> groups = BuildSubmeshGroupsFromDescs(target, mrId);
                 if (groups.Count == 0) continue;
 
                 bool leftHanded = xform.determinant < 0f;
@@ -1258,11 +1263,11 @@ namespace NativeRender
                     // Build per-submesh primitive + instance data for this group.
                     for (int gi = 0; gi < grp.submeshIndices.Length; gi++)
                     {
-                        int      sub    = grp.submeshIndices[gi];
-                        Material subMat = grp.materials[gi];
+                        int      sub     = grp.submeshIndices[gi];
+                        Material subMat  = grp.materials[gi];
 
                         uint subFlags  = grp.isTransparent ? FLAG_TRANSPARENT : FLAG_NON_TRANSPARENT;
-                        int  subMatIdx = GetOrAddMaterial(subMat, texPtrs);
+                        int  subMatIdx = GetOrAddMaterial(target.SubmeshMaterialInfos[sub], texPtrs);
 
                         int indexCount = (int)mesh.GetIndexCount(sub);
                         int triCount   = indexCount / 3;
@@ -1301,7 +1306,7 @@ namespace NativeRender
                             scale                 = (leftHanded ? -1f : 1f) * scaleMax,
                             morphPrimitiveOffset  = 0,
                         };
-                        EncodeMaterial(subMat, ref inst);
+                        EncodeMaterial(target.SubmeshMaterialInfos[sub], ref inst);
                         instList.Add(inst);
                         instanceCursor++;
                     }
@@ -1495,7 +1500,7 @@ namespace NativeRender
             int  mrId        = mr.GetInstanceID();
             uint indexStride = mesh.indexFormat == UnityEngine.Rendering.IndexFormat.UInt16 ? 2u : 4u;
 
-            List<SubmeshGroup> groups = ClassifySubmeshGroups(mr, mesh, mrId);
+            List<SubmeshGroup> groups = BuildSubmeshGroupsFromDescs(target, mrId);
             if (groups.Count == 0) return;
 
             Matrix4x4 xform = target.transform.localToWorldMatrix;
@@ -1617,7 +1622,7 @@ namespace NativeRender
                     Material subMat = grp.materials[gi];
 
                     uint subFlags  = grp.isTransparent ? FLAG_TRANSPARENT : FLAG_NON_TRANSPARENT;
-                    int  subMatIdx = GetOrAddMaterial(subMat, null);
+                    int  subMatIdx = GetOrAddMaterial(target.SubmeshMaterialInfos[sub], null);
 
                     int indexCount = (int)mesh.GetIndexCount(sub);
                     int triCount   = indexCount / 3;
@@ -1655,7 +1660,7 @@ namespace NativeRender
                         scale                 = (leftHanded ? -1f : 1f) * scaleMax,
                         morphPrimitiveOffset  = 0,
                     };
-                    EncodeMaterial(subMat, ref _instanceCpu[instSlot]);
+                    EncodeMaterial(target.SubmeshMaterialInfos[sub], ref _instanceCpu[instSlot]);
                     instCursor++;
                 }
             }
@@ -1899,7 +1904,7 @@ namespace NativeRender
                     }
 
                     Material subMat    = sharedMaterials[sub];
-                    int      subMatIdx = GetOrAddMaterial(subMat, texPtrs);
+                    int      subMatIdx = GetOrAddMaterial(target.SubmeshMaterialInfos[sub], texPtrs);
 
                     int indexCount = (int)mesh.GetIndexCount(sub);
                     int triCount   = indexCount / 3;
@@ -1956,7 +1961,7 @@ namespace NativeRender
                         scale                 = 1f,
                         morphPrimitiveOffset  = 0,
                     };
-                    EncodeMaterial(subMat, ref inst);
+                    EncodeMaterial(target.SubmeshMaterialInfos[sub], ref inst);
                     instList.Add(inst);
                     instanceCursor++;
                 }
@@ -2057,6 +2062,48 @@ namespace NativeRender
         /// </para>
         /// Always increments the material reference count.
         /// </summary>
+        private int GetOrAddMaterial(SubmeshMaterialData matData, List<IntPtr> texPtrs)
+        {
+            Material mat = matData?.material;
+
+            if (mat != null && _materialSlots.TryGetValue(mat, out int existingD))
+            {
+                _materialRefCounts[mat] = (_materialRefCounts.TryGetValue(mat, out int rcD) ? rcD : 0) + 1;
+                return existingD;
+            }
+
+            int idxD;
+            if (_freeMatSlots.Count > 0)
+                idxD = _freeMatSlots.Dequeue();
+            else if (texPtrs != null)
+                idxD = _materialSlots.Count;
+            else
+                idxD = _textures != null ? _textures.Capacity / TexturesPerMaterial : _materialSlots.Count;
+
+            if (mat != null)
+            {
+                _materialSlots[mat]     = idxD;
+                _materialRefCounts[mat] = 1;
+            }
+
+            if (texPtrs != null && matData != null)
+            {
+                for (int i = 0; i < TexturesPerMaterial; i++)
+                    texPtrs.Add(matData.texturePtrs[i]);
+            }
+            else if (_textures != null && matData != null)
+            {
+                int base4D = idxD * TexturesPerMaterial;
+                int needD  = base4D + TexturesPerMaterial;
+                if (needD > _textures.Capacity)
+                    _textures.Resize(needD);
+                for (int i = 0; i < TexturesPerMaterial; i++)
+                    _textures.SetNativePtr(base4D + i, matData.texturePtrs[i]);
+            }
+
+            return idxD;
+        }
+
         private int GetOrAddMaterial(Material mat, List<IntPtr> texPtrs)
         {
             // Already registered — bump ref count and return existing slot.
@@ -2227,6 +2274,22 @@ namespace NativeRender
             texPtrs.Add(t.GetNativeTexturePtr());
         }
 
+        private static void EncodeMaterial(SubmeshMaterialData data, ref InstanceDataNRD inst)
+        {
+            inst.baseColorAndMetalnessScale.x = new half(data.baseColor.r);
+            inst.baseColorAndMetalnessScale.y = new half(data.baseColor.g);
+            inst.baseColorAndMetalnessScale.z = new half(data.baseColor.b);
+            inst.baseColorAndMetalnessScale.w = new half(data.metallic);
+
+            inst.emissionAndRoughnessScale.x = new half(data.emissionColor.r);
+            inst.emissionAndRoughnessScale.y = new half(data.emissionColor.g);
+            inst.emissionAndRoughnessScale.z = new half(data.emissionColor.b);
+            inst.emissionAndRoughnessScale.w = new half(data.roughnessScale);
+
+            inst.normalUvScale.x = new half(data.normalScale);
+            inst.normalUvScale.y = new half(data.normalScale);
+        }
+
         private static void EncodeMaterial(Material mat, ref InstanceDataNRD inst)
         {
             Color baseColor      = TryGetColor(mat, "_BaseColor", Color.white);
@@ -2272,167 +2335,35 @@ namespace NativeRender
             => (uint)(mrInstanceId & 0x0FFFFFFF) | ((uint)groupIndex << 28);
 
         /// <summary>
-        /// Partitions all submeshes of <paramref name="mr"/> into groups where submeshes
-        /// sharing the same (isTransparent, isEmissive) pair are in the same group.
-        /// Each group receives a unique <see cref="SubmeshGroup.customHandle"/>.
+        /// Builds the internal <see cref="SubmeshGroup"/> list for a target from its pre-computed
+        /// <see cref="SubmeshGroupDesc"/> array (populated by <see cref="NativeRayTracingTarget.RebuildMaterialData"/>).
         /// </summary>
-        private static List<SubmeshGroup> ClassifySubmeshGroups(MeshRenderer mr, Mesh mesh, int mrInstanceId)
+        private static List<SubmeshGroup> BuildSubmeshGroupsFromDescs(NativeRayTracingTarget target, int mrId)
         {
-            var        dict   = new Dictionary<(bool, bool), SubmeshGroup>();
-            Material[] mats   = mr.sharedMaterials;
-            int        subCnt = mesh.subMeshCount;
-
-            for (int s = 0; s < subCnt; s++)
+            var descs  = target.SubmeshGroups;
+            var result = new List<SubmeshGroup>(descs.Length);
+            for (int gi = 0; gi < descs.Length; gi++)
             {
-                if (s >= mats.Length)
+                var desc      = descs[gi];
+                int subCount  = desc.submeshIndices.Length;
+                var materials = new Material[subCount];
+                for (int si = 0; si < subCount; si++)
+                    materials[si] = desc.materialDatas[si].material;
+
+                result.Add(new SubmeshGroup
                 {
-                    Debug.LogError($"[NRDSampleResource] Submesh {s} of '{mr.name}' has no material assigned; skipping submesh");
-                    continue;
-                }
-
-                Material mat     = mats[s];
-                bool     isTrans = IsMaterialTransparent(mat);
-                bool     isEmit  = IsMaterialEmissive(mat);
-                var      key     = (isTrans, isEmit);
-
-                if (!dict.TryGetValue(key, out var grp))
-                {
-                    grp = new SubmeshGroup
-                    {
-                        isTransparent  = isTrans,
-                        isEmissive     = isEmit,
-                        submeshIndices = new int[0],
-                        materials      = new Material[0],
-                        tlasList       = new List<RayTracingAccelerationStructure>(),
-                    };
-                    dict[key] = grp;
-                }
-
-                // Grow arrays
-                int n = grp.submeshIndices.Length;
-                Array.Resize(ref grp.submeshIndices, n + 1);
-                Array.Resize(ref grp.materials, n + 1);
-                grp.submeshIndices[n] = s;
-                grp.materials[n]      = mat;
+                    isTransparent    = desc.isTransparent,
+                    isEmissive       = desc.isEmissive,
+                    submeshIndices   = (int[])desc.submeshIndices.Clone(),
+                    materials        = materials,
+                    tlasList         = new List<RayTracingAccelerationStructure>(),
+                    customHandle     = MakeGroupHandle(mrId, gi),
+                    primitiveOffsets = new uint[subCount],
+                    primitiveCounts  = new int[subCount],
+                });
             }
-
-            int gi     = 0;
-            var result = new List<SubmeshGroup>(dict.Count);
-            foreach (var g in dict.Values)
-            {
-                g.customHandle     = MakeGroupHandle(mrInstanceId, gi++);
-                g.primitiveOffsets = new uint[g.submeshIndices.Length];
-                g.primitiveCounts  = new int[g.submeshIndices.Length];
-                result.Add(g);
-            }
-
             return result;
         }
-
-        private static bool IsMaterialTransparent(Material mat)
-        {
-            if (mat == null) return false;
-
-            if (mat.shader.name is "Universal Render Pipeline/Lit" or "RayTracing/Lit")
-            {
-                // URP lit: _Surface = 1 → Transparent.
-                if (mat.HasProperty("_Surface") && mat.GetFloat("_Surface") > 0.5f) return true;
-                return false;
-            }
-
-            if (mat.shader.name == "Shader Graphs/glTF-pbrMetallicRoughness")
-            {
-                return mat.IsKeywordEnabled("_SURFACE_TYPE_TRANSPARENT");
-            }
-
-            Debug.LogWarning($"[NRDSampleResource] Unrecognized shader '{mat.shader.name}' when checking transparency for material '{mat.name}'. Defaulting to opaque.");
-            return false;
-        }
-
-        private static bool IsMaterialEmissive(Material mat)
-        {
-            if (mat == null) return false;
-
-            if (mat.shader.name is "Universal Render Pipeline/Lit" or "RayTracing/Lit")
-            {
-                // URP lit: _EmissionColor > black → emissive.
-                if (mat.HasProperty("_EmissionColor"))
-                {
-                    Color e = mat.GetColor("_EmissionColor").linear;
-                    if (e.r > 0f || e.g > 0f || e.b > 0f) return true;
-                }
-
-                if (mat.HasProperty("_EmissionMap") && mat.GetTexture("_EmissionMap") != null) return true;
-                return false;
-            }
-
-            if (mat.shader.name == "Shader Graphs/glTF-pbrMetallicRoughness")
-            {
-                return mat.IsKeywordEnabled("_EMISSIVE");
-            }
-
-            Debug.LogWarning($"[NRDSampleResource] Unrecognized shader '{mat.shader.name}' when checking emissiveness for material '{mat.name}'. Defaulting to non-emissive.");
-            return false;
-        }
-
-        // =====================================================================
-        // Geometry helpers
-        // =====================================================================
-
-        private static Vector3 TransformNormal(Matrix4x4 normalMatrix, Vector3[] arr, int idx)
-        {
-            Vector3 n  = (arr != null && idx < arr.Length) ? arr[idx] : Vector3.up;
-            Vector3 tn = normalMatrix.MultiplyVector(n);
-            return tn.sqrMagnitude > 1e-12f ? tn.normalized : Vector3.up;
-        }
-
-        private static Vector4 TransformTangent(Matrix4x4 xform, Vector4[] arr, int idx)
-        {
-            Vector4 tt = (arr != null && idx < arr.Length) ? arr[idx] : new Vector4(1f, 0f, 0f, 1f);
-            Vector3 td = xform.MultiplyVector(new Vector3(tt.x, tt.y, tt.z));
-            Vector3 n  = td.sqrMagnitude > 1e-12f ? td.normalized : Vector3.right;
-            return new Vector4(n.x, n.y, n.z, tt.w);
-        }
-
-        // Raw object-space accessors for the non-merged path (shader transforms via mOverloadedMatrix).
-        private static Vector3 GetNormal(Vector3[] arr, int idx)
-        {
-            Vector3 n = (arr != null && idx < arr.Length) ? arr[idx] : Vector3.up;
-            return n.sqrMagnitude > 1e-12f ? n.normalized : Vector3.up;
-        }
-
-        private static Vector4 GetTangent(Vector4[] arr, int idx)
-        {
-            return (arr != null && idx < arr.Length) ? arr[idx] : new Vector4(1f, 0f, 0f, 1f);
-        }
-
-        /// <summary>Signed octahedral unit-vector encoding, matching MathLib Packing::EncodeUnitVector(v, true).</summary>
-        private static half2 EncodeUnitVectorSigned(Vector3 v)
-        {
-            return EncodeUnitVector(v, true);
-        }
-
-        static float SafeSign(float x)
-        {
-            return x >= 0.0f ? 1.0f : -1.0f;
-        }
-
-        static float2 SafeSign(float2 v)
-        {
-            return new float2(SafeSign(v.x), SafeSign(v.y));
-        }
-
-
-        static half2 EncodeUnitVector(float3 v, bool bSigned = false)
-        {
-            v /= math.dot(math.abs(v), 1.0f);
-
-            float2 octWrap = (1.0f - math.abs(v.yx)) * SafeSign(v.xy);
-            v.xy = v.z >= 0.0f ? v.xy : octWrap;
-
-            return new half2(bSigned ? v.xy : 0.5f * v.xy + 0.5f);
-        }
-
 
         private static Texture TryGetTex(Material mat, string prop) =>
             mat != null && mat.HasProperty(prop) ? mat.GetTexture(prop) : null;
