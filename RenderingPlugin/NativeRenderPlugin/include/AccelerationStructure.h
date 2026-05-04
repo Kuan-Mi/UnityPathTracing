@@ -17,12 +17,16 @@ using Microsoft::WRL::ComPtr;
 //   Plain data descriptor for one sub-mesh within an AddInstance call.
 //   Must match the C# NativeRenderPlugin.SubmeshDesc struct layout exactly.
 // ---------------------------------------------------------------------------
+// Flags for NR_SubmeshDesc::flags
+// Bit 0: geometry is fully opaque (no alpha-clip / any-hit) — maps to D3D12_RAYTRACING_GEOMETRY_FLAG_OPAQUE
+#define NR_SUBMESH_FLAG_GEOMETRY_OPAQUE  0x1u
+
 struct NR_SubmeshDesc
 {
     uint32_t indexCount;      // number of indices in this sub-mesh
     uint32_t indexByteOffset; // byte offset of this sub-mesh's first index in the shared IB
     uint32_t baseVertex;      // value added to each index before reading a vertex (Unity SubMeshDescriptor.baseVertex)
-    uint32_t _pad;            // padding to keep 8-byte alignment
+    uint32_t flags;           // NR_SUBMESH_FLAG_* bitmask (bit 0 = GEOMETRY_OPAQUE)
 };
 
 // ---------------------------------------------------------------------------
@@ -79,6 +83,7 @@ struct SubMeshData
     UINT        indexCount;
     UINT        indexByteOffset;  // byte offset of this sub-mesh's first index in the shared IB
     INT         baseVertex = 0;  // value added to each index before reading a vertex (BaseVertexLocation in D3D12)
+    uint32_t    flags = 0;       // NR_SUBMESH_FLAG_* bitmask (bit 0 = NR_SUBMESH_FLAG_GEOMETRY_OPAQUE)
 
     bool hasBakedOMM = false;
     struct OMMBakedData

@@ -17,6 +17,7 @@ namespace NativeRender
 
         public bool isTransparent;
         public bool isEmissive;
+        public bool isAlphaClip;
 
         /// <summary>
         /// 4 textures in gIn_Textures order:
@@ -34,15 +35,16 @@ namespace NativeRender
     }
 
     /// <summary>
-    /// A group of submeshes that share the same (isTransparent, isEmissive) pair.
+    /// A group of submeshes that share the same (isTransparent, isEmissive, isAlphaClip) tuple.
     /// Each group is registered as a separate TLAS entry by <see cref="NRDSampleResource"/>.
     /// </summary>
-    
     [Serializable]
     public class SubmeshGroupDesc
     {
         public bool isTransparent;
         public bool isEmissive;
+        /// <summary>True when any submesh in the group uses alpha-clip; GEOMETRY_OPAQUE is NOT set for these geometries.</summary>
+        public bool isAlphaClip;
 
         /// <summary>Indices into the Mesh's subMeshCount — also indices into SubmeshMaterialInfos.</summary>
         public int[] submeshIndices;
@@ -125,6 +127,19 @@ namespace NativeRender
             return false;
         }
 
+        public static bool IsMaterialAlphaClip(Material mat)
+        {
+            if (mat == null) return false;
+
+            if (mat.shader.name is "Universal Render Pipeline/Lit" or "RayTracing/Lit")
+                return mat.HasProperty("_AlphaClip") && mat.GetFloat("_AlphaClip") > 0.5f;
+
+            if (mat.shader.name == "Shader Graphs/glTF-pbrMetallicRoughness")
+                return mat.IsKeywordEnabled("_ALPHATEST_ON");
+
+            return false;
+        }
+
         public static bool IsMaterialEmissive(Material mat)
         {
             if (mat == null) return false;
@@ -173,6 +188,7 @@ namespace NativeRender
                 material      = mat,
                 isTransparent = IsMaterialTransparent(mat),
                 isEmissive    = IsMaterialEmissive(mat),
+                isAlphaClip   = IsMaterialAlphaClip(mat),
                 textures      = new Texture[4],
             };
 
@@ -216,12 +232,12 @@ namespace NativeRender
         /// </summary>
         public static SubmeshGroupDesc[] BuildSubmeshGroupDescs(SubmeshMaterialData[] infos)
         {
-            var dict = new Dictionary<(bool, bool), (List<int> indices, List<SubmeshMaterialData> datas)>();
+            var dict = new Dictionary<(bool, bool, bool), (List<int> indices, List<SubmeshMaterialData> datas)>();
 
             for (int s = 0; s < infos.Length; s++)
             {
                 var d   = infos[s];
-                var key = (d.isTransparent, d.isEmissive);
+                var key = (d.isTransparent, d.isEmissive, d.isAlphaClip);
                 if (!dict.TryGetValue(key, out var pair))
                 {
                     pair = (new List<int>(), new List<SubmeshMaterialData>());
@@ -239,6 +255,7 @@ namespace NativeRender
                 {
                     isTransparent  = kv.Key.Item1,
                     isEmissive     = kv.Key.Item2,
+                    isAlphaClip    = kv.Key.Item3,
                     submeshIndices = kv.Value.indices.ToArray(),
                     materialDatas  = kv.Value.datas.ToArray(),
                 };

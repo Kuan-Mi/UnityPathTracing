@@ -35,13 +35,14 @@ namespace NativeRender
         public static extern void NR_AS_Clear(ulong handle);
 
         /// <summary>Per-submesh descriptor. Must match C++ NR_SubmeshDesc exactly.</summary>
-        [StructLayout(LayoutKind.Sequential)]
+        public const uint SUBMESH_FLAG_GEOMETRY_OPAQUE = 0x1u;
+
         public struct SubmeshDesc
         {
             public uint indexCount;
             public uint indexByteOffset;
             public uint baseVertex;      // Unity SubMeshDescriptor.baseVertex
-            public uint _pad;            // padding to keep 8-byte alignment
+            public uint flags;           // NR_SUBMESH_FLAG_* bitmask (bit 0 = GEOMETRY_OPAQUE)
         }
 
         /// <summary>

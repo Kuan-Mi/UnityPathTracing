@@ -120,6 +120,8 @@ namespace NativeRender
             /// <summary>Whether all submeshes in this group are emissive.</summary>
             public bool isEmissive;
 
+            public bool isAlphaClip;
+
             /// <summary>Indices into the original mesh.subMeshCount.</summary>
             public int[] submeshIndices;
 
@@ -325,10 +327,10 @@ namespace NativeRender
             Matrix4x4 xform = GetSkinnedRootTransform(smr);
             _worldAS.SetInstanceTransform(smr, xform);
 
-            var      smi           = stTarget?.SubmeshMaterialInfos;
-            bool     isEmissive    = smi != null && smi.Length > 0 && smi[0].isEmissive;
-            bool     isTransparent = smi != null && smi.Length > 0 && smi[0].isTransparent;
-            uint     baseFlags     = isTransparent ? FLAG_TRANSPARENT : FLAG_NON_TRANSPARENT;
+            var  smi           = stTarget?.SubmeshMaterialInfos;
+            bool isEmissive    = smi != null && smi.Length > 0 && smi[0].isEmissive;
+            bool isTransparent = smi != null && smi.Length > 0 && smi[0].isTransparent;
+            uint baseFlags     = isTransparent ? FLAG_TRANSPARENT : FLAG_NON_TRANSPARENT;
             _worldAS.SetInstanceMask(smr, GetMaskForFlags(baseFlags));
 
             var tlasList = new List<RayTracingAccelerationStructure> { _worldAS };
@@ -1219,6 +1221,7 @@ namespace NativeRender
                             indexCount      = (uint)sd.indexCount,
                             indexByteOffset = (uint)sd.indexStart * indexStride,
                             baseVertex      = (uint)sd.baseVertex,
+                            flags           = grp.isAlphaClip ? 0u : NativeRenderPlugin.SUBMESH_FLAG_GEOMETRY_OPAQUE,
                         };
                     }
 
@@ -1255,7 +1258,7 @@ namespace NativeRender
                     // Build per-submesh primitive + instance data for this group.
                     for (int gi = 0; gi < grp.submeshIndices.Length; gi++)
                     {
-                        int      sub     = grp.submeshIndices[gi];
+                        int sub = grp.submeshIndices[gi];
 
                         uint subFlags  = grp.isTransparent ? FLAG_TRANSPARENT : FLAG_NON_TRANSPARENT;
                         int  subMatIdx = GetOrAddMaterial(target.SubmeshMaterialInfos[sub], texPtrs);
@@ -1574,6 +1577,7 @@ namespace NativeRender
                         indexCount      = (uint)sd.indexCount,
                         indexByteOffset = (uint)sd.indexStart * indexStride,
                         baseVertex      = (uint)sd.baseVertex,
+                        flags           = grp.isAlphaClip ? 0u : NativeRenderPlugin.SUBMESH_FLAG_GEOMETRY_OPAQUE,
                     };
                 }
 
@@ -1609,7 +1613,7 @@ namespace NativeRender
 
                 for (int gi = 0; gi < grp.submeshIndices.Length; gi++)
                 {
-                    int      sub    = grp.submeshIndices[gi];
+                    int sub = grp.submeshIndices[gi];
 
                     uint subFlags  = grp.isTransparent ? FLAG_TRANSPARENT : FLAG_NON_TRANSPARENT;
                     int  subMatIdx = GetOrAddMaterial(target.SubmeshMaterialInfos[sub], null);
@@ -1908,6 +1912,7 @@ namespace NativeRender
                     {
                         indexCount      = (uint)indexCount,
                         indexByteOffset = (uint)(iBase * sizeof(uint)),
+                        flags           = target.SubmeshMaterialInfos[sub].isAlphaClip ? 0u : NativeRenderPlugin.SUBMESH_FLAG_GEOMETRY_OPAQUE,
                     });
 
                     // Remap local indices to global merged-VB space.
@@ -2172,6 +2177,7 @@ namespace NativeRender
                 {
                     isTransparent    = desc.isTransparent,
                     isEmissive       = desc.isEmissive,
+                    isAlphaClip      = desc.isAlphaClip,
                     submeshIndices   = (int[])desc.submeshIndices.Clone(),
                     materials        = materials,
                     tlasList         = new List<RayTracingAccelerationStructure>(),
@@ -2180,6 +2186,7 @@ namespace NativeRender
                     primitiveCounts  = new int[subCount],
                 });
             }
+
             return result;
         }
     }

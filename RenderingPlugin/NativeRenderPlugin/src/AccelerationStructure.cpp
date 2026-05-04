@@ -330,7 +330,9 @@ bool AccelerationStructure::EnsureBLAS(ID3D12GraphicsCommandList4 *cmdList, Inst
         else
         {
             geomDesc.Type = D3D12_RAYTRACING_GEOMETRY_TYPE_TRIANGLES;
-            geomDesc.Flags = D3D12_RAYTRACING_GEOMETRY_FLAG_OPAQUE;
+            geomDesc.Flags = (sub.flags & NR_SUBMESH_FLAG_GEOMETRY_OPAQUE)
+                ? D3D12_RAYTRACING_GEOMETRY_FLAG_OPAQUE
+                : D3D12_RAYTRACING_GEOMETRY_FLAG_NONE;
             geomDesc.Triangles.VertexBuffer.StartAddress = def.vertexBuffer->GetGPUVirtualAddress()
                 + static_cast<UINT64>(sub.baseVertex) * def.vertexStride;
             geomDesc.Triangles.VertexBuffer.StrideInBytes = def.vertexStride;
@@ -1059,6 +1061,7 @@ bool AccelerationStructure::AddInstance(const NR_AddInstanceDesc &desc)
         md.indexCount = submeshes[j].indexCount;
         md.indexByteOffset = submeshes[j].indexByteOffset;
         md.baseVertex = static_cast<INT>(submeshes[j].baseVertex);
+        md.flags = submeshes[j].flags;
         md.hasBakedOMM = false;
 
         if (desc.ommDescs && desc.ommDescs[j].arrayData && desc.ommDescs[j].arrayDataSize > 0)
