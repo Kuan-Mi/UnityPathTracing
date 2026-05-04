@@ -19,11 +19,11 @@ namespace NativeRender
         public bool isEmissive;
 
         /// <summary>
-        /// 4 native texture pointers in gIn_Textures order:
+        /// 4 textures in gIn_Textures order:
         /// [0] BaseMap,  [1] MetallicGlossMap,  [2] BumpMap,  [3] EmissionMap.
-        /// Placeholder textures fill missing slots (never IntPtr.Zero).
+        /// Placeholder textures fill missing slots (never null).
         /// </summary>
-        public IntPtr[] texturePtrs; // length = 4
+        public Texture[] textures; // length = 4
 
         // Scalar fields written into InstanceDataNRD.
         public Color baseColor;
@@ -173,7 +173,7 @@ namespace NativeRender
                 material      = mat,
                 isTransparent = IsMaterialTransparent(mat),
                 isEmissive    = IsMaterialEmissive(mat),
-                texturePtrs   = new IntPtr[4],
+                textures      = new Texture[4],
             };
 
             if (mat != null && mat.shader.name == "Shader Graphs/glTF-pbrMetallicRoughness")
@@ -184,10 +184,10 @@ namespace NativeRender
                 data.roughnessScale = TryGetFloat(mat, "roughnessFactor", 0.5f);
                 data.normalScale    = 1f;
 
-                data.texturePtrs[0] = ResolveTexPtr(TryGetTex(mat, "baseColorTexture"),          White);
-                data.texturePtrs[1] = ResolveTexPtr(TryGetTex(mat, "metallicRoughnessTexture"),  Black);
-                data.texturePtrs[2] = ResolveTexPtr(TryGetTex(mat, "normalTexture"),             FlatNormal);
-                data.texturePtrs[3] = ResolveTexPtr(TryGetTex(mat, "emissiveTexture"),           Black);
+                data.textures[0] = TryGetTex(mat, "baseColorTexture")          ?? White;
+                data.textures[1] = TryGetTex(mat, "metallicRoughnessTexture")  ?? Black;
+                data.textures[2] = TryGetTex(mat, "normalTexture")             ?? FlatNormal;
+                data.textures[3] = TryGetTex(mat, "emissiveTexture")           ?? Black;
             }
             else
             {
@@ -199,10 +199,10 @@ namespace NativeRender
                 data.roughnessScale = 1f - smooth;
                 data.normalScale    = TryGetFloat(mat, "_BumpScale", 1f);
 
-                data.texturePtrs[0] = ResolveTexPtr(TryGetTex(mat, "_BaseMap"),           White);
-                data.texturePtrs[1] = ResolveTexPtr(TryGetTex(mat, "_MetallicGlossMap"),  Black);
-                data.texturePtrs[2] = ResolveTexPtr(TryGetTex(mat, "_BumpMap"),           FlatNormal);
-                data.texturePtrs[3] = ResolveTexPtr(TryGetTex(mat, "_EmissionMap"),       Black);
+                data.textures[0] = TryGetTex(mat, "_BaseMap")           ?? White;
+                data.textures[1] = TryGetTex(mat, "_MetallicGlossMap")  ?? Black;
+                data.textures[2] = TryGetTex(mat, "_BumpMap")           ?? FlatNormal;
+                data.textures[3] = TryGetTex(mat, "_EmissionMap")       ?? Black;
             }
 
             return data;

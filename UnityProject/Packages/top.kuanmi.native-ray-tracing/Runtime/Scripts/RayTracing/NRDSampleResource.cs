@@ -249,7 +249,7 @@ namespace NativeRender
         public IntPtr AccumulationBufferPtr { get; private set; }
         public IntPtr ResolvedBufferPtr     { get; private set; }
 
-        public NRDSampleResource(bool mergeBlas = true) // mergeBlas param retained for call-site compat but ignored
+        public NRDSampleResource()
         {
             _worldAS = new RayTracingAccelerationStructure();
             _lightAS = new RayTracingAccelerationStructure();
@@ -287,9 +287,6 @@ namespace NativeRender
             //   - Dynamic (isStatic=false) entries: mOverloaded is written every frame
             //     (motion matrix when moved, identity when stationary) so Xprev is always correct.
             UpdateTransformsOnly(targets);
-            // foreach (var t in targets)
-            //     if (t != null)
-            //         t.transform.hasChanged = false;
 
             // Update skinned mesh vertex buffers (must happen after Unity's skinning pass).
             UpdateSkinnedInstances();
@@ -429,9 +426,7 @@ namespace NativeRender
                 }
 
                 Material subMat    = sharedMats[sub];
-                int      subMatIdx = stTarget != null && sub < stTarget.SubmeshMaterialInfos.Length
-                    ? GetOrAddMaterial(stTarget.SubmeshMaterialInfos[sub], null)
-                    : GetOrAddMaterial(subMat, null); // incremental path: grows _textures in-place
+                int      subMatIdx = GetOrAddMaterial(stTarget.SubmeshMaterialInfos[sub], null);
 
                 int indexCount = (int)mesh.GetIndexCount(sub);
                 int triCount   = indexCount / 3;
@@ -483,10 +478,7 @@ namespace NativeRender
                     scale                 = (leftHanded ? -1f : 1f) * scaleMax,
                     morphPrimitiveOffset  = morphOffset,
                 };
-                if (stTarget != null && sub < stTarget.SubmeshMaterialInfos.Length)
-                    EncodeMaterial(stTarget.SubmeshMaterialInfos[sub], ref _instanceCpu[instSlot]);
-                else
-                    EncodeMaterial(subMat, ref _instanceCpu[instSlot]);
+                EncodeMaterial(stTarget.SubmeshMaterialInfos[sub], ref _instanceCpu[instSlot]);
             }
 
             // Wait for all Burst jobs.
@@ -1264,7 +1256,6 @@ namespace NativeRender
                     for (int gi = 0; gi < grp.submeshIndices.Length; gi++)
                     {
                         int      sub     = grp.submeshIndices[gi];
-                        Material subMat  = grp.materials[gi];
 
                         uint subFlags  = grp.isTransparent ? FLAG_TRANSPARENT : FLAG_NON_TRANSPARENT;
                         int  subMatIdx = GetOrAddMaterial(target.SubmeshMaterialInfos[sub], texPtrs);
@@ -1619,7 +1610,6 @@ namespace NativeRender
                 for (int gi = 0; gi < grp.submeshIndices.Length; gi++)
                 {
                     int      sub    = grp.submeshIndices[gi];
-                    Material subMat = grp.materials[gi];
 
                     uint subFlags  = grp.isTransparent ? FLAG_TRANSPARENT : FLAG_NON_TRANSPARENT;
                     int  subMatIdx = GetOrAddMaterial(target.SubmeshMaterialInfos[sub], null);
@@ -2089,7 +2079,7 @@ namespace NativeRender
             if (texPtrs != null && matData != null)
             {
                 for (int i = 0; i < TexturesPerMaterial; i++)
-                    texPtrs.Add(matData.texturePtrs[i]);
+                    texPtrs.Add(matData.textures[i].GetNativeTexturePtr());
             }
             else if (_textures != null && matData != null)
             {
@@ -2098,88 +2088,10 @@ namespace NativeRender
                 if (needD > _textures.Capacity)
                     _textures.Resize(needD);
                 for (int i = 0; i < TexturesPerMaterial; i++)
-                    _textures.SetNativePtr(base4D + i, matData.texturePtrs[i]);
+                    _textures.SetNativePtr(base4D + i, matData.textures[i].GetNativeTexturePtr());
             }
 
             return idxD;
-        }
-
-        private int GetOrAddMaterial(Material mat, List<IntPtr> texPtrs)
-        {
-            // Already registered — bump ref count and return existing slot.
-            if (mat != null && _materialSlots.TryGetValue(mat, out int existing))
-            {
-                _materialRefCounts[mat] = (_materialRefCounts.TryGetValue(mat, out int rc) ? rc : 0) + 1;
-                return existing;
-            }
-
-            // Determine slot index: reuse a freed slot if one is available.
-            int idx;
-            if (_freeMatSlots.Count > 0)
-            {
-                idx = _freeMatSlots.Dequeue();
-            }
-            else if (texPtrs != null)
-            {
-                // Bulk build path: next sequential slot based on how many materials are already known.
-                idx = _materialSlots.Count;
-            }
-            else
-            {
-                // Incremental path: derive from current _textures capacity.
-                idx = _textures != null ? _textures.Capacity / TexturesPerMaterial : _materialSlots.Count;
-            }
-
-            if (mat != null)
-            {
-                _materialSlots[mat]     = idx;
-                _materialRefCounts[mat] = 1;
-            }
-
-            if (texPtrs != null)
-            {
-                if (mat.shader.name is "Universal Render Pipeline/Lit" or "RayTracing/Lit")
-                {
-                    // Bulk build path: append raw pointers; caller will create _textures.
-                    AppendTexture(TryGetTex(mat, "_BaseMap"), PlaceholderKind.White, texPtrs);
-                    AppendTexture(TryGetTex(mat, "_MetallicGlossMap"), PlaceholderKind.Black, texPtrs);
-                    AppendTexture(TryGetTex(mat, "_BumpMap"), PlaceholderKind.FlatNormal, texPtrs);
-                    AppendTexture(TryGetTex(mat, "_EmissionMap"), PlaceholderKind.Black, texPtrs);
-                }
-                else if (mat.shader.name == "Shader Graphs/glTF-pbrMetallicRoughness")
-                {
-                    AppendTexture(TryGetTex(mat, "baseColorTexture"), PlaceholderKind.White, texPtrs);
-                    AppendTexture(TryGetTex(mat, "metallicRoughnessTexture"), PlaceholderKind.Black, texPtrs);
-                    AppendTexture(TryGetTex(mat, "normalTexture"), PlaceholderKind.FlatNormal, texPtrs);
-                    AppendTexture(TryGetTex(mat, "emissiveTexture"), PlaceholderKind.Black, texPtrs);
-                }
-                else
-                {
-                    // Fallback for unknown shaders: try common property names, but order is not guaranteed.
-                    AppendTexture(TryGetTex(mat, "_BaseMap"), PlaceholderKind.White, texPtrs);
-                    AppendTexture(TryGetTex(mat, "_MetallicGlossMap"), PlaceholderKind.Black, texPtrs);
-                    AppendTexture(TryGetTex(mat, "_BumpMap"), PlaceholderKind.FlatNormal, texPtrs);
-                    AppendTexture(TryGetTex(mat, "_EmissionMap"), PlaceholderKind.Black, texPtrs);
-                }
-            }
-            else if (_textures != null)
-            {
-                // Incremental path: write directly into the live descriptor array.
-                int base4 = idx * TexturesPerMaterial;
-                int need  = base4 + TexturesPerMaterial;
-                if (need > _textures.Capacity)
-                {
-                    Debug.Log($"[NRDSampleResource] Growing _textures from capacity {_textures.Capacity} to {need} to accommodate new material '{mat.name}'");
-                    _textures.Resize(need);
-                }
-
-                _textures.SetNativePtr(base4 + 0, NativePtrOf(TryGetTex(mat, "_BaseMap"), PlaceholderKind.White));
-                _textures.SetNativePtr(base4 + 1, NativePtrOf(TryGetTex(mat, "_MetallicGlossMap"), PlaceholderKind.Black));
-                _textures.SetNativePtr(base4 + 2, NativePtrOf(TryGetTex(mat, "_BumpMap"), PlaceholderKind.FlatNormal));
-                _textures.SetNativePtr(base4 + 3, NativePtrOf(TryGetTex(mat, "_EmissionMap"), PlaceholderKind.Black));
-            }
-
-            return idx;
         }
 
         /// <summary>
@@ -2213,67 +2125,6 @@ namespace NativeRender
             }
         }
 
-        /// <summary>Returns the native texture pointer for <paramref name="tex"/>, or the placeholder if null.</summary>
-        private static IntPtr NativePtrOf(Texture tex, PlaceholderKind fallback)
-        {
-            var t = tex != null ? tex : GetPlaceholder(fallback);
-            return t.GetNativeTexturePtr();
-        }
-
-        // 1x1 placeholder textures so missing material slots never bind null to gIn_Textures.
-        // Order matches GetOrAddMaterial: BaseMap, BumpMap, MetallicGlossMap, EmissionMap.
-        private enum PlaceholderKind
-        {
-            White,
-            FlatNormal,
-            Black,
-            Black2
-        }
-
-        private static Texture2D _phWhite;
-        private static Texture2D _phFlatNormal;
-        private static Texture2D _phBlack;
-
-        private static Texture2D GetPlaceholder(PlaceholderKind kind)
-        {
-            switch (kind)
-            {
-                case PlaceholderKind.White:
-                    if (_phWhite == null)
-                    {
-                        _phWhite = new Texture2D(1, 1, TextureFormat.RGBA32, false, true) { name = "NRD_Placeholder_White", hideFlags = HideFlags.HideAndDontSave };
-                        _phWhite.SetPixel(0, 0, Color.white);
-                        _phWhite.Apply(false, true);
-                    }
-
-                    return _phWhite;
-                case PlaceholderKind.FlatNormal:
-                    if (_phFlatNormal == null)
-                    {
-                        _phFlatNormal = new Texture2D(1, 1, TextureFormat.RGBA32, false, true) { name = "NRD_Placeholder_FlatNormal", hideFlags = HideFlags.HideAndDontSave };
-                        _phFlatNormal.SetPixel(0, 0, new Color(0.5f, 0.5f, 1f, 1f));
-                        _phFlatNormal.Apply(false, true);
-                    }
-
-                    return _phFlatNormal;
-                default: // Black / Black2
-                    if (_phBlack == null)
-                    {
-                        _phBlack = new Texture2D(1, 1, TextureFormat.RGBA32, false, true) { name = "NRD_Placeholder_Black", hideFlags = HideFlags.HideAndDontSave };
-                        _phBlack.SetPixel(0, 0, new Color(0f, 0f, 0f, 1f));
-                        _phBlack.Apply(false, true);
-                    }
-
-                    return _phBlack;
-            }
-        }
-
-        private static void AppendTexture(Texture tex, PlaceholderKind fallback, List<IntPtr> texPtrs)
-        {
-            var t = tex != null ? tex : GetPlaceholder(fallback);
-            texPtrs.Add(t.GetNativeTexturePtr());
-        }
-
         private static void EncodeMaterial(SubmeshMaterialData data, ref InstanceDataNRD inst)
         {
             inst.baseColorAndMetalnessScale.x = new half(data.baseColor.r);
@@ -2288,39 +2139,6 @@ namespace NativeRender
 
             inst.normalUvScale.x = new half(data.normalScale);
             inst.normalUvScale.y = new half(data.normalScale);
-        }
-
-        private static void EncodeMaterial(Material mat, ref InstanceDataNRD inst)
-        {
-            Color baseColor      = TryGetColor(mat, "_BaseColor", Color.white);
-            Color emission       = TryGetColor(mat, "_EmissionColor", Color.black);
-            float metal          = TryGetFloat(mat, "_Metallic", 0f);
-            float smooth         = TryGetFloat(mat, "_Smoothness", 0.5f);
-            float roughnessScale = 1f - smooth;
-
-            float normScale = TryGetFloat(mat, "_BumpScale", 1f);
-
-            if (mat.shader.name == "Shader Graphs/glTF-pbrMetallicRoughness")
-            {
-                baseColor      = TryGetColor(mat, "baseColorFactor", Color.white);
-                emission       = TryGetColor(mat, "emissiveFactor", Color.black);
-                metal          = TryGetFloat(mat, "metallicFactor", 0f);
-                roughnessScale = TryGetFloat(mat, "roughnessFactor", 0.5f);
-            }
-
-            inst.baseColorAndMetalnessScale.x = new half(baseColor.r);
-            inst.baseColorAndMetalnessScale.y = new half(baseColor.g);
-            inst.baseColorAndMetalnessScale.z = new half(baseColor.b);
-            inst.baseColorAndMetalnessScale.w = new half(metal);
-
-            inst.emissionAndRoughnessScale.x = new half(emission.r);
-            inst.emissionAndRoughnessScale.y = new half(emission.g);
-            inst.emissionAndRoughnessScale.z = new half(emission.b);
-            // 这里实际传入的是光滑度
-            inst.emissionAndRoughnessScale.w = new half(roughnessScale);
-
-            inst.normalUvScale.x = new half(normScale);
-            inst.normalUvScale.y = new half(normScale);
         }
 
         // =====================================================================
@@ -2364,14 +2182,5 @@ namespace NativeRender
             }
             return result;
         }
-
-        private static Texture TryGetTex(Material mat, string prop) =>
-            mat != null && mat.HasProperty(prop) ? mat.GetTexture(prop) : null;
-
-        private static Color TryGetColor(Material mat, string prop, Color def) =>
-            mat != null && mat.HasProperty(prop) ? mat.GetColor(prop).linear : def;
-
-        private static float TryGetFloat(Material mat, string prop, float def) =>
-            mat != null && mat.HasProperty(prop) ? mat.GetFloat(prop) : def;
     }
 }

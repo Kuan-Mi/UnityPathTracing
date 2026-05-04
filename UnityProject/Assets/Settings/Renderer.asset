@@ -97,21 +97,21 @@ MonoBehaviour:
     normalMap: 1
     TAA: 1
     emission: 1
-    importanceSampling: 1
+    importanceSampling: 0
     specularLobeTrimming: 1
     adaptiveAccumulation: 1
     usePrevFrame: 1
     boost: 0
-    SR: 1
+    SR: 0
     RR: 0
     tmpDisableRR: 0
     upscalerMode: 0
-    confidence: 1
+    confidence: 0
     showMode: 18
     update: 1
     updateTick: 1
     denoisingRange: 1000
-    nisSharpness: 0.229
+    nisSharpness: 0.187
     skipRightEyeInVR: 0
   renderPassEvent: 550
   finalMaterial: {fileID: 2100000, guid: 27695a2bc55ef2f469362b9a2994989e, type: 2}
