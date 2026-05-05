@@ -101,6 +101,8 @@ namespace NativeRender
         /// texture native pointers, scalar properties, and classifies submeshes into groups.
         /// Must be called on the main thread.
         /// </summary>
+        
+        [ContextMenu("Rebuild Material Data")]
         public void RebuildMaterialData()
         {
             var mr = meshRenderer != null ? meshRenderer : GetComponent<MeshRenderer>();
@@ -155,24 +157,24 @@ namespace NativeRender
             // Object is alive here — safe to capture component references.
             meshRenderer = GetComponent<MeshRenderer>();
             instanceId = meshRenderer != null ? meshRenderer.GetInstanceID() : 0;
-            RebuildMaterialData();
+            // RebuildMaterialData();
             AddQueue.Enqueue(new TargetAddEvent(this, meshRenderer, instanceId));
         }
 
-#if UNITY_EDITOR
-        private void OnValidate()
-        {
-            // Bake the static flag into the serialized field while in the editor
-            // so the correct value survives a build (gameObject.isStatic is editor-only).
-            _isStaticObject = gameObject.isStatic;
-            RebuildMaterialData();
-        }
-
-        private void Reset()
-        {
-            _isStaticObject = gameObject.isStatic;
-        }
-#endif
+// #if UNITY_EDITOR
+//         private void OnValidate()
+//         {
+//             // Bake the static flag into the serialized field while in the editor
+//             // so the correct value survives a build (gameObject.isStatic is editor-only).
+//             _isStaticObject = gameObject.isStatic;
+//             RebuildMaterialData();
+//         }
+//
+//         private void Reset()
+//         {
+//             _isStaticObject = gameObject.isStatic;
+//         }
+// #endif
 
         private void OnDisable()
         {

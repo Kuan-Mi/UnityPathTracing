@@ -962,9 +962,8 @@ namespace NativeRender
                             continue;
                         }
 
-                        Material subMat     = mats[s];
-                        bool     isTrans    = t.SubmeshMaterialInfos[s].isTransparent;
-                        bool     isEmissive = t.SubmeshMaterialInfos[s].isEmissive;
+                        bool isTrans    = t.SubmeshMaterialInfos[s].isTransparent;
+                        bool isEmissive = t.SubmeshMaterialInfos[s].isEmissive;
 
                         var sr = new SubmeshRef(t, s);
                         if (isTrans)
@@ -1231,31 +1230,40 @@ namespace NativeRender
                     uint groupFlags = grp.isTransparent ? FLAG_TRANSPARENT : FLAG_NON_TRANSPARENT;
                     byte groupMask  = GetMaskForFlags(groupFlags);
 
-                    if (!_worldAS.AddInstanceGroup(mesh, groupDescs, grp.customHandle))
+                    var ommPinnedHandles = new List<GCHandle>();
+                    var groupOmmDescs    = BuildGroupOmmDescs(target, grp.submeshIndices, ommPinnedHandles);
+                    try
                     {
-                        Debug.LogWarning($"[NRDSampleResource] AddInstanceGroup failed for '{mr.name}' group handle={grp.customHandle} — skipping group");
-                        continue;
+                        if (!_worldAS.AddInstanceGroup(mesh, groupDescs, grp.customHandle, groupOmmDescs: groupOmmDescs))
+                        {
+                            Debug.LogWarning($"[NRDSampleResource] AddInstanceGroup failed for '{mr.name}' group handle={grp.customHandle} — skipping group");
+                            continue;
+                        }
+
+                        grp.firstInstanceIdx = instanceCursor;
+                        _worldAS.SetInstanceID(grp.customHandle, instanceCursor);
+                        _worldAS.SetInstanceTransform(grp.customHandle, xform);
+                        _worldAS.SetInstanceMask(grp.customHandle, groupMask);
+                        grp.tlasList.Add(_worldAS);
+
+                        if (grp.isEmissive)
+                        {
+                            if (_lightAS.AddInstanceGroup(mesh, groupDescs, grp.customHandle, groupOmmDescs: groupOmmDescs))
+                            {
+                                _lightAS.SetInstanceID(grp.customHandle, instanceCursor);
+                                _lightAS.SetInstanceTransform(grp.customHandle, xform);
+                                _lightAS.SetInstanceMask(grp.customHandle, groupMask);
+                                grp.tlasList.Add(_lightAS);
+                            }
+                            else
+                            {
+                                Debug.LogWarning($"[NRDSampleResource] AddInstanceGroup on lightAS failed for '{mr.name}' group handle={grp.customHandle}");
+                            }
+                        }
                     }
-
-                    grp.firstInstanceIdx = instanceCursor;
-                    _worldAS.SetInstanceID(grp.customHandle, instanceCursor);
-                    _worldAS.SetInstanceTransform(grp.customHandle, xform);
-                    _worldAS.SetInstanceMask(grp.customHandle, groupMask);
-                    grp.tlasList.Add(_worldAS);
-
-                    if (grp.isEmissive)
+                    finally
                     {
-                        if (_lightAS.AddInstanceGroup(mesh, groupDescs, grp.customHandle))
-                        {
-                            _lightAS.SetInstanceID(grp.customHandle, instanceCursor);
-                            _lightAS.SetInstanceTransform(grp.customHandle, xform);
-                            _lightAS.SetInstanceMask(grp.customHandle, groupMask);
-                            grp.tlasList.Add(_lightAS);
-                        }
-                        else
-                        {
-                            Debug.LogWarning($"[NRDSampleResource] AddInstanceGroup on lightAS failed for '{mr.name}' group handle={grp.customHandle}");
-                        }
+                        foreach (var h in ommPinnedHandles) h.Free();
                     }
 
                     // Build per-submesh primitive + instance data for this group.
@@ -1587,31 +1595,40 @@ namespace NativeRender
                 uint groupFlags = grp.isTransparent ? FLAG_TRANSPARENT : FLAG_NON_TRANSPARENT;
                 byte groupMask  = GetMaskForFlags(groupFlags);
 
-                if (!_worldAS.AddInstanceGroup(mesh, groupDescs, grp.customHandle))
+                var ommPinnedHandles = new List<GCHandle>();
+                var groupOmmDescs    = BuildGroupOmmDescs(target, grp.submeshIndices, ommPinnedHandles);
+                try
                 {
-                    Debug.LogWarning($"[NRDSampleResource] AddTargetIncremental: AddInstanceGroup failed for '{mr.name}' handle={grp.customHandle}");
-                    continue;
+                    if (!_worldAS.AddInstanceGroup(mesh, groupDescs, grp.customHandle, groupOmmDescs: groupOmmDescs))
+                    {
+                        Debug.LogWarning($"[NRDSampleResource] AddTargetIncremental: AddInstanceGroup failed for '{mr.name}' handle={grp.customHandle}");
+                        continue;
+                    }
+
+                    grp.firstInstanceIdx = instCursor;
+                    _worldAS.SetInstanceID(grp.customHandle, instCursor);
+                    _worldAS.SetInstanceTransform(grp.customHandle, xform);
+                    _worldAS.SetInstanceMask(grp.customHandle, groupMask);
+                    grp.tlasList.Add(_worldAS);
+
+                    if (grp.isEmissive)
+                    {
+                        if (_lightAS.AddInstanceGroup(mesh, groupDescs, grp.customHandle, groupOmmDescs: groupOmmDescs))
+                        {
+                            _lightAS.SetInstanceID(grp.customHandle, instCursor);
+                            _lightAS.SetInstanceTransform(grp.customHandle, xform);
+                            _lightAS.SetInstanceMask(grp.customHandle, groupMask);
+                            grp.tlasList.Add(_lightAS);
+                        }
+                        else
+                        {
+                            Debug.LogWarning($"[NRDSampleResource] AddTargetIncremental: AddInstanceGroup on lightAS failed for '{mr.name}' handle={grp.customHandle}");
+                        }
+                    }
                 }
-
-                grp.firstInstanceIdx = instCursor;
-                _worldAS.SetInstanceID(grp.customHandle, instCursor);
-                _worldAS.SetInstanceTransform(grp.customHandle, xform);
-                _worldAS.SetInstanceMask(grp.customHandle, groupMask);
-                grp.tlasList.Add(_worldAS);
-
-                if (grp.isEmissive)
+                finally
                 {
-                    if (_lightAS.AddInstanceGroup(mesh, groupDescs, grp.customHandle))
-                    {
-                        _lightAS.SetInstanceID(grp.customHandle, instCursor);
-                        _lightAS.SetInstanceTransform(grp.customHandle, xform);
-                        _lightAS.SetInstanceMask(grp.customHandle, groupMask);
-                        grp.tlasList.Add(_lightAS);
-                    }
-                    else
-                    {
-                        Debug.LogWarning($"[NRDSampleResource] AddTargetIncremental: AddInstanceGroup on lightAS failed for '{mr.name}' handle={grp.customHandle}");
-                    }
+                    foreach (var h in ommPinnedHandles) h.Free();
                 }
 
                 for (int gi = 0; gi < grp.submeshIndices.Length; gi++)
@@ -1840,7 +1857,7 @@ namespace NativeRender
 
             var meshDataArr  = Mesh.AcquireReadOnlyMeshData(meshList);
             var submeshDescs = new List<NativeRenderPlugin.SubmeshDesc>();
-            var ommCacheList  = new List<OMMCache>();
+            var ommCacheList = new List<OMMCache>();
             var jobHandles   = new List<JobHandle>(targetOrder.Count * 4);
             var tempArrays   = new List<System.IDisposable>(targetOrder.Count * 5);
 
@@ -2008,11 +2025,15 @@ namespace NativeRender
             if (blas.ommCaches != null)
             {
                 foreach (var c in blas.ommCaches)
-                    if (c != null && c.IsValid) { hasAnyOMM = true; break; }
+                    if (c != null && c.IsValid)
+                    {
+                        hasAnyOMM = true;
+                        break;
+                    }
             }
 
             // Collect GCHandles (freed in finally) and build ommDescs in one pass.
-            NativeRenderPlugin.SubmeshOMMDesc[] ommDescs    = hasAnyOMM ? new NativeRenderPlugin.SubmeshOMMDesc[blas.submeshDescs.Length] : null;
+            NativeRenderPlugin.SubmeshOMMDesc[] ommDescs      = hasAnyOMM ? new NativeRenderPlugin.SubmeshOMMDesc[blas.submeshDescs.Length] : null;
             var                                 pinnedHandles = new List<GCHandle>();
             if (ommDescs != null)
             {
@@ -2020,10 +2041,10 @@ namespace NativeRender
                 {
                     OMMCache cache = (blas.ommCaches != null && s < blas.ommCaches.Length) ? blas.ommCaches[s] : null;
                     if (cache == null || !cache.IsValid) continue;
-                    pinnedHandles.Add(GCHandle.Alloc(cache.bakedArrayData,   GCHandleType.Pinned));
-                    pinnedHandles.Add(GCHandle.Alloc(cache.bakedDescArray,   GCHandleType.Pinned));
+                    pinnedHandles.Add(GCHandle.Alloc(cache.bakedArrayData, GCHandleType.Pinned));
+                    pinnedHandles.Add(GCHandle.Alloc(cache.bakedDescArray, GCHandleType.Pinned));
                     pinnedHandles.Add(GCHandle.Alloc(cache.bakedIndexBuffer, GCHandleType.Pinned));
-                    pinnedHandles.Add(GCHandle.Alloc(cache.histogramFlat,    GCHandleType.Pinned));
+                    pinnedHandles.Add(GCHandle.Alloc(cache.histogramFlat, GCHandleType.Pinned));
                     ommDescs[s] = new NativeRenderPlugin.SubmeshOMMDesc
                     {
                         arrayData      = pinnedHandles[pinnedHandles.Count - 4].AddrOfPinnedObject(),
@@ -2111,6 +2132,55 @@ namespace NativeRender
         // Material / texture helpers
         // =====================================================================
 
+        /// <summary>
+        /// Builds a <see cref="NativeRenderPlugin.SubmeshOMMDesc"/> array for the given submesh index
+        /// subset of <paramref name="target"/>.ommCaches, pinning the underlying byte arrays.
+        /// Returns null if no valid OMM entry exists.  Caller must free <paramref name="pinnedHandles"/>
+        /// after the native AddInstanceGroup call completes.
+        /// </summary>
+        private static NativeRenderPlugin.SubmeshOMMDesc[] BuildGroupOmmDescs(
+            NativeRayTracingTarget target,
+            int[] submeshIndices,
+            List<GCHandle> pinnedHandles)
+        {
+            if (target.ommCaches == null) return null;
+            bool hasAny = false;
+            foreach (int s in submeshIndices)
+                if (s < target.ommCaches.Length && target.ommCaches[s] != null && target.ommCaches[s].IsValid)
+                {
+                    hasAny = true;
+                    break;
+                }
+
+            if (!hasAny) return null;
+
+            var descs = new NativeRenderPlugin.SubmeshOMMDesc[submeshIndices.Length];
+            for (int gi = 0; gi < submeshIndices.Length; gi++)
+            {
+                int      s     = submeshIndices[gi];
+                OMMCache cache = (s < target.ommCaches.Length) ? target.ommCaches[s] : null;
+                if (cache == null || !cache.IsValid) continue;
+                pinnedHandles.Add(GCHandle.Alloc(cache.bakedArrayData, GCHandleType.Pinned));
+                pinnedHandles.Add(GCHandle.Alloc(cache.bakedDescArray, GCHandleType.Pinned));
+                pinnedHandles.Add(GCHandle.Alloc(cache.bakedIndexBuffer, GCHandleType.Pinned));
+                pinnedHandles.Add(GCHandle.Alloc(cache.histogramFlat, GCHandleType.Pinned));
+                descs[gi] = new NativeRenderPlugin.SubmeshOMMDesc
+                {
+                    arrayData      = pinnedHandles[pinnedHandles.Count - 4].AddrOfPinnedObject(),
+                    arrayDataSize  = (uint)cache.bakedArrayData.Length,
+                    descArray      = pinnedHandles[pinnedHandles.Count - 3].AddrOfPinnedObject(),
+                    descArrayCount = cache.bakedDescArrayCount,
+                    indexBuffer    = pinnedHandles[pinnedHandles.Count - 2].AddrOfPinnedObject(),
+                    indexCount     = cache.bakedIndexCount,
+                    indexStride    = cache.bakedIndexStride,
+                    histogramFlat  = pinnedHandles[pinnedHandles.Count - 1].AddrOfPinnedObject(),
+                    histogramCount = (uint)cache.HistogramEntryCount,
+                };
+            }
+
+            return descs;
+        }
+
         private static byte GetMaskForFlags(uint flags)
         {
             // Use FLAG bits 0–2 as the visibility mask (matches merged-BLAS usage).
@@ -2157,7 +2227,29 @@ namespace NativeRender
             if (texPtrs != null && matData != null)
             {
                 for (int i = 0; i < TexturesPerMaterial; i++)
-                    texPtrs.Add(matData.textures[i].GetNativeTexturePtr());
+                {
+                    var tex = matData.textures[i];
+                    if (tex == null)
+                    {
+                        switch (i)
+                        {
+                            case 0: // BaseColor
+                                tex = Texture2D.whiteTexture;
+                                break;
+                            case 1: // metallicRoughness
+                                tex = Texture2D.blackTexture;
+                                break;
+                            case 2: // normalTexture
+                                tex = Texture2D.normalTexture;
+                                break;
+                            case 3: // emission
+                                tex = Texture2D.blackTexture;
+                                break;
+                        }
+                    }
+
+                    texPtrs.Add(tex.GetNativeTexturePtr());
+                }
             }
             else if (_textures != null && matData != null)
             {
@@ -2166,7 +2258,29 @@ namespace NativeRender
                 if (needD > _textures.Capacity)
                     _textures.Resize(needD);
                 for (int i = 0; i < TexturesPerMaterial; i++)
-                    _textures.SetNativePtr(base4D + i, matData.textures[i].GetNativeTexturePtr());
+                {
+                    var tex = matData.textures[i];
+                    if (tex == null)
+                    {
+                        switch (i)
+                        {
+                            case 0: // BaseColor
+                                tex = Texture2D.whiteTexture;
+                                break;
+                            case 1: // metallicRoughness
+                                tex = Texture2D.blackTexture;
+                                break;
+                            case 2: // normalTexture
+                                tex = Texture2D.normalTexture;
+                                break;
+                            case 3: // emission
+                                tex = Texture2D.blackTexture;
+                                break;
+                        }
+
+                        _textures.SetNativePtr(base4D + i, tex.GetNativeTexturePtr());
+                    }
+                }
             }
 
             return idxD;

@@ -120,13 +120,14 @@ struct MeshInfo
 // MeshKey  –  identifies a unique mesh+submesh-subset combination.
 //   Two AddInstance calls sharing the same VB+IB AND the same submesh subset
 //   (identified by submeshHash) reuse the same BLAS.  Different subsets of the
-//   same VB+IB (e.g. transparent vs. opaque groups) get independent BLASes.
+//   same VB+IB (e.g. transparent vs. opaque groups), different geometry flags,
+//   or different OMM presence get independent BLASes.
 // ---------------------------------------------------------------------------
 struct MeshKey
 {
     uintptr_t vbPtr       = 0;
     uintptr_t ibPtr       = 0;
-    uint64_t  submeshHash = 0; // hash of (indexCount, indexByteOffset, baseVertex) for each submesh in this call
+    uint64_t  submeshHash = 0; // hash of (indexCount, indexByteOffset, baseVertex, flags, hasOMM) for each submesh
     bool operator==(const MeshKey& o) const
     {
         return vbPtr == o.vbPtr && ibPtr == o.ibPtr && submeshHash == o.submeshHash;

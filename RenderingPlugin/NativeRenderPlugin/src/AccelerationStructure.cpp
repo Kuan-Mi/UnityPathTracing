@@ -12,12 +12,16 @@ extern void EnqueueDeferredDelete(void* ptr, DeferredType type);
 // ---------------------------------------------------------------------------
 // HashSubmeshDescs
 //   Produces a stable 64-bit hash from the (indexCount, indexByteOffset,
-//   baseVertex) tuple of each submesh passed to AddInstance.  Used as the
-//   third component of MeshKey so that different submesh subsets of the same
-//   VB+IB (e.g. transparent vs. opaque SubmeshGroups) are cached separately.
+//   baseVertex, flags) tuple of each submesh passed to AddInstance, plus a
+//   per-submesh OMM-present bit derived from ommDescs.  Used as the third
+//   component of MeshKey so that different submesh subsets of the same VB+IB
+//   (e.g. transparent vs. opaque SubmeshGroups) are cached separately, and so
+//   that BLAS builds with/without OMM or with different geometry flags never
+//   share a cache entry.
 //   Returns at least 1 (0 is reserved as an unset sentinel).
 // ---------------------------------------------------------------------------
-static uint64_t HashSubmeshDescs(const NR_SubmeshDesc* descs, uint32_t count)
+static uint64_t HashSubmeshDescs(const NR_SubmeshDesc* descs, uint32_t count,
+                                  const NR_SubmeshOMMDesc* ommDescs = nullptr)
 {
     uint64_t h = static_cast<uint64_t>(count);
     for (uint32_t i = 0; i < count; ++i)
@@ -25,6 +29,10 @@ static uint64_t HashSubmeshDescs(const NR_SubmeshDesc* descs, uint32_t count)
         h ^= static_cast<uint64_t>(descs[i].indexCount)      * 2654435761ULL + (h << 7) + (h >> 5);
         h ^= static_cast<uint64_t>(descs[i].indexByteOffset) * 2246822519ULL + (h << 7) + (h >> 5);
         h ^= static_cast<uint64_t>(descs[i].baseVertex)      * 3266489917ULL + (h << 7) + (h >> 5);
+        h ^= static_cast<uint64_t>(descs[i].flags)           * 2166136261ULL + (h << 7) + (h >> 5);
+        // Encode OMM presence per-submesh (1 = has OMM, 0 = no OMM)
+        const uint64_t hasOMM = (ommDescs && ommDescs[i].arrayData) ? 1ULL : 0ULL;
+        h ^= hasOMM * 1000000007ULL + (h << 7) + (h >> 5);
     }
     return h ? h : 1u;
 }
@@ -301,7 +309,9 @@ bool AccelerationStructure::EnsureBLAS(ID3D12GraphicsCommandList4 *cmdList, Inst
         if (subUseOMM)
         {
             geomDesc.Type = D3D12_RAYTRACING_GEOMETRY_TYPE_OMM_TRIANGLES;
-            geomDesc.Flags = D3D12_RAYTRACING_GEOMETRY_FLAG_NONE;
+            geomDesc.Flags = (sub.flags & NR_SUBMESH_FLAG_GEOMETRY_OPAQUE)
+                ? D3D12_RAYTRACING_GEOMETRY_FLAG_OPAQUE
+                : D3D12_RAYTRACING_GEOMETRY_FLAG_NONE;
 
             D3D12_RAYTRACING_GEOMETRY_TRIANGLES_DESC &td = ommTriDescs[j];
             td = {};
@@ -1029,7 +1039,7 @@ bool AccelerationStructure::AddInstance(const NR_AddInstanceDesc &desc)
         slot.meshKey = {
             reinterpret_cast<uintptr_t>(vb),
             reinterpret_cast<uintptr_t>(ib),
-            HashSubmeshDescs(submeshes, submeshCount)
+            HashSubmeshDescs(submeshes, submeshCount, desc.ommDescs)
         };
 
     // Set descriptive names for Unity-provided buffers to aid debugging

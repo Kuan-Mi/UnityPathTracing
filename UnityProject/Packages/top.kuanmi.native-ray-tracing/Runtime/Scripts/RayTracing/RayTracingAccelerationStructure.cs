@@ -266,10 +266,11 @@ namespace NativeRender
         /// (e.g. transparent vs. opaque submesh groups).
         /// </summary>
         public unsafe bool AddInstanceGroup(
-            Mesh                            mesh,
-            NativeRenderPlugin.SubmeshDesc[] groupSubmeshDescs,
-            uint                            customHandle,
-            bool                            isDynamic = false)
+            Mesh                                     mesh,
+            NativeRenderPlugin.SubmeshDesc[]         groupSubmeshDescs,
+            uint                                     customHandle,
+            bool                                     isDynamic = false,
+            NativeRenderPlugin.SubmeshOMMDesc[]      groupOmmDescs = null)
         {
             if (_handle == 0 || mesh == null || groupSubmeshDescs == null || groupSubmeshDescs.Length == 0)
                 return false;
@@ -287,22 +288,47 @@ namespace NativeRender
             uint vertexStride = (uint)mesh.GetVertexBufferStride(0);
             uint indexStride  = mesh.indexFormat == IndexFormat.UInt16 ? 2u : 4u;
 
+            bool hasOMM = groupOmmDescs != null;
             fixed (NativeRenderPlugin.SubmeshDesc* pDescs = groupSubmeshDescs)
             {
-                var desc = new NativeRenderPlugin.AddInstanceDesc
+                bool ok;
+                if (hasOMM)
                 {
-                    instanceHandle        = customHandle,
-                    vertexBufferNativePtr = vbPtr,
-                    vertexCount           = vertexCount,
-                    vertexStride          = vertexStride,
-                    indexBufferNativePtr  = ibPtr,
-                    indexStride           = indexStride,
-                    submeshDescs          = (IntPtr)pDescs,
-                    submeshCount          = (uint)groupSubmeshDescs.Length,
-                    ommDescs              = IntPtr.Zero,
-                    isDynamic             = isDynamic ? 1u : 0u,
-                };
-                bool ok = NativeRenderPlugin.NR_AS_AddInstance(_handle, ref desc);
+                    fixed (NativeRenderPlugin.SubmeshOMMDesc* pOMM = groupOmmDescs)
+                    {
+                        var desc = new NativeRenderPlugin.AddInstanceDesc
+                        {
+                            instanceHandle        = customHandle,
+                            vertexBufferNativePtr = vbPtr,
+                            vertexCount           = vertexCount,
+                            vertexStride          = vertexStride,
+                            indexBufferNativePtr  = ibPtr,
+                            indexStride           = indexStride,
+                            submeshDescs          = (IntPtr)pDescs,
+                            submeshCount          = (uint)groupSubmeshDescs.Length,
+                            ommDescs              = (IntPtr)pOMM,
+                            isDynamic             = isDynamic ? 1u : 0u,
+                        };
+                        ok = NativeRenderPlugin.NR_AS_AddInstance(_handle, ref desc);
+                    }
+                }
+                else
+                {
+                    var desc = new NativeRenderPlugin.AddInstanceDesc
+                    {
+                        instanceHandle        = customHandle,
+                        vertexBufferNativePtr = vbPtr,
+                        vertexCount           = vertexCount,
+                        vertexStride          = vertexStride,
+                        indexBufferNativePtr  = ibPtr,
+                        indexStride           = indexStride,
+                        submeshDescs          = (IntPtr)pDescs,
+                        submeshCount          = (uint)groupSubmeshDescs.Length,
+                        ommDescs              = IntPtr.Zero,
+                        isDynamic             = isDynamic ? 1u : 0u,
+                    };
+                    ok = NativeRenderPlugin.NR_AS_AddInstance(_handle, ref desc);
+                }
                 if (!ok)
                     Debug.LogError($"[NativeRayTracing] AddInstanceGroup failed for '{mesh.name}' handle={customHandle}");
                 return ok;

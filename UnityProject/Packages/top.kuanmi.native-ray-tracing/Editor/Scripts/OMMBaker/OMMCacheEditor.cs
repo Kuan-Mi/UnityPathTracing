@@ -291,7 +291,7 @@ namespace NativeRender
 
             // Build UV mesh (positions = UV coords mapped to [-1,1])
             if (_uvMesh == null || rebuildBuffers)
-                _uvMesh = BuildUVMesh(cache.sourceMesh);
+                _uvMesh = BuildUVMesh(cache.sourceMesh, cache.submeshIndex);
 
             if (_uvMesh == null)
             {
@@ -334,7 +334,7 @@ namespace NativeRender
 
         // ── Build a mesh whose vertex positions are UV coords in NDC ──────
 
-        private static Mesh BuildUVMesh(Mesh src)
+        private static Mesh BuildUVMesh(Mesh src, int submeshIndex)
         {
             if (src == null) return null;
             Vector2[] uvs = src.uv;
@@ -351,10 +351,11 @@ namespace NativeRender
             m.vertices    = verts;
             m.uv          = uvs;
 
-            int sc = src.subMeshCount;
-            m.subMeshCount = sc;
-            for (int s = 0; s < sc; s++)
-                m.SetTriangles(src.GetTriangles(s), s);
+            // Only include the baked submesh triangles so triangle indices
+            // align with the OMM index buffer (which covers only that submesh).
+            int clampedSub = Mathf.Clamp(submeshIndex, 0, src.subMeshCount - 1);
+            m.subMeshCount = 1;
+            m.SetTriangles(src.GetTriangles(clampedSub), 0);
 
             m.RecalculateBounds();
             return m;
