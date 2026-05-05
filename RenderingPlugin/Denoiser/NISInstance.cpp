@@ -139,6 +139,23 @@ void NISInstance::DispatchCompute(NISFrameData* data)
     dispatchUpscaleDesc.currentResolution = {(nri::Dim_t)data->currentWidth, (nri::Dim_t)data->currentHeight};
     dispatchUpscaleDesc.settings.nis.sharpness = data->sharpness;
 
+    // Transition input to SRV, output to UAV before dispatch
+    {
+        auto& nriCore = RenderSystem::Get().GetNriCore();
+        if (data->inputTex)
+        {
+            auto* inputRes = reinterpret_cast<ID3D12Resource*>(nriCore.GetTextureNativeObject(data->inputTex));
+            if (inputRes)
+                s_d3d12->RequestResourceState(inputRes, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
+        }
+        if (data->outputTex)
+        {
+            auto* outputRes = reinterpret_cast<ID3D12Resource*>(nriCore.GetTextureNativeObject(data->outputTex));
+            if (outputRes)
+                s_d3d12->RequestResourceState(outputRes, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
+        }
+    }
+
     RenderSystem::Get().GetNriUpScaler().CmdDispatchUpscale(*nriCmdBuffer, *m_NIS, dispatchUpscaleDesc);
 
     RenderSystem::Get().GetNriCore().DestroyCommandBuffer(nriCmdBuffer);

@@ -33,10 +33,10 @@ MonoBehaviour:
   m_AssetVersion: 3
   m_PrepassLayerMask:
     serializedVersion: 2
-    m_Bits: 0
+    m_Bits: 4294967295
   m_OpaqueLayerMask:
     serializedVersion: 2
-    m_Bits: 0
+    m_Bits: 4294967295
   m_TransparentLayerMask:
     serializedVersion: 2
     m_Bits: 0
@@ -67,7 +67,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 5a4e0d79381289b4cb6b3a5e5d56f537, type: 3}
   m_Name: NRDFeature
   m_EditorClassIdentifier: Assembly-CSharp::PathTracing.NRDFeature
-  m_Active: 1
+  m_Active: 0
   setting:
     showValidation: 0
     showMV: 0
