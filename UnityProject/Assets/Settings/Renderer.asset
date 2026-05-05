@@ -74,7 +74,7 @@ MonoBehaviour:
     mergeBlas: 1
     cameraJitter: 1
     sunAngularDiameter: 0.533
-    exposure: 1
+    exposure: 30
     roughnessOverride: 0
     metalnessOverride: 0
     emissionIntensityLights: 1

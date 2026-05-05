@@ -263,6 +263,46 @@ namespace NativeRender
 
         public void MarkRebuildDirty() => _sceneDirty = true;
 
+        /// <summary>打印 _instanceCpu 和 _textures 的全部信息到 Console。</summary>
+        public void PrintDebugInfo()
+        {
+            var sb = new System.Text.StringBuilder();
+
+            // ---------- _instanceCpu ----------
+            if (_instanceCpu == null)
+            {
+                sb.AppendLine("[NRDSampleResource] _instanceCpu: null");
+            }
+            else
+            {
+                sb.AppendLine($"[NRDSampleResource] _instanceCpu: {_instanceCpu.Length} entries");
+                for (int i = 0; i < _instanceCpu.Length; i++)
+                {
+                    var inst = _instanceCpu[i];
+                    // sb.AppendLine($"  [{i}] mOverloaded0={inst.mOverloadedMatrix0}  mOverloaded1={inst.mOverloadedMatrix1}  mOverloaded2={inst.mOverloadedMatrix2}");
+                    // sb.AppendLine($"  [{i}] mOverloaded0={inst.mOverloadedMatrix0}  mOverloaded1={inst.mOverloadedMatrix1}  mOverloaded2={inst.mOverloadedMatrix2}");
+                    sb.AppendLine($"  [{i}] textureOffsetAndFlags=0x{inst.textureOffsetAndFlags:X8}  primitiveOffset={inst.primitiveOffset}  scale={inst.scale}  morphPrimitiveOffset={inst.morphPrimitiveOffset}");
+                }
+            }
+
+            // ---------- _textures ----------
+            if (_textures == null)
+            {
+                sb.AppendLine("[NRDSampleResource] _textures: null");
+            }
+            else
+            {
+                sb.AppendLine($"[NRDSampleResource] _textures: capacity={_textures.Capacity}  handle=0x{_textures.Handle:X}  isValid={_textures.IsValid}");
+                for (int i = 0; i < _textures.Capacity; i++)
+                {
+                    var tex = _textures[i];
+                    sb.AppendLine($"  [{i}] {(tex != null ? $"{tex.name} ({tex.GetType().Name}) dim={tex.dimension} {tex.width}x{tex.height}" : "<null>")}");
+                }
+            }
+
+            Debug.Log(sb.ToString());
+        }
+
         /// <summary>Dirty detection + full scene rebuild when needed.</summary>
         public void UpdateForFrame()
         {
@@ -996,7 +1036,7 @@ namespace NativeRender
             uint instanceCursor  = 0;
 
             var instList = new List<InstanceDataNRD>();
-            var texPtrs  = new List<IntPtr>();
+            var texPtrs  = new List<Texture>();
 
             // ---- Merged BLASes for static objects (play mode only) ----
             uint staticOpaqueFirstInstance      = instanceCursor;
@@ -1038,7 +1078,7 @@ namespace NativeRender
                 int texCount = Mathf.Max(texPtrs.Count, 1);
                 _textures = new BindlessTexture(texCount);
                 for (int i = 0; i < texPtrs.Count; i++)
-                    _textures.SetNativePtr(i, texPtrs[i]);
+                    _textures[i] = texPtrs[i];
             }
 
             // ---- GPU buffers ----
@@ -1126,7 +1166,7 @@ namespace NativeRender
             ref uint instanceCursor,
             ref uint primitiveCursor,
             List<InstanceDataNRD> instList,
-            List<IntPtr> texPtrs)
+            List<Texture> texPtrs)
         {
             var swTotal = Stopwatch.StartNew();
 
@@ -1807,7 +1847,7 @@ namespace NativeRender
             ref uint primitiveCursor,
             List<InstanceDataNRD> instList,
             NativeArray<PrimitiveDataNRD> primOutput,
-            List<IntPtr> texPtrs,
+            List<Texture> texPtrs,
             uint baseFlags)
         {
             if (group.Count == 0) return null;
@@ -2200,7 +2240,7 @@ namespace NativeRender
         /// </para>
         /// Always increments the material reference count.
         /// </summary>
-        private int GetOrAddMaterial(SubmeshMaterialData matData, List<IntPtr> texPtrs)
+        private int GetOrAddMaterial(SubmeshMaterialData matData, List<Texture> texPtrs)
         {
             Material mat = matData?.material;
 
@@ -2248,7 +2288,7 @@ namespace NativeRender
                         }
                     }
 
-                    texPtrs.Add(tex.GetNativeTexturePtr());
+                    texPtrs.Add(tex);
                 }
             }
             else if (_textures != null && matData != null)
@@ -2278,8 +2318,8 @@ namespace NativeRender
                                 break;
                         }
 
-                        _textures.SetNativePtr(base4D + i, tex.GetNativeTexturePtr());
                     }
+                    _textures[base4D + i] = tex;
                 }
             }
 
@@ -2313,7 +2353,7 @@ namespace NativeRender
             {
                 int base4 = slotIdx * TexturesPerMaterial;
                 for (int i = 0; i < TexturesPerMaterial; i++)
-                    _textures.SetNativePtr(base4 + i, IntPtr.Zero);
+                    _textures[base4 + i] = null;
             }
         }
 

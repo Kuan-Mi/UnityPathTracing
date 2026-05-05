@@ -38,10 +38,20 @@ namespace PathTracing
                 feature.AutoFillShaders();
             }
 
+            if (GUILayout.Button("Print NRDSampleResource Info"))
+            {
+                var res = feature.NrdSampleResource;
+                if (res != null)
+                    res.PrintDebugInfo();
+                else
+                    Debug.Log("[NRDFeatureEditor] NrdSampleResource is null (not initialized yet).");
+            }
+
 
             EditorGUILayout.Space(10);
 
             DrawObjectRecursive("Global Constants", feature.globalConstants, "GlobalConstants");
+            DrawObjectRecursive("Info", feature.NrdSampleResource, "Info");
 
             serializedObject.ApplyModifiedProperties();
         }

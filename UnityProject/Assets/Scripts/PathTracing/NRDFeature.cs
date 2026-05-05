@@ -71,6 +71,7 @@ namespace PathTracing
         private NativeFrameTick       _nativeFrameTickPass;
 
         private NRDSampleResource _nrdSampleResource;
+        public NRDSampleResource NrdSampleResource => _nrdSampleResource;
 
         private readonly Dictionary<long, NativeBuffer> _nrdConstantBuffers = new();
 

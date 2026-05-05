@@ -82,6 +82,8 @@ namespace NativeRender
             {
                 if (index < 0 || index >= _textures.Length)
                     throw new ArgumentOutOfRangeException(nameof(index));
+                
+                Debug.Log($"[BindlessTexture] Setting slot {index} to {(value != null ? value.name : "null")}");
                 _textures[index] = value;
                 if (IsValid)
                 {
