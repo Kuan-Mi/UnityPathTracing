@@ -76,6 +76,9 @@ namespace NativeRender
             // Per-submesh records (one entry per submesh of every target in the BLAS).
             public NativeRenderPlugin.SubmeshDesc[] submeshDescs;
 
+            // Parallel to submeshDescs; null element means no OMM for that submesh.
+            public OMMCache[] ommCaches;
+
             public void Dispose()
             {
                 vb?.Release();
@@ -1837,6 +1840,7 @@ namespace NativeRender
 
             var meshDataArr  = Mesh.AcquireReadOnlyMeshData(meshList);
             var submeshDescs = new List<NativeRenderPlugin.SubmeshDesc>();
+            var ommCacheList  = new List<OMMCache>();
             var jobHandles   = new List<JobHandle>(targetOrder.Count * 4);
             var tempArrays   = new List<System.IDisposable>(targetOrder.Count * 5);
 
@@ -1914,6 +1918,7 @@ namespace NativeRender
                         indexByteOffset = (uint)(iBase * sizeof(uint)),
                         flags           = target.SubmeshMaterialInfos[sub].isAlphaClip ? 0u : NativeRenderPlugin.SUBMESH_FLAG_GEOMETRY_OPAQUE,
                     });
+                    ommCacheList.Add((target.ommCaches != null && sub < target.ommCaches.Length) ? target.ommCaches[sub] : null);
 
                     // Remap local indices to global merged-VB space.
                     jobHandles.Add(new RemapIndicesJob
@@ -1978,6 +1983,7 @@ namespace NativeRender
             {
                 vertexCount  = (uint)totalVerts,
                 submeshDescs = submeshDescs.ToArray(),
+                ommCaches    = ommCacheList.ToArray(),
                 vb           = new GraphicsBuffer(GraphicsBuffer.Target.Structured, totalVerts, sizeof(float) * 3),
                 ib           = new GraphicsBuffer(GraphicsBuffer.Target.Structured, totalIndices, sizeof(uint)),
             };
@@ -1997,26 +2003,93 @@ namespace NativeRender
             if (dstAS == null || blas == null) return;
             if (blas.submeshDescs == null || blas.submeshDescs.Length == 0) return;
 
-            fixed (NativeRenderPlugin.SubmeshDesc* pDescs = blas.submeshDescs)
+            // Check whether any submesh has a valid baked OMM.
+            bool hasAnyOMM = false;
+            if (blas.ommCaches != null)
             {
-                var desc = new NativeRenderPlugin.AddInstanceDesc
-                {
-                    vertexBufferNativePtr = blas.vb.GetNativeBufferPtr(),
-                    indexBufferNativePtr  = blas.ib.GetNativeBufferPtr(),
-                    submeshDescs          = (IntPtr)pDescs,
-                    ommDescs              = IntPtr.Zero,
-                    instanceHandle        = handle,
-                    vertexCount           = blas.vertexCount,
-                    vertexStride          = sizeof(float) * 3,
-                    indexStride           = sizeof(uint),
-                    submeshCount          = (uint)blas.submeshDescs.Length,
-                };
+                foreach (var c in blas.ommCaches)
+                    if (c != null && c.IsValid) { hasAnyOMM = true; break; }
+            }
 
-                if (!NativeRenderPlugin.NR_AS_AddInstance(dstAS.Handle, ref desc))
+            // Collect GCHandles (freed in finally) and build ommDescs in one pass.
+            NativeRenderPlugin.SubmeshOMMDesc[] ommDescs    = hasAnyOMM ? new NativeRenderPlugin.SubmeshOMMDesc[blas.submeshDescs.Length] : null;
+            var                                 pinnedHandles = new List<GCHandle>();
+            if (ommDescs != null)
+            {
+                for (int s = 0; s < ommDescs.Length; s++)
                 {
-                    Debug.LogError("[NRDSampleResource] NR_AS_AddInstance failed for merged BLAS");
-                    return;
+                    OMMCache cache = (blas.ommCaches != null && s < blas.ommCaches.Length) ? blas.ommCaches[s] : null;
+                    if (cache == null || !cache.IsValid) continue;
+                    pinnedHandles.Add(GCHandle.Alloc(cache.bakedArrayData,   GCHandleType.Pinned));
+                    pinnedHandles.Add(GCHandle.Alloc(cache.bakedDescArray,   GCHandleType.Pinned));
+                    pinnedHandles.Add(GCHandle.Alloc(cache.bakedIndexBuffer, GCHandleType.Pinned));
+                    pinnedHandles.Add(GCHandle.Alloc(cache.histogramFlat,    GCHandleType.Pinned));
+                    ommDescs[s] = new NativeRenderPlugin.SubmeshOMMDesc
+                    {
+                        arrayData      = pinnedHandles[pinnedHandles.Count - 4].AddrOfPinnedObject(),
+                        arrayDataSize  = (uint)cache.bakedArrayData.Length,
+                        descArray      = pinnedHandles[pinnedHandles.Count - 3].AddrOfPinnedObject(),
+                        descArrayCount = cache.bakedDescArrayCount,
+                        indexBuffer    = pinnedHandles[pinnedHandles.Count - 2].AddrOfPinnedObject(),
+                        indexCount     = cache.bakedIndexCount,
+                        indexStride    = cache.bakedIndexStride,
+                        histogramFlat  = pinnedHandles[pinnedHandles.Count - 1].AddrOfPinnedObject(),
+                        histogramCount = (uint)cache.HistogramEntryCount,
+                    };
                 }
+            }
+
+            try
+            {
+                fixed (NativeRenderPlugin.SubmeshDesc* pDescs = blas.submeshDescs)
+                {
+                    bool ok;
+                    if (ommDescs != null)
+                    {
+                        fixed (NativeRenderPlugin.SubmeshOMMDesc* pOMM = ommDescs)
+                        {
+                            var desc = new NativeRenderPlugin.AddInstanceDesc
+                            {
+                                vertexBufferNativePtr = blas.vb.GetNativeBufferPtr(),
+                                indexBufferNativePtr  = blas.ib.GetNativeBufferPtr(),
+                                submeshDescs          = (IntPtr)pDescs,
+                                ommDescs              = (IntPtr)pOMM,
+                                instanceHandle        = handle,
+                                vertexCount           = blas.vertexCount,
+                                vertexStride          = sizeof(float) * 3,
+                                indexStride           = sizeof(uint),
+                                submeshCount          = (uint)blas.submeshDescs.Length,
+                            };
+                            ok = NativeRenderPlugin.NR_AS_AddInstance(dstAS.Handle, ref desc);
+                        }
+                    }
+                    else
+                    {
+                        var desc = new NativeRenderPlugin.AddInstanceDesc
+                        {
+                            vertexBufferNativePtr = blas.vb.GetNativeBufferPtr(),
+                            indexBufferNativePtr  = blas.ib.GetNativeBufferPtr(),
+                            submeshDescs          = (IntPtr)pDescs,
+                            ommDescs              = IntPtr.Zero,
+                            instanceHandle        = handle,
+                            vertexCount           = blas.vertexCount,
+                            vertexStride          = sizeof(float) * 3,
+                            indexStride           = sizeof(uint),
+                            submeshCount          = (uint)blas.submeshDescs.Length,
+                        };
+                        ok = NativeRenderPlugin.NR_AS_AddInstance(dstAS.Handle, ref desc);
+                    }
+
+                    if (!ok)
+                    {
+                        Debug.LogError("[NRDSampleResource] NR_AS_AddInstance failed for merged BLAS");
+                        return;
+                    }
+                }
+            }
+            finally
+            {
+                foreach (var h in pinnedHandles) h.Free();
             }
 
             // Identity transform – vertices already in world space.
