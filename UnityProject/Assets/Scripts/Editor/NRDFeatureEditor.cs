@@ -24,7 +24,7 @@ namespace PathTracing
             NRDFeature feature = (NRDFeature)target;
 
             // 1. 绘制 PathTracingSetting (带折叠 Header)
-            SerializedProperty settingsProp = serializedObject.FindProperty("pathTracingSetting");
+            SerializedProperty settingsProp = serializedObject.FindProperty("setting");
             if (settingsProp != null)
             {
                 DrawSettingsWithFoldableHeaders(settingsProp);
@@ -66,7 +66,7 @@ namespace PathTracing
             // 已在其他地方单独处理的字段名，跳过
             var skip = new HashSet<string>
             {
-                "pathTracingSetting", "globalConstants", "resamplingConstants", "renderPassEvent"
+                "pathTracingSetting", "globalConstants", "resamplingConstants", "setting"
             };
 
             // 类型 → 分组标题

@@ -52,6 +52,7 @@ namespace PathTracing
         private IntPtr sobolTexPtr;
 
 
+        private DepthBarrierFixPass   _depthBarrierFixPass;
         private NRDTlasUpdatePass     _nrdTlasUpdatePass;
         private NRDSharcPass          _nrdSharcPass;
         private NRDOpaquePass         _nrdOpaquePass;
@@ -176,6 +177,11 @@ namespace PathTracing
             _nativeFrameTickPass ??= new NativeFrameTick()
             {
                 renderPassEvent = renderPassEvent,
+            };
+
+            _depthBarrierFixPass ??= new DepthBarrierFixPass()
+            {
+                renderPassEvent = RenderPassEvent.AfterRendering,
             };
         }
 
@@ -700,6 +706,8 @@ namespace PathTracing
                     showReference   = false,
                 });
                 renderer.EnqueuePass(_outputBlitPass);
+
+                renderer.EnqueuePass(_depthBarrierFixPass);
 
                 if (renderingData.cameraData.xr.enabled)
                 {
