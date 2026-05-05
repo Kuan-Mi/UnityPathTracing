@@ -58,7 +58,7 @@ namespace NativeRender
     /// Shared between <see cref="NativeRayTracingTarget"/>, <see cref="NativeRayTracingSkinnedTarget"/>,
     /// and <see cref="NRDSampleResource"/>.
     /// </summary>
-    internal static class RayTracingMaterialHelper
+    public static class RayTracingMaterialHelper
     {
         // ── Placeholder textures ──────────────────────────────────────────────
 

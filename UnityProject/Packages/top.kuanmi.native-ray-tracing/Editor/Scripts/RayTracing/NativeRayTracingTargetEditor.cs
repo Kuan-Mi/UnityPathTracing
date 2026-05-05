@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using System.IO;
 using UnityEditor;
 using UnityEngine;
@@ -5,38 +6,56 @@ using UnityEngine;
 namespace NativeRender
 {
     [CustomEditor(typeof(NativeRayTracingTarget))]
+    [CanEditMultipleObjects]
     public class NativeRayTracingTargetEditor : Editor
     {
-        // ── Bake settings (editor-only, not serialized on the component) ──
-        private string _saveFolder = "Assets/OMMCaches";
-
-        // Per-submesh texture overrides and bake params
-        private Texture2D[]            _texOverride;
-        private float[]                _alphaCutoff;
-        private byte[]                 _maxSubdiv;
-        private float[]                _dynScale;
-        private OMMCache.OmmFormat[]   _ommFormat;
-        private OMMCache.DownsampleFactor[] _downsample;
-
-        // UI state
-        private bool   _showBake  = true;
-        private string _bakeStatus = null;
+        // ── Shared bake settings ──────────────────────────────────────────
+        private string _saveFolder  = "Assets/OMMCaches";
+        private bool   _showBake    = true;
+        private string _bakeStatus  = null;
         private bool   _bakeSuccess = false;
 
-        // ── Cached component references ────────────────────────────────────
-        private NativeRayTracingTarget Target     => (NativeRayTracingTarget)target;
-        private MeshFilter             _meshFilter;
-        private MeshRenderer           _renderer;
-        private Mesh                   _prevMesh;
-        private int                    _prevSubCount = -1;
+        // ── Per-target editor state ───────────────────────────────────────
+        private class TargetState
+        {
+            public MeshFilter  meshFilter;
+            public MeshRenderer renderer;
+            public Mesh        prevMesh;
+            public int         prevSubCount = -1;
+
+            public Texture2D[]                 texOverride;
+            public float[]                     alphaCutoff;
+            public byte[]                      maxSubdiv;
+            public float[]                     dynScale;
+            public OMMCache.OmmFormat[]        ommFormat;
+            public OMMCache.DownsampleFactor[] downsample;
+        }
+
+        private readonly Dictionary<int, TargetState> _states = new Dictionary<int, TargetState>();
 
         private void OnEnable()
         {
-            _meshFilter = Target.GetComponent<MeshFilter>();
-            _renderer   = Target.GetComponent<MeshRenderer>();
-            RebuildPerSubmeshArrays();
+            foreach (var t in targets)
+            {
+                var nrt = (NativeRayTracingTarget)t;
+                int id = nrt.GetInstanceID();
+                if (!_states.ContainsKey(id))
+                    _states[id] = CreateState(nrt);
+            }
         }
 
+        private TargetState CreateState(NativeRayTracingTarget nrt)
+        {
+            var state = new TargetState
+            {
+                meshFilter = nrt.GetComponent<MeshFilter>(),
+                renderer   = nrt.GetComponent<MeshRenderer>()
+            };
+            RebuildArrays(state);
+            return state;
+        }
+
+        // ──────────────────────────────────────────────────────────────────
         public override void OnInspectorGUI()
         {
             DrawDefaultInspector();
@@ -44,37 +63,13 @@ namespace NativeRender
             EditorGUILayout.Space(8);
             _showBake = EditorGUILayout.BeginFoldoutHeaderGroup(_showBake, "OMM Bake");
             if (_showBake)
-            {
                 DrawBakeSection();
-            }
             EditorGUILayout.EndFoldoutHeaderGroup();
         }
 
-        // ──────────────────────────────────────────────────────────────────
         private void DrawBakeSection()
         {
-            Mesh mesh = _meshFilter != null ? _meshFilter.sharedMesh : null;
-
-            // Detect mesh change → re-init per-submesh arrays
-            if (mesh != _prevMesh)
-            {
-                _prevMesh = mesh;
-                RebuildPerSubmeshArrays();
-            }
-
-            if (mesh == null)
-            {
-                EditorGUILayout.HelpBox("No Mesh found on MeshFilter.", MessageType.Warning);
-                return;
-            }
-
-            int subCount = mesh.subMeshCount;
-            if (subCount != _prevSubCount)
-            {
-                RebuildPerSubmeshArrays();
-            }
-
-            // Save folder
+            // Save folder (shared across all selected objects)
             EditorGUILayout.BeginHorizontal();
             _saveFolder = EditorGUILayout.TextField("Save Folder", _saveFolder);
             if (GUILayout.Button("Browse", GUILayout.Width(60)))
@@ -84,44 +79,96 @@ namespace NativeRender
                     "");
                 if (!string.IsNullOrEmpty(chosen))
                 {
-                    // Convert absolute path back to project-relative
                     if (chosen.StartsWith(Application.dataPath))
                         chosen = "Assets" + chosen.Substring(Application.dataPath.Length).Replace('\\', '/');
                     _saveFolder = chosen;
                 }
             }
             EditorGUILayout.EndHorizontal();
-
             EditorGUILayout.Space(4);
-            EditorGUILayout.LabelField("Submeshes", EditorStyles.boldLabel);
 
-            // Per-submesh rows
-            for (int i = 0; i < subCount; i++)
+            bool multiSelect = targets.Length > 1;
+
+            foreach (var t in targets)
             {
-                DrawSubmeshRow(i, mesh, subCount);
-            }
+                var nrt = (NativeRayTracingTarget)t;
+                int id  = nrt.GetInstanceID();
 
-            EditorGUILayout.Space(6);
-
-            // Bake all button
-            using (new EditorGUI.DisabledScope(mesh == null))
-            {
-                if (GUILayout.Button("Bake All Submeshes", GUILayout.Height(28)))
+                if (!_states.TryGetValue(id, out var state))
                 {
-                    BakeAll(mesh);
+                    state = CreateState(nrt);
+                    _states[id] = state;
+                }
+
+                Mesh mesh = state.meshFilter != null ? state.meshFilter.sharedMesh : null;
+
+                // Detect mesh / subMesh count change
+                if (mesh != state.prevMesh)
+                {
+                    state.prevMesh = mesh;
+                    RebuildArrays(state);
+                }
+                else if (mesh != null && mesh.subMeshCount != state.prevSubCount)
+                {
+                    RebuildArrays(state);
+                }
+
+                if (multiSelect)
+                {
+                    EditorGUILayout.LabelField($"► {nrt.gameObject.name}", EditorStyles.boldLabel);
+                    EditorGUI.indentLevel++;
+                }
+
+                if (mesh == null)
+                {
+                    EditorGUILayout.HelpBox("No Mesh found on MeshFilter.", MessageType.Warning);
+                }
+                else
+                {
+                    EditorGUILayout.LabelField("Submeshes", EditorStyles.boldLabel);
+                    int subCount = mesh.subMeshCount;
+                    for (int i = 0; i < subCount; i++)
+                        DrawSubmeshRow(nrt, state, i, mesh, subCount);
+
+                    EditorGUILayout.Space(4);
+                    string bakeLabel = multiSelect ? $"Bake All Submeshes  ({nrt.gameObject.name})" : "Bake All Submeshes";
+                    if (GUILayout.Button(bakeLabel, GUILayout.Height(24)))
+                        BakeAll(nrt, mesh, state, updateStatus: !multiSelect);
+                }
+
+                if (multiSelect)
+                {
+                    EditorGUI.indentLevel--;
+                    EditorGUILayout.Space(6);
                 }
             }
 
-            // Status
-            if (!string.IsNullOrEmpty(_bakeStatus))
+            // Batch bake button shown only when multiple objects are selected
+            if (multiSelect)
             {
-                var style = _bakeSuccess ? EditorStyles.helpBox : EditorStyles.helpBox;
-                var msgType = _bakeSuccess ? MessageType.Info : MessageType.Error;
-                EditorGUILayout.HelpBox(_bakeStatus, msgType);
+                EditorGUILayout.Space(2);
+                if (GUILayout.Button($"Bake All {targets.Length} Selected Objects", GUILayout.Height(28)))
+                {
+                    bool allOk = true;
+                    foreach (var t in targets)
+                    {
+                        var nrt = (NativeRayTracingTarget)t;
+                        if (!_states.TryGetValue(nrt.GetInstanceID(), out var state)) continue;
+                        Mesh mesh = state.meshFilter != null ? state.meshFilter.sharedMesh : null;
+                        if (mesh == null) continue;
+                        if (!BakeAll(nrt, mesh, state, updateStatus: false))
+                            allOk = false;
+                    }
+                    _bakeStatus  = allOk ? $"All {targets.Length} object(s) baked successfully." : "Some objects failed — check Console.";
+                    _bakeSuccess = allOk;
+                }
             }
+
+            if (!string.IsNullOrEmpty(_bakeStatus))
+                EditorGUILayout.HelpBox(_bakeStatus, _bakeSuccess ? MessageType.Info : MessageType.Error);
         }
 
-        private void DrawSubmeshRow(int i, Mesh mesh, int subCount)
+        private void DrawSubmeshRow(NativeRayTracingTarget nrt, TargetState state, int i, Mesh mesh, int subCount)
         {
             EditorGUILayout.BeginVertical(EditorStyles.helpBox);
 
@@ -130,103 +177,82 @@ namespace NativeRender
             EditorGUILayout.LabelField(label, EditorStyles.miniBoldLabel, GUILayout.Width(100));
 
             // Cache status badge
-            OMMCache existing = (Target.ommCaches != null && i < Target.ommCaches.Length)
-                ? Target.ommCaches[i] : null;
+            OMMCache existing = (nrt.ommCaches != null && i < nrt.ommCaches.Length) ? nrt.ommCaches[i] : null;
             if (existing == null)
             {
                 GUILayout.Label("[ no cache ]", EditorStyles.miniLabel);
             }
             else if (existing.IsValid)
             {
-                var prevColor = GUI.color;
+                var prev = GUI.color;
                 GUI.color = new Color(0.4f, 1f, 0.4f);
                 GUILayout.Label("✓ valid", EditorStyles.miniLabel);
-                GUI.color = prevColor;
+                GUI.color = prev;
             }
             else
             {
-                var prevColor = GUI.color;
+                var prev = GUI.color;
                 GUI.color = new Color(1f, 0.7f, 0.2f);
                 GUILayout.Label("⚠ invalid", EditorStyles.miniLabel);
-                GUI.color = prevColor;
+                GUI.color = prev;
             }
 
             GUILayout.FlexibleSpace();
-
-            // Per-submesh bake button
             if (GUILayout.Button("Bake", GUILayout.Width(50), GUILayout.Height(18)))
-            {
-                BakeSingle(i, mesh);
-            }
+                BakeSingle(nrt, state, i, mesh, updateStatus: true);
             EditorGUILayout.EndHorizontal();
 
-            // Texture override
-            _texOverride[i] = (Texture2D)EditorGUILayout.ObjectField(
-                "Alpha Texture", _texOverride[i], typeof(Texture2D), false);
-
-            // Alpha cutoff
-            _alphaCutoff[i] = EditorGUILayout.FloatField("Alpha Cutoff", _alphaCutoff[i]);
-
-            // Max subdivision
-            _maxSubdiv[i] = (byte)EditorGUILayout.IntSlider("Max Subdivision", _maxSubdiv[i], 0, 12);
-
-            // Dynamic subdivision scale
-            _dynScale[i] = EditorGUILayout.Slider("Dynamic Scale", _dynScale[i], 0f, 12f);
-
-            // OMM Format
-            _ommFormat[i] = (OMMCache.OmmFormat)EditorGUILayout.EnumPopup("OMM Format", _ommFormat[i]);
-
-            // Downsample factor
-            _downsample[i] = (OMMCache.DownsampleFactor)EditorGUILayout.EnumPopup("Texture Downsample", _downsample[i]);
+            state.texOverride[i] = (Texture2D)EditorGUILayout.ObjectField("Alpha Texture",    state.texOverride[i], typeof(Texture2D), false);
+            state.alphaCutoff[i] = EditorGUILayout.FloatField(               "Alpha Cutoff",    state.alphaCutoff[i]);
+            state.maxSubdiv[i]   = (byte)EditorGUILayout.IntSlider(          "Max Subdivision", state.maxSubdiv[i], 0, 12);
+            state.dynScale[i]    = EditorGUILayout.Slider(                   "Dynamic Scale",   state.dynScale[i], 0f, 12f);
+            state.ommFormat[i]   = (OMMCache.OmmFormat)EditorGUILayout.EnumPopup(        "OMM Format",        state.ommFormat[i]);
+            state.downsample[i]  = (OMMCache.DownsampleFactor)EditorGUILayout.EnumPopup( "Texture Downsample", state.downsample[i]);
 
             EditorGUILayout.EndVertical();
         }
 
         // ──────────────────────────────────────────────────────────────────
-        private void RebuildPerSubmeshArrays()
+        private void RebuildArrays(TargetState state)
         {
-            Mesh mesh = _meshFilter != null ? _meshFilter.sharedMesh : null;
+            Mesh mesh = state.meshFilter != null ? state.meshFilter.sharedMesh : null;
             int n = (mesh != null) ? Mathf.Max(1, mesh.subMeshCount) : 1;
-            _prevSubCount = (mesh != null) ? mesh.subMeshCount : -1;
+            state.prevSubCount = (mesh != null) ? mesh.subMeshCount : -1;
 
-            // Preserve existing values when growing
-            int oldN = (_texOverride != null) ? _texOverride.Length : 0;
+            int oldN = (state.texOverride != null) ? state.texOverride.Length : 0;
 
-            System.Array.Resize(ref _texOverride, n);
-            System.Array.Resize(ref _alphaCutoff,  n);
-            System.Array.Resize(ref _maxSubdiv,    n);
-            System.Array.Resize(ref _dynScale,     n);
-            System.Array.Resize(ref _ommFormat,    n);
-            System.Array.Resize(ref _downsample,   n);
+            System.Array.Resize(ref state.texOverride, n);
+            System.Array.Resize(ref state.alphaCutoff,  n);
+            System.Array.Resize(ref state.maxSubdiv,    n);
+            System.Array.Resize(ref state.dynScale,     n);
+            System.Array.Resize(ref state.ommFormat,    n);
+            System.Array.Resize(ref state.downsample,   n);
 
-            // Init new slots with defaults and auto-detect textures
             for (int i = oldN; i < n; i++)
             {
-                _texOverride[i] = AutoDetectTexture(i);
-                _alphaCutoff[i] = 0.5f;
-                _maxSubdiv[i]   = 8;
-                _dynScale[i]    = 2f;
-                _ommFormat[i]   = OMMCache.OmmFormat.FourState;
-                _downsample[i]  = OMMCache.DownsampleFactor.x1;
+                state.texOverride[i] = AutoDetectTexture(state, i);
+                state.alphaCutoff[i] = 0.5f;
+                state.maxSubdiv[i]   = 8;
+                state.dynScale[i]    = 2f;
+                state.ommFormat[i]   = OMMCache.OmmFormat.FourState;
+                state.downsample[i]  = OMMCache.DownsampleFactor.x1;
             }
 
-            // Auto-fill textures for existing slots that are null
             for (int i = 0; i < Mathf.Min(oldN, n); i++)
             {
-                if (_texOverride[i] == null)
-                    _texOverride[i] = AutoDetectTexture(i);
+                if (state.texOverride[i] == null)
+                    state.texOverride[i] = AutoDetectTexture(state, i);
             }
         }
 
-        private Texture2D AutoDetectTexture(int submeshIndex)
+        private static Texture2D AutoDetectTexture(TargetState state, int submeshIndex)
         {
-            if (_renderer == null) return null;
-            var mats = _renderer.sharedMaterials;
+            if (state.renderer == null) return null;
+            var mats = state.renderer.sharedMaterials;
             if (mats == null || submeshIndex >= mats.Length) return null;
             var mat = mats[submeshIndex];
             if (mat == null) return null;
 
-            // Try common alpha/cutout texture property names first
             foreach (var propName in new[] { "_AlphaMap", "_AlphaTex", "_MaskTex", "_MainTex", "_BaseMap" })
             {
                 if (mat.HasProperty(propName))
@@ -239,48 +265,41 @@ namespace NativeRender
         }
 
         // ──────────────────────────────────────────────────────────────────
-        private void BakeAll(Mesh mesh)
+        private bool BakeAll(NativeRayTracingTarget nrt, Mesh mesh, TargetState state, bool updateStatus)
         {
             bool allOk = true;
             for (int i = 0; i < mesh.subMeshCount; i++)
             {
-                if (!BakeSingle(i, mesh))
+                if (!BakeSingle(nrt, state, i, mesh, updateStatus: false))
                     allOk = false;
             }
-            _bakeStatus  = allOk ? $"All {mesh.subMeshCount} submesh(es) baked successfully." : "Some submeshes failed — check Console.";
-            _bakeSuccess = allOk;
+            if (updateStatus)
+            {
+                _bakeStatus  = allOk ? $"All {mesh.subMeshCount} submesh(es) baked successfully." : "Some submeshes failed — check Console.";
+                _bakeSuccess = allOk;
+            }
+            return allOk;
         }
 
-        private bool BakeSingle(int submeshIndex, Mesh mesh)
+        private bool BakeSingle(NativeRayTracingTarget nrt, TargetState state, int submeshIndex, Mesh mesh, bool updateStatus)
         {
-            _bakeStatus = null;
-
-            // Validate texture
-            Texture2D tex = _texOverride[submeshIndex];
+            Texture2D tex = state.texOverride[submeshIndex];
             if (tex == null)
             {
-                _bakeStatus  = $"Submesh {submeshIndex}: No alpha texture specified.";
-                _bakeSuccess = false;
-                Debug.LogError($"[NativeRayTracingTarget] {_bakeStatus}");
+                string msg = $"Submesh {submeshIndex}: No alpha texture specified.";
+                if (updateStatus) { _bakeStatus = msg; _bakeSuccess = false; }
+                Debug.LogError($"[NativeRayTracingTarget] ({nrt.gameObject.name}) {msg}");
                 return false;
             }
 
-            // Ensure save folder exists
             if (!AssetDatabase.IsValidFolder(_saveFolder))
-            {
                 CreateFolderRecursive(_saveFolder);
-            }
 
-            // Determine asset path
-            string goName   = Target.gameObject.name;
-            string meshName = mesh.name;
-            string assetName = $"{goName}_{meshName}_sub{submeshIndex}.asset";
-            // Sanitize
+            string assetName = $"{nrt.gameObject.name}_{mesh.name}_sub{submeshIndex}.asset";
             foreach (char c in Path.GetInvalidFileNameChars())
                 assetName = assetName.Replace(c, '_');
             string assetPath = $"{_saveFolder}/{assetName}";
 
-            // Reuse existing asset or create new
             OMMCache cache = AssetDatabase.LoadAssetAtPath<OMMCache>(assetPath);
             if (cache == null)
             {
@@ -288,18 +307,16 @@ namespace NativeRender
                 AssetDatabase.CreateAsset(cache, assetPath);
             }
 
-            // Populate bake parameters
-            cache.sourceMesh             = mesh;
-            cache.submeshIndex           = submeshIndex;
-            cache.sourceTexture          = tex;
-            cache.alphaCutoff            = _alphaCutoff[submeshIndex];
-            cache.maxSubdivisionLevel    = _maxSubdiv[submeshIndex];
-            cache.dynamicSubdivisionScale = _dynScale[submeshIndex];
-            cache.ommFormat              = _ommFormat[submeshIndex];
-            cache.textureDownsampleFactor = _downsample[submeshIndex];
+            cache.sourceMesh              = mesh;
+            cache.submeshIndex            = submeshIndex;
+            cache.sourceTexture           = tex;
+            cache.alphaCutoff             = state.alphaCutoff[submeshIndex];
+            cache.maxSubdivisionLevel     = state.maxSubdiv[submeshIndex];
+            cache.dynamicSubdivisionScale = state.dynScale[submeshIndex];
+            cache.ommFormat               = state.ommFormat[submeshIndex];
+            cache.textureDownsampleFactor = state.downsample[submeshIndex];
             EditorUtility.SetDirty(cache);
 
-            // Bake
             bool ok = OMMCacheEditor.BakeInto(cache, submeshIndex);
 
             if (ok)
@@ -307,29 +324,28 @@ namespace NativeRender
                 EditorUtility.SetDirty(cache);
                 AssetDatabase.SaveAssets();
 
-                // Write back into ommCaches array
-                Undo.RecordObject(Target, "Bake OMM");
-                if (Target.ommCaches == null || Target.ommCaches.Length <= submeshIndex)
+                Undo.RecordObject(nrt, "Bake OMM");
+                if (nrt.ommCaches == null || nrt.ommCaches.Length <= submeshIndex)
                 {
                     int newLen = submeshIndex + 1;
                     var newArr = new OMMCache[newLen];
-                    if (Target.ommCaches != null)
-                        System.Array.Copy(Target.ommCaches, newArr, Target.ommCaches.Length);
-                    Target.ommCaches = newArr;
+                    if (nrt.ommCaches != null)
+                        System.Array.Copy(nrt.ommCaches, newArr, nrt.ommCaches.Length);
+                    nrt.ommCaches = newArr;
                 }
-                Target.ommCaches[submeshIndex] = cache;
-                EditorUtility.SetDirty(Target);
+                nrt.ommCaches[submeshIndex] = cache;
+                EditorUtility.SetDirty(nrt);
                 if (!Application.isPlaying)
-                    UnityEditor.SceneManagement.EditorSceneManager.MarkSceneDirty(Target.gameObject.scene);
+                    UnityEditor.SceneManagement.EditorSceneManager.MarkSceneDirty(nrt.gameObject.scene);
 
-                _bakeStatus  = $"Submesh {submeshIndex} baked ✓  ({cache.bakedIndexCount / 3} triangles)";
-                _bakeSuccess = true;
-                Debug.Log($"[NativeRayTracingTarget] {_bakeStatus}  →  {assetPath}");
+                string statusMsg = $"Submesh {submeshIndex} baked ✓  ({cache.bakedIndexCount / 3} triangles)";
+                if (updateStatus) { _bakeStatus = statusMsg; _bakeSuccess = true; }
+                Debug.Log($"[NativeRayTracingTarget] ({nrt.gameObject.name}) {statusMsg}  →  {assetPath}");
             }
             else
             {
-                _bakeStatus  = $"Submesh {submeshIndex} bake FAILED. Check Console for details.";
-                _bakeSuccess = false;
+                string statusMsg = $"Submesh {submeshIndex} bake FAILED. Check Console for details.";
+                if (updateStatus) { _bakeStatus = statusMsg; _bakeSuccess = false; }
             }
 
             return ok;
@@ -338,9 +354,8 @@ namespace NativeRender
         // ──────────────────────────────────────────────────────────────────
         private static void CreateFolderRecursive(string folderPath)
         {
-            // folderPath like "Assets/Foo/Bar/Baz"
             string[] parts = folderPath.Split('/');
-            string current = parts[0]; // "Assets"
+            string current = parts[0];
             for (int i = 1; i < parts.Length; i++)
             {
                 string next = current + "/" + parts[i];
