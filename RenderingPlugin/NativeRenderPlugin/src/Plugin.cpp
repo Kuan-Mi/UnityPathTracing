@@ -1123,13 +1123,13 @@ NR_DestroyNativeStructuredBuffer(uint64_t handle)
 
 // ---------------------------------------------------------------------------
 // NR_NSB_UploadRange
-//   Copies |elementCount| elements from |data| starting at |elementOffset|.
+//   Legacy export: redirects to EnqueueUpload for backwards compatibility.
 // ---------------------------------------------------------------------------
 extern "C" void UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API
 NR_NSB_UploadRange(uint64_t handle, const void* data, uint32_t elementOffset, uint32_t elementCount)
 {
     if (!handle || !data) return;
-    reinterpret_cast<NativeStructuredBuffer*>(handle)->UploadRange(data, elementOffset, elementCount);
+    reinterpret_cast<NativeStructuredBuffer*>(handle)->EnqueueUpload(data, elementOffset, elementCount);
 }
 
 // ---------------------------------------------------------------------------
@@ -1194,6 +1194,36 @@ extern "C" UnityRenderingEventAndData UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API
 NR_NSB_GetFlushEventFunc()
 {
     return NsbFlushCallback;
+}
+
+// ---------------------------------------------------------------------------
+// NR_NSB_DrainEnqueuedUploads render-event callback
+//   Drains the main-thread pending-upload queue and writes into staging[g_frameIndex].
+//   Must be issued BEFORE NsbFlushCallback in the same CommandBuffer.
+// ---------------------------------------------------------------------------
+static void UNITY_INTERFACE_API NsbDrainCallback(int /*eventId*/, void* data)
+{
+    if (!data) return;
+    static_cast<NativeStructuredBuffer*>(data)->DrainEnqueuedUploads();
+}
+
+extern "C" UnityRenderingEventAndData UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API
+NR_NSB_GetDrainEventFunc()
+{
+    return NsbDrainCallback;
+}
+
+// ---------------------------------------------------------------------------
+// NR_NSB_EnqueueUpload
+//   Thread-safe (main-thread) counterpart to UploadRange.
+//   Deep-copies |elementCount| elements from |data| into the pending queue.
+//   The actual staging write happens on the render thread via NsbDrainCallback.
+// ---------------------------------------------------------------------------
+extern "C" void UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API
+NR_NSB_EnqueueUpload(uint64_t handle, const void* data, uint32_t elementOffset, uint32_t elementCount)
+{
+    if (!handle || !data) return;
+    reinterpret_cast<NativeStructuredBuffer*>(handle)->EnqueueUpload(data, elementOffset, elementCount);
 }
 
 // ===========================================================================

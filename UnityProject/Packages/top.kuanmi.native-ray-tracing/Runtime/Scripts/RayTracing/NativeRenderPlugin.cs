@@ -391,6 +391,22 @@ namespace NativeRender
         [DllImport(DllName)]
         public static extern IntPtr NR_NSB_GetFlushEventFunc();
 
+        /// <summary>
+        /// Returns the <c>UnityRenderingEventAndData</c> function pointer for draining the
+        /// main-thread pending-upload queue into staging[g_frameIndex] on the render thread.
+        /// Must be issued BEFORE <see cref="NR_NSB_GetFlushEventFunc"/> in the same CommandBuffer.
+        /// </summary>
+        [DllImport(DllName)]
+        public static extern IntPtr NR_NSB_GetDrainEventFunc();
+
+        /// <summary>
+        /// Thread-safe (main thread): deep-copies <paramref name="elementCount"/> elements from
+        /// <paramref name="data"/> into the pending-upload queue. The actual staging write
+        /// happens on the render thread when the Drain event fires.
+        /// </summary>
+        [DllImport(DllName)]
+        public static unsafe extern void NR_NSB_EnqueueUpload(ulong handle, void* data, uint elementOffset, uint elementCount);
+
         // -------------------------------------------------------------------
         // ComputeShader API  (generic compute pipeline, cs_6_x)
         // -------------------------------------------------------------------

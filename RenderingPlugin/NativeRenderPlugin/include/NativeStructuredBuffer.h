@@ -3,6 +3,8 @@
 #include <wrl/client.h>
 #include <cstdint>
 #include <array>
+#include <mutex>
+#include <vector>
 #include "IUnityLog.h"
 
 using Microsoft::WRL::ComPtr;
@@ -31,8 +33,18 @@ public:
     bool Initialize(ID3D12Device* device, uint32_t capacity, uint32_t elementStride, IUnityLog* log = nullptr);
     ~NativeStructuredBuffer();
 
-    /// <summary>Writes elements into the current frame's staging buffer.</summary>
-    void UploadRange(const void* data, uint32_t elementOffset, uint32_t elementCount);
+    /// <summary>
+    /// Thread-safe: enqueues a copy of [data, data+elementCount) into an internal queue.
+    /// Must be called from the main thread. The actual write into staging happens on the
+    /// render thread via DrainEnqueuedUploads(), which reads g_frameIndex at the correct time.
+    /// </summary>
+    void EnqueueUpload(const void* data, uint32_t elementOffset, uint32_t elementCount);
+
+    /// <summary>
+    /// Render-thread: drains the enqueue queue and writes all pending entries into
+    /// staging[g_frameIndex]. Called via IssuePluginEventAndData before FlushPendingCopies.
+    /// </summary>
+    void DrainEnqueuedUploads();
 
     /// <summary>
     /// Issues COMMON→COPY_DEST barrier, CopyBufferRegion for the frame's dirty range,
@@ -77,5 +89,18 @@ private:
     bool AllocBuffer (uint32_t capacity);
     bool AllocStaging(uint32_t capacity);
     void FreeStaging (GrowResult* outOld = nullptr); // moves old resources into outOld if non-null
+
+    // Render-thread only: directly writes into staging[g_frameIndex] and expands the dirty region.
+    void UploadRange(const void* data, uint32_t elementOffset, uint32_t elementCount);
+
+    // Pending upload queue (main-thread enqueue, render-thread drain)
+    struct PendingUpload
+    {
+        std::vector<uint8_t> data;
+        uint32_t             offset;
+        uint32_t             count;
+    };
+    std::vector<PendingUpload> m_pendingQueue;
+    std::mutex                 m_queueMutex;
 };
 

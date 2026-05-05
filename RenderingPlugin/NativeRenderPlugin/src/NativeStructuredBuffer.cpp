@@ -169,16 +169,35 @@ void NativeStructuredBuffer::UploadRange(const void* data, uint32_t elementOffse
         m_dirtyMin[fi] = std::min(m_dirtyMin[fi], elementOffset);
         m_dirtyMax[fi] = std::max(m_dirtyMax[fi], rangeMax);
     }
+}
 
-    // {
-    //     char _buf[256];
-    //     snprintf(_buf, sizeof(_buf),
-    //         "[NativeStructuredBuffer::UploadRange] frame=%u  offset=%u  count=%u  bytes=%zu  dirtyRange=[%u,%u)",
-    //         fi, elementOffset, elementCount,
-    //         static_cast<size_t>(elementCount) * m_stride,
-    //         m_dirtyMin[fi], m_dirtyMax[fi]);
-    //     Log(_buf);
-    // }
+void NativeStructuredBuffer::EnqueueUpload(const void* data, uint32_t elementOffset, uint32_t elementCount)
+{
+    assert(data);
+    if (!data || elementCount == 0) return;
+
+    const size_t byteCount = static_cast<size_t>(elementCount) * m_stride;
+
+    PendingUpload entry;
+    entry.data.resize(byteCount);
+    memcpy(entry.data.data(), data, byteCount);
+    entry.offset = elementOffset;
+    entry.count  = elementCount;
+
+    std::lock_guard<std::mutex> lk(m_queueMutex);
+    m_pendingQueue.push_back(std::move(entry));
+}
+
+void NativeStructuredBuffer::DrainEnqueuedUploads()
+{
+    std::vector<PendingUpload> local;
+    {
+        std::lock_guard<std::mutex> lk(m_queueMutex);
+        local.swap(m_pendingQueue);
+    }
+
+    for (const auto& entry : local)
+        UploadRange(entry.data.data(), entry.offset, entry.count);
 }
 
 void NativeStructuredBuffer::FlushPendingCopies(ID3D12GraphicsCommandList* cmdList)

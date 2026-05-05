@@ -8,17 +8,14 @@ using UnityEngine.Rendering;
 namespace NativeRender
 {
     /// <summary>
-    /// Single D3D12 upload-heap structured buffer managed by the native plugin.
-    /// Persistently mapped; CPU writes are visible to the GPU on the same command-list
-    /// submission (no triple-buffering required because writes precede submission).
+    /// GPU-resident (DEFAULT heap) structured buffer backed by a triple-buffered UPLOAD
+    /// staging layer and a native plugin render-thread flush mechanism.
     ///
-    /// Usage:
-    ///   var nsb = new NativeStructuredBuffer(capacity, Marshal.SizeOf&lt;MyStruct&gt;());
-    ///   // each frame (or when data changes):
-    ///   nsb.UploadRange(array, dstOffset: 0, count: array.Length);
-    ///   pipeline.SetStructuredBuffer("gIn_Data", nsb);
-    ///   // cleanup:
-    ///   nsb.Dispose();
+    /// Write path  : UploadRange() → EnqueueUpload (main thread, deep-copies data)
+    /// Flush path  : FlushPendingCopies(cmd) → Drain event (RT writes staging[g_frameIndex])
+    ///                                        → Flush event (RT: CopyBufferRegion → GPU buffer)
+    /// The Drain+Flush pair ensures g_frameIndex is read on the render thread for both
+    /// operations, eliminating the main-thread/render-thread race on g_frameIndex.
     /// </summary>
     public sealed class NativeStructuredBuffer : IDisposable
     {
@@ -45,26 +42,27 @@ namespace NativeRender
         }
 
         /// <summary>
-        /// Copies <paramref name="count"/> elements from <paramref name="data"/>
-        /// into the buffer starting at element index <paramref name="dstOffset"/>.
+        /// Thread-safe (main thread): enqueues a deep-copy of <paramref name="count"/> elements
+        /// from <paramref name="data"/> starting at <paramref name="dstOffset"/>.
+        /// The actual staging write happens on the render thread when <see cref="FlushPendingCopies"/> fires.
         /// </summary>
         public unsafe void UploadRange<T>(T[] data, int dstOffset, int count) where T : unmanaged
         {
             if (_disposed) throw new ObjectDisposedException(nameof(NativeStructuredBuffer));
             if (data == null) throw new ArgumentNullException(nameof(data));
-            
+
             fixed (T* ptr = data)
-                NativeRenderPlugin.NR_NSB_UploadRange(Handle, ptr + dstOffset, (uint)dstOffset, (uint)count);
+                NativeRenderPlugin.NR_NSB_EnqueueUpload(Handle, ptr + dstOffset, (uint)dstOffset, (uint)count);
         }
 
         /// <summary>
-        /// Copies <paramref name="count"/> elements from a <see cref="NativeArray{T}"/>
-        /// into the buffer starting at element index <paramref name="dstOffset"/>.
+        /// Thread-safe (main thread): enqueues a deep-copy of <paramref name="count"/> elements
+        /// from a <see cref="NativeArray{T}"/> starting at <paramref name="dstOffset"/>.
         /// </summary>
         public unsafe void UploadRange<T>(NativeArray<T> data, int dstOffset, int count) where T : unmanaged
         {
             if (_disposed) throw new ObjectDisposedException(nameof(NativeStructuredBuffer));
-            NativeRenderPlugin.NR_NSB_UploadRange(
+            NativeRenderPlugin.NR_NSB_EnqueueUpload(
                 Handle,
                 NativeArrayUnsafeUtility.GetUnsafeReadOnlyPtr(data),
                 (uint)dstOffset,
@@ -82,17 +80,32 @@ namespace NativeRender
         }
 
         /// <summary>Returns the ID3D12Resource* as IntPtr for SRV binding.</summary>
-        public IntPtr NativePtr => NativeRenderPlugin.NR_NSB_GetNativePtr(Handle);
+        public IntPtr NativePtr
+        {
+            get
+            {
+                var var = NativeRenderPlugin.NR_NSB_GetNativePtr(Handle);
+                Debug.Log($"NativeStructuredBuffer: Capacity={Capacity}, Stride={Stride}, NativePtr=0x{var.ToString("X")}");
+                return var;
+            }
+        }
 
         /// <summary>
-        /// Records a <c>CopyBufferRegion</c> command (with surrounding resource barriers)
-        /// into <paramref name="cmd"/> to upload this frame's staged data into the
-        /// GPU-resident DEFAULT-heap buffer. Must be called before the buffer is used as
-        /// an SRV in the same command buffer submission.
+        /// Records two render-thread events into <paramref name="cmd"/>:
+        /// <list type="number">
+        ///   <item>Drain: flushes the enqueue queue into staging[g_frameIndex].</item>
+        ///   <item>Flush: copies the dirty staging range into the GPU-resident DEFAULT-heap buffer.</item>
+        /// </list>
+        /// Must be called before the buffer is used as an SRV in the same command buffer submission.
         /// </summary>
         public void FlushPendingCopies(CommandBuffer cmd)
         {
             if (_disposed) throw new ObjectDisposedException(nameof(NativeStructuredBuffer));
+            // Drain must precede Flush so that the queued data is in staging before the copy.
+            cmd.IssuePluginEventAndData(
+                NativeRenderPlugin.NR_NSB_GetDrainEventFunc(),
+                1,
+                (IntPtr)Handle);
             cmd.IssuePluginEventAndData(
                 NativeRenderPlugin.NR_NSB_GetFlushEventFunc(),
                 1,

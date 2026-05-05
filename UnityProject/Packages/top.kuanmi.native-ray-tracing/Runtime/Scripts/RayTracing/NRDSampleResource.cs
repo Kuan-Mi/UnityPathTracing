@@ -1825,7 +1825,11 @@ namespace NativeRender
             _primitiveDataBuf = new GraphicsBuffer(
                 GraphicsBuffer.Target.Structured | GraphicsBuffer.Target.Raw,
                 cap, Marshal.SizeOf<PrimitiveDataNRD>());
-            _primitiveDataBuf.SetData(_primitiveCpu);
+            // Only upload the actually-used range to avoid overwhelming the D3D12 upload
+            // ring buffer when cap doubles to >~50 MB in a single SetData call.
+            int usedPrims = (int)_primAlloc.UsedCount;
+            if (usedPrims > 0)
+                _primitiveDataBuf.SetData(_primitiveCpu, 0, 0, usedPrims);
             PrimitiveDataBufPtr = _primitiveDataBuf.GetNativeBufferPtr();
         }
 
