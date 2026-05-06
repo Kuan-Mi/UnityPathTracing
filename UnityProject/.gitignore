@@ -89,4 +89,7 @@ MinimalSample
 RTXDI-Library
 
 Assets/OMMCaches
-Assets/OMMCaches.meta
+Assets/OMMCaches.meta 
+# Generated reflection dumps
+*.computeshader.reflection.json
+*.computeshader.reflection.json.meta
