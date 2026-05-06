@@ -1,0 +1,85 @@
+/*
+ * SPDX-FileCopyrightText: Copyright (c) 2020-2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * SPDX-License-Identifier: LicenseRef-NvidiaProprietary
+ *
+ * NVIDIA CORPORATION, its affiliates and licensors retain all intellectual
+ * property and proprietary rights in and to this material, related
+ * documentation and any modifications thereto. Any use, reproduction,
+ * disclosure or distribution of this material and related documentation
+ * without an express license agreement from NVIDIA CORPORATION or
+ * its affiliates is strictly prohibited.
+ */
+
+#pragma pack_matrix(row_major)
+
+// Only enable the boiling filter for RayQuery (compute shader) mode because it requires shared memory
+#if USE_RAY_QUERY
+#define RTXDI_ENABLE_BOILING_FILTER
+#define RTXDI_BOILING_FILTER_GROUP_SIZE RTXDI_SCREEN_SPACE_GROUP_SIZE
+#endif
+
+#include "../RtxdiApplicationBridge/RtxdiApplicationBridge.hlsli"
+
+#include <Rtxdi/DI/BoilingFilter.hlsli>
+#include <Rtxdi/DI/TemporalResampling.hlsli>
+
+#if USE_RAY_QUERY
+[numthreads(RTXDI_SCREEN_SPACE_GROUP_SIZE, RTXDI_SCREEN_SPACE_GROUP_SIZE, 1)] 
+void main(uint2 GlobalIndex : SV_DispatchThreadID, uint2 LocalIndex : SV_GroupThreadID, uint2 GroupIdx : SV_GroupID)
+#else
+[shader("raygeneration")]
+void RayGen()
+#endif
+{
+#if !USE_RAY_QUERY
+    uint2 GlobalIndex = DispatchRaysIndex().xy;
+#endif
+
+    const RTXDI_RuntimeParameters params = g_Const.runtimeParams;
+
+    uint2 pixelPosition = RTXDI_ReservoirPosToPixelPos(GlobalIndex, params.activeCheckerboardField);
+
+    RTXDI_RandomSamplerState rng = RTXDI_InitRandomSampler(pixelPosition, g_Const.runtimeParams.frameIndex, RTXDI_DI_TEMPORAL_RESAMPLING_RANDOM_SEED);
+
+    RAB_Surface surface = RAB_GetGBufferSurface(pixelPosition, false);
+
+    bool usePermutationSampling = false;
+    if (g_Const.restirDI.temporalResamplingParams.enablePermutationSampling)
+    {
+        // Permutation sampling makes more noise on thin, high-detail objects.
+        usePermutationSampling = !IsComplexSurface(pixelPosition, surface);
+    }
+
+	RTXDI_DITemporalResamplingParameters tParams = g_Const.restirDI.temporalResamplingParams;
+	tParams.enablePermutationSampling = usePermutationSampling;
+
+    RTXDI_DIReservoir temporalResult = RTXDI_EmptyDIReservoir();
+    int2 temporalSamplePixelPos = -1;
+    
+    if (RAB_IsSurfaceValid(surface))
+    {
+        RTXDI_DIReservoir curSample = RTXDI_LoadDIReservoir(g_Const.restirDI.reservoirBufferParams,
+            GlobalIndex, g_Const.restirDI.bufferIndices.initialSamplingOutputBufferIndex);
+
+        float3 motionVector = t_MotionVectors[pixelPosition].xyz;
+        motionVector = convertMotionVectorToPixelSpace(g_Const.view, g_Const.prevView, pixelPosition, motionVector);
+
+		uint sourceBufferIndex = g_Const.restirDI.bufferIndices.temporalResamplingInputBufferIndex;
+
+        RAB_LightSample selectedLightSample = (RAB_LightSample)0;
+        
+        temporalResult = RTXDI_DITemporalResampling(pixelPosition, surface, curSample,
+            rng, params, g_Const.restirDI.reservoirBufferParams, motionVector, sourceBufferIndex, tParams, temporalSamplePixelPos, selectedLightSample);
+    }
+
+#ifdef RTXDI_ENABLE_BOILING_FILTER
+    if (g_Const.restirDI.boilingFilterParams.enableBoilingFilter)
+    {
+        RTXDI_BoilingFilter(LocalIndex, g_Const.restirDI.boilingFilterParams.boilingFilterStrength, temporalResult);
+    }
+#endif
+
+    u_TemporalSamplePositions[GlobalIndex] = temporalSamplePixelPos;
+    
+    RTXDI_StoreDIReservoir(temporalResult, g_Const.restirDI.reservoirBufferParams, GlobalIndex, g_Const.restirDI.bufferIndices.temporalResamplingOutputBufferIndex);
+}

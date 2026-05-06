@@ -6,3 +6,9 @@
 	path = RenderingPlugin/External/NRI
 	url = https://github.com/NVIDIA-RTX/NRI.git
 	branch = v178
+[submodule "RenderingPlugin/External/donut"]
+	path = RenderingPlugin/External/donut
+	url = https://github.com/NVIDIA-RTX/Donut.git
+[submodule "RenderingPlugin/External/Rtxdi"]
+	path = RenderingPlugin/External/Rtxdi
+	url = https://github.com/NVIDIA-RTX/RTXDI-Library.git

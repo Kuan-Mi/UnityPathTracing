@@ -15,4 +15,4 @@ UnityProject/*.sln
 UnityProject/*.csproj
 
 Editor.log
-RTXDI/
+/RTXDI/

@@ -1,0 +1,24 @@
+fileFormatVersion: 2
+guid: ffd5853d22710ea448eb888400fe2b54
+ScriptedImporter:
+  internalIDToNameTable: []
+  externalObjects: {}
+  serializedVersion: 2
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+  script: {fileID: 11500000, guid: ea13329833ed16543aa33a7c88f8c5bf, type: 3}
+  isComputeShader: 1
+  additionalIncludePaths:
+  - ../RenderingPlugin/External/Rtxdi/Include
+  - ../RenderingPlugin/External/donut/include
+  - Assets/RTXDI/Shaders/SharedShaderInclude
+  extraArgs:
+  - -Wno-conversion
+  - -enable-16bit-types
+  defines:
+  - USE_RAY_QUERY=1
+  entryPoint: main
+  targetProfile: cs_6_6
+  rootConstantsHints: []
+  rootSRVHints: []
