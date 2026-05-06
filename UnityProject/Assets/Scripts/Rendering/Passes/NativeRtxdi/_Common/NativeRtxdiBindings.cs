@@ -40,22 +40,22 @@ namespace PathTracing
             ctx.RtxdiGpuScene?.BindToShader(ds);
 
             // ---------- GBuffer SRVs (current frame, t0..t4) ----------
-            if (ctx.ViewDepthPtr     != System.IntPtr.Zero) ds.SetTexture("t_GBufferDepth",         ctx.ViewDepthPtr);
-            if (ctx.NormalsPtr       != System.IntPtr.Zero) ds.SetTexture("t_GBufferNormals",       ctx.NormalsPtr);
-            if (ctx.GeoNormalsPtr    != System.IntPtr.Zero) ds.SetTexture("t_GBufferGeoNormals",    ctx.GeoNormalsPtr);
+            if (ctx.ViewDepthPtr != System.IntPtr.Zero) ds.SetTexture("t_GBufferDepth", ctx.ViewDepthPtr);
+            if (ctx.NormalsPtr != System.IntPtr.Zero) ds.SetTexture("t_GBufferNormals", ctx.NormalsPtr);
+            if (ctx.GeoNormalsPtr != System.IntPtr.Zero) ds.SetTexture("t_GBufferGeoNormals", ctx.GeoNormalsPtr);
             if (ctx.DiffuseAlbedoPtr != System.IntPtr.Zero) ds.SetTexture("t_GBufferDiffuseAlbedo", ctx.DiffuseAlbedoPtr);
             if (ctx.SpecularRoughPtr != System.IntPtr.Zero) ds.SetTexture("t_GBufferSpecularRough", ctx.SpecularRoughPtr);
 
             // ---------- GBuffer SRVs (previous frame, t5..t9) ----------
-            if (ctx.PrevViewDepthPtr     != System.IntPtr.Zero) ds.SetTexture("t_PrevGBufferDepth",         ctx.PrevViewDepthPtr);
-            if (ctx.PrevNormalsPtr       != System.IntPtr.Zero) ds.SetTexture("t_PrevGBufferNormals",       ctx.PrevNormalsPtr);
-            if (ctx.PrevGeoNormalsPtr    != System.IntPtr.Zero) ds.SetTexture("t_PrevGBufferGeoNormals",    ctx.PrevGeoNormalsPtr);
+            if (ctx.PrevViewDepthPtr != System.IntPtr.Zero) ds.SetTexture("t_PrevGBufferDepth", ctx.PrevViewDepthPtr);
+            if (ctx.PrevNormalsPtr != System.IntPtr.Zero) ds.SetTexture("t_PrevGBufferNormals", ctx.PrevNormalsPtr);
+            if (ctx.PrevGeoNormalsPtr != System.IntPtr.Zero) ds.SetTexture("t_PrevGBufferGeoNormals", ctx.PrevGeoNormalsPtr);
             if (ctx.PrevDiffuseAlbedoPtr != System.IntPtr.Zero) ds.SetTexture("t_PrevGBufferDiffuseAlbedo", ctx.PrevDiffuseAlbedoPtr);
             if (ctx.PrevSpecularRoughPtr != System.IntPtr.Zero) ds.SetTexture("t_PrevGBufferSpecularRough", ctx.PrevSpecularRoughPtr);
 
             // ---------- Per-frame aux SRVs (t10..t12) ----------
-            if (ctx.PrevRestirLuminancePtr   != System.IntPtr.Zero) ds.SetTexture("t_PrevRestirLuminance",     ctx.PrevRestirLuminancePtr);
-            if (ctx.MotionVectorsPtr         != System.IntPtr.Zero) ds.SetTexture("t_MotionVectors",           ctx.MotionVectorsPtr);
+            if (ctx.PrevRestirLuminancePtr != System.IntPtr.Zero) ds.SetTexture("t_PrevRestirLuminance", ctx.PrevRestirLuminancePtr);
+            if (ctx.MotionVectorsPtr != System.IntPtr.Zero) ds.SetTexture("t_MotionVectors", ctx.MotionVectorsPtr);
             if (ctx.DenoiserNormalRoughnessPtr != System.IntPtr.Zero) ds.SetTexture("t_DenoiserNormalRoughness", ctx.DenoiserNormalRoughnessPtr);
 
             // ---------- Light / RTXDI SRVs (t20..t25) ----------
@@ -112,13 +112,13 @@ namespace PathTracing
                 ds.SetRWBuffer("u_RayCountBuffer", ctx.RayCountBuffer.GetNativeBufferPtr());
 
             // ---------- Screen UAVs (u1..u5, u17) ----------
-            if (ctx.DiffuseLightingPtr         != System.IntPtr.Zero) ds.SetRWTexture("u_DiffuseLighting",         ctx.DiffuseLightingPtr);
-            if (ctx.SpecularLightingPtr        != System.IntPtr.Zero) ds.SetRWTexture("u_SpecularLighting",        ctx.SpecularLightingPtr);
+            if (ctx.DiffuseLightingPtr != System.IntPtr.Zero) ds.SetRWTexture("u_DiffuseLighting", ctx.DiffuseLightingPtr);
+            if (ctx.SpecularLightingPtr != System.IntPtr.Zero) ds.SetRWTexture("u_SpecularLighting", ctx.SpecularLightingPtr);
             if (ctx.TemporalSamplePositionsPtr != System.IntPtr.Zero) ds.SetRWTexture("u_TemporalSamplePositions", ctx.TemporalSamplePositionsPtr);
-            if (ctx.GradientsPtr               != System.IntPtr.Zero) ds.SetRWTexture("u_Gradients",               ctx.GradientsPtr);
-            if (ctx.RestirLuminancePtr         != System.IntPtr.Zero) ds.SetRWTexture("u_RestirLuminance",         ctx.RestirLuminancePtr);
-            if (ctx.DirectLightingRawPtr       != System.IntPtr.Zero) ds.SetRWTexture("u_DirectLightingRaw",       ctx.DirectLightingRawPtr);
-            if (ctx.IndirectLightingRawPtr     != System.IntPtr.Zero) ds.SetRWTexture("u_IndirectLightingRaw",     ctx.IndirectLightingRawPtr);
+            if (ctx.GradientsPtr != System.IntPtr.Zero) ds.SetRWTexture("u_Gradients", ctx.GradientsPtr);
+            if (ctx.RestirLuminancePtr != System.IntPtr.Zero) ds.SetRWTexture("u_RestirLuminance", ctx.RestirLuminancePtr);
+            if (ctx.DirectLightingRawPtr != System.IntPtr.Zero) ds.SetRWTexture("u_DirectLightingRaw", ctx.DirectLightingRawPtr);
+            if (ctx.IndirectLightingRawPtr != System.IntPtr.Zero) ds.SetRWTexture("u_IndirectLightingRaw", ctx.IndirectLightingRawPtr);
         }
     }
 }

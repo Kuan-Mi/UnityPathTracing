@@ -36,6 +36,7 @@ namespace PathTracing
                 Undo.RecordObject(feature, "Auto Fill Shaders");
                 feature.AutoFillShaders();
             }
+
             if (GUILayout.Button("InitializeBuffers"))
             {
                 feature.InitializeBuffers();
@@ -64,14 +65,14 @@ namespace PathTracing
 
             var groupLabels = new Dictionary<Type, string>
             {
-                { typeof(Material),            "Materials" },
+                { typeof(Material), "Materials" },
                 { typeof(NativeComputeShader), "Native Compute Shaders" },
-                { typeof(ComputeShader),       "Compute Shaders" },
-                { typeof(Texture),             "Textures" },
-                { typeof(Texture2D),           "Textures" },
-                { typeof(Texture3D),           "Textures" },
-                { typeof(RenderTexture),       "Textures" },
-                { typeof(Cubemap),             "Textures" },
+                { typeof(ComputeShader), "Compute Shaders" },
+                { typeof(Texture), "Textures" },
+                { typeof(Texture2D), "Textures" },
+                { typeof(Texture3D), "Textures" },
+                { typeof(RenderTexture), "Textures" },
+                { typeof(Cubemap), "Textures" },
             };
 
             var groups = new Dictionary<string, List<string>>();
@@ -92,6 +93,7 @@ namespace PathTracing
                         break;
                     }
                 }
+
                 if (groupName == null) groupName = "Other";
 
                 if (!groups.ContainsKey(groupName))
@@ -105,9 +107,9 @@ namespace PathTracing
                 if (!groups.TryGetValue(groupName, out var fieldNames) || fieldNames.Count == 0)
                     continue;
 
-                string foldoutKey = GetKey("AssetGroup_" + groupName);
-                bool isExpanded = SessionState.GetBool(foldoutKey, true);
-                bool newExpanded = EditorGUILayout.BeginFoldoutHeaderGroup(isExpanded, groupName);
+                string foldoutKey  = GetKey("AssetGroup_" + groupName);
+                bool   isExpanded  = SessionState.GetBool(foldoutKey, true);
+                bool   newExpanded = EditorGUILayout.BeginFoldoutHeaderGroup(isExpanded, groupName);
                 if (newExpanded != isExpanded)
                     SessionState.SetBool(foldoutKey, newExpanded);
 
@@ -120,6 +122,7 @@ namespace PathTracing
                         if (prop != null)
                             EditorGUILayout.PropertyField(prop);
                     }
+
                     EditorGUI.indentLevel--;
                 }
 

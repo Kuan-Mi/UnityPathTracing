@@ -71,7 +71,7 @@ MonoBehaviour:
   setting:
     exposureEv: 0
     cameraJitter: 1
-    showMode: 27
+    showMode: 31
     showMv: 0
     upscalerMode: 0
     tmpDisableRR: 0
@@ -133,9 +133,9 @@ MonoBehaviour:
     regirDynamicParams:
       regirCellSize: 1
       center:
-        x: 0.6673757
-        y: 0.4714458
-        z: -0.8205998
+        x: -0.044813156
+        y: 1.6244663
+        z: -0.069980204
       fallbackSamplingMode: 1
       presamplingMode: 1
       regirSamplingJitter: 1

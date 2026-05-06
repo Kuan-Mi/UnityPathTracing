@@ -668,7 +668,8 @@ namespace PathTracing
                 Vector4[] tangents = src.tangents;
                 for (int i = 0; i < vc; i++)
                 {
-                    uint packed = PackRGBA8Snorm(tangents[i]);
+                    // todo 这里取反了
+                    uint packed = PackRGBA8Snorm(new Vector4(tangents[i].x, tangents[i].y, tangents[i].z, -tangents[i].w));
                     Buffer.BlockCopy(BitConverter.GetBytes(packed), 0, vbData, writePos, 4);
                     writePos += 4;
                 }
