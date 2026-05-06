@@ -102,6 +102,16 @@ namespace PathTracing
             _nriResources[RenderResourceType.RtxdiPrevGeoNormals]    = new NriTextureResource(RenderResourceType.RtxdiPrevGeoNormals, GraphicsFormat.R32_UInt, uavState);
             _nriResources[RenderResourceType.RtxdiEmissive]          = new NriTextureResource(RenderResourceType.RtxdiEmissive, GraphicsFormat.R16G16B16A16_SFloat, uavState);
             _nriResources[RenderResourceType.RtxdiMotionVectors]     = new NriTextureResource(RenderResourceType.RtxdiMotionVectors, GraphicsFormat.R16G16B16A16_SFloat, uavState);
+
+            // ── RTXDI lighting output UAVs ────────────────────────────────────────
+            _nriResources[RenderResourceType.RtxdiDiffuseLighting]         = new NriTextureResource(RenderResourceType.RtxdiDiffuseLighting, GraphicsFormat.R16G16B16A16_SFloat, uavState);
+            _nriResources[RenderResourceType.RtxdiSpecularLighting]        = new NriTextureResource(RenderResourceType.RtxdiSpecularLighting, GraphicsFormat.R16G16B16A16_SFloat, uavState);
+            _nriResources[RenderResourceType.RtxdiTemporalSamplePos]       = new NriTextureResource(RenderResourceType.RtxdiTemporalSamplePos, GraphicsFormat.R16G16_SInt, uavState);
+            _nriResources[RenderResourceType.RtxdiRestirLuminance]         = new NriTextureResource(RenderResourceType.RtxdiRestirLuminance, GraphicsFormat.R16G16_SFloat, uavState);
+            _nriResources[RenderResourceType.RtxdiPrevRestirLuminance]     = new NriTextureResource(RenderResourceType.RtxdiPrevRestirLuminance, GraphicsFormat.R16G16_SFloat, uavState);
+            _nriResources[RenderResourceType.RtxdiDirectLightingRaw]       = new NriTextureResource(RenderResourceType.RtxdiDirectLightingRaw,   GraphicsFormat.R16G16B16A16_SFloat, uavState);
+            _nriResources[RenderResourceType.RtxdiIndirectLightingRaw]     = new NriTextureResource(RenderResourceType.RtxdiIndirectLightingRaw, GraphicsFormat.R16G16B16A16_SFloat, uavState);
+            _nriResources[RenderResourceType.RtxdiDenoiserNormalRoughness] = new NriTextureResource(RenderResourceType.RtxdiDenoiserNormalRoughness, GraphicsFormat.R8G8B8A8_UNorm, uavState);
         }
 
         /// <summary>

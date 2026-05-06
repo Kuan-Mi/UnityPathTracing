@@ -338,8 +338,9 @@ void ComputeDescriptorSet::Dispatch(
             if (!ok)
             {
                 Logf(kUnityLogTypeError,
-                     "ComputeDescriptorSet::Dispatch: binding '%s' (%s, space%u, reg%u) is not set",
-                     b.name.c_str(), kind, b.space, b.registerIndex);
+                     "ComputeDescriptorSet::Dispatch: '%s' binding '%s' (%s, space%u, reg%u) is not set",
+                        m_cs->GetName(),
+                      b.name.c_str(), kind, b.space, b.registerIndex);
                 anyMissing = true;
             }
         }

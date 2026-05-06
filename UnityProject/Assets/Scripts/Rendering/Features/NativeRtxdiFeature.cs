@@ -1,0 +1,715 @@
+using System;
+using System.Collections.Generic;
+using System.Runtime.InteropServices;
+using DLRR;
+using mini;
+using NativeRender;
+using Rtxdi;
+using RTXDI;
+using Rtxdi.DI;
+using Rtxdi.GI;
+using Unity.Mathematics;
+using UnityEngine;
+using UnityEngine.Rendering;
+using UnityEngine.Rendering.Universal;
+using RayTracingAccelerationStructure = NativeRender.RayTracingAccelerationStructure;
+
+namespace PathTracing
+{
+    /// <summary>
+    /// Pure NativeComputeShader RTXDI feature.
+    ///
+    /// Mirrors <see cref="UnityRtxdiFeature"/> but every per-pass shader is a
+    /// <see cref="NativeComputeShader"/> compiled from the pre-shipped HLSL under
+    /// <c>UnityProject/Assets/RTXDI/Shaders</c>. Inline RayQuery (USE_RAY_QUERY) is baked
+    /// into the shipped DXIL so no <c>RayTracingShader</c> is needed.
+    ///
+    /// This is currently a SKELETON: pass instantiation, scene/light scene, AS build, and constant
+    /// buffer initialisation match <see cref="UnityRtxdiFeature"/>, but <see cref="AddRenderPasses"/>
+    /// only enqueues the reference <see cref="NativeRtxdiGenerateInitialSamplesPass"/> behind a
+    /// <c>setting.useNativeRtxdiPipeline</c> guard. Remaining passes are implemented incrementally
+    /// (see /memories/session/plan.md).
+    /// </summary>
+    public class NativeRtxdiFeature : ScriptableRendererFeature
+    {
+        // -------------------------------------------------------------------
+        // User-visible configuration  (mirrors UnityRtxdiFeature)
+        // -------------------------------------------------------------------
+        public RtxdiSetting setting;
+
+        public GlobalConstants     globalConstants;
+        public ResamplingConstants resamplingConstants;
+
+        public RenderPassEvent renderPassEvent = RenderPassEvent.BeforeRenderingPostProcessing;
+
+        public Material finalMaterial;
+
+        // ── Native compute shaders (one per RTXDI HLSL pass) ─────────────────
+        // Source: UnityProject/Assets/RTXDI/Shaders/...
+
+        // Prepare / Environment
+        public NativeComputeShader prepareLightsCs; // PrepareLights.computeshader
+        public NativeComputeShader preprocessEnvironmentMapCs; // PreprocessEnvironmentMap.computeshader
+
+        // GBuffer
+        public NativeComputeShader raytracedGBufferCs; // RaytracedGBuffer.computeshader
+        public NativeComputeShader postprocessGBufferCs; // PostprocessGBuffer.computeshader
+
+        // Presampling
+        public NativeComputeShader presampleLightsCs; // LightingPasses/Presampling/PresampleLights.computeshader
+        public NativeComputeShader presampleEnvironmentMapCs; // LightingPasses/Presampling/PresampleEnvironmentMap.computeshader
+        public NativeComputeShader presampleReGirCs; // LightingPasses/Presampling/PresampleReGIR.computeshader
+
+        // ReSTIR DI
+        public NativeComputeShader diGenerateInitialSamplesCs; // LightingPasses/DI/GenerateInitialSamples.computeshader
+        public NativeComputeShader diTemporalResamplingCs; // LightingPasses/DI/TemporalResampling.computeshader
+        public NativeComputeShader diSpatialResamplingCs; // LightingPasses/DI/SpatialResampling.computeshader
+        public NativeComputeShader diShadeSamplesCs; // LightingPasses/DI/ShadeSamples.computeshader
+
+        // Indirect / ReSTIR GI
+        public NativeComputeShader brdfRayTracingCs; // LightingPasses/BrdfRayTracing.computeshader
+        public NativeComputeShader shadeSecondarySurfacesCs; // LightingPasses/ShadeSecondarySurfaces.computeshader
+        public NativeComputeShader giTemporalResamplingCs; // LightingPasses/GI/TemporalResampling.computeshader
+        public NativeComputeShader giSpatialResamplingCs; // LightingPasses/GI/SpatialResampling.computeshader
+        public NativeComputeShader giFinalShadingCs; // LightingPasses/GI/FinalShading.computeshader
+
+        // Auxiliary
+        public ComputeShader dlssBeforeCs;
+        public ComputeShader pdfTextureCs;
+        public ComputeShader genMipsCs;
+
+        // -------------------------------------------------------------------
+        // Pass instances (one per implemented pass; rest filled in over time)
+        // -------------------------------------------------------------------
+        private NativeRtxdiGenerateInitialSamplesPass _diGenerateInitialSamplesPass;
+        private NativeRtxdiTemporalResamplingPass     _diTemporalResamplingPass;
+        private NativeRtxdiSpatialResamplingPass      _diSpatialResamplingPass;
+        private NativeRtxdiShadeSamplesPass           _diShadeSamplesPass;
+
+        private NativeRtxdiBrdfRayTracingPass         _brdfRayTracingPass;
+        private NativeRtxdiShadeSecondarySurfacesPass _shadeSecondarySurfacesPass;
+        private NativeRtxdiGITemporalResamplingPass   _giTemporalResamplingPass;
+        private NativeRtxdiGISpatialResamplingPass    _giSpatialResamplingPass;
+        private NativeRtxdiGIFinalShadingPass         _giFinalShadingPass;
+        private NativeFrameTick                       _nativeFrameTickPass;
+
+        // -------------------------------------------------------------------
+        // Managed scaffolding passes (still using RayTracingShader / ComputeShader).
+        // Will be replaced with native equivalents once their .computeshader assets are wired in.
+        // -------------------------------------------------------------------
+        private PrepareLightPass           _prepareLightPass;
+        private GBufferRasterPass          _gBufferRasterPass;
+        private GBufferRasterPass.Resource _gBufferRasterResource;
+        private PdfTexturePass             _pdfTexturePass;
+        private GenerateMipsPass           _generateMipsPass;
+        private PresamplePass              _presamplePass;
+        private PresampleReGirLightsPass   _presampleReGirLightsPass;
+        private RxtdiDlssBeforePass        _rtxdiDlssBeforePass;
+        private DlssRRPass                 _dlssrrPass;
+        private OutputBlitPass             _outputBlitPass;
+
+        // Native: builds GPUScene TLAS at the head of the native pipeline.
+        private NativeRtxdiBuildAccelerationStructurePass _buildAsPass;
+
+        // -------------------------------------------------------------------
+        // Shared resources
+        // -------------------------------------------------------------------
+        // The TLAS is owned by GPUScene (NativeRender.RayTracingAccelerationStructure).
+        private RayTracingAccelerationStructure AccelerationStructure => _gpuScene?.AccelerationStructure;
+        private GraphicsBuffer _constantBuffer;
+        private GraphicsBuffer _resamplingConstantBuffer;
+        private GraphicsBuffer _perPassConstantBuffer;
+
+        private GPUScene _gpuScene;
+
+        private readonly GlobalConstants[]             _globalConstantsArray     = new GlobalConstants[1];
+        private readonly ResamplingConstants[]         _resamplingConstantsArray = new ResamplingConstants[1];
+        private readonly NativeRtxdiPerPassConstants[] _perPassConstantsArray    = new NativeRtxdiPerPassConstants[1];
+
+        private readonly Dictionary<long, DlrrDenoiser>              _dlrrDenoisers     = new();
+        private readonly Dictionary<long, PathTracingResourcePool>   _resourcePools     = new();
+        private readonly Dictionary<long, NativeRtxdiResources>      _rtxdiResources    = new();
+        private readonly Dictionary<long, ImportanceSamplingContext> _isContexts        = new();
+        private readonly Dictionary<long, CameraFrameState>          _cameraFrameStates = new();
+
+        // -------------------------------------------------------------------
+        // ScriptableRendererFeature lifecycle
+        // -------------------------------------------------------------------
+
+        public override void Create()
+        {
+            _gpuScene ??= new GPUScene();
+
+            if (_constantBuffer == null)
+                InitializeBuffers();
+
+            // Managed scaffolding passes (NOTE: PrepareLights / PdfMipmap are intentionally
+            // NOT instantiated here — see TODO in AddRenderPasses about porting
+            // RTXDI/Samples/FullSample/Source/RenderPasses/PrepareLightsPass.cpp).
+            _gBufferRasterPass     ??= new GBufferRasterPass() { renderPassEvent = renderPassEvent };
+            _gBufferRasterResource ??= new GBufferRasterPass.Resource();
+            _buildAsPass           ??= new NativeRtxdiBuildAccelerationStructurePass() { renderPassEvent = renderPassEvent };
+            // PresamplePass / PresampleReGirLightsPass currently consume managed ComputeShader assets.
+            // Until their NativeComputeShader equivalents are wired in, presampling is disabled
+            // when those managed assets are absent.
+            if (dlssBeforeCs != null)
+                _rtxdiDlssBeforePass ??= new RxtdiDlssBeforePass(dlssBeforeCs) { renderPassEvent = renderPassEvent };
+            _dlssrrPass ??= new DlssRRPass() { renderPassEvent = renderPassEvent };
+            if (finalMaterial != null)
+                _outputBlitPass ??= new OutputBlitPass(finalMaterial) { renderPassEvent = renderPassEvent };
+
+            if (diGenerateInitialSamplesCs != null)
+                _diGenerateInitialSamplesPass ??= new NativeRtxdiGenerateInitialSamplesPass(diGenerateInitialSamplesCs)
+                {
+                    renderPassEvent = renderPassEvent
+                };
+            if (diTemporalResamplingCs != null)
+                _diTemporalResamplingPass ??= new NativeRtxdiTemporalResamplingPass(diTemporalResamplingCs)
+                {
+                    renderPassEvent = renderPassEvent
+                };
+            if (diSpatialResamplingCs != null)
+                _diSpatialResamplingPass ??= new NativeRtxdiSpatialResamplingPass(diSpatialResamplingCs)
+                {
+                    renderPassEvent = renderPassEvent
+                };
+            if (diShadeSamplesCs != null)
+                _diShadeSamplesPass ??= new NativeRtxdiShadeSamplesPass(diShadeSamplesCs)
+                {
+                    renderPassEvent = renderPassEvent
+                };
+
+            if (brdfRayTracingCs != null)
+                _brdfRayTracingPass ??= new NativeRtxdiBrdfRayTracingPass(brdfRayTracingCs)
+                {
+                    renderPassEvent = renderPassEvent
+                };
+            if (shadeSecondarySurfacesCs != null)
+                _shadeSecondarySurfacesPass ??= new NativeRtxdiShadeSecondarySurfacesPass(shadeSecondarySurfacesCs)
+                {
+                    renderPassEvent = renderPassEvent
+                };
+            if (giTemporalResamplingCs != null)
+                _giTemporalResamplingPass ??= new NativeRtxdiGITemporalResamplingPass(giTemporalResamplingCs)
+                {
+                    renderPassEvent = renderPassEvent
+                };
+            if (giSpatialResamplingCs != null)
+                _giSpatialResamplingPass ??= new NativeRtxdiGISpatialResamplingPass(giSpatialResamplingCs)
+                {
+                    renderPassEvent = renderPassEvent
+                };
+            if (giFinalShadingCs != null)
+                _giFinalShadingPass ??= new NativeRtxdiGIFinalShadingPass(giFinalShadingCs)
+                {
+                    renderPassEvent = renderPassEvent
+                };
+            
+            _nativeFrameTickPass ??= new NativeFrameTick()
+            {
+                renderPassEvent = renderPassEvent,
+            };
+        }
+
+        public void InitializeBuffers()
+        {
+            _constantBuffer           = new GraphicsBuffer(GraphicsBuffer.Target.Constant, 1, Marshal.SizeOf<GlobalConstants>());
+            _resamplingConstantBuffer = new GraphicsBuffer(GraphicsBuffer.Target.Structured, 1, Marshal.SizeOf<ResamplingConstants>());
+            _perPassConstantBuffer    = new GraphicsBuffer(GraphicsBuffer.Target.Constant, 1, Marshal.SizeOf<NativeRtxdiPerPassConstants>());
+        }
+
+        public override void AddRenderPasses(ScriptableRenderer renderer, ref RenderingData renderingData)
+        {
+            var cam = renderingData.cameraData.camera;
+            if (cam.cameraType is CameraType.Preview or CameraType.Reflection) return;
+            if (cam.cameraType != CameraType.Game && cam.cameraType != CameraType.SceneView) return;
+
+            cam.depthTextureMode = DepthTextureMode.Depth | DepthTextureMode.MotionVectors;
+
+            int eyeIndex = renderingData.cameraData.xr.enabled ? renderingData.cameraData.xr.multipassId : 0;
+            if (eyeIndex == 1 && setting.skipRightEyeInVR) return;
+
+            // Mandatory native pass shaders
+            if (_diGenerateInitialSamplesPass == null || _diShadeSamplesPass == null)
+            {
+                Debug.LogWarning("[NativeRtxdiFeature] Missing required native compute shaders — skipping.");
+                return;
+            }
+
+            // TODO(FullSample port): replace this with NativeRtxdiPrepareLightsPass that mirrors
+            // RTXDI/Samples/FullSample/Source/RenderPasses/PrepareLightsPass.{h,cpp} — it should
+            // (a) walk emissive MeshRenderers + analytic Unity Lights to build a CPU-side
+            //     TaskBuffer + PrimitiveLightBuffer, and
+            // (b) dispatch PrepareLights.computeshader to populate LightDataBuffer +
+            //     LightIndexMappingBuffer + LocalLightPdfTexture inside NativeRtxdiResources.
+            // Until then the feature renders without dynamic emissive lights.
+
+            long uniqueKey = cam.GetInstanceID() + (eyeIndex * 100000L);
+            bool isVR      = renderingData.cameraData.xrRendering;
+
+            if (!_resourcePools.TryGetValue(uniqueKey, out var pool))
+            {
+                pool = new PathTracingResourcePool();
+                pool.InitRtxdiResources();
+                _resourcePools.Add(uniqueKey, pool);
+            }
+
+            if (!_dlrrDenoisers.TryGetValue(uniqueKey, out var dlrr))
+            {
+                var camName = isVR ? $"{cam.name}_Eye{eyeIndex}" : cam.name;
+                dlrr = new DlrrDenoiser(camName);
+                _dlrrDenoisers.Add(uniqueKey, dlrr);
+            }
+
+            if (!_cameraFrameStates.TryGetValue(uniqueKey, out var frameState))
+            {
+                frameState = new CameraFrameState(1);
+                _cameraFrameStates.Add(uniqueKey, frameState);
+            }
+
+            int2 outputResolution = ComputeOutputResolution(renderingData.cameraData);
+            bool resourcesChanged = pool.EnsureResources(outputResolution, setting.upscalerMode);
+            int2 renderResolution = pool.renderResolution;
+
+            if (!_isContexts.TryGetValue(uniqueKey, out var isContext))
+            {
+                var isParams = ImportanceSamplingContext_StaticParameters.Default();
+                isParams.renderWidth  = (uint)renderResolution.x;
+                isParams.renderHeight = (uint)renderResolution.y;
+                isContext             = new ImportanceSamplingContext(isParams);
+                _isContexts.Add(uniqueKey, isContext);
+            }
+
+            if (!_rtxdiResources.TryGetValue(uniqueKey, out var rtxdiResources))
+            {
+                // Placeholder counts — will be driven by NativeRtxdiPrepareLightsPass.CountLightsInScene()
+                // once the FullSample port lands. Mirror FullSample's allocation quanta.
+                const uint kPlaceholderEmissiveMeshes    = 128;
+                const uint kPlaceholderEmissiveTriangles = 1024;
+                const uint kPlaceholderPrimitiveLights   = 128;
+                const uint kPlaceholderGeometryInstances = 1024;
+                const uint kPlaceholderEnvW              = 1;
+                const uint kPlaceholderEnvH              = 1;
+
+                rtxdiResources = new NativeRtxdiResources(
+                    isContext.GetReSTIRDIContext(),
+                    isContext.GetRISBufferSegmentAllocator(),
+                    kPlaceholderEmissiveMeshes,
+                    kPlaceholderEmissiveTriangles,
+                    kPlaceholderPrimitiveLights,
+                    kPlaceholderGeometryInstances,
+                    kPlaceholderEnvW,
+                    kPlaceholderEnvH);
+                _rtxdiResources.Add(uniqueKey, rtxdiResources);
+            }
+
+            // GPUScene tracks scene targets / instance buffers; the native AS handles skinned
+            // mesh updates internally via NativeRayTracingSkinnedTarget. The TLAS itself is
+            // built later inside NativeRtxdiBuildAccelerationStructurePass (needs a CommandBuffer).
+            _gpuScene.UpdateForFrame();
+
+            if (resourcesChanged)
+            {
+                frameState.renderResolution = pool.renderResolution;
+                frameState.frameIndex       = 0;
+            }
+
+            uint curFrame = frameState.frameIndex;
+            frameState.Update(renderingData, false, 1);
+
+            // ---- Constants upload ----
+            globalConstants          = frameState.GetConstants(renderingData, setting);
+            _globalConstantsArray[0] = globalConstants;
+            _constantBuffer.SetData(_globalConstantsArray);
+
+            var localSettings = setting.lightingSettings;
+            localSettings.enablePreviousTLAS        = false;
+            localSettings.enableAlphaTestedGeometry = false;
+            localSettings.enableTransparentGeometry = false;
+            localSettings.denoiserMode              = 0;
+            localSettings.enableGradients           = false;
+
+            bool enableDirectReStirPass    = setting.directLightingMode == DirectLightingMode.ReStir;
+            bool enableBrdfAndIndirectPass = setting.directLightingMode == DirectLightingMode.Brdf || setting.indirectLightingMode != IndirectLightingMode.None;
+            bool enableIndirect            = setting.indirectLightingMode != IndirectLightingMode.None;
+            bool enableReSTIRGI            = setting.indirectLightingMode == IndirectLightingMode.ReStirGI;
+            bool enableEmissiveSurfaces    = setting.directLightingMode == DirectLightingMode.Brdf;
+            bool enableAdditiveBlend       = enableDirectReStirPass;
+            bool enableAccumulation        = false;
+
+            // Mirror UnityRtxdiFeature shading-param patch
+            var diShadingParams = isContext.GetReSTIRDIContext().GetShadingParameters();
+            diShadingParams.enableDenoiserInputPacking = !enableIndirect ? 1u : 0u;
+            isContext.GetReSTIRDIContext().SetShadingParameters(diShadingParams);
+
+            if (!enableDirectReStirPass)
+            {
+                localSettings.brdfptParams.enableSecondaryResampling = 0u;
+                localSettings.enableGradients                        = false;
+            }
+
+            // ---- PrepareLight (TODO: native FullSample-style port) ----
+            // Currently no PrepareLights pass runs; LightDataBuffer / LocalLightPdfTexture in
+            // NativeRtxdiResources stay zero-initialised. DI/GI passes will sample empty data
+            // until the port lands.
+
+            RTXDI_LightBufferParameters lightBufferParams        = default;
+            uint2                       localLightPdfTextureSize = rtxdiResources.LocalLightPdfTextureSize;
+
+            resamplingConstants = RtxdiConstantsBuilder.Build(
+                setting, localSettings, isContext, frameState, lightBufferParams, localLightPdfTextureSize,
+                enableIndirect, enableAdditiveBlend, enableEmissiveSurfaces, enableAccumulation, enableReSTIRGI);
+            _resamplingConstantsArray[0] = resamplingConstants;
+            _resamplingConstantBuffer.SetData(_resamplingConstantsArray);
+
+            _perPassConstantsArray[0] = new NativeRtxdiPerPassConstants { rayCountBufferIndex = 0 };
+            _perPassConstantBuffer.SetData(_perPassConstantsArray);
+
+            // ---- Ping-pong GBuffer (current vs previous frame) ----
+            bool isOddFrame = (curFrame % 2) == 1;
+
+            RTHandle viewDepth         = isOddFrame ? pool.GetRT(RenderResourceType.RtxdiViewDepth) : pool.GetRT(RenderResourceType.RtxdiPrevViewDepth);
+            RTHandle diffuseAlbedo     = isOddFrame ? pool.GetRT(RenderResourceType.RtxdiDiffuseAlbedo) : pool.GetRT(RenderResourceType.RtxdiPrevDiffuseAlbedo);
+            RTHandle specularRough     = isOddFrame ? pool.GetRT(RenderResourceType.RtxdiSpecularRough) : pool.GetRT(RenderResourceType.RtxdiPrevSpecularRough);
+            RTHandle normals           = isOddFrame ? pool.GetRT(RenderResourceType.RtxdiNormals) : pool.GetRT(RenderResourceType.RtxdiPrevNormals);
+            RTHandle geoNormals        = isOddFrame ? pool.GetRT(RenderResourceType.RtxdiGeoNormals) : pool.GetRT(RenderResourceType.RtxdiPrevGeoNormals);
+            RTHandle prevViewDepth     = isOddFrame ? pool.GetRT(RenderResourceType.RtxdiPrevViewDepth) : pool.GetRT(RenderResourceType.RtxdiViewDepth);
+            RTHandle prevDiffuseAlbedo = isOddFrame ? pool.GetRT(RenderResourceType.RtxdiPrevDiffuseAlbedo) : pool.GetRT(RenderResourceType.RtxdiDiffuseAlbedo);
+            RTHandle prevSpecularRough = isOddFrame ? pool.GetRT(RenderResourceType.RtxdiPrevSpecularRough) : pool.GetRT(RenderResourceType.RtxdiSpecularRough);
+            RTHandle prevNormals       = isOddFrame ? pool.GetRT(RenderResourceType.RtxdiPrevNormals) : pool.GetRT(RenderResourceType.RtxdiNormals);
+            RTHandle prevGeoNormals    = isOddFrame ? pool.GetRT(RenderResourceType.RtxdiPrevGeoNormals) : pool.GetRT(RenderResourceType.RtxdiGeoNormals);
+
+            // Managed RTHandle context — for managed scaffolding passes
+            var managedCtx = new RtxdiPassContext
+            {
+                ConstantBuffer           = _constantBuffer,
+                ResamplingConstantBuffer = _resamplingConstantBuffer,
+                GeometryInstanceToLight  = rtxdiResources.GeometryInstanceToLight,
+                ViewDepth                = viewDepth,
+                DiffuseAlbedo            = diffuseAlbedo,
+                SpecularRough            = specularRough,
+                Normals                  = normals,
+                GeoNormals               = geoNormals,
+                PrevViewDepth            = prevViewDepth,
+                PrevDiffuseAlbedo        = prevDiffuseAlbedo,
+                PrevSpecularRough        = prevSpecularRough,
+                PrevNormals              = prevNormals,
+                PrevGeoNormals           = prevGeoNormals,
+                DirectLighting           = pool.GetRT(RenderResourceType.DirectLighting),
+                Emissive                 = pool.GetRT(RenderResourceType.RtxdiEmissive),
+                MotionVectors            = pool.GetRT(RenderResourceType.RtxdiMotionVectors),
+                LocalLightPdfTexture     = rtxdiResources.LocalLightPdfTexture,
+                RtxdiResources           = null, // Legacy LightScene-coupled resources removed.
+                RenderResolution         = renderResolution,
+                ResolutionScale          = 1,
+            };
+
+            // Native IntPtr context — for native compute passes
+            IntPtr GetPt(RenderResourceType t) => pool.GetPoint(t);
+            IntPtr ToPt(RTHandle h)            => h != null && h.rt != null ? h.rt.GetNativeTexturePtr() : IntPtr.Zero;
+
+            var nativeCtx = new NativeRtxdiPassContext
+            {
+                ConstantBuffer           = _constantBuffer,
+                ResamplingConstantBuffer = _resamplingConstantBuffer,
+                PerPassConstantBuffer    = _perPassConstantBuffer,
+                WorldTlas                = AccelerationStructure,
+                PrevWorldTlas            = AccelerationStructure,
+                GpuScene                 = _gpuScene,
+                ViewDepthPtr             = isOddFrame ? GetPt(RenderResourceType.RtxdiViewDepth) : GetPt(RenderResourceType.RtxdiPrevViewDepth),
+                DiffuseAlbedoPtr         = isOddFrame ? GetPt(RenderResourceType.RtxdiDiffuseAlbedo) : GetPt(RenderResourceType.RtxdiPrevDiffuseAlbedo),
+                SpecularRoughPtr         = isOddFrame ? GetPt(RenderResourceType.RtxdiSpecularRough) : GetPt(RenderResourceType.RtxdiPrevSpecularRough),
+                NormalsPtr               = isOddFrame ? GetPt(RenderResourceType.RtxdiNormals) : GetPt(RenderResourceType.RtxdiPrevNormals),
+                GeoNormalsPtr            = isOddFrame ? GetPt(RenderResourceType.RtxdiGeoNormals) : GetPt(RenderResourceType.RtxdiPrevGeoNormals),
+                PrevViewDepthPtr         = isOddFrame ? GetPt(RenderResourceType.RtxdiPrevViewDepth) : GetPt(RenderResourceType.RtxdiViewDepth),
+                PrevDiffuseAlbedoPtr     = isOddFrame ? GetPt(RenderResourceType.RtxdiPrevDiffuseAlbedo) : GetPt(RenderResourceType.RtxdiDiffuseAlbedo),
+                PrevSpecularRoughPtr     = isOddFrame ? GetPt(RenderResourceType.RtxdiPrevSpecularRough) : GetPt(RenderResourceType.RtxdiSpecularRough),
+                PrevNormalsPtr           = isOddFrame ? GetPt(RenderResourceType.RtxdiPrevNormals) : GetPt(RenderResourceType.RtxdiNormals),
+                PrevGeoNormalsPtr        = isOddFrame ? GetPt(RenderResourceType.RtxdiPrevGeoNormals) : GetPt(RenderResourceType.RtxdiGeoNormals),
+                DirectLightingPtr        = GetPt(RenderResourceType.DirectLighting),
+                EmissivePtr              = GetPt(RenderResourceType.RtxdiEmissive),
+                MotionVectorsPtr         = GetPt(RenderResourceType.RtxdiMotionVectors),
+                LocalLightPdfTexturePtr  = ToPt(rtxdiResources.LocalLightPdfTexture),
+                // Lighting output UAVs
+                DiffuseLightingPtr         = GetPt(RenderResourceType.RtxdiDiffuseLighting),
+                SpecularLightingPtr        = GetPt(RenderResourceType.RtxdiSpecularLighting),
+                TemporalSamplePositionsPtr = GetPt(RenderResourceType.RtxdiTemporalSamplePos),
+                RestirLuminancePtr         = GetPt(RenderResourceType.RtxdiRestirLuminance),
+                PrevRestirLuminancePtr     = GetPt(RenderResourceType.RtxdiPrevRestirLuminance),
+                DirectLightingRawPtr       = GetPt(RenderResourceType.RtxdiDirectLightingRaw),
+                IndirectLightingRawPtr     = GetPt(RenderResourceType.RtxdiIndirectLightingRaw),
+                DenoiserNormalRoughnessPtr = GetPt(RenderResourceType.RtxdiDenoiserNormalRoughness),
+                RayCountBuffer             = rtxdiResources.RayCountBuffer,
+                Resources                  = rtxdiResources,
+                Pool                       = pool,
+                RenderResolution           = renderResolution,
+                ResolutionScale            = 1f,
+            };
+
+            // ---- GBuffer (managed rasterised path) ----
+            _gBufferRasterResource.EnsureResources(pool.renderResolution);
+            _gBufferRasterPass.Setup(managedCtx, _gBufferRasterResource);
+            renderer.EnqueuePass(_gBufferRasterPass);
+
+            // ---- Build native TLAS (must run before any native compute pass that binds SceneBVH) ----
+            _buildAsPass.Setup(_gpuScene);
+            renderer.EnqueuePass(_buildAsPass);
+
+            // ---- Pre-sampling (TODO: native PdfMipmap port) ----
+            // FullSample's m_localLightPdfMipmapPass / m_environmentMapPdfMipmapPass run after
+            // PrepareLights. Skipped until the native PrepareLights pass is implemented.
+
+            // ---- DI core (NATIVE) ----
+            if (enableDirectReStirPass)
+            {
+                _diGenerateInitialSamplesPass.Setup(nativeCtx);
+                renderer.EnqueuePass(_diGenerateInitialSamplesPass);
+
+                if (_diTemporalResamplingPass != null &&
+                    setting.diResamplingMode is ReSTIRDI_ResamplingMode.Temporal or ReSTIRDI_ResamplingMode.TemporalAndSpatial)
+                {
+                    _diTemporalResamplingPass.Setup(nativeCtx);
+                    renderer.EnqueuePass(_diTemporalResamplingPass);
+                }
+
+                if (_diSpatialResamplingPass != null &&
+                    setting.diResamplingMode is ReSTIRDI_ResamplingMode.Spatial or ReSTIRDI_ResamplingMode.TemporalAndSpatial)
+                {
+                    _diSpatialResamplingPass.Setup(nativeCtx);
+                    renderer.EnqueuePass(_diSpatialResamplingPass);
+                }
+
+                _diShadeSamplesPass.Setup(nativeCtx);
+                renderer.EnqueuePass(_diShadeSamplesPass);
+            }
+
+            // ---- BRDF + GI (NATIVE) ----
+            if (enableBrdfAndIndirectPass && _brdfRayTracingPass != null)
+            {
+                _brdfRayTracingPass.Setup(nativeCtx);
+                renderer.EnqueuePass(_brdfRayTracingPass);
+
+                if (enableIndirect && _shadeSecondarySurfacesPass != null)
+                {
+                    _shadeSecondarySurfacesPass.Setup(nativeCtx);
+                    renderer.EnqueuePass(_shadeSecondarySurfacesPass);
+
+                    if (enableReSTIRGI)
+                    {
+                        if (_giTemporalResamplingPass != null &&
+                            setting.giResamplingMode is ReSTIRGI_ResamplingMode.Temporal or ReSTIRGI_ResamplingMode.TemporalAndSpatial)
+                        {
+                            _giTemporalResamplingPass.Setup(nativeCtx);
+                            renderer.EnqueuePass(_giTemporalResamplingPass);
+                        }
+
+                        if (_giSpatialResamplingPass != null &&
+                            setting.giResamplingMode is ReSTIRGI_ResamplingMode.Spatial or ReSTIRGI_ResamplingMode.TemporalAndSpatial)
+                        {
+                            _giSpatialResamplingPass.Setup(nativeCtx);
+                            renderer.EnqueuePass(_giSpatialResamplingPass);
+                        }
+
+                        if (_giFinalShadingPass != null)
+                        {
+                            _giFinalShadingPass.Setup(nativeCtx);
+                            renderer.EnqueuePass(_giFinalShadingPass);
+                        }
+                    }
+                }
+            }
+
+            // ---- DLSS-RR + OutputBlit (managed) ----
+            var dlrrRes = new DlrrDenoiser.DlrrResources
+            {
+                input           = pool.GetNriResource(RenderResourceType.DirectLighting),
+                output          = pool.GetNriResource(RenderResourceType.DlssOutput),
+                mv              = pool.GetNriResource(RenderResourceType.RtxdiMotionVectors),
+                depth           = pool.GetNriResource(isOddFrame ? RenderResourceType.RtxdiViewDepth : RenderResourceType.RtxdiPrevViewDepth),
+                diffAlbedo      = pool.GetNriResource(RenderResourceType.RrGuideDiffAlbedo),
+                specAlbedo      = pool.GetNriResource(RenderResourceType.RrGuideSpecAlbedo),
+                normalRoughness = pool.GetNriResource(RenderResourceType.RrGuideNormalRoughness),
+                specHitDistance = pool.GetNriResource(RenderResourceType.RrGuideSpecHitDistance),
+            };
+
+            var dlrrInput = new DlrrDenoiser.DlrrFrameInput
+            {
+                worldToView      = frameState.worldToView,
+                viewToClip       = frameState.viewToClip,
+                viewportJitter   = frameState.viewportJitter,
+                renderResolution = frameState.renderResolution,
+                frameIndex       = curFrame,
+                outputWidth      = (ushort)outputResolution.x,
+                outputHeight     = (ushort)outputResolution.y,
+            };
+            IntPtr dlssDataPtr = dlrr.GetInteropDataPtr(dlrrInput, dlrrRes, 1, setting.upscalerMode);
+
+            int rectGridW = (int)(renderResolution.x * 1 + 0.5f + 15) / 16;
+            int rectGridH = (int)(renderResolution.y * 1 + 0.5f + 15) / 16;
+
+            if (_rtxdiDlssBeforePass != null)
+            {
+                _rtxdiDlssBeforePass.Setup(managedCtx,
+                    pool.GetRT(RenderResourceType.RrGuideDiffAlbedo),
+                    pool.GetRT(RenderResourceType.RrGuideSpecAlbedo),
+                    pool.GetRT(RenderResourceType.RrGuideSpecHitDistance),
+                    pool.GetRT(RenderResourceType.RrGuideNormalRoughness),
+                    rectGridW, rectGridH);
+                renderer.EnqueuePass(_rtxdiDlssBeforePass);
+            }
+
+            _dlssrrPass.Setup(dlssDataPtr, new DlssRRPass.Settings { tmpDisableRR = setting.tmpDisableRR });
+            renderer.EnqueuePass(_dlssrrPass);
+
+            if (_outputBlitPass != null)
+            {
+                var outputBlitResource = new OutputBlitPass.Resource
+                {
+                    Mv                       = pool.GetRT(RenderResourceType.RtxdiMotionVectors),
+                    DirectLighting           = pool.GetRT(RenderResourceType.DirectLighting),
+                    RRGuide_DiffAlbedo       = pool.GetRT(RenderResourceType.RrGuideDiffAlbedo),
+                    RRGuide_SpecAlbedo       = pool.GetRT(RenderResourceType.RrGuideSpecAlbedo),
+                    RRGuide_Normal_Roughness = pool.GetRT(RenderResourceType.RrGuideNormalRoughness),
+                    RRGuide_SpecHitDistance  = pool.GetRT(RenderResourceType.RrGuideSpecHitDistance),
+                    DlssOutput               = pool.GetRT(RenderResourceType.DlssOutput),
+                };
+                var outputBlitSettings = new OutputBlitPass.Settings
+                {
+                    showMode        = setting.showMode,
+                    resolutionScale = frameState.resolutionScale,
+                    enableDlssRR    = true,
+                    tmpDisableRR    = setting.tmpDisableRR,
+                    showMV          = setting.showMv,
+                    showValidation  = false,
+                    showReference   = false,
+                };
+                _outputBlitPass.Setup(outputBlitResource, outputBlitSettings);
+                renderer.EnqueuePass(_outputBlitPass);
+            }
+            
+            
+            if (renderingData.cameraData.xr.enabled)
+            {
+                if (setting.skipRightEyeInVR || eyeIndex == 1)
+                    renderer.EnqueuePass(_nativeFrameTickPass);
+            }
+            else
+            {
+                renderer.EnqueuePass(_nativeFrameTickPass);
+            }
+        }
+
+        private static int2 ComputeOutputResolution(CameraData cameraData)
+        {
+            var xrPass = cameraData.xr;
+            if (xrPass.enabled)
+                return new int2(xrPass.renderTargetDesc.width, xrPass.renderTargetDesc.height);
+            return new int2(
+                (int)(cameraData.camera.pixelWidth * cameraData.renderScale),
+                (int)(cameraData.camera.pixelHeight * cameraData.renderScale));
+        }
+
+        protected override void Dispose(bool disposing)
+        {
+            base.Dispose(disposing);
+
+            _constantBuffer?.Release();
+            _constantBuffer = null;
+            _resamplingConstantBuffer?.Release();
+            _resamplingConstantBuffer = null;
+            _perPassConstantBuffer?.Release();
+            _perPassConstantBuffer = null;
+
+            foreach (var d in _dlrrDenoisers.Values) d.Dispose();
+            _dlrrDenoisers.Clear();
+
+            foreach (var p in _resourcePools.Values) p.Dispose();
+            _resourcePools.Clear();
+
+            foreach (var r in _rtxdiResources.Values) r.Dispose();
+            _rtxdiResources.Clear();
+
+            _cameraFrameStates.Clear();
+
+            _gpuScene?.Dispose();
+            _gpuScene = null;
+
+            _diGenerateInitialSamplesPass?.Dispose();
+            _diGenerateInitialSamplesPass = null;
+            _diTemporalResamplingPass?.Dispose();
+            _diTemporalResamplingPass = null;
+            _diSpatialResamplingPass?.Dispose();
+            _diSpatialResamplingPass = null;
+            _diShadeSamplesPass?.Dispose();
+            _diShadeSamplesPass = null;
+
+            _brdfRayTracingPass?.Dispose();
+            _brdfRayTracingPass = null;
+            _shadeSecondarySurfacesPass?.Dispose();
+            _shadeSecondarySurfacesPass = null;
+            _giTemporalResamplingPass?.Dispose();
+            _giTemporalResamplingPass = null;
+            _giSpatialResamplingPass?.Dispose();
+            _giSpatialResamplingPass = null;
+            _giFinalShadingPass?.Dispose();
+            _giFinalShadingPass  = null;
+            _nativeFrameTickPass = null;
+        }
+
+#if UNITY_EDITOR
+        private void Reset()
+        {
+            setting = new RtxdiSetting();
+            AutoFillShaders();
+        }
+
+        public void AutoFillShaders()
+        {
+            const string shaderRoot = "Assets/RTXDI/Shaders";
+
+            finalMaterial = UnityEditor.AssetDatabase.LoadAssetAtPath<Material>("Assets/Shaders/Mat/KM_Final.mat");
+
+            // Prepare / Environment
+            prepareLightsCs            = LoadCS($"{shaderRoot}/PrepareLights.computeshader");
+            preprocessEnvironmentMapCs = LoadCS($"{shaderRoot}/PreprocessEnvironmentMap.computeshader");
+
+            // GBuffer
+            raytracedGBufferCs   = LoadCS($"{shaderRoot}/RaytracedGBuffer.computeshader");
+            postprocessGBufferCs = LoadCS($"{shaderRoot}/PostprocessGBuffer.computeshader");
+
+            // Presampling
+            presampleLightsCs         = LoadCS($"{shaderRoot}/LightingPasses/Presampling/PresampleLights.computeshader");
+            presampleEnvironmentMapCs = LoadCS($"{shaderRoot}/LightingPasses/Presampling/PresampleEnvironmentMap.computeshader");
+            presampleReGirCs          = LoadCS($"{shaderRoot}/LightingPasses/Presampling/PresampleReGIR.computeshader");
+
+            // ReSTIR DI
+            diGenerateInitialSamplesCs = LoadCS($"{shaderRoot}/LightingPasses/DI/GenerateInitialSamples.computeshader");
+            diTemporalResamplingCs     = LoadCS($"{shaderRoot}/LightingPasses/DI/TemporalResampling.computeshader");
+            diSpatialResamplingCs      = LoadCS($"{shaderRoot}/LightingPasses/DI/SpatialResampling.computeshader");
+            diShadeSamplesCs           = LoadCS($"{shaderRoot}/LightingPasses/DI/ShadeSamples.computeshader");
+
+            // Indirect / ReSTIR GI
+            brdfRayTracingCs         = LoadCS($"{shaderRoot}/LightingPasses/BrdfRayTracing.computeshader");
+            shadeSecondarySurfacesCs = LoadCS($"{shaderRoot}/LightingPasses/ShadeSecondarySurfaces.computeshader");
+            giTemporalResamplingCs   = LoadCS($"{shaderRoot}/LightingPasses/GI/TemporalResampling.computeshader");
+            giSpatialResamplingCs    = LoadCS($"{shaderRoot}/LightingPasses/GI/SpatialResampling.computeshader");
+            giFinalShadingCs         = LoadCS($"{shaderRoot}/LightingPasses/GI/FinalShading.computeshader");
+
+            // Managed compute helpers (kept for v1 — not yet ported to NativeComputeShader)
+            dlssBeforeCs = UnityEditor.AssetDatabase.LoadAssetAtPath<ComputeShader>("Assets/Shaders/PostProcess/RtxdiDlssBefore.compute");
+            pdfTextureCs = UnityEditor.AssetDatabase.LoadAssetAtPath<ComputeShader>("Assets/Shaders/RayTracing/Presampling/PdfTexture.compute");
+            genMipsCs    = UnityEditor.AssetDatabase.LoadAssetAtPath<ComputeShader>("Assets/Shaders/RayTracing/DI/GenerateMips.compute");
+
+            UnityEditor.EditorUtility.SetDirty(this);
+
+            static NativeComputeShader LoadCS(string path)
+            {
+                var s = UnityEditor.AssetDatabase.LoadAssetAtPath<NativeComputeShader>(path);
+                if (s == null)
+                    Debug.LogWarning($"[NativeRtxdiFeature] Missing NativeComputeShader at: {path}");
+                return s;
+            }
+        }
+#endif
+    }
+}

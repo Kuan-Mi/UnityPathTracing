@@ -397,7 +397,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: -4864833620444741553, guid: 23a7c2d222024b34288d7a9c98990daa, type: 3}
       propertyPath: m_IsActive
-      value: 0
+      value: 1
       objectReference: {fileID: 0}
     - target: {fileID: -3714074880520146989, guid: 23a7c2d222024b34288d7a9c98990daa, type: 3}
       propertyPath: m_IsActive
@@ -409,27 +409,27 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: -3102515372194591862, guid: 23a7c2d222024b34288d7a9c98990daa, type: 3}
       propertyPath: m_LocalPosition.x
-      value: 2.47
+      value: 0
       objectReference: {fileID: 0}
     - target: {fileID: -3102515372194591862, guid: 23a7c2d222024b34288d7a9c98990daa, type: 3}
       propertyPath: m_LocalPosition.z
-      value: -1
+      value: 0
       objectReference: {fileID: 0}
     - target: {fileID: -877593755064287766, guid: 23a7c2d222024b34288d7a9c98990daa, type: 3}
       propertyPath: m_IsActive
-      value: 0
+      value: 1
       objectReference: {fileID: 0}
     - target: {fileID: 36980949171833630, guid: 23a7c2d222024b34288d7a9c98990daa, type: 3}
       propertyPath: m_LocalPosition.x
-      value: 3.27
+      value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 36980949171833630, guid: 23a7c2d222024b34288d7a9c98990daa, type: 3}
       propertyPath: m_LocalPosition.y
-      value: 0.7596277
+      value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 36980949171833630, guid: 23a7c2d222024b34288d7a9c98990daa, type: 3}
       propertyPath: m_LocalPosition.z
-      value: 0.881
+      value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 901852194166581958, guid: 23a7c2d222024b34288d7a9c98990daa, type: 3}
       propertyPath: m_LocalPosition.x
@@ -543,8 +543,43 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: NativeRayTracing.Runtime::NativeRender.NativeRayTracingTarget
   ommCaches: []
-  meshRenderer: {fileID: 0}
-  instanceId: 0
+  _isStaticObject: 0
+  meshRenderer: {fileID: 1693006192}
+  SubmeshMaterialInfos:
+  - material: {fileID: 2100000, guid: 37973bc64c5d6c541a53646b6fa68811, type: 2}
+    isTransparent: 0
+    isEmissive: 0
+    isAlphaClip: 0
+    textures:
+    - {fileID: 2800000, guid: 66e2aae1a43a98a4ca92d08195537e14, type: 3}
+    - {fileID: 0}
+    - {fileID: 0}
+    - {fileID: 0}
+    baseColor: {r: 1, g: 1, b: 1, a: 1}
+    emissionColor: {r: 0, g: 0, b: 0, a: 0}
+    metallic: 0
+    roughnessScale: 0.3
+    normalScale: 1
+  SubmeshGroups:
+  - isTransparent: 0
+    isEmissive: 0
+    isAlphaClip: 0
+    submeshIndices: 00000000
+    materialDatas:
+    - material: {fileID: 2100000, guid: 37973bc64c5d6c541a53646b6fa68811, type: 2}
+      isTransparent: 0
+      isEmissive: 0
+      isAlphaClip: 0
+      textures:
+      - {fileID: 2800000, guid: 66e2aae1a43a98a4ca92d08195537e14, type: 3}
+      - {fileID: 0}
+      - {fileID: 0}
+      - {fileID: 0}
+      baseColor: {r: 1, g: 1, b: 1, a: 1}
+      emissionColor: {r: 0, g: 0, b: 0, a: 0}
+      metallic: 0
+      roughnessScale: 0.3
+      normalScale: 1
 --- !u!114 &308568798
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -558,8 +593,71 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: NativeRayTracing.Runtime::NativeRender.NativeRayTracingTarget
   ommCaches: []
+  _isStaticObject: 0
   meshRenderer: {fileID: 1442166428}
-  instanceId: 55712
+  SubmeshMaterialInfos:
+  - material: {fileID: 2100000, guid: d547db0a17938a2408900ce78449e4b2, type: 2}
+    isTransparent: 0
+    isEmissive: 0
+    isAlphaClip: 0
+    textures:
+    - {fileID: 2800000, guid: 83a7df08e907b334b90c38e99133a0f8, type: 3}
+    - {fileID: 2800000, guid: 94c6e08c204ccce4496a96c56644c49f, type: 3}
+    - {fileID: 2800000, guid: 9499b9406278ca44997d403775441fe7, type: 3}
+    - {fileID: 0}
+    baseColor: {r: 1, g: 1, b: 1, a: 1}
+    emissionColor: {r: 0, g: 0, b: 0, a: 0}
+    metallic: 0
+    roughnessScale: 0
+    normalScale: 1
+  - material: {fileID: 2100000, guid: e72c9cc57dccd5942b6da278896be5cd, type: 2}
+    isTransparent: 0
+    isEmissive: 0
+    isAlphaClip: 0
+    textures:
+    - {fileID: 2800000, guid: 21733e85028ddb447b57852efa46ba9a, type: 3}
+    - {fileID: 2800000, guid: 94c6e08c204ccce4496a96c56644c49f, type: 3}
+    - {fileID: 2800000, guid: 9499b9406278ca44997d403775441fe7, type: 3}
+    - {fileID: 0}
+    baseColor: {r: 1, g: 1, b: 1, a: 1}
+    emissionColor: {r: 0, g: 0, b: 0, a: 0}
+    metallic: 0
+    roughnessScale: 0
+    normalScale: 1
+  SubmeshGroups:
+  - isTransparent: 0
+    isEmissive: 0
+    isAlphaClip: 0
+    submeshIndices: 0000000001000000
+    materialDatas:
+    - material: {fileID: 2100000, guid: d547db0a17938a2408900ce78449e4b2, type: 2}
+      isTransparent: 0
+      isEmissive: 0
+      isAlphaClip: 0
+      textures:
+      - {fileID: 2800000, guid: 83a7df08e907b334b90c38e99133a0f8, type: 3}
+      - {fileID: 2800000, guid: 94c6e08c204ccce4496a96c56644c49f, type: 3}
+      - {fileID: 2800000, guid: 9499b9406278ca44997d403775441fe7, type: 3}
+      - {fileID: 0}
+      baseColor: {r: 1, g: 1, b: 1, a: 1}
+      emissionColor: {r: 0, g: 0, b: 0, a: 0}
+      metallic: 0
+      roughnessScale: 0
+      normalScale: 1
+    - material: {fileID: 2100000, guid: e72c9cc57dccd5942b6da278896be5cd, type: 2}
+      isTransparent: 0
+      isEmissive: 0
+      isAlphaClip: 0
+      textures:
+      - {fileID: 2800000, guid: 21733e85028ddb447b57852efa46ba9a, type: 3}
+      - {fileID: 2800000, guid: 94c6e08c204ccce4496a96c56644c49f, type: 3}
+      - {fileID: 2800000, guid: 9499b9406278ca44997d403775441fe7, type: 3}
+      - {fileID: 0}
+      baseColor: {r: 1, g: 1, b: 1, a: 1}
+      emissionColor: {r: 0, g: 0, b: 0, a: 0}
+      metallic: 0
+      roughnessScale: 0
+      normalScale: 1
 --- !u!114 &308568799
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -573,8 +671,71 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: NativeRayTracing.Runtime::NativeRender.NativeRayTracingTarget
   ommCaches: []
+  _isStaticObject: 0
   meshRenderer: {fileID: 1442166429}
-  instanceId: 55714
+  SubmeshMaterialInfos:
+  - material: {fileID: 2100000, guid: 068817714d3fda84398482539bbde815, type: 2}
+    isTransparent: 0
+    isEmissive: 0
+    isAlphaClip: 0
+    textures:
+    - {fileID: 2800000, guid: 80f51e8e7edf70046b9d988d53673bb2, type: 3}
+    - {fileID: 2800000, guid: d1fa039d6de2e8447a6603c7a6f21db8, type: 3}
+    - {fileID: 2800000, guid: 8a4dc7535856a24468d1da704e104ccf, type: 3}
+    - {fileID: 0}
+    baseColor: {r: 1, g: 1, b: 1, a: 1}
+    emissionColor: {r: 0, g: 0, b: 0, a: 0}
+    metallic: 0
+    roughnessScale: 0
+    normalScale: 1
+  - material: {fileID: 2100000, guid: f0c374064a3739b48b8c4b9924761490, type: 2}
+    isTransparent: 0
+    isEmissive: 0
+    isAlphaClip: 0
+    textures:
+    - {fileID: 2800000, guid: 9baaf9baf8e6d8d4e8dcc001a6babea7, type: 3}
+    - {fileID: 2800000, guid: 529b56f26cd48d3408fe065ee0575a21, type: 3}
+    - {fileID: 2800000, guid: 83670c4ea2add6b48a601607de7b682a, type: 3}
+    - {fileID: 0}
+    baseColor: {r: 1, g: 1, b: 1, a: 1}
+    emissionColor: {r: 0, g: 0, b: 0, a: 0}
+    metallic: 0
+    roughnessScale: 0
+    normalScale: 1
+  SubmeshGroups:
+  - isTransparent: 0
+    isEmissive: 0
+    isAlphaClip: 0
+    submeshIndices: 0000000001000000
+    materialDatas:
+    - material: {fileID: 2100000, guid: 068817714d3fda84398482539bbde815, type: 2}
+      isTransparent: 0
+      isEmissive: 0
+      isAlphaClip: 0
+      textures:
+      - {fileID: 2800000, guid: 80f51e8e7edf70046b9d988d53673bb2, type: 3}
+      - {fileID: 2800000, guid: d1fa039d6de2e8447a6603c7a6f21db8, type: 3}
+      - {fileID: 2800000, guid: 8a4dc7535856a24468d1da704e104ccf, type: 3}
+      - {fileID: 0}
+      baseColor: {r: 1, g: 1, b: 1, a: 1}
+      emissionColor: {r: 0, g: 0, b: 0, a: 0}
+      metallic: 0
+      roughnessScale: 0
+      normalScale: 1
+    - material: {fileID: 2100000, guid: f0c374064a3739b48b8c4b9924761490, type: 2}
+      isTransparent: 0
+      isEmissive: 0
+      isAlphaClip: 0
+      textures:
+      - {fileID: 2800000, guid: 9baaf9baf8e6d8d4e8dcc001a6babea7, type: 3}
+      - {fileID: 2800000, guid: 529b56f26cd48d3408fe065ee0575a21, type: 3}
+      - {fileID: 2800000, guid: 83670c4ea2add6b48a601607de7b682a, type: 3}
+      - {fileID: 0}
+      baseColor: {r: 1, g: 1, b: 1, a: 1}
+      emissionColor: {r: 0, g: 0, b: 0, a: 0}
+      metallic: 0
+      roughnessScale: 0
+      normalScale: 1
 --- !u!114 &308568801
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -582,12 +743,12 @@ MonoBehaviour:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 308568795}
-  m_Enabled: 1
+  m_Enabled: 0
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 56e9e04d79cc44388156f98f7db1bba3, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::DefaultNamespace.AutoMove
-  center: {x: 1, y: 0.28510022, z: 0}
+  center: {x: 1, y: 0.7596277, z: 0}
   length: 1
   duration: 2
   axis: {x: 0, y: 1, z: 0}
@@ -937,8 +1098,43 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: NativeRayTracing.Runtime::NativeRender.NativeRayTracingTarget
   ommCaches: []
-  meshRenderer: {fileID: 0}
-  instanceId: 0
+  _isStaticObject: 0
+  meshRenderer: {fileID: 617201254}
+  SubmeshMaterialInfos:
+  - material: {fileID: 2100000, guid: dc6a787d252ddbc4c87e052b9601115d, type: 2}
+    isTransparent: 0
+    isEmissive: 1
+    isAlphaClip: 0
+    textures:
+    - {fileID: 2800000, guid: cacd99a737e2d9046a275d9d451ea486, type: 3}
+    - {fileID: 2800000, guid: 20aa00a27f094244f9cd190ad2fb1362, type: 3}
+    - {fileID: 2800000, guid: f49c0c046c6890649913e771449b954f, type: 3}
+    - {fileID: 2800000, guid: 164beaa3867dc954e9206ec80fd74718, type: 3}
+    baseColor: {r: 1, g: 1, b: 1, a: 1}
+    emissionColor: {r: 1, g: 1, b: 1, a: 1}
+    metallic: 0
+    roughnessScale: 0
+    normalScale: 1
+  SubmeshGroups:
+  - isTransparent: 0
+    isEmissive: 1
+    isAlphaClip: 0
+    submeshIndices: 00000000
+    materialDatas:
+    - material: {fileID: 2100000, guid: dc6a787d252ddbc4c87e052b9601115d, type: 2}
+      isTransparent: 0
+      isEmissive: 1
+      isAlphaClip: 0
+      textures:
+      - {fileID: 2800000, guid: cacd99a737e2d9046a275d9d451ea486, type: 3}
+      - {fileID: 2800000, guid: 20aa00a27f094244f9cd190ad2fb1362, type: 3}
+      - {fileID: 2800000, guid: f49c0c046c6890649913e771449b954f, type: 3}
+      - {fileID: 2800000, guid: 164beaa3867dc954e9206ec80fd74718, type: 3}
+      baseColor: {r: 1, g: 1, b: 1, a: 1}
+      emissionColor: {r: 1, g: 1, b: 1, a: 1}
+      metallic: 0
+      roughnessScale: 0
+      normalScale: 1
 --- !u!1 &573189070
 GameObject:
   m_ObjectHideFlags: 0
@@ -1066,6 +1262,11 @@ Transform:
   m_Children: []
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0.334, y: -181.051, z: -0.95}
+--- !u!23 &617201254 stripped
+MeshRenderer:
+  m_CorrespondingSourceObject: {fileID: 4210357320963261148, guid: 23a7c2d222024b34288d7a9c98990daa, type: 3}
+  m_PrefabInstance: {fileID: 308568790}
+  m_PrefabAsset: {fileID: 0}
 --- !u!1001 &758476467
 PrefabInstance:
   m_ObjectHideFlags: 0
@@ -2103,6 +2304,11 @@ Transform:
   m_Children: []
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: -63.001, z: 0}
+--- !u!23 &1693006192 stripped
+MeshRenderer:
+  m_CorrespondingSourceObject: {fileID: 7401102832525348, guid: 23a7c2d222024b34288d7a9c98990daa, type: 3}
+  m_PrefabInstance: {fileID: 308568790}
+  m_PrefabAsset: {fileID: 0}
 --- !u!1001 &1766313773
 PrefabInstance:
   m_ObjectHideFlags: 0

@@ -76,5 +76,15 @@ namespace PathTracing
         RtxdiPrevSpecularRough,
         RtxdiPrevNormals,
         RtxdiPrevGeoNormals,
+
+        // RTXDI lighting output UAVs (screen-sized)
+        RtxdiDiffuseLighting,       // u_DiffuseLighting  RGBA16_SFloat
+        RtxdiSpecularLighting,      // u_SpecularLighting RGBA16_SFloat
+        RtxdiTemporalSamplePos,     // u_TemporalSamplePositions RG16_SInt
+        RtxdiRestirLuminance,       // u_RestirLuminance  RG16_SFloat (ping)
+        RtxdiPrevRestirLuminance,   // t_PrevRestirLuminance RG16_SFloat (pong)
+        RtxdiDirectLightingRaw,       // u_DirectLightingRaw      RGBA16_SFloat
+        RtxdiIndirectLightingRaw,    // u_IndirectLightingRaw    RGBA16_SFloat
+        RtxdiDenoiserNormalRoughness, // t_DenoiserNormalRoughness RGBA8_UNorm
     }
 }
