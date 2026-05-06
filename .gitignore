@@ -16,3 +16,7 @@ UnityProject/*.csproj
 
 Editor.log
 /RTXDI/
+
+# Generated reflection dumps next to .computeshader assets
+*.computeshader.reflection.json
+*.computeshader.reflection.json.meta
