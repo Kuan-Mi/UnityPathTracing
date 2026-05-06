@@ -1,0 +1,1265 @@
+fileFormatVersion: 2
+guid: 543678799ffd15441b3667b700e72dc1
+ScriptedImporter:
+  internalIDToNameTable: []
+  externalObjects: {}
+  serializedVersion: 2
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+  script: {fileID: 11500000, guid: 715df9372183c47e389bb6e19fbc3b52, type: 3}
+  editorImportSettings:
+    generateSecondaryUVSet: 0
+  importSettings:
+    nodeNameMethod: 1
+    animationMethod: 2
+    generateMipMaps: 1
+    texturesReadable: 0
+    defaultMinFilterMode: 9729
+    defaultMagFilterMode: 9729
+    anisotropicFilterLevel: 1
+  instantiationSettings:
+    mask: -1
+    layer: 0
+    skinUpdateWhenOffscreen: 1
+    lightIntensityFactor: 1
+    sceneObjectCreation: 2
+  assetDependencies:
+  - type: 0
+    originalUri: Assets\Gltf\BistroExterior.bin
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Image.png
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\Vespa_Headlight_Normal.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\Vespa_Headlight_BaseColor.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\Vespa_Headlight_Specular.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Image-1.png
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\Foliage_Leaves_Normal.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\Foliage_Leaves_BaseColor.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\Foliage_Leaves_Specular.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\Foliage_Trunk_Normal.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\Foliage_Trunk_BaseColor.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\Foliage_Trunk_Specular.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\Vespa_Odometer_Glass_Normal.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\Vespa_Odometer_Glass_BaseColor.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\Vespa_Odometer_Glass_Specular.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\Vespa_Normal.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\Vespa_BaseColor.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\Vespa_Specular.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\Vespa_Odometer_Normal.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\Vespa_Odometer_BaseColor.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\Vespa_Odometer_Specular.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\Foliage_Bux_Hedges46_Normal.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\Foliage_Bux_Hedges46_BaseColor.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\Foliage_Bux_Hedges46_Specular.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\Foliage_Ivy_leaf_a_Normal.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\Foliage_Ivy_leaf_a_BaseColor.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\Foliage_Ivy_leaf_a_Specular.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\Foliage_Ivy_branches_Normal.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\Foliage_Ivy_branches_BaseColor.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\Foliage_Ivy_branches_Specular.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\Foliage_Linde_Tree_Large_Trunk_Normal.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\Foliage_Linde_Tree_Large_Trunk_BaseColor.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\Foliage_Linde_Tree_Large_Trunk_Specular.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\Foliage_Linde_Tree_Large_Orange_Leaves_Normal.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\Foliage_Linde_Tree_Large_Orange_Leaves_BaseColor.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\Foliage_Linde_Tree_Large_Orange_Leaves_Specular.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\Foliage_Linde_Tree_Large_Green_Leaves_Normal.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\Foliage_Linde_Tree_Large_Green_Leaves_BaseColor.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\Foliage_Linde_Tree_Large_Green_Leaves_Specular.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\Antenna_Metal_Normal.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\Antenna_Metal_BaseColor.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\Antenna_Metal_Specular.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\Antenna_Plastic_Blue_Normal.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\Antenna_Plastic_Blue_BaseColor.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\Antenna_Plastic_Blue_Specular.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\Antenna_Plastic_Normal.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\Antenna_Plastic_BaseColor.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\Antenna_Plastic_Specular.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\Ashtray_Normal.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\Ashtray_BaseColor.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\Ashtray_Specular.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\Awnings_Hotel_Fabric_Normal.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\Awnings_Hotel_Fabric_BaseColor.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\Awnings_Hotel_Fabric_Specular.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\Awnings_Fabric_Normal.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\Awnings_Fabric_BaseColor.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\Awnings_Fabric_Specular.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\Awnings_Beams_Normal.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\Awnings_Beams_BaseColor.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\Awnings_Beams_Specular.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\Banner_Metal_Normal.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\Banner_Metal_BaseColor.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\Banner_Metal_Specular.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\Bistro_Sign_Main_Normal.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\Bistro_Sign_Main_BaseColor.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\Bistro_Sign_Main_Specular.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\Bistro_Sign_Letters_Normal.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\Bistro_Sign_Letters_BaseColor.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\Bistro_Sign_Letters_Specular.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\Bollards_Normal.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\Bollards_BaseColor.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\Bollards_Specular.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\MASTER_Wood_Painted3_Normal.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\MASTER_Wood_Painted3_BaseColor.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\MASTER_Wood_Painted3_Specular.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\MASTER_Concrete_Grooved_Normal.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\MASTER_Concrete_Grooved_BaseColor.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\MASTER_Concrete_Grooved_Specular.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\MASTER_Concrete_Smooth_Normal.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\MASTER_Concrete_Smooth_BaseColor.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\MASTER_Concrete_Smooth_Specular.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\MASTER_Concrete_Plaster1_BLENDSHADER_Normal.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\MASTER_Concrete_Plaster1_BLENDSHADER_BaseColor.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\MASTER_Concrete_Plaster1_BLENDSHADER_Specular.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\Spotlight_Glass_Emissive_Emissive.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\Spotlight_Glass_Emissive_Normal.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\Spotlight_Glass_Emissive_BaseColor.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\Spotlight_Glass_Emissive_Specular.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\MASTER_Focus_Normal.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\MASTER_Focus_BaseColor.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\MASTER_Focus_Specular.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\MASTER_Grain_Metal_Normal.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\MASTER_Grain_Metal_BaseColor.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\MASTER_Grain_Metal_Specular.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\MASTER_Glass_Exterior_Normal.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\MASTER_Glass_Exterior_BaseColor.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\MASTER_Glass_Exterior_Specular.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\MASTER_Metal_Normal.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\MASTER_Metal_BaseColor.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\MASTER_Metal_Specular.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\MASTER_Light_Bulb_Normal.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\MASTER_Light_Bulb_BaseColor.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\MASTER_Light_Bulb_Specular.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\MASTER_Metal_Pipe_Normal.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\MASTER_Metal_Pipe_BaseColor.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\MASTER_Metal_Pipe_Specular.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\MASTER_Forge_Metal_Normal.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\MASTER_Forge_Metal_BaseColor.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\MASTER_Forge_Metal_Specular.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\MASTER_Focus_Ornament_Normal.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\MASTER_Focus_Ornament_BaseColor.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\MASTER_Focus_Ornament_Specular.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\MASTER_Wood_Polished_Normal.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\MASTER_Wood_Polished_BaseColor.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\MASTER_Wood_Polished_Specular.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\MASTER_Roofing_Shingle_Grey_Normal.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\MASTER_Roofing_Shingle_Grey_BaseColor.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\MASTER_Roofing_Shingle_Grey_Specular.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\MASTER_Roofing_Shingle_Green_Normal.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\MASTER_Roofing_Shingle_Green_BaseColor.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\MASTER_Roofing_Shingle_Green_Specular.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\MASTER_Plastic_Normal.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\MASTER_Plastic_BaseColor.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\MASTER_Plastic_Specular.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\MASTER_Concrete1_Normal.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\MASTER_Concrete1_BaseColor.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\MASTER_Concrete1_Specular.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\MASTER_Curtains_Normal.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\MASTER_Curtains_BaseColor.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\MASTER_Curtains_Specular.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\MASTER_Glass_Dirty_MASKED_Normal.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\MASTER_Glass_Dirty_MASKED_BaseColor.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\MASTER_Glass_Dirty_MASKED_Specular.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\MASTER_Concrete_Normal.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\MASTER_Concrete_BaseColor.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\MASTER_Concrete_Specular.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\MASTER_Bistro_Main_Door_Normal.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\MASTER_Bistro_Main_Door_BaseColor.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\MASTER_Bistro_Main_Door_Specular.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\MASTER_Concrete_Yellow_Normal.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\MASTER_Concrete_Yellow_BaseColor.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\MASTER_Concrete_Yellow_Specular.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\MASTER_Trim_Cornice_Normal.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\MASTER_Trim_Cornice_BaseColor.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\MASTER_Trim_Cornice_Specular.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\Emissive_StreetLight_Emissive.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\Emissive_StreetLight_Normal.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\Emissive_StreetLight_BaseColor.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\Emissive_StreetLight_Specular.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\MASTER_Side_Letters_Normal.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\MASTER_Side_Letters_BaseColor.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\MASTER_Side_Letters_Specular.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\MASTER_Glass_Dirty_Normal.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\MASTER_Glass_Dirty_BaseColor.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\MASTER_Glass_Dirty_Specular.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\MASTER_Doors_Normal.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\MASTER_Doors_BaseColor.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\MASTER_Doors_Specular.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\MASTER_Brick_Large_Beige_BLENDSHADER_Normal.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\MASTER_Brick_Large_Beige_BLENDSHADER_BaseColor.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\MASTER_Brick_Large_Beige_BLENDSHADER_Specular.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\MASTER_Wood_Brown_Normal.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\MASTER_Wood_Brown_BaseColor.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\MASTER_Wood_Brown_Specular.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\MASTER_Brick_Small_Red_BLENDSHADER_Normal.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\MASTER_Brick_Small_Red_BLENDSHADER_BaseColor.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\MASTER_Brick_Small_Red_BLENDSHADER_Specular.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\MASTER_Wood_Painted_Green_Normal.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\MASTER_Wood_Painted_Green_BaseColor.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\MASTER_Wood_Painted_Green_Specular.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\MASTER_Concrete_Plaster_Normal.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\MASTER_Concrete_Plaster_BaseColor.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\MASTER_Concrete_Plaster_Specular.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\MASTER_Black_Metal_Normal.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\MASTER_Black_Metal_BaseColor.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\MASTER_Black_Metal_Specular.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\MASTER_Brick_Large_White_Normal.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\MASTER_Brick_Large_White_BaseColor.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\MASTER_Brick_Large_White_Specular.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\MASTER_Building_Details_Normal.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\MASTER_Building_Details_BaseColor.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\MASTER_Building_Details_Specular.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\MASTER_Wood_Painted_Cyan_Normal.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\MASTER_Wood_Painted_Cyan_BaseColor.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\MASTER_Wood_Painted_Cyan_Specular.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\MASTER_Brick_Small_Red_Normal.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\MASTER_Brick_Small_Red_BaseColor.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\MASTER_Brick_Small_Red_Specular.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\MASTER_Roofing_Metal_01_Normal.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\MASTER_Roofing_Metal_01_BaseColor.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\MASTER_Roofing_Metal_01_Specular.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\MASTER_Room_Interior_Normal.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\MASTER_Room_Interior_BaseColor.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\MASTER_Room_Interior_Specular.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\MASTER_Awning_Beams_Normal.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\MASTER_Awning_Beams_BaseColor.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\MASTER_Awning_Beams_Specular.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\MASTER_Boulangerie_Normal.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\MASTER_Boulangerie_BaseColor.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\MASTER_Boulangerie_Specular.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\MASTER_Frosted_Glass_Normal.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\MASTER_Frosted_Glass_BaseColor.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\MASTER_Frosted_Glass_Specular.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\MASTER_Awning_Fabric_Cyan_Normal.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\MASTER_Awning_Fabric_Cyan_BaseColor.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\MASTER_Awning_Fabric_Cyan_Specular.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\MASTER_Concrete_White_Normal.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\MASTER_Concrete_White_BaseColor.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\MASTER_Concrete_White_Specular.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\MASTER_Bronze_BLENDSHADER_Normal.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\MASTER_Bronze_BLENDSHADER_BaseColor.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\MASTER_Bronze_BLENDSHADER_Specular.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\MASTER_Awning_Fabric_Red_Normal.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\MASTER_Awning_Fabric_Red_BaseColor.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\MASTER_Awning_Fabric_Red_Specular.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\MASTER_Book_Covers_Normal.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\MASTER_Book_Covers_BaseColor.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\MASTER_Book_Covers_Specular.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\MASTER_Concrete_Smooth_BLENDSHADER_Normal.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\MASTER_Concrete_Smooth_BLENDSHADER_BaseColor.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\MASTER_Concrete_Smooth_BLENDSHADER_Specular.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\MASTER_Wood_Painted_Green_BLENDSHADER_Normal.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\MASTER_Wood_Painted_Green_BLENDSHADER_BaseColor.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\MASTER_Wood_Painted_Green_BLENDSHADER_Specular.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\MASTER_Rollup_Door_Normal.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\MASTER_Rollup_Door_BaseColor.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\MASTER_Rollup_Door_Specular.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\MASTER_Details_Dark_Normal.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\MASTER_Details_Dark_BaseColor.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\MASTER_Details_Dark_Specular.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\Paris_Chair_01_Normal.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\Paris_Chair_01_BaseColor.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\Paris_Chair_01_Specular.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\Concrete_Normal.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\Concrete_BaseColor.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\Concrete_Specular.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\Plaster_Normal.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\Plaster_BaseColor.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\Plaster_Specular.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\Concrete_Striped_Normal.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\Concrete_Striped_BaseColor.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\Concrete_Striped_Specular.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\Concrete2_Normal.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\Concrete2_BaseColor.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\Concrete2_Specular.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\Chimneys_Metal_Normal.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\Chimneys_Metal_BaseColor.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\Chimneys_Metal_Specular.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\ElectricBox_Normal.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\ElectricBox_BaseColor.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\ElectricBox_Specular.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\Foliage_Paris_Flowers_Normal.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\Foliage_Paris_Flowers_BaseColor.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\Foliage_Paris_Flowers_Specular.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\Foliage_Flowers_Normal.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\Foliage_Flowers_BaseColor.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\Foliage_Flowers_Specular.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\Paris_LiquorBottle_01_Glass_Wine_Normal.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\Paris_LiquorBottle_01_Glass_Wine_BaseColor.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\Paris_LiquorBottle_01_Glass_Wine_Specular.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\Paris_LiquorBottle_01_Caps_Normal.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\Paris_LiquorBottle_01_Caps_BaseColor.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\Paris_LiquorBottle_01_Caps_Specular.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\Paris_LiquorBottle_01_Labels_Normal.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\Paris_LiquorBottle_01_Labels_BaseColor.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\Balcony_Concrete_Normal.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\Balcony_Concrete_BaseColor.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\Balcony_Concrete_Specular.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\Balcony_Trims_Normal.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\Balcony_Trims_BaseColor.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\Balcony_Trims_Specular.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\Balcony_Ornaments_Normal.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\Balcony_Ornaments_BaseColor.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\Balcony_Ornaments_Specular.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\Balcony_Green_Wood_Normal.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\Balcony_Green_Wood_BaseColor.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\Balcony_Green_Wood_Specular.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\MenuSign_01_Normal.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\MenuSign_01_BaseColor.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\MenuSign_01_Specular.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\MenuSign_02_Mesh_Normal.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\MenuSign_02_Mesh_BaseColor.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\MenuSign_02_Mesh_Specular.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\MenuSign_02_Glass_Normal.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\MenuSign_02_Glass_BaseColor.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\MenuSign_02_Glass_Specular.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\NapkinHolder_Normal.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\NapkinHolder_BaseColor.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\NapkinHolder_Specular.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\Plantpots_Normal.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\Plantpots_BaseColor.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\Plantpots_Specular.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\Shopsign_Bakery_Normal.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\Shopsign_Bakery_BaseColor.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\Shopsign_Bakery_Specular.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\Shopsign_Ties_Shop_Normal.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\Shopsign_Ties_Shop_BaseColor.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\Shopsign_Ties_Shop_Specular.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\Shopsign_Book_Store_Emissive_Emissive.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\Shopsign_Book_Store_Emissive_Normal.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\Shopsign_Book_Store_Emissive_BaseColor.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\Shopsign_Book_Store_Emissive_Specular.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\Shopsign_Pharmacy_Emissive_Emissive.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\Shopsign_Pharmacy_Emissive_Normal.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\Shopsign_Pharmacy_Emissive_BaseColor.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\Shopsign_Pharmacy_Emissive_Specular.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\Sidewalkbarrier_Normal.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\Sidewalkbarrier_BaseColor.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\Sidewalkbarrier_Specular.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\Pavement_Curbstones_Normal.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\Pavement_Curbstones_BaseColor.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\Pavement_Curbstones_Specular.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\Pavement_Cobblestone_Small_BLENDSHADER_Normal.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\Pavement_Cobblestone_Small_BLENDSHADER_BaseColor.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\Pavement_Cobblestone_Small_BLENDSHADER_Specular.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\Pavement_Cobblestone_Big_BLENDSHADER_Normal.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\Pavement_Cobblestone_Big_BLENDSHADER_BaseColor.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\Pavement_Cobblestone_Big_BLENDSHADER_Specular.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\Pavement_Brick_BLENDSHADER_Normal.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\Pavement_Brick_BLENDSHADER_BaseColor.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\Pavement_Brick_BLENDSHADER_Specular.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\Pavement_Cobblestone_02_Normal.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\Pavement_Cobblestone_02_BaseColor.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\Pavement_Cobblestone_02_Specular.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\Pavement_Ground_Wet_Normal.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\Pavement_Ground_Wet_BaseColor.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\Pavement_Ground_Wet_Specular.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\Pavement_Cobblestone_Wet_BLENDSHADER_Normal.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\Pavement_Cobblestone_Wet_BLENDSHADER_BaseColor.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\Pavement_Cobblestone_Wet_BLENDSHADER_Specular.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\Pavement_Cobblestone_Wet_Leaves_BLENDSHADER_Normal.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\Pavement_Cobblestone_Wet_Leaves_BLENDSHADER_BaseColor.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\Pavement_Cobblestone_Wet_Leaves_BLENDSHADER_Specular.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\Pavement_Cobble_Leaves_BLENDSHADER_Normal.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\Pavement_Cobble_Leaves_BLENDSHADER_BaseColor.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\Pavement_Cobble_Leaves_BLENDSHADER_Specular.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\Pavement_Cobblestone_01_BLENDSHADER_Normal.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\Pavement_Cobblestone_01_BLENDSHADER_BaseColor.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\Pavement_Cobblestone_01_BLENDSHADER_Specular.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\Concrete3_Normal.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\Concrete3_BaseColor.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\Concrete3_Specular.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\Streetlight_Metal_Normal.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\Streetlight_Metal_BaseColor.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\Streetlight_Metal_Specular.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\Paris_StringLights_01_White_Color_Normal.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\Paris_StringLights_01_White_Color_BaseColor.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\Paris_StringLights_01_White_Color_Specular.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\Streetlight_Support_Bulb_Normal.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\Streetlight_Support_Bulb_BaseColor.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\Streetlight_Support_Bulb_Specular.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\Streetlight_Chains_Normal.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\Streetlight_Chains_BaseColor.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\Streetlight_Chains_Specular.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\Paris_StreetPivot_Normal.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\Paris_StreetPivot_BaseColor.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\Paris_StreetPivot_Specular.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\Paris_StreetSign_01_Normal.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\Paris_StreetSign_01_BaseColor.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\Paris_StreetSign_01_Specular.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\Paris_Table_Terrace_Normal.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\Paris_Table_Terrace_BaseColor.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\Paris_Table_Terrace_Specular.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\Paris_TrafficSign_A_Normal.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\Paris_TrafficSign_A_BaseColor.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\Paris_TrafficSign_A_Specular.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\Trashcan_Normal.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\Trashcan_BaseColor.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\Trashcan_Specular.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\Spotlight_Main_Normal.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\Spotlight_Main_BaseColor.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\Spotlight_Main_Specular.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\Spotlight_Emissive_Normal.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\Spotlight_Emissive_BaseColor.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\Spotlight_Emissive_Specular.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\LanternEmissive_Normal.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\LanternEmissive_BaseColor.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\LanternEmissive_Specular.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\Pavement_Manhole_Cover_Normal.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\Pavement_Manhole_Cover_BaseColor.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\Pavement_Manhole_Cover_Specular.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\Stringlights_Normal.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\Stringlights_BaseColor.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\Stringlights_Specular.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\Paris_StringLights_01_Orange_Color_Emissive_Emissive.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\Paris_StringLights_01_Orange_Color_Emissive_Normal.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\Paris_StringLights_01_Orange_Color_Emissive_BaseColor.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\Paris_StringLights_01_Orange_Color_Emissive_Specular.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\Paris_StringLights_01_Blue_Color_Emissive_Emissive.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\Paris_StringLights_01_Blue_Color_Emissive_Normal.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\Paris_StringLights_01_Blue_Color_Emissive_BaseColor.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\Paris_StringLights_01_Blue_Color_Emissive_Specular.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\Paris_StringLights_01_White_Color_Emissive_Emissive.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\Paris_StringLights_01_White_Color_Emissive_Normal.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\Paris_StringLights_01_White_Color_Emissive_BaseColor.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\Paris_StringLights_01_White_Color_Emissive_Specular.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\Paris_StringLights_01_Pink_Color_Emissive_Emissive.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\Paris_StringLights_01_Pink_Color_Emissive_Normal.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\Paris_StringLights_01_Pink_Color_Emissive_BaseColor.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\Paris_StringLights_01_Pink_Color_Emissive_Specular.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\Paris_StringLights_01_Red_Color_Emissive_Emissive.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\Paris_StringLights_01_Red_Color_Emissive_Normal.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\Paris_StringLights_01_Red_Color_Emissive_BaseColor.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\Paris_StringLights_01_Red_Color_Emissive_Specular.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\Paris_StringLights_01_Green_Color_Emissive_Emissive.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\Paris_StringLights_01_Green_Color_Emissive_Normal.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\Paris_StringLights_01_Green_Color_Emissive_BaseColor.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\Paris_StringLights_01_Green_Color_Emissive_Specular.dds
+    assetPath: 
+  reportItems:
+  - type: 2
+    code: 20
+    messages:
+    - KHR_materials_specular
+  - type: 2
+    code: 20
+    messages:
+    - KHR_materials_ior
+  - type: 0
+    code: 8
+    messages:
+    - Cannot find resource at path Assets\Gltf\BistroExterior.bin
+    - 0

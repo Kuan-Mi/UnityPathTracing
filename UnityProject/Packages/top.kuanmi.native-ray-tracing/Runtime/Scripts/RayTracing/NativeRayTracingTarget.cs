@@ -157,7 +157,7 @@ namespace NativeRender
             // Object is alive here — safe to capture component references.
             meshRenderer = GetComponent<MeshRenderer>();
             instanceId = meshRenderer != null ? meshRenderer.GetInstanceID() : 0;
-            // RebuildMaterialData();
+            RebuildMaterialData();
             AddQueue.Enqueue(new TargetAddEvent(this, meshRenderer, instanceId));
         }
 
