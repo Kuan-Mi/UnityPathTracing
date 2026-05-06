@@ -38,7 +38,7 @@ namespace PathTracing
         public RtxdiSetting setting;
 
         // public GlobalConstants     globalConstants;
-        public ResamplingConstants resamplingConstants;
+        public NativeResamplingConstants resamplingConstants;
 
         public RenderPassEvent renderPassEvent = RenderPassEvent.BeforeRenderingPostProcessing;
 
@@ -125,7 +125,7 @@ namespace PathTracing
 
         private NativeRtxdiGPUScene _rtxdiGpuScene;
 
-        private readonly ResamplingConstants[]         _resamplingConstantsArray = new ResamplingConstants[1];
+        private readonly NativeResamplingConstants[]     _resamplingConstantsArray = new NativeResamplingConstants[1];
         private readonly NativeRtxdiPerPassConstants[] _perPassConstantsArray    = new NativeRtxdiPerPassConstants[1];
         private readonly NativeGBufferConstants[]      _gbufferConstantsArray    = new NativeGBufferConstants[1];
 
@@ -222,7 +222,7 @@ namespace PathTracing
 
         public void InitializeBuffers()
         {
-            _resamplingConstantBuffer  = new GraphicsBuffer(GraphicsBuffer.Target.Structured, 1, Marshal.SizeOf<ResamplingConstants>());
+            _resamplingConstantBuffer  = new GraphicsBuffer(GraphicsBuffer.Target.Structured, 1, Marshal.SizeOf<NativeResamplingConstants>());
             _perPassConstantBuffer     = new GraphicsBuffer(GraphicsBuffer.Target.Constant, 1, Marshal.SizeOf<NativeRtxdiPerPassConstants>());
             _gbufferConstantBuffer     = new GraphicsBuffer(GraphicsBuffer.Target.Constant, 1, Marshal.SizeOf<NativeGBufferConstants>());
             _compositingConstantBuffer = new GraphicsBuffer(GraphicsBuffer.Target.Constant, 1, Marshal.SizeOf<NativeCompositingConstants>());
@@ -367,9 +367,67 @@ namespace PathTracing
             RTXDI_LightBufferParameters lightBufferParams        = default;
             uint2                       localLightPdfTextureSize = rtxdiResources.LocalLightPdfTextureSize;
 
-            resamplingConstants = RtxdiConstantsBuilder.Build(
+            var baseConsts = RtxdiConstantsBuilder.Build(
                 setting, localSettings, isContext, frameState, lightBufferParams, localLightPdfTextureSize,
                 enableIndirect, enableAdditiveBlend, enableEmissiveSurfaces, enableAccumulation, enableReSTIRGI);
+
+            var viewConst     = NativeGBufferConstantsBuilder.BuildViewPublic(
+                frameState.worldToView,     frameState.viewToClip,     frameState.worldToClip,
+                frameState.camPos,     renderResolution, 1f, frameState.viewportJitter);
+            var prevViewConst = NativeGBufferConstantsBuilder.BuildViewPublic(
+                frameState.prevWorldToView, frameState.prevViewToClip, frameState.prevWorldToClip,
+                frameState.prevCamPos, renderResolution, 1f, frameState.prevViewportJitter);
+
+            resamplingConstants = new NativeResamplingConstants
+            {
+                view         = viewConst,
+                prevView     = prevViewConst,
+                prevPrevView = prevViewConst, // CameraFrameState has no prev-prev; use prev as approximation
+
+                runtimeParams       = baseConsts.runtimeParams,
+                reblurHitDistParams = default,
+
+                pad3                 = 0u,
+                enablePreviousTLAS   = baseConsts.enablePreviousTLAS,
+                denoiserMode         = baseConsts.denoiserMode,
+                discountNaiveSamples = baseConsts.discountNaiveSamples,
+
+                enableBrdfIndirect     = baseConsts.enableBrdfIndirect,
+                enableBrdfAdditiveBlend = baseConsts.enableBrdfAdditiveBlend,
+                enableAccumulation     = baseConsts.enableAccumulation,
+                directLightingMode     = (uint)setting.directLightingMode,
+
+                sceneConstants = new NativeSceneConstants
+                {
+                    enableEnvironmentMap       = 0u,
+                    environmentMapTextureIndex = 0u,
+                    environmentScale           = 1f,
+                    environmentRotation        = 0f,
+                    enableAlphaTestedGeometry  = localSettings.enableAlphaTestedGeometry ? 1u : 0u,
+                    enableTransparentGeometry  = localSettings.enableTransparentGeometry ? 1u : 0u,
+                },
+
+                lightBufferParams                      = baseConsts.lightBufferParams,
+                localLightsRISBufferSegmentParams      = baseConsts.localLightsRISBufferSegmentParams,
+                environmentLightRISBufferSegmentParams = baseConsts.environmentLightRISBufferSegmentParams,
+
+                restirDI = baseConsts.restirDI,
+                regir    = baseConsts.regir,
+                restirGI = baseConsts.restirGI,
+                restirPT = default,
+                pt       = default,
+                brdfPT   = baseConsts.brdfPT,
+
+                visualizeRegirCells     = baseConsts.visualizeRegirCells,
+                enableDenoiserPSR       = 0u,
+                usePSRMvecForResampling = 0u,
+                updatePSRwithResampling = 0u,
+
+                environmentPdfTextureSize = default,
+                localLightPdfTextureSize  = baseConsts.localLightPdfTextureSize,
+
+                debug = default,
+            };
             _resamplingConstantsArray[0] = resamplingConstants;
             _resamplingConstantBuffer.SetData(_resamplingConstantsArray);
 
