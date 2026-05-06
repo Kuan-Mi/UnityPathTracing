@@ -87,5 +87,9 @@ namespace PathTracing
         RtxdiIndirectLightingRaw,    // u_IndirectLightingRaw    RGBA16_SFloat
         RtxdiDenoiserNormalRoughness, // t_DenoiserNormalRoughness RGBA8_UNorm
         RtxdiDeviceDepth,            // u_DeviceDepth            R32_SFloat (clip-space z from RaytracedGBuffer)
+
+        // RTXDI NRD denoised outputs (written by NRD, read by CompositingPass)
+        RtxdiDenoisedDiffuseLighting, // OUT_DIFF_RADIANCE_HITDIST RGBA16_SFloat
+        RtxdiDenoisedSpecularLighting, // OUT_SPEC_RADIANCE_HITDIST RGBA16_SFloat
     }
 }

@@ -71,11 +71,12 @@ MonoBehaviour:
   setting:
     exposureEv: 0
     cameraJitter: 1
-    showMode: 31
+    showMode: 30
     showMv: 0
     upscalerMode: 0
     tmpDisableRR: 0
     skipRightEyeInVR: 1
+    enableDenoiser: 0
     lightingSettings:
       denoiserMode: 0
       enablePreviousTLAS: 1
@@ -133,9 +134,9 @@ MonoBehaviour:
     regirDynamicParams:
       regirCellSize: 1
       center:
-        x: -0.044813156
-        y: 1.6244663
-        z: -0.069980204
+        x: -1.4880188
+        y: 2.2593532
+        z: 2.5311344
       fallbackSamplingMode: 1
       presamplingMode: 1
       regirSamplingJitter: 1
@@ -272,6 +273,6 @@ MonoBehaviour:
   giTemporalResamplingCs: {fileID: -2368575503658470205, guid: 04165b76eee034844bca13f4501961fe, type: 3}
   giSpatialResamplingCs: {fileID: -2368575503658470205, guid: b11fa9fb4a922cd4f8fd035886d54a5e, type: 3}
   giFinalShadingCs: {fileID: -2368575503658470205, guid: f93a131479999af468c2cd51726471d1, type: 3}
-  dlssBeforeCs: {fileID: 7200000, guid: 67dc866d93db4e5cbf0d2d3992691a90, type: 3}
+  compositingPassCs: {fileID: -2368575503658470205, guid: 5a6883217629ab840a29e57ae5a31e6a, type: 3}
   pdfTextureCs: {fileID: 7200000, guid: 6d3d83398dc04a9ea285602128206037, type: 3}
   genMipsCs: {fileID: 7200000, guid: 479eb3f98680430492d6af04d7f3ee14, type: 3}

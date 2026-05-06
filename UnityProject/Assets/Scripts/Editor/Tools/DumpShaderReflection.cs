@@ -14,6 +14,42 @@ namespace ProjectTools.Editor
     {
         private const string MenuRoot = "Tools/Native Shader Reflection";
 
+        [MenuItem(MenuRoot + "/Reimport All Native Shaders")]
+        public static void ReimportAll()
+        {
+            string[] computeGuids = AssetDatabase.FindAssets("t:" + nameof(NativeComputeShader));
+            string[] raytraceGuids = AssetDatabase.FindAssets("t:" + nameof(RayTraceShader));
+            int total = computeGuids.Length + raytraceGuids.Length;
+            int done = 0;
+            try
+            {
+                AssetDatabase.StartAssetEditing();
+                foreach (string guid in computeGuids)
+                {
+                    string assetPath = AssetDatabase.GUIDToAssetPath(guid);
+                    EditorUtility.DisplayProgressBar(
+                        "Reimporting native shaders", assetPath, (float)done / Mathf.Max(1, total));
+                    AssetDatabase.ImportAsset(assetPath, ImportAssetOptions.ForceUpdate);
+                    done++;
+                }
+                foreach (string guid in raytraceGuids)
+                {
+                    string assetPath = AssetDatabase.GUIDToAssetPath(guid);
+                    EditorUtility.DisplayProgressBar(
+                        "Reimporting native shaders", assetPath, (float)done / Mathf.Max(1, total));
+                    AssetDatabase.ImportAsset(assetPath, ImportAssetOptions.ForceUpdate);
+                    done++;
+                }
+            }
+            finally
+            {
+                AssetDatabase.StopAssetEditing();
+                EditorUtility.ClearProgressBar();
+                AssetDatabase.Refresh();
+            }
+            Debug.Log($"[DumpShaderReflection] Reimported {done} native shader(s) ({computeGuids.Length} compute, {raytraceGuids.Length} raytrace).");
+        }
+
         [MenuItem(MenuRoot + "/Dump All To Sibling Files")]
         public static void DumpAll()
         {

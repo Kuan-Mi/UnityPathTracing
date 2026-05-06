@@ -90,6 +90,11 @@ namespace PathTracing
             };
         }
 
+        public static NativePlanarViewConstants BuildViewPublic(
+            Matrix4x4 worldToView, Matrix4x4 viewToClip, Matrix4x4 worldToClip,
+            float3 cameraPos, int2 renderResolution, float resolutionScale, float2 jitter)
+            => BuildView(worldToView, viewToClip, worldToClip, cameraPos, renderResolution, resolutionScale, jitter);
+
         static NativePlanarViewConstants BuildView(
             Matrix4x4 worldToView, Matrix4x4 viewToClip, Matrix4x4 worldToClip,
             float3 cameraPos, int2 renderResolution, float resolutionScale, float2 jitter)

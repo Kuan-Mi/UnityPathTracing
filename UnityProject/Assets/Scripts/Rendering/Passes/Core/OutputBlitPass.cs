@@ -176,7 +176,10 @@ namespace PathTracing
                         {
                             Blitter.BlitTexture(natCmd, data.Resource.DlssOutput, new Vector4(1, 1, 0, 0), data.BlitMaterial, (int)ShowPass.Dlss);
                         }
-                    else
+                    else if (data.Resource.DirectLighting != null)
+                        // NRD path: CompositingPass wrote the composited result into DirectLighting
+                        Blitter.BlitTexture(natCmd, data.Resource.DirectLighting, scaleOffset, data.BlitMaterial, (int)ShowPass.Out);
+                    else if (data.Resource.taaDst != null)
                         Blitter.BlitTexture(natCmd, data.Resource.taaDst, scaleOffset, data.BlitMaterial, (int)ShowPass.Out);
 
                     break;

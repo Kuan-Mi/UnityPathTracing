@@ -113,6 +113,10 @@ namespace PathTracing
             _nriResources[RenderResourceType.RtxdiDirectLightingRaw]       = new NriTextureResource(RenderResourceType.RtxdiDirectLightingRaw,   GraphicsFormat.R16G16B16A16_SFloat, uavState);
             _nriResources[RenderResourceType.RtxdiIndirectLightingRaw]     = new NriTextureResource(RenderResourceType.RtxdiIndirectLightingRaw, GraphicsFormat.R16G16B16A16_SFloat, uavState);
             _nriResources[RenderResourceType.RtxdiDenoiserNormalRoughness] = new NriTextureResource(RenderResourceType.RtxdiDenoiserNormalRoughness, GraphicsFormat.R8G8B8A8_UNorm, uavState);
+
+            // ── RTXDI NRD denoised outputs ────────────────────────────────────────
+            _nriResources[RenderResourceType.RtxdiDenoisedDiffuseLighting]  = new NriTextureResource(RenderResourceType.RtxdiDenoisedDiffuseLighting,  GraphicsFormat.R16G16B16A16_SFloat, uavState);
+            _nriResources[RenderResourceType.RtxdiDenoisedSpecularLighting] = new NriTextureResource(RenderResourceType.RtxdiDenoisedSpecularLighting, GraphicsFormat.R16G16B16A16_SFloat, uavState);
         }
 
         /// <summary>

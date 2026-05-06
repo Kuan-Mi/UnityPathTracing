@@ -98,6 +98,7 @@ namespace PathTracing
 
         public bool tmpDisableRR;
         public bool skipRightEyeInVR = true;
+        public bool enableDenoiser   = true;
 
         [FoldoutHeader("RTXDI")]
         public UnityRtxdiFeature.RenderSettings lightingSettings = UnityRtxdiFeature.RenderSettings.Default();

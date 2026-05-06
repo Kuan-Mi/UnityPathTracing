@@ -71,6 +71,7 @@ public static class RenderPassMarkers
     public static readonly NamedMarker NrdDenoise = new(ProfilerCategory.Render, "NRD Denoise", MarkerFlags.SampleGPU);
     public static readonly NamedMarker NrdDenoiseShadow = new(ProfilerCategory.Render, "NRD Denoise Shadow", MarkerFlags.SampleGPU);
     public static readonly NamedMarker NrdDenoiseOpaque = new(ProfilerCategory.Render, "NRD Denoise Opaque", MarkerFlags.SampleGPU);
+    public static readonly NamedMarker NrdDenoiseRtxdi  = new(ProfilerCategory.Render, "NRD Denoise RTXDI",  MarkerFlags.SampleGPU);
     
     public static readonly NamedMarker Composition = new(ProfilerCategory.Render, "Composition", MarkerFlags.SampleGPU);
     
