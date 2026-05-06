@@ -36,7 +36,7 @@ namespace PathTracing
         // -------------------------------------------------------------------
         public RtxdiSetting setting;
 
-        public GlobalConstants     globalConstants;
+        // public GlobalConstants     globalConstants;
         public ResamplingConstants resamplingConstants;
 
         public RenderPassEvent renderPassEvent = RenderPassEvent.BeforeRenderingPostProcessing;
@@ -111,20 +111,19 @@ namespace PathTracing
         private NativeRtxdiBuildAccelerationStructurePass _buildAsPass;
 
         // Native GBuffer passes (replace managed GBufferRasterPass)
-        private NativeRtxdiRaytracedGBufferPass    _raytracedGBufferPass;
-        private NativeRtxdiPostprocessGBufferPass  _postprocessGBufferPass;
+        private NativeRtxdiRaytracedGBufferPass   _raytracedGBufferPass;
+        private NativeRtxdiPostprocessGBufferPass _postprocessGBufferPass;
 
         // -------------------------------------------------------------------
         // Shared resources
         // -------------------------------------------------------------------
-        private GraphicsBuffer _constantBuffer;
+        // private GraphicsBuffer _constantBuffer;
         private GraphicsBuffer _resamplingConstantBuffer;
         private GraphicsBuffer _perPassConstantBuffer;
         private GraphicsBuffer _gbufferConstantBuffer;
 
         private NativeRtxdiGPUScene _rtxdiGpuScene;
 
-        private readonly GlobalConstants[]             _globalConstantsArray     = new GlobalConstants[1];
         private readonly ResamplingConstants[]         _resamplingConstantsArray = new ResamplingConstants[1];
         private readonly NativeRtxdiPerPassConstants[] _perPassConstantsArray    = new NativeRtxdiPerPassConstants[1];
         private readonly NativeGBufferConstants[]      _gbufferConstantsArray    = new NativeGBufferConstants[1];
@@ -143,7 +142,7 @@ namespace PathTracing
         {
             _rtxdiGpuScene ??= new NativeRtxdiGPUScene();
 
-            if (_constantBuffer == null)
+            if (_gbufferConstantBuffer == null)
                 InitializeBuffers();
 
             // Managed scaffolding passes (NOTE: PrepareLights / PdfMipmap are intentionally
@@ -211,7 +210,7 @@ namespace PathTracing
                 {
                     renderPassEvent = renderPassEvent
                 };
-            
+
             _nativeFrameTickPass ??= new NativeFrameTick()
             {
                 renderPassEvent = renderPassEvent,
@@ -220,7 +219,6 @@ namespace PathTracing
 
         public void InitializeBuffers()
         {
-            _constantBuffer           = new GraphicsBuffer(GraphicsBuffer.Target.Constant, 1, Marshal.SizeOf<GlobalConstants>());
             _resamplingConstantBuffer = new GraphicsBuffer(GraphicsBuffer.Target.Structured, 1, Marshal.SizeOf<ResamplingConstants>());
             _perPassConstantBuffer    = new GraphicsBuffer(GraphicsBuffer.Target.Constant, 1, Marshal.SizeOf<NativeRtxdiPerPassConstants>());
             _gbufferConstantBuffer    = new GraphicsBuffer(GraphicsBuffer.Target.Constant, 1, Marshal.SizeOf<NativeGBufferConstants>());
@@ -325,11 +323,6 @@ namespace PathTracing
             uint curFrame = frameState.frameIndex;
             frameState.Update(renderingData, false, 1);
 
-            // ---- Constants upload ----
-            globalConstants          = frameState.GetConstants(renderingData, setting);
-            _globalConstantsArray[0] = globalConstants;
-            _constantBuffer.SetData(_globalConstantsArray);
-
             _gbufferConstantsArray[0] = NativeGBufferConstantsBuilder.Build(frameState, renderResolution, 1f);
             _gbufferConstantBuffer.SetData(_gbufferConstantsArray);
 
@@ -384,36 +377,6 @@ namespace PathTracing
             RTHandle specularRough     = isOddFrame ? pool.GetRT(RenderResourceType.RtxdiSpecularRough) : pool.GetRT(RenderResourceType.RtxdiPrevSpecularRough);
             RTHandle normals           = isOddFrame ? pool.GetRT(RenderResourceType.RtxdiNormals) : pool.GetRT(RenderResourceType.RtxdiPrevNormals);
             RTHandle geoNormals        = isOddFrame ? pool.GetRT(RenderResourceType.RtxdiGeoNormals) : pool.GetRT(RenderResourceType.RtxdiPrevGeoNormals);
-            RTHandle prevViewDepth     = isOddFrame ? pool.GetRT(RenderResourceType.RtxdiPrevViewDepth) : pool.GetRT(RenderResourceType.RtxdiViewDepth);
-            RTHandle prevDiffuseAlbedo = isOddFrame ? pool.GetRT(RenderResourceType.RtxdiPrevDiffuseAlbedo) : pool.GetRT(RenderResourceType.RtxdiDiffuseAlbedo);
-            RTHandle prevSpecularRough = isOddFrame ? pool.GetRT(RenderResourceType.RtxdiPrevSpecularRough) : pool.GetRT(RenderResourceType.RtxdiSpecularRough);
-            RTHandle prevNormals       = isOddFrame ? pool.GetRT(RenderResourceType.RtxdiPrevNormals) : pool.GetRT(RenderResourceType.RtxdiNormals);
-            RTHandle prevGeoNormals    = isOddFrame ? pool.GetRT(RenderResourceType.RtxdiPrevGeoNormals) : pool.GetRT(RenderResourceType.RtxdiGeoNormals);
-
-            // Managed RTHandle context — for managed scaffolding passes
-            var managedCtx = new RtxdiPassContext
-            {
-                ConstantBuffer           = _constantBuffer,
-                ResamplingConstantBuffer = _resamplingConstantBuffer,
-                GeometryInstanceToLight  = rtxdiResources.GeometryInstanceToLight,
-                ViewDepth                = viewDepth,
-                DiffuseAlbedo            = diffuseAlbedo,
-                SpecularRough            = specularRough,
-                Normals                  = normals,
-                GeoNormals               = geoNormals,
-                PrevViewDepth            = prevViewDepth,
-                PrevDiffuseAlbedo        = prevDiffuseAlbedo,
-                PrevSpecularRough        = prevSpecularRough,
-                PrevNormals              = prevNormals,
-                PrevGeoNormals           = prevGeoNormals,
-                DirectLighting           = pool.GetRT(RenderResourceType.DirectLighting),
-                Emissive                 = pool.GetRT(RenderResourceType.RtxdiEmissive),
-                MotionVectors            = pool.GetRT(RenderResourceType.RtxdiMotionVectors),
-                LocalLightPdfTexture     = rtxdiResources.LocalLightPdfTexture,
-                RtxdiResources           = null, // Legacy LightScene-coupled resources removed.
-                RenderResolution         = renderResolution,
-                ResolutionScale          = 1,
-            };
 
             // Native IntPtr context — for native compute passes
             IntPtr GetPt(RenderResourceType t) => pool.GetPoint(t);
@@ -421,7 +384,6 @@ namespace PathTracing
 
             var nativeCtx = new NativeRtxdiPassContext
             {
-                ConstantBuffer           = _constantBuffer,
                 ResamplingConstantBuffer = _resamplingConstantBuffer,
                 PerPassConstantBuffer    = _perPassConstantBuffer,
                 GBufferConstantBuffer    = _gbufferConstantBuffer,
@@ -462,24 +424,14 @@ namespace PathTracing
             renderer.EnqueuePass(_buildAsPass);
 
             // ---- GBuffer (native raytraced path) ----
-            if (_raytracedGBufferPass != null)
-            {
-                _raytracedGBufferPass.Setup(nativeCtx);
-                renderer.EnqueuePass(_raytracedGBufferPass);
 
-                if (_postprocessGBufferPass != null)
-                {
-                    _postprocessGBufferPass.Setup(nativeCtx);
-                    renderer.EnqueuePass(_postprocessGBufferPass);
-                }
-            }
-            else
-            {
-                // Fallback to managed rasterized GBuffer if native shader not assigned
-                _gBufferRasterResource.EnsureResources(pool.renderResolution);
-                _gBufferRasterPass.Setup(managedCtx, _gBufferRasterResource);
-                renderer.EnqueuePass(_gBufferRasterPass);
-            }
+            _raytracedGBufferPass.Setup(nativeCtx);
+            renderer.EnqueuePass(_raytracedGBufferPass);
+
+
+            // _postprocessGBufferPass.Setup(nativeCtx);
+            // renderer.EnqueuePass(_postprocessGBufferPass);
+
 
             // // ---- Pre-sampling (TODO: native PdfMipmap port) ----
             // // FullSample's m_localLightPdfMipmapPass / m_environmentMapPdfMipmapPass run after
@@ -587,7 +539,7 @@ namespace PathTracing
             // _dlssrrPass.Setup(dlssDataPtr, new DlssRRPass.Settings { tmpDisableRR = setting.tmpDisableRR });
             // renderer.EnqueuePass(_dlssrrPass);
 
-            if (_outputBlitPass != null)
+            
             {
                 var outputBlitResource = new OutputBlitPass.Resource
                 {
@@ -599,11 +551,11 @@ namespace PathTracing
                     RRGuide_SpecHitDistance  = pool.GetRT(RenderResourceType.RrGuideSpecHitDistance),
                     DlssOutput               = pool.GetRT(RenderResourceType.DlssOutput),
                     // Rtxdi GBuffer debug
-                    RtxdiViewDepth      = viewDepth,
-                    RtxdiDiffuseAlbedo  = diffuseAlbedo,
-                    RtxdiSpecularRough  = specularRough,
-                    RtxdiNormals        = normals,
-                    RtxdiGeoNormals     = geoNormals,
+                    RtxdiViewDepth     = viewDepth,
+                    RtxdiDiffuseAlbedo = diffuseAlbedo,
+                    RtxdiSpecularRough = specularRough,
+                    RtxdiNormals       = normals,
+                    RtxdiGeoNormals    = geoNormals,
                 };
                 var outputBlitSettings = new OutputBlitPass.Settings
                 {
@@ -618,8 +570,8 @@ namespace PathTracing
                 _outputBlitPass.Setup(outputBlitResource, outputBlitSettings);
                 renderer.EnqueuePass(_outputBlitPass);
             }
-            
-            
+
+
             if (renderingData.cameraData.xr.enabled)
             {
                 if (setting.skipRightEyeInVR || eyeIndex == 1)
@@ -645,8 +597,6 @@ namespace PathTracing
         {
             base.Dispose(disposing);
 
-            _constantBuffer?.Release();
-            _constantBuffer = null;
             _resamplingConstantBuffer?.Release();
             _resamplingConstantBuffer = null;
             _perPassConstantBuffer?.Release();

@@ -25,8 +25,6 @@ namespace PathTracing
             // GlobalConstants instead pass their own buffer via ctx.ConstantBuffer.
             if (ctx.ResamplingConstantBuffer != null)
                 ds.SetConstantBuffer("g_Const", ctx.ResamplingConstantBuffer.GetNativeBufferPtr());
-            else if (ctx.ConstantBuffer != null)
-                ds.SetConstantBuffer("g_Const", ctx.ConstantBuffer.GetNativeBufferPtr());
 
             if (ctx.PerPassConstantBuffer != null)
                 ds.SetConstantBuffer("g_PerPassConstants", ctx.PerPassConstantBuffer.GetNativeBufferPtr());

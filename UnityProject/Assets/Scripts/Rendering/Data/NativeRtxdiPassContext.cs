@@ -15,7 +15,7 @@ namespace PathTracing
     {
         // --- Constant buffers ---
         // g_Const (b0) — GlobalConstants for prep passes, ResamplingConstants for DI/GI passes.
-        public GraphicsBuffer ConstantBuffer;
+        // public GraphicsBuffer ConstantBuffer;
         public GraphicsBuffer ResamplingConstantBuffer;
         // g_Const (b0) for RaytracedGBuffer — holds NativeGBufferConstants (GBufferConstants layout).
         // Must NOT be confused with ConstantBuffer which holds GlobalConstants.
