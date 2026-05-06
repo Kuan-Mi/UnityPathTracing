@@ -99,7 +99,7 @@ namespace PathTracing
                 natCmd.SetComputeBufferParam(data.SharcResolveCs, 0, g_ResolvedBufferID, data.Resource.ResolvedBuffer);
  
                 int LINEAR_BLOCK_SIZE = 256;
-                int x = (PathTracingFeature.Capacity + LINEAR_BLOCK_SIZE - 1) / LINEAR_BLOCK_SIZE;
+                int x = (UnityNrdFeature.Capacity + LINEAR_BLOCK_SIZE - 1) / LINEAR_BLOCK_SIZE;
 
                 natCmd.DispatchCompute(data.SharcResolveCs, 0, x, 1, 1);
 

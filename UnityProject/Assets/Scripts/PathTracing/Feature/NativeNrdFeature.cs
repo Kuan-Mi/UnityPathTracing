@@ -20,7 +20,7 @@ namespace PathTracing
     /// NRDComposition → NRDTransparent → NRDTaa → NRDFinal → OutputBlit.
     /// Does NOT include AccumulatePass, ReferencePtPass, DlssBeforePass, DlssRRPass, or AutoExposurePass.
     /// </summary>
-    public class NRDFeature : ScriptableRendererFeature
+    public class NativeNrdFeature : ScriptableRendererFeature
     {
         private const uint sharcDownscale = 5;
 

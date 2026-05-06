@@ -26,7 +26,7 @@ namespace PathTracing
         // ── Resource initialisation ─────────────────────────────────────────────
 
         /// <summary>
-        /// Registers all textures required by <see cref="PathTracingFeature"/>:
+        /// Registers all textures required by <see cref="UnityNrdFeature"/>:
         /// NRD I/O, DLSS/RR interop, TAA history, and prev-frame GBuffer.
         /// </summary>
         public void InitPathTracingResources()
@@ -73,7 +73,7 @@ namespace PathTracing
         }
 
         /// <summary>
-        /// Registers all textures required by <see cref="RtxdiFeature"/>:
+        /// Registers all textures required by <see cref="UnityRtxdiFeature"/>:
         /// shared NRD I/O subset, DLSS/RR interop, and RTXDI GBuffer ping-pong textures.
         /// </summary>
         public void InitRtxdiResources()
@@ -105,7 +105,7 @@ namespace PathTracing
         }
 
         /// <summary>
-        /// Registers all textures required by <see cref="NRDFeature"/>.
+        /// Registers all textures required by <see cref="NativeNrdFeature"/>.
         /// Formats mirror NRDSample.cpp CreateResourcesAndDescriptors with:
         ///   shadowFormat      = RGBA8_UNORM  (SIGMA_TRANSLUCENCY = 1)
         ///   dataFormat        = RGBA16_SFLOAT (NRD_MODE = NORMAL)

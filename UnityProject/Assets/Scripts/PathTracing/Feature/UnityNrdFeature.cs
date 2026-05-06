@@ -13,7 +13,7 @@ using static PathTracing.ShaderIDs;
 
 namespace PathTracing
 {
-    public class PathTracingFeature : ScriptableRendererFeature
+    public class UnityNrdFeature : ScriptableRendererFeature
     {
         public PathTracingSetting pathTracingSetting;
 

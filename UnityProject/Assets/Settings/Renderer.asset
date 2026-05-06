@@ -111,7 +111,7 @@ MonoBehaviour:
     update: 1
     updateTick: 1
     denoisingRange: 1000
-    nisSharpness: 0.187
+    nisSharpness: 0.2
     skipRightEyeInVR: 0
   renderPassEvent: 550
   finalMaterial: {fileID: 2100000, guid: 27695a2bc55ef2f469362b9a2994989e, type: 2}

@@ -8,7 +8,7 @@ using UnityEngine.Rendering;
 
 namespace PathTracing
 {
-    [CustomEditor(typeof(RtxdiFeature))]
+    [CustomEditor(typeof(UnityRtxdiFeature))]
     public class RtxdiFeatureEditor : Editor
     {
         private RtxdiSettingPreset _presetTarget;
@@ -23,7 +23,7 @@ namespace PathTracing
         {
             serializedObject.Update();
             // DrawDefaultInspector();
-            RtxdiFeature feature = (RtxdiFeature)target;
+            UnityRtxdiFeature feature = (UnityRtxdiFeature)target;
 
             // 1. 绘制 PathTracingSetting (带折叠 Header)
             SerializedProperty settingsProp = serializedObject.FindProperty("setting");
@@ -97,7 +97,7 @@ namespace PathTracing
             // 收集分组
             var groups = new Dictionary<string, List<string>>();
 
-            FieldInfo[] fields = typeof(RtxdiFeature)
+            FieldInfo[] fields = typeof(UnityRtxdiFeature)
                 .GetFields(BindingFlags.Public | BindingFlags.Instance);
 
             foreach (var field in fields)
@@ -153,7 +153,7 @@ namespace PathTracing
         /// <summary>
         /// 绘制预设保存/加载 UI
         /// </summary>
-        private void DrawPresetUI(RtxdiFeature feature)
+        private void DrawPresetUI(UnityRtxdiFeature feature)
         {
             string foldoutKey = GetKey("PresetFoldout");
             bool isExpanded = SessionState.GetBool(foldoutKey, true);

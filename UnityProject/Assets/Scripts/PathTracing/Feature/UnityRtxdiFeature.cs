@@ -16,7 +16,7 @@ using static PathTracing.ShaderIDs;
 
 namespace PathTracing
 {
-    public class RtxdiFeature : ScriptableRendererFeature
+    public class UnityRtxdiFeature : ScriptableRendererFeature
     {
         public RtxdiSetting setting;
 

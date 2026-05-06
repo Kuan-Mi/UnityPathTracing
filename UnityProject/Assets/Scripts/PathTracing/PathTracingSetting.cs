@@ -93,7 +93,7 @@ namespace PathTracing
         public bool skipRightEyeInVR = true;
 
         [FoldoutHeader("RTXDI")]
-        public RtxdiFeature.RenderSettings lightingSettings = RtxdiFeature.RenderSettings.Default();
+        public UnityRtxdiFeature.RenderSettings lightingSettings = UnityRtxdiFeature.RenderSettings.Default();
 
         public DirectLightingMode   directLightingMode   = DirectLightingMode.ReStir;
         public IndirectLightingMode indirectLightingMode = IndirectLightingMode.ReStirGI;

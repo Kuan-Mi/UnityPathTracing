@@ -8,7 +8,7 @@ using UnityEngine.Rendering;
 
 namespace PathTracing
 {
-    [CustomEditor(typeof(NRDFeature))]
+    [CustomEditor(typeof(NativeNrdFeature))]
     public class NRDFeatureEditor : Editor
     {
         private string GetKey(string headerName)
@@ -21,7 +21,7 @@ namespace PathTracing
         {
             serializedObject.Update();
             // DrawDefaultInspector();
-            NRDFeature feature = (NRDFeature)target;
+            NativeNrdFeature feature = (NativeNrdFeature)target;
 
             // 1. 绘制 PathTracingSetting (带折叠 Header)
             SerializedProperty settingsProp = serializedObject.FindProperty("setting");
@@ -85,7 +85,7 @@ namespace PathTracing
             // 收集分组
             var groups = new Dictionary<string, List<string>>();
 
-            FieldInfo[] fields = typeof(NRDFeature)
+            FieldInfo[] fields = typeof(NativeNrdFeature)
                 .GetFields(BindingFlags.Public | BindingFlags.Instance);
 
             foreach (var field in fields)

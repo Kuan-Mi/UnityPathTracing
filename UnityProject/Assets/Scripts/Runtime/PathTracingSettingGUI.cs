@@ -22,7 +22,7 @@ namespace PathTracing
         private readonly Dictionary<string, bool>   _foldouts  = new();
         private readonly Dictionary<string, string> _textCache = new();
 
-        private RtxdiFeature _feature;
+        private UnityRtxdiFeature _feature;
         private Rect         _windowRect;
         private bool         _windowRectInited;
 
@@ -402,7 +402,7 @@ namespace PathTracing
 
         // ─── Feature finder ──────────────────────────────────────────────
 
-        private static RtxdiFeature FindFeature()
+        private static UnityRtxdiFeature FindFeature()
         {
             var cam = Camera.main;
             if (cam == null) return null;
@@ -421,7 +421,7 @@ namespace PathTracing
                 if (list != null)
                 {
                     foreach (var f in list)
-                        if (f is RtxdiFeature r) return r;
+                        if (f is UnityRtxdiFeature r) return r;
                     return null;
                 }
             }
@@ -435,7 +435,7 @@ namespace PathTracing
             if (flist == null) return null;
 
             foreach (var f in flist)
-                if (f is RtxdiFeature r) return r;
+                if (f is UnityRtxdiFeature r) return r;
 
             return null;
         }
