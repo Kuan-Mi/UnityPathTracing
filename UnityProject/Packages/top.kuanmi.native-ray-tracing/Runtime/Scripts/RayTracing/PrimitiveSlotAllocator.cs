@@ -33,7 +33,7 @@ namespace NativeRender
     ///   if (_primAlloc.FragmentationRatio > 0.5f) MarkRebuildDirty();
     /// </code>
     /// </summary>
-    internal sealed class PrimitiveSlotAllocator
+    public sealed class PrimitiveSlotAllocator
     {
         /// <summary>Sentinel value returned by <see cref="Allocate"/> when no block fits.</summary>
         public const uint InvalidOffset = uint.MaxValue;
