@@ -153,6 +153,26 @@ namespace PathTracing
     }
 
     // =========================================================================
+    // Emissive geometry enumeration (used by NativeRtxdiPrepareLightsPass)
+    // =========================================================================
+
+    /// <summary>
+    /// One entry per emissive sub-mesh in the scene.
+    /// Mirrors the per-geometry task record that PrepareLights.computeshader needs.
+    /// </summary>
+    public struct EmissiveGeometryEntry
+    {
+        /// <summary>Flat index into the t_InstanceData GPU buffer.</summary>
+        public int  InstanceIndex;
+        /// <summary>Sub-geometry index within the instance (0 … numGeometries-1).</summary>
+        public int  GeometrySubIndex;
+        /// <summary>Number of triangles (numIndices / 3) for this sub-mesh.</summary>
+        public uint TriangleCount;
+        /// <summary>instance.firstGeometryInstanceIndex — used to fill GeometryInstanceToLight.</summary>
+        public uint FirstGeometryInstanceIndex;
+    }
+
+    // =========================================================================
     // NativeRtxdiGPUScene
     // =========================================================================
 
@@ -209,6 +229,53 @@ namespace PathTracing
         private bool _disposed;
 
         public RayTracingAccelerationStructure AccelerationStructure => _accelStructure;
+
+        /// <summary>
+        /// Number of geometry entries in the flat geometry array (length of t_GeometryData buffer).
+        /// Used by PrepareLightsPass to size the GeometryInstanceToLight mapping array.
+        /// </summary>
+        public int TotalGeometryInstanceCount => _geometryCpu != null ? _geometryCpu.Length : 0;
+
+        /// <summary>
+        /// Returns one <see cref="EmissiveGeometryEntry"/> for every sub-mesh whose material has
+        /// a non-zero emissiveColor.  Must be called after <see cref="UpdateForFrame"/>.
+        /// </summary>
+        public List<EmissiveGeometryEntry> GetEmissiveGeometries()
+        {
+            var result = new List<EmissiveGeometryEntry>();
+            if (_instanceCpu == null || _geometryCpu == null || _materialCpu == null)
+                return result;
+
+            for (int i = 0; i < _instanceCpu.Length; i++)
+            {
+                var inst     = _instanceCpu[i];
+                int firstGeom = (int)inst.firstGeometryIndex;
+                int numGeoms  = (int)inst.numGeometries;
+
+                for (int s = 0; s < numGeoms; s++)
+                {
+                    int geomIdx = firstGeom + s;
+                    if (geomIdx >= _geometryCpu.Length) break;
+
+                    var geom   = _geometryCpu[geomIdx];
+                    int matIdx = (int)geom.materialIndex;
+                    if (matIdx < 0 || matIdx >= _materialCpu.Length) continue;
+
+                    var mat = _materialCpu[matIdx];
+                    if (mat.emissiveColor.x <= 0f && mat.emissiveColor.y <= 0f && mat.emissiveColor.z <= 0f)
+                        continue;
+
+                    result.Add(new EmissiveGeometryEntry
+                    {
+                        InstanceIndex              = i,
+                        GeometrySubIndex           = s,
+                        TriangleCount              = geom.numIndices / 3u,
+                        FirstGeometryInstanceIndex = inst.firstGeometryInstanceIndex,
+                    });
+                }
+            }
+            return result;
+        }
 
         public NativeRtxdiGPUScene()
         {

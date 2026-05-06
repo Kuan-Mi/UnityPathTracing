@@ -97,7 +97,7 @@ namespace PathTracing
         // Managed scaffolding passes (still using RayTracingShader / ComputeShader).
         // Will be replaced with native equivalents once their .computeshader assets are wired in.
         // -------------------------------------------------------------------
-        private PrepareLightPass           _prepareLightPass;
+        private NativeRtxdiPrepareLightsPass          _prepareLightsPass;
         private GBufferRasterPass          _gBufferRasterPass;
         private GBufferRasterPass.Resource _gBufferRasterResource;
         private PdfTexturePass             _pdfTexturePass;
@@ -151,6 +151,8 @@ namespace PathTracing
             // Managed scaffolding passes (NOTE: PrepareLights / PdfMipmap are intentionally
             // NOT instantiated here — see TODO in AddRenderPasses about porting
             // RTXDI/Samples/FullSample/Source/RenderPasses/PrepareLightsPass.cpp).
+            if (prepareLightsCs != null)
+                _prepareLightsPass ??= new NativeRtxdiPrepareLightsPass(prepareLightsCs) { renderPassEvent = renderPassEvent };
             _gBufferRasterPass     ??= new GBufferRasterPass() { renderPassEvent = renderPassEvent };
             _gBufferRasterResource ??= new GBufferRasterPass.Resource();
             _buildAsPass           ??= new NativeRtxdiBuildAccelerationStructurePass() { renderPassEvent = renderPassEvent };
@@ -359,13 +361,24 @@ namespace PathTracing
                 localSettings.enableGradients                        = false;
             }
 
-            // ---- PrepareLight (TODO: native FullSample-style port) ----
-            // Currently no PrepareLights pass runs; LightDataBuffer / LocalLightPdfTexture in
-            // NativeRtxdiResources stay zero-initialised. DI/GI passes will sample empty data
-            // until the port lands.
+            // ---- PrepareLight (native FullSample-style port) ----
+            // Build CPU-side TaskBuffer + GeometryInstanceToLight, upload to GPU,
+            // and get back the RTXDI_LightBufferParameters that encodes the current-frame
+            // light region inside the double-buffered LightDataBuffer.
+            RTXDI_LightBufferParameters lightBufferParams = default;
+            if (_prepareLightsPass != null)
+            {
+                // nativeCtx is not yet built at this point; create a lightweight context with
+                // only the fields needed by BuildTasksOnCpu (Resources + RtxdiGpuScene).
+                var prepCtx = new NativeRtxdiPassContext
+                {
+                    Resources    = rtxdiResources,
+                    RtxdiGpuScene = _rtxdiGpuScene,
+                };
+                lightBufferParams = _prepareLightsPass.BuildTasksOnCpu(prepCtx);
+            }
 
-            RTXDI_LightBufferParameters lightBufferParams        = default;
-            uint2                       localLightPdfTextureSize = rtxdiResources.LocalLightPdfTextureSize;
+            uint2 localLightPdfTextureSize = rtxdiResources.LocalLightPdfTextureSize;
 
             var baseConsts = RtxdiConstantsBuilder.Build(
                 setting, localSettings, isContext, frameState, lightBufferParams, localLightPdfTextureSize,
@@ -487,6 +500,17 @@ namespace PathTracing
             // ---- Build native TLAS (must run before RaytracedGBuffer which needs SceneBVH) ----
             _buildAsPass.Setup(_rtxdiGpuScene);
             renderer.EnqueuePass(_buildAsPass);
+
+            // ---- PrepareLights (native CS port) ----
+            // Dispatches PrepareLights.computeshader to populate LightDataBuffer,
+            // LightIndexMappingBuffer, and LocalLightPdfTexture from the TaskBuffer
+            // uploaded by BuildTasksOnCpu above.
+            if (_prepareLightsPass != null)
+            {
+                Debug.Log("_prepareLightsPass");
+                _prepareLightsPass.Setup(nativeCtx);
+                renderer.EnqueuePass(_prepareLightsPass);
+            }
 
             // ---- GBuffer (native raytraced path) ----
 

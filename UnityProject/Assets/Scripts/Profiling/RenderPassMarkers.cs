@@ -27,6 +27,7 @@ public static class RenderPassMarkers
 {
     // ── Prepare ──────────────────────────────────────────────────────────────
     public static readonly NamedMarker PrepareLight = new(ProfilerCategory.Render, "Prepare Light", MarkerFlags.SampleGPU);
+    public static readonly NamedMarker PrepareLightsCompute = new(ProfilerCategory.Render, "PrepareLights CS", MarkerFlags.SampleGPU);
     public static readonly NamedMarker PdfTexture = new(ProfilerCategory.Render, "PdfTexture", MarkerFlags.SampleGPU);
     public static readonly NamedMarker GenerateMips = new(ProfilerCategory.Render, "Generate Mips", MarkerFlags.SampleGPU);
     public static readonly NamedMarker Presample = new(ProfilerCategory.Render, "Presample", MarkerFlags.SampleGPU);
