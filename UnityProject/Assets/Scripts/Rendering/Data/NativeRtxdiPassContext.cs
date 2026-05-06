@@ -1,10 +1,8 @@
 using System;
 using mini;
-using NativeRender;
 using Unity.Mathematics;
 using UnityEngine;
 using UnityEngine.Rendering;
-using RayTracingAccelerationStructure = NativeRender.RayTracingAccelerationStructure;
 
 namespace PathTracing
 {
@@ -19,17 +17,16 @@ namespace PathTracing
         // g_Const (b0) — GlobalConstants for prep passes, ResamplingConstants for DI/GI passes.
         public GraphicsBuffer ConstantBuffer;
         public GraphicsBuffer ResamplingConstantBuffer;
+        // g_Const (b0) for RaytracedGBuffer — holds NativeGBufferConstants (GBufferConstants layout).
+        // Must NOT be confused with ConstantBuffer which holds GlobalConstants.
+        public GraphicsBuffer GBufferConstantBuffer;
         // g_PerPassConstants (b1) — holds NativeRtxdiPerPassConstants.
         public GraphicsBuffer PerPassConstantBuffer;
 
         // --- Scene bindings ---
-        // SceneBVH (space0:t30).
-        public RayTracingAccelerationStructure WorldTlas;
-        // PrevSceneBVH (space0:t31). May reference the same TLAS as <see cref="WorldTlas"/>
-        // if no separate previous-frame structure is maintained.
-        public RayTracingAccelerationStructure PrevWorldTlas;
-        // Provides t_InstanceData / t_GeometryData / t_MaterialConstants / bindless arrays.
-        public GPUScene GpuScene;
+        // Provides TLAS, t_InstanceData / t_GeometryData / t_MaterialConstants / bindless arrays
+        // in donut-compatible layout for all RTXDI-native passes.
+        public NativeRtxdiGPUScene RtxdiGpuScene;
 
         // --- GBuffer (current frame) — bound as IntPtr SRVs via NativeComputeDescriptorSet.SetTexture(string, IntPtr) ---
         public IntPtr ViewDepthPtr;
@@ -52,6 +49,7 @@ namespace PathTracing
         public IntPtr DenoiserNormalRoughnessPtr;   // t_DenoiserNormalRoughness (t12)
         public IntPtr LocalLightPdfTexturePtr;
         public IntPtr EnvironmentPdfTexturePtr;
+        public IntPtr DeviceDepthPtr;               // u_DeviceDepth (clip-space z written by RaytracedGBuffer)
 
         // --- DI screen-sized UAVs (DI temporal/spatial/shade) ---
         public IntPtr DiffuseLightingPtr;           // u_DiffuseLighting          (u1)

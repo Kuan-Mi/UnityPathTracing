@@ -34,6 +34,13 @@ namespace PathTracing
         DLSS_Output,
         ViewZ,
         Gradient,
+        // ── Rtxdi native GBuffer debug views ──────────────────────────────────
+        Rtxdi_ViewDepth,        // R32_SFloat    – linear view-space depth (greyscale)
+        Rtxdi_DiffuseAlbedo,    // R32_UINT pack R11G11B10_UFLOAT – diffuse albedo
+        Rtxdi_SpecularF0,       // R32_UINT pack R8G8B8A8_Gamma_UFLOAT – specular F0 (RGB)
+        Rtxdi_Roughness,        // R32_UINT pack R8G8B8A8_Gamma_UFLOAT – roughness (A)
+        Rtxdi_Normal,           // R32_UINT oct32 – shading normal as colour
+        Rtxdi_GeoNormal,        // R32_UINT oct32 – geometry normal as colour
     }
 
     public enum UpscalerMode : byte // Scaling factor       // Min jitter phases (or just use unclamped Halton2D)

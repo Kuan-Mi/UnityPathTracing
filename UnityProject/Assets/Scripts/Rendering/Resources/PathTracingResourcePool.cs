@@ -92,6 +92,7 @@ namespace PathTracing
             // ── RTXDI GBuffer ping-pong textures ────────────────────────────────
             _nriResources[RenderResourceType.RtxdiViewDepth]         = new NriTextureResource(RenderResourceType.RtxdiViewDepth, GraphicsFormat.R32_SFloat, uavState);
             _nriResources[RenderResourceType.RtxdiPrevViewDepth]     = new NriTextureResource(RenderResourceType.RtxdiPrevViewDepth, GraphicsFormat.R32_SFloat, uavState);
+            _nriResources[RenderResourceType.RtxdiDeviceDepth]       = new NriTextureResource(RenderResourceType.RtxdiDeviceDepth, GraphicsFormat.R32_SFloat, uavState);
             _nriResources[RenderResourceType.RtxdiDiffuseAlbedo]     = new NriTextureResource(RenderResourceType.RtxdiDiffuseAlbedo, GraphicsFormat.R32_UInt, uavState);
             _nriResources[RenderResourceType.RtxdiPrevDiffuseAlbedo] = new NriTextureResource(RenderResourceType.RtxdiPrevDiffuseAlbedo, GraphicsFormat.R32_UInt, uavState);
             _nriResources[RenderResourceType.RtxdiSpecularRough]     = new NriTextureResource(RenderResourceType.RtxdiSpecularRough, GraphicsFormat.R32_UInt, uavState);

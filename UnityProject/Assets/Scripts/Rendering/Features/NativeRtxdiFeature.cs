@@ -12,7 +12,6 @@ using Unity.Mathematics;
 using UnityEngine;
 using UnityEngine.Rendering;
 using UnityEngine.Rendering.Universal;
-using RayTracingAccelerationStructure = NativeRender.RayTracingAccelerationStructure;
 
 namespace PathTracing
 {
@@ -111,20 +110,24 @@ namespace PathTracing
         // Native: builds GPUScene TLAS at the head of the native pipeline.
         private NativeRtxdiBuildAccelerationStructurePass _buildAsPass;
 
+        // Native GBuffer passes (replace managed GBufferRasterPass)
+        private NativeRtxdiRaytracedGBufferPass    _raytracedGBufferPass;
+        private NativeRtxdiPostprocessGBufferPass  _postprocessGBufferPass;
+
         // -------------------------------------------------------------------
         // Shared resources
         // -------------------------------------------------------------------
-        // The TLAS is owned by GPUScene (NativeRender.RayTracingAccelerationStructure).
-        private RayTracingAccelerationStructure AccelerationStructure => _gpuScene?.AccelerationStructure;
         private GraphicsBuffer _constantBuffer;
         private GraphicsBuffer _resamplingConstantBuffer;
         private GraphicsBuffer _perPassConstantBuffer;
+        private GraphicsBuffer _gbufferConstantBuffer;
 
-        private GPUScene _gpuScene;
+        private NativeRtxdiGPUScene _rtxdiGpuScene;
 
         private readonly GlobalConstants[]             _globalConstantsArray     = new GlobalConstants[1];
         private readonly ResamplingConstants[]         _resamplingConstantsArray = new ResamplingConstants[1];
         private readonly NativeRtxdiPerPassConstants[] _perPassConstantsArray    = new NativeRtxdiPerPassConstants[1];
+        private readonly NativeGBufferConstants[]      _gbufferConstantsArray    = new NativeGBufferConstants[1];
 
         private readonly Dictionary<long, DlrrDenoiser>              _dlrrDenoisers     = new();
         private readonly Dictionary<long, PathTracingResourcePool>   _resourcePools     = new();
@@ -138,7 +141,7 @@ namespace PathTracing
 
         public override void Create()
         {
-            _gpuScene ??= new GPUScene();
+            _rtxdiGpuScene ??= new NativeRtxdiGPUScene();
 
             if (_constantBuffer == null)
                 InitializeBuffers();
@@ -149,6 +152,10 @@ namespace PathTracing
             _gBufferRasterPass     ??= new GBufferRasterPass() { renderPassEvent = renderPassEvent };
             _gBufferRasterResource ??= new GBufferRasterPass.Resource();
             _buildAsPass           ??= new NativeRtxdiBuildAccelerationStructurePass() { renderPassEvent = renderPassEvent };
+            if (raytracedGBufferCs != null)
+                _raytracedGBufferPass ??= new NativeRtxdiRaytracedGBufferPass(raytracedGBufferCs) { renderPassEvent = renderPassEvent };
+            if (postprocessGBufferCs != null)
+                _postprocessGBufferPass ??= new NativeRtxdiPostprocessGBufferPass(postprocessGBufferCs) { renderPassEvent = renderPassEvent };
             // PresamplePass / PresampleReGirLightsPass currently consume managed ComputeShader assets.
             // Until their NativeComputeShader equivalents are wired in, presampling is disabled
             // when those managed assets are absent.
@@ -216,6 +223,7 @@ namespace PathTracing
             _constantBuffer           = new GraphicsBuffer(GraphicsBuffer.Target.Constant, 1, Marshal.SizeOf<GlobalConstants>());
             _resamplingConstantBuffer = new GraphicsBuffer(GraphicsBuffer.Target.Structured, 1, Marshal.SizeOf<ResamplingConstants>());
             _perPassConstantBuffer    = new GraphicsBuffer(GraphicsBuffer.Target.Constant, 1, Marshal.SizeOf<NativeRtxdiPerPassConstants>());
+            _gbufferConstantBuffer    = new GraphicsBuffer(GraphicsBuffer.Target.Constant, 1, Marshal.SizeOf<NativeGBufferConstants>());
         }
 
         public override void AddRenderPasses(ScriptableRenderer renderer, ref RenderingData renderingData)
@@ -303,10 +311,10 @@ namespace PathTracing
                 _rtxdiResources.Add(uniqueKey, rtxdiResources);
             }
 
-            // GPUScene tracks scene targets / instance buffers; the native AS handles skinned
+            // NativeRtxdiGPUScene tracks scene targets / instance buffers; the native AS handles skinned
             // mesh updates internally via NativeRayTracingSkinnedTarget. The TLAS itself is
             // built later inside NativeRtxdiBuildAccelerationStructurePass (needs a CommandBuffer).
-            _gpuScene.UpdateForFrame();
+            _rtxdiGpuScene.UpdateForFrame();
 
             if (resourcesChanged)
             {
@@ -321,6 +329,9 @@ namespace PathTracing
             globalConstants          = frameState.GetConstants(renderingData, setting);
             _globalConstantsArray[0] = globalConstants;
             _constantBuffer.SetData(_globalConstantsArray);
+
+            _gbufferConstantsArray[0] = NativeGBufferConstantsBuilder.Build(frameState, renderResolution, 1f);
+            _gbufferConstantBuffer.SetData(_gbufferConstantsArray);
 
             var localSettings = setting.lightingSettings;
             localSettings.enablePreviousTLAS        = false;
@@ -413,9 +424,8 @@ namespace PathTracing
                 ConstantBuffer           = _constantBuffer,
                 ResamplingConstantBuffer = _resamplingConstantBuffer,
                 PerPassConstantBuffer    = _perPassConstantBuffer,
-                WorldTlas                = AccelerationStructure,
-                PrevWorldTlas            = AccelerationStructure,
-                GpuScene                 = _gpuScene,
+                GBufferConstantBuffer    = _gbufferConstantBuffer,
+                RtxdiGpuScene            = _rtxdiGpuScene,
                 ViewDepthPtr             = isOddFrame ? GetPt(RenderResourceType.RtxdiViewDepth) : GetPt(RenderResourceType.RtxdiPrevViewDepth),
                 DiffuseAlbedoPtr         = isOddFrame ? GetPt(RenderResourceType.RtxdiDiffuseAlbedo) : GetPt(RenderResourceType.RtxdiPrevDiffuseAlbedo),
                 SpecularRoughPtr         = isOddFrame ? GetPt(RenderResourceType.RtxdiSpecularRough) : GetPt(RenderResourceType.RtxdiPrevSpecularRough),
@@ -429,6 +439,7 @@ namespace PathTracing
                 DirectLightingPtr        = GetPt(RenderResourceType.DirectLighting),
                 EmissivePtr              = GetPt(RenderResourceType.RtxdiEmissive),
                 MotionVectorsPtr         = GetPt(RenderResourceType.RtxdiMotionVectors),
+                DeviceDepthPtr           = GetPt(RenderResourceType.RtxdiDeviceDepth),
                 LocalLightPdfTexturePtr  = ToPt(rtxdiResources.LocalLightPdfTexture),
                 // Lighting output UAVs
                 DiffuseLightingPtr         = GetPt(RenderResourceType.RtxdiDiffuseLighting),
@@ -446,120 +457,135 @@ namespace PathTracing
                 ResolutionScale            = 1f,
             };
 
-            // ---- GBuffer (managed rasterised path) ----
-            _gBufferRasterResource.EnsureResources(pool.renderResolution);
-            _gBufferRasterPass.Setup(managedCtx, _gBufferRasterResource);
-            renderer.EnqueuePass(_gBufferRasterPass);
-
-            // ---- Build native TLAS (must run before any native compute pass that binds SceneBVH) ----
-            _buildAsPass.Setup(_gpuScene);
+            // ---- Build native TLAS (must run before RaytracedGBuffer which needs SceneBVH) ----
+            _buildAsPass.Setup(_rtxdiGpuScene);
             renderer.EnqueuePass(_buildAsPass);
 
-            // ---- Pre-sampling (TODO: native PdfMipmap port) ----
-            // FullSample's m_localLightPdfMipmapPass / m_environmentMapPdfMipmapPass run after
-            // PrepareLights. Skipped until the native PrepareLights pass is implemented.
-
-            // ---- DI core (NATIVE) ----
-            if (enableDirectReStirPass)
+            // ---- GBuffer (native raytraced path) ----
+            if (_raytracedGBufferPass != null)
             {
-                _diGenerateInitialSamplesPass.Setup(nativeCtx);
-                renderer.EnqueuePass(_diGenerateInitialSamplesPass);
+                _raytracedGBufferPass.Setup(nativeCtx);
+                renderer.EnqueuePass(_raytracedGBufferPass);
 
-                if (_diTemporalResamplingPass != null &&
-                    setting.diResamplingMode is ReSTIRDI_ResamplingMode.Temporal or ReSTIRDI_ResamplingMode.TemporalAndSpatial)
+                if (_postprocessGBufferPass != null)
                 {
-                    _diTemporalResamplingPass.Setup(nativeCtx);
-                    renderer.EnqueuePass(_diTemporalResamplingPass);
-                }
-
-                if (_diSpatialResamplingPass != null &&
-                    setting.diResamplingMode is ReSTIRDI_ResamplingMode.Spatial or ReSTIRDI_ResamplingMode.TemporalAndSpatial)
-                {
-                    _diSpatialResamplingPass.Setup(nativeCtx);
-                    renderer.EnqueuePass(_diSpatialResamplingPass);
-                }
-
-                _diShadeSamplesPass.Setup(nativeCtx);
-                renderer.EnqueuePass(_diShadeSamplesPass);
-            }
-
-            // ---- BRDF + GI (NATIVE) ----
-            if (enableBrdfAndIndirectPass && _brdfRayTracingPass != null)
-            {
-                _brdfRayTracingPass.Setup(nativeCtx);
-                renderer.EnqueuePass(_brdfRayTracingPass);
-
-                if (enableIndirect && _shadeSecondarySurfacesPass != null)
-                {
-                    _shadeSecondarySurfacesPass.Setup(nativeCtx);
-                    renderer.EnqueuePass(_shadeSecondarySurfacesPass);
-
-                    if (enableReSTIRGI)
-                    {
-                        if (_giTemporalResamplingPass != null &&
-                            setting.giResamplingMode is ReSTIRGI_ResamplingMode.Temporal or ReSTIRGI_ResamplingMode.TemporalAndSpatial)
-                        {
-                            _giTemporalResamplingPass.Setup(nativeCtx);
-                            renderer.EnqueuePass(_giTemporalResamplingPass);
-                        }
-
-                        if (_giSpatialResamplingPass != null &&
-                            setting.giResamplingMode is ReSTIRGI_ResamplingMode.Spatial or ReSTIRGI_ResamplingMode.TemporalAndSpatial)
-                        {
-                            _giSpatialResamplingPass.Setup(nativeCtx);
-                            renderer.EnqueuePass(_giSpatialResamplingPass);
-                        }
-
-                        if (_giFinalShadingPass != null)
-                        {
-                            _giFinalShadingPass.Setup(nativeCtx);
-                            renderer.EnqueuePass(_giFinalShadingPass);
-                        }
-                    }
+                    _postprocessGBufferPass.Setup(nativeCtx);
+                    renderer.EnqueuePass(_postprocessGBufferPass);
                 }
             }
-
-            // ---- DLSS-RR + OutputBlit (managed) ----
-            var dlrrRes = new DlrrDenoiser.DlrrResources
+            else
             {
-                input           = pool.GetNriResource(RenderResourceType.DirectLighting),
-                output          = pool.GetNriResource(RenderResourceType.DlssOutput),
-                mv              = pool.GetNriResource(RenderResourceType.RtxdiMotionVectors),
-                depth           = pool.GetNriResource(isOddFrame ? RenderResourceType.RtxdiViewDepth : RenderResourceType.RtxdiPrevViewDepth),
-                diffAlbedo      = pool.GetNriResource(RenderResourceType.RrGuideDiffAlbedo),
-                specAlbedo      = pool.GetNriResource(RenderResourceType.RrGuideSpecAlbedo),
-                normalRoughness = pool.GetNriResource(RenderResourceType.RrGuideNormalRoughness),
-                specHitDistance = pool.GetNriResource(RenderResourceType.RrGuideSpecHitDistance),
-            };
-
-            var dlrrInput = new DlrrDenoiser.DlrrFrameInput
-            {
-                worldToView      = frameState.worldToView,
-                viewToClip       = frameState.viewToClip,
-                viewportJitter   = frameState.viewportJitter,
-                renderResolution = frameState.renderResolution,
-                frameIndex       = curFrame,
-                outputWidth      = (ushort)outputResolution.x,
-                outputHeight     = (ushort)outputResolution.y,
-            };
-            IntPtr dlssDataPtr = dlrr.GetInteropDataPtr(dlrrInput, dlrrRes, 1, setting.upscalerMode);
-
-            int rectGridW = (int)(renderResolution.x * 1 + 0.5f + 15) / 16;
-            int rectGridH = (int)(renderResolution.y * 1 + 0.5f + 15) / 16;
-
-            if (_rtxdiDlssBeforePass != null)
-            {
-                _rtxdiDlssBeforePass.Setup(managedCtx,
-                    pool.GetRT(RenderResourceType.RrGuideDiffAlbedo),
-                    pool.GetRT(RenderResourceType.RrGuideSpecAlbedo),
-                    pool.GetRT(RenderResourceType.RrGuideSpecHitDistance),
-                    pool.GetRT(RenderResourceType.RrGuideNormalRoughness),
-                    rectGridW, rectGridH);
-                renderer.EnqueuePass(_rtxdiDlssBeforePass);
+                // Fallback to managed rasterized GBuffer if native shader not assigned
+                _gBufferRasterResource.EnsureResources(pool.renderResolution);
+                _gBufferRasterPass.Setup(managedCtx, _gBufferRasterResource);
+                renderer.EnqueuePass(_gBufferRasterPass);
             }
 
-            _dlssrrPass.Setup(dlssDataPtr, new DlssRRPass.Settings { tmpDisableRR = setting.tmpDisableRR });
-            renderer.EnqueuePass(_dlssrrPass);
+            // // ---- Pre-sampling (TODO: native PdfMipmap port) ----
+            // // FullSample's m_localLightPdfMipmapPass / m_environmentMapPdfMipmapPass run after
+            // // PrepareLights. Skipped until the native PrepareLights pass is implemented.
+            //
+            // // ---- DI core (NATIVE) ----
+            // if (enableDirectReStirPass)
+            // {
+            //     _diGenerateInitialSamplesPass.Setup(nativeCtx);
+            //     renderer.EnqueuePass(_diGenerateInitialSamplesPass);
+            //
+            //     if (_diTemporalResamplingPass != null &&
+            //         setting.diResamplingMode is ReSTIRDI_ResamplingMode.Temporal or ReSTIRDI_ResamplingMode.TemporalAndSpatial)
+            //     {
+            //         _diTemporalResamplingPass.Setup(nativeCtx);
+            //         renderer.EnqueuePass(_diTemporalResamplingPass);
+            //     }
+            //
+            //     if (_diSpatialResamplingPass != null &&
+            //         setting.diResamplingMode is ReSTIRDI_ResamplingMode.Spatial or ReSTIRDI_ResamplingMode.TemporalAndSpatial)
+            //     {
+            //         _diSpatialResamplingPass.Setup(nativeCtx);
+            //         renderer.EnqueuePass(_diSpatialResamplingPass);
+            //     }
+            //
+            //     _diShadeSamplesPass.Setup(nativeCtx);
+            //     renderer.EnqueuePass(_diShadeSamplesPass);
+            // }
+            //
+            // // ---- BRDF + GI (NATIVE) ----
+            // if (enableBrdfAndIndirectPass && _brdfRayTracingPass != null)
+            // {
+            //     _brdfRayTracingPass.Setup(nativeCtx);
+            //     renderer.EnqueuePass(_brdfRayTracingPass);
+            //
+            //     if (enableIndirect && _shadeSecondarySurfacesPass != null)
+            //     {
+            //         _shadeSecondarySurfacesPass.Setup(nativeCtx);
+            //         renderer.EnqueuePass(_shadeSecondarySurfacesPass);
+            //
+            //         if (enableReSTIRGI)
+            //         {
+            //             if (_giTemporalResamplingPass != null &&
+            //                 setting.giResamplingMode is ReSTIRGI_ResamplingMode.Temporal or ReSTIRGI_ResamplingMode.TemporalAndSpatial)
+            //             {
+            //                 _giTemporalResamplingPass.Setup(nativeCtx);
+            //                 renderer.EnqueuePass(_giTemporalResamplingPass);
+            //             }
+            //
+            //             if (_giSpatialResamplingPass != null &&
+            //                 setting.giResamplingMode is ReSTIRGI_ResamplingMode.Spatial or ReSTIRGI_ResamplingMode.TemporalAndSpatial)
+            //             {
+            //                 _giSpatialResamplingPass.Setup(nativeCtx);
+            //                 renderer.EnqueuePass(_giSpatialResamplingPass);
+            //             }
+            //
+            //             if (_giFinalShadingPass != null)
+            //             {
+            //                 _giFinalShadingPass.Setup(nativeCtx);
+            //                 renderer.EnqueuePass(_giFinalShadingPass);
+            //             }
+            //         }
+            //     }
+            // }
+            //
+            // // ---- DLSS-RR + OutputBlit (managed) ----
+            // var dlrrRes = new DlrrDenoiser.DlrrResources
+            // {
+            //     input           = pool.GetNriResource(RenderResourceType.DirectLighting),
+            //     output          = pool.GetNriResource(RenderResourceType.DlssOutput),
+            //     mv              = pool.GetNriResource(RenderResourceType.RtxdiMotionVectors),
+            //     depth           = pool.GetNriResource(isOddFrame ? RenderResourceType.RtxdiViewDepth : RenderResourceType.RtxdiPrevViewDepth),
+            //     diffAlbedo      = pool.GetNriResource(RenderResourceType.RrGuideDiffAlbedo),
+            //     specAlbedo      = pool.GetNriResource(RenderResourceType.RrGuideSpecAlbedo),
+            //     normalRoughness = pool.GetNriResource(RenderResourceType.RrGuideNormalRoughness),
+            //     specHitDistance = pool.GetNriResource(RenderResourceType.RrGuideSpecHitDistance),
+            // };
+            //
+            // var dlrrInput = new DlrrDenoiser.DlrrFrameInput
+            // {
+            //     worldToView      = frameState.worldToView,
+            //     viewToClip       = frameState.viewToClip,
+            //     viewportJitter   = frameState.viewportJitter,
+            //     renderResolution = frameState.renderResolution,
+            //     frameIndex       = curFrame,
+            //     outputWidth      = (ushort)outputResolution.x,
+            //     outputHeight     = (ushort)outputResolution.y,
+            // };
+            // IntPtr dlssDataPtr = dlrr.GetInteropDataPtr(dlrrInput, dlrrRes, 1, setting.upscalerMode);
+            //
+            // int rectGridW = (int)(renderResolution.x * 1 + 0.5f + 15) / 16;
+            // int rectGridH = (int)(renderResolution.y * 1 + 0.5f + 15) / 16;
+            //
+            // if (_rtxdiDlssBeforePass != null)
+            // {
+            //     _rtxdiDlssBeforePass.Setup(managedCtx,
+            //         pool.GetRT(RenderResourceType.RrGuideDiffAlbedo),
+            //         pool.GetRT(RenderResourceType.RrGuideSpecAlbedo),
+            //         pool.GetRT(RenderResourceType.RrGuideSpecHitDistance),
+            //         pool.GetRT(RenderResourceType.RrGuideNormalRoughness),
+            //         rectGridW, rectGridH);
+            //     renderer.EnqueuePass(_rtxdiDlssBeforePass);
+            // }
+            //
+            // _dlssrrPass.Setup(dlssDataPtr, new DlssRRPass.Settings { tmpDisableRR = setting.tmpDisableRR });
+            // renderer.EnqueuePass(_dlssrrPass);
 
             if (_outputBlitPass != null)
             {
@@ -572,6 +598,12 @@ namespace PathTracing
                     RRGuide_Normal_Roughness = pool.GetRT(RenderResourceType.RrGuideNormalRoughness),
                     RRGuide_SpecHitDistance  = pool.GetRT(RenderResourceType.RrGuideSpecHitDistance),
                     DlssOutput               = pool.GetRT(RenderResourceType.DlssOutput),
+                    // Rtxdi GBuffer debug
+                    RtxdiViewDepth      = viewDepth,
+                    RtxdiDiffuseAlbedo  = diffuseAlbedo,
+                    RtxdiSpecularRough  = specularRough,
+                    RtxdiNormals        = normals,
+                    RtxdiGeoNormals     = geoNormals,
                 };
                 var outputBlitSettings = new OutputBlitPass.Settings
                 {
@@ -619,6 +651,8 @@ namespace PathTracing
             _resamplingConstantBuffer = null;
             _perPassConstantBuffer?.Release();
             _perPassConstantBuffer = null;
+            _gbufferConstantBuffer?.Release();
+            _gbufferConstantBuffer = null;
 
             foreach (var d in _dlrrDenoisers.Values) d.Dispose();
             _dlrrDenoisers.Clear();
@@ -631,11 +665,15 @@ namespace PathTracing
 
             _cameraFrameStates.Clear();
 
-            _gpuScene?.Dispose();
-            _gpuScene = null;
+            _rtxdiGpuScene?.Dispose();
+            _rtxdiGpuScene = null;
 
             _diGenerateInitialSamplesPass?.Dispose();
             _diGenerateInitialSamplesPass = null;
+            _raytracedGBufferPass?.Dispose();
+            _raytracedGBufferPass = null;
+            _postprocessGBufferPass?.Dispose();
+            _postprocessGBufferPass = null;
             _diTemporalResamplingPass?.Dispose();
             _diTemporalResamplingPass = null;
             _diSpatialResamplingPass?.Dispose();

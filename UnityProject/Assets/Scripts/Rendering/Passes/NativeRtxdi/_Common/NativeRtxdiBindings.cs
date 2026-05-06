@@ -32,16 +32,14 @@ namespace PathTracing
                 ds.SetConstantBuffer("g_PerPassConstants", ctx.PerPassConstantBuffer.GetNativeBufferPtr());
 
             // ---------- TLAS ----------
-            if (ctx.WorldTlas != null)
-                ds.SetAccelerationStructure("SceneBVH", ctx.WorldTlas);
-            if (ctx.PrevWorldTlas != null)
-                ds.SetAccelerationStructure("PrevSceneBVH", ctx.PrevWorldTlas);
-            else if (ctx.WorldTlas != null)
-                // Fall back to the current-frame TLAS so the binding is non-null.
-                ds.SetAccelerationStructure("PrevSceneBVH", ctx.WorldTlas);
+            var tlas = ctx.RtxdiGpuScene?.AccelerationStructure;
+            if (tlas != null)
+                ds.SetAccelerationStructure("SceneBVH", tlas);
+            if (tlas != null)
+                ds.SetAccelerationStructure("PrevSceneBVH", tlas);
 
             // ---------- Scene buffers + bindless arrays ----------
-            ctx.GpuScene?.BindToShader(ds);
+            ctx.RtxdiGpuScene?.BindToShader(ds);
 
             // ---------- GBuffer SRVs (current frame, t0..t4) ----------
             if (ctx.ViewDepthPtr     != System.IntPtr.Zero) ds.SetTexture("t_GBufferDepth",         ctx.ViewDepthPtr);

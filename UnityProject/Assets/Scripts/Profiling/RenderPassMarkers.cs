@@ -35,6 +35,8 @@ public static class RenderPassMarkers
     // ── GBuffer ───────────────────────────────────────────────────────────────
     public static readonly NamedMarker GBufferRay = new(ProfilerCategory.Render, "GBuffer Ray", MarkerFlags.SampleGPU);
     public static readonly NamedMarker GBufferRaster = new(ProfilerCategory.Render, "GBuffer Raster", MarkerFlags.SampleGPU);
+    public static readonly NamedMarker RaytracedGBufferCompute = new(ProfilerCategory.Render, "RaytracedGBuffer CS", MarkerFlags.SampleGPU);
+    public static readonly NamedMarker PostprocessGBufferCompute = new(ProfilerCategory.Render, "PostprocessGBuffer CS", MarkerFlags.SampleGPU);
 
     // ── DI ────────────────────────────────────────────────────────────────────
     public static readonly NamedMarker GenInitialSamplesCompute = new(ProfilerCategory.Render, "GenInitialSamples CS", MarkerFlags.SampleGPU);

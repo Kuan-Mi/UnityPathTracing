@@ -55,6 +55,13 @@ namespace PathTracing
             internal RTHandle DirectEmission;
             internal RTHandle ComposedDiff;
             internal RTHandle ComposedSpecViewZ;
+
+            // ── Rtxdi native GBuffer debug textures ──────────────────────────
+            internal RTHandle RtxdiViewDepth;
+            internal RTHandle RtxdiDiffuseAlbedo;   // R32_UINT  R11G11B10_UFLOAT
+            internal RTHandle RtxdiSpecularRough;   // R32_UINT  R8G8B8A8_Gamma_UFLOAT
+            internal RTHandle RtxdiNormals;         // R32_UINT  oct32
+            internal RTHandle RtxdiGeoNormals;      // R32_UINT  oct32
         }
 
         public class Settings
@@ -194,6 +201,24 @@ namespace PathTracing
                 
                 case ShowMode.Gradient:
                     Blitter.BlitTexture(natCmd, data.Resource.Gradient, scaleOffset, data.BlitMaterial, (int)ShowPass.Gradient);
+                    break;
+                case ShowMode.Rtxdi_ViewDepth:
+                    Blitter.BlitTexture(natCmd, data.Resource.RtxdiViewDepth, scaleOffset, data.BlitMaterial, (int)ShowPass.RtxdiViewDepth);
+                    break;
+                case ShowMode.Rtxdi_DiffuseAlbedo:
+                    Blitter.BlitTexture(natCmd, data.Resource.RtxdiDiffuseAlbedo, scaleOffset, data.BlitMaterial, (int)ShowPass.RtxdiDiffuseAlbedo);
+                    break;
+                case ShowMode.Rtxdi_SpecularF0:
+                    Blitter.BlitTexture(natCmd, data.Resource.RtxdiSpecularRough, scaleOffset, data.BlitMaterial, (int)ShowPass.RtxdiSpecularF0);
+                    break;
+                case ShowMode.Rtxdi_Roughness:
+                    Blitter.BlitTexture(natCmd, data.Resource.RtxdiSpecularRough, scaleOffset, data.BlitMaterial, (int)ShowPass.RtxdiRoughness);
+                    break;
+                case ShowMode.Rtxdi_Normal:
+                    Blitter.BlitTexture(natCmd, data.Resource.RtxdiNormals, scaleOffset, data.BlitMaterial, (int)ShowPass.RtxdiNormal);
+                    break;
+                case ShowMode.Rtxdi_GeoNormal:
+                    Blitter.BlitTexture(natCmd, data.Resource.RtxdiGeoNormals, scaleOffset, data.BlitMaterial, (int)ShowPass.RtxdiGeoNormal);
                     break;
                 default:
                     throw new ArgumentOutOfRangeException();
