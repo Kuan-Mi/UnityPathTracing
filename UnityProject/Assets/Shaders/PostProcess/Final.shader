@@ -1060,7 +1060,7 @@
                 int2  px     = int2(saturate(i.uv) * dim);
                 uint  packed = _BlitTexture.Load(int3(px, 0));
                 float3 n     = octToNdirUnorm32(packed);
-                return float4(n * 0.5 + 0.5, 1);
+                return float4(n, 1);
             }
             ENDHLSL
         }
@@ -1103,7 +1103,7 @@
                 int2  px     = int2(saturate(i.uv) * dim);
                 uint  packed = _BlitTexture.Load(int3(px, 0));
                 float3 n     = octToNdirUnorm32(packed);
-                return float4(n * 0.5 + 0.5, 1);
+                return float4(n, 1);
             }
             ENDHLSL
         }

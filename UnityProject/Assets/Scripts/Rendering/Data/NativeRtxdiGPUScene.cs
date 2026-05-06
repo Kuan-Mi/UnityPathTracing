@@ -200,8 +200,8 @@ namespace PathTracing
         private readonly Dictionary<int, (int vb, int ib)> _meshBufferSlots = new();
         private readonly Dictionary<int, int>              _materialSlots   = new();
         private readonly Dictionary<int, int>              _textureSlots    = new();
-        private readonly Dictionary<int, Mesh>             _normalizedMeshCache = new();
-        private readonly List<Mesh>                        _ownedMeshes     = new();
+        private readonly Dictionary<int, (GraphicsBuffer vb, GraphicsBuffer ib)> _donutBufferCache = new();
+        private readonly List<GraphicsBuffer>              _ownedGfxBuffers = new();
         private readonly List<NativeRayTracingTarget>      _registeredTargets = new();
 
         private bool _sceneGpuDirty = true;
@@ -311,14 +311,10 @@ namespace PathTracing
             _materialSlots.Clear();
             _textureSlots.Clear();
 
-            foreach (var m in _ownedMeshes)
-            {
-                if (m == null) continue;
-                if (Application.isPlaying) UnityEngine.Object.Destroy(m);
-                else UnityEngine.Object.DestroyImmediate(m);
-            }
-            _ownedMeshes.Clear();
-            _normalizedMeshCache.Clear();
+            foreach (var buf in _ownedGfxBuffers)
+                buf?.Release();
+            _ownedGfxBuffers.Clear();
+            _donutBufferCache.Clear();
         }
 
         private void RebuildSceneGpuData(IReadOnlyList<NativeRayTracingTarget> targets)
@@ -339,31 +335,30 @@ namespace PathTracing
                 var mf = mr.GetComponent<MeshFilter>();
                 if (mf == null || mf.sharedMesh == null) continue;
 
-                Mesh mesh = GetOrCreateSingleStreamMesh(mf.sharedMesh);
+                Mesh mesh = mf.sharedMesh;
                 if (mesh == null) continue;
                 int meshKey = mesh.GetInstanceID();
-                mesh.UploadMeshData(false);
 
                 if (!_meshBufferSlots.TryGetValue(meshKey, out var slots))
                 {
-                    IntPtr vbPtr = mesh.GetNativeVertexBufferPtr(0);
-                    IntPtr ibPtr = mesh.GetNativeIndexBufferPtr();
-                    if (vbPtr == IntPtr.Zero || ibPtr == IntPtr.Zero)
+                    var (donutVb, donutIb) = GetOrCreateDonutBuffers(mesh);
+                    if (donutVb == null || donutIb == null)
                     {
-                        Debug.LogWarning($"[NativeRtxdiGPUScene] '{mesh.name}': failed to get GPU buffer ptrs — skipping");
+                        Debug.LogWarning($"[NativeRtxdiGPUScene] '{mesh.name}': failed to build donut buffers — skipping");
                         continue;
                     }
                     slots = (bufPtrs.Count, bufPtrs.Count + 1);
-                    bufPtrs.Add(vbPtr);
-                    bufPtrs.Add(ibPtr);
+                    bufPtrs.Add(donutVb.GetNativeBufferPtr());
+                    bufPtrs.Add(donutIb.GetNativeBufferPtr());
                     _meshBufferSlots[meshKey] = slots;
                 }
 
-                uint indexStride = mesh.indexFormat == IndexFormat.UInt16 ? 2u : 4u;
-                uint posOff  = mesh.HasVertexAttribute(VertexAttribute.Position) ? (uint)mesh.GetVertexAttributeOffset(VertexAttribute.Position)  : 0u;
-                uint normOff = mesh.HasVertexAttribute(VertexAttribute.Normal)   ? (uint)mesh.GetVertexAttributeOffset(VertexAttribute.Normal)     : 0xFFFFFFFFu;
-                uint uvOff   = mesh.HasVertexAttribute(VertexAttribute.TexCoord0) ? (uint)mesh.GetVertexAttributeOffset(VertexAttribute.TexCoord0) : 0xFFFFFFFFu;
-                uint tanOff  = mesh.HasVertexAttribute(VertexAttribute.Tangent)  ? (uint)mesh.GetVertexAttributeOffset(VertexAttribute.Tangent)    : 0xFFFFFFFFu;
+                // SoA offsets (matches c_SizeOfPosition=12, c_SizeOfNormal=4, c_SizeOfTexcoord=8)
+                uint vc       = (uint)mesh.vertexCount;
+                uint posOff   = 0u;
+                uint normOff  = mesh.HasVertexAttribute(VertexAttribute.Normal)    ? vc * 12u           : 0xFFFFFFFFu;
+                uint uvOff    = mesh.HasVertexAttribute(VertexAttribute.TexCoord0) ? vc * (12u + 4u)    : 0xFFFFFFFFu;
+                uint tanOff   = mesh.HasVertexAttribute(VertexAttribute.Tangent)   ? vc * (12u + 4u + 8u) : 0xFFFFFFFFu;
 
                 Material[] mats       = mr.sharedMaterials ?? Array.Empty<Material>();
                 int        subMeshCnt = mesh.subMeshCount;
@@ -381,7 +376,7 @@ namespace PathTracing
                         numIndices        = (uint)sub.indexCount,
                         numVertices       = (uint)mesh.vertexCount,
                         indexBufferIndex  = slots.ib,
-                        indexOffset       = (uint)sub.indexStart * indexStride,
+                        indexOffset       = (uint)sub.indexStart * 4u,  // always uint32
                         vertexBufferIndex = slots.vb,
                         positionOffset    = posOff,
                         prevPositionOffset = posOff,  // no skinning / morph support yet
@@ -608,46 +603,125 @@ namespace PathTracing
         }
 
         /// <summary>
-        /// Returns a single-stream copy of the mesh if needed; original otherwise.
-        /// Mirrors the same logic in <c>NativeRender.GPUScene</c>.
+        /// Builds donut-compatible SoA vertex buffer and uint32 index buffer for the given mesh.
+        /// VB layout: [Position: float3 × vc][Normal: RGB8_SNORM × vc][TexCoord: float2 × vc][Tangent: RGBA8_SNORM × vc]
+        /// IB layout: uint32 per index, same slot layout as Unity submesh indexStart.
+        /// Both returned as <c>GraphicsBuffer.Target.Raw</c> (ByteAddressBuffer).
         /// </summary>
-        private Mesh GetOrCreateSingleStreamMesh(Mesh source)
+        private (GraphicsBuffer vb, GraphicsBuffer ib) GetOrCreateDonutBuffers(Mesh src)
         {
-            if (source == null) return null;
-            int key = source.GetInstanceID();
-            if (_normalizedMeshCache.TryGetValue(key, out var cached)) return cached;
+            if (src == null) return (null, null);
+            int key = src.GetInstanceID();
+            if (_donutBufferCache.TryGetValue(key, out var cached)) return cached;
 
-            // If only one vertex stream, use as-is.
-            if (source.vertexBufferCount <= 1)
+            int vc = src.vertexCount;
+            bool hasNormal  = src.HasVertexAttribute(VertexAttribute.Normal);
+            bool hasUV      = src.HasVertexAttribute(VertexAttribute.TexCoord0);
+            bool hasTangent = src.HasVertexAttribute(VertexAttribute.Tangent);
+
+            // ---- VB (SoA) ----
+            int vbBytes = vc * 12;                      // position always present
+            if (hasNormal)  vbBytes += vc * 4;          // RGB8_SNORM
+            if (hasUV)      vbBytes += vc * 8;          // float2
+            if (hasTangent) vbBytes += vc * 4;          // RGBA8_SNORM
+
+            var vbData = new byte[vbBytes];
+
+            // Position stream (float3, no compression)
+            Vector3[] positions = src.vertices;
+            int writePos = 0;
+            for (int i = 0; i < vc; i++)
             {
-                _normalizedMeshCache[key] = source;
-                return source;
+                Buffer.BlockCopy(BitConverter.GetBytes(positions[i].x), 0, vbData, writePos,     4);
+                Buffer.BlockCopy(BitConverter.GetBytes(positions[i].y), 0, vbData, writePos + 4, 4);
+                Buffer.BlockCopy(BitConverter.GetBytes(positions[i].z), 0, vbData, writePos + 8, 4);
+                writePos += 12;
             }
 
-            // Combine into a single stream.
-            var desc = new Mesh();
-            desc.name = source.name + "_SingleStream";
-            desc.indexFormat = source.indexFormat;
+            // Normal stream (RGB8_SNORM, 4 bytes each)
+            if (hasNormal)
+            {
+                Vector3[] normals = src.normals;
+                for (int i = 0; i < vc; i++)
+                {
+                    uint packed = PackRGB8Snorm(normals[i]);
+                    Buffer.BlockCopy(BitConverter.GetBytes(packed), 0, vbData, writePos, 4);
+                    writePos += 4;
+                }
+            }
 
-            var positions = source.vertices;
-            var normals   = source.normals;
-            var tangents  = source.tangents;
-            var uvs       = source.uv;
+            // TexCoord stream (float2, 8 bytes each)
+            if (hasUV)
+            {
+                Vector2[] uvs = src.uv;
+                for (int i = 0; i < vc; i++)
+                {
+                    Buffer.BlockCopy(BitConverter.GetBytes(uvs[i].x), 0, vbData, writePos,     4);
+                    Buffer.BlockCopy(BitConverter.GetBytes(uvs[i].y), 0, vbData, writePos + 4, 4);
+                    writePos += 8;
+                }
+            }
 
-            desc.vertices = positions;
-            if (normals.Length  > 0) desc.normals  = normals;
-            if (tangents.Length > 0) desc.tangents = tangents;
-            if (uvs.Length      > 0) desc.uv       = uvs;
+            // Tangent stream (RGBA8_SNORM, 4 bytes each)
+            if (hasTangent)
+            {
+                Vector4[] tangents = src.tangents;
+                for (int i = 0; i < vc; i++)
+                {
+                    uint packed = PackRGBA8Snorm(tangents[i]);
+                    Buffer.BlockCopy(BitConverter.GetBytes(packed), 0, vbData, writePos, 4);
+                    writePos += 4;
+                }
+            }
 
-            desc.subMeshCount = source.subMeshCount;
-            for (int s = 0; s < source.subMeshCount; s++)
-                desc.SetIndices(source.GetIndices(s), source.GetSubMesh(s).topology, s);
+            var vbUint = new uint[vbBytes / 4];
+            Buffer.BlockCopy(vbData, 0, vbUint, 0, vbBytes);
+            var vbGfx = new GraphicsBuffer(GraphicsBuffer.Target.Raw, vbBytes / 4, 4);
+            vbGfx.SetData(vbUint);
 
-            desc.UploadMeshData(false);
+            // ---- IB (uint32, matching Unity submesh indexStart layout) ----
+            int totalIndexSlots = 0;
+            for (int s = 0; s < src.subMeshCount; s++)
+            {
+                var sub = src.GetSubMesh(s);
+                totalIndexSlots = Mathf.Max(totalIndexSlots, sub.indexStart + sub.indexCount);
+            }
 
-            _normalizedMeshCache[key] = desc;
-            _ownedMeshes.Add(desc);
-            return desc;
+            var ibData = new uint[Mathf.Max(totalIndexSlots, 3)];
+            for (int s = 0; s < src.subMeshCount; s++)
+            {
+                var sub = src.GetSubMesh(s);
+                int[] subIdx = src.GetIndices(s, applyBaseVertex: true);
+                for (int k = 0; k < subIdx.Length; k++)
+                    ibData[sub.indexStart + k] = (uint)subIdx[k];
+            }
+
+            int ibBytes = ibData.Length * 4;
+            var ibGfx = new GraphicsBuffer(GraphicsBuffer.Target.Raw, ibBytes / 4, 4);
+            ibGfx.SetData(ibData);
+
+            _ownedGfxBuffers.Add(vbGfx);
+            _ownedGfxBuffers.Add(ibGfx);
+            var result = (vbGfx, ibGfx);
+            _donutBufferCache[key] = result;
+            return result;
+        }
+
+        private static uint PackRGB8Snorm(Vector3 v)
+        {
+            byte r = (byte)(Mathf.RoundToInt(Mathf.Clamp(v.x, -1f, 1f) * 127f) & 0xFF);
+            byte g = (byte)(Mathf.RoundToInt(Mathf.Clamp(v.y, -1f, 1f) * 127f) & 0xFF);
+            byte b = (byte)(Mathf.RoundToInt(Mathf.Clamp(v.z, -1f, 1f) * 127f) & 0xFF);
+            return (uint)(r | (g << 8) | (b << 16));
+        }
+
+        private static uint PackRGBA8Snorm(Vector4 v)
+        {
+            byte r = (byte)(Mathf.RoundToInt(Mathf.Clamp(v.x, -1f, 1f) * 127f) & 0xFF);
+            byte g = (byte)(Mathf.RoundToInt(Mathf.Clamp(v.y, -1f, 1f) * 127f) & 0xFF);
+            byte b = (byte)(Mathf.RoundToInt(Mathf.Clamp(v.z, -1f, 1f) * 127f) & 0xFF);
+            byte a = (byte)(Mathf.RoundToInt(Mathf.Clamp(v.w, -1f, 1f) * 127f) & 0xFF);
+            return (uint)(r | (g << 8) | (b << 16) | (a << 24));
         }
     }
 }
