@@ -42,6 +42,19 @@ namespace PathTracing
                 feature.InitializeBuffers();
             }
 
+            EditorGUILayout.Space(4);
+
+            if (GUILayout.Button("TestPrepareLight — Readback LightDataBuffer"))
+            {
+                feature.TestPrepareLight();
+            }
+
+            EditorGUILayout.HelpBox(
+                "Reads back LightDataBuffer from GPU and logs every non-black PolymorphicLightInfo " +
+                "entry to the Console + draws normals in the Scene view. " +
+                "Run the scene for a few frames before clicking.",
+                MessageType.Info);
+
             EditorGUILayout.Space(8);
             var globalConstProp = serializedObject.FindProperty("globalConstants");
             if (globalConstProp != null)

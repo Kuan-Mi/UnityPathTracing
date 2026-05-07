@@ -295,33 +295,46 @@ namespace PathTracing
                 _isContexts.Add(uniqueKey, isContext);
             }
 
+            // NativeRtxdiGPUScene tracks scene targets / instance buffers; the native AS handles skinned
+            // mesh updates internally via NativeRayTracingSkinnedTarget. The TLAS itself is
+            // built later inside NativeRtxdiBuildAccelerationStructurePass (needs a CommandBuffer).
+            // Must run before rtxdiResources creation so we can query actual scene counts.
+            _rtxdiGpuScene.UpdateForFrame();
+
             if (!_rtxdiResources.TryGetValue(uniqueKey, out var rtxdiResources))
             {
-                // Placeholder counts — will be driven by NativeRtxdiPrepareLightsPass.CountLightsInScene()
-                // once the FullSample port lands. Mirror FullSample's allocation quanta.
-                const uint kPlaceholderEmissiveMeshes    = 128;
-                const uint kPlaceholderEmissiveTriangles = 1024;
-                const uint kPlaceholderPrimitiveLights   = 128;
-                const uint kPlaceholderGeometryInstances = 1024;
-                const uint kPlaceholderEnvW              = 1;
-                const uint kPlaceholderEnvH              = 1;
+                // Mirror FullSample's SceneRenderer::UpdateRtxdiResources():
+                // count actual emissive meshes / triangles / geometry instances from the live scene,
+                // then round up to allocation quanta so minor scene changes don't force a realloc.
+                // Rebuild on overflow is deferred (TODO).
+                const uint kMeshQuantum     = 128u;
+                const uint kTriangleQuantum = 1024u;
+                const uint kPrimQuantum     = 128u;
+
+                var emissiveGeos = _rtxdiGpuScene.GetEmissiveGeometries();
+                uint numEmissiveMeshes    = (uint)emissiveGeos.Count;
+                uint numEmissiveTriangles = 0u;
+                foreach (var e in emissiveGeos) numEmissiveTriangles += e.TriangleCount;
+                uint numPrimitiveLights   = 0u; // analytic lights not yet ported
+                uint numGeomInstances     = (uint)_rtxdiGpuScene.TotalGeometryInstanceCount;
+
+                // Round up to quanta (ensure at least one quantum so buffers are non-zero)
+                uint allocMeshes    = Math.Max(kMeshQuantum,     (numEmissiveMeshes    + kMeshQuantum     - 1u) & ~(kMeshQuantum     - 1u));
+                uint allocTriangles = Math.Max(kTriangleQuantum, (numEmissiveTriangles + kTriangleQuantum - 1u) & ~(kTriangleQuantum - 1u));
+                uint allocPrims     = Math.Max(kPrimQuantum,     (numPrimitiveLights   + kPrimQuantum     - 1u) & ~(kPrimQuantum     - 1u));
+                uint allocGeom      = Math.Max(1u, numGeomInstances);
 
                 rtxdiResources = new NativeRtxdiResources(
                     isContext.GetReSTIRDIContext(),
                     isContext.GetRISBufferSegmentAllocator(),
-                    kPlaceholderEmissiveMeshes,
-                    kPlaceholderEmissiveTriangles,
-                    kPlaceholderPrimitiveLights,
-                    kPlaceholderGeometryInstances,
-                    kPlaceholderEnvW,
-                    kPlaceholderEnvH);
+                    allocMeshes,
+                    allocTriangles,
+                    allocPrims,
+                    allocGeom,
+                    1u,  // EnvW — no environment map yet
+                    1u); // EnvH
                 _rtxdiResources.Add(uniqueKey, rtxdiResources);
             }
-
-            // NativeRtxdiGPUScene tracks scene targets / instance buffers; the native AS handles skinned
-            // mesh updates internally via NativeRayTracingSkinnedTarget. The TLAS itself is
-            // built later inside NativeRtxdiBuildAccelerationStructurePass (needs a CommandBuffer).
-            _rtxdiGpuScene.UpdateForFrame();
 
             if (resourcesChanged)
             {
@@ -752,6 +765,92 @@ namespace PathTracing
             _compositingPass     = null;
             _nrdDenoisePass      = null;
             _nativeFrameTickPass = null;
+        }
+
+        // -------------------------------------------------------------------
+        // Debug / test helpers
+        // -------------------------------------------------------------------
+
+        /// <summary>
+        /// Reads back <c>LightDataBuffer</c> from the first active camera's
+        /// <see cref="NativeRtxdiResources"/> and logs each non-black light entry,
+        /// mirroring <c>LightScene.DebugReadback()</c> in <c>UnityRtxdiFeature</c>.
+        /// Call from the Inspector button (Editor-only) after a few rendered frames.
+        /// </summary>
+        public void TestPrepareLight()
+        {
+            if (_rtxdiResources.Count == 0)
+            {
+                Debug.LogWarning("[NativeRtxdiFeature] No NativeRtxdiResources allocated yet — run the scene first.");
+                return;
+            }
+
+            // Pick the first entry (main camera or first active eye).
+            NativeRtxdiResources res = null;
+            foreach (var kv in _rtxdiResources) { res = kv.Value; break; }
+            if (res == null || res.LightDataBuffer == null)
+            {
+                Debug.LogWarning("[NativeRtxdiFeature] LightDataBuffer is null.");
+                return;
+            }
+
+            // Determine the exact current-frame range from the PrepareLights pass if available,
+            // otherwise fall back to scanning the whole buffer.
+            int  frameOffset = 0;
+            int  frameCount  = res.LightDataBuffer.count;
+            if (_prepareLightsPass != null && _prepareLightsPass.TotalLightCount > 0)
+            {
+                frameOffset = (int)_prepareLightsPass.CurrentFrameOffset;
+                frameCount  = _prepareLightsPass.TotalLightCount;
+            }
+
+            var debugData = new PolymorphicLightInfo[frameCount];
+            res.LightDataBuffer.GetData(debugData, 0, frameOffset, frameCount);
+
+            int validCount = 0;
+            for (int i = 0; i < debugData.Length; i++)
+            {
+                var info = debugData[i];
+
+                // Decode intensity from logRadiance low-16 bits.
+                uint logRad    = info.logRadiance & 0xFFFFu;
+                float intensity = (logRad == 0) ? 0f : Unity.Mathematics.math.exp2(((logRad - 1) / 65534f) * 48f - 8f);
+
+                if (intensity < 0.01f)
+                    continue;
+
+                validCount++;
+
+                float normR = (info.colorTypeAndFlags & 0xFFu) / 255f;
+                float normG = ((info.colorTypeAndFlags >> 8) & 0xFFu) / 255f;
+                float normB = ((info.colorTypeAndFlags >> 16) & 0xFFu) / 255f;
+                var c = new Color(normR * intensity, normG * intensity, normB * intensity, 1f);
+
+                var center   = new Vector3(info.center.x, info.center.y, info.center.z);
+                var edge1Dir = OctUnorm32ToDir(info.direction1);
+                var edge2Dir = OctUnorm32ToDir(info.direction2);
+                var normal   = Vector3.Cross(edge1Dir, edge2Dir).normalized;
+
+                Debug.Log($"[NativePrepareLights slot {frameOffset + i}] center={center}, color={c}, normal={normal}");
+                Debug.DrawLine(center, center + normal * (intensity / 10f), c, 10f);
+            }
+
+            Debug.Log($"[NativeRtxdiFeature] LightDataBuffer readback: {validCount} active lights / {frameCount} current-frame slots (offset={frameOffset}, total buffer={res.LightDataBuffer.count})");
+        }
+
+        private static Vector3 OctUnorm32ToDir(uint packed)
+        {
+            float px = (packed & 0xFFFFu) / (float)0xFFFEu;
+            float py = (packed >> 16)     / (float)0xFFFEu;
+            var p = new Unity.Mathematics.float2(px * 2f - 1f, py * 2f - 1f);
+            var n = new Unity.Mathematics.float3(p.x, p.y, 1f - Unity.Mathematics.math.abs(p.x) - Unity.Mathematics.math.abs(p.y));
+            if (n.z < 0f)
+            {
+                var wrap = (1f - Unity.Mathematics.math.abs(p.yx)) * Unity.Mathematics.math.select(-1f, 1f, p.xy >= 0f);
+                n.x = wrap.x;
+                n.y = wrap.y;
+            }
+            return ((Vector3)(Unity.Mathematics.math.normalize(n)));
         }
 
 #if UNITY_EDITOR

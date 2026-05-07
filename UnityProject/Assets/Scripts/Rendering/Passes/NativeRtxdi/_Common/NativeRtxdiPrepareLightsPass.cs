@@ -114,6 +114,11 @@ namespace PathTracing
         private uint _currentFrameOffset;
         private uint _previousFrameOffset;
 
+        /// <summary>First slot in LightDataBuffer that belongs to the current frame.</summary>
+        public uint CurrentFrameOffset => _currentFrameOffset;
+        /// <summary>Number of valid light entries written this frame.</summary>
+        public int  TotalLightCount    => _totalLightCount;
+
         // ── Temporal tracking (frame-relative light buffer offsets per geometry) ──
         // Key = (instanceIndex << 12 | geometrySubIndex).  Value = frame-relative offset.
         private readonly Dictionary<long, int> _prevEmissiveOffsets = new();
