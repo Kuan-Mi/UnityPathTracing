@@ -886,7 +886,7 @@
                 uint2 dim; _BlitTexture.GetDimensions(dim.x, dim.y);
                 int2  px   = int2(saturate(i.uv) * dim);
                 float viewZ = _BlitTexture.Load(int3(px, 0));
-                float d = log2(1.0 + abs(viewZ)) / log2(1.0 + 1000.0);
+                float d = log2(1.0 + (viewZ)) / log2(1.0 + 1000.0);
                 d = saturate(d);
                 return float4(d, d, d, 1);
             }

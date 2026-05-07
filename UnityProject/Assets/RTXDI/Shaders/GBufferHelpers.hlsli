@@ -94,7 +94,7 @@ float3 getPreviousWorldPos(
     float4 viewPos = mul(clipPos, viewPrev.matClipToView);
     viewPos.xy /= viewPos.z;
     viewPos.zw = 1.0;
-    viewPos.xyz *= prevViewDepth;
+    viewPos.xyz *= -prevViewDepth; // Unity right-handed view space: viewPos.z < 0, viewDepth = -viewPos.z
     return mul(viewPos, viewPrev.matViewToWorld).xyz;
 }
 
@@ -108,7 +108,7 @@ float3 viewDepthToWorldPos(
     float4 viewPos = mul(clipPos, view.matClipToView);
     viewPos.xy /= viewPos.z;
     viewPos.zw = 1.0;
-    viewPos.xyz *= viewDepth;
+    viewPos.xyz *= -viewDepth; // Unity right-handed view space: viewPos.z < 0, viewDepth = -viewPos.z
     return mul(viewPos, view.matViewToWorld).xyz;
 }
 
