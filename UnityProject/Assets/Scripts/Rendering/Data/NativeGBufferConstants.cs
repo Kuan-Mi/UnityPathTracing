@@ -1,3 +1,4 @@
+using System;
 using System.Runtime.InteropServices;
 using Unity.Mathematics;
 using UnityEngine;
@@ -19,6 +20,7 @@ namespace PathTracing
     /// Therefore matrices are assigned from Unity as-is, with no extra transpose step.
     /// </summary>
     [StructLayout(LayoutKind.Sequential)]
+    [Serializable]
     public struct NativePlanarViewConstants
     {
         public float4x4 matWorldToView;

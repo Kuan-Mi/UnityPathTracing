@@ -31,7 +31,7 @@ namespace Rtxdi.PT
             {
                 numInitialSamples  = 1,
                 maxBounceDepth     = 3,
-                maxRcVertexLength  = 5,
+                maxRcVertexLength  = 4,
             };
         }
 
@@ -90,7 +90,7 @@ namespace Rtxdi.PT
             return new RTXDI_PTSpatialResamplingParameters
             {
                 numSpatialSamples                = 1,
-                numDisocclusionBoostSamples      = 8,
+                numDisocclusionBoostSamples      = 4,
                 maxTemporalHistory               = 8,
                 duplicationBasedHistoryReduction = 0,
                 samplingRadius                   = 32.0f,

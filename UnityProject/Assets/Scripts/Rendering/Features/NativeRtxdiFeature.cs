@@ -9,6 +9,7 @@ using Rtxdi;
 using RTXDI;
 using Rtxdi.DI;
 using Rtxdi.GI;
+using Rtxdi.PT;
 using Unity.Mathematics;
 using UnityEngine;
 using UnityEngine.Rendering;
@@ -358,15 +359,11 @@ namespace PathTracing
             bool enableDirectReStirPass    = setting.directLightingMode == DirectLightingMode.ReStir;
             bool enableBrdfAndIndirectPass = setting.directLightingMode == DirectLightingMode.Brdf || setting.indirectLightingMode != IndirectLightingMode.None;
             bool enableIndirect            = setting.indirectLightingMode != IndirectLightingMode.None;
+            bool needSecondaryGBuffer      = enableIndirect || setting.directLightingMode == DirectLightingMode.Brdf;
             bool enableReSTIRGI            = setting.indirectLightingMode == IndirectLightingMode.ReStirGI;
             bool enableEmissiveSurfaces    = setting.directLightingMode == DirectLightingMode.Brdf;
             bool enableAdditiveBlend       = enableDirectReStirPass;
             bool enableAccumulation        = false;
-
-            // Mirror UnityRtxdiFeature shading-param patch
-            var diShadingParams = isContext.GetReSTIRDIContext().GetShadingParameters();
-            diShadingParams.enableDenoiserInputPacking = !enableIndirect ? 1u : 0u;
-            isContext.GetReSTIRDIContext().SetShadingParameters(diShadingParams);
 
             if (!enableDirectReStirPass)
             {
@@ -396,6 +393,9 @@ namespace PathTracing
             var baseConsts = RtxdiConstantsBuilder.Build(
                 setting, localSettings, isContext, frameState, lightBufferParams, localLightPdfTextureSize,
                 enableIndirect, enableAdditiveBlend, enableEmissiveSurfaces, enableAccumulation, enableReSTIRGI);
+
+            // Patch enableDenoiserInputPacking after Build() so it isn't overwritten by setting.shadingParams
+            baseConsts.restirDI.shadingParams.enableDenoiserInputPacking = !enableIndirect ? 1u : 0u;
 
             var viewConst     = NativeGBufferConstantsBuilder.BuildViewPublic(
                 frameState.worldToView,     frameState.viewToClip,     frameState.worldToClip,
@@ -440,14 +440,14 @@ namespace PathTracing
                 restirDI = baseConsts.restirDI,
                 regir    = baseConsts.regir,
                 restirGI = baseConsts.restirGI,
-                restirPT = default,
-                pt       = default,
+                restirPT = BuildRestirPTParams(isContext),
+                pt       = BuildPTParams(),
                 brdfPT   = baseConsts.brdfPT,
 
                 visualizeRegirCells     = baseConsts.visualizeRegirCells,
-                enableDenoiserPSR       = 0u,
-                usePSRMvecForResampling = 0u,
-                updatePSRwithResampling = 0u,
+                enableDenoiserPSR       = 1u,
+                usePSRMvecForResampling = 1u,
+                updatePSRwithResampling = 1u,
 
                 environmentPdfTextureSize = default,
                 localLightPdfTextureSize  = baseConsts.localLightPdfTextureSize,
@@ -520,7 +520,6 @@ namespace PathTracing
             // uploaded by BuildTasksOnCpu above.
             if (_prepareLightsPass != null)
             {
-                Debug.Log("_prepareLightsPass");
                 _prepareLightsPass.Setup(nativeCtx);
                 renderer.EnqueuePass(_prepareLightsPass);
             }
@@ -569,7 +568,7 @@ namespace PathTracing
                 _brdfRayTracingPass.Setup(nativeCtx);
                 renderer.EnqueuePass(_brdfRayTracingPass);
 
-                if (enableIndirect && _shadeSecondarySurfacesPass != null)
+                if (needSecondaryGBuffer && _shadeSecondarySurfacesPass != null)
                 {
                     _shadeSecondarySurfacesPass.Setup(nativeCtx);
                     renderer.EnqueuePass(_shadeSecondarySurfacesPass);
@@ -667,6 +666,10 @@ namespace PathTracing
                 {
                     Mv             = pool.GetRT(RenderResourceType.RtxdiMotionVectors),
                     DirectLighting = pool.GetRT(RenderResourceType.DirectLighting),
+                    
+                    Diff =  pool.GetRT(RenderResourceType.RtxdiDiffuseLighting),
+                    Spec =  pool.GetRT(RenderResourceType.RtxdiSpecularLighting),
+                    
                     DenoisedDiff   = pool.GetRT(RenderResourceType.RtxdiDenoisedDiffuseLighting),
                     DenoisedSpec   = pool.GetRT(RenderResourceType.RtxdiDenoisedSpecularLighting),
                     // Rtxdi GBuffer debug
@@ -699,6 +702,65 @@ namespace PathTracing
             {
                 renderer.EnqueuePass(_nativeFrameTickPass);
             }
+        }
+
+        private static RTXDI_PTParameters BuildRestirPTParams(ImportanceSamplingContext isContext)
+        {
+            var ctx = isContext.GetReSTIRPTContext();
+            return new RTXDI_PTParameters
+            {
+                reservoirBuffer    = ctx.GetReservoirBufferParameters(),
+                bufferIndices      = ctx.GetBufferIndices(),
+                initialSampling    = ctx.GetInitialSamplingParameters(),
+                reconnection       = ctx.GetReconnectionParameters(),
+                temporalResampling = ctx.GetTemporalResamplingParameters(),
+                hybridShift        = ctx.GetHybridShiftParameters(),
+                boilingFilter      = ctx.GetBoilingFilterParameters(),
+                spatialResampling  = ctx.GetSpatialResamplingParameters(),
+            };
+        }
+
+        private static NativePTParameters BuildPTParams()
+        {
+            return new NativePTParameters
+            {
+                enableRussianRoulette              = 1u,
+                russianRouletteContinueChance      = 0.8f,
+                enableSecondaryDISpatialResampling = 0u,
+                copyReSTIRDISimilarityThresholds   = 1u,
+                nee = new NativePTNeeParameters
+                {
+                    initialSamplingParams = new RTXDI_DIInitialSamplingParameters
+                    {
+                        numLocalLightSamples             = 2,
+                        numInfiniteLightSamples          = 1,
+                        numEnvironmentSamples            = 1,
+                        numBrdfSamples                   = 0,
+                        brdfCutoff                       = 0f,
+                        brdfRayMinT                      = 0.001f,
+                        localLightSamplingMode           = (uint)ReSTIRDI_LocalLightSamplingMode.Uniform,
+                        enableInitialVisibility          = 1u,
+                        environmentMapImportanceSampling = 1u,
+                    },
+                    spatialResamplingParams = new RTXDI_DISpatialResamplingParameters
+                    {
+                        numSamples                   = 1,
+                        numDisocclusionBoostSamples  = 0,
+                        samplingRadius               = 1f,
+                        biasCorrectionMode           = ReSTIRDI_SpatialBiasCorrectionMode.Basic,
+                        depthThreshold               = 0.1f,
+                        normalThreshold              = 0.5f,
+                        targetHistoryLength          = 0,
+                        enableMaterialSimilarityTest = 1u,
+                        discountNaiveSamples         = 0u,
+                    },
+                },
+                sampleEnvMapOnSecondaryMiss  = 0u,
+                sampleEmissivesOnSecondaryHit = 0u,
+                lightSamplingMode            = (uint)ReSTIRDI_LocalLightSamplingMode.ReGIR_RIS,
+                extraMirrorBounceBudget      = 4u,
+                minimumPathThroughput        = 0.05f,
+            };
         }
 
         private static int2 ComputeOutputResolution(CameraData cameraData)

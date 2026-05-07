@@ -60,7 +60,6 @@ namespace PathTracing
             FillResamplingConstants(ref constants, localSettings, isContext, localLightPdfTextureSize);
             FillBRDFPTConstants(ref constants.brdfPT, setting);
 
-            constants.brdfPT = setting.brdfptParams;
             constants.brdfPT.enableIndirectEmissiveSurfaces = enableEmissiveSurfaces ? 1u : 0u;
             constants.brdfPT.enableReSTIRGI                 = enableReSTIRGI         ? 1u : 0u;
 
@@ -92,7 +91,6 @@ namespace PathTracing
         private static void FillBRDFPTConstants(ref BRDFPathTracing_Parameters constants, RtxdiSetting setting)
         {
             constants = setting.brdfptParams;
-            constants.materialOverrideParams.minSecondaryRoughness = 0;
             constants.materialOverrideParams.roughnessOverride     = -1.0f;
             constants.materialOverrideParams.metalnessOverride     = -1.0f;
             constants.secondarySurfaceReSTIRDIParams.initialSamplingParams.environmentMapImportanceSampling = 0;
@@ -112,18 +110,22 @@ namespace PathTracing
             rparams.initialSamplingParams.environmentMapImportanceSampling = lightBufferParameters.environmentLightParams.lightPresent;
             if (rparams.initialSamplingParams.environmentMapImportanceSampling == 0)
                 rparams.initialSamplingParams.numEnvironmentSamples = 0;
-            rparams.temporalResamplingParams = restirDIContext.GetTemporalResamplingParameters();
-            rparams.spatialResamplingParams  = restirDIContext.GetSpatialResamplingParameters();
-            rparams.shadingParams            = restirDIContext.GetShadingParameters();
+            rparams.temporalResamplingParams        = restirDIContext.GetTemporalResamplingParameters();
+            rparams.boilingFilterParams             = restirDIContext.GetBoilingFilterParameters();
+            rparams.spatialResamplingParams         = restirDIContext.GetSpatialResamplingParameters();
+            rparams.spatioTemporalResamplingParams  = restirDIContext.GetSpatioTemporalResamplingParameters();
+            rparams.shadingParams                  = restirDIContext.GetShadingParameters();
         }
 
         private static void FillReSTIRGIConstants(ref RTXDI_GIParameters constants, ReSTIRGIContext restirGIContext)
         {
-            constants.reservoirBufferParams    = restirGIContext.GetReservoirBufferParameters();
-            constants.bufferIndices            = restirGIContext.GetBufferIndices();
-            constants.temporalResamplingParams = restirGIContext.GetTemporalResamplingParameters();
-            constants.spatialResamplingParams  = restirGIContext.GetSpatialResamplingParameters();
-            constants.finalShadingParams       = restirGIContext.GetFinalShadingParameters();
+            constants.reservoirBufferParams         = restirGIContext.GetReservoirBufferParameters();
+            constants.bufferIndices                 = restirGIContext.GetBufferIndices();
+            constants.temporalResamplingParams      = restirGIContext.GetTemporalResamplingParameters();
+            constants.boilingFilterParams           = restirGIContext.GetBoilingFilterParameters();
+            constants.spatialResamplingParams       = restirGIContext.GetSpatialResamplingParameters();
+            constants.spatioTemporalResamplingParams = restirGIContext.GetSpatioTemporalResamplingParameters();
+            constants.finalShadingParams            = restirGIContext.GetFinalShadingParameters();
         }
 
         private static void FillReGIRConstants(ref ReGIR_Parameters reGirParams, ReGIRContext regirContext)

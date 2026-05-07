@@ -179,8 +179,6 @@ namespace PathTracing
             var emissiveGeos = gpuScene.GetEmissiveGeometries();
             int numTasks     = emissiveGeos.Count;  // analytic lights excluded for now
             
-            Debug.Log("Found " + numTasks + " emissive geometries in the scene for PrepareLights.");
-
             // Resize scratch arrays if needed
             if (_taskScratch.Length < numTasks)
                 _taskScratch = new PrepareLightsTask[numTasks];
@@ -347,8 +345,6 @@ namespace PathTracing
 
             // ---- Dispatch: ceil(totalLightCount / 256) groups of 256 threads ----
             uint groups = ((uint)data.TotalLightCount + GroupSize - 1u) / GroupSize;
-            
-            Debug.Log("Dispatching PrepareLights with " + groups + " groups (" + data.TotalLightCount + " total lights)");
             
             cs.Dispatch(cmd, ds, groups, 1u, 1u);
 

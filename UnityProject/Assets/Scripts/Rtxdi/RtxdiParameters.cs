@@ -37,6 +37,7 @@ namespace Rtxdi
     }
 
     [StructLayout(LayoutKind.Sequential)]
+    [System.Serializable]
     public struct RTXDI_RISBufferSegmentParameters
     {
         public uint bufferOffset;

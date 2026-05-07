@@ -1,3 +1,4 @@
+using System;
 using System.Runtime.InteropServices;
 using Rtxdi;
 using Rtxdi.DI;
@@ -12,6 +13,7 @@ namespace PathTracing
     // Mirrors SceneConstants from ShaderParameters.h
     // -------------------------------------------------------------------------
     [StructLayout(LayoutKind.Sequential)]
+    [System.Serializable]
     public struct NativeSceneConstants
     {
         public uint  enableEnvironmentMap;        // Global
@@ -29,6 +31,7 @@ namespace PathTracing
     //   ShaderDebug/ReSTIRShaderDebugParameters.h
     // -------------------------------------------------------------------------
     [StructLayout(LayoutKind.Sequential)]
+    [System.Serializable]
     public struct NativeReSTIRShaderDebugParameters
     {
         public uint2  mouseSelectedPixel;
@@ -55,6 +58,7 @@ namespace PathTracing
     // Mirrors PTParameters from PTParameters.h
     // -------------------------------------------------------------------------
     [StructLayout(LayoutKind.Sequential)]
+    [System.Serializable]
     public struct NativePTParameters
     {
         public uint  enableRussianRoulette;
@@ -80,6 +84,7 @@ namespace PathTracing
     // Use this instead of ResamplingConstants when passing data to native shaders
     // via NativeRtxdiGenerateInitialSamplesPass (and related passes).
     // -------------------------------------------------------------------------
+    [Serializable]
     [StructLayout(LayoutKind.Sequential)]
     public struct NativeResamplingConstants
     {
