@@ -41,6 +41,8 @@ namespace PathTracing
         Rtxdi_Roughness,        // R32_UINT pack R8G8B8A8_Gamma_UFLOAT – roughness (A)
         Rtxdi_Normal,           // R32_UINT oct32 – shading normal as colour
         Rtxdi_GeoNormal,        // R32_UINT oct32 – geometry normal as colour
+        Rtxdi_DiffuseLighting,  // RTXDI diffuse lighting output
+        Rtxdi_SpecularLighting, // RTXDI specular lighting output
     }
 
     public enum UpscalerMode : byte // Scaling factor       // Min jitter phases (or just use unclamped Halton2D)

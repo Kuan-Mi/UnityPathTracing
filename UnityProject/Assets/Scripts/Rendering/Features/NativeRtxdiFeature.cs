@@ -636,28 +636,27 @@ namespace PathTracing
                 renderer.EnqueuePass(_nrdDenoisePass);
             }
 
-            // ---- Compositing (denoised diff + spec → DirectLighting) ----
-            if (_compositingPass != null)
-            {
-                var compositingConsts = NativeCompositingConstantsBuilder.Build(
-                    frameState, renderResolution, 1f, localSettings.denoiserMode);
-                var compositingConstsArray = new NativeCompositingConstants[] { compositingConsts };
-                _compositingConstantBuffer.SetData(compositingConstsArray);
-
-                var compositingRes = new NativeRtxdiCompositingPass.Resource
-                {
-                    ConstantBuffer = _compositingConstantBuffer.GetNativeBufferPtr(),
-                    Pool           = pool,
-                    GpuScene       = _rtxdiGpuScene,
-                };
-                var compositingSettings = new NativeRtxdiCompositingPass.Settings
-                {
-                    renderW = renderResolution.x,
-                    renderH = renderResolution.y,
-                };
-                _compositingPass.Setup(compositingRes, compositingSettings);
-                renderer.EnqueuePass(_compositingPass);
-            }
+            // // ---- Compositing (denoised diff + spec → DirectLighting) ----
+            // {
+            //     var compositingConsts = NativeCompositingConstantsBuilder.Build(
+            //         frameState, renderResolution, 1f, localSettings.denoiserMode);
+            //     var compositingConstsArray = new NativeCompositingConstants[] { compositingConsts };
+            //     _compositingConstantBuffer.SetData(compositingConstsArray);
+            //
+            //     var compositingRes = new NativeRtxdiCompositingPass.Resource
+            //     {
+            //         ConstantBuffer = _compositingConstantBuffer.GetNativeBufferPtr(),
+            //         Pool           = pool,
+            //         GpuScene       = _rtxdiGpuScene,
+            //     };
+            //     var compositingSettings = new NativeRtxdiCompositingPass.Settings
+            //     {
+            //         renderW = renderResolution.x,
+            //         renderH = renderResolution.y,
+            //     };
+            //     _compositingPass.Setup(compositingRes, compositingSettings);
+            //     renderer.EnqueuePass(_compositingPass);
+            // }
 
             // ---- OutputBlit (shows DirectLighting = composited NRD result) ----
             if (_outputBlitPass != null)

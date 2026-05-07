@@ -144,9 +144,7 @@ namespace NativeRender
             GUI.backgroundColor = shader.HasCompiledBytes ? new Color(0.4f, 0.8f, 0.4f) : new Color(1f, 0.6f, 0.3f);
             if (GUILayout.Button(shader.HasCompiledBytes ? "Recompile" : "Compile", GUILayout.Height(28)))
             {
-                shader.ForceRecompile();
-                EditorUtility.SetDirty(shader);
-                AssetDatabase.SaveAssetIfDirty(shader);
+                ApplyAndImport(importer);
             }
             GUI.backgroundColor = Color.white;
 

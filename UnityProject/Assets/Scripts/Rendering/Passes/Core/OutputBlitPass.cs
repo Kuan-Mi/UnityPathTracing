@@ -223,6 +223,12 @@ namespace PathTracing
                 case ShowMode.Rtxdi_GeoNormal:
                     Blitter.BlitTexture(natCmd, data.Resource.RtxdiGeoNormals, scaleOffset, data.BlitMaterial, (int)ShowPass.RtxdiGeoNormal);
                     break;
+                case ShowMode.Rtxdi_DiffuseLighting:
+                    Blitter.BlitTexture(natCmd, data.Resource.Diff, scaleOffset, data.BlitMaterial, (int)ShowPass.Out);
+                    break;
+                case ShowMode.Rtxdi_SpecularLighting:
+                    Blitter.BlitTexture(natCmd, data.Resource.Spec, scaleOffset, data.BlitMaterial, (int)ShowPass.Out);
+                    break;
                 default:
                     throw new ArgumentOutOfRangeException();
             }
