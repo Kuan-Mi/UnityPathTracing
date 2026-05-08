@@ -17,6 +17,175 @@
 #include <Rtxdi/DI/InitialSampling.hlsli>
 #include <Rtxdi/DI/ReservoirStorage.hlsli>
 
+RTXDI_DIReservoir DEBUG_SampleLocalLightsInternal(
+    inout RTXDI_RandomSamplerState rng,
+    inout RTXDI_RandomSamplerState coherentRng,
+    RAB_Surface surface,
+    RTXDI_DIInitialSamplingParameters sampleParams,
+    RTXDI_InitialSamplingMisData misData,
+    ReSTIRDI_LocalLightSamplingMode localLightSamplingMode,
+    RTXDI_LightBufferRegion localLightBufferRegion,
+#if RTXDI_ENABLE_PRESAMPLING
+    RTXDI_RISBufferSegmentParameters localLightRISBufferSegmentParams,
+#if RTXDI_REGIR_MODE != RTXDI_REGIR_DISABLED
+    ReGIR_Parameters regirParams,
+#endif
+#endif
+    out RAB_LightSample o_selectedSample)
+{
+    RTXDI_DIReservoir state = RTXDI_EmptyDIReservoir();
+
+    RTXDI_LocalLightSelectionContext lightSelectionContext = RTXDI_InitializeLocalLightSelectionContext(coherentRng, localLightSamplingMode, localLightBufferRegion
+#if RTXDI_ENABLE_PRESAMPLING
+        , localLightRISBufferSegmentParams
+#if RTXDI_REGIR_MODE != RTXDI_REGIR_DISABLED
+        , regirParams
+        , surface
+#endif
+#endif
+    );
+
+    for (uint i = 0; i < sampleParams.numLocalLightSamples; i++)
+    {
+        uint lightIndex;
+        RAB_LightInfo lightInfo;
+        float invSourcePdf;
+
+        float rnd = RTXDI_GetNextRandom(rng);
+#if RTXDI_STRATIFY_LOCAL_SAMPLING
+        rnd = (rnd + i) / sampleParams.numLocalLightSamples;
+#endif
+
+        RTXDI_SelectNextLocalLight(lightSelectionContext, rnd, lightInfo, lightIndex, invSourcePdf);
+        float2 uv = RTXDI_RandomlySelectLocalLightUV(rng);
+        bool zeroPdf = RTXDI_StreamLocalLightAtUVIntoReservoir(rng, misData, surface, sampleParams.brdfCutoff, misData.localLightMisWeight, lightIndex, uv, invSourcePdf, lightInfo, state, o_selectedSample);
+
+        if (zeroPdf)
+            continue;
+
+
+    }
+
+    RTXDI_FinalizeResampling(state, 1.0, misData.numMisSamples);
+    state.M = 1;
+
+    return state;
+}
+
+RTXDI_DIReservoir DEBUG_SampleLocalLights(
+    inout RTXDI_RandomSamplerState rng,
+    inout RTXDI_RandomSamplerState coherentRng,
+    RAB_Surface surface,
+    RTXDI_DIInitialSamplingParameters sampleParams,
+    RTXDI_InitialSamplingMisData misData,
+    ReSTIRDI_LocalLightSamplingMode localLightSamplingMode,
+    RTXDI_LightBufferRegion localLightBufferRegion,
+#if RTXDI_ENABLE_PRESAMPLING
+    RTXDI_RISBufferSegmentParameters localLightRISBufferSegmentParams,
+#if RTXDI_REGIR_MODE != RTXDI_REGIR_DISABLED
+    ReGIR_Parameters regirParams,
+#endif
+#endif
+    out RAB_LightSample o_selectedSample)
+{
+    o_selectedSample = RAB_EmptyLightSample();
+
+    if (localLightBufferRegion.numLights == 0)
+        return RTXDI_EmptyDIReservoir();
+
+    if (sampleParams.numLocalLightSamples == 0)
+        return RTXDI_EmptyDIReservoir();
+
+    return DEBUG_SampleLocalLightsInternal(rng, coherentRng, surface, sampleParams, misData, localLightSamplingMode, localLightBufferRegion,
+#if RTXDI_ENABLE_PRESAMPLING
+        localLightRISBufferSegmentParams,
+#if RTXDI_REGIR_MODE != RTXDI_REGIR_DISABLED
+        regirParams,
+#endif
+#endif
+        o_selectedSample);
+}
+
+RTXDI_DIReservoir DEBUG_SampleLightsForSurface(
+    inout RTXDI_RandomSamplerState rng,
+    inout RTXDI_RandomSamplerState coherentRng,
+    RAB_Surface surface,
+    RTXDI_DIInitialSamplingParameters sampleParams,
+    RTXDI_LightBufferParameters lightBufferParams,
+#if RTXDI_ENABLE_PRESAMPLING
+    RTXDI_RISBufferSegmentParameters localLightRISBufferSegmentParams,
+    RTXDI_RISBufferSegmentParameters environmentLightRISBufferSegmentParams,
+#if RTXDI_REGIR_MODE != RTXDI_REGIR_DISABLED
+    ReGIR_Parameters regirParams,
+#endif
+#endif
+    out RAB_LightSample o_lightSample)
+{
+    o_lightSample = RAB_EmptyLightSample();
+
+    RTXDI_DIReservoir localReservoir;
+    RAB_LightSample localSample = RAB_EmptyLightSample();
+
+    RTXDI_InitialSamplingMisData misData = RTXDI_ComputeInitialSamplingMisData(sampleParams);
+
+    localReservoir = DEBUG_SampleLocalLights(rng, coherentRng, surface,
+        sampleParams, misData, sampleParams.localLightSamplingMode, lightBufferParams.localLightBufferRegion,
+#if RTXDI_ENABLE_PRESAMPLING
+        localLightRISBufferSegmentParams,
+#if RTXDI_REGIR_MODE != RTXDI_REGIR_DISABLED
+        regirParams,
+#endif
+#endif
+        localSample);
+
+    RAB_LightSample infiniteSample = RAB_EmptyLightSample();
+    RTXDI_DIReservoir infiniteReservoir = RTXDI_SampleInfiniteLights(rng, surface,
+        sampleParams.numInfiniteLightSamples, lightBufferParams.infiniteLightBufferRegion, infiniteSample);
+
+#if RTXDI_ENABLE_PRESAMPLING
+    RAB_LightSample environmentSample = RAB_EmptyLightSample();
+    RTXDI_DIReservoir environmentReservoir = RTXDI_SampleEnvironmentMap(rng, coherentRng, surface,
+        sampleParams, misData, lightBufferParams.environmentLightParams, environmentLightRISBufferSegmentParams, environmentSample);
+#endif // RTXDI_ENABLE_PRESAMPLING
+
+    RAB_LightSample brdfSample = RAB_EmptyLightSample();
+    RTXDI_DIReservoir brdfReservoir = RTXDI_SampleBrdf(rng, surface, sampleParams.numBrdfSamples, sampleParams.brdfCutoff, sampleParams.brdfRayMinT, misData, coherentRng, lightBufferParams, brdfSample);
+
+    RTXDI_DIReservoir state = RTXDI_EmptyDIReservoir();
+    RTXDI_CombineDIReservoirs(state, localReservoir, 0.5, localReservoir.targetPdf);
+    bool selectInfinite = RTXDI_CombineDIReservoirs(state, infiniteReservoir, RTXDI_GetNextRandom(rng), infiniteReservoir.targetPdf);
+#if RTXDI_ENABLE_PRESAMPLING
+    bool selectEnvironment = RTXDI_CombineDIReservoirs(state, environmentReservoir, RTXDI_GetNextRandom(rng), environmentReservoir.targetPdf);
+#endif // RTXDI_ENABLE_PRESAMPLING
+    bool selectBrdf = RTXDI_CombineDIReservoirs(state, brdfReservoir, RTXDI_GetNextRandom(rng), brdfReservoir.targetPdf);
+
+    RTXDI_FinalizeResampling(state, 1.0, 1.0);
+    state.M = 1;
+
+    if (selectBrdf)
+        o_lightSample = brdfSample;
+    else
+#if RTXDI_ENABLE_PRESAMPLING
+    if (selectEnvironment)
+        o_lightSample = environmentSample;
+    else
+#endif // RTXDI_ENABLE_PRESAMPLING
+    if (selectInfinite)
+        o_lightSample = infiniteSample;
+    else
+        o_lightSample = localSample;
+
+    if (sampleParams.enableInitialVisibility && RTXDI_IsValidDIReservoir(state))
+    {
+        if (!RAB_GetConservativeVisibility(surface, o_lightSample))
+        {
+            RTXDI_StoreVisibilityInDIReservoir(state, 0, true);
+        }
+    }
+
+    return state;
+}
+
 #if USE_RAY_QUERY
 [numthreads(RTXDI_SCREEN_SPACE_GROUP_SIZE, RTXDI_SCREEN_SPACE_GROUP_SIZE, 1)]
 void main(uint2 GlobalIndex : SV_DispatchThreadID)
@@ -38,9 +207,14 @@ void RayGen()
 
     RAB_Surface surface = RAB_GetGBufferSurface(pixelPosition, false);
 
+    // DEBUG: 强制只采 1 个 local light，禁用其他采样策略
+    RTXDI_DIInitialSamplingParameters debugSampleParams = g_Const.restirDI.initialSamplingParams;
+    debugSampleParams.numLocalLightSamples = 1;
+
     RAB_LightSample lightSample;
-    RTXDI_DIReservoir reservoir = RTXDI_SampleLightsForSurface(rng, tileRng, surface,
-        g_Const.restirDI.initialSamplingParams, g_Const.lightBufferParams,
+    RTXDI_DIReservoir reservoir = DEBUG_SampleLightsForSurface(rng, tileRng, surface,
+        // g_Const.restirDI.initialSamplingParams, g_Const.lightBufferParams,
+        debugSampleParams, g_Const.lightBufferParams,
 #ifdef RTXDI_ENABLE_PRESAMPLING
         g_Const.localLightsRISBufferSegmentParams, g_Const.environmentLightRISBufferSegmentParams,
 #if RTXDI_REGIR_MODE != RTXDI_REGIR_MODE_DISABLED
@@ -50,4 +224,19 @@ void RayGen()
         lightSample);
 
     RTXDI_StoreDIReservoir(reservoir, g_Const.restirDI.reservoirBufferParams, GlobalIndex, g_Const.restirDI.bufferIndices.initialSamplingOutputBufferIndex);
+    
+    // debug 
+    // u_DiffuseLighting[pixelPosition] = float4(1,0,0, 0);
+
+    // float3 debugColor = g_Const.restirDI.initialSamplingParams.numLocalLightSamples / 2.0f;
+    // u_DiffuseLighting[pixelPosition] = float4(debugColor, 0);
+
+// if (g_Const.restirDI.initialSamplingParams.numLocalLightSamples == 1) 
+//     u_DiffuseLighting[pixelPosition] = float4(0, 1, 0, 0); // 绿色表示确认为1
+// else 
+//     u_DiffuseLighting[pixelPosition] = float4(1, 0, 0, 0); // 红色表示不是1
+
+
+    // u_DiffuseLighting[pixelPosition] = float4(lightSample.radiance, 0);
+    // u_DiffuseLighting[pixelPosition] = float4(surface.material.diffuseAlbedo, 0);
 }

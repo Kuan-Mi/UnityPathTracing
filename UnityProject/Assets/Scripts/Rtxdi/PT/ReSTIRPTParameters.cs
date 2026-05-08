@@ -30,7 +30,7 @@ namespace Rtxdi.PT
     // Enums
     // -------------------------------------------------------------------------
 
-    public enum RTXDI_PTReconnectionMode : ushort
+    public enum RTXDI_PTReconnectionMode : uint
     {
         FixedThreshold = 0, // RTXDI_RESTIRPT_RECONNECTION_MODE_FIXED_THRESHOLD
         Footprint      = 1, // RTXDI_RESTIRPT_RECONNECTION_MODE_FOOTPRINT

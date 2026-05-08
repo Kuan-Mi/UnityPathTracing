@@ -257,8 +257,12 @@ namespace PathTracing
             var p = new RTXDI_LightBufferParameters();
             p.localLightBufferRegion.firstLightIndex = _currentFrameOffset;
             p.localLightBufferRegion.numLights       = (uint)_totalLightCount;
-            // infiniteLightBufferRegion and environmentLightParams stay zero
-            // (analytic/infinite lights not yet ported)
+            // No infinite lights yet; firstLightIndex must still point past the local region.
+            p.infiniteLightBufferRegion.firstLightIndex = _currentFrameOffset + (uint)_totalLightCount;
+            p.infiniteLightBufferRegion.numLights        = 0;
+            // No environment light — use RTXDI_INVALID_LIGHT_INDEX (0xFFFFFFFF).
+            p.environmentLightParams.lightPresent = 0;
+            p.environmentLightParams.lightIndex   = 0xFFFFFFFFu;
             return p;
         }
 
