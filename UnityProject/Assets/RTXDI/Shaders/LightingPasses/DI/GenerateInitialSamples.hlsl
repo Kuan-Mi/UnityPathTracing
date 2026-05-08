@@ -17,6 +17,43 @@
 #include <Rtxdi/DI/InitialSampling.hlsli>
 #include <Rtxdi/DI/ReservoirStorage.hlsli>
 
+bool DEBUG_StreamLocalLightAtUVIntoReservoir(
+    inout RTXDI_RandomSamplerState rng,
+    RTXDI_InitialSamplingMisData misData,
+    RAB_Surface surface,
+    float brdfCutoff,
+    float localLightMisWeight,
+    uint lightIndex,
+    float2 uv,
+    float invSourcePdf,
+    RAB_LightInfo lightInfo,
+    inout RTXDI_DIReservoir state,
+    inout RAB_LightSample o_selectedSample,float2 pixelPosition)
+{
+    RAB_LightSample candidateSample = RAB_SamplePolymorphicLight(lightInfo, surface, uv);
+    float blendedSourcePdf = RTXDI_LightBrdfMisWeight(surface, candidateSample, 1.0 / invSourcePdf,
+        misData.localLightMisWeight, false, misData.brdfMisWeight, brdfCutoff);
+    float targetPdf = RAB_GetLightSampleTargetPdfForSurface(candidateSample, surface);
+    float risRnd = RTXDI_GetNextRandom(rng);
+
+    if (blendedSourcePdf == 0)
+    {
+        return false;
+    }
+    bool selected = RTXDI_StreamSample(state, lightIndex, uv, risRnd, targetPdf, 1.0 / blendedSourcePdf);
+
+    float3 debugColor = selected;
+        u_DiffuseLighting[pixelPosition] = float4(debugColor, 0);
+    if (selected) {
+        o_selectedSample = candidateSample;
+ 
+
+        u_DiffuseLighting[pixelPosition] = float4(o_selectedSample.radiance, 0);
+    }
+        // u_DiffuseLighting[pixelPosition] = float4(o_selectedSample.radiance, 0);
+    return true;
+}
+
 void DEBUG_RandomlySelectLightUniformly(
     float rnd,
     RTXDI_LightBufferRegion region,
@@ -116,7 +153,8 @@ RTXDI_DIReservoir DEBUG_SampleLocalLightsInternal(
         debugColor = lightSample.radiance ;       
         u_DiffuseLighting[pixelPosition] = float4(debugColor, 0);
 
-        bool zeroPdf = RTXDI_StreamLocalLightAtUVIntoReservoir(rng, misData, surface, sampleParams.brdfCutoff, misData.localLightMisWeight, lightIndex, uv, invSourcePdf, lightInfo, state, o_selectedSample);
+        bool zeroPdf = DEBUG_StreamLocalLightAtUVIntoReservoir(rng, misData, surface, sampleParams.brdfCutoff, misData.localLightMisWeight, lightIndex, uv, invSourcePdf, lightInfo, state, o_selectedSample
+        ,pixelPosition);
 
 
         // u_DiffuseLighting[pixelPosition] = float4(o_selectedSample.radiance, 0);
