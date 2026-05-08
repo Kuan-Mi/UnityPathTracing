@@ -107,8 +107,8 @@ GBR_FragOutput GBufferRasterFrag(GBR_Varyings IN)
     float4 metallicSample = SAMPLE_TEXTURE2D(_MetallicGlossMap, sampler_MetallicGlossMap, uv);
     // Bistro channel layout: roughness in G (inverted smoothness), metallic in B.
     // Standard URP layout (commented): smoothness in A, metallic in R.
-    float smooth = (1.0 - metallicSample.g) * _Smoothness;
-    roughness = 1.0 - smooth;
+
+    roughness = metallicSample.g * (1 - _Smoothness);
     metallic = metallicSample.b;
     #else
     roughness = 1.0 - _Smoothness;

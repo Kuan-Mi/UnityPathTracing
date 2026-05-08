@@ -366,8 +366,7 @@ Shader "RayTracing/Lit"
                 // metallic = vv.r;
 
                 // for Bistro
-                float smooth = (1 - vv.g) * _Smoothness;
-                roughness = 1 - smooth;
+                roughness = vv.g * (1 - _Smoothness);
                 metallic = vv.b;
 
                 #else
@@ -606,8 +605,7 @@ Shader "RayTracing/Lit"
                 // metallic = vv.r;
 
                 // for Bistro
-                float smooth = (1 - vv.g) * _Smoothness;
-                roughness = 1 - smooth;
+                roughness = vv.g * (1 - _Smoothness);
                 metallic = vv.b;
 
                 #else

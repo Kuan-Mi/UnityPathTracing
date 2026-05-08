@@ -608,7 +608,7 @@ MonoBehaviour:
     baseColor: {r: 1, g: 1, b: 1, a: 1}
     emissionColor: {r: 0, g: 0, b: 0, a: 0}
     metallic: 0
-    roughnessScale: 0
+    roughnessScale: 1
     normalScale: 1
   - material: {fileID: 2100000, guid: e72c9cc57dccd5942b6da278896be5cd, type: 2}
     isTransparent: 0
@@ -622,7 +622,7 @@ MonoBehaviour:
     baseColor: {r: 1, g: 1, b: 1, a: 1}
     emissionColor: {r: 0, g: 0, b: 0, a: 0}
     metallic: 0
-    roughnessScale: 0
+    roughnessScale: 1
     normalScale: 1
   SubmeshGroups:
   - isTransparent: 0
@@ -642,7 +642,7 @@ MonoBehaviour:
       baseColor: {r: 1, g: 1, b: 1, a: 1}
       emissionColor: {r: 0, g: 0, b: 0, a: 0}
       metallic: 0
-      roughnessScale: 0
+      roughnessScale: 1
       normalScale: 1
     - material: {fileID: 2100000, guid: e72c9cc57dccd5942b6da278896be5cd, type: 2}
       isTransparent: 0
@@ -656,7 +656,7 @@ MonoBehaviour:
       baseColor: {r: 1, g: 1, b: 1, a: 1}
       emissionColor: {r: 0, g: 0, b: 0, a: 0}
       metallic: 0
-      roughnessScale: 0
+      roughnessScale: 1
       normalScale: 1
 --- !u!114 &308568799
 MonoBehaviour:
@@ -686,7 +686,7 @@ MonoBehaviour:
     baseColor: {r: 1, g: 1, b: 1, a: 1}
     emissionColor: {r: 0, g: 0, b: 0, a: 0}
     metallic: 0
-    roughnessScale: 0
+    roughnessScale: 1
     normalScale: 1
   - material: {fileID: 2100000, guid: f0c374064a3739b48b8c4b9924761490, type: 2}
     isTransparent: 0
@@ -700,7 +700,7 @@ MonoBehaviour:
     baseColor: {r: 1, g: 1, b: 1, a: 1}
     emissionColor: {r: 0, g: 0, b: 0, a: 0}
     metallic: 0
-    roughnessScale: 0
+    roughnessScale: 1
     normalScale: 1
   SubmeshGroups:
   - isTransparent: 0
@@ -720,7 +720,7 @@ MonoBehaviour:
       baseColor: {r: 1, g: 1, b: 1, a: 1}
       emissionColor: {r: 0, g: 0, b: 0, a: 0}
       metallic: 0
-      roughnessScale: 0
+      roughnessScale: 1
       normalScale: 1
     - material: {fileID: 2100000, guid: f0c374064a3739b48b8c4b9924761490, type: 2}
       isTransparent: 0
@@ -734,7 +734,7 @@ MonoBehaviour:
       baseColor: {r: 1, g: 1, b: 1, a: 1}
       emissionColor: {r: 0, g: 0, b: 0, a: 0}
       metallic: 0
-      roughnessScale: 0
+      roughnessScale: 1
       normalScale: 1
 --- !u!114 &308568801
 MonoBehaviour:
@@ -1113,7 +1113,7 @@ MonoBehaviour:
     baseColor: {r: 1, g: 1, b: 1, a: 1}
     emissionColor: {r: 1, g: 1, b: 1, a: 1}
     metallic: 0
-    roughnessScale: 0
+    roughnessScale: 1
     normalScale: 1
   SubmeshGroups:
   - isTransparent: 0
@@ -1133,7 +1133,7 @@ MonoBehaviour:
       baseColor: {r: 1, g: 1, b: 1, a: 1}
       emissionColor: {r: 1, g: 1, b: 1, a: 1}
       metallic: 0
-      roughnessScale: 0
+      roughnessScale: 1
       normalScale: 1
 --- !u!1 &573189070
 GameObject:
@@ -2053,7 +2053,7 @@ Transform:
   m_GameObject: {fileID: 1246522490}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalPosition: {x: 0, y: 1, z: 0}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -3032,7 +3032,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 1
+  m_IsActive: 0
 --- !u!108 &2135674572
 Light:
   m_ObjectHideFlags: 0

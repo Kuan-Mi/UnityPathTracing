@@ -638,6 +638,19 @@ namespace PathTracing
                 RRGuide_Normal_Roughness = pool.GetRT(RenderResourceType.RrGuideNormalRoughness),
                 RRGuide_SpecHitDistance  = pool.GetRT(RenderResourceType.RrGuideSpecHitDistance),
                 DlssOutput               = pool.GetRT(RenderResourceType.DlssOutput),
+                
+                
+                Diff = pool.GetRT(RenderResourceType.RtxdiDiffuseLighting),
+                Spec = pool.GetRT(RenderResourceType.RtxdiSpecularLighting),
+                
+                
+                // Rtxdi GBuffer debug
+                RtxdiViewDepth     = viewDepth,
+                RtxdiDiffuseAlbedo = diffuseAlbedo,
+                RtxdiSpecularRough = specularRough,
+                RtxdiNormals       = normals,
+                RtxdiGeoNormals    = geoNormals,
+                
             };
 
             var outputBlitSettings = new OutputBlitPass.Settings

@@ -155,11 +155,16 @@ namespace NativeRender
             for (int s = 0; s < subMeshCount; s++)
             {
                 SubMeshDescriptor sub = mesh.GetSubMesh(s);
+                
+                var material      = meshRenderer.sharedMaterials[s];
+                var isAlphaTested = RayTracingMaterialHelper.IsMaterialAlphaClip(material);
+                
                 submeshDescs[s] = new NativeRenderPlugin.SubmeshDesc
                 {
                     indexCount      = (uint)sub.indexCount,
                     indexByteOffset = (uint)sub.indexStart * indexStride,
                     baseVertex      = (uint)sub.baseVertex,
+                    flags  = isAlphaTested ? 0u : NativeRenderPlugin.SUBMESH_FLAG_GEOMETRY_OPAQUE,
                 };
 
                 if (ommCaches != null && s < ommCaches.Length && ommCaches[s] != null && ommCaches[s].IsValid)

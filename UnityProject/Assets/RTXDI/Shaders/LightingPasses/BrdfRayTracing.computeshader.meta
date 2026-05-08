@@ -16,6 +16,9 @@ ScriptedImporter:
   extraArgs:
   - -Wno-conversion
   - -enable-16bit-types
+  - -Zi
+  - -Od
+  - -Qembed_debug
   defines:
   - USE_RAY_QUERY=1
   entryPoint: main
