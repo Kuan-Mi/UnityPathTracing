@@ -15,7 +15,7 @@ namespace PathTracing
     internal static class RtxdiConstantsBuilder
     {
         public static ResamplingConstants Build(
-            RtxdiSetting              setting,
+            NativeRtxdiSetting              setting,
             UnityRtxdiFeature.RenderSettings localSettings,
             ImportanceSamplingContext isContext,
             CameraFrameState          frameState,
@@ -89,6 +89,15 @@ namespace PathTracing
         }
 
         private static void FillBRDFPTConstants(ref BRDFPathTracing_Parameters constants, RtxdiSetting setting)
+        {
+            constants = setting.brdfptParams;
+            constants.materialOverrideParams.roughnessOverride     = -1.0f;
+            constants.materialOverrideParams.metalnessOverride     = -1.0f;
+            constants.secondarySurfaceReSTIRDIParams.initialSamplingParams.environmentMapImportanceSampling = 0;
+            if (constants.secondarySurfaceReSTIRDIParams.initialSamplingParams.environmentMapImportanceSampling == 0)
+                constants.secondarySurfaceReSTIRDIParams.initialSamplingParams.numEnvironmentSamples = 0;
+        }
+        private static void FillBRDFPTConstants(ref BRDFPathTracing_Parameters constants, NativeRtxdiSetting setting)
         {
             constants = setting.brdfptParams;
             constants.materialOverrideParams.roughnessOverride     = -1.0f;

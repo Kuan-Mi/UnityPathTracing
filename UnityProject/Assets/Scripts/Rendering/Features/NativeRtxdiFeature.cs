@@ -36,7 +36,7 @@ namespace PathTracing
         // -------------------------------------------------------------------
         // User-visible configuration  (mirrors UnityRtxdiFeature)
         // -------------------------------------------------------------------
-        public RtxdiSetting setting;
+        public NativeRtxdiSetting setting;
 
         // public GlobalConstants     globalConstants;
         public NativeResamplingConstants  resamplingConstants;
@@ -893,7 +893,7 @@ namespace PathTracing
 #if UNITY_EDITOR
         private void Reset()
         {
-            setting = new RtxdiSetting();
+            setting = new NativeRtxdiSetting();
             AutoFillShaders();
         }
 
