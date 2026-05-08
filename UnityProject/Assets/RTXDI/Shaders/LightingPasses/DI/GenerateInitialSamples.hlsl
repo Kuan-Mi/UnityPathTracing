@@ -17,6 +17,54 @@
 #include <Rtxdi/DI/InitialSampling.hlsli>
 #include <Rtxdi/DI/ReservoirStorage.hlsli>
 
+void DEBUG_RandomlySelectLightUniformly(
+    float rnd,
+    RTXDI_LightBufferRegion region,
+    out RAB_LightInfo lightInfo,
+    out uint lightIndex,
+    out float invSourcePdf,float2 pixelPosition)
+{
+    invSourcePdf = float(region.numLights);
+    lightIndex = region.firstLightIndex + min(uint(floor(rnd * region.numLights)), region.numLights - 1);
+    lightInfo = RAB_LoadLightInfo(lightIndex, false);
+}
+
+#if RTXDI_ENABLE_PRESAMPLING
+void DEBUG_RandomlySelectLocalLightFromRISTile(
+    float rnd,
+    const RTXDI_RISTileInfo risTileInfo,
+    out RAB_LightInfo lightInfo,
+    out uint lightIndex,
+    out float invSourcePdf)
+{
+    uint2 risTileData;
+    uint risBufferPtr;
+    RTXDI_RandomlySelectLightDataFromRISTile(rnd, risTileInfo, risTileData, risBufferPtr);
+    RTXDI_UnpackLocalLightFromRISLightData(risTileData, risBufferPtr, lightInfo, lightIndex, invSourcePdf);
+}
+#endif
+
+void DEBUG_SelectNextLocalLight(
+    RTXDI_LocalLightSelectionContext ctx,
+    float rnd,
+    out RAB_LightInfo lightInfo,
+    out uint lightIndex,
+    out float invSourcePdf,float2 pixelPosition)
+{
+    switch (ctx.mode)
+    {
+#if RTXDI_ENABLE_PRESAMPLING
+    case RTXDI_LocalLightContextSamplingMode_RIS:
+        DEBUG_RandomlySelectLocalLightFromRISTile(rnd, ctx.risTileInfo, lightInfo, lightIndex, invSourcePdf);
+        break;
+#endif
+    default:
+    case RTXDI_LocalLightContextSamplingMode_UNIFORM:
+        DEBUG_RandomlySelectLightUniformly(rnd, ctx.lightBufferRegion, lightInfo, lightIndex, invSourcePdf,pixelPosition);
+        break;
+    }
+}
+
 RTXDI_DIReservoir DEBUG_SampleLocalLightsInternal(
     inout RTXDI_RandomSamplerState rng,
     inout RTXDI_RandomSamplerState coherentRng,
@@ -56,9 +104,22 @@ RTXDI_DIReservoir DEBUG_SampleLocalLightsInternal(
         rnd = (rnd + i) / sampleParams.numLocalLightSamples;
 #endif
 
-        RTXDI_SelectNextLocalLight(lightSelectionContext, rnd, lightInfo, lightIndex, invSourcePdf);
+        DEBUG_SelectNextLocalLight(lightSelectionContext, rnd, lightInfo, lightIndex, invSourcePdf,pixelPosition);
+        // RTXDI_SelectNextLocalLight(lightSelectionContext, rnd, lightInfo, lightIndex, invSourcePdf);
         float2 uv = RTXDI_RandomlySelectLocalLightUV(rng);
+
+        float3 debugColor = (lightIndex - localLightBufferRegion.firstLightIndex) / (float)localLightBufferRegion.numLights;
+        // debugColor = rnd;
+        debugColor = lightInfo.logRadiance/1000.0f;
+
+        RAB_LightSample lightSample = RAB_SamplePolymorphicLight(lightInfo, surface, float2(0,0));
+        debugColor = lightSample.radiance ;       
+        u_DiffuseLighting[pixelPosition] = float4(debugColor, 0);
+
         bool zeroPdf = RTXDI_StreamLocalLightAtUVIntoReservoir(rng, misData, surface, sampleParams.brdfCutoff, misData.localLightMisWeight, lightIndex, uv, invSourcePdf, lightInfo, state, o_selectedSample);
+
+
+        // u_DiffuseLighting[pixelPosition] = float4(o_selectedSample.radiance, 0);
 
         if (zeroPdf)
             continue;
@@ -209,7 +270,7 @@ void RayGen()
 
     // DEBUG: 强制只采 1 个 local light，禁用其他采样策略
     RTXDI_DIInitialSamplingParameters debugSampleParams = g_Const.restirDI.initialSamplingParams;
-    debugSampleParams.numLocalLightSamples = 1;
+    // debugSampleParams.numLocalLightSamples = 1;
 
     RAB_LightSample lightSample;
     RTXDI_DIReservoir reservoir = DEBUG_SampleLightsForSurface(rng, tileRng, surface,
