@@ -204,7 +204,16 @@ namespace NativeRender
 
             if (_handle != 0)
             {
-                GL.Flush();
+                // Issue a render-thread flush event so all in-flight CsDispatchCallbacks
+                // finish executing before we free ring-buffer NativeArrays.
+                // GL.Flush() alone only queues commands — it does NOT wait for execution,
+                // causing a use-after-free when FreeRingBuffers() runs immediately after.
+                using var flushCmd = new CommandBuffer { name = "NR_GpuFlush" };
+                flushCmd.IssuePluginEvent(NativeRenderPlugin.NR_GetGpuFlushEventFunc(), 0);
+                Graphics.ExecuteCommandBuffer(flushCmd);
+                // Block main thread until render thread + GPU are fully idle.
+                NativeRenderPlugin.NR_WaitForGpuFlush();
+
                 NativeRenderPlugin.NR_DestroyComputeShader(_handle);
                 _handle = 0;
             }

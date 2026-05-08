@@ -147,6 +147,7 @@ namespace NativeRender
                 ApplyAndImport(importer);
             }
             GUI.backgroundColor = Color.white;
+            GL.End();
 
             EditorGUILayout.Space(2);
             if (shader.HasCompiledBytes)

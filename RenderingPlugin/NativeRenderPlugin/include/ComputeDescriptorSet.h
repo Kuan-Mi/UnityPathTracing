@@ -51,6 +51,12 @@ private:
     DescriptorHeapAllocator* m_allocator = nullptr;
     IUnityGraphicsD3D12v8*   m_d3d12v8   = nullptr;
 
+    // Cached at construction — used by FreeAllocations so we never touch m_cs
+    // after it may have been deleted (ComputeShader is enqueued for deferred-delete
+    // before ComputeDescriptorSet, so m_cs can be a dangling pointer in the dtor).
+    uint32_t                 m_cachedNumSRV = 0;
+    uint32_t                 m_cachedNumUAV = 0;
+
     static constexpr uint32_t kInvalidAlloc    = UINT32_MAX;
     static constexpr uint32_t kNumFrames        = 3;  // triple-buffering
     static constexpr uint32_t kMaxEyesPerFrame  = 2;  // XR stereo

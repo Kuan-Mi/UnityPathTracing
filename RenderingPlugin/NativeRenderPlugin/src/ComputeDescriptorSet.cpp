@@ -15,6 +15,8 @@ ComputeDescriptorSet::ComputeDescriptorSet(ComputeShader*            cs,
                                            DescriptorHeapAllocator*  allocator,
                                            IUnityGraphicsD3D12v8*    d3d12v8)
     : m_cs(cs), m_device(device), m_log(log), m_allocator(allocator), m_d3d12v8(d3d12v8)
+    , m_cachedNumSRV(cs ? cs->GetNumSRV() : 0)
+    , m_cachedNumUAV(cs ? cs->GetNumUAV() : 0)
 {
 }
 
@@ -47,8 +49,10 @@ void ComputeDescriptorSet::Logf(UnityLogType type, const char* fmt, ...) const
 void ComputeDescriptorSet::FreeAllocations()
 {
     if (!m_allocator) return;
-    uint32_t numSRV = m_cs ? m_cs->GetNumSRV() : 0;
-    uint32_t numUAV = m_cs ? m_cs->GetNumUAV() : 0;
+    // Use cached counts — m_cs may already be deleted (ComputeShader is enqueued for
+    // deferred-delete before ComputeDescriptorSet, so dereferencing m_cs here is UAF).
+    uint32_t numSRV = m_cachedNumSRV;
+    uint32_t numUAV = m_cachedNumUAV;
     for (uint32_t f = 0; f < kNumSlots; ++f)
     {
         if (m_srvAllocBase[f] != kInvalidAlloc && numSRV > 0) { m_allocator->Free(m_srvAllocBase[f], numSRV); m_srvAllocBase[f] = kInvalidAlloc; }

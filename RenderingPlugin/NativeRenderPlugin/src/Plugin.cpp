@@ -48,6 +48,10 @@ static IUnityLog*                s_Log         = nullptr;
 static DescriptorHeapAllocator   s_DescHeap;   // global shared GPU-visible CBV/SRV/UAV heap
 static bool                      s_RendererReady = false;
 
+// Event used by NR_WaitForGpuFlush: set by GpuFlushAndSignalCallback on the render thread
+// after FlushGpuAndWait() completes, so the main thread can safely free ring buffers.
+static HANDLE                    s_gpuFlushDoneEvent = nullptr;
+
 // Global triple-buffer frame index — advanced once per frame by AccelerationStructure::BuildOrUpdate().
 // All subsystems (AccelerationStructure, ComputeDescriptorSet, …) index into their
 // per-frame ring buffers using this value so they stay in sync.
@@ -312,6 +316,10 @@ static void UNITY_INTERFACE_API OnGraphicsDeviceEvent(UnityGfxDeviceEventType ev
         }
         else
             NR_ERROR("Device does not support DXR (ID3D12Device5 unavailable)");
+
+        // Create the manual-reset event used by NR_WaitForGpuFlush / GpuFlushAndSignalCallback.
+        if (!s_gpuFlushDoneEvent)
+            s_gpuFlushDoneEvent = CreateEventW(nullptr, /*bManualReset=*/TRUE, /*bInitialState=*/FALSE, nullptr);
     }
     else if (eventType == kUnityGfxDeviceEventShutdown)
     {
@@ -336,6 +344,8 @@ static void UNITY_INTERFACE_API OnGraphicsDeviceEvent(UnityGfxDeviceEventType ev
         s_RendererReady = false;
         s_D3D12         = nullptr;
         s_D3D12v8       = nullptr;
+
+        if (s_gpuFlushDoneEvent) { CloseHandle(s_gpuFlushDoneEvent); s_gpuFlushDoneEvent = nullptr; }
         NR_LOG("Plugin shutdown - COMPLETE");
     }
 }
@@ -802,6 +812,47 @@ NR_RTS_GetRenderEventDataSize()
 static void UNITY_INTERFACE_API FrameTickCallback(int /*eventId*/)
 {
     DrainDeferredDeletes();
+}
+
+// ---------------------------------------------------------------------------
+// NR_GetGpuFlushEventFunc / NR_WaitForGpuFlush
+//   Allows the main thread to synchronise with the render thread before
+//   freeing NativeArray ring buffers that in-flight render-thread callbacks
+//   may still be reading (e.g. after a hot-reload / Recompile).
+//
+//   Usage from C#:
+//     1. cmd.IssuePluginEvent(NR_GetGpuFlushEventFunc(), 0);
+//        Graphics.ExecuteCommandBuffer(cmd);   // queues callback on render thread
+//     2. NR_WaitForGpuFlush();                 // main thread blocks here until done
+// ---------------------------------------------------------------------------
+static void UNITY_INTERFACE_API GpuFlushAndSignalCallback(int /*eventId*/)
+{
+    // Called on the render thread — all previously-enqueued render callbacks
+    // have already executed before this one runs.
+    FlushGpuAndWait();
+    if (s_gpuFlushDoneEvent)
+        SetEvent(s_gpuFlushDoneEvent);
+}
+
+extern "C" UnityRenderingEvent UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API
+NR_GetGpuFlushEventFunc()
+{
+    return GpuFlushAndSignalCallback;
+}
+
+// Blocks the calling thread (main thread) until GpuFlushAndSignalCallback has
+// run and signalled s_gpuFlushDoneEvent.  Resets the event afterwards so it
+// can be reused.  Timeout: 15 seconds.
+extern "C" void UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API
+NR_WaitForGpuFlush()
+{
+    if (!s_gpuFlushDoneEvent) return;
+    DWORD result = WaitForSingleObject(s_gpuFlushDoneEvent, 15000);
+    if (result == WAIT_TIMEOUT)
+        NR_ERROR("NR_WaitForGpuFlush: timed out after 15 seconds!");
+    else if (result != WAIT_OBJECT_0)
+        NR_ERROR("NR_WaitForGpuFlush: WaitForSingleObject failed");
+    ResetEvent(s_gpuFlushDoneEvent);
 }
 
 extern "C" UnityRenderingEventAndData UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API

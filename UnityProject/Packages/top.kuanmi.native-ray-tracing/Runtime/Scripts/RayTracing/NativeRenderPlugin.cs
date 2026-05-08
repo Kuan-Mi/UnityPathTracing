@@ -221,6 +221,24 @@ namespace NativeRender
         [DllImport(DllName)]
         public static extern IntPtr NR_GetFrameTickEventFunc();
 
+        /// <summary>
+        /// Returns the render-event function pointer for GPU flush + signal.
+        /// Issue via <c>cmd.IssuePluginEvent(NR_GetGpuFlushEventFunc(), 0)</c> then
+        /// <c>Graphics.ExecuteCommandBuffer(cmd)</c>, then call <see cref="NR_WaitForGpuFlush"/>
+        /// on the main thread to block until the render thread has finished and the GPU is idle.
+        /// </summary>
+        [DllImport(DllName)]
+        public static extern IntPtr NR_GetGpuFlushEventFunc();
+
+        /// <summary>
+        /// Blocks the calling (main) thread until the render thread has executed
+        /// <c>FlushGpuAndWait</c> via the event issued by <see cref="NR_GetGpuFlushEventFunc"/>.
+        /// Must be called after <c>Graphics.ExecuteCommandBuffer</c> with that event.
+        /// Timeout: 15 seconds.
+        /// </summary>
+        [DllImport(DllName)]
+        public static extern void NR_WaitForGpuFlush();
+
         /// <summary>Returns sizeof(AS_BuildEventData) for buffer allocation.</summary>
         [DllImport(DllName)]
         public static extern uint NR_AS_GetBuildEventDataSize();
