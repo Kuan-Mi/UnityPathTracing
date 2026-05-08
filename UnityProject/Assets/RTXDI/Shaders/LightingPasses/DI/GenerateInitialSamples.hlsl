@@ -31,7 +31,7 @@ RTXDI_DIReservoir DEBUG_SampleLocalLightsInternal(
     ReGIR_Parameters regirParams,
 #endif
 #endif
-    out RAB_LightSample o_selectedSample)
+    out RAB_LightSample o_selectedSample,float2 pixelPosition)
 {
     RTXDI_DIReservoir state = RTXDI_EmptyDIReservoir();
 
@@ -86,7 +86,7 @@ RTXDI_DIReservoir DEBUG_SampleLocalLights(
     ReGIR_Parameters regirParams,
 #endif
 #endif
-    out RAB_LightSample o_selectedSample)
+    out RAB_LightSample o_selectedSample,float2 pixelPosition)
 {
     o_selectedSample = RAB_EmptyLightSample();
 
@@ -103,7 +103,7 @@ RTXDI_DIReservoir DEBUG_SampleLocalLights(
         regirParams,
 #endif
 #endif
-        o_selectedSample);
+        o_selectedSample,pixelPosition);
 }
 
 RTXDI_DIReservoir DEBUG_SampleLightsForSurface(
@@ -119,7 +119,7 @@ RTXDI_DIReservoir DEBUG_SampleLightsForSurface(
     ReGIR_Parameters regirParams,
 #endif
 #endif
-    out RAB_LightSample o_lightSample)
+    out RAB_LightSample o_lightSample,float2 pixelPosition)
 {
     o_lightSample = RAB_EmptyLightSample();
 
@@ -136,7 +136,7 @@ RTXDI_DIReservoir DEBUG_SampleLightsForSurface(
         regirParams,
 #endif
 #endif
-        localSample);
+        localSample,pixelPosition);
 
     RAB_LightSample infiniteSample = RAB_EmptyLightSample();
     RTXDI_DIReservoir infiniteReservoir = RTXDI_SampleInfiniteLights(rng, surface,
@@ -221,7 +221,7 @@ void RayGen()
         g_Const.regir,
 #endif
 #endif
-        lightSample);
+        lightSample,pixelPosition);
 
     RTXDI_StoreDIReservoir(reservoir, g_Const.restirDI.reservoirBufferParams, GlobalIndex, g_Const.restirDI.bufferIndices.initialSamplingOutputBufferIndex);
     
