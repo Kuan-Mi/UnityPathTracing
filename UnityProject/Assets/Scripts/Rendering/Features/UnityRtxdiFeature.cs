@@ -650,6 +650,9 @@ namespace PathTracing
                 RtxdiSpecularRough = specularRough,
                 RtxdiNormals       = normals,
                 RtxdiGeoNormals    = geoNormals,
+                // Rtxdi PDF debug
+                LocalLightPdfTexture  = _lightScene?.localLightPdfTexture,
+                EnvironmentPdfTexture = null, // UnityRtxdiFeature has no env PDF texture yet
                 
             };
 
@@ -662,6 +665,8 @@ namespace PathTracing
                 showMV          = setting.showMv,
                 showValidation  = false,
                 showReference   = false,
+                pdfMipLevel     = setting.pdfMipLevel,
+                pdfExposureStops = setting.pdfExposureStops,
             };
 
             _outputBlitPass.Setup(outputBlitResource, outputBlitSettings);

@@ -247,6 +247,7 @@ namespace RTXDI
             }
 
             RtxdiUtils.ComputePdfTextureSize(maxLocalLights, out uint texWidth, out uint texHeight, out uint mipLevels);
+            Debug.Log($"[LightScene] LocalLightPdfTexture: maxLocalLights={maxLocalLights} (emissiveTriangles={emissiveTriangleCount} + otherLocal={otherLocalLightCount}), computed size={texWidth}x{texHeight}, mips={mipLevels}");
 
             if ((localLightPdfTextureSize.x != texWidth || localLightPdfTextureSize.y != texHeight))
             {

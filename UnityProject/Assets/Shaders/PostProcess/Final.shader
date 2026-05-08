@@ -1108,5 +1108,77 @@
             ENDHLSL
         }
 
+        // 18 – PdfTextureMip  (R32_Float → log-scale heat map of a chosen mip level)
+        //  _PdfMipLevel : int   – which mip to display (0 = full-res, 1, 2, ...)
+        Pass
+        {
+            Name "PdfTextureMip"
+            ZWrite Off ZTest Always Cull Off
+            Blend Off
+
+            HLSLPROGRAM
+            #pragma vertex Vert
+            #pragma fragment Frag
+            #pragma target 4.5
+            #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
+
+            Texture2D<float> _BlitTexture;
+            float4           _BlitScaleBias;
+            int              _PdfMipLevel;
+            // Exposure in stops: positive = brighter (magnify dim values), negative = darker.
+            // 0 = default range (~65504 peak). Each +1 stop doubles visible sensitivity.
+            float            _PdfExposureStops;
+
+            struct Attributes { uint vertexID : SV_VertexID; };
+            struct Varyings   { float4 positionCS : SV_POSITION; float2 uv : TEXCOORD0; };
+
+            Varyings Vert(Attributes i)
+            {
+                Varyings o;
+                o.positionCS = GetFullScreenTriangleVertexPosition(i.vertexID);
+                o.uv         = GetFullScreenTriangleTexCoord(i.vertexID);
+                return o;
+            }
+
+            // Jet-style heat map: 0=blue, 0.5=green, 1=red
+            float3 HeatMap(float t)
+            {
+                t = saturate(t);
+                float r = saturate(1.5 - abs(t * 4.0 - 3.0));
+                float g = saturate(1.5 - abs(t * 4.0 - 2.0));
+                float b = saturate(1.5 - abs(t * 4.0 - 1.0));
+                return float3(r, g, b);
+            }
+
+            float4 Frag(Varyings i) : SV_Target
+            {
+                #ifdef UNITY_UV_STARTS_AT_TOP
+                i.uv.y = 1.0 - i.uv.y;
+                #endif
+                i.uv = i.uv * _BlitScaleBias.xy + _BlitScaleBias.zw;
+
+                uint mipW, mipH, mipCount;
+                _BlitTexture.GetDimensions(_PdfMipLevel, mipW, mipH, mipCount);
+
+                // Clamp requested mip to valid range
+                int mip = clamp(_PdfMipLevel, 0, (int)mipCount - 1);
+                _BlitTexture.GetDimensions(mip, mipW, mipH, mipCount);
+
+                int2 px    = int2(saturate(i.uv) * float2(mipW, mipH));
+                float val  = _BlitTexture.Load(int3(px, mip));
+
+                // Log-scale with exposure control.
+                // _PdfExposureStops > 0  → peak maps lower (brighter / more sensitive)
+                // _PdfExposureStops < 0  → peak maps higher (darker / less sensitive)
+     
+     
+                float scale = pow(2.0, _PdfExposureStops);
+                float3 color = val * scale;
+
+                return float4(color, 1);
+            }
+            ENDHLSL
+        }
+
     }
 }

@@ -29,5 +29,6 @@
         RtxdiRoughness,      // 15  R8G8B8A8_Gamma → float roughness
         RtxdiNormal,         // 16  oct32 → float3 normal
         RtxdiGeoNormal,      // 17  oct32 → float3 geo-normal
+        PdfTextureMip,       // 18  R32_Float mip slice → log-scale heat map
     }
 }

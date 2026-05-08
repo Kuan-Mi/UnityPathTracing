@@ -61,8 +61,9 @@ namespace PathTracing
             internal RTHandle RtxdiDiffuseAlbedo;   // R32_UINT  R11G11B10_UFLOAT
             internal RTHandle RtxdiSpecularRough;   // R32_UINT  R8G8B8A8_Gamma_UFLOAT
             internal RTHandle RtxdiNormals;         // R32_UINT  oct32
-            internal RTHandle RtxdiGeoNormals;      // R32_UINT  oct32
-        }
+            internal RTHandle RtxdiGeoNormals;      // R32_UINT  oct32            // ── Rtxdi PDF debug textures (R32_Float mip chain) ──────────────────
+            internal RTHandle LocalLightPdfTexture;
+            internal RTHandle EnvironmentPdfTexture;        }
 
         public class Settings
         {
@@ -73,6 +74,10 @@ namespace PathTracing
             internal bool showMV;
             internal bool showValidation;
             internal bool showReference;
+            /// <summary>Mip level to display for Rtxdi_LocalLightPdf / Rtxdi_EnvironmentPdf modes.</summary>
+            internal int   pdfMipLevel;
+            /// <summary>Exposure in stops for the PDF heat-map visualisation.</summary>
+            internal float pdfExposureStops;
         }
 
 
@@ -228,6 +233,22 @@ namespace PathTracing
                     break;
                 case ShowMode.Rtxdi_SpecularLighting:
                     Blitter.BlitTexture(natCmd, data.Resource.Spec, scaleOffset, data.BlitMaterial, (int)ShowPass.Out);
+                    break;
+                case ShowMode.Rtxdi_LocalLightPdf:
+                    if (data.Resource.LocalLightPdfTexture != null)
+                    {
+                        data.BlitMaterial.SetInt("_PdfMipLevel", data.Setting.pdfMipLevel);
+                        data.BlitMaterial.SetFloat("_PdfExposureStops", data.Setting.pdfExposureStops);
+                        Blitter.BlitTexture(natCmd, data.Resource.LocalLightPdfTexture, scaleOffset, data.BlitMaterial, (int)ShowPass.PdfTextureMip);
+                    }
+                    break;
+                case ShowMode.Rtxdi_EnvironmentPdf:
+                    if (data.Resource.EnvironmentPdfTexture != null)
+                    {
+                        data.BlitMaterial.SetInt("_PdfMipLevel", data.Setting.pdfMipLevel);
+                        data.BlitMaterial.SetFloat("_PdfExposureStops", data.Setting.pdfExposureStops);
+                        Blitter.BlitTexture(natCmd, data.Resource.EnvironmentPdfTexture, scaleOffset, data.BlitMaterial, (int)ShowPass.PdfTextureMip);
+                    }
                     break;
                 default:
                     throw new ArgumentOutOfRangeException();

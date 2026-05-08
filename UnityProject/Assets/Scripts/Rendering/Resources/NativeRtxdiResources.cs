@@ -123,16 +123,18 @@ namespace PathTracing
                 sizeof(uint)) { name = "LightIndexMappingBuffer" };
 
             // ---- LocalLightPdfTexture ----
-            uint pdfTexSize = math.max(1u, math.ceilpow2((uint)math.ceil(math.sqrt((float)totalLights))));
-            LocalLightPdfTextureSize = new uint2(pdfTexSize, pdfTexSize);
+            uint maxLocalLights = maxEmissiveTriangles + maxPrimitiveLights;
+            RtxdiUtils.ComputePdfTextureSize(maxLocalLights, out uint pdfW, out uint pdfH, out uint pdfMips);
+            LocalLightPdfTextureSize = new uint2(pdfW, pdfH);
+            UnityEngine.Debug.Log($"[NativeRtxdiResources] LocalLightPdfTexture: maxLocalLights={maxLocalLights} (maxEmissiveTriangles={maxEmissiveTriangles} + maxPrimitiveLights={maxPrimitiveLights}), pdfSize={pdfW}x{pdfH}, mips={pdfMips}");
             LocalLightPdfTexture = RTHandles.Alloc(
-                width:           (int)pdfTexSize,
-                height:          (int)pdfTexSize,
-                colorFormat:     GraphicsFormat.R32_SFloat,
+                width:             (int)pdfW,
+                height:            (int)pdfH,
+                colorFormat:       GraphicsFormat.R32_SFloat,
                 enableRandomWrite: true,
-                useMipMap:       true,
-                autoGenerateMips:false,
-                name:            "LocalLightPdfTexture");
+                useMipMap:         true,
+                autoGenerateMips:  false,
+                name:              "LocalLightPdfTexture");
 
             // ---- EnvironmentPdfTexture ----
             uint envW = math.max(environmentMapWidth, 1u);

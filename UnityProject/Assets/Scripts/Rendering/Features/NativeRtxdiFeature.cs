@@ -104,6 +104,7 @@ namespace PathTracing
         private GBufferRasterPass.Resource   _gBufferRasterResource;
         private PdfTexturePass               _pdfTexturePass;
         private GenerateMipsPass             _generateMipsPass;
+        private NativeRtxdiPdfMipsPass       _pdfMipsPass;
         private PresamplePass                _presamplePass;
         private PresampleReGirLightsPass     _presampleReGirLightsPass;
         private NrdPass                      _nrdDenoisePass;
@@ -165,6 +166,8 @@ namespace PathTracing
             // when those managed assets are absent.
             _nrdDenoisePass  ??= new NrdPass() { renderPassEvent                                     = renderPassEvent };
             _compositingPass ??= new NativeRtxdiCompositingPass(compositingPassCs) { renderPassEvent = renderPassEvent };
+            if (genMipsCs != null)
+                _pdfMipsPass ??= new NativeRtxdiPdfMipsPass(genMipsCs) { renderPassEvent = renderPassEvent };
             _outputBlitPass  ??= new OutputBlitPass(finalMaterial) { renderPassEvent                 = renderPassEvent };
 
             _diGenerateInitialSamplesPass ??= new NativeRtxdiGenerateInitialSamplesPass(diGenerateInitialSamplesCs) { renderPassEvent = renderPassEvent };
@@ -407,7 +410,7 @@ namespace PathTracing
                 usePSRMvecForResampling = 1u,
                 updatePSRwithResampling = 1u,
 
-                environmentPdfTextureSize = default,
+                environmentPdfTextureSize = rtxdiResources.EnvironmentPdfTextureSize,
                 localLightPdfTextureSize  = baseConsts.localLightPdfTextureSize,
 
                 debug = default,
@@ -492,9 +495,13 @@ namespace PathTracing
             renderer.EnqueuePass(_postprocessGBufferPass);
 
 
-            // ---- Pre-sampling (TODO: native PdfMipmap port) ----
-            // FullSample's m_localLightPdfMipmapPass / m_environmentMapPdfMipmapPass run after
-            // PrepareLights. Skipped until the native PrepareLights pass is implemented.
+            // ---- PDF mip chain (mirrors FullSample's m_localLightPdfMipmapPass / m_environmentMapPdfMipmapPass) ----
+            // Must run after PrepareLights, which writes mip 0 of LocalLightPdfTexture.
+            if (_pdfMipsPass != null && _prepareLightsPass != null)
+            {
+                _pdfMipsPass.Setup(nativeCtx);
+                renderer.EnqueuePass(_pdfMipsPass);
+            }
 
             // ---- DI core (NATIVE) ----
             if (enableDirectReStirPass)
@@ -635,6 +642,9 @@ namespace PathTracing
                     RtxdiSpecularRough = specularRough,
                     RtxdiNormals       = normals,
                     RtxdiGeoNormals    = geoNormals,
+                    // Rtxdi PDF debug
+                    LocalLightPdfTexture  = rtxdiResources.LocalLightPdfTexture,
+                    EnvironmentPdfTexture = rtxdiResources.EnvironmentPdfTexture,
                 };
                 var outputBlitSettings = new OutputBlitPass.Settings
                 {
@@ -644,6 +654,8 @@ namespace PathTracing
                     showMV          = setting.showMv,
                     showValidation  = false,
                     showReference   = false,
+                    pdfMipLevel     = setting.pdfMipLevel,
+                    pdfExposureStops = setting.pdfExposureStops,
                 };
                 _outputBlitPass.Setup(outputBlitResource, outputBlitSettings);
                 renderer.EnqueuePass(_outputBlitPass);
