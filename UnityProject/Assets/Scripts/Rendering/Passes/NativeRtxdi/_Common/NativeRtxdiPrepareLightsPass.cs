@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Runtime.InteropServices;
 using NativeRender;
+using Nri;
 using Rtxdi;
 using UnityEngine;
 using UnityEngine.Rendering;
@@ -342,8 +343,11 @@ namespace PathTracing
                     rtx.LightDataBuffer.count, rtx.LightDataBuffer.stride);
 
             if (rtx.LightIndexMappingBuffer != null)
-                ds.SetRWBuffer("u_LightIndexMappingBuffer",
-                    rtx.LightIndexMappingBuffer.GetNativeBufferPtr());
+                // RWBuffer<uint> requires a typed UAV: DXGI_FORMAT_R32_UINT
+                ds.SetRWTypedBuffer("u_LightIndexMappingBuffer",
+                    rtx.LightIndexMappingBuffer.GetNativeBufferPtr(),
+                    rtx.LightIndexMappingBuffer.count,
+                    (uint)Nri.DXGI_FORMAT.DXGI_FORMAT_R32_UINT);
 
             if (rtx.LocalLightPdfTexture?.rt != null)
                 ds.SetRWTexture("u_LocalLightPdfTexture",
