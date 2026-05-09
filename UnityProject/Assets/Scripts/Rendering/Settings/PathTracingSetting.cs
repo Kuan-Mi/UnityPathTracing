@@ -203,6 +203,10 @@ namespace PathTracing
         public RTXDI_GISpatialResamplingParameters  giSpatialResamplingParams  = ReSTIRGIDefaults.GetDefaultSpatialResamplingParams();
         public RTXDI_GIFinalShadingParameters       giFinalShadingParams       = ReSTIRGIDefaults.GetDefaultFinalShadingParams();
         public BRDFPathTracing_Parameters           brdfptParams               = BRDFPathTracing_Parameters.Default();
+
+        [FoldoutHeader("ReSTIR PT")]
+        public bool                    enableReSTIRPT   = false;
+        public ReSTIRPT_ResamplingMode ptResamplingMode = ReSTIRPT_ResamplingMode.TemporalAndSpatial;
     }
 
     public enum OnScreen

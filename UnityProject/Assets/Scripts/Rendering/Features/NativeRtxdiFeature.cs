@@ -75,6 +75,14 @@ namespace PathTracing
         public NativeComputeShader giSpatialResamplingCs; // LightingPasses/GI/SpatialResampling.computeshader
         public NativeComputeShader giFinalShadingCs; // LightingPasses/GI/FinalShading.computeshader
 
+        // ReSTIR PT
+        public NativeComputeShader ptGenerateInitialSamplesCs; // LightingPasses/PT/GenerateInitialSamples.computeshader
+        public NativeComputeShader ptTemporalResamplingCs;     // LightingPasses/PT/TemporalResampling.computeshader
+        public NativeComputeShader ptSpatialResamplingCs;      // LightingPasses/PT/SpatialResampling.computeshader
+        public NativeComputeShader ptFillSampleIDCs;           // LightingPasses/PT/FillSampleID.computeshader
+        public NativeComputeShader ptComputeDuplicationMapCs;  // LightingPasses/PT/ComputeDuplicationMap.computeshader
+        public NativeComputeShader ptFinalShadingCs;           // LightingPasses/PT/FinalShading.computeshader
+
         // Auxiliary
         public NativeComputeShader compositingPassCs; // CompositingPass.computeshader
         public ComputeShader       pdfTextureCs;
@@ -95,6 +103,14 @@ namespace PathTracing
         private NativeRtxdiGITemporalResamplingPass   _giTemporalResamplingPass;
         private NativeRtxdiGISpatialResamplingPass    _giSpatialResamplingPass;
         private NativeRtxdiGIFinalShadingPass         _giFinalShadingPass;
+
+        private NativeRtxdiPTGenerateInitialSamplesPass _ptGenerateInitialSamplesPass;
+        private NativeRtxdiPTTemporalResamplingPass     _ptTemporalResamplingPass;
+        private NativeRtxdiPTSpatialResamplingPass      _ptSpatialResamplingPass;
+        private NativeRtxdiPTFillSampleIDPass           _ptFillSampleIDPass;
+        private NativeRtxdiPTComputeDuplicationMapPass  _ptComputeDuplicationMapPass;
+        private NativeRtxdiPTFinalShadingPass           _ptFinalShadingPass;
+
         private NativeFrameTick                       _nativeFrameTickPass;
 
         // -------------------------------------------------------------------
@@ -183,6 +199,13 @@ namespace PathTracing
             _giTemporalResamplingPass   ??= new NativeRtxdiGITemporalResamplingPass(giTemporalResamplingCs) { renderPassEvent     = renderPassEvent };
             _giSpatialResamplingPass    ??= new NativeRtxdiGISpatialResamplingPass(giSpatialResamplingCs) { renderPassEvent       = renderPassEvent };
             _giFinalShadingPass         ??= new NativeRtxdiGIFinalShadingPass(giFinalShadingCs) { renderPassEvent                 = renderPassEvent };
+
+            _ptGenerateInitialSamplesPass ??= new NativeRtxdiPTGenerateInitialSamplesPass(ptGenerateInitialSamplesCs) { renderPassEvent = renderPassEvent };
+            _ptTemporalResamplingPass     ??= new NativeRtxdiPTTemporalResamplingPass(ptTemporalResamplingCs) { renderPassEvent         = renderPassEvent };
+            _ptSpatialResamplingPass      ??= new NativeRtxdiPTSpatialResamplingPass(ptSpatialResamplingCs) { renderPassEvent           = renderPassEvent };
+            _ptFillSampleIDPass           ??= new NativeRtxdiPTFillSampleIDPass(ptFillSampleIDCs) { renderPassEvent                     = renderPassEvent };
+            _ptComputeDuplicationMapPass  ??= new NativeRtxdiPTComputeDuplicationMapPass(ptComputeDuplicationMapCs) { renderPassEvent  = renderPassEvent };
+            _ptFinalShadingPass           ??= new NativeRtxdiPTFinalShadingPass(ptFinalShadingCs) { renderPassEvent                     = renderPassEvent };
 
             _nativeFrameTickPass ??= new NativeFrameTick() { renderPassEvent = renderPassEvent, };
         }
@@ -597,6 +620,49 @@ namespace PathTracing
                 }
             }
 
+            // ---- ReSTIR PT (NATIVE) ----
+            if (setting.enableReSTIRPT && _ptGenerateInitialSamplesPass != null)
+            {
+                _ptGenerateInitialSamplesPass.Setup(nativeCtx);
+                renderer.EnqueuePass(_ptGenerateInitialSamplesPass);
+
+                if (_ptTemporalResamplingPass != null &&
+                    setting.ptResamplingMode is ReSTIRPT_ResamplingMode.Temporal or ReSTIRPT_ResamplingMode.TemporalAndSpatial)
+                {
+                    _ptTemporalResamplingPass.Setup(nativeCtx);
+                    renderer.EnqueuePass(_ptTemporalResamplingPass);
+                }
+
+                if (_ptSpatialResamplingPass != null &&
+                    setting.ptResamplingMode is ReSTIRPT_ResamplingMode.Spatial or ReSTIRPT_ResamplingMode.TemporalAndSpatial)
+                {
+                    _ptSpatialResamplingPass.Setup(nativeCtx);
+                    renderer.EnqueuePass(_ptSpatialResamplingPass);
+                }
+
+                // Optional duplication-based history reduction (FillSampleID → ComputeDuplicationMap)
+                var ptTemporalParams = resamplingConstants.restirPT.temporalResampling;
+                if (ptTemporalParams.duplicationBasedHistoryReduction != 0)
+                {
+                    if (_ptFillSampleIDPass != null)
+                    {
+                        _ptFillSampleIDPass.Setup(nativeCtx);
+                        renderer.EnqueuePass(_ptFillSampleIDPass);
+                    }
+                    if (_ptComputeDuplicationMapPass != null)
+                    {
+                        _ptComputeDuplicationMapPass.Setup(nativeCtx);
+                        renderer.EnqueuePass(_ptComputeDuplicationMapPass);
+                    }
+                }
+
+                if (_ptFinalShadingPass != null)
+                {
+                    _ptFinalShadingPass.Setup(nativeCtx);
+                    renderer.EnqueuePass(_ptFinalShadingPass);
+                }
+            }
+
             // ---- NRD denoising (REBLUR_DIFFUSE_SPECULAR) ----
             if (setting.enableDenoiser)
             {
@@ -826,6 +892,18 @@ namespace PathTracing
             _giSpatialResamplingPass = null;
             _giFinalShadingPass?.Dispose();
             _giFinalShadingPass = null;
+            _ptGenerateInitialSamplesPass?.Dispose();
+            _ptGenerateInitialSamplesPass = null;
+            _ptTemporalResamplingPass?.Dispose();
+            _ptTemporalResamplingPass = null;
+            _ptSpatialResamplingPass?.Dispose();
+            _ptSpatialResamplingPass = null;
+            _ptFillSampleIDPass?.Dispose();
+            _ptFillSampleIDPass = null;
+            _ptComputeDuplicationMapPass?.Dispose();
+            _ptComputeDuplicationMapPass = null;
+            _ptFinalShadingPass?.Dispose();
+            _ptFinalShadingPass = null;
             _presampleReGirNativePass?.Dispose();
             _presampleReGirNativePass = null;
             _compositingPass?.Dispose();

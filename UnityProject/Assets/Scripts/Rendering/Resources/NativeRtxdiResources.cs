@@ -63,10 +63,12 @@ namespace PathTracing
         // ---- reservoirs / secondary GBuffer ----
         public GraphicsBuffer LightReservoirBuffer        { get; private set; }
         public GraphicsBuffer GIReservoirBuffer           { get; private set; }
+        public GraphicsBuffer PTReservoirBuffer           { get; private set; }
         public GraphicsBuffer SecondaryGBuffer            { get; private set; }
 
         private const int c_NumReSTIRDIReservoirBuffers = 3;
         private const int c_NumReSTIRGIReservoirBuffers = 2;
+        private const int c_NumReSTIRPTReservoirBuffers = 2;
 
         private bool m_neighborOffsetsInitialized = false;
 
@@ -175,6 +177,14 @@ namespace PathTracing
                     GraphicsBuffer.Target.Structured, totalGIReservoirs, giReservoirStride) { name = "GIReservoirBuffer" };
             }
 
+            int ptReservoirStride = Marshal.SizeOf<RTXDI_PackedPTReservoir>();
+            int totalPTReservoirs = (int)reservoirParams.reservoirArrayPitch * c_NumReSTIRPTReservoirBuffers;
+            if (totalPTReservoirs > 0)
+            {
+                PTReservoirBuffer = new GraphicsBuffer(
+                    GraphicsBuffer.Target.Structured, totalPTReservoirs, ptReservoirStride) { name = "PTReservoirBuffer" };
+            }
+
             int secondaryGBufferStride = Marshal.SizeOf<SecondaryGBufferData>();
             int totalSecondaryGBuffers = (int)reservoirParams.reservoirArrayPitch;
             SecondaryGBuffer = new GraphicsBuffer(
@@ -234,6 +244,7 @@ namespace PathTracing
 
             LightReservoirBuffer?.Dispose();        LightReservoirBuffer = null;
             GIReservoirBuffer?.Dispose();           GIReservoirBuffer = null;
+            PTReservoirBuffer?.Dispose();           PTReservoirBuffer = null;
             SecondaryGBuffer?.Dispose();            SecondaryGBuffer = null;
         }
     }

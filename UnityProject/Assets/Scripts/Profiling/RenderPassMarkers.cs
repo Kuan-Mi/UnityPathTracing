@@ -60,6 +60,14 @@ public static class RenderPassMarkers
     public static readonly NamedMarker GiFinalShadingCompute = new(ProfilerCategory.Render, "GI FinalShading CS", MarkerFlags.SampleGPU);
     public static readonly NamedMarker GiFinalShading = new(ProfilerCategory.Render, "GI FinalShading RS", MarkerFlags.SampleGPU);
 
+    // ── PT (ReSTIR PT) ────────────────────────────────────────────────────────
+    public static readonly NamedMarker PtGenerateInitialSamplesCompute = new(ProfilerCategory.Render, "PT GenerateInitialSamples CS", MarkerFlags.SampleGPU);
+    public static readonly NamedMarker PtTemporalResamplingCompute     = new(ProfilerCategory.Render, "PT TemporalResampling CS",     MarkerFlags.SampleGPU);
+    public static readonly NamedMarker PtSpatialResamplingCompute      = new(ProfilerCategory.Render, "PT SpatialResampling CS",      MarkerFlags.SampleGPU);
+    public static readonly NamedMarker PtFillSampleIDCompute           = new(ProfilerCategory.Render, "PT FillSampleID CS",           MarkerFlags.SampleGPU);
+    public static readonly NamedMarker PtComputeDuplicationMapCompute  = new(ProfilerCategory.Render, "PT ComputeDuplicationMap CS",  MarkerFlags.SampleGPU);
+    public static readonly NamedMarker PtFinalShadingCompute           = new(ProfilerCategory.Render, "PT FinalShading CS",           MarkerFlags.SampleGPU);
+
     // ── Main passes ───────────────────────────────────────────────────────────
     public static readonly NamedMarker Streamer = new(ProfilerCategory.Render, "Streamer", MarkerFlags.SampleGPU);
     public static readonly NamedMarker TLAS = new(ProfilerCategory.Render, "TLAS", MarkerFlags.SampleGPU);

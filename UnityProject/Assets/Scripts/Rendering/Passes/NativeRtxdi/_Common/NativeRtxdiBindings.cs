@@ -96,6 +96,9 @@ namespace PathTracing
 
             ds.SetRWStructuredBuffer("u_GIReservoirs", rtx.GIReservoirBuffer.GetNativeBufferPtr(), rtx.GIReservoirBuffer.count, rtx.GIReservoirBuffer.stride);
 
+            if (rtx.PTReservoirBuffer != null)
+                ds.SetRWStructuredBuffer("u_PTReservoirs", rtx.PTReservoirBuffer.GetNativeBufferPtr(), rtx.PTReservoirBuffer.count, rtx.PTReservoirBuffer.stride);
+
             ds.SetRWStructuredBuffer("u_SecondaryGBuffer", rtx.SecondaryGBuffer.GetNativeBufferPtr(), rtx.SecondaryGBuffer.count, rtx.SecondaryGBuffer.stride);
 
 
