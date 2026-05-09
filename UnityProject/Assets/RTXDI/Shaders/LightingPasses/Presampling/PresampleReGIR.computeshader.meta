@@ -18,7 +18,7 @@ ScriptedImporter:
   - -enable-16bit-types
   defines:
   - USE_RAY_QUERY=1
-  - RTXDI_REGIR_MODE=RTXDI_REGIR_GRID
+  - RTXDI_REGIR_MODE=RTXDI_REGIR_ONION
   entryPoint: main
   targetProfile: cs_6_6
   rootConstantsHints: []

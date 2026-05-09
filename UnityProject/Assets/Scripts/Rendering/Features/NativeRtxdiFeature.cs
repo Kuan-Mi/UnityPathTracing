@@ -83,7 +83,8 @@ namespace PathTracing
         // -------------------------------------------------------------------
         // Pass instances (one per implemented pass; rest filled in over time)
         // -------------------------------------------------------------------
-        private NativeRtxdiPresampleLightsPass           _presampleLightsNativePass;
+        private NativeRtxdiPresampleLightsPass        _presampleLightsNativePass;
+        private NativeRtxdiPresampleReGirPass         _presampleReGirNativePass;
         private NativeRtxdiGenerateInitialSamplesPass _diGenerateInitialSamplesPass;
         private NativeRtxdiTemporalResamplingPass     _diTemporalResamplingPass;
         private NativeRtxdiSpatialResamplingPass      _diSpatialResamplingPass;
@@ -107,7 +108,6 @@ namespace PathTracing
         private GenerateMipsPass             _generateMipsPass;
         private NativeRtxdiPdfMipsPass       _pdfMipsPass;
         private PresamplePass                _presamplePass;
-        private PresampleReGirLightsPass     _presampleReGirLightsPass;
         private NrdPass                      _nrdDenoisePass;
         private NativeRtxdiCompositingPass   _compositingPass;
         private OutputBlitPass               _outputBlitPass;
@@ -155,23 +155,23 @@ namespace PathTracing
             // Managed scaffolding passes (NOTE: PrepareLights / PdfMipmap are intentionally
             // NOT instantiated here — see TODO in AddRenderPasses about porting
             // RTXDI/Samples/FullSample/Source/RenderPasses/PrepareLightsPass.cpp).
-            if (prepareLightsCs != null)
-                _prepareLightsPass ??= new NativeRtxdiPrepareLightsPass(prepareLightsCs) { renderPassEvent = renderPassEvent };
-            _gBufferRasterPass      ??= new GBufferRasterPass() { renderPassEvent = renderPassEvent };
+
+            _prepareLightsPass      ??= new NativeRtxdiPrepareLightsPass(prepareLightsCs) { renderPassEvent = renderPassEvent };
+            _gBufferRasterPass      ??= new GBufferRasterPass() { renderPassEvent                           = renderPassEvent };
             _gBufferRasterResource  ??= new GBufferRasterPass.Resource();
             _buildAsPass            ??= new NativeRtxdiBuildAccelerationStructurePass() { renderPassEvent             = renderPassEvent };
             _raytracedGBufferPass   ??= new NativeRtxdiRaytracedGBufferPass(raytracedGBufferCs) { renderPassEvent     = renderPassEvent };
             _postprocessGBufferPass ??= new NativeRtxdiPostprocessGBufferPass(postprocessGBufferCs) { renderPassEvent = renderPassEvent };
-            // PresamplePass / PresampleReGirLightsPass currently consume managed ComputeShader assets.
-            // Until their NativeComputeShader equivalents are wired in, presampling is disabled
-            // when those managed assets are absent.
+            // PresamplePass currently consumes a managed ComputeShader asset; its native port is pending.
+            // PresampleReGIR is fully native via NativeRtxdiPresampleReGirPass (wired in below).
             _nrdDenoisePass  ??= new NrdPass() { renderPassEvent                                     = renderPassEvent };
             _compositingPass ??= new NativeRtxdiCompositingPass(compositingPassCs) { renderPassEvent = renderPassEvent };
 
-            _pdfMipsPass ??= new NativeRtxdiPdfMipsPass(genMipsCs) { renderPassEvent = renderPassEvent };
-            _outputBlitPass  ??= new OutputBlitPass(finalMaterial) { renderPassEvent                 = renderPassEvent };
+            _pdfMipsPass    ??= new NativeRtxdiPdfMipsPass(genMipsCs) { renderPassEvent = renderPassEvent };
+            _outputBlitPass ??= new OutputBlitPass(finalMaterial) { renderPassEvent     = renderPassEvent };
 
             _presampleLightsNativePass ??= new NativeRtxdiPresampleLightsPass(presampleLightsCs) { renderPassEvent = renderPassEvent };
+            _presampleReGirNativePass  ??= new NativeRtxdiPresampleReGirPass(presampleReGirCs) { renderPassEvent   = renderPassEvent };
 
             _diGenerateInitialSamplesPass ??= new NativeRtxdiGenerateInitialSamplesPass(diGenerateInitialSamplesCs) { renderPassEvent = renderPassEvent };
             _diTemporalResamplingPass     ??= new NativeRtxdiTemporalResamplingPass(diTemporalResamplingCs) { renderPassEvent         = renderPassEvent };
@@ -506,16 +506,35 @@ namespace PathTracing
                 renderer.EnqueuePass(_pdfMipsPass);
             }
 
+            // ---- Update ReGIR context (center = camera position, mirrors FullSample UpdateReGIRContextFromUI) ----
+            {
+                var regirContext = isContext.GetReGIRContext();
+                setting.regirDynamicParams.center = frameState.camPos;
+                regirContext.SetDynamicParameters(setting.regirDynamicParams);
+            }
+
             // ---- Presample local lights (NATIVE) ----
             // Mirrors FullSample: runs after PDF mip chain when using non-uniform local-light sampling.
             if (setting.initialSamplingParams.localLightSamplingMode != ReSTIRDI_LocalLightSamplingMode.Uniform)
             {
                 const uint presampleGroupSize = 256u; // RTXDI_PRESAMPLING_GROUP_SIZE
-                var seg     = isContext.GetLocalLightRISBufferSegmentParams();
-                uint groupsX = (seg.tileSize + presampleGroupSize - 1u) / presampleGroupSize;
-                uint groupsY = seg.tileCount;
+                var        seg                = isContext.GetLocalLightRISBufferSegmentParams();
+                uint       groupsX            = (seg.tileSize + presampleGroupSize - 1u) / presampleGroupSize;
+                uint       groupsY            = seg.tileCount;
                 _presampleLightsNativePass.Setup(nativeCtx, groupsX, groupsY);
                 renderer.EnqueuePass(_presampleLightsNativePass);
+            }
+
+            // ---- Presample ReGIR (NATIVE) ----
+            // Mirrors FullSample: runs after PresampleLights when the sampling mode is ReGIR_RIS.
+            if (setting.initialSamplingParams.localLightSamplingMode == ReSTIRDI_LocalLightSamplingMode.ReGIR_RIS &&
+                _presampleReGirNativePass != null)
+            {
+                const uint reGirTileSize = 256u; // RTXDI_PRESAMPLING_GROUP_SIZE used for ReGIR
+                var        regirContext  = isContext.GetReGIRContext();
+                uint       groupsX       = (regirContext.GetReGIRLightSlotCount() + reGirTileSize - 1u) / reGirTileSize;
+                _presampleReGirNativePass.Setup(nativeCtx, groupsX);
+                renderer.EnqueuePass(_presampleReGirNativePass);
             }
 
             // ---- DI core (NATIVE) ----
@@ -622,7 +641,7 @@ namespace PathTracing
                     frameState, renderResolution, 1f, localSettings.denoiserMode);
                 var compositingConstsArray = new[] { compositingConstants };
                 _compositingConstantBuffer.SetData(compositingConstsArray);
-            
+
                 var compositingRes = new NativeRtxdiCompositingPass.Resource
                 {
                     ConstantBuffer = _compositingConstantBuffer.GetNativeBufferPtr(),
@@ -663,13 +682,13 @@ namespace PathTracing
                 };
                 var outputBlitSettings = new OutputBlitPass.Settings
                 {
-                    showMode        = setting.showMode,
-                    resolutionScale = frameState.resolutionScale,
-                    enableDlssRR    = false,
-                    showMV          = setting.showMv,
-                    showValidation  = false,
-                    showReference   = false,
-                    pdfMipLevel     = setting.pdfMipLevel,
+                    showMode         = setting.showMode,
+                    resolutionScale  = frameState.resolutionScale,
+                    enableDlssRR     = false,
+                    showMV           = setting.showMv,
+                    showValidation   = false,
+                    showReference    = false,
+                    pdfMipLevel      = setting.pdfMipLevel,
                     pdfExposureStops = setting.pdfExposureStops,
                 };
                 _outputBlitPass.Setup(outputBlitResource, outputBlitSettings);
@@ -807,6 +826,8 @@ namespace PathTracing
             _giSpatialResamplingPass = null;
             _giFinalShadingPass?.Dispose();
             _giFinalShadingPass = null;
+            _presampleReGirNativePass?.Dispose();
+            _presampleReGirNativePass = null;
             _compositingPass?.Dispose();
             _compositingPass     = null;
             _nrdDenoisePass      = null;
