@@ -134,6 +134,13 @@ void ComputeDescriptorSet::UpdateDescriptors(const CS_BindingSlot* slots, uint32
                             s.Buffer.NumElements         = slot.count;
                             s.Buffer.StructureByteStride = slot.stride;
                         }
+                        else if (slot.count > 0 && slot.format != 0)
+                        {
+                            // Typed buffer (e.g. Buffer<float2> -> DXGI_FORMAT_R32G32_FLOAT)
+                            s.ViewDimension      = D3D12_SRV_DIMENSION_BUFFER;
+                            s.Format             = static_cast<DXGI_FORMAT>(slot.format);
+                            s.Buffer.NumElements = slot.count;
+                        }
                         else
                         {
                             s.ViewDimension      = D3D12_SRV_DIMENSION_BUFFER;
@@ -184,6 +191,12 @@ void ComputeDescriptorSet::UpdateDescriptors(const CS_BindingSlot* slots, uint32
                         u.Format                     = DXGI_FORMAT_UNKNOWN;
                         u.Buffer.NumElements         = slot.count;
                         u.Buffer.StructureByteStride = slot.stride;
+                    }
+                    else if (slot.count > 0 && slot.format != 0)
+                    {
+                        // Typed buffer (e.g. RWBuffer<uint2> -> DXGI_FORMAT_R32G32_UINT)
+                        u.Format             = static_cast<DXGI_FORMAT>(slot.format);
+                        u.Buffer.NumElements = slot.count;
                     }
                     else
                     {

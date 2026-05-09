@@ -215,9 +215,11 @@ namespace PathTracing
                 _prevEmissiveOffsets[hash] = (int)lightBufferOffset; // record for next frame
 
                 // Fill GeometryInstanceToLight  (firstGeometryInstanceIndex + subIndex)
+                // Store absolute offset (including double-buffer ping-pong base) so the shader
+                // can use t_GeometryInstanceToLight[instanceID] + primitiveIndex directly.
                 int giIdx = (int)(e.FirstGeometryInstanceIndex + (uint)e.GeometrySubIndex);
                 if (giIdx < geomToLightLen)
-                    _geomToLightScratch[giIdx] = lightBufferOffset; // frame-relative
+                    _geomToLightScratch[giIdx] = _currentFrameOffset + lightBufferOffset;
 
                 lightBufferOffset += e.TriangleCount;
             }

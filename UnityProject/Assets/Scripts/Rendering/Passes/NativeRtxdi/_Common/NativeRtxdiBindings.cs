@@ -66,7 +66,8 @@ namespace PathTracing
                     rtx.LightDataBuffer.count, rtx.LightDataBuffer.stride);
 
             if (rtx?.NeighborOffsetsBuffer != null)
-                ds.SetBuffer("t_NeighborOffsets", rtx.NeighborOffsetsBuffer.GetNativeBufferPtr());
+                // Buffer<float2> requires a typed SRV: DXGI_FORMAT_R32G32_FLOAT
+                ds.SetTypedBuffer("t_NeighborOffsets", rtx.NeighborOffsetsBuffer.GetNativeBufferPtr(), rtx.NeighborOffsetsBuffer.count, (uint)Nri.DXGI_FORMAT.DXGI_FORMAT_R32G32_FLOAT);
 
             if (rtx?.LightIndexMappingBuffer != null)
                 ds.SetStructuredBuffer("t_LightIndexMappingBuffer",
@@ -96,9 +97,11 @@ namespace PathTracing
                     rtx.LightReservoirBuffer.GetNativeBufferPtr(),
                     rtx.LightReservoirBuffer.count, rtx.LightReservoirBuffer.stride);
             if (rtx?.RisBuffer != null)
-                ds.SetRWBuffer("u_RisBuffer", rtx.RisBuffer.GetNativeBufferPtr());
+                // RWBuffer<uint2> requires a typed UAV: DXGI_FORMAT_R32G32_UINT
+                ds.SetRWTypedBuffer("u_RisBuffer", rtx.RisBuffer.GetNativeBufferPtr(), rtx.RisBuffer.count, (uint)Nri.DXGI_FORMAT.DXGI_FORMAT_R32G32_UINT);
             if (rtx?.RisLightDataBuffer != null)
-                ds.SetRWBuffer("u_RisLightDataBuffer", rtx.RisLightDataBuffer.GetNativeBufferPtr());
+                // RWBuffer<uint4> requires a typed UAV: DXGI_FORMAT_R32G32B32A32_UINT
+                ds.SetRWTypedBuffer("u_RisLightDataBuffer", rtx.RisLightDataBuffer.GetNativeBufferPtr(), rtx.RisLightDataBuffer.count, (uint)Nri.DXGI_FORMAT.DXGI_FORMAT_R32G32B32A32_UINT);
             if (rtx?.GIReservoirBuffer != null)
                 ds.SetRWStructuredBuffer("u_GIReservoirs",
                     rtx.GIReservoirBuffer.GetNativeBufferPtr(),

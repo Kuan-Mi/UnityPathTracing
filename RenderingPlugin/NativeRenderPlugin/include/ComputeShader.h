@@ -65,10 +65,10 @@ struct CS_BindingSlot
 {
     uint64_t             resourcePtr;   // ID3D12Resource* (may be 0)
     uint64_t             objectPtr;     // AccelerationStructure* | BindlessTexture* | BindlessBuffer*
-    uint32_t             count;         // element count  (StructuredBuffer)
-    uint32_t             stride;        // element stride (StructuredBuffer; 0 = raw)
+    uint32_t             count;         // element count  (StructuredBuffer or typed buffer)
+    uint32_t             stride;        // element stride (StructuredBuffer; 0 = raw/typed)
     CS_BindingObjectKind objectKind;    // what objectPtr points to
-    uint32_t             _pad;
+    uint32_t             format;        // DXGI_FORMAT for typed buffer UAV/SRV (0 = raw/structured)
 }; // 32 bytes
 #pragma pack(pop)
 

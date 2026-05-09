@@ -83,6 +83,7 @@ namespace PathTracing
         // -------------------------------------------------------------------
         // Pass instances (one per implemented pass; rest filled in over time)
         // -------------------------------------------------------------------
+        private NativeRtxdiPresampleLightsPass           _presampleLightsNativePass;
         private NativeRtxdiGenerateInitialSamplesPass _diGenerateInitialSamplesPass;
         private NativeRtxdiTemporalResamplingPass     _diTemporalResamplingPass;
         private NativeRtxdiSpatialResamplingPass      _diSpatialResamplingPass;
@@ -166,9 +167,11 @@ namespace PathTracing
             // when those managed assets are absent.
             _nrdDenoisePass  ??= new NrdPass() { renderPassEvent                                     = renderPassEvent };
             _compositingPass ??= new NativeRtxdiCompositingPass(compositingPassCs) { renderPassEvent = renderPassEvent };
-            if (genMipsCs != null)
-                _pdfMipsPass ??= new NativeRtxdiPdfMipsPass(genMipsCs) { renderPassEvent = renderPassEvent };
+
+            _pdfMipsPass ??= new NativeRtxdiPdfMipsPass(genMipsCs) { renderPassEvent = renderPassEvent };
             _outputBlitPass  ??= new OutputBlitPass(finalMaterial) { renderPassEvent                 = renderPassEvent };
+
+            _presampleLightsNativePass ??= new NativeRtxdiPresampleLightsPass(presampleLightsCs) { renderPassEvent = renderPassEvent };
 
             _diGenerateInitialSamplesPass ??= new NativeRtxdiGenerateInitialSamplesPass(diGenerateInitialSamplesCs) { renderPassEvent = renderPassEvent };
             _diTemporalResamplingPass     ??= new NativeRtxdiTemporalResamplingPass(diTemporalResamplingCs) { renderPassEvent         = renderPassEvent };
@@ -501,6 +504,18 @@ namespace PathTracing
             {
                 _pdfMipsPass.Setup(nativeCtx);
                 renderer.EnqueuePass(_pdfMipsPass);
+            }
+
+            // ---- Presample local lights (NATIVE) ----
+            // Mirrors FullSample: runs after PDF mip chain when using non-uniform local-light sampling.
+            if (setting.initialSamplingParams.localLightSamplingMode != ReSTIRDI_LocalLightSamplingMode.Uniform)
+            {
+                const uint presampleGroupSize = 256u; // RTXDI_PRESAMPLING_GROUP_SIZE
+                var seg     = isContext.GetLocalLightRISBufferSegmentParams();
+                uint groupsX = (seg.tileSize + presampleGroupSize - 1u) / presampleGroupSize;
+                uint groupsY = seg.tileCount;
+                _presampleLightsNativePass.Setup(nativeCtx, groupsX, groupsY);
+                renderer.EnqueuePass(_presampleLightsNativePass);
             }
 
             // ---- DI core (NATIVE) ----

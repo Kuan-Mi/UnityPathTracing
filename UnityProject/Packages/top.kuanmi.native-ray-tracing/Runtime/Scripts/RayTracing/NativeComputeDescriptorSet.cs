@@ -178,6 +178,7 @@ namespace NativeRender
             _stagingSlots[i].objectKind  = ObjKindNone;
             _stagingSlots[i].count       = 0;
             _stagingSlots[i].stride      = 0;
+            _stagingSlots[i].format      = 0;
         }
 
         /// <summary>Binds a ComputeBuffer as an RW (read-write) buffer (UAV).</summary>
@@ -188,6 +189,19 @@ namespace NativeRender
             _stagingSlots[i].objectKind  = ObjKindNone;
             _stagingSlots[i].count       = 0;
             _stagingSlots[i].stride      = 0;
+            _stagingSlots[i].format      = 0;
+        }
+
+        /// <summary>Binds a ComputeBuffer as a typed RWBuffer&lt;T&gt; UAV (e.g. RWBuffer&lt;uint2&gt;).
+        /// <paramref name="dxgiFormat"/> must be the matching DXGI_FORMAT value (e.g. 0x18 = DXGI_FORMAT_R32G32_UINT).</summary>
+        public void SetRWTypedBuffer(string name, IntPtr bufferPtr, int count, uint dxgiFormat)
+        {
+            if (!TryGetSlot(name, out uint i)) return;
+            _stagingSlots[i].resourcePtr = (ulong)bufferPtr;
+            _stagingSlots[i].objectKind  = ObjKindNone;
+            _stagingSlots[i].count       = (uint)count;
+            _stagingSlots[i].stride      = 0;
+            _stagingSlots[i].format      = dxgiFormat;
         }
 
         /// <summary>Binds a GraphicsBuffer as an RWStructuredBuffer UAV with explicit element count and stride.</summary>
@@ -246,6 +260,18 @@ namespace NativeRender
         }
 
 
+
+        /// <summary>Binds a ComputeBuffer as a typed Buffer&lt;T&gt; SRV (e.g. Buffer&lt;float2&gt;).
+        /// <paramref name="dxgiFormat"/> must be the matching DXGI_FORMAT value.</summary>
+        public void SetTypedBuffer(string name, IntPtr bufferPtr, int count, uint dxgiFormat)
+        {
+            if (!TryGetSlot(name, out uint i)) return;
+            _stagingSlots[i].resourcePtr = (ulong)bufferPtr;
+            _stagingSlots[i].objectKind  = ObjKindNone;
+            _stagingSlots[i].count       = (uint)count;
+            _stagingSlots[i].stride      = 0;
+            _stagingSlots[i].format      = dxgiFormat;
+        }
 
         /// <summary>Binds a ComputeBuffer as a StructuredBuffer SRV with explicit element count and stride.</summary>
         public void SetStructuredBuffer(string name, IntPtr bufferPtr, int elementCount, int elementStride)
