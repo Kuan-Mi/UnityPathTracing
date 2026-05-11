@@ -6,6 +6,7 @@ using RTXDI;
 using Rtxdi.DI;
 using Rtxdi.GI;
 using Rtxdi.LightSampling;
+using Rtxdi.PT;
 using Unity.Mathematics;
 using UnityEngine;
 using UnityEngine.Experimental.Rendering;
