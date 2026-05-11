@@ -53,15 +53,15 @@ void main(uint2 globalIdx : SV_DispatchThreadID)
         float3 specularF0 = Unpack_R8G8B8A8_Gamma_UFLOAT(t_GBufferSpecularRough[globalIdx]).rgb;
         float3 emissive = t_GBufferEmissive[globalIdx].rgb;
 
-        float3 PSRDiffuseAlbedo = Unpack_R11G11B10_UFLOAT(t_PSRDiffuseAlbedo[globalIdx]);
-        float3 PSRSpecularF0 = Unpack_R11G11B10_UFLOAT(t_PSRSpecularF0[globalIdx]);
-        // PSR surface
-        if (any(PSRDiffuseAlbedo > 0.f) || any(PSRSpecularF0 > 0.f))
-        {
-            float metalness = getMetalness(diffuseAlbedo, specularF0);
-            diffuseAlbedo = lerp(diffuseAlbedo, PSRDiffuseAlbedo, metalness);
-            specularF0 = lerp(specularF0, PSRSpecularF0, metalness);
-        }
+        // float3 PSRDiffuseAlbedo = Unpack_R11G11B10_UFLOAT(t_PSRDiffuseAlbedo[globalIdx]);
+        // float3 PSRSpecularF0 = Unpack_R11G11B10_UFLOAT(t_PSRSpecularF0[globalIdx]);
+        // // PSR surface
+        // if (any(PSRDiffuseAlbedo > 0.f) || any(PSRSpecularF0 > 0.f))
+        // {
+        //     float metalness = getMetalness(diffuseAlbedo, specularF0);
+        //     diffuseAlbedo = lerp(diffuseAlbedo, PSRDiffuseAlbedo, metalness);
+        //     specularF0 = lerp(specularF0, PSRSpecularF0, metalness);
+        // }
 
         int2 illuminationPos = globalIdx;
         if (g_Const.denoiserMode != DENOISER_MODE_OFF && g_Const.checkerboard)
@@ -125,5 +125,5 @@ void main(uint2 globalIdx : SV_DispatchThreadID)
     if(any(isnan(compositedColor)))
         compositedColor = float3(0, 0, 1);
 
-    u_Output[globalIdx] = float4(compositedColor * 100, 1.0);
+    u_Output[globalIdx] = float4(compositedColor, 1.0);
 }
