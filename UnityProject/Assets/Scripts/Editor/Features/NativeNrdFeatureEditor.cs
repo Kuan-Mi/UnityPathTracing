@@ -8,11 +8,9 @@ using UnityEngine.Rendering;
 
 namespace PathTracing
 {
-    [CustomEditor(typeof(UnityRtxdiFeature))]
-    public class RtxdiFeatureEditor : Editor
+    [CustomEditor(typeof(NativeNrdFeature))]
+    public class NativeNrdFeatureEditor : Editor
     {
-        private RtxdiSettingPreset _presetTarget;
-
         private string GetKey(string headerName)
         {
             return $"PT_Foldout_{target.GetInstanceID()}_{headerName}";
@@ -23,7 +21,7 @@ namespace PathTracing
         {
             serializedObject.Update();
             // DrawDefaultInspector();
-            UnityRtxdiFeature feature = (UnityRtxdiFeature)target;
+            NativeNrdFeature feature = (NativeNrdFeature)target;
 
             // 1. 绘制 PathTracingSetting (带折叠 Header)
             SerializedProperty settingsProp = serializedObject.FindProperty("setting");
@@ -40,37 +38,27 @@ namespace PathTracing
                 feature.AutoFillShaders();
             }
 
-            if (GUILayout.Button("InitializeBuffers"))
+            if (GUILayout.Button("Print NRDSampleResource Info"))
             {
-                feature.InitializeBuffers();
+                var res = feature.NrdSampleResource;
+                if (res != null)
+                    res.PrintDebugInfo();
+                else
+                    Debug.Log("[NRDFeatureEditor] NrdSampleResource is null (not initialized yet).");
             }
 
-            if (GUILayout.Button("SetMask"))
-            {
-                feature.SetMask();
-            }
-
-            if (GUILayout.Button("TestPrepareLight"))
-            {
-                feature.Test();
-            }
 
             EditorGUILayout.Space(10);
-            DrawPresetUI(feature);
-            EditorGUILayout.Space(10);
 
-            DrawObjectRecursive("Global Constants", feature.globalConstants , "GlobalConstants");
-            
-  
-            DrawObjectRecursive("Resampling Constants", feature.resamplingConstants,  "ResamplingConstants");
-            
+            DrawObjectRecursive("Global Constants", feature.globalConstants, "GlobalConstants");
+            DrawObjectRecursive("Info", feature.NrdSampleResource, "Info");
 
             serializedObject.ApplyModifiedProperties();
         }
 
 
         /// <summary>
-        /// 通过反射扫描 RtxdiFeature 的所有公有字段，按类型自动分组显示。
+        /// 通过反射扫描 NRDFeature 的所有公有字段，按类型自动分组显示。
         /// 新增字段无需修改此处代码。
         /// </summary>
         private void DrawGroupedAssetFields()
@@ -78,26 +66,26 @@ namespace PathTracing
             // 已在其他地方单独处理的字段名，跳过
             var skip = new HashSet<string>
             {
-                "pathTracingSetting", "globalConstants", "resamplingConstants", "renderPassEvent", "setting"
+                "pathTracingSetting", "globalConstants", "resamplingConstants", "setting"
             };
 
             // 类型 → 分组标题
             var groupLabels = new Dictionary<Type, string>
             {
-                { typeof(Material),           "Materials" },
-                { typeof(RayTracingShader),   "Ray Tracing Shaders" },
-                { typeof(ComputeShader),      "Compute Shaders" },
-                { typeof(Texture),            "Textures" },
-                { typeof(Texture2D),          "Textures" },
-                { typeof(Texture3D),          "Textures" },
-                { typeof(RenderTexture),      "Textures" },
-                { typeof(Cubemap),            "Textures" },
+                { typeof(Material), "Materials" },
+                { typeof(RayTracingShader), "Ray Tracing Shaders" },
+                { typeof(ComputeShader), "Compute Shaders" },
+                { typeof(Texture), "Textures" },
+                { typeof(Texture2D), "Textures" },
+                { typeof(Texture3D), "Textures" },
+                { typeof(RenderTexture), "Textures" },
+                { typeof(Cubemap), "Textures" },
             };
 
             // 收集分组
             var groups = new Dictionary<string, List<string>>();
 
-            FieldInfo[] fields = typeof(UnityRtxdiFeature)
+            FieldInfo[] fields = typeof(NativeNrdFeature)
                 .GetFields(BindingFlags.Public | BindingFlags.Instance);
 
             foreach (var field in fields)
@@ -114,6 +102,7 @@ namespace PathTracing
                         break;
                     }
                 }
+
                 if (groupName == null) groupName = "Other";
 
                 if (!groups.ContainsKey(groupName))
@@ -143,80 +132,12 @@ namespace PathTracing
                         if (prop != null)
                             EditorGUILayout.PropertyField(prop);
                     }
+
                     EditorGUI.indentLevel--;
                 }
 
                 EditorGUILayout.EndFoldoutHeaderGroup();
             }
-        }
-
-        /// <summary>
-        /// 绘制预设保存/加载 UI
-        /// </summary>
-        private void DrawPresetUI(UnityRtxdiFeature feature)
-        {
-            string foldoutKey = GetKey("PresetFoldout");
-            bool isExpanded = SessionState.GetBool(foldoutKey, true);
-            bool newExpanded = EditorGUILayout.BeginFoldoutHeaderGroup(isExpanded, "Presets");
-            if (newExpanded != isExpanded)
-                SessionState.SetBool(foldoutKey, newExpanded);
-
-            if (newExpanded)
-            {
-                EditorGUI.indentLevel++;
-
-                _presetTarget = (RtxdiSettingPreset)EditorGUILayout.ObjectField(
-                    "Preset Asset", _presetTarget, typeof(RtxdiSettingPreset), false);
-
-                EditorGUILayout.BeginHorizontal();
-
-                GUI.enabled = _presetTarget != null;
-                if (GUILayout.Button("Load Preset"))
-                {
-                    Undo.RecordObject(feature, "Load Rtxdi Setting Preset");
-                    CopySettings(_presetTarget.setting, feature.setting);
-                    EditorUtility.SetDirty(feature);
-                }
-
-                if (GUILayout.Button("Save to Preset"))
-                {
-                    Undo.RecordObject(_presetTarget, "Save Rtxdi Setting Preset");
-                    CopySettings(feature.setting, _presetTarget.setting);
-                    EditorUtility.SetDirty(_presetTarget);
-                    AssetDatabase.SaveAssets();
-                }
-                GUI.enabled = true;
-
-                if (GUILayout.Button("New Preset..."))
-                {
-                    string path = EditorUtility.SaveFilePanelInProject(
-                        "Save Rtxdi Setting Preset",
-                        "RtxdiSettingPreset",
-                        "asset",
-                        "Choose location to save preset");
-                    if (!string.IsNullOrEmpty(path))
-                    {
-                        var newPreset = CreateInstance<RtxdiSettingPreset>();
-                        CopySettings(feature.setting, newPreset.setting);
-                        AssetDatabase.CreateAsset(newPreset, path);
-                        AssetDatabase.SaveAssets();
-                        _presetTarget = newPreset;
-                    }
-                }
-
-                EditorGUILayout.EndHorizontal();
-                EditorGUI.indentLevel--;
-            }
-
-            EditorGUILayout.EndFoldoutHeaderGroup();
-        }
-
-        /// <summary>
-        /// 通过 JSON 序列化在两个 RtxdiSetting 实例之间深拷贝
-        /// </summary>
-        private static void CopySettings(RtxdiSetting src, RtxdiSetting dst)
-        {
-            JsonUtility.FromJsonOverwrite(JsonUtility.ToJson(src), dst);
         }
 
         /// <summary>
@@ -227,7 +148,7 @@ namespace PathTracing
             EditorGUILayout.LabelField("Settings", EditorStyles.boldLabel);
 
             // 获取实际的类型以通过反射读取 Header
-            Type type = typeof(RtxdiSetting);
+            Type type = typeof(PathTracingSetting);
 
             // 迭代所有子属性
             SerializedProperty childProp = parentProp.Copy();
@@ -254,7 +175,7 @@ namespace PathTracing
 
                             // 从 SessionState 获取该 Header 的保存状态
                             string key = GetKey(header.Name);
-                            bool isExpanded = SessionState.GetBool(key, false);
+                            bool isExpanded = SessionState.GetBool(key, true);
 
                             // 绘制 Foldout
                             bool newState = EditorGUILayout.BeginFoldoutHeaderGroup(isExpanded, header.Name);
@@ -304,7 +225,7 @@ namespace PathTracing
             bool isExpanded = SessionState.GetBool(foldoutKey, false); // 默认折叠
 
             EditorGUILayout.BeginVertical();
-            
+
             // 绘制可点击的折叠标签
             isExpanded = EditorGUILayout.Foldout(isExpanded, label, true, EditorStyles.foldoutHeader);
             SessionState.SetBool(foldoutKey, isExpanded);
@@ -319,6 +240,7 @@ namespace PathTracing
                     // 递归时将当前 label 加入 path，保证子节点的 key 唯一
                     DrawObjectRecursive(field.Name, value, path + "_" + label);
                 }
+
                 EditorGUI.indentLevel--;
             }
 
@@ -328,11 +250,11 @@ namespace PathTracing
         // 判断是否是直接绘制的底层类型
         private bool IsSimpleType(System.Type type)
         {
-            return type.IsPrimitive ||type.IsEnum || 
+            return type.IsPrimitive || type.IsEnum ||
                    type == typeof(float) || type == typeof(int) || type == typeof(uint) ||
                    type == typeof(float2) || type == typeof(float3) || type == typeof(float4) ||
                    type == typeof(float4x4) || type == typeof(Vector2) || type == typeof(Vector3) ||
-                   type == typeof(Vector4) || type == typeof(bool) || type == typeof(string)|| type == typeof(int2) || type == typeof(uint2);
+                   type == typeof(Vector4) || type == typeof(bool) || type == typeof(string) || type == typeof(int2) || type == typeof(uint2);
         }
 
         // 绘制具体的字段值
@@ -343,6 +265,7 @@ namespace PathTracing
                 EditorGUILayout.EnumPopup(label, enumValue);
                 return;
             }
+
             if (value is float4x4 m)
             {
                 EditorGUILayout.LabelField(label);

@@ -35,17 +35,18 @@ namespace PathTracing
         DLSS_Output,
         ViewZ,
         Gradient,
+
         // ── Rtxdi native GBuffer debug views ──────────────────────────────────
-        Rtxdi_ViewDepth,        // R32_SFloat    – linear view-space depth (greyscale)
-        Rtxdi_DiffuseAlbedo,    // R32_UINT pack R11G11B10_UFLOAT – diffuse albedo
-        Rtxdi_SpecularF0,       // R32_UINT pack R8G8B8A8_Gamma_UFLOAT – specular F0 (RGB)
-        Rtxdi_Roughness,        // R32_UINT pack R8G8B8A8_Gamma_UFLOAT – roughness (A)
-        Rtxdi_Normal,           // R32_UINT oct32 – shading normal as colour
-        Rtxdi_GeoNormal,        // R32_UINT oct32 – geometry normal as colour
-        Rtxdi_DiffuseLighting,  // RTXDI diffuse lighting output
+        Rtxdi_ViewDepth, // R32_SFloat    – linear view-space depth (greyscale)
+        Rtxdi_DiffuseAlbedo, // R32_UINT pack R11G11B10_UFLOAT – diffuse albedo
+        Rtxdi_SpecularF0, // R32_UINT pack R8G8B8A8_Gamma_UFLOAT – specular F0 (RGB)
+        Rtxdi_Roughness, // R32_UINT pack R8G8B8A8_Gamma_UFLOAT – roughness (A)
+        Rtxdi_Normal, // R32_UINT oct32 – shading normal as colour
+        Rtxdi_GeoNormal, // R32_UINT oct32 – geometry normal as colour
+        Rtxdi_DiffuseLighting, // RTXDI diffuse lighting output
         Rtxdi_SpecularLighting, // RTXDI specular lighting output
-        Rtxdi_LocalLightPdf,   // LocalLightPdfTexture mip slice (log-scale heat map)
-        Rtxdi_EnvironmentPdf,  // EnvironmentPdfTexture mip slice (log-scale heat map)
+        Rtxdi_LocalLightPdf, // LocalLightPdfTexture mip slice (log-scale heat map)
+        Rtxdi_EnvironmentPdf, // EnvironmentPdfTexture mip slice (log-scale heat map)
     }
 
     public enum UpscalerMode : byte // Scaling factor       // Min jitter phases (or just use unclamped Halton2D)
@@ -83,7 +84,8 @@ namespace PathTracing
     {
         None,
         Brdf,
-        ReStirGI
+        ReStirGI,
+        ReStirPT
     };
 
 
@@ -96,15 +98,18 @@ namespace PathTracing
 
         public float exposure => Mathf.Pow(2, exposureEv);
 
-        public bool         cameraJitter = true;
-        public ShowMode     showMode     = ShowMode.Final;
-        public bool         showMv;
+        public bool     cameraJitter = true;
+        public ShowMode showMode     = ShowMode.Final;
+        public bool     showMv;
+
         /// <summary>Mip level to visualise when showMode is Rtxdi_LocalLightPdf or Rtxdi_EnvironmentPdf.</summary>
         [Range(0, 15)]
-        public int          pdfMipLevel      = 0;
+        public int pdfMipLevel = 0;
+
         /// <summary>Exposure in stops for the PDF heat-map. +1 = 2× brighter (more sensitive), -1 = 2× darker.</summary>
         [Range(-10f, 10f)]
-        public float        pdfExposureStops = 0f;
+        public float pdfExposureStops = 0f;
+
         public UpscalerMode upscalerMode = UpscalerMode.NATIVE;
 
         public bool tmpDisableRR;
@@ -152,6 +157,7 @@ namespace PathTracing
         public RTXDI_GIFinalShadingParameters       giFinalShadingParams       = ReSTIRGIDefaults.GetDefaultFinalShadingParams();
         public BRDFPathTracing_Parameters           brdfptParams               = BRDFPathTracing_Parameters.Default();
     }
+
     [System.Serializable]
     public class NativeRtxdiSetting
     {
@@ -161,15 +167,18 @@ namespace PathTracing
 
         public float exposure => Mathf.Pow(2, exposureEv);
 
-        public bool         cameraJitter = true;
-        public ShowMode     showMode     = ShowMode.Final;
-        public bool         showMv;
+        public bool     cameraJitter = true;
+        public ShowMode showMode     = ShowMode.Final;
+        public bool     showMv;
+
         /// <summary>Mip level to visualise when showMode is Rtxdi_LocalLightPdf or Rtxdi_EnvironmentPdf.</summary>
         [Range(0, 15)]
-        public int          pdfMipLevel      = 0;
+        public int pdfMipLevel = 0;
+
         /// <summary>Exposure in stops for the PDF heat-map. +1 = 2× brighter (more sensitive), -1 = 2× darker.</summary>
         [Range(-10f, 10f)]
-        public float        pdfExposureStops = 0f;
+        public float pdfExposureStops = 0f;
+
         public UpscalerMode upscalerMode = UpscalerMode.NATIVE;
 
         public bool skipRightEyeInVR = true;
@@ -181,12 +190,7 @@ namespace PathTracing
         public DirectLightingMode   directLightingMode   = DirectLightingMode.ReStir;
         public IndirectLightingMode indirectLightingMode = IndirectLightingMode.ReStirGI;
 
-        public bool enableGIFinalShading = true;
-        public bool enableDIFinalShading = true;
-
-        public bool enableEnv        = true;
-        public bool useRasterGBuffer = true;
-
+        public bool                   enableEnv          = true;
         public ReGIRDynamicParameters regirDynamicParams = ReGIRDynamicParameters.Default();
 
         [FoldoutHeader("ReSTIR DI")]
@@ -206,8 +210,10 @@ namespace PathTracing
         public BRDFPathTracing_Parameters           brdfptParams               = BRDFPathTracing_Parameters.Default();
 
         [FoldoutHeader("ReSTIR PT")]
-        public bool                    enableReSTIRPT   = false;
         public ReSTIRPT_ResamplingMode ptResamplingMode = ReSTIRPT_ResamplingMode.TemporalAndSpatial;
+
+        public RTXDI_PTTemporalResamplingParameters ptTemporalResamplingParams = ReSTIRPTDefaults.GetDefaultTemporalResamplingParams();
+        public RTXDI_PTSpatialResamplingParameters  ptSpatialResamplingParams  = ReSTIRPTDefaults.GetDefaultSpatialResamplingParams();
     }
 
     public enum OnScreen
@@ -417,8 +423,9 @@ namespace PathTracing
     public class NrdSampleSetting
     {
         public bool showValidation = false;
-        public bool showMV = false;
-        public bool mergeBlas      = false;
+        public bool showMV         = false;
+
+        public bool mergeBlas = false;
         // ── Animation / timing (not used by shader, kept for completeness) ──
         // public double motionStartTime        = 0.0;
         // public float  emulateMotionSpeed     = 1.0f;
@@ -443,37 +450,40 @@ namespace PathTracing
         // public float camFov          = 90.0f;        // horizontal FOV in degrees
         // public bool  limitFps        = false;
         // public bool  ortho           = false;
-        public bool  cameraJitter    = true;
+        public bool cameraJitter = true;
         // public int   mvType          = 1;            // 0 = MV_2D, 1 = MV_25D
 
         // ── Sun ──────────────────────────────────────────────────────────
-        public float sunAngularDiameter = 0.533f;   // degrees
+        public float sunAngularDiameter = 0.533f; // degrees
 
         // ── Rendering ────────────────────────────────────────────────────
-        public float exposure               = 80.0f;
-        public float roughnessOverride      = 0.0f;
-        public float metalnessOverride      = 0.0f;
+        public float exposure                = 80.0f;
+        public float roughnessOverride       = 0.0f;
+        public float metalnessOverride       = 0.0f;
         public float emissionIntensityLights = 1.0f;
         public float emissionIntensityCubes  = 1.0f;
-        public float debug                  = 0.0f;
-        public float meterToUnitsMultiplier = 1.0f;
-        
+        public float debug                   = 0.0f;
+        public float meterToUnitsMultiplier  = 1.0f;
+
         [Range(0.0f, 1.0f)]
-        public float separator              = 0.0f;
-        public float hitDistScale           = 3.0f;
-        public float resolutionScale        = 1.0f;
+        public float separator = 0.0f;
+
+        public float hitDistScale    = 3.0f;
+        public float resolutionScale = 1.0f;
         // public float sharpness              = 0.15f;
 
         [Range(1f, 120f)]
-        public uint         maxAccumulatedFrameNum     = 31;
+        public uint maxAccumulatedFrameNum = 31;
+
         [Range(1f, 20f)]
-        public uint         maxFastAccumulatedFrameNum = 7;
+        public uint maxFastAccumulatedFrameNum = 7;
+
         public OnScreen     onScreen             = 0;
         public int          forcedMaterial       = 0;
-        public DenoiserType denoiser             = 0;  // 0 = DENOISER_REBLUR
+        public DenoiserType denoiser             = 0; // 0 = DENOISER_REBLUR
         public int          rpp                  = 1;
         public int          bounceNum            = 1;
-        public RESOLUTION   tracingMode          = RESOLUTION.RESOLUTION_HALF;  // RESOLUTION_HALF
+        public RESOLUTION   tracingMode          = RESOLUTION.RESOLUTION_HALF; // RESOLUTION_HALF
         public bool         SHARC                = true;
         public bool         PSR                  = false;
         public bool         normalMap            = true;

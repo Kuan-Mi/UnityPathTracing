@@ -8,8 +8,8 @@ using UnityEngine.Rendering;
 
 namespace PathTracing
 {
-    [CustomEditor(typeof(NativeNrdFeature))]
-    public class NRDFeatureEditor : Editor
+    [CustomEditor(typeof(UnityNrdFeature))]
+    public class UnityNrdFeatureEditor : Editor
     {
         private string GetKey(string headerName)
         {
@@ -21,10 +21,10 @@ namespace PathTracing
         {
             serializedObject.Update();
             // DrawDefaultInspector();
-            NativeNrdFeature feature = (NativeNrdFeature)target;
+            UnityNrdFeature feature = (UnityNrdFeature)target;
 
             // 1. 绘制 PathTracingSetting (带折叠 Header)
-            SerializedProperty settingsProp = serializedObject.FindProperty("setting");
+            SerializedProperty settingsProp = serializedObject.FindProperty("pathTracingSetting");
             if (settingsProp != null)
             {
                 DrawSettingsWithFoldableHeaders(settingsProp);
@@ -38,27 +38,26 @@ namespace PathTracing
                 feature.AutoFillShaders();
             }
 
-            if (GUILayout.Button("Print NRDSampleResource Info"))
+            if (GUILayout.Button("InitializeBuffers"))
             {
-                var res = feature.NrdSampleResource;
-                if (res != null)
-                    res.PrintDebugInfo();
-                else
-                    Debug.Log("[NRDFeatureEditor] NrdSampleResource is null (not initialized yet).");
+                feature.InitializeBuffers();
             }
 
+            if (GUILayout.Button("SetMask"))
+            {
+                feature.SetMask();
+            }
 
             EditorGUILayout.Space(10);
 
-            DrawObjectRecursive("Global Constants", feature.globalConstants, "GlobalConstants");
-            DrawObjectRecursive("Info", feature.NrdSampleResource, "Info");
+            DrawObjectRecursive("Global Constants", feature.GlobalConstants, "GlobalConstants");
 
             serializedObject.ApplyModifiedProperties();
         }
 
 
         /// <summary>
-        /// 通过反射扫描 NRDFeature 的所有公有字段，按类型自动分组显示。
+        /// 通过反射扫描 PathTracingFeature 的所有公有字段，按类型自动分组显示。
         /// 新增字段无需修改此处代码。
         /// </summary>
         private void DrawGroupedAssetFields()
@@ -66,7 +65,7 @@ namespace PathTracing
             // 已在其他地方单独处理的字段名，跳过
             var skip = new HashSet<string>
             {
-                "pathTracingSetting", "globalConstants", "resamplingConstants", "setting"
+                "pathTracingSetting", "globalConstants", "resamplingConstants", "renderPassEvent"
             };
 
             // 类型 → 分组标题
@@ -85,7 +84,7 @@ namespace PathTracing
             // 收集分组
             var groups = new Dictionary<string, List<string>>();
 
-            FieldInfo[] fields = typeof(NativeNrdFeature)
+            FieldInfo[] fields = typeof(UnityNrdFeature)
                 .GetFields(BindingFlags.Public | BindingFlags.Instance);
 
             foreach (var field in fields)

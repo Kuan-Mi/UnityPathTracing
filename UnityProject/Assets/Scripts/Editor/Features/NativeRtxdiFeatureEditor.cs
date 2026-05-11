@@ -23,7 +23,9 @@ namespace PathTracing
             // Settings (use default property field — RtxdiSetting has its own property drawers).
             var settingsProp = serializedObject.FindProperty("setting");
             if (settingsProp != null)
-                EditorGUILayout.PropertyField(settingsProp, includeChildren: true);
+            {
+                DrawSettingsWithFoldableHeaders(settingsProp);
+            }
 
             EditorGUILayout.Space(4);
             EditorGUILayout.PropertyField(serializedObject.FindProperty("renderPassEvent"));
@@ -382,5 +384,68 @@ namespace PathTracing
                 return n.Substring(6);
             return n;
         }
+        
+        /// <summary>
+        /// 自动根据 [Header] 特性将属性分组并渲染为可折叠栏
+        /// </summary>
+        private void DrawSettingsWithFoldableHeaders(SerializedProperty parentProp)
+        {
+            EditorGUILayout.LabelField("Settings", EditorStyles.boldLabel);
+
+            // 获取实际的类型以通过反射读取 Header
+            Type type = typeof(NativeRtxdiSetting);
+
+            // 迭代所有子属性
+            SerializedProperty childProp = parentProp.Copy();
+            SerializedProperty endProp = childProp.GetEndProperty();
+
+            bool currentFoldoutState = true;
+
+            if (childProp.NextVisible(true)) // 进入对象内部
+            {
+                do
+                {
+                    if (SerializedProperty.EqualContents(childProp, endProp)) break;
+
+                    // 通过反射查找该字段是否有 [Header] 标签
+                    FieldInfo fieldInfo = type.GetField(childProp.name);
+                    if (fieldInfo != null)
+                    {
+                        FoldoutHeaderAttribute header = fieldInfo.GetCustomAttribute<FoldoutHeaderAttribute>();
+                        if (header != null)
+                        {
+                            // 如果有 Header，创建一个新的折叠组
+                            // EditorGUILayout.Space(8);
+
+
+                            // 从 SessionState 获取该 Header 的保存状态
+                            string key = GetKey(header.Name);
+                            bool isExpanded = SessionState.GetBool(key, false);
+
+                            // 绘制 Foldout
+                            bool newState = EditorGUILayout.BeginFoldoutHeaderGroup(isExpanded, header.Name);
+
+                            // 如果状态改变，存回 SessionState
+                            if (newState != isExpanded)
+                            {
+                                SessionState.SetBool(key, newState);
+                            }
+
+                            currentFoldoutState = newState;
+                            EditorGUILayout.EndFoldoutHeaderGroup();
+                        }
+                    }
+
+                    // 如果当前组是打开的，则绘制属性
+                    if (currentFoldoutState)
+                    {
+                        EditorGUI.indentLevel++;
+                        EditorGUILayout.PropertyField(childProp, true);
+                        EditorGUI.indentLevel--;
+                    }
+                } while (childProp.NextVisible(false)); // 只迭代当前层级
+            }
+        }
+
     }
 }

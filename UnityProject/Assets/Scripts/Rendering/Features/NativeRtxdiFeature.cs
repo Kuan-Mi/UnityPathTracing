@@ -85,7 +85,6 @@ namespace PathTracing
 
         // Auxiliary
         public NativeComputeShader compositingPassCs; // CompositingPass.computeshader
-        public ComputeShader       pdfTextureCs;
         public ComputeShader       genMipsCs;
 
         // -------------------------------------------------------------------
@@ -621,7 +620,7 @@ namespace PathTracing
             }
 
             // ---- ReSTIR PT (NATIVE) ----
-            if (setting.enableReSTIRPT && _ptGenerateInitialSamplesPass != null)
+            if (setting.indirectLightingMode ==  IndirectLightingMode.ReStirPT && _ptGenerateInitialSamplesPass != null)
             {
                 _ptGenerateInitialSamplesPass.Setup(nativeCtx);
                 renderer.EnqueuePass(_ptGenerateInitialSamplesPass);
@@ -1043,9 +1042,16 @@ namespace PathTracing
             giSpatialResamplingCs    = LoadCS($"{shaderRoot}/LightingPasses/GI/SpatialResampling.computeshader");
             giFinalShadingCs         = LoadCS($"{shaderRoot}/LightingPasses/GI/FinalShading.computeshader");
 
+            // PT
+            ptGenerateInitialSamplesCs = LoadCS($"{shaderRoot}/LightingPasses/PT/GenerateInitialSamples.computeshader");
+            ptTemporalResamplingCs     = LoadCS($"{shaderRoot}/LightingPasses/PT/TemporalResampling.computeshader");
+            ptSpatialResamplingCs      = LoadCS($"{shaderRoot}/LightingPasses/PT/SpatialResampling.computeshader");
+            ptFillSampleIDCs           = LoadCS($"{shaderRoot}/LightingPasses/PT/FillSampleID.computeshader");
+            ptComputeDuplicationMapCs  = LoadCS($"{shaderRoot}/LightingPasses/PT/ComputeDuplicationMap.computeshader");
+            ptFinalShadingCs           = LoadCS($"{shaderRoot}/LightingPasses/PT/FinalShading.computeshader");
+            
             // Managed compute helpers (kept for v1 — not yet ported to NativeComputeShader)
             compositingPassCs = LoadCS($"{shaderRoot}/CompositingPass.computeshader");
-            pdfTextureCs      = UnityEditor.AssetDatabase.LoadAssetAtPath<ComputeShader>("Assets/Shaders/RayTracing/Presampling/PdfTexture.compute");
             genMipsCs         = UnityEditor.AssetDatabase.LoadAssetAtPath<ComputeShader>("Assets/Shaders/RayTracing/DI/GenerateMips.compute");
 
             UnityEditor.EditorUtility.SetDirty(this);
