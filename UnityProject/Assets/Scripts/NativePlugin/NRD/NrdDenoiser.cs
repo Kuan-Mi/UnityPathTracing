@@ -59,6 +59,7 @@ namespace Nrd
             public bool                          isHistoryConfidenceAvailable;
             public float                         splitScreen;
             public float                         denoisingRange;
+            public float                         strandMaterialID;
         }
 
 
@@ -170,7 +171,7 @@ namespace Nrd
             // Common 设置
             data.commonSettings.denoisingRange                 = fi.denoisingRange;
             data.commonSettings.splitScreen                    = fi.splitScreen;
-            data.commonSettings.strandMaterialID               = 2;
+            data.commonSettings.strandMaterialID               = fi.strandMaterialID == 0f ? 999.0f : fi.strandMaterialID;
             data.commonSettings.enableValidation               = fi.enableValidation;
             data.commonSettings.disocclusionThresholdAlternate = 0.1f;
             data.commonSettings.isHistoryConfidenceAvailable   = fi.isHistoryConfidenceAvailable;

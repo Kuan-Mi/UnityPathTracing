@@ -41,11 +41,22 @@ namespace NativeRender
 
             // Always prepend the Unity project root so shaders can include project-relative headers.
             string projectRoot = Path.GetFullPath(Path.Combine(Application.dataPath, ".."));
-            var allPaths = new string[1 + additionalIncludePaths.Length];
-            allPaths[0] = projectRoot;
+
+            // Merge global project settings (prepended) with per-asset settings.
+            var globalSettings = NativeShaderProjectSettings.instance;
+
+            // ── Include paths: [projectRoot] + globalIncludePaths + additionalIncludePaths ──
+            var allIncludeSources = new string[additionalIncludePaths.Length + globalSettings.globalIncludePaths.Length];
+            for (int i = 0; i < globalSettings.globalIncludePaths.Length; i++)
+                allIncludeSources[i] = globalSettings.globalIncludePaths[i];
             for (int i = 0; i < additionalIncludePaths.Length; i++)
+                allIncludeSources[globalSettings.globalIncludePaths.Length + i] = additionalIncludePaths[i];
+
+            var allPaths = new string[1 + allIncludeSources.Length];
+            allPaths[0] = projectRoot;
+            for (int i = 0; i < allIncludeSources.Length; i++)
             {
-                string p = Environment.ExpandEnvironmentVariables(additionalIncludePaths[i]);
+                string p = Environment.ExpandEnvironmentVariables(allIncludeSources[i]);
                 if (!Path.IsPathRooted(p))
                     p = Path.GetFullPath(Path.Combine(projectRoot, p));
                 allPaths[1 + i] = p;
@@ -56,15 +67,29 @@ namespace NativeRender
             for (int i = 0; i < allPaths.Length; i++)
                 pathsProp.GetArrayElementAtIndex(i).stringValue = allPaths[i];
 
-            var extraArgsProp = so.FindProperty("_extraArgs");
-            extraArgsProp.arraySize = extraArgs.Length;
+            // ── Extra args: globalExtraArgs + extraArgs ──
+            var allExtraArgs = new string[globalSettings.globalExtraArgs.Length + extraArgs.Length];
+            for (int i = 0; i < globalSettings.globalExtraArgs.Length; i++)
+                allExtraArgs[i] = globalSettings.globalExtraArgs[i];
             for (int i = 0; i < extraArgs.Length; i++)
-                extraArgsProp.GetArrayElementAtIndex(i).stringValue = extraArgs[i];
+                allExtraArgs[globalSettings.globalExtraArgs.Length + i] = extraArgs[i];
+
+            var extraArgsProp = so.FindProperty("_extraArgs");
+            extraArgsProp.arraySize = allExtraArgs.Length;
+            for (int i = 0; i < allExtraArgs.Length; i++)
+                extraArgsProp.GetArrayElementAtIndex(i).stringValue = allExtraArgs[i];
+
+            // ── Defines: globalDefines + defines ──
+            var allDefines = new string[globalSettings.globalDefines.Length + defines.Length];
+            for (int i = 0; i < globalSettings.globalDefines.Length; i++)
+                allDefines[i] = globalSettings.globalDefines[i];
+            for (int i = 0; i < defines.Length; i++)
+                allDefines[globalSettings.globalDefines.Length + i] = defines[i];
 
             var definesProp = so.FindProperty("_defines");
-            definesProp.arraySize = defines.Length;
-            for (int i = 0; i < defines.Length; i++)
-                definesProp.GetArrayElementAtIndex(i).stringValue = defines[i];
+            definesProp.arraySize = allDefines.Length;
+            for (int i = 0; i < allDefines.Length; i++)
+                definesProp.GetArrayElementAtIndex(i).stringValue = allDefines[i];
 
             so.ApplyModifiedPropertiesWithoutUndo();
 

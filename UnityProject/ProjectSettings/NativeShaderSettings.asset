@@ -1,0 +1,7 @@
+{
+    "globalDefines": [],
+    "globalIncludePaths": [
+        "../RenderingPlugin/External/NRD/Shaders"
+    ],
+    "globalExtraArgs": []
+}

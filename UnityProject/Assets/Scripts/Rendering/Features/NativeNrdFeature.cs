@@ -436,6 +436,7 @@ namespace PathTracing
                     isHistoryConfidenceAvailable = setting.confidence,
                     splitScreen                  = setting.separator,
                     denoisingRange               = setting.denoisingRange,
+                    strandMaterialID             = 2f,
                 };
 
                 // Shadow denoising (SIGMA) — matches NRDSample.cpp "Shadow denoising" block
