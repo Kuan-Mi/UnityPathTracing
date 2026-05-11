@@ -190,6 +190,8 @@ namespace PathTracing
 
         public UpscalerMode upscalerMode = UpscalerMode.NATIVE;
 
+        public bool SR = false;
+
         public bool              skipRightEyeInVR = true;
         public RtxDiDenoiserType denoiserMode     = RtxDiDenoiserType.DENOISER_MODE_OFF;
         public bool              enableGradients  = true;

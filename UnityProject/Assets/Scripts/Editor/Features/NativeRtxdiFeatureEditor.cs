@@ -384,7 +384,7 @@ namespace PathTracing
                 return n.Substring(6);
             return n;
         }
-        
+
         /// <summary>
         /// 自动根据 [Header] 特性将属性分组并渲染为可折叠栏
         /// </summary>
@@ -397,7 +397,7 @@ namespace PathTracing
 
             // 迭代所有子属性
             SerializedProperty childProp = parentProp.Copy();
-            SerializedProperty endProp = childProp.GetEndProperty();
+            SerializedProperty endProp   = childProp.GetEndProperty();
 
             bool currentFoldoutState = true;
 
@@ -419,8 +419,8 @@ namespace PathTracing
 
 
                             // 从 SessionState 获取该 Header 的保存状态
-                            string key = GetKey(header.Name);
-                            bool isExpanded = SessionState.GetBool(key, false);
+                            string key        = GetKey(header.Name);
+                            bool   isExpanded = SessionState.GetBool(key, false);
 
                             // 绘制 Foldout
                             bool newState = EditorGUILayout.BeginFoldoutHeaderGroup(isExpanded, header.Name);
@@ -446,6 +446,5 @@ namespace PathTracing
                 } while (childProp.NextVisible(false)); // 只迭代当前层级
             }
         }
-
     }
 }

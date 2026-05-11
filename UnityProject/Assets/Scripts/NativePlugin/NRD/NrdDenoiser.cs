@@ -128,7 +128,7 @@ namespace Nrd
             }
 
             UpdateDenoiserResources(_nrdInstanceId, (IntPtr)ptr, idx);
-            Debug.Log($"[NRD] Updated Resources for Denoiser Instance {_nrdInstanceId} with {idx} resources.");
+            // Debug.Log($"[NRD] Updated Resources for Denoiser Instance {_nrdInstanceId} with {idx} resources.");
         }
 
         private unsafe NrdFrameData GetData(NrdFrameInput fi)

@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Runtime.InteropServices;
 using DLRR;
+using DLSR;
 using mini;
 using NativeRender;
 using Nrd;
@@ -121,6 +122,9 @@ namespace PathTracing
         private NativeRtxdiFilterGradientsPass _filterGradientsPass;
         private NativeRtxdiConfidencePass      _confidencePass;
 
+        private DlssSRPass _dlssrPass;
+        private readonly Dictionary<long, DlsrUpscaler> _dlsrUpscalers = new();
+
         // -------------------------------------------------------------------
         // Managed scaffolding passes (still using RayTracingShader / ComputeShader).
         // Will be replaced with native equivalents once their .computeshader assets are wired in.
@@ -219,6 +223,8 @@ namespace PathTracing
 
             _filterGradientsPass ??= filterGradientsPassCs != null ? new NativeRtxdiFilterGradientsPass(filterGradientsPassCs) { renderPassEvent = renderPassEvent } : null;
             _confidencePass      ??= confidencePassCs != null ? new NativeRtxdiConfidencePass(confidencePassCs) { renderPassEvent                = renderPassEvent } : null;
+
+            _dlssrPass ??= new DlssSRPass() { renderPassEvent = renderPassEvent };
         }
 
         public void InitializeBuffers()
@@ -778,6 +784,47 @@ namespace PathTracing
                 renderer.EnqueuePass(_compositingPass);
             }
 
+            // ---- DLSS SR (upscale DirectLighting → DlssOutput) ----
+            if (setting.SR && _dlssrPass != null)
+            {
+                if (!_dlsrUpscalers.TryGetValue(uniqueKey, out var dlsr))
+                {
+                    var camName = isVR ? $"{cam.name}_Eye{eyeIndex}" : cam.name;
+                    dlsr = new DlsrUpscaler(camName + "_Rtxdi");
+                    _dlsrUpscalers.Add(uniqueKey, dlsr);
+                }
+
+                var dlsrRes = new DlsrUpscaler.DlsrResources
+                {
+                    input    = pool.GetNriResource(RenderResourceType.DirectLighting),
+                    output   = pool.GetNriResource(RenderResourceType.DlssOutput),
+                    mv       = pool.GetNriResource(RenderResourceType.RtxdiMotionVectors),
+                    depth    = pool.GetNriResource(RenderResourceType.RtxdiDeviceDepth),
+                    exposure = default,
+                    reactive = default,
+                };
+
+                var dlsrInput = new DlsrUpscaler.DlsrFrameInput
+                {
+                    viewportJitter   = frameState.viewportJitter,
+                    renderResolution = frameState.renderResolution,
+                    frameIndex       = curFrame,
+                    outputWidth      = (ushort)outputResolution.x,
+                    outputHeight     = (ushort)outputResolution.y,
+                };
+
+                var dlsrSettings = new DlsrUpscaler.DlsrSettings
+                {
+                    upscalerMode = setting.upscalerMode,
+                    preset       = 0,
+                    resetHistory = resourcesChanged,
+                };
+
+                var dlsrDataPtr = dlsr.GetInteropDataPtr(dlsrInput, dlsrRes, frameState.resolutionScale, dlsrSettings);
+                _dlssrPass.Setup(dlsrDataPtr);
+                renderer.EnqueuePass(_dlssrPass);
+            }
+
             // ---- OutputBlit (shows DirectLighting = composited NRD result) ----
             if (_outputBlitPass != null)
             {
@@ -802,6 +849,7 @@ namespace PathTracing
                     // Rtxdi PDF debug
                     LocalLightPdfTexture  = rtxdiResources.LocalLightPdfTexture,
                     EnvironmentPdfTexture = rtxdiResources.EnvironmentPdfTexture,
+                    DlssOutput            = setting.SR ? pool.GetRT(RenderResourceType.DlssOutput) : null,
                 };
                 var outputBlitSettings = new OutputBlitPass.Settings
                 {
@@ -968,8 +1016,12 @@ namespace PathTracing
             _confidencePass?.Dispose();
             _confidencePass = null;
             _compositingPass?.Dispose();
-            _compositingPass     = null;
-            _nrdDenoisePass      = null;
+            _compositingPass = null;
+            _nrdDenoisePass  = null;
+
+            foreach (var upscaler in _dlsrUpscalers.Values) upscaler.Dispose();
+            _dlsrUpscalers.Clear();
+            _dlssrPass           = null;
             _nativeFrameTickPass = null;
         }
 
