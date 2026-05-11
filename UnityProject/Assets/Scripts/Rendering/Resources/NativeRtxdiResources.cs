@@ -197,7 +197,7 @@ namespace PathTracing
 
             int lightDataStride = sizeof(uint) * 8;
             RisLightDataBuffer = new ComputeBuffer(
-                (int)totalSizeInElements, lightDataStride, ComputeBufferType.Default) { name = "RisLightDataBuffer" };
+                (int)totalSizeInElements * 2, lightDataStride, ComputeBufferType.Default) { name = "RisLightDataBuffer" };
 
             // u_RayCountBuffer (u12): single uint written atomically by shading passes.
             RayCountBuffer = new GraphicsBuffer(GraphicsBuffer.Target.Raw, 1, sizeof(uint)) { name = "RayCountBuffer" };
