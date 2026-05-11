@@ -14,6 +14,7 @@ using Unity.Mathematics;
 using UnityEngine;
 using UnityEngine.Rendering;
 using UnityEngine.Rendering.Universal;
+using CheckerboardMode = Nrd.CheckerboardMode;
 
 namespace PathTracing
 {
@@ -269,7 +270,8 @@ namespace PathTracing
                 var camName = isVR ? $"{cam.name}_Eye{eyeIndex}" : cam.name;
                 nrdReblur = new NrdDenoiser(camName + "_Rtxdi", new NrdDenoiserDesc[]
                 {
-                    new(0, Denoiser.REBLUR_DIFFUSE_SPECULAR),
+                    // new(0, Denoiser.REBLUR_DIFFUSE_SPECULAR),
+                    new(0, Denoiser.RELAX_DIFFUSE_SPECULAR),
                 });
                 _nrdDenoisers.Add(uniqueKey, nrdReblur);
             }
@@ -352,8 +354,8 @@ namespace PathTracing
             localSettings.enablePreviousTLAS        = false;
             localSettings.enableAlphaTestedGeometry = false;
             localSettings.enableTransparentGeometry = false;
-            localSettings.denoiserMode    = setting.enableDenoiser ? 1u : 0u; // 1 = DENOISER_MODE_REBLUR
-            localSettings.enableGradients = enableDirectReStirPass && setting.enableDenoiser && setting.enableGradients;
+            localSettings.denoiserMode              = (uint)setting.denoiserMode;
+            localSettings.enableGradients           = enableDirectReStirPass && setting.denoiserMode!=RtxDiDenoiserType.DENOISER_MODE_OFF && setting.enableGradients;
 
             bool enableBrdfAndIndirectPass = setting.directLightingMode == DirectLightingMode.Brdf || setting.indirectLightingMode != IndirectLightingMode.None;
             bool enableIndirect            = setting.indirectLightingMode != IndirectLightingMode.None;
@@ -409,7 +411,7 @@ namespace PathTracing
                 prevPrevView = prevViewConst, // CameraFrameState has no prev-prev; use prev as approximation
 
                 runtimeParams       = baseConsts.runtimeParams,
-                reblurHitDistParams = default,
+                reblurHitDistParams = new float4(3.0f,0.1f,20.0f,0f),
 
                 pad3                 = 0u,
                 enablePreviousTLAS   = baseConsts.enablePreviousTLAS,
@@ -467,7 +469,7 @@ namespace PathTracing
                 (renderResolution.x + GradFactor - 1) / GradFactor,
                 (renderResolution.y + GradFactor - 1) / GradFactor);
 
-            bool enableGradients = enableDirectReStirPass && setting.enableDenoiser && setting.enableGradients;
+            bool enableGradients = enableDirectReStirPass && setting.denoiserMode!=RtxDiDenoiserType.DENOISER_MODE_OFF && setting.enableGradients;
             if (enableGradients)
                 pool.EnsureRtxdiGradientArray(gradDims);
 
@@ -699,7 +701,7 @@ namespace PathTracing
             }
 
             // ---- NRD denoising (REBLUR_DIFFUSE_SPECULAR) ----
-            if (setting.enableDenoiser)
+            if (setting.denoiserMode!=RtxDiDenoiserType.DENOISER_MODE_OFF)
             {
                 // ---- Filter gradients + compute confidence (mirrors FullSample stages 2-4) ----
                 if (enableGradients && _filterGradientsPass != null && _confidencePass != null)
@@ -715,6 +717,7 @@ namespace PathTracing
                 var currentViewDepthNri = pool.GetNriResource(isOddFrame ? RenderResourceType.RtxdiViewDepth : RenderResourceType.RtxdiPrevViewDepth);
 
                 nrdReblur.UpdateResources(
+                    (ResourceType.OUT_VALIDATION, pool.GetNriResource(RenderResourceType.Validation)),
                     (ResourceType.IN_MV, pool.GetNriResource(RenderResourceType.RtxdiMotionVectors)),
                     (ResourceType.IN_VIEWZ, currentViewDepthNri),
                     (ResourceType.IN_NORMAL_ROUGHNESS, pool.GetNriResource(RenderResourceType.RtxdiDenoiserNormalRoughness)),
@@ -744,6 +747,9 @@ namespace PathTracing
                     lightDirection               = lightDir,
                     denoisingRange               = 1000f,
                     isHistoryConfidenceAvailable = enableGradients,
+                    enableValidation             = setting.showValidation,
+                    checkerboardMode             = CheckerboardMode.OFF,
+                    flipMovionVectors            = true
                 };
 
                 _nrdDenoisePass.Setup(nrdReblur.GetInteropDataPtr(nrdInput), RenderPassMarkers.NrdDenoiseRtxdi);
@@ -778,6 +784,7 @@ namespace PathTracing
                 var outputBlitResource = new OutputBlitPass.Resource
                 {
                     Mv             = pool.GetRT(RenderResourceType.RtxdiMotionVectors),
+                    Validation     = pool.GetRT(RenderResourceType.Validation),
                     DirectLighting = pool.GetRT(RenderResourceType.DirectLighting),
 
                     Diff = pool.GetRT(RenderResourceType.RtxdiDiffuseLighting),
@@ -802,7 +809,7 @@ namespace PathTracing
                     resolutionScale  = frameState.resolutionScale,
                     enableDlssRR     = false,
                     showMV           = setting.showMv,
-                    showValidation   = false,
+                    showValidation   = setting.showValidation,
                     showReference    = false,
                     pdfMipLevel      = setting.pdfMipLevel,
                     pdfExposureStops = setting.pdfExposureStops,

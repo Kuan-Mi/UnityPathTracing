@@ -87,6 +87,8 @@ namespace PathTracing
             var srvState = new NriResourceState { accessBits = AccessBits.SHADER_RESOURCE, layout         = Layout.SHADER_RESOURCE, stageBits         = 1 << 7 };
             var uavState = new NriResourceState { accessBits = AccessBits.SHADER_RESOURCE_STORAGE, layout = Layout.SHADER_RESOURCE_STORAGE, stageBits = 1 << 10 };
 
+            _nriResources[RenderResourceType.Validation]          = new NriTextureResource(RenderResourceType.Validation, GraphicsFormat.R8G8B8A8_UNorm, uavState);
+
             // ── NRI-interop resources (DLSS / composition) ──────────────────────
             _nriResources[RenderResourceType.DirectLighting]         = new NriTextureResource(RenderResourceType.DirectLighting, GraphicsFormat.R16G16B16A16_SFloat, uavState);
             _nriResources[RenderResourceType.DlssOutput]             = new NriTextureResource(RenderResourceType.DlssOutput, GraphicsFormat.R16G16B16A16_SFloat, uavState);

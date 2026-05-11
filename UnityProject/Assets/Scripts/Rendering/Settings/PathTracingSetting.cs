@@ -65,6 +65,13 @@ namespace PathTracing
         DENOISER_REBLUR    = 0,
         DENOISER_RELAX     = 1,
         DENOISER_REFERENCE = 2,
+    }    
+    
+    public enum RtxDiDenoiserType
+    {
+        DENOISER_MODE_OFF    = 0,
+        DENOISER_MODE_REBLUR = 1,
+        DENOISER_MODE_RELAX  = 2,
     }
 
     public enum RESOLUTION
@@ -171,6 +178,7 @@ namespace PathTracing
         public bool     cameraJitter = true;
         public ShowMode showMode     = ShowMode.Final;
         public bool     showMv;
+        public bool     showValidation;
 
         /// <summary>Mip level to visualise when showMode is Rtxdi_LocalLightPdf or Rtxdi_EnvironmentPdf.</summary>
         [Range(0, 15)]
@@ -182,9 +190,9 @@ namespace PathTracing
 
         public UpscalerMode upscalerMode = UpscalerMode.NATIVE;
 
-        public bool skipRightEyeInVR = true;
-        public bool enableDenoiser   = true;
-        public bool enableGradients  = true;
+        public bool              skipRightEyeInVR = true;
+        public RtxDiDenoiserType denoiserMode     = RtxDiDenoiserType.DENOISER_MODE_OFF;
+        public bool              enableGradients  = true;
 
         [FoldoutHeader("RTXDI")]
         public UnityRtxdiFeature.RenderSettings lightingSettings = UnityRtxdiFeature.RenderSettings.Default();

@@ -50,6 +50,7 @@ namespace Nrd
             public int2                          renderResolution;
             public uint                          frameIndex;
             public float3                        lightDirection;
+            public bool                          flipMovionVectors;
             public CheckerboardMode              checkerboardMode;
             public HitDistanceReconstructionMode hitDistanceReconstructionMode;
             public uint                          maxAccumulatedFrameNum;
@@ -159,7 +160,7 @@ namespace Nrd
             data.commonSettings.rectSizePrev[0]     = prevRectW;
             data.commonSettings.rectSizePrev[1]     = prevRectH;
 
-            data.commonSettings.motionVectorScale          = new float3(1.0f / rectW, 1.0f / rectH, -1.0f);
+            data.commonSettings.motionVectorScale          = new float3(1.0f / rectW, 1.0f / rectH, fi.flipMovionVectors?1.0f:-1.0f);
             data.commonSettings.isMotionVectorInWorldSpace = false;
             data.commonSettings.accumulationMode           = AccumulationMode.CONTINUE;
             data.commonSettings.frameIndex                 = fi.frameIndex;
@@ -175,7 +176,7 @@ namespace Nrd
             data.commonSettings.enableValidation               = fi.enableValidation;
             data.commonSettings.disocclusionThresholdAlternate = 0.1f;
             data.commonSettings.isHistoryConfidenceAvailable   = fi.isHistoryConfidenceAvailable;
-
+ 
             // PrintCommonSettings(data.commonSettings);
             // --- Per-denoiser settings (entries[]) ---
             data.denoiserCount = (uint)_denoisers.Length;
