@@ -99,8 +99,6 @@ namespace PathTracing
             // Same RAB superset as PresampleLights: g_Const, t_LocalLightPdfTexture,
             // t_LightDataBuffer, u_RisBuffer, u_RisLightDataBuffer.
             NativeRtxdiBindings.BindRabCommon(ds, ctx);
-            
-            Debug.Log($"Dispatching NativeRtxdiPresampleReGirPass with groupsX={data.GroupsX}, groupsY=1");
 
             cs.Dispatch(cmd, ds, data.GroupsX, 1, 1);
 
