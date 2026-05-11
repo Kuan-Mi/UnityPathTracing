@@ -736,11 +736,12 @@ namespace PathTracing
                     DenoisedDiff = pool.GetRT(RenderResourceType.RtxdiDenoisedDiffuseLighting),
                     DenoisedSpec = pool.GetRT(RenderResourceType.RtxdiDenoisedSpecularLighting),
                     // Rtxdi GBuffer debug
-                    RtxdiViewDepth     = viewDepth,
-                    RtxdiDiffuseAlbedo = diffuseAlbedo,
-                    RtxdiSpecularRough = specularRough,
-                    RtxdiNormals       = normals,
-                    RtxdiGeoNormals    = geoNormals,
+                    RtxdiViewDepth         = viewDepth,
+                    RtxdiDiffuseAlbedo     = diffuseAlbedo,
+                    RtxdiSpecularRough     = specularRough,
+                    RtxdiNormals           = normals,
+                    RtxdiGeoNormals        = geoNormals,
+                    RtxdiDirectLightingRaw = pool.GetRT(RenderResourceType.RtxdiDirectLightingRaw),
                     // Rtxdi PDF debug
                     LocalLightPdfTexture  = rtxdiResources.LocalLightPdfTexture,
                     EnvironmentPdfTexture = rtxdiResources.EnvironmentPdfTexture,

@@ -62,6 +62,7 @@ namespace PathTracing
             internal RTHandle RtxdiSpecularRough;   // R32_UINT  R8G8B8A8_Gamma_UFLOAT
             internal RTHandle RtxdiNormals;         // R32_UINT  oct32
             internal RTHandle RtxdiGeoNormals;      // R32_UINT  oct32            // ── Rtxdi PDF debug textures (R32_Float mip chain) ──────────────────
+            internal RTHandle RtxdiDirectLightingRaw;
             internal RTHandle LocalLightPdfTexture;
             internal RTHandle EnvironmentPdfTexture;        }
 
@@ -249,6 +250,9 @@ namespace PathTracing
                         data.BlitMaterial.SetFloat("_PdfExposureStops", data.Setting.pdfExposureStops);
                         Blitter.BlitTexture(natCmd, data.Resource.EnvironmentPdfTexture, scaleOffset, data.BlitMaterial, (int)ShowPass.PdfTextureMip);
                     }
+                    break;
+                case ShowMode.Rtxdi_DirectLightingRaw:
+                    Blitter.BlitTexture(natCmd, data.Resource.RtxdiDirectLightingRaw, scaleOffset, data.BlitMaterial, (int)ShowPass.Out);
                     break;
                 default:
                     throw new ArgumentOutOfRangeException();

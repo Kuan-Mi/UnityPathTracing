@@ -47,6 +47,7 @@ namespace PathTracing
         Rtxdi_SpecularLighting, // RTXDI specular lighting output
         Rtxdi_LocalLightPdf, // LocalLightPdfTexture mip slice (log-scale heat map)
         Rtxdi_EnvironmentPdf, // EnvironmentPdfTexture mip slice (log-scale heat map)
+        Rtxdi_DirectLightingRaw, // EnvironmentPdfTexture mip slice (log-scale heat map)
     }
 
     public enum UpscalerMode : byte // Scaling factor       // Min jitter phases (or just use unclamped Halton2D)
