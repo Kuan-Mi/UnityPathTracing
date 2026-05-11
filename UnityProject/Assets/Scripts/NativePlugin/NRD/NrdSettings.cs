@@ -403,10 +403,10 @@ namespace Nrd
     [StructLayout(LayoutKind.Sequential)]
     public struct RelaxAntilagSettings
     {
-        public float accelerationAmount;  // Default: 0.3f
-        public float spatialSigmaScale;   // Default: 4.5f
-        public float temporalSigmaScale;  // Default: 0.5f
-        public float resetAmount;         // Default: 0.5f
+        public float accelerationAmount; // Default: 0.3f
+        public float spatialSigmaScale; // Default: 4.5f
+        public float temporalSigmaScale; // Default: 0.5f
+        public float resetAmount; // Default: 0.5f
 
         public static readonly RelaxAntilagSettings _default = new RelaxAntilagSettings
         {
@@ -423,53 +423,53 @@ namespace Nrd
     {
         public RelaxAntilagSettings antilagSettings;
 
-        public uint diffuseMaxAccumulatedFrameNum;      // Default: 30
-        public uint specularMaxAccumulatedFrameNum;     // Default: 30
-        public uint diffuseMaxFastAccumulatedFrameNum;  // Default: 6
+        public uint diffuseMaxAccumulatedFrameNum; // Default: 30
+        public uint specularMaxAccumulatedFrameNum; // Default: 30
+        public uint diffuseMaxFastAccumulatedFrameNum; // Default: 6
         public uint specularMaxFastAccumulatedFrameNum; // Default: 6
 
-        public uint historyFixFrameNum;             // Default: 3
-        public uint historyFixBasePixelStride;      // Default: 14
+        public uint historyFixFrameNum; // Default: 3
+        public uint historyFixBasePixelStride; // Default: 14
         public uint historyFixAlternatePixelStride; // Default: 14
 
         public float historyFixEdgeStoppingNormalPower; // Default: 8.0f
-        public float fastHistoryClampingSigmaScale;     // Default: 2.0f
+        public float fastHistoryClampingSigmaScale; // Default: 2.0f
 
-        public float diffusePrepassBlurRadius;  // Default: 30.0f
+        public float diffusePrepassBlurRadius; // Default: 30.0f
         public float specularPrepassBlurRadius; // Default: 50.0f
-        public float minHitDistanceWeight;      // Default: 0.1f
+        public float minHitDistanceWeight; // Default: 0.1f
 
-        public uint  spatialVarianceEstimationHistoryThreshold; // Default: 3
+        public uint spatialVarianceEstimationHistoryThreshold; // Default: 3
 
-        public float diffusePhiLuminance;  // Default: 2.0f
+        public float diffusePhiLuminance; // Default: 2.0f
         public float specularPhiLuminance; // Default: 1.0f
 
         public float lobeAngleFraction; // Default: 0.5f
         public float roughnessFraction; // Default: 0.15f
 
-        public float specularVarianceBoost;  // Default: 0.0f
+        public float specularVarianceBoost; // Default: 0.0f
         public float specularLobeAngleSlack; // Default: 0.15f
 
-        public uint  atrousIterationNum;         // Default: 5
-        public float diffuseMinLuminanceWeight;  // Default: 0.0f
+        public uint  atrousIterationNum; // Default: 5
+        public float diffuseMinLuminanceWeight; // Default: 0.0f
         public float specularMinLuminanceWeight; // Default: 0.0f
-        public float depthThreshold;             // Default: 0.003f
+        public float depthThreshold; // Default: 0.003f
 
-        public float confidenceDrivenRelaxationMultiplier;            // Default: 0.0f
+        public float confidenceDrivenRelaxationMultiplier; // Default: 0.0f
         public float confidenceDrivenLuminanceEdgeStoppingRelaxation; // Default: 0.0f
-        public float confidenceDrivenNormalEdgeStoppingRelaxation;    // Default: 0.0f
+        public float confidenceDrivenNormalEdgeStoppingRelaxation; // Default: 0.0f
 
         public float luminanceEdgeStoppingRelaxation; // Default: 0.5f
-        public float normalEdgeStoppingRelaxation;    // Default: 0.3f
+        public float normalEdgeStoppingRelaxation; // Default: 0.3f
         public float roughnessEdgeStoppingRelaxation; // Default: 1.0f
 
-        public CheckerboardMode              checkerboardMode;              // Default: OFF
+        public CheckerboardMode              checkerboardMode; // Default: OFF
         public HitDistanceReconstructionMode hitDistanceReconstructionMode; // Default: OFF
 
-        public float minMaterialForDiffuse;  // Default: 4.0f
+        public float minMaterialForDiffuse; // Default: 4.0f
         public float minMaterialForSpecular; // Default: 4.0f
 
-        private byte _enableAntiFirefly;           // Default: false
+        private byte _enableAntiFirefly; // Default: false
         private byte _enableRoughnessEdgeStopping; // Default: true
 
         public bool enableAntiFirefly

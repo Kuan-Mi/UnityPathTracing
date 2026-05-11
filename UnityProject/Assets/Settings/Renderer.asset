@@ -298,15 +298,15 @@ MonoBehaviour:
   m_Active: 1
   setting:
     exposureEv: 10
-    cameraJitter: 1
-    showMode: 18
+    cameraJitter: 0
+    showMode: 11
     showMv: 0
     showValidation: 1
     pdfMipLevel: 3
     pdfExposureStops: 10
     upscalerMode: 0
     skipRightEyeInVR: 1
-    denoiserMode: 1
+    denoiserMode: 2
     enableGradients: 0
     lightingSettings:
       denoiserMode: 0
@@ -362,16 +362,16 @@ MonoBehaviour:
     regirDynamicParams:
       regirCellSize: 1
       center:
-        x: 2.2427752
-        y: 0.17362046
-        z: -0.6253729
+        x: 0.35627508
+        y: 0.70327353
+        z: 0.83849
       fallbackSamplingMode: 1
       presamplingMode: 1
       regirSamplingJitter: 1
       regirNumBuildSamples: 8
     diResamplingMode: 3
     initialSamplingParams:
-      numLocalLightSamples: 1
+      numLocalLightSamples: 8
       numInfiniteLightSamples: 0
       numEnvironmentSamples: 0
       numBrdfSamples: 0
@@ -502,24 +502,24 @@ MonoBehaviour:
     view:
       matWorldToView:
         c0:
-          x: -0.98785686
-          y: -0.04329962
-          z: 0.14921027
+          x: -0.89963233
+          y: -0.20942037
+          z: 0.3831506
           w: 0
         c1:
-          x: 0.013421024
-          y: 0.93300766
-          z: 0.35960612
+          x: 0.01439707
+          y: 0.8627786
+          z: 0.5053769
           w: 0
         c2:
-          x: 0.15478513
-          y: -0.35724196
-          z: 0.9210969
+          x: 0.43641034
+          y: -0.46016973
+          z: 0.77316844
           w: 0
         c3:
-          x: 2.3100092
-          y: -0.28828734
-          z: 0.178949
+          x: -0.055534184
+          y: -0.1463104
+          z: -1.1402192
           w: 1
       matViewToClip:
         c0:
@@ -533,8 +533,8 @@ MonoBehaviour:
           z: 0
           w: 0
         c2:
-          x: 0
-          y: 0
+          x: 0.00048344905
+          y: -0.0014923114
           z: 0.00000500679
           w: -1
         c3:
@@ -544,25 +544,25 @@ MonoBehaviour:
           w: 0
       matWorldToClip:
         c0:
-          x: -0.76923245
-          y: -0.07499714
-          z: 0.0000007470645
-          w: -0.14921027
+          x: -0.70034784
+          y: -0.3632985
+          z: 0.0000019183547
+          w: -0.3831506
         c1:
-          x: 0.010450793
-          y: 1.6160166
-          z: 0.0000018004723
-          w: -0.35960612
+          x: 0.011455152
+          y: 1.4936221
+          z: 0.000002530316
+          w: -0.5053769
         c2:
-          x: 0.12052935
-          y: -0.6187612
-          z: 0.000004611739
-          w: -0.9210969
+          x: 0.34020135
+          y: -0.7981912
+          z: 0.0000038710923
+          w: -0.77316844
         c3:
-          x: 1.7987769
-          y: -0.49932832
-          z: 0.001000901
-          w: -0.178949
+          x: -0.043795053
+          y: -0.25171548
+          z: 0.0009942962
+          w: 1.1402192
       matClipToView:
         c0:
           x: 1.284211
@@ -580,51 +580,51 @@ MonoBehaviour:
           z: -0
           w: 999.99493
         c3:
-          x: 0
-          y: 0
+          x: 0.0006208506
+          y: -0.00086158636
           z: -1
           w: 0.005006765
       matViewToWorld:
         c0:
-          x: -0.9878571
-          y: 0.01342103
-          z: 0.15478517
+          x: -0.8996327
+          y: 0.01439711
+          z: 0.43641055
           w: 0
         c1:
-          x: -0.043299627
-          y: 0.9330077
-          z: -0.35724205
+          x: -0.20942041
+          y: 0.86277854
+          z: -0.4601698
           w: 0
         c2:
-          x: 0.14921029
-          y: 0.35960615
-          z: 0.9210971
+          x: 0.38315076
+          y: 0.50537694
+          z: 0.7731688
           w: 0
         c3:
-          x: 2.2427752
-          y: 0.17362045
-          z: -0.6253729
+          x: 0.35627508
+          y: 0.70327353
+          z: 0.83849
           w: 1
       matClipToWorld:
         c0:
-          x: -1.2686172
-          y: 0.017235423
-          z: 0.19877683
+          x: -1.1553181
+          y: 0.018488925
+          z: 0.5604432
           w: 0
         c1:
-          x: -0.024999054
-          y: 0.53867227
-          z: -0.20625378
-          w: 1.1368626e-10
+          x: -0.12090893
+          y: 0.49812546
+          z: -0.26567918
+          w: 0
         c2:
-          x: 2242.764
-          y: 173.61958
-          z: -625.36975
+          x: 356.2733
+          y: 703.27
+          z: 838.4858
           w: 999.99493
         c3:
-          x: -0.13798125
-          y: -0.3587368
-          z: -0.92422813
+          x: -0.38174504
+          y: -0.5025903
+          z: -0.7683033
           w: 0.005006765
       matViewToClipNoOffset:
         c0:
@@ -649,25 +649,25 @@ MonoBehaviour:
           w: 0
       matWorldToClipNoOffset:
         c0:
-          x: -0.76923245
-          y: -0.07499714
-          z: 0.0000007470645
-          w: -0.14921027
+          x: -0.7005331
+          y: -0.36272672
+          z: 0.0000019183547
+          w: -0.3831506
         c1:
-          x: 0.010450793
-          y: 1.6160166
-          z: 0.0000018004723
-          w: -0.35960612
+          x: 0.011210828
+          y: 1.4943763
+          z: 0.000002530316
+          w: -0.5053769
         c2:
-          x: 0.12052935
-          y: -0.6187612
-          z: 0.000004611739
-          w: -0.9210969
+          x: 0.33982757
+          y: -0.79703736
+          z: 0.0000038710923
+          w: -0.77316844
         c3:
-          x: 1.7987769
-          y: -0.49932832
-          z: 0.001000901
-          w: -0.178949
+          x: -0.043243814
+          y: -0.25341704
+          z: 0.0009942962
+          w: 1.1402192
       matClipToViewNoOffset:
         c0:
           x: 1.284211
@@ -691,24 +691,24 @@ MonoBehaviour:
           w: 0.005006765
       matClipToWorldNoOffset:
         c0:
-          x: -1.2686172
-          y: 0.017235423
-          z: 0.19877683
+          x: -1.1553181
+          y: 0.018488925
+          z: 0.5604432
           w: 0
         c1:
-          x: -0.024999054
-          y: 0.53867227
-          z: -0.20625378
-          w: 1.1368626e-10
+          x: -0.12090893
+          y: 0.49812546
+          z: -0.26567918
+          w: 0
         c2:
-          x: 2242.764
-          y: 173.61958
-          z: -625.36975
+          x: 356.2733
+          y: 703.27
+          z: 838.4858
           w: 999.99493
         c3:
-          x: -0.13798125
-          y: -0.3587368
-          z: -0.92422813
+          x: -0.38136694
+          y: -0.50185585
+          z: -0.76897067
           w: 0.005006765
       viewportOrigin:
         x: 0
@@ -720,8 +720,8 @@ MonoBehaviour:
         x: 0.00094250706
         y: 0.002096436
       pixelOffset:
-        x: -0.47485352
-        y: 0.40230155
+        x: -0.25646973
+        y: -0.35591626
       clipToWindowScale:
         x: 530.5
         y: -238.5
@@ -735,31 +735,31 @@ MonoBehaviour:
         x: -1
         y: 0.99999994
       cameraDirectionOrPosition:
-        x: 2.2427752
-        y: 0.17362046
-        z: -0.6253729
+        x: 0.35627508
+        y: 0.70327353
+        z: 0.83849
         w: 1
     prevView:
       matWorldToView:
         c0:
-          x: -0.98785686
-          y: -0.04329962
-          z: 0.14921027
+          x: -0.89963233
+          y: -0.20942037
+          z: 0.3831506
           w: 0
         c1:
-          x: 0.013421024
-          y: 0.93300766
-          z: 0.35960612
+          x: 0.01439707
+          y: 0.8627786
+          z: 0.5053769
           w: 0
         c2:
-          x: 0.15478513
-          y: -0.35724196
-          z: 0.9210969
+          x: 0.43641034
+          y: -0.46016973
+          z: 0.77316844
           w: 0
         c3:
-          x: 2.3100092
-          y: -0.28828734
-          z: 0.178949
+          x: -0.055534184
+          y: -0.1463104
+          z: -1.1402192
           w: 1
       matViewToClip:
         c0:
@@ -773,8 +773,8 @@ MonoBehaviour:
           z: 0
           w: 0
         c2:
-          x: 0
-          y: 0
+          x: -0.0006946848
+          y: 0.0008370619
           z: 0.00000500679
           w: -1
         c3:
@@ -784,25 +784,25 @@ MonoBehaviour:
           w: 0
       matWorldToClip:
         c0:
-          x: -0.76923245
-          y: -0.07499714
-          z: 0.0000007470645
-          w: -0.14921027
+          x: -0.7007993
+          y: -0.362406
+          z: 0.0000019183547
+          w: -0.3831506
         c1:
-          x: 0.010450793
-          y: 1.6160166
-          z: 0.0000018004723
-          w: -0.35960612
+          x: 0.01085975
+          y: 1.4947994
+          z: 0.000002530316
+          w: -0.5053769
         c2:
-          x: 0.12052935
-          y: -0.6187612
-          z: 0.000004611739
-          w: -0.9210969
+          x: 0.33929047
+          y: -0.7963902
+          z: 0.0000038710923
+          w: -0.77316844
         c3:
-          x: 1.7987769
-          y: -0.49932832
-          z: 0.001000901
-          w: -0.178949
+          x: -0.04245172
+          y: -0.25437146
+          z: 0.0009942962
+          w: 1.1402192
       matClipToView:
         c0:
           x: 1.284211
@@ -820,51 +820,51 @@ MonoBehaviour:
           z: -0
           w: 999.99493
         c3:
-          x: 0
-          y: 0
+          x: -0.00089212187
+          y: 0.0004832779
           z: -1
           w: 0.005006765
       matViewToWorld:
         c0:
-          x: -0.9878571
-          y: 0.01342103
-          z: 0.15478517
+          x: -0.8996327
+          y: 0.01439711
+          z: 0.43641055
           w: 0
         c1:
-          x: -0.043299627
-          y: 0.9330077
-          z: -0.35724205
+          x: -0.20942041
+          y: 0.86277854
+          z: -0.4601698
           w: 0
         c2:
-          x: 0.14921029
-          y: 0.35960615
-          z: 0.9210971
+          x: 0.38315076
+          y: 0.50537694
+          z: 0.7731688
           w: 0
         c3:
-          x: 2.2427752
-          y: 0.17362045
-          z: -0.6253729
+          x: 0.35627508
+          y: 0.70327353
+          z: 0.83849
           w: 1
       matClipToWorld:
         c0:
-          x: -1.2686172
-          y: 0.017235423
-          z: 0.19877683
+          x: -1.1553181
+          y: 0.018488925
+          z: 0.5604432
           w: 0
         c1:
-          x: -0.024999054
-          y: 0.53867227
-          z: -0.20625378
-          w: 1.1368626e-10
+          x: -0.12090893
+          y: 0.49812546
+          z: -0.26567918
+          w: 0
         c2:
-          x: 2242.764
-          y: 173.61958
-          z: -625.36975
+          x: 356.2733
+          y: 703.27
+          z: 838.4858
           w: 999.99493
         c3:
-          x: -0.13798125
-          y: -0.3587368
-          z: -0.92422813
+          x: -0.38066557
+          y: -0.50145173
+          z: -0.7695824
           w: 0.005006765
       matViewToClipNoOffset:
         c0:
@@ -889,25 +889,25 @@ MonoBehaviour:
           w: 0
       matWorldToClipNoOffset:
         c0:
-          x: -0.76923245
-          y: -0.07499714
-          z: 0.0000007470645
-          w: -0.14921027
+          x: -0.7005331
+          y: -0.36272672
+          z: 0.0000019183547
+          w: -0.3831506
         c1:
-          x: 0.010450793
-          y: 1.6160166
-          z: 0.0000018004723
-          w: -0.35960612
+          x: 0.011210828
+          y: 1.4943763
+          z: 0.000002530316
+          w: -0.5053769
         c2:
-          x: 0.12052935
-          y: -0.6187612
-          z: 0.000004611739
-          w: -0.9210969
+          x: 0.33982757
+          y: -0.79703736
+          z: 0.0000038710923
+          w: -0.77316844
         c3:
-          x: 1.7987769
-          y: -0.49932832
-          z: 0.001000901
-          w: -0.178949
+          x: -0.043243814
+          y: -0.25341704
+          z: 0.0009942962
+          w: 1.1402192
       matClipToViewNoOffset:
         c0:
           x: 1.284211
@@ -931,24 +931,24 @@ MonoBehaviour:
           w: 0.005006765
       matClipToWorldNoOffset:
         c0:
-          x: -1.2686172
-          y: 0.017235423
-          z: 0.19877683
+          x: -1.1553181
+          y: 0.018488925
+          z: 0.5604432
           w: 0
         c1:
-          x: -0.024999054
-          y: 0.53867227
-          z: -0.20625378
-          w: 1.1368626e-10
+          x: -0.12090893
+          y: 0.49812546
+          z: -0.26567918
+          w: 0
         c2:
-          x: 2242.764
-          y: 173.61958
-          z: -625.36975
+          x: 356.2733
+          y: 703.27
+          z: 838.4858
           w: 999.99493
         c3:
-          x: -0.13798125
-          y: -0.3587368
-          z: -0.92422813
+          x: -0.38136694
+          y: -0.50185585
+          z: -0.76897067
           w: 0.005006765
       viewportOrigin:
         x: 0
@@ -960,8 +960,8 @@ MonoBehaviour:
         x: 0.00094250706
         y: 0.002096436
       pixelOffset:
-        x: 0.47827148
-        y: 0.06896818
+        x: 0.36853027
+        y: 0.19963926
       clipToWindowScale:
         x: 530.5
         y: -238.5
@@ -975,31 +975,31 @@ MonoBehaviour:
         x: -1
         y: 0.99999994
       cameraDirectionOrPosition:
-        x: 2.2427752
-        y: 0.17362046
-        z: -0.6253729
+        x: 0.35627508
+        y: 0.70327353
+        z: 0.83849
         w: 1
     prevPrevView:
       matWorldToView:
         c0:
-          x: -0.98785686
-          y: -0.04329962
-          z: 0.14921027
+          x: -0.89963233
+          y: -0.20942037
+          z: 0.3831506
           w: 0
         c1:
-          x: 0.013421024
-          y: 0.93300766
-          z: 0.35960612
+          x: 0.01439707
+          y: 0.8627786
+          z: 0.5053769
           w: 0
         c2:
-          x: 0.15478513
-          y: -0.35724196
-          z: 0.9210969
+          x: 0.43641034
+          y: -0.46016973
+          z: 0.77316844
           w: 0
         c3:
-          x: 2.3100092
-          y: -0.28828734
-          z: 0.178949
+          x: -0.055534184
+          y: -0.1463104
+          z: -1.1402192
           w: 1
       matViewToClip:
         c0:
@@ -1013,8 +1013,8 @@ MonoBehaviour:
           z: 0
           w: 0
         c2:
-          x: 0
-          y: 0
+          x: -0.0006946848
+          y: 0.0008370619
           z: 0.00000500679
           w: -1
         c3:
@@ -1024,25 +1024,25 @@ MonoBehaviour:
           w: 0
       matWorldToClip:
         c0:
-          x: -0.76923245
-          y: -0.07499714
-          z: 0.0000007470645
-          w: -0.14921027
+          x: -0.7007993
+          y: -0.362406
+          z: 0.0000019183547
+          w: -0.3831506
         c1:
-          x: 0.010450793
-          y: 1.6160166
-          z: 0.0000018004723
-          w: -0.35960612
+          x: 0.01085975
+          y: 1.4947994
+          z: 0.000002530316
+          w: -0.5053769
         c2:
-          x: 0.12052935
-          y: -0.6187612
-          z: 0.000004611739
-          w: -0.9210969
+          x: 0.33929047
+          y: -0.7963902
+          z: 0.0000038710923
+          w: -0.77316844
         c3:
-          x: 1.7987769
-          y: -0.49932832
-          z: 0.001000901
-          w: -0.178949
+          x: -0.04245172
+          y: -0.25437146
+          z: 0.0009942962
+          w: 1.1402192
       matClipToView:
         c0:
           x: 1.284211
@@ -1060,51 +1060,51 @@ MonoBehaviour:
           z: -0
           w: 999.99493
         c3:
-          x: 0
-          y: 0
+          x: -0.00089212187
+          y: 0.0004832779
           z: -1
           w: 0.005006765
       matViewToWorld:
         c0:
-          x: -0.9878571
-          y: 0.01342103
-          z: 0.15478517
+          x: -0.8996327
+          y: 0.01439711
+          z: 0.43641055
           w: 0
         c1:
-          x: -0.043299627
-          y: 0.9330077
-          z: -0.35724205
+          x: -0.20942041
+          y: 0.86277854
+          z: -0.4601698
           w: 0
         c2:
-          x: 0.14921029
-          y: 0.35960615
-          z: 0.9210971
+          x: 0.38315076
+          y: 0.50537694
+          z: 0.7731688
           w: 0
         c3:
-          x: 2.2427752
-          y: 0.17362045
-          z: -0.6253729
+          x: 0.35627508
+          y: 0.70327353
+          z: 0.83849
           w: 1
       matClipToWorld:
         c0:
-          x: -1.2686172
-          y: 0.017235423
-          z: 0.19877683
+          x: -1.1553181
+          y: 0.018488925
+          z: 0.5604432
           w: 0
         c1:
-          x: -0.024999054
-          y: 0.53867227
-          z: -0.20625378
-          w: 1.1368626e-10
+          x: -0.12090893
+          y: 0.49812546
+          z: -0.26567918
+          w: 0
         c2:
-          x: 2242.764
-          y: 173.61958
-          z: -625.36975
+          x: 356.2733
+          y: 703.27
+          z: 838.4858
           w: 999.99493
         c3:
-          x: -0.13798125
-          y: -0.3587368
-          z: -0.92422813
+          x: -0.38066557
+          y: -0.50145173
+          z: -0.7695824
           w: 0.005006765
       matViewToClipNoOffset:
         c0:
@@ -1129,25 +1129,25 @@ MonoBehaviour:
           w: 0
       matWorldToClipNoOffset:
         c0:
-          x: -0.76923245
-          y: -0.07499714
-          z: 0.0000007470645
-          w: -0.14921027
+          x: -0.7005331
+          y: -0.36272672
+          z: 0.0000019183547
+          w: -0.3831506
         c1:
-          x: 0.010450793
-          y: 1.6160166
-          z: 0.0000018004723
-          w: -0.35960612
+          x: 0.011210828
+          y: 1.4943763
+          z: 0.000002530316
+          w: -0.5053769
         c2:
-          x: 0.12052935
-          y: -0.6187612
-          z: 0.000004611739
-          w: -0.9210969
+          x: 0.33982757
+          y: -0.79703736
+          z: 0.0000038710923
+          w: -0.77316844
         c3:
-          x: 1.7987769
-          y: -0.49932832
-          z: 0.001000901
-          w: -0.178949
+          x: -0.043243814
+          y: -0.25341704
+          z: 0.0009942962
+          w: 1.1402192
       matClipToViewNoOffset:
         c0:
           x: 1.284211
@@ -1171,24 +1171,24 @@ MonoBehaviour:
           w: 0.005006765
       matClipToWorldNoOffset:
         c0:
-          x: -1.2686172
-          y: 0.017235423
-          z: 0.19877683
+          x: -1.1553181
+          y: 0.018488925
+          z: 0.5604432
           w: 0
         c1:
-          x: -0.024999054
-          y: 0.53867227
-          z: -0.20625378
-          w: 1.1368626e-10
+          x: -0.12090893
+          y: 0.49812546
+          z: -0.26567918
+          w: 0
         c2:
-          x: 2242.764
-          y: 173.61958
-          z: -625.36975
+          x: 356.2733
+          y: 703.27
+          z: 838.4858
           w: 999.99493
         c3:
-          x: -0.13798125
-          y: -0.3587368
-          z: -0.92422813
+          x: -0.38136694
+          y: -0.50185585
+          z: -0.76897067
           w: 0.005006765
       viewportOrigin:
         x: 0
@@ -1200,8 +1200,8 @@ MonoBehaviour:
         x: 0.00094250706
         y: 0.002096436
       pixelOffset:
-        x: 0.47827148
-        y: 0.06896818
+        x: 0.36853027
+        y: 0.19963926
       clipToWindowScale:
         x: 530.5
         y: -238.5
@@ -1215,23 +1215,23 @@ MonoBehaviour:
         x: -1
         y: 0.99999994
       cameraDirectionOrPosition:
-        x: 2.2427752
-        y: 0.17362046
-        z: -0.6253729
+        x: 0.35627508
+        y: 0.70327353
+        z: 0.83849
         w: 1
     runtimeParams:
       neighborOffsetMask: 8191
       activeCheckerboardField: 0
-      frameIndex: 3680
+      frameIndex: 6780
       pad2: 0
     reblurHitDistParams:
-      x: 0
-      y: 0
-      z: 0
+      x: 3
+      y: 0.1
+      z: 20
       w: 0
     pad3: 0
-    enablePreviousTLAS: 1
-    denoiserMode: 1
+    enablePreviousTLAS: 2
+    denoiserMode: 2
     discountNaiveSamples: 0
     enableBrdfIndirect: 0
     enableBrdfAdditiveBlend: 1
@@ -1280,16 +1280,16 @@ MonoBehaviour:
         pad1: 0
         pad2: 0
       bufferIndices:
-        initialSamplingOutputBufferIndex: 2
-        temporalResamplingInputBufferIndex: 1
-        temporalResamplingOutputBufferIndex: 2
-        spatialResamplingInputBufferIndex: 2
-        spatialResamplingOutputBufferIndex: 0
-        shadingInputBufferIndex: 0
+        initialSamplingOutputBufferIndex: 1
+        temporalResamplingInputBufferIndex: 0
+        temporalResamplingOutputBufferIndex: 1
+        spatialResamplingInputBufferIndex: 1
+        spatialResamplingOutputBufferIndex: 2
+        shadingInputBufferIndex: 2
         pad1: 0
         pad2: 0
       initialSamplingParams:
-        numLocalLightSamples: 1
+        numLocalLightSamples: 8
         numInfiniteLightSamples: 0
         numEnvironmentSamples: 0
         numBrdfSamples: 0
@@ -1308,7 +1308,7 @@ MonoBehaviour:
         normalThreshold: 0.5
         enableVisibilityShortcut: 1
         enablePermutationSampling: 1
-        uniformRandomNumber: 3610082417
+        uniformRandomNumber: 1660833598
         permutationSamplingThreshold: 0
       boilingFilterParams:
         enableBoilingFilter: 1
@@ -1334,7 +1334,7 @@ MonoBehaviour:
         biasCorrectionMode: 1
         maxHistoryLength: 20
         enablePermutationSampling: 1
-        uniformRandomNumber: 3610082417
+        uniformRandomNumber: 1660833598
         enableVisibilityShortcut: 1
         numSamples: 1
         numDisocclusionBoostSamples: 8
@@ -1373,7 +1373,7 @@ MonoBehaviour:
         biasCorrectionMode: 1
         maxReservoirAge: 30
         enablePermutationSampling: 0
-        uniformRandomNumber: 3610082417
+        uniformRandomNumber: 1660833598
       boilingFilterParams:
         enableBoilingFilter: 1
         boilingFilterStrength: 0.2
@@ -1398,7 +1398,7 @@ MonoBehaviour:
         enableFallbackSampling: 1
         maxReservoirAge: 30
         enablePermutationSampling: 0
-        uniformRandomNumber: 3610082417
+        uniformRandomNumber: 1660833598
         pad1: 0
         pad2: 0
       finalShadingParams:

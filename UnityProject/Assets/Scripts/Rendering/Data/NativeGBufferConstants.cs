@@ -56,15 +56,15 @@ namespace PathTracing
     {
         public NativePlanarViewConstants view;
         public NativePlanarViewConstants viewPrev;
-        public float roughnessOverride;          // negative = disabled
-        public float metalnessOverride;          // negative = disabled
-        public float normalMapScale;
-        public uint  enableAlphaTestedGeometry;
-        public int2  materialReadbackPosition;   // (-1,-1) = disabled
-        public uint  materialReadbackBufferIndex;
-        public uint  enableTransparentGeometry;
-        public float textureLodBias;
-        public float textureGradientScale;
+        public float                     roughnessOverride; // negative = disabled
+        public float                     metalnessOverride; // negative = disabled
+        public float                     normalMapScale;
+        public uint                      enableAlphaTestedGeometry;
+        public int2                      materialReadbackPosition; // (-1,-1) = disabled
+        public uint                      materialReadbackBufferIndex;
+        public uint                      enableTransparentGeometry;
+        public float                     textureLodBias;
+        public float                     textureGradientScale;
     }
 
     /// <summary>
@@ -77,18 +77,18 @@ namespace PathTracing
         {
             return new NativeGBufferConstants
             {
-                view     = BuildView(fs.worldToView,     fs.viewToClip,     fs.worldToClip,     fs.camPos,     renderResolution, resolutionScale, fs.viewportJitter),
+                view     = BuildView(fs.worldToView, fs.viewToClip, fs.worldToClip, fs.camPos, renderResolution, resolutionScale, fs.viewportJitter),
                 viewPrev = BuildView(fs.prevWorldToView, fs.prevViewToClip, fs.prevWorldToClip, fs.prevCamPos, renderResolution, resolutionScale, fs.prevViewportJitter),
 
-                roughnessOverride            = -1f,   // disabled — use material value
-                metalnessOverride            = -1f,   // disabled — use material value
-                normalMapScale               = 1f,
-                enableAlphaTestedGeometry    = 1u,
-                materialReadbackPosition     = new int2(-1, -1), // disabled
-                materialReadbackBufferIndex  = 0u,
-                enableTransparentGeometry    = 0u,
-                textureLodBias               = 0f,
-                textureGradientScale         = 1f,
+                roughnessOverride           = -1f, // disabled — use material value
+                metalnessOverride           = -1f, // disabled — use material value
+                normalMapScale              = 1f,
+                enableAlphaTestedGeometry   = 1u,
+                materialReadbackPosition    = new int2(-1, -1), // disabled
+                materialReadbackBufferIndex = 0u,
+                enableTransparentGeometry   = 0u,
+                textureLodBias              = 0f,
+                textureGradientScale        = 1f,
             };
         }
 
@@ -97,48 +97,72 @@ namespace PathTracing
             float3 cameraPos, int2 renderResolution, float resolutionScale, float2 jitter)
             => BuildView(worldToView, viewToClip, worldToClip, cameraPos, renderResolution, resolutionScale, jitter);
 
-        static NativePlanarViewConstants BuildView(
-            Matrix4x4 worldToView, Matrix4x4 viewToClip, Matrix4x4 worldToClip,
-            float3 cameraPos, int2 renderResolution, float resolutionScale, float2 jitter)
-        {
-            var w     = renderResolution.x * resolutionScale;
-            var h     = renderResolution.y * resolutionScale;
-            var vSize = new float2(w, h);
+       static NativePlanarViewConstants BuildView(
+    Matrix4x4 worldToView, 
+    Matrix4x4 viewToClipNoOffset, 
+    Matrix4x4 worldToClipNoOffset,
+    float3 cameraPos, 
+    int2 renderResolution, 
+    float resolutionScale, 
+    float2 jitter)
+{
+    var w = renderResolution.x * resolutionScale;
+    var h = renderResolution.y * resolutionScale;
+    var vSize = new float2(w, h);
 
-            // Clip space [-1,1] → window pixel (D3D convention: Y flipped)
-            var ctw_scale = new float2(0.5f * w, -0.5f * h);
-            var ctw_bias  = new float2(0.5f * w,  0.5f * h);
+    // 1. 计算偏移矩阵 (NDC 空间平移)
+    float offsetX = 2f * jitter.x / w;
+    float offsetY = -2f * jitter.y / h;
 
-            var wtc_scale = 1f / ctw_scale;
-            var wtc_bias  = -ctw_bias * wtc_scale;
+    // Unity Matrix4x4.Translate 创建的是列主序平移矩阵
+    Matrix4x4 pixelOffsetMatrix = Matrix4x4.Translate(new Vector3(offsetX, offsetY, 0));
+    Matrix4x4 pixelOffsetMatrixInv = Matrix4x4.Translate(new Vector3(-offsetX, -offsetY, 0));
 
-            // Inverse matrices on CPU (single frame, negligible cost)
-            var clipToView  = viewToClip.inverse;
-            var viewToWorld = worldToView.inverse;
-            var clipToWorld = worldToClip.inverse;
+    // 2. 【关键修复】在 Unity 中，应用 NDC 偏移需要左乘 (Pre-multiply)
+    // Clip_jittered = T_jitter * Clip_base
+    var viewToClip = pixelOffsetMatrix * viewToClipNoOffset; 
+    var worldToClip = pixelOffsetMatrix * worldToClipNoOffset;
 
-            return new NativePlanarViewConstants
-            {
-                matWorldToView          = worldToView,
-                matViewToClip           = viewToClip,
-                matWorldToClip          = worldToClip,
-                matClipToView           = clipToView,
-                matViewToWorld          = viewToWorld,
-                matClipToWorld          = clipToWorld,
-                matViewToClipNoOffset   = viewToClip,   // no jitter baked into our matrix
-                matWorldToClipNoOffset  = worldToClip,
-                matClipToViewNoOffset   = clipToView,
-                matClipToWorldNoOffset  = clipToWorld,
-                viewportOrigin          = float2.zero,
-                viewportSize            = vSize,
-                viewportSizeInv         = math.rcp(vSize),
-                pixelOffset             = jitter,
-                clipToWindowScale       = ctw_scale,
-                clipToWindowBias        = ctw_bias,
-                windowToClipScale       = wtc_scale,
-                windowToClipBias        = wtc_bias,
-                cameraDirectionOrPosition = new float4(cameraPos, 1f),
-            };
-        }
+    // 3. 计算逆矩阵
+    // (T * P * V)^-1 = V^-1 * P^-1 * T^-1
+    // 在 Unity 中 A * B 的逆是 B.inv * A.inv
+    var clipToViewNoOffset = viewToClipNoOffset.inverse;
+    var clipToWorldNoOffset = worldToClipNoOffset.inverse;
+
+    // 注意逆矩阵的顺序也要反过来
+    var clipToView = clipToViewNoOffset * pixelOffsetMatrixInv;
+    var clipToWorld = clipToWorldNoOffset * pixelOffsetMatrixInv;
+
+    var viewToWorld = worldToView.inverse;
+
+    // ... 其他逻辑保持不变 ...
+    var ctw_scale = new float2(0.5f * w, -0.5f * h);
+    var ctw_bias = new float2(0.5f * w, 0.5f * h);
+    var wtc_scale = 1f / ctw_scale;
+    var wtc_bias = -ctw_bias * wtc_scale;
+
+    return new NativePlanarViewConstants
+    {
+        matWorldToView = worldToView,
+        matViewToClip = viewToClip,
+        matWorldToClip = worldToClip,
+        matClipToView = clipToView,
+        matViewToWorld = viewToWorld,
+        matClipToWorld = clipToWorld,
+        matViewToClipNoOffset = viewToClipNoOffset,
+        matWorldToClipNoOffset = worldToClipNoOffset,
+        matClipToViewNoOffset = clipToViewNoOffset,
+        matClipToWorldNoOffset = clipToWorldNoOffset,
+        viewportOrigin = float2.zero,
+        viewportSize = vSize,
+        viewportSizeInv = math.rcp(vSize),
+        pixelOffset = jitter,
+        clipToWindowScale = ctw_scale,
+        clipToWindowBias = ctw_bias,
+        windowToClipScale = wtc_scale,
+        windowToClipBias = wtc_bias,
+        cameraDirectionOrPosition = new float4(cameraPos, 1f),
+    };
+}
     }
 }
