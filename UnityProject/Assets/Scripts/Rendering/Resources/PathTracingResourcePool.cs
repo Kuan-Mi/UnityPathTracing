@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using Nri;
 using Unity.Mathematics;
+using UnityEngine;
 using UnityEngine.Experimental.Rendering;
 using UnityEngine.Rendering;
 
@@ -19,6 +20,11 @@ namespace PathTracing
     public class PathTracingResourcePool : IDisposable
     {
         private readonly Dictionary<RenderResourceType, NriTextureResource> _nriResources = new();
+
+        // Gradient Texture2DArray (2 slices, ping-pong within single array) used by FilterGradientsPass.
+        // Not NRI-managed: bound via raw native ptr to NativeComputeDescriptorSet.
+        private RTHandle _rtxdiGradientArray;
+        public IntPtr GradientArrayPtr => _rtxdiGradientArray?.rt != null ? _rtxdiGradientArray.rt.GetNativeTexturePtr() : IntPtr.Zero;
 
         public int2 renderResolution { get; private set; }
 
@@ -117,6 +123,31 @@ namespace PathTracing
             // ── RTXDI NRD denoised outputs ────────────────────────────────────────
             _nriResources[RenderResourceType.RtxdiDenoisedDiffuseLighting]  = new NriTextureResource(RenderResourceType.RtxdiDenoisedDiffuseLighting,  GraphicsFormat.R16G16B16A16_SFloat, uavState);
             _nriResources[RenderResourceType.RtxdiDenoisedSpecularLighting] = new NriTextureResource(RenderResourceType.RtxdiDenoisedSpecularLighting, GraphicsFormat.R16G16B16A16_SFloat, uavState);
+
+            // ── RTXDI confidence textures (ping-pong per frame, R8_UNorm) ──────────
+            _nriResources[RenderResourceType.RtxdiDiffuseConfidence]      = new NriTextureResource(RenderResourceType.RtxdiDiffuseConfidence,      GraphicsFormat.R8_UNorm, uavState);
+            _nriResources[RenderResourceType.RtxdiPrevDiffuseConfidence]  = new NriTextureResource(RenderResourceType.RtxdiPrevDiffuseConfidence,  GraphicsFormat.R8_UNorm, uavState);
+            _nriResources[RenderResourceType.RtxdiSpecularConfidence]     = new NriTextureResource(RenderResourceType.RtxdiSpecularConfidence,     GraphicsFormat.R8_UNorm, uavState);
+            _nriResources[RenderResourceType.RtxdiPrevSpecularConfidence] = new NriTextureResource(RenderResourceType.RtxdiPrevSpecularConfidence, GraphicsFormat.R8_UNorm, uavState);
+        }
+
+        /// <summary>
+        /// Allocates (or reallocates) the gradient Texture2DArray (2 slices) used by FilterGradientsPass.
+        /// Call each frame after computing gradDims = ceil(renderRes / RTXDI_GRAD_FACTOR).
+        /// </summary>
+        public void EnsureRtxdiGradientArray(int2 gradDims)
+        {
+            var rt = _rtxdiGradientArray?.rt;
+            if (rt != null && rt.width == gradDims.x && rt.height == gradDims.y) return;
+
+            _rtxdiGradientArray?.Release();
+            var desc = new RenderTextureDescriptor(gradDims.x, gradDims.y, GraphicsFormat.R16G16B16A16_SFloat, 0)
+            {
+                dimension         = TextureDimension.Tex2DArray,
+                volumeDepth       = 2,
+                enableRandomWrite = true,
+            };
+            _rtxdiGradientArray = RTHandles.Alloc(desc);
         }
 
         /// <summary>
@@ -286,6 +317,9 @@ namespace PathTracing
 
             foreach (var res in _nriResources.Values) res.Release();
             _nriResources.Clear();
+
+            _rtxdiGradientArray?.Release();
+            _rtxdiGradientArray = null;
         }
     }
 }

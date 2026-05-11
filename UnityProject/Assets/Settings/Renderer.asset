@@ -306,6 +306,7 @@ MonoBehaviour:
     upscalerMode: 0
     skipRightEyeInVR: 1
     enableDenoiser: 0
+    enableGradients: 0
     lightingSettings:
       denoiserMode: 0
       enablePreviousTLAS: 1
@@ -1561,3 +1562,5 @@ MonoBehaviour:
   ptFinalShadingCs: {fileID: -2368575503658470205, guid: aa617678eb9a08645b362713c2ef250b, type: 3}
   compositingPassCs: {fileID: -2368575503658470205, guid: 5a6883217629ab840a29e57ae5a31e6a, type: 3}
   genMipsCs: {fileID: 7200000, guid: 479eb3f98680430492d6af04d7f3ee14, type: 3}
+  filterGradientsPassCs: {fileID: 0}
+  confidencePassCs: {fileID: 0}

@@ -61,6 +61,12 @@ namespace PathTracing
         public IntPtr DirectLightingRawPtr;         // u_DirectLightingRaw        (u17)
         public IntPtr IndirectLightingRawPtr;       // u_IndirectLightingRaw      (u18)
 
+        // --- Confidence textures (ping-pong, written by ConfidencePass, consumed by NRD) ---
+        public IntPtr DiffuseConfidencePtr;         // u_DiffuseConfidence (current frame output)
+        public IntPtr PrevDiffuseConfidencePtr;     // t_PrevDiffuseConfidence (previous frame input)
+        public IntPtr SpecularConfidencePtr;        // u_SpecularConfidence (current frame output)
+        public IntPtr PrevSpecularConfidencePtr;    // t_PrevSpecularConfidence (previous frame input)
+
         // u_RayCountBuffer (u12): raw uint buffer for per-frame ray counting (debug / stats).
         // Stored as a GraphicsBuffer because it is a raw/typed buffer, not a texture.
         public GraphicsBuffer RayCountBuffer;

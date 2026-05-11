@@ -91,5 +91,11 @@ namespace PathTracing
         // RTXDI NRD denoised outputs (written by NRD, read by CompositingPass)
         RtxdiDenoisedDiffuseLighting, // OUT_DIFF_RADIANCE_HITDIST RGBA16_SFloat
         RtxdiDenoisedSpecularLighting, // OUT_SPEC_RADIANCE_HITDIST RGBA16_SFloat
+
+        // RTXDI confidence textures (ping-pong, written by ConfidencePass, read by NRD)
+        RtxdiDiffuseConfidence,      // R8_UNorm — current-frame diffuse confidence
+        RtxdiPrevDiffuseConfidence,  // R8_UNorm — previous-frame diffuse confidence
+        RtxdiSpecularConfidence,     // R8_UNorm — current-frame specular confidence
+        RtxdiPrevSpecularConfidence, // R8_UNorm — previous-frame specular confidence
     }
 }

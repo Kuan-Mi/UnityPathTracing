@@ -77,15 +77,19 @@ namespace PathTracing
 
         // ReSTIR PT
         public NativeComputeShader ptGenerateInitialSamplesCs; // LightingPasses/PT/GenerateInitialSamples.computeshader
-        public NativeComputeShader ptTemporalResamplingCs;     // LightingPasses/PT/TemporalResampling.computeshader
-        public NativeComputeShader ptSpatialResamplingCs;      // LightingPasses/PT/SpatialResampling.computeshader
-        public NativeComputeShader ptFillSampleIDCs;           // LightingPasses/PT/FillSampleID.computeshader
-        public NativeComputeShader ptComputeDuplicationMapCs;  // LightingPasses/PT/ComputeDuplicationMap.computeshader
-        public NativeComputeShader ptFinalShadingCs;           // LightingPasses/PT/FinalShading.computeshader
+        public NativeComputeShader ptTemporalResamplingCs; // LightingPasses/PT/TemporalResampling.computeshader
+        public NativeComputeShader ptSpatialResamplingCs; // LightingPasses/PT/SpatialResampling.computeshader
+        public NativeComputeShader ptFillSampleIDCs; // LightingPasses/PT/FillSampleID.computeshader
+        public NativeComputeShader ptComputeDuplicationMapCs; // LightingPasses/PT/ComputeDuplicationMap.computeshader
+        public NativeComputeShader ptFinalShadingCs; // LightingPasses/PT/FinalShading.computeshader
 
         // Auxiliary
         public NativeComputeShader compositingPassCs; // CompositingPass.computeshader
         public ComputeShader       genMipsCs;
+
+        // Denoising passes (gradient filter + confidence)
+        public NativeComputeShader filterGradientsPassCs; // DenoisingPasses/FilterGradientsPass.computeshader
+        public NativeComputeShader confidencePassCs; // DenoisingPasses/ConfidencePass.computeshader
 
         // -------------------------------------------------------------------
         // Pass instances (one per implemented pass; rest filled in over time)
@@ -110,7 +114,11 @@ namespace PathTracing
         private NativeRtxdiPTComputeDuplicationMapPass  _ptComputeDuplicationMapPass;
         private NativeRtxdiPTFinalShadingPass           _ptFinalShadingPass;
 
-        private NativeFrameTick                       _nativeFrameTickPass;
+        private NativeFrameTick _nativeFrameTickPass;
+
+        // Denoising: gradient filter + confidence (mirror FullSample FilterGradientsPass + ConfidencePass)
+        private NativeRtxdiFilterGradientsPass _filterGradientsPass;
+        private NativeRtxdiConfidencePass      _confidencePass;
 
         // -------------------------------------------------------------------
         // Managed scaffolding passes (still using RayTracingShader / ComputeShader).
@@ -203,10 +211,13 @@ namespace PathTracing
             _ptTemporalResamplingPass     ??= new NativeRtxdiPTTemporalResamplingPass(ptTemporalResamplingCs) { renderPassEvent         = renderPassEvent };
             _ptSpatialResamplingPass      ??= new NativeRtxdiPTSpatialResamplingPass(ptSpatialResamplingCs) { renderPassEvent           = renderPassEvent };
             _ptFillSampleIDPass           ??= new NativeRtxdiPTFillSampleIDPass(ptFillSampleIDCs) { renderPassEvent                     = renderPassEvent };
-            _ptComputeDuplicationMapPass  ??= new NativeRtxdiPTComputeDuplicationMapPass(ptComputeDuplicationMapCs) { renderPassEvent  = renderPassEvent };
+            _ptComputeDuplicationMapPass  ??= new NativeRtxdiPTComputeDuplicationMapPass(ptComputeDuplicationMapCs) { renderPassEvent   = renderPassEvent };
             _ptFinalShadingPass           ??= new NativeRtxdiPTFinalShadingPass(ptFinalShadingCs) { renderPassEvent                     = renderPassEvent };
 
             _nativeFrameTickPass ??= new NativeFrameTick() { renderPassEvent = renderPassEvent, };
+
+            _filterGradientsPass ??= filterGradientsPassCs != null ? new NativeRtxdiFilterGradientsPass(filterGradientsPassCs) { renderPassEvent = renderPassEvent } : null;
+            _confidencePass      ??= confidencePassCs != null ? new NativeRtxdiConfidencePass(confidencePassCs) { renderPassEvent                = renderPassEvent } : null;
         }
 
         public void InitializeBuffers()
@@ -335,14 +346,15 @@ namespace PathTracing
             _gbufferConstantsArray[0] = NativeGBufferConstantsBuilder.Build(frameState, renderResolution, 1f);
             _gbufferConstantBuffer.SetData(_gbufferConstantsArray);
 
+            bool enableDirectReStirPass = setting.directLightingMode == DirectLightingMode.ReStir;
+
             var localSettings = setting.lightingSettings;
             localSettings.enablePreviousTLAS        = false;
             localSettings.enableAlphaTestedGeometry = false;
             localSettings.enableTransparentGeometry = false;
-            localSettings.denoiserMode              = setting.enableDenoiser ? 1u : 0u; // 1 = DENOISER_MODE_REBLUR
-            localSettings.enableGradients           = false;
+            localSettings.denoiserMode    = setting.enableDenoiser ? 1u : 0u; // 1 = DENOISER_MODE_REBLUR
+            localSettings.enableGradients = enableDirectReStirPass && setting.enableDenoiser && setting.enableGradients;
 
-            bool enableDirectReStirPass    = setting.directLightingMode == DirectLightingMode.ReStir;
             bool enableBrdfAndIndirectPass = setting.directLightingMode == DirectLightingMode.Brdf || setting.indirectLightingMode != IndirectLightingMode.None;
             bool enableIndirect            = setting.indirectLightingMode != IndirectLightingMode.None;
             bool needSecondaryGBuffer      = enableIndirect || setting.directLightingMode == DirectLightingMode.Brdf;
@@ -449,6 +461,22 @@ namespace PathTracing
             // ---- Ping-pong GBuffer (current vs previous frame) ----
             bool isOddFrame = (curFrame % 2) == 1;
 
+            // ---- Gradient texture (RTXDI_GRAD_FACTOR = 3) + confidence ping-pong ----
+            const int GradFactor = 3; // RTXDI_GRAD_FACTOR from ShaderParameters.h
+            var gradDims = new int2(
+                (renderResolution.x + GradFactor - 1) / GradFactor,
+                (renderResolution.y + GradFactor - 1) / GradFactor);
+
+            bool enableGradients = enableDirectReStirPass && setting.enableDenoiser && setting.enableGradients;
+            if (enableGradients)
+                pool.EnsureRtxdiGradientArray(gradDims);
+
+            // Confidence ping-pong: current frame writes, previous frame is read.
+            var diffConfCurrentType = isOddFrame ? RenderResourceType.RtxdiDiffuseConfidence : RenderResourceType.RtxdiPrevDiffuseConfidence;
+            var diffConfPrevType    = isOddFrame ? RenderResourceType.RtxdiPrevDiffuseConfidence : RenderResourceType.RtxdiDiffuseConfidence;
+            var specConfCurrentType = isOddFrame ? RenderResourceType.RtxdiSpecularConfidence : RenderResourceType.RtxdiPrevSpecularConfidence;
+            var specConfPrevType    = isOddFrame ? RenderResourceType.RtxdiPrevSpecularConfidence : RenderResourceType.RtxdiSpecularConfidence;
+
             RTHandle viewDepth     = isOddFrame ? pool.GetRT(RenderResourceType.RtxdiViewDepth) : pool.GetRT(RenderResourceType.RtxdiPrevViewDepth);
             RTHandle diffuseAlbedo = isOddFrame ? pool.GetRT(RenderResourceType.RtxdiDiffuseAlbedo) : pool.GetRT(RenderResourceType.RtxdiPrevDiffuseAlbedo);
             RTHandle specularRough = isOddFrame ? pool.GetRT(RenderResourceType.RtxdiSpecularRough) : pool.GetRT(RenderResourceType.RtxdiPrevSpecularRough);
@@ -489,11 +517,18 @@ namespace PathTracing
                 DirectLightingRawPtr       = GetPt(RenderResourceType.RtxdiDirectLightingRaw),
                 IndirectLightingRawPtr     = GetPt(RenderResourceType.RtxdiIndirectLightingRaw),
                 DenoiserNormalRoughnessPtr = GetPt(RenderResourceType.RtxdiDenoiserNormalRoughness),
-                RayCountBuffer             = rtxdiResources.RayCountBuffer,
-                Resources                  = rtxdiResources,
-                Pool                       = pool,
-                RenderResolution           = renderResolution,
-                ResolutionScale            = 1f,
+                // Gradient 2DArray (written by DI shaders when enableGradients=1, filtered by FilterGradientsPass)
+                GradientsPtr = pool.GradientArrayPtr,
+                // Confidence ping-pong
+                DiffuseConfidencePtr      = GetPt(diffConfCurrentType),
+                PrevDiffuseConfidencePtr  = GetPt(diffConfPrevType),
+                SpecularConfidencePtr     = GetPt(specConfCurrentType),
+                PrevSpecularConfidencePtr = GetPt(specConfPrevType),
+                RayCountBuffer            = rtxdiResources.RayCountBuffer,
+                Resources                 = rtxdiResources,
+                Pool                      = pool,
+                RenderResolution          = renderResolution,
+                ResolutionScale           = 1f,
             };
 
             // ---- Build native TLAS (must run before RaytracedGBuffer which needs SceneBVH) ----
@@ -620,7 +655,7 @@ namespace PathTracing
             }
 
             // ---- ReSTIR PT (NATIVE) ----
-            if (setting.indirectLightingMode ==  IndirectLightingMode.ReStirPT && _ptGenerateInitialSamplesPass != null)
+            if (setting.indirectLightingMode == IndirectLightingMode.ReStirPT && _ptGenerateInitialSamplesPass != null)
             {
                 _ptGenerateInitialSamplesPass.Setup(nativeCtx);
                 renderer.EnqueuePass(_ptGenerateInitialSamplesPass);
@@ -648,6 +683,7 @@ namespace PathTracing
                         _ptFillSampleIDPass.Setup(nativeCtx);
                         renderer.EnqueuePass(_ptFillSampleIDPass);
                     }
+
                     if (_ptComputeDuplicationMapPass != null)
                     {
                         _ptComputeDuplicationMapPass.Setup(nativeCtx);
@@ -665,6 +701,16 @@ namespace PathTracing
             // ---- NRD denoising (REBLUR_DIFFUSE_SPECULAR) ----
             if (setting.enableDenoiser)
             {
+                // ---- Filter gradients + compute confidence (mirrors FullSample stages 2-4) ----
+                if (enableGradients && _filterGradientsPass != null && _confidencePass != null)
+                {
+                    _filterGradientsPass.Setup(pool.GradientArrayPtr, gradDims);
+                    renderer.EnqueuePass(_filterGradientsPass);
+
+                    _confidencePass.Setup(nativeCtx, pool.GradientArrayPtr, gradDims);
+                    renderer.EnqueuePass(_confidencePass);
+                }
+
                 // ---- NRD resource bindings (update every frame for ping-pong ViewDepth) ----
                 var currentViewDepthNri = pool.GetNriResource(isOddFrame ? RenderResourceType.RtxdiViewDepth : RenderResourceType.RtxdiPrevViewDepth);
 
@@ -674,6 +720,8 @@ namespace PathTracing
                     (ResourceType.IN_NORMAL_ROUGHNESS, pool.GetNriResource(RenderResourceType.RtxdiDenoiserNormalRoughness)),
                     (ResourceType.IN_DIFF_RADIANCE_HITDIST, pool.GetNriResource(RenderResourceType.RtxdiDiffuseLighting)),
                     (ResourceType.IN_SPEC_RADIANCE_HITDIST, pool.GetNriResource(RenderResourceType.RtxdiSpecularLighting)),
+                    (ResourceType.IN_DIFF_CONFIDENCE, pool.GetNriResource(diffConfCurrentType)),
+                    (ResourceType.IN_SPEC_CONFIDENCE, pool.GetNriResource(specConfCurrentType)),
                     (ResourceType.OUT_DIFF_RADIANCE_HITDIST, pool.GetNriResource(RenderResourceType.RtxdiDenoisedDiffuseLighting)),
                     (ResourceType.OUT_SPEC_RADIANCE_HITDIST, pool.GetNriResource(RenderResourceType.RtxdiDenoisedSpecularLighting))
                 );
@@ -683,17 +731,19 @@ namespace PathTracing
 
                 var nrdInput = new NrdDenoiser.NrdFrameInput
                 {
-                    worldToView         = frameState.worldToView,
-                    prevWorldToView     = frameState.prevWorldToView,
-                    viewToClip          = frameState.viewToClip,
-                    prevViewToClip      = frameState.prevViewToClip,
-                    viewportJitter      = frameState.viewportJitter,
-                    prevViewportJitter  = frameState.prevViewportJitter,
-                    resolutionScale     = frameState.resolutionScale,
-                    prevResolutionScale = frameState.prevResolutionScale,
-                    renderResolution    = frameState.renderResolution,
-                    frameIndex          = curFrame,
-                    lightDirection      = lightDir,
+                    worldToView                  = frameState.worldToView,
+                    prevWorldToView              = frameState.prevWorldToView,
+                    viewToClip                   = frameState.viewToClip,
+                    prevViewToClip               = frameState.prevViewToClip,
+                    viewportJitter               = frameState.viewportJitter,
+                    prevViewportJitter           = frameState.prevViewportJitter,
+                    resolutionScale              = frameState.resolutionScale,
+                    prevResolutionScale          = frameState.prevResolutionScale,
+                    renderResolution             = frameState.renderResolution,
+                    frameIndex                   = curFrame,
+                    lightDirection               = lightDir,
+                    denoisingRange               = 1000f,
+                    isHistoryConfidenceAvailable = enableGradients,
                 };
 
                 _nrdDenoisePass.Setup(nrdReblur.GetInteropDataPtr(nrdInput), RenderPassMarkers.NrdDenoiseRtxdi);
@@ -906,6 +956,10 @@ namespace PathTracing
             _ptFinalShadingPass = null;
             _presampleReGirNativePass?.Dispose();
             _presampleReGirNativePass = null;
+            _filterGradientsPass?.Dispose();
+            _filterGradientsPass = null;
+            _confidencePass?.Dispose();
+            _confidencePass = null;
             _compositingPass?.Dispose();
             _compositingPass     = null;
             _nrdDenoisePass      = null;
@@ -1050,10 +1104,13 @@ namespace PathTracing
             ptFillSampleIDCs           = LoadCS($"{shaderRoot}/LightingPasses/PT/FillSampleID.computeshader");
             ptComputeDuplicationMapCs  = LoadCS($"{shaderRoot}/LightingPasses/PT/ComputeDuplicationMap.computeshader");
             ptFinalShadingCs           = LoadCS($"{shaderRoot}/LightingPasses/PT/FinalShading.computeshader");
-            
+
             // Managed compute helpers (kept for v1 — not yet ported to NativeComputeShader)
             compositingPassCs = LoadCS($"{shaderRoot}/CompositingPass.computeshader");
             genMipsCs         = UnityEditor.AssetDatabase.LoadAssetAtPath<ComputeShader>("Assets/Shaders/RayTracing/DI/GenerateMips.compute");
+
+            filterGradientsPassCs = LoadCS($"{shaderRoot}/DenoisingPasses/FilterGradientsPass.computeshader");
+            confidencePassCs      = LoadCS($"{shaderRoot}/DenoisingPasses/ConfidencePass.computeshader");
 
             UnityEditor.EditorUtility.SetDirty(this);
 
