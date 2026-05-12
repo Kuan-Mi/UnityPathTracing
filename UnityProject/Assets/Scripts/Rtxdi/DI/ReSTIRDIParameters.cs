@@ -72,7 +72,7 @@ namespace Rtxdi.DI
     [StructLayout(LayoutKind.Sequential)]
     public struct RTXDI_DIInitialSamplingParameters
     {
-        [Range(0, 1600)]
+        [Range(0, 16)]
         public uint numLocalLightSamples;
 
         [Range(0, 16)]

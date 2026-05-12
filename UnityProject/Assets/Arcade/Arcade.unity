@@ -1463,7 +1463,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 0
+  m_IsActive: 1
 --- !u!114 &847621194
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -1567,7 +1567,7 @@ Transform:
   m_GameObject: {fileID: 847621193}
   serializedVersion: 2
   m_LocalRotation: {x: 0.7370626, y: -0.47224024, z: -0.19251123, w: 0.44347206}
-  m_LocalPosition: {x: -0.315, y: 1.782, z: 2.653}
+  m_LocalPosition: {x: 0.147, y: 1.782, z: 2.527}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -1675,8 +1675,8 @@ Transform:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 892357417}
   serializedVersion: 2
-  m_LocalRotation: {x: 0.06657017, y: -0.8903887, z: 0.15124291, w: 0.42414853}
-  m_LocalPosition: {x: 1.7445884, y: 0.31950045, z: 1.5321753}
+  m_LocalRotation: {x: 0.15893738, y: -0.8108468, z: 0.2571661, w: 0.5011308}
+  m_LocalPosition: {x: 2, y: 1.577, z: 1}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -3032,7 +3032,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 0
+  m_IsActive: 1
 --- !u!108 &2135674572
 Light:
   m_ObjectHideFlags: 0
@@ -3043,7 +3043,7 @@ Light:
   m_Enabled: 1
   serializedVersion: 12
   m_Type: 1
-  m_Color: {r: 1.2379484, g: 1.1589767, b: 1.0201759, a: 1}
+  m_Color: {r: 1.2349333, g: 1.1384655, b: 0.99033135, a: 1}
   m_Intensity: 1
   m_Range: 10
   m_SpotAngle: 30
@@ -3106,13 +3106,13 @@ Transform:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 2135674571}
   serializedVersion: 2
-  m_LocalRotation: {x: -0.5524722, y: -0.59175277, z: 0.123530425, w: -0.5738845}
-  m_LocalPosition: {x: 2.368456, y: 0.31057167, z: 2.9381924}
+  m_LocalRotation: {x: -0.36690396, y: -0.19997685, z: -0.10610852, w: -0.90229255}
+  m_LocalPosition: {x: 2.354, y: 0.31057167, z: 2.851}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
   m_Father: {fileID: 0}
-  m_LocalEulerAnglesHint: {x: -308.711, y: -240.20099, z: 414.964}
+  m_LocalEulerAnglesHint: {x: -321.708, y: -326.013, z: 385.527}
 --- !u!114 &2135674574
 MonoBehaviour:
   m_ObjectHideFlags: 0
