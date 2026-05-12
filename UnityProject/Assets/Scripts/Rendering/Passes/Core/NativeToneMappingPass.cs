@@ -66,7 +66,8 @@ namespace PathTracing
         private readonly NativeComputeDescriptorSet _tonemapDs;
 
         // ── GPU resources ────────────────────────────────────────────────────
-        private readonly GraphicsBuffer _cbuffer;        // ToneMappingConstants
+        private readonly GraphicsBuffer _histogramCBuffer;  // ToneMappingConstants for histogram pass
+        private readonly GraphicsBuffer _otherCBuffer;      // ToneMappingConstants for exposure + tonemap passes (log scale inverted for exposure pass)
         private readonly GraphicsBuffer _histogramBuffer; // 256 x uint
         private readonly GraphicsBuffer _exposureBuffer;  // 1 x uint (float bits)
 
@@ -89,9 +90,10 @@ namespace PathTracing
             _tonemapCs   = new NativeComputePipeline(tonemapCs);
             _tonemapDs   = new NativeComputeDescriptorSet(_tonemapCs);
 
-            _cbuffer         = new GraphicsBuffer(GraphicsBuffer.Target.Constant, 1, Marshal.SizeOf<ToneMappingConstants>());
-            _histogramBuffer = new GraphicsBuffer(GraphicsBuffer.Target.Raw, 256, sizeof(uint));
-            _exposureBuffer  = new GraphicsBuffer(GraphicsBuffer.Target.Raw, 1,   sizeof(uint));
+            _histogramCBuffer = new GraphicsBuffer(GraphicsBuffer.Target.Constant, 1, Marshal.SizeOf<ToneMappingConstants>());
+                _otherCBuffer     = new GraphicsBuffer(GraphicsBuffer.Target.Constant, 1, Marshal.SizeOf<ToneMappingConstants>());
+            _histogramBuffer  = new GraphicsBuffer(GraphicsBuffer.Target.Raw, 256, sizeof(uint));
+            _exposureBuffer   = new GraphicsBuffer(GraphicsBuffer.Target.Raw, 1,   sizeof(uint));
         }
 
         public void Dispose()
@@ -102,7 +104,8 @@ namespace PathTracing
             _exposureCs?.Dispose();
             _tonemapDs?.Dispose();
             _tonemapCs?.Dispose();
-            _cbuffer?.Release();
+            _histogramCBuffer?.Release();
+            _otherCBuffer?.Release();
             _histogramBuffer?.Release();
             _exposureBuffer?.Release();
         }
@@ -113,6 +116,42 @@ namespace PathTracing
         {
             _resource = resource;
             _settings = settings;
+        }
+
+        // ── Debug Readback ────────────────────────────────────────────────────
+
+        /// <summary>
+        /// 回读 HistogramBuffer，打印非零 bin 的数量和总像素计数（需等待 GPU 完成）。
+        /// 用法：在 Update() 或 OnRenderImage() 中调用，每隔几帧调用一次即可。
+        /// </summary>
+        public void ReadbackHistogram()
+        {
+            var req = AsyncGPUReadback.Request(_histogramBuffer);
+            req.WaitForCompletion();
+            if (req.hasError) { Debug.LogError("[ToneMapping] HistogramBuffer readback error"); return; }
+
+            var data = req.GetData<uint>();
+            int nonZero = 0;
+            long total  = 0;
+            for (int i = 0; i < data.Length; i++)
+            {
+                if (data[i] != 0) { nonZero++; total += data[i]; }
+            }
+            Debug.Log($"[ToneMapping] Histogram: {nonZero}/256 bins non-zero, total pixel weight = {total / 64f:F1} (fixed-point /64)");
+        }
+
+        /// <summary>
+        /// 回读 ExposureBuffer，打印当前 adapted luminance 值。
+        /// </summary>
+        public void ReadbackExposure()
+        {
+            var req = AsyncGPUReadback.Request(_exposureBuffer);
+            req.WaitForCompletion();
+            if (req.hasError) { Debug.LogError("[ToneMapping] ExposureBuffer readback error"); return; }
+
+            var data = req.GetData<uint>();
+            float lum = System.BitConverter.ToSingle(System.BitConverter.GetBytes(data[0]), 0);
+            Debug.Log($"[ToneMapping] Adapted luminance = {lum:F6}  (raw uint = {data[0]})");
         }
 
         // ── Resource / Settings ──────────────────────────────────────────────
@@ -153,7 +192,8 @@ namespace PathTracing
             internal NativeComputeDescriptorSet ExposureDs;
             internal NativeComputePipeline      TonemapCs;
             internal NativeComputeDescriptorSet TonemapDs;
-            internal GraphicsBuffer             CBuffer;
+            internal GraphicsBuffer             histogramCBuffer;
+            internal GraphicsBuffer             otherCBuffer;
             internal GraphicsBuffer             HistogramBuffer;
             internal GraphicsBuffer             ExposureBuffer;
             internal Resource                   Resource;
@@ -194,11 +234,17 @@ namespace PathTracing
                     ? new float2(1f / (res.ColorLUTSize * res.ColorLUTSize), 1f / res.ColorLUTSize)
                     : float2.zero,
             };
-            data.CBuffer.SetData(new[] { cb });
+            data.histogramCBuffer.SetData(new[] { cb });
 
-            var cbPtr   = data.CBuffer.GetNativeBufferPtr();
-            var histPtr = data.HistogramBuffer.GetNativeBufferPtr();
-            var expPtr  = data.ExposureBuffer.GetNativeBufferPtr();
+            cb.logLuminanceScale = MaxLogLuminance - MinLogLuminance;
+            cb.logLuminanceBias  = MinLogLuminance;
+            
+            data.otherCBuffer.SetData(new[] { cb });
+
+            var histogramCbPtr = data.histogramCBuffer.GetNativeBufferPtr();
+            var otherCbPtr     = data.otherCBuffer.GetNativeBufferPtr();
+            var histPtr        = data.HistogramBuffer.GetNativeBufferPtr();
+            var expPtr         = data.ExposureBuffer.GetNativeBufferPtr();
 
             uint renderW = (uint)s.RenderResolution.x;
             uint renderH = (uint)s.RenderResolution.y;
@@ -208,7 +254,7 @@ namespace PathTracing
             cmd.SetBufferData(data.HistogramBuffer, new uint[256]);
 
             // Build
-            data.HistogramDs.SetConstantBuffer("c_ToneMapping", cbPtr);
+            data.HistogramDs.SetConstantBuffer("c_ToneMapping", histogramCbPtr);
             data.HistogramDs.SetTexture("t_Source", res.SourceTexture);
             data.HistogramDs.SetRWTypedBuffer("u_Histogram", histPtr, 256, (uint)Nri.DXGI_FORMAT.DXGI_FORMAT_R32_UINT);
 
@@ -217,14 +263,14 @@ namespace PathTracing
             data.HistogramCs.Dispatch(cmd, data.HistogramDs, hx, hy, 1);
 
             // ── Pass 2: Compute Exposure ─────────────────────────────────────
-            data.ExposureDs.SetConstantBuffer("c_ToneMapping", cbPtr);
+            data.ExposureDs.SetConstantBuffer("c_ToneMapping", otherCbPtr);
             data.ExposureDs.SetTypedBuffer("t_Histogram", histPtr, 256, (uint)Nri.DXGI_FORMAT.DXGI_FORMAT_R32_UINT);
             data.ExposureDs.SetRWTypedBuffer("u_Exposure", expPtr, 1,   (uint)Nri.DXGI_FORMAT.DXGI_FORMAT_R32_UINT);
 
             data.ExposureCs.Dispatch(cmd, data.ExposureDs, 1, 1, 1);
 
             // ── Pass 3: Tone Map ─────────────────────────────────────────────
-            data.TonemapDs.SetConstantBuffer("c_ToneMapping", cbPtr);
+            data.TonemapDs.SetConstantBuffer("c_ToneMapping", otherCbPtr);
             data.TonemapDs.SetTexture("t_Source",   res.SourceTexture);
             data.TonemapDs.SetTypedBuffer("t_Exposure", expPtr, 1, (uint)Nri.DXGI_FORMAT.DXGI_FORMAT_R32_UINT);
             if (res.ColorLUT != IntPtr.Zero)
@@ -250,7 +296,8 @@ namespace PathTracing
             passData.ExposureDs     = _exposureDs;
             passData.TonemapCs      = _tonemapCs;
             passData.TonemapDs      = _tonemapDs;
-            passData.CBuffer        = _cbuffer;
+            passData.histogramCBuffer        = _histogramCBuffer;
+            passData.otherCBuffer            = _otherCBuffer;
             passData.HistogramBuffer= _histogramBuffer;
             passData.ExposureBuffer = _exposureBuffer;
             passData.Resource       = _resource;

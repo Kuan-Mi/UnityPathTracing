@@ -107,10 +107,13 @@ namespace PathTracing
             {
                 case NativeRtxdiShowMode.Final:
                     // Mirror FullSample SceneRenderer::RenderWaitFrame:
-                    //   LdrColor when ToneMapping on (SR path uses upscaled output),
+                    //   DlssOutput when SR is on,
+                    //   LdrColor when ToneMapping is on,
                     //   HdrColor otherwise.
                     if (res.DlssOutput != null)
                         Blitter.BlitTexture(cmd, res.DlssOutput, fullScaleOffset, mat, (int)ShowPass.Out);
+                    else if (res.LdrColor != null)
+                        Blitter.BlitTexture(cmd, res.LdrColor, scaleOffset, mat, (int)ShowPass.Out);
                     else if (res.HdrColor != null)
                         Blitter.BlitTexture(cmd, res.HdrColor, scaleOffset, mat, (int)ShowPass.Out);
                     break;

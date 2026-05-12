@@ -106,16 +106,5 @@ void main(uint2 pixelPos : SV_DispatchThreadID)
         result.rgb = ApplyColorLUT(result.rgb);
     }
 
-
-    // ---- 调试区 ----
-    // STEP 3A: 检查 t_Source (HDR源图) 是否正确
-    // 如果画面全黑或花屏，说明 t_Source 绑定有问题
-    //u_Output[pixelPos] = float4(HdrColor.rgb * 1000, 1); // HDR值通常很亮，缩小10倍看结构
-
-    // STEP 3B: 检查 Exposure 值是否合理 (注释掉3A后启用)
-    float expVal = asfloat(t_Exposure[0]);
-     u_Output[pixelPos] = float4(expVal, expVal, expVal, 1); // 期望值约 0.002~0.2
-
-    // STEP 3C: 检查 ConvertToLDR 输出 (注释掉3A/3B后启用)
-    // u_Output[pixelPos] = float4(result.rgb, 1);
+    u_Output[pixelPos] = float4(result.rgb, 1);
 }
