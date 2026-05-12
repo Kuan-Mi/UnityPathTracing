@@ -795,7 +795,7 @@ namespace PathTracing
                 var dlsrRes = new DlsrUpscaler.DlsrResources
                 {
                     input    = pool.HdrColor,
-                    output   = pool.DlssOutput,
+                    output   = pool.ResolvedColor,
                     mv       = pool.MotionVectors,
                     depth    = pool.DeviceDepth,
                     exposure = default,
@@ -829,7 +829,7 @@ namespace PathTracing
                 var outputBlitResource = new NativeRtxdiOutputBlitPass.Resource
                 {
                     HdrColor           = pool.HdrColor.Handle,
-                    DlssOutput         = setting.SR ? pool.DlssOutput.Handle : null,
+                    DlssOutput         = setting.SR ? pool.ResolvedColor.Handle : null,
 
                     DiffuseLighting    = pool.DiffuseLighting.Handle,
                     SpecularLighting   = pool.SpecularLighting.Handle,
