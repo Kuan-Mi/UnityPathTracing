@@ -226,6 +226,20 @@ namespace PathTracing
 
         public RTXDI_PTTemporalResamplingParameters ptTemporalResamplingParams = ReSTIRPTDefaults.GetDefaultTemporalResamplingParams();
         public RTXDI_PTSpatialResamplingParameters  ptSpatialResamplingParams  = ReSTIRPTDefaults.GetDefaultSpatialResamplingParams();
+
+        [FoldoutHeader("Tone Mapping")]
+        public bool  enableToneMapping            = true;
+        [Range(-5f, 5f)]
+        public float tmExposureBias               = -0.5f;
+        public float tmWhitePoint                 =  3f;
+        public float tmMinAdaptedLuminance         =  0.002f;
+        public float tmMaxAdaptedLuminance         =  0.2f;
+        [Range(0f, 1f)]
+        public float tmHistogramLowPercentile      =  0.8f;
+        [Range(0f, 1f)]
+        public float tmHistogramHighPercentile     =  0.95f;
+        public float tmEyeAdaptationSpeedUp        =  2f;
+        public float tmEyeAdaptationSpeedDown      =  1f;
     }
 
     /// <summary>
@@ -241,6 +255,7 @@ namespace PathTracing
         // ── Intermediate lighting buffers ──────────────────────────────────
         /// <summary>Raw HDR composited lighting written by CompositingPass (= original HdrColor).</summary>
         HdrColor,
+        LdrColor,
         /// <summary>DLSS-SR upscaled output (display resolution).</summary>
         DlssOutput,
 

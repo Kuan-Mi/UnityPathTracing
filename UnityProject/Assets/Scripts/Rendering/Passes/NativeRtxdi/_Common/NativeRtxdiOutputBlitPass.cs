@@ -36,6 +36,7 @@ namespace PathTracing
             // ── Main outputs ───────────────────────────────────────────────
             /// <summary>Composited HDR lighting (CompositingPass output = original HdrColor).</summary>
             internal RTHandle HdrColor;
+            internal RTHandle LdrColor;
             /// <summary>DLSS-SR upscaled image (display resolution). Null when SR is disabled.</summary>
             internal RTHandle DlssOutput;
 
@@ -117,6 +118,10 @@ namespace PathTracing
                 case NativeRtxdiShowMode.HdrColor:
                     if (res.HdrColor != null)
                         Blitter.BlitTexture(cmd, res.HdrColor, scaleOffset, mat, (int)ShowPass.Out);
+                    break;
+                case NativeRtxdiShowMode.LdrColor:
+                    if (res.LdrColor != null)
+                        Blitter.BlitTexture(cmd, res.LdrColor, scaleOffset, mat, (int)ShowPass.Out);
                     break;
 
                 case NativeRtxdiShowMode.DlssOutput:

@@ -93,6 +93,11 @@ namespace PathTracing
         public NativeComputeShader filterGradientsPassCs; // DenoisingPasses/FilterGradientsPass.computeshader
         public NativeComputeShader confidencePassCs; // DenoisingPasses/ConfidencePass.computeshader
 
+        // Tone mapping
+        public NativeComputeShader toneMappingHistogramCs; // Shaders/donut/histogram.computeshader
+        public NativeComputeShader toneMappingExposureCs; // Shaders/donut/exposure.computeshader
+        public NativeComputeShader toneMappingCs; // Shaders/donut/tonemapping.computeshader
+
         // -------------------------------------------------------------------
         // Pass instances (one per implemented pass; rest filled in over time)
         // -------------------------------------------------------------------
@@ -122,6 +127,8 @@ namespace PathTracing
         private NativeRtxdiFilterGradientsPass _filterGradientsPass;
         private NativeRtxdiConfidencePass      _confidencePass;
 
+        private NativeToneMappingPass _toneMappingPass;
+
         private          DlssSRPass                     _dlssrPass;
         private readonly Dictionary<long, DlsrUpscaler> _dlsrUpscalers = new();
 
@@ -137,8 +144,8 @@ namespace PathTracing
         private NativeRtxdiPdfMipsPass       _pdfMipsPass;
         private PresamplePass                _presamplePass;
         private NrdPass                      _nrdDenoisePass;
-        private NativeRtxdiCompositingPass         _compositingPass;
-        private NativeRtxdiOutputBlitPass          _outputBlitPass;
+        private NativeRtxdiCompositingPass   _compositingPass;
+        private NativeRtxdiOutputBlitPass    _outputBlitPass;
 
         // Native: builds GPUScene TLAS at the head of the native pipeline.
         private NativeRtxdiBuildAccelerationStructurePass _buildAsPass;
@@ -195,7 +202,7 @@ namespace PathTracing
             _nrdDenoisePass  ??= new NrdPass() { renderPassEvent                                     = renderPassEvent };
             _compositingPass ??= new NativeRtxdiCompositingPass(compositingPassCs) { renderPassEvent = renderPassEvent };
 
-            _pdfMipsPass    ??= new NativeRtxdiPdfMipsPass(genMipsCs) { renderPassEvent = renderPassEvent };
+            _pdfMipsPass    ??= new NativeRtxdiPdfMipsPass(genMipsCs) { renderPassEvent        = renderPassEvent };
             _outputBlitPass ??= new NativeRtxdiOutputBlitPass(finalMaterial) { renderPassEvent = renderPassEvent };
 
             _presampleLightsNativePass ??= new NativeRtxdiPresampleLightsPass(presampleLightsCs) { renderPassEvent = renderPassEvent };
@@ -223,6 +230,10 @@ namespace PathTracing
 
             _filterGradientsPass ??= filterGradientsPassCs != null ? new NativeRtxdiFilterGradientsPass(filterGradientsPassCs) { renderPassEvent = renderPassEvent } : null;
             _confidencePass      ??= confidencePassCs != null ? new NativeRtxdiConfidencePass(confidencePassCs) { renderPassEvent                = renderPassEvent } : null;
+
+            _toneMappingPass ??= (toneMappingHistogramCs != null && toneMappingExposureCs != null && toneMappingCs != null)
+                ? new NativeToneMappingPass(toneMappingHistogramCs, toneMappingExposureCs, toneMappingCs) { renderPassEvent = renderPassEvent }
+                : null;
 
             _dlssrPass ??= new DlssSRPass() { renderPassEvent = renderPassEvent };
         }
@@ -823,23 +834,53 @@ namespace PathTracing
                 renderer.EnqueuePass(_dlssrPass);
             }
 
+            // ---- Tone Mapping (HDR → LDR, adaptive exposure) ----
+            if (_toneMappingPass != null && setting.enableToneMapping)
+            {
+                var tmSource = setting.SR ? pool.ResolvedColor.NativePtr : pool.HdrColor.NativePtr;
+                var tmRes    = setting.SR ? outputResolution : renderResolution;
+                var tmResource = new NativeToneMappingPass.Resource
+                {
+                    SourceTexture = tmSource,
+                    OutputTexture = pool.LdrColor.NativePtr,
+                    ColorLUT      = tmSource,
+                    ColorLUTSize  = 0f,
+                };
+                var tmSettings = new NativeToneMappingPass.Settings
+                {
+                    RenderResolution          = tmRes,
+                    FrameTime                 = Time.deltaTime,
+                    ExposureBias              = setting.tmExposureBias,
+                    WhitePoint                = setting.tmWhitePoint,
+                    MinAdaptedLuminance       = setting.tmMinAdaptedLuminance,
+                    MaxAdaptedLuminance       = setting.tmMaxAdaptedLuminance,
+                    HistogramLowPercentile    = setting.tmHistogramLowPercentile,
+                    HistogramHighPercentile   = setting.tmHistogramHighPercentile,
+                    EyeAdaptationSpeedUp      = setting.tmEyeAdaptationSpeedUp,
+                    EyeAdaptationSpeedDown    = setting.tmEyeAdaptationSpeedDown,
+                };
+                _toneMappingPass.Setup(tmResource, tmSettings);
+                renderer.EnqueuePass(_toneMappingPass);
+            }
+
             // ---- OutputBlit (shows DirectLighting = composited NRD result) ----
             if (_outputBlitPass != null)
             {
                 var outputBlitResource = new NativeRtxdiOutputBlitPass.Resource
                 {
-                    HdrColor           = pool.HdrColor.Handle,
-                    DlssOutput         = setting.SR ? pool.ResolvedColor.Handle : null,
+                    HdrColor   = pool.HdrColor.Handle,
+                    LdrColor   = pool.LdrColor.Handle,
+                    DlssOutput = setting.SR ? pool.ResolvedColor.Handle : null,
 
-                    DiffuseLighting    = pool.DiffuseLighting.Handle,
-                    SpecularLighting   = pool.SpecularLighting.Handle,
-                    DenoisedDiffuse    = pool.DenoisedDiffuseLighting.Handle,
-                    DenoisedSpecular   = pool.DenoisedSpecularLighting.Handle,
-                    DirectLightingRaw  = pool.DirectLightingRaw.Handle,
+                    DiffuseLighting     = pool.DiffuseLighting.Handle,
+                    SpecularLighting    = pool.SpecularLighting.Handle,
+                    DenoisedDiffuse     = pool.DenoisedDiffuseLighting.Handle,
+                    DenoisedSpecular    = pool.DenoisedSpecularLighting.Handle,
+                    DirectLightingRaw   = pool.DirectLightingRaw.Handle,
                     IndirectLightingRaw = pool.IndirectLightingRaw.Handle,
 
-                    NrdValidation      = pool.NrdValidation.Handle,
-                    MotionVectors      = pool.MotionVectors.Handle,
+                    NrdValidation = pool.NrdValidation.Handle,
+                    MotionVectors = pool.MotionVectors.Handle,
 
                     // GBuffer debug
                     ViewDepth     = viewDepth,
@@ -1014,6 +1055,8 @@ namespace PathTracing
             _filterGradientsPass = null;
             _confidencePass?.Dispose();
             _confidencePass = null;
+            _toneMappingPass?.Dispose();
+            _toneMappingPass = null;
             _compositingPass?.Dispose();
             _compositingPass = null;
             _nrdDenoisePass  = null;
@@ -1169,6 +1212,10 @@ namespace PathTracing
 
             filterGradientsPassCs = LoadCS($"{shaderRoot}/DenoisingPasses/FilterGradientsPass.computeshader");
             confidencePassCs      = LoadCS($"{shaderRoot}/DenoisingPasses/ConfidencePass.computeshader");
+
+            toneMappingHistogramCs = LoadCS($"Assets/Shaders/donut/histogram.computeshader");
+            toneMappingExposureCs  = LoadCS($"Assets/Shaders/donut/exposure.computeshader");
+            toneMappingCs          = LoadCS($"Assets/Shaders/donut/tonemapping.computeshader");
 
             UnityEditor.EditorUtility.SetDirty(this);
 
