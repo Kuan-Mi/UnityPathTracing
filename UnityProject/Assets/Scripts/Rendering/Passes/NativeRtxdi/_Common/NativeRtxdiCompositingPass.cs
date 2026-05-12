@@ -62,6 +62,7 @@ namespace PathTracing
         public class Resource
         {
             internal IntPtr                      ConstantBuffer;
+            internal IntPtr                      CurrentDepth;
             internal NativeRtxdiTextureResources Pool;
             internal NativeRtxdiGPUScene         GpuScene;
         }
@@ -111,7 +112,7 @@ namespace PathTracing
             ds.SetRWTexture("u_MotionVectors",  pool.MotionVectors.NativePtr);
 
             // SRV inputs – GBuffer
-            ds.SetTexture("t_GBufferDepth",         pool.DeviceDepth.NativePtr);
+            ds.SetTexture("t_GBufferDepth", data.Resource.CurrentDepth);
             ds.SetTexture("t_GBufferNormals",        pool.GBufferNormals.NativePtr);
             ds.SetTexture("t_GBufferDiffuseAlbedo",  pool.GBufferDiffuseAlbedo.NativePtr);
             ds.SetTexture("t_GBufferSpecularRough",  pool.GBufferSpecularRough.NativePtr);

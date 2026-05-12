@@ -126,6 +126,12 @@ namespace PathTracing
         /// <summary>Number of valid light entries written this frame.</summary>
         public int TotalLightCount => _totalLightCount;
 
+        /// <summary>
+        /// Bindless texture array index of the environment map registered this frame.
+        /// -1 when no environment map is active. Set by BuildTasksOnCpu.
+        /// </summary>
+        public int EnvMapBindlessTextureIndex { get; private set; } = -1;
+
         // ── Temporal tracking (frame-relative light buffer offsets per geometry) ──
         // Key = (instanceIndex << 12 | geometrySubIndex).  Value = frame-relative offset.
         private readonly Dictionary<long, int> _prevEmissiveOffsets = new();
@@ -177,7 +183,11 @@ namespace PathTracing
         /// the <see cref="RTXDI_LightBufferParameters"/> to feed into
         /// <c>ResamplingConstants.lightBufferParams</c>.
         /// </summary>
-        public RTXDI_LightBufferParameters BuildTasksOnCpu(NativeRtxdiPassContext ctx)
+        public RTXDI_LightBufferParameters BuildTasksOnCpu(
+            NativeRtxdiPassContext ctx,
+            Texture2D environmentMap     ,
+            float     environmentRotDeg  ,
+            float     environmentScale   )
         {
             var resources = ctx.Resources;
             var gpuScene  = ctx.RtxdiGpuScene;
@@ -187,6 +197,11 @@ namespace PathTracing
             uint maxLights = resources.MaxEmissiveTriangles + resources.MaxPrimitiveLights;
             _currentFrameOffset  = maxLights * (_oddFrame ? 1u : 0u);
             _previousFrameOffset = maxLights * (_oddFrame ? 0u : 1u);
+
+            // ---- Register environment map in GPUScene bindless array ----
+            Texture2D envMapTex = environmentMap;
+
+            gpuScene.SetEnvironmentMap(envMapTex); // no-op if unchanged
 
             // ---- Collect analytic Unity lights ----
             // Gather all enabled Directional / Point / Spot lights in the scene.
@@ -205,9 +220,10 @@ namespace PathTracing
                 // Rectangle / Disc lights handled by LightScene; skip here.
             }
 
+            bool hasEnvLight = envMapTex != null;
             // ---- Collect emissive geometries from GPUScene ----
             var emissiveGeos = gpuScene.GetEmissiveGeometries();
-            int numAnalytic  = finiteLights.Count + infiniteLights.Count;
+            int numAnalytic  = finiteLights.Count + infiniteLights.Count + (hasEnvLight ? 1 : 0);
             int numTasks     = emissiveGeos.Count + numAnalytic;
 
             // Resize scratch arrays if needed
@@ -310,6 +326,38 @@ namespace PathTracing
                 numInfinitePrimLights++;
             }
 
+            // Environment light — placed after infinite lights, treated as another infinite light
+            // so it is sampled via infiniteLightBufferRegion (no presampled RIS required).
+            // direction1 holds the bindless texture index; direction2 holds the texture dimensions.
+            EnvMapBindlessTextureIndex = -1;
+            bool hasActiveEnvLight = false;
+            int  envTexIdx         = gpuScene.EnvironmentMapTextureIndex;
+            if (hasEnvLight && envTexIdx >= 0 && lightBufferOffset < maxLights)
+            {
+                var envPli = new PolymorphicLightInfo();
+                envPli.SetColorAndType( Color.white * environmentScale, PolymorphicLightType.kEnvironment);
+                envPli.direction1 = (uint)envTexIdx;
+                envPli.direction2 = (uint)(envMapTex.width | (envMapTex.height << 16));
+
+                float rotRad  = environmentRotDeg * Mathf.Deg2Rad;
+                envPli.scalars = LightScene.Fp32ToFp16(rotRad);
+
+                int prevOff = _prevPrimitiveLightOffsets.TryGetValue(0 /*env key = 0*/, out int envPo) ? envPo : -1;
+                _taskScratch[validTasks++] = new PrepareLightsTask
+                {
+                    instanceAndGeometryIndex  = TaskPrimitiveLightBit | (uint)primitiveWriteIdx,
+                    triangleCount             = 1u,
+                    lightBufferOffset         = lightBufferOffset,
+                    previousLightBufferOffset = prevOff,
+                };
+                _prevPrimitiveLightOffsets[0]               = (int)lightBufferOffset;
+                _primitiveLightScratch[primitiveWriteIdx++] = envPli;
+                lightBufferOffset++;
+                numInfinitePrimLights++;
+                EnvMapBindlessTextureIndex = envTexIdx;
+                hasActiveEnvLight = true;
+            }
+
             _numTasks        = (uint)validTasks;
             _totalLightCount = (int)lightBufferOffset;
 
@@ -343,16 +391,18 @@ namespace PathTracing
 
             // ---- Compose RTXDI_LightBufferParameters ----
             // Layout (frame-relative, shader adds _currentFrameOffset at runtime):
-            //   [0 .. emissivePlusFiniteCount)  — local lights (emissive triangles + point/spot)
-            //   [emissivePlusFiniteCount .. emissivePlusFiniteCount+numInfinite) — infinite (directional)
+            //   [0 .. emissivePlusFiniteCount)                       — local lights (emissive + point/spot)
+            //   [emissivePlusFiniteCount .. +numInfinite)            — infinite (directional + env)
+            // environmentLightParams is intentionally left empty: env map goes into the infinite
+            // region so it is sampled without a presampled-RIS pipeline.
             var p = new RTXDI_LightBufferParameters();
             p.localLightBufferRegion.firstLightIndex    = _currentFrameOffset;
             p.localLightBufferRegion.numLights          = emissivePlusFiniteCount;
             p.infiniteLightBufferRegion.firstLightIndex = _currentFrameOffset + emissivePlusFiniteCount;
             p.infiniteLightBufferRegion.numLights       = numInfinitePrimLights;
-            // No environment light.
-            p.environmentLightParams.lightPresent = 0;
-            p.environmentLightParams.lightIndex   = 0xFFFF_FFFFu;
+            p.environmentLightParams.lightPresent       = 0;
+            p.environmentLightParams.lightIndex         = 0xFFFF_FFFFu;
+
             return p;
         }
 

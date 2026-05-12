@@ -133,7 +133,7 @@ namespace PathTracing
         public bool enableGIFinalShading = true;
         public bool enableDIFinalShading = true;
 
-        public bool enableEnv        = true;
+        public bool enableEnv       = true;
         public bool useRasterGBuffer = true;
 
         public ReGIRDynamicParameters regirDynamicParams = ReGIRDynamicParameters.Default();
@@ -170,11 +170,11 @@ namespace PathTracing
     public class NativeRtxdiSetting
     {
         [FoldoutHeader("Base Settings")]
-        [Range(-10f, 10f)]
-        public float exposureEv = 0.0f;
-
-        public float exposure => Mathf.Pow(2, exposureEv);
-
+        public Texture2D environmentMap      = null; // Equirectangular env map for RTXDI importance sampling
+        [Range(0f, 360f)]
+        public float     environmentRotation = 0f;   // Horizontal rotation in degrees
+      
+        public float     environmentScale    = 1;   // Radiance multiplier
         public bool                cameraJitter = true;
         public NativeRtxdiShowMode showMode     = NativeRtxdiShowMode.Final;
         public bool                showMv;

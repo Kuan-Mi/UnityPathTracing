@@ -241,6 +241,28 @@ namespace PathTracing
         private bool _forceRebuild  = false;
         private bool _disposed;
 
+        // Optional equirectangular environment map for RTXDI environment light.
+        private Texture  _pendingEnvMap;
+        private int      _environmentMapTextureIndex = -1;
+
+        /// <summary>
+        /// Index of the environment map texture in the bindless texture array, or -1 if none.
+        /// Valid after the scene has been rebuilt (after <see cref="UpdateForFrame"/>).
+        /// </summary>
+        public int EnvironmentMapTextureIndex => _environmentMapTextureIndex;
+
+        /// <summary>
+        /// Registers an equirectangular environment map to include in the bindless texture array.
+        /// Call before <see cref="UpdateForFrame"/> each frame; only triggers a scene rebuild when
+        /// the texture instance changes.
+        /// </summary>
+        public void SetEnvironmentMap(Texture envMap)
+        {
+            if (_pendingEnvMap == envMap) return;
+            _pendingEnvMap  = envMap;
+            _sceneGpuDirty  = true;
+        }
+
         public RayTracingAccelerationStructure AccelerationStructure => _accelStructure;
 
         /// <summary>
@@ -397,6 +419,7 @@ namespace PathTracing
             _meshBufferSlots.Clear();
             _materialSlots.Clear();
             _textureSlots.Clear();
+            _environmentMapTextureIndex = -1;
 
             foreach (var buf in _ownedGfxBuffers)
                 buf?.Release();
@@ -504,6 +527,13 @@ namespace PathTracing
                     prevRow1  = row1,
                     prevRow2  = row2,
                 });
+            }
+
+            // Append environment map to bindless texture array (if registered)
+            if (_pendingEnvMap != null)
+            {
+                _environmentMapTextureIndex = texPtrs.Count;
+                texPtrs.Add(_pendingEnvMap.GetNativeTexturePtr());
             }
 
             _sceneBuffers = new BindlessBuffer(Mathf.Max(bufPtrs.Count, 1));

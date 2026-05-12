@@ -401,7 +401,11 @@ namespace PathTracing
                     Resources     = rtxdiResources,
                     RtxdiGpuScene = _rtxdiGpuScene,
                 };
-                lightBufferParams = _prepareLightsPass.BuildTasksOnCpu(prepCtx);
+                lightBufferParams = _prepareLightsPass.BuildTasksOnCpu(
+                    prepCtx,
+                    setting.environmentMap,
+                    setting.environmentRotation,
+                    setting.environmentScale);
             }
 
             uint2 localLightPdfTextureSize = rtxdiResources.LocalLightPdfTextureSize;
@@ -495,7 +499,7 @@ namespace PathTracing
             var specConfCurrent = isOddFrame ? pool.SpecularConfidence : pool.PrevSpecularConfidence;
             var specConfPrev    = isOddFrame ? pool.PrevSpecularConfidence : pool.SpecularConfidence;
 
-            RTHandle viewDepth     = isOddFrame ? pool.Depth.Handle : pool.PrevDepth.Handle;
+            RTHandle depth         = isOddFrame ? pool.Depth.Handle : pool.PrevDepth.Handle;
             RTHandle diffuseAlbedo = isOddFrame ? pool.GBufferDiffuseAlbedo.Handle : pool.PrevGBufferDiffuseAlbedo.Handle;
             RTHandle specularRough = isOddFrame ? pool.GBufferSpecularRough.Handle : pool.PrevGBufferSpecularRough.Handle;
             RTHandle normals       = isOddFrame ? pool.GBufferNormals.Handle : pool.PrevGBufferNormals.Handle;
@@ -775,12 +779,19 @@ namespace PathTracing
             {
                 compositingConstants = NativeCompositingConstantsBuilder.Build(
                     frameState, renderResolution, 1f, localSettings.denoiserMode);
+
+                compositingConstants.enableEnvironmentMap       = setting.environmentMap != null ? 1u : 0u;
+                compositingConstants.environmentMapTextureIndex = (uint)_rtxdiGpuScene.EnvironmentMapTextureIndex;
+                compositingConstants.environmentRotation        = setting.environmentRotation / 360f; // HLSL subtracts this from uv.x (0..1 range)
+                compositingConstants.environmentScale           = setting.environmentScale;
+
                 var compositingConstsArray = new[] { compositingConstants };
                 _compositingConstantBuffer.SetData(compositingConstsArray);
 
                 var compositingRes = new NativeRtxdiCompositingPass.Resource
                 {
                     ConstantBuffer = _compositingConstantBuffer.GetNativeBufferPtr(),
+                    CurrentDepth   = ToPt(depth),
                     Pool           = pool,
                     GpuScene       = _rtxdiGpuScene,
                 };
@@ -848,8 +859,8 @@ namespace PathTracing
                 };
                 var tmSettings = new NativeToneMappingPass.Settings
                 {
-                    RenderResolution          = tmRes,
-                    FrameTime                 = Time.deltaTime,
+                    RenderResolution  = tmRes,
+                    FrameTime         = Time.deltaTime,
                     ToneMappingParams = setting.toneMappingParams,
                 };
                 _toneMappingPass.Setup(tmResource, tmSettings);
@@ -876,7 +887,7 @@ namespace PathTracing
                     MotionVectors = pool.MotionVectors.Handle,
 
                     // GBuffer debug
-                    ViewDepth     = viewDepth,
+                    ViewDepth     = depth,
                     DiffuseAlbedo = diffuseAlbedo,
                     SpecularRough = specularRough,
                     Normals       = normals,
