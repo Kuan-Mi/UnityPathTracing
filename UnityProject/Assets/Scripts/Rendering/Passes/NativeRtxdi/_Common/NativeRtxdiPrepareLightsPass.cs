@@ -185,9 +185,9 @@ namespace PathTracing
         /// </summary>
         public RTXDI_LightBufferParameters BuildTasksOnCpu(
             NativeRtxdiPassContext ctx,
-            Texture2D environmentMap     ,
-            float     environmentRotDeg  ,
-            float     environmentScale   )
+            Texture2D environmentMap,
+            float environmentRotDeg,
+            float environmentScale)
         {
             var resources = ctx.Resources;
             var gpuScene  = ctx.RtxdiGpuScene;
@@ -335,11 +335,11 @@ namespace PathTracing
             if (hasEnvLight && envTexIdx >= 0 && lightBufferOffset < maxLights)
             {
                 var envPli = new PolymorphicLightInfo();
-                envPli.SetColorAndType( Color.white * environmentScale, PolymorphicLightType.kEnvironment);
+                envPli.SetColorAndType(Color.white * environmentScale, PolymorphicLightType.kEnvironment);
                 envPli.direction1 = (uint)envTexIdx;
                 envPli.direction2 = (uint)(envMapTex.width | (envMapTex.height << 16));
 
-                float rotRad  = environmentRotDeg * Mathf.Deg2Rad;
+                float rotRad = environmentRotDeg * Mathf.Deg2Rad;
                 envPli.scalars = LightScene.Fp32ToFp16(rotRad);
 
                 int prevOff = _prevPrimitiveLightOffsets.TryGetValue(0 /*env key = 0*/, out int envPo) ? envPo : -1;
@@ -355,7 +355,7 @@ namespace PathTracing
                 lightBufferOffset++;
                 numInfinitePrimLights++;
                 EnvMapBindlessTextureIndex = envTexIdx;
-                hasActiveEnvLight = true;
+                hasActiveEnvLight          = true;
             }
 
             _numTasks        = (uint)validTasks;

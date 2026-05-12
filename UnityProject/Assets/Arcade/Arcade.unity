@@ -394,7 +394,7 @@ MonoBehaviour:
     baseColor: {r: 1, g: 1, b: 1, a: 1}
     emissionColor: {r: 0, g: 0, b: 0, a: 1}
     metallic: 1
-    roughnessScale: 0.100000024
+    roughnessScale: 0.050000012
     normalScale: 1
   SubmeshGroups:
   - isTransparent: 0
@@ -414,7 +414,7 @@ MonoBehaviour:
       baseColor: {r: 1, g: 1, b: 1, a: 1}
       emissionColor: {r: 0, g: 0, b: 0, a: 1}
       metallic: 1
-      roughnessScale: 0.100000024
+      roughnessScale: 0.050000012
       normalScale: 1
 --- !u!23 &307774785
 MeshRenderer:
@@ -3075,7 +3075,7 @@ MonoBehaviour:
     baseColor: {r: 1, g: 1, b: 1, a: 1}
     emissionColor: {r: 0, g: 0, b: 0, a: 1}
     metallic: 1
-    roughnessScale: 0.00999999
+    roughnessScale: 0.050000012
     normalScale: 1
   SubmeshGroups:
   - isTransparent: 0
@@ -3095,7 +3095,7 @@ MonoBehaviour:
       baseColor: {r: 1, g: 1, b: 1, a: 1}
       emissionColor: {r: 0, g: 0, b: 0, a: 1}
       metallic: 1
-      roughnessScale: 0.00999999
+      roughnessScale: 0.050000012
       normalScale: 1
 --- !u!23 &1994543430
 MeshRenderer:
@@ -3314,7 +3314,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 0
+  m_IsActive: 1
 --- !u!108 &2135674572
 Light:
   m_ObjectHideFlags: 0
