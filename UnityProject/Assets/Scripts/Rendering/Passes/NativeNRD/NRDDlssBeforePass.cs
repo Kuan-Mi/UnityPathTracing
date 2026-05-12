@@ -59,7 +59,7 @@ namespace PathTracing
         public class Resource
         {
             internal IntPtr                  ConstantBuffer;
-            internal PathTracingResourcePool Pool;
+            internal NativeNrdTextureResources Pool;
         }
 
         public class Settings
@@ -78,7 +78,7 @@ namespace PathTracing
             internal NativeComputeDescriptorSet Ds;
             internal Resource                   Resource;
             internal Settings                   Settings;
-            internal PathTracingResourcePool    Pool;
+            internal NativeNrdTextureResources    Pool;
         }
 
         // -------------------------------------------------------------------------
@@ -96,16 +96,16 @@ namespace PathTracing
             cmd.BeginSample(RenderPassMarkers.DlssBefore);
 
             // SRV inputs
-            ds.SetTexture("gIn_Normal_Roughness", pool.GetPoint(RenderResourceType.NormalRoughness));
-            ds.SetTexture("gIn_BaseColor_Metalness", pool.GetPoint(RenderResourceType.BaseColorMetalness));
-            ds.SetTexture("gIn_Spec", pool.GetPoint(RenderResourceType.Unfiltered_Spec));
+            ds.SetTexture("gIn_Normal_Roughness", pool.NormalRoughness.NativePtr);
+            ds.SetTexture("gIn_BaseColor_Metalness", pool.BaseColorMetalness.NativePtr);
+            ds.SetTexture("gIn_Spec", pool.Unfiltered_Spec.NativePtr);
 
             // UAV outputs
-            ds.SetRWTexture("gInOut_ViewZ", pool.GetPoint(RenderResourceType.Viewz));
-            ds.SetRWTexture("gOut_DiffAlbedo", pool.GetPoint(RenderResourceType.RrGuideDiffAlbedo));
-            ds.SetRWTexture("gOut_SpecAlbedo", pool.GetPoint(RenderResourceType.RrGuideSpecAlbedo));
-            ds.SetRWTexture("gOut_SpecHitDistance", pool.GetPoint(RenderResourceType.RrGuideSpecHitDistance));
-            ds.SetRWTexture("gOut_Normal_Roughness", pool.GetPoint(RenderResourceType.RrGuideNormalRoughness));
+            ds.SetRWTexture("gInOut_ViewZ", pool.Viewz.NativePtr);
+            ds.SetRWTexture("gOut_DiffAlbedo", pool.RrGuideDiffAlbedo.NativePtr);
+            ds.SetRWTexture("gOut_SpecAlbedo", pool.RrGuideSpecAlbedo.NativePtr);
+            ds.SetRWTexture("gOut_SpecHitDistance", pool.RrGuideSpecHitDistance.NativePtr);
+            ds.SetRWTexture("gOut_Normal_Roughness", pool.RrGuideNormalRoughness.NativePtr);
 
             // Constant buffer
             ds.SetConstantBuffer("GlobalConstants", res.ConstantBuffer);

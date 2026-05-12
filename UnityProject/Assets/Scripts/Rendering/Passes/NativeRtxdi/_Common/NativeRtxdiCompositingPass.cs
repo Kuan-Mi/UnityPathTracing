@@ -61,9 +61,9 @@ namespace PathTracing
 
         public class Resource
         {
-            internal IntPtr                  ConstantBuffer;
-            internal PathTracingResourcePool Pool;
-            internal NativeRtxdiGPUScene     GpuScene;
+            internal IntPtr                      ConstantBuffer;
+            internal NativeRtxdiTextureResources Pool;
+            internal NativeRtxdiGPUScene         GpuScene;
         }
 
         public class Settings
@@ -107,27 +107,27 @@ namespace PathTracing
             ds.SetConstantBuffer("g_Const", data.Resource.ConstantBuffer);
 
             // UAV outputs
-            ds.SetRWTexture("u_Output",        pool.GetPoint(RenderResourceType.DirectLighting));
-            ds.SetRWTexture("u_MotionVectors",  pool.GetPoint(RenderResourceType.RtxdiMotionVectors));
+            ds.SetRWTexture("u_Output",        pool.DirectLighting.NativePtr);
+            ds.SetRWTexture("u_MotionVectors",  pool.RtxdiMotionVectors.NativePtr);
 
             // SRV inputs – GBuffer
-            ds.SetTexture("t_GBufferDepth",         pool.GetPoint(RenderResourceType.RtxdiDeviceDepth));
-            ds.SetTexture("t_GBufferNormals",        pool.GetPoint(RenderResourceType.RtxdiNormals));
-            ds.SetTexture("t_GBufferDiffuseAlbedo",  pool.GetPoint(RenderResourceType.RtxdiDiffuseAlbedo));
-            ds.SetTexture("t_GBufferSpecularRough",  pool.GetPoint(RenderResourceType.RtxdiSpecularRough));
-            ds.SetTexture("t_GBufferEmissive",       pool.GetPoint(RenderResourceType.RtxdiEmissive));
+            ds.SetTexture("t_GBufferDepth",         pool.RtxdiDeviceDepth.NativePtr);
+            ds.SetTexture("t_GBufferNormals",        pool.RtxdiNormals.NativePtr);
+            ds.SetTexture("t_GBufferDiffuseAlbedo",  pool.RtxdiDiffuseAlbedo.NativePtr);
+            ds.SetTexture("t_GBufferSpecularRough",  pool.RtxdiSpecularRough.NativePtr);
+            ds.SetTexture("t_GBufferEmissive",       pool.RtxdiEmissive.NativePtr);
 
             // SRV inputs – lighting (noisy)
-            ds.SetTexture("t_Diffuse",  pool.GetPoint(RenderResourceType.RtxdiDiffuseLighting));
-            ds.SetTexture("t_Specular", pool.GetPoint(RenderResourceType.RtxdiSpecularLighting));
+            ds.SetTexture("t_Diffuse",  pool.RtxdiDiffuseLighting.NativePtr);
+            ds.SetTexture("t_Specular", pool.RtxdiSpecularLighting.NativePtr);
 
             // SRV inputs – denoised
-            ds.SetTexture("t_DenoisedDiffuse",  pool.GetPoint(RenderResourceType.RtxdiDenoisedDiffuseLighting));
-            ds.SetTexture("t_DenoisedSpecular", pool.GetPoint(RenderResourceType.RtxdiDenoisedSpecularLighting));
+            ds.SetTexture("t_DenoisedDiffuse",  pool.RtxdiDenoisedDiffuseLighting.NativePtr);
+            ds.SetTexture("t_DenoisedSpecular", pool.RtxdiDenoisedSpecularLighting.NativePtr);
 
             // SRV inputs – PSR (not used; bind normals as dummy to avoid null hazard)
-            ds.SetTexture("t_PSRDiffuseAlbedo", pool.GetPoint(RenderResourceType.RtxdiNormals));
-            ds.SetTexture("t_PSRSpecularF0",    pool.GetPoint(RenderResourceType.RtxdiNormals));
+            ds.SetTexture("t_PSRDiffuseAlbedo", pool.RtxdiNormals.NativePtr);
+            ds.SetTexture("t_PSRSpecularF0",    pool.RtxdiNormals.NativePtr);
 
             // Bindless scene textures/buffers (space1/space2)
             data.Resource.GpuScene?.BindToShader(ds);

@@ -52,7 +52,7 @@ namespace PathTracing
         public class Resource
         {
             internal IntPtr                  ConstantBuffer;  // GlobalConstants CBV
-            internal PathTracingResourcePool Pool;
+            internal NativeNrdTextureResources Pool;
         }
 
         public class Settings
@@ -70,7 +70,7 @@ namespace PathTracing
             internal NativeComputeDescriptorSet Ds;
             internal Resource                   Resource;
             internal Settings                   Settings;
-            internal PathTracingResourcePool    Pool;
+            internal NativeNrdTextureResources    Pool;
         }
 
         // -------------------------------------------------------------------------
@@ -89,11 +89,11 @@ namespace PathTracing
 
             ds.SetConstantBuffer("GlobalConstants", res.ConstantBuffer);
 
-            ds.SetTexture("gIn_PostAA",     pool.GetPoint(RenderResourceType.PreFinal));
-            ds.SetTexture("gIn_PreAA",      pool.GetPoint(RenderResourceType.Composed));
-            ds.SetTexture("gIn_Validation", pool.GetPoint(RenderResourceType.Validation));
+            ds.SetTexture("gIn_PostAA",     pool.PreFinal.NativePtr);
+            ds.SetTexture("gIn_PreAA",      pool.Composed.NativePtr);
+            ds.SetTexture("gIn_Validation", pool.Validation.NativePtr);
 
-            ds.SetRWTexture("gOut_Final", pool.GetPoint(RenderResourceType.Final));
+            ds.SetRWTexture("gOut_Final", pool.Final.NativePtr);
 
             uint groupsX = ((uint)data.Settings.OutputResolution.x + 15u) / 16u;
             uint groupsY = ((uint)data.Settings.OutputResolution.y + 15u) / 16u;

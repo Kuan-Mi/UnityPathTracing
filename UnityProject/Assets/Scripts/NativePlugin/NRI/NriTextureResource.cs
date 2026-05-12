@@ -1,6 +1,5 @@
 ﻿using System;
 using System.Runtime.InteropServices;
-using PathTracing;
 using Unity.Mathematics;
 using UnityEngine;
 using UnityEngine.Experimental.Rendering;
@@ -30,9 +29,9 @@ namespace Nri
         public bool IsCreated => Handle != null;
 
 
-        public NriTextureResource(RenderResourceType resourceType, GraphicsFormat graphicsFormat, NriResourceState initialState, bool srgb = false)
+        public NriTextureResource(string name, GraphicsFormat graphicsFormat, NriResourceState initialState, bool srgb = false)
         {
-            Name = resourceType.ToString();
+            Name = name;
             ResourceState = initialState;
             GraphicsFormat = graphicsFormat;
             SRGB = srgb;

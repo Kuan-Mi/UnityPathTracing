@@ -49,7 +49,7 @@ namespace PathTracing
             internal IntPtr ConstantBuffer;
 
             // RT textures sourced from the pool inside ExecutePass
-            internal PathTracingResourcePool Pool;
+            internal NativeNrdTextureResources Pool;
             internal bool                    isEven;
         }
 
@@ -70,7 +70,7 @@ namespace PathTracing
             internal NativeComputeDescriptorSet DsPong;
             internal Resource                   Resource;
             internal Settings                   Settings;
-            internal PathTracingResourcePool    Pool;
+            internal NativeNrdTextureResources    Pool;
             internal bool                       IsEven;
         }
 
@@ -92,8 +92,8 @@ namespace PathTracing
             var ds = data.IsEven ? data.DsPing : data.DsPong;
 
             // Dynamic per-frame bindings (same regardless of ping/pong)
-            ds.SetTexture("gIn_Mv",       pool.GetPoint(RenderResourceType.MV));
-            ds.SetTexture("gIn_Composed", pool.GetPoint(RenderResourceType.Composed));
+            ds.SetTexture("gIn_Mv",       pool.MV.NativePtr);
+            ds.SetTexture("gIn_Composed", pool.Composed.NativePtr);
             ds.SetConstantBuffer("GlobalConstants", res.ConstantBuffer);
 
             cs.Dispatch(cmd, ds, (uint)data.Settings.rectGridW, (uint)data.Settings.rectGridH, 1);
@@ -121,11 +121,11 @@ namespace PathTracing
             // Ping (isEven):  gIn_History = TaaHistoryPrev, gOut_Result = TaaHistory
             // Pong (!isEven): gIn_History = TaaHistory,     gOut_Result = TaaHistoryPrev
             var pool = _resource.Pool;
-            _dsPing.SetTexture ("gIn_History",  pool.GetPoint(RenderResourceType.TaaHistoryPrev));
-            _dsPing.SetRWTexture("gOut_Result", pool.GetPoint(RenderResourceType.TaaHistory));
+            _dsPing.SetTexture ("gIn_History",  pool.TaaHistoryPrev.NativePtr);
+            _dsPing.SetRWTexture("gOut_Result", pool.TaaHistory.NativePtr);
 
-            _dsPong.SetTexture ("gIn_History",  pool.GetPoint(RenderResourceType.TaaHistory));
-            _dsPong.SetRWTexture("gOut_Result", pool.GetPoint(RenderResourceType.TaaHistoryPrev));
+            _dsPong.SetTexture ("gIn_History",  pool.TaaHistory.NativePtr);
+            _dsPong.SetRWTexture("gOut_Result", pool.TaaHistoryPrev.NativePtr);
  
 
             builder.AllowPassCulling(false);

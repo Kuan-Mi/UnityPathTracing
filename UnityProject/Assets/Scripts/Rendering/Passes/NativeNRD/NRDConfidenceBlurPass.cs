@@ -68,7 +68,7 @@ namespace PathTracing
         public class Resource
         {
             internal IntPtr                  ConstantBuffer;   // GlobalConstants CBV
-            internal PathTracingResourcePool Pool;
+            internal NativeNrdTextureResources Pool;
         }
 
         public class Settings
@@ -87,7 +87,7 @@ namespace PathTracing
             internal NativeComputeDescriptorSet[] Ds;  // [0..4], one per iteration
             internal Resource                     Resource;
             internal Settings                     Settings;
-            internal PathTracingResourcePool      Pool;
+            internal NativeNrdTextureResources      Pool;
         }
 
         // -------------------------------------------------------------------------
@@ -138,8 +138,8 @@ namespace PathTracing
             for (int i = 0; i < IterationCount; i++)
             {
                 bool isPing = (i % 2 == 0);
-                _ds[i].SetTexture ("gIn_Gradient",  pool.GetPoint(isPing ? RenderResourceType.Gradient_Ping : RenderResourceType.Gradient_Pong));
-                _ds[i].SetRWTexture("gOut_Gradient", pool.GetPoint(isPing ? RenderResourceType.Gradient_Pong : RenderResourceType.Gradient_Ping));
+                _ds[i].SetTexture ("gIn_Gradient",  isPing ? pool.Gradient_Ping.NativePtr : pool.Gradient_Pong.NativePtr);
+                _ds[i].SetRWTexture("gOut_Gradient", isPing ? pool.Gradient_Pong.NativePtr : pool.Gradient_Ping.NativePtr);
             }
 
             builder.AllowPassCulling(false);

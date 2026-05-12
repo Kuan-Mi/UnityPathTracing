@@ -68,7 +68,7 @@ namespace PathTracing
             internal IntPtr ConstantBuffer;
 
             // Gradient textures sourced from the pool inside ExecutePass
-            internal PathTracingResourcePool Pool;
+            internal NativeNrdTextureResources Pool;
         }
 
         public class Settings
@@ -92,7 +92,7 @@ namespace PathTracing
             internal NRDSampleResource          NrdResource;
             internal Resource                   Resource;
             internal Settings                   Settings;
-            internal PathTracingResourcePool    Pool;
+            internal NativeNrdTextureResources    Pool;
         }
 
         // -------------------------------------------------------------------------
@@ -177,13 +177,13 @@ namespace PathTracing
             // Odd  frame (Pong): StoredPong → in,  StoredPing → out
             // gOut_Gradient always writes to Gradient_Ping.
             var pool = _resource.Pool;
-            _updateDsPing.SetTexture ("gIn_PrevGradient",   pool.GetPoint(RenderResourceType.Gradient_StoredPing));
-            _updateDsPing.SetRWTexture("gOut_CurrGradient", pool.GetPoint(RenderResourceType.Gradient_StoredPong));
-            _updateDsPing.SetRWTexture("gOut_Gradient",     pool.GetPoint(RenderResourceType.Gradient_Ping));
+            _updateDsPing.SetTexture ("gIn_PrevGradient",   pool.Gradient_StoredPing.NativePtr);
+            _updateDsPing.SetRWTexture("gOut_CurrGradient", pool.Gradient_StoredPong.NativePtr);
+            _updateDsPing.SetRWTexture("gOut_Gradient",     pool.Gradient_Ping.NativePtr);
 
-            _updateDsPong.SetTexture ("gIn_PrevGradient",   pool.GetPoint(RenderResourceType.Gradient_StoredPong));
-            _updateDsPong.SetRWTexture("gOut_CurrGradient", pool.GetPoint(RenderResourceType.Gradient_StoredPing));
-            _updateDsPong.SetRWTexture("gOut_Gradient",     pool.GetPoint(RenderResourceType.Gradient_Ping));
+            _updateDsPong.SetTexture ("gIn_PrevGradient",   pool.Gradient_StoredPong.NativePtr);
+            _updateDsPong.SetRWTexture("gOut_CurrGradient", pool.Gradient_StoredPing.NativePtr);
+            _updateDsPong.SetRWTexture("gOut_Gradient",     pool.Gradient_Ping.NativePtr);
 
             builder.AllowPassCulling(false);
             builder.SetRenderFunc((PassData data, UnsafeGraphContext context) => ExecutePass(data, context));

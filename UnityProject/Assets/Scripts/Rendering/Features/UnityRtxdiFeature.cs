@@ -94,7 +94,7 @@ namespace PathTracing
         private readonly ResamplingConstants[] _resamplingConstantsArray = new ResamplingConstants[1];
 
         private readonly Dictionary<long, DlrrDenoiser>              _dlrrDenoisers     = new();
-        private readonly Dictionary<long, PathTracingResourcePool>   _resourcePools     = new();
+        private readonly Dictionary<long, UnityRtxdiTextureResources>   _resourcePools     = new();
         private readonly Dictionary<long, RtxdiResources>            _rtxdiResources    = new();
         private readonly Dictionary<long, ImportanceSamplingContext> _isContexts        = new();
         private readonly Dictionary<long, CameraFrameState>          _cameraFrameStates = new();
@@ -305,8 +305,7 @@ namespace PathTracing
 
             if (!_resourcePools.TryGetValue(uniqueKey, out var pool))
             {
-                pool = new PathTracingResourcePool();
-                pool.InitRtxdiResources();
+                pool = new UnityRtxdiTextureResources();
                 _resourcePools.Add(uniqueKey, pool);
             }
 
@@ -433,16 +432,16 @@ namespace PathTracing
             #endregion
 
             var isOddFrame        = (curFrame % 2) == 1;
-            var viewDepth         = isOddFrame ? pool.GetRT(RenderResourceType.RtxdiViewDepth) : pool.GetRT(RenderResourceType.RtxdiPrevViewDepth);
-            var diffuseAlbedo     = isOddFrame ? pool.GetRT(RenderResourceType.RtxdiDiffuseAlbedo) : pool.GetRT(RenderResourceType.RtxdiPrevDiffuseAlbedo);
-            var specularRough     = isOddFrame ? pool.GetRT(RenderResourceType.RtxdiSpecularRough) : pool.GetRT(RenderResourceType.RtxdiPrevSpecularRough);
-            var normals           = isOddFrame ? pool.GetRT(RenderResourceType.RtxdiNormals) : pool.GetRT(RenderResourceType.RtxdiPrevNormals);
-            var geoNormals        = isOddFrame ? pool.GetRT(RenderResourceType.RtxdiGeoNormals) : pool.GetRT(RenderResourceType.RtxdiPrevGeoNormals);
-            var prevViewDepth     = isOddFrame ? pool.GetRT(RenderResourceType.RtxdiPrevViewDepth) : pool.GetRT(RenderResourceType.RtxdiViewDepth);
-            var prevDiffuseAlbedo = isOddFrame ? pool.GetRT(RenderResourceType.RtxdiPrevDiffuseAlbedo) : pool.GetRT(RenderResourceType.RtxdiDiffuseAlbedo);
-            var prevSpecularRough = isOddFrame ? pool.GetRT(RenderResourceType.RtxdiPrevSpecularRough) : pool.GetRT(RenderResourceType.RtxdiSpecularRough);
-            var prevNormals       = isOddFrame ? pool.GetRT(RenderResourceType.RtxdiPrevNormals) : pool.GetRT(RenderResourceType.RtxdiNormals);
-            var prevGeoNormals    = isOddFrame ? pool.GetRT(RenderResourceType.RtxdiPrevGeoNormals) : pool.GetRT(RenderResourceType.RtxdiGeoNormals);
+            var viewDepth         = isOddFrame ? pool.RtxdiViewDepth.Handle : pool.RtxdiPrevViewDepth.Handle;
+            var diffuseAlbedo     = isOddFrame ? pool.RtxdiDiffuseAlbedo.Handle : pool.RtxdiPrevDiffuseAlbedo.Handle;
+            var specularRough     = isOddFrame ? pool.RtxdiSpecularRough.Handle : pool.RtxdiPrevSpecularRough.Handle;
+            var normals           = isOddFrame ? pool.RtxdiNormals.Handle : pool.RtxdiPrevNormals.Handle;
+            var geoNormals        = isOddFrame ? pool.RtxdiGeoNormals.Handle : pool.RtxdiPrevGeoNormals.Handle;
+            var prevViewDepth     = isOddFrame ? pool.RtxdiPrevViewDepth.Handle : pool.RtxdiViewDepth.Handle;
+            var prevDiffuseAlbedo = isOddFrame ? pool.RtxdiPrevDiffuseAlbedo.Handle : pool.RtxdiDiffuseAlbedo.Handle;
+            var prevSpecularRough = isOddFrame ? pool.RtxdiPrevSpecularRough.Handle : pool.RtxdiSpecularRough.Handle;
+            var prevNormals       = isOddFrame ? pool.RtxdiPrevNormals.Handle : pool.RtxdiNormals.Handle;
+            var prevGeoNormals    = isOddFrame ? pool.RtxdiPrevGeoNormals.Handle : pool.RtxdiGeoNormals.Handle;
 
             var rtxdiCtx = new RtxdiPassContext
             {
@@ -459,9 +458,9 @@ namespace PathTracing
                 PrevSpecularRough        = prevSpecularRough,
                 PrevNormals              = prevNormals,
                 PrevGeoNormals           = prevGeoNormals,
-                DirectLighting           = pool.GetRT(RenderResourceType.DirectLighting),
-                Emissive                 = pool.GetRT(RenderResourceType.RtxdiEmissive),
-                MotionVectors            = pool.GetRT(RenderResourceType.RtxdiMotionVectors),
+                DirectLighting           = pool.DirectLighting.Handle,
+                Emissive                 = pool.RtxdiEmissive.Handle,
+                MotionVectors            = pool.RtxdiMotionVectors.Handle,
                 LocalLightPdfTexture     = _lightScene.localLightPdfTexture,
                 RtxdiResources           = rtxdiResources,
                 RenderResolution         = renderResolution,
@@ -586,14 +585,14 @@ namespace PathTracing
 
             var dlrrRes = new DlrrDenoiser.DlrrResources
             {
-                input           = pool.GetNriResource(RenderResourceType.DirectLighting),
-                output          = pool.GetNriResource(RenderResourceType.DlssOutput),
-                mv              = pool.GetNriResource(RenderResourceType.RtxdiMotionVectors),
-                depth           = pool.GetNriResource(isOddFrame ? RenderResourceType.RtxdiViewDepth : RenderResourceType.RtxdiPrevViewDepth),
-                diffAlbedo      = pool.GetNriResource(RenderResourceType.RrGuideDiffAlbedo),
-                specAlbedo      = pool.GetNriResource(RenderResourceType.RrGuideSpecAlbedo),
-                normalRoughness = pool.GetNriResource(RenderResourceType.RrGuideNormalRoughness),
-                specHitDistance = pool.GetNriResource(RenderResourceType.RrGuideSpecHitDistance),
+                input           = pool.DirectLighting,
+                output          = pool.DlssOutput,
+                mv              = pool.RtxdiMotionVectors,
+                depth           = isOddFrame ? pool.RtxdiViewDepth : pool.RtxdiPrevViewDepth,
+                diffAlbedo      = pool.RrGuideDiffAlbedo,
+                specAlbedo      = pool.RrGuideSpecAlbedo,
+                normalRoughness = pool.RrGuideNormalRoughness,
+                specHitDistance = pool.RrGuideSpecHitDistance,
             };
 
             var dlrrInput = new DlrrDenoiser.DlrrFrameInput
@@ -612,10 +611,10 @@ namespace PathTracing
             var rectGridH = (int)(renderResolution.y * 1 + 0.5f + 15) / 16;
 
             _rtxdiDlssBeforePass.Setup(rtxdiCtx,
-                pool.GetRT(RenderResourceType.RrGuideDiffAlbedo),
-                pool.GetRT(RenderResourceType.RrGuideSpecAlbedo),
-                pool.GetRT(RenderResourceType.RrGuideSpecHitDistance),
-                pool.GetRT(RenderResourceType.RrGuideNormalRoughness),
+                pool.RrGuideDiffAlbedo.Handle,
+                pool.RrGuideSpecAlbedo.Handle,
+                pool.RrGuideSpecHitDistance.Handle,
+                pool.RrGuideNormalRoughness.Handle,
                 rectGridW, rectGridH);
             renderer.EnqueuePass(_rtxdiDlssBeforePass);
 
@@ -631,17 +630,17 @@ namespace PathTracing
 
             var outputBlitResource = new OutputBlitPass.Resource
             {
-                Mv                       = pool.GetRT(RenderResourceType.RtxdiMotionVectors),
-                DirectLighting           = pool.GetRT(RenderResourceType.DirectLighting),
-                RRGuide_DiffAlbedo       = pool.GetRT(RenderResourceType.RrGuideDiffAlbedo),
-                RRGuide_SpecAlbedo       = pool.GetRT(RenderResourceType.RrGuideSpecAlbedo),
-                RRGuide_Normal_Roughness = pool.GetRT(RenderResourceType.RrGuideNormalRoughness),
-                RRGuide_SpecHitDistance  = pool.GetRT(RenderResourceType.RrGuideSpecHitDistance),
-                DlssOutput               = pool.GetRT(RenderResourceType.DlssOutput),
+                Mv                       = pool.RtxdiMotionVectors.Handle,
+                DirectLighting           = pool.DirectLighting.Handle,
+                RRGuide_DiffAlbedo       = pool.RrGuideDiffAlbedo.Handle,
+                RRGuide_SpecAlbedo       = pool.RrGuideSpecAlbedo.Handle,
+                RRGuide_Normal_Roughness = pool.RrGuideNormalRoughness.Handle,
+                RRGuide_SpecHitDistance  = pool.RrGuideSpecHitDistance.Handle,
+                DlssOutput               = pool.DlssOutput.Handle,
                 
                 
-                Diff = pool.GetRT(RenderResourceType.RtxdiDiffuseLighting),
-                Spec = pool.GetRT(RenderResourceType.RtxdiSpecularLighting),
+                Diff = pool.RtxdiDiffuseLighting.Handle,
+                Spec = pool.RtxdiSpecularLighting.Handle,
                 
                 
                 // Rtxdi GBuffer debug

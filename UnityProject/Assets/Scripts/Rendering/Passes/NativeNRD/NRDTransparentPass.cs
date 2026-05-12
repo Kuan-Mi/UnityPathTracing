@@ -53,7 +53,7 @@ namespace PathTracing
             internal IntPtr ConstantBuffer;
 
             // RT textures sourced from the pool inside ExecutePass
-            internal PathTracingResourcePool Pool;
+            internal NativeNrdTextureResources Pool;
         }
 
         public class Settings
@@ -73,7 +73,7 @@ namespace PathTracing
             internal NRDSampleResource          NrdResource;
             internal Resource                   Resource;
             internal Settings                   Settings;
-            internal PathTracingResourcePool    Pool;
+            internal NativeNrdTextureResources    Pool;
         }
 
         // -------------------------------------------------------------------------
@@ -109,13 +109,13 @@ namespace PathTracing
             var pool = data.Pool;
 
             // 6. SRV inputs
-            ds.SetTexture("gIn_ComposedDiff", pool.GetPoint(RenderResourceType.ComposedDiff));
-            ds.SetTexture("gIn_ComposedSpec_ViewZ", pool.GetPoint(RenderResourceType.ComposedSpecViewZ));
+            ds.SetTexture("gIn_ComposedDiff", pool.ComposedDiff.NativePtr);
+            ds.SetTexture("gIn_ComposedSpec_ViewZ", pool.ComposedSpecViewZ.NativePtr);
 
             // 7. UAV outputs
-            ds.SetRWTexture("gOut_Composed",         pool.GetPoint(RenderResourceType.Composed));
-            ds.SetRWTexture("gInOut_Mv",             pool.GetPoint(RenderResourceType.MV));
-            ds.SetRWTexture("gOut_Normal_Roughness", pool.GetPoint(RenderResourceType.NormalRoughness));
+            ds.SetRWTexture("gOut_Composed",         pool.Composed.NativePtr);
+            ds.SetRWTexture("gInOut_Mv",             pool.MV.NativePtr);
+            ds.SetRWTexture("gOut_Normal_Roughness", pool.NormalRoughness.NativePtr);
 
             // 8. Constant buffer
             ds.SetConstantBuffer("GlobalConstants", res.ConstantBuffer);

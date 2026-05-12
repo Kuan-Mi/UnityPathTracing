@@ -45,7 +45,7 @@ namespace PathTracing
             internal IntPtr ConstantBuffer;
 
             // RT textures sourced from the pool inside ExecutePass
-            internal PathTracingResourcePool Pool;
+            internal NativeNrdTextureResources Pool;
         }
 
         public class Settings
@@ -65,7 +65,7 @@ namespace PathTracing
             internal NativeComputeDescriptorSet Ds;
             internal Resource                   Resource;
             internal Settings                   Settings;
-            internal PathTracingResourcePool    Pool;
+            internal NativeNrdTextureResources    Pool;
         }
 
         // -------------------------------------------------------------------------
@@ -84,22 +84,22 @@ namespace PathTracing
             var pool = data.Pool;
 
             // SRV inputs
-            ds.SetTexture("gIn_ViewZ", pool.GetPoint(RenderResourceType.Viewz));
-            ds.SetTexture("gIn_Normal_Roughness", pool.GetPoint(RenderResourceType.NormalRoughness));
-            ds.SetTexture("gIn_BaseColor_Metalness", pool.GetPoint(RenderResourceType.BaseColorMetalness));
-            ds.SetTexture("gIn_DirectLighting", pool.GetPoint(RenderResourceType.DirectLighting));
-            ds.SetTexture("gIn_DirectEmission", pool.GetPoint(RenderResourceType.DirectEmission));
-            ds.SetTexture("gIn_PsrThroughput", pool.GetPoint(RenderResourceType.PsrThroughput));
+            ds.SetTexture("gIn_ViewZ", pool.Viewz.NativePtr);
+            ds.SetTexture("gIn_Normal_Roughness", pool.NormalRoughness.NativePtr);
+            ds.SetTexture("gIn_BaseColor_Metalness", pool.BaseColorMetalness.NativePtr);
+            ds.SetTexture("gIn_DirectLighting", pool.DirectLighting.NativePtr);
+            ds.SetTexture("gIn_DirectEmission", pool.DirectEmission.NativePtr);
+            ds.SetTexture("gIn_PsrThroughput", pool.PsrThroughput.NativePtr);
 
             bool useRR = data.Settings.useRR;
 
-            ds.SetTexture("gIn_Shadow", pool.GetPoint(useRR ? RenderResourceType.Unfiltered_Translucency : RenderResourceType.Shadow));
-            ds.SetTexture("gIn_Diff", pool.GetPoint(useRR ? RenderResourceType.Unfiltered_Diff : RenderResourceType.Diff));
-            ds.SetTexture("gIn_Spec", pool.GetPoint(useRR ? RenderResourceType.Unfiltered_Spec : RenderResourceType.Spec));
+            ds.SetTexture("gIn_Shadow", useRR ? pool.Unfiltered_Translucency.NativePtr : pool.Shadow.NativePtr);
+            ds.SetTexture("gIn_Diff",   useRR ? pool.Unfiltered_Diff.NativePtr          : pool.Diff.NativePtr);
+            ds.SetTexture("gIn_Spec",   useRR ? pool.Unfiltered_Spec.NativePtr          : pool.Spec.NativePtr);
 
             // UAV outputs
-            ds.SetRWTexture("gOut_ComposedDiff", pool.GetPoint(RenderResourceType.ComposedDiff));
-            ds.SetRWTexture("gOut_ComposedSpec_ViewZ", pool.GetPoint(RenderResourceType.ComposedSpecViewZ));
+            ds.SetRWTexture("gOut_ComposedDiff", pool.ComposedDiff.NativePtr);
+            ds.SetRWTexture("gOut_ComposedSpec_ViewZ", pool.ComposedSpecViewZ.NativePtr);
 
             // Constant buffer
             ds.SetConstantBuffer("GlobalConstants", res.ConstantBuffer);

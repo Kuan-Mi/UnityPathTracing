@@ -76,7 +76,7 @@ namespace PathTracing
         public NativeRtxdiResources Resources;
 
         // Resource pool — exposed so pass authors can resolve additional IntPtr handles via Pool.GetPoint(...).
-        public PathTracingResourcePool Pool;
+        public NativeRtxdiTextureResources Pool;
 
         // --- Render dimensions ---
         public int2 RenderResolution;

@@ -46,7 +46,7 @@ namespace PathTracing
         public class Resource
         {
             internal IntPtr                  ConstantBuffer;
-            internal PathTracingResourcePool Pool;
+            internal NativeNrdTextureResources Pool;
         }
 
         public class Settings
@@ -72,7 +72,7 @@ namespace PathTracing
 
             cmd.BeginSample(RenderPassMarkers.DlssAfter);
 
-            ds.SetRWTexture("gOut_Image", res.Pool.GetPoint(RenderResourceType.DlssOutput));
+            ds.SetRWTexture("gOut_Image", res.Pool.DlssOutput.NativePtr);
             ds.SetConstantBuffer("GlobalConstants", res.ConstantBuffer);
 
             cs.Dispatch(cmd, ds, (uint)data.Settings.outputGridW, (uint)data.Settings.outputGridH, 1);

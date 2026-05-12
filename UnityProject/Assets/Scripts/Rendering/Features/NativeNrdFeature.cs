@@ -81,7 +81,7 @@ namespace PathTracing
         private readonly Dictionary<long, DlrrDenoiser>            _dlrrDenoisers      = new();
         private readonly Dictionary<long, DlsrUpscaler>            _dlsrUpscalers      = new();
         private readonly Dictionary<long, NisUpscaler>             _nisUpscalers       = new();
-        private readonly Dictionary<long, PathTracingResourcePool> _resourcePools      = new();
+        private readonly Dictionary<long, NativeNrdTextureResources> _resourcePools      = new();
         private readonly Dictionary<long, CameraFrameState>        _cameraFrameStates  = new();
 
         public override void Create()
@@ -232,8 +232,7 @@ namespace PathTracing
 
             if (!_resourcePools.TryGetValue(uniqueKey, out var pool))
             {
-                pool = new PathTracingResourcePool();
-                pool.InitNrdSampleResources();
+                pool = new NativeNrdTextureResources();
                 _resourcePools.Add(uniqueKey, pool);
             }
 
@@ -331,35 +330,35 @@ namespace PathTracing
                 // Shadow denoiser (SIGMA) resources
                 nrdSigma.UpdateResources(
                     // Common
-                    (ResourceType.IN_MV, pool.GetNriResource(RenderResourceType.MV)),
-                    (ResourceType.IN_VIEWZ, pool.GetNriResource(RenderResourceType.Viewz)),
-                    (ResourceType.IN_NORMAL_ROUGHNESS, pool.GetNriResource(RenderResourceType.NormalRoughness)),
+                    (ResourceType.IN_MV, pool.MV),
+                    (ResourceType.IN_VIEWZ, pool.Viewz),
+                    (ResourceType.IN_NORMAL_ROUGHNESS, pool.NormalRoughness),
 
                     // SIGMA
-                    (ResourceType.IN_PENUMBRA, pool.GetNriResource(RenderResourceType.Unfiltered_Penumbra)),
-                    (ResourceType.IN_TRANSLUCENCY, pool.GetNriResource(RenderResourceType.Unfiltered_Translucency)),
-                    (ResourceType.OUT_SHADOW_TRANSLUCENCY, pool.GetNriResource(RenderResourceType.Shadow))
+                    (ResourceType.IN_PENUMBRA, pool.Unfiltered_Penumbra),
+                    (ResourceType.IN_TRANSLUCENCY, pool.Unfiltered_Translucency),
+                    (ResourceType.OUT_SHADOW_TRANSLUCENCY, pool.Shadow)
                 );
 
                 // Opaque denoiser (REBLUR) resources
                 nrdReblur.UpdateResources(
                     // Common
-                    (ResourceType.IN_MV, pool.GetNriResource(RenderResourceType.MV)),
-                    (ResourceType.IN_VIEWZ, pool.GetNriResource(RenderResourceType.Viewz)),
-                    (ResourceType.IN_NORMAL_ROUGHNESS, pool.GetNriResource(RenderResourceType.NormalRoughness)),
+                    (ResourceType.IN_MV, pool.MV),
+                    (ResourceType.IN_VIEWZ, pool.Viewz),
+                    (ResourceType.IN_NORMAL_ROUGHNESS, pool.NormalRoughness),
 
                     // (Optional) Validation
-                    (ResourceType.OUT_VALIDATION, pool.GetNriResource(RenderResourceType.Validation)),
+                    (ResourceType.OUT_VALIDATION, pool.Validation),
 
                     // Diffuse
-                    (ResourceType.IN_DIFF_RADIANCE_HITDIST, pool.GetNriResource(RenderResourceType.Unfiltered_Diff)),
-                    (ResourceType.OUT_DIFF_RADIANCE_HITDIST, pool.GetNriResource(RenderResourceType.Diff)),
-                    (ResourceType.IN_DIFF_CONFIDENCE, pool.GetNriResource(RenderResourceType.Gradient_Pong)),
+                    (ResourceType.IN_DIFF_RADIANCE_HITDIST, pool.Unfiltered_Diff),
+                    (ResourceType.OUT_DIFF_RADIANCE_HITDIST, pool.Diff),
+                    (ResourceType.IN_DIFF_CONFIDENCE, pool.Gradient_Pong),
 
                     // Specular
-                    (ResourceType.IN_SPEC_RADIANCE_HITDIST, pool.GetNriResource(RenderResourceType.Unfiltered_Spec)),
-                    (ResourceType.OUT_SPEC_RADIANCE_HITDIST, pool.GetNriResource(RenderResourceType.Spec)),
-                    (ResourceType.IN_SPEC_CONFIDENCE, pool.GetNriResource(RenderResourceType.Gradient_Pong))
+                    (ResourceType.IN_SPEC_RADIANCE_HITDIST, pool.Unfiltered_Spec),
+                    (ResourceType.OUT_SPEC_RADIANCE_HITDIST, pool.Spec),
+                    (ResourceType.IN_SPEC_CONFIDENCE, pool.Gradient_Pong)
                 );
             }
 
@@ -505,14 +504,14 @@ namespace PathTracing
             {
                 var dlrrRes = new DlrrDenoiser.DlrrResources
                 {
-                    input           = pool.GetNriResource(RenderResourceType.Composed),
-                    output          = pool.GetNriResource(RenderResourceType.DlssOutput),
-                    mv              = pool.GetNriResource(RenderResourceType.MV),
-                    depth           = pool.GetNriResource(RenderResourceType.Viewz),
-                    diffAlbedo      = pool.GetNriResource(RenderResourceType.RrGuideDiffAlbedo),
-                    specAlbedo      = pool.GetNriResource(RenderResourceType.RrGuideSpecAlbedo),
-                    normalRoughness = pool.GetNriResource(RenderResourceType.RrGuideNormalRoughness),
-                    specHitDistance = pool.GetNriResource(RenderResourceType.RrGuideSpecHitDistance),
+                    input           = pool.Composed,
+                    output          = pool.DlssOutput,
+                    mv              = pool.MV,
+                    depth           = pool.Viewz,
+                    diffAlbedo      = pool.RrGuideDiffAlbedo,
+                    specAlbedo      = pool.RrGuideSpecAlbedo,
+                    normalRoughness = pool.RrGuideNormalRoughness,
+                    specHitDistance = pool.RrGuideSpecHitDistance,
                 };
 
                 var dlrrInput = new DlrrDenoiser.DlrrFrameInput
@@ -548,10 +547,10 @@ namespace PathTracing
 
                 var dlsrRes = new DlsrUpscaler.DlsrResources
                 {
-                    input    = pool.GetNriResource(RenderResourceType.Composed),
-                    output   = pool.GetNriResource(RenderResourceType.DlssOutput),
-                    mv       = pool.GetNriResource(RenderResourceType.MV),
-                    depth    = pool.GetNriResource(RenderResourceType.Viewz),
+                    input    = pool.Composed,
+                    output   = pool.DlssOutput,
+                    mv       = pool.MV,
+                    depth    = pool.Viewz,
                     exposure = default,
                     reactive = default,
                 };
@@ -610,13 +609,13 @@ namespace PathTracing
                 NriTextureResource nisInput;
                 if (isDlss)
                 {
-                    nisInput = pool.GetNriResource(RenderResourceType.DlssOutput);
+                    nisInput = pool.DlssOutput;
                     currentW = (ushort)outputResolution.x;
                     currentH = (ushort)outputResolution.y;
                 }
                 else
                 {
-                    nisInput = pool.GetNriResource(isEven ? RenderResourceType.TaaHistory : RenderResourceType.TaaHistoryPrev);
+                    nisInput = isEven ? pool.TaaHistory : pool.TaaHistoryPrev;
                     currentW = (ushort)(renderResolution.x * setting.resolutionScale + 0.5f);
                     currentH = (ushort)(renderResolution.y * setting.resolutionScale + 0.5f);
                 }
@@ -633,7 +632,7 @@ namespace PathTracing
                 var nisRes = new NisUpscaler.NisResources
                 {
                     input  = nisInput,
-                    output = pool.GetNriResource(RenderResourceType.PreFinal),
+                    output = pool.PreFinal,
                 };
 
                 var nisSettings = new NisUpscaler.NisSettings { sharpness = setting.nisSharpness };
@@ -659,41 +658,38 @@ namespace PathTracing
 
             // Output Blit
             {
-                var currrentGradient = isEven ? RenderResourceType.Gradient_StoredPong : RenderResourceType.Gradient_StoredPing;
-
-
                 var outputBlitResource = new OutputBlitPass.Resource
                 {
-                    Mv                 = pool.GetRT(RenderResourceType.MV),
-                    NormalRoughness    = pool.GetRT(RenderResourceType.NormalRoughness),
-                    BaseColorMetalness = pool.GetRT(RenderResourceType.BaseColorMetalness),
+                    Mv                 = pool.MV.Handle,
+                    NormalRoughness    = pool.NormalRoughness.Handle,
+                    BaseColorMetalness = pool.BaseColorMetalness.Handle,
 
-                    Penumbra = pool.GetRT(RenderResourceType.Unfiltered_Penumbra),
-                    Diff     = pool.GetRT(RenderResourceType.Unfiltered_Diff),
-                    Spec     = pool.GetRT(RenderResourceType.Unfiltered_Spec),
+                    Penumbra = pool.Unfiltered_Penumbra.Handle,
+                    Diff     = pool.Unfiltered_Diff.Handle,
+                    Spec     = pool.Unfiltered_Spec.Handle,
 
-                    ShadowTranslucency = pool.GetRT(RenderResourceType.Shadow),
-                    DenoisedDiff       = pool.GetRT(RenderResourceType.Diff),
-                    DenoisedSpec       = pool.GetRT(RenderResourceType.Spec),
-                    Validation         = pool.GetRT(RenderResourceType.Validation),
+                    ShadowTranslucency = pool.Shadow.Handle,
+                    DenoisedDiff       = pool.Diff.Handle,
+                    DenoisedSpec       = pool.Spec.Handle,
+                    Validation         = pool.Validation.Handle,
 
-                    Composed       = pool.GetRT(RenderResourceType.Composed),
-                    DirectLighting = pool.GetRT(RenderResourceType.DirectLighting),
+                    Composed       = pool.Composed.Handle,
+                    DirectLighting = pool.DirectLighting.Handle,
 
-                    RRGuide_DiffAlbedo       = pool.GetRT(RenderResourceType.RrGuideDiffAlbedo),
-                    RRGuide_SpecAlbedo       = pool.GetRT(RenderResourceType.RrGuideSpecAlbedo),
-                    RRGuide_Normal_Roughness = pool.GetRT(RenderResourceType.RrGuideNormalRoughness),
-                    RRGuide_SpecHitDistance  = pool.GetRT(RenderResourceType.RrGuideSpecHitDistance),
-                    DlssOutput               = pool.GetRT(RenderResourceType.Final),
+                    RRGuide_DiffAlbedo       = pool.RrGuideDiffAlbedo.Handle,
+                    RRGuide_SpecAlbedo       = pool.RrGuideSpecAlbedo.Handle,
+                    RRGuide_Normal_Roughness = pool.RrGuideNormalRoughness.Handle,
+                    RRGuide_SpecHitDistance  = pool.RrGuideSpecHitDistance.Handle,
+                    DlssOutput               = pool.Final.Handle,
                     // todo
-                    taaDst   = pool.GetRT(RenderResourceType.Final),
-                    ViewZ    = pool.GetRT(RenderResourceType.Viewz),
-                    Gradient = pool.GetRT(RenderResourceType.Gradient_Pong),
+                    taaDst   = pool.Final.Handle,
+                    ViewZ    = pool.Viewz.Handle,
+                    Gradient = pool.Gradient_Pong.Handle,
 
-                    Output            = pool.GetRT(RenderResourceType.Final),
-                    DirectEmission    = pool.GetRT(RenderResourceType.DirectEmission),
-                    ComposedDiff      = pool.GetRT(RenderResourceType.ComposedDiff),
-                    ComposedSpecViewZ = pool.GetRT(RenderResourceType.ComposedSpecViewZ),
+                    Output            = pool.Final.Handle,
+                    DirectEmission    = pool.DirectEmission.Handle,
+                    ComposedDiff      = pool.ComposedDiff.Handle,
+                    ComposedSpecViewZ = pool.ComposedSpecViewZ.Handle,
                 };
 
                 _outputBlitPass.Setup(outputBlitResource, new OutputBlitPass.Settings
@@ -722,7 +718,7 @@ namespace PathTracing
             }
         }
 
-        private void EnqueueDlssAfterPass(ScriptableRenderer renderer, PathTracingResourcePool pool, int2 outputResolution, NativeBuffer nrdConstantBuffer)
+        private void EnqueueDlssAfterPass(ScriptableRenderer renderer, NativeNrdTextureResources pool, int2 outputResolution, NativeBuffer nrdConstantBuffer)
         {
             var outputGridW = (outputResolution.x + 15) / 16;
             var outputGridH = (outputResolution.y + 15) / 16;
