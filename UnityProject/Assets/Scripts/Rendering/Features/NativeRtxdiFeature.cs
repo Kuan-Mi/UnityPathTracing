@@ -19,22 +19,11 @@ namespace PathTracing
 {
     /// <summary>
     /// Pure NativeComputeShader RTXDI feature.
-    ///
-    /// Mirrors <see cref="UnityRtxdiFeature"/> but every per-pass shader is a
-    /// <see cref="NativeComputeShader"/> compiled from the pre-shipped HLSL under
-    /// <c>UnityProject/Assets/RTXDI/Shaders</c>. Inline RayQuery (USE_RAY_QUERY) is baked
-    /// into the shipped DXIL so no <c>RayTracingShader</c> is needed.
-    ///
-    /// This is currently a SKELETON: pass instantiation, scene/light scene, AS build, and constant
-    /// buffer initialisation match <see cref="UnityRtxdiFeature"/>, but <see cref="AddRenderPasses"/>
-    /// only enqueues the reference <see cref="NativeRtxdiGenerateInitialSamplesPass"/> behind a
-    /// <c>setting.useNativeRtxdiPipeline</c> guard. Remaining passes are implemented incrementally
-    /// (see /memories/session/plan.md).
     /// </summary>
     public class NativeRtxdiFeature : ScriptableRendererFeature
     {
         // -------------------------------------------------------------------
-        // User-visible configuration  (mirrors UnityRtxdiFeature)
+        // User-visible configuration
         // -------------------------------------------------------------------
         public NativeRtxdiSetting setting;
 
@@ -158,6 +147,7 @@ namespace PathTracing
         private GraphicsBuffer _resamplingConstantBuffer;
         private GraphicsBuffer _perPassConstantBuffer;
         private GraphicsBuffer _gbufferConstantBuffer;
+        private GraphicsBuffer _compositingConstantBuffer;
 
         private NativeRtxdiGPUScene _rtxdiGpuScene;
 
@@ -171,7 +161,6 @@ namespace PathTracing
         private readonly Dictionary<long, ImportanceSamplingContext>   _isContexts        = new();
         private readonly Dictionary<long, CameraFrameState>            _cameraFrameStates = new();
 
-        private GraphicsBuffer _compositingConstantBuffer;
 
         // -------------------------------------------------------------------
         // ScriptableRendererFeature lifecycle
@@ -447,6 +436,7 @@ namespace PathTracing
             _resamplingConstantsArray[0] = resamplingConstants;
             _resamplingConstantBuffer.SetData(_resamplingConstantsArray);
 
+            // 基本不使用
             _perPassConstantsArray[0] = new NativeRtxdiPerPassConstants { rayCountBufferIndex = 0 };
             _perPassConstantBuffer.SetData(_perPassConstantsArray);
 
@@ -652,7 +642,7 @@ namespace PathTracing
             // ---- NRD denoising (REBLUR_DIFFUSE_SPECULAR) ----
             if (setting.denoiserMode != RtxDiDenoiserType.DENOISER_MODE_OFF)
             {
-                // ---- Filter gradients + compute confidence (mirrors FullSample stages 2-4) ----
+                // ---- Filter gradients + compute confidence ----
                 if (enableGradients && _filterGradientsPass != null && _confidencePass != null)
                 {
                     _filterGradientsPass.Setup(pool.GradientArrayPtr, gradDims);
@@ -1108,56 +1098,56 @@ namespace PathTracing
             finalMaterial = UnityEditor.AssetDatabase.LoadAssetAtPath<Material>("Assets/Shaders/Mat/KM_Final.mat");
 
             // Prepare / Environment
-            prepareLightsCs            = LoadCs($"{shaderRoot}/PrepareLights.computeshader");
-            preprocessEnvironmentMapCs = LoadCs($"{shaderRoot}/PreprocessEnvironmentMap.computeshader");
-            preprocessLocalLightCs     = LoadCs($"{shaderRoot}/PreprocessLocalLight.computeshader");
-            preprocessLocalLightCs     = LoadCs($"{shaderRoot}/PreprocessLocalLight.computeshader");
+            prepareLightsCs            = LoadCs($"{shaderRoot}/PrepareLights");
+            preprocessEnvironmentMapCs = LoadCs($"{shaderRoot}/PreprocessEnvironmentMap");
+            preprocessLocalLightCs     = LoadCs($"{shaderRoot}/PreprocessLocalLight");
+            preprocessLocalLightCs     = LoadCs($"{shaderRoot}/PreprocessLocalLight");
 
             // GBuffer
-            raytracedGBufferCs   = LoadCs($"{shaderRoot}/RaytracedGBuffer.computeshader");
-            postprocessGBufferCs = LoadCs($"{shaderRoot}/PostprocessGBuffer.computeshader");
+            raytracedGBufferCs   = LoadCs($"{shaderRoot}/RaytracedGBuffer");
+            postprocessGBufferCs = LoadCs($"{shaderRoot}/PostprocessGBuffer");
 
             // Presampling
-            presampleLightsCs         = LoadCs($"{shaderRoot}/LightingPasses/Presampling/PresampleLights.computeshader");
-            presampleEnvironmentMapCs = LoadCs($"{shaderRoot}/LightingPasses/Presampling/PresampleEnvironmentMap.computeshader");
-            presampleReGirCs          = LoadCs($"{shaderRoot}/LightingPasses/Presampling/PresampleReGIR.computeshader");
+            presampleLightsCs         = LoadCs($"{shaderRoot}/LightingPasses/Presampling/PresampleLights");
+            presampleEnvironmentMapCs = LoadCs($"{shaderRoot}/LightingPasses/Presampling/PresampleEnvironmentMap");
+            presampleReGirCs          = LoadCs($"{shaderRoot}/LightingPasses/Presampling/PresampleReGIR");
 
             // ReSTIR DI
-            diGenerateInitialSamplesCs = LoadCs($"{shaderRoot}/LightingPasses/DI/GenerateInitialSamples.computeshader");
-            diTemporalResamplingCs     = LoadCs($"{shaderRoot}/LightingPasses/DI/TemporalResampling.computeshader");
-            diSpatialResamplingCs      = LoadCs($"{shaderRoot}/LightingPasses/DI/SpatialResampling.computeshader");
-            diShadeSamplesCs           = LoadCs($"{shaderRoot}/LightingPasses/DI/ShadeSamples.computeshader");
+            diGenerateInitialSamplesCs = LoadCs($"{shaderRoot}/LightingPasses/DI/GenerateInitialSamples");
+            diTemporalResamplingCs     = LoadCs($"{shaderRoot}/LightingPasses/DI/TemporalResampling");
+            diSpatialResamplingCs      = LoadCs($"{shaderRoot}/LightingPasses/DI/SpatialResampling");
+            diShadeSamplesCs           = LoadCs($"{shaderRoot}/LightingPasses/DI/ShadeSamples");
 
             // Indirect / ReSTIR GI
-            brdfRayTracingCs         = LoadCs($"{shaderRoot}/LightingPasses/BrdfRayTracing.computeshader");
-            shadeSecondarySurfacesCs = LoadCs($"{shaderRoot}/LightingPasses/ShadeSecondarySurfaces.computeshader");
-            giTemporalResamplingCs   = LoadCs($"{shaderRoot}/LightingPasses/GI/TemporalResampling.computeshader");
-            giSpatialResamplingCs    = LoadCs($"{shaderRoot}/LightingPasses/GI/SpatialResampling.computeshader");
-            giFinalShadingCs         = LoadCs($"{shaderRoot}/LightingPasses/GI/FinalShading.computeshader");
+            brdfRayTracingCs         = LoadCs($"{shaderRoot}/LightingPasses/BrdfRayTracing");
+            shadeSecondarySurfacesCs = LoadCs($"{shaderRoot}/LightingPasses/ShadeSecondarySurfaces");
+            giTemporalResamplingCs   = LoadCs($"{shaderRoot}/LightingPasses/GI/TemporalResampling");
+            giSpatialResamplingCs    = LoadCs($"{shaderRoot}/LightingPasses/GI/SpatialResampling");
+            giFinalShadingCs         = LoadCs($"{shaderRoot}/LightingPasses/GI/FinalShading");
 
             // PT
-            ptGenerateInitialSamplesCs = LoadCs($"{shaderRoot}/LightingPasses/PT/GenerateInitialSamples.computeshader");
-            ptTemporalResamplingCs     = LoadCs($"{shaderRoot}/LightingPasses/PT/TemporalResampling.computeshader");
-            ptSpatialResamplingCs      = LoadCs($"{shaderRoot}/LightingPasses/PT/SpatialResampling.computeshader");
-            ptFillSampleIDCs           = LoadCs($"{shaderRoot}/LightingPasses/PT/FillSampleID.computeshader");
-            ptComputeDuplicationMapCs  = LoadCs($"{shaderRoot}/LightingPasses/PT/ComputeDuplicationMap.computeshader");
-            ptFinalShadingCs           = LoadCs($"{shaderRoot}/LightingPasses/PT/FinalShading.computeshader");
+            ptGenerateInitialSamplesCs = LoadCs($"{shaderRoot}/LightingPasses/PT/GenerateInitialSamples");
+            ptTemporalResamplingCs     = LoadCs($"{shaderRoot}/LightingPasses/PT/TemporalResampling");
+            ptSpatialResamplingCs      = LoadCs($"{shaderRoot}/LightingPasses/PT/SpatialResampling");
+            ptFillSampleIDCs           = LoadCs($"{shaderRoot}/LightingPasses/PT/FillSampleID");
+            ptComputeDuplicationMapCs  = LoadCs($"{shaderRoot}/LightingPasses/PT/ComputeDuplicationMap");
+            ptFinalShadingCs           = LoadCs($"{shaderRoot}/LightingPasses/PT/FinalShading");
 
             // Managed compute helpers (kept for v1 — not yet ported to NativeComputeShader)
-            compositingPassCs = LoadCs($"{shaderRoot}/CompositingPass.computeshader");
+            compositingPassCs = LoadCs($"{shaderRoot}/CompositingPass");
 
-            filterGradientsPassCs = LoadCs($"{shaderRoot}/DenoisingPasses/FilterGradientsPass.computeshader");
-            confidencePassCs      = LoadCs($"{shaderRoot}/DenoisingPasses/ConfidencePass.computeshader");
+            filterGradientsPassCs = LoadCs($"{shaderRoot}/DenoisingPasses/FilterGradientsPass");
+            confidencePassCs      = LoadCs($"{shaderRoot}/DenoisingPasses/ConfidencePass");
 
-            toneMappingHistogramCs = LoadCs($"Assets/Shaders/donut/histogram.computeshader");
-            toneMappingExposureCs  = LoadCs($"Assets/Shaders/donut/exposure.computeshader");
-            toneMappingCs          = LoadCs($"Assets/Shaders/donut/tonemapping.computeshader");
+            toneMappingHistogramCs = LoadCs($"Assets/Shaders/donut/histogram");
+            toneMappingExposureCs  = LoadCs($"Assets/Shaders/donut/exposure");
+            toneMappingCs          = LoadCs($"Assets/Shaders/donut/tonemapping");
 
             UnityEditor.EditorUtility.SetDirty(this);
 
             static NativeComputeShader LoadCs(string path)
             {
-                var s = UnityEditor.AssetDatabase.LoadAssetAtPath<NativeComputeShader>(path);
+                var s = UnityEditor.AssetDatabase.LoadAssetAtPath<NativeComputeShader>(path + ".computeshader");
                 if (s == null)
                     Debug.LogWarning($"[NativeRtxdiFeature] Missing NativeComputeShader at: {path}");
                 return s;
