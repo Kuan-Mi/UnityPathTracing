@@ -65,8 +65,8 @@ namespace PathTracing
         DENOISER_REBLUR    = 0,
         DENOISER_RELAX     = 1,
         DENOISER_REFERENCE = 2,
-    }    
-    
+    }
+
     public enum RtxDiDenoiserType
     {
         DENOISER_MODE_OFF    = 0,
@@ -175,10 +175,10 @@ namespace PathTracing
 
         public float exposure => Mathf.Pow(2, exposureEv);
 
-        public bool              cameraJitter = true;
-        public NativeRtxdiShowMode showMode   = NativeRtxdiShowMode.Final;
-        public bool     showMv;
-        public bool     showValidation;
+        public bool                cameraJitter = true;
+        public NativeRtxdiShowMode showMode     = NativeRtxdiShowMode.Final;
+        public bool                showMv;
+        public bool                showValidation;
 
         /// <summary>Mip level to visualise when showMode is LocalLightPdf or EnvironmentPdf.</summary>
         [Range(0, 15)]
@@ -228,18 +228,9 @@ namespace PathTracing
         public RTXDI_PTSpatialResamplingParameters  ptSpatialResamplingParams  = ReSTIRPTDefaults.GetDefaultSpatialResamplingParams();
 
         [FoldoutHeader("Tone Mapping")]
-        public bool  enableToneMapping            = true;
-        [Range(-5f, 5f)]
-        public float tmExposureBias               = -0.5f;
-        public float tmWhitePoint                 =  3f;
-        public float tmMinAdaptedLuminance         =  0.002f;
-        public float tmMaxAdaptedLuminance         =  0.2f;
-        [Range(0f, 1f)]
-        public float tmHistogramLowPercentile      =  0.8f;
-        [Range(0f, 1f)]
-        public float tmHistogramHighPercentile     =  0.95f;
-        public float tmEyeAdaptationSpeedUp        =  2f;
-        public float tmEyeAdaptationSpeedDown      =  1f;
+        public bool enableToneMapping = true;
+
+        public NativeToneMappingPass.ToneMappingParameters toneMappingParams;
     }
 
     /// <summary>
@@ -256,6 +247,7 @@ namespace PathTracing
         /// <summary>Raw HDR composited lighting written by CompositingPass (= original HdrColor).</summary>
         HdrColor,
         LdrColor,
+
         /// <summary>DLSS-SR upscaled output (display resolution).</summary>
         DlssOutput,
 
@@ -271,12 +263,12 @@ namespace PathTracing
         NrdValidation,
 
         // ── GBuffer ────────────────────────────────────────────────────────
-        ViewDepth,      // R32_SFloat linear depth
-        DiffuseAlbedo,  // R32_UINT  R11G11B10_UFLOAT → albedo
-        SpecularF0,     // R32_UINT  R8G8B8A8_Gamma   → specular F0
-        Roughness,      // R32_UINT  R8G8B8A8_Gamma   → roughness (alpha)
-        Normal,         // R32_UINT  oct32             → shading normal
-        GeoNormal,      // R32_UINT  oct32             → geometry normal
+        ViewDepth, // R32_SFloat linear depth
+        DiffuseAlbedo, // R32_UINT  R11G11B10_UFLOAT → albedo
+        SpecularF0, // R32_UINT  R8G8B8A8_Gamma   → specular F0
+        Roughness, // R32_UINT  R8G8B8A8_Gamma   → roughness (alpha)
+        Normal, // R32_UINT  oct32             → shading normal
+        GeoNormal, // R32_UINT  oct32             → geometry normal
 
         // ── Light PDF debug ────────────────────────────────────────────────
         LocalLightPdf,

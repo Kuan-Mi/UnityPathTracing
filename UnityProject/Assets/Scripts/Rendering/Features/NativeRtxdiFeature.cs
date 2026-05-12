@@ -850,14 +850,7 @@ namespace PathTracing
                 {
                     RenderResolution          = tmRes,
                     FrameTime                 = Time.deltaTime,
-                    ExposureBias              = setting.tmExposureBias,
-                    WhitePoint                = setting.tmWhitePoint,
-                    MinAdaptedLuminance       = setting.tmMinAdaptedLuminance,
-                    MaxAdaptedLuminance       = setting.tmMaxAdaptedLuminance,
-                    HistogramLowPercentile    = setting.tmHistogramLowPercentile,
-                    HistogramHighPercentile   = setting.tmHistogramHighPercentile,
-                    EyeAdaptationSpeedUp      = setting.tmEyeAdaptationSpeedUp,
-                    EyeAdaptationSpeedDown    = setting.tmEyeAdaptationSpeedDown,
+                    ToneMappingParams = setting.toneMappingParams,
                 };
                 _toneMappingPass.Setup(tmResource, tmSettings);
                 renderer.EnqueuePass(_toneMappingPass);
