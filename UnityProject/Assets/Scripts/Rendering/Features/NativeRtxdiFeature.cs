@@ -136,7 +136,6 @@ namespace PathTracing
         // -------------------------------------------------------------------
         private NativeRtxdiPrepareLightsPass _prepareLightsPass;
         private GBufferRasterPass            _gBufferRasterPass;
-        private GBufferRasterPass.Resource   _gBufferRasterResource;
         private PdfTexturePass               _pdfTexturePass;
         private GenerateMipsPass             _generateMipsPass;
         private NativeRtxdiPdfMipsPass       _pdfMipsPass;
@@ -185,55 +184,37 @@ namespace PathTracing
             if (_gbufferConstantBuffer == null)
                 InitializeBuffers();
 
-            // Managed scaffolding passes (NOTE: PrepareLights / PdfMipmap are intentionally
-            // NOT instantiated here — see TODO in AddRenderPasses about porting
-            // RTXDI/Samples/FullSample/Source/RenderPasses/PrepareLightsPass.cpp).
-
-            _prepareLightsPass      ??= new NativeRtxdiPrepareLightsPass(prepareLightsCs) { renderPassEvent = renderPassEvent };
-            _gBufferRasterPass      ??= new GBufferRasterPass() { renderPassEvent                           = renderPassEvent };
-            _gBufferRasterResource  ??= new GBufferRasterPass.Resource();
-            _buildAsPass            ??= new NativeRtxdiBuildAccelerationStructurePass() { renderPassEvent             = renderPassEvent };
-            _raytracedGBufferPass   ??= new NativeRtxdiRaytracedGBufferPass(raytracedGBufferCs) { renderPassEvent     = renderPassEvent };
-            _postprocessGBufferPass ??= new NativeRtxdiPostprocessGBufferPass(postprocessGBufferCs) { renderPassEvent = renderPassEvent };
-            // PresamplePass currently consumes a managed ComputeShader asset; its native port is pending.
-            // PresampleReGIR is fully native via NativeRtxdiPresampleReGirPass (wired in below).
-            _nrdDenoisePass  ??= new NrdPass() { renderPassEvent                                     = renderPassEvent };
-            _compositingPass ??= new NativeRtxdiCompositingPass(compositingPassCs) { renderPassEvent = renderPassEvent };
-
-            _pdfMipsPass    ??= new NativeRtxdiPdfMipsPass(preprocessLocalLightCs, preprocessEnvironmentMapCs) { renderPassEvent = renderPassEvent };
-            _outputBlitPass ??= new NativeRtxdiOutputBlitPass(finalMaterial) { renderPassEvent                                   = renderPassEvent };
-
-            _presampleLightsNativePass ??= new NativeRtxdiPresampleLightsPass(presampleLightsCs) { renderPassEvent = renderPassEvent };
-            _presampleReGirNativePass  ??= new NativeRtxdiPresampleReGirPass(presampleReGirCs) { renderPassEvent   = renderPassEvent };
-
-            _diGenerateInitialSamplesPass ??= new NativeRtxdiGenerateInitialSamplesPass(diGenerateInitialSamplesCs) { renderPassEvent = renderPassEvent };
-            _diTemporalResamplingPass     ??= new NativeRtxdiTemporalResamplingPass(diTemporalResamplingCs) { renderPassEvent         = renderPassEvent };
-            _diSpatialResamplingPass      ??= new NativeRtxdiSpatialResamplingPass(diSpatialResamplingCs) { renderPassEvent           = renderPassEvent };
-            _diShadeSamplesPass           ??= new NativeRtxdiShadeSamplesPass(diShadeSamplesCs) { renderPassEvent                     = renderPassEvent };
-
-            _brdfRayTracingPass         ??= new NativeRtxdiBrdfRayTracingPass(brdfRayTracingCs) { renderPassEvent                 = renderPassEvent };
-            _shadeSecondarySurfacesPass ??= new NativeRtxdiShadeSecondarySurfacesPass(shadeSecondarySurfacesCs) { renderPassEvent = renderPassEvent };
-            _giTemporalResamplingPass   ??= new NativeRtxdiGITemporalResamplingPass(giTemporalResamplingCs) { renderPassEvent     = renderPassEvent };
-            _giSpatialResamplingPass    ??= new NativeRtxdiGISpatialResamplingPass(giSpatialResamplingCs) { renderPassEvent       = renderPassEvent };
-            _giFinalShadingPass         ??= new NativeRtxdiGIFinalShadingPass(giFinalShadingCs) { renderPassEvent                 = renderPassEvent };
-
-            _ptGenerateInitialSamplesPass ??= new NativeRtxdiPTGenerateInitialSamplesPass(ptGenerateInitialSamplesCs) { renderPassEvent = renderPassEvent };
-            _ptTemporalResamplingPass     ??= new NativeRtxdiPTTemporalResamplingPass(ptTemporalResamplingCs) { renderPassEvent         = renderPassEvent };
-            _ptSpatialResamplingPass      ??= new NativeRtxdiPTSpatialResamplingPass(ptSpatialResamplingCs) { renderPassEvent           = renderPassEvent };
-            _ptFillSampleIDPass           ??= new NativeRtxdiPTFillSampleIDPass(ptFillSampleIDCs) { renderPassEvent                     = renderPassEvent };
-            _ptComputeDuplicationMapPass  ??= new NativeRtxdiPTComputeDuplicationMapPass(ptComputeDuplicationMapCs) { renderPassEvent   = renderPassEvent };
-            _ptFinalShadingPass           ??= new NativeRtxdiPTFinalShadingPass(ptFinalShadingCs) { renderPassEvent                     = renderPassEvent };
-
-            _nativeFrameTickPass ??= new NativeFrameTick() { renderPassEvent = renderPassEvent, };
-
-            _filterGradientsPass ??= filterGradientsPassCs != null ? new NativeRtxdiFilterGradientsPass(filterGradientsPassCs) { renderPassEvent = renderPassEvent } : null;
-            _confidencePass      ??= confidencePassCs != null ? new NativeRtxdiConfidencePass(confidencePassCs) { renderPassEvent                = renderPassEvent } : null;
-
-            _toneMappingPass ??= (toneMappingHistogramCs != null && toneMappingExposureCs != null && toneMappingCs != null)
-                ? new NativeToneMappingPass(toneMappingHistogramCs, toneMappingExposureCs, toneMappingCs) { renderPassEvent = renderPassEvent }
-                : null;
-
-            _dlssrPass ??= new DlssSRPass() { renderPassEvent = renderPassEvent };
+            _prepareLightsPass            ??= new NativeRtxdiPrepareLightsPass(prepareLightsCs) { renderPassEvent                                       = renderPassEvent };
+            _gBufferRasterPass            ??= new GBufferRasterPass { renderPassEvent                                                                   = renderPassEvent };
+            _buildAsPass                  ??= new NativeRtxdiBuildAccelerationStructurePass { renderPassEvent                                           = renderPassEvent };
+            _raytracedGBufferPass         ??= new NativeRtxdiRaytracedGBufferPass(raytracedGBufferCs) { renderPassEvent                                 = renderPassEvent };
+            _postprocessGBufferPass       ??= new NativeRtxdiPostprocessGBufferPass(postprocessGBufferCs) { renderPassEvent                             = renderPassEvent };
+            _nrdDenoisePass               ??= new NrdPass { renderPassEvent                                                                             = renderPassEvent };
+            _compositingPass              ??= new NativeRtxdiCompositingPass(compositingPassCs) { renderPassEvent                                       = renderPassEvent };
+            _pdfMipsPass                  ??= new NativeRtxdiPdfMipsPass(preprocessLocalLightCs, preprocessEnvironmentMapCs) { renderPassEvent          = renderPassEvent };
+            _outputBlitPass               ??= new NativeRtxdiOutputBlitPass(finalMaterial) { renderPassEvent                                            = renderPassEvent };
+            _presampleLightsNativePass    ??= new NativeRtxdiPresampleLightsPass(presampleLightsCs) { renderPassEvent                                   = renderPassEvent };
+            _presampleReGirNativePass     ??= new NativeRtxdiPresampleReGirPass(presampleReGirCs) { renderPassEvent                                     = renderPassEvent };
+            _diGenerateInitialSamplesPass ??= new NativeRtxdiGenerateInitialSamplesPass(diGenerateInitialSamplesCs) { renderPassEvent                   = renderPassEvent };
+            _diTemporalResamplingPass     ??= new NativeRtxdiTemporalResamplingPass(diTemporalResamplingCs) { renderPassEvent                           = renderPassEvent };
+            _diSpatialResamplingPass      ??= new NativeRtxdiSpatialResamplingPass(diSpatialResamplingCs) { renderPassEvent                             = renderPassEvent };
+            _diShadeSamplesPass           ??= new NativeRtxdiShadeSamplesPass(diShadeSamplesCs) { renderPassEvent                                       = renderPassEvent };
+            _brdfRayTracingPass           ??= new NativeRtxdiBrdfRayTracingPass(brdfRayTracingCs) { renderPassEvent                                     = renderPassEvent };
+            _shadeSecondarySurfacesPass   ??= new NativeRtxdiShadeSecondarySurfacesPass(shadeSecondarySurfacesCs) { renderPassEvent                     = renderPassEvent };
+            _giTemporalResamplingPass     ??= new NativeRtxdiGITemporalResamplingPass(giTemporalResamplingCs) { renderPassEvent                         = renderPassEvent };
+            _giSpatialResamplingPass      ??= new NativeRtxdiGISpatialResamplingPass(giSpatialResamplingCs) { renderPassEvent                           = renderPassEvent };
+            _giFinalShadingPass           ??= new NativeRtxdiGIFinalShadingPass(giFinalShadingCs) { renderPassEvent                                     = renderPassEvent };
+            _ptGenerateInitialSamplesPass ??= new NativeRtxdiPTGenerateInitialSamplesPass(ptGenerateInitialSamplesCs) { renderPassEvent                 = renderPassEvent };
+            _ptTemporalResamplingPass     ??= new NativeRtxdiPTTemporalResamplingPass(ptTemporalResamplingCs) { renderPassEvent                         = renderPassEvent };
+            _ptSpatialResamplingPass      ??= new NativeRtxdiPTSpatialResamplingPass(ptSpatialResamplingCs) { renderPassEvent                           = renderPassEvent };
+            _ptFillSampleIDPass           ??= new NativeRtxdiPTFillSampleIDPass(ptFillSampleIDCs) { renderPassEvent                                     = renderPassEvent };
+            _ptComputeDuplicationMapPass  ??= new NativeRtxdiPTComputeDuplicationMapPass(ptComputeDuplicationMapCs) { renderPassEvent                   = renderPassEvent };
+            _ptFinalShadingPass           ??= new NativeRtxdiPTFinalShadingPass(ptFinalShadingCs) { renderPassEvent                                     = renderPassEvent };
+            _nativeFrameTickPass          ??= new NativeFrameTick { renderPassEvent                                                                     = renderPassEvent, };
+            _filterGradientsPass          ??= new NativeRtxdiFilterGradientsPass(filterGradientsPassCs) { renderPassEvent                               = renderPassEvent };
+            _confidencePass               ??= new NativeRtxdiConfidencePass(confidencePassCs) { renderPassEvent                                         = renderPassEvent };
+            _toneMappingPass              ??= new NativeToneMappingPass(toneMappingHistogramCs, toneMappingExposureCs, toneMappingCs) { renderPassEvent = renderPassEvent };
+            _dlssrPass                    ??= new DlssSRPass { renderPassEvent                                                                          = renderPassEvent };
         }
 
         public void InitializeBuffers()
@@ -449,8 +430,8 @@ namespace PathTracing
                 restirDI = baseConsts.restirDI,
                 regir    = baseConsts.regir,
                 restirGI = baseConsts.restirGI,
-                restirPT = BuildRestirPTParams(isContext),
-                pt       = BuildPTParams(),
+                restirPT = BuildRestirPtParams(isContext),
+                pt       = BuildPtParams(),
                 brdfPT   = baseConsts.brdfPT,
 
                 visualizeRegirCells     = baseConsts.visualizeRegirCells,
@@ -513,7 +494,6 @@ namespace PathTracing
                 PrevSpecularRoughPtr     = isOddFrame ? pool.PrevGBufferSpecularRough.NativePtr : pool.GBufferSpecularRough.NativePtr,
                 PrevNormalsPtr           = isOddFrame ? pool.PrevGBufferNormals.NativePtr : pool.GBufferNormals.NativePtr,
                 PrevGeoNormalsPtr        = isOddFrame ? pool.PrevGBufferGeoNormals.NativePtr : pool.GBufferGeoNormals.NativePtr,
-                DirectLightingPtr        = pool.HdrColor.NativePtr,
                 EmissivePtr              = pool.GBufferEmissive.NativePtr,
                 MotionVectorsPtr         = pool.MotionVectors.NativePtr,
                 DeviceDepthPtr           = pool.DeviceDepth.NativePtr,
@@ -871,7 +851,7 @@ namespace PathTracing
             }
         }
 
-        private static RTXDI_PTParameters BuildRestirPTParams(ImportanceSamplingContext isContext)
+        private static RTXDI_PTParameters BuildRestirPtParams(ImportanceSamplingContext isContext)
         {
             var ctx = isContext.GetReSTIRPTContext();
             return new RTXDI_PTParameters
@@ -887,7 +867,7 @@ namespace PathTracing
             };
         }
 
-        private static NativePTParameters BuildPTParams()
+        private static NativePTParameters BuildPtParams()
         {
             return new NativePTParameters
             {
@@ -1111,7 +1091,7 @@ namespace PathTracing
                 n.y = wrap.y;
             }
 
-            return ((Vector3)(math.normalize(n)));
+            return math.normalize(n);
         }
 
 #if UNITY_EDITOR
@@ -1128,54 +1108,54 @@ namespace PathTracing
             finalMaterial = UnityEditor.AssetDatabase.LoadAssetAtPath<Material>("Assets/Shaders/Mat/KM_Final.mat");
 
             // Prepare / Environment
-            prepareLightsCs            = LoadCS($"{shaderRoot}/PrepareLights.computeshader");
-            preprocessEnvironmentMapCs = LoadCS($"{shaderRoot}/PreprocessEnvironmentMap.computeshader");
-            preprocessLocalLightCs     = LoadCS($"{shaderRoot}/PreprocessLocalLight.computeshader");
-            preprocessLocalLightCs     = LoadCS($"{shaderRoot}/PreprocessLocalLight.computeshader");
+            prepareLightsCs            = LoadCs($"{shaderRoot}/PrepareLights.computeshader");
+            preprocessEnvironmentMapCs = LoadCs($"{shaderRoot}/PreprocessEnvironmentMap.computeshader");
+            preprocessLocalLightCs     = LoadCs($"{shaderRoot}/PreprocessLocalLight.computeshader");
+            preprocessLocalLightCs     = LoadCs($"{shaderRoot}/PreprocessLocalLight.computeshader");
 
             // GBuffer
-            raytracedGBufferCs   = LoadCS($"{shaderRoot}/RaytracedGBuffer.computeshader");
-            postprocessGBufferCs = LoadCS($"{shaderRoot}/PostprocessGBuffer.computeshader");
+            raytracedGBufferCs   = LoadCs($"{shaderRoot}/RaytracedGBuffer.computeshader");
+            postprocessGBufferCs = LoadCs($"{shaderRoot}/PostprocessGBuffer.computeshader");
 
             // Presampling
-            presampleLightsCs         = LoadCS($"{shaderRoot}/LightingPasses/Presampling/PresampleLights.computeshader");
-            presampleEnvironmentMapCs = LoadCS($"{shaderRoot}/LightingPasses/Presampling/PresampleEnvironmentMap.computeshader");
-            presampleReGirCs          = LoadCS($"{shaderRoot}/LightingPasses/Presampling/PresampleReGIR.computeshader");
+            presampleLightsCs         = LoadCs($"{shaderRoot}/LightingPasses/Presampling/PresampleLights.computeshader");
+            presampleEnvironmentMapCs = LoadCs($"{shaderRoot}/LightingPasses/Presampling/PresampleEnvironmentMap.computeshader");
+            presampleReGirCs          = LoadCs($"{shaderRoot}/LightingPasses/Presampling/PresampleReGIR.computeshader");
 
             // ReSTIR DI
-            diGenerateInitialSamplesCs = LoadCS($"{shaderRoot}/LightingPasses/DI/GenerateInitialSamples.computeshader");
-            diTemporalResamplingCs     = LoadCS($"{shaderRoot}/LightingPasses/DI/TemporalResampling.computeshader");
-            diSpatialResamplingCs      = LoadCS($"{shaderRoot}/LightingPasses/DI/SpatialResampling.computeshader");
-            diShadeSamplesCs           = LoadCS($"{shaderRoot}/LightingPasses/DI/ShadeSamples.computeshader");
+            diGenerateInitialSamplesCs = LoadCs($"{shaderRoot}/LightingPasses/DI/GenerateInitialSamples.computeshader");
+            diTemporalResamplingCs     = LoadCs($"{shaderRoot}/LightingPasses/DI/TemporalResampling.computeshader");
+            diSpatialResamplingCs      = LoadCs($"{shaderRoot}/LightingPasses/DI/SpatialResampling.computeshader");
+            diShadeSamplesCs           = LoadCs($"{shaderRoot}/LightingPasses/DI/ShadeSamples.computeshader");
 
             // Indirect / ReSTIR GI
-            brdfRayTracingCs         = LoadCS($"{shaderRoot}/LightingPasses/BrdfRayTracing.computeshader");
-            shadeSecondarySurfacesCs = LoadCS($"{shaderRoot}/LightingPasses/ShadeSecondarySurfaces.computeshader");
-            giTemporalResamplingCs   = LoadCS($"{shaderRoot}/LightingPasses/GI/TemporalResampling.computeshader");
-            giSpatialResamplingCs    = LoadCS($"{shaderRoot}/LightingPasses/GI/SpatialResampling.computeshader");
-            giFinalShadingCs         = LoadCS($"{shaderRoot}/LightingPasses/GI/FinalShading.computeshader");
+            brdfRayTracingCs         = LoadCs($"{shaderRoot}/LightingPasses/BrdfRayTracing.computeshader");
+            shadeSecondarySurfacesCs = LoadCs($"{shaderRoot}/LightingPasses/ShadeSecondarySurfaces.computeshader");
+            giTemporalResamplingCs   = LoadCs($"{shaderRoot}/LightingPasses/GI/TemporalResampling.computeshader");
+            giSpatialResamplingCs    = LoadCs($"{shaderRoot}/LightingPasses/GI/SpatialResampling.computeshader");
+            giFinalShadingCs         = LoadCs($"{shaderRoot}/LightingPasses/GI/FinalShading.computeshader");
 
             // PT
-            ptGenerateInitialSamplesCs = LoadCS($"{shaderRoot}/LightingPasses/PT/GenerateInitialSamples.computeshader");
-            ptTemporalResamplingCs     = LoadCS($"{shaderRoot}/LightingPasses/PT/TemporalResampling.computeshader");
-            ptSpatialResamplingCs      = LoadCS($"{shaderRoot}/LightingPasses/PT/SpatialResampling.computeshader");
-            ptFillSampleIDCs           = LoadCS($"{shaderRoot}/LightingPasses/PT/FillSampleID.computeshader");
-            ptComputeDuplicationMapCs  = LoadCS($"{shaderRoot}/LightingPasses/PT/ComputeDuplicationMap.computeshader");
-            ptFinalShadingCs           = LoadCS($"{shaderRoot}/LightingPasses/PT/FinalShading.computeshader");
+            ptGenerateInitialSamplesCs = LoadCs($"{shaderRoot}/LightingPasses/PT/GenerateInitialSamples.computeshader");
+            ptTemporalResamplingCs     = LoadCs($"{shaderRoot}/LightingPasses/PT/TemporalResampling.computeshader");
+            ptSpatialResamplingCs      = LoadCs($"{shaderRoot}/LightingPasses/PT/SpatialResampling.computeshader");
+            ptFillSampleIDCs           = LoadCs($"{shaderRoot}/LightingPasses/PT/FillSampleID.computeshader");
+            ptComputeDuplicationMapCs  = LoadCs($"{shaderRoot}/LightingPasses/PT/ComputeDuplicationMap.computeshader");
+            ptFinalShadingCs           = LoadCs($"{shaderRoot}/LightingPasses/PT/FinalShading.computeshader");
 
             // Managed compute helpers (kept for v1 — not yet ported to NativeComputeShader)
-            compositingPassCs = LoadCS($"{shaderRoot}/CompositingPass.computeshader");
+            compositingPassCs = LoadCs($"{shaderRoot}/CompositingPass.computeshader");
 
-            filterGradientsPassCs = LoadCS($"{shaderRoot}/DenoisingPasses/FilterGradientsPass.computeshader");
-            confidencePassCs      = LoadCS($"{shaderRoot}/DenoisingPasses/ConfidencePass.computeshader");
+            filterGradientsPassCs = LoadCs($"{shaderRoot}/DenoisingPasses/FilterGradientsPass.computeshader");
+            confidencePassCs      = LoadCs($"{shaderRoot}/DenoisingPasses/ConfidencePass.computeshader");
 
-            toneMappingHistogramCs = LoadCS($"Assets/Shaders/donut/histogram.computeshader");
-            toneMappingExposureCs  = LoadCS($"Assets/Shaders/donut/exposure.computeshader");
-            toneMappingCs          = LoadCS($"Assets/Shaders/donut/tonemapping.computeshader");
+            toneMappingHistogramCs = LoadCs($"Assets/Shaders/donut/histogram.computeshader");
+            toneMappingExposureCs  = LoadCs($"Assets/Shaders/donut/exposure.computeshader");
+            toneMappingCs          = LoadCs($"Assets/Shaders/donut/tonemapping.computeshader");
 
             UnityEditor.EditorUtility.SetDirty(this);
 
-            static NativeComputeShader LoadCS(string path)
+            static NativeComputeShader LoadCs(string path)
             {
                 var s = UnityEditor.AssetDatabase.LoadAssetAtPath<NativeComputeShader>(path);
                 if (s == null)

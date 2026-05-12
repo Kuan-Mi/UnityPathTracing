@@ -43,7 +43,6 @@ namespace PathTracing
         public IntPtr PrevGeoNormalsPtr;
 
         // --- Lighting / aux textures ---
-        public IntPtr DirectLightingPtr;
         public IntPtr EmissivePtr;
         public IntPtr MotionVectorsPtr;             // t_MotionVectors           (t11)
         public IntPtr DenoiserNormalRoughnessPtr;   // t_DenoiserNormalRoughness (t12)
