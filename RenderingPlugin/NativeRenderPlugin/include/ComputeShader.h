@@ -16,6 +16,7 @@ using Microsoft::WRL::ComPtr;
 
 class BindlessTexture;
 class BindlessBuffer;
+class BindlessUAVTexture;
 class AccelerationStructure;
 class NativeBuffer;
 
@@ -28,6 +29,7 @@ enum class ComputeBindingType
     UAV,            // single RWTexture2D / RWStructuredBuffer / RWBuffer (UAV)
     CBV,            // ConstantBuffer<T> bound as inline root CBV descriptor
     SRV_ARRAY,      // unbounded array[] bound via BindlessTexture or BindlessBuffer
+    UAV_ARRAY,      // unbounded RWTexture2D[] bound via BindlessUAVTexture
     TLAS,           // RaytracingAccelerationStructure
     ROOT_CONSTANTS, // ConstantBuffer<T> pushed via SetComputeRoot32BitConstants
     ROOT_SRV,       // buffer SRV / TLAS promoted to inline root descriptor (SetComputeRootShaderResourceView)
@@ -54,11 +56,12 @@ struct ComputeBinding
 #pragma pack(push, 4)
 enum class CS_BindingObjectKind : uint32_t
 {
-    None            = 0,
-    AccelStruct     = 1,
-    BindlessTexture = 2,
-    BindlessBuffer  = 3,
-    NativeBuffer    = 5,
+    None               = 0,
+    AccelStruct        = 1,
+    BindlessTexture    = 2,
+    BindlessBuffer     = 3,
+    BindlessUAVTexture = 6,
+    NativeBuffer       = 5,
 };
 
 struct CS_BindingSlot
@@ -83,9 +86,10 @@ struct CS_BindingSlot
 // Root parameter layout (built dynamically from reflection):
 //   0   – SRV descriptor table (one range per SRV binding)           optional
 //   1   – UAV descriptor table (one range per UAV binding)            optional
-//   2+  – one descriptor table per SRV_ARRAY (unbounded) binding
-//   N+  – one root CBV descriptor per CBV binding
-//   M+  – one root 32-bit constants slot per ROOT_CONSTANTS binding
+//   2+  – one descriptor table per SRV_ARRAY (unbounded SRV) binding
+//   N+  – one descriptor table per UAV_ARRAY (unbounded UAV) binding
+//   M+  – one root CBV descriptor per CBV binding
+//   P+  – one root 32-bit constants slot per ROOT_CONSTANTS binding
 // ---------------------------------------------------------------------------
 class ComputeShader
 {
@@ -127,6 +131,7 @@ public:
     uint32_t GetRootParamRootSRVBase()   const { return m_rootParamRootSRVBase; }
     uint32_t GetNumSRV()                 const { return m_numSRV; }
     uint32_t GetNumUAV()                 const { return m_numUAV; }
+    uint32_t GetNumUAVArray()            const { return m_numUAVArray; }
     uint32_t GetNumRootConstants()       const { return m_numRootConstants; }
     uint32_t GetNumRootSRV()             const { return m_numRootSRV; }
     const char* GetName()          const { return m_name.c_str(); }
@@ -176,6 +181,7 @@ private:
     uint32_t m_numUAV           = 0;
     uint32_t m_numCBV           = 0;
     uint32_t m_numSRVArray      = 0;
+    uint32_t m_numUAVArray      = 0;
     uint32_t m_numRootConstants = 0;
     uint32_t m_numRootSRV       = 0;
 

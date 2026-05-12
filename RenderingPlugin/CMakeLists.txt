@@ -335,6 +335,7 @@ add_library(NativeRenderPlugin SHARED
     NativeRenderPlugin/src/DescriptorHeapAllocator.cpp
     NativeRenderPlugin/src/BindlessTexture.cpp
     NativeRenderPlugin/src/BindlessBuffer.cpp
+    NativeRenderPlugin/src/BindlessUAVTexture.cpp
     NativeRenderPlugin/src/NativeBuffer.cpp
     NativeRenderPlugin/src/NativeStructuredBuffer.cpp
 )

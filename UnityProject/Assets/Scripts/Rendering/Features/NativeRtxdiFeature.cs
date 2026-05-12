@@ -53,7 +53,8 @@ namespace PathTracing
 
         // Prepare / Environment
         public NativeComputeShader prepareLightsCs; // PrepareLights.computeshader
-        public NativeComputeShader preprocessEnvironmentMapCs; // PreprocessEnvironmentMap.computeshader
+        public NativeComputeShader preprocessEnvironmentMapCs; // PreprocessEnvironmentMap.computeshader  (INPUT_ENVIRONMENT_MAP=1)
+        public NativeComputeShader preprocessLocalLightCs; // PreprocessLocalLight.computeshader   (INPUT_ENVIRONMENT_MAP=0)
 
         // GBuffer
         public NativeComputeShader raytracedGBufferCs; // RaytracedGBuffer.computeshader
@@ -87,7 +88,6 @@ namespace PathTracing
 
         // Auxiliary
         public NativeComputeShader compositingPassCs; // CompositingPass.computeshader
-        public ComputeShader       genMipsCs;
 
         // Denoising passes (gradient filter + confidence)
         public NativeComputeShader filterGradientsPassCs; // DenoisingPasses/FilterGradientsPass.computeshader
@@ -202,8 +202,8 @@ namespace PathTracing
             _nrdDenoisePass  ??= new NrdPass() { renderPassEvent                                     = renderPassEvent };
             _compositingPass ??= new NativeRtxdiCompositingPass(compositingPassCs) { renderPassEvent = renderPassEvent };
 
-            _pdfMipsPass    ??= new NativeRtxdiPdfMipsPass(genMipsCs) { renderPassEvent        = renderPassEvent };
-            _outputBlitPass ??= new NativeRtxdiOutputBlitPass(finalMaterial) { renderPassEvent = renderPassEvent };
+            _pdfMipsPass    ??= new NativeRtxdiPdfMipsPass(preprocessLocalLightCs, preprocessEnvironmentMapCs) { renderPassEvent = renderPassEvent };
+            _outputBlitPass ??= new NativeRtxdiOutputBlitPass(finalMaterial) { renderPassEvent                                   = renderPassEvent };
 
             _presampleLightsNativePass ??= new NativeRtxdiPresampleLightsPass(presampleLightsCs) { renderPassEvent = renderPassEvent };
             _presampleReGirNativePass  ??= new NativeRtxdiPresampleReGirPass(presampleReGirCs) { renderPassEvent   = renderPassEvent };
@@ -1067,7 +1067,9 @@ namespace PathTracing
 
             foreach (var upscaler in _dlsrUpscalers.Values) upscaler.Dispose();
             _dlsrUpscalers.Clear();
-            _dlssrPass           = null;
+            _dlssrPass = null;
+            _pdfMipsPass?.Dispose();
+            _pdfMipsPass         = null;
             _nativeFrameTickPass = null;
         }
 
@@ -1179,6 +1181,8 @@ namespace PathTracing
             // Prepare / Environment
             prepareLightsCs            = LoadCS($"{shaderRoot}/PrepareLights.computeshader");
             preprocessEnvironmentMapCs = LoadCS($"{shaderRoot}/PreprocessEnvironmentMap.computeshader");
+            preprocessLocalLightCs     = LoadCS($"{shaderRoot}/PreprocessLocalLight.computeshader");
+            preprocessLocalLightCs     = LoadCS($"{shaderRoot}/PreprocessLocalLight.computeshader");
 
             // GBuffer
             raytracedGBufferCs   = LoadCS($"{shaderRoot}/RaytracedGBuffer.computeshader");
@@ -1212,7 +1216,6 @@ namespace PathTracing
 
             // Managed compute helpers (kept for v1 — not yet ported to NativeComputeShader)
             compositingPassCs = LoadCS($"{shaderRoot}/CompositingPass.computeshader");
-            genMipsCs         = UnityEditor.AssetDatabase.LoadAssetAtPath<ComputeShader>("Assets/Shaders/RayTracing/DI/GenerateMips.compute");
 
             filterGradientsPassCs = LoadCS($"{shaderRoot}/DenoisingPasses/FilterGradientsPass.computeshader");
             confidencePassCs      = LoadCS($"{shaderRoot}/DenoisingPasses/ConfidencePass.computeshader");

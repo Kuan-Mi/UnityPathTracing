@@ -2,6 +2,7 @@
 #include "AccelerationStructure.h"
 #include "BindlessTexture.h"
 #include "BindlessBuffer.h"
+#include "BindlessUAVTexture.h"
 #include "NativeBuffer.h"
 #include "PluginInternal.h"
 #include <cstdio>
@@ -292,6 +293,19 @@ void ComputeDescriptorSet::RequestResourceStates(const CS_BindingSlot* slots, ui
                     m_d3d12v8->RequestResourceState(buf, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
             }
         }
+        else if (b.type == ComputeBindingType::UAV_ARRAY &&
+                 slot.objectKind == CS_BindingObjectKind::BindlessUAVTexture && slot.objectPtr)
+        {
+            // Individual mip-level UAVs inside BindlessUAVTexture share the same resource.
+            // Request UNORDERED_ACCESS on each unique resource.
+            auto* uavArr = reinterpret_cast<BindlessUAVTexture*>(slot.objectPtr);
+            // We only have per-slot resource access via the SlotInfo inside BindlessUAVTexture.
+            // Since BindlessUAVTexture doesn't expose per-slot resources directly, request state
+            // on the resource passed via resourcePtr (the base texture).
+            ID3D12Resource* res = reinterpret_cast<ID3D12Resource*>(slot.resourcePtr);
+            if (res)
+                m_d3d12v8->RequestResourceState(res, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
+        }
     }
 }
 
@@ -346,6 +360,10 @@ void ComputeDescriptorSet::Dispatch(
                 kind = "SRV_ARRAY";
                 ok = (slot.objectKind == CS_BindingObjectKind::BindlessTexture && slot.objectPtr != 0) ||
                      (slot.objectKind == CS_BindingObjectKind::BindlessBuffer  && slot.objectPtr != 0);
+                break;
+            case ComputeBindingType::UAV_ARRAY:
+                kind = "UAV_ARRAY";
+                ok = (slot.objectKind == CS_BindingObjectKind::BindlessUAVTexture && slot.objectPtr != 0);
                 break;
             case ComputeBindingType::ROOT_CONSTANTS:
                 kind = "ROOT_CONSTANTS";
@@ -430,6 +448,18 @@ void ComputeDescriptorSet::Dispatch(
         else if (slot.objectKind == CS_BindingObjectKind::BindlessBuffer && slot.objectPtr)
             cmdList->SetComputeRootDescriptorTable(b.rootParam,
                 reinterpret_cast<BindlessBuffer*>(slot.objectPtr)->GetGPUHandle());
+    }
+
+    // UAV_ARRAY bindings – each has its own root parameter
+    for (size_t i = 0; i < bindings.size(); ++i)
+    {
+        const auto& b = bindings[i];
+        if (b.type != ComputeBindingType::UAV_ARRAY) continue;
+        if (b.rootParam == kInvalidAlloc) continue;
+        const CS_BindingSlot& slot = (i < slotCount) ? slots[i] : CS_BindingSlot{};
+        if (slot.objectKind == CS_BindingObjectKind::BindlessUAVTexture && slot.objectPtr)
+            cmdList->SetComputeRootDescriptorTable(b.rootParam,
+                reinterpret_cast<BindlessUAVTexture*>(slot.objectPtr)->GetGPUHandle());
     }
 
     // Root CBV per CBV binding

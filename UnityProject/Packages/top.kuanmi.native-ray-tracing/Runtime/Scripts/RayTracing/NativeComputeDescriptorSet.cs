@@ -33,9 +33,10 @@ namespace NativeRender
         // objectKind constants matching C++ CS_BindingObjectKind
         private const uint ObjKindNone            = 0;
         private const uint ObjKindAccelStruct     = 1;
-        private const uint ObjKindBindlessTexture = 2;
-        private const uint ObjKindBindlessBuffer  = 3;
-        private const uint ObjKindRootConstants   = 4;
+        private const uint ObjKindBindlessTexture    = 2;
+        private const uint ObjKindBindlessBuffer      = 3;
+        private const uint ObjKindRootConstants       = 4;
+        private const uint ObjKindBindlessUAVTexture  = 6;
         private const uint ObjKindNativeBuffer    = 5;
 
         private readonly NativeComputePipeline _pipeline;
@@ -318,6 +319,22 @@ namespace NativeRender
             _stagingSlots[i].resourcePtr = 0;
             _stagingSlots[i].objectPtr   = bb != null ? bb.Handle : 0;
             _stagingSlots[i].objectKind  = ObjKindBindlessBuffer;
+            _stagingSlots[i].count       = 0;
+            _stagingSlots[i].stride      = 0;
+        }
+
+        /// <summary>
+        /// Binds a <see cref="BindlessUAVTexture"/> to an unbounded RWTexture2D[] variable.
+        /// Call again after BindlessUAVTexture.Resize() to rebind the new descriptor range.
+        /// <para><paramref name="baseResource"/>: native ptr of the base texture resource used
+        /// for resource-state tracking (pass tex.GetNativeTexturePtr()).</para>
+        /// </summary>
+        public void SetBindlessRWTexture(string name, BindlessUAVTexture uav, IntPtr baseResource = default)
+        {
+            if (!TryGetSlot(name, out uint i)) return;
+            _stagingSlots[i].resourcePtr = (ulong)baseResource;
+            _stagingSlots[i].objectPtr   = uav != null ? uav.Handle : 0;
+            _stagingSlots[i].objectKind  = ObjKindBindlessUAVTexture;
             _stagingSlots[i].count       = 0;
             _stagingSlots[i].stride      = 0;
         }

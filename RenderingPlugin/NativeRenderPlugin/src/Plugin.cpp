@@ -25,6 +25,7 @@
 #include "DescriptorHeapAllocator.h"
 #include "BindlessTexture.h"
 #include "BindlessBuffer.h"
+#include "BindlessUAVTexture.h"
 #include "NativeBuffer.h"
 #include "NativeStructuredBuffer.h"
 #include "D3D12HeapHook.h"
@@ -194,6 +195,10 @@ void EnqueueDeferredDelete(void* ptr, DeferredType type)
 
     case DeferredType::BindlessBuffer:
         EnqueueCleanup([p = static_cast<BindlessBuffer*>(ptr)] { delete p; });
+        break;
+
+    case DeferredType::BindlessUAVTexture:
+        EnqueueCleanup([p = static_cast<BindlessUAVTexture*>(ptr)] { delete p; });
         break;
 
     case DeferredType::AccelStruct:
@@ -1068,6 +1073,91 @@ NR_BB_GetCapacity(uint64_t handle)
 {
     if (!handle) return 0;
     return reinterpret_cast<BindlessBuffer*>(handle)->Capacity();
+}
+
+// ===========================================================================
+// BindlessUAVTexture  -  GPU-visible RWTexture2D[] UAV descriptor array
+// ===========================================================================
+
+// ---------------------------------------------------------------------------
+// NR_CreateBindlessUAVTexture
+//   Allocates a BindlessUAVTexture with |capacity| slots in the shared GPU heap.
+//   Returns an opaque uint64 handle. Caller owns lifetime; call
+//   NR_DestroyBindlessUAVTexture when done.
+// ---------------------------------------------------------------------------
+extern "C" uint64_t UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API
+NR_CreateBindlessUAVTexture(uint32_t capacity)
+{
+    if (!s_RendererReady || !s_DescHeap.IsInitialized())
+    {
+        NR_WARN("NR_CreateBindlessUAVTexture: renderer not ready");
+        return 0;
+    }
+    ID3D12Device* device = s_D3D12->GetDevice();
+    if (!device) return 0;
+
+    auto* uav = new BindlessUAVTexture();
+    if (!uav->Initialize(device, &s_DescHeap, capacity, s_Log))
+    {
+        delete uav;
+        return 0;
+    }
+    return reinterpret_cast<uint64_t>(uav);
+}
+
+// ---------------------------------------------------------------------------
+// NR_DestroyBindlessUAVTexture
+//   Enqueues destruction after a kDeleteDelay-frame GPU fence delay.
+// ---------------------------------------------------------------------------
+extern "C" void UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API
+NR_DestroyBindlessUAVTexture(uint64_t handle)
+{
+    if (handle) EnqueueDeferredDelete(reinterpret_cast<void*>(handle), DeferredType::BindlessUAVTexture);
+}
+
+// ---------------------------------------------------------------------------
+// NR_BUAV_SetTexture
+//   Sets the UAV descriptor at |index| within the BindlessUAVTexture array.
+//   |d3d12ResourcePtr|  – native ID3D12Resource* (pass nullptr to write null UAV)
+//   |mipSlice|          – which mip level to expose as UAV (0-based)
+//   |dxgiFormat|        – DXGI_FORMAT for the view; 0 = derive from resource
+//   Returns 1 on success, 0 if index is out of range.
+// ---------------------------------------------------------------------------
+extern "C" int32_t UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API
+NR_BUAV_SetTexture(uint64_t handle, uint32_t index, void* d3d12ResourcePtr,
+                   uint32_t mipSlice, uint32_t dxgiFormat)
+{
+    if (!handle) return 0;
+    auto* uav = reinterpret_cast<BindlessUAVTexture*>(handle);
+    if (index >= uav->Capacity()) return 0;
+    uav->SetTexture(index,
+                    static_cast<ID3D12Resource*>(d3d12ResourcePtr),
+                    mipSlice,
+                    static_cast<DXGI_FORMAT>(dxgiFormat));
+    return 1;
+}
+
+// ---------------------------------------------------------------------------
+// NR_BUAV_Resize
+//   Resizes the BindlessUAVTexture to |newCapacity| slots.
+//   Any shader that references this object must call SetBindlessRWTexture again.
+// ---------------------------------------------------------------------------
+extern "C" void UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API
+NR_BUAV_Resize(uint64_t handle, uint32_t newCapacity)
+{
+    if (!handle) return;
+    reinterpret_cast<BindlessUAVTexture*>(handle)->Resize(newCapacity);
+}
+
+// ---------------------------------------------------------------------------
+// NR_BUAV_GetCapacity
+//   Returns the current capacity of the BindlessUAVTexture.
+// ---------------------------------------------------------------------------
+extern "C" uint32_t UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API
+NR_BUAV_GetCapacity(uint64_t handle)
+{
+    if (!handle) return 0;
+    return reinterpret_cast<BindlessUAVTexture*>(handle)->Capacity();
 }
 
 // ===========================================================================

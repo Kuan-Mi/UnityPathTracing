@@ -19,6 +19,7 @@ void NR_EnqueueDescriptorRangeFree(DescriptorHeapAllocator* alloc,
 enum class DeferredType {
     BindlessTexture,
     BindlessBuffer,
+    BindlessUAVTexture,
     AccelStruct,
     RayTraceShader,
     ComputeShader,

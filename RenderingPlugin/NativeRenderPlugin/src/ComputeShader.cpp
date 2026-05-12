@@ -78,9 +78,9 @@ bool ComputeShader::LoadShaderFromBytes(const uint8_t* dxilBytes, uint32_t size,
     if (!BuildRootSignature())              return false;
     if (!BuildPipeline(shaderBlob.Get()))   return false;
 
-    Logf(kUnityLogTypeLog, "ComputeShader '%s': pipeline ready from bytes (%u SRV, %u UAV, %u CBV, %u SRV_ARRAY)",
+    Logf(kUnityLogTypeLog, "ComputeShader '%s': pipeline ready from bytes (%u SRV, %u UAV, %u CBV, %u SRV_ARRAY, %u UAV_ARRAY)",
          m_name.c_str(),
-         m_numSRV, m_numUAV, m_numCBV, m_numSRVArray);
+         m_numSRV, m_numUAV, m_numCBV, m_numSRVArray, m_numUAVArray);
     return true;
 }
 
@@ -198,8 +198,16 @@ bool ComputeShader::ReflectBindings(IDxcBlob* shaderBlob)
             }
             break;
         default: // UAV variants
-            cb.type = ComputeBindingType::UAV;
-            ++m_numUAV;
+            if (bind.BindCount == 0)
+            {
+                cb.type = ComputeBindingType::UAV_ARRAY;
+                ++m_numUAVArray;
+            }
+            else
+            {
+                cb.type = ComputeBindingType::UAV;
+                ++m_numUAV;
+            }
             break;
         }
 
@@ -209,14 +217,14 @@ bool ComputeShader::ReflectBindings(IDxcBlob* shaderBlob)
 
     // Assign consecutive heap offsets per type group
     // TLAS shares the SRV descriptor table (same as RayTraceShader)
-    // ROOT_CONSTANTS bindings need no heap slot.
+    // ROOT_CONSTANTS, ROOT_SRV, SRV_ARRAY, UAV_ARRAY bindings need no heap slot here.
     uint32_t srvOff = 0, uavOff = 0, cbvOff = 0;
     for (auto& b : m_bindings)
     {
         if      (b.type == ComputeBindingType::SRV || b.type == ComputeBindingType::TLAS)  b.heapOffset = srvOff++;
         else if (b.type == ComputeBindingType::UAV)           b.heapOffset = uavOff++;
         else if (b.type == ComputeBindingType::CBV)           b.heapOffset = cbvOff++;
-        // ROOT_CONSTANTS, ROOT_SRV: heapOffset stays 0, not used
+        // ROOT_CONSTANTS, ROOT_SRV, SRV_ARRAY, UAV_ARRAY: heapOffset stays 0, not used
     }
 
     return true;
@@ -227,15 +235,14 @@ bool ComputeShader::ReflectBindings(IDxcBlob* shaderBlob)
 //   Fully dynamic �?no hardcoded registers or spaces.
 //   Param 0: SRV table (one range per SRV binding)          optional
 //   Param 1: UAV table (one range per UAV binding)           optional
-//   Params+: one table per SRV_ARRAY binding
-//   Params+: one root CBV per CBV binding
+//   Params+: one table per SRV_ARRAY binding//   Params+: one table per UAV_ARRAY binding//   Params+: one root CBV per CBV binding
 // ---------------------------------------------------------------------------
 bool ComputeShader::BuildRootSignature()
 {
     std::vector<D3D12_DESCRIPTOR_RANGE1> allRanges;
-    allRanges.reserve(m_numSRV + m_numUAV + m_numSRVArray);
-    Logf(kUnityLogTypeLog, "ComputeShader::BuildRootSignature: %u SRV, %u UAV, %u SRV_ARRAY bindings",
-         m_numSRV, m_numUAV, m_numSRVArray);
+    allRanges.reserve(m_numSRV + m_numUAV + m_numSRVArray + m_numUAVArray);
+    Logf(kUnityLogTypeLog, "ComputeShader::BuildRootSignature: %u SRV, %u UAV, %u SRV_ARRAY, %u UAV_ARRAY bindings",
+         m_numSRV, m_numUAV, m_numSRVArray, m_numUAVArray);
 
     // --- SRV descriptor ranges (one per SRV/TLAS binding) ---
     const size_t srvRangesOffset = allRanges.size();
@@ -271,7 +278,7 @@ bool ComputeShader::BuildRootSignature()
              b.name.c_str(), b.registerIndex, b.space, b.heapOffset);
     }
 
-    // --- SRV_ARRAY descriptor ranges (one per unbounded array binding) ---
+    // --- SRV_ARRAY descriptor ranges (one per unbounded SRV array binding) ---
     const size_t srvArrayRangesOffset = allRanges.size();
     for (const auto& b : m_bindings)
     {
@@ -288,8 +295,25 @@ bool ComputeShader::BuildRootSignature()
              b.name.c_str(), b.registerIndex, b.space);
     }
 
+    // --- UAV_ARRAY descriptor ranges (one per unbounded UAV array binding) ---
+    const size_t uavArrayRangesOffset = allRanges.size();
+    for (const auto& b : m_bindings)
+    {
+        if (b.type != ComputeBindingType::UAV_ARRAY) continue;
+        D3D12_DESCRIPTOR_RANGE1 r = {};
+        r.RangeType                         = D3D12_DESCRIPTOR_RANGE_TYPE_UAV;
+        r.NumDescriptors                    = UINT_MAX;
+        r.BaseShaderRegister                = b.registerIndex;
+        r.RegisterSpace                     = b.space;
+        r.Flags                             = D3D12_DESCRIPTOR_RANGE_FLAG_DESCRIPTORS_VOLATILE | D3D12_DESCRIPTOR_RANGE_FLAG_DATA_VOLATILE;
+        r.OffsetInDescriptorsFromTableStart = 0;
+        allRanges.push_back(r);
+        Logf(kUnityLogTypeLog, "  UAV_ARRAY binding: name='%s' u%u space%u",
+             b.name.c_str(), b.registerIndex, b.space);
+    }
+
     std::vector<D3D12_ROOT_PARAMETER1> params;
-    params.reserve((m_numSRV ? 1 : 0) + (m_numUAV ? 1 : 0) + m_numSRVArray + m_numCBV);
+    params.reserve((m_numSRV ? 1 : 0) + (m_numUAV ? 1 : 0) + m_numSRVArray + m_numUAVArray + m_numCBV);
 
     // Optional - SRV table
     if (m_numSRV > 0)
@@ -329,6 +353,23 @@ bool ComputeShader::BuildRootSignature()
             p.ShaderVisibility                    = D3D12_SHADER_VISIBILITY_ALL;
             params.push_back(p);
             Logf(kUnityLogTypeLog, "  Root param %u: SRV_ARRAY '%s' with unbounded descriptors",
+                 b.rootParam, b.name.c_str());
+        }
+    }
+    // One table per UAV_ARRAY
+    {
+        uint32_t arrayIdx = 0;
+        for (auto& b : m_bindings)
+        {
+            if (b.type != ComputeBindingType::UAV_ARRAY) continue;
+            b.rootParam = static_cast<uint32_t>(params.size());
+            D3D12_ROOT_PARAMETER1 p = {};
+            p.ParameterType                       = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
+            p.DescriptorTable.NumDescriptorRanges = 1;
+            p.DescriptorTable.pDescriptorRanges   = &allRanges[uavArrayRangesOffset + arrayIdx++];
+            p.ShaderVisibility                    = D3D12_SHADER_VISIBILITY_ALL;
+            params.push_back(p);
+            Logf(kUnityLogTypeLog, "  Root param %u: UAV_ARRAY '%s' with unbounded descriptors",
                  b.rootParam, b.name.c_str());
         }
     }

@@ -1327,6 +1327,7 @@ MonoBehaviour:
   finalMaterial: {fileID: 2100000, guid: 27695a2bc55ef2f469362b9a2994989e, type: 2}
   prepareLightsCs: {fileID: -2368575503658470205, guid: c0f1df340357abb498a5fea4bcdbbfb1, type: 3}
   preprocessEnvironmentMapCs: {fileID: -2368575503658470205, guid: f6e7a8184af646242a3a05ff4f7ec2ac, type: 3}
+  preprocessLocalLightCs: {fileID: -2368575503658470205, guid: 96f680253e511c1438975a987d638213, type: 3}
   raytracedGBufferCs: {fileID: -2368575503658470205, guid: ffd5853d22710ea448eb888400fe2b54, type: 3}
   postprocessGBufferCs: {fileID: -2368575503658470205, guid: 85207e0d995cb154192bdcb0ad2bc97e, type: 3}
   presampleLightsCs: {fileID: -2368575503658470205, guid: 40f958c76fcc58e418dddb622896eae2, type: 3}
@@ -1348,7 +1349,6 @@ MonoBehaviour:
   ptComputeDuplicationMapCs: {fileID: -2368575503658470205, guid: b740e60bb323a5f4889512ba5877bc6d, type: 3}
   ptFinalShadingCs: {fileID: -2368575503658470205, guid: aa617678eb9a08645b362713c2ef250b, type: 3}
   compositingPassCs: {fileID: -2368575503658470205, guid: 5a6883217629ab840a29e57ae5a31e6a, type: 3}
-  genMipsCs: {fileID: 7200000, guid: 479eb3f98680430492d6af04d7f3ee14, type: 3}
   filterGradientsPassCs: {fileID: -2368575503658470205, guid: 465560f3f3911de4897b18a9adc190b2, type: 3}
   confidencePassCs: {fileID: -2368575503658470205, guid: b0d332f7a0941994091289c9eef997a2, type: 3}
   toneMappingHistogramCs: {fileID: -2368575503658470205, guid: 4da6f987bf06072418d582edb57f6fa6, type: 3}

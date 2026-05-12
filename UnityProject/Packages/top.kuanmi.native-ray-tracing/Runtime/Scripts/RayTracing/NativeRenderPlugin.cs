@@ -344,6 +344,43 @@ namespace NativeRender
         public static extern uint NR_BB_GetCapacity(ulong handle);
 
         // -------------------------------------------------------------------
+        // BindlessUAVTexture API  (independent GPU-visible RWTexture2D[] UAV array)
+        // -------------------------------------------------------------------
+
+        /// <summary>
+        /// Creates a BindlessUAVTexture with |capacity| shader-visible UAV slots (RWTexture2D[]).
+        /// Returns an opaque handle; caller must call NR_DestroyBindlessUAVTexture when done.
+        /// </summary>
+        [DllImport(DllName)]
+        public static extern ulong NR_CreateBindlessUAVTexture(uint capacity);
+
+        /// <summary>Destroys a BindlessUAVTexture created by NR_CreateBindlessUAVTexture.</summary>
+        [DllImport(DllName)]
+        public static extern void NR_DestroyBindlessUAVTexture(ulong handle);
+
+        /// <summary>
+        /// Sets the UAV descriptor at |index| within the BindlessUAVTexture array.
+        /// Pass IntPtr.Zero to write a null UAV at that slot.
+        /// <paramref name="mipSlice"/>: which mip level to expose (0-based).
+        /// <paramref name="dxgiFormat"/>: DXGI_FORMAT for the view; 0 = derive from resource.
+        /// Returns 1 on success, 0 if index is out of range.
+        /// </summary>
+        [DllImport(DllName)]
+        public static extern int NR_BUAV_SetTexture(ulong handle, uint index,
+            IntPtr d3d12ResourcePtr, uint mipSlice, uint dxgiFormat);
+
+        /// <summary>
+        /// Resizes the BindlessUAVTexture to |newCapacity| slots.
+        /// After resize, re-bind to any shader that uses it.
+        /// </summary>
+        [DllImport(DllName)]
+        public static extern void NR_BUAV_Resize(ulong handle, uint newCapacity);
+
+        /// <summary>Returns the current capacity of the BindlessUAVTexture.</summary>
+        [DllImport(DllName)]
+        public static extern uint NR_BUAV_GetCapacity(ulong handle);
+
+        // -------------------------------------------------------------------
         // NativeBuffer API  (triple-buffered upload-heap constant buffer)
         // -------------------------------------------------------------------
 
