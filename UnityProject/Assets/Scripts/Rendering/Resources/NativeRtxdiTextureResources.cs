@@ -14,52 +14,73 @@ namespace PathTracing
     /// </summary>
     public class NativeRtxdiTextureResources : IDisposable
     {
+        public NriTextureResource DeviceDepth;
+        public NriTextureResource Depth;
+        public NriTextureResource PrevDepth;
+        public NriTextureResource GBufferDiffuseAlbedo;
+        public NriTextureResource GBufferSpecularRough;
+        public NriTextureResource GBufferNormals;
+        public NriTextureResource GBufferGeoNormals;
+        public NriTextureResource GBufferEmissive;
+        public NriTextureResource PrevGBufferDiffuseAlbedo;
+        public NriTextureResource PrevGBufferSpecularRough;
+        public NriTextureResource PrevGBufferNormals;
+        public NriTextureResource PrevGBufferGeoNormals;
+        public NriTextureResource MotionVectors;
+        public NriTextureResource NormalRoughness; // for NRD
+
+        // public NriTextureResource PSRMotionVectors;
+        // public NriTextureResource PSRNormalRoughness;
+        // public NriTextureResource PSRDepth;
+        // public NriTextureResource PSRHitT;
+        // // PSR material/direction buffers (packed: R11G11B10 for albedo/F0, oct for view/light dir)
+        // public NriTextureResource PSRDiffuseAlbedo;
+        // public NriTextureResource PSRSpecularF0;
+        // public NriTextureResource PSRLightDir;
+        //
+        // public NriTextureResource HdrColor;
+        // public NriTextureResource LdrColor;
+        public NriTextureResource DiffuseLighting;
+        public NriTextureResource SpecularLighting;
+        public NriTextureResource DenoisedDiffuseLighting;
+        public NriTextureResource DenoisedSpecularLighting;
+
+        public NriTextureResource NrdValidation;
+
+        // public NriTextureResource      TaaFeedback1;
+        // public NriTextureResource      TaaFeedback2;
+        // public NriTextureResource      ResolvedColor;
+        // public NriTextureResource      AccumulatedColor;
+        public NriTextureResource RestirLuminance;
+        public NriTextureResource PrevRestirLuminance;
+
+        public NriTextureResource DirectLightingRaw;
+        public NriTextureResource IndirectLightingRaw;
+
+        // public NriTextureResource PTSampleIDTexture;
+        // public NriTextureResource PTDuplicationMap;
+
+        // ── Non-NRI gradient Texture2DArray (2 slices, FilterGradientsPass) ──
+        private RTHandle           _gradientArray;
+        public  NriTextureResource TemporalSamplePos;
+        public  NriTextureResource DiffuseConfidence;
+        public  NriTextureResource SpecularConfidence;
+        public  NriTextureResource PrevDiffuseConfidence;
+        public  NriTextureResource PrevSpecularConfidence;
+
+        // public NriTextureResource DebugColor;
+        // public NriTextureResource ReferenceColor;
+
+
         // ── Shared (UAV) ────────────────────────────────────────────────────
-        public NriTextureResource Validation;
         public NriTextureResource DirectLighting;
-        public NriTextureResource DlssOutput;             // output resolution
+
+        public NriTextureResource DlssOutput; // output resolution
         public NriTextureResource RrGuideDiffAlbedo;
         public NriTextureResource RrGuideSpecAlbedo;
         public NriTextureResource RrGuideSpecHitDistance;
         public NriTextureResource RrGuideNormalRoughness;
 
-        // ── RTXDI GBuffer ping-pong (UAV) ────────────────────────────────────
-        public NriTextureResource RtxdiViewDepth;
-        public NriTextureResource RtxdiPrevViewDepth;
-        public NriTextureResource RtxdiDeviceDepth;
-        public NriTextureResource RtxdiDiffuseAlbedo;
-        public NriTextureResource RtxdiPrevDiffuseAlbedo;
-        public NriTextureResource RtxdiSpecularRough;
-        public NriTextureResource RtxdiPrevSpecularRough;
-        public NriTextureResource RtxdiNormals;
-        public NriTextureResource RtxdiPrevNormals;
-        public NriTextureResource RtxdiGeoNormals;
-        public NriTextureResource RtxdiPrevGeoNormals;
-        public NriTextureResource RtxdiEmissive;
-        public NriTextureResource RtxdiMotionVectors;
-
-        // ── RTXDI lighting outputs (UAV) ─────────────────────────────────────
-        public NriTextureResource RtxdiDiffuseLighting;
-        public NriTextureResource RtxdiSpecularLighting;
-        public NriTextureResource RtxdiTemporalSamplePos;
-        public NriTextureResource RtxdiRestirLuminance;
-        public NriTextureResource RtxdiPrevRestirLuminance;
-        public NriTextureResource RtxdiDirectLightingRaw;
-        public NriTextureResource RtxdiIndirectLightingRaw;
-        public NriTextureResource RtxdiDenoiserNormalRoughness;
-
-        // ── RTXDI NRD denoised outputs (UAV) ─────────────────────────────────
-        public NriTextureResource RtxdiDenoisedDiffuseLighting;
-        public NriTextureResource RtxdiDenoisedSpecularLighting;
-
-        // ── RTXDI confidence ping-pong (UAV) ─────────────────────────────────
-        public NriTextureResource RtxdiDiffuseConfidence;
-        public NriTextureResource RtxdiPrevDiffuseConfidence;
-        public NriTextureResource RtxdiSpecularConfidence;
-        public NriTextureResource RtxdiPrevSpecularConfidence;
-
-        // ── Non-NRI gradient Texture2DArray (2 slices, FilterGradientsPass) ──
-        private RTHandle _gradientArray;
         public IntPtr GradientArrayPtr => _gradientArray?.rt != null ? _gradientArray.rt.GetNativeTexturePtr() : IntPtr.Zero;
 
         public int2 renderResolution { get; private set; }
@@ -68,57 +89,57 @@ namespace PathTracing
         {
             var uav = new NriResourceState { accessBits = AccessBits.SHADER_RESOURCE_STORAGE, layout = Layout.SHADER_RESOURCE_STORAGE, stageBits = 1 << 10 };
 
-            Validation             = new NriTextureResource("Validation",             GraphicsFormat.R8G8B8A8_UNorm,          uav);
-            DirectLighting         = new NriTextureResource("DirectLighting",         GraphicsFormat.R16G16B16A16_SFloat,     uav);
-            DlssOutput             = new NriTextureResource("DlssOutput",             GraphicsFormat.R16G16B16A16_SFloat,     uav);
-            RrGuideDiffAlbedo      = new NriTextureResource("RrGuideDiffAlbedo",      GraphicsFormat.A2B10G10R10_UNormPack32, uav);
-            RrGuideSpecAlbedo      = new NriTextureResource("RrGuideSpecAlbedo",      GraphicsFormat.A2B10G10R10_UNormPack32, uav);
-            RrGuideSpecHitDistance = new NriTextureResource("RrGuideSpecHitDistance", GraphicsFormat.R16_SFloat,              uav);
-            RrGuideNormalRoughness = new NriTextureResource("RrGuideNormalRoughness", GraphicsFormat.R16G16B16A16_SFloat,     uav);
+            NrdValidation          = new NriTextureResource("Validation", GraphicsFormat.R8G8B8A8_UNorm, uav);
+            DirectLighting         = new NriTextureResource("DirectLighting", GraphicsFormat.R16G16B16A16_SFloat, uav);
+            DlssOutput             = new NriTextureResource("DlssOutput", GraphicsFormat.R16G16B16A16_SFloat, uav);
+            RrGuideDiffAlbedo      = new NriTextureResource("RrGuideDiffAlbedo", GraphicsFormat.A2B10G10R10_UNormPack32, uav);
+            RrGuideSpecAlbedo      = new NriTextureResource("RrGuideSpecAlbedo", GraphicsFormat.A2B10G10R10_UNormPack32, uav);
+            RrGuideSpecHitDistance = new NriTextureResource("RrGuideSpecHitDistance", GraphicsFormat.R16_SFloat, uav);
+            RrGuideNormalRoughness = new NriTextureResource("RrGuideNormalRoughness", GraphicsFormat.R16G16B16A16_SFloat, uav);
 
-            RtxdiViewDepth         = new NriTextureResource("RtxdiViewDepth",         GraphicsFormat.R32_SFloat,  uav);
-            RtxdiPrevViewDepth     = new NriTextureResource("RtxdiPrevViewDepth",     GraphicsFormat.R32_SFloat,  uav);
-            RtxdiDeviceDepth       = new NriTextureResource("RtxdiDeviceDepth",       GraphicsFormat.R32_SFloat,  uav);
-            RtxdiDiffuseAlbedo     = new NriTextureResource("RtxdiDiffuseAlbedo",     GraphicsFormat.R32_UInt,    uav);
-            RtxdiPrevDiffuseAlbedo = new NriTextureResource("RtxdiPrevDiffuseAlbedo", GraphicsFormat.R32_UInt,    uav);
-            RtxdiSpecularRough     = new NriTextureResource("RtxdiSpecularRough",     GraphicsFormat.R32_UInt,    uav);
-            RtxdiPrevSpecularRough = new NriTextureResource("RtxdiPrevSpecularRough", GraphicsFormat.R32_UInt,    uav);
-            RtxdiNormals           = new NriTextureResource("RtxdiNormals",           GraphicsFormat.R32_UInt,    uav);
-            RtxdiPrevNormals       = new NriTextureResource("RtxdiPrevNormals",       GraphicsFormat.R32_UInt,    uav);
-            RtxdiGeoNormals        = new NriTextureResource("RtxdiGeoNormals",        GraphicsFormat.R32_UInt,    uav);
-            RtxdiPrevGeoNormals    = new NriTextureResource("RtxdiPrevGeoNormals",    GraphicsFormat.R32_UInt,    uav);
-            RtxdiEmissive          = new NriTextureResource("RtxdiEmissive",          GraphicsFormat.R16G16B16A16_SFloat, uav);
-            RtxdiMotionVectors     = new NriTextureResource("RtxdiMotionVectors",     GraphicsFormat.R16G16B16A16_SFloat, uav);
+            Depth                    = new NriTextureResource("Depth", GraphicsFormat.R32_SFloat, uav);
+            PrevDepth                = new NriTextureResource("PrevDepth", GraphicsFormat.R32_SFloat, uav);
+            DeviceDepth              = new NriTextureResource("DeviceDepth", GraphicsFormat.R32_SFloat, uav);
+            GBufferDiffuseAlbedo     = new NriTextureResource("DiffuseAlbedo", GraphicsFormat.R32_UInt, uav);
+            PrevGBufferDiffuseAlbedo = new NriTextureResource("PrevDiffuseAlbedo", GraphicsFormat.R32_UInt, uav);
+            GBufferSpecularRough     = new NriTextureResource("SpecularRough", GraphicsFormat.R32_UInt, uav);
+            PrevGBufferSpecularRough = new NriTextureResource("PrevSpecularRough", GraphicsFormat.R32_UInt, uav);
+            GBufferNormals           = new NriTextureResource("Normals", GraphicsFormat.R32_UInt, uav);
+            PrevGBufferNormals       = new NriTextureResource("PrevNormals", GraphicsFormat.R32_UInt, uav);
+            GBufferGeoNormals        = new NriTextureResource("GeoNormals", GraphicsFormat.R32_UInt, uav);
+            PrevGBufferGeoNormals    = new NriTextureResource("PrevGeoNormals", GraphicsFormat.R32_UInt, uav);
+            GBufferEmissive          = new NriTextureResource("Emissive", GraphicsFormat.R16G16B16A16_SFloat, uav);
+            MotionVectors            = new NriTextureResource("MotionVectors", GraphicsFormat.R16G16B16A16_SFloat, uav);
 
-            RtxdiDiffuseLighting         = new NriTextureResource("RtxdiDiffuseLighting",         GraphicsFormat.R16G16B16A16_SFloat, uav);
-            RtxdiSpecularLighting        = new NriTextureResource("RtxdiSpecularLighting",        GraphicsFormat.R16G16B16A16_SFloat, uav);
-            RtxdiTemporalSamplePos       = new NriTextureResource("RtxdiTemporalSamplePos",       GraphicsFormat.R16G16_SInt,         uav);
-            RtxdiRestirLuminance         = new NriTextureResource("RtxdiRestirLuminance",         GraphicsFormat.R16G16_SFloat,       uav);
-            RtxdiPrevRestirLuminance     = new NriTextureResource("RtxdiPrevRestirLuminance",     GraphicsFormat.R16G16_SFloat,       uav);
-            RtxdiDirectLightingRaw       = new NriTextureResource("RtxdiDirectLightingRaw",       GraphicsFormat.R16G16B16A16_SFloat, uav);
-            RtxdiIndirectLightingRaw     = new NriTextureResource("RtxdiIndirectLightingRaw",     GraphicsFormat.R16G16B16A16_SFloat, uav);
-            RtxdiDenoiserNormalRoughness = new NriTextureResource("RtxdiDenoiserNormalRoughness", GraphicsFormat.R8G8B8A8_UNorm,      uav);
+            DiffuseLighting     = new NriTextureResource("DiffuseLighting", GraphicsFormat.R16G16B16A16_SFloat, uav);
+            SpecularLighting    = new NriTextureResource("SpecularLighting", GraphicsFormat.R16G16B16A16_SFloat, uav);
+            TemporalSamplePos   = new NriTextureResource("TemporalSamplePos", GraphicsFormat.R16G16_SInt, uav);
+            RestirLuminance     = new NriTextureResource("RestirLuminance", GraphicsFormat.R16G16_SFloat, uav);
+            PrevRestirLuminance = new NriTextureResource("PrevRestirLuminance", GraphicsFormat.R16G16_SFloat, uav);
+            DirectLightingRaw   = new NriTextureResource("DirectLightingRaw", GraphicsFormat.R16G16B16A16_SFloat, uav);
+            IndirectLightingRaw = new NriTextureResource("IndirectLightingRaw", GraphicsFormat.R16G16B16A16_SFloat, uav);
+            NormalRoughness     = new NriTextureResource("DenoiserNormalRoughness", GraphicsFormat.R8G8B8A8_UNorm, uav);
 
-            RtxdiDenoisedDiffuseLighting  = new NriTextureResource("RtxdiDenoisedDiffuseLighting",  GraphicsFormat.R16G16B16A16_SFloat, uav);
-            RtxdiDenoisedSpecularLighting = new NriTextureResource("RtxdiDenoisedSpecularLighting", GraphicsFormat.R16G16B16A16_SFloat, uav);
+            DenoisedDiffuseLighting  = new NriTextureResource("DenoisedDiffuseLighting", GraphicsFormat.R16G16B16A16_SFloat, uav);
+            DenoisedSpecularLighting = new NriTextureResource("DenoisedSpecularLighting", GraphicsFormat.R16G16B16A16_SFloat, uav);
 
-            RtxdiDiffuseConfidence      = new NriTextureResource("RtxdiDiffuseConfidence",      GraphicsFormat.R8_UNorm, uav);
-            RtxdiPrevDiffuseConfidence  = new NriTextureResource("RtxdiPrevDiffuseConfidence",  GraphicsFormat.R8_UNorm, uav);
-            RtxdiSpecularConfidence     = new NriTextureResource("RtxdiSpecularConfidence",     GraphicsFormat.R8_UNorm, uav);
-            RtxdiPrevSpecularConfidence = new NriTextureResource("RtxdiPrevSpecularConfidence", GraphicsFormat.R8_UNorm, uav);
+            DiffuseConfidence      = new NriTextureResource("DiffuseConfidence", GraphicsFormat.R8_UNorm, uav);
+            PrevDiffuseConfidence  = new NriTextureResource("PrevDiffuseConfidence", GraphicsFormat.R8_UNorm, uav);
+            SpecularConfidence     = new NriTextureResource("SpecularConfidence", GraphicsFormat.R8_UNorm, uav);
+            PrevSpecularConfidence = new NriTextureResource("PrevSpecularConfidence", GraphicsFormat.R8_UNorm, uav);
         }
 
         public static int2 GetUpscaledResolution(int2 outputRes, UpscalerMode mode)
         {
             float scale = mode switch
             {
-                UpscalerMode.NATIVE            => 1.0f,
-                UpscalerMode.ULTRA_QUALITY     => 1.3f,
-                UpscalerMode.QUALITY           => 1.5f,
-                UpscalerMode.BALANCED          => 1.7f,
-                UpscalerMode.PERFORMANCE       => 2.0f,
+                UpscalerMode.NATIVE => 1.0f,
+                UpscalerMode.ULTRA_QUALITY => 1.3f,
+                UpscalerMode.QUALITY => 1.5f,
+                UpscalerMode.BALANCED => 1.7f,
+                UpscalerMode.PERFORMANCE => 2.0f,
                 UpscalerMode.ULTRA_PERFORMANCE => 3.0f,
-                _                              => 1.0f
+                _ => 1.0f
             };
             return new int2((int)(outputRes.x / scale + 0.5f), (int)(outputRes.y / scale + 0.5f));
         }
@@ -129,7 +150,7 @@ namespace PathTracing
         /// </summary>
         public bool EnsureResources(int2 outputResolution, UpscalerMode mode)
         {
-            bool invalid = !Validation.IsCreated;
+            bool invalid = !NrdValidation.IsCreated;
             int2 target  = GetUpscaledResolution(outputResolution, mode);
 
             if (!invalid && target.x == renderResolution.x && target.y == renderResolution.y)
@@ -166,23 +187,23 @@ namespace PathTracing
 
         private NriTextureResource[] RenderResolutionResources() => new[]
         {
-            Validation,
+            NrdValidation,
             RrGuideDiffAlbedo, RrGuideSpecAlbedo, RrGuideSpecHitDistance, RrGuideNormalRoughness,
-            RtxdiViewDepth, RtxdiPrevViewDepth, RtxdiDeviceDepth,
-            RtxdiDiffuseAlbedo, RtxdiPrevDiffuseAlbedo,
-            RtxdiSpecularRough, RtxdiPrevSpecularRough,
-            RtxdiNormals, RtxdiPrevNormals,
-            RtxdiGeoNormals, RtxdiPrevGeoNormals,
-            RtxdiEmissive, RtxdiMotionVectors,
+            Depth, PrevDepth, DeviceDepth,
+            GBufferDiffuseAlbedo, PrevGBufferDiffuseAlbedo,
+            GBufferSpecularRough, PrevGBufferSpecularRough,
+            GBufferNormals, PrevGBufferNormals,
+            GBufferGeoNormals, PrevGBufferGeoNormals,
+            GBufferEmissive, MotionVectors,
             DirectLighting,
-            RtxdiDiffuseLighting, RtxdiSpecularLighting,
-            RtxdiTemporalSamplePos,
-            RtxdiRestirLuminance, RtxdiPrevRestirLuminance,
-            RtxdiDirectLightingRaw, RtxdiIndirectLightingRaw,
-            RtxdiDenoiserNormalRoughness,
-            RtxdiDenoisedDiffuseLighting, RtxdiDenoisedSpecularLighting,
-            RtxdiDiffuseConfidence, RtxdiPrevDiffuseConfidence,
-            RtxdiSpecularConfidence, RtxdiPrevSpecularConfidence,
+            DiffuseLighting, SpecularLighting,
+            TemporalSamplePos,
+            RestirLuminance, PrevRestirLuminance,
+            DirectLightingRaw, IndirectLightingRaw,
+            NormalRoughness,
+            DenoisedDiffuseLighting, DenoisedSpecularLighting,
+            DiffuseConfidence, PrevDiffuseConfidence,
+            SpecularConfidence, PrevSpecularConfidence,
         };
 
         public void Dispose()
@@ -198,6 +219,7 @@ namespace PathTracing
                     break;
                 }
             }
+
             foreach (var res in all) res.Release();
 
             _gradientArray?.Release();
@@ -206,22 +228,22 @@ namespace PathTracing
 
         private NriTextureResource[] AllResources() => new[]
         {
-            Validation, DirectLighting, DlssOutput,
+            NrdValidation, DirectLighting, DlssOutput,
             RrGuideDiffAlbedo, RrGuideSpecAlbedo, RrGuideSpecHitDistance, RrGuideNormalRoughness,
-            RtxdiViewDepth, RtxdiPrevViewDepth, RtxdiDeviceDepth,
-            RtxdiDiffuseAlbedo, RtxdiPrevDiffuseAlbedo,
-            RtxdiSpecularRough, RtxdiPrevSpecularRough,
-            RtxdiNormals, RtxdiPrevNormals,
-            RtxdiGeoNormals, RtxdiPrevGeoNormals,
-            RtxdiEmissive, RtxdiMotionVectors,
-            RtxdiDiffuseLighting, RtxdiSpecularLighting,
-            RtxdiTemporalSamplePos,
-            RtxdiRestirLuminance, RtxdiPrevRestirLuminance,
-            RtxdiDirectLightingRaw, RtxdiIndirectLightingRaw,
-            RtxdiDenoiserNormalRoughness,
-            RtxdiDenoisedDiffuseLighting, RtxdiDenoisedSpecularLighting,
-            RtxdiDiffuseConfidence, RtxdiPrevDiffuseConfidence,
-            RtxdiSpecularConfidence, RtxdiPrevSpecularConfidence,
+            Depth, PrevDepth, DeviceDepth,
+            GBufferDiffuseAlbedo, PrevGBufferDiffuseAlbedo,
+            GBufferSpecularRough, PrevGBufferSpecularRough,
+            GBufferNormals, PrevGBufferNormals,
+            GBufferGeoNormals, PrevGBufferGeoNormals,
+            GBufferEmissive, MotionVectors,
+            DiffuseLighting, SpecularLighting,
+            TemporalSamplePos,
+            RestirLuminance, PrevRestirLuminance,
+            DirectLightingRaw, IndirectLightingRaw,
+            NormalRoughness,
+            DenoisedDiffuseLighting, DenoisedSpecularLighting,
+            DiffuseConfidence, PrevDiffuseConfidence,
+            SpecularConfidence, PrevSpecularConfidence,
         };
     }
 }

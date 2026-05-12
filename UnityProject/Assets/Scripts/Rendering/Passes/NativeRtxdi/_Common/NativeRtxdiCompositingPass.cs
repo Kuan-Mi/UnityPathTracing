@@ -108,26 +108,26 @@ namespace PathTracing
 
             // UAV outputs
             ds.SetRWTexture("u_Output",        pool.DirectLighting.NativePtr);
-            ds.SetRWTexture("u_MotionVectors",  pool.RtxdiMotionVectors.NativePtr);
+            ds.SetRWTexture("u_MotionVectors",  pool.MotionVectors.NativePtr);
 
             // SRV inputs – GBuffer
-            ds.SetTexture("t_GBufferDepth",         pool.RtxdiDeviceDepth.NativePtr);
-            ds.SetTexture("t_GBufferNormals",        pool.RtxdiNormals.NativePtr);
-            ds.SetTexture("t_GBufferDiffuseAlbedo",  pool.RtxdiDiffuseAlbedo.NativePtr);
-            ds.SetTexture("t_GBufferSpecularRough",  pool.RtxdiSpecularRough.NativePtr);
-            ds.SetTexture("t_GBufferEmissive",       pool.RtxdiEmissive.NativePtr);
+            ds.SetTexture("t_GBufferDepth",         pool.DeviceDepth.NativePtr);
+            ds.SetTexture("t_GBufferNormals",        pool.GBufferNormals.NativePtr);
+            ds.SetTexture("t_GBufferDiffuseAlbedo",  pool.GBufferDiffuseAlbedo.NativePtr);
+            ds.SetTexture("t_GBufferSpecularRough",  pool.GBufferSpecularRough.NativePtr);
+            ds.SetTexture("t_GBufferEmissive",       pool.GBufferEmissive.NativePtr);
 
             // SRV inputs – lighting (noisy)
-            ds.SetTexture("t_Diffuse",  pool.RtxdiDiffuseLighting.NativePtr);
-            ds.SetTexture("t_Specular", pool.RtxdiSpecularLighting.NativePtr);
+            ds.SetTexture("t_Diffuse",  pool.DiffuseLighting.NativePtr);
+            ds.SetTexture("t_Specular", pool.SpecularLighting.NativePtr);
 
             // SRV inputs – denoised
-            ds.SetTexture("t_DenoisedDiffuse",  pool.RtxdiDenoisedDiffuseLighting.NativePtr);
-            ds.SetTexture("t_DenoisedSpecular", pool.RtxdiDenoisedSpecularLighting.NativePtr);
+            ds.SetTexture("t_DenoisedDiffuse",  pool.DenoisedDiffuseLighting.NativePtr);
+            ds.SetTexture("t_DenoisedSpecular", pool.DenoisedSpecularLighting.NativePtr);
 
             // SRV inputs – PSR (not used; bind normals as dummy to avoid null hazard)
-            ds.SetTexture("t_PSRDiffuseAlbedo", pool.RtxdiNormals.NativePtr);
-            ds.SetTexture("t_PSRSpecularF0",    pool.RtxdiNormals.NativePtr);
+            ds.SetTexture("t_PSRDiffuseAlbedo", pool.GBufferNormals.NativePtr);
+            ds.SetTexture("t_PSRSpecularF0",    pool.GBufferNormals.NativePtr);
 
             // Bindless scene textures/buffers (space1/space2)
             data.Resource.GpuScene?.BindToShader(ds);

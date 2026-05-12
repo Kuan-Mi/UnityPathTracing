@@ -479,16 +479,16 @@ namespace PathTracing
                 pool.EnsureGradientArray(gradDims);
 
             // Confidence ping-pong: current frame writes, previous frame is read.
-            var diffConfCurrent = isOddFrame ? pool.RtxdiDiffuseConfidence : pool.RtxdiPrevDiffuseConfidence;
-            var diffConfPrev    = isOddFrame ? pool.RtxdiPrevDiffuseConfidence : pool.RtxdiDiffuseConfidence;
-            var specConfCurrent = isOddFrame ? pool.RtxdiSpecularConfidence : pool.RtxdiPrevSpecularConfidence;
-            var specConfPrev    = isOddFrame ? pool.RtxdiPrevSpecularConfidence : pool.RtxdiSpecularConfidence;
+            var diffConfCurrent = isOddFrame ? pool.DiffuseConfidence : pool.PrevDiffuseConfidence;
+            var diffConfPrev    = isOddFrame ? pool.PrevDiffuseConfidence : pool.DiffuseConfidence;
+            var specConfCurrent = isOddFrame ? pool.SpecularConfidence : pool.PrevSpecularConfidence;
+            var specConfPrev    = isOddFrame ? pool.PrevSpecularConfidence : pool.SpecularConfidence;
 
-            RTHandle viewDepth     = isOddFrame ? pool.RtxdiViewDepth.Handle : pool.RtxdiPrevViewDepth.Handle;
-            RTHandle diffuseAlbedo = isOddFrame ? pool.RtxdiDiffuseAlbedo.Handle : pool.RtxdiPrevDiffuseAlbedo.Handle;
-            RTHandle specularRough = isOddFrame ? pool.RtxdiSpecularRough.Handle : pool.RtxdiPrevSpecularRough.Handle;
-            RTHandle normals       = isOddFrame ? pool.RtxdiNormals.Handle : pool.RtxdiPrevNormals.Handle;
-            RTHandle geoNormals    = isOddFrame ? pool.RtxdiGeoNormals.Handle : pool.RtxdiPrevGeoNormals.Handle;
+            RTHandle viewDepth     = isOddFrame ? pool.Depth.Handle : pool.PrevDepth.Handle;
+            RTHandle diffuseAlbedo = isOddFrame ? pool.GBufferDiffuseAlbedo.Handle : pool.PrevGBufferDiffuseAlbedo.Handle;
+            RTHandle specularRough = isOddFrame ? pool.GBufferSpecularRough.Handle : pool.PrevGBufferSpecularRough.Handle;
+            RTHandle normals       = isOddFrame ? pool.GBufferNormals.Handle : pool.PrevGBufferNormals.Handle;
+            RTHandle geoNormals    = isOddFrame ? pool.GBufferGeoNormals.Handle : pool.PrevGBufferGeoNormals.Handle;
 
             // Native IntPtr context — for native compute passes
             IntPtr ToPt(RTHandle h) => h != null && h.rt != null ? h.rt.GetNativeTexturePtr() : IntPtr.Zero;
@@ -499,30 +499,30 @@ namespace PathTracing
                 PerPassConstantBuffer    = _perPassConstantBuffer,
                 GBufferConstantBuffer    = _gbufferConstantBuffer,
                 RtxdiGpuScene            = _rtxdiGpuScene,
-                ViewDepthPtr             = isOddFrame ? pool.RtxdiViewDepth.NativePtr : pool.RtxdiPrevViewDepth.NativePtr,
-                DiffuseAlbedoPtr         = isOddFrame ? pool.RtxdiDiffuseAlbedo.NativePtr : pool.RtxdiPrevDiffuseAlbedo.NativePtr,
-                SpecularRoughPtr         = isOddFrame ? pool.RtxdiSpecularRough.NativePtr : pool.RtxdiPrevSpecularRough.NativePtr,
-                NormalsPtr               = isOddFrame ? pool.RtxdiNormals.NativePtr : pool.RtxdiPrevNormals.NativePtr,
-                GeoNormalsPtr            = isOddFrame ? pool.RtxdiGeoNormals.NativePtr : pool.RtxdiPrevGeoNormals.NativePtr,
-                PrevViewDepthPtr         = isOddFrame ? pool.RtxdiPrevViewDepth.NativePtr : pool.RtxdiViewDepth.NativePtr,
-                PrevDiffuseAlbedoPtr     = isOddFrame ? pool.RtxdiPrevDiffuseAlbedo.NativePtr : pool.RtxdiDiffuseAlbedo.NativePtr,
-                PrevSpecularRoughPtr     = isOddFrame ? pool.RtxdiPrevSpecularRough.NativePtr : pool.RtxdiSpecularRough.NativePtr,
-                PrevNormalsPtr           = isOddFrame ? pool.RtxdiPrevNormals.NativePtr : pool.RtxdiNormals.NativePtr,
-                PrevGeoNormalsPtr        = isOddFrame ? pool.RtxdiPrevGeoNormals.NativePtr : pool.RtxdiGeoNormals.NativePtr,
+                ViewDepthPtr             = isOddFrame ? pool.Depth.NativePtr : pool.PrevDepth.NativePtr,
+                DiffuseAlbedoPtr         = isOddFrame ? pool.GBufferDiffuseAlbedo.NativePtr : pool.PrevGBufferDiffuseAlbedo.NativePtr,
+                SpecularRoughPtr         = isOddFrame ? pool.GBufferSpecularRough.NativePtr : pool.PrevGBufferSpecularRough.NativePtr,
+                NormalsPtr               = isOddFrame ? pool.GBufferNormals.NativePtr : pool.PrevGBufferNormals.NativePtr,
+                GeoNormalsPtr            = isOddFrame ? pool.GBufferGeoNormals.NativePtr : pool.PrevGBufferGeoNormals.NativePtr,
+                PrevViewDepthPtr         = isOddFrame ? pool.PrevDepth.NativePtr : pool.Depth.NativePtr,
+                PrevDiffuseAlbedoPtr     = isOddFrame ? pool.PrevGBufferDiffuseAlbedo.NativePtr : pool.GBufferDiffuseAlbedo.NativePtr,
+                PrevSpecularRoughPtr     = isOddFrame ? pool.PrevGBufferSpecularRough.NativePtr : pool.GBufferSpecularRough.NativePtr,
+                PrevNormalsPtr           = isOddFrame ? pool.PrevGBufferNormals.NativePtr : pool.GBufferNormals.NativePtr,
+                PrevGeoNormalsPtr        = isOddFrame ? pool.PrevGBufferGeoNormals.NativePtr : pool.GBufferGeoNormals.NativePtr,
                 DirectLightingPtr        = pool.DirectLighting.NativePtr,
-                EmissivePtr              = pool.RtxdiEmissive.NativePtr,
-                MotionVectorsPtr         = pool.RtxdiMotionVectors.NativePtr,
-                DeviceDepthPtr           = pool.RtxdiDeviceDepth.NativePtr,
+                EmissivePtr              = pool.GBufferEmissive.NativePtr,
+                MotionVectorsPtr         = pool.MotionVectors.NativePtr,
+                DeviceDepthPtr           = pool.DeviceDepth.NativePtr,
                 LocalLightPdfTexturePtr  = ToPt(rtxdiResources.LocalLightPdfTexture),
                 // Lighting output UAVs
-                DiffuseLightingPtr         = pool.RtxdiDiffuseLighting.NativePtr,
-                SpecularLightingPtr        = pool.RtxdiSpecularLighting.NativePtr,
-                TemporalSamplePositionsPtr = pool.RtxdiTemporalSamplePos.NativePtr,
-                RestirLuminancePtr         = pool.RtxdiRestirLuminance.NativePtr,
-                PrevRestirLuminancePtr     = pool.RtxdiPrevRestirLuminance.NativePtr,
-                DirectLightingRawPtr       = pool.RtxdiDirectLightingRaw.NativePtr,
-                IndirectLightingRawPtr     = pool.RtxdiIndirectLightingRaw.NativePtr,
-                DenoiserNormalRoughnessPtr = pool.RtxdiDenoiserNormalRoughness.NativePtr,
+                DiffuseLightingPtr         = pool.DiffuseLighting.NativePtr,
+                SpecularLightingPtr        = pool.SpecularLighting.NativePtr,
+                TemporalSamplePositionsPtr = pool.TemporalSamplePos.NativePtr,
+                RestirLuminancePtr         = pool.RestirLuminance.NativePtr,
+                PrevRestirLuminancePtr     = pool.PrevRestirLuminance.NativePtr,
+                DirectLightingRawPtr       = pool.DirectLightingRaw.NativePtr,
+                IndirectLightingRawPtr     = pool.IndirectLightingRaw.NativePtr,
+                DenoiserNormalRoughnessPtr = pool.NormalRoughness.NativePtr,
                 // Gradient 2DArray (written by DI shaders when enableGradients=1, filtered by FilterGradientsPass)
                 GradientsPtr = pool.GradientArrayPtr,
                 // Confidence ping-pong
@@ -718,19 +718,19 @@ namespace PathTracing
                 }
 
                 // ---- NRD resource bindings (update every frame for ping-pong ViewDepth) ----
-                var currentViewDepthNri = isOddFrame ? pool.RtxdiViewDepth : pool.RtxdiPrevViewDepth;
+                var currentViewDepthNri = isOddFrame ? pool.Depth : pool.PrevDepth;
 
                 nrdReblur.UpdateResources(
-                    (ResourceType.OUT_VALIDATION, pool.Validation),
-                    (ResourceType.IN_MV, pool.RtxdiMotionVectors),
+                    (ResourceType.OUT_VALIDATION, pool.NrdValidation),
+                    (ResourceType.IN_MV, pool.MotionVectors),
                     (ResourceType.IN_VIEWZ, currentViewDepthNri),
-                    (ResourceType.IN_NORMAL_ROUGHNESS, pool.RtxdiDenoiserNormalRoughness),
-                    (ResourceType.IN_DIFF_RADIANCE_HITDIST, pool.RtxdiDiffuseLighting),
-                    (ResourceType.IN_SPEC_RADIANCE_HITDIST, pool.RtxdiSpecularLighting),
+                    (ResourceType.IN_NORMAL_ROUGHNESS, pool.NormalRoughness),
+                    (ResourceType.IN_DIFF_RADIANCE_HITDIST, pool.DiffuseLighting),
+                    (ResourceType.IN_SPEC_RADIANCE_HITDIST, pool.SpecularLighting),
                     (ResourceType.IN_DIFF_CONFIDENCE, diffConfCurrent),
                     (ResourceType.IN_SPEC_CONFIDENCE, specConfCurrent),
-                    (ResourceType.OUT_DIFF_RADIANCE_HITDIST, pool.RtxdiDenoisedDiffuseLighting),
-                    (ResourceType.OUT_SPEC_RADIANCE_HITDIST, pool.RtxdiDenoisedSpecularLighting)
+                    (ResourceType.OUT_DIFF_RADIANCE_HITDIST, pool.DenoisedDiffuseLighting),
+                    (ResourceType.OUT_SPEC_RADIANCE_HITDIST, pool.DenoisedSpecularLighting)
                 );
                 var lightData = renderingData.lightData;
                 var mainLight = lightData.mainLightIndex >= 0 ? lightData.visibleLights[lightData.mainLightIndex] : default;
@@ -796,8 +796,8 @@ namespace PathTracing
                 {
                     input    = pool.DirectLighting,
                     output   = pool.DlssOutput,
-                    mv       = pool.RtxdiMotionVectors,
-                    depth    = pool.RtxdiDeviceDepth,
+                    mv       = pool.MotionVectors,
+                    depth    = pool.DeviceDepth,
                     exposure = default,
                     reactive = default,
                 };
@@ -828,22 +828,22 @@ namespace PathTracing
             {
                 var outputBlitResource = new OutputBlitPass.Resource
                 {
-                    Mv             = pool.RtxdiMotionVectors.Handle,
-                    Validation     = pool.Validation.Handle,
+                    Mv             = pool.MotionVectors.Handle,
+                    Validation     = pool.NrdValidation.Handle,
                     DirectLighting = pool.DirectLighting.Handle,
 
-                    Diff = pool.RtxdiDiffuseLighting.Handle,
-                    Spec = pool.RtxdiSpecularLighting.Handle,
+                    Diff = pool.DiffuseLighting.Handle,
+                    Spec = pool.SpecularLighting.Handle,
 
-                    DenoisedDiff = pool.RtxdiDenoisedDiffuseLighting.Handle,
-                    DenoisedSpec = pool.RtxdiDenoisedSpecularLighting.Handle,
+                    DenoisedDiff = pool.DenoisedDiffuseLighting.Handle,
+                    DenoisedSpec = pool.DenoisedSpecularLighting.Handle,
                     // Rtxdi GBuffer debug
                     RtxdiViewDepth         = viewDepth,
                     RtxdiDiffuseAlbedo     = diffuseAlbedo,
                     RtxdiSpecularRough     = specularRough,
                     RtxdiNormals           = normals,
                     RtxdiGeoNormals        = geoNormals,
-                    RtxdiDirectLightingRaw = pool.RtxdiDirectLightingRaw.Handle,
+                    RtxdiDirectLightingRaw = pool.DirectLightingRaw.Handle,
                     // Rtxdi PDF debug
                     LocalLightPdfTexture  = rtxdiResources.LocalLightPdfTexture,
                     EnvironmentPdfTexture = rtxdiResources.EnvironmentPdfTexture,
