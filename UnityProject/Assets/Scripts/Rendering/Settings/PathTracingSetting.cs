@@ -175,12 +175,12 @@ namespace PathTracing
 
         public float exposure => Mathf.Pow(2, exposureEv);
 
-        public bool     cameraJitter = true;
-        public ShowMode showMode     = ShowMode.Final;
+        public bool              cameraJitter = true;
+        public NativeRtxdiShowMode showMode   = NativeRtxdiShowMode.Final;
         public bool     showMv;
         public bool     showValidation;
 
-        /// <summary>Mip level to visualise when showMode is Rtxdi_LocalLightPdf or Rtxdi_EnvironmentPdf.</summary>
+        /// <summary>Mip level to visualise when showMode is LocalLightPdf or EnvironmentPdf.</summary>
         [Range(0, 15)]
         public int pdfMipLevel = 0;
 
@@ -226,6 +226,46 @@ namespace PathTracing
 
         public RTXDI_PTTemporalResamplingParameters ptTemporalResamplingParams = ReSTIRPTDefaults.GetDefaultTemporalResamplingParams();
         public RTXDI_PTSpatialResamplingParameters  ptSpatialResamplingParams  = ReSTIRPTDefaults.GetDefaultSpatialResamplingParams();
+    }
+
+    /// <summary>
+    /// Debug / display mode used exclusively by <see cref="NativeRtxdiFeature"/>.
+    /// Keeps NativeRtxdi concerns separate from the shared <see cref="ShowMode"/> enum.
+    /// </summary>
+    public enum NativeRtxdiShowMode
+    {
+        // ── Main output ────────────────────────────────────────────────────
+        /// <summary>Final composited image (DlssOutput when SR is on, HdrColor otherwise).</summary>
+        Final,
+
+        // ── Intermediate lighting buffers ──────────────────────────────────
+        /// <summary>Raw HDR composited lighting written by CompositingPass (= original HdrColor).</summary>
+        HdrColor,
+        /// <summary>DLSS-SR upscaled output (display resolution).</summary>
+        DlssOutput,
+
+        // ── Denoiser inputs / outputs ──────────────────────────────────────
+        DiffuseLighting,
+        SpecularLighting,
+        DenoisedDiffuse,
+        DenoisedSpecular,
+        DirectLightingRaw,
+        IndirectLightingRaw,
+
+        // ── NRD validation overlay ─────────────────────────────────────────
+        NrdValidation,
+
+        // ── GBuffer ────────────────────────────────────────────────────────
+        ViewDepth,      // R32_SFloat linear depth
+        DiffuseAlbedo,  // R32_UINT  R11G11B10_UFLOAT → albedo
+        SpecularF0,     // R32_UINT  R8G8B8A8_Gamma   → specular F0
+        Roughness,      // R32_UINT  R8G8B8A8_Gamma   → roughness (alpha)
+        Normal,         // R32_UINT  oct32             → shading normal
+        GeoNormal,      // R32_UINT  oct32             → geometry normal
+
+        // ── Light PDF debug ────────────────────────────────────────────────
+        LocalLightPdf,
+        EnvironmentPdf,
     }
 
     public enum OnScreen

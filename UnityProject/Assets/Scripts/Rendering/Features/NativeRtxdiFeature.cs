@@ -137,8 +137,8 @@ namespace PathTracing
         private NativeRtxdiPdfMipsPass       _pdfMipsPass;
         private PresamplePass                _presamplePass;
         private NrdPass                      _nrdDenoisePass;
-        private NativeRtxdiCompositingPass   _compositingPass;
-        private OutputBlitPass               _outputBlitPass;
+        private NativeRtxdiCompositingPass         _compositingPass;
+        private NativeRtxdiOutputBlitPass          _outputBlitPass;
 
         // Native: builds GPUScene TLAS at the head of the native pipeline.
         private NativeRtxdiBuildAccelerationStructurePass _buildAsPass;
@@ -196,7 +196,7 @@ namespace PathTracing
             _compositingPass ??= new NativeRtxdiCompositingPass(compositingPassCs) { renderPassEvent = renderPassEvent };
 
             _pdfMipsPass    ??= new NativeRtxdiPdfMipsPass(genMipsCs) { renderPassEvent = renderPassEvent };
-            _outputBlitPass ??= new OutputBlitPass(finalMaterial) { renderPassEvent     = renderPassEvent };
+            _outputBlitPass ??= new NativeRtxdiOutputBlitPass(finalMaterial) { renderPassEvent = renderPassEvent };
 
             _presampleLightsNativePass ??= new NativeRtxdiPresampleLightsPass(presampleLightsCs) { renderPassEvent = renderPassEvent };
             _presampleReGirNativePass  ??= new NativeRtxdiPresampleReGirPass(presampleReGirCs) { renderPassEvent   = renderPassEvent };
@@ -509,7 +509,7 @@ namespace PathTracing
                 PrevSpecularRoughPtr     = isOddFrame ? pool.PrevGBufferSpecularRough.NativePtr : pool.GBufferSpecularRough.NativePtr,
                 PrevNormalsPtr           = isOddFrame ? pool.PrevGBufferNormals.NativePtr : pool.GBufferNormals.NativePtr,
                 PrevGeoNormalsPtr        = isOddFrame ? pool.PrevGBufferGeoNormals.NativePtr : pool.GBufferGeoNormals.NativePtr,
-                DirectLightingPtr        = pool.DirectLighting.NativePtr,
+                DirectLightingPtr        = pool.HdrColor.NativePtr,
                 EmissivePtr              = pool.GBufferEmissive.NativePtr,
                 MotionVectorsPtr         = pool.MotionVectors.NativePtr,
                 DeviceDepthPtr           = pool.DeviceDepth.NativePtr,
@@ -794,7 +794,7 @@ namespace PathTracing
 
                 var dlsrRes = new DlsrUpscaler.DlsrResources
                 {
-                    input    = pool.DirectLighting,
+                    input    = pool.HdrColor,
                     output   = pool.DlssOutput,
                     mv       = pool.MotionVectors,
                     depth    = pool.DeviceDepth,
@@ -826,37 +826,38 @@ namespace PathTracing
             // ---- OutputBlit (shows DirectLighting = composited NRD result) ----
             if (_outputBlitPass != null)
             {
-                var outputBlitResource = new OutputBlitPass.Resource
+                var outputBlitResource = new NativeRtxdiOutputBlitPass.Resource
                 {
-                    Mv             = pool.MotionVectors.Handle,
-                    Validation     = pool.NrdValidation.Handle,
-                    DirectLighting = pool.DirectLighting.Handle,
+                    HdrColor           = pool.HdrColor.Handle,
+                    DlssOutput         = setting.SR ? pool.DlssOutput.Handle : null,
 
-                    Diff = pool.DiffuseLighting.Handle,
-                    Spec = pool.SpecularLighting.Handle,
+                    DiffuseLighting    = pool.DiffuseLighting.Handle,
+                    SpecularLighting   = pool.SpecularLighting.Handle,
+                    DenoisedDiffuse    = pool.DenoisedDiffuseLighting.Handle,
+                    DenoisedSpecular   = pool.DenoisedSpecularLighting.Handle,
+                    DirectLightingRaw  = pool.DirectLightingRaw.Handle,
+                    IndirectLightingRaw = pool.IndirectLightingRaw.Handle,
 
-                    DenoisedDiff = pool.DenoisedDiffuseLighting.Handle,
-                    DenoisedSpec = pool.DenoisedSpecularLighting.Handle,
-                    // Rtxdi GBuffer debug
-                    RtxdiViewDepth         = viewDepth,
-                    RtxdiDiffuseAlbedo     = diffuseAlbedo,
-                    RtxdiSpecularRough     = specularRough,
-                    RtxdiNormals           = normals,
-                    RtxdiGeoNormals        = geoNormals,
-                    RtxdiDirectLightingRaw = pool.DirectLightingRaw.Handle,
-                    // Rtxdi PDF debug
+                    NrdValidation      = pool.NrdValidation.Handle,
+                    MotionVectors      = pool.MotionVectors.Handle,
+
+                    // GBuffer debug
+                    ViewDepth     = viewDepth,
+                    DiffuseAlbedo = diffuseAlbedo,
+                    SpecularRough = specularRough,
+                    Normals       = normals,
+                    GeoNormals    = geoNormals,
+
+                    // PDF debug
                     LocalLightPdfTexture  = rtxdiResources.LocalLightPdfTexture,
                     EnvironmentPdfTexture = rtxdiResources.EnvironmentPdfTexture,
-                    DlssOutput            = setting.SR ? pool.DlssOutput.Handle : null,
                 };
-                var outputBlitSettings = new OutputBlitPass.Settings
+                var outputBlitSettings = new NativeRtxdiOutputBlitPass.Settings
                 {
                     showMode         = setting.showMode,
                     resolutionScale  = frameState.resolutionScale,
-                    enableDlssRR     = false,
-                    showMV           = setting.showMv,
+                    showMv           = setting.showMv,
                     showValidation   = setting.showValidation,
-                    showReference    = false,
                     pdfMipLevel      = setting.pdfMipLevel,
                     pdfExposureStops = setting.pdfExposureStops,
                 };

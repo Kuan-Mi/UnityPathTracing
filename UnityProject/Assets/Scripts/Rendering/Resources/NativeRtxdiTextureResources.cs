@@ -38,7 +38,8 @@ namespace PathTracing
         // public NriTextureResource PSRSpecularF0;
         // public NriTextureResource PSRLightDir;
         //
-        // public NriTextureResource HdrColor;
+
+        public NriTextureResource HdrColor;
         // public NriTextureResource LdrColor;
         public NriTextureResource DiffuseLighting;
         public NriTextureResource SpecularLighting;
@@ -73,7 +74,6 @@ namespace PathTracing
 
 
         // ── Shared (UAV) ────────────────────────────────────────────────────
-        public NriTextureResource DirectLighting;
 
         public NriTextureResource DlssOutput; // output resolution
         public NriTextureResource RrGuideDiffAlbedo;
@@ -90,7 +90,7 @@ namespace PathTracing
             var uav = new NriResourceState { accessBits = AccessBits.SHADER_RESOURCE_STORAGE, layout = Layout.SHADER_RESOURCE_STORAGE, stageBits = 1 << 10 };
 
             NrdValidation          = new NriTextureResource("Validation", GraphicsFormat.R8G8B8A8_UNorm, uav);
-            DirectLighting         = new NriTextureResource("DirectLighting", GraphicsFormat.R16G16B16A16_SFloat, uav);
+            HdrColor         = new NriTextureResource("DirectLighting", GraphicsFormat.R16G16B16A16_SFloat, uav);
             DlssOutput             = new NriTextureResource("DlssOutput", GraphicsFormat.R16G16B16A16_SFloat, uav);
             RrGuideDiffAlbedo      = new NriTextureResource("RrGuideDiffAlbedo", GraphicsFormat.A2B10G10R10_UNormPack32, uav);
             RrGuideSpecAlbedo      = new NriTextureResource("RrGuideSpecAlbedo", GraphicsFormat.A2B10G10R10_UNormPack32, uav);
@@ -195,7 +195,7 @@ namespace PathTracing
             GBufferNormals, PrevGBufferNormals,
             GBufferGeoNormals, PrevGBufferGeoNormals,
             GBufferEmissive, MotionVectors,
-            DirectLighting,
+            HdrColor,
             DiffuseLighting, SpecularLighting,
             TemporalSamplePos,
             RestirLuminance, PrevRestirLuminance,
@@ -228,7 +228,7 @@ namespace PathTracing
 
         private NriTextureResource[] AllResources() => new[]
         {
-            NrdValidation, DirectLighting, DlssOutput,
+            NrdValidation, HdrColor, DlssOutput,
             RrGuideDiffAlbedo, RrGuideSpecAlbedo, RrGuideSpecHitDistance, RrGuideNormalRoughness,
             Depth, PrevDepth, DeviceDepth,
             GBufferDiffuseAlbedo, PrevGBufferDiffuseAlbedo,

@@ -107,7 +107,7 @@ namespace PathTracing
             ds.SetConstantBuffer("g_Const", data.Resource.ConstantBuffer);
 
             // UAV outputs
-            ds.SetRWTexture("u_Output",        pool.DirectLighting.NativePtr);
+            ds.SetRWTexture("u_Output",        pool.HdrColor.NativePtr);
             ds.SetRWTexture("u_MotionVectors",  pool.MotionVectors.NativePtr);
 
             // SRV inputs – GBuffer
