@@ -1,3 +1,4 @@
+using System;
 using System.Runtime.InteropServices;
 using Unity.Mathematics;
 using UnityEngine;
@@ -11,6 +12,7 @@ namespace PathTracing
     /// Used as <c>ConstantBuffer&lt;CompositingConstants&gt; g_Const : register(b0)</c> in
     /// <c>CompositingPass.hlsl</c>.
     /// </summary>
+    [Serializable]
     [StructLayout(LayoutKind.Sequential)]
     public struct NativeCompositingConstants
     {

@@ -51,6 +51,7 @@ namespace PathTracing
     /// Used as <c>ConstantBuffer&lt;GBufferConstants&gt; g_Const : register(b0)</c> in
     /// <c>RaytracedGBuffer.hlsl</c>.
     /// </summary>
+    [Serializable]
     [StructLayout(LayoutKind.Sequential)]
     public struct NativeGBufferConstants
     {

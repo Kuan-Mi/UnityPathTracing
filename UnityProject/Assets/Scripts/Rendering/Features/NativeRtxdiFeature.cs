@@ -1,9 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Runtime.InteropServices;
-using DLRR;
 using DLSR;
-using mini;
 using NativeRender;
 using Nrd;
 using Rtxdi;
@@ -40,9 +38,9 @@ namespace PathTracing
         // -------------------------------------------------------------------
         public NativeRtxdiSetting setting;
 
-        // public GlobalConstants     globalConstants;
         public NativeResamplingConstants  resamplingConstants;
         public NativeCompositingConstants compositingConstants;
+        public NativeGBufferConstants     gbufferConstants;
 
         public RenderPassEvent renderPassEvent = RenderPassEvent.BeforeRenderingPostProcessing;
 
@@ -264,14 +262,6 @@ namespace PathTracing
                 return;
             }
 
-            // TODO(FullSample port): replace this with NativeRtxdiPrepareLightsPass that mirrors
-            // RTXDI/Samples/FullSample/Source/RenderPasses/PrepareLightsPass.{h,cpp} — it should
-            // (a) walk emissive MeshRenderers + analytic Unity Lights to build a CPU-side
-            //     TaskBuffer + PrimitiveLightBuffer, and
-            // (b) dispatch PrepareLights.computeshader to populate LightDataBuffer +
-            //     LightIndexMappingBuffer + LocalLightPdfTexture inside NativeRtxdiResources.
-            // Until then the feature renders without dynamic emissive lights.
-
             long uniqueKey = cam.GetInstanceID() + (eyeIndex * 100000L);
             bool isVR      = renderingData.cameraData.xrRendering;
 
@@ -361,7 +351,8 @@ namespace PathTracing
             uint curFrame = frameState.frameIndex;
             frameState.Update(renderingData, false, 1);
 
-            _gbufferConstantsArray[0] = NativeGBufferConstantsBuilder.Build(frameState, renderResolution, 1f);
+            gbufferConstants          = NativeGBufferConstantsBuilder.Build(frameState, renderResolution, 1f);
+            _gbufferConstantsArray[0] = gbufferConstants;
             _gbufferConstantBuffer.SetData(_gbufferConstantsArray);
 
             bool enableDirectReStirPass = setting.directLightingMode == DirectLightingMode.ReStir;
@@ -392,21 +383,19 @@ namespace PathTracing
             // and get back the RTXDI_LightBufferParameters that encodes the current-frame
             // light region inside the double-buffered LightDataBuffer.
             RTXDI_LightBufferParameters lightBufferParams = default;
-            if (_prepareLightsPass != null)
+
+            // nativeCtx is not yet built at this point; create a lightweight context with
+            // only the fields needed by BuildTasksOnCpu (Resources + RtxdiGpuScene).
+            var prepCtx = new NativeRtxdiPassContext
             {
-                // nativeCtx is not yet built at this point; create a lightweight context with
-                // only the fields needed by BuildTasksOnCpu (Resources + RtxdiGpuScene).
-                var prepCtx = new NativeRtxdiPassContext
-                {
-                    Resources     = rtxdiResources,
-                    RtxdiGpuScene = _rtxdiGpuScene,
-                };
-                lightBufferParams = _prepareLightsPass.BuildTasksOnCpu(
-                    prepCtx,
-                    setting.environmentMap,
-                    setting.environmentRotation,
-                    setting.environmentScale);
-            }
+                Resources     = rtxdiResources,
+                RtxdiGpuScene = _rtxdiGpuScene,
+            };
+            lightBufferParams = _prepareLightsPass.BuildTasksOnCpu(
+                prepCtx,
+                setting.environmentMap,
+                setting.environmentRotation,
+                setting.environmentScale);
 
             uint2 localLightPdfTextureSize = rtxdiResources.LocalLightPdfTextureSize;
 
@@ -556,43 +545,25 @@ namespace PathTracing
             _buildAsPass.Setup(_rtxdiGpuScene);
             renderer.EnqueuePass(_buildAsPass);
 
-            // ---- PrepareLights (native CS port) ----
-            // Dispatches PrepareLights.computeshader to populate LightDataBuffer,
-            // LightIndexMappingBuffer, and LocalLightPdfTexture from the TaskBuffer
-            // uploaded by BuildTasksOnCpu above.
-            if (_prepareLightsPass != null)
-            {
-                _prepareLightsPass.Setup(nativeCtx);
-                renderer.EnqueuePass(_prepareLightsPass);
-            }
+            // ---- PrepareLights ----
+            _prepareLightsPass.Setup(nativeCtx);
+            renderer.EnqueuePass(_prepareLightsPass);
 
-            // ---- GBuffer (native raytraced path) ----
-
+            // ---- GBuffer ----
             _raytracedGBufferPass.Setup(nativeCtx);
             renderer.EnqueuePass(_raytracedGBufferPass);
-
-
             _postprocessGBufferPass.Setup(nativeCtx);
             renderer.EnqueuePass(_postprocessGBufferPass);
 
+            // --- PDF Mipmaps ----
+            _pdfMipsPass.Setup(nativeCtx);
+            renderer.EnqueuePass(_pdfMipsPass);
 
-            // ---- PDF mip chain (mirrors FullSample's m_localLightPdfMipmapPass / m_environmentMapPdfMipmapPass) ----
-            // Must run after PrepareLights, which writes mip 0 of LocalLightPdfTexture.
-            if (_pdfMipsPass != null && _prepareLightsPass != null)
-            {
-                _pdfMipsPass.Setup(nativeCtx);
-                renderer.EnqueuePass(_pdfMipsPass);
-            }
+            var regirContext = isContext.GetReGIRContext();
+            setting.regirDynamicParams.center = frameState.camPos;
+            regirContext.SetDynamicParameters(setting.regirDynamicParams);
 
-            // ---- Update ReGIR context (center = camera position, mirrors FullSample UpdateReGIRContextFromUI) ----
-            {
-                var regirContext = isContext.GetReGIRContext();
-                setting.regirDynamicParams.center = frameState.camPos;
-                regirContext.SetDynamicParameters(setting.regirDynamicParams);
-            }
-
-            // ---- Presample local lights (NATIVE) ----
-            // Mirrors FullSample: runs after PDF mip chain when using non-uniform local-light sampling.
+            // ---- Presample local lights (power) ----
             if (setting.initialSamplingParams.localLightSamplingMode != ReSTIRDI_LocalLightSamplingMode.Uniform)
             {
                 const uint presampleGroupSize = 256u; // RTXDI_PRESAMPLING_GROUP_SIZE
@@ -603,33 +574,28 @@ namespace PathTracing
                 renderer.EnqueuePass(_presampleLightsNativePass);
             }
 
-            // ---- Presample ReGIR (NATIVE) ----
-            // Mirrors FullSample: runs after PresampleLights when the sampling mode is ReGIR_RIS.
-            if (setting.initialSamplingParams.localLightSamplingMode == ReSTIRDI_LocalLightSamplingMode.ReGIR_RIS &&
-                _presampleReGirNativePass != null)
+            // ---- Presample ReGIR ----
+            if (setting.initialSamplingParams.localLightSamplingMode == ReSTIRDI_LocalLightSamplingMode.ReGIR_RIS)
             {
                 const uint reGirTileSize = 256u; // RTXDI_PRESAMPLING_GROUP_SIZE used for ReGIR
-                var        regirContext  = isContext.GetReGIRContext();
                 uint       groupsX       = (regirContext.GetReGIRLightSlotCount() + reGirTileSize - 1u) / reGirTileSize;
                 _presampleReGirNativePass.Setup(nativeCtx, groupsX);
                 renderer.EnqueuePass(_presampleReGirNativePass);
             }
 
-            // ---- DI core (NATIVE) ----
+            // ---- DI ----
             if (enableDirectReStirPass)
             {
                 _diGenerateInitialSamplesPass.Setup(nativeCtx);
                 renderer.EnqueuePass(_diGenerateInitialSamplesPass);
 
-                if (_diTemporalResamplingPass != null &&
-                    setting.diResamplingMode is ReSTIRDI_ResamplingMode.Temporal or ReSTIRDI_ResamplingMode.TemporalAndSpatial)
+                if (setting.diResamplingMode is ReSTIRDI_ResamplingMode.Temporal or ReSTIRDI_ResamplingMode.TemporalAndSpatial)
                 {
                     _diTemporalResamplingPass.Setup(nativeCtx);
                     renderer.EnqueuePass(_diTemporalResamplingPass);
                 }
 
-                if (_diSpatialResamplingPass != null &&
-                    setting.diResamplingMode is ReSTIRDI_ResamplingMode.Spatial or ReSTIRDI_ResamplingMode.TemporalAndSpatial)
+                if (setting.diResamplingMode is ReSTIRDI_ResamplingMode.Spatial or ReSTIRDI_ResamplingMode.TemporalAndSpatial)
                 {
                     _diSpatialResamplingPass.Setup(nativeCtx);
                     renderer.EnqueuePass(_diSpatialResamplingPass);
@@ -639,57 +605,50 @@ namespace PathTracing
                 renderer.EnqueuePass(_diShadeSamplesPass);
             }
 
-            // ---- BRDF + GI (NATIVE) ----
-            if (enableBrdfAndIndirectPass && _brdfRayTracingPass != null)
+            // ---- BRDF + GI ----
+            if (enableBrdfAndIndirectPass)
             {
                 _brdfRayTracingPass.Setup(nativeCtx);
                 renderer.EnqueuePass(_brdfRayTracingPass);
 
-                if (needSecondaryGBuffer && _shadeSecondarySurfacesPass != null)
+                if (needSecondaryGBuffer)
                 {
                     _shadeSecondarySurfacesPass.Setup(nativeCtx);
                     renderer.EnqueuePass(_shadeSecondarySurfacesPass);
 
                     if (enableReSTIRGI)
                     {
-                        if (_giTemporalResamplingPass != null &&
-                            setting.giResamplingMode is ReSTIRGI_ResamplingMode.Temporal or ReSTIRGI_ResamplingMode.TemporalAndSpatial)
+                        if (setting.giResamplingMode is ReSTIRGI_ResamplingMode.Temporal or ReSTIRGI_ResamplingMode.TemporalAndSpatial)
                         {
                             _giTemporalResamplingPass.Setup(nativeCtx);
                             renderer.EnqueuePass(_giTemporalResamplingPass);
                         }
 
-                        if (_giSpatialResamplingPass != null &&
-                            setting.giResamplingMode is ReSTIRGI_ResamplingMode.Spatial or ReSTIRGI_ResamplingMode.TemporalAndSpatial)
+                        if (setting.giResamplingMode is ReSTIRGI_ResamplingMode.Spatial or ReSTIRGI_ResamplingMode.TemporalAndSpatial)
                         {
                             _giSpatialResamplingPass.Setup(nativeCtx);
                             renderer.EnqueuePass(_giSpatialResamplingPass);
                         }
 
-                        if (_giFinalShadingPass != null)
-                        {
-                            _giFinalShadingPass.Setup(nativeCtx);
-                            renderer.EnqueuePass(_giFinalShadingPass);
-                        }
+                        _giFinalShadingPass.Setup(nativeCtx);
+                        renderer.EnqueuePass(_giFinalShadingPass);
                     }
                 }
             }
 
-            // ---- ReSTIR PT (NATIVE) ----
-            if (setting.indirectLightingMode == IndirectLightingMode.ReStirPT && _ptGenerateInitialSamplesPass != null)
+            // ---- ReSTIR PT ----
+            if (setting.indirectLightingMode == IndirectLightingMode.ReStirPT)
             {
                 _ptGenerateInitialSamplesPass.Setup(nativeCtx);
                 renderer.EnqueuePass(_ptGenerateInitialSamplesPass);
 
-                if (_ptTemporalResamplingPass != null &&
-                    setting.ptResamplingMode is ReSTIRPT_ResamplingMode.Temporal or ReSTIRPT_ResamplingMode.TemporalAndSpatial)
+                if (setting.ptResamplingMode is ReSTIRPT_ResamplingMode.Temporal or ReSTIRPT_ResamplingMode.TemporalAndSpatial)
                 {
                     _ptTemporalResamplingPass.Setup(nativeCtx);
                     renderer.EnqueuePass(_ptTemporalResamplingPass);
                 }
 
-                if (_ptSpatialResamplingPass != null &&
-                    setting.ptResamplingMode is ReSTIRPT_ResamplingMode.Spatial or ReSTIRPT_ResamplingMode.TemporalAndSpatial)
+                if (setting.ptResamplingMode is ReSTIRPT_ResamplingMode.Spatial or ReSTIRPT_ResamplingMode.TemporalAndSpatial)
                 {
                     _ptSpatialResamplingPass.Setup(nativeCtx);
                     renderer.EnqueuePass(_ptSpatialResamplingPass);
@@ -699,24 +658,15 @@ namespace PathTracing
                 var ptTemporalParams = resamplingConstants.restirPT.temporalResampling;
                 if (ptTemporalParams.duplicationBasedHistoryReduction != 0)
                 {
-                    if (_ptFillSampleIDPass != null)
-                    {
-                        _ptFillSampleIDPass.Setup(nativeCtx);
-                        renderer.EnqueuePass(_ptFillSampleIDPass);
-                    }
+                    _ptFillSampleIDPass.Setup(nativeCtx);
+                    renderer.EnqueuePass(_ptFillSampleIDPass);
 
-                    if (_ptComputeDuplicationMapPass != null)
-                    {
-                        _ptComputeDuplicationMapPass.Setup(nativeCtx);
-                        renderer.EnqueuePass(_ptComputeDuplicationMapPass);
-                    }
+                    _ptComputeDuplicationMapPass.Setup(nativeCtx);
+                    renderer.EnqueuePass(_ptComputeDuplicationMapPass);
                 }
 
-                if (_ptFinalShadingPass != null)
-                {
-                    _ptFinalShadingPass.Setup(nativeCtx);
-                    renderer.EnqueuePass(_ptFinalShadingPass);
-                }
+                _ptFinalShadingPass.Setup(nativeCtx);
+                renderer.EnqueuePass(_ptFinalShadingPass);
             }
 
             // ---- NRD denoising (REBLUR_DIFFUSE_SPECULAR) ----
@@ -867,7 +817,7 @@ namespace PathTracing
                 renderer.EnqueuePass(_toneMappingPass);
             }
 
-            // ---- OutputBlit (shows DirectLighting = composited NRD result) ----
+            // ---- OutputBlit ----
             if (_outputBlitPass != null)
             {
                 var outputBlitResource = new NativeRtxdiOutputBlitPass.Resource
@@ -909,7 +859,6 @@ namespace PathTracing
                 _outputBlitPass.Setup(outputBlitResource, outputBlitSettings);
                 renderer.EnqueuePass(_outputBlitPass);
             }
-
 
             if (renderingData.cameraData.xr.enabled)
             {
@@ -1109,7 +1058,7 @@ namespace PathTracing
             // otherwise fall back to scanning the whole buffer.
             int frameOffset = 0;
             int frameCount  = res.LightDataBuffer.count;
-            if (_prepareLightsPass != null && _prepareLightsPass.TotalLightCount > 0)
+            if (_prepareLightsPass.TotalLightCount > 0)
             {
                 frameOffset = (int)_prepareLightsPass.CurrentFrameOffset;
                 frameCount  = _prepareLightsPass.TotalLightCount;
@@ -1125,7 +1074,7 @@ namespace PathTracing
 
                 // Decode intensity from logRadiance low-16 bits.
                 uint  logRad    = info.logRadiance & 0xFFFFu;
-                float intensity = (logRad == 0) ? 0f : Unity.Mathematics.math.exp2(((logRad - 1) / 65534f) * 48f - 8f);
+                float intensity = (logRad == 0) ? 0f : math.exp2(((logRad - 1) / 65534f) * 48f - 8f);
 
                 if (intensity < 0.01f)
                     continue;
@@ -1153,16 +1102,16 @@ namespace PathTracing
         {
             float px = (packed & 0xFFFFu) / (float)0xFFFEu;
             float py = (packed >> 16) / (float)0xFFFEu;
-            var   p  = new Unity.Mathematics.float2(px * 2f - 1f, py * 2f - 1f);
-            var   n  = new Unity.Mathematics.float3(p.x, p.y, 1f - Unity.Mathematics.math.abs(p.x) - Unity.Mathematics.math.abs(p.y));
+            var   p  = new float2(px * 2f - 1f, py * 2f - 1f);
+            var   n  = new float3(p.x, p.y, 1f - math.abs(p.x) - math.abs(p.y));
             if (n.z < 0f)
             {
-                var wrap = (1f - Unity.Mathematics.math.abs(p.yx)) * Unity.Mathematics.math.select(-1f, 1f, p.xy >= 0f);
+                var wrap = (1f - math.abs(p.yx)) * math.select(-1f, 1f, p.xy >= 0f);
                 n.x = wrap.x;
                 n.y = wrap.y;
             }
 
-            return ((Vector3)(Unity.Mathematics.math.normalize(n)));
+            return ((Vector3)(math.normalize(n)));
         }
 
 #if UNITY_EDITOR
