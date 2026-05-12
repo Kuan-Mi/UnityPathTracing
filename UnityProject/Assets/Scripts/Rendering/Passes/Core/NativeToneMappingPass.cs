@@ -210,7 +210,7 @@ namespace PathTracing
             // Build
             data.HistogramDs.SetConstantBuffer("c_ToneMapping", cbPtr);
             data.HistogramDs.SetTexture("t_Source", res.SourceTexture);
-            data.HistogramDs.SetRWBuffer("u_Histogram", histPtr);
+            data.HistogramDs.SetRWTypedBuffer("u_Histogram", histPtr, 256, (uint)Nri.DXGI_FORMAT.DXGI_FORMAT_R32_UINT);
 
             uint hx = (renderW + 15u) / 16u;
             uint hy = (renderH + 15u) / 16u;
