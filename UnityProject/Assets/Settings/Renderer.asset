@@ -68,7 +68,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 0851c2374f973ce42b0f91f849f0933f, type: 3}
   m_Name: NativeRtxdiFeature
   m_EditorClassIdentifier: Assembly-CSharp::PathTracing.NativeRtxdiFeature
-  m_Active: 1
+  m_Active: 0
   setting:
     environmentMap: {fileID: 0}
     environmentRotation: 0
@@ -2352,7 +2352,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 5a4e0d79381289b4cb6b3a5e5d56f537, type: 3}
   m_Name: NativeNrdFeature
   m_EditorClassIdentifier: Assembly-CSharp::PathTracing.NativeNrdFeature
-  m_Active: 0
+  m_Active: 1
   setting:
     showValidation: 0
     showMV: 0
@@ -2370,7 +2370,7 @@ MonoBehaviour:
     hitDistScale: 3
     resolutionScale: 1
     maxAccumulatedFrameNum: 31
-    maxFastAccumulatedFrameNum: 7
+    maxFastAccumulatedFrameNum: 1
     onScreen: 0
     forcedMaterial: 0
     denoiser: 0
@@ -2392,7 +2392,7 @@ MonoBehaviour:
     tmpDisableRR: 0
     upscalerMode: 0
     confidence: 1
-    showMode: 18
+    showMode: 0
     update: 0
     updateTick: 0
     denoisingRange: 1000

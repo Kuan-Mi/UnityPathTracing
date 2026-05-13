@@ -133,7 +133,7 @@ namespace PathTracing
         public bool enableGIFinalShading = true;
         public bool enableDIFinalShading = true;
 
-        public bool enableEnv       = true;
+        public bool enableEnv        = true;
         public bool useRasterGBuffer = true;
 
         public ReGIRDynamicParameters regirDynamicParams = ReGIRDynamicParameters.Default();
@@ -170,13 +170,14 @@ namespace PathTracing
     public class NativeRtxdiSetting
     {
         [FoldoutHeader("Base Settings")]
-        public Texture2D environmentMap      = null; // Equirectangular env map for RTXDI importance sampling
+        public Texture2D environmentMap = null; // Equirectangular env map for RTXDI importance sampling
+
         [Range(0f, 360f)]
-        public float     environmentRotation = 0f;   // Horizontal rotation in degrees
-      
-        public float     environmentScale    = 1;   // Radiance multiplier
-        public bool                cameraJitter = true;
-        public NativeRtxdiShowMode showMode     = NativeRtxdiShowMode.Final;
+        public float environmentRotation = 0f; // Horizontal rotation in degrees
+
+        public float               environmentScale = 1; // Radiance multiplier
+        public bool                cameraJitter     = true;
+        public NativeRtxdiShowMode showMode         = NativeRtxdiShowMode.Final;
         public bool                showMv;
         public bool                showValidation;
 
@@ -237,6 +238,55 @@ namespace PathTracing
     /// Debug / display mode used exclusively by <see cref="NativeRtxdiFeature"/>.
     /// Keeps NativeRtxdi concerns separate from the shared <see cref="ShowMode"/> enum.
     /// </summary>
+    /// <summary>
+    /// Debug / display modes for <see cref="NativeNrdFeature"/>'s dedicated
+    /// <see cref="NativeNrdOutputBlitPass"/>.  Only NRD-pipeline buffers are listed here;
+    /// RTXDI-specific GBuffer and PDF views are intentionally absent.
+    /// </summary>
+    public enum NativeNrdShowMode
+    {
+        // ── Main output ────────────────────────────────────────────────────
+        /// <summary>Tone-mapped final image written by NRDFinalPass.</summary>
+        Final,
+
+        // ── GBuffer ────────────────────────────────────────────────────────
+        BaseColor,
+        Metalness,
+        Normal,
+        Roughness,
+        ViewZ,
+
+        // ── Denoiser inputs ────────────────────────────────────────────────
+        NoiseDiffuse,
+        NoiseSpecular,
+        NoiseShadow,
+
+        // ── Denoiser outputs ───────────────────────────────────────────────
+        DenoisedDiffuse,
+        DenoisedSpecular,
+        Shadow,
+
+        // ── Intermediate lighting ──────────────────────────────────────────
+        DirectLight,
+        Emissive,
+        ComposedDiff,
+        ComposedSpec,
+        Composed,
+
+        // ── TAA output ─────────────────────────────────────────────────────
+        Taa,
+
+        // ── DLSS/RR guide buffers ──────────────────────────────────────────
+        DLSS_DiffuseAlbedo,
+        DLSS_SpecularAlbedo,
+        DLSS_SpecularHitDistance,
+        DLSS_NormalRoughness,
+        DLSS_Output,
+
+        // ── SHARC confidence gradient ──────────────────────────────────────
+        Gradient,
+    }
+
     public enum NativeRtxdiShowMode
     {
         // ── Main output ────────────────────────────────────────────────────
@@ -481,10 +531,10 @@ namespace PathTracing
     [System.Serializable]
     public class NrdSampleSetting
     {
-        public bool showValidation = false;
-        public bool showMV         = false;
+        public NativeNrdShowMode showMode;
+        public bool              showValidation = false;
+        public bool              showMV         = false;
 
-        public bool mergeBlas = false;
         // ── Animation / timing (not used by shader, kept for completeness) ──
         // public double motionStartTime        = 0.0;
         // public float  emulateMotionSpeed     = 1.0f;
@@ -558,10 +608,7 @@ namespace PathTracing
         public bool         tmpDisableRR         = false;
         public UpscalerMode upscalerMode         = UpscalerMode.NATIVE;
         public bool         confidence           = true;
-        public ShowMode     showMode;
-        public bool         update;
-        public bool         updateTick;
-        public float        denoisingRange = 1000f;
+        public float        denoisingRange       = 1000f;
 
         [Range(0.0f, 1.0f)]
         public float nisSharpness = 0.2f;

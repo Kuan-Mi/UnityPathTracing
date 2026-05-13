@@ -68,7 +68,7 @@ namespace PathTracing
         private DlssRRPass            _dlssrrPass;
         private DlssSRPass            _dlssrPass;
         private NisPass               _nisPass;
-        private OutputBlitPass        _outputBlitPass;
+        private NativeNrdOutputBlitPass _outputBlitPass;
         private NativeFrameTick       _nativeFrameTickPass;
 
         private NRDSampleResource _nrdSampleResource;
@@ -169,7 +169,7 @@ namespace PathTracing
                 renderPassEvent = renderPassEvent
             };
 
-            _outputBlitPass ??= new OutputBlitPass(finalMaterial)
+            _outputBlitPass ??= new NativeNrdOutputBlitPass(finalMaterial)
             {
                 renderPassEvent = renderPassEvent
             };
@@ -658,49 +658,52 @@ namespace PathTracing
 
             // Output Blit
             {
-                var outputBlitResource = new OutputBlitPass.Resource
+                bool isDlss  = setting.RR || setting.SR;
+                var taaDst   = isEven ? pool.TaaHistory.Handle : pool.TaaHistoryPrev.Handle;
+                var dlssOut  = isDlss ? pool.DlssOutput.Handle : null;
+
+                var outputBlitResource = new NativeNrdOutputBlitPass.Resource
                 {
                     Mv                 = pool.MV.Handle,
                     NormalRoughness    = pool.NormalRoughness.Handle,
                     BaseColorMetalness = pool.BaseColorMetalness.Handle,
+                    ViewZ              = pool.Viewz.Handle,
 
-                    Penumbra = pool.Unfiltered_Penumbra.Handle,
-                    Diff     = pool.Unfiltered_Diff.Handle,
-                    Spec     = pool.Unfiltered_Spec.Handle,
+                    Penumbra  = pool.Unfiltered_Penumbra.Handle,
+                    NoiseDiff = pool.Unfiltered_Diff.Handle,
+                    NoiseSpec = pool.Unfiltered_Spec.Handle,
 
-                    ShadowTranslucency = pool.Shadow.Handle,
-                    DenoisedDiff       = pool.Diff.Handle,
-                    DenoisedSpec       = pool.Spec.Handle,
-                    Validation         = pool.Validation.Handle,
+                    Shadow       = pool.Shadow.Handle,
+                    DenoisedDiff = pool.Diff.Handle,
+                    DenoisedSpec = pool.Spec.Handle,
+                    Validation   = pool.Validation.Handle,
 
-                    Composed       = pool.Composed.Handle,
-                    DirectLighting = pool.DirectLighting.Handle,
+                    DirectLighting    = pool.DirectLighting.Handle,
+                    DirectEmission    = pool.DirectEmission.Handle,
+                    ComposedDiff      = pool.ComposedDiff.Handle,
+                    ComposedSpecViewZ = pool.ComposedSpecViewZ.Handle,
+                    Composed          = pool.Composed.Handle,
+
+                    TaaDst = taaDst,
 
                     RRGuide_DiffAlbedo       = pool.RrGuideDiffAlbedo.Handle,
                     RRGuide_SpecAlbedo       = pool.RrGuideSpecAlbedo.Handle,
                     RRGuide_Normal_Roughness = pool.RrGuideNormalRoughness.Handle,
                     RRGuide_SpecHitDistance  = pool.RrGuideSpecHitDistance.Handle,
-                    DlssOutput               = pool.Final.Handle,
-                    // todo
-                    taaDst   = pool.Final.Handle,
-                    ViewZ    = pool.Viewz.Handle,
-                    Gradient = pool.Gradient_Pong.Handle,
+                    DlssOutput               = dlssOut,
 
-                    Output            = pool.Final.Handle,
-                    DirectEmission    = pool.DirectEmission.Handle,
-                    ComposedDiff      = pool.ComposedDiff.Handle,
-                    ComposedSpecViewZ = pool.ComposedSpecViewZ.Handle,
+                    Gradient = pool.Gradient_Pong.Handle,
+                    Output   = pool.Final.Handle,
                 };
 
-                _outputBlitPass.Setup(outputBlitResource, new OutputBlitPass.Settings
+                _outputBlitPass.Setup(outputBlitResource, new NativeNrdOutputBlitPass.Settings
                 {
                     showMode        = setting.showMode,
                     resolutionScale = frameState.resolutionScale,
-                    enableDlssRR    = setting.RR || setting.SR,
+                    enableDlssRR    = isDlss,
                     tmpDisableRR    = setting.tmpDisableRR,
                     showMV          = setting.showMV,
                     showValidation  = setting.showValidation,
-                    showReference   = false,
                 });
                 renderer.EnqueuePass(_outputBlitPass);
 
