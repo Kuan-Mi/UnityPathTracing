@@ -1133,7 +1133,6 @@ namespace PathTracing
             ptComputeDuplicationMapCs  = LoadCs($"{shaderRoot}/LightingPasses/PT/ComputeDuplicationMap");
             ptFinalShadingCs           = LoadCs($"{shaderRoot}/LightingPasses/PT/FinalShading");
 
-            // Managed compute helpers (kept for v1 — not yet ported to NativeComputeShader)
             compositingPassCs = LoadCs($"{shaderRoot}/CompositingPass");
 
             filterGradientsPassCs = LoadCs($"{shaderRoot}/DenoisingPasses/FilterGradientsPass");
