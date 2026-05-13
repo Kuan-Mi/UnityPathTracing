@@ -50,6 +50,58 @@ namespace ProjectTools.Editor
             Debug.Log($"[DumpShaderReflection] Reimported {done} native shader(s) ({computeGuids.Length} compute, {raytraceGuids.Length} raytrace).");
         }
 
+        [MenuItem(MenuRoot + "/Reimport Selected Folder Shaders")]
+        public static void ReimportSelectedFolder()
+        {
+            string folderPath = null;
+            foreach (var obj in Selection.objects)
+            {
+                string p = AssetDatabase.GetAssetPath(obj);
+                if (!string.IsNullOrEmpty(p) && AssetDatabase.IsValidFolder(p))
+                {
+                    folderPath = p;
+                    break;
+                }
+            }
+            if (folderPath == null)
+            {
+                Debug.LogWarning("[DumpShaderReflection] Please select a folder in the Project window.");
+                return;
+            }
+
+            string[] computeGuids = AssetDatabase.FindAssets("t:" + nameof(NativeComputeShader), new[] { folderPath });
+            string[] raytraceGuids = AssetDatabase.FindAssets("t:" + nameof(RayTraceShader), new[] { folderPath });
+            int total = computeGuids.Length + raytraceGuids.Length;
+            int done = 0;
+            try
+            {
+                AssetDatabase.StartAssetEditing();
+                foreach (string guid in computeGuids)
+                {
+                    string assetPath = AssetDatabase.GUIDToAssetPath(guid);
+                    EditorUtility.DisplayProgressBar(
+                        "Reimporting native shaders", assetPath, (float)done / Mathf.Max(1, total));
+                    AssetDatabase.ImportAsset(assetPath, ImportAssetOptions.ForceUpdate);
+                    done++;
+                }
+                foreach (string guid in raytraceGuids)
+                {
+                    string assetPath = AssetDatabase.GUIDToAssetPath(guid);
+                    EditorUtility.DisplayProgressBar(
+                        "Reimporting native shaders", assetPath, (float)done / Mathf.Max(1, total));
+                    AssetDatabase.ImportAsset(assetPath, ImportAssetOptions.ForceUpdate);
+                    done++;
+                }
+            }
+            finally
+            {
+                AssetDatabase.StopAssetEditing();
+                EditorUtility.ClearProgressBar();
+                AssetDatabase.Refresh();
+            }
+            Debug.Log($"[DumpShaderReflection] Reimported {done} native shader(s) from '{folderPath}' ({computeGuids.Length} compute, {raytraceGuids.Length} raytrace).");
+        }
+
         [MenuItem(MenuRoot + "/Dump All To Sibling Files")]
         public static void DumpAll()
         {

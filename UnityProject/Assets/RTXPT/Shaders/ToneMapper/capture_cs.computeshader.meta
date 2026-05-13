@@ -1,0 +1,23 @@
+﻿fileFormatVersion: 2
+guid: 935928f7dbb94801bf0f9a2a4b9a10d9
+ScriptedImporter:
+  internalIDToNameTable: []
+  externalObjects: {}
+  serializedVersion: 2
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+  script: {fileID: 11500000, guid: ea13329833ed16543aa33a7c88f8c5bf, type: 3}
+  isComputeShader: 1
+  additionalIncludePaths:
+  - ../RenderingPlugin/External/RTXPT/Rtxpt/ToneMapper
+  - ../RenderingPlugin/External/RTXPT/Rtxpt
+  - ../RenderingPlugin/External/RTXPT/External
+  - ../RenderingPlugin/External/donut/include
+  extraArgs:
+  - -enable-16bit-types
+  defines: []
+  entryPoint: capture_cs
+  targetProfile: cs_6_6
+  rootConstantsHints: []
+  rootSRVHints: []

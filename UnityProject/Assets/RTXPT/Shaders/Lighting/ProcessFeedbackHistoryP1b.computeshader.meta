@@ -1,0 +1,25 @@
+﻿fileFormatVersion: 2
+guid: a266fce7cd9441b0a521b055622ade32
+ScriptedImporter:
+  internalIDToNameTable: []
+  externalObjects: {}
+  serializedVersion: 2
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+  script: {fileID: 11500000, guid: ea13329833ed16543aa33a7c88f8c5bf, type: 3}
+  isComputeShader: 1
+  additionalIncludePaths:
+  - ../RenderingPlugin/External/RTXPT/Rtxpt/Lighting
+  - ../RenderingPlugin/External/RTXPT/Rtxpt
+  - ../RenderingPlugin/External/RTXPT/External/Nrd/Shaders/Include
+  - ../RenderingPlugin/External/RTXPT/External/Rtxdi/Include
+  - ../RenderingPlugin/External/RTXPT/External
+  - ../RenderingPlugin/External/donut/include
+  extraArgs:
+  - -enable-16bit-types
+  defines: []
+  entryPoint: ProcessFeedbackHistoryP1b
+  targetProfile: cs_6_6
+  rootConstantsHints: []
+  rootSRVHints: []
