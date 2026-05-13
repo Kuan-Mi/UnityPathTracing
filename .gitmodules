@@ -18,3 +18,6 @@
 [submodule "RenderingPlugin/External/RTXDI"]
 	path = RenderingPlugin/External/RTXDI
 	url = https://github.com/Kuan-Mi/RTXDIForUnity.git
+[submodule "RenderingPlugin/External/RTXPT"]
+	path = RenderingPlugin/External/RTXPT
+	url = https://github.com/Kuan-Mi/RTXPT.git
