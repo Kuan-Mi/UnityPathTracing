@@ -351,7 +351,7 @@ namespace PathTracing
     }
 
     [System.Serializable]
-    public class PathTracingSetting
+    public class NrdSampleSetting
     {
         [FoldoutHeader("显示模式")]
         [Range(-10f, 10f)]
@@ -529,7 +529,7 @@ namespace PathTracing
     /// which faithfully follows the C++ <c>UpdateConstantBuffer</c> logic.
     /// </summary>
     [System.Serializable]
-    public class NrdSampleSetting
+    public class NativeNrdSampleSetting
     {
         public NativeNrdShowMode showMode;
         public bool              showValidation = false;

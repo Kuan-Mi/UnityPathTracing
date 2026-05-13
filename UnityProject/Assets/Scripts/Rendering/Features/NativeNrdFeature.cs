@@ -26,7 +26,7 @@ namespace PathTracing
 
 
         [FormerlySerializedAs("pathTracingSetting")]
-        public NrdSampleSetting setting;
+        public NativeNrdSampleSetting setting;
 
         public NRDGlobalConstants globalConstants;
 
@@ -815,7 +815,7 @@ namespace PathTracing
 #if UNITY_EDITOR
         private void Reset()
         {
-            setting = new NrdSampleSetting();
+            setting = new NativeNrdSampleSetting();
             AutoFillShaders();
         }
 

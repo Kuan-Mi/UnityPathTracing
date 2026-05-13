@@ -101,7 +101,7 @@ namespace PathTracing
             GUILayout.Space(2);
             _scrollPos = GUILayout.BeginScrollView(_scrollPos, GUILayout.ExpandHeight(true));
 
-            DrawObjectFieldsInPlace(_feature.setting, typeof(PathTracingSetting), "root");
+            DrawObjectFieldsInPlace(_feature.setting, typeof(NrdSampleSetting), "root");
 
             GUILayout.EndScrollView();
             GUI.DragWindow(new Rect(0, 0, _windowRect.width, 18));

@@ -15,7 +15,7 @@ namespace PathTracing
 {
     public class UnityNrdFeature : ScriptableRendererFeature
     {
-        public PathTracingSetting pathTracingSetting;
+        public NrdSampleSetting nrdSampleSetting;
 
         public GlobalConstants GlobalConstants;
 
@@ -244,7 +244,7 @@ namespace PathTracing
             {
                 _aeExposureBuffer = new GraphicsBuffer(GraphicsBuffer.Target.Structured, 1, sizeof(float));
                 // Seed with the manual exposure value so first frame is not zero
-                _exposureArray[0] = pathTracingSetting?.exposure ?? 1.0f;
+                _exposureArray[0] = nrdSampleSetting?.exposure ?? 1.0f;
                 _aeExposureBuffer.SetData(_exposureArray);
             }
         }
@@ -280,7 +280,7 @@ namespace PathTracing
             var eyeIndex = renderingData.cameraData.xr.enabled ? renderingData.cameraData.xr.multipassId : 0;
 
 
-            if (eyeIndex == 1 && pathTracingSetting.skipRightEyeInVR)
+            if (eyeIndex == 1 && nrdSampleSetting.skipRightEyeInVR)
                 return;
 
 
@@ -330,7 +330,7 @@ namespace PathTracing
 
             if (!_cameraFrameStates.TryGetValue(uniqueKey, out var frameState))
             {
-                frameState = new CameraFrameState(pathTracingSetting.resolutionScale);
+                frameState = new CameraFrameState(nrdSampleSetting.resolutionScale);
                 _cameraFrameStates.Add(uniqueKey, frameState);
             }
 
@@ -373,7 +373,7 @@ namespace PathTracing
             _lightCollector.Collect();
 
             var  outputResolution = ComputeOutputResolution(renderingData.cameraData);
-            bool resourcesChanged = pool.EnsureResources(outputResolution, pathTracingSetting.upscalerMode);
+            bool resourcesChanged = pool.EnsureResources(outputResolution, nrdSampleSetting.upscalerMode);
             var  renderResolution = pool.renderResolution;
 
             if (resourcesChanged)
@@ -400,9 +400,9 @@ namespace PathTracing
 
             // Update per-camera temporal state for this frame
             uint curFrame = frameState.frameIndex;
-            frameState.Update(renderingData, false, pathTracingSetting.resolutionScale);
+            frameState.Update(renderingData, false, nrdSampleSetting.resolutionScale);
 
-            GlobalConstants          = frameState.GetConstants(renderingData, pathTracingSetting, _lightCollector);
+            GlobalConstants          = frameState.GetConstants(renderingData, nrdSampleSetting, _lightCollector);
             _globalConstantsArray[0] = GlobalConstants;
             _constantBuffer.SetData(_globalConstantsArray);
 
@@ -424,7 +424,7 @@ namespace PathTracing
             var sharcSettings = new SharcPass.Settings
             {
                 RenderResolution = renderResolution,
-                sharcDownscale   = pathTracingSetting.sharcDownscale
+                sharcDownscale   = nrdSampleSetting.sharcDownscale
             };
 
             _sharcPass.Setup(sharcResource, sharcSettings);
@@ -478,7 +478,7 @@ namespace PathTracing
                 var nativeOpaqueSettings = new NativeOpaquePass.Settings
                 {
                     m_RenderResolution = renderResolution,
-                    resolutionScale    = pathTracingSetting.resolutionScale
+                    resolutionScale    = nrdSampleSetting.resolutionScale
                 };
 
                 _nativeOpaquePass.Setup(nativeOpaqueResource, nativeOpaqueSettings);
@@ -528,7 +528,7 @@ namespace PathTracing
                 var opaqueSettings = new OpaquePass.Settings
                 {
                     m_RenderResolution = renderResolution,
-                    resolutionScale    = pathTracingSetting.resolutionScale
+                    resolutionScale    = nrdSampleSetting.resolutionScale
                 };
 
                 _opaquePass.Setup(opaqueResource, opaqueSettings);
@@ -537,7 +537,7 @@ namespace PathTracing
 
             #endregion
 
-            if (!pathTracingSetting.RR)
+            if (!nrdSampleSetting.RR)
             {
                 var nrdLightData = renderingData.lightData;
                 var nrdMainLight = nrdLightData.mainLightIndex >= 0 ? nrdLightData.visibleLights[nrdLightData.mainLightIndex] : default;
@@ -576,7 +576,7 @@ namespace PathTracing
                 DirectLighting     = pool.DirectLighting.Handle,
             };
 
-            if (pathTracingSetting.RR)
+            if (nrdSampleSetting.RR)
             {
                 compositionResource.Shadow = pool.Unfiltered_Penumbra.Handle;
                 compositionResource.Diff   = pool.Unfiltered_Diff.Handle;
@@ -593,8 +593,8 @@ namespace PathTracing
             compositionResource.ComposedDiff      = pool.ComposedDiff.Handle;
             compositionResource.ComposedSpecViewZ = pool.ComposedSpecViewZ.Handle;
 
-            var rectGridW = (int)(renderResolution.x * pathTracingSetting.resolutionScale + 0.5f + 15) / 16;
-            var rectGridH = (int)(renderResolution.y * pathTracingSetting.resolutionScale + 0.5f + 15) / 16;
+            var rectGridW = (int)(renderResolution.x * nrdSampleSetting.resolutionScale + 0.5f + 15) / 16;
+            var rectGridH = (int)(renderResolution.y * nrdSampleSetting.resolutionScale + 0.5f + 15) / 16;
 
             var compositionSettings = new CompositionPass.Settings
             {
@@ -648,25 +648,25 @@ namespace PathTracing
 
             var aeSettings = new AutoExposurePass.Settings
             {
-                AeEnabled              = pathTracingSetting.enableAutoExposure,
-                AeEVMin                = pathTracingSetting.aeEVMin,
-                AeEVMax                = pathTracingSetting.aeEVMax,
-                AeLowPercent           = pathTracingSetting.aeLowPercent,
-                AeHighPercent          = pathTracingSetting.aeHighPercent,
-                AeSpeedUp              = pathTracingSetting.aeAdaptationSpeedUp,
-                AeSpeedDown            = pathTracingSetting.aeAdaptationSpeedDown,
+                AeEnabled              = nrdSampleSetting.enableAutoExposure,
+                AeEVMin                = nrdSampleSetting.aeEVMin,
+                AeEVMax                = nrdSampleSetting.aeEVMax,
+                AeLowPercent           = nrdSampleSetting.aeLowPercent,
+                AeHighPercent          = nrdSampleSetting.aeHighPercent,
+                AeSpeedUp              = nrdSampleSetting.aeAdaptationSpeedUp,
+                AeSpeedDown            = nrdSampleSetting.aeAdaptationSpeedDown,
                 AeDeltaTime            = Time.deltaTime,
-                AeExposureCompensation = pathTracingSetting.aeExposureCompensation,
-                AeMinExposure          = pathTracingSetting.aeMinExposure,
-                AeMaxExposure          = pathTracingSetting.aeMaxExposure,
+                AeExposureCompensation = nrdSampleSetting.aeExposureCompensation,
+                AeMinExposure          = nrdSampleSetting.aeMinExposure,
+                AeMaxExposure          = nrdSampleSetting.aeMaxExposure,
                 AeTexWidth             = (uint)renderResolution.x,
                 AeTexHeight            = (uint)renderResolution.y,
-                ManualExposure         = pathTracingSetting.exposure
+                ManualExposure         = nrdSampleSetting.exposure
             };
 
-            if (!pathTracingSetting.enableAutoExposure)
+            if (!nrdSampleSetting.enableAutoExposure)
             {
-                _exposureArray[0] = pathTracingSetting.exposure;
+                _exposureArray[0] = nrdSampleSetting.exposure;
                 _aeExposureBuffer.SetData(_exposureArray);
             }
             else
@@ -675,9 +675,9 @@ namespace PathTracing
                 renderer.EnqueuePass(_autoExposurePass);
             }
 
-            if (pathTracingSetting.RR)
+            if (nrdSampleSetting.RR)
             {
-                if (pathTracingSetting.accumulate)
+                if (nrdSampleSetting.accumulate)
                 {
                     var accumulateResource = new AccumulatePass.Resource
                     {
@@ -719,11 +719,11 @@ namespace PathTracing
                         outputWidth      = (ushort)outputResolution.x,
                         outputHeight     = (ushort)outputResolution.y,
                     };
-                    var dlssDataPtr = dlrr.GetInteropDataPtr(dlrrInput, dlrrRes, pathTracingSetting.RR ? 1 : pathTracingSetting.resolutionScale, pathTracingSetting.upscalerMode);
+                    var dlssDataPtr = dlrr.GetInteropDataPtr(dlrrInput, dlrrRes, nrdSampleSetting.RR ? 1 : nrdSampleSetting.resolutionScale, nrdSampleSetting.upscalerMode);
 
                     var dlssSettings = new DlssRRPass.Settings
                     {
-                        tmpDisableRR = pathTracingSetting.tmpDisableRR
+                        tmpDisableRR = nrdSampleSetting.tmpDisableRR
                     };
 
 
@@ -746,7 +746,7 @@ namespace PathTracing
                     {
                         rectGridW    = rectGridW,
                         rectGridH    = rectGridH,
-                        tmpDisableRR = pathTracingSetting.tmpDisableRR
+                        tmpDisableRR = nrdSampleSetting.tmpDisableRR
                     };
 
                     _dlssBeforePass.Setup(dlssResource, dlssBeforeSettings);
@@ -779,7 +779,7 @@ namespace PathTracing
                 renderer.EnqueuePass(_taaPass);
             }
 
-            if (pathTracingSetting.useReferencePathTracing)
+            if (nrdSampleSetting.useReferencePathTracing)
             {
                 var referencePtResource = new ReferencePtPass.Resource
                 {
@@ -796,10 +796,10 @@ namespace PathTracing
                 var referencePtSettings = new ReferencePtPass.Settings
                 {
                     m_RenderResolution = renderResolution,
-                    resolutionScale    = pathTracingSetting.resolutionScale,
-                    referenceBounceNum = pathTracingSetting.referenceBounceNum,
-                    convergenceStep    = pathTracingSetting.accumulateReference ? frameState.convergenceStep : 0,
-                    split              = pathTracingSetting.split
+                    resolutionScale    = nrdSampleSetting.resolutionScale,
+                    referenceBounceNum = nrdSampleSetting.referenceBounceNum,
+                    convergenceStep    = nrdSampleSetting.accumulateReference ? frameState.convergenceStep : 0,
+                    split              = nrdSampleSetting.split
                 };
 
                 _referencePtPass.Setup(referencePtResource, referencePtSettings);
@@ -841,12 +841,12 @@ namespace PathTracing
 
             var outputBlitSettings = new OutputBlitPass.Settings
             {
-                showMode        = pathTracingSetting.showMode,
+                showMode        = nrdSampleSetting.showMode,
                 resolutionScale = frameState.resolutionScale,
-                enableDlssRR    = pathTracingSetting.RR,
-                showMV          = pathTracingSetting.showMv,
-                showValidation  = pathTracingSetting.showValidation,
-                showReference   = pathTracingSetting.useReferencePathTracing,
+                enableDlssRR    = nrdSampleSetting.RR,
+                showMV          = nrdSampleSetting.showMv,
+                showValidation  = nrdSampleSetting.showValidation,
+                showReference   = nrdSampleSetting.useReferencePathTracing,
             };
 
             _outputBlitPass.Setup(outputBlitResource, outputBlitSettings);
@@ -994,7 +994,7 @@ namespace PathTracing
 #if UNITY_EDITOR
         private void Reset()
         {
-            pathTracingSetting = new PathTracingSetting();
+            nrdSampleSetting = new NrdSampleSetting();
             AutoFillShaders();
         }
 

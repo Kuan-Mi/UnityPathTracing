@@ -161,7 +161,7 @@ namespace PathTracing
         }
 
 
-        public GlobalConstants GetConstants(RenderingData renderingData, PathTracingSetting settings, LightCollector lightCollector)
+        public GlobalConstants GetConstants(RenderingData renderingData, NrdSampleSetting settings, LightCollector lightCollector)
         {
             var cameraData = renderingData.cameraData;
 
@@ -483,7 +483,7 @@ namespace PathTracing
         }
 
 
-        public NRDGlobalConstants GetNrdConstants(RenderingData renderingData, PathTracingSetting settings)
+        public NRDGlobalConstants GetNrdConstants(RenderingData renderingData, NrdSampleSetting settings)
         {
             var cameraData = renderingData.cameraData;
 
@@ -653,10 +653,10 @@ namespace PathTracing
 
         /// <summary>
         /// Faithful C# port of the C++ <c>Sample::UpdateConstantBuffer</c> function in NRDSample.cpp.
-        /// Uses <see cref="NrdSampleSetting"/> which directly mirrors the C++ <c>Settings</c> struct.
+        /// Uses <see cref="NativeNrdSampleSetting"/> which directly mirrors the C++ <c>Settings</c> struct.
         /// Sun direction is computed analytically from azimuth/elevation (not from a Unity scene light).
         /// </summary>
-        public NRDGlobalConstants GetNrdConstants(RenderingData renderingData, NrdSampleSetting settings)
+        public NRDGlobalConstants GetNrdConstants(RenderingData renderingData, NativeNrdSampleSetting settings)
         {
             // ── Sun direction from azimuth / elevation (mirrors GetSunDirection()) ──
 
