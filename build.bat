@@ -6,9 +6,14 @@ echo  NativeRenderPlugin Build
 echo ============================================================
 echo.
 
-:: Initialize / update git submodules (NRD + NRI)
 echo Initializing git submodules...
-git submodule update --init --recursive
+git submodule update --init --recursive RenderingPlugin/External/NRD
+git submodule update --init --recursive RenderingPlugin/External/NRI
+git submodule update --init RenderingPlugin/External/donut
+git submodule update --init RenderingPlugin/External/RTXDI-Library
+git submodule update --init RenderingPlugin/External/RTXPT
+git submodule update --init RenderingPlugin/External/NRD-Sample
+git submodule update --init RenderingPlugin/External/RTXDI
 if errorlevel 1 (
     echo [ERROR] git submodule update failed.
     exit /b 1

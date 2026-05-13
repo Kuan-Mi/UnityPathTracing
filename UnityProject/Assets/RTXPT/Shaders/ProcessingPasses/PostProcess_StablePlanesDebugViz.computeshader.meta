@@ -18,6 +18,7 @@ ScriptedImporter:
   - ../RenderingPlugin/External/donut/include
   extraArgs:
   - -enable-16bit-types
+  - -enable-payload-qualifiers
   defines:
   - STABLE_PLANES_DEBUG_VIZ=1
   entryPoint: main

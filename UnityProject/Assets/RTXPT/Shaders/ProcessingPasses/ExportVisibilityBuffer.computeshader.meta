@@ -13,7 +13,7 @@ ScriptedImporter:
   - ../RenderingPlugin/External/RTXPT/Rtxpt/ProcessingPasses
   - ../RenderingPlugin/External/RTXPT/Rtxpt
   - ../RenderingPlugin/External/RTXPT/External/Nrd/Shaders/Include
-  - ../RenderingPlugin/External/RTXPT/External/Rtxdi/Include
+  - ../RenderingPlugin/External/RTXDI-Library/Include
   - ../RenderingPlugin/External/RTXPT/External
   - ../RenderingPlugin/External/donut/include
   extraArgs:

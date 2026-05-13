@@ -19,7 +19,7 @@ ScriptedImporter:
   extraArgs:
   - -enable-16bit-types
   defines: []
-  entryPoint: main
+  entryPoint: BuildMIPDescentImportanceMapCS
   targetProfile: cs_6_6
   rootConstantsHints: []
   rootSRVHints: []

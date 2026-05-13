@@ -107,7 +107,7 @@ namespace NativeRender
 
             if (!ok || nativePtr == IntPtr.Zero || nativeSize == 0)
             {
-                Debug.LogError($"[NativeComputeShader] Compilation failed: {hlslPath}");
+                Debug.LogError($"[NativeComputeShader] Compilation failed: {hlslPath}", this);
                 return;
             }
 

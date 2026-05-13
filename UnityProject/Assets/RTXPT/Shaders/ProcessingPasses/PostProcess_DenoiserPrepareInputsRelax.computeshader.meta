@@ -18,6 +18,7 @@ ScriptedImporter:
   - ../RenderingPlugin/External/donut/include
   extraArgs:
   - -enable-16bit-types
+  - -enable-payload-qualifiers
   defines:
   - DENOISER_PREPARE_INPUTS=1
   - USE_RELAX=1
