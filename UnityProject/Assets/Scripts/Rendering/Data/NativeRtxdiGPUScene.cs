@@ -360,6 +360,19 @@ namespace PathTracing
             if (_sceneBuffers != null) ds.SetBindlessBuffer("t_BindlessBuffers", _sceneBuffers);
             if (_sceneTextures != null) ds.SetBindlessTexture("t_BindlessTextures", _sceneTextures);
         }
+        
+        public void BindToShader(NativeRayTraceDescriptorSet ds)
+        {
+            if (ds == null) return;
+            if (_instanceGpuBuf != null)
+                ds.SetStructuredBuffer("t_InstanceData", _instanceGpuBuf.GetNativeBufferPtr(), _instanceGpuBuf.count, _instanceGpuBuf.stride);
+            if (_geometryGpuBuf != null)
+                ds.SetStructuredBuffer("t_GeometryData", _geometryGpuBuf.GetNativeBufferPtr(), _geometryGpuBuf.count, _geometryGpuBuf.stride);
+            if (_materialGpuBuf != null)
+                ds.SetStructuredBuffer("t_MaterialConstants", _materialGpuBuf.GetNativeBufferPtr(), _materialGpuBuf.count, _materialGpuBuf.stride);
+            if (_sceneBuffers != null) ds.SetBindlessBuffer("t_BindlessBuffers", _sceneBuffers);
+            if (_sceneTextures != null) ds.SetBindlessTexture("t_BindlessTextures", _sceneTextures);
+        }
 
         /// <summary>Builds / updates the TLAS. Call inside a CommandBuffer recording.</summary>
         public void BuildAccelerationStructure(CommandBuffer cmd)

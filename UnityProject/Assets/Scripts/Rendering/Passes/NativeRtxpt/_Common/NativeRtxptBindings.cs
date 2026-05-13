@@ -32,36 +32,6 @@ namespace PathTracing
         /// </summary>
         public static void BindCommon(RayTracePipeline rtp, NativeRtxptPassContext ctx)
         {
-            // Constant buffer
-            if (ctx.ConstantBuffer != null)
-                rtp.SetConstantBuffer("g_Const", ctx.ConstantBuffer);
-
-            // // TLAS
-            // var tlas = ctx.NrdSampleResource?.AccelerationStructure;
-            // if (tlas != null)
-            //     rtp.SetAccelerationStructure("SceneBVH", tlas);
-            //
-            // // GPU scene (bindless instance/geometry/material arrays)
-            // ctx.GpuScene?.BindToShader(rtp);
-
-            // Output UAVs
-            if (ctx.OutputColorPtr          != IntPtr.Zero) rtp.SetRWTexture("u_OutputColor",           ctx.Textures.OutputColor.Handle.rt);
-            if (ctx.ThroughputPtr           != IntPtr.Zero) rtp.SetRWTexture("u_Throughput",            ctx.Textures.Throughput.Handle.rt);
-            if (ctx.MotionVectorsPtr        != IntPtr.Zero) rtp.SetRWTexture("u_MotionVectors",         ctx.Textures.ScreenMotionVectors.Handle.rt);
-            if (ctx.DepthPtr                != IntPtr.Zero) rtp.SetRWTexture("u_Depth",                 ctx.Textures.Depth.Handle.rt);
-            if (ctx.SpecularHitTPtr         != IntPtr.Zero) rtp.SetRWTexture("u_SpecularHitT",          ctx.Textures.SpecularHitT.Handle.rt);
-            if (ctx.ScratchFloat1Ptr        != IntPtr.Zero) rtp.SetRWTexture("u_ScratchFloat1",         ctx.Textures.ScratchFloat1.Handle.rt);
-
-            // Stable planes
-            if (ctx.StablePlanesHeaderPtr   != IntPtr.Zero) rtp.SetRWTexture("u_StablePlanesHeader",    ctx.Textures.StablePlanesHeader.Handle.rt);
-            if (ctx.StableRadiancePtr       != IntPtr.Zero) rtp.SetRWTexture("u_StableRadiance",        ctx.Textures.StableRadiance.Handle.rt);
-            if (ctx.Buffers?.StablePlanesBuffer != null)    rtp.SetRWStructuredBuffer("u_StablePlanesBuffer", ctx.Buffers.StablePlanesBuffer);
-            if (ctx.Buffers?.SurfaceDataBuffer  != null)    rtp.SetRWStructuredBuffer("u_SurfaceData",        ctx.Buffers.SurfaceDataBuffer);
-
-            // DLSS-RR guide UAVs
-            if (ctx.DlssRrDiffAlbedoPtr      != IntPtr.Zero) rtp.SetRWTexture("u_RRDiffuseAlbedo",          ctx.Textures.DlssRrDiffAlbedo.Handle.rt);
-            if (ctx.DlssRrSpecAlbedoPtr      != IntPtr.Zero) rtp.SetRWTexture("u_RRSpecAlbedo",             ctx.Textures.DlssRrSpecAlbedo.Handle.rt);
-            if (ctx.DlssRrNormalRoughnessPtr != IntPtr.Zero) rtp.SetRWTexture("u_RRNormalsAndRoughness",     ctx.Textures.DlssRrNormalRoughness.Handle.rt);
         }
 
         // ── Private helpers ───────────────────────────────────────────────────

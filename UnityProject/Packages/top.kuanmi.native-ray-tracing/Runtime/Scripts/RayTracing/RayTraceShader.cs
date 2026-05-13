@@ -26,12 +26,23 @@ namespace NativeRender
         [SerializeField, HideInInspector]
         private string[] _defines = Array.Empty<string>();
 
+        /// <summary>DXC target profile (e.g. "lib_6_6"). Written by the ScriptedImporter.</summary>
+        [SerializeField, HideInInspector]
+        private string _targetProfile = "lib_6_6";
+
         /// <summary>Pre-compiled DXIL bytecode. Populated by EnsureCompiled(); persisted by Unity serialization.</summary>
         [SerializeField, HideInInspector]
         private byte[] _compiledDxil;
 
+        /// <summary>JSON reflection data produced after each successful compilation. Persisted for editor display.</summary>
+        [SerializeField, HideInInspector]
+        private string _reflectionJson = "";
+
         /// <summary>True when compiled DXIL bytes are available.</summary>
         public bool HasCompiledBytes => _compiledDxil is { Length: > 0 };
+
+        /// <summary>JSON reflection data produced after the last successful compilation. Empty when not yet compiled.</summary>
+        public string ReflectionJson => _reflectionJson ?? "";
 
         /// <summary>
         /// Fired after this shader asset has been successfully (re)compiled.
@@ -65,12 +76,13 @@ namespace NativeRender
             if (string.IsNullOrEmpty(hlslPath))
                 hlslPath = GetHlslPath();
             string includeDirs = BuildIncludeDirs(hlslPath);
+            string target      = string.IsNullOrEmpty(_targetProfile) ? "lib_6_6" : _targetProfile;
 
             string defines   = _defines   is { Length: > 0 } ? string.Join(";", _defines)   : null;
             string extraArgs = _extraArgs is { Length: > 0 } ? string.Join(";", _extraArgs) : null;
 
             bool ok = NativeRenderPlugin.ShaderCompilerPlugin.NR_SC_Compile(
-                hlslPath, includeDirs, defines, extraArgs,
+                hlslPath, target, includeDirs, defines, extraArgs,
                 out IntPtr nativePtr, out uint nativeSize);
 
             if (!ok || nativePtr == IntPtr.Zero || nativeSize == 0)
@@ -82,6 +94,16 @@ namespace NativeRender
             _compiledDxil = new byte[nativeSize];
             Marshal.Copy(nativePtr, _compiledDxil, 0, (int)nativeSize);
             NativeRenderPlugin.ShaderCompilerPlugin.NR_SC_Free(nativePtr);
+
+            // Reflect bound resources from the freshly compiled DXIL library
+            _reflectionJson = "";
+            if (NativeRenderPlugin.ShaderCompilerPlugin.NR_SC_ReflectLib(
+                    _compiledDxil, (uint)_compiledDxil.Length, out IntPtr jsonPtr, out uint jsonLen)
+                && jsonPtr != IntPtr.Zero && jsonLen > 0)
+            {
+                _reflectionJson = Marshal.PtrToStringAnsi(jsonPtr, (int)jsonLen);
+                NativeRenderPlugin.ShaderCompilerPlugin.NR_SC_Free(jsonPtr);
+            }
 
 #if UNITY_EDITOR
             UnityEditor.EditorUtility.SetDirty(this);

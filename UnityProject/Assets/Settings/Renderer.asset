@@ -68,7 +68,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 0851c2374f973ce42b0f91f849f0933f, type: 3}
   m_Name: NativeRtxdiFeature
   m_EditorClassIdentifier: Assembly-CSharp::PathTracing.NativeRtxdiFeature
-  m_Active: 0
+  m_Active: 1
   setting:
     environmentMap: {fileID: 0}
     environmentRotation: 0
@@ -146,6 +146,7 @@ MonoBehaviour:
       regirSamplingJitter: 1
       regirNumBuildSamples: 8
     diResamplingMode: 3
+    useRayTracingForDIGenerateInitialSamples: 1
     initialSamplingParams:
       numLocalLightSamples: 16
       numInfiniteLightSamples: 1
@@ -2320,6 +2321,7 @@ MonoBehaviour:
   presampleEnvironmentMapCs: {fileID: -2368575503658470205, guid: 4de57b8614874874fb04f9bf194a86fa, type: 3}
   presampleReGirCs: {fileID: -2368575503658470205, guid: 05d08599cd909ee43b6cd2c7d33ed129, type: 3}
   diGenerateInitialSamplesCs: {fileID: -2368575503658470205, guid: 6f39bf28c58a7c243a074c7e7ae369e8, type: 3}
+  diGenerateInitialSamplesRs: {fileID: -6676421132958364438, guid: fc6fc37c87df4664581f4d0ccfec89ac, type: 3}
   diTemporalResamplingCs: {fileID: -2368575503658470205, guid: 147da207427313046abeacaf6e1c532c, type: 3}
   diSpatialResamplingCs: {fileID: -2368575503658470205, guid: 6804ad80233164445baf709867a53e36, type: 3}
   diShadeSamplesCs: {fileID: -2368575503658470205, guid: fd39b8644ce8ec84c80eba86e58b9fee, type: 3}
@@ -2352,11 +2354,11 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 5a4e0d79381289b4cb6b3a5e5d56f537, type: 3}
   m_Name: NativeNrdFeature
   m_EditorClassIdentifier: Assembly-CSharp::PathTracing.NativeNrdFeature
-  m_Active: 1
+  m_Active: 0
   setting:
+    showMode: 0
     showValidation: 0
     showMV: 0
-    mergeBlas: 0
     cameraJitter: 1
     sunAngularDiameter: 0.533
     exposure: 1
@@ -2392,9 +2394,6 @@ MonoBehaviour:
     tmpDisableRR: 0
     upscalerMode: 0
     confidence: 1
-    showMode: 0
-    update: 0
-    updateTick: 0
     denoisingRange: 1000
     nisSharpness: 0.2
     skipRightEyeInVR: 0

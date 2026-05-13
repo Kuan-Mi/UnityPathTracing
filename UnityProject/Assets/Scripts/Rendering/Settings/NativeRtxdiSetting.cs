@@ -49,6 +49,9 @@ namespace PathTracing
         [FoldoutHeader("ReSTIR DI")]
         public ReSTIRDI_ResamplingMode diResamplingMode = ReSTIRDI_ResamplingMode.TemporalAndSpatial;
 
+        /// <summary>Use the DXR ray-tracing shader variant for GenerateInitialSamples instead of the compute shader.</summary>
+        public bool useRayTracingForDIGenerateInitialSamples = false;
+
         public RTXDI_DIInitialSamplingParameters    initialSamplingParams    = ReSTIRDIDefaults.GetDefaultInitialSamplingParams();
         public RTXDI_DITemporalResamplingParameters temporalResamplingParams = ReSTIRDIDefaults.GetDefaultTemporalResamplingParams();
         public RTXDI_DISpatialResamplingParameters  spatialResamplingParams  = ReSTIRDIDefaults.GetDefaultSpatialResamplingParams();

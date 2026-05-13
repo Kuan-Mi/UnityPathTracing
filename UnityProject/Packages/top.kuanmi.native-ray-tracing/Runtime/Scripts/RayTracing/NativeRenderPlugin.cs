@@ -147,65 +147,6 @@ namespace NativeRender
         [DllImport(DllName)]
         public static extern ulong NR_CreateRayTraceShaderFromBytes(byte[] dxilBytes, uint size, string name);
 
-        /// <summary>Binds a raw/structured buffer (SRV) by HLSL variable name. Returns 1 on success.</summary>
-        [DllImport(DllName)]
-        public static extern int NR_RTS_SetBuffer(ulong handle,
-            [MarshalAs(UnmanagedType.LPStr)] string name, IntPtr d3d12ResourcePtr);
-
-        /// <summary>Binds an RW buffer (UAV) by HLSL variable name. Returns 1 on success.</summary>
-        [DllImport(DllName)]
-        public static extern int NR_RTS_SetRWBuffer(ulong handle,
-            [MarshalAs(UnmanagedType.LPStr)] string name, IntPtr d3d12ResourcePtr);
-
-        /// <summary>Binds an RWStructuredBuffer (UAV) by HLSL variable name, with explicit element count and stride. Returns 1 on success.</summary>
-        [DllImport(DllName)]
-        public static extern int NR_RTS_SetRWStructuredBuffer(ulong handle,
-            [MarshalAs(UnmanagedType.LPStr)] string name, IntPtr d3d12ResourcePtr,
-            uint elementCount, uint elementStride);
-
-        /// <summary>Binds a texture (SRV) by HLSL variable name. Returns 1 on success.</summary>
-        [DllImport(DllName)]
-        public static extern int NR_RTS_SetTexture(ulong handle,
-            [MarshalAs(UnmanagedType.LPStr)] string name, IntPtr d3d12ResourcePtr);
-
-        /// <summary>Binds an RW texture (UAV) by HLSL variable name. Returns 1 on success.</summary>
-        [DllImport(DllName)]
-        public static extern int NR_RTS_SetRWTexture(ulong handle,
-            [MarshalAs(UnmanagedType.LPStr)] string name, IntPtr d3d12ResourcePtr);
-
-        /// <summary>Binds a constant buffer (CBV) by HLSL variable name. Returns 1 on success.</summary>
-        [DllImport(DllName)]
-        public static extern int NR_RTS_SetConstantBuffer(ulong handle,
-            [MarshalAs(UnmanagedType.LPStr)] string name, IntPtr d3d12ResourcePtr);
-
-        /// <summary>Binds a StructuredBuffer by HLSL variable name, with explicit element count and stride. Returns 1 on success.</summary>
-        [DllImport(DllName)]
-        public static extern int NR_RTS_SetStructuredBuffer(ulong handle,
-            [MarshalAs(UnmanagedType.LPStr)] string name, IntPtr d3d12ResourcePtr,
-            uint elementCount, uint elementStride);
-
-        /// <summary>Binds a RaytracingAccelerationStructure (TLAS) by HLSL variable name. Returns 1 on success.</summary>
-        [DllImport(DllName)]
-        public static extern int NR_RTS_SetAccelerationStructure(ulong handle,
-            [MarshalAs(UnmanagedType.LPStr)] string name, IntPtr tlasd3d12Ptr);
-
-        /// <summary>
-        /// Preferred: binds by AccelerationStructure handle. The TLAS pointer is resolved dynamically at
-        /// Dispatch time, so a full TLAS rebuild (new buffer) is always picked up in the same frame.
-        /// </summary>
-        [DllImport(DllName)]
-        public static extern int NR_RTS_SetAccelerationStructureHandle(ulong shaderHandle,
-            [MarshalAs(UnmanagedType.LPStr)] string name, ulong asHandle);
-
-        /// <summary>
-        /// Binds a BindlessTexture to an unbounded Texture2D[] variable (any space) by name.
-        /// Returns 1 on success, 0 if the variable is not found or is not an array type.
-        /// After BindlessTexture.Resize() call this again to rebind the new descriptor range.
-        /// </summary>
-        [DllImport(DllName)]
-        public static extern int NR_RTS_SetBindlessTexture(ulong shaderHandle,
-            [MarshalAs(UnmanagedType.LPStr)] string name, ulong btHandle);
-
         // -------------------------------------------------------------------
         // RayTraceDescriptorSet API
         // -------------------------------------------------------------------
@@ -618,13 +559,14 @@ namespace NativeRender
         [DllImport(DllName)]
         public static extern bool NR_SC_Compile(
             [MarshalAs(UnmanagedType.LPStr)] string hlslPath,
+            [MarshalAs(UnmanagedType.LPStr)] string targetProfile,
             [MarshalAs(UnmanagedType.LPStr)] string includeDirs,
             [MarshalAs(UnmanagedType.LPStr)] string defines,
             [MarshalAs(UnmanagedType.LPStr)] string extraArgs,
             out IntPtr outBytes,
             out uint   outSize);
 
-        /// <summary>Frees the buffer allocated by <see cref="NR_SC_Compile"/>, <see cref="NR_SC_CompileCS"/>, or <see cref="NR_SC_ReflectCS"/>.</summary>
+        /// <summary>Frees the buffer allocated by <see cref="NR_SC_Compile"/>, <see cref="NR_SC_CompileCS"/>, <see cref="NR_SC_ReflectCS"/>, or <see cref="NR_SC_ReflectLib"/>.</summary>
         [DllImport(DllName)]
         public static extern void NR_SC_Free(IntPtr ptr);
 
@@ -636,6 +578,19 @@ namespace NativeRender
         /// </summary>
         [DllImport(DllName)]
         public static extern bool NR_SC_ReflectCS(
+            byte[]     dxilBytes,
+            uint       size,
+            out IntPtr outJson,
+            out uint   outJsonLen);
+
+        /// <summary>
+        /// Reflects a compiled DXIL *library* blob (lib_6_x, used by DXR ray tracing shaders) and
+        /// returns a JSON string describing bound resources across all exported functions.
+        /// JSON shape: { "bindings": [ { "name", "type", "space", "reg", "dim", "retType" }, ... ] }
+        /// On success returns true; the caller must free the buffer with <see cref="NR_SC_Free"/>.
+        /// </summary>
+        [DllImport(DllName)]
+        public static extern bool NR_SC_ReflectLib(
             byte[]     dxilBytes,
             uint       size,
             out IntPtr outJson,

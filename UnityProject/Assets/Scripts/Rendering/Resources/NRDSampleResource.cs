@@ -22,7 +22,6 @@ namespace NativeRender
     /// In editor non-play mode, all objects use separate BLASes with FLAG_STATIC
     /// (no motion vectors needed; mOverloaded = current rotation matrix).
     ///
-    /// Binding names (<c>BindToShader</c>) exactly match NRDSample.cpp.
     /// </summary>
     public sealed class NRDSampleResource : IDisposable
     {
@@ -820,25 +819,6 @@ namespace NativeRender
 
             _worldAS.BuildOrUpdate(cmd);
             _lightAS.BuildOrUpdate(cmd);
-        }
-
-        /// <summary>Bind all scene GPU resources to a ray tracing pipeline using NRDSample names.</summary>
-        public void BindToShader(RayTracePipeline pipeline)
-        {
-            if (pipeline == null || !pipeline.IsValid) return;
-
-            pipeline.SetAccelerationStructure("gWorldTlas", _worldAS);
-            pipeline.SetAccelerationStructure("gLightTlas", _lightAS);
-
-            pipeline.SetStructuredBuffer("gIn_InstanceData", _instanceDataBuf);
-            pipeline.SetStructuredBuffer("gIn_PrimitiveData", _primitiveDataBuf);
-            pipeline.SetStructuredBuffer("gIn_MorphPrimitivePositionsPrev", _morphPrimitivePositionsPrevBuf);
-
-            pipeline.SetRWStructuredBuffer("gInOut_SharcHashEntriesBuffer", _sharcHashEntries);
-            pipeline.SetRWStructuredBuffer("gInOut_SharcAccumulated", _sharcAccumulated);
-            pipeline.SetRWStructuredBuffer("gInOut_SharcResolved", _sharcResolved);
-
-            pipeline.SetBindlessTexture("gIn_Textures", _textures);
         }
 
         public void Dispose()

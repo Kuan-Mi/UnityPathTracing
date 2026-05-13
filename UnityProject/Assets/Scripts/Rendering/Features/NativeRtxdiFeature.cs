@@ -54,6 +54,7 @@ namespace PathTracing
 
         // ReSTIR DI
         public NativeComputeShader diGenerateInitialSamplesCs; // LightingPasses/DI/GenerateInitialSamples.computeshader
+        public RayTraceShader diGenerateInitialSamplesRs; // LightingPasses/DI/GenerateInitialSamples.rayshader
         public NativeComputeShader diTemporalResamplingCs; // LightingPasses/DI/TemporalResampling.computeshader
         public NativeComputeShader diSpatialResamplingCs; // LightingPasses/DI/SpatialResampling.computeshader
         public NativeComputeShader diShadeSamplesCs; // LightingPasses/DI/ShadeSamples.computeshader
@@ -173,37 +174,37 @@ namespace PathTracing
             if (_gbufferConstantBuffer == null)
                 InitializeBuffers();
 
-            _prepareLightsPass            ??= new NativeRtxdiPrepareLightsPass(prepareLightsCs) { renderPassEvent                                       = renderPassEvent };
-            _gBufferRasterPass            ??= new GBufferRasterPass { renderPassEvent                                                                   = renderPassEvent };
-            _buildAsPass                  ??= new NativeRtxdiBuildAccelerationStructurePass { renderPassEvent                                           = renderPassEvent };
-            _raytracedGBufferPass         ??= new NativeRtxdiRaytracedGBufferPass(raytracedGBufferCs) { renderPassEvent                                 = renderPassEvent };
-            _postprocessGBufferPass       ??= new NativeRtxdiPostprocessGBufferPass(postprocessGBufferCs) { renderPassEvent                             = renderPassEvent };
-            _nrdDenoisePass               ??= new NrdPass { renderPassEvent                                                                             = renderPassEvent };
-            _compositingPass              ??= new NativeRtxdiCompositingPass(compositingPassCs) { renderPassEvent                                       = renderPassEvent };
-            _pdfMipsPass                  ??= new NativeRtxdiPdfMipsPass(preprocessLocalLightCs, preprocessEnvironmentMapCs) { renderPassEvent          = renderPassEvent };
-            _outputBlitPass               ??= new NativeRtxdiOutputBlitPass(finalMaterial) { renderPassEvent                                            = renderPassEvent };
-            _presampleLightsNativePass    ??= new NativeRtxdiPresampleLightsPass(presampleLightsCs) { renderPassEvent                                   = renderPassEvent };
-            _presampleReGirNativePass     ??= new NativeRtxdiPresampleReGirPass(presampleReGirCs) { renderPassEvent                                     = renderPassEvent };
-            _diGenerateInitialSamplesPass ??= new NativeRtxdiGenerateInitialSamplesPass(diGenerateInitialSamplesCs) { renderPassEvent                   = renderPassEvent };
-            _diTemporalResamplingPass     ??= new NativeRtxdiTemporalResamplingPass(diTemporalResamplingCs) { renderPassEvent                           = renderPassEvent };
-            _diSpatialResamplingPass      ??= new NativeRtxdiSpatialResamplingPass(diSpatialResamplingCs) { renderPassEvent                             = renderPassEvent };
-            _diShadeSamplesPass           ??= new NativeRtxdiShadeSamplesPass(diShadeSamplesCs) { renderPassEvent                                       = renderPassEvent };
-            _brdfRayTracingPass           ??= new NativeRtxdiBrdfRayTracingPass(brdfRayTracingCs) { renderPassEvent                                     = renderPassEvent };
-            _shadeSecondarySurfacesPass   ??= new NativeRtxdiShadeSecondarySurfacesPass(shadeSecondarySurfacesCs) { renderPassEvent                     = renderPassEvent };
-            _giTemporalResamplingPass     ??= new NativeRtxdiGITemporalResamplingPass(giTemporalResamplingCs) { renderPassEvent                         = renderPassEvent };
-            _giSpatialResamplingPass      ??= new NativeRtxdiGISpatialResamplingPass(giSpatialResamplingCs) { renderPassEvent                           = renderPassEvent };
-            _giFinalShadingPass           ??= new NativeRtxdiGIFinalShadingPass(giFinalShadingCs) { renderPassEvent                                     = renderPassEvent };
-            _ptGenerateInitialSamplesPass ??= new NativeRtxdiPTGenerateInitialSamplesPass(ptGenerateInitialSamplesCs) { renderPassEvent                 = renderPassEvent };
-            _ptTemporalResamplingPass     ??= new NativeRtxdiPTTemporalResamplingPass(ptTemporalResamplingCs) { renderPassEvent                         = renderPassEvent };
-            _ptSpatialResamplingPass      ??= new NativeRtxdiPTSpatialResamplingPass(ptSpatialResamplingCs) { renderPassEvent                           = renderPassEvent };
-            _ptFillSampleIDPass           ??= new NativeRtxdiPTFillSampleIDPass(ptFillSampleIDCs) { renderPassEvent                                     = renderPassEvent };
-            _ptComputeDuplicationMapPass  ??= new NativeRtxdiPTComputeDuplicationMapPass(ptComputeDuplicationMapCs) { renderPassEvent                   = renderPassEvent };
-            _ptFinalShadingPass           ??= new NativeRtxdiPTFinalShadingPass(ptFinalShadingCs) { renderPassEvent                                     = renderPassEvent };
-            _nativeFrameTickPass          ??= new NativeFrameTick { renderPassEvent                                                                     = renderPassEvent, };
-            _filterGradientsPass          ??= new NativeRtxdiFilterGradientsPass(filterGradientsPassCs) { renderPassEvent                               = renderPassEvent };
-            _confidencePass               ??= new NativeRtxdiConfidencePass(confidencePassCs) { renderPassEvent                                         = renderPassEvent };
-            _toneMappingPass              ??= new NativeToneMappingPass(toneMappingHistogramCs, toneMappingExposureCs, toneMappingCs) { renderPassEvent = renderPassEvent };
-            _dlssrPass                    ??= new DlssSRPass { renderPassEvent                                                                          = renderPassEvent };
+            _prepareLightsPass            ??= new NativeRtxdiPrepareLightsPass(prepareLightsCs) { renderPassEvent                                                = renderPassEvent };
+            _gBufferRasterPass            ??= new GBufferRasterPass { renderPassEvent                                                                            = renderPassEvent };
+            _buildAsPass                  ??= new NativeRtxdiBuildAccelerationStructurePass { renderPassEvent                                                    = renderPassEvent };
+            _raytracedGBufferPass         ??= new NativeRtxdiRaytracedGBufferPass(raytracedGBufferCs) { renderPassEvent                                          = renderPassEvent };
+            _postprocessGBufferPass       ??= new NativeRtxdiPostprocessGBufferPass(postprocessGBufferCs) { renderPassEvent                                      = renderPassEvent };
+            _nrdDenoisePass               ??= new NrdPass { renderPassEvent                                                                                      = renderPassEvent };
+            _compositingPass              ??= new NativeRtxdiCompositingPass(compositingPassCs) { renderPassEvent                                                = renderPassEvent };
+            _pdfMipsPass                  ??= new NativeRtxdiPdfMipsPass(preprocessLocalLightCs, preprocessEnvironmentMapCs) { renderPassEvent                   = renderPassEvent };
+            _outputBlitPass               ??= new NativeRtxdiOutputBlitPass(finalMaterial) { renderPassEvent                                                     = renderPassEvent };
+            _presampleLightsNativePass    ??= new NativeRtxdiPresampleLightsPass(presampleLightsCs) { renderPassEvent                                            = renderPassEvent };
+            _presampleReGirNativePass     ??= new NativeRtxdiPresampleReGirPass(presampleReGirCs) { renderPassEvent                                              = renderPassEvent };
+            _diGenerateInitialSamplesPass ??= new NativeRtxdiGenerateInitialSamplesPass(diGenerateInitialSamplesCs,diGenerateInitialSamplesRs) { renderPassEvent = renderPassEvent };
+            _diTemporalResamplingPass     ??= new NativeRtxdiTemporalResamplingPass(diTemporalResamplingCs) { renderPassEvent                                    = renderPassEvent };
+            _diSpatialResamplingPass      ??= new NativeRtxdiSpatialResamplingPass(diSpatialResamplingCs) { renderPassEvent                                      = renderPassEvent };
+            _diShadeSamplesPass           ??= new NativeRtxdiShadeSamplesPass(diShadeSamplesCs) { renderPassEvent                                                = renderPassEvent };
+            _brdfRayTracingPass           ??= new NativeRtxdiBrdfRayTracingPass(brdfRayTracingCs) { renderPassEvent                                              = renderPassEvent };
+            _shadeSecondarySurfacesPass   ??= new NativeRtxdiShadeSecondarySurfacesPass(shadeSecondarySurfacesCs) { renderPassEvent                              = renderPassEvent };
+            _giTemporalResamplingPass     ??= new NativeRtxdiGITemporalResamplingPass(giTemporalResamplingCs) { renderPassEvent                                  = renderPassEvent };
+            _giSpatialResamplingPass      ??= new NativeRtxdiGISpatialResamplingPass(giSpatialResamplingCs) { renderPassEvent                                    = renderPassEvent };
+            _giFinalShadingPass           ??= new NativeRtxdiGIFinalShadingPass(giFinalShadingCs) { renderPassEvent                                              = renderPassEvent };
+            _ptGenerateInitialSamplesPass ??= new NativeRtxdiPTGenerateInitialSamplesPass(ptGenerateInitialSamplesCs) { renderPassEvent                          = renderPassEvent };
+            _ptTemporalResamplingPass     ??= new NativeRtxdiPTTemporalResamplingPass(ptTemporalResamplingCs) { renderPassEvent                                  = renderPassEvent };
+            _ptSpatialResamplingPass      ??= new NativeRtxdiPTSpatialResamplingPass(ptSpatialResamplingCs) { renderPassEvent                                    = renderPassEvent };
+            _ptFillSampleIDPass           ??= new NativeRtxdiPTFillSampleIDPass(ptFillSampleIDCs) { renderPassEvent                                              = renderPassEvent };
+            _ptComputeDuplicationMapPass  ??= new NativeRtxdiPTComputeDuplicationMapPass(ptComputeDuplicationMapCs) { renderPassEvent                            = renderPassEvent };
+            _ptFinalShadingPass           ??= new NativeRtxdiPTFinalShadingPass(ptFinalShadingCs) { renderPassEvent                                              = renderPassEvent };
+            _nativeFrameTickPass          ??= new NativeFrameTick { renderPassEvent                                                                              = renderPassEvent, };
+            _filterGradientsPass          ??= new NativeRtxdiFilterGradientsPass(filterGradientsPassCs) { renderPassEvent                                        = renderPassEvent };
+            _confidencePass               ??= new NativeRtxdiConfidencePass(confidencePassCs) { renderPassEvent                                                  = renderPassEvent };
+            _toneMappingPass              ??= new NativeToneMappingPass(toneMappingHistogramCs, toneMappingExposureCs, toneMappingCs) { renderPassEvent          = renderPassEvent };
+            _dlssrPass                    ??= new DlssSRPass { renderPassEvent                                                                                   = renderPassEvent };
         }
 
         public void InitializeBuffers()
@@ -556,7 +557,7 @@ namespace PathTracing
             // ---- DI ----
             if (enableDirectReStirPass)
             {
-                _diGenerateInitialSamplesPass.Setup(nativeCtx);
+                _diGenerateInitialSamplesPass.Setup(nativeCtx, setting.useRayTracingForDIGenerateInitialSamples);
                 renderer.EnqueuePass(_diGenerateInitialSamplesPass);
 
                 if (setting.diResamplingMode is ReSTIRDI_ResamplingMode.Temporal or ReSTIRDI_ResamplingMode.TemporalAndSpatial)

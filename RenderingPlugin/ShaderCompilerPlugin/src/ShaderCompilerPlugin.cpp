@@ -5,7 +5,7 @@
  * Integrates IUnityLog for in-Editor log output when loaded by Unity.
  *
  * Exported API:
- *   bool  NR_SC_Compile(hlslPath, includeDirs, extraArgs, outBytes*, outSize*) – compile HLSL to DXIL
+ *   bool  NR_SC_Compile(hlslPath, targetProfile, includeDirs, defines, extraArgs, outBytes*, outSize*) – compile HLSL to DXIL
  *   void  NR_SC_Free(ptr)                                           – free the output buffer
  *   (Unity lifecycle) UnityPluginLoad / UnityPluginUnload
  */
@@ -332,6 +332,7 @@ static bool EnsureInitialized()
 extern "C" __declspec(dllexport)
 bool NR_SC_Compile(
     const char* hlslPath,
+    const char* targetProfile,
     const char* includeDirs,
     const char* defines,
     const char* extraArgs,
@@ -370,8 +371,12 @@ bool NR_SC_Compile(
     std::vector<std::wstring> defs     = ParseSemicolonList(defines);
     std::vector<std::wstring> dxcArgs  = ParseSemicolonList(extraArgs);
 
+    std::wstring targetProfileW = (targetProfile && targetProfile[0] != '\0')
+        ? std::wstring(targetProfile, targetProfile + strlen(targetProfile))
+        : L"lib_6_9";
+
     ComPtr<IDxcBlob> blob = s_Plugin.CompileShader(
-        source.c_str(), L"", L"lib_6_9", defs, dirs, dxcArgs);
+        source.c_str(), L"", targetProfileW.c_str(), defs, dirs, dxcArgs);
 
     if (!blob)
     {
@@ -582,7 +587,9 @@ bool NR_SC_ReflectCS(
     hr = utils->CreateReflection(&buf, IID_PPV_ARGS(&refl));
     if (FAILED(hr))
     {
-        SCLogError("NR_SC_ReflectCS: CreateReflection failed");
+        char msg[128];
+        snprintf(msg, sizeof(msg), "NR_SC_ReflectCS: CreateReflection failed (hr=0x%08X). Use NR_SC_ReflectLib for lib_* profiles.", (unsigned)hr);
+        SCLogError(msg);
         return false;
     }
 
@@ -666,4 +673,166 @@ extern "C" __declspec(dllexport)
 void NR_SC_Free(uint8_t* ptr)
 {
     free(ptr);
+}
+
+// ---------------------------------------------------------------------------
+// NR_SC_ReflectLib
+//   Reflects a compiled DXIL *library* blob (lib_6_x profiles used by DXR
+//   ray tracing shaders) and returns a JSON string describing all bound
+//   resources across all exported functions.
+//
+//   JSON layout (same as NR_SC_ReflectCS minus numthreads):
+//   { "bindings": [ { "name": "...", "type": "SRV|UAV|CBV|Sampler|TLAS",
+//                     "space": N, "reg": N, "dim": "...", "retType": "..." }, ... ] }
+//
+//   The caller must free the returned buffer with NR_SC_Free.
+// ---------------------------------------------------------------------------
+extern "C" __declspec(dllexport)
+bool NR_SC_ReflectLib(
+    const uint8_t* dxilBytes,
+    uint32_t       dxilSize,
+    char**         outJson,
+    uint32_t*      outJsonLen)
+{
+    if (!outJson || !outJsonLen)
+    {
+        SCLogError("NR_SC_ReflectLib: null output pointers");
+        return false;
+    }
+    *outJson    = nullptr;
+    *outJsonLen = 0;
+
+    if (!dxilBytes || dxilSize == 0)
+    {
+        SCLogError("NR_SC_ReflectLib: empty DXIL blob");
+        return false;
+    }
+
+    ComPtr<IDxcUtils> utils;
+    HRESULT hr = DxcCreateInstance(CLSID_DxcUtils, IID_PPV_ARGS(&utils));
+    if (FAILED(hr))
+    {
+        SCLogError("NR_SC_ReflectLib: failed to create IDxcUtils");
+        return false;
+    }
+
+    ComPtr<IDxcBlobEncoding> blobEnc;
+    hr = utils->CreateBlob(dxilBytes, dxilSize, DXC_CP_ACP, &blobEnc);
+    if (FAILED(hr))
+    {
+        SCLogError("NR_SC_ReflectLib: failed to create DXIL blob");
+        return false;
+    }
+
+    DxcBuffer buf{};
+    buf.Ptr      = blobEnc->GetBufferPointer();
+    buf.Size     = blobEnc->GetBufferSize();
+    buf.Encoding = DXC_CP_ACP;
+
+    ComPtr<ID3D12LibraryReflection> libRefl;
+    hr = utils->CreateReflection(&buf, IID_PPV_ARGS(&libRefl));
+    if (FAILED(hr))
+    {
+        char msg[128];
+        snprintf(msg, sizeof(msg), "NR_SC_ReflectLib: CreateReflection failed (hr=0x%08X)", (unsigned)hr);
+        SCLogError(msg);
+        return false;
+    }
+
+    D3D12_LIBRARY_DESC libDesc{};
+    libRefl->GetDesc(&libDesc);
+
+    // Collect unique bindings across all exported functions
+    // Use a map keyed on (name, space, reg) to deduplicate.
+    struct BindKey { std::string name; UINT space; UINT reg; };
+    struct BindVal { std::string type; std::string dim; std::string retType; };
+    std::vector<std::pair<BindKey, BindVal>> bindings;
+
+    auto alreadyAdded = [&](const std::string& name, UINT space, UINT reg) -> bool {
+        for (auto& kv : bindings)
+            if (kv.first.name == name && kv.first.space == space && kv.first.reg == reg)
+                return true;
+        return false;
+    };
+
+    for (UINT fi = 0; fi < libDesc.FunctionCount; ++fi)
+    {
+        auto* fn = libRefl->GetFunctionByIndex((INT)fi);
+        if (!fn) continue;
+
+        D3D12_FUNCTION_DESC fnDesc{};
+        if (FAILED(fn->GetDesc(&fnDesc))) continue;
+
+        for (UINT bi = 0; bi < fnDesc.BoundResources; ++bi)
+        {
+            D3D12_SHADER_INPUT_BIND_DESC bd{};
+            if (FAILED(fn->GetResourceBindingDesc(bi, &bd))) continue;
+
+            std::string name = bd.Name ? bd.Name : "";
+            if (alreadyAdded(name, bd.Space, bd.BindPoint)) continue;
+
+            const char* typeName = "Unknown";
+            switch (bd.Type)
+            {
+            case D3D_SIT_CBUFFER:               typeName = "CBV";     break;
+            case D3D_SIT_TBUFFER:               typeName = "CBV";     break;
+            case D3D_SIT_TEXTURE:               typeName = "SRV";     break;
+            case D3D_SIT_SAMPLER:               typeName = "Sampler"; break;
+            case D3D_SIT_UAV_RWTYPED:           typeName = "UAV";     break;
+            case D3D_SIT_STRUCTURED:            typeName = "SRV";     break;
+            case D3D_SIT_UAV_RWSTRUCTURED:      typeName = "UAV";     break;
+            case D3D_SIT_BYTEADDRESS:           typeName = "SRV";     break;
+            case D3D_SIT_UAV_RWBYTEADDRESS:     typeName = "UAV";     break;
+            case D3D_SIT_UAV_APPEND_STRUCTURED: typeName = "UAV";     break;
+            case D3D_SIT_UAV_CONSUME_STRUCTURED:typeName = "UAV";     break;
+            case D3D_SIT_UAV_RWSTRUCTURED_WITH_COUNTER: typeName = "UAV"; break;
+            case D3D_SIT_RTACCELERATIONSTRUCTURE: typeName = "TLAS";  break;
+            default: break;
+            }
+
+            BindKey k{ name, bd.Space, bd.BindPoint };
+            BindVal v{ typeName, SrvDimensionToString(bd.Dimension), ReturnTypeToString(bd.ReturnType) };
+            bindings.push_back({ k, v });
+        }
+    }
+
+    // Serialize to JSON
+    std::string json;
+    json.reserve(1024);
+    json += "{\n  \"bindings\": [\n";
+
+    for (size_t i = 0; i < bindings.size(); ++i)
+    {
+        const auto& k = bindings[i].first;
+        const auto& v = bindings[i].second;
+        if (i > 0) json += ",\n";
+        json += "    { \"name\": \"";
+        json += k.name;
+        json += "\", \"type\": \"";
+        json += v.type;
+        json += "\", \"space\": ";
+        json += std::to_string(k.space);
+        json += ", \"reg\": ";
+        json += std::to_string(k.reg);
+        json += ", \"dim\": \"";
+        json += v.dim;
+        json += "\", \"retType\": \"";
+        json += v.retType;
+        json += "\" }";
+    }
+
+    json += "\n  ]\n}";
+
+    const size_t len = json.size();
+    char* outBuf = static_cast<char*>(malloc(len + 1));
+    if (!outBuf)
+    {
+        SCLogError("NR_SC_ReflectLib: out of memory");
+        return false;
+    }
+    memcpy(outBuf, json.c_str(), len + 1);
+
+    *outJson    = outBuf;
+    *outJsonLen = static_cast<uint32_t>(len);
+    return true;
 }

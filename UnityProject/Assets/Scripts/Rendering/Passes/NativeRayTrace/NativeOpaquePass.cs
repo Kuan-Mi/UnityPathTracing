@@ -15,18 +15,21 @@ namespace PathTracing
 {
     public class NativeOpaquePass : ScriptableRenderPass, IDisposable
     {
-        private readonly RayTracePipeline _opaqueTs;
-        private          Resource       _resource;
-        private          Settings       _settings;
+        private readonly RayTracePipeline            _opaqueTs;
+        private readonly NativeRayTraceDescriptorSet _ds;
+        private          Resource                    _resource;
+        private          Settings                    _settings;
 
 
         public NativeOpaquePass(RayTraceShader opaqueTs)
         {
             _opaqueTs = new RayTracePipeline(opaqueTs);
+            _ds       = new NativeRayTraceDescriptorSet(_opaqueTs);
         }
 
         public void Dispose()
         {
+            _ds?.Dispose();
             _opaqueTs?.Dispose();
         }
 
@@ -89,9 +92,10 @@ namespace PathTracing
 
         class PassData
         {
-            internal RayTracePipeline OpaqueTs;
-            internal Resource       Resource;
-            internal Settings       Settings;
+            internal RayTracePipeline            OpaqueTs;
+            internal NativeRayTraceDescriptorSet Ds;
+            internal Resource                    Resource;
+            internal Settings                    Settings;
 
         }
 
@@ -106,60 +110,56 @@ namespace PathTracing
 
             
             _gpuScene.BuildAccelerationStructure(natCmd);
-            
-            data.OpaqueTs.SetAccelerationStructure("gWorldTlas", _gpuScene.AccelerationStructure);
-            
-            
-            
+
+            var ds       = data.Ds;
             var resource = data.Resource;
             var settings = data.Settings;
 
+            ds.SetAccelerationStructure("gWorldTlas", _gpuScene.AccelerationStructure);
 
-            data.OpaqueTs.SetConstantBuffer("GlobalConstants", resource.ConstantBuffer);
+            ds.SetConstantBuffer("GlobalConstants", resource.ConstantBuffer.GetNativeBufferPtr());
 
-            data.OpaqueTs.SetBuffer("gIn_ScramblingRanking", resource.ScramblingRanking);
-            data.OpaqueTs.SetBuffer("gIn_Sobol", resource.Sobol);
+            ds.SetBuffer("gIn_ScramblingRanking", resource.ScramblingRanking.GetNativeBufferPtr());
+            ds.SetBuffer("gIn_Sobol",             resource.Sobol.GetNativeBufferPtr());
 
-            data.OpaqueTs.SetRWStructuredBuffer("gInOut_SharcHashEntriesBuffer", resource.HashEntriesBuffer);
-            data.OpaqueTs.SetRWStructuredBuffer("gInOut_SharcAccumulated",      resource.AccumulationBuffer);
-            data.OpaqueTs.SetRWStructuredBuffer("gInOut_SharcResolved",         resource.ResolvedBuffer);
+            ds.SetRWStructuredBuffer("gInOut_SharcHashEntriesBuffer", resource.HashEntriesBuffer.GetNativeBufferPtr(), resource.HashEntriesBuffer.count, resource.HashEntriesBuffer.stride);
+            ds.SetRWStructuredBuffer("gInOut_SharcAccumulated",       resource.AccumulationBuffer.GetNativeBufferPtr(), resource.AccumulationBuffer.count, resource.AccumulationBuffer.stride);
+            ds.SetRWStructuredBuffer("gInOut_SharcResolved",          resource.ResolvedBuffer.GetNativeBufferPtr(), resource.ResolvedBuffer.count, resource.ResolvedBuffer.stride);
 
+            ds.SetRWTexture("g_Output",               resource.Output.rt.GetNativeTexturePtr());
 
-            data.OpaqueTs.SetRWTexture("g_Output",              resource.Output.rt);
+            ds.SetRWTexture("gOut_Mv",                resource.Mv.rt.GetNativeTexturePtr());
+            ds.SetRWTexture("gOut_ViewZ",             resource.ViewZ.rt.GetNativeTexturePtr());
+            ds.SetRWTexture("gOut_Normal_Roughness",  resource.NormalRoughness.rt.GetNativeTexturePtr());
+            ds.SetRWTexture("gOut_BaseColor_Metalness", resource.BaseColorMetalness.rt.GetNativeTexturePtr());
 
-            data.OpaqueTs.SetRWTexture("gOut_Mv",               resource.Mv.rt);
-            data.OpaqueTs.SetRWTexture("gOut_ViewZ",            resource.ViewZ.rt);
-            data.OpaqueTs.SetRWTexture("gOut_Normal_Roughness", resource.NormalRoughness.rt);
-            data.OpaqueTs.SetRWTexture("gOut_BaseColor_Metalness", resource.BaseColorMetalness.rt);
+            ds.SetRWTexture("gOut_DirectLighting",    resource.DirectLighting.rt.GetNativeTexturePtr());
+            ds.SetRWTexture("gOut_DirectEmission",    resource.DirectEmission.rt.GetNativeTexturePtr());
+            ds.SetRWTexture("gOut_PsrThroughput",     resource.PsrThroughput.rt.GetNativeTexturePtr());
 
-            data.OpaqueTs.SetRWTexture("gOut_DirectLighting",   resource.DirectLighting.rt);
-            data.OpaqueTs.SetRWTexture("gOut_DirectEmission",   resource.DirectEmission.rt);
-            data.OpaqueTs.SetRWTexture("gOut_PsrThroughput",    resource.PsrThroughput.rt);
+            ds.SetRWTexture("gOut_ShadowData",        resource.Penumbra.rt.GetNativeTexturePtr());
+            ds.SetRWTexture("gOut_Diff",              resource.Diff.rt.GetNativeTexturePtr());
+            ds.SetRWTexture("gOut_Spec",              resource.Spec.rt.GetNativeTexturePtr());
 
-            data.OpaqueTs.SetRWTexture("gOut_ShadowData",       resource.Penumbra.rt);
-            data.OpaqueTs.SetRWTexture("gOut_Diff",             resource.Diff.rt);
-            data.OpaqueTs.SetRWTexture("gOut_Spec",             resource.Spec.rt);
+            ds.SetTexture("gIn_PrevComposedDiff",          resource.ComposedDiff.rt.GetNativeTexturePtr());
+            ds.SetTexture("gIn_PrevComposedSpec_PrevViewZ", resource.ComposedSpecViewZ.rt.GetNativeTexturePtr());
 
-            data.OpaqueTs.SetTexture("gIn_PrevComposedDiff",         resource.ComposedDiff.rt);
-            data.OpaqueTs.SetTexture("gIn_PrevComposedSpec_PrevViewZ", resource.ComposedSpecViewZ.rt);
+            ds.SetTexture("gIn_PrevViewZ",             resource.PrevViewZ.rt.GetNativeTexturePtr());
+            ds.SetTexture("gIn_PrevNormalRoughness",   resource.PrevNormalRoughness.rt.GetNativeTexturePtr());
+            ds.SetTexture("gIn_PrevBaseColorMetalness", resource.PrevBaseColorMetalness.rt.GetNativeTexturePtr());
 
-            data.OpaqueTs.SetTexture("gIn_PrevViewZ",            resource.PrevViewZ.rt);
-            data.OpaqueTs.SetTexture("gIn_PrevNormalRoughness",  resource.PrevNormalRoughness.rt);
-            data.OpaqueTs.SetTexture("gIn_PrevBaseColorMetalness", resource.PrevBaseColorMetalness.rt);
+            ds.SetRWTexture("gOut_GeoNormal",          resource.GeoNormal.rt.GetNativeTexturePtr());
+            ds.SetTexture("gIn_PrevGeoNormal",         resource.PrevGeoNormal.rt.GetNativeTexturePtr());
 
-            data.OpaqueTs.SetRWTexture("gOut_GeoNormal",         resource.GeoNormal.rt);
-            data.OpaqueTs.SetTexture("gIn_PrevGeoNormal",        resource.PrevGeoNormal.rt);
-
-            data.OpaqueTs.SetStructuredBuffer("gIn_SpotLights",  resource.SpotLightBuffer);
-            data.OpaqueTs.SetStructuredBuffer("gIn_AreaLights",  resource.AreaLightBuffer);
-            data.OpaqueTs.SetStructuredBuffer("gIn_PointLights", resource.PointLightBuffer);
-
+            ds.SetStructuredBuffer("gIn_SpotLights",   resource.SpotLightBuffer.GetNativeBufferPtr(), resource.SpotLightBuffer.count, resource.SpotLightBuffer.stride);
+            ds.SetStructuredBuffer("gIn_AreaLights",   resource.AreaLightBuffer.GetNativeBufferPtr(), resource.AreaLightBuffer.count, resource.AreaLightBuffer.stride);
+            ds.SetStructuredBuffer("gIn_PointLights",  resource.PointLightBuffer.GetNativeBufferPtr(), resource.PointLightBuffer.count, resource.PointLightBuffer.stride);
 
             uint rectWmod = (uint)(settings.m_RenderResolution.x * settings.resolutionScale + 0.5f);
             uint rectHmod = (uint)(settings.m_RenderResolution.y * settings.resolutionScale + 0.5f);
 
-            _gpuScene.BindToShader(data.OpaqueTs);
-            data.OpaqueTs.Dispatch(natCmd, rectWmod, rectHmod);
+            _gpuScene.BindToShader(ds);
+            data.OpaqueTs.Dispatch(natCmd, ds, rectWmod, rectHmod);
 
             natCmd.EndSample(opaqueTracingMarker);
         }
@@ -181,6 +181,7 @@ namespace PathTracing
             using var builder = renderGraph.AddUnsafePass<PassData>("Opaque", out var passData);
 
             passData.OpaqueTs = _opaqueTs;
+            passData.Ds       = _ds;
 
             passData.Resource = _resource;
             passData.Settings = _settings;
