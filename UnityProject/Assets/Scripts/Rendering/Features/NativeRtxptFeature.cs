@@ -31,22 +31,22 @@ namespace PathTracing
     /// </summary>
     public class NativeRtxptFeature : ScriptableRendererFeature
     {
-        // 鈹€鈹€ Inspector fields 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
+        //  Inspector fields 
         public NativeRtxptSetting setting;
 
         public RenderPassEvent renderPassEvent = RenderPassEvent.BeforeRenderingPostProcessing;
 
         public ComputeShader updateSkinnedPrimitivesCS;
 
-        // 鈹€鈹€ Phase 5: NoDenoiserFinalMerge 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
+        //  Phase 5: NoDenoiserFinalMerge 
         // TODO: replace with NativeComputeShader once asset is wired in.
         // public NativeComputeShader noDenoiserFinalMergeCs;
 
-        // 鈹€鈹€ Phase 6: DlssBefore (guide buffer preparation) 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
+        //  Phase 6: DlssBefore (guide buffer preparation) 
         // TODO: replace with NativeComputeShader once asset is wired in.
         // public NativeComputeShader dlssBeforeCs;
 
-        // 鈹€鈹€ Pass instances 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
+        //  Pass instances 
         private NativeRtxptBuildTlasPass _buildTlasPass;
         private DlssRRPass               _dlssRRPass;
         private NativeFrameTick          _nativeFrameTickPass;
@@ -58,19 +58,22 @@ namespace PathTracing
         // private NativeRtxptDlssBeforePass                _dlssBeforePass;
         // private NativeRtxptAccumulationPass              _accumulationPass;          // reference mode
 
-        // 鈹€鈹€ Shared scene resource 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
+        //  Shared scene resource 
         private NRDSampleResource _nrdSampleResource;
 
-        // 鈹€鈹€ Per-camera resource pools 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
+        //  Per-camera resource pools 
         // Key = camera.GetInstanceID() + eyeIndex 脳 100_000L
         private readonly Dictionary<long, NativeRtxptTextureResources> _texturePools    = new();
         private readonly Dictionary<long, NativeRtxptBufferResources>  _bufferPools     = new();
-        private readonly Dictionary<long, NativeBuffer>                _constantBuffers = new();
+        private readonly Dictionary<long, GraphicsBuffer>             _constantBuffers = new();
 
         // DLSS-RR denoiser instance per camera.
-        private readonly Dictionary<long, DlrrDenoiser> _dlrrDenoisers = new();
+        private readonly Dictionary<long, DlrrDenoiser>      _dlrrDenoisers      = new();
+        private readonly Dictionary<long, CameraFrameState>  _cameraFrameStates  = new();
 
-        // 鈹€鈹€ Lifecycle 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
+        private readonly SampleConstants[] _sampleConstantsArray = new SampleConstants[1];
+
+        //  Lifecycle 
 
         public override void Create()
         {
@@ -115,14 +118,14 @@ namespace PathTracing
             if (eyeIndex == 1 && setting.skipRightEyeInVR)
                 return;
 
-            // 鈹€鈹€ Shared scene resource 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
+            //  Shared scene resource 
             if (_nrdSampleResource == null)
                 _nrdSampleResource = new NRDSampleResource();
 
             if (eyeIndex == 0)
                 _nrdSampleResource.UpdateForFrame();
 
-            // 鈹€鈹€ Per-camera resource lookup / creation 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
+            //  Per-camera resource lookup / creation 
             var uniqueKey = cam.GetInstanceID() + (eyeIndex * 100_000L);
             bool isVR     = renderingData.cameraData.xrRendering;
 
@@ -138,7 +141,7 @@ namespace PathTracing
                 _bufferPools.Add(uniqueKey, bufPool);
             }
 
-            // 鈹€鈹€ DLSS-RR denoiser instance 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
+            //  DLSS-RR denoiser instance 
             if (!_dlrrDenoisers.TryGetValue(uniqueKey, out var dlrr))
             {
                 var camName = isVR ? $"{cam.name}_Eye{eyeIndex}" : cam.name;
@@ -146,15 +149,14 @@ namespace PathTracing
                 _dlrrDenoisers.Add(uniqueKey, dlrr);
             }
 
-            // 鈹€鈹€ Constant buffer 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
+            //  Constant buffer 
             if (!_constantBuffers.TryGetValue(uniqueKey, out var constantBuffer))
             {
-                // TODO: replace 256 placeholder with actual SampleConstants size.
-                constantBuffer = new NativeBuffer(256);
+                constantBuffer = new GraphicsBuffer(GraphicsBuffer.Target.Constant, 1, Marshal.SizeOf<SampleConstants>());
                 _constantBuffers.Add(uniqueKey, constantBuffer);
             }
 
-            // 鈹€鈹€ Resolution 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
+            //  Resolution 
             var displayResolution = ComputeOutputResolution(renderingData.cameraData);
             var renderResolution  = ComputeRenderResolution(displayResolution, setting.upscalerMode);
 
@@ -162,35 +164,54 @@ namespace PathTracing
             bufPool.EnsureResources(renderResolution);
             bufPool.EnsureLightBuffers();
 
-            // 鈹€鈹€ Phase 0: TLAS 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
+            // ── Per-camera temporal state ──────────────────────────────────────
+            if (!_cameraFrameStates.TryGetValue(uniqueKey, out var frameState))
+            {
+                frameState = new CameraFrameState(1.0f);
+                _cameraFrameStates.Add(uniqueKey, frameState);
+            }
+
+            if (texturesChanged)
+            {
+                frameState.renderResolution = renderResolution;
+                frameState.frameIndex       = 0;
+            }
+
+            frameState.Update(renderingData, texturesChanged, 1.0f);
+
+            // ── Build & upload SampleConstants ────────────────────────────────
+            _sampleConstantsArray[0] = NativeRtxptConstantsBuilder.Build(
+                renderingData, setting, renderResolution, displayResolution, frameState);
+            constantBuffer.SetData(_sampleConstantsArray);
+
+            //  Phase 0: TLAS 
             if (eyeIndex == 0)
             {
                 _buildTlasPass.SetNRDSampleResource(_nrdSampleResource);
                 renderer.EnqueuePass(_buildTlasPass);
             }
 
-            // 鈹€鈹€ Phase 1: LightsBaker 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
+            //  Phase 1: LightsBaker 
             // TODO: enqueue LightsBaker passes once implemented.
 
-            // 鈹€鈹€ Phase 2: PathTracer RT Shader 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
+            //  Phase 2: PathTracer RT Shader 
             // TODO: enqueue RT pass once NativeRayTraceShader asset is wired.
 
-            // 鈹€鈹€ Phase 3: ExportVisibilityBuffer 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
+            //  Phase 3: ExportVisibilityBuffer 
             // TODO: enqueue once NativeComputeShader asset is wired.
 
-            // 鈹€鈹€ Phase 4: DenoiseSpecHitT (脳2 ping-pong) 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
+            //  Phase 4: DenoiseSpecHitT (脳2 ping-pong) 
             // TODO: enqueue once NativeComputeShader asset is wired.
 
-            // 鈹€鈹€ Phase 5: NoDenoiserFinalMerge 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
+            //  Phase 5: NoDenoiserFinalMerge 
             // Merges stable planes 鈫?OutputColor (no NRD denoising).
             // TODO: enqueue once NativeComputeShader asset is wired.
 
-            // 鈹€鈹€ Phase 6: DLSS-RR guide buffers (DlssBefore) 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
+            //  Phase 6: DLSS-RR guide buffers (DlssBefore) 
             // TODO: enqueue once NativeComputeShader asset is wired.
 
-            // 鈹€鈹€ Phase 7: DLSS Ray Reconstruction 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
-            if (setting.pathTracerMode == RtxptPathTracerMode.BuildStablePlanes
-                && texPool.DlssRrOutput.IsCreated)
+            //  Phase 7: DLSS Ray Reconstruction 
+            if (texPool.DlssRrOutput.IsCreated)
             {
                 // TODO: fill DlrrFrameInput from CameraFrameState once PT is wired.
                 // var dlrrInput = new DlrrDenoiser.DlrrFrameInput { ... };
@@ -210,15 +231,16 @@ namespace PathTracing
                 // renderer.EnqueuePass(_dlssRRPass);
             }
 
-            // 鈹€鈹€ Phase 8: AccumulationPass (reference mode only) 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
+            //  Phase 8: AccumulationPass (reference mode only) 
             // if (setting.pathTracerMode == RtxptPathTracerMode.Reference)
             //     TODO: enqueue AccumulationPass.
 
-            // 鈹€鈹€ Frame tick 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
+            //  Frame tick 
             renderer.EnqueuePass(_nativeFrameTickPass);
         }
 
-        // 鈹€鈹€ Helpers 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
+        // ── Helpers ─────────────────────────────────────────────────────────
+        // (SampleConstants building is in NativeRtxptConstantsBuilder.cs)
 
         private static int2 ComputeOutputResolution(CameraData cameraData)
         {
@@ -242,7 +264,7 @@ namespace PathTracing
             return new int2((int)(outputRes.x / scale + 0.5f), (int)(outputRes.y / scale + 0.5f));
         }
 
-        // 鈹€鈹€ Cleanup 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
+        //  Cleanup 
 
         protected override void Dispose(bool disposing)
         {
@@ -259,6 +281,8 @@ namespace PathTracing
 
             foreach (var dlrr in _dlrrDenoisers.Values) dlrr?.Dispose();
             _dlrrDenoisers.Clear();
+
+            _cameraFrameStates.Clear();
 
             _nrdSampleResource?.Dispose();
             _nrdSampleResource = null;
