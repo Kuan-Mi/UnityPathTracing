@@ -22,6 +22,7 @@ enum class DeferredType {
     BindlessUAVTexture,
     AccelStruct,
     RayTraceShader,
+    RayTraceDescriptorSet,
     ComputeShader,
     ComputeDescriptorSet,
     AccelStructBlas,

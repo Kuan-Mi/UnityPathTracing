@@ -36,13 +36,13 @@ namespace PathTracing
             if (ctx.ConstantBuffer != null)
                 rtp.SetConstantBuffer("g_Const", ctx.ConstantBuffer);
 
-            // TLAS
-            var tlas = ctx.NrdSampleResource?.AccelerationStructure;
-            if (tlas != null)
-                rtp.SetAccelerationStructure("SceneBVH", tlas);
-
-            // GPU scene (bindless instance/geometry/material arrays)
-            ctx.GpuScene?.BindToShader(rtp);
+            // // TLAS
+            // var tlas = ctx.NrdSampleResource?.AccelerationStructure;
+            // if (tlas != null)
+            //     rtp.SetAccelerationStructure("SceneBVH", tlas);
+            //
+            // // GPU scene (bindless instance/geometry/material arrays)
+            // ctx.GpuScene?.BindToShader(rtp);
 
             // Output UAVs
             if (ctx.OutputColorPtr          != IntPtr.Zero) rtp.SetRWTexture("u_OutputColor",           ctx.Textures.OutputColor.Handle.rt);
@@ -68,14 +68,14 @@ namespace PathTracing
 
         private static void BindConstantsAndScene(NativeComputeDescriptorSet ds, NativeRtxptPassContext ctx)
         {
-            if (ctx.ConstantBuffer != null)
-                ds.SetConstantBuffer("g_Const", ctx.ConstantBuffer.GetNativeBufferPtr());
-
-            var tlas = ctx.NrdSampleResource?.AccelerationStructure;
-            if (tlas != null)
-                ds.SetAccelerationStructure("SceneBVH", tlas);
-
-            ctx.GpuScene?.BindToShader(ds);
+            // if (ctx.ConstantBuffer != null)
+            //     ds.SetConstantBuffer("g_Const", ctx.ConstantBuffer.GetNativeBufferPtr());
+            //
+            // var tlas = ctx.NrdSampleResource?.AccelerationStructure;
+            // if (tlas != null)
+            //     ds.SetAccelerationStructure("SceneBVH", tlas);
+            //
+            // ctx.GpuScene?.BindToShader(ds);
         }
 
         private static void BindOutputUAVs(NativeComputeDescriptorSet ds, NativeRtxptPassContext ctx)

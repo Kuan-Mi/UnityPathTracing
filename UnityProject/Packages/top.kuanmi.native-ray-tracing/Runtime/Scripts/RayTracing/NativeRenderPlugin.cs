@@ -206,7 +206,48 @@ namespace NativeRender
         public static extern int NR_RTS_SetBindlessTexture(ulong shaderHandle,
             [MarshalAs(UnmanagedType.LPStr)] string name, ulong btHandle);
 
-        /// <summary>Returns the render event callback pointer for per-shader dispatches.</summary>
+        // -------------------------------------------------------------------
+        // RayTraceDescriptorSet API
+        // -------------------------------------------------------------------
+
+        /// <summary>Creates a RayTraceDescriptorSet bound to the given shader handle. Returns 0 on failure.</summary>
+        [DllImport(DllName)]
+        public static extern ulong NR_RTS_CreateDescriptorSet(ulong shaderHandle);
+
+        /// <summary>Destroys a RayTraceDescriptorSet created by NR_RTS_CreateDescriptorSet (deferred).</summary>
+        [DllImport(DllName)]
+        public static extern void NR_RTS_DestroyDescriptorSet(ulong handle);
+
+        /// <summary>Returns the number of resource bindings in the shader (slot count).</summary>
+        [DllImport(DllName)]
+        public static extern uint NR_RTS_GetBindingCount(ulong shaderHandle);
+
+        /// <summary>Returns the slot index for the named binding, or uint.MaxValue if not found.</summary>
+        [DllImport(DllName)]
+        public static extern uint NR_RTS_GetSlotIndex(ulong shaderHandle,
+            [MarshalAs(UnmanagedType.LPStr)] string name);
+
+        /// <summary>Returns the HLSL variable name for the binding at the given index, or null.</summary>
+        [DllImport(DllName)]
+        public static extern IntPtr NR_RTS_GetBindingName(ulong shaderHandle, uint index);
+
+        /// <summary>
+        /// Hints that the named CBV binding should be treated as 32-bit root constants.
+        /// Must be called BEFORE NR_CreateRayTraceShaderFromBytes.
+        /// </summary>
+        [DllImport(DllName)]
+        public static extern void NR_RTS_SetRootConstantsHint(ulong shaderHandle,
+            [MarshalAs(UnmanagedType.LPStr)] string name, uint num32BitValues);
+
+        /// <summary>
+        /// Hints that the named SRV or TLAS binding should be bound as an inline root SRV descriptor.
+        /// Must be called BEFORE NR_CreateRayTraceShaderFromBytes.
+        /// </summary>
+        [DllImport(DllName)]
+        public static extern void NR_RTS_SetRootSRVHint(ulong shaderHandle,
+            [MarshalAs(UnmanagedType.LPStr)] string name);
+
+        /// <summary>Returns the render event callback pointer for per-descriptor-set dispatches.</summary>
         [DllImport(DllName)]
         public static extern IntPtr NR_RTS_GetRenderEventFunc();
 
@@ -249,14 +290,17 @@ namespace NativeRender
 
         /// <summary>
         /// Event data for NR_RTS_GetRenderEventFunc dispatches.
-        /// Must match C++ RTS_RenderEventData exactly (Pack=4).
+        /// Must match C++ RTS_RenderEventData exactly (Pack=4, 32 bytes).
         /// </summary>
         [StructLayout(LayoutKind.Sequential, Pack = 4)]
         public struct RTS_RenderEventData
         {
-            public ulong  shaderHandle;
-            public uint   width;
-            public uint   height;
+            public ulong  descriptorSetHandle;  // +0  RayTraceDescriptorSet*
+            public ulong  bindingSlotsPtr;       // +8  CS_BindingSlot*
+            public uint   bindingCount;          // +16
+            public uint   width;                 // +20
+            public uint   height;                // +24
+            public uint   _pad;                  // +28
         }
 
         /// <summary>Event data for NR_AS_GetBuildRenderEventFunc. Must match C++ AS_BuildEventData (Pack=4).</summary>

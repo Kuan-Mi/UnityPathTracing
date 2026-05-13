@@ -20,6 +20,7 @@
 
 #include "AccelerationStructure.h"
 #include "RayTraceShader.h"
+#include "RayTraceDescriptorSet.h"
 #include "ComputeShader.h"
 #include "ComputeDescriptorSet.h"
 #include "DescriptorHeapAllocator.h"
@@ -207,6 +208,10 @@ void EnqueueDeferredDelete(void* ptr, DeferredType type)
 
     case DeferredType::RayTraceShader:
         EnqueueCleanup([p = static_cast<RayTraceShader*>(ptr)] { delete p; });
+        break;
+
+    case DeferredType::RayTraceDescriptorSet:
+        EnqueueCleanup([p = static_cast<::RayTraceDescriptorSet*>(ptr)] { delete p; });
         break;
 
     case DeferredType::ComputeShader:
@@ -544,16 +549,26 @@ NR_AS_UpdateDynamicVertexBuffer(uint64_t handle, uint32_t instanceHandle,
 
 // ---------------------------------------------------------------------------
 // RTS_RenderEventData
-//   Passed from C# via IssuePluginEventAndData for per-shader dispatches.
+//   Passed from C# via IssuePluginEventAndData for per-descriptor-set dispatches.
 //   Must match NativeRenderPlugin.RTS_RenderEventData exactly (Pack=4).
+//
+//   New layout (32 bytes):
+//     descriptorSetHandle — pointer to RayTraceDescriptorSet
+//     bindingSlotsPtr     — pointer to CS_BindingSlot[] array (marshalled by C#)
+//     bindingCount        — number of entries in bindingSlotsPtr
+//     width, height       — dispatch dimensions
+//     _pad                — reserved / struct alignment
 // ---------------------------------------------------------------------------
 #pragma pack(push, 4)
 struct RTS_RenderEventData
 {
-    uint64_t shaderHandle;  // +0 (8B): pointer to RayTraceShader
-    uint32_t width;         // +8 (4B)
-    uint32_t height;        // +12 (4B)
-};  // Total: 16 bytes
+    uint64_t descriptorSetHandle;  // +0  (8B): RayTraceDescriptorSet*
+    uint64_t bindingSlotsPtr;      // +8  (8B): CS_BindingSlot*
+    uint32_t bindingCount;         // +16 (4B)
+    uint32_t width;                // +20 (4B)
+    uint32_t height;               // +24 (4B)
+    uint32_t _pad;                 // +28 (4B)
+};  // Total: 32 bytes
 #pragma pack(pop)
 
 // AS build event data - passed to AsBuildRenderCallback
@@ -680,85 +695,6 @@ NR_CreateRayTraceShaderFromBytes(const uint8_t* dxilBytes, uint32_t size, const 
 // ---------------------------------------------------------------------------
 // Resource binding helpers (return 1 on success, 0 if name not found)
 // ---------------------------------------------------------------------------
-extern "C" int32_t UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API
-NR_RTS_SetBuffer(uint64_t handle, const char* name, void* d3d12ResourcePtr)
-{
-    if (!handle) return 0;
-    return reinterpret_cast<RayTraceShader*>(handle)
-        ->SetBuffer(name, static_cast<ID3D12Resource*>(d3d12ResourcePtr)) ? 1 : 0;
-}
-
-extern "C" int32_t UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API
-NR_RTS_SetRWBuffer(uint64_t handle, const char* name, void* d3d12ResourcePtr)
-{
-    if (!handle) return 0;
-    return reinterpret_cast<RayTraceShader*>(handle)
-        ->SetRWBuffer(name, static_cast<ID3D12Resource*>(d3d12ResourcePtr)) ? 1 : 0;
-}
-
-extern "C" int32_t UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API
-NR_RTS_SetRWStructuredBuffer(uint64_t handle, const char* name, void* d3d12ResourcePtr,
-                              uint32_t elementCount, uint32_t elementStride)
-{
-    if (!handle) return 0;
-    return reinterpret_cast<RayTraceShader*>(handle)
-        ->SetRWStructuredBuffer(name, static_cast<ID3D12Resource*>(d3d12ResourcePtr),
-                                elementCount, elementStride) ? 1 : 0;
-}
-
-extern "C" int32_t UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API
-NR_RTS_SetTexture(uint64_t handle, const char* name, void* d3d12ResourcePtr)
-{
-    if (!handle) return 0;
-    return reinterpret_cast<RayTraceShader*>(handle)
-        ->SetTexture(name, static_cast<ID3D12Resource*>(d3d12ResourcePtr)) ? 1 : 0;
-}
-
-extern "C" int32_t UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API
-NR_RTS_SetRWTexture(uint64_t handle, const char* name, void* d3d12ResourcePtr)
-{
-    if (!handle) return 0;
-    return reinterpret_cast<RayTraceShader*>(handle)
-        ->SetRWTexture(name, static_cast<ID3D12Resource*>(d3d12ResourcePtr)) ? 1 : 0;
-}
-
-extern "C" int32_t UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API
-NR_RTS_SetConstantBuffer(uint64_t handle, const char* name, void* d3d12ResourcePtr)
-{
-    if (!handle) return 0;
-    return reinterpret_cast<RayTraceShader*>(handle)
-        ->SetConstantBuffer(name, static_cast<ID3D12Resource*>(d3d12ResourcePtr)) ? 1 : 0;
-}
-
-extern "C" int32_t UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API
-NR_RTS_SetStructuredBuffer(uint64_t handle, const char* name, void* d3d12ResourcePtr,
-                            uint32_t elementCount, uint32_t elementStride)
-{
-    if (!handle) return 0;
-    return reinterpret_cast<RayTraceShader*>(handle)
-        ->SetStructuredBuffer(name, static_cast<ID3D12Resource*>(d3d12ResourcePtr),
-                              elementCount, elementStride) ? 1 : 0;
-}
-
-extern "C" int32_t UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API
-NR_RTS_SetAccelerationStructure(uint64_t handle, const char* name, void* tlasd3d12Ptr)
-{
-    if (!handle) return 0;
-    return reinterpret_cast<RayTraceShader*>(handle)
-        ->SetAccelerationStructure(name, static_cast<ID3D12Resource*>(tlasd3d12Ptr)) ? 1 : 0;
-}
-
-// Preferred variant: binds by AccelerationStructure object — TLAS ptr is resolved dynamically at Dispatch time.
-// asHandle is the uint64_t returned by NR_CreateAccelerationStructure.
-extern "C" int32_t UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API
-NR_RTS_SetAccelerationStructureHandle(uint64_t shaderHandle, const char* name, uint64_t asHandle)
-{
-    if (!shaderHandle) return 0;
-    return reinterpret_cast<RayTraceShader*>(shaderHandle)
-        ->SetAccelerationStructureObject(name,
-            asHandle ? reinterpret_cast<AccelerationStructure*>(asHandle) : nullptr) ? 1 : 0;
-}
-
 // ---------------------------------------------------------------------------
 // NR_RTS_GetRenderEventFunc / NR_RTS_GetRenderEventDataSize
 //   Use with CommandBuffer.IssuePluginEventAndData for per-shader ray trace.
@@ -768,21 +704,21 @@ static void UNITY_INTERFACE_API RtsRenderCallback(int /*eventId*/, void* data)
     if (!s_RendererReady || !s_D3D12 || !data) return;
 
     auto* ed = static_cast<RTS_RenderEventData*>(data);
-    if (!ed->shaderHandle) return;
+    if (!ed->descriptorSetHandle) return;
 
     UnityGraphicsD3D12RecordingState recordingState = {};
     if (!s_D3D12->CommandRecordingState(&recordingState) || !recordingState.commandList) return;
 
-    auto* shader  = reinterpret_cast<RayTraceShader*>(ed->shaderHandle);
+    auto* ds      = reinterpret_cast<::RayTraceDescriptorSet*>(ed->descriptorSetHandle);
+    auto* slots   = reinterpret_cast<const CS_BindingSlot*>(static_cast<uintptr_t>(ed->bindingSlotsPtr));
     auto* cmdList = static_cast<ID3D12GraphicsCommandList4*>(recordingState.commandList);
 
     D3D12HeapHook::BeginPluginDispatch();
-    shader->Dispatch(cmdList, ed->width, ed->height);
+    ds->Dispatch(cmdList, ed->width, ed->height, slots, ed->bindingCount);
     D3D12HeapHook::EndPluginDispatch();
 
-    // Our Dispatch bound a private descriptor heap. Restore Unity's heaps so
-    // Unity's subsequent SetComputeRootDescriptorTable does not trip D3D12
-    // validation (category 9, id 708).
+    // Restore Unity's heaps so subsequent Unity SetComputeRootDescriptorTable
+    // does not trip D3D12 validation (category 9, id 708).
     D3D12HeapHook::RestoreUnityHeaps(cmdList);
 }
 
@@ -813,6 +749,73 @@ NR_RTS_GetRenderEventDataSize()
     return static_cast<uint32_t>(sizeof(RTS_RenderEventData));
 }
 
+// ---------------------------------------------------------------------------
+// NR_RTS_CreateDescriptorSet / NR_RTS_DestroyDescriptorSet
+//   Create a RayTraceDescriptorSet bound to a previously-created RayTraceShader.
+//   Returns 0 on failure.  The descriptor set owns its own heap slice.
+// ---------------------------------------------------------------------------
+extern "C" uint64_t UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API
+NR_RTS_CreateDescriptorSet(uint64_t shaderHandle)
+{
+    if (!shaderHandle || !s_RendererReady) return 0;
+    auto* shader = reinterpret_cast<RayTraceShader*>(shaderHandle);
+    ID3D12Device* dev = s_D3D12->GetDevice();
+    if (!dev) return 0;
+    auto* ds = new ::RayTraceDescriptorSet(shader, dev, s_Log, &s_DescHeap, s_D3D12v8);
+    return reinterpret_cast<uint64_t>(ds);
+}
+
+extern "C" void UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API
+NR_RTS_DestroyDescriptorSet(uint64_t handle)
+{
+    if (!handle) return;
+    EnqueueDeferredDelete(reinterpret_cast<void*>(handle), DeferredType::RayTraceDescriptorSet);
+}
+
+// ---------------------------------------------------------------------------
+// NR_RTS_GetBindingCount / NR_RTS_GetSlotIndex / NR_RTS_GetBindingName
+//   Slot-layout queries on the RayTraceShader.  C# uses these to build its
+//   NativeRayTraceDescriptorSet slot map at construction time.
+// ---------------------------------------------------------------------------
+extern "C" uint32_t UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API
+NR_RTS_GetBindingCount(uint64_t shaderHandle)
+{
+    if (!shaderHandle) return 0;
+    return reinterpret_cast<RayTraceShader*>(shaderHandle)->GetBindingCount();
+}
+
+extern "C" uint32_t UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API
+NR_RTS_GetSlotIndex(uint64_t shaderHandle, const char* name)
+{
+    if (!shaderHandle || !name) return UINT32_MAX;
+    return reinterpret_cast<RayTraceShader*>(shaderHandle)->GetSlotIndex(name);
+}
+
+extern "C" UNITY_INTERFACE_EXPORT const char* UNITY_INTERFACE_API
+NR_RTS_GetBindingName(uint64_t shaderHandle, uint32_t index)
+{
+    if (!shaderHandle) return nullptr;
+    return reinterpret_cast<RayTraceShader*>(shaderHandle)->GetBindingName(index);
+}
+
+// ---------------------------------------------------------------------------
+// NR_RTS_SetRootConstantsHint / NR_RTS_SetRootSRVHint
+//   Must be called BEFORE NR_CreateRayTraceShaderFromBytes so the reflection
+//   pass applies the correct binding types.
+// ---------------------------------------------------------------------------
+extern "C" void UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API
+NR_RTS_SetRootConstantsHint(uint64_t shaderHandle, const char* name, uint32_t num32BitValues)
+{
+    if (!shaderHandle || !name) return;
+    reinterpret_cast<RayTraceShader*>(shaderHandle)->SetRootConstantsHint(name, num32BitValues);
+}
+
+extern "C" void UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API
+NR_RTS_SetRootSRVHint(uint64_t shaderHandle, const char* name)
+{
+    if (!shaderHandle || !name) return;
+    reinterpret_cast<RayTraceShader*>(shaderHandle)->SetRootSRVHint(name);
+}
 
 static void UNITY_INTERFACE_API FrameTickCallback(int /*eventId*/)
 {
@@ -884,20 +887,6 @@ NR_AS_GetTLASNativePtr(uint64_t asHandle)
     if (!asHandle) return 0;
     return reinterpret_cast<intptr_t>(
         reinterpret_cast<AccelerationStructure*>(asHandle)->GetTLAS());
-}
-
-// ---------------------------------------------------------------------------
-// NR_RTS_SetBindlessTexture
-//   Binds a BindlessTexture to an unbounded Texture2D[] variable.
-//   Returns 1 on success, 0 if the name is not found or isn't an SRV_ARRAY.
-// ---------------------------------------------------------------------------
-extern "C" int32_t UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API
-NR_RTS_SetBindlessTexture(uint64_t shaderHandle, const char* name, uint64_t btHandle)
-{
-    if (!shaderHandle) return 0;
-    auto* shader = reinterpret_cast<RayTraceShader*>(shaderHandle);
-    auto* bt     = reinterpret_cast<BindlessTexture*>(btHandle); // may be nullptr to unbind
-    return shader->SetBindlessTexture(name, bt) ? 1 : 0;
 }
 
 // ===========================================================================
@@ -984,20 +973,6 @@ NR_BT_GetCapacity(uint64_t handle)
 // ===========================================================================
 // BindlessBuffer  -  independent GPU-visible buffer (ByteAddressBuffer) array
 // ===========================================================================
-
-// ---------------------------------------------------------------------------
-// NR_RTS_SetBindlessBuffer
-//   Binds a BindlessBuffer to an unbounded ByteAddressBuffer[] variable.
-//   Returns 1 on success, 0 if the name is not found or isn't an SRV_ARRAY.
-// ---------------------------------------------------------------------------
-extern "C" int32_t UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API
-NR_RTS_SetBindlessBuffer(uint64_t shaderHandle, const char* name, uint64_t bbHandle)
-{
-    if (!shaderHandle) return 0;
-    auto* shader = reinterpret_cast<RayTraceShader*>(shaderHandle);
-    auto* bb     = reinterpret_cast<BindlessBuffer*>(bbHandle); // may be nullptr to unbind
-    return shader->SetBindlessBuffer(name, bb) ? 1 : 0;
-}
 
 // ---------------------------------------------------------------------------
 // NR_CreateBindlessBuffer

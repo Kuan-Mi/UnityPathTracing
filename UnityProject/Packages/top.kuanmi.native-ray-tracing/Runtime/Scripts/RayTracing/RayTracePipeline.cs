@@ -1,4 +1,6 @@
 using System;
+using System.Collections.Generic;
+using System.Runtime.InteropServices;
 using Unity.Collections;
 using Unity.Collections.LowLevel.Unsafe;
 using UnityEngine;
@@ -23,6 +25,21 @@ namespace NativeRender
 
         /// <summary>True if the underlying D3D12 pipeline is valid and ready to dispatch.</summary>
         public bool IsValid => _handle != 0;
+
+        /// <summary>Opaque native handle (pointer to RayTraceShader). Used by NativeRayTraceDescriptorSet.</summary>
+        public ulong Handle => _handle;
+
+        /// <summary>Number of resource binding slots in this shader.</summary>
+        public uint SlotCount => _slotCount;
+
+        /// <summary>Maps HLSL variable names to slot indices (for NativeRayTraceDescriptorSet).</summary>
+        public IReadOnlyDictionary<string, uint> NameToSlot => _nameToSlot;
+
+        /// <summary>Fired (on the main thread) whenever the pipeline is rebuilt after a hot-reload.</summary>
+        public event Action<RayTracePipeline> OnRebuilt;
+
+        private uint                     _slotCount;
+        private Dictionary<string, uint> _nameToSlot = new Dictionary<string, uint>();
 
         // -------------------------------------------------------------------
         // Construction
@@ -55,6 +72,25 @@ namespace NativeRender
             if (_handle == 0)
                 throw new InvalidOperationException(
                     $"[RayTracePipeline] NR_CreateRayTraceShaderFromBytes returned 0 for: {shader.name}");
+
+            RefreshSlotLayout();
+        }
+
+        private void RefreshSlotLayout()
+        {
+            _nameToSlot.Clear();
+            if (_handle == 0) { _slotCount = 0; return; }
+            _slotCount = NativeRenderPlugin.NR_RTS_GetBindingCount(_handle);
+            for (uint i = 0; i < _slotCount; i++)
+            {
+                IntPtr namePtr = NativeRenderPlugin.NR_RTS_GetBindingName(_handle, i);
+                if (namePtr != IntPtr.Zero)
+                {
+                    string n = Marshal.PtrToStringAnsi(namePtr);
+                    if (!string.IsNullOrEmpty(n))
+                        _nameToSlot[n] = i;
+                }
+            }
         }
 
         private void OnShaderRecompiled(RayTraceShader shader)
@@ -73,6 +109,7 @@ namespace NativeRender
             {
                 BuildNativeHandle(shader);
                 Debug.Log($"[RayTracePipeline] Rebuilt pipeline for: {shader.name}");
+                OnRebuilt?.Invoke(this);
             }
             catch (Exception e)
             {
@@ -241,6 +278,18 @@ namespace NativeRender
         // -------------------------------------------------------------------
 
         /// <summary>
+        /// Enqueues a DispatchRays call into the CommandBuffer using a NativeRayTraceDescriptorSet.
+        /// This is the preferred overload — supports per-dispatch bindings and XR stereo.
+        /// </summary>
+        public void Dispatch(CommandBuffer cmd, NativeRayTraceDescriptorSet ds, uint width, uint height)
+        {
+            if (!IsValid || ds == null) return;
+            IntPtr ptr = ds.SnapshotAndBuildHeader(width, height);
+            if (ptr == IntPtr.Zero) return;
+            cmd.IssuePluginEventAndData(NativeRenderPlugin.NR_RTS_GetRenderEventFunc(), 1, ptr);
+        }
+
+        /// <summary>
         /// Enqueues a DispatchRays call into the CommandBuffer.
         /// Must be called during a URP/HDRP render pass (on the render thread).
         /// </summary>
@@ -249,10 +298,15 @@ namespace NativeRender
             if (!IsValid) return;
 
             var ed = _eventData[0];
-            ed.shaderHandle = _handle;
-            ed.width        = width;
-            ed.height       = height;
-            _eventData[0]   = ed;
+            // Legacy path — descriptorSetHandle is 0, C++ plugin falls back to shader-owned state.
+            // For new code use Dispatch(cmd, NativeRayTraceDescriptorSet, width, height).
+            ed.descriptorSetHandle = 0;
+            ed.bindingSlotsPtr     = 0;
+            ed.bindingCount        = 0;
+            ed.width               = width;
+            ed.height              = height;
+            ed._pad                = 0;
+            _eventData[0]          = ed;
 
             unsafe
             {
