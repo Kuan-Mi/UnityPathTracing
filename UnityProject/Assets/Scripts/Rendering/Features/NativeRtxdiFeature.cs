@@ -1143,6 +1143,7 @@ namespace PathTracing
             toneMappingCs          = LoadCs($"Assets/Shaders/donut/tonemapping");
 
             UnityEditor.EditorUtility.SetDirty(this);
+            return;
 
             static NativeComputeShader LoadCs(string path)
             {

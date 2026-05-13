@@ -12,7 +12,8 @@ ScriptedImporter:
   additionalIncludePaths:
   - ../RenderingPlugin/External/RTXDI-Library/Include
   - ../RenderingPlugin/External/donut/include
-  - Assets/RTXDI/Shaders/SharedShaderInclude
+  - ../RenderingPlugin/External/RTXDI/Samples/FullSample/Shaders/SharedShaderInclude
+  - ../RenderingPlugin/External/RTXDI/Samples/FullSample/Shaders/DenoisingPasses
   extraArgs:
   - -Wno-conversion
   - -enable-16bit-types
