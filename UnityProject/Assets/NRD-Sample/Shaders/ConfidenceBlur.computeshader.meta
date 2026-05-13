@@ -15,6 +15,7 @@ ScriptedImporter:
   - ../RenderingPlugin/External/NRD/Shaders
   - ../RenderingPlugin/_deps/mathlib-src
   - ../RenderingPlugin/_deps/sharc-src/include
+  - ../RenderingPlugin/External/NRD-Sample/Shaders
   extraArgs:
   - -enable-16bit-types
   defines: []
@@ -23,3 +24,4 @@ ScriptedImporter:
   rootConstantsHints:
   - Name: g_PushConstants
     Count: 1
+  rootSRVHints: []

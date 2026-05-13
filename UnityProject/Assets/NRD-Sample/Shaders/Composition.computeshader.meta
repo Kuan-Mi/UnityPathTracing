@@ -15,8 +15,11 @@ ScriptedImporter:
   - ../RenderingPlugin/External/NRD/Shaders
   - ../RenderingPlugin/_deps/mathlib-src
   - ../RenderingPlugin/_deps/sharc-src/include
+  - ../RenderingPlugin/External/NRD-Sample/Shaders
   extraArgs:
   - -enable-16bit-types
   defines: []
   entryPoint: main
   targetProfile: cs_6_6
+  rootConstantsHints: []
+  rootSRVHints: []

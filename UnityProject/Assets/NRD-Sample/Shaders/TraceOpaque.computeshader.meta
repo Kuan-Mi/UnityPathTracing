@@ -15,6 +15,7 @@ ScriptedImporter:
   - ../RenderingPlugin/External/NRD/Shaders
   - ../RenderingPlugin/_deps/mathlib-src
   - ../RenderingPlugin/_deps/sharc-src/include
+  - ../RenderingPlugin/External/NRD-Sample/Shaders
   extraArgs:
   - -Wno-conversion
   - -enable-16bit-types
