@@ -12,3 +12,9 @@
 [submodule "RenderingPlugin/External/NRD-Sample"]
 	path = RenderingPlugin/External/NRD-Sample
 	url = https://github.com/Kuan-Mi/NRD-Sample.git
+[submodule "RenderingPlugin/External/RTXDI-Library"]
+	path = RenderingPlugin/External/RTXDI-Library
+	url = https://github.com/NVIDIA-RTX/RTXDI-Library
+[submodule "RenderingPlugin/External/RTXDI"]
+	path = RenderingPlugin/External/RTXDI
+	url = https://github.com/Kuan-Mi/RTXDIForUnity.git
