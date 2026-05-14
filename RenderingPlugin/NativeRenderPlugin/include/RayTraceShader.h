@@ -11,46 +11,14 @@
 #include "IUnityLog.h"
 #include "IUnityGraphicsD3D12.h"
 #include "DescriptorHeapAllocator.h"
+#include "ComputeShader.h"  // ComputeBindingType, ComputeBinding, CS_BindingSlot
 
 using Microsoft::WRL::ComPtr;
 
-class BindlessTexture;
-class BindlessBuffer;
-class BindlessUAVTexture;
-class AccelerationStructure;
-class NativeBuffer;
-
-// ---------------------------------------------------------------------------
-// RayTraceBindingType
-//   Mirrors ComputeBindingType — fully aligned with the CS slot-based system.
-// ---------------------------------------------------------------------------
-enum class RayTraceBindingType
-{
-    SRV,            // single StructuredBuffer<T> / ByteAddressBuffer / Texture2D (SRV)
-    UAV,            // single RWTexture2D / RWStructuredBuffer / RWBuffer (UAV)
-    CBV,            // ConstantBuffer<T> bound as inline root CBV descriptor
-    SRV_ARRAY,      // unbounded Texture2D[] / ByteAddressBuffer[] via BindlessTexture/BindlessBuffer
-    UAV_ARRAY,      // unbounded RWTexture2D[] via BindlessUAVTexture
-    TLAS,           // RaytracingAccelerationStructure
-    ROOT_CONSTANTS, // ConstantBuffer<T> pushed via SetComputeRoot32BitConstants
-    ROOT_SRV,       // buffer SRV / TLAS promoted to inline root SRV descriptor
-};
-
-// ---------------------------------------------------------------------------
-// RayTraceBinding
-//   One reflected binding.  Stateless: no bound* fields.
-//   Resource data is passed per-dispatch via CS_BindingSlot[].
-// ---------------------------------------------------------------------------
-struct RayTraceBinding
-{
-    std::string         name;           // HLSL variable name
-    RayTraceBindingType type;           // SRV / UAV / CBV / SRV_ARRAY / UAV_ARRAY / TLAS / ...
-    uint32_t            space;          // register space
-    uint32_t            registerIndex;  // t/u/b register number
-    uint32_t            heapOffset;     // offset within shared SRV or UAV alloc range
-    uint32_t            rootParam;      // root parameter index (SRV_ARRAY/UAV_ARRAY/ROOT_CONSTANTS/ROOT_SRV: own; others: shared table)
-    uint32_t            num32BitValues; // ROOT_CONSTANTS only
-};
+// RayTraceBindingType and RayTraceBinding are identical to their Compute
+// counterparts — unify them to enable shared descriptor-set logic.
+using RayTraceBindingType = ComputeBindingType;
+using RayTraceBinding     = ComputeBinding;
 
 // ---------------------------------------------------------------------------
 // RayTraceShader
@@ -100,7 +68,7 @@ public:
     // --- Accessors for RayTraceDescriptorSet ---
     ID3D12StateObject*                    GetPSO()            const { return m_pso.Get(); }
     ID3D12RootSignature*                  GetRootSignature()  const { return m_rootSig.Get(); }
-    const std::vector<RayTraceBinding>&   GetBindings()       const { return m_bindings; }
+    const std::vector<ComputeBinding>&    GetBindings()       const { return m_bindings; }
     uint32_t GetRootParamSRV()            const { return m_rootParamSRV; }
     uint32_t GetRootParamUAV()            const { return m_rootParamUAV; }
     uint32_t GetRootParamCBVBase()        const { return m_rootParamCBVBase; }
@@ -155,7 +123,7 @@ private:
     };
 
     // All reflected bindings (all types except samplers)
-    std::vector<RayTraceBinding>            m_bindings;
+    std::vector<ComputeBinding>             m_bindings;
     std::unordered_map<std::string, size_t> m_bindingIndex; // name → index
 
     std::vector<SamplerReflection>          m_samplerBindings;

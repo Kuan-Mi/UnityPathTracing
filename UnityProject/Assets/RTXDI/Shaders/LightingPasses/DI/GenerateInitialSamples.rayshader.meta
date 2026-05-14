@@ -18,6 +18,8 @@ ScriptedImporter:
   extraArgs:
   - -Wno-conversion
   - -enable-16bit-types
-  defines: []
+  defines:
+  - RTXDI_REGIR_MODE=RTXDI_REGIR_ONION
+  - USE_RAY_QUERY=0
   targetProfile: lib_6_6
   maxPayloadSizeInBytes: 40
