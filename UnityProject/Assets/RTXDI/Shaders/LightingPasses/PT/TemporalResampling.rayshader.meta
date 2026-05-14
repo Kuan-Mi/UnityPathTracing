@@ -1,0 +1,23 @@
+fileFormatVersion: 2
+guid: bb73732dcb8ba964dbc89b6efb5c211c
+ScriptedImporter:
+  internalIDToNameTable: []
+  externalObjects: {}
+  serializedVersion: 2
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+  script: {fileID: 11500000, guid: edebcba6c71d5754a859601f2a711697, type: 3}
+  isRayTraceShader: 1
+  additionalIncludePaths:
+  - ../RenderingPlugin/External/RTXDI-Library/Include
+  - ../RenderingPlugin/External/donut/include
+  - ../RenderingPlugin/External/RTXDI/Samples/FullSample/Shaders/SharedShaderInclude
+  - ../RenderingPlugin/External/RTXDI/Samples/FullSample/Shaders/LightingPasses/PT
+  - ../RenderingPlugin/External/NVAPI
+  extraArgs:
+  - -Wno-conversion
+  - -enable-16bit-types
+  defines: []
+  targetProfile: lib_6_6
+  maxPayloadSizeInBytes: 40

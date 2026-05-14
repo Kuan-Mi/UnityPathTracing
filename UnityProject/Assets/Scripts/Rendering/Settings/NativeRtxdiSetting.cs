@@ -51,6 +51,9 @@ namespace PathTracing
 
         /// <summary>Use the DXR ray-tracing shader variant for GenerateInitialSamples instead of the compute shader.</summary>
         public bool useRayTracingForDIGenerateInitialSamples = false;
+        public bool useRayTracingForDITemporalResampling     = false;
+        public bool useRayTracingForDISpatialResampling      = false;
+        public bool useRayTracingForDIShadeSamples           = false;
 
         public RTXDI_DIInitialSamplingParameters    initialSamplingParams    = ReSTIRDIDefaults.GetDefaultInitialSamplingParams();
         public RTXDI_DITemporalResamplingParameters temporalResamplingParams = ReSTIRDIDefaults.GetDefaultTemporalResamplingParams();
@@ -60,6 +63,12 @@ namespace PathTracing
         [FoldoutHeader("ReSTIR GI")]
         public ReSTIRGI_ResamplingMode giResamplingMode = ReSTIRGI_ResamplingMode.TemporalAndSpatial;
 
+        public bool useRayTracingForBrdfRayTracing           = false;
+        public bool useRayTracingForShadeSecondarySurfaces   = false;
+        public bool useRayTracingForGITemporalResampling     = false;
+        public bool useRayTracingForGISpatialResampling      = false;
+        public bool useRayTracingForGIFinalShading           = false;
+
         public RTXDI_GITemporalResamplingParameters giTemporalResamplingParams = ReSTIRGIDefaults.GetDefaultTemporalResamplingParams();
         public RTXDI_GISpatialResamplingParameters  giSpatialResamplingParams  = ReSTIRGIDefaults.GetDefaultSpatialResamplingParams();
         public RTXDI_GIFinalShadingParameters       giFinalShadingParams       = ReSTIRGIDefaults.GetDefaultFinalShadingParams();
@@ -67,6 +76,12 @@ namespace PathTracing
 
         [FoldoutHeader("ReSTIR PT")]
         public ReSTIRPT_ResamplingMode ptResamplingMode = ReSTIRPT_ResamplingMode.TemporalAndSpatial;
+
+        public bool useRayTracingForPTGenerateInitialSamples = false;
+        public bool useRayTracingForPTTemporalResampling     = false;
+        public bool useRayTracingForPTSpatialResampling      = false;
+        public bool useRayTracingForPTFillSampleID           = false;
+        public bool useRayTracingForPTFinalShading           = false;
 
         public RTXDI_PTTemporalResamplingParameters ptTemporalResamplingParams = ReSTIRPTDefaults.GetDefaultTemporalResamplingParams();
         public RTXDI_PTSpatialResamplingParameters  ptSpatialResamplingParams  = ReSTIRPTDefaults.GetDefaultSpatialResamplingParams();
