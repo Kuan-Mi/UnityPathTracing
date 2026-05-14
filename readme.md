@@ -43,6 +43,27 @@ cd UnityPathTracing
 build.bat
 ```
 
+### Upgrade Unity's built-in Agility SDK to 1.619.1
+
+The Unity editor ships with an older Agility SDK. You need to upgrade it to version 1.619.1 by patching the editor executable and replacing the D3D12 runtime DLLs.
+
+You can do this manually by hex-editing the Unity executable (change the SDK version constant from `618` to `619`) and then downloading `D3D12Core.dll` and `d3d12SDKLayers.dll` from the [Microsoft.Direct3D.D3D12 NuGet package](https://www.nuget.org/packages/Microsoft.Direct3D.D3D12) and replacing the files in the `D3D12/` folder next to the Unity executable.
+
+Alternatively, use the provided PowerShell script **`patch.ps1`**, which automates both steps:
+
+1. Opens a file picker — select your `Unity.exe` (e.g. `C:\Program Files\Unity\Hub\Editor\6000.3.2f1\Editor\Unity.exe`)
+2. Patches the SDK version constant in the binary in-place
+3. Downloads Agility SDK 1.619.1 from NuGet and overwrites `D3D12Core.dll` / `d3d12SDKLayers.dll` in the adjacent `D3D12\` folder
+4. Backs up all modified files as `.bak` before overwriting
+
+```powershell
+powershell -ExecutionPolicy Bypass -File patch.ps1
+```
+
+> **Note:** Run PowerShell as Administrator if UAC prevents writing to `Program Files`.
+
+> **Note:** The built game executable also needs to be patched. Run `patch.ps1` again and select the `.exe` in your build output folder.
+
 ---
 
 ## Requirements
@@ -103,6 +124,27 @@ git clone https://github.com/Kuan-Mi/UnityPathTracing
 cd UnityPathTracing
 build.bat
 ```
+
+### 将 Unity 内置的 Agility SDK 升级至 1.619.1
+
+Unity 编辑器自带的 Agility SDK 版本较旧，需要升级至 1.619.1。
+
+你可以手动完成此操作：用十六进制编辑器修改 Unity 可执行文件中的版本常量（将 `618` 改为 `619`），然后从 [Microsoft.Direct3D.D3D12 NuGet 包](https://www.nuget.org/packages/Microsoft.Direct3D.D3D12) 下载 `D3D12Core.dll` 和 `d3d12SDKLayers.dll`，并替换 Unity 可执行文件同级目录下 `D3D12\` 文件夹中的对应文件。
+
+也可以使用项目提供的 PowerShell 脚本 **`patch.ps1`**，它会自动完成以上所有步骤：
+
+1. 弹出文件选择框，选择你的 `Unity.exe`（例如 `C:\Program Files\Unity\Hub\Editor\6000.3.2f1\Editor\Unity.exe`）
+2. 自动修改可执行文件中的 SDK 版本常量
+3. 从 NuGet 下载 Agility SDK 1.619.1，并覆盖同级 `D3D12\` 目录中的 DLL 文件
+4. 所有被修改的文件在覆盖前均会备份为 `.bak`
+
+```powershell
+powershell -ExecutionPolicy Bypass -File patch.ps1
+```
+
+> **注意**：如果 UAC 阻止写入 `Program Files` 目录，请以管理员身份运行 PowerShell。
+
+> **注意**：打包后的游戏可执行文件同样需要修改。再次运行 `patch.ps1`，选择打包输出目录中的 `.exe` 文件即可，`D3D12\` 文件夹会自动创建在其同级目录下。
 
 ---
 
