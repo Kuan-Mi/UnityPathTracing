@@ -1,32 +1,15 @@
 #pragma once
-#include <cstdint>
-#include <d3d12.h>
-#include <dxgi1_6.h>
-#include <dxcapi.h>
-#include <wrl/client.h>
-#include <string>
-#include <vector>
-#include <unordered_map>
-#include <unordered_set>
-#include "IUnityLog.h"
-#include "IUnityGraphicsD3D12.h"
-#include "DescriptorHeapAllocator.h"
-#include "ComputeShader.h"  // ComputeBindingType, ComputeBinding, CS_BindingSlot
+#include "ShaderBase.h"  // pulls in all D3D12/DXC/Unity headers + ComputeBinding types
 
-using Microsoft::WRL::ComPtr;
-
-// RayTraceBindingType and RayTraceBinding are identical to their Compute
-// counterparts — unify them to enable shared descriptor-set logic.
-using RayTraceBindingType = ComputeBindingType;
-using RayTraceBinding     = ComputeBinding;
+// RayTraceBindingType and RayTraceBinding are type aliases for the Compute
+// counterparts — shared descriptor-set logic uses ComputeBinding directly.
+using RayTraceBindingType = BindingType;
+using RayTraceBinding     = Binding;
 
 // ---------------------------------------------------------------------------
 // RayTraceShader
-//   One self-contained DXR pipeline.  Manages its own PSO, root signature,
-//   and shader tables.  Heap management is delegated to RayTraceDescriptorSet.
-//
-// Resource data is passed per-dispatch via CS_BindingSlot[] (same layout as
-// ComputeShader) so the same C# DescriptorSet ring-buffer infrastructure works.
+//   One self-contained DXR pipeline.  Common binding metadata, root-signature
+//   build, logging, and hints are provided by ShaderBase.
 //
 // Root parameter layout (built dynamically from reflection):
 //   0   – SRV descriptor table (one range per SRV/TLAS binding)     optional
@@ -37,82 +20,40 @@ using RayTraceBinding     = ComputeBinding;
 //   P+  – one inline root SRV per ROOT_SRV binding
 //   Q+  – one root 32-bit constants slot per ROOT_CONSTANTS binding
 // ---------------------------------------------------------------------------
-class RayTraceShader
+class RayTraceShader : public ShaderBase
 {
 public:
-    RayTraceShader();
-    ~RayTraceShader();
+    RayTraceShader()  = default;
+    ~RayTraceShader() = default;
 
     bool Initialize(ID3D12Device5* device, IUnityLog* log,
                     DescriptorHeapAllocator* allocator, IUnityGraphicsD3D12v8* d3d12v8);
 
     // Build DXR pipeline from pre-compiled DXIL lib bytes.
-    // name is used as the D3D12 debug name (optional).
-    // flags: bit 0 = allow D3D12_RAYTRACING_PIPELINE_FLAG_ALLOW_OPACITY_MICROMAPS (only for lib_6_9+).
+    // flags: bit 0 = allow D3D12_RAYTRACING_PIPELINE_FLAG_ALLOW_OPACITY_MICROMAPS (lib_6_9+).
     // maxPayloadSizeInBytes: MaxPayloadSizeInBytes for D3D12_RAYTRACING_SHADER_CONFIG.
-    bool LoadShaderFromBytes(const uint8_t* dxilBytes, uint32_t size, const char* name = nullptr, uint32_t flags = 0, uint32_t maxPayloadSizeInBytes = 4);
+    bool LoadShaderFromBytes(const uint8_t* dxilBytes, uint32_t size,
+                             const char* name = nullptr,
+                             uint32_t flags = 0,
+                             uint32_t maxPayloadSizeInBytes = 4);
 
-    // Pre-load hints — must be called BEFORE LoadShaderFromBytes.
-    // Promote a CBV to inline root 32-bit constants.
-    void SetRootConstantsHint(const char* name, uint32_t num32BitValues);
-    // Promote a buffer SRV or TLAS to an inline root SRV descriptor.
-    void SetRootSRVHint(const char* name);
     // Allow Opacity Micromaps in the pipeline (requires lib_6_9+ DXIL and GPU support).
     void SetAllowOpacityMicromaps(bool allow) { m_allowOpacityMicromaps = allow; }
 
-    // --- Binding metadata queries (main thread, called from C# to build slot arrays) ---
-    uint32_t    GetBindingCount() const;
-    uint32_t    GetSlotIndex   (const char* name) const;
-    const char* GetBindingName (uint32_t index)   const;
-
     // --- Accessors for RayTraceDescriptorSet ---
-    ID3D12StateObject*                    GetPSO()            const { return m_pso.Get(); }
-    ID3D12RootSignature*                  GetRootSignature()  const { return m_rootSig.Get(); }
-    const std::vector<ComputeBinding>&    GetBindings()       const { return m_bindings; }
-    uint32_t GetRootParamSRV()            const { return m_rootParamSRV; }
-    uint32_t GetRootParamUAV()            const { return m_rootParamUAV; }
-    uint32_t GetRootParamCBVBase()        const { return m_rootParamCBVBase; }
-    uint32_t GetRootParamRootSRVBase()    const { return m_rootParamRootSRVBase; }
-    uint32_t GetNumSRV()                  const { return m_numSRV; }
-    uint32_t GetNumUAV()                  const { return m_numUAV; }
+    ID3D12StateObject* GetPSO()         const { return m_pso.Get(); }
 
     // Shader table accessors for RayTraceDescriptorSet::Dispatch
-    ID3D12Resource* GetRayGenTable()      const { return m_rayGenTable.Get(); }
-    ID3D12Resource* GetMissTable()        const { return m_missTable.Get(); }
-    ID3D12Resource* GetHitGroupTable()    const { return m_hitGroupTable.Get(); }
-    uint32_t        GetMissCount()        const { return static_cast<uint32_t>(m_missShaders.size()); }
-    uint32_t        GetHitGroupCount()    const { return static_cast<uint32_t>(m_hitGroups.size()); }
-
-    const char* GetName() const { return m_name.c_str(); }
-
-    static constexpr uint32_t kInvalidAlloc = UINT32_MAX;
+    ID3D12Resource* GetRayGenTable()    const { return m_rayGenTable.Get(); }
+    ID3D12Resource* GetMissTable()      const { return m_missTable.Get(); }
+    ID3D12Resource* GetHitGroupTable()  const { return m_hitGroupTable.Get(); }
+    uint32_t        GetMissCount()      const { return static_cast<uint32_t>(m_missShaders.size()); }
+    uint32_t        GetHitGroupCount()  const { return static_cast<uint32_t>(m_hitGroups.size()); }
 
 private:
     bool ReflectBindings(IDxcBlob* shaderLib);
-    bool BuildRootSignature();
-    bool BuildPipeline(IDxcBlob* shaderLib);
+    bool BuildPipeline  (IDxcBlob* shaderLib);
     bool BuildShaderTable();
-
-    void Log (UnityLogType type, const char* msg)      const;
-    void Logf(UnityLogType type, const char* fmt, ...) const;
-
-    IUnityLog*               m_log       = nullptr;
-    ComPtr<ID3D12Device5>    m_device;
-    DescriptorHeapAllocator* m_allocator = nullptr;
-    IUnityGraphicsD3D12v8*   m_d3d12v8   = nullptr;
-    std::string              m_name;
-
-    // Pipeline
-    ComPtr<ID3D12StateObject>   m_pso;
-    ComPtr<ID3D12RootSignature> m_rootSig;
-
-    // Shader tables (upload heap; GPU reads at DispatchRays time)
-    ComPtr<ID3D12Resource> m_rayGenTable;
-    ComPtr<ID3D12Resource> m_missTable;
-    ComPtr<ID3D12Resource> m_hitGroupTable;
-
-    // Sampler reflection
-    struct SamplerReflection { std::string name; uint32_t reg; uint32_t space; };
 
     // Hit group info — one per discovered (ClosestHit*/AnyHit*) group
     struct HitGroupInfo
@@ -122,36 +63,20 @@ private:
         std::wstring anyHitExport;
     };
 
-    // All reflected bindings (all types except samplers)
-    std::vector<ComputeBinding>             m_bindings;
-    std::unordered_map<std::string, size_t> m_bindingIndex; // name → index
+    // DXR-specific state
+    ComPtr<ID3D12StateObject>   m_pso;
 
-    std::vector<SamplerReflection>          m_samplerBindings;
-
-    // Root parameter indices (set during BuildRootSignature)
-    uint32_t m_rootParamSRV         = kInvalidAlloc;
-    uint32_t m_rootParamUAV         = kInvalidAlloc;
-    uint32_t m_rootParamCBVBase     = kInvalidAlloc;
-    uint32_t m_rootParamRootSRVBase = kInvalidAlloc;
-
-    // Binding counts
-    uint32_t m_numSRV           = 0;
-    uint32_t m_numUAV           = 0;
-    uint32_t m_numCBV           = 0;
-    uint32_t m_numSRVArray      = 0;
-    uint32_t m_numUAVArray      = 0;
-    uint32_t m_numRootConstants = 0;
-    uint32_t m_numRootSRV       = 0;
-
-    // Pre-load hints
-    std::unordered_map<std::string, uint32_t> m_rootConstantsHints; // name → num32BitValues
-    bool     m_allowOpacityMicromaps  = false;
-    uint32_t m_maxPayloadSizeInBytes  = 4;
-    std::unordered_set<std::string>           m_rootSRVHints;       // names promoted to root SRV
+    // Shader tables (upload heap; GPU reads at DispatchRays time)
+    ComPtr<ID3D12Resource> m_rayGenTable;
+    ComPtr<ID3D12Resource> m_missTable;
+    ComPtr<ID3D12Resource> m_hitGroupTable;
 
     // Shader entry points
-    std::vector<std::wstring>                 m_rayGenShaders;  // [0] used for Dispatch
-    std::vector<std::wstring>                 m_missShaders;
-    std::vector<HitGroupInfo>                 m_hitGroups;
-    std::unordered_map<std::wstring, size_t>  m_hitGroupIndex;  // groupKey → index
+    std::vector<std::wstring>                m_rayGenShaders;  // [0] used for Dispatch
+    std::vector<std::wstring>                m_missShaders;
+    std::vector<HitGroupInfo>                m_hitGroups;
+    std::unordered_map<std::wstring, size_t> m_hitGroupIndex;  // groupKey → index
+
+    bool     m_allowOpacityMicromaps = false;
+    uint32_t m_maxPayloadSizeInBytes = 4;
 };

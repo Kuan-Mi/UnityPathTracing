@@ -712,7 +712,7 @@ static void UNITY_INTERFACE_API RtsRenderCallback(int /*eventId*/, void* data)
     if (!s_D3D12->CommandRecordingState(&recordingState) || !recordingState.commandList) return;
 
     auto* ds      = reinterpret_cast<::RayTraceDescriptorSet*>(ed->descriptorSetHandle);
-    auto* slots   = reinterpret_cast<const CS_BindingSlot*>(static_cast<uintptr_t>(ed->bindingSlotsPtr));
+    auto* slots   = reinterpret_cast<const BindingSlot*>(static_cast<uintptr_t>(ed->bindingSlotsPtr));
     auto* cmdList = static_cast<ID3D12GraphicsCommandList4*>(recordingState.commandList);
 
     D3D12HeapHook::BeginPluginDispatch();
@@ -1391,13 +1391,21 @@ NR_CreateComputeShader(const uint8_t* dxilBytes, uint32_t size, const char* name
         NR_ERROR("NR_CreateComputeShader: failed to obtain ID3D12Device");
         return 0;
     }
+    ID3D12Device5* dev5 = nullptr;
+    if (FAILED(device->QueryInterface(IID_PPV_ARGS(&dev5))))
+    {
+        NR_ERROR("NR_CreateComputeShader: failed to obtain ID3D12Device5");
+        return 0;
+    }
     auto* cs = new ComputeShader();
-    if (!cs->Initialize(device, s_Log, &s_DescHeap, s_D3D12v8) ||
+    if (!cs->Initialize(dev5, s_Log, &s_DescHeap, s_D3D12v8) ||
         !cs->LoadShaderFromBytes(dxilBytes, size, name))
     {
         delete cs;
+        dev5->Release();
         return 0;
     }
+    dev5->Release();
     return reinterpret_cast<uint64_t>(cs);
 }
 
@@ -1475,10 +1483,17 @@ NR_CreateComputeShaderEx(const uint8_t* dxilBytes, uint32_t size, const char* na
         NR_ERROR("NR_CreateComputeShaderEx: failed to obtain ID3D12Device");
         return 0;
     }
+    ID3D12Device5* dev5 = nullptr;
+    if (FAILED(device->QueryInterface(IID_PPV_ARGS(&dev5))))
+    {
+        NR_ERROR("NR_CreateComputeShaderEx: failed to obtain ID3D12Device5");
+        return 0;
+    }
     auto* cs = new ComputeShader();
-    if (!cs->Initialize(device, s_Log, &s_DescHeap, s_D3D12v8))
+    if (!cs->Initialize(dev5, s_Log, &s_DescHeap, s_D3D12v8))
     {
         delete cs;
+        dev5->Release();
         return 0;
     }
     ApplyRootConstantsHints(cs, hintsJson);
@@ -1486,8 +1501,10 @@ NR_CreateComputeShaderEx(const uint8_t* dxilBytes, uint32_t size, const char* na
     if (!cs->LoadShaderFromBytes(dxilBytes, size, name))
     {
         delete cs;
+        dev5->Release();
         return 0;
     }
+    dev5->Release();
     return reinterpret_cast<uint64_t>(cs);
 }
 // ---------------------------------------------------------------------------
@@ -1560,7 +1577,7 @@ static void UNITY_INTERFACE_API CsDispatchCallback(int /*eventId*/, void* data)
 
     auto* ds      = reinterpret_cast<ComputeDescriptorSet*>(ed->descriptorSetHandle);
     auto* cmdList = static_cast<ID3D12GraphicsCommandList*>(recordingState.commandList);
-    auto* slots   = reinterpret_cast<CS_BindingSlot*>(ed->bindingSlotsPtr);
+    auto* slots   = reinterpret_cast<BindingSlot*>(ed->bindingSlotsPtr);
 
     D3D12HeapHook::BeginPluginDispatch();
     ds->Dispatch(cmdList, ed->threadGroupX, ed->threadGroupY, ed->threadGroupZ,

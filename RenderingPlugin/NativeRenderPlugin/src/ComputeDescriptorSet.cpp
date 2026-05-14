@@ -6,7 +6,7 @@
 void ComputeDescriptorSet::Dispatch(
     ID3D12GraphicsCommandList* cmdList,
     UINT threadGroupX, UINT threadGroupY, UINT threadGroupZ,
-    const CS_BindingSlot* slots, uint32_t slotCount)
+    const BindingSlot* slots, uint32_t slotCount)
 {
     if (!m_shader || !m_shader->GetPSO() || !m_shader->GetRootSignature() || !m_allocator) return;
     if (!slots && slotCount > 0) return;

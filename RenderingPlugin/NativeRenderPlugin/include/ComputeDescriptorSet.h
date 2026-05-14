@@ -20,5 +20,5 @@ public:
     // resource-state requests, and root-parameter setup happen here.
     void Dispatch(ID3D12GraphicsCommandList* cmdList,
                   UINT threadGroupX, UINT threadGroupY, UINT threadGroupZ,
-                  const CS_BindingSlot* slots, uint32_t slotCount);
+                  const BindingSlot* slots, uint32_t slotCount);
 };

@@ -44,14 +44,14 @@ protected:
 
     // --- Descriptor heap management ---
     void FreeAllocations();
-    bool AllocateAndWriteDescriptors(const CS_BindingSlot* slots, uint32_t slotCount, uint32_t slotIdx);
-    void UpdateDescriptors          (const CS_BindingSlot* slots, uint32_t slotCount, uint32_t slotIdx);
-    void RequestResourceStates      (const CS_BindingSlot* slots, uint32_t slotCount);
+    bool AllocateAndWriteDescriptors(const BindingSlot* slots, uint32_t slotCount, uint32_t slotIdx);
+    void UpdateDescriptors          (const BindingSlot* slots, uint32_t slotCount, uint32_t slotIdx);
+    void RequestResourceStates      (const BindingSlot* slots, uint32_t slotCount);
 
     // --- Dispatch helpers ---
 
     // Validates all binding slots; logs errors and returns false on any missing binding.
-    bool ValidateBindings(const CS_BindingSlot* slots, uint32_t slotCount) const;
+    bool ValidateBindings(const BindingSlot* slots, uint32_t slotCount) const;
 
     // Computes per-dispatch slotIdx (ring-buffer across frames × eyes) and
     // increments m_subFrameIdx.  Always succeeds; clamps on overflow.
@@ -59,14 +59,14 @@ protected:
 
     // Allocates heap slots on first use then writes descriptors; or just
     // re-writes descriptors if already allocated.
-    void EnsureDescriptors(const CS_BindingSlot* slots, uint32_t slotCount, uint32_t slotIdx);
+    void EnsureDescriptors(const BindingSlot* slots, uint32_t slotCount, uint32_t slotIdx);
 
     // Binds the global heap, the root signature, and all root parameters
     // (descriptor tables, inline CBVs, inline SRVs, root constants).
     // Takes the base ID3D12GraphicsCommandList* so it works for both
     // Dispatch (cmdList) and DispatchRays (cmdList4 implicitly upcast).
     void BindRootParams(ID3D12GraphicsCommandList* cmdList,
-                        const CS_BindingSlot*      slots,
+                        const BindingSlot*      slots,
                         uint32_t                   slotCount,
                         uint32_t                   slotIdx);
 

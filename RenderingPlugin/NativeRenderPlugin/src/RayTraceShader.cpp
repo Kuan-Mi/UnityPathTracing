@@ -1,13 +1,7 @@
 #include "RayTraceShader.h"
-#include "BindlessTexture.h"
-#include "BindlessBuffer.h"
-#include "BindlessUAVTexture.h"
-#include "AccelerationStructure.h"
-#include "ComputeShader.h"   // CS_BindingSlot, CS_BindingObjectKind
 #include <d3d12shader.h>
 #include <d3d12sdklayers.h>
 #include <cstdio>
-#include <cstdarg>
 #include <algorithm>
 #include <windows.h>
 
@@ -43,26 +37,6 @@ namespace
 
 // ---------------------------------------------------------------------------
 
-RayTraceShader::RayTraceShader() = default;
-
-RayTraceShader::~RayTraceShader() = default;
-
-void RayTraceShader::Log(UnityLogType type, const char* msg) const
-{
-    if (m_log) m_log->Log(type, msg, __FILE__, __LINE__);
-    else        printf("[RayTraceShader] %s\n", msg);
-}
-
-void RayTraceShader::Logf(UnityLogType type, const char* fmt, ...) const
-{
-    char buf[512];
-    va_list args;
-    va_start(args, fmt);
-    vsnprintf(buf, sizeof(buf), fmt, args);
-    va_end(args);
-    Log(type, buf);
-}
-
 bool RayTraceShader::Initialize(ID3D12Device5* device, IUnityLog* log,
                                  DescriptorHeapAllocator* allocator,
                                  IUnityGraphicsD3D12v8*   d3d12v8)
@@ -75,49 +49,16 @@ bool RayTraceShader::Initialize(ID3D12Device5* device, IUnityLog* log,
 }
 
 // ---------------------------------------------------------------------------
-// Pre-load hints
-// ---------------------------------------------------------------------------
-void RayTraceShader::SetRootConstantsHint(const char* name, uint32_t num32BitValues)
-{
-    if (name) m_rootConstantsHints[name] = num32BitValues;
-}
-
-void RayTraceShader::SetRootSRVHint(const char* name)
-{
-    if (name) m_rootSRVHints.insert(name);
-}
-
-// ---------------------------------------------------------------------------
-// Slot-layout queries
-// ---------------------------------------------------------------------------
-uint32_t RayTraceShader::GetBindingCount() const
-{
-    return static_cast<uint32_t>(m_bindings.size());
-}
-
-uint32_t RayTraceShader::GetSlotIndex(const char* name) const
-{
-    if (!name) return kInvalidAlloc;
-    auto it = m_bindingIndex.find(name);
-    return it != m_bindingIndex.end()
-        ? static_cast<uint32_t>(it->second)
-        : kInvalidAlloc;
-}
-
-const char* RayTraceShader::GetBindingName(uint32_t index) const
-{
-    if (index >= m_bindings.size()) return nullptr;
-    return m_bindings[index].name.c_str();
-}
-
-// ---------------------------------------------------------------------------
 // LoadShaderFromBytes
 // ---------------------------------------------------------------------------
-bool RayTraceShader::LoadShaderFromBytes(const uint8_t* dxilBytes, uint32_t size, const char* name, uint32_t flags, uint32_t maxPayloadSizeInBytes)
+bool RayTraceShader::LoadShaderFromBytes(const uint8_t* dxilBytes, uint32_t size,
+                                          const char* name, uint32_t flags,
+                                          uint32_t maxPayloadSizeInBytes)
 {
     m_name = (name && name[0]) ? name : "RayTraceShader";
-    m_allowOpacityMicromaps  = (flags & 1u) != 0;
-    m_maxPayloadSizeInBytes  = maxPayloadSizeInBytes > 0 ? maxPayloadSizeInBytes : 4;
+    m_allowOpacityMicromaps = (flags & 1u) != 0;
+    m_maxPayloadSizeInBytes = maxPayloadSizeInBytes > 0 ? maxPayloadSizeInBytes : 4;
+
     if (!dxilBytes || size == 0)
     {
         Log(kUnityLogTypeError, "RayTraceShader::LoadShaderFromBytes: empty input");
@@ -155,10 +96,10 @@ bool RayTraceShader::LoadShaderFromBytes(const uint8_t* dxilBytes, uint32_t size
     m_numSRV = m_numUAV = m_numCBV = m_numSRVArray = m_numUAVArray = m_numRootConstants = m_numRootSRV = 0;
     m_rootParamSRV = m_rootParamUAV = m_rootParamCBVBase = m_rootParamRootSRVBase = kInvalidAlloc;
 
-    if (!ReflectBindings(shaderLib.Get()))   return false;
-    if (!BuildRootSignature())               return false;
-    if (!BuildPipeline(shaderLib.Get()))     return false;
-    if (!BuildShaderTable())                 return false;
+    if (!ReflectBindings(shaderLib.Get()))  return false;
+    if (!BuildRootSignature())              return false;
+    if (!BuildPipeline(shaderLib.Get()))    return false;
+    if (!BuildShaderTable())                return false;
 
     Logf(kUnityLogTypeLog,
          "RayTraceShader '%s': pipeline ready (%u SRV, %u UAV, %u CBV, %u SRV_ARRAY, %u UAV_ARRAY, %u ROOT_SRV, %u ROOT_CONSTANTS)",
@@ -172,7 +113,7 @@ bool RayTraceShader::LoadShaderFromBytes(const uint8_t* dxilBytes, uint32_t size
 //   Collects resource bindings from all functions in the library.
 //   Classifies shader entry points (raygen, miss, closesthit, anyhit).
 //   Deduplicates bindings across functions.
-//   Supports ROOT_CONSTANTS and ROOT_SRV via pre-load hints.
+//   Resource classification is delegated to ShaderBase::ClassifyBinding().
 // ---------------------------------------------------------------------------
 bool RayTraceShader::ReflectBindings(IDxcBlob* shaderLib)
 {
@@ -193,7 +134,7 @@ bool RayTraceShader::ReflectBindings(IDxcBlob* shaderLib)
     if (FAILED(hr))
     {
         Logf(kUnityLogTypeWarning,
-             "RayTraceShader: CreateReflection failed (hr=0x%08X) — no bindings", hr);
+             "RayTraceShader: CreateReflection failed (hr=0x%08X) - no bindings", hr);
         return true; // not fatal
     }
 
@@ -212,7 +153,6 @@ bool RayTraceShader::ReflectBindings(IDxcBlob* shaderLib)
         if (!funcDesc.Name) continue;
 
         // --- Demangle DXC name ---
-        // DXC may emit ?FunctionName@@<sig>, optionally prefixed with \x01.
         std::string nameA(funcDesc.Name);
         std::string realName = nameA;
         {
@@ -291,7 +231,7 @@ bool RayTraceShader::ReflectBindings(IDxcBlob* shaderLib)
             }
         }
 
-        // --- Collect resource bindings ---
+        // --- Collect resource bindings (delegate classification to ShaderBase) ---
         for (UINT ri = 0; ri < funcDesc.BoundResources; ++ri)
         {
             D3D12_SHADER_INPUT_BIND_DESC bind = {};
@@ -311,97 +251,15 @@ bool RayTraceShader::ReflectBindings(IDxcBlob* shaderLib)
             const std::string bname(bind.Name);
             if (m_bindingIndex.count(bname)) continue; // de-duplicate across functions
 
-            RayTraceBinding rb;
-            rb.name           = bname;
-            rb.space          = bind.Space;
-            rb.registerIndex  = bind.BindPoint;
-            rb.heapOffset     = 0;
-            rb.rootParam      = kInvalidAlloc;
-            rb.num32BitValues = 0;
-
-            switch (bind.Type)
-            {
-            case D3D_SIT_RTACCELERATIONSTRUCTURE:
-                if (m_rootSRVHints.count(bname))
-                {
-                    rb.type = RayTraceBindingType::ROOT_SRV;
-                    ++m_numRootSRV;
-                }
-                else
-                {
-                    rb.type = RayTraceBindingType::TLAS;
-                    ++m_numSRV;
-                }
-                break;
-            case D3D_SIT_CBUFFER:
-            {
-                auto hint = m_rootConstantsHints.find(bname);
-                if (hint != m_rootConstantsHints.end())
-                {
-                    rb.type           = RayTraceBindingType::ROOT_CONSTANTS;
-                    rb.num32BitValues = hint->second;
-                    ++m_numRootConstants;
-                }
-                else
-                {
-                    rb.type = RayTraceBindingType::CBV;
-                    ++m_numCBV;
-                }
-                break;
-            }
-            case D3D_SIT_TBUFFER:
-            case D3D_SIT_TEXTURE:
-            case D3D_SIT_STRUCTURED:
-            case D3D_SIT_BYTEADDRESS:
-                if (bind.BindCount == 0)
-                {
-                    rb.type = RayTraceBindingType::SRV_ARRAY;
-                    ++m_numSRVArray;
-                }
-                else if (m_rootSRVHints.count(bname))
-                {
-                    rb.type = RayTraceBindingType::ROOT_SRV;
-                    ++m_numRootSRV;
-                }
-                else
-                {
-                    rb.type = RayTraceBindingType::SRV;
-                    ++m_numSRV;
-                }
-                break;
-            default: // UAV variants (D3D_SIT_UAV_RWTYPED / D3D_SIT_UAV_RWSTRUCTURED / etc.)
-                if (bind.BindCount == 0)
-                {
-                    rb.type = RayTraceBindingType::UAV_ARRAY;
-                    ++m_numUAVArray;
-                }
-                else
-                {
-                    rb.type = RayTraceBindingType::UAV;
-                    ++m_numUAV;
-                }
-                break;
-            }
+            Binding cb = {};
+            if (!ClassifyBinding(bind, bname, cb)) continue;
 
             m_bindingIndex[bname] = m_bindings.size();
-            m_bindings.push_back(std::move(rb));
+            m_bindings.push_back(std::move(cb));
         }
     }
 
-    // Assign consecutive heap offsets per type group
-    // SRV table: SRV + TLAS; UAV table: UAV; ROOT_SRV / ROOT_CONSTANTS / SRV_ARRAY / UAV_ARRAY: no slot here.
-    {
-        uint32_t srvOff = 0, uavOff = 0, cbvOff = 0;
-        for (auto& b : m_bindings)
-        {
-            if      (b.type == RayTraceBindingType::SRV  || b.type == RayTraceBindingType::TLAS)
-                b.heapOffset = srvOff++;
-            else if (b.type == RayTraceBindingType::UAV)
-                b.heapOffset = uavOff++;
-            else if (b.type == RayTraceBindingType::CBV)
-                b.heapOffset = cbvOff++;
-        }
-    }
+    AssignHeapOffsets();
 
     // Sort miss shaders and hit groups for deterministic shader-table ordering.
     std::sort(m_missShaders.begin(), m_missShaders.end());
@@ -423,313 +281,8 @@ bool RayTraceShader::ReflectBindings(IDxcBlob* shaderLib)
 }
 
 // ---------------------------------------------------------------------------
-// BuildRootSignature
-//   Fully dynamic — no hardcoded registers or spaces.
-//   Mirrors ComputeShader::BuildRootSignature but uses D3D12_SHADER_VISIBILITY_ALL
-//   (required for global root signatures in DXR).
-// ---------------------------------------------------------------------------
-bool RayTraceShader::BuildRootSignature()
-{
-    std::vector<D3D12_DESCRIPTOR_RANGE1> allRanges;
-    allRanges.reserve(m_numSRV + m_numUAV + m_numSRVArray + m_numUAVArray);
-
-    Logf(kUnityLogTypeLog,
-         "RayTraceShader::BuildRootSignature: %u SRV, %u UAV, %u CBV, %u SRV_ARRAY, %u UAV_ARRAY, %u ROOT_SRV, %u ROOT_CONSTANTS",
-         m_numSRV, m_numUAV, m_numCBV, m_numSRVArray, m_numUAVArray, m_numRootSRV, m_numRootConstants);
-
-    // --- SRV descriptor ranges (SRV + TLAS) ---
-    const size_t srvRangesOffset = allRanges.size();
-    for (const auto& b : m_bindings)
-    {
-        if (b.type != RayTraceBindingType::SRV && b.type != RayTraceBindingType::TLAS) continue;
-        D3D12_DESCRIPTOR_RANGE1 r = {};
-        r.RangeType                         = D3D12_DESCRIPTOR_RANGE_TYPE_SRV;
-        r.NumDescriptors                    = 1;
-        r.BaseShaderRegister                = b.registerIndex;
-        r.RegisterSpace                     = b.space;
-        r.Flags                             = D3D12_DESCRIPTOR_RANGE_FLAG_DESCRIPTORS_VOLATILE | D3D12_DESCRIPTOR_RANGE_FLAG_DATA_VOLATILE;
-        r.OffsetInDescriptorsFromTableStart = b.heapOffset;
-        allRanges.push_back(r);
-    }
-
-    // --- UAV descriptor ranges ---
-    const size_t uavRangesOffset = allRanges.size();
-    for (const auto& b : m_bindings)
-    {
-        if (b.type != RayTraceBindingType::UAV) continue;
-        D3D12_DESCRIPTOR_RANGE1 r = {};
-        r.RangeType                         = D3D12_DESCRIPTOR_RANGE_TYPE_UAV;
-        r.NumDescriptors                    = 1;
-        r.BaseShaderRegister                = b.registerIndex;
-        r.RegisterSpace                     = b.space;
-        r.Flags                             = D3D12_DESCRIPTOR_RANGE_FLAG_DESCRIPTORS_VOLATILE | D3D12_DESCRIPTOR_RANGE_FLAG_DATA_VOLATILE;
-        r.OffsetInDescriptorsFromTableStart = b.heapOffset;
-        allRanges.push_back(r);
-    }
-
-    // --- SRV_ARRAY descriptor ranges (unbounded) ---
-    const size_t srvArrayRangesOffset = allRanges.size();
-    for (const auto& b : m_bindings)
-    {
-        if (b.type != RayTraceBindingType::SRV_ARRAY) continue;
-        D3D12_DESCRIPTOR_RANGE1 r = {};
-        r.RangeType                         = D3D12_DESCRIPTOR_RANGE_TYPE_SRV;
-        r.NumDescriptors                    = UINT_MAX;
-        r.BaseShaderRegister                = b.registerIndex;
-        r.RegisterSpace                     = b.space;
-        r.Flags                             = D3D12_DESCRIPTOR_RANGE_FLAG_DESCRIPTORS_VOLATILE | D3D12_DESCRIPTOR_RANGE_FLAG_DATA_VOLATILE;
-        r.OffsetInDescriptorsFromTableStart = 0;
-        allRanges.push_back(r);
-    }
-
-    // --- UAV_ARRAY descriptor ranges (unbounded) ---
-    const size_t uavArrayRangesOffset = allRanges.size();
-    for (const auto& b : m_bindings)
-    {
-        if (b.type != RayTraceBindingType::UAV_ARRAY) continue;
-        D3D12_DESCRIPTOR_RANGE1 r = {};
-        r.RangeType                         = D3D12_DESCRIPTOR_RANGE_TYPE_UAV;
-        r.NumDescriptors                    = UINT_MAX;
-        r.BaseShaderRegister                = b.registerIndex;
-        r.RegisterSpace                     = b.space;
-        r.Flags                             = D3D12_DESCRIPTOR_RANGE_FLAG_DESCRIPTORS_VOLATILE | D3D12_DESCRIPTOR_RANGE_FLAG_DATA_VOLATILE;
-        r.OffsetInDescriptorsFromTableStart = 0;
-        allRanges.push_back(r);
-    }
-
-    std::vector<D3D12_ROOT_PARAMETER1> params;
-    params.reserve(
-        (m_numSRV      ? 1 : 0) +
-        (m_numUAV      ? 1 : 0) +
-        m_numSRVArray  +
-        m_numUAVArray  +
-        m_numCBV       +
-        m_numRootSRV   +
-        m_numRootConstants);
-
-    // Optional — SRV table (SRV + TLAS)
-    if (m_numSRV > 0)
-    {
-        m_rootParamSRV = static_cast<uint32_t>(params.size());
-        D3D12_ROOT_PARAMETER1 p = {};
-        p.ParameterType                       = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
-        p.DescriptorTable.NumDescriptorRanges = m_numSRV;
-        p.DescriptorTable.pDescriptorRanges   = &allRanges[srvRangesOffset];
-        p.ShaderVisibility                    = D3D12_SHADER_VISIBILITY_ALL;
-        params.push_back(p);
-        Logf(kUnityLogTypeLog, "  Root param %u: SRV table (%u descriptors)", m_rootParamSRV, m_numSRV);
-    }
-
-    // Optional — UAV table
-    if (m_numUAV > 0)
-    {
-        m_rootParamUAV = static_cast<uint32_t>(params.size());
-        D3D12_ROOT_PARAMETER1 p = {};
-        p.ParameterType                       = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
-        p.DescriptorTable.NumDescriptorRanges = m_numUAV;
-        p.DescriptorTable.pDescriptorRanges   = &allRanges[uavRangesOffset];
-        p.ShaderVisibility                    = D3D12_SHADER_VISIBILITY_ALL;
-        params.push_back(p);
-        Logf(kUnityLogTypeLog, "  Root param %u: UAV table (%u descriptors)", m_rootParamUAV, m_numUAV);
-    }
-
-    // One table per SRV_ARRAY
-    {
-        uint32_t arrayIdx = 0;
-        for (auto& b : m_bindings)
-        {
-            if (b.type != RayTraceBindingType::SRV_ARRAY) continue;
-            b.rootParam = static_cast<uint32_t>(params.size());
-            D3D12_ROOT_PARAMETER1 p = {};
-            p.ParameterType                       = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
-            p.DescriptorTable.NumDescriptorRanges = 1;
-            p.DescriptorTable.pDescriptorRanges   = &allRanges[srvArrayRangesOffset + arrayIdx++];
-            p.ShaderVisibility                    = D3D12_SHADER_VISIBILITY_ALL;
-            params.push_back(p);
-            Logf(kUnityLogTypeLog, "  Root param %u: SRV_ARRAY '%s'", b.rootParam, b.name.c_str());
-        }
-    }
-
-    // One table per UAV_ARRAY
-    {
-        uint32_t arrayIdx = 0;
-        for (auto& b : m_bindings)
-        {
-            if (b.type != RayTraceBindingType::UAV_ARRAY) continue;
-            b.rootParam = static_cast<uint32_t>(params.size());
-            D3D12_ROOT_PARAMETER1 p = {};
-            p.ParameterType                       = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
-            p.DescriptorTable.NumDescriptorRanges = 1;
-            p.DescriptorTable.pDescriptorRanges   = &allRanges[uavArrayRangesOffset + arrayIdx++];
-            p.ShaderVisibility                    = D3D12_SHADER_VISIBILITY_ALL;
-            params.push_back(p);
-            Logf(kUnityLogTypeLog, "  Root param %u: UAV_ARRAY '%s'", b.rootParam, b.name.c_str());
-        }
-    }
-
-    // One root CBV per CBV binding
-    if (m_numCBV > 0)
-    {
-        m_rootParamCBVBase = static_cast<uint32_t>(params.size());
-        for (auto& b : m_bindings)
-        {
-            if (b.type != RayTraceBindingType::CBV) continue;
-            b.rootParam = static_cast<uint32_t>(params.size());
-            D3D12_ROOT_PARAMETER1 p = {};
-            p.ParameterType             = D3D12_ROOT_PARAMETER_TYPE_CBV;
-            p.Descriptor.ShaderRegister = b.registerIndex;
-            p.Descriptor.RegisterSpace  = b.space;
-            p.ShaderVisibility          = D3D12_SHADER_VISIBILITY_ALL;
-            params.push_back(p);
-            Logf(kUnityLogTypeLog, "  Root param %u: CBV '%s' b%u space%u",
-                 b.rootParam, b.name.c_str(), b.registerIndex, b.space);
-        }
-    }
-
-    // One inline root SRV per ROOT_SRV binding
-    if (m_numRootSRV > 0)
-    {
-        m_rootParamRootSRVBase = static_cast<uint32_t>(params.size());
-        for (auto& b : m_bindings)
-        {
-            if (b.type != RayTraceBindingType::ROOT_SRV) continue;
-            b.rootParam = static_cast<uint32_t>(params.size());
-            D3D12_ROOT_PARAMETER1 p = {};
-            p.ParameterType             = D3D12_ROOT_PARAMETER_TYPE_SRV;
-            p.Descriptor.ShaderRegister = b.registerIndex;
-            p.Descriptor.RegisterSpace  = b.space;
-            p.ShaderVisibility          = D3D12_SHADER_VISIBILITY_ALL;
-            params.push_back(p);
-            Logf(kUnityLogTypeLog, "  Root param %u: ROOT_SRV '%s' t%u space%u",
-                 b.rootParam, b.name.c_str(), b.registerIndex, b.space);
-        }
-    }
-
-    // One root 32-bit constants slot per ROOT_CONSTANTS binding
-    for (auto& b : m_bindings)
-    {
-        if (b.type != RayTraceBindingType::ROOT_CONSTANTS) continue;
-        b.rootParam = static_cast<uint32_t>(params.size());
-        D3D12_ROOT_PARAMETER1 p = {};
-        p.ParameterType            = D3D12_ROOT_PARAMETER_TYPE_32BIT_CONSTANTS;
-        p.Constants.ShaderRegister = b.registerIndex;
-        p.Constants.RegisterSpace  = b.space;
-        p.Constants.Num32BitValues = b.num32BitValues;
-        p.ShaderVisibility         = D3D12_SHADER_VISIBILITY_ALL;
-        params.push_back(p);
-        Logf(kUnityLogTypeLog, "  Root param %u: ROOT_CONSTANTS '%s' b%u space%u num32=%u",
-             b.rootParam, b.name.c_str(), b.registerIndex, b.space, b.num32BitValues);
-    }
-
-    // Static samplers — parsed from Unity inline sampler naming convention.
-    auto ToLower = [](std::string s) {
-        std::transform(s.begin(), s.end(), s.begin(), [](unsigned char c){ return (char)tolower(c); });
-        return s;
-    };
-    auto Contains = [](const std::string& haystack, const char* needle) {
-        return haystack.find(needle) != std::string::npos;
-    };
-
-    std::vector<D3D12_STATIC_SAMPLER_DESC> samplers;
-    samplers.reserve(m_samplerBindings.size());
-    for (const auto& sr : m_samplerBindings)
-    {
-        const std::string lower = ToLower(sr.name);
-        D3D12_FILTER filter = D3D12_FILTER_MIN_MAG_MIP_LINEAR;
-        if      (Contains(lower, "point")) filter = D3D12_FILTER_MIN_MAG_MIP_POINT;
-        else if (Contains(lower, "aniso")) filter = D3D12_FILTER_ANISOTROPIC;
-
-        D3D12_TEXTURE_ADDRESS_MODE addr = D3D12_TEXTURE_ADDRESS_MODE_WRAP;
-        if      (Contains(lower, "mirroronce")) addr = D3D12_TEXTURE_ADDRESS_MODE_MIRROR_ONCE;
-        else if (Contains(lower, "mirror"))     addr = D3D12_TEXTURE_ADDRESS_MODE_MIRROR;
-        else if (Contains(lower, "clamp"))      addr = D3D12_TEXTURE_ADDRESS_MODE_CLAMP;
-        else if (Contains(lower, "repeat"))     addr = D3D12_TEXTURE_ADDRESS_MODE_WRAP;
-
-        D3D12_STATIC_SAMPLER_DESC sd = {};
-        sd.Filter           = filter;
-        sd.AddressU = sd.AddressV = sd.AddressW = addr;
-        sd.MaxAnisotropy    = (filter == D3D12_FILTER_ANISOTROPIC) ? 16 : 1;
-        sd.ComparisonFunc   = D3D12_COMPARISON_FUNC_NEVER;
-        sd.BorderColor      = D3D12_STATIC_BORDER_COLOR_OPAQUE_WHITE;
-        sd.MaxLOD           = D3D12_FLOAT32_MAX;
-        sd.ShaderRegister   = sr.reg;
-        sd.RegisterSpace    = sr.space;
-        sd.ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
-        samplers.push_back(sd);
-    }
-
-    // Validate register spaces
-    bool spaceValid = true;
-    for (const auto& range : allRanges)
-    {
-        if (range.RegisterSpace >= 0xfffffff0)
-        {
-            const char* bindName = "?";
-            for (const auto& b : m_bindings)
-                if (b.registerIndex == range.BaseShaderRegister && b.space == range.RegisterSpace)
-                    { bindName = b.name.c_str(); break; }
-            Logf(kUnityLogTypeError,
-                 "RayTraceShader: binding '%s' has invalid RegisterSpace=0x%08X — add explicit register() in HLSL",
-                 bindName, range.RegisterSpace);
-            spaceValid = false;
-        }
-    }
-    for (const auto& p : params)
-    {
-        if ((p.ParameterType == D3D12_ROOT_PARAMETER_TYPE_CBV ||
-             p.ParameterType == D3D12_ROOT_PARAMETER_TYPE_SRV ||
-             p.ParameterType == D3D12_ROOT_PARAMETER_TYPE_UAV) &&
-             p.Descriptor.RegisterSpace >= 0xfffffff0)
-        {
-            Logf(kUnityLogTypeError,
-                 "RayTraceShader: root descriptor has invalid RegisterSpace=0x%08X",
-                 p.Descriptor.RegisterSpace);
-            spaceValid = false;
-        }
-    }
-    if (!spaceValid) return false;
-
-    D3D12_ROOT_SIGNATURE_DESC1 rsDesc1 = {};
-    rsDesc1.NumParameters     = static_cast<UINT>(params.size());
-    rsDesc1.pParameters       = params.empty()   ? nullptr : params.data();
-    rsDesc1.NumStaticSamplers = static_cast<UINT>(samplers.size());
-    rsDesc1.pStaticSamplers   = samplers.empty() ? nullptr : samplers.data();
-    rsDesc1.Flags             = D3D12_ROOT_SIGNATURE_FLAG_NONE;
-
-    D3D12_VERSIONED_ROOT_SIGNATURE_DESC vrsDesc = {};
-    vrsDesc.Version  = D3D_ROOT_SIGNATURE_VERSION_1_1;
-    vrsDesc.Desc_1_1 = rsDesc1;
-
-    ComPtr<ID3DBlob> sigBlob, errBlob;
-    HRESULT hr = D3D12SerializeVersionedRootSignature(&vrsDesc, &sigBlob, &errBlob);
-    if (FAILED(hr))
-    {
-        Logf(kUnityLogTypeError,
-             "RayTraceShader: D3D12SerializeVersionedRootSignature failed (hr=0x%08X): %s",
-             hr, errBlob ? (char*)errBlob->GetBufferPointer() : "");
-        return false;
-    }
-
-    hr = m_device->CreateRootSignature(0, sigBlob->GetBufferPointer(),
-                                        sigBlob->GetBufferSize(), IID_PPV_ARGS(&m_rootSig));
-    if (FAILED(hr))
-    {
-        Logf(kUnityLogTypeError, "RayTraceShader: CreateRootSignature failed (hr=0x%08X)", hr);
-        return false;
-    }
-    {
-        std::wstring wname(m_name.begin(), m_name.end());
-        wname += L"_RootSig";
-        m_rootSig->SetName(wname.c_str());
-    }
-    Logf(kUnityLogTypeLog, "RayTraceShader: root signature OK (%u params)", rsDesc1.NumParameters);
-    return true;
-}
-
-// ---------------------------------------------------------------------------
 // BuildPipeline
 //   Creates the DXR RTPSO from the reflected shader entry points.
-//   Hit groups are auto-discovered from ClosestHit*/AnyHit* naming convention.
 // ---------------------------------------------------------------------------
 bool RayTraceShader::BuildPipeline(IDxcBlob* shaderLib)
 {
@@ -749,19 +302,19 @@ bool RayTraceShader::BuildPipeline(IDxcBlob* shaderLib)
         return false;
     }
 
-    const UINT hitGroupCount    = static_cast<UINT>(m_hitGroups.size());
-    const UINT totalSubobjects  = 4 + hitGroupCount; // lib, N×hitgroups, shaderCfg, rootSig, pipelineCfg
+    const UINT hitGroupCount   = static_cast<UINT>(m_hitGroups.size());
+    const UINT totalSubobjects = 4 + hitGroupCount;
 
     std::vector<D3D12_STATE_SUBOBJECT> subObjects(totalSubobjects);
     std::vector<D3D12_HIT_GROUP_DESC>  hitGroupDescs(hitGroupCount);
     UINT si = 0;
 
     // 1. DXIL library (export all)
-    D3D12_DXIL_LIBRARY_DESC libDesc = {};
-    libDesc.DXILLibrary.pShaderBytecode = shaderLib->GetBufferPointer();
-    libDesc.DXILLibrary.BytecodeLength  = shaderLib->GetBufferSize();
-    libDesc.NumExports                  = 0;
-    subObjects[si++] = { D3D12_STATE_SUBOBJECT_TYPE_DXIL_LIBRARY, &libDesc };
+    D3D12_DXIL_LIBRARY_DESC libDescSub = {};
+    libDescSub.DXILLibrary.pShaderBytecode = shaderLib->GetBufferPointer();
+    libDescSub.DXILLibrary.BytecodeLength  = shaderLib->GetBufferSize();
+    libDescSub.NumExports                  = 0;
+    subObjects[si++] = { D3D12_STATE_SUBOBJECT_TYPE_DXIL_LIBRARY, &libDescSub };
 
     // 2. Hit groups
     for (UINT i = 0; i < hitGroupCount; ++i)
@@ -777,7 +330,7 @@ bool RayTraceShader::BuildPipeline(IDxcBlob* shaderLib)
         subObjects[si++] = { D3D12_STATE_SUBOBJECT_TYPE_HIT_GROUP, &desc };
     }
 
-    // 3. Shader config (payload + attribute sizes)
+    // 3. Shader config
     D3D12_RAYTRACING_SHADER_CONFIG shaderCfg = {};
     shaderCfg.MaxPayloadSizeInBytes   = m_maxPayloadSizeInBytes;
     shaderCfg.MaxAttributeSizeInBytes = sizeof(float) * 2;
@@ -787,10 +340,12 @@ bool RayTraceShader::BuildPipeline(IDxcBlob* shaderLib)
     ID3D12RootSignature* pRS = m_rootSig.Get();
     subObjects[si++] = { D3D12_STATE_SUBOBJECT_TYPE_GLOBAL_ROOT_SIGNATURE, &pRS };
 
-    // 5. Pipeline config (supports opacity micromaps)
+    // 5. Pipeline config
     D3D12_RAYTRACING_PIPELINE_CONFIG1 pipeCfg = {};
     pipeCfg.MaxTraceRecursionDepth = 1;
-    pipeCfg.Flags = m_allowOpacityMicromaps ? D3D12_RAYTRACING_PIPELINE_FLAG_ALLOW_OPACITY_MICROMAPS : D3D12_RAYTRACING_PIPELINE_FLAG_NONE;
+    pipeCfg.Flags = m_allowOpacityMicromaps
+        ? D3D12_RAYTRACING_PIPELINE_FLAG_ALLOW_OPACITY_MICROMAPS
+        : D3D12_RAYTRACING_PIPELINE_FLAG_NONE;
     subObjects[si++] = { D3D12_STATE_SUBOBJECT_TYPE_RAYTRACING_PIPELINE_CONFIG1, &pipeCfg };
 
     D3D12_STATE_OBJECT_DESC soDesc = {};
@@ -803,7 +358,6 @@ bool RayTraceShader::BuildPipeline(IDxcBlob* shaderLib)
     {
         Logf(kUnityLogTypeError, "RayTraceShader: CreateStateObject failed (hr=0x%08X)", hr);
 
-        // Drain D3D12 debug layer messages for a more detailed diagnosis.
         ComPtr<ID3D12InfoQueue> infoQueue;
         if (SUCCEEDED(m_device->QueryInterface(IID_PPV_ARGS(&infoQueue))))
         {
@@ -812,8 +366,8 @@ bool RayTraceShader::BuildPipeline(IDxcBlob* shaderLib)
             {
                 SIZE_T msgSize = 0;
                 if (FAILED(infoQueue->GetMessage(i, nullptr, &msgSize)) || msgSize == 0) continue;
-                std::vector<uint8_t> buf(msgSize);
-                auto* msg = reinterpret_cast<D3D12_MESSAGE*>(buf.data());
+                std::vector<uint8_t> msgBuf(msgSize);
+                auto* msg = reinterpret_cast<D3D12_MESSAGE*>(msgBuf.data());
                 if (SUCCEEDED(infoQueue->GetMessage(i, msg, &msgSize)) && msg->pDescription)
                     Logf(kUnityLogTypeError, "  D3D12[%llu]: %s", (unsigned long long)i, msg->pDescription);
             }
@@ -878,8 +432,8 @@ bool RayTraceShader::BuildShaderTable()
         return buf;
     };
 
-    m_rayGenTable   = MakeTable("RayGen",   { m_rayGenShaders[0] });
-    m_missTable     = MakeTable("Miss",     m_missShaders);
+    m_rayGenTable = MakeTable("RayGen", { m_rayGenShaders[0] });
+    m_missTable   = MakeTable("Miss",   m_missShaders);
     std::vector<std::wstring> hgNames;
     hgNames.reserve(m_hitGroups.size());
     for (const auto& hg : m_hitGroups) hgNames.push_back(hg.groupExport);
