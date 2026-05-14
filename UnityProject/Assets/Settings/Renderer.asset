@@ -93,7 +93,7 @@ MonoBehaviour:
     bounceNum: 1
     tracingMode: 2
     SHARC: 1
-    PSR: 0
+    PSR: 1
     normalMap: 1
     TAA: 1
     emission: 1

@@ -23,7 +23,7 @@ Material:
     MotionVector: User
     RenderType: Opaque
   disabledShaderPasses: []
-  m_LockedProperties: 
+  m_LockedProperties: _MetallicGlossMap
   m_SavedProperties:
     serializedVersion: 3
     m_TexEnvs:
@@ -150,7 +150,7 @@ Material:
     - _SKINNEDMESH: 0
     - _SSS: 0
     - _SSSScatteringScale: 1
-    - _Smoothness: 1
+    - _Smoothness: 0
     - _SmoothnessTextureChannel: 0
     - _SpecularHighlights: 1
     - _SrcBlend: 1
