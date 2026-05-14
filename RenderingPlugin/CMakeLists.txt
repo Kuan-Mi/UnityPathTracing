@@ -327,24 +327,30 @@ target_link_libraries(OMMBakerPlugin PRIVATE omm-lib)
 # NativeRenderPlugin – D3D12 DXR ray-tracing plugin
 # ---------------------------------------------------------------------------
 add_library(NativeRenderPlugin SHARED
-    NativeRenderPlugin/src/Plugin.cpp
-    NativeRenderPlugin/src/ShaderBase.cpp
-    NativeRenderPlugin/src/DescriptorSetBase.cpp
-    NativeRenderPlugin/src/RayTraceShader.cpp
-    NativeRenderPlugin/src/RayTraceDescriptorSet.cpp
-    NativeRenderPlugin/src/ComputeShader.cpp
-    NativeRenderPlugin/src/ComputeDescriptorSet.cpp
-    NativeRenderPlugin/src/AccelerationStructure.cpp
-    NativeRenderPlugin/src/DescriptorHeapAllocator.cpp
-    NativeRenderPlugin/src/BindlessTexture.cpp
-    NativeRenderPlugin/src/BindlessBuffer.cpp
-    NativeRenderPlugin/src/BindlessUAVTexture.cpp
-    NativeRenderPlugin/src/NativeBuffer.cpp
-    NativeRenderPlugin/src/NativeStructuredBuffer.cpp
+    NativeRenderPlugin/src/Plugin/Plugin.cpp
+    NativeRenderPlugin/src/Shaders/ShaderBase.cpp
+    NativeRenderPlugin/src/Descriptors/DescriptorSetBase.cpp
+    NativeRenderPlugin/src/Shaders/RayTraceShader.cpp
+    NativeRenderPlugin/src/Descriptors/RayTraceDescriptorSet.cpp
+    NativeRenderPlugin/src/Shaders/ComputeShader.cpp
+    NativeRenderPlugin/src/Descriptors/ComputeDescriptorSet.cpp
+    NativeRenderPlugin/src/Resources/AccelerationStructure.cpp
+    NativeRenderPlugin/src/Descriptors/DescriptorHeapAllocator.cpp
+    NativeRenderPlugin/src/Resources/BindlessTexture.cpp
+    NativeRenderPlugin/src/Resources/BindlessBuffer.cpp
+    NativeRenderPlugin/src/Resources/BindlessUAVTexture.cpp
+    NativeRenderPlugin/src/Resources/NativeBuffer.cpp
+    NativeRenderPlugin/src/Resources/NativeStructuredBuffer.cpp
+    NativeRenderPlugin/src/Hooks/D3D12HeapHook.cpp
 )
 
 target_include_directories(NativeRenderPlugin PRIVATE
     NativeRenderPlugin/include
+    NativeRenderPlugin/include/Descriptors
+    NativeRenderPlugin/include/Shaders
+    NativeRenderPlugin/include/Resources
+    NativeRenderPlugin/include/Hooks
+    NativeRenderPlugin/src/Plugin
     D3D12HeapHook
     "${UNITY_PLUGIN_API_DIR}"
     "${DXC_INC}"
