@@ -34,6 +34,9 @@ namespace NativeRender
         [Tooltip("DXC target profile (e.g. lib_6_6, lib_6_9).")]
         public string targetProfile = "lib_6_6";
 
+        [Tooltip("MaxPayloadSizeInBytes passed to D3D12 CreateStateObject. Must be >= the size of all payload structs used in the shader. Default 4 (uint = no real payload).")]
+        public uint maxPayloadSizeInBytes = 4;
+
         public override void OnImportAsset(AssetImportContext ctx)
         {
             if (!isRayTraceShader)
@@ -98,6 +101,9 @@ namespace NativeRender
 
             var targetProfileProp = so.FindProperty("_targetProfile");
             targetProfileProp.stringValue = string.IsNullOrEmpty(targetProfile) ? "lib_6_6" : targetProfile;
+
+            var payloadSizeProp = so.FindProperty("_maxPayloadSizeInBytes");
+            payloadSizeProp.longValue = maxPayloadSizeInBytes;
 
             so.ApplyModifiedPropertiesWithoutUndo();
 

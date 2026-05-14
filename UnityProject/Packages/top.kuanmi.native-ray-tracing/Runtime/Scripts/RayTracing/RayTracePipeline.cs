@@ -66,12 +66,32 @@ namespace NativeRender
                 throw new InvalidOperationException(
                     $"[RayTracePipeline] Shader compilation failed for: {shader.GetHlslPath()}");
 
-            _handle = NativeRenderPlugin.NR_CreateRayTraceShaderFromBytes(dxil, (uint)dxil.Length, shader.name);
+            uint flags = ProfileSupportsOpacityMicromaps(shader.TargetProfile) ? 1u : 0u;
+            uint maxPayload = shader.MaxPayloadSizeInBytes;
+            Debug.Log($"[RayTracePipeline] Creating pipeline for: {shader.name} (DXIL size: {dxil.Length} bytes, OMM support: {flags != 0}, MaxPayload: {maxPayload})");
+            _handle = NativeRenderPlugin.NR_CreateRayTraceShaderFromBytes(dxil, (uint)dxil.Length, shader.name, flags, maxPayload);
             if (_handle == 0)
                 throw new InvalidOperationException(
                     $"[RayTracePipeline] NR_CreateRayTraceShaderFromBytes returned 0 for: {shader.name}");
 
             RefreshSlotLayout();
+        }
+
+        /// <summary>
+        /// Returns true if the given DXC target profile supports Opacity Micromaps (lib_6_9 and above).
+        /// </summary>
+        private static bool ProfileSupportsOpacityMicromaps(string profile)
+        {
+            // Expected format: "lib_X_Y" — OMM requires SM 6.9+
+            if (string.IsNullOrEmpty(profile)) return false;
+            // Strip leading "lib_" and parse major.minor
+            const string prefix = "lib_";
+            if (!profile.StartsWith(prefix, System.StringComparison.OrdinalIgnoreCase)) return false;
+            string version = profile.Substring(prefix.Length); // e.g. "6_9" or "6_6"
+            string[] parts = version.Split('_');
+            if (parts.Length < 2) return false;
+            if (!int.TryParse(parts[0], out int major) || !int.TryParse(parts[1], out int minor)) return false;
+            return major > 6 || (major == 6 && minor >= 9);
         }
 
         private void RefreshSlotLayout()

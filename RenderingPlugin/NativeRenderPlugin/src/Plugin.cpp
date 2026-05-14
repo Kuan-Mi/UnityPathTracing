@@ -663,10 +663,12 @@ NR_DestroyRayTraceShader(uint64_t handle)
 // NR_CreateRayTraceShaderFromBytes
 //   Builds a DXR pipeline from pre-compiled DXIL bytes.  Returns an opaque
 //   uint64 handle on success, 0 on failure.
+//   flags: bit 0 = D3D12_RAYTRACING_PIPELINE_FLAG_ALLOW_OPACITY_MICROMAPS (only pass when target profile >= lib_6_9).
+//   maxPayloadSizeInBytes: MaxPayloadSizeInBytes for D3D12_RAYTRACING_SHADER_CONFIG.
 //   Caller owns the lifetime; call NR_DestroyRayTraceShader when done.
 // ---------------------------------------------------------------------------
 extern "C" uint64_t UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API
-NR_CreateRayTraceShaderFromBytes(const uint8_t* dxilBytes, uint32_t size, const char* name)
+NR_CreateRayTraceShaderFromBytes(const uint8_t* dxilBytes, uint32_t size, const char* name, uint32_t flags = 0, uint32_t maxPayloadSizeInBytes = 4)
 {
     if (!s_RendererReady)
     {
@@ -682,7 +684,7 @@ NR_CreateRayTraceShaderFromBytes(const uint8_t* dxilBytes, uint32_t size, const 
     }
     auto* shader = new RayTraceShader();
     if (!shader->Initialize(dev5, s_Log, &s_DescHeap, s_D3D12v8) ||
-        !shader->LoadShaderFromBytes(dxilBytes, size, name))
+        !shader->LoadShaderFromBytes(dxilBytes, size, name, flags, maxPayloadSizeInBytes))
     {
         delete shader;
         dev5->Release();

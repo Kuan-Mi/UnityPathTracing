@@ -20,3 +20,4 @@ ScriptedImporter:
   - -enable-16bit-types
   defines: []
   targetProfile: lib_6_6
+  maxPayloadSizeInBytes: 40

@@ -30,6 +30,10 @@ namespace NativeRender
         [SerializeField, HideInInspector]
         private string _targetProfile = "lib_6_6";
 
+        /// <summary>MaxPayloadSizeInBytes for the DXR pipeline. Written by the ScriptedImporter.</summary>
+        [SerializeField, HideInInspector]
+        private uint _maxPayloadSizeInBytes = 4;
+
         /// <summary>Pre-compiled DXIL bytecode. Populated by EnsureCompiled(); persisted by Unity serialization.</summary>
         [SerializeField, HideInInspector]
         private byte[] _compiledDxil;
@@ -40,6 +44,12 @@ namespace NativeRender
 
         /// <summary>True when compiled DXIL bytes are available.</summary>
         public bool HasCompiledBytes => _compiledDxil is { Length: > 0 };
+
+        /// <summary>DXC target profile used to compile this shader (e.g. "lib_6_6", "lib_6_9").</summary>
+        public string TargetProfile => string.IsNullOrEmpty(_targetProfile) ? "lib_6_6" : _targetProfile;
+
+        /// <summary>MaxPayloadSizeInBytes to pass to D3D12 CreateStateObject.</summary>
+        public uint MaxPayloadSizeInBytes => _maxPayloadSizeInBytes > 0 ? _maxPayloadSizeInBytes : 4;
 
         /// <summary>JSON reflection data produced after the last successful compilation. Empty when not yet compiled.</summary>
         public string ReflectionJson => _reflectionJson ?? "";

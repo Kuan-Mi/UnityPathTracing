@@ -73,7 +73,7 @@ option(NRD_STATIC_LIBRARY "" OFF)
 option(NRD_EMBEDS_SPIRV_SHADERS "" OFF)
 option(NRD_EMBEDS_DXBC_SHADERS "" OFF)
 
-# Must match PostprocessGBuffer.hlsl encoding: normal * 0.5 + 0.5 → RGBA8_UNORM (0), linear roughness → LINEAR (1)
+# NRD_NORMAL_ENCODING  0 for Rtxdi Feature   2 for other
 set(NRD_NORMAL_ENCODING   "2" CACHE STRING "Normal encoding variant (0-4, matches 'nrd::NormalEncoding')" FORCE)
 set(NRD_ROUGHNESS_ENCODING "1" CACHE STRING "Roughness encoding variant (0-2, matches 'nrd::RoughnessEncoding')" FORCE)
 

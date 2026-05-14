@@ -5,6 +5,7 @@
 #include "AccelerationStructure.h"
 #include "ComputeShader.h"   // CS_BindingSlot, CS_BindingObjectKind
 #include <d3d12shader.h>
+#include <d3d12sdklayers.h>
 #include <cstdio>
 #include <cstdarg>
 #include <algorithm>
@@ -112,9 +113,11 @@ const char* RayTraceShader::GetBindingName(uint32_t index) const
 // ---------------------------------------------------------------------------
 // LoadShaderFromBytes
 // ---------------------------------------------------------------------------
-bool RayTraceShader::LoadShaderFromBytes(const uint8_t* dxilBytes, uint32_t size, const char* name)
+bool RayTraceShader::LoadShaderFromBytes(const uint8_t* dxilBytes, uint32_t size, const char* name, uint32_t flags, uint32_t maxPayloadSizeInBytes)
 {
     m_name = (name && name[0]) ? name : "RayTraceShader";
+    m_allowOpacityMicromaps  = (flags & 1u) != 0;
+    m_maxPayloadSizeInBytes  = maxPayloadSizeInBytes > 0 ? maxPayloadSizeInBytes : 4;
     if (!dxilBytes || size == 0)
     {
         Log(kUnityLogTypeError, "RayTraceShader::LoadShaderFromBytes: empty input");
@@ -776,7 +779,7 @@ bool RayTraceShader::BuildPipeline(IDxcBlob* shaderLib)
 
     // 3. Shader config (payload + attribute sizes)
     D3D12_RAYTRACING_SHADER_CONFIG shaderCfg = {};
-    shaderCfg.MaxPayloadSizeInBytes   = sizeof(float) * 6;
+    shaderCfg.MaxPayloadSizeInBytes   = m_maxPayloadSizeInBytes;
     shaderCfg.MaxAttributeSizeInBytes = sizeof(float) * 2;
     subObjects[si++] = { D3D12_STATE_SUBOBJECT_TYPE_RAYTRACING_SHADER_CONFIG, &shaderCfg };
 
@@ -787,7 +790,7 @@ bool RayTraceShader::BuildPipeline(IDxcBlob* shaderLib)
     // 5. Pipeline config (supports opacity micromaps)
     D3D12_RAYTRACING_PIPELINE_CONFIG1 pipeCfg = {};
     pipeCfg.MaxTraceRecursionDepth = 1;
-    pipeCfg.Flags = D3D12_RAYTRACING_PIPELINE_FLAG_ALLOW_OPACITY_MICROMAPS;
+    pipeCfg.Flags = m_allowOpacityMicromaps ? D3D12_RAYTRACING_PIPELINE_FLAG_ALLOW_OPACITY_MICROMAPS : D3D12_RAYTRACING_PIPELINE_FLAG_NONE;
     subObjects[si++] = { D3D12_STATE_SUBOBJECT_TYPE_RAYTRACING_PIPELINE_CONFIG1, &pipeCfg };
 
     D3D12_STATE_OBJECT_DESC soDesc = {};
@@ -799,6 +802,23 @@ bool RayTraceShader::BuildPipeline(IDxcBlob* shaderLib)
     if (FAILED(hr))
     {
         Logf(kUnityLogTypeError, "RayTraceShader: CreateStateObject failed (hr=0x%08X)", hr);
+
+        // Drain D3D12 debug layer messages for a more detailed diagnosis.
+        ComPtr<ID3D12InfoQueue> infoQueue;
+        if (SUCCEEDED(m_device->QueryInterface(IID_PPV_ARGS(&infoQueue))))
+        {
+            const UINT64 msgCount = infoQueue->GetNumStoredMessages();
+            for (UINT64 i = 0; i < msgCount; ++i)
+            {
+                SIZE_T msgSize = 0;
+                if (FAILED(infoQueue->GetMessage(i, nullptr, &msgSize)) || msgSize == 0) continue;
+                std::vector<uint8_t> buf(msgSize);
+                auto* msg = reinterpret_cast<D3D12_MESSAGE*>(buf.data());
+                if (SUCCEEDED(infoQueue->GetMessage(i, msg, &msgSize)) && msg->pDescription)
+                    Logf(kUnityLogTypeError, "  D3D12[%llu]: %s", (unsigned long long)i, msg->pDescription);
+            }
+            infoQueue->ClearStoredMessages();
+        }
         return false;
     }
     {

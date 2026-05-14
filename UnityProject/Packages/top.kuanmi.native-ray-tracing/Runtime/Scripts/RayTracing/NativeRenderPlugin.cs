@@ -143,9 +143,11 @@ namespace NativeRender
         /// on success, 0 on failure.  The byte array is copied internally; the caller does
         /// not need to keep it alive after this call returns.
         /// name is used as the D3D12 debug name visible in PIX / RenderDoc (optional, can be null).
+        /// flags: bit 0 = D3D12_RAYTRACING_PIPELINE_FLAG_ALLOW_OPACITY_MICROMAPS (only set when target profile >= lib_6_9).
+        /// maxPayloadSizeInBytes: MaxPayloadSizeInBytes for D3D12_RAYTRACING_SHADER_CONFIG (must match the largest payload struct in the shader).
         /// </summary>
         [DllImport(DllName)]
-        public static extern ulong NR_CreateRayTraceShaderFromBytes(byte[] dxilBytes, uint size, string name);
+        public static extern ulong NR_CreateRayTraceShaderFromBytes(byte[] dxilBytes, uint size, string name, uint flags = 0, uint maxPayloadSizeInBytes = 4);
 
         // -------------------------------------------------------------------
         // RayTraceDescriptorSet API

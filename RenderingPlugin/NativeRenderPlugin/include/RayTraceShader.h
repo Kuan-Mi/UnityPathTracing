@@ -80,13 +80,17 @@ public:
 
     // Build DXR pipeline from pre-compiled DXIL lib bytes.
     // name is used as the D3D12 debug name (optional).
-    bool LoadShaderFromBytes(const uint8_t* dxilBytes, uint32_t size, const char* name = nullptr);
+    // flags: bit 0 = allow D3D12_RAYTRACING_PIPELINE_FLAG_ALLOW_OPACITY_MICROMAPS (only for lib_6_9+).
+    // maxPayloadSizeInBytes: MaxPayloadSizeInBytes for D3D12_RAYTRACING_SHADER_CONFIG.
+    bool LoadShaderFromBytes(const uint8_t* dxilBytes, uint32_t size, const char* name = nullptr, uint32_t flags = 0, uint32_t maxPayloadSizeInBytes = 4);
 
     // Pre-load hints — must be called BEFORE LoadShaderFromBytes.
     // Promote a CBV to inline root 32-bit constants.
     void SetRootConstantsHint(const char* name, uint32_t num32BitValues);
     // Promote a buffer SRV or TLAS to an inline root SRV descriptor.
     void SetRootSRVHint(const char* name);
+    // Allow Opacity Micromaps in the pipeline (requires lib_6_9+ DXIL and GPU support).
+    void SetAllowOpacityMicromaps(bool allow) { m_allowOpacityMicromaps = allow; }
 
     // --- Binding metadata queries (main thread, called from C# to build slot arrays) ---
     uint32_t    GetBindingCount() const;
@@ -173,6 +177,8 @@ private:
 
     // Pre-load hints
     std::unordered_map<std::string, uint32_t> m_rootConstantsHints; // name → num32BitValues
+    bool     m_allowOpacityMicromaps  = false;
+    uint32_t m_maxPayloadSizeInBytes  = 4;
     std::unordered_set<std::string>           m_rootSRVHints;       // names promoted to root SRV
 
     // Shader entry points
