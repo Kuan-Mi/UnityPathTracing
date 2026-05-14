@@ -319,6 +319,40 @@ void DescriptorSetBase<ShaderT>::RequestResourceStates(
 }
 
 // ===========================================================================
+// NotifyResourceStates
+//   Notifies Unity about the post-dispatch state of each resource.
+//   The UAVAccess=true flag on UAV resources is critical: it tells Unity
+//   to insert a UAV barrier before the next use of that resource, even
+//   when the state does not change (UAV -> UAV write-after-write hazard).
+// ===========================================================================
+
+template<typename ShaderT>
+void DescriptorSetBase<ShaderT>::NotifyResourceStates(
+    const BindingSlot* slots, uint32_t slotCount)
+{
+    if (!m_d3d12v8) return;
+    const auto& bindings = m_shader->GetBindings();
+
+    for (size_t i = 0; i < bindings.size(); ++i)
+    {
+        const auto& b = bindings[i];
+        const BindingSlot& slot = (i < slotCount) ? slots[i] : BindingSlot{};
+        ID3D12Resource* res = reinterpret_cast<ID3D12Resource*>(slot.resourcePtr);
+
+        if (b.type == BindingType::UAV && res)
+        {
+            m_d3d12v8->NotifyResourceState(res, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, /*UAVAccess=*/true);
+        }
+        else if (b.type == BindingType::UAV_ARRAY &&
+                 slot.objectKind == BindingObjectKind::BindlessUAVTexture && slot.objectPtr)
+        {
+            if (res)
+                m_d3d12v8->NotifyResourceState(res, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, /*UAVAccess=*/true);
+        }
+    }
+}
+
+// ===========================================================================
 // ValidateBindings
 // ===========================================================================
 

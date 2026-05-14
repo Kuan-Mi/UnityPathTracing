@@ -20,4 +20,5 @@ void ComputeDescriptorSet::Dispatch(
     BindRootParams(cmdList, slots, slotCount, slotIdx);
     RequestResourceStates(slots, slotCount);
     cmdList->Dispatch(threadGroupX, threadGroupY, threadGroupZ);
+    NotifyResourceStates(slots, slotCount);
 }

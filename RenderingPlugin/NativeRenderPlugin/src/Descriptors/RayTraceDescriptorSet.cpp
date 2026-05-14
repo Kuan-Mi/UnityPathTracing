@@ -37,4 +37,5 @@ void RayTraceDescriptorSet::Dispatch(
     drd.Height = height;
     drd.Depth  = 1;
     cmdList->DispatchRays(&drd);
+    NotifyResourceStates(slots, slotCount);
 }

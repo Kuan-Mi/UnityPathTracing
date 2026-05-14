@@ -47,6 +47,7 @@ protected:
     bool AllocateAndWriteDescriptors(const BindingSlot* slots, uint32_t slotCount, uint32_t slotIdx);
     void UpdateDescriptors          (const BindingSlot* slots, uint32_t slotCount, uint32_t slotIdx);
     void RequestResourceStates      (const BindingSlot* slots, uint32_t slotCount);
+    void NotifyResourceStates       (const BindingSlot* slots, uint32_t slotCount);
 
     // --- Dispatch helpers ---
 
