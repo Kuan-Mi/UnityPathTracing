@@ -19,9 +19,6 @@ namespace NativeRender
     [ScriptedImporter(1, "rayshader", 0)]
     public class RayTraceShaderImporter : ScriptedImporter
     {
-        [Tooltip("当设置为 True 时，该 .hlsl 文件将作为 RayTraceShader 资产导入。")]
-        public bool isRayTraceShader = false;
-
         [Tooltip("Additional #include search directories (absolute paths). The shader file's own directory is always included automatically.")]
         public string[] additionalIncludePaths = Array.Empty<string>();
 
@@ -37,11 +34,11 @@ namespace NativeRender
         [Tooltip("MaxPayloadSizeInBytes passed to D3D12 CreateStateObject. Must be >= the size of all payload structs used in the shader. Default 4 (uint = no real payload).")]
         public uint maxPayloadSizeInBytes = 4;
 
+        [Tooltip("Name of the RayGeneration shader entry point to use for DispatchRays. Leave empty to use the first discovered RayGen shader.")]
+        public string rayGenName = "";
+
         public override void OnImportAsset(AssetImportContext ctx)
         {
-            if (!isRayTraceShader)
-                return;
-
             var asset = ScriptableObject.CreateInstance<RayTraceShader>();
 
             // Write private serialized fields via SerializedObject.
@@ -105,6 +102,9 @@ namespace NativeRender
             var payloadSizeProp = so.FindProperty("_maxPayloadSizeInBytes");
             payloadSizeProp.longValue = maxPayloadSizeInBytes;
 
+            var rayGenNameProp = so.FindProperty("_rayGenName");
+            rayGenNameProp.stringValue = rayGenName ?? "";
+
             so.ApplyModifiedPropertiesWithoutUndo();
 
             ctx.AddObjectToAsset("RayTraceShader", asset);
@@ -131,7 +131,6 @@ namespace NativeRender
             if (targets.Length != 1) return;
 
             var importer = (RayTraceShaderImporter)target;
-            if (!importer.isRayTraceShader) return;
 
             var shader = AssetDatabase.LoadAssetAtPath<RayTraceShader>(importer.assetPath);
             if (shader == null) return;

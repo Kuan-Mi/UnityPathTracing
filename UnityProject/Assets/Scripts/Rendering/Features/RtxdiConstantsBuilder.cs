@@ -35,6 +35,7 @@ namespace PathTracing
             restirDIContext.SetResamplingMode(setting.diResamplingMode);
             restirDIContext.SetInitialSamplingParameters(setting.initialSamplingParams);
             restirDIContext.SetTemporalResamplingParameters(setting.temporalResamplingParams);
+            restirDIContext.SetBoilingFilterParameters(setting.boilingFilterParams);
             restirDIContext.SetSpatialResamplingParameters(setting.spatialResamplingParams);
             restirDIContext.SetShadingParameters(setting.shadingParams);
 

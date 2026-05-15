@@ -53,11 +53,15 @@ bool RayTraceShader::Initialize(ID3D12Device5* device, IUnityLog* log,
 // ---------------------------------------------------------------------------
 bool RayTraceShader::LoadShaderFromBytes(const uint8_t* dxilBytes, uint32_t size,
                                           const char* name, uint32_t flags,
-                                          uint32_t maxPayloadSizeInBytes)
+                                          uint32_t maxPayloadSizeInBytes,
+                                          const char* rayGenName)
 {
     m_name = (name && name[0]) ? name : "RayTraceShader";
     m_allowOpacityMicromaps = (flags & 1u) != 0;
     m_maxPayloadSizeInBytes = maxPayloadSizeInBytes > 0 ? maxPayloadSizeInBytes : 4;
+    m_rayGenName = (rayGenName && rayGenName[0])
+        ? std::wstring(rayGenName, rayGenName + strlen(rayGenName))
+        : L"";
 
     if (!dxilBytes || size == 0)
     {
@@ -432,7 +436,40 @@ bool RayTraceShader::BuildShaderTable()
         return buf;
     };
 
-    m_rayGenTable = MakeTable("RayGen", { m_rayGenShaders[0] });
+    // Select raygen by name if specified, otherwise fall back to [0]
+    std::wstring selectedRayGen = m_rayGenShaders[0];
+    if (!m_rayGenName.empty())
+    {
+        bool found = false;
+        for (const auto& rg : m_rayGenShaders)
+        {
+            if (rg == m_rayGenName)
+            {
+                selectedRayGen = rg;
+                found = true;
+                break;
+            }
+        }
+        if (!found)
+        {
+            char nameA[256] = {};
+            WideCharToMultiByte(CP_UTF8, 0, m_rayGenName.c_str(), -1, nameA, sizeof(nameA)-1, nullptr, nullptr);
+            // List available raygen shaders to help diagnose the problem
+            std::string available;
+            for (const auto& rg : m_rayGenShaders)
+            {
+                char tmp[256] = {};
+                WideCharToMultiByte(CP_UTF8, 0, rg.c_str(), -1, tmp, sizeof(tmp)-1, nullptr, nullptr);
+                if (!available.empty()) available += ", ";
+                available += tmp;
+            }
+            Logf(kUnityLogTypeError,
+                 "RayTraceShader: requested rayGenName '%s' not found in shader library. Available: [%s]",
+                 nameA, available.c_str());
+            return false;
+        }
+    }
+    m_rayGenTable = MakeTable("RayGen", { selectedRayGen });
     m_missTable   = MakeTable("Miss",   m_missShaders);
     std::vector<std::wstring> hgNames;
     hgNames.reserve(m_hitGroups.size());

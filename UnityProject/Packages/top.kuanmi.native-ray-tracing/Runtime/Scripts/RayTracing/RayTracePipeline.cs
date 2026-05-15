@@ -69,7 +69,8 @@ namespace NativeRender
             uint flags = ProfileSupportsOpacityMicromaps(shader.TargetProfile) ? 1u : 0u;
             uint maxPayload = shader.MaxPayloadSizeInBytes;
             Debug.Log($"[RayTracePipeline] Creating pipeline for: {shader.name} (DXIL size: {dxil.Length} bytes, OMM support: {flags != 0}, MaxPayload: {maxPayload})");
-            _handle = NativeRenderPlugin.NR_CreateRayTraceShaderFromBytes(dxil, (uint)dxil.Length, shader.name, flags, maxPayload);
+            string rayGenName = string.IsNullOrEmpty(shader.RayGenName) ? null : shader.RayGenName;
+            _handle = NativeRenderPlugin.NR_CreateRayTraceShaderFromBytes(dxil, (uint)dxil.Length, shader.name, flags, maxPayload, rayGenName);
             if (_handle == 0)
                 throw new InvalidOperationException(
                     $"[RayTracePipeline] NR_CreateRayTraceShaderFromBytes returned 0 for: {shader.name}");

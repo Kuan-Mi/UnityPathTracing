@@ -32,10 +32,12 @@ public:
     // Build DXR pipeline from pre-compiled DXIL lib bytes.
     // flags: bit 0 = allow D3D12_RAYTRACING_PIPELINE_FLAG_ALLOW_OPACITY_MICROMAPS (lib_6_9+).
     // maxPayloadSizeInBytes: MaxPayloadSizeInBytes for D3D12_RAYTRACING_SHADER_CONFIG.
+    // rayGenName: RayGeneration entry point to use for DispatchRays. Null/empty = first discovered.
     bool LoadShaderFromBytes(const uint8_t* dxilBytes, uint32_t size,
                              const char* name = nullptr,
                              uint32_t flags = 0,
-                             uint32_t maxPayloadSizeInBytes = 4);
+                             uint32_t maxPayloadSizeInBytes = 4,
+                             const char* rayGenName = nullptr);
 
     // Allow Opacity Micromaps in the pipeline (requires lib_6_9+ DXIL and GPU support).
     void SetAllowOpacityMicromaps(bool allow) { m_allowOpacityMicromaps = allow; }
@@ -72,7 +74,8 @@ private:
     ComPtr<ID3D12Resource> m_hitGroupTable;
 
     // Shader entry points
-    std::vector<std::wstring>                m_rayGenShaders;  // [0] used for Dispatch
+    std::vector<std::wstring>                m_rayGenShaders;  // all discovered; m_rayGenName selects which one
+    std::wstring                             m_rayGenName;     // requested entry; empty = use [0]
     std::vector<std::wstring>                m_missShaders;
     std::vector<HitGroupInfo>                m_hitGroups;
     std::unordered_map<std::wstring, size_t> m_hitGroupIndex;  // groupKey → index

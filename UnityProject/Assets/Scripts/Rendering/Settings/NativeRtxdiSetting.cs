@@ -1,3 +1,4 @@
+using Rtxdi;
 using Rtxdi.DI;
 using Rtxdi.GI;
 using Rtxdi.PT;
@@ -51,23 +52,25 @@ namespace PathTracing
 
         /// <summary>Use the DXR ray-tracing shader variant for GenerateInitialSamples instead of the compute shader.</summary>
         public bool useRayTracingForDIGenerateInitialSamples = false;
-        public bool useRayTracingForDITemporalResampling     = false;
-        public bool useRayTracingForDISpatialResampling      = false;
-        public bool useRayTracingForDIShadeSamples           = false;
+
+        public bool useRayTracingForDITemporalResampling = false;
+        public bool useRayTracingForDISpatialResampling  = false;
+        public bool useRayTracingForDIShadeSamples       = false;
 
         public RTXDI_DIInitialSamplingParameters    initialSamplingParams    = ReSTIRDIDefaults.GetDefaultInitialSamplingParams();
         public RTXDI_DITemporalResamplingParameters temporalResamplingParams = ReSTIRDIDefaults.GetDefaultTemporalResamplingParams();
+        public RTXDI_BoilingFilterParameters        boilingFilterParams      = ReSTIRDIDefaults.GetDefaultBoilingFilterParams();
         public RTXDI_DISpatialResamplingParameters  spatialResamplingParams  = ReSTIRDIDefaults.GetDefaultSpatialResamplingParams();
         public RTXDI_ShadingParameters              shadingParams            = ReSTIRDIDefaults.GetDefaultShadingParams();
 
         [FoldoutHeader("ReSTIR GI")]
         public ReSTIRGI_ResamplingMode giResamplingMode = ReSTIRGI_ResamplingMode.TemporalAndSpatial;
 
-        public bool useRayTracingForBrdfRayTracing           = false;
-        public bool useRayTracingForShadeSecondarySurfaces   = false;
-        public bool useRayTracingForGITemporalResampling     = false;
-        public bool useRayTracingForGISpatialResampling      = false;
-        public bool useRayTracingForGIFinalShading           = false;
+        public bool useRayTracingForBrdfRayTracing         = false;
+        public bool useRayTracingForShadeSecondarySurfaces = false;
+        public bool useRayTracingForGITemporalResampling   = false;
+        public bool useRayTracingForGISpatialResampling    = false;
+        public bool useRayTracingForGIFinalShading         = false;
 
         public RTXDI_GITemporalResamplingParameters giTemporalResamplingParams = ReSTIRGIDefaults.GetDefaultTemporalResamplingParams();
         public RTXDI_GISpatialResamplingParameters  giSpatialResamplingParams  = ReSTIRGIDefaults.GetDefaultSpatialResamplingParams();

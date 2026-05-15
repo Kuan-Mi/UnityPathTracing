@@ -1,0 +1,24 @@
+fileFormatVersion: 2
+guid: fd6d33330a3e97e43ac449908a5fe035
+ScriptedImporter:
+  internalIDToNameTable: []
+  externalObjects: {}
+  serializedVersion: 2
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+  script: {fileID: 11500000, guid: edebcba6c71d5754a859601f2a711697, type: 3}
+  additionalIncludePaths:
+  - ../RenderingPlugin/External/RTXPT/Rtxpt/Lighting
+  - ../RenderingPlugin/External/RTXPT/Rtxpt
+  - ../RenderingPlugin/External/RTXPT/External/Nrd/Shaders/Include
+  - ../RenderingPlugin/External/RTXPT/External/Rtxdi/Include
+  - ../RenderingPlugin/External/RTXPT/External
+  - ../RenderingPlugin/External/donut/include
+  - ../RenderingPlugin/External/RTXPT/Rtxpt/Shaders
+  extraArgs: []
+  defines:
+  - PATH_TRACER_MODE=PATH_TRACER_MODE_FILL_STABLE_PLANES
+  targetProfile: lib_6_9
+  maxPayloadSizeInBytes: 4
+  rayGenName: RayGen_FILL

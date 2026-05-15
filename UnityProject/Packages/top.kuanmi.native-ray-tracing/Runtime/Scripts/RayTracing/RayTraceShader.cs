@@ -34,6 +34,10 @@ namespace NativeRender
         [SerializeField, HideInInspector]
         private uint _maxPayloadSizeInBytes = 4;
 
+        /// <summary>RayGeneration entry point name to use for DispatchRays. Empty = use first discovered.</summary>
+        [SerializeField, HideInInspector]
+        private string _rayGenName = "";
+
         /// <summary>Pre-compiled DXIL bytecode. Populated by EnsureCompiled(); persisted by Unity serialization.</summary>
         [SerializeField, HideInInspector]
         private byte[] _compiledDxil;
@@ -50,6 +54,9 @@ namespace NativeRender
 
         /// <summary>MaxPayloadSizeInBytes to pass to D3D12 CreateStateObject.</summary>
         public uint MaxPayloadSizeInBytes => _maxPayloadSizeInBytes > 0 ? _maxPayloadSizeInBytes : 4;
+
+        /// <summary>RayGeneration entry point name to use for DispatchRays. Null/empty = first discovered.</summary>
+        public string RayGenName => _rayGenName;
 
         /// <summary>JSON reflection data produced after the last successful compilation. Empty when not yet compiled.</summary>
         public string ReflectionJson => _reflectionJson ?? "";

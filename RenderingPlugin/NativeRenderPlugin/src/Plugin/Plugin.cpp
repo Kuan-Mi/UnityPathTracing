@@ -665,10 +665,11 @@ NR_DestroyRayTraceShader(uint64_t handle)
 //   uint64 handle on success, 0 on failure.
 //   flags: bit 0 = D3D12_RAYTRACING_PIPELINE_FLAG_ALLOW_OPACITY_MICROMAPS (only pass when target profile >= lib_6_9).
 //   maxPayloadSizeInBytes: MaxPayloadSizeInBytes for D3D12_RAYTRACING_SHADER_CONFIG.
+//   rayGenName: Name of the RayGeneration entry point to use for DispatchRays. Null or empty = first discovered.
 //   Caller owns the lifetime; call NR_DestroyRayTraceShader when done.
 // ---------------------------------------------------------------------------
 extern "C" uint64_t UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API
-NR_CreateRayTraceShaderFromBytes(const uint8_t* dxilBytes, uint32_t size, const char* name, uint32_t flags = 0, uint32_t maxPayloadSizeInBytes = 4)
+NR_CreateRayTraceShaderFromBytes(const uint8_t* dxilBytes, uint32_t size, const char* name, uint32_t flags = 0, uint32_t maxPayloadSizeInBytes = 4, const char* rayGenName = nullptr)
 {
     if (!s_RendererReady)
     {
@@ -684,7 +685,7 @@ NR_CreateRayTraceShaderFromBytes(const uint8_t* dxilBytes, uint32_t size, const 
     }
     auto* shader = new RayTraceShader();
     if (!shader->Initialize(dev5, s_Log, &s_DescHeap, s_D3D12v8) ||
-        !shader->LoadShaderFromBytes(dxilBytes, size, name, flags, maxPayloadSizeInBytes))
+        !shader->LoadShaderFromBytes(dxilBytes, size, name, flags, maxPayloadSizeInBytes, rayGenName))
     {
         delete shader;
         dev5->Release();
