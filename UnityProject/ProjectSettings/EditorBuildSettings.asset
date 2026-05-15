@@ -8,6 +8,9 @@ EditorBuildSettings:
   - enabled: 1
     path: Assets/Gltf/BistroInterior.unity
     guid: fde80c6f946b47545bcaa37aa4ec6c64
+  - enabled: 1
+    path: Assets/Gltf/BistroExterior.unity
+    guid: 1bdb4a44586c16e41a76056b2cdb15ae
   - enabled: 0
     path: Assets/Scenes/NRDSample.unity
     guid: a9fec97d90fc4e149938fbbb34d3c87b
