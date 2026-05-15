@@ -74,7 +74,7 @@ MonoBehaviour:
     showMV: 0
     cameraJitter: 1
     sunAngularDiameter: 0.533
-    exposure: 1
+    exposure: 50
     roughnessOverride: 0
     metalnessOverride: 0
     emissionIntensityLights: 1
@@ -97,12 +97,12 @@ MonoBehaviour:
     normalMap: 1
     TAA: 1
     emission: 1
-    importanceSampling: 1
+    importanceSampling: 0
     specularLobeTrimming: 1
     adaptiveAccumulation: 1
     usePrevFrame: 1
     boost: 0
-    SR: 0
+    SR: 1
     RR: 0
     tmpDisableRR: 0
     upscalerMode: 0

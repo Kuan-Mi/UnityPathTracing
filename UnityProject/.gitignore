@@ -93,3 +93,11 @@ Assets/OMMCaches.meta
 # Generated reflection dumps
 *.computeshader.reflection.json
 *.computeshader.reflection.json.meta
+
+# Bistro scene data (downloaded by download_bistro.bat)
+Assets/Gltf/BistroInterior.bin
+Assets/Gltf/BistroInterior.bin.meta
+Assets/Gltf/BistroExterior.bin
+Assets/Gltf/BistroExterior.bin.meta
+Assets/Gltf/Textures/
+Assets/Gltf/Textures.meta
