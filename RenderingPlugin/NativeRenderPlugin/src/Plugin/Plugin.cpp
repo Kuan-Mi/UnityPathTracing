@@ -696,7 +696,65 @@ NR_CreateRayTraceShaderFromBytes(const uint8_t* dxilBytes, uint32_t size, const 
 }
 
 // ---------------------------------------------------------------------------
-// Resource binding helpers (return 1 on success, 0 if name not found)
+// NR_CreateRayTracePipelineFromBlobs
+//   Builds a DXR pipeline from N pre-compiled DXIL blobs merged into one RTPSO.
+//
+//   blobDataPtrs   : array of pointers to DXIL bytes (length = blobCount)
+//   blobSizes      : array of sizes in bytes (length = blobCount)
+//   blobCount      : number of blobs
+//     blob[0]      : raygen + miss shaders
+//     blob[1..N-1] : additional hit-group blobs (per-material permutations)
+//
+//   All other parameters match NR_CreateRayTraceShaderFromBytes.
+//   Returns an opaque uint64 handle on success, 0 on failure.
+//   Caller owns the lifetime; call NR_DestroyRayTraceShader when done.
+// ---------------------------------------------------------------------------
+extern "C" uint64_t UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API
+NR_CreateRayTracePipelineFromBlobs(
+    const uint8_t** blobDataPtrs,
+    const uint32_t* blobSizes,
+    uint32_t        blobCount,
+    const char*     name,
+    uint32_t        flags,
+    uint32_t        maxPayloadSizeInBytes,
+    const char*     rayGenName)
+{
+    if (!s_RendererReady)
+    {
+        NR_WARN("NR_CreateRayTracePipelineFromBlobs: renderer not ready");
+        return 0;
+    }
+    if (!blobDataPtrs || !blobSizes || blobCount == 0)
+    {
+        NR_WARN("NR_CreateRayTracePipelineFromBlobs: invalid arguments");
+        return 0;
+    }
+
+    ID3D12Device5* dev5 = nullptr;
+    ID3D12Device*  base = s_D3D12->GetDevice();
+    if (!base || FAILED(base->QueryInterface(IID_PPV_ARGS(&dev5))))
+    {
+        NR_ERROR("NR_CreateRayTracePipelineFromBlobs: failed to obtain ID3D12Device5");
+        return 0;
+    }
+
+    // Build BlobDesc array
+    std::vector<RayTraceShader::BlobDesc> descs(blobCount);
+    for (uint32_t i = 0; i < blobCount; ++i)
+        descs[i] = { blobDataPtrs[i], blobSizes[i] };
+
+    auto* shader = new RayTraceShader();
+    if (!shader->Initialize(dev5, s_Log, &s_DescHeap, s_D3D12v8) ||
+        !shader->LoadShaderFromMultipleBlobs(descs.data(), blobCount, name, flags,
+                                             maxPayloadSizeInBytes, rayGenName))
+    {
+        delete shader;
+        dev5->Release();
+        return 0;
+    }
+    dev5->Release();
+    return reinterpret_cast<uint64_t>(shader);
+}
 // ---------------------------------------------------------------------------
 // ---------------------------------------------------------------------------
 // NR_RTS_GetRenderEventFunc / NR_RTS_GetRenderEventDataSize

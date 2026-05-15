@@ -29,7 +29,7 @@ public:
     bool Initialize(ID3D12Device5* device, IUnityLog* log,
                     DescriptorHeapAllocator* allocator, IUnityGraphicsD3D12v8* d3d12v8);
 
-    // Build DXR pipeline from pre-compiled DXIL lib bytes.
+    // Build DXR pipeline from a single pre-compiled DXIL lib blob.
     // flags: bit 0 = allow D3D12_RAYTRACING_PIPELINE_FLAG_ALLOW_OPACITY_MICROMAPS (lib_6_9+).
     // maxPayloadSizeInBytes: MaxPayloadSizeInBytes for D3D12_RAYTRACING_SHADER_CONFIG.
     // rayGenName: RayGeneration entry point to use for DispatchRays. Null/empty = first discovered.
@@ -38,6 +38,17 @@ public:
                              uint32_t flags = 0,
                              uint32_t maxPayloadSizeInBytes = 4,
                              const char* rayGenName = nullptr);
+
+    // Build DXR pipeline from multiple DXIL blobs.
+    // blobs[0]        : raygen + miss shaders
+    // blobs[1..N-1]   : additional hit-group blobs (each compiled with distinct RTXPT_MATERIAL_PERMUTATION_NAME)
+    // Each blob is reflected independently; bindings are de-duplicated across blobs.
+    struct BlobDesc { const uint8_t* data; uint32_t size; };
+    bool LoadShaderFromMultipleBlobs(const BlobDesc* blobs, uint32_t blobCount,
+                                     const char* name = nullptr,
+                                     uint32_t flags = 0,
+                                     uint32_t maxPayloadSizeInBytes = 4,
+                                     const char* rayGenName = nullptr);
 
     // Allow Opacity Micromaps in the pipeline (requires lib_6_9+ DXIL and GPU support).
     void SetAllowOpacityMicromaps(bool allow) { m_allowOpacityMicromaps = allow; }
@@ -54,7 +65,9 @@ public:
 
 private:
     bool ReflectBindings(IDxcBlob* shaderLib);
-    bool BuildPipeline  (IDxcBlob* shaderLib);
+    bool ReflectBindingsFromBlob(IDxcBlob* shaderLib); // reflects into existing state (no reset)
+    bool BuildPipeline  (const std::vector<ComPtr<IDxcBlob>>& libs);
+    bool BuildPipeline  (IDxcBlob* shaderLib); // single-blob convenience
     bool BuildShaderTable();
 
     // Hit group info — one per discovered (ClosestHit*/AnyHit*) group

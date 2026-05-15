@@ -20,7 +20,8 @@ namespace NativeRender
     public sealed class RayTracePipeline : IDisposable
     {
         private ulong _handle;
-        private RayTraceShader _shader;
+        private RayTraceShader  _shader;
+        private HitGroupShader[] _hitGroupShaders; // null when not using multi-blob path
 
         /// <summary>True if the underlying D3D12 pipeline is valid and ready to dispatch.</summary>
         public bool IsValid => _handle != 0;
@@ -59,6 +60,31 @@ namespace NativeRender
             RayTraceShader.OnRecompiled += OnShaderRecompiled;
         }
 
+        /// <summary>
+        /// Creates a DXR pipeline from a primary shader (raygen + miss) and one or more
+        /// <see cref="HitGroupShader"/> blobs (per-material hit-group permutations).
+        /// All blobs are merged into one RTPSO.
+        ///
+        /// <paramref name="primaryShader"/> must contain at least one RayGeneration and one Miss entry.
+        /// <paramref name="hitGroupShaders"/> must not be null or empty; use the single-shader
+        /// constructor when no extra hit groups are needed.
+        /// </summary>
+        public RayTracePipeline(RayTraceShader primaryShader, HitGroupShader[] hitGroupShaders)
+        {
+            if (primaryShader == null)
+                throw new ArgumentNullException(nameof(primaryShader));
+            if (hitGroupShaders == null || hitGroupShaders.Length == 0)
+                throw new ArgumentException("Use the single-shader constructor when there are no extra hit groups.",
+                    nameof(hitGroupShaders));
+
+            _shader          = primaryShader;
+            _hitGroupShaders = hitGroupShaders;
+
+            BuildNativeHandleMultiBlob(primaryShader, hitGroupShaders);
+            RayTraceShader.OnRecompiled  += OnShaderRecompiled;
+            HitGroupShader.OnRecompiled  += OnHitGroupShaderRecompiled;
+        }
+
         private void BuildNativeHandle(RayTraceShader shader)
         {
             byte[] dxil = shader.GetOrCompileDxil();
@@ -74,6 +100,60 @@ namespace NativeRender
             if (_handle == 0)
                 throw new InvalidOperationException(
                     $"[RayTracePipeline] NR_CreateRayTraceShaderFromBytes returned 0 for: {shader.name}");
+
+            RefreshSlotLayout();
+        }
+
+        private void BuildNativeHandleMultiBlob(RayTraceShader primaryShader, HitGroupShader[] hitGroupShaders)
+        {
+            int totalBlobs = 1 + hitGroupShaders.Length;
+            byte[][]  dxils = new byte[totalBlobs][];
+            GCHandle[] pins  = new GCHandle[totalBlobs];
+
+            try
+            {
+                // Compile all blobs
+                dxils[0] = primaryShader.GetOrCompileDxil();
+                if (dxils[0] == null || dxils[0].Length == 0)
+                    throw new InvalidOperationException(
+                        $"[RayTracePipeline] Compilation failed for primary shader: {primaryShader.GetHlslPath()}");
+
+                for (int i = 0; i < hitGroupShaders.Length; ++i)
+                {
+                    dxils[i + 1] = hitGroupShaders[i].GetOrCompileDxil();
+                    if (dxils[i + 1] == null || dxils[i + 1].Length == 0)
+                        throw new InvalidOperationException(
+                            $"[RayTracePipeline] Compilation failed for hit-group shader[{i}]: {hitGroupShaders[i].GetHlslPath()}");
+                }
+
+                // Pin all byte arrays and build pointer / size arrays
+                IntPtr[] ptrs  = new IntPtr[totalBlobs];
+                uint[]   sizes = new uint[totalBlobs];
+                for (int i = 0; i < totalBlobs; ++i)
+                {
+                    pins[i]  = GCHandle.Alloc(dxils[i], GCHandleType.Pinned);
+                    ptrs[i]  = pins[i].AddrOfPinnedObject();
+                    sizes[i] = (uint)dxils[i].Length;
+                }
+
+                uint flags      = ProfileSupportsOpacityMicromaps(primaryShader.TargetProfile) ? 1u : 0u;
+                uint maxPayload = primaryShader.MaxPayloadSizeInBytes;
+                string rayGenName = string.IsNullOrEmpty(primaryShader.RayGenName) ? null : primaryShader.RayGenName;
+
+                Debug.Log($"[RayTracePipeline] Creating multi-blob pipeline for '{primaryShader.name}' ({totalBlobs} blobs)");
+                _handle = NativeRenderPlugin.NR_CreateRayTracePipelineFromBlobs(
+                    ptrs, sizes, (uint)totalBlobs,
+                    primaryShader.name, flags, maxPayload, rayGenName);
+
+                if (_handle == 0)
+                    throw new InvalidOperationException(
+                        $"[RayTracePipeline] NR_CreateRayTracePipelineFromBlobs returned 0 for: {primaryShader.name}");
+            }
+            finally
+            {
+                foreach (var pin in pins)
+                    if (pin.IsAllocated) pin.Free();
+            }
 
             RefreshSlotLayout();
         }
@@ -115,8 +195,19 @@ namespace NativeRender
         private void OnShaderRecompiled(RayTraceShader shader)
         {
             if (shader != _shader) return;
+            RebuildPipeline();
+        }
 
-            // Destroy the old native pipeline and rebuild from the freshly compiled DXIL.
+        private void OnHitGroupShaderRecompiled(HitGroupShader shader)
+        {
+            // Rebuild whenever any of our hit-group blobs changes.
+            if (_hitGroupShaders == null) return;
+            foreach (var hg in _hitGroupShaders)
+                if (hg == shader) { RebuildPipeline(); return; }
+        }
+
+        private void RebuildPipeline()
+        {
             if (_handle != 0)
             {
                 GL.Flush();
@@ -126,8 +217,11 @@ namespace NativeRender
 
             try
             {
-                BuildNativeHandle(shader);
-                Debug.Log($"[RayTracePipeline] Rebuilt pipeline for: {shader.name}");
+                if (_hitGroupShaders != null && _hitGroupShaders.Length > 0)
+                    BuildNativeHandleMultiBlob(_shader, _hitGroupShaders);
+                else
+                    BuildNativeHandle(_shader);
+                Debug.Log($"[RayTracePipeline] Rebuilt pipeline for: {_shader.name}");
                 OnRebuilt?.Invoke(this);
             }
             catch (Exception e)
@@ -142,7 +236,8 @@ namespace NativeRender
 
         public void Dispose()
         {
-            RayTraceShader.OnRecompiled -= OnShaderRecompiled;
+            RayTraceShader.OnRecompiled  -= OnShaderRecompiled;
+            HitGroupShader.OnRecompiled  -= OnHitGroupShaderRecompiled;
 
             if (_handle != 0)
             {
@@ -150,8 +245,6 @@ namespace NativeRender
                 NativeRenderPlugin.NR_DestroyRayTraceShader(_handle);
                 _handle = 0;
             }
-
-
         }
 
         // -------------------------------------------------------------------

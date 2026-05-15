@@ -37,15 +37,24 @@ namespace PathTracing
         public NativeRtxptPathTracerPass(
             RayTraceShader buildStablePlanes,
             RayTraceShader fillStablePlanes,
-            RayTraceShader reference)
+            RayTraceShader reference,
+            HitGroupShader[] buildHitGroups   = null,
+            HitGroupShader[] fillHitGroups    = null,
+            HitGroupShader[] referenceHitGroups = null)
         {
-            _buildSP = new RayTracePipeline(buildStablePlanes);
+            _buildSP = buildHitGroups is { Length: > 0 }
+                ? new RayTracePipeline(buildStablePlanes, buildHitGroups)
+                : new RayTracePipeline(buildStablePlanes);
             _buildDs = new NativeRayTraceDescriptorSet(_buildSP);
 
-            _fillSP = new RayTracePipeline(fillStablePlanes);
+            _fillSP = fillHitGroups is { Length: > 0 }
+                ? new RayTracePipeline(fillStablePlanes, fillHitGroups)
+                : new RayTracePipeline(fillStablePlanes);
             _fillDs = new NativeRayTraceDescriptorSet(_fillSP);
 
-            _refSP = new RayTracePipeline(reference);
+            _refSP = referenceHitGroups is { Length: > 0 }
+                ? new RayTracePipeline(reference, referenceHitGroups)
+                : new RayTracePipeline(reference);
             _refDs = new NativeRayTraceDescriptorSet(_refSP);
 
             _miniConstBuffer = new GraphicsBuffer(

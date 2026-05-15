@@ -38,6 +38,11 @@ namespace PathTracing
         public RayTraceShader fillStablePlanesShader;
         public RayTraceShader referenceShader;
 
+        // Phase 2: per-pipeline extra hit-group blobs
+        public HitGroupShader[] buildHitGroups;
+        public HitGroupShader[] fillHitGroups;
+        public HitGroupShader[] referenceHitGroups;
+
         // Phase 3
         public NativeComputeShader exportVisibilityBufferCs;
         // Phase 4
@@ -93,7 +98,8 @@ namespace PathTracing
                 && referenceShader         != null)
             {
                 _pathTracerPass = new NativeRtxptPathTracerPass(
-                    buildStablePlanesShader, fillStablePlanesShader, referenceShader)
+                    buildStablePlanesShader, fillStablePlanesShader, referenceShader,
+                    buildHitGroups, fillHitGroups, referenceHitGroups)
                 { renderPassEvent = renderPassEvent };
             }
 

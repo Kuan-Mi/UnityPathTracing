@@ -150,9 +150,24 @@ namespace NativeRender
         [DllImport(DllName)]
         public static extern ulong NR_CreateRayTraceShaderFromBytes(byte[] dxilBytes, uint size, string name, uint flags = 0, uint maxPayloadSizeInBytes = 4, string rayGenName = null);
 
-        // -------------------------------------------------------------------
-        // RayTraceDescriptorSet API
-        // -------------------------------------------------------------------
+        /// <summary>
+        /// Builds a DXR pipeline from N pre-compiled DXIL blobs merged into one RTPSO.
+        /// blobDataPtrs[0] must contain raygen + miss shaders.
+        /// blobDataPtrs[1..N-1] contain additional hit-group blobs (per-material permutations).
+        /// All blobs are pinned by the caller for the duration of this call.
+        /// Returns an opaque handle on success, 0 on failure.
+        /// </summary>
+        [DllImport(DllName)]
+        public static extern ulong NR_CreateRayTracePipelineFromBlobs(
+            [In] IntPtr[] blobDataPtrs,
+            [In] uint[]   blobSizes,
+            uint          blobCount,
+            string        name,
+            uint          flags,
+            uint          maxPayloadSizeInBytes,
+            string        rayGenName);
+
+
 
         /// <summary>Creates a RayTraceDescriptorSet bound to the given shader handle. Returns 0 on failure.</summary>
         [DllImport(DllName)]

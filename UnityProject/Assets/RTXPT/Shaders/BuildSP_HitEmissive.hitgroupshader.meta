@@ -1,5 +1,5 @@
 fileFormatVersion: 2
-guid: be311863611ef33419d1a1aead5b64a0
+guid: f2211fa4e496d5a4a82f6b4a069cdc08
 ScriptedImporter:
   internalIDToNameTable: []
   externalObjects: {}
@@ -7,7 +7,7 @@ ScriptedImporter:
   userData: 
   assetBundleName: 
   assetBundleVariant: 
-  script: {fileID: 11500000, guid: edebcba6c71d5754a859601f2a711697, type: 3}
+  script: {fileID: 11500000, guid: 95541f6964d24494cb2e70ab0bbba6e7, type: 3}
   additionalIncludePaths:
   - ../RenderingPlugin/External/RTXPT/Rtxpt/Lighting
   - ../RenderingPlugin/External/RTXPT/Rtxpt
@@ -20,6 +20,7 @@ ScriptedImporter:
   defines:
   - PATH_TRACER_MODE=PATH_TRACER_MODE_BUILD_STABLE_PLANES
   - RTXPT_PIPELINE_PERMUTATION_NAME=BUILD
+  - RTXPT_MATERIAL_PERMUTATION_NAME=BUILD_Emissive
+  - RTXPT_MATERIAL_IS_EMISSIVE=1
+  - RTXPT_MATERIAL_IS_ANALYTIC_LIGHT_PROXY=0
   targetProfile: lib_6_9
-  maxPayloadSizeInBytes: 4
-  rayGenName: RayGen_BUILD
