@@ -14,6 +14,7 @@ git submodule update --init RenderingPlugin/External/RTXDI-Library
 git submodule update --init RenderingPlugin/External/RTXPT
 git submodule update --init RenderingPlugin/External/NRD-Sample
 git submodule update --init RenderingPlugin/External/RTXDI
+git submodule update --init RenderingPlugin/External/NVAPI
 if errorlevel 1 (
     echo [ERROR] git submodule update failed.
     exit /b 1

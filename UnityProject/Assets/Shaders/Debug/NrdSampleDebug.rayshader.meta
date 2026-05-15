@@ -15,3 +15,5 @@ ScriptedImporter:
   - -disable-payload-qualifiers
   - -enable-16bit-types
   defines: []
+  targetProfile: lib_6_9
+  maxPayloadSizeInBytes: 4

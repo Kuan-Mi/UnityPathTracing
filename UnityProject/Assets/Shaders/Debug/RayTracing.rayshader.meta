@@ -13,3 +13,5 @@ ScriptedImporter:
   extraArgs:
   - -disable-payload-qualifiers
   defines: []
+  targetProfile: lib_6_9
+  maxPayloadSizeInBytes: 4
