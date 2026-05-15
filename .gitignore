@@ -1,6 +1,7 @@
 ﻿.vs/
 .idea/
 .vscode/
+.claude/
 build/
 
 # Unity generated
