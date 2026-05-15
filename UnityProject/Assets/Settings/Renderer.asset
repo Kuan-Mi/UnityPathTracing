@@ -27,7 +27,8 @@ MonoBehaviour:
   m_RendererFeatures:
   - {fileID: 854432803363579010}
   - {fileID: 2424755221429042075}
-  m_RendererFeatureMap: 8264ed901b8edb0b9b3b8de80676a621
+  - {fileID: 5459658748897014939}
+  m_RendererFeatureMap: 8264ed901b8edb0b9b3b8de80676a6219b34dca2b49ac44b
   m_UseNativeRenderPass: 1
   xrSystemData: {fileID: 0}
   postProcessData: {fileID: 11400000, guid: 41439944d30ece34e96484bdb6645b55, type: 2}
@@ -68,7 +69,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 0851c2374f973ce42b0f91f849f0933f, type: 3}
   m_Name: NativeRtxdiFeature
   m_EditorClassIdentifier: Assembly-CSharp::PathTracing.NativeRtxdiFeature
-  m_Active: 1
+  m_Active: 0
   setting:
     environmentMap: {fileID: 0}
     environmentRotation: 0
@@ -2444,3 +2445,92 @@ MonoBehaviour:
   updateSkinnedPrimitivesCS: {fileID: 0}
   scramblingRankingTex: {fileID: 2800000, guid: ba45d1e4dcf9022438a4798a5f9e7b80, type: 3}
   sobolTex: {fileID: 2800000, guid: 17e7ce8147355314ea8aab1178a6a43c, type: 3}
+--- !u!114 &5459658748897014939
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 324cab2d455449e4b9e70b945e4d8e49, type: 3}
+  m_Name: NativeRtxptFeature
+  m_EditorClassIdentifier: Assembly-CSharp::PathTracing.NativeRtxptFeature
+  m_Active: 1
+  setting:
+    realtimeMode: 1
+    realtimeAA: 3
+    upscalerMode: 2
+    cameraJitter: 1
+    cameraAperture: 0
+    cameraFocalDistance: 10000
+    cameraMoveSpeed: 1
+    realtimeSamplesPerPixel: 1
+    bounceCount: 24
+    diffuseBounceCount: 3
+    texLODBias: -1.5
+    accumulationTarget: 4096
+    accumulationPreWarmRealtimeCaches: 1
+    accumulationAA: 1
+    useNEE: 1
+    neeType: 1
+    neeCandidateSamples: 5
+    neeFullSamples: 2
+    neeMisType: 1
+    neeatGlobalTemporalFeedbackWeight: 0.75
+    neeatLocalToGlobalSampleRatio: 0.65
+    neeatDistantVsLocalImportance: 1
+    useReSTIRDI: 0
+    useReSTIRGI: 0
+    normalMap: 1
+    specularLobeTrimming: 1
+    importanceSampling: 1
+    enableLDSamplerForBSDF: 1
+    indirectDiffuse: 1
+    indirectSpecular: 1
+    enableRussianRoulette: 1
+    emission: 1
+    nestedDielectricsQuality: 1
+    usePrevFrame: 1
+    useFp16Types: 1
+    allowPrimarySurfaceReplacement: 1
+    stablePlanesSuppressPrimaryIndirectSpecular: 1
+    stablePlanesSuppressPrimaryIndirectSpecularK: 0.6
+    stablePlanesActiveCount: 3
+    stablePlanesMaxVertexDepth: 9
+    stablePlanesSplitStopThreshold: 0.95
+    stablePlanesAntiAliasingFallthrough: 0.6
+    realtimeFireflyFilterEnabled: 1
+    realtimeFireflyFilterThreshold: 0.1
+    referenceFireflyFilterEnabled: 1
+    referenceFireflyFilterThreshold: 5
+    denoiserRadianceClampK: 8
+    dlssrrBrightnessClampK: 4096
+    dlssrrMicroJitter: 0.1
+    disableReSTIRsWithDLSSRR: 1
+    tmpDisableDlssRR: 0
+    enableBloom: 1
+    bloomRadius: 8
+    bloomIntensity: 0.004
+    environmentMapDiffuseSampleMIPLevel: 2
+    environmentMapEnabled: 1
+    environmentMapIntensity: 1
+    environmentMapTint: {r: 1, g: 1, b: 1, a: 1}
+    enableToneMapping: 1
+    showValidation: 0
+    enableShaderDebug: 1
+    dbgFreezeRealtimeNoiseSeed: 0
+    dbgDiscardNonNEELighting: 0
+    dbgDiscardNEELighting: 0
+    dbgDisablePostProcessFilters: 0
+    skipRightEyeInVR: 1
+  renderPassEvent: 550
+  buildStablePlanesShader: {fileID: -6676421132958364438, guid: be311863611ef33419d1a1aead5b64a0, type: 3}
+  fillStablePlanesShader: {fileID: -6676421132958364438, guid: fd6d33330a3e97e43ac449908a5fe035, type: 3}
+  referenceShader: {fileID: -6676421132958364438, guid: ff675002877a45d4497da9c6e89e523e, type: 3}
+  exportVisibilityBufferCs: {fileID: -2368575503658470205, guid: 1ff1244216fcd31478566758afd6b1ff, type: 3}
+  denoiseSpecHitTCs: {fileID: -2368575503658470205, guid: abb4162c8ba2cd041955d93cefb0143e, type: 3}
+  noDenoiserFinalMergeCs: {fileID: -2368575503658470205, guid: a1b2c3d4e5f6a1b2c3d4e5f6a1b2c307, type: 3}
+  dlssBeforeCs: {fileID: -2368575503658470205, guid: a1b2c3d4e5f6a1b2c3d4e5f6a1b2c306, type: 3}
+  accumulationCs: {fileID: -2368575503658470205, guid: 96ba0c67e691b484781846c8b20f6061, type: 3}

@@ -32,7 +32,6 @@ namespace PathTracing
         // ---- Inspector fields -----------------------------------------------
         public NativeRtxptSetting setting;
         public RenderPassEvent renderPassEvent = RenderPassEvent.BeforeRenderingPostProcessing;
-        public ComputeShader updateSkinnedPrimitivesCS;
 
         // Phase 2: PathTracer RT shaders
         public RayTraceShader buildStablePlanesShader;
@@ -85,7 +84,6 @@ namespace PathTracing
         {
             _buildTlasPass ??= new NativeRtxptBuildTlasPass
             {
-                updateSkinnedPrimitivesCS = this.updateSkinnedPrimitivesCS,
                 renderPassEvent           = renderPassEvent,
             };
 
@@ -348,5 +346,59 @@ namespace PathTracing
             _nrdSampleResource?.Dispose(); _nrdSampleResource = null;
             _gpuScene?.Dispose();          _gpuScene          = null;
         }
+
+        // ---- Editor helpers ----------------------------------------------------
+
+#if UNITY_EDITOR
+        private void Reset()
+        {
+            setting = new NativeRtxptSetting();
+            AutoFillShaders();
+        }
+
+        public void AutoFillShaders()
+        {
+            const string shaderRoot = "Assets/RTXPT/Shaders";
+
+            // Phase 2: PathTracer RT shaders
+            buildStablePlanesShader = LoadRs($"{shaderRoot}/BuildStablePlanes");
+            fillStablePlanesShader  = LoadRs($"{shaderRoot}/FillStablePlanes");
+            referenceShader         = LoadRs($"{shaderRoot}/Reference");
+
+            // Phase 3
+            exportVisibilityBufferCs = LoadCs($"{shaderRoot}/ProcessingPasses/ExportVisibilityBuffer");
+
+            // Phase 4
+            denoiseSpecHitTCs = LoadCs($"{shaderRoot}/ProcessingPasses/DenoisingGuidesBaker_DenoiseSpecHitT");
+
+            // Phase 5
+            noDenoiserFinalMergeCs = LoadCs($"{shaderRoot}/ProcessingPasses/PostProcess_NoDenoiserFinalMerge");
+
+            // Phase 6
+            dlssBeforeCs = LoadCs($"{shaderRoot}/ProcessingPasses/PostProcess_DenoiserPrepareInputsDlssRR");
+
+            // Phase 8
+            accumulationCs = LoadCs($"{shaderRoot}/ProcessingPasses/AccumulationPass");
+
+            UnityEditor.EditorUtility.SetDirty(this);
+            return;
+
+            static NativeComputeShader LoadCs(string path)
+            {
+                var s = UnityEditor.AssetDatabase.LoadAssetAtPath<NativeComputeShader>(path + ".computeshader");
+                if (s == null)
+                    Debug.LogWarning($"[NativeRtxptFeature] Missing NativeComputeShader at: {path}");
+                return s;
+            }
+
+            static RayTraceShader LoadRs(string path)
+            {
+                var s = UnityEditor.AssetDatabase.LoadAssetAtPath<RayTraceShader>(path + ".rayshader");
+                if (s == null)
+                    Debug.LogWarning($"[NativeRtxptFeature] Missing RayTraceShader at: {path}");
+                return s;
+            }
+        }
+#endif
     }
 }
