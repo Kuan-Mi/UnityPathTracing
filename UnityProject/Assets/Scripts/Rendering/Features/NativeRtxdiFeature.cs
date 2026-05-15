@@ -94,6 +94,9 @@ namespace PathTracing
         public NativeComputeShader filterGradientsPassCs; // DenoisingPasses/FilterGradientsPass.computeshader
         public NativeComputeShader confidencePassCs; // DenoisingPasses/ConfidencePass.computeshader
 
+        // Validation: test that NriTextureArrayResource wraps Texture2DArray correctly
+        public NativeComputeShader gradientArrayTestCs; // DenoisingPasses/GradientArrayTest.computeshader
+
         // Tone mapping
         public NativeComputeShader toneMappingHistogramCs; // Shaders/donut/histogram.computeshader
         public NativeComputeShader toneMappingExposureCs; // Shaders/donut/exposure.computeshader
@@ -125,8 +128,9 @@ namespace PathTracing
         private NativeFrameTick _nativeFrameTickPass;
 
         // Denoising: gradient filter + confidence (mirror FullSample FilterGradientsPass + ConfidencePass)
-        private NativeRtxdiFilterGradientsPass _filterGradientsPass;
-        private NativeRtxdiConfidencePass      _confidencePass;
+        private NativeRtxdiFilterGradientsPass    _filterGradientsPass;
+        private NativeRtxdiConfidencePass         _confidencePass;
+        private NativeRtxdiGradientArrayTestPass  _gradientArrayTestPass;
 
         private NativeToneMappingPass _toneMappingPass;
 
@@ -216,6 +220,8 @@ namespace PathTracing
             _nativeFrameTickPass          ??= new NativeFrameTick { renderPassEvent                                                                              = renderPassEvent, };
             _filterGradientsPass          ??= new NativeRtxdiFilterGradientsPass(filterGradientsPassCs) { renderPassEvent                                        = renderPassEvent };
             _confidencePass               ??= new NativeRtxdiConfidencePass(confidencePassCs) { renderPassEvent                                                  = renderPassEvent };
+            if (_gradientArrayTestPass == null && gradientArrayTestCs != null)
+                _gradientArrayTestPass = new NativeRtxdiGradientArrayTestPass(gradientArrayTestCs) { renderPassEvent = renderPassEvent };
             _toneMappingPass              ??= new NativeToneMappingPass(toneMappingHistogramCs, toneMappingExposureCs, toneMappingCs) { renderPassEvent          = renderPassEvent };
             _dlssrPass                    ??= new DlssSRPass { renderPassEvent                                                                                   = renderPassEvent };
         }
@@ -466,6 +472,14 @@ namespace PathTracing
             bool enableGradients = enableDirectReStirPass && setting.denoiserMode != RtxDiDenoiserType.DENOISER_MODE_OFF && setting.enableGradients;
             if (enableGradients)
                 pool.EnsureGradientArray(gradDims);
+
+            // // ---- GradientArray validation test (runs when gradientArrayTestCs is assigned) ----
+            // if (_gradientArrayTestPass != null)
+            // {
+            //     pool.EnsureGradientArray(gradDims); // ensure allocated even when enableGradients=false
+            //     _gradientArrayTestPass.Setup(pool.GradientArrayPtr, gradDims);
+            //     renderer.EnqueuePass(_gradientArrayTestPass);
+            // }
 
             // Confidence ping-pong: current frame writes, previous frame is read.
             var diffConfCurrent = isOddFrame ? pool.DiffuseConfidence : pool.PrevDiffuseConfidence;
@@ -830,6 +844,9 @@ namespace PathTracing
                     // PDF debug
                     LocalLightPdfTexture  = rtxdiResources.LocalLightPdfTexture,
                     EnvironmentPdfTexture = rtxdiResources.EnvironmentPdfTexture,
+
+                    // Gradient Texture2DArray
+                    GradientArray = pool.GradientArrayPtr != System.IntPtr.Zero ? pool.GradientArrayHandle : null,
                 };
                 var outputBlitSettings = new NativeRtxdiOutputBlitPass.Settings
                 {

@@ -19,9 +19,6 @@ namespace NativeRender
     [ScriptedImporter(1, "computeshader", -1000)]
     public class NativeComputeShaderImporter : ScriptedImporter
     {
-        [Tooltip("当设置为 True 时，该 .hlsl 文件将作为 NativeComputeShader 资产导入。")]
-        public bool isComputeShader = false;
-
         [Tooltip("Additional #include search directories (absolute paths). The shader file's own directory is always included automatically.")]
         public string[] additionalIncludePaths = Array.Empty<string>();
 
@@ -49,9 +46,6 @@ namespace NativeRender
 
         public override void OnImportAsset(AssetImportContext ctx)
         {
-            if (!isComputeShader)
-                return;
-
             var asset = ScriptableObject.CreateInstance<NativeComputeShader>();
 
             // Write private serialized fields via SerializedObject.
@@ -159,7 +153,6 @@ namespace NativeRender
             if (targets.Length != 1) return;
 
             var importer = (NativeComputeShaderImporter)target;
-            if (!importer.isComputeShader) return;
 
             var shader = AssetDatabase.LoadAssetAtPath<NativeComputeShader>(importer.assetPath);
             if (shader == null) return;

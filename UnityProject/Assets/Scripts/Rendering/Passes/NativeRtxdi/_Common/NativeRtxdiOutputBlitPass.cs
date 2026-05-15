@@ -64,7 +64,8 @@ namespace PathTracing
             // ── Light PDF debug ────────────────────────────────────────────
             internal RTHandle LocalLightPdfTexture;
             internal RTHandle EnvironmentPdfTexture;
-        }
+            // ── Gradient Texture2DArray debug ─────────────────────────────────
+            internal RenderTexture GradientArray;        }
 
         public class Settings
         {
@@ -214,6 +215,19 @@ namespace PathTracing
                         mat.SetInt("_PdfMipLevel", set.pdfMipLevel);
                         mat.SetFloat("_PdfExposureStops", set.pdfExposureStops);
                         Blitter.BlitTexture(cmd, res.EnvironmentPdfTexture, scaleOffset, mat, (int)ShowPass.PdfTextureMip);
+                    }
+                    break;
+
+                // ── Gradient Texture2DArray ─────────────────────────────────
+                case NativeRtxdiShowMode.GradientArraySlice0:
+                case NativeRtxdiShowMode.GradientArraySlice1:
+                    if (res.GradientArray != null)
+                    {
+                        int slice = set.showMode == NativeRtxdiShowMode.GradientArraySlice0 ? 0 : 1;
+                        mat.SetTexture("_GradientArray", res.GradientArray);
+                        mat.SetInt("_GradientArraySlice", slice);
+                        mat.SetVector("_BlitScaleBias", scaleOffset);
+                        cmd.DrawProcedural(UnityEngine.Matrix4x4.identity, mat, (int)ShowPass.ShowGradientArray, UnityEngine.MeshTopology.Triangles, 3);
                     }
                     break;
             }

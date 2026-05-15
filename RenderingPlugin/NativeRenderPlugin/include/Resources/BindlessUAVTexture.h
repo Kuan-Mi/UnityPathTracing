@@ -56,6 +56,12 @@ public:
     uint32_t Capacity()  const { return m_capacity;  }
     uint32_t AllocBase() const { return m_allocBase; }
 
+    // Returns the resource at |index|, or nullptr if the slot is empty / index is out of range.
+    ID3D12Resource* GetTexture(uint32_t index) const
+    {
+        return index < m_slots.size() ? m_slots[index].resource : nullptr;
+    }
+
     // GPU handle for the start of the descriptor range.
     // Pass this to SetComputeRootDescriptorTable() for the matching root param.
     D3D12_GPU_DESCRIPTOR_HANDLE GetGPUHandle() const;

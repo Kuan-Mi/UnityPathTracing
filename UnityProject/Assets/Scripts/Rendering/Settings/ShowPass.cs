@@ -30,5 +30,6 @@
         RtxdiNormal,         // 16  oct32 → float3 normal
         RtxdiGeoNormal,      // 17  oct32 → float3 geo-normal
         PdfTextureMip,       // 18  R32_Float mip slice → log-scale heat map
+        ShowGradientArray,   // 19  Texture2DArray slice (gradient array debug)
     }
 }

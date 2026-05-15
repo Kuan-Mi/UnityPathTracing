@@ -63,8 +63,8 @@ namespace PathTracing
         // public NriTextureResource PTSampleIDTexture;
         // public NriTextureResource PTDuplicationMap;
 
-        // ── Non-NRI gradient Texture2DArray (2 slices, FilterGradientsPass) ──
-        private RTHandle           _gradientArray;
+        // ── Gradient Texture2DArray (2 slices, FilterGradientsPass) ──
+        private NriTextureArrayResource _gradientArray;
         public  NriTextureResource TemporalSamplePos;
         public  NriTextureResource DiffuseConfidence;
         public  NriTextureResource SpecularConfidence;
@@ -82,7 +82,8 @@ namespace PathTracing
         public NriTextureResource RrGuideSpecHitDistance;
         public NriTextureResource RrGuideNormalRoughness;
 
-        public IntPtr GradientArrayPtr => _gradientArray?.rt != null ? _gradientArray.rt.GetNativeTexturePtr() : IntPtr.Zero;
+        public IntPtr GradientArrayPtr => _gradientArray?.NativePtr ?? IntPtr.Zero;
+        public RenderTexture GradientArrayHandle => _gradientArray?.Handle?.rt;
 
         public int2 renderResolution { get; private set; }
 
@@ -175,17 +176,13 @@ namespace PathTracing
         /// </summary>
         public void EnsureGradientArray(int2 gradDims)
         {
-            var rt = _gradientArray?.rt;
-            if (rt != null && rt.width == gradDims.x && rt.height == gradDims.y) return;
+            _gradientArray ??= new NriTextureArrayResource(
+                "GradientArray",
+                GraphicsFormat.R16G16B16A16_SFloat,
+                new NriResourceState { accessBits = AccessBits.SHADER_RESOURCE_STORAGE, layout = Layout.SHADER_RESOURCE_STORAGE, stageBits = 1 << 10 },
+                arraySize: 2);
 
-            _gradientArray?.Release();
-            var desc = new RenderTextureDescriptor(gradDims.x, gradDims.y, GraphicsFormat.R16G16B16A16_SFloat, 0)
-            {
-                dimension         = TextureDimension.Tex2DArray,
-                volumeDepth       = 2,
-                enableRandomWrite = true,
-            };
-            _gradientArray = RTHandles.Alloc(desc);
+            _gradientArray.Allocate(gradDims);
         }
 
         private NriTextureResource[] RenderResolutionResources() => new[]
@@ -228,6 +225,7 @@ namespace PathTracing
             _gradientArray?.Release();
             _gradientArray = null;
         }
+
 
         private NriTextureResource[] AllResources() => new[]
         {

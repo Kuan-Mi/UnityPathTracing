@@ -169,6 +169,17 @@ void DescriptorSetBase<ShaderT>::UpdateDescriptors(
                             s.Buffer.NumElements = static_cast<UINT>(rd.Width / 4);
                         }
                     }
+                    else if (rd.DepthOrArraySize > 1)
+                    {
+                        s.ViewDimension                        = D3D12_SRV_DIMENSION_TEXTURE2DARRAY;
+                        s.Format                               = rd.Format;
+                        s.Texture2DArray.MostDetailedMip       = 0;
+                        s.Texture2DArray.MipLevels             = rd.MipLevels;
+                        s.Texture2DArray.FirstArraySlice       = 0;
+                        s.Texture2DArray.ArraySize             = rd.DepthOrArraySize;
+                        s.Texture2DArray.PlaneSlice            = 0;
+                        s.Texture2DArray.ResourceMinLODClamp   = 0.0f;
+                    }
                     else
                     {
                         s.ViewDimension       = D3D12_SRV_DIMENSION_TEXTURE2D;
@@ -224,6 +235,15 @@ void DescriptorSetBase<ShaderT>::UpdateDescriptors(
                         u.Buffer.Flags       = D3D12_BUFFER_UAV_FLAG_RAW;
                         u.Buffer.NumElements = static_cast<UINT>(rd.Width / 4);
                     }
+                }
+                else if (rd.DepthOrArraySize > 1)
+                {
+                    u.ViewDimension                  = D3D12_UAV_DIMENSION_TEXTURE2DARRAY;
+                    u.Format                         = rd.Format;
+                    u.Texture2DArray.MipSlice        = 0;
+                    u.Texture2DArray.FirstArraySlice = 0;
+                    u.Texture2DArray.ArraySize       = rd.DepthOrArraySize;
+                    u.Texture2DArray.PlaneSlice      = 0;
                 }
                 else
                 {
@@ -312,8 +332,13 @@ void DescriptorSetBase<ShaderT>::RequestResourceStates(
         else if (b.type == BindingType::UAV_ARRAY &&
                  slot.objectKind == BindingObjectKind::BindlessUAVTexture && slot.objectPtr)
         {
-            if (res)
-                m_d3d12v8->RequestResourceState(res, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
+            auto* bt = reinterpret_cast<BindlessUAVTexture*>(slot.objectPtr);
+            for (uint32_t k = 0; k < bt->Capacity(); ++k)
+            {
+                ID3D12Resource* tex = bt->GetTexture(k);
+                if (tex)
+                    m_d3d12v8->RequestResourceState(tex, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
+            }
         }
     }
 }

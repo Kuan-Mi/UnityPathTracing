@@ -157,6 +157,12 @@ namespace PathTracing
         // ── Light PDF debug ────────────────────────────────────────────────
         LocalLightPdf,
         EnvironmentPdf,
+
+        // ── Gradient Texture2DArray debug ─────────────────────────────────
+        /// <summary>Slice 0 of the gradient Texture2DArray (FilterGradientsPass input/output).</summary>
+        GradientArraySlice0,
+        /// <summary>Slice 1 of the gradient Texture2DArray.</summary>
+        GradientArraySlice1,
     }
 
     /// <summary>

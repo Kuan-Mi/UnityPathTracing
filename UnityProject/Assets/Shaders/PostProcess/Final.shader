@@ -1180,5 +1180,46 @@
             ENDHLSL
         }
 
+        // 19 – ShowGradientArray  (Texture2DArray, slice selected by _GradientArraySlice)
+        Pass
+        {
+            Name "ShowGradientArray"
+            ZWrite Off ZTest Always Cull Off
+            Blend SrcAlpha OneMinusSrcAlpha
+
+            HLSLPROGRAM
+            #pragma vertex Vert
+            #pragma fragment Frag
+            #pragma target 4.5
+            #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
+
+            TEXTURE2D_ARRAY(_GradientArray);
+            SAMPLER(sampler_GradientArray);
+            float4 _BlitScaleBias;
+            int    _GradientArraySlice;
+
+            struct Attributes { uint vertexID : SV_VertexID; };
+            struct Varyings   { float4 positionCS : SV_POSITION; float2 uv : TEXCOORD0; };
+
+            Varyings Vert(Attributes i)
+            {
+                Varyings o;
+                o.positionCS = GetFullScreenTriangleVertexPosition(i.vertexID);
+                o.uv         = GetFullScreenTriangleTexCoord(i.vertexID);
+                return o;
+            }
+
+            float4 Frag(Varyings i) : SV_Target
+            {
+                #ifdef UNITY_UV_STARTS_AT_TOP
+                i.uv.y = 1.0 - i.uv.y;
+                #endif
+                i.uv = i.uv * _BlitScaleBias.xy + _BlitScaleBias.zw;
+                float4 c = SAMPLE_TEXTURE2D_ARRAY(_GradientArray, sampler_GradientArray, i.uv, _GradientArraySlice);
+                return float4(abs(c.rgb), 1.0);
+            }
+            ENDHLSL
+        }
+
     }
 }

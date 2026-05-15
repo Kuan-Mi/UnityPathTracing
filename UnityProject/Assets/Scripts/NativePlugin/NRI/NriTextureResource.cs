@@ -16,6 +16,10 @@ namespace Nri
         [DllImport("Denoiser")]
         private static extern void ReleaseTexture(IntPtr nriTex);
 
+        /// <summary>Exposed for subclasses that need to wrap a non-2D resource.</summary>
+        protected static IntPtr WrapD3D12TextureInternal(IntPtr resource, DXGI_FORMAT format)
+            => WrapD3D12Texture(resource, format);
+
         public RTHandle Handle; // Unity RTHandle封装
         public IntPtr NativePtr; // DX12底层指针
         public IntPtr NriPtr; // NRD封装指针
