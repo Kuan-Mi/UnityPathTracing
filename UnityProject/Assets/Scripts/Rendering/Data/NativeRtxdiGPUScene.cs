@@ -641,30 +641,59 @@ namespace PathTracing
             int idx = matList.Count;
             _materialSlots[matId] = idx;
 
-            int baseTexIdx       = AddTexture(TryGetTex(mat, "_BaseMap"), texPtrs);
-            int normalTexIdx     = AddTexture(TryGetTex(mat, "_BumpMap"), texPtrs);
-            int metalRoughTexIdx = AddTexture(TryGetTex(mat, "_MetallicGlossMap"), texPtrs);
-            int emissiveTexIdx   = AddTexture(TryGetTex(mat, "_EmissionMap"), texPtrs);
-            int occlusionTexIdx  = AddTexture(TryGetTex(mat, "_OcclusionMap"), texPtrs);
+            int baseTexIdx, normalTexIdx, metalRoughTexIdx, emissiveTexIdx, occlusionTexIdx;
+            Color baseColor;
+            Color emissive;
+            float roughness, metalness, alphaCutoff, normalScale, occStr;
+            int domain;
 
-            Color baseColor   = TryGetColor(mat, "_BaseColor", Color.white);
-            Color emissive    = TryGetColor(mat, "_EmissionColor", Color.black);
-            float roughness   = 1f - TryGetFloat(mat, "_Smoothness", 0.5f);
-            float metalness   = TryGetFloat(mat, "_Metallic", 0f);
-            float alphaCutoff = TryGetFloat(mat, "_Cutoff", 0f);
-            float normalScale = TryGetFloat(mat, "_BumpScale", 1f);
-            float occStr      = TryGetFloat(mat, "_OcclusionStrength", 1f);
+            bool isGltf = mat != null && mat.shader.name == "Shader Graphs/glTF-pbrMetallicRoughness";
+            if (isGltf)
+            {
+                baseTexIdx       = AddTexture(TryGetTex(mat, "baseColorTexture"),         texPtrs);
+                normalTexIdx     = AddTexture(TryGetTex(mat, "normalTexture"),             texPtrs);
+                metalRoughTexIdx = AddTexture(TryGetTex(mat, "metallicRoughnessTexture"),  texPtrs);
+                emissiveTexIdx   = AddTexture(TryGetTex(mat, "emissiveTexture"),           texPtrs);
+                occlusionTexIdx  = AddTexture(TryGetTex(mat, "occlusionTexture"),          texPtrs);
+
+                baseColor   = TryGetColor(mat, "baseColorFactor", Color.white);
+                emissive    = TryGetColor(mat, "emissiveFactor",  Color.black);
+                roughness   = TryGetFloat(mat, "roughnessFactor", 0.5f);
+                metalness   = TryGetFloat(mat, "metallicFactor",  0f);
+                alphaCutoff = mat.IsKeywordEnabled("_ALPHATEST_ON") ? TryGetFloat(mat, "alphaCutoff", 0.5f) : 0f;
+                normalScale = 1f;
+                occStr      = TryGetFloat(mat, "occlusionStrength", 1f);
+
+                domain = mat.IsKeywordEnabled("_SURFACE_TYPE_TRANSPARENT") ? 1 : 0;
+            }
+            else
+            {
+                // URP/Lit, RayTracing/Lit, and unknown-shader fallback
+                baseTexIdx       = AddTexture(TryGetTex(mat, "_BaseMap"),          texPtrs);
+                normalTexIdx     = AddTexture(TryGetTex(mat, "_BumpMap"),          texPtrs);
+                metalRoughTexIdx = AddTexture(TryGetTex(mat, "_MetallicGlossMap"), texPtrs);
+                emissiveTexIdx   = AddTexture(TryGetTex(mat, "_EmissionMap"),      texPtrs);
+                occlusionTexIdx  = AddTexture(TryGetTex(mat, "_OcclusionMap"),     texPtrs);
+
+                baseColor   = TryGetColor(mat, "_BaseColor",     Color.white);
+                emissive    = TryGetColor(mat, "_EmissionColor", Color.black);
+                roughness   = 1f - TryGetFloat(mat, "_Smoothness",        0.5f);
+                metalness   = TryGetFloat(mat, "_Metallic",       0f);
+                alphaCutoff = TryGetFloat(mat, "_Cutoff",         0f);
+                normalScale = TryGetFloat(mat, "_BumpScale",      1f);
+                occStr      = TryGetFloat(mat, "_OcclusionStrength", 1f);
+
+                domain = 0;
+                if (mat != null && mat.HasProperty("_Surface"))
+                    domain = (int)mat.GetFloat("_Surface");
+                else if (alphaCutoff > 0f)
+                    domain = 1; // AlphaTested
+            }
 
             // Approximate F0 specular colour (donut convention)
             Vector3 dielectricF0   = Vector3.one * 0.04f;
             Vector3 metalBaseColor = new Vector3(baseColor.r, baseColor.g, baseColor.b);
             Vector3 specularColor  = Vector3.Lerp(dielectricF0, metalBaseColor, metalness);
-
-            int domain = 0;
-            if (mat != null && mat.HasProperty("_Surface"))
-                domain = (int)mat.GetFloat("_Surface");
-            else if (alphaCutoff > 0f)
-                domain = 1; // AlphaTested
 
             int matFlags                        = 0;
             if (baseTexIdx >= 0) matFlags       |= DonutMaterialFlags.UseBaseOrDiffuseTexture;

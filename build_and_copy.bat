@@ -45,11 +45,11 @@ copy /Y "RenderingPlugin\_Build\Debug\D3D12HeapHook.dll"         "%UNITY_PLUGINS
 copy /Y "RenderingPlugin\_Build\Debug\D3D12HeapHook.pdb"         "%UNITY_PLUGINS%\" >nul
 
 :: DXC (dxcompiler / dxil)
-copy /Y "RenderingPlugin\_Build\_deps\dxc-nuget\build\native\bin\x64\dxcompiler.dll" "%UNITY_PLUGINS%\" >nul
-copy /Y "RenderingPlugin\_Build\_deps\dxc-nuget\build\native\bin\x64\dxil.dll"       "%UNITY_PLUGINS%\" >nul
+copy /Y "RenderingPlugin\_deps\dxc-nuget\build\native\bin\x64\dxcompiler.dll" "%UNITY_PLUGINS%\" >nul
+copy /Y "RenderingPlugin\_deps\dxc-nuget\build\native\bin\x64\dxil.dll"       "%UNITY_PLUGINS%\" >nul
 
 :: OMM lib
-copy /Y "RenderingPlugin\_Build\_deps\omm-src\bin\omm-lib.dll" "%UNITY_PLUGINS%\" >nul
+copy /Y "RenderingPlugin\_deps\omm-src\bin\omm-lib.dll" "%UNITY_PLUGINS%\" >nul
 
 :: Denoiser / PrepareLight -> Assets\Plugins\x86_64
 copy /Y "RenderingPlugin\_Build\Debug\Denoiser.dll"              "%UNITY_ASSETS_PLUGINS%\" >nul
