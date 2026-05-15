@@ -55,6 +55,20 @@ namespace
     std::mutex                                                     g_CacheMutex;
     std::unordered_map<ID3D12GraphicsCommandList*, HeapBinding>    g_Cache;
 
+    // Release every cached heap ref in `b` and zero it out.
+    void ReleaseBinding(HeapBinding& b)
+    {
+        for (UINT i = 0; i < b.num; ++i)
+        {
+            if (b.heaps[i])
+            {
+                b.heaps[i]->Release();
+                b.heaps[i] = nullptr;
+            }
+        }
+        b.num = 0;
+    }
+
     thread_local uint64_t              tl_CaptureCount  = 0;
     thread_local uint64_t              tl_RestoreCount  = 0;
     thread_local int                   tl_InPluginDispatch = 0; // nesting depth
@@ -121,11 +135,28 @@ namespace
         HeapBinding bind{};
         bind.num = n;
         for (UINT i = 0; i < n; ++i)
+        {
             bind.heaps[i] = ppDescriptorHeaps[i];
+            // AddRef so the heap stays alive until we either overwrite or
+            // explicitly release this cache entry. Without this, Unity can
+            // release a heap between capture and our RestoreUnityHeaps call,
+            // and the original SetDescriptorHeaps will then crash inside
+            // D3D12Core dereferencing a dangling pointer.
+            if (bind.heaps[i]) bind.heaps[i]->AddRef();
+        }
 
         {
             std::lock_guard<std::mutex> lock(g_CacheMutex);
-            g_Cache[This] = bind;
+            auto it = g_Cache.find(This);
+            if (it != g_Cache.end())
+            {
+                ReleaseBinding(it->second);
+                it->second = bind;
+            }
+            else
+            {
+                g_Cache.emplace(This, bind);
+            }
         }
 
         ++tl_CaptureCount;
@@ -273,6 +304,10 @@ namespace D3D12HeapHook
             return;
         }
 
+        // Snapshot the binding under the lock AND AddRef each heap so it
+        // can't be released between here and the SetDescriptorHeaps call
+        // below (e.g. by the capture path overwriting the cache entry, or
+        // by the user calling some future cache-clear API).
         HeapBinding bind{};
         bool found = false;
         {
@@ -281,6 +316,8 @@ namespace D3D12HeapHook
             if (it != g_Cache.end())
             {
                 bind  = it->second;
+                for (UINT i = 0; i < bind.num; ++i)
+                    if (bind.heaps[i]) bind.heaps[i]->AddRef();
                 found = true;
             }
         }
@@ -307,5 +344,9 @@ namespace D3D12HeapHook
         }
 
         g_OrigSetDescriptorHeaps(cmdList, bind.num, bind.heaps);
+
+        // Drop the per-call refs we took above.
+        for (UINT i = 0; i < bind.num; ++i)
+            if (bind.heaps[i]) bind.heaps[i]->Release();
     }
 }

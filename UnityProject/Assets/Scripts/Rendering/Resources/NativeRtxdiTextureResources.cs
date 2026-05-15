@@ -40,7 +40,7 @@ namespace PathTracing
 
 
         public NriTextureResource HdrColor;
-        public NriTextureResource LdrColor;  // output resolution (after tone mapping)
+        public NriTextureResource LdrColor; // output resolution (after tone mapping)
 
         public NriTextureResource DiffuseLighting;
         public NriTextureResource SpecularLighting;
@@ -51,7 +51,7 @@ namespace PathTracing
 
         // public NriTextureResource      TaaFeedback1;
         // public NriTextureResource      TaaFeedback2;
-        public NriTextureResource ResolvedColor;   // output resolution (DLSS output)
+        public NriTextureResource ResolvedColor; // output resolution (DLSS output)
 
         // public NriTextureResource      AccumulatedColor;
         public NriTextureResource RestirLuminance;
@@ -93,7 +93,7 @@ namespace PathTracing
             NrdValidation          = new NriTextureResource("Validation", GraphicsFormat.R8G8B8A8_UNorm, uav);
             HdrColor               = new NriTextureResource("DirectLighting", GraphicsFormat.R16G16B16A16_SFloat, uav);
             ResolvedColor          = new NriTextureResource("DlssOutput", GraphicsFormat.R16G16B16A16_SFloat, uav);
-            LdrColor        = new NriTextureResource("ToneMapped", GraphicsFormat.R16G16B16A16_SFloat, uav);
+            LdrColor               = new NriTextureResource("ToneMapped", GraphicsFormat.R16G16B16A16_SFloat, uav);
             RrGuideDiffAlbedo      = new NriTextureResource("RrGuideDiffAlbedo", GraphicsFormat.A2B10G10R10_UNormPack32, uav);
             RrGuideSpecAlbedo      = new NriTextureResource("RrGuideSpecAlbedo", GraphicsFormat.A2B10G10R10_UNormPack32, uav);
             RrGuideSpecHitDistance = new NriTextureResource("RrGuideSpecHitDistance", GraphicsFormat.R16_SFloat, uav);
