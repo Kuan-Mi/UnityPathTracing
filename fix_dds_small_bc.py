@@ -13,7 +13,7 @@ import struct
 import os
 import sys
 
-TARGET_DIR = r'.\UnityProject\Assets\Bistro_v5_2\Bistro\Textures'
+TARGET_DIR = r'.\UnityProject\Assets\Gltf\Textures'
 
 DDS_MAGIC  = b'DDS '
 DDPF_FOURCC = 0x4

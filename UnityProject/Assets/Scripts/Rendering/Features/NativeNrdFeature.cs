@@ -192,7 +192,6 @@ namespace PathTracing
                 return;
             if (cam.cameraType != CameraType.Game && cam.cameraType != CameraType.SceneView)
                 return;
-            CreatePass();
 
             cam.depthTextureMode = DepthTextureMode.Depth | DepthTextureMode.MotionVectors;
 
@@ -210,9 +209,19 @@ namespace PathTracing
                 || scramblingRankingTex == null
                 || sobolTex == null)
             {
+
+#if UNITY_EDITOR
+                if (!Application.isPlaying)
+                {
+                    AutoFillShaders();
+                    return;
+                }
+#endif
+
                 Debug.LogWarning("NRDFeature: Missing required assets, skipping pass.");
                 return;
             }
+            CreatePass();
 
 
             if (_nrdSampleResource == null)

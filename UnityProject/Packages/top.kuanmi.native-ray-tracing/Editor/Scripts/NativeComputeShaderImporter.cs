@@ -16,7 +16,7 @@ namespace NativeRender
     /// To create a new compute shader asset: right-click in the Project view and rename any
     /// text file to have the <c>.computeshader</c> extension, or duplicate an existing one.
     /// </summary>
-    [ScriptedImporter(1, "computeshader", 0)]
+    [ScriptedImporter(1, "computeshader", -1000)]
     public class NativeComputeShaderImporter : ScriptedImporter
     {
         [Tooltip("当设置为 True 时，该 .hlsl 文件将作为 NativeComputeShader 资产导入。")]

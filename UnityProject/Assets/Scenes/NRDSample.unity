@@ -936,6 +936,41 @@ MonoBehaviour:
   ommCaches: []
   _isStaticObject: 0
   meshRenderer: {fileID: 1015431882}
+  SubmeshMaterialInfos:
+  - material: {fileID: 2100000, guid: 31321ba15b8f8eb4c954353edc038b1d, type: 2}
+    isTransparent: 0
+    isEmissive: 0
+    isAlphaClip: 0
+    textures:
+    - {fileID: 0}
+    - {fileID: 0}
+    - {fileID: 0}
+    - {fileID: 0}
+    baseColor: {r: 0.21404114, g: 0.21404114, b: 0.21404114, a: 1}
+    emissionColor: {r: 0, g: 0, b: 0, a: 1}
+    metallic: 0
+    roughnessScale: 0.5
+    normalScale: 1
+  SubmeshGroups:
+  - isTransparent: 0
+    isEmissive: 0
+    isAlphaClip: 0
+    submeshIndices: 00000000
+    materialDatas:
+    - material: {fileID: 2100000, guid: 31321ba15b8f8eb4c954353edc038b1d, type: 2}
+      isTransparent: 0
+      isEmissive: 0
+      isAlphaClip: 0
+      textures:
+      - {fileID: 0}
+      - {fileID: 0}
+      - {fileID: 0}
+      - {fileID: 0}
+      baseColor: {r: 0.21404114, g: 0.21404114, b: 0.21404114, a: 1}
+      emissionColor: {r: 0, g: 0, b: 0, a: 1}
+      metallic: 0
+      roughnessScale: 0.5
+      normalScale: 1
 --- !u!65 &1015431881
 BoxCollider:
   m_ObjectHideFlags: 0
@@ -1191,6 +1226,41 @@ MonoBehaviour:
   ommCaches: []
   _isStaticObject: 0
   meshRenderer: {fileID: 1154397541}
+  SubmeshMaterialInfos:
+  - material: {fileID: 2100000, guid: 31321ba15b8f8eb4c954353edc038b1d, type: 2}
+    isTransparent: 0
+    isEmissive: 0
+    isAlphaClip: 0
+    textures:
+    - {fileID: 0}
+    - {fileID: 0}
+    - {fileID: 0}
+    - {fileID: 0}
+    baseColor: {r: 0.21404114, g: 0.21404114, b: 0.21404114, a: 1}
+    emissionColor: {r: 0, g: 0, b: 0, a: 1}
+    metallic: 0
+    roughnessScale: 0.5
+    normalScale: 1
+  SubmeshGroups:
+  - isTransparent: 0
+    isEmissive: 0
+    isAlphaClip: 0
+    submeshIndices: 00000000
+    materialDatas:
+    - material: {fileID: 2100000, guid: 31321ba15b8f8eb4c954353edc038b1d, type: 2}
+      isTransparent: 0
+      isEmissive: 0
+      isAlphaClip: 0
+      textures:
+      - {fileID: 0}
+      - {fileID: 0}
+      - {fileID: 0}
+      - {fileID: 0}
+      baseColor: {r: 0.21404114, g: 0.21404114, b: 0.21404114, a: 1}
+      emissionColor: {r: 0, g: 0, b: 0, a: 1}
+      metallic: 0
+      roughnessScale: 0.5
+      normalScale: 1
 --- !u!65 &1154397540
 BoxCollider:
   m_ObjectHideFlags: 0
@@ -1746,6 +1816,41 @@ MonoBehaviour:
   ommCaches: []
   _isStaticObject: 0
   meshRenderer: {fileID: 1672218823}
+  SubmeshMaterialInfos:
+  - material: {fileID: 2100000, guid: 396c187fb8847ea4ab644b19e780390e, type: 2}
+    isTransparent: 0
+    isEmissive: 0
+    isAlphaClip: 0
+    textures:
+    - {fileID: 0}
+    - {fileID: 0}
+    - {fileID: 0}
+    - {fileID: 0}
+    baseColor: {r: 1, g: 0.94123554, b: 0.7524076, a: 1}
+    emissionColor: {r: 0, g: 0, b: 0, a: 1}
+    metallic: 0
+    roughnessScale: 0
+    normalScale: 0
+  SubmeshGroups:
+  - isTransparent: 0
+    isEmissive: 0
+    isAlphaClip: 0
+    submeshIndices: 00000000
+    materialDatas:
+    - material: {fileID: 2100000, guid: 396c187fb8847ea4ab644b19e780390e, type: 2}
+      isTransparent: 0
+      isEmissive: 0
+      isAlphaClip: 0
+      textures:
+      - {fileID: 0}
+      - {fileID: 0}
+      - {fileID: 0}
+      - {fileID: 0}
+      baseColor: {r: 1, g: 0.94123554, b: 0.7524076, a: 1}
+      emissionColor: {r: 0, g: 0, b: 0, a: 1}
+      metallic: 0
+      roughnessScale: 0
+      normalScale: 0
 --- !u!1 &1687737116
 GameObject:
   m_ObjectHideFlags: 0
@@ -1852,6 +1957,41 @@ MonoBehaviour:
   ommCaches: []
   _isStaticObject: 0
   meshRenderer: {fileID: 1687737118}
+  SubmeshMaterialInfos:
+  - material: {fileID: 2100000, guid: aee007a3fa67b2c439c3d17098fc5662, type: 2}
+    isTransparent: 0
+    isEmissive: 0
+    isAlphaClip: 0
+    textures:
+    - {fileID: 0}
+    - {fileID: 0}
+    - {fileID: 0}
+    - {fileID: 0}
+    baseColor: {r: 0.121448144, g: 0.8562991, b: 0.1749816, a: 1}
+    emissionColor: {r: 0, g: 0, b: 0, a: 1}
+    metallic: 0
+    roughnessScale: 1
+    normalScale: 0
+  SubmeshGroups:
+  - isTransparent: 0
+    isEmissive: 0
+    isAlphaClip: 0
+    submeshIndices: 00000000
+    materialDatas:
+    - material: {fileID: 2100000, guid: aee007a3fa67b2c439c3d17098fc5662, type: 2}
+      isTransparent: 0
+      isEmissive: 0
+      isAlphaClip: 0
+      textures:
+      - {fileID: 0}
+      - {fileID: 0}
+      - {fileID: 0}
+      - {fileID: 0}
+      baseColor: {r: 0.121448144, g: 0.8562991, b: 0.1749816, a: 1}
+      emissionColor: {r: 0, g: 0, b: 0, a: 1}
+      metallic: 0
+      roughnessScale: 1
+      normalScale: 0
 --- !u!1 &1712532248
 GameObject:
   m_ObjectHideFlags: 0
@@ -1958,6 +2098,41 @@ MonoBehaviour:
   ommCaches: []
   _isStaticObject: 0
   meshRenderer: {fileID: 1712532250}
+  SubmeshMaterialInfos:
+  - material: {fileID: 2100000, guid: b2183b77dbd9a6841b237f374b1aa98e, type: 2}
+    isTransparent: 0
+    isEmissive: 0
+    isAlphaClip: 0
+    textures:
+    - {fileID: 2800000, guid: c0a41b5656f00de4d8239f65118bc165, type: 3}
+    - {fileID: 2800000, guid: bf8f44f5bc8384d41be295930fede691, type: 3}
+    - {fileID: 2800000, guid: 51196fdf27b68b24681f6b0cf24dd958, type: 3}
+    - {fileID: 0}
+    baseColor: {r: 1, g: 1, b: 1, a: 1}
+    emissionColor: {r: 0, g: 0, b: 0, a: 1}
+    metallic: 0
+    roughnessScale: 0.34500003
+    normalScale: 1
+  SubmeshGroups:
+  - isTransparent: 0
+    isEmissive: 0
+    isAlphaClip: 0
+    submeshIndices: 00000000
+    materialDatas:
+    - material: {fileID: 2100000, guid: b2183b77dbd9a6841b237f374b1aa98e, type: 2}
+      isTransparent: 0
+      isEmissive: 0
+      isAlphaClip: 0
+      textures:
+      - {fileID: 2800000, guid: c0a41b5656f00de4d8239f65118bc165, type: 3}
+      - {fileID: 2800000, guid: bf8f44f5bc8384d41be295930fede691, type: 3}
+      - {fileID: 2800000, guid: 51196fdf27b68b24681f6b0cf24dd958, type: 3}
+      - {fileID: 0}
+      baseColor: {r: 1, g: 1, b: 1, a: 1}
+      emissionColor: {r: 0, g: 0, b: 0, a: 1}
+      metallic: 0
+      roughnessScale: 0.34500003
+      normalScale: 1
 --- !u!1 &1748554751
 GameObject:
   m_ObjectHideFlags: 0
@@ -2064,6 +2239,41 @@ MonoBehaviour:
   ommCaches: []
   _isStaticObject: 0
   meshRenderer: {fileID: 1748554753}
+  SubmeshMaterialInfos:
+  - material: {fileID: 2100000, guid: 0a9f2294c03d27f4fbc173700574684f, type: 2}
+    isTransparent: 0
+    isEmissive: 0
+    isAlphaClip: 0
+    textures:
+    - {fileID: 0}
+    - {fileID: 2800000, guid: 9a7bfeb80605fa6458d072e5cc2e5548, type: 3}
+    - {fileID: 2800000, guid: 1e323752320081e4aaf6cf39ca508cff, type: 3}
+    - {fileID: 0}
+    baseColor: {r: 1, g: 1, b: 1, a: 1}
+    emissionColor: {r: 0, g: 0, b: 0, a: 1}
+    metallic: 0
+    roughnessScale: 0
+    normalScale: 1
+  SubmeshGroups:
+  - isTransparent: 0
+    isEmissive: 0
+    isAlphaClip: 0
+    submeshIndices: 00000000
+    materialDatas:
+    - material: {fileID: 2100000, guid: 0a9f2294c03d27f4fbc173700574684f, type: 2}
+      isTransparent: 0
+      isEmissive: 0
+      isAlphaClip: 0
+      textures:
+      - {fileID: 0}
+      - {fileID: 2800000, guid: 9a7bfeb80605fa6458d072e5cc2e5548, type: 3}
+      - {fileID: 2800000, guid: 1e323752320081e4aaf6cf39ca508cff, type: 3}
+      - {fileID: 0}
+      baseColor: {r: 1, g: 1, b: 1, a: 1}
+      emissionColor: {r: 0, g: 0, b: 0, a: 1}
+      metallic: 0
+      roughnessScale: 0
+      normalScale: 1
 --- !u!1 &1816539103
 GameObject:
   m_ObjectHideFlags: 0
@@ -2202,6 +2412,41 @@ MonoBehaviour:
   ommCaches: []
   _isStaticObject: 0
   meshRenderer: {fileID: 1858160350}
+  SubmeshMaterialInfos:
+  - material: {fileID: 2100000, guid: 55b68156422e3434fab86ffc7561984d, type: 2}
+    isTransparent: 1
+    isEmissive: 0
+    isAlphaClip: 0
+    textures:
+    - {fileID: 0}
+    - {fileID: 0}
+    - {fileID: 0}
+    - {fileID: 0}
+    baseColor: {r: 1, g: 1, b: 1, a: 1}
+    emissionColor: {r: 0, g: 0, b: 0, a: 1}
+    metallic: 1
+    roughnessScale: 0
+    normalScale: 1
+  SubmeshGroups:
+  - isTransparent: 1
+    isEmissive: 0
+    isAlphaClip: 0
+    submeshIndices: 00000000
+    materialDatas:
+    - material: {fileID: 2100000, guid: 55b68156422e3434fab86ffc7561984d, type: 2}
+      isTransparent: 1
+      isEmissive: 0
+      isAlphaClip: 0
+      textures:
+      - {fileID: 0}
+      - {fileID: 0}
+      - {fileID: 0}
+      - {fileID: 0}
+      baseColor: {r: 1, g: 1, b: 1, a: 1}
+      emissionColor: {r: 0, g: 0, b: 0, a: 1}
+      metallic: 1
+      roughnessScale: 0
+      normalScale: 1
 --- !u!1 &1914419601
 GameObject:
   m_ObjectHideFlags: 0
@@ -2308,6 +2553,41 @@ MonoBehaviour:
   ommCaches: []
   _isStaticObject: 0
   meshRenderer: {fileID: 1914419603}
+  SubmeshMaterialInfos:
+  - material: {fileID: 2100000, guid: 149581cfdb8c4ed4b9a7f22b56f5f1ac, type: 2}
+    isTransparent: 0
+    isEmissive: 0
+    isAlphaClip: 0
+    textures:
+    - {fileID: 0}
+    - {fileID: 0}
+    - {fileID: 0}
+    - {fileID: 0}
+    baseColor: {r: 0.74334973, g: 0.5176195, b: 0.37972245, a: 1}
+    emissionColor: {r: 0, g: 0, b: 0, a: 1}
+    metallic: 0
+    roughnessScale: 0
+    normalScale: 0
+  SubmeshGroups:
+  - isTransparent: 0
+    isEmissive: 0
+    isAlphaClip: 0
+    submeshIndices: 00000000
+    materialDatas:
+    - material: {fileID: 2100000, guid: 149581cfdb8c4ed4b9a7f22b56f5f1ac, type: 2}
+      isTransparent: 0
+      isEmissive: 0
+      isAlphaClip: 0
+      textures:
+      - {fileID: 0}
+      - {fileID: 0}
+      - {fileID: 0}
+      - {fileID: 0}
+      baseColor: {r: 0.74334973, g: 0.5176195, b: 0.37972245, a: 1}
+      emissionColor: {r: 0, g: 0, b: 0, a: 1}
+      metallic: 0
+      roughnessScale: 0
+      normalScale: 0
 --- !u!1 &1991282384
 GameObject:
   m_ObjectHideFlags: 0
@@ -3061,6 +3341,41 @@ MonoBehaviour:
   ommCaches: []
   _isStaticObject: 0
   meshRenderer: {fileID: 4316629808157788574}
+  SubmeshMaterialInfos:
+  - material: {fileID: 2100000, guid: 3192dd97252226d45be15da37a62cf13, type: 2}
+    isTransparent: 0
+    isEmissive: 0
+    isAlphaClip: 0
+    textures:
+    - {fileID: 2800000, guid: 6610f7da178eba54ba8bc17373d80ece, type: 3}
+    - {fileID: 2800000, guid: 558ea19008d2e964fbf9d3ab06656af5, type: 3}
+    - {fileID: 2800000, guid: 8f1374db88c3dfa478b399bb52b34364, type: 3}
+    - {fileID: 0}
+    baseColor: {r: 1, g: 1, b: 1, a: 1}
+    emissionColor: {r: 0, g: 0, b: 0, a: 1}
+    metallic: 0
+    roughnessScale: 1
+    normalScale: 1
+  SubmeshGroups:
+  - isTransparent: 0
+    isEmissive: 0
+    isAlphaClip: 0
+    submeshIndices: 00000000
+    materialDatas:
+    - material: {fileID: 2100000, guid: 3192dd97252226d45be15da37a62cf13, type: 2}
+      isTransparent: 0
+      isEmissive: 0
+      isAlphaClip: 0
+      textures:
+      - {fileID: 2800000, guid: 6610f7da178eba54ba8bc17373d80ece, type: 3}
+      - {fileID: 2800000, guid: 558ea19008d2e964fbf9d3ab06656af5, type: 3}
+      - {fileID: 2800000, guid: 8f1374db88c3dfa478b399bb52b34364, type: 3}
+      - {fileID: 0}
+      baseColor: {r: 1, g: 1, b: 1, a: 1}
+      emissionColor: {r: 0, g: 0, b: 0, a: 1}
+      metallic: 0
+      roughnessScale: 1
+      normalScale: 1
 --- !u!23 &4329397002389103357
 MeshRenderer:
   m_ObjectHideFlags: 0
@@ -3189,6 +3504,41 @@ MonoBehaviour:
   ommCaches: []
   _isStaticObject: 0
   meshRenderer: {fileID: 4387901216462066796}
+  SubmeshMaterialInfos:
+  - material: {fileID: 2100000, guid: 0a9f2294c03d27f4fbc173700574684f, type: 2}
+    isTransparent: 0
+    isEmissive: 0
+    isAlphaClip: 0
+    textures:
+    - {fileID: 0}
+    - {fileID: 2800000, guid: 9a7bfeb80605fa6458d072e5cc2e5548, type: 3}
+    - {fileID: 2800000, guid: 1e323752320081e4aaf6cf39ca508cff, type: 3}
+    - {fileID: 0}
+    baseColor: {r: 1, g: 1, b: 1, a: 1}
+    emissionColor: {r: 0, g: 0, b: 0, a: 1}
+    metallic: 0
+    roughnessScale: 0
+    normalScale: 1
+  SubmeshGroups:
+  - isTransparent: 0
+    isEmissive: 0
+    isAlphaClip: 0
+    submeshIndices: 00000000
+    materialDatas:
+    - material: {fileID: 2100000, guid: 0a9f2294c03d27f4fbc173700574684f, type: 2}
+      isTransparent: 0
+      isEmissive: 0
+      isAlphaClip: 0
+      textures:
+      - {fileID: 0}
+      - {fileID: 2800000, guid: 9a7bfeb80605fa6458d072e5cc2e5548, type: 3}
+      - {fileID: 2800000, guid: 1e323752320081e4aaf6cf39ca508cff, type: 3}
+      - {fileID: 0}
+      baseColor: {r: 1, g: 1, b: 1, a: 1}
+      emissionColor: {r: 0, g: 0, b: 0, a: 1}
+      metallic: 0
+      roughnessScale: 0
+      normalScale: 1
 --- !u!23 &4898057470769292634
 MeshRenderer:
   m_ObjectHideFlags: 0
@@ -3253,6 +3603,41 @@ MonoBehaviour:
   ommCaches: []
   _isStaticObject: 0
   meshRenderer: {fileID: 4898057470769292634}
+  SubmeshMaterialInfos:
+  - material: {fileID: 2100000, guid: 4325f89616240dd4ca5f2b68eaa7cf6f, type: 2}
+    isTransparent: 0
+    isEmissive: 0
+    isAlphaClip: 0
+    textures:
+    - {fileID: 2800000, guid: ce0897d21cea1484da4d16c016810fe6, type: 3}
+    - {fileID: 2800000, guid: 6edf2e566b1cce5439114ed66b00bc22, type: 3}
+    - {fileID: 2800000, guid: 4557b0255f09b9c4ba65d70d16879068, type: 3}
+    - {fileID: 0}
+    baseColor: {r: 1, g: 1, b: 1, a: 1}
+    emissionColor: {r: 0, g: 0, b: 0, a: 1}
+    metallic: 0
+    roughnessScale: 1
+    normalScale: 1
+  SubmeshGroups:
+  - isTransparent: 0
+    isEmissive: 0
+    isAlphaClip: 0
+    submeshIndices: 00000000
+    materialDatas:
+    - material: {fileID: 2100000, guid: 4325f89616240dd4ca5f2b68eaa7cf6f, type: 2}
+      isTransparent: 0
+      isEmissive: 0
+      isAlphaClip: 0
+      textures:
+      - {fileID: 2800000, guid: ce0897d21cea1484da4d16c016810fe6, type: 3}
+      - {fileID: 2800000, guid: 6edf2e566b1cce5439114ed66b00bc22, type: 3}
+      - {fileID: 2800000, guid: 4557b0255f09b9c4ba65d70d16879068, type: 3}
+      - {fileID: 0}
+      baseColor: {r: 1, g: 1, b: 1, a: 1}
+      emissionColor: {r: 0, g: 0, b: 0, a: 1}
+      metallic: 0
+      roughnessScale: 1
+      normalScale: 1
 --- !u!4 &5312381281301409343
 Transform:
   m_ObjectHideFlags: 0
@@ -3355,6 +3740,41 @@ MonoBehaviour:
   ommCaches: []
   _isStaticObject: 0
   meshRenderer: {fileID: 4175926269525833774}
+  SubmeshMaterialInfos:
+  - material: {fileID: 2100000, guid: cc3c3c1af942de645b5de20443b8922f, type: 2}
+    isTransparent: 0
+    isEmissive: 0
+    isAlphaClip: 0
+    textures:
+    - {fileID: 2800000, guid: 23c7b66842763f74cb328ba161cad44d, type: 3}
+    - {fileID: 2800000, guid: cda658ec381e7434ea03e1e8a04ed4da, type: 3}
+    - {fileID: 2800000, guid: 5c994fa744408a44ab21cd71da315275, type: 3}
+    - {fileID: 0}
+    baseColor: {r: 1, g: 1, b: 1, a: 1}
+    emissionColor: {r: 0, g: 0, b: 0, a: 1}
+    metallic: 0
+    roughnessScale: 1
+    normalScale: 1
+  SubmeshGroups:
+  - isTransparent: 0
+    isEmissive: 0
+    isAlphaClip: 0
+    submeshIndices: 00000000
+    materialDatas:
+    - material: {fileID: 2100000, guid: cc3c3c1af942de645b5de20443b8922f, type: 2}
+      isTransparent: 0
+      isEmissive: 0
+      isAlphaClip: 0
+      textures:
+      - {fileID: 2800000, guid: 23c7b66842763f74cb328ba161cad44d, type: 3}
+      - {fileID: 2800000, guid: cda658ec381e7434ea03e1e8a04ed4da, type: 3}
+      - {fileID: 2800000, guid: 5c994fa744408a44ab21cd71da315275, type: 3}
+      - {fileID: 0}
+      baseColor: {r: 1, g: 1, b: 1, a: 1}
+      emissionColor: {r: 0, g: 0, b: 0, a: 1}
+      metallic: 0
+      roughnessScale: 1
+      normalScale: 1
 --- !u!1 &7118363089034152835
 GameObject:
   m_ObjectHideFlags: 0
@@ -3446,6 +3866,41 @@ MonoBehaviour:
   ommCaches: []
   _isStaticObject: 0
   meshRenderer: {fileID: 1595013579286618807}
+  SubmeshMaterialInfos:
+  - material: {fileID: 2100000, guid: b92f8e73121e409498c384ff22686ca0, type: 2}
+    isTransparent: 0
+    isEmissive: 0
+    isAlphaClip: 0
+    textures:
+    - {fileID: 2800000, guid: 0bdd1003ab7d0e24d9f865477e82c303, type: 3}
+    - {fileID: 2800000, guid: 4babd8a715a152a41b562f8ab92ff7c9, type: 3}
+    - {fileID: 2800000, guid: ed6b35e4f22ddd34bb30b9e9d192e4d8, type: 3}
+    - {fileID: 0}
+    baseColor: {r: 1, g: 1, b: 1, a: 1}
+    emissionColor: {r: 0, g: 0, b: 0, a: 1}
+    metallic: 1
+    roughnessScale: 1
+    normalScale: 1
+  SubmeshGroups:
+  - isTransparent: 0
+    isEmissive: 0
+    isAlphaClip: 0
+    submeshIndices: 00000000
+    materialDatas:
+    - material: {fileID: 2100000, guid: b92f8e73121e409498c384ff22686ca0, type: 2}
+      isTransparent: 0
+      isEmissive: 0
+      isAlphaClip: 0
+      textures:
+      - {fileID: 2800000, guid: 0bdd1003ab7d0e24d9f865477e82c303, type: 3}
+      - {fileID: 2800000, guid: 4babd8a715a152a41b562f8ab92ff7c9, type: 3}
+      - {fileID: 2800000, guid: ed6b35e4f22ddd34bb30b9e9d192e4d8, type: 3}
+      - {fileID: 0}
+      baseColor: {r: 1, g: 1, b: 1, a: 1}
+      emissionColor: {r: 0, g: 0, b: 0, a: 1}
+      metallic: 1
+      roughnessScale: 1
+      normalScale: 1
 --- !u!33 &7962309624657857162
 MeshFilter:
   m_ObjectHideFlags: 0
@@ -3469,6 +3924,8 @@ MonoBehaviour:
   ommCaches: []
   _isStaticObject: 0
   meshRenderer: {fileID: 0}
+  SubmeshMaterialInfos: []
+  SubmeshGroups: []
 --- !u!23 &8021470151075589969
 MeshRenderer:
   m_ObjectHideFlags: 0
@@ -3533,6 +3990,41 @@ MonoBehaviour:
   ommCaches: []
   _isStaticObject: 0
   meshRenderer: {fileID: 8021470151075589969}
+  SubmeshMaterialInfos:
+  - material: {fileID: 2100000, guid: 0a9f2294c03d27f4fbc173700574684f, type: 2}
+    isTransparent: 0
+    isEmissive: 0
+    isAlphaClip: 0
+    textures:
+    - {fileID: 0}
+    - {fileID: 2800000, guid: 9a7bfeb80605fa6458d072e5cc2e5548, type: 3}
+    - {fileID: 2800000, guid: 1e323752320081e4aaf6cf39ca508cff, type: 3}
+    - {fileID: 0}
+    baseColor: {r: 1, g: 1, b: 1, a: 1}
+    emissionColor: {r: 0, g: 0, b: 0, a: 1}
+    metallic: 0
+    roughnessScale: 0
+    normalScale: 1
+  SubmeshGroups:
+  - isTransparent: 0
+    isEmissive: 0
+    isAlphaClip: 0
+    submeshIndices: 00000000
+    materialDatas:
+    - material: {fileID: 2100000, guid: 0a9f2294c03d27f4fbc173700574684f, type: 2}
+      isTransparent: 0
+      isEmissive: 0
+      isAlphaClip: 0
+      textures:
+      - {fileID: 0}
+      - {fileID: 2800000, guid: 9a7bfeb80605fa6458d072e5cc2e5548, type: 3}
+      - {fileID: 2800000, guid: 1e323752320081e4aaf6cf39ca508cff, type: 3}
+      - {fileID: 0}
+      baseColor: {r: 1, g: 1, b: 1, a: 1}
+      emissionColor: {r: 0, g: 0, b: 0, a: 1}
+      metallic: 0
+      roughnessScale: 0
+      normalScale: 1
 --- !u!33 &8066999598948552797
 MeshFilter:
   m_ObjectHideFlags: 0
@@ -3556,6 +4048,41 @@ MonoBehaviour:
   ommCaches: []
   _isStaticObject: 0
   meshRenderer: {fileID: 1393697188820824965}
+  SubmeshMaterialInfos:
+  - material: {fileID: 2100000, guid: b2183b77dbd9a6841b237f374b1aa98e, type: 2}
+    isTransparent: 0
+    isEmissive: 0
+    isAlphaClip: 0
+    textures:
+    - {fileID: 2800000, guid: c0a41b5656f00de4d8239f65118bc165, type: 3}
+    - {fileID: 2800000, guid: bf8f44f5bc8384d41be295930fede691, type: 3}
+    - {fileID: 2800000, guid: 51196fdf27b68b24681f6b0cf24dd958, type: 3}
+    - {fileID: 0}
+    baseColor: {r: 1, g: 1, b: 1, a: 1}
+    emissionColor: {r: 0, g: 0, b: 0, a: 1}
+    metallic: 0
+    roughnessScale: 0.34500003
+    normalScale: 1
+  SubmeshGroups:
+  - isTransparent: 0
+    isEmissive: 0
+    isAlphaClip: 0
+    submeshIndices: 00000000
+    materialDatas:
+    - material: {fileID: 2100000, guid: b2183b77dbd9a6841b237f374b1aa98e, type: 2}
+      isTransparent: 0
+      isEmissive: 0
+      isAlphaClip: 0
+      textures:
+      - {fileID: 2800000, guid: c0a41b5656f00de4d8239f65118bc165, type: 3}
+      - {fileID: 2800000, guid: bf8f44f5bc8384d41be295930fede691, type: 3}
+      - {fileID: 2800000, guid: 51196fdf27b68b24681f6b0cf24dd958, type: 3}
+      - {fileID: 0}
+      baseColor: {r: 1, g: 1, b: 1, a: 1}
+      emissionColor: {r: 0, g: 0, b: 0, a: 1}
+      metallic: 0
+      roughnessScale: 0.34500003
+      normalScale: 1
 --- !u!1 &8771091788108555836
 GameObject:
   m_ObjectHideFlags: 0
@@ -3602,6 +4129,41 @@ MonoBehaviour:
   ommCaches: []
   _isStaticObject: 0
   meshRenderer: {fileID: 4329397002389103357}
+  SubmeshMaterialInfos:
+  - material: {fileID: 2100000, guid: 47754b34df7b35b45ab8686abde2bba9, type: 2}
+    isTransparent: 0
+    isEmissive: 0
+    isAlphaClip: 0
+    textures:
+    - {fileID: 2800000, guid: 54cdc4a4f6ef60a44b427570a6bdfbde, type: 3}
+    - {fileID: 2800000, guid: e6d41ff1627cab446aa27103ccce714c, type: 3}
+    - {fileID: 2800000, guid: 1e323752320081e4aaf6cf39ca508cff, type: 3}
+    - {fileID: 0}
+    baseColor: {r: 1, g: 1, b: 1, a: 1}
+    emissionColor: {r: 0, g: 0, b: 0, a: 1}
+    metallic: 0
+    roughnessScale: 1
+    normalScale: 1
+  SubmeshGroups:
+  - isTransparent: 0
+    isEmissive: 0
+    isAlphaClip: 0
+    submeshIndices: 00000000
+    materialDatas:
+    - material: {fileID: 2100000, guid: 47754b34df7b35b45ab8686abde2bba9, type: 2}
+      isTransparent: 0
+      isEmissive: 0
+      isAlphaClip: 0
+      textures:
+      - {fileID: 2800000, guid: 54cdc4a4f6ef60a44b427570a6bdfbde, type: 3}
+      - {fileID: 2800000, guid: e6d41ff1627cab446aa27103ccce714c, type: 3}
+      - {fileID: 2800000, guid: 1e323752320081e4aaf6cf39ca508cff, type: 3}
+      - {fileID: 0}
+      baseColor: {r: 1, g: 1, b: 1, a: 1}
+      emissionColor: {r: 0, g: 0, b: 0, a: 1}
+      metallic: 0
+      roughnessScale: 1
+      normalScale: 1
 --- !u!1660057539 &9223372036854775807
 SceneRoots:
   m_ObjectHideFlags: 0
