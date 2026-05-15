@@ -19,6 +19,8 @@ ScriptedImporter:
   extraArgs: []
   defines:
   - PATH_TRACER_MODE=PATH_TRACER_MODE_REFERENCE
+  - RTXPT_PIPELINE_PERMUTATION_NAME=REF
+  - RTXPT_MATERIAL_PERMUTATION_NAME=REF
   targetProfile: lib_6_9
   maxPayloadSizeInBytes: 4
   rayGenName: RayGen_REF

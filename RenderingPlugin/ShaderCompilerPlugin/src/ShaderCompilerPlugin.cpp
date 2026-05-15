@@ -755,6 +755,10 @@ bool NR_SC_ReflectLib(
         return false;
     };
 
+    // Shader entry point list
+    struct ShaderEntry { std::string name; std::string kind; };
+    std::vector<ShaderEntry> shaderEntries;
+
     for (UINT fi = 0; fi < libDesc.FunctionCount; ++fi)
     {
         auto* fn = libRefl->GetFunctionByIndex((INT)fi);
@@ -762,6 +766,41 @@ bool NR_SC_ReflectLib(
 
         D3D12_FUNCTION_DESC fnDesc{};
         if (FAILED(fn->GetDesc(&fnDesc))) continue;
+
+        // Classify entry point by shader type bits
+        UINT shaderType = (fnDesc.Version >> 16) & 0xffff;
+        const char* kind = nullptr;
+        switch (shaderType)
+        {
+        case 0x08: kind = "raygen";       break; // D3D12_SHVER_RAYGEN_SHADER
+        case 0x09: kind = "anyhit";       break; // D3D12_SHVER_ANY_HIT_SHADER
+        case 0x0A: kind = "closesthit";   break; // D3D12_SHVER_CLOSEST_HIT_SHADER
+        case 0x0B: kind = "miss";         break; // D3D12_SHVER_MISS_SHADER
+        case 0x0C: kind = "intersection"; break; // D3D12_SHVER_INTERSECTION_SHADER
+        case 0x0D: kind = "callable";     break; // D3D12_SHVER_CALLABLE_SHADER
+        default:   break;
+        }
+        if (kind && fnDesc.Name && fnDesc.Name[0])
+        {
+            // Demangle DXC mangled name (same logic as RayTraceShader::ReflectBindings)
+            std::string nameA(fnDesc.Name);
+            std::string realName = nameA;
+            {
+                const char* p = nameA.c_str();
+                while (*p && (unsigned char)*p < 0x20) ++p;
+                if (*p == '?')
+                {
+                    ++p;
+                    const char* atAt = strstr(p, "@@");
+                    if (atAt) realName = std::string(p, atAt);
+                }
+                else if (p != nameA.c_str())
+                {
+                    realName = std::string(p);
+                }
+            }
+            shaderEntries.push_back({ realName, kind });
+        }
 
         for (UINT bi = 0; bi < fnDesc.BoundResources; ++bi)
         {
@@ -799,7 +838,17 @@ bool NR_SC_ReflectLib(
     // Serialize to JSON
     std::string json;
     json.reserve(1024);
-    json += "{\n  \"bindings\": [\n";
+    json += "{\n  \"shaders\": [\n";
+    for (size_t i = 0; i < shaderEntries.size(); ++i)
+    {
+        if (i > 0) json += ",\n";
+        json += "    { \"name\": \"";
+        json += shaderEntries[i].name;
+        json += "\", \"kind\": \"";
+        json += shaderEntries[i].kind;
+        json += "\" }";
+    }
+    json += "\n  ],\n  \"bindings\": [\n";
 
     for (size_t i = 0; i < bindings.size(); ++i)
     {

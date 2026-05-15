@@ -19,6 +19,8 @@ ScriptedImporter:
   extraArgs: []
   defines:
   - PATH_TRACER_MODE=PATH_TRACER_MODE_FILL_STABLE_PLANES
+  - RTXPT_PIPELINE_PERMUTATION_NAME=FILL
+  - RTXPT_MATERIAL_PERMUTATION_NAME=FILL
   targetProfile: lib_6_9
   maxPayloadSizeInBytes: 4
   rayGenName: RayGen_FILL

@@ -122,6 +122,7 @@ namespace NativeRender
         private bool _showCBV        = true;
         private bool _showSampler    = true;
         private bool _showTLAS       = true;
+        private bool _showShaders    = true;
         private bool _showReflection = true;
 
         public override void OnInspectorGUI()
@@ -165,6 +166,8 @@ namespace NativeRender
             {
                 EditorGUI.indentLevel++;
 
+                DrawShaderGroup(ref _showShaders, info.Shaders);
+
                 DrawBindingGroup(ref _showSRV,     "SRV",     info.SRV);
                 DrawBindingGroup(ref _showUAV,     "UAV",     info.UAV);
                 DrawBindingGroup(ref _showCBV,     "CBV",     info.CBV);
@@ -190,6 +193,14 @@ namespace NativeRender
             sb.AppendLine($"=== Shader Reflection: {System.IO.Path.GetFileName(assetPath)} ===");
             sb.AppendLine();
 
+            if (info.Shaders.Count > 0)
+            {
+                sb.AppendLine($"-- Shader Entry Points ({info.Shaders.Count}) --");
+                foreach (var s in info.Shaders)
+                    sb.AppendLine($"  [{s.Kind,-12}]  {s.Name}");
+                sb.AppendLine();
+            }
+
             void AppendGroup(string label, List<ShaderBindingEntry> entries)
             {
                 if (entries.Count == 0) return;
@@ -206,6 +217,17 @@ namespace NativeRender
             AppendGroup("TLAS",    info.TLAS);
 
             Debug.Log(sb.ToString());
+        }
+
+        private static void DrawShaderGroup(ref bool foldout, List<ShaderEntry> entries)
+        {
+            if (entries.Count == 0) return;
+            foldout = EditorGUILayout.Foldout(foldout, $"Shaders  ({entries.Count})", true);
+            if (!foldout) return;
+            EditorGUI.indentLevel++;
+            foreach (var s in entries)
+                EditorGUILayout.LabelField(s.Name, s.Kind);
+            EditorGUI.indentLevel--;
         }
 
         private static void DrawBindingGroup(ref bool foldout, string label, List<ShaderBindingEntry> entries)
@@ -265,8 +287,15 @@ namespace NativeRender
             }
         }
 
+        private class ShaderEntry
+        {
+            public string Name;
+            public string Kind;
+        }
+
         private class ShaderReflectionInfo
         {
+            public List<ShaderEntry>        Shaders = new();
             public List<ShaderBindingEntry> SRV     = new();
             public List<ShaderBindingEntry> UAV     = new();
             public List<ShaderBindingEntry> CBV     = new();
@@ -279,11 +308,39 @@ namespace NativeRender
                 {
                     var result = new ShaderReflectionInfo();
 
+                    // Parse "shaders" array
+                    int shadersIdx = json.IndexOf("\"shaders\"", StringComparison.Ordinal);
+                    if (shadersIdx >= 0)
+                    {
+                        int aStart = json.IndexOf('[', shadersIdx);
+                        int aEnd   = json.IndexOf(']', aStart);
+                        if (aStart >= 0 && aEnd > aStart)
+                        {
+                            string body = json.Substring(aStart + 1, aEnd - aStart - 1);
+                            int pos2 = 0;
+                            while (pos2 < body.Length)
+                            {
+                                int o1 = body.IndexOf('{', pos2);
+                                if (o1 < 0) break;
+                                int o2 = body.IndexOf('}', o1);
+                                if (o2 < 0) break;
+                                string obj = body.Substring(o1 + 1, o2 - o1 - 1);
+                                result.Shaders.Add(new ShaderEntry
+                                {
+                                    Name = ExtractString(obj, "name"),
+                                    Kind = ExtractString(obj, "kind"),
+                                });
+                                pos2 = o2 + 1;
+                            }
+                        }
+                    }
+
+                    // Parse "bindings" array
                     int bindingsIdx = json.IndexOf("\"bindings\"", StringComparison.Ordinal);
                     if (bindingsIdx < 0) return result;
 
                     int arrayStart = json.IndexOf('[', bindingsIdx);
-                    int arrayEnd   = json.LastIndexOf(']');
+                    int arrayEnd   = json.IndexOf(']', arrayStart);
                     if (arrayStart < 0 || arrayEnd <= arrayStart) return result;
 
                     string arrayBody = json.Substring(arrayStart + 1, arrayEnd - arrayStart - 1);
