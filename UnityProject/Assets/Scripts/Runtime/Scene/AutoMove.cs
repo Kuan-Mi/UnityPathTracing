@@ -13,7 +13,7 @@ namespace DefaultNamespace
 
         private void OnEnable()
         {
-            center = transform.position;
+            // center = transform.position;
         }
         
         private void Update()

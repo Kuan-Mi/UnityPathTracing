@@ -46,15 +46,15 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: -8679921383154817045, guid: de926825f0840584db0f9890040354ed, type: 3}
       propertyPath: m_LocalPosition.x
-      value: -1.17987
+      value: 5.14305
       objectReference: {fileID: 0}
     - target: {fileID: -8679921383154817045, guid: de926825f0840584db0f9890040354ed, type: 3}
       propertyPath: m_LocalPosition.y
-      value: 8.88885
+      value: 0
       objectReference: {fileID: 0}
     - target: {fileID: -8679921383154817045, guid: de926825f0840584db0f9890040354ed, type: 3}
       propertyPath: m_LocalPosition.z
-      value: 0.46863
+      value: -8.56658
       objectReference: {fileID: 0}
     - target: {fileID: -8679921383154817045, guid: de926825f0840584db0f9890040354ed, type: 3}
       propertyPath: m_LocalRotation.w
@@ -3412,6 +3412,11 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: cf1f7d8416f11b44cba2b22bf319cda7, type: 3}
   m_Name: 
   m_EditorClassIdentifier: NativeRayTracing.Runtime::NativeRender.NativeRayTracingSkinnedTarget
+--- !u!23 &1952876464262507581 stripped
+MeshRenderer:
+  m_CorrespondingSourceObject: {fileID: -6136125401420605915, guid: de926825f0840584db0f9890040354ed, type: 3}
+  m_PrefabInstance: {fileID: 3585455436616481304}
+  m_PrefabAsset: {fileID: 0}
 --- !u!1 &3856141144039505491 stripped
 GameObject:
   m_CorrespondingSourceObject: {fileID: -8916604678226410421, guid: de926825f0840584db0f9890040354ed, type: 3}
@@ -3443,7 +3448,7 @@ Animator:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 4396482356987922249}
   m_Enabled: 1
-  m_Avatar: {fileID: 0}
+  m_Avatar: {fileID: 9000000, guid: de926825f0840584db0f9890040354ed, type: 3}
   m_Controller: {fileID: 9100000, guid: a8e4206b0d8d4b747b347eba663aad4a, type: 2}
   m_CullingMode: 0
   m_UpdateMode: 0
@@ -3508,3 +3513,68 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: NativeRayTracing.Runtime::NativeRender.NativeRayTracingTarget
   ommCaches: []
+  _isStaticObject: 0
+  meshRenderer: {fileID: 1952876464262507581}
+  SubmeshMaterialInfos:
+  - material: {fileID: 2100000, guid: 40d41d9c97fcf984d857e7f0e6cfc6e2, type: 2}
+    isTransparent: 0
+    isEmissive: 0
+    isAlphaClip: 0
+    textures:
+    - {fileID: 0}
+    - {fileID: 0}
+    - {fileID: 0}
+    - {fileID: 0}
+    baseColor: {r: 0.85882354, g: 0.80784315, b: 0.87058824, a: 1}
+    emissionColor: {r: 0, g: 0, b: 0, a: 1}
+    metallic: 0
+    roughnessScale: 0.8
+    normalScale: 1
+  - material: {fileID: 2100000, guid: 8d08b105766fe224c970458677e58f85, type: 2}
+    isTransparent: 0
+    isEmissive: 0
+    isAlphaClip: 0
+    textures:
+    - {fileID: 0}
+    - {fileID: 0}
+    - {fileID: 0}
+    - {fileID: 0}
+    baseColor: {r: 0.3921568, g: 0.36862743, b: 0.4, a: 1}
+    emissionColor: {r: 0, g: 0, b: 0, a: 1}
+    metallic: 0
+    roughnessScale: 0.71715736
+    normalScale: 1
+  SubmeshGroups:
+  - isTransparent: 0
+    isEmissive: 0
+    isAlphaClip: 0
+    submeshIndices: 0000000001000000
+    materialDatas:
+    - material: {fileID: 2100000, guid: 40d41d9c97fcf984d857e7f0e6cfc6e2, type: 2}
+      isTransparent: 0
+      isEmissive: 0
+      isAlphaClip: 0
+      textures:
+      - {fileID: 0}
+      - {fileID: 0}
+      - {fileID: 0}
+      - {fileID: 0}
+      baseColor: {r: 0.85882354, g: 0.80784315, b: 0.87058824, a: 1}
+      emissionColor: {r: 0, g: 0, b: 0, a: 1}
+      metallic: 0
+      roughnessScale: 0.8
+      normalScale: 1
+    - material: {fileID: 2100000, guid: 8d08b105766fe224c970458677e58f85, type: 2}
+      isTransparent: 0
+      isEmissive: 0
+      isAlphaClip: 0
+      textures:
+      - {fileID: 0}
+      - {fileID: 0}
+      - {fileID: 0}
+      - {fileID: 0}
+      baseColor: {r: 0.3921568, g: 0.36862743, b: 0.4, a: 1}
+      emissionColor: {r: 0, g: 0, b: 0, a: 1}
+      metallic: 0
+      roughnessScale: 0.71715736
+      normalScale: 1
