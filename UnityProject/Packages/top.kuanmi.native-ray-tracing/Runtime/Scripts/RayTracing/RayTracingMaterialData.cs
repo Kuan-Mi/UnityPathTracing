@@ -30,7 +30,7 @@ namespace NativeRender
         public Color baseColor;
         public Color emissionColor;
         public float metallic;
-        public float roughnessScale;  // 1 − smoothness (URP) or roughnessFactor (glTF)
+        public float roughnessScale; // 1 − smoothness (URP) or roughnessFactor (glTF)
         public float normalScale;
     }
 
@@ -43,6 +43,7 @@ namespace NativeRender
     {
         public bool isTransparent;
         public bool isEmissive;
+
         /// <summary>True when any submesh in the group uses alpha-clip; GEOMETRY_OPAQUE is NOT set for these geometries.</summary>
         public bool isAlphaClip;
 
@@ -77,6 +78,7 @@ namespace NativeRender
                     _phWhite.SetPixel(0, 0, Color.white);
                     _phWhite.Apply(false, true);
                 }
+
                 return _phWhite;
             }
         }
@@ -92,6 +94,7 @@ namespace NativeRender
                     _phFlatNormal.SetPixel(0, 0, new Color(0.5f, 0.5f, 1f, 1f));
                     _phFlatNormal.Apply(false, true);
                 }
+
                 return _phFlatNormal;
             }
         }
@@ -107,6 +110,7 @@ namespace NativeRender
                     _phBlack.SetPixel(0, 0, Color.black);
                     _phBlack.Apply(false, true);
                 }
+
                 return _phBlack;
             }
         }
@@ -151,6 +155,7 @@ namespace NativeRender
                     Color e = mat.GetColor("_EmissionColor").linear;
                     if (e.r > 0f || e.g > 0f || e.b > 0f) return true;
                 }
+
                 return mat.HasProperty("_EmissionMap") && mat.GetTexture("_EmissionMap") != null;
             }
 
@@ -200,25 +205,32 @@ namespace NativeRender
                 data.roughnessScale = TryGetFloat(mat, "roughnessFactor", 0.5f);
                 data.normalScale    = 1f;
 
-                data.textures[0] = TryGetTex(mat, "baseColorTexture")          ?? White;
-                data.textures[1] = TryGetTex(mat, "metallicRoughnessTexture")  ?? Black;
-                data.textures[2] = TryGetTex(mat, "normalTexture")             ?? FlatNormal;
-                data.textures[3] = TryGetTex(mat, "emissiveTexture")           ?? Black;
+                data.textures[0] = TryGetTex(mat, "baseColorTexture") ?? White;
+                data.textures[1] = TryGetTex(mat, "metallicRoughnessTexture") ?? Black;
+
+                var normal = TryGetTex(mat, "normalTexture");
+                if (normal.height <= 4)
+                {
+                    normal = FlatNormal;
+                }
+
+                data.textures[2] = normal ?? FlatNormal;
+                data.textures[3] = TryGetTex(mat, "emissiveTexture") ?? Black;
             }
             else
             {
                 // URP/Lit, RayTracing/Lit, and unknown-shader fallback.
-                data.baseColor      = TryGetColor(mat, "_BaseColor", Color.white);
-                data.emissionColor  = TryGetColor(mat, "_EmissionColor", Color.black);
-                data.metallic       = TryGetFloat(mat, "_Metallic", 0f);
-                float smooth        = TryGetFloat(mat, "_Smoothness", 0.5f);
+                data.baseColor     = TryGetColor(mat, "_BaseColor", Color.white);
+                data.emissionColor = TryGetColor(mat, "_EmissionColor", Color.black);
+                data.metallic      = TryGetFloat(mat, "_Metallic", 0f);
+                float smooth = TryGetFloat(mat, "_Smoothness", 0.5f);
                 data.roughnessScale = 1f - smooth;
                 data.normalScale    = TryGetFloat(mat, "_BumpScale", 1f);
 
-                data.textures[0] = TryGetTex(mat, "_BaseMap")           ?? White;
-                data.textures[1] = TryGetTex(mat, "_MetallicGlossMap")  ?? Black;
-                data.textures[2] = TryGetTex(mat, "_BumpMap")           ?? FlatNormal;
-                data.textures[3] = TryGetTex(mat, "_EmissionMap")       ?? Black;
+                data.textures[0] = TryGetTex(mat, "_BaseMap") ?? White;
+                data.textures[1] = TryGetTex(mat, "_MetallicGlossMap") ?? Black;
+                data.textures[2] = TryGetTex(mat, "_BumpMap") ?? FlatNormal;
+                data.textures[3] = TryGetTex(mat, "_EmissionMap") ?? Black;
             }
 
             return data;
@@ -240,9 +252,10 @@ namespace NativeRender
                 var key = (d.isTransparent, d.isEmissive, d.isAlphaClip);
                 if (!dict.TryGetValue(key, out var pair))
                 {
-                    pair = (new List<int>(), new List<SubmeshMaterialData>());
+                    pair      = (new List<int>(), new List<SubmeshMaterialData>());
                     dict[key] = pair;
                 }
+
                 pair.indices.Add(s);
                 pair.datas.Add(d);
             }
@@ -260,6 +273,7 @@ namespace NativeRender
                     materialDatas  = kv.Value.datas.ToArray(),
                 };
             }
+
             return result;
         }
     }

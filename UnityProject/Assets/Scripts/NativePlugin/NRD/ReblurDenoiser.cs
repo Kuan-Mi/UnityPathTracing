@@ -10,22 +10,6 @@ namespace Nrd
     {
         private readonly Denoiser _denoiser;
 
-        /// <summary>Per-frame input for REBLUR denoising.</summary>
-        public struct FrameInput
-        {
-            public CommonFrameInput common;
-
-            // REBLUR-specific settings
-            public CheckerboardMode              checkerboardMode;
-            public HitDistanceReconstructionMode hitDistanceReconstructionMode;
-            public uint                          maxAccumulatedFrameNum;
-            public uint                          maxFastAccumulatedFrameNum;
-            public uint                          maxStabilizedFrameNum;
-
-            /// <summary>Default: 1.5f</summary>
-            public float fastHistoryClampingSigmaScale;
-        }
-
         private static readonly HashSet<Denoiser> ValidDenoisers = new()
         {
             Denoiser.REBLUR_DIFFUSE,
@@ -49,28 +33,22 @@ namespace Nrd
             _denoiser = denoiser;
         }
 
-        public IntPtr GetInteropDataPtr(FrameInput fi)
+        public unsafe IntPtr  GetInteropDataPtr(CommonSettings common, ReblurSettings settings)
         {
             var data = NrdFrameData._default;
-            FillCommonSettings(ref data, fi.common);
+            
+            data.instanceId     = _nrdInstanceId;
+            data.width          = common.resourceSize[0];
+            data.height         = common.resourceSize[1];
+            data.commonSettings = common;
 
             data.denoiserCount = 1;
             ref var entry = ref NrdFrameData.GetEntry(ref data, 0);
             entry.identifier = 0;
             entry.denoiser   = _denoiser;
+            entry.Write(settings);
 
-            var s = ReblurSettings._default;
-            s.checkerboardMode              = fi.checkerboardMode;
-            s.minMaterialForDiffuse         = 0;
-            s.minMaterialForSpecular        = 1;
-            s.hitDistanceReconstructionMode = fi.hitDistanceReconstructionMode;
-            s.maxAccumulatedFrameNum        = fi.maxAccumulatedFrameNum;
-            s.maxFastAccumulatedFrameNum    = fi.maxFastAccumulatedFrameNum;
-            s.maxStabilizedFrameNum         = fi.maxStabilizedFrameNum;
-            s.fastHistoryClampingSigmaScale = fi.fastHistoryClampingSigmaScale > 0f ? fi.fastHistoryClampingSigmaScale : 1.5f;
-            entry.Write(s);
-
-            return StoreAndGetPtr(data, fi.common.frameIndex);
+            return StoreAndGetPtr(data, common.frameIndex);
         }
     }
 }

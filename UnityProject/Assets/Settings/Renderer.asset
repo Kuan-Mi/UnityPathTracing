@@ -74,7 +74,7 @@ MonoBehaviour:
     showMV: 0
     cameraJitter: 1
     sunAngularDiameter: 0.533
-    enableAutoExposure: 1
+    enableAutoExposure: 0
     fixExposure: 22.45
     toneMappingParams:
       histogramLowPercentile: 0.8
@@ -93,32 +93,233 @@ MonoBehaviour:
     separator: 0
     hitDistScale: 3
     resolutionScale: 1
-    maxAccumulatedFrameNum: 20
-    maxFastAccumulatedFrameNum: 4
+    maxAccumulatedFrameNum: 50
+    maxFastAccumulatedFrameNum: 10
     onScreen: 0
     forcedMaterial: 0
-    denoiser: 0
+    denoiser: 1
     rpp: 1
     bounceNum: 1
-    tracingMode: 2
+    tracingMode: 0
     SHARC: 1
     PSR: 1
     normalMap: 1
     TAA: 1
     emission: 1
     importanceSampling: 1
-    adaptiveAccumulation: 1
+    adaptiveAccumulation: 0
     usePrevFrame: 1
     boost: 1
-    SR: 0
-    RR: 1
-    upscalerMode: 1
+    SR: 1
+    RR: 0
+    upscalerMode: 0
     confidence: 1
     denoisingRange: 1000
     nisSharpness: 0.17709924
     skipRightEyeInVR: 0
     dofAperture: 0
     dofFocalDistance: 2
+  commonSettings:
+    viewToClipMatrix:
+      e00: 0.91844463
+      e01: 0
+      e02: 0
+      e03: 0
+      e10: 0
+      e11: 1.7320508
+      e12: 0
+      e13: 0
+      e20: 0
+      e21: 0
+      e22: 0.000005066395
+      e23: 0.10450052
+      e30: 0
+      e31: 0
+      e32: -1
+      e33: 0
+    viewToClipMatrixPrev:
+      e00: 0.91844463
+      e01: 0
+      e02: 0
+      e03: 0
+      e10: 0
+      e11: 1.7320508
+      e12: 0
+      e13: 0
+      e20: 0
+      e21: 0
+      e22: 0.000005066395
+      e23: 0.10450052
+      e30: 0
+      e31: 0
+      e32: -1
+      e33: 0
+    worldToViewMatrix:
+      e00: -0.017470598
+      e01: 0.00031873584
+      e02: 0.99984735
+      e03: 3.4742548
+      e10: -0.29492864
+      e11: 0.9555037
+      e12: -0.0054579824
+      e13: -3.3611672
+      e20: 0.95535964
+      e21: 0.29497898
+      e22: 0.016599298
+      e23: 3.8462658
+      e30: 0
+      e31: 0
+      e32: 0
+      e33: 1
+    worldToViewMatrixPrev:
+      e00: -0.017470598
+      e01: 0.00031873584
+      e02: 0.99984735
+      e03: 3.4742548
+      e10: -0.29492864
+      e11: 0.9555037
+      e12: -0.0054579824
+      e13: -3.3611672
+      e20: 0.95535964
+      e21: 0.29497898
+      e22: 0.016599298
+      e23: 3.8462658
+      e30: 0
+      e31: 0
+      e32: 0
+      e33: 1
+    worldPrevToWorldMatrix:
+      e00: 1
+      e01: 0
+      e02: 0
+      e03: 0
+      e10: 0
+      e11: 1
+      e12: 0
+      e13: 0
+      e20: 0
+      e21: 0
+      e22: 1
+      e23: 0
+      e30: 0
+      e31: 0
+      e32: 0
+      e33: 1
+    motionVectorScale:
+      x: 0.00085251493
+      y: 0.001607717
+      z: -1
+    cameraJitter:
+      x: -0.05340576
+      y: -0.3562211
+    cameraJitterPrev:
+      x: 0.19659424
+      y: 0.19933444
+    resourceSize: 95046e02
+    resourceSizePrev: 95046e02
+    rectSize: 95046e02
+    rectSizePrev: 95046e02
+    viewZScale: 1
+    timeDeltaBetweenFrames: 0
+    denoisingRange: 1000
+    disocclusionThreshold: 0.01
+    disocclusionThresholdAlternate: 0.1
+    cameraAttachedReflectionMaterialID: 999
+    strandMaterialID: 2
+    historyFixAlternatePixelStrideMaterialID: 999
+    strandThickness: 0.00008
+    splitScreen: 0
+    printfAt: 0f270f27
+    debug: 0
+    rectOrigin: 0000000000000000
+    frameIndex: 10829
+    accumulationMode: 0
+  sigmaSettings:
+    lightDirection: {x: 0.9257155, y: 0.3584616, z: -0.12064916}
+    planeDistanceSensitivity: 0.02
+    maxStabilizedFrameNum: 5
+  reblurSettings:
+    hitDistanceParameters:
+      A: 3
+      B: 0.1
+      C: 20
+    antilagSettings:
+      luminanceSigmaScale: 2
+      luminanceSensitivity: 3
+    responsiveAccumulationSettings:
+      roughnessThreshold: 0
+      minAccumulatedFrameNum: 3
+    convergenceSettings:
+      s: 1
+      b: 0.2
+      p: 0.8
+    maxAccumulatedFrameNum: 50
+    maxFastAccumulatedFrameNum: 10
+    maxStabilizedFrameNum: 50
+    historyFixFrameNum: 3
+    historyFixBasePixelStride: 14
+    historyFixAlternatePixelStride: 14
+    fastHistoryClampingSigmaScale: 1.5
+    diffusePrepassBlurRadius: 30
+    specularPrepassBlurRadius: 50
+    minHitDistanceWeight: 0.1
+    minBlurRadius: 1
+    maxBlurRadius: 30
+    lobeAngleFraction: 0.15
+    roughnessFraction: 0.15
+    planeDistanceSensitivity: 0.02
+    specularProbabilityThresholdsForMvModification:
+    - 0.5
+    - 0.9
+    fireflySuppressorMinRelativeScale: 2
+    minMaterialForDiffuse: 0
+    minMaterialForSpecular: 1
+    checkerboardMode: 0
+    hitDistanceReconstructionMode: 0
+    _enableAntiFirefly: 1
+    _usePrepassOnlyForSpecularMotionEstimation: 0
+    _returnHistoryLengthInsteadOfOcclusion: 0
+  relaxSettings:
+    antilagSettings:
+      accelerationAmount: 0.3
+      spatialSigmaScale: 4.5
+      temporalSigmaScale: 0.5
+      resetAmount: 0.5
+    diffuseMaxAccumulatedFrameNum: 50
+    specularMaxAccumulatedFrameNum: 50
+    diffuseMaxFastAccumulatedFrameNum: 10
+    specularMaxFastAccumulatedFrameNum: 10
+    historyFixFrameNum: 3
+    historyFixBasePixelStride: 14
+    historyFixAlternatePixelStride: 14
+    historyFixEdgeStoppingNormalPower: 8
+    fastHistoryClampingSigmaScale: 1.5
+    diffusePrepassBlurRadius: 30
+    specularPrepassBlurRadius: 50
+    minHitDistanceWeight: 0.1
+    spatialVarianceEstimationHistoryThreshold: 3
+    diffusePhiLuminance: 2
+    specularPhiLuminance: 1
+    lobeAngleFraction: 0.5
+    roughnessFraction: 0.15
+    specularVarianceBoost: 0
+    specularLobeAngleSlack: 0.15
+    atrousIterationNum: 5
+    diffuseMinLuminanceWeight: 0
+    specularMinLuminanceWeight: 0
+    depthThreshold: 0.003
+    confidenceDrivenRelaxationMultiplier: 0
+    confidenceDrivenLuminanceEdgeStoppingRelaxation: 0
+    confidenceDrivenNormalEdgeStoppingRelaxation: 0
+    luminanceEdgeStoppingRelaxation: 0.5
+    normalEdgeStoppingRelaxation: 0.3
+    roughnessEdgeStoppingRelaxation: 1
+    checkerboardMode: 0
+    hitDistanceReconstructionMode: 0
+    minMaterialForDiffuse: 0
+    minMaterialForSpecular: 1
+    _enableAntiFirefly: 0
+    _enableRoughnessEdgeStopping: 1
   renderPassEvent: 550
   finalMaterial: {fileID: 2100000, guid: 27695a2bc55ef2f469362b9a2994989e, type: 2}
   nrdOpaqueTracingShader: {fileID: -2368575503658470205, guid: 317f1945d390e3d40b100508cc1e2544, type: 3}

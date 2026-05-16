@@ -96,46 +96,41 @@ namespace Nrd
             UpdateDenoiserResources(_nrdInstanceId, (IntPtr)ptr, idx);
         }
 
-        // -----------------------------------------------------------------------
-        protected unsafe void FillCommonSettings(ref NrdFrameData data, CommonFrameInput fi)
+        public static unsafe void GetCommonSettings(ref CommonSettings commonSettings, CommonFrameInput fi)
         {
-            data.commonSettings.viewToClipMatrix      = fi.viewToClip;
-            data.commonSettings.viewToClipMatrixPrev  = fi.prevViewToClip;
-            data.commonSettings.worldToViewMatrix     = fi.worldToView;
-            data.commonSettings.worldToViewMatrixPrev = fi.prevWorldToView;
+            commonSettings.viewToClipMatrix      = fi.viewToClip;
+            commonSettings.viewToClipMatrixPrev  = fi.prevViewToClip;
+            commonSettings.worldToViewMatrix     = fi.worldToView;
+            commonSettings.worldToViewMatrixPrev = fi.prevWorldToView;
 
-            data.commonSettings.cameraJitter     = fi.viewportJitter;
-            data.commonSettings.cameraJitterPrev = fi.prevViewportJitter;
+            commonSettings.cameraJitter     = fi.viewportJitter;
+            commonSettings.cameraJitterPrev = fi.prevViewportJitter;
 
             ushort rectW     = (ushort)(fi.renderResolution.x * fi.resolutionScale + 0.5f);
             ushort rectH     = (ushort)(fi.renderResolution.y * fi.resolutionScale + 0.5f);
             ushort prevRectW = (ushort)(fi.renderResolution.x * fi.prevResolutionScale + 0.5f);
             ushort prevRectH = (ushort)(fi.renderResolution.y * fi.prevResolutionScale + 0.5f);
 
-            data.commonSettings.resourceSize[0]     = (ushort)fi.renderResolution.x;
-            data.commonSettings.resourceSize[1]     = (ushort)fi.renderResolution.y;
-            data.commonSettings.rectSize[0]         = rectW;
-            data.commonSettings.rectSize[1]         = rectH;
-            data.commonSettings.resourceSizePrev[0] = (ushort)fi.renderResolution.x;
-            data.commonSettings.resourceSizePrev[1] = (ushort)fi.renderResolution.y;
-            data.commonSettings.rectSizePrev[0]     = prevRectW;
-            data.commonSettings.rectSizePrev[1]     = prevRectH;
+            commonSettings.resourceSize[0]     = (ushort)fi.renderResolution.x;
+            commonSettings.resourceSize[1]     = (ushort)fi.renderResolution.y;
+            commonSettings.rectSize[0]         = rectW;
+            commonSettings.rectSize[1]         = rectH;
+            commonSettings.resourceSizePrev[0] = (ushort)fi.renderResolution.x;
+            commonSettings.resourceSizePrev[1] = (ushort)fi.renderResolution.y;
+            commonSettings.rectSizePrev[0]     = prevRectW;
+            commonSettings.rectSizePrev[1]     = prevRectH;
 
-            data.commonSettings.motionVectorScale          = new float3(1.0f / rectW, 1.0f / rectH, fi.flipMotionVectors ? 1.0f : -1.0f);
-            data.commonSettings.isMotionVectorInWorldSpace = false;
-            data.commonSettings.accumulationMode           = AccumulationMode.CONTINUE;
-            data.commonSettings.frameIndex                 = fi.frameIndex;
+            commonSettings.motionVectorScale          = new float3(1.0f / rectW, 1.0f / rectH, fi.flipMotionVectors ? 1.0f : -1.0f);
+            commonSettings.isMotionVectorInWorldSpace = false;
+            commonSettings.accumulationMode           = AccumulationMode.CONTINUE;
+            commonSettings.frameIndex                 = fi.frameIndex;
 
-            data.instanceId = _nrdInstanceId;
-            data.width      = (ushort)fi.renderResolution.x;
-            data.height     = (ushort)fi.renderResolution.y;
-
-            data.commonSettings.denoisingRange                 = fi.denoisingRange;
-            data.commonSettings.splitScreen                    = fi.splitScreen;
-            data.commonSettings.strandMaterialID               = fi.strandMaterialID == 0f ? 999.0f : fi.strandMaterialID;
-            data.commonSettings.enableValidation               = fi.enableValidation;
-            data.commonSettings.disocclusionThresholdAlternate = 0.1f;
-            data.commonSettings.isHistoryConfidenceAvailable   = fi.isHistoryConfidenceAvailable;
+            commonSettings.denoisingRange                 = fi.denoisingRange;
+            commonSettings.splitScreen                    = fi.splitScreen;
+            commonSettings.strandMaterialID               = fi.strandMaterialID == 0f ? 999.0f : fi.strandMaterialID;
+            commonSettings.enableValidation               = fi.enableValidation;
+            commonSettings.disocclusionThresholdAlternate = 0.1f;
+            commonSettings.isHistoryConfidenceAvailable   = fi.isHistoryConfidenceAvailable;
         }
 
         protected unsafe IntPtr StoreAndGetPtr(NrdFrameData data, uint frameIndex)
@@ -153,7 +148,4 @@ namespace Nrd
             Debug.Log($"[NRD] Destroyed Denoiser Instance {_nrdInstanceId} for Camera {_cameraName}");
         }
     }
-
-
-
 }

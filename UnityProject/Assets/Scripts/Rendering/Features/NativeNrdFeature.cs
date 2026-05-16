@@ -18,6 +18,10 @@ namespace PathTracing
         private const uint sharcDownscale = 5;
 
         public NativeNrdSampleSetting setting;
+        public CommonSettings         commonSettings  = CommonSettings._default;
+        public SigmaSettings          sigmaSettings  = SigmaSettings._default;
+        public ReblurSettings         reblurSettings = ReblurSettings._default;
+        public RelaxSettings          relaxSettings  = RelaxSettings._default;
 
         public NRDGlobalConstants globalConstants;
 
@@ -395,43 +399,33 @@ namespace PathTracing
                     strandMaterialID             = 2f
                 };
 
-                var sigmaInput = new SigmaDenoiser.FrameInput
-                {
-                    common         = commonInput,
-                    lightDirection = lightDir
-                };
+                NrdDenoiser.GetCommonSettings(ref commonSettings, commonInput);
 
-                var reblurInput = new ReblurDenoiser.FrameInput
-                {
-                    common                        = commonInput,
-                    checkerboardMode              = setting.tracingMode == RESOLUTION.RESOLUTION_HALF ? CheckerboardMode.BLACK : CheckerboardMode.OFF,
-                    hitDistanceReconstructionMode = setting.tracingMode == RESOLUTION.RESOLUTION_FULL_PROBABILISTIC ? HitDistanceReconstructionMode.AREA_3X3 : HitDistanceReconstructionMode.OFF,
-                    maxAccumulatedFrameNum        = setting.maxAccumulatedFrameNum,
-                    maxFastAccumulatedFrameNum    = setting.maxFastAccumulatedFrameNum,
-                    maxStabilizedFrameNum         = setting.maxAccumulatedFrameNum
-                };
-                
-                var relaxInput = new RelaxDenoiser.FrameInput
-                {
-                    common                            = commonInput,
-                    checkerboardMode                  = setting.tracingMode == RESOLUTION.RESOLUTION_HALF ? CheckerboardMode.BLACK : CheckerboardMode.OFF,
-                    hitDistanceReconstructionMode     = setting.tracingMode == RESOLUTION.RESOLUTION_FULL_PROBABILISTIC ? HitDistanceReconstructionMode.AREA_3X3 : HitDistanceReconstructionMode.OFF,
-                    diffuseMaxAccumulatedFrameNum      = setting.maxAccumulatedFrameNum,
-                    specularMaxAccumulatedFrameNum     = setting.maxAccumulatedFrameNum,
-                    diffuseMaxFastAccumulatedFrameNum  = setting.maxFastAccumulatedFrameNum,
-                    specularMaxFastAccumulatedFrameNum = setting.maxFastAccumulatedFrameNum,
-                    diffusePrepassBlurRadius           = setting.tracingMode == RESOLUTION.RESOLUTION_FULL_PROBABILISTIC ? 30.0f : 0.0f,
-                    specularPrepassBlurRadius          = setting.tracingMode == RESOLUTION.RESOLUTION_FULL_PROBABILISTIC ? 50.0f : 0.0f,
-                };
+                sigmaSettings.lightDirection = new float3(lightDir.x, lightDir.y, lightDir.z);
+
+                reblurSettings.checkerboardMode              = setting.tracingMode == RESOLUTION.RESOLUTION_HALF ? CheckerboardMode.WHITE : CheckerboardMode.OFF;
+                reblurSettings.hitDistanceReconstructionMode = setting.tracingMode == RESOLUTION.RESOLUTION_FULL_PROBABILISTIC ? HitDistanceReconstructionMode.AREA_3X3 : HitDistanceReconstructionMode.OFF;
+                reblurSettings.maxAccumulatedFrameNum        = setting.maxAccumulatedFrameNum;
+                reblurSettings.maxFastAccumulatedFrameNum    = setting.maxFastAccumulatedFrameNum;
+                reblurSettings.maxStabilizedFrameNum         = setting.maxAccumulatedFrameNum;
+                reblurSettings.minMaterialForDiffuse         = 0;
+                reblurSettings.minMaterialForSpecular        = 1;
+
+                relaxSettings.checkerboardMode                   = setting.tracingMode == RESOLUTION.RESOLUTION_HALF ? CheckerboardMode.WHITE : CheckerboardMode.OFF;
+                relaxSettings.hitDistanceReconstructionMode      = setting.tracingMode == RESOLUTION.RESOLUTION_FULL_PROBABILISTIC ? HitDistanceReconstructionMode.AREA_3X3 : HitDistanceReconstructionMode.OFF;
+                relaxSettings.diffuseMaxAccumulatedFrameNum      = setting.maxAccumulatedFrameNum;
+                relaxSettings.specularMaxAccumulatedFrameNum     = setting.maxAccumulatedFrameNum;
+                relaxSettings.diffuseMaxFastAccumulatedFrameNum  = setting.maxFastAccumulatedFrameNum;
+                relaxSettings.specularMaxFastAccumulatedFrameNum = setting.maxFastAccumulatedFrameNum;
 
                 // Shadow denoising (SIGMA) — matches NRDSample.cpp "Shadow denoising" block
-                _nrdShadowDenoisePass.Setup(nrdSigma.GetInteropDataPtr(sigmaInput), RenderPassMarkers.NrdDenoiseShadow);
+                _nrdShadowDenoisePass.Setup(nrdSigma.GetInteropDataPtr(commonSettings, sigmaSettings), RenderPassMarkers.NrdDenoiseShadow);
                 renderer.EnqueuePass(_nrdShadowDenoisePass);
 
                 if (setting.denoiser == DenoiserType.DENOISER_REBLUR)
-                    _nrdOpaqueDenoisePass.Setup(nrdReblur.GetInteropDataPtr(reblurInput), RenderPassMarkers.NrdDenoiseOpaque);
+                    _nrdOpaqueDenoisePass.Setup(nrdReblur.GetInteropDataPtr(commonSettings, reblurSettings), RenderPassMarkers.NrdDenoiseOpaque);
                 else
-                    _nrdOpaqueDenoisePass.Setup(nrdRelax.GetInteropDataPtr(relaxInput), RenderPassMarkers.NrdDenoiseOpaque);
+                    _nrdOpaqueDenoisePass.Setup(nrdRelax.GetInteropDataPtr(commonSettings, relaxSettings), RenderPassMarkers.NrdDenoiseOpaque);
                 renderer.EnqueuePass(_nrdOpaqueDenoisePass);
             }
 
@@ -797,7 +791,10 @@ namespace PathTracing
 #if UNITY_EDITOR
         private void Reset()
         {
-            setting = new NativeNrdSampleSetting();
+            setting        = new NativeNrdSampleSetting();
+            sigmaSettings  = SigmaSettings._default;
+            reblurSettings = ReblurSettings._default;
+            relaxSettings  = RelaxSettings._default;
             AutoFillShaders();
         }
 

@@ -18,6 +18,7 @@ namespace PathTracing
         public NrdSampleSetting nrdSampleSetting;
 
         public GlobalConstants GlobalConstants;
+        public CommonSettings  commonSettings  = CommonSettings._default;
 
         public RenderPassEvent renderPassEvent = RenderPassEvent.BeforeRenderingPostProcessing;
 
@@ -580,21 +581,19 @@ namespace PathTracing
                     frameIndex          = curFrame,
                 };
 
-                var sigmaInput = new SigmaDenoiser.FrameInput
+                var sigmaSettings = new SigmaSettings
                 {
-                    common         = commonInput,
-                    lightDirection = nrdLightDir
+                    lightDirection = new float3(nrdLightDir.x, nrdLightDir.y, nrdLightDir.z),
                 };
 
-                var reblurInput = new ReblurDenoiser.FrameInput
-                {
-                    common = commonInput
-                };
+                var reblurSettings = ReblurSettings._default;
 
-                _nrdShadowPass.Setup(nrdSigma.GetInteropDataPtr(sigmaInput), RenderPassMarkers.NrdDenoise);
+                NrdDenoiser.GetCommonSettings(ref commonSettings, commonInput);
+                
+                _nrdShadowPass.Setup(nrdSigma.GetInteropDataPtr(commonSettings, sigmaSettings), RenderPassMarkers.NrdDenoise);
                 renderer.EnqueuePass(_nrdShadowPass);
 
-                _nrdOpaquePass.Setup(nrdReblur.GetInteropDataPtr(reblurInput), RenderPassMarkers.NrdDenoise);
+                _nrdOpaquePass.Setup(nrdReblur.GetInteropDataPtr(commonSettings, reblurSettings), RenderPassMarkers.NrdDenoise);
                 renderer.EnqueuePass(_nrdOpaquePass);
             }
 

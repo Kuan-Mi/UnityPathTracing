@@ -318,9 +318,9 @@ namespace Nrd
         public HitDistanceReconstructionMode hitDistanceReconstructionMode; // Default: OFF
 
         // Bools (mapped to byte for interop safety)
-        private byte _enableAntiFirefly; // Default: false
-        private byte _usePrepassOnlyForSpecularMotionEstimation; // Default: false
-        private byte _returnHistoryLengthInsteadOfOcclusion; // Default: false
+        public byte _enableAntiFirefly; // Default: false
+        public byte _usePrepassOnlyForSpecularMotionEstimation; // Default: false
+        public byte _returnHistoryLengthInsteadOfOcclusion; // Default: false
 
         // -----------------------------------------------------------------------
         // Boolean Properties
@@ -469,8 +469,8 @@ namespace Nrd
         public float minMaterialForDiffuse; // Default: 4.0f
         public float minMaterialForSpecular; // Default: 4.0f
 
-        private byte _enableAntiFirefly; // Default: false
-        private byte _enableRoughnessEdgeStopping; // Default: true
+        public byte _enableAntiFirefly; // Default: false
+        public byte _enableRoughnessEdgeStopping; // Default: true
 
         public bool enableAntiFirefly
         {

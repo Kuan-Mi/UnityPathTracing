@@ -26,6 +26,7 @@ namespace PathTracing
         // User-visible configuration
         // -------------------------------------------------------------------
         public NativeRtxdiSetting setting;
+        public CommonSettings     commonSettings  = CommonSettings._default;
 
         [NonSerialized]
         public NativeResamplingConstants resamplingConstants;
@@ -699,28 +700,29 @@ namespace PathTracing
                 var mainLight = lightData.mainLightIndex >= 0 ? lightData.visibleLights[lightData.mainLightIndex] : default;
                 var lightDir  = new float3(-(Vector3)mainLight.localToWorldMatrix.GetColumn(2));
 
-                var nrdInput = new RelaxDenoiser.FrameInput
+                var nrdCommon = new NrdDenoiser.CommonFrameInput
                 {
-                    common = new NrdDenoiser.CommonFrameInput
-                    {
-                        worldToView                  = frameState.worldToView,
-                        prevWorldToView              = frameState.prevWorldToView,
-                        viewToClip                   = frameState.viewToClip,
-                        prevViewToClip               = frameState.prevViewToClip,
-                        viewportJitter               = frameState.viewportJitter,
-                        prevViewportJitter           = frameState.prevViewportJitter,
-                        resolutionScale              = frameState.resolutionScale,
-                        prevResolutionScale          = frameState.prevResolutionScale,
-                        renderResolution             = frameState.renderResolution,
-                        frameIndex                   = curFrame,
-                        denoisingRange               = 1000f,
-                        isHistoryConfidenceAvailable = enableGradients,
-                        enableValidation             = setting.showValidation,
-                        flipMotionVectors            = true
-                    }
+                    worldToView                  = frameState.worldToView,
+                    prevWorldToView              = frameState.prevWorldToView,
+                    viewToClip                   = frameState.viewToClip,
+                    prevViewToClip               = frameState.prevViewToClip,
+                    viewportJitter               = frameState.viewportJitter,
+                    prevViewportJitter           = frameState.prevViewportJitter,
+                    resolutionScale              = frameState.resolutionScale,
+                    prevResolutionScale          = frameState.prevResolutionScale,
+                    renderResolution             = frameState.renderResolution,
+                    frameIndex                   = curFrame,
+                    denoisingRange               = 1000f,
+                    isHistoryConfidenceAvailable = enableGradients,
+                    enableValidation             = setting.showValidation,
+                    flipMotionVectors            = true
                 };
 
-                _nrdDenoisePass.Setup(nrdReblur.GetInteropDataPtr(nrdInput), RenderPassMarkers.NrdDenoiseRtxdi);
+                var nrdRelaxSettings = RelaxSettings._default;
+                
+                NrdDenoiser.GetCommonSettings(ref commonSettings, nrdCommon);
+
+                _nrdDenoisePass.Setup(nrdReblur.GetInteropDataPtr(commonSettings, nrdRelaxSettings), RenderPassMarkers.NrdDenoiseRtxdi);
                 renderer.EnqueuePass(_nrdDenoisePass);
             }
 
