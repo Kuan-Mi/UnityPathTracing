@@ -97,7 +97,7 @@ MonoBehaviour:
     maxFastAccumulatedFrameNum: 10
     onScreen: 0
     forcedMaterial: 0
-    denoiser: 2
+    denoiser: 0
     rpp: 1
     bounceNum: 1
     tracingMode: 0
@@ -121,7 +121,7 @@ MonoBehaviour:
     dofFocalDistance: 2
   commonSettings:
     viewToClipMatrix:
-      e00: 0.91844463
+      e00: 0.97427857
       e01: 0
       e02: 0
       e03: 0
@@ -131,14 +131,14 @@ MonoBehaviour:
       e13: 0
       e20: 0
       e21: 0
-      e22: 0.000005066395
-      e23: 0.10450052
+      e22: 0.00000011920929
+      e23: 0.000100000005
       e30: 0
       e31: 0
       e32: -1
       e33: 0
     viewToClipMatrixPrev:
-      e00: 0.91844463
+      e00: 0.97427857
       e01: 0
       e02: 0
       e03: 0
@@ -148,42 +148,42 @@ MonoBehaviour:
       e13: 0
       e20: 0
       e21: 0
-      e22: 0.000005066395
-      e23: 0.10450052
+      e22: 0.00000011920929
+      e23: 0.000100000005
       e30: 0
       e31: 0
       e32: -1
       e33: 0
     worldToViewMatrix:
-      e00: 0.5324742
-      e01: 0.00031074882
-      e02: 0.8464461
-      e03: 3.999258
-      e10: -0.18854162
-      e11: 0.9749202
-      e12: 0.11824803
-      e13: -2.8933358
-      e20: 0.8251807
-      e21: 0.22255437
-      e22: -0.5191785
-      e23: 1.3734386
+      e00: 0.4304917
+      e01: -0.0000007227063
+      e02: 0.9025946
+      e03: 4.9235587
+      e10: -0.1918152
+      e11: 0.97715765
+      e12: 0.091486886
+      e13: -3.0046089
+      e20: 0.88197726
+      e21: 0.2125157
+      e22: -0.42065805
+      e23: 1.259388
       e30: 0
       e31: 0
       e32: 0
       e33: 1
     worldToViewMatrixPrev:
-      e00: 0.5324742
-      e01: 0.00031074882
-      e02: 0.8464461
-      e03: 3.999258
-      e10: -0.18854162
-      e11: 0.9749202
-      e12: 0.11824803
-      e13: -2.8933358
-      e20: 0.8251807
-      e21: 0.22255437
-      e22: -0.5191785
-      e23: 1.3734386
+      e00: 0.4304917
+      e01: -0.0000007227063
+      e02: 0.9025946
+      e03: 4.9235587
+      e10: -0.1918152
+      e11: 0.97715765
+      e12: 0.091486886
+      e13: -3.0046089
+      e20: 0.88197726
+      e21: 0.2125157
+      e22: -0.42065805
+      e23: 1.259388
       e30: 0
       e31: 0
       e32: 0
@@ -206,19 +206,19 @@ MonoBehaviour:
       e32: 0
       e33: 1
     motionVectorScale:
-      x: 0.00085251493
-      y: 0.001607717
+      x: 0.00052083336
+      y: 0.0009259259
       z: -1
     cameraJitter:
-      x: -0.4824829
-      y: -0.14720827
+      x: -0.076049805
+      y: 0.29042828
     cameraJitterPrev:
-      x: 0.4706421
-      y: -0.4805416
-    resourceSize: 95046e02
-    resourceSizePrev: 95046e02
-    rectSize: 95046e02
-    rectSizePrev: 95046e02
+      x: 0.1739502
+      y: -0.042905033
+    resourceSize: 80073804
+    resourceSizePrev: 80073804
+    rectSize: 80073804
+    rectSizePrev: 80073804
     viewZScale: 1
     timeDeltaBetweenFrames: 0
     denoisingRange: 1000
@@ -228,14 +228,14 @@ MonoBehaviour:
     strandMaterialID: 2
     historyFixAlternatePixelStrideMaterialID: 999
     strandThickness: 0.00008
-    splitScreen: 1
+    splitScreen: 0
     printfAt: 0f270f27
     debug: 0
     rectOrigin: 0000000000000000
-    frameIndex: 15903
+    frameIndex: 4405
     accumulationMode: 0
   sigmaSettings:
-    lightDirection: {x: 0.9257155, y: 0.3584616, z: -0.12064916}
+    lightDirection: {x: -0, y: -0.7071068, z: -0.7071067}
     planeDistanceSensitivity: 0.02
     maxStabilizedFrameNum: 5
   reblurSettings:

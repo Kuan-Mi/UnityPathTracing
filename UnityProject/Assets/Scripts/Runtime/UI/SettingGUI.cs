@@ -97,8 +97,10 @@ namespace PathTracing
 
         protected abstract object GetSettingValue();
 
-        float azimuth   = 0;
-        float elevation = 45;
+        float azimuth   = 180;
+        float elevation = -13;
+
+        protected abstract void DeawOtherGUI();
 
         protected void DrawWindow(int id)
         {
@@ -123,6 +125,8 @@ namespace PathTracing
 
             DrawObjectFieldsInPlace(GetSettingValue(), typeof(TSettings), "root");
 
+            DeawOtherGUI();
+
             GUILayout.EndScrollView();
             GUI.DragWindow(new Rect(0, 0, _windowRect.width, 18));
         }
@@ -133,9 +137,18 @@ namespace PathTracing
         /// 遍历 type 的所有公有实例字段并在 owner 上原地修改。
         /// owner 可以是类实例，也可以是装箱的 struct（反射可原地写入）。
         /// </summary>
-        private void DrawObjectFieldsInPlace(object owner, Type type, string path)
+        protected void DrawObjectFieldsInPlace(object owner, Type type, string path)
         {
             if (owner == null) return;
+
+
+            string key                                      = path + "_fold";
+            if (!_foldouts.ContainsKey(key)) _foldouts[key] = false;
+
+            bool fold                           = _foldouts[key];
+            bool openObj                        = GUILayout.Toggle(fold, (fold ? "▼ " : "▷ ") + type.Name, _boldLabel);
+            if (openObj != fold) _foldouts[key] = openObj;
+            if (!openObj) return;
 
             FieldInfo[] fields = type.GetFields(BindingFlags.Public | BindingFlags.Instance);
 
