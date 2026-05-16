@@ -65,7 +65,7 @@ namespace PathTracing
             switch (set.ShowMode)
             {
                 case NativeNrdShowMode.Final:
-                        Blitter.BlitTexture(cmd, res.Final.Handle, scaleOffset, mat, (int)ShowPass.Out);
+                    Blitter.BlitTexture(cmd, res.Final.Handle, scaleOffset, mat, (int)ShowPass.Out);
                     break;
 
                 // ── GBuffer ────────────────────────────────────────────────
@@ -91,7 +91,7 @@ namespace PathTracing
 
                 // ── Denoiser inputs ────────────────────────────────────────
                 case NativeNrdShowMode.NoiseShadow:
-                    Blitter.BlitTexture(cmd, res.Unfiltered_Penumbra.Handle, scaleOffset, mat, (int)ShowPass.NoiseShadow);
+                    Blitter.BlitTexture(cmd, res.Unfiltered_Translucency.Handle, scaleOffset, mat, (int)ShowPass.NoiseShadow);
                     break;
 
                 case NativeNrdShowMode.NoiseDiffuse:

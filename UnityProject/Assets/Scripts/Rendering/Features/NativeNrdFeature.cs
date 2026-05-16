@@ -9,6 +9,7 @@ using Nrd;
 using Nri;
 using Unity.Mathematics;
 using UnityEngine;
+using UnityEngine.Experimental.Rendering;
 using UnityEngine.Rendering.Universal;
 
 namespace PathTracing
@@ -40,6 +41,7 @@ namespace PathTracing
         public NativeComputeShader nrdDlssBeforeShader;
         public NativeComputeShader nrdDlssAfterShader;
         public ComputeShader       updateSkinnedPrimitivesCS;
+        public ComputeShader       fillUintTextureCS;
 
         // Tone mapping
         public NativeComputeShader toneMappingHistogramCs; // Shaders/donut/histogram.computeshader
@@ -49,6 +51,9 @@ namespace PathTracing
 
         public Texture2D scramblingRankingTex;
         public Texture2D sobolTex;
+
+        private RenderTexture scramblingRankingUintTex;
+        private RenderTexture sobolUintTex;
 
         private IntPtr scramblingRankingTexPtr;
         private IntPtr sobolTexPtr;
@@ -90,10 +95,42 @@ namespace PathTracing
         private readonly Dictionary<long, NativeNrdTextureResources> _resourcePools     = new();
         private readonly Dictionary<long, CameraFrameState>          _cameraFrameStates = new();
 
+
+        public RenderTexture GetUintTexture(Texture2D sourceTex)
+        {
+            RenderTextureDescriptor desc    = new RenderTextureDescriptor(sourceTex.width, sourceTex.height, GraphicsFormat.R8G8B8A8_UInt, 0);
+            var                     UintTex = new RenderTexture(desc) { enableRandomWrite = true };
+
+            var scramblingData = sourceTex.GetRawTextureData<byte>();
+
+            var buffer = new ComputeBuffer(scramblingData.Length / 4, sizeof(uint));
+            buffer.SetData(scramblingData);
+
+            var kernel = fillUintTextureCS.FindKernel("Fill");
+
+            fillUintTextureCS.SetBuffer(kernel, "_InputBuffer", buffer);
+            fillUintTextureCS.SetTexture(kernel, "_TargetTex", UintTex);
+            fillUintTextureCS.SetInt("_Width", sourceTex.width);
+
+            int threadGroupsX = Mathf.CeilToInt(sourceTex.width / 8.0f);
+            int threadGroupsY = Mathf.CeilToInt(sourceTex.height / 8.0f);
+
+            fillUintTextureCS.Dispatch(kernel, threadGroupsX, threadGroupsY, 1);
+            buffer.Dispose();
+
+            return UintTex;
+        }
+
+
         public override void Create()
         {
-            scramblingRankingTexPtr = scramblingRankingTex.GetNativeTexturePtr();
-            sobolTexPtr             = sobolTex.GetNativeTexturePtr();
+            scramblingRankingUintTex ??= GetUintTexture(scramblingRankingTex);
+            sobolUintTex             ??= GetUintTexture(sobolTex);
+
+            if (scramblingRankingTexPtr == IntPtr.Zero)
+                scramblingRankingTexPtr = scramblingRankingUintTex.GetNativeTexturePtr();
+            if (sobolTexPtr == IntPtr.Zero)
+                sobolTexPtr = sobolUintTex.GetNativeTexturePtr();
         }
 
         private void CreatePass()
@@ -418,9 +455,9 @@ namespace PathTracing
                     frameIndex                   = curFrame,
                     enableValidation             = setting.showValidation,
                     isHistoryConfidenceAvailable = setting.confidence,
-                    splitScreen      = setting.denoiser == DenoiserType.DENOISER_REFERENCE ? 1.0f : setting.separator,
-                    denoisingRange   = setting.denoisingRange,
-                    strandMaterialID = 2f
+                    splitScreen                  = setting.denoiser == DenoiserType.DENOISER_REFERENCE ? 1.0f : setting.separator,
+                    denoisingRange               = setting.denoisingRange,
+                    strandMaterialID             = 2f
                 };
 
                 NrdDenoiserHelper.GetCommonSettings(ref commonSettings, commonInput);
@@ -697,6 +734,9 @@ namespace PathTracing
 
             // Output Blit
             {
+                finalMaterial.SetFloat("gTanSunAngularRadius", math.tan(math.radians(setting.sunAngularDiameter * 0.5f)));
+
+
                 _outputBlitPass.Setup(pool, new NativeNrdOutputBlitPass.Settings
                 {
                     ShowMode        = setting.showMode,

@@ -645,7 +645,7 @@
                 float missing = shadowHitDist >= NRD_FP16_MAX ? 1.0 : 0.0;
 
 
-                float4 color = float4(missing, missing, missing, 1);
+                float4 color = float4(OUT_SHADOW_TRANSLUCENCY.x, OUT_SHADOW_TRANSLUCENCY.x, OUT_SHADOW_TRANSLUCENCY.x, 1);
 
                 return color;
             }

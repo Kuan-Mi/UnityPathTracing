@@ -1,0 +1,19 @@
+﻿#pragma kernel Fill
+
+StructuredBuffer<uint> _InputBuffer; 
+RWTexture2D<uint4> _TargetTex;
+uint _Width;
+
+[numthreads(8, 8, 1)]
+void Fill (uint3 id : SV_DispatchThreadID)
+{
+    uint index = id.y * _Width + id.x;
+    uint p = _InputBuffer[index];
+
+    _TargetTex[id.xy] = uint4(
+        p & 0xFF,         // R
+        (p >> 8) & 0xFF,  // G
+        (p >> 16) & 0xFF, // B
+        (p >> 24) & 0xFF  // A
+    );
+}
