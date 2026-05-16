@@ -276,7 +276,7 @@ namespace PathTracing
             // ── Pass 1: Clear + Build Histogram ─────────────────────────────
             // Clear
             cmd.SetBufferData(data.HistogramBuffer, new uint[256]);
-
+            histPtr = data.HistogramBuffer.GetNativeBufferPtr();
             // Build
             data.HistogramDs.SetRootConstants("c_ToneMapping", &cb);
             data.HistogramDs.SetTexture("t_Source", res.SourceTexture);

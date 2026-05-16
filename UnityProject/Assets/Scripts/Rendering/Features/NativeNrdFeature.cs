@@ -124,13 +124,17 @@ namespace PathTracing
 
         public override void Create()
         {
-            scramblingRankingUintTex ??= GetUintTexture(scramblingRankingTex);
-            sobolUintTex             ??= GetUintTexture(sobolTex);
-
             if (scramblingRankingTexPtr == IntPtr.Zero)
-                scramblingRankingTexPtr = scramblingRankingUintTex.GetNativeTexturePtr();
+            {
+                scramblingRankingUintTex = GetUintTexture(scramblingRankingTex);
+                scramblingRankingTexPtr  = scramblingRankingUintTex.GetNativeTexturePtr();
+            }
+
             if (sobolTexPtr == IntPtr.Zero)
-                sobolTexPtr = sobolUintTex.GetNativeTexturePtr();
+            {
+                sobolUintTex = GetUintTexture(sobolTex);
+                sobolTexPtr  = sobolUintTex.GetNativeTexturePtr();
+            }
         }
 
         private void CreatePass()
@@ -862,6 +866,13 @@ namespace PathTracing
             _nativeFrameTickPass = null;
             _depthBarrierFixPass = null;
             _toneMappingPass     = null;
+
+            scramblingRankingUintTex.Release();
+            sobolUintTex.Release();
+            scramblingRankingUintTex = null;
+            sobolUintTex             = null;
+            sobolTexPtr              = IntPtr.Zero;
+            scramblingRankingTexPtr  = IntPtr.Zero;
         }
 
 #if UNITY_EDITOR
