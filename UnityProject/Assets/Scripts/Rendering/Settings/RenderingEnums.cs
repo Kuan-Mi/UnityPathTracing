@@ -62,6 +62,13 @@ namespace PathTracing
         DENOISER_REFERENCE = 2,
     }
 
+    public enum ForceMaterial
+    {
+        Null = 0,
+        Gypsum = 1,
+        Cobalt = 2,
+    }
+
     public enum RtxDiDenoiserType
     {
         DENOISER_MODE_OFF    = 0,

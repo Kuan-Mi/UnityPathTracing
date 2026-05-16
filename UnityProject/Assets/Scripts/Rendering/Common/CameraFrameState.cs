@@ -811,7 +811,7 @@ namespace PathTracing
                 gJitterPrev         = jitterPrev,
 
                 gEmissionIntensityLights = settings.emission ? settings.emissionIntensityLights : 0.0f,
-                gEmissionIntensityCubes  = settings.emission ? settings.emissionIntensityCubes : 0.0f,
+                gEmissionIntensityCubes  = settings.emission ? 1.0f : 0.0f,
                 gNearZ                   = -nearZ, // C++ uses signed NEAR_Z * meterToUnitsMultiplier; here we use proj-derived value
                 gSeparator               = separator,
                 gRoughnessOverride       = settings.roughnessOverride,
@@ -819,7 +819,7 @@ namespace PathTracing
                 gUnitToMetersMultiplier  = 1.0f / settings.meterToUnitsMultiplier,
                 gTanSunAngularRadius     = math.tan(math.radians(settings.sunAngularDiameter * 0.5f)),
                 gTanPixelAngularRadius   = tanPixelAngularRadius,
-                gDebug                   = settings.debug,
+                gDebug                   = 0,
                 gPrevFrameConfidence     = prevFrameConfidence,
                 gUnproject               = 1.0f / (0.5f * rectH * project1),
                 gAperture                = 0.0f, // C++ uses m_DofAperture (UI state); not in NrdSampleSetting
@@ -849,7 +849,7 @@ namespace PathTracing
                 gSampleNum                                 = (uint)settings.rpp,
                 gPSR                                       = settings.PSR ? 1u : 0u,
                 gSHARC                                     = settings.SHARC ? 1u : 0u,
-                gTrimLobe                                  = settings.specularLobeTrimming ? 1u : 0u,
+                gTrimLobe                                  = 0u,
             };
         }
     }

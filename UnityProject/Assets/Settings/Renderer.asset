@@ -393,8 +393,8 @@ MonoBehaviour:
     adaptiveAccumulation: 1
     usePrevFrame: 1
     boost: 0
-    SR: 0
-    RR: 1
+    SR: 1
+    RR: 0
     tmpDisableRR: 0
     upscalerMode: 2
     confidence: 1

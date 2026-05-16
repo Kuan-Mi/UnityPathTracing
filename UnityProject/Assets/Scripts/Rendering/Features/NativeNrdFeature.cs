@@ -446,7 +446,7 @@ namespace PathTracing
 
                 _dlssrrPass.Setup(dlssDataPtr, new DlssRRPass.Settings
                 {
-                    tmpDisableRR = setting.tmpDisableRR
+                    tmpDisableRR = false
                 });
                 renderer.EnqueuePass(_dlssrrPass);
 
@@ -580,7 +580,6 @@ namespace PathTracing
                     ShowMode        = setting.showMode,
                     ResolutionScale = frameState.resolutionScale,
                     EnableDlssRr    = setting.RR || setting.SR,
-                    TMPDisableRr    = setting.tmpDisableRR,
                     ShowMv          = setting.showMV,
                     ShowValidation  = setting.showValidation
                 });

@@ -32,7 +32,6 @@ namespace PathTracing
             internal NativeNrdShowMode ShowMode;
             internal float             ResolutionScale;
             internal bool              EnableDlssRr;
-            internal bool              TMPDisableRr;
             internal bool              ShowMv;
             internal bool              ShowValidation;
             internal bool              IsEven;
@@ -67,21 +66,9 @@ namespace PathTracing
             {
                 case NativeNrdShowMode.Final:
                     if (set.EnableDlssRr)
-                    {
-                        if (set.TMPDisableRr)
-                        {
-                            Blitter.BlitTexture(cmd, res.DirectLighting.Handle, scaleOffset, mat, (int)ShowPass.Out);
-                        }
-                        else
-                        {
-                            Blitter.BlitTexture(cmd, res.DlssOutput.Handle, fullScaleOffset, mat, (int)ShowPass.Dlss);
-                        }
-                    }
+                        Blitter.BlitTexture(cmd, res.DlssOutput.Handle, fullScaleOffset, mat, (int)ShowPass.Dlss);
                     else
-                    {
                         Blitter.BlitTexture(cmd, res.Final.Handle, scaleOffset, mat, (int)ShowPass.Out);
-                    }
-
                     break;
 
                 // ── GBuffer ────────────────────────────────────────────────

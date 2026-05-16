@@ -1,7 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Reflection;
-using Unity.Mathematics;
 using UnityEditor;
 using UnityEngine;
 using UnityEngine.Rendering;
@@ -142,7 +141,7 @@ namespace PathTracing
             EditorGUILayout.LabelField("Settings", EditorStyles.boldLabel);
 
             // 获取实际的类型以通过反射读取 Header
-            Type type = typeof(NrdSampleSetting);
+            Type type = typeof(NativeNrdSampleSetting);
 
             // 迭代所有子属性
             SerializedProperty childProp = parentProp.Copy();
