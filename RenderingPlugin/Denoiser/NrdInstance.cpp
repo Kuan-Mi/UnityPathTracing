@@ -273,7 +273,7 @@ void NrdInstance::CreateNrd()
 
     if (result != nrd::Result::SUCCESS)
     {
-        LOG(("[NRD Native] id:" + std::to_string(id) + " - NRD Integration Init Failed.").c_str());
+        LOG(("[NRD Native] id:" + std::to_string(id) + " - NRD Integration Init Failed, result=" + std::to_string(static_cast<int>(result)) + ".").c_str());
         throw std::runtime_error("NRD Integration Init Failed");
     }
 

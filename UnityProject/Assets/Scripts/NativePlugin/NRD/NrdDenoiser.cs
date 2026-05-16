@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.Runtime.InteropServices;
 using Nri;
 using PathTracing;
@@ -9,7 +10,11 @@ using UnityEngine;
 
 namespace Nrd
 {
-    public class NrdDenoiser : IDisposable
+    // -----------------------------------------------------------------------
+    // Abstract base – holds all common infrastructure shared by the three
+    // typed denoiser subclasses (Sigma / Reblur / Relax).
+    // -----------------------------------------------------------------------
+    public abstract class NrdDenoiser : IDisposable
     {
         [DllImport("Denoiser")]
         private static extern int CreateDenoiserInstance(IntPtr denoisers, int count);
@@ -22,92 +27,53 @@ namespace Nrd
 
         private NativeArray<NrdResourceInput> _resourceCache;
 
-        private readonly int    _nrdInstanceId;
-        private readonly string _cameraName;
-
-        // Denoiser list captured at construction, used to populate each frame's entries[].
-        private readonly NrdDenoiserDesc[] _denoisers;
+        protected readonly int    _nrdInstanceId;
+        protected readonly string _cameraName;
 
         private       NativeArray<NrdFrameData> _buffer;
         private const int                       BufferCount = 3;
 
-        // private readonly PathTracingSetting _setting;
-
-        /// <summary>
-        /// Per-frame camera data filled by PathTracingFeature from CameraFrameState.
-        /// NRDDenoiser does not depend on CameraFrameState directly.
-        /// </summary>
-        public struct NrdFrameInput
+        // -----------------------------------------------------------------------
+        // Fields shared by all denoiser types – filled from camera/frame state.
+        // -----------------------------------------------------------------------
+        public struct CommonFrameInput
         {
-            public Matrix4x4                     worldToView;
-            public Matrix4x4                     prevWorldToView;
-            public Matrix4x4                     viewToClip;
-            public Matrix4x4                     prevViewToClip;
-            public float2                        viewportJitter;
-            public float2                        prevViewportJitter;
-            public float                         resolutionScale;
-            public float                         prevResolutionScale;
-            public int2                          renderResolution;
-            public uint                          frameIndex;
-            public float3                        lightDirection;
-            public bool                          flipMovionVectors;
-            public CheckerboardMode              checkerboardMode;
-            public HitDistanceReconstructionMode hitDistanceReconstructionMode;
-            public uint                          maxAccumulatedFrameNum;
-            public uint                          maxFastAccumulatedFrameNum;
-            public uint                          maxStabilizedFrameNum;
-            public bool                          enableValidation;
-            public bool                          isHistoryConfidenceAvailable;
-            public float                         splitScreen;
-            public float                         denoisingRange;
-            public float                         strandMaterialID;
+            public Matrix4x4 worldToView;
+            public Matrix4x4 prevWorldToView;
+            public Matrix4x4 viewToClip;
+            public Matrix4x4 prevViewToClip;
+            public float2    viewportJitter;
+            public float2    prevViewportJitter;
+            public float     resolutionScale;
+            public float     prevResolutionScale;
+            public int2      renderResolution;
+            public uint      frameIndex;
+            public bool      flipMotionVectors;
+            public bool      enableValidation;
+            public bool      isHistoryConfidenceAvailable;
+            public float     splitScreen;
+            public float     denoisingRange;
+            public float     strandMaterialID;
         }
 
-
-
-        public NrdDenoiser(string camName, NrdDenoiserDesc[] denoisers)
+        // -----------------------------------------------------------------------
+        protected NrdDenoiser(string camName, NrdDenoiserDesc desc)
         {
-            if (denoisers == null || denoisers.Length == 0)
-                throw new ArgumentException("At least one denoiser must be specified.", nameof(denoisers));
-            if (denoisers.Length > NrdLayout.MaxDenoisersPerInstance)
-                throw new ArgumentException(
-                    $"denoisers.Length={denoisers.Length} exceeds max {NrdLayout.MaxDenoisersPerInstance}",
-                    nameof(denoisers));
-
-            // _setting    = setting;
             _cameraName = camName;
-            _denoisers  = (NrdDenoiserDesc[])denoisers.Clone();
-
+            var descs = new[] { desc };
             unsafe
             {
-                fixed (NrdDenoiserDesc* p = _denoisers)
+                fixed (NrdDenoiserDesc* p = descs)
                 {
-                    _nrdInstanceId = CreateDenoiserInstance((IntPtr)p, _denoisers.Length);
+                    _nrdInstanceId = CreateDenoiserInstance((IntPtr)p, 1);
                 }
             }
 
             _buffer = new NativeArray<NrdFrameData>(BufferCount, Allocator.Persistent);
-            Debug.Log($"[NRD] Created Denoiser Instance {_nrdInstanceId} for Camera {_cameraName} with {_denoisers.Length} denoiser(s)");
+            Debug.Log($"[NRD] Created Denoiser Instance {_nrdInstanceId} | camera={_cameraName} | type={desc.denoiser} (id={desc.identifier}, enum={(uint)desc.denoiser})");
         }
 
-        /// <summary>
-        /// Default factory matching legacy behaviour: SIGMA_SHADOW (id 0) + REBLUR_DIFFUSE_SPECULAR (id 1).
-        /// </summary>
-        public static NrdDenoiser CreateDefault(string camName)
-        {
-            var descs = new[]
-            {
-                new NrdDenoiserDesc(0, Denoiser.SIGMA_SHADOW),
-                new NrdDenoiserDesc(1, Denoiser.REBLUR_DIFFUSE_SPECULAR),
-            };
-            return new NrdDenoiser(camName, descs);
-        }
-
-        /// <summary>
-        /// Pushes NRD texture bindings to the C++ denoiser.
-        /// Called by PathTracingFeature whenever textures are reallocated.
-        /// Each entry is a (ResourceType, NriTextureResource) pair; null textures are skipped.
-        /// </summary>
+        // -----------------------------------------------------------------------
         public unsafe void UpdateResources(params (ResourceType type, NriTextureResource resource)[] entries)
         {
             if (entries == null || entries.Length == 0) return;
@@ -128,24 +94,19 @@ namespace Nrd
             }
 
             UpdateDenoiserResources(_nrdInstanceId, (IntPtr)ptr, idx);
-            // Debug.Log($"[NRD] Updated Resources for Denoiser Instance {_nrdInstanceId} with {idx} resources.");
         }
 
-        private unsafe NrdFrameData GetData(NrdFrameInput fi)
+        // -----------------------------------------------------------------------
+        protected unsafe void FillCommonSettings(ref NrdFrameData data, CommonFrameInput fi)
         {
-            NrdFrameData data = NrdFrameData._default;
-
-            // --- 矩阵赋值 ---
             data.commonSettings.viewToClipMatrix      = fi.viewToClip;
             data.commonSettings.viewToClipMatrixPrev  = fi.prevViewToClip;
             data.commonSettings.worldToViewMatrix     = fi.worldToView;
             data.commonSettings.worldToViewMatrixPrev = fi.prevWorldToView;
 
-            // --- Jitter ---
-            data.commonSettings.cameraJitter     =  fi.viewportJitter;
-            data.commonSettings.cameraJitterPrev =  fi.prevViewportJitter;
+            data.commonSettings.cameraJitter     = fi.viewportJitter;
+            data.commonSettings.cameraJitterPrev = fi.prevViewportJitter;
 
-            // --- 分辨率 ---
             ushort rectW     = (ushort)(fi.renderResolution.x * fi.resolutionScale + 0.5f);
             ushort rectH     = (ushort)(fi.renderResolution.y * fi.resolutionScale + 0.5f);
             ushort prevRectW = (ushort)(fi.renderResolution.x * fi.prevResolutionScale + 0.5f);
@@ -160,7 +121,7 @@ namespace Nrd
             data.commonSettings.rectSizePrev[0]     = prevRectW;
             data.commonSettings.rectSizePrev[1]     = prevRectH;
 
-            data.commonSettings.motionVectorScale          = new float3(1.0f / rectW, 1.0f / rectH, fi.flipMovionVectors?1.0f:-1.0f);
+            data.commonSettings.motionVectorScale          = new float3(1.0f / rectW, 1.0f / rectH, fi.flipMotionVectors ? 1.0f : -1.0f);
             data.commonSettings.isMotionVectorInWorldSpace = false;
             data.commonSettings.accumulationMode           = AccumulationMode.CONTINUE;
             data.commonSettings.frameIndex                 = fi.frameIndex;
@@ -169,199 +130,19 @@ namespace Nrd
             data.width      = (ushort)fi.renderResolution.x;
             data.height     = (ushort)fi.renderResolution.y;
 
-            // Common 设置
             data.commonSettings.denoisingRange                 = fi.denoisingRange;
             data.commonSettings.splitScreen                    = fi.splitScreen;
             data.commonSettings.strandMaterialID               = fi.strandMaterialID == 0f ? 999.0f : fi.strandMaterialID;
             data.commonSettings.enableValidation               = fi.enableValidation;
             data.commonSettings.disocclusionThresholdAlternate = 0.1f;
             data.commonSettings.isHistoryConfidenceAvailable   = fi.isHistoryConfidenceAvailable;
- 
-            // PrintCommonSettings(data.commonSettings);
-            // --- Per-denoiser settings (entries[]) ---
-            data.denoiserCount = (uint)_denoisers.Length;
-            for (int i = 0; i < _denoisers.Length; i++)
-            {
-                ref DenoiserSettingsEntry entry = ref NrdFrameData.GetEntry(ref data, i);
-                entry.identifier = _denoisers[i].identifier;
-                entry.denoiser   = _denoisers[i].denoiser;
-
-                switch (_denoisers[i].denoiser)
-                {
-                    case Denoiser.SIGMA_SHADOW:
-                    case Denoiser.SIGMA_SHADOW_TRANSLUCENCY:
-                    {
-                        var s = SigmaSettings._default;
-                        s.lightDirection           = fi.lightDirection;
-                        s.planeDistanceSensitivity = 0.02f;
-                        s.maxStabilizedFrameNum    = 5;
-                        entry.Write(s);
-                        break;
-                    }
-
-                    case Denoiser.REBLUR_DIFFUSE:
-                    case Denoiser.REBLUR_DIFFUSE_OCCLUSION:
-                    case Denoiser.REBLUR_DIFFUSE_SH:
-                    case Denoiser.REBLUR_SPECULAR:
-                    case Denoiser.REBLUR_SPECULAR_OCCLUSION:
-                    case Denoiser.REBLUR_SPECULAR_SH:
-                    case Denoiser.REBLUR_DIFFUSE_SPECULAR:
-                    case Denoiser.REBLUR_DIFFUSE_SPECULAR_OCCLUSION:
-                    case Denoiser.REBLUR_DIFFUSE_SPECULAR_SH:
-                    case Denoiser.REBLUR_DIFFUSE_DIRECTIONAL_OCCLUSION:
-                    {
-                        var s = ReblurSettings._default;
-                        s.checkerboardMode              = fi.checkerboardMode;
-                        s.minMaterialForDiffuse         = 0;
-                        s.minMaterialForSpecular        = 1;
-                        s.hitDistanceReconstructionMode = fi.hitDistanceReconstructionMode;
-                        s.maxAccumulatedFrameNum = fi.maxAccumulatedFrameNum;
-                        s.maxFastAccumulatedFrameNum = fi.maxFastAccumulatedFrameNum;
-                        s.maxStabilizedFrameNum  = fi.maxStabilizedFrameNum;
-                        s.fastHistoryClampingSigmaScale = 1.5f;
-                        // PrintReblurSettings(s);
-                        
-                        entry.Write(s);
-                        break;
-                    }
-
-                    case Denoiser.RELAX_DIFFUSE:
-                    case Denoiser.RELAX_DIFFUSE_SH:
-                    case Denoiser.RELAX_SPECULAR:
-                    case Denoiser.RELAX_SPECULAR_SH:
-                    case Denoiser.RELAX_DIFFUSE_SPECULAR:
-                    case Denoiser.RELAX_DIFFUSE_SPECULAR_SH:
-                    {
-                        entry.Write(RelaxSettings._default);
-                        break;
-                    }
-
-                    case Denoiser.REFERENCE:
-                    {
-                        entry.Write(ReferenceSettings._default);
-                        break;
-                    }
-
-                    default:
-                        // Zero-initialized blob (default defaults); still safe for NRD to consume.
-                        break;
-                }
-            }
-
-            return data;
         }
 
-        public IntPtr GetInteropDataPtr(NrdFrameInput fi)
+        protected unsafe IntPtr StoreAndGetPtr(NrdFrameData data, uint frameIndex)
         {
-            var index = (int)(fi.frameIndex % BufferCount);
-            _buffer[index] = GetData(fi);
-            unsafe
-            {
-                return (IntPtr)_buffer.GetUnsafePtr() + index * sizeof(NrdFrameData);
-            }
-        }
-
-        
-        public static unsafe void PrintCommonSettings(CommonSettings s)
-        {
-            Debug.Log(
-                $"[CommonSettings]\n" +
-                // Matrices
-                $"  viewToClipMatrix =\n{s.viewToClipMatrix}\n" +
-                $"  viewToClipMatrixPrev =\n{s.viewToClipMatrixPrev}\n" +
-                $"  worldToViewMatrix =\n{s.worldToViewMatrix}\n" +
-                $"  worldToViewMatrixPrev =\n{s.worldToViewMatrixPrev}\n" +
-                $"  worldPrevToWorldMatrix =\n{s.worldPrevToWorldMatrix}\n" +
-                // Motion / Jitter
-                $"  motionVectorScale           = {s.motionVectorScale}\n" +
-                $"  cameraJitter                = {s.cameraJitter}\n" +
-                $"  cameraJitterPrev            = {s.cameraJitterPrev}\n" +
-                // Resolution (fixed arrays read via unsafe)
-                $"  resourceSize      = ({s.resourceSize[0]}, {s.resourceSize[1]})\n" +
-                $"  resourceSizePrev  = ({s.resourceSizePrev[0]}, {s.resourceSizePrev[1]})\n" +
-                $"  rectSize          = ({s.rectSize[0]}, {s.rectSize[1]})\n" +
-                $"  rectSizePrev      = ({s.rectSizePrev[0]}, {s.rectSizePrev[1]})\n" +
-                // Scalars
-                $"  viewZScale                                 = {s.viewZScale}\n" +
-                $"  timeDeltaBetweenFrames                     = {s.timeDeltaBetweenFrames}\n" +
-                $"  denoisingRange                             = {s.denoisingRange}\n" +
-                $"  disocclusionThreshold                      = {s.disocclusionThreshold}\n" +
-                $"  disocclusionThresholdAlternate             = {s.disocclusionThresholdAlternate}\n" +
-                // Material IDs
-                $"  cameraAttachedReflectionMaterialID         = {s.cameraAttachedReflectionMaterialID}\n" +
-                $"  strandMaterialID                           = {s.strandMaterialID}\n" +
-                $"  historyFixAlternatePixelStrideMaterialID   = {s.historyFixAlternatePixelStrideMaterialID}\n" +
-                $"  strandThickness                            = {s.strandThickness}\n" +
-                // Debug / display
-                $"  splitScreen  = {s.splitScreen}\n" +
-                $"  debug        = {s.debug}\n" +
-                $"  printfAt     = ({s.printfAt[0]}, {s.printfAt[1]})\n" +
-                $"  rectOrigin        = ({s.rectOrigin[0]}, {s.rectOrigin[1]})\n" +
-                $"  frameIndex       = {s.frameIndex}\n" +
-                $"  accumulationMode = {s.accumulationMode}\n" +
-                // Bools
-                $"  isMotionVectorInWorldSpace             = {s.isMotionVectorInWorldSpace}\n" +
-                $"  isHistoryConfidenceAvailable           = {s.isHistoryConfidenceAvailable}\n" +
-                $"  isDisocclusionThresholdMixAvailable    = {s.isDisocclusionThresholdMixAvailable}\n" +
-                $"  enableValidation                       = {s.enableValidation}"
-            );
-        }
-
-        
-        public static unsafe void PrintReblurSettings(ReblurSettings s)
-        {
-            float specThresh0 = s.specularProbabilityThresholdsForMvModification[0];
-            float specThresh1 = s.specularProbabilityThresholdsForMvModification[1];
-            Debug.Log(
-                $"[ReblurSettings]\n" +
-                // HitDistanceParameters
-                $"  hitDistanceParameters.A = {s.hitDistanceParameters.A}\n" +
-                $"  hitDistanceParameters.B = {s.hitDistanceParameters.B}\n" +
-                $"  hitDistanceParameters.C = {s.hitDistanceParameters.C}\n" +
-                // AntilagSettings
-                $"  antilagSettings.luminanceSigmaScale  = {s.antilagSettings.luminanceSigmaScale}\n" +
-                $"  antilagSettings.luminanceSensitivity = {s.antilagSettings.luminanceSensitivity}\n" +
-                // ResponsiveAccumulationSettings
-                $"  responsiveAccumulationSettings.roughnessThreshold     = {s.responsiveAccumulationSettings.roughnessThreshold}\n" +
-                $"  responsiveAccumulationSettings.minAccumulatedFrameNum = {s.responsiveAccumulationSettings.minAccumulatedFrameNum}\n" +
-                // ConvergenceSettings
-                $"  convergenceSettings.s = {s.convergenceSettings.s}\n" +
-                $"  convergenceSettings.b = {s.convergenceSettings.b}\n" +
-                $"  convergenceSettings.p = {s.convergenceSettings.p}\n" +
-                // Accumulation
-                $"  maxAccumulatedFrameNum     = {s.maxAccumulatedFrameNum}\n" +
-                $"  maxFastAccumulatedFrameNum = {s.maxFastAccumulatedFrameNum}\n" +
-                $"  maxStabilizedFrameNum      = {s.maxStabilizedFrameNum}\n" +
-                // History fix
-                $"  historyFixFrameNum             = {s.historyFixFrameNum}\n" +
-                $"  historyFixBasePixelStride      = {s.historyFixBasePixelStride}\n" +
-                $"  historyFixAlternatePixelStride = {s.historyFixAlternatePixelStride}\n" +
-                // Blur
-                $"  fastHistoryClampingSigmaScale = {s.fastHistoryClampingSigmaScale}\n" +
-                $"  diffusePrepassBlurRadius      = {s.diffusePrepassBlurRadius}\n" +
-                $"  specularPrepassBlurRadius     = {s.specularPrepassBlurRadius}\n" +
-                $"  minHitDistanceWeight          = {s.minHitDistanceWeight}\n" +
-                $"  minBlurRadius                 = {s.minBlurRadius}\n" +
-                $"  maxBlurRadius                 = {s.maxBlurRadius}\n" +
-                // Material / lobe
-                $"  lobeAngleFraction        = {s.lobeAngleFraction}\n" +
-                $"  roughnessFraction        = {s.roughnessFraction}\n" +
-                $"  planeDistanceSensitivity = {s.planeDistanceSensitivity}\n" +
-                // Specular probability thresholds (fixed array, read via unsafe)
-                $"  specularProbabilityThresholdsForMvModification[0] = {specThresh0}\n" +
-                $"  specularProbabilityThresholdsForMvModification[1] = {specThresh1}\n" +
-                // Firefly / material
-                $"  fireflySuppressorMinRelativeScale = {s.fireflySuppressorMinRelativeScale}\n" +
-                $"  minMaterialForDiffuse             = {s.minMaterialForDiffuse}\n" +
-                $"  minMaterialForSpecular            = {s.minMaterialForSpecular}\n" +
-                // Enums
-                $"  checkerboardMode              = {s.checkerboardMode}\n" +
-                $"  hitDistanceReconstructionMode = {s.hitDistanceReconstructionMode}\n" +
-                // Bools
-                $"  enableAntiFirefly                         = {s.enableAntiFirefly}\n" +
-                $"  usePrepassOnlyForSpecularMotionEstimation = {s.usePrepassOnlyForSpecularMotionEstimation}\n" +
-                $"  returnHistoryLengthInsteadOfOcclusion     = {s.returnHistoryLengthInsteadOfOcclusion}"
-            );
+            var index = (int)(frameIndex % BufferCount);
+            _buffer[index] = data;
+            return (IntPtr)_buffer.GetUnsafePtr() + index * sizeof(NrdFrameData);
         }
 
         public void Dispose()
@@ -369,7 +150,10 @@ namespace Nrd
             if (_buffer.IsCreated) _buffer.Dispose();
             if (_resourceCache.IsCreated) _resourceCache.Dispose();
             DestroyDenoiserInstance(_nrdInstanceId);
-            Debug.Log($"[NRD] Destroyed Denoiser Instance {_nrdInstanceId} for Camera {_cameraName} - Dispose Complete");
+            Debug.Log($"[NRD] Destroyed Denoiser Instance {_nrdInstanceId} for Camera {_cameraName}");
         }
     }
+
+
+
 }

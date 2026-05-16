@@ -73,8 +73,8 @@ namespace PathTracing
 
         private readonly Dictionary<long, NativeBuffer> _nrdConstantBuffers = new();
 
-        private readonly Dictionary<long, NrdDenoiser>               _nrdSigmaDenoisers  = new();
-        private readonly Dictionary<long, NrdDenoiser>               _nrdReblurDenoisers = new();
+        private readonly Dictionary<long, SigmaDenoiser>             _nrdSigmaDenoisers  = new();
+        private readonly Dictionary<long, ReblurDenoiser>            _nrdReblurDenoisers = new();
         private readonly Dictionary<long, DlrrDenoiser>              _dlrrDenoisers      = new();
         private readonly Dictionary<long, DlsrUpscaler>              _dlsrUpscalers      = new();
         private readonly Dictionary<long, NisUpscaler>               _nisUpscalers       = new();
@@ -164,20 +164,14 @@ namespace PathTracing
             if (!_nrdSigmaDenoisers.TryGetValue(uniqueKey, out var nrdSigma))
             {
                 var camName = isVR ? $"{cam.name}_Eye{eyeIndex}" : cam.name;
-                nrdSigma = new NrdDenoiser(camName + "_Shadow", new NrdDenoiserDesc[]
-                {
-                    new(0, Denoiser.SIGMA_SHADOW_TRANSLUCENCY)
-                });
+                nrdSigma = new SigmaDenoiser(camName + "_Shadow", Denoiser.SIGMA_SHADOW_TRANSLUCENCY);
                 _nrdSigmaDenoisers.Add(uniqueKey, nrdSigma);
             }
 
             if (!_nrdReblurDenoisers.TryGetValue(uniqueKey, out var nrdReblur))
             {
                 var camName = isVR ? $"{cam.name}_Eye{eyeIndex}" : cam.name;
-                nrdReblur = new NrdDenoiser(camName + "_Opaque", new NrdDenoiserDesc[]
-                {
-                    new(1, Denoiser.REBLUR_DIFFUSE_SPECULAR)
-                });
+                nrdReblur = new ReblurDenoiser(camName + "_Opaque", Denoiser.REBLUR_DIFFUSE_SPECULAR);
                 _nrdReblurDenoisers.Add(uniqueKey, nrdReblur);
             }
 
@@ -353,25 +347,18 @@ namespace PathTracing
                 var mainLight = lightData.mainLightIndex >= 0 ? lightData.visibleLights[lightData.mainLightIndex] : default;
                 var lightDir  = new float3(-(Vector3)mainLight.localToWorldMatrix.GetColumn(2));
 
-                var nrdInput = new NrdDenoiser.NrdFrameInput
+                var commonInput = new NrdDenoiser.CommonFrameInput
                 {
-                    worldToView                   = frameState.worldToView,
-                    prevWorldToView               = frameState.prevWorldToView,
-                    viewToClip                    = frameState.viewToClip,
-                    prevViewToClip                = frameState.prevViewToClip,
-                    viewportJitter                = frameState.viewportJitter,
-                    prevViewportJitter            = frameState.prevViewportJitter,
-                    resolutionScale               = frameState.resolutionScale,
-                    prevResolutionScale           = frameState.prevResolutionScale,
-                    renderResolution              = frameState.renderResolution,
-                    frameIndex                    = curFrame,
-                    lightDirection                = lightDir,
-                    checkerboardMode              = setting.tracingMode == RESOLUTION.RESOLUTION_HALF ? CheckerboardMode.BLACK : CheckerboardMode.OFF,
-                    hitDistanceReconstructionMode = setting.tracingMode == RESOLUTION.RESOLUTION_FULL_PROBABILISTIC ? HitDistanceReconstructionMode.AREA_3X3 : HitDistanceReconstructionMode.OFF,
-                    maxAccumulatedFrameNum        = setting.maxAccumulatedFrameNum,
-                    maxFastAccumulatedFrameNum    = setting.maxFastAccumulatedFrameNum,
-                    maxStabilizedFrameNum         = setting.maxAccumulatedFrameNum,
-
+                    worldToView                  = frameState.worldToView,
+                    prevWorldToView              = frameState.prevWorldToView,
+                    viewToClip                   = frameState.viewToClip,
+                    prevViewToClip               = frameState.prevViewToClip,
+                    viewportJitter               = frameState.viewportJitter,
+                    prevViewportJitter           = frameState.prevViewportJitter,
+                    resolutionScale              = frameState.resolutionScale,
+                    prevResolutionScale          = frameState.prevResolutionScale,
+                    renderResolution             = frameState.renderResolution,
+                    frameIndex                   = curFrame,
                     enableValidation             = setting.showValidation,
                     isHistoryConfidenceAvailable = setting.confidence,
                     splitScreen                  = setting.separator,
@@ -379,12 +366,28 @@ namespace PathTracing
                     strandMaterialID             = 2f
                 };
 
+                var sigmaInput = new SigmaDenoiser.FrameInput
+                {
+                    common         = commonInput,
+                    lightDirection = lightDir
+                };
+
+                var reblurInput = new ReblurDenoiser.FrameInput
+                {
+                    common                        = commonInput,
+                    checkerboardMode              = setting.tracingMode == RESOLUTION.RESOLUTION_HALF ? CheckerboardMode.BLACK : CheckerboardMode.OFF,
+                    hitDistanceReconstructionMode = setting.tracingMode == RESOLUTION.RESOLUTION_FULL_PROBABILISTIC ? HitDistanceReconstructionMode.AREA_3X3 : HitDistanceReconstructionMode.OFF,
+                    maxAccumulatedFrameNum        = setting.maxAccumulatedFrameNum,
+                    maxFastAccumulatedFrameNum    = setting.maxFastAccumulatedFrameNum,
+                    maxStabilizedFrameNum         = setting.maxAccumulatedFrameNum
+                };
+
                 // Shadow denoising (SIGMA) — matches NRDSample.cpp "Shadow denoising" block
-                _nrdShadowDenoisePass.Setup(nrdSigma.GetInteropDataPtr(nrdInput), RenderPassMarkers.NrdDenoiseShadow);
+                _nrdShadowDenoisePass.Setup(nrdSigma.GetInteropDataPtr(sigmaInput), RenderPassMarkers.NrdDenoiseShadow);
                 renderer.EnqueuePass(_nrdShadowDenoisePass);
 
                 // Opaque denoising (REBLUR) — matches NRDSample.cpp "Opaque denoising" block
-                _nrdOpaqueDenoisePass.Setup(nrdReblur.GetInteropDataPtr(nrdInput), RenderPassMarkers.NrdDenoiseOpaque);
+                _nrdOpaqueDenoisePass.Setup(nrdReblur.GetInteropDataPtr(reblurInput), RenderPassMarkers.NrdDenoiseOpaque);
                 renderer.EnqueuePass(_nrdOpaqueDenoisePass);
             }
 
@@ -554,8 +557,8 @@ namespace PathTracing
 
                 _nrdTaaPass.Setup(nrdTaaResource, new NRDTaaPass.Settings
                 {
-                    rectGridW = rectGridW,
-                    rectGridH = rectGridH,
+                    rectGridW          = rectGridW,
+                    rectGridH          = rectGridH,
                     enableAutoExposure = setting.enableAutoExposure
                 });
                 renderer.EnqueuePass(_nrdTaaPass);

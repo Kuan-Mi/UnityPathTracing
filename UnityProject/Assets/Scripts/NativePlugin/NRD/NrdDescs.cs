@@ -158,9 +158,9 @@
         public uint     identifier;
         public Denoiser denoiser;
 
-        public NrdDenoiserDesc(uint identifier, Denoiser denoiser)
+        public NrdDenoiserDesc(Denoiser denoiser)
         {
-            this.identifier = identifier;
+            identifier = 0;
             this.denoiser   = denoiser;
         }
     }

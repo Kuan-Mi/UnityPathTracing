@@ -28,11 +28,13 @@ namespace PathTracing
         public NativeRtxdiSetting setting;
 
         [NonSerialized]
-        public NativeResamplingConstants  resamplingConstants;
+        public NativeResamplingConstants resamplingConstants;
+
         [NonSerialized]
         public NativeCompositingConstants compositingConstants;
+
         [NonSerialized]
-        public NativeGBufferConstants     gbufferConstants;
+        public NativeGBufferConstants gbufferConstants;
 
         public RenderPassEvent renderPassEvent = RenderPassEvent.BeforeRenderingPostProcessing;
 
@@ -176,7 +178,7 @@ namespace PathTracing
         private readonly NativeRtxdiPerPassConstants[] _perPassConstantsArray    = new NativeRtxdiPerPassConstants[1];
         private readonly NativeGBufferConstants[]      _gbufferConstantsArray    = new NativeGBufferConstants[1];
 
-        private readonly Dictionary<long, NrdDenoiser>                 _nrdDenoisers      = new();
+        private readonly Dictionary<long, RelaxDenoiser>               _nrdDenoisers      = new();
         private readonly Dictionary<long, NativeRtxdiTextureResources> _resourcePools     = new();
         private readonly Dictionary<long, NativeRtxdiResources>        _rtxdiResources    = new();
         private readonly Dictionary<long, ImportanceSamplingContext>   _isContexts        = new();
@@ -266,11 +268,7 @@ namespace PathTracing
             if (!_nrdDenoisers.TryGetValue(uniqueKey, out var nrdReblur))
             {
                 var camName = isVR ? $"{cam.name}_Eye{eyeIndex}" : cam.name;
-                nrdReblur = new NrdDenoiser(camName + "_Rtxdi", new NrdDenoiserDesc[]
-                {
-                    // new(0, Denoiser.REBLUR_DIFFUSE_SPECULAR),
-                    new(0, Denoiser.RELAX_DIFFUSE_SPECULAR),
-                });
+                nrdReblur = new RelaxDenoiser(camName + "_Rtxdi", Denoiser.RELAX_DIFFUSE_SPECULAR);
                 _nrdDenoisers.Add(uniqueKey, nrdReblur);
             }
 
@@ -701,24 +699,25 @@ namespace PathTracing
                 var mainLight = lightData.mainLightIndex >= 0 ? lightData.visibleLights[lightData.mainLightIndex] : default;
                 var lightDir  = new float3(-(Vector3)mainLight.localToWorldMatrix.GetColumn(2));
 
-                var nrdInput = new NrdDenoiser.NrdFrameInput
+                var nrdInput = new RelaxDenoiser.FrameInput
                 {
-                    worldToView                  = frameState.worldToView,
-                    prevWorldToView              = frameState.prevWorldToView,
-                    viewToClip                   = frameState.viewToClip,
-                    prevViewToClip               = frameState.prevViewToClip,
-                    viewportJitter               = frameState.viewportJitter,
-                    prevViewportJitter           = frameState.prevViewportJitter,
-                    resolutionScale              = frameState.resolutionScale,
-                    prevResolutionScale          = frameState.prevResolutionScale,
-                    renderResolution             = frameState.renderResolution,
-                    frameIndex                   = curFrame,
-                    lightDirection               = lightDir,
-                    denoisingRange               = 1000f,
-                    isHistoryConfidenceAvailable = enableGradients,
-                    enableValidation             = setting.showValidation,
-                    checkerboardMode             = CheckerboardMode.OFF,
-                    flipMovionVectors            = true
+                    common = new NrdDenoiser.CommonFrameInput
+                    {
+                        worldToView                  = frameState.worldToView,
+                        prevWorldToView              = frameState.prevWorldToView,
+                        viewToClip                   = frameState.viewToClip,
+                        prevViewToClip               = frameState.prevViewToClip,
+                        viewportJitter               = frameState.viewportJitter,
+                        prevViewportJitter           = frameState.prevViewportJitter,
+                        resolutionScale              = frameState.resolutionScale,
+                        prevResolutionScale          = frameState.prevResolutionScale,
+                        renderResolution             = frameState.renderResolution,
+                        frameIndex                   = curFrame,
+                        denoisingRange               = 1000f,
+                        isHistoryConfidenceAvailable = enableGradients,
+                        enableValidation             = setting.showValidation,
+                        flipMotionVectors            = true
+                    }
                 };
 
                 _nrdDenoisePass.Setup(nrdReblur.GetInteropDataPtr(nrdInput), RenderPassMarkers.NrdDenoiseRtxdi);
