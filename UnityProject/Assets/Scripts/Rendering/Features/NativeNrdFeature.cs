@@ -75,6 +75,7 @@ namespace PathTracing
 
         private readonly Dictionary<long, SigmaDenoiser>             _nrdSigmaDenoisers  = new();
         private readonly Dictionary<long, ReblurDenoiser>            _nrdReblurDenoisers = new();
+        private readonly Dictionary<long, RelaxDenoiser>             _nrdRelaxDenoisers  = new();
         private readonly Dictionary<long, DlrrDenoiser>              _dlrrDenoisers      = new();
         private readonly Dictionary<long, DlsrUpscaler>              _dlsrUpscalers      = new();
         private readonly Dictionary<long, NisUpscaler>               _nisUpscalers       = new();
@@ -173,6 +174,13 @@ namespace PathTracing
                 var camName = isVR ? $"{cam.name}_Eye{eyeIndex}" : cam.name;
                 nrdReblur = new ReblurDenoiser(camName + "_Opaque", Denoiser.REBLUR_DIFFUSE_SPECULAR);
                 _nrdReblurDenoisers.Add(uniqueKey, nrdReblur);
+            }
+
+            if (!_nrdRelaxDenoisers.TryGetValue(uniqueKey, out var nrdRelax))
+            {
+                var camName = isVR ? $"{cam.name}_Eye{eyeIndex}" : cam.name;
+                nrdRelax = new RelaxDenoiser(camName + "_Opaque", Denoiser.RELAX_DIFFUSE_SPECULAR);
+                _nrdRelaxDenoisers.Add(uniqueKey, nrdRelax);
             }
 
             if (!_dlrrDenoisers.TryGetValue(uniqueKey, out var dlrr))
@@ -295,6 +303,27 @@ namespace PathTracing
                     (ResourceType.OUT_SPEC_RADIANCE_HITDIST, pool.Spec),
                     (ResourceType.IN_SPEC_CONFIDENCE, pool.Gradient_Pong)
                 );
+
+                // Opaque denoiser (RELAX) resources
+                nrdRelax.UpdateResources(
+                    // Common
+                    (ResourceType.IN_MV, pool.MV),
+                    (ResourceType.IN_VIEWZ, pool.Viewz),
+                    (ResourceType.IN_NORMAL_ROUGHNESS, pool.NormalRoughness),
+
+                    // (Optional) Validation
+                    (ResourceType.OUT_VALIDATION, pool.Validation),
+
+                    // Diffuse
+                    (ResourceType.IN_DIFF_RADIANCE_HITDIST, pool.Unfiltered_Diff),
+                    (ResourceType.OUT_DIFF_RADIANCE_HITDIST, pool.Diff),
+                    (ResourceType.IN_DIFF_CONFIDENCE, pool.Gradient_Pong),
+
+                    // Specular
+                    (ResourceType.IN_SPEC_RADIANCE_HITDIST, pool.Unfiltered_Spec),
+                    (ResourceType.OUT_SPEC_RADIANCE_HITDIST, pool.Spec),
+                    (ResourceType.IN_SPEC_CONFIDENCE, pool.Gradient_Pong)
+                );
             }
 
             // Confidence Blur (5 ping-pong iterations over SHARC gradient)
@@ -381,13 +410,28 @@ namespace PathTracing
                     maxFastAccumulatedFrameNum    = setting.maxFastAccumulatedFrameNum,
                     maxStabilizedFrameNum         = setting.maxAccumulatedFrameNum
                 };
+                
+                var relaxInput = new RelaxDenoiser.FrameInput
+                {
+                    common                            = commonInput,
+                    checkerboardMode                  = setting.tracingMode == RESOLUTION.RESOLUTION_HALF ? CheckerboardMode.BLACK : CheckerboardMode.OFF,
+                    hitDistanceReconstructionMode     = setting.tracingMode == RESOLUTION.RESOLUTION_FULL_PROBABILISTIC ? HitDistanceReconstructionMode.AREA_3X3 : HitDistanceReconstructionMode.OFF,
+                    diffuseMaxAccumulatedFrameNum      = setting.maxAccumulatedFrameNum,
+                    specularMaxAccumulatedFrameNum     = setting.maxAccumulatedFrameNum,
+                    diffuseMaxFastAccumulatedFrameNum  = setting.maxFastAccumulatedFrameNum,
+                    specularMaxFastAccumulatedFrameNum = setting.maxFastAccumulatedFrameNum,
+                    diffusePrepassBlurRadius           = setting.tracingMode == RESOLUTION.RESOLUTION_FULL_PROBABILISTIC ? 30.0f : 0.0f,
+                    specularPrepassBlurRadius          = setting.tracingMode == RESOLUTION.RESOLUTION_FULL_PROBABILISTIC ? 50.0f : 0.0f,
+                };
 
                 // Shadow denoising (SIGMA) — matches NRDSample.cpp "Shadow denoising" block
                 _nrdShadowDenoisePass.Setup(nrdSigma.GetInteropDataPtr(sigmaInput), RenderPassMarkers.NrdDenoiseShadow);
                 renderer.EnqueuePass(_nrdShadowDenoisePass);
 
-                // Opaque denoising (REBLUR) — matches NRDSample.cpp "Opaque denoising" block
-                _nrdOpaqueDenoisePass.Setup(nrdReblur.GetInteropDataPtr(reblurInput), RenderPassMarkers.NrdDenoiseOpaque);
+                if (setting.denoiser == DenoiserType.DENOISER_REBLUR)
+                    _nrdOpaqueDenoisePass.Setup(nrdReblur.GetInteropDataPtr(reblurInput), RenderPassMarkers.NrdDenoiseOpaque);
+                else
+                    _nrdOpaqueDenoisePass.Setup(nrdRelax.GetInteropDataPtr(relaxInput), RenderPassMarkers.NrdDenoiseOpaque);
                 renderer.EnqueuePass(_nrdOpaqueDenoisePass);
             }
 
@@ -693,9 +737,14 @@ namespace PathTracing
             foreach (var denoiser in _nrdSigmaDenoisers.Values)
                 denoiser.Dispose();
             _nrdSigmaDenoisers.Clear();
+
             foreach (var denoiser in _nrdReblurDenoisers.Values)
                 denoiser.Dispose();
             _nrdReblurDenoisers.Clear();
+
+            foreach (var denoiser in _nrdRelaxDenoisers.Values)
+                denoiser.Dispose();
+            _nrdRelaxDenoisers.Clear();
 
             foreach (var denoiser in _dlrrDenoisers.Values)
                 denoiser.Dispose();
