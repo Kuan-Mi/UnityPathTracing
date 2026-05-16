@@ -24,8 +24,6 @@ namespace PathTracing
     {
         private const uint sharcDownscale = 5;
 
-
-        [FormerlySerializedAs("pathTracingSetting")]
         public NativeNrdSampleSetting setting;
 
         public NRDGlobalConstants globalConstants;
@@ -224,8 +222,7 @@ namespace PathTracing
             CreatePass();
 
 
-            if (_nrdSampleResource == null)
-                _nrdSampleResource = new NRDSampleResource();
+            _nrdSampleResource ??= new NRDSampleResource();
 
             // MergeBlas is no longer a runtime property; merging is determined automatically
             // based on Application.isPlaying and gameObject.isStatic per-object.

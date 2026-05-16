@@ -97,6 +97,7 @@ namespace Rtxdi.ReGIR
     public struct ReGIRDynamicParameters
     {
         public float                        regirCellSize;
+        [NonSerialized]
         public float3                       center;
         public LocalLightReGIRFallbackSamplingMode fallbackSamplingMode;
         public LocalLightReGIRPresamplingMode      presamplingMode;

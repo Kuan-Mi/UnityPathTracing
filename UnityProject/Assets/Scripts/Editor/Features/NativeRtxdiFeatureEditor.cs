@@ -76,13 +76,11 @@ namespace PathTracing
                 "Run the scene for a few frames before clicking.",
                 MessageType.Info);
 
-            EditorGUILayout.Space(8);
-            var globalConstProp = serializedObject.FindProperty("globalConstants");
-            if (globalConstProp != null)
-                EditorGUILayout.PropertyField(globalConstProp, includeChildren: true);
-            var resamplingConstProp = serializedObject.FindProperty("resamplingConstants");
-            if (resamplingConstProp != null)
-                EditorGUILayout.PropertyField(resamplingConstProp, includeChildren: true);
+            EditorGUILayout.Space(10);
+
+            DrawObjectHelper.Draw(target.GetInstanceID(), "Resampling Constants", feature.resamplingConstants);
+            DrawObjectHelper.Draw(target.GetInstanceID(), "Compositing Constants", feature.compositingConstants);
+            DrawObjectHelper.Draw(target.GetInstanceID(), "GBuffer Constants", feature.gbufferConstants);
 
             serializedObject.ApplyModifiedProperties();
         }

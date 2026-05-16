@@ -27,8 +27,11 @@ namespace PathTracing
         // -------------------------------------------------------------------
         public NativeRtxdiSetting setting;
 
+        [NonSerialized]
         public NativeResamplingConstants  resamplingConstants;
+        [NonSerialized]
         public NativeCompositingConstants compositingConstants;
+        [NonSerialized]
         public NativeGBufferConstants     gbufferConstants;
 
         public RenderPassEvent renderPassEvent = RenderPassEvent.BeforeRenderingPostProcessing;
