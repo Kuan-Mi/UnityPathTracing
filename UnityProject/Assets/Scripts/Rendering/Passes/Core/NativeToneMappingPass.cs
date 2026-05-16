@@ -64,12 +64,12 @@ namespace PathTracing
 
         private readonly NativeComputePipeline      _tonemapCs;
         private readonly NativeComputeDescriptorSet _tonemapDs;
-
-        // ── GPU resources ────────────────────────────────────────────────────
-        private readonly GraphicsBuffer _histogramCBuffer; // ToneMappingConstants for histogram pass
-        private readonly GraphicsBuffer _otherCBuffer; // ToneMappingConstants for exposure + tonemap passes (log scale inverted for exposure pass)
+        
         private readonly GraphicsBuffer _histogramBuffer; // 256 x uint
         private readonly GraphicsBuffer _exposureBuffer; // 1 x uint (float bits)
+
+        private IntPtr histPtr;
+        private IntPtr expPtr;
 
         private Resource _resource;
         private Settings _settings;
@@ -89,11 +89,12 @@ namespace PathTracing
 
             _tonemapCs = new NativeComputePipeline(tonemapCs);
             _tonemapDs = new NativeComputeDescriptorSet(_tonemapCs);
-
-            _histogramCBuffer = new GraphicsBuffer(GraphicsBuffer.Target.Constant, 1, Marshal.SizeOf<ToneMappingConstants>());
-            _otherCBuffer     = new GraphicsBuffer(GraphicsBuffer.Target.Constant, 1, Marshal.SizeOf<ToneMappingConstants>());
+            
             _histogramBuffer  = new GraphicsBuffer(GraphicsBuffer.Target.Raw, 256, sizeof(uint));
             _exposureBuffer   = new GraphicsBuffer(GraphicsBuffer.Target.Raw, 1, sizeof(uint));
+
+            histPtr = _histogramBuffer.GetNativeBufferPtr();
+            expPtr  = _exposureBuffer.GetNativeBufferPtr();
         }
 
         public void Dispose()
@@ -104,8 +105,6 @@ namespace PathTracing
             _exposureCs?.Dispose();
             _tonemapDs?.Dispose();
             _tonemapCs?.Dispose();
-            _histogramCBuffer?.Release();
-            _otherCBuffer?.Release();
             _histogramBuffer?.Release();
             _exposureBuffer?.Release();
         }
@@ -224,17 +223,17 @@ namespace PathTracing
             internal NativeComputeDescriptorSet ExposureDs;
             internal NativeComputePipeline      TonemapCs;
             internal NativeComputeDescriptorSet TonemapDs;
-            internal GraphicsBuffer             histogramCBuffer;
-            internal GraphicsBuffer             otherCBuffer;
+
             internal GraphicsBuffer             HistogramBuffer;
-            internal GraphicsBuffer             ExposureBuffer;
             internal Resource                   Resource;
             internal Settings                   Settings;
+            public   IntPtr                     histPtr;
+            public   IntPtr                     expPtr;
         }
 
         // ── Execution ─────────────────────────────────────────────────────────
 
-        static void ExecutePass(PassData data, UnsafeGraphContext context)
+        static unsafe void ExecutePass(PassData data, UnsafeGraphContext context)
         {
             var cmd = CommandBufferHelpers.GetNativeCommandBuffer(context.cmd);
             var res = data.Resource;
@@ -267,17 +266,9 @@ namespace PathTracing
                     ? new float2(1f / (res.ColorLUTSize * res.ColorLUTSize), 1f / res.ColorLUTSize)
                     : float2.zero,
             };
-            data.histogramCBuffer.SetData(new[] { cb });
 
-            cb.logLuminanceScale = MaxLogLuminance - MinLogLuminance;
-            cb.logLuminanceBias  = MinLogLuminance;
-
-            data.otherCBuffer.SetData(new[] { cb });
-
-            var histogramCbPtr = data.histogramCBuffer.GetNativeBufferPtr();
-            var otherCbPtr     = data.otherCBuffer.GetNativeBufferPtr();
-            var histPtr        = data.HistogramBuffer.GetNativeBufferPtr();
-            var expPtr         = data.ExposureBuffer.GetNativeBufferPtr();
+            var histPtr        = data.histPtr;
+            var expPtr         = data.expPtr;
 
             uint renderW = (uint)s.RenderResolution.x;
             uint renderH = (uint)s.RenderResolution.y;
@@ -287,23 +278,26 @@ namespace PathTracing
             cmd.SetBufferData(data.HistogramBuffer, new uint[256]);
 
             // Build
-            data.HistogramDs.SetConstantBuffer("c_ToneMapping", histogramCbPtr);
+            data.HistogramDs.SetRootConstants("c_ToneMapping", &cb);
             data.HistogramDs.SetTexture("t_Source", res.SourceTexture);
             data.HistogramDs.SetRWTypedBuffer("u_Histogram", histPtr, 256, (uint)Nri.DXGI_FORMAT.DXGI_FORMAT_R32_UINT);
+
+            cb.logLuminanceScale = MaxLogLuminance - MinLogLuminance;
+            cb.logLuminanceBias  = MinLogLuminance;
 
             uint hx = (renderW + 15u) / 16u;
             uint hy = (renderH + 15u) / 16u;
             data.HistogramCs.Dispatch(cmd, data.HistogramDs, hx, hy, 1);
 
             // ── Pass 2: Compute Exposure ─────────────────────────────────────
-            data.ExposureDs.SetConstantBuffer("c_ToneMapping", otherCbPtr);
+            data.ExposureDs.SetRootConstants("c_ToneMapping", &cb);
             data.ExposureDs.SetTypedBuffer("t_Histogram", histPtr, 256, (uint)Nri.DXGI_FORMAT.DXGI_FORMAT_R32_UINT);
             data.ExposureDs.SetRWTypedBuffer("u_Exposure", expPtr, 1, (uint)Nri.DXGI_FORMAT.DXGI_FORMAT_R32_UINT);
 
             data.ExposureCs.Dispatch(cmd, data.ExposureDs, 1, 1, 1);
 
             // ── Pass 3: Tone Map ─────────────────────────────────────────────
-            data.TonemapDs.SetConstantBuffer("c_ToneMapping", otherCbPtr);
+            data.TonemapDs.SetRootConstants("c_ToneMapping", &cb);
             data.TonemapDs.SetTexture("t_Source", res.SourceTexture);
             data.TonemapDs.SetTypedBuffer("t_Exposure", expPtr, 1, (uint)Nri.DXGI_FORMAT.DXGI_FORMAT_R32_UINT);
             if (res.ColorLUT != IntPtr.Zero)
@@ -329,12 +323,12 @@ namespace PathTracing
             passData.ExposureDs       = _exposureDs;
             passData.TonemapCs        = _tonemapCs;
             passData.TonemapDs        = _tonemapDs;
-            passData.histogramCBuffer = _histogramCBuffer;
-            passData.otherCBuffer     = _otherCBuffer;
+            
             passData.HistogramBuffer  = _histogramBuffer;
-            passData.ExposureBuffer   = _exposureBuffer;
             passData.Resource         = _resource;
             passData.Settings         = _settings;
+            passData.histPtr          = histPtr;
+            passData.expPtr           = expPtr;
 
             builder.AllowPassCulling(false);
             builder.SetRenderFunc((PassData data, UnsafeGraphContext ctx) => ExecutePass(data, ctx));

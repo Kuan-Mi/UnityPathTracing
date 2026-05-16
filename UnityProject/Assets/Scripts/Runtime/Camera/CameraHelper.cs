@@ -14,7 +14,7 @@ namespace Runtime
         [ContextMenu("Set Camera")]
         public void SetCamera()
         {
-            var allMeshRenderers = FindObjectsOfType<MeshRenderer>();
+            var allMeshRenderers = FindObjectsByType<MeshRenderer>(FindObjectsSortMode.None);
 
              aabb = allMeshRenderers[0].bounds;
             foreach (var meshRenderer in allMeshRenderers)

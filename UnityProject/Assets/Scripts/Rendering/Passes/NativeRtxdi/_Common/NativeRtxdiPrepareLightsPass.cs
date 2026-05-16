@@ -330,7 +330,6 @@ namespace PathTracing
             // so it is sampled via infiniteLightBufferRegion (no presampled RIS required).
             // direction1 holds the bindless texture index; direction2 holds the texture dimensions.
             EnvMapBindlessTextureIndex = -1;
-            bool hasActiveEnvLight = false;
             int  envTexIdx         = gpuScene.EnvironmentMapTextureIndex;
             if (hasEnvLight && envTexIdx >= 0 && lightBufferOffset < maxLights)
             {
@@ -355,7 +354,6 @@ namespace PathTracing
                 lightBufferOffset++;
                 numInfinitePrimLights++;
                 EnvMapBindlessTextureIndex = envTexIdx;
-                hasActiveEnvLight          = true;
             }
 
             _numTasks        = (uint)validTasks;

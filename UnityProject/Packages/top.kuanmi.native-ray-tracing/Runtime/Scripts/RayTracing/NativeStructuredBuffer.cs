@@ -85,7 +85,7 @@ namespace NativeRender
             get
             {
                 var var = NativeRenderPlugin.NR_NSB_GetNativePtr(Handle);
-                Debug.Log($"NativeStructuredBuffer: Capacity={Capacity}, Stride={Stride}, NativePtr=0x{var.ToString("X")}");
+                // Debug.Log($"NativeStructuredBuffer: Capacity={Capacity}, Stride={Stride}, NativePtr=0x{var.ToString("X")}");
                 return var;
             }
         }

@@ -389,8 +389,6 @@ namespace PathTracing
             lightingSettings.denoiserMode    = 0;
             lightingSettings.enableGradients = false;
 
-            bool checkerboard = false;
-
             bool enableDirectReStirPass    = setting.directLightingMode == DirectLightingMode.ReStir;
             bool enableBrdfAndIndirectPass = setting.directLightingMode == DirectLightingMode.Brdf || setting.indirectLightingMode != IndirectLightingMode.None;
             bool enableIndirect            = setting.indirectLightingMode != IndirectLightingMode.None;

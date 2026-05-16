@@ -387,9 +387,6 @@ namespace PathTracing
 
             var emissionIntensity = 1;
 
-            var accumulationTime   = 0.5f;
-            var maxHistoryFrameNum = 60;
-            var resetHistoryFactor = 1.0f;
             var minProbability     = 0.0f;
 
             var globalConstants = new GlobalConstants
