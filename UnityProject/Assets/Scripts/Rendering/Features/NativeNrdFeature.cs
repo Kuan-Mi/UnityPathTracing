@@ -199,6 +199,22 @@ namespace PathTracing
             var curFrame = frameState.frameIndex;
             frameState.Update(renderingData, false, setting.resolutionScale);
 
+            // Adaptive accumulation — mirrors NRDSample.cpp PrepareFrame adaptiveAccumulation block.
+            // C++: ACCUMULATION_TIME = 0.5f s, MAX_HISTORY_FRAME_NUM = min(60, REBLUR_MAX, RELAX_MAX).
+            // nrd::GetMaxAccumulatedFrameNum(t, fps) = (uint)(t * fps + 0.5f).
+            if (setting.adaptiveAccumulation)
+            {
+                const float AccumulationTime   = 0.5f;  // seconds — matches C++ ACCUMULATION_TIME
+                const uint  MaxHistoryFrameNum = 60u;   // matches C++ MAX_HISTORY_FRAME_NUM
+
+                float fps      = math.min(1.0f / Time.smoothDeltaTime, 121.0f);
+                float accTime  = AccumulationTime * ((setting.boost && setting.SHARC) ? 0.667f : 1.0f);
+                uint  maxAccum = (uint)math.max((int)(accTime * fps + 0.5f), 1);
+
+                setting.maxAccumulatedFrameNum     = math.min(maxAccum, MaxHistoryFrameNum);
+                setting.maxFastAccumulatedFrameNum = setting.maxAccumulatedFrameNum / 5u;
+            }
+            
             globalConstants = frameState.GetNrdConstants(renderingData, setting);
 
             if (!_nrdConstantBuffers.TryGetValue(uniqueKey, out var nrdConstantBuffer))
