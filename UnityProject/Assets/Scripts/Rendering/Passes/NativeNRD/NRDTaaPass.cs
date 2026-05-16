@@ -93,7 +93,7 @@ namespace PathTracing
             var ds = data.IsEven ? data.DsPing : data.DsPong;
 
             // Dynamic per-frame bindings (same regardless of ping/pong)
-            ds.SetTexture("gIn_Mv",       pool.MV.NativePtr);
+            ds.SetTexture("gIn_Mv",       pool.Mv.NativePtr);
             ds.SetTexture("gIn_Composed", data.Settings.enableAutoExposure ?pool.LdrColor.NativePtr: pool.Composed.NativePtr);
             ds.SetConstantBuffer("GlobalConstants", res.ConstantBuffer);
 
@@ -122,11 +122,11 @@ namespace PathTracing
             // Ping (isEven):  gIn_History = TaaHistoryPrev, gOut_Result = TaaHistory
             // Pong (!isEven): gIn_History = TaaHistory,     gOut_Result = TaaHistoryPrev
             var pool = _resource.Pool;
-            _dsPing.SetTexture ("gIn_History",  pool.TaaHistoryPrev.NativePtr);
-            _dsPing.SetRWTexture("gOut_Result", pool.TaaHistory.NativePtr);
+            _dsPing.SetTexture ("gIn_History",  pool.TaaHistoryPong.NativePtr);
+            _dsPing.SetRWTexture("gOut_Result", pool.TaaHistoryPing.NativePtr);
 
-            _dsPong.SetTexture ("gIn_History",  pool.TaaHistory.NativePtr);
-            _dsPong.SetRWTexture("gOut_Result", pool.TaaHistoryPrev.NativePtr);
+            _dsPong.SetTexture ("gIn_History",  pool.TaaHistoryPing.NativePtr);
+            _dsPong.SetRWTexture("gOut_Result", pool.TaaHistoryPong.NativePtr);
  
 
             builder.AllowPassCulling(false);

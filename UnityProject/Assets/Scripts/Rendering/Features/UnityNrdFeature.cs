@@ -18,7 +18,9 @@ namespace PathTracing
         public NrdSampleSetting nrdSampleSetting;
 
         public GlobalConstants GlobalConstants;
-        public CommonSettings  commonSettings  = CommonSettings._default;
+        public CommonSettings  commonSettings = CommonSettings._default;
+        public SigmaSettings   sigmaSettings  = SigmaSettings._default;
+        public ReblurSettings  reblurSettings = ReblurSettings._default;
 
         public RenderPassEvent renderPassEvent = RenderPassEvent.BeforeRenderingPostProcessing;
 
@@ -579,17 +581,18 @@ namespace PathTracing
                     prevResolutionScale = frameState.prevResolutionScale,
                     renderResolution    = frameState.renderResolution,
                     frameIndex          = curFrame,
+                    denoisingRange = 1000.0f, 
                 };
 
-                var sigmaSettings = new SigmaSettings
-                {
-                    lightDirection = new float3(nrdLightDir.x, nrdLightDir.y, nrdLightDir.z),
-                };
+                sigmaSettings.lightDirection = new float3(nrdLightDir.x, nrdLightDir.y, nrdLightDir.z);
 
-                var reblurSettings = ReblurSettings._default;
+                reblurSettings.checkerboardMode              = nrdSampleSetting.tracingMode == RESOLUTION.RESOLUTION_HALF ? CheckerboardMode.WHITE : CheckerboardMode.OFF;
+                reblurSettings.hitDistanceReconstructionMode = nrdSampleSetting.tracingMode == RESOLUTION.RESOLUTION_FULL_PROBABILISTIC ? HitDistanceReconstructionMode.AREA_3X3 : HitDistanceReconstructionMode.OFF;
+                reblurSettings.minMaterialForDiffuse         = 0;
+                reblurSettings.minMaterialForSpecular        = 1;
 
                 NrdDenoiserHelper.GetCommonSettings(ref commonSettings, commonInput);
-                
+
                 _nrdShadowPass.Setup(nrdSigma.GetInteropDataPtr(commonSettings, sigmaSettings), RenderPassMarkers.NrdDenoise);
                 renderer.EnqueuePass(_nrdShadowPass);
 

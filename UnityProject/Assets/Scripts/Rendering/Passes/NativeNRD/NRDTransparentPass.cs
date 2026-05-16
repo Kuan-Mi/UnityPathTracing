@@ -114,7 +114,7 @@ namespace PathTracing
 
             // 7. UAV outputs
             ds.SetRWTexture("gOut_Composed",         pool.Composed.NativePtr);
-            ds.SetRWTexture("gInOut_Mv",             pool.MV.NativePtr);
+            ds.SetRWTexture("gInOut_Mv",             pool.Mv.NativePtr);
             ds.SetRWTexture("gOut_Normal_Roughness", pool.NormalRoughness.NativePtr);
 
             // 8. Constant buffer

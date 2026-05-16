@@ -101,7 +101,7 @@ namespace PathTracing
             ds.SetTexture("gIn_Spec", pool.Unfiltered_Spec.NativePtr);
 
             // UAV outputs
-            ds.SetRWTexture("gInOut_ViewZ", pool.Viewz.NativePtr);
+            ds.SetRWTexture("gInOut_ViewZ", pool.ViewZ.NativePtr);
             ds.SetRWTexture("gOut_DiffAlbedo", pool.RrGuideDiffAlbedo.NativePtr);
             ds.SetRWTexture("gOut_SpecAlbedo", pool.RrGuideSpecAlbedo.NativePtr);
             ds.SetRWTexture("gOut_SpecHitDistance", pool.RrGuideSpecHitDistance.NativePtr);

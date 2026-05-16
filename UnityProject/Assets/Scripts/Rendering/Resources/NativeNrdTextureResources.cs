@@ -15,46 +15,46 @@ namespace PathTracing
     public class NativeNrdTextureResources : IDisposable
     {
         // ── NRD standard inputs (SRV) ──────────────────────────────────────
-        public NriTextureResource Viewz;
-        public NriTextureResource MV;
+        public NriTextureResource ViewZ;
+        public NriTextureResource Mv;
         public NriTextureResource NormalRoughness;
+        public NriTextureResource PsrThroughput; // R10_G10_B10_A2_UNORM
         public NriTextureResource BaseColorMetalness;
+        public NriTextureResource DirectLighting; // B10G11R11 (colorFormat)
+        public NriTextureResource DirectEmission; // B10G11R11 (colorFormat)
+        public NriTextureResource Shadow; // RGBA8_UNORM because SIGMA_TRANSLUCENCY=1
+        public NriTextureResource Diff;
+        public NriTextureResource Spec;
+
         public NriTextureResource Unfiltered_Penumbra;
         public NriTextureResource Unfiltered_Diff;
         public NriTextureResource Unfiltered_Spec;
         public NriTextureResource Unfiltered_Translucency;
 
-        // ── NRD outputs (UAV) ───────────────────────────────────────────────
-        public NriTextureResource Shadow; // RGBA8_UNORM because SIGMA_TRANSLUCENCY=1
-        public NriTextureResource Diff;
-        public NriTextureResource Spec;
         public NriTextureResource Validation;
+        public NriTextureResource Composed;
 
-        // ── SHARC gradient textures — sized by sharcDims, allocated separately ──
         public NriTextureResource Gradient_StoredPing;
         public NriTextureResource Gradient_StoredPong;
         public NriTextureResource Gradient_Ping;
         public NriTextureResource Gradient_Pong;
 
-        // ── DLSS / RR interop (UAV) ─────────────────────────────────────────
-        public NriTextureResource DirectLighting; // B10G11R11 (colorFormat)
-        public NriTextureResource Composed;
+        public NriTextureResource ComposedDiff; // B10G11R11 (colorFormat)
+        public NriTextureResource ComposedSpecViewZ;
+        public NriTextureResource TaaHistoryPing;
+        public NriTextureResource TaaHistoryPong;
+
         public NriTextureResource DlssOutput; // output resolution
+        public NriTextureResource PreFinal; // output resolution
+        public NriTextureResource Final; // output resolution
+
         public NriTextureResource RrGuideDiffAlbedo;
         public NriTextureResource RrGuideSpecAlbedo;
         public NriTextureResource RrGuideSpecHitDistance;
         public NriTextureResource RrGuideNormalRoughness;
 
         // ── Cross-frame / per-frame (UAV) ───────────────────────────────────
-        public NriTextureResource TaaHistory;
-        public NriTextureResource TaaHistoryPrev;
-        public NriTextureResource PsrThroughput; // R10_G10_B10_A2_UNORM
-        public NriTextureResource Final; // output resolution
         public NriTextureResource LdrColor; //
-        public NriTextureResource PreFinal; // output resolution
-        public NriTextureResource DirectEmission; // B10G11R11 (colorFormat)
-        public NriTextureResource ComposedDiff; // B10G11R11 (colorFormat)
-        public NriTextureResource ComposedSpecViewZ;
 
         public int2 renderResolution { get; private set; }
 
@@ -63,42 +63,55 @@ namespace PathTracing
             var srv = new NriResourceState { accessBits = AccessBits.SHADER_RESOURCE, layout         = Layout.SHADER_RESOURCE, stageBits         = 1 << 7 };
             var uav = new NriResourceState { accessBits = AccessBits.SHADER_RESOURCE_STORAGE, layout = Layout.SHADER_RESOURCE_STORAGE, stageBits = 1 << 10 };
 
-            Viewz                   = new NriTextureResource("Viewz", GraphicsFormat.R32_SFloat, srv);
-            MV                      = new NriTextureResource("MV", GraphicsFormat.R16G16B16A16_SFloat, srv);
-            NormalRoughness         = new NriTextureResource("NormalRoughness", GraphicsFormat.A2B10G10R10_UNormPack32, srv);
-            BaseColorMetalness      = new NriTextureResource("BaseColorMetalness", GraphicsFormat.R8G8B8A8_UNorm, srv);
-            Unfiltered_Penumbra     = new NriTextureResource("Unfiltered_Penumbra", GraphicsFormat.R16_SFloat, srv);
-            Unfiltered_Diff         = new NriTextureResource("Unfiltered_Diff", GraphicsFormat.R16G16B16A16_SFloat, srv);
-            Unfiltered_Spec         = new NriTextureResource("Unfiltered_Spec", GraphicsFormat.R16G16B16A16_SFloat, srv);
-            Unfiltered_Translucency = new NriTextureResource("Unfiltered_Translucency", GraphicsFormat.R8G8B8A8_UNorm, srv);
+            var dataFormat = GraphicsFormat.R16G16B16A16_SFloat;
 
-            Shadow     = new NriTextureResource("Shadow", GraphicsFormat.R8G8B8A8_UNorm, uav);
-            Diff       = new NriTextureResource("Diff", GraphicsFormat.R16G16B16A16_SFloat, uav);
-            Spec       = new NriTextureResource("Spec", GraphicsFormat.R16G16B16A16_SFloat, uav);
+            var taaFormat           = GraphicsFormat.R16G16B16A16_SFloat;
+            var colorFormat         = GraphicsFormat.B10G11R11_UFloatPack32;
+            var criticalColorFormat = GraphicsFormat.R16G16B16A16_SFloat;
+            var shadowFormat        = GraphicsFormat.R8G8B8A8_UNorm;
+
+            ViewZ           = new NriTextureResource("Viewz", GraphicsFormat.R32_SFloat, srv);
+            Mv              = new NriTextureResource("MV", GraphicsFormat.R16G16B16A16_SFloat, srv);
+            NormalRoughness = new NriTextureResource("NormalRoughness", GraphicsFormat.A2B10G10R10_UNormPack32, srv);
+            PsrThroughput   = new NriTextureResource("PsrThroughput", GraphicsFormat.A2B10G10R10_UNormPack32, uav);
+
+
+            BaseColorMetalness = new NriTextureResource("BaseColorMetalness", GraphicsFormat.R8G8B8A8_UNorm, srv);
+            DirectLighting     = new NriTextureResource("DirectLighting", colorFormat, uav);
+            DirectEmission     = new NriTextureResource("DirectEmission", colorFormat, uav);
+
+            Shadow = new NriTextureResource("Shadow", shadowFormat, uav);
+            Diff   = new NriTextureResource("Diff", dataFormat, uav);
+            Spec   = new NriTextureResource("Spec", dataFormat, uav);
+
+            Unfiltered_Penumbra     = new NriTextureResource("Unfiltered_Penumbra", GraphicsFormat.R16_SFloat, srv);
+            Unfiltered_Diff         = new NriTextureResource("Unfiltered_Diff", dataFormat, srv);
+            Unfiltered_Spec         = new NriTextureResource("Unfiltered_Spec", dataFormat, srv);
+            Unfiltered_Translucency = new NriTextureResource("Unfiltered_Translucency", shadowFormat, srv);
+
             Validation = new NriTextureResource("Validation", GraphicsFormat.R8G8B8A8_UNorm, uav);
+            Composed   = new NriTextureResource("Composed", criticalColorFormat, uav);
 
             Gradient_StoredPing = new NriTextureResource("Gradient_StoredPing", GraphicsFormat.R16G16B16A16_SFloat, uav);
             Gradient_StoredPong = new NriTextureResource("Gradient_StoredPong", GraphicsFormat.R16G16B16A16_SFloat, uav);
             Gradient_Ping       = new NriTextureResource("Gradient_Ping", GraphicsFormat.R16G16B16A16_SFloat, uav);
             Gradient_Pong       = new NriTextureResource("Gradient_Pong", GraphicsFormat.R16G16B16A16_SFloat, uav);
+            ComposedDiff        = new NriTextureResource("ComposedDiff", colorFormat, uav);
+            ComposedSpecViewZ   = new NriTextureResource("ComposedSpecViewZ", GraphicsFormat.R16G16B16A16_SFloat, uav);
 
-            DirectLighting         = new NriTextureResource("DirectLighting", GraphicsFormat.B10G11R11_UFloatPack32, uav);
-            Composed               = new NriTextureResource("Composed", GraphicsFormat.R16G16B16A16_SFloat, uav);
-            DlssOutput             = new NriTextureResource("DlssOutput", GraphicsFormat.R16G16B16A16_SFloat, uav);
+            TaaHistoryPing = new NriTextureResource("TaaHistory", taaFormat, uav);
+            TaaHistoryPong = new NriTextureResource("TaaHistoryPrev", taaFormat, uav);
+
+            DlssOutput = new NriTextureResource("DlssOutput", criticalColorFormat, uav);
+
+            PreFinal = new NriTextureResource("PreFinal", criticalColorFormat, uav);
+            Final    = new NriTextureResource("Final", criticalColorFormat, uav);
+            LdrColor = new NriTextureResource("LdrColor", criticalColorFormat, uav);
+
             RrGuideDiffAlbedo      = new NriTextureResource("RrGuideDiffAlbedo", GraphicsFormat.A2B10G10R10_UNormPack32, uav);
             RrGuideSpecAlbedo      = new NriTextureResource("RrGuideSpecAlbedo", GraphicsFormat.A2B10G10R10_UNormPack32, uav);
             RrGuideSpecHitDistance = new NriTextureResource("RrGuideSpecHitDistance", GraphicsFormat.R16_SFloat, uav);
             RrGuideNormalRoughness = new NriTextureResource("RrGuideNormalRoughness", GraphicsFormat.R16G16B16A16_SFloat, uav);
-
-            TaaHistory        = new NriTextureResource("TaaHistory", GraphicsFormat.R16G16B16A16_SFloat, uav);
-            TaaHistoryPrev    = new NriTextureResource("TaaHistoryPrev", GraphicsFormat.R16G16B16A16_SFloat, uav);
-            PsrThroughput     = new NriTextureResource("PsrThroughput", GraphicsFormat.A2B10G10R10_UNormPack32, uav);
-            Final             = new NriTextureResource("Final", GraphicsFormat.R16G16B16A16_SFloat, uav);
-            LdrColor          = new NriTextureResource("LdrColor", GraphicsFormat.R16G16B16A16_SFloat, uav);
-            PreFinal          = new NriTextureResource("PreFinal", GraphicsFormat.R16G16B16A16_SFloat, uav);
-            DirectEmission    = new NriTextureResource("DirectEmission", GraphicsFormat.B10G11R11_UFloatPack32, uav);
-            ComposedDiff      = new NriTextureResource("ComposedDiff", GraphicsFormat.B10G11R11_UFloatPack32, uav);
-            ComposedSpecViewZ = new NriTextureResource("ComposedSpecViewZ", GraphicsFormat.R16G16B16A16_SFloat, uav);
         }
 
         public static int2 GetUpscaledResolution(int2 outputRes, UpscalerMode mode)
@@ -123,7 +136,7 @@ namespace PathTracing
         /// </summary>
         public bool EnsureResources(int2 outputResolution, UpscalerMode mode)
         {
-            bool invalid = !Viewz.IsCreated;
+            bool invalid = !ViewZ.IsCreated;
             int2 target  = GetUpscaledResolution(outputResolution, mode);
 
             if (!invalid && target.x == renderResolution.x && target.y == renderResolution.y)
@@ -162,13 +175,13 @@ namespace PathTracing
 
         private NriTextureResource[] RenderResolutionResources() => new[]
         {
-            Viewz, MV, NormalRoughness, BaseColorMetalness,
+            ViewZ, Mv, NormalRoughness, BaseColorMetalness,
             Unfiltered_Penumbra, Unfiltered_Diff, Unfiltered_Spec, Unfiltered_Translucency,
             Shadow, Diff, Spec, Validation,
             DirectLighting, Composed,
             RrGuideDiffAlbedo, RrGuideSpecAlbedo, RrGuideSpecHitDistance, RrGuideNormalRoughness,
-            TaaHistory, TaaHistoryPrev, PsrThroughput,
-            DirectEmission, ComposedDiff, ComposedSpecViewZ,LdrColor
+            TaaHistoryPing, TaaHistoryPong, PsrThroughput,
+            DirectEmission, ComposedDiff, ComposedSpecViewZ, LdrColor
         };
 
         public void Dispose()
@@ -190,14 +203,14 @@ namespace PathTracing
 
         private NriTextureResource[] AllResources() => new[]
         {
-            Viewz, MV, NormalRoughness, BaseColorMetalness,
+            ViewZ, Mv, NormalRoughness, BaseColorMetalness,
             Unfiltered_Penumbra, Unfiltered_Diff, Unfiltered_Spec, Unfiltered_Translucency,
             Shadow, Diff, Spec, Validation,
             Gradient_StoredPing, Gradient_StoredPong, Gradient_Ping, Gradient_Pong,
             DirectLighting, Composed, DlssOutput,
             RrGuideDiffAlbedo, RrGuideSpecAlbedo, RrGuideSpecHitDistance, RrGuideNormalRoughness,
-            TaaHistory, TaaHistoryPrev, PsrThroughput,
-            Final, PreFinal, DirectEmission, ComposedDiff, ComposedSpecViewZ,LdrColor
+            TaaHistoryPing, TaaHistoryPong, PsrThroughput,
+            Final, PreFinal, DirectEmission, ComposedDiff, ComposedSpecViewZ, LdrColor
         };
     }
 }

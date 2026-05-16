@@ -84,7 +84,7 @@ namespace PathTracing
             var pool = data.Pool;
 
             // SRV inputs
-            ds.SetTexture("gIn_ViewZ", pool.Viewz.NativePtr);
+            ds.SetTexture("gIn_ViewZ", pool.ViewZ.NativePtr);
             ds.SetTexture("gIn_Normal_Roughness", pool.NormalRoughness.NativePtr);
             ds.SetTexture("gIn_BaseColor_Metalness", pool.BaseColorMetalness.NativePtr);
             ds.SetTexture("gIn_DirectLighting", pool.DirectLighting.NativePtr);

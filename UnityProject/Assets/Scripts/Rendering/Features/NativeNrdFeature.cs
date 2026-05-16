@@ -289,8 +289,8 @@ namespace PathTracing
                 // Shadow denoiser (SIGMA) resources
                 nrdSigma.UpdateResources(
                     // Common
-                    (ResourceType.IN_MV, pool.MV),
-                    (ResourceType.IN_VIEWZ, pool.Viewz),
+                    (ResourceType.IN_MV, pool.Mv),
+                    (ResourceType.IN_VIEWZ, pool.ViewZ),
                     (ResourceType.IN_NORMAL_ROUGHNESS, pool.NormalRoughness),
 
                     // SIGMA
@@ -302,8 +302,8 @@ namespace PathTracing
                 // Opaque denoiser (REBLUR) resources
                 nrdReblur.UpdateResources(
                     // Common
-                    (ResourceType.IN_MV, pool.MV),
-                    (ResourceType.IN_VIEWZ, pool.Viewz),
+                    (ResourceType.IN_MV, pool.Mv),
+                    (ResourceType.IN_VIEWZ, pool.ViewZ),
                     (ResourceType.IN_NORMAL_ROUGHNESS, pool.NormalRoughness),
 
                     // (Optional) Validation
@@ -323,8 +323,8 @@ namespace PathTracing
                 // Opaque denoiser (RELAX) resources
                 nrdRelax.UpdateResources(
                     // Common
-                    (ResourceType.IN_MV, pool.MV),
-                    (ResourceType.IN_VIEWZ, pool.Viewz),
+                    (ResourceType.IN_MV, pool.Mv),
+                    (ResourceType.IN_VIEWZ, pool.ViewZ),
                     (ResourceType.IN_NORMAL_ROUGHNESS, pool.NormalRoughness),
 
                     // (Optional) Validation
@@ -344,8 +344,8 @@ namespace PathTracing
                 // Reference denoiser resources
                 nrdReference.UpdateResources(
                     // Common (required by NRDIntegration sanity check on frame 0)
-                    (ResourceType.IN_MV, pool.MV),
-                    (ResourceType.IN_VIEWZ, pool.Viewz),
+                    (ResourceType.IN_MV, pool.Mv),
+                    (ResourceType.IN_VIEWZ, pool.ViewZ),
                     (ResourceType.IN_NORMAL_ROUGHNESS, pool.NormalRoughness),
 
                     // REFERENCE
@@ -543,8 +543,8 @@ namespace PathTracing
                 {
                     input           = setting.enableAutoExposure ? pool.LdrColor : pool.Composed,
                     output          = pool.DlssOutput,
-                    mv              = pool.MV,
-                    depth           = pool.Viewz,
+                    mv              = pool.Mv,
+                    depth           = pool.ViewZ,
                     diffAlbedo      = pool.RrGuideDiffAlbedo,
                     specAlbedo      = pool.RrGuideSpecAlbedo,
                     normalRoughness = pool.RrGuideNormalRoughness,
@@ -586,8 +586,8 @@ namespace PathTracing
                 {
                     input    = setting.enableAutoExposure ? pool.LdrColor : pool.Composed,
                     output   = pool.DlssOutput,
-                    mv       = pool.MV,
-                    depth    = pool.Viewz,
+                    mv       = pool.Mv,
+                    depth    = pool.ViewZ,
                     exposure = null,
                     reactive = null
                 };
@@ -653,7 +653,7 @@ namespace PathTracing
                 }
                 else
                 {
-                    nisInputTex = isEven ? pool.TaaHistory : pool.TaaHistoryPrev;
+                    nisInputTex = isEven ? pool.TaaHistoryPing : pool.TaaHistoryPong;
                     currentW    = (ushort)(renderResolution.x * setting.resolutionScale + 0.5f);
                     currentH    = (ushort)(renderResolution.y * setting.resolutionScale + 0.5f);
                 }

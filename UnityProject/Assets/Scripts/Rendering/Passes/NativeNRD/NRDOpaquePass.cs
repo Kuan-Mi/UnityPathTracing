@@ -171,8 +171,8 @@ namespace PathTracing
 
 
             // UAV
-            ds.SetRWTexture("gOut_Mv", pool.MV.NativePtr);
-            ds.SetRWTexture("gOut_ViewZ", pool.Viewz.NativePtr);
+            ds.SetRWTexture("gOut_Mv", pool.Mv.NativePtr);
+            ds.SetRWTexture("gOut_ViewZ", pool.ViewZ.NativePtr);
             ds.SetRWTexture("gOut_Normal_Roughness", pool.NormalRoughness.NativePtr);
             ds.SetRWTexture("gOut_BaseColor_Metalness", pool.BaseColorMetalness.NativePtr);
             ds.SetRWTexture("gOut_DirectLighting", pool.DirectLighting.NativePtr);

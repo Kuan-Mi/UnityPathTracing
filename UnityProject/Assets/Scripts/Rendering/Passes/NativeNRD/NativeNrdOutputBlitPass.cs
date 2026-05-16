@@ -86,7 +86,7 @@ namespace PathTracing
                     break;
 
                 case NativeNrdShowMode.ViewZ:
-                    Blitter.BlitTexture(cmd, res.Viewz.Handle, scaleOffset, mat, (int)ShowPass.ViewZ);
+                    Blitter.BlitTexture(cmd, res.ViewZ.Handle, scaleOffset, mat, (int)ShowPass.ViewZ);
                     break;
 
                 // ── Denoiser inputs ────────────────────────────────────────
@@ -139,7 +139,7 @@ namespace PathTracing
                 // ── TAA output ─────────────────────────────────────────────
                 case NativeNrdShowMode.Taa:
 
-                    var taaDst = set.IsEven ? res.TaaHistory.Handle : res.TaaHistoryPrev.Handle;
+                    var taaDst = set.IsEven ? res.TaaHistoryPing.Handle : res.TaaHistoryPong.Handle;
                     Blitter.BlitTexture(cmd, taaDst, scaleOffset, mat, (int)ShowPass.Alpha);
                     break;
 
@@ -172,7 +172,7 @@ namespace PathTracing
 
             // ── Overlays ───────────────────────────────────────────────────
             if (set.ShowMv)
-                Blitter.BlitTexture(cmd, res.MV.Handle, fullScaleOffset, mat, (int)ShowPass.Mv);
+                Blitter.BlitTexture(cmd, res.Mv.Handle, fullScaleOffset, mat, (int)ShowPass.Mv);
 
             if (set.ShowValidation)
                 Blitter.BlitTexture(cmd, res.Validation.Handle, fullScaleOffset, mat, (int)ShowPass.Validation);
