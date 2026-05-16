@@ -567,7 +567,7 @@ namespace PathTracing
                 var nrdMainLight = nrdLightData.mainLightIndex >= 0 ? nrdLightData.visibleLights[nrdLightData.mainLightIndex] : default;
                 var nrdLightDir  = new float3(-(Vector3)nrdMainLight.localToWorldMatrix.GetColumn(2));
 
-                var commonInput = new NrdDenoiser.CommonFrameInput
+                var commonInput = new NrdDenoiserHelper.CommonFrameInput
                 {
                     worldToView         = frameState.worldToView,
                     prevWorldToView     = frameState.prevWorldToView,
@@ -588,7 +588,7 @@ namespace PathTracing
 
                 var reblurSettings = ReblurSettings._default;
 
-                NrdDenoiser.GetCommonSettings(ref commonSettings, commonInput);
+                NrdDenoiserHelper.GetCommonSettings(ref commonSettings, commonInput);
                 
                 _nrdShadowPass.Setup(nrdSigma.GetInteropDataPtr(commonSettings, sigmaSettings), RenderPassMarkers.NrdDenoise);
                 renderer.EnqueuePass(_nrdShadowPass);

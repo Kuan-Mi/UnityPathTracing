@@ -6,14 +6,14 @@ namespace Nrd
     // -----------------------------------------------------------------------
     // SIGMA – shadow / translucency denoiser
     // -----------------------------------------------------------------------
-    public sealed class SigmaDenoiser : NrdDenoiser<SigmaSettings>
+    public sealed class ReferenceDenoiser : NrdDenoiser<ReferenceSettings>
     {
-        public SigmaDenoiser(string camName, Denoiser denoiser)
+        public ReferenceDenoiser(string camName, Denoiser denoiser)
             : base(camName, new NrdDenoiserDesc(denoiser))
         {
-            if (denoiser != Denoiser.SIGMA_SHADOW && denoiser != Denoiser.SIGMA_SHADOW_TRANSLUCENCY)
+            if (denoiser != Denoiser.REFERENCE)
                 throw new ArgumentException(
-                    $"SigmaNrdDenoiser requires a SIGMA_* denoiser, got {denoiser}.", nameof(denoiser));
+                    $"ReferenceDenoiser requires the REFERENCE denoiser, got {denoiser}.", nameof(denoiser));
             _denoiser = denoiser;
         }
     }

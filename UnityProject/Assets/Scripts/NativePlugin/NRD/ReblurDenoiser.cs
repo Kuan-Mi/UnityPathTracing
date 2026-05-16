@@ -6,10 +6,8 @@ namespace Nrd
     // -----------------------------------------------------------------------
     // REBLUR – diffuse / specular radiance + hit-distance denoiser
     // -----------------------------------------------------------------------
-    public sealed class ReblurDenoiser : NrdDenoiser
+    public sealed class ReblurDenoiser : NrdDenoiser<ReblurSettings>
     {
-        private readonly Denoiser _denoiser;
-
         private static readonly HashSet<Denoiser> ValidDenoisers = new()
         {
             Denoiser.REBLUR_DIFFUSE,
@@ -31,24 +29,6 @@ namespace Nrd
                 throw new ArgumentException(
                     $"ReblurNrdDenoiser requires a REBLUR_* denoiser, got {denoiser}.", nameof(denoiser));
             _denoiser = denoiser;
-        }
-
-        public unsafe IntPtr  GetInteropDataPtr(CommonSettings common, ReblurSettings settings)
-        {
-            var data = NrdFrameData._default;
-            
-            data.instanceId     = _nrdInstanceId;
-            data.width          = common.resourceSize[0];
-            data.height         = common.resourceSize[1];
-            data.commonSettings = common;
-
-            data.denoiserCount = 1;
-            ref var entry = ref NrdFrameData.GetEntry(ref data, 0);
-            entry.identifier = 0;
-            entry.denoiser   = _denoiser;
-            entry.Write(settings);
-
-            return StoreAndGetPtr(data, common.frameIndex);
         }
     }
 }

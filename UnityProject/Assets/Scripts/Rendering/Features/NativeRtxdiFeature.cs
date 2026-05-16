@@ -700,7 +700,7 @@ namespace PathTracing
                 var mainLight = lightData.mainLightIndex >= 0 ? lightData.visibleLights[lightData.mainLightIndex] : default;
                 var lightDir  = new float3(-(Vector3)mainLight.localToWorldMatrix.GetColumn(2));
 
-                var nrdCommon = new NrdDenoiser.CommonFrameInput
+                var nrdCommon = new NrdDenoiserHelper.CommonFrameInput
                 {
                     worldToView                  = frameState.worldToView,
                     prevWorldToView              = frameState.prevWorldToView,
@@ -720,7 +720,7 @@ namespace PathTracing
 
                 var nrdRelaxSettings = RelaxSettings._default;
                 
-                NrdDenoiser.GetCommonSettings(ref commonSettings, nrdCommon);
+                NrdDenoiserHelper.GetCommonSettings(ref commonSettings, nrdCommon);
 
                 _nrdDenoisePass.Setup(nrdReblur.GetInteropDataPtr(commonSettings, nrdRelaxSettings), RenderPassMarkers.NrdDenoiseRtxdi);
                 renderer.EnqueuePass(_nrdDenoisePass);

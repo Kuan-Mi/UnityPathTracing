@@ -18,10 +18,11 @@ namespace PathTracing
         private const uint sharcDownscale = 5;
 
         public NativeNrdSampleSetting setting;
-        public CommonSettings         commonSettings  = CommonSettings._default;
-        public SigmaSettings          sigmaSettings  = SigmaSettings._default;
-        public ReblurSettings         reblurSettings = ReblurSettings._default;
-        public RelaxSettings          relaxSettings  = RelaxSettings._default;
+        public CommonSettings         commonSettings    = CommonSettings._default;
+        public SigmaSettings          sigmaSettings     = SigmaSettings._default;
+        public ReblurSettings         reblurSettings    = ReblurSettings._default;
+        public RelaxSettings          relaxSettings     = RelaxSettings._default;
+        public ReferenceSettings      referenceSettings = ReferenceSettings._default;
 
         public NRDGlobalConstants globalConstants;
 
@@ -63,6 +64,7 @@ namespace PathTracing
         private NRDFinalPass            _nrdFinalPass;
         private NrdPass                 _nrdShadowDenoisePass;
         private NrdPass                 _nrdOpaqueDenoisePass;
+        private NrdPass                 _nrdReferenceDenoisePass;
         private NRDDlssBeforePass       _nrdDlssBeforePass;
         private NRDDlssAfterPass        _nrdDlssAfterPass;
         private DlssRRPass              _dlssrrPass;
@@ -77,14 +79,16 @@ namespace PathTracing
 
         private readonly Dictionary<long, NativeBuffer> _nrdConstantBuffers = new();
 
-        private readonly Dictionary<long, SigmaDenoiser>             _nrdSigmaDenoisers  = new();
-        private readonly Dictionary<long, ReblurDenoiser>            _nrdReblurDenoisers = new();
-        private readonly Dictionary<long, RelaxDenoiser>             _nrdRelaxDenoisers  = new();
-        private readonly Dictionary<long, DlrrDenoiser>              _dlrrDenoisers      = new();
-        private readonly Dictionary<long, DlsrUpscaler>              _dlsrUpscalers      = new();
-        private readonly Dictionary<long, NisUpscaler>               _nisUpscalers       = new();
-        private readonly Dictionary<long, NativeNrdTextureResources> _resourcePools      = new();
-        private readonly Dictionary<long, CameraFrameState>          _cameraFrameStates  = new();
+        private readonly Dictionary<long, SigmaDenoiser>     _sigmaDenoisers     = new();
+        private readonly Dictionary<long, ReblurDenoiser>    _reblurDenoisers    = new();
+        private readonly Dictionary<long, RelaxDenoiser>     _relaxDenoisers     = new();
+        private readonly Dictionary<long, ReferenceDenoiser> _referenceDenoisers = new();
+
+        private readonly Dictionary<long, DlrrDenoiser>              _dlrrDenoisers     = new();
+        private readonly Dictionary<long, DlsrUpscaler>              _dlsrUpscalers     = new();
+        private readonly Dictionary<long, NisUpscaler>               _nisUpscalers      = new();
+        private readonly Dictionary<long, NativeNrdTextureResources> _resourcePools     = new();
+        private readonly Dictionary<long, CameraFrameState>          _cameraFrameStates = new();
 
         public override void Create()
         {
@@ -94,25 +98,26 @@ namespace PathTracing
 
         private void CreatePass()
         {
-            _nrdTlasUpdatePass     ??= new NRDTlasUpdatePass { updateSkinnedPrimitivesCS                                                         = updateSkinnedPrimitivesCS, renderPassEvent = renderPassEvent };
-            _nrdSharcPass          ??= new NRDSharcPass(nrdSharcResolve, nrdSharcUpdate) { renderPassEvent                                       = renderPassEvent };
-            _nrdOpaquePass         ??= new NRDOpaquePass(nrdOpaqueTracingShader) { renderPassEvent                                               = renderPassEvent };
-            _nrdTransparentPass    ??= new NRDTransparentPass(nrdTransparentShader) { renderPassEvent                                            = renderPassEvent };
-            _nrdCompositionPass    ??= new NRDCompositionPass(nrdCompositionShader) { renderPassEvent                                            = renderPassEvent };
-            _nrdTaaPass            ??= new NRDTaaPass(nrdTaaShader) { renderPassEvent                                                            = renderPassEvent };
-            _nrdConfidenceBlurPass ??= new NRDConfidenceBlurPass(nrdConfidenceBlurShader) { renderPassEvent                                      = renderPassEvent };
-            _nrdFinalPass          ??= new NRDFinalPass(nrdFinalShader) { renderPassEvent                                                        = renderPassEvent };
-            _nrdShadowDenoisePass  ??= new NrdPass { renderPassEvent                                                                             = renderPassEvent };
-            _nrdOpaqueDenoisePass  ??= new NrdPass { renderPassEvent                                                                             = renderPassEvent };
-            _nrdDlssBeforePass     ??= new NRDDlssBeforePass(nrdDlssBeforeShader) { renderPassEvent                                              = renderPassEvent };
-            _nrdDlssAfterPass      ??= new NRDDlssAfterPass(nrdDlssAfterShader) { renderPassEvent                                                = renderPassEvent };
-            _dlssrrPass            ??= new DlssRRPass { renderPassEvent                                                                          = renderPassEvent };
-            _dlsssrPass            ??= new DlssSRPass { renderPassEvent                                                                          = renderPassEvent };
-            _nisPass               ??= new NisPass { renderPassEvent                                                                             = renderPassEvent };
-            _outputBlitPass        ??= new NativeNrdOutputBlitPass(finalMaterial) { renderPassEvent                                              = renderPassEvent };
-            _nativeFrameTickPass   ??= new NativeFrameTick { renderPassEvent                                                                     = renderPassEvent };
-            _depthBarrierFixPass   ??= new DepthBarrierFixPass { renderPassEvent                                                                 = RenderPassEvent.AfterRendering };
-            _toneMappingPass       ??= new NativeToneMappingPass(toneMappingHistogramCs, toneMappingExposureCs, toneMappingCs) { renderPassEvent = renderPassEvent };
+            _nrdTlasUpdatePass       ??= new NRDTlasUpdatePass { updateSkinnedPrimitivesCS                                                         = updateSkinnedPrimitivesCS, renderPassEvent = renderPassEvent };
+            _nrdSharcPass            ??= new NRDSharcPass(nrdSharcResolve, nrdSharcUpdate) { renderPassEvent                                       = renderPassEvent };
+            _nrdOpaquePass           ??= new NRDOpaquePass(nrdOpaqueTracingShader) { renderPassEvent                                               = renderPassEvent };
+            _nrdTransparentPass      ??= new NRDTransparentPass(nrdTransparentShader) { renderPassEvent                                            = renderPassEvent };
+            _nrdCompositionPass      ??= new NRDCompositionPass(nrdCompositionShader) { renderPassEvent                                            = renderPassEvent };
+            _nrdTaaPass              ??= new NRDTaaPass(nrdTaaShader) { renderPassEvent                                                            = renderPassEvent };
+            _nrdConfidenceBlurPass   ??= new NRDConfidenceBlurPass(nrdConfidenceBlurShader) { renderPassEvent                                      = renderPassEvent };
+            _nrdFinalPass            ??= new NRDFinalPass(nrdFinalShader) { renderPassEvent                                                        = renderPassEvent };
+            _nrdShadowDenoisePass    ??= new NrdPass { renderPassEvent                                                                             = renderPassEvent };
+            _nrdOpaqueDenoisePass    ??= new NrdPass { renderPassEvent                                                                             = renderPassEvent };
+            _nrdReferenceDenoisePass ??= new NrdPass { renderPassEvent                                                                             = renderPassEvent };
+            _nrdDlssBeforePass       ??= new NRDDlssBeforePass(nrdDlssBeforeShader) { renderPassEvent                                              = renderPassEvent };
+            _nrdDlssAfterPass        ??= new NRDDlssAfterPass(nrdDlssAfterShader) { renderPassEvent                                                = renderPassEvent };
+            _dlssrrPass              ??= new DlssRRPass { renderPassEvent                                                                          = renderPassEvent };
+            _dlsssrPass              ??= new DlssSRPass { renderPassEvent                                                                          = renderPassEvent };
+            _nisPass                 ??= new NisPass { renderPassEvent                                                                             = renderPassEvent };
+            _outputBlitPass          ??= new NativeNrdOutputBlitPass(finalMaterial) { renderPassEvent                                              = renderPassEvent };
+            _nativeFrameTickPass     ??= new NativeFrameTick { renderPassEvent                                                                     = renderPassEvent };
+            _depthBarrierFixPass     ??= new DepthBarrierFixPass { renderPassEvent                                                                 = RenderPassEvent.AfterRendering };
+            _toneMappingPass         ??= new NativeToneMappingPass(toneMappingHistogramCs, toneMappingExposureCs, toneMappingCs) { renderPassEvent = renderPassEvent };
         }
 
         public override void AddRenderPasses(ScriptableRenderer renderer, ref RenderingData renderingData)
@@ -166,25 +171,32 @@ namespace PathTracing
                 _resourcePools.Add(uniqueKey, pool);
             }
 
-            if (!_nrdSigmaDenoisers.TryGetValue(uniqueKey, out var nrdSigma))
+            if (!_sigmaDenoisers.TryGetValue(uniqueKey, out var nrdSigma))
             {
                 var camName = isVR ? $"{cam.name}_Eye{eyeIndex}" : cam.name;
                 nrdSigma = new SigmaDenoiser(camName + "_Shadow", Denoiser.SIGMA_SHADOW_TRANSLUCENCY);
-                _nrdSigmaDenoisers.Add(uniqueKey, nrdSigma);
+                _sigmaDenoisers.Add(uniqueKey, nrdSigma);
             }
 
-            if (!_nrdReblurDenoisers.TryGetValue(uniqueKey, out var nrdReblur))
+            if (!_reblurDenoisers.TryGetValue(uniqueKey, out var nrdReblur))
             {
                 var camName = isVR ? $"{cam.name}_Eye{eyeIndex}" : cam.name;
                 nrdReblur = new ReblurDenoiser(camName + "_Opaque", Denoiser.REBLUR_DIFFUSE_SPECULAR);
-                _nrdReblurDenoisers.Add(uniqueKey, nrdReblur);
+                _reblurDenoisers.Add(uniqueKey, nrdReblur);
             }
 
-            if (!_nrdRelaxDenoisers.TryGetValue(uniqueKey, out var nrdRelax))
+            if (!_relaxDenoisers.TryGetValue(uniqueKey, out var nrdRelax))
             {
                 var camName = isVR ? $"{cam.name}_Eye{eyeIndex}" : cam.name;
                 nrdRelax = new RelaxDenoiser(camName + "_Opaque", Denoiser.RELAX_DIFFUSE_SPECULAR);
-                _nrdRelaxDenoisers.Add(uniqueKey, nrdRelax);
+                _relaxDenoisers.Add(uniqueKey, nrdRelax);
+            }
+
+            if (!_referenceDenoisers.TryGetValue(uniqueKey, out var nrdReference))
+            {
+                var camName = isVR ? $"{cam.name}_Eye{eyeIndex}" : cam.name;
+                nrdReference = new ReferenceDenoiser(camName + "_Reference", Denoiser.REFERENCE);
+                _referenceDenoisers.Add(uniqueKey, nrdReference);
             }
 
             if (!_dlrrDenoisers.TryGetValue(uniqueKey, out var dlrr))
@@ -328,6 +340,18 @@ namespace PathTracing
                     (ResourceType.OUT_SPEC_RADIANCE_HITDIST, pool.Spec),
                     (ResourceType.IN_SPEC_CONFIDENCE, pool.Gradient_Pong)
                 );
+
+                // Reference denoiser resources
+                nrdReference.UpdateResources(
+                    // Common (required by NRDIntegration sanity check on frame 0)
+                    (ResourceType.IN_MV, pool.MV),
+                    (ResourceType.IN_VIEWZ, pool.Viewz),
+                    (ResourceType.IN_NORMAL_ROUGHNESS, pool.NormalRoughness),
+
+                    // REFERENCE
+                    (ResourceType.IN_SIGNAL, pool.Composed),
+                    (ResourceType.OUT_SIGNAL, pool.Composed)
+                );
             }
 
             // Confidence Blur (5 ping-pong iterations over SHARC gradient)
@@ -380,7 +404,7 @@ namespace PathTracing
                 var mainLight = lightData.mainLightIndex >= 0 ? lightData.visibleLights[lightData.mainLightIndex] : default;
                 var lightDir  = new float3(-(Vector3)mainLight.localToWorldMatrix.GetColumn(2));
 
-                var commonInput = new NrdDenoiser.CommonFrameInput
+                var commonInput = new NrdDenoiserHelper.CommonFrameInput
                 {
                     worldToView                  = frameState.worldToView,
                     prevWorldToView              = frameState.prevWorldToView,
@@ -394,12 +418,12 @@ namespace PathTracing
                     frameIndex                   = curFrame,
                     enableValidation             = setting.showValidation,
                     isHistoryConfidenceAvailable = setting.confidence,
-                    splitScreen                  = setting.separator,
-                    denoisingRange               = setting.denoisingRange,
-                    strandMaterialID             = 2f
+                    splitScreen      = setting.denoiser == DenoiserType.DENOISER_REFERENCE ? 1.0f : setting.separator,
+                    denoisingRange   = setting.denoisingRange,
+                    strandMaterialID = 2f
                 };
 
-                NrdDenoiser.GetCommonSettings(ref commonSettings, commonInput);
+                NrdDenoiserHelper.GetCommonSettings(ref commonSettings, commonInput);
 
                 sigmaSettings.lightDirection = new float3(lightDir.x, lightDir.y, lightDir.z);
 
@@ -422,10 +446,10 @@ namespace PathTracing
                 _nrdShadowDenoisePass.Setup(nrdSigma.GetInteropDataPtr(commonSettings, sigmaSettings), RenderPassMarkers.NrdDenoiseShadow);
                 renderer.EnqueuePass(_nrdShadowDenoisePass);
 
-                if (setting.denoiser == DenoiserType.DENOISER_REBLUR)
-                    _nrdOpaqueDenoisePass.Setup(nrdReblur.GetInteropDataPtr(commonSettings, reblurSettings), RenderPassMarkers.NrdDenoiseOpaque);
-                else
+                if (setting.denoiser == DenoiserType.DENOISER_RELAX)
                     _nrdOpaqueDenoisePass.Setup(nrdRelax.GetInteropDataPtr(commonSettings, relaxSettings), RenderPassMarkers.NrdDenoiseOpaque);
+                else
+                    _nrdOpaqueDenoisePass.Setup(nrdReblur.GetInteropDataPtr(commonSettings, reblurSettings), RenderPassMarkers.NrdDenoiseOpaque);
                 renderer.EnqueuePass(_nrdOpaqueDenoisePass);
             }
 
@@ -466,6 +490,13 @@ namespace PathTracing
                 renderer.EnqueuePass(_nrdTransparentPass);
             }
 
+            if (!setting.RR && setting.denoiser == DenoiserType.DENOISER_REFERENCE)
+            {
+                var refCommonSettings = commonSettings;
+                refCommonSettings.splitScreen = setting.separator;
+                _nrdReferenceDenoisePass.Setup(nrdReference.GetInteropDataPtr(refCommonSettings, referenceSettings), RenderPassMarkers.NrdDenoiseOpaque);
+                renderer.EnqueuePass(_nrdReferenceDenoisePass);
+            }
 
             // ---- Tone Mapping (HDR → LDR, adaptive exposure) ----
             if (setting.enableAutoExposure)
@@ -728,17 +759,21 @@ namespace PathTracing
                 cb.Dispose();
             _nrdConstantBuffers.Clear();
 
-            foreach (var denoiser in _nrdSigmaDenoisers.Values)
+            foreach (var denoiser in _sigmaDenoisers.Values)
                 denoiser.Dispose();
-            _nrdSigmaDenoisers.Clear();
+            _sigmaDenoisers.Clear();
 
-            foreach (var denoiser in _nrdReblurDenoisers.Values)
+            foreach (var denoiser in _reblurDenoisers.Values)
                 denoiser.Dispose();
-            _nrdReblurDenoisers.Clear();
+            _reblurDenoisers.Clear();
 
-            foreach (var denoiser in _nrdRelaxDenoisers.Values)
+            foreach (var denoiser in _relaxDenoisers.Values)
                 denoiser.Dispose();
-            _nrdRelaxDenoisers.Clear();
+            _relaxDenoisers.Clear();
+
+            foreach (var denoiser in _referenceDenoisers.Values)
+                denoiser.Dispose();
+            _referenceDenoisers.Clear();
 
             foreach (var denoiser in _dlrrDenoisers.Values)
                 denoiser.Dispose();
@@ -772,9 +807,10 @@ namespace PathTracing
             _nrdConfidenceBlurPass?.Dispose();
             _nrdConfidenceBlurPass = null;
             _nrdFinalPass?.Dispose();
-            _nrdFinalPass         = null;
-            _nrdShadowDenoisePass = null;
-            _nrdOpaqueDenoisePass = null;
+            _nrdFinalPass            = null;
+            _nrdShadowDenoisePass    = null;
+            _nrdOpaqueDenoisePass    = null;
+            _nrdReferenceDenoisePass = null;
             _nrdDlssBeforePass?.Dispose();
             _nrdDlssBeforePass = null;
             _nrdDlssAfterPass?.Dispose();

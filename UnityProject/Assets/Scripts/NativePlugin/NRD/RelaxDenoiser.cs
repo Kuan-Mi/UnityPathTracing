@@ -6,10 +6,8 @@ namespace Nrd
     // -----------------------------------------------------------------------
     // RELAX – spatiotemporal accumulation denoiser
     // -----------------------------------------------------------------------
-    public sealed class RelaxDenoiser : NrdDenoiser
+    public sealed class RelaxDenoiser : NrdDenoiser<RelaxSettings>
     {
-        private readonly Denoiser _denoiser;
-
         private static readonly HashSet<Denoiser> ValidDenoisers = new()
         {
             Denoiser.RELAX_DIFFUSE,
@@ -27,23 +25,6 @@ namespace Nrd
                 throw new ArgumentException(
                     $"RelaxNrdDenoiser requires a RELAX_* denoiser, got {denoiser}.", nameof(denoiser));
             _denoiser   = denoiser;
-        }
-
-        public unsafe IntPtr GetInteropDataPtr(CommonSettings common, RelaxSettings settings)
-        {
-            var data = NrdFrameData._default;
-            data.instanceId     = _nrdInstanceId;
-            data.width          = common.resourceSize[0];
-            data.height         = common.resourceSize[1];
-            data.commonSettings = common;
-
-            data.denoiserCount = 1;
-            ref var entry = ref NrdFrameData.GetEntry(ref data, 0);
-            entry.identifier = 0;
-            entry.denoiser   = _denoiser;
-            entry.Write(settings);
-
-            return StoreAndGetPtr(data, common.frameIndex);
         }
     }
 }

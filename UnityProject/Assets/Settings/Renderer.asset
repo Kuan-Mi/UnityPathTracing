@@ -97,7 +97,7 @@ MonoBehaviour:
     maxFastAccumulatedFrameNum: 10
     onScreen: 0
     forcedMaterial: 0
-    denoiser: 1
+    denoiser: 2
     rpp: 1
     bounceNum: 1
     tracingMode: 0
@@ -110,7 +110,7 @@ MonoBehaviour:
     adaptiveAccumulation: 0
     usePrevFrame: 1
     boost: 1
-    SR: 1
+    SR: 0
     RR: 0
     upscalerMode: 0
     confidence: 1
@@ -155,35 +155,35 @@ MonoBehaviour:
       e32: -1
       e33: 0
     worldToViewMatrix:
-      e00: -0.017470598
-      e01: 0.00031873584
-      e02: 0.99984735
-      e03: 3.4742548
-      e10: -0.29492864
-      e11: 0.9555037
-      e12: -0.0054579824
-      e13: -3.3611672
-      e20: 0.95535964
-      e21: 0.29497898
-      e22: 0.016599298
-      e23: 3.8462658
+      e00: 0.5324742
+      e01: 0.00031074882
+      e02: 0.8464461
+      e03: 3.999258
+      e10: -0.18854162
+      e11: 0.9749202
+      e12: 0.11824803
+      e13: -2.8933358
+      e20: 0.8251807
+      e21: 0.22255437
+      e22: -0.5191785
+      e23: 1.3734386
       e30: 0
       e31: 0
       e32: 0
       e33: 1
     worldToViewMatrixPrev:
-      e00: -0.017470598
-      e01: 0.00031873584
-      e02: 0.99984735
-      e03: 3.4742548
-      e10: -0.29492864
-      e11: 0.9555037
-      e12: -0.0054579824
-      e13: -3.3611672
-      e20: 0.95535964
-      e21: 0.29497898
-      e22: 0.016599298
-      e23: 3.8462658
+      e00: 0.5324742
+      e01: 0.00031074882
+      e02: 0.8464461
+      e03: 3.999258
+      e10: -0.18854162
+      e11: 0.9749202
+      e12: 0.11824803
+      e13: -2.8933358
+      e20: 0.8251807
+      e21: 0.22255437
+      e22: -0.5191785
+      e23: 1.3734386
       e30: 0
       e31: 0
       e32: 0
@@ -210,11 +210,11 @@ MonoBehaviour:
       y: 0.001607717
       z: -1
     cameraJitter:
-      x: -0.05340576
-      y: -0.3562211
+      x: -0.4824829
+      y: -0.14720827
     cameraJitterPrev:
-      x: 0.19659424
-      y: 0.19933444
+      x: 0.4706421
+      y: -0.4805416
     resourceSize: 95046e02
     resourceSizePrev: 95046e02
     rectSize: 95046e02
@@ -228,11 +228,11 @@ MonoBehaviour:
     strandMaterialID: 2
     historyFixAlternatePixelStrideMaterialID: 999
     strandThickness: 0.00008
-    splitScreen: 0
+    splitScreen: 1
     printfAt: 0f270f27
     debug: 0
     rectOrigin: 0000000000000000
-    frameIndex: 10829
+    frameIndex: 15903
     accumulationMode: 0
   sigmaSettings:
     lightDirection: {x: 0.9257155, y: 0.3584616, z: -0.12064916}
@@ -320,6 +320,8 @@ MonoBehaviour:
     minMaterialForSpecular: 1
     _enableAntiFirefly: 0
     _enableRoughnessEdgeStopping: 1
+  referenceSettings:
+    maxAccumulatedFrameNum: 4096
   renderPassEvent: 550
   finalMaterial: {fileID: 2100000, guid: 27695a2bc55ef2f469362b9a2994989e, type: 2}
   nrdOpaqueTracingShader: {fileID: -2368575503658470205, guid: 317f1945d390e3d40b100508cc1e2544, type: 3}
