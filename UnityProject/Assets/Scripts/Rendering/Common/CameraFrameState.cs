@@ -651,7 +651,7 @@ namespace PathTracing
                 gFocalLength             = focalLength,
                 gTAA                     = taa,
                 gHdrScale                = 1.0f, // C++ reads from display descriptor; default to SDR
-                gExposure                = settings.exposure,
+                gExposure                = settings.enableAutoExposure ? 1 : settings.fixExposure,
                 gMipBias                 = mipBias,
                 gOrthoMode               = orthoMode,
                 gMinProbability          = minProbability,

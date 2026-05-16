@@ -65,9 +65,6 @@ namespace PathTracing
             switch (set.ShowMode)
             {
                 case NativeNrdShowMode.Final:
-                    if (set.EnableDlssRr)
-                        Blitter.BlitTexture(cmd, res.DlssOutput.Handle, fullScaleOffset, mat, (int)ShowPass.Dlss);
-                    else
                         Blitter.BlitTexture(cmd, res.Final.Handle, scaleOffset, mat, (int)ShowPass.Out);
                     break;
 

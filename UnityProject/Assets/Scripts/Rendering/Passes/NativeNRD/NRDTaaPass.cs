@@ -55,8 +55,9 @@ namespace PathTracing
 
         public class Settings
         {
-            internal int rectGridW;
-            internal int rectGridH;
+            internal int  rectGridW;
+            internal int  rectGridH;
+            public   bool enableAutoExposure;
         }
 
         // -------------------------------------------------------------------------
@@ -93,7 +94,7 @@ namespace PathTracing
 
             // Dynamic per-frame bindings (same regardless of ping/pong)
             ds.SetTexture("gIn_Mv",       pool.MV.NativePtr);
-            ds.SetTexture("gIn_Composed", pool.Composed.NativePtr);
+            ds.SetTexture("gIn_Composed", data.Settings.enableAutoExposure ?pool.LdrColor.NativePtr: pool.Composed.NativePtr);
             ds.SetConstantBuffer("GlobalConstants", res.ConstantBuffer);
 
             cs.Dispatch(cmd, ds, (uint)data.Settings.rectGridW, (uint)data.Settings.rectGridH, 1);

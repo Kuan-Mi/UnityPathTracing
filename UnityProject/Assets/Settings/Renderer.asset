@@ -365,18 +365,27 @@ MonoBehaviour:
     showMV: 0
     cameraJitter: 1
     sunAngularDiameter: 0.533
-    exposure: 4.9
+    enableAutoExposure: 1
+    fixExposure: 107.58
+    toneMappingParams:
+      histogramLowPercentile: 0.8
+      histogramHighPercentile: 0.95
+      eyeAdaptationSpeedUp: 10
+      eyeAdaptationSpeedDown: 5
+      minAdaptedLuminance: 0.02
+      maxAdaptedLuminance: 0.5
+      exposureBias: 0
+      whitePoint: 3
+      enableColorLUT: 0
     roughnessOverride: 0
     metalnessOverride: 0
     emissionIntensityLights: 1
-    emissionIntensityCubes: 1
-    debug: 0
     meterToUnitsMultiplier: 1
     separator: 0
     hitDistScale: 3
     resolutionScale: 1
-    maxAccumulatedFrameNum: 31
-    maxFastAccumulatedFrameNum: 1
+    maxAccumulatedFrameNum: 12
+    maxFastAccumulatedFrameNum: 2
     onScreen: 0
     forcedMaterial: 0
     denoiser: 0
@@ -389,18 +398,18 @@ MonoBehaviour:
     TAA: 1
     emission: 1
     importanceSampling: 1
-    specularLobeTrimming: 1
     adaptiveAccumulation: 1
     usePrevFrame: 1
-    boost: 0
+    boost: 1
     SR: 1
-    RR: 0
-    tmpDisableRR: 0
+    RR: 1
     upscalerMode: 2
     confidence: 1
     denoisingRange: 1000
     nisSharpness: 0.2
     skipRightEyeInVR: 0
+    dofAperture: 0
+    dofFocalDistance: 2
   renderPassEvent: 550
   finalMaterial: {fileID: 2100000, guid: 27695a2bc55ef2f469362b9a2994989e, type: 2}
   nrdOpaqueTracingShader: {fileID: -2368575503658470205, guid: 317f1945d390e3d40b100508cc1e2544, type: 3}
@@ -414,5 +423,8 @@ MonoBehaviour:
   nrdDlssBeforeShader: {fileID: -2368575503658470205, guid: f5e21f2594d12fc49b4fd26c01c33415, type: 3}
   nrdDlssAfterShader: {fileID: -2368575503658470205, guid: ccb470348255bd1489d6a9752f36b77d, type: 3}
   updateSkinnedPrimitivesCS: {fileID: 7200000, guid: 2d589790ec726d548addcbbeb7a17477, type: 3}
+  toneMappingHistogramCs: {fileID: -2368575503658470205, guid: 4da6f987bf06072418d582edb57f6fa6, type: 3}
+  toneMappingExposureCs: {fileID: -2368575503658470205, guid: 3d65022f076c70242ab9845539bd4e1f, type: 3}
+  toneMappingCs: {fileID: -2368575503658470205, guid: 9d906646ce76618439a964cd3565df1e, type: 3}
   scramblingRankingTex: {fileID: 2800000, guid: ba45d1e4dcf9022438a4798a5f9e7b80, type: 3}
   sobolTex: {fileID: 2800000, guid: 17e7ce8147355314ea8aab1178a6a43c, type: 3}

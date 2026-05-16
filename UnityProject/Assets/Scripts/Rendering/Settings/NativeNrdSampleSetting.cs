@@ -1,4 +1,5 @@
 using UnityEngine;
+using UnityEngine.Serialization;
 
 namespace PathTracing
 {
@@ -22,7 +23,9 @@ namespace PathTracing
         public float sunAngularDiameter = 0.533f; // degrees
 
         // ── Rendering ────────────────────────────────────────────────────
-        public float exposure = 80.0f;
+        public bool                                        enableAutoExposure = true;
+        public float                                       fixExposure           = 80.0f;
+        public NativeToneMappingPass.ToneMappingParameters toneMappingParams;
 
         [Range(0, 1)]
         public float roughnessOverride = 0.0f;
