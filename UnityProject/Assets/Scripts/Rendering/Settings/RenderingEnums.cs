@@ -191,7 +191,7 @@ namespace PathTracing
         // ── Denoiser outputs ───────────────────────────────────────────────
         DenoisedDiffuse,
         DenoisedSpecular,
-        Shadow,
+        DenoisedShadow,
 
         // ── Intermediate lighting ──────────────────────────────────────────
         DirectLight,
