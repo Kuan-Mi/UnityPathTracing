@@ -31,7 +31,6 @@ namespace PathTracing
         {
             internal NativeNrdShowMode ShowMode;
             internal float             ResolutionScale;
-            internal bool              EnableDlssRr;
             internal bool              ShowMv;
             internal bool              ShowValidation;
             internal bool              IsEven;

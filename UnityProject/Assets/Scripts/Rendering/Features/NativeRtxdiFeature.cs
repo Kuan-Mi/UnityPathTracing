@@ -190,7 +190,7 @@ namespace PathTracing
         // ScriptableRendererFeature lifecycle
         // -------------------------------------------------------------------
 
-        public override void Create()
+        public void CreatePass()
         {
             _rtxdiGpuScene ??= new NativeRtxdiGPUScene();
 
@@ -239,11 +239,17 @@ namespace PathTracing
             _compositingConstantBuffer = new GraphicsBuffer(GraphicsBuffer.Target.Constant, 1, Marshal.SizeOf<NativeCompositingConstants>());
         }
 
+        public override void Create()
+        {
+        }
+
         public override void AddRenderPasses(ScriptableRenderer renderer, ref RenderingData renderingData)
         {
             var cam = renderingData.cameraData.camera;
             if (cam.cameraType is CameraType.Preview or CameraType.Reflection) return;
             if (cam.cameraType != CameraType.Game && cam.cameraType != CameraType.SceneView) return;
+
+            CreatePass();
 
             cam.depthTextureMode = DepthTextureMode.Depth | DepthTextureMode.MotionVectors;
 

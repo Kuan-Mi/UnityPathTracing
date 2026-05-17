@@ -745,8 +745,7 @@ namespace PathTracing
                 {
                     ShowMode        = setting.showMode,
                     ResolutionScale = frameState.resolutionScale,
-                    EnableDlssRr    = setting.RR || setting.SR,
-                    ShowMv          = setting.showMV,
+                    ShowMv          = setting.showMv,
                     ShowValidation  = setting.showValidation
                 });
                 renderer.EnqueuePass(_outputBlitPass);

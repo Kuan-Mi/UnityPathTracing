@@ -14,7 +14,7 @@ namespace PathTracing
     {
         public NativeNrdShowMode showMode;
         public bool              showValidation = false;
-        public bool              showMV         = false;
+        public bool              showMv         = false;
 
         // ── Camera ───────────────────────────────────────────────────────
         public bool cameraJitter = true;
@@ -24,7 +24,7 @@ namespace PathTracing
 
         // ── Rendering ────────────────────────────────────────────────────
         public bool                                        enableAutoExposure = true;
-        public float                                       fixExposure           = 80.0f;
+        public float                                       fixExposure        = 80.0f;
         public NativeToneMappingPass.ToneMappingParameters toneMappingParams;
 
         [Range(0, 1)]

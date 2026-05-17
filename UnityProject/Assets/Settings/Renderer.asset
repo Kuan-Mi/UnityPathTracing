@@ -224,7 +224,7 @@ MonoBehaviour:
   setting:
     showMode: 0
     showValidation: 0
-    showMV: 0
+    showMv: 0
     cameraJitter: 1
     sunAngularDiameter: 1
     enableAutoExposure: 1
