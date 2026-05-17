@@ -272,6 +272,95 @@ bool AccelerationStructure::EnsureBLAS(ID3D12GraphicsCommandList4 *cmdList, Inst
     m_d3d12v8->RequestResourceState(def.vertexBuffer, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
     m_d3d12v8->RequestResourceState(def.indexBuffer, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
 
+    // ---------------------------------------------------------------------------
+    // Fast update path: reuse existing dynamic BLAS/Scratch with PERFORM_UPDATE.
+    // Topology (indices, OMM) is unchanged; only vertex positions change each frame.
+    // ---------------------------------------------------------------------------
+    if (isDynamic && slot.dynamicBlas)
+    {
+        BLASEntry &existing = *slot.dynamicBlas;
+        std::vector<D3D12_RAYTRACING_GEOMETRY_DESC>                  upGeomDescs(subCount);
+        std::vector<D3D12_RAYTRACING_GEOMETRY_TRIANGLES_DESC>        upOmmTriDescs(subCount);
+        std::vector<D3D12_RAYTRACING_GEOMETRY_OMM_LINKAGE_DESC>      upOmmLinkages(subCount);
+
+        for (size_t j = 0; j < subCount; ++j)
+        {
+            const SubMeshData &sub = def.submeshes[j];
+            D3D12_RAYTRACING_GEOMETRY_DESC &gd = upGeomDescs[j];
+            gd = {};
+
+            if (sub.hasBakedOMM && j < existing.ommArrays.size() && existing.ommArrays[j])
+            {
+                gd.Type  = D3D12_RAYTRACING_GEOMETRY_TYPE_OMM_TRIANGLES;
+                gd.Flags = (sub.flags & NR_SUBMESH_FLAG_GEOMETRY_OPAQUE)
+                    ? D3D12_RAYTRACING_GEOMETRY_FLAG_OPAQUE
+                    : D3D12_RAYTRACING_GEOMETRY_FLAG_NONE;
+
+                D3D12_RAYTRACING_GEOMETRY_TRIANGLES_DESC &td = upOmmTriDescs[j];
+                td = {};
+                td.VertexBuffer.StartAddress  = def.vertexBuffer->GetGPUVirtualAddress()
+                    + static_cast<UINT64>(sub.baseVertex) * def.vertexStride;
+                td.VertexBuffer.StrideInBytes = def.vertexStride;
+                td.VertexCount  = def.vertexCount - static_cast<UINT>(sub.baseVertex);
+                td.VertexFormat = DXGI_FORMAT_R32G32B32_FLOAT;
+                td.IndexBuffer  = def.indexBuffer->GetGPUVirtualAddress() + sub.indexByteOffset;
+                td.IndexCount   = sub.indexCount;
+                td.IndexFormat  = def.indexFormat;
+                td.Transform3x4 = 0;
+
+                D3D12_RAYTRACING_GEOMETRY_OMM_LINKAGE_DESC &ol = upOmmLinkages[j];
+                ol = {};
+                ol.OpacityMicromapArray                    = existing.ommArrays[j]->GetGPUVirtualAddress();
+                ol.OpacityMicromapBaseLocation             = 0;
+                ol.OpacityMicromapIndexBuffer.StartAddress = existing.ommIndexBuffers[j]->GetGPUVirtualAddress();
+                ol.OpacityMicromapIndexBuffer.StrideInBytes = existing.ommIndexStrides[j];
+                ol.OpacityMicromapIndexFormat              = existing.ommIndexFormats[j];
+
+                gd.OmmTriangles.pTriangles  = &td;
+                gd.OmmTriangles.pOmmLinkage = &ol;
+            }
+            else
+            {
+                gd.Type  = D3D12_RAYTRACING_GEOMETRY_TYPE_TRIANGLES;
+                gd.Flags = (sub.flags & NR_SUBMESH_FLAG_GEOMETRY_OPAQUE)
+                    ? D3D12_RAYTRACING_GEOMETRY_FLAG_OPAQUE
+                    : D3D12_RAYTRACING_GEOMETRY_FLAG_NONE;
+                gd.Triangles.VertexBuffer.StartAddress  = def.vertexBuffer->GetGPUVirtualAddress()
+                    + static_cast<UINT64>(sub.baseVertex) * def.vertexStride;
+                gd.Triangles.VertexBuffer.StrideInBytes = def.vertexStride;
+                gd.Triangles.VertexCount  = def.vertexCount - static_cast<UINT>(sub.baseVertex);
+                gd.Triangles.VertexFormat = DXGI_FORMAT_R32G32B32_FLOAT;
+                gd.Triangles.IndexBuffer  = def.indexBuffer->GetGPUVirtualAddress() + sub.indexByteOffset;
+                gd.Triangles.IndexCount   = sub.indexCount;
+                gd.Triangles.IndexFormat  = def.indexFormat;
+                gd.Triangles.Transform3x4 = 0;
+            }
+        }
+
+        D3D12_RAYTRACING_ACCELERATION_STRUCTURE_BUILD_FLAGS upFlags =
+            D3D12_RAYTRACING_ACCELERATION_STRUCTURE_BUILD_FLAG_ALLOW_UPDATE |
+            D3D12_RAYTRACING_ACCELERATION_STRUCTURE_BUILD_FLAG_PERFORM_UPDATE;
+        if (existing.anyOMM)
+            upFlags |= D3D12_RAYTRACING_ACCELERATION_STRUCTURE_BUILD_FLAG_ALLOW_DISABLE_OMMS;
+
+        D3D12_BUILD_RAYTRACING_ACCELERATION_STRUCTURE_INPUTS upInputs = {};
+        upInputs.Type         = D3D12_RAYTRACING_ACCELERATION_STRUCTURE_TYPE_BOTTOM_LEVEL;
+        upInputs.Flags        = upFlags;
+        upInputs.NumDescs     = static_cast<UINT>(subCount);
+        upInputs.DescsLayout  = D3D12_ELEMENTS_LAYOUT_ARRAY;
+        upInputs.pGeometryDescs = upGeomDescs.data();
+
+        D3D12_BUILD_RAYTRACING_ACCELERATION_STRUCTURE_DESC upDesc = {};
+        upDesc.SourceAccelerationStructureData = existing.blas->GetGPUVirtualAddress(); // in-place update
+        upDesc.DestAccelerationStructureData   = existing.blas->GetGPUVirtualAddress();
+        upDesc.Inputs                          = upInputs;
+        upDesc.ScratchAccelerationStructureData = existing.blasScratch->GetGPUVirtualAddress();
+        cmdList->BuildRaytracingAccelerationStructure(&upDesc, 0, nullptr);
+
+        slot.blasVA = existing.blas->GetGPUVirtualAddress();
+        return true;
+    }
+
     blas.ommArrays.resize(subCount);
     blas.ommArrayScratch.resize(subCount);
     blas.ommIndexBuffers.resize(subCount);
@@ -401,8 +490,13 @@ bool AccelerationStructure::EnsureBLAS(ID3D12GraphicsCommandList4 *cmdList, Inst
         swprintf(scratchName, 64, L"BLASScratch_Static_VB_%p", (void *)key.vbPtr);
     }
 
+    // For dynamic BLAS the same scratch is reused every frame (PERFORM_UPDATE),
+    // so allocate max(build size, update size) to guarantee it always fits.
+    const UINT64 scratchSize = isDynamic
+        ? max(prebuildInfo.ScratchDataSizeInBytes, prebuildInfo.UpdateScratchDataSizeInBytes)
+        : prebuildInfo.ScratchDataSizeInBytes;
     blas.blasScratch = CreateBuffer(m_device.Get(),
-                                     prebuildInfo.ScratchDataSizeInBytes,
+                                     scratchSize,
                                      D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS,
                                      D3D12_RESOURCE_STATE_COMMON, defaultHeap, scratchName);
     blas.blas = CreateBuffer(m_device.Get(),
@@ -423,7 +517,10 @@ bool AccelerationStructure::EnsureBLAS(ID3D12GraphicsCommandList4 *cmdList, Inst
 
     slot.blasVA = blas.blas->GetGPUVirtualAddress();
     if(isDynamic){
-        EnqueueDeferredDelete(new BLASEntry(std::move(blas)), DeferredType::AccelStructBlas);
+        // Store the BLASEntry in the slot so it can be reused (via PERFORM_UPDATE) next frame.
+        // Ownership transfers here; ReleaseBLAS/RemoveInstance will defer-delete it when the
+        // instance is destroyed.
+        slot.dynamicBlas = std::make_unique<BLASEntry>(std::move(blas));
     }else{
         SafeReleaseResource(std::move(blas.blasScratch));
         blas.refCount = 1;
@@ -1135,6 +1232,12 @@ void AccelerationStructure::RemoveInstance(uint32_t handle)
 
     if (!slot.needsBLAS)
         ReleaseBLAS(slot.meshKey);
+
+    // Release the persistent dynamic BLAS (deferred GPU delete, safe after 3 frames).
+    if (slot.dynamicBlas)
+    {
+        EnqueueDeferredDelete(slot.dynamicBlas.release(), DeferredType::AccelStructBlas);
+    }
 
     // NOTE: We no longer defer deletion of vertex/index buffers because we don't own them.
     // Unity manages these resources, and we only store raw pointers without AddRef.

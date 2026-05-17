@@ -3,6 +3,8 @@ using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Runtime.InteropServices;
 using Unity.Collections;
+using Unity.Profiling;
+using Unity.Profiling.LowLevel;
 using UnityEngine;
 using UnityEngine.Rendering;
 
@@ -72,6 +74,11 @@ namespace NativeRender
         {
             if (_handle == 0) return;
 
+            var mark1 = new ProfilerMarker(ProfilerCategory.Render, "TLAS1", MarkerFlags.SampleGPU);
+            var mark2 = new ProfilerMarker(ProfilerCategory.Render, "TLAS2", MarkerFlags.SampleGPU);
+            
+            cmd.BeginSample(mark1);
+            
             // Retry adding pending SkinnedMeshRenderers (runs on main thread during cmd recording)
             RetryPendingSkinnedInstances();
 
@@ -87,7 +94,9 @@ namespace NativeRender
                 _buildEventData    = new NativeArray<NativeRenderPlugin.AS_BuildEventData>(1, Allocator.Persistent);
                 _buildEventData[0] = new NativeRenderPlugin.AS_BuildEventData { asHandle = _handle };
             }
+            cmd.EndSample(mark1);
 
+            cmd.BeginSample(mark2);
             unsafe
             {
                 cmd.IssuePluginEventAndData(
@@ -95,6 +104,7 @@ namespace NativeRender
                     1,
                     (IntPtr)Unity.Collections.LowLevel.Unsafe.NativeArrayUnsafeUtility.GetUnsafePtr(_buildEventData));
             }
+            cmd.EndSample(mark2);
         }
 
         /// <summary>Returns the native ID3D12Resource* of the TLAS for binding via SetAccelerationStructure.</summary>
@@ -654,7 +664,7 @@ namespace NativeRender
             {
                 int    slot  = (Time.frameCount - cache.baseFrame) & 1;
                 IntPtr vbPtr = slot == 0 ? cache.ptr0 : cache.ptr1;
-                NativeRenderPlugin.NR_AS_UpdateDynamicVertexBuffer(_handle, id, vbPtr, cache.vertexCount, cache.vertexStride);
+                NativeRenderPlugin.NR_AS_UpdateDynamicVertexBuffer(_handle, id, vbPtr);
                 return;
             }
 
@@ -692,7 +702,7 @@ namespace NativeRender
                 Debug.Log($"[NativeRayTracing] SkinnedMeshRenderer '{smr.name}' calibrated with ptr0={cache.ptr0} ptr1={cache.ptr1} at relative frame {relFrame}");
             }
 
-            NativeRenderPlugin.NR_AS_UpdateDynamicVertexBuffer(_handle, id, curPtr, cache.vertexCount, cache.vertexStride);
+            NativeRenderPlugin.NR_AS_UpdateDynamicVertexBuffer(_handle, id, curPtr);
         }
 
         /// <summary>Removes the skinned instance associated with <paramref name="smr"/>.</summary>

@@ -5,6 +5,7 @@
 #include <vector>
 #include <list>
 #include <unordered_map>
+#include <memory>
 #include <mutex>
 #include <cstdint>
 #include "IUnityLog.h"
@@ -274,8 +275,10 @@ private:
         uint8_t mask      = 0xFF;
         bool    active    = false;
         bool    needsBLAS = false;
-        bool    isDynamic = false; // SkinnedMeshRenderer: BLAS rebuilt each frame
+        bool    isDynamic = false; // SkinnedMeshRenderer: BLAS updated each frame
         D3D12_GPU_VIRTUAL_ADDRESS blasVA;
+        // Persistent BLAS for dynamic (skinned) instances – reused every frame with PERFORM_UPDATE
+        std::unique_ptr<BLASEntry> dynamicBlas;
     };
 
     // -----------------------------------------------------------------------

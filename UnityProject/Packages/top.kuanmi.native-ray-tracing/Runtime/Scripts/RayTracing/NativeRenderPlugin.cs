@@ -128,7 +128,7 @@ namespace NativeRender
         /// </summary>
         [DllImport(DllName)]
         public static extern void NR_AS_UpdateDynamicVertexBuffer(
-            ulong handle, uint instanceHandle, IntPtr vbPtr, uint vertexCount, uint vertexStride);
+            ulong handle, uint instanceHandle, IntPtr vbPtr);
 
         // -------------------------------------------------------------------
         // RayTraceShader API  (multi-shader, per-instance DXR pipelines)

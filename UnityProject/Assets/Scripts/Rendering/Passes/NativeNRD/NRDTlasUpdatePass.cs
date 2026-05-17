@@ -46,8 +46,11 @@ namespace PathTracing
             
             cmd.BeginSample(RenderPassMarkers.TLAS);
             data.NrdResource.BuildAccelerationStructures(cmd);
-            data.NrdResource.RecordSkinnedMorphUpdate(cmd, data.updateSkinnedPrimitivesCS);
             cmd.EndSample(RenderPassMarkers.TLAS);
+            
+            cmd.BeginSample(RenderPassMarkers.RecordSkinnedMorphUpdate);
+            data.NrdResource.RecordSkinnedMorphUpdate(cmd, data.updateSkinnedPrimitivesCS);
+            cmd.EndSample(RenderPassMarkers.RecordSkinnedMorphUpdate);
         }
 
         public override void RecordRenderGraph(RenderGraph renderGraph, ContextContainer frameData)
