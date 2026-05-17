@@ -41,8 +41,8 @@ namespace NativeRender
         {
             public uint indexCount;
             public uint indexByteOffset;
-            public uint baseVertex;      // Unity SubMeshDescriptor.baseVertex
-            public uint flags;           // NR_SUBMESH_FLAG_* bitmask (bit 0 = GEOMETRY_OPAQUE)
+            public uint baseVertex; // Unity SubMeshDescriptor.baseVertex
+            public uint flags; // NR_SUBMESH_FLAG_* bitmask (bit 0 = GEOMETRY_OPAQUE)
         }
 
         /// <summary>
@@ -54,16 +54,16 @@ namespace NativeRender
         [StructLayout(LayoutKind.Sequential)]
         public struct SubmeshOMMDesc
         {
-            public IntPtr arrayData;        // nullable
+            public IntPtr arrayData; // nullable
             public IntPtr descArray;
             public IntPtr indexBuffer;
-            public IntPtr histogramFlat;    // uint32[] of {count, subdivLevel, format} * histogramCount
+            public IntPtr histogramFlat; // uint32[] of {count, subdivLevel, format} * histogramCount
 
-            public uint   arrayDataSize;
-            public uint   descArrayCount;
-            public uint   indexCount;
-            public uint   indexStride;
-            public uint   histogramCount;
+            public uint arrayDataSize;
+            public uint descArrayCount;
+            public uint indexCount;
+            public uint indexStride;
+            public uint histogramCount;
         }
 
         /// <summary>
@@ -77,15 +77,15 @@ namespace NativeRender
         {
             public IntPtr vertexBufferNativePtr;
             public IntPtr indexBufferNativePtr;
-            public IntPtr submeshDescs;         // NR_SubmeshDesc*
-            public IntPtr ommDescs;             // NR_SubmeshOMMDesc* or IntPtr.Zero
+            public IntPtr submeshDescs; // NR_SubmeshDesc*
+            public IntPtr ommDescs; // NR_SubmeshOMMDesc* or IntPtr.Zero
 
-            public uint   instanceHandle;       // unique handle (e.g. MeshRenderer.GetInstanceID())
-            public uint   vertexCount;
-            public uint   vertexStride;
-            public uint   indexStride;
-            public uint   submeshCount;
-            public uint   isDynamic;             // 1 = SkinnedMeshRenderer (BLAS rebuilt every frame)
+            public uint instanceHandle; // unique handle (e.g. MeshRenderer.GetInstanceID())
+            public uint vertexCount;
+            public uint vertexStride;
+            public uint indexStride;
+            public uint submeshCount;
+            public uint isDynamic; // 1 = SkinnedMeshRenderer (BLAS rebuilt every frame)
         }
 
         /// <summary>
@@ -160,13 +160,12 @@ namespace NativeRender
         [DllImport(DllName)]
         public static extern ulong NR_CreateRayTracePipelineFromBlobs(
             [In] IntPtr[] blobDataPtrs,
-            [In] uint[]   blobSizes,
-            uint          blobCount,
-            string        name,
-            uint          flags,
-            uint          maxPayloadSizeInBytes,
-            string        rayGenName);
-
+            [In] uint[] blobSizes,
+            uint blobCount,
+            string name,
+            uint flags,
+            uint maxPayloadSizeInBytes,
+            string rayGenName);
 
 
         /// <summary>Creates a RayTraceDescriptorSet bound to the given shader handle. Returns 0 on failure.</summary>
@@ -216,7 +215,7 @@ namespace NativeRender
 
         /// <summary>Returns the render event callback pointer for AS BuildOrUpdate.</summary>
         [DllImport(DllName)]
-        public static extern IntPtr NR_AS_GetBuildRenderEventFunc();       
+        public static extern IntPtr NR_AS_GetBuildRenderEventFunc();
 
         [DllImport(DllName)]
         public static extern IntPtr NR_GetFrameTickEventFunc();
@@ -254,12 +253,12 @@ namespace NativeRender
         [StructLayout(LayoutKind.Sequential, Pack = 4)]
         public struct RTS_RenderEventData
         {
-            public ulong  descriptorSetHandle;  // +0  RayTraceDescriptorSet*
-            public ulong  bindingSlotsPtr;       // +8  CS_BindingSlot*
-            public uint   bindingCount;          // +16
-            public uint   width;                 // +20
-            public uint   height;                // +24
-            public uint   _pad;                  // +28
+            public ulong descriptorSetHandle; // +0  RayTraceDescriptorSet*
+            public ulong bindingSlotsPtr; // +8  CS_BindingSlot*
+            public uint  bindingCount; // +16
+            public uint  width; // +20
+            public uint  height; // +24
+            public uint  _pad; // +28
         }
 
         /// <summary>Event data for NR_AS_GetBuildRenderEventFunc. Must match C++ AS_BuildEventData (Pack=4).</summary>
@@ -398,20 +397,12 @@ namespace NativeRender
         [DllImport(DllName)]
         public static extern void NR_DestroyNativeBuffer(ulong handle);
 
-        /// <summary>
-        /// Copies <paramref name="bytes"/> bytes from <paramref name="data"/> into the
-        /// current frame's mapped slot.  Call each frame before issuing GPU work.
-        /// </summary>
-        [DllImport(DllName)]
-        public static extern unsafe void NR_NB_Upload(ulong handle, void* data, uint bytes);
-
-        /// <summary>
-        /// Returns the ID3D12Resource* for the current frame slot as IntPtr.
-        /// Compatibility/debug path; prefer passing the handle as objectPtr with
-        /// objectKind = NativeBuffer in CS_BindingSlot.
-        /// </summary>
-        [DllImport(DllName)]
-        public static extern IntPtr NR_NB_GetNativePtr(ulong handle);
+        // /// <summary>
+        // /// Copies <paramref name="bytes"/> bytes from <paramref name="data"/> into the
+        // /// current frame's mapped slot.  Call each frame before issuing GPU work.
+        // /// </summary>
+        // [DllImport(DllName)]
+        // public static extern unsafe void NR_NB_Upload(ulong handle, void* data, uint bytes);
 
         // -------------------------------------------------------------------
         // NativeStructuredBuffer API  (single upload-heap SRV buffer)
@@ -535,12 +526,12 @@ namespace NativeRender
         [StructLayout(LayoutKind.Sequential, Pack = 4)]
         public struct CS_BindingSlot
         {
-            public ulong  resourcePtr;   // ID3D12Resource* (may be 0)
-            public ulong  objectPtr;     // AccelerationStructure* | BindlessTexture* | BindlessBuffer*
-            public uint   count;         // element count  (StructuredBuffer or typed buffer)
-            public uint   stride;        // element stride (StructuredBuffer; 0 = raw/typed)
-            public uint   objectKind;    // 0=none, 1=AccelStruct, 2=BindlessTexture, 3=BindlessBuffer
-            public uint   format;        // DXGI_FORMAT for typed buffer UAV (0 = raw/structured)
+            public ulong resourcePtr; // ID3D12Resource* (may be 0)
+            public ulong objectPtr; // AccelerationStructure* | BindlessTexture* | BindlessBuffer*
+            public uint  count; // element count  (StructuredBuffer or typed buffer)
+            public uint  stride; // element stride (StructuredBuffer; 0 = raw/typed)
+            public uint  objectKind; // 0=none, 1=AccelStruct, 2=BindlessTexture, 3=BindlessBuffer
+            public uint  format; // DXGI_FORMAT for typed buffer UAV (0 = raw/structured)
         }
 
         /// <summary>
@@ -550,12 +541,12 @@ namespace NativeRender
         [StructLayout(LayoutKind.Sequential, Pack = 4)]
         public struct CS_RenderEventData
         {
-            public ulong  descriptorSetHandle; // pointer to ComputeDescriptorSet
-            public uint   threadGroupX;
-            public uint   threadGroupY;
-            public uint   threadGroupZ;
-            public uint   bindingCount;
-            public ulong  bindingSlotsPtr; // pointer to CS_BindingSlot[] in pinned NativeArray
+            public ulong descriptorSetHandle; // pointer to ComputeDescriptorSet
+            public uint  threadGroupX;
+            public uint  threadGroupY;
+            public uint  threadGroupZ;
+            public uint  bindingCount;
+            public ulong bindingSlotsPtr; // pointer to CS_BindingSlot[] in pinned NativeArray
         }
 
         // -----------------------------------------------------------------------
@@ -564,70 +555,74 @@ namespace NativeRender
         // -----------------------------------------------------------------------
         public static class ShaderCompilerPlugin
         {
-        private const string DllName = "ShaderCompilerPlugin";
+            private const string DllName = "ShaderCompilerPlugin";
 
-        /// <summary>
-        /// Compiles the HLSL file at <paramref name="hlslPath"/> to DXIL bytecode.
-        /// On success returns true and sets <paramref name="outBytes"/> / <paramref name="outSize"/>;
-        /// the caller must free the buffer with <see cref="NR_SC_Free"/>.
-        /// <paramref name="includeDirs"/> may be null or semicolon-separated paths.
-        /// <paramref name="extraArgs"/> may be null or semicolon-separated additional DXC arguments
-        /// (e.g. "-disable-payload-qualifiers").
-        /// </summary>
-        [DllImport(DllName)]
-        public static extern bool NR_SC_Compile(
-            [MarshalAs(UnmanagedType.LPStr)] string hlslPath,
-            [MarshalAs(UnmanagedType.LPStr)] string targetProfile,
-            [MarshalAs(UnmanagedType.LPStr)] string includeDirs,
-            [MarshalAs(UnmanagedType.LPStr)] string defines,
-            [MarshalAs(UnmanagedType.LPStr)] string extraArgs,
-            out IntPtr outBytes,
-            out uint   outSize);
+            /// <summary>
+            /// Compiles the HLSL file at <paramref name="hlslPath"/> to DXIL bytecode.
+            /// On success returns true and sets <paramref name="outBytes"/> / <paramref name="outSize"/>;
+            /// the caller must free the buffer with <see cref="NR_SC_Free"/>.
+            /// <paramref name="includeDirs"/> may be null or semicolon-separated paths.
+            /// <paramref name="extraArgs"/> may be null or semicolon-separated additional DXC arguments
+            /// (e.g. "-disable-payload-qualifiers").
+            /// </summary>
+            [DllImport(DllName)]
+            public static extern bool NR_SC_Compile(
+                [MarshalAs(UnmanagedType.LPStr)] string hlslPath,
+                [MarshalAs(UnmanagedType.LPStr)] string targetProfile,
+                [MarshalAs(UnmanagedType.LPStr)] string includeDirs,
+                [MarshalAs(UnmanagedType.LPStr)] string defines,
+                [MarshalAs(UnmanagedType.LPStr)] string extraArgs,
+                out IntPtr outBytes,
+                out uint outSize);
 
-        /// <summary>Frees the buffer allocated by <see cref="NR_SC_Compile"/>, <see cref="NR_SC_CompileCS"/>, <see cref="NR_SC_ReflectCS"/>, or <see cref="NR_SC_ReflectLib"/>.</summary>
-        [DllImport(DllName)]
-        public static extern void NR_SC_Free(IntPtr ptr);
+            /// <summary>Frees the buffer allocated by <see cref="NR_SC_Compile"/>, <see cref="NR_SC_CompileCS"/>, <see cref="NR_SC_ReflectCS"/>, or <see cref="NR_SC_ReflectLib"/>.</summary>
+            [DllImport(DllName)]
+            public static extern void NR_SC_Free(IntPtr ptr);
 
-        /// <summary>
-        /// Reflects a compiled DXIL compute shader blob and returns a JSON string describing
-        /// bound resources (SRV / UAV / CBV / Sampler) and the numthreads declaration.
-        /// On success returns true and sets <paramref name="outJson"/> / <paramref name="outJsonLen"/>;
-        /// the caller must free the buffer with <see cref="NR_SC_Free"/>.
-        /// </summary>
-        [DllImport(DllName)]
-        public static extern bool NR_SC_ReflectCS(
-            byte[]     dxilBytes,
-            uint       size,
-            out IntPtr outJson,
-            out uint   outJsonLen);
+            /// <summary>
+            /// Reflects a compiled DXIL compute shader blob and returns a JSON string describing
+            /// bound resources (SRV / UAV / CBV / Sampler) and the numthreads declaration.
+            /// On success returns true and sets <paramref name="outJson"/> / <paramref name="outJsonLen"/>;
+            /// the caller must free the buffer with <see cref="NR_SC_Free"/>.
+            /// </summary>
+            [DllImport(DllName)]
+            public static extern bool NR_SC_ReflectCS(
+                byte[] dxilBytes,
+                uint size,
+                out IntPtr outJson,
+                out uint outJsonLen);
 
-        /// <summary>
-        /// Reflects a compiled DXIL *library* blob (lib_6_x, used by DXR ray tracing shaders) and
-        /// returns a JSON string describing bound resources across all exported functions.
-        /// JSON shape: { "bindings": [ { "name", "type", "space", "reg", "dim", "retType" }, ... ] }
-        /// On success returns true; the caller must free the buffer with <see cref="NR_SC_Free"/>.
-        /// </summary>
-        [DllImport(DllName)]
-        public static extern bool NR_SC_ReflectLib(
-            byte[]     dxilBytes,
-            uint       size,
-            out IntPtr outJson,
-            out uint   outJsonLen);
+            /// <summary>
+            /// Reflects a compiled DXIL *library* blob (lib_6_x, used by DXR ray tracing shaders) and
+            /// returns a JSON string describing bound resources across all exported functions.
+            /// JSON shape: { "bindings": [ { "name", "type", "space", "reg", "dim", "retType" }, ... ] }
+            /// On success returns true; the caller must free the buffer with <see cref="NR_SC_Free"/>.
+            /// </summary>
+            [DllImport(DllName)]
+            public static extern bool NR_SC_ReflectLib(
+                byte[] dxilBytes,
+                uint size,
+                out IntPtr outJson,
+                out uint outJsonLen);
 
-        /// <summary>
-        /// Compiles a compute shader HLSL file to DXIL bytecode with a specified entry point and target profile.
-        /// On success returns true and sets <paramref name="outBytes"/> / <paramref name="outSize"/>;
-        /// the caller must free the buffer with <see cref="NR_SC_Free"/>.
-        /// </summary>
+            /// <summary>
+            /// Compiles a compute shader HLSL file to DXIL bytecode with a specified entry point and target profile.
+            /// On success returns true and sets <paramref name="outBytes"/> / <paramref name="outSize"/>;
+            /// the caller must free the buffer with <see cref="NR_SC_Free"/>.
+            /// </summary>
+            [DllImport(DllName)]
+            public static extern bool NR_SC_CompileCS(
+                [MarshalAs(UnmanagedType.LPStr)] string hlslPath,
+                [MarshalAs(UnmanagedType.LPStr)] string entryPoint,
+                [MarshalAs(UnmanagedType.LPStr)] string target,
+                [MarshalAs(UnmanagedType.LPStr)] string includeDirs,
+                [MarshalAs(UnmanagedType.LPStr)] string defines,
+                [MarshalAs(UnmanagedType.LPStr)] string extraArgs,
+                out IntPtr outBytes,
+                out uint outSize);
+        }
+
         [DllImport(DllName)]
-        public static extern bool NR_SC_CompileCS(
-            [MarshalAs(UnmanagedType.LPStr)] string hlslPath,
-            [MarshalAs(UnmanagedType.LPStr)] string entryPoint,
-            [MarshalAs(UnmanagedType.LPStr)] string target,
-            [MarshalAs(UnmanagedType.LPStr)] string includeDirs,
-            [MarshalAs(UnmanagedType.LPStr)] string defines,
-            [MarshalAs(UnmanagedType.LPStr)] string extraArgs,
-            out IntPtr outBytes,
-            out uint   outSize);
-        }    }
+        public static extern IntPtr GetNativeBufferUploadCallbackPtr();
+    }
 }

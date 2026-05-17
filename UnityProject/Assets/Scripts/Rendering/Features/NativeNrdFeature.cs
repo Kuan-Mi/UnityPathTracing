@@ -290,7 +290,7 @@ namespace PathTracing
                 _nrdConstantBuffers.Add(uniqueKey, nrdConstantBuffer);
             }
 
-            nrdConstantBuffer.Upload(globalConstants);
+            nrdConstantBuffer.Upload(renderer, globalConstants);
 
             var isEven = (globalConstants.gFrameIndex & 1) == 0;
 
@@ -309,7 +309,7 @@ namespace PathTracing
 
                 var nrdSharcResource = new NRDSharcPass.Resource
                 {
-                    ConstantBuffer = nrdConstantBuffer.NativePtr,
+                    ConstantBuffer = nrdConstantBuffer,
                     Pool           = pool
                 };
 
@@ -403,7 +403,7 @@ namespace PathTracing
 
                 var nrdConfidenceBlurResource = new NRDConfidenceBlurPass.Resource
                 {
-                    ConstantBuffer = nrdConstantBuffer.NativePtr,
+                    ConstantBuffer = nrdConstantBuffer,
                     Pool           = pool
                 };
 
@@ -421,7 +421,7 @@ namespace PathTracing
             {
                 var nrdOpaqueResource = new NRDOpaquePass.Resource
                 {
-                    ConstantBuffer    = nrdConstantBuffer.NativePtr,
+                    ConstantBuffer    = nrdConstantBuffer,
                     ScramblingRanking = scramblingRankingTexPtr,
                     Sobol             = sobolTexPtr,
                     Pool              = pool
@@ -501,7 +501,7 @@ namespace PathTracing
             {
                 var nrdCompositionResource = new NRDCompositionPass.Resource
                 {
-                    ConstantBuffer = nrdConstantBuffer.NativePtr,
+                    ConstantBuffer = nrdConstantBuffer,
                     Pool           = pool
                 };
 
@@ -518,7 +518,7 @@ namespace PathTracing
             {
                 var nrdTransparentResource = new NRDTransparentPass.Resource
                 {
-                    ConstantBuffer = nrdConstantBuffer.NativePtr,
+                    ConstantBuffer = nrdConstantBuffer,
                     Pool           = pool
                 };
 
@@ -566,7 +566,7 @@ namespace PathTracing
             {
                 var nrdDlssBeforeResource = new NRDDlssBeforePass.Resource
                 {
-                    ConstantBuffer = nrdConstantBuffer.NativePtr,
+                    ConstantBuffer = nrdConstantBuffer,
                     Pool           = pool
                 };
 
@@ -660,7 +660,7 @@ namespace PathTracing
                 // TAA
                 var nrdTaaResource = new NRDTaaPass.Resource
                 {
-                    ConstantBuffer = nrdConstantBuffer.NativePtr,
+                    ConstantBuffer = nrdConstantBuffer,
                     Pool           = pool,
                     isEven         = isEven
                 };
@@ -724,7 +724,7 @@ namespace PathTracing
             {
                 var nrdFinalResource = new NRDFinalPass.Resource
                 {
-                    ConstantBuffer = nrdConstantBuffer.NativePtr,
+                    ConstantBuffer = nrdConstantBuffer,
                     Pool           = pool
                 };
 
@@ -772,7 +772,7 @@ namespace PathTracing
 
             _nrdDlssAfterPass.Setup(new NRDDlssAfterPass.Resource
             {
-                ConstantBuffer = nrdConstantBuffer.NativePtr,
+                ConstantBuffer = nrdConstantBuffer,
                 Pool           = pool
             }, new NRDDlssAfterPass.Settings
             {

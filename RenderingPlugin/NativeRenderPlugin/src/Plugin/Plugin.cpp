@@ -579,6 +579,16 @@ struct AS_BuildEventData
 };
 #pragma pack(pop)
 
+// NativeBuffer update event data - passed to NativeBufferUpdateCallback
+#pragma pack(push, 4)
+struct UploadParams
+{
+    NativeBuffer* bufferInstance; // 对应 C# 的 ulong BufferPtr
+    void* sourceData;             // 对应 C# 的 IntPtr SourceData
+    uint32_t size;
+};
+#pragma pack(pop)
+
 // ---------------------------------------------------------------------------
 // FlushGpuAndWait - signal a value on the graphics queue and block until done
 // ---------------------------------------------------------------------------
@@ -1251,17 +1261,26 @@ NR_NB_Upload(uint64_t handle, const void* data, uint32_t bytes)
     reinterpret_cast<NativeBuffer*>(handle)->Upload(data, bytes);
 }
 
-// ---------------------------------------------------------------------------
-// NR_NB_GetNativePtr
-//   Returns the ID3D12Resource* for the current frame slot as intptr_t.
-//   Provided as a compatibility/debug path; the preferred usage is to pass
-//   the handle as objectPtr with objectKind = NativeBuffer in CS_BindingSlot.
-// ---------------------------------------------------------------------------
-extern "C" intptr_t UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API
-NR_NB_GetNativePtr(uint64_t handle)
+ 
+static void UNITY_INTERFACE_API NativeBufferUploadCallback(int /*eventId*/, void* data)
 {
-    if (!handle) return 0;
-    return reinterpret_cast<intptr_t>(reinterpret_cast<NativeBuffer*>(handle)->GetResource());
+    // 1. 基础检查
+    if (!data) return;
+
+    auto* params = static_cast<UploadParams*>(data);
+
+    // 直接将 Handle 转回指针并调用其成员函数
+    if (params->bufferInstance && params->sourceData)
+    {
+        params->bufferInstance->Upload(params->sourceData, params->size);
+    }
+
+}
+
+extern "C" UnityRenderingEventAndData UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API
+GetNativeBufferUploadCallbackPtr()
+{
+    return NativeBufferUploadCallback;
 }
 
 // ===========================================================================

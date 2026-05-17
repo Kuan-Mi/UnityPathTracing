@@ -211,13 +211,24 @@ namespace NativeRender
             _stagingSlots[i].count       = 0;
             _stagingSlots[i].stride      = 0;
         }
+        
+        /// <summary>Binds a GraphicsBuffer as a constant buffer (CBV).</summary>
+        public void SetConstantBuffer(string name, NativeBuffer nativeBuffer)
+        {
+            if (!TryGetSlot(name, out uint i)) return;
+            _stagingSlots[i].resourcePtr = 0;
+            _stagingSlots[i].objectPtr   = nativeBuffer.Handle;
+            _stagingSlots[i].objectKind  = ObjKindNativeBuffer;
+            _stagingSlots[i].count       = 0;
+            _stagingSlots[i].stride      = 0;
+        }
 
         /// <summary>Binds a <see cref="NativeBuffer"/> as a constant buffer (CBV).</summary>
         public void SetNativeBuffer(string name, NativeBuffer nb)
         {
             if (!TryGetSlot(name, out uint i)) return;
             _stagingSlots[i].resourcePtr = 0;
-            _stagingSlots[i].objectPtr   = nb != null ? nb.Handle : 0;
+            _stagingSlots[i].objectPtr   = nb?.Handle ?? 0;
             _stagingSlots[i].objectKind  = ObjKindNativeBuffer;
             _stagingSlots[i].count       = 0;
             _stagingSlots[i].stride      = 0;
