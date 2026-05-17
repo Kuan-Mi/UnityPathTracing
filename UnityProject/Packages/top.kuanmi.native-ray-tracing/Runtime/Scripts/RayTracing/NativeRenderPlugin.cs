@@ -397,6 +397,29 @@ namespace NativeRender
         [DllImport(DllName)]
         public static extern void NR_DestroyNativeBuffer(ulong handle);
 
+        // -------------------------------------------------------------------
+        // NativeGpuBuffer API  (single DEFAULT-heap buffer with UAV support)
+        // -------------------------------------------------------------------
+
+        /// <summary>
+        /// Allocates a DEFAULT-heap buffer of <paramref name="sizeInBytes"/> with
+        /// D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS. Suitable for SRV and UAV bindings.
+        /// Returns an opaque handle; caller must call NR_DestroyNativeGpuBuffer when done.
+        /// </summary>
+        [DllImport(DllName)]
+        public static extern ulong NR_CreateNativeGpuBuffer(uint sizeInBytes);
+
+        /// <summary>Enqueues destruction after a GPU fence delay.</summary>
+        [DllImport(DllName)]
+        public static extern void NR_DestroyNativeGpuBuffer(ulong handle);
+
+        /// <summary>
+        /// Returns the render-event callback pointer for zeroing a NativeGpuBuffer.
+        /// Pass the result to <c>cmd.IssuePluginEventAndData</c> with the buffer Handle as data.
+        /// </summary>
+        [DllImport(DllName)]
+        public static extern IntPtr NR_GetClearNativeGpuBufferCallbackPtr();
+
         // /// <summary>
         // /// Copies <paramref name="bytes"/> bytes from <paramref name="data"/> into the
         // /// current frame's mapped slot.  Call each frame before issuing GPU work.

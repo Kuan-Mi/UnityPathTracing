@@ -53,11 +53,20 @@ namespace NativeRender
             _internalPass = new InternalUploadPass(this);
         }
 
+        public void AdvanceFrame()
+        {
+            _bufferIndex = (_bufferIndex + 1) % BufferCount;
+        }
+        
+        
         // todo 目前要手动确保每帧只调用一次
         public unsafe void Upload<T>(ScriptableRenderer renderer, T data) where T : unmanaged
         {
             if (_disposed) return;
 
+
+            AdvanceFrame();
+            
             // 拷贝数据到当前帧对应的缓冲区
             var   currentData = _frameDataArray[_bufferIndex];
             void* srcPtr      = UnsafeUtility.AddressOf(ref data);
@@ -66,6 +75,23 @@ namespace NativeRender
 
             _internalPass.Setup(_bufferIndex);
             renderer.EnqueuePass(_internalPass);
+        }
+        
+        public unsafe void UploadDirect<T>(UnsafeCommandBuffer cmd, T[] data) where T : unmanaged
+        {
+            if (_disposed || data == null || data.Length == 0) return;
+            
+            AdvanceFrame();
+            
+            // 固定托管数组地址进行拷贝
+            fixed (void* srcPtr = data)
+            {
+                void* dstPtr     = _frameDataArray[_bufferIndex].GetUnsafePtr();
+                long  sizeToCopy = Math.Min((long)data.Length * UnsafeUtility.SizeOf<T>(), (long)_singleFrameSize);
+                UnsafeUtility.MemCpy(dstPtr, srcPtr, sizeToCopy);
+            }
+
+            Execute(cmd, _bufferIndex);
         }
 
         private unsafe void Execute(UnsafeCommandBuffer cmd, int index)

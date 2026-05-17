@@ -341,6 +341,7 @@ add_library(NativeRenderPlugin SHARED
     NativeRenderPlugin/src/Resources/BindlessUAVTexture.cpp
     NativeRenderPlugin/src/Resources/NativeBuffer.cpp
     NativeRenderPlugin/src/Resources/NativeStructuredBuffer.cpp
+    NativeRenderPlugin/src/Resources/NativeGpuBuffer.cpp
     NativeRenderPlugin/src/Hooks/D3D12HeapHook.cpp
 )
 

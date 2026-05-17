@@ -29,6 +29,7 @@
 #include "BindlessUAVTexture.h"
 #include "NativeBuffer.h"
 #include "NativeStructuredBuffer.h"
+#include "NativeGpuBuffer.h"
 #include "D3D12HeapHook.h"
 #include "PluginInternal.h"
 #include <map>
@@ -48,6 +49,7 @@ static IUnityGraphicsD3D12v7*    s_D3D12       = nullptr;
 static IUnityGraphicsD3D12v8*    s_D3D12v8     = nullptr;
 static IUnityLog*                s_Log         = nullptr;
 static DescriptorHeapAllocator   s_DescHeap;   // global shared GPU-visible CBV/SRV/UAV heap
+static ComPtr<ID3D12DescriptorHeap> s_ClearCpuHeap; // 1-slot CPU-only heap for ClearUnorderedAccessViewUint
 static bool                      s_RendererReady = false;
 
 // Event used by NR_WaitForGpuFlush: set by GpuFlushAndSignalCallback on the render thread
@@ -234,6 +236,10 @@ void EnqueueDeferredDelete(void* ptr, DeferredType type)
         EnqueueCleanup([p = static_cast<NativeStructuredBuffer*>(ptr)] { delete p; });
         break;
 
+    case DeferredType::NativeGpuBuffer:
+        EnqueueCleanup([p = static_cast<NativeGpuBuffer*>(ptr)] { delete p; });
+        break;
+
     default:
         // 如果进入了未定义的类型，为了安全起见，尝试直接 delete 
         // 但注意：void* 是不能直接 delete 的，这里最好记录一个错误日志
@@ -322,6 +328,16 @@ static void UNITY_INTERFACE_API OnGraphicsDeviceEvent(UnityGfxDeviceEventType ev
             if (!s_DescHeap.Initialize(device))
                 NR_ERROR("DescriptorHeapAllocator initialization failed");
 
+            // 1-slot CPU-only heap used by ClearNativeGpuBufferCallback
+            {
+                D3D12_DESCRIPTOR_HEAP_DESC hd = {};
+                hd.Type           = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
+                hd.NumDescriptors = 1;
+                hd.Flags          = D3D12_DESCRIPTOR_HEAP_FLAG_NONE;
+                if (FAILED(device->CreateDescriptorHeap(&hd, IID_PPV_ARGS(&s_ClearCpuHeap))))
+                    NR_ERROR("Failed to create CPU-only UAV heap for buffer clear");
+            }
+
             NR_LOG("Plugin initialized (DXR device confirmed)");
         }
         else
@@ -351,6 +367,7 @@ static void UNITY_INTERFACE_API OnGraphicsDeviceEvent(UnityGfxDeviceEventType ev
         NR_LOG("Plugin shutdown - deferred deletes drained");
 
         s_DescHeap.Shutdown();
+        s_ClearCpuHeap.Reset();
         s_RendererReady = false;
         s_D3D12         = nullptr;
         s_D3D12v8       = nullptr;
@@ -1248,28 +1265,13 @@ NR_DestroyNativeBuffer(uint64_t handle)
 {
     if (handle) EnqueueDeferredDelete(reinterpret_cast<void*>(handle), DeferredType::NativeBuffer);
 }
-
-// ---------------------------------------------------------------------------
-// NR_NB_Upload
-//   Copies |bytes| bytes from |data| into the current frame's mapped slot.
-//   Must be called from the main thread before issuing GPU work.
-// ---------------------------------------------------------------------------
-extern "C" void UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API
-NR_NB_Upload(uint64_t handle, const void* data, uint32_t bytes)
-{
-    if (!handle || !data) return;
-    reinterpret_cast<NativeBuffer*>(handle)->Upload(data, bytes);
-}
-
  
 static void UNITY_INTERFACE_API NativeBufferUploadCallback(int /*eventId*/, void* data)
 {
-    // 1. 基础检查
     if (!data) return;
 
     auto* params = static_cast<UploadParams*>(data);
 
-    // 直接将 Handle 转回指针并调用其成员函数
     if (params->bufferInstance && params->sourceData)
     {
         params->bufferInstance->Upload(params->sourceData, params->size);
@@ -1317,8 +1319,122 @@ NR_DestroyNativeStructuredBuffer(uint64_t handle)
     if (handle) EnqueueDeferredDelete(reinterpret_cast<void*>(handle), DeferredType::NativeStructuredBuffer);
 }
 
+// ===========================================================================
+// NativeGpuBuffer — single DEFAULT-heap buffer with ALLOW_UNORDERED_ACCESS
+// ===========================================================================
+
 // ---------------------------------------------------------------------------
-// NR_NSB_UploadRange
+// NR_CreateNativeGpuBuffer
+//   Allocates a DEFAULT-heap buffer of |sizeInBytes| with UAV support.
+//   Returns opaque handle (NativeGpuBuffer*) or 0 on failure.
+// ---------------------------------------------------------------------------
+extern "C" uint64_t UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API
+NR_CreateNativeGpuBuffer(uint32_t sizeInBytes)
+{
+    if (!s_D3D12) { NR_WARN("NR_CreateNativeGpuBuffer: renderer not ready"); return 0; }
+    ID3D12Device* device = s_D3D12->GetDevice();
+    if (!device)  { NR_WARN("NR_CreateNativeGpuBuffer: no D3D12 device"); return 0; }
+    auto* buf = new NativeGpuBuffer();
+    if (!buf->Initialize(device, sizeInBytes))
+    {
+        delete buf;
+        NR_WARN("NR_CreateNativeGpuBuffer: Initialize failed");
+        return 0;
+    }
+    return reinterpret_cast<uint64_t>(buf);
+}
+
+// ---------------------------------------------------------------------------
+// NR_DestroyNativeGpuBuffer
+//   Enqueues destruction after a GPU fence delay.
+// ---------------------------------------------------------------------------
+extern "C" void UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API
+NR_DestroyNativeGpuBuffer(uint64_t handle)
+{
+    if (handle) EnqueueDeferredDelete(reinterpret_cast<void*>(handle), DeferredType::NativeGpuBuffer);
+}
+
+// ---------------------------------------------------------------------------
+// NR_ClearNativeGpuBufferCallback
+//   Render-thread callback (IssuePluginEventAndData).
+//   data = NativeGpuBuffer*  (the Handle value from C#).
+//   Zeroes the entire buffer via ClearUnorderedAccessViewUint using:
+//     - a 1-slot CPU-only descriptor heap (s_ClearCpuHeap) for the CPU handle
+//     - a temporarily allocated slot from s_DescHeap (shader-visible) for the
+//       GPU handle required by the API.
+//   State management is delegated to Unity's RequestResourceState /
+//   NotifyResourceState so barriers compose correctly with surrounding passes.
+// ---------------------------------------------------------------------------
+static void UNITY_INTERFACE_API NR_ClearNativeGpuBufferCallback(int /*eventId*/, void* data)
+{
+    if (!s_RendererReady || !s_D3D12 || !data || !s_ClearCpuHeap) return;
+
+    auto* buf = static_cast<NativeGpuBuffer*>(data);
+    ID3D12Resource* res = buf->GetResource();
+    if (!res) return;
+
+    UnityGraphicsD3D12RecordingState rs = {};
+    if (!s_D3D12->CommandRecordingState(&rs) || !rs.commandList) return;
+    auto* cmdList = static_cast<ID3D12GraphicsCommandList*>(rs.commandList);
+
+    ID3D12Device* device = s_D3D12->GetDevice();
+    if (!device) return;
+
+    // Allocate one temporary slot from the shared shader-visible heap.
+    uint32_t tempSlot = s_DescHeap.Allocate(1);
+
+    // Build a UAV desc covering the whole buffer as R32_UINT.
+    D3D12_UNORDERED_ACCESS_VIEW_DESC uavDesc = {};
+    uavDesc.ViewDimension      = D3D12_UAV_DIMENSION_BUFFER;
+    uavDesc.Format             = DXGI_FORMAT_R32_UINT;
+    uavDesc.Buffer.NumElements = buf->SizeInBytes() / 4;
+
+    // CPU-only handle (required by ClearUnorderedAccessViewUint alongside the GPU handle).
+    D3D12_CPU_DESCRIPTOR_HANDLE cpuHandle = s_ClearCpuHeap->GetCPUDescriptorHandleForHeapStart();
+    device->CreateUnorderedAccessView(res, nullptr, &uavDesc, cpuHandle);
+
+    // GPU-visible handle in the currently-bound shader-visible heap.
+    D3D12_CPU_DESCRIPTOR_HANDLE gpuCpuHandle = s_DescHeap.GetCPUHandle(tempSlot);
+    device->CreateUnorderedAccessView(res, nullptr, &uavDesc, gpuCpuHandle);
+    D3D12_GPU_DESCRIPTOR_HANDLE gpuHandle = s_DescHeap.GetGPUHandle(tempSlot);
+
+    // Transition to UAV state via Unity's barrier system.
+    if (s_D3D12v8)
+        s_D3D12v8->RequestResourceState(res, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
+
+    // BeginPluginDispatch marks that we are in a plugin-owned dispatch so the
+    // vtable hook does not overwrite the cache with our heap binding.
+    D3D12HeapHook::BeginPluginDispatch();
+
+    // Manually bind s_DescHeap so the GPU handle is valid on the currently-set heap.
+    ID3D12DescriptorHeap* heaps[] = { s_DescHeap.GetHeap() };
+    cmdList->SetDescriptorHeaps(1, heaps);
+
+    // Clear to zero.
+    const UINT zeros[4] = { 0, 0, 0, 0 };
+    cmdList->ClearUnorderedAccessViewUint(gpuHandle, cpuHandle, res, zeros, 0, nullptr);
+
+    D3D12HeapHook::EndPluginDispatch();
+
+    // Notify Unity that the resource is in UAV state with a UAV access (triggers UAV barrier
+    // before next use, even if the state doesn't change — write-after-write hazard).
+    if (s_D3D12v8)
+        s_D3D12v8->NotifyResourceState(res, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, /*UAVAccess=*/true);
+
+    // Return the temporary slot to the pool.
+    s_DescHeap.Free(tempSlot, 1);
+
+    // Restore Unity's descriptor heaps so subsequent Unity commands are not broken.
+    D3D12HeapHook::RestoreUnityHeaps(cmdList);
+}
+
+extern "C" UnityRenderingEventAndData UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API
+NR_GetClearNativeGpuBufferCallbackPtr()
+{
+    return NR_ClearNativeGpuBufferCallback;
+}
+
+
 //   Legacy export: redirects to EnqueueUpload for backwards compatibility.
 // ---------------------------------------------------------------------------
 extern "C" void UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API

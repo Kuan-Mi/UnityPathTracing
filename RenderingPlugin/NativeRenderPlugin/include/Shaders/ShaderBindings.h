@@ -44,6 +44,7 @@ enum class BindingObjectKind : uint32_t
     RootConstants      = 4,
     NativeBuffer       = 5,
     BindlessUAVTexture = 6,
+    NativeGpuBuffer    = 7,
 };
 
 struct BindingSlot

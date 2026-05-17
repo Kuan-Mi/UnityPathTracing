@@ -28,6 +28,7 @@ enum class DeferredType {
     AccelStructBlas,
     NativeBuffer,
     NativeStructuredBuffer,
+    NativeGpuBuffer,
 };
 
 // ---------------------------------------------------------------------------

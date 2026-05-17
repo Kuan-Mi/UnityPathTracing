@@ -6,6 +6,7 @@
 #include "BindlessBuffer.h"
 #include "BindlessUAVTexture.h"
 #include "NativeBuffer.h"
+#include "NativeGpuBuffer.h"
 #include "PluginInternal.h"
 #include <cstdio>
 #include <cstdarg>
@@ -142,7 +143,11 @@ void DescriptorSetBase<ShaderT>::UpdateDescriptors(
                 D3D12_CPU_DESCRIPTOR_HANDLE h = m_allocator->GetCPUHandle(m_srvAllocBase[f] + b.heapOffset);
                 D3D12_SHADER_RESOURCE_VIEW_DESC s = {};
                 s.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
-                ID3D12Resource* res = reinterpret_cast<ID3D12Resource*>(slot.resourcePtr);
+                ID3D12Resource* res = (slot.objectKind == BindingObjectKind::NativeBuffer && slot.objectPtr)
+                    ? reinterpret_cast<::NativeBuffer*>(slot.objectPtr)->GetResource()
+                    : (slot.objectKind == BindingObjectKind::NativeGpuBuffer && slot.objectPtr)
+                        ? reinterpret_cast<::NativeGpuBuffer*>(slot.objectPtr)->GetResource()
+                        : reinterpret_cast<ID3D12Resource*>(slot.resourcePtr);
                 if (res)
                 {
                     auto rd = res->GetDesc();
@@ -209,7 +214,11 @@ void DescriptorSetBase<ShaderT>::UpdateDescriptors(
             const auto& b = bindings[i];
             if (b.type != BindingType::UAV) continue;
             const BindingSlot& slot = (i < slotCount) ? slots[i] : BindingSlot{};
-            ID3D12Resource* res = reinterpret_cast<ID3D12Resource*>(slot.resourcePtr);
+            ID3D12Resource* res = (slot.objectKind == BindingObjectKind::NativeBuffer && slot.objectPtr)
+                ? reinterpret_cast<::NativeBuffer*>(slot.objectPtr)->GetResource()
+                : (slot.objectKind == BindingObjectKind::NativeGpuBuffer && slot.objectPtr)
+                    ? reinterpret_cast<::NativeGpuBuffer*>(slot.objectPtr)->GetResource()
+                    : reinterpret_cast<ID3D12Resource*>(slot.resourcePtr);
             D3D12_CPU_DESCRIPTOR_HANDLE h = m_allocator->GetCPUHandle(m_uavAllocBase[f] + b.heapOffset);
             D3D12_UNORDERED_ACCESS_VIEW_DESC u = {};
             if (res)
@@ -281,9 +290,15 @@ void DescriptorSetBase<ShaderT>::RequestResourceStates(
         const BindingSlot& slot = (i < slotCount) ? slots[i] : BindingSlot{};
         ID3D12Resource* res = reinterpret_cast<ID3D12Resource*>(slot.resourcePtr);
 
-        if (b.type == BindingType::SRV && res)
+        if (b.type == BindingType::SRV)
         {
-            m_d3d12v8->RequestResourceState(res, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
+            ID3D12Resource* srvRes = (slot.objectKind == BindingObjectKind::NativeBuffer && slot.objectPtr)
+                ? reinterpret_cast<::NativeBuffer*>(slot.objectPtr)->GetResource()
+                : (slot.objectKind == BindingObjectKind::NativeGpuBuffer && slot.objectPtr)
+                    ? reinterpret_cast<::NativeGpuBuffer*>(slot.objectPtr)->GetResource()
+                    : res;
+            if (srvRes)
+                m_d3d12v8->RequestResourceState(srvRes, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
         }
         else if (b.type == BindingType::ROOT_SRV)
         {
@@ -295,9 +310,15 @@ void DescriptorSetBase<ShaderT>::RequestResourceStates(
             if (srvRes)
                 m_d3d12v8->RequestResourceState(srvRes, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
         }
-        else if (b.type == BindingType::UAV && res)
+        else if (b.type == BindingType::UAV)
         {
-            m_d3d12v8->RequestResourceState(res, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
+            ID3D12Resource* uavRes = (slot.objectKind == BindingObjectKind::NativeBuffer && slot.objectPtr)
+                ? reinterpret_cast<::NativeBuffer*>(slot.objectPtr)->GetResource()
+                : (slot.objectKind == BindingObjectKind::NativeGpuBuffer && slot.objectPtr)
+                    ? reinterpret_cast<::NativeGpuBuffer*>(slot.objectPtr)->GetResource()
+                    : res;
+            if (uavRes)
+                m_d3d12v8->RequestResourceState(uavRes, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
         }
         else if (b.type == BindingType::CBV)
         {
@@ -364,9 +385,15 @@ void DescriptorSetBase<ShaderT>::NotifyResourceStates(
         const BindingSlot& slot = (i < slotCount) ? slots[i] : BindingSlot{};
         ID3D12Resource* res = reinterpret_cast<ID3D12Resource*>(slot.resourcePtr);
 
-        if (b.type == BindingType::UAV && res)
+        if (b.type == BindingType::UAV)
         {
-            m_d3d12v8->NotifyResourceState(res, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, /*UAVAccess=*/true);
+            ID3D12Resource* uavRes = (slot.objectKind == BindingObjectKind::NativeBuffer && slot.objectPtr)
+                ? reinterpret_cast<::NativeBuffer*>(slot.objectPtr)->GetResource()
+                : (slot.objectKind == BindingObjectKind::NativeGpuBuffer && slot.objectPtr)
+                    ? reinterpret_cast<::NativeGpuBuffer*>(slot.objectPtr)->GetResource()
+                    : res;
+            if (uavRes)
+                m_d3d12v8->NotifyResourceState(uavRes, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, /*UAVAccess=*/true);
         }
         else if (b.type == BindingType::UAV_ARRAY &&
                  slot.objectKind == BindingObjectKind::BindlessUAVTexture && slot.objectPtr)
@@ -404,11 +431,15 @@ bool DescriptorSetBase<ShaderT>::ValidateBindings(
             break;
         case BindingType::SRV:
             kind = "SRV";
-            ok = slot.resourcePtr != 0;
+            ok = slot.resourcePtr != 0 ||
+                 (slot.objectKind == BindingObjectKind::NativeBuffer    && slot.objectPtr != 0) ||
+                 (slot.objectKind == BindingObjectKind::NativeGpuBuffer && slot.objectPtr != 0);
             break;
         case BindingType::UAV:
             kind = "UAV";
-            ok = slot.resourcePtr != 0;
+            ok = slot.resourcePtr != 0 ||
+                 (slot.objectKind == BindingObjectKind::NativeBuffer    && slot.objectPtr != 0) ||
+                 (slot.objectKind == BindingObjectKind::NativeGpuBuffer && slot.objectPtr != 0);
             break;
         case BindingType::ROOT_SRV:
             kind = "ROOT_SRV";

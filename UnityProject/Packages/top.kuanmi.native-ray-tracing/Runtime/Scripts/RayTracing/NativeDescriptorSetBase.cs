@@ -32,6 +32,7 @@ namespace NativeRender
         protected const uint ObjKindRootConstants      = 4;
         protected const uint ObjKindNativeBuffer       = 5;
         protected const uint ObjKindBindlessUAVTexture = 6;
+        protected const uint ObjKindNativeGpuBuffer    = 7;
 
         // Native C++ descriptor-set handle.
         protected ulong _descriptorSetHandle;
@@ -171,6 +172,30 @@ namespace NativeRender
             _stagingSlots[i].stride      = 0;
             _stagingSlots[i].format      = dxgiFormat;
         }
+        
+        
+        public void SetRWTypedBuffer(string name, NativeBuffer nativeBuffer, int count, uint dxgiFormat)
+        {
+            if (!TryGetSlot(name, out uint i)) return;
+            _stagingSlots[i].resourcePtr = 0;
+            _stagingSlots[i].objectPtr   = nativeBuffer.Handle;
+            _stagingSlots[i].objectKind  = ObjKindNativeBuffer;
+            _stagingSlots[i].count       = (uint)count;
+            _stagingSlots[i].stride      = 0;
+            _stagingSlots[i].format      = dxgiFormat;
+        }
+
+        /// <summary>Binds a <see cref="NativeGpuBuffer"/> as a typed RW buffer UAV (e.g. RWBuffer&lt;float2&gt;).</summary>
+        public void SetRWTypedBuffer(string name, NativeGpuBuffer gpuBuffer, int count, uint dxgiFormat)
+        {
+            if (!TryGetSlot(name, out uint i)) return;
+            _stagingSlots[i].resourcePtr = 0;
+            _stagingSlots[i].objectPtr   = gpuBuffer.Handle;
+            _stagingSlots[i].objectKind  = ObjKindNativeGpuBuffer;
+            _stagingSlots[i].count       = (uint)count;
+            _stagingSlots[i].stride      = 0;
+            _stagingSlots[i].format      = dxgiFormat;
+        }
 
         /// <summary>Binds a structured buffer (UAV) with explicit element count and stride.</summary>
         public void SetRWStructuredBuffer(string name, IntPtr bufferPtr, int count, int stride)
@@ -240,6 +265,29 @@ namespace NativeRender
             if (!TryGetSlot(name, out uint i)) return;
             _stagingSlots[i].resourcePtr = (ulong)bufferPtr;
             _stagingSlots[i].objectKind  = ObjKindNone;
+            _stagingSlots[i].count       = (uint)count;
+            _stagingSlots[i].stride      = 0;
+            _stagingSlots[i].format      = dxgiFormat;
+        }
+        
+        public void SetTypedBuffer(string name, NativeBuffer nativeBuffer, int count, uint dxgiFormat)
+        {
+            if (!TryGetSlot(name, out uint i)) return;
+            _stagingSlots[i].resourcePtr = 0;
+            _stagingSlots[i].objectPtr   = nativeBuffer.Handle;
+            _stagingSlots[i].objectKind  = ObjKindNativeBuffer;
+            _stagingSlots[i].count       = (uint)count;
+            _stagingSlots[i].stride      = 0;
+            _stagingSlots[i].format      = dxgiFormat;
+        }
+
+        /// <summary>Binds a <see cref="NativeGpuBuffer"/> as a typed buffer SRV (e.g. Buffer&lt;float2&gt;).</summary>
+        public void SetTypedBuffer(string name, NativeGpuBuffer gpuBuffer, int count, uint dxgiFormat)
+        {
+            if (!TryGetSlot(name, out uint i)) return;
+            _stagingSlots[i].resourcePtr = 0;
+            _stagingSlots[i].objectPtr   = gpuBuffer.Handle;
+            _stagingSlots[i].objectKind  = ObjKindNativeGpuBuffer;
             _stagingSlots[i].count       = (uint)count;
             _stagingSlots[i].stride      = 0;
             _stagingSlots[i].format      = dxgiFormat;

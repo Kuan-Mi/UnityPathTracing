@@ -74,8 +74,8 @@ MonoBehaviour:
     showMV: 0
     cameraJitter: 1
     sunAngularDiameter: 1
-    enableAutoExposure: 0
-    fixExposure: 32.9
+    enableAutoExposure: 1
+    fixExposure: 2.54
     toneMappingParams:
       histogramLowPercentile: 0.8
       histogramHighPercentile: 0.95
@@ -83,7 +83,7 @@ MonoBehaviour:
       eyeAdaptationSpeedDown: 1
       minAdaptedLuminance: 0.02
       maxAdaptedLuminance: 0.5
-      exposureBias: 0
+      exposureBias: 2.06
       whitePoint: 3
       enableColorLUT: 0
     roughnessOverride: 0
@@ -111,7 +111,7 @@ MonoBehaviour:
     usePrevFrame: 1
     boost: 1
     SR: 0
-    RR: 0
+    RR: 1
     upscalerMode: 0
     confidence: 1
     denoisingRange: 1000
@@ -155,35 +155,35 @@ MonoBehaviour:
       e32: -1
       e33: 0
     worldToViewMatrix:
-      e00: 0.519581
-      e01: -0.000028558075
-      e02: 0.8544213
-      e03: 1.6547209
-      e10: -0.1826357
-      e11: 0.9768839
-      e12: 0.111095056
-      e13: -2.5174055
-      e20: 0.8346736
-      e21: 0.2137707
-      e22: -0.50756514
-      e23: 5.2820106
+      e00: 0.13193238
+      e01: -0.00019718707
+      e02: 0.9912586
+      e03: 4.9576063
+      e10: -0.29237545
+      e11: 0.95550376
+      e12: 0.039103985
+      e13: -3.4004307
+      e20: 0.94715905
+      e21: 0.29497877
+      e22: -0.12600422
+      e23: 1.0999224
       e30: 0
       e31: 0
       e32: 0
       e33: 1
     worldToViewMatrixPrev:
-      e00: 0.519581
-      e01: -0.000028558075
-      e02: 0.8544213
-      e03: 1.6547209
-      e10: -0.1826357
-      e11: 0.9768839
-      e12: 0.111095056
-      e13: -2.5174055
-      e20: 0.8346736
-      e21: 0.2137707
-      e22: -0.50756514
-      e23: 5.2820106
+      e00: 0.13193238
+      e01: -0.00019718707
+      e02: 0.9912586
+      e03: 4.9576063
+      e10: -0.29237545
+      e11: 0.95550376
+      e12: 0.039103985
+      e13: -3.4004307
+      e20: 0.94715905
+      e21: 0.29497877
+      e22: -0.12600422
+      e23: 1.0999224
       e30: 0
       e31: 0
       e32: 0
@@ -210,11 +210,11 @@ MonoBehaviour:
       y: 0.001607717
       z: -1
     cameraJitter:
-      x: -0.2609253
-      y: -0.040110737
+      x: -0.3687744
+      y: 0.1541686
     cameraJitterPrev:
-      x: 0.3640747
-      y: -0.37344408
+      x: 0.2562256
+      y: -0.17916477
     resourceSize: 95046e02
     resourceSizePrev: 95046e02
     rectSize: 95046e02
@@ -232,7 +232,7 @@ MonoBehaviour:
     printfAt: 0f270f27
     debug: 0
     rectOrigin: 0000000000000000
-    frameIndex: 11451
+    frameIndex: 6531
     accumulationMode: 0
   sigmaSettings:
     lightDirection: {x: 0.9257155, y: 0.3584616, z: -0.12064916}
