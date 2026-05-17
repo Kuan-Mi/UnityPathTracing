@@ -58,7 +58,7 @@ namespace NativeRender
         /// Set to <see cref="Verbosity.Verbose"/> when debugging slot management issues.
         /// Defaults to <see cref="Verbosity.None"/>.
         /// </summary>
-        public Verbosity LogLevel { get; set; } = Verbosity.Verbose;
+        public Verbosity LogLevel { get; set; } = Verbosity.None;
 
         /// <summary>
         /// Optional label prepended to all log messages (e.g. "instance" or "primitive")

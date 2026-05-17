@@ -74,16 +74,13 @@ namespace PathTracing
                 ds.SetConstantBuffer("g_Const", ctx.ConstantBuffer.GetNativeBufferPtr());
 
             // SRV input: noisy PT output
-            if (res.OutputColor.IsCreated)
-                ds.SetTexture("t_InputColor", res.OutputColor.NativePtr);
+            ds.SetTexture("t_InputColor", res.OutputColor.NativePtr);
 
             // UAV accumulation buffer (read-modify-write)
-            if (res.AccumulatedRadiance.IsCreated)
-                ds.SetRWTexture("u_AccumulatedColor", res.AccumulatedRadiance.NativePtr);
+            ds.SetRWTexture("u_AccumulatedColor", res.AccumulatedRadiance.NativePtr);
 
             // UAV output: post-processed result
-            if (res.ProcessedOutputColor.IsCreated)
-                ds.SetRWTexture("u_OutputColor", res.ProcessedOutputColor.NativePtr);
+            ds.SetRWTexture("u_OutputColor", res.ProcessedOutputColor.NativePtr);
 
             uint gx = ((uint)ctx.DisplayResolution.x + 7u) / 8u;
             uint gy = ((uint)ctx.DisplayResolution.y + 7u) / 8u;

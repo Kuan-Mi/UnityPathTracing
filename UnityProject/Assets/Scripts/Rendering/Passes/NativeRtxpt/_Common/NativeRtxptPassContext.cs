@@ -50,22 +50,31 @@ namespace PathTracing
         // ── Pre-resolved IntPtrs (filled once per frame from Textures pool) ───
         // u0  OutputColor
         public IntPtr OutputColorPtr;
+
         // u1  ProcessedOutputColor
         public IntPtr ProcessedOutputColorPtr;
+
         // u4  Throughput
         public IntPtr ThroughputPtr;
+
         // u5  MotionVectors
         public IntPtr MotionVectorsPtr;
+
         // u6  Depth
         public IntPtr DepthPtr;
+
         // u7  SpecularHitT
         public IntPtr SpecularHitTPtr;
+
         // u8  ScratchFloat1
         public IntPtr ScratchFloat1Ptr;
+
         // u40 StablePlanesHeader
         public IntPtr StablePlanesHeaderPtr;
+
         // u44 StableRadiance
         public IntPtr StableRadiancePtr;
+
         // DLSS-RR guide buffers
         public IntPtr DlssRrDiffAlbedoPtr;
         public IntPtr DlssRrSpecAlbedoPtr;
@@ -80,19 +89,19 @@ namespace PathTracing
         /// </summary>
         public void ResolveNativePtrs()
         {
-            OutputColorPtr            = Textures.OutputColor.IsCreated          ? Textures.OutputColor.NativePtr          : IntPtr.Zero;
-            ProcessedOutputColorPtr   = Textures.ProcessedOutputColor.IsCreated ? Textures.ProcessedOutputColor.NativePtr  : IntPtr.Zero;
-            ThroughputPtr             = Textures.Throughput.IsCreated           ? Textures.Throughput.NativePtr            : IntPtr.Zero;
-            MotionVectorsPtr          = Textures.ScreenMotionVectors.IsCreated  ? Textures.ScreenMotionVectors.NativePtr   : IntPtr.Zero;
-            DepthPtr                  = Textures.Depth.IsCreated                ? Textures.Depth.NativePtr                 : IntPtr.Zero;
-            SpecularHitTPtr           = Textures.SpecularHitT.IsCreated         ? Textures.SpecularHitT.NativePtr          : IntPtr.Zero;
-            ScratchFloat1Ptr          = Textures.ScratchFloat1.IsCreated        ? Textures.ScratchFloat1.NativePtr         : IntPtr.Zero;
-            StablePlanesHeaderPtr     = Textures.StablePlanesHeader.IsCreated   ? Textures.StablePlanesHeader.NativePtr    : IntPtr.Zero;
-            StableRadiancePtr         = Textures.StableRadiance.IsCreated       ? Textures.StableRadiance.NativePtr        : IntPtr.Zero;
-            DlssRrDiffAlbedoPtr       = Textures.DlssRrDiffAlbedo.IsCreated     ? Textures.DlssRrDiffAlbedo.NativePtr      : IntPtr.Zero;
-            DlssRrSpecAlbedoPtr       = Textures.DlssRrSpecAlbedo.IsCreated     ? Textures.DlssRrSpecAlbedo.NativePtr      : IntPtr.Zero;
-            DlssRrNormalRoughnessPtr  = Textures.DlssRrNormalRoughness.IsCreated ? Textures.DlssRrNormalRoughness.NativePtr : IntPtr.Zero;
-            DlssRrOutputPtr           = Textures.DlssRrOutput.IsCreated         ? Textures.DlssRrOutput.NativePtr          : IntPtr.Zero;
+            OutputColorPtr           = Textures.OutputColor.NativePtr;
+            ProcessedOutputColorPtr  = Textures.ProcessedOutputColor.NativePtr;
+            ThroughputPtr            = Textures.Throughput.NativePtr;
+            MotionVectorsPtr         = Textures.ScreenMotionVectors.NativePtr;
+            DepthPtr                 = Textures.Depth.NativePtr;
+            SpecularHitTPtr          = Textures.SpecularHitT.NativePtr;
+            ScratchFloat1Ptr         = Textures.ScratchFloat1.NativePtr;
+            StablePlanesHeaderPtr    = Textures.StablePlanesHeader.NativePtr;
+            StableRadiancePtr        = Textures.StableRadiance.NativePtr;
+            DlssRrDiffAlbedoPtr      = Textures.DlssRrDiffAlbedo.NativePtr;
+            DlssRrSpecAlbedoPtr      = Textures.DlssRrSpecAlbedo.NativePtr;
+            DlssRrNormalRoughnessPtr = Textures.DlssRrNormalRoughness.NativePtr;
+            DlssRrOutputPtr          = Textures.DlssRrOutput.NativePtr;
         }
     }
 }

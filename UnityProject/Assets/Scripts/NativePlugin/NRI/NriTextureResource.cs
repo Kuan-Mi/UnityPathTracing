@@ -20,25 +20,26 @@ namespace Nri
         protected static IntPtr WrapD3D12TextureInternal(IntPtr resource, DXGI_FORMAT format)
             => WrapD3D12Texture(resource, format);
 
-        public RTHandle Handle; // Unity RTHandle封装
-        public IntPtr NativePtr; // DX12底层指针
-        public IntPtr NriPtr; // NRD封装指针
+        public RenderTexture rt;
+        public RTHandle      Handle; // Unity RTHandle封装
+        public IntPtr        NativePtr; // DX12底层指针
+        public IntPtr        NriPtr; // NRD封装指针
 
 
-        public string Name;
+        public string           Name;
         public NriResourceState ResourceState;
-        public GraphicsFormat GraphicsFormat;
-        public bool SRGB;
-        
-        public bool IsCreated => Handle != null;
+        public GraphicsFormat   GraphicsFormat;
+        public bool             SRGB;
+
+        public bool IsCreated => Handle != null && rt != null;
 
 
         public NriTextureResource(string name, GraphicsFormat graphicsFormat, NriResourceState initialState, bool srgb = false)
         {
-            Name = name;
-            ResourceState = initialState;
+            Name           = name;
+            ResourceState  = initialState;
             GraphicsFormat = graphicsFormat;
-            SRGB = srgb;
+            SRGB           = srgb;
         }
 
         public void Allocate(int2 resolution)
@@ -53,23 +54,23 @@ namespace Nri
             var desc = new RenderTextureDescriptor(resolution.x, resolution.y, GraphicsFormat, 0)
             {
                 enableRandomWrite = true,
-                useMipMap = false,
-                msaaSamples = 1,
-                sRGB = SRGB
+                useMipMap         = false,
+                msaaSamples       = 1,
+                sRGB              = SRGB
             };
 
             // 创建 RT
-            var rt = new RenderTexture(desc)
+            rt = new RenderTexture(desc)
             {
-                name = Name,
+                name       = Name,
                 filterMode = FilterMode.Point,
-                wrapMode = TextureWrapMode.Clamp
+                wrapMode   = TextureWrapMode.Clamp
             };
             rt.Create();
 
-            Handle = RTHandles.Alloc(rt);
+            Handle    = RTHandles.Alloc(rt);
             NativePtr = Handle.rt.GetNativeTexturePtr();
-            NriPtr = WrapD3D12Texture(NativePtr, dxgiFormat);
+            NriPtr    = WrapD3D12Texture(NativePtr, dxgiFormat);
         }
 
         public void Release()
@@ -84,9 +85,6 @@ namespace Nri
 
             if (Handle != null)
             {
-                var rt = Handle.rt;
-
-
                 RTHandles.Release(Handle);
                 Handle = null;
                 if (rt != null)

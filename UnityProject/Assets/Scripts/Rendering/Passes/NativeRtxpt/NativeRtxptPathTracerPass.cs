@@ -32,14 +32,14 @@ namespace PathTracing
         private NativeRtxptPassContext _ctx;
 
         private readonly SampleMiniConstants[] _miniConstArray = new SampleMiniConstants[1];
-        private          GraphicsBuffer         _miniConstBuffer;
+        private          GraphicsBuffer        _miniConstBuffer;
 
         public NativeRtxptPathTracerPass(
             RayTraceShader buildStablePlanes,
             RayTraceShader fillStablePlanes,
             RayTraceShader reference,
-            HitGroupShader[] buildHitGroups   = null,
-            HitGroupShader[] fillHitGroups    = null,
+            HitGroupShader[] buildHitGroups = null,
+            HitGroupShader[] fillHitGroups = null,
             HitGroupShader[] referenceHitGroups = null)
         {
             _buildSP = buildHitGroups is { Length: > 0 }
@@ -58,16 +58,19 @@ namespace PathTracing
             _refDs = new NativeRayTraceDescriptorSet(_refSP);
 
             _miniConstBuffer = new GraphicsBuffer(
-                GraphicsBuffer.Target.Constant, 1,
-                Marshal.SizeOf<SampleMiniConstants>())
-            { name = "Rtxpt_MiniConst" };
+                    GraphicsBuffer.Target.Constant, 1,
+                    Marshal.SizeOf<SampleMiniConstants>())
+                { name = "Rtxpt_MiniConst" };
         }
 
         public void Dispose()
         {
-            _buildDs?.Dispose(); _buildSP?.Dispose();
-            _fillDs?.Dispose();  _fillSP?.Dispose();
-            _refDs?.Dispose();   _refSP?.Dispose();
+            _buildDs?.Dispose();
+            _buildSP?.Dispose();
+            _fillDs?.Dispose();
+            _fillSP?.Dispose();
+            _refDs?.Dispose();
+            _refSP?.Dispose();
             _miniConstBuffer?.Dispose();
             _miniConstBuffer = null;
         }
@@ -95,16 +98,16 @@ namespace PathTracing
         {
             using var builder = renderGraph.AddUnsafePass<PassData>("NativeRtxpt.PathTracer", out var passData);
 
-            passData.BuildSP        = _buildSP;
-            passData.BuildDs        = _buildDs;
-            passData.FillSP         = _fillSP;
-            passData.FillDs         = _fillDs;
-            passData.RefSP          = _refSP;
-            passData.RefDs          = _refDs;
-            passData.Ctx            = _ctx;
+            passData.BuildSP         = _buildSP;
+            passData.BuildDs         = _buildDs;
+            passData.FillSP          = _fillSP;
+            passData.FillDs          = _fillDs;
+            passData.RefSP           = _refSP;
+            passData.RefDs           = _refDs;
+            passData.Ctx             = _ctx;
             passData.MiniConstBuffer = _miniConstBuffer;
-            passData.RenderRes      = _ctx.RenderResolution;
-            passData.IsRealtime     = _ctx.Setting.realtimeMode;
+            passData.RenderRes       = _ctx.RenderResolution;
+            passData.IsRealtime      = _ctx.Setting.realtimeMode;
 
             builder.AllowPassCulling(false);
             builder.SetRenderFunc((PassData data, UnsafeGraphContext context) => ExecutePass(data, context));
@@ -139,12 +142,12 @@ namespace PathTracing
                     BindCommonRT(ds, ctx, data.MiniConstBuffer, tlas);
 
                     // BuildStablePlanes-specific outputs
-                    if (res.Throughput.IsCreated)       ds.SetRWTexture("u_Throughput",         res.Throughput.NativePtr);
-                    if (res.ScreenMotionVectors.IsCreated) ds.SetRWTexture("u_MotionVectors",   res.ScreenMotionVectors.NativePtr);
-                    if (res.Depth.IsCreated)            ds.SetRWTexture("u_Depth",              res.Depth.NativePtr);
-                    if (res.StablePlanesHeader.IsCreated)  ds.SetRWTexture("u_StablePlanesHeader", res.StablePlanesHeader.NativePtr);
-                    if (res.StableRadiance.IsCreated)   ds.SetRWTexture("u_StableRadiance",     res.StableRadiance.NativePtr);
-                    if (res.SpecularHitT.IsCreated)     ds.SetRWTexture("u_SpecularHitT",       res.SpecularHitT.NativePtr);
+                    ds.SetRWTexture("u_Throughput", res.Throughput.NativePtr);
+                    ds.SetRWTexture("u_MotionVectors", res.ScreenMotionVectors.NativePtr);
+                    ds.SetRWTexture("u_Depth", res.Depth.NativePtr);
+                    ds.SetRWTexture("u_StablePlanesHeader", res.StablePlanesHeader.NativePtr);
+                    ds.SetRWTexture("u_StableRadiance", res.StableRadiance.NativePtr);
+                    ds.SetRWTexture("u_SpecularHitT", res.SpecularHitT.NativePtr);
                     if (buf.StablePlanesBuffer != null)
                         ds.SetRWStructuredBuffer("u_StablePlanesBuffer",
                             buf.StablePlanesBuffer.GetNativeBufferPtr(),
@@ -161,8 +164,8 @@ namespace PathTracing
                     BindCommonRT(ds, ctx, data.MiniConstBuffer, tlas);
                     BindLightBuffers(ds, ctx);
 
-                    if (res.StablePlanesHeader.IsCreated)  ds.SetRWTexture("u_StablePlanesHeader", res.StablePlanesHeader.NativePtr);
-                    if (res.SpecularHitT.IsCreated)     ds.SetRWTexture("u_SpecularHitT",       res.SpecularHitT.NativePtr);
+                    ds.SetRWTexture("u_StablePlanesHeader", res.StablePlanesHeader.NativePtr);
+                    ds.SetRWTexture("u_SpecularHitT", res.SpecularHitT.NativePtr);
                     if (buf.StablePlanesBuffer != null)
                         ds.SetRWStructuredBuffer("u_StablePlanesBuffer",
                             buf.StablePlanesBuffer.GetNativeBufferPtr(),
@@ -181,11 +184,11 @@ namespace PathTracing
                     BindCommonRT(ds, ctx, data.MiniConstBuffer, tlas);
                     BindLightBuffers(ds, ctx);
 
-                    if (res.OutputColor.IsCreated)      ds.SetRWTexture("u_OutputColor",        res.OutputColor.NativePtr);
-                    if (res.Throughput.IsCreated)       ds.SetRWTexture("u_Throughput",         res.Throughput.NativePtr);
-                    if (res.ScreenMotionVectors.IsCreated) ds.SetRWTexture("u_MotionVectors",   res.ScreenMotionVectors.NativePtr);
-                    if (res.Depth.IsCreated)            ds.SetRWTexture("u_Depth",              res.Depth.NativePtr);
-                    if (res.SpecularHitT.IsCreated)     ds.SetRWTexture("u_SpecularHitT",       res.SpecularHitT.NativePtr);
+                    ds.SetRWTexture("u_OutputColor", res.OutputColor.NativePtr);
+                    ds.SetRWTexture("u_Throughput", res.Throughput.NativePtr);
+                    ds.SetRWTexture("u_MotionVectors", res.ScreenMotionVectors.NativePtr);
+                    ds.SetRWTexture("u_Depth", res.Depth.NativePtr);
+                    ds.SetRWTexture("u_SpecularHitT", res.SpecularHitT.NativePtr);
 
                     data.RefSP.Dispatch(cmd, ds, (uint)data.RenderRes.x, (uint)data.RenderRes.y);
                 }

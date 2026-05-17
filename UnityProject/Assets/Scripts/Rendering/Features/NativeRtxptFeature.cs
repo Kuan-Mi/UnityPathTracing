@@ -265,7 +265,6 @@ namespace PathTracing
                 }
 
                 // Phase 7: DLSS-RR
-                if (texPool.DlssRrOutput.IsCreated && texPool.OutputColor.IsCreated)
                 {
                     var dlrrInput = new DlrrDenoiser.DlrrFrameInput
                     {

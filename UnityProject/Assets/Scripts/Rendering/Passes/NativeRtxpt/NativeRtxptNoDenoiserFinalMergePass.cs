@@ -74,9 +74,9 @@ namespace PathTracing
             if (ctx.ConstantBuffer != null)
                 ds.SetConstantBuffer("g_Const", ctx.ConstantBuffer.GetNativeBufferPtr());
 
-            if (res.OutputColor.IsCreated)       ds.SetRWTexture("u_OutputColor",       res.OutputColor.NativePtr);
-            if (res.StablePlanesHeader.IsCreated) ds.SetRWTexture("u_StablePlanesHeader", res.StablePlanesHeader.NativePtr);
-            if (res.StableRadiance.IsCreated)    ds.SetRWTexture("u_StableRadiance",    res.StableRadiance.NativePtr);
+            ds.SetRWTexture("u_OutputColor", res.OutputColor.NativePtr);
+            ds.SetRWTexture("u_StablePlanesHeader", res.StablePlanesHeader.NativePtr);
+            ds.SetRWTexture("u_StableRadiance", res.StableRadiance.NativePtr);
 
             if (buf?.StablePlanesBuffer != null)
                 ds.SetRWStructuredBuffer("u_StablePlanesBuffer",

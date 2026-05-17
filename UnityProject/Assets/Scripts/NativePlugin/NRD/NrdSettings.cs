@@ -196,6 +196,7 @@ namespace Nrd
     [StructLayout(LayoutKind.Sequential)]
     public struct SigmaSettings
     {
+        [NonSerialized]
         public Vector3 lightDirection; // Default: {0.0, 0.0, 0.0}
 
         [Range(0.0f, 1.0f)]

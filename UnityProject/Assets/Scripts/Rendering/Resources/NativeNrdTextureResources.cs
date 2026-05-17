@@ -58,6 +58,8 @@ namespace PathTracing
 
         public int2 renderResolution { get; private set; }
 
+        private int _pendingReallocFrames;
+
         public NativeNrdTextureResources()
         {
             var srv = new NriResourceState { accessBits = AccessBits.SHADER_RESOURCE, layout         = Layout.SHADER_RESOURCE, stageBits         = 1 << 7 };
@@ -136,10 +138,25 @@ namespace PathTracing
         /// </summary>
         public bool EnsureResources(int2 outputResolution, UpscalerMode mode)
         {
-            bool invalid = !ViewZ.IsCreated;
-            int2 target  = GetUpscaledResolution(outputResolution, mode);
+            bool isCreated = ViewZ.IsCreated;
+            int2 target    = GetUpscaledResolution(outputResolution, mode);
 
-            if (!invalid && target.x == renderResolution.x && target.y == renderResolution.y)
+            bool externallyDestroyed = !isCreated && ViewZ.NriPtr != IntPtr.Zero;
+            if (externallyDestroyed && _pendingReallocFrames == 0)
+            {
+                _pendingReallocFrames = 2;
+                return false;
+            }
+
+            if (_pendingReallocFrames > 0)
+            {
+                _pendingReallocFrames--;
+                if (_pendingReallocFrames > 0)
+                    return false; // still waiting
+            }
+
+            if (isCreated && _pendingReallocFrames == 0 &&
+                target.x == renderResolution.x && target.y == renderResolution.y)
                 return false;
 
             renderResolution = target;

@@ -75,7 +75,7 @@ MonoBehaviour:
     cameraJitter: 1
     sunAngularDiameter: 0.5
     enableAutoExposure: 0
-    fixExposure: 50
+    fixExposure: 1
     toneMappingParams:
       histogramLowPercentile: 0.8
       histogramHighPercentile: 0.95
@@ -135,7 +135,6 @@ MonoBehaviour:
     rectOrigin: 0000000000000000
     accumulationMode: 0
   sigmaSettings:
-    lightDirection: {x: 0.9257155, y: 0.3584616, z: -0.12064916}
     planeDistanceSensitivity: 0.02
     maxStabilizedFrameNum: 5
   reblurSettings:

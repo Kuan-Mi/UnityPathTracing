@@ -255,6 +255,12 @@ namespace PathTracing
 
             var outputResolution = ComputeOutputResolution(renderingData.cameraData);
             var resourcesChanged = pool.EnsureResources(outputResolution, setting.upscalerMode);
+            if (!pool.ViewZ.IsCreated)
+            {
+                Debug.Log("NRDFeature: Resources not ready, skipping frame.");
+                return;
+            }
+
             var renderResolution = pool.renderResolution;
 
             if (resourcesChanged)

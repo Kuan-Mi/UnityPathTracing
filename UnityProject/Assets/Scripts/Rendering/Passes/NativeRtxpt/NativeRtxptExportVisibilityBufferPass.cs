@@ -71,8 +71,8 @@ namespace PathTracing
             if (ctx.ConstantBuffer != null)
                 ds.SetConstantBuffer("g_Const", ctx.ConstantBuffer.GetNativeBufferPtr());
 
-            if (res.ScreenMotionVectors.IsCreated) ds.SetRWTexture("u_MotionVectors", res.ScreenMotionVectors.NativePtr);
-            if (res.Depth.IsCreated)               ds.SetRWTexture("u_Depth",         res.Depth.NativePtr);
+            ds.SetRWTexture("u_MotionVectors", res.ScreenMotionVectors.NativePtr);
+            ds.SetRWTexture("u_Depth", res.Depth.NativePtr);
 
             uint gx = ((uint)ctx.RenderResolution.x + 7u) / 8u;
             uint gy = ((uint)ctx.RenderResolution.y + 7u) / 8u;

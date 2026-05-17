@@ -28,11 +28,11 @@ namespace PathTracing
         [StructLayout(LayoutKind.Sequential, Pack = 4)]
         private struct DenoisingGuidesBakerConstants
         {
-            public uint RenderResX, RenderResY;
+            public uint RenderResX,  RenderResY;
             public uint DisplayResX, DisplayResY;
             public int  DebugView;
             public uint Ping;
-            public uint _pad1, _pad2;
+            public uint _pad1,  _pad2;
             public uint _pad3x, _pad3y, _pad3z, _pad3w;
             public uint _pad4x, _pad4y, _pad4z, _pad4w;
         }
@@ -42,15 +42,15 @@ namespace PathTracing
         private          NativeRtxptPassContext     _ctx;
 
         private readonly DenoisingGuidesBakerConstants[] _cbData = new DenoisingGuidesBakerConstants[1];
-        private          GraphicsBuffer _cb;
+        private          GraphicsBuffer                  _cb;
 
         public NativeRtxptDenoiseSpecHitTPass(NativeComputeShader shader)
         {
             _cs = new NativeComputePipeline(shader);
             _ds = new NativeComputeDescriptorSet(_cs);
             _cb = new GraphicsBuffer(GraphicsBuffer.Target.Constant, 1,
-                Marshal.SizeOf<DenoisingGuidesBakerConstants>())
-            { name = "Rtxpt_DenoisingGuidesBakerConstants" };
+                    Marshal.SizeOf<DenoisingGuidesBakerConstants>())
+                { name = "Rtxpt_DenoisingGuidesBakerConstants" };
         }
 
         public void Dispose()
@@ -67,10 +67,10 @@ namespace PathTracing
 
         private class PassData
         {
-            internal NativeComputePipeline      Cs;
-            internal NativeComputeDescriptorSet Ds;
-            internal NativeRtxptPassContext     Ctx;
-            internal GraphicsBuffer             Cb;
+            internal NativeComputePipeline           Cs;
+            internal NativeComputeDescriptorSet      Ds;
+            internal NativeRtxptPassContext          Ctx;
+            internal GraphicsBuffer                  Cb;
             internal DenoisingGuidesBakerConstants[] CbData;
         }
 
@@ -117,9 +117,9 @@ namespace PathTracing
                 data.Cb.SetData(data.CbData);
                 ds.SetConstantBuffer("g_denoisingConstants", data.Cb.GetNativeBufferPtr());
 
-                if (res.Depth.IsCreated)        ds.SetRWTexture("u_Depth",        res.Depth.NativePtr);
-                if (res.SpecularHitT.IsCreated) ds.SetRWTexture("u_SpecularHitT", res.SpecularHitT.NativePtr);
-                if (res.ScratchFloat1.IsCreated) ds.SetRWTexture("u_ScratchFloat1", res.ScratchFloat1.NativePtr);
+                ds.SetRWTexture("u_Depth", res.Depth.NativePtr);
+                ds.SetRWTexture("u_SpecularHitT", res.SpecularHitT.NativePtr);
+                ds.SetRWTexture("u_ScratchFloat1", res.ScratchFloat1.NativePtr);
 
                 data.Cs.Dispatch(cmd, ds, gx, gy, 1);
 

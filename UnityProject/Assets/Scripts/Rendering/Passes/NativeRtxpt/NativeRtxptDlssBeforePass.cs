@@ -82,12 +82,12 @@ namespace PathTracing
                 ds.SetConstantBuffer("g_Const", ctx.ConstantBuffer.GetNativeBufferPtr());
 
             // Input UAVs
-            if (res.OutputColor.IsCreated)          ds.SetRWTexture("u_OutputColor",       res.OutputColor.NativePtr);
-            if (res.ScreenMotionVectors.IsCreated)   ds.SetRWTexture("u_MotionVectors",     res.ScreenMotionVectors.NativePtr);
-            if (res.Depth.IsCreated)                 ds.SetRWTexture("u_Depth",             res.Depth.NativePtr);
-            if (res.SpecularHitT.IsCreated)          ds.SetRWTexture("u_SpecularHitT",      res.SpecularHitT.NativePtr);
-            if (res.StablePlanesHeader.IsCreated)    ds.SetRWTexture("u_StablePlanesHeader", res.StablePlanesHeader.NativePtr);
-            if (res.StableRadiance.IsCreated)        ds.SetRWTexture("u_StableRadiance",    res.StableRadiance.NativePtr);
+            ds.SetRWTexture("u_OutputColor", res.OutputColor.NativePtr);
+            ds.SetRWTexture("u_MotionVectors", res.ScreenMotionVectors.NativePtr);
+            ds.SetRWTexture("u_Depth", res.Depth.NativePtr);
+            ds.SetRWTexture("u_SpecularHitT", res.SpecularHitT.NativePtr);
+            ds.SetRWTexture("u_StablePlanesHeader", res.StablePlanesHeader.NativePtr);
+            ds.SetRWTexture("u_StableRadiance", res.StableRadiance.NativePtr);
 
             if (buf?.StablePlanesBuffer != null)
                 ds.SetRWStructuredBuffer("u_StablePlanesBuffer",
@@ -95,11 +95,11 @@ namespace PathTracing
                     buf.StablePlanesBuffer.count, buf.StablePlanesBuffer.stride);
 
             // Output guide UAVs
-            if (res.DlssRrDiffAlbedo.IsCreated)      ds.SetRWTexture("u_RRDiffuseAlbedo",      res.DlssRrDiffAlbedo.NativePtr);
-            if (res.DlssRrSpecAlbedo.IsCreated)      ds.SetRWTexture("u_RRSpecAlbedo",         res.DlssRrSpecAlbedo.NativePtr);
-            if (res.DlssRrNormalRoughness.IsCreated) ds.SetRWTexture("u_RRNormalsAndRoughness", res.DlssRrNormalRoughness.NativePtr);
+            ds.SetRWTexture("u_RRDiffuseAlbedo", res.DlssRrDiffAlbedo.NativePtr);
+            ds.SetRWTexture("u_RRSpecAlbedo", res.DlssRrSpecAlbedo.NativePtr);
+            ds.SetRWTexture("u_RRNormalsAndRoughness", res.DlssRrNormalRoughness.NativePtr);
             // u_RRSpecMotionVectors reuses ScreenMotionVectors (or can be left to MotionVectors)
-            if (res.ScreenMotionVectors.IsCreated)   ds.SetRWTexture("u_RRSpecMotionVectors",  res.ScreenMotionVectors.NativePtr);
+            ds.SetRWTexture("u_RRSpecMotionVectors", res.ScreenMotionVectors.NativePtr);
 
             uint gx = ((uint)ctx.RenderResolution.x + 7u) / 8u;
             uint gy = ((uint)ctx.RenderResolution.y + 7u) / 8u;
