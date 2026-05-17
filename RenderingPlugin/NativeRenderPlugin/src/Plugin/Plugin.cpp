@@ -556,8 +556,7 @@ NR_AS_UpdateDynamicVertexBuffer(uint64_t handle, uint32_t instanceHandle,
                                  void* vbPtr, uint32_t vertexCount, uint32_t vertexStride)
 {
     if (!handle || !vbPtr) return;
-    reinterpret_cast<AccelerationStructure*>(handle)
-        ->UpdateDynamicVertexBuffer(instanceHandle, vbPtr, vertexCount, vertexStride);
+    reinterpret_cast<AccelerationStructure*>(handle)->UpdateDynamicVertexBuffer(instanceHandle, vbPtr);
 }
 
 // ===========================================================================

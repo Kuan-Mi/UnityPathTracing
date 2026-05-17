@@ -200,7 +200,7 @@ public:
     // Update the vertex buffer pointer for a dynamic (SkinnedMeshRenderer) instance.
     // Discards the old BLAS (deferred 3-frame GPU delete) and schedules a rebuild.
     // vbPtr must be the current-frame ID3D12Resource* from GetVertexBuffer().
-    void UpdateDynamicVertexBuffer(uint32_t handle, void* vbPtr, uint32_t vertexCount, uint32_t vertexStride);
+    void UpdateDynamicVertexBuffer(uint32_t handle, void* vbPtr);
 
     // Per-frame update: set world transform (row-major 3x4).
     void SetInstanceTransform(uint32_t handle, const float transform[12]);

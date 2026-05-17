@@ -469,8 +469,7 @@ namespace NativeRender
                     continue;
                 }
 
-                Material subMat    = sharedMats[sub];
-                int      subMatIdx = GetOrAddMaterial(stTarget.SubmeshMaterialInfos[sub], null);
+                int subMatIdx = GetOrAddMaterial(stTarget.SubmeshMaterialInfos[sub], null);
 
                 int indexCount = (int)mesh.GetIndexCount(sub);
                 int triCount   = indexCount / 3;
@@ -602,9 +601,9 @@ namespace NativeRender
                 var smr   = entry.smr;
                 if (smr == null) continue;
 
-                // Refresh the GPU vertex buffer to the current frame's skinning result.
-                foreach (var tlas in entry.tlasList)
-                    tlas.UpdateSkinnedInstance(smr);
+                // // Refresh the GPU vertex buffer to the current frame's skinning result.
+                // foreach (var tlas in entry.tlasList)
+                //     tlas.UpdateSkinnedInstance(smr);
 
                 // Store the PREVIOUS frame's root-bone-to-world transform into mOverloaded.
                 // The FLAG_MORPH path in HLSL uses mOverloaded to transform Xprev from
@@ -2301,8 +2300,8 @@ namespace NativeRender
                                 tex = Texture2D.blackTexture;
                                 break;
                         }
-
                     }
+
                     _textures[base4D + i] = tex;
                 }
             }

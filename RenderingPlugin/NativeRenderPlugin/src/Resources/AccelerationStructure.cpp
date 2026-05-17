@@ -1154,7 +1154,7 @@ void AccelerationStructure::RemoveInstance(uint32_t handle)
 //   produced by Unity's skinning pass, discard the stale BLAS (deferred GPU
 //   delete after 3 frames), and schedule a rebuild for next BuildOrUpdate.
 // ---------------------------------------------------------------------------
-void AccelerationStructure::UpdateDynamicVertexBuffer(uint32_t handle, void *vbPtr, uint32_t vertexCount, uint32_t vertexStride)
+void AccelerationStructure::UpdateDynamicVertexBuffer(uint32_t handle, void *vbPtr)
 {
     std::lock_guard<std::mutex> lock(m_stateMutex);
     auto it = m_handleToSlot.find(handle);
@@ -1169,15 +1169,12 @@ void AccelerationStructure::UpdateDynamicVertexBuffer(uint32_t handle, void *vbP
     if (!newVb)
         return;
 
-    wchar_t vbName[64];
-    swprintf(vbName, 64, L"Unity_VB_Dynamic_Handle%u_Updated", handle);
-    newVb->SetName(vbName);
-
-    AccelLogf(m_log, kUnityLogTypeLog, "[UpdateDynamicVB] Handle=%u, oldVB=%p, newVB=%p '%ls'", handle, (void *)slot.meshInfo.vertexBuffer, (void *)newVb, vbName);
+    //wchar_t vbName[64];
+    //swprintf(vbName, 64, L"Unity_VB_Dynamic_Handle%u_Updated", handle);
+    //newVb->SetName(vbName);
+    //AccelLogf(m_log, kUnityLogTypeLog, "[UpdateDynamicVB] Handle=%u, oldVB=%p, newVB=%p '%ls'", handle, (void *)slot.meshInfo.vertexBuffer, (void *)newVb, vbName);
 
     slot.meshInfo.vertexBuffer = newVb;
-    slot.meshInfo.vertexCount = vertexCount;
-    slot.meshInfo.vertexStride = vertexStride;
     slot.needsBLAS = true;
 }
 

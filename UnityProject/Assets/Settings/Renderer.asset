@@ -264,8 +264,8 @@ MonoBehaviour:
     usePrevFrame: 1
     boost: 1
     SR: 0
-    RR: 1
-    upscalerMode: 1
+    RR: 0
+    upscalerMode: 0
     confidence: 1
     denoisingRange: 1000
     nisSharpness: 0.2
@@ -288,7 +288,7 @@ MonoBehaviour:
     rectOrigin: 0000000000000000
     accumulationMode: 0
   sigmaSettings:
-    lightDirection: {x: 0.83241934, y: 0.12186929, z: 0.54057944}
+    lightDirection: {x: 0.9257155, y: 0.3584616, z: -0.12064916}
     planeDistanceSensitivity: 0.02
     maxStabilizedFrameNum: 5
   reblurSettings:
