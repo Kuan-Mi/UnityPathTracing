@@ -242,8 +242,8 @@ namespace PathTracing
         private bool _disposed;
 
         // Optional equirectangular environment map for RTXDI environment light.
-        private Texture  _pendingEnvMap;
-        private int      _environmentMapTextureIndex = -1;
+        private Texture _pendingEnvMap;
+        private int     _environmentMapTextureIndex = -1;
 
         /// <summary>
         /// Index of the environment map texture in the bindless texture array, or -1 if none.
@@ -259,8 +259,8 @@ namespace PathTracing
         public void SetEnvironmentMap(Texture envMap)
         {
             if (_pendingEnvMap == envMap) return;
-            _pendingEnvMap  = envMap;
-            _sceneGpuDirty  = true;
+            _pendingEnvMap = envMap;
+            _sceneGpuDirty = true;
         }
 
         public RayTracingAccelerationStructure AccelerationStructure => _accelStructure;
@@ -360,7 +360,7 @@ namespace PathTracing
             if (_sceneBuffers != null) ds.SetBindlessBuffer("t_BindlessBuffers", _sceneBuffers);
             if (_sceneTextures != null) ds.SetBindlessTexture("t_BindlessTextures", _sceneTextures);
         }
-        
+
         public void BindToShader(NativeRayTraceDescriptorSet ds)
         {
             if (ds == null) return;
@@ -641,25 +641,25 @@ namespace PathTracing
             int idx = matList.Count;
             _materialSlots[matId] = idx;
 
-            int baseTexIdx, normalTexIdx, metalRoughTexIdx, emissiveTexIdx, occlusionTexIdx;
+            int   baseTexIdx, normalTexIdx, metalRoughTexIdx, emissiveTexIdx, occlusionTexIdx;
             Color baseColor;
             Color emissive;
             float roughness, metalness, alphaCutoff, normalScale, occStr;
-            int domain;
+            int   domain;
 
             bool isGltf = mat != null && mat.shader.name == "Shader Graphs/glTF-pbrMetallicRoughness";
             if (isGltf)
             {
-                baseTexIdx       = AddTexture(TryGetTex(mat, "baseColorTexture"),         texPtrs);
-                normalTexIdx     = AddTexture(TryGetTex(mat, "normalTexture"),             texPtrs);
-                metalRoughTexIdx = AddTexture(TryGetTex(mat, "metallicRoughnessTexture"),  texPtrs);
-                emissiveTexIdx   = AddTexture(TryGetTex(mat, "emissiveTexture"),           texPtrs);
-                occlusionTexIdx  = AddTexture(TryGetTex(mat, "occlusionTexture"),          texPtrs);
+                baseTexIdx       = AddTexture(TryGetTex(mat, "baseColorTexture"), texPtrs);
+                normalTexIdx     = AddTexture(TryGetTex(mat, "normalTexture"), texPtrs);
+                metalRoughTexIdx = AddTexture(TryGetTex(mat, "metallicRoughnessTexture"), texPtrs);
+                emissiveTexIdx   = AddTexture(TryGetTex(mat, "emissiveTexture"), texPtrs);
+                occlusionTexIdx  = AddTexture(TryGetTex(mat, "occlusionTexture"), texPtrs);
 
                 baseColor   = TryGetColor(mat, "baseColorFactor", Color.white);
-                emissive    = TryGetColor(mat, "emissiveFactor",  Color.black);
+                emissive    = TryGetColor(mat, "emissiveFactor", Color.black);
                 roughness   = TryGetFloat(mat, "roughnessFactor", 0.5f);
-                metalness   = TryGetFloat(mat, "metallicFactor",  0f);
+                metalness   = TryGetFloat(mat, "metallicFactor", 0f);
                 alphaCutoff = mat.IsKeywordEnabled("_ALPHATEST_ON") ? TryGetFloat(mat, "alphaCutoff", 0.5f) : 0f;
                 normalScale = 1f;
                 occStr      = TryGetFloat(mat, "occlusionStrength", 1f);
@@ -669,18 +669,28 @@ namespace PathTracing
             else
             {
                 // URP/Lit, RayTracing/Lit, and unknown-shader fallback
-                baseTexIdx       = AddTexture(TryGetTex(mat, "_BaseMap"),          texPtrs);
-                normalTexIdx     = AddTexture(TryGetTex(mat, "_BumpMap"),          texPtrs);
+                baseTexIdx       = AddTexture(TryGetTex(mat, "_BaseMap"), texPtrs);
+                normalTexIdx     = AddTexture(TryGetTex(mat, "_BumpMap"), texPtrs);
                 metalRoughTexIdx = AddTexture(TryGetTex(mat, "_MetallicGlossMap"), texPtrs);
-                emissiveTexIdx   = AddTexture(TryGetTex(mat, "_EmissionMap"),      texPtrs);
-                occlusionTexIdx  = AddTexture(TryGetTex(mat, "_OcclusionMap"),     texPtrs);
 
-                baseColor   = TryGetColor(mat, "_BaseColor",     Color.white);
-                emissive    = TryGetColor(mat, "_EmissionColor", Color.black);
-                roughness   = 1f - TryGetFloat(mat, "_Smoothness",        0.5f);
-                metalness   = TryGetFloat(mat, "_Metallic",       0f);
-                alphaCutoff = TryGetFloat(mat, "_Cutoff",         0f);
-                normalScale = TryGetFloat(mat, "_BumpScale",      1f);
+                var isEmissiveMat = RayTracingMaterialHelper.IsMaterialEmissive(mat);
+                if (isEmissiveMat)
+                    emissiveTexIdx = AddTexture(TryGetTex(mat, "_EmissionMap"), texPtrs);
+                else
+                    emissiveTexIdx = -1;
+                occlusionTexIdx = AddTexture(TryGetTex(mat, "_OcclusionMap"), texPtrs);
+
+                baseColor = TryGetColor(mat, "_BaseColor", Color.white);
+
+                if (isEmissiveMat)
+                    emissive = TryGetColor(mat, "_EmissionColor", Color.black);
+                else
+                    emissive = Color.black;
+
+                roughness   = 1f - TryGetFloat(mat, "_Smoothness", 0.5f);
+                metalness   = TryGetFloat(mat, "_Metallic", 0f);
+                alphaCutoff = TryGetFloat(mat, "_Cutoff", 0f);
+                normalScale = TryGetFloat(mat, "_BumpScale", 1f);
                 occStr      = TryGetFloat(mat, "_OcclusionStrength", 1f);
 
                 domain = 0;

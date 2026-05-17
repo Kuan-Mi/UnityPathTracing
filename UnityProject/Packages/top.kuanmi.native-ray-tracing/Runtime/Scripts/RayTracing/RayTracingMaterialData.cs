@@ -150,13 +150,16 @@ namespace NativeRender
 
             if (mat.shader.name is "Universal Render Pipeline/Lit" or "RayTracing/Lit")
             {
-                if (mat.HasProperty("_EmissionColor"))
-                {
-                    Color e = mat.GetColor("_EmissionColor").linear;
-                    if (e.r > 0f || e.g > 0f || e.b > 0f) return true;
-                }
+                // Debug.Log($"[RayTracingMaterialHelper] Checking emissiveness for material '{mat.name}' with shader '{mat.shader.name}' using _EMISSION keyword.");
+                return mat.IsKeywordEnabled("_EMISSION");
 
-                return mat.HasProperty("_EmissionMap") && mat.GetTexture("_EmissionMap") != null;
+                // if (mat.HasProperty("_EmissionColor"))
+                // {
+                //     Color e = mat.GetColor("_EmissionColor").linear;
+                //     if (e.r > 0f || e.g > 0f || e.b > 0f) return true;
+                // }
+                //
+                // return mat.HasProperty("_EmissionMap") && mat.GetTexture("_EmissionMap") != null;
             }
 
             if (mat.shader.name == "Shader Graphs/glTF-pbrMetallicRoughness")
@@ -215,7 +218,7 @@ namespace NativeRender
                 }
 
                 data.textures[2] = normal ?? FlatNormal;
-                data.textures[3] = TryGetTex(mat, "emissiveTexture") ?? Black;
+                data.textures[3] = TryGetTex(mat, "emissiveTexture") ?? (data.isEmissive ? White : Black);
             }
             else
             {
@@ -230,7 +233,8 @@ namespace NativeRender
                 data.textures[0] = TryGetTex(mat, "_BaseMap") ?? White;
                 data.textures[1] = TryGetTex(mat, "_MetallicGlossMap") ?? Black;
                 data.textures[2] = TryGetTex(mat, "_BumpMap") ?? FlatNormal;
-                data.textures[3] = TryGetTex(mat, "_EmissionMap") ?? Black;
+
+                data.textures[3] = TryGetTex(mat, "_EmissionMap") ?? (data.isEmissive ? White : Black);
             }
 
             return data;

@@ -1135,7 +1135,6 @@ namespace PathTracing
             prepareLightsCs            = LoadCs($"{shaderRoot}/PrepareLights");
             preprocessEnvironmentMapCs = LoadCs($"{shaderRoot}/PreprocessEnvironmentMap");
             preprocessLocalLightCs     = LoadCs($"{shaderRoot}/PreprocessLocalLight");
-            preprocessLocalLightCs     = LoadCs($"{shaderRoot}/PreprocessLocalLight");
 
             // GBuffer
             raytracedGBufferCs   = LoadCs($"{shaderRoot}/RaytracedGBuffer");

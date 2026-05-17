@@ -867,8 +867,10 @@ namespace PathTracing
             _depthBarrierFixPass = null;
             _toneMappingPass     = null;
 
-            scramblingRankingUintTex.Release();
-            sobolUintTex.Release();
+            if (scramblingRankingUintTex != null)
+                scramblingRankingUintTex.Release();
+            if (sobolUintTex != null)
+                sobolUintTex?.Release();
             scramblingRankingUintTex = null;
             sobolUintTex             = null;
             sobolTexPtr              = IntPtr.Zero;
