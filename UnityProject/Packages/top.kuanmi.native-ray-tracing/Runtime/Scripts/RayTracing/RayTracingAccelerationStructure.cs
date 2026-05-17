@@ -76,9 +76,9 @@ namespace NativeRender
 
             var mark1 = new ProfilerMarker(ProfilerCategory.Render, "TLAS1", MarkerFlags.SampleGPU);
             var mark2 = new ProfilerMarker(ProfilerCategory.Render, "TLAS2", MarkerFlags.SampleGPU);
-            
+
             cmd.BeginSample(mark1);
-            
+
             // Retry adding pending SkinnedMeshRenderers (runs on main thread during cmd recording)
             RetryPendingSkinnedInstances();
 
@@ -94,6 +94,7 @@ namespace NativeRender
                 _buildEventData    = new NativeArray<NativeRenderPlugin.AS_BuildEventData>(1, Allocator.Persistent);
                 _buildEventData[0] = new NativeRenderPlugin.AS_BuildEventData { asHandle = _handle };
             }
+
             cmd.EndSample(mark1);
 
             cmd.BeginSample(mark2);
@@ -104,6 +105,7 @@ namespace NativeRender
                     1,
                     (IntPtr)Unity.Collections.LowLevel.Unsafe.NativeArrayUnsafeUtility.GetUnsafePtr(_buildEventData));
             }
+
             cmd.EndSample(mark2);
         }
 
@@ -659,6 +661,24 @@ namespace NativeRender
 
             if (Time.frameCount == cache.baseFrame)
                 return;
+
+
+#if UNITY_EDITOR
+
+            if (!Application.isPlaying)
+            {
+                var skinnedVBPtr = smr.GetVertexBuffer()?.GetNativeBufferPtr() ?? IntPtr.Zero;
+                if (skinnedVBPtr == IntPtr.Zero)
+                {
+                    Debug.LogError($"[NativeRayTracing] UpdateSkinnedInstance: buffer not ready for '{smr.name}'");
+                    return;
+                }
+
+                NativeRenderPlugin.NR_AS_UpdateDynamicVertexBuffer(_handle, id, skinnedVBPtr);
+                return;
+            }
+
+#endif
 
             if (cache.calibrated)
             {
