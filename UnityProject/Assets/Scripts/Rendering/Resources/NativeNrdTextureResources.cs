@@ -144,7 +144,7 @@ namespace PathTracing
             bool externallyDestroyed = !isCreated && ViewZ.NriPtr != IntPtr.Zero;
             if (externallyDestroyed && _pendingReallocFrames == 0)
             {
-                _pendingReallocFrames = 2;
+                _pendingReallocFrames = 3;
                 return false;
             }
 
