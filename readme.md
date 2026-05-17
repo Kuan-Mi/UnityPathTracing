@@ -8,7 +8,9 @@
 
 A real-time path tracing rendering system built in Unity URP, replicating the core features of NVIDIA NRDSample, RTXDI, and other RTX technologies, with optimizations and extensions for the Unity environment. Primarily serves as an experimental playground for various RTX-related technologies in Unity.
 
-Due to the lack of Bindless and SER support, there are still gaps in performance and quality compared to the original. For demonstration purposes only.
+At its core, a native rendering plugin based on shader reflection information is implemented, enabling arbitrary shaders to be compiled with arbitrary parameters and used within Unity. This makes it possible to leverage various DX12 features — including custom acceleration structures, SER, OMM, and Bindless — directly in Unity.
+
+Four RenderFeatures are currently implemented: native and Unity versions of NrdSampleFeature, and native and Unity versions of RtxdiFeature. The native NrdSampleFeature has been highly optimized to work with Unity's multi-threaded rendering, achieving performance nearly identical to the original NRD-Sample.
 
 Blog post: [NRDSample Implementation in Unity](https://www.kuanmi.top/2026/01/22/UnityNRD)
 
@@ -41,6 +43,7 @@ Blog post: [RTXDI Implementation in Unity](https://www.kuanmi.top/2026/04/14/Uni
 git clone https://github.com/Kuan-Mi/UnityPathTracing
 cd UnityPathTracing
 build.bat
+download_bistro.bat
 ```
 
 ### Upgrade Unity's built-in Agility SDK to 1.619.1
@@ -62,7 +65,7 @@ powershell -ExecutionPolicy Bypass -File patch.ps1
 
 > **Note:** Run PowerShell as Administrator if UAC prevents writing to `Program Files`.
 
-> **Note:** The built game executable also needs to be patched. Run `patch.ps1` again and select the `.exe` in your build output folder.
+> **Note:** The built game executable also needs to be patched. Run `patch.ps1` again and select the `.exe` in your build output folder. The `D3D12\` folder will be created automatically next to it.
 
 ---
 
@@ -90,7 +93,11 @@ Thanks to [inedelcu](https://github.com/INedelcu) for the great help with writin
 
 在 Unity URP 中实现的实时路径追踪渲染系统，复刻了 NVIDIA NRDSample、RTXDI等核心功能，并针对 Unity 环境进行了优化和扩展。主要是试验各种RTX相关技术在Unity中的使用。
 
-受限于没有Bindless、SER等特性支持，在性能和质量方面和原版仍有差距，仅用于演示。
+其中实现了一个基于Shader反射信息的原生渲染插件，可以以任意参数编译任意着色器并在Untiy中使用，这使得自定义加速结构、SER、OMM、Bindless等各种dx12特性可以在Unity中使用。
+
+目前实现了四个RenderFeature，分别是原生/untiy版本的NrdSampleFeature，原生/Unity版本的RtxdiFeature。
+
+其中原生版本的NrdSampleFeature经过高度优化，可以适配unity的多线程渲染，性能和原版（NrdSample）几乎一致
 
 详见博客：[NRDSample 在 Unity 中的实现](https://www.kuanmi.top/2026/01/22/UnityNRD)
 
@@ -123,6 +130,7 @@ Thanks to [inedelcu](https://github.com/INedelcu) for the great help with writin
 git clone https://github.com/Kuan-Mi/UnityPathTracing
 cd UnityPathTracing
 build.bat
+download_bistro.bat
 ```
 
 ### 将 Unity 内置的 Agility SDK 升级至 1.619.1
