@@ -42,7 +42,7 @@ Blog post: [RTXDI Implementation in Unity](https://www.kuanmi.top/2026/04/14/Uni
 ```bash
 git clone https://github.com/Kuan-Mi/UnityPathTracing
 cd UnityPathTracing
-build.bat
+build_and_copy.bat
 download_bistro.bat
 ```
 
@@ -129,7 +129,7 @@ Thanks to [inedelcu](https://github.com/INedelcu) for the great help with writin
 ```bash
 git clone https://github.com/Kuan-Mi/UnityPathTracing
 cd UnityPathTracing
-build.bat
+build_and_copy.bat
 download_bistro.bat
 ```
 
