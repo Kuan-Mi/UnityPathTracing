@@ -7,6 +7,7 @@
 // license agreement from NVIDIA CORPORATION is strictly prohibited.
 
 using System.Runtime.InteropServices;
+using UnityEngine;
 
 namespace Rtxdi
 {
@@ -15,28 +16,29 @@ namespace Rtxdi
     /// </summary>
     public static class RtxdiConstants
     {
-        public const uint RTXDI_LIGHT_COMPACT_BIT                           = 0x80000000u;
-        public const uint RTXDI_LIGHT_INDEX_MASK                            = 0x7fffffff;
-        public const uint RTXDI_RESERVOIR_BLOCK_SIZE                        = 16;
+        public const uint RTXDI_LIGHT_COMPACT_BIT    = 0x80000000u;
+        public const uint RTXDI_LIGHT_INDEX_MASK     = 0x7fffffff;
+        public const uint RTXDI_RESERVOIR_BLOCK_SIZE = 16;
 
-        public const uint RTXDI_BIAS_CORRECTION_OFF                         = 0;
-        public const uint RTXDI_BIAS_CORRECTION_BASIC                       = 1;
-        public const uint RTXDI_BIAS_CORRECTION_PAIRWISE                    = 2;
-        public const uint RTXDI_BIAS_CORRECTION_RAY_TRACED                  = 3;
+        public const uint RTXDI_BIAS_CORRECTION_OFF        = 0;
+        public const uint RTXDI_BIAS_CORRECTION_BASIC      = 1;
+        public const uint RTXDI_BIAS_CORRECTION_PAIRWISE   = 2;
+        public const uint RTXDI_BIAS_CORRECTION_RAY_TRACED = 3;
 
-        public const uint ReSTIRDI_LocalLightSamplingMode_UNIFORM           = 0;
-        public const uint ReSTIRDI_LocalLightSamplingMode_POWER_RIS         = 1;
-        public const uint ReSTIRDI_LocalLightSamplingMode_REGIR_RIS         = 2;
+        public const uint ReSTIRDI_LocalLightSamplingMode_UNIFORM   = 0;
+        public const uint ReSTIRDI_LocalLightSamplingMode_POWER_RIS = 1;
+        public const uint ReSTIRDI_LocalLightSamplingMode_REGIR_RIS = 2;
 
-        public const uint RTXDI_RESTIRPT_RECONNECTION_MODE_FIXED_THRESHOLD  = 0;
-        public const uint RTXDI_RESTIRPT_RECONNECTION_MODE_FOOTPRINT        = 1;
+        public const uint RTXDI_RESTIRPT_RECONNECTION_MODE_FIXED_THRESHOLD = 0;
+        public const uint RTXDI_RESTIRPT_RECONNECTION_MODE_FOOTPRINT       = 1;
 
-        public const uint RTXDI_NAIVE_SAMPLING_M_THRESHOLD                  = 2;
-        public const uint RTXDI_ENABLE_PRESAMPLING                          = 1;
-        public const uint RTXDI_INVALID_LIGHT_INDEX                         = 0xffffffffu;
+        public const uint RTXDI_NAIVE_SAMPLING_M_THRESHOLD = 2;
+        public const uint RTXDI_ENABLE_PRESAMPLING         = 1;
+        public const uint RTXDI_INVALID_LIGHT_INDEX        = 0xffffffffu;
     }
 
     [StructLayout(LayoutKind.Sequential)]
+    [System.Serializable]
     public struct RTXDI_RISBufferSegmentParameters
     {
         public uint bufferOffset;
@@ -73,7 +75,7 @@ namespace Rtxdi
     [StructLayout(LayoutKind.Sequential)]
     public struct RTXDI_RuntimeParameters
     {
-        public uint neighborOffsetMask;      // spatial neighbor lookup mask
+        public uint neighborOffsetMask; // spatial neighbor lookup mask
         public uint activeCheckerboardField; // 0 = off, 1 = odd pixels, 2 = even pixels
         public uint frameIndex;
         public uint pad2;
@@ -83,8 +85,8 @@ namespace Rtxdi
     [StructLayout(LayoutKind.Sequential)]
     public struct RTXDI_LightBufferParameters
     {
-        public RTXDI_LightBufferRegion localLightBufferRegion;
-        public RTXDI_LightBufferRegion infiniteLightBufferRegion;
+        public RTXDI_LightBufferRegion                localLightBufferRegion;
+        public RTXDI_LightBufferRegion                infiniteLightBufferRegion;
         public RTXDI_EnvironmentLightBufferParameters environmentLightParams;
     }
 
@@ -102,10 +104,17 @@ namespace Rtxdi
     [StructLayout(LayoutKind.Sequential)]
     public struct RTXDI_BoilingFilterParameters
     {
-        public uint  enableBoilingFilter;
+        [Toggle]
+        public uint enableBoilingFilter;
+
+        [Range(0f, 1f)]
         public float boilingFilterStrength;
-        public uint  pad1;
-        public uint  pad2;
+
+        [HideInInspector]
+        public uint pad1;
+
+        [HideInInspector]
+        public uint pad2;
     }
 
     [StructLayout(LayoutKind.Sequential)]

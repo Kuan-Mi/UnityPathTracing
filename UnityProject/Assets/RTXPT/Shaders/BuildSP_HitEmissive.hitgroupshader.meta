@@ -1,0 +1,26 @@
+fileFormatVersion: 2
+guid: f2211fa4e496d5a4a82f6b4a069cdc08
+ScriptedImporter:
+  internalIDToNameTable: []
+  externalObjects: {}
+  serializedVersion: 2
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+  script: {fileID: 11500000, guid: 95541f6964d24494cb2e70ab0bbba6e7, type: 3}
+  additionalIncludePaths:
+  - ../RenderingPlugin/External/RTXPT/Rtxpt/Lighting
+  - ../RenderingPlugin/External/RTXPT/Rtxpt
+  - ../RenderingPlugin/External/RTXPT/External/Nrd/Shaders/Include
+  - ../RenderingPlugin/External/RTXPT/External/Rtxdi/Include
+  - ../RenderingPlugin/External/RTXPT/External
+  - ../RenderingPlugin/External/donut/include
+  - ../RenderingPlugin/External/RTXPT/Rtxpt/Shaders
+  extraArgs: []
+  defines:
+  - PATH_TRACER_MODE=PATH_TRACER_MODE_BUILD_STABLE_PLANES
+  - RTXPT_PIPELINE_PERMUTATION_NAME=BUILD
+  - RTXPT_MATERIAL_PERMUTATION_NAME=BUILD_Emissive
+  - RTXPT_MATERIAL_IS_EMISSIVE=1
+  - RTXPT_MATERIAL_IS_ANALYTIC_LIGHT_PROXY=0
+  targetProfile: lib_6_9

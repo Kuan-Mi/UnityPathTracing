@@ -1,7 +1,9 @@
 cmake_minimum_required(VERSION 3.22)
 project(RenderingPlugin)
 
-set(CMAKE_CXX_STANDARD 17)
+include(FetchContent)
+
+set(CMAKE_CXX_STANDARD 20)
 
 # ---------------------------------------------------------------------------
 # Find Windows SDK paths (for D3D12 headers)
@@ -26,11 +28,25 @@ endif()
 
 message(STATUS "Windows SDK: ${WIN_SDK_PATH} version ${WIN_SDK_VERSION}")
 set(WIN_SDK_INC "${WIN_SDK_PATH}/Include/${WIN_SDK_VERSION}")
+set(WIN_SDK_LIB "${WIN_SDK_PATH}/Lib/${WIN_SDK_VERSION}/um/x64")
 
 # ---------------------------------------------------------------------------
 # Keep FetchContent downloads outside _Build so they survive cache resets
 # ---------------------------------------------------------------------------
-set(FETCHCONTENT_BASE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/_deps" CACHE PATH "FetchContent download cache")
+set(FETCHCONTENT_BASE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/_deps" CACHE PATH "FetchContent download cache" FORCE)
+
+# ---------------------------------------------------------------------------
+# SHARC – header-only, downloaded once into _deps/sharc-src
+# ---------------------------------------------------------------------------
+FetchContent_Declare(
+    sharc
+    DOWNLOAD_EXTRACT_TIMESTAMP 1
+    DOWNLOAD_NO_PROGRESS 1
+    SOURCE_SUBDIR "ignore CMakeLists.txt"
+    URL https://github.com/NVIDIA-RTX/SHARC/archive/6893c9af2a16df07de0cd1b70a85404e2f8fc5e8.zip
+)
+FetchContent_MakeAvailable(sharc)
+message(STATUS "SHARC include path: ${sharc_SOURCE_DIR}/include")
 
 # ---------------------------------------------------------------------------
 # NRI – D3D12 only, shared by both plugin targets
@@ -43,7 +59,7 @@ option(NRI_ENABLE_VALIDATION_SUPPORT "" OFF)
 option(NRI_ENABLE_NVTX_SUPPORT "" OFF)
 option(NRI_ENABLE_AMDAGS "" OFF)
 option(NRI_ENABLE_NVAPI "" OFF)
-option(NRI_ENABLE_NIS_SDK "" OFF)
+option(NRI_ENABLE_NIS_SDK "" ON)
 option(NRI_ENABLE_IMGUI_EXTENSION "" OFF)
 option(NRI_ENABLE_NGX_SDK "" ON)
 
@@ -56,6 +72,10 @@ option(NRD_NRI "" OFF)
 option(NRD_STATIC_LIBRARY "" OFF)
 option(NRD_EMBEDS_SPIRV_SHADERS "" OFF)
 option(NRD_EMBEDS_DXBC_SHADERS "" OFF)
+
+# NRD_NORMAL_ENCODING  0 for Rtxdi Feature   2 for other
+set(NRD_NORMAL_ENCODING   "2" CACHE STRING "Normal encoding variant (0-4, matches 'nrd::NormalEncoding')" FORCE)
+set(NRD_ROUGHNESS_ENCODING "1" CACHE STRING "Roughness encoding variant (0-2, matches 'nrd::RoughnessEncoding')" FORCE)
 
 add_subdirectory(External/NRD "${CMAKE_CURRENT_SOURCE_DIR}/_ExternalBuild/NRD_build")
 
@@ -133,10 +153,33 @@ macro(setup_unity_plugin TARGET)
 endmacro()
 
 # ---------------------------------------------------------------------------
+# D3D12HeapHook – shared DLL for SetDescriptorHeaps vtable hook
+# Both NativeRenderPlugin and Denoiser link against this so they share
+# a single set of globals (one hook, one cache, one TLS counter).
+# ---------------------------------------------------------------------------
+add_library(D3D12HeapHook SHARED
+    D3D12HeapHook/D3D12HeapHook.cpp
+)
+
+target_include_directories(D3D12HeapHook PRIVATE
+    D3D12HeapHook
+    "${WIN_SDK_INC}/um"
+    "${WIN_SDK_INC}/shared"
+)
+
+target_compile_definitions(D3D12HeapHook PRIVATE D3D12HEAPHOOK_EXPORTS)
+target_compile_options(D3D12HeapHook PRIVATE /utf-8)
+
+target_link_directories(D3D12HeapHook PRIVATE "${WIN_SDK_LIB}")
+target_link_libraries(D3D12HeapHook PRIVATE d3d12.lib)
+
+# ---------------------------------------------------------------------------
 # Denoiser DLL  (NRD + NRI denoising plugin)
 # ---------------------------------------------------------------------------
 add_library(Denoiser SHARED
     Denoiser/DLRRInstance.cpp
+    Denoiser/DLSRInstance.cpp
+    Denoiser/NISInstance.cpp
     Denoiser/NrdInstance.cpp
     Denoiser/RenderingPlugin.cpp
     Denoiser/RenderSystem.cpp
@@ -144,6 +187,7 @@ add_library(Denoiser SHARED
 
 target_include_directories(Denoiser PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}
+    D3D12HeapHook
     # NRD Integration helper (NRDIntegration.h, NRDIntegration.hpp)
     "${CMAKE_CURRENT_SOURCE_DIR}/External/NRD/Integration"
     # Agility SDK headers MUST come before Windows SDK so its d3d12.h overrides the older system one
@@ -157,7 +201,7 @@ target_include_directories(Denoiser PRIVATE
 target_compile_options(Denoiser PRIVATE /utf-8)
 
 # NRD and NRI CMake targets carry their public include dirs transitively
-target_link_libraries(Denoiser PRIVATE NRD NRI)
+target_link_libraries(Denoiser PRIVATE NRD NRI D3D12HeapHook)
 
 setup_unity_plugin(Denoiser COPY_NRD)
 
@@ -184,3 +228,230 @@ target_compile_options(PrepareLight PRIVATE /utf-8)
 target_link_libraries(PrepareLight PRIVATE NRI)
 
 setup_unity_plugin(PrepareLight)
+
+# ===========================================================================
+# NativeRenderPlugin, ShaderCompilerPlugin, OMMBakerPlugin
+# (formerly in NativePlugin/)
+# ===========================================================================
+
+# ---------------------------------------------------------------------------
+# Helper: download and unzip a versioned package (uses a .ver sentinel file
+# so re-configuration is a no-op when the correct version is already present)
+# ---------------------------------------------------------------------------
+function(CheckAndDownloadPackage NAME VERSION LOCAL_PATH URL ARCHIVE_TYPE)
+    if(NOT EXISTS "${LOCAL_PATH}/${VERSION}.ver")
+        if(EXISTS "${LOCAL_PATH}")
+            message(STATUS "Deleting old ${NAME}")
+            file(REMOVE_RECURSE "${LOCAL_PATH}")
+        endif()
+        set(_ARCHIVE "${LOCAL_PATH}.${ARCHIVE_TYPE}")
+        message(STATUS "Downloading ${NAME} ${VERSION} from ${URL}")
+        file(DOWNLOAD "${URL}" "${_ARCHIVE}" SHOW_PROGRESS STATUS _DL_STATUS)
+        list(GET _DL_STATUS 0 _DL_ERR)
+        if(NOT _DL_ERR EQUAL 0)
+            list(GET _DL_STATUS 1 _DL_MSG)
+            file(REMOVE "${_ARCHIVE}")
+            message(FATAL_ERROR "Failed to download ${NAME}: ${_DL_MSG}")
+        endif()
+        message(STATUS "Extracting ${NAME} to ${LOCAL_PATH}")
+        file(ARCHIVE_EXTRACT INPUT "${_ARCHIVE}" DESTINATION "${LOCAL_PATH}")
+        file(REMOVE "${_ARCHIVE}")
+        file(WRITE "${LOCAL_PATH}/${VERSION}.ver")
+    endif()
+endfunction()
+
+# ---------------------------------------------------------------------------
+# omm-lib – auto-downloaded pre-built SDK (CPU baker only, no GPU/NVRHI)
+# ---------------------------------------------------------------------------
+CheckAndDownloadPackage(
+    "OMM SDK" "v1.9.1"
+    "${FETCHCONTENT_BASE_DIR}/omm-src"
+    "https://github.com/NVIDIA-RTX/OMM/releases/download/v1.9.1/Opacity.Micro-Map.SDK.Windows.zip"
+    "zip"
+)
+set(OMM_INSTALL_DIR "${FETCHCONTENT_BASE_DIR}/omm-src")
+
+add_library(omm-lib SHARED IMPORTED GLOBAL)
+set_target_properties(omm-lib PROPERTIES
+    IMPORTED_IMPLIB   "${OMM_INSTALL_DIR}/lib/omm-lib.lib"
+    IMPORTED_LOCATION "${OMM_INSTALL_DIR}/bin/omm-lib.dll"
+    INTERFACE_INCLUDE_DIRECTORIES "${OMM_INSTALL_DIR}/include"
+)
+
+# ---------------------------------------------------------------------------
+# DXC – auto-downloaded from NuGet (SM 6.9 capable, v1.9.2602.17)
+# ---------------------------------------------------------------------------
+CheckAndDownloadPackage(
+    "DXC" "v1.9.2602.17"
+    "${FETCHCONTENT_BASE_DIR}/dxc-nuget"
+    "https://www.nuget.org/api/v2/package/Microsoft.Direct3D.DXC/1.9.2602.17"
+    "zip"
+)
+set(DXC_DIR "${FETCHCONTENT_BASE_DIR}/dxc-nuget")
+set(DXC_INC "${DXC_DIR}/build/native/inc")
+set(DXC_LIB "${DXC_DIR}/build/native/lib/x64")
+set(DXC_BIN "${DXC_DIR}/build/native/bin/x64")
+
+# ---------------------------------------------------------------------------
+# Unity plugin API headers (shared with Denoiser/PrepareLight)
+# ---------------------------------------------------------------------------
+set(UNITY_PLUGIN_API_DIR "${CMAKE_CURRENT_SOURCE_DIR}/Unity")
+if(NOT EXISTS "${UNITY_PLUGIN_API_DIR}/IUnityInterface.h")
+    message(WARNING
+        "Unity PluginAPI headers not found at ${UNITY_PLUGIN_API_DIR}.\n"
+        "Copy the following files from <UnityInstall>/Editor/Data/PluginAPI/ :\n"
+        "  IUnityInterface.h\n"
+        "  IUnityGraphics.h\n"
+        "  IUnityGraphicsD3D12.h\n"
+        "  IUnityRenderingExtensions.h")
+endif()
+
+set(NATIVE_PLUGINS_UNITY_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../UnityProject/Packages/top.kuanmi.native-ray-tracing/Plugins/x86_64")
+
+# ---------------------------------------------------------------------------
+# OMMBakerPlugin – standalone CPU baker DLL (Editor-only, no D3D12)
+# ---------------------------------------------------------------------------
+add_library(OMMBakerPlugin SHARED
+    OMMBakerPlugin/src/OMMBakerPlugin.cpp
+)
+
+target_include_directories(OMMBakerPlugin PRIVATE
+    "${OMM_INSTALL_DIR}/include"
+)
+
+target_compile_options(OMMBakerPlugin PRIVATE /utf-8)
+
+target_link_libraries(OMMBakerPlugin PRIVATE omm-lib)
+
+# ---------------------------------------------------------------------------
+# NativeRenderPlugin – D3D12 DXR ray-tracing plugin
+# ---------------------------------------------------------------------------
+add_library(NativeRenderPlugin SHARED
+    NativeRenderPlugin/src/Plugin/Plugin.cpp
+    NativeRenderPlugin/src/Shaders/ShaderBase.cpp
+    NativeRenderPlugin/src/Descriptors/DescriptorSetBase.cpp
+    NativeRenderPlugin/src/Shaders/RayTraceShader.cpp
+    NativeRenderPlugin/src/Descriptors/RayTraceDescriptorSet.cpp
+    NativeRenderPlugin/src/Shaders/ComputeShader.cpp
+    NativeRenderPlugin/src/Descriptors/ComputeDescriptorSet.cpp
+    NativeRenderPlugin/src/Resources/AccelerationStructure.cpp
+    NativeRenderPlugin/src/Descriptors/DescriptorHeapAllocator.cpp
+    NativeRenderPlugin/src/Resources/BindlessTexture.cpp
+    NativeRenderPlugin/src/Resources/BindlessBuffer.cpp
+    NativeRenderPlugin/src/Resources/BindlessUAVTexture.cpp
+    NativeRenderPlugin/src/Resources/NativeBuffer.cpp
+    NativeRenderPlugin/src/Resources/NativeStructuredBuffer.cpp
+    NativeRenderPlugin/src/Resources/NativeGpuBuffer.cpp
+    NativeRenderPlugin/src/Hooks/D3D12HeapHook.cpp
+)
+
+target_include_directories(NativeRenderPlugin PRIVATE
+    NativeRenderPlugin/include
+    NativeRenderPlugin/include/Descriptors
+    NativeRenderPlugin/include/Shaders
+    NativeRenderPlugin/include/Resources
+    NativeRenderPlugin/include/Hooks
+    NativeRenderPlugin/src/Plugin
+    D3D12HeapHook
+    "${UNITY_PLUGIN_API_DIR}"
+    "${DXC_INC}"
+    "${WIN_SDK_INC}/um"
+    "${WIN_SDK_INC}/shared"
+)
+
+target_compile_options(NativeRenderPlugin PRIVATE /utf-8)
+
+target_link_directories(NativeRenderPlugin PRIVATE
+    "${WIN_SDK_LIB}"
+    "${DXC_LIB}"
+)
+
+target_link_libraries(NativeRenderPlugin PRIVATE
+    d3d12.lib
+    dxgi.lib
+    dxguid.lib
+    dxcompiler.lib
+    D3D12HeapHook
+)
+
+# ---------------------------------------------------------------------------
+# ShaderCompilerPlugin – standalone HLSL-to-DXIL compiler DLL
+# ---------------------------------------------------------------------------
+add_library(ShaderCompilerPlugin SHARED
+    ShaderCompilerPlugin/src/ShaderCompilerPlugin.cpp
+)
+
+target_include_directories(ShaderCompilerPlugin PRIVATE
+    ShaderCompilerPlugin/include
+    "${UNITY_PLUGIN_API_DIR}"
+    "${DXC_INC}"
+    "${WIN_SDK_INC}/um"
+    "${WIN_SDK_INC}/shared"
+)
+
+target_compile_options(ShaderCompilerPlugin PRIVATE /utf-8)
+
+target_link_directories(ShaderCompilerPlugin PRIVATE
+    "${WIN_SDK_LIB}"
+    "${DXC_LIB}"
+)
+
+target_link_libraries(ShaderCompilerPlugin PRIVATE
+    dxcompiler.lib
+)
+
+# ---------------------------------------------------------------------------
+# Output directories and post-build copies for the three native plugins
+# ---------------------------------------------------------------------------
+if(NOT NR_SKIP_UNITY_COPY)
+    foreach(_TARGET NativeRenderPlugin ShaderCompilerPlugin OMMBakerPlugin)
+        set_target_properties(${_TARGET} PROPERTIES
+            RUNTIME_OUTPUT_DIRECTORY         "${NATIVE_PLUGINS_UNITY_DIR}"
+            RUNTIME_OUTPUT_DIRECTORY_RELEASE "${NATIVE_PLUGINS_UNITY_DIR}"
+            RUNTIME_OUTPUT_DIRECTORY_DEBUG   "${NATIVE_PLUGINS_UNITY_DIR}"
+            PDB_OUTPUT_DIRECTORY             "${NATIVE_PLUGINS_UNITY_DIR}"
+            PDB_OUTPUT_DIRECTORY_RELEASE     "${NATIVE_PLUGINS_UNITY_DIR}"
+            PDB_OUTPUT_DIRECTORY_DEBUG       "${NATIVE_PLUGINS_UNITY_DIR}"
+        )
+    endforeach()
+
+    # D3D12HeapHook.dll (copy to both plugin directories)
+    add_custom_command(TARGET D3D12HeapHook POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E make_directory "${NATIVE_PLUGINS_UNITY_DIR}"
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different
+            $<TARGET_FILE:D3D12HeapHook>
+            "${NATIVE_PLUGINS_UNITY_DIR}/$<TARGET_FILE_NAME:D3D12HeapHook>"
+        COMMAND ${CMAKE_COMMAND} -E make_directory "${UNITY_PLUGINS_DIR}"
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different
+            $<TARGET_FILE:D3D12HeapHook>
+            "${UNITY_PLUGINS_DIR}/$<TARGET_FILE_NAME:D3D12HeapHook>"
+        COMMAND ${CMAKE_COMMAND} -E $<IF:$<CONFIG:Debug>,copy_if_different,true>
+            "$<$<CONFIG:Debug>:$<TARGET_PDB_FILE:D3D12HeapHook>>"
+            "$<$<CONFIG:Debug>:${NATIVE_PLUGINS_UNITY_DIR}/$<TARGET_PDB_FILE_NAME:D3D12HeapHook>>"
+        COMMAND ${CMAKE_COMMAND} -E $<IF:$<CONFIG:Debug>,copy_if_different,true>
+            "$<$<CONFIG:Debug>:$<TARGET_PDB_FILE:D3D12HeapHook>>"
+            "$<$<CONFIG:Debug>:${UNITY_PLUGINS_DIR}/$<TARGET_PDB_FILE_NAME:D3D12HeapHook>>"
+        COMMENT "Copying D3D12HeapHook DLL (and PDB in Debug) to Unity plugin directories"
+    )
+
+    # dxcompiler.dll + dxil.dll (copy on NativeRenderPlugin build)
+    add_custom_command(TARGET NativeRenderPlugin POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E make_directory "${NATIVE_PLUGINS_UNITY_DIR}"
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different
+            "${DXC_BIN}/dxcompiler.dll"
+            "${NATIVE_PLUGINS_UNITY_DIR}/dxcompiler.dll"
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different
+            "${DXC_BIN}/dxil.dll"
+            "${NATIVE_PLUGINS_UNITY_DIR}/dxil.dll"
+        COMMENT "Copying dxcompiler.dll and dxil.dll to Unity Packages Plugins"
+    )
+
+    # omm-lib.dll (copy on OMMBakerPlugin build)
+    add_custom_command(TARGET OMMBakerPlugin POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E make_directory "${NATIVE_PLUGINS_UNITY_DIR}"
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different
+            "${OMM_INSTALL_DIR}/bin/omm-lib.dll"
+            "${NATIVE_PLUGINS_UNITY_DIR}/omm-lib.dll"
+        COMMENT "Copying omm-lib.dll to Unity Packages Plugins"
+    )
+endif()

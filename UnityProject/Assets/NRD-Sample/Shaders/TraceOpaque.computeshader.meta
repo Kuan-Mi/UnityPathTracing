@@ -1,0 +1,32 @@
+fileFormatVersion: 2
+guid: 317f1945d390e3d40b100508cc1e2544
+ScriptedImporter:
+  internalIDToNameTable: []
+  externalObjects: {}
+  serializedVersion: 2
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+  script: {fileID: 11500000, guid: ea13329833ed16543aa33a7c88f8c5bf, type: 3}
+  isComputeShader: 1
+  additionalIncludePaths:
+  - ../RenderingPlugin/External/NRI/Include
+  - ../RenderingPlugin/External/NRD/Include
+  - ../RenderingPlugin/External/NRD/Shaders
+  - ../RenderingPlugin/_deps/mathlib-src
+  - ../RenderingPlugin/_deps/sharc-src/include
+  - ../RenderingPlugin/External/NRD-Sample/Shaders
+  extraArgs:
+  - -Wno-conversion
+  - -enable-16bit-types
+  defines:
+  - RTXCR_INTEGRATION=0
+  entryPoint: main
+  targetProfile: cs_6_6
+  rootConstantsHints: []
+  rootSRVHints:
+  - gIn_InstanceData
+  - gIn_PrimitiveData
+  - gIn_MorphPrimitivePositionsPrev
+  - gWorldTlas
+  - gLightTlas

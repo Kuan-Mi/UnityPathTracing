@@ -1,6 +1,13 @@
 
 
 #define SHARC_ENABLE_64_BIT_ATOMICS 1
+
+// Register binding helper: only emits ': register(...)' when USE_NATIVE is defined
+#ifdef USE_NATIVE
+#define REG(a, b) : register(a, b)
+#else
+#define REG(a, b)
+#endif
 // #pragma exclude_renderers   opengl vulkan metal  glCore gles3 webgpu
 // #pragma use_dxc
 // #pragma target 6.0
@@ -134,6 +141,8 @@
 #define SHARC_MATERIAL_DEMODULATION         1
 #define SHARC_USE_FP16                      0
 
+#define SHARC_RADIANCE_SCALE                100.0 // matches max emission intensity range ( must be > SUN_INTENSITY )
+
 // Blue noise
 #define BLUE_NOISE_SPATIAL_DIM              128 // see StaticTexture::ScramblingRanking
 #define BLUE_NOISE_TEMPORAL_DIM             4 // good values: 4-8 for shadows, 8-16 for occlusion, 8-32 for lighting
@@ -174,7 +183,11 @@
 #define CBUFFER_START(name) cbuffer name {
 #define CBUFFER_END };
 
+#ifdef USE_NATIVE
+#include "NativeGlobalConstants.cs.hlsl"
+#else
 #include "GlobalConstants.cs.hlsl"
+#endif
 
 
 // RTXDI_ReservoirBufferParameters restirDIReservoirBufferParams;
@@ -185,7 +198,7 @@
 
 SamplerState sampler_Trilinear_Repeat;
 SamplerState sampler_Linear_Repeat;
-SamplerState sampler_Point_Repeat;
+SamplerState sampler_Point_Repeat REG(s2,space1);
 
 #define gLinearMipmapLinearSampler  sampler_Trilinear_Repeat
 #define gLinearMipmapNearestSampler  sampler_Linear_Repeat
@@ -198,7 +211,7 @@ SamplerState sampler_Point_Repeat;
 // Auto-exposure: current exposure multiplier written by AutoExposure.compute.
 // When auto-exposure is disabled, the C# side writes gExposure into this buffer each frame
 // so ApplyExposure() works identically in both modes.
-StructuredBuffer<float> _AE_ExposureBuffer;
+StructuredBuffer<float> _AE_ExposureBuffer REG(t12, space1);
 
 
 //=============================================================================================

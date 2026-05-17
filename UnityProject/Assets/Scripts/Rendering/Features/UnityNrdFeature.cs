@@ -1,0 +1,1068 @@
+﻿using System.Collections.Generic;
+using System.Runtime.InteropServices;
+using DLRR;
+using NativeRender;
+using Nrd;
+using Unity.Mathematics;
+using UnityEngine;
+using UnityEngine.Rendering;
+using UnityEngine.Rendering.Universal;
+using RayTracingAccelerationStructure = UnityEngine.Rendering.RayTracingAccelerationStructure;
+using static UnityEngine.Rendering.RayTracingAccelerationStructure;
+using static PathTracing.ShaderIDs;
+
+namespace PathTracing
+{
+    public class UnityNrdFeature : ScriptableRendererFeature
+    {
+        public NrdSampleSetting nrdSampleSetting;
+
+        public GlobalConstants GlobalConstants;
+        public CommonSettings  commonSettings = CommonSettings._default;
+        public SigmaSettings   sigmaSettings  = SigmaSettings._default;
+        public ReblurSettings  reblurSettings = ReblurSettings._default;
+
+        public RenderPassEvent renderPassEvent = RenderPassEvent.BeforeRenderingPostProcessing;
+
+        public bool useNativeOpaquePass = false;
+
+        public Material         finalMaterial;
+        public RayTracingShader sharcUpdateTs;
+        public RayTracingShader opaqueTracingShader;
+        public RayTraceShader   nativeOpaqueTracingShader;
+        public RayTracingShader transparentTracingShader;
+        public RayTracingShader referencePtTracingShader;
+
+        public ComputeShader compositionComputeShader;
+        public ComputeShader taaComputeShader;
+        public ComputeShader dlssBeforeComputeShader;
+        public ComputeShader sharcResolveCs;
+        public ComputeShader autoExposureShader;
+        public ComputeShader accumulateCs;
+
+        public Texture2D scramblingRankingTex;
+        public Texture2D sobolTex;
+
+        private OutputBlitPass   _outputBlitPass;
+        private SharcPass        _sharcPass;
+        private OpaquePass       _opaquePass;
+        private NativeOpaquePass _nativeOpaquePass;
+        private NrdPass          _nrdShadowPass;
+        private NrdPass          _nrdOpaquePass;
+        private CompositionPass  _compositionPass;
+        private TransparentPass  _transparentPass;
+        private AutoExposurePass _autoExposurePass;
+        private TaaPass          _taaPass;
+        private DlssBeforePass   _dlssBeforePass;
+        private DlssRRPass       _dlssrrPass;
+        private ReferencePtPass  _referencePtPass;
+        private AccumulatePass   _accumulatePass;
+
+        private RayTracingAccelerationStructure _accelerationStructure;
+
+        private GPUScene _gpuScene;
+
+        private GraphicsBuffer _constantBuffer;
+
+        private GraphicsBuffer _scramblingRankingUintBuffer;
+        private GraphicsBuffer _sobolUintBuffer;
+
+        private GraphicsBuffer _hashEntriesBuffer;
+        private GraphicsBuffer _accumulationBuffer;
+        private GraphicsBuffer _resolvedBuffer;
+
+        private GraphicsBuffer _aeHistogramBuffer; // 256 x uint
+        private GraphicsBuffer _aeExposureBuffer; // 1 x float  (current exposure multiplier)
+
+        private LightCollector _lightCollector = new();
+
+        private readonly GlobalConstants[] _globalConstantsArray = new GlobalConstants[1];
+        private readonly float[]           _exposureArray        = new float[1];
+
+        private readonly Dictionary<long, SigmaDenoiser>  _nrdSigmaDenoisers  = new();
+        private readonly Dictionary<long, ReblurDenoiser> _nrdReblurDenoisers = new();
+        private readonly Dictionary<long, DlrrDenoiser>   _dlrrDenoisers      = new();
+
+        private readonly Dictionary<long, UnityNrdTextureResources> _resourcePools = new();
+
+        // private readonly Dictionary<long, ReSTIRDIContext> _restirDiContexts = new();
+        private readonly Dictionary<long, CameraFrameState> _cameraFrameStates = new();
+
+        public override void Create()
+        {
+            if (useNativeOpaquePass && _gpuScene == null)
+                _gpuScene = new GPUScene();
+
+            if (_accelerationStructure == null)
+            {
+                var settings = new Settings
+                {
+                    managementMode     = ManagementMode.Automatic,
+                    rayTracingModeMask = RayTracingModeMask.Everything
+                };
+                _accelerationStructure = new RayTracingAccelerationStructure(settings);
+                _accelerationStructure.Build();
+                SetMask();
+            }
+
+            _lightCollector ??= new LightCollector();
+
+            if (_scramblingRankingUintBuffer == null && scramblingRankingTex != null)
+            {
+                _scramblingRankingUintBuffer = new GraphicsBuffer(GraphicsBuffer.Target.Structured, scramblingRankingTex.width * scramblingRankingTex.height, 16);
+                var scramblingRankingData = new uint4[scramblingRankingTex.width * scramblingRankingTex.height];
+                var rawData               = scramblingRankingTex.GetRawTextureData();
+                var count                 = scramblingRankingData.Length;
+                for (var i = 0; i < count; i++)
+                {
+                    scramblingRankingData[i] = new uint4(rawData[i * 4 + 0], rawData[i * 4 + 1], rawData[i * 4 + 2], rawData[i * 4 + 3]);
+                }
+
+                _scramblingRankingUintBuffer.SetData(scramblingRankingData);
+            }
+
+            if (_sobolUintBuffer == null && sobolTex != null)
+            {
+                _sobolUintBuffer = new GraphicsBuffer(GraphicsBuffer.Target.Structured, sobolTex.width * sobolTex.height, 16);
+                var sobolData = new uint4[sobolTex.width * sobolTex.height];
+                var rawData   = sobolTex.GetRawTextureData();
+                var count     = sobolData.Length;
+                for (var i = 0; i < count; i++)
+                {
+                    sobolData[i] = new uint4(rawData[i * 4 + 0], rawData[i * 4 + 1], rawData[i * 4 + 2], rawData[i * 4 + 3]);
+                }
+
+                _sobolUintBuffer.SetData(sobolData);
+            }
+
+            if (_accumulationBuffer == null)
+            {
+                InitializeBuffers();
+            }
+
+            _sharcPass ??= new SharcPass(sharcResolveCs, sharcUpdateTs)
+            {
+                renderPassEvent = renderPassEvent
+            };
+
+            if (useNativeOpaquePass)
+            {
+                _nativeOpaquePass ??= new NativeOpaquePass(nativeOpaqueTracingShader)
+                {
+                    renderPassEvent = renderPassEvent
+                };
+            }
+            else
+            {
+                _opaquePass ??= new OpaquePass(opaqueTracingShader)
+                {
+                    renderPassEvent = renderPassEvent
+                };
+            }
+
+            _nrdShadowPass ??= new NrdPass
+            {
+                renderPassEvent = renderPassEvent
+            };
+            _nrdOpaquePass ??= new NrdPass
+            {
+                renderPassEvent = renderPassEvent
+            };
+            _compositionPass ??= new CompositionPass(compositionComputeShader)
+            {
+                renderPassEvent = renderPassEvent
+            };
+            _transparentPass ??= new TransparentPass(transparentTracingShader)
+            {
+                renderPassEvent = renderPassEvent
+            };
+            _autoExposurePass ??= new AutoExposurePass(autoExposureShader)
+            {
+                renderPassEvent = renderPassEvent
+            };
+            _taaPass ??= new TaaPass(taaComputeShader)
+            {
+                renderPassEvent = renderPassEvent
+            };
+            _dlssBeforePass ??= new DlssBeforePass(dlssBeforeComputeShader)
+            {
+                renderPassEvent = renderPassEvent
+            };
+            _dlssrrPass ??= new DlssRRPass()
+            {
+                renderPassEvent = renderPassEvent
+            };
+            _outputBlitPass ??= new OutputBlitPass(finalMaterial)
+            {
+                renderPassEvent = renderPassEvent
+            };
+            _referencePtPass ??= new ReferencePtPass(referencePtTracingShader)
+            {
+                renderPassEvent = renderPassEvent
+            };
+            _accumulatePass ??= new AccumulatePass(accumulateCs)
+            {
+                renderPassEvent = renderPassEvent
+            };
+        }
+
+        public static readonly int Capacity = 1 << 23;
+
+        public void InitializeBuffers()
+        {
+            if (_hashEntriesBuffer != null)
+            {
+                _hashEntriesBuffer.Release();
+                _hashEntriesBuffer = null;
+            }
+
+            if (_accumulationBuffer != null)
+            {
+                _accumulationBuffer.Release();
+                _accumulationBuffer = null;
+            }
+
+            if (_resolvedBuffer != null)
+            {
+                _resolvedBuffer.Release();
+                _resolvedBuffer = null;
+            }
+
+            _constantBuffer = new GraphicsBuffer(GraphicsBuffer.Target.Constant, 1, Marshal.SizeOf<GlobalConstants>());
+
+            _hashEntriesBuffer = new GraphicsBuffer(GraphicsBuffer.Target.Structured, Capacity, sizeof(ulong));
+            var clearData = new ulong[Capacity];
+            _hashEntriesBuffer.SetData(clearData);
+
+            // 2. Accumulation Buffer: storing uint4 (16 bytes)
+            // HLSL: RWStructuredBuffer<SharcAccumulationData> gInOut_SharcAccumulated;
+            _accumulationBuffer = new GraphicsBuffer(GraphicsBuffer.Target.Structured, Capacity, sizeof(uint) * 4);
+            var clearAccumData = new uint4[Capacity];
+            _accumulationBuffer.SetData(clearAccumData);
+
+            // 3. Resolved Buffer: storing uint3 + uint (16 bytes)
+            // HLSL: RWStructuredBuffer<SharcPackedData> gInOut_SharcResolved;
+            _resolvedBuffer = new GraphicsBuffer(GraphicsBuffer.Target.Structured, Capacity, sizeof(uint) * 4);
+            var clearResolvedData = new uint4[Capacity];
+            _resolvedBuffer.SetData(clearResolvedData);
+
+            // Auto-exposure buffers
+            _aeHistogramBuffer ??= new GraphicsBuffer(GraphicsBuffer.Target.Structured, 256, sizeof(uint));
+
+            if (_aeExposureBuffer == null)
+            {
+                _aeExposureBuffer = new GraphicsBuffer(GraphicsBuffer.Target.Structured, 1, sizeof(float));
+                // Seed with the manual exposure value so first frame is not zero
+                _exposureArray[0] = nrdSampleSetting?.exposure ?? 1.0f;
+                _aeExposureBuffer.SetData(_exposureArray);
+            }
+        }
+
+        public static int2 GetUpscaledResolution(int2 outputRes, UpscalerMode mode)
+        {
+            float scale = mode switch
+            {
+                UpscalerMode.NATIVE => 1.0f,
+                UpscalerMode.ULTRA_QUALITY => 1.3f,
+                UpscalerMode.QUALITY => 1.5f,
+                UpscalerMode.BALANCED => 1.7f,
+                UpscalerMode.PERFORMANCE => 2.0f,
+                UpscalerMode.ULTRA_PERFORMANCE => 3.0f,
+                _ => 1.0f
+            };
+            return new int2((int)(outputRes.x / scale + 0.5f), (int)(outputRes.y / scale + 0.5f));
+        }
+
+
+        public override void AddRenderPasses(ScriptableRenderer renderer, ref RenderingData renderingData)
+        {
+            var cam = renderingData.cameraData.camera;
+            if (cam.cameraType is CameraType.Preview or CameraType.Reflection)
+                return;
+            if (cam.cameraType != CameraType.Game && cam.cameraType != CameraType.SceneView)
+            {
+                return;
+            }
+
+            cam.depthTextureMode = DepthTextureMode.Depth | DepthTextureMode.MotionVectors;
+
+            var eyeIndex = renderingData.cameraData.xr.enabled ? renderingData.cameraData.xr.multipassId : 0;
+
+
+            if (eyeIndex == 1 && nrdSampleSetting.skipRightEyeInVR)
+                return;
+
+
+            if (useNativeOpaquePass)
+            {
+                _gpuScene?.UpdateForFrame();
+                _nativeOpaquePass.SetGPUScene(_gpuScene);
+            }
+
+            Shader.SetGlobalRayTracingAccelerationStructure(g_AccelStructID, _accelerationStructure);
+
+            var uniqueKey = cam.GetInstanceID() + (eyeIndex * 100000L);
+
+
+            var isVR = renderingData.cameraData.xrRendering;
+
+            if (!_resourcePools.TryGetValue(uniqueKey, out var pool))
+            {
+                pool = new UnityNrdTextureResources();
+                _resourcePools.Add(uniqueKey, pool);
+            }
+
+            if (!_nrdSigmaDenoisers.TryGetValue(uniqueKey, out var nrdSigma))
+            {
+                var camName = cam.name;
+                if (isVR)
+                {
+                    camName = $"{cam.name}_Eye{eyeIndex}";
+                }
+
+                nrdSigma = new SigmaDenoiser(camName + "_Shadow", Denoiser.SIGMA_SHADOW);
+                _nrdSigmaDenoisers.Add(uniqueKey, nrdSigma);
+            }
+
+            if (!_nrdReblurDenoisers.TryGetValue(uniqueKey, out var nrdReblur))
+            {
+                var camName = cam.name;
+                if (isVR)
+                {
+                    camName = $"{cam.name}_Eye{eyeIndex}";
+                }
+
+                nrdReblur = new ReblurDenoiser(camName + "_Opaque", Denoiser.REBLUR_DIFFUSE_SPECULAR);
+                _nrdReblurDenoisers.Add(uniqueKey, nrdReblur);
+            }
+
+
+            if (!_dlrrDenoisers.TryGetValue(uniqueKey, out var dlrr))
+            {
+                var camName = cam.name;
+                if (isVR)
+                {
+                    camName = $"{cam.name}_Eye{eyeIndex}";
+                }
+
+                dlrr = new DlrrDenoiser(camName);
+                _dlrrDenoisers.Add(uniqueKey, dlrr);
+            }
+
+            if (!_cameraFrameStates.TryGetValue(uniqueKey, out var frameState))
+            {
+                frameState = new CameraFrameState(nrdSampleSetting.resolutionScale);
+                _cameraFrameStates.Add(uniqueKey, frameState);
+            }
+
+
+            // if (!_restirDiContexts.TryGetValue(uniqueKey, out var restirDiContext))
+            // {
+            //     var contextParams = ReSTIRDIStaticParameters.Default();
+            //     contextParams.RenderWidth = (uint)cam.pixelWidth;
+            //     contextParams.RenderHeight = (uint)cam.pixelHeight;
+            //
+            //     restirDiContext = new ReSTIRDIContext(contextParams);
+            //     _restirDiContexts.Add(uniqueKey, restirDiContext);
+            // }
+
+
+            if (finalMaterial == null
+                || opaqueTracingShader == null
+                || transparentTracingShader == null
+                || compositionComputeShader == null
+                || taaComputeShader == null
+                || dlssBeforeComputeShader == null
+                || sharcResolveCs == null
+                || sharcUpdateTs == null
+                || scramblingRankingTex == null
+                || sobolTex == null
+               )
+            {
+                Debug.LogWarning("PathTracingFeature: Missing required assets, skipping path tracing pass.");
+                return;
+            }
+
+            var allSkinnedMeshRenderers = FindObjectsByType<SkinnedMeshRenderer>(FindObjectsSortMode.None);
+            foreach (var smr in allSkinnedMeshRenderers)
+            {
+                _accelerationStructure.UpdateInstanceTransform(smr);
+            }
+
+            _accelerationStructure.Build();
+
+            _lightCollector.Collect();
+
+            var  outputResolution = ComputeOutputResolution(renderingData.cameraData);
+            bool resourcesChanged = pool.EnsureResources(outputResolution, nrdSampleSetting.upscalerMode);
+            var  renderResolution = pool.renderResolution;
+
+            if (resourcesChanged)
+            {
+                frameState.renderResolution = pool.renderResolution;
+                frameState.frameIndex       = 0;
+            }
+
+            if (resourcesChanged)
+            {
+                nrdSigma.UpdateResources(
+                    (ResourceType.IN_MV, pool.MV),
+                    (ResourceType.IN_VIEWZ, pool.Viewz),
+                    (ResourceType.IN_NORMAL_ROUGHNESS, pool.NormalRoughness),
+                    (ResourceType.IN_PENUMBRA, pool.Unfiltered_Penumbra),
+                    (ResourceType.OUT_SHADOW_TRANSLUCENCY, pool.Shadow)
+                );
+                nrdReblur.UpdateResources(
+                    (ResourceType.IN_MV, pool.MV),
+                    (ResourceType.IN_VIEWZ, pool.Viewz),
+                    (ResourceType.IN_NORMAL_ROUGHNESS, pool.NormalRoughness),
+                    (ResourceType.IN_DIFF_RADIANCE_HITDIST, pool.Unfiltered_Diff),
+                    (ResourceType.IN_SPEC_RADIANCE_HITDIST, pool.Unfiltered_Spec),
+                    (ResourceType.OUT_DIFF_RADIANCE_HITDIST, pool.Diff),
+                    (ResourceType.OUT_SPEC_RADIANCE_HITDIST, pool.Spec),
+                    (ResourceType.OUT_VALIDATION, pool.Validation)
+                );
+            }
+
+            // Update per-camera temporal state for this frame
+            uint curFrame = frameState.frameIndex;
+            frameState.Update(renderingData, false, nrdSampleSetting.resolutionScale);
+
+            GlobalConstants          = frameState.GetConstants(renderingData, nrdSampleSetting, _lightCollector);
+            _globalConstantsArray[0] = GlobalConstants;
+            _constantBuffer.SetData(_globalConstantsArray);
+
+            #region Sharc
+
+            bool isEven = (GlobalConstants.gFrameIndex & 1) == 0;
+
+            var sharcResource = new SharcPass.Resource
+            {
+                ConstantBuffer     = _constantBuffer,
+                AccumulationBuffer = _accumulationBuffer,
+                HashEntriesBuffer  = _hashEntriesBuffer,
+                ResolvedBuffer     = _resolvedBuffer,
+                PointLightBuffer   = _lightCollector.PointLightBuffer,
+                AreaLightBuffer    = _lightCollector.AreaLightBuffer,
+                SpotLightBuffer    = _lightCollector.SpotLightBuffer
+            };
+
+            var sharcSettings = new SharcPass.Settings
+            {
+                RenderResolution = renderResolution,
+                sharcDownscale   = nrdSampleSetting.sharcDownscale
+            };
+
+            _sharcPass.Setup(sharcResource, sharcSettings);
+            renderer.EnqueuePass(_sharcPass);
+
+            #endregion
+
+            #region Opaque Pass
+
+            if (useNativeOpaquePass)
+            {
+                var nativeOpaqueResource = new NativeOpaquePass.Resource
+                {
+                    ConstantBuffer = _constantBuffer,
+
+                    AccumulationBuffer = _accumulationBuffer,
+                    HashEntriesBuffer  = _hashEntriesBuffer,
+                    ResolvedBuffer     = _resolvedBuffer,
+
+                    PointLightBuffer = _lightCollector.PointLightBuffer,
+                    AreaLightBuffer  = _lightCollector.AreaLightBuffer,
+                    SpotLightBuffer  = _lightCollector.SpotLightBuffer,
+
+                    ScramblingRanking = _scramblingRankingUintBuffer,
+                    Sobol             = _sobolUintBuffer,
+
+                    Mv                 = pool.MV.Handle,
+                    ViewZ              = pool.Viewz.Handle,
+                    NormalRoughness    = pool.NormalRoughness.Handle,
+                    BaseColorMetalness = pool.BaseColorMetalness.Handle,
+                    GeoNormal          = pool.GeoNormal.Handle,
+                    DirectLighting     = pool.DirectLighting.Handle,
+
+                    Penumbra = pool.Unfiltered_Penumbra.Handle,
+                    Diff     = pool.Unfiltered_Diff.Handle,
+                    Spec     = pool.Unfiltered_Spec.Handle,
+
+                    PrevViewZ              = pool.PrevViewZ.Handle,
+                    PrevNormalRoughness    = pool.PrevNormalRoughness.Handle,
+                    PrevBaseColorMetalness = pool.PrevBaseColorMetalness.Handle,
+                    PrevGeoNormal          = pool.PrevGeoNormal.Handle,
+
+                    PsrThroughput = pool.PsrThroughput.Handle,
+
+                    Output            = pool.Final.Handle,
+                    DirectEmission    = pool.DirectEmission.Handle,
+                    ComposedDiff      = pool.ComposedDiff.Handle,
+                    ComposedSpecViewZ = pool.ComposedSpecViewZ.Handle,
+                };
+
+                var nativeOpaqueSettings = new NativeOpaquePass.Settings
+                {
+                    m_RenderResolution = renderResolution,
+                    resolutionScale    = nrdSampleSetting.resolutionScale
+                };
+
+                _nativeOpaquePass.Setup(nativeOpaqueResource, nativeOpaqueSettings);
+                renderer.EnqueuePass(_nativeOpaquePass);
+            }
+            else
+            {
+                var opaqueResource = new OpaquePass.Resource
+                {
+                    ConstantBuffer = _constantBuffer,
+
+                    AccumulationBuffer = _accumulationBuffer,
+                    HashEntriesBuffer  = _hashEntriesBuffer,
+                    ResolvedBuffer     = _resolvedBuffer,
+
+                    PointLightBuffer = _lightCollector.PointLightBuffer,
+                    AreaLightBuffer  = _lightCollector.AreaLightBuffer,
+                    SpotLightBuffer  = _lightCollector.SpotLightBuffer,
+
+                    ScramblingRanking = _scramblingRankingUintBuffer,
+                    Sobol             = _sobolUintBuffer,
+
+                    Mv                 = pool.MV.Handle,
+                    ViewZ              = pool.Viewz.Handle,
+                    NormalRoughness    = pool.NormalRoughness.Handle,
+                    BaseColorMetalness = pool.BaseColorMetalness.Handle,
+                    GeoNormal          = pool.GeoNormal.Handle,
+                    DirectLighting     = pool.DirectLighting.Handle,
+
+                    Penumbra = pool.Unfiltered_Penumbra.Handle,
+                    Diff     = pool.Unfiltered_Diff.Handle,
+                    Spec     = pool.Unfiltered_Spec.Handle,
+
+                    PrevViewZ              = pool.PrevViewZ.Handle,
+                    PrevNormalRoughness    = pool.PrevNormalRoughness.Handle,
+                    PrevBaseColorMetalness = pool.PrevBaseColorMetalness.Handle,
+                    PrevGeoNormal          = pool.PrevGeoNormal.Handle,
+
+                    PsrThroughput = pool.PsrThroughput.Handle,
+
+                    Output            = pool.Final.Handle,
+                    DirectEmission    = pool.DirectEmission.Handle,
+                    ComposedDiff      = pool.ComposedDiff.Handle,
+                    ComposedSpecViewZ = pool.ComposedSpecViewZ.Handle,
+                };
+
+                var opaqueSettings = new OpaquePass.Settings
+                {
+                    m_RenderResolution = renderResolution,
+                    resolutionScale    = nrdSampleSetting.resolutionScale
+                };
+
+                _opaquePass.Setup(opaqueResource, opaqueSettings);
+                renderer.EnqueuePass(_opaquePass);
+            }
+
+            #endregion
+
+            if (!nrdSampleSetting.RR)
+            {
+                var nrdLightData = renderingData.lightData;
+                var nrdMainLight = nrdLightData.mainLightIndex >= 0 ? nrdLightData.visibleLights[nrdLightData.mainLightIndex] : default;
+                var nrdLightDir  = new float3(-(Vector3)nrdMainLight.localToWorldMatrix.GetColumn(2));
+
+                var commonInput = new NrdDenoiserHelper.CommonFrameInput
+                {
+                    worldToView         = frameState.worldToView,
+                    prevWorldToView     = frameState.prevWorldToView,
+                    viewToClip          = frameState.viewToClip,
+                    prevViewToClip      = frameState.prevViewToClip,
+                    viewportJitter      = frameState.viewportJitter,
+                    prevViewportJitter  = frameState.prevViewportJitter,
+                    resolutionScale     = frameState.resolutionScale,
+                    prevResolutionScale = frameState.prevResolutionScale,
+                    renderResolution    = frameState.renderResolution,
+                    frameIndex          = curFrame,
+                    denoisingRange = 1000.0f, 
+                };
+
+                sigmaSettings.lightDirection = new float3(nrdLightDir.x, nrdLightDir.y, nrdLightDir.z);
+
+                reblurSettings.checkerboardMode              = nrdSampleSetting.tracingMode == RESOLUTION.RESOLUTION_HALF ? CheckerboardMode.WHITE : CheckerboardMode.OFF;
+                reblurSettings.hitDistanceReconstructionMode = nrdSampleSetting.tracingMode == RESOLUTION.RESOLUTION_FULL_PROBABILISTIC ? HitDistanceReconstructionMode.AREA_3X3 : HitDistanceReconstructionMode.OFF;
+                reblurSettings.minMaterialForDiffuse         = 0;
+                reblurSettings.minMaterialForSpecular        = 1;
+
+                NrdDenoiserHelper.GetCommonSettings(ref commonSettings, commonInput);
+
+                _nrdShadowPass.Setup(nrdSigma.GetInteropDataPtr(commonSettings, sigmaSettings), RenderPassMarkers.NrdDenoise);
+                renderer.EnqueuePass(_nrdShadowPass);
+
+                _nrdOpaquePass.Setup(nrdReblur.GetInteropDataPtr(commonSettings, reblurSettings), RenderPassMarkers.NrdDenoise);
+                renderer.EnqueuePass(_nrdOpaquePass);
+            }
+
+
+            var compositionResource = new CompositionPass.Resource
+            {
+                ConstantBuffer = _constantBuffer,
+
+                ViewZ              = pool.Viewz.Handle,
+                NormalRoughness    = pool.NormalRoughness.Handle,
+                BaseColorMetalness = pool.BaseColorMetalness.Handle,
+                PsrThroughput      = pool.PsrThroughput.Handle,
+                DirectLighting     = pool.DirectLighting.Handle,
+            };
+
+            if (nrdSampleSetting.RR)
+            {
+                compositionResource.Shadow = pool.Unfiltered_Penumbra.Handle;
+                compositionResource.Diff   = pool.Unfiltered_Diff.Handle;
+                compositionResource.Spec   = pool.Unfiltered_Spec.Handle;
+            }
+            else
+            {
+                compositionResource.Shadow = pool.Shadow.Handle;
+                compositionResource.Diff   = pool.Diff.Handle;
+                compositionResource.Spec   = pool.Spec.Handle;
+            }
+
+            compositionResource.DirectEmission    = pool.DirectEmission.Handle;
+            compositionResource.ComposedDiff      = pool.ComposedDiff.Handle;
+            compositionResource.ComposedSpecViewZ = pool.ComposedSpecViewZ.Handle;
+
+            var rectGridW = (int)(renderResolution.x * nrdSampleSetting.resolutionScale + 0.5f + 15) / 16;
+            var rectGridH = (int)(renderResolution.y * nrdSampleSetting.resolutionScale + 0.5f + 15) / 16;
+
+            var compositionSettings = new CompositionPass.Settings
+            {
+                rectGridW = rectGridW,
+                rectGridH = rectGridH
+            };
+
+            _compositionPass.Setup(compositionResource, compositionSettings);
+            renderer.EnqueuePass(_compositionPass);
+
+
+            var transparentResource = new TransparentPass.Resource
+            {
+                ConstantBuffer = _constantBuffer,
+
+                Mv              = pool.MV.Handle,
+                Composed        = pool.Composed.Handle,
+                NormalRoughness = pool.NormalRoughness.Handle,
+
+                HashEntriesBuffer  = _hashEntriesBuffer,
+                AccumulationBuffer = _accumulationBuffer,
+                ResolvedBuffer     = _resolvedBuffer,
+
+                PointLightBuffer = _lightCollector.PointLightBuffer,
+                AreaLightBuffer  = _lightCollector.AreaLightBuffer,
+                SpotLightBuffer  = _lightCollector.SpotLightBuffer,
+
+                AeExposureBuffer = _aeExposureBuffer,
+
+                ComposedDiff      = pool.ComposedDiff.Handle,
+                ComposedSpecViewZ = pool.ComposedSpecViewZ.Handle,
+            };
+
+            var transparentSettings = new TransparentPass.Settings
+            {
+                m_RenderResolution = renderResolution,
+
+                convergenceStep = frameState.convergenceStep,
+            };
+
+            _transparentPass.Setup(transparentResource, transparentSettings);
+            renderer.EnqueuePass(_transparentPass);
+
+            var autoExposureResource = new AutoExposurePass.Resource
+            {
+                AeHistogramBuffer = _aeHistogramBuffer,
+                AeExposureBuffer  = _aeExposureBuffer,
+                Composed          = pool.Composed.Handle
+            };
+
+
+            var aeSettings = new AutoExposurePass.Settings
+            {
+                AeEnabled              = nrdSampleSetting.enableAutoExposure,
+                AeEVMin                = nrdSampleSetting.aeEVMin,
+                AeEVMax                = nrdSampleSetting.aeEVMax,
+                AeLowPercent           = nrdSampleSetting.aeLowPercent,
+                AeHighPercent          = nrdSampleSetting.aeHighPercent,
+                AeSpeedUp              = nrdSampleSetting.aeAdaptationSpeedUp,
+                AeSpeedDown            = nrdSampleSetting.aeAdaptationSpeedDown,
+                AeDeltaTime            = Time.deltaTime,
+                AeExposureCompensation = nrdSampleSetting.aeExposureCompensation,
+                AeMinExposure          = nrdSampleSetting.aeMinExposure,
+                AeMaxExposure          = nrdSampleSetting.aeMaxExposure,
+                AeTexWidth             = (uint)renderResolution.x,
+                AeTexHeight            = (uint)renderResolution.y,
+                ManualExposure         = nrdSampleSetting.exposure
+            };
+
+            if (!nrdSampleSetting.enableAutoExposure)
+            {
+                _exposureArray[0] = nrdSampleSetting.exposure;
+                _aeExposureBuffer.SetData(_exposureArray);
+            }
+            else
+            {
+                _autoExposurePass.Setup(autoExposureResource, aeSettings);
+                renderer.EnqueuePass(_autoExposurePass);
+            }
+
+            if (nrdSampleSetting.RR)
+            {
+                if (nrdSampleSetting.accumulate)
+                {
+                    var accumulateResource = new AccumulatePass.Resource
+                    {
+                        noise        = pool.Composed.Handle,
+                        accumulation = pool.DlssOutput.Handle,
+                    };
+
+                    var accumulateSettings = new AccumulatePass.Settings
+                    {
+                        rectGridW       = rectGridW,
+                        rectGridH       = rectGridH,
+                        convergenceStep = frameState.convergenceStep,
+                    };
+
+                    _accumulatePass.Setup(accumulateResource, accumulateSettings);
+                    renderer.EnqueuePass(_accumulatePass);
+                }
+                else
+                {
+                    var dlrrRes = new DlrrDenoiser.DlrrResources
+                    {
+                        input           = pool.Composed,
+                        output          = pool.DlssOutput,
+                        mv              = pool.MV,
+                        depth           = pool.Viewz,
+                        diffAlbedo      = pool.RrGuideDiffAlbedo,
+                        specAlbedo      = pool.RrGuideSpecAlbedo,
+                        normalRoughness = pool.RrGuideNormalRoughness,
+                        specHitDistance = pool.RrGuideSpecHitDistance,
+                    };
+
+                    var dlrrInput = new DlrrDenoiser.DlrrFrameInput
+                    {
+                        worldToView      = frameState.worldToView,
+                        viewToClip       = frameState.viewToClip,
+                        viewportJitter   = frameState.viewportJitter,
+                        renderResolution = frameState.renderResolution,
+                        frameIndex       = curFrame,
+                        outputWidth      = (ushort)outputResolution.x,
+                        outputHeight     = (ushort)outputResolution.y,
+                    };
+                    var dlssDataPtr = dlrr.GetInteropDataPtr(dlrrInput, dlrrRes, nrdSampleSetting.RR ? 1 : nrdSampleSetting.resolutionScale, nrdSampleSetting.upscalerMode);
+
+                    var dlssSettings = new DlssRRPass.Settings
+                    {
+                        tmpDisableRR = nrdSampleSetting.tmpDisableRR
+                    };
+
+
+                    var dlssResource = new DlssBeforePass.Resource
+                    {
+                        ConstantBuffer = _constantBuffer,
+
+                        NormalRoughness    = pool.NormalRoughness.Handle,
+                        BaseColorMetalness = pool.BaseColorMetalness.Handle,
+                        Spec               = pool.Unfiltered_Spec.Handle,
+                        ViewZ              = pool.Viewz.Handle,
+
+                        RRGuide_DiffAlbedo       = pool.RrGuideDiffAlbedo.Handle,
+                        RRGuide_SpecAlbedo       = pool.RrGuideSpecAlbedo.Handle,
+                        RRGuide_SpecHitDistance  = pool.RrGuideSpecHitDistance.Handle,
+                        RRGuide_Normal_Roughness = pool.RrGuideNormalRoughness.Handle,
+                    };
+
+                    var dlssBeforeSettings = new DlssBeforePass.Settings
+                    {
+                        rectGridW    = rectGridW,
+                        rectGridH    = rectGridH,
+                        tmpDisableRR = nrdSampleSetting.tmpDisableRR
+                    };
+
+                    _dlssBeforePass.Setup(dlssResource, dlssBeforeSettings);
+                    renderer.EnqueuePass(_dlssBeforePass);
+
+                    _dlssrrPass.Setup(dlssDataPtr, dlssSettings);
+                    renderer.EnqueuePass(_dlssrrPass);
+                }
+            }
+            else
+            {
+                var taaResource = new TaaPass.Resource
+                {
+                    ConstantBuffer = _constantBuffer,
+
+                    Mv       = pool.MV.Handle,
+                    Composed = pool.Composed.Handle,
+                    taaSrc   = isEven ? pool.TaaHistoryPrev.Handle : pool.TaaHistory.Handle,
+                    taaDst   = isEven ? pool.TaaHistory.Handle : pool.TaaHistoryPrev.Handle,
+                    Output   = pool.Final.Handle,
+                };
+
+                var taaSettings = new TaaPass.Settings
+                {
+                    rectGridW = rectGridW,
+                    rectGridH = rectGridH
+                };
+
+                _taaPass.Setup(taaResource, taaSettings);
+                renderer.EnqueuePass(_taaPass);
+            }
+
+            if (nrdSampleSetting.useReferencePathTracing)
+            {
+                var referencePtResource = new ReferencePtPass.Resource
+                {
+                    ConstantBuffer = _constantBuffer,
+
+                    PointLightBuffer = _lightCollector.PointLightBuffer,
+                    AreaLightBuffer  = _lightCollector.AreaLightBuffer,
+                    SpotLightBuffer  = _lightCollector.SpotLightBuffer,
+                    AeExposureBuffer = _aeExposureBuffer,
+
+                    Output = pool.Final.Handle,
+                };
+
+                var referencePtSettings = new ReferencePtPass.Settings
+                {
+                    m_RenderResolution = renderResolution,
+                    resolutionScale    = nrdSampleSetting.resolutionScale,
+                    referenceBounceNum = nrdSampleSetting.referenceBounceNum,
+                    convergenceStep    = nrdSampleSetting.accumulateReference ? frameState.convergenceStep : 0,
+                    split              = nrdSampleSetting.split
+                };
+
+                _referencePtPass.Setup(referencePtResource, referencePtSettings);
+                renderer.EnqueuePass(_referencePtPass);
+            }
+
+            var outputBlitResource = new OutputBlitPass.Resource
+            {
+                Mv                 = pool.MV.Handle,
+                NormalRoughness    = pool.NormalRoughness.Handle,
+                BaseColorMetalness = pool.BaseColorMetalness.Handle,
+
+
+                Penumbra = pool.Unfiltered_Penumbra.Handle,
+                Diff     = pool.Unfiltered_Diff.Handle,
+                Spec     = pool.Unfiltered_Spec.Handle,
+
+                ShadowTranslucency = pool.Shadow.Handle,
+                DenoisedDiff       = pool.Diff.Handle,
+                DenoisedSpec       = pool.Spec.Handle,
+                Validation         = pool.Validation.Handle,
+
+                Composed       = pool.Composed.Handle,
+                DirectLighting = pool.DirectLighting.Handle,
+
+                RRGuide_DiffAlbedo       = pool.RrGuideDiffAlbedo.Handle,
+                RRGuide_SpecAlbedo       = pool.RrGuideSpecAlbedo.Handle,
+                RRGuide_Normal_Roughness = pool.RrGuideNormalRoughness.Handle,
+                RRGuide_SpecHitDistance  = pool.RrGuideSpecHitDistance.Handle,
+                DlssOutput               = pool.DlssOutput.Handle,
+                taaDst                   = isEven ? pool.TaaHistory.Handle : pool.TaaHistoryPrev.Handle,
+                ViewZ                    = pool.Viewz.Handle,
+
+                Output            = pool.Final.Handle,
+                DirectEmission    = pool.DirectEmission.Handle,
+                ComposedDiff      = pool.ComposedDiff.Handle,
+                ComposedSpecViewZ = pool.ComposedSpecViewZ.Handle,
+            };
+
+            var outputBlitSettings = new OutputBlitPass.Settings
+            {
+                showMode        = nrdSampleSetting.showMode,
+                resolutionScale = frameState.resolutionScale,
+                enableDlssRR    = nrdSampleSetting.RR,
+                showMV          = nrdSampleSetting.showMv,
+                showValidation  = nrdSampleSetting.showValidation,
+                showReference   = nrdSampleSetting.useReferencePathTracing,
+            };
+
+            _outputBlitPass.Setup(outputBlitResource, outputBlitSettings);
+            renderer.EnqueuePass(_outputBlitPass);
+        }
+
+        private static int2 ComputeOutputResolution(CameraData cameraData)
+        {
+            var xrPass = cameraData.xr;
+            if (xrPass.enabled)
+                return new int2(xrPass.renderTargetDesc.width, xrPass.renderTargetDesc.height);
+            return new int2(
+                (int)(cameraData.camera.pixelWidth * cameraData.renderScale),
+                (int)(cameraData.camera.pixelHeight * cameraData.renderScale));
+        }
+
+        protected override void Dispose(bool disposing)
+        {
+            Debug.Log("PathTracingFeature Dispose");
+            GL.Flush();
+            base.Dispose(disposing);
+
+            _accelerationStructure?.Dispose();
+            _accelerationStructure = null;
+
+            _constantBuffer?.Release();
+            _constantBuffer = null;
+
+            foreach (var denoiser in _nrdSigmaDenoisers.Values)
+            {
+                denoiser.Dispose();
+            }
+
+            _nrdSigmaDenoisers.Clear();
+
+            foreach (var denoiser in _nrdReblurDenoisers.Values)
+            {
+                denoiser.Dispose();
+            }
+
+            _nrdReblurDenoisers.Clear();
+
+            foreach (var denoiser in _dlrrDenoisers.Values)
+            {
+                denoiser.Dispose();
+            }
+
+            _dlrrDenoisers.Clear();
+
+            _cameraFrameStates.Clear();
+
+            foreach (var pool in _resourcePools.Values)
+            {
+                pool.Dispose();
+            }
+
+            _resourcePools.Clear();
+
+            _lightCollector?.Dispose();
+            _lightCollector = null;
+
+            _scramblingRankingUintBuffer?.Release();
+            _scramblingRankingUintBuffer = null;
+
+            _sobolUintBuffer?.Release();
+            _sobolUintBuffer = null;
+
+            _accumulationBuffer?.Release();
+            _accumulationBuffer = null;
+
+            _hashEntriesBuffer?.Release();
+            _hashEntriesBuffer = null;
+
+            _resolvedBuffer?.Release();
+            _resolvedBuffer = null;
+
+            _aeHistogramBuffer?.Release();
+            _aeHistogramBuffer = null;
+
+            _aeExposureBuffer?.Release();
+            _aeExposureBuffer = null;
+
+            _gpuScene   = null;
+            _sharcPass  = null;
+            _opaquePass = null;
+            _nativeOpaquePass?.Dispose();
+            _nativeOpaquePass = null;
+            _transparentPass  = null;
+            _compositionPass  = null;
+            _nrdShadowPass    = null;
+            _nrdOpaquePass    = null;
+            _taaPass          = null;
+            _dlssrrPass       = null;
+            _autoExposurePass = null;
+            _outputBlitPass   = null;
+        }
+
+        // #define FLAG_NON_TRANSPARENT                0x01 // geometry flag: non-transparent
+        // #define FLAG_TRANSPARENT                    0x02 // geometry flag: transparent
+        // #define FLAG_FORCED_EMISSION                0x04 // animated emissive cube
+        // #define FLAG_STATIC                         0x08 // no velocity
+        // #define FLAG_HAIR                           0x10 // hair
+        // #define FLAG_LEAF                           0x20 // leaf
+        // #define FLAG_SKIN                           0x40 // skin
+        // #define FLAG_MORPH                          0x80 // morph
+
+        public void SetMask()
+        {
+            var allRenderers = FindObjectsByType<Renderer>(FindObjectsSortMode.None);
+            foreach (var r in allRenderers)
+            {
+                var materials      = r.sharedMaterials;
+                var hasTransparent = false;
+                var hasOpaque      = false;
+                // bool isSSS = false;
+                foreach (var mat in materials)
+                {
+                    if (mat != null)
+                    {
+                        if (mat.renderQueue >= 3000)
+                        {
+                            hasTransparent = true;
+                        }
+                        else
+                        {
+                            hasOpaque = true;
+                        }
+
+                        // if (mat.IsKeywordEnabled("_SSS"))
+                        // {
+                        //     isSSS = true;
+                        //     Debug.Log($"Renderer {r.name} marked as SSS.");
+                        // }
+                    }
+                }
+
+                uint mask = 0;
+
+                if (hasOpaque)
+                    mask |= 0x01; // FLAG_NON_TRANSPARENT
+                if (hasTransparent)
+                    mask |= 0x02; // FLAG_TRANSPARENT
+
+                // if (isSSS)
+                //     mask |= 0x40; // FLAG_SKIN
+
+                // Debug.Log($"Renderer {r.name} Mask: {mask}");
+
+                _accelerationStructure.UpdateInstanceMask(r, mask); // 1 表示包含在内
+            }
+        }
+
+#if UNITY_EDITOR
+        private void Reset()
+        {
+            nrdSampleSetting = new NrdSampleSetting();
+            AutoFillShaders();
+        }
+
+        public void AutoFillShaders()
+        {
+            finalMaterial = UnityEditor.AssetDatabase.LoadAssetAtPath<Material>("Assets/Shaders/Mat/KM_Final.mat");
+
+            sharcUpdateTs            = UnityEditor.AssetDatabase.LoadAssetAtPath<RayTracingShader>("Assets/Shaders/Sharc/SharcUpdate.raytrace");
+            opaqueTracingShader      = UnityEditor.AssetDatabase.LoadAssetAtPath<RayTracingShader>("Assets/Shaders/RayTracing/TraceOpaque.raytrace");
+            transparentTracingShader = UnityEditor.AssetDatabase.LoadAssetAtPath<RayTracingShader>("Assets/Shaders/RayTracing/TraceTransparent.raytrace");
+            referencePtTracingShader = UnityEditor.AssetDatabase.LoadAssetAtPath<RayTracingShader>("Assets/Shaders/RayTracing/ReferencePt.raytrace");
+
+            compositionComputeShader = UnityEditor.AssetDatabase.LoadAssetAtPath<ComputeShader>("Assets/Shaders/PostProcess/Composition.compute");
+            taaComputeShader         = UnityEditor.AssetDatabase.LoadAssetAtPath<ComputeShader>("Assets/Shaders/PostProcess/Taa.compute");
+            dlssBeforeComputeShader  = UnityEditor.AssetDatabase.LoadAssetAtPath<ComputeShader>("Assets/Shaders/PostProcess/DlssBefore.compute");
+            sharcResolveCs           = UnityEditor.AssetDatabase.LoadAssetAtPath<ComputeShader>("Assets/Shaders/Sharc/SharcResolve.compute");
+            autoExposureShader       = UnityEditor.AssetDatabase.LoadAssetAtPath<ComputeShader>("Assets/Shaders/PostProcess/AutoExposure.compute");
+            accumulateCs             = UnityEditor.AssetDatabase.LoadAssetAtPath<ComputeShader>("Assets/Shaders/PostProcess/Accumulate.compute");
+
+            scramblingRankingTex = UnityEditor.AssetDatabase.LoadAssetAtPath<Texture2D>("Assets/Textures/scrambling_ranking_128x128_2d_4spp.png");
+            sobolTex             = UnityEditor.AssetDatabase.LoadAssetAtPath<Texture2D>("Assets/Textures/sobol_256_4d.png");
+
+            UnityEditor.EditorUtility.SetDirty(this);
+        }
+#endif
+    }
+}

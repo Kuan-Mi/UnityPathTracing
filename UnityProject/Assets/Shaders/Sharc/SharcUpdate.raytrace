@@ -3,5 +3,6 @@
 // #pragma enable_d3d11_debug_symbols
 #pragma use_dxc
 #pragma enable_ray_tracing_shader_debug_symbols
+#pragma require Native16Bit
 
 #include "SharcUpdate.hlsl"

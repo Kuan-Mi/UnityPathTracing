@@ -1,0 +1,552 @@
+using System;
+using System.Collections.Generic;
+using System.IO;
+using UnityEditor;
+using UnityEditor.AssetImporters;
+using UnityEngine;
+using Object = UnityEngine.Object;
+
+namespace NativeRender
+{
+    /// <summary>
+    /// Imports <c>.computeshader</c> files as <see cref="NativeComputeShader"/> ScriptableObject assets.
+    /// The file content is raw HLSL; the importer stores the absolute path so the native
+    /// plugin can compile it at runtime via DXC.
+    ///
+    /// To create a new compute shader asset: right-click in the Project view and rename any
+    /// text file to have the <c>.computeshader</c> extension, or duplicate an existing one.
+    /// </summary>
+    [ScriptedImporter(1, "computeshader", -1000)]
+    public class NativeComputeShaderImporter : ScriptedImporter
+    {
+        [Tooltip("Additional #include search directories (absolute paths). The shader file's own directory is always included automatically.")]
+        public string[] additionalIncludePaths = Array.Empty<string>();
+
+        [Tooltip("Additional DXC compiler arguments (e.g. -HV 2021).")]
+        public string[] extraArgs = Array.Empty<string>();
+
+        [Tooltip("Preprocessor defines (e.g. FOO=1, BAR).")]
+        public string[] defines = Array.Empty<string>();
+
+        [Tooltip("Entry point function name (e.g. main).")]
+        public string entryPoint = "main";
+
+        [Tooltip("DXC target profile (e.g. cs_6_6).")]
+        public string targetProfile = "cs_6_6";
+
+        [Tooltip("Promote these ConstantBuffer bindings to root 32-bit constants (SetComputeRoot32BitConstants). " +
+                 "\"Name\" must match the HLSL variable name exactly. " +
+                 "\"Count\" is the total number of 32-bit values in the buffer.")]
+        public RootConstantsHint[] rootConstantsHints = Array.Empty<RootConstantsHint>();
+
+        [Tooltip("Promote these buffer SRV / TLAS bindings to inline root descriptors (SetComputeRootShaderResourceView) " +
+                 "instead of a descriptor-table entry. Only valid for buffer resources. " +
+                 "Each string must match the HLSL variable name exactly.")]
+        public string[] rootSRVHints = Array.Empty<string>();
+
+        public override void OnImportAsset(AssetImportContext ctx)
+        {
+            var asset = ScriptableObject.CreateInstance<NativeComputeShader>();
+
+            // Write private serialized fields via SerializedObject.
+            var so = new SerializedObject(asset);
+
+            // Always prepend the Unity project root so shaders can include project-relative headers.
+            string projectRoot = Path.GetFullPath(Path.Combine(Application.dataPath, ".."));
+
+            // Merge global project settings (prepended) with per-asset settings.
+            var globalSettings = NativeShaderProjectSettings.instance;
+
+            // ── Include paths: [projectRoot] + globalIncludePaths + additionalIncludePaths ──
+            var allIncludeSources = new string[additionalIncludePaths.Length + globalSettings.globalIncludePaths.Length];
+            for (int i = 0; i < globalSettings.globalIncludePaths.Length; i++)
+                allIncludeSources[i] = globalSettings.globalIncludePaths[i];
+            for (int i = 0; i < additionalIncludePaths.Length; i++)
+                allIncludeSources[globalSettings.globalIncludePaths.Length + i] = additionalIncludePaths[i];
+
+            var allPaths = new string[1 + allIncludeSources.Length];
+            allPaths[0] = projectRoot;
+            for (int i = 0; i < allIncludeSources.Length; i++)
+            {
+                string p = Environment.ExpandEnvironmentVariables(allIncludeSources[i]);
+                if (!Path.IsPathRooted(p))
+                    p = Path.GetFullPath(Path.Combine(projectRoot, p));
+                allPaths[1 + i] = p;
+            }
+
+            var pathsProp = so.FindProperty("additionalIncludePaths");
+            pathsProp.arraySize = allPaths.Length;
+            for (int i = 0; i < allPaths.Length; i++)
+                pathsProp.GetArrayElementAtIndex(i).stringValue = allPaths[i];
+
+            // ── Extra args: globalExtraArgs + extraArgs ──
+            var allExtraArgs = new string[globalSettings.globalExtraArgs.Length + extraArgs.Length];
+            for (int i = 0; i < globalSettings.globalExtraArgs.Length; i++)
+                allExtraArgs[i] = globalSettings.globalExtraArgs[i];
+            for (int i = 0; i < extraArgs.Length; i++)
+                allExtraArgs[globalSettings.globalExtraArgs.Length + i] = extraArgs[i];
+
+            var extraArgsProp = so.FindProperty("_extraArgs");
+            extraArgsProp.arraySize = allExtraArgs.Length;
+            for (int i = 0; i < allExtraArgs.Length; i++)
+                extraArgsProp.GetArrayElementAtIndex(i).stringValue = allExtraArgs[i];
+
+            // ── Defines: globalDefines + defines ──
+            var allDefines = new string[globalSettings.globalDefines.Length + defines.Length];
+            for (int i = 0; i < globalSettings.globalDefines.Length; i++)
+                allDefines[i] = globalSettings.globalDefines[i];
+            for (int i = 0; i < defines.Length; i++)
+                allDefines[globalSettings.globalDefines.Length + i] = defines[i];
+
+            var definesProp = so.FindProperty("_defines");
+            definesProp.arraySize = allDefines.Length;
+            for (int i = 0; i < allDefines.Length; i++)
+                definesProp.GetArrayElementAtIndex(i).stringValue = allDefines[i];
+
+            var entryPointProp = so.FindProperty("_entryPoint");
+            entryPointProp.stringValue = string.IsNullOrEmpty(entryPoint) ? "main" : entryPoint;
+
+            var targetProfileProp = so.FindProperty("_targetProfile");
+            targetProfileProp.stringValue = string.IsNullOrEmpty(targetProfile) ? "cs_6_6" : targetProfile;
+
+            var hintsProp = so.FindProperty("_rootConstantsHints");
+            hintsProp.arraySize = rootConstantsHints?.Length ?? 0;
+            for (int i = 0; i < (rootConstantsHints?.Length ?? 0); i++)
+            {
+                var elem = hintsProp.GetArrayElementAtIndex(i);
+                elem.FindPropertyRelative("Name").stringValue  = rootConstantsHints[i].Name ?? "";
+                elem.FindPropertyRelative("Count").intValue    = (int)rootConstantsHints[i].Count;
+            }
+
+            var srvHintsProp = so.FindProperty("_rootSRVHints");
+            srvHintsProp.arraySize = rootSRVHints?.Length ?? 0;
+            for (int i = 0; i < (rootSRVHints?.Length ?? 0); i++)
+                srvHintsProp.GetArrayElementAtIndex(i).stringValue = rootSRVHints[i] ?? "";
+
+            so.ApplyModifiedPropertiesWithoutUndo();
+
+            ctx.AddObjectToAsset("NativeComputeShader", asset);
+            var filePath = Path.GetFullPath(ctx.assetPath);
+            asset.ForceRecompile(filePath);
+            ctx.SetMainObject(asset);
+        }
+    }
+
+    [CustomEditor(typeof(NativeComputeShaderImporter))]
+    public class NativeComputeShaderImporterEditor : ScriptedImporterEditor
+    {
+        // Foldout state — not persisted, resets on selection change (fine for a dev tool)
+        private bool _showSRV          = true;
+        private bool _showUAV          = true;
+        private bool _showCBV          = true;
+        private bool _showSampler      = true;
+        private bool _showTLAS         = true;
+        private bool _showReflection   = true;
+        private bool _showRootConstants = true;
+        private bool _showRootSRV       = true;
+
+        public override void OnInspectorGUI()
+        {
+            base.OnInspectorGUI();
+
+            // Only show compile button when a single asset is selected
+            if (targets.Length != 1) return;
+
+            var importer = (NativeComputeShaderImporter)target;
+
+            var shader = AssetDatabase.LoadAssetAtPath<NativeComputeShader>(importer.assetPath);
+            if (shader == null) return;
+
+            EditorGUILayout.Space(6);
+
+            GUI.backgroundColor = shader.HasCompiledBytes ? new Color(0.4f, 0.8f, 0.4f) : new Color(1f, 0.6f, 0.3f);
+            if (GUILayout.Button(shader.HasCompiledBytes ? "Recompile" : "Compile", GUILayout.Height(28)))
+            {
+                ApplyAndImport(importer);
+            }
+            GUI.backgroundColor = Color.white;
+            GL.End();
+
+            EditorGUILayout.Space(2);
+            if (shader.HasCompiledBytes)
+                EditorGUILayout.HelpBox($"DXIL cached ({shader.CompiledByteCount:N0} bytes)", MessageType.Info);
+            else
+                EditorGUILayout.HelpBox("No compiled DXIL – click Compile to build.", MessageType.Warning);
+
+            // ---------------------------------------------------------------
+            // Reflection panel
+            // ---------------------------------------------------------------
+            string json = shader.ReflectionJson;
+            if (string.IsNullOrEmpty(json)) return;
+
+            var info = ShaderReflectionInfo.Parse(json);
+            if (info == null) return;
+
+            EditorGUILayout.Space(6);
+            _showReflection = EditorGUILayout.Foldout(_showReflection, "Shader Reflection", true, EditorStyles.foldoutHeader);
+            if (_showReflection)
+            {
+                EditorGUI.indentLevel++;
+
+                // Thread group size
+                EditorGUILayout.LabelField("numthreads",
+                    $"[{info.NumThreadsX}, {info.NumThreadsY}, {info.NumThreadsZ}]",
+                    EditorStyles.boldLabel);
+
+                DrawBindingGroup(ref _showSRV,     "SRV",     info.SRV);
+                DrawBindingGroup(ref _showUAV,     "UAV",     info.UAV);
+                DrawBindingGroup(ref _showCBV,     "CBV",     info.CBV);
+                DrawBindingGroup(ref _showSampler, "Sampler", info.Sampler);
+                DrawBindingGroup(ref _showTLAS,    "TLAS",    info.TLAS);
+
+                // Root Constants section — only shown when there are CBV or TLAS bindings to promote
+                if (info.CBV.Count > 0)
+                {
+                    EditorGUILayout.Space(4);
+                    _showRootConstants = EditorGUILayout.Foldout(_showRootConstants, "Root Constants Hints", true);
+                    if (_showRootConstants)
+                    {
+                        EditorGUI.indentLevel++;
+
+                        var importerSO = new SerializedObject(importer);
+                        var hintsProp  = importerSO.FindProperty("rootConstantsHints");
+                        if (hintsProp != null)
+                        {
+                            EditorGUILayout.HelpBox(
+                                "Promote a ConstantBuffer binding to inline root 32-bit constants " +
+                                "(no GPU buffer required). Name must match the HLSL variable exactly. " +
+                                "Count = total number of 32-bit values (e.g. 4 floats = 4).",
+                                MessageType.None);
+
+                            // Quick-add buttons for each reflected CBV
+                            EditorGUILayout.LabelField("Add from reflected CBV:", EditorStyles.miniLabel);
+                            foreach (var cbv in info.CBV)
+                            {
+                                // Check if already present
+                                bool alreadyAdded = false;
+                                for (int hi = 0; hi < hintsProp.arraySize; hi++)
+                                {
+                                    var e = hintsProp.GetArrayElementAtIndex(hi);
+                                    if (e.FindPropertyRelative("Name").stringValue == cbv.Name)
+                                    { alreadyAdded = true; break; }
+                                }
+
+                                using (new EditorGUI.DisabledScope(alreadyAdded))
+                                {
+                                    if (GUILayout.Button($"+ {cbv.Name}  (b{cbv.Reg} space{cbv.Space})",
+                                                         EditorStyles.miniButton))
+                                    {
+                                        importerSO.Update();
+                                        int idx = hintsProp.arraySize;
+                                        hintsProp.InsertArrayElementAtIndex(idx);
+                                        var newElem = hintsProp.GetArrayElementAtIndex(idx);
+                                        newElem.FindPropertyRelative("Name").stringValue = cbv.Name;
+                                        newElem.FindPropertyRelative("Count").intValue   = 0;
+                                        importerSO.ApplyModifiedProperties();
+                                    }
+                                }
+                            }
+
+                            EditorGUILayout.Space(2);
+                            EditorGUILayout.PropertyField(hintsProp, new GUIContent("Hints"), true);
+                            if (importerSO.ApplyModifiedProperties())
+                                ApplyAndImport(importer);
+                        }
+
+                        EditorGUI.indentLevel--;
+                    }
+                }
+
+                // Root SRV Hints section — shown when there are SRV or TLAS bindings to promote
+                if (info.SRV.Count > 0 || info.TLAS.Count > 0)
+                {
+                    EditorGUILayout.Space(4);
+                    _showRootSRV = EditorGUILayout.Foldout(_showRootSRV, "Root SRV Hints", true);
+                    if (_showRootSRV)
+                    {
+                        EditorGUI.indentLevel++;
+
+                        var importerSO   = new SerializedObject(importer);
+                        var srvHintsProp = importerSO.FindProperty("rootSRVHints");
+                        if (srvHintsProp != null)
+                        {
+                            EditorGUILayout.HelpBox(
+                                "Promote a buffer SRV or TLAS binding to an inline root descriptor " +
+                                "(SetComputeRootShaderResourceView). Only valid for buffer resources. " +
+                                "Name must match the HLSL variable exactly.",
+                                MessageType.None);
+
+                            // Quick-add buttons for reflected SRV bindings
+                            var candidates = new List<ShaderBindingEntry>();
+                            candidates.AddRange(info.SRV);
+                            candidates.AddRange(info.TLAS);
+
+                            EditorGUILayout.LabelField("Add from reflected SRV / TLAS:", EditorStyles.miniLabel);
+                            foreach (var srv in candidates)
+                            {
+                                bool alreadyAdded = false;
+                                for (int hi = 0; hi < srvHintsProp.arraySize; hi++)
+                                {
+                                    if (srvHintsProp.GetArrayElementAtIndex(hi).stringValue == srv.Name)
+                                    { alreadyAdded = true; break; }
+                                }
+
+                                string prefix = srv.Type == "TLAS" ? "TLAS" : "SRV";
+                                using (new EditorGUI.DisabledScope(alreadyAdded))
+                                {
+                                    if (GUILayout.Button($"+ {srv.Name}  [{prefix}  space{srv.Space}:t{srv.Reg}]",
+                                                         EditorStyles.miniButton))
+                                    {
+                                        importerSO.Update();
+                                        int idx = srvHintsProp.arraySize;
+                                        srvHintsProp.InsertArrayElementAtIndex(idx);
+                                        srvHintsProp.GetArrayElementAtIndex(idx).stringValue = srv.Name;
+                                        importerSO.ApplyModifiedProperties();
+                                    }
+                                }
+                            }
+
+                            EditorGUILayout.Space(2);
+                            EditorGUILayout.PropertyField(srvHintsProp, new GUIContent("Hints"), true);
+                            if (importerSO.ApplyModifiedProperties())
+                                ApplyAndImport(importer);
+                        }
+
+                        EditorGUI.indentLevel--;
+                    }
+                }
+
+                EditorGUILayout.Space(4);
+                if (GUILayout.Button("Print to Console"))
+                    PrintReflectionToConsole(importer.assetPath, info);
+
+                EditorGUI.indentLevel--;
+            }
+        }
+
+        private static void ApplyAndImport(NativeComputeShaderImporter importer)
+        {
+            importer.SaveAndReimport();
+        }
+
+        private static void PrintReflectionToConsole(string assetPath, ShaderReflectionInfo info)        {
+            var sb = new System.Text.StringBuilder();
+            sb.AppendLine($"=== Shader Reflection: {System.IO.Path.GetFileName(assetPath)} ===");
+            sb.AppendLine($"numthreads  [{info.NumThreadsX}, {info.NumThreadsY}, {info.NumThreadsZ}]");
+            sb.AppendLine();
+
+            void AppendGroup(string label, List<ShaderBindingEntry> entries)
+            {
+                if (entries.Count == 0) return;
+                sb.AppendLine($"-- {label} ({entries.Count}) --");
+                foreach (var e in entries)
+                    sb.AppendLine($"  {e.Name,-32}  {e.HlslType,-36}  space{e.Space}:{ResourcePrefix(label)}{e.Reg}");
+                sb.AppendLine();
+            }
+
+            AppendGroup("SRV",     info.SRV);
+            AppendGroup("UAV",     info.UAV);
+            AppendGroup("CBV",     info.CBV);
+            AppendGroup("Sampler", info.Sampler);
+            AppendGroup("TLAS",    info.TLAS);
+
+            Debug.Log(sb.ToString());
+        }
+
+        private static void DrawBindingGroup(ref bool foldout, string label, List<ShaderBindingEntry> entries)
+        {
+            if (entries.Count == 0) return;
+
+            foldout = EditorGUILayout.Foldout(foldout, $"{label}  ({entries.Count})", true);
+            if (!foldout) return;
+
+            EditorGUI.indentLevel++;
+            foreach (var e in entries)
+                EditorGUILayout.LabelField(e.Name, $"{e.HlslType}    space{e.Space}:{ResourcePrefix(label)}{e.Reg}");
+            EditorGUI.indentLevel--;
+        }
+
+        private static string ResourcePrefix(string type) => type switch
+        {
+            "SRV"     => "t",
+            "UAV"     => "u",
+            "CBV"     => "b",
+            "Sampler" => "s",
+            "TLAS"    => "t",
+            _         => ""
+        };
+
+        // -------------------------------------------------------------------
+        // Minimal JSON parser for our fixed reflection JSON shape.
+        // Avoids a dependency on System.Text.Json / Newtonsoft.
+        // -------------------------------------------------------------------
+        private class ShaderBindingEntry
+        {
+            public string Name;
+            public string Type;
+            public int    Space;
+            public int    Reg;
+            public string Dim;     // e.g. "Texture2D", "Buffer", "ByteAddressBuffer"
+            public string RetType; // e.g. "float", "uint", ""
+
+            /// <summary>Human-readable HLSL-like type string, e.g. "Texture2D&lt;float4&gt;" or "StructuredBuffer".</summary>
+            public string HlslType
+            {
+                get
+                {
+                    if (Type == "CBV")     return "ConstantBuffer";
+                    if (Type == "Sampler") return "SamplerState";
+                    if (Type == "TLAS")   return "RaytracingAccelerationStructure";
+
+                    string prefix = Type == "UAV" ? "RW" : "";
+                    string dim    = string.IsNullOrEmpty(Dim) ? "Buffer" : Dim;
+
+                    // ByteAddressBuffer has no element type
+                    if (dim == "ByteAddressBuffer")
+                        return prefix + "ByteAddressBuffer";
+
+                    // Buffers without a return type are StructuredBuffers
+                    if (string.IsNullOrEmpty(RetType))
+                        return prefix + (dim == "Buffer" ? "StructuredBuffer" : dim);
+
+                    return prefix + dim + "<" + RetType + "4>";
+                }
+            }
+        }
+
+        private class ShaderReflectionInfo
+        {
+            public int NumThreadsX, NumThreadsY, NumThreadsZ;
+            public List<ShaderBindingEntry> SRV     = new();
+            public List<ShaderBindingEntry> UAV     = new();
+            public List<ShaderBindingEntry> CBV     = new();
+            public List<ShaderBindingEntry> Sampler = new();
+            public List<ShaderBindingEntry> TLAS    = new();
+
+            public static ShaderReflectionInfo Parse(string json)
+            {
+                try
+                {
+                    var result = new ShaderReflectionInfo();
+
+                    // numthreads: [X, Y, Z]
+                    int ntIdx = json.IndexOf("\"numthreads\"", StringComparison.Ordinal);
+                    if (ntIdx >= 0)
+                    {
+                        int lb = json.IndexOf('[', ntIdx);
+                        int rb = json.IndexOf(']', lb);
+                        if (lb >= 0 && rb > lb)
+                        {
+                            var parts = json.Substring(lb + 1, rb - lb - 1).Split(',');
+                            if (parts.Length >= 3)
+                            {
+                                int.TryParse(parts[0].Trim(), out result.NumThreadsX);
+                                int.TryParse(parts[1].Trim(), out result.NumThreadsY);
+                                int.TryParse(parts[2].Trim(), out result.NumThreadsZ);
+                            }
+                        }
+                    }
+
+                    // bindings array — iterate over { ... } objects
+                    int bindingsIdx = json.IndexOf("\"bindings\"", StringComparison.Ordinal);
+                    if (bindingsIdx < 0) return result;
+
+                    int arrayStart = json.IndexOf('[', bindingsIdx);
+                    int arrayEnd   = json.LastIndexOf(']');
+                    if (arrayStart < 0 || arrayEnd <= arrayStart) return result;
+
+                    string arrayBody = json.Substring(arrayStart + 1, arrayEnd - arrayStart - 1);
+                    int pos = 0;
+                    while (pos < arrayBody.Length)
+                    {
+                        int objStart = arrayBody.IndexOf('{', pos);
+                        if (objStart < 0) break;
+                        int objEnd = arrayBody.IndexOf('}', objStart);
+                        if (objEnd < 0) break;
+
+                        string obj = arrayBody.Substring(objStart + 1, objEnd - objStart - 1);
+                        var entry = new ShaderBindingEntry
+                        {
+                            Name    = ExtractString(obj, "name"),
+                            Type    = ExtractString(obj, "type"),
+                            Space   = ExtractInt   (obj, "space"),
+                            Reg     = ExtractInt   (obj, "reg"),
+                            Dim     = ExtractString(obj, "dim"),
+                            RetType = ExtractString(obj, "retType"),
+                        };
+
+                        var list = entry.Type switch
+                        {
+                            "SRV"     => result.SRV,
+                            "UAV"     => result.UAV,
+                            "CBV"     => result.CBV,
+                            "Sampler" => result.Sampler,
+                            "TLAS"    => result.TLAS,
+                            _         => null
+                        };
+                        list?.Add(entry);
+
+                        pos = objEnd + 1;
+                    }
+
+                    return result;
+                }
+                catch
+                {
+                    return null;
+                }
+            }
+
+            private static string ExtractString(string obj, string key)
+            {
+                string search = $"\"{key}\"";
+                int ki = obj.IndexOf(search, StringComparison.Ordinal);
+                if (ki < 0) return "";
+                int colon = obj.IndexOf(':', ki + search.Length);
+                if (colon < 0) return "";
+                int q1 = obj.IndexOf('"', colon + 1);
+                if (q1 < 0) return "";
+                int q2 = obj.IndexOf('"', q1 + 1);
+                if (q2 < 0) return "";
+                return obj.Substring(q1 + 1, q2 - q1 - 1);
+            }
+
+            private static int ExtractInt(string obj, string key)
+            {
+                string search = $"\"{key}\"";
+                int ki = obj.IndexOf(search, StringComparison.Ordinal);
+                if (ki < 0) return 0;
+                int colon = obj.IndexOf(':', ki + search.Length);
+                if (colon < 0) return 0;
+                int start = colon + 1;
+                while (start < obj.Length && (obj[start] == ' ' || obj[start] == '\t')) start++;
+                int end = start;
+                while (end < obj.Length && (char.IsDigit(obj[end]) || obj[end] == '-')) end++;
+                int.TryParse(obj.Substring(start, end - start), out int val);
+                return val;
+            }
+        }
+    }
+
+    /// <summary>
+    /// Notifies any live <see cref="NativeComputePipeline"/> instances that a .computeshader asset
+    /// has been reimported so they can rebuild their native D3D12 handles using the new DXIL bytes.
+    /// </summary>
+    internal class NativeComputeShaderPostprocessor : AssetPostprocessor
+    {
+        static void OnPostprocessAllAssets(
+            string[] importedAssets, string[] deletedAssets,
+            string[] movedAssets,    string[] movedFromAssetPaths)
+        {
+            foreach (string path in importedAssets)
+            {
+                if (!path.EndsWith(".computeshader", System.StringComparison.OrdinalIgnoreCase))
+                    continue;
+
+                var shader = AssetDatabase.LoadAssetAtPath<NativeComputeShader>(path);
+                if (shader != null)
+                    NativeComputeShader.InvokeOnRecompiled(shader);
+            }
+        }
+    }
+}

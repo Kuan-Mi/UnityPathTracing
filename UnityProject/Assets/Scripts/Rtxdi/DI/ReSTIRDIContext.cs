@@ -93,7 +93,7 @@ namespace Rtxdi.DI
                 maxHistoryLength              = 20,
                 enablePermutationSampling     = 1,
                 uniformRandomNumber           = 0,
-                enableVisibilityShortcut      = 0,
+                enableVisibilityShortcut      = 1,
                 numSamples                    = 1,
                 numDisocclusionBoostSamples   = 8,
                 samplingRadius                = 32.0f,

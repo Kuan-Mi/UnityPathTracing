@@ -1,0 +1,17 @@
+{
+  "name": "top.kuanmi.native-ray-tracing",
+  "version": "1.0.0",
+  "displayName": "Native DXR Ray Tracing",
+  "description": "DirectX 12 ray tracing (DXR) with Opacity Micro-Maps (OMM) for Unity 6 URP via native C++ plugins.",
+  "unity": "6000.0",
+  "keywords": [
+    "ray tracing",
+    "DXR",
+    "D3D12",
+    "OMM"
+  ],
+  "dependencies": {
+    "com.unity.render-pipelines.universal": "17.3.0"
+  },
+  "type": "library"
+}

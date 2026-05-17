@@ -27,6 +27,7 @@ public static class RenderPassMarkers
 {
     // ── Prepare ──────────────────────────────────────────────────────────────
     public static readonly NamedMarker PrepareLight = new(ProfilerCategory.Render, "Prepare Light", MarkerFlags.SampleGPU);
+    public static readonly NamedMarker PrepareLightsCompute = new(ProfilerCategory.Render, "PrepareLights CS", MarkerFlags.SampleGPU);
     public static readonly NamedMarker PdfTexture = new(ProfilerCategory.Render, "PdfTexture", MarkerFlags.SampleGPU);
     public static readonly NamedMarker GenerateMips = new(ProfilerCategory.Render, "Generate Mips", MarkerFlags.SampleGPU);
     public static readonly NamedMarker Presample = new(ProfilerCategory.Render, "Presample", MarkerFlags.SampleGPU);
@@ -35,6 +36,8 @@ public static class RenderPassMarkers
     // ── GBuffer ───────────────────────────────────────────────────────────────
     public static readonly NamedMarker GBufferRay = new(ProfilerCategory.Render, "GBuffer Ray", MarkerFlags.SampleGPU);
     public static readonly NamedMarker GBufferRaster = new(ProfilerCategory.Render, "GBuffer Raster", MarkerFlags.SampleGPU);
+    public static readonly NamedMarker RaytracedGBufferCompute = new(ProfilerCategory.Render, "RaytracedGBuffer CS", MarkerFlags.SampleGPU);
+    public static readonly NamedMarker PostprocessGBufferCompute = new(ProfilerCategory.Render, "PostprocessGBuffer CS", MarkerFlags.SampleGPU);
 
     // ── DI ────────────────────────────────────────────────────────────────────
     public static readonly NamedMarker GenInitialSamplesCompute = new(ProfilerCategory.Render, "GenInitialSamples CS", MarkerFlags.SampleGPU);
@@ -47,7 +50,8 @@ public static class RenderPassMarkers
     public static readonly NamedMarker DiShadeSamples = new(ProfilerCategory.Render, "DI ShadeSamples RS", MarkerFlags.SampleGPU);
 
     // ── GI ────────────────────────────────────────────────────────────────────
-    public static readonly NamedMarker BrdfRayTracing = new(ProfilerCategory.Render, "BrdfRayTracing", MarkerFlags.SampleGPU);
+    public static readonly NamedMarker BrdfRayTracingCompute = new(ProfilerCategory.Render, "BrdfRayTracing CS", MarkerFlags.SampleGPU);
+    public static readonly NamedMarker BrdfRayTracing = new(ProfilerCategory.Render, "BrdfRayTracing RS", MarkerFlags.SampleGPU);
     public static readonly NamedMarker ShadeSecondarySurfaces = new(ProfilerCategory.Render, "ShadeSecondarySurfaces RS", MarkerFlags.SampleGPU);
     public static readonly NamedMarker ShadeSecondarySurfacesCompute = new(ProfilerCategory.Render, "ShadeSecondarySurfaces CS", MarkerFlags.SampleGPU);
     public static readonly NamedMarker GiTemporalResamplingCompute = new(ProfilerCategory.Render, "GI TemporalResampling CS", MarkerFlags.SampleGPU);
@@ -57,23 +61,55 @@ public static class RenderPassMarkers
     public static readonly NamedMarker GiFinalShadingCompute = new(ProfilerCategory.Render, "GI FinalShading CS", MarkerFlags.SampleGPU);
     public static readonly NamedMarker GiFinalShading = new(ProfilerCategory.Render, "GI FinalShading RS", MarkerFlags.SampleGPU);
 
+    // ── PT (ReSTIR PT) ────────────────────────────────────────────────────────
+    public static readonly NamedMarker PtGenerateInitialSamplesCompute = new(ProfilerCategory.Render, "PT GenerateInitialSamples CS", MarkerFlags.SampleGPU);
+    public static readonly NamedMarker PtGenerateInitialSamples        = new(ProfilerCategory.Render, "PT GenerateInitialSamples RS", MarkerFlags.SampleGPU);
+    public static readonly NamedMarker PtTemporalResamplingCompute     = new(ProfilerCategory.Render, "PT TemporalResampling CS",     MarkerFlags.SampleGPU);
+    public static readonly NamedMarker PtTemporalResampling            = new(ProfilerCategory.Render, "PT TemporalResampling RS",     MarkerFlags.SampleGPU);
+    public static readonly NamedMarker PtSpatialResamplingCompute      = new(ProfilerCategory.Render, "PT SpatialResampling CS",      MarkerFlags.SampleGPU);
+    public static readonly NamedMarker PtSpatialResampling             = new(ProfilerCategory.Render, "PT SpatialResampling RS",      MarkerFlags.SampleGPU);
+    public static readonly NamedMarker PtFillSampleIDCompute           = new(ProfilerCategory.Render, "PT FillSampleID CS",           MarkerFlags.SampleGPU);
+    public static readonly NamedMarker PtFillSampleID                  = new(ProfilerCategory.Render, "PT FillSampleID RS",           MarkerFlags.SampleGPU);
+    public static readonly NamedMarker PtComputeDuplicationMapCompute  = new(ProfilerCategory.Render, "PT ComputeDuplicationMap CS",  MarkerFlags.SampleGPU);
+    public static readonly NamedMarker PtFinalShadingCompute           = new(ProfilerCategory.Render, "PT FinalShading CS",           MarkerFlags.SampleGPU);
+    public static readonly NamedMarker PtFinalShading                  = new(ProfilerCategory.Render, "PT FinalShading RS",           MarkerFlags.SampleGPU);
+
     // ── Main passes ───────────────────────────────────────────────────────────
-    public static readonly NamedMarker OpaqueTracing = new(ProfilerCategory.Render, "Opaque Tracing", MarkerFlags.SampleGPU);
-    public static readonly NamedMarker TransparentTracing = new(ProfilerCategory.Render, "Transparent Tracing", MarkerFlags.SampleGPU);
-    public static readonly NamedMarker ReferencePtTracing = new(ProfilerCategory.Render, "Reference Pt Tracing", MarkerFlags.SampleGPU);
+    public static readonly NamedMarker Streamer                 = new(ProfilerCategory.Render, "Streamer", MarkerFlags.SampleGPU);
+    public static readonly NamedMarker TLAS                     = new(ProfilerCategory.Render, "TLAS", MarkerFlags.SampleGPU);
+    public static readonly NamedMarker TLAS1                     = new(ProfilerCategory.Render, "TLAS1", MarkerFlags.SampleGPU);
+    public static readonly NamedMarker TLAS2                     = new(ProfilerCategory.Render, "TLAS2", MarkerFlags.SampleGPU);
+    public static readonly NamedMarker RecordSkinnedMorphUpdate = new(ProfilerCategory.Render, "RecordSkinnedMorphUpdate", MarkerFlags.SampleGPU);
+    
     public static readonly NamedMarker SharcUpdate = new(ProfilerCategory.Render, "Sharc Update", MarkerFlags.SampleGPU);
     public static readonly NamedMarker SharcResolve = new(ProfilerCategory.Render, "Sharc Resolve", MarkerFlags.SampleGPU);
-
-    // ── Denoising / Upscaling ─────────────────────────────────────────────────
+    
+    public static readonly NamedMarker OpaqueTracing = new(ProfilerCategory.Render, "Tracing opaque ", MarkerFlags.SampleGPU);
+    
     public static readonly NamedMarker NrdDenoise = new(ProfilerCategory.Render, "NRD Denoise", MarkerFlags.SampleGPU);
-    public static readonly NamedMarker DlssBefore = new(ProfilerCategory.Render, "DLSS Before", MarkerFlags.SampleGPU);
-    public static readonly NamedMarker DlssDenoise = new(ProfilerCategory.Render, "DLSS Denoise", MarkerFlags.SampleGPU);
-
-    // ── Post-process / Output ─────────────────────────────────────────────────
+    public static readonly NamedMarker NrdDenoiseShadow = new(ProfilerCategory.Render, "NRD Denoise Shadow", MarkerFlags.SampleGPU);
+    public static readonly NamedMarker NrdDenoiseOpaque = new(ProfilerCategory.Render, "NRD Denoise Opaque", MarkerFlags.SampleGPU);
+    public static readonly NamedMarker NrdDenoiseRtxdi  = new(ProfilerCategory.Render, "NRD Denoise RTXDI",  MarkerFlags.SampleGPU);
+    
     public static readonly NamedMarker Composition = new(ProfilerCategory.Render, "Composition", MarkerFlags.SampleGPU);
+    
+    public static readonly NamedMarker TransparentTracing = new(ProfilerCategory.Render, "Tracing transparent ", MarkerFlags.SampleGPU);
+    public static readonly NamedMarker ReferencePtTracing = new(ProfilerCategory.Render, "Reference Pt Tracing", MarkerFlags.SampleGPU);
+
+    
+    public static readonly NamedMarker DlssBefore  = new(ProfilerCategory.Render, "DLSS Before",   MarkerFlags.SampleGPU);
+    public static readonly NamedMarker DlssDenoise = new(ProfilerCategory.Render, "DLSS Denoise",  MarkerFlags.SampleGPU);
+    public static readonly NamedMarker DlssUpscale   = new(ProfilerCategory.Render, "DLSS Upscale",    MarkerFlags.SampleGPU);
+    public static readonly NamedMarker DlssAfter  = new(ProfilerCategory.Render, "DLSS After",   MarkerFlags.SampleGPU);
+    public static readonly NamedMarker NisSharpening = new(ProfilerCategory.Render, "NIS Sharpening", MarkerFlags.SampleGPU);
+
+    
     public static readonly NamedMarker Acc = new(ProfilerCategory.Render, "Acc", MarkerFlags.SampleGPU);
     public static readonly NamedMarker AutoExposure = new(ProfilerCategory.Render, "Auto Exposure", MarkerFlags.SampleGPU);
     public static readonly NamedMarker Taa = new(ProfilerCategory.Render, "TAA", MarkerFlags.SampleGPU);
+    public static readonly NamedMarker ToneMapping = new(ProfilerCategory.Render, "Tone Mapping", MarkerFlags.SampleGPU);
+    public static readonly NamedMarker ConfidenceBlur = new(ProfilerCategory.Render, "Confidence Blur", MarkerFlags.SampleGPU);
+    public static readonly NamedMarker Final = new(ProfilerCategory.Render, "Final", MarkerFlags.SampleGPU);
     public static readonly NamedMarker OutputBlit = new(ProfilerCategory.Render, "Output Blit", MarkerFlags.SampleGPU);
 
     // ── All marker names (for GPUProfiler inspector population) ──────────────

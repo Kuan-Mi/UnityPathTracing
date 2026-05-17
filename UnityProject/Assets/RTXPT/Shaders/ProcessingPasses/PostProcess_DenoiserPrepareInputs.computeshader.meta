@@ -1,0 +1,27 @@
+fileFormatVersion: 2
+guid: a1b2c3d4e5f6a1b2c3d4e5f6a1b2c302
+ScriptedImporter:
+  internalIDToNameTable: []
+  externalObjects: {}
+  serializedVersion: 2
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+  script: {fileID: 11500000, guid: ea13329833ed16543aa33a7c88f8c5bf, type: 3}
+  isComputeShader: 1
+  additionalIncludePaths:
+  - ../RenderingPlugin/External/RTXPT/Rtxpt/ProcessingPasses
+  - ../RenderingPlugin/External/RTXPT/Rtxpt
+  - ../RenderingPlugin/External/RTXPT/External/Nrd/Shaders/Include
+  - ../RenderingPlugin/External/RTXPT/External/Rtxdi/Include
+  - ../RenderingPlugin/External/RTXPT/External
+  - ../RenderingPlugin/External/donut/include
+  extraArgs:
+  - -enable-16bit-types
+  - -enable-payload-qualifiers
+  defines:
+  - DENOISER_PREPARE_INPUTS=1
+  entryPoint: main
+  targetProfile: cs_6_6
+  rootConstantsHints: []
+  rootSRVHints: []

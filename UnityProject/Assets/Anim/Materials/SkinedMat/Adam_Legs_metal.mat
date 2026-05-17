@@ -105,6 +105,7 @@ Material:
     - _ClearCoatMask: 0
     - _ClearCoatSmoothness: 0
     - _Cull: 2
+    - _CullGBuffer: 1
     - _Cutoff: 0.5
     - _DetailAlbedoMapScale: 1
     - _DetailNormalMapScale: 1
@@ -115,7 +116,7 @@ Material:
     - _Glossiness: 0.28284267
     - _GlossyReflections: 1
     - _IOR: 1.5
-    - _Metallic: 0
+    - _Metallic: 0.785
     - _Mode: 0
     - _OcclusionStrength: 1
     - _Parallax: 0.02
@@ -124,7 +125,7 @@ Material:
     - _SKINNEDMESH: 1
     - _SSS: 0
     - _SSSScatteringScale: 1
-    - _Smoothness: 0.5
+    - _Smoothness: 1
     - _SmoothnessTextureChannel: 0
     - _SpecularHighlights: 1
     - _SrcBlend: 1

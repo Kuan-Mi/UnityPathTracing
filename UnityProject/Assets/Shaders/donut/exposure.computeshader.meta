@@ -1,0 +1,22 @@
+fileFormatVersion: 2
+guid: 3d65022f076c70242ab9845539bd4e1f
+ScriptedImporter:
+  internalIDToNameTable: []
+  externalObjects: {}
+  serializedVersion: 2
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+  script: {fileID: 11500000, guid: ea13329833ed16543aa33a7c88f8c5bf, type: 3}
+  additionalIncludePaths:
+  - ../RenderingPlugin/External/donut/shaders
+  - ../RenderingPlugin/External/donut/include
+  extraArgs: []
+  defines:
+  - HISTOGRAM_BINS=256
+  entryPoint: main
+  targetProfile: cs_6_6
+  rootConstantsHints:
+  - Name: c_ToneMapping
+    Count: 20
+  rootSRVHints: []

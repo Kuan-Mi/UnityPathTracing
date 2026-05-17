@@ -69,18 +69,27 @@ MonoBehaviour:
   - GI SpatialResampling RS
   - GI FinalShading CS
   - GI FinalShading RS
-  - Opaque Tracing
-  - Transparent Tracing
-  - Reference Pt Tracing
+  - Streamer
+  - TLAS
   - Sharc Update
   - Sharc Resolve
+  - 'Tracing opaque '
   - NRD Denoise
+  - NRD Denoise Shadow
+  - NRD Denoise Opaque
+  - Composition
+  - 'Tracing transparent '
+  - Reference Pt Tracing
   - DLSS Before
   - DLSS Denoise
-  - Composition
+  - DLSS Upscale
+  - DLSS After
+  - NIS Sharpening
   - Acc
   - Auto Exposure
   - TAA
+  - Confidence Blur
+  - Final
   - Output Blit
   averageWindowSeconds: 1
   toggleKey: 284

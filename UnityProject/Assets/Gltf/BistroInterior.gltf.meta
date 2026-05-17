@@ -1,0 +1,689 @@
+fileFormatVersion: 2
+guid: b7338435e44437a49b8fb7efbcee18e6
+ScriptedImporter:
+  internalIDToNameTable: []
+  externalObjects: {}
+  serializedVersion: 2
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+  script: {fileID: 11500000, guid: 715df9372183c47e389bb6e19fbc3b52, type: 3}
+  editorImportSettings:
+    generateSecondaryUVSet: 0
+  importSettings:
+    nodeNameMethod: 1
+    animationMethod: 2
+    generateMipMaps: 1
+    texturesReadable: 0
+    defaultMinFilterMode: 9729
+    defaultMagFilterMode: 9729
+    anisotropicFilterLevel: 1
+  instantiationSettings:
+    mask: -1
+    layer: 0
+    skinUpdateWhenOffscreen: 1
+    lightIntensityFactor: 1
+    sceneObjectCreation: 2
+  assetDependencies:
+  - type: 0
+    originalUri: Assets\Gltf\BistroInterior.bin
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Image.png
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\Paris_Cashregister_Normal.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\Paris_Cashregister_BaseColor.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\Paris_Cashregister_Specular.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\Paris_Cashregister_Buttons_Normal.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\Paris_Cashregister_Buttons_BaseColor.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\Paris_Cashregister_Buttons_Specular.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\Paris_Cashregister_Glass_Normal.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\Paris_Cashregister_Glass_BaseColor.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\Paris_Cashregister_Glass_Specular.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\Paris_Coasters_01_Normal.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\Paris_Coasters_01_BaseColor.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\Paris_Coasters_01_Specular.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\ToffeeJar_Metal_Normal.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\ToffeeJar_Metal_BaseColor.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\ToffeeJar_Metal_Specular.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\ToffeeJar_Label_Normal.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\ToffeeJar_Label_BaseColor.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\ToffeeJar_Label_Specular.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\CookieJar_Cookies_Normal.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\CookieJar_Cookies_BaseColor.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\CookieJar_Cookies_Specular.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Image-1.png
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\TransparentGlass_Normal.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\TransparentGlass_BaseColor.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\TransparentGlass_Specular.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\Paris_LiquorBottle_01_Glass_Wine_Normal.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\Paris_LiquorBottle_01_Glass_Wine_BaseColor.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\Paris_LiquorBottle_01_Glass_Wine_Specular.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\Paris_LiquorBottle_01_Caps_Normal.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\Paris_LiquorBottle_01_Caps_BaseColor.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\Paris_LiquorBottle_01_Caps_Specular.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\Metal_Chrome1_Normal.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\Metal_Chrome1_BaseColor.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\Metal_Chrome1_Specular.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\Cloth_Normal.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\Cloth_BaseColor.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\Cloth_Specular.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\Paris_Table_cloth_01_Normal.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\Paris_Table_cloth_01_BaseColor.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\curtainA_Normal.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\curtainA_BaseColor.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\curtainA_Specular.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\curtainB1_Normal.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\curtainB1_BaseColor.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\curtainB1_Specular.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\Cutlery_chrome_Normal.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\Cutlery_chrome_BaseColor.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\Cutlery_chrome_Specular.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\Cutlery_details_Normal.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\Cutlery_details_BaseColor.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\Cutlery_details_Specular.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\Paris_Doormat_Normal.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\Paris_Doormat_BaseColor.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\Paris_Doormat_Specular.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\NapkinHolder_01_Normal.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\NapkinHolder_01_BaseColor.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\NapkinHolder_01_Specular.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\Trolley_Plastic_Normal.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\Trolley_Plastic_BaseColor.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\Trolley_Plastic_Specular.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\Trolley_Wheels_Normal.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\Trolley_Wheels_BaseColor.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\Trolley_Wheels_Specular.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\Trolley_Wood_Painted_Normal.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\Trolley_Wood_Painted_BaseColor.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\Trolley_Wood_Painted_Specular.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\Paris_BarStool_Normal.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\Paris_BarStool_BaseColor.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\Paris_BarStool_Specular.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\Paris_Beertap_Normal.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\Paris_Beertap_BaseColor.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\Paris_Beertap_Specular.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\MASTER_Interior_01_Plaster_Normal.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\MASTER_Interior_01_Plaster_BaseColor.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\MASTER_Interior_01_Plaster_Specular.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\MASTER_Interior_01_Wood_Normal.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\MASTER_Interior_01_Wood_BaseColor.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\MASTER_Interior_01_Wood_Specular.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\MASTER_Interior_01_Wooden_stuco_Normal.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\MASTER_Interior_01_Wooden_stuco_BaseColor.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\MASTER_Interior_01_Wooden_stuco_Specular.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\MASTER_Interior_01_Plaster_Red_Normal.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\MASTER_Interior_01_Plaster_Red_BaseColor.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\MASTER_Interior_01_Plaster_Red_Specular.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\MASTER_Wood_Painted3_Normal.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\MASTER_Wood_Painted3_BaseColor.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\MASTER_Wood_Painted3_Specular.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\MASTER_Interior_01_Grid_Normal.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\MASTER_Interior_01_Grid_BaseColor.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\MASTER_Interior_01_Grid_Specular.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\MASTER_Interior_01_Brushed_Metal_Normal.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\MASTER_Interior_01_Brushed_Metal_BaseColor.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\MASTER_Interior_01_Brushed_Metal_Specular.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\MASTER_Interior_01_Plaster2_Normal.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\MASTER_Interior_01_Plaster2_BaseColor.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\MASTER_Interior_01_Plaster2_Specular.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\MASTER_Interior_01_Frozen_Glass_Normal.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\MASTER_Interior_01_Frozen_Glass_BaseColor.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\MASTER_Interior_01_Frozen_Glass_Specular.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\MASTER_Interior_01_Floor_Tile_Hexagonal_BLENDSHADER_Normal.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\MASTER_Interior_01_Floor_Tile_Hexagonal_BLENDSHADER_BaseColor.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\MASTER_Interior_01_Floor_Tile_Hexagonal_BLENDSHADER_Specular.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\MASTER_Interior_01_Paris_Bartrim_Normal.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\MASTER_Interior_01_Paris_Bartrim_BaseColor.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\MASTER_Interior_01_Paris_Bartrim_Specular.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\MASTER_Interior_01_White_Plastic_Normal.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\MASTER_Interior_01_White_Plastic_BaseColor.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\MASTER_Interior_01_White_Plastic_Specular.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\MASTER_Interior_01_Grid1_Normal.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\MASTER_Interior_01_Grid1_BaseColor.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\MASTER_Interior_01_Grid1_Specular.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\MASTER_Interior_01_Material_Normal.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\MASTER_Interior_01_Material_BaseColor.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\MASTER_Interior_01_Material_Specular.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\MASTER_Interior_01_Paris_Lantern_Emissive.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\MASTER_Interior_01_Paris_Lantern_Normal.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\MASTER_Interior_01_Paris_Lantern_BaseColor.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\MASTER_Interior_01_Paris_Lantern_Specular.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\Paris_Ceiling_Lamp_Emissive.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\Paris_Ceiling_Lamp_Normal.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\Paris_Ceiling_Lamp_BaseColor.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\Paris_Ceiling_Lamp_Specular.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\Paris_CeilingFan_Emissive.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\Paris_CeilingFan_Normal.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\Paris_CeilingFan_BaseColor.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\Paris_CeilingFan_Specular.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\Paris_Table_03_Normal.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\Paris_Table_03_BaseColor.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\Paris_Table_03_Specular.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\Metal_Worn_01_Normal.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\Metal_Worn_01_BaseColor.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\Metal_Worn_01_Specular.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\Wood_Normal.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\Wood_BaseColor.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\Wood_Specular.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\Plastic_02_Normal.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\Plastic_02_BaseColor.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\Plastic_02_Specular.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\Plants_Metal_Base_01_Normal.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\Plants_Metal_Base_01_BaseColor.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\Plants_Metal_Base_01_Specular.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\Plants_plants_Normal.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\Plants_plants_BaseColor.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\Plants_plants_Specular.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\Paris_LiquorBottle_02_Glass_Normal.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\Paris_LiquorBottle_02_Glass_BaseColor.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\Paris_LiquorBottle_02_Glass_Specular.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\Paris_LiquorBottle_01_Glass_Normal.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\Paris_LiquorBottle_01_Glass_BaseColor.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\Paris_LiquorBottle_01_Glass_Specular.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\Paris_LiquorBottle_03_Glass_Normal.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\Paris_LiquorBottle_03_Glass_BaseColor.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\Paris_LiquorBottle_03_Glass_Specular.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\Paris_Painting_Metal_Normal.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\Paris_Painting_Metal_BaseColor.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\Paris_Painting_Metal_Specular.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\Paris_Paintings_Normal.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\Paris_Paintings_BaseColor.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\Paris_Paintings_Specular.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\Paris_Paintings_Glass_Normal.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\Paris_Paintings_Glass_BaseColor.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\Paris_Paintings_Glass_Specular.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\Plates_Details_Normal.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\Plates_Details_BaseColor.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\Plates_Details_Specular.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\Plates_Ceramic_Normal.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\Plates_Ceramic_BaseColor.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\Plates_Ceramic_Specular.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\Paris_Radiator_Normal.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\Paris_Radiator_BaseColor.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\Paris_Radiator_Specular.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\Rubber_Bar_Mat_01_Normal.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\Rubber_Bar_Mat_01_BaseColor.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\Rubber_Bar_Mat_01_Specular.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\Plastic_01_Normal.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\Plastic_01_BaseColor.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\Plastic_01_Specular.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\ToffeeJar_Toffee_Normal.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\ToffeeJar_Toffee_BaseColor.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\ToffeeJar_Toffee_Specular.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\Paris_Wall_Light_Interior_Emissive.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\Paris_Wall_Light_Interior_Normal.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\Paris_Wall_Light_Interior_BaseColor.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\Paris_Wall_Light_Interior_Specular.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\Paris_Wall_Bulb_Light_Normal.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\Paris_Wall_Bulb_Light_BaseColor.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\Paris_Wall_Bulb_Light_Specular.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\Wall_Lamp_Normal.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\Wall_Lamp_BaseColor.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\Wall_Lamp_Specular.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\Metal_Bronze_01_Normal.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\Metal_Bronze_01_BaseColor.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\Metal_Bronze_01_Specular.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\WickerBasket_Normal.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\WickerBasket_BaseColor.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\WickerBasket_Specular.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\MASTER_Glass_Exterior_Normal.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\MASTER_Glass_Exterior_BaseColor.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\MASTER_Glass_Exterior_Specular.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\MASTER_Bistro_Main_Door_Normal.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\MASTER_Bistro_Main_Door_BaseColor.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\MASTER_Bistro_Main_Door_Specular.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\MASTER_Concrete_Yellow_Normal.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\MASTER_Concrete_Yellow_BaseColor.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\MASTER_Concrete_Yellow_Specular.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\MASTER_Concrete_Grooved_Normal.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\MASTER_Concrete_Grooved_BaseColor.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\MASTER_Concrete_Grooved_Specular.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\MASTER_Concrete_Normal.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\MASTER_Concrete_BaseColor.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\MASTER_Concrete_Specular.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\MASTER_Concrete1_Normal.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\MASTER_Concrete1_BaseColor.dds
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Gltf\Textures\MASTER_Concrete1_Specular.dds
+    assetPath: 
+  reportItems:
+  - type: 2
+    code: 20
+    messages:
+    - KHR_materials_specular
+  - type: 2
+    code: 20
+    messages:
+    - KHR_materials_ior
+  - type: 0
+    code: 8
+    messages:
+    - Cannot find resource at path Assets\Gltf\BistroInterior.bin
+    - 0

@@ -1,0 +1,26 @@
+fileFormatVersion: 2
+guid: 6f39bf28c58a7c243a074c7e7ae369e8
+ScriptedImporter:
+  internalIDToNameTable: []
+  externalObjects: {}
+  serializedVersion: 2
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+  script: {fileID: 11500000, guid: ea13329833ed16543aa33a7c88f8c5bf, type: 3}
+  isComputeShader: 1
+  additionalIncludePaths:
+  - ../RenderingPlugin/External/RTXDI-Library/Include
+  - ../RenderingPlugin/External/donut/include
+  - ../RenderingPlugin/External/RTXDI/Samples/FullSample/Shaders/SharedShaderInclude
+  - ../RenderingPlugin/External/RTXDI/Samples/FullSample/Shaders/LightingPasses/DI
+  extraArgs:
+  - -Wno-conversion
+  - -enable-16bit-types
+  defines:
+  - USE_RAY_QUERY=1
+  - RTXDI_REGIR_MODE=RTXDI_REGIR_ONION
+  entryPoint: main
+  targetProfile: cs_6_6
+  rootConstantsHints: []
+  rootSRVHints: []

@@ -1,0 +1,25 @@
+﻿fileFormatVersion: 2
+guid: d39e180f0a3b4801969e3c8626e4f939
+ScriptedImporter:
+  internalIDToNameTable: []
+  externalObjects: {}
+  serializedVersion: 2
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+  script: {fileID: 11500000, guid: ea13329833ed16543aa33a7c88f8c5bf, type: 3}
+  isComputeShader: 1
+  additionalIncludePaths:
+  - ../RenderingPlugin/External/RTXPT/Rtxpt/Lighting
+  - ../RenderingPlugin/External/RTXPT/Rtxpt
+  - ../RenderingPlugin/External/RTXPT/External/Nrd/Shaders/Include
+  - ../RenderingPlugin/External/RTXPT/External/Rtxdi/Include
+  - ../RenderingPlugin/External/RTXPT/External
+  - ../RenderingPlugin/External/donut/include
+  extraArgs:
+  - -enable-16bit-types
+  defines: []
+  entryPoint: ResetLightProxyCounters
+  targetProfile: cs_6_6
+  rootConstantsHints: []
+  rootSRVHints: []

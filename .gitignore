@@ -1,6 +1,8 @@
 ﻿.vs/
 .idea/
 .vscode/
+.claude/
+build/
 
 # Unity generated
 UnityProject/Library/
@@ -13,3 +15,13 @@ UnityProject/ProfilerCaptures/
 UnityProject/*.sln
 UnityProject/*.csproj
 
+Editor.log
+/RTXDI/
+
+# Generated reflection dumps next to .computeshader assets
+*.computeshader.reflection.json
+*.computeshader.reflection.json.meta
+
+# Build output DLLs copied by build_and_copy.bat
+UnityProject/Packages/top.kuanmi.native-ray-tracing/Plugins/x86_64/
+UnityProject/Assets/Plugins/x86_64/

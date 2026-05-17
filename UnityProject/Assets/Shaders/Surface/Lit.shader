@@ -339,7 +339,7 @@ Shader "RayTracing/Lit"
                 float4 n = _BumpMap.SampleLevel(sampler_BumpMap, _BaseMap_ST.xy * normalUV + _BaseMap_ST.zw, mip);
                 float3 tangentNormal = UnpackNormalScale(n, _BumpScale);
 
-                float3 bitangent = cross(normalWS.xyz, tangentWS.xyz);
+                float3 bitangent = - cross(normalWS.xyz, tangentWS.xyz) * sign(v.tangent.w);
                 half3x3 tangentToWorld = half3x3(tangentWS.xyz, bitangent.xyz, normalWS.xyz);
 
                 float3 matWorldNormal = TransformTangentToWorld(tangentNormal, tangentToWorld);
@@ -366,8 +366,7 @@ Shader "RayTracing/Lit"
                 // metallic = vv.r;
 
                 // for Bistro
-                float smooth = (1 - vv.g) * _Smoothness;
-                roughness = 1 - smooth;
+                roughness = vv.g * (1 - _Smoothness);
                 metallic = vv.b;
 
                 #else
@@ -606,8 +605,7 @@ Shader "RayTracing/Lit"
                 // metallic = vv.r;
 
                 // for Bistro
-                float smooth = (1 - vv.g) * _Smoothness;
-                roughness = 1 - smooth;
+                roughness = vv.g * (1 - _Smoothness);
                 metallic = vv.b;
 
                 #else

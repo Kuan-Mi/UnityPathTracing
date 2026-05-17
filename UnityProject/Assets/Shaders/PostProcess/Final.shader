@@ -118,9 +118,12 @@
 
                 i.uv = i.uv * _BlitScaleBias.xy + _BlitScaleBias.zw;
 
-                float OUT_SHADOW_TRANSLUCENCY = SAMPLE_TEXTURE2D(_BlitTexture, sampler_BlitTexture, i.uv).r;
-                float shadow = SIGMA_BackEnd_UnpackShadow(OUT_SHADOW_TRANSLUCENCY);
+                float4 shadowData = SAMPLE_TEXTURE2D(_BlitTexture, sampler_BlitTexture, i.uv);
+                float shadow = SIGMA_BackEnd_UnpackShadow(shadowData).x;
                 float4 color = float4(shadow, shadow, shadow, 1);
+                
+                // float3 shadow = SIGMA_BackEnd_UnpackShadow(shadowData).yzw;
+                // float4 color = float4(shadow,  1);
 
                 return color;
             }
@@ -327,7 +330,8 @@
 
                 // float3 normal = X.rgb ;
 
-                float3 n = float3(-X.r, -X.b, X.g);
+                // float3 n = float3(-X.r, -X.b, X.g);
+                float3 n = X.rgb;
 
                 float3 normal = n * 0.5 + 0.5; // [-1,1] -> [0,1]
 
@@ -641,7 +645,7 @@
                 float missing = shadowHitDist >= NRD_FP16_MAX ? 1.0 : 0.0;
 
 
-                float4 color = float4(missing, missing, missing, 1);
+                float4 color = float4(OUT_SHADOW_TRANSLUCENCY.x, OUT_SHADOW_TRANSLUCENCY.x, OUT_SHADOW_TRANSLUCENCY.x, 1);
 
                 return color;
             }
@@ -725,6 +729,494 @@
 
 
                 return float4(color, 1);
+            }
+            ENDHLSL
+        }
+
+        // 10
+        Pass
+        {
+            Name "ShowViewZ"
+            ZWrite Off
+            ZTest Always
+            Cull Off
+            Blend SrcAlpha OneMinusSrcAlpha
+
+            HLSLPROGRAM
+            #pragma vertex Vert
+            #pragma fragment Frag
+            #pragma target 4.5
+
+            #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
+
+            TEXTURE2D(_BlitTexture);
+            SAMPLER(sampler_BlitTexture);
+            float4 _BlitScaleBias;
+
+            struct Attributes
+            {
+                uint vertexID : SV_VertexID;
+            };
+
+            struct Varyings
+            {
+                float4 positionCS : SV_POSITION;
+                float2 uv : TEXCOORD0;
+            };
+
+            Varyings Vert(Attributes input)
+            {
+                Varyings o;
+                o.positionCS = GetFullScreenTriangleVertexPosition(input.vertexID);
+                o.uv = GetFullScreenTriangleTexCoord(input.vertexID);
+                return o;
+            }
+
+            float4 Frag(Varyings i) : SV_Target
+            {
+                #ifdef UNITY_UV_STARTS_AT_TOP
+                i.uv.y = 1.0 - i.uv.y;
+                #endif
+                i.uv = i.uv * _BlitScaleBias.xy + _BlitScaleBias.zw;
+
+                // ViewZ 存储的是负值（view space, camera looks down -Z）
+                float viewZ = SAMPLE_TEXTURE2D(_BlitTexture, sampler_BlitTexture, i.uv).r;
+                float depth = -viewZ; // 转为正数
+
+                // 对数映射：更好地显示近处细节
+                float normalized = log2(1.0 + depth) / log2(1.0 + 1000.0);
+                normalized = saturate(normalized);
+
+                return float4(normalized, normalized, normalized, 1);
+            }
+            ENDHLSL
+        }
+        // 11
+        Pass
+        {
+            Name "ShowGradient"
+            ZWrite Off
+            ZTest Always
+            Cull Off
+            Blend SrcAlpha OneMinusSrcAlpha
+
+            HLSLPROGRAM
+            #pragma vertex Vert
+            #pragma fragment Frag
+            #pragma target 4.5
+
+            #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
+
+            TEXTURE2D(_BlitTexture);
+            SAMPLER(sampler_BlitTexture);
+            float4 _BlitScaleBias;
+
+            struct Attributes
+            {
+                uint vertexID : SV_VertexID;
+            };
+
+            struct Varyings
+            {
+                float4 positionCS : SV_POSITION;
+                float2 uv : TEXCOORD0;
+            };
+
+            Varyings Vert(Attributes input)
+            {
+                Varyings o;
+                o.positionCS = GetFullScreenTriangleVertexPosition(input.vertexID);
+                o.uv = GetFullScreenTriangleTexCoord(input.vertexID);
+                return o;
+            }
+
+            float4 Frag(Varyings i) : SV_Target
+            {
+                #ifdef UNITY_UV_STARTS_AT_TOP
+                i.uv.y = 1.0 - i.uv.y;
+                #endif
+                i.uv = i.uv * _BlitScaleBias.xy + _BlitScaleBias.zw;
+
+                float Gradient = SAMPLE_TEXTURE2D(_BlitTexture, sampler_BlitTexture, i.uv).r;
+
+
+                return float4(Gradient, Gradient, Gradient, 1);
+            }
+            ENDHLSL
+        }
+
+        // ── Rtxdi GBuffer debug passes ───────────────────────────────────────────
+        // These passes operate on R32_UINT or R32_SFloat textures produced by
+        // NativeRtxdiRaytracedGBufferPass.  R32_UINT is not hardware-filterable so
+        // we declare _BlitTexture with the correct scalar type and use .Load().
+
+        // 12 – RtxdiViewDepth  (R32_SFloat → greyscale log depth)
+        Pass
+        {
+            Name "RtxdiViewDepth"
+            ZWrite Off ZTest Always Cull Off
+            Blend SrcAlpha OneMinusSrcAlpha
+
+            HLSLPROGRAM
+            #pragma vertex Vert
+            #pragma fragment Frag
+            #pragma target 4.5
+            #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
+
+            Texture2D<float> _BlitTexture;
+            float4 _BlitScaleBias;
+
+            struct Attributes { uint vertexID : SV_VertexID; };
+            struct Varyings   { float4 positionCS : SV_POSITION; float2 uv : TEXCOORD0; };
+
+            Varyings Vert(Attributes i)
+            {
+                Varyings o;
+                o.positionCS = GetFullScreenTriangleVertexPosition(i.vertexID);
+                o.uv         = GetFullScreenTriangleTexCoord(i.vertexID);
+                return o;
+            }
+
+            float4 Frag(Varyings i) : SV_Target
+            {
+                #ifdef UNITY_UV_STARTS_AT_TOP
+                i.uv.y = 1.0 - i.uv.y;
+                #endif
+                i.uv = i.uv * _BlitScaleBias.xy + _BlitScaleBias.zw;
+                uint2 dim; _BlitTexture.GetDimensions(dim.x, dim.y);
+                int2  px   = int2(saturate(i.uv) * dim);
+                float viewZ = _BlitTexture.Load(int3(px, 0));
+                float d = log2(1.0 + (viewZ)) / log2(1.0 + 1000.0);
+                d = saturate(d);
+                return float4(d, d, d, 1);
+            }
+            ENDHLSL
+        }
+
+        // 13 – RtxdiDiffuseAlbedo  (R32_UINT R11G11B10_UFLOAT → float3 albedo)
+        Pass
+        {
+            Name "RtxdiDiffuseAlbedo"
+            ZWrite Off ZTest Always Cull Off
+            Blend SrcAlpha OneMinusSrcAlpha
+
+            HLSLPROGRAM
+            #pragma vertex Vert
+            #pragma fragment Frag
+            #pragma target 4.5
+            #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
+            #include "Assets/Shaders/donut/packing.hlsli"
+
+            Texture2D<uint> _BlitTexture;
+            float4 _BlitScaleBias;
+
+            struct Attributes { uint vertexID : SV_VertexID; };
+            struct Varyings   { float4 positionCS : SV_POSITION; float2 uv : TEXCOORD0; };
+
+            Varyings Vert(Attributes i)
+            {
+                Varyings o;
+                o.positionCS = GetFullScreenTriangleVertexPosition(i.vertexID);
+                o.uv         = GetFullScreenTriangleTexCoord(i.vertexID);
+                return o;
+            }
+
+            float4 Frag(Varyings i) : SV_Target
+            {
+                #ifdef UNITY_UV_STARTS_AT_TOP
+                i.uv.y = 1.0 - i.uv.y;
+                #endif
+                i.uv = i.uv * _BlitScaleBias.xy + _BlitScaleBias.zw;
+                uint2 dim; _BlitTexture.GetDimensions(dim.x, dim.y);
+                int2  px     = int2(saturate(i.uv) * dim);
+                uint  packed = _BlitTexture.Load(int3(px, 0));
+                float3 albedo = Unpack_R11G11B10_UFLOAT(packed);
+                return float4(albedo, 1);
+            }
+            ENDHLSL
+        }
+
+        // 14 – RtxdiSpecularF0  (R32_UINT R8G8B8A8_Gamma_UFLOAT → float3 F0 in RGB)
+        Pass
+        {
+            Name "RtxdiSpecularF0"
+            ZWrite Off ZTest Always Cull Off
+            Blend SrcAlpha OneMinusSrcAlpha
+
+            HLSLPROGRAM
+            #pragma vertex Vert
+            #pragma fragment Frag
+            #pragma target 4.5
+            #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
+            #include "Assets/Shaders/donut/packing.hlsli"
+
+            Texture2D<uint> _BlitTexture;
+            float4 _BlitScaleBias;
+
+            struct Attributes { uint vertexID : SV_VertexID; };
+            struct Varyings   { float4 positionCS : SV_POSITION; float2 uv : TEXCOORD0; };
+
+            Varyings Vert(Attributes i)
+            {
+                Varyings o;
+                o.positionCS = GetFullScreenTriangleVertexPosition(i.vertexID);
+                o.uv         = GetFullScreenTriangleTexCoord(i.vertexID);
+                return o;
+            }
+
+            float4 Frag(Varyings i) : SV_Target
+            {
+                #ifdef UNITY_UV_STARTS_AT_TOP
+                i.uv.y = 1.0 - i.uv.y;
+                #endif
+                i.uv = i.uv * _BlitScaleBias.xy + _BlitScaleBias.zw;
+                uint2 dim; _BlitTexture.GetDimensions(dim.x, dim.y);
+                int2  px     = int2(saturate(i.uv) * dim);
+                uint  packed = _BlitTexture.Load(int3(px, 0));
+                float3 f0 = Unpack_R8G8B8A8_Gamma_UFLOAT(packed).rgb;
+                return float4(f0, 1);
+            }
+            ENDHLSL
+        }
+
+        // 15 – RtxdiRoughness  (R32_UINT R8G8B8A8_Gamma_UFLOAT → roughness in A)
+        Pass
+        {
+            Name "RtxdiRoughness"
+            ZWrite Off ZTest Always Cull Off
+            Blend SrcAlpha OneMinusSrcAlpha
+
+            HLSLPROGRAM
+            #pragma vertex Vert
+            #pragma fragment Frag
+            #pragma target 4.5
+            #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
+            #include "Assets/Shaders/donut/packing.hlsli"
+
+            Texture2D<uint> _BlitTexture;
+            float4 _BlitScaleBias;
+
+            struct Attributes { uint vertexID : SV_VertexID; };
+            struct Varyings   { float4 positionCS : SV_POSITION; float2 uv : TEXCOORD0; };
+
+            Varyings Vert(Attributes i)
+            {
+                Varyings o;
+                o.positionCS = GetFullScreenTriangleVertexPosition(i.vertexID);
+                o.uv         = GetFullScreenTriangleTexCoord(i.vertexID);
+                return o;
+            }
+
+            float4 Frag(Varyings i) : SV_Target
+            {
+                #ifdef UNITY_UV_STARTS_AT_TOP
+                i.uv.y = 1.0 - i.uv.y;
+                #endif
+                i.uv = i.uv * _BlitScaleBias.xy + _BlitScaleBias.zw;
+                uint2 dim; _BlitTexture.GetDimensions(dim.x, dim.y);
+                int2  px        = int2(saturate(i.uv) * dim);
+                uint  packed    = _BlitTexture.Load(int3(px, 0));
+                float roughness = Unpack_R8G8B8A8_Gamma_UFLOAT(packed).a;
+                return float4(roughness, roughness, roughness, 1);
+            }
+            ENDHLSL
+        }
+
+        // 16 – RtxdiNormal  (R32_UINT oct32 → shading normal mapped to [0,1])
+        Pass
+        {
+            Name "RtxdiNormal"
+            ZWrite Off ZTest Always Cull Off
+            Blend SrcAlpha OneMinusSrcAlpha
+
+            HLSLPROGRAM
+            #pragma vertex Vert
+            #pragma fragment Frag
+            #pragma target 4.5
+            #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
+            #include "Assets/Shaders/donut/utils.hlsli"
+
+            Texture2D<uint> _BlitTexture;
+            float4 _BlitScaleBias;
+
+            struct Attributes { uint vertexID : SV_VertexID; };
+            struct Varyings   { float4 positionCS : SV_POSITION; float2 uv : TEXCOORD0; };
+
+            Varyings Vert(Attributes i)
+            {
+                Varyings o;
+                o.positionCS = GetFullScreenTriangleVertexPosition(i.vertexID);
+                o.uv         = GetFullScreenTriangleTexCoord(i.vertexID);
+                return o;
+            }
+
+            float4 Frag(Varyings i) : SV_Target
+            {
+                #ifdef UNITY_UV_STARTS_AT_TOP
+                i.uv.y = 1.0 - i.uv.y;
+                #endif
+                i.uv = i.uv * _BlitScaleBias.xy + _BlitScaleBias.zw;
+                uint2 dim; _BlitTexture.GetDimensions(dim.x, dim.y);
+                int2  px     = int2(saturate(i.uv) * dim);
+                uint  packed = _BlitTexture.Load(int3(px, 0));
+                float3 n     = octToNdirUnorm32(packed);
+                return float4(n, 1);
+            }
+            ENDHLSL
+        }
+
+        // 17 – RtxdiGeoNormal  (R32_UINT oct32 → geometry normal mapped to [0,1])
+        Pass
+        {
+            Name "RtxdiGeoNormal"
+            ZWrite Off ZTest Always Cull Off
+            Blend SrcAlpha OneMinusSrcAlpha
+
+            HLSLPROGRAM
+            #pragma vertex Vert
+            #pragma fragment Frag
+            #pragma target 4.5
+            #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
+            #include "Assets/Shaders/donut/utils.hlsli"
+
+            Texture2D<uint> _BlitTexture;
+            float4 _BlitScaleBias;
+
+            struct Attributes { uint vertexID : SV_VertexID; };
+            struct Varyings   { float4 positionCS : SV_POSITION; float2 uv : TEXCOORD0; };
+
+            Varyings Vert(Attributes i)
+            {
+                Varyings o;
+                o.positionCS = GetFullScreenTriangleVertexPosition(i.vertexID);
+                o.uv         = GetFullScreenTriangleTexCoord(i.vertexID);
+                return o;
+            }
+
+            float4 Frag(Varyings i) : SV_Target
+            {
+                #ifdef UNITY_UV_STARTS_AT_TOP
+                i.uv.y = 1.0 - i.uv.y;
+                #endif
+                i.uv = i.uv * _BlitScaleBias.xy + _BlitScaleBias.zw;
+                uint2 dim; _BlitTexture.GetDimensions(dim.x, dim.y);
+                int2  px     = int2(saturate(i.uv) * dim);
+                uint  packed = _BlitTexture.Load(int3(px, 0));
+                float3 n     = octToNdirUnorm32(packed);
+                return float4(n, 1);
+            }
+            ENDHLSL
+        }
+
+        // 18 – PdfTextureMip  (R32_Float → log-scale heat map of a chosen mip level)
+        //  _PdfMipLevel : int   – which mip to display (0 = full-res, 1, 2, ...)
+        Pass
+        {
+            Name "PdfTextureMip"
+            ZWrite Off ZTest Always Cull Off
+            Blend Off
+
+            HLSLPROGRAM
+            #pragma vertex Vert
+            #pragma fragment Frag
+            #pragma target 4.5
+            #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
+
+            Texture2D<float> _BlitTexture;
+            float4           _BlitScaleBias;
+            int              _PdfMipLevel;
+            // Exposure in stops: positive = brighter (magnify dim values), negative = darker.
+            // 0 = default range (~65504 peak). Each +1 stop doubles visible sensitivity.
+            float            _PdfExposureStops;
+
+            struct Attributes { uint vertexID : SV_VertexID; };
+            struct Varyings   { float4 positionCS : SV_POSITION; float2 uv : TEXCOORD0; };
+
+            Varyings Vert(Attributes i)
+            {
+                Varyings o;
+                o.positionCS = GetFullScreenTriangleVertexPosition(i.vertexID);
+                o.uv         = GetFullScreenTriangleTexCoord(i.vertexID);
+                return o;
+            }
+
+            // Jet-style heat map: 0=blue, 0.5=green, 1=red
+            float3 HeatMap(float t)
+            {
+                t = saturate(t);
+                float r = saturate(1.5 - abs(t * 4.0 - 3.0));
+                float g = saturate(1.5 - abs(t * 4.0 - 2.0));
+                float b = saturate(1.5 - abs(t * 4.0 - 1.0));
+                return float3(r, g, b);
+            }
+
+            float4 Frag(Varyings i) : SV_Target
+            {
+                #ifdef UNITY_UV_STARTS_AT_TOP
+                i.uv.y = 1.0 - i.uv.y;
+                #endif
+                i.uv = i.uv * _BlitScaleBias.xy + _BlitScaleBias.zw;
+
+                uint mipW, mipH, mipCount;
+                _BlitTexture.GetDimensions(_PdfMipLevel, mipW, mipH, mipCount);
+
+                // Clamp requested mip to valid range
+                int mip = clamp(_PdfMipLevel, 0, (int)mipCount - 1);
+                _BlitTexture.GetDimensions(mip, mipW, mipH, mipCount);
+
+                int2 px    = int2(saturate(i.uv) * float2(mipW, mipH));
+                float val  = _BlitTexture.Load(int3(px, mip));
+
+                // Log-scale with exposure control.
+                // _PdfExposureStops > 0  → peak maps lower (brighter / more sensitive)
+                // _PdfExposureStops < 0  → peak maps higher (darker / less sensitive)
+     
+     
+                float scale = pow(2.0, _PdfExposureStops);
+                float3 color = val * scale;
+
+                return float4(color, 1);
+            }
+            ENDHLSL
+        }
+
+        // 19 – ShowGradientArray  (Texture2DArray, slice selected by _GradientArraySlice)
+        Pass
+        {
+            Name "ShowGradientArray"
+            ZWrite Off ZTest Always Cull Off
+            Blend SrcAlpha OneMinusSrcAlpha
+
+            HLSLPROGRAM
+            #pragma vertex Vert
+            #pragma fragment Frag
+            #pragma target 4.5
+            #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
+
+            TEXTURE2D_ARRAY(_GradientArray);
+            SAMPLER(sampler_GradientArray);
+            float4 _BlitScaleBias;
+            int    _GradientArraySlice;
+
+            struct Attributes { uint vertexID : SV_VertexID; };
+            struct Varyings   { float4 positionCS : SV_POSITION; float2 uv : TEXCOORD0; };
+
+            Varyings Vert(Attributes i)
+            {
+                Varyings o;
+                o.positionCS = GetFullScreenTriangleVertexPosition(i.vertexID);
+                o.uv         = GetFullScreenTriangleTexCoord(i.vertexID);
+                return o;
+            }
+
+            float4 Frag(Varyings i) : SV_Target
+            {
+                #ifdef UNITY_UV_STARTS_AT_TOP
+                i.uv.y = 1.0 - i.uv.y;
+                #endif
+                i.uv = i.uv * _BlitScaleBias.xy + _BlitScaleBias.zw;
+                float4 c = SAMPLE_TEXTURE2D_ARRAY(_GradientArray, sampler_GradientArray, i.uv, _GradientArraySlice);
+                return float4(abs(c.rgb), 1.0);
             }
             ENDHLSL
         }

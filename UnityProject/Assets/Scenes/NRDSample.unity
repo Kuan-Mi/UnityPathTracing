@@ -575,7 +575,7 @@ Light:
   m_Enabled: 1
   serializedVersion: 12
   m_Type: 1
-  m_Color: {r: 1.2355534, g: 1.1409429, b: 0.99371785, a: 1}
+  m_Color: {r: 1.2189051, g: 1.1023413, b: 0.9449104, a: 1}
   m_Intensity: 1
   m_Range: 10
   m_SpotAngle: 30
@@ -638,13 +638,13 @@ Transform:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 410087039}
   serializedVersion: 2
-  m_LocalRotation: {x: 0.33702597, y: 0.065081656, z: -0.023360291, w: 0.93895274}
-  m_LocalPosition: {x: -15.7, y: 5.1082854, z: -2.4569862}
+  m_LocalRotation: {x: -0.2300766, y: -0.05445875, z: 0.046014536, w: -0.9705574}
+  m_LocalPosition: {x: -7.1423864, y: 7.249296, z: -5.5177464}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
   m_Father: {fileID: 0}
-  m_LocalEulerAnglesHint: {x: 39.49, y: 7.93, z: 0}
+  m_LocalEulerAnglesHint: {x: 153.153, y: 185.437, z: 175.87}
 --- !u!114 &410087042
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -901,6 +901,169 @@ MeshFilter:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 835592087}
   m_Mesh: {fileID: 10207, guid: 0000000000000000e000000000000000, type: 0}
+--- !u!1 &1015431879
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1015431884}
+  - component: {fileID: 1015431883}
+  - component: {fileID: 1015431882}
+  - component: {fileID: 1015431881}
+  - component: {fileID: 1015431880}
+  m_Layer: 0
+  m_Name: Cube (2)
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!114 &1015431880
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1015431879}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 7765801a50bd3ca4cbfacd1f313497a2, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: NativeRayTracing.Runtime::NativeRender.NativeRayTracingTarget
+  ommCaches: []
+  _isStaticObject: 0
+  meshRenderer: {fileID: 1015431882}
+  SubmeshMaterialInfos:
+  - material: {fileID: 2100000, guid: 31321ba15b8f8eb4c954353edc038b1d, type: 2}
+    isTransparent: 0
+    isEmissive: 0
+    isAlphaClip: 0
+    textures:
+    - {fileID: 0}
+    - {fileID: 0}
+    - {fileID: 0}
+    - {fileID: 0}
+    baseColor: {r: 0.21404114, g: 0.21404114, b: 0.21404114, a: 1}
+    emissionColor: {r: 0, g: 0, b: 0, a: 1}
+    metallic: 0
+    roughnessScale: 0.5
+    normalScale: 1
+  SubmeshGroups:
+  - isTransparent: 0
+    isEmissive: 0
+    isAlphaClip: 0
+    submeshIndices: 00000000
+    materialDatas:
+    - material: {fileID: 2100000, guid: 31321ba15b8f8eb4c954353edc038b1d, type: 2}
+      isTransparent: 0
+      isEmissive: 0
+      isAlphaClip: 0
+      textures:
+      - {fileID: 0}
+      - {fileID: 0}
+      - {fileID: 0}
+      - {fileID: 0}
+      baseColor: {r: 0.21404114, g: 0.21404114, b: 0.21404114, a: 1}
+      emissionColor: {r: 0, g: 0, b: 0, a: 1}
+      metallic: 0
+      roughnessScale: 0.5
+      normalScale: 1
+--- !u!65 &1015431881
+BoxCollider:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1015431879}
+  m_Material: {fileID: 0}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_LayerOverridePriority: 0
+  m_IsTrigger: 0
+  m_ProvidesContacts: 0
+  m_Enabled: 1
+  serializedVersion: 3
+  m_Size: {x: 1, y: 1, z: 1}
+  m_Center: {x: 0, y: 0, z: 0}
+--- !u!23 &1015431882
+MeshRenderer:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1015431879}
+  m_Enabled: 1
+  m_CastShadows: 1
+  m_ReceiveShadows: 1
+  m_DynamicOccludee: 1
+  m_StaticShadowCaster: 0
+  m_MotionVectors: 1
+  m_LightProbeUsage: 1
+  m_ReflectionProbeUsage: 1
+  m_RayTracingMode: 2
+  m_RayTraceProcedural: 0
+  m_RayTracingAccelStructBuildFlagsOverride: 0
+  m_RayTracingAccelStructBuildFlags: 1
+  m_SmallMeshCulling: 1
+  m_ForceMeshLod: -1
+  m_MeshLodSelectionBias: 0
+  m_RenderingLayerMask: 1
+  m_RendererPriority: 0
+  m_Materials:
+  - {fileID: 2100000, guid: 31321ba15b8f8eb4c954353edc038b1d, type: 2}
+  m_StaticBatchInfo:
+    firstSubMesh: 0
+    subMeshCount: 0
+  m_StaticBatchRoot: {fileID: 0}
+  m_ProbeAnchor: {fileID: 0}
+  m_LightProbeVolumeOverride: {fileID: 0}
+  m_ScaleInLightmap: 1
+  m_ReceiveGI: 1
+  m_PreserveUVs: 0
+  m_IgnoreNormalsForChartDetection: 0
+  m_ImportantGI: 0
+  m_StitchLightmapSeams: 1
+  m_SelectedEditorRenderState: 3
+  m_MinimumChartSize: 4
+  m_AutoUVMaxDistance: 0.5
+  m_AutoUVMaxAngle: 89
+  m_LightmapParameters: {fileID: 0}
+  m_GlobalIlluminationMeshLod: 0
+  m_SortingLayerID: 0
+  m_SortingLayer: 0
+  m_SortingOrder: 0
+  m_MaskInteraction: 0
+  m_AdditionalVertexStreams: {fileID: 0}
+--- !u!33 &1015431883
+MeshFilter:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1015431879}
+  m_Mesh: {fileID: 10202, guid: 0000000000000000e000000000000000, type: 0}
+--- !u!4 &1015431884
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1015431879}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0.7071068, z: 0, w: 0.7071068}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 1816539104}
+  m_LocalEulerAnglesHint: {x: 0, y: 90, z: 0}
 --- !u!1 &1109635456
 GameObject:
   m_ObjectHideFlags: 0
@@ -1028,6 +1191,169 @@ Transform:
   m_Children: []
   m_Father: {fileID: 2088091275}
   m_LocalEulerAnglesHint: {x: -83.906, y: 0, z: 0}
+--- !u!1 &1154397538
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1154397543}
+  - component: {fileID: 1154397542}
+  - component: {fileID: 1154397541}
+  - component: {fileID: 1154397540}
+  - component: {fileID: 1154397539}
+  m_Layer: 0
+  m_Name: Cube
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!114 &1154397539
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1154397538}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 7765801a50bd3ca4cbfacd1f313497a2, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: NativeRayTracing.Runtime::NativeRender.NativeRayTracingTarget
+  ommCaches: []
+  _isStaticObject: 0
+  meshRenderer: {fileID: 1154397541}
+  SubmeshMaterialInfos:
+  - material: {fileID: 2100000, guid: 31321ba15b8f8eb4c954353edc038b1d, type: 2}
+    isTransparent: 0
+    isEmissive: 0
+    isAlphaClip: 0
+    textures:
+    - {fileID: 0}
+    - {fileID: 0}
+    - {fileID: 0}
+    - {fileID: 0}
+    baseColor: {r: 0.21404114, g: 0.21404114, b: 0.21404114, a: 1}
+    emissionColor: {r: 0, g: 0, b: 0, a: 1}
+    metallic: 0
+    roughnessScale: 0.5
+    normalScale: 1
+  SubmeshGroups:
+  - isTransparent: 0
+    isEmissive: 0
+    isAlphaClip: 0
+    submeshIndices: 00000000
+    materialDatas:
+    - material: {fileID: 2100000, guid: 31321ba15b8f8eb4c954353edc038b1d, type: 2}
+      isTransparent: 0
+      isEmissive: 0
+      isAlphaClip: 0
+      textures:
+      - {fileID: 0}
+      - {fileID: 0}
+      - {fileID: 0}
+      - {fileID: 0}
+      baseColor: {r: 0.21404114, g: 0.21404114, b: 0.21404114, a: 1}
+      emissionColor: {r: 0, g: 0, b: 0, a: 1}
+      metallic: 0
+      roughnessScale: 0.5
+      normalScale: 1
+--- !u!65 &1154397540
+BoxCollider:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1154397538}
+  m_Material: {fileID: 0}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_LayerOverridePriority: 0
+  m_IsTrigger: 0
+  m_ProvidesContacts: 0
+  m_Enabled: 1
+  serializedVersion: 3
+  m_Size: {x: 1, y: 1, z: 1}
+  m_Center: {x: 0, y: 0, z: 0}
+--- !u!23 &1154397541
+MeshRenderer:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1154397538}
+  m_Enabled: 1
+  m_CastShadows: 1
+  m_ReceiveShadows: 1
+  m_DynamicOccludee: 1
+  m_StaticShadowCaster: 0
+  m_MotionVectors: 1
+  m_LightProbeUsage: 1
+  m_ReflectionProbeUsage: 1
+  m_RayTracingMode: 2
+  m_RayTraceProcedural: 0
+  m_RayTracingAccelStructBuildFlagsOverride: 0
+  m_RayTracingAccelStructBuildFlags: 1
+  m_SmallMeshCulling: 1
+  m_ForceMeshLod: -1
+  m_MeshLodSelectionBias: 0
+  m_RenderingLayerMask: 1
+  m_RendererPriority: 0
+  m_Materials:
+  - {fileID: 2100000, guid: 31321ba15b8f8eb4c954353edc038b1d, type: 2}
+  m_StaticBatchInfo:
+    firstSubMesh: 0
+    subMeshCount: 0
+  m_StaticBatchRoot: {fileID: 0}
+  m_ProbeAnchor: {fileID: 0}
+  m_LightProbeVolumeOverride: {fileID: 0}
+  m_ScaleInLightmap: 1
+  m_ReceiveGI: 1
+  m_PreserveUVs: 0
+  m_IgnoreNormalsForChartDetection: 0
+  m_ImportantGI: 0
+  m_StitchLightmapSeams: 1
+  m_SelectedEditorRenderState: 3
+  m_MinimumChartSize: 4
+  m_AutoUVMaxDistance: 0.5
+  m_AutoUVMaxAngle: 89
+  m_LightmapParameters: {fileID: 0}
+  m_GlobalIlluminationMeshLod: 0
+  m_SortingLayerID: 0
+  m_SortingLayer: 0
+  m_SortingOrder: 0
+  m_MaskInteraction: 0
+  m_AdditionalVertexStreams: {fileID: 0}
+--- !u!33 &1154397542
+MeshFilter:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1154397538}
+  m_Mesh: {fileID: 10202, guid: 0000000000000000e000000000000000, type: 0}
+--- !u!4 &1154397543
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1154397538}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: -14.84, y: 1.13068, z: -1.43}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &1197495795
 GameObject:
   m_ObjectHideFlags: 0
@@ -1395,6 +1721,7 @@ GameObject:
   - component: {fileID: 1672218822}
   - component: {fileID: 1672218824}
   - component: {fileID: 1672218823}
+  - component: {fileID: 1672218825}
   m_Layer: 0
   m_Name: ShaderBall_Concrete_Shimizu_ShaderBall (1)
   m_TagString: Untagged
@@ -1474,6 +1801,56 @@ MeshFilter:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1672218821}
   m_Mesh: {fileID: 6639483930795213293, guid: 9c2e154e190f89945a49f6b86fc55b2a, type: 3}
+--- !u!114 &1672218825
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1672218821}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 7765801a50bd3ca4cbfacd1f313497a2, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: NativeRayTracing.Runtime::NativeRender.NativeRayTracingTarget
+  ommCaches: []
+  _isStaticObject: 0
+  meshRenderer: {fileID: 1672218823}
+  SubmeshMaterialInfos:
+  - material: {fileID: 2100000, guid: 396c187fb8847ea4ab644b19e780390e, type: 2}
+    isTransparent: 0
+    isEmissive: 0
+    isAlphaClip: 0
+    textures:
+    - {fileID: 0}
+    - {fileID: 0}
+    - {fileID: 0}
+    - {fileID: 0}
+    baseColor: {r: 1, g: 0.94123554, b: 0.7524076, a: 1}
+    emissionColor: {r: 0, g: 0, b: 0, a: 1}
+    metallic: 0
+    roughnessScale: 0
+    normalScale: 0
+  SubmeshGroups:
+  - isTransparent: 0
+    isEmissive: 0
+    isAlphaClip: 0
+    submeshIndices: 00000000
+    materialDatas:
+    - material: {fileID: 2100000, guid: 396c187fb8847ea4ab644b19e780390e, type: 2}
+      isTransparent: 0
+      isEmissive: 0
+      isAlphaClip: 0
+      textures:
+      - {fileID: 0}
+      - {fileID: 0}
+      - {fileID: 0}
+      - {fileID: 0}
+      baseColor: {r: 1, g: 0.94123554, b: 0.7524076, a: 1}
+      emissionColor: {r: 0, g: 0, b: 0, a: 1}
+      metallic: 0
+      roughnessScale: 0
+      normalScale: 0
 --- !u!1 &1687737116
 GameObject:
   m_ObjectHideFlags: 0
@@ -1485,6 +1862,7 @@ GameObject:
   - component: {fileID: 1687737117}
   - component: {fileID: 1687737119}
   - component: {fileID: 1687737118}
+  - component: {fileID: 1687737120}
   m_Layer: 0
   m_Name: ShaderBall_Concrete_Shimizu_ShaderBall (3)
   m_TagString: Untagged
@@ -1564,6 +1942,56 @@ MeshFilter:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1687737116}
   m_Mesh: {fileID: 6639483930795213293, guid: 9c2e154e190f89945a49f6b86fc55b2a, type: 3}
+--- !u!114 &1687737120
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1687737116}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 7765801a50bd3ca4cbfacd1f313497a2, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: NativeRayTracing.Runtime::NativeRender.NativeRayTracingTarget
+  ommCaches: []
+  _isStaticObject: 0
+  meshRenderer: {fileID: 1687737118}
+  SubmeshMaterialInfos:
+  - material: {fileID: 2100000, guid: aee007a3fa67b2c439c3d17098fc5662, type: 2}
+    isTransparent: 0
+    isEmissive: 0
+    isAlphaClip: 0
+    textures:
+    - {fileID: 0}
+    - {fileID: 0}
+    - {fileID: 0}
+    - {fileID: 0}
+    baseColor: {r: 0.121448144, g: 0.8562991, b: 0.1749816, a: 1}
+    emissionColor: {r: 0, g: 0, b: 0, a: 1}
+    metallic: 0
+    roughnessScale: 1
+    normalScale: 0
+  SubmeshGroups:
+  - isTransparent: 0
+    isEmissive: 0
+    isAlphaClip: 0
+    submeshIndices: 00000000
+    materialDatas:
+    - material: {fileID: 2100000, guid: aee007a3fa67b2c439c3d17098fc5662, type: 2}
+      isTransparent: 0
+      isEmissive: 0
+      isAlphaClip: 0
+      textures:
+      - {fileID: 0}
+      - {fileID: 0}
+      - {fileID: 0}
+      - {fileID: 0}
+      baseColor: {r: 0.121448144, g: 0.8562991, b: 0.1749816, a: 1}
+      emissionColor: {r: 0, g: 0, b: 0, a: 1}
+      metallic: 0
+      roughnessScale: 1
+      normalScale: 0
 --- !u!1 &1712532248
 GameObject:
   m_ObjectHideFlags: 0
@@ -1575,6 +2003,7 @@ GameObject:
   - component: {fileID: 1712532249}
   - component: {fileID: 1712532251}
   - component: {fileID: 1712532250}
+  - component: {fileID: 1712532252}
   m_Layer: 0
   m_Name: Floor (3)
   m_TagString: Untagged
@@ -1654,6 +2083,56 @@ MeshFilter:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1712532248}
   m_Mesh: {fileID: 2636336197179252740, guid: 9c2e154e190f89945a49f6b86fc55b2a, type: 3}
+--- !u!114 &1712532252
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1712532248}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 7765801a50bd3ca4cbfacd1f313497a2, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: NativeRayTracing.Runtime::NativeRender.NativeRayTracingTarget
+  ommCaches: []
+  _isStaticObject: 0
+  meshRenderer: {fileID: 1712532250}
+  SubmeshMaterialInfos:
+  - material: {fileID: 2100000, guid: b2183b77dbd9a6841b237f374b1aa98e, type: 2}
+    isTransparent: 0
+    isEmissive: 0
+    isAlphaClip: 0
+    textures:
+    - {fileID: 2800000, guid: c0a41b5656f00de4d8239f65118bc165, type: 3}
+    - {fileID: 2800000, guid: bf8f44f5bc8384d41be295930fede691, type: 3}
+    - {fileID: 2800000, guid: 51196fdf27b68b24681f6b0cf24dd958, type: 3}
+    - {fileID: 0}
+    baseColor: {r: 1, g: 1, b: 1, a: 1}
+    emissionColor: {r: 0, g: 0, b: 0, a: 1}
+    metallic: 0
+    roughnessScale: 0.34500003
+    normalScale: 1
+  SubmeshGroups:
+  - isTransparent: 0
+    isEmissive: 0
+    isAlphaClip: 0
+    submeshIndices: 00000000
+    materialDatas:
+    - material: {fileID: 2100000, guid: b2183b77dbd9a6841b237f374b1aa98e, type: 2}
+      isTransparent: 0
+      isEmissive: 0
+      isAlphaClip: 0
+      textures:
+      - {fileID: 2800000, guid: c0a41b5656f00de4d8239f65118bc165, type: 3}
+      - {fileID: 2800000, guid: bf8f44f5bc8384d41be295930fede691, type: 3}
+      - {fileID: 2800000, guid: 51196fdf27b68b24681f6b0cf24dd958, type: 3}
+      - {fileID: 0}
+      baseColor: {r: 1, g: 1, b: 1, a: 1}
+      emissionColor: {r: 0, g: 0, b: 0, a: 1}
+      metallic: 0
+      roughnessScale: 0.34500003
+      normalScale: 1
 --- !u!1 &1748554751
 GameObject:
   m_ObjectHideFlags: 0
@@ -1665,6 +2144,7 @@ GameObject:
   - component: {fileID: 1748554752}
   - component: {fileID: 1748554754}
   - component: {fileID: 1748554753}
+  - component: {fileID: 1748554755}
   m_Layer: 0
   m_Name: ShaderBall_Concrete_Shimizu_ShaderBall (4)
   m_TagString: Untagged
@@ -1744,6 +2224,88 @@ MeshFilter:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1748554751}
   m_Mesh: {fileID: 6639483930795213293, guid: 9c2e154e190f89945a49f6b86fc55b2a, type: 3}
+--- !u!114 &1748554755
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1748554751}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 7765801a50bd3ca4cbfacd1f313497a2, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: NativeRayTracing.Runtime::NativeRender.NativeRayTracingTarget
+  ommCaches: []
+  _isStaticObject: 0
+  meshRenderer: {fileID: 1748554753}
+  SubmeshMaterialInfos:
+  - material: {fileID: 2100000, guid: 0a9f2294c03d27f4fbc173700574684f, type: 2}
+    isTransparent: 0
+    isEmissive: 0
+    isAlphaClip: 0
+    textures:
+    - {fileID: 0}
+    - {fileID: 2800000, guid: 9a7bfeb80605fa6458d072e5cc2e5548, type: 3}
+    - {fileID: 2800000, guid: 1e323752320081e4aaf6cf39ca508cff, type: 3}
+    - {fileID: 0}
+    baseColor: {r: 1, g: 1, b: 1, a: 1}
+    emissionColor: {r: 0, g: 0, b: 0, a: 1}
+    metallic: 0
+    roughnessScale: 0
+    normalScale: 1
+  SubmeshGroups:
+  - isTransparent: 0
+    isEmissive: 0
+    isAlphaClip: 0
+    submeshIndices: 00000000
+    materialDatas:
+    - material: {fileID: 2100000, guid: 0a9f2294c03d27f4fbc173700574684f, type: 2}
+      isTransparent: 0
+      isEmissive: 0
+      isAlphaClip: 0
+      textures:
+      - {fileID: 0}
+      - {fileID: 2800000, guid: 9a7bfeb80605fa6458d072e5cc2e5548, type: 3}
+      - {fileID: 2800000, guid: 1e323752320081e4aaf6cf39ca508cff, type: 3}
+      - {fileID: 0}
+      baseColor: {r: 1, g: 1, b: 1, a: 1}
+      emissionColor: {r: 0, g: 0, b: 0, a: 1}
+      metallic: 0
+      roughnessScale: 0
+      normalScale: 1
+--- !u!1 &1816539103
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1816539104}
+  m_Layer: 0
+  m_Name: GameObject
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &1816539104
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1816539103}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0.15141092, y: 0.7527166, z: -0.6131409, w: 0.18587823}
+  m_LocalPosition: {x: -13.03, y: 1.13068, z: -1.43}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children:
+  - {fileID: 1015431884}
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: -281.669, y: -207.743, z: 0}
 --- !u!1 &1858160348
 GameObject:
   m_ObjectHideFlags: 0
@@ -1755,6 +2317,7 @@ GameObject:
   - component: {fileID: 1858160349}
   - component: {fileID: 1858160351}
   - component: {fileID: 1858160350}
+  - component: {fileID: 1858160352}
   m_Layer: 0
   m_Name: ShaderBall_Concrete_Shimizu_ShaderBall (2)
   m_TagString: Untagged
@@ -1834,6 +2397,56 @@ MeshFilter:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1858160348}
   m_Mesh: {fileID: 6639483930795213293, guid: 9c2e154e190f89945a49f6b86fc55b2a, type: 3}
+--- !u!114 &1858160352
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1858160348}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 7765801a50bd3ca4cbfacd1f313497a2, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: NativeRayTracing.Runtime::NativeRender.NativeRayTracingTarget
+  ommCaches: []
+  _isStaticObject: 0
+  meshRenderer: {fileID: 1858160350}
+  SubmeshMaterialInfos:
+  - material: {fileID: 2100000, guid: 55b68156422e3434fab86ffc7561984d, type: 2}
+    isTransparent: 1
+    isEmissive: 0
+    isAlphaClip: 0
+    textures:
+    - {fileID: 0}
+    - {fileID: 0}
+    - {fileID: 0}
+    - {fileID: 0}
+    baseColor: {r: 1, g: 1, b: 1, a: 1}
+    emissionColor: {r: 0, g: 0, b: 0, a: 1}
+    metallic: 1
+    roughnessScale: 0
+    normalScale: 1
+  SubmeshGroups:
+  - isTransparent: 1
+    isEmissive: 0
+    isAlphaClip: 0
+    submeshIndices: 00000000
+    materialDatas:
+    - material: {fileID: 2100000, guid: 55b68156422e3434fab86ffc7561984d, type: 2}
+      isTransparent: 1
+      isEmissive: 0
+      isAlphaClip: 0
+      textures:
+      - {fileID: 0}
+      - {fileID: 0}
+      - {fileID: 0}
+      - {fileID: 0}
+      baseColor: {r: 1, g: 1, b: 1, a: 1}
+      emissionColor: {r: 0, g: 0, b: 0, a: 1}
+      metallic: 1
+      roughnessScale: 0
+      normalScale: 1
 --- !u!1 &1914419601
 GameObject:
   m_ObjectHideFlags: 0
@@ -1845,6 +2458,7 @@ GameObject:
   - component: {fileID: 1914419602}
   - component: {fileID: 1914419604}
   - component: {fileID: 1914419603}
+  - component: {fileID: 1914419605}
   m_Layer: 0
   m_Name: ShaderBall_Concrete_Shimizu_ShaderBall (5)
   m_TagString: Untagged
@@ -1924,6 +2538,56 @@ MeshFilter:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1914419601}
   m_Mesh: {fileID: 6639483930795213293, guid: 9c2e154e190f89945a49f6b86fc55b2a, type: 3}
+--- !u!114 &1914419605
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1914419601}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 7765801a50bd3ca4cbfacd1f313497a2, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: NativeRayTracing.Runtime::NativeRender.NativeRayTracingTarget
+  ommCaches: []
+  _isStaticObject: 0
+  meshRenderer: {fileID: 1914419603}
+  SubmeshMaterialInfos:
+  - material: {fileID: 2100000, guid: 149581cfdb8c4ed4b9a7f22b56f5f1ac, type: 2}
+    isTransparent: 0
+    isEmissive: 0
+    isAlphaClip: 0
+    textures:
+    - {fileID: 0}
+    - {fileID: 0}
+    - {fileID: 0}
+    - {fileID: 0}
+    baseColor: {r: 0.74334973, g: 0.5176195, b: 0.37972245, a: 1}
+    emissionColor: {r: 0, g: 0, b: 0, a: 1}
+    metallic: 0
+    roughnessScale: 0
+    normalScale: 0
+  SubmeshGroups:
+  - isTransparent: 0
+    isEmissive: 0
+    isAlphaClip: 0
+    submeshIndices: 00000000
+    materialDatas:
+    - material: {fileID: 2100000, guid: 149581cfdb8c4ed4b9a7f22b56f5f1ac, type: 2}
+      isTransparent: 0
+      isEmissive: 0
+      isAlphaClip: 0
+      textures:
+      - {fileID: 0}
+      - {fileID: 0}
+      - {fileID: 0}
+      - {fileID: 0}
+      baseColor: {r: 0.74334973, g: 0.5176195, b: 0.37972245, a: 1}
+      emissionColor: {r: 0, g: 0, b: 0, a: 1}
+      metallic: 0
+      roughnessScale: 0
+      normalScale: 0
 --- !u!1 &1991282384
 GameObject:
   m_ObjectHideFlags: 0
@@ -2099,13 +2763,14 @@ GameObject:
   - component: {fileID: 3448000038563234584}
   - component: {fileID: 7962309624657857162}
   - component: {fileID: 2271256860194622473}
+  - component: {fileID: 7962309624657857163}
   m_Layer: 0
   m_Name: ShaderBall_Brick_Cinder_ShaderBall
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 1
+  m_IsActive: 0
 --- !u!1001 &568887273051011234
 PrefabInstance:
   m_ObjectHideFlags: 0
@@ -2182,6 +2847,7 @@ GameObject:
   - component: {fileID: 6715563498675587330}
   - component: {fileID: 2749951466009784007}
   - component: {fileID: 4175926269525833774}
+  - component: {fileID: 6715563498675587331}
   m_Layer: 0
   m_Name: ShaderBall_Concrete_Shimizu_ShaderBall
   m_TagString: Untagged
@@ -2249,6 +2915,7 @@ GameObject:
   - component: {fileID: 4882022542845902555}
   - component: {fileID: 3105976023136790401}
   - component: {fileID: 4387901216462066796}
+  - component: {fileID: 4882022542845902556}
   m_Layer: 0
   m_Name: LupaPupa_Icosphere
   m_TagString: Untagged
@@ -2485,6 +3152,7 @@ GameObject:
   - component: {fileID: 4251704872986112001}
   - component: {fileID: 665640636627901621}
   - component: {fileID: 4316629808157788574}
+  - component: {fileID: 4316629808157788575}
   m_Layer: 0
   m_Name: ShaderBall_Glass_ShaderBall
   m_TagString: Untagged
@@ -2518,6 +3186,7 @@ GameObject:
   - component: {fileID: 2947742990384961623}
   - component: {fileID: 1718396412193515484}
   - component: {fileID: 4898057470769292634}
+  - component: {fileID: 4898057470769292635}
   m_Layer: 0
   m_Name: ShaderBall_Brick_Concrete_ShaderBall
   m_TagString: Untagged
@@ -2600,6 +3269,7 @@ GameObject:
   - component: {fileID: 7125193275615016595}
   - component: {fileID: 8066999598948552797}
   - component: {fileID: 1393697188820824965}
+  - component: {fileID: 8066999598948552798}
   m_Layer: 0
   m_Name: Floor
   m_TagString: Untagged
@@ -2656,6 +3326,56 @@ MeshRenderer:
   m_SortingOrder: 0
   m_MaskInteraction: 0
   m_AdditionalVertexStreams: {fileID: 0}
+--- !u!114 &4316629808157788575
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 3430537964665352109}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 7765801a50bd3ca4cbfacd1f313497a2, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: NativeRayTracing.Runtime::NativeRender.NativeRayTracingTarget
+  ommCaches: []
+  _isStaticObject: 0
+  meshRenderer: {fileID: 4316629808157788574}
+  SubmeshMaterialInfos:
+  - material: {fileID: 2100000, guid: 3192dd97252226d45be15da37a62cf13, type: 2}
+    isTransparent: 0
+    isEmissive: 0
+    isAlphaClip: 0
+    textures:
+    - {fileID: 2800000, guid: 6610f7da178eba54ba8bc17373d80ece, type: 3}
+    - {fileID: 2800000, guid: 558ea19008d2e964fbf9d3ab06656af5, type: 3}
+    - {fileID: 2800000, guid: 8f1374db88c3dfa478b399bb52b34364, type: 3}
+    - {fileID: 0}
+    baseColor: {r: 1, g: 1, b: 1, a: 1}
+    emissionColor: {r: 0, g: 0, b: 0, a: 1}
+    metallic: 0
+    roughnessScale: 1
+    normalScale: 1
+  SubmeshGroups:
+  - isTransparent: 0
+    isEmissive: 0
+    isAlphaClip: 0
+    submeshIndices: 00000000
+    materialDatas:
+    - material: {fileID: 2100000, guid: 3192dd97252226d45be15da37a62cf13, type: 2}
+      isTransparent: 0
+      isEmissive: 0
+      isAlphaClip: 0
+      textures:
+      - {fileID: 2800000, guid: 6610f7da178eba54ba8bc17373d80ece, type: 3}
+      - {fileID: 2800000, guid: 558ea19008d2e964fbf9d3ab06656af5, type: 3}
+      - {fileID: 2800000, guid: 8f1374db88c3dfa478b399bb52b34364, type: 3}
+      - {fileID: 0}
+      baseColor: {r: 1, g: 1, b: 1, a: 1}
+      emissionColor: {r: 0, g: 0, b: 0, a: 1}
+      metallic: 0
+      roughnessScale: 1
+      normalScale: 1
 --- !u!23 &4329397002389103357
 MeshRenderer:
   m_ObjectHideFlags: 0
@@ -2769,6 +3489,56 @@ Transform:
   m_Children: []
   m_Father: {fileID: 5312381281301409343}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &4882022542845902556
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1570873999953517968}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 7765801a50bd3ca4cbfacd1f313497a2, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: NativeRayTracing.Runtime::NativeRender.NativeRayTracingTarget
+  ommCaches: []
+  _isStaticObject: 0
+  meshRenderer: {fileID: 4387901216462066796}
+  SubmeshMaterialInfos:
+  - material: {fileID: 2100000, guid: 0a9f2294c03d27f4fbc173700574684f, type: 2}
+    isTransparent: 0
+    isEmissive: 0
+    isAlphaClip: 0
+    textures:
+    - {fileID: 0}
+    - {fileID: 2800000, guid: 9a7bfeb80605fa6458d072e5cc2e5548, type: 3}
+    - {fileID: 2800000, guid: 1e323752320081e4aaf6cf39ca508cff, type: 3}
+    - {fileID: 0}
+    baseColor: {r: 1, g: 1, b: 1, a: 1}
+    emissionColor: {r: 0, g: 0, b: 0, a: 1}
+    metallic: 0
+    roughnessScale: 0
+    normalScale: 1
+  SubmeshGroups:
+  - isTransparent: 0
+    isEmissive: 0
+    isAlphaClip: 0
+    submeshIndices: 00000000
+    materialDatas:
+    - material: {fileID: 2100000, guid: 0a9f2294c03d27f4fbc173700574684f, type: 2}
+      isTransparent: 0
+      isEmissive: 0
+      isAlphaClip: 0
+      textures:
+      - {fileID: 0}
+      - {fileID: 2800000, guid: 9a7bfeb80605fa6458d072e5cc2e5548, type: 3}
+      - {fileID: 2800000, guid: 1e323752320081e4aaf6cf39ca508cff, type: 3}
+      - {fileID: 0}
+      baseColor: {r: 1, g: 1, b: 1, a: 1}
+      emissionColor: {r: 0, g: 0, b: 0, a: 1}
+      metallic: 0
+      roughnessScale: 0
+      normalScale: 1
 --- !u!23 &4898057470769292634
 MeshRenderer:
   m_ObjectHideFlags: 0
@@ -2818,6 +3588,56 @@ MeshRenderer:
   m_SortingOrder: 0
   m_MaskInteraction: 0
   m_AdditionalVertexStreams: {fileID: 0}
+--- !u!114 &4898057470769292635
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 3640935991427062392}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 7765801a50bd3ca4cbfacd1f313497a2, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: NativeRayTracing.Runtime::NativeRender.NativeRayTracingTarget
+  ommCaches: []
+  _isStaticObject: 0
+  meshRenderer: {fileID: 4898057470769292634}
+  SubmeshMaterialInfos:
+  - material: {fileID: 2100000, guid: 4325f89616240dd4ca5f2b68eaa7cf6f, type: 2}
+    isTransparent: 0
+    isEmissive: 0
+    isAlphaClip: 0
+    textures:
+    - {fileID: 2800000, guid: ce0897d21cea1484da4d16c016810fe6, type: 3}
+    - {fileID: 2800000, guid: 6edf2e566b1cce5439114ed66b00bc22, type: 3}
+    - {fileID: 2800000, guid: 4557b0255f09b9c4ba65d70d16879068, type: 3}
+    - {fileID: 0}
+    baseColor: {r: 1, g: 1, b: 1, a: 1}
+    emissionColor: {r: 0, g: 0, b: 0, a: 1}
+    metallic: 0
+    roughnessScale: 1
+    normalScale: 1
+  SubmeshGroups:
+  - isTransparent: 0
+    isEmissive: 0
+    isAlphaClip: 0
+    submeshIndices: 00000000
+    materialDatas:
+    - material: {fileID: 2100000, guid: 4325f89616240dd4ca5f2b68eaa7cf6f, type: 2}
+      isTransparent: 0
+      isEmissive: 0
+      isAlphaClip: 0
+      textures:
+      - {fileID: 2800000, guid: ce0897d21cea1484da4d16c016810fe6, type: 3}
+      - {fileID: 2800000, guid: 6edf2e566b1cce5439114ed66b00bc22, type: 3}
+      - {fileID: 2800000, guid: 4557b0255f09b9c4ba65d70d16879068, type: 3}
+      - {fileID: 0}
+      baseColor: {r: 1, g: 1, b: 1, a: 1}
+      emissionColor: {r: 0, g: 0, b: 0, a: 1}
+      metallic: 0
+      roughnessScale: 1
+      normalScale: 1
 --- !u!4 &5312381281301409343
 Transform:
   m_ObjectHideFlags: 0
@@ -2859,6 +3679,7 @@ GameObject:
   - component: {fileID: 6175568359103846732}
   - component: {fileID: 1639097768920550510}
   - component: {fileID: 8021470151075589969}
+  - component: {fileID: 8021470151075589970}
   m_Layer: 0
   m_Name: PupaLupa_Icosphere
   m_TagString: Untagged
@@ -2904,6 +3725,56 @@ Transform:
   m_Children: []
   m_Father: {fileID: 5312381281301409343}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &6715563498675587331
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1118723105524715310}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 7765801a50bd3ca4cbfacd1f313497a2, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: NativeRayTracing.Runtime::NativeRender.NativeRayTracingTarget
+  ommCaches: []
+  _isStaticObject: 0
+  meshRenderer: {fileID: 4175926269525833774}
+  SubmeshMaterialInfos:
+  - material: {fileID: 2100000, guid: cc3c3c1af942de645b5de20443b8922f, type: 2}
+    isTransparent: 0
+    isEmissive: 0
+    isAlphaClip: 0
+    textures:
+    - {fileID: 2800000, guid: 23c7b66842763f74cb328ba161cad44d, type: 3}
+    - {fileID: 2800000, guid: cda658ec381e7434ea03e1e8a04ed4da, type: 3}
+    - {fileID: 2800000, guid: 5c994fa744408a44ab21cd71da315275, type: 3}
+    - {fileID: 0}
+    baseColor: {r: 1, g: 1, b: 1, a: 1}
+    emissionColor: {r: 0, g: 0, b: 0, a: 1}
+    metallic: 0
+    roughnessScale: 1
+    normalScale: 1
+  SubmeshGroups:
+  - isTransparent: 0
+    isEmissive: 0
+    isAlphaClip: 0
+    submeshIndices: 00000000
+    materialDatas:
+    - material: {fileID: 2100000, guid: cc3c3c1af942de645b5de20443b8922f, type: 2}
+      isTransparent: 0
+      isEmissive: 0
+      isAlphaClip: 0
+      textures:
+      - {fileID: 2800000, guid: 23c7b66842763f74cb328ba161cad44d, type: 3}
+      - {fileID: 2800000, guid: cda658ec381e7434ea03e1e8a04ed4da, type: 3}
+      - {fileID: 2800000, guid: 5c994fa744408a44ab21cd71da315275, type: 3}
+      - {fileID: 0}
+      baseColor: {r: 1, g: 1, b: 1, a: 1}
+      emissionColor: {r: 0, g: 0, b: 0, a: 1}
+      metallic: 0
+      roughnessScale: 1
+      normalScale: 1
 --- !u!1 &7118363089034152835
 GameObject:
   m_ObjectHideFlags: 0
@@ -2915,6 +3786,7 @@ GameObject:
   - component: {fileID: 9191577787864500305}
   - component: {fileID: 7305319908105505033}
   - component: {fileID: 4329397002389103357}
+  - component: {fileID: 9191577787864500306}
   m_Layer: 0
   m_Name: ShaderBall_Brick_Beige_ShaderBall
   m_TagString: Untagged
@@ -2956,6 +3828,7 @@ GameObject:
   - component: {fileID: 7643626533740539658}
   - component: {fileID: 5801719651233477330}
   - component: {fileID: 1595013579286618807}
+  - component: {fileID: 7643626533740539659}
   m_Layer: 0
   m_Name: ShaderBall_Brick_Yellow_ShaderBall
   m_TagString: Untagged
@@ -2978,6 +3851,56 @@ Transform:
   m_Children: []
   m_Father: {fileID: 5312381281301409343}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &7643626533740539659
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 7395786787795234232}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 7765801a50bd3ca4cbfacd1f313497a2, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: NativeRayTracing.Runtime::NativeRender.NativeRayTracingTarget
+  ommCaches: []
+  _isStaticObject: 0
+  meshRenderer: {fileID: 1595013579286618807}
+  SubmeshMaterialInfos:
+  - material: {fileID: 2100000, guid: b92f8e73121e409498c384ff22686ca0, type: 2}
+    isTransparent: 0
+    isEmissive: 0
+    isAlphaClip: 0
+    textures:
+    - {fileID: 2800000, guid: 0bdd1003ab7d0e24d9f865477e82c303, type: 3}
+    - {fileID: 2800000, guid: 4babd8a715a152a41b562f8ab92ff7c9, type: 3}
+    - {fileID: 2800000, guid: ed6b35e4f22ddd34bb30b9e9d192e4d8, type: 3}
+    - {fileID: 0}
+    baseColor: {r: 1, g: 1, b: 1, a: 1}
+    emissionColor: {r: 0, g: 0, b: 0, a: 1}
+    metallic: 1
+    roughnessScale: 1
+    normalScale: 1
+  SubmeshGroups:
+  - isTransparent: 0
+    isEmissive: 0
+    isAlphaClip: 0
+    submeshIndices: 00000000
+    materialDatas:
+    - material: {fileID: 2100000, guid: b92f8e73121e409498c384ff22686ca0, type: 2}
+      isTransparent: 0
+      isEmissive: 0
+      isAlphaClip: 0
+      textures:
+      - {fileID: 2800000, guid: 0bdd1003ab7d0e24d9f865477e82c303, type: 3}
+      - {fileID: 2800000, guid: 4babd8a715a152a41b562f8ab92ff7c9, type: 3}
+      - {fileID: 2800000, guid: ed6b35e4f22ddd34bb30b9e9d192e4d8, type: 3}
+      - {fileID: 0}
+      baseColor: {r: 1, g: 1, b: 1, a: 1}
+      emissionColor: {r: 0, g: 0, b: 0, a: 1}
+      metallic: 1
+      roughnessScale: 1
+      normalScale: 1
 --- !u!33 &7962309624657857162
 MeshFilter:
   m_ObjectHideFlags: 0
@@ -2986,6 +3909,23 @@ MeshFilter:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 53720163407341116}
   m_Mesh: {fileID: 2253105149633723326, guid: 9c2e154e190f89945a49f6b86fc55b2a, type: 3}
+--- !u!114 &7962309624657857163
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 53720163407341116}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 7765801a50bd3ca4cbfacd1f313497a2, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: NativeRayTracing.Runtime::NativeRender.NativeRayTracingTarget
+  ommCaches: []
+  _isStaticObject: 0
+  meshRenderer: {fileID: 0}
+  SubmeshMaterialInfos: []
+  SubmeshGroups: []
 --- !u!23 &8021470151075589969
 MeshRenderer:
   m_ObjectHideFlags: 0
@@ -3035,6 +3975,56 @@ MeshRenderer:
   m_SortingOrder: 0
   m_MaskInteraction: 0
   m_AdditionalVertexStreams: {fileID: 0}
+--- !u!114 &8021470151075589970
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 5750893071686526031}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 7765801a50bd3ca4cbfacd1f313497a2, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: NativeRayTracing.Runtime::NativeRender.NativeRayTracingTarget
+  ommCaches: []
+  _isStaticObject: 0
+  meshRenderer: {fileID: 8021470151075589969}
+  SubmeshMaterialInfos:
+  - material: {fileID: 2100000, guid: 0a9f2294c03d27f4fbc173700574684f, type: 2}
+    isTransparent: 0
+    isEmissive: 0
+    isAlphaClip: 0
+    textures:
+    - {fileID: 0}
+    - {fileID: 2800000, guid: 9a7bfeb80605fa6458d072e5cc2e5548, type: 3}
+    - {fileID: 2800000, guid: 1e323752320081e4aaf6cf39ca508cff, type: 3}
+    - {fileID: 0}
+    baseColor: {r: 1, g: 1, b: 1, a: 1}
+    emissionColor: {r: 0, g: 0, b: 0, a: 1}
+    metallic: 0
+    roughnessScale: 0
+    normalScale: 1
+  SubmeshGroups:
+  - isTransparent: 0
+    isEmissive: 0
+    isAlphaClip: 0
+    submeshIndices: 00000000
+    materialDatas:
+    - material: {fileID: 2100000, guid: 0a9f2294c03d27f4fbc173700574684f, type: 2}
+      isTransparent: 0
+      isEmissive: 0
+      isAlphaClip: 0
+      textures:
+      - {fileID: 0}
+      - {fileID: 2800000, guid: 9a7bfeb80605fa6458d072e5cc2e5548, type: 3}
+      - {fileID: 2800000, guid: 1e323752320081e4aaf6cf39ca508cff, type: 3}
+      - {fileID: 0}
+      baseColor: {r: 1, g: 1, b: 1, a: 1}
+      emissionColor: {r: 0, g: 0, b: 0, a: 1}
+      metallic: 0
+      roughnessScale: 0
+      normalScale: 1
 --- !u!33 &8066999598948552797
 MeshFilter:
   m_ObjectHideFlags: 0
@@ -3043,6 +4033,56 @@ MeshFilter:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 4252634802048852028}
   m_Mesh: {fileID: 2636336197179252740, guid: 9c2e154e190f89945a49f6b86fc55b2a, type: 3}
+--- !u!114 &8066999598948552798
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 4252634802048852028}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 7765801a50bd3ca4cbfacd1f313497a2, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: NativeRayTracing.Runtime::NativeRender.NativeRayTracingTarget
+  ommCaches: []
+  _isStaticObject: 0
+  meshRenderer: {fileID: 1393697188820824965}
+  SubmeshMaterialInfos:
+  - material: {fileID: 2100000, guid: b2183b77dbd9a6841b237f374b1aa98e, type: 2}
+    isTransparent: 0
+    isEmissive: 0
+    isAlphaClip: 0
+    textures:
+    - {fileID: 2800000, guid: c0a41b5656f00de4d8239f65118bc165, type: 3}
+    - {fileID: 2800000, guid: bf8f44f5bc8384d41be295930fede691, type: 3}
+    - {fileID: 2800000, guid: 51196fdf27b68b24681f6b0cf24dd958, type: 3}
+    - {fileID: 0}
+    baseColor: {r: 1, g: 1, b: 1, a: 1}
+    emissionColor: {r: 0, g: 0, b: 0, a: 1}
+    metallic: 0
+    roughnessScale: 0.34500003
+    normalScale: 1
+  SubmeshGroups:
+  - isTransparent: 0
+    isEmissive: 0
+    isAlphaClip: 0
+    submeshIndices: 00000000
+    materialDatas:
+    - material: {fileID: 2100000, guid: b2183b77dbd9a6841b237f374b1aa98e, type: 2}
+      isTransparent: 0
+      isEmissive: 0
+      isAlphaClip: 0
+      textures:
+      - {fileID: 2800000, guid: c0a41b5656f00de4d8239f65118bc165, type: 3}
+      - {fileID: 2800000, guid: bf8f44f5bc8384d41be295930fede691, type: 3}
+      - {fileID: 2800000, guid: 51196fdf27b68b24681f6b0cf24dd958, type: 3}
+      - {fileID: 0}
+      baseColor: {r: 1, g: 1, b: 1, a: 1}
+      emissionColor: {r: 0, g: 0, b: 0, a: 1}
+      metallic: 0
+      roughnessScale: 0.34500003
+      normalScale: 1
 --- !u!1 &8771091788108555836
 GameObject:
   m_ObjectHideFlags: 0
@@ -3074,6 +4114,56 @@ Transform:
   m_Children: []
   m_Father: {fileID: 5312381281301409343}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &9191577787864500306
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 7118363089034152835}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 7765801a50bd3ca4cbfacd1f313497a2, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: NativeRayTracing.Runtime::NativeRender.NativeRayTracingTarget
+  ommCaches: []
+  _isStaticObject: 0
+  meshRenderer: {fileID: 4329397002389103357}
+  SubmeshMaterialInfos:
+  - material: {fileID: 2100000, guid: 47754b34df7b35b45ab8686abde2bba9, type: 2}
+    isTransparent: 0
+    isEmissive: 0
+    isAlphaClip: 0
+    textures:
+    - {fileID: 2800000, guid: 54cdc4a4f6ef60a44b427570a6bdfbde, type: 3}
+    - {fileID: 2800000, guid: e6d41ff1627cab446aa27103ccce714c, type: 3}
+    - {fileID: 2800000, guid: 1e323752320081e4aaf6cf39ca508cff, type: 3}
+    - {fileID: 0}
+    baseColor: {r: 1, g: 1, b: 1, a: 1}
+    emissionColor: {r: 0, g: 0, b: 0, a: 1}
+    metallic: 0
+    roughnessScale: 1
+    normalScale: 1
+  SubmeshGroups:
+  - isTransparent: 0
+    isEmissive: 0
+    isAlphaClip: 0
+    submeshIndices: 00000000
+    materialDatas:
+    - material: {fileID: 2100000, guid: 47754b34df7b35b45ab8686abde2bba9, type: 2}
+      isTransparent: 0
+      isEmissive: 0
+      isAlphaClip: 0
+      textures:
+      - {fileID: 2800000, guid: 54cdc4a4f6ef60a44b427570a6bdfbde, type: 3}
+      - {fileID: 2800000, guid: e6d41ff1627cab446aa27103ccce714c, type: 3}
+      - {fileID: 2800000, guid: 1e323752320081e4aaf6cf39ca508cff, type: 3}
+      - {fileID: 0}
+      baseColor: {r: 1, g: 1, b: 1, a: 1}
+      emissionColor: {r: 0, g: 0, b: 0, a: 1}
+      metallic: 0
+      roughnessScale: 1
+      normalScale: 1
 --- !u!1660057539 &9223372036854775807
 SceneRoots:
   m_ObjectHideFlags: 0
@@ -3089,3 +4179,5 @@ SceneRoots:
   - {fileID: 382038759}
   - {fileID: 667211478}
   - {fileID: 1600345164}
+  - {fileID: 1154397543}
+  - {fileID: 1816539104}

@@ -4,6 +4,7 @@
 #pragma use_dxc
 #pragma target 6.0
 #pragma require inlineraytracing
+#pragma require Native16Bit
 
 
 #define USE_RAY_QUERY

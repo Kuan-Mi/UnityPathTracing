@@ -42,25 +42,39 @@ namespace Nrd
     public unsafe struct CommonSettings
     {
         // Matrices
+        [NonSerialized]
         public Matrix4x4 viewToClipMatrix;
+        [NonSerialized]
         public Matrix4x4 viewToClipMatrixPrev;
+        [NonSerialized]
         public Matrix4x4 worldToViewMatrix;
+        [NonSerialized]
         public Matrix4x4 worldToViewMatrixPrev;
-
-        // 可选
+        [NonSerialized]
         public Matrix4x4 worldPrevToWorldMatrix; // Default: Identity
 
         // Motion Vectors
+        
+        [NonSerialized]
         public float3 motionVectorScale; // Default: {1.0, 1.0, 0.0}
 
         // Jitter
+        [NonSerialized]
         public float2 cameraJitter;
+        [NonSerialized]
         public float2 cameraJitterPrev;
 
         // Resolution
+        [NonSerialized]
         public fixed ushort resourceSize[2];
+        
+        [NonSerialized]
         public fixed ushort resourceSizePrev[2];
+        
+        [NonSerialized]
         public fixed ushort rectSize[2];
+        
+        [NonSerialized]
         public fixed ushort rectSizePrev[2];
 
         // Scalars
@@ -93,6 +107,7 @@ namespace Nrd
 
         public fixed uint rectOrigin[2];
 
+        [NonSerialized]
         public uint frameIndex; // Default: 0
 
         public AccumulationMode accumulationMode; // Default: CONTINUE
@@ -245,7 +260,7 @@ namespace Nrd
         {
             return new ReblurAntilagSettings
             {
-                luminanceSigmaScale  = 4.0f,
+                luminanceSigmaScale  = 2.0f,
                 luminanceSensitivity = 3.0f
             };
         }
@@ -318,9 +333,9 @@ namespace Nrd
         public HitDistanceReconstructionMode hitDistanceReconstructionMode; // Default: OFF
 
         // Bools (mapped to byte for interop safety)
-        private byte _enableAntiFirefly; // Default: false
-        private byte _usePrepassOnlyForSpecularMotionEstimation; // Default: false
-        private byte _returnHistoryLengthInsteadOfOcclusion; // Default: false
+        public byte _enableAntiFirefly; // Default: false
+        public byte _usePrepassOnlyForSpecularMotionEstimation; // Default: false
+        public byte _returnHistoryLengthInsteadOfOcclusion; // Default: false
 
         // -----------------------------------------------------------------------
         // Boolean Properties
@@ -387,11 +402,176 @@ namespace Nrd
             s.checkerboardMode              = CheckerboardMode.OFF;
             s.hitDistanceReconstructionMode = HitDistanceReconstructionMode.OFF;
 
-            s.enableAntiFirefly                         = false;
+            s.enableAntiFirefly                         = true;
             s.usePrepassOnlyForSpecularMotionEstimation = false;
             s.returnHistoryLengthInsteadOfOcclusion     = false;
 
             return s;
         }
+    }
+
+    // ===================================================================================
+    // RELAX SETTINGS
+    // ===================================================================================
+
+    [Serializable]
+    [StructLayout(LayoutKind.Sequential)]
+    public struct RelaxAntilagSettings
+    {
+        public float accelerationAmount; // Default: 0.3f
+        public float spatialSigmaScale; // Default: 4.5f
+        public float temporalSigmaScale; // Default: 0.5f
+        public float resetAmount; // Default: 0.5f
+
+        public static readonly RelaxAntilagSettings _default = new RelaxAntilagSettings
+        {
+            accelerationAmount = 0.3f,
+            spatialSigmaScale  = 4.5f,
+            temporalSigmaScale = 0.5f,
+            resetAmount        = 0.5f,
+        };
+    }
+
+    [Serializable]
+    [StructLayout(LayoutKind.Sequential)]
+    public struct RelaxSettings
+    {
+        public RelaxAntilagSettings antilagSettings;
+
+        public uint diffuseMaxAccumulatedFrameNum; // Default: 30
+        public uint specularMaxAccumulatedFrameNum; // Default: 30
+        public uint diffuseMaxFastAccumulatedFrameNum; // Default: 6
+        public uint specularMaxFastAccumulatedFrameNum; // Default: 6
+
+        public uint historyFixFrameNum; // Default: 3
+        public uint historyFixBasePixelStride; // Default: 14
+        public uint historyFixAlternatePixelStride; // Default: 14
+
+        public float historyFixEdgeStoppingNormalPower; // Default: 8.0f
+        public float fastHistoryClampingSigmaScale; // Default: 2.0f
+
+        public float diffusePrepassBlurRadius; // Default: 30.0f
+        public float specularPrepassBlurRadius; // Default: 50.0f
+        public float minHitDistanceWeight; // Default: 0.1f
+
+        public uint spatialVarianceEstimationHistoryThreshold; // Default: 3
+
+        public float diffusePhiLuminance; // Default: 2.0f
+        public float specularPhiLuminance; // Default: 1.0f
+
+        public float lobeAngleFraction; // Default: 0.5f
+        public float roughnessFraction; // Default: 0.15f
+
+        public float specularVarianceBoost; // Default: 0.0f
+        public float specularLobeAngleSlack; // Default: 0.15f
+
+        public uint  atrousIterationNum; // Default: 5
+        public float diffuseMinLuminanceWeight; // Default: 0.0f
+        public float specularMinLuminanceWeight; // Default: 0.0f
+        public float depthThreshold; // Default: 0.003f
+
+        public float confidenceDrivenRelaxationMultiplier; // Default: 0.0f
+        public float confidenceDrivenLuminanceEdgeStoppingRelaxation; // Default: 0.0f
+        public float confidenceDrivenNormalEdgeStoppingRelaxation; // Default: 0.0f
+
+        public float luminanceEdgeStoppingRelaxation; // Default: 0.5f
+        public float normalEdgeStoppingRelaxation; // Default: 0.3f
+        public float roughnessEdgeStoppingRelaxation; // Default: 1.0f
+
+        public CheckerboardMode              checkerboardMode; // Default: OFF
+        public HitDistanceReconstructionMode hitDistanceReconstructionMode; // Default: OFF
+
+        public float minMaterialForDiffuse; // Default: 4.0f
+        public float minMaterialForSpecular; // Default: 4.0f
+
+        public byte _enableAntiFirefly; // Default: false
+        public byte _enableRoughnessEdgeStopping; // Default: true
+
+        public bool enableAntiFirefly
+        {
+            get => _enableAntiFirefly != 0;
+            set => _enableAntiFirefly = value ? (byte)1 : (byte)0;
+        }
+
+        public bool enableRoughnessEdgeStopping
+        {
+            get => _enableRoughnessEdgeStopping != 0;
+            set => _enableRoughnessEdgeStopping = value ? (byte)1 : (byte)0;
+        }
+
+        public static readonly RelaxSettings _default = CreateDefault();
+
+        private static RelaxSettings CreateDefault()
+        {
+            var s = new RelaxSettings();
+            s.antilagSettings = RelaxAntilagSettings._default;
+
+            s.diffuseMaxAccumulatedFrameNum      = 30;
+            s.specularMaxAccumulatedFrameNum     = 30;
+            s.diffuseMaxFastAccumulatedFrameNum  = 6;
+            s.specularMaxFastAccumulatedFrameNum = 6;
+
+            s.historyFixFrameNum             = 3;
+            s.historyFixBasePixelStride      = 14;
+            s.historyFixAlternatePixelStride = 14;
+
+            s.historyFixEdgeStoppingNormalPower = 8.0f;
+            s.fastHistoryClampingSigmaScale     = 2.0f;
+
+            s.diffusePrepassBlurRadius  = 30.0f;
+            s.specularPrepassBlurRadius = 50.0f;
+            s.minHitDistanceWeight      = 0.1f;
+
+            s.spatialVarianceEstimationHistoryThreshold = 3;
+
+            s.diffusePhiLuminance  = 2.0f;
+            s.specularPhiLuminance = 1.0f;
+
+            s.lobeAngleFraction = 0.5f;
+            s.roughnessFraction = 0.15f;
+
+            s.specularVarianceBoost  = 0.0f;
+            s.specularLobeAngleSlack = 0.15f;
+
+            s.atrousIterationNum         = 5;
+            s.diffuseMinLuminanceWeight  = 0.0f;
+            s.specularMinLuminanceWeight = 0.0f;
+            s.depthThreshold             = 0.003f;
+
+            s.confidenceDrivenRelaxationMultiplier            = 0.0f;
+            s.confidenceDrivenLuminanceEdgeStoppingRelaxation = 0.0f;
+            s.confidenceDrivenNormalEdgeStoppingRelaxation    = 0.0f;
+
+            s.luminanceEdgeStoppingRelaxation = 0.5f;
+            s.normalEdgeStoppingRelaxation    = 0.3f;
+            s.roughnessEdgeStoppingRelaxation = 1.0f;
+
+            s.checkerboardMode              = CheckerboardMode.OFF;
+            s.hitDistanceReconstructionMode = HitDistanceReconstructionMode.OFF;
+
+            s.minMaterialForDiffuse  = 4.0f;
+            s.minMaterialForSpecular = 4.0f;
+
+            s.enableAntiFirefly           = false;
+            s.enableRoughnessEdgeStopping = true;
+
+            return s;
+        }
+    }
+
+    // ===================================================================================
+    // REFERENCE SETTINGS
+    // ===================================================================================
+
+    [Serializable]
+    [StructLayout(LayoutKind.Sequential)]
+    public struct ReferenceSettings
+    {
+        public uint maxAccumulatedFrameNum; // Default: 120
+
+        public static readonly ReferenceSettings _default = new ReferenceSettings
+        {
+            maxAccumulatedFrameNum = 120,
+        };
     }
 }
