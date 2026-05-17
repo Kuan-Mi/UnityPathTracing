@@ -42,25 +42,39 @@ namespace Nrd
     public unsafe struct CommonSettings
     {
         // Matrices
+        [NonSerialized]
         public Matrix4x4 viewToClipMatrix;
+        [NonSerialized]
         public Matrix4x4 viewToClipMatrixPrev;
+        [NonSerialized]
         public Matrix4x4 worldToViewMatrix;
+        [NonSerialized]
         public Matrix4x4 worldToViewMatrixPrev;
-
-        // 可选
+        [NonSerialized]
         public Matrix4x4 worldPrevToWorldMatrix; // Default: Identity
 
         // Motion Vectors
+        
+        [NonSerialized]
         public float3 motionVectorScale; // Default: {1.0, 1.0, 0.0}
 
         // Jitter
+        [NonSerialized]
         public float2 cameraJitter;
+        [NonSerialized]
         public float2 cameraJitterPrev;
 
         // Resolution
+        [NonSerialized]
         public fixed ushort resourceSize[2];
+        
+        [NonSerialized]
         public fixed ushort resourceSizePrev[2];
+        
+        [NonSerialized]
         public fixed ushort rectSize[2];
+        
+        [NonSerialized]
         public fixed ushort rectSizePrev[2];
 
         // Scalars
@@ -93,6 +107,7 @@ namespace Nrd
 
         public fixed uint rectOrigin[2];
 
+        [NonSerialized]
         public uint frameIndex; // Default: 0
 
         public AccumulationMode accumulationMode; // Default: CONTINUE

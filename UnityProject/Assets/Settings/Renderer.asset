@@ -111,7 +111,7 @@ MonoBehaviour:
     usePrevFrame: 1
     boost: 1
     SR: 0
-    RR: 1
+    RR: 0
     upscalerMode: 0
     confidence: 1
     denoisingRange: 1000
@@ -120,105 +120,6 @@ MonoBehaviour:
     dofAperture: 0
     dofFocalDistance: 2
   commonSettings:
-    viewToClipMatrix:
-      e00: 0.91844463
-      e01: 0
-      e02: 0
-      e03: 0
-      e10: 0
-      e11: 1.7320508
-      e12: 0
-      e13: 0
-      e20: 0
-      e21: 0
-      e22: 0.000005066395
-      e23: 0.10450052
-      e30: 0
-      e31: 0
-      e32: -1
-      e33: 0
-    viewToClipMatrixPrev:
-      e00: 0.91844463
-      e01: 0
-      e02: 0
-      e03: 0
-      e10: 0
-      e11: 1.7320508
-      e12: 0
-      e13: 0
-      e20: 0
-      e21: 0
-      e22: 0.000005066395
-      e23: 0.10450052
-      e30: 0
-      e31: 0
-      e32: -1
-      e33: 0
-    worldToViewMatrix:
-      e00: 0.13193238
-      e01: -0.00019718707
-      e02: 0.9912586
-      e03: 4.9576063
-      e10: -0.29237545
-      e11: 0.95550376
-      e12: 0.039103985
-      e13: -3.4004307
-      e20: 0.94715905
-      e21: 0.29497877
-      e22: -0.12600422
-      e23: 1.0999224
-      e30: 0
-      e31: 0
-      e32: 0
-      e33: 1
-    worldToViewMatrixPrev:
-      e00: 0.13193238
-      e01: -0.00019718707
-      e02: 0.9912586
-      e03: 4.9576063
-      e10: -0.29237545
-      e11: 0.95550376
-      e12: 0.039103985
-      e13: -3.4004307
-      e20: 0.94715905
-      e21: 0.29497877
-      e22: -0.12600422
-      e23: 1.0999224
-      e30: 0
-      e31: 0
-      e32: 0
-      e33: 1
-    worldPrevToWorldMatrix:
-      e00: 1
-      e01: 0
-      e02: 0
-      e03: 0
-      e10: 0
-      e11: 1
-      e12: 0
-      e13: 0
-      e20: 0
-      e21: 0
-      e22: 1
-      e23: 0
-      e30: 0
-      e31: 0
-      e32: 0
-      e33: 1
-    motionVectorScale:
-      x: 0.00085251493
-      y: 0.001607717
-      z: -1
-    cameraJitter:
-      x: -0.3687744
-      y: 0.1541686
-    cameraJitterPrev:
-      x: 0.2562256
-      y: -0.17916477
-    resourceSize: 95046e02
-    resourceSizePrev: 95046e02
-    rectSize: 95046e02
-    rectSizePrev: 95046e02
     viewZScale: 1
     timeDeltaBetweenFrames: 0
     denoisingRange: 1000
@@ -232,7 +133,6 @@ MonoBehaviour:
     printfAt: 0f270f27
     debug: 0
     rectOrigin: 0000000000000000
-    frameIndex: 6531
     accumulationMode: 0
   sigmaSettings:
     lightDirection: {x: 0.9257155, y: 0.3584616, z: -0.12064916}
