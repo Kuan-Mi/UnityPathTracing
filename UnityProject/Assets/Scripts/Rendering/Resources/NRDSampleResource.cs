@@ -70,7 +70,7 @@ namespace NativeRender
         private GraphicsBuffer _sharcResolved; // gInOut_SharcResolved
 
         // ----- Material texture array (gIn_Textures) -----
-        private BindlessTexture _textures;
+        private readonly MaterialTextureRegistry _materials = new();
 
         // ----- CPU mirrors -----
         private InstanceDataNRD[]             _instanceCpu;
@@ -197,15 +197,6 @@ namespace NativeRender
         private const float kFragThreshold    = 0.5f;
         private const uint  kFragMinFreeCount = 10_000;
 
-        // ----- Tracking for dirty-detection -----
-        private readonly Dictionary<Material, int> _materialSlots = new();
-
-        // Reference counts per material slot (how many submeshes reference it).
-        private readonly Dictionary<Material, int> _materialRefCounts = new();
-
-        // Freed material slot indices available for reuse (each slot = TexturesPerMaterial descriptors).
-        private readonly Queue<int> _freeMatSlots = new();
-
         private bool _sceneDirty = true;
         private bool _disposed;
 
@@ -220,7 +211,7 @@ namespace NativeRender
         public IntPtr PrimitiveDataBufPtr { get; private set; }
         public IntPtr MorphPrimitivePositionsPrevBufPtr { get; private set; }
 
-        public BindlessTexture Textures => _textures;
+        public BindlessTexture Textures => _materials.Textures;
 
         public GraphicsBuffer HashEntriesBuffer => _sharcHashEntries;
         public GraphicsBuffer AccumulationBuffer => _sharcAccumulated;
@@ -263,16 +254,17 @@ namespace NativeRender
             }
 
             // ---------- _textures ----------
-            if (_textures == null)
+            BindlessTexture textures = _materials.Textures;
+            if (textures == null)
             {
                 sb.AppendLine("[NRDSampleResource] _textures: null");
             }
             else
             {
-                sb.AppendLine($"[NRDSampleResource] _textures: capacity={_textures.Capacity}  handle=0x{_textures.Handle:X}  isValid={_textures.IsValid}");
-                for (int i = 0; i < _textures.Capacity; i++)
+                sb.AppendLine($"[NRDSampleResource] _textures: capacity={textures.Capacity}  handle=0x{textures.Handle:X}  isValid={textures.IsValid}");
+                for (int i = 0; i < textures.Capacity; i++)
                 {
-                    var tex = _textures[i];
+                    var tex = textures[i];
                     sb.AppendLine($"  [{i}] {(tex != null ? $"{tex.name} ({tex.GetType().Name}) dim={tex.dimension} {tex.width}x{tex.height}" : "<null>")}");
                 }
             }
@@ -440,7 +432,7 @@ namespace NativeRender
                     continue;
                 }
 
-                int subMatIdx = GetOrAddMaterial(stTarget.SubmeshMaterialInfos[sub], null);
+                int subMatIdx = _materials.GetOrAdd(stTarget.SubmeshMaterialInfos[sub], null);
 
                 int indexCount = (int)mesh.GetIndexCount(sub);
                 int triCount   = indexCount / 3;
@@ -855,11 +847,7 @@ namespace NativeRender
             _morphPrimitivePositionsPrevBuf = null;
             _morphPrimCursor                = 0;
 
-            if (!preserveTextures)
-            {
-                _textures?.Dispose();
-                _textures = null;
-            }
+            _materials.DisposeTextures(preserveTextures);
 
             _blasOpaque?.Dispose();
             _blasOpaque = null;
@@ -889,12 +877,7 @@ namespace NativeRender
             _instanceAlloc.Reset(0);
             _primAlloc.Reset(0);
 
-            if (!preserveTextures)
-            {
-                _materialSlots.Clear();
-                _materialRefCounts.Clear();
-                _freeMatSlots.Clear();
-            }
+            _materials.ClearSlots(preserveTextures);
         }
 
         /// <summary>
@@ -1072,12 +1055,7 @@ namespace NativeRender
 
         private void UploadTextureArray(List<Texture> texPtrs, bool preserveTextures)
         {
-            if (preserveTextures) return;
-
-            int texCount = Mathf.Max(texPtrs.Count, 1);
-            _textures = new BindlessTexture(texCount);
-            for (int i = 0; i < texPtrs.Count; i++)
-                _textures[i] = texPtrs[i];
+            _materials.UploadTextureArray(texPtrs, preserveTextures);
         }
 
         private void UploadSceneGeometryBuffers(List<InstanceDataNRD> instList)
@@ -1248,7 +1226,7 @@ namespace NativeRender
                         int sub = grp.submeshIndices[gi];
 
                         uint subFlags  = grp.isTransparent ? FLAG_TRANSPARENT : FLAG_NON_TRANSPARENT;
-                        int  subMatIdx = GetOrAddMaterial(target.SubmeshMaterialInfos[sub], texPtrs);
+                        int  subMatIdx = _materials.GetOrAdd(target.SubmeshMaterialInfos[sub], texPtrs);
 
                         int indexCount = (int)mesh.GetIndexCount(sub);
                         int triCount   = indexCount / 3;
@@ -1451,7 +1429,7 @@ namespace NativeRender
 
                 // Release material reference counts.
                 foreach (var mat in grp.materials)
-                    ReleaseMaterial(mat);
+                    _materials.Release(mat);
             }
 
             _perTargetBlas.Remove(rendererInstanceId);
@@ -1575,7 +1553,7 @@ namespace NativeRender
                     int sub = grp.submeshIndices[gi];
 
                     uint subFlags  = grp.isTransparent ? FLAG_TRANSPARENT : FLAG_NON_TRANSPARENT;
-                    int  subMatIdx = GetOrAddMaterial(target.SubmeshMaterialInfos[sub], null);
+                    int  subMatIdx = _materials.GetOrAdd(target.SubmeshMaterialInfos[sub], null);
 
                     int indexCount = (int)mesh.GetIndexCount(sub);
                     int triCount   = indexCount / 3;
@@ -1862,7 +1840,7 @@ namespace NativeRender
                     }
 
                     Material subMat    = sharedMaterials[sub];
-                    int      subMatIdx = GetOrAddMaterial(target.SubmeshMaterialInfos[sub], texPtrs);
+                    int      subMatIdx = _materials.GetOrAdd(target.SubmeshMaterialInfos[sub], texPtrs);
 
                     int indexCount = (int)mesh.GetIndexCount(sub);
                     int triCount   = indexCount / 3;
@@ -2079,136 +2057,7 @@ namespace NativeRender
             return (byte)(flags & 0xFF);
         }
 
-        /// <summary>
-        /// Returns the material slot index for <paramref name="mat"/>, registering it if new.
-        /// <para>
-        /// <b>Bulk path</b> (<paramref name="texPtrs"/> != null): appends 4 native texture pointers
-        /// to <paramref name="texPtrs"/>; the caller creates <see cref="_textures"/> afterwards.
-        /// </para>
-        /// <para>
-        /// <b>Incremental path</b> (<paramref name="texPtrs"/> == null): writes directly into
-        /// <see cref="_textures"/>, growing it via <see cref="BindlessTexture.Resize"/> as needed.
-        /// Reuses freed slots from <see cref="_freeMatSlots"/> before appending.
-        /// </para>
-        /// Always increments the material reference count.
-        /// </summary>
-        private int GetOrAddMaterial(SubmeshMaterialData matData, List<Texture> texPtrs)
-        {
-            Material mat = matData?.material;
-
-            if (mat != null && _materialSlots.TryGetValue(mat, out int existingD))
-            {
-                _materialRefCounts[mat] = (_materialRefCounts.TryGetValue(mat, out int rcD) ? rcD : 0) + 1;
-                return existingD;
-            }
-
-            int idxD;
-            if (_freeMatSlots.Count > 0)
-                idxD = _freeMatSlots.Dequeue();
-            else if (texPtrs != null)
-                idxD = _materialSlots.Count;
-            else
-                idxD = _textures != null ? _textures.Capacity / TexturesPerMaterial : _materialSlots.Count;
-
-            if (mat != null)
-            {
-                _materialSlots[mat]     = idxD;
-                _materialRefCounts[mat] = 1;
-            }
-
-            if (texPtrs != null && matData != null)
-            {
-                for (int i = 0; i < TexturesPerMaterial; i++)
-                {
-                    var tex = matData.textures[i];
-                    if (tex == null)
-                    {
-                        switch (i)
-                        {
-                            case 0: // BaseColor
-                                tex = Texture2D.whiteTexture;
-                                break;
-                            case 1: // metallicRoughness
-                                tex = Texture2D.blackTexture;
-                                break;
-                            case 2: // normalTexture
-                                tex = Texture2D.normalTexture;
-                                break;
-                            case 3: // emission
-                                tex = Texture2D.blackTexture;
-                                break;
-                        }
-                    }
-
-                    texPtrs.Add(tex);
-                }
-            }
-            else if (_textures != null && matData != null)
-            {
-                int base4D = idxD * TexturesPerMaterial;
-                int needD  = base4D + TexturesPerMaterial;
-                if (needD > _textures.Capacity)
-                    _textures.Resize(needD);
-                for (int i = 0; i < TexturesPerMaterial; i++)
-                {
-                    var tex = matData.textures[i];
-                    if (tex == null)
-                    {
-                        switch (i)
-                        {
-                            case 0: // BaseColor
-                                tex = Texture2D.whiteTexture;
-                                break;
-                            case 1: // metallicRoughness
-                                tex = Texture2D.blackTexture;
-                                break;
-                            case 2: // normalTexture
-                                tex = Texture2D.normalTexture;
-                                break;
-                            case 3: // emission
-                                tex = Texture2D.blackTexture;
-                                break;
-                        }
-                    }
-
-                    _textures[base4D + i] = tex;
-                }
-            }
-
-            return idxD;
-        }
-
-        /// <summary>
-        /// Decrements the reference count for <paramref name="mat"/>.
-        /// When the count reaches zero, the material slot is freed:
-        /// its 4 descriptor entries are cleared to null SRVs and the slot index
-        /// is enqueued in <see cref="_freeMatSlots"/> for future reuse.
-        /// </summary>
-        private void ReleaseMaterial(Material mat)
-        {
-            if (mat == null || !_materialSlots.TryGetValue(mat, out int slotIdx)) return;
-
-            int newRc = _materialRefCounts.GetValueOrDefault(mat, 1) - 1;
-            if (newRc > 0)
-            {
-                _materialRefCounts[mat] = newRc;
-                return;
-            }
-
             // Reference count hit zero — free the slot.
-            _materialSlots.Remove(mat);
-            _materialRefCounts.Remove(mat);
-            _freeMatSlots.Enqueue(slotIdx);
-
-            // Write null SRVs so stale GPU resources don't linger.
-            if (_textures != null)
-            {
-                int base4 = slotIdx * TexturesPerMaterial;
-                for (int i = 0; i < TexturesPerMaterial; i++)
-                    _textures[base4 + i] = null;
-            }
-        }
-
         private static void EncodeMaterial(SubmeshMaterialData data, ref InstanceDataNRD inst)
         {
             inst.baseColorAndMetalnessScale.x = new half(data.baseColor.r);
