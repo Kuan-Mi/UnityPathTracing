@@ -100,6 +100,7 @@ namespace PathTracing
         {
             RenderTextureDescriptor desc    = new RenderTextureDescriptor(sourceTex.width, sourceTex.height, GraphicsFormat.R8G8B8A8_UInt, 0);
             var                     UintTex = new RenderTexture(desc) { enableRandomWrite = true };
+            UintTex.hideFlags = HideFlags.DontSave;
 
             var scramblingData = sourceTex.GetRawTextureData<byte>();
 
@@ -257,8 +258,7 @@ namespace PathTracing
             var resourcesChanged = pool.EnsureResources(outputResolution, setting.upscalerMode);
             if (!pool.ViewZ.IsCreated)
             {
-                Debug.Log("NRDFeature: Resources not ready, skipping frame.");
-                return;
+                Debug.LogError("NRDFeature: Resources not ready");
             }
 
             var renderResolution = pool.renderResolution;

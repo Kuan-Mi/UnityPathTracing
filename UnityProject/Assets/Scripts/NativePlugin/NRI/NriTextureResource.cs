@@ -66,6 +66,7 @@ namespace Nri
                 filterMode = FilterMode.Point,
                 wrapMode   = TextureWrapMode.Clamp
             };
+            rt.hideFlags = HideFlags.DontSave;
             rt.Create();
 
             Handle    = RTHandles.Alloc(rt);
