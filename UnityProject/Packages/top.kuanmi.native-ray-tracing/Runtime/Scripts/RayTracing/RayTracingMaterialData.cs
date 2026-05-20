@@ -43,8 +43,6 @@ namespace NativeRender
     {
         public bool isTransparent;
         public bool isEmissive;
-
-        /// <summary>True when any submesh in the group uses alpha-clip; GEOMETRY_OPAQUE is NOT set for these geometries.</summary>
         public bool isAlphaClip;
 
         /// <summary>Indices into the Mesh's subMeshCount — also indices into SubmeshMaterialInfos.</summary>

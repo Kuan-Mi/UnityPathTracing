@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Runtime.InteropServices;
+using Rendering.Resources;
 using Unity.Collections;
 using Unity.Jobs;
 using Unity.Mathematics;
@@ -49,43 +50,10 @@ namespace NativeRender
         // ----- Mode helpers -----
         // Static objects are merged into one BLAS in play mode only.
         private static bool ShouldMerge() => Application.isPlaying;
-        private static bool IsStaticObject(NativeRayTracingTarget t) => t.IsStatic;
-
-
-        // Identity 3x4 row-major transform (12 floats).
-        private static readonly float[] kIdentity3x4 =
-        {
-            1f, 0f, 0f, 0f,
-            0f, 1f, 0f, 0f,
-            0f, 0f, 1f, 0f,
-        };
 
         // ----- Acceleration structures -----
         private RayTracingAccelerationStructure _worldAS; // gWorldTlas
         private RayTracingAccelerationStructure _lightAS; // gLightTlas
-
-        // ----- Merged BLAS resources -----
-        private sealed class MergedBlas : IDisposable
-        {
-            public GraphicsBuffer vb; // float3 world-space positions, stride = 12
-            public GraphicsBuffer ib; // uint32 indices,               stride = 4
-
-            public uint vertexCount;
-
-            // Per-submesh records (one entry per submesh of every target in the BLAS).
-            public NativeRenderPlugin.SubmeshDesc[] submeshDescs;
-
-            // Parallel to submeshDescs; null element means no OMM for that submesh.
-            public OMMCache[] ommCaches;
-
-            public void Dispose()
-            {
-                vb?.Release();
-                vb = null;
-                ib?.Release();
-                ib = null;
-            }
-        }
 
         private MergedBlas _blasOpaque;
         private MergedBlas _blasTransparent;
@@ -113,6 +81,8 @@ namespace NativeRender
         /// <summary>
         /// Represents one group of submeshes that share the same (isTransparent, isEmissive) pair
         /// and are therefore registered as a single TLAS entry with a unique customHandle.
+        ///
+        /// 一个GO下的一个或多个 submesh 可能会被分成多个 SubmeshGroup 注册到 TLAS 中，条件是它们的 isTransparent/isEmissive/isAlphaClip 标志不同。
         /// </summary>
         private sealed class SubmeshGroup
         {
@@ -234,24 +204,24 @@ namespace NativeRender
         public RayTracingAccelerationStructure WorldAS => _worldAS;
         public RayTracingAccelerationStructure LightAS => _lightAS;
 
-        public NativeStructuredBuffer InstanceDataBuf                => _instanceDataBuf;
-        public GraphicsBuffer         PrimitiveDataBuf               => _primitiveDataBuf;
-        public GraphicsBuffer         MorphPrimitivePositionsPrevBuf => _morphPrimitivePositionsPrevBuf;
+        public NativeStructuredBuffer InstanceDataBuf => _instanceDataBuf;
+        public GraphicsBuffer PrimitiveDataBuf => _primitiveDataBuf;
+        public GraphicsBuffer MorphPrimitivePositionsPrevBuf => _morphPrimitivePositionsPrevBuf;
 
-        public IntPtr InstanceDataBufPtr                { get; private set; }
-        public IntPtr PrimitiveDataBufPtr               { get; private set; }
+        public IntPtr InstanceDataBufPtr { get; private set; }
+        public IntPtr PrimitiveDataBufPtr { get; private set; }
         public IntPtr MorphPrimitivePositionsPrevBufPtr { get; private set; }
 
         public BindlessTexture Textures => _textures;
 
-        public GraphicsBuffer HashEntriesBuffer  => _sharcHashEntries;
+        public GraphicsBuffer HashEntriesBuffer => _sharcHashEntries;
         public GraphicsBuffer AccumulationBuffer => _sharcAccumulated;
-        public GraphicsBuffer ResolvedBuffer     => _sharcResolved;
+        public GraphicsBuffer ResolvedBuffer => _sharcResolved;
 
         // Cached native pointers (valid for the lifetime of the buffers, set once in AllocateStaticResources).
-        public IntPtr HashEntriesBufferPtr  { get; private set; }
+        public IntPtr HashEntriesBufferPtr { get; private set; }
         public IntPtr AccumulationBufferPtr { get; private set; }
-        public IntPtr ResolvedBufferPtr     { get; private set; }
+        public IntPtr ResolvedBufferPtr { get; private set; }
 
         public NRDSampleResource()
         {
@@ -322,17 +292,10 @@ namespace NativeRender
                 return;
             }
 
-            // Consume Add/Remove events. Static objects in play mode trigger a full rebuild;
-            // dynamic objects are handled incrementally.
             DrainChangeQueue();
 
-            // UpdateTransformsOnly is called every frame:
-            //   - Edit-mode (isStatic=true) entries: only patched when hasChanged.
-            //   - Dynamic (isStatic=false) entries: mOverloaded is written every frame
-            //     (motion matrix when moved, identity when stationary) so Xprev is always correct.
             UpdateTransformsOnly(targets);
 
-            // Update skinned mesh vertex buffers (must happen after Unity's skinning pass).
             UpdateSkinnedInstances();
         }
 
@@ -558,7 +521,7 @@ namespace NativeRender
                 morphPrimitiveOffsets  = subMorphOffsets,
                 primitiveOffsets       = subPrimOffsets,
                 primitiveCounts        = subPrimCounts,
-                indexStride            = mesh.indexFormat == UnityEngine.Rendering.IndexFormat.UInt16 ? 2 : 4,
+                indexStride            = mesh.indexFormat == IndexFormat.UInt16 ? 2 : 4,
             };
         }
 
@@ -767,7 +730,7 @@ namespace NativeRender
                 if (ev.Target == null || ev.Renderer == null) continue;
 
                 // Static objects in play mode live in merged BLASes → full rebuild required.
-                if (ShouldMerge() && IsStaticObject(ev.Target))
+                if (ShouldMerge() && (ev.Target.IsStatic))
                 {
                     _sceneDirty = true;
                     continue;
@@ -941,9 +904,7 @@ namespace NativeRender
         {
             DisposeSceneGpuBuffers(preserveTextures);
 
-            _morphPrimitivePositionsPrevBuf = new GraphicsBuffer(
-                GraphicsBuffer.Target.Structured | GraphicsBuffer.Target.Raw, 1,
-                Marshal.SizeOf<MorphPrimitivePositionsNRD>());
+            _morphPrimitivePositionsPrevBuf   = new GraphicsBuffer(GraphicsBuffer.Target.Structured | GraphicsBuffer.Target.Raw, 1, Marshal.SizeOf<MorphPrimitivePositionsNRD>());
             MorphPrimitivePositionsPrevBufPtr = _morphPrimitivePositionsPrevBuf.GetNativeBufferPtr();
 
             _worldAS?.Clear();
@@ -951,10 +912,12 @@ namespace NativeRender
 
             bool mergeStatics = ShouldMerge();
 
-            // Bucket targets at submesh granularity: in play mode statics go to merged lists; everything else to separate lists.
+            // worldAS 将静态物体分成两个Tlas (透明/不透明)
             var staticOpaque      = new List<SubmeshRef>();
             var staticTransparent = new List<SubmeshRef>();
-            var staticEmissive    = new List<SubmeshRef>();
+
+            // 自发光物体单独分一个加速结构
+            var staticEmissive = new List<SubmeshRef>();
 
             var dyn = new List<NativeRayTracingTarget>();
 
@@ -966,7 +929,7 @@ namespace NativeRender
                 var mf = mr.GetComponent<MeshFilter>();
                 if (mf == null || mf.sharedMesh == null) continue;
 
-                bool goesToMerged = mergeStatics && IsStaticObject(t);
+                bool goesToMerged = mergeStatics && t.IsStatic;
 
                 if (goesToMerged)
                 {
@@ -1008,8 +971,7 @@ namespace NativeRender
             Debug.Log(
                 $"[RebuildScene] Total triangles: {totalPrims}  (Opaque: {CountGroupTriangles(staticOpaque)}, Transparent: {CountGroupTriangles(staticTransparent)}, Emissive: {CountGroupTriangles(staticEmissive)}, Dynamic: {CountGroupTriangles(dyn)})");
 
-            _primitiveCpu = new NativeArray<PrimitiveDataNRD>(
-                Mathf.Max(totalPrims, 1), Allocator.Persistent, NativeArrayOptions.UninitializedMemory);
+            _primitiveCpu = new NativeArray<PrimitiveDataNRD>(Mathf.Max(totalPrims, 1), Allocator.Persistent, NativeArrayOptions.UninitializedMemory);
 
             uint primitiveCursor = 0;
             uint instanceCursor  = 0;
@@ -1024,20 +986,17 @@ namespace NativeRender
 
             if (mergeStatics)
             {
-                _blasOpaque = BuildMergedBlas(staticOpaque, ref instanceCursor, ref primitiveCursor,
-                    instList, _primitiveCpu, texPtrs, FLAG_STATIC | FLAG_NON_TRANSPARENT);
+                _blasOpaque = BuildMergedBlas(staticOpaque, ref instanceCursor, ref primitiveCursor, instList, _primitiveCpu, texPtrs, FLAG_STATIC | FLAG_NON_TRANSPARENT);
 
                 Debug.Log($"Opaque Num {instanceCursor - staticOpaqueFirstInstance} instances, {primitiveCursor} primitives");
 
                 staticTransparentFirstInstance = instanceCursor;
-                _blasTransparent = BuildMergedBlas(staticTransparent, ref instanceCursor, ref primitiveCursor,
-                    instList, _primitiveCpu, texPtrs, FLAG_STATIC | FLAG_TRANSPARENT);
+                _blasTransparent               = BuildMergedBlas(staticTransparent, ref instanceCursor, ref primitiveCursor, instList, _primitiveCpu, texPtrs, FLAG_STATIC | FLAG_TRANSPARENT);
 
                 Debug.Log($"Transparent Num {instanceCursor - staticTransparentFirstInstance} instances, {primitiveCursor - staticOpaqueFirstInstance} primitives");
 
                 staticEmissiveFirstInstance = instanceCursor;
-                _blasEmissive = BuildMergedBlas(staticEmissive, ref instanceCursor, ref primitiveCursor,
-                    instList, _primitiveCpu, texPtrs, FLAG_STATIC | FLAG_NON_TRANSPARENT);
+                _blasEmissive               = BuildMergedBlas(staticEmissive, ref instanceCursor, ref primitiveCursor, instList, _primitiveCpu, texPtrs, FLAG_STATIC | FLAG_NON_TRANSPARENT);
                 Debug.Log($"Emissive Num {instanceCursor - staticEmissiveFirstInstance} instances, {primitiveCursor - staticTransparentFirstInstance} primitives");
             }
 
@@ -1046,10 +1005,6 @@ namespace NativeRender
             // so that HLSL uses mOverloaded as the rotation matrix for normals.
 
             ProcessSeparateGroup(dyn, ref instanceCursor, ref primitiveCursor, instList, texPtrs);
-
-
-            // ProcessSeparateGroup(dynTransparent, _worldAS, FLAG_TRANSPARENT, ref instanceCursor, ref primitiveCursor, instList, texPtrs);
-            // ProcessSeparateGroup(dynEmissive, _lightAS, FLAG_NON_TRANSPARENT | FLAG_EMISSIVE, ref instanceCursor, ref primitiveCursor, instList, texPtrs);
 
             // ---- Texture array ----
             if (!preserveTextures)
@@ -1082,14 +1037,11 @@ namespace NativeRender
             if (mergeStatics)
             {
                 if (_blasOpaque != null)
-                    RegisterMergedBlas(_worldAS, _blasOpaque, kHandleOpaque,
-                        staticOpaqueFirstInstance, (byte)FLAG_NON_TRANSPARENT);
+                    _worldAS.RegisterMergedBlas(_blasOpaque, kHandleOpaque, staticOpaqueFirstInstance, (byte)FLAG_NON_TRANSPARENT);
                 if (_blasTransparent != null)
-                    RegisterMergedBlas(_worldAS, _blasTransparent, kHandleTransparent,
-                        staticTransparentFirstInstance, (byte)FLAG_TRANSPARENT);
+                    _worldAS.RegisterMergedBlas(_blasTransparent, kHandleTransparent, staticTransparentFirstInstance, (byte)FLAG_TRANSPARENT);
                 if (_blasEmissive != null)
-                    RegisterMergedBlas(_lightAS, _blasEmissive, kHandleEmissive,
-                        staticEmissiveFirstInstance, (byte)FLAG_NON_TRANSPARENT);
+                    _lightAS.RegisterMergedBlas(_blasEmissive, kHandleEmissive, staticEmissiveFirstInstance, (byte)FLAG_NON_TRANSPARENT);
             }
 
             // ---- Initialize slot allocators for incremental updates (dynamic objects) ----
@@ -1182,13 +1134,13 @@ namespace NativeRender
 
             // Per-job tracking — kept alive until all jobs Complete().
             var jobHandles = new List<JobHandle>(validPairs.Count * 4);
-            var tempArrays = new List<System.IDisposable>(validPairs.Count * 5);
+            var tempArrays = new List<IDisposable>(validPairs.Count * 5);
 
             foreach (var (target, mr, mesh, meshIndex) in validPairs)
             {
                 Matrix4x4 xform       = target.transform.localToWorldMatrix;
                 int       mrId        = mr.GetInstanceID();
-                uint      indexStride = mesh.indexFormat == UnityEngine.Rendering.IndexFormat.UInt16 ? 2u : 4u;
+                uint      indexStride = mesh.indexFormat == IndexFormat.UInt16 ? 2u : 4u;
 
                 List<SubmeshGroup> groups = BuildSubmeshGroupsFromDescs(target, mrId);
                 if (groups.Count == 0) continue;
@@ -1522,7 +1474,7 @@ namespace NativeRender
             Mesh mesh        = mf.sharedMesh;
             int  subCnt      = mesh.subMeshCount;
             int  mrId        = mr.GetInstanceID();
-            uint indexStride = mesh.indexFormat == UnityEngine.Rendering.IndexFormat.UInt16 ? 2u : 4u;
+            uint indexStride = mesh.indexFormat == IndexFormat.UInt16 ? 2u : 4u;
 
             List<SubmeshGroup> groups = BuildSubmeshGroupsFromDescs(target, mrId);
             if (groups.Count == 0) return;
@@ -1882,7 +1834,7 @@ namespace NativeRender
             var submeshDescs = new List<NativeRenderPlugin.SubmeshDesc>();
             var ommCacheList = new List<OMMCache>();
             var jobHandles   = new List<JobHandle>(targetOrder.Count * 4);
-            var tempArrays   = new List<System.IDisposable>(targetOrder.Count * 5);
+            var tempArrays   = new List<IDisposable>(targetOrder.Count * 5);
 
             int vertBase = 0, iBase = 0;
 
@@ -2037,119 +1989,6 @@ namespace NativeRender
         }
 
         /// <summary>Passes the merged BLAS's VB/IB pointers to the native AS as a single instance.</summary>
-        private unsafe void RegisterMergedBlas(RayTracingAccelerationStructure dstAS,
-            MergedBlas blas, uint handle, uint firstInstanceDataIndex, byte mask)
-        {
-            if (dstAS == null || blas == null) return;
-            if (blas.submeshDescs == null || blas.submeshDescs.Length == 0) return;
-
-            // Check whether any submesh has a valid baked OMM.
-            bool hasAnyOMM = false;
-            if (blas.ommCaches != null)
-            {
-                foreach (var c in blas.ommCaches)
-                    if (c != null && c.IsValid)
-                    {
-                        hasAnyOMM = true;
-                        break;
-                    }
-            }
-
-            // Collect GCHandles (freed in finally) and build ommDescs in one pass.
-            NativeRenderPlugin.SubmeshOMMDesc[] ommDescs      = hasAnyOMM ? new NativeRenderPlugin.SubmeshOMMDesc[blas.submeshDescs.Length] : null;
-            var                                 pinnedHandles = new List<GCHandle>();
-            if (ommDescs != null)
-            {
-                for (int s = 0; s < ommDescs.Length; s++)
-                {
-                    OMMCache cache = (blas.ommCaches != null && s < blas.ommCaches.Length) ? blas.ommCaches[s] : null;
-                    if (cache == null || !cache.IsValid) continue;
-                    pinnedHandles.Add(GCHandle.Alloc(cache.bakedArrayData, GCHandleType.Pinned));
-                    pinnedHandles.Add(GCHandle.Alloc(cache.bakedDescArray, GCHandleType.Pinned));
-                    pinnedHandles.Add(GCHandle.Alloc(cache.bakedIndexBuffer, GCHandleType.Pinned));
-                    pinnedHandles.Add(GCHandle.Alloc(cache.histogramFlat, GCHandleType.Pinned));
-                    ommDescs[s] = new NativeRenderPlugin.SubmeshOMMDesc
-                    {
-                        arrayData      = pinnedHandles[pinnedHandles.Count - 4].AddrOfPinnedObject(),
-                        arrayDataSize  = (uint)cache.bakedArrayData.Length,
-                        descArray      = pinnedHandles[pinnedHandles.Count - 3].AddrOfPinnedObject(),
-                        descArrayCount = cache.bakedDescArrayCount,
-                        indexBuffer    = pinnedHandles[pinnedHandles.Count - 2].AddrOfPinnedObject(),
-                        indexCount     = cache.bakedIndexCount,
-                        indexStride    = cache.bakedIndexStride,
-                        histogramFlat  = pinnedHandles[pinnedHandles.Count - 1].AddrOfPinnedObject(),
-                        histogramCount = (uint)cache.HistogramEntryCount,
-                    };
-                }
-            }
-
-            try
-            {
-                fixed (NativeRenderPlugin.SubmeshDesc* pDescs = blas.submeshDescs)
-                {
-                    bool ok;
-                    if (ommDescs != null)
-                    {
-                        fixed (NativeRenderPlugin.SubmeshOMMDesc* pOMM = ommDescs)
-                        {
-                            var desc = new NativeRenderPlugin.AddInstanceDesc
-                            {
-                                vertexBufferNativePtr = blas.vb.GetNativeBufferPtr(),
-                                indexBufferNativePtr  = blas.ib.GetNativeBufferPtr(),
-                                submeshDescs          = (IntPtr)pDescs,
-                                ommDescs              = (IntPtr)pOMM,
-                                instanceHandle        = handle,
-                                vertexCount           = blas.vertexCount,
-                                vertexStride          = sizeof(float) * 3,
-                                indexStride           = sizeof(uint),
-                                submeshCount          = (uint)blas.submeshDescs.Length,
-                            };
-                            ok = NativeRenderPlugin.NR_AS_AddInstance(dstAS.Handle, ref desc);
-                        }
-                    }
-                    else
-                    {
-                        var desc = new NativeRenderPlugin.AddInstanceDesc
-                        {
-                            vertexBufferNativePtr = blas.vb.GetNativeBufferPtr(),
-                            indexBufferNativePtr  = blas.ib.GetNativeBufferPtr(),
-                            submeshDescs          = (IntPtr)pDescs,
-                            ommDescs              = IntPtr.Zero,
-                            instanceHandle        = handle,
-                            vertexCount           = blas.vertexCount,
-                            vertexStride          = sizeof(float) * 3,
-                            indexStride           = sizeof(uint),
-                            submeshCount          = (uint)blas.submeshDescs.Length,
-                        };
-                        ok = NativeRenderPlugin.NR_AS_AddInstance(dstAS.Handle, ref desc);
-                    }
-
-                    if (!ok)
-                    {
-                        Debug.LogError("[NRDSampleResource] NR_AS_AddInstance failed for merged BLAS");
-                        return;
-                    }
-                }
-            }
-            finally
-            {
-                foreach (var h in pinnedHandles) h.Free();
-            }
-
-            // Identity transform – vertices already in world space.
-            var handles = GCHandle.Alloc(kIdentity3x4, GCHandleType.Pinned);
-            try
-            {
-                NativeRenderPlugin.NR_AS_SetInstanceTransform(dstAS.Handle, handle, handles.AddrOfPinnedObject());
-            }
-            finally
-            {
-                handles.Free();
-            }
-
-            NativeRenderPlugin.NR_AS_SetInstanceMask(dstAS.Handle, handle, mask);
-            NativeRenderPlugin.NR_AS_SetInstanceID(dstAS.Handle, handle, firstInstanceDataIndex);
-        }
 
         // =====================================================================
         // Material / texture helpers

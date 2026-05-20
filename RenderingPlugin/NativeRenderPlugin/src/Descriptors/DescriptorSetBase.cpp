@@ -150,6 +150,11 @@ void DescriptorSetBase<ShaderT>::UpdateDescriptors(
                         : reinterpret_cast<ID3D12Resource*>(slot.resourcePtr);
                 if (res)
                 {
+                    // Logf(kUnityLogTypeLog,
+                    //      "DescriptorSet SRV[%zu] '%s' reg=t%u space%u kind=%d res=%p stride=%u count=%u fmt=%u",
+                    //      i, b.name.c_str(), b.registerIndex, b.space,
+                    //      (int)slot.objectKind, (void*)res,
+                    //      slot.stride, slot.count, slot.format);
                     auto rd = res->GetDesc();
                     if (rd.Dimension == D3D12_RESOURCE_DIMENSION_BUFFER)
                     {
