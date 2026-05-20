@@ -160,10 +160,10 @@ namespace NativeRender
 
         private sealed class SceneBuildPlan
         {
-            public readonly List<SubmeshRef> StaticOpaque      = new();
-            public readonly List<SubmeshRef> StaticTransparent = new();
-            public readonly List<SubmeshRef> StaticEmissive    = new();
-            public readonly List<NativeRayTracingTarget> Dynamic = new();
+            public readonly List<SubmeshRef>             StaticOpaque      = new();
+            public readonly List<SubmeshRef>             StaticTransparent = new();
+            public readonly List<SubmeshRef>             StaticEmissive    = new();
+            public readonly List<NativeRayTracingTarget> Dynamic           = new();
         }
 
         // ----- SkinnedMeshRenderer tracking -----
@@ -920,10 +920,9 @@ namespace NativeRender
 
             bool mergeStatics = ShouldMerge();
 
-            SceneBuildPlan plan = BuildScenePlan(targets, mergeStatics);
+            var plan = BuildScenePlan(targets, mergeStatics);
 
-            int totalPrims = CountSceneTriangles(plan);
-            LogSceneTriangleCounts(plan, totalPrims);
+            var totalPrims = CountSceneTriangles(plan);
 
             _primitiveCpu = new NativeArray<PrimitiveDataNRD>(Mathf.Max(totalPrims, 1), Allocator.Persistent, NativeArrayOptions.UninitializedMemory);
 
@@ -933,29 +932,25 @@ namespace NativeRender
             var instList = new List<InstanceDataNRD>();
             var texPtrs  = new List<Texture>();
 
-            BuildMergedBlases(
-                plan,
-                mergeStatics,
-                ref instanceCursor,
-                ref primitiveCursor,
-                instList,
-                texPtrs,
-                out uint staticOpaqueFirstInstance,
-                out uint staticTransparentFirstInstance,
-                out uint staticEmissiveFirstInstance);
-
-            // ---- Separate BLASes for dynamic objects (or all objects in edit mode) ----
-            // In edit mode every object is "dynamic" in this path but gets FLAG_STATIC
-            // so that HLSL uses mOverloaded as the rotation matrix for normals.
+            if (mergeStatics)
+            {
+                BuildMergedBlases(
+                    plan,
+                    ref instanceCursor,
+                    ref primitiveCursor,
+                    instList,
+                    texPtrs,
+                    out uint staticOpaqueFirstInstance,
+                    out uint staticTransparentFirstInstance,
+                    out uint staticEmissiveFirstInstance);
+                RegisterMergedBlases(staticOpaqueFirstInstance, staticTransparentFirstInstance, staticEmissiveFirstInstance);
+            }
 
             ProcessSeparateGroup(plan.Dynamic, ref instanceCursor, ref primitiveCursor, instList, texPtrs);
 
             UploadTextureArray(texPtrs, preserveTextures);
 
-            // ---- GPU buffers ----
             UploadSceneGeometryBuffers(instList);
-
-            RegisterMergedBlases(mergeStatics, staticOpaqueFirstInstance, staticTransparentFirstInstance, staticEmissiveFirstInstance);
 
             InitializeIncrementalAllocators(totalPrims);
             RegisterSkinnedTargets();
@@ -1038,7 +1033,6 @@ namespace NativeRender
 
         private void BuildMergedBlases(
             SceneBuildPlan plan,
-            bool mergeStatics,
             ref uint instanceCursor,
             ref uint primitiveCursor,
             List<InstanceDataNRD> instList,
@@ -1050,8 +1044,6 @@ namespace NativeRender
             staticOpaqueFirstInstance      = instanceCursor;
             staticTransparentFirstInstance = 0;
             staticEmissiveFirstInstance    = 0;
-
-            if (!mergeStatics) return;
 
             _blasOpaque = BuildMergedBlas(plan.StaticOpaque, ref instanceCursor, ref primitiveCursor, instList, _primitiveCpu, texPtrs, FLAG_STATIC | FLAG_NON_TRANSPARENT);
             Debug.Log($"Opaque Num {instanceCursor - staticOpaqueFirstInstance} instances, {primitiveCursor} primitives");
@@ -1066,13 +1058,10 @@ namespace NativeRender
         }
 
         private void RegisterMergedBlases(
-            bool mergeStatics,
             uint staticOpaqueFirstInstance,
             uint staticTransparentFirstInstance,
             uint staticEmissiveFirstInstance)
         {
-            if (!mergeStatics) return;
-
             if (_blasOpaque != null)
                 _worldAS.RegisterMergedBlas(_blasOpaque, kHandleOpaque, staticOpaqueFirstInstance, (byte)FLAG_NON_TRANSPARENT);
             if (_blasTransparent != null)
@@ -1237,7 +1226,7 @@ namespace NativeRender
 
                 foreach (var grp in groups)
                 {
-                    var groupDescs = BuildGroupSubmeshDescs(mesh, grp, indexStride);
+                    var  groupDescs = BuildGroupSubmeshDescs(mesh, grp, indexStride);
                     uint groupFlags = grp.isTransparent ? FLAG_TRANSPARENT : FLAG_NON_TRANSPARENT;
                     byte groupMask  = GetMaskForFlags(groupFlags);
 
@@ -1972,7 +1961,6 @@ namespace NativeRender
         // =====================================================================
         // Material / texture helpers
         // =====================================================================
-
         private static NativeRenderPlugin.SubmeshDesc[] BuildGroupSubmeshDescs(
             Mesh mesh,
             SubmeshGroup group,
