@@ -84,7 +84,7 @@ namespace PathTracing
 
                 string foldoutKey  = GetKey("AssetGroup_" + groupName);
                 bool   isExpanded  = SessionState.GetBool(foldoutKey, true);
-                bool   newExpanded = EditorGUILayout.BeginFoldoutHeaderGroup(isExpanded, groupName);
+                bool   newExpanded = EditorGUILayout.Foldout(isExpanded, groupName, toggleOnLabelClick: true, EditorStyles.foldoutHeader);
                 if (newExpanded != isExpanded)
                     SessionState.SetBool(foldoutKey, newExpanded);
 
@@ -99,8 +99,6 @@ namespace PathTracing
                     }
                     EditorGUI.indentLevel--;
                 }
-
-                EditorGUILayout.EndFoldoutHeaderGroup();
             }
         }
     }
