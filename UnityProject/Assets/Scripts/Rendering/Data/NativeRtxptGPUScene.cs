@@ -30,7 +30,6 @@ namespace PathTracing
         // Structured buffers (donut-compatible)
         private GraphicsBuffer _instanceGpuBuf; // t_InstanceData  (t2)
         private GraphicsBuffer _geometryGpuBuf; // t_GeometryData  (t3)
-        private GraphicsBuffer _materialGpuBuf; // t_MaterialConstants (donut, kept for compatibility)
 
         // RTXPT-specific structured buffers
         private GraphicsBuffer _subInstanceGpuBuf; // t_SubInstanceData    (t1)
@@ -44,7 +43,6 @@ namespace PathTracing
         // CPU-side mirrors
         private DonutInstanceData[]      _instanceCpu;
         private DonutGeometryData[]      _geometryCpu;
-        private DonutMaterialConstants[] _materialCpu;
         private SubInstanceData[]        _subInstanceCpu;
         private PTMaterialData[]         _ptMaterialCpu;
         private GeometryDebugData[]      _geomDebugCpu;
@@ -111,7 +109,7 @@ namespace PathTracing
         public List<EmissiveGeometryEntry> GetEmissiveGeometries()
         {
             var result = new List<EmissiveGeometryEntry>();
-            if (_instanceCpu == null || _geometryCpu == null || _materialCpu == null)
+            if (_instanceCpu == null || _geometryCpu == null)
                 return result;
 
             for (int i = 0; i < _instanceCpu.Length; i++)
@@ -127,10 +125,10 @@ namespace PathTracing
 
                     var geom   = _geometryCpu[geomIdx];
                     int matIdx = (int)geom.materialIndex;
-                    if (matIdx < 0 || matIdx >= _materialCpu.Length) continue;
+                    if (matIdx < 0 || matIdx >= _ptMaterialCpu.Length) continue;
 
-                    var mat = _materialCpu[matIdx];
-                    if (mat.emissiveColor.x <= 0f && mat.emissiveColor.y <= 0f && mat.emissiveColor.z <= 0f)
+                    var mat = _ptMaterialCpu[matIdx];
+                    if (mat.EmissiveColor.x <= 0f && mat.EmissiveColor.y <= 0f && mat.EmissiveColor.z <= 0f)
                         continue;
 
                     result.Add(new EmissiveGeometryEntry
@@ -195,8 +193,6 @@ namespace PathTracing
                 ds.SetStructuredBuffer("t_GeometryDebugData", _geomDebugGpuBuf.GetNativeBufferPtr(), _geomDebugGpuBuf.count, _geomDebugGpuBuf.stride);
             if (_ptMaterialGpuBuf != null)
                 ds.SetStructuredBuffer("t_PTMaterialData", _ptMaterialGpuBuf.GetNativeBufferPtr(), _ptMaterialGpuBuf.count, _ptMaterialGpuBuf.stride);
-            if (_materialGpuBuf != null)
-                ds.SetStructuredBuffer("t_MaterialConstants", _materialGpuBuf.GetNativeBufferPtr(), _materialGpuBuf.count, _materialGpuBuf.stride);
             if (_sceneBuffers != null) ds.SetBindlessBuffer("t_BindlessBuffers", _sceneBuffers);
             if (_sceneTextures != null) ds.SetBindlessTexture("t_BindlessTextures", _sceneTextures);
         }
@@ -214,8 +210,6 @@ namespace PathTracing
                 ds.SetStructuredBuffer("t_GeometryDebugData", _geomDebugGpuBuf.GetNativeBufferPtr(), _geomDebugGpuBuf.count, _geomDebugGpuBuf.stride);
             if (_ptMaterialGpuBuf != null)
                 ds.SetStructuredBuffer("t_PTMaterialData", _ptMaterialGpuBuf.GetNativeBufferPtr(), _ptMaterialGpuBuf.count, _ptMaterialGpuBuf.stride);
-            if (_materialGpuBuf != null)
-                ds.SetStructuredBuffer("t_MaterialConstants", _materialGpuBuf.GetNativeBufferPtr(), _materialGpuBuf.count, _materialGpuBuf.stride);
             if (_sceneBuffers != null) ds.SetBindlessBuffer("t_BindlessBuffers", _sceneBuffers);
             if (_sceneTextures != null) ds.SetBindlessTexture("t_BindlessTextures", _sceneTextures);
         }
@@ -265,8 +259,6 @@ namespace PathTracing
             _instanceGpuBuf = null;
             _geometryGpuBuf?.Release();
             _geometryGpuBuf = null;
-            _materialGpuBuf?.Release();
-            _materialGpuBuf = null;
             _subInstanceGpuBuf?.Release();
             _subInstanceGpuBuf = null;
             _ptMaterialGpuBuf?.Release();
@@ -279,7 +271,6 @@ namespace PathTracing
             _sceneTextures  = null;
             _instanceCpu    = null;
             _geometryCpu    = null;
-            _materialCpu    = null;
             _subInstanceCpu = null;
             _ptMaterialCpu  = null;
             _geomDebugCpu   = null;
@@ -301,7 +292,6 @@ namespace PathTracing
 
             var instList    = new List<DonutInstanceData>();
             var geomList    = new List<DonutGeometryData>();
-            var matList     = new List<DonutMaterialConstants>();
             var subInstList = new List<SubInstanceData>();
             var ptMatList   = new List<PTMaterialData>();
             var geomDbgList = new List<GeometryDebugData>();
@@ -351,7 +341,7 @@ namespace PathTracing
                 {
                     SubMeshDescriptor sub    = mesh.GetSubMesh(s);
                     Material          mat    = s < mats.Length ? mats[s] : (mats.Length > 0 ? mats[mats.Length - 1] : null);
-                    int               matIdx = GetOrAddMaterial(mat, instIdx, matList, ptMatList, texPtrs);
+                    int               matIdx = GetOrAddMaterial(mat, ptMatList, texPtrs);
 
                     int globalGeomIdx = geomList.Count; // index we're about to push
 
@@ -377,8 +367,8 @@ namespace PathTracing
                     float aCutoff       = isAlphaTested ? TryGetFloat(mat, "_Cutoff", 0f) : 0f;
                     uint  alphaU8       = (uint)Mathf.RoundToInt(Mathf.Clamp01(aCutoff) * 255f);
                     // AlphaTextureIndex in lo16: use base texture slot if alpha-tested, else 0
-                    uint alphaTexIdx = isAlphaTested && matList.Count > matIdx
-                        ? (uint)Mathf.Max(0, matList[matIdx].baseOrDiffuseTextureIndex)
+                    uint alphaTexIdx = isAlphaTested && ptMatList.Count > matIdx
+                        ? (uint)Mathf.Max(0, ptMatList[matIdx].BaseOrDiffuseTextureIndex)
                         : 0u;
                     uint siFlags               = alphaTexIdx & 0xFFFFu;
                     if (isAlphaTested) siFlags |= SubInstanceFlags.AlphaTested;
@@ -449,7 +439,6 @@ namespace PathTracing
             {
                 instList.Add(default);
                 geomList.Add(default);
-                matList.Add(default);
                 subInstList.Add(default);
                 ptMatList.Add(default);
                 geomDbgList.Add(default);
@@ -457,7 +446,6 @@ namespace PathTracing
 
             _instanceCpu    = instList.ToArray();
             _geometryCpu    = geomList.ToArray();
-            _materialCpu    = matList.ToArray();
             _subInstanceCpu = subInstList.ToArray();
             _ptMaterialCpu  = ptMatList.ToArray();
             _geomDebugCpu   = geomDbgList.ToArray();
@@ -467,9 +455,6 @@ namespace PathTracing
 
             _geometryGpuBuf = new GraphicsBuffer(GraphicsBuffer.Target.Structured, _geometryCpu.Length, Marshal.SizeOf<DonutGeometryData>());
             _geometryGpuBuf.SetData(_geometryCpu);
-
-            _materialGpuBuf = new GraphicsBuffer(GraphicsBuffer.Target.Structured, _materialCpu.Length, Marshal.SizeOf<DonutMaterialConstants>());
-            _materialGpuBuf.SetData(_materialCpu);
 
             _subInstanceGpuBuf = new GraphicsBuffer(GraphicsBuffer.Target.Structured, _subInstanceCpu.Length, Marshal.SizeOf<SubInstanceData>());
             _subInstanceGpuBuf.SetData(_subInstanceCpu);
@@ -533,14 +518,13 @@ namespace PathTracing
                 _instanceGpuBuf.SetData(_instanceCpu, dirtyStart, dirtyStart, instanceCount - dirtyStart);
         }
 
-        private int GetOrAddMaterial(Material mat, int instanceSlotIndex,
-            List<DonutMaterialConstants> matList, List<PTMaterialData> ptMatList, List<IntPtr> texPtrs)
+        private int GetOrAddMaterial(Material mat,List<PTMaterialData> ptMatList, List<IntPtr> texPtrs)
         {
             int matId = mat != null ? mat.GetInstanceID() : -1;
             if (_materialSlots.TryGetValue(matId, out int existing))
                 return existing;
 
-            int idx = matList.Count;
+            int idx = ptMatList.Count;
             _materialSlots[matId] = idx;
 
             int   baseTexIdx, normalTexIdx, metalRoughTexIdx, emissiveTexIdx, occlusionTexIdx;
@@ -637,33 +621,6 @@ namespace PathTracing
                 DiffuseTransmissionFactor        = 0f,
                 VolumeAttenuationColor           = Vector3.one,
                 VolumeAttenuationDistance        = float.MaxValue,
-            });
-
-            matList.Add(new DonutMaterialConstants
-            {
-                baseOrDiffuseColor               = new Vector3(baseColor.r, baseColor.g, baseColor.b),
-                flags                            = matFlags,
-                specularColor                    = specularColor,
-                materialID                       = idx,
-                emissiveColor                    = new Vector3(emissive.r, emissive.g, emissive.b),
-                domain                           = domain,
-                opacity                          = baseColor.a,
-                roughness                        = roughness,
-                metalness                        = metalness,
-                normalTextureScale               = normalScale,
-                occlusionStrength                = occStr,
-                alphaCutoff                      = alphaCutoff,
-                transmissionFactor               = 0f,
-                baseOrDiffuseTextureIndex        = baseTexIdx,
-                metalRoughOrSpecularTextureIndex = metalRoughTexIdx,
-                emissiveTextureIndex             = emissiveTexIdx,
-                normalTextureIndex               = normalTexIdx,
-                occlusionTextureIndex            = occlusionTexIdx,
-                transmissionTextureIndex         = -1,
-                opacityTextureIndex              = -1,
-                normalTextureTransformScaleX     = 1f,
-                normalTextureTransformScaleY     = 1f,
-                // SSS / hair — all zero (default struct init)
             });
 
             return idx;

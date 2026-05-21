@@ -16,7 +16,7 @@ MonoBehaviour:
   setting:
     realtimeMode: 1
     realtimeAA: 3
-    upscalerMode: 2
+    upscalerMode: 0
     cameraJitter: 1
     cameraAperture: 0
     cameraFocalDistance: 10000
@@ -81,6 +81,7 @@ MonoBehaviour:
     dbgDiscardNonNEELighting: 0
     dbgDiscardNEELighting: 0
     dbgDisablePostProcessFilters: 0
+    showMode: 0
     skipRightEyeInVR: 1
   renderPassEvent: 550
   buildStablePlanesShader: {fileID: -6676421132958364438, guid: be311863611ef33419d1a1aead5b64a0, type: 3}
@@ -100,6 +101,7 @@ MonoBehaviour:
   noDenoiserFinalMergeCs: {fileID: -2368575503658470205, guid: a1b2c3d4e5f6a1b2c3d4e5f6a1b2c307, type: 3}
   dlssBeforeCs: {fileID: -2368575503658470205, guid: a1b2c3d4e5f6a1b2c3d4e5f6a1b2c306, type: 3}
   accumulationCs: {fileID: -2368575503658470205, guid: 96ba0c67e691b484781846c8b20f6061, type: 3}
+  outputBlitMaterial: {fileID: 2100000, guid: 27695a2bc55ef2f469362b9a2994989e, type: 2}
 --- !u!114 &11400000
 MonoBehaviour:
   m_ObjectHideFlags: 0

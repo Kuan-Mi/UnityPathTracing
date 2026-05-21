@@ -60,14 +60,14 @@ namespace PathTracing
         public NriTextureResource MaterialInfo;
 
         // ── DLSS-RR guide buffers (prepared by DlssBeforePass equivalent) ────
-        /// <summary>Diffuse albedo guide for DLSS-RR. A2B10G10R10_UNORM.</summary>
+        /// <summary>Diffuse albedo guide for DLSS-RR. R11G11B10_FLOAT (sl::kBufferTypeAlbedo).</summary>
         public NriTextureResource DlssRrDiffAlbedo;
 
-        /// <summary>Specular albedo guide for DLSS-RR. A2B10G10R10_UNORM.</summary>
+        /// <summary>Specular albedo guide for DLSS-RR. R11G11B10_FLOAT (sl::kBufferTypeSpecularAlbedo).</summary>
         public NriTextureResource DlssRrSpecAlbedo;
 
-        /// <summary>Specular hit distance guide for DLSS-RR. R16_FLOAT.</summary>
-        public NriTextureResource DlssRrSpecHitDistance;
+        /// <summary>Specular motion vectors guide for DLSS-RR. RG16_FLOAT (sl::kBufferTypeSpecularMotionVectors).</summary>
+        public NriTextureResource DlssRrSpecMotionVectors;
 
         /// <summary>Normal + roughness guide for DLSS-RR. RGBA16_FLOAT.</summary>
         public NriTextureResource DlssRrNormalRoughness;
@@ -112,9 +112,9 @@ namespace PathTracing
             RoughnessMetal        = new NriTextureResource("Rtxpt_RoughnessMetal",        GraphicsFormat.R16G16_SFloat,            uav);
             MaterialInfo          = new NriTextureResource("Rtxpt_MaterialInfo",          GraphicsFormat.R32_UInt,                 uav);
 
-            DlssRrDiffAlbedo      = new NriTextureResource("Rtxpt_DlssRrDiffAlbedo",      GraphicsFormat.A2B10G10R10_UNormPack32, uav);
-            DlssRrSpecAlbedo      = new NriTextureResource("Rtxpt_DlssRrSpecAlbedo",      GraphicsFormat.A2B10G10R10_UNormPack32, uav);
-            DlssRrSpecHitDistance = new NriTextureResource("Rtxpt_DlssRrSpecHitDistance", GraphicsFormat.R16_SFloat,               uav);
+            DlssRrDiffAlbedo      = new NriTextureResource("Rtxpt_DlssRrDiffAlbedo",      GraphicsFormat.B10G11R11_UFloatPack32,  uav);
+            DlssRrSpecAlbedo      = new NriTextureResource("Rtxpt_DlssRrSpecAlbedo",      GraphicsFormat.B10G11R11_UFloatPack32,  uav);
+            DlssRrSpecMotionVectors = new NriTextureResource("Rtxpt_DlssRrSpecMotionVectors", GraphicsFormat.R16G16_SFloat,          uav);
             DlssRrNormalRoughness = new NriTextureResource("Rtxpt_DlssRrNormalRoughness", GraphicsFormat.R16G16B16A16_SFloat,     uav);
 
             DlssRrOutput          = new NriTextureResource("Rtxpt_DlssRrOutput",          GraphicsFormat.R16G16B16A16_SFloat,     uav);
@@ -144,6 +144,9 @@ namespace PathTracing
             foreach (var tex in RenderResolutionTextures())
                 tex.Allocate(renderResolution);
 
+            // StablePlanesHeader is a Texture2DArray with 4 slices
+            StablePlanesHeader.Allocate(renderResolution, slices: 4);
+
             // Display-resolution textures
             DlssRrOutput.Allocate(displayResolution);
             ProcessedOutputColor.Allocate(displayResolution);
@@ -155,9 +158,9 @@ namespace PathTracing
         {
             OutputColor, Depth, ScreenMotionVectors, Throughput,
             SpecularHitT, ScratchFloat1,
-            StablePlanesHeader, StableRadiance,
+            StableRadiance,
             BaseColor, SpecNormal, RoughnessMetal, MaterialInfo,
-            DlssRrDiffAlbedo, DlssRrSpecAlbedo, DlssRrSpecHitDistance, DlssRrNormalRoughness,
+            DlssRrDiffAlbedo, DlssRrSpecAlbedo, DlssRrSpecMotionVectors, DlssRrNormalRoughness,
             ShaderDebugViz, AccumulatedRadiance,
         };
 
@@ -182,7 +185,7 @@ namespace PathTracing
             SpecularHitT, ScratchFloat1,
             StablePlanesHeader, StableRadiance,
             BaseColor, SpecNormal, RoughnessMetal, MaterialInfo,
-            DlssRrDiffAlbedo, DlssRrSpecAlbedo, DlssRrSpecHitDistance, DlssRrNormalRoughness,
+            DlssRrDiffAlbedo, DlssRrSpecAlbedo, DlssRrSpecMotionVectors, DlssRrNormalRoughness,
             ShaderDebugViz, DlssRrOutput, AccumulatedRadiance, ProcessedOutputColor,
         };
     }

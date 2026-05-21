@@ -203,7 +203,7 @@ namespace PathTracing
         DiffuseAlbedo,
         SpecularAlbedo,
         NormalRoughness,
-        SpecHitDistance,
+        SpecMotionVectors,
 
         // ── Debug ──────────────────────────────────────────────────────────
         ShaderDebugViz,

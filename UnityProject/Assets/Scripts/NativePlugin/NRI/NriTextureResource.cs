@@ -42,15 +42,11 @@ namespace Nri
             SRGB           = srgb;
         }
 
-        public void Allocate(int2 resolution)
+        public void Allocate(int2 resolution, int slices = 1)
         {
             Release(); // 确保先释放旧的
             var dxgiFormat = NriUtil.GetDXGIFormat(GraphicsFormat);
 
-            // Debug.Log($"Allocating NRD Texture Resource: {Name}, Size: {resolution}, Format: {GraphicsFormat}");
-
-
-            // 创建 RT 描述
             var desc = new RenderTextureDescriptor(resolution.x, resolution.y, GraphicsFormat, 0)
             {
                 enableRandomWrite = true,
@@ -58,6 +54,12 @@ namespace Nri
                 msaaSamples       = 1,
                 sRGB              = SRGB
             };
+
+            if (slices > 1)
+            {
+                desc.dimension   = TextureDimension.Tex2DArray;
+                desc.volumeDepth = slices;
+            }
 
             // 创建 RT
             rt = new RenderTexture(desc)

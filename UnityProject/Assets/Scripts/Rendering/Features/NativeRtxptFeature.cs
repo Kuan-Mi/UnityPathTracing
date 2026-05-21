@@ -265,7 +265,7 @@ namespace PathTracing
                         diffAlbedo      = texPool.DlssRrDiffAlbedo,
                         specAlbedo      = texPool.DlssRrSpecAlbedo,
                         normalRoughness = texPool.DlssRrNormalRoughness,
-                        specHitDistance = texPool.DlssRrSpecHitDistance,
+                        specHitDistance = texPool.DlssRrSpecMotionVectors,
                     };
                     _dlssRRPass.Setup(
                         dlrr.GetInteropDataPtr(dlrrInput, dlrrRes, 1.0f, setting.upscalerMode),

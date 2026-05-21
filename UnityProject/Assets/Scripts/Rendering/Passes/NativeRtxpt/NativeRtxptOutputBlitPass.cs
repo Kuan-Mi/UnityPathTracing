@@ -118,8 +118,8 @@ namespace PathTracing
                     Blitter.BlitTexture(cmd, res.DlssRrNormalRoughness.Handle, scaleOffset, mat, (int)ShowPass.Normal);
                     break;
 
-                case NativeRtxptShowMode.SpecHitDistance:
-                    Blitter.BlitTexture(cmd, res.DlssRrSpecHitDistance.Handle, scaleOffset, mat, (int)ShowPass.Out);
+                case NativeRtxptShowMode.SpecMotionVectors:
+                    Blitter.BlitTexture(cmd, res.DlssRrSpecMotionVectors.Handle, scaleOffset, mat, (int)ShowPass.Out);
                     break;
 
                 // ── Debug ──────────────────────────────────────────────────
