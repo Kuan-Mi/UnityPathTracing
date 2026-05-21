@@ -15,7 +15,7 @@ namespace PathTracing
         private readonly Material                  _blitMaterial;
         private          NativeNrdTextureResources _resource;
         private          Settings                  _settings;
-
+ 
         public NativeNrdOutputBlitPass(Material blitMaterial)
         {
             _blitMaterial = blitMaterial;

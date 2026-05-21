@@ -173,6 +173,43 @@ namespace PathTracing
     }
 
     /// <summary>
+    /// Debug / display modes for <see cref="NativeRtxptFeature"/>'s
+    /// <see cref="NativeRtxptOutputBlitPass"/>.
+    /// </summary>
+    public enum NativeRtxptShowMode
+    {
+        // ── Final outputs ──────────────────────────────────────────────────
+        /// <summary>DLSS-RR denoised + upscaled output (realtime mode).</summary>
+        DlssRrOutput,
+        /// <summary>Post-accumulation tone-mapped output (reference mode).</summary>
+        ProcessedOutput,
+        /// <summary>Raw PT output color before denoising.</summary>
+        OutputColor,
+
+        // ── GBuffer ────────────────────────────────────────────────────────
+        BaseColor,
+        RoughnessMetal,
+        SpecNormal,
+
+        // ── Depth / motion ─────────────────────────────────────────────────
+        Depth,
+        MotionVectors,
+
+        // ── Stable planes ─────────────────────────────────────────────────
+        SpecularHitT,
+        StableRadiance,
+
+        // ── DLSS-RR guide buffers ──────────────────────────────────────────
+        DiffuseAlbedo,
+        SpecularAlbedo,
+        NormalRoughness,
+        SpecHitDistance,
+
+        // ── Debug ──────────────────────────────────────────────────────────
+        ShaderDebugViz,
+    }
+
+    /// <summary>
     /// Debug / display modes for <see cref="NativeNrdFeature"/>'s dedicated
     /// <see cref="NativeNrdOutputBlitPass"/>.  Only NRD-pipeline buffers are listed here;
     /// RTXDI-specific GBuffer and PDF views are intentionally absent.

@@ -141,6 +141,9 @@ namespace PathTracing
         public bool dbgDiscardNEELighting        = false;
         public bool dbgDisablePostProcessFilters = false;
 
+        /// <summary>Which buffer to display in the output blit pass.</summary>
+        public NativeRtxptShowMode showMode = NativeRtxptShowMode.DlssRrOutput;
+
         // ── Misc ──────────────────────────────────────────────────────────────
         public bool skipRightEyeInVR = true;
     }

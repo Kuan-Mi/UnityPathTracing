@@ -54,6 +54,9 @@ namespace PathTracing
         // Phase 8
         public NativeComputeShader accumulationCs;
 
+        // Phase 9: Output blit (debug display)
+        public Material outputBlitMaterial;
+
         // ---- Pass instances -------------------------------------------------
         private NativeRtxptBuildTlasPass              _buildTlasPass;
         private NativeRtxptPathTracerPass             _pathTracerPass;
@@ -63,6 +66,7 @@ namespace PathTracing
         private NativeRtxptDlssBeforePass             _dlssBeforePass;
         private DlssRRPass                            _dlssRRPass;
         private NativeRtxptAccumulationPass           _accumulationPass;
+        private NativeRtxptOutputBlitPass             _outputBlitPass;
         private NativeFrameTick                       _nativeFrameTickPass;
 
         // ---- Shared scene resources -----------------------------------------
@@ -92,38 +96,30 @@ namespace PathTracing
                 renderPassEvent           = renderPassEvent,
             };
 
-            if (_pathTracerPass == null
-                && buildStablePlanesShader != null
-                && fillStablePlanesShader  != null
-                && referenceShader         != null)
-            {
-                _pathTracerPass = new NativeRtxptPathTracerPass(
-                    buildStablePlanesShader, fillStablePlanesShader, referenceShader,
-                    buildHitGroups, fillHitGroups, referenceHitGroups)
+            _pathTracerPass ??= new NativeRtxptPathTracerPass(
+                buildStablePlanesShader, fillStablePlanesShader, referenceShader,
+                buildHitGroups, fillHitGroups, referenceHitGroups)
+            { renderPassEvent = renderPassEvent };
+
+            _exportVisibilityBufferPass ??= new NativeRtxptExportVisibilityBufferPass(exportVisibilityBufferCs)
                 { renderPassEvent = renderPassEvent };
-            }
 
-            if (_exportVisibilityBufferPass == null && exportVisibilityBufferCs != null)
-                _exportVisibilityBufferPass = new NativeRtxptExportVisibilityBufferPass(exportVisibilityBufferCs)
-                    { renderPassEvent = renderPassEvent };
+            _denoiseSpecHitTPass ??= new NativeRtxptDenoiseSpecHitTPass(denoiseSpecHitTCs)
+                { renderPassEvent = renderPassEvent };
 
-            if (_denoiseSpecHitTPass == null && denoiseSpecHitTCs != null)
-                _denoiseSpecHitTPass = new NativeRtxptDenoiseSpecHitTPass(denoiseSpecHitTCs)
-                    { renderPassEvent = renderPassEvent };
+            _noDenoiserFinalMergePass ??= new NativeRtxptNoDenoiserFinalMergePass(noDenoiserFinalMergeCs)
+                { renderPassEvent = renderPassEvent };
 
-            if (_noDenoiserFinalMergePass == null && noDenoiserFinalMergeCs != null)
-                _noDenoiserFinalMergePass = new NativeRtxptNoDenoiserFinalMergePass(noDenoiserFinalMergeCs)
-                    { renderPassEvent = renderPassEvent };
-
-            if (_dlssBeforePass == null && dlssBeforeCs != null)
-                _dlssBeforePass = new NativeRtxptDlssBeforePass(dlssBeforeCs)
-                    { renderPassEvent = renderPassEvent };
+            _dlssBeforePass ??= new NativeRtxptDlssBeforePass(dlssBeforeCs)
+                { renderPassEvent = renderPassEvent };
 
             _dlssRRPass ??= new DlssRRPass { renderPassEvent = renderPassEvent };
 
-            if (_accumulationPass == null && accumulationCs != null)
-                _accumulationPass = new NativeRtxptAccumulationPass(accumulationCs)
-                    { renderPassEvent = renderPassEvent };
+            _accumulationPass ??= new NativeRtxptAccumulationPass(accumulationCs)
+                { renderPassEvent = renderPassEvent };
+
+            _outputBlitPass ??= new NativeRtxptOutputBlitPass(outputBlitMaterial)
+                { renderPassEvent = renderPassEvent };
 
             _nativeFrameTickPass ??= new NativeFrameTick { renderPassEvent = renderPassEvent };
         }
@@ -230,42 +226,27 @@ namespace PathTracing
             // ---- Phase 1: LightsBaker (TODO) --------------------------------
 
             // ---- Phase 2: PathTracer RT Shader ------------------------------
-            if (_pathTracerPass != null)
-            {
-                _pathTracerPass.Setup(passCtx);
-                renderer.EnqueuePass(_pathTracerPass);
-            }
+            _pathTracerPass.Setup(passCtx);
+            renderer.EnqueuePass(_pathTracerPass);
 
             // ---- Phase 3: ExportVisibilityBuffer ----------------------------
-            if (_exportVisibilityBufferPass != null)
-            {
-                _exportVisibilityBufferPass.Setup(passCtx);
-                renderer.EnqueuePass(_exportVisibilityBufferPass);
-            }
+            _exportVisibilityBufferPass.Setup(passCtx);
+            renderer.EnqueuePass(_exportVisibilityBufferPass);
 
             // ---- Realtime-only phases (4-7) ---------------------------------
             if (setting.realtimeMode)
             {
                 // Phase 4: DenoiseSpecHitT x2
-                if (_denoiseSpecHitTPass != null)
-                {
-                    _denoiseSpecHitTPass.Setup(passCtx);
-                    renderer.EnqueuePass(_denoiseSpecHitTPass);
-                }
+                _denoiseSpecHitTPass.Setup(passCtx);
+                renderer.EnqueuePass(_denoiseSpecHitTPass);
 
                 // Phase 5: NoDenoiserFinalMerge
-                if (_noDenoiserFinalMergePass != null)
-                {
-                    _noDenoiserFinalMergePass.Setup(passCtx);
-                    renderer.EnqueuePass(_noDenoiserFinalMergePass);
-                }
+                _noDenoiserFinalMergePass.Setup(passCtx);
+                renderer.EnqueuePass(_noDenoiserFinalMergePass);
 
                 // Phase 6: DlssBefore
-                if (_dlssBeforePass != null)
-                {
-                    _dlssBeforePass.Setup(passCtx);
-                    renderer.EnqueuePass(_dlssBeforePass);
-                }
+                _dlssBeforePass.Setup(passCtx);
+                renderer.EnqueuePass(_dlssBeforePass);
 
                 // Phase 7: DLSS-RR
                 {
@@ -299,11 +280,17 @@ namespace PathTracing
             else
             {
                 // Phase 8: Accumulation (reference mode)
-                if (_accumulationPass != null)
-                {
-                    _accumulationPass.Setup(passCtx);
-                    renderer.EnqueuePass(_accumulationPass);
-                }
+                _accumulationPass.Setup(passCtx);
+                renderer.EnqueuePass(_accumulationPass);
+            }
+
+            // ---- Phase 9: Output blit (debug display) ----------------------
+            {
+                float renderScale = setting.upscalerMode == UpscalerMode.NATIVE
+                    ? 1f
+                    : (float)renderResolution.x / displayResolution.x;
+                _outputBlitPass.Setup(texPool, setting.showMode, renderScale);
+                renderer.EnqueuePass(_outputBlitPass);
             }
 
             // ---- Frame tick ------------------------------------------------
@@ -344,6 +331,7 @@ namespace PathTracing
             _noDenoiserFinalMergePass?.Dispose();   _noDenoiserFinalMergePass   = null;
             _dlssBeforePass?.Dispose();             _dlssBeforePass             = null;
             _accumulationPass?.Dispose();           _accumulationPass           = null;
+            _outputBlitPass = null;
 
             foreach (var p in _texturePools.Values)  p.Dispose();   _texturePools.Clear();
             foreach (var p in _bufferPools.Values)   p.Dispose();   _bufferPools.Clear();
