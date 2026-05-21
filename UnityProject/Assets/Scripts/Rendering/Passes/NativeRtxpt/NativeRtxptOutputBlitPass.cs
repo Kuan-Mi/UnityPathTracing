@@ -106,19 +106,19 @@ namespace PathTracing
                     break;
 
                 // ── DLSS-RR guide buffers ──────────────────────────────────
-                case NativeRtxptShowMode.DiffuseAlbedo:
+                case NativeRtxptShowMode.DlssDiffuseAlbedo:
                     Blitter.BlitTexture(cmd, res.DlssRrDiffAlbedo.Handle, scaleOffset, mat, (int)ShowPass.Out);
                     break;
 
-                case NativeRtxptShowMode.SpecularAlbedo:
+                case NativeRtxptShowMode.DlssSpecularAlbedo:
                     Blitter.BlitTexture(cmd, res.DlssRrSpecAlbedo.Handle, scaleOffset, mat, (int)ShowPass.Out);
                     break;
 
-                case NativeRtxptShowMode.NormalRoughness:
+                case NativeRtxptShowMode.DlssNormalRoughness:
                     Blitter.BlitTexture(cmd, res.DlssRrNormalRoughness.Handle, scaleOffset, mat, (int)ShowPass.Normal);
                     break;
 
-                case NativeRtxptShowMode.SpecMotionVectors:
+                case NativeRtxptShowMode.DlssSpecMotionVectors:
                     Blitter.BlitTexture(cmd, res.DlssRrSpecMotionVectors.Handle, scaleOffset, mat, (int)ShowPass.Out);
                     break;
 

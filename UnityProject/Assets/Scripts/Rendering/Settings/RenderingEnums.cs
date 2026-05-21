@@ -200,10 +200,10 @@ namespace PathTracing
         StableRadiance,
 
         // ── DLSS-RR guide buffers ──────────────────────────────────────────
-        DiffuseAlbedo,
-        SpecularAlbedo,
-        NormalRoughness,
-        SpecMotionVectors,
+        DlssDiffuseAlbedo,
+        DlssSpecularAlbedo,
+        DlssNormalRoughness,
+        DlssSpecMotionVectors,
 
         // ── Debug ──────────────────────────────────────────────────────────
         ShaderDebugViz,
