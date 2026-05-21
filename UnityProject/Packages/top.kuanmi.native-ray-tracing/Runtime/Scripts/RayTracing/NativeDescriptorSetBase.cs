@@ -60,14 +60,14 @@ namespace NativeRender
             _nameToSlot = new Dictionary<string, uint>(slotCount > 0 ? (int)slotCount : 0);
             foreach (var kv in nameToSlot)
                 _nameToSlot[kv.Key] = kv.Value;
-            int eff           = _slotCount > 0 ? (int)_slotCount : 1;
+            int eff = _slotCount > 0 ? (int)_slotCount : 1;
             _stagingSlots     = new NativeRenderPlugin.CS_BindingSlot[eff];
             _stagingConstants = new byte[eff * MaxRootConstantBytes];
         }
 
         protected void AllocateRingBuffersCommon()
         {
-            int eff        = _slotCount > 0 ? (int)_slotCount : 1;
+            int eff = _slotCount > 0 ? (int)_slotCount : 1;
             _slotRing      = new NativeArray<NativeRenderPlugin.CS_BindingSlot>[RingSize];
             _constantsRing = new NativeArray<byte>[RingSize];
             for (int i = 0; i < RingSize; i++)
@@ -75,6 +75,7 @@ namespace NativeRender
                 _slotRing[i]      = new NativeArray<NativeRenderPlugin.CS_BindingSlot>(eff, Allocator.Persistent);
                 _constantsRing[i] = new NativeArray<byte>(eff * MaxRootConstantBytes, Allocator.Persistent);
             }
+
             _ringIdx = 0;
         }
 
@@ -83,9 +84,10 @@ namespace NativeRender
             if (_slotRing == null) return;
             for (int i = 0; i < RingSize; i++)
             {
-                if (_slotRing[i].IsCreated)      _slotRing[i].Dispose();
+                if (_slotRing[i].IsCreated) _slotRing[i].Dispose();
                 if (_constantsRing[i].IsCreated) _constantsRing[i].Dispose();
             }
+
             _slotRing      = null;
             _constantsRing = null;
         }
@@ -120,7 +122,7 @@ namespace NativeRender
                 if (slotArray[k].objectKind == ObjKindRootConstants)
                 {
                     var s = slotArray[k];
-                    s.objectPtr = (ulong)(constBase + k * MaxRootConstantBytes);
+                    s.objectPtr  = (ulong)(constBase + k * MaxRootConstantBytes);
                     slotArray[k] = s;
                 }
             }
@@ -172,8 +174,8 @@ namespace NativeRender
             _stagingSlots[i].stride      = 0;
             _stagingSlots[i].format      = dxgiFormat;
         }
-        
-        
+
+
         public void SetRWTypedBuffer(string name, NativeBuffer nativeBuffer, int count, uint dxgiFormat)
         {
             if (!TryGetSlot(name, out uint i)) return;
@@ -207,6 +209,11 @@ namespace NativeRender
             _stagingSlots[i].stride      = (uint)stride;
         }
 
+        public void SetRWStructuredBuffer(string name, GraphicsBuffer buffe)
+        {
+            SetRWStructuredBuffer(name, buffe.GetNativeBufferPtr(), buffe.count, buffe.stride);
+        }
+
         /// <summary>Binds a Texture2D or RenderTexture as a read-only texture (SRV).</summary>
         public void SetTexture(string name, IntPtr texturePtr)
         {
@@ -236,7 +243,7 @@ namespace NativeRender
             _stagingSlots[i].count       = 0;
             _stagingSlots[i].stride      = 0;
         }
-        
+
         /// <summary>Binds a GraphicsBuffer as a constant buffer (CBV).</summary>
         public void SetConstantBuffer(string name, NativeBuffer nativeBuffer)
         {
@@ -269,7 +276,7 @@ namespace NativeRender
             _stagingSlots[i].stride      = 0;
             _stagingSlots[i].format      = dxgiFormat;
         }
-        
+
         public void SetTypedBuffer(string name, NativeBuffer nativeBuffer, int count, uint dxgiFormat)
         {
             if (!TryGetSlot(name, out uint i)) return;
@@ -301,6 +308,11 @@ namespace NativeRender
             _stagingSlots[i].objectKind  = ObjKindNone;
             _stagingSlots[i].count       = (uint)elementCount;
             _stagingSlots[i].stride      = (uint)elementStride;
+        }
+
+        public void SetStructuredBuffer(string name, GraphicsBuffer buffer)
+        {
+            SetStructuredBuffer(name, buffer.GetNativeBufferPtr(), buffer.count, buffer.stride);
         }
 
         /// <summary>Binds a RaytracingAccelerationStructure (TLAS) by HLSL variable name.</summary>
@@ -383,9 +395,9 @@ namespace NativeRender
             where T : unmanaged
         {
             if (!TryGetSlot(name, out uint i)) return;
-            void* src           = NativeArrayUnsafeUtility.GetUnsafeReadOnlyPtr(data);
-            uint byteCount      = count32 == 0 ? (uint)(data.Length * sizeof(T)) : count32 * 4u;
-            uint destByteOffset = destOffset32 * 4u;
+            void* src            = NativeArrayUnsafeUtility.GetUnsafeReadOnlyPtr(data);
+            uint  byteCount      = count32 == 0 ? (uint)(data.Length * sizeof(T)) : count32 * 4u;
+            uint  destByteOffset = destOffset32 * 4u;
             fixed (byte* dst = _stagingConstants)
                 Buffer.MemoryCopy(src,
                     dst + i * MaxRootConstantBytes + destByteOffset,

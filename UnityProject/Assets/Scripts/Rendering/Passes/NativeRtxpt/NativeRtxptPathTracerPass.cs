@@ -126,8 +126,8 @@ namespace PathTracing
             // params0x = sub-sample index (sampleIndex), params0y = pingPong flag
             var mini = new SampleMiniConstants
             {
-                params0x = (uint)ctx.FrameState.frameIndex,
-                params0y = (uint)(ctx.FrameState.frameIndex & 1),
+                params0x = ctx.FrameState.frameIndex,
+                params0y = (ctx.FrameState.frameIndex & 1),
             };
             data.MiniConstBuffer.SetData(new[] { mini });
 
@@ -148,10 +148,8 @@ namespace PathTracing
                     ds.SetRWTexture("u_StablePlanesHeader", res.StablePlanesHeader.NativePtr);
                     ds.SetRWTexture("u_StableRadiance", res.StableRadiance.NativePtr);
                     ds.SetRWTexture("u_SpecularHitT", res.SpecularHitT.NativePtr);
-                    if (buf.StablePlanesBuffer != null)
-                        ds.SetRWStructuredBuffer("u_StablePlanesBuffer",
-                            buf.StablePlanesBuffer.GetNativeBufferPtr(),
-                            buf.StablePlanesBuffer.count, buf.StablePlanesBuffer.stride);
+                    
+                    ds.SetRWStructuredBuffer("u_StablePlanesBuffer", buf.StablePlanesBuffer);
 
                     data.BuildSP.Dispatch(cmd, ds, (uint)data.RenderRes.x, (uint)data.RenderRes.y);
                 }
@@ -166,10 +164,7 @@ namespace PathTracing
 
                     ds.SetRWTexture("u_StablePlanesHeader", res.StablePlanesHeader.NativePtr);
                     ds.SetRWTexture("u_SpecularHitT", res.SpecularHitT.NativePtr);
-                    if (buf.StablePlanesBuffer != null)
-                        ds.SetRWStructuredBuffer("u_StablePlanesBuffer",
-                            buf.StablePlanesBuffer.GetNativeBufferPtr(),
-                            buf.StablePlanesBuffer.count, buf.StablePlanesBuffer.stride);
+                    ds.SetRWStructuredBuffer("u_StablePlanesBuffer", buf.StablePlanesBuffer);
 
                     data.FillSP.Dispatch(cmd, ds, (uint)data.RenderRes.x, (uint)data.RenderRes.y);
                 }
@@ -204,16 +199,11 @@ namespace PathTracing
             GraphicsBuffer miniConstBuffer,
             RayTracingAccelerationStructure tlas)
         {
-            if (ctx.ConstantBuffer != null)
-                ds.SetConstantBuffer("g_Const", ctx.ConstantBuffer.GetNativeBufferPtr());
+            ds.SetConstantBuffer("g_Const", ctx.ConstantBuffer.GetNativeBufferPtr());
+            ds.SetConstantBuffer("g_MiniConst", miniConstBuffer.GetNativeBufferPtr());
+            ds.SetAccelerationStructure("SceneBVH", tlas);
 
-            if (miniConstBuffer != null)
-                ds.SetConstantBuffer("g_MiniConst", miniConstBuffer.GetNativeBufferPtr());
-
-            if (tlas != null)
-                ds.SetAccelerationStructure("SceneBVH", tlas);
-
-            ctx.GpuScene?.BindToShader(ds);
+            ctx.GpuScene.BindToShader(ds);
 
             // t_EnvironmentMap (t10): bind configured env map or fallback to black texture
             var envMap = ctx.Setting?.environmentMap != null
@@ -228,11 +218,10 @@ namespace PathTracing
             ds.SetTexture("t_EnvLookupMap", envLut.GetNativeTexturePtr());
 
             // u_FeedbackBuffer (u51): debug stub buffer
-            if (ctx.Buffers?.FeedbackBuffer != null)
-                ds.SetRWStructuredBuffer("u_FeedbackBuffer",
-                    ctx.Buffers.FeedbackBuffer.GetNativeBufferPtr(),
-                    ctx.Buffers.FeedbackBuffer.count,
-                    ctx.Buffers.FeedbackBuffer.stride);
+            ds.SetRWStructuredBuffer("u_FeedbackBuffer",
+                ctx.Buffers.FeedbackBuffer.GetNativeBufferPtr(),
+                ctx.Buffers.FeedbackBuffer.count,
+                ctx.Buffers.FeedbackBuffer.stride);
         }
 
         private static void BindLightBuffers(NativeRayTraceDescriptorSet ds, NativeRtxptPassContext ctx)
@@ -240,27 +229,15 @@ namespace PathTracing
             var buf = ctx.Buffers;
             if (buf == null) return;
 
-            if (buf.LightControlBuffer != null)
-                ds.SetBuffer("t_LightsCB",
-                    buf.LightControlBuffer.GetNativeBufferPtr());
+            ds.SetBuffer("t_LightsCB", buf.LightControlBuffer.GetNativeBufferPtr());
 
-            if (buf.LightBuffer != null)
-                ds.SetStructuredBuffer("t_Lights",
-                    buf.LightBuffer.GetNativeBufferPtr(),
-                    buf.LightBuffer.count, buf.LightBuffer.stride);
+            ds.SetStructuredBuffer("t_Lights", buf.LightBuffer.GetNativeBufferPtr(), buf.LightBuffer.count, buf.LightBuffer.stride);
 
-            if (buf.LightProxyCounters != null)
-                ds.SetBuffer("t_LightProxyCounters",
-                    buf.LightProxyCounters.GetNativeBufferPtr());
+            ds.SetBuffer("t_LightProxyCounters", buf.LightProxyCounters.GetNativeBufferPtr());
 
-            if (buf.LocalSamplingBuffer != null)
-                ds.SetBuffer("t_LightLocalSamplingBuffer",
-                    buf.LocalSamplingBuffer.GetNativeBufferPtr());
+            ds.SetBuffer("t_LightLocalSamplingBuffer", buf.LocalSamplingBuffer.GetNativeBufferPtr());
 
-            if (buf.LightExBuffer != null)
-                ds.SetStructuredBuffer("t_LightsEx",
-                    buf.LightExBuffer.GetNativeBufferPtr(),
-                    buf.LightExBuffer.count, buf.LightExBuffer.stride);
+            ds.SetStructuredBuffer("t_LightsEx", buf.LightExBuffer);
         }
     }
 }

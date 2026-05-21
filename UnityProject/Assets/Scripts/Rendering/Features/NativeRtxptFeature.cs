@@ -1,4 +1,3 @@
- 
 using System.Collections.Generic;
 using System.Runtime.InteropServices;
 using DLRR;
@@ -31,7 +30,7 @@ namespace PathTracing
     {
         // ---- Inspector fields -----------------------------------------------
         public NativeRtxptSetting setting;
-        public RenderPassEvent renderPassEvent = RenderPassEvent.BeforeRenderingPostProcessing;
+        public RenderPassEvent    renderPassEvent = RenderPassEvent.BeforeRenderingPostProcessing;
 
         // Phase 2: PathTracer RT shaders
         public RayTraceShader buildStablePlanesShader;
@@ -45,12 +44,16 @@ namespace PathTracing
 
         // Phase 3
         public NativeComputeShader exportVisibilityBufferCs;
+
         // Phase 4
         public NativeComputeShader denoiseSpecHitTCs;
+
         // Phase 5
         public NativeComputeShader noDenoiserFinalMergeCs;
+
         // Phase 6
         public NativeComputeShader dlssBeforeCs;
+
         // Phase 8
         public NativeComputeShader accumulationCs;
 
@@ -92,35 +95,22 @@ namespace PathTracing
         {
             _buildTlasPass ??= new NativeRtxptBuildTlasPass
             {
-                renderPassEvent           = renderPassEvent,
+                renderPassEvent = renderPassEvent,
             };
 
             _pathTracerPass ??= new NativeRtxptPathTracerPass(
-                buildStablePlanesShader, fillStablePlanesShader, referenceShader,
-                buildHitGroups, fillHitGroups, referenceHitGroups)
-            { renderPassEvent = renderPassEvent };
-
-            _exportVisibilityBufferPass ??= new NativeRtxptExportVisibilityBufferPass(exportVisibilityBufferCs)
+                    buildStablePlanesShader, fillStablePlanesShader, referenceShader,
+                    buildHitGroups, fillHitGroups, referenceHitGroups)
                 { renderPassEvent = renderPassEvent };
 
-            _denoiseSpecHitTPass ??= new NativeRtxptDenoiseSpecHitTPass(denoiseSpecHitTCs)
-                { renderPassEvent = renderPassEvent };
-
-            _noDenoiserFinalMergePass ??= new NativeRtxptNoDenoiserFinalMergePass(noDenoiserFinalMergeCs)
-                { renderPassEvent = renderPassEvent };
-
-            _dlssBeforePass ??= new NativeRtxptDlssBeforePass(dlssBeforeCs)
-                { renderPassEvent = renderPassEvent };
-
-            _dlssRRPass ??= new DlssRRPass { renderPassEvent = renderPassEvent };
-
-            _accumulationPass ??= new NativeRtxptAccumulationPass(accumulationCs)
-                { renderPassEvent = renderPassEvent };
-
-            _outputBlitPass ??= new NativeRtxptOutputBlitPass(outputBlitMaterial)
-                { renderPassEvent = renderPassEvent };
-
-            _nativeFrameTickPass ??= new NativeFrameTick { renderPassEvent = renderPassEvent };
+            _exportVisibilityBufferPass ??= new NativeRtxptExportVisibilityBufferPass(exportVisibilityBufferCs) { renderPassEvent = renderPassEvent };
+            _denoiseSpecHitTPass        ??= new NativeRtxptDenoiseSpecHitTPass(denoiseSpecHitTCs) { renderPassEvent               = renderPassEvent };
+            _noDenoiserFinalMergePass   ??= new NativeRtxptNoDenoiserFinalMergePass(noDenoiserFinalMergeCs) { renderPassEvent     = renderPassEvent };
+            _dlssBeforePass             ??= new NativeRtxptDlssBeforePass(dlssBeforeCs) { renderPassEvent                         = renderPassEvent };
+            _dlssRRPass                 ??= new DlssRRPass { renderPassEvent                                                      = renderPassEvent };
+            _accumulationPass           ??= new NativeRtxptAccumulationPass(accumulationCs) { renderPassEvent                     = renderPassEvent };
+            _outputBlitPass             ??= new NativeRtxptOutputBlitPass(outputBlitMaterial) { renderPassEvent                   = renderPassEvent };
+            _nativeFrameTickPass        ??= new NativeFrameTick { renderPassEvent                                                 = renderPassEvent };
         }
 
         public override void AddRenderPasses(ScriptableRenderer renderer, ref RenderingData renderingData)
@@ -134,7 +124,8 @@ namespace PathTracing
             cam.depthTextureMode = DepthTextureMode.Depth | DepthTextureMode.MotionVectors;
 
             var eyeIndex = renderingData.cameraData.xr.enabled
-                ? renderingData.cameraData.xr.multipassId : 0;
+                ? renderingData.cameraData.xr.multipassId
+                : 0;
 
             if (eyeIndex == 1 && setting.skipRightEyeInVR) return;
 
@@ -155,16 +146,19 @@ namespace PathTracing
                 texPool = new NativeRtxptTextureResources();
                 _texturePools.Add(uniqueKey, texPool);
             }
+
             if (!_bufferPools.TryGetValue(uniqueKey, out var bufPool))
             {
                 bufPool = new NativeRtxptBufferResources();
                 _bufferPools.Add(uniqueKey, bufPool);
             }
+
             if (!_dlrrDenoisers.TryGetValue(uniqueKey, out var dlrr))
             {
                 dlrr = new DlrrDenoiser(isVR ? $"{cam.name}_Eye{eyeIndex}" : cam.name);
                 _dlrrDenoisers.Add(uniqueKey, dlrr);
             }
+
             if (!_constantBuffers.TryGetValue(uniqueKey, out var constantBuffer))
             {
                 constantBuffer = new GraphicsBuffer(GraphicsBuffer.Target.Constant, 1,
@@ -186,16 +180,17 @@ namespace PathTracing
                 frameState = new CameraFrameState(1.0f);
                 _cameraFrameStates.Add(uniqueKey, frameState);
             }
+
             if (texturesChanged)
             {
                 frameState.renderResolution = renderResolution;
                 frameState.frameIndex       = 0;
             }
+
             frameState.Update(renderingData, texturesChanged, 1.0f);
 
             // ---- Build & upload SampleConstants -----------------------------
-            _sampleConstantsArray[0] = NativeRtxptConstantsBuilder.Build(
-                renderingData, setting, renderResolution, displayResolution, frameState);
+            _sampleConstantsArray[0] = NativeRtxptConstantsBuilder.Build(renderingData, setting, renderResolution, displayResolution, frameState);
             constantBuffer.SetData(_sampleConstantsArray);
 
             // ---- Build shared pass context ----------------------------------
@@ -297,22 +292,22 @@ namespace PathTracing
 
         private static int2 ComputeOutputResolution(CameraData cameraData) =>
             new int2(cameraData.cameraTargetDescriptor.width,
-                     cameraData.cameraTargetDescriptor.height);
+                cameraData.cameraTargetDescriptor.height);
 
         private static int2 ComputeRenderResolution(int2 outputRes, UpscalerMode mode)
         {
             float scale = mode switch
             {
-                UpscalerMode.NATIVE            => 1.0f,
-                UpscalerMode.ULTRA_QUALITY     => 1.3f,
-                UpscalerMode.QUALITY           => 1.5f,
-                UpscalerMode.BALANCED          => 1.7f,
-                UpscalerMode.PERFORMANCE       => 2.0f,
+                UpscalerMode.NATIVE => 1.0f,
+                UpscalerMode.ULTRA_QUALITY => 1.3f,
+                UpscalerMode.QUALITY => 1.5f,
+                UpscalerMode.BALANCED => 1.7f,
+                UpscalerMode.PERFORMANCE => 2.0f,
                 UpscalerMode.ULTRA_PERFORMANCE => 3.0f,
-                _                              => 1.0f,
+                _ => 1.0f,
             };
             return new int2((int)(outputRes.x / scale + 0.5f),
-                            (int)(outputRes.y / scale + 0.5f));
+                (int)(outputRes.y / scale + 0.5f));
         }
 
         // ---- Cleanup -------------------------------------------------------
@@ -321,21 +316,32 @@ namespace PathTracing
         {
             if (!disposing) return;
 
-            _pathTracerPass?.Dispose();             _pathTracerPass            = null;
-            _exportVisibilityBufferPass?.Dispose(); _exportVisibilityBufferPass = null;
-            _denoiseSpecHitTPass?.Dispose();        _denoiseSpecHitTPass        = null;
-            _noDenoiserFinalMergePass?.Dispose();   _noDenoiserFinalMergePass   = null;
-            _dlssBeforePass?.Dispose();             _dlssBeforePass             = null;
-            _accumulationPass?.Dispose();           _accumulationPass           = null;
-            _outputBlitPass = null;
+            _pathTracerPass?.Dispose();
+            _pathTracerPass = null;
+            _exportVisibilityBufferPass?.Dispose();
+            _exportVisibilityBufferPass = null;
+            _denoiseSpecHitTPass?.Dispose();
+            _denoiseSpecHitTPass = null;
+            _noDenoiserFinalMergePass?.Dispose();
+            _noDenoiserFinalMergePass = null;
+            _dlssBeforePass?.Dispose();
+            _dlssBeforePass = null;
+            _accumulationPass?.Dispose();
+            _accumulationPass = null;
+            _outputBlitPass   = null;
 
-            foreach (var p in _texturePools.Values)  p.Dispose();   _texturePools.Clear();
-            foreach (var p in _bufferPools.Values)   p.Dispose();   _bufferPools.Clear();
-            foreach (var cb in _constantBuffers.Values) cb.Dispose(); _constantBuffers.Clear();
-            foreach (var d in _dlrrDenoisers.Values) d?.Dispose();  _dlrrDenoisers.Clear();
+            foreach (var p in _texturePools.Values) p.Dispose();
+            _texturePools.Clear();
+            foreach (var p in _bufferPools.Values) p.Dispose();
+            _bufferPools.Clear();
+            foreach (var cb in _constantBuffers.Values) cb.Dispose();
+            _constantBuffers.Clear();
+            foreach (var d in _dlrrDenoisers.Values) d?.Dispose();
+            _dlrrDenoisers.Clear();
             _cameraFrameStates.Clear();
 
-            _gpuScene?.Dispose();          _gpuScene          = null;
+            _gpuScene?.Dispose();
+            _gpuScene = null;
         }
 
         // ---- Editor helpers ----------------------------------------------------

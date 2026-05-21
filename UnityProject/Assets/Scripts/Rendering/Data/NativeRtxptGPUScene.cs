@@ -41,11 +41,11 @@ namespace PathTracing
         private BindlessTexture _sceneTextures;
 
         // CPU-side mirrors
-        private DonutInstanceData[]      _instanceCpu;
-        private DonutGeometryData[]      _geometryCpu;
-        private SubInstanceData[]        _subInstanceCpu;
-        private PTMaterialData[]         _ptMaterialCpu;
-        private GeometryDebugData[]      _geomDebugCpu;
+        private DonutInstanceData[] _instanceCpu;
+        private DonutGeometryData[] _geometryCpu;
+        private SubInstanceData[]   _subInstanceCpu;
+        private PTMaterialData[]    _ptMaterialCpu;
+        private GeometryDebugData[] _geomDebugCpu;
 
         // Per-instance tracking for transforms
         private struct SceneInstance
@@ -183,35 +183,25 @@ namespace PathTracing
         public void BindToShader(NativeComputeDescriptorSet ds)
         {
             if (ds == null) return;
-            if (_subInstanceGpuBuf != null)
-                ds.SetStructuredBuffer("t_SubInstanceData", _subInstanceGpuBuf.GetNativeBufferPtr(), _subInstanceGpuBuf.count, _subInstanceGpuBuf.stride);
-            if (_instanceGpuBuf != null)
-                ds.SetStructuredBuffer("t_InstanceData", _instanceGpuBuf.GetNativeBufferPtr(), _instanceGpuBuf.count, _instanceGpuBuf.stride);
-            if (_geometryGpuBuf != null)
-                ds.SetStructuredBuffer("t_GeometryData", _geometryGpuBuf.GetNativeBufferPtr(), _geometryGpuBuf.count, _geometryGpuBuf.stride);
-            if (_geomDebugGpuBuf != null)
-                ds.SetStructuredBuffer("t_GeometryDebugData", _geomDebugGpuBuf.GetNativeBufferPtr(), _geomDebugGpuBuf.count, _geomDebugGpuBuf.stride);
-            if (_ptMaterialGpuBuf != null)
-                ds.SetStructuredBuffer("t_PTMaterialData", _ptMaterialGpuBuf.GetNativeBufferPtr(), _ptMaterialGpuBuf.count, _ptMaterialGpuBuf.stride);
-            if (_sceneBuffers != null) ds.SetBindlessBuffer("t_BindlessBuffers", _sceneBuffers);
-            if (_sceneTextures != null) ds.SetBindlessTexture("t_BindlessTextures", _sceneTextures);
+            ds.SetStructuredBuffer("t_SubInstanceData", _subInstanceGpuBuf.GetNativeBufferPtr(), _subInstanceGpuBuf.count, _subInstanceGpuBuf.stride);
+            ds.SetStructuredBuffer("t_InstanceData", _instanceGpuBuf.GetNativeBufferPtr(), _instanceGpuBuf.count, _instanceGpuBuf.stride);
+            ds.SetStructuredBuffer("t_GeometryData", _geometryGpuBuf.GetNativeBufferPtr(), _geometryGpuBuf.count, _geometryGpuBuf.stride);
+            ds.SetStructuredBuffer("t_GeometryDebugData", _geomDebugGpuBuf.GetNativeBufferPtr(), _geomDebugGpuBuf.count, _geomDebugGpuBuf.stride);
+            ds.SetStructuredBuffer("t_PTMaterialData", _ptMaterialGpuBuf.GetNativeBufferPtr(), _ptMaterialGpuBuf.count, _ptMaterialGpuBuf.stride);
+            ds.SetBindlessBuffer("t_BindlessBuffers", _sceneBuffers);
+            ds.SetBindlessTexture("t_BindlessTextures", _sceneTextures);
         }
 
         public void BindToShader(NativeRayTraceDescriptorSet ds)
         {
             if (ds == null) return;
-            if (_subInstanceGpuBuf != null)
-                ds.SetStructuredBuffer("t_SubInstanceData", _subInstanceGpuBuf.GetNativeBufferPtr(), _subInstanceGpuBuf.count, _subInstanceGpuBuf.stride);
-            if (_instanceGpuBuf != null)
-                ds.SetStructuredBuffer("t_InstanceData", _instanceGpuBuf.GetNativeBufferPtr(), _instanceGpuBuf.count, _instanceGpuBuf.stride);
-            if (_geometryGpuBuf != null)
-                ds.SetStructuredBuffer("t_GeometryData", _geometryGpuBuf.GetNativeBufferPtr(), _geometryGpuBuf.count, _geometryGpuBuf.stride);
-            if (_geomDebugGpuBuf != null)
-                ds.SetStructuredBuffer("t_GeometryDebugData", _geomDebugGpuBuf.GetNativeBufferPtr(), _geomDebugGpuBuf.count, _geomDebugGpuBuf.stride);
-            if (_ptMaterialGpuBuf != null)
-                ds.SetStructuredBuffer("t_PTMaterialData", _ptMaterialGpuBuf.GetNativeBufferPtr(), _ptMaterialGpuBuf.count, _ptMaterialGpuBuf.stride);
-            if (_sceneBuffers != null) ds.SetBindlessBuffer("t_BindlessBuffers", _sceneBuffers);
-            if (_sceneTextures != null) ds.SetBindlessTexture("t_BindlessTextures", _sceneTextures);
+            ds.SetStructuredBuffer("t_SubInstanceData", _subInstanceGpuBuf.GetNativeBufferPtr(), _subInstanceGpuBuf.count, _subInstanceGpuBuf.stride);
+            ds.SetStructuredBuffer("t_InstanceData", _instanceGpuBuf.GetNativeBufferPtr(), _instanceGpuBuf.count, _instanceGpuBuf.stride);
+            ds.SetStructuredBuffer("t_GeometryData", _geometryGpuBuf.GetNativeBufferPtr(), _geometryGpuBuf.count, _geometryGpuBuf.stride);
+            ds.SetStructuredBuffer("t_GeometryDebugData", _geomDebugGpuBuf.GetNativeBufferPtr(), _geomDebugGpuBuf.count, _geomDebugGpuBuf.stride);
+            ds.SetStructuredBuffer("t_PTMaterialData", _ptMaterialGpuBuf.GetNativeBufferPtr(), _ptMaterialGpuBuf.count, _ptMaterialGpuBuf.stride);
+            ds.SetBindlessBuffer("t_BindlessBuffers", _sceneBuffers);
+            ds.SetBindlessTexture("t_BindlessTextures", _sceneTextures);
         }
 
         /// <summary>Builds / updates the TLAS. Call inside a CommandBuffer recording.</summary>
@@ -337,11 +327,13 @@ namespace PathTracing
                 int        firstGeom  = geomList.Count;
                 int        instIdx    = instList.Count;
 
+                var matOverride = mr.GetComponent<NativeRtxptMaterialOverride>();
+
                 for (int s = 0; s < subMeshCnt; s++)
                 {
                     SubMeshDescriptor sub    = mesh.GetSubMesh(s);
                     Material          mat    = s < mats.Length ? mats[s] : (mats.Length > 0 ? mats[mats.Length - 1] : null);
-                    int               matIdx = GetOrAddMaterial(mat, ptMatList, texPtrs);
+                    int               matIdx = GetOrAddMaterial(mat, s, matOverride, ptMatList, texPtrs);
 
                     int globalGeomIdx = geomList.Count; // index we're about to push
 
@@ -518,8 +510,81 @@ namespace PathTracing
                 _instanceGpuBuf.SetData(_instanceCpu, dirtyStart, dirtyStart, instanceCount - dirtyStart);
         }
 
-        private int GetOrAddMaterial(Material mat,List<PTMaterialData> ptMatList, List<IntPtr> texPtrs)
+        private int BuildMaterialFromOverride(RtxptMaterialSlot slot, List<PTMaterialData> ptMatList, List<IntPtr> texPtrs)
         {
+            int idx = ptMatList.Count;
+
+            int baseTexIdx       = AddTexture(slot.BaseOrDiffuseTexture, texPtrs);
+            int normalTexIdx     = AddTexture(slot.NormalTexture,        texPtrs);
+            int metalRoughTexIdx = AddTexture(slot.MetalRoughTexture,    texPtrs);
+            int emissiveTexIdx   = AddTexture(slot.EmissiveTexture,      texPtrs);
+            int occlusionTexIdx  = AddTexture(slot.OcclusionTexture,     texPtrs);
+            int transmTexIdx     = AddTexture(slot.TransmissionTexture,  texPtrs);
+
+            uint SafeIdx(int i) => i >= 0 ? (uint)i : 0xFFFFFFFFu;
+
+            uint flags = 0;
+            if (baseTexIdx >= 0)       flags |= PTMaterialFlags.UseBaseOrDiffuseTexture;
+            if (normalTexIdx >= 0)     flags |= PTMaterialFlags.UseNormalTexture;
+            if (metalRoughTexIdx >= 0) flags |= PTMaterialFlags.UseMetalRoughOrSpecularTexture;
+            if (emissiveTexIdx >= 0)   flags |= PTMaterialFlags.UseEmissiveTexture;
+            if (occlusionTexIdx >= 0)  flags |= (uint)DonutMaterialFlags.UseOcclusionTexture;
+            if (transmTexIdx >= 0)     flags |= PTMaterialFlags.UseTransmissionTexture;
+            if (slot.ThinSurface)              flags |= PTMaterialFlags.ThinSurface;
+            if (slot.MetalnessInRedChannel)    flags |= PTMaterialFlags.MetalnessInRedChannel;
+            if (slot.PSDExclude)               flags |= PTMaterialFlags.PSDExclude;
+            if (slot.IgnoreMeshTangentSpace)   flags |= PTMaterialFlags.IgnoreMeshTangentSpace;
+            if (slot.PSDBlockMotionVectorsAtSurfaceType % 2 != 0) flags |= PTMaterialFlags.PSDBlockMVsAtSurfaceTypeB0;
+            if (slot.PSDBlockMotionVectorsAtSurfaceType / 2 != 0) flags |= PTMaterialFlags.PSDBlockMVsAtSurfaceTypeB1;
+            flags |= (uint)Mathf.Clamp(slot.NestedPriority, 0, 15)        << PTMaterialFlags.NestedPriorityShift;
+            flags |= (uint)Mathf.Clamp(slot.PSDDominantDeltaLobe + 1, 0, 7) << PTMaterialFlags.PSDDominantDeltaLobeP1Shift;
+
+            ptMatList.Add(new PTMaterialData
+            {
+                BaseOrDiffuseColor               = new Vector3(slot.BaseOrDiffuseColor.r, slot.BaseOrDiffuseColor.g, slot.BaseOrDiffuseColor.b),
+                Flags                            = flags,
+                SpecularColor                    = new Vector3(slot.SpecularColor.r, slot.SpecularColor.g, slot.SpecularColor.b),
+                _padding0                        = 0,
+                EmissiveColor                    = new Vector3(slot.EmissiveColor.r, slot.EmissiveColor.g, slot.EmissiveColor.b),
+                ShadowNoLFadeout                 = Mathf.Clamp(slot.ShadowNoLFadeout, 0f, 0.25f),
+                Opacity                          = slot.Opacity,
+                Roughness                        = slot.Roughness,
+                Metalness                        = slot.Metalness,
+                NormalTextureScale               = slot.NormalTextureScale,
+                _padding1                        = 0f,
+                AlphaCutoff                      = slot.AlphaCutoff,
+                TransmissionFactor               = slot.TransmissionFactor,
+                BaseOrDiffuseTextureIndex        = SafeIdx(baseTexIdx),
+                MetalRoughOrSpecularTextureIndex = SafeIdx(metalRoughTexIdx),
+                EmissiveTextureIndex             = SafeIdx(emissiveTexIdx),
+                NormalTextureIndex               = SafeIdx(normalTexIdx),
+                OcclusionTextureIndex            = SafeIdx(occlusionTexIdx),
+                TransmissionTextureIndex         = SafeIdx(transmTexIdx),
+                IoR                              = slot.IoR,
+                ThicknessFactor                  = slot.ThicknessFactor,
+                DiffuseTransmissionFactor        = slot.DiffuseTransmissionFactor,
+                VolumeAttenuationColor           = new Vector3(slot.VolumeAttenuationColor.r, slot.VolumeAttenuationColor.g, slot.VolumeAttenuationColor.b),
+                VolumeAttenuationDistance        = slot.VolumeAttenuationDistance,
+            });
+            return idx;
+        }
+
+        private int GetOrAddMaterial(Material mat, int subMeshIndex, NativeRtxptMaterialOverride matOverride,
+                                        List<PTMaterialData> ptMatList, List<IntPtr> texPtrs)
+        {
+            // ----------------------------------------------------------------
+            // Fast path: renderer has a manual override for this sub-mesh
+            // ----------------------------------------------------------------
+            if (matOverride != null && subMeshIndex < matOverride.Slots.Count)
+            {
+                // Overrides are per-(renderer, subMesh), so skip the shared material cache
+                // and always produce a unique GPU material entry.
+                return BuildMaterialFromOverride(matOverride.Slots[subMeshIndex], ptMatList, texPtrs);
+            }
+
+            // ----------------------------------------------------------------
+            // Normal path: derive from Unity Material
+            // ----------------------------------------------------------------
             int matId = mat != null ? mat.GetInstanceID() : -1;
             if (_materialSlots.TryGetValue(matId, out int existing))
                 return existing;
@@ -595,14 +660,23 @@ namespace PathTracing
             // PTMaterialData texture indices use uint with 0xFFFFFFFF = none
             uint SafeTexIdx(int i) => i >= 0 ? (uint)i : 0xFFFFFFFFu;
 
+            // Additional PT-specific flags (beyond the shared donut texture flags)
+            uint ptExtraFlags = 0;
+            // All Unity materials use TransmissionFactor=0 (no transmission), so they are thin surfaces.
+            // Matches C++ MaterialsBaker: if (ThinSurface || !EnableTransmission) data.Flags |= ThinSurface
+            ptExtraFlags |= PTMaterialFlags.ThinSurface;
+            // URP _MetallicGlossMap stores metalness in the R channel
+            if (metalRoughTexIdx >= 0)
+                ptExtraFlags |= PTMaterialFlags.MetalnessInRedChannel;
+
             ptMatList.Add(new PTMaterialData
             {
                 BaseOrDiffuseColor               = new Vector3(baseColor.r, baseColor.g, baseColor.b),
-                Flags                            = (uint)matFlags, // flag bits 1..8 are identical between donut and RTXPT
+                Flags                            = (uint)matFlags | ptExtraFlags, // flag bits 1..8 are identical between donut and RTXPT
                 SpecularColor                    = specularColor,
                 _padding0                        = 0,
                 EmissiveColor                    = new Vector3(emissive.r, emissive.g, emissive.b),
-                ShadowNoLFadeout                 = 1f,
+                ShadowNoLFadeout                 = 0f, // C++ clamps to [0, 0.25f]; 0 = full shadow fadeout always shown
                 Opacity                          = baseColor.a,
                 Roughness                        = roughness,
                 Metalness                        = metalness,
