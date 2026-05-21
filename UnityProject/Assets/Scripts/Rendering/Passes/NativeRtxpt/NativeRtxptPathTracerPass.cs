@@ -148,6 +148,7 @@ namespace PathTracing
                     ds.SetRWTexture("u_StablePlanesHeader", res.StablePlanesHeader.NativePtr);
                     ds.SetRWTexture("u_StableRadiance", res.StableRadiance.NativePtr);
                     ds.SetRWTexture("u_SpecularHitT", res.SpecularHitT.NativePtr);
+                    ds.SetRWTexture("u_ShaderDebugVizTextureBuffer", res.ShaderDebugViz.NativePtr);
                     
                     ds.SetRWStructuredBuffer("u_StablePlanesBuffer", buf.StablePlanesBuffer);
 

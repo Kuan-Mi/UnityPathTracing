@@ -19,17 +19,20 @@ namespace PathTracing
         private NativeRtxptTextureResources _resources;
         private NativeRtxptShowMode         _showMode;
         private float                        _renderScale; // renderRes / displayRes
+        private RtxptDebugViewType           _debugViewType;
 
         public NativeRtxptOutputBlitPass(Material blitMaterial)
         {
             _blitMaterial = blitMaterial;
         }
 
-        public void Setup(NativeRtxptTextureResources resources, NativeRtxptShowMode showMode, float renderScale)
+        public void Setup(NativeRtxptTextureResources resources, NativeRtxptShowMode showMode, float renderScale,
+                          RtxptDebugViewType debugViewType = RtxptDebugViewType.Disabled)
         {
-            _resources   = resources;
-            _showMode    = showMode;
-            _renderScale = renderScale;
+            _resources     = resources;
+            _showMode      = showMode;
+            _renderScale   = renderScale;
+            _debugViewType = debugViewType;
         }
 
         // ──────────────────────────────────────────────────────────────────
@@ -43,6 +46,7 @@ namespace PathTracing
             internal NativeRtxptShowMode         ShowMode;
             internal float                       RenderScale;
             internal TextureHandle               CameraTexture;
+            internal RtxptDebugViewType          DebugViewType;
         }
 
         static void ExecutePass(PassData data, UnsafeGraphContext context)
@@ -58,6 +62,14 @@ namespace PathTracing
 
             cmd.BeginSample("Rtxpt.OutputBlit");
             cmd.SetRenderTarget(data.CameraTexture);
+
+            // When a debug view is active, override showMode and display the debug viz texture.
+            if (data.DebugViewType != RtxptDebugViewType.Disabled)
+            {
+                Blitter.BlitTexture(cmd, res.ShaderDebugViz.Handle, scaleOffset, mat, (int)ShowPass.Out);
+                cmd.EndSample("Rtxpt.OutputBlit");
+                return;
+            }
 
             switch (mode)
             {
@@ -142,6 +154,7 @@ namespace PathTracing
             passData.ShowMode      = _showMode;
             passData.RenderScale   = _renderScale;
             passData.CameraTexture = resourceData.activeColorTexture;
+            passData.DebugViewType = _debugViewType;
 
             builder.UseTexture(passData.CameraTexture, AccessFlags.Write);
             builder.AllowPassCulling(false);

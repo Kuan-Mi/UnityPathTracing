@@ -144,6 +144,21 @@ namespace PathTracing
         /// <summary>Which buffer to display in the output blit pass.</summary>
         public NativeRtxptShowMode showMode = NativeRtxptShowMode.DlssRrOutput;
 
+        /// <summary>
+        /// Selects which surface attribute to visualise via the path tracer's
+        /// built-in debug-viz channel (ShaderDebugViz texture).
+        /// Mirrors HLSL <c>DebugViewType</c>.
+        /// When non-Disabled the output blit pass will show the debug texture.
+        /// </summary>
+        public RtxptDebugViewType debugViewType = RtxptDebugViewType.Disabled;
+
+        /// <summary>
+        /// Which stable-plane index to inspect when <see cref="debugViewType"/>
+        /// is a StablePlane_* mode. -1 means all planes combined.
+        /// </summary>
+        [Range(-1, 2)]
+        public int debugViewStablePlaneIndex = -1;
+
         // ── Misc ──────────────────────────────────────────────────────────────
         public bool skipRightEyeInVR = true;
     }

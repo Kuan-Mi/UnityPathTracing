@@ -281,7 +281,7 @@ namespace PathTracing
 
             // ---- Phase 9: Output blit (debug display) ----------------------
             {
-                _outputBlitPass.Setup(texPool, setting.showMode, 1.0f);
+                _outputBlitPass.Setup(texPool, setting.showMode, 1.0f, setting.debugViewType);
                 renderer.EnqueuePass(_outputBlitPass);
             }
 

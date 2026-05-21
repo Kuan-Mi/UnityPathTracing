@@ -119,9 +119,9 @@ namespace PathTracing
 
             DlssRrOutput          = new NriTextureResource("Rtxpt_DlssRrOutput",          GraphicsFormat.R16G16B16A16_SFloat,     uav);
 
-            ShaderDebugViz        = new NriTextureResource("Rtxpt_ShaderDebugViz",        GraphicsFormat.R32_SFloat,               uav);
-            AccumulatedRadiance   = new NriTextureResource("Rtxpt_AccumulatedRadiance",   GraphicsFormat.R32G32B32A32_SFloat,     uav);
-            ProcessedOutputColor  = new NriTextureResource("Rtxpt_ProcessedOutputColor",  GraphicsFormat.R16G16B16A16_SFloat,     uav);
+            ShaderDebugViz       = new NriTextureResource("Rtxpt_ShaderDebugViz",        GraphicsFormat.R16G16B16A16_SFloat,               uav);
+            AccumulatedRadiance  = new NriTextureResource("Rtxpt_AccumulatedRadiance",   GraphicsFormat.R32G32B32A32_SFloat,     uav);
+            ProcessedOutputColor = new NriTextureResource("Rtxpt_ProcessedOutputColor",  GraphicsFormat.R16G16B16A16_SFloat,     uav);
         }
 
         /// <summary>
