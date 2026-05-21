@@ -22,5 +22,5 @@ ScriptedImporter:
   - RTXPT_PIPELINE_PERMUTATION_NAME=REF
   - RTXPT_MATERIAL_PERMUTATION_NAME=REF
   targetProfile: lib_6_9
-  maxPayloadSizeInBytes: 4
+  maxPayloadSizeInBytes: 80
   rayGenName: RayGen_REF

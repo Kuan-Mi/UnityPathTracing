@@ -21,5 +21,5 @@ ScriptedImporter:
   - PATH_TRACER_MODE=PATH_TRACER_MODE_BUILD_STABLE_PLANES
   - RTXPT_PIPELINE_PERMUTATION_NAME=BUILD
   targetProfile: lib_6_9
-  maxPayloadSizeInBytes: 4
+  maxPayloadSizeInBytes: 80
   rayGenName: RayGen_BUILD
