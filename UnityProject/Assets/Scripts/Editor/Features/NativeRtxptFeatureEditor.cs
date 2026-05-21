@@ -36,6 +36,12 @@ namespace PathTracing
                 feature.AutoFillShaders();
             }
 
+
+            EditorGUILayout.Space(10);
+
+            DrawObjectHelper.Draw(target.GetInstanceID(), "Sample Constants", feature.sampleConstants);
+
+
             serializedObject.ApplyModifiedProperties();
         }
 
@@ -46,8 +52,8 @@ namespace PathTracing
             var groupLabels = new Dictionary<System.Type, string>
             {
                 { typeof(NativeComputeShader), "Native Compute Shaders" },
-                { typeof(RayTraceShader),       "Ray Trace Shaders"      },
-                { typeof(ComputeShader),         "Compute Shaders"        },
+                { typeof(RayTraceShader), "Ray Trace Shaders" },
+                { typeof(ComputeShader), "Compute Shaders" },
             };
 
             var groups = new Dictionary<string, List<string>>();
@@ -97,6 +103,7 @@ namespace PathTracing
                         if (prop != null)
                             EditorGUILayout.PropertyField(prop);
                     }
+
                     EditorGUI.indentLevel--;
                 }
             }

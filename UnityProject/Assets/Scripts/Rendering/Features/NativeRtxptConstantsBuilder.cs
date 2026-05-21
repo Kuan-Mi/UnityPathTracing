@@ -230,32 +230,17 @@ namespace PathTracing
             // 在 Unity 中 A * B 的逆是 B.inv * A.inv
             // var clipToViewNoOffset  = viewToClipNoOffset.inverse;
             var clipToWorldNoOffset = worldToClipNoOffset.inverse;
-            //
-            // // 注意逆矩阵的顺序也要反过来
-            // var clipToView  = clipToViewNoOffset * pixelOffsetMatrixInv;
-            // var clipToWorld = clipToWorldNoOffset * pixelOffsetMatrixInv;
-            //
-            // var viewToWorld = worldToView.inverse;
-
-            // // HLSL pragma pack_matrix(row_major) — transpose Unity's column-major matrices.
-            // var mWtv      = worldToView.transpose;
-            // var mVtc      = viewToClipNoOffset.transpose;
-            // var mWtc      = (viewToClipNoOffset * worldToView).transpose;
-            // var mWtcNoOff = mWtc; // no jitter offset for now
-            // var mCtwNoOff = (viewToClipNoOffset * worldToView).inverse.transpose;
-
+            
             var ctw_scale = new float2(0.5f * w, -0.5f * h);
             var ctw_bias  = new float2(0.5f * w, 0.5f * h);
-            var wtc_scale = 1f / ctw_scale;
-            // var wtc_bias  = -ctw_bias * wtc_scale;
 
             return new SimpleViewConstants
             {
-                matWorldToView         = worldToView.transpose,
-                matViewToClip          = viewToClip.transpose,
-                matWorldToClip         = worldToClip.transpose,
-                matWorldToClipNoOffset = worldToClipNoOffset.transpose,
-                matClipToWorldNoOffset = clipToWorldNoOffset.transpose,
+                matWorldToView         = worldToView,
+                matViewToClip          = viewToClip,
+                matWorldToClip         = worldToClip,
+                matWorldToClipNoOffset = worldToClipNoOffset,
+                matClipToWorldNoOffset = clipToWorldNoOffset,
                 viewportOrigin         = float2.zero,
                 viewportSize           = vSize,
                 viewportSizeInv        = math.rcp(vSize),

@@ -5,9 +5,9 @@
  *   - StructLayout(Sequential, Pack = 4) — matches HLSL's 4-byte minimum alignment.
  *   - HLSL bool in cbuffer is 4 bytes (maps to uint / int in C#).
  *   - float3x4 (row_major) = 3 rows × 4 floats = 3 × Vector4 = 48 bytes.
- *   - float4x4 (row_major) = Matrix4x4 = 64 bytes.
- *     Unity Matrix4x4 is column-major internally; callers are responsible for
- *     transposing before upload when HLSL expects row-major (use Matrix4x4.transpose).
+ *   - float4x4 (row_major) = float4x4 = 64 bytes.
+ *     Unity float4x4 is column-major internally; callers are responsible for
+ *     transposing before upload when HLSL expects row-major (use float4x4.transpose).
  *
  * Sizes (verified against HLSL offsets):
  *   PathTracerCameraData          : 112 B
@@ -128,11 +128,11 @@ namespace PathTracing
     [StructLayout(LayoutKind.Sequential, Pack = 4)]
     public struct SimpleViewConstants
     {
-        public Matrix4x4 matWorldToView;            // +0    (upload transposed!)
-        public Matrix4x4 matViewToClip;             // +64
-        public Matrix4x4 matWorldToClip;            // +128
-        public Matrix4x4 matWorldToClipNoOffset;    // +192
-        public Matrix4x4 matClipToWorldNoOffset;    // +256
+        public float4x4  matWorldToView;            // +0    (upload transposed!)
+        public float4x4 matViewToClip;             // +64
+        public float4x4 matWorldToClip;            // +128
+        public float4x4 matWorldToClipNoOffset;    // +192
+        public float4x4 matClipToWorldNoOffset;    // +256
         // +320
         public float2 viewportOrigin;
         public float2 viewportSize;

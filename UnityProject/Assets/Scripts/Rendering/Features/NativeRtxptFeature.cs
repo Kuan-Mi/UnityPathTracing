@@ -31,6 +31,8 @@ namespace PathTracing
         // ---- Inspector fields -----------------------------------------------
         public NativeRtxptSetting setting;
         public RenderPassEvent    renderPassEvent = RenderPassEvent.BeforeRenderingPostProcessing;
+ 
+        public SampleConstants sampleConstants;
 
         // Phase 2: PathTracer RT shaders
         public RayTraceShader buildStablePlanesShader;
@@ -190,7 +192,9 @@ namespace PathTracing
             frameState.Update(renderingData, texturesChanged, 1.0f);
 
             // ---- Build & upload SampleConstants -----------------------------
-            _sampleConstantsArray[0] = NativeRtxptConstantsBuilder.Build(renderingData, setting, renderResolution, displayResolution, frameState);
+            sampleConstants = NativeRtxptConstantsBuilder.Build(renderingData, setting, renderResolution, displayResolution, frameState);
+
+            _sampleConstantsArray[0] = sampleConstants;
             constantBuffer.SetData(_sampleConstantsArray);
 
             // ---- Build shared pass context ----------------------------------
@@ -220,67 +224,64 @@ namespace PathTracing
             _pathTracerPass.Setup(passCtx);
             renderer.EnqueuePass(_pathTracerPass);
 
-            // ---- Phase 3: ExportVisibilityBuffer ----------------------------
-            _exportVisibilityBufferPass.Setup(passCtx);
-            renderer.EnqueuePass(_exportVisibilityBufferPass);
+            // // ---- Phase 3: ExportVisibilityBuffer ----------------------------
+            // _exportVisibilityBufferPass.Setup(passCtx);
+            // renderer.EnqueuePass(_exportVisibilityBufferPass);
 
-            // ---- Realtime-only phases (4-7) ---------------------------------
-            if (setting.realtimeMode)
-            {
-                // Phase 4: DenoiseSpecHitT x2
-                _denoiseSpecHitTPass.Setup(passCtx);
-                renderer.EnqueuePass(_denoiseSpecHitTPass);
-
-                // Phase 5: NoDenoiserFinalMerge
-                _noDenoiserFinalMergePass.Setup(passCtx);
-                renderer.EnqueuePass(_noDenoiserFinalMergePass);
-
-                // Phase 6: DlssBefore
-                _dlssBeforePass.Setup(passCtx);
-                renderer.EnqueuePass(_dlssBeforePass);
-
-                // Phase 7: DLSS-RR
-                {
-                    var dlrrInput = new DlrrDenoiser.DlrrFrameInput
-                    {
-                        worldToView      = frameState.worldToView,
-                        viewToClip       = frameState.viewToClip,
-                        viewportJitter   = frameState.viewportJitter,
-                        renderResolution = renderResolution,
-                        frameIndex       = frameState.frameIndex,
-                        outputWidth      = (ushort)displayResolution.x,
-                        outputHeight     = (ushort)displayResolution.y,
-                    };
-                    var dlrrRes = new DlrrDenoiser.DlrrResources
-                    {
-                        input           = texPool.OutputColor,
-                        output          = texPool.DlssRrOutput,
-                        mv              = texPool.ScreenMotionVectors,
-                        depth           = texPool.Depth,
-                        diffAlbedo      = texPool.DlssRrDiffAlbedo,
-                        specAlbedo      = texPool.DlssRrSpecAlbedo,
-                        normalRoughness = texPool.DlssRrNormalRoughness,
-                        specHitDistance = texPool.DlssRrSpecMotionVectors,
-                    };
-                    _dlssRRPass.Setup(
-                        dlrr.GetInteropDataPtr(dlrrInput, dlrrRes, 1.0f, setting.upscalerMode),
-                        new DlssRRPass.Settings { tmpDisableRR = setting.tmpDisableDlssRR });
-                    renderer.EnqueuePass(_dlssRRPass);
-                }
-            }
-            else
-            {
-                // Phase 8: Accumulation (reference mode)
-                _accumulationPass.Setup(passCtx);
-                renderer.EnqueuePass(_accumulationPass);
-            }
+            // // ---- Realtime-only phases (4-7) ---------------------------------
+            // if (setting.realtimeMode)
+            // {
+            //     // Phase 4: DenoiseSpecHitT x2
+            //     _denoiseSpecHitTPass.Setup(passCtx);
+            //     renderer.EnqueuePass(_denoiseSpecHitTPass);
+            //
+            //     // Phase 5: NoDenoiserFinalMerge
+            //     _noDenoiserFinalMergePass.Setup(passCtx);
+            //     renderer.EnqueuePass(_noDenoiserFinalMergePass);
+            //
+            //     // Phase 6: DlssBefore
+            //     _dlssBeforePass.Setup(passCtx);
+            //     renderer.EnqueuePass(_dlssBeforePass);
+            //
+            //     // Phase 7: DLSS-RR
+            //     {
+            //         var dlrrInput = new DlrrDenoiser.DlrrFrameInput
+            //         {
+            //             worldToView      = frameState.worldToView,
+            //             viewToClip       = frameState.viewToClip,
+            //             viewportJitter   = frameState.viewportJitter,
+            //             renderResolution = renderResolution,
+            //             frameIndex       = frameState.frameIndex,
+            //             outputWidth      = (ushort)displayResolution.x,
+            //             outputHeight     = (ushort)displayResolution.y,
+            //         };
+            //         var dlrrRes = new DlrrDenoiser.DlrrResources
+            //         {
+            //             input           = texPool.OutputColor,
+            //             output          = texPool.DlssRrOutput,
+            //             mv              = texPool.ScreenMotionVectors,
+            //             depth           = texPool.Depth,
+            //             diffAlbedo      = texPool.DlssRrDiffAlbedo,
+            //             specAlbedo      = texPool.DlssRrSpecAlbedo,
+            //             normalRoughness = texPool.DlssRrNormalRoughness,
+            //             specHitDistance = texPool.DlssRrSpecMotionVectors,
+            //         };
+            //         _dlssRRPass.Setup(
+            //             dlrr.GetInteropDataPtr(dlrrInput, dlrrRes, 1.0f, setting.upscalerMode),
+            //             new DlssRRPass.Settings { tmpDisableRR = setting.tmpDisableDlssRR });
+            //         renderer.EnqueuePass(_dlssRRPass);
+            //     }
+            // }
+            // else
+            // {
+            //     // Phase 8: Accumulation (reference mode)
+            //     _accumulationPass.Setup(passCtx);
+            //     renderer.EnqueuePass(_accumulationPass);
+            // }
 
             // ---- Phase 9: Output blit (debug display) ----------------------
             {
-                float renderScale = setting.upscalerMode == UpscalerMode.NATIVE
-                    ? 1f
-                    : (float)renderResolution.x / displayResolution.x;
-                _outputBlitPass.Setup(texPool, setting.showMode, renderScale);
+                _outputBlitPass.Setup(texPool, setting.showMode, 1.0f);
                 renderer.EnqueuePass(_outputBlitPass);
             }
 
