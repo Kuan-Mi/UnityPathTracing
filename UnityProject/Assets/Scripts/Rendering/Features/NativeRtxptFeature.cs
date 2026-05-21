@@ -67,7 +67,7 @@ namespace PathTracing
 
         // ---- Shared scene resources -----------------------------------------
         private NRDSampleResource   _nrdSampleResource;
-        private NativeRtxdiGPUScene _gpuScene;
+        private NativeRtxptGPUScene _gpuScene;
 
         // ---- Per-camera resource pools (key = instanceID + eyeIndex*100000) -
         private readonly Dictionary<long, NativeRtxptTextureResources> _texturePools      = new();
@@ -145,10 +145,13 @@ namespace PathTracing
 
             // ---- Shared scene resources -------------------------------------
             _nrdSampleResource ??= new NRDSampleResource();
-            _gpuScene          ??= new NativeRtxdiGPUScene();
+            _gpuScene          ??= new NativeRtxptGPUScene();
 
             if (eyeIndex == 0)
+            {
                 _nrdSampleResource.UpdateForFrame();
+                _gpuScene.UpdateForFrame();
+            }
 
             // ---- Per-camera resource lookup / creation ----------------------
             var  uniqueKey = cam.GetInstanceID() + (eyeIndex * 100_000L);

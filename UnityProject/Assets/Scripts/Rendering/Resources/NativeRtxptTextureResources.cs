@@ -76,6 +76,10 @@ namespace PathTracing
         /// <summary>DLSS-RR denoised + upscaled output. RGBA16_FLOAT. Display resolution.</summary>
         public NriTextureResource DlssRrOutput;
 
+        // ── Debug viz ─────────────────────────────────────────────────────────────
+        /// <summary>Shader debug visualisation texture. R32_FLOAT. Bound as u_ShaderDebugVizTextureBuffer (u126).</summary>
+        public NriTextureResource ShaderDebugViz;
+
         // ── Reference mode accumulation ───────────────────────────────────────
         /// <summary>Multi-frame accumulation buffer (reference mode only). RGBA32_FLOAT.</summary>
         public NriTextureResource AccumulatedRadiance;
@@ -115,6 +119,7 @@ namespace PathTracing
 
             DlssRrOutput          = new NriTextureResource("Rtxpt_DlssRrOutput",          GraphicsFormat.R16G16B16A16_SFloat,     uav);
 
+            ShaderDebugViz        = new NriTextureResource("Rtxpt_ShaderDebugViz",        GraphicsFormat.R32_SFloat,               uav);
             AccumulatedRadiance   = new NriTextureResource("Rtxpt_AccumulatedRadiance",   GraphicsFormat.R32G32B32A32_SFloat,     uav);
             ProcessedOutputColor  = new NriTextureResource("Rtxpt_ProcessedOutputColor",  GraphicsFormat.R16G16B16A16_SFloat,     uav);
         }
@@ -153,7 +158,7 @@ namespace PathTracing
             StablePlanesHeader, StableRadiance,
             BaseColor, SpecNormal, RoughnessMetal, MaterialInfo,
             DlssRrDiffAlbedo, DlssRrSpecAlbedo, DlssRrSpecHitDistance, DlssRrNormalRoughness,
-            AccumulatedRadiance,
+            ShaderDebugViz, AccumulatedRadiance,
         };
 
         public void Dispose()
@@ -178,7 +183,7 @@ namespace PathTracing
             StablePlanesHeader, StableRadiance,
             BaseColor, SpecNormal, RoughnessMetal, MaterialInfo,
             DlssRrDiffAlbedo, DlssRrSpecAlbedo, DlssRrSpecHitDistance, DlssRrNormalRoughness,
-            DlssRrOutput, AccumulatedRadiance, ProcessedOutputColor,
+            ShaderDebugViz, DlssRrOutput, AccumulatedRadiance, ProcessedOutputColor,
         };
     }
 }

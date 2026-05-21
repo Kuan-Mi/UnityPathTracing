@@ -214,6 +214,25 @@ namespace PathTracing
                 ds.SetAccelerationStructure("SceneBVH", tlas);
 
             ctx.GpuScene?.BindToShader(ds);
+
+            // t_EnvironmentMap (t10): bind configured env map or fallback to black texture
+            var envMap = ctx.Setting?.environmentMap != null
+                ? ctx.Setting.environmentMap
+                : Texture2D.blackTexture;
+            ds.SetTexture("t_EnvironmentMap", envMap.GetNativeTexturePtr());
+
+            // t_EnvLookupMap (t18): bind configured LUT or fallback to white texture
+            var envLut = ctx.Setting?.environmentLookupMap != null
+                ? ctx.Setting.environmentLookupMap
+                : Texture2D.whiteTexture;
+            ds.SetTexture("t_EnvLookupMap", envLut.GetNativeTexturePtr());
+
+            // u_FeedbackBuffer (u51): debug stub buffer
+            if (ctx.Buffers?.FeedbackBuffer != null)
+                ds.SetRWStructuredBuffer("u_FeedbackBuffer",
+                    ctx.Buffers.FeedbackBuffer.GetNativeBufferPtr(),
+                    ctx.Buffers.FeedbackBuffer.count,
+                    ctx.Buffers.FeedbackBuffer.stride);
         }
 
         private static void BindLightBuffers(NativeRayTraceDescriptorSet ds, NativeRtxptPassContext ctx)
@@ -237,6 +256,11 @@ namespace PathTracing
             if (buf.LocalSamplingBuffer != null)
                 ds.SetBuffer("t_LightLocalSamplingBuffer",
                     buf.LocalSamplingBuffer.GetNativeBufferPtr());
+
+            if (buf.LightExBuffer != null)
+                ds.SetStructuredBuffer("t_LightsEx",
+                    buf.LightExBuffer.GetNativeBufferPtr(),
+                    buf.LightExBuffer.count, buf.LightExBuffer.stride);
         }
     }
 }

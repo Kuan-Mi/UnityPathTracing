@@ -73,6 +73,8 @@ namespace PathTracing
 
             ds.SetRWTexture("u_MotionVectors", res.ScreenMotionVectors.NativePtr);
             ds.SetRWTexture("u_Depth", res.Depth.NativePtr);
+            if (res.ShaderDebugViz.NativePtr != System.IntPtr.Zero)
+                ds.SetRWTexture("u_ShaderDebugVizTextureBuffer", res.ShaderDebugViz.NativePtr);
 
             uint gx = ((uint)ctx.RenderResolution.x + 7u) / 8u;
             uint gy = ((uint)ctx.RenderResolution.y + 7u) / 8u;

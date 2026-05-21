@@ -94,6 +94,9 @@ namespace PathTracing
                     buf.StablePlanesBuffer.GetNativeBufferPtr(),
                     buf.StablePlanesBuffer.count, buf.StablePlanesBuffer.stride);
 
+            if (res.ShaderDebugViz.NativePtr != System.IntPtr.Zero)
+                ds.SetRWTexture("u_ShaderDebugVizTextureBuffer", res.ShaderDebugViz.NativePtr);
+
             // Output guide UAVs
             ds.SetRWTexture("u_RRDiffuseAlbedo", res.DlssRrDiffAlbedo.NativePtr);
             ds.SetRWTexture("u_RRSpecAlbedo", res.DlssRrSpecAlbedo.NativePtr);

@@ -29,7 +29,7 @@ namespace PathTracing
 
         // ── GPU scene (bindless geometry / material arrays) ───────────────────
         /// <summary>Provides BindToShader() for bindless instance/geometry/material arrays.</summary>
-        public NativeRtxdiGPUScene GpuScene;
+        public NativeRtxptGPUScene GpuScene;
 
         // ── Texture pool (render-res) ─────────────────────────────────────────
         public NativeRtxptTextureResources Textures;
@@ -75,6 +75,9 @@ namespace PathTracing
         // u44 StableRadiance
         public IntPtr StableRadiancePtr;
 
+        // u126 ShaderDebugVizTextureBuffer
+        public IntPtr ShaderDebugVizPtr;
+
         // DLSS-RR guide buffers
         public IntPtr DlssRrDiffAlbedoPtr;
         public IntPtr DlssRrSpecAlbedoPtr;
@@ -98,6 +101,7 @@ namespace PathTracing
             ScratchFloat1Ptr         = Textures.ScratchFloat1.NativePtr;
             StablePlanesHeaderPtr    = Textures.StablePlanesHeader.NativePtr;
             StableRadiancePtr        = Textures.StableRadiance.NativePtr;
+            ShaderDebugVizPtr        = Textures.ShaderDebugViz.NativePtr;
             DlssRrDiffAlbedoPtr      = Textures.DlssRrDiffAlbedo.NativePtr;
             DlssRrSpecAlbedoPtr      = Textures.DlssRrSpecAlbedo.NativePtr;
             DlssRrNormalRoughnessPtr = Textures.DlssRrNormalRoughness.NativePtr;

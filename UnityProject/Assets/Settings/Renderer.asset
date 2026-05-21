@@ -72,6 +72,8 @@ MonoBehaviour:
     environmentMapEnabled: 1
     environmentMapIntensity: 1
     environmentMapTint: {r: 1, g: 1, b: 1, a: 1}
+    environmentMap: {fileID: 2800000, guid: 203489572be13f147a037e6cded7b058, type: 3}
+    environmentLookupMap: {fileID: 2800000, guid: dad5841e3a4ecc9469f0d82c22a0f1ea, type: 3}
     enableToneMapping: 1
     showValidation: 0
     enableShaderDebug: 1

@@ -57,6 +57,7 @@ namespace PathTracing
             if (ctx.DepthPtr              != IntPtr.Zero) ds.SetRWTexture("u_Depth",              ctx.DepthPtr);
             if (ctx.SpecularHitTPtr       != IntPtr.Zero) ds.SetRWTexture("u_SpecularHitT",       ctx.SpecularHitTPtr);
             if (ctx.ScratchFloat1Ptr      != IntPtr.Zero) ds.SetRWTexture("u_ScratchFloat1",      ctx.ScratchFloat1Ptr);
+            if (ctx.ShaderDebugVizPtr     != IntPtr.Zero) ds.SetRWTexture("u_ShaderDebugVizTextureBuffer", ctx.ShaderDebugVizPtr);
         }
 
         private static void BindStablePlanes(NativeComputeDescriptorSet ds, NativeRtxptPassContext ctx)

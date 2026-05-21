@@ -121,10 +121,14 @@ namespace PathTracing
 
         // ── Environment map ───────────────────────────────────────────────────
         [Range(0, 5)]
-        public int   environmentMapDiffuseSampleMIPLevel = 2;
-        public bool  environmentMapEnabled   = true;
-        public float environmentMapIntensity = 1.0f;
-        public Color environmentMapTint      = Color.white;
+        public int       environmentMapDiffuseSampleMIPLevel = 2;
+        public bool      environmentMapEnabled   = true;
+        public float     environmentMapIntensity = 1.0f;
+        public Color     environmentMapTint      = Color.white;
+        /// <summary>Equirectangular HDR environment map. Bound as t_EnvironmentMap (t10).</summary>
+        public Texture2D environmentMap          = null;
+        /// <summary>Precomputed environment CDF LUT for importance sampling. Bound as t_EnvLookupMap (t18).</summary>
+        public Texture2D environmentLookupMap    = null;
 
         // ── Tone mapping ──────────────────────────────────────────────────────
         public bool enableToneMapping = true;

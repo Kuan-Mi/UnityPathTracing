@@ -41,6 +41,13 @@ namespace PathTracing
         /// </summary>
         public GraphicsBuffer SurfaceDataBuffer;
 
+        // ── Debug buffers ─────────────────────────────────────────────────────
+        /// <summary>
+        /// Stub feedback buffer for shader debugging. 1 element, 64B stride.
+        /// HLSL: RWStructuredBuffer u_FeedbackBuffer (u51).
+        /// </summary>
+        public GraphicsBuffer FeedbackBuffer;
+
         // ── Light system buffers ──────────────────────────────────────────────
         /// <summary>
         /// Light control / management struct. Single-element structured buffer.
@@ -117,18 +124,20 @@ namespace PathTracing
 
             ReleaseResolutionBuffers();
 
-            // StablePlanesBuffer: W×H×3 entries of 80B each, as raw byte-addressable.
+            // StablePlanesBuffer: W×H×StablePlaneCount structured entries, stride = StablePlaneStride (80).
+            // Shader declares: RWStructuredBuffer<StablePlane> u_StablePlanesBuffer (u42).
             StablePlanesBuffer = new GraphicsBuffer(
-                GraphicsBuffer.Target.Raw,
-                pixelCount * StablePlaneCount * StablePlaneStride / 4,
-                4)
+                GraphicsBuffer.Target.Structured,
+                pixelCount * StablePlaneCount,
+                StablePlaneStride)
             { name = "Rtxpt_StablePlanesBuffer" };
 
-            // SurfaceDataBuffer: W×H×2 entries of 64B each.
+            // SurfaceDataBuffer: W×H×2 structured entries, stride = SurfaceDataStride (64).
+            // Shader declares: RWStructuredBuffer<PackedPathTracerSurfaceData> u_SurfaceData (u45).
             SurfaceDataBuffer = new GraphicsBuffer(
-                GraphicsBuffer.Target.Raw,
-                pixelCount * 2 * SurfaceDataStride / 4,
-                4)
+                GraphicsBuffer.Target.Structured,
+                pixelCount * 2,
+                SurfaceDataStride)
             { name = "Rtxpt_SurfaceDataBuffer" };
 
             return true;
@@ -141,6 +150,12 @@ namespace PathTracing
         public void EnsureLightBuffers()
         {
             if (LightControlBuffer != null) return;
+
+            // FeedbackBuffer stub — 1 element, 64B stride (matches DebugFeedbackStruct size).
+            FeedbackBuffer = new GraphicsBuffer(
+                GraphicsBuffer.Target.Structured,
+                1, 64)
+            { name = "Rtxpt_FeedbackBuffer" };
 
             // LightControlBuffer — single 256-byte element (pad to 256 for CBV alignment).
             LightControlBuffer = new GraphicsBuffer(
@@ -200,6 +215,7 @@ namespace PathTracing
 
         private void ReleaseLightBuffers()
         {
+            FeedbackBuffer?.Release();           FeedbackBuffer           = null;
             LightControlBuffer?.Release();       LightControlBuffer       = null;
             LightBuffer?.Release();              LightBuffer              = null;
             LightExBuffer?.Release();            LightExBuffer            = null;
