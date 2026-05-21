@@ -70,7 +70,6 @@ namespace PathTracing
         private NativeFrameTick                       _nativeFrameTickPass;
 
         // ---- Shared scene resources -----------------------------------------
-        private NRDSampleResource   _nrdSampleResource;
         private NativeRtxptGPUScene _gpuScene;
 
         // ---- Per-camera resource pools (key = instanceID + eyeIndex*100000) -
@@ -140,12 +139,10 @@ namespace PathTracing
             if (eyeIndex == 1 && setting.skipRightEyeInVR) return;
 
             // ---- Shared scene resources -------------------------------------
-            _nrdSampleResource ??= new NRDSampleResource();
-            _gpuScene          ??= new NativeRtxptGPUScene();
+            _gpuScene ??= new NativeRtxptGPUScene();
 
             if (eyeIndex == 0)
             {
-                _nrdSampleResource.UpdateForFrame();
                 _gpuScene.UpdateForFrame();
             }
 
@@ -205,7 +202,6 @@ namespace PathTracing
             var passCtx = new NativeRtxptPassContext
             {
                 ConstantBuffer    = constantBuffer,
-                NrdSampleResource = _nrdSampleResource,
                 GpuScene          = _gpuScene,
                 Textures          = texPool,
                 Buffers           = bufPool,
@@ -219,7 +215,7 @@ namespace PathTracing
             // ---- Phase 0: TLAS ---------------------------------------------
             if (eyeIndex == 0)
             {
-                _buildTlasPass.SetNRDSampleResource(_nrdSampleResource);
+                _buildTlasPass.Setup(_gpuScene);
                 renderer.EnqueuePass(_buildTlasPass);
             }
 
@@ -339,7 +335,6 @@ namespace PathTracing
             foreach (var d in _dlrrDenoisers.Values) d?.Dispose();  _dlrrDenoisers.Clear();
             _cameraFrameStates.Clear();
 
-            _nrdSampleResource?.Dispose(); _nrdSampleResource = null;
             _gpuScene?.Dispose();          _gpuScene          = null;
         }
 

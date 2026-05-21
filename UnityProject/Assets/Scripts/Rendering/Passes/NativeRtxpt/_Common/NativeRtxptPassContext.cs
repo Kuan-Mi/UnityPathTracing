@@ -15,7 +15,7 @@ namespace PathTracing
     /// Binding layout follows <c>ShaderResourceBindings.hlsli</c>:
     ///   b0  = g_Const        (SampleConstants)
     ///   b1  = g_MiniConst    (SampleMiniConstants — not yet used, reserved)
-    ///   TLAS via NRDSampleResource.AccelerationStructure
+    ///   TLAS via GpuScene.AccelerationStructure
     /// </summary>
     public class NativeRtxptPassContext
     {
@@ -24,8 +24,7 @@ namespace PathTracing
         public GraphicsBuffer ConstantBuffer;
 
         // ── Scene acceleration structure ──────────────────────────────────────
-        /// <summary>Top-level acceleration structure for DXR passes.</summary>
-        public NRDSampleResource NrdSampleResource;
+        // (TLAS is owned by GpuScene; use GpuScene.AccelerationStructure directly)
 
         // ── GPU scene (bindless geometry / material arrays) ───────────────────
         /// <summary>Provides BindToShader() for bindless instance/geometry/material arrays.</summary>

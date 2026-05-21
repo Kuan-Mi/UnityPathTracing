@@ -131,7 +131,7 @@ namespace PathTracing
             };
             data.MiniConstBuffer.SetData(new[] { mini });
 
-            var tlas = ctx.NrdSampleResource?.WorldAS;
+            var tlas = ctx.GpuScene?.AccelerationStructure;
 
             if (data.IsRealtime)
             {

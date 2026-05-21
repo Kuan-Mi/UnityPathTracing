@@ -1,5 +1,3 @@
-using NativeRender;
-using UnityEngine;
 using UnityEngine.Rendering;
 using UnityEngine.Rendering.RenderGraphModule;
 using UnityEngine.Rendering.Universal;
@@ -7,30 +5,28 @@ using UnityEngine.Rendering.Universal;
 namespace PathTracing
 {
     /// <summary>
-    /// Builds/updates the <see cref="NRDSampleResource"/> TLASes once per frame,
+    /// Builds/updates the <see cref="NativeRtxptGPUScene"/> TLAS once per frame,
     /// before any RTXPT pass that needs the acceleration structure.
-    ///
-    /// Mirrors <see cref="NRDTlasUpdatePass"/> from the NRD pipeline.
     /// </summary>
     public class NativeRtxptBuildTlasPass : ScriptableRenderPass
     {
-        private NRDSampleResource _nrdSampleResource;
+        private NativeRtxptGPUScene _gpuScene;
 
-        public void SetNRDSampleResource(NRDSampleResource resource)
+        public void Setup(NativeRtxptGPUScene gpuScene)
         {
-            _nrdSampleResource = resource;
+            _gpuScene = gpuScene;
         }
 
         private class PassData
         {
-            internal NRDSampleResource Resource;
+            internal NativeRtxptGPUScene GpuScene;
         }
 
         public override void RecordRenderGraph(RenderGraph renderGraph, ContextContainer frameData)
         {
             using var builder = renderGraph.AddUnsafePass<PassData>("NativeRtxpt.BuildTlas", out var passData);
 
-            passData.Resource                  = _nrdSampleResource;
+            passData.GpuScene = _gpuScene;
 
             builder.AllowPassCulling(false);
             builder.SetRenderFunc((PassData data, UnsafeGraphContext context) => ExecutePass(data, context));
@@ -38,15 +34,10 @@ namespace PathTracing
 
         private static void ExecutePass(PassData data, UnsafeGraphContext context)
         {
-            if (data.Resource == null) return;
             var cmd = CommandBufferHelpers.GetNativeCommandBuffer(context.cmd);
 
-            cmd.BeginSample(RenderPassMarkers.Streamer);
-            data.Resource.FlushPendingCopies(cmd);
-            cmd.EndSample(RenderPassMarkers.Streamer);
-
             cmd.BeginSample(RenderPassMarkers.TLAS);
-            data.Resource.BuildAccelerationStructures(cmd);
+            data.GpuScene.BuildAccelerationStructure(cmd);
             cmd.EndSample(RenderPassMarkers.TLAS);
         }
     }

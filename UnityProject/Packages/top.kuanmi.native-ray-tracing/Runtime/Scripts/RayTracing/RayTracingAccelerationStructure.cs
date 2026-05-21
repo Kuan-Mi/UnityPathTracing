@@ -75,10 +75,10 @@ namespace NativeRender
         {
             if (_handle == 0) return;
 
-            var mark1 = new ProfilerMarker(ProfilerCategory.Render, "TLAS1", MarkerFlags.SampleGPU);
-            var mark2 = new ProfilerMarker(ProfilerCategory.Render, "TLAS2", MarkerFlags.SampleGPU);
+            // var mark1 = new ProfilerMarker(ProfilerCategory.Render, "TLAS1", MarkerFlags.SampleGPU);
+            // var mark2 = new ProfilerMarker(ProfilerCategory.Render, "TLAS2", MarkerFlags.SampleGPU);
 
-            cmd.BeginSample(mark1);
+            // cmd.BeginSample(mark1);
 
             // Retry adding pending SkinnedMeshRenderers (runs on main thread during cmd recording)
             RetryPendingSkinnedInstances();
@@ -96,9 +96,9 @@ namespace NativeRender
                 _buildEventData[0] = new NativeRenderPlugin.AS_BuildEventData { asHandle = _handle };
             }
 
-            cmd.EndSample(mark1);
-
-            cmd.BeginSample(mark2);
+            // cmd.EndSample(mark1);
+            //
+            // cmd.BeginSample(mark2);
             unsafe
             {
                 cmd.IssuePluginEventAndData(
@@ -107,7 +107,7 @@ namespace NativeRender
                     (IntPtr)Unity.Collections.LowLevel.Unsafe.NativeArrayUnsafeUtility.GetUnsafePtr(_buildEventData));
             }
 
-            cmd.EndSample(mark2);
+            // cmd.EndSample(mark2);
         }
 
         /// <summary>Returns the native ID3D12Resource* of the TLAS for binding via SetAccelerationStructure.</summary>

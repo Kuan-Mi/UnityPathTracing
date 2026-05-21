@@ -77,8 +77,8 @@ public static class RenderPassMarkers
     // ── Main passes ───────────────────────────────────────────────────────────
     public static readonly NamedMarker Streamer                 = new(ProfilerCategory.Render, "Streamer", MarkerFlags.SampleGPU);
     public static readonly NamedMarker TLAS                     = new(ProfilerCategory.Render, "TLAS", MarkerFlags.SampleGPU);
-    public static readonly NamedMarker TLAS1                     = new(ProfilerCategory.Render, "TLAS1", MarkerFlags.SampleGPU);
-    public static readonly NamedMarker TLAS2                     = new(ProfilerCategory.Render, "TLAS2", MarkerFlags.SampleGPU);
+    // public static readonly NamedMarker TLAS1                     = new(ProfilerCategory.Render, "TLAS1", MarkerFlags.SampleGPU);
+    // public static readonly NamedMarker TLAS2                     = new(ProfilerCategory.Render, "TLAS2", MarkerFlags.SampleGPU);
     public static readonly NamedMarker RecordSkinnedMorphUpdate = new(ProfilerCategory.Render, "RecordSkinnedMorphUpdate", MarkerFlags.SampleGPU);
     
     public static readonly NamedMarker SharcUpdate = new(ProfilerCategory.Render, "Sharc Update", MarkerFlags.SampleGPU);

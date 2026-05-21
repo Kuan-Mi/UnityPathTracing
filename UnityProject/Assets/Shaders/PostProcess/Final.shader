@@ -412,7 +412,7 @@
                 // float3 linearRgb = LinearToSRGB(rgb);
 
 
-                return float4(rgb, 1);
+                return float4(rgb * 100, 1);
             }
             ENDHLSL
         }
