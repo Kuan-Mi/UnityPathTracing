@@ -16,34 +16,34 @@ namespace PathTracing
         /// Fills a complete <see cref="SampleConstants"/> struct ready for GPU upload.
         /// </summary>
         public static SampleConstants Build(
-            RenderingData      renderingData,
+            RenderingData renderingData,
             NativeRtxptSetting setting,
-            int2               renderRes,
-            int2               displayRes,
-            CameraFrameState   fs)
+            int2 renderRes,
+            int2 displayRes,
+            CameraFrameState fs)
         {
-            var cam    = renderingData.cameraData.camera;
-            var xrPass = renderingData.cameraData.xr;
-            bool isXR  = xrPass.enabled;
+            var  cam    = renderingData.cameraData.camera;
+            var  xrPass = renderingData.cameraData.xr;
+            bool isXR   = xrPass.enabled;
 
             var proj = GL.GetGPUProjectionMatrix(
                 isXR ? xrPass.GetProjMatrix() : cam.projectionMatrix, false);
 
             // ── SimpleViewConstants ───────────────────────────────────────────
-            var view     = BuildSimpleViewConstants(fs.worldToView,     fs.viewToClip,     renderRes, fs.viewportJitter);
-            var prevView = BuildSimpleViewConstants(fs.prevWorldToView, fs.prevViewToClip, renderRes, fs.prevViewportJitter);
+            var view     = BuildSimpleViewConstants(fs.worldToView, fs.viewToClip, fs.worldToClip,  renderRes, 1.0f, fs.viewportJitter);
+            var prevView = BuildSimpleViewConstants(fs.prevWorldToView, fs.prevViewToClip, fs.prevWorldToClip, renderRes, 1.0f, fs.prevViewportJitter);
 
             // ── Camera geometry ───────────────────────────────────────────────
             float nearZ = proj.m23 / (proj.m22 - 1.0f);
             float farZ  = proj.m23 / (proj.m22 + 1.0f);
 
             // Falcor-style ray-gen orthonormal frame
-            var viewInv     = fs.worldToView.inverse;
+            var   viewInv     = fs.worldToView.inverse;
             float tanHalfFovY = 1.0f / proj.m11;
             float tanHalfFovX = 1.0f / proj.m00;
-            var right = new Vector3(viewInv.m00, viewInv.m10, viewInv.m20);
-            var up    = new Vector3(viewInv.m01, viewInv.m11, viewInv.m21);
-            var fwd   = new Vector3(-viewInv.m02, -viewInv.m12, -viewInv.m22);
+            var   right       = new Vector3(viewInv.m00, viewInv.m10, viewInv.m20);
+            var   up          = new Vector3(viewInv.m01, viewInv.m11, viewInv.m21);
+            var   fwd         = new Vector3(-viewInv.m02, -viewInv.m12, -viewInv.m22);
 
             float focalDist   = math.max(setting.cameraFocalDistance, 1e-4f);
             float spreadAngle = 2.0f * math.atan(tanHalfFovY / renderRes.y);
@@ -56,7 +56,7 @@ namespace PathTracing
                 PixelConeSpreadAngle = spreadAngle,
                 CameraU              = right * tanHalfFovX,
                 FarZ                 = farZ,
-                CameraV              = up    * tanHalfFovY,
+                CameraV              = up * tanHalfFovY,
                 FocalDistance        = focalDist,
                 CameraW              = fwd,
                 AspectRatio          = (float)renderRes.x / renderRes.y,
@@ -84,7 +84,7 @@ namespace PathTracing
                 PixelConeSpreadAngle = spreadAngle,
                 CameraU              = prevRight * tanHalfFovX,
                 FarZ                 = farZ,
-                CameraV              = prevUp    * tanHalfFovY,
+                CameraV              = prevUp * tanHalfFovY,
                 FocalDistance        = focalDist,
                 CameraW              = prevFwd,
                 AspectRatio          = (float)renderRes.x / renderRes.y,
@@ -201,36 +201,67 @@ namespace PathTracing
 
         // ─────────────────────────────────────────────────────────────────────
         private static SimpleViewConstants BuildSimpleViewConstants(
-            Matrix4x4 worldToView, Matrix4x4 viewToClip, int2 renderRes, float2 jitter)
+            Matrix4x4 worldToView,
+            Matrix4x4 viewToClipNoOffset,
+            Matrix4x4 worldToClipNoOffset,
+            int2 renderResolution,
+            float resolutionScale,
+            float2 jitter)
         {
-            // HLSL pragma pack_matrix(row_major) — transpose Unity's column-major matrices.
-            var mWtv       = worldToView.transpose;
-            var mVtc       = viewToClip.transpose;
-            var mWtc       = (viewToClip * worldToView).transpose;
-            var mWtcNoOff  = mWtc;                                          // no jitter offset for now
-            var mCtwNoOff  = (viewToClip * worldToView).inverse.transpose;
+            var w = renderResolution.x * resolutionScale;
+            var h = renderResolution.y * resolutionScale;
+            var vSize = new float2(w, h);
+            
+            // 1. 计算偏移矩阵 (NDC 空间平移)
+            float offsetX = 2f * jitter.x / w;
+            float offsetY = -2f * jitter.y / h;
+            
+            // Unity Matrix4x4.Translate 创建的是列主序平移矩阵
+            Matrix4x4 pixelOffsetMatrix    = Matrix4x4.Translate(new Vector3(offsetX, offsetY, 0));
+            Matrix4x4 pixelOffsetMatrixInv = Matrix4x4.Translate(new Vector3(-offsetX, -offsetY, 0));
 
-            float w = renderRes.x, h = renderRes.y;
+            // 2. 【关键修复】在 Unity 中，应用 NDC 偏移需要左乘 (Pre-multiply)
+            // Clip_jittered = T_jitter * Clip_base
+            var viewToClip  = pixelOffsetMatrix * viewToClipNoOffset;
+            var worldToClip = pixelOffsetMatrix * worldToClipNoOffset;
+
+            // 3. 计算逆矩阵
+            // (T * P * V)^-1 = V^-1 * P^-1 * T^-1
+            // 在 Unity 中 A * B 的逆是 B.inv * A.inv
+            // var clipToViewNoOffset  = viewToClipNoOffset.inverse;
+            var clipToWorldNoOffset = worldToClipNoOffset.inverse;
+            //
+            // // 注意逆矩阵的顺序也要反过来
+            // var clipToView  = clipToViewNoOffset * pixelOffsetMatrixInv;
+            // var clipToWorld = clipToWorldNoOffset * pixelOffsetMatrixInv;
+            //
+            // var viewToWorld = worldToView.inverse;
+
+            // // HLSL pragma pack_matrix(row_major) — transpose Unity's column-major matrices.
+            // var mWtv      = worldToView.transpose;
+            // var mVtc      = viewToClipNoOffset.transpose;
+            // var mWtc      = (viewToClipNoOffset * worldToView).transpose;
+            // var mWtcNoOff = mWtc; // no jitter offset for now
+            // var mCtwNoOff = (viewToClipNoOffset * worldToView).inverse.transpose;
+
+            var ctw_scale = new float2(0.5f * w, -0.5f * h);
+            var ctw_bias  = new float2(0.5f * w, 0.5f * h);
+            var wtc_scale = 1f / ctw_scale;
+            // var wtc_bias  = -ctw_bias * wtc_scale;
 
             return new SimpleViewConstants
             {
-                matWorldToView         = mWtv,
-                matViewToClip          = mVtc,
-                matWorldToClip         = mWtc,
-                matWorldToClipNoOffset = mWtcNoOff,
-                matClipToWorldNoOffset = mCtwNoOff,
-                viewportOriginX        = 0f,
-                viewportOriginY        = 0f,
-                viewportSizeX          = w,
-                viewportSizeY          = h,
-                viewportSizeInvX       = 1f / w,
-                viewportSizeInvY       = 1f / h,
-                pixelOffsetX           = jitter.x,
-                pixelOffsetY           = jitter.y,
-                clipToWindowScaleX     =  w * 0.5f,
-                clipToWindowScaleY     = -h * 0.5f,
-                clipToWindowBiasX      =  w * 0.5f,
-                clipToWindowBiasY      =  h * 0.5f,
+                matWorldToView         = worldToView.transpose,
+                matViewToClip          = viewToClip.transpose,
+                matWorldToClip         = worldToClip.transpose,
+                matWorldToClipNoOffset = worldToClipNoOffset.transpose,
+                matClipToWorldNoOffset = clipToWorldNoOffset.transpose,
+                viewportOrigin         = float2.zero,
+                viewportSize           = vSize,
+                viewportSizeInv        = math.rcp(vSize),
+                pixelOffset            = jitter,
+                clipToWindowScale      = ctw_scale,
+                clipToWindowBias       = ctw_bias,
             };
         }
     }

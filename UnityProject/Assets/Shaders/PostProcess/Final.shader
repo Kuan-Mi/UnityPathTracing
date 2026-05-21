@@ -781,11 +781,13 @@
 
                 // ViewZ 存储的是负值（view space, camera looks down -Z）
                 float viewZ = SAMPLE_TEXTURE2D(_BlitTexture, sampler_BlitTexture, i.uv).r;
-                float depth = -viewZ; // 转为正数
+                float depth = abs(viewZ); // 转为正数
 
                 // 对数映射：更好地显示近处细节
                 float normalized = log2(1.0 + depth) / log2(1.0 + 1000.0);
                 normalized = saturate(normalized);
+                // depth = 1;
+                // normalized = depth;
 
                 return float4(normalized, normalized, normalized, 1);
             }

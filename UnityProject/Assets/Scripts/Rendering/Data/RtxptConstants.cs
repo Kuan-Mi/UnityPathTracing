@@ -21,6 +21,7 @@
  */
 
 using System.Runtime.InteropServices;
+using Unity.Mathematics;
 using UnityEngine;
 
 namespace PathTracing
@@ -133,20 +134,14 @@ namespace PathTracing
         public Matrix4x4 matWorldToClipNoOffset;    // +192
         public Matrix4x4 matClipToWorldNoOffset;    // +256
         // +320
-        public float viewportOriginX;
-        public float viewportOriginY;
-        public float viewportSizeX;
-        public float viewportSizeY;
+        public float2 viewportOrigin;
+        public float2 viewportSize;
         // +336
-        public float viewportSizeInvX;
-        public float viewportSizeInvY;
-        public float pixelOffsetX;
-        public float pixelOffsetY;
+        public float2 viewportSizeInv;
+        public float2 pixelOffset;
         // +352
-        public float clipToWindowScaleX;
-        public float clipToWindowScaleY;
-        public float clipToWindowBiasX;
-        public float clipToWindowBiasY;
+        public float2 clipToWindowScale;
+        public float2 clipToWindowBias;
         // Total: 368 B
     }
 
@@ -234,6 +229,7 @@ namespace PathTracing
         public PathTracerConstants              ptConsts;                          // +864  368 B
         public DebugConstants                   debug;                             // +1232  64 B
         public Vector4                          denoisingHitParamConsts;           // +1296  16 B
+        
         public uint                             materialCount;                     // +1312
         public uint                             _padding0;                         // +1316
         public uint                             _padding1;                         // +1320
