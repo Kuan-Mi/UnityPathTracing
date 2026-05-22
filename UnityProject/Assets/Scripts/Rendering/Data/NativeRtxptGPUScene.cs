@@ -666,8 +666,8 @@ namespace PathTracing
             // Matches C++ MaterialsBaker: if (ThinSurface || !EnableTransmission) data.Flags |= ThinSurface
             ptExtraFlags |= PTMaterialFlags.ThinSurface;
             // URP _MetallicGlossMap stores metalness in the R channel
-            if (metalRoughTexIdx >= 0)
-                ptExtraFlags |= PTMaterialFlags.MetalnessInRedChannel;
+            // if (metalRoughTexIdx >= 0)
+            //     ptExtraFlags |= PTMaterialFlags.MetalnessInRedChannel;
 
             ptMatList.Add(new PTMaterialData
             {
