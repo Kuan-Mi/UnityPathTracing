@@ -172,7 +172,9 @@ namespace PathTracing
                 pick                      = 0,
                 debugLineScale            = 1f,
                 showWireframe             = 0u,
-                debugViewType             = (int)setting.debugViewType,
+                debugViewType             = (int)(setting.showMode == NativeRtxptShowMode.NEELightColor
+                                                ? RtxptDebugViewType.NEELightColor
+                                                : setting.debugViewType),
                 debugViewStablePlaneIndex = setting.debugViewStablePlaneIndex,
                 exploreDeltaTree          = 0,
                 imageWidth                = renderRes.x,

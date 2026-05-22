@@ -76,6 +76,13 @@ namespace PathTracing
         /// <summary>DLSS-RR denoised + upscaled output. RGBA16_FLOAT. Display resolution.</summary>
         public NriTextureResource DlssRrOutput;
 
+        // ── Light feedback (NEE adaptive sampling) ────────────────────────────────
+        /// <summary>Per-pixel accumulated NEE weight. R32_FLOAT. Bound as u_LightFeedbackTotalWeight (u20).</summary>
+        public NriTextureResource LightFeedbackTotalWeight;
+
+        /// <summary>Per-pixel NEE candidate light index. R32_UINT. Bound as u_LightFeedbackCandidates (u21).</summary>
+        public NriTextureResource LightFeedbackCandidates;
+
         // ── Debug viz ─────────────────────────────────────────────────────────────
         /// <summary>Shader debug visualisation texture. R32_FLOAT. Bound as u_ShaderDebugVizTextureBuffer (u126).</summary>
         public NriTextureResource ShaderDebugViz;
@@ -119,6 +126,9 @@ namespace PathTracing
 
             DlssRrOutput          = new NriTextureResource("Rtxpt_DlssRrOutput",          GraphicsFormat.R16G16B16A16_SFloat,     uav);
 
+            LightFeedbackTotalWeight = new NriTextureResource("Rtxpt_LightFeedbackTotalWeight", GraphicsFormat.R32_SFloat,  uav);
+            LightFeedbackCandidates  = new NriTextureResource("Rtxpt_LightFeedbackCandidates",  GraphicsFormat.R32_UInt,    uav);
+
             ShaderDebugViz       = new NriTextureResource("Rtxpt_ShaderDebugViz",        GraphicsFormat.R16G16B16A16_SFloat,               uav);
             AccumulatedRadiance  = new NriTextureResource("Rtxpt_AccumulatedRadiance",   GraphicsFormat.R32G32B32A32_SFloat,     uav);
             ProcessedOutputColor = new NriTextureResource("Rtxpt_ProcessedOutputColor",  GraphicsFormat.R16G16B16A16_SFloat,     uav);
@@ -161,6 +171,7 @@ namespace PathTracing
             StableRadiance,
             BaseColor, SpecNormal, RoughnessMetal, MaterialInfo,
             DlssRrDiffAlbedo, DlssRrSpecAlbedo, DlssRrSpecMotionVectors, DlssRrNormalRoughness,
+            LightFeedbackTotalWeight, LightFeedbackCandidates,
             ShaderDebugViz, AccumulatedRadiance,
         };
 
@@ -186,6 +197,7 @@ namespace PathTracing
             StablePlanesHeader, StableRadiance,
             BaseColor, SpecNormal, RoughnessMetal, MaterialInfo,
             DlssRrDiffAlbedo, DlssRrSpecAlbedo, DlssRrSpecMotionVectors, DlssRrNormalRoughness,
+            LightFeedbackTotalWeight, LightFeedbackCandidates,
             ShaderDebugViz, DlssRrOutput, AccumulatedRadiance, ProcessedOutputColor,
         };
     }

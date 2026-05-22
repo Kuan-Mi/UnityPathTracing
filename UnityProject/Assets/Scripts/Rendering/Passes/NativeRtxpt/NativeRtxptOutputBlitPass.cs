@@ -135,8 +135,7 @@ namespace PathTracing
                     break;
 
                 // ── Debug ──────────────────────────────────────────────────
-                case NativeRtxptShowMode.ShaderDebugViz:
-                    Blitter.BlitTexture(cmd, res.ShaderDebugViz.Handle, scaleOffset, mat, (int)ShowPass.Out);
+                case NativeRtxptShowMode.ShaderDebugViz:                case NativeRtxptShowMode.NEELightColor:                    Blitter.BlitTexture(cmd, res.ShaderDebugViz.Handle, scaleOffset, mat, (int)ShowPass.Out);
                     break;
             }
 

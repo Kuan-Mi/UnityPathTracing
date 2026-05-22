@@ -208,6 +208,9 @@ namespace PathTracing
         // ── Debug ──────────────────────────────────────────────────────────
         ShaderDebugViz,
 
+        /// <summary>First-hit NEE sampled light radiance (tonemapped) written to ShaderDebugViz.</summary>
+        NEELightColor,
+
         /// <summary>First-hit surface debug visualisation driven by <see cref="RtxptDebugViewType"/>.
         /// Displayed when <see cref="NativeRtxptSetting.debugViewType"/> is not Disabled.</summary>
         FirstHitDebugViz,
@@ -280,6 +283,9 @@ namespace PathTracing
         ReSTIRDIFinalOutput,
         ReSTIRDIFinalContribution,
         ReGIRIndirectOutput,
+
+        /// <summary>First-hit NEE sampled radiance written to ShaderDebugViz by the path tracer.</summary>
+        NEELightColor,
     }
 
     /// <summary>

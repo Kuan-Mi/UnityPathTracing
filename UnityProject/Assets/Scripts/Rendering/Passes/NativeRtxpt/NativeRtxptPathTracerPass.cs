@@ -163,6 +163,7 @@ namespace PathTracing
                     BindCommonRT(ds, ctx, data.MiniConstBuffer, tlas);
                     BindLightBuffers(ds, ctx);
 
+                    ds.SetRWTexture("u_ShaderDebugVizTextureBuffer", res.ShaderDebugViz.NativePtr);
                     ds.SetRWTexture("u_StablePlanesHeader", res.StablePlanesHeader.NativePtr);
                     ds.SetRWTexture("u_SpecularHitT", res.SpecularHitT.NativePtr);
                     ds.SetRWStructuredBuffer("u_StablePlanesBuffer", buf.StablePlanesBuffer);
@@ -241,6 +242,10 @@ namespace PathTracing
             ds.SetTypedBuffer("t_LightLocalSamplingBuffer", buf.LocalSamplingBuffer.GetNativeBufferPtr(), buf.LocalSamplingBuffer.count, (uint)Nri.DXGI_FORMAT.DXGI_FORMAT_R32_UINT);
 
             ds.SetStructuredBuffer("t_LightsEx", buf.LightExBuffer);
+
+            var tex = ctx.Textures;
+            ds.SetRWTexture("u_LightFeedbackTotalWeight", tex.LightFeedbackTotalWeight.NativePtr);
+            ds.SetRWTexture("u_LightFeedbackCandidates",  tex.LightFeedbackCandidates.NativePtr);
         }
     }
 }
