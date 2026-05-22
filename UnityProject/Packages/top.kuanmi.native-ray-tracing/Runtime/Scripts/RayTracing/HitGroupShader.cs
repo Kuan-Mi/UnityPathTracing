@@ -76,7 +76,7 @@ namespace NativeRender
                 hlslPath = GetHlslPath();
             string includeDirs = BuildIncludeDirs(hlslPath);
             string target      = string.IsNullOrEmpty(_targetProfile) ? "lib_6_6" : _targetProfile;
-            string defines     = _defines   is { Length: > 0 } ? string.Join(";", _defines)   : null;
+            string defines     = _defines is { Length: > 0 } ? string.Join(";", _defines) : null;
             string extraArgs   = _extraArgs is { Length: > 0 } ? string.Join(";", _extraArgs) : null;
 
             bool ok = NativeRenderPlugin.ShaderCompilerPlugin.NR_SC_Compile(

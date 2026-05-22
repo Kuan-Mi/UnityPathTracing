@@ -127,8 +127,6 @@ namespace PathTracing
         public Color     environmentMapTint      = Color.white;
         /// <summary>Equirectangular HDR environment map. Bound as t_EnvironmentMap (t10).</summary>
         public Texture2D environmentMap          = null;
-        /// <summary>Precomputed environment CDF LUT for importance sampling. Bound as t_EnvLookupMap (t18).</summary>
-        public Texture2D environmentLookupMap    = null;
 
         // ── Tone mapping ──────────────────────────────────────────────────────
         public bool enableToneMapping = true;

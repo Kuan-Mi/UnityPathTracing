@@ -83,6 +83,12 @@ namespace PathTracing
         public IntPtr DlssRrNormalRoughnessPtr;
         public IntPtr DlssRrOutputPtr;
 
+        // ── Baked env map (filled by NativeRtxptEnvMapBakerPass each frame) ─────
+        /// <summary>Baked 256×256 cubemap mip0. Bound as t_EnvironmentMap (TextureCube).</summary>
+        public IntPtr BakedEnvCubePtr;
+        /// <summary>1024×1024 flat importance map (R32F). Bound as t_EnvLookupMap.</summary>
+        public IntPtr EnvImportanceMapPtr;
+
         // ── Factory ───────────────────────────────────────────────────────────
 
         /// <summary>

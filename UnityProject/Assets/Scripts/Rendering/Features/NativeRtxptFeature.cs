@@ -71,11 +71,16 @@ namespace PathTracing
         public NativeComputeShader createProxyJobsCs;
         public NativeComputeShader executeProxyJobsCs;
 
+        // Phase 1: EnvMap baker compute shaders
+        public NativeComputeShader baseLayerCs;
+        public NativeComputeShader envMapImportanceBakerCs;
+
         // Phase 9: Output blit (debug display)
         public Material outputBlitMaterial;
 
         // ---- Pass instances -------------------------------------------------
         private NativeRtxptBuildTlasPass              _buildTlasPass;
+        private NativeRtxptEnvMapBakerPass            _envMapBakerPass;
         private NativeRtxptLightingPass               _lightingPass;
         private NativeRtxptPathTracerPass             _pathTracerPass;
         private NativeRtxptExportVisibilityBufferPass _exportVisibilityBufferPass;
@@ -232,6 +237,12 @@ namespace PathTracing
                 _buildTlasPass.Setup(_gpuScene);
                 renderer.EnqueuePass(_buildTlasPass);
             }
+
+            // ---- Phase 1a: EnvMapBaker ----------------------------------------
+            _envMapBakerPass ??= new NativeRtxptEnvMapBakerPass(baseLayerCs, envMapImportanceBakerCs)
+                { renderPassEvent = renderPassEvent };
+            _envMapBakerPass.Setup(passCtx);
+            renderer.EnqueuePass(_envMapBakerPass);
 
             // ---- Phase 1: LightsBaker ------------------------------------------
             if (_lightingPass == null)

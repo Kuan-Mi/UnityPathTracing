@@ -72,8 +72,8 @@ MonoBehaviour:
     environmentMapEnabled: 1
     environmentMapIntensity: 1
     environmentMapTint: {r: 1, g: 1, b: 1, a: 1}
-    environmentMap: {fileID: 2800000, guid: 203489572be13f147a037e6cded7b058, type: 3}
-    environmentLookupMap: {fileID: 2800000, guid: dad5841e3a4ecc9469f0d82c22a0f1ea, type: 3}
+    environmentMap: {fileID: 0}
+    environmentLookupMap: {fileID: 0}
     enableToneMapping: 1
     showValidation: 0
     enableShaderDebug: 1
@@ -81,7 +81,7 @@ MonoBehaviour:
     dbgDiscardNonNEELighting: 0
     dbgDiscardNEELighting: 0
     dbgDisablePostProcessFilters: 0
-    showMode: 2
+    showMode: 0
     debugViewType: 0
     debugViewStablePlaneIndex: -1
     skipRightEyeInVR: 1
@@ -111,6 +111,8 @@ MonoBehaviour:
   computeProxyBaselineOffsetsCs: {fileID: -2368575503658470205, guid: dd00e3d605f947ad946391f7217f322d, type: 3}
   createProxyJobsCs: {fileID: -2368575503658470205, guid: fb8a3f0c6249439f98d3691c1c405d0a, type: 3}
   executeProxyJobsCs: {fileID: -2368575503658470205, guid: fbef0b02cf5a4a318cfd39f808e415cf, type: 3}
+  baseLayerCs: {fileID: -2368575503658470205, guid: 106bca701da24f7a9ed113d910f8393d, type: 3}
+  envMapImportanceBakerCs: {fileID: -2368575503658470205, guid: 160f5c1d357e92a4eb92eb09a58ba1b7, type: 3}
   outputBlitMaterial: {fileID: 2100000, guid: 27695a2bc55ef2f469362b9a2994989e, type: 2}
 --- !u!114 &11400000
 MonoBehaviour:

@@ -207,17 +207,17 @@ namespace PathTracing
 
             ctx.GpuScene.BindToShader(ds);
 
-            // t_EnvironmentMap (t10): bind configured env map or fallback to black texture
-            var envMap = ctx.Setting?.environmentMap != null
-                ? ctx.Setting.environmentMap
-                : Texture2D.blackTexture;
-            ds.SetTexture("t_EnvironmentMap", envMap.GetNativeTexturePtr());
+            // t_EnvironmentMap (t10): use baked cubemap from EnvMapBakerPass
+            var envCubePtr = ctx.BakedEnvCubePtr != IntPtr.Zero
+                ? ctx.BakedEnvCubePtr
+                : Texture2D.blackTexture.GetNativeTexturePtr();
+            ds.SetTexture("t_EnvironmentMap", envCubePtr);
 
-            // t_EnvLookupMap (t18): bind configured LUT or fallback to white texture
-            var envLut = ctx.Setting?.environmentLookupMap != null
-                ? ctx.Setting.environmentLookupMap
-                : Texture2D.whiteTexture;
-            ds.SetTexture("t_EnvLookupMap", envLut.GetNativeTexturePtr());
+            // t_EnvLookupMap (t18): use baked importance map from EnvMapBakerPass
+            var envImportancePtr = ctx.EnvImportanceMapPtr != IntPtr.Zero
+                ? ctx.EnvImportanceMapPtr
+                : Texture2D.whiteTexture.GetNativeTexturePtr();
+            ds.SetTexture("t_EnvLookupMap", envImportancePtr);
 
             // u_FeedbackBuffer (u51): debug stub buffer
             ds.SetRWStructuredBuffer("u_FeedbackBuffer",
