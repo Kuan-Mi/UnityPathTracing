@@ -81,7 +81,7 @@ MonoBehaviour:
     dbgDiscardNonNEELighting: 0
     dbgDiscardNEELighting: 0
     dbgDisablePostProcessFilters: 0
-    showMode: 0
+    showMode: 2
     debugViewType: 0
     debugViewStablePlaneIndex: -1
     skipRightEyeInVR: 1
