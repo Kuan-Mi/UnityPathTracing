@@ -230,15 +230,15 @@ namespace PathTracing
             var buf = ctx.Buffers;
             if (buf == null) return;
 
-            ds.SetBuffer("t_LightsCB", buf.LightControlBuffer.GetNativeBufferPtr());
+            ds.SetStructuredBuffer("t_LightsCB", buf.LightControlBuffer.GetNativeBufferPtr(), buf.LightControlBuffer.count, buf.LightControlBuffer.stride);
 
             ds.SetStructuredBuffer("t_Lights", buf.LightBuffer.GetNativeBufferPtr(), buf.LightBuffer.count, buf.LightBuffer.stride);
 
-            ds.SetBuffer("t_LightProxyCounters", buf.LightProxyCounters.GetNativeBufferPtr());
+            ds.SetTypedBuffer("t_LightProxyCounters", buf.LightProxyCounters.GetNativeBufferPtr(), buf.LightProxyCounters.count, (uint)Nri.DXGI_FORMAT.DXGI_FORMAT_R32_UINT);
 
-            ds.SetBuffer("t_LightProxyIndices", buf.LightSamplingProxies.GetNativeBufferPtr());
+            ds.SetTypedBuffer("t_LightProxyIndices", buf.LightSamplingProxies.GetNativeBufferPtr(), buf.LightSamplingProxies.count, (uint)Nri.DXGI_FORMAT.DXGI_FORMAT_R32_UINT);
 
-            ds.SetBuffer("t_LightLocalSamplingBuffer", buf.LocalSamplingBuffer.GetNativeBufferPtr());
+            ds.SetTypedBuffer("t_LightLocalSamplingBuffer", buf.LocalSamplingBuffer.GetNativeBufferPtr(), buf.LocalSamplingBuffer.count, (uint)Nri.DXGI_FORMAT.DXGI_FORMAT_R32_UINT);
 
             ds.SetStructuredBuffer("t_LightsEx", buf.LightExBuffer);
         }

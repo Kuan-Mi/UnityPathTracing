@@ -80,6 +80,15 @@ namespace PathTracing
         private int                    _analyticLightCount;
         private bool                   _ping = true; // ping-pong for weights buffer
 
+        // ---- debug throttle ------------------------------------------------
+        private int _dbgFrameCounter;
+
+        // ---- GPU readback (static: ExecutePass is a static callback) ------
+        private static bool s_weightsReadbackPending;
+        private static uint s_weightsReadbackOffset; // which offset was current when we dispatched
+        private static bool s_ctrlReadbackPending;
+        private static AsyncGPUReadbackRequest s_ctrlReadback;
+
         // ====================================================================
         // Constructor / Dispose
         // ====================================================================
@@ -147,9 +156,13 @@ namespace PathTracing
 
         public void Setup(NativeRtxptPassContext ctx)
         {
+            // Check results from the previous frame's readback
+            CheckReadbackResults();
+
             _ctx = ctx;
             _analyticLightCount = CollectAndPackLights();
             UploadLightData();
+            // readback is requested at end of ExecutePass (after GPU dispatches)
         }
 
         // ====================================================================
@@ -181,14 +194,27 @@ namespace PathTracing
 
         public override void RecordRenderGraph(RenderGraph renderGraph, ContextContainer frameData)
         {
+            // Log shader assignment status once
+            if ((_dbgFrameCounter % 60) == 2)
+                Debug.Log($"[Lighting] Shaders: ResetProxyCounters={_resetLightProxyCountersCs != null}" +
+                          $"  ResetHistory={_resetPastToCurrentHistoryCs != null}" +
+                          $"  ComputeWeights={_computeWeightsCs != null}" +
+                          $"  ProxyCounts={_computeProxyCountsCs != null}" +
+                          $"  BaselineOffsets={_computeProxyBaselineOffsetsCs != null}" +
+                          $"  CreateJobs={_createProxyJobsCs != null}" +
+                          $"  ExecuteJobs={_executeProxyJobsCs != null}");
+
             // Skip if any required shader is missing
             if (_resetLightProxyCountersCs == null || _computeWeightsCs == null ||
                 _computeProxyCountsCs == null || _computeProxyBaselineOffsetsCs == null ||
                 _createProxyJobsCs == null || _executeProxyJobsCs == null)
             {
-                Debug.LogWarning("[NativeRtxptLightingPass] One or more lighting compute shaders are missing.");
+                Debug.LogWarning("[NativeRtxptLightingPass] One or more lighting compute shaders are missing — GPU pass skipped.");
                 return;
             }
+
+            if ((_dbgFrameCounter % 60) == 2)
+                Debug.Log($"[Lighting] RecordRenderGraph: TotalLightCount={_analyticLightCount}  ping={!_ping}  currentOffset={(_ping ? 0u : WeightsCountHalf)}  AllShaders=OK");
 
             using var builder = renderGraph.AddUnsafePass<PassData>("NativeRtxpt.LightsBaker", out var passData);
             passData.ResetProxyCountersCs          = _resetLightProxyCountersCs;
@@ -260,6 +286,7 @@ namespace PathTracing
             int cProxies = buf.LightSamplingProxies.count;
 
             cmd.BeginSample("Rtxpt.LightsBaker");
+            UnityEngine.Debug.Log($"[Lighting] ExecutePass: total={data.TotalLightCount}  cCtrl={data.Ctx.Buffers.LightControlBuffer.count}  cLights={data.Ctx.Buffers.LightBuffer.count}  cProxies={data.Ctx.Buffers.LightSamplingProxies.count}");
 
             // ---- 1. ResetLightProxyCounters --------------------------------
             // dispatch: div_ceil(TotalLightCount+1, 128)  (+1 for the "invalid" slot)
@@ -344,11 +371,70 @@ namespace PathTracing
             }
 
             cmd.EndSample("Rtxpt.LightsBaker");
+
+            // Insert readback INTO the command buffer so it executes on the GPU timeline,
+            // after all dispatches above. Reads LightWeightsBuffer[currentOffset..+4] to
+            // verify ComputeWeights actually wrote non-zero weights.
+            if (!s_weightsReadbackPending)
+            {
+                s_weightsReadbackOffset = data.CurrentWeightsOffset;
+                cmd.RequestAsyncReadback(buf.LightWeightsBuffer, OnWeightsReadback);
+                s_weightsReadbackPending = true;
+            }
+
+            // Also readback control buffer to verify SamplingProxyCount / ProxyBuildTaskCount.
+            if (!s_ctrlReadbackPending)
+            {
+                cmd.RequestAsyncReadback(buf.LightControlBuffer, OnCtrlReadback);
+                s_ctrlReadbackPending = true;
+            }
+        }
+
+        private static void OnCtrlReadback(AsyncGPUReadbackRequest req)
+        {
+            s_ctrlReadbackPending = false;
+            if (req.hasError) { Debug.LogError("[Lighting][Readback] LightControlBuffer error."); return; }
+            var arr = req.GetData<RtxptLightingControlData>();
+            if (arr.Length == 0) return;
+            var c = arr[0];
+            float weightsSumF = BitConverter.Int32BitsToSingle((int)c.WeightsSumUINT);
+            Debug.Log($"[Lighting][Readback] Ctrl: TotalLightCount={c.TotalLightCount}" +
+                      $"  SamplingProxyCount={c.SamplingProxyCount}" +
+                      $"  ProxyBuildTaskCount={c.ProxyBuildTaskCount}" +
+                      $"  WeightsSum={weightsSumF:F4} (raw={c.WeightsSumUINT})");
+            if (c.SamplingProxyCount == 0)
+                Debug.LogWarning("[Lighting][Readback] SamplingProxyCount=0 → NEE skipped!");
+        }
+
+        private static void OnWeightsReadback(AsyncGPUReadbackRequest req)
+        {
+            s_weightsReadbackPending = false;
+            if (req.hasError)
+            {
+                Debug.LogError("[Lighting][Readback] LightWeightsBuffer readback error.");
+                return;
+            }
+            var weights = req.GetData<float>();
+            uint off = s_weightsReadbackOffset;
+            float w0 = off < (uint)weights.Length ? weights[(int)off] : -1f;
+            float w1 = (off + 1) < (uint)weights.Length ? weights[(int)(off + 1)] : -1f;
+            Debug.Log($"[Lighting][Readback] LightWeights[{off}]={w0:F4}  [{off+1}]={w1:F4}  (len={weights.Length})");
+            if (w0 == 0f && w1 == 0f)
+                Debug.LogWarning("[Lighting][Readback] All weights are 0 at currentOffset → ComputeWeights produced nothing.");
         }
 
         // ====================================================================
         // Private helpers
         // ====================================================================
+
+        /// <summary>
+        /// Checks whether a previously requested GPU readback has completed and logs key fields.
+        /// Called at the start of Setup() so we're back on the main thread.
+        /// </summary>
+        private void CheckReadbackResults()
+        {
+            // Readback is now handled via OnWeightsReadback callback (GPU-timeline sequenced).
+        }
 
         /// <summary>
         /// Collects all enabled Point / Spot lights in the scene and packs them
@@ -371,14 +457,23 @@ namespace PathTracing
                 {
                     case LightType.Point:
                         PackPointLight(light, ref s_lightsStaging[count], ref s_lightsExStaging[count]);
+                        if ((_dbgFrameCounter % 60) == 0)
+                            Debug.Log($"[Lighting] Point '{light.name}' @ {light.transform.position}  intensity={light.intensity}  color={light.color}  → ColorTypeAndFlags=0x{s_lightsStaging[count].ColorTypeAndFlags:X8}  LogRadiance={s_lightsStaging[count].LogRadiance}");
                         count++;
                         break;
                     case LightType.Spot:
                         PackSpotLight(light, ref s_lightsStaging[count], ref s_lightsExStaging[count]);
+                        if ((_dbgFrameCounter % 60) == 0)
+                            Debug.Log($"[Lighting] Spot  '{light.name}' @ {light.transform.position}  spotAngle={light.spotAngle}  intensity={light.intensity}  → ColorTypeAndFlags=0x{s_lightsStaging[count].ColorTypeAndFlags:X8}");
                         count++;
                         break;
                 }
             }
+
+            if ((_dbgFrameCounter % 60) == 0)
+                Debug.Log($"[Lighting] CollectAndPackLights: found {lights.Length} Light components, packed {count} analytic lights.");
+
+            _dbgFrameCounter++;
             return count;
         }
 
@@ -420,6 +515,9 @@ namespace PathTracing
                 ctrl._paddingBK[29] = historicOffset;  // BakerConstants.HistoricWeightsBufferOffset
             }
 
+            if ((_dbgFrameCounter % 60) == 1)  // just after counter incremented
+                Debug.Log($"[Lighting] UploadLightData: TotalLightCount={ctrl.TotalLightCount}  ImportanceSamplingType={ctrl.ImportanceSamplingType}  currentOffset={currentOffset}  historicOffset={historicOffset}  StrideCtrl={StrideCtrl}  StrideLights={StrideLights}  StrideLightsEx={StrideLightsEx}");
+
             buf.LightControlBuffer.SetData(s_controlStaging);
 
             if (_analyticLightCount > 0)
@@ -444,14 +542,20 @@ namespace PathTracing
             info.CenterY = pos.y;
             info.CenterZ = pos.z;
 
-            // Point light: treat as kPoint (ideal point source, radius = 0)
-            // flux = color * intensity (Unity intensity ≈ candela for Point lights)
-            Color   linear = light.color.linear;
-            Vector3 flux   = new Vector3(linear.r, linear.g, linear.b) * light.intensity;
-            PackLightColor(flux, ref info, (uint)RtxptLightType.Point);
+            // POLYLIGHT_POINT_ENABLE = 0 in PolymorphicLightPTConfig.h: point lights are
+            // "handled by sphere".  Pack as kSphere with a small radius, matching the C++
+            // LightsBaker path for point.radius > 0:
+            //   radiance = flux / (PI * r^2)   (projected-area normalisation)
+            //   Scalars  = fp16(radius)
+            const float kPointRadius = 0.01f; // 1 cm sphere approximating a point source
+            float projectedArea = Mathf.PI * kPointRadius * kPointRadius;
 
-            // Direction2: full cone (PI outer, 0 inner) so the shader treats it as omni-directional
-            info.Direction2 = Fp32ToFp16(Mathf.PI) | (Fp32ToFp16(0f) << 16);
+            Color   linear  = light.color.linear;
+            Vector3 flux    = new Vector3(linear.r, linear.g, linear.b) * light.intensity;
+            Vector3 radiance = flux / projectedArea;
+
+            PackLightColor(radiance, ref info, (uint)RtxptLightType.Sphere);
+            info.Scalars = Fp32ToFp16(kPointRadius);
         }
 
         private static void PackSpotLight(Light light, ref RtxptPolymorphicLightInfo info,
@@ -465,27 +569,28 @@ namespace PathTracing
             info.CenterY = pos.y;
             info.CenterZ = pos.z;
 
+            // Pack as kSphere + shaping (matches C++ LightsBaker spot with radius > 0)
+            const float kSpotRadius = 0.01f;
+            float projectedArea = Mathf.PI * kSpotRadius * kSpotRadius;
+
             // Unity spotAngle is the full cone angle; half-angle for outer
             float outerRad = Mathf.Deg2Rad * (light.spotAngle * 0.5f);
-            // Inner angle approximation: use 80 % of outer (Unity doesn't expose inner angle directly)
             float innerRad = outerRad * 0.8f;
+            float softness = Mathf.Clamp01(1f - innerRad / outerRad);
 
-            Color   linear = light.color.linear;
-            Vector3 flux   = new Vector3(linear.r, linear.g, linear.b) * light.intensity;
+            Color   linear  = light.color.linear;
+            Vector3 flux    = new Vector3(linear.r, linear.g, linear.b) * light.intensity;
+            Vector3 radiance = flux / projectedArea;
 
-            // Pack as kPoint with shaping so the spot cone is applied
-            PackLightColor(flux, ref info, (uint)RtxptLightType.Point);
+            PackLightColor(radiance, ref info, (uint)RtxptLightType.Sphere);
             info.ColorTypeAndFlags |= kShapingEnableBit;
-
-            var forward = light.transform.forward;
-            info.Direction1 = NDirToOctUnorm32(forward);
-            info.Direction2 = Fp32ToFp16(outerRad) | (Fp32ToFp16(innerRad) << 16);
+            info.Scalars = Fp32ToFp16(kSpotRadius);
 
             // Extended shaping data
+            var forward = light.transform.forward;
             infoEx.PrimaryAxis             = NDirToOctUnorm32(forward);
-            float softness                 = 1f - (innerRad / outerRad);
             infoEx.CosConeAngleAndSoftness = Fp32ToFp16(Mathf.Cos(outerRad)) |
-                                             (Fp32ToFp16(Mathf.Clamp01(softness)) << 16);
+                                             (Fp32ToFp16(softness) << 16);
         }
 
         // ====================================================================
@@ -566,6 +671,11 @@ namespace PathTracing
             uint sign = u & 0x80000000u;
             uint body = s & 0x0FFFFFFFu;
             return ((sign >> 16) | (body >> 13)) & 0xFFFFu;
+        }
+
+        private static unsafe float UintBitsToFloat(uint v)
+        {
+            return *(float*)&v;
         }
     }
 }
