@@ -1,8 +1,5 @@
 using System;
-using System.Runtime.InteropServices;
 using NativeRender;
-using Unity.Mathematics;
-using UnityEngine;
 using UnityEngine.Rendering;
 using UnityEngine.Rendering.RenderGraphModule;
 using UnityEngine.Rendering.Universal;
@@ -10,19 +7,26 @@ using UnityEngine.Rendering.Universal;
 namespace PathTracing
 {
     /// <summary>
-    /// Phase 3: Exports screen-space depth and motion vectors from the inline
-    /// visibility buffer written by the path tracer.
+    /// Debug pass: runs the StablePlanesDebugViz compute shader and writes the
+    /// result into the ShaderDebugViz texture, which <see cref="NativeRtxptOutputBlitPass"/>
+    /// then blits to screen when a debug view is active.
     ///
-    /// Shader: ExportVisibilityBuffer.computeshader  numthreads [8,8,1]
-    /// Bindings: g_Const (b0), u_MotionVectors (u5), u_Depth (u6)
+    /// Shader: PostProcess_StablePlanesDebugViz.computeshader  numthreads [8,8,1]
+    ///
+    /// Bindings (reflection JSON):
+    ///   b0   g_Const
+    ///   u40  u_StablePlanesHeader
+    ///   u42  u_StablePlanesBuffer
+    ///   u44  u_StableRadiance
+    ///   u126 u_ShaderDebugVizTextureBuffer
     /// </summary>
-    public class NativeRtxptExportVisibilityBufferPass : ScriptableRenderPass, IDisposable
+    public class NativeRtxptStablePlanesDebugVizPass : ScriptableRenderPass, IDisposable
     {
         private readonly NativeComputePipeline      _cs;
         private readonly NativeComputeDescriptorSet _ds;
         private          NativeRtxptPassContext     _ctx;
 
-        public NativeRtxptExportVisibilityBufferPass(NativeComputeShader shader)
+        public NativeRtxptStablePlanesDebugVizPass(NativeComputeShader shader)
         {
             _cs = new NativeComputePipeline(shader);
             _ds = new NativeComputeDescriptorSet(_cs);
@@ -49,7 +53,7 @@ namespace PathTracing
 
         public override void RecordRenderGraph(RenderGraph renderGraph, ContextContainer frameData)
         {
-            using var builder = renderGraph.AddUnsafePass<PassData>("NativeRtxpt.ExportVisibilityBuffer", out var passData);
+            using var builder = renderGraph.AddUnsafePass<PassData>("NativeRtxpt.StablePlanesDebugViz", out var passData);
             passData.Cs  = _cs;
             passData.Ds  = _ds;
             passData.Ctx = _ctx;
@@ -65,19 +69,28 @@ namespace PathTracing
             var ctx = data.Ctx;
             var ds  = data.Ds;
             var res = ctx.Textures;
+            var buf = ctx.Buffers;
 
-            cmd.BeginSample("Rtxpt.ExportVisibilityBuffer");
+            cmd.BeginSample("Rtxpt.StablePlanesDebugViz");
 
-            ds.SetConstantBuffer("g_Const", ctx.ConstantBuffer.GetNativeBufferPtr());
-            ds.SetRWTexture("u_MotionVectors", res.ScreenMotionVectors.NativePtr);
-            ds.SetRWTexture("u_Depth", res.Depth.NativePtr);
+            if (ctx.ConstantBuffer != null)
+                ds.SetConstantBuffer("g_Const", ctx.ConstantBuffer.GetNativeBufferPtr());
+
+            ds.SetRWTexture("u_StablePlanesHeader", res.StablePlanesHeader.NativePtr);
+            ds.SetRWTexture("u_StableRadiance",     res.StableRadiance.NativePtr);
+
+            if (buf?.StablePlanesBuffer != null)
+                ds.SetRWStructuredBuffer("u_StablePlanesBuffer",
+                    buf.StablePlanesBuffer.GetNativeBufferPtr(),
+                    buf.StablePlanesBuffer.count, buf.StablePlanesBuffer.stride);
+
             ds.SetRWTexture("u_ShaderDebugVizTextureBuffer", res.ShaderDebugViz.NativePtr);
 
             uint gx = ((uint)ctx.RenderResolution.x + 7u) / 8u;
             uint gy = ((uint)ctx.RenderResolution.y + 7u) / 8u;
             data.Cs.Dispatch(cmd, ds, gx, gy, 1);
 
-            cmd.EndSample("Rtxpt.ExportVisibilityBuffer");
+            cmd.EndSample("Rtxpt.StablePlanesDebugViz");
         }
     }
 }

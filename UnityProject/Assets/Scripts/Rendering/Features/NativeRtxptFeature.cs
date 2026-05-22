@@ -59,6 +59,9 @@ namespace PathTracing
         // Phase 8
         public NativeComputeShader accumulationCs;
 
+        // Phase Debug: StablePlanesDebugViz
+        public NativeComputeShader stablePlanesDebugVizCs;
+
         // Phase 9: Output blit (debug display)
         public Material outputBlitMaterial;
 
@@ -70,8 +73,9 @@ namespace PathTracing
         private NativeRtxptNoDenoiserFinalMergePass   _noDenoiserFinalMergePass;
         private NativeRtxptDlssBeforePass             _dlssBeforePass;
         private DlssRRPass                            _dlssRRPass;
-        private NativeRtxptAccumulationPass           _accumulationPass;
-        private NativeRtxptOutputBlitPass             _outputBlitPass;
+        private NativeRtxptAccumulationPass               _accumulationPass;
+        private NativeRtxptStablePlanesDebugVizPass       _stablePlanesDebugVizPass;
+        private NativeRtxptOutputBlitPass                 _outputBlitPass;
         private NativeFrameTick                       _nativeFrameTickPass;
 
         // ---- Shared scene resources -----------------------------------------
@@ -110,8 +114,9 @@ namespace PathTracing
             _noDenoiserFinalMergePass   ??= new NativeRtxptNoDenoiserFinalMergePass(noDenoiserFinalMergeCs) { renderPassEvent     = renderPassEvent };
             _dlssBeforePass             ??= new NativeRtxptDlssBeforePass(dlssBeforeCs) { renderPassEvent                         = renderPassEvent };
             _dlssRRPass                 ??= new DlssRRPass { renderPassEvent                                                      = renderPassEvent };
-            _accumulationPass           ??= new NativeRtxptAccumulationPass(accumulationCs) { renderPassEvent                     = renderPassEvent };
-            _outputBlitPass             ??= new NativeRtxptOutputBlitPass(outputBlitMaterial) { renderPassEvent                   = renderPassEvent };
+            _accumulationPass             ??= new NativeRtxptAccumulationPass(accumulationCs) { renderPassEvent                        = renderPassEvent };
+            _stablePlanesDebugVizPass     ??= new NativeRtxptStablePlanesDebugVizPass(stablePlanesDebugVizCs) { renderPassEvent   = renderPassEvent };
+            _outputBlitPass               ??= new NativeRtxptOutputBlitPass(outputBlitMaterial) { renderPassEvent                  = renderPassEvent };
             _nativeFrameTickPass        ??= new NativeFrameTick { renderPassEvent                                                 = renderPassEvent };
         }
 
@@ -279,6 +284,13 @@ namespace PathTracing
                 renderer.EnqueuePass(_accumulationPass);
             }
 
+            // ---- Phase Debug: StablePlanesDebugViz (only when a debug view is active) ----
+            if (setting.debugViewType != RtxptDebugViewType.Disabled && stablePlanesDebugVizCs != null)
+            {
+                _stablePlanesDebugVizPass.Setup(passCtx);
+                renderer.EnqueuePass(_stablePlanesDebugVizPass);
+            }
+
             // ---- Phase 9: Output blit (debug display) ----------------------
             {
                 _outputBlitPass.Setup(texPool, setting.showMode, 1.0f, setting.debugViewType);
@@ -329,6 +341,8 @@ namespace PathTracing
             _dlssBeforePass = null;
             _accumulationPass?.Dispose();
             _accumulationPass = null;
+            _stablePlanesDebugVizPass?.Dispose();
+            _stablePlanesDebugVizPass = null;
             _outputBlitPass   = null;
 
             foreach (var p in _texturePools.Values) p.Dispose();
@@ -377,6 +391,8 @@ namespace PathTracing
 
             // Phase 8
             accumulationCs = LoadCs($"{shaderRoot}/ProcessingPasses/AccumulationPass");
+            
+            stablePlanesDebugVizCs =  LoadCs($"{shaderRoot}/ProcessingPasses/PostProcess_StablePlanesDebugViz");
 
             UnityEditor.EditorUtility.SetDirty(this);
             return;
