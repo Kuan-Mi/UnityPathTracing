@@ -153,7 +153,7 @@ namespace PathTracing
                 InvTransformRow1 = new Vector4(0, 1, 0, 0),
                 InvTransformRow2 = new Vector4(0, 0, 1, 0),
                 colorMultiplier  = Vector3.one,
-                enabled          = RenderSettings.skybox != null ? 1f : 0f,
+                enabled          = 1f,  // always enabled; env cube is baked each frame (directional lights + optional skybox)
             };
 
             var envMapIS = new EnvMapImportanceSamplingParams

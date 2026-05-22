@@ -164,6 +164,7 @@ namespace PathTracing
                     BindLightBuffers(ds, ctx);
 
                     ds.SetRWTexture("u_ShaderDebugVizTextureBuffer", res.ShaderDebugViz.NativePtr);
+                    ds.SetRWTexture("u_DebugOutputColor", res.DebugOutputColor.NativePtr);
                     ds.SetRWTexture("u_StablePlanesHeader", res.StablePlanesHeader.NativePtr);
                     ds.SetRWTexture("u_SpecularHitT", res.SpecularHitT.NativePtr);
                     ds.SetRWStructuredBuffer("u_StablePlanesBuffer", buf.StablePlanesBuffer);

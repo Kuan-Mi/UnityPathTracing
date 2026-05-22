@@ -406,10 +406,10 @@ namespace PathTracing
                 int offset = lightCount * 32;
 
                 // ColorIntensity: float4(r, g, b, intensity)
-                WriteF32(s_envBakerBytes, offset + 0, linear.r * intensity);
-                WriteF32(s_envBakerBytes, offset + 4, linear.g * intensity);
-                WriteF32(s_envBakerBytes, offset + 8, linear.b * intensity);
-                WriteF32(s_envBakerBytes, offset + 12, 1.0f);
+                WriteF32(s_envBakerBytes, offset + 0, linear.r);
+                WriteF32(s_envBakerBytes, offset + 4, linear.g);
+                WriteF32(s_envBakerBytes, offset + 8, linear.b);
+                WriteF32(s_envBakerBytes, offset + 12, intensity);
 
                 // Direction: incoming direction = -light.transform.forward
                 Vector3 fwd = light.transform.forward;
@@ -418,7 +418,7 @@ namespace PathTracing
                 WriteF32(s_envBakerBytes, offset + 24, -fwd.z);
 
                 // AngularSize: Sun's angular diameter ~0.53° = 0.009273 rad
-                WriteF32(s_envBakerBytes, offset + 28, 0.009273f);
+                WriteF32(s_envBakerBytes, offset + 28, 0.1f);
 
                 lightCount++;
             }

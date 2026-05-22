@@ -214,6 +214,10 @@ namespace PathTracing
         /// <summary>First-hit surface debug visualisation driven by <see cref="RtxptDebugViewType"/>.
         /// Displayed when <see cref="NativeRtxptSetting.debugViewType"/> is not Disabled.</summary>
         FirstHitDebugViz,
+
+        // ── 环境光调试 ─────────────────────────────────────────────────────
+        /// <summary>调试纹理：由 PathTracer HandleMiss 中调试代码写入（环境光采样结果等）。</summary>
+        DebugOutputColor,
     }
 
     /// <summary>

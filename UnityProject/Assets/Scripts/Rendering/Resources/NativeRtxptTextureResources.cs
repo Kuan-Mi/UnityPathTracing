@@ -87,6 +87,9 @@ namespace PathTracing
         /// <summary>Shader debug visualisation texture. R32_FLOAT. Bound as u_ShaderDebugVizTextureBuffer (u126).</summary>
         public NriTextureResource ShaderDebugViz;
 
+        /// <summary>Debug output color texture. RGBA16_FLOAT. Mirrors u_OutputColor for debug inspection (written by PathTracer debug code).</summary>
+        public NriTextureResource DebugOutputColor;
+
         // ── Reference mode accumulation ───────────────────────────────────────
         /// <summary>Multi-frame accumulation buffer (reference mode only). RGBA32_FLOAT.</summary>
         public NriTextureResource AccumulatedRadiance;
@@ -130,6 +133,7 @@ namespace PathTracing
             LightFeedbackCandidates  = new NriTextureResource("Rtxpt_LightFeedbackCandidates",  GraphicsFormat.R32_UInt,    uav);
 
             ShaderDebugViz       = new NriTextureResource("Rtxpt_ShaderDebugViz",        GraphicsFormat.R16G16B16A16_SFloat,               uav);
+            DebugOutputColor     = new NriTextureResource("Rtxpt_DebugOutputColor",       GraphicsFormat.R16G16B16A16_SFloat,     uav);
             AccumulatedRadiance  = new NriTextureResource("Rtxpt_AccumulatedRadiance",   GraphicsFormat.R32G32B32A32_SFloat,     uav);
             ProcessedOutputColor = new NriTextureResource("Rtxpt_ProcessedOutputColor",  GraphicsFormat.R16G16B16A16_SFloat,     uav);
         }
@@ -172,7 +176,7 @@ namespace PathTracing
             BaseColor, SpecNormal, RoughnessMetal, MaterialInfo,
             DlssRrDiffAlbedo, DlssRrSpecAlbedo, DlssRrSpecMotionVectors, DlssRrNormalRoughness,
             LightFeedbackTotalWeight, LightFeedbackCandidates,
-            ShaderDebugViz, AccumulatedRadiance,
+            ShaderDebugViz, DebugOutputColor, AccumulatedRadiance,
         };
 
         public void Dispose()
@@ -198,7 +202,7 @@ namespace PathTracing
             BaseColor, SpecNormal, RoughnessMetal, MaterialInfo,
             DlssRrDiffAlbedo, DlssRrSpecAlbedo, DlssRrSpecMotionVectors, DlssRrNormalRoughness,
             LightFeedbackTotalWeight, LightFeedbackCandidates,
-            ShaderDebugViz, DlssRrOutput, AccumulatedRadiance, ProcessedOutputColor,
+            ShaderDebugViz, DebugOutputColor, DlssRrOutput, AccumulatedRadiance, ProcessedOutputColor,
         };
     }
 }
