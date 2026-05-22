@@ -31,7 +31,7 @@ namespace PathTracing
         // ---- Inspector fields -----------------------------------------------
         public NativeRtxptSetting setting;
         public RenderPassEvent    renderPassEvent = RenderPassEvent.BeforeRenderingPostProcessing;
- 
+
         public SampleConstants sampleConstants;
 
         // Phase 2: PathTracer RT shaders
@@ -62,20 +62,30 @@ namespace PathTracing
         // Phase Debug: StablePlanesDebugViz
         public NativeComputeShader stablePlanesDebugVizCs;
 
+        // Phase 1: LightsBaker compute shaders
+        public NativeComputeShader resetLightProxyCountersCs;
+        public NativeComputeShader resetPastToCurrentHistoryCs;
+        public NativeComputeShader computeWeightsCs;
+        public NativeComputeShader computeProxyCountsCs;
+        public NativeComputeShader computeProxyBaselineOffsetsCs;
+        public NativeComputeShader createProxyJobsCs;
+        public NativeComputeShader executeProxyJobsCs;
+
         // Phase 9: Output blit (debug display)
         public Material outputBlitMaterial;
 
         // ---- Pass instances -------------------------------------------------
         private NativeRtxptBuildTlasPass              _buildTlasPass;
+        private NativeRtxptLightingPass               _lightingPass;
         private NativeRtxptPathTracerPass             _pathTracerPass;
         private NativeRtxptExportVisibilityBufferPass _exportVisibilityBufferPass;
         private NativeRtxptDenoiseSpecHitTPass        _denoiseSpecHitTPass;
         private NativeRtxptNoDenoiserFinalMergePass   _noDenoiserFinalMergePass;
         private NativeRtxptDlssBeforePass             _dlssBeforePass;
         private DlssRRPass                            _dlssRRPass;
-        private NativeRtxptAccumulationPass               _accumulationPass;
-        private NativeRtxptStablePlanesDebugVizPass       _stablePlanesDebugVizPass;
-        private NativeRtxptOutputBlitPass                 _outputBlitPass;
+        private NativeRtxptAccumulationPass           _accumulationPass;
+        private NativeRtxptStablePlanesDebugVizPass   _stablePlanesDebugVizPass;
+        private NativeRtxptOutputBlitPass             _outputBlitPass;
         private NativeFrameTick                       _nativeFrameTickPass;
 
         // ---- Shared scene resources -----------------------------------------
@@ -114,9 +124,9 @@ namespace PathTracing
             _noDenoiserFinalMergePass   ??= new NativeRtxptNoDenoiserFinalMergePass(noDenoiserFinalMergeCs) { renderPassEvent     = renderPassEvent };
             _dlssBeforePass             ??= new NativeRtxptDlssBeforePass(dlssBeforeCs) { renderPassEvent                         = renderPassEvent };
             _dlssRRPass                 ??= new DlssRRPass { renderPassEvent                                                      = renderPassEvent };
-            _accumulationPass             ??= new NativeRtxptAccumulationPass(accumulationCs) { renderPassEvent                        = renderPassEvent };
-            _stablePlanesDebugVizPass     ??= new NativeRtxptStablePlanesDebugVizPass(stablePlanesDebugVizCs) { renderPassEvent   = renderPassEvent };
-            _outputBlitPass               ??= new NativeRtxptOutputBlitPass(outputBlitMaterial) { renderPassEvent                  = renderPassEvent };
+            _accumulationPass           ??= new NativeRtxptAccumulationPass(accumulationCs) { renderPassEvent                     = renderPassEvent };
+            _stablePlanesDebugVizPass   ??= new NativeRtxptStablePlanesDebugVizPass(stablePlanesDebugVizCs) { renderPassEvent     = renderPassEvent };
+            _outputBlitPass             ??= new NativeRtxptOutputBlitPass(outputBlitMaterial) { renderPassEvent                   = renderPassEvent };
             _nativeFrameTickPass        ??= new NativeFrameTick { renderPassEvent                                                 = renderPassEvent };
         }
 
@@ -223,7 +233,22 @@ namespace PathTracing
                 renderer.EnqueuePass(_buildTlasPass);
             }
 
-            // ---- Phase 1: LightsBaker (TODO) --------------------------------
+            // ---- Phase 1: LightsBaker ------------------------------------------
+            if (_lightingPass == null)
+            {
+                _lightingPass = new NativeRtxptLightingPass(
+                        resetLightProxyCountersCs,
+                        resetPastToCurrentHistoryCs,
+                        computeWeightsCs,
+                        computeProxyCountsCs,
+                        computeProxyBaselineOffsetsCs,
+                        createProxyJobsCs,
+                        executeProxyJobsCs)
+                    { renderPassEvent = renderPassEvent };
+            }
+
+            _lightingPass.Setup(passCtx);
+            renderer.EnqueuePass(_lightingPass);
 
             // ---- Phase 2: PathTracer RT Shader ------------------------------
             _pathTracerPass.Setup(passCtx);
@@ -239,15 +264,15 @@ namespace PathTracing
                 // Phase 4: DenoiseSpecHitT x2
                 _denoiseSpecHitTPass.Setup(passCtx);
                 renderer.EnqueuePass(_denoiseSpecHitTPass);
-            
+
                 // Phase 5: NoDenoiserFinalMerge
                 _noDenoiserFinalMergePass.Setup(passCtx);
                 renderer.EnqueuePass(_noDenoiserFinalMergePass);
-            
+
                 // Phase 6: DlssBefore
                 _dlssBeforePass.Setup(passCtx);
                 renderer.EnqueuePass(_dlssBeforePass);
-            
+
                 // Phase 7: DLSS-RR
                 {
                     var dlrrInput = new DlrrDenoiser.DlrrFrameInput
@@ -343,7 +368,7 @@ namespace PathTracing
             _accumulationPass = null;
             _stablePlanesDebugVizPass?.Dispose();
             _stablePlanesDebugVizPass = null;
-            _outputBlitPass   = null;
+            _outputBlitPass           = null;
 
             foreach (var p in _texturePools.Values) p.Dispose();
             _texturePools.Clear();
@@ -391,8 +416,18 @@ namespace PathTracing
 
             // Phase 8
             accumulationCs = LoadCs($"{shaderRoot}/ProcessingPasses/AccumulationPass");
-            
-            stablePlanesDebugVizCs =  LoadCs($"{shaderRoot}/ProcessingPasses/PostProcess_StablePlanesDebugViz");
+
+            stablePlanesDebugVizCs = LoadCs($"{shaderRoot}/ProcessingPasses/PostProcess_StablePlanesDebugViz");
+
+            // Phase 1: LightsBaker shaders
+            string lightRoot = $"{shaderRoot}/Lighting";
+            resetLightProxyCountersCs     = LoadCs($"{lightRoot}/ResetLightProxyCounters");
+            resetPastToCurrentHistoryCs   = LoadCs($"{lightRoot}/ResetPastToCurrentHistory");
+            computeWeightsCs              = LoadCs($"{lightRoot}/ComputeWeights");
+            computeProxyCountsCs          = LoadCs($"{lightRoot}/ComputeProxyCounts");
+            computeProxyBaselineOffsetsCs = LoadCs($"{lightRoot}/ComputeProxyBaselineOffsets");
+            createProxyJobsCs             = LoadCs($"{lightRoot}/CreateProxyJobs");
+            executeProxyJobsCs            = LoadCs($"{lightRoot}/ExecuteProxyJobs");
 
             UnityEditor.EditorUtility.SetDirty(this);
             return;

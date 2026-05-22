@@ -1,0 +1,571 @@
+using System;
+using System.Runtime.InteropServices;
+using NativeRender;
+using Unity.Mathematics;
+using UnityEngine;
+using UnityEngine.Rendering;
+using UnityEngine.Rendering.RenderGraphModule;
+using UnityEngine.Rendering.Universal;
+using Object = UnityEngine.Object;
+
+namespace PathTracing
+{
+    /// <summary>
+    /// RTXPT lighting pass (Phase 1).
+    ///
+    /// CPU side: collects Unity analytic lights and uploads LightBuffer / LightExBuffer /
+    /// LightControlBuffer via GraphicsBuffer.SetData (mirrors CollectAnalyticLightsCPU).
+    ///
+    /// GPU side: dispatches the full LightsBaker proxy-build pipeline using
+    /// NativeComputePipeline, matching LightsBaker::UpdateFrame in C++:
+    ///   1. ResetLightProxyCounters
+    ///   2. ResetPastToCurrentHistory
+    ///   3. ComputeWeights
+    ///   4. ComputeProxyCounts
+    ///   5. ComputeProxyBaselineOffsets
+    ///   6. CreateProxyJobs
+    ///   7. ExecuteProxyJobs
+    ///
+    /// ImportanceSamplingType = 1 (Power-based) — driven by GPU.
+    /// </summary>
+    public class NativeRtxptLightingPass : ScriptableRenderPass, IDisposable
+    {
+        // ---- constants mirrors from PolymorphicLight.h ----------------------
+        private const uint  kTypeShift                    = 24;
+        private const uint  kShapingEnableBit             = 1u << 28;
+        private const uint  kShapingUseMinFalloff         = 1u << 30;
+        private const float kMinLog2Radiance              = -8f;
+        private const float kMaxLog2Radiance              = 40f;
+
+        // LLB constants (mirrors NEEATBaker.hlsli)
+        private const uint LLB_NUM_COMPUTE_THREADS       = 128;
+        private const uint LLB_LOCAL_BLOCK_SIZE          = 32;
+        // ComputeWeights items-per-group = LLB_LOCAL_BLOCK_SIZE * LLB_NUM_COMPUTE_THREADS
+        private const uint LLB_WEIGHTS_ITEMS_PER_GROUP   = LLB_LOCAL_BLOCK_SIZE * LLB_NUM_COMPUTE_THREADS;
+
+        // WeightsBufferOffset ping-pong half: mirrors RTXPT_LIGHTING_WEIGHTS_COUNT_HALF = MaxLights+1
+        private const uint WeightsCountHalf = NativeRtxptBufferResources.MaxLights + 1;
+
+        // For ExecuteProxyJobs we dispatch over LLB_MAX_PROXY_PROC_TASKS which is computed from
+        // RTXPT_LIGHTING_MAX_LIGHTS (compiled constant). We approximate conservatively using MaxLights.
+        // The shader guards with ProxyBuildTaskCount, so extra threads are no-ops.
+        private const uint LLB_MAX_PROXIES_PER_TASK      = 32;
+        private static readonly uint LLB_MAX_PROXY_PROC_TASKS =
+            (uint)NativeRtxptBufferResources.MaxLights +
+            ((uint)NativeRtxptBufferResources.MaxLights * 12 + LLB_MAX_PROXIES_PER_TASK - 1) / LLB_MAX_PROXIES_PER_TASK;
+
+        // ---- GPU pipelines --------------------------------------------------
+        private readonly NativeComputePipeline      _resetLightProxyCountersCs;
+        private readonly NativeComputeDescriptorSet _resetLightProxyCountersDs;
+        private readonly NativeComputePipeline      _resetPastToCurrentHistoryCs;
+        private readonly NativeComputeDescriptorSet _resetPastToCurrentHistoryDs;
+        private readonly NativeComputePipeline      _computeWeightsCs;
+        private readonly NativeComputeDescriptorSet _computeWeightsDs;
+        private readonly NativeComputePipeline      _computeProxyCountsCs;
+        private readonly NativeComputeDescriptorSet _computeProxyCountsDs;
+        private readonly NativeComputePipeline      _computeProxyBaselineOffsetsCs;
+        private readonly NativeComputeDescriptorSet _computeProxyBaselineOffsetsDs;
+        private readonly NativeComputePipeline      _createProxyJobsCs;
+        private readonly NativeComputeDescriptorSet _createProxyJobsDs;
+        private readonly NativeComputePipeline      _executeProxyJobsCs;
+        private readonly NativeComputeDescriptorSet _executeProxyJobsDs;
+
+        // ---- CPU staging arrays --------------------------------------------
+        private static readonly RtxptLightingControlData[]      s_controlStaging  = new RtxptLightingControlData[1];
+        private static          RtxptPolymorphicLightInfo[]      s_lightsStaging   = new RtxptPolymorphicLightInfo[NativeRtxptBufferResources.MaxLights];
+        private static          RtxptPolymorphicLightInfoEx[]    s_lightsExStaging = new RtxptPolymorphicLightInfoEx[NativeRtxptBufferResources.MaxLights];
+
+        // ---- state set by Setup each frame ---------------------------------
+        private NativeRtxptPassContext _ctx;
+        private int                    _analyticLightCount;
+        private bool                   _ping = true; // ping-pong for weights buffer
+
+        // ====================================================================
+        // Constructor / Dispose
+        // ====================================================================
+
+        public NativeRtxptLightingPass(
+            NativeComputeShader resetLightProxyCounters,
+            NativeComputeShader resetPastToCurrentHistory,
+            NativeComputeShader computeWeights,
+            NativeComputeShader computeProxyCounts,
+            NativeComputeShader computeProxyBaselineOffsets,
+            NativeComputeShader createProxyJobs,
+            NativeComputeShader executeProxyJobs)
+        {
+            if (resetLightProxyCounters != null)
+            {
+                _resetLightProxyCountersCs = new NativeComputePipeline(resetLightProxyCounters);
+                _resetLightProxyCountersDs = new NativeComputeDescriptorSet(_resetLightProxyCountersCs);
+            }
+            if (resetPastToCurrentHistory != null)
+            {
+                _resetPastToCurrentHistoryCs = new NativeComputePipeline(resetPastToCurrentHistory);
+                _resetPastToCurrentHistoryDs = new NativeComputeDescriptorSet(_resetPastToCurrentHistoryCs);
+            }
+            if (computeWeights != null)
+            {
+                _computeWeightsCs = new NativeComputePipeline(computeWeights);
+                _computeWeightsDs = new NativeComputeDescriptorSet(_computeWeightsCs);
+            }
+            if (computeProxyCounts != null)
+            {
+                _computeProxyCountsCs = new NativeComputePipeline(computeProxyCounts);
+                _computeProxyCountsDs = new NativeComputeDescriptorSet(_computeProxyCountsCs);
+            }
+            if (computeProxyBaselineOffsets != null)
+            {
+                _computeProxyBaselineOffsetsCs = new NativeComputePipeline(computeProxyBaselineOffsets);
+                _computeProxyBaselineOffsetsDs = new NativeComputeDescriptorSet(_computeProxyBaselineOffsetsCs);
+            }
+            if (createProxyJobs != null)
+            {
+                _createProxyJobsCs = new NativeComputePipeline(createProxyJobs);
+                _createProxyJobsDs = new NativeComputeDescriptorSet(_createProxyJobsCs);
+            }
+            if (executeProxyJobs != null)
+            {
+                _executeProxyJobsCs = new NativeComputePipeline(executeProxyJobs);
+                _executeProxyJobsDs = new NativeComputeDescriptorSet(_executeProxyJobsCs);
+            }
+        }
+
+        public void Dispose()
+        {
+            _resetLightProxyCountersDs?.Dispose();       _resetLightProxyCountersCs?.Dispose();
+            _resetPastToCurrentHistoryDs?.Dispose();     _resetPastToCurrentHistoryCs?.Dispose();
+            _computeWeightsDs?.Dispose();                _computeWeightsCs?.Dispose();
+            _computeProxyCountsDs?.Dispose();            _computeProxyCountsCs?.Dispose();
+            _computeProxyBaselineOffsetsDs?.Dispose();   _computeProxyBaselineOffsetsCs?.Dispose();
+            _createProxyJobsDs?.Dispose();               _createProxyJobsCs?.Dispose();
+            _executeProxyJobsDs?.Dispose();              _executeProxyJobsCs?.Dispose();
+        }
+
+        // ====================================================================
+        // Setup – called on the main thread before RecordRenderGraph
+        // ====================================================================
+
+        public void Setup(NativeRtxptPassContext ctx)
+        {
+            _ctx = ctx;
+            _analyticLightCount = CollectAndPackLights();
+            UploadLightData();
+        }
+
+        // ====================================================================
+        // RecordRenderGraph – GPU proxy-build pipeline
+        // ====================================================================
+
+        private class PassData
+        {
+            internal NativeComputePipeline      ResetProxyCountersCs;
+            internal NativeComputeDescriptorSet ResetProxyCountersDs;
+            internal NativeComputePipeline      ResetPastToCurrentCs;
+            internal NativeComputeDescriptorSet ResetPastToCurrentDs;
+            internal NativeComputePipeline      ComputeWeightsCs;
+            internal NativeComputeDescriptorSet ComputeWeightsDs;
+            internal NativeComputePipeline      ComputeProxyCountsCs;
+            internal NativeComputeDescriptorSet ComputeProxyCountsDs;
+            internal NativeComputePipeline      ComputeProxyBaselineOffsetsCs;
+            internal NativeComputeDescriptorSet ComputeProxyBaselineOffsetsDs;
+            internal NativeComputePipeline      CreateProxyJobsCs;
+            internal NativeComputeDescriptorSet CreateProxyJobsDs;
+            internal NativeComputePipeline      ExecuteProxyJobsCs;
+            internal NativeComputeDescriptorSet ExecuteProxyJobsDs;
+            internal NativeRtxptPassContext     Ctx;
+            internal uint                       TotalLightCount;
+            internal uint                       HistoricTotalLightCount;
+            internal uint                       CurrentWeightsOffset;
+            internal uint                       HistoricWeightsOffset;
+        }
+
+        public override void RecordRenderGraph(RenderGraph renderGraph, ContextContainer frameData)
+        {
+            // Skip if any required shader is missing
+            if (_resetLightProxyCountersCs == null || _computeWeightsCs == null ||
+                _computeProxyCountsCs == null || _computeProxyBaselineOffsetsCs == null ||
+                _createProxyJobsCs == null || _executeProxyJobsCs == null)
+            {
+                Debug.LogWarning("[NativeRtxptLightingPass] One or more lighting compute shaders are missing.");
+                return;
+            }
+
+            using var builder = renderGraph.AddUnsafePass<PassData>("NativeRtxpt.LightsBaker", out var passData);
+            passData.ResetProxyCountersCs          = _resetLightProxyCountersCs;
+            passData.ResetProxyCountersDs          = _resetLightProxyCountersDs;
+            passData.ResetPastToCurrentCs          = _resetPastToCurrentHistoryCs;
+            passData.ResetPastToCurrentDs          = _resetPastToCurrentHistoryDs;
+            passData.ComputeWeightsCs              = _computeWeightsCs;
+            passData.ComputeWeightsDs              = _computeWeightsDs;
+            passData.ComputeProxyCountsCs          = _computeProxyCountsCs;
+            passData.ComputeProxyCountsDs          = _computeProxyCountsDs;
+            passData.ComputeProxyBaselineOffsetsCs = _computeProxyBaselineOffsetsCs;
+            passData.ComputeProxyBaselineOffsetsDs = _computeProxyBaselineOffsetsDs;
+            passData.CreateProxyJobsCs             = _createProxyJobsCs;
+            passData.CreateProxyJobsDs             = _createProxyJobsDs;
+            passData.ExecuteProxyJobsCs            = _executeProxyJobsCs;
+            passData.ExecuteProxyJobsDs            = _executeProxyJobsDs;
+            passData.Ctx                           = _ctx;
+            passData.TotalLightCount               = (uint)_analyticLightCount;
+            passData.HistoricTotalLightCount       = (uint)_analyticLightCount; // simple: no history tracking
+            passData.CurrentWeightsOffset          = _ping ? 0u : WeightsCountHalf;
+            passData.HistoricWeightsOffset         = _ping ? WeightsCountHalf : 0u;
+            _ping = !_ping;
+
+            builder.AllowPassCulling(false);
+            builder.SetRenderFunc((PassData d, UnsafeGraphContext c) => ExecutePass(d, c));
+        }
+
+        // ====================================================================
+        // Execute – GPU dispatch sequence
+        // ====================================================================
+
+        // DXGI format constants used for typed buffer binding
+        private const uint DXGI_FORMAT_R32_FLOAT = 41u;
+        private const uint DXGI_FORMAT_R32_UINT  = 42u;
+
+        // Buffer element strides derived from struct sizes at runtime
+        private static readonly int StrideCtrl     = Marshal.SizeOf<RtxptLightingControlData>();
+        private static readonly int StrideLights   = Marshal.SizeOf<RtxptPolymorphicLightInfo>();
+        private static readonly int StrideLightsEx = Marshal.SizeOf<RtxptPolymorphicLightInfoEx>();
+
+        private static void ExecutePass(PassData data, UnsafeGraphContext context)
+        {
+            var cmd      = CommandBufferHelpers.GetNativeCommandBuffer(context.cmd);
+            var buf      = data.Ctx.Buffers;
+            uint total   = data.TotalLightCount;
+            uint historic = data.HistoricTotalLightCount;
+
+            // Retrieve native buffer pointers
+            var pCtrl    = buf.LightControlBuffer.GetNativeBufferPtr();
+            var pLights  = buf.LightBuffer.GetNativeBufferPtr();
+            var pLightsEx= buf.LightExBuffer.GetNativeBufferPtr();
+            var pScratch = buf.LightScratchBuffer.GetNativeBufferPtr();
+            var pScrList = buf.ScratchListBuffer.GetNativeBufferPtr();
+            var pWeights = buf.LightWeightsBuffer.GetNativeBufferPtr();
+            var pHistCur = buf.HistoryRemapCurrentToPast.GetNativeBufferPtr();
+            var pHistPas = buf.HistoryRemapPastToCurrent.GetNativeBufferPtr();
+            var pProxyCnt= buf.LightProxyCounters.GetNativeBufferPtr();
+            var pProxies = buf.LightSamplingProxies.GetNativeBufferPtr();
+
+            // Buffer element counts for typed/structured bindings
+            int cCtrl    = buf.LightControlBuffer.count;
+            int cLights  = buf.LightBuffer.count;
+            int cLightsEx= buf.LightExBuffer.count;
+            int cScrList = buf.ScratchListBuffer.count;
+            int cWeights = buf.LightWeightsBuffer.count;
+            int cHistCur = buf.HistoryRemapCurrentToPast.count;
+            int cHistPas = buf.HistoryRemapPastToCurrent.count;
+            int cProxyCnt= buf.LightProxyCounters.count;
+            int cProxies = buf.LightSamplingProxies.count;
+
+            cmd.BeginSample("Rtxpt.LightsBaker");
+
+            // ---- 1. ResetLightProxyCounters --------------------------------
+            // dispatch: div_ceil(TotalLightCount+1, 128)  (+1 for the "invalid" slot)
+            {
+                var ds = data.ResetProxyCountersDs;
+                ds.SetRWStructuredBuffer("u_controlBuffer",         pCtrl,     cCtrl,     StrideCtrl);
+                ds.SetRWTypedBuffer(     "u_perLightProxyCounters", pProxyCnt, cProxyCnt, DXGI_FORMAT_R32_UINT);
+                uint gx = (total + 1 + LLB_NUM_COMPUTE_THREADS - 1) / LLB_NUM_COMPUTE_THREADS;
+                data.ResetProxyCountersCs.Dispatch(cmd, ds, gx, 1, 1);
+            }
+
+            // ---- 2. ResetPastToCurrentHistory ------------------------------
+            if (data.ResetPastToCurrentCs != null)
+            {
+                uint items = Math.Max(historic, total);
+                var ds = data.ResetPastToCurrentDs;
+                ds.SetRWStructuredBuffer("u_controlBuffer",              pCtrl,     cCtrl,     StrideCtrl);
+                ds.SetRWTypedBuffer(     "u_historyRemapPastToCurrent",  pHistPas,  cHistPas,  DXGI_FORMAT_R32_UINT);
+                uint gx = (items + LLB_NUM_COMPUTE_THREADS - 1) / LLB_NUM_COMPUTE_THREADS;
+                if (gx == 0) gx = 1;
+                data.ResetPastToCurrentCs.Dispatch(cmd, ds, gx, 1, 1);
+            }
+
+            // ---- 3. ComputeWeights -----------------------------------------
+            {
+                var ds = data.ComputeWeightsDs;
+                ds.SetRWStructuredBuffer("u_controlBuffer",             pCtrl,     cCtrl,     StrideCtrl);
+                ds.SetRWStructuredBuffer("u_lightsBuffer",              pLights,   cLights,   StrideLights);
+                ds.SetRWStructuredBuffer("u_lightsExBuffer",            pLightsEx, cLightsEx, StrideLightsEx);
+                ds.SetRWTypedBuffer(     "u_lightWeights",              pWeights,  cWeights,  DXGI_FORMAT_R32_FLOAT);
+                ds.SetRWTypedBuffer(     "u_historyRemapCurrentToPast", pHistCur,  cHistCur,  DXGI_FORMAT_R32_UINT);
+                uint gx = (total + LLB_WEIGHTS_ITEMS_PER_GROUP - 1) / LLB_WEIGHTS_ITEMS_PER_GROUP;
+                if (gx == 0) gx = 1;
+                data.ComputeWeightsCs.Dispatch(cmd, ds, gx, 1, 1);
+            }
+
+            // ---- 4. ComputeProxyCounts -------------------------------------
+            {
+                var ds = data.ComputeProxyCountsDs;
+                ds.SetRWStructuredBuffer("u_controlBuffer",         pCtrl,     cCtrl,     StrideCtrl);
+                ds.SetRWTypedBuffer(     "u_scratchList",           pScrList,  cScrList,  DXGI_FORMAT_R32_UINT);
+                ds.SetRWTypedBuffer(     "u_lightWeights",          pWeights,  cWeights,  DXGI_FORMAT_R32_FLOAT);
+                ds.SetRWTypedBuffer(     "u_perLightProxyCounters", pProxyCnt, cProxyCnt, DXGI_FORMAT_R32_UINT);
+                ds.SetRWTypedBuffer(     "u_lightSamplingProxies",  pProxies,  cProxies,  DXGI_FORMAT_R32_UINT);
+                uint gx = (total + LLB_NUM_COMPUTE_THREADS - 1) / LLB_NUM_COMPUTE_THREADS;
+                if (gx == 0) gx = 1;
+                data.ComputeProxyCountsCs.Dispatch(cmd, ds, gx, 1, 1);
+            }
+
+            // ---- 5. ComputeProxyBaselineOffsets ----------------------------
+            // Original dispatches with (1,1,1) — single thread-group for prefix-sum
+            {
+                var ds = data.ComputeProxyBaselineOffsetsDs;
+                ds.SetRWStructuredBuffer("u_controlBuffer",        pCtrl,    cCtrl,    StrideCtrl);
+                ds.SetRWTypedBuffer(     "u_lightSamplingProxies", pProxies, cProxies, DXGI_FORMAT_R32_UINT);
+                data.ComputeProxyBaselineOffsetsCs.Dispatch(cmd, ds, 1, 1, 1);
+            }
+
+            // ---- 6. CreateProxyJobs ----------------------------------------
+            {
+                var ds = data.CreateProxyJobsDs;
+                ds.SetRWStructuredBuffer("u_controlBuffer",         pCtrl,     cCtrl,     StrideCtrl);
+                ds.SetRWBuffer(          "u_scratchBuffer",         pScratch);  // RWByteAddressBuffer — no stride
+                ds.SetRWTypedBuffer(     "u_scratchList",           pScrList,  cScrList,  DXGI_FORMAT_R32_UINT);
+                ds.SetRWTypedBuffer(     "u_perLightProxyCounters", pProxyCnt, cProxyCnt, DXGI_FORMAT_R32_UINT);
+                ds.SetRWTypedBuffer(     "u_lightSamplingProxies",  pProxies,  cProxies,  DXGI_FORMAT_R32_UINT);
+                uint gx = (total + LLB_NUM_COMPUTE_THREADS - 1) / LLB_NUM_COMPUTE_THREADS;
+                if (gx == 0) gx = 1;
+                data.CreateProxyJobsCs.Dispatch(cmd, ds, gx, 1, 1);
+            }
+
+            // ---- 7. ExecuteProxyJobs ---------------------------------------
+            // ProxyBuildTaskCount is written on GPU; dispatch over max tasks, shader self-limits.
+            {
+                var ds = data.ExecuteProxyJobsDs;
+                ds.SetRWStructuredBuffer("u_controlBuffer",        pCtrl,    cCtrl,    StrideCtrl);
+                ds.SetRWBuffer(          "u_scratchBuffer",        pScratch);  // RWByteAddressBuffer — no stride
+                ds.SetRWTypedBuffer(     "u_lightSamplingProxies", pProxies, cProxies, DXGI_FORMAT_R32_UINT);
+                uint gx = (LLB_MAX_PROXY_PROC_TASKS + LLB_NUM_COMPUTE_THREADS - 1) / LLB_NUM_COMPUTE_THREADS;
+                if (gx == 0) gx = 1;
+                data.ExecuteProxyJobsCs.Dispatch(cmd, ds, gx, 1, 1);
+            }
+
+            cmd.EndSample("Rtxpt.LightsBaker");
+        }
+
+        // ====================================================================
+        // Private helpers
+        // ====================================================================
+
+        /// <summary>
+        /// Collects all enabled Point / Spot lights in the scene and packs them
+        /// into the staging arrays.  Returns the number of lights packed.
+        /// </summary>
+        private int CollectAndPackLights()
+        {
+            int count = 0;
+            var lights = Object.FindObjectsByType<Light>(FindObjectsSortMode.None);
+            foreach (var light in lights)
+            {
+                if (light == null || !light.enabled) continue;
+                if (count >= NativeRtxptBufferResources.MaxLights)
+                {
+                    Debug.LogWarning("[NativeRtxptLightingPass] MaxLights exceeded; some lights ignored.");
+                    break;
+                }
+
+                switch (light.type)
+                {
+                    case LightType.Point:
+                        PackPointLight(light, ref s_lightsStaging[count], ref s_lightsExStaging[count]);
+                        count++;
+                        break;
+                    case LightType.Spot:
+                        PackSpotLight(light, ref s_lightsStaging[count], ref s_lightsExStaging[count]);
+                        count++;
+                        break;
+                }
+            }
+            return count;
+        }
+
+        /// <summary>
+        /// Uploads packed data to the GPU buffers via <c>GraphicsBuffer.SetData</c>.
+        /// WeightsBufferOffsets are set here so the GPU shaders see correct ping-pong values.
+        /// </summary>
+        private void UploadLightData()
+        {
+            var buf = _ctx.Buffers;
+            if (buf == null) return;
+
+            // Ping-pong: _ping is toggled in RecordRenderGraph after passData is filled,
+            // so here we use the same _ping value to fill the control buffer before GPU dispatch.
+            uint currentOffset  = _ping ? 0u : WeightsCountHalf;
+            uint historicOffset = _ping ? WeightsCountHalf : 0u;
+
+            // Build control record
+            ref var ctrl = ref s_controlStaging[0];
+            ctrl = default;
+            ctrl.TotalLightCount                  = (uint)_analyticLightCount;
+            ctrl.AnalyticLightCount               = (uint)_analyticLightCount;
+            ctrl.ImportanceSamplingType           = 1; // Power-based importance sampling
+            ctrl.HistoricTotalLightCount          = (uint)_analyticLightCount;
+            // WeightsSumUINT starts at 0; GPU fills it via InterlockedAdd in ComputeWeights.
+            ctrl.WeightsSumUINT                   = 0;
+            // ProxyBuildTaskCount is filled by GPU in CreateProxyJobs.
+            ctrl.ProxyBuildTaskCount              = 0;
+            // SamplingProxyCount is filled by GPU. Pre-zero it.
+            ctrl.SamplingProxyCount               = 0;
+            // Embed baker constants ping-pong offsets inside the paddingBK region.
+            // LightsBakerConstants layout (LightingTypes.hlsli):
+            //   7 rows × 16 bytes before CurrentWeightsBufferOffset → offset 112 bytes from start.
+            // paddingBK[112/4 = 28] = CurrentWeightsBufferOffset
+            // paddingBK[29]         = HistoricWeightsBufferOffset
+            unsafe
+            {
+                ctrl._paddingBK[28] = currentOffset;   // BakerConstants.CurrentWeightsBufferOffset
+                ctrl._paddingBK[29] = historicOffset;  // BakerConstants.HistoricWeightsBufferOffset
+            }
+
+            buf.LightControlBuffer.SetData(s_controlStaging);
+
+            if (_analyticLightCount > 0)
+            {
+                buf.LightBuffer.SetData(s_lightsStaging,   0, 0, _analyticLightCount);
+                buf.LightExBuffer.SetData(s_lightsExStaging, 0, 0, _analyticLightCount);
+            }
+        }
+
+        // ====================================================================
+        // Light packing  (mirrors ConvertLight() in LightsBaker.cpp)
+        // ====================================================================
+
+        private static void PackPointLight(Light light, ref RtxptPolymorphicLightInfo info,
+                                           ref RtxptPolymorphicLightInfoEx infoEx)
+        {
+            info   = default;
+            infoEx = default;
+
+            var pos   = light.transform.position;
+            info.CenterX = pos.x;
+            info.CenterY = pos.y;
+            info.CenterZ = pos.z;
+
+            // Point light: treat as kPoint (ideal point source, radius = 0)
+            // flux = color * intensity (Unity intensity ≈ candela for Point lights)
+            Color   linear = light.color.linear;
+            Vector3 flux   = new Vector3(linear.r, linear.g, linear.b) * light.intensity;
+            PackLightColor(flux, ref info, (uint)RtxptLightType.Point);
+
+            // Direction2: full cone (PI outer, 0 inner) so the shader treats it as omni-directional
+            info.Direction2 = Fp32ToFp16(Mathf.PI) | (Fp32ToFp16(0f) << 16);
+        }
+
+        private static void PackSpotLight(Light light, ref RtxptPolymorphicLightInfo info,
+                                          ref RtxptPolymorphicLightInfoEx infoEx)
+        {
+            info   = default;
+            infoEx = default;
+
+            var pos = light.transform.position;
+            info.CenterX = pos.x;
+            info.CenterY = pos.y;
+            info.CenterZ = pos.z;
+
+            // Unity spotAngle is the full cone angle; half-angle for outer
+            float outerRad = Mathf.Deg2Rad * (light.spotAngle * 0.5f);
+            // Inner angle approximation: use 80 % of outer (Unity doesn't expose inner angle directly)
+            float innerRad = outerRad * 0.8f;
+
+            Color   linear = light.color.linear;
+            Vector3 flux   = new Vector3(linear.r, linear.g, linear.b) * light.intensity;
+
+            // Pack as kPoint with shaping so the spot cone is applied
+            PackLightColor(flux, ref info, (uint)RtxptLightType.Point);
+            info.ColorTypeAndFlags |= kShapingEnableBit;
+
+            var forward = light.transform.forward;
+            info.Direction1 = NDirToOctUnorm32(forward);
+            info.Direction2 = Fp32ToFp16(outerRad) | (Fp32ToFp16(innerRad) << 16);
+
+            // Extended shaping data
+            infoEx.PrimaryAxis             = NDirToOctUnorm32(forward);
+            float softness                 = 1f - (innerRad / outerRad);
+            infoEx.CosConeAngleAndSoftness = Fp32ToFp16(Mathf.Cos(outerRad)) |
+                                             (Fp32ToFp16(Mathf.Clamp01(softness)) << 16);
+        }
+
+        // ====================================================================
+        // Encoding helpers (mirrors LightsBaker.cpp / PolymorphicLight.h)
+        // ====================================================================
+
+        /// <summary>
+        /// Encodes <paramref name="color"/> into <c>ColorTypeAndFlags</c> + <c>LogRadiance</c>.
+        /// Mirrors <c>packLightColor()</c> in <c>LightsBaker.cpp</c>.
+        /// </summary>
+        private static void PackLightColor(Vector3 color, ref RtxptPolymorphicLightInfo info, uint typeCode)
+        {
+            info.ColorTypeAndFlags = typeCode << (int)kTypeShift;
+
+            float maxRadiance = Mathf.Max(color.x, Mathf.Max(color.y, color.z));
+            if (maxRadiance <= 0f) return;
+
+            float logN = Mathf.Clamp01(
+                (Mathf.Log(maxRadiance, 2f) - kMinLog2Radiance) / (kMaxLog2Radiance - kMinLog2Radiance));
+            uint packedRadiance = (uint)Mathf.Min(Mathf.Ceil(logN * 65534f) + 1f, 0xFFFF);
+
+            // Unpack to find the quantised radiance used for colour normalisation
+            float unpackedRadiance = Mathf.Pow(2f,
+                ((packedRadiance - 1f) / 65534f) * (kMaxLog2Radiance - kMinLog2Radiance) + kMinLog2Radiance);
+
+            float r = Mathf.Clamp01(color.x / unpackedRadiance);
+            float g = Mathf.Clamp01(color.y / unpackedRadiance);
+            float b = Mathf.Clamp01(color.z / unpackedRadiance);
+
+            uint r8 = (uint)Mathf.RoundToInt(r * 255f) & 0xFFu;
+            uint g8 = (uint)Mathf.RoundToInt(g * 255f) & 0xFFu;
+            uint b8 = (uint)Mathf.RoundToInt(b * 255f) & 0xFFu;
+
+            info.ColorTypeAndFlags |= r8 | (g8 << 8) | (b8 << 16);
+            info.LogRadiance        = packedRadiance;
+        }
+
+        /// <summary>
+        /// Encodes a unit direction vector into an oct-mapped 32-bit value.
+        /// Mirrors <c>NDirToOctUnorm32()</c> in <c>LightsBaker.cpp</c>.
+        /// </summary>
+        private static uint NDirToOctUnorm32(Vector3 n)
+        {
+            // Project onto L1 sphere
+            float absSum = Mathf.Abs(n.x) + Mathf.Abs(n.y) + Mathf.Abs(n.z);
+            float px = n.x / absSum;
+            float py = n.y / absSum;
+
+            if (n.z < 0f)
+            {
+                float ox = (1f - Mathf.Abs(py)) * (px >= 0f ? 1f : -1f);
+                float oy = (1f - Mathf.Abs(px)) * (py >= 0f ? 1f : -1f);
+                px = ox;
+                py = oy;
+            }
+
+            // Map from [-1,1] to [0,1], then multiply by 0.5 + 0.5 again (matches C++ saturate(p*0.5+0.5))
+            px = Mathf.Clamp01(px * 0.5f + 0.5f);
+            py = Mathf.Clamp01(py * 0.5f + 0.5f);
+
+            uint ux = (uint)Mathf.RoundToInt(px * 0xFFFEu);
+            uint uy = (uint)Mathf.RoundToInt(py * 0xFFFEu);
+            return ux | (uy << 16);
+        }
+
+        /// <summary>
+        /// Converts a float32 value to a float16 bit pattern (returned as uint).
+        /// Mirrors <c>fp32ToFp16()</c> in <c>LightsBaker.cpp</c>.
+        /// </summary>
+        private static uint Fp32ToFp16(float v)
+        {
+            // Use Unity's built-in Mathf.FloatToHalf equivalent via bit manipulation
+            // Simple approach: clamp to fp16 range then convert
+            uint u = (uint)BitConverter.ToInt32(BitConverter.GetBytes(v), 0);
+            // Apply the 2^-112 multiplier trick to flush subnormals
+            float scaled = v * 1.9259299444e-34f; // 2^-112
+            uint s = (uint)BitConverter.ToInt32(BitConverter.GetBytes(scaled), 0);
+            uint sign = u & 0x80000000u;
+            uint body = s & 0x0FFFFFFFu;
+            return ((sign >> 16) | (body >> 13)) & 0xFFFFu;
+        }
+    }
+}

@@ -168,4 +168,106 @@ namespace PathTracing
         public const uint AlphaOffsetMask   = 0xFF000000u;
         public const int  AlphaOffsetOffset = 24;
     }
+
+    // =========================================================================
+    // RTXPT Lighting structs
+    // Mirror PolymorphicLight.h / LightingTypes.hlsli
+    // =========================================================================
+
+    /// <summary>
+    /// RTXPT polymorphic light type codes.
+    /// Mirrors <c>PolymorphicLightType</c> in <c>PolymorphicLight.h</c>.
+    /// </summary>
+    public enum RtxptLightType : uint
+    {
+        Sphere         = 0,
+        Triangle       = 1,
+        Directional    = 2,
+        Environment    = 3,
+        Point          = 4,
+        EnvironmentQuad = 5,
+    }
+
+    /// <summary>
+    /// Per-light GPU data. Mirrors <c>PolymorphicLightInfo</c> in <c>PolymorphicLight.h</c>.
+    /// Size = 2 × uint4 = 32 bytes.
+    /// Shader binding: <c>StructuredBuffer&lt;PolymorphicLightInfo&gt; t_Lights : register(t13)</c>
+    /// </summary>
+    [StructLayout(LayoutKind.Sequential, Pack = 4)]
+    public struct RtxptPolymorphicLightInfo
+    {
+        // uint4[0]: position + packed color/type
+        public float CenterX;
+        public float CenterY;
+        public float CenterZ;
+        public uint  ColorTypeAndFlags;  // R8G8B8 chroma | type<<24 | flags<<28
+
+        // uint4[1]: direction / scalar encodings + log-radiance
+        public uint Direction1;    // oct-encoded normal (for triangles/directionals)
+        public uint Direction2;    // oct-encoded or fp16 cone angle pair (for spots)
+        public uint Scalars;       // fp16 pair: e.g. sphere radius
+        public uint LogRadiance;   // uint16 log2-encoded radiance magnitude
+    } // 32 bytes
+
+    /// <summary>
+    /// Extended per-light data (shaping / IES). Mirrors <c>PolymorphicLightInfoEx</c>.
+    /// Size = 1 × uint4 = 16 bytes.
+    /// Shader binding: <c>StructuredBuffer&lt;PolymorphicLightInfoEx&gt; t_LightsEx : register(t14)</c>
+    /// </summary>
+    [StructLayout(LayoutKind.Sequential, Pack = 4)]
+    public struct RtxptPolymorphicLightInfoEx
+    {
+        public uint IesProfileIndex;
+        public uint PrimaryAxis;               // oct-encoded spot/IES primary axis
+        public uint CosConeAngleAndSoftness;   // fp16 pair: cos(outerAngle) | softness
+        public uint UniqueID;                  // debug-only hash
+    } // 16 bytes
+
+    /// <summary>
+    /// Single-element control buffer read by the path tracer each frame.
+    /// Mirrors <c>LightingControlData</c> in <c>LightingTypes.hlsli</c>.
+    /// Size = 112 + 464 (paddingBK) = 576 bytes.
+    /// Shader binding: <c>StructuredBuffer&lt;LightingControlData&gt; t_LightsCB : register(t12)</c>
+    /// </summary>
+    [StructLayout(LayoutKind.Sequential, Pack = 4)]
+    public unsafe struct RtxptLightingControlData
+    {
+        public uint  TotalLightCount;
+        public uint  EnvmapQuadNodeCount;
+        public uint  AnalyticLightCount;
+        public uint  TriangleLightCount;
+
+        public uint  SamplingProxyCount;
+        public uint  HistoricTotalLightCount;
+        public uint  LastFrameTemporalFeedbackAvailable;
+        public uint  LastFrameLocalSamplesAvailable;
+
+        public uint  ProxyBuildTaskCount;
+        public uint  WeightsSumUINT;
+        public uint  ImportanceSamplingType;   // 0=Uniform, 1=Power, 2=NEE-AT
+        public uint  _padding0;
+
+        public uint  TemporalFeedbackRequired;
+        public uint  TotalMaxFeedbackCount;
+        public float GlobalFeedbackUseWeight;
+        public float LocalToGlobalSampleRatio;
+
+        public uint  TileBufferHeight;
+        public float ScreenSpaceVsWorldSpaceThreshold;
+        public uint  LocalSamplingResolutionX;
+        public uint  LocalSamplingResolutionY;
+
+        public uint  LocalSamplingTileJitterX;
+        public uint  LocalSamplingTileJitterY;
+        public uint  LocalSamplingTileJitterPrevX;
+        public uint  LocalSamplingTileJitterPrevY;
+
+        public uint  ValidFeedbackCount;
+        public uint  _padding1;
+        public uint  _padding2;
+        public uint  _padding3;
+
+        // Padding for LightsBakerConstants (unused in non-baker path, 464 bytes = 116 uints)
+        public fixed uint _paddingBK[116];
+    } // 576 bytes
 }

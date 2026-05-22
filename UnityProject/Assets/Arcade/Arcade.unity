@@ -359,6 +359,7 @@ GameObject:
   - component: {fileID: 307774786}
   - component: {fileID: 307774785}
   - component: {fileID: 307774784}
+  - component: {fileID: 307774788}
   m_Layer: 0
   m_Name: Sphere
   m_TagString: Untagged
@@ -382,39 +383,39 @@ MonoBehaviour:
   _isStaticObject: 0
   meshRenderer: {fileID: 307774785}
   SubmeshMaterialInfos:
-  - material: {fileID: 2100000, guid: 76c9db36e1258f748be8273f6327bbf5, type: 2}
-    isTransparent: 0
+  - material: {fileID: 2100000, guid: 55b68156422e3434fab86ffc7561984d, type: 2}
+    isTransparent: 1
     isEmissive: 0
     isAlphaClip: 0
     textures:
     - {fileID: 0}
-    - {fileID: 2800000, guid: 6c62655ee373e5d4bbc47bc437aa474d, type: 3}
     - {fileID: 0}
     - {fileID: 0}
-    baseColor: {r: 1, g: 1, b: 1, a: 1}
+    - {fileID: 0}
+    baseColor: {r: 1, g: 1, b: 1, a: 0.2627451}
     emissionColor: {r: 0, g: 0, b: 0, a: 1}
     metallic: 1
-    roughnessScale: 0.050000012
+    roughnessScale: 0
     normalScale: 1
   SubmeshGroups:
-  - isTransparent: 0
+  - isTransparent: 1
     isEmissive: 0
     isAlphaClip: 0
     submeshIndices: 00000000
     materialDatas:
-    - material: {fileID: 2100000, guid: 76c9db36e1258f748be8273f6327bbf5, type: 2}
-      isTransparent: 0
+    - material: {fileID: 2100000, guid: 55b68156422e3434fab86ffc7561984d, type: 2}
+      isTransparent: 1
       isEmissive: 0
       isAlphaClip: 0
       textures:
       - {fileID: 0}
-      - {fileID: 2800000, guid: 6c62655ee373e5d4bbc47bc437aa474d, type: 3}
       - {fileID: 0}
       - {fileID: 0}
-      baseColor: {r: 1, g: 1, b: 1, a: 1}
+      - {fileID: 0}
+      baseColor: {r: 1, g: 1, b: 1, a: 0.2627451}
       emissionColor: {r: 0, g: 0, b: 0, a: 1}
       metallic: 1
-      roughnessScale: 0.050000012
+      roughnessScale: 0
       normalScale: 1
 --- !u!23 &307774785
 MeshRenderer:
@@ -482,12 +483,54 @@ Transform:
   m_GameObject: {fileID: 307774783}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 1.087, y: 0.569, z: 1.098}
+  m_LocalPosition: {x: -0.089, y: 0.569, z: 1.677}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &307774788
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 307774783}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: e198bd8f1fa7c2340822fa968f5c1be3, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::PathTracing.NativeRtxptMaterialOverride
+  Slots:
+  - SourceMaterial: {fileID: 2100000, guid: 55b68156422e3434fab86ffc7561984d, type: 2}
+    BaseOrDiffuseTexture: {fileID: 0}
+    NormalTexture: {fileID: 0}
+    MetalRoughTexture: {fileID: 0}
+    EmissiveTexture: {fileID: 0}
+    OcclusionTexture: {fileID: 0}
+    TransmissionTexture: {fileID: 0}
+    BaseOrDiffuseColor: {r: 1, g: 1, b: 1, a: 0.2627451}
+    SpecularColor: {r: 1, g: 1, b: 1, a: 1}
+    EmissiveColor: {r: 0, g: 0, b: 0, a: 1}
+    VolumeAttenuationColor: {r: 1, g: 1, b: 1, a: 1}
+    Roughness: 0
+    Metalness: 1
+    Opacity: 0.2627451
+    NormalTextureScale: 1
+    AlphaCutoff: 0.55
+    IoR: 1.5
+    TransmissionFactor: 0
+    DiffuseTransmissionFactor: 0
+    ThicknessFactor: 0
+    VolumeAttenuationDistance: 3.4028235e+38
+    ShadowNoLFadeout: 0
+    ThinSurface: 1
+    MetalnessInRedChannel: 0
+    PSDExclude: 0
+    IgnoreMeshTangentSpace: 0
+    PSDDominantDeltaLobe: -1
+    NestedPriority: 0
+    PSDBlockMotionVectorsAtSurfaceType: 0
 --- !u!1001 &308568790
 PrefabInstance:
   m_ObjectHideFlags: 0
@@ -2046,7 +2089,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 0
+  m_IsActive: 1
 --- !u!114 &1197924014
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -2087,7 +2130,7 @@ Light:
   serializedVersion: 12
   m_Type: 2
   m_Color: {r: 0, g: 1, b: 0.27466083, a: 1}
-  m_Intensity: 1.6
+  m_Intensity: 318.45
   m_Range: 1.4841788
   m_SpotAngle: 30
   m_InnerSpotAngle: 21.80208
@@ -2150,7 +2193,7 @@ Transform:
   m_GameObject: {fileID: 1197924013}
   serializedVersion: 2
   m_LocalRotation: {x: -0.015474296, y: 0.9245826, z: -0.005496519, w: -0.3806276}
-  m_LocalPosition: {x: 0.832, y: 0.832, z: -0.332}
+  m_LocalPosition: {x: 0.439, y: 0.832, z: -1.211}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -3063,39 +3106,39 @@ MonoBehaviour:
   _isStaticObject: 0
   meshRenderer: {fileID: 1994543430}
   SubmeshMaterialInfos:
-  - material: {fileID: 2100000, guid: 76c9db36e1258f748be8273f6327bbf5, type: 2}
-    isTransparent: 0
+  - material: {fileID: 2100000, guid: 55b68156422e3434fab86ffc7561984d, type: 2}
+    isTransparent: 1
     isEmissive: 0
     isAlphaClip: 0
     textures:
     - {fileID: 0}
-    - {fileID: 2800000, guid: 6c62655ee373e5d4bbc47bc437aa474d, type: 3}
     - {fileID: 0}
     - {fileID: 0}
-    baseColor: {r: 1, g: 1, b: 1, a: 1}
+    - {fileID: 0}
+    baseColor: {r: 1, g: 1, b: 1, a: 0.2627451}
     emissionColor: {r: 0, g: 0, b: 0, a: 1}
     metallic: 1
-    roughnessScale: 0.050000012
+    roughnessScale: 0
     normalScale: 1
   SubmeshGroups:
-  - isTransparent: 0
+  - isTransparent: 1
     isEmissive: 0
     isAlphaClip: 0
     submeshIndices: 00000000
     materialDatas:
-    - material: {fileID: 2100000, guid: 76c9db36e1258f748be8273f6327bbf5, type: 2}
-      isTransparent: 0
+    - material: {fileID: 2100000, guid: 55b68156422e3434fab86ffc7561984d, type: 2}
+      isTransparent: 1
       isEmissive: 0
       isAlphaClip: 0
       textures:
       - {fileID: 0}
-      - {fileID: 2800000, guid: 6c62655ee373e5d4bbc47bc437aa474d, type: 3}
       - {fileID: 0}
       - {fileID: 0}
-      baseColor: {r: 1, g: 1, b: 1, a: 1}
+      - {fileID: 0}
+      baseColor: {r: 1, g: 1, b: 1, a: 0.2627451}
       emissionColor: {r: 0, g: 0, b: 0, a: 1}
       metallic: 1
-      roughnessScale: 0.050000012
+      roughnessScale: 0
       normalScale: 1
 --- !u!23 &1994543430
 MeshRenderer:
@@ -3163,7 +3206,7 @@ Transform:
   m_GameObject: {fileID: 1994543428}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 1.435, y: -0.055, z: 0.97}
+  m_LocalPosition: {x: 1.435, y: 0.5, z: 0.97}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []

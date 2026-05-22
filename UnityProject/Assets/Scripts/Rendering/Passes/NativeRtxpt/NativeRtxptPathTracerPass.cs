@@ -236,6 +236,8 @@ namespace PathTracing
 
             ds.SetBuffer("t_LightProxyCounters", buf.LightProxyCounters.GetNativeBufferPtr());
 
+            ds.SetBuffer("t_LightProxyIndices", buf.LightSamplingProxies.GetNativeBufferPtr());
+
             ds.SetBuffer("t_LightLocalSamplingBuffer", buf.LocalSamplingBuffer.GetNativeBufferPtr());
 
             ds.SetStructuredBuffer("t_LightsEx", buf.LightExBuffer);

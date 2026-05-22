@@ -1,4 +1,5 @@
 using System;
+using System.Runtime.InteropServices;
 using Unity.Mathematics;
 using UnityEngine;
 using UnityEngine.Rendering;
@@ -97,16 +98,32 @@ namespace PathTracing
         /// <summary>Local sampling scratch buffer.</summary>
         public GraphicsBuffer LocalSamplingBuffer;
 
+        /// <summary>
+        /// Per-light weight values, ping-pong. 2 × (MaxLights+1) float elements.
+        /// HLSL: u_lightWeights (u5). CurrentWeightsBufferOffset / HistoricWeightsBufferOffset select the half.
+        /// </summary>
+        public GraphicsBuffer LightWeightsBuffer;
+
+        /// <summary>
+        /// Typed uint scratch list used by ComputeProxyCounts / CreateProxyJobs.
+        /// MaxLights uint elements.
+        /// HLSL: u_scratchList (u4).
+        /// </summary>
+        public GraphicsBuffer ScratchListBuffer;
+
         // ── Resolved resolution ───────────────────────────────────────────────
         public int2 renderResolution { get; private set; }
 
         // Scratch buffer size (heuristic: 16 ints per light entry).
         private const int ScratchElementCount = MaxLights * 16;
 
-        // Proxy buffer sizes (heuristic defaults; can be adjusted for scene complexity).
-        private const int ProxyCounterCount = 1024;
+        // Proxy buffer sizes. ProxyCounterCount must be >= MaxLights (indexed by lightIndex).
+        private const int ProxyCounterCount = MaxLights;
         private const int ProxySamplingCount = MaxLights * 4;
         private const int LocalSamplingCount = MaxLights;
+
+        // LightWeights ping-pong half-count: mirrors RTXPT_LIGHTING_WEIGHTS_COUNT_HALF = MaxLights+1.
+        private const int WeightsCountHalf = MaxLights + 1;
 
         /// <summary>
         /// Allocates or reallocates all resolution-dependent buffers.
@@ -157,21 +174,21 @@ namespace PathTracing
                 1, 64)
             { name = "Rtxpt_FeedbackBuffer" };
 
-            // LightControlBuffer — single 256-byte element (pad to 256 for CBV alignment).
+            // LightControlBuffer — single RtxptLightingControlData element (576 bytes).
             LightControlBuffer = new GraphicsBuffer(
                 GraphicsBuffer.Target.Structured,
-                1, 256)
+                1, Marshal.SizeOf<RtxptLightingControlData>())
             { name = "Rtxpt_LightControlBuffer" };
 
-            // LightBuffer / LightExBuffer — placeholder stride of 64B; TODO: match LightData struct.
+            // LightBuffer / LightExBuffer — match PolymorphicLightInfo (32B) and PolymorphicLightInfoEx (16B).
             LightBuffer = new GraphicsBuffer(
                 GraphicsBuffer.Target.Structured,
-                MaxLights, 64)
+                MaxLights, Marshal.SizeOf<RtxptPolymorphicLightInfo>())
             { name = "Rtxpt_LightBuffer" };
 
             LightExBuffer = new GraphicsBuffer(
                 GraphicsBuffer.Target.Structured,
-                MaxLights, 32)
+                MaxLights, Marshal.SizeOf<RtxptPolymorphicLightInfoEx>())
             { name = "Rtxpt_LightExBuffer" };
 
             LightScratchBuffer = new GraphicsBuffer(
@@ -203,6 +220,18 @@ namespace PathTracing
                 GraphicsBuffer.Target.Raw,
                 LocalSamplingCount, 4)
             { name = "Rtxpt_LocalSamplingBuffer" };
+
+            // LightWeightsBuffer: 2 halves of (MaxLights+1) floats for ping-pong historic weights.
+            LightWeightsBuffer = new GraphicsBuffer(
+                GraphicsBuffer.Target.Structured,
+                2 * WeightsCountHalf, 4)
+            { name = "Rtxpt_LightWeightsBuffer" };
+
+            // ScratchListBuffer: uint typed scratch for proxy count prefix-sum and job list.
+            ScratchListBuffer = new GraphicsBuffer(
+                GraphicsBuffer.Target.Structured,
+                MaxLights, 4)
+            { name = "Rtxpt_ScratchListBuffer" };
         }
 
         private void ReleaseResolutionBuffers()
@@ -225,6 +254,8 @@ namespace PathTracing
             LightProxyCounters?.Release();       LightProxyCounters       = null;
             LightSamplingProxies?.Release();     LightSamplingProxies     = null;
             LocalSamplingBuffer?.Release();      LocalSamplingBuffer      = null;
+            LightWeightsBuffer?.Release();       LightWeightsBuffer       = null;
+            ScratchListBuffer?.Release();        ScratchListBuffer        = null;
         }
 
         public void Dispose()
