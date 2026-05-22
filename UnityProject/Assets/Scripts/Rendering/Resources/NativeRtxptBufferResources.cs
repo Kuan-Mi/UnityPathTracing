@@ -118,9 +118,16 @@ namespace PathTracing
         private const int ScratchElementCount = MaxLights * 16;
 
         // Proxy buffer sizes. ProxyCounterCount must be >= MaxLights (indexed by lightIndex).
-        private const int ProxyCounterCount = MaxLights;
-        private const int ProxySamplingCount = MaxLights * 4;
-        private const int LocalSamplingCount = MaxLights;
+        // ProxySamplingCount must hold worst-case SamplingProxyCount from GPU:
+        //   HLSL budget = RTXPT_LIGHTING_SAMPLING_PROXY_RATIO * max(TotalLightCount, RTXPT_LIGHTING_MAX_LIGHTS/10)
+        //              = 12 * max(N, 524288/10) → max ~629,136 proxies when N is small.
+        //   Each light is additionally capped at RTXPT_LIGHTING_MAX_SAMPLING_PROXIES_PER_LIGHT-1=262143,
+        //   but the total never exceeds the budget, so 630k is a safe upper bound.
+        private const int HlslMaxLights       = 512 * 1024;   // RTXPT_LIGHTING_MAX_LIGHTS compiled into shaders
+        private const int HlslProxyRatio      = 12;           // RTXPT_LIGHTING_SAMPLING_PROXY_RATIO
+        private const int ProxyCounterCount   = MaxLights + 1; // +1: HLSL uses [TotalLightCount] for invalid-feedback count
+        internal const int ProxySamplingCount = HlslProxyRatio * (HlslMaxLights / 10) + 4096; // ~633k
+        private const int LocalSamplingCount  = MaxLights;
 
         // LightWeights ping-pong half-count: mirrors RTXPT_LIGHTING_WEIGHTS_COUNT_HALF = MaxLights+1.
         private const int WeightsCountHalf = MaxLights + 1;

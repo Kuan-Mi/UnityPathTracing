@@ -46,13 +46,14 @@ namespace PathTracing
         // WeightsBufferOffset ping-pong half: mirrors RTXPT_LIGHTING_WEIGHTS_COUNT_HALF = MaxLights+1
         private const uint WeightsCountHalf = NativeRtxptBufferResources.MaxLights + 1;
 
-        // For ExecuteProxyJobs we dispatch over LLB_MAX_PROXY_PROC_TASKS which is computed from
-        // RTXPT_LIGHTING_MAX_LIGHTS (compiled constant). We approximate conservatively using MaxLights.
-        // The shader guards with ProxyBuildTaskCount, so extra threads are no-ops.
+        // For ExecuteProxyJobs we dispatch over LLB_MAX_PROXY_PROC_TASKS which must cover
+        // the actual ProxyBuildTaskCount written by CreateProxyJobs on the GPU.
+        // ProxyBuildTaskCount = TotalLightCount + ceil(SamplingProxyCount / LLB_MAX_PROXIES_PER_TASK).
+        // Use ProxySamplingCount (the buffer size) as the upper bound for proxy tasks.
         private const uint LLB_MAX_PROXIES_PER_TASK      = 32;
         private static readonly uint LLB_MAX_PROXY_PROC_TASKS =
             (uint)NativeRtxptBufferResources.MaxLights +
-            ((uint)NativeRtxptBufferResources.MaxLights * 12 + LLB_MAX_PROXIES_PER_TASK - 1) / LLB_MAX_PROXIES_PER_TASK;
+            ((uint)NativeRtxptBufferResources.ProxySamplingCount + LLB_MAX_PROXIES_PER_TASK - 1) / LLB_MAX_PROXIES_PER_TASK;
 
         // ---- GPU pipelines --------------------------------------------------
         private readonly NativeComputePipeline      _resetLightProxyCountersCs;
@@ -88,6 +89,9 @@ namespace PathTracing
         private static uint s_weightsReadbackOffset; // which offset was current when we dispatched
         private static bool s_ctrlReadbackPending;
         private static AsyncGPUReadbackRequest s_ctrlReadback;
+        private static bool s_proxyCntReadbackPending;
+        private static uint s_proxyCntReadbackLightCount;
+        private static bool s_proxiesReadbackPending;
 
         // ====================================================================
         // Constructor / Dispose
@@ -367,6 +371,8 @@ namespace PathTracing
                 ds.SetRWTypedBuffer(     "u_lightSamplingProxies", pProxies, cProxies, DXGI_FORMAT_R32_UINT);
                 uint gx = (LLB_MAX_PROXY_PROC_TASKS + LLB_NUM_COMPUTE_THREADS - 1) / LLB_NUM_COMPUTE_THREADS;
                 if (gx == 0) gx = 1;
+                
+                Debug.Log($"[Lighting] Dispatching ExecuteProxyJobs: ProxyBuildTaskCount=unknown (GPU-written)  dispatch gx={gx} over max {LLB_MAX_PROXY_PROC_TASKS} tasks");
                 data.ExecuteProxyJobsCs.Dispatch(cmd, ds, gx, 1, 1);
             }
 
@@ -388,6 +394,21 @@ namespace PathTracing
                 cmd.RequestAsyncReadback(buf.LightControlBuffer, OnCtrlReadback);
                 s_ctrlReadbackPending = true;
             }
+
+            // Readback per-light proxy counters to verify proxy distribution.
+            if (!s_proxyCntReadbackPending)
+            {
+                s_proxyCntReadbackLightCount = total;
+                cmd.RequestAsyncReadback(buf.LightProxyCounters, OnProxyCountersReadback);
+                s_proxyCntReadbackPending = true;
+            }
+
+            // Readback first few proxy list entries to verify light indices stored.
+            if (!s_proxiesReadbackPending)
+            {
+                cmd.RequestAsyncReadback(buf.LightSamplingProxies, Mathf.Min(16, buf.LightSamplingProxies.count) * sizeof(uint), 0, OnProxiesReadback);
+                s_proxiesReadbackPending = true;
+            }
         }
 
         private static void OnCtrlReadback(AsyncGPUReadbackRequest req)
@@ -404,6 +425,29 @@ namespace PathTracing
                       $"  WeightsSum={weightsSumF:F4} (raw={c.WeightsSumUINT})");
             if (c.SamplingProxyCount == 0)
                 Debug.LogWarning("[Lighting][Readback] SamplingProxyCount=0 → NEE skipped!");
+        }
+
+        private static void OnProxyCountersReadback(AsyncGPUReadbackRequest req)
+        {
+            s_proxyCntReadbackPending = false;
+            if (req.hasError) { Debug.LogError("[Lighting][Readback] LightProxyCounters error."); return; }
+            var data = req.GetData<uint>();
+            uint lightCount = s_proxyCntReadbackLightCount;
+            var sb = new System.Text.StringBuilder("[Lighting][Readback] ProxyCounters:");
+            for (uint i = 0; i < lightCount && i < (uint)data.Length; i++)
+                sb.Append($"  [{i}]={data[(int)i]}");
+            Debug.Log(sb.ToString());
+        }
+
+        private static void OnProxiesReadback(AsyncGPUReadbackRequest req)
+        {
+            s_proxiesReadbackPending = false;
+            if (req.hasError) { Debug.LogError("[Lighting][Readback] LightSamplingProxies error."); return; }
+            var data = req.GetData<uint>();
+            var sb = new System.Text.StringBuilder("[Lighting][Readback] ProxyList[0.." + (data.Length - 1) + "]:");
+            for (int i = 0; i < data.Length; i++)
+                sb.Append($"  [{i}]=0x{data[i]:X8}");
+            Debug.Log(sb.ToString());
         }
 
         private static void OnWeightsReadback(AsyncGPUReadbackRequest req)
