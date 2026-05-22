@@ -42,11 +42,11 @@ namespace PathTracing
         private readonly NativeComputeDescriptorSet _importanceBakerDs;
 
         // ── Owned render textures ───────────────────────────────────────────
-        private RenderTexture _envCubeMip0Rt; // 256×256 Cube RGBA16F  UAV+SRV
-        private RenderTexture _envCubeMip1Rt; // 128×128 Cube RGBA16F  UAV       (BaseLayerCS dst1)
-        private RenderTexture _importanceMapRt; // 1024×1024 2D RFloat   UAV
-        private RenderTexture _radianceMapRt; // 1024×1024 2D RGBA16F  UAV       (importance baker side output)
-        private RenderTexture _dummyCubeRt; // 4×4 Cube RGBA8        dummy SRV for unused cube slots
+        private RenderTexture _envCubeMip0Rt;        // 256×256 Cube RGBA16F  UAV   (BaseLayerCS dst0)
+        private RenderTexture _envCubeMip1Rt;        // 128×128 Cube RGBA16F  UAV   (BaseLayerCS dst1)
+        private RenderTexture _importanceMapRt;      // 1024×1024 2D RFloat   UAV
+        private RenderTexture _radianceMapRt;        // 1024×1024 2D RGBA16F  UAV   (importance baker side output)
+        private RenderTexture _dummyCubeRt;          // 4×4 Cube RGBA8        dummy SRV for unused cube slots
 
         // ── Constant buffers ────────────────────────────────────────────────
         private GraphicsBuffer _envBakerCb; // EnvMapBakerConstants            (704 bytes)
@@ -59,6 +59,13 @@ namespace PathTracing
         // ── Per-frame state ─────────────────────────────────────────────────
         private NativeRtxptPassContext _ctx;
         private bool                   _shadersReady;
+        private int                    _dbgFrameCounter;
+
+        // ── GPU readback state (static: ExecutePass callback is static) ────
+        private static bool                    s_importanceReadbackPending;
+        private static AsyncGPUReadbackRequest s_importanceReadback;
+        private static bool                    s_envCubeReadbackPending;
+        private static AsyncGPUReadbackRequest s_envCubeReadback;
 
         // ====================================================================
         // Constructor / Dispose
@@ -105,9 +112,21 @@ namespace PathTracing
 
         public void Setup(NativeRtxptPassContext ctx)
         {
+            _dbgFrameCounter++;
             _ctx = ctx;
             EnsureRenderTextures();
             EnsureConstantBuffers();
+
+            // ── Throttled setup log ────────────────────────────────────────
+            if ((_dbgFrameCounter % 60) == 1)
+            {
+                Debug.Log($"[EnvMapBaker] Setup frame={_dbgFrameCounter}" +
+                          $"  BaseLayerCs={_baseLayerCs != null}  ImportanceBakerCs={_importanceBakerCs != null}" +
+                          $"  ShadersReady={_shadersReady}" +
+                          $"  envCubeMip0=({_envCubeMip0Rt != null && _envCubeMip0Rt.IsCreated()})" +
+                          $"  importanceMap=({_importanceMapRt != null && _importanceMapRt.IsCreated()})" +
+                          $"  skyTex={ctx.Setting?.environmentMap != null}");
+            }
 
             // Collect directional lights and upload to GPU
             FillEnvBakerConstants(ctx.Setting);
@@ -116,9 +135,27 @@ namespace PathTracing
             FillImportanceBakerConstants();
             _importanceBakerCb.SetData(s_importanceBytes);
 
-            // Expose baked pointers to downstream passes
+            // ── Log parsed CB content every 60 frames ──────────────────────
+            if ((_dbgFrameCounter % 60) == 1)
+                LogEnvBakerCbContent(ctx.Setting);
+
+            // ── Request async readback of previous frame's baked textures ──
+            if (!s_importanceReadbackPending && _importanceMapRt != null && _importanceMapRt.IsCreated())
+            {
+                s_importanceReadbackPending = true;
+                s_importanceReadback = AsyncGPUReadback.Request(_importanceMapRt, 0, OnImportanceMapReadback);
+            }
+            if (!s_envCubeReadbackPending && _envCubeMip0Rt != null && _envCubeMip0Rt.IsCreated())
+            {
+                s_envCubeReadbackPending = true;
+                // Read only face 0 (srcZ=0, srcDepth=1) of the 256×256 cubemap
+                s_envCubeReadback = AsyncGPUReadback.Request(_envCubeMip0Rt, 0,
+                    0, CubeDim, 0, CubeDim, 0, 1, OnEnvCubeReadback);
+            }
+
+            // Expose baked pointers to downstream passes.
             ctx.BakedEnvCubePtr     = _envCubeMip0Rt.IsCreated() ? _envCubeMip0Rt.GetNativeTexturePtr() : IntPtr.Zero;
-            ctx.EnvImportanceMapPtr = _importanceMapRt.IsCreated() ? _importanceMapRt.GetNativeTexturePtr() : IntPtr.Zero;
+            ctx.EnvImportanceMapPtr = _importanceMapRt.IsCreated()      ? _importanceMapRt.GetNativeTexturePtr()      : IntPtr.Zero;
         }
 
         // ====================================================================
@@ -138,22 +175,36 @@ namespace PathTracing
             public IntPtr ImportanceBakerCbPtr;
 
             // Texture ptrs
-            public IntPtr SkyTexturePtr; // SRV equirect input (may be blackTexture)
-            public IntPtr EnvCubeMip0Ptr; // UAV cube mip0 output + SRV for importance baker
-            public IntPtr EnvCubeMip1Ptr; // UAV cube mip1 output
-            public IntPtr ImportanceMapPtr; // UAV importance map output
-            public IntPtr RadianceMapPtr; // UAV radiance map output
-            public IntPtr DummyCubePtr; // dummy SRV for unused TextureCube slots
-            public IntPtr DummyTex2DPtr; // dummy SRV for unused Texture2D slots
+            public IntPtr SkyTexturePtr;            // SRV equirect input (may be blackTexture)
+            public IntPtr EnvCubeMip0Ptr;           // UAV cube mip0 output (BaseLayerCS write)
+            public IntPtr EnvCubeMip1Ptr;           // UAV cube mip1 output
+            public IntPtr ImportanceMapPtr;         // UAV importance map output (mip0)
+            public IntPtr RadianceMapPtr;           // UAV radiance map output (mip0)
+            public RenderTexture ImportanceMapRt;   // ref for cmd.GenerateMips
+            public RenderTexture RadianceMapRt;     // ref for cmd.GenerateMips
+            public IntPtr DummyCubePtr;             // dummy SRV for unused TextureCube slots
+            public IntPtr DummyTex2DPtr;            // dummy SRV for unused Texture2D slots
+
+            // Debug
+            public int  DbgFrame;
+            public bool HasSkyTex;
         }
 
         public override void RecordRenderGraph(RenderGraph renderGraph, ContextContainer frameData)
         {
             if (!_shadersReady)
             {
-                Debug.LogWarning("[NativeRtxptEnvMapBakerPass] Shaders not assigned — env map baker skipped.");
+                Debug.LogWarning("[NativeRtxptEnvMapBakerPass] Shaders not assigned — env map baker skipped." +
+                                 $"  baseLayerCs={((_baseLayerCs != null) ? "OK" : "NULL")}" +
+                                 $"  importanceBakerCs={((_importanceBakerCs != null) ? "OK" : "NULL")}");
                 return;
             }
+
+            if ((_dbgFrameCounter % 60) == 1)
+                Debug.Log($"[EnvMapBaker] RecordRenderGraph frame={_dbgFrameCounter}" +
+                          $"  envCubeMip0Ptr={_envCubeMip0Rt.GetNativeTexturePtr()}" +
+                          $"  importanceMapPtr={_importanceMapRt.GetNativeTexturePtr()}" +
+                          $"  envBakerCbPtr={_envBakerCb.GetNativeBufferPtr()}");
 
             using var builder = renderGraph.AddUnsafePass<PassData>("NativeRtxpt.EnvMapBaker", out var passData);
 
@@ -166,15 +217,19 @@ namespace PathTracing
             passData.ImportanceBakerCbPtr = _importanceBakerCb.GetNativeBufferPtr();
 
             var skyTex = _ctx.Setting?.environmentMap;
-            passData.SkyTexturePtr = skyTex != null
+            passData.HasSkyTex            = skyTex != null;
+            passData.SkyTexturePtr        = skyTex != null
                 ? skyTex.GetNativeTexturePtr()
                 : Texture2D.blackTexture.GetNativeTexturePtr();
-            passData.EnvCubeMip0Ptr   = _envCubeMip0Rt.GetNativeTexturePtr();
-            passData.EnvCubeMip1Ptr   = _envCubeMip1Rt.GetNativeTexturePtr();
-            passData.ImportanceMapPtr = _importanceMapRt.GetNativeTexturePtr();
-            passData.RadianceMapPtr   = _radianceMapRt.GetNativeTexturePtr();
-            passData.DummyCubePtr     = _dummyCubeRt.GetNativeTexturePtr();
-            passData.DummyTex2DPtr    = Texture2D.blackTexture.GetNativeTexturePtr();
+            passData.EnvCubeMip0Ptr       = _envCubeMip0Rt.GetNativeTexturePtr();
+            passData.EnvCubeMip1Ptr       = _envCubeMip1Rt.GetNativeTexturePtr();
+            passData.ImportanceMapPtr     = _importanceMapRt.GetNativeTexturePtr();
+            passData.RadianceMapPtr       = _radianceMapRt.GetNativeTexturePtr();
+            passData.ImportanceMapRt      = _importanceMapRt;
+            passData.RadianceMapRt        = _radianceMapRt;
+            passData.DummyCubePtr         = _dummyCubeRt.GetNativeTexturePtr();
+            passData.DummyTex2DPtr        = Texture2D.blackTexture.GetNativeTexturePtr();
+            passData.DbgFrame             = _dbgFrameCounter;
 
             builder.AllowPassCulling(false);
             builder.SetRenderFunc((PassData d, UnsafeGraphContext c) => ExecutePass(d, c));
@@ -188,6 +243,17 @@ namespace PathTracing
         {
             var cmd = CommandBufferHelpers.GetNativeCommandBuffer(context.cmd);
             cmd.BeginSample("Rtxpt.EnvMapBaker");
+
+            if ((data.DbgFrame % 60) == 1)
+                Debug.Log($"[EnvMapBaker] ExecutePass frame={data.DbgFrame}" +
+                          $"  HasSkyTex={data.HasSkyTex}" +
+                          $"  EnvBakerCbPtr={data.EnvBakerCbPtr}" +
+                          $"  ImportanceBakerCbPtr={data.ImportanceBakerCbPtr}" +
+                          $"  EnvCubeMip0Ptr={data.EnvCubeMip0Ptr}" +
+                          $"  EnvCubeMip1Ptr={data.EnvCubeMip1Ptr}" +
+                          $"  ImportanceMapPtr={data.ImportanceMapPtr}" +
+                          $"  DummyCubePtr={data.DummyCubePtr}" +
+                          $"  BaseLayerGroupsXY={BaseLayerGroupsXY}  ImportanceBakerGroupsXY={ImportanceBakerGroupsXY}");
 
             // ── 1. BaseLayerCS ─────────────────────────────────────────────
             // Writes mip0 (256×256×6) to EnvCubeMip0 and mip1 (128×128×6) to EnvCubeMip1.
@@ -207,7 +273,7 @@ namespace PathTracing
             }
 
             // ── 2. ImportanceBakerCS ───────────────────────────────────────
-            // Reads the baked cubemap mip0 as TextureCube and writes the 1024×1024
+            // Reads mip0 as TextureCube and writes the 1024×1024
             // flat importance map (R32F) and radiance map (RGBA16F).
             // Dispatch: (64, 64, 1) groups  [numthreads(16,16,1) over 1024×1024]
             {
@@ -220,7 +286,102 @@ namespace PathTracing
                     ImportanceBakerGroupsXY, ImportanceBakerGroupsXY, 1);
             }
 
+            // ── 3. Generate MIP chain ──────────────────────────────────────
+            // MIP descent importance sampling requires the full mip hierarchy
+            // (mip0=1024 down to mip10=1×1), matching MipMapGenPass in original C++.
+            cmd.GenerateMips(data.ImportanceMapRt);
+            cmd.GenerateMips(data.RadianceMapRt);
+
             cmd.EndSample("Rtxpt.EnvMapBaker");
+        }
+
+        // ====================================================================
+        // Debug helpers
+        // ====================================================================
+
+        private static void LogEnvBakerCbContent(NativeRtxptSetting setting)
+        {
+            // Read back what we packed into the constant buffer staging bytes
+            int lightCount = (int)ReadU32(s_envBakerBytes, 684);
+            uint bgType    = ReadU32(s_envBakerBytes, 700);
+            float scaleR   = ReadF32(s_envBakerBytes, 672);
+            float scaleG   = ReadF32(s_envBakerBytes, 676);
+            float scaleB   = ReadF32(s_envBakerBytes, 680);
+            uint cubeDim   = ReadU32(s_envBakerBytes, 688);
+
+            var sb = new System.Text.StringBuilder();
+            sb.Append($"[EnvMapBaker][CB] DirectionalLightCount={lightCount}" +
+                      $"  BackgroundSourceType={bgType}" +
+                      $"  ScaleColor=({scaleR:F3},{scaleG:F3},{scaleB:F3})" +
+                      $"  CubeDim={cubeDim}" +
+                      $"  skyTexAssigned={setting?.environmentMap != null}");
+            for (int i = 0; i < lightCount && i < 4; i++)
+            {
+                int o = i * 32;
+                float cr = ReadF32(s_envBakerBytes, o + 0);
+                float cg = ReadF32(s_envBakerBytes, o + 4);
+                float cb = ReadF32(s_envBakerBytes, o + 8);
+                float dx = ReadF32(s_envBakerBytes, o + 16);
+                float dy = ReadF32(s_envBakerBytes, o + 20);
+                float dz = ReadF32(s_envBakerBytes, o + 24);
+                sb.Append($"  Light[{i}]:color=({cr:F3},{cg:F3},{cb:F3}) dir=({dx:F3},{dy:F3},{dz:F3})");
+            }
+            Debug.Log(sb.ToString());
+        }
+
+        private static void OnImportanceMapReadback(AsyncGPUReadbackRequest req)
+        {
+            s_importanceReadbackPending = false;
+            if (req.hasError)
+            {
+                Debug.LogError("[EnvMapBaker][Readback] ImportanceMap readback error.");
+                return;
+            }
+            var data = req.GetData<float>();
+            float sum = 0f, maxVal = 0f;
+            int nonZero = 0;
+            int sampleCount = data.Length;
+            for (int i = 0; i < sampleCount; i++)
+            {
+                float v = data[i];
+                if (v > 0f) nonZero++;
+                sum    += v;
+                maxVal  = Mathf.Max(maxVal, v);
+            }
+            Debug.Log($"[EnvMapBaker][Readback] ImportanceMap: total_pixels={data.Length}" +
+                      $"  sampled={sampleCount}  nonZero={nonZero}  max={maxVal:F6}  avg={sum/sampleCount:F6}");
+            if (nonZero == 0)
+                Debug.LogWarning("[EnvMapBaker][Readback] ImportanceMap is ALL ZERO → BaseLayerCS or ImportanceBakerCS produced no output!");
+        }
+
+        private static void OnEnvCubeReadback(AsyncGPUReadbackRequest req)
+        {
+            s_envCubeReadbackPending = false;
+            if (req.hasError)
+            {
+                Debug.LogError("[EnvMapBaker][Readback] EnvCubeMip0 face-0 readback error.");
+                return;
+            }
+            // RGBA16F raw data as ushorts: 4 channels × 2 bytes = 8 bytes per pixel
+            var raw = req.GetData<ushort>();
+            int nonZero = 0;
+            int sampleCount = Mathf.Min(raw.Length, 512); // first 128 pixels × 4 channels
+            for (int i = 0; i < sampleCount; i++)
+                if (raw[i] != 0) nonZero++;
+            Debug.Log($"[EnvMapBaker][Readback] EnvCubeMip0 face0: raw_ushorts={raw.Length}" +
+                      $"  sampled={sampleCount}  nonZeroUshorts={nonZero}");
+            if (nonZero == 0)
+                Debug.LogWarning("[EnvMapBaker][Readback] EnvCubeMip0 face-0 is ALL ZERO → BaseLayerCS wrote nothing!");
+        }
+
+        private static unsafe float ReadF32(byte[] buf, int offset)
+        {
+            fixed (byte* p = &buf[offset]) return *(float*)p;
+        }
+
+        private static unsafe uint ReadU32(byte[] buf, int offset)
+        {
+            fixed (byte* p = &buf[offset]) return *(uint*)p;
         }
 
         // ====================================================================
@@ -306,8 +467,8 @@ namespace PathTracing
             // ImportanceMapInvSamples: 1/16 = 0.0625
             WriteF32(s_importanceBytes, 40, 1.0f / ImportanceSamples);
 
-            // ImportanceMapBaseMip = 0 (flat map, no mip hierarchy)
-            WriteU32(s_importanceBytes, 44, 0u);
+            // ImportanceMapBaseMip = log2(1024) = 10 (MIP descent starts from smallest mip)
+            WriteU32(s_importanceBytes, 44, 10u);
         }
 
         // ── Bit writers ─────────────────────────────────────────────────────
@@ -330,11 +491,11 @@ namespace PathTracing
 
         private void EnsureRenderTextures()
         {
-            _envCubeMip0Rt   = EnsureCubeRT(ref _envCubeMip0Rt, CubeDim, RenderTextureFormat.ARGBHalf, true);
-            _envCubeMip1Rt   = EnsureCubeRT(ref _envCubeMip1Rt, CubeDim / 2, RenderTextureFormat.ARGBHalf, true);
-            _importanceMapRt = Ensure2DRT(ref _importanceMapRt, ImportanceMapDim, RenderTextureFormat.RFloat, true);
-            _radianceMapRt   = Ensure2DRT(ref _radianceMapRt, ImportanceMapDim, RenderTextureFormat.ARGBHalf, true);
-            _dummyCubeRt     = EnsureCubeRT(ref _dummyCubeRt, 4, RenderTextureFormat.ARGB32, false);
+            _envCubeMip0Rt        = EnsureCubeRT(ref _envCubeMip0Rt,        CubeDim,     RenderTextureFormat.ARGBHalf, true);
+            _envCubeMip1Rt        = EnsureCubeRT(ref _envCubeMip1Rt,        CubeDim / 2, RenderTextureFormat.ARGBHalf, true);
+            _importanceMapRt      = Ensure2DRT  (ref _importanceMapRt,      ImportanceMapDim, RenderTextureFormat.RFloat,    true,  useMipMap: true);
+            _radianceMapRt        = Ensure2DRT  (ref _radianceMapRt,        ImportanceMapDim, RenderTextureFormat.ARGBHalf,  true,  useMipMap: true);
+            _dummyCubeRt          = EnsureCubeRT(ref _dummyCubeRt,          4,           RenderTextureFormat.ARGB32,   false);
         }
 
         private static RenderTexture EnsureCubeRT(ref RenderTexture rt, int size,
@@ -355,14 +516,14 @@ namespace PathTracing
         }
 
         private static RenderTexture Ensure2DRT(ref RenderTexture rt, int size,
-            RenderTextureFormat fmt, bool randomWrite)
+            RenderTextureFormat fmt, bool randomWrite, bool useMipMap = false)
         {
-            if (rt != null && rt.IsCreated()) return rt;
+            if (rt != null && rt.IsCreated() && rt.useMipMap == useMipMap) return rt;
             rt?.Release();
             rt = new RenderTexture(size, size, 0, fmt)
             {
                 dimension         = TextureDimension.Tex2D,
-                useMipMap         = false,
+                useMipMap         = useMipMap,
                 autoGenerateMips  = false,
                 enableRandomWrite = randomWrite,
                 hideFlags         = HideFlags.HideAndDontSave,

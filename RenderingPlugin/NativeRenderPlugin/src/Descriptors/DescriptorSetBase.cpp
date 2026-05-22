@@ -179,6 +179,17 @@ void DescriptorSetBase<ShaderT>::UpdateDescriptors(
                             s.Buffer.NumElements = static_cast<UINT>(rd.Width / 4);
                         }
                     }
+                    else if (rd.DepthOrArraySize == 6)
+                    {
+                        // Cube map: DepthOrArraySize==6 → TEXTURECUBE SRV.
+                        // A TEXTURE2DARRAY view would be incompatible with a
+                        // TextureCube binding in the shader.
+                        s.ViewDimension                   = D3D12_SRV_DIMENSION_TEXTURECUBE;
+                        s.Format                          = rd.Format;
+                        s.TextureCube.MostDetailedMip     = 0;
+                        s.TextureCube.MipLevels           = rd.MipLevels;
+                        s.TextureCube.ResourceMinLODClamp = 0.0f;
+                    }
                     else if (rd.DepthOrArraySize > 1)
                     {
                         s.ViewDimension                        = D3D12_SRV_DIMENSION_TEXTURE2DARRAY;
