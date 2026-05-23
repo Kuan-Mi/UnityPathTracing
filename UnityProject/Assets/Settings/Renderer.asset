@@ -72,7 +72,7 @@ MonoBehaviour:
     environmentMapEnabled: 1
     environmentMapIntensity: 1
     environmentMapTint: {r: 1, g: 1, b: 1, a: 1}
-    environmentMap: {fileID: 2800000, guid: 4189bb55106917948a5a3fa90df52b8c, type: 3}
+    environmentMap: {fileID: 2800000, guid: 5d8fd7994f717214481ba9721da2ebe6, type: 3}
     enableToneMapping: 1
     showValidation: 0
     enableShaderDebug: 1
@@ -80,7 +80,7 @@ MonoBehaviour:
     dbgDiscardNonNEELighting: 0
     dbgDiscardNEELighting: 0
     dbgDisablePostProcessFilters: 0
-    showMode: 17
+    showMode: 0
     debugViewType: 0
     debugViewStablePlaneIndex: -1
     skipRightEyeInVR: 1
@@ -112,6 +112,11 @@ MonoBehaviour:
   executeProxyJobsCs: {fileID: -2368575503658470205, guid: fbef0b02cf5a4a318cfd39f808e415cf, type: 3}
   baseLayerCs: {fileID: -2368575503658470205, guid: 106bca701da24f7a9ed113d910f8393d, type: 3}
   envMapImportanceBakerCs: {fileID: -2368575503658470205, guid: 160f5c1d357e92a4eb92eb09a58ba1b7, type: 3}
+  envLightsBackupPastCs: {fileID: -2368575503658470205, guid: cf73e6cf697e4f138478b7b3025711ef, type: 3}
+  envLightsSubdivideBaseCs: {fileID: -2368575503658470205, guid: 55fd78dd2602429aa3889925f4f08b7f, type: 3}
+  envLightsSubdivideBoostCs: {fileID: -2368575503658470205, guid: 7d3bec58059446d78bef95b87ec5a63c, type: 3}
+  envLightsFillLookupMapCs: {fileID: -2368575503658470205, guid: de5fd4bbbb2849b8b041bc233379bb11, type: 3}
+  envLightsMapPastToCurrentCs: {fileID: -2368575503658470205, guid: 0330c94e2ff3413e856ac5ad84ff2458, type: 3}
   outputBlitMaterial: {fileID: 2100000, guid: 27695a2bc55ef2f469362b9a2994989e, type: 2}
 --- !u!114 &11400000
 MonoBehaviour:

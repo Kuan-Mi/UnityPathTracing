@@ -132,6 +132,12 @@ namespace PathTracing
         // LightWeights ping-pong half-count: mirrors RTXPT_LIGHTING_WEIGHTS_COUNT_HALF = MaxLights+1.
         private const int WeightsCountHalf = MaxLights + 1;
 
+        // ScratchListBuffer must be large enough for both:
+        //   - proxy-build passes: MaxLights entries
+        //   - env-light backup region: 2 × RTXPT_NEEAT_ENVMAP_QT_TOTAL_NODE_COUNT (88×61×2 = 10736)
+        private const int EnvTotalNodeCount  = 5368; // RTXPT_NEEAT_ENVMAP_QT_UNBOOSTED(88) × BOOST_NODES_MULT(61)
+        private const int ScratchListCount   = 16384; // max(MaxLights, EnvTotalNodeCount*2) rounded up to power-of-2
+
         /// <summary>
         /// Allocates or reallocates all resolution-dependent buffers.
         /// Returns true if any allocation occurred.
@@ -235,9 +241,11 @@ namespace PathTracing
             { name = "Rtxpt_LightWeightsBuffer" };
 
             // ScratchListBuffer: uint typed scratch for proxy count prefix-sum and job list.
+            // Must hold at least 2 × RTXPT_NEEAT_ENVMAP_QT_TOTAL_NODE_COUNT (=5368×2=10736) entries
+            // for the env-light backup history region, plus MaxLights for proxy-build passes.
             ScratchListBuffer = new GraphicsBuffer(
                 GraphicsBuffer.Target.Structured,
-                MaxLights, 4)
+                ScratchListCount, 4)
             { name = "Rtxpt_ScratchListBuffer" };
         }
 

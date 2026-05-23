@@ -214,11 +214,11 @@ namespace PathTracing
                 : Texture2D.blackTexture.GetNativeTexturePtr();
             ds.SetTexture("t_EnvironmentMap", envCubePtr);
 
-            // t_EnvLookupMap (t18): use baked importance map from EnvMapBakerPass
-            var envImportancePtr = ctx.EnvImportanceMapPtr != IntPtr.Zero
-                ? ctx.EnvImportanceMapPtr
-                : Texture2D.whiteTexture.GetNativeTexturePtr();
-            ds.SetTexture("t_EnvLookupMap", envImportancePtr);
+            // t_EnvLookupMap (t18): env-light quad-tree lookup map (R32_UINT) from EnvLightsBakerPass
+            var envLookupPtr = ctx.EnvLightLookupMapPtr != IntPtr.Zero
+                ? ctx.EnvLightLookupMapPtr
+                : Texture2D.blackTexture.GetNativeTexturePtr();
+            ds.SetTexture("t_EnvLookupMap", envLookupPtr);
 
             // u_FeedbackBuffer (u51): debug stub buffer
             ds.SetRWStructuredBuffer("u_FeedbackBuffer",

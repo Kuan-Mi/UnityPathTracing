@@ -156,11 +156,13 @@ namespace PathTracing
                 enabled          = 1f,  // always enabled; env cube is baked each frame (directional lights + optional skybox)
             };
 
+            // ImportanceMapDim = 1024, mipLevels = 11 → ImportanceBaseMip = 10, InvDim = 1/1024
+            const int importanceMapDim = 1024;
             var envMapIS = new EnvMapImportanceSamplingParams
             {
-                importanceInvDimX = 0f,
-                importanceInvDimY = 0f,
-                importanceBaseMip = 0u,
+                importanceInvDimX = 1.0f / importanceMapDim,
+                importanceInvDimY = 1.0f / importanceMapDim,
+                importanceBaseMip = 10u,   // log2(1024) = 10, i.e. mip 10 is 1×1
                 _padding0         = 0u,
             };
 

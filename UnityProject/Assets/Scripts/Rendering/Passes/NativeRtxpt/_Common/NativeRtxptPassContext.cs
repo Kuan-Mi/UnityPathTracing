@@ -86,8 +86,13 @@ namespace PathTracing
         // ── Baked env map (filled by NativeRtxptEnvMapBakerPass each frame) ─────
         /// <summary>Baked 256×256 cubemap mip0. Bound as t_EnvironmentMap (TextureCube).</summary>
         public IntPtr BakedEnvCubePtr;
-        /// <summary>1024×1024 flat importance map (R32F). Bound as t_EnvLookupMap.</summary>
+        /// <summary>1024×1024 flat importance map (R32F). Single-channel luminance/importance only.</summary>
         public IntPtr EnvImportanceMapPtr;
+        /// <summary>1024×1024 combined radiance+importance map (RGBA16F, rgb=radiance, a=luminance).
+        /// This is what LightsBaker shaders expect as t_envRadianceAndImportanceMap.</summary>
+        public IntPtr EnvRadianceAndImportanceMapPtr;
+        /// <summary>1024×1024 env-light lookup map (R32_UINT). Filled by EnvLightsFillLookupMap. Bound as t_EnvLookupMap (t18).</summary>
+        public IntPtr EnvLightLookupMapPtr;
 
         // ── Factory ───────────────────────────────────────────────────────────
 

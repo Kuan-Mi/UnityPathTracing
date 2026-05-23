@@ -75,12 +75,20 @@ namespace PathTracing
         public NativeComputeShader baseLayerCs;
         public NativeComputeShader envMapImportanceBakerCs;
 
+        // Phase 1b: Env-light quad-tree baker compute shaders
+        public NativeComputeShader envLightsBackupPastCs;
+        public NativeComputeShader envLightsSubdivideBaseCs;
+        public NativeComputeShader envLightsSubdivideBoostCs;
+        public NativeComputeShader envLightsFillLookupMapCs;
+        public NativeComputeShader envLightsMapPastToCurrentCs;
+
         // Phase 9: Output blit (debug display)
         public Material outputBlitMaterial;
 
         // ---- Pass instances -------------------------------------------------
         private NativeRtxptBuildTlasPass              _buildTlasPass;
         private NativeRtxptEnvMapBakerPass            _envMapBakerPass;
+        private NativeRtxptEnvLightsBakerPass         _envLightsBakerPass;
         private NativeRtxptLightingPass               _lightingPass;
         private NativeRtxptPathTracerPass             _pathTracerPass;
         private NativeRtxptExportVisibilityBufferPass _exportVisibilityBufferPass;
@@ -260,6 +268,19 @@ namespace PathTracing
 
             _lightingPass.Setup(passCtx);
             renderer.EnqueuePass(_lightingPass);
+
+            // ---- Phase 1b: EnvLightsBaker (quad-tree subdivision + lookup map) ---
+            // Must run AFTER LightingPass so ControlBuffer is initialised (TotalLightCount,
+            // env-map flags etc.) before SubdivideBase reads it.
+            _envLightsBakerPass ??= new NativeRtxptEnvLightsBakerPass(
+                    envLightsBackupPastCs,
+                    envLightsSubdivideBaseCs,
+                    envLightsSubdivideBoostCs,
+                    envLightsFillLookupMapCs,
+                    envLightsMapPastToCurrentCs)
+                { renderPassEvent = renderPassEvent };
+            _envLightsBakerPass.Setup(passCtx);
+            renderer.EnqueuePass(_envLightsBakerPass);
 
             // ---- Phase 2: PathTracer RT Shader ------------------------------
             _pathTracerPass.Setup(passCtx);

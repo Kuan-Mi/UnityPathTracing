@@ -117,16 +117,16 @@ namespace PathTracing
             EnsureRenderTextures();
             EnsureConstantBuffers();
 
-            // ── Throttled setup log ────────────────────────────────────────
-            if ((_dbgFrameCounter % 60) == 1)
-            {
-                Debug.Log($"[EnvMapBaker] Setup frame={_dbgFrameCounter}" +
-                          $"  BaseLayerCs={_baseLayerCs != null}  ImportanceBakerCs={_importanceBakerCs != null}" +
-                          $"  ShadersReady={_shadersReady}" +
-                          $"  envCubeMip0=({_envCubeMip0Rt != null && _envCubeMip0Rt.IsCreated()})" +
-                          $"  importanceMap=({_importanceMapRt != null && _importanceMapRt.IsCreated()})" +
-                          $"  skyTex={ctx.Setting?.environmentMap != null}");
-            }
+            // // ── Throttled setup log ────────────────────────────────────────
+            // if ((_dbgFrameCounter % 60) == 1)
+            // {
+            //     Debug.Log($"[EnvMapBaker] Setup frame={_dbgFrameCounter}" +
+            //               $"  BaseLayerCs={_baseLayerCs != null}  ImportanceBakerCs={_importanceBakerCs != null}" +
+            //               $"  ShadersReady={_shadersReady}" +
+            //               $"  envCubeMip0=({_envCubeMip0Rt != null && _envCubeMip0Rt.IsCreated()})" +
+            //               $"  importanceMap=({_importanceMapRt != null && _importanceMapRt.IsCreated()})" +
+            //               $"  skyTex={ctx.Setting?.environmentMap != null}");
+            // }
 
             // Collect directional lights and upload to GPU
             FillEnvBakerConstants(ctx.Setting);
@@ -135,27 +135,29 @@ namespace PathTracing
             FillImportanceBakerConstants();
             _importanceBakerCb.SetData(s_importanceBytes);
 
-            // ── Log parsed CB content every 60 frames ──────────────────────
-            if ((_dbgFrameCounter % 60) == 1)
-                LogEnvBakerCbContent(ctx.Setting);
-
-            // ── Request async readback of previous frame's baked textures ──
-            if (!s_importanceReadbackPending && _importanceMapRt != null && _importanceMapRt.IsCreated())
-            {
-                s_importanceReadbackPending = true;
-                s_importanceReadback = AsyncGPUReadback.Request(_importanceMapRt, 0, OnImportanceMapReadback);
-            }
-            if (!s_envCubeReadbackPending && _envCubeMip0Rt != null && _envCubeMip0Rt.IsCreated())
-            {
-                s_envCubeReadbackPending = true;
-                // Read only face 0 (srcZ=0, srcDepth=1) of the 256×256 cubemap
-                s_envCubeReadback = AsyncGPUReadback.Request(_envCubeMip0Rt, 0,
-                    0, CubeDim, 0, CubeDim, 0, 1, OnEnvCubeReadback);
-            }
+            // // ── Log parsed CB content every 60 frames ──────────────────────
+            // if ((_dbgFrameCounter % 60) == 1)
+            //     LogEnvBakerCbContent(ctx.Setting);
+            //
+            // // ── Request async readback of previous frame's baked textures ──
+            // if (!s_importanceReadbackPending && _importanceMapRt != null && _importanceMapRt.IsCreated())
+            // {
+            //     s_importanceReadbackPending = true;
+            //     s_importanceReadback = AsyncGPUReadback.Request(_importanceMapRt, 0, OnImportanceMapReadback);
+            // }
+            // if (!s_envCubeReadbackPending && _envCubeMip0Rt != null && _envCubeMip0Rt.IsCreated())
+            // {
+            //     s_envCubeReadbackPending = true;
+            //     // Read only face 0 (srcZ=0, srcDepth=1) of the 256×256 cubemap
+            //     s_envCubeReadback = AsyncGPUReadback.Request(_envCubeMip0Rt, 0,
+            //         0, CubeDim, 0, CubeDim, 0, 1, OnEnvCubeReadback);
+            // }
 
             // Expose baked pointers to downstream passes.
-            ctx.BakedEnvCubePtr     = _envCubeMip0Rt.IsCreated() ? _envCubeMip0Rt.GetNativeTexturePtr() : IntPtr.Zero;
-            ctx.EnvImportanceMapPtr = _importanceMapRt.IsCreated()      ? _importanceMapRt.GetNativeTexturePtr()      : IntPtr.Zero;
+            ctx.BakedEnvCubePtr                  = _envCubeMip0Rt.IsCreated()    ? _envCubeMip0Rt.GetNativeTexturePtr()    : IntPtr.Zero;
+            ctx.EnvImportanceMapPtr              = _importanceMapRt.IsCreated()  ? _importanceMapRt.GetNativeTexturePtr()  : IntPtr.Zero;
+            // RadianceMap (RGBA16F: rgb=radiance, a=luminance) is what LightsBaker shaders read as t_envRadianceAndImportanceMap
+            ctx.EnvRadianceAndImportanceMapPtr   = _radianceMapRt.IsCreated()    ? _radianceMapRt.GetNativeTexturePtr()    : IntPtr.Zero;
         }
 
         // ====================================================================
@@ -192,19 +194,19 @@ namespace PathTracing
 
         public override void RecordRenderGraph(RenderGraph renderGraph, ContextContainer frameData)
         {
-            if (!_shadersReady)
-            {
-                Debug.LogWarning("[NativeRtxptEnvMapBakerPass] Shaders not assigned — env map baker skipped." +
-                                 $"  baseLayerCs={((_baseLayerCs != null) ? "OK" : "NULL")}" +
-                                 $"  importanceBakerCs={((_importanceBakerCs != null) ? "OK" : "NULL")}");
-                return;
-            }
-
-            if ((_dbgFrameCounter % 60) == 1)
-                Debug.Log($"[EnvMapBaker] RecordRenderGraph frame={_dbgFrameCounter}" +
-                          $"  envCubeMip0Ptr={_envCubeMip0Rt.GetNativeTexturePtr()}" +
-                          $"  importanceMapPtr={_importanceMapRt.GetNativeTexturePtr()}" +
-                          $"  envBakerCbPtr={_envBakerCb.GetNativeBufferPtr()}");
+            // if (!_shadersReady)
+            // {
+            //     Debug.LogWarning("[NativeRtxptEnvMapBakerPass] Shaders not assigned — env map baker skipped." +
+            //                      $"  baseLayerCs={((_baseLayerCs != null) ? "OK" : "NULL")}" +
+            //                      $"  importanceBakerCs={((_importanceBakerCs != null) ? "OK" : "NULL")}");
+            //     return;
+            // }
+            //
+            // if ((_dbgFrameCounter % 60) == 1)
+            //     Debug.Log($"[EnvMapBaker] RecordRenderGraph frame={_dbgFrameCounter}" +
+            //               $"  envCubeMip0Ptr={_envCubeMip0Rt.GetNativeTexturePtr()}" +
+            //               $"  importanceMapPtr={_importanceMapRt.GetNativeTexturePtr()}" +
+            //               $"  envBakerCbPtr={_envBakerCb.GetNativeBufferPtr()}");
 
             using var builder = renderGraph.AddUnsafePass<PassData>("NativeRtxpt.EnvMapBaker", out var passData);
 
@@ -244,16 +246,16 @@ namespace PathTracing
             var cmd = CommandBufferHelpers.GetNativeCommandBuffer(context.cmd);
             cmd.BeginSample("Rtxpt.EnvMapBaker");
 
-            if ((data.DbgFrame % 60) == 1)
-                Debug.Log($"[EnvMapBaker] ExecutePass frame={data.DbgFrame}" +
-                          $"  HasSkyTex={data.HasSkyTex}" +
-                          $"  EnvBakerCbPtr={data.EnvBakerCbPtr}" +
-                          $"  ImportanceBakerCbPtr={data.ImportanceBakerCbPtr}" +
-                          $"  EnvCubeMip0Ptr={data.EnvCubeMip0Ptr}" +
-                          $"  EnvCubeMip1Ptr={data.EnvCubeMip1Ptr}" +
-                          $"  ImportanceMapPtr={data.ImportanceMapPtr}" +
-                          $"  DummyCubePtr={data.DummyCubePtr}" +
-                          $"  BaseLayerGroupsXY={BaseLayerGroupsXY}  ImportanceBakerGroupsXY={ImportanceBakerGroupsXY}");
+            // if ((data.DbgFrame % 60) == 1)
+            //     Debug.Log($"[EnvMapBaker] ExecutePass frame={data.DbgFrame}" +
+            //               $"  HasSkyTex={data.HasSkyTex}" +
+            //               $"  EnvBakerCbPtr={data.EnvBakerCbPtr}" +
+            //               $"  ImportanceBakerCbPtr={data.ImportanceBakerCbPtr}" +
+            //               $"  EnvCubeMip0Ptr={data.EnvCubeMip0Ptr}" +
+            //               $"  EnvCubeMip1Ptr={data.EnvCubeMip1Ptr}" +
+            //               $"  ImportanceMapPtr={data.ImportanceMapPtr}" +
+            //               $"  DummyCubePtr={data.DummyCubePtr}" +
+            //               $"  BaseLayerGroupsXY={BaseLayerGroupsXY}  ImportanceBakerGroupsXY={ImportanceBakerGroupsXY}");
 
             // ── 1. BaseLayerCS ─────────────────────────────────────────────
             // Writes mip0 (256×256×6) to EnvCubeMip0 and mip1 (128×128×6) to EnvCubeMip1.
@@ -411,11 +413,11 @@ namespace PathTracing
                 WriteF32(s_envBakerBytes, offset + 8, linear.b);
                 WriteF32(s_envBakerBytes, offset + 12, intensity);
 
-                // Direction: incoming direction = -light.transform.forward
+                // Direction: incoming direction = light.transform.forward (the direction light travels, i.e. -sunDirection)
                 Vector3 fwd = light.transform.forward;
-                WriteF32(s_envBakerBytes, offset + 16, -fwd.x);
-                WriteF32(s_envBakerBytes, offset + 20, -fwd.y);
-                WriteF32(s_envBakerBytes, offset + 24, -fwd.z);
+                WriteF32(s_envBakerBytes, offset + 16, fwd.x);
+                WriteF32(s_envBakerBytes, offset + 20, fwd.y);
+                WriteF32(s_envBakerBytes, offset + 24, fwd.z);
 
                 // AngularSize: Sun's angular diameter ~0.53° = 0.009273 rad
                 WriteF32(s_envBakerBytes, offset + 28, 0.1f);
