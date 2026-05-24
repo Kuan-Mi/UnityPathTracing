@@ -86,6 +86,8 @@ namespace NativeRender
             public uint indexStride;
             public uint submeshCount;
             public uint isDynamic; // 1 = SkinnedMeshRenderer (BLAS rebuilt every frame)
+            public uint hitGroupContribution; // InstanceContributionToHitGroupIndex, computed by C#
+            public uint _pad; // explicit padding to match C++ 8-byte struct alignment (total 64 bytes)
         }
 
         /// <summary>
@@ -261,12 +263,36 @@ namespace NativeRender
             public uint  _pad; // +28
         }
 
-        /// <summary>Event data for NR_AS_GetBuildRenderEventFunc. Must match C++ AS_BuildEventData (Pack=4).</summary>
+        /// <summary>Event data for NR_AS_GetBuildRenderEventFunc. Must match C++ AS_BuildEventData (Pack=4, 8 bytes).</summary>
         [StructLayout(LayoutKind.Sequential, Pack = 4)]
         public struct AS_BuildEventData
         {
             public ulong asHandle;
         }
+
+        /// <summary>
+        /// Event data for NR_RTS_GetRebuildHitGroupTableEventFunc.
+        /// C# pre-computes the flat variant-index array; native side writes shader identifiers.
+        /// Must match C++ ShtRebuildEventData (Pack=4, 24 bytes).
+        /// variantIndicesPtr must point to a pinned/NativeArray of uint32 for the duration of GPU execution.
+        /// </summary>
+        [StructLayout(LayoutKind.Sequential, Pack = 4)]
+        public struct ShtRebuildEventData
+        {
+            public ulong  shaderHandle;      // RayTraceShader*
+            public IntPtr variantIndicesPtr; // const uint32_t* — per-geometry variant index array
+            public uint   count;             // number of geometries
+            public uint   _pad;
+        }
+
+        /// <summary>Returns the render event function for shader hit-group table rebuild.
+        /// Issue via CommandBuffer.IssuePluginEventAndData after the AS build event.</summary>
+        [DllImport(DllName)]
+        public static extern UnityEngine.Rendering.UnityRenderingEventAndData NR_RTS_GetRebuildHitGroupTableEventFunc();
+
+        /// <summary>Returns sizeof(ShtRebuildEventData) for buffer allocation.</summary>
+        [DllImport(DllName)]
+        public static extern uint NR_RTS_GetRebuildHitGroupTableEventDataSize();
 
         // -------------------------------------------------------------------
         // BindlessTexture API  (independent GPU-visible texture array)

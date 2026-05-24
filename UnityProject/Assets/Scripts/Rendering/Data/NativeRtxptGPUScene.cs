@@ -67,6 +67,8 @@ namespace PathTracing
         private readonly Dictionary<int, (GraphicsBuffer vb, GraphicsBuffer ib)> _donutBufferCache  = new();
         private readonly List<GraphicsBuffer>                                    _ownedGfxBuffers   = new();
         private readonly List<NativeRayTracingTarget>                            _registeredTargets = new();
+        // Maps MeshRenderer.GetInstanceID() → list of per-group TLAS handles registered in _accelStructure.
+        private readonly Dictionary<int, List<uint>>                             _perTargetGroupHandles = new();
 
         private bool _sceneGpuDirty = true;
         private bool _forceRebuild  = false;
@@ -210,6 +212,15 @@ namespace PathTracing
             _accelStructure.BuildOrUpdate(cmd);
         }
 
+        /// <summary>
+        /// Issues a render event to rebuild the fill-shader hit-group table.
+        /// Call in the same CommandBuffer, immediately after BuildAccelerationStructure.
+        /// </summary>
+        public void RebuildFillShaderTable(CommandBuffer cmd, RayTracePipeline fillPipeline)
+        {
+            fillPipeline?.RebuildHitGroupTable(cmd, _accelStructure);
+        }
+
         public void Dispose()
         {
             if (_disposed) return;
@@ -230,7 +241,18 @@ namespace PathTracing
                 {
                     if (t == null) continue;
                     var mr = t.GetComponent<MeshRenderer>();
-                    if (mr != null) _accelStructure.RemoveInstance(mr);
+                    if (mr == null) continue;
+                    int mrId = mr.GetInstanceID();
+                    if (_perTargetGroupHandles.TryGetValue(mrId, out var oldHandles))
+                    {
+                        foreach (var h in oldHandles)
+                            _accelStructure.RemoveInstance(h);
+                        _perTargetGroupHandles.Remove(mrId);
+                    }
+                    else
+                    {
+                        _accelStructure.RemoveInstance(mr);
+                    }
                 }
             }
 
@@ -239,9 +261,60 @@ namespace PathTracing
                 if (t == null) continue;
                 var mr = t.GetComponent<MeshRenderer>();
                 if (mr == null) continue;
-                _accelStructure.AddInstance(mr);
+
+                var groups = t.SubmeshGroups;
+                if (groups != null && groups.Length > 0)
+                {
+                    var mesh = mr.GetComponent<MeshFilter>()?.sharedMesh;
+                    if (mesh == null) continue;
+
+                    uint indexStride = mesh.indexFormat == UnityEngine.Rendering.IndexFormat.UInt16 ? 2u : 4u;
+                    int  mrId        = mr.GetInstanceID();
+                    var  handles     = new List<uint>(groups.Length);
+
+                    for (int gi = 0; gi < groups.Length; gi++)
+                    {
+                        var grp    = groups[gi];
+                        int subCnt = grp.submeshIndices.Length;
+                        var descs  = new NativeRenderPlugin.SubmeshDesc[subCnt];
+                        for (int si = 0; si < subCnt; si++)
+                        {
+                            var sub = mesh.GetSubMesh(grp.submeshIndices[si]);
+                            descs[si] = new NativeRenderPlugin.SubmeshDesc
+                            {
+                                indexCount      = (uint)sub.indexCount,
+                                indexByteOffset = (uint)sub.indexStart * indexStride,
+                                baseVertex      = (uint)sub.baseVertex,
+                                flags           = grp.isAlphaClip ? 0u : NativeRenderPlugin.SUBMESH_FLAG_GEOMETRY_OPAQUE,
+                            };
+                        }
+
+                        uint handle           = MakeGroupHandle(mrId, gi);
+                        uint hitGroupVariant  = grp.isEmissive ? 0u : 1u;
+                        if (_accelStructure.AddInstanceGroup(mesh, descs, handle, hitGroupVariantIndex: hitGroupVariant))
+                        {
+                            _accelStructure.SetInstanceTransform(handle, mr.transform.localToWorldMatrix);
+                            handles.Add(handle);
+                        }
+                        else
+                        {
+                            Debug.LogWarning($"[NativeRtxptGPUScene] AddInstanceGroup failed for '{mr.name}' gi={gi}");
+                        }
+                    }
+
+                    if (handles.Count > 0)
+                        _perTargetGroupHandles[mrId] = handles;
+                }
+                else
+                {
+                    // Fallback: no group info, add as single instance (hitgroup 0 = NonEmissive default)
+                    _accelStructure.AddInstance(mr);
+                }
             }
         }
+
+        private static uint MakeGroupHandle(int mrInstanceId, int groupIndex)
+            => (uint)(mrInstanceId & 0x0FFFFFFF) | ((uint)groupIndex << 28);
 
         private void DisposeGpuBuffers()
         {
@@ -268,6 +341,7 @@ namespace PathTracing
             _meshBufferSlots.Clear();
             _materialSlots.Clear();
             _textureSlots.Clear();
+            _perTargetGroupHandles.Clear();
             _environmentMapTextureIndex = -1;
 
             foreach (var buf in _ownedGfxBuffers)

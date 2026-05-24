@@ -480,6 +480,66 @@ bool RayTraceShader::BuildShaderTable()
 }
 
 // ---------------------------------------------------------------------------
+// RebuildHitGroupTable
+//   Rebuilds the hit-group shader table with one entry per geometry (TLAS order).
+//   variantIndices[i] selects which m_hitGroups entry to use for geometry i.
+//   C# pre-computes this array; no AccelerationStructure involvement.
+// ---------------------------------------------------------------------------
+bool RayTraceShader::RebuildHitGroupTable(const uint32_t* variantIndices, uint32_t count)
+{
+    if (!m_pso) { Log(kUnityLogTypeError, "RebuildHitGroupTable: m_pso is null"); return false; }
+    if (!variantIndices || count == 0) return true;
+
+    ComPtr<ID3D12StateObjectProperties> props;
+    if (FAILED(m_pso->QueryInterface(IID_PPV_ARGS(&props))) || !props)
+    {
+        Log(kUnityLogTypeError, "RebuildHitGroupTable: QueryInterface for ID3D12StateObjectProperties failed");
+        return false;
+    }
+
+    const UINT stride    = D3D12_RAYTRACING_SHADER_RECORD_BYTE_ALIGNMENT;
+    const UINT idSize    = D3D12_SHADER_IDENTIFIER_SIZE_IN_BYTES;
+    const UINT totalSize = stride * count;
+
+    auto buf = CreateUploadBuffer(m_device.Get(), totalSize);
+    if (!buf) { Log(kUnityLogTypeError, "RebuildHitGroupTable: CreateUploadBuffer failed"); return false; }
+
+    uint8_t* p = nullptr;
+    if (FAILED(buf->Map(0, nullptr, reinterpret_cast<void**>(&p))) || !p)
+    {
+        Log(kUnityLogTypeError, "RebuildHitGroupTable: Map failed");
+        return false;
+    }
+
+    for (uint32_t i = 0; i < count; ++i)
+    {
+        const uint32_t idx = variantIndices[i];
+        if (idx >= m_hitGroups.size())
+        {
+            Logf(kUnityLogTypeError, "RebuildHitGroupTable: variantIndex[%u]=%u out of range (hitGroups=%zu)",
+                 i, idx, m_hitGroups.size());
+            buf->Unmap(0, nullptr);
+            return false;
+        }
+        void* id = props->GetShaderIdentifier(m_hitGroups[idx].groupExport.c_str());
+        if (!id)
+        {
+            char nameA[256] = {};
+            WideCharToMultiByte(CP_UTF8, 0, m_hitGroups[idx].groupExport.c_str(), -1, nameA, sizeof(nameA)-1, nullptr, nullptr);
+            Logf(kUnityLogTypeError, "RebuildHitGroupTable: GetShaderIdentifier null for '%s' at index %u", nameA, idx);
+            buf->Unmap(0, nullptr);
+            return false;
+        }
+        memcpy(p, id, idSize);
+        p += stride;
+    }
+    buf->Unmap(0, nullptr);
+    m_hitGroupTable = std::move(buf);
+    Logf(kUnityLogTypeLog, "[RebuildHitGroupTable] Rebuilt hit-group table: %u entries, stride=%u bytes", count, stride);
+    return true;
+}
+
+// ---------------------------------------------------------------------------
 // ReflectBindingsFromBlob
 //   Like ReflectBindings but merges into existing state instead of resetting.
 //   Used by LoadShaderFromMultipleBlobs for blobs[1..N].

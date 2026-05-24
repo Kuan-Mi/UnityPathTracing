@@ -807,7 +807,7 @@ bool AccelerationStructure::BuildTLAS(ID3D12GraphicsCommandList4 *cmdList, const
             memcpy(inst.Transform, e.transform, 12 * sizeof(float));
             inst.InstanceID = e.instanceID;
             inst.InstanceMask = e.mask;
-            inst.InstanceContributionToHitGroupIndex = 0;
+            inst.InstanceContributionToHitGroupIndex = e.hitGroupContribution;
             inst.Flags = D3D12_RAYTRACING_INSTANCE_FLAG_NONE;
             inst.AccelerationStructure = e.blasVA;
         }
@@ -1122,6 +1122,7 @@ bool AccelerationStructure::AddInstance(const NR_AddInstanceDesc &desc)
     slot.active = true;
     slot.needsBLAS = true;
     slot.isDynamic = (desc.isDynamic != 0);
+    slot.hitGroupContribution = desc.hitGroupContribution;
     slot.mask = 0xFF;
     float identity[12] = {1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0};
     memcpy(slot.transform, identity, 48);
@@ -1379,6 +1380,8 @@ bool AccelerationStructure::BuildOrUpdate(ID3D12GraphicsCommandList4 *cmdList)
         e.instanceID = slot.customInstanceID;
         e.mask = slot.mask;
         memcpy(e.transform, slot.transform, 48);
+        e.hitGroupContribution = slot.hitGroupContribution;
+        e.submeshCount = static_cast<uint32_t>(slot.meshInfo.submeshes.size());
         m_tlasEntries.push_back(e);
     }
 

@@ -242,7 +242,7 @@ namespace PathTracing
             // ---- Phase 0: TLAS ---------------------------------------------
             if (eyeIndex == 0)
             {
-                _buildTlasPass.Setup(_gpuScene);
+                _buildTlasPass.Setup(_gpuScene, _pathTracerPass?.FillPipeline);
                 renderer.EnqueuePass(_buildTlasPass);
             }
 

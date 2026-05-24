@@ -70,6 +70,12 @@ private:
     bool BuildPipeline  (IDxcBlob* shaderLib); // single-blob convenience
     bool BuildShaderTable();
 
+public:
+    /// Rebuilds the hit-group shader table with one entry per geometry (in TLAS order).
+    /// variantIndices[i] selects which m_hitGroups entry to use for geometry i.
+    /// C# pre-computes this array; no AccelerationStructure reference needed.
+    bool RebuildHitGroupTable(const uint32_t* variantIndices, uint32_t count);
+
     // Hit group info — one per discovered (ClosestHit*/AnyHit*) group
     struct HitGroupInfo
     {

@@ -591,8 +591,21 @@ struct RTS_RenderEventData
 #pragma pack(push, 4)
 struct AS_BuildEventData
 {
-    uint64_t asHandle;  // pointer to AccelerationStructure
-};
+    uint64_t asHandle;     // pointer to AccelerationStructure
+};  // 8 bytes
+#pragma pack(pop)
+
+// Shader hit-group table rebuild event data - passed to ShtRebuildRenderCallback
+// C# side pre-computes the flat variant-index array and passes a pointer + count.
+// Layout: pointer (8B) then two u32s (8B) = 16 bytes, Pack=4 avoids struct-end pad.
+#pragma pack(push, 4)
+struct ShtRebuildEventData
+{
+    uint64_t        shaderHandle;   // pointer to RayTraceShader
+    const uint32_t* variantIndices; // per-geometry hitgroup variant index (C# NativeArray ptr)
+    uint32_t        count;          // total number of entries
+    uint32_t        _pad;
+};  // 24 bytes
 #pragma pack(pop)
 
 // NativeBuffer update event data - passed to NativeBufferUpdateCallback
@@ -824,6 +837,26 @@ static void UNITY_INTERFACE_API AsBuildRenderCallback(int /*eventId*/, void* dat
     as->BuildOrUpdate(cmdList);
 }
 
+// ---------------------------------------------------------------------------
+// Shader hit-group table rebuild callback.
+// C# passes a pre-computed flat variant-index array; we write one shader-table
+// entry per element.  Fully decoupled from AccelerationStructure.
+// ---------------------------------------------------------------------------
+static void UNITY_INTERFACE_API ShtRebuildRenderCallback(int /*eventId*/, void* data)
+{
+    if (!s_RendererReady || !data) return;
+    auto* ed = static_cast<ShtRebuildEventData*>(data);
+    if (!ed->shaderHandle || !ed->variantIndices || ed->count == 0)
+    {
+        NR_WARN("ShtRebuildRenderCallback: invalid event data (shaderHandle/variantIndices/count)");
+        return;
+    }
+    auto* shader = reinterpret_cast<RayTraceShader*>(ed->shaderHandle);
+    NR_LOG("ShtRebuildRenderCallback: rebuilding hit-group table, count=%u", ed->count);
+    if (!shader->RebuildHitGroupTable(ed->variantIndices, ed->count))
+        NR_WARN("ShtRebuildRenderCallback: RebuildHitGroupTable failed");
+}
+
 extern "C" UnityRenderingEventAndData UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API
 NR_RTS_GetRenderEventFunc()
 {
@@ -954,6 +987,18 @@ extern "C" UnityRenderingEventAndData UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API
 NR_AS_GetBuildRenderEventFunc()
 {
     return AsBuildRenderCallback;
+}
+
+extern "C" UnityRenderingEventAndData UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API
+NR_RTS_GetRebuildHitGroupTableEventFunc()
+{
+    return ShtRebuildRenderCallback;
+}
+
+extern "C" uint32_t UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API
+NR_RTS_GetRebuildHitGroupTableEventDataSize()
+{
+    return static_cast<uint32_t>(sizeof(ShtRebuildEventData));
 }
 
 extern "C" UnityRenderingEvent UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API

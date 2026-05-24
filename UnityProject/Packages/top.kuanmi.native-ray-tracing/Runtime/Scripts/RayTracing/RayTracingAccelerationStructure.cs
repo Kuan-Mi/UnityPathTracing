@@ -1,9 +1,11 @@
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.Linq;
 using System.Runtime.InteropServices;
 using Rendering.Resources;
 using Unity.Collections;
+using Unity.Collections.LowLevel.Unsafe;
 using Unity.Profiling;
 using Unity.Profiling.LowLevel;
 using UnityEngine;
@@ -25,6 +27,16 @@ namespace NativeRender
 
         // Persisted event data for AS build dispatches
         private NativeArray<NativeRenderPlugin.AS_BuildEventData> _buildEventData;
+
+        // Per-instance hit-group variant tracking (C# computes flat array for SHT rebuild)
+        // Each entry: (submeshCount, variantIndex). Ordered same as TLAS insertion order.
+        private readonly List<(uint submeshCount, uint variantIndex)> _geomVariants   = new();
+        // Maps instanceHandle → insertion index in _geomVariants (for efficient remove)
+        private readonly Dictionary<uint, int> _handleToGeomVariantSlot              = new();
+        private          bool                  _variantIndexDirty                    = false;
+        private NativeArray<uint>              _variantIndexArray;
+        // Persisted event data for SHT rebuild dispatches
+        private NativeArray<NativeRenderPlugin.ShtRebuildEventData> _shtEventData;
 
         // Thread-safe collections for pending SkinnedMeshRenderers
         // Key: SkinnedMeshRenderer.GetInstanceID()
@@ -92,9 +104,9 @@ namespace NativeRender
 
             if (!_buildEventData.IsCreated)
             {
-                _buildEventData    = new NativeArray<NativeRenderPlugin.AS_BuildEventData>(1, Allocator.Persistent);
-                _buildEventData[0] = new NativeRenderPlugin.AS_BuildEventData { asHandle = _handle };
+                _buildEventData = new NativeArray<NativeRenderPlugin.AS_BuildEventData>(1, Allocator.Persistent);
             }
+            _buildEventData[0] = new NativeRenderPlugin.AS_BuildEventData { asHandle = _handle };
 
             // cmd.EndSample(mark1);
             //
@@ -113,6 +125,57 @@ namespace NativeRender
         /// <summary>Returns the native ID3D12Resource* of the TLAS for binding via SetAccelerationStructure.</summary>
         public IntPtr GetTLASNativePtr() => NativeRenderPlugin.NR_AS_GetTLASNativePtr(_handle);
 
+        // ---------------------------------------------------------------------------
+        // Hit-group shader table (SHT) variant tracking
+        // ---------------------------------------------------------------------------
+
+        /// <summary>
+        /// Rebuilds the flat per-geometry variant-index array from the current _geomVariants list.
+        /// Called lazily before issuing the SHT rebuild render event.
+        /// </summary>
+        private void RebuildVariantIndexArray()
+        {
+            int total = _geomVariants.Sum(g => (int)g.submeshCount);
+            if (_variantIndexArray.IsCreated) _variantIndexArray.Dispose();
+            _variantIndexArray = new NativeArray<uint>(total, Allocator.Persistent);
+            int i = 0;
+            foreach (var (subCount, variant) in _geomVariants)
+                for (uint j = 0; j < subCount; j++)
+                    _variantIndexArray[i++] = variant;
+            _variantIndexDirty = false;
+            string variantLog = string.Join(",", _geomVariants.Select(g => $"{g.variantIndex}x{g.submeshCount}"));
+            Debug.Log($"[RayTracingAccelerationStructure] RebuildVariantIndexArray: total={total} entries, groups=[{variantLog}]");
+        }
+
+        /// <summary>
+        /// Issues a render event to rebuild the hit-group shader table on the GPU timeline.
+        /// C# pre-computes the flat per-geometry variant-index array and passes a pinned pointer.
+        /// Must be called after BuildOrUpdate in the same CommandBuffer.
+        /// </summary>
+        public unsafe void IssueRebuildHitGroupTable(CommandBuffer cmd, ulong shaderHandle)
+        {
+            if (_handle == 0 || shaderHandle == 0) return;
+            if (_variantIndexDirty || !_variantIndexArray.IsCreated)
+                RebuildVariantIndexArray();
+            if (!_variantIndexArray.IsCreated || _variantIndexArray.Length == 0) return;
+
+            if (!_shtEventData.IsCreated)
+                _shtEventData = new NativeArray<NativeRenderPlugin.ShtRebuildEventData>(1, Allocator.Persistent);
+
+            _shtEventData[0] = new NativeRenderPlugin.ShtRebuildEventData
+            {
+                shaderHandle      = shaderHandle,
+                variantIndicesPtr = (IntPtr)NativeArrayUnsafeUtility.GetUnsafeReadOnlyPtr(_variantIndexArray),
+                count             = (uint)_variantIndexArray.Length,
+                _pad              = 0,
+            };
+            Debug.Log($"[RayTracingAccelerationStructure] IssueRebuildHitGroupTable: shaderHandle=0x{shaderHandle:X} count={_variantIndexArray.Length}");
+            cmd.IssuePluginEventAndData(
+                NativeRenderPlugin.NR_RTS_GetRebuildHitGroupTableEventFunc(),
+                2,
+                (IntPtr)NativeArrayUnsafeUtility.GetUnsafePtr(_shtEventData));
+        }
+
         public RayTracingAccelerationStructure()
         {
             _handle = NativeRenderPlugin.NR_CreateAccelerationStructure();
@@ -125,6 +188,8 @@ namespace NativeRender
         public void Dispose()
         {
             if (_buildEventData.IsCreated) _buildEventData.Dispose();
+            if (_variantIndexArray.IsCreated) _variantIndexArray.Dispose();
+            if (_shtEventData.IsCreated) _shtEventData.Dispose();
             if (_handle != 0)
             {
                 NativeRenderPlugin.NR_DestroyAccelerationStructure(_handle);
@@ -137,6 +202,10 @@ namespace NativeRender
         {
             if (_handle != 0)
                 NativeRenderPlugin.NR_AS_Clear(_handle);
+            _geomVariants.Clear();
+            _handleToGeomVariantSlot.Clear();
+            _variantIndexDirty = true;
+            Debug.Log("[RayTracingAccelerationStructure] Clear: variant table cleared");
         }
 
         /// <summary>
@@ -309,7 +378,8 @@ namespace NativeRender
             NativeRenderPlugin.SubmeshDesc[] groupSubmeshDescs,
             uint customHandle,
             bool isDynamic = false,
-            NativeRenderPlugin.SubmeshOMMDesc[] groupOmmDescs = null)
+            NativeRenderPlugin.SubmeshOMMDesc[] groupOmmDescs = null,
+            uint hitGroupVariantIndex = 0)
         {
             if (_handle == 0 || mesh == null || groupSubmeshDescs == null || groupSubmeshDescs.Length == 0)
                 return false;
@@ -347,6 +417,7 @@ namespace NativeRender
                             submeshCount          = (uint)groupSubmeshDescs.Length,
                             ommDescs              = (IntPtr)pOMM,
                             isDynamic             = isDynamic ? 1u : 0u,
+                            hitGroupContribution  = (uint)_geomVariants.Sum(g => (int)g.submeshCount),
                         };
                         ok = NativeRenderPlugin.NR_AS_AddInstance(_handle, ref desc);
                     }
@@ -365,12 +436,22 @@ namespace NativeRender
                         submeshCount          = (uint)groupSubmeshDescs.Length,
                         ommDescs              = IntPtr.Zero,
                         isDynamic             = isDynamic ? 1u : 0u,
+                        hitGroupContribution  = (uint)_geomVariants.Sum(g => (int)g.submeshCount),
                     };
                     ok = NativeRenderPlugin.NR_AS_AddInstance(_handle, ref desc);
                 }
 
                 if (!ok)
                     Debug.LogError($"[NativeRayTracing] AddInstanceGroup failed for '{mesh.name}' handle={customHandle}");
+                else
+                {
+                    // Track per-instance variant so C# can compute the flat SHT array.
+                    int slotIdx = _geomVariants.Count;
+                    _geomVariants.Add(((uint)groupSubmeshDescs.Length, hitGroupVariantIndex));
+                    _handleToGeomVariantSlot[customHandle] = slotIdx;
+                    _variantIndexDirty = true;
+                    Debug.Log($"[RayTracingAccelerationStructure] AddInstanceGroup handle={customHandle} submeshCount={groupSubmeshDescs.Length} variantIndex={hitGroupVariantIndex} => slot {slotIdx}");
+                }
                 return ok;
             }
         }
@@ -394,6 +475,17 @@ namespace NativeRender
         {
             if (_handle == 0) return;
             NativeRenderPlugin.NR_AS_RemoveInstance(_handle, handle);
+            if (_handleToGeomVariantSlot.TryGetValue(handle, out int slotIdx))
+            {
+                _geomVariants.RemoveAt(slotIdx);
+                _handleToGeomVariantSlot.Remove(handle);
+                // Shift all slots with index > slotIdx by -1
+                foreach (var kv in new List<KeyValuePair<uint,int>>(_handleToGeomVariantSlot))
+                    if (kv.Value > slotIdx)
+                        _handleToGeomVariantSlot[kv.Key] = kv.Value - 1;
+                _variantIndexDirty = true;
+                Debug.Log($"[RayTracingAccelerationStructure] RemoveInstance handle={handle}: removed geomVariant slot {slotIdx}");
+            }
         }
 
         /// <summary>Updates the world transform for an instance identified by raw <paramref name="handle"/>.</summary>

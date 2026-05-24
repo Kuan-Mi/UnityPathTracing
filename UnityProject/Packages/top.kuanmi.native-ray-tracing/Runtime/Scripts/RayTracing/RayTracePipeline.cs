@@ -262,5 +262,17 @@ namespace NativeRender
             if (ptr == IntPtr.Zero) return;
             cmd.IssuePluginEventAndData(NativeRenderPlugin.NR_RTS_GetRenderEventFunc(), 1, ptr);
         }
+
+        /// <summary>
+        /// Issues a render event to rebuild the hit-group shader table for <paramref name="accelStruct"/>.
+        /// C# pre-computed the flat variant-index array is stored inside accelStruct.
+        /// Call this in the same CommandBuffer, after the AS BuildOrUpdate event.
+        /// </summary>
+        public void RebuildHitGroupTable(CommandBuffer cmd, RayTracingAccelerationStructure accelStruct)
+        {
+            if (!IsValid || accelStruct == null) return;
+            Debug.Log($"[RayTracePipeline] RebuildHitGroupTable: shaderHandle=0x{_handle:X}");
+            accelStruct.IssueRebuildHitGroupTable(cmd, _handle);
+        }
     }
 }

@@ -71,9 +71,11 @@ struct NR_AddInstanceDesc
     uint32_t                 indexStride;
     uint32_t                 submeshCount;
     uint32_t                 isDynamic;     // 1 = SkinnedMeshRenderer (BLAS rebuilt every frame)
+    uint32_t                 hitGroupContribution; // InstanceContributionToHitGroupIndex, computed by C#
+    uint32_t                 _pad;          // explicit padding to 64 bytes (8-byte struct alignment)
 };
 
-static_assert(sizeof(NR_AddInstanceDesc) == 56, "NR_AddInstanceDesc size mismatch with C# AddInstanceDesc");
+static_assert(sizeof(NR_AddInstanceDesc) == 64, "NR_AddInstanceDesc size mismatch with C# AddInstanceDesc");
 
 // ---------------------------------------------------------------------------
 // SubMeshData  –  per-submesh data (indices, material, optional OMM).
@@ -256,6 +258,8 @@ private:
         float    transform[12];
         uint32_t instanceID;
         uint8_t  mask;
+        uint32_t hitGroupContribution;  // InstanceContributionToHitGroupIndex, computed by C#
+        uint32_t submeshCount;          // number of geometries in this BLAS
     };
 
     // -----------------------------------------------------------------------
@@ -276,6 +280,7 @@ private:
         bool    active    = false;
         bool    needsBLAS = false;
         bool    isDynamic = false; // SkinnedMeshRenderer: BLAS updated each frame
+        uint32_t hitGroupContribution = 0; // InstanceContributionToHitGroupIndex, computed by C#
         D3D12_GPU_VIRTUAL_ADDRESS blasVA;
         // Persistent BLAS for dynamic (skinned) instances – reused every frame with PERFORM_UPDATE
         std::unique_ptr<BLASEntry> dynamicBlas;
