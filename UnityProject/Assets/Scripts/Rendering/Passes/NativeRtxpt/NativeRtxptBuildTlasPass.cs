@@ -13,26 +13,37 @@ namespace PathTracing
     public class NativeRtxptBuildTlasPass : ScriptableRenderPass
     {
         private NativeRtxptGPUScene _gpuScene;
+        private RayTracePipeline    _buildPipeline;
         private RayTracePipeline    _fillPipeline;
+        private RayTracePipeline    _refPipeline;
 
-        public void Setup(NativeRtxptGPUScene gpuScene, RayTracePipeline fillPipeline = null)
+        public void Setup(NativeRtxptGPUScene gpuScene,
+                          RayTracePipeline buildPipeline = null,
+                          RayTracePipeline fillPipeline  = null,
+                          RayTracePipeline refPipeline   = null)
         {
-            _gpuScene     = gpuScene;
-            _fillPipeline = fillPipeline;
+            _gpuScene      = gpuScene;
+            _buildPipeline = buildPipeline;
+            _fillPipeline  = fillPipeline;
+            _refPipeline   = refPipeline;
         }
 
         private class PassData
         {
             internal NativeRtxptGPUScene GpuScene;
+            internal RayTracePipeline    BuildPipeline;
             internal RayTracePipeline    FillPipeline;
+            internal RayTracePipeline    RefPipeline;
         }
 
         public override void RecordRenderGraph(RenderGraph renderGraph, ContextContainer frameData)
         {
             using var builder = renderGraph.AddUnsafePass<PassData>("NativeRtxpt.BuildTlas", out var passData);
 
-            passData.GpuScene     = _gpuScene;
-            passData.FillPipeline = _fillPipeline;
+            passData.GpuScene      = _gpuScene;
+            passData.BuildPipeline = _buildPipeline;
+            passData.FillPipeline  = _fillPipeline;
+            passData.RefPipeline   = _refPipeline;
 
             builder.AllowPassCulling(false);
             builder.SetRenderFunc((PassData data, UnsafeGraphContext context) => ExecutePass(data, context));
@@ -44,7 +55,9 @@ namespace PathTracing
 
             cmd.BeginSample(RenderPassMarkers.TLAS);
             data.GpuScene.BuildAccelerationStructure(cmd);
+            data.GpuScene.RebuildFillShaderTable(cmd, data.BuildPipeline);
             data.GpuScene.RebuildFillShaderTable(cmd, data.FillPipeline);
+            data.GpuScene.RebuildFillShaderTable(cmd, data.RefPipeline);
             cmd.EndSample(RenderPassMarkers.TLAS);
         }
     }

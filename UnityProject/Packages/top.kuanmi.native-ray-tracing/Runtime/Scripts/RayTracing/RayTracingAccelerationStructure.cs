@@ -217,7 +217,6 @@ namespace NativeRender
                 count             = (uint)_variantIndexArray.Length,
                 _pad              = 0,
             };
-            Debug.Log($"[RayTracingAccelerationStructure] IssueRebuildHitGroupTable: shaderHandle=0x{shaderHandle:X} count={_variantIndexArray.Length}");
             unsafe
             {
                 var basePtr = (NativeRenderPlugin.ShtRebuildEventData*)NativeArrayUnsafeUtility.GetUnsafePtr(_shtEventData);
@@ -489,6 +488,7 @@ namespace NativeRender
                         ommDescs              = IntPtr.Zero,
                         isDynamic             = isDynamic ? 1u : 0u,
                         hitGroupContribution  = (uint)_geomVariants.Sum(g => (int)g.submeshCount),
+                        // hitGroupContribution  = 0,
                     };
                     ok = NativeRenderPlugin.NR_AS_AddInstance(_handle, ref desc);
                 }

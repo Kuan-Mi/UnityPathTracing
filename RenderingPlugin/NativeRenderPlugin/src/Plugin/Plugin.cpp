@@ -863,7 +863,6 @@ static void UNITY_INTERFACE_API ShtRebuildRenderCallback(int /*eventId*/, void* 
         return;
     }
     auto* shader = reinterpret_cast<RayTraceShader*>(ed->shaderHandle);
-    NR_LOG("ShtRebuildRenderCallback: rebuilding hit-group table, count=%u", ed->count);
     if (!shader->RebuildHitGroupTable(ed->variantIndices, ed->count))
         NR_WARN("ShtRebuildRenderCallback: RebuildHitGroupTable failed");
 }

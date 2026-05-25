@@ -271,7 +271,6 @@ namespace NativeRender
         public void RebuildHitGroupTable(CommandBuffer cmd, RayTracingAccelerationStructure accelStruct)
         {
             if (!IsValid || accelStruct == null) return;
-            Debug.Log($"[RayTracePipeline] RebuildHitGroupTable: shaderHandle=0x{_handle:X}");
             accelStruct.IssueRebuildHitGroupTable(cmd, _handle);
         }
     }

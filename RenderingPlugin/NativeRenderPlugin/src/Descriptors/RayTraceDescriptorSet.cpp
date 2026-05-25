@@ -11,6 +11,7 @@ void RayTraceDescriptorSet::Dispatch(
 {
     if (!m_shader || !m_shader->GetPSO() || !m_shader->GetRootSignature() || !m_allocator) return;
     if (!m_shader->GetRayGenTable() || !m_shader->GetMissTable() || !m_shader->GetHitGroupTable()) return;
+    if (m_shader->GetHitGroupCount() == 0) return; // RebuildHitGroupTable not yet run; skip DispatchRays
     if (!slots && slotCount > 0) return;
     if (!ValidateBindings(slots, slotCount)) return;
 
@@ -36,24 +37,6 @@ void RayTraceDescriptorSet::Dispatch(
     drd.Width  = width;
     drd.Height = height;
     drd.Depth  = 1;
-
-    // Debug: log SBT parameters to help diagnose TDR issues.
-    {
-        char dbgMsg[512];
-        snprintf(dbgMsg, sizeof(dbgMsg),
-            "[DispatchRays] shader='%s' dim=%ux%u "
-            "hitGroupEntries=%u hitSizeInBytes=%llu hitStride=%u "
-            "missEntries=%u missSizeInBytes=%llu "
-            "hitTableVA=0x%llX missTableVA=0x%llX rayGenVA=0x%llX\n",
-            m_shader->GetName(),
-            width, height,
-            m_shader->GetHitGroupCount(), (unsigned long long)drd.HitGroupTable.SizeInBytes, stride,
-            m_shader->GetMissCount(), (unsigned long long)drd.MissShaderTable.SizeInBytes,
-            (unsigned long long)drd.HitGroupTable.StartAddress,
-            (unsigned long long)drd.MissShaderTable.StartAddress,
-            (unsigned long long)drd.RayGenerationShaderRecord.StartAddress);
-        OutputDebugStringA(dbgMsg);
-    }
 
     cmdList->DispatchRays(&drd);
     NotifyResourceStates(slots, slotCount);

@@ -479,8 +479,11 @@ bool RayTraceShader::BuildShaderTable()
     hgNames.reserve(m_hitGroups.size());
     for (const auto& hg : m_hitGroups) hgNames.push_back(hg.groupExport);
     m_hitGroupTable = MakeTable("HitGroup", hgNames);
-    if (m_rayGenTable && m_missTable && m_hitGroupTable)
-        m_hitGroupTableEntryCount = static_cast<uint32_t>(m_hitGroups.size());
+    // NOTE: intentionally leave m_hitGroupTableEntryCount = 0 here.
+    // The real per-geometry SBT is built by RebuildHitGroupTable(); until
+    // that runs on the render thread, DispatchRays must be suppressed
+    // (see the GetHitGroupCount() == 0 guard in RayTraceDescriptorSet::Dispatch).
+    (void)m_hitGroupTable; // table allocated but count stays 0 until Rebuild runs
 
     return m_rayGenTable && m_missTable && m_hitGroupTable;
 }
@@ -544,27 +547,6 @@ bool RayTraceShader::RebuildHitGroupTable(const uint32_t* variantIndices, uint32
     SafeReleaseResource(std::move(m_hitGroupTable));
     m_hitGroupTable = std::move(buf);
     m_hitGroupTableEntryCount = count;  // SizeInBytes in DispatchRays must reflect the new count
-
-    // Debug: dump the variant index → hitGroup mapping for each SBT entry.
-    {
-        std::string dump;
-        dump.reserve(count * 12 + 80);
-        char tmp[32];
-        dump += "[RebuildHitGroupTable] SBT entries: [";
-        for (uint32_t i = 0; i < count; ++i)
-        {
-            if (i > 0) dump += ",";
-            char nameA[128] = {};
-            WideCharToMultiByte(CP_UTF8, 0, m_hitGroups[variantIndices[i]].groupExport.c_str(),
-                                -1, nameA, sizeof(nameA)-1, nullptr, nullptr);
-            snprintf(tmp, sizeof(tmp), "%u->%s", i, nameA);
-            dump += tmp;
-        }
-        dump += "]";
-        Logf(kUnityLogTypeLog, "%s", dump.c_str());
-    }
-
-    Logf(kUnityLogTypeLog, "[RebuildHitGroupTable] Rebuilt hit-group table: %u entries, stride=%u bytes", count, stride);
     return true;
 }
 

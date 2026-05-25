@@ -63,8 +63,10 @@ namespace PathTracing
                 { name = "Rtxpt_MiniConst" };
         }
 
-        /// <summary>The FillStablePlanes RayTracePipeline. Used by BuildTlasPass to rebuild the hit-group table after TLAS updates.</summary>
-        public RayTracePipeline FillPipeline => _fillSP;
+        /// <summary>All three RayTracePipelines. Used by BuildTlasPass to rebuild all hit-group tables after TLAS updates.</summary>
+        public RayTracePipeline BuildPipeline => _buildSP;
+        public RayTracePipeline FillPipeline  => _fillSP;
+        public RayTracePipeline RefPipeline   => _refSP;
 
         public void Dispose()
         {
