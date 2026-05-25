@@ -54,21 +54,27 @@ namespace PathTracing
 
             public Transform transform;
 
+            // Non-zero for TLAS instances added via AddInstanceGroup (SubmeshGroups path).
+            // When non-zero, use SetInstanceTransform(groupHandle, ...) instead of SetInstanceTransform(renderer, ...).
+            public uint groupHandle;
+
             // Previous frame's world matrix rows (for prevTransform)
             public Vector4 prevRow0;
             public Vector4 prevRow1;
             public Vector4 prevRow2;
         }
 
-        private readonly List<SceneInstance>                                     _sceneInstances    = new();
-        private readonly Dictionary<int, (int vb, int ib)>                       _meshBufferSlots   = new();
-        private readonly Dictionary<int, int>                                    _materialSlots     = new();
-        private readonly Dictionary<int, int>                                    _textureSlots      = new();
-        private readonly Dictionary<int, (GraphicsBuffer vb, GraphicsBuffer ib)> _donutBufferCache  = new();
-        private readonly List<GraphicsBuffer>                                    _ownedGfxBuffers   = new();
-        private readonly List<NativeRayTracingTarget>                            _registeredTargets = new();
+        private readonly List<SceneInstance>                                     _sceneInstances   = new();
+        private readonly Dictionary<int, (int vb, int ib)>                       _meshBufferSlots  = new();
+        private readonly Dictionary<int, int>                                    _materialSlots    = new();
+        private readonly Dictionary<int, int>                                    _textureSlots     = new();
+        private readonly Dictionary<int, (GraphicsBuffer vb, GraphicsBuffer ib)> _donutBufferCache = new();
+        private readonly List<GraphicsBuffer>                                    _ownedGfxBuffers  = new();
+
+        private readonly List<NativeRayTracingTarget> _registeredTargets = new();
+
         // Maps MeshRenderer.GetInstanceID() → list of per-group TLAS handles registered in _accelStructure.
-        private readonly Dictionary<int, List<uint>>                             _perTargetGroupHandles = new();
+        private readonly Dictionary<int, List<uint>> _perTargetGroupHandles = new();
 
         private bool _sceneGpuDirty = true;
         private bool _forceRebuild  = false;
@@ -223,7 +229,7 @@ namespace PathTracing
         /// Call in the same CommandBuffer, immediately after BuildAccelerationStructure.
         /// </summary>
         public void RebuildFillShaderTable(CommandBuffer cmd, RayTracePipeline fillPipeline)
-        {
+        { 
             fillPipeline?.RebuildHitGroupTable(cmd, _accelStructure);
         }
 
@@ -295,8 +301,8 @@ namespace PathTracing
                             };
                         }
 
-                        uint handle           = MakeGroupHandle(mrId, gi);
-                        uint hitGroupVariant  = grp.isEmissive ? 0u : 1u;
+                        uint handle          = MakeGroupHandle(mrId, gi);
+                        uint hitGroupVariant = grp.isEmissive ? 0u : 1u;
                         if (_accelStructure.AddInstanceGroup(mesh, descs, handle, hitGroupVariantIndex: hitGroupVariant))
                         {
                             _accelStructure.SetInstanceTransform(handle, mr.transform.localToWorldMatrix);
@@ -391,34 +397,89 @@ namespace PathTracing
                     }
 
                     slots = (bufPtrs.Count, bufPtrs.Count + 1);
+                    // SubInstanceData.IndexBufferIndex_VertexBufferIndex packs both as 16-bit.
+                    if (bufPtrs.Count > 0xFFFF)
+                        Debug.LogError($"[NativeRtxptGPUScene] Bindless buffer slot overflow: VB slot index {bufPtrs.Count} exceeds 16-bit limit (65535). Rendering will be corrupted. Mesh='{mesh.name}'.");
                     bufPtrs.Add(donutVb.GetNativeBufferPtr());
                     bufPtrs.Add(donutIb.GetNativeBufferPtr());
                     _meshBufferSlots[meshKey] = slots;
                 }
 
-                // SoA offsets (matches c_SizeOfPosition=12, c_SizeOfNormal=4, c_SizeOfTexcoord=8)
-                uint vc      = (uint)mesh.vertexCount;
-                uint posOff  = 0u;
-                uint normOff = mesh.HasVertexAttribute(VertexAttribute.Normal) ? vc * 12u : 0xFFFFFFFFu;
-                uint uvOff   = mesh.HasVertexAttribute(VertexAttribute.TexCoord0) ? vc * (12u + 4u) : 0xFFFFFFFFu;
-                uint tanOff  = mesh.HasVertexAttribute(VertexAttribute.Tangent) ? vc * (12u + 4u + 8u) : 0xFFFFFFFFu;
+                // SoA offsets — must match GetOrCreateDonutBuffers stream order exactly:
+                //   [positions: vc*12] [normals?: vc*4] [uvs?: vc*8] [tangents?: vc*4]
+                // Only present streams occupy bytes, so offsets are computed cumulatively.
+                uint vc         = (uint)mesh.vertexCount;
+                bool hasNormal  = mesh.HasVertexAttribute(VertexAttribute.Normal);
+                bool hasUV      = mesh.HasVertexAttribute(VertexAttribute.TexCoord0);
+                bool hasTangent = mesh.HasVertexAttribute(VertexAttribute.Tangent);
+
+                uint streamOffset = 0u;
+                uint posOff       = streamOffset;
+                streamOffset += vc * 12u;
+                uint normOff                = hasNormal ? streamOffset : 0xFFFFFFFFu;
+                if (hasNormal) streamOffset += vc * 4u;
+                uint uvOff                  = hasUV ? streamOffset : 0xFFFFFFFFu;
+                if (hasUV) streamOffset     += vc * 8u;
+                uint tanOff                 = hasTangent ? streamOffset : 0xFFFFFFFFu;
 
                 Material[] mats       = mr.sharedMaterials ?? Array.Empty<Material>();
                 int        subMeshCnt = mesh.subMeshCount;
-                int        firstGeom  = geomList.Count;
-                int        instIdx    = instList.Count;
+                // (firstGeom and instIdx are computed per-branch below)
 
-                var matOverride = mr.GetComponent<NativeRtxptMaterialOverride>();
+#if UNITY_EDITOR
+                if (mr.name == "Bistro_Research_Interior_Paris_Flower_Pot_01A_2442" ||
+                    mr.name == "Bistro_Research_Interior_Paris_ToffeeJar_01_3262" ||
+                    mr.name == "Bistro_Research_Interior_Paris_Wall_Light_Interior_01_3266")
+                {
+                    var groups_dbg = target.SubmeshGroups;
+                    var sb         = new System.Text.StringBuilder();
+                    sb.AppendLine($"[GPUScene DEBUG] Renderer: '{mr.name}'");
+                    sb.AppendLine($"  Mesh: '{mesh.name}'  vertexCount={vc}  subMeshCount={subMeshCnt}");
+                    sb.AppendLine($"  SoA offsets: pos={posOff}  norm={normOff}  uv={uvOff}  tan={tanOff}");
+                    sb.AppendLine($"  Buffer slots: vb={slots.vb}  ib={slots.ib}");
+                    sb.AppendLine($"  instList.Count={instList.Count}  geomList.Count={geomList.Count}  groups={groups_dbg?.Length ?? 0}");
+                    for (int _s = 0; _s < subMeshCnt; _s++)
+                    {
+                        var _sub = mesh.GetSubMesh(_s);
+                        sb.AppendLine($"  subMesh[{_s}]: indexStart={_sub.indexStart}  indexCount={_sub.indexCount}  baseVertex={_sub.baseVertex}  topology={_sub.topology}");
+                        var _mat = _s < mats.Length ? mats[_s] : null;
+                        sb.AppendLine($"  subMesh[{_s}]: mat='{(_mat != null ? _mat.name : "null")}'");
+                    }
+
+                    if (groups_dbg != null)
+                        for (int _gi = 0; _gi < groups_dbg.Length; _gi++)
+                        {
+                            var _grp = groups_dbg[_gi];
+                            sb.AppendLine($"  Group[{_gi}]: emissive={_grp.isEmissive} alphaClip={_grp.isAlphaClip} submeshIndices=[{string.Join(",", _grp.submeshIndices)}]");
+                        }
+
+                    Debug.Log(sb.ToString());
+                }
+#endif
+
+                var   matOverride        = mr.GetComponent<NativeRtxptMaterialOverride>();
                 int[] overrideMatIndices = matOverride != null ? new int[subMeshCnt] : null;
 
-                for (int s = 0; s < subMeshCnt; s++)
+                Matrix4x4 m    = target.transform.localToWorldMatrix;
+                var       row0 = new Vector4(m.m00, m.m01, m.m02, m.m03);
+                var       row1 = new Vector4(m.m10, m.m11, m.m12, m.m13);
+                var       row2 = new Vector4(m.m20, m.m21, m.m22, m.m23);
+
+                // Local helper: append geometry + sub-instance data for one sub-mesh index.
+                void AddSubmeshData(int s)
                 {
-                    SubMeshDescriptor sub    = mesh.GetSubMesh(s);
-                    Material          mat    = s < mats.Length ? mats[s] : (mats.Length > 0 ? mats[mats.Length - 1] : null);
-                    int               matIdx = GetOrAddMaterial(mat, s, matOverride, ptMatList, texPtrs);
+                    SubMeshDescriptor sub                                 = mesh.GetSubMesh(s);
+                    Material          mat                                 = s < mats.Length ? mats[s] : (mats.Length > 0 ? mats[mats.Length - 1] : null);
+                    int               matIdx                              = GetOrAddMaterial(mat, s, matOverride, ptMatList, texPtrs);
                     if (overrideMatIndices != null) overrideMatIndices[s] = matIdx;
 
-                    int globalGeomIdx = geomList.Count; // index we're about to push
+                    int globalGeomIdx = geomList.Count;
+
+                    // SubInstanceData.GlobalGeometryIndex_PTMaterialDataIndex packs both fields as 16-bit.
+                    if (globalGeomIdx > 0xFFFF)
+                        Debug.LogError($"[NativeRtxptGPUScene] GlobalGeometryIndex overflow: geomIndex={globalGeomIdx} exceeds 16-bit limit (65535). Rendering will be corrupted. Renderer='{mr.name}' subMesh={s}.");
+                    if (matIdx > 0xFFFF)
+                        Debug.LogError($"[NativeRtxptGPUScene] PTMaterialDataIndex overflow: matIndex={matIdx} exceeds 16-bit limit (65535). Rendering will be corrupted. Renderer='{mr.name}' subMesh={s}.");
 
                     geomList.Add(new DonutGeometryData
                     {
@@ -465,36 +526,85 @@ namespace PathTracing
                     geomDbgList.Add(default);
                 }
 
-                Matrix4x4 m    = target.transform.localToWorldMatrix;
-                var       row0 = new Vector4(m.m00, m.m01, m.m02, m.m03);
-                var       row1 = new Vector4(m.m10, m.m11, m.m12, m.m13);
-                var       row2 = new Vector4(m.m20, m.m21, m.m22, m.m23);
+                var groups = target.SubmeshGroups;
+                if (groups != null && groups.Length > 0)
+                {
+                    // Each SubmeshGroup is a separate TLAS instance (AddInstanceGroup), so each needs
+                    // its own DonutInstanceData with firstGeometryIndex pointing to its own geomList slice.
+                    // GeometryIndex() in the shader is 0-based within each group instance.
+                    int mrId = mr.GetInstanceID();
+                    for (int gi = 0; gi < groups.Length; gi++)
+                    {
+                        var grp               = groups[gi];
+                        int firstGeomForGroup = geomList.Count;
+
+                        for (int si = 0; si < grp.submeshIndices.Length; si++)
+                            AddSubmeshData(grp.submeshIndices[si]);
+
+                        int  groupInstIdx = instList.Count;
+                        uint groupHandle  = MakeGroupHandle(mrId, gi);
+                        _accelStructure.SetInstanceID(groupHandle, (uint)groupInstIdx);
+
+                        instList.Add(new DonutInstanceData
+                        {
+                            flags                      = 0u,
+                            firstGeometryInstanceIndex = (uint)firstGeomForGroup,
+                            firstGeometryIndex         = (uint)firstGeomForGroup,
+                            numGeometries              = (uint)grp.submeshIndices.Length,
+                            transformRow0              = row0,
+                            transformRow1              = row1,
+                            transformRow2              = row2,
+                            prevTransformRow0          = row0,
+                            prevTransformRow1          = row1,
+                            prevTransformRow2          = row2,
+                        });
+                        _sceneInstances.Add(new SceneInstance
+                        {
+                            renderer    = mr,
+                            transform   = mr.transform,
+                            groupHandle = groupHandle,
+                            prevRow0    = row0,
+                            prevRow1    = row1,
+                            prevRow2    = row2,
+                        });
+                    }
+                }
+                else
+                {
+                    // Non-grouped: one TLAS instance (AddInstance) covers all sub-meshes.
+                    int firstGeom = geomList.Count;
+                    int instIdx   = instList.Count;
+
+                    for (int s = 0; s < subMeshCnt; s++)
+                        AddSubmeshData(s);
+
+                    _accelStructure.SetInstanceID(mr, (uint)instIdx);
+                    instList.Add(new DonutInstanceData
+                    {
+                        flags                      = 0u,
+                        firstGeometryInstanceIndex = (uint)firstGeom,
+                        firstGeometryIndex         = (uint)firstGeom,
+                        numGeometries              = (uint)subMeshCnt,
+                        transformRow0              = row0,
+                        transformRow1              = row1,
+                        transformRow2              = row2,
+                        prevTransformRow0          = row0,
+                        prevTransformRow1          = row1,
+                        prevTransformRow2          = row2,
+                    });
+                    _sceneInstances.Add(new SceneInstance
+                    {
+                        renderer    = mr,
+                        transform   = mr.transform,
+                        groupHandle = 0u,
+                        prevRow0    = row0,
+                        prevRow1    = row1,
+                        prevRow2    = row2,
+                    });
+                }
 
                 if (overrideMatIndices != null)
                     _overrideMaterialIndices[mr.GetInstanceID()] = overrideMatIndices;
-
-                _accelStructure.SetInstanceID(mr, (uint)instIdx);
-                instList.Add(new DonutInstanceData
-                {
-                    flags                      = 0u,
-                    firstGeometryInstanceIndex = (uint)firstGeom,
-                    firstGeometryIndex         = (uint)firstGeom,
-                    numGeometries              = (uint)subMeshCnt,
-                    transformRow0              = row0,
-                    transformRow1              = row1,
-                    transformRow2              = row2,
-                    prevTransformRow0          = row0,
-                    prevTransformRow1          = row1,
-                    prevTransformRow2          = row2,
-                });
-                _sceneInstances.Add(new SceneInstance
-                {
-                    renderer  = mr,
-                    transform = mr.transform,
-                    prevRow0  = row0,
-                    prevRow1  = row1,
-                    prevRow2  = row2,
-                });
             }
 
             // Append environment map to bindless texture array (if registered)
@@ -592,38 +702,38 @@ namespace PathTracing
         {
             uint flags = 0;
             // Preserve texture-presence flags derived from the current texture indices.
-            if (data.BaseOrDiffuseTextureIndex        != 0xFFFFFFFFu) flags |= PTMaterialFlags.UseBaseOrDiffuseTexture;
-            if (data.NormalTextureIndex               != 0xFFFFFFFFu) flags |= PTMaterialFlags.UseNormalTexture;
+            if (data.BaseOrDiffuseTextureIndex != 0xFFFFFFFFu) flags        |= PTMaterialFlags.UseBaseOrDiffuseTexture;
+            if (data.NormalTextureIndex != 0xFFFFFFFFu) flags               |= PTMaterialFlags.UseNormalTexture;
             if (data.MetalRoughOrSpecularTextureIndex != 0xFFFFFFFFu) flags |= PTMaterialFlags.UseMetalRoughOrSpecularTexture;
-            if (data.EmissiveTextureIndex             != 0xFFFFFFFFu) flags |= PTMaterialFlags.UseEmissiveTexture;
-            if (data.OcclusionTextureIndex            != 0xFFFFFFFFu) flags |= (uint)DonutMaterialFlags.UseOcclusionTexture;
-            if (data.TransmissionTextureIndex         != 0xFFFFFFFFu) flags |= PTMaterialFlags.UseTransmissionTexture;
+            if (data.EmissiveTextureIndex != 0xFFFFFFFFu) flags             |= PTMaterialFlags.UseEmissiveTexture;
+            if (data.OcclusionTextureIndex != 0xFFFFFFFFu) flags            |= (uint)DonutMaterialFlags.UseOcclusionTexture;
+            if (data.TransmissionTextureIndex != 0xFFFFFFFFu) flags         |= PTMaterialFlags.UseTransmissionTexture;
 
-            if (slot.ThinSurface)                                     flags |= PTMaterialFlags.ThinSurface;
-            if (slot.MetalnessInRedChannel)                           flags |= PTMaterialFlags.MetalnessInRedChannel;
-            if (slot.PSDExclude)                                      flags |= PTMaterialFlags.PSDExclude;
-            if (slot.IgnoreMeshTangentSpace)                          flags |= PTMaterialFlags.IgnoreMeshTangentSpace;
-            if (slot.PSDBlockMotionVectorsAtSurfaceType % 2 != 0)     flags |= PTMaterialFlags.PSDBlockMVsAtSurfaceTypeB0;
-            if (slot.PSDBlockMotionVectorsAtSurfaceType / 2 != 0)     flags |= PTMaterialFlags.PSDBlockMVsAtSurfaceTypeB1;
-            flags |= (uint)Mathf.Clamp(slot.NestedPriority,              0, 15) << PTMaterialFlags.NestedPriorityShift;
-            flags |= (uint)Mathf.Clamp(slot.PSDDominantDeltaLobe + 1, 0,  7)   << PTMaterialFlags.PSDDominantDeltaLobeP1Shift;
+            if (slot.ThinSurface) flags                                 |= PTMaterialFlags.ThinSurface;
+            if (slot.MetalnessInRedChannel) flags                       |= PTMaterialFlags.MetalnessInRedChannel;
+            if (slot.PSDExclude) flags                                  |= PTMaterialFlags.PSDExclude;
+            if (slot.IgnoreMeshTangentSpace) flags                      |= PTMaterialFlags.IgnoreMeshTangentSpace;
+            if (slot.PSDBlockMotionVectorsAtSurfaceType % 2 != 0) flags |= PTMaterialFlags.PSDBlockMVsAtSurfaceTypeB0;
+            if (slot.PSDBlockMotionVectorsAtSurfaceType / 2 != 0) flags |= PTMaterialFlags.PSDBlockMVsAtSurfaceTypeB1;
+            flags |= (uint)Mathf.Clamp(slot.NestedPriority, 0, 15) << PTMaterialFlags.NestedPriorityShift;
+            flags |= (uint)Mathf.Clamp(slot.PSDDominantDeltaLobe + 1, 0, 7) << PTMaterialFlags.PSDDominantDeltaLobeP1Shift;
 
-            data.Flags                      = flags;
-            data.BaseOrDiffuseColor         = new Vector3(slot.BaseColorFactor.r, slot.BaseColorFactor.g, slot.BaseColorFactor.b);
-            data.SpecularColor              = new Vector3(slot.SpecularColor.r, slot.SpecularColor.g, slot.SpecularColor.b);
-            data.EmissiveColor              = new Vector3(slot.EmissiveColor.r, slot.EmissiveColor.g, slot.EmissiveColor.b);
-            data.ShadowNoLFadeout           = Mathf.Clamp(slot.ShadowNoLFadeout, 0f, 0.25f);
-            data.Opacity                    = slot.Opacity;
-            data.Roughness                  = slot.Roughness;
-            data.Metalness                  = slot.Metalness;
-            data.NormalTextureScale         = slot.NormalTextureScale;
-            data.AlphaCutoff                = slot.AlphaCutoff;
-            data.TransmissionFactor         = slot.TransmissionFactor;
-            data.IoR                        = slot.IoR;
-            data.ThicknessFactor            = slot.ThicknessFactor;
-            data.DiffuseTransmissionFactor  = slot.DiffuseTransmissionFactor;
-            data.VolumeAttenuationColor     = new Vector3(slot.VolumeAttenuationColor.r, slot.VolumeAttenuationColor.g, slot.VolumeAttenuationColor.b);
-            data.VolumeAttenuationDistance  = slot.VolumeAttenuationDistance;
+            data.Flags                     = flags;
+            data.BaseOrDiffuseColor        = new Vector3(slot.BaseColorFactor.r, slot.BaseColorFactor.g, slot.BaseColorFactor.b);
+            data.SpecularColor             = new Vector3(slot.SpecularColor.r, slot.SpecularColor.g, slot.SpecularColor.b);
+            data.EmissiveColor             = new Vector3(slot.EmissiveColor.r, slot.EmissiveColor.g, slot.EmissiveColor.b);
+            data.ShadowNoLFadeout          = Mathf.Clamp(slot.ShadowNoLFadeout, 0f, 0.25f);
+            data.Opacity                   = slot.Opacity;
+            data.Roughness                 = slot.Roughness;
+            data.Metalness                 = slot.Metalness;
+            data.NormalTextureScale        = slot.NormalTextureScale;
+            data.AlphaCutoff               = slot.AlphaCutoff;
+            data.TransmissionFactor        = slot.TransmissionFactor;
+            data.IoR                       = slot.IoR;
+            data.ThicknessFactor           = slot.ThicknessFactor;
+            data.DiffuseTransmissionFactor = slot.DiffuseTransmissionFactor;
+            data.VolumeAttenuationColor    = new Vector3(slot.VolumeAttenuationColor.r, slot.VolumeAttenuationColor.g, slot.VolumeAttenuationColor.b);
+            data.VolumeAttenuationDistance = slot.VolumeAttenuationDistance;
         }
 
         private void UpdateInstanceTransforms()
@@ -661,7 +771,10 @@ namespace PathTracing
                 _instanceCpu[i].transformRow1 = row1;
                 _instanceCpu[i].transformRow2 = row2;
 
-                _accelStructure.SetInstanceTransform(si.renderer, m);
+                if (si.groupHandle != 0)
+                    _accelStructure.SetInstanceTransform(si.groupHandle, m);
+                else
+                    _accelStructure.SetInstanceTransform(si.renderer, m);
                 // Debug.Log($"[NativeRtxptGPUScene] Updated transform for instance {i} ({si.renderer.name}) pos = {si.transform.position}");
                 if (dirtyStart < 0) dirtyStart = i;
 
@@ -682,28 +795,28 @@ namespace PathTracing
             int idx = ptMatList.Count;
 
             int baseTexIdx       = AddTexture(slot.BaseOrDiffuseTexture, texPtrs);
-            int normalTexIdx     = AddTexture(slot.NormalTexture,        texPtrs);
-            int metalRoughTexIdx = AddTexture(slot.MetalRoughTexture,    texPtrs);
-            int emissiveTexIdx   = AddTexture(slot.EmissiveTexture,      texPtrs);
-            int occlusionTexIdx  = AddTexture(slot.OcclusionTexture,     texPtrs);
-            int transmTexIdx     = AddTexture(slot.TransmissionTexture,  texPtrs);
+            int normalTexIdx     = AddTexture(slot.NormalTexture, texPtrs);
+            int metalRoughTexIdx = AddTexture(slot.MetalRoughTexture, texPtrs);
+            int emissiveTexIdx   = AddTexture(slot.EmissiveTexture, texPtrs);
+            int occlusionTexIdx  = AddTexture(slot.OcclusionTexture, texPtrs);
+            int transmTexIdx     = AddTexture(slot.TransmissionTexture, texPtrs);
 
             uint SafeIdx(int i) => i >= 0 ? (uint)i : 0xFFFFFFFFu;
 
-            uint flags = 0;
-            if (baseTexIdx >= 0)       flags |= PTMaterialFlags.UseBaseOrDiffuseTexture;
-            if (normalTexIdx >= 0)     flags |= PTMaterialFlags.UseNormalTexture;
-            if (metalRoughTexIdx >= 0) flags |= PTMaterialFlags.UseMetalRoughOrSpecularTexture;
-            if (emissiveTexIdx >= 0)   flags |= PTMaterialFlags.UseEmissiveTexture;
-            if (occlusionTexIdx >= 0)  flags |= (uint)DonutMaterialFlags.UseOcclusionTexture;
-            if (transmTexIdx >= 0)     flags |= PTMaterialFlags.UseTransmissionTexture;
-            if (slot.ThinSurface)              flags |= PTMaterialFlags.ThinSurface;
-            if (slot.MetalnessInRedChannel)    flags |= PTMaterialFlags.MetalnessInRedChannel;
-            if (slot.PSDExclude)               flags |= PTMaterialFlags.PSDExclude;
-            if (slot.IgnoreMeshTangentSpace)   flags |= PTMaterialFlags.IgnoreMeshTangentSpace;
+            uint flags                                                  = 0;
+            if (baseTexIdx >= 0) flags                                  |= PTMaterialFlags.UseBaseOrDiffuseTexture;
+            if (normalTexIdx >= 0) flags                                |= PTMaterialFlags.UseNormalTexture;
+            if (metalRoughTexIdx >= 0) flags                            |= PTMaterialFlags.UseMetalRoughOrSpecularTexture;
+            if (emissiveTexIdx >= 0) flags                              |= PTMaterialFlags.UseEmissiveTexture;
+            if (occlusionTexIdx >= 0) flags                             |= (uint)DonutMaterialFlags.UseOcclusionTexture;
+            if (transmTexIdx >= 0) flags                                |= PTMaterialFlags.UseTransmissionTexture;
+            if (slot.ThinSurface) flags                                 |= PTMaterialFlags.ThinSurface;
+            if (slot.MetalnessInRedChannel) flags                       |= PTMaterialFlags.MetalnessInRedChannel;
+            if (slot.PSDExclude) flags                                  |= PTMaterialFlags.PSDExclude;
+            if (slot.IgnoreMeshTangentSpace) flags                      |= PTMaterialFlags.IgnoreMeshTangentSpace;
             if (slot.PSDBlockMotionVectorsAtSurfaceType % 2 != 0) flags |= PTMaterialFlags.PSDBlockMVsAtSurfaceTypeB0;
             if (slot.PSDBlockMotionVectorsAtSurfaceType / 2 != 0) flags |= PTMaterialFlags.PSDBlockMVsAtSurfaceTypeB1;
-            flags |= (uint)Mathf.Clamp(slot.NestedPriority, 0, 15)        << PTMaterialFlags.NestedPriorityShift;
+            flags |= (uint)Mathf.Clamp(slot.NestedPriority, 0, 15) << PTMaterialFlags.NestedPriorityShift;
             flags |= (uint)Mathf.Clamp(slot.PSDDominantDeltaLobe + 1, 0, 7) << PTMaterialFlags.PSDDominantDeltaLobeP1Shift;
 
             ptMatList.Add(new PTMaterialData
@@ -737,7 +850,7 @@ namespace PathTracing
         }
 
         private int GetOrAddMaterial(Material mat, int subMeshIndex, NativeRtxptMaterialOverride matOverride,
-                                        List<PTMaterialData> ptMatList, List<IntPtr> texPtrs)
+            List<PTMaterialData> ptMatList, List<IntPtr> texPtrs)
         {
             // ----------------------------------------------------------------
             // Fast path: renderer has a manual override for this sub-mesh

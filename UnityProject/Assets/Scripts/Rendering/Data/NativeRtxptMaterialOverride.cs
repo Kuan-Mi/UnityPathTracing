@@ -29,13 +29,13 @@ namespace PathTracing
 
         [Range(0f, 1f)]
         public float Metalness = 0f;
-        
+
         [Range(0f, 1f)]
         public float Roughness = 0.5f;
 
 
-        public Color EmissiveColor          = Color.black;
-        
+        public Color EmissiveColor = Color.black;
+
         public Color SpecularColor          = new Color(0.04f, 0.04f, 0.04f, 1f);
         public Color VolumeAttenuationColor = Color.white;
 
@@ -157,7 +157,7 @@ namespace PathTracing
                 Slots[s] = slot;
             }
         }
-
+          
         private static void BakeSlotFromMaterial(RtxptMaterialSlot slot, Material mat)
         {
             if (mat == null) return;

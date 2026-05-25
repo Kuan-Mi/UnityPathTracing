@@ -310,6 +310,7 @@ namespace PathTracing
                 // count actual emissive meshes / triangles / geometry instances from the live scene,
                 // then round up to allocation quanta so minor scene changes don't force a realloc.
                 // Rebuild on overflow is deferred (TODO).
+                // NOTE: overflow detection below will fire if the scene grows beyond the initial allocation.
                 const uint kMeshQuantum     = 128u;
                 const uint kTriangleQuantum = 1024u;
                 const uint kPrimQuantum     = 128u;
@@ -337,6 +338,22 @@ namespace PathTracing
                     1u, // EnvW — no environment map yet
                     1u); // EnvH
                 _rtxdiResources.Add(uniqueKey, rtxdiResources);
+            }
+            else
+            {
+                // Resources already allocated at first frame — check for overflow (dynamic resize is TODO).
+                var  emissiveGeos     = _rtxdiGpuScene.GetEmissiveGeometries();
+                uint curMeshes        = (uint)emissiveGeos.Count;
+                uint curTriangles     = 0u;
+                foreach (var e in emissiveGeos) curTriangles += e.TriangleCount;
+                uint curGeomInstances = (uint)_rtxdiGpuScene.TotalGeometryInstanceCount;
+
+                if (curMeshes > rtxdiResources.MaxEmissiveMeshes)
+                    Debug.LogError($"[NativeRtxdiFeature] Emissive mesh count overflow: current={curMeshes} > allocated={rtxdiResources.MaxEmissiveMeshes}. GPU buffers are too small — rendering will be corrupted. (Dynamic resize not yet implemented.)");
+                if (curTriangles > rtxdiResources.MaxEmissiveTriangles)
+                    Debug.LogError($"[NativeRtxdiFeature] Emissive triangle count overflow: current={curTriangles} > allocated={rtxdiResources.MaxEmissiveTriangles}. GPU buffers are too small — rendering will be corrupted. (Dynamic resize not yet implemented.)");
+                if (curGeomInstances > rtxdiResources.MaxGeometryInstances)
+                    Debug.LogError($"[NativeRtxdiFeature] Geometry instance count overflow: current={curGeomInstances} > allocated={rtxdiResources.MaxGeometryInstances}. GPU buffers are too small — rendering will be corrupted. (Dynamic resize not yet implemented.)");
             }
 
             if (resourcesChanged)

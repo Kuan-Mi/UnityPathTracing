@@ -269,7 +269,7 @@ namespace NativeRender
         /// Call this in the same CommandBuffer, after the AS BuildOrUpdate event.
         /// </summary>
         public void RebuildHitGroupTable(CommandBuffer cmd, RayTracingAccelerationStructure accelStruct)
-        {
+        {                             
             if (!IsValid || accelStruct == null) return;
             accelStruct.IssueRebuildHitGroupTable(cmd, _handle);
         }
