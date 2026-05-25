@@ -811,8 +811,24 @@ bool AccelerationStructure::BuildTLAS(ID3D12GraphicsCommandList4 *cmdList, const
             inst.Flags = D3D12_RAYTRACING_INSTANCE_FLAG_NONE;
             inst.AccelerationStructure = e.blasVA;
         }
-    }
 
+        // Debug: dump per-instance InstanceContributionToHitGroupIndex for SBT diagnostics.
+        {
+            std::string dumpMsg;
+            dumpMsg.reserve(count * 20 + 80);
+            char tmp[64];
+            snprintf(tmp, sizeof(tmp), "[TLAS] %u instances, InstanceContributions: [", count);
+            dumpMsg += tmp;
+            for (uint32_t i = 0; i < count; ++i)
+            {
+                if (i > 0) dumpMsg += ",";
+                snprintf(tmp, sizeof(tmp), "%u", descs[i].InstanceContributionToHitGroupIndex);
+                dumpMsg += tmp;
+            }
+            dumpMsg += "]";
+            AccelLogf(m_log, kUnityLogTypeLog, "%s", dumpMsg.c_str());
+        }
+    }
     // ------------------------------------------------------------------
     // 2. Query prebuild sizes for the new instance count.
     // ------------------------------------------------------------------

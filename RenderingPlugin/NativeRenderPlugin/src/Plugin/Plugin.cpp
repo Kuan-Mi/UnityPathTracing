@@ -7,6 +7,7 @@
 #include <d3d12.h>
 #include <dxgi1_6.h>
 #include <wrl/client.h>
+#include <cstdarg>
 #include <cstdint>
 #include <cstdio>
 #include <list>
@@ -272,11 +273,21 @@ static void PluginLog(UnityLogType type, const char* msg, const char* file, int 
         printf("[NativeRender] %s\n", msg);
 }
 
+static void PluginLogFmt(UnityLogType type, const char* file, int line, const char* fmt, ...)
+{
+    char buf[1024];
+    va_list args;
+    va_start(args, fmt);
+    vsnprintf(buf, sizeof(buf), fmt, args);
+    va_end(args);
+    PluginLog(type, buf, file, line);
+}
+
 static void FlushGpuAndWait();
 
-#define NR_LOG(msg)     PluginLog(kUnityLogTypeLog,     (msg), __FILE__, __LINE__)
-#define NR_WARN(msg)    PluginLog(kUnityLogTypeWarning, (msg), __FILE__, __LINE__)
-#define NR_ERROR(msg)   PluginLog(kUnityLogTypeError,   (msg), __FILE__, __LINE__)
+#define NR_LOG(fmt, ...)   PluginLogFmt(kUnityLogTypeLog,     __FILE__, __LINE__, fmt, ##__VA_ARGS__)
+#define NR_WARN(fmt, ...)  PluginLogFmt(kUnityLogTypeWarning, __FILE__, __LINE__, fmt, ##__VA_ARGS__)
+#define NR_ERROR(fmt, ...) PluginLogFmt(kUnityLogTypeError,   __FILE__, __LINE__, fmt, ##__VA_ARGS__)
 
 // Bridge D3D12HeapHook logs into Unity's log (called from any thread).
 static void HeapHookLogBridge(int level, const char* msg)

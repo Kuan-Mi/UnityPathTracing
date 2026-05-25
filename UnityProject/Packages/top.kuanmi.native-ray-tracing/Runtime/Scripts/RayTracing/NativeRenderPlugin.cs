@@ -288,7 +288,7 @@ namespace NativeRender
         /// <summary>Returns the render event function for shader hit-group table rebuild.
         /// Issue via CommandBuffer.IssuePluginEventAndData after the AS build event.</summary>
         [DllImport(DllName)]
-        public static extern UnityEngine.Rendering.UnityRenderingEventAndData NR_RTS_GetRebuildHitGroupTableEventFunc();
+        public static extern IntPtr NR_RTS_GetRebuildHitGroupTableEventFunc();
 
         /// <summary>Returns sizeof(ShtRebuildEventData) for buffer allocation.</summary>
         [DllImport(DllName)]

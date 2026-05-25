@@ -35,8 +35,12 @@ namespace NativeRender
         private readonly Dictionary<uint, int> _handleToGeomVariantSlot              = new();
         private          bool                  _variantIndexDirty                    = false;
         private NativeArray<uint>              _variantIndexArray;
-        // Persisted event data for SHT rebuild dispatches
+        // Persisted event data for SHT rebuild dispatches.
+        // Ring buffer of 3 slots so consecutive frames don't overwrite in-flight data
+        // before the render thread has consumed the previous frame's callback.
+        private const int kShtRingSize = 3;
         private NativeArray<NativeRenderPlugin.ShtRebuildEventData> _shtEventData;
+        private int _shtRingIndex = 0;
 
         // Thread-safe collections for pending SkinnedMeshRenderers
         // Key: SkinnedMeshRenderer.GetInstanceID()
@@ -130,6 +134,46 @@ namespace NativeRender
         // ---------------------------------------------------------------------------
 
         /// <summary>
+        /// Prints the current shader table contents to the Unity console for debugging.
+        /// Shows the per-group summary (_geomVariants) and the flat per-geometry variant-index array.
+        /// </summary>
+        public void PrintShaderTable()
+        {
+            var sb = new System.Text.StringBuilder();
+            sb.AppendLine($"[ShaderTable] asHandle=0x{_handle:X}");
+
+            // Group summary
+            sb.AppendLine($"  GeomVariant groups ({_geomVariants.Count}):");
+            for (int gi = 0; gi < _geomVariants.Count; gi++)
+            {
+                var (subCount, variant) = _geomVariants[gi];
+                sb.AppendLine($"    [{gi}] variantIndex={variant}  submeshCount={subCount}");
+            }
+
+            // Flat per-geometry array (lazily built if needed)
+            if (_variantIndexDirty || !_variantIndexArray.IsCreated)
+                RebuildVariantIndexArray();
+
+            if (_variantIndexArray.IsCreated && _variantIndexArray.Length > 0)
+            {
+                sb.AppendLine($"  Flat variantIndexArray ({_variantIndexArray.Length} entries):");
+                var entries = new System.Text.StringBuilder("    ");
+                for (int i = 0; i < _variantIndexArray.Length; i++)
+                {
+                    if (i > 0) entries.Append(", ");
+                    entries.Append(_variantIndexArray[i]);
+                }
+                sb.AppendLine(entries.ToString());
+            }
+            else
+            {
+                sb.AppendLine("  Flat variantIndexArray: (empty)");
+            }
+
+            Debug.Log(sb.ToString());
+        }
+
+        /// <summary>
         /// Rebuilds the flat per-geometry variant-index array from the current _geomVariants list.
         /// Called lazily before issuing the SHT rebuild render event.
         /// </summary>
@@ -160,9 +204,13 @@ namespace NativeRender
             if (!_variantIndexArray.IsCreated || _variantIndexArray.Length == 0) return;
 
             if (!_shtEventData.IsCreated)
-                _shtEventData = new NativeArray<NativeRenderPlugin.ShtRebuildEventData>(1, Allocator.Persistent);
+                _shtEventData = new NativeArray<NativeRenderPlugin.ShtRebuildEventData>(kShtRingSize, Allocator.Persistent);
 
-            _shtEventData[0] = new NativeRenderPlugin.ShtRebuildEventData
+            // Advance ring index so we never overwrite the slot the render thread
+            // may still be reading from a previous (in-flight) frame.
+            _shtRingIndex = (_shtRingIndex + 1) % kShtRingSize;
+
+            _shtEventData[_shtRingIndex] = new NativeRenderPlugin.ShtRebuildEventData
             {
                 shaderHandle      = shaderHandle,
                 variantIndicesPtr = (IntPtr)NativeArrayUnsafeUtility.GetUnsafeReadOnlyPtr(_variantIndexArray),
@@ -170,10 +218,14 @@ namespace NativeRender
                 _pad              = 0,
             };
             Debug.Log($"[RayTracingAccelerationStructure] IssueRebuildHitGroupTable: shaderHandle=0x{shaderHandle:X} count={_variantIndexArray.Length}");
-            cmd.IssuePluginEventAndData(
-                NativeRenderPlugin.NR_RTS_GetRebuildHitGroupTableEventFunc(),
-                2,
-                (IntPtr)NativeArrayUnsafeUtility.GetUnsafePtr(_shtEventData));
+            unsafe
+            {
+                var basePtr = (NativeRenderPlugin.ShtRebuildEventData*)NativeArrayUnsafeUtility.GetUnsafePtr(_shtEventData);
+                cmd.IssuePluginEventAndData(
+                    NativeRenderPlugin.NR_RTS_GetRebuildHitGroupTableEventFunc(),
+                    2,
+                    (IntPtr)(basePtr + _shtRingIndex));
+            }
         }
 
         public RayTracingAccelerationStructure()

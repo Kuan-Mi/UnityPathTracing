@@ -16,7 +16,7 @@ namespace NativeRender
     /// To create a new shader asset: right-click in the Project view and rename any text file
     /// to have the <c>.rayshader</c> extension, or duplicate an existing one.
     /// </summary>
-    [ScriptedImporter(1, "rayshader", 0)]
+    [ScriptedImporter(1, "rayshader", -1000)]
     public class RayTraceShaderImporter : ScriptedImporter
     {
         [Tooltip("Additional #include search directories (absolute paths). The shader file's own directory is always included automatically.")]
