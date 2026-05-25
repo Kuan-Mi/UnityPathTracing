@@ -15,13 +15,15 @@ namespace PathTracing
     /// Pass execution order:
     ///   Phase 0 : NativeRtxptBuildTlasPass              - TLAS rebuild
     ///   Phase 1 : LightsBaker passes                    - env map / emissive / proxies / feedback (TODO)
-    ///   Phase 2 : NativeRtxptPathTracerPass             - BuildStablePlanes + FillStablePlanes (realtime) / Reference
-    ///   Phase 3 : NativeRtxptExportVisibilityBufferPass - depth + motion vectors export
-    ///   Phase 4 : NativeRtxptDenoiseSpecHitTPass        - specular hit-distance bilateral filter x2
-    ///   Phase 5 : NativeRtxptNoDenoiserFinalMergePass   - merge stable planes to OutputColor
-    ///   Phase 6 : NativeRtxptDlssBeforePass             - prepare DLSS-RR guide buffers
-    ///   Phase 7 : DlssRRPass                            - DLSS Ray Reconstruction (denoise + upscale)
-    ///   Phase 8 : NativeRtxptAccumulationPass           - multi-frame accumulation (reference mode only)
+    ///   Phase 2a: NativeRtxptBuildStablePlanesPass       - BuildStablePlanes RT (PathTracePrePass)
+    ///   Phase 2b: NativeRtxptExportVisibilityBufferPass  - depth + motion vectors export
+    ///   Phase 2c: NativeRtxptLightingUpdateEndPass       - NEE-AT feedback processing (stub)
+    ///   Phase 2d: NativeRtxptFillStablePlanesPass        - FillStablePlanes RT (PathTrace) / Reference
+    ///   Phase 3 : NativeRtxptDenoiseSpecHitTPass         - specular hit-distance bilateral filter x2
+    ///   Phase 4 : NativeRtxptNoDenoiserFinalMergePass    - merge stable planes to OutputColor
+    ///   Phase 5 : NativeRtxptDlssBeforePass              - prepare DLSS-RR guide buffers
+    ///   Phase 6 : DlssRRPass                             - DLSS Ray Reconstruction (denoise + upscale)
+    ///   Phase 7 : NativeRtxptAccumulationPass            - multi-frame accumulation (reference mode only)
     ///
     /// PT_USE_RESTIR_DI = 0, PT_USE_RESTIR_GI = 0 (no RTXDI).
     /// cStablePlaneCount = 3.
@@ -34,12 +36,12 @@ namespace PathTracing
 
         public SampleConstants sampleConstants;
 
-        // Phase 2: PathTracer RT shaders
+        // Phase 2a/2d: PathTracer RT shaders
         public RayTraceShader buildStablePlanesShader;
         public RayTraceShader fillStablePlanesShader;
         public RayTraceShader referenceShader;
 
-        // Phase 2: per-pipeline extra hit-group blobs
+        // Phase 2a/2d: per-pipeline extra hit-group blobs
         public HitGroupShader[] buildHitGroups;
         public HitGroupShader[] fillHitGroups;
         public HitGroupShader[] referenceHitGroups;
@@ -90,8 +92,10 @@ namespace PathTracing
         private NativeRtxptEnvMapBakerPass            _envMapBakerPass;
         private NativeRtxptEnvLightsBakerPass         _envLightsBakerPass;
         private NativeRtxptLightingPass               _lightingPass;
-        private NativeRtxptPathTracerPass             _pathTracerPass;
+        private NativeRtxptBuildStablePlanesPass      _buildStablePlanesPass;
         private NativeRtxptExportVisibilityBufferPass _exportVisibilityBufferPass;
+        private NativeRtxptLightingUpdateEndPass      _lightingUpdateEndPass;
+        private NativeRtxptFillStablePlanesPass       _fillStablePlanesPass;
         private NativeRtxptDenoiseSpecHitTPass        _denoiseSpecHitTPass;
         private NativeRtxptNoDenoiserFinalMergePass   _noDenoiserFinalMergePass;
         private NativeRtxptDlssBeforePass             _dlssBeforePass;
@@ -127,12 +131,18 @@ namespace PathTracing
                 renderPassEvent = renderPassEvent,
             };
 
-            _pathTracerPass ??= new NativeRtxptPathTracerPass(
-                    buildStablePlanesShader, fillStablePlanesShader, referenceShader,
-                    buildHitGroups, fillHitGroups, referenceHitGroups)
+            _buildStablePlanesPass ??= new NativeRtxptBuildStablePlanesPass(
+                    buildStablePlanesShader, buildHitGroups)
                 { renderPassEvent = renderPassEvent };
 
             _exportVisibilityBufferPass ??= new NativeRtxptExportVisibilityBufferPass(exportVisibilityBufferCs) { renderPassEvent = renderPassEvent };
+
+            _lightingUpdateEndPass ??= new NativeRtxptLightingUpdateEndPass { renderPassEvent = renderPassEvent };
+
+            _fillStablePlanesPass ??= new NativeRtxptFillStablePlanesPass(
+                    fillStablePlanesShader, referenceShader,
+                    fillHitGroups, referenceHitGroups)
+                { renderPassEvent = renderPassEvent };
             _denoiseSpecHitTPass        ??= new NativeRtxptDenoiseSpecHitTPass(denoiseSpecHitTCs) { renderPassEvent               = renderPassEvent };
             _noDenoiserFinalMergePass   ??= new NativeRtxptNoDenoiserFinalMergePass(noDenoiserFinalMergeCs) { renderPassEvent     = renderPassEvent };
             _dlssBeforePass             ??= new NativeRtxptDlssBeforePass(dlssBeforeCs) { renderPassEvent                         = renderPassEvent };
@@ -243,9 +253,9 @@ namespace PathTracing
             if (eyeIndex == 0)
             {
                 _buildTlasPass.Setup(_gpuScene,
-                    _pathTracerPass?.BuildPipeline,
-                    _pathTracerPass?.FillPipeline,
-                    _pathTracerPass?.RefPipeline);
+                    _buildStablePlanesPass?.BuildPipeline,
+                    _fillStablePlanesPass?.FillPipeline,
+                    _fillStablePlanesPass?.RefPipeline);
                 renderer.EnqueuePass(_buildTlasPass);
             }
 
@@ -285,30 +295,41 @@ namespace PathTracing
             _envLightsBakerPass.Setup(passCtx);
             renderer.EnqueuePass(_envLightsBakerPass);
 
-            // ---- Phase 2: PathTracer RT Shader ------------------------------
-            _pathTracerPass.Setup(passCtx);
-            renderer.EnqueuePass(_pathTracerPass);
+            // ---- Phase 2a: BuildStablePlanes RT (PathTracePrePass) ----------
+            _buildStablePlanesPass.Setup(passCtx);
+            renderer.EnqueuePass(_buildStablePlanesPass);
 
-            // ---- Phase 3: ExportVisibilityBuffer ----------------------------
+            // ---- Phase 2b: ExportVisibilityBuffer ---------------------------
+            // Outputs Depth + MotionVectors needed by LightingUpdateEnd.
             _exportVisibilityBufferPass.Setup(passCtx);
             renderer.EnqueuePass(_exportVisibilityBufferPass);
 
-            // ---- Realtime-only phases (4-7) ---------------------------------
+            // ---- Phase 2c: LightingUpdateEnd --------------------------------
+            // NEE-AT feedback processing: builds per-tile LocalSamplingBuffer
+            // for FillStablePlanes, then clears feedback for current frame.
+            _lightingUpdateEndPass.Setup(passCtx);
+            renderer.EnqueuePass(_lightingUpdateEndPass);
+
+            // ---- Phase 2d: FillStablePlanes RT (PathTrace) / Reference ------
+            _fillStablePlanesPass.Setup(passCtx);
+            renderer.EnqueuePass(_fillStablePlanesPass);
+
+            // ---- Realtime-only phases (3-6) ---------------------------------
             if (setting.realtimeMode)
             {
-                // Phase 4: DenoiseSpecHitT x2
+                // Phase 3: DenoiseSpecHitT x2
                 _denoiseSpecHitTPass.Setup(passCtx);
                 renderer.EnqueuePass(_denoiseSpecHitTPass);
 
-                // Phase 5: NoDenoiserFinalMerge
+                // Phase 4: NoDenoiserFinalMerge
                 _noDenoiserFinalMergePass.Setup(passCtx);
                 renderer.EnqueuePass(_noDenoiserFinalMergePass);
 
-                // Phase 6: DlssBefore
+                // Phase 5: DlssBefore
                 _dlssBeforePass.Setup(passCtx);
                 renderer.EnqueuePass(_dlssBeforePass);
 
-                // Phase 7: DLSS-RR
+                // Phase 6: DLSS-RR
                 {
                     var dlrrInput = new DlrrDenoiser.DlrrFrameInput
                     {
@@ -339,7 +360,7 @@ namespace PathTracing
             }
             else
             {
-                // Phase 8: Accumulation (reference mode)
+                // Phase 7: Accumulation (reference mode)
                 _accumulationPass.Setup(passCtx);
                 renderer.EnqueuePass(_accumulationPass);
             }
@@ -389,8 +410,11 @@ namespace PathTracing
         {
             if (!disposing) return;
 
-            _pathTracerPass?.Dispose();
-            _pathTracerPass = null;
+            _buildStablePlanesPass?.Dispose();
+            _buildStablePlanesPass = null;
+            _fillStablePlanesPass?.Dispose();
+            _fillStablePlanesPass = null;
+            _lightingUpdateEndPass = null;
             _exportVisibilityBufferPass?.Dispose();
             _exportVisibilityBufferPass = null;
             _denoiseSpecHitTPass?.Dispose();
@@ -432,7 +456,7 @@ namespace PathTracing
         {
             const string shaderRoot = "Assets/RTXPT/Shaders";
 
-            // Phase 2: PathTracer RT shaders
+            // Phase 2a/2d: PathTracer RT shaders
             buildStablePlanesShader = LoadRs($"{shaderRoot}/BuildStablePlanes");
             fillStablePlanesShader  = LoadRs($"{shaderRoot}/FillStablePlanes");
             referenceShader         = LoadRs($"{shaderRoot}/Reference");
