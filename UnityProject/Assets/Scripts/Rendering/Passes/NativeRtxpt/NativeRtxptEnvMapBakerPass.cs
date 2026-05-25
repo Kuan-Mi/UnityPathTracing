@@ -19,6 +19,11 @@ namespace PathTracing
     ///   <c>BakedEnvCubePtr</c>      → t_EnvironmentMap  (TextureCube mip0)
     ///   <c>EnvImportanceMapPtr</c>  → t_EnvLookupMap    (Texture2D R32F)
     /// </summary>
+    /// <summary>
+    /// DEPRECATED — absorbed into NativeRtxptLightingUpdateBeginPass.
+    /// This class is retained only to avoid breaking serialized asset references.
+    /// </summary>
+    [Obsolete("Use NativeRtxptLightingUpdateBeginPass instead.")]
     public class NativeRtxptEnvMapBakerPass : ScriptableRenderPass, IDisposable
     {
         // ── Shader / pipeline constants ─────────────────────────────────────

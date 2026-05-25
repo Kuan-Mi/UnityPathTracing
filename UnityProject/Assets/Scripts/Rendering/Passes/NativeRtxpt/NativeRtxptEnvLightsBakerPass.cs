@@ -25,6 +25,11 @@ namespace PathTracing
     /// The resulting <c>EnvLightLookupMap</c> (1024×1024 R32_UINT) is exposed on
     /// <see cref="NativeRtxptPassContext.EnvLightLookupMapPtr"/> for the path tracer (t18 t_EnvLookupMap).
     /// </summary>
+    /// <summary>
+    /// DEPRECATED — absorbed into NativeRtxptLightingUpdateBeginPass.
+    /// This class is retained only to avoid breaking serialized asset references.
+    /// </summary>
+    [Obsolete("Use NativeRtxptLightingUpdateBeginPass instead.")]
     public class NativeRtxptEnvLightsBakerPass : ScriptableRenderPass, IDisposable
     {
         // ---- Quad-tree constants (mirror LightingConfig.h) -----------------

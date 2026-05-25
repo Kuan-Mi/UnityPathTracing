@@ -64,7 +64,14 @@ namespace PathTracing
         // Phase Debug: StablePlanesDebugViz
         public NativeComputeShader stablePlanesDebugVizCs;
 
-        // Phase 1: LightsBaker compute shaders
+        // LightingUpdateBegin: all compute shaders (merged from EnvMapBaker, EnvLightsBaker, LightsBaker)
+        public NativeComputeShader baseLayerCs;
+        public NativeComputeShader envMapImportanceBakerCs;
+        public NativeComputeShader envLightsBackupPastCs;
+        public NativeComputeShader envLightsSubdivideBaseCs;
+        public NativeComputeShader envLightsSubdivideBoostCs;
+        public NativeComputeShader envLightsFillLookupMapCs;
+        public NativeComputeShader envLightsMapPastToCurrentCs;
         public NativeComputeShader resetLightProxyCountersCs;
         public NativeComputeShader resetPastToCurrentHistoryCs;
         public NativeComputeShader computeWeightsCs;
@@ -73,25 +80,12 @@ namespace PathTracing
         public NativeComputeShader createProxyJobsCs;
         public NativeComputeShader executeProxyJobsCs;
 
-        // Phase 1: EnvMap baker compute shaders
-        public NativeComputeShader baseLayerCs;
-        public NativeComputeShader envMapImportanceBakerCs;
-
-        // Phase 1b: Env-light quad-tree baker compute shaders
-        public NativeComputeShader envLightsBackupPastCs;
-        public NativeComputeShader envLightsSubdivideBaseCs;
-        public NativeComputeShader envLightsSubdivideBoostCs;
-        public NativeComputeShader envLightsFillLookupMapCs;
-        public NativeComputeShader envLightsMapPastToCurrentCs;
-
         // Phase 9: Output blit (debug display)
         public Material outputBlitMaterial;
 
         // ---- Pass instances -------------------------------------------------
         private NativeRtxptBuildTlasPass              _buildTlasPass;
-        private NativeRtxptEnvMapBakerPass            _envMapBakerPass;
-        private NativeRtxptEnvLightsBakerPass         _envLightsBakerPass;
-        private NativeRtxptLightingPass               _lightingPass;
+        private NativeRtxptLightingUpdateBeginPass    _lightingUpdateBeginPass;
         private NativeRtxptBuildStablePlanesPass      _buildStablePlanesPass;
         private NativeRtxptExportVisibilityBufferPass _exportVisibilityBufferPass;
         private NativeRtxptLightingUpdateEndPass      _lightingUpdateEndPass;
@@ -130,6 +124,18 @@ namespace PathTracing
             {
                 renderPassEvent = renderPassEvent,
             };
+
+            if (_lightingUpdateBeginPass == null)
+            {
+                _lightingUpdateBeginPass = new NativeRtxptLightingUpdateBeginPass(
+                    baseLayerCs, envMapImportanceBakerCs,
+                    envLightsBackupPastCs, envLightsSubdivideBaseCs, envLightsSubdivideBoostCs,
+                    envLightsFillLookupMapCs, envLightsMapPastToCurrentCs,
+                    resetLightProxyCountersCs, resetPastToCurrentHistoryCs,
+                    computeWeightsCs, computeProxyCountsCs, computeProxyBaselineOffsetsCs,
+                    createProxyJobsCs, executeProxyJobsCs)
+                { renderPassEvent = renderPassEvent };
+            }
 
             _buildStablePlanesPass ??= new NativeRtxptBuildStablePlanesPass(
                     buildStablePlanesShader, buildHitGroups)
@@ -259,41 +265,11 @@ namespace PathTracing
                 renderer.EnqueuePass(_buildTlasPass);
             }
 
-            // ---- Phase 1a: EnvMapBaker ----------------------------------------
-            _envMapBakerPass ??= new NativeRtxptEnvMapBakerPass(baseLayerCs, envMapImportanceBakerCs)
-                { renderPassEvent = renderPassEvent };
-            _envMapBakerPass.Setup(passCtx);
-            renderer.EnqueuePass(_envMapBakerPass);
-
-            // ---- Phase 1: LightsBaker ------------------------------------------
-            if (_lightingPass == null)
-            {
-                _lightingPass = new NativeRtxptLightingPass(
-                        resetLightProxyCountersCs,
-                        resetPastToCurrentHistoryCs,
-                        computeWeightsCs,
-                        computeProxyCountsCs,
-                        computeProxyBaselineOffsetsCs,
-                        createProxyJobsCs,
-                        executeProxyJobsCs)
-                    { renderPassEvent = renderPassEvent };
-            }
-
-            _lightingPass.Setup(passCtx);
-            renderer.EnqueuePass(_lightingPass);
-
-            // ---- Phase 1b: EnvLightsBaker (quad-tree subdivision + lookup map) ---
-            // Must run AFTER LightingPass so ControlBuffer is initialised (TotalLightCount,
-            // env-map flags etc.) before SubdivideBase reads it.
-            _envLightsBakerPass ??= new NativeRtxptEnvLightsBakerPass(
-                    envLightsBackupPastCs,
-                    envLightsSubdivideBaseCs,
-                    envLightsSubdivideBoostCs,
-                    envLightsFillLookupMapCs,
-                    envLightsMapPastToCurrentCs)
-                { renderPassEvent = renderPassEvent };
-            _envLightsBakerPass.Setup(passCtx);
-            renderer.EnqueuePass(_envLightsBakerPass);
+            // ---- LightingUpdateBegin -----------------------------------------
+            // Unified pass: EnvMapBaker → EnvLightsBaker → ProxyBuild
+            // Correct order mirrors original RTXPT LightsBaker::UpdateFrame front half.
+            _lightingUpdateBeginPass.Setup(passCtx);
+            renderer.EnqueuePass(_lightingUpdateBeginPass);
 
             // ---- Phase 2a: BuildStablePlanes RT (PathTracePrePass) ----------
             _buildStablePlanesPass.Setup(passCtx);
@@ -410,6 +386,8 @@ namespace PathTracing
         {
             if (!disposing) return;
 
+            _lightingUpdateBeginPass?.Dispose();
+            _lightingUpdateBeginPass = null;
             _buildStablePlanesPass?.Dispose();
             _buildStablePlanesPass = null;
             _fillStablePlanesPass?.Dispose();

@@ -28,6 +28,11 @@ namespace PathTracing
     ///
     /// ImportanceSamplingType = 1 (Power-based) — driven by GPU.
     /// </summary>
+    /// <summary>
+    /// DEPRECATED — absorbed into NativeRtxptLightingUpdateBeginPass.
+    /// This class is retained only to avoid breaking serialized asset references.
+    /// </summary>
+    [Obsolete("Use NativeRtxptLightingUpdateBeginPass instead.")]
     public class NativeRtxptLightingPass : ScriptableRenderPass, IDisposable
     {
         // ---- constants mirrors from PolymorphicLight.h ----------------------
