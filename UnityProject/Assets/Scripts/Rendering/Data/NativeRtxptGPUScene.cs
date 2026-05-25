@@ -74,6 +74,10 @@ namespace PathTracing
         private bool _forceRebuild  = false;
         private bool _disposed;
 
+        // Maps MeshRenderer.GetInstanceID() → per-submesh material indices in _ptMaterialCpu
+        // for renderers that have a NativeRtxptMaterialOverride. Used for lightweight material-only updates.
+        private readonly Dictionary<int, int[]> _overrideMaterialIndices = new();
+
         // Optional equirectangular environment map for RTXDI environment light.
         private Texture _pendingEnvMap;
         private int     _environmentMapTextureIndex = -1;
@@ -172,6 +176,8 @@ namespace PathTracing
 
             if (_sceneGpuDirty)
                 RebuildSceneGpuData(targets);
+            else
+                CheckAndUpdateMaterialOverrides(targets);
 
             UpdateInstanceTransforms();
         }
@@ -342,6 +348,7 @@ namespace PathTracing
             _materialSlots.Clear();
             _textureSlots.Clear();
             _perTargetGroupHandles.Clear();
+            _overrideMaterialIndices.Clear();
             _environmentMapTextureIndex = -1;
 
             foreach (var buf in _ownedGfxBuffers)
@@ -402,12 +409,14 @@ namespace PathTracing
                 int        instIdx    = instList.Count;
 
                 var matOverride = mr.GetComponent<NativeRtxptMaterialOverride>();
+                int[] overrideMatIndices = matOverride != null ? new int[subMeshCnt] : null;
 
                 for (int s = 0; s < subMeshCnt; s++)
                 {
                     SubMeshDescriptor sub    = mesh.GetSubMesh(s);
                     Material          mat    = s < mats.Length ? mats[s] : (mats.Length > 0 ? mats[mats.Length - 1] : null);
                     int               matIdx = GetOrAddMaterial(mat, s, matOverride, ptMatList, texPtrs);
+                    if (overrideMatIndices != null) overrideMatIndices[s] = matIdx;
 
                     int globalGeomIdx = geomList.Count; // index we're about to push
 
@@ -460,6 +469,9 @@ namespace PathTracing
                 var       row0 = new Vector4(m.m00, m.m01, m.m02, m.m03);
                 var       row1 = new Vector4(m.m10, m.m11, m.m12, m.m13);
                 var       row2 = new Vector4(m.m20, m.m21, m.m22, m.m23);
+
+                if (overrideMatIndices != null)
+                    _overrideMaterialIndices[mr.GetInstanceID()] = overrideMatIndices;
 
                 _accelStructure.SetInstanceID(mr, (uint)instIdx);
                 instList.Add(new DonutInstanceData
@@ -534,6 +546,86 @@ namespace PathTracing
             _sceneGpuDirty = false;
         }
 
+        /// <summary>
+        /// Checks all registered targets for dirty <see cref="NativeRtxptMaterialOverride"/> components
+        /// and, if any are found, refreshes only the affected entries in <c>_ptMaterialCpu</c> and
+        /// re-uploads the material buffer.  Texture assignments are not changed; only scalar/color/flag
+        /// parameters are updated.  If you also change texture assignments, call
+        /// <see cref="MarkRebuildDirty"/> instead to trigger a full scene rebuild.
+        /// </summary>
+        private void CheckAndUpdateMaterialOverrides(IReadOnlyList<NativeRayTracingTarget> targets)
+        {
+            if (_ptMaterialCpu == null || _ptMaterialGpuBuf == null) return;
+
+            bool anyDirty = false;
+            foreach (var target in targets)
+            {
+                if (target == null) continue;
+                var mr = target.GetComponent<MeshRenderer>();
+                if (mr == null) continue;
+                var matOverride = mr.GetComponent<NativeRtxptMaterialOverride>();
+                if (matOverride == null || !matOverride.IsDirty) continue;
+
+                int mrId = mr.GetInstanceID();
+                if (!_overrideMaterialIndices.TryGetValue(mrId, out int[] matIndices)) continue;
+
+                for (int s = 0; s < matIndices.Length && s < matOverride.Slots.Count; s++)
+                {
+                    int idx = matIndices[s];
+                    if (idx < 0 || idx >= _ptMaterialCpu.Length) continue;
+                    RefreshMaterialCpuFromOverride(matOverride.Slots[s], ref _ptMaterialCpu[idx]);
+                }
+
+                matOverride.ClearDirty();
+                anyDirty = true;
+            }
+
+            if (anyDirty)
+                _ptMaterialGpuBuf.SetData(_ptMaterialCpu);
+        }
+
+        /// <summary>
+        /// Refreshes all scalar/color/flag fields of <paramref name="data"/> from <paramref name="slot"/>,
+        /// preserving the existing texture index fields (which are set only during a full scene rebuild).
+        /// </summary>
+        private static void RefreshMaterialCpuFromOverride(RtxptMaterialSlot slot, ref PTMaterialData data)
+        {
+            uint flags = 0;
+            // Preserve texture-presence flags derived from the current texture indices.
+            if (data.BaseOrDiffuseTextureIndex        != 0xFFFFFFFFu) flags |= PTMaterialFlags.UseBaseOrDiffuseTexture;
+            if (data.NormalTextureIndex               != 0xFFFFFFFFu) flags |= PTMaterialFlags.UseNormalTexture;
+            if (data.MetalRoughOrSpecularTextureIndex != 0xFFFFFFFFu) flags |= PTMaterialFlags.UseMetalRoughOrSpecularTexture;
+            if (data.EmissiveTextureIndex             != 0xFFFFFFFFu) flags |= PTMaterialFlags.UseEmissiveTexture;
+            if (data.OcclusionTextureIndex            != 0xFFFFFFFFu) flags |= (uint)DonutMaterialFlags.UseOcclusionTexture;
+            if (data.TransmissionTextureIndex         != 0xFFFFFFFFu) flags |= PTMaterialFlags.UseTransmissionTexture;
+
+            if (slot.ThinSurface)                                     flags |= PTMaterialFlags.ThinSurface;
+            if (slot.MetalnessInRedChannel)                           flags |= PTMaterialFlags.MetalnessInRedChannel;
+            if (slot.PSDExclude)                                      flags |= PTMaterialFlags.PSDExclude;
+            if (slot.IgnoreMeshTangentSpace)                          flags |= PTMaterialFlags.IgnoreMeshTangentSpace;
+            if (slot.PSDBlockMotionVectorsAtSurfaceType % 2 != 0)     flags |= PTMaterialFlags.PSDBlockMVsAtSurfaceTypeB0;
+            if (slot.PSDBlockMotionVectorsAtSurfaceType / 2 != 0)     flags |= PTMaterialFlags.PSDBlockMVsAtSurfaceTypeB1;
+            flags |= (uint)Mathf.Clamp(slot.NestedPriority,              0, 15) << PTMaterialFlags.NestedPriorityShift;
+            flags |= (uint)Mathf.Clamp(slot.PSDDominantDeltaLobe + 1, 0,  7)   << PTMaterialFlags.PSDDominantDeltaLobeP1Shift;
+
+            data.Flags                      = flags;
+            data.BaseOrDiffuseColor         = new Vector3(slot.BaseColorFactor.r, slot.BaseColorFactor.g, slot.BaseColorFactor.b);
+            data.SpecularColor              = new Vector3(slot.SpecularColor.r, slot.SpecularColor.g, slot.SpecularColor.b);
+            data.EmissiveColor              = new Vector3(slot.EmissiveColor.r, slot.EmissiveColor.g, slot.EmissiveColor.b);
+            data.ShadowNoLFadeout           = Mathf.Clamp(slot.ShadowNoLFadeout, 0f, 0.25f);
+            data.Opacity                    = slot.Opacity;
+            data.Roughness                  = slot.Roughness;
+            data.Metalness                  = slot.Metalness;
+            data.NormalTextureScale         = slot.NormalTextureScale;
+            data.AlphaCutoff                = slot.AlphaCutoff;
+            data.TransmissionFactor         = slot.TransmissionFactor;
+            data.IoR                        = slot.IoR;
+            data.ThicknessFactor            = slot.ThicknessFactor;
+            data.DiffuseTransmissionFactor  = slot.DiffuseTransmissionFactor;
+            data.VolumeAttenuationColor     = new Vector3(slot.VolumeAttenuationColor.r, slot.VolumeAttenuationColor.g, slot.VolumeAttenuationColor.b);
+            data.VolumeAttenuationDistance  = slot.VolumeAttenuationDistance;
+        }
+
         private void UpdateInstanceTransforms()
         {
             if (_instanceCpu == null || _instanceGpuBuf == null) return;
@@ -570,6 +662,7 @@ namespace PathTracing
                 _instanceCpu[i].transformRow2 = row2;
 
                 _accelStructure.SetInstanceTransform(si.renderer, m);
+                // Debug.Log($"[NativeRtxptGPUScene] Updated transform for instance {i} ({si.renderer.name}) pos = {si.transform.position}");
                 if (dirtyStart < 0) dirtyStart = i;
 
                 // update cached prev for next frame
@@ -615,7 +708,7 @@ namespace PathTracing
 
             ptMatList.Add(new PTMaterialData
             {
-                BaseOrDiffuseColor               = new Vector3(slot.BaseOrDiffuseColor.r, slot.BaseOrDiffuseColor.g, slot.BaseOrDiffuseColor.b),
+                BaseOrDiffuseColor               = new Vector3(slot.BaseColorFactor.r, slot.BaseColorFactor.g, slot.BaseColorFactor.b),
                 Flags                            = flags,
                 SpecularColor                    = new Vector3(slot.SpecularColor.r, slot.SpecularColor.g, slot.SpecularColor.b),
                 _padding0                        = 0,

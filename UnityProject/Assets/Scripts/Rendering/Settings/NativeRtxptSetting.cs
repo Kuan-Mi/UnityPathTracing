@@ -126,7 +126,7 @@ namespace PathTracing
         public float     environmentMapIntensity = 1.0f;
         public Color     environmentMapTint      = Color.white;
         /// <summary>Equirectangular HDR environment map. Bound as t_EnvironmentMap (t10).</summary>
-        public Texture2D environmentMap          = null;
+        public Texture environmentMap          = null;
 
         // ── Tone mapping ──────────────────────────────────────────────────────
         public bool enableToneMapping = true;

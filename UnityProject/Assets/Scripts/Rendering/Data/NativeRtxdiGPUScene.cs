@@ -163,7 +163,6 @@ namespace PathTracing
     // =========================================================================
     // Emissive geometry enumeration (used by NativeRtxdiPrepareLightsPass)
     // =========================================================================
-
     /// <summary>
     /// One entry per emissive sub-mesh in the scene.
     /// Mirrors the per-geometry task record that PrepareLights.computeshader needs.

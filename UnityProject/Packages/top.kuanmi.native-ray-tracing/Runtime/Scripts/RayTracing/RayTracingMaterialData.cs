@@ -209,7 +209,7 @@ namespace NativeRender
                 data.textures[0] = TryGetTex(mat, "baseColorTexture") ?? White;
                 data.textures[1] = TryGetTex(mat, "metallicRoughnessTexture") ?? Black;
 
-                var normal = TryGetTex(mat, "normalTexture");
+                var normal = TryGetTex(mat, "normalTexture") ?? FlatNormal;
                 if (normal.height <= 4)
                 {
                     normal = FlatNormal;

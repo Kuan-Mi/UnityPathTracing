@@ -6,56 +6,76 @@ using UnityEngine;
 namespace PathTracing
 {
     [CustomEditor(typeof(NativeRtxptMaterialOverride))]
+    [CanEditMultipleObjects]
     public class NativeRtxptMaterialOverrideEditor : Editor
     {
-        private static readonly GUIStyle s_headerStyle = null;
         private bool[] _slotFoldouts = System.Array.Empty<bool>();
 
         public override void OnInspectorGUI()
         {
-            var comp = (NativeRtxptMaterialOverride)target;
+            bool multiEdit = targets.Length > 1;
 
             // ---- Top toolbar ----
             EditorGUILayout.BeginHorizontal();
 
             if (GUILayout.Button("Bake from Renderer", GUILayout.Height(28)))
             {
-                Undo.RecordObject(comp, "Bake RTXPT Materials from Renderer");
-                comp.BakeFromRenderer();
-                EditorUtility.SetDirty(comp);
+                foreach (var t in targets)
+                {
+                    var c = (NativeRtxptMaterialOverride)t;
+                    Undo.RecordObject(c, "Bake RTXPT Materials from Renderer");
+                    c.BakeFromRenderer();
+                    EditorUtility.SetDirty(c);
+                }
             }
-
-            // if (GUILayout.Button("Force Scene Rebuild", GUILayout.Width(150), GUILayout.Height(28)))
-            // {
-            //     // Notify NativeRtxptGPUScene to rebuild next frame
-            //     foreach (var scene in FindObjectsByType<NativeRtxptSceneHost>(FindObjectsSortMode.None))
-            //         scene.MarkRebuildDirty();
-            //     Debug.Log("[RTXPT] Scene rebuild scheduled.");
-            // }
 
             EditorGUILayout.EndHorizontal();
             EditorGUILayout.Space(4);
 
-            if (comp.Slots == null || comp.Slots.Count == 0)
+            if (multiEdit)
             {
-                EditorGUILayout.HelpBox("No slots. Press 'Bake from Renderer' to populate.", MessageType.Info);
-                return;
-            }
-
-            // Sync foldout array size
-            if (_slotFoldouts.Length != comp.Slots.Count)
-            {
-                System.Array.Resize(ref _slotFoldouts, comp.Slots.Count);
-                for (int i = 0; i < _slotFoldouts.Length; i++)
-                    _slotFoldouts[i] = true;
+                EditorGUILayout.HelpBox($"Editing {targets.Length} objects. Slot properties are shown for objects with matching slot counts.", MessageType.None);
+                EditorGUILayout.Space(2);
             }
 
             serializedObject.Update();
             var slotsProp = serializedObject.FindProperty("Slots");
 
-            for (int i = 0; i < comp.Slots.Count; i++)
+            // Determine the slot count to display: use the primary target's count,
+            // but show a warning when counts differ across selected objects.
+            var primaryComp = (NativeRtxptMaterialOverride)target;
+            int primaryCount = primaryComp.Slots?.Count ?? 0;
+
+            if (primaryCount == 0)
             {
-                var slot    = comp.Slots[i];
+                EditorGUILayout.HelpBox("No slots. Press 'Bake from Renderer' to populate.", MessageType.Info);
+                return;
+            }
+
+            bool countMismatch = false;
+            if (multiEdit)
+            {
+                foreach (var t in targets)
+                {
+                    var c = (NativeRtxptMaterialOverride)t;
+                    if ((c.Slots?.Count ?? 0) != primaryCount) { countMismatch = true; break; }
+                }
+            }
+
+            if (countMismatch)
+                EditorGUILayout.HelpBox("Selected objects have different slot counts. Only the primary object's slots are shown; slot edits apply to all objects with matching slot counts.", MessageType.Warning);
+
+            // Sync foldout array size
+            if (_slotFoldouts.Length != primaryCount)
+            {
+                System.Array.Resize(ref _slotFoldouts, primaryCount);
+                for (int i = 0; i < _slotFoldouts.Length; i++)
+                    _slotFoldouts[i] = true;
+            }
+
+            for (int i = 0; i < primaryCount; i++)
+            {
+                var slot    = primaryComp.Slots[i];
                 string name = slot?.SourceMaterial != null ? slot.SourceMaterial.name : $"Slot {i}";
 
                 _slotFoldouts[i] = EditorGUILayout.BeginFoldoutHeaderGroup(_slotFoldouts[i],
@@ -73,7 +93,10 @@ namespace PathTracing
             }
 
             if (serializedObject.ApplyModifiedProperties())
-                EditorUtility.SetDirty(comp);
+            {
+                foreach (var t in targets)
+                    EditorUtility.SetDirty(t);
+            }
         }
     }
 }

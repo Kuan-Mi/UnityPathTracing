@@ -16,57 +16,84 @@ namespace PathTracing
 
         [Header("Textures")]
         public Texture BaseOrDiffuseTexture;
+
         public Texture NormalTexture;
-        public Texture MetalRoughTexture;   // R=Metalness, G=Roughness (URP convention)
+        public Texture MetalRoughTexture; // R=Metalness, G=Roughness (URP convention)
         public Texture EmissiveTexture;
         public Texture OcclusionTexture;
         public Texture TransmissionTexture;
 
-        [Header("Colors")]
-        public Color BaseOrDiffuseColor   = Color.white;
-        public Color SpecularColor        = new Color(0.04f, 0.04f, 0.04f, 1f);
-        public Color EmissiveColor        = Color.black;
+
+        [ColorUsage(false, false)]
+        public Color BaseColorFactor = Color.white;
+
+        [Range(0f, 1f)]
+        public float Metalness = 0f;
+        
+        [Range(0f, 1f)]
+        public float Roughness = 0.5f;
+
+
+        public Color EmissiveColor          = Color.black;
+        
+        public Color SpecularColor          = new Color(0.04f, 0.04f, 0.04f, 1f);
         public Color VolumeAttenuationColor = Color.white;
 
-        [Header("PBR Scalars")]
-        [Range(0f, 1f)]  public float Roughness              = 0.5f;
-        [Range(0f, 1f)]  public float Metalness              = 0f;
-        [Range(0f, 1f)]  public float Opacity                = 1f;
-        [Min(0f)]        public float NormalTextureScale     = 1f;
-        [Range(0f, 1f)]  public float AlphaCutoff            = 0f;
-        [Range(1f, 3f)]  public float IoR                    = 1.5f;
+        [Range(0f, 1f)]
+        public float Opacity = 1f;
+
+        [Min(0f)]
+        public float NormalTextureScale = 1f;
+
+        [Range(0f, 1f)]
+        public float AlphaCutoff = 0f;
+
+        [Range(1f, 3f)]
+        public float IoR = 1.5f;
 
         [Header("Transmission")]
-        [Range(0f, 1f)]  public float TransmissionFactor          = 0f;
-        [Range(0f, 1f)]  public float DiffuseTransmissionFactor   = 0f;
-        [Min(0f)]        public float ThicknessFactor             = 0f;
-        [Min(0f)]        public float VolumeAttenuationDistance   = float.MaxValue;
+        [Range(0f, 1f)]
+        public float TransmissionFactor = 0f;
+
+        [Range(0f, 1f)]
+        public float DiffuseTransmissionFactor = 0f;
+
+        [Min(0f)]
+        public float ThicknessFactor = 0f;
+
+        [Min(0f)]
+        public float VolumeAttenuationDistance = float.MaxValue;
 
         [Header("Shadows")]
-        [Range(0f, 0.25f)] public float ShadowNoLFadeout = 0f;
+        [Range(0f, 0.25f)]
+        public float ShadowNoLFadeout = 0f;
 
         [Header("PT Flags")]
-        public bool ThinSurface             = true;
-        public bool MetalnessInRedChannel   = false;
+        public bool ThinSurface = true;
+
+        public bool MetalnessInRedChannel  = false;
         public bool PSDExclude             = false;
-        public bool IgnoreMeshTangentSpace  = false;
+        public bool IgnoreMeshTangentSpace = false;
 
         /// <summary>
         /// Dominant delta lobe for Stable Planes.
         /// -1 = None (surface itself), 0 = Surface, 1 = Transparency, 2 = Reflection.
         /// Packed as (value+1) into bits [27:24].
         /// </summary>
-        [Range(-1, 6)] public int PSDDominantDeltaLobe = -1;
+        [Range(-1, 6)]
+        public int PSDDominantDeltaLobe = -1;
 
         /// <summary>
         /// Dielectric nesting priority (0–15). Used for overlapping IOR regions.
         /// </summary>
-        [Range(0, 15)] public int NestedPriority = 0;
+        [Range(0, 15)]
+        public int NestedPriority = 0;
 
         /// <summary>
         /// Controls motion-vector blocking at surface type boundaries (0–3).
         /// </summary>
-        [Range(0, 3)] public int PSDBlockMotionVectorsAtSurfaceType = 0;
+        [Range(0, 3)]
+        public int PSDBlockMotionVectorsAtSurfaceType = 0;
     }
 
     // =========================================================================
@@ -91,14 +118,26 @@ namespace PathTracing
         [Tooltip("One slot per sub-mesh. Index matches MeshRenderer.sharedMaterials.")]
         public List<RtxptMaterialSlot> Slots = new();
 
+        /// <summary>
+        /// True when any slot parameter has changed since the last GPU upload.
+        /// Set automatically via OnValidate (Editor) or manually via <see cref="MarkDirty"/>.
+        /// Note: texture assignment changes require a full scene rebuild via <see cref="NativeRtxptGPUScene.MarkRebuildDirty"/>.
+        /// </summary>
+        public bool IsDirty { get; private set; }
+
+        public void MarkDirty()  => IsDirty = true;
+        public void ClearDirty() => IsDirty = false;
+
+        private void OnValidate() => IsDirty = true;
+
         // Called by the Editor button and also useful at runtime.
         public void BakeFromRenderer()
         {
-            var mr   = GetComponent<MeshRenderer>();
-            var mf   = GetComponent<MeshFilter>();
+            var mr = GetComponent<MeshRenderer>();
+            var mf = GetComponent<MeshFilter>();
             if (mr == null) return;
 
-            Material[] mats      = mr.sharedMaterials ?? Array.Empty<Material>();
+            Material[] mats       = mr.sharedMaterials ?? Array.Empty<Material>();
             int        subMeshCnt = mf != null && mf.sharedMesh != null ? mf.sharedMesh.subMeshCount : mats.Length;
 
             // Keep existing slots if count matches; otherwise rebuild.
@@ -110,7 +149,7 @@ namespace PathTracing
 
             for (int s = 0; s < subMeshCnt; s++)
             {
-                Material mat  = s < mats.Length ? mats[s] : (mats.Length > 0 ? mats[^1] : null);
+                Material          mat  = s < mats.Length ? mats[s] : (mats.Length > 0 ? mats[^1] : null);
                 RtxptMaterialSlot slot = Slots[s] ?? new RtxptMaterialSlot();
 
                 slot.SourceMaterial = mat;
@@ -133,7 +172,7 @@ namespace PathTracing
                 slot.OcclusionTexture     = TryGetTex(mat, "occlusionTexture");
 
                 Color baseC = TryGetColor(mat, "baseColorFactor", Color.white);
-                slot.BaseOrDiffuseColor = baseC;
+                slot.BaseColorFactor    = baseC;
                 slot.Opacity            = baseC.a;
                 slot.EmissiveColor      = TryGetColor(mat, "emissiveFactor", Color.black);
                 slot.Roughness          = TryGetFloat(mat, "roughnessFactor", 0.5f);
@@ -151,7 +190,7 @@ namespace PathTracing
                 slot.OcclusionTexture     = TryGetTex(mat, "_OcclusionMap");
 
                 Color baseC = TryGetColor(mat, "_BaseColor", Color.white);
-                slot.BaseOrDiffuseColor = baseC;
+                slot.BaseColorFactor    = baseC;
                 slot.Opacity            = baseC.a;
                 slot.EmissiveColor      = TryGetColor(mat, "_EmissionColor", Color.black);
                 slot.Roughness          = 1f - TryGetFloat(mat, "_Smoothness", 0.5f);
@@ -161,16 +200,16 @@ namespace PathTracing
             }
 
             // Derived fields
-            float met = slot.Metalness;
-            Vector3 dielectricF0   = new Vector3(0.04f, 0.04f, 0.04f);
-            Vector3 metalBaseColor = new Vector3(slot.BaseOrDiffuseColor.r,
-                                                  slot.BaseOrDiffuseColor.g,
-                                                  slot.BaseOrDiffuseColor.b);
+            float   met          = slot.Metalness;
+            Vector3 dielectricF0 = new Vector3(0.04f, 0.04f, 0.04f);
+            Vector3 metalBaseColor = new Vector3(slot.BaseColorFactor.r,
+                slot.BaseColorFactor.g,
+                slot.BaseColorFactor.b);
             Vector3 specF0 = Vector3.Lerp(dielectricF0, metalBaseColor, met);
             slot.SpecularColor = new Color(specF0.x, specF0.y, specF0.z, 1f);
 
             // PT flags
-            slot.ThinSurface           = true;  // TransmissionFactor = 0 → always thin
+            slot.ThinSurface           = true; // TransmissionFactor = 0 → always thin
             slot.MetalnessInRedChannel = slot.MetalRoughTexture != null;
         }
 
