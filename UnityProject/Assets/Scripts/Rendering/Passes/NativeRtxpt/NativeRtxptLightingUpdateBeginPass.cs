@@ -342,7 +342,7 @@ namespace PathTracing
             _analyticLightCount = CollectAndPackLights();
 
             // --- Emissive triangles: MUST run before UploadLightData so _emissiveTaskCount
-            //     is known when we write BakerConstants.TriangleLightTaskCount (_paddingBK[3]).
+            //     is known when we write BakerConstants.TriangleLightTaskCount.
             var gpuScene = ctx.GpuScene;
             if (gpuScene != null && ctx.Buffers?.LightScratchBuffer != null)
             {
@@ -896,48 +896,26 @@ namespace PathTracing
             ctrl.ImportanceSamplingType  = 1;
             ctrl.HistoricTotalLightCount = EnvQtTotalNodeCount + (uint)_analyticLightCount + _emissiveTotalTriCount;
 
-            unsafe
+            ref var bk = ref ctrl.BakerConstants;
+            bk.CurrentWeightsBufferOffset        = currentOffset;
+            bk.HistoricWeightsBufferOffset       = historicOffset;
+            bk.DistantVsLocalRelativeImportance  = 1.0f;
+            bk.EnvMapImportanceMapMIPCount        = 11u;
+            bk.EnvMapImportanceMapResolution      = 1024u;
+            bk.TriangleLightTaskCount             = (uint)_emissiveTaskCount;
+            bk.EnvMapParams = new RtxptLightsBakerEnvMapParams
             {
-                ctrl._paddingBK[28] = currentOffset;
-                ctrl._paddingBK[29] = historicOffset;
-                float distantVsLocal = 1.0f;
-                ctrl._paddingBK[0] = *(uint*)&distantVsLocal;
-                ctrl._paddingBK[1] = 11u; // EnvMapImportanceMapMIPCount
-                ctrl._paddingBK[2] = 1024u; // EnvMapImportanceMapResolution
-                ctrl._paddingBK[3] = (uint)_emissiveTaskCount; // BakerConstants.TriangleLightTaskCount
-
-                float one = 1f, zero = 0f;
-                ctrl._paddingBK[88]  = *(uint*)&one;
-                ctrl._paddingBK[89]  = *(uint*)&zero;
-                ctrl._paddingBK[90]  = *(uint*)&zero;
-                ctrl._paddingBK[91]  = *(uint*)&zero;
-                ctrl._paddingBK[92]  = *(uint*)&zero;
-                ctrl._paddingBK[93]  = *(uint*)&one;
-                ctrl._paddingBK[94]  = *(uint*)&zero;
-                ctrl._paddingBK[95]  = *(uint*)&zero;
-                ctrl._paddingBK[96]  = *(uint*)&zero;
-                ctrl._paddingBK[97]  = *(uint*)&zero;
-                ctrl._paddingBK[98]  = *(uint*)&one;
-                ctrl._paddingBK[99]  = *(uint*)&zero;
-                ctrl._paddingBK[100] = *(uint*)&one;
-                ctrl._paddingBK[101] = *(uint*)&zero;
-                ctrl._paddingBK[102] = *(uint*)&zero;
-                ctrl._paddingBK[103] = *(uint*)&zero;
-                ctrl._paddingBK[104] = *(uint*)&zero;
-                ctrl._paddingBK[105] = *(uint*)&one;
-                ctrl._paddingBK[106] = *(uint*)&zero;
-                ctrl._paddingBK[107] = *(uint*)&zero;
-                ctrl._paddingBK[108] = *(uint*)&zero;
-                ctrl._paddingBK[109] = *(uint*)&zero;
-                ctrl._paddingBK[110] = *(uint*)&one;
-                ctrl._paddingBK[111] = *(uint*)&zero;
-
-                float cr = envTint.r * envIntensity, cg = envTint.g * envIntensity, cb = envTint.b * envIntensity;
-                ctrl._paddingBK[112] = *(uint*)&cr;
-                ctrl._paddingBK[113] = *(uint*)&cg;
-                ctrl._paddingBK[114] = *(uint*)&cb;
-                ctrl._paddingBK[115] = *(uint*)&one;
-            }
+                TransformRow0    = new Vector4(1, 0, 0, 0),
+                TransformRow1    = new Vector4(0, 1, 0, 0),
+                TransformRow2    = new Vector4(0, 0, 1, 0),
+                InvTransformRow0 = new Vector4(1, 0, 0, 0),
+                InvTransformRow1 = new Vector4(0, 1, 0, 0),
+                InvTransformRow2 = new Vector4(0, 0, 1, 0),
+                ColorMultiplierR = envTint.r * envIntensity,
+                ColorMultiplierG = envTint.g * envIntensity,
+                ColorMultiplierB = envTint.b * envIntensity,
+                Enabled          = 1.0f,
+            };
 
             buf.LightControlBuffer.SetData(s_controlStaging);
 

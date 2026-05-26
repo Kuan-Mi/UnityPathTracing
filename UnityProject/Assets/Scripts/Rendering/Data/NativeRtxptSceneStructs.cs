@@ -242,9 +242,88 @@ namespace PathTracing
     } // 32 bytes
 
     /// <summary>
+    /// Mirrors <c>LightsBakerEnvMapParams</c> in <c>LightingTypes.hlsli</c>.
+    /// Size = 48 + 48 + 12 + 4 = 112 bytes.
+    /// </summary>
+    [StructLayout(LayoutKind.Sequential, Pack = 4)]
+    public struct RtxptLightsBakerEnvMapParams
+    {
+        // ROW_MAJOR float3x4 Transform (local → world)
+        public Vector4 TransformRow0;
+        public Vector4 TransformRow1;
+        public Vector4 TransformRow2;
+        // ROW_MAJOR float3x4 InvTransform (world → local)
+        public Vector4 InvTransformRow0;
+        public Vector4 InvTransformRow1;
+        public Vector4 InvTransformRow2;
+        // float3 ColorMultiplier (Tint × Intensity)
+        public float ColorMultiplierR;
+        public float ColorMultiplierG;
+        public float ColorMultiplierB;
+        // float Enabled: 1 if enabled, 0 if not
+        public float Enabled;
+    } // 112 bytes
+
+    /// <summary>
+    /// Mirrors <c>LightsBakerConstants</c> in <c>LightingTypes.hlsli</c>.
+    /// Size = NEEAT_LIGHTS_BAKER_CONSTANTS_SIZE = 464 bytes.
+    /// </summary>
+    [StructLayout(LayoutKind.Sequential, Pack = 4)]
+    public unsafe struct RtxptLightsBakerConstants
+    {
+        public float DistantVsLocalRelativeImportance;   // [0]
+        public uint  EnvMapImportanceMapMIPCount;         // [1]
+        public uint  EnvMapImportanceMapResolution;       // [2]
+        public uint  TriangleLightTaskCount;              // [3]
+
+        public uint  FeedbackResolutionX;                // [4]
+        public uint  FeedbackResolutionY;                // [5]
+        public uint  BlendedFeedbackResolutionX;         // [6]
+        public uint  BlendedFeedbackResolutionY;         // [7]
+
+        public uint  MouseCursorPosX;                    // [8]
+        public uint  MouseCursorPosY;                    // [9]
+        public float PrevOverCurrentViewportSizeX;       // [10]
+        public float PrevOverCurrentViewportSizeY;       // [11]
+
+        public int   DebugDrawType;                      // [12]
+        public uint  DebugDrawTileLights;                // [13]
+        public uint  UpdateCounter;                      // [14]
+        public uint  DebugDrawFrustum;                   // [15]
+
+        public float ImportanceBoostIntensityDelta;      // [16]
+        public float ImportanceBoostFrustumMul;          // [17]
+        public float ImportanceBoostFrustumFadeDistance; // [18]
+        public float _padding3;                          // [19]
+
+        public float SceneCameraPosX;                    // [20]
+        public float SceneCameraPosY;                    // [21]
+        public float SceneCameraPosZ;                    // [22]
+        public float SceneAverageContentsDistance;       // [23]
+
+        public float DepthDisocclusionThreshold;         // [24]
+        public uint  EnableMotionReprojection;           // [25]
+        public float ReservoirHistoryDropoff;            // [26]
+        public uint  _padding0;                          // [27]
+
+        public uint  CurrentWeightsBufferOffset;         // [28] 0 or RTXPT_LIGHTING_WEIGHTS_COUNT_HALF
+        public uint  HistoricWeightsBufferOffset;        // [29] 0 or RTXPT_LIGHTING_WEIGHTS_COUNT_HALF
+        public uint  _padding1;                          // [30]
+        public uint  _padding2;                          // [31]
+
+        // float4 FrustumPlanes[6]  — Left Right Top Bottom Near Far (96 bytes, [32]..[55])
+        public fixed float FrustumPlanes[24];
+        // float4 FrustumCorners[8] — for debugging only (128 bytes, [56]..[87])
+        public fixed float FrustumCorners[32];
+
+        // LightsBakerEnvMapParams EnvMapParams (112 bytes, [88]..[115])
+        public RtxptLightsBakerEnvMapParams EnvMapParams;
+    } // 464 bytes
+
+    /// <summary>
     /// Single-element control buffer read by the path tracer each frame.
     /// Mirrors <c>LightingControlData</c> in <c>LightingTypes.hlsli</c>.
-    /// Size = 112 + 464 (paddingBK) = 576 bytes.
+    /// Size = 112 + 464 (BakerConstants) = 576 bytes.
     /// Shader binding: <c>StructuredBuffer&lt;LightingControlData&gt; t_LightsCB : register(t12)</c>
     /// </summary>
     [StructLayout(LayoutKind.Sequential, Pack = 4)]
@@ -285,7 +364,7 @@ namespace PathTracing
         public uint  _padding2;
         public uint  _padding3;
 
-        // Padding for LightsBakerConstants (unused in non-baker path, 464 bytes = 116 uints)
-        public fixed uint _paddingBK[116];
+        // Mirrors LightsBakerConstants (NEEAT_BAKER_ONLY path); always present to keep struct size = 576 bytes.
+        public RtxptLightsBakerConstants BakerConstants;
     } // 576 bytes
 }
