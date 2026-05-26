@@ -15,11 +15,11 @@ namespace PathTracing
     /// </summary>
     public class NativeRtxptOutputBlitPass : ScriptableRenderPass
     {
-        private readonly Material _blitMaterial;
-        private NativeRtxptTextureResources _resources;
-        private NativeRtxptShowMode         _showMode;
-        private float                        _renderScale; // renderRes / displayRes
-        private RtxptDebugViewType           _debugViewType;
+        private readonly Material                    _blitMaterial;
+        private          NativeRtxptTextureResources _resources;
+        private          NativeRtxptShowMode         _showMode;
+        private          float                       _renderScale; // renderRes / displayRes
+        private          RtxptDebugViewType          _debugViewType;
 
         public NativeRtxptOutputBlitPass(Material blitMaterial)
         {
@@ -27,7 +27,7 @@ namespace PathTracing
         }
 
         public void Setup(NativeRtxptTextureResources resources, NativeRtxptShowMode showMode, float renderScale,
-                          RtxptDebugViewType debugViewType = RtxptDebugViewType.Disabled)
+            RtxptDebugViewType debugViewType = RtxptDebugViewType.Disabled)
         {
             _resources     = resources;
             _showMode      = showMode;
@@ -41,7 +41,7 @@ namespace PathTracing
 
         class PassData
         {
-            internal Material                   BlitMaterial;
+            internal Material                    BlitMaterial;
             internal NativeRtxptTextureResources Resources;
             internal NativeRtxptShowMode         ShowMode;
             internal float                       RenderScale;
@@ -126,8 +126,12 @@ namespace PathTracing
                     Blitter.BlitTexture(cmd, res.DlssRrSpecAlbedo.Handle, scaleOffset, mat, (int)ShowPass.Out);
                     break;
 
-                case NativeRtxptShowMode.DlssNormalRoughness:
+                case NativeRtxptShowMode.DlssNormal:
                     Blitter.BlitTexture(cmd, res.DlssRrNormalRoughness.Handle, scaleOffset, mat, (int)ShowPass.Normal);
+                    break;
+
+                case NativeRtxptShowMode.DlssRoughness:
+                    Blitter.BlitTexture(cmd, res.DlssRrNormalRoughness.Handle, scaleOffset, mat, (int)ShowPass.Roughness);
                     break;
 
                 case NativeRtxptShowMode.DlssSpecMotionVectors:
@@ -135,7 +139,9 @@ namespace PathTracing
                     break;
 
                 // ── Debug ──────────────────────────────────────────────────
-                case NativeRtxptShowMode.ShaderDebugViz:                case NativeRtxptShowMode.NEELightColor:                    Blitter.BlitTexture(cmd, res.ShaderDebugViz.Handle, scaleOffset, mat, (int)ShowPass.Out);
+                case NativeRtxptShowMode.ShaderDebugViz:
+                case NativeRtxptShowMode.NEELightColor:
+                    Blitter.BlitTexture(cmd, res.ShaderDebugViz.Handle, scaleOffset, mat, (int)ShowPass.Out);
                     break;
 
                 case NativeRtxptShowMode.DebugOutputColor:

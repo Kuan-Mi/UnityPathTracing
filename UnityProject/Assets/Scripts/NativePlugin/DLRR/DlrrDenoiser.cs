@@ -17,10 +17,10 @@ namespace DLRR
         [DllImport("Denoiser")]
         private static extern void DestroyDLRRInstance(int id);
 
-        private readonly int _instanceId;
-        private NativeArray<DlrrFrameData> _buffer;
-        private const int BufferCount = 3;
-        private readonly string _cameraName;
+        private readonly int                        _instanceId;
+        private          NativeArray<DlrrFrameData> _buffer;
+        private const    int                        BufferCount = 3;
+        private readonly string                     _cameraName;
 
         /// <summary>
         /// Per-frame camera data filled by PathTracingFeature from CameraFrameState.
@@ -35,6 +35,7 @@ namespace DLRR
             public uint      frameIndex;
             public ushort    outputWidth;
             public ushort    outputHeight;
+            public bool      useMv;
         }
 
         /// <summary>
@@ -42,22 +43,22 @@ namespace DLRR
         /// </summary>
         public struct DlrrResources
         {
-            public NriTextureResource input;           // Composed
-            public NriTextureResource output;          // DlssOutput
-            public NriTextureResource mv;              // IN_MV
-            public NriTextureResource depth;           // IN_VIEWZ
-            public NriTextureResource diffAlbedo;      // RRGuide_DiffAlbedo
-            public NriTextureResource specAlbedo;      // RRGuide_SpecAlbedo
+            public NriTextureResource input; // Composed
+            public NriTextureResource output; // DlssOutput
+            public NriTextureResource mv; // IN_MV
+            public NriTextureResource depth; // IN_VIEWZ
+            public NriTextureResource diffAlbedo; // RRGuide_DiffAlbedo
+            public NriTextureResource specAlbedo; // RRGuide_SpecAlbedo
             public NriTextureResource normalRoughness; // RRGuide_Normal_Roughness
-            public NriTextureResource specHitDistance; // RRGuide_SpecHitDistance
+            public NriTextureResource specularMvOrHitTex; // RRGuide_SpecHitDistance
         }
 
         public DlrrDenoiser(string camName)
         {
             _instanceId = CreateDLRRInstance();
             _cameraName = camName;
-            _buffer = new NativeArray<DlrrFrameData>(BufferCount, Allocator.Persistent);
-                Debug.Log($"[DLSS RR] Created Denoiser Instance {_instanceId} for Camera {_cameraName}");
+            _buffer     = new NativeArray<DlrrFrameData>(BufferCount, Allocator.Persistent);
+            Debug.Log($"[DLSS RR] Created Denoiser Instance {_instanceId} for Camera {_cameraName}");
         }
 
         private DlrrFrameData GetData(DlrrFrameInput fi, DlrrResources res, float resolutionScale, UpscalerMode upscalerMode)
@@ -67,23 +68,24 @@ namespace DLRR
 
             var data = new DlrrFrameData
             {
-                inputTex = res.input.NriPtr,
-                outputTex = res.output.NriPtr,
-                mvTex = res.mv.NriPtr,
-                depthTex = res.depth.NriPtr,
-                diffuseAlbedoTex = res.diffAlbedo.NriPtr,
-                specularAlbedoTex = res.specAlbedo.NriPtr,
-                normalRoughnessTex = res.normalRoughness.NriPtr,
-                specularMvOrHitTex = res.specHitDistance.NriPtr,
-                worldToViewMatrix = fi.worldToView,
-                viewToClipMatrix = fi.viewToClip,
-                outputWidth = fi.outputWidth,
-                outputHeight = fi.outputHeight,
-                currentWidth = rectW,
-                currentHeight = rectH,
-                upscalerMode = upscalerMode,
-                cameraJitter = fi.viewportJitter,
-                instanceId = _instanceId
+                inputTex                = res.input.NriPtr,
+                outputTex               = res.output.NriPtr,
+                mvTex                   = res.mv.NriPtr,
+                depthTex                = res.depth.NriPtr,
+                diffuseAlbedoTex        = res.diffAlbedo.NriPtr,
+                specularAlbedoTex       = res.specAlbedo.NriPtr,
+                normalRoughnessTex      = res.normalRoughness.NriPtr,
+                specularMvOrHitTex      = res.specularMvOrHitTex.NriPtr, // 默认传hitT，后续可根据外部参数切换
+                useSpecularMotionVector = fi.useMv,
+                worldToViewMatrix       = fi.worldToView,
+                viewToClipMatrix        = fi.viewToClip,
+                outputWidth             = fi.outputWidth,
+                outputHeight            = fi.outputHeight,
+                currentWidth            = rectW,
+                currentHeight           = rectH,
+                upscalerMode            = upscalerMode,
+                cameraJitter            = fi.viewportJitter,
+                instanceId              = _instanceId,
             };
 
             return data;
@@ -107,8 +109,8 @@ namespace DLRR
             }
 
             DestroyDLRRInstance(_instanceId);
-            
-            
+
+
             Debug.Log($"[DLSS RR] Destroyed Denoiser Instance {_instanceId} for Camera {_cameraName} - Dispose Complete");
         }
     }

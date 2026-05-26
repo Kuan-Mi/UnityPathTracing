@@ -129,14 +129,14 @@ namespace PathTracing
             if (_lightingUpdateBeginPass == null)
             {
                 _lightingUpdateBeginPass = new NativeRtxptLightingUpdateBeginPass(
-                    baseLayerCs, envMapImportanceBakerCs,
-                    envLightsBackupPastCs, envLightsSubdivideBaseCs, envLightsSubdivideBoostCs,
-                    envLightsFillLookupMapCs, envLightsMapPastToCurrentCs,
-                    resetLightProxyCountersCs, resetPastToCurrentHistoryCs,
-                    computeWeightsCs, computeProxyCountsCs, computeProxyBaselineOffsetsCs,
-                    createProxyJobsCs, executeProxyJobsCs,
-                    bakeEmissiveTrianglesCs)
-                { renderPassEvent = renderPassEvent };
+                        baseLayerCs, envMapImportanceBakerCs,
+                        envLightsBackupPastCs, envLightsSubdivideBaseCs, envLightsSubdivideBoostCs,
+                        envLightsFillLookupMapCs, envLightsMapPastToCurrentCs,
+                        resetLightProxyCountersCs, resetPastToCurrentHistoryCs,
+                        computeWeightsCs, computeProxyCountsCs, computeProxyBaselineOffsetsCs,
+                        createProxyJobsCs, executeProxyJobsCs,
+                        bakeEmissiveTrianglesCs)
+                    { renderPassEvent = renderPassEvent };
             }
 
             _buildStablePlanesPass ??= new NativeRtxptBuildStablePlanesPass(
@@ -151,14 +151,14 @@ namespace PathTracing
                     fillStablePlanesShader, referenceShader,
                     fillHitGroups, referenceHitGroups)
                 { renderPassEvent = renderPassEvent };
-            _denoiseSpecHitTPass        ??= new NativeRtxptDenoiseSpecHitTPass(denoiseSpecHitTCs) { renderPassEvent               = renderPassEvent };
-            _noDenoiserFinalMergePass   ??= new NativeRtxptNoDenoiserFinalMergePass(noDenoiserFinalMergeCs) { renderPassEvent     = renderPassEvent };
-            _dlssBeforePass             ??= new NativeRtxptDlssBeforePass(dlssBeforeCs) { renderPassEvent                         = renderPassEvent };
-            _dlssRRPass                 ??= new DlssRRPass { renderPassEvent                                                      = renderPassEvent };
-            _accumulationPass           ??= new NativeRtxptAccumulationPass(accumulationCs) { renderPassEvent                     = renderPassEvent };
-            _stablePlanesDebugVizPass   ??= new NativeRtxptStablePlanesDebugVizPass(stablePlanesDebugVizCs) { renderPassEvent     = renderPassEvent };
-            _outputBlitPass             ??= new NativeRtxptOutputBlitPass(outputBlitMaterial) { renderPassEvent                   = renderPassEvent };
-            _nativeFrameTickPass        ??= new NativeFrameTick { renderPassEvent                                                 = renderPassEvent };
+            _denoiseSpecHitTPass      ??= new NativeRtxptDenoiseSpecHitTPass(denoiseSpecHitTCs) { renderPassEvent           = renderPassEvent };
+            _noDenoiserFinalMergePass ??= new NativeRtxptNoDenoiserFinalMergePass(noDenoiserFinalMergeCs) { renderPassEvent = renderPassEvent };
+            _dlssBeforePass           ??= new NativeRtxptDlssBeforePass(dlssBeforeCs) { renderPassEvent                     = renderPassEvent };
+            _dlssRRPass               ??= new DlssRRPass { renderPassEvent                                                  = renderPassEvent };
+            _accumulationPass         ??= new NativeRtxptAccumulationPass(accumulationCs) { renderPassEvent                 = renderPassEvent };
+            _stablePlanesDebugVizPass ??= new NativeRtxptStablePlanesDebugVizPass(stablePlanesDebugVizCs) { renderPassEvent = renderPassEvent };
+            _outputBlitPass           ??= new NativeRtxptOutputBlitPass(outputBlitMaterial) { renderPassEvent               = renderPassEvent };
+            _nativeFrameTickPass      ??= new NativeFrameTick { renderPassEvent                                             = renderPassEvent };
         }
 
         public override void AddRenderPasses(ScriptableRenderer renderer, ref RenderingData renderingData)
@@ -318,6 +318,7 @@ namespace PathTracing
                         frameIndex       = frameState.frameIndex,
                         outputWidth      = (ushort)displayResolution.x,
                         outputHeight     = (ushort)displayResolution.y,
+                        useMv            = true
                     };
                     var dlrrRes = new DlrrDenoiser.DlrrResources
                     {
@@ -328,7 +329,7 @@ namespace PathTracing
                         diffAlbedo      = texPool.DlssRrDiffAlbedo,
                         specAlbedo      = texPool.DlssRrSpecAlbedo,
                         normalRoughness = texPool.DlssRrNormalRoughness,
-                        specHitDistance = texPool.DlssRrSpecMotionVectors,
+                        specularMvOrHitTex = texPool.DlssRrSpecMotionVectors,
                     };
                     _dlssRRPass.Setup(
                         dlrr.GetInteropDataPtr(dlrrInput, dlrrRes, 1.0f, setting.upscalerMode),
@@ -393,7 +394,7 @@ namespace PathTracing
             _buildStablePlanesPass?.Dispose();
             _buildStablePlanesPass = null;
             _fillStablePlanesPass?.Dispose();
-            _fillStablePlanesPass = null;
+            _fillStablePlanesPass  = null;
             _lightingUpdateEndPass = null;
             _exportVisibilityBufferPass?.Dispose();
             _exportVisibilityBufferPass = null;
@@ -445,7 +446,12 @@ namespace PathTracing
             }
 
             NativeRtxptBufferResources buf = null;
-            foreach (var kv in _bufferPools) { buf = kv.Value; break; }
+            foreach (var kv in _bufferPools)
+            {
+                buf = kv.Value;
+                break;
+            }
+
             if (buf?.LightBuffer == null)
             {
                 Debug.LogWarning("[NativeRtxptFeature] LightBuffer is null — run the scene first.");
@@ -476,7 +482,7 @@ namespace PathTracing
             }
 
             int readCount = (int)System.Math.Min(triCount, 4096u);
-            var data = new RtxptPolymorphicLightInfo[readCount];
+            var data      = new RtxptPolymorphicLightInfo[readCount];
             buf.LightBuffer.GetData(data, 0, (int)triOffset, readCount);
 
             int   nonZero  = 0;
@@ -484,16 +490,17 @@ namespace PathTracing
 
             for (int i = 0; i < readCount; i++)
             {
-                var   info      = data[i];
-                uint  logRad    = info.LogRadiance & 0xFFFFu;
-                float intensity = (logRad == 0) ? 0f
+                var  info   = data[i];
+                uint logRad = info.LogRadiance & 0xFFFFu;
+                float intensity = (logRad == 0)
+                    ? 0f
                     : Unity.Mathematics.math.exp2(((logRad - 1) / 65534f) * 48f - 8f);
                 if (intensity < 0.001f) continue;
                 nonZero++;
 
                 // Decode color (RGB8 in bits 0-23 of ColorTypeAndFlags)
-                float normR = ( info.ColorTypeAndFlags        & 0xFFu) / 255f;
-                float normG = ((info.ColorTypeAndFlags >>  8) & 0xFFu) / 255f;
+                float normR = (info.ColorTypeAndFlags & 0xFFu) / 255f;
+                float normG = ((info.ColorTypeAndFlags >> 8) & 0xFFu) / 255f;
                 float normB = ((info.ColorTypeAndFlags >> 16) & 0xFFu) / 255f;
                 var   col   = new Color(normR, normG, normB, 1f); // use hue only, not intensity (too large)
 
@@ -501,23 +508,23 @@ namespace PathTracing
                 //   low  16 bits → edge1 component,  high 16 bits → edge2 component
                 // Center = base + (edge1 + edge2) / 3  (triangle centroid)
                 var center = new Vector3(info.CenterX, info.CenterY, info.CenterZ);
-                var edge1  = new Vector3(
-                    Mathf.HalfToFloat((ushort)( info.Direction1        & 0xFFFFu)),
-                    Mathf.HalfToFloat((ushort)( info.Direction2        & 0xFFFFu)),
-                    Mathf.HalfToFloat((ushort)( info.Scalars           & 0xFFFFu)));
-                var edge2  = new Vector3(
+                var edge1 = new Vector3(
+                    Mathf.HalfToFloat((ushort)(info.Direction1 & 0xFFFFu)),
+                    Mathf.HalfToFloat((ushort)(info.Direction2 & 0xFFFFu)),
+                    Mathf.HalfToFloat((ushort)(info.Scalars & 0xFFFFu)));
+                var edge2 = new Vector3(
                     Mathf.HalfToFloat((ushort)((info.Direction1 >> 16) & 0xFFFFu)),
                     Mathf.HalfToFloat((ushort)((info.Direction2 >> 16) & 0xFFFFu)),
-                    Mathf.HalfToFloat((ushort)((info.Scalars    >> 16) & 0xFFFFu)));
-                var normal = Vector3.Cross(edge1, edge2).normalized;
-                var triBase = center - (edge1 + edge2) / 3f;  // recover base vertex
+                    Mathf.HalfToFloat((ushort)((info.Scalars >> 16) & 0xFFFFu)));
+                var normal  = Vector3.Cross(edge1, edge2).normalized;
+                var triBase = center - (edge1 + edge2) / 3f; // recover base vertex
 
                 // Draw triangle outline + normal
                 float size = 0.05f;
-                Debug.DrawLine(triBase,          triBase + edge1,          col, drawTime);
-                Debug.DrawLine(triBase,          triBase + edge2,          col, drawTime);
-                Debug.DrawLine(triBase + edge1,  triBase + edge2,          col, drawTime);
-                Debug.DrawLine(center,           center + normal * (size * 3f), col, drawTime);
+                Debug.DrawLine(triBase, triBase + edge1, col, drawTime);
+                Debug.DrawLine(triBase, triBase + edge2, col, drawTime);
+                Debug.DrawLine(triBase + edge1, triBase + edge2, col, drawTime);
+                Debug.DrawLine(center, center + normal * (size * 3f), col, drawTime);
 
                 if (nonZero <= 16)
                 {
@@ -528,6 +535,7 @@ namespace PathTracing
                                   $"  e1=({edge1.x:F2},{edge1.y:F2},{edge1.z:F2})");
                 }
             }
+
             sb.AppendLine($"  Non-zero entries in first {readCount}: {nonZero}  (draws visible for {drawTime}s in Scene view)");
             if (triCount > (uint)readCount)
                 sb.AppendLine($"  (only first {readCount} of {triCount} entries read back)");

@@ -19,10 +19,12 @@ namespace DLRR
         public IntPtr outputTex;
         public IntPtr mvTex;
         public IntPtr depthTex;
+        
         public IntPtr diffuseAlbedoTex;
         public IntPtr specularAlbedoTex;
         public IntPtr normalRoughnessTex;
         public IntPtr specularMvOrHitTex; 
+        
         
         
         public Matrix4x4 worldToViewMatrix;
@@ -36,6 +38,7 @@ namespace DLRR
 
         public float2 cameraJitter;
         public int instanceId;
+        public bool useSpecularMotionVector; // true: 传入mv，false: 传入hitT
         
         public UpscalerMode upscalerMode;
     }

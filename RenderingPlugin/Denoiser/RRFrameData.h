@@ -29,6 +29,7 @@ struct RRFrameData
     float cameraJitter[2];
 
     int instanceId;
+    bool useSpecularMotionVector; // true: 传入mv，false: 传入hitT
     nri::UpscalerMode upscalerMode;
     
 };

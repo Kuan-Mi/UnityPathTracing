@@ -166,6 +166,9 @@ void DLRRInstance::DispatchCompute(RRFrameData* data)
     dispatchUpscaleDesc.cameraJitter = {-data->cameraJitter[0], -data->cameraJitter[1]};
     dispatchUpscaleDesc.mvScale = {1.0f, 1.0f};
     dispatchUpscaleDesc.flags = nri::DispatchUpscaleBits::NONE;
+    if (data->useSpecularMotionVector) {
+        dispatchUpscaleDesc.flags |= nri::DispatchUpscaleBits::USE_SPECULAR_MOTION;
+    }
 
     dispatchUpscaleDesc.guides.denoiser.mv = GetPair(data->mvTex, false);
     dispatchUpscaleDesc.guides.denoiser.depth = GetPair(data->depthTex, false);

@@ -202,7 +202,8 @@ namespace PathTracing
         // ── DLSS-RR guide buffers ──────────────────────────────────────────
         DlssDiffuseAlbedo,
         DlssSpecularAlbedo,
-        DlssNormalRoughness,
+        DlssNormal,
+        DlssRoughness,
         DlssSpecMotionVectors,
 
         // ── Debug ──────────────────────────────────────────────────────────
