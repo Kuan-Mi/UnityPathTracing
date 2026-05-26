@@ -432,6 +432,76 @@ namespace PathTracing
             AutoFillShaders();
         }
 
+        /// <summary>
+        /// Debug readback: logs all emissive triangle light entries from the GPU LightBuffer.
+        /// Run the scene for at least one frame before clicking.
+        /// </summary>
+        public void TestEmissiveTriangles()
+        {
+            if (_lightingUpdateBeginPass == null)
+            {
+                Debug.LogWarning("[NativeRtxptFeature] LightingUpdateBeginPass not created — run the scene first.");
+                return;
+            }
+
+            NativeRtxptBufferResources buf = null;
+            foreach (var kv in _bufferPools) { buf = kv.Value; break; }
+            if (buf?.LightBuffer == null)
+            {
+                Debug.LogWarning("[NativeRtxptFeature] LightBuffer is null — run the scene first.");
+                return;
+            }
+
+            uint triOffset = _lightingUpdateBeginPass.EmissiveLightOffset;
+            uint triCount  = _lightingUpdateBeginPass.EmissiveTriangleCount;
+
+            var sb = new System.Text.StringBuilder();
+            sb.AppendLine($"[Rtxpt Emissive Triangles] offset={triOffset}  count={triCount}  analyticCount={triOffset - 5368}  MaxLights={NativeRtxptBufferResources.MaxLights}");
+
+            // ---- CPU-side: SubInstanceData EmissiveLightMappingOffset ----
+            if (_gpuScene != null)
+            {
+                var emissive = _gpuScene.GetEmissiveGeometries();
+                sb.AppendLine($"  Emissive geometries ({emissive.Count}):");
+                foreach (var e in emissive)
+                    sb.AppendLine($"    inst={e.InstanceIndex} geom={e.GeometrySubIndex}  triCount={e.TriangleCount}");
+            }
+
+            // ---- GPU readback: LightBuffer entries at emissive range ----
+            if (triCount == 0)
+            {
+                sb.AppendLine("  No emissive triangles collected last frame.");
+                Debug.Log(sb.ToString());
+                return;
+            }
+
+            int readCount = (int)System.Math.Min(triCount, 256u); // cap readback to 256 entries
+            var data = new RtxptPolymorphicLightInfo[readCount];
+            buf.LightBuffer.GetData(data, 0, (int)triOffset, readCount);
+
+            int nonZero = 0;
+            for (int i = 0; i < readCount; i++)
+            {
+                var info       = data[i];
+                uint logRad    = info.LogRadiance & 0xFFFFu;
+                float intensity = (logRad == 0) ? 0f
+                    : Unity.Mathematics.math.exp2(((logRad - 1) / 65534f) * 48f - 8f);
+                if (intensity < 0.001f) continue;
+                nonZero++;
+                if (nonZero <= 8)
+                {
+                    uint typeCode = (info.ColorTypeAndFlags >> 24) & 0xFu;
+                    sb.AppendLine($"    [{(int)triOffset + i}] type={typeCode}  intensity={intensity:F3}" +
+                                  $"  center=({info.CenterX:F2},{info.CenterY:F2},{info.CenterZ:F2})");
+                }
+            }
+            sb.AppendLine($"  Non-zero entries in first {readCount}: {nonZero}");
+            if (triCount > 256u)
+                sb.AppendLine($"  (only first 256 of {triCount} entries read back)");
+
+            Debug.Log(sb.ToString());
+        }
+
         public void AutoFillShaders()
         {
             const string shaderRoot = "Assets/RTXPT/Shaders";

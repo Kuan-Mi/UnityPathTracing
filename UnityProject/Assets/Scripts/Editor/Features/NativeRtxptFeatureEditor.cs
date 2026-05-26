@@ -36,6 +36,16 @@ namespace PathTracing
                 feature.AutoFillShaders();
             }
 
+            EditorGUILayout.Space(4);
+            if (GUILayout.Button("Test Emissive Triangles — Readback LightBuffer"))
+            {
+                feature.TestEmissiveTriangles();
+            }
+            EditorGUILayout.HelpBox(
+                "Reads back the emissive-triangle range of LightBuffer from GPU and prints center, " +
+                "intensity, and type of the first non-zero entries to the Console. " +
+                "Run the scene for a few frames before clicking.",
+                MessageType.Info);
 
             EditorGUILayout.Space(10);
 

@@ -187,6 +187,11 @@ namespace PathTracing
         private bool                   _ping = true; // ping-pong for weights buffer
         private int                    _dbgFrameCounter;
 
+        /// <summary>lightsBuffer index where emissive triangles start (= EnvQtTotalNodeCount + analyticLightCount).</summary>
+        public uint EmissiveLightOffset  => EnvQtTotalNodeCount + (uint)_analyticLightCount;
+        /// <summary>Total emissive triangle-light count produced last frame.</summary>
+        public uint EmissiveTriangleCount => _emissiveTotalTriCount;
+
         // ====================================================================
         // Constructor
         // ====================================================================
