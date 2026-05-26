@@ -559,13 +559,13 @@ namespace PathTracing
             var cmd = CommandBufferHelpers.GetNativeCommandBuffer(context.cmd);
             var buf = data.Ctx.Buffers;
 
-            cmd.BeginSample("Rtxpt.LightingUpdateBegin");
+            cmd.BeginSample(RenderPassMarkers.RtxptLightingUpdateBegin);
 
             // ----------------------------------------------------------------
             // 1–2. EnvMapBaker
             // ----------------------------------------------------------------
             {
-                cmd.BeginSample("Rtxpt.EnvMapBaker");
+                cmd.BeginSample(RenderPassMarkers.RtxptEnvMapBaker);
 
                 // 1. BaseLayerCS — write env cube mip0 + mip1
                 {
@@ -578,7 +578,9 @@ namespace PathTracing
                     ds.SetTexture("t_ProcSkyScatter", data.DummyTex2DPtr);
                     ds.SetRWTexture("u_EnvMapCubeFacesDst0", data.EnvCubeMip0Ptr);
                     ds.SetRWTexture("u_EnvMapCubeFacesDst1", data.EnvCubeMip1Ptr);
+                    cmd.BeginSample(RenderPassMarkers.RtxptEnvMapBaseLayer);
                     data.BaseLayerCs.Dispatch(cmd, ds, BaseLayerGroupsXY, BaseLayerGroupsXY, 6);
+                    cmd.EndSample(RenderPassMarkers.RtxptEnvMapBaseLayer);
                 }
 
                 // 2. ImportanceBakerCS — build importance + radiance maps, then generate mips
@@ -588,13 +590,15 @@ namespace PathTracing
                     ds.SetTexture("t_EnvMapCube", data.EnvCubeMip0Ptr);
                     ds.SetRWTexture("u_ImportanceMap", data.ImportanceMapPtr);
                     ds.SetRWTexture("u_RadianceMap", data.RadianceMapPtr);
+                    cmd.BeginSample(RenderPassMarkers.RtxptEnvMapImportanceBaker);
                     data.ImportanceBakerCs.Dispatch(cmd, ds, ImportanceBakerGroupsXY, ImportanceBakerGroupsXY, 1);
+                    cmd.EndSample(RenderPassMarkers.RtxptEnvMapImportanceBaker);
                 }
 
                 cmd.GenerateMips(data.ImportanceMapRt);
                 cmd.GenerateMips(data.RadianceMapRt);
 
-                cmd.EndSample("Rtxpt.EnvMapBaker");
+                cmd.EndSample(RenderPassMarkers.RtxptEnvMapBaker);
             }
 
             // Buffer pointers used by the remaining passes
@@ -632,7 +636,9 @@ namespace PathTracing
                 ds.SetRWStructuredBuffer("u_controlBuffer", pCtrl, cCtrl, StrideCtrl);
                 ds.SetRWTypedBuffer("u_perLightProxyCounters", pProxyCnt, cProxyCnt, DXGI_FORMAT_R32_UINT);
                 uint gx = (total + 1 + LLB_NUM_COMPUTE_THREADS - 1) / LLB_NUM_COMPUTE_THREADS;
+                cmd.BeginSample(RenderPassMarkers.RtxptResetLightProxyCounters);
                 data.ResetProxyCountersCs.Dispatch(cmd, ds, gx, 1, 1);
+                cmd.EndSample(RenderPassMarkers.RtxptResetLightProxyCounters);
             }
 
             // ----------------------------------------------------------------
@@ -644,7 +650,9 @@ namespace PathTracing
                 ds.SetRWStructuredBuffer("u_controlBuffer", pCtrl, cCtrl, StrideCtrl);
                 ds.SetRWTypedBuffer("u_historyRemapPastToCurrent", pHistPas, cHistPas, DXGI_FORMAT_R32_UINT);
                 uint gx = Math.Max(1u, (items + LLB_NUM_COMPUTE_THREADS - 1) / LLB_NUM_COMPUTE_THREADS);
+                cmd.BeginSample(RenderPassMarkers.RtxptResetPastToCurrentHistory);
                 data.ResetPastToCurrentCs.Dispatch(cmd, ds, gx, 1, 1);
+                cmd.EndSample(RenderPassMarkers.RtxptResetPastToCurrentHistory);
             }
 
             // ----------------------------------------------------------------
@@ -656,7 +664,9 @@ namespace PathTracing
                 ds.SetRWStructuredBuffer("u_lightsBuffer", pLights, cLights, StrideLights);
                 ds.SetRWTypedBuffer("u_scratchList", pScrList, cScrList, DXGI_FORMAT_R32_UINT);
                 uint gx = (EnvQtTotalNodeCount + LLB_NUM_COMPUTE_THREADS - 1) / LLB_NUM_COMPUTE_THREADS;
+                cmd.BeginSample(RenderPassMarkers.RtxptEnvLightsBackupPast);
                 data.BackupPastCs.Dispatch(cmd, ds, gx, 1, 1);
+                cmd.EndSample(RenderPassMarkers.RtxptEnvLightsBackupPast);
             }
 
             // ----------------------------------------------------------------
@@ -667,7 +677,9 @@ namespace PathTracing
                 ds.SetTexture("t_envRadianceAndImportanceMap", envImportancePtr);
                 ds.SetRWStructuredBuffer("u_controlBuffer", pCtrl, cCtrl, StrideCtrl);
                 ds.SetRWTypedBuffer("u_scratchList", pScrList, cScrList, DXGI_FORMAT_R32_UINT);
+                cmd.BeginSample(RenderPassMarkers.RtxptEnvLightsSubdivideBase);
                 data.SubdivideBaseCs.Dispatch(cmd, ds, 1, 1, 1);
+                cmd.EndSample(RenderPassMarkers.RtxptEnvLightsSubdivideBase);
             }
 
             // ----------------------------------------------------------------
@@ -682,7 +694,9 @@ namespace PathTracing
                 ds.SetRWTypedBuffer("u_scratchList", pScrList, cScrList, DXGI_FORMAT_R32_UINT);
                 ds.SetRWTypedBuffer("u_historyRemapCurrentToPast", pHistCur, cHistCur, DXGI_FORMAT_R32_UINT);
                 ds.SetRWTexture("u_envLightLookupMap", envLookupMapPtr);
+                cmd.BeginSample(RenderPassMarkers.RtxptEnvLightsSubdivideBoost);
                 data.SubdivideBoostCs.Dispatch(cmd, ds, EnvQtUnboostedCount, 1, 1);
+                cmd.EndSample(RenderPassMarkers.RtxptEnvLightsSubdivideBoost);
             }
 
             // ----------------------------------------------------------------
@@ -690,7 +704,6 @@ namespace PathTracing
             // ----------------------------------------------------------------
             if (data.EmissiveTaskCount > 0)
             {
-                cmd.BeginSample("Rtxpt.BakeEmissiveTriangles");
                 var ds = data.BakeEmissiveTrianglesDs;
                 // UAV outputs
                 ds.SetRWStructuredBuffer("u_controlBuffer", pCtrl, cCtrl, StrideCtrl);
@@ -709,8 +722,9 @@ namespace PathTracing
                 data.Ctx.GpuScene?.BindToShader(ds);
                 // Dispatch: ceil(taskCount / 8) groups × [256,1,1] threads = taskCount × 32 threads total
                 uint gxBake = Math.Max(1u, ((uint)data.EmissiveTaskCount + 7u) / 8u);
+                cmd.BeginSample(RenderPassMarkers.RtxptBakeEmissiveTriangles);
                 data.BakeEmissiveTrianglesCs.Dispatch(cmd, ds, gxBake, 1, 1);
-                cmd.EndSample("Rtxpt.BakeEmissiveTriangles");
+                cmd.EndSample(RenderPassMarkers.RtxptBakeEmissiveTriangles);
             }
 
             // ----------------------------------------------------------------
@@ -721,7 +735,9 @@ namespace PathTracing
                 ds.SetRWStructuredBuffer("u_controlBuffer", pCtrl, cCtrl, StrideCtrl);
                 ds.SetRWStructuredBuffer("u_lightsBuffer", pLights, cLights, StrideLights);
                 ds.SetRWTexture("u_envLightLookupMap", envLookupMapPtr);
+                cmd.BeginSample(RenderPassMarkers.RtxptEnvLightFillLookupMap);
                 data.FillLookupMapCs.Dispatch(cmd, ds, EnvQtTotalNodeCount, 1, 1);
+                cmd.EndSample(RenderPassMarkers.RtxptEnvLightFillLookupMap);
             }
 
             // ----------------------------------------------------------------
@@ -734,7 +750,9 @@ namespace PathTracing
                 ds.SetRWTypedBuffer("u_historyRemapPastToCurrent", pHistPas, cHistPas, DXGI_FORMAT_R32_UINT);
                 ds.SetRWTexture("u_envLightLookupMap", envLookupMapPtr);
                 uint gx = (uint)(EnvQtTotalNodeCount + LLB_NUM_COMPUTE_THREADS - 1) / LLB_NUM_COMPUTE_THREADS;
+                cmd.BeginSample(RenderPassMarkers.RtxptEnvLightsMapPastToCurrent);
                 data.MapPastToCurrentCs.Dispatch(cmd, ds, gx, 1, 1);
+                cmd.EndSample(RenderPassMarkers.RtxptEnvLightsMapPastToCurrent);
             }
 
             // ----------------------------------------------------------------
@@ -748,7 +766,9 @@ namespace PathTracing
                 ds.SetRWTexture("u_feedbackCandidates", ctx.FeedbackCandidatesPtr);
                 uint gx = (uint)(ctx.RenderResolution.x + LLB_PREPROCESS_BLOCK_SIZE_INNER - 1) / LLB_PREPROCESS_BLOCK_SIZE_INNER;
                 uint gy = (uint)(ctx.RenderResolution.y + LLB_PREPROCESS_BLOCK_SIZE_INNER - 1) / LLB_PREPROCESS_BLOCK_SIZE_INNER;
+                cmd.BeginSample(RenderPassMarkers.RtxptProcessFeedbackHistoryPreFilter);
                 data.ProcessFeedbackHistoryPreFilterCs.Dispatch(cmd, ds, gx, gy, 1);
+                cmd.EndSample(RenderPassMarkers.RtxptProcessFeedbackHistoryPreFilter);
             }
 
             // ----------------------------------------------------------------
@@ -770,7 +790,9 @@ namespace PathTracing
 
                 uint gx = (uint)(ctx.RenderResolution.x + LLB_NUM_COMPUTE_THREADS_2D - 1) / LLB_NUM_COMPUTE_THREADS_2D;
                 uint gy = (uint)(ctx.RenderResolution.y + LLB_NUM_COMPUTE_THREADS_2D - 1) / LLB_NUM_COMPUTE_THREADS_2D;
+                cmd.BeginSample(RenderPassMarkers.RtxptProcessFeedbackHistoryP0);
                 data.ProcessFeedbackHistoryP0Cs.Dispatch(cmd, ds, gx, gy, 1);
+                cmd.EndSample(RenderPassMarkers.RtxptProcessFeedbackHistoryP0);
             }
 
             // ----------------------------------------------------------------
@@ -784,7 +806,9 @@ namespace PathTracing
                 ds.SetRWTypedBuffer("u_lightWeights", pWeights, cWeights, DXGI_FORMAT_R32_FLOAT);
                 ds.SetRWTypedBuffer("u_historyRemapCurrentToPast", pHistCur, cHistCur, DXGI_FORMAT_R32_UINT);
                 uint gx = Math.Max(1u, (total + LLB_WEIGHTS_ITEMS_PER_GROUP - 1) / LLB_WEIGHTS_ITEMS_PER_GROUP);
+                cmd.BeginSample(RenderPassMarkers.RtxptComputeWeights);
                 data.ComputeWeightsCs.Dispatch(cmd, ds, gx, 1, 1);
+                cmd.EndSample(RenderPassMarkers.RtxptComputeWeights);
             }
 
             // ----------------------------------------------------------------
@@ -798,7 +822,9 @@ namespace PathTracing
                 ds.SetRWTypedBuffer("u_perLightProxyCounters", pProxyCnt, cProxyCnt, DXGI_FORMAT_R32_UINT);
                 ds.SetRWTypedBuffer("u_lightSamplingProxies", pProxies, cProxies, DXGI_FORMAT_R32_UINT);
                 uint gx = Math.Max(1u, (total + LLB_NUM_COMPUTE_THREADS - 1) / LLB_NUM_COMPUTE_THREADS);
+                cmd.BeginSample(RenderPassMarkers.RtxptComputeProxyCounts);
                 data.ComputeProxyCountsCs.Dispatch(cmd, ds, gx, 1, 1);
+                cmd.EndSample(RenderPassMarkers.RtxptComputeProxyCounts);
             }
 
             // ----------------------------------------------------------------
@@ -808,7 +834,9 @@ namespace PathTracing
                 var ds = data.ComputeProxyBaselineOffsetsDs;
                 ds.SetRWStructuredBuffer("u_controlBuffer", pCtrl, cCtrl, StrideCtrl);
                 ds.SetRWTypedBuffer("u_lightSamplingProxies", pProxies, cProxies, DXGI_FORMAT_R32_UINT);
+                cmd.BeginSample(RenderPassMarkers.RtxptComputeProxyBaselineOffsets);
                 data.ComputeProxyBaselineOffsetsCs.Dispatch(cmd, ds, 1, 1, 1);
+                cmd.EndSample(RenderPassMarkers.RtxptComputeProxyBaselineOffsets);
             }
 
             // ----------------------------------------------------------------
@@ -822,7 +850,9 @@ namespace PathTracing
                 ds.SetRWTypedBuffer("u_perLightProxyCounters", pProxyCnt, cProxyCnt, DXGI_FORMAT_R32_UINT);
                 ds.SetRWTypedBuffer("u_lightSamplingProxies", pProxies, cProxies, DXGI_FORMAT_R32_UINT);
                 uint gx = Math.Max(1u, (total + LLB_NUM_COMPUTE_THREADS - 1) / LLB_NUM_COMPUTE_THREADS);
+                cmd.BeginSample(RenderPassMarkers.RtxptCreateProxyJobs);
                 data.CreateProxyJobsCs.Dispatch(cmd, ds, gx, 1, 1);
+                cmd.EndSample(RenderPassMarkers.RtxptCreateProxyJobs);
             }
 
             // ----------------------------------------------------------------
@@ -834,10 +864,12 @@ namespace PathTracing
                 ds.SetRWBuffer("u_scratchBuffer", pScratch);
                 ds.SetRWTypedBuffer("u_lightSamplingProxies", pProxies, cProxies, DXGI_FORMAT_R32_UINT);
                 uint gx = Math.Max(1u, (LLB_MAX_PROXY_PROC_TASKS + LLB_NUM_COMPUTE_THREADS - 1) / LLB_NUM_COMPUTE_THREADS);
+                cmd.BeginSample(RenderPassMarkers.RtxptExecuteProxyJobs);
                 data.ExecuteProxyJobsCs.Dispatch(cmd, ds, gx, 1, 1);
+                cmd.EndSample(RenderPassMarkers.RtxptExecuteProxyJobs);
             }
 
-            cmd.EndSample("Rtxpt.LightingUpdateBegin");
+            cmd.EndSample(RenderPassMarkers.RtxptLightingUpdateBegin);
         }
 
         // ====================================================================

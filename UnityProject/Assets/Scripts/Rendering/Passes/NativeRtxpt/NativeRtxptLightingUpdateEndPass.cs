@@ -129,7 +129,7 @@ namespace PathTracing
             var ctx = data.Ctx;
             var buf = ctx.Buffers;
 
-            cmd.BeginSample("Rtxpt.LightingUpdateEnd");
+            cmd.BeginSample(RenderPassMarkers.RtxptLightingUpdateEnd);
 
             // Shared pointers
             var pCtrl    = buf.LightControlBuffer.GetNativeBufferPtr();
@@ -174,7 +174,9 @@ namespace PathTracing
                 ds.SetTexture("t_motionVectors", ctx.MotionVectorsPtr);
                 uint gx = (uint)Math.Max(1, (blendW + Threads2D - 1) / Threads2D);
                 uint gy = (uint)Math.Max(1, (blendH + Threads2D - 1) / Threads2D);
+                cmd.BeginSample(RenderPassMarkers.RtxptProcessFeedbackHistoryP1a);
                 data.P1aCs.Dispatch(cmd, ds, gx, gy, 1);
+                cmd.EndSample(RenderPassMarkers.RtxptProcessFeedbackHistoryP1a);
             }
 
             // ----------------------------------------------------------------
@@ -207,7 +209,9 @@ namespace PathTracing
                 ds.SetTexture("t_motionVectors", ctx.MotionVectorsPtr);
                 uint gx = (uint)Math.Max(1, (renderRes.x + Threads2D - 1) / Threads2D);
                 uint gy = (uint)Math.Max(1, (renderRes.y + Threads2D - 1) / Threads2D);
+                cmd.BeginSample(RenderPassMarkers.RtxptProcessFeedbackHistoryP1b);
                 data.P1bCs.Dispatch(cmd, ds, gx, gy, 1);
+                cmd.EndSample(RenderPassMarkers.RtxptProcessFeedbackHistoryP1b);
             }
 
             // ----------------------------------------------------------------
@@ -228,7 +232,9 @@ namespace PathTracing
                 ds.SetRWTypedBuffer("u_localSamplingBuffer", pLocal, cLocal, DXGI_FORMAT_R32_UINT);
                 uint gx = (uint)Math.Max(1, (localW + Threads2D - 1) / Threads2D);
                 uint gy = (uint)Math.Max(1, (localH + Threads2D - 1) / Threads2D);
+                cmd.BeginSample(RenderPassMarkers.RtxptProcessFeedbackHistoryP2);
                 data.P2Cs.Dispatch(cmd, ds, gx, gy, 1);
+                cmd.EndSample(RenderPassMarkers.RtxptProcessFeedbackHistoryP2);
             }
 
             // ----------------------------------------------------------------
@@ -244,7 +250,9 @@ namespace PathTracing
                 ds.SetRWTexture("u_feedbackCandidates", ctx.FeedbackCandidatesPtr);
                 ds.SetRWTexture("u_historyDepth", ctx.NEEATHistoryDepthPtr);
                 ds.SetRWTypedBuffer("u_localSamplingBuffer", pLocal, cLocal, DXGI_FORMAT_R32_UINT);
+                cmd.BeginSample(RenderPassMarkers.RtxptProcessFeedbackHistoryP3);
                 data.P3Cs.Dispatch(cmd, ds, (uint)Math.Max(1, localW), (uint)Math.Max(1, localH), 1);
+                cmd.EndSample(RenderPassMarkers.RtxptProcessFeedbackHistoryP3);
             }
 
             // ----------------------------------------------------------------
@@ -267,10 +275,12 @@ namespace PathTracing
 
                 uint gx = (uint)Math.Max(1, (renderRes.x + Threads2D - 1) / Threads2D);
                 uint gy = (uint)Math.Max(1, (renderRes.y + Threads2D - 1) / Threads2D);
+                cmd.BeginSample(RenderPassMarkers.RtxptClearFeedbackHistory);
                 data.ClearCs.Dispatch(cmd, ds, gx, gy, 1);
+                cmd.EndSample(RenderPassMarkers.RtxptClearFeedbackHistory);
             }
 
-            cmd.EndSample("Rtxpt.LightingUpdateEnd");
+            cmd.EndSample(RenderPassMarkers.RtxptLightingUpdateEnd);
         }
     }
 }
