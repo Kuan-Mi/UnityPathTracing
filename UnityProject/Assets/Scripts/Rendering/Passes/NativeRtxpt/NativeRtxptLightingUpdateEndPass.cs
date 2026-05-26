@@ -164,6 +164,11 @@ namespace PathTracing
                 ds.SetRWTexture("u_feedbackCandidatesScratch", ctx.FeedbackCandidatesScratchPtr);
                 ds.SetRWTexture("u_feedbackTotalWeightBlended", ctx.FeedbackTotalWeightBlendedPtr);
                 ds.SetRWTexture("u_feedbackCandidatesBlended", ctx.FeedbackCandidatesBlendedPtr);
+                ds.SetRWTexture("u_ShaderDebugVizTextureBuffer", ctx.ShaderDebugVizPtr);
+                var pProxies = buf.LightSamplingProxies.GetNativeBufferPtr();
+                int cProxies = buf.LightSamplingProxies.count;
+                ds.SetRWTypedBuffer("u_lightSamplingProxies", pProxies, cProxies, DXGI_FORMAT_R32_UINT);
+
                 ds.SetRWTexture("u_historyDepth", ctx.NEEATHistoryDepthPtr);
                 ds.SetTexture("t_depthBuffer", ctx.DepthPtr);
                 ds.SetTexture("t_motionVectors", ctx.MotionVectorsPtr);
@@ -187,6 +192,17 @@ namespace PathTracing
                 ds.SetRWTexture("u_feedbackTotalWeightBlended", ctx.FeedbackTotalWeightBlendedPtr);
                 ds.SetRWTexture("u_feedbackCandidatesBlended", ctx.FeedbackCandidatesBlendedPtr);
                 ds.SetRWTexture("u_historyDepth", ctx.NEEATHistoryDepthPtr);
+                ds.SetRWTexture("u_ShaderDebugVizTextureBuffer", ctx.ShaderDebugVizPtr);
+                var pHistPas = buf.HistoryRemapPastToCurrent.GetNativeBufferPtr();
+                int cHistPas = buf.HistoryRemapPastToCurrent.count;
+
+                ds.SetRWTypedBuffer("u_historyRemapPastToCurrent", pHistPas, cHistPas, DXGI_FORMAT_R32_UINT);
+                var pProxies = buf.LightSamplingProxies.GetNativeBufferPtr();
+                int cProxies = buf.LightSamplingProxies.count;
+                ds.SetRWTypedBuffer("u_lightSamplingProxies", pProxies, cProxies, DXGI_FORMAT_R32_UINT);
+                ds.SetRWTypedBuffer("u_localSamplingBuffer", pLocal, cLocal, DXGI_FORMAT_R32_UINT);
+
+
                 ds.SetTexture("t_depthBuffer", ctx.DepthPtr);
                 ds.SetTexture("t_motionVectors", ctx.MotionVectorsPtr);
                 uint gx = (uint)Math.Max(1, (renderRes.x + Threads2D - 1) / Threads2D);
@@ -207,6 +223,8 @@ namespace PathTracing
                 ds.SetRWTexture("u_feedbackCandidates", ctx.FeedbackCandidatesPtr);
                 ds.SetRWTexture("u_feedbackTotalWeightBlended", ctx.FeedbackTotalWeightBlendedPtr);
                 ds.SetRWTexture("u_feedbackCandidatesBlended", ctx.FeedbackCandidatesBlendedPtr);
+                ds.SetRWTexture("u_feedbackCandidatesScratch", ctx.FeedbackCandidatesScratchPtr);
+
                 ds.SetRWTypedBuffer("u_localSamplingBuffer", pLocal, cLocal, DXGI_FORMAT_R32_UINT);
                 uint gx = (uint)Math.Max(1, (localW + Threads2D - 1) / Threads2D);
                 uint gy = (uint)Math.Max(1, (localH + Threads2D - 1) / Threads2D);
@@ -243,6 +261,10 @@ namespace PathTracing
                 ds.SetRWTexture("u_feedbackTotalWeightScratch", ctx.FeedbackTotalWeightScratchPtr);
                 ds.SetRWTexture("u_feedbackCandidatesScratch", ctx.FeedbackCandidatesScratchPtr);
                 ds.SetRWTexture("u_historyDepth", ctx.NEEATHistoryDepthPtr);
+                ds.SetTexture("t_depthBuffer", ctx.DepthPtr);
+                ds.SetRWTexture("u_ShaderDebugVizTextureBuffer", ctx.ShaderDebugVizPtr);
+
+
                 uint gx = (uint)Math.Max(1, (renderRes.x + Threads2D - 1) / Threads2D);
                 uint gy = (uint)Math.Max(1, (renderRes.y + Threads2D - 1) / Threads2D);
                 data.ClearCs.Dispatch(cmd, ds, gx, gy, 1);
