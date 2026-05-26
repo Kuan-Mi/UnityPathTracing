@@ -159,8 +159,12 @@ namespace PathTracing
         private uint                   _emissiveTotalTriCount;
         private bool                   _ping = true; // ping-pong for weights buffer
         private int                    _dbgFrameCounter;
-        private bool                   _lastFrameTemporalFeedbackAvailable;
-        private bool                   _lastFrameLocalSamplesAvailable;
+        private uint                   _historicTotalLightCount;
+        private bool                   _feedbackBufferFilled;
+        private bool                   _previousFrameTemporalFeedbackAvailable;
+        private Vector2                _localJitterSequence;
+        private uint2                  _localSamplingTileJitter;
+        private uint2                  _prevLocalSamplingTileJitter;
 
         /// <summary>lightsBuffer index where emissive triangles start (= EnvQtTotalNodeCount + analyticLightCount).</summary>
         public uint EmissiveLightOffset => EnvQtTotalNodeCount + (uint)_analyticLightCount;
@@ -371,6 +375,7 @@ namespace PathTracing
             internal NativeComputeDescriptorSet ProcessFeedbackHistoryPreFilterDs;
             internal NativeComputePipeline      ProcessFeedbackHistoryP0Cs;
             internal NativeComputeDescriptorSet ProcessFeedbackHistoryP0Ds;
+            internal bool                       LastFrameFeedbackAvailable;
 
             // --- Shared ---
             internal NativeRtxptPassContext Ctx;
@@ -417,7 +422,7 @@ namespace PathTracing
             pd.ExecuteProxyJobsCs            = _executeProxyJobsCs;
             pd.ExecuteProxyJobsDs            = _executeProxyJobsDs;
             pd.TotalLightCount               = EnvQtTotalNodeCount + (uint)_analyticLightCount + _emissiveTotalTriCount;
-            pd.HistoricTotalLightCount       = EnvQtTotalNodeCount + (uint)_analyticLightCount + _emissiveTotalTriCount;
+            pd.HistoricTotalLightCount       = _historicTotalLightCount;
             pd.LightControlBuffer            = _ctx.Buffers.LightControlBuffer;
             pd.LightBuffer                   = _ctx.Buffers.LightBuffer;
             pd.LightExBuffer                 = _ctx.Buffers.LightExBuffer;
@@ -431,6 +436,7 @@ namespace PathTracing
             pd.ProcessFeedbackHistoryPreFilterDs = _processFeedbackHistoryPreFilterDs;
             pd.ProcessFeedbackHistoryP0Cs        = _processFeedbackHistoryP0Cs;
             pd.ProcessFeedbackHistoryP0Ds        = _processFeedbackHistoryP0Ds;
+            pd.LastFrameFeedbackAvailable        = s_controlStaging[0].LastFrameTemporalFeedbackAvailable != 0;
 
             // BakeEmissiveTriangles
             pd.BakeEmissiveTrianglesCs = _bakeEmissiveTrianglesCs;
@@ -445,9 +451,7 @@ namespace PathTracing
                 out pd.PTMaterialDataPtr, out pd.PTMaterialDataCount, out pd.PTMaterialDataStride);
 
 
-            bool neeAtEnabled = _ctx.Setting != null && _ctx.Setting.useNEE && _ctx.Setting.neeType == 2;
-            _lastFrameTemporalFeedbackAvailable = neeAtEnabled;
-            _lastFrameLocalSamplesAvailable     = neeAtEnabled;
+            _historicTotalLightCount = pd.TotalLightCount;
 
             // Flip ping-pong AFTER filling passData so BuildControlData used same side
             _ping = !_ping;
@@ -639,43 +643,44 @@ namespace PathTracing
             }
 
             // ----------------------------------------------------------------
-            // 11. ProcessFeedbackHistoryPreFilter
+            // 11. ProcessFeedbackHistoryPreFilter / P0
+            //     Original RTXPT only runs these when the previous frame's
+            //     temporal feedback buffer is known to contain valid data.
             // ----------------------------------------------------------------
+            if (data.LastFrameFeedbackAvailable)
             {
-                var ds  = data.ProcessFeedbackHistoryPreFilterDs;
-                var ctx = data.Ctx;
-                ds.SetRWStructuredBuffer("u_controlBuffer", pCtrl, cCtrl, StrideCtrl);
-                ds.SetRWTexture("u_feedbackTotalWeight", ctx.FeedbackTotalWeightPtr);
-                ds.SetRWTexture("u_feedbackCandidates", ctx.FeedbackCandidatesPtr);
-                uint gx = (uint)(ctx.RenderResolution.x + LLB_PREPROCESS_BLOCK_SIZE_INNER - 1) / LLB_PREPROCESS_BLOCK_SIZE_INNER;
-                uint gy = (uint)(ctx.RenderResolution.y + LLB_PREPROCESS_BLOCK_SIZE_INNER - 1) / LLB_PREPROCESS_BLOCK_SIZE_INNER;
-                cmd.BeginSample(RenderPassMarkers.RtxptProcessFeedbackHistoryPreFilter);
-                data.ProcessFeedbackHistoryPreFilterCs.Dispatch(cmd, ds, gx, gy, 1);
-                cmd.EndSample(RenderPassMarkers.RtxptProcessFeedbackHistoryPreFilter);
-            }
+                {
+                    var ds  = data.ProcessFeedbackHistoryPreFilterDs;
+                    var ctx = data.Ctx;
+                    ds.SetRWStructuredBuffer("u_controlBuffer", pCtrl, cCtrl, StrideCtrl);
+                    ds.SetRWTexture("u_feedbackTotalWeight", ctx.FeedbackTotalWeightPtr);
+                    ds.SetRWTexture("u_feedbackCandidates", ctx.FeedbackCandidatesPtr);
+                    uint gx = (uint)(ctx.RenderResolution.x + LLB_PREPROCESS_BLOCK_SIZE_INNER - 1) / LLB_PREPROCESS_BLOCK_SIZE_INNER;
+                    uint gy = (uint)(ctx.RenderResolution.y + LLB_PREPROCESS_BLOCK_SIZE_INNER - 1) / LLB_PREPROCESS_BLOCK_SIZE_INNER;
+                    cmd.BeginSample(RenderPassMarkers.RtxptProcessFeedbackHistoryPreFilter);
+                    data.ProcessFeedbackHistoryPreFilterCs.Dispatch(cmd, ds, gx, gy, 1);
+                    cmd.EndSample(RenderPassMarkers.RtxptProcessFeedbackHistoryPreFilter);
+                }
 
-            // ----------------------------------------------------------------
-            // 12. ProcessFeedbackHistoryP0
-            // ----------------------------------------------------------------
-            {
-                var ds  = data.ProcessFeedbackHistoryP0Ds;
-                var ctx = data.Ctx;
-                ds.SetRWStructuredBuffer("u_controlBuffer", pCtrl, cCtrl, StrideCtrl);
-                ds.SetRWTypedBuffer("u_lightWeights", pWeights, cWeights, DXGI_FORMAT_R32_FLOAT);
-                ds.SetRWTexture("u_feedbackTotalWeight", ctx.FeedbackTotalWeightPtr);
-                ds.SetRWTexture("u_feedbackCandidates", ctx.FeedbackCandidatesPtr);
-                ds.SetRWTexture("u_feedbackTotalWeightBlended", ctx.FeedbackTotalWeightBlendedPtr);
-                ds.SetRWTexture("u_feedbackCandidatesBlended", ctx.FeedbackCandidatesBlendedPtr);
-                ds.SetRWTexture("u_ShaderDebugVizTextureBuffer", ctx.ShaderDebugVizPtr);
-                ds.SetRWTypedBuffer("u_historyRemapPastToCurrent", pHistPas, cHistPas, DXGI_FORMAT_R32_UINT);
-                ds.SetRWTypedBuffer("u_perLightProxyCounters", pProxyCnt, cProxyCnt, DXGI_FORMAT_R32_UINT);
+                {
+                    var ds  = data.ProcessFeedbackHistoryP0Ds;
+                    var ctx = data.Ctx;
+                    ds.SetRWStructuredBuffer("u_controlBuffer", pCtrl, cCtrl, StrideCtrl);
+                    ds.SetRWTypedBuffer("u_lightWeights", pWeights, cWeights, DXGI_FORMAT_R32_FLOAT);
+                    ds.SetRWTexture("u_feedbackTotalWeight", ctx.FeedbackTotalWeightPtr);
+                    ds.SetRWTexture("u_feedbackCandidates", ctx.FeedbackCandidatesPtr);
+                    ds.SetRWTexture("u_feedbackTotalWeightBlended", ctx.FeedbackTotalWeightBlendedPtr);
+                    ds.SetRWTexture("u_feedbackCandidatesBlended", ctx.FeedbackCandidatesBlendedPtr);
+                    ds.SetRWTexture("u_ShaderDebugVizTextureBuffer", ctx.ShaderDebugVizPtr);
+                    ds.SetRWTypedBuffer("u_historyRemapPastToCurrent", pHistPas, cHistPas, DXGI_FORMAT_R32_UINT);
+                    ds.SetRWTypedBuffer("u_perLightProxyCounters", pProxyCnt, cProxyCnt, DXGI_FORMAT_R32_UINT);
 
-
-                uint gx = (uint)(ctx.RenderResolution.x + LLB_NUM_COMPUTE_THREADS_2D - 1) / LLB_NUM_COMPUTE_THREADS_2D;
-                uint gy = (uint)(ctx.RenderResolution.y + LLB_NUM_COMPUTE_THREADS_2D - 1) / LLB_NUM_COMPUTE_THREADS_2D;
-                cmd.BeginSample(RenderPassMarkers.RtxptProcessFeedbackHistoryP0);
-                data.ProcessFeedbackHistoryP0Cs.Dispatch(cmd, ds, gx, gy, 1);
-                cmd.EndSample(RenderPassMarkers.RtxptProcessFeedbackHistoryP0);
+                    uint gx = (uint)(ctx.RenderResolution.x + LLB_NUM_COMPUTE_THREADS_2D - 1) / LLB_NUM_COMPUTE_THREADS_2D;
+                    uint gy = (uint)(ctx.RenderResolution.y + LLB_NUM_COMPUTE_THREADS_2D - 1) / LLB_NUM_COMPUTE_THREADS_2D;
+                    cmd.BeginSample(RenderPassMarkers.RtxptProcessFeedbackHistoryP0);
+                    data.ProcessFeedbackHistoryP0Cs.Dispatch(cmd, ds, gx, gy, 1);
+                    cmd.EndSample(RenderPassMarkers.RtxptProcessFeedbackHistoryP0);
+                }
             }
 
             // ----------------------------------------------------------------
@@ -803,8 +808,12 @@ namespace PathTracing
             ref var ctrl = ref s_controlStaging[0];
             ctrl                         = default;
             var setting = _ctx.Setting;
-            bool neeAtEnabled       = setting.useNEE && setting.neeType == 2;
-            bool lastFrameFeedback  = neeAtEnabled && _lastFrameTemporalFeedbackAvailable;
+            bool neeAtEnabled       = setting != null && setting.useNEE && setting.neeType == 2;
+            if (!neeAtEnabled)
+                _feedbackBufferFilled = false;
+
+            bool lastFrameFeedback  = neeAtEnabled && _feedbackBufferFilled;
+            bool lastFrameLocal     = _previousFrameTemporalFeedbackAvailable && lastFrameFeedback;
             uint totalLightCount    = EnvQtTotalNodeCount + (uint)_analyticLightCount + _emissiveTotalTriCount;
             int2 renderRes          = _ctx.RenderResolution;
             uint feedbackW          = (uint)Math.Max(1, renderRes.x);
@@ -821,18 +830,23 @@ namespace PathTracing
             ctrl.AnalyticLightCount                 = (uint)_analyticLightCount;
             ctrl.EnvmapQuadNodeCount                = EnvQtTotalNodeCount;
             ctrl.TriangleLightCount                 = _emissiveTotalTriCount;
-            ctrl.HistoricTotalLightCount            = totalLightCount;
+            ctrl.HistoricTotalLightCount            = _historicTotalLightCount;
             ctrl.LastFrameTemporalFeedbackAvailable = lastFrameFeedback ? 1u : 0u;
-            ctrl.LastFrameLocalSamplesAvailable     = neeAtEnabled && _lastFrameLocalSamplesAvailable ? 1u : 0u;
-            ctrl.ImportanceSamplingType             = setting.useNEE ? (uint)Mathf.Clamp(setting.neeType, 0, 2) : 0u;
+            ctrl.LastFrameLocalSamplesAvailable     = lastFrameLocal ? 1u : 0u;
+            ctrl.ImportanceSamplingType             = setting != null && setting.useNEE ? (uint)Mathf.Clamp(setting.neeType, 0, 2) : 0u;
             ctrl.TemporalFeedbackRequired           = neeAtEnabled ? 1u : 0u;
             ctrl.TotalMaxFeedbackCount              = lastFrameFeedback ? p0ThreadCount : 0u;
             ctrl.GlobalFeedbackUseWeight            = lastFrameFeedback ? (setting?.neeatGlobalTemporalFeedbackWeight ?? 0.75f) : 0.0f;
             ctrl.LocalToGlobalSampleRatio           = lastFrameFeedback ? (setting?.neeatLocalToGlobalSampleRatio ?? 0.65f) : 0.0f;
             ctrl.TileBufferHeight                   = localH;
-            ctrl.ScreenSpaceVsWorldSpaceThreshold   = 0.0f;
+            ctrl.ScreenSpaceVsWorldSpaceThreshold   = 0.3f;
             ctrl.LocalSamplingResolutionX           = localW;
             ctrl.LocalSamplingResolutionY           = localH;
+            UpdateLocalSamplingJitter();
+            ctrl.LocalSamplingTileJitterX           = _localSamplingTileJitter.x;
+            ctrl.LocalSamplingTileJitterY           = _localSamplingTileJitter.y;
+            ctrl.LocalSamplingTileJitterPrevX       = _prevLocalSamplingTileJitter.x;
+            ctrl.LocalSamplingTileJitterPrevY       = _prevLocalSamplingTileJitter.y;
 
             ref var bk = ref ctrl.BakerConstants;
             bk.CurrentWeightsBufferOffset       = currentOffset;
@@ -848,9 +862,9 @@ namespace PathTracing
             bk.PrevOverCurrentViewportSizeX     = 1.0f;
             bk.PrevOverCurrentViewportSizeY     = 1.0f;
             bk.UpdateCounter                    = (uint)_dbgFrameCounter;
-            bk.DepthDisocclusionThreshold       = 0.1f;
+            bk.DepthDisocclusionThreshold       = 1.5f;
             bk.EnableMotionReprojection         = 1u;
-            bk.ReservoirHistoryDropoff          = 0.0f;
+            bk.ReservoirHistoryDropoff          = 0.005f;
             bk.EnvMapParams = new RtxptLightsBakerEnvMapParams
             {
                 TransformRow0    = new Vector4(1, 0, 0, 0),
@@ -864,6 +878,30 @@ namespace PathTracing
                 ColorMultiplierB = envTint.b * envIntensity,
                 Enabled          = 1.0f,
             };
+
+            _previousFrameTemporalFeedbackAvailable = ctrl.TemporalFeedbackRequired != 0;
+            if (ctrl.TemporalFeedbackRequired != 0)
+                _feedbackBufferFilled = true;
+        }
+
+        private void UpdateLocalSamplingJitter()
+        {
+            _prevLocalSamplingTileJitter = _localSamplingTileJitter;
+
+            const float g  = 1.324717957244746f;
+            const float a1 = 1.0f / g;
+            const float a2 = 1.0f / (g * g);
+
+            if (((uint)_dbgFrameCounter % 1024u) == 0u)
+                _localJitterSequence = Vector2.zero;
+
+            _localJitterSequence.x = Mathf.Repeat(_localJitterSequence.x + a1, 1.0f);
+            _localJitterSequence.y = Mathf.Repeat(_localJitterSequence.y + a2, 1.0f);
+
+            uint maxJitter = (uint)(LightingConfig.RTXPT_LIGHTING_SAMPLING_BUFFER_TILE_SIZE - 1);
+            _localSamplingTileJitter = new uint2(
+                (uint)Mathf.Clamp((int)(_localJitterSequence.x * LightingConfig.RTXPT_LIGHTING_SAMPLING_BUFFER_TILE_SIZE), 0, (int)maxJitter),
+                (uint)Mathf.Clamp((int)(_localJitterSequence.y * LightingConfig.RTXPT_LIGHTING_SAMPLING_BUFFER_TILE_SIZE), 0, (int)maxJitter));
         }
 
         // ====================================================================

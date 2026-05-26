@@ -590,13 +590,17 @@ namespace PathTracing
             var ctrlData = new RtxptLightingControlData[1];
             buf.LightControlBuffer.GetData(ctrlData);
             var ctrl = ctrlData[0];
+            uint invalidFeedbackCount = ReadUIntAt(buf.LightProxyCounters, (int)ctrl.TotalLightCount);
+            uint derivedValidFeedback = ctrl.TotalMaxFeedbackCount > invalidFeedbackCount
+                ? ctrl.TotalMaxFeedbackCount - invalidFeedbackCount
+                : 0u;
 
             var sb = new System.Text.StringBuilder();
             sb.AppendLine("[Rtxpt NEE-AT Readback]");
             sb.AppendLine($"  Inspector: useNEE={setting?.useNEE} neeType={setting?.neeType} candidateSamples={setting?.neeCandidateSamples} fullSamples={setting?.neeFullSamples}");
             sb.AppendLine($"  Control: importanceType={ctrl.ImportanceSamplingType} temporalRequired={ctrl.TemporalFeedbackRequired} lastTemporal={ctrl.LastFrameTemporalFeedbackAvailable} lastLocal={ctrl.LastFrameLocalSamplesAvailable}");
             sb.AppendLine($"  Lights: total={ctrl.TotalLightCount} env={ctrl.EnvmapQuadNodeCount} analytic={ctrl.AnalyticLightCount} emissiveTriangles={ctrl.TriangleLightCount}");
-            sb.AppendLine($"  Proxies: samplingProxyCount={ctrl.SamplingProxyCount} proxyBuildTaskCount={ctrl.ProxyBuildTaskCount} validFeedback={ctrl.ValidFeedbackCount}/{ctrl.TotalMaxFeedbackCount}");
+            sb.AppendLine($"  Proxies: samplingProxyCount={ctrl.SamplingProxyCount} proxyBuildTaskCount={ctrl.ProxyBuildTaskCount} validFeedback={derivedValidFeedback}/{ctrl.TotalMaxFeedbackCount} invalidFeedback={invalidFeedbackCount}");
             sb.AppendLine($"  LocalSampling: resolution={ctrl.LocalSamplingResolutionX}x{ctrl.LocalSamplingResolutionY} tileBufferHeight={ctrl.TileBufferHeight} bufferCount={buf.LocalSamplingBuffer?.count ?? 0}");
             sb.AppendLine($"  Feedback: resolution={ctrl.BakerConstants.FeedbackResolutionX}x{ctrl.BakerConstants.FeedbackResolutionY} blended={ctrl.BakerConstants.BlendedFeedbackResolutionX}x{ctrl.BakerConstants.BlendedFeedbackResolutionY}");
             sb.AppendLine($"  Weights: currentOffset={ctrl.BakerConstants.CurrentWeightsBufferOffset} historicOffset={ctrl.BakerConstants.HistoricWeightsBufferOffset} globalFeedbackWeight={ctrl.GlobalFeedbackUseWeight:F3} localToGlobal={ctrl.LocalToGlobalSampleRatio:F3}");
@@ -651,6 +655,16 @@ namespace PathTracing
 
             if (float.IsInfinity(min)) min = max = 0.0f;
             sb.AppendLine($"  {label}: read={count} nonZero={nonZero} min={min:G4} max={max:G4} sum={sum:G5}");
+        }
+
+        private static uint ReadUIntAt(GraphicsBuffer buffer, int index)
+        {
+            if (buffer == null || index < 0 || index >= buffer.count)
+                return 0u;
+
+            var data = new uint[1];
+            buffer.GetData(data, 0, index, 1);
+            return data[0];
         }
 
         private static void AppendUIntBufferStats(System.Text.StringBuilder sb, string label, GraphicsBuffer buffer, int start, int count)
