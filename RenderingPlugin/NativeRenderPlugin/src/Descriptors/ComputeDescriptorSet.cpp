@@ -17,8 +17,8 @@ void ComputeDescriptorSet::Dispatch(
     EnsureDescriptors(slots, slotCount, slotIdx);
 
     cmdList->SetPipelineState(m_shader->GetPSO());
-    BindRootParams(cmdList, slots, slotCount, slotIdx);
     RequestResourceStates(slots, slotCount);
+    BindRootParams(cmdList, slots, slotCount, slotIdx);
     cmdList->Dispatch(threadGroupX, threadGroupY, threadGroupZ);
     NotifyResourceStates(slots, slotCount);
 }

@@ -19,7 +19,7 @@ namespace PathTracing
     ///
     ///   CPU (Setup)
     ///     ControlDataSetup          — pack LightingControlData → LightControlBuffer
-    ///     EnvmapAndAnalyticLights   — pack point/spot lights   → LightBuffer / LightExBuffer
+    ///     EnvmapAndAnalyticLightBuffers — pack point/spot lights → LightBuffer / LightExBuffer
     ///
     ///   GPU (ExecutePass)
     ///     1.  EnvMapBaker BaseLayerCS          — bake env cubemap (mip0 + mip1)
@@ -29,11 +29,11 @@ namespace PathTracing
     ///     5.  EnvLightsBackupPast
     ///     6.  EnvLightsSubdivideBase
     ///     7.  EnvLightsSubdivideBoost
-    ///     8.  BakeEmissiveTriangles            (TODO — stub)
+    ///     8.  BakeEmissiveTriangles
     ///     9.  EnvLightFillLookupMap
     ///     10. EnvLightsMapPastToCurrent
-    ///     11. ProcessFeedbackHistoryPreFilter  (TODO — stub)
-    ///     12. ProcessFeedbackHistoryP0         (TODO — stub)
+    ///     11. ProcessFeedbackHistoryPreFilter
+    ///     12. ProcessFeedbackHistoryP0
     ///     13. ComputeWeights
     ///     14. ComputeProxyCounts
     ///     15. ComputeProxyBaselineOffsets
@@ -350,9 +350,7 @@ namespace PathTracing
 
             // --- EnvMapBaker CPU work ---
             FillEnvBakerConstants(ctx.Setting);
-            _envBakerCb.SetData(s_envBakerBytes);
             FillImportanceBakerConstants();
-            _importanceBakerCb.SetData(s_importanceBytes);
 
             // Expose baked env pointers for downstream passes (BuildStablePlanes / FillStablePlanes)
             ctx.BakedEnvCubePtr                = _envCubeMip0Rt.IsCreated() ? _envCubeMip0Rt.GetNativeTexturePtr() : IntPtr.Zero;
@@ -364,10 +362,10 @@ namespace PathTracing
                 ? _envLightLookupMapRt.GetNativeTexturePtr()
                 : IntPtr.Zero;
 
-            // --- LightsBaker CPU work (ControlDataSetup + EnvmapAndAnalyticLightBuffers) ---
+            // --- LightsBaker CPU staging work ---
             _analyticLightCount = CollectAndPackLights();
 
-            // --- Emissive triangles: MUST run before UploadLightData so _emissiveTaskCount
+            // --- Emissive triangles: MUST run before BuildControlData so _emissiveTaskCount
             //     is known when we write BakerConstants.TriangleLightTaskCount.
             var gpuScene = ctx.GpuScene;
 
@@ -375,9 +373,7 @@ namespace PathTracing
             gpuScene.PrepareEmissiveTriangleTasks(emissiveLightOffset, ctx.Buffers.LightScratchBuffer);
             _emissiveTaskCount     = gpuScene.LastEmissiveTaskCount;
             _emissiveTotalTriCount = gpuScene.LastEmissiveTriangleCount;
-
-
-            UploadLightData();
+            BuildControlData();
         }
 
         // ====================================================================
@@ -391,6 +387,10 @@ namespace PathTracing
             internal NativeComputeDescriptorSet BaseLayerDs;
             internal NativeComputePipeline      ImportanceBakerCs;
             internal NativeComputeDescriptorSet ImportanceBakerDs;
+            internal GraphicsBuffer             EnvBakerCb;
+            internal GraphicsBuffer             ImportanceBakerCb;
+            internal byte[]                     EnvBakerData;
+            internal byte[]                     ImportanceBakerData;
             internal IntPtr                     EnvBakerCbPtr;
             internal IntPtr                     ImportanceBakerCbPtr;
             internal IntPtr                     SkyTexturePtr;
@@ -450,6 +450,13 @@ namespace PathTracing
             internal NativeComputeDescriptorSet ExecuteProxyJobsDs;
             internal uint                       TotalLightCount;
             internal uint                       HistoricTotalLightCount;
+            internal GraphicsBuffer             LightControlBuffer;
+            internal GraphicsBuffer             LightBuffer;
+            internal GraphicsBuffer             LightExBuffer;
+            internal RtxptLightingControlData[] ControlData;
+            internal RtxptPolymorphicLightInfo[] LightData;
+            internal RtxptPolymorphicLightInfoEx[] LightExData;
+            internal int                        AnalyticLightCount;
 
             // --- Feedback pre-processing (begin) ---
             internal NativeComputePipeline      ProcessFeedbackHistoryPreFilterCs;
@@ -478,6 +485,10 @@ namespace PathTracing
             pd.BaseLayerDs          = _baseLayerDs;
             pd.ImportanceBakerCs    = _importanceBakerCs;
             pd.ImportanceBakerDs    = _importanceBakerDs;
+            pd.EnvBakerCb           = _envBakerCb;
+            pd.ImportanceBakerCb    = _importanceBakerCb;
+            pd.EnvBakerData         = s_envBakerBytes;
+            pd.ImportanceBakerData  = s_importanceBytes;
             pd.EnvBakerCbPtr        = _envBakerCb.GetNativeBufferPtr();
             pd.ImportanceBakerCbPtr = _importanceBakerCb.GetNativeBufferPtr();
             var skyTex = _ctx.Setting?.environmentMap;
@@ -521,6 +532,13 @@ namespace PathTracing
             pd.ExecuteProxyJobsDs            = _executeProxyJobsDs;
             pd.TotalLightCount               = EnvQtTotalNodeCount + (uint)_analyticLightCount + _emissiveTotalTriCount;
             pd.HistoricTotalLightCount       = EnvQtTotalNodeCount + (uint)_analyticLightCount + _emissiveTotalTriCount;
+            pd.LightControlBuffer            = _ctx.Buffers.LightControlBuffer;
+            pd.LightBuffer                   = _ctx.Buffers.LightBuffer;
+            pd.LightExBuffer                 = _ctx.Buffers.LightExBuffer;
+            pd.ControlData                   = s_controlStaging;
+            pd.LightData                     = s_lightsStaging;
+            pd.LightExData                   = s_lightsExStaging;
+            pd.AnalyticLightCount            = _analyticLightCount;
 
             // Feedback pre-processing (begin)
             pd.ProcessFeedbackHistoryPreFilterCs = _processFeedbackHistoryPreFilterCs;
@@ -541,7 +559,7 @@ namespace PathTracing
                 out pd.PTMaterialDataPtr, out pd.PTMaterialDataCount, out pd.PTMaterialDataStride);
 
 
-            // Flip ping-pong AFTER filling passData so UploadLightData used same side
+            // Flip ping-pong AFTER filling passData so BuildControlData used same side
             _ping = !_ping;
 
             pd.Ctx = _ctx;
@@ -561,11 +579,18 @@ namespace PathTracing
 
             cmd.BeginSample(RenderPassMarkers.RtxptLightingUpdateBegin);
 
+            context.cmd.BeginSample(RenderPassMarkers.RtxptControlDataSetup);
+            context.cmd.SetBufferData(data.LightControlBuffer, data.ControlData, 0, 0, 1);
+            context.cmd.EndSample(RenderPassMarkers.RtxptControlDataSetup);
+
             // ----------------------------------------------------------------
             // 1–2. EnvMapBaker
             // ----------------------------------------------------------------
             {
                 cmd.BeginSample(RenderPassMarkers.RtxptEnvMapBaker);
+
+                context.cmd.SetBufferData(data.EnvBakerCb, data.EnvBakerData, 0, 0, data.EnvBakerData.Length);
+                context.cmd.SetBufferData(data.ImportanceBakerCb, data.ImportanceBakerData, 0, 0, data.ImportanceBakerData.Length);
 
                 // 1. BaseLayerCS — write env cube mip0 + mip1
                 {
@@ -667,6 +692,17 @@ namespace PathTracing
                 cmd.BeginSample(RenderPassMarkers.RtxptEnvLightsBackupPast);
                 data.BackupPastCs.Dispatch(cmd, ds, gx, 1, 1);
                 cmd.EndSample(RenderPassMarkers.RtxptEnvLightsBackupPast);
+            }
+
+            // ----------------------------------------------------------------
+            // 5b. EnvmapAndAnalyticLightBuffers
+            // ----------------------------------------------------------------
+            if (data.AnalyticLightCount > 0)
+            {
+                context.cmd.BeginSample(RenderPassMarkers.RtxptEnvmapAndAnalyticLightBuffers);
+                context.cmd.SetBufferData(data.LightBuffer, data.LightData, 0, (int)EnvQtTotalNodeCount, data.AnalyticLightCount);
+                context.cmd.SetBufferData(data.LightExBuffer, data.LightExData, 0, (int)EnvQtTotalNodeCount, data.AnalyticLightCount);
+                context.cmd.EndSample(RenderPassMarkers.RtxptEnvmapAndAnalyticLightBuffers);
             }
 
             // ----------------------------------------------------------------
@@ -970,12 +1006,12 @@ namespace PathTracing
             return count;
         }
 
-        private void UploadLightData()
+        private void BuildControlData()
         {
             var buf = _ctx.Buffers;
             if (buf == null) return;
 
-            // _ping was not yet flipped when UploadLightData runs (flip happens at end of RecordRenderGraph)
+            // _ping was not yet flipped when BuildControlData runs (flip happens at end of RecordRenderGraph)
             uint currentOffset  = _ping ? 0u : WeightsCountHalf;
             uint historicOffset = _ping ? WeightsCountHalf : 0u;
 
@@ -1010,14 +1046,6 @@ namespace PathTracing
                 ColorMultiplierB = envTint.b * envIntensity,
                 Enabled          = 1.0f,
             };
-
-            buf.LightControlBuffer.SetData(s_controlStaging);
-
-            if (_analyticLightCount > 0)
-            {
-                buf.LightBuffer.SetData(s_lightsStaging, 0, (int)EnvQtTotalNodeCount, _analyticLightCount);
-                buf.LightExBuffer.SetData(s_lightsExStaging, 0, (int)EnvQtTotalNodeCount, _analyticLightCount);
-            }
         }
 
         // ====================================================================

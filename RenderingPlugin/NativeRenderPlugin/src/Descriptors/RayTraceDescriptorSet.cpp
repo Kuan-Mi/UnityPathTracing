@@ -20,8 +20,8 @@ void RayTraceDescriptorSet::Dispatch(
     EnsureDescriptors(slots, slotCount, slotIdx);
 
     cmdList->SetPipelineState1(m_shader->GetPSO());
-    BindRootParams(cmdList, slots, slotCount, slotIdx);
     RequestResourceStates(slots, slotCount);
+    BindRootParams(cmdList, slots, slotCount, slotIdx);
 
     // DispatchRays
     const UINT stride = D3D12_RAYTRACING_SHADER_RECORD_BYTE_ALIGNMENT;

@@ -76,12 +76,14 @@ public static class RenderPassMarkers
 
     // RTXPT LightingUpdateBegin
     public static readonly NamedMarker RtxptLightingUpdateBegin = new(ProfilerCategory.Render, "LightingUpdateBegin", MarkerFlags.SampleGPU);
+    public static readonly NamedMarker RtxptControlDataSetup = new(ProfilerCategory.Render, "ControlDataSetup", MarkerFlags.SampleGPU);
     public static readonly NamedMarker RtxptEnvMapBaker = new(ProfilerCategory.Render, "EnvMapBaker", MarkerFlags.SampleGPU);
     public static readonly NamedMarker RtxptEnvMapBaseLayer = new(ProfilerCategory.Render, "EnvMap BaseLayer", MarkerFlags.SampleGPU);
     public static readonly NamedMarker RtxptEnvMapImportanceBaker = new(ProfilerCategory.Render, "EnvMap ImportanceBaker", MarkerFlags.SampleGPU);
     public static readonly NamedMarker RtxptResetLightProxyCounters = new(ProfilerCategory.Render, "ResetLightProxyCounters", MarkerFlags.SampleGPU);
     public static readonly NamedMarker RtxptResetPastToCurrentHistory = new(ProfilerCategory.Render, "ResetPastToCurrentHistory", MarkerFlags.SampleGPU);
     public static readonly NamedMarker RtxptEnvLightsBackupPast = new(ProfilerCategory.Render, "EnvLightsBackupPast", MarkerFlags.SampleGPU);
+    public static readonly NamedMarker RtxptEnvmapAndAnalyticLightBuffers = new(ProfilerCategory.Render, "EnvmapAndAnalyticLightBuffers", MarkerFlags.SampleGPU);
     public static readonly NamedMarker RtxptEnvLightsSubdivideBase = new(ProfilerCategory.Render, "EnvLightsSubdivideBase", MarkerFlags.SampleGPU);
     public static readonly NamedMarker RtxptEnvLightsSubdivideBoost = new(ProfilerCategory.Render, "EnvLightsSubdivideBoost", MarkerFlags.SampleGPU);
     public static readonly NamedMarker RtxptBakeEmissiveTriangles = new(ProfilerCategory.Render, "BakeEmissiveTriangles", MarkerFlags.SampleGPU);
