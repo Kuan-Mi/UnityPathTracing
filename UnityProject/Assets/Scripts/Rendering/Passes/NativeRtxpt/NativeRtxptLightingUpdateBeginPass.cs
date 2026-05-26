@@ -53,10 +53,10 @@ namespace PathTracing
         private const float kMaxLog2Radiance  = 40f;
 
         // Env quad-tree — derived from LightingConfig.h via LightingConfig.cs
-        private const uint EnvQtBaseResolution  = LightingConfig.RTXPT_NEEAT_ENVMAP_QT_BASE_RESOLUTION;
-        private const uint EnvQtSubdivisions    = LightingConfig.RTXPT_NEEAT_ENVMAP_QT_SUBDIVISIONS;
-        private const uint EnvQtAdditionalNodes = LightingConfig.RTXPT_NEEAT_ENVMAP_QT_ADDITIONAL_NODES;
-        private const uint EnvQtUnboostedCount  = LightingConfig.RTXPT_NEEAT_ENVMAP_QT_UNBOOSTED_NODE_COUNT;
+        private const uint EnvQtBaseResolution   = LightingConfig.RTXPT_NEEAT_ENVMAP_QT_BASE_RESOLUTION;
+        private const uint EnvQtSubdivisions     = LightingConfig.RTXPT_NEEAT_ENVMAP_QT_SUBDIVISIONS;
+        private const uint EnvQtAdditionalNodes  = LightingConfig.RTXPT_NEEAT_ENVMAP_QT_ADDITIONAL_NODES;
+        private const uint EnvQtUnboostedCount   = LightingConfig.RTXPT_NEEAT_ENVMAP_QT_UNBOOSTED_NODE_COUNT;
         private const uint EnvQtBoostSubdivision = LightingConfig.RTXPT_NEEAT_ENVMAP_QT_BOOST_SUBDIVISION;
         private const uint EnvQtBoostNodesMult   = LightingConfig.RTXPT_NEEAT_ENVMAP_QT_BOOST_NODES_MULT;
         private const uint EnvQtTotalNodeCount   = LightingConfig.RTXPT_NEEAT_ENVMAP_QT_TOTAL_NODE_COUNT;
@@ -185,7 +185,8 @@ namespace PathTracing
         private int                    _dbgFrameCounter;
 
         /// <summary>lightsBuffer index where emissive triangles start (= EnvQtTotalNodeCount + analyticLightCount).</summary>
-        public uint EmissiveLightOffset  => EnvQtTotalNodeCount + (uint)_analyticLightCount;
+        public uint EmissiveLightOffset => EnvQtTotalNodeCount + (uint)_analyticLightCount;
+
         /// <summary>Total emissive triangle-light count produced last frame.</summary>
         public uint EmissiveTriangleCount => _emissiveTotalTriCount;
 
@@ -897,12 +898,12 @@ namespace PathTracing
             ctrl.HistoricTotalLightCount = EnvQtTotalNodeCount + (uint)_analyticLightCount + _emissiveTotalTriCount;
 
             ref var bk = ref ctrl.BakerConstants;
-            bk.CurrentWeightsBufferOffset        = currentOffset;
-            bk.HistoricWeightsBufferOffset       = historicOffset;
-            bk.DistantVsLocalRelativeImportance  = 1.0f;
-            bk.EnvMapImportanceMapMIPCount        = 11u;
-            bk.EnvMapImportanceMapResolution      = 1024u;
-            bk.TriangleLightTaskCount             = (uint)_emissiveTaskCount;
+            bk.CurrentWeightsBufferOffset       = currentOffset;
+            bk.HistoricWeightsBufferOffset      = historicOffset;
+            bk.DistantVsLocalRelativeImportance = 1.0f;
+            bk.EnvMapImportanceMapMIPCount      = 11u;
+            bk.EnvMapImportanceMapResolution    = 1024u;
+            bk.TriangleLightTaskCount           = (uint)_emissiveTaskCount;
             bk.EnvMapParams = new RtxptLightsBakerEnvMapParams
             {
                 TransformRow0    = new Vector4(1, 0, 0, 0),
