@@ -1,6 +1,7 @@
 using System;
 using System.Runtime.InteropServices;
 using NativeRender;
+using Unity.Mathematics;
 using UnityEngine;
 using UnityEngine.Experimental.Rendering;
 using UnityEngine.Rendering;
@@ -158,6 +159,8 @@ namespace PathTracing
         private uint                   _emissiveTotalTriCount;
         private bool                   _ping = true; // ping-pong for weights buffer
         private int                    _dbgFrameCounter;
+        private bool                   _lastFrameTemporalFeedbackAvailable;
+        private bool                   _lastFrameLocalSamplesAvailable;
 
         /// <summary>lightsBuffer index where emissive triangles start (= EnvQtTotalNodeCount + analyticLightCount).</summary>
         public uint EmissiveLightOffset => EnvQtTotalNodeCount + (uint)_analyticLightCount;
@@ -441,6 +444,10 @@ namespace PathTracing
                 out pd.GeometryDataPtr, out pd.GeometryDataCount, out pd.GeometryDataStride,
                 out pd.PTMaterialDataPtr, out pd.PTMaterialDataCount, out pd.PTMaterialDataStride);
 
+
+            bool neeAtEnabled = _ctx.Setting != null && _ctx.Setting.useNEE && _ctx.Setting.neeType == 2;
+            _lastFrameTemporalFeedbackAvailable = neeAtEnabled;
+            _lastFrameLocalSamplesAvailable     = neeAtEnabled;
 
             // Flip ping-pong AFTER filling passData so BuildControlData used same side
             _ping = !_ping;
@@ -795,19 +802,55 @@ namespace PathTracing
 
             ref var ctrl = ref s_controlStaging[0];
             ctrl                         = default;
-            ctrl.TotalLightCount         = EnvQtTotalNodeCount + (uint)_analyticLightCount + _emissiveTotalTriCount;
-            ctrl.AnalyticLightCount      = (uint)_analyticLightCount;
-            ctrl.EnvmapQuadNodeCount     = EnvQtTotalNodeCount;
-            ctrl.ImportanceSamplingType  = 1;
-            ctrl.HistoricTotalLightCount = EnvQtTotalNodeCount + (uint)_analyticLightCount + _emissiveTotalTriCount;
+            var setting = _ctx.Setting;
+            bool neeAtEnabled       = setting.useNEE && setting.neeType == 2;
+            bool lastFrameFeedback  = neeAtEnabled && _lastFrameTemporalFeedbackAvailable;
+            uint totalLightCount    = EnvQtTotalNodeCount + (uint)_analyticLightCount + _emissiveTotalTriCount;
+            int2 renderRes          = _ctx.RenderResolution;
+            uint feedbackW          = (uint)Math.Max(1, renderRes.x);
+            uint feedbackH          = (uint)Math.Max(1, renderRes.y);
+            uint blendedW           = (uint)Math.Max(1, (renderRes.x + LightingConfig.RTXPT_NEEAT_EARLY_FEEDBACK_TILE_SIZE - 1) / LightingConfig.RTXPT_NEEAT_EARLY_FEEDBACK_TILE_SIZE);
+            uint blendedH           = (uint)Math.Max(1, (renderRes.y + LightingConfig.RTXPT_NEEAT_EARLY_FEEDBACK_TILE_SIZE - 1) / LightingConfig.RTXPT_NEEAT_EARLY_FEEDBACK_TILE_SIZE);
+            uint localW             = (uint)Math.Max(1, (renderRes.x + LightingConfig.RTXPT_LIGHTING_SAMPLING_BUFFER_TILE_SIZE - 1) / LightingConfig.RTXPT_LIGHTING_SAMPLING_BUFFER_TILE_SIZE);
+            uint localH             = (uint)Math.Max(1, (renderRes.y + LightingConfig.RTXPT_LIGHTING_SAMPLING_BUFFER_TILE_SIZE - 1) / LightingConfig.RTXPT_LIGHTING_SAMPLING_BUFFER_TILE_SIZE);
+            uint p0ThreadCount      = ((feedbackW + LLB_NUM_COMPUTE_THREADS_2D - 1) / LLB_NUM_COMPUTE_THREADS_2D)
+                                    * ((feedbackH + LLB_NUM_COMPUTE_THREADS_2D - 1) / LLB_NUM_COMPUTE_THREADS_2D)
+                                    * LLB_NUM_COMPUTE_THREADS_2D * LLB_NUM_COMPUTE_THREADS_2D;
+
+            ctrl.TotalLightCount                    = totalLightCount;
+            ctrl.AnalyticLightCount                 = (uint)_analyticLightCount;
+            ctrl.EnvmapQuadNodeCount                = EnvQtTotalNodeCount;
+            ctrl.TriangleLightCount                 = _emissiveTotalTriCount;
+            ctrl.HistoricTotalLightCount            = totalLightCount;
+            ctrl.LastFrameTemporalFeedbackAvailable = lastFrameFeedback ? 1u : 0u;
+            ctrl.LastFrameLocalSamplesAvailable     = neeAtEnabled && _lastFrameLocalSamplesAvailable ? 1u : 0u;
+            ctrl.ImportanceSamplingType             = setting.useNEE ? (uint)Mathf.Clamp(setting.neeType, 0, 2) : 0u;
+            ctrl.TemporalFeedbackRequired           = neeAtEnabled ? 1u : 0u;
+            ctrl.TotalMaxFeedbackCount              = lastFrameFeedback ? p0ThreadCount : 0u;
+            ctrl.GlobalFeedbackUseWeight            = lastFrameFeedback ? (setting?.neeatGlobalTemporalFeedbackWeight ?? 0.75f) : 0.0f;
+            ctrl.LocalToGlobalSampleRatio           = lastFrameFeedback ? (setting?.neeatLocalToGlobalSampleRatio ?? 0.65f) : 0.0f;
+            ctrl.TileBufferHeight                   = localH;
+            ctrl.ScreenSpaceVsWorldSpaceThreshold   = 0.0f;
+            ctrl.LocalSamplingResolutionX           = localW;
+            ctrl.LocalSamplingResolutionY           = localH;
 
             ref var bk = ref ctrl.BakerConstants;
             bk.CurrentWeightsBufferOffset       = currentOffset;
             bk.HistoricWeightsBufferOffset      = historicOffset;
-            bk.DistantVsLocalRelativeImportance = 1.0f;
+            bk.DistantVsLocalRelativeImportance = (setting?.neeatDistantVsLocalImportance ?? 1.0f) * 0.0002f;
             bk.EnvMapImportanceMapMIPCount      = 11u;
             bk.EnvMapImportanceMapResolution    = 1024u;
             bk.TriangleLightTaskCount           = (uint)_emissiveTaskCount;
+            bk.FeedbackResolutionX              = feedbackW;
+            bk.FeedbackResolutionY              = feedbackH;
+            bk.BlendedFeedbackResolutionX       = blendedW;
+            bk.BlendedFeedbackResolutionY       = blendedH;
+            bk.PrevOverCurrentViewportSizeX     = 1.0f;
+            bk.PrevOverCurrentViewportSizeY     = 1.0f;
+            bk.UpdateCounter                    = (uint)_dbgFrameCounter;
+            bk.DepthDisocclusionThreshold       = 0.1f;
+            bk.EnableMotionReprojection         = 1u;
+            bk.ReservoirHistoryDropoff          = 0.0f;
             bk.EnvMapParams = new RtxptLightsBakerEnvMapParams
             {
                 TransformRow0    = new Vector4(1, 0, 0, 0),

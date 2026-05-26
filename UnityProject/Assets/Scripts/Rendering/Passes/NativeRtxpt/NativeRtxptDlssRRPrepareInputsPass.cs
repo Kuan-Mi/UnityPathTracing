@@ -92,15 +92,13 @@ namespace PathTracing
                 buf.StablePlanesBuffer.GetNativeBufferPtr(),
                 buf.StablePlanesBuffer.count, buf.StablePlanesBuffer.stride);
 
-            if (res.ShaderDebugViz.NativePtr != System.IntPtr.Zero)
-                ds.SetRWTexture("u_ShaderDebugVizTextureBuffer", res.ShaderDebugViz.NativePtr);
+            ds.SetRWTexture("u_ShaderDebugVizTextureBuffer", res.ShaderDebugViz.NativePtr);
 
             // Output guide UAVs
             ds.SetRWTexture("u_RRDiffuseAlbedo", res.DlssRrDiffAlbedo.NativePtr);
             ds.SetRWTexture("u_RRSpecAlbedo", res.DlssRrSpecAlbedo.NativePtr);
             ds.SetRWTexture("u_RRNormalsAndRoughness", res.DlssRrNormalRoughness.NativePtr);
-            // u_RRSpecMotionVectors reuses ScreenMotionVectors (or can be left to MotionVectors)
-            ds.SetRWTexture("u_RRSpecMotionVectors", res.ScreenMotionVectors.NativePtr);
+            ds.SetRWTexture("u_RRSpecMotionVectors", res.DlssRrSpecMotionVectors.NativePtr);
 
             uint gx = ((uint)ctx.RenderResolution.x + 7u) / 8u;
             uint gy = ((uint)ctx.RenderResolution.y + 7u) / 8u;

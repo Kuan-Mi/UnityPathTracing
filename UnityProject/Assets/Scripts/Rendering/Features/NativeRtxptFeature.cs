@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Runtime.InteropServices;
 using DLRR;
@@ -101,7 +102,7 @@ namespace PathTracing
         private NativeRtxptLightingUpdateEndPass      _lightingUpdateEndPass;
         private NativeRtxptFillStablePlanesPass       _fillStablePlanesPass;
         private NativeRtxptDenoisingGuidesBakePass    _denoisingGuidesBakePass;
-        private NativeRtxptDlssRRPrepareInputsPass             _dlssRrPrepareInputsPass;
+        private NativeRtxptDlssRRPrepareInputsPass    _dlssRrPrepareInputsPass;
         private DlssRRPass                            _dlssRRPass;
         private NativeRtxptAccumulationPass           _accumulationPass;
         private NativeRtxptStablePlanesDebugVizPass   _stablePlanesDebugVizPass;
@@ -169,7 +170,7 @@ namespace PathTracing
                     fillHitGroups, referenceHitGroups)
                 { renderPassEvent = renderPassEvent };
             _denoisingGuidesBakePass  ??= new NativeRtxptDenoisingGuidesBakePass(denoiseSpecHitTCs) { renderPassEvent       = renderPassEvent };
-            _dlssRrPrepareInputsPass           ??= new NativeRtxptDlssRRPrepareInputsPass(dlssBeforeCs) { renderPassEvent                     = renderPassEvent };
+            _dlssRrPrepareInputsPass  ??= new NativeRtxptDlssRRPrepareInputsPass(dlssBeforeCs) { renderPassEvent            = renderPassEvent };
             _dlssRRPass               ??= new DlssRRPass { renderPassEvent                                                  = renderPassEvent };
             _accumulationPass         ??= new NativeRtxptAccumulationPass(accumulationCs) { renderPassEvent                 = renderPassEvent };
             _stablePlanesDebugVizPass ??= new NativeRtxptStablePlanesDebugVizPass(stablePlanesDebugVizCs) { renderPassEvent = renderPassEvent };
@@ -557,6 +558,195 @@ namespace PathTracing
                 sb.AppendLine($"  (only first {readCount} of {triCount} entries read back)");
 
             Debug.Log(sb.ToString());
+        }
+
+        /// <summary>
+        /// Debug readback for the NEE-AT data path.
+        /// Run with setting.neeType = 2 for a few frames before clicking.
+        /// </summary>
+        public void TestNeeAtReadback()
+        {
+            NativeRtxptBufferResources buf = null;
+            NativeRtxptTextureResources tex = null;
+
+            foreach (var kv in _bufferPools)
+            {
+                buf = kv.Value;
+                break;
+            }
+
+            foreach (var kv in _texturePools)
+            {
+                tex = kv.Value;
+                break;
+            }
+
+            if (buf?.LightControlBuffer == null || tex == null)
+            {
+                Debug.LogWarning("[NativeRtxptFeature] NEE-AT readback unavailable - run the scene for a few frames first.");
+                return;
+            }
+
+            var ctrlData = new RtxptLightingControlData[1];
+            buf.LightControlBuffer.GetData(ctrlData);
+            var ctrl = ctrlData[0];
+
+            var sb = new System.Text.StringBuilder();
+            sb.AppendLine("[Rtxpt NEE-AT Readback]");
+            sb.AppendLine($"  Inspector: useNEE={setting?.useNEE} neeType={setting?.neeType} candidateSamples={setting?.neeCandidateSamples} fullSamples={setting?.neeFullSamples}");
+            sb.AppendLine($"  Control: importanceType={ctrl.ImportanceSamplingType} temporalRequired={ctrl.TemporalFeedbackRequired} lastTemporal={ctrl.LastFrameTemporalFeedbackAvailable} lastLocal={ctrl.LastFrameLocalSamplesAvailable}");
+            sb.AppendLine($"  Lights: total={ctrl.TotalLightCount} env={ctrl.EnvmapQuadNodeCount} analytic={ctrl.AnalyticLightCount} emissiveTriangles={ctrl.TriangleLightCount}");
+            sb.AppendLine($"  Proxies: samplingProxyCount={ctrl.SamplingProxyCount} proxyBuildTaskCount={ctrl.ProxyBuildTaskCount} validFeedback={ctrl.ValidFeedbackCount}/{ctrl.TotalMaxFeedbackCount}");
+            sb.AppendLine($"  LocalSampling: resolution={ctrl.LocalSamplingResolutionX}x{ctrl.LocalSamplingResolutionY} tileBufferHeight={ctrl.TileBufferHeight} bufferCount={buf.LocalSamplingBuffer?.count ?? 0}");
+            sb.AppendLine($"  Feedback: resolution={ctrl.BakerConstants.FeedbackResolutionX}x{ctrl.BakerConstants.FeedbackResolutionY} blended={ctrl.BakerConstants.BlendedFeedbackResolutionX}x{ctrl.BakerConstants.BlendedFeedbackResolutionY}");
+            sb.AppendLine($"  Weights: currentOffset={ctrl.BakerConstants.CurrentWeightsBufferOffset} historicOffset={ctrl.BakerConstants.HistoricWeightsBufferOffset} globalFeedbackWeight={ctrl.GlobalFeedbackUseWeight:F3} localToGlobal={ctrl.LocalToGlobalSampleRatio:F3}");
+
+            AppendFloatBufferStats(sb, "LightWeights.current", buf.LightWeightsBuffer, (int)ctrl.BakerConstants.CurrentWeightsBufferOffset, (int)Math.Min(ctrl.TotalLightCount + 1u, 4096u));
+            AppendUIntBufferStats(sb, "LightProxyCounters", buf.LightProxyCounters, 0, (int)Math.Min(ctrl.TotalLightCount + 1u, 4096u));
+            AppendUIntBufferStats(sb, "LightSamplingProxies", buf.LightSamplingProxies, 0, Mathf.Min(buf.LightSamplingProxies?.count ?? 0, 4096));
+            AppendUIntBufferStats(sb, "LocalSamplingBuffer", buf.LocalSamplingBuffer, 0, Mathf.Min(buf.LocalSamplingBuffer?.count ?? 0, 4096));
+
+            AppendFloatTextureStats(sb, "FeedbackTotalWeight", tex.LightFeedbackTotalWeight, 8192);
+            AppendUIntTextureStats(sb, "FeedbackCandidates", tex.LightFeedbackCandidates, 8192);
+            AppendFloatTextureStats(sb, "FeedbackTotalWeightBlended", tex.FeedbackTotalWeightBlended, 8192);
+            AppendUIntTextureStats(sb, "FeedbackCandidatesBlended", tex.FeedbackCandidatesBlended, 8192);
+
+            if (ctrl.ImportanceSamplingType != 2 || ctrl.TemporalFeedbackRequired == 0)
+                sb.AppendLine("  RESULT: NEE-AT is not enabled in LightingControl. Set NativeRtxptSetting.neeType = 2 and useNEE = true.");
+            else if (ctrl.SamplingProxyCount == 0)
+                sb.AppendLine("  RESULT: NEE-AT config is active, but proxy data is empty. Check light counts, env/emissive setup, and proxy build passes.");
+            else if (ctrl.LastFrameTemporalFeedbackAvailable == 0)
+                sb.AppendLine("  RESULT: First-frame warmup state. Wait a few frames, then read back again.");
+            else
+                sb.AppendLine("  RESULT: NEE-AT control/proxy/local-sampling path is producing data.");
+
+            Debug.Log(sb.ToString());
+        }
+
+        private static void AppendFloatBufferStats(System.Text.StringBuilder sb, string label, GraphicsBuffer buffer, int start, int count)
+        {
+            if (buffer == null || count <= 0 || start < 0 || start >= buffer.count)
+            {
+                sb.AppendLine($"  {label}: unavailable");
+                return;
+            }
+
+            count = Mathf.Min(count, buffer.count - start);
+            var data = new float[count];
+            buffer.GetData(data, 0, start, count);
+
+            int nonZero = 0;
+            float min = float.PositiveInfinity;
+            float max = float.NegativeInfinity;
+            double sum = 0.0;
+            for (int i = 0; i < data.Length; i++)
+            {
+                float v = data[i];
+                if (float.IsNaN(v) || float.IsInfinity(v)) continue;
+                if (Mathf.Abs(v) > 1e-8f) nonZero++;
+                min = Mathf.Min(min, v);
+                max = Mathf.Max(max, v);
+                sum += v;
+            }
+
+            if (float.IsInfinity(min)) min = max = 0.0f;
+            sb.AppendLine($"  {label}: read={count} nonZero={nonZero} min={min:G4} max={max:G4} sum={sum:G5}");
+        }
+
+        private static void AppendUIntBufferStats(System.Text.StringBuilder sb, string label, GraphicsBuffer buffer, int start, int count)
+        {
+            if (buffer == null || count <= 0 || start < 0 || start >= buffer.count)
+            {
+                sb.AppendLine($"  {label}: unavailable");
+                return;
+            }
+
+            count = Mathf.Min(count, buffer.count - start);
+            var data = new uint[count];
+            buffer.GetData(data, 0, start, count);
+            AppendUIntStats(sb, label, data);
+        }
+
+        private static void AppendFloatTextureStats(System.Text.StringBuilder sb, string label, Nri.NriTextureResource tex, int maxSamples)
+        {
+            if (tex?.Handle == null)
+            {
+                sb.AppendLine($"  {label}: unavailable");
+                return;
+            }
+
+            var req = AsyncGPUReadback.Request(tex.Handle);
+            req.WaitForCompletion();
+            if (req.hasError)
+            {
+                sb.AppendLine($"  {label}: readback error");
+                return;
+            }
+
+            var data = req.GetData<float>();
+            int count = Mathf.Min(data.Length, maxSamples);
+            int nonZero = 0;
+            float min = float.PositiveInfinity;
+            float max = float.NegativeInfinity;
+            double sum = 0.0;
+            for (int i = 0; i < count; i++)
+            {
+                float v = data[i];
+                if (float.IsNaN(v) || float.IsInfinity(v)) continue;
+                if (Mathf.Abs(v) > 1e-8f) nonZero++;
+                min = Mathf.Min(min, v);
+                max = Mathf.Max(max, v);
+                sum += v;
+            }
+
+            if (float.IsInfinity(min)) min = max = 0.0f;
+            sb.AppendLine($"  {label}: read={count}/{data.Length} nonZero={nonZero} min={min:G4} max={max:G4} sum={sum:G5}");
+        }
+
+        private static void AppendUIntTextureStats(System.Text.StringBuilder sb, string label, Nri.NriTextureResource tex, int maxSamples)
+        {
+            if (tex?.Handle == null)
+            {
+                sb.AppendLine($"  {label}: unavailable");
+                return;
+            }
+
+            var req = AsyncGPUReadback.Request(tex.Handle);
+            req.WaitForCompletion();
+            if (req.hasError)
+            {
+                sb.AppendLine($"  {label}: readback error");
+                return;
+            }
+
+            var data = req.GetData<uint>();
+            int count = Mathf.Min(data.Length, maxSamples);
+            var sample = new uint[count];
+            for (int i = 0; i < count; i++)
+                sample[i] = data[i];
+            AppendUIntStats(sb, label, sample, data.Length);
+        }
+
+        private static void AppendUIntStats(System.Text.StringBuilder sb, string label, uint[] data, int totalCount = -1)
+        {
+            int nonZero = 0;
+            int invalid = 0;
+            uint min = uint.MaxValue;
+            uint max = 0;
+            ulong sumLowBits = 0;
+            for (int i = 0; i < data.Length; i++)
+            {
+                uint v = data[i];
+                if (v != 0) nonZero++;
+                if (v == 0xffffffffu) invalid++;
+                if (v < min) min = v;
+                if (v > max) max = v;
+                sumLowBits += v & 0xffffu;
+            }
+
+            if (data.Length == 0) min = 0;
+            string suffix = totalCount >= 0 ? $"/{totalCount}" : "";
+            sb.AppendLine($"  {label}: read={data.Length}{suffix} nonZero={nonZero} invalid=0xFFFFFFFF:{invalid} min={min} max={max} sumLow16={sumLowBits}");
         }
 
 

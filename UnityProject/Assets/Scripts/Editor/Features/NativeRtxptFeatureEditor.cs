@@ -47,6 +47,16 @@ namespace PathTracing
                 "Run the scene for a few frames before clicking.",
                 MessageType.Info);
 
+            EditorGUILayout.Space(4);
+            if (GUILayout.Button("Test NEE-AT - Readback Buffers"))
+            {
+                feature.TestNeeAtReadback();
+            }
+            EditorGUILayout.HelpBox(
+                "Reads back LightingControl, weights, proxy counters, proxy lists, local sampling, " +
+                "and feedback textures. Set useNEE=true and neeType=2, then run for a few frames before clicking.",
+                MessageType.Info);
+
             EditorGUILayout.Space(10);
 
             DrawObjectHelper.Draw(target.GetInstanceID(), "Sample Constants", feature.sampleConstants);
