@@ -58,42 +58,32 @@ namespace PathTracing
             NativeComputeShader processFeedbackHistoryP3Cs,
             NativeComputeShader clearFeedbackHistoryCs)
         {
-            if (processFeedbackHistoryP1aCs != null)
-            {
-                _p1aCs = new NativeComputePipeline(processFeedbackHistoryP1aCs);
-                _p1aDs = new NativeComputeDescriptorSet(_p1aCs);
-            }
-            if (processFeedbackHistoryP1bCs != null)
-            {
-                _p1bCs = new NativeComputePipeline(processFeedbackHistoryP1bCs);
-                _p1bDs = new NativeComputeDescriptorSet(_p1bCs);
-            }
-            if (processFeedbackHistoryP2Cs != null)
-            {
-                _p2Cs = new NativeComputePipeline(processFeedbackHistoryP2Cs);
-                _p2Ds = new NativeComputeDescriptorSet(_p2Cs);
-            }
-            if (processFeedbackHistoryP3Cs != null)
-            {
-                _p3Cs = new NativeComputePipeline(processFeedbackHistoryP3Cs);
-                _p3Ds = new NativeComputeDescriptorSet(_p3Cs);
-            }
-            if (clearFeedbackHistoryCs != null)
-            {
-                _clearCs = new NativeComputePipeline(clearFeedbackHistoryCs);
-                _clearDs = new NativeComputeDescriptorSet(_clearCs);
-            }
+            _p1aCs   = new NativeComputePipeline(processFeedbackHistoryP1aCs);
+            _p1aDs   = new NativeComputeDescriptorSet(_p1aCs);
+            _p1bCs   = new NativeComputePipeline(processFeedbackHistoryP1bCs);
+            _p1bDs   = new NativeComputeDescriptorSet(_p1bCs);
+            _p2Cs    = new NativeComputePipeline(processFeedbackHistoryP2Cs);
+            _p2Ds    = new NativeComputeDescriptorSet(_p2Cs);
+            _p3Cs    = new NativeComputePipeline(processFeedbackHistoryP3Cs);
+            _p3Ds    = new NativeComputeDescriptorSet(_p3Cs);
+            _clearCs = new NativeComputePipeline(clearFeedbackHistoryCs);
+            _clearDs = new NativeComputeDescriptorSet(_clearCs);
         }
 
         // ── IDisposable ────────────────────────────────────────────────────────
 
         public void Dispose()
         {
-            _p1aDs?.Dispose();   _p1aCs?.Dispose();
-            _p1bDs?.Dispose();   _p1bCs?.Dispose();
-            _p2Ds?.Dispose();    _p2Cs?.Dispose();
-            _p3Ds?.Dispose();    _p3Cs?.Dispose();
-            _clearDs?.Dispose(); _clearCs?.Dispose();
+            _p1aDs?.Dispose();
+            _p1aCs?.Dispose();
+            _p1bDs?.Dispose();
+            _p1bCs?.Dispose();
+            _p2Ds?.Dispose();
+            _p2Cs?.Dispose();
+            _p3Ds?.Dispose();
+            _p3Cs?.Dispose();
+            _clearDs?.Dispose();
+            _clearCs?.Dispose();
         }
 
         // ── Setup ──────────────────────────────────────────────────────────────
@@ -115,11 +105,16 @@ namespace PathTracing
         {
             using var builder = renderGraph.AddUnsafePass<PassData>("NativeRtxpt.LightingUpdateEnd", out var pd);
 
-            pd.P1aCs   = _p1aCs;   pd.P1aDs   = _p1aDs;
-            pd.P1bCs   = _p1bCs;   pd.P1bDs   = _p1bDs;
-            pd.P2Cs    = _p2Cs;    pd.P2Ds    = _p2Ds;
-            pd.P3Cs    = _p3Cs;    pd.P3Ds    = _p3Ds;
-            pd.ClearCs = _clearCs; pd.ClearDs = _clearDs;
+            pd.P1aCs   = _p1aCs;
+            pd.P1aDs   = _p1aDs;
+            pd.P1bCs   = _p1bCs;
+            pd.P1bDs   = _p1bDs;
+            pd.P2Cs    = _p2Cs;
+            pd.P2Ds    = _p2Ds;
+            pd.P3Cs    = _p3Cs;
+            pd.P3Ds    = _p3Ds;
+            pd.ClearCs = _clearCs;
+            pd.ClearDs = _clearDs;
             pd.Ctx     = _ctx;
 
             builder.AllowPassCulling(false);
@@ -160,19 +155,18 @@ namespace PathTracing
             //    Aggregates blended early-feedback into scratch surfaces.
             //    Dispatch: ceil(blendW/8) x ceil(blendH/8)
             // ----------------------------------------------------------------
-            if (data.P1aCs != null)
             {
                 var ds = data.P1aDs;
-                ds.SetRWStructuredBuffer("u_controlBuffer",             pCtrl,   cCtrl,   StrideCtrl);
-                ds.SetRWTexture("u_feedbackTotalWeight",                ctx.FeedbackTotalWeightPtr);
-                ds.SetRWTexture("u_feedbackCandidates",                 ctx.FeedbackCandidatesPtr);
-                ds.SetRWTexture("u_feedbackTotalWeightScratch",         ctx.FeedbackTotalWeightScratchPtr);
-                ds.SetRWTexture("u_feedbackCandidatesScratch",          ctx.FeedbackCandidatesScratchPtr);
-                ds.SetRWTexture("u_feedbackTotalWeightBlended",         ctx.FeedbackTotalWeightBlendedPtr);
-                ds.SetRWTexture("u_feedbackCandidatesBlended",          ctx.FeedbackCandidatesBlendedPtr);
-                ds.SetRWTexture("u_historyDepth",                       ctx.NEEATHistoryDepthPtr);
-                ds.SetTexture("t_depthBuffer",                          ctx.DepthPtr);
-                ds.SetTexture("t_motionVectors",                        ctx.MotionVectorsPtr);
+                ds.SetRWStructuredBuffer("u_controlBuffer", pCtrl, cCtrl, StrideCtrl);
+                ds.SetRWTexture("u_feedbackTotalWeight", ctx.FeedbackTotalWeightPtr);
+                ds.SetRWTexture("u_feedbackCandidates", ctx.FeedbackCandidatesPtr);
+                ds.SetRWTexture("u_feedbackTotalWeightScratch", ctx.FeedbackTotalWeightScratchPtr);
+                ds.SetRWTexture("u_feedbackCandidatesScratch", ctx.FeedbackCandidatesScratchPtr);
+                ds.SetRWTexture("u_feedbackTotalWeightBlended", ctx.FeedbackTotalWeightBlendedPtr);
+                ds.SetRWTexture("u_feedbackCandidatesBlended", ctx.FeedbackCandidatesBlendedPtr);
+                ds.SetRWTexture("u_historyDepth", ctx.NEEATHistoryDepthPtr);
+                ds.SetTexture("t_depthBuffer", ctx.DepthPtr);
+                ds.SetTexture("t_motionVectors", ctx.MotionVectorsPtr);
                 uint gx = (uint)Math.Max(1, (blendW + Threads2D - 1) / Threads2D);
                 uint gy = (uint)Math.Max(1, (blendH + Threads2D - 1) / Threads2D);
                 data.P1aCs.Dispatch(cmd, ds, gx, gy, 1);
@@ -183,19 +177,18 @@ namespace PathTracing
             //    Full-res temporal blend from scratch into main surfaces.
             //    Dispatch: ceil(renderW/8) x ceil(renderH/8)
             // ----------------------------------------------------------------
-            if (data.P1bCs != null)
             {
                 var ds = data.P1bDs;
-                ds.SetRWStructuredBuffer("u_controlBuffer",             pCtrl,   cCtrl,   StrideCtrl);
-                ds.SetRWTexture("u_feedbackTotalWeight",                ctx.FeedbackTotalWeightPtr);
-                ds.SetRWTexture("u_feedbackCandidates",                 ctx.FeedbackCandidatesPtr);
-                ds.SetRWTexture("u_feedbackTotalWeightScratch",         ctx.FeedbackTotalWeightScratchPtr);
-                ds.SetRWTexture("u_feedbackCandidatesScratch",          ctx.FeedbackCandidatesScratchPtr);
-                ds.SetRWTexture("u_feedbackTotalWeightBlended",         ctx.FeedbackTotalWeightBlendedPtr);
-                ds.SetRWTexture("u_feedbackCandidatesBlended",          ctx.FeedbackCandidatesBlendedPtr);
-                ds.SetRWTexture("u_historyDepth",                       ctx.NEEATHistoryDepthPtr);
-                ds.SetTexture("t_depthBuffer",                          ctx.DepthPtr);
-                ds.SetTexture("t_motionVectors",                        ctx.MotionVectorsPtr);
+                ds.SetRWStructuredBuffer("u_controlBuffer", pCtrl, cCtrl, StrideCtrl);
+                ds.SetRWTexture("u_feedbackTotalWeight", ctx.FeedbackTotalWeightPtr);
+                ds.SetRWTexture("u_feedbackCandidates", ctx.FeedbackCandidatesPtr);
+                ds.SetRWTexture("u_feedbackTotalWeightScratch", ctx.FeedbackTotalWeightScratchPtr);
+                ds.SetRWTexture("u_feedbackCandidatesScratch", ctx.FeedbackCandidatesScratchPtr);
+                ds.SetRWTexture("u_feedbackTotalWeightBlended", ctx.FeedbackTotalWeightBlendedPtr);
+                ds.SetRWTexture("u_feedbackCandidatesBlended", ctx.FeedbackCandidatesBlendedPtr);
+                ds.SetRWTexture("u_historyDepth", ctx.NEEATHistoryDepthPtr);
+                ds.SetTexture("t_depthBuffer", ctx.DepthPtr);
+                ds.SetTexture("t_motionVectors", ctx.MotionVectorsPtr);
                 uint gx = (uint)Math.Max(1, (renderRes.x + Threads2D - 1) / Threads2D);
                 uint gy = (uint)Math.Max(1, (renderRes.y + Threads2D - 1) / Threads2D);
                 data.P1bCs.Dispatch(cmd, ds, gx, gy, 1);
@@ -206,18 +199,17 @@ namespace PathTracing
             //    Builds per-tile local sampling buffer from blended feedback.
             //    Dispatch: ceil(localW/8) x ceil(localH/8)
             // ----------------------------------------------------------------
-            if (data.P2Cs != null)
             {
                 var ds = data.P2Ds;
-                ds.SetRWStructuredBuffer("u_controlBuffer",             pCtrl,   cCtrl,   StrideCtrl);
-                ds.SetRWTypedBuffer("u_lightWeights",                   pWeights, cWeights, DXGI_FORMAT_R32_FLOAT);
-                ds.SetRWTexture("u_feedbackTotalWeight",                ctx.FeedbackTotalWeightPtr);
-                ds.SetRWTexture("u_feedbackCandidates",                 ctx.FeedbackCandidatesPtr);
-                ds.SetRWTexture("u_feedbackTotalWeightBlended",         ctx.FeedbackTotalWeightBlendedPtr);
-                ds.SetRWTexture("u_feedbackCandidatesBlended",          ctx.FeedbackCandidatesBlendedPtr);
-                ds.SetRWTypedBuffer("u_localSamplingBuffer",            pLocal,  cLocal,  DXGI_FORMAT_R32_UINT);
+                ds.SetRWStructuredBuffer("u_controlBuffer", pCtrl, cCtrl, StrideCtrl);
+                ds.SetRWTypedBuffer("u_lightWeights", pWeights, cWeights, DXGI_FORMAT_R32_FLOAT);
+                ds.SetRWTexture("u_feedbackTotalWeight", ctx.FeedbackTotalWeightPtr);
+                ds.SetRWTexture("u_feedbackCandidates", ctx.FeedbackCandidatesPtr);
+                ds.SetRWTexture("u_feedbackTotalWeightBlended", ctx.FeedbackTotalWeightBlendedPtr);
+                ds.SetRWTexture("u_feedbackCandidatesBlended", ctx.FeedbackCandidatesBlendedPtr);
+                ds.SetRWTypedBuffer("u_localSamplingBuffer", pLocal, cLocal, DXGI_FORMAT_R32_UINT);
                 uint gx = (uint)Math.Max(1, (localW + Threads2D - 1) / Threads2D);
-                uint gy =  (uint)Math.Max(1, (localH + Threads2D - 1) / Threads2D);
+                uint gy = (uint)Math.Max(1, (localH + Threads2D - 1) / Threads2D);
                 data.P2Cs.Dispatch(cmd, ds, gx, gy, 1);
             }
 
@@ -227,14 +219,13 @@ namespace PathTracing
             //    numthreads = RTXPT_LIGHTING_LOCAL_PROXY_COUNT/2 = 64
             //    Dispatch: localW x localH x 1
             // ----------------------------------------------------------------
-            if (data.P3Cs != null)
             {
                 var ds = data.P3Ds;
-                ds.SetRWStructuredBuffer("u_controlBuffer",             pCtrl,   cCtrl,   StrideCtrl);
-                ds.SetRWTexture("u_feedbackTotalWeight",                ctx.FeedbackTotalWeightPtr);
-                ds.SetRWTexture("u_feedbackCandidates",                 ctx.FeedbackCandidatesPtr);
-                ds.SetRWTexture("u_historyDepth",                       ctx.NEEATHistoryDepthPtr);
-                ds.SetRWTypedBuffer("u_localSamplingBuffer",            pLocal,  cLocal,  DXGI_FORMAT_R32_UINT);
+                ds.SetRWStructuredBuffer("u_controlBuffer", pCtrl, cCtrl, StrideCtrl);
+                ds.SetRWTexture("u_feedbackTotalWeight", ctx.FeedbackTotalWeightPtr);
+                ds.SetRWTexture("u_feedbackCandidates", ctx.FeedbackCandidatesPtr);
+                ds.SetRWTexture("u_historyDepth", ctx.NEEATHistoryDepthPtr);
+                ds.SetRWTypedBuffer("u_localSamplingBuffer", pLocal, cLocal, DXGI_FORMAT_R32_UINT);
                 data.P3Cs.Dispatch(cmd, ds, (uint)Math.Max(1, localW), (uint)Math.Max(1, localH), 1);
             }
 
@@ -244,15 +235,14 @@ namespace PathTracing
             //    FillStablePlanes can write fresh NEE samples.
             //    Dispatch: ceil(renderW/8) x ceil(renderH/8)
             // ----------------------------------------------------------------
-            if (data.ClearCs != null)
             {
                 var ds = data.ClearDs;
-                ds.SetRWStructuredBuffer("u_controlBuffer",             pCtrl,   cCtrl,   StrideCtrl);
-                ds.SetRWTexture("u_feedbackTotalWeight",                ctx.FeedbackTotalWeightPtr);
-                ds.SetRWTexture("u_feedbackCandidates",                 ctx.FeedbackCandidatesPtr);
-                ds.SetRWTexture("u_feedbackTotalWeightScratch",         ctx.FeedbackTotalWeightScratchPtr);
-                ds.SetRWTexture("u_feedbackCandidatesScratch",          ctx.FeedbackCandidatesScratchPtr);
-                ds.SetRWTexture("u_historyDepth",                       ctx.NEEATHistoryDepthPtr);
+                ds.SetRWStructuredBuffer("u_controlBuffer", pCtrl, cCtrl, StrideCtrl);
+                ds.SetRWTexture("u_feedbackTotalWeight", ctx.FeedbackTotalWeightPtr);
+                ds.SetRWTexture("u_feedbackCandidates", ctx.FeedbackCandidatesPtr);
+                ds.SetRWTexture("u_feedbackTotalWeightScratch", ctx.FeedbackTotalWeightScratchPtr);
+                ds.SetRWTexture("u_feedbackCandidatesScratch", ctx.FeedbackCandidatesScratchPtr);
+                ds.SetRWTexture("u_historyDepth", ctx.NEEATHistoryDepthPtr);
                 uint gx = (uint)Math.Max(1, (renderRes.x + Threads2D - 1) / Threads2D);
                 uint gy = (uint)Math.Max(1, (renderRes.y + Threads2D - 1) / Threads2D);
                 data.ClearCs.Dispatch(cmd, ds, gx, gy, 1);
@@ -262,4 +252,3 @@ namespace PathTracing
         }
     }
 }
-

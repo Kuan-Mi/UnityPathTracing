@@ -78,8 +78,7 @@ namespace PathTracing
 
             cmd.BeginSample("Rtxpt.DlssBefore");
 
-            if (ctx.ConstantBuffer != null)
-                ds.SetConstantBuffer("g_Const", ctx.ConstantBuffer.GetNativeBufferPtr());
+            ds.SetConstantBuffer("g_Const", ctx.ConstantBuffer.GetNativeBufferPtr());
 
             // Input UAVs
             ds.SetRWTexture("u_OutputColor", res.OutputColor.NativePtr);
@@ -89,10 +88,9 @@ namespace PathTracing
             ds.SetRWTexture("u_StablePlanesHeader", res.StablePlanesHeader.NativePtr);
             ds.SetRWTexture("u_StableRadiance", res.StableRadiance.NativePtr);
 
-            if (buf?.StablePlanesBuffer != null)
-                ds.SetRWStructuredBuffer("u_StablePlanesBuffer",
-                    buf.StablePlanesBuffer.GetNativeBufferPtr(),
-                    buf.StablePlanesBuffer.count, buf.StablePlanesBuffer.stride);
+            ds.SetRWStructuredBuffer("u_StablePlanesBuffer",
+                buf.StablePlanesBuffer.GetNativeBufferPtr(),
+                buf.StablePlanesBuffer.count, buf.StablePlanesBuffer.stride);
 
             if (res.ShaderDebugViz.NativePtr != System.IntPtr.Zero)
                 ds.SetRWTexture("u_ShaderDebugVizTextureBuffer", res.ShaderDebugViz.NativePtr);

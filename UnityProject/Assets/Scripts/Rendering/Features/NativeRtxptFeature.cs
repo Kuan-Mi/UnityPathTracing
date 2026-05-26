@@ -83,7 +83,9 @@ namespace PathTracing
 
         // LightingUpdateBegin feedback passes
         public NativeComputeShader processFeedbackHistoryPreFilterCs;
+
         public NativeComputeShader processFeedbackHistoryP0Cs;
+
         // LightingUpdateEnd feedback passes
         public NativeComputeShader processFeedbackHistoryP1aCs;
         public NativeComputeShader processFeedbackHistoryP1bCs;
@@ -337,13 +339,13 @@ namespace PathTracing
                     };
                     var dlrrRes = new DlrrDenoiser.DlrrResources
                     {
-                        input           = texPool.OutputColor,
-                        output          = texPool.DlssRrOutput,
-                        mv              = texPool.ScreenMotionVectors,
-                        depth           = texPool.Depth,
-                        diffAlbedo      = texPool.DlssRrDiffAlbedo,
-                        specAlbedo      = texPool.DlssRrSpecAlbedo,
-                        normalRoughness = texPool.DlssRrNormalRoughness,
+                        input              = texPool.OutputColor,
+                        output             = texPool.DlssRrOutput,
+                        mv                 = texPool.ScreenMotionVectors,
+                        depth              = texPool.Depth,
+                        diffAlbedo         = texPool.DlssRrDiffAlbedo,
+                        specAlbedo         = texPool.DlssRrSpecAlbedo,
+                        normalRoughness    = texPool.DlssRrNormalRoughness,
                         specularMvOrHitTex = texPool.DlssRrSpecMotionVectors,
                     };
                     _dlssRRPass.Setup(
@@ -409,7 +411,7 @@ namespace PathTracing
             _buildStablePlanesPass?.Dispose();
             _buildStablePlanesPass = null;
             _fillStablePlanesPass?.Dispose();
-            _fillStablePlanesPass  = null;
+            _fillStablePlanesPass = null;
             _lightingUpdateEndPass?.Dispose();
             _lightingUpdateEndPass = null;
             _exportVisibilityBufferPass?.Dispose();
@@ -565,28 +567,16 @@ namespace PathTracing
             const string shaderRoot = "Assets/RTXPT/Shaders";
 
             // Phase 2a/2d: PathTracer RT shaders
-            buildStablePlanesShader = LoadRs($"{shaderRoot}/BuildStablePlanes");
-            fillStablePlanesShader  = LoadRs($"{shaderRoot}/FillStablePlanes");
-            referenceShader         = LoadRs($"{shaderRoot}/Reference");
-
-            // Phase 3
+            buildStablePlanesShader  = LoadRs($"{shaderRoot}/BuildStablePlanes");
+            fillStablePlanesShader   = LoadRs($"{shaderRoot}/FillStablePlanes");
+            referenceShader          = LoadRs($"{shaderRoot}/Reference");
             exportVisibilityBufferCs = LoadCs($"{shaderRoot}/ProcessingPasses/ExportVisibilityBuffer");
+            denoiseSpecHitTCs        = LoadCs($"{shaderRoot}/ProcessingPasses/DenoisingGuidesBaker_DenoiseSpecHitT");
+            noDenoiserFinalMergeCs   = LoadCs($"{shaderRoot}/ProcessingPasses/PostProcess_NoDenoiserFinalMerge");
+            dlssBeforeCs             = LoadCs($"{shaderRoot}/ProcessingPasses/PostProcess_DenoiserPrepareInputsDlssRR");
+            accumulationCs           = LoadCs($"{shaderRoot}/ProcessingPasses/AccumulationPass");
+            stablePlanesDebugVizCs   = LoadCs($"{shaderRoot}/ProcessingPasses/PostProcess_StablePlanesDebugViz");
 
-            // Phase 4
-            denoiseSpecHitTCs = LoadCs($"{shaderRoot}/ProcessingPasses/DenoisingGuidesBaker_DenoiseSpecHitT");
-
-            // Phase 5
-            noDenoiserFinalMergeCs = LoadCs($"{shaderRoot}/ProcessingPasses/PostProcess_NoDenoiserFinalMerge");
-
-            // Phase 6
-            dlssBeforeCs = LoadCs($"{shaderRoot}/ProcessingPasses/PostProcess_DenoiserPrepareInputsDlssRR");
-
-            // Phase 8
-            accumulationCs = LoadCs($"{shaderRoot}/ProcessingPasses/AccumulationPass");
-
-            stablePlanesDebugVizCs = LoadCs($"{shaderRoot}/ProcessingPasses/PostProcess_StablePlanesDebugViz");
-
-            // Phase 1: LightsBaker shaders
             string lightRoot = $"{shaderRoot}/Lighting";
             resetLightProxyCountersCs     = LoadCs($"{lightRoot}/ResetLightProxyCounters");
             resetPastToCurrentHistoryCs   = LoadCs($"{lightRoot}/ResetPastToCurrentHistory");
@@ -597,6 +587,15 @@ namespace PathTracing
             executeProxyJobsCs            = LoadCs($"{lightRoot}/ExecuteProxyJobs");
             bakeEmissiveTrianglesCs       = LoadCs($"{lightRoot}/BakeEmissiveTriangles");
 
+            processFeedbackHistoryPreFilterCs = LoadCs($"{lightRoot}/ProcessFeedbackHistoryPreFilter");
+            processFeedbackHistoryP0Cs        = LoadCs($"{lightRoot}/ProcessFeedbackHistoryP0");
+            
+            processFeedbackHistoryP1aCs = LoadCs($"{lightRoot}/ProcessFeedbackHistoryP1a");
+            processFeedbackHistoryP1bCs = LoadCs($"{lightRoot}/ProcessFeedbackHistoryP1b");
+            processFeedbackHistoryP2Cs  = LoadCs($"{lightRoot}/ProcessFeedbackHistoryP2");
+            processFeedbackHistoryP3Cs  = LoadCs($"{lightRoot}/ProcessFeedbackHistoryP3");
+            clearFeedbackHistoryCs      = LoadCs($"{lightRoot}/ClearFeedbackHistory");
+            
             UnityEditor.EditorUtility.SetDirty(this);
             return;
 

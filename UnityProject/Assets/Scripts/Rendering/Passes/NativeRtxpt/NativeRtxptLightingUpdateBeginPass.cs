@@ -62,12 +62,12 @@ namespace PathTracing
         private const uint EnvQtTotalNodeCount   = LightingConfig.RTXPT_NEEAT_ENVMAP_QT_TOTAL_NODE_COUNT;
 
         // NEEATBaker.hlsli dispatch constants
-        private const int  LLB_NUM_COMPUTE_THREADS_2D     = 8;  // 2D tile dispatch thread count
+        private const int  LLB_NUM_COMPUTE_THREADS_2D      = 8; // 2D tile dispatch thread count
         private const int  LLB_PREPROCESS_BLOCK_SIZE_INNER = 14; // outer=16, inner=outer-2
         private const uint LLB_NUM_COMPUTE_THREADS         = 128; // 1D dispatch thread count
         private const uint LLB_LOCAL_BLOCK_SIZE            = 32;
-        private const uint LLB_WEIGHTS_ITEMS_PER_GROUP = LLB_LOCAL_BLOCK_SIZE * LLB_NUM_COMPUTE_THREADS;
-        private const uint LLB_MAX_PROXIES_PER_TASK    = 32;
+        private const uint LLB_WEIGHTS_ITEMS_PER_GROUP     = LLB_LOCAL_BLOCK_SIZE * LLB_NUM_COMPUTE_THREADS;
+        private const uint LLB_MAX_PROXIES_PER_TASK        = 32;
 
         private static readonly uint LLB_MAX_PROXY_PROC_TASKS =
             (uint)NativeRtxptBufferResources.MaxLights +
@@ -248,33 +248,27 @@ namespace PathTracing
             _mapPastToCurrentDs = new NativeComputeDescriptorSet(_mapPastToCurrentCs);
 
             // Proxy build
-            _resetLightProxyCountersCs     = new NativeComputePipeline(resetLightProxyCountersCs);
-            _resetLightProxyCountersDs     = new NativeComputeDescriptorSet(_resetLightProxyCountersCs);
-            _resetPastToCurrentHistoryCs   = new NativeComputePipeline(resetPastToCurrentHistoryCs);
-            _resetPastToCurrentHistoryDs   = new NativeComputeDescriptorSet(_resetPastToCurrentHistoryCs);
-            _computeWeightsCs              = new NativeComputePipeline(computeWeightsCs);
-            _computeWeightsDs              = new NativeComputeDescriptorSet(_computeWeightsCs);
-            _computeProxyCountsCs          = new NativeComputePipeline(computeProxyCountsCs);
-            _computeProxyCountsDs          = new NativeComputeDescriptorSet(_computeProxyCountsCs);
-            _computeProxyBaselineOffsetsCs = new NativeComputePipeline(computeProxyBaselineOffsetsCs);
-            _computeProxyBaselineOffsetsDs = new NativeComputeDescriptorSet(_computeProxyBaselineOffsetsCs);
-            _createProxyJobsCs             = new NativeComputePipeline(createProxyJobsCs);
-            _createProxyJobsDs             = new NativeComputeDescriptorSet(_createProxyJobsCs);
-            _executeProxyJobsCs            = new NativeComputePipeline(executeProxyJobsCs);
-            _executeProxyJobsDs            = new NativeComputeDescriptorSet(_executeProxyJobsCs);
-            _bakeEmissiveTrianglesCs       = new NativeComputePipeline(bakeEmissiveTrianglesCs);
-            _bakeEmissiveTrianglesDs       = new NativeComputeDescriptorSet(_bakeEmissiveTrianglesCs);
+            _resetLightProxyCountersCs         = new NativeComputePipeline(resetLightProxyCountersCs);
+            _resetLightProxyCountersDs         = new NativeComputeDescriptorSet(_resetLightProxyCountersCs);
+            _resetPastToCurrentHistoryCs       = new NativeComputePipeline(resetPastToCurrentHistoryCs);
+            _resetPastToCurrentHistoryDs       = new NativeComputeDescriptorSet(_resetPastToCurrentHistoryCs);
+            _computeWeightsCs                  = new NativeComputePipeline(computeWeightsCs);
+            _computeWeightsDs                  = new NativeComputeDescriptorSet(_computeWeightsCs);
+            _computeProxyCountsCs              = new NativeComputePipeline(computeProxyCountsCs);
+            _computeProxyCountsDs              = new NativeComputeDescriptorSet(_computeProxyCountsCs);
+            _computeProxyBaselineOffsetsCs     = new NativeComputePipeline(computeProxyBaselineOffsetsCs);
+            _computeProxyBaselineOffsetsDs     = new NativeComputeDescriptorSet(_computeProxyBaselineOffsetsCs);
+            _createProxyJobsCs                 = new NativeComputePipeline(createProxyJobsCs);
+            _createProxyJobsDs                 = new NativeComputeDescriptorSet(_createProxyJobsCs);
+            _executeProxyJobsCs                = new NativeComputePipeline(executeProxyJobsCs);
+            _executeProxyJobsDs                = new NativeComputeDescriptorSet(_executeProxyJobsCs);
+            _bakeEmissiveTrianglesCs           = new NativeComputePipeline(bakeEmissiveTrianglesCs);
+            _bakeEmissiveTrianglesDs           = new NativeComputeDescriptorSet(_bakeEmissiveTrianglesCs);
+            _processFeedbackHistoryPreFilterCs = new NativeComputePipeline(processFeedbackHistoryPreFilterCs);
+            _processFeedbackHistoryPreFilterDs = new NativeComputeDescriptorSet(_processFeedbackHistoryPreFilterCs);
+            _processFeedbackHistoryP0Cs        = new NativeComputePipeline(processFeedbackHistoryP0Cs);
+            _processFeedbackHistoryP0Ds        = new NativeComputeDescriptorSet(_processFeedbackHistoryP0Cs);
 
-            if (processFeedbackHistoryPreFilterCs != null)
-            {
-                _processFeedbackHistoryPreFilterCs = new NativeComputePipeline(processFeedbackHistoryPreFilterCs);
-                _processFeedbackHistoryPreFilterDs = new NativeComputeDescriptorSet(_processFeedbackHistoryPreFilterCs);
-            }
-            if (processFeedbackHistoryP0Cs != null)
-            {
-                _processFeedbackHistoryP0Cs = new NativeComputePipeline(processFeedbackHistoryP0Cs);
-                _processFeedbackHistoryP0Ds = new NativeComputeDescriptorSet(_processFeedbackHistoryP0Cs);
-            }
 
             EnsureRenderTextures();
             EnsureConstantBuffers();
@@ -376,18 +370,12 @@ namespace PathTracing
             // --- Emissive triangles: MUST run before UploadLightData so _emissiveTaskCount
             //     is known when we write BakerConstants.TriangleLightTaskCount.
             var gpuScene = ctx.GpuScene;
-            if (gpuScene != null && ctx.Buffers?.LightScratchBuffer != null)
-            {
-                uint emissiveLightOffset = EnvQtTotalNodeCount + (uint)_analyticLightCount;
-                gpuScene.PrepareEmissiveTriangleTasks(emissiveLightOffset, ctx.Buffers.LightScratchBuffer);
-                _emissiveTaskCount     = gpuScene.LastEmissiveTaskCount;
-                _emissiveTotalTriCount = gpuScene.LastEmissiveTriangleCount;
-            }
-            else
-            {
-                _emissiveTaskCount     = 0;
-                _emissiveTotalTriCount = 0u;
-            }
+
+            uint emissiveLightOffset = EnvQtTotalNodeCount + (uint)_analyticLightCount;
+            gpuScene.PrepareEmissiveTriangleTasks(emissiveLightOffset, ctx.Buffers.LightScratchBuffer);
+            _emissiveTaskCount     = gpuScene.LastEmissiveTaskCount;
+            _emissiveTotalTriCount = gpuScene.LastEmissiveTriangleCount;
+
 
             UploadLightData();
         }
@@ -576,7 +564,6 @@ namespace PathTracing
             // ----------------------------------------------------------------
             // 1–2. EnvMapBaker
             // ----------------------------------------------------------------
-            if (data.BaseLayerCs != null && data.ImportanceBakerCs != null)
             {
                 cmd.BeginSample("Rtxpt.EnvMapBaker");
 
@@ -753,13 +740,12 @@ namespace PathTracing
             // ----------------------------------------------------------------
             // 11. ProcessFeedbackHistoryPreFilter
             // ----------------------------------------------------------------
-            if (data.ProcessFeedbackHistoryPreFilterCs != null)
             {
                 var ds  = data.ProcessFeedbackHistoryPreFilterDs;
                 var ctx = data.Ctx;
                 ds.SetRWStructuredBuffer("u_controlBuffer", pCtrl, cCtrl, StrideCtrl);
                 ds.SetRWTexture("u_feedbackTotalWeight", ctx.FeedbackTotalWeightPtr);
-                ds.SetRWTexture("u_feedbackCandidates",  ctx.FeedbackCandidatesPtr);
+                ds.SetRWTexture("u_feedbackCandidates", ctx.FeedbackCandidatesPtr);
                 uint gx = (uint)(ctx.RenderResolution.x + LLB_PREPROCESS_BLOCK_SIZE_INNER - 1) / LLB_PREPROCESS_BLOCK_SIZE_INNER;
                 uint gy = (uint)(ctx.RenderResolution.y + LLB_PREPROCESS_BLOCK_SIZE_INNER - 1) / LLB_PREPROCESS_BLOCK_SIZE_INNER;
                 data.ProcessFeedbackHistoryPreFilterCs.Dispatch(cmd, ds, gx, gy, 1);
@@ -768,16 +754,15 @@ namespace PathTracing
             // ----------------------------------------------------------------
             // 12. ProcessFeedbackHistoryP0
             // ----------------------------------------------------------------
-            if (data.ProcessFeedbackHistoryP0Cs != null)
             {
                 var ds  = data.ProcessFeedbackHistoryP0Ds;
                 var ctx = data.Ctx;
                 ds.SetRWStructuredBuffer("u_controlBuffer", pCtrl, cCtrl, StrideCtrl);
                 ds.SetRWTypedBuffer("u_lightWeights", pWeights, cWeights, DXGI_FORMAT_R32_FLOAT);
-                ds.SetRWTexture("u_feedbackTotalWeight",        ctx.FeedbackTotalWeightPtr);
-                ds.SetRWTexture("u_feedbackCandidates",         ctx.FeedbackCandidatesPtr);
+                ds.SetRWTexture("u_feedbackTotalWeight", ctx.FeedbackTotalWeightPtr);
+                ds.SetRWTexture("u_feedbackCandidates", ctx.FeedbackCandidatesPtr);
                 ds.SetRWTexture("u_feedbackTotalWeightBlended", ctx.FeedbackTotalWeightBlendedPtr);
-                ds.SetRWTexture("u_feedbackCandidatesBlended",  ctx.FeedbackCandidatesBlendedPtr);
+                ds.SetRWTexture("u_feedbackCandidatesBlended", ctx.FeedbackCandidatesBlendedPtr);
                 uint gx = (uint)(ctx.RenderResolution.x + LLB_NUM_COMPUTE_THREADS_2D - 1) / LLB_NUM_COMPUTE_THREADS_2D;
                 uint gy = (uint)(ctx.RenderResolution.y + LLB_NUM_COMPUTE_THREADS_2D - 1) / LLB_NUM_COMPUTE_THREADS_2D;
                 data.ProcessFeedbackHistoryP0Cs.Dispatch(cmd, ds, gx, gy, 1);
@@ -988,7 +973,7 @@ namespace PathTracing
                 ColorMultiplierB = envTint.b * envIntensity,
                 Enabled          = 1.0f,
             };
- 
+
             buf.LightControlBuffer.SetData(s_controlStaging);
 
             if (_analyticLightCount > 0)

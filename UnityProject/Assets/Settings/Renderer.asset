@@ -118,6 +118,13 @@ MonoBehaviour:
   createProxyJobsCs: {fileID: -2368575503658470205, guid: fb8a3f0c6249439f98d3691c1c405d0a, type: 3}
   executeProxyJobsCs: {fileID: -2368575503658470205, guid: fbef0b02cf5a4a318cfd39f808e415cf, type: 3}
   bakeEmissiveTrianglesCs: {fileID: -2368575503658470205, guid: 00ace2221f9744748f666064d2858c5c, type: 3}
+  processFeedbackHistoryPreFilterCs: {fileID: -2368575503658470205, guid: 7bb4a6a209574968ad95a4360afa87aa, type: 3}
+  processFeedbackHistoryP0Cs: {fileID: -2368575503658470205, guid: e0f94af128ba49fda3ddf56baf27c568, type: 3}
+  processFeedbackHistoryP1aCs: {fileID: -2368575503658470205, guid: 08a2acfbd9ef4f3a804554de21da1810, type: 3}
+  processFeedbackHistoryP1bCs: {fileID: -2368575503658470205, guid: a266fce7cd9441b0a521b055622ade32, type: 3}
+  processFeedbackHistoryP2Cs: {fileID: -2368575503658470205, guid: 80685bbf11f9476ca61ac0c406dfb301, type: 3}
+  processFeedbackHistoryP3Cs: {fileID: -2368575503658470205, guid: 73a1be516d2c482494cab22b23855c24, type: 3}
+  clearFeedbackHistoryCs: {fileID: -2368575503658470205, guid: 0516581ad4c349f2ab07379494fff911, type: 3}
   outputBlitMaterial: {fileID: 2100000, guid: 27695a2bc55ef2f469362b9a2994989e, type: 2}
 --- !u!114 &11400000
 MonoBehaviour:
