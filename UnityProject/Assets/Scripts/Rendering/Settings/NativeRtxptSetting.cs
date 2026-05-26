@@ -87,7 +87,7 @@ namespace PathTracing
         [Range(0f, 1f)]
         public float stablePlanesSuppressPrimaryIndirectSpecularK = 0.6f;
         [Range(1, 3)]
-        public int   stablePlanesActiveCount     = 3; // cStablePlaneCount
+        public int   stablePlanesActiveCount     = PathTracerConfig.cStablePlaneCount;
         [Range(1, 9)]
         public int   stablePlanesMaxVertexDepth  = 9;
         [Range(0f, 1f)]

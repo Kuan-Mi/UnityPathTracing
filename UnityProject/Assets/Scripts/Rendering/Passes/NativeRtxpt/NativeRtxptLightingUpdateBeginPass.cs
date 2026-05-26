@@ -52,17 +52,14 @@ namespace PathTracing
         private const float kMinLog2Radiance  = -8f;
         private const float kMaxLog2Radiance  = 40f;
 
-        // Env quad-tree (LightingConfig.h)
-        private const uint EnvQtBaseResolution  = 4;
-        private const uint EnvQtSubdivisions    = 24;
-        private const uint EnvQtAdditionalNodes = 3 * EnvQtSubdivisions; // 72
-
-        private const uint EnvQtUnboostedCount = EnvQtBaseResolution * EnvQtBaseResolution // 16
-                                                 + EnvQtAdditionalNodes; // = 88
-
-        private const uint EnvQtBoostSubdivision = 20;
-        private const uint EnvQtBoostNodesMult   = EnvQtBoostSubdivision * 3 + 1; // 61
-        private const uint EnvQtTotalNodeCount   = EnvQtUnboostedCount * EnvQtBoostNodesMult; // 5368
+        // Env quad-tree — derived from LightingConfig.h via LightingConfig.cs
+        private const uint EnvQtBaseResolution  = LightingConfig.RTXPT_NEEAT_ENVMAP_QT_BASE_RESOLUTION;
+        private const uint EnvQtSubdivisions    = LightingConfig.RTXPT_NEEAT_ENVMAP_QT_SUBDIVISIONS;
+        private const uint EnvQtAdditionalNodes = LightingConfig.RTXPT_NEEAT_ENVMAP_QT_ADDITIONAL_NODES;
+        private const uint EnvQtUnboostedCount  = LightingConfig.RTXPT_NEEAT_ENVMAP_QT_UNBOOSTED_NODE_COUNT;
+        private const uint EnvQtBoostSubdivision = LightingConfig.RTXPT_NEEAT_ENVMAP_QT_BOOST_SUBDIVISION;
+        private const uint EnvQtBoostNodesMult   = LightingConfig.RTXPT_NEEAT_ENVMAP_QT_BOOST_NODES_MULT;
+        private const uint EnvQtTotalNodeCount   = LightingConfig.RTXPT_NEEAT_ENVMAP_QT_TOTAL_NODE_COUNT;
 
         // NEEATBaker.hlsli
         private const uint LLB_NUM_COMPUTE_THREADS     = 128;
@@ -74,7 +71,7 @@ namespace PathTracing
             (uint)NativeRtxptBufferResources.MaxLights +
             ((uint)NativeRtxptBufferResources.ProxySamplingCount + LLB_MAX_PROXIES_PER_TASK - 1) / LLB_MAX_PROXIES_PER_TASK;
 
-        private const uint WeightsCountHalf = NativeRtxptBufferResources.MaxLights + 1;
+        private const uint WeightsCountHalf = LightingConfig.RTXPT_LIGHTING_WEIGHTS_COUNT_HALF;
 
         // DXGI format constants
         private const uint DXGI_FORMAT_R32_FLOAT = 41u;
@@ -343,16 +340,24 @@ namespace PathTracing
 
             // --- LightsBaker CPU work (ControlDataSetup + EnvmapAndAnalyticLightBuffers) ---
             _analyticLightCount = CollectAndPackLights();
-            UploadLightData();
 
-            // --- Emissive triangles: build tasks, upload to scratch, update SubInstance buffer ---
+            // --- Emissive triangles: MUST run before UploadLightData so _emissiveTaskCount
+            //     is known when we write BakerConstants.TriangleLightTaskCount (_paddingBK[3]).
             var gpuScene = ctx.GpuScene;
+            if (gpuScene != null && ctx.Buffers?.LightScratchBuffer != null)
+            {
+                uint emissiveLightOffset = EnvQtTotalNodeCount + (uint)_analyticLightCount;
+                gpuScene.PrepareEmissiveTriangleTasks(emissiveLightOffset, ctx.Buffers.LightScratchBuffer);
+                _emissiveTaskCount     = gpuScene.LastEmissiveTaskCount;
+                _emissiveTotalTriCount = gpuScene.LastEmissiveTriangleCount;
+            }
+            else
+            {
+                _emissiveTaskCount     = 0;
+                _emissiveTotalTriCount = 0u;
+            }
 
-
-            uint emissiveLightOffset = EnvQtTotalNodeCount + (uint)_analyticLightCount;
-            gpuScene.PrepareEmissiveTriangleTasks(emissiveLightOffset, ctx.Buffers.LightScratchBuffer);
-            _emissiveTaskCount     = gpuScene.LastEmissiveTaskCount;
-            _emissiveTotalTriCount = gpuScene.LastEmissiveTriangleCount;
+            UploadLightData();
         }
 
         // ====================================================================
@@ -885,11 +890,11 @@ namespace PathTracing
 
             ref var ctrl = ref s_controlStaging[0];
             ctrl                         = default;
-            ctrl.TotalLightCount         = (uint)_analyticLightCount + EnvQtTotalNodeCount;
+            ctrl.TotalLightCount         = EnvQtTotalNodeCount + (uint)_analyticLightCount + _emissiveTotalTriCount;
             ctrl.AnalyticLightCount      = (uint)_analyticLightCount;
             ctrl.EnvmapQuadNodeCount     = EnvQtTotalNodeCount;
             ctrl.ImportanceSamplingType  = 1;
-            ctrl.HistoricTotalLightCount = (uint)_analyticLightCount + EnvQtTotalNodeCount;
+            ctrl.HistoricTotalLightCount = EnvQtTotalNodeCount + (uint)_analyticLightCount + _emissiveTotalTriCount;
 
             unsafe
             {
@@ -899,6 +904,7 @@ namespace PathTracing
                 ctrl._paddingBK[0] = *(uint*)&distantVsLocal;
                 ctrl._paddingBK[1] = 11u; // EnvMapImportanceMapMIPCount
                 ctrl._paddingBK[2] = 1024u; // EnvMapImportanceMapResolution
+                ctrl._paddingBK[3] = (uint)_emissiveTaskCount; // BakerConstants.TriangleLightTaskCount
 
                 float one = 1f, zero = 0f;
                 ctrl._paddingBK[88]  = *(uint*)&one;

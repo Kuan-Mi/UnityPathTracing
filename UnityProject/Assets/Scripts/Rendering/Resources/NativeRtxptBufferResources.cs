@@ -16,18 +16,17 @@ namespace PathTracing
     /// </summary>
     public class NativeRtxptBufferResources : IDisposable
     {
-        // sizeof(StablePlane) in bytes — must match Config.h.
+        // sizeof(StablePlane) in bytes — must match HLSL struct StablePlane layout.
         public const int StablePlaneStride = 80;
 
-        // Number of stable planes — must match cStablePlaneCount in Config.h.
-        public const int StablePlaneCount = 3;
+        // Number of stable planes — mirrors cStablePlaneCount in Config.h.
+        public const int StablePlaneCount = PathTracerConfig.cStablePlaneCount;
 
         // sizeof(PackedPathTracerSurfaceData) — TODO: verify from HLSL struct.
         public const int SurfaceDataStride = 64;
 
-        // Max lights — env quad-tree uses EnvQtTotalNodeCount (5368) slots, leaving the rest for
-        // analytic + emissive triangle lights.  Increase this if the scene has many emissive triangles.
-        public const int MaxLights = 512 * 1024;
+        // Max lights — mirrors RTXPT_LIGHTING_MAX_LIGHTS in LightingConfig.h.
+        public const int MaxLights = LightingConfig.RTXPT_LIGHTING_MAX_LIGHTS;
 
         // ── Stable Planes ────────────────────────────────────────────────────
         /// <summary>
@@ -118,26 +117,22 @@ namespace PathTracing
         // Scratch buffer size (heuristic: 16 ints per light entry).
         private const int ScratchElementCount = MaxLights * 16;
 
-        // Proxy buffer sizes. ProxyCounterCount must be >= MaxLights (indexed by lightIndex).
-        // ProxySamplingCount must hold worst-case SamplingProxyCount from GPU:
-        //   HLSL budget = RTXPT_LIGHTING_SAMPLING_PROXY_RATIO * max(TotalLightCount, RTXPT_LIGHTING_MAX_LIGHTS/10)
-        //              = 12 * max(N, 524288/10) → max ~629,136 proxies when N is small.
-        //   Each light is additionally capped at RTXPT_LIGHTING_MAX_SAMPLING_PROXIES_PER_LIGHT-1=262143,
-        //   but the total never exceeds the budget, so 630k is a safe upper bound.
-        private const int HlslMaxLights       = 512 * 1024;   // RTXPT_LIGHTING_MAX_LIGHTS compiled into shaders
-        private const int HlslProxyRatio      = 12;           // RTXPT_LIGHTING_SAMPLING_PROXY_RATIO
-        private const int ProxyCounterCount   = MaxLights + 1; // +1: HLSL uses [TotalLightCount] for invalid-feedback count
-        internal const int ProxySamplingCount = HlslProxyRatio * (HlslMaxLights / 10) + 4096; // ~633k
-        private const int LocalSamplingCount  = MaxLights;
+        // Proxy buffer sizes — derived from LightingConfig.h constants.
+        // ProxyCounterCount must be >= MaxLights (indexed by lightIndex).
+        //   +1: HLSL uses [TotalLightCount] for invalid-feedback count.
+        private const int ProxyCounterCount   = LightingConfig.RTXPT_LIGHTING_MAX_LIGHTS + 1;
+        // ProxySamplingCount: worst-case total proxies = RTXPT_LIGHTING_MAX_SAMPLING_PROXIES.
+        internal const int ProxySamplingCount = LightingConfig.RTXPT_LIGHTING_MAX_SAMPLING_PROXIES;
+        private const int LocalSamplingCount  = LightingConfig.RTXPT_LIGHTING_MAX_LIGHTS;
 
-        // LightWeights ping-pong half-count: mirrors RTXPT_LIGHTING_WEIGHTS_COUNT_HALF = MaxLights+1.
-        private const int WeightsCountHalf = MaxLights + 1;
+        // LightWeights ping-pong half-count: RTXPT_LIGHTING_WEIGHTS_COUNT_HALF.
+        private const int WeightsCountHalf = LightingConfig.RTXPT_LIGHTING_WEIGHTS_COUNT_HALF;
 
         // ScratchListBuffer must be large enough for both:
         //   - proxy-build passes: MaxLights entries
-        //   - env-light backup region: 2 × RTXPT_NEEAT_ENVMAP_QT_TOTAL_NODE_COUNT (88×61×2 = 10736)
-        private const int EnvTotalNodeCount  = 5368; // RTXPT_NEEAT_ENVMAP_QT_UNBOOSTED(88) × BOOST_NODES_MULT(61)
-        private const int ScratchListCount   = 16384; // max(MaxLights, EnvTotalNodeCount*2) rounded up to power-of-2
+        //   - env-light backup region: 2 × RTXPT_NEEAT_ENVMAP_QT_TOTAL_NODE_COUNT (5368×2 = 10736)
+        private static readonly int ScratchListCount =
+            System.Math.Max(LightingConfig.RTXPT_LIGHTING_MAX_LIGHTS, LightingConfig.RTXPT_NEEAT_ENVMAP_QT_TOTAL_NODE_COUNT * 2);
 
         /// <summary>
         /// Allocates or reallocates all resolution-dependent buffers.
