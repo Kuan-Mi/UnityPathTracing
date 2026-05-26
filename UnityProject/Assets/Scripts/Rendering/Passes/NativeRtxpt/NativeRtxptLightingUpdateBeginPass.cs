@@ -473,11 +473,21 @@ namespace PathTracing
 
             cmd.BeginSample(RenderPassMarkers.RtxptLightingUpdateBegin);
 
+            // CPU uploads first — SetData may change the underlying native pointer,
+            // so all uploads must complete before any GetNativeBufferPtr call.
             context.cmd.BeginSample(RenderPassMarkers.RtxptControlDataSetup);
-            context.cmd.SetBufferData(data.LightControlBuffer, data.ControlData, 0, 0, 1);
+            data.LightControlBuffer.SetData(data.ControlData, 0, 0, 1);
             context.cmd.EndSample(RenderPassMarkers.RtxptControlDataSetup);
 
-            // Buffer pointers used by the remaining passes
+            if (data.AnalyticLightCount > 0)
+            {
+                context.cmd.BeginSample(RenderPassMarkers.RtxptEnvmapAndAnalyticLightBuffers);
+                data.LightBuffer.SetData(data.LightData, 0, (int)EnvQtTotalNodeCount, data.AnalyticLightCount);
+                data.LightExBuffer.SetData(data.LightExData, 0, (int)EnvQtTotalNodeCount, data.AnalyticLightCount);
+                context.cmd.EndSample(RenderPassMarkers.RtxptEnvmapAndAnalyticLightBuffers);
+            }
+
+            // Buffer pointers — captured after all SetData calls
             var pCtrl     = buf.LightControlBuffer.GetNativeBufferPtr();
             var pLights   = buf.LightBuffer.GetNativeBufferPtr();
             var pLightsEx = buf.LightExBuffer.GetNativeBufferPtr();
@@ -543,17 +553,6 @@ namespace PathTracing
                 cmd.BeginSample(RenderPassMarkers.RtxptEnvLightsBackupPast);
                 data.BackupPastCs.Dispatch(cmd, ds, gx, 1, 1);
                 cmd.EndSample(RenderPassMarkers.RtxptEnvLightsBackupPast);
-            }
-
-            // ----------------------------------------------------------------
-            // 5b. EnvmapAndAnalyticLightBuffers
-            // ----------------------------------------------------------------
-            if (data.AnalyticLightCount > 0)
-            {
-                context.cmd.BeginSample(RenderPassMarkers.RtxptEnvmapAndAnalyticLightBuffers);
-                context.cmd.SetBufferData(data.LightBuffer, data.LightData, 0, (int)EnvQtTotalNodeCount, data.AnalyticLightCount);
-                context.cmd.SetBufferData(data.LightExBuffer, data.LightExData, 0, (int)EnvQtTotalNodeCount, data.AnalyticLightCount);
-                context.cmd.EndSample(RenderPassMarkers.RtxptEnvmapAndAnalyticLightBuffers);
             }
 
             // ----------------------------------------------------------------
