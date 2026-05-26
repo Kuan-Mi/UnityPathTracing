@@ -14,7 +14,6 @@ namespace PathTracing
     /// LightingUpdateBegin — single unified pass that mirrors LightsBaker::UpdateFrame
     /// (the front half) in original RTXPT.
     ///
-    /// Absorbs NativeRtxptEnvLightsBakerPass and NativeRtxptLightingPass into one
     /// ScriptableRenderPass with the correct dispatch order:
     ///
     ///   CPU (Setup)
