@@ -22,7 +22,7 @@ namespace Nri
         }
 
         /// <summary>Allocates (or reallocates) a Texture2DArray at the given resolution.</summary>
-        public new void Allocate(int2 resolution)
+        public void Allocate(int2 resolution)
         {
             // Check if already allocated at the right size
             var existing = Handle?.rt;

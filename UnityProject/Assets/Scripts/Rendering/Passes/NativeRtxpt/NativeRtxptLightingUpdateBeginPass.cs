@@ -657,15 +657,13 @@ namespace PathTracing
                 ds.SetRWStructuredBuffer("u_lightsBuffer", pLights, cLights, StrideLights);
                 ds.SetRWTypedBuffer("u_historyRemapCurrentToPast", pHistCur, cHistCur, DXGI_FORMAT_R32_UINT);
                 ds.SetRWTypedBuffer("u_historyRemapPastToCurrent", pHistPas, cHistPas, DXGI_FORMAT_R32_UINT);
+                ds.SetRWStructuredBuffer("u_lightsExBuffer", pLightsEx, cLightsEx, StrideLightsEx);
+
                 // SRV scene inputs
-                if (data.SubInstanceDataPtr != IntPtr.Zero)
-                    ds.SetStructuredBuffer("t_SubInstanceData", data.SubInstanceDataPtr, data.SubInstanceDataCount, data.SubInstanceDataStride);
-                if (data.InstanceDataPtr != IntPtr.Zero)
-                    ds.SetStructuredBuffer("t_InstanceData", data.InstanceDataPtr, data.InstanceDataCount, data.InstanceDataStride);
-                if (data.GeometryDataPtr != IntPtr.Zero)
-                    ds.SetStructuredBuffer("t_GeometryData", data.GeometryDataPtr, data.GeometryDataCount, data.GeometryDataStride);
-                if (data.PTMaterialDataPtr != IntPtr.Zero)
-                    ds.SetStructuredBuffer("t_PTMaterialData", data.PTMaterialDataPtr, data.PTMaterialDataCount, data.PTMaterialDataStride);
+                ds.SetStructuredBuffer("t_SubInstanceData", data.SubInstanceDataPtr, data.SubInstanceDataCount, data.SubInstanceDataStride);
+                ds.SetStructuredBuffer("t_InstanceData", data.InstanceDataPtr, data.InstanceDataCount, data.InstanceDataStride);
+                ds.SetStructuredBuffer("t_GeometryData", data.GeometryDataPtr, data.GeometryDataCount, data.GeometryDataStride);
+                ds.SetStructuredBuffer("t_PTMaterialData", data.PTMaterialDataPtr, data.PTMaterialDataCount, data.PTMaterialDataStride);
                 // Bindless vertex/index buffers
                 data.Ctx.GpuScene?.BindToShader(ds);
                 // Dispatch: ceil(taskCount / 8) groups × [256,1,1] threads = taskCount × 32 threads total

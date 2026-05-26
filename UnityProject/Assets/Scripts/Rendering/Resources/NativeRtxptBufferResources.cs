@@ -25,8 +25,9 @@ namespace PathTracing
         // sizeof(PackedPathTracerSurfaceData) — TODO: verify from HLSL struct.
         public const int SurfaceDataStride = 64;
 
-        // Max lights — can be enlarged if scene exceeds this.
-        public const int MaxLights = 8192;
+        // Max lights — env quad-tree uses EnvQtTotalNodeCount (5368) slots, leaving the rest for
+        // analytic + emissive triangle lights.  Increase this if the scene has many emissive triangles.
+        public const int MaxLights = 512 * 1024;
 
         // ── Stable Planes ────────────────────────────────────────────────────
         /// <summary>
