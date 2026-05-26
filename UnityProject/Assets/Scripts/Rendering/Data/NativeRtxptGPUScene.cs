@@ -235,7 +235,9 @@ namespace PathTracing
                 if (siIdx >= 0 && siIdx < _subInstanceCpu.Length)
                     _subInstanceCpu[siIdx].EmissiveLightMappingOffset = destBase;
 
-                // Split into tasks of at most MaxTriPerTask triangles
+                // Split into tasks of at most MaxTriPerTask triangles.
+                // Each task writes to DestinationBufferOffset + subIndex (0..31), so successive
+                // tasks must each advance the offset by MaxTriPerTask to avoid aliasing.
                 for (uint from = 0u; from < triCount && taskIdx < MaxEmissiveProcTasks; from += MaxTriPerTask)
                 {
                     uint to = System.Math.Min(from + MaxTriPerTask, triCount);
@@ -245,8 +247,8 @@ namespace PathTracing
                         GeometryIndex              = (uint)e.GeometrySubIndex,
                         TriangleIndexFrom          = from,
                         TriangleIndexTo            = to,
-                        DestinationBufferOffset    = destBase,
-                        HistoricBufferOffset       = historicBase,
+                        DestinationBufferOffset    = destBase + from,   // each task owns its own 32-slot window
+                        HistoricBufferOffset       = (historicBase != Invalid) ? historicBase + from : Invalid,
                         EmissiveLightMappingOffset = (uint)siIdx,
                         Padding0                   = 0u,
                     };

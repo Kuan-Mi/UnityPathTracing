@@ -917,7 +917,7 @@ namespace PathTracing
                 ColorMultiplierB = envTint.b * envIntensity,
                 Enabled          = 1.0f,
             };
-
+ 
             buf.LightControlBuffer.SetData(s_controlStaging);
 
             if (_analyticLightCount > 0)

@@ -497,24 +497,35 @@ namespace PathTracing
                 float normB = ((info.ColorTypeAndFlags >> 16) & 0xFFu) / 255f;
                 var   col   = new Color(normR, normG, normB, 1f); // use hue only, not intensity (too large)
 
-                var center   = new Vector3(info.CenterX, info.CenterY, info.CenterZ);
-                var edge1Dir = OctUnorm32ToDir(info.Direction1);
-                var edge2Dir = OctUnorm32ToDir(info.Direction2);
-                var normal   = Vector3.Cross(edge1Dir, edge2Dir).normalized;
+                // Direction1/Direction2/Scalars pack edge1.xyz and edge2.xyz as fp16 pairs:
+                //   low  16 bits → edge1 component,  high 16 bits → edge2 component
+                // Center = base + (edge1 + edge2) / 3  (triangle centroid)
+                var center = new Vector3(info.CenterX, info.CenterY, info.CenterZ);
+                var edge1  = new Vector3(
+                    Mathf.HalfToFloat((ushort)( info.Direction1        & 0xFFFFu)),
+                    Mathf.HalfToFloat((ushort)( info.Direction2        & 0xFFFFu)),
+                    Mathf.HalfToFloat((ushort)( info.Scalars           & 0xFFFFu)));
+                var edge2  = new Vector3(
+                    Mathf.HalfToFloat((ushort)((info.Direction1 >> 16) & 0xFFFFu)),
+                    Mathf.HalfToFloat((ushort)((info.Direction2 >> 16) & 0xFFFFu)),
+                    Mathf.HalfToFloat((ushort)((info.Scalars    >> 16) & 0xFFFFu)));
+                var normal = Vector3.Cross(edge1, edge2).normalized;
+                var triBase = center - (edge1 + edge2) / 3f;  // recover base vertex
 
-                // Draw a cross at the triangle center + a normal line
+                // Draw triangle outline + normal
                 float size = 0.05f;
-                // Debug.DrawLine(center - Vector3.right  * size, center + Vector3.right  * size, col, drawTime);
-                // Debug.DrawLine(center - Vector3.up     * size, center + Vector3.up     * size, col, drawTime);
-                // Debug.DrawLine(center - Vector3.forward* size, center + Vector3.forward* size, col, drawTime);
-                Debug.DrawLine(center, center + normal * (size * 3f), col, drawTime);
+                Debug.DrawLine(triBase,          triBase + edge1,          col, drawTime);
+                Debug.DrawLine(triBase,          triBase + edge2,          col, drawTime);
+                Debug.DrawLine(triBase + edge1,  triBase + edge2,          col, drawTime);
+                Debug.DrawLine(center,           center + normal * (size * 3f), col, drawTime);
 
                 if (nonZero <= 16)
                 {
                     uint typeCode = (info.ColorTypeAndFlags >> 24) & 0xFu;
                     sb.AppendLine($"    [{(int)triOffset + i}] type={typeCode}  intensity={intensity:F3}" +
                                   $"  center=({info.CenterX:F2},{info.CenterY:F2},{info.CenterZ:F2})" +
-                                  $"  normal=({normal.x:F2},{normal.y:F2},{normal.z:F2})");
+                                  $"  normal=({normal.x:F2},{normal.y:F2},{normal.z:F2})" +
+                                  $"  e1=({edge1.x:F2},{edge1.y:F2},{edge1.z:F2})");
                 }
             }
             sb.AppendLine($"  Non-zero entries in first {readCount}: {nonZero}  (draws visible for {drawTime}s in Scene view)");
@@ -524,21 +535,6 @@ namespace PathTracing
             Debug.Log(sb.ToString());
         }
 
-        private static Vector3 OctUnorm32ToDir(uint packed)
-        {
-            float px = (packed & 0xFFFFu) / (float)0xFFFEu;
-            float py = ((packed >> 16) & 0xFFFFu) / (float)0xFFFEu;
-            px = px * 2f - 1f;
-            py = py * 2f - 1f;
-            var n = new Vector3(px, py, 1f - Mathf.Abs(px) - Mathf.Abs(py));
-            if (n.z < 0f)
-            {
-                float ox = n.x;
-                n.x = (1f - Mathf.Abs(n.y)) * (ox >= 0f ? 1f : -1f);
-                n.y = (1f - Mathf.Abs(ox))  * (n.y >= 0f ? 1f : -1f);
-            }
-            return n.normalized;
-        }
 
         public void AutoFillShaders()
         {
