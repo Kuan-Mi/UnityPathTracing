@@ -80,6 +80,20 @@ namespace PathTracing
         private bool _forceRebuild  = false;
         private bool _disposed;
 
+        // ---- Emissive triangle light tracking --------------------------------
+        // Maps (globalInstanceIndex, geometrySubIndex) → last-frame DestinationBufferOffset
+        private readonly Dictionary<(int, int), uint> _emissiveHistoricOffsets = new();
+
+        // Max task count: MaxLights / LLB_MAX_TRIANGLES_PER_TASK * 2
+        private const int MaxEmissiveProcTasks = NativeRtxptBufferResources.MaxLights / 32 * 2;
+        private static readonly RtxptEmissiveTrianglesProcTask[] s_emissiveTaskStaging =
+            new RtxptEmissiveTrianglesProcTask[MaxEmissiveProcTasks];
+
+        /// <summary>Number of tasks produced by the last <see cref="PrepareEmissiveTriangleTasks"/> call.</summary>
+        public int  LastEmissiveTaskCount     { get; private set; }
+        /// <summary>Total triangle-light count produced by the last <see cref="PrepareEmissiveTriangleTasks"/> call.</summary>
+        public uint LastEmissiveTriangleCount { get; private set; }
+
         // Maps MeshRenderer.GetInstanceID() → per-submesh material indices in _ptMaterialCpu
         // for renderers that have a NativeRtxptMaterialOverride. Used for lightweight material-only updates.
         private readonly Dictionary<int, int[]> _overrideMaterialIndices = new();
@@ -164,6 +178,102 @@ namespace PathTracing
         public void MarkRebuildDirty() => _forceRebuild = true;
 
         /// <summary>
+        /// CPU-side emissive-triangle pass: mirrors <c>LightsBaker::ProcessEmissiveGeometry</c>.
+        /// Generates <see cref="RtxptEmissiveTrianglesProcTask"/> entries, uploads them to
+        /// <paramref name="scratchBuffer"/>, updates <c>SubInstanceData.EmissiveLightMappingOffset</c>
+        /// for emissive geometries, and re-uploads the sub-instance GPU buffer.
+        /// Must be called on the main thread after <see cref="UpdateForFrame"/> and before
+        /// command-buffer recording (i.e. from a pass <c>Setup</c> method).
+        /// </summary>
+        /// <param name="lightOffset">Base index in lightsBuffer where triangle lights start
+        ///     (= EnvQtTotalNodeCount + analyticLightCount).</param>
+        /// <param name="scratchBuffer">Raw <see cref="GraphicsBuffer"/> bound as u_scratchBuffer.
+        ///     Tasks are written at element offset 0 (each element = 4 bytes; tasks are 32 B each,
+        ///     so stride-8 within the raw buffer).</param>
+        public void PrepareEmissiveTriangleTasks(uint lightOffset, GraphicsBuffer scratchBuffer)
+        {
+            if (_instanceCpu == null || _subInstanceCpu == null || _ptMaterialCpu == null)
+            {
+                LastEmissiveTaskCount     = 0;
+                LastEmissiveTriangleCount = 0u;
+                return;
+            }
+
+            const uint Invalid = 0xFFFFFFFFu;
+            const uint MaxTriPerTask = 32u;
+
+            var emissive = GetEmissiveGeometries();
+
+            var newHistoric = new Dictionary<(int, int), uint>(emissive.Count);
+            int taskIdx        = 0;
+            uint accumTriangles = 0u;
+
+            foreach (var e in emissive)
+            {
+                if (taskIdx >= MaxEmissiveProcTasks)
+                {
+                    Debug.LogWarning("[NativeRtxptGPUScene] EmissiveTrianglesProcTask overflow — some emissive geometry ignored.");
+                    break;
+                }
+
+                uint triCount  = e.TriangleCount;
+                uint destBase  = lightOffset + accumTriangles;
+
+                // Overflow guard
+                if (destBase + triCount > NativeRtxptBufferResources.MaxLights)
+                {
+                    Debug.LogWarning($"[NativeRtxptGPUScene] MaxLights overflow at emissive geometry (inst={e.InstanceIndex}, geom={e.GeometrySubIndex}) — skipping.");
+                    break;
+                }
+
+                _emissiveHistoricOffsets.TryGetValue((e.InstanceIndex, e.GeometrySubIndex), out uint historicBase);
+                if (!_emissiveHistoricOffsets.ContainsKey((e.InstanceIndex, e.GeometrySubIndex)))
+                    historicBase = Invalid;
+
+                // Update SubInstanceData.EmissiveLightMappingOffset
+                int siIdx = (int)(e.FirstGeometryInstanceIndex + (uint)e.GeometrySubIndex);
+                if (siIdx >= 0 && siIdx < _subInstanceCpu.Length)
+                    _subInstanceCpu[siIdx].EmissiveLightMappingOffset = destBase;
+
+                // Split into tasks of at most MaxTriPerTask triangles
+                for (uint from = 0u; from < triCount && taskIdx < MaxEmissiveProcTasks; from += MaxTriPerTask)
+                {
+                    uint to = System.Math.Min(from + MaxTriPerTask, triCount);
+                    s_emissiveTaskStaging[taskIdx++] = new RtxptEmissiveTrianglesProcTask
+                    {
+                        InstanceIndex              = (uint)e.InstanceIndex,
+                        GeometryIndex              = (uint)e.GeometrySubIndex,
+                        TriangleIndexFrom          = from,
+                        TriangleIndexTo            = to,
+                        DestinationBufferOffset    = destBase,
+                        HistoricBufferOffset       = historicBase,
+                        EmissiveLightMappingOffset = (uint)siIdx,
+                        Padding0                   = 0u,
+                    };
+                }
+
+                newHistoric[(e.InstanceIndex, e.GeometrySubIndex)] = destBase;
+                accumTriangles += triCount;
+            }
+
+            // Swap historic offsets for next frame
+            _emissiveHistoricOffsets.Clear();
+            foreach (var kv in newHistoric)
+                _emissiveHistoricOffsets[kv.Key] = kv.Value;
+
+            // Re-upload SubInstanceData (EmissiveLightMappingOffset fields updated)
+            if (_subInstanceGpuBuf != null && _subInstanceCpu != null)
+                _subInstanceGpuBuf.SetData(_subInstanceCpu);
+
+            // Upload task array to scratch buffer (Raw buffer, stride = 4 bytes, tasks = 8 uints each)
+            if (taskIdx > 0 && scratchBuffer != null)
+                scratchBuffer.SetData(s_emissiveTaskStaging, 0, 0, taskIdx);
+
+            LastEmissiveTaskCount     = taskIdx;
+            LastEmissiveTriangleCount = accumTriangles;
+        }
+
+        /// <summary>
         /// Call once per frame before <see cref="BuildAccelerationStructure"/>.
         /// Handles dirty detection, GPU data rebuild, and transform updates.
         /// </summary>
@@ -186,6 +296,34 @@ namespace PathTracing
                 CheckAndUpdateMaterialOverrides(targets);
 
             UpdateInstanceTransforms();
+        }
+
+        /// <summary>
+        /// Outputs native buffer pointers and metadata for the four scene buffers needed by
+        /// BakeEmissiveTriangles (t_SubInstanceData, t_InstanceData, t_GeometryData, t_PTMaterialData).
+        /// Returns zeroed values if the buffers have not yet been allocated.
+        /// </summary>
+        public void GetSceneBufferPtrs(
+            out IntPtr subInstancePtr, out int subInstanceCount, out int subInstanceStride,
+            out IntPtr instancePtr,    out int instanceCount,    out int instanceStride,
+            out IntPtr geometryPtr,    out int geometryCount,    out int geometryStride,
+            out IntPtr ptMaterialPtr,  out int ptMaterialCount,  out int ptMaterialStride)
+        {
+            if (_subInstanceGpuBuf != null)
+            { subInstancePtr = _subInstanceGpuBuf.GetNativeBufferPtr(); subInstanceCount = _subInstanceGpuBuf.count; subInstanceStride = _subInstanceGpuBuf.stride; }
+            else { subInstancePtr = IntPtr.Zero; subInstanceCount = 0; subInstanceStride = 1; }
+
+            if (_instanceGpuBuf != null)
+            { instancePtr = _instanceGpuBuf.GetNativeBufferPtr(); instanceCount = _instanceGpuBuf.count; instanceStride = _instanceGpuBuf.stride; }
+            else { instancePtr = IntPtr.Zero; instanceCount = 0; instanceStride = 1; }
+
+            if (_geometryGpuBuf != null)
+            { geometryPtr = _geometryGpuBuf.GetNativeBufferPtr(); geometryCount = _geometryGpuBuf.count; geometryStride = _geometryGpuBuf.stride; }
+            else { geometryPtr = IntPtr.Zero; geometryCount = 0; geometryStride = 1; }
+
+            if (_ptMaterialGpuBuf != null)
+            { ptMaterialPtr = _ptMaterialGpuBuf.GetNativeBufferPtr(); ptMaterialCount = _ptMaterialGpuBuf.count; ptMaterialStride = _ptMaterialGpuBuf.stride; }
+            else { ptMaterialPtr = IntPtr.Zero; ptMaterialCount = 0; ptMaterialStride = 1; }
         }
 
         /// <summary>

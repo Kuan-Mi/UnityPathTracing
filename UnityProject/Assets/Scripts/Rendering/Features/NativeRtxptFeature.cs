@@ -79,6 +79,7 @@ namespace PathTracing
         public NativeComputeShader computeProxyBaselineOffsetsCs;
         public NativeComputeShader createProxyJobsCs;
         public NativeComputeShader executeProxyJobsCs;
+        public NativeComputeShader bakeEmissiveTrianglesCs;
 
         // Phase 9: Output blit (debug display)
         public Material outputBlitMaterial;
@@ -133,7 +134,8 @@ namespace PathTracing
                     envLightsFillLookupMapCs, envLightsMapPastToCurrentCs,
                     resetLightProxyCountersCs, resetPastToCurrentHistoryCs,
                     computeWeightsCs, computeProxyCountsCs, computeProxyBaselineOffsetsCs,
-                    createProxyJobsCs, executeProxyJobsCs)
+                    createProxyJobsCs, executeProxyJobsCs,
+                    bakeEmissiveTrianglesCs)
                 { renderPassEvent = renderPassEvent };
             }
 
@@ -465,6 +467,7 @@ namespace PathTracing
             computeProxyBaselineOffsetsCs = LoadCs($"{lightRoot}/ComputeProxyBaselineOffsets");
             createProxyJobsCs             = LoadCs($"{lightRoot}/CreateProxyJobs");
             executeProxyJobsCs            = LoadCs($"{lightRoot}/ExecuteProxyJobs");
+            bakeEmissiveTrianglesCs       = LoadCs($"{lightRoot}/BakeEmissiveTriangles");
 
             UnityEditor.EditorUtility.SetDirty(this);
             return;

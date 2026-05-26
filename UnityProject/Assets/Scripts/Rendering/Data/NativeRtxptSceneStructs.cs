@@ -224,6 +224,24 @@ namespace PathTracing
     } // 16 bytes
 
     /// <summary>
+    /// CPU-side mirror of <c>EmissiveTrianglesProcTask</c> in <c>NEEATBaker.hlsli</c>.
+    /// One task covers up to <c>LLB_MAX_TRIANGLES_PER_TASK</c> (32) consecutive triangles
+    /// of a single emissive geometry.  Stride = 8 × 4 = 32 bytes.
+    /// </summary>
+    [StructLayout(LayoutKind.Sequential)]
+    public struct RtxptEmissiveTrianglesProcTask
+    {
+        public uint InstanceIndex;             // index into t_InstanceData
+        public uint GeometryIndex;             // sub-mesh index within the instance
+        public uint TriangleIndexFrom;         // first triangle (inclusive) in this task
+        public uint TriangleIndexTo;           // last  triangle (exclusive) in this task
+        public uint DestinationBufferOffset;   // write offset in lightsBuffer
+        public uint HistoricBufferOffset;      // last-frame block base, or 0xFFFFFFFF if new
+        public uint EmissiveLightMappingOffset;// = firstGeometryInstanceIndex + GeometryIndex
+        public uint Padding0;
+    } // 32 bytes
+
+    /// <summary>
     /// Single-element control buffer read by the path tracer each frame.
     /// Mirrors <c>LightingControlData</c> in <c>LightingTypes.hlsli</c>.
     /// Size = 112 + 464 (paddingBK) = 576 bytes.
