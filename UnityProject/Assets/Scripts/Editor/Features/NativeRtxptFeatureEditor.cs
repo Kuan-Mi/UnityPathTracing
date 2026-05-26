@@ -54,7 +54,7 @@ namespace PathTracing
             }
             EditorGUILayout.HelpBox(
                 "Reads back LightingControl, weights, proxy counters, proxy lists, local sampling, " +
-                "and feedback textures. Set useNEE=true and neeType=2, then run for a few frames before clicking.",
+                "and feedback textures. Set useNEE=true and neeType=NEEAT, then run for a few frames before clicking.",
                 MessageType.Info);
 
             EditorGUILayout.Space(10);

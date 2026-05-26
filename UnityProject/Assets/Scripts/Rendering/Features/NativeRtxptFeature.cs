@@ -117,7 +117,7 @@ namespace PathTracing
         private readonly Dictionary<long, NativeRtxptBufferResources>  _bufferPools       = new();
         private readonly Dictionary<long, GraphicsBuffer>              _constantBuffers   = new();
         private readonly Dictionary<long, DlrrDenoiser>                _dlrrDenoisers     = new();
-        private readonly Dictionary<long, CameraFrameState>            _cameraFrameStates = new();
+        private readonly Dictionary<long, RtxptCameraFrameState>       _cameraFrameStates = new();
 
         private readonly SampleConstants[] _sampleConstantsArray = new SampleConstants[1];
 
@@ -242,7 +242,7 @@ namespace PathTracing
             // ---- Per-camera temporal state ----------------------------------
             if (!_cameraFrameStates.TryGetValue(uniqueKey, out var frameState))
             {
-                frameState = new CameraFrameState(1.0f);
+                frameState = new RtxptCameraFrameState(1.0f);
                 _cameraFrameStates.Add(uniqueKey, frameState);
             }
 
@@ -252,7 +252,7 @@ namespace PathTracing
                 frameState.frameIndex       = 0;
             }
 
-            frameState.Update(renderingData, texturesChanged, 1.0f);
+            frameState.Update(renderingData, texturesChanged, 1.0f, setting);
 
             // ---- Build & upload SampleConstants -----------------------------
             sampleConstants = NativeRtxptConstantsBuilder.Build(renderingData, setting, renderResolution, displayResolution, frameState);
@@ -562,7 +562,7 @@ namespace PathTracing
 
         /// <summary>
         /// Debug readback for the NEE-AT data path.
-        /// Run with setting.neeType = 2 for a few frames before clicking.
+        /// Run with setting.neeType = NEEAT for a few frames before clicking.
         /// </summary>
         public void TestNeeAtReadback()
         {
@@ -616,7 +616,7 @@ namespace PathTracing
             AppendUIntTextureStats(sb, "FeedbackCandidatesBlended", tex.FeedbackCandidatesBlended, 8192);
 
             if (ctrl.ImportanceSamplingType != 2 || ctrl.TemporalFeedbackRequired == 0)
-                sb.AppendLine("  RESULT: NEE-AT is not enabled in LightingControl. Set NativeRtxptSetting.neeType = 2 and useNEE = true.");
+                sb.AppendLine("  RESULT: NEE-AT is not enabled in LightingControl. Set NativeRtxptSetting.neeType = NEEAT and useNEE = true.");
             else if (ctrl.SamplingProxyCount == 0)
                 sb.AppendLine("  RESULT: NEE-AT config is active, but proxy data is empty. Check light counts, env/emissive setup, and proxy build passes.");
             else if (ctrl.LastFrameTemporalFeedbackAvailable == 0)

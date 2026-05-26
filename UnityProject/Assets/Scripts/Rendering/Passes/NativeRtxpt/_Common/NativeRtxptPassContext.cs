@@ -41,7 +41,7 @@ namespace PathTracing
         public int2 DisplayResolution;
 
         // ── Per-frame temporal state ──────────────────────────────────────────
-        public CameraFrameState FrameState;
+        public RtxptCameraFrameState FrameState;
 
         // ── Inspector settings snapshot ───────────────────────────────────────
         public NativeRtxptSetting Setting;

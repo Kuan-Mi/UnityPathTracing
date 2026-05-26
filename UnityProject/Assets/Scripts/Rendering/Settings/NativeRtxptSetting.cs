@@ -3,6 +3,17 @@ using UnityEngine;
 namespace PathTracing
 {
     /// <summary>
+    /// Mirrors SampleUIData::NEEType / LightingControlData::ImportanceSamplingType.
+    /// Numeric values are part of the shader ABI.
+    /// </summary>
+    public enum NativeRtxptNeeType
+    {
+        Uniform = 0,
+        Power   = 1,
+        NEEAT   = 2,
+    }
+
+    /// <summary>
     /// Inspector-facing settings for <see cref="NativeRtxptFeature"/>.
     /// Mirrors <c>SampleUIData</c> from RTXPT/Rtxpt/SampleUI.h, adapted for Unity.
     /// Denoising is handled exclusively by DLSS Ray Reconstruction (DLSS-RR).
@@ -52,8 +63,7 @@ namespace PathTracing
 
         // ── NEE / Lighting ────────────────────────────────────────────────────
         public bool  useNEE              = true;
-        /// <summary>0=Uniform, 1=Power, 2=NEE-AT. SampleUIData::NEEType.</summary>
-        public int   neeType             = 1;
+        public NativeRtxptNeeType neeType = NativeRtxptNeeType.Power;
         [Range(1, 16)]
         public int   neeCandidateSamples = 5;
         [Range(1, 4)]

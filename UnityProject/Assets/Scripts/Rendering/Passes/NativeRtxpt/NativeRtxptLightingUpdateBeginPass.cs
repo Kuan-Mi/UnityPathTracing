@@ -808,7 +808,7 @@ namespace PathTracing
             ref var ctrl = ref s_controlStaging[0];
             ctrl                         = default;
             var setting = _ctx.Setting;
-            bool neeAtEnabled       = setting != null && setting.useNEE && setting.neeType == 2;
+            bool neeAtEnabled       = setting != null && setting.useNEE && setting.neeType == NativeRtxptNeeType.NEEAT;
             if (!neeAtEnabled)
                 _feedbackBufferFilled = false;
 
@@ -833,7 +833,7 @@ namespace PathTracing
             ctrl.HistoricTotalLightCount            = _historicTotalLightCount;
             ctrl.LastFrameTemporalFeedbackAvailable = lastFrameFeedback ? 1u : 0u;
             ctrl.LastFrameLocalSamplesAvailable     = lastFrameLocal ? 1u : 0u;
-            ctrl.ImportanceSamplingType             = setting != null && setting.useNEE ? (uint)Mathf.Clamp(setting.neeType, 0, 2) : 0u;
+            ctrl.ImportanceSamplingType             = setting != null && setting.useNEE ? (uint)setting.neeType : 0u;
             ctrl.TemporalFeedbackRequired           = neeAtEnabled ? 1u : 0u;
             ctrl.TotalMaxFeedbackCount              = lastFrameFeedback ? p0ThreadCount : 0u;
             ctrl.GlobalFeedbackUseWeight            = lastFrameFeedback ? (setting?.neeatGlobalTemporalFeedbackWeight ?? 0.75f) : 0.0f;

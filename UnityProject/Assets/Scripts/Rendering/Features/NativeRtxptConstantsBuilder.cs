@@ -20,7 +20,7 @@ namespace PathTracing
             NativeRtxptSetting setting,
             int2 renderRes,
             int2 displayRes,
-            CameraFrameState fs)
+            RtxptCameraFrameState fs)
         {
             var  cam    = renderingData.cameraData.camera;
             var  xrPass = renderingData.cameraData.xr;
@@ -106,7 +106,7 @@ namespace PathTracing
                 imageWidth                                   = (uint)renderRes.x,
                 imageHeight                                  = (uint)renderRes.y,
                 sampleBaseIndex                              = 0u,
-                perPixelJitterAAScale                        = setting.realtimeAA != 0 ? 1.0f : 0.0f,
+                perPixelJitterAAScale                        = fs.perPixelJitterAAScale,
                 bounceCount                                  = (uint)setting.bounceCount,
                 diffuseBounceCount                           = (uint)setting.diffuseBounceCount,
                 environmentMapDiffuseSampleMIPLevel          = 0f,
