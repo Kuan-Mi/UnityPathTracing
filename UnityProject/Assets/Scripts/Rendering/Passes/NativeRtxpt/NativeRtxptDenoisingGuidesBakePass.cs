@@ -20,8 +20,8 @@ namespace PathTracing
     ///   u7  u_SpecularHitT
     ///   u8  u_ScratchFloat1
     ///
-    /// Pass 0  (Ping=0): reads SpecularHitT → writes ScratchFloat1
-    /// Pass 1  (Ping=1): reads ScratchFloat1 → writes SpecularHitT
+    /// Pass 0  (Ping=1): reads SpecularHitT, writes ScratchFloat1
+    /// Pass 1  (Ping=0): reads ScratchFloat1, writes SpecularHitT
     /// </summary>
     public class NativeRtxptDenoisingGuidesBakePass : ScriptableRenderPass, IDisposable
     {
@@ -38,27 +38,37 @@ namespace PathTracing
         }
 
         private readonly NativeComputePipeline      _cs;
-        private readonly NativeComputeDescriptorSet _ds;
+        private readonly NativeComputeDescriptorSet _pingDs;
+        private readonly NativeComputeDescriptorSet _pongDs;
         private          NativeRtxptPassContext     _ctx;
 
-        private readonly DenoisingGuidesBakerConstants[] _cbData = new DenoisingGuidesBakerConstants[1];
-        private          GraphicsBuffer                  _cb;
+        private readonly DenoisingGuidesBakerConstants[] _pingCbData = new DenoisingGuidesBakerConstants[1];
+        private readonly DenoisingGuidesBakerConstants[] _pongCbData = new DenoisingGuidesBakerConstants[1];
+        private          GraphicsBuffer                  _pingCb;
+        private          GraphicsBuffer                  _pongCb;
 
         public NativeRtxptDenoisingGuidesBakePass(NativeComputeShader shader)
         {
             _cs = new NativeComputePipeline(shader);
-            _ds = new NativeComputeDescriptorSet(_cs);
-            _cb = new GraphicsBuffer(GraphicsBuffer.Target.Constant, 1,
+            _pingDs = new NativeComputeDescriptorSet(_cs);
+            _pongDs = new NativeComputeDescriptorSet(_cs);
+            _pingCb = new GraphicsBuffer(GraphicsBuffer.Target.Constant, 1,
                     Marshal.SizeOf<DenoisingGuidesBakerConstants>())
-                { name = "Rtxpt_DenoisingGuidesBakerConstants" };
+                { name = "Rtxpt_DenoisingGuidesBakerConstants_Ping" };
+            _pongCb = new GraphicsBuffer(GraphicsBuffer.Target.Constant, 1,
+                    Marshal.SizeOf<DenoisingGuidesBakerConstants>())
+                { name = "Rtxpt_DenoisingGuidesBakerConstants_Pong" };
         }
 
         public void Dispose()
         {
-            _ds?.Dispose();
+            _pingDs?.Dispose();
+            _pongDs?.Dispose();
             _cs?.Dispose();
-            _cb?.Dispose();
-            _cb = null;
+            _pingCb?.Dispose();
+            _pingCb = null;
+            _pongCb?.Dispose();
+            _pongCb = null;
         }
 
         public void Setup(NativeRtxptPassContext ctx) => _ctx = ctx;
@@ -68,10 +78,13 @@ namespace PathTracing
         private class PassData
         {
             internal NativeComputePipeline           Cs;
-            internal NativeComputeDescriptorSet      Ds;
+            internal NativeComputeDescriptorSet      PingDs;
+            internal NativeComputeDescriptorSet      PongDs;
             internal NativeRtxptPassContext          Ctx;
-            internal GraphicsBuffer                  Cb;
-            internal DenoisingGuidesBakerConstants[] CbData;
+            internal GraphicsBuffer                  PingCb;
+            internal GraphicsBuffer                  PongCb;
+            internal DenoisingGuidesBakerConstants[] PingCbData;
+            internal DenoisingGuidesBakerConstants[] PongCbData;
         }
 
         // ── RenderGraph ───────────────────────────────────────────────────────
@@ -79,11 +92,14 @@ namespace PathTracing
         public override void RecordRenderGraph(RenderGraph renderGraph, ContextContainer frameData)
         {
             using var builder = renderGraph.AddUnsafePass<PassData>("NativeRtxpt.DenoiseSpecHitT", out var passData);
-            passData.Cs     = _cs;
-            passData.Ds     = _ds;
-            passData.Ctx    = _ctx;
-            passData.Cb     = _cb;
-            passData.CbData = _cbData;
+            passData.Cs         = _cs;
+            passData.PingDs     = _pingDs;
+            passData.PongDs     = _pongDs;
+            passData.Ctx        = _ctx;
+            passData.PingCb     = _pingCb;
+            passData.PongCb     = _pongCb;
+            passData.PingCbData = _pingCbData;
+            passData.PongCbData = _pongCbData;
             builder.AllowPassCulling(false);
             builder.SetRenderFunc((PassData d, UnsafeGraphContext c) => ExecutePass(d, c));
         }
@@ -94,37 +110,49 @@ namespace PathTracing
         {
             var cmd = CommandBufferHelpers.GetNativeCommandBuffer(context.cmd);
             var ctx = data.Ctx;
-            var ds  = data.Ds;
             var res = ctx.Textures;
 
             uint gx = ((uint)ctx.RenderResolution.x + 7u) / 8u;
             uint gy = ((uint)ctx.RenderResolution.y + 7u) / 8u;
 
-            // Two ping-pong passes
-            for (uint ping = 0; ping <= 1; ping++)
+            cmd.BeginSample("Rtxpt.DenoiseSpecHitT[Ping]");
+            DispatchDenoiseSpecHitT(cmd, data, data.PingDs, data.PingCb, data.PingCbData, 1u, gx, gy, res, ctx);
+            cmd.EndSample("Rtxpt.DenoiseSpecHitT[Ping]");
+
+            cmd.BeginSample("Rtxpt.DenoiseSpecHitT[Pong]");
+            DispatchDenoiseSpecHitT(cmd, data, data.PongDs, data.PongCb, data.PongCbData, 0u, gx, gy, res, ctx);
+            cmd.EndSample("Rtxpt.DenoiseSpecHitT[Pong]");
+        }
+
+        private static void DispatchDenoiseSpecHitT(
+            CommandBuffer cmd,
+            PassData data,
+            NativeComputeDescriptorSet ds,
+            GraphicsBuffer cb,
+            DenoisingGuidesBakerConstants[] cbData,
+            uint ping,
+            uint gx,
+            uint gy,
+            NativeRtxptTextureResources res,
+            NativeRtxptPassContext ctx)
+        {
+            cbData[0] = new DenoisingGuidesBakerConstants
             {
-                cmd.BeginSample(ping == 0 ? "Rtxpt.DenoiseSpecHitT[0]" : "Rtxpt.DenoiseSpecHitT[1]");
+                RenderResX  = (uint)ctx.RenderResolution.x,
+                RenderResY  = (uint)ctx.RenderResolution.y,
+                DisplayResX = (uint)ctx.DisplayResolution.x,
+                DisplayResY = (uint)ctx.DisplayResolution.y,
+                DebugView   = 0,
+                Ping        = ping,
+            };
+            cb.SetData(cbData);
+            ds.SetConstantBuffer("g_denoisingConstants", cb.GetNativeBufferPtr());
 
-                data.CbData[0] = new DenoisingGuidesBakerConstants
-                {
-                    RenderResX  = (uint)ctx.RenderResolution.x,
-                    RenderResY  = (uint)ctx.RenderResolution.y,
-                    DisplayResX = (uint)ctx.DisplayResolution.x,
-                    DisplayResY = (uint)ctx.DisplayResolution.y,
-                    DebugView   = 0,
-                    Ping        = ping,
-                };
-                data.Cb.SetData(data.CbData);
-                ds.SetConstantBuffer("g_denoisingConstants", data.Cb.GetNativeBufferPtr());
+            ds.SetRWTexture("u_Depth", res.Depth.NativePtr);
+            ds.SetRWTexture("u_SpecularHitT", res.SpecularHitT.NativePtr);
+            ds.SetRWTexture("u_ScratchFloat1", res.ScratchFloat1.NativePtr);
 
-                ds.SetRWTexture("u_Depth", res.Depth.NativePtr);
-                ds.SetRWTexture("u_SpecularHitT", res.SpecularHitT.NativePtr);
-                ds.SetRWTexture("u_ScratchFloat1", res.ScratchFloat1.NativePtr);
-
-                data.Cs.Dispatch(cmd, ds, gx, gy, 1);
-
-                cmd.EndSample(ping == 0 ? "Rtxpt.DenoiseSpecHitT[0]" : "Rtxpt.DenoiseSpecHitT[1]");
-            }
+            data.Cs.Dispatch(cmd, ds, gx, gy, 1);
         }
     }
 }
