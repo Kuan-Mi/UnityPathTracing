@@ -94,6 +94,22 @@ namespace PathTracing
         /// <summary>1024×1024 env-light lookup map (R32_UINT). Filled by EnvLightsFillLookupMap. Bound as t_EnvLookupMap (t18).</summary>
         public IntPtr EnvLightLookupMapPtr;
 
+        // ── NEE-AT feedback texture pointers ─────────────────────────────────
+        /// <summary>u_feedbackTotalWeight (u11) — main reservoir working surface (R32_FLOAT).</summary>
+        public IntPtr FeedbackTotalWeightPtr;
+        /// <summary>u_feedbackCandidates (u12) — main reservoir working surface (R32_UINT).</summary>
+        public IntPtr FeedbackCandidatesPtr;
+        /// <summary>u_feedbackTotalWeightScratch (u13) — scratch reprojection surface (R32_FLOAT).</summary>
+        public IntPtr FeedbackTotalWeightScratchPtr;
+        /// <summary>u_feedbackCandidatesScratch (u14) — scratch reprojection surface (R32_UINT).</summary>
+        public IntPtr FeedbackCandidatesScratchPtr;
+        /// <summary>u_feedbackTotalWeightBlended (u15) — blended early-feedback surface (R32_FLOAT, half-res).</summary>
+        public IntPtr FeedbackTotalWeightBlendedPtr;
+        /// <summary>u_feedbackCandidatesBlended (u16) — blended early-feedback surface (R32_UINT, half-res).</summary>
+        public IntPtr FeedbackCandidatesBlendedPtr;
+        /// <summary>u_historyDepth (u17) — NEE-AT per-pixel history depth / confidence (R32_FLOAT).</summary>
+        public IntPtr NEEATHistoryDepthPtr;
+
         // ── Factory ───────────────────────────────────────────────────────────
 
         /// <summary>
@@ -116,6 +132,14 @@ namespace PathTracing
             DlssRrSpecAlbedoPtr      = Textures.DlssRrSpecAlbedo.NativePtr;
             DlssRrNormalRoughnessPtr = Textures.DlssRrNormalRoughness.NativePtr;
             DlssRrOutputPtr          = Textures.DlssRrOutput.NativePtr;
+
+            FeedbackTotalWeightPtr        = Textures.LightFeedbackTotalWeight.NativePtr;
+            FeedbackCandidatesPtr         = Textures.LightFeedbackCandidates.NativePtr;
+            FeedbackTotalWeightScratchPtr = Textures.FeedbackTotalWeightScratch.NativePtr;
+            FeedbackCandidatesScratchPtr  = Textures.FeedbackCandidatesScratch.NativePtr;
+            FeedbackTotalWeightBlendedPtr = Textures.FeedbackTotalWeightBlended.NativePtr;
+            FeedbackCandidatesBlendedPtr  = Textures.FeedbackCandidatesBlended.NativePtr;
+            NEEATHistoryDepthPtr          = Textures.NEEATHistoryDepth.NativePtr;
         }
     }
 }

@@ -83,6 +83,22 @@ namespace PathTracing
         /// <summary>Per-pixel NEE candidate light index. R32_UINT. Bound as u_LightFeedbackCandidates (u21).</summary>
         public NriTextureResource LightFeedbackCandidates;
 
+        // ── NEE-AT feedback scratch / blended / history ───────────────────────
+        /// <summary>Scratch reprojection target for NEE total weight. R32_FLOAT. u_feedbackTotalWeightScratch (u13).</summary>
+        public NriTextureResource FeedbackTotalWeightScratch;
+
+        /// <summary>Scratch reprojection target for NEE candidates. R32_UINT. u_feedbackCandidatesScratch (u14).</summary>
+        public NriTextureResource FeedbackCandidatesScratch;
+
+        /// <summary>Blended early-feedback total weight. R32_FLOAT. Size = ceil(renderRes/NEEAT_TILE_SIZE). u_feedbackTotalWeightBlended (u15).</summary>
+        public NriTextureResource FeedbackTotalWeightBlended;
+
+        /// <summary>Blended early-feedback candidates. R32_UINT. Size = ceil(renderRes/NEEAT_TILE_SIZE). u_feedbackCandidatesBlended (u16).</summary>
+        public NriTextureResource FeedbackCandidatesBlended;
+
+        /// <summary>NEE-AT per-pixel history depth / confidence. R32_FLOAT. u_historyDepth (u17).</summary>
+        public NriTextureResource NEEATHistoryDepth;
+
         // ── Debug viz ─────────────────────────────────────────────────────────────
         /// <summary>Shader debug visualisation texture. R32_FLOAT. Bound as u_ShaderDebugVizTextureBuffer (u126).</summary>
         public NriTextureResource ShaderDebugViz;
@@ -132,6 +148,12 @@ namespace PathTracing
             LightFeedbackTotalWeight = new NriTextureResource("Rtxpt_LightFeedbackTotalWeight", GraphicsFormat.R32_SFloat,  uav);
             LightFeedbackCandidates  = new NriTextureResource("Rtxpt_LightFeedbackCandidates",  GraphicsFormat.R32_UInt,    uav);
 
+            FeedbackTotalWeightScratch  = new NriTextureResource("Rtxpt_FeedbackTotalWeightScratch",  GraphicsFormat.R32_SFloat, uav);
+            FeedbackCandidatesScratch   = new NriTextureResource("Rtxpt_FeedbackCandidatesScratch",   GraphicsFormat.R32_UInt,   uav);
+            FeedbackTotalWeightBlended  = new NriTextureResource("Rtxpt_FeedbackTotalWeightBlended",  GraphicsFormat.R32_SFloat, uav);
+            FeedbackCandidatesBlended   = new NriTextureResource("Rtxpt_FeedbackCandidatesBlended",   GraphicsFormat.R32_UInt,   uav);
+            NEEATHistoryDepth           = new NriTextureResource("Rtxpt_NEEATHistoryDepth",           GraphicsFormat.R32_SFloat, uav);
+
             ShaderDebugViz       = new NriTextureResource("Rtxpt_ShaderDebugViz",        GraphicsFormat.R16G16B16A16_SFloat,               uav);
             DebugOutputColor     = new NriTextureResource("Rtxpt_DebugOutputColor",       GraphicsFormat.R16G16B16A16_SFloat,     uav);
             AccumulatedRadiance  = new NriTextureResource("Rtxpt_AccumulatedRadiance",   GraphicsFormat.R32G32B32A32_SFloat,     uav);
@@ -161,6 +183,13 @@ namespace PathTracing
             // StablePlanesHeader is a Texture2DArray with 4 slices
             StablePlanesHeader.Allocate(renderResolution, slices: 4);
 
+            // Blended feedback: half resolution (ceil each axis by NEEAT_TILE_SIZE=2)
+            var blendedRes = new int2(
+                (renderRes.x + LightingConfig.RTXPT_NEEAT_EARLY_FEEDBACK_TILE_SIZE - 1) / LightingConfig.RTXPT_NEEAT_EARLY_FEEDBACK_TILE_SIZE,
+                (renderRes.y + LightingConfig.RTXPT_NEEAT_EARLY_FEEDBACK_TILE_SIZE - 1) / LightingConfig.RTXPT_NEEAT_EARLY_FEEDBACK_TILE_SIZE);
+            FeedbackTotalWeightBlended.Allocate(blendedRes);
+            FeedbackCandidatesBlended.Allocate(blendedRes);
+
             // Display-resolution textures
             DlssRrOutput.Allocate(displayResolution);
             ProcessedOutputColor.Allocate(displayResolution);
@@ -176,6 +205,8 @@ namespace PathTracing
             BaseColor, SpecNormal, RoughnessMetal, MaterialInfo,
             DlssRrDiffAlbedo, DlssRrSpecAlbedo, DlssRrSpecMotionVectors, DlssRrNormalRoughness,
             LightFeedbackTotalWeight, LightFeedbackCandidates,
+            FeedbackTotalWeightScratch, FeedbackCandidatesScratch,
+            NEEATHistoryDepth,
             ShaderDebugViz, DebugOutputColor, AccumulatedRadiance,
         };
 
@@ -202,6 +233,9 @@ namespace PathTracing
             BaseColor, SpecNormal, RoughnessMetal, MaterialInfo,
             DlssRrDiffAlbedo, DlssRrSpecAlbedo, DlssRrSpecMotionVectors, DlssRrNormalRoughness,
             LightFeedbackTotalWeight, LightFeedbackCandidates,
+            FeedbackTotalWeightScratch, FeedbackCandidatesScratch,
+            FeedbackTotalWeightBlended, FeedbackCandidatesBlended,
+            NEEATHistoryDepth,
             ShaderDebugViz, DebugOutputColor, DlssRrOutput, AccumulatedRadiance, ProcessedOutputColor,
         };
     }

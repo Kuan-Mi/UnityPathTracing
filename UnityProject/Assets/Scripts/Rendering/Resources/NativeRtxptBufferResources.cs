@@ -123,7 +123,7 @@ namespace PathTracing
         private const int ProxyCounterCount   = LightingConfig.RTXPT_LIGHTING_MAX_LIGHTS + 1;
         // ProxySamplingCount: worst-case total proxies = RTXPT_LIGHTING_MAX_SAMPLING_PROXIES.
         internal const int ProxySamplingCount = LightingConfig.RTXPT_LIGHTING_MAX_SAMPLING_PROXIES;
-        private const int LocalSamplingCount  = LightingConfig.RTXPT_LIGHTING_MAX_LIGHTS;
+        private const int LocalSamplingCount  = LightingConfig.RTXPT_LIGHTING_MAX_LIGHTS; // placeholder; actual buffer is resolution-dependent (see EnsureResources)
 
         // LightWeights ping-pong half-count: RTXPT_LIGHTING_WEIGHTS_COUNT_HALF.
         private const int WeightsCountHalf = LightingConfig.RTXPT_LIGHTING_WEIGHTS_COUNT_HALF;
@@ -149,6 +149,17 @@ namespace PathTracing
             int pixelCount = renderRes.x * renderRes.y;
 
             ReleaseResolutionBuffers();
+
+            // LocalSamplingBuffer: tileW × tileH × LOCAL_PROXY_COUNT uint elements.
+            // Each tile covers RTXPT_LIGHTING_SAMPLING_BUFFER_TILE_SIZE × TILE_SIZE pixels.
+            int tileW    = (renderRes.x + LightingConfig.RTXPT_LIGHTING_SAMPLING_BUFFER_TILE_SIZE - 1) / LightingConfig.RTXPT_LIGHTING_SAMPLING_BUFFER_TILE_SIZE;
+            int tileH    = (renderRes.y + LightingConfig.RTXPT_LIGHTING_SAMPLING_BUFFER_TILE_SIZE - 1) / LightingConfig.RTXPT_LIGHTING_SAMPLING_BUFFER_TILE_SIZE;
+            int localSampCount = tileW * tileH * LightingConfig.RTXPT_LIGHTING_LOCAL_PROXY_COUNT;
+            LocalSamplingBuffer?.Release();
+            LocalSamplingBuffer = new GraphicsBuffer(
+                GraphicsBuffer.Target.Structured,
+                localSampCount, 4)
+            { name = "Rtxpt_LocalSamplingBuffer" };
 
             // StablePlanesBuffer: W×H×StablePlaneCount structured entries, stride = StablePlaneStride (80).
             // Shader declares: RWStructuredBuffer<StablePlane> u_StablePlanesBuffer (u42).
@@ -225,10 +236,7 @@ namespace PathTracing
                 ProxySamplingCount, 4)
             { name = "Rtxpt_LightSamplingProxies" };
 
-            LocalSamplingBuffer = new GraphicsBuffer(
-                GraphicsBuffer.Target.Raw,
-                LocalSamplingCount, 4)
-            { name = "Rtxpt_LocalSamplingBuffer" };
+            // LocalSamplingBuffer is now allocated in EnsureResources() with the correct resolution-dependent size.
 
             // LightWeightsBuffer: 2 halves of (MaxLights+1) floats for ping-pong historic weights.
             LightWeightsBuffer = new GraphicsBuffer(
@@ -251,6 +259,8 @@ namespace PathTracing
             StablePlanesBuffer = null;
             SurfaceDataBuffer?.Release();
             SurfaceDataBuffer = null;
+            LocalSamplingBuffer?.Release();
+            LocalSamplingBuffer = null;
         }
 
         private void ReleaseLightBuffers()
@@ -264,7 +274,7 @@ namespace PathTracing
             HistoryRemapPastToCurrent?.Release();HistoryRemapPastToCurrent= null;
             LightProxyCounters?.Release();       LightProxyCounters       = null;
             LightSamplingProxies?.Release();     LightSamplingProxies     = null;
-            LocalSamplingBuffer?.Release();      LocalSamplingBuffer      = null;
+            LocalSamplingBuffer?.Release();      LocalSamplingBuffer      = null; // now re-created by EnsureResources
             LightWeightsBuffer?.Release();       LightWeightsBuffer       = null;
             ScratchListBuffer?.Release();        ScratchListBuffer        = null;
         }

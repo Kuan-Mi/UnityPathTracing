@@ -81,6 +81,16 @@ namespace PathTracing
         public NativeComputeShader executeProxyJobsCs;
         public NativeComputeShader bakeEmissiveTrianglesCs;
 
+        // LightingUpdateBegin feedback passes
+        public NativeComputeShader processFeedbackHistoryPreFilterCs;
+        public NativeComputeShader processFeedbackHistoryP0Cs;
+        // LightingUpdateEnd feedback passes
+        public NativeComputeShader processFeedbackHistoryP1aCs;
+        public NativeComputeShader processFeedbackHistoryP1bCs;
+        public NativeComputeShader processFeedbackHistoryP2Cs;
+        public NativeComputeShader processFeedbackHistoryP3Cs;
+        public NativeComputeShader clearFeedbackHistoryCs;
+
         // Phase 9: Output blit (debug display)
         public Material outputBlitMaterial;
 
@@ -135,7 +145,8 @@ namespace PathTracing
                         resetLightProxyCountersCs, resetPastToCurrentHistoryCs,
                         computeWeightsCs, computeProxyCountsCs, computeProxyBaselineOffsetsCs,
                         createProxyJobsCs, executeProxyJobsCs,
-                        bakeEmissiveTrianglesCs)
+                        bakeEmissiveTrianglesCs,
+                        processFeedbackHistoryPreFilterCs, processFeedbackHistoryP0Cs)
                     { renderPassEvent = renderPassEvent };
             }
 
@@ -145,7 +156,11 @@ namespace PathTracing
 
             _exportVisibilityBufferPass ??= new NativeRtxptExportVisibilityBufferPass(exportVisibilityBufferCs) { renderPassEvent = renderPassEvent };
 
-            _lightingUpdateEndPass ??= new NativeRtxptLightingUpdateEndPass { renderPassEvent = renderPassEvent };
+            _lightingUpdateEndPass ??= new NativeRtxptLightingUpdateEndPass(
+                    processFeedbackHistoryP1aCs, processFeedbackHistoryP1bCs,
+                    processFeedbackHistoryP2Cs, processFeedbackHistoryP3Cs,
+                    clearFeedbackHistoryCs)
+                { renderPassEvent = renderPassEvent };
 
             _fillStablePlanesPass ??= new NativeRtxptFillStablePlanesPass(
                     fillStablePlanesShader, referenceShader,
@@ -395,6 +410,7 @@ namespace PathTracing
             _buildStablePlanesPass = null;
             _fillStablePlanesPass?.Dispose();
             _fillStablePlanesPass  = null;
+            _lightingUpdateEndPass?.Dispose();
             _lightingUpdateEndPass = null;
             _exportVisibilityBufferPass?.Dispose();
             _exportVisibilityBufferPass = null;

@@ -61,9 +61,11 @@ namespace PathTracing
         private const uint EnvQtBoostNodesMult   = LightingConfig.RTXPT_NEEAT_ENVMAP_QT_BOOST_NODES_MULT;
         private const uint EnvQtTotalNodeCount   = LightingConfig.RTXPT_NEEAT_ENVMAP_QT_TOTAL_NODE_COUNT;
 
-        // NEEATBaker.hlsli
-        private const uint LLB_NUM_COMPUTE_THREADS     = 128;
-        private const uint LLB_LOCAL_BLOCK_SIZE        = 32;
+        // NEEATBaker.hlsli dispatch constants
+        private const int  LLB_NUM_COMPUTE_THREADS_2D     = 8;  // 2D tile dispatch thread count
+        private const int  LLB_PREPROCESS_BLOCK_SIZE_INNER = 14; // outer=16, inner=outer-2
+        private const uint LLB_NUM_COMPUTE_THREADS         = 128; // 1D dispatch thread count
+        private const uint LLB_LOCAL_BLOCK_SIZE            = 32;
         private const uint LLB_WEIGHTS_ITEMS_PER_GROUP = LLB_LOCAL_BLOCK_SIZE * LLB_NUM_COMPUTE_THREADS;
         private const uint LLB_MAX_PROXIES_PER_TASK    = 32;
 
@@ -146,6 +148,15 @@ namespace PathTracing
         private readonly NativeComputeDescriptorSet _bakeEmissiveTrianglesDs;
 
         // ====================================================================
+        // GPU pipelines — NEE-AT feedback pre-processing (UpdateBegin)
+        // ====================================================================
+
+        private readonly NativeComputePipeline      _processFeedbackHistoryPreFilterCs;
+        private readonly NativeComputeDescriptorSet _processFeedbackHistoryPreFilterDs;
+        private readonly NativeComputePipeline      _processFeedbackHistoryP0Cs;
+        private readonly NativeComputeDescriptorSet _processFeedbackHistoryP0Ds;
+
+        // ====================================================================
         // Owned render textures
         // ====================================================================
 
@@ -213,7 +224,10 @@ namespace PathTracing
             NativeComputeShader createProxyJobsCs,
             NativeComputeShader executeProxyJobsCs,
             // Emissive triangles
-            NativeComputeShader bakeEmissiveTrianglesCs)
+            NativeComputeShader bakeEmissiveTrianglesCs,
+            // NEE-AT feedback (begin half)
+            NativeComputeShader processFeedbackHistoryPreFilterCs,
+            NativeComputeShader processFeedbackHistoryP0Cs)
         {
             // EnvMapBaker
             _baseLayerCs       = new NativeComputePipeline(baseLayerCs);
@@ -250,6 +264,17 @@ namespace PathTracing
             _executeProxyJobsDs            = new NativeComputeDescriptorSet(_executeProxyJobsCs);
             _bakeEmissiveTrianglesCs       = new NativeComputePipeline(bakeEmissiveTrianglesCs);
             _bakeEmissiveTrianglesDs       = new NativeComputeDescriptorSet(_bakeEmissiveTrianglesCs);
+
+            if (processFeedbackHistoryPreFilterCs != null)
+            {
+                _processFeedbackHistoryPreFilterCs = new NativeComputePipeline(processFeedbackHistoryPreFilterCs);
+                _processFeedbackHistoryPreFilterDs = new NativeComputeDescriptorSet(_processFeedbackHistoryPreFilterCs);
+            }
+            if (processFeedbackHistoryP0Cs != null)
+            {
+                _processFeedbackHistoryP0Cs = new NativeComputePipeline(processFeedbackHistoryP0Cs);
+                _processFeedbackHistoryP0Ds = new NativeComputeDescriptorSet(_processFeedbackHistoryP0Cs);
+            }
 
             EnsureRenderTextures();
             EnsureConstantBuffers();
@@ -296,6 +321,12 @@ namespace PathTracing
             _executeProxyJobsCs?.Dispose();
             _bakeEmissiveTrianglesDs?.Dispose();
             _bakeEmissiveTrianglesCs?.Dispose();
+
+            // NEE-AT feedback (begin)
+            _processFeedbackHistoryPreFilterDs?.Dispose();
+            _processFeedbackHistoryPreFilterCs?.Dispose();
+            _processFeedbackHistoryP0Ds?.Dispose();
+            _processFeedbackHistoryP0Cs?.Dispose();
 
             // Render textures
             DestroyRT(ref _envCubeMip0Rt);
@@ -432,6 +463,12 @@ namespace PathTracing
             internal uint                       TotalLightCount;
             internal uint                       HistoricTotalLightCount;
 
+            // --- Feedback pre-processing (begin) ---
+            internal NativeComputePipeline      ProcessFeedbackHistoryPreFilterCs;
+            internal NativeComputeDescriptorSet ProcessFeedbackHistoryPreFilterDs;
+            internal NativeComputePipeline      ProcessFeedbackHistoryP0Cs;
+            internal NativeComputeDescriptorSet ProcessFeedbackHistoryP0Ds;
+
             // --- Shared ---
             internal NativeRtxptPassContext Ctx;
         }
@@ -496,6 +533,12 @@ namespace PathTracing
             pd.ExecuteProxyJobsDs            = _executeProxyJobsDs;
             pd.TotalLightCount               = EnvQtTotalNodeCount + (uint)_analyticLightCount + _emissiveTotalTriCount;
             pd.HistoricTotalLightCount       = EnvQtTotalNodeCount + (uint)_analyticLightCount + _emissiveTotalTriCount;
+
+            // Feedback pre-processing (begin)
+            pd.ProcessFeedbackHistoryPreFilterCs = _processFeedbackHistoryPreFilterCs;
+            pd.ProcessFeedbackHistoryPreFilterDs = _processFeedbackHistoryPreFilterDs;
+            pd.ProcessFeedbackHistoryP0Cs        = _processFeedbackHistoryP0Cs;
+            pd.ProcessFeedbackHistoryP0Ds        = _processFeedbackHistoryP0Ds;
 
             // BakeEmissiveTriangles
             pd.BakeEmissiveTrianglesCs = _bakeEmissiveTrianglesCs;
@@ -703,14 +746,42 @@ namespace PathTracing
                 ds.SetRWTypedBuffer("u_scratchList", pScrList, cScrList, DXGI_FORMAT_R32_UINT);
                 ds.SetRWTypedBuffer("u_historyRemapPastToCurrent", pHistPas, cHistPas, DXGI_FORMAT_R32_UINT);
                 ds.SetRWTexture("u_envLightLookupMap", envLookupMapPtr);
-                uint gx = (EnvQtTotalNodeCount + LLB_NUM_COMPUTE_THREADS - 1) / LLB_NUM_COMPUTE_THREADS;
+                uint gx = (uint)(EnvQtTotalNodeCount + LLB_NUM_COMPUTE_THREADS - 1) / LLB_NUM_COMPUTE_THREADS;
                 data.MapPastToCurrentCs.Dispatch(cmd, ds, gx, 1, 1);
             }
 
             // ----------------------------------------------------------------
-            // 11. ProcessFeedbackHistoryPreFilter — TODO: optional, not yet implemented
-            // 12. ProcessFeedbackHistoryP0        — TODO: not yet implemented
+            // 11. ProcessFeedbackHistoryPreFilter
             // ----------------------------------------------------------------
+            if (data.ProcessFeedbackHistoryPreFilterCs != null)
+            {
+                var ds  = data.ProcessFeedbackHistoryPreFilterDs;
+                var ctx = data.Ctx;
+                ds.SetRWStructuredBuffer("u_controlBuffer", pCtrl, cCtrl, StrideCtrl);
+                ds.SetRWTexture("u_feedbackTotalWeight", ctx.FeedbackTotalWeightPtr);
+                ds.SetRWTexture("u_feedbackCandidates",  ctx.FeedbackCandidatesPtr);
+                uint gx = (uint)(ctx.RenderResolution.x + LLB_PREPROCESS_BLOCK_SIZE_INNER - 1) / LLB_PREPROCESS_BLOCK_SIZE_INNER;
+                uint gy = (uint)(ctx.RenderResolution.y + LLB_PREPROCESS_BLOCK_SIZE_INNER - 1) / LLB_PREPROCESS_BLOCK_SIZE_INNER;
+                data.ProcessFeedbackHistoryPreFilterCs.Dispatch(cmd, ds, gx, gy, 1);
+            }
+
+            // ----------------------------------------------------------------
+            // 12. ProcessFeedbackHistoryP0
+            // ----------------------------------------------------------------
+            if (data.ProcessFeedbackHistoryP0Cs != null)
+            {
+                var ds  = data.ProcessFeedbackHistoryP0Ds;
+                var ctx = data.Ctx;
+                ds.SetRWStructuredBuffer("u_controlBuffer", pCtrl, cCtrl, StrideCtrl);
+                ds.SetRWTypedBuffer("u_lightWeights", pWeights, cWeights, DXGI_FORMAT_R32_FLOAT);
+                ds.SetRWTexture("u_feedbackTotalWeight",        ctx.FeedbackTotalWeightPtr);
+                ds.SetRWTexture("u_feedbackCandidates",         ctx.FeedbackCandidatesPtr);
+                ds.SetRWTexture("u_feedbackTotalWeightBlended", ctx.FeedbackTotalWeightBlendedPtr);
+                ds.SetRWTexture("u_feedbackCandidatesBlended",  ctx.FeedbackCandidatesBlendedPtr);
+                uint gx = (uint)(ctx.RenderResolution.x + LLB_NUM_COMPUTE_THREADS_2D - 1) / LLB_NUM_COMPUTE_THREADS_2D;
+                uint gy = (uint)(ctx.RenderResolution.y + LLB_NUM_COMPUTE_THREADS_2D - 1) / LLB_NUM_COMPUTE_THREADS_2D;
+                data.ProcessFeedbackHistoryP0Cs.Dispatch(cmd, ds, gx, gy, 1);
+            }
 
             // ----------------------------------------------------------------
             // 13. ComputeWeights
