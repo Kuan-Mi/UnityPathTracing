@@ -23,7 +23,7 @@ namespace PathTracing
     /// Pass 0  (Ping=0): reads SpecularHitT → writes ScratchFloat1
     /// Pass 1  (Ping=1): reads ScratchFloat1 → writes SpecularHitT
     /// </summary>
-    public class NativeRtxptDenoiseSpecHitTPass : ScriptableRenderPass, IDisposable
+    public class NativeRtxptDenoisingGuidesBakePass : ScriptableRenderPass, IDisposable
     {
         [StructLayout(LayoutKind.Sequential, Pack = 4)]
         private struct DenoisingGuidesBakerConstants
@@ -44,7 +44,7 @@ namespace PathTracing
         private readonly DenoisingGuidesBakerConstants[] _cbData = new DenoisingGuidesBakerConstants[1];
         private          GraphicsBuffer                  _cb;
 
-        public NativeRtxptDenoiseSpecHitTPass(NativeComputeShader shader)
+        public NativeRtxptDenoisingGuidesBakePass(NativeComputeShader shader)
         {
             _cs = new NativeComputePipeline(shader);
             _ds = new NativeComputeDescriptorSet(_cs);

@@ -100,8 +100,8 @@ namespace PathTracing
         private NativeRtxptExportVisibilityBufferPass _exportVisibilityBufferPass;
         private NativeRtxptLightingUpdateEndPass      _lightingUpdateEndPass;
         private NativeRtxptFillStablePlanesPass       _fillStablePlanesPass;
-        private NativeRtxptDenoiseSpecHitTPass        _denoiseSpecHitTPass;
-        private NativeRtxptDlssBeforePass             _dlssBeforePass;
+        private NativeRtxptDenoisingGuidesBakePass    _denoisingGuidesBakePass;
+        private NativeRtxptDlssRRPrepareInputsPass             _dlssRrPrepareInputsPass;
         private DlssRRPass                            _dlssRRPass;
         private NativeRtxptAccumulationPass           _accumulationPass;
         private NativeRtxptStablePlanesDebugVizPass   _stablePlanesDebugVizPass;
@@ -168,8 +168,8 @@ namespace PathTracing
                     fillStablePlanesShader, referenceShader,
                     fillHitGroups, referenceHitGroups)
                 { renderPassEvent = renderPassEvent };
-            _denoiseSpecHitTPass      ??= new NativeRtxptDenoiseSpecHitTPass(denoiseSpecHitTCs) { renderPassEvent           = renderPassEvent };
-            _dlssBeforePass           ??= new NativeRtxptDlssBeforePass(dlssBeforeCs) { renderPassEvent                     = renderPassEvent };
+            _denoisingGuidesBakePass  ??= new NativeRtxptDenoisingGuidesBakePass(denoiseSpecHitTCs) { renderPassEvent       = renderPassEvent };
+            _dlssRrPrepareInputsPass           ??= new NativeRtxptDlssRRPrepareInputsPass(dlssBeforeCs) { renderPassEvent                     = renderPassEvent };
             _dlssRRPass               ??= new DlssRRPass { renderPassEvent                                                  = renderPassEvent };
             _accumulationPass         ??= new NativeRtxptAccumulationPass(accumulationCs) { renderPassEvent                 = renderPassEvent };
             _stablePlanesDebugVizPass ??= new NativeRtxptStablePlanesDebugVizPass(stablePlanesDebugVizCs) { renderPassEvent = renderPassEvent };
@@ -315,12 +315,12 @@ namespace PathTracing
             if (setting.realtimeMode)
             {
                 // Phase 3: DenoiseSpecHitT x2
-                _denoiseSpecHitTPass.Setup(passCtx);
-                renderer.EnqueuePass(_denoiseSpecHitTPass);
+                _denoisingGuidesBakePass.Setup(passCtx);
+                renderer.EnqueuePass(_denoisingGuidesBakePass);
 
                 // Phase 4: DlssBefore
-                _dlssBeforePass.Setup(passCtx);
-                renderer.EnqueuePass(_dlssBeforePass);
+                _dlssRrPrepareInputsPass.Setup(passCtx);
+                renderer.EnqueuePass(_dlssRrPrepareInputsPass);
 
                 // Phase 5: DLSS-RR
                 {
@@ -416,10 +416,10 @@ namespace PathTracing
             _lightingUpdateEndPass = null;
             _exportVisibilityBufferPass?.Dispose();
             _exportVisibilityBufferPass = null;
-            _denoiseSpecHitTPass?.Dispose();
-            _denoiseSpecHitTPass = null;
-            _dlssBeforePass?.Dispose();
-            _dlssBeforePass = null;
+            _denoisingGuidesBakePass?.Dispose();
+            _denoisingGuidesBakePass = null;
+            _dlssRrPrepareInputsPass?.Dispose();
+            _dlssRrPrepareInputsPass = null;
             _accumulationPass?.Dispose();
             _accumulationPass = null;
             _stablePlanesDebugVizPass?.Dispose();
@@ -590,13 +590,13 @@ namespace PathTracing
 
             processFeedbackHistoryPreFilterCs = LoadCs($"{lightRoot}/ProcessFeedbackHistoryPreFilter");
             processFeedbackHistoryP0Cs        = LoadCs($"{lightRoot}/ProcessFeedbackHistoryP0");
-            
+
             processFeedbackHistoryP1aCs = LoadCs($"{lightRoot}/ProcessFeedbackHistoryP1a");
             processFeedbackHistoryP1bCs = LoadCs($"{lightRoot}/ProcessFeedbackHistoryP1b");
             processFeedbackHistoryP2Cs  = LoadCs($"{lightRoot}/ProcessFeedbackHistoryP2");
             processFeedbackHistoryP3Cs  = LoadCs($"{lightRoot}/ProcessFeedbackHistoryP3");
             clearFeedbackHistoryCs      = LoadCs($"{lightRoot}/ClearFeedbackHistory");
-            
+
             UnityEditor.EditorUtility.SetDirty(this);
             return;
 

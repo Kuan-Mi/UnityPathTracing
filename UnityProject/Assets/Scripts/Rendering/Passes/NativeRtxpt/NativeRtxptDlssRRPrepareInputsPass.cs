@@ -25,13 +25,13 @@ namespace PathTracing
     ///   u72 u_RRNormalsAndRoughness
     ///   u73 u_RRSpecMotionVectors
     /// </summary>
-    public class NativeRtxptDlssBeforePass : ScriptableRenderPass, IDisposable
+    public class NativeRtxptDlssRRPrepareInputsPass : ScriptableRenderPass, IDisposable
     {
         private readonly NativeComputePipeline      _cs;
         private readonly NativeComputeDescriptorSet _ds;
         private          NativeRtxptPassContext     _ctx;
 
-        public NativeRtxptDlssBeforePass(NativeComputeShader shader)
+        public NativeRtxptDlssRRPrepareInputsPass(NativeComputeShader shader)
         {
             _cs = new NativeComputePipeline(shader);
             _ds = new NativeComputeDescriptorSet(_cs);
