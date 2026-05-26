@@ -14,31 +14,29 @@ namespace PathTracing
     /// LightingUpdateBegin — single unified pass that mirrors LightsBaker::UpdateFrame
     /// (the front half) in original RTXPT.
     ///
-    /// Absorbs NativeRtxptEnvMapBakerPass, NativeRtxptEnvLightsBakerPass, and
-    /// NativeRtxptLightingPass into one ScriptableRenderPass with the correct dispatch order:
+    /// Absorbs NativeRtxptEnvLightsBakerPass and NativeRtxptLightingPass into one
+    /// ScriptableRenderPass with the correct dispatch order:
     ///
     ///   CPU (Setup)
     ///     ControlDataSetup          — pack LightingControlData → LightControlBuffer
     ///     EnvmapAndAnalyticLightBuffers — pack point/spot lights → LightBuffer / LightExBuffer
     ///
     ///   GPU (ExecutePass)
-    ///     1.  EnvMapBaker BaseLayerCS          — bake env cubemap (mip0 + mip1)
-    ///     2.  EnvMapBaker ImportanceBakerCS    — build importance + radiance maps + GenerateMips
-    ///     3.  ResetLightProxyCounters
-    ///     4.  ResetPastToCurrentHistory
-    ///     5.  EnvLightsBackupPast
-    ///     6.  EnvLightsSubdivideBase
-    ///     7.  EnvLightsSubdivideBoost
-    ///     8.  BakeEmissiveTriangles
-    ///     9.  EnvLightFillLookupMap
-    ///     10. EnvLightsMapPastToCurrent
-    ///     11. ProcessFeedbackHistoryPreFilter
-    ///     12. ProcessFeedbackHistoryP0
-    ///     13. ComputeWeights
-    ///     14. ComputeProxyCounts
-    ///     15. ComputeProxyBaselineOffsets
-    ///     16. CreateProxyJobs
-    ///     17. ExecuteProxyJobs
+    ///     1.  ResetLightProxyCounters
+    ///     2.  ResetPastToCurrentHistory
+    ///     3.  EnvLightsBackupPast
+    ///     4.  EnvLightsSubdivideBase
+    ///     5.  EnvLightsSubdivideBoost
+    ///     6.  BakeEmissiveTriangles
+    ///     7.  EnvLightFillLookupMap
+    ///     8.  EnvLightsMapPastToCurrent
+    ///     9.  ProcessFeedbackHistoryPreFilter
+    ///     10. ProcessFeedbackHistoryP0
+    ///     11. ComputeWeights
+    ///     12. ComputeProxyCounts
+    ///     13. ComputeProxyBaselineOffsets
+    ///     14. CreateProxyJobs
+    ///     15. ExecuteProxyJobs
     /// </summary>
     public class NativeRtxptLightingUpdateBeginPass : ScriptableRenderPass, IDisposable
     {
@@ -84,27 +82,8 @@ namespace PathTracing
         private static readonly int StrideLights   = Marshal.SizeOf<RtxptPolymorphicLightInfo>();
         private static readonly int StrideLightsEx = Marshal.SizeOf<RtxptPolymorphicLightInfoEx>();
 
-        // EnvMapBaker dimensions
-        private const int CubeDim                 = 256;
-        private const int CubeDimLowRes           = 32;
-        private const int ImportanceMapDim        = 1024;
-        private const int ImportanceSamples       = 16;
-        private const int ImportanceSamplesX      = 4;
-        private const int ImportanceSamplesY      = 4;
-        private const int BaseLayerGroupsXY       = (CubeDim / 2 + 7) / 8; // 16
-        private const int ImportanceBakerGroupsXY = (ImportanceMapDim + 15) / 16; // 64
-
         // EnvLightLookupMap dimension
         private const int EnvLookupMapDim = 1024;
-
-        // ====================================================================
-        // GPU pipelines — EnvMapBaker
-        // ====================================================================
-
-        private readonly NativeComputePipeline      _baseLayerCs;
-        private readonly NativeComputeDescriptorSet _baseLayerDs;
-        private readonly NativeComputePipeline      _importanceBakerCs;
-        private readonly NativeComputeDescriptorSet _importanceBakerDs;
 
         // ====================================================================
         // GPU pipelines — EnvLightsBaker
@@ -160,26 +139,12 @@ namespace PathTracing
         // Owned render textures
         // ====================================================================
 
-        private RenderTexture _envCubeMip0Rt; // 256×256 Cube RGBA16F UAV
-        private RenderTexture _envCubeMip1Rt; // 128×128 Cube RGBA16F UAV
-        private RenderTexture _importanceMapRt; // 1024×1024 2D RFloat UAV + mips
-        private RenderTexture _radianceMapRt; // 1024×1024 2D RGBA16F UAV + mips
-        private RenderTexture _dummyCubeRt; // 4×4 Cube dummy SRV
         private RenderTexture _envLightLookupMapRt; // 1024×1024 2D R32_UINT UAV
-
-        // ====================================================================
-        // GPU constant buffers
-        // ====================================================================
-
-        private GraphicsBuffer _envBakerCb; // EnvMapBakerConstants (704 bytes)
-        private GraphicsBuffer _importanceBakerCb; // EnvMapImportanceSamplingBakerConstants (48 bytes)
 
         // ====================================================================
         // CPU staging
         // ====================================================================
 
-        private static readonly byte[]                        s_envBakerBytes   = new byte[704];
-        private static readonly byte[]                        s_importanceBytes = new byte[48];
         private static readonly RtxptLightingControlData[]    s_controlStaging  = new RtxptLightingControlData[1];
         private static          RtxptPolymorphicLightInfo[]   s_lightsStaging   = new RtxptPolymorphicLightInfo[NativeRtxptBufferResources.MaxLights];
         private static          RtxptPolymorphicLightInfoEx[] s_lightsExStaging = new RtxptPolymorphicLightInfoEx[NativeRtxptBufferResources.MaxLights];
@@ -206,9 +171,6 @@ namespace PathTracing
         // ====================================================================
 
         public NativeRtxptLightingUpdateBeginPass(
-            // EnvMapBaker
-            NativeComputeShader baseLayerCs,
-            NativeComputeShader importanceBakerCs,
             // EnvLightsBaker
             NativeComputeShader envLightsBackupPastCs,
             NativeComputeShader envLightsSubdivideBaseCs,
@@ -229,12 +191,6 @@ namespace PathTracing
             NativeComputeShader processFeedbackHistoryPreFilterCs,
             NativeComputeShader processFeedbackHistoryP0Cs)
         {
-            // EnvMapBaker
-            _baseLayerCs       = new NativeComputePipeline(baseLayerCs);
-            _baseLayerDs       = new NativeComputeDescriptorSet(_baseLayerCs);
-            _importanceBakerCs = new NativeComputePipeline(importanceBakerCs);
-            _importanceBakerDs = new NativeComputeDescriptorSet(_importanceBakerCs);
-
             // EnvLightsBaker
             _backupPastCs       = new NativeComputePipeline(envLightsBackupPastCs);
             _backupPastDs       = new NativeComputeDescriptorSet(_backupPastCs);
@@ -269,9 +225,7 @@ namespace PathTracing
             _processFeedbackHistoryP0Cs        = new NativeComputePipeline(processFeedbackHistoryP0Cs);
             _processFeedbackHistoryP0Ds        = new NativeComputeDescriptorSet(_processFeedbackHistoryP0Cs);
 
-
-            EnsureRenderTextures();
-            EnsureConstantBuffers();
+            EnsureLookupMapTexture();
         }
 
         // ====================================================================
@@ -280,12 +234,6 @@ namespace PathTracing
 
         public void Dispose()
         {
-            // EnvMapBaker pipelines
-            _baseLayerDs?.Dispose();
-            _baseLayerCs?.Dispose();
-            _importanceBakerDs?.Dispose();
-            _importanceBakerCs?.Dispose();
-
             // EnvLightsBaker pipelines
             _backupPastDs?.Dispose();
             _backupPastCs?.Dispose();
@@ -323,18 +271,7 @@ namespace PathTracing
             _processFeedbackHistoryP0Cs?.Dispose();
 
             // Render textures
-            DestroyRT(ref _envCubeMip0Rt);
-            DestroyRT(ref _envCubeMip1Rt);
-            DestroyRT(ref _importanceMapRt);
-            DestroyRT(ref _radianceMapRt);
-            DestroyRT(ref _dummyCubeRt);
             DestroyRT(ref _envLightLookupMapRt);
-
-            // Constant buffers
-            _envBakerCb?.Dispose();
-            _envBakerCb = null;
-            _importanceBakerCb?.Dispose();
-            _importanceBakerCb = null;
         }
 
         // ====================================================================
@@ -345,17 +282,7 @@ namespace PathTracing
         {
             _dbgFrameCounter++;
             _ctx = ctx;
-            EnsureRenderTextures();
-            EnsureConstantBuffers();
-
-            // --- EnvMapBaker CPU work ---
-            FillEnvBakerConstants(ctx.Setting);
-            FillImportanceBakerConstants();
-
-            // Expose baked env pointers for downstream passes (BuildStablePlanes / FillStablePlanes)
-            ctx.BakedEnvCubePtr                = _envCubeMip0Rt.IsCreated() ? _envCubeMip0Rt.GetNativeTexturePtr() : IntPtr.Zero;
-            ctx.EnvImportanceMapPtr            = _importanceMapRt.IsCreated() ? _importanceMapRt.GetNativeTexturePtr() : IntPtr.Zero;
-            ctx.EnvRadianceAndImportanceMapPtr = _radianceMapRt.IsCreated() ? _radianceMapRt.GetNativeTexturePtr() : IntPtr.Zero;
+            EnsureLookupMapTexture();
 
             // Expose env-light lookup map pointer
             ctx.EnvLightLookupMapPtr = _envLightLookupMapRt != null && _envLightLookupMapRt.IsCreated()
@@ -382,27 +309,6 @@ namespace PathTracing
 
         private class PassData
         {
-            // --- EnvMapBaker ---
-            internal NativeComputePipeline      BaseLayerCs;
-            internal NativeComputeDescriptorSet BaseLayerDs;
-            internal NativeComputePipeline      ImportanceBakerCs;
-            internal NativeComputeDescriptorSet ImportanceBakerDs;
-            internal GraphicsBuffer             EnvBakerCb;
-            internal GraphicsBuffer             ImportanceBakerCb;
-            internal byte[]                     EnvBakerData;
-            internal byte[]                     ImportanceBakerData;
-            internal IntPtr                     EnvBakerCbPtr;
-            internal IntPtr                     ImportanceBakerCbPtr;
-            internal IntPtr                     SkyTexturePtr;
-            internal IntPtr                     EnvCubeMip0Ptr;
-            internal IntPtr                     EnvCubeMip1Ptr;
-            internal IntPtr                     ImportanceMapPtr;
-            internal IntPtr                     RadianceMapPtr;
-            internal RenderTexture              ImportanceMapRt;
-            internal RenderTexture              RadianceMapRt;
-            internal IntPtr                     DummyCubePtr;
-            internal IntPtr                     DummyTex2DPtr;
-
             // --- EnvLightsBaker ---
             internal NativeComputePipeline      BackupPastCs;
             internal NativeComputeDescriptorSet BackupPastDs;
@@ -479,28 +385,6 @@ namespace PathTracing
             }
 
             using var builder = renderGraph.AddUnsafePass<PassData>("NativeRtxpt.LightingUpdateBegin", out var pd);
-
-            // EnvMapBaker
-            pd.BaseLayerCs          = _baseLayerCs;
-            pd.BaseLayerDs          = _baseLayerDs;
-            pd.ImportanceBakerCs    = _importanceBakerCs;
-            pd.ImportanceBakerDs    = _importanceBakerDs;
-            pd.EnvBakerCb           = _envBakerCb;
-            pd.ImportanceBakerCb    = _importanceBakerCb;
-            pd.EnvBakerData         = s_envBakerBytes;
-            pd.ImportanceBakerData  = s_importanceBytes;
-            pd.EnvBakerCbPtr        = _envBakerCb.GetNativeBufferPtr();
-            pd.ImportanceBakerCbPtr = _importanceBakerCb.GetNativeBufferPtr();
-            var skyTex = _ctx.Setting?.environmentMap;
-            pd.SkyTexturePtr    = skyTex != null ? skyTex.GetNativeTexturePtr() : Texture2D.blackTexture.GetNativeTexturePtr();
-            pd.EnvCubeMip0Ptr   = _envCubeMip0Rt.GetNativeTexturePtr();
-            pd.EnvCubeMip1Ptr   = _envCubeMip1Rt.GetNativeTexturePtr();
-            pd.ImportanceMapPtr = _importanceMapRt.GetNativeTexturePtr();
-            pd.RadianceMapPtr   = _radianceMapRt.GetNativeTexturePtr();
-            pd.ImportanceMapRt  = _importanceMapRt;
-            pd.RadianceMapRt    = _radianceMapRt;
-            pd.DummyCubePtr     = _dummyCubeRt.GetNativeTexturePtr();
-            pd.DummyTex2DPtr    = Texture2D.blackTexture.GetNativeTexturePtr();
 
             // EnvLightsBaker
             pd.BackupPastCs         = _backupPastCs;
@@ -583,49 +467,6 @@ namespace PathTracing
             context.cmd.SetBufferData(data.LightControlBuffer, data.ControlData, 0, 0, 1);
             context.cmd.EndSample(RenderPassMarkers.RtxptControlDataSetup);
 
-            // ----------------------------------------------------------------
-            // 1–2. EnvMapBaker
-            // ----------------------------------------------------------------
-            {
-                cmd.BeginSample(RenderPassMarkers.RtxptEnvMapBaker);
-
-                context.cmd.SetBufferData(data.EnvBakerCb, data.EnvBakerData, 0, 0, data.EnvBakerData.Length);
-                context.cmd.SetBufferData(data.ImportanceBakerCb, data.ImportanceBakerData, 0, 0, data.ImportanceBakerData.Length);
-
-                // 1. BaseLayerCS — write env cube mip0 + mip1
-                {
-                    var ds = data.BaseLayerDs;
-                    ds.SetConstantBuffer("g_Const", data.EnvBakerCbPtr);
-                    ds.SetTexture("t_SrcEquirectangularEnvMap", data.SkyTexturePtr);
-                    ds.SetTexture("t_SrcCubemapEnvMap", data.DummyCubePtr);
-                    ds.SetTexture("t_LowResPrePassCube", data.DummyCubePtr);
-                    ds.SetTexture("t_ProcSkyTransmittance", data.DummyTex2DPtr);
-                    ds.SetTexture("t_ProcSkyScatter", data.DummyTex2DPtr);
-                    ds.SetRWTexture("u_EnvMapCubeFacesDst0", data.EnvCubeMip0Ptr);
-                    ds.SetRWTexture("u_EnvMapCubeFacesDst1", data.EnvCubeMip1Ptr);
-                    cmd.BeginSample(RenderPassMarkers.RtxptEnvMapBaseLayer);
-                    data.BaseLayerCs.Dispatch(cmd, ds, BaseLayerGroupsXY, BaseLayerGroupsXY, 6);
-                    cmd.EndSample(RenderPassMarkers.RtxptEnvMapBaseLayer);
-                }
-
-                // 2. ImportanceBakerCS — build importance + radiance maps, then generate mips
-                {
-                    var ds = data.ImportanceBakerDs;
-                    ds.SetConstantBuffer("g_BuilderConsts", data.ImportanceBakerCbPtr);
-                    ds.SetTexture("t_EnvMapCube", data.EnvCubeMip0Ptr);
-                    ds.SetRWTexture("u_ImportanceMap", data.ImportanceMapPtr);
-                    ds.SetRWTexture("u_RadianceMap", data.RadianceMapPtr);
-                    cmd.BeginSample(RenderPassMarkers.RtxptEnvMapImportanceBaker);
-                    data.ImportanceBakerCs.Dispatch(cmd, ds, ImportanceBakerGroupsXY, ImportanceBakerGroupsXY, 1);
-                    cmd.EndSample(RenderPassMarkers.RtxptEnvMapImportanceBaker);
-                }
-
-                cmd.GenerateMips(data.ImportanceMapRt);
-                cmd.GenerateMips(data.RadianceMapRt);
-
-                cmd.EndSample(RenderPassMarkers.RtxptEnvMapBaker);
-            }
-
             // Buffer pointers used by the remaining passes
             var pCtrl     = buf.LightControlBuffer.GetNativeBufferPtr();
             var pLights   = buf.LightBuffer.GetNativeBufferPtr();
@@ -654,7 +495,7 @@ namespace PathTracing
             var  envLookupMapPtr  = data.EnvLightLookupMapPtr;
 
             // ----------------------------------------------------------------
-            // 3. ResetLightProxyCounters
+            // 1. ResetLightProxyCounters
             // ----------------------------------------------------------------
             {
                 var ds = data.ResetProxyCountersDs;
@@ -667,7 +508,7 @@ namespace PathTracing
             }
 
             // ----------------------------------------------------------------
-            // 4. ResetPastToCurrentHistory
+            // 2. ResetPastToCurrentHistory
             // ----------------------------------------------------------------
             {
                 uint items = Math.Max(historic, total);
@@ -909,71 +750,6 @@ namespace PathTracing
         }
 
         // ====================================================================
-        // CPU helpers — EnvMapBaker constants
-        // ====================================================================
-
-        private void FillEnvBakerConstants(NativeRtxptSetting setting)
-        {
-            Array.Clear(s_envBakerBytes, 0, s_envBakerBytes.Length);
-            int lightCount = 0;
-
-            foreach (var light in Object.FindObjectsByType<Light>(FindObjectsSortMode.None))
-            {
-                if (!light.enabled || !light.gameObject.activeInHierarchy) continue;
-                if (light.type != LightType.Directional) continue;
-                if (lightCount >= 16) break;
-
-                Color linear    = light.color.linear;
-                float intensity = light.intensity;
-                int   offset    = lightCount * 32;
-
-                WriteF32(s_envBakerBytes, offset + 0, linear.r);
-                WriteF32(s_envBakerBytes, offset + 4, linear.g);
-                WriteF32(s_envBakerBytes, offset + 8, linear.b);
-                WriteF32(s_envBakerBytes, offset + 12, intensity);
-
-                Vector3 fwd = light.transform.forward;
-                WriteF32(s_envBakerBytes, offset + 16, fwd.x);
-                WriteF32(s_envBakerBytes, offset + 20, fwd.y);
-                WriteF32(s_envBakerBytes, offset + 24, fwd.z);
-                WriteF32(s_envBakerBytes, offset + 28, 0.1f); // angular size
-
-                lightCount++;
-            }
-
-            float envIntensity = setting?.environmentMapIntensity ?? 1.0f;
-            Color tint         = setting?.environmentMapTint ?? Color.white;
-            bool  hasSky       = setting?.environmentMap != null;
-            int   o            = 672;
-
-            WriteF32(s_envBakerBytes, o + 0, tint.linear.r * envIntensity);
-            WriteF32(s_envBakerBytes, o + 4, tint.linear.g * envIntensity);
-            WriteF32(s_envBakerBytes, o + 8, tint.linear.b * envIntensity);
-            WriteU32(s_envBakerBytes, o + 12, (uint)lightCount);
-            WriteU32(s_envBakerBytes, o + 16, (uint)CubeDim);
-            WriteU32(s_envBakerBytes, o + 20, (uint)CubeDimLowRes);
-            WriteU32(s_envBakerBytes, o + 24, 0u); // ProcSkyEnabled = 0
-            WriteU32(s_envBakerBytes, o + 28, hasSky ? 1u : 0u); // BackgroundSourceType
-        }
-
-        private static void FillImportanceBakerConstants()
-        {
-            Array.Clear(s_importanceBytes, 0, s_importanceBytes.Length);
-            WriteU32(s_importanceBytes, 0, (uint)CubeDim);
-            WriteU32(s_importanceBytes, 4, 1u);
-            WriteU32(s_importanceBytes, 8, 0u);
-            WriteU32(s_importanceBytes, 12, 0u);
-            WriteU32(s_importanceBytes, 16, (uint)ImportanceMapDim);
-            WriteU32(s_importanceBytes, 20, (uint)ImportanceMapDim);
-            WriteU32(s_importanceBytes, 24, (uint)(ImportanceMapDim * ImportanceSamplesX));
-            WriteU32(s_importanceBytes, 28, (uint)(ImportanceMapDim * ImportanceSamplesY));
-            WriteU32(s_importanceBytes, 32, (uint)ImportanceSamplesX);
-            WriteU32(s_importanceBytes, 36, (uint)ImportanceSamplesY);
-            WriteF32(s_importanceBytes, 40, 1.0f / ImportanceSamples);
-            WriteU32(s_importanceBytes, 44, 10u); // log2(1024)
-        }
-
-        // ====================================================================
         // CPU helpers — LightsBaker
         // ====================================================================
 
@@ -1129,32 +905,8 @@ namespace PathTracing
         }
 
         // ====================================================================
-        // Byte writers
-        // ====================================================================
-
-        private static unsafe void WriteF32(byte[] buf, int offset, float v)
-        {
-            fixed (byte* p = &buf[offset]) *(float*)p = v;
-        }
-
-        private static unsafe void WriteU32(byte[] buf, int offset, uint v)
-        {
-            fixed (byte* p = &buf[offset]) *(uint*)p = v;
-        }
-
-        // ====================================================================
         // Render texture helpers
         // ====================================================================
-
-        private void EnsureRenderTextures()
-        {
-            _envCubeMip0Rt   = EnsureCubeRT(ref _envCubeMip0Rt, CubeDim, RenderTextureFormat.ARGBHalf, true);
-            _envCubeMip1Rt   = EnsureCubeRT(ref _envCubeMip1Rt, CubeDim / 2, RenderTextureFormat.ARGBHalf, true);
-            _importanceMapRt = Ensure2DRT(ref _importanceMapRt, ImportanceMapDim, RenderTextureFormat.RFloat, true, useMipMap: true);
-            _radianceMapRt   = Ensure2DRT(ref _radianceMapRt, ImportanceMapDim, RenderTextureFormat.ARGBHalf, true, useMipMap: true);
-            _dummyCubeRt     = EnsureCubeRT(ref _dummyCubeRt, 4, RenderTextureFormat.ARGB32, false);
-            EnsureLookupMapTexture();
-        }
 
         private void EnsureLookupMapTexture()
         {
@@ -1168,47 +920,6 @@ namespace PathTracing
             };
             _envLightLookupMapRt = new RenderTexture(desc) { autoGenerateMips = false, hideFlags = HideFlags.HideAndDontSave };
             _envLightLookupMapRt.Create();
-        }
-
-        private void EnsureConstantBuffers()
-        {
-            if (_envBakerCb == null || !_envBakerCb.IsValid())
-            {
-                _envBakerCb?.Dispose();
-                _envBakerCb = new GraphicsBuffer(GraphicsBuffer.Target.Constant, 1, 704);
-            }
-
-            if (_importanceBakerCb == null || !_importanceBakerCb.IsValid())
-            {
-                _importanceBakerCb?.Dispose();
-                _importanceBakerCb = new GraphicsBuffer(GraphicsBuffer.Target.Constant, 1, 48);
-            }
-        }
-
-        private static RenderTexture EnsureCubeRT(ref RenderTexture rt, int size, RenderTextureFormat fmt, bool rw)
-        {
-            if (rt != null && rt.IsCreated()) return rt;
-            rt?.Release();
-            rt = new RenderTexture(size, size, 0, fmt)
-            {
-                dimension         = TextureDimension.Cube, useMipMap = false, autoGenerateMips = false,
-                enableRandomWrite = rw, hideFlags                    = HideFlags.HideAndDontSave,
-            };
-            rt.Create();
-            return rt;
-        }
-
-        private static RenderTexture Ensure2DRT(ref RenderTexture rt, int size, RenderTextureFormat fmt, bool rw, bool useMipMap = false)
-        {
-            if (rt != null && rt.IsCreated() && rt.useMipMap == useMipMap) return rt;
-            rt?.Release();
-            rt = new RenderTexture(size, size, 0, fmt)
-            {
-                dimension         = TextureDimension.Tex2D, useMipMap = useMipMap, autoGenerateMips = false,
-                enableRandomWrite = rw, hideFlags                     = HideFlags.HideAndDontSave,
-            };
-            rt.Create();
-            return rt;
         }
 
         private static void DestroyRT(ref RenderTexture rt)

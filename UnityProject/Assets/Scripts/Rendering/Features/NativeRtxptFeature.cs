@@ -64,7 +64,7 @@ namespace PathTracing
         // Phase Debug: StablePlanesDebugViz
         public NativeComputeShader stablePlanesDebugVizCs;
 
-        // LightingUpdateBegin: all compute shaders (merged from EnvMapBaker, EnvLightsBaker, LightsBaker)
+        // EnvMapBaker + LightingUpdateBegin compute shaders
         public NativeComputeShader baseLayerCs;
         public NativeComputeShader envMapImportanceBakerCs;
         public NativeComputeShader envLightsBackupPastCs;
@@ -98,6 +98,7 @@ namespace PathTracing
 
         // ---- Pass instances -------------------------------------------------
         private NativeRtxptBuildTlasPass              _buildTlasPass;
+        private NativeRtxptEnvMapBakerPass            _envMapBakerPass;
         private NativeRtxptLightingUpdateBeginPass    _lightingUpdateBeginPass;
         private NativeRtxptBuildStablePlanesPass      _buildStablePlanesPass;
         private NativeRtxptExportVisibilityBufferPass _exportVisibilityBufferPass;
@@ -138,10 +139,14 @@ namespace PathTracing
                 renderPassEvent = renderPassEvent,
             };
 
+            _envMapBakerPass ??= new NativeRtxptEnvMapBakerPass(baseLayerCs, envMapImportanceBakerCs)
+            {
+                renderPassEvent = renderPassEvent,
+            };
+
             if (_lightingUpdateBeginPass == null)
             {
                 _lightingUpdateBeginPass = new NativeRtxptLightingUpdateBeginPass(
-                        baseLayerCs, envMapImportanceBakerCs,
                         envLightsBackupPastCs, envLightsSubdivideBaseCs, envLightsSubdivideBoostCs,
                         envLightsFillLookupMapCs, envLightsMapPastToCurrentCs,
                         resetLightProxyCountersCs, resetPastToCurrentHistoryCs,
@@ -287,6 +292,9 @@ namespace PathTracing
             // ---- LightingUpdateBegin -----------------------------------------
             // Unified pass: EnvMapBaker → EnvLightsBaker → ProxyBuild
             // Correct order mirrors original RTXPT LightsBaker::UpdateFrame front half.
+            _envMapBakerPass.Setup(passCtx);
+            renderer.EnqueuePass(_envMapBakerPass);
+
             _lightingUpdateBeginPass.Setup(passCtx);
             renderer.EnqueuePass(_lightingUpdateBeginPass);
 
@@ -408,6 +416,8 @@ namespace PathTracing
 
             _lightingUpdateBeginPass?.Dispose();
             _lightingUpdateBeginPass = null;
+            _envMapBakerPass?.Dispose();
+            _envMapBakerPass = null;
             _buildStablePlanesPass?.Dispose();
             _buildStablePlanesPass = null;
             _fillStablePlanesPass?.Dispose();
@@ -577,7 +587,11 @@ namespace PathTracing
             accumulationCs           = LoadCs($"{shaderRoot}/ProcessingPasses/AccumulationPass");
             stablePlanesDebugVizCs   = LoadCs($"{shaderRoot}/ProcessingPasses/PostProcess_StablePlanesDebugViz");
 
-            string lightRoot = $"{shaderRoot}/Lighting";
+            string lightRoot   = $"{shaderRoot}/Lighting";
+            string distantRoot = $"{lightRoot}/Distant";
+            baseLayerCs             = LoadCs($"{distantRoot}/BaseLayerCS");
+            envMapImportanceBakerCs = LoadCs($"{distantRoot}/EnvMapImportanceSamplingBaker");
+
             resetLightProxyCountersCs     = LoadCs($"{lightRoot}/ResetLightProxyCounters");
             resetPastToCurrentHistoryCs   = LoadCs($"{lightRoot}/ResetPastToCurrentHistory");
             computeWeightsCs              = LoadCs($"{lightRoot}/ComputeWeights");
