@@ -475,31 +475,69 @@ namespace PathTracing
                 return;
             }
 
-            int readCount = (int)System.Math.Min(triCount, 256u); // cap readback to 256 entries
+            int readCount = (int)System.Math.Min(triCount, 4096u);
             var data = new RtxptPolymorphicLightInfo[readCount];
             buf.LightBuffer.GetData(data, 0, (int)triOffset, readCount);
 
-            int nonZero = 0;
+            int   nonZero  = 0;
+            float drawTime = 30f; // seconds visible in scene view
+
             for (int i = 0; i < readCount; i++)
             {
-                var info       = data[i];
-                uint logRad    = info.LogRadiance & 0xFFFFu;
+                var   info      = data[i];
+                uint  logRad    = info.LogRadiance & 0xFFFFu;
                 float intensity = (logRad == 0) ? 0f
                     : Unity.Mathematics.math.exp2(((logRad - 1) / 65534f) * 48f - 8f);
                 if (intensity < 0.001f) continue;
                 nonZero++;
-                if (nonZero <= 8)
+
+                // Decode color (RGB8 in bits 0-23 of ColorTypeAndFlags)
+                float normR = ( info.ColorTypeAndFlags        & 0xFFu) / 255f;
+                float normG = ((info.ColorTypeAndFlags >>  8) & 0xFFu) / 255f;
+                float normB = ((info.ColorTypeAndFlags >> 16) & 0xFFu) / 255f;
+                var   col   = new Color(normR, normG, normB, 1f); // use hue only, not intensity (too large)
+
+                var center   = new Vector3(info.CenterX, info.CenterY, info.CenterZ);
+                var edge1Dir = OctUnorm32ToDir(info.Direction1);
+                var edge2Dir = OctUnorm32ToDir(info.Direction2);
+                var normal   = Vector3.Cross(edge1Dir, edge2Dir).normalized;
+
+                // Draw a cross at the triangle center + a normal line
+                float size = 0.05f;
+                // Debug.DrawLine(center - Vector3.right  * size, center + Vector3.right  * size, col, drawTime);
+                // Debug.DrawLine(center - Vector3.up     * size, center + Vector3.up     * size, col, drawTime);
+                // Debug.DrawLine(center - Vector3.forward* size, center + Vector3.forward* size, col, drawTime);
+                Debug.DrawLine(center, center + normal * (size * 3f), col, drawTime);
+
+                if (nonZero <= 16)
                 {
                     uint typeCode = (info.ColorTypeAndFlags >> 24) & 0xFu;
                     sb.AppendLine($"    [{(int)triOffset + i}] type={typeCode}  intensity={intensity:F3}" +
-                                  $"  center=({info.CenterX:F2},{info.CenterY:F2},{info.CenterZ:F2})");
+                                  $"  center=({info.CenterX:F2},{info.CenterY:F2},{info.CenterZ:F2})" +
+                                  $"  normal=({normal.x:F2},{normal.y:F2},{normal.z:F2})");
                 }
             }
-            sb.AppendLine($"  Non-zero entries in first {readCount}: {nonZero}");
-            if (triCount > 256u)
-                sb.AppendLine($"  (only first 256 of {triCount} entries read back)");
+            sb.AppendLine($"  Non-zero entries in first {readCount}: {nonZero}  (draws visible for {drawTime}s in Scene view)");
+            if (triCount > (uint)readCount)
+                sb.AppendLine($"  (only first {readCount} of {triCount} entries read back)");
 
             Debug.Log(sb.ToString());
+        }
+
+        private static Vector3 OctUnorm32ToDir(uint packed)
+        {
+            float px = (packed & 0xFFFFu) / (float)0xFFFEu;
+            float py = ((packed >> 16) & 0xFFFFu) / (float)0xFFFEu;
+            px = px * 2f - 1f;
+            py = py * 2f - 1f;
+            var n = new Vector3(px, py, 1f - Mathf.Abs(px) - Mathf.Abs(py));
+            if (n.z < 0f)
+            {
+                float ox = n.x;
+                n.x = (1f - Mathf.Abs(n.y)) * (ox >= 0f ? 1f : -1f);
+                n.y = (1f - Mathf.Abs(ox))  * (n.y >= 0f ? 1f : -1f);
+            }
+            return n.normalized;
         }
 
         public void AutoFillShaders()
