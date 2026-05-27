@@ -73,6 +73,15 @@ namespace PathTracing
         public float neeatGlobalTemporalFeedbackWeight = 0.75f;
         public float neeatLocalToGlobalSampleRatio     = 0.65f;
         public float neeatDistantVsLocalImportance     = 1.0f;
+        // Advanced NEE-AT baker knobs (mirror LightsBaker.cpp m_advSetting_*).
+        public float neeatScreenSpaceVsWorldSpaceThreshold = 0.3f;
+        public float neeatDepthDisocclusionThreshold       = 1.5f;
+        public float neeatReservoirHistoryDropoff          = 0.005f;
+        public bool  neeatEnableMotionReprojection         = true;
+        public float neeatImportanceBoostIntensityDelta    = 0.0f;
+        public float neeatImportanceBoostFrustumMul        = 0.0f;
+        public float neeatImportanceBoostFrustumFadeDistance = 0.0f;
+        public float neeatSceneAverageContentsDistance     = 10.0f;
 
         public bool useReSTIRDI = false;
         public bool useReSTIRGI = false;

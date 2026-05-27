@@ -165,6 +165,7 @@ namespace PathTracing
         private Vector2                _localJitterSequence;
         private uint2                  _localSamplingTileJitter;
         private uint2                  _prevLocalSamplingTileJitter;
+        private int2                   _prevRenderResolution;
 
         /// <summary>lightsBuffer index where emissive triangles start (= EnvQtTotalNodeCount + analyticLightCount).</summary>
         public uint EmissiveLightOffset => EnvQtTotalNodeCount + (uint)_analyticLightCount;
@@ -807,8 +808,11 @@ namespace PathTracing
             ref var ctrl = ref s_controlStaging[0];
             ctrl                         = default;
             var setting = _ctx.Setting;
-            bool neeAtEnabled       = setting != null && setting.useNEE && setting.neeType == NativeRtxptNeeType.NEEAT;
-            if (!neeAtEnabled)
+            // Original (LightsBaker.cpp:1022): TemporalFeedbackRequired depends only on
+            // ImportanceSamplingType == NEEAT, not on the global UseNEE toggle.
+            bool neeAtSelected      = setting != null && setting.neeType == NativeRtxptNeeType.NEEAT;
+            bool neeAtEnabled       = setting != null && setting.useNEE && neeAtSelected;
+            if (!neeAtSelected)
                 _feedbackBufferFilled = false;
 
             bool lastFrameFeedback  = neeAtEnabled && _feedbackBufferFilled;
@@ -833,12 +837,13 @@ namespace PathTracing
             ctrl.LastFrameTemporalFeedbackAvailable = lastFrameFeedback ? 1u : 0u;
             ctrl.LastFrameLocalSamplesAvailable     = lastFrameLocal ? 1u : 0u;
             ctrl.ImportanceSamplingType             = setting != null && setting.useNEE ? (uint)setting.neeType : 0u;
-            ctrl.TemporalFeedbackRequired           = neeAtEnabled ? 1u : 0u;
+            // LightsBaker.cpp:1022,1070 — depends only on ImportanceSamplingType == NEEAT.
+            ctrl.TemporalFeedbackRequired           = neeAtSelected ? 1u : 0u;
             ctrl.TotalMaxFeedbackCount              = lastFrameFeedback ? p0ThreadCount : 0u;
             ctrl.GlobalFeedbackUseWeight            = lastFrameFeedback ? (setting?.neeatGlobalTemporalFeedbackWeight ?? 0.75f) : 0.0f;
             ctrl.LocalToGlobalSampleRatio           = lastFrameFeedback ? (setting?.neeatLocalToGlobalSampleRatio ?? 0.65f) : 0.0f;
             ctrl.TileBufferHeight                   = localH;
-            ctrl.ScreenSpaceVsWorldSpaceThreshold   = 0.3f;
+            ctrl.ScreenSpaceVsWorldSpaceThreshold   = setting?.neeatScreenSpaceVsWorldSpaceThreshold ?? 0.3f;
             ctrl.LocalSamplingResolutionX           = localW;
             ctrl.LocalSamplingResolutionY           = localH;
             UpdateLocalSamplingJitter();
@@ -846,7 +851,7 @@ namespace PathTracing
             ctrl.LocalSamplingTileJitterY           = _localSamplingTileJitter.y;
             ctrl.LocalSamplingTileJitterPrevX       = _prevLocalSamplingTileJitter.x;
             ctrl.LocalSamplingTileJitterPrevY       = _prevLocalSamplingTileJitter.y;
-
+ 
             ref var bk = ref ctrl.BakerConstants;
             bk.CurrentWeightsBufferOffset       = currentOffset;
             bk.HistoricWeightsBufferOffset      = historicOffset;
@@ -858,12 +863,32 @@ namespace PathTracing
             bk.FeedbackResolutionY              = feedbackH;
             bk.BlendedFeedbackResolutionX       = blendedW;
             bk.BlendedFeedbackResolutionY       = blendedH;
-            bk.PrevOverCurrentViewportSizeX     = 1.0f;
-            bk.PrevOverCurrentViewportSizeY     = 1.0f;
+
+            // Prev-over-current viewport size (LightsBaker.cpp:1019). First frame: 1.0.
+            int2 prevRes = _prevRenderResolution.x > 0 ? _prevRenderResolution : renderRes;
+            bk.PrevOverCurrentViewportSizeX     = (float)prevRes.x / math.max(renderRes.x, 1);
+            bk.PrevOverCurrentViewportSizeY     = (float)prevRes.y / math.max(renderRes.y, 1);
+            _prevRenderResolution               = renderRes;
+
             bk.UpdateCounter                    = (uint)_dbgFrameCounter;
-            bk.DepthDisocclusionThreshold       = 1.5f;
-            bk.EnableMotionReprojection         = 1u;
-            bk.ReservoirHistoryDropoff          = 0.005f;
+            bk.DepthDisocclusionThreshold       = setting?.neeatDepthDisocclusionThreshold ?? 1.5f;
+            bk.EnableMotionReprojection         = (setting?.neeatEnableMotionReprojection ?? true) ? 1u : 0u;
+            bk.ReservoirHistoryDropoff          = setting?.neeatReservoirHistoryDropoff ?? 0.005f;
+
+            // Scene-relative info used by NEE-AT tile/light importance scoring.
+            bk.SceneCameraPosX                  = _ctx.FrameState != null ? _ctx.FrameState.camPos.x : 0f;
+            bk.SceneCameraPosY                  = _ctx.FrameState != null ? _ctx.FrameState.camPos.y : 0f;
+            bk.SceneCameraPosZ                  = _ctx.FrameState != null ? _ctx.FrameState.camPos.z : 0f;
+            bk.SceneAverageContentsDistance     = setting?.neeatSceneAverageContentsDistance ?? 10.0f;
+
+            bk.ImportanceBoostIntensityDelta    = setting?.neeatImportanceBoostIntensityDelta ?? 0f;
+            bk.ImportanceBoostFrustumMul        = setting?.neeatImportanceBoostFrustumMul ?? 0f;
+            bk.ImportanceBoostFrustumFadeDistance = setting?.neeatImportanceBoostFrustumFadeDistance ?? 0f;
+
+            // Frustum planes + corners (Gribb-Hartmann, LightsBaker.cpp:884 UpdateFrustumConsts).
+            if (_ctx.FrameState != null)
+                FillFrustumPlanesAndCorners(ref bk, _ctx.FrameState.worldToClip);
+
             bk.EnvMapParams = new RtxptLightsBakerEnvMapParams
             {
                 TransformRow0    = new Vector4(1, 0, 0, 0),
@@ -881,6 +906,104 @@ namespace PathTracing
             _previousFrameTemporalFeedbackAvailable = ctrl.TemporalFeedbackRequired != 0;
             if (ctrl.TemporalFeedbackRequired != 0)
                 _feedbackBufferFilled = true;
+        }
+
+        // ─────────────────────────────────────────────────────────────────────
+        // Gribb-Hartmann frustum extraction from a column-vector worldToClip.
+        // Mirrors LightsBaker::UpdateFrustumConsts (LightsBaker.cpp:884).
+        // Donut uses row-vector convention (M[col][row]); Unity uses column-vector
+        // (M[row][col]) — so row/col are swapped vs the original, but the result
+        // (plane equations in world space) is identical.
+        // Plane convention here matches donut's: dot(plane.xyz, p) - plane.w = signed distance.
+        // ─────────────────────────────────────────────────────────────────────
+        private static unsafe void FillFrustumPlanesAndCorners(ref RtxptLightsBakerConstants bk, Matrix4x4 wtc)
+        {
+            const float DISTANT_LIGHT_DISTANCE = 100000.0f;
+
+            Vector4 r0 = wtc.GetRow(0);
+            Vector4 r1 = wtc.GetRow(1);
+            Vector4 r2 = wtc.GetRow(2);
+            Vector4 r3 = wtc.GetRow(3);
+
+            Vector4 left   = r3 + r0;
+            Vector4 right  = r3 - r0;
+            Vector4 top    = r3 - r1;
+            Vector4 bottom = r3 + r1;
+            Vector4 near   = r3 - r2;
+
+            // Donut stores w as the negated homogeneous offset.
+            left.w   = -left.w;
+            right.w  = -right.w;
+            top.w    = -top.w;
+            bottom.w = -bottom.w;
+            near.w   = -near.w;
+
+            Normalize(ref left);
+            Normalize(ref right);
+            Normalize(ref top);
+            Normalize(ref bottom);
+            Normalize(ref near);
+
+            // Far = inverted near pushed away by DISTANT_LIGHT_DISTANCE.
+            Vector4 far = new Vector4(-near.x, -near.y, -near.z, -near.w - DISTANT_LIGHT_DISTANCE);
+
+            // Order: Left Right Top Bottom Near Far.
+            Vector4* planes = stackalloc Vector4[6] { left, right, top, bottom, near, far };
+
+            fixed (float* dst = bk.FrustumPlanes)
+            {
+                for (int i = 0; i < 6; i++)
+                {
+                    dst[i * 4 + 0] = planes[i].x;
+                    dst[i * 4 + 1] = planes[i].y;
+                    dst[i * 4 + 2] = planes[i].z;
+                    dst[i * 4 + 3] = planes[i].w;
+                }
+            }
+
+            // Corners: intersect three planes per corner (8 corners for the box L/R × T/B × N/F).
+            // Matches the original ordering: bit0=R/L (encoded oddly via XOR with bit1), bit1=B/T, bit2=F/N.
+            fixed (float* dstC = bk.FrustumCorners)
+            {
+                for (int i = 0; i < 8; i++)
+                {
+                    bool bone = (i & 1) != 0;
+                    bool btwo = (i & 2) != 0;
+                    Vector4 a = (bone == btwo) ? right : left;
+                    Vector4 b = (i & 2) != 0 ? bottom : top;
+                    Vector4 c = (i & 4) != 0 ? far : near;
+                    Vector3 corner = IntersectThreePlanes(a, b, c);
+                    dstC[i * 4 + 0] = corner.x;
+                    dstC[i * 4 + 1] = corner.y;
+                    dstC[i * 4 + 2] = corner.z;
+                    dstC[i * 4 + 3] = 0f;
+                }
+            }
+
+            bk.DebugDrawFrustum = 0u;
+        }
+
+        private static void Normalize(ref Vector4 plane)
+        {
+            float lenSq = plane.x * plane.x + plane.y * plane.y + plane.z * plane.z;
+            float scale = lenSq > 0f ? 1.0f / Mathf.Sqrt(lenSq) : 0f;
+            plane.x *= scale;
+            plane.y *= scale;
+            plane.z *= scale;
+            plane.w *= scale;
+        }
+
+        // Solve { dot(n_i, p) = d_i } for p, given three planes whose normals form an invertible basis.
+        private static Vector3 IntersectThreePlanes(Vector4 a, Vector4 b, Vector4 c)
+        {
+            Matrix4x4 m = Matrix4x4.identity;
+            m.SetRow(0, new Vector4(a.x, a.y, a.z, 0f));
+            m.SetRow(1, new Vector4(b.x, b.y, b.z, 0f));
+            m.SetRow(2, new Vector4(c.x, c.y, c.z, 0f));
+            m.SetRow(3, new Vector4(0f,  0f,  0f, 1f));
+            Matrix4x4 inv = m.inverse;
+            Vector3 d = new Vector3(a.w, b.w, c.w);
+            return inv.MultiplyPoint3x4(d);
         }
 
         private void UpdateLocalSamplingJitter()
