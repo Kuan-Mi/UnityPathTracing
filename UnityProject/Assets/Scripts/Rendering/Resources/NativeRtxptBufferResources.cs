@@ -148,6 +148,11 @@ namespace PathTracing
             renderResolution = renderRes;
             int pixelCount = renderRes.x * renderRes.y;
 
+            // Tiled-swizzled storage element count for StablePlanesBuffer (TS_TILE_SIZE = 8 in Utils.hlsli).
+            // Must match GenericTSComputePlaneStride: ceil(W/8)*8 * ceil(H/8)*8.
+            int tsLineStride   = ((renderRes.x + 7) / 8) * 8;
+            int tsPlaneStride  = tsLineStride * (((renderRes.y + 7) / 8) * 8);
+
             ReleaseResolutionBuffers();
 
             // LocalSamplingBuffer: tileW × tileH × LOCAL_PROXY_COUNT uint elements.
@@ -165,7 +170,7 @@ namespace PathTracing
             // Shader declares: RWStructuredBuffer<StablePlane> u_StablePlanesBuffer (u42).
             StablePlanesBuffer = new GraphicsBuffer(
                 GraphicsBuffer.Target.Structured,
-                pixelCount * StablePlaneCount,
+                tsPlaneStride * StablePlaneCount,
                 StablePlaneStride)
             { name = "Rtxpt_StablePlanesBuffer" };
 
