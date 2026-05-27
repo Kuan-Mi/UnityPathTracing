@@ -639,15 +639,30 @@ namespace PathTracing
                     });
 
                     // --- SubInstanceData (RTXPT t1) ---
-                    bool  isAlphaTested = mat != null && TryGetFloat(mat, "_Cutoff", 0f) > 0f;
-                    float aCutoff       = isAlphaTested ? TryGetFloat(mat, "_Cutoff", 0f) : 0f;
-                    uint  alphaU8       = (uint)Mathf.RoundToInt(Mathf.Clamp01(aCutoff) * 255f);
+                    var   overrideSlot  = matOverride != null && s < matOverride.Slots.Count ? matOverride.Slots[s] : null;
+                    bool  isAlphaTested;
+                    float aCutoff;
+                    bool  excludeFromNEE;
+                    if (overrideSlot != null)
+                    {
+                        isAlphaTested  = overrideSlot.Slot.EnableAlphaTesting;
+                        aCutoff        = isAlphaTested ? overrideSlot.Slot.AlphaCutoff : 0f;
+                        excludeFromNEE = overrideSlot.Slot.ExcludeFromNEE;
+                    }
+                    else
+                    {
+                        isAlphaTested  = mat != null && TryGetFloat(mat, "_Cutoff", 0f) > 0f;
+                        aCutoff        = isAlphaTested ? TryGetFloat(mat, "_Cutoff", 0f) : 0f;
+                        excludeFromNEE = false;
+                    }
+                    uint alphaU8     = (uint)Mathf.RoundToInt(Mathf.Clamp01(aCutoff) * 255f);
                     // AlphaTextureIndex in lo16: use base texture slot if alpha-tested, else 0
                     uint alphaTexIdx = isAlphaTested && ptMatList.Count > matIdx
                         ? (uint)Mathf.Max(0, ptMatList[matIdx].BaseOrDiffuseTextureIndex)
                         : 0u;
-                    uint siFlags               = alphaTexIdx & 0xFFFFu;
-                    if (isAlphaTested) siFlags |= SubInstanceFlags.AlphaTested;
+                    uint siFlags = alphaTexIdx & 0xFFFFu;
+                    if (isAlphaTested)  siFlags |= SubInstanceFlags.AlphaTested;
+                    if (excludeFromNEE) siFlags |= SubInstanceFlags.ExcludeFromNEE;
                     siFlags |= (alphaU8 << SubInstanceFlags.AlphaOffsetOffset);
 
                     subInstList.Add(new SubInstanceData
@@ -821,9 +836,10 @@ namespace PathTracing
 
                 for (int s = 0; s < matIndices.Length && s < matOverride.Slots.Count; s++)
                 {
+                    if (matOverride.Slots[s] == null) continue;
                     int idx = matIndices[s];
                     if (idx < 0 || idx >= _ptMaterialCpu.Length) continue;
-                    RefreshMaterialCpuFromOverride(matOverride.Slots[s], ref _ptMaterialCpu[idx]);
+                    RefreshMaterialCpuFromOverride(matOverride.Slots[s].Slot, ref _ptMaterialCpu[idx]);
                 }
 
                 matOverride.ClearDirty();
@@ -840,38 +856,38 @@ namespace PathTracing
         /// </summary>
         private static void RefreshMaterialCpuFromOverride(RtxptMaterialSlot slot, ref PTMaterialData data)
         {
+            // Texture flags: preserve loaded state (indices set during full rebuild) AND'd with slot enables.
             uint flags = 0;
-            // Preserve texture-presence flags derived from the current texture indices.
-            if (data.BaseOrDiffuseTextureIndex != 0xFFFFFFFFu) flags        |= PTMaterialFlags.UseBaseOrDiffuseTexture;
-            if (data.NormalTextureIndex != 0xFFFFFFFFu) flags               |= PTMaterialFlags.UseNormalTexture;
-            if (data.MetalRoughOrSpecularTextureIndex != 0xFFFFFFFFu) flags |= PTMaterialFlags.UseMetalRoughOrSpecularTexture;
-            if (data.EmissiveTextureIndex != 0xFFFFFFFFu) flags             |= PTMaterialFlags.UseEmissiveTexture;
-            if (data.OcclusionTextureIndex != 0xFFFFFFFFu) flags            |= (uint)DonutMaterialFlags.UseOcclusionTexture;
-            if (data.TransmissionTextureIndex != 0xFFFFFFFFu) flags         |= PTMaterialFlags.UseTransmissionTexture;
-
-            if (slot.ThinSurface) flags                                 |= PTMaterialFlags.ThinSurface;
-            if (slot.MetalnessInRedChannel) flags                       |= PTMaterialFlags.MetalnessInRedChannel;
-            if (slot.PSDExclude) flags                                  |= PTMaterialFlags.PSDExclude;
-            if (slot.IgnoreMeshTangentSpace) flags                      |= PTMaterialFlags.IgnoreMeshTangentSpace;
-            if (slot.PSDBlockMotionVectorsAtSurfaceType % 2 != 0) flags |= PTMaterialFlags.PSDBlockMVsAtSurfaceTypeB0;
-            if (slot.PSDBlockMotionVectorsAtSurfaceType / 2 != 0) flags |= PTMaterialFlags.PSDBlockMVsAtSurfaceTypeB1;
-            flags |= (uint)Mathf.Clamp(slot.NestedPriority, 0, 15) << PTMaterialFlags.NestedPriorityShift;
+            if (slot.UseSpecularGlossModel) flags |= PTMaterialFlags.UseSpecularGlossModel;
+            if (data.BaseOrDiffuseTextureIndex        != 0xFFFFFFFFu && slot.EnableBaseTexture)                                             flags |= PTMaterialFlags.UseBaseOrDiffuseTexture;
+            if (data.MetalRoughOrSpecularTextureIndex != 0xFFFFFFFFu && slot.EnableOcclusionRoughnessMetallicTexture)                       flags |= PTMaterialFlags.UseMetalRoughOrSpecularTexture;
+            if (data.EmissiveTextureIndex             != 0xFFFFFFFFu && slot.EnableEmissiveTexture)                                         flags |= PTMaterialFlags.UseEmissiveTexture;
+            if (data.NormalTextureIndex               != 0xFFFFFFFFu && slot.EnableNormalTexture)                                           flags |= PTMaterialFlags.UseNormalTexture;
+            if (data.TransmissionTextureIndex         != 0xFFFFFFFFu && slot.EnableTransmissionTexture && slot.EnableTransmission)           flags |= PTMaterialFlags.UseTransmissionTexture;
+            if (slot.MetalnessInRedChannel)                                                             flags |= PTMaterialFlags.MetalnessInRedChannel;
+            if (slot.ThinSurface || !slot.EnableTransmission)                                           flags |= PTMaterialFlags.ThinSurface;
+            if (slot.PSDExclude)                                                                        flags |= PTMaterialFlags.PSDExclude;
+            if (slot.EnableAsAnalyticLightProxy)                                                        flags |= PTMaterialFlags.EnableAsAnalyticLightProxy;
+            if (slot.IgnoreMeshTangentSpace)                                                            flags |= PTMaterialFlags.IgnoreMeshTangentSpace;
+            if (slot.PSDBlockMotionVectorsAtSurfaceType % 2 != 0)                                       flags |= PTMaterialFlags.PSDBlockMVsAtSurfaceTypeB0;
+            if (slot.PSDBlockMotionVectorsAtSurfaceType / 2 != 0)                                       flags |= PTMaterialFlags.PSDBlockMVsAtSurfaceTypeB1;
+            flags |= (uint)Mathf.Clamp(slot.NestedPriority, 0, 14) << PTMaterialFlags.NestedPriorityShift;
             flags |= (uint)Mathf.Clamp(slot.PSDDominantDeltaLobe + 1, 0, 7) << PTMaterialFlags.PSDDominantDeltaLobeP1Shift;
 
             data.Flags                     = flags;
             data.BaseOrDiffuseColor        = new Vector3(slot.BaseColorFactor.r, slot.BaseColorFactor.g, slot.BaseColorFactor.b);
             data.SpecularColor             = new Vector3(slot.SpecularColor.r, slot.SpecularColor.g, slot.SpecularColor.b);
-            data.EmissiveColor             = new Vector3(slot.EmissiveColor.r, slot.EmissiveColor.g, slot.EmissiveColor.b);
+            data.EmissiveColor             = new Vector3(slot.EmissiveColor.r, slot.EmissiveColor.g, slot.EmissiveColor.b) * slot.EmissiveIntensity;
             data.ShadowNoLFadeout          = Mathf.Clamp(slot.ShadowNoLFadeout, 0f, 0.25f);
             data.Opacity                   = slot.Opacity;
             data.Roughness                 = slot.Roughness;
             data.Metalness                 = slot.Metalness;
             data.NormalTextureScale        = slot.NormalTextureScale;
             data.AlphaCutoff               = slot.AlphaCutoff;
-            data.TransmissionFactor        = slot.TransmissionFactor;
+            data.TransmissionFactor        = slot.EnableTransmission ? slot.TransmissionFactor       : 0f;
+            data.DiffuseTransmissionFactor = slot.EnableTransmission ? slot.DiffuseTransmissionFactor : 0f;
             data.IoR                       = slot.IoR;
             data.ThicknessFactor           = slot.ThicknessFactor;
-            data.DiffuseTransmissionFactor = slot.DiffuseTransmissionFactor;
             data.VolumeAttenuationColor    = new Vector3(slot.VolumeAttenuationColor.r, slot.VolumeAttenuationColor.g, slot.VolumeAttenuationColor.b);
             data.VolumeAttenuationDistance = slot.VolumeAttenuationDistance;
         }
@@ -934,29 +950,29 @@ namespace PathTracing
         {
             int idx = ptMatList.Count;
 
-            int baseTexIdx       = AddTexture(slot.BaseOrDiffuseTexture, texPtrs);
-            int normalTexIdx     = AddTexture(slot.NormalTexture, texPtrs);
-            int metalRoughTexIdx = AddTexture(slot.MetalRoughTexture, texPtrs);
-            int emissiveTexIdx   = AddTexture(slot.EmissiveTexture, texPtrs);
-            int occlusionTexIdx  = AddTexture(slot.OcclusionTexture, texPtrs);
-            int transmTexIdx     = AddTexture(slot.TransmissionTexture, texPtrs);
+            int baseTexIdx    = AddTexture(slot.BaseOrDiffuseTexture,              texPtrs);
+            int ormTexIdx     = AddTexture(slot.OcclusionRoughnessMetallicTexture, texPtrs);
+            int normalTexIdx  = AddTexture(slot.NormalTexture,                     texPtrs);
+            int emissiveTexIdx = AddTexture(slot.EmissiveTexture,                  texPtrs);
+            int transmTexIdx  = AddTexture(slot.TransmissionTexture,               texPtrs);
 
             uint SafeIdx(int i) => i >= 0 ? (uint)i : 0xFFFFFFFFu;
 
-            uint flags                                                  = 0;
-            if (baseTexIdx >= 0) flags                                  |= PTMaterialFlags.UseBaseOrDiffuseTexture;
-            if (normalTexIdx >= 0) flags                                |= PTMaterialFlags.UseNormalTexture;
-            if (metalRoughTexIdx >= 0) flags                            |= PTMaterialFlags.UseMetalRoughOrSpecularTexture;
-            if (emissiveTexIdx >= 0) flags                              |= PTMaterialFlags.UseEmissiveTexture;
-            if (occlusionTexIdx >= 0) flags                             |= (uint)DonutMaterialFlags.UseOcclusionTexture;
-            if (transmTexIdx >= 0) flags                                |= PTMaterialFlags.UseTransmissionTexture;
-            if (slot.ThinSurface) flags                                 |= PTMaterialFlags.ThinSurface;
-            if (slot.MetalnessInRedChannel) flags                       |= PTMaterialFlags.MetalnessInRedChannel;
-            if (slot.PSDExclude) flags                                  |= PTMaterialFlags.PSDExclude;
-            if (slot.IgnoreMeshTangentSpace) flags                      |= PTMaterialFlags.IgnoreMeshTangentSpace;
-            if (slot.PSDBlockMotionVectorsAtSurfaceType % 2 != 0) flags |= PTMaterialFlags.PSDBlockMVsAtSurfaceTypeB0;
-            if (slot.PSDBlockMotionVectorsAtSurfaceType / 2 != 0) flags |= PTMaterialFlags.PSDBlockMVsAtSurfaceTypeB1;
-            flags |= (uint)Mathf.Clamp(slot.NestedPriority, 0, 15) << PTMaterialFlags.NestedPriorityShift;
+            uint flags = 0;
+            if (slot.UseSpecularGlossModel)                                                         flags |= PTMaterialFlags.UseSpecularGlossModel;
+            if (baseTexIdx    >= 0 && slot.EnableBaseTexture)                                        flags |= PTMaterialFlags.UseBaseOrDiffuseTexture;
+            if (ormTexIdx     >= 0 && slot.EnableOcclusionRoughnessMetallicTexture)                  flags |= PTMaterialFlags.UseMetalRoughOrSpecularTexture;
+            if (emissiveTexIdx >= 0 && slot.EnableEmissiveTexture)                                   flags |= PTMaterialFlags.UseEmissiveTexture;
+            if (normalTexIdx  >= 0 && slot.EnableNormalTexture)                                      flags |= PTMaterialFlags.UseNormalTexture;
+            if (transmTexIdx  >= 0 && slot.EnableTransmissionTexture && slot.EnableTransmission)     flags |= PTMaterialFlags.UseTransmissionTexture;
+            if (slot.MetalnessInRedChannel)                                                          flags |= PTMaterialFlags.MetalnessInRedChannel;
+            if (slot.ThinSurface || !slot.EnableTransmission)                                        flags |= PTMaterialFlags.ThinSurface;
+            if (slot.PSDExclude)                                                                     flags |= PTMaterialFlags.PSDExclude;
+            if (slot.EnableAsAnalyticLightProxy)                                                     flags |= PTMaterialFlags.EnableAsAnalyticLightProxy;
+            if (slot.IgnoreMeshTangentSpace)                                                         flags |= PTMaterialFlags.IgnoreMeshTangentSpace;
+            if (slot.PSDBlockMotionVectorsAtSurfaceType % 2 != 0)                                    flags |= PTMaterialFlags.PSDBlockMVsAtSurfaceTypeB0;
+            if (slot.PSDBlockMotionVectorsAtSurfaceType / 2 != 0)                                    flags |= PTMaterialFlags.PSDBlockMVsAtSurfaceTypeB1;
+            flags |= (uint)Mathf.Clamp(slot.NestedPriority, 0, 14) << PTMaterialFlags.NestedPriorityShift;
             flags |= (uint)Mathf.Clamp(slot.PSDDominantDeltaLobe + 1, 0, 7) << PTMaterialFlags.PSDDominantDeltaLobeP1Shift;
 
             ptMatList.Add(new PTMaterialData
@@ -964,25 +980,25 @@ namespace PathTracing
                 BaseOrDiffuseColor               = new Vector3(slot.BaseColorFactor.r, slot.BaseColorFactor.g, slot.BaseColorFactor.b),
                 Flags                            = flags,
                 SpecularColor                    = new Vector3(slot.SpecularColor.r, slot.SpecularColor.g, slot.SpecularColor.b),
-                _padding0                        = 0,
-                EmissiveColor                    = new Vector3(slot.EmissiveColor.r, slot.EmissiveColor.g, slot.EmissiveColor.b),
+                _padding0                        = 42,
+                EmissiveColor                    = new Vector3(slot.EmissiveColor.r, slot.EmissiveColor.g, slot.EmissiveColor.b) * slot.EmissiveIntensity,
                 ShadowNoLFadeout                 = Mathf.Clamp(slot.ShadowNoLFadeout, 0f, 0.25f),
                 Opacity                          = slot.Opacity,
                 Roughness                        = slot.Roughness,
                 Metalness                        = slot.Metalness,
                 NormalTextureScale               = slot.NormalTextureScale,
-                _padding1                        = 0f,
+                _padding1                        = 42f,
                 AlphaCutoff                      = slot.AlphaCutoff,
-                TransmissionFactor               = slot.TransmissionFactor,
+                TransmissionFactor               = slot.EnableTransmission ? slot.TransmissionFactor        : 0f,
                 BaseOrDiffuseTextureIndex        = SafeIdx(baseTexIdx),
-                MetalRoughOrSpecularTextureIndex = SafeIdx(metalRoughTexIdx),
+                MetalRoughOrSpecularTextureIndex = SafeIdx(ormTexIdx),
                 EmissiveTextureIndex             = SafeIdx(emissiveTexIdx),
                 NormalTextureIndex               = SafeIdx(normalTexIdx),
-                OcclusionTextureIndex            = SafeIdx(occlusionTexIdx),
+                OcclusionTextureIndex            = 0xFFFFFFFFu, // packed into ORM above
                 TransmissionTextureIndex         = SafeIdx(transmTexIdx),
                 IoR                              = slot.IoR,
                 ThicknessFactor                  = slot.ThicknessFactor,
-                DiffuseTransmissionFactor        = slot.DiffuseTransmissionFactor,
+                DiffuseTransmissionFactor        = slot.EnableTransmission ? slot.DiffuseTransmissionFactor : 0f,
                 VolumeAttenuationColor           = new Vector3(slot.VolumeAttenuationColor.r, slot.VolumeAttenuationColor.g, slot.VolumeAttenuationColor.b),
                 VolumeAttenuationDistance        = slot.VolumeAttenuationDistance,
             });
@@ -995,11 +1011,11 @@ namespace PathTracing
             // ----------------------------------------------------------------
             // Fast path: renderer has a manual override for this sub-mesh
             // ----------------------------------------------------------------
-            if (matOverride != null && subMeshIndex < matOverride.Slots.Count)
+            if (matOverride != null && subMeshIndex < matOverride.Slots.Count && matOverride.Slots[subMeshIndex] != null)
             {
                 // Overrides are per-(renderer, subMesh), so skip the shared material cache
                 // and always produce a unique GPU material entry.
-                return BuildMaterialFromOverride(matOverride.Slots[subMeshIndex], ptMatList, texPtrs);
+                return BuildMaterialFromOverride(matOverride.Slots[subMeshIndex].Slot, ptMatList, texPtrs);
             }
 
             // ----------------------------------------------------------------

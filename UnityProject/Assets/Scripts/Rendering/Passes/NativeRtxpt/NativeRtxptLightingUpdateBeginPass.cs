@@ -828,7 +828,7 @@ namespace PathTracing
             uint p0ThreadCount      = ((feedbackW + LLB_NUM_COMPUTE_THREADS_2D - 1) / LLB_NUM_COMPUTE_THREADS_2D)
                                     * ((feedbackH + LLB_NUM_COMPUTE_THREADS_2D - 1) / LLB_NUM_COMPUTE_THREADS_2D)
                                     * LLB_NUM_COMPUTE_THREADS_2D * LLB_NUM_COMPUTE_THREADS_2D;
-
+ 
             ctrl.TotalLightCount                    = totalLightCount;
             ctrl.AnalyticLightCount                 = (uint)_analyticLightCount;
             ctrl.EnvmapQuadNodeCount                = EnvQtTotalNodeCount;

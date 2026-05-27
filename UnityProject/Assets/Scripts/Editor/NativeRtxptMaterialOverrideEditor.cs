@@ -1,5 +1,6 @@
 #if UNITY_EDITOR
-using System.Collections.Generic;
+using System;
+using System.IO;
 using UnityEditor;
 using UnityEngine;
 
@@ -9,7 +10,7 @@ namespace PathTracing
     [CanEditMultipleObjects]
     public class NativeRtxptMaterialOverrideEditor : Editor
     {
-        private bool[] _slotFoldouts = System.Array.Empty<bool>();
+        private bool[] _slotFoldouts = Array.Empty<bool>();
 
         public override void OnInspectorGUI()
         {
@@ -23,10 +24,14 @@ namespace PathTracing
                 foreach (var t in targets)
                 {
                     var c = (NativeRtxptMaterialOverride)t;
+                    EnsureSlotAssets(c);
                     Undo.RecordObject(c, "Bake RTXPT Materials from Renderer");
                     c.BakeFromRenderer();
                     EditorUtility.SetDirty(c);
+                    foreach (var asset in c.Slots)
+                        if (asset != null) EditorUtility.SetDirty(asset);
                 }
+                AssetDatabase.SaveAssets();
             }
 
             EditorGUILayout.EndHorizontal();
@@ -34,58 +39,76 @@ namespace PathTracing
 
             if (multiEdit)
             {
-                EditorGUILayout.HelpBox($"Editing {targets.Length} objects. Slot properties are shown for objects with matching slot counts.", MessageType.None);
+                EditorGUILayout.HelpBox($"Editing {targets.Length} objects.", MessageType.None);
                 EditorGUILayout.Space(2);
             }
 
-            serializedObject.Update();
-            var slotsProp = serializedObject.FindProperty("Slots");
-
-            // Determine the slot count to display: use the primary target's count,
-            // but show a warning when counts differ across selected objects.
+            // Auto-sync slot count to sub-mesh count for the primary target.
             var primaryComp = (NativeRtxptMaterialOverride)target;
+            SyncSlotCount(primaryComp);
+
+            serializedObject.Update();
+            var slotsProp    = serializedObject.FindProperty("Slots");
             int primaryCount = primaryComp.Slots?.Count ?? 0;
 
             if (primaryCount == 0)
             {
-                EditorGUILayout.HelpBox("No slots. Press 'Bake from Renderer' to populate.", MessageType.Info);
+                EditorGUILayout.HelpBox("No sub-meshes found on the MeshRenderer.", MessageType.Info);
+                serializedObject.ApplyModifiedProperties();
                 return;
             }
 
-            bool countMismatch = false;
-            if (multiEdit)
-            {
-                foreach (var t in targets)
-                {
-                    var c = (NativeRtxptMaterialOverride)t;
-                    if ((c.Slots?.Count ?? 0) != primaryCount) { countMismatch = true; break; }
-                }
-            }
-
-            if (countMismatch)
-                EditorGUILayout.HelpBox("Selected objects have different slot counts. Only the primary object's slots are shown; slot edits apply to all objects with matching slot counts.", MessageType.Warning);
-
-            // Sync foldout array size
+            // Sync foldout array size.
             if (_slotFoldouts.Length != primaryCount)
             {
-                System.Array.Resize(ref _slotFoldouts, primaryCount);
-                for (int i = 0; i < _slotFoldouts.Length; i++)
-                    _slotFoldouts[i] = true;
+                Array.Resize(ref _slotFoldouts, primaryCount);
+                for (int i = 0; i < _slotFoldouts.Length; i++) _slotFoldouts[i] = true;
             }
 
             for (int i = 0; i < primaryCount; i++)
             {
-                var slot    = primaryComp.Slots[i];
-                string name = slot?.SourceMaterial != null ? slot.SourceMaterial.name : $"Slot {i}";
+                var    assetRef = primaryComp.Slots[i];
+                string label    = assetRef != null ? assetRef.name : $"Slot {i}  (default baking)";
 
-                _slotFoldouts[i] = EditorGUILayout.BeginFoldoutHeaderGroup(_slotFoldouts[i],
-                    $"Sub-mesh {i}  —  {name}");
+                _slotFoldouts[i] = EditorGUILayout.BeginFoldoutHeaderGroup(_slotFoldouts[i], $"Sub-mesh {i}  —  {label}");
 
-                if (_slotFoldouts[i] && slotsProp.arraySize > i)
+                if (_slotFoldouts[i])
                 {
                     EditorGUI.indentLevel++;
-                    var slotProp = slotsProp.GetArrayElementAtIndex(i);
-                    EditorGUILayout.PropertyField(slotProp, includeChildren: true);
+
+                    // Asset reference field — drag any RtxptMaterialOverrideAsset here.
+                    EditorGUILayout.BeginHorizontal();
+                    EditorGUILayout.PropertyField(slotsProp.GetArrayElementAtIndex(i), new GUIContent("Override Asset"));
+
+                    // "Create" button to make a new asset for this slot.
+                    if (assetRef == null && GUILayout.Button("Create", GUILayout.Width(54), GUILayout.Height(18)))
+                    {
+                        var newAsset = CreateSlotAsset(primaryComp, i);
+                        if (newAsset != null)
+                        {
+                            Undo.RecordObject(primaryComp, "Create RTXPT Slot Asset");
+                            primaryComp.Slots[i] = newAsset;
+                            EditorUtility.SetDirty(primaryComp);
+                            serializedObject.Update();
+                        }
+                    }
+
+                    EditorGUILayout.EndHorizontal();
+
+                    // Inline-edit the assigned asset.
+                    if (assetRef != null)
+                    {
+                        var assetSO = new SerializedObject(assetRef);
+                        assetSO.Update();
+                        EditorGUILayout.PropertyField(assetSO.FindProperty("Slot"), includeChildren: true);
+                        if (assetSO.ApplyModifiedProperties())
+                            EditorUtility.SetDirty(assetRef);
+                    }
+                    else
+                    {
+                        EditorGUILayout.HelpBox("No asset assigned — this slot uses the default material baking path.", MessageType.None);
+                    }
+
                     EditorGUI.indentLevel--;
                 }
 
@@ -97,6 +120,72 @@ namespace PathTracing
                 foreach (var t in targets)
                     EditorUtility.SetDirty(t);
             }
+        }
+
+        // Resize the Slots list to match the renderer's sub-mesh count.
+        private static void SyncSlotCount(NativeRtxptMaterialOverride comp)
+        {
+            var mr = comp.GetComponent<MeshRenderer>();
+            var mf = comp.GetComponent<MeshFilter>();
+            if (mr == null) return;
+
+            var  mats      = mr.sharedMaterials ?? Array.Empty<Material>();
+            int  slotCount = mf?.sharedMesh != null ? mf.sharedMesh.subMeshCount : mats.Length;
+
+            if (comp.Slots.Count == slotCount) return;
+
+            Undo.RecordObject(comp, "Sync RTXPT Slot Count");
+            while (comp.Slots.Count < slotCount) comp.Slots.Add(null);
+            if (comp.Slots.Count > slotCount)    comp.Slots.RemoveRange(slotCount, comp.Slots.Count - slotCount);
+            EditorUtility.SetDirty(comp);
+        }
+
+        // Creates asset files for all null slot entries (used by "Bake from Renderer").
+        private static void EnsureSlotAssets(NativeRtxptMaterialOverride comp)
+        {
+            SyncSlotCount(comp);
+            string dir = ResolveAssetDir(comp.gameObject.scene.path);
+
+            for (int s = 0; s < comp.Slots.Count; s++)
+            {
+                if (comp.Slots[s] != null) continue;
+                comp.Slots[s] = CreateSlotAsset(comp, s, dir);
+            }
+
+            AssetDatabase.SaveAssets();
+        }
+
+        // Creates a single new asset for slot s.
+        private static RtxptMaterialOverrideAsset CreateSlotAsset(NativeRtxptMaterialOverride comp, int s, string dir = null)
+        {
+            dir ??= ResolveAssetDir(comp.gameObject.scene.path);
+            var    asset = CreateInstance<RtxptMaterialOverrideAsset>();
+            string path  = AssetDatabase.GenerateUniqueAssetPath($"{dir}/{comp.gameObject.name}_Slot{s}.asset");
+            AssetDatabase.CreateAsset(asset, path);
+            AssetDatabase.SaveAssets();
+            return asset;
+        }
+
+        private static string ResolveAssetDir(string scenePath)
+        {
+            string dir = string.IsNullOrEmpty(scenePath)
+                ? "Assets/RtxptMaterialOverrides"
+                : Path.GetDirectoryName(scenePath)?.Replace('\\', '/') + "/RtxptMaterialOverrides";
+
+            if (!AssetDatabase.IsValidFolder(dir))
+            {
+                string[] parts   = dir.Split('/');
+                string   current = parts[0];
+                for (int i = 1; i < parts.Length; i++)
+                {
+                    string next = current + "/" + parts[i];
+                    if (!AssetDatabase.IsValidFolder(next))
+                        AssetDatabase.CreateFolder(current, parts[i]);
+                    current = next;
+                }
+            }
+
+            return dir;
         }
     }
 }
