@@ -46,7 +46,12 @@ namespace PathTracing
             var   fwd         = new Vector3(-viewInv.m02, -viewInv.m12, -viewInv.m22);
 
             float focalDist   = math.max(setting.cameraFocalDistance, 1e-4f);
-            float spreadAngle = 2.0f * math.atan(tanHalfFovY / renderRes.y);
+            // Matches BridgeCamera (PathTracerShared.h:133): atan(2 * tan(fovY/2) / viewportHeight).
+            float spreadAngle = math.atan(2.0f * tanHalfFovY / renderRes.y);
+            // Aspect ratio in BridgeCamera is the *display* (output) aspect, not render aspect.
+            float displayAspect = (float)displayRes.x / displayRes.y;
+            float ulen = focalDist * tanHalfFovY * displayAspect; // CameraU length
+            float vlen = focalDist * tanHalfFovY;                 // CameraV length
 
             var camera = new PathTracerCameraData
             {
@@ -54,18 +59,18 @@ namespace PathTracing
                 NearZ                = nearZ,
                 DirectionW           = fwd,
                 PixelConeSpreadAngle = spreadAngle,
-                CameraU              = right * tanHalfFovX,
+                CameraU              = right * ulen,
                 FarZ                 = farZ,
-                CameraV              = up * tanHalfFovY,
+                CameraV              = up * vlen,
                 FocalDistance        = focalDist,
-                CameraW              = fwd,
-                AspectRatio          = (float)renderRes.x / renderRes.y,
+                CameraW              = fwd * focalDist,
+                AspectRatio          = displayAspect,
                 ViewportSizeX        = (uint)renderRes.x,
                 ViewportSizeY        = (uint)renderRes.y,
                 ApertureRadius       = setting.cameraAperture,
                 _padding0            = 0f,
-                JitterX              =  -fs.viewportJitter.x,
-                JitterY              = fs.viewportJitter.y,
+                JitterX              = -fs.viewportJitter.x,
+                JitterY              =  fs.viewportJitter.y,
                 _padding1            = 0f,
                 _padding2            = 0f,
             };
@@ -82,38 +87,69 @@ namespace PathTracing
                 NearZ                = nearZ,
                 DirectionW           = prevFwd,
                 PixelConeSpreadAngle = spreadAngle,
-                CameraU              = prevRight * tanHalfFovX,
+                CameraU              = prevRight * ulen,
                 FarZ                 = farZ,
-                CameraV              = prevUp * tanHalfFovY,
+                CameraV              = prevUp * vlen,
                 FocalDistance        = focalDist,
-                CameraW              = prevFwd,
-                AspectRatio          = (float)renderRes.x / renderRes.y,
+                CameraW              = prevFwd * focalDist,
+                AspectRatio          = displayAspect,
                 ViewportSizeX        = (uint)renderRes.x,
                 ViewportSizeY        = (uint)renderRes.y,
                 ApertureRadius       = setting.cameraAperture,
                 _padding0            = 0f,
-                JitterX              =  -fs.prevViewportJitter.x,
-                JitterY              = fs.prevViewportJitter.y,
+                JitterX              = -fs.prevViewportJitter.x,
+                JitterY              =  fs.prevViewportJitter.y,
                 _padding1            = 0f,
                 _padding2            = 0f,
             };
 
             bool isDlssRR = setting.realtimeAA == 3 && !setting.tmpDisableDlssRR;
 
+            // DLSS upscaling MIP bias (Sample.cpp:1496) — sharpens textures to compensate for upscale.
+            float renderArea  = (float)renderRes.x   * renderRes.y;
+            float displayArea = (float)displayRes.x  * displayRes.y;
+            float dlssBias    = -math.log2(math.sqrt(displayArea / math.max(renderArea, 1f)));
+
+            int spp = math.max(setting.realtimeSamplesPerPixel, 1);
+
+            // Original (Sample.cpp:1444,1499): sampleIndex = frameIndex % 8192, sampleBaseIndex = sampleIndex * spp.
+            uint sampleIndex     = setting.realtimeMode ? (fs.frameIndex % 8192u) : 0u;
+            uint sampleBaseIndex = sampleIndex * (uint)spp;
+
+            // No tonemapper hookup in this port — original multiplies by luminance(GetPreExposedGray(0))
+            // when tone mapping is enabled; with neutral exposure this is 1.0.
+            const float preExposedGrayLuminance = 1.0f;
+
+            // Original (Sample.cpp:1511-1514): scales with sqrt(preExposedGrayLuminance) * 1e3.
+            float fireflyThreshold;
+            if (setting.realtimeMode)
+                fireflyThreshold = setting.realtimeFireflyFilterEnabled
+                    ? setting.realtimeFireflyFilterThreshold * math.sqrt(preExposedGrayLuminance) * 1e3f
+                    : 0f;
+            else
+                fireflyThreshold = setting.referenceFireflyFilterEnabled
+                    ? setting.referenceFireflyFilterThreshold * math.sqrt(preExposedGrayLuminance) * 1e3f
+                    : 0f;
+
+            // Original (Sample.cpp:1518): DLSSRRBrightnessClampK *= preExposedGrayLuminance (else 0).
+            float dlssRRClamp = setting.dlssrrBrightnessClampK > 0f
+                ? setting.dlssrrBrightnessClampK * preExposedGrayLuminance
+                : 0f;
+
             // ── PathTracerConstants ───────────────────────────────────────────
             var ptConsts = new PathTracerConstants
             {
                 imageWidth                                   = (uint)renderRes.x,
                 imageHeight                                  = (uint)renderRes.y,
-                sampleBaseIndex                              = 0u,
+                sampleBaseIndex                              = sampleBaseIndex,
                 perPixelJitterAAScale                        = fs.perPixelJitterAAScale,
                 bounceCount                                  = (uint)setting.bounceCount,
                 diffuseBounceCount                           = (uint)setting.diffuseBounceCount,
                 environmentMapDiffuseSampleMIPLevel          = 0f,
-                texLODBias                                   = setting.texLODBias,
-                invSubSampleCount                            = 1.0f / math.max(setting.realtimeSamplesPerPixel, 1),
-                fireflyFilterThreshold                       = 0f,
-                preExposedGrayLuminance                      = 1.0f,
+                texLODBias                                   = setting.texLODBias + dlssBias,
+                invSubSampleCount                            = 1.0f / spp,
+                fireflyFilterThreshold                       = fireflyThreshold,
+                preExposedGrayLuminance                      = preExposedGrayLuminance,
                 denoisingEnabled                             = isDlssRR ? 1u : 0u,
                 frameIndex                                   = fs.frameIndex,
                 useReSTIRDI                                  = 0u,
@@ -123,8 +159,8 @@ namespace PathTracing
                 _padding3                                    = 0f,
                 _padding4                                    = 0u,
                 stablePlanesSuppressPrimaryIndirectSpecularK = 0f,
-                denoiserRadianceClampK                       = isDlssRR ? setting.dlssrrBrightnessClampK : setting.denoiserRadianceClampK,
-                dlssRRBrightnessClampK                       = setting.dlssrrBrightnessClampK,
+                denoiserRadianceClampK                       = setting.denoiserRadianceClampK,
+                dlssRRBrightnessClampK                       = dlssRRClamp,
                 stablePlanesAntiAliasingFallthrough          = 0.04f,
                 activeStablePlaneCount                       = (uint)setting.stablePlanesActiveCount,
                 maxStablePlaneVertexDepth                    = 8u,
