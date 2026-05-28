@@ -54,6 +54,9 @@ namespace PathTracing
             var cmd = CommandBufferHelpers.GetNativeCommandBuffer(context.cmd);
 
             cmd.BeginSample(RenderPassMarkers.TLAS);
+            // Record the deferred t_InstanceData upload (transforms updated this frame) before
+            // the TLAS build, so the structured buffer is current for downstream RTXPT passes.
+            data.GpuScene.FlushInstanceBuffer(cmd);
             data.GpuScene.BuildAccelerationStructure(cmd);
             // Rebuild each pipeline's hit-group table only when the scene topology changed,
             // not every frame (no-op while the scene is static).

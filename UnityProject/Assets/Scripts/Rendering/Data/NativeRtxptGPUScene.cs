@@ -29,7 +29,10 @@ namespace PathTracing
         private RayTracingAccelerationStructure _accelStructure;
 
         // Structured buffers (donut-compatible)
-        private GraphicsBuffer _instanceGpuBuf; // t_InstanceData  (t2)
+        // t_InstanceData (t2): transforms are re-uploaded every frame, so this uses
+        // NativeStructuredBuffer — its NativePtr is stable across SetData (unlike
+        // GraphicsBuffer.GetNativeBufferPtr), so we fetch the pointer once at creation.
+        private NativeStructuredBuffer _instanceGpuBuf;
         private GraphicsBuffer _geometryGpuBuf; // t_GeometryData  (t3)
 
         // RTXPT-specific structured buffers
@@ -348,7 +351,7 @@ namespace PathTracing
             else { subInstancePtr = IntPtr.Zero; subInstanceCount = 0; subInstanceStride = 1; }
 
             if (_instanceGpuBuf != null)
-            { instancePtr = _instanceGpuBufPtr; instanceCount = _instanceGpuBuf.count; instanceStride = _instanceGpuBuf.stride; }
+            { instancePtr = _instanceGpuBufPtr; instanceCount = _instanceGpuBuf.Capacity; instanceStride = _instanceGpuBuf.Stride; }
             else { instancePtr = IntPtr.Zero; instanceCount = 0; instanceStride = 1; }
 
             if (_geometryGpuBuf != null)
@@ -370,7 +373,7 @@ namespace PathTracing
         {
             if (ds == null) return;
             ds.SetStructuredBuffer("t_SubInstanceData", _subInstanceGpuBufPtr, _subInstanceGpuBuf.count, _subInstanceGpuBuf.stride);
-            ds.SetStructuredBuffer("t_InstanceData", _instanceGpuBufPtr, _instanceGpuBuf.count, _instanceGpuBuf.stride);
+            ds.SetStructuredBuffer("t_InstanceData", _instanceGpuBufPtr, _instanceGpuBuf.Capacity, _instanceGpuBuf.Stride);
             ds.SetStructuredBuffer("t_GeometryData", _geometryGpuBufPtr, _geometryGpuBuf.count, _geometryGpuBuf.stride);
             ds.SetStructuredBuffer("t_GeometryDebugData", _geomDebugGpuBufPtr, _geomDebugGpuBuf.count, _geomDebugGpuBuf.stride);
             ds.SetStructuredBuffer("t_PTMaterialData", _ptMaterialGpuBufPtr, _ptMaterialGpuBuf.count, _ptMaterialGpuBuf.stride);
@@ -382,7 +385,7 @@ namespace PathTracing
         {
             if (ds == null) return;
             ds.SetStructuredBuffer("t_SubInstanceData", _subInstanceGpuBufPtr, _subInstanceGpuBuf.count, _subInstanceGpuBuf.stride);
-            ds.SetStructuredBuffer("t_InstanceData", _instanceGpuBufPtr, _instanceGpuBuf.count, _instanceGpuBuf.stride);
+            ds.SetStructuredBuffer("t_InstanceData", _instanceGpuBufPtr, _instanceGpuBuf.Capacity, _instanceGpuBuf.Stride);
             ds.SetStructuredBuffer("t_GeometryData", _geometryGpuBufPtr, _geometryGpuBuf.count, _geometryGpuBuf.stride);
             ds.SetStructuredBuffer("t_GeometryDebugData", _geomDebugGpuBufPtr, _geomDebugGpuBuf.count, _geomDebugGpuBuf.stride);
             ds.SetStructuredBuffer("t_PTMaterialData", _ptMaterialGpuBufPtr, _ptMaterialGpuBuf.count, _ptMaterialGpuBuf.stride);
@@ -394,6 +397,16 @@ namespace PathTracing
         public void BuildAccelerationStructure(CommandBuffer cmd)
         {
             _accelStructure.BuildOrUpdate(cmd);
+        }
+
+        /// <summary>
+        /// Records the deferred GPU copy for any t_InstanceData writes accumulated this frame
+        /// by <see cref="UpdateInstanceTransforms"/>. A no-op when nothing changed. Must run in
+        /// the same CommandBuffer as the TLAS build, before any pass that reads t_InstanceData.
+        /// </summary>
+        public void FlushInstanceBuffer(CommandBuffer cmd)
+        {
+            _instanceGpuBuf?.Flush(cmd);
         }
 
         /// <summary>
@@ -526,7 +539,7 @@ namespace PathTracing
 
         private void DisposeGpuBuffers()
         {
-            _instanceGpuBuf?.Release();
+            _instanceGpuBuf?.Dispose();
             _instanceGpuBuf = null;
             _instanceGpuBufPtr = IntPtr.Zero;
             _geometryGpuBuf?.Release();
@@ -865,9 +878,11 @@ namespace PathTracing
             _ptMaterialCpu  = ptMatList.ToArray();
             _geomDebugCpu   = geomDbgList.ToArray();
 
-            _instanceGpuBuf = new GraphicsBuffer(GraphicsBuffer.Target.Structured, _instanceCpu.Length, Marshal.SizeOf<DonutInstanceData>());
-            _instanceGpuBuf.SetData(_instanceCpu);
-            _instanceGpuBufPtr = _instanceGpuBuf.GetNativeBufferPtr();
+            // Ranges mode: per-frame transform updates touch only the moved instances,
+            // so we upload just those sub-ranges rather than a full-buffer span.
+            _instanceGpuBuf = new NativeStructuredBuffer(_instanceCpu.Length, Marshal.SizeOf<DonutInstanceData>());
+            _instanceGpuBuf.SetData(_instanceCpu, 0, _instanceCpu.Length);
+            _instanceGpuBufPtr = _instanceGpuBuf.NativePtr; // stable for the buffer's lifetime
 
             _geometryGpuBuf = new GraphicsBuffer(GraphicsBuffer.Target.Structured, _geometryCpu.Length, Marshal.SizeOf<DonutGeometryData>());
             _geometryGpuBuf.SetData(_geometryCpu);
@@ -1019,8 +1034,9 @@ namespace PathTracing
                     }
                 }
 
-                _instanceGpuBuf.SetData(_instanceCpu, start, start, count);
-                _instanceGpuBufPtr = _instanceGpuBuf.GetNativeBufferPtr();
+                // Pointer is stable; no GetNativeBufferPtr re-fetch needed. The GPU copy
+                // is recorded later by FlushInstanceBuffer(cmd) in the TLAS build pass.
+                _instanceGpuBuf.SetData(_instanceCpu, start, count);
                 entry.wasMoving = moved;
             }
         }
