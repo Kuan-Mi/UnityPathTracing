@@ -55,9 +55,15 @@ namespace PathTracing
 
             cmd.BeginSample(RenderPassMarkers.TLAS);
             data.GpuScene.BuildAccelerationStructure(cmd);
-            data.GpuScene.RebuildFillShaderTable(cmd, data.BuildPipeline);
-            data.GpuScene.RebuildFillShaderTable(cmd, data.FillPipeline);
-            data.GpuScene.RebuildFillShaderTable(cmd, data.RefPipeline);
+            // Rebuild each pipeline's hit-group table only when the scene topology changed,
+            // not every frame (no-op while the scene is static).
+            if (data.GpuScene.ShaderTableDirty)
+            {
+                data.GpuScene.RebuildShaderTable(cmd, data.BuildPipeline);
+                data.GpuScene.RebuildShaderTable(cmd, data.FillPipeline);
+                data.GpuScene.RebuildShaderTable(cmd, data.RefPipeline);
+                data.GpuScene.MarkShaderTableClean();
+            }
             cmd.EndSample(RenderPassMarkers.TLAS);
         }
     }

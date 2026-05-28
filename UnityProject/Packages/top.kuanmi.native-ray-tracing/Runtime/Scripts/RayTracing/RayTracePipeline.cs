@@ -41,6 +41,13 @@ namespace NativeRender
         private uint                     _slotCount;
         private Dictionary<string, uint> _nameToSlot = new Dictionary<string, uint>();
 
+        // Persisted event data for hit-group-table rebuild dispatches.
+        // Ring of 3 slots so consecutive rebuilds don't overwrite a slot the render
+        // thread may still be reading from a previous (in-flight) frame.
+        private const int kShtRingSize = 3;
+        private NativeArray<NativeRenderPlugin.ShtRebuildEventData> _shtEventData;
+        private int _shtRingIndex;
+
         // -------------------------------------------------------------------
         // Construction
         // -------------------------------------------------------------------
@@ -239,6 +246,8 @@ namespace NativeRender
             RayTraceShader.OnRecompiled  -= OnShaderRecompiled;
             HitGroupShader.OnRecompiled  -= OnHitGroupShaderRecompiled;
 
+            if (_shtEventData.IsCreated) _shtEventData.Dispose();
+
             if (_handle != 0)
             {
                 GL.Flush();
@@ -264,14 +273,39 @@ namespace NativeRender
         }
 
         /// <summary>
-        /// Issues a render event to rebuild the hit-group shader table for <paramref name="accelStruct"/>.
-        /// C# pre-computed the flat variant-index array is stored inside accelStruct.
-        /// Call this in the same CommandBuffer, after the AS BuildOrUpdate event.
+        /// Issues a render event to rebuild this pipeline's hit-group shader table from the
+        /// caller-supplied flat per-geometry <paramref name="variantIndices"/> array (one entry
+        /// per TLAS geometry, selecting which hit-group export to use). The array must stay
+        /// allocated until the render thread has consumed the event (i.e. for the duration of
+        /// GPU execution); the caller owns its lifetime.
+        ///
+        /// No <see cref="RayTracingAccelerationStructure"/> dependency: only rebuild when the
+        /// variant layout actually changes (e.g. on a scene topology change), not every frame.
         /// </summary>
-        public void RebuildHitGroupTable(CommandBuffer cmd, RayTracingAccelerationStructure accelStruct)
-        {                             
-            if (!IsValid || accelStruct == null) return;
-            accelStruct.IssueRebuildHitGroupTable(cmd, _handle);
+        public unsafe void RebuildHitGroupTable(CommandBuffer cmd, NativeArray<uint> variantIndices)
+        {
+            if (!IsValid || !variantIndices.IsCreated || variantIndices.Length == 0) return;
+
+            if (!_shtEventData.IsCreated)
+                _shtEventData = new NativeArray<NativeRenderPlugin.ShtRebuildEventData>(kShtRingSize, Allocator.Persistent);
+
+            // Advance ring index so we never overwrite the slot the render thread
+            // may still be reading from a previous (in-flight) frame.
+            _shtRingIndex = (_shtRingIndex + 1) % kShtRingSize;
+
+            _shtEventData[_shtRingIndex] = new NativeRenderPlugin.ShtRebuildEventData
+            {
+                shaderHandle      = _handle,
+                variantIndicesPtr = (IntPtr)NativeArrayUnsafeUtility.GetUnsafeReadOnlyPtr(variantIndices),
+                count             = (uint)variantIndices.Length,
+                _pad              = 0,
+            };
+
+            var basePtr = (NativeRenderPlugin.ShtRebuildEventData*)NativeArrayUnsafeUtility.GetUnsafePtr(_shtEventData);
+            cmd.IssuePluginEventAndData(
+                NativeRenderPlugin.NR_RTS_GetRebuildHitGroupTableEventFunc(),
+                2,
+                (IntPtr)(basePtr + _shtRingIndex));
         }
     }
 }

@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Runtime.InteropServices;
 using NativeRender;
+using Unity.Collections;
 using UnityEngine;
 using UnityEngine.Rendering;
 using RayTracingAccelerationStructure = NativeRender.RayTracingAccelerationStructure;
@@ -75,6 +76,21 @@ namespace PathTracing
 
         // Maps MeshRenderer.GetInstanceID() → list of per-group TLAS handles registered in _accelStructure.
         private readonly Dictionary<int, List<uint>> _perTargetGroupHandles = new();
+
+        // Flat per-geometry hit-group variant index (one entry per TLAS geometry, in insertion
+        // order), used to rebuild each ray-trace pipeline's hit-group shader table. Owned here
+        // (not by the AS) so RayTraceShader and RayTracingAccelerationStructure stay decoupled.
+        // Rebuilt only when the scene topology changes (in RegisterScene); the SBT rebuild is
+        // then issued once per affected pipeline instead of every frame.
+        private NativeArray<uint> _variantIndexArray;
+        private bool              _shaderTableDirty;
+
+        /// <summary>
+        /// True when the per-geometry hit-group variant layout changed since the last
+        /// <see cref="MarkShaderTableClean"/>. While set, callers should rebuild the hit-group
+        /// table of every ray-trace pipeline via <see cref="RebuildShaderTable"/>.
+        /// </summary>
+        public bool ShaderTableDirty => _shaderTableDirty;
 
         private bool _sceneGpuDirty = true;
         private bool _forceRebuild  = false;
@@ -365,19 +381,26 @@ namespace PathTracing
         }
 
         /// <summary>
-        /// Issues a render event to rebuild the fill-shader hit-group table.
-        /// Call in the same CommandBuffer, immediately after BuildAccelerationStructure.
+        /// Issues a render event to rebuild <paramref name="pipeline"/>'s hit-group table from the
+        /// scene's flat per-geometry variant array. Only does work while <see cref="ShaderTableDirty"/>
+        /// is set (i.e. after a scene topology change); call once per pipeline, then
+        /// <see cref="MarkShaderTableClean"/>. Issue in the same CommandBuffer as the TLAS build.
         /// </summary>
-        public void RebuildFillShaderTable(CommandBuffer cmd, RayTracePipeline fillPipeline)
-        { 
-            fillPipeline?.RebuildHitGroupTable(cmd, _accelStructure);
+        public void RebuildShaderTable(CommandBuffer cmd, RayTracePipeline pipeline)
+        {
+            if (!_shaderTableDirty || pipeline == null || !_variantIndexArray.IsCreated) return;
+            pipeline.RebuildHitGroupTable(cmd, _variantIndexArray);
         }
+
+        /// <summary>Clears the dirty flag after every pipeline's hit-group table has been rebuilt.</summary>
+        public void MarkShaderTableClean() => _shaderTableDirty = false;
 
         public void Dispose()
         {
             if (_disposed) return;
             _disposed = true;
             DisposeGpuBuffers();
+            if (_variantIndexArray.IsCreated) _variantIndexArray.Dispose();
             _accelStructure?.Dispose();
             _accelStructure = null;
         }
@@ -407,6 +430,13 @@ namespace PathTracing
                     }
                 }
             }
+
+            // Flat per-geometry hit-group variant array, rebuilt in lockstep with the TLAS
+            // insertion order. runningContribution is each group's InstanceContributionToHitGroupIndex
+            // (the base offset of its geometries in the flat shader table) — the value the AS used to
+            // compute internally, now pre-calculated here so the AS stays free of hit-group concerns.
+            var  variantList         = new List<uint>();
+            uint runningContribution = 0;
 
             foreach (var t in targets)
             {
@@ -443,10 +473,13 @@ namespace PathTracing
 
                         uint handle          = MakeGroupHandle(mrId, gi);
                         uint hitGroupVariant = grp.isEmissive ? 0u : 1u;
-                        if (_accelStructure.AddInstanceGroup(mesh, descs, handle, hitGroupVariantIndex: hitGroupVariant))
+                        if (_accelStructure.AddInstanceGroup(mesh, descs, handle, hitGroupContribution: runningContribution))
                         {
                             _accelStructure.SetInstanceTransform(handle, mr.transform.localToWorldMatrix);
                             handles.Add(handle);
+                            for (int si = 0; si < subCnt; si++)
+                                variantList.Add(hitGroupVariant);
+                            runningContribution += (uint)subCnt;
                         }
                         else
                         {
@@ -463,6 +496,13 @@ namespace PathTracing
                     _accelStructure.AddInstance(mr);
                 }
             }
+
+            // Publish the new per-geometry variant array and flag pipelines for a one-time SBT rebuild.
+            if (_variantIndexArray.IsCreated) _variantIndexArray.Dispose();
+            _variantIndexArray = new NativeArray<uint>(variantList.Count, Allocator.Persistent);
+            for (int i = 0; i < variantList.Count; i++)
+                _variantIndexArray[i] = variantList[i];
+            _shaderTableDirty = true;
         }
 
         private static uint MakeGroupHandle(int mrInstanceId, int groupIndex)
