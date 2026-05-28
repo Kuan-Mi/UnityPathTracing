@@ -4,9 +4,10 @@
 
 // ---------------------------------------------------------------------------
 // RayTraceDescriptorSet
-//   Owns the GPU-heap slice (SRV / UAV allocations) for one logical descriptor
-//   set tied to a RayTraceShader.  All common descriptor management is
-//   provided by DescriptorSetBase<RayTraceShader>.
+//   Binds resources and issues one DispatchRays for a RayTraceShader.  Holds no
+//   per-frame GPU-heap state of its own: each Dispatch bump-allocates its
+//   SRV/UAV descriptor table from the global TransientDescriptorRing.  All
+//   common descriptor management is provided by DescriptorSetBase<RayTraceShader>.
 //
 //   Lifetime: created via NR_RTS_CreateDescriptorSet /
 //             destroyed via NR_RTS_DestroyDescriptorSet (both called from C#).

@@ -25,7 +25,7 @@
 //     uint32_t                           GetRootParamUAV()        const
 //     uint32_t                           GetRootParamCBVBase()    const
 //     uint32_t                           GetRootParamRootSRVBase()const
-//     const std::vector<ComputeBinding>& GetBindings()            const
+//     const std::vector<Binding>&        GetBindings()            const
 //     ID3D12RootSignature*               GetRootSignature()       const
 //
 //   Explicit template instantiations for ComputeShader and RayTraceShader

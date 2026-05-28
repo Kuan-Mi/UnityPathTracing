@@ -64,7 +64,7 @@ const char* ShaderBase::GetBindingName(uint32_t index) const
 
 // ===========================================================================
 // ClassifyBinding
-//   Fills type / num32BitValues / m_num* on a freshly zeroed ComputeBinding
+//   Fills type / num32BitValues / m_num* on a freshly zeroed Binding
 //   using the D3D12 reflection descriptor and pre-load hints.
 //   Returns false for samplers (caller should handle separately).
 // ===========================================================================

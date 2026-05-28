@@ -42,12 +42,10 @@ namespace
 // ---------------------------------------------------------------------------
 
 bool RayTraceShader::Initialize(ID3D12Device5* device, IUnityLog* log,
-                                 DescriptorHeapAllocator* allocator,
                                  IUnityGraphicsD3D12v8*   d3d12v8)
 {
     m_log       = log;
     m_device    = device;
-    m_allocator = allocator;
     m_d3d12v8   = d3d12v8;
     return true;
 }

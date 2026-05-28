@@ -12,7 +12,7 @@
 #include "IUnityLog.h"
 #include "IUnityGraphicsD3D12.h"
 #include "DescriptorHeapAllocator.h"
-#include "ShaderBindings.h"  // ComputeBindingType, ComputeBinding, CS_BindingSlot
+#include "ShaderBindings.h"  // BindingType, Binding, BindingSlot
 
 using Microsoft::WRL::ComPtr;
 
@@ -70,7 +70,7 @@ protected:
     bool BuildRootSignature();
 
     // --- Shared reflection helpers ---
-    //   ClassifyBinding: fills type/num fields on a ComputeBinding from a
+    //   ClassifyBinding: fills type/num fields on a Binding from a
     //   D3D12_SHADER_INPUT_BIND_DESC, using current hints.  Returns false if
     //   the binding should be skipped (samplers → caller handles separately).
     bool ClassifyBinding(const D3D12_SHADER_INPUT_BIND_DESC& bind,
@@ -84,7 +84,6 @@ protected:
     // --- Shared state ---
     IUnityLog*               m_log       = nullptr;
     ComPtr<ID3D12Device5>    m_device;           // unified to Device5; CS uses as Device
-    DescriptorHeapAllocator* m_allocator = nullptr;
     IUnityGraphicsD3D12v8*   m_d3d12v8   = nullptr;
     std::string              m_name;
 

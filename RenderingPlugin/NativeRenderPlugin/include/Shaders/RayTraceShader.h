@@ -1,8 +1,8 @@
 #pragma once
-#include "ShaderBase.h"  // pulls in all D3D12/DXC/Unity headers + ComputeBinding types
+#include "ShaderBase.h"  // pulls in all D3D12/DXC/Unity headers + Binding types
 
-// RayTraceBindingType and RayTraceBinding are type aliases for the Compute
-// counterparts — shared descriptor-set logic uses ComputeBinding directly.
+// RayTraceBindingType and RayTraceBinding are kept as aliases for call-site
+// readability; shared descriptor-set logic uses Binding / BindingType directly.
 using RayTraceBindingType = BindingType;
 using RayTraceBinding     = Binding;
 
@@ -26,8 +26,7 @@ public:
     RayTraceShader()  = default;
     ~RayTraceShader() = default;
 
-    bool Initialize(ID3D12Device5* device, IUnityLog* log,
-                    DescriptorHeapAllocator* allocator, IUnityGraphicsD3D12v8* d3d12v8);
+    bool Initialize(ID3D12Device5* device, IUnityLog* log, IUnityGraphicsD3D12v8* d3d12v8);
 
     // Build DXR pipeline from a single pre-compiled DXIL lib blob.
     // flags: bit 0 = allow D3D12_RAYTRACING_PIPELINE_FLAG_ALLOW_OPACITY_MICROMAPS (lib_6_9+).

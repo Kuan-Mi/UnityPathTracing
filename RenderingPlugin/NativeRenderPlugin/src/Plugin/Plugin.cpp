@@ -750,7 +750,7 @@ NR_CreateRayTraceShaderFromBytes(const uint8_t* dxilBytes, uint32_t size, const 
         return 0;
     }
     auto* shader = new RayTraceShader();
-    if (!shader->Initialize(dev5, s_Log, &s_DescHeap, s_D3D12v8) ||
+    if (!shader->Initialize(dev5, s_Log, s_D3D12v8) ||
         !shader->LoadShaderFromBytes(dxilBytes, size, name, flags, maxPayloadSizeInBytes, rayGenName))
     {
         delete shader;
@@ -810,7 +810,7 @@ NR_CreateRayTracePipelineFromBlobs(
         descs[i] = { blobDataPtrs[i], blobSizes[i] };
 
     auto* shader = new RayTraceShader();
-    if (!shader->Initialize(dev5, s_Log, &s_DescHeap, s_D3D12v8) ||
+    if (!shader->Initialize(dev5, s_Log, s_D3D12v8) ||
         !shader->LoadShaderFromMultipleBlobs(descs.data(), blobCount, name, flags,
                                              maxPayloadSizeInBytes, rayGenName))
     {
@@ -1673,7 +1673,7 @@ NR_CreateComputeShader(const uint8_t* dxilBytes, uint32_t size, const char* name
         return 0;
     }
     auto* cs = new ComputeShader();
-    if (!cs->Initialize(dev5, s_Log, &s_DescHeap, s_D3D12v8) ||
+    if (!cs->Initialize(dev5, s_Log, s_D3D12v8) ||
         !cs->LoadShaderFromBytes(dxilBytes, size, name))
     {
         delete cs;
@@ -1765,7 +1765,7 @@ NR_CreateComputeShaderEx(const uint8_t* dxilBytes, uint32_t size, const char* na
         return 0;
     }
     auto* cs = new ComputeShader();
-    if (!cs->Initialize(dev5, s_Log, &s_DescHeap, s_D3D12v8))
+    if (!cs->Initialize(dev5, s_Log, s_D3D12v8))
     {
         delete cs;
         dev5->Release();
