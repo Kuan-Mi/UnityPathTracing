@@ -52,10 +52,10 @@ public:
     ~NativeStructuredBuffer();
 
     /// <summary>
-    /// Render-thread: stages |payloadBytes| of packed data through one transient UPLOAD
-    /// buffer and records a CopyBufferRegion per range (COMMON->COPY_DEST->COMMON). Each
-    /// range copies only its own slice; untouched regions of the DEFAULT buffer keep their
-    /// previously-uploaded contents. The transient buffer is defer-released.
+    /// Render-thread: stages the packed payload through one suballocation from the shared
+    /// UPLOAD chunk pool and records a CopyBufferRegion per range (COMMON->COPY_DEST->COMMON).
+    /// Each range copies only its own slice; untouched regions of the DEFAULT buffer keep
+    /// their previously-uploaded contents. The upload memory is recycled by the frame fence.
     /// </summary>
     void UploadSnapshot(ID3D12GraphicsCommandList* cmdList,
                         const NsbFlushRange*       ranges,

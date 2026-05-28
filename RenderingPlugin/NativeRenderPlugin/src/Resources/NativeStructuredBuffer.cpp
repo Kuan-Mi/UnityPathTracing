@@ -3,7 +3,6 @@
 #include <cstring>
 #include <cassert>
 #include <cstdio>
-#include <utility>
 #include <windows.h>
 
 // ---------------------------------------------------------------------------
@@ -11,7 +10,8 @@
 //
 // Fixed-capacity DEFAULT-heap buffer. CPU writes are buffered on the C# side and
 // arrive as a self-describing snapshot blob; UploadSnapshot stages them to the GPU
-// through a transient UPLOAD buffer, mirroring nvrhi's CommandList::writeBuffer.
+// through the shared UPLOAD chunk pool (g_uploadPool), mirroring nvrhi's
+// CommandList::writeBuffer + UploadManager.
 // ---------------------------------------------------------------------------
 
 NativeStructuredBuffer::~NativeStructuredBuffer() = default;
@@ -71,43 +71,23 @@ void NativeStructuredBuffer::UploadSnapshot(ID3D12GraphicsCommandList* cmdList,
     assert(cmdList);
     if (!cmdList || !ranges || rangeCount == 0 || !payload) return;
 
-    // The packed payload spans [0, totalBytes); copy it through one transient UPLOAD buffer.
+    // The packed payload spans [0, totalBytes); stage it through one shared-pool allocation.
     uint64_t totalBytes = 0;
     for (uint32_t i = 0; i < rangeCount; ++i)
         totalBytes += static_cast<uint64_t>(ranges[i].elementCount) * m_stride;
     if (totalBytes == 0) return;
 
-    D3D12_HEAP_PROPERTIES uploadHeap = {};
-    uploadHeap.Type = D3D12_HEAP_TYPE_UPLOAD;
-
-    D3D12_RESOURCE_DESC uploadDesc = {};
-    uploadDesc.Dimension        = D3D12_RESOURCE_DIMENSION_BUFFER;
-    uploadDesc.Width            = totalBytes;
-    uploadDesc.Height           = 1;
-    uploadDesc.DepthOrArraySize = 1;
-    uploadDesc.MipLevels        = 1;
-    uploadDesc.SampleDesc.Count = 1;
-    uploadDesc.Layout           = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
-    uploadDesc.Flags            = D3D12_RESOURCE_FLAG_NONE;
-
-    ComPtr<ID3D12Resource> upload;
-    HRESULT hr = m_device->CreateCommittedResource(
-        &uploadHeap,
-        D3D12_HEAP_FLAG_NONE,
-        &uploadDesc,
-        D3D12_RESOURCE_STATE_GENERIC_READ,
-        nullptr,
-        IID_PPV_ARGS(&upload));
-    if (FAILED(hr))
+    // Suballocate from the shared UPLOAD chunk pool (recycled by frame fence) instead of
+    // creating a committed resource every flush.
+    SharedUploadPool::Allocation alloc = g_uploadPool.Allocate(totalBytes, 16);
+    if (!alloc.IsValid())
     {
-        Log("[NativeStructuredBuffer::UploadSnapshot] transient upload allocation failed");
+        Log("[NativeStructuredBuffer::UploadSnapshot] shared upload allocation failed");
         return;
     }
 
-    void* mapped = nullptr;
-    const D3D12_RANGE readRange = { 0, 0 };
-    hr = upload->Map(0, &readRange, &mapped);
-    if (FAILED(hr)) return;
+    // The payload is contiguous; copy it once into the suballocation.
+    memcpy(alloc.cpu, payload, static_cast<size_t>(totalBytes));
 
     // COMMON -> COPY_DEST. The buffer starts in COMMON and decays back to COMMON at each
     // ExecuteCommandLists boundary, so this transition is always valid here.
@@ -125,23 +105,15 @@ void NativeStructuredBuffer::UploadSnapshot(ID3D12GraphicsCommandList* cmdList,
         const uint64_t bytes      = static_cast<uint64_t>(r.elementCount) * m_stride;
         const uint64_t destOffset = static_cast<uint64_t>(r.elementOffset) * m_stride;
 
-        memcpy(reinterpret_cast<uint8_t*>(mapped) + r.payloadByteOffset,
-               payload + r.payloadByteOffset,
-               static_cast<size_t>(bytes));
-
         // Each range copies only its own slice; untouched regions of the DEFAULT
         // buffer keep their previously-uploaded contents.
-        cmdList->CopyBufferRegion(m_buffer.Get(), destOffset, upload.Get(), r.payloadByteOffset, bytes);
+        cmdList->CopyBufferRegion(m_buffer.Get(), destOffset,
+                                  alloc.resource, alloc.offset + r.payloadByteOffset, bytes);
     }
-
-    upload->Unmap(0, nullptr);
 
     // COPY_DEST -> COMMON. Returning to COMMON lets the resource be implicitly promoted
     // to NON_PIXEL_SHADER_RESOURCE when shaders read it later in the same command list.
     barrier.Transition.StateBefore = D3D12_RESOURCE_STATE_COPY_DEST;
     barrier.Transition.StateAfter  = D3D12_RESOURCE_STATE_COMMON;
     cmdList->ResourceBarrier(1, &barrier);
-
-    // Keep the transient upload buffer alive until the GPU has consumed the copy.
-    EnqueueCleanup([res = std::move(upload)] {});
 }

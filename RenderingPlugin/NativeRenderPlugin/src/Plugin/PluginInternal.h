@@ -1,6 +1,7 @@
 #pragma once
 #include "DescriptorHeapAllocator.h"
 #include "TransientDescriptorRing.h"
+#include "SharedUploadPool.h"
 #include <cstdint>
 #include <functional>
 
@@ -55,3 +56,11 @@ extern uint32_t g_frameIndex;
 //   reclaimed by the frame fence at each NR_FrameTick.
 // ---------------------------------------------------------------------------
 extern TransientDescriptorRing g_transientRing;
+
+// ---------------------------------------------------------------------------
+// g_uploadPool
+//   Shared UPLOAD-heap chunk pool used to stage CPU writes into DEFAULT-heap
+//   buffers (e.g. NativeStructuredBuffer::UploadSnapshot). Initialised at renderer
+//   init; chunks are reclaimed by the frame fence at each NR_FrameTick.
+// ---------------------------------------------------------------------------
+extern SharedUploadPool g_uploadPool;

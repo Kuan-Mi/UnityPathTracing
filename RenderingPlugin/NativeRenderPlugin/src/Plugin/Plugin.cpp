@@ -73,6 +73,10 @@ TransientDescriptorRing g_transientRing;
 // Must be <= DescriptorHeapAllocator::kCapacity minus expected bindless usage.
 static constexpr uint32_t kTransientRingCapacity = 32768u;
 
+// Shared UPLOAD-heap chunk pool (see PluginInternal.h). Stages CPU writes into
+// DEFAULT-heap buffers; chunks are recycled once the frame fence completes.
+SharedUploadPool g_uploadPool;
+
 // ---------------------------------------------------------------------------
 // Deferred delete queue — delays destruction of GPU-facing objects until the
 // GPU has finished executing all commands that may reference them.
@@ -355,6 +359,10 @@ static void UNITY_INTERFACE_API OnGraphicsDeviceEvent(UnityGfxDeviceEventType ev
             if (!g_transientRing.Initialize(&s_DescHeap, kTransientRingCapacity))
                 NR_ERROR("TransientDescriptorRing initialization failed");
 
+            // Shared UPLOAD-heap chunk pool for staging CPU writes into DEFAULT buffers.
+            if (!g_uploadPool.Initialize(device))
+                NR_ERROR("SharedUploadPool initialization failed");
+
             // 1-slot CPU-only heap used by ClearNativeGpuBufferCallback
             {
                 D3D12_DESCRIPTOR_HEAP_DESC hd = {};
@@ -394,6 +402,7 @@ static void UNITY_INTERFACE_API OnGraphicsDeviceEvent(UnityGfxDeviceEventType ev
         NR_LOG("Plugin shutdown - deferred deletes drained");
 
         g_transientRing.Shutdown();
+        g_uploadPool.Shutdown();
         s_DescHeap.Shutdown();
         s_ClearCpuHeap.Reset();
         s_RendererReady = false;
@@ -977,6 +986,10 @@ static void UNITY_INTERFACE_API FrameTickCallback(int /*eventId*/)
         const uint64_t completedValue = s_D3D12->GetFrameFence()->GetCompletedValue();
         const uint64_t frameFence     = s_D3D12->GetNextFrameFenceValue() + kDeleteDelay;
         g_transientRing.EndFrame(frameFence, completedValue);
+
+        // Recycle shared upload chunks under the same frame-fence discipline.
+        if (g_uploadPool.IsInitialized())
+            g_uploadPool.EndFrame(frameFence, completedValue);
     }
 }
 
