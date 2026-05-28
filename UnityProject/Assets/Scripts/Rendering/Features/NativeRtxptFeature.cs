@@ -115,11 +115,9 @@ namespace PathTracing
         // ---- Per-camera resource pools (key = instanceID + eyeIndex*100000) -
         private readonly Dictionary<long, NativeRtxptTextureResources> _texturePools      = new();
         private readonly Dictionary<long, NativeRtxptBufferResources>  _bufferPools       = new();
-        private readonly Dictionary<long, GraphicsBuffer>              _constantBuffers   = new();
+        private readonly Dictionary<long, NativeBuffer>                _constantBuffers   = new();
         private readonly Dictionary<long, DlrrDenoiser>                _dlrrDenoisers     = new();
         private readonly Dictionary<long, RtxptCameraFrameState>       _cameraFrameStates = new();
-
-        private readonly SampleConstants[] _sampleConstantsArray = new SampleConstants[1];
 
         // ---- Lifecycle ------------------------------------------------------
 
@@ -226,8 +224,7 @@ namespace PathTracing
 
             if (!_constantBuffers.TryGetValue(uniqueKey, out var constantBuffer))
             {
-                constantBuffer = new GraphicsBuffer(GraphicsBuffer.Target.Constant, 1,
-                    Marshal.SizeOf<SampleConstants>());
+                constantBuffer = new NativeBuffer(Marshal.SizeOf<SampleConstants>());
                 _constantBuffers.Add(uniqueKey, constantBuffer);
             }
 
@@ -257,8 +254,7 @@ namespace PathTracing
             // ---- Build & upload SampleConstants -----------------------------
             sampleConstants = NativeRtxptConstantsBuilder.Build(renderingData, setting, renderResolution, displayResolution, frameState);
 
-            _sampleConstantsArray[0] = sampleConstants;
-            constantBuffer.SetData(_sampleConstantsArray);
+            constantBuffer.Upload(renderer, sampleConstants);
 
             // ---- Build shared pass context ----------------------------------
             var passCtx = new NativeRtxptPassContext

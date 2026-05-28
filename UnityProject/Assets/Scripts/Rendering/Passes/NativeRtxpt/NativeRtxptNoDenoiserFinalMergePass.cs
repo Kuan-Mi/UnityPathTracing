@@ -71,8 +71,8 @@ namespace PathTracing
 
             cmd.BeginSample("Rtxpt.NoDenoiserFinalMerge");
 
-            if (ctx.ConstantBufferPtr != IntPtr.Zero)
-                ds.SetConstantBuffer("g_Const", ctx.ConstantBufferPtr);
+            if (ctx.ConstantBuffer != null)
+                ds.SetConstantBuffer("g_Const", ctx.ConstantBuffer);
 
             ds.SetRWTexture("u_OutputColor", res.OutputColor.NativePtr);
             ds.SetRWTexture("u_StablePlanesHeader", res.StablePlanesHeader.NativePtr);

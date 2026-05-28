@@ -1,5 +1,4 @@
 using System;
-using System.Runtime.InteropServices;
 using NativeRender;
 using Unity.Mathematics;
 using UnityEngine;
@@ -30,8 +29,10 @@ namespace PathTracing
         private readonly NativeRayTraceDescriptorSet _refDs;
 
         private          NativeRtxptPassContext _ctx;
-        private readonly SampleMiniConstants[]  _miniConstArray = new SampleMiniConstants[1];
-        private          GraphicsBuffer         _miniConstBuffer;
+        private static readonly RootConstantsHint[] MiniConstRootConstantsHints =
+        {
+            new RootConstantsHint { Name = "g_MiniConst", Count = 16 }
+        };
 
         /// <summary>Pipeline handles exposed for NativeRtxptBuildTlasPass hit-table rebuilds.</summary>
         public RayTracePipeline FillPipeline => _fillSP;
@@ -44,19 +45,14 @@ namespace PathTracing
             HitGroupShader[] referenceHitGroups = null)
         {
             _fillSP = fillHitGroups is { Length: > 0 }
-                ? new RayTracePipeline(fillStablePlanes, fillHitGroups)
-                : new RayTracePipeline(fillStablePlanes);
+                ? new RayTracePipeline(fillStablePlanes, fillHitGroups, MiniConstRootConstantsHints)
+                : new RayTracePipeline(fillStablePlanes, MiniConstRootConstantsHints);
             _fillDs = new NativeRayTraceDescriptorSet(_fillSP);
 
             _refSP = referenceHitGroups is { Length: > 0 }
-                ? new RayTracePipeline(reference, referenceHitGroups)
-                : new RayTracePipeline(reference);
+                ? new RayTracePipeline(reference, referenceHitGroups, MiniConstRootConstantsHints)
+                : new RayTracePipeline(reference, MiniConstRootConstantsHints);
             _refDs = new NativeRayTraceDescriptorSet(_refSP);
-
-            _miniConstBuffer = new GraphicsBuffer(
-                    GraphicsBuffer.Target.Constant, 1,
-                    Marshal.SizeOf<SampleMiniConstants>())
-                { name = "Rtxpt_MiniConst_Fill" };
         }
 
         public void Dispose()
@@ -65,8 +61,6 @@ namespace PathTracing
             _fillSP?.Dispose();
             _refDs?.Dispose();
             _refSP?.Dispose();
-            _miniConstBuffer?.Dispose();
-            _miniConstBuffer = null;
         }
 
         public void Setup(NativeRtxptPassContext ctx) => _ctx = ctx;
@@ -78,7 +72,6 @@ namespace PathTracing
             internal RayTracePipeline            FillSP, RefSP;
             internal NativeRayTraceDescriptorSet FillDs, RefDs;
             internal NativeRtxptPassContext      Ctx;
-            internal GraphicsBuffer              MiniConstBuffer;
             internal int2                        RenderRes;
             internal bool                        IsRealtime;
         }
@@ -94,7 +87,6 @@ namespace PathTracing
             passData.RefSP              = _refSP;
             passData.RefDs              = _refDs;
             passData.Ctx                = _ctx;
-            passData.MiniConstBuffer    = _miniConstBuffer;
             passData.RenderRes          = _ctx.RenderResolution;
             passData.IsRealtime         = _ctx.Setting.realtimeMode;
 
@@ -104,23 +96,18 @@ namespace PathTracing
 
         // ── Execute ────────────────────────────────────────────────────────────
 
-        private static void ExecutePass(PassData data, UnsafeGraphContext context)
+        private static unsafe void ExecutePass(PassData data, UnsafeGraphContext context)
         {
             var cmd = CommandBufferHelpers.GetNativeCommandBuffer(context.cmd);
             var ctx = data.Ctx;
             var res = ctx.Textures;
             var buf = ctx.Buffers;
 
-            // Upload g_MiniConst (same values as BuildStablePlanes, frame-consistent)
-            data.MiniConstBuffer.SetData(new[]
+            var miniConst = new SampleMiniConstants
             {
-                new SampleMiniConstants
-                {
-                    params0x = ctx.FrameState.frameIndex,
-                    params0y = (ctx.FrameState.frameIndex & 1),
-                }
-            });
-            var miniConstBufferPtr = data.MiniConstBuffer.GetNativeBufferPtr();
+                params0x = ctx.FrameState.frameIndex,
+                params0y = (ctx.FrameState.frameIndex & 1),
+            };
 
             var tlas = ctx.GpuScene?.AccelerationStructure;
 
@@ -129,7 +116,7 @@ namespace PathTracing
                 cmd.BeginSample("Rtxpt.FillStablePlanes");
                 {
                     var ds = data.FillDs;
-                    BindCommonRT(ds, ctx, miniConstBufferPtr, tlas);
+                    BindCommonRT(ds, ctx, &miniConst, tlas);
                     BindLightBuffers(ds, ctx);
 
                     ds.SetRWTexture("u_ShaderDebugVizTextureBuffer", res.ShaderDebugViz.NativePtr);
@@ -147,7 +134,7 @@ namespace PathTracing
                 cmd.BeginSample("Rtxpt.Reference");
                 {
                     var ds = data.RefDs;
-                    BindCommonRT(ds, ctx, miniConstBufferPtr, tlas);
+                    BindCommonRT(ds, ctx, &miniConst, tlas);
                     BindLightBuffers(ds, ctx);
 
                     ds.SetRWTexture("u_OutputColor",   res.OutputColor.NativePtr);
@@ -164,14 +151,14 @@ namespace PathTracing
 
         // ── Binding helpers ────────────────────────────────────────────────────
 
-        private static void BindCommonRT(
+        private static unsafe void BindCommonRT(
             NativeRayTraceDescriptorSet ds,
             NativeRtxptPassContext ctx,
-            IntPtr miniConstBufferPtr,
+            SampleMiniConstants* miniConst,
             RayTracingAccelerationStructure tlas)
         {
-            ds.SetConstantBuffer("g_Const",     ctx.ConstantBufferPtr);
-            ds.SetConstantBuffer("g_MiniConst", miniConstBufferPtr);
+            ds.SetConstantBuffer("g_Const",     ctx.ConstantBuffer);
+            ds.SetRootConstants("g_MiniConst", miniConst);
             ds.SetAccelerationStructure("SceneBVH", tlas);
 
             ctx.GpuScene.BindToShader(ds);

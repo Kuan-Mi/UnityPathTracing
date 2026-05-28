@@ -73,8 +73,8 @@ namespace PathTracing
 
             cmd.BeginSample("Rtxpt.StablePlanesDebugViz");
 
-            if (ctx.ConstantBufferPtr != IntPtr.Zero)
-                ds.SetConstantBuffer("g_Const", ctx.ConstantBufferPtr);
+            if (ctx.ConstantBuffer != null)
+                ds.SetConstantBuffer("g_Const", ctx.ConstantBuffer);
 
             ds.SetRWTexture("u_StablePlanesHeader", res.StablePlanesHeader.NativePtr);
             ds.SetRWTexture("u_StableRadiance",     res.StableRadiance.NativePtr);

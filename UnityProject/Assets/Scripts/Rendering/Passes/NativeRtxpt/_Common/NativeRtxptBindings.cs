@@ -39,7 +39,7 @@ namespace PathTracing
         private static void BindConstantsAndScene(NativeComputeDescriptorSet ds, NativeRtxptPassContext ctx)
         {
             // if (ctx.ConstantBuffer != null)
-            //     ds.SetConstantBuffer("g_Const", ctx.ConstantBuffer.GetNativeBufferPtr());
+            //     ds.SetConstantBuffer("g_Const", ctx.ConstantBuffer);
             //
             // var tlas = ctx.NrdSampleResource?.AccelerationStructure;
             // if (tlas != null)

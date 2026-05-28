@@ -1,5 +1,6 @@
 using System;
 using System.Runtime.InteropServices;
+using NativeRender;
 using Unity.Mathematics;
 using UnityEngine;
 using UnityEngine.Rendering;
@@ -113,10 +114,10 @@ namespace PathTracing
 
         // ── Env map baker constant buffers ────────────────────────────────────
         /// <summary>Constant buffer for the base-layer env bake pass. 704 bytes.</summary>
-        public GraphicsBuffer EnvBakerCb;
+        public NativeBuffer EnvBakerCb;
 
         /// <summary>Constant buffer for the importance baker pass. 48 bytes.</summary>
-        public GraphicsBuffer ImportanceBakerCb;
+        public NativeBuffer ImportanceBakerCb;
 
         // ── Cached native pointers (immutable after allocation) ───────────────
         // Resolution-dependent buffers — valid after EnsureResources(), cleared on resize
@@ -138,9 +139,6 @@ namespace PathTracing
         public IntPtr ScratchListBufferPtr        { get; private set; }
 
         // Env baker CBs — valid after EnsureEnvBakerBuffers()
-        public IntPtr EnvBakerCbPtr        { get; private set; }
-        public IntPtr ImportanceBakerCbPtr { get; private set; }
-
         public void RefreshLightControlBufferPtr()
         {
             LightControlBufferPtr = LightControlBuffer?.GetNativeBufferPtr() ?? IntPtr.Zero;
@@ -155,12 +153,6 @@ namespace PathTracing
         public void RefreshLightScratchBufferPtr()
         {
             LightScratchBufferPtr = LightScratchBuffer?.GetNativeBufferPtr() ?? IntPtr.Zero;
-        }
-
-        public void RefreshEnvBakerBufferPtrs()
-        {
-            EnvBakerCbPtr        = EnvBakerCb?.GetNativeBufferPtr()        ?? IntPtr.Zero;
-            ImportanceBakerCbPtr = ImportanceBakerCb?.GetNativeBufferPtr() ?? IntPtr.Zero;
         }
 
         // ── Resolved resolution ───────────────────────────────────────────────
@@ -329,15 +321,11 @@ namespace PathTracing
         /// </summary>
         public void EnsureEnvBakerBuffers()
         {
-            if (EnvBakerCb != null && EnvBakerCb.IsValid()) return;
+            if (EnvBakerCb != null && ImportanceBakerCb != null) return;
             EnvBakerCb?.Dispose();
-            EnvBakerCb = new GraphicsBuffer(GraphicsBuffer.Target.Constant, 704 / sizeof(uint), sizeof(uint))
-                { name = "Rtxpt_EnvBakerCb" };
-            EnvBakerCbPtr = EnvBakerCb.GetNativeBufferPtr();
+            EnvBakerCb = new NativeBuffer(704);
             ImportanceBakerCb?.Dispose();
-            ImportanceBakerCb = new GraphicsBuffer(GraphicsBuffer.Target.Constant, 48 / sizeof(uint), sizeof(uint))
-                { name = "Rtxpt_ImportanceBakerCb" };
-            ImportanceBakerCbPtr = ImportanceBakerCb.GetNativeBufferPtr();
+            ImportanceBakerCb = new NativeBuffer(48);
         }
 
         private void ReleaseResolutionBuffers()
@@ -355,8 +343,8 @@ namespace PathTracing
 
         private void ReleaseLightBuffers()
         {
-            EnvBakerCb?.Dispose();               EnvBakerCb               = null; EnvBakerCbPtr        = IntPtr.Zero;
-            ImportanceBakerCb?.Dispose();         ImportanceBakerCb        = null; ImportanceBakerCbPtr = IntPtr.Zero;
+            EnvBakerCb?.Dispose();               EnvBakerCb               = null;
+            ImportanceBakerCb?.Dispose();         ImportanceBakerCb        = null;
             FeedbackBuffer?.Release();            FeedbackBuffer           = null; FeedbackBufferPtr           = IntPtr.Zero;
             LightControlBuffer?.Release();        LightControlBuffer       = null; LightControlBufferPtr       = IntPtr.Zero;
             LightBuffer?.Release();               LightBuffer              = null; LightBufferPtr              = IntPtr.Zero;

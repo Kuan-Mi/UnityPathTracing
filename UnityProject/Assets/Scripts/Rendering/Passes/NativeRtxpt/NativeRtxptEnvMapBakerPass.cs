@@ -52,10 +52,7 @@ namespace PathTracing
             ctx.Buffers.EnsureEnvBakerBuffers();
 
             FillEnvBakerConstants(ctx.Setting);
-            ctx.Buffers.EnvBakerCb.SetData(s_envBakerWords);
             FillImportanceBakerConstants();
-            ctx.Buffers.ImportanceBakerCb.SetData(s_importanceWords);
-            ctx.Buffers.RefreshEnvBakerBufferPtrs();
 
             ctx.BakedEnvCubePtr                = ctx.Textures.EnvCubeMip0.IsCreated ? ctx.Textures.EnvCubeMip0.NativePtr : IntPtr.Zero;
             ctx.EnvImportanceMapPtr            = ctx.Textures.EnvImportanceMap.IsCreated ? ctx.Textures.EnvImportanceMap.NativePtr : IntPtr.Zero;
@@ -68,8 +65,10 @@ namespace PathTracing
             internal NativeComputeDescriptorSet BaseLayerDs;
             internal NativeComputePipeline      ImportanceBakerCs;
             internal NativeComputeDescriptorSet ImportanceBakerDs;
-            internal IntPtr                     EnvBakerCbPtr;
-            internal IntPtr                     ImportanceBakerCbPtr;
+            internal NativeBuffer               EnvBakerCb;
+            internal NativeBuffer               ImportanceBakerCb;
+            internal uint[]                     EnvBakerWords;
+            internal uint[]                     ImportanceWords;
             internal IntPtr                     SkyTexturePtr;
             internal IntPtr                     EnvCubeMip0Ptr;
             internal IntPtr                     EnvCubeMip1Ptr;
@@ -89,8 +88,10 @@ namespace PathTracing
             pd.BaseLayerDs          = _baseLayerDs;
             pd.ImportanceBakerCs    = _importanceBakerCs;
             pd.ImportanceBakerDs    = _importanceBakerDs;
-            pd.EnvBakerCbPtr        = _ctx.Buffers.EnvBakerCbPtr;
-            pd.ImportanceBakerCbPtr = _ctx.Buffers.ImportanceBakerCbPtr;
+            pd.EnvBakerCb        = _ctx.Buffers.EnvBakerCb;
+            pd.ImportanceBakerCb = _ctx.Buffers.ImportanceBakerCb;
+            pd.EnvBakerWords     = (uint[])s_envBakerWords.Clone();
+            pd.ImportanceWords   = (uint[])s_importanceWords.Clone();
             var skyTex = _ctx.Setting?.environmentMap;
             pd.SkyTexturePtr    = skyTex != null ? skyTex.GetNativeTexturePtr() : Texture2D.blackTexture.GetNativeTexturePtr();
             pd.EnvCubeMip0Ptr   = _ctx.Textures.EnvCubeMip0.NativePtr;
@@ -114,7 +115,8 @@ namespace PathTracing
 
             {
                 var ds = data.BaseLayerDs;
-                ds.SetConstantBuffer("g_Const", data.EnvBakerCbPtr);
+                data.EnvBakerCb.UploadDirect(context.cmd, data.EnvBakerWords);
+                ds.SetConstantBuffer("g_Const", data.EnvBakerCb);
                 ds.SetTexture("t_SrcEquirectangularEnvMap", data.SkyTexturePtr);
                 ds.SetTexture("t_SrcCubemapEnvMap", data.DummyCubePtr);
                 ds.SetTexture("t_LowResPrePassCube", data.DummyCubePtr);
@@ -129,7 +131,8 @@ namespace PathTracing
 
             {
                 var ds = data.ImportanceBakerDs;
-                ds.SetConstantBuffer("g_BuilderConsts", data.ImportanceBakerCbPtr);
+                data.ImportanceBakerCb.UploadDirect(context.cmd, data.ImportanceWords);
+                ds.SetConstantBuffer("g_BuilderConsts", data.ImportanceBakerCb);
                 ds.SetTexture("t_EnvMapCube", data.EnvCubeMip0Ptr);
                 ds.SetRWTexture("u_ImportanceMap", data.ImportanceMapPtr);
                 ds.SetRWTexture("u_RadianceMap", data.RadianceMapPtr);

@@ -78,7 +78,7 @@ namespace PathTracing
 
             cmd.BeginSample("Rtxpt.DlssBefore");
 
-            ds.SetConstantBuffer("g_Const", ctx.ConstantBufferPtr);
+            ds.SetConstantBuffer("g_Const", ctx.ConstantBuffer);
 
             // Input UAVs
             ds.SetRWTexture("u_OutputColor", res.OutputColor.NativePtr);

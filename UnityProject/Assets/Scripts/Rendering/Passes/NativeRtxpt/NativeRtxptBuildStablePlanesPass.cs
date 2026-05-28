@@ -1,5 +1,4 @@
 using System;
-using System.Runtime.InteropServices;
 using NativeRender;
 using Unity.Mathematics;
 using UnityEngine;
@@ -25,8 +24,10 @@ namespace PathTracing
         private readonly NativeRayTraceDescriptorSet _buildDs;
 
         private          NativeRtxptPassContext _ctx;
-        private readonly SampleMiniConstants[]  _miniConstArray = new SampleMiniConstants[1];
-        private          GraphicsBuffer         _miniConstBuffer;
+        private static readonly RootConstantsHint[] MiniConstRootConstantsHints =
+        {
+            new RootConstantsHint { Name = "g_MiniConst", Count = 16 }
+        };
 
         /// <summary>Pipeline handle exposed for NativeRtxptBuildTlasPass hit-table rebuilds.</summary>
         public RayTracePipeline BuildPipeline => _buildSP;
@@ -36,22 +37,15 @@ namespace PathTracing
             HitGroupShader[] buildHitGroups = null)
         {
             _buildSP = buildHitGroups is { Length: > 0 }
-                ? new RayTracePipeline(buildStablePlanes, buildHitGroups)
-                : new RayTracePipeline(buildStablePlanes);
+                ? new RayTracePipeline(buildStablePlanes, buildHitGroups, MiniConstRootConstantsHints)
+                : new RayTracePipeline(buildStablePlanes, MiniConstRootConstantsHints);
             _buildDs = new NativeRayTraceDescriptorSet(_buildSP);
-
-            _miniConstBuffer = new GraphicsBuffer(
-                    GraphicsBuffer.Target.Constant, 1,
-                    Marshal.SizeOf<SampleMiniConstants>())
-                { name = "Rtxpt_MiniConst_Build" };
         }
 
         public void Dispose()
         {
             _buildDs?.Dispose();
             _buildSP?.Dispose();
-            _miniConstBuffer?.Dispose();
-            _miniConstBuffer = null;
         }
 
         public void Setup(NativeRtxptPassContext ctx) => _ctx = ctx;
@@ -63,7 +57,6 @@ namespace PathTracing
             internal RayTracePipeline            BuildSP;
             internal NativeRayTraceDescriptorSet BuildDs;
             internal NativeRtxptPassContext      Ctx;
-            internal GraphicsBuffer              MiniConstBuffer;
             internal int2                        RenderRes;
         }
 
@@ -76,7 +69,6 @@ namespace PathTracing
             passData.BuildSP            = _buildSP;
             passData.BuildDs            = _buildDs;
             passData.Ctx                = _ctx;
-            passData.MiniConstBuffer    = _miniConstBuffer;
             passData.RenderRes          = _ctx.RenderResolution;
 
             builder.AllowPassCulling(false);
@@ -85,30 +77,25 @@ namespace PathTracing
 
         // ── Execute ────────────────────────────────────────────────────────────
 
-        private static void ExecutePass(PassData data, UnsafeGraphContext context)
+        private static unsafe void ExecutePass(PassData data, UnsafeGraphContext context)
         {
             var cmd = CommandBufferHelpers.GetNativeCommandBuffer(context.cmd);
             var ctx = data.Ctx;
             var res = ctx.Textures;
             var buf = ctx.Buffers;
 
-            // Upload g_MiniConst
-            data.MiniConstBuffer.SetData(new[]
+            var miniConst = new SampleMiniConstants
             {
-                new SampleMiniConstants
-                {
-                    params0x = ctx.FrameState.frameIndex,
-                    params0y = (ctx.FrameState.frameIndex & 1),
-                }
-            });
-            var miniConstBufferPtr = data.MiniConstBuffer.GetNativeBufferPtr();
+                params0x = ctx.FrameState.frameIndex,
+                params0y = (ctx.FrameState.frameIndex & 1),
+            };
 
             var tlas = ctx.GpuScene?.AccelerationStructure;
 
             cmd.BeginSample("Rtxpt.BuildStablePlanes");
             {
                 var ds = data.BuildDs;
-                BindCommonRT(ds, ctx, miniConstBufferPtr, tlas);
+                BindCommonRT(ds, ctx, &miniConst, tlas);
 
                 ds.SetRWTexture("u_Throughput",                res.Throughput.NativePtr);
                 ds.SetRWTexture("u_MotionVectors",             res.ScreenMotionVectors.NativePtr);
@@ -126,14 +113,14 @@ namespace PathTracing
 
         // ── Binding helpers ────────────────────────────────────────────────────
 
-        private static void BindCommonRT(
+        private static unsafe void BindCommonRT(
             NativeRayTraceDescriptorSet ds,
             NativeRtxptPassContext ctx,
-            IntPtr miniConstBufferPtr,
+            SampleMiniConstants* miniConst,
             RayTracingAccelerationStructure tlas)
         {
-            ds.SetConstantBuffer("g_Const",    ctx.ConstantBufferPtr);
-            ds.SetConstantBuffer("g_MiniConst", miniConstBufferPtr);
+            ds.SetConstantBuffer("g_Const",    ctx.ConstantBuffer);
+            ds.SetRootConstants("g_MiniConst", miniConst);
             ds.SetAccelerationStructure("SceneBVH", tlas);
 
             ctx.GpuScene.BindToShader(ds);

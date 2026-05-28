@@ -1,5 +1,7 @@
 using System;
+using System.Runtime.InteropServices;
 using NativeRender;
+using Unity.Mathematics;
 using UnityEngine.Rendering;
 using UnityEngine.Rendering.RenderGraphModule;
 using UnityEngine.Rendering.Universal;
@@ -20,13 +22,27 @@ namespace PathTracing
     /// </summary>
     public class NativeRtxptAccumulationPass : ScriptableRenderPass, IDisposable
     {
+        [StructLayout(LayoutKind.Sequential, Pack = 4)]
+        private struct AccumulationConstants
+        {
+            public float2 outputSize;
+            public float2 inputSize;
+            public float2 inputTextureSizeInv;
+            public float2 pixelOffset;
+            public float  blendFactor;
+        }
+
         private readonly NativeComputePipeline      _cs;
         private readonly NativeComputeDescriptorSet _ds;
         private          NativeRtxptPassContext     _ctx;
+        private static readonly RootConstantsHint[] AccumulationRootConstantsHints =
+        {
+            new RootConstantsHint { Name = "g_Const", Count = 9 }
+        };
 
         public NativeRtxptAccumulationPass(NativeComputeShader shader)
         {
-            _cs = new NativeComputePipeline(shader);
+            _cs = new NativeComputePipeline(shader, AccumulationRootConstantsHints);
             _ds = new NativeComputeDescriptorSet(_cs);
         }
 
@@ -61,7 +77,7 @@ namespace PathTracing
 
         // ── Execute ───────────────────────────────────────────────────────────
 
-        private static void ExecutePass(PassData data, UnsafeGraphContext context)
+        private static unsafe void ExecutePass(PassData data, UnsafeGraphContext context)
         {
             var cmd = CommandBufferHelpers.GetNativeCommandBuffer(context.cmd);
             var ctx = data.Ctx;
@@ -70,8 +86,21 @@ namespace PathTracing
 
             cmd.BeginSample("Rtxpt.Accumulation");
 
-            if (ctx.ConstantBufferPtr != IntPtr.Zero)
-                ds.SetConstantBuffer("g_Const", ctx.ConstantBufferPtr);
+            var inputSize  = new float2(ctx.RenderResolution.x, ctx.RenderResolution.y);
+            var outputSize = new float2(ctx.DisplayResolution.x, ctx.DisplayResolution.y);
+            uint sampleIndex = math.max(1u, ctx.FrameState.frameIndex);
+            float blendFactor = sampleIndex <= (uint)math.max(1, ctx.Setting.accumulationTarget)
+                ? 1.0f / sampleIndex
+                : 0.0f;
+            var constants = new AccumulationConstants
+            {
+                outputSize          = outputSize,
+                inputSize           = inputSize,
+                inputTextureSizeInv = 1.0f / inputSize,
+                pixelOffset         = float2.zero,
+                blendFactor         = blendFactor,
+            };
+            ds.SetRootConstants("g_Const", &constants);
 
             // SRV input: noisy PT output
             ds.SetTexture("t_InputColor", res.OutputColor.NativePtr);

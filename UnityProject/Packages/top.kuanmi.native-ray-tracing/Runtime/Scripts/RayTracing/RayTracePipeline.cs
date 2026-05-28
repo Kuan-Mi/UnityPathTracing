@@ -22,6 +22,8 @@ namespace NativeRender
         private ulong _handle;
         private RayTraceShader  _shader;
         private HitGroupShader[] _hitGroupShaders; // null when not using multi-blob path
+        private RootConstantsHint[] _rootConstantsHints;
+        private string[]            _rootSRVHints;
 
         /// <summary>True if the underlying D3D12 pipeline is valid and ready to dispatch.</summary>
         public bool IsValid => _handle != 0;
@@ -58,11 +60,23 @@ namespace NativeRender
         /// Throws <see cref="InvalidOperationException"/> if pipeline creation fails.
         /// </summary>
         public RayTracePipeline(RayTraceShader shader)
+            : this(shader, null, null)
+        {
+        }
+
+        public RayTracePipeline(RayTraceShader shader, RootConstantsHint[] rootConstantsHints)
+            : this(shader, rootConstantsHints, null)
+        {
+        }
+
+        public RayTracePipeline(RayTraceShader shader, RootConstantsHint[] rootConstantsHints, string[] rootSRVHints)
         {
             if (shader == null)
                 throw new ArgumentNullException(nameof(shader));
 
-            _shader = shader;
+            _shader             = shader;
+            _rootConstantsHints = rootConstantsHints;
+            _rootSRVHints       = rootSRVHints;
             BuildNativeHandle(shader);
             RayTraceShader.OnRecompiled += OnShaderRecompiled;
         }
@@ -77,6 +91,15 @@ namespace NativeRender
         /// constructor when no extra hit groups are needed.
         /// </summary>
         public RayTracePipeline(RayTraceShader primaryShader, HitGroupShader[] hitGroupShaders)
+            : this(primaryShader, hitGroupShaders, null, null)
+        {
+        }
+
+        public RayTracePipeline(
+            RayTraceShader primaryShader,
+            HitGroupShader[] hitGroupShaders,
+            RootConstantsHint[] rootConstantsHints,
+            string[] rootSRVHints = null)
         {
             if (primaryShader == null)
                 throw new ArgumentNullException(nameof(primaryShader));
@@ -84,8 +107,10 @@ namespace NativeRender
                 throw new ArgumentException("Use the single-shader constructor when there are no extra hit groups.",
                     nameof(hitGroupShaders));
 
-            _shader          = primaryShader;
-            _hitGroupShaders = hitGroupShaders;
+            _shader             = primaryShader;
+            _hitGroupShaders    = hitGroupShaders;
+            _rootConstantsHints = rootConstantsHints;
+            _rootSRVHints       = rootSRVHints;
 
             BuildNativeHandleMultiBlob(primaryShader, hitGroupShaders);
             RayTraceShader.OnRecompiled  += OnShaderRecompiled;
@@ -103,7 +128,10 @@ namespace NativeRender
             uint maxPayload = shader.MaxPayloadSizeInBytes;
             Debug.Log($"[RayTracePipeline] Creating pipeline for: {shader.name} (DXIL size: {dxil.Length} bytes, OMM support: {flags != 0}, MaxPayload: {maxPayload})");
             string rayGenName = string.IsNullOrEmpty(shader.RayGenName) ? null : shader.RayGenName;
-            _handle = NativeRenderPlugin.NR_CreateRayTraceShaderFromBytes(dxil, (uint)dxil.Length, shader.name, flags, maxPayload, rayGenName);
+            string hintsJson = BuildHintsJson(_rootConstantsHints, _rootSRVHints);
+            _handle = hintsJson != null
+                ? NativeRenderPlugin.NR_CreateRayTraceShaderFromBytesEx(dxil, (uint)dxil.Length, shader.name, flags, maxPayload, rayGenName, hintsJson)
+                : NativeRenderPlugin.NR_CreateRayTraceShaderFromBytes(dxil, (uint)dxil.Length, shader.name, flags, maxPayload, rayGenName);
             if (_handle == 0)
                 throw new InvalidOperationException(
                     $"[RayTracePipeline] NR_CreateRayTraceShaderFromBytes returned 0 for: {shader.name}");
@@ -148,9 +176,14 @@ namespace NativeRender
                 string rayGenName = string.IsNullOrEmpty(primaryShader.RayGenName) ? null : primaryShader.RayGenName;
 
                 Debug.Log($"[RayTracePipeline] Creating multi-blob pipeline for '{primaryShader.name}' ({totalBlobs} blobs)");
-                _handle = NativeRenderPlugin.NR_CreateRayTracePipelineFromBlobs(
-                    ptrs, sizes, (uint)totalBlobs,
-                    primaryShader.name, flags, maxPayload, rayGenName);
+                string hintsJson = BuildHintsJson(_rootConstantsHints, _rootSRVHints);
+                _handle = hintsJson != null
+                    ? NativeRenderPlugin.NR_CreateRayTracePipelineFromBlobsEx(
+                        ptrs, sizes, (uint)totalBlobs,
+                        primaryShader.name, flags, maxPayload, rayGenName, hintsJson)
+                    : NativeRenderPlugin.NR_CreateRayTracePipelineFromBlobs(
+                        ptrs, sizes, (uint)totalBlobs,
+                        primaryShader.name, flags, maxPayload, rayGenName);
 
                 if (_handle == 0)
                     throw new InvalidOperationException(
@@ -180,6 +213,48 @@ namespace NativeRender
             if (parts.Length < 2) return false;
             if (!int.TryParse(parts[0], out int major) || !int.TryParse(parts[1], out int minor)) return false;
             return major > 6 || (major == 6 && minor >= 9);
+        }
+
+        private static string BuildHintsJson(RootConstantsHint[] rcHints, string[] srvHints)
+        {
+            bool hasRC  = rcHints  != null && rcHints.Length  > 0;
+            bool hasSRV = srvHints != null && srvHints.Length > 0;
+            if (!hasRC && !hasSRV) return null;
+
+            var sb = new System.Text.StringBuilder();
+            sb.Append('{');
+
+            if (hasRC)
+            {
+                sb.Append("\"rootConstants\":[");
+                for (int i = 0; i < rcHints.Length; i++)
+                {
+                    if (i > 0) sb.Append(',');
+                    sb.Append("{\"name\":\"");
+                    sb.Append(rcHints[i].Name);
+                    sb.Append("\",\"count\":");
+                    sb.Append(rcHints[i].Count);
+                    sb.Append('}');
+                }
+                sb.Append(']');
+            }
+
+            if (hasSRV)
+            {
+                if (hasRC) sb.Append(',');
+                sb.Append("\"rootSRV\":[");
+                for (int i = 0; i < srvHints.Length; i++)
+                {
+                    if (i > 0) sb.Append(',');
+                    sb.Append('"');
+                    sb.Append(srvHints[i]);
+                    sb.Append('"');
+                }
+                sb.Append(']');
+            }
+
+            sb.Append('}');
+            return sb.ToString();
         }
 
         private void RefreshSlotLayout()

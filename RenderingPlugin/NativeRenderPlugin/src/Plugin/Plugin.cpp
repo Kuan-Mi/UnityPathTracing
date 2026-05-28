@@ -1691,7 +1691,7 @@ NR_CreateComputeShader(const uint8_t* dxilBytes, uint32_t size, const char* name
 //   hintsJson format: [{"name":"MyConstants","count":4}, ...]
 //   Must be called before Unity sets up resource bindings.
 // ---------------------------------------------------------------------------
-static void ApplyRootConstantsHints(ComputeShader* cs, const char* hintsJson)
+static void ApplyRootConstantsHints(ShaderBase* shader, const char* hintsJson)
 {
     if (!hintsJson || hintsJson[0] == '\0') return;
     // Lightweight JSON array parser: find {"name":"...","count":N} objects
@@ -1712,13 +1712,13 @@ static void ApplyRootConstantsHints(ComputeShader* cs, const char* hintsJson)
         if (!colon) break;
         uint32_t count = static_cast<uint32_t>(atoi(colon + 1));
 
-        cs->SetRootConstantsHint(name.c_str(), count);
+        shader->SetRootConstantsHint(name.c_str(), count);
         p = colon + 1;
     }
 }
 
 // Parses "rootSRV":["name1","name2",...] from a JSON object.
-static void ApplyRootSRVHints(ComputeShader* cs, const char* hintsJson)
+static void ApplyRootSRVHints(ShaderBase* shader, const char* hintsJson)
 {
     if (!hintsJson || hintsJson[0] == '\0') return;
     const char* tag = strstr(hintsJson, "\"rootSRV\"");
@@ -1734,7 +1734,7 @@ static void ApplyRootSRVHints(ComputeShader* cs, const char* hintsJson)
         if (!q2) break;
         std::string name(q1 + 1, q2);
         if (!name.empty())
-            cs->SetRootSRVHint(name.c_str());
+            shader->SetRootSRVHint(name.c_str());
         p = q2 + 1;
         // stop at end of array
         const char* nextComma    = strchr(p, ',');
@@ -1742,6 +1742,101 @@ static void ApplyRootSRVHints(ComputeShader* cs, const char* hintsJson)
         if (!arrEnd) break;
         if (!nextComma || arrEnd < nextComma) break;
     }
+}
+
+extern "C" uint64_t UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API
+NR_CreateRayTraceShaderFromBytesEx(
+    const uint8_t* dxilBytes,
+    uint32_t size,
+    const char* name,
+    uint32_t flags,
+    uint32_t maxPayloadSizeInBytes,
+    const char* rayGenName,
+    const char* hintsJson)
+{
+    if (!s_RendererReady)
+    {
+        NR_WARN("NR_CreateRayTraceShaderFromBytesEx: renderer not ready");
+        return 0;
+    }
+    ID3D12Device5* dev5 = nullptr;
+    ID3D12Device*  base = s_D3D12->GetDevice();
+    if (!base || FAILED(base->QueryInterface(IID_PPV_ARGS(&dev5))))
+    {
+        NR_ERROR("NR_CreateRayTraceShaderFromBytesEx: failed to obtain ID3D12Device5");
+        return 0;
+    }
+    auto* shader = new RayTraceShader();
+    if (!shader->Initialize(dev5, s_Log, s_D3D12v8))
+    {
+        delete shader;
+        dev5->Release();
+        return 0;
+    }
+    ApplyRootConstantsHints(shader, hintsJson);
+    ApplyRootSRVHints(shader, hintsJson);
+    if (!shader->LoadShaderFromBytes(dxilBytes, size, name, flags, maxPayloadSizeInBytes, rayGenName))
+    {
+        delete shader;
+        dev5->Release();
+        return 0;
+    }
+    dev5->Release();
+    return reinterpret_cast<uint64_t>(shader);
+}
+
+extern "C" uint64_t UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API
+NR_CreateRayTracePipelineFromBlobsEx(
+    const uint8_t** blobDataPtrs,
+    const uint32_t* blobSizes,
+    uint32_t        blobCount,
+    const char*     name,
+    uint32_t        flags,
+    uint32_t        maxPayloadSizeInBytes,
+    const char*     rayGenName,
+    const char*     hintsJson)
+{
+    if (!s_RendererReady)
+    {
+        NR_WARN("NR_CreateRayTracePipelineFromBlobsEx: renderer not ready");
+        return 0;
+    }
+    if (!blobDataPtrs || !blobSizes || blobCount == 0)
+    {
+        NR_WARN("NR_CreateRayTracePipelineFromBlobsEx: invalid arguments");
+        return 0;
+    }
+
+    ID3D12Device5* dev5 = nullptr;
+    ID3D12Device*  base = s_D3D12->GetDevice();
+    if (!base || FAILED(base->QueryInterface(IID_PPV_ARGS(&dev5))))
+    {
+        NR_ERROR("NR_CreateRayTracePipelineFromBlobsEx: failed to obtain ID3D12Device5");
+        return 0;
+    }
+
+    std::vector<RayTraceShader::BlobDesc> descs(blobCount);
+    for (uint32_t i = 0; i < blobCount; ++i)
+        descs[i] = { blobDataPtrs[i], blobSizes[i] };
+
+    auto* shader = new RayTraceShader();
+    if (!shader->Initialize(dev5, s_Log, s_D3D12v8))
+    {
+        delete shader;
+        dev5->Release();
+        return 0;
+    }
+    ApplyRootConstantsHints(shader, hintsJson);
+    ApplyRootSRVHints(shader, hintsJson);
+    if (!shader->LoadShaderFromMultipleBlobs(descs.data(), blobCount, name, flags,
+                                             maxPayloadSizeInBytes, rayGenName))
+    {
+        delete shader;
+        dev5->Release();
+        return 0;
+    }
+    dev5->Release();
+    return reinterpret_cast<uint64_t>(shader);
 }
 
 extern "C" uint64_t UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API
