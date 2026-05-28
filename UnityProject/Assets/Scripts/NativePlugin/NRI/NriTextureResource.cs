@@ -42,7 +42,7 @@ namespace Nri
             SRGB           = srgb;
         }
 
-        public void Allocate(int2 resolution, int slices = 1)
+        public void Allocate(int2 resolution, int slices = 1, bool useMipMap = false)
         {
             Release(); // 确保先释放旧的
             var dxgiFormat = NriUtil.GetDXGIFormat(GraphicsFormat);
@@ -50,7 +50,8 @@ namespace Nri
             var desc = new RenderTextureDescriptor(resolution.x, resolution.y, GraphicsFormat, 0)
             {
                 enableRandomWrite = true,
-                useMipMap         = false,
+                useMipMap         = useMipMap,
+                autoGenerateMips  = false,
                 msaaSamples       = 1,
                 sRGB              = SRGB
             };
@@ -74,6 +75,37 @@ namespace Nri
             Handle    = RTHandles.Alloc(rt);
             NativePtr = Handle.rt.GetNativeTexturePtr();
             NriPtr    = WrapD3D12Texture(NativePtr, dxgiFormat);
+        }
+
+        /// <summary>
+        /// Allocates a cubemap render texture. NriPtr is left zero — cubemaps are not used with NRD.
+        /// </summary>
+        public void AllocateCube(int size, bool useMipMap = false, bool enableRandomWrite = true)
+        {
+            Release();
+
+            var desc = new RenderTextureDescriptor(size, size, GraphicsFormat, 0)
+            {
+                dimension         = TextureDimension.Cube,
+                enableRandomWrite = enableRandomWrite,
+                useMipMap         = useMipMap,
+                autoGenerateMips  = false,
+                msaaSamples       = 1,
+                sRGB              = SRGB,
+            };
+
+            rt = new RenderTexture(desc)
+            {
+                name       = Name,
+                filterMode = FilterMode.Bilinear,
+                wrapMode   = TextureWrapMode.Clamp,
+                hideFlags  = HideFlags.DontSave,
+            };
+            rt.Create();
+
+            Handle    = RTHandles.Alloc(rt);
+            NativePtr = Handle.rt.GetNativeTexturePtr();
+            NriPtr    = IntPtr.Zero; // cubemaps are not used with NRD
         }
 
         public void Release()

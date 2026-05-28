@@ -111,6 +111,13 @@ namespace PathTracing
         /// </summary>
         public GraphicsBuffer ScratchListBuffer;
 
+        // ── Env map baker constant buffers ────────────────────────────────────
+        /// <summary>Constant buffer for the base-layer env bake pass. 704 bytes.</summary>
+        public GraphicsBuffer EnvBakerCb;
+
+        /// <summary>Constant buffer for the importance baker pass. 48 bytes.</summary>
+        public GraphicsBuffer ImportanceBakerCb;
+
         // ── Resolved resolution ───────────────────────────────────────────────
         public int2 renderResolution { get; private set; }
 
@@ -258,6 +265,20 @@ namespace PathTracing
             { name = "Rtxpt_ScratchListBuffer" };
         }
 
+        /// <summary>
+        /// Allocates env map baker constant buffers. Idempotent — safe to call every frame.
+        /// </summary>
+        public void EnsureEnvBakerBuffers()
+        {
+            if (EnvBakerCb != null && EnvBakerCb.IsValid()) return;
+            EnvBakerCb?.Dispose();
+            EnvBakerCb = new GraphicsBuffer(GraphicsBuffer.Target.Constant, 704 / sizeof(uint), sizeof(uint))
+                { name = "Rtxpt_EnvBakerCb" };
+            ImportanceBakerCb?.Dispose();
+            ImportanceBakerCb = new GraphicsBuffer(GraphicsBuffer.Target.Constant, 48 / sizeof(uint), sizeof(uint))
+                { name = "Rtxpt_ImportanceBakerCb" };
+        }
+
         private void ReleaseResolutionBuffers()
         {
             StablePlanesBuffer?.Release();
@@ -270,6 +291,8 @@ namespace PathTracing
 
         private void ReleaseLightBuffers()
         {
+            EnvBakerCb?.Dispose();               EnvBakerCb               = null;
+            ImportanceBakerCb?.Dispose();         ImportanceBakerCb        = null;
             FeedbackBuffer?.Release();           FeedbackBuffer           = null;
             LightControlBuffer?.Release();       LightControlBuffer       = null;
             LightBuffer?.Release();              LightBuffer              = null;

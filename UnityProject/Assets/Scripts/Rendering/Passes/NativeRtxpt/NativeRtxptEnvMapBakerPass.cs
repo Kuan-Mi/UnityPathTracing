@@ -24,15 +24,6 @@ namespace PathTracing
         private readonly NativeComputePipeline      _importanceBakerCs;
         private readonly NativeComputeDescriptorSet _importanceBakerDs;
 
-        private RenderTexture _envCubeMip0Rt;
-        private RenderTexture _envCubeMip1Rt;
-        private RenderTexture _importanceMapRt;
-        private RenderTexture _radianceMapRt;
-        private RenderTexture _dummyCubeRt;
-
-        private GraphicsBuffer _envBakerCb;
-        private GraphicsBuffer _importanceBakerCb;
-
         private static readonly uint[] s_envBakerWords   = new uint[704 / 4];
         private static readonly uint[] s_importanceWords = new uint[48 / 4];
 
@@ -44,9 +35,6 @@ namespace PathTracing
             _baseLayerDs       = new NativeComputeDescriptorSet(_baseLayerCs);
             _importanceBakerCs = new NativeComputePipeline(importanceBakerCs);
             _importanceBakerDs = new NativeComputeDescriptorSet(_importanceBakerCs);
-
-            EnsureRenderTextures();
-            EnsureConstantBuffers();
         }
 
         public void Dispose()
@@ -55,33 +43,22 @@ namespace PathTracing
             _baseLayerCs?.Dispose();
             _importanceBakerDs?.Dispose();
             _importanceBakerCs?.Dispose();
-
-            DestroyRT(ref _envCubeMip0Rt);
-            DestroyRT(ref _envCubeMip1Rt);
-            DestroyRT(ref _importanceMapRt);
-            DestroyRT(ref _radianceMapRt);
-            DestroyRT(ref _dummyCubeRt);
-
-            _envBakerCb?.Dispose();
-            _envBakerCb = null;
-            _importanceBakerCb?.Dispose();
-            _importanceBakerCb = null;
         }
 
         public void Setup(NativeRtxptPassContext ctx)
         {
             _ctx = ctx;
-            EnsureRenderTextures();
-            EnsureConstantBuffers();
+            ctx.Textures.EnsureEnvMapResources();
+            ctx.Buffers.EnsureEnvBakerBuffers();
 
             FillEnvBakerConstants(ctx.Setting);
-            _envBakerCb.SetData(s_envBakerWords);
+            ctx.Buffers.EnvBakerCb.SetData(s_envBakerWords);
             FillImportanceBakerConstants();
-            _importanceBakerCb.SetData(s_importanceWords);
+            ctx.Buffers.ImportanceBakerCb.SetData(s_importanceWords);
 
-            ctx.BakedEnvCubePtr                = _envCubeMip0Rt.IsCreated() ? _envCubeMip0Rt.GetNativeTexturePtr() : IntPtr.Zero;
-            ctx.EnvImportanceMapPtr            = _importanceMapRt.IsCreated() ? _importanceMapRt.GetNativeTexturePtr() : IntPtr.Zero;
-            ctx.EnvRadianceAndImportanceMapPtr = _radianceMapRt.IsCreated() ? _radianceMapRt.GetNativeTexturePtr() : IntPtr.Zero;
+            ctx.BakedEnvCubePtr                = ctx.Textures.EnvCubeMip0.IsCreated ? ctx.Textures.EnvCubeMip0.NativePtr : IntPtr.Zero;
+            ctx.EnvImportanceMapPtr            = ctx.Textures.EnvImportanceMap.IsCreated ? ctx.Textures.EnvImportanceMap.NativePtr : IntPtr.Zero;
+            ctx.EnvRadianceAndImportanceMapPtr = ctx.Textures.EnvRadianceMap.IsCreated ? ctx.Textures.EnvRadianceMap.NativePtr : IntPtr.Zero;
         }
 
         private class PassData
@@ -111,17 +88,17 @@ namespace PathTracing
             pd.BaseLayerDs          = _baseLayerDs;
             pd.ImportanceBakerCs    = _importanceBakerCs;
             pd.ImportanceBakerDs    = _importanceBakerDs;
-            pd.EnvBakerCbPtr        = _envBakerCb.GetNativeBufferPtr();
-            pd.ImportanceBakerCbPtr = _importanceBakerCb.GetNativeBufferPtr();
+            pd.EnvBakerCbPtr        = _ctx.Buffers.EnvBakerCb.GetNativeBufferPtr();
+            pd.ImportanceBakerCbPtr = _ctx.Buffers.ImportanceBakerCb.GetNativeBufferPtr();
             var skyTex = _ctx.Setting?.environmentMap;
             pd.SkyTexturePtr    = skyTex != null ? skyTex.GetNativeTexturePtr() : Texture2D.blackTexture.GetNativeTexturePtr();
-            pd.EnvCubeMip0Ptr   = _envCubeMip0Rt.GetNativeTexturePtr();
-            pd.EnvCubeMip1Ptr   = _envCubeMip1Rt.GetNativeTexturePtr();
-            pd.ImportanceMapPtr = _importanceMapRt.GetNativeTexturePtr();
-            pd.RadianceMapPtr   = _radianceMapRt.GetNativeTexturePtr();
-            pd.ImportanceMapRt  = _importanceMapRt;
-            pd.RadianceMapRt    = _radianceMapRt;
-            pd.DummyCubePtr     = _dummyCubeRt.GetNativeTexturePtr();
+            pd.EnvCubeMip0Ptr   = _ctx.Textures.EnvCubeMip0.NativePtr;
+            pd.EnvCubeMip1Ptr   = _ctx.Textures.EnvCubeMip1.NativePtr;
+            pd.ImportanceMapPtr = _ctx.Textures.EnvImportanceMap.NativePtr;
+            pd.RadianceMapPtr   = _ctx.Textures.EnvRadianceMap.NativePtr;
+            pd.ImportanceMapRt  = _ctx.Textures.EnvImportanceMap.rt;
+            pd.RadianceMapRt    = _ctx.Textures.EnvRadianceMap.rt;
+            pd.DummyCubePtr     = _ctx.Textures.EnvDummyCube.NativePtr;
             pd.DummyTex2DPtr    = Texture2D.blackTexture.GetNativeTexturePtr();
 
             builder.AllowPassCulling(false);
@@ -235,64 +212,6 @@ namespace PathTracing
         private static void WriteU32(uint[] buf, int offset, uint v)
         {
             buf[offset / 4] = v;
-        }
-
-        private void EnsureRenderTextures()
-        {
-            _envCubeMip0Rt   = EnsureCubeRT(ref _envCubeMip0Rt, CubeDim, RenderTextureFormat.ARGBHalf, true);
-            _envCubeMip1Rt   = EnsureCubeRT(ref _envCubeMip1Rt, CubeDim / 2, RenderTextureFormat.ARGBHalf, true);
-            _importanceMapRt = Ensure2DRT(ref _importanceMapRt, ImportanceMapDim, RenderTextureFormat.RFloat, true, useMipMap: true);
-            _radianceMapRt   = Ensure2DRT(ref _radianceMapRt, ImportanceMapDim, RenderTextureFormat.ARGBHalf, true, useMipMap: true);
-            _dummyCubeRt     = EnsureCubeRT(ref _dummyCubeRt, 4, RenderTextureFormat.ARGB32, false);
-        }
-
-        private void EnsureConstantBuffers()
-        {
-            if (_envBakerCb == null || !_envBakerCb.IsValid())
-            {
-                _envBakerCb?.Dispose();
-                _envBakerCb = new GraphicsBuffer(GraphicsBuffer.Target.Constant, s_envBakerWords.Length, sizeof(uint));
-            }
-
-            if (_importanceBakerCb == null || !_importanceBakerCb.IsValid())
-            {
-                _importanceBakerCb?.Dispose();
-                _importanceBakerCb = new GraphicsBuffer(GraphicsBuffer.Target.Constant, s_importanceWords.Length, sizeof(uint));
-            }
-        }
-
-        private static RenderTexture EnsureCubeRT(ref RenderTexture rt, int size, RenderTextureFormat fmt, bool rw)
-        {
-            if (rt != null && rt.IsCreated()) return rt;
-            rt?.Release();
-            rt = new RenderTexture(size, size, 0, fmt)
-            {
-                dimension         = TextureDimension.Cube, useMipMap = false, autoGenerateMips = false,
-                enableRandomWrite = rw, hideFlags                    = HideFlags.HideAndDontSave,
-            };
-            rt.Create();
-            return rt;
-        }
-
-        private static RenderTexture Ensure2DRT(ref RenderTexture rt, int size, RenderTextureFormat fmt, bool rw, bool useMipMap = false)
-        {
-            if (rt != null && rt.IsCreated() && rt.useMipMap == useMipMap) return rt;
-            rt?.Release();
-            rt = new RenderTexture(size, size, 0, fmt)
-            {
-                dimension         = TextureDimension.Tex2D, useMipMap = useMipMap, autoGenerateMips = false,
-                enableRandomWrite = rw, hideFlags                     = HideFlags.HideAndDontSave,
-            };
-            rt.Create();
-            return rt;
-        }
-
-        private static void DestroyRT(ref RenderTexture rt)
-        {
-            if (rt == null) return;
-            rt.Release();
-            Object.DestroyImmediate(rt);
-            rt = null;
         }
     }
 }

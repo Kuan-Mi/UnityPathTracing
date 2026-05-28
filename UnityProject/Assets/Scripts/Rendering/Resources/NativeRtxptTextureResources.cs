@@ -113,6 +113,22 @@ namespace PathTracing
         /// <summary>Post-accumulation output (reference mode). RGBA16_FLOAT. Display resolution.</summary>
         public NriTextureResource ProcessedOutputColor;
 
+        // ── Env map baking outputs (fixed size, shared across frames) ─────────
+        /// <summary>256×256 baked env cubemap mip0. RGBA16F, UAV. Bound as t_EnvironmentMap.</summary>
+        public NriTextureResource EnvCubeMip0;
+
+        /// <summary>128×128 baked env cubemap mip1. RGBA16F, UAV.</summary>
+        public NriTextureResource EnvCubeMip1;
+
+        /// <summary>1024×1024 importance map. R32F, UAV, mipmapped. Bound as u_ImportanceMap / t_EnvImportanceMap.</summary>
+        public NriTextureResource EnvImportanceMap;
+
+        /// <summary>1024×1024 combined radiance+importance map. RGBA16F, UAV, mipmapped. Bound as u_RadianceMap / t_envRadianceAndImportanceMap.</summary>
+        public NriTextureResource EnvRadianceMap;
+
+        /// <summary>4×4 dummy cubemap (RGBA8). Used to satisfy shader bindings when the real cube is unneeded.</summary>
+        public NriTextureResource EnvDummyCube;
+
         // ── Resolved dimensions ───────────────────────────────────────────────
         public int2 renderResolution  { get; private set; }
         public int2 displayResolution { get; private set; }
@@ -158,6 +174,26 @@ namespace PathTracing
             DebugOutputColor     = new NriTextureResource("Rtxpt_DebugOutputColor",       GraphicsFormat.R16G16B16A16_SFloat,     uav);
             AccumulatedRadiance  = new NriTextureResource("Rtxpt_AccumulatedRadiance",   GraphicsFormat.R32G32B32A32_SFloat,     uav);
             ProcessedOutputColor = new NriTextureResource("Rtxpt_ProcessedOutputColor",  GraphicsFormat.R16G16B16A16_SFloat,     uav);
+
+            EnvCubeMip0      = new NriTextureResource("Rtxpt_EnvCubeMip0",      GraphicsFormat.R16G16B16A16_SFloat, uav);
+            EnvCubeMip1      = new NriTextureResource("Rtxpt_EnvCubeMip1",      GraphicsFormat.R16G16B16A16_SFloat, uav);
+            EnvImportanceMap = new NriTextureResource("Rtxpt_EnvImportanceMap", GraphicsFormat.R32_SFloat,           uav);
+            EnvRadianceMap   = new NriTextureResource("Rtxpt_EnvRadianceMap",   GraphicsFormat.R16G16B16A16_SFloat, uav);
+            EnvDummyCube     = new NriTextureResource("Rtxpt_EnvDummyCube",     GraphicsFormat.R8G8B8A8_UNorm,      srv);
+        }
+
+        /// <summary>
+        /// Allocates env map baking textures (fixed sizes, not resolution-dependent).
+        /// Idempotent — safe to call every frame.
+        /// </summary>
+        public void EnsureEnvMapResources()
+        {
+            if (EnvCubeMip0.IsCreated) return;
+            EnvCubeMip0.AllocateCube(256);
+            EnvCubeMip1.AllocateCube(128);
+            EnvImportanceMap.Allocate(new int2(1024, 1024), useMipMap: true);
+            EnvRadianceMap.Allocate(new int2(1024, 1024), useMipMap: true);
+            EnvDummyCube.AllocateCube(4, enableRandomWrite: false);
         }
 
         /// <summary>
@@ -237,6 +273,7 @@ namespace PathTracing
             FeedbackTotalWeightBlended, FeedbackCandidatesBlended,
             NEEATHistoryDepth,
             ShaderDebugViz, DebugOutputColor, DlssRrOutput, AccumulatedRadiance, ProcessedOutputColor,
+            EnvCubeMip0, EnvCubeMip1, EnvImportanceMap, EnvRadianceMap, EnvDummyCube,
         };
     }
 }
