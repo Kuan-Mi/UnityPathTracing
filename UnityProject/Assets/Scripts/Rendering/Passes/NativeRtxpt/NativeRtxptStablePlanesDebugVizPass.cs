@@ -73,15 +73,15 @@ namespace PathTracing
 
             cmd.BeginSample("Rtxpt.StablePlanesDebugViz");
 
-            if (ctx.ConstantBuffer != null)
-                ds.SetConstantBuffer("g_Const", ctx.ConstantBuffer.GetNativeBufferPtr());
+            if (ctx.ConstantBufferPtr != IntPtr.Zero)
+                ds.SetConstantBuffer("g_Const", ctx.ConstantBufferPtr);
 
             ds.SetRWTexture("u_StablePlanesHeader", res.StablePlanesHeader.NativePtr);
             ds.SetRWTexture("u_StableRadiance",     res.StableRadiance.NativePtr);
 
-            if (buf?.StablePlanesBuffer != null)
+            if (buf?.StablePlanesBufferPtr != IntPtr.Zero)
                 ds.SetRWStructuredBuffer("u_StablePlanesBuffer",
-                    buf.StablePlanesBuffer.GetNativeBufferPtr(),
+                    buf.StablePlanesBufferPtr,
                     buf.StablePlanesBuffer.count, buf.StablePlanesBuffer.stride);
 
             ds.SetRWTexture("u_ShaderDebugVizTextureBuffer", res.ShaderDebugViz.NativePtr);

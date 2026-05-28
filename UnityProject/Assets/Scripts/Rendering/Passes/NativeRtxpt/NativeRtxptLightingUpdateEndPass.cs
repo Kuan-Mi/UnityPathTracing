@@ -131,12 +131,12 @@ namespace PathTracing
 
             cmd.BeginSample(RenderPassMarkers.RtxptLightingUpdateEnd);
 
-            // Shared pointers
-            var pCtrl    = buf.LightControlBuffer.GetNativeBufferPtr();
+            // Shared pointers (all cached — immutable for lifetime of buffer objects)
+            var pCtrl    = buf.LightControlBufferPtr;
             int cCtrl    = buf.LightControlBuffer.count;
-            var pWeights = buf.LightWeightsBuffer.GetNativeBufferPtr();
+            var pWeights = buf.LightWeightsBufferPtr;
             int cWeights = buf.LightWeightsBuffer.count;
-            var pLocal   = buf.LocalSamplingBuffer.GetNativeBufferPtr();
+            var pLocal   = buf.LocalSamplingBufferPtr;
             int cLocal   = buf.LocalSamplingBuffer.count;
 
             // Render resolution and derived resolutions
@@ -165,9 +165,7 @@ namespace PathTracing
                 ds.SetRWTexture("u_feedbackTotalWeightBlended", ctx.FeedbackTotalWeightBlendedPtr);
                 ds.SetRWTexture("u_feedbackCandidatesBlended", ctx.FeedbackCandidatesBlendedPtr);
                 ds.SetRWTexture("u_ShaderDebugVizTextureBuffer", ctx.ShaderDebugVizPtr);
-                var pProxies = buf.LightSamplingProxies.GetNativeBufferPtr();
-                int cProxies = buf.LightSamplingProxies.count;
-                ds.SetRWTypedBuffer("u_lightSamplingProxies", pProxies, cProxies, DXGI_FORMAT_R32_UINT);
+                ds.SetRWTypedBuffer("u_lightSamplingProxies", buf.LightSamplingProxiesPtr, buf.LightSamplingProxies.count, DXGI_FORMAT_R32_UINT);
 
                 ds.SetRWTexture("u_historyDepth", ctx.NEEATHistoryDepthPtr);
                 ds.SetTexture("t_depthBuffer", ctx.DepthPtr);
@@ -195,13 +193,8 @@ namespace PathTracing
                 ds.SetRWTexture("u_feedbackCandidatesBlended", ctx.FeedbackCandidatesBlendedPtr);
                 ds.SetRWTexture("u_historyDepth", ctx.NEEATHistoryDepthPtr);
                 ds.SetRWTexture("u_ShaderDebugVizTextureBuffer", ctx.ShaderDebugVizPtr);
-                var pHistPas = buf.HistoryRemapPastToCurrent.GetNativeBufferPtr();
-                int cHistPas = buf.HistoryRemapPastToCurrent.count;
-
-                ds.SetRWTypedBuffer("u_historyRemapPastToCurrent", pHistPas, cHistPas, DXGI_FORMAT_R32_UINT);
-                var pProxies = buf.LightSamplingProxies.GetNativeBufferPtr();
-                int cProxies = buf.LightSamplingProxies.count;
-                ds.SetRWTypedBuffer("u_lightSamplingProxies", pProxies, cProxies, DXGI_FORMAT_R32_UINT);
+                ds.SetRWTypedBuffer("u_historyRemapPastToCurrent", buf.HistoryRemapPastToCurrPtr, buf.HistoryRemapPastToCurrent.count, DXGI_FORMAT_R32_UINT);
+                ds.SetRWTypedBuffer("u_lightSamplingProxies",      buf.LightSamplingProxiesPtr,   buf.LightSamplingProxies.count,   DXGI_FORMAT_R32_UINT);
                 ds.SetRWTypedBuffer("u_localSamplingBuffer", pLocal, cLocal, DXGI_FORMAT_R32_UINT);
 
 

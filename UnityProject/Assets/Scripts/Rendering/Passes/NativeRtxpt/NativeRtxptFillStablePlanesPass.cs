@@ -32,6 +32,7 @@ namespace PathTracing
         private          NativeRtxptPassContext _ctx;
         private readonly SampleMiniConstants[]  _miniConstArray = new SampleMiniConstants[1];
         private          GraphicsBuffer         _miniConstBuffer;
+        private          IntPtr                 _miniConstBufferPtr;
 
         /// <summary>Pipeline handles exposed for NativeRtxptBuildTlasPass hit-table rebuilds.</summary>
         public RayTracePipeline FillPipeline => _fillSP;
@@ -57,6 +58,7 @@ namespace PathTracing
                     GraphicsBuffer.Target.Constant, 1,
                     Marshal.SizeOf<SampleMiniConstants>())
                 { name = "Rtxpt_MiniConst_Fill" };
+            _miniConstBufferPtr = _miniConstBuffer.GetNativeBufferPtr();
         }
 
         public void Dispose()
@@ -66,7 +68,8 @@ namespace PathTracing
             _refDs?.Dispose();
             _refSP?.Dispose();
             _miniConstBuffer?.Dispose();
-            _miniConstBuffer = null;
+            _miniConstBuffer    = null;
+            _miniConstBufferPtr = IntPtr.Zero;
         }
 
         public void Setup(NativeRtxptPassContext ctx) => _ctx = ctx;
@@ -79,6 +82,7 @@ namespace PathTracing
             internal NativeRayTraceDescriptorSet FillDs, RefDs;
             internal NativeRtxptPassContext      Ctx;
             internal GraphicsBuffer              MiniConstBuffer;
+            internal IntPtr                      MiniConstBufferPtr;
             internal int2                        RenderRes;
             internal bool                        IsRealtime;
         }
@@ -89,14 +93,15 @@ namespace PathTracing
         {
             using var builder = renderGraph.AddUnsafePass<PassData>("NativeRtxpt.FillStablePlanes", out var passData);
 
-            passData.FillSP         = _fillSP;
-            passData.FillDs         = _fillDs;
-            passData.RefSP          = _refSP;
-            passData.RefDs          = _refDs;
-            passData.Ctx            = _ctx;
-            passData.MiniConstBuffer = _miniConstBuffer;
-            passData.RenderRes      = _ctx.RenderResolution;
-            passData.IsRealtime     = _ctx.Setting.realtimeMode;
+            passData.FillSP             = _fillSP;
+            passData.FillDs             = _fillDs;
+            passData.RefSP              = _refSP;
+            passData.RefDs              = _refDs;
+            passData.Ctx                = _ctx;
+            passData.MiniConstBuffer    = _miniConstBuffer;
+            passData.MiniConstBufferPtr = _miniConstBufferPtr;
+            passData.RenderRes          = _ctx.RenderResolution;
+            passData.IsRealtime         = _ctx.Setting.realtimeMode;
 
             builder.AllowPassCulling(false);
             builder.SetRenderFunc((PassData data, UnsafeGraphContext context) => ExecutePass(data, context));
@@ -120,6 +125,7 @@ namespace PathTracing
                     params0y = (ctx.FrameState.frameIndex & 1),
                 }
             });
+            var miniConstBufferPtr = data.MiniConstBuffer.GetNativeBufferPtr();
 
             var tlas = ctx.GpuScene?.AccelerationStructure;
 
@@ -128,7 +134,7 @@ namespace PathTracing
                 cmd.BeginSample("Rtxpt.FillStablePlanes");
                 {
                     var ds = data.FillDs;
-                    BindCommonRT(ds, ctx, data.MiniConstBuffer, tlas);
+                    BindCommonRT(ds, ctx, miniConstBufferPtr, tlas);
                     BindLightBuffers(ds, ctx);
 
                     ds.SetRWTexture("u_ShaderDebugVizTextureBuffer", res.ShaderDebugViz.NativePtr);
@@ -146,7 +152,7 @@ namespace PathTracing
                 cmd.BeginSample("Rtxpt.Reference");
                 {
                     var ds = data.RefDs;
-                    BindCommonRT(ds, ctx, data.MiniConstBuffer, tlas);
+                    BindCommonRT(ds, ctx, miniConstBufferPtr, tlas);
                     BindLightBuffers(ds, ctx);
 
                     ds.SetRWTexture("u_OutputColor",   res.OutputColor.NativePtr);
@@ -166,11 +172,11 @@ namespace PathTracing
         private static void BindCommonRT(
             NativeRayTraceDescriptorSet ds,
             NativeRtxptPassContext ctx,
-            GraphicsBuffer miniConstBuffer,
+            IntPtr miniConstBufferPtr,
             RayTracingAccelerationStructure tlas)
         {
-            ds.SetConstantBuffer("g_Const",     ctx.ConstantBuffer.GetNativeBufferPtr());
-            ds.SetConstantBuffer("g_MiniConst", miniConstBuffer.GetNativeBufferPtr());
+            ds.SetConstantBuffer("g_Const",     ctx.ConstantBufferPtr);
+            ds.SetConstantBuffer("g_MiniConst", miniConstBufferPtr);
             ds.SetAccelerationStructure("SceneBVH", tlas);
 
             ctx.GpuScene.BindToShader(ds);
@@ -186,7 +192,7 @@ namespace PathTracing
             ds.SetTexture("t_EnvLookupMap", envLookupPtr);
 
             ds.SetRWStructuredBuffer("u_FeedbackBuffer",
-                ctx.Buffers.FeedbackBuffer.GetNativeBufferPtr(),
+                ctx.Buffers.FeedbackBufferPtr,
                 ctx.Buffers.FeedbackBuffer.count,
                 ctx.Buffers.FeedbackBuffer.stride);
         }
@@ -196,12 +202,12 @@ namespace PathTracing
             var buf = ctx.Buffers;
             if (buf == null) return;
 
-            ds.SetStructuredBuffer("t_LightsCB", buf.LightControlBuffer.GetNativeBufferPtr(), buf.LightControlBuffer.count, buf.LightControlBuffer.stride);
-            ds.SetStructuredBuffer("t_Lights",   buf.LightBuffer.GetNativeBufferPtr(), buf.LightBuffer.count, buf.LightBuffer.stride);
+            ds.SetStructuredBuffer("t_LightsCB", buf.LightControlBufferPtr, buf.LightControlBuffer.count, buf.LightControlBuffer.stride);
+            ds.SetStructuredBuffer("t_Lights",   buf.LightBufferPtr,        buf.LightBuffer.count,        buf.LightBuffer.stride);
 
-            ds.SetTypedBuffer("t_LightProxyCounters",      buf.LightProxyCounters.GetNativeBufferPtr(),   buf.LightProxyCounters.count,   (uint)Nri.DXGI_FORMAT.DXGI_FORMAT_R32_UINT);
-            ds.SetTypedBuffer("t_LightProxyIndices",       buf.LightSamplingProxies.GetNativeBufferPtr(), buf.LightSamplingProxies.count, (uint)Nri.DXGI_FORMAT.DXGI_FORMAT_R32_UINT);
-            ds.SetTypedBuffer("t_LightLocalSamplingBuffer", buf.LocalSamplingBuffer.GetNativeBufferPtr(), buf.LocalSamplingBuffer.count,  (uint)Nri.DXGI_FORMAT.DXGI_FORMAT_R32_UINT);
+            ds.SetTypedBuffer("t_LightProxyCounters",       buf.LightProxyCountersPtr,   buf.LightProxyCounters.count,   (uint)Nri.DXGI_FORMAT.DXGI_FORMAT_R32_UINT);
+            ds.SetTypedBuffer("t_LightProxyIndices",        buf.LightSamplingProxiesPtr, buf.LightSamplingProxies.count, (uint)Nri.DXGI_FORMAT.DXGI_FORMAT_R32_UINT);
+            ds.SetTypedBuffer("t_LightLocalSamplingBuffer", buf.LocalSamplingBufferPtr,  buf.LocalSamplingBuffer.count,  (uint)Nri.DXGI_FORMAT.DXGI_FORMAT_R32_UINT);
 
             ds.SetStructuredBuffer("t_LightsEx", buf.LightExBuffer);
 

@@ -23,6 +23,9 @@ namespace PathTracing
         /// <summary>g_Const (b0) — SampleConstants, built each frame by NativeRtxptConstantsBuilder.</summary>
         public GraphicsBuffer ConstantBuffer;
 
+        /// <summary>Cached native ptr for ConstantBuffer. Valid for the lifetime of the per-camera buffer object.</summary>
+        public IntPtr ConstantBufferPtr;
+
         // ── Scene acceleration structure ──────────────────────────────────────
         // (TLAS is owned by GpuScene; use GpuScene.AccelerationStructure directly)
 
@@ -118,6 +121,7 @@ namespace PathTracing
         /// </summary>
         public void ResolveNativePtrs()
         {
+            ConstantBufferPtr        = ConstantBuffer?.GetNativeBufferPtr() ?? IntPtr.Zero;
             OutputColorPtr           = Textures.OutputColor.NativePtr;
             ProcessedOutputColorPtr  = Textures.ProcessedOutputColor.NativePtr;
             ThroughputPtr            = Textures.Throughput.NativePtr;

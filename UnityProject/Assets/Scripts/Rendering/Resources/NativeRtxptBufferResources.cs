@@ -118,6 +118,47 @@ namespace PathTracing
         /// <summary>Constant buffer for the importance baker pass. 48 bytes.</summary>
         public GraphicsBuffer ImportanceBakerCb;
 
+        // ── Cached native pointers (immutable after allocation) ───────────────
+        // Resolution-dependent buffers — valid after EnsureResources(), cleared on resize
+        public IntPtr StablePlanesBufferPtr  { get; private set; }
+        public IntPtr SurfaceDataBufferPtr   { get; private set; }
+        public IntPtr LocalSamplingBufferPtr { get; private set; }
+
+        // Light system buffers — valid after EnsureLightBuffers(), cleared in ReleaseLightBuffers()
+        public IntPtr FeedbackBufferPtr           { get; private set; }
+        public IntPtr LightControlBufferPtr       { get; private set; }
+        public IntPtr LightBufferPtr              { get; private set; }
+        public IntPtr LightExBufferPtr            { get; private set; }
+        public IntPtr LightScratchBufferPtr       { get; private set; }
+        public IntPtr HistoryRemapCurrToPastPtr   { get; private set; }
+        public IntPtr HistoryRemapPastToCurrPtr   { get; private set; }
+        public IntPtr LightProxyCountersPtr       { get; private set; }
+        public IntPtr LightSamplingProxiesPtr     { get; private set; }
+        public IntPtr LightWeightsBufferPtr       { get; private set; }
+        public IntPtr ScratchListBufferPtr        { get; private set; }
+
+        // Env baker CBs — valid after EnsureEnvBakerBuffers()
+        public IntPtr EnvBakerCbPtr        { get; private set; }
+        public IntPtr ImportanceBakerCbPtr { get; private set; }
+
+        public void RefreshLightUploadBufferPtrs()
+        {
+            LightControlBufferPtr = LightControlBuffer?.GetNativeBufferPtr() ?? IntPtr.Zero;
+            LightBufferPtr        = LightBuffer?.GetNativeBufferPtr()        ?? IntPtr.Zero;
+            LightExBufferPtr      = LightExBuffer?.GetNativeBufferPtr()      ?? IntPtr.Zero;
+        }
+
+        public void RefreshLightScratchBufferPtr()
+        {
+            LightScratchBufferPtr = LightScratchBuffer?.GetNativeBufferPtr() ?? IntPtr.Zero;
+        }
+
+        public void RefreshEnvBakerBufferPtrs()
+        {
+            EnvBakerCbPtr        = EnvBakerCb?.GetNativeBufferPtr()        ?? IntPtr.Zero;
+            ImportanceBakerCbPtr = ImportanceBakerCb?.GetNativeBufferPtr() ?? IntPtr.Zero;
+        }
+
         // ── Resolved resolution ───────────────────────────────────────────────
         public int2 renderResolution { get; private set; }
 
@@ -172,6 +213,7 @@ namespace PathTracing
                 GraphicsBuffer.Target.Structured,
                 localSampCount, 4)
             { name = "Rtxpt_LocalSamplingBuffer" };
+            LocalSamplingBufferPtr = LocalSamplingBuffer.GetNativeBufferPtr();
 
             // StablePlanesBuffer: W×H×StablePlaneCount structured entries, stride = StablePlaneStride (80).
             // Shader declares: RWStructuredBuffer<StablePlane> u_StablePlanesBuffer (u42).
@@ -180,6 +222,7 @@ namespace PathTracing
                 tsPlaneStride * StablePlaneCount,
                 StablePlaneStride)
             { name = "Rtxpt_StablePlanesBuffer" };
+            StablePlanesBufferPtr = StablePlanesBuffer.GetNativeBufferPtr();
 
             // SurfaceDataBuffer: W×H×2 structured entries, stride = SurfaceDataStride (64).
             // Shader declares: RWStructuredBuffer<PackedPathTracerSurfaceData> u_SurfaceData (u45).
@@ -188,6 +231,7 @@ namespace PathTracing
                 pixelCount * 2,
                 SurfaceDataStride)
             { name = "Rtxpt_SurfaceDataBuffer" };
+            SurfaceDataBufferPtr = SurfaceDataBuffer.GetNativeBufferPtr();
 
             return true;
         }
@@ -205,48 +249,57 @@ namespace PathTracing
                 GraphicsBuffer.Target.Structured,
                 1, 64)
             { name = "Rtxpt_FeedbackBuffer" };
+            FeedbackBufferPtr = FeedbackBuffer.GetNativeBufferPtr();
 
             // LightControlBuffer — single RtxptLightingControlData element (576 bytes).
             LightControlBuffer = new GraphicsBuffer(
                 GraphicsBuffer.Target.Structured,
                 1, Marshal.SizeOf<RtxptLightingControlData>())
             { name = "Rtxpt_LightControlBuffer" };
+            LightControlBufferPtr = LightControlBuffer.GetNativeBufferPtr();
 
             // LightBuffer / LightExBuffer — match PolymorphicLightInfo (32B) and PolymorphicLightInfoEx (16B).
             LightBuffer = new GraphicsBuffer(
                 GraphicsBuffer.Target.Structured,
                 MaxLights, Marshal.SizeOf<RtxptPolymorphicLightInfo>())
             { name = "Rtxpt_LightBuffer" };
+            LightBufferPtr = LightBuffer.GetNativeBufferPtr();
 
             LightExBuffer = new GraphicsBuffer(
                 GraphicsBuffer.Target.Structured,
                 MaxLights, Marshal.SizeOf<RtxptPolymorphicLightInfoEx>())
             { name = "Rtxpt_LightExBuffer" };
+            LightExBufferPtr = LightExBuffer.GetNativeBufferPtr();
 
             LightScratchBuffer = new GraphicsBuffer(
                 GraphicsBuffer.Target.Raw,
                 ScratchElementCount, 4)
             { name = "Rtxpt_LightScratchBuffer" };
+            LightScratchBufferPtr = LightScratchBuffer.GetNativeBufferPtr();
 
             HistoryRemapCurrentToPast = new GraphicsBuffer(
                 GraphicsBuffer.Target.Structured,
                 MaxLights, 4)
             { name = "Rtxpt_HistoryRemapCurrentToPast" };
+            HistoryRemapCurrToPastPtr = HistoryRemapCurrentToPast.GetNativeBufferPtr();
 
             HistoryRemapPastToCurrent = new GraphicsBuffer(
                 GraphicsBuffer.Target.Structured,
                 MaxLights, 4)
             { name = "Rtxpt_HistoryRemapPastToCurrent" };
+            HistoryRemapPastToCurrPtr = HistoryRemapPastToCurrent.GetNativeBufferPtr();
 
             LightProxyCounters = new GraphicsBuffer(
                 GraphicsBuffer.Target.Structured,
                 ProxyCounterCount, 4)
             { name = "Rtxpt_LightProxyCounters" };
+            LightProxyCountersPtr = LightProxyCounters.GetNativeBufferPtr();
 
             LightSamplingProxies = new GraphicsBuffer(
                 GraphicsBuffer.Target.Structured,
                 ProxySamplingCount, 4)
             { name = "Rtxpt_LightSamplingProxies" };
+            LightSamplingProxiesPtr = LightSamplingProxies.GetNativeBufferPtr();
 
             // LocalSamplingBuffer is now allocated in EnsureResources() with the correct resolution-dependent size.
 
@@ -255,6 +308,7 @@ namespace PathTracing
                 GraphicsBuffer.Target.Structured,
                 2 * WeightsCountHalf, 4)
             { name = "Rtxpt_LightWeightsBuffer" };
+            LightWeightsBufferPtr = LightWeightsBuffer.GetNativeBufferPtr();
 
             // ScratchListBuffer: uint typed scratch for proxy count prefix-sum and job list.
             // Must hold at least 2 × RTXPT_NEEAT_ENVMAP_QT_TOTAL_NODE_COUNT (=5368×2=10736) entries
@@ -263,6 +317,7 @@ namespace PathTracing
                 GraphicsBuffer.Target.Structured,
                 ScratchListCount, 4)
             { name = "Rtxpt_ScratchListBuffer" };
+            ScratchListBufferPtr = ScratchListBuffer.GetNativeBufferPtr();
         }
 
         /// <summary>
@@ -274,37 +329,42 @@ namespace PathTracing
             EnvBakerCb?.Dispose();
             EnvBakerCb = new GraphicsBuffer(GraphicsBuffer.Target.Constant, 704 / sizeof(uint), sizeof(uint))
                 { name = "Rtxpt_EnvBakerCb" };
+            EnvBakerCbPtr = EnvBakerCb.GetNativeBufferPtr();
             ImportanceBakerCb?.Dispose();
             ImportanceBakerCb = new GraphicsBuffer(GraphicsBuffer.Target.Constant, 48 / sizeof(uint), sizeof(uint))
                 { name = "Rtxpt_ImportanceBakerCb" };
+            ImportanceBakerCbPtr = ImportanceBakerCb.GetNativeBufferPtr();
         }
 
         private void ReleaseResolutionBuffers()
         {
             StablePlanesBuffer?.Release();
-            StablePlanesBuffer = null;
+            StablePlanesBuffer  = null;
+            StablePlanesBufferPtr = IntPtr.Zero;
             SurfaceDataBuffer?.Release();
-            SurfaceDataBuffer = null;
+            SurfaceDataBuffer  = null;
+            SurfaceDataBufferPtr = IntPtr.Zero;
             LocalSamplingBuffer?.Release();
-            LocalSamplingBuffer = null;
+            LocalSamplingBuffer  = null;
+            LocalSamplingBufferPtr = IntPtr.Zero;
         }
 
         private void ReleaseLightBuffers()
         {
-            EnvBakerCb?.Dispose();               EnvBakerCb               = null;
-            ImportanceBakerCb?.Dispose();         ImportanceBakerCb        = null;
-            FeedbackBuffer?.Release();           FeedbackBuffer           = null;
-            LightControlBuffer?.Release();       LightControlBuffer       = null;
-            LightBuffer?.Release();              LightBuffer              = null;
-            LightExBuffer?.Release();            LightExBuffer            = null;
-            LightScratchBuffer?.Release();       LightScratchBuffer       = null;
-            HistoryRemapCurrentToPast?.Release();HistoryRemapCurrentToPast= null;
-            HistoryRemapPastToCurrent?.Release();HistoryRemapPastToCurrent= null;
-            LightProxyCounters?.Release();       LightProxyCounters       = null;
-            LightSamplingProxies?.Release();     LightSamplingProxies     = null;
-            LocalSamplingBuffer?.Release();      LocalSamplingBuffer      = null; // now re-created by EnsureResources
-            LightWeightsBuffer?.Release();       LightWeightsBuffer       = null;
-            ScratchListBuffer?.Release();        ScratchListBuffer        = null;
+            EnvBakerCb?.Dispose();               EnvBakerCb               = null; EnvBakerCbPtr        = IntPtr.Zero;
+            ImportanceBakerCb?.Dispose();         ImportanceBakerCb        = null; ImportanceBakerCbPtr = IntPtr.Zero;
+            FeedbackBuffer?.Release();            FeedbackBuffer           = null; FeedbackBufferPtr           = IntPtr.Zero;
+            LightControlBuffer?.Release();        LightControlBuffer       = null; LightControlBufferPtr       = IntPtr.Zero;
+            LightBuffer?.Release();               LightBuffer              = null; LightBufferPtr              = IntPtr.Zero;
+            LightExBuffer?.Release();             LightExBuffer            = null; LightExBufferPtr            = IntPtr.Zero;
+            LightScratchBuffer?.Release();        LightScratchBuffer       = null; LightScratchBufferPtr       = IntPtr.Zero;
+            HistoryRemapCurrentToPast?.Release(); HistoryRemapCurrentToPast= null; HistoryRemapCurrToPastPtr   = IntPtr.Zero;
+            HistoryRemapPastToCurrent?.Release(); HistoryRemapPastToCurrent= null; HistoryRemapPastToCurrPtr   = IntPtr.Zero;
+            LightProxyCounters?.Release();        LightProxyCounters       = null; LightProxyCountersPtr       = IntPtr.Zero;
+            LightSamplingProxies?.Release();      LightSamplingProxies     = null; LightSamplingProxiesPtr     = IntPtr.Zero;
+            LocalSamplingBuffer?.Release();       LocalSamplingBuffer      = null; LocalSamplingBufferPtr      = IntPtr.Zero;
+            LightWeightsBuffer?.Release();        LightWeightsBuffer       = null; LightWeightsBufferPtr       = IntPtr.Zero;
+            ScratchListBuffer?.Release();         ScratchListBuffer        = null; ScratchListBufferPtr        = IntPtr.Zero;
         }
 
         public void Dispose()

@@ -68,7 +68,7 @@ namespace PathTracing
 
             cmd.BeginSample("Rtxpt.ExportVisibilityBuffer");
 
-            ds.SetConstantBuffer("g_Const", ctx.ConstantBuffer.GetNativeBufferPtr());
+            ds.SetConstantBuffer("g_Const", ctx.ConstantBufferPtr);
             ds.SetRWTexture("u_MotionVectors", res.ScreenMotionVectors.NativePtr);
             ds.SetRWTexture("u_Depth", res.Depth.NativePtr);
             ds.SetRWTexture("u_ShaderDebugVizTextureBuffer", res.ShaderDebugViz.NativePtr);

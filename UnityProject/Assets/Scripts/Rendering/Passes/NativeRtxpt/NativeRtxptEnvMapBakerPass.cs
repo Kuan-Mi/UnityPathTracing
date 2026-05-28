@@ -55,6 +55,7 @@ namespace PathTracing
             ctx.Buffers.EnvBakerCb.SetData(s_envBakerWords);
             FillImportanceBakerConstants();
             ctx.Buffers.ImportanceBakerCb.SetData(s_importanceWords);
+            ctx.Buffers.RefreshEnvBakerBufferPtrs();
 
             ctx.BakedEnvCubePtr                = ctx.Textures.EnvCubeMip0.IsCreated ? ctx.Textures.EnvCubeMip0.NativePtr : IntPtr.Zero;
             ctx.EnvImportanceMapPtr            = ctx.Textures.EnvImportanceMap.IsCreated ? ctx.Textures.EnvImportanceMap.NativePtr : IntPtr.Zero;
@@ -88,8 +89,8 @@ namespace PathTracing
             pd.BaseLayerDs          = _baseLayerDs;
             pd.ImportanceBakerCs    = _importanceBakerCs;
             pd.ImportanceBakerDs    = _importanceBakerDs;
-            pd.EnvBakerCbPtr        = _ctx.Buffers.EnvBakerCb.GetNativeBufferPtr();
-            pd.ImportanceBakerCbPtr = _ctx.Buffers.ImportanceBakerCb.GetNativeBufferPtr();
+            pd.EnvBakerCbPtr        = _ctx.Buffers.EnvBakerCbPtr;
+            pd.ImportanceBakerCbPtr = _ctx.Buffers.ImportanceBakerCbPtr;
             var skyTex = _ctx.Setting?.environmentMap;
             pd.SkyTexturePtr    = skyTex != null ? skyTex.GetNativeTexturePtr() : Texture2D.blackTexture.GetNativeTexturePtr();
             pd.EnvCubeMip0Ptr   = _ctx.Textures.EnvCubeMip0.NativePtr;

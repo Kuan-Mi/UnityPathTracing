@@ -70,8 +70,8 @@ namespace PathTracing
 
             cmd.BeginSample("Rtxpt.Accumulation");
 
-            if (ctx.ConstantBuffer != null)
-                ds.SetConstantBuffer("g_Const", ctx.ConstantBuffer.GetNativeBufferPtr());
+            if (ctx.ConstantBufferPtr != IntPtr.Zero)
+                ds.SetConstantBuffer("g_Const", ctx.ConstantBufferPtr);
 
             // SRV input: noisy PT output
             ds.SetTexture("t_InputColor", res.OutputColor.NativePtr);

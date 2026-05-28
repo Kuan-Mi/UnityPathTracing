@@ -27,6 +27,7 @@ namespace PathTracing
         private          NativeRtxptPassContext _ctx;
         private readonly SampleMiniConstants[]  _miniConstArray = new SampleMiniConstants[1];
         private          GraphicsBuffer         _miniConstBuffer;
+        private          IntPtr                 _miniConstBufferPtr;
 
         /// <summary>Pipeline handle exposed for NativeRtxptBuildTlasPass hit-table rebuilds.</summary>
         public RayTracePipeline BuildPipeline => _buildSP;
@@ -44,6 +45,7 @@ namespace PathTracing
                     GraphicsBuffer.Target.Constant, 1,
                     Marshal.SizeOf<SampleMiniConstants>())
                 { name = "Rtxpt_MiniConst_Build" };
+            _miniConstBufferPtr = _miniConstBuffer.GetNativeBufferPtr();
         }
 
         public void Dispose()
@@ -51,7 +53,8 @@ namespace PathTracing
             _buildDs?.Dispose();
             _buildSP?.Dispose();
             _miniConstBuffer?.Dispose();
-            _miniConstBuffer = null;
+            _miniConstBuffer    = null;
+            _miniConstBufferPtr = IntPtr.Zero;
         }
 
         public void Setup(NativeRtxptPassContext ctx) => _ctx = ctx;
@@ -64,6 +67,7 @@ namespace PathTracing
             internal NativeRayTraceDescriptorSet BuildDs;
             internal NativeRtxptPassContext      Ctx;
             internal GraphicsBuffer              MiniConstBuffer;
+            internal IntPtr                      MiniConstBufferPtr;
             internal int2                        RenderRes;
         }
 
@@ -73,11 +77,12 @@ namespace PathTracing
         {
             using var builder = renderGraph.AddUnsafePass<PassData>("NativeRtxpt.BuildStablePlanes", out var passData);
 
-            passData.BuildSP         = _buildSP;
-            passData.BuildDs         = _buildDs;
-            passData.Ctx             = _ctx;
-            passData.MiniConstBuffer = _miniConstBuffer;
-            passData.RenderRes       = _ctx.RenderResolution;
+            passData.BuildSP            = _buildSP;
+            passData.BuildDs            = _buildDs;
+            passData.Ctx                = _ctx;
+            passData.MiniConstBuffer    = _miniConstBuffer;
+            passData.MiniConstBufferPtr = _miniConstBufferPtr;
+            passData.RenderRes          = _ctx.RenderResolution;
 
             builder.AllowPassCulling(false);
             builder.SetRenderFunc((PassData data, UnsafeGraphContext context) => ExecutePass(data, context));
@@ -101,13 +106,14 @@ namespace PathTracing
                     params0y = (ctx.FrameState.frameIndex & 1),
                 }
             });
+            var miniConstBufferPtr = data.MiniConstBuffer.GetNativeBufferPtr();
 
             var tlas = ctx.GpuScene?.AccelerationStructure;
 
             cmd.BeginSample("Rtxpt.BuildStablePlanes");
             {
                 var ds = data.BuildDs;
-                BindCommonRT(ds, ctx, data.MiniConstBuffer, tlas);
+                BindCommonRT(ds, ctx, miniConstBufferPtr, tlas);
 
                 ds.SetRWTexture("u_Throughput",                res.Throughput.NativePtr);
                 ds.SetRWTexture("u_MotionVectors",             res.ScreenMotionVectors.NativePtr);
@@ -128,11 +134,11 @@ namespace PathTracing
         private static void BindCommonRT(
             NativeRayTraceDescriptorSet ds,
             NativeRtxptPassContext ctx,
-            GraphicsBuffer miniConstBuffer,
+            IntPtr miniConstBufferPtr,
             RayTracingAccelerationStructure tlas)
         {
-            ds.SetConstantBuffer("g_Const",    ctx.ConstantBuffer.GetNativeBufferPtr());
-            ds.SetConstantBuffer("g_MiniConst", miniConstBuffer.GetNativeBufferPtr());
+            ds.SetConstantBuffer("g_Const",    ctx.ConstantBufferPtr);
+            ds.SetConstantBuffer("g_MiniConst", miniConstBufferPtr);
             ds.SetAccelerationStructure("SceneBVH", tlas);
 
             ctx.GpuScene.BindToShader(ds);
@@ -148,7 +154,7 @@ namespace PathTracing
             ds.SetTexture("t_EnvLookupMap", envLookupPtr);
 
             ds.SetRWStructuredBuffer("u_FeedbackBuffer",
-                ctx.Buffers.FeedbackBuffer.GetNativeBufferPtr(),
+                ctx.Buffers.FeedbackBufferPtr,
                 ctx.Buffers.FeedbackBuffer.count,
                 ctx.Buffers.FeedbackBuffer.stride);
         }

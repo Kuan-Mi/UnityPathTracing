@@ -305,6 +305,7 @@ namespace PathTracing
 
             uint emissiveLightOffset = EnvQtTotalNodeCount + (uint)_analyticLightCount;
             gpuScene.PrepareEmissiveTriangleTasks(emissiveLightOffset, ctx.Buffers.LightScratchBuffer);
+            ctx.Buffers.RefreshLightScratchBufferPtr();
             _emissiveTaskCount     = gpuScene.LastEmissiveTaskCount;
             _emissiveTotalTriCount = gpuScene.LastEmissiveTriangleCount;
             BuildControlData();
@@ -474,8 +475,7 @@ namespace PathTracing
 
             cmd.BeginSample(RenderPassMarkers.RtxptLightingUpdateBegin);
 
-            // CPU uploads first — SetData may change the underlying native pointer,
-            // so all uploads must complete before any GetNativeBufferPtr call.
+            // CPU uploads.
             context.cmd.BeginSample(RenderPassMarkers.RtxptControlDataSetup);
             data.LightControlBuffer.SetData(data.ControlData, 0, 0, 1);
             context.cmd.EndSample(RenderPassMarkers.RtxptControlDataSetup);
@@ -488,17 +488,19 @@ namespace PathTracing
                 context.cmd.EndSample(RenderPassMarkers.RtxptEnvmapAndAnalyticLightBuffers);
             }
 
-            // Buffer pointers — captured after all SetData calls
-            var pCtrl     = buf.LightControlBuffer.GetNativeBufferPtr();
-            var pLights   = buf.LightBuffer.GetNativeBufferPtr();
-            var pLightsEx = buf.LightExBuffer.GetNativeBufferPtr();
-            var pScratch  = buf.LightScratchBuffer.GetNativeBufferPtr();
-            var pScrList  = buf.ScratchListBuffer.GetNativeBufferPtr();
-            var pWeights  = buf.LightWeightsBuffer.GetNativeBufferPtr();
-            var pHistCur  = buf.HistoryRemapCurrentToPast.GetNativeBufferPtr();
-            var pHistPas  = buf.HistoryRemapPastToCurrent.GetNativeBufferPtr();
-            var pProxyCnt = buf.LightProxyCounters.GetNativeBufferPtr();
-            var pProxies  = buf.LightSamplingProxies.GetNativeBufferPtr();
+            // Refresh cached pointers after CPU uploads before binding.
+            buf.RefreshLightUploadBufferPtrs();
+
+            var pCtrl     = buf.LightControlBufferPtr;
+            var pLights   = buf.LightBufferPtr;
+            var pLightsEx = buf.LightExBufferPtr;
+            var pScratch  = buf.LightScratchBufferPtr;
+            var pScrList  = buf.ScratchListBufferPtr;
+            var pWeights  = buf.LightWeightsBufferPtr;
+            var pHistCur  = buf.HistoryRemapCurrToPastPtr;
+            var pHistPas  = buf.HistoryRemapPastToCurrPtr;
+            var pProxyCnt = buf.LightProxyCountersPtr;
+            var pProxies  = buf.LightSamplingProxiesPtr;
 
             int cCtrl     = buf.LightControlBuffer.count;
             int cLights   = buf.LightBuffer.count;

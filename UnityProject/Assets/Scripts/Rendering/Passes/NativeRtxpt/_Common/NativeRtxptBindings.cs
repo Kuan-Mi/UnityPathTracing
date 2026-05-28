@@ -67,13 +67,12 @@ namespace PathTracing
             if (ctx.StableRadiancePtr != IntPtr.Zero)
                 ds.SetRWTexture("u_StableRadiance", ctx.StableRadiancePtr);
 
-            var spBuf = ctx.Buffers?.StablePlanesBuffer;
-            if (spBuf != null)
-                ds.SetRWStructuredBuffer("u_StablePlanesBuffer", spBuf.GetNativeBufferPtr(), spBuf.count, spBuf.stride);
+            var buf = ctx.Buffers;
+            if (buf?.StablePlanesBufferPtr != IntPtr.Zero)
+                ds.SetRWStructuredBuffer("u_StablePlanesBuffer", buf.StablePlanesBufferPtr, buf.StablePlanesBuffer.count, buf.StablePlanesBuffer.stride);
 
-            var sdBuf = ctx.Buffers?.SurfaceDataBuffer;
-            if (sdBuf != null)
-                ds.SetRWStructuredBuffer("u_SurfaceData", sdBuf.GetNativeBufferPtr(), sdBuf.count, sdBuf.stride);
+            if (buf?.SurfaceDataBufferPtr != IntPtr.Zero)
+                ds.SetRWStructuredBuffer("u_SurfaceData", buf.SurfaceDataBufferPtr, buf.SurfaceDataBuffer.count, buf.SurfaceDataBuffer.stride);
         }
 
         private static void BindDlssRrGuides(NativeComputeDescriptorSet ds, NativeRtxptPassContext ctx)
