@@ -114,6 +114,10 @@ namespace PathTracing
         // for renderers that have a NativeRtxptMaterialOverride. Used for lightweight material-only updates.
         private readonly Dictionary<int, int[]> _overrideMaterialIndices = new();
 
+        // Cached list of (component, matIndices) for all renderers with a NativeRtxptMaterialOverride.
+        // Rebuilt during RebuildSceneGpuData so CheckAndUpdateMaterialOverrides never calls GetComponent.
+        private readonly List<(NativeRtxptMaterialOverride comp, int[] matIndices)> _overrideCache = new();
+
         // Optional equirectangular environment map for RTXDI environment light.
         private Texture _pendingEnvMap;
         private int     _environmentMapTextureIndex = -1;
@@ -311,7 +315,7 @@ namespace PathTracing
             if (_sceneGpuDirty)
                 RebuildSceneGpuData(targets);
             else
-                CheckAndUpdateMaterialOverrides(targets);
+                CheckAndUpdateMaterialOverrides();
 
             UpdateInstanceTransforms();
         }
@@ -535,6 +539,7 @@ namespace PathTracing
             _textureSlots.Clear();
             _perTargetGroupHandles.Clear();
             _overrideMaterialIndices.Clear();
+            _overrideCache.Clear();
             _environmentMapTextureIndex = -1;
 
             foreach (var buf in _ownedGfxBuffers)
@@ -799,7 +804,10 @@ namespace PathTracing
                 }
 
                 if (overrideMatIndices != null)
+                {
                     _overrideMaterialIndices[mr.GetInstanceID()] = overrideMatIndices;
+                    _overrideCache.Add((matOverride, overrideMatIndices));
+                }
             }
 
             // Append environment map to bindless texture array (if registered)
@@ -858,21 +866,16 @@ namespace PathTracing
         /// parameters are updated.  If you also change texture assignments, call
         /// <see cref="MarkRebuildDirty"/> instead to trigger a full scene rebuild.
         /// </summary>
-        private void CheckAndUpdateMaterialOverrides(IReadOnlyList<NativeRayTracingTarget> targets)
+        private void CheckAndUpdateMaterialOverrides()
         {
             if (_ptMaterialCpu == null || _ptMaterialGpuBuf == null) return;
 
-            bool anyDirty = false;
-            foreach (var target in targets)
-            {
-                if (target == null) continue;
-                var mr = target.GetComponent<MeshRenderer>();
-                if (mr == null) continue;
-                var matOverride = mr.GetComponent<NativeRtxptMaterialOverride>();
-                if (matOverride == null || !matOverride.IsDirty) continue;
+            int dirtyMin = int.MaxValue;
+            int dirtyMax = int.MinValue;
 
-                int mrId = mr.GetInstanceID();
-                if (!_overrideMaterialIndices.TryGetValue(mrId, out int[] matIndices)) continue;
+            foreach (var (matOverride, matIndices) in _overrideCache)
+            {
+                if (matOverride == null || !matOverride.IsDirty) continue;
 
                 for (int s = 0; s < matIndices.Length && s < matOverride.Slots.Count; s++)
                 {
@@ -880,14 +883,15 @@ namespace PathTracing
                     int idx = matIndices[s];
                     if (idx < 0 || idx >= _ptMaterialCpu.Length) continue;
                     RefreshMaterialCpuFromOverride(matOverride.Slots[s].Slot, ref _ptMaterialCpu[idx]);
+                    if (idx < dirtyMin) dirtyMin = idx;
+                    if (idx > dirtyMax) dirtyMax = idx;
                 }
 
                 matOverride.ClearDirty();
-                anyDirty = true;
             }
 
-            if (anyDirty)
-                _ptMaterialGpuBuf.SetData(_ptMaterialCpu);
+            if (dirtyMin <= dirtyMax)
+                _ptMaterialGpuBuf.SetData(_ptMaterialCpu, dirtyMin, dirtyMin, dirtyMax - dirtyMin + 1);
         }
 
         /// <summary>
