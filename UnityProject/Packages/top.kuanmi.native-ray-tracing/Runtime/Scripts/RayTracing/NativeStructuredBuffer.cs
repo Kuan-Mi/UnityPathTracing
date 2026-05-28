@@ -48,7 +48,7 @@ namespace NativeRender
         public ulong Handle { get; private set; }
 
         /// <summary>Fixed element capacity of the underlying D3D12 buffer.</summary>
-        public int count => (int)NativeRenderPlugin.NR_NSB_GetCapacity(Handle);
+        public int count { get; }
 
         /// <summary>Element stride in bytes (fixed at construction).</summary>
         public int stride { get; }
@@ -87,6 +87,7 @@ namespace NativeRender
         {
             if (capacity      <= 0) throw new ArgumentOutOfRangeException(nameof(capacity));
             if (elementStride <= 0) throw new ArgumentOutOfRangeException(nameof(elementStride));
+            count = capacity;
             stride = elementStride;
             Mode   = mode;
             Handle = NativeRenderPlugin.NR_CreateNativeStructuredBuffer((uint)capacity, (uint)elementStride);
