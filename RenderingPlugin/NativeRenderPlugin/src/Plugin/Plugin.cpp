@@ -62,6 +62,16 @@ static HANDLE                    s_gpuFlushDoneEvent = nullptr;
 // per-frame ring buffers using this value so they stay in sync.
 uint32_t g_frameIndex = 0;
 
+// Shared transient descriptor ring (see PluginInternal.h). Reserves a contiguous
+// sub-range of s_DescHeap at renderer init; descriptor-set dispatches bump-allocate
+// SRV/UAV tables out of it and the ring reclaims them once the frame fence completes.
+TransientDescriptorRing g_transientRing;
+
+// Capacity of the transient ring in descriptor slots. Sized so it can absorb several
+// frames-in-flight worth of dispatches across all descriptor sets without exhaustion.
+// Must be <= DescriptorHeapAllocator::kCapacity minus expected bindless usage.
+static constexpr uint32_t kTransientRingCapacity = 32768u;
+
 // ---------------------------------------------------------------------------
 // Deferred delete queue — delays destruction of GPU-facing objects until the
 // GPU has finished executing all commands that may reference them.
@@ -339,6 +349,11 @@ static void UNITY_INTERFACE_API OnGraphicsDeviceEvent(UnityGfxDeviceEventType ev
             if (!s_DescHeap.Initialize(device))
                 NR_ERROR("DescriptorHeapAllocator initialization failed");
 
+            // Reserve the transient descriptor ring from the shared heap *before*
+            // any other allocations so it gets a fixed range at the bottom.
+            if (!g_transientRing.Initialize(&s_DescHeap, kTransientRingCapacity))
+                NR_ERROR("TransientDescriptorRing initialization failed");
+
             // 1-slot CPU-only heap used by ClearNativeGpuBufferCallback
             {
                 D3D12_DESCRIPTOR_HEAP_DESC hd = {};
@@ -377,6 +392,7 @@ static void UNITY_INTERFACE_API OnGraphicsDeviceEvent(UnityGfxDeviceEventType ev
         DrainDeferredDeletes(true);
         NR_LOG("Plugin shutdown - deferred deletes drained");
 
+        g_transientRing.Shutdown();
         s_DescHeap.Shutdown();
         s_ClearCpuHeap.Reset();
         s_RendererReady = false;
@@ -950,6 +966,17 @@ NR_RTS_SetRootSRVHint(uint64_t shaderHandle, const char* name)
 static void UNITY_INTERFACE_API FrameTickCallback(int /*eventId*/)
 {
     DrainDeferredDeletes();
+
+    // Reclaim transient descriptor-ring slots whose frame fence has completed,
+    // and record this frame's high-water mark against the value the fence will
+    // reach once this frame's GPU work finishes. kDeleteDelay matches the safety
+    // margin used by the deferred-delete queue so the lifetime semantics align.
+    if (s_D3D12 && g_transientRing.IsInitialized())
+    {
+        const uint64_t completedValue = s_D3D12->GetFrameFence()->GetCompletedValue();
+        const uint64_t frameFence     = s_D3D12->GetNextFrameFenceValue() + kDeleteDelay;
+        g_transientRing.EndFrame(frameFence, completedValue);
+    }
 }
 
 // ---------------------------------------------------------------------------

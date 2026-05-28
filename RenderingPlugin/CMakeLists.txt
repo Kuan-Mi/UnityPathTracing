@@ -336,6 +336,7 @@ add_library(NativeRenderPlugin SHARED
     NativeRenderPlugin/src/Descriptors/ComputeDescriptorSet.cpp
     NativeRenderPlugin/src/Resources/AccelerationStructure.cpp
     NativeRenderPlugin/src/Descriptors/DescriptorHeapAllocator.cpp
+    NativeRenderPlugin/src/Descriptors/TransientDescriptorRing.cpp
     NativeRenderPlugin/src/Resources/BindlessTexture.cpp
     NativeRenderPlugin/src/Resources/BindlessBuffer.cpp
     NativeRenderPlugin/src/Resources/BindlessUAVTexture.cpp

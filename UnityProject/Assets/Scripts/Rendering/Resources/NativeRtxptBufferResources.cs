@@ -15,7 +15,7 @@ namespace PathTracing
     ///   sizeof(PackedPathTracerSurfaceData) = 64 bytes  (TODO: verify from HLSL)
     /// </summary>
     public class NativeRtxptBufferResources : IDisposable
-    {
+    { 
         // sizeof(StablePlane) in bytes — must match HLSL struct StablePlane layout.
         public const int StablePlaneStride = 80;
 

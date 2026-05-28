@@ -12,6 +12,11 @@
 //   Common state and descriptor-management logic shared between
 //   ComputeDescriptorSet (Dispatch) and RayTraceDescriptorSet (DispatchRays).
 //
+//   The SRV+UAV descriptor table backing each Dispatch is bump-allocated from
+//   the global TransientDescriptorRing (see TransientDescriptorRing.h) and
+//   reclaimed automatically once the GPU finishes the frame that used it.
+//   The descriptor set itself owns no per-frame heap state.
+//
 //   ShaderT must expose:
 //     const char*                        GetName()                const
 //     uint32_t                           GetNumSRV()              const
@@ -35,32 +40,32 @@ public:
                       IUnityLog*                log,
                       DescriptorHeapAllocator*  allocator,
                       IUnityGraphicsD3D12v8*    d3d12v8);
-    ~DescriptorSetBase();
 
 protected:
     // --- Logging ---
     void Log (UnityLogType type, const char* msg)      const;
     void Logf(UnityLogType type, const char* fmt, ...) const;
 
-    // --- Descriptor heap management ---
-    void FreeAllocations();
-    bool AllocateAndWriteDescriptors(const BindingSlot* slots, uint32_t slotCount, uint32_t slotIdx);
-    void UpdateDescriptors          (const BindingSlot* slots, uint32_t slotCount, uint32_t slotIdx);
-    void RequestResourceStates      (const BindingSlot* slots, uint32_t slotCount);
-    void NotifyResourceStates       (const BindingSlot* slots, uint32_t slotCount);
-
     // --- Dispatch helpers ---
 
     // Validates all binding slots; logs errors and returns false on any missing binding.
     bool ValidateBindings(const BindingSlot* slots, uint32_t slotCount) const;
 
-    // Computes per-dispatch slotIdx (ring-buffer across frames × eyes) and
-    // increments m_subFrameIdx.  Always succeeds; clamps on overflow.
-    void AcquireSlot(uint32_t& outSlotIdx);
+    // Bump-allocate the SRV and UAV descriptor tables for one dispatch from the
+    // global transient ring.  On success returns true and fills outSrvBase /
+    // outUavBase with absolute heap slot indices (or kInvalidAlloc if the
+    // shader uses zero SRVs / zero UAVs).  On ring exhaustion logs an error
+    // and returns false; callers must skip the dispatch in that case.
+    bool AllocateTransientTables(uint32_t& outSrvBase, uint32_t& outUavBase) const;
 
-    // Allocates heap slots on first use then writes descriptors; or just
-    // re-writes descriptors if already allocated.
-    void EnsureDescriptors(const BindingSlot* slots, uint32_t slotCount, uint32_t slotIdx);
+    // Write SRV/TLAS and UAV descriptors into the supplied transient table
+    // bases.  ROOT_SRV / CBV / ROOT_CONSTANTS / SRV_ARRAY / UAV_ARRAY are
+    // bound elsewhere (BindRootParams) and are skipped here.
+    void WriteDescriptors(const BindingSlot* slots, uint32_t slotCount,
+                          uint32_t srvBase, uint32_t uavBase);
+
+    void RequestResourceStates(const BindingSlot* slots, uint32_t slotCount);
+    void NotifyResourceStates (const BindingSlot* slots, uint32_t slotCount);
 
     // Binds the global heap, the root signature, and all root parameters
     // (descriptor tables, inline CBVs, inline SRVs, root constants).
@@ -69,7 +74,8 @@ protected:
     void BindRootParams(ID3D12GraphicsCommandList* cmdList,
                         const BindingSlot*      slots,
                         uint32_t                   slotCount,
-                        uint32_t                   slotIdx);
+                        uint32_t                   srvBase,
+                        uint32_t                   uavBase);
 
     // --- State ---
     ShaderT*                 m_shader    = nullptr;
@@ -78,27 +84,5 @@ protected:
     DescriptorHeapAllocator* m_allocator = nullptr;
     IUnityGraphicsD3D12v8*   m_d3d12v8   = nullptr;
 
-    // Cached at construction — FreeAllocations must not dereference m_shader
-    // because the shader object may already be destroyed by the time the
-    // descriptor set's destructor runs (deferred-delete ordering).
-    uint32_t m_cachedNumSRV = 0;
-    uint32_t m_cachedNumUAV = 0;
-
-    static constexpr uint32_t kInvalidAlloc    = UINT32_MAX;
-    static constexpr uint32_t kNumFrames        = 3;  // triple-buffering
-    static constexpr uint32_t kMaxEyesPerFrame  = 2;  // XR stereo
-    static constexpr uint32_t kNumSlots         = kNumFrames * kMaxEyesPerFrame; // 6
-
-    // Per-dispatch slot index: slotIdx = g_frameIndex * kMaxEyesPerFrame + m_subFrameIdx.
-    // m_subFrameIdx resets to 0 on each new frame, then increments per Dispatch call,
-    // giving eye0 and eye1 independent GPU heap slices within the same frame.
-    uint32_t m_lastFrameIndex = UINT32_MAX;
-    uint32_t m_subFrameIdx    = 0;
-
-    uint32_t m_srvAllocBase[kNumSlots] = {
-        kInvalidAlloc, kInvalidAlloc, kInvalidAlloc,
-        kInvalidAlloc, kInvalidAlloc, kInvalidAlloc };
-    uint32_t m_uavAllocBase[kNumSlots] = {
-        kInvalidAlloc, kInvalidAlloc, kInvalidAlloc,
-        kInvalidAlloc, kInvalidAlloc, kInvalidAlloc };
+    static constexpr uint32_t kInvalidAlloc = UINT32_MAX;
 };

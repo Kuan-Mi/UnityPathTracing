@@ -1,5 +1,6 @@
 #pragma once
 #include "DescriptorHeapAllocator.h"
+#include "TransientDescriptorRing.h"
 #include <cstdint>
 
 // ---------------------------------------------------------------------------
@@ -39,3 +40,12 @@ enum class DeferredType {
 // ---------------------------------------------------------------------------
 static constexpr uint32_t kGlobalNumFrames = 3;
 extern uint32_t g_frameIndex;
+
+// ---------------------------------------------------------------------------
+// g_transientRing
+//   Shared transient-descriptor ring used by ComputeDescriptorSet and
+//   RayTraceDescriptorSet for per-dispatch SRV/UAV table allocation.  Reserves
+//   a contiguous sub-range of s_DescHeap at renderer init; allocations are
+//   reclaimed by the frame fence at each NR_FrameTick.
+// ---------------------------------------------------------------------------
+extern TransientDescriptorRing g_transientRing;

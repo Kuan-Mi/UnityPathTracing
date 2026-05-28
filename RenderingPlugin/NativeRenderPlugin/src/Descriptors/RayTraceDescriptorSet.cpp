@@ -15,13 +15,13 @@ void RayTraceDescriptorSet::Dispatch(
     if (!slots && slotCount > 0) return;
     if (!ValidateBindings(slots, slotCount)) return;
 
-    uint32_t slotIdx;
-    AcquireSlot(slotIdx);
-    EnsureDescriptors(slots, slotCount, slotIdx);
+    uint32_t srvBase, uavBase;
+    if (!AllocateTransientTables(srvBase, uavBase)) return;
+    WriteDescriptors(slots, slotCount, srvBase, uavBase);
 
     cmdList->SetPipelineState1(m_shader->GetPSO());
     RequestResourceStates(slots, slotCount);
-    BindRootParams(cmdList, slots, slotCount, slotIdx);
+    BindRootParams(cmdList, slots, slotCount, srvBase, uavBase);
 
     // DispatchRays
     const UINT stride = D3D12_RAYTRACING_SHADER_RECORD_BYTE_ALIGNMENT;

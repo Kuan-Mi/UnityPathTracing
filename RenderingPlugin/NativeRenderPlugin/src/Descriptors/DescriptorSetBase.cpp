@@ -7,12 +7,13 @@
 #include "BindlessUAVTexture.h"
 #include "NativeBuffer.h"
 #include "NativeGpuBuffer.h"
+#include "TransientDescriptorRing.h"
 #include "PluginInternal.h"
 #include <cstdio>
 #include <cstdarg>
 
 // ===========================================================================
-// Constructor / Destructor
+// Constructor
 // ===========================================================================
 
 template<typename ShaderT>
@@ -23,15 +24,7 @@ DescriptorSetBase<ShaderT>::DescriptorSetBase(
     DescriptorHeapAllocator*  allocator,
     IUnityGraphicsD3D12v8*    d3d12v8)
     : m_shader(shader), m_device(device), m_log(log), m_allocator(allocator), m_d3d12v8(d3d12v8)
-    , m_cachedNumSRV(shader ? shader->GetNumSRV() : 0)
-    , m_cachedNumUAV(shader ? shader->GetNumUAV() : 0)
 {
-}
-
-template<typename ShaderT>
-DescriptorSetBase<ShaderT>::~DescriptorSetBase()
-{
-    FreeAllocations();
 }
 
 // ===========================================================================
@@ -57,61 +50,61 @@ void DescriptorSetBase<ShaderT>::Logf(UnityLogType type, const char* fmt, ...) c
 }
 
 // ===========================================================================
-// FreeAllocations
+// AllocateTransientTables
+//   Allocates one contiguous block of (numSRV + numUAV) slots from the
+//   transient ring.  Doing it as a single allocation eliminates the
+//   partial-failure case (succeed for SRV but fail for UAV) and halves the
+//   per-dispatch ring bookkeeping.  The SRV table occupies [base, base+numSRV)
+//   and the UAV table [base+numSRV, base+numSRV+numUAV); the two are bound as
+//   separate root descriptor tables in BindRootParams.
 // ===========================================================================
 
 template<typename ShaderT>
-void DescriptorSetBase<ShaderT>::FreeAllocations()
+bool DescriptorSetBase<ShaderT>::AllocateTransientTables(
+    uint32_t& outSrvBase, uint32_t& outUavBase) const
 {
-    if (!m_allocator) return;
-    // Use cached counts — m_shader may already be deleted (shader is enqueued for
-    // deferred-delete before descriptor set, so m_shader can be a dangling pointer).
-    const uint32_t numSRV = m_cachedNumSRV;
-    const uint32_t numUAV = m_cachedNumUAV;
-    for (uint32_t f = 0; f < kNumSlots; ++f)
-    {
-        if (m_srvAllocBase[f] != kInvalidAlloc && numSRV > 0)
-            { m_allocator->Free(m_srvAllocBase[f], numSRV); m_srvAllocBase[f] = kInvalidAlloc; }
-        if (m_uavAllocBase[f] != kInvalidAlloc && numUAV > 0)
-            { m_allocator->Free(m_uavAllocBase[f], numUAV); m_uavAllocBase[f] = kInvalidAlloc; }
-    }
-}
-
-// ===========================================================================
-// AllocateAndWriteDescriptors
-// ===========================================================================
-
-template<typename ShaderT>
-bool DescriptorSetBase<ShaderT>::AllocateAndWriteDescriptors(
-    const BindingSlot* slots, uint32_t slotCount, uint32_t slotIdx)
-{
-    if (!m_allocator) return false;
     const uint32_t numSRV = m_shader->GetNumSRV();
     const uint32_t numUAV = m_shader->GetNumUAV();
-    if (m_srvAllocBase[slotIdx] == kInvalidAlloc && numSRV > 0)
-        m_srvAllocBase[slotIdx] = m_allocator->Allocate(numSRV);
-    if (m_uavAllocBase[slotIdx] == kInvalidAlloc && numUAV > 0)
-        m_uavAllocBase[slotIdx] = m_allocator->Allocate(numUAV);
-    UpdateDescriptors(slots, slotCount, slotIdx);
+    const uint32_t total  = numSRV + numUAV;
+
+    if (total == 0)
+    {
+        outSrvBase = kInvalidAlloc;
+        outUavBase = kInvalidAlloc;
+        return true;
+    }
+
+    uint32_t base = g_transientRing.Allocate(total);
+    if (base == UINT32_MAX)
+    {
+        Logf(kUnityLogTypeError,
+             "DescriptorSet::Dispatch [%s]: transient descriptor ring exhausted "
+             "(needed %u slots) - skipping dispatch",
+             m_shader->GetName(), total);
+        return false;
+    }
+
+    outSrvBase = (numSRV > 0) ? base                : kInvalidAlloc;
+    outUavBase = (numUAV > 0) ? (base + numSRV)     : kInvalidAlloc;
     return true;
 }
 
 // ===========================================================================
-// UpdateDescriptors
-//   Writes all SRV/UAV descriptors from the per-dispatch slot array.
+// WriteDescriptors
+//   Writes all SRV/UAV descriptors into the transient table bases.
 //   CBVs and ROOT_SRVs are bound as inline root descriptors in BindRootParams.
 //   SRV_ARRAY / UAV_ARRAY bindings use their own heap (Bindless* objects).
 // ===========================================================================
 
 template<typename ShaderT>
-void DescriptorSetBase<ShaderT>::UpdateDescriptors(
-    const BindingSlot* slots, uint32_t slotCount, uint32_t slotIdx)
+void DescriptorSetBase<ShaderT>::WriteDescriptors(
+    const BindingSlot* slots, uint32_t slotCount,
+    uint32_t srvBase, uint32_t uavBase)
 {
     const auto& bindings = m_shader->GetBindings();
-    const uint32_t f = slotIdx;
 
     // --- SRV / TLAS ---
-    if (m_srvAllocBase[f] != kInvalidAlloc)
+    if (srvBase != kInvalidAlloc)
     {
         for (size_t i = 0; i < bindings.size(); ++i)
         {
@@ -136,11 +129,11 @@ void DescriptorSetBase<ShaderT>::UpdateDescriptors(
 
                 s.RaytracingAccelerationStructure.Location = tlas ? tlas->GetGPUVirtualAddress() : 0;
                 m_device->CreateShaderResourceView(nullptr, &s,
-                    m_allocator->GetCPUHandle(m_srvAllocBase[f] + b.heapOffset));
+                    m_allocator->GetCPUHandle(srvBase + b.heapOffset));
             }
             else if (b.type == BindingType::SRV)
             {
-                D3D12_CPU_DESCRIPTOR_HANDLE h = m_allocator->GetCPUHandle(m_srvAllocBase[f] + b.heapOffset);
+                D3D12_CPU_DESCRIPTOR_HANDLE h = m_allocator->GetCPUHandle(srvBase + b.heapOffset);
                 D3D12_SHADER_RESOURCE_VIEW_DESC s = {};
                 s.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
                 ID3D12Resource* res = (slot.objectKind == BindingObjectKind::NativeBuffer && slot.objectPtr)
@@ -150,11 +143,6 @@ void DescriptorSetBase<ShaderT>::UpdateDescriptors(
                         : reinterpret_cast<ID3D12Resource*>(slot.resourcePtr);
                 if (res)
                 {
-                    // Logf(kUnityLogTypeLog,
-                    //      "DescriptorSet SRV[%zu] '%s' reg=t%u space%u kind=%d res=%p stride=%u count=%u fmt=%u",
-                    //      i, b.name.c_str(), b.registerIndex, b.space,
-                    //      (int)slot.objectKind, (void*)res,
-                    //      slot.stride, slot.count, slot.format);
                     auto rd = res->GetDesc();
                     if (rd.Dimension == D3D12_RESOURCE_DIMENSION_BUFFER)
                     {
@@ -223,7 +211,7 @@ void DescriptorSetBase<ShaderT>::UpdateDescriptors(
     }
 
     // --- UAV ---
-    if (m_uavAllocBase[f] != kInvalidAlloc)
+    if (uavBase != kInvalidAlloc)
     {
         for (size_t i = 0; i < bindings.size(); ++i)
         {
@@ -235,7 +223,7 @@ void DescriptorSetBase<ShaderT>::UpdateDescriptors(
                 : (slot.objectKind == BindingObjectKind::NativeGpuBuffer && slot.objectPtr)
                     ? reinterpret_cast<::NativeGpuBuffer*>(slot.objectPtr)->GetResource()
                     : reinterpret_cast<ID3D12Resource*>(slot.resourcePtr);
-            D3D12_CPU_DESCRIPTOR_HANDLE h = m_allocator->GetCPUHandle(m_uavAllocBase[f] + b.heapOffset);
+            D3D12_CPU_DESCRIPTOR_HANDLE h = m_allocator->GetCPUHandle(uavBase + b.heapOffset);
             D3D12_UNORDERED_ACCESS_VIEW_DESC u = {};
             if (res)
             {
@@ -494,50 +482,6 @@ bool DescriptorSetBase<ShaderT>::ValidateBindings(
 }
 
 // ===========================================================================
-// AcquireSlot
-// ===========================================================================
-
-template<typename ShaderT>
-void DescriptorSetBase<ShaderT>::AcquireSlot(uint32_t& outSlotIdx)
-{
-    if (g_frameIndex != m_lastFrameIndex)
-    {
-        m_subFrameIdx    = 0;
-        m_lastFrameIndex = g_frameIndex;
-    }
-    if (m_subFrameIdx >= kMaxEyesPerFrame)
-    {
-        Logf(kUnityLogTypeError,
-             "DescriptorSet::Dispatch [%s]: more than %u dispatches in one frame. Clamping.",
-             m_shader->GetName(), kMaxEyesPerFrame);
-        m_subFrameIdx = kMaxEyesPerFrame - 1;
-    }
-    outSlotIdx = g_frameIndex * kMaxEyesPerFrame + m_subFrameIdx;
-    ++m_subFrameIdx;
-}
-
-// ===========================================================================
-// EnsureDescriptors
-// ===========================================================================
-
-template<typename ShaderT>
-void DescriptorSetBase<ShaderT>::EnsureDescriptors(
-    const BindingSlot* slots, uint32_t slotCount, uint32_t slotIdx)
-{
-    const uint32_t numSRV = m_shader->GetNumSRV();
-    const uint32_t numUAV = m_shader->GetNumUAV();
-    if ((numSRV > 0 && m_srvAllocBase[slotIdx] == kInvalidAlloc) ||
-        (numUAV > 0 && m_uavAllocBase[slotIdx] == kInvalidAlloc))
-    {
-        AllocateAndWriteDescriptors(slots, slotCount, slotIdx);
-    }
-    else
-    {
-        UpdateDescriptors(slots, slotCount, slotIdx);
-    }
-}
-
-// ===========================================================================
 // BindRootParams
 //   Binds the global heap, root signature, and all root parameters.
 //   The base ID3D12GraphicsCommandList* interface exposes all SetComputeRoot*
@@ -549,7 +493,8 @@ void DescriptorSetBase<ShaderT>::BindRootParams(
     ID3D12GraphicsCommandList* cmdList,
     const BindingSlot*      slots,
     uint32_t                   slotCount,
-    uint32_t                   slotIdx)
+    uint32_t                   srvBase,
+    uint32_t                   uavBase)
 {
     // Bind the global shared heap
     ID3D12DescriptorHeap* heapsToBind[1] = { m_allocator->GetHeap() };
@@ -563,14 +508,14 @@ void DescriptorSetBase<ShaderT>::BindRootParams(
     const uint32_t rootParamCBVBase = m_shader->GetRootParamCBVBase();
 
     // SRV descriptor table
-    if (rootParamSRV != kInvalidAlloc && m_srvAllocBase[slotIdx] != kInvalidAlloc)
+    if (rootParamSRV != kInvalidAlloc && srvBase != kInvalidAlloc)
         cmdList->SetComputeRootDescriptorTable(rootParamSRV,
-            m_allocator->GetGPUHandle(m_srvAllocBase[slotIdx]));
+            m_allocator->GetGPUHandle(srvBase));
 
     // UAV descriptor table
-    if (rootParamUAV != kInvalidAlloc && m_uavAllocBase[slotIdx] != kInvalidAlloc)
+    if (rootParamUAV != kInvalidAlloc && uavBase != kInvalidAlloc)
         cmdList->SetComputeRootDescriptorTable(rootParamUAV,
-            m_allocator->GetGPUHandle(m_uavAllocBase[slotIdx]));
+            m_allocator->GetGPUHandle(uavBase));
 
     // SRV_ARRAY bindings — each has its own root parameter
     for (size_t i = 0; i < bindings.size(); ++i)
