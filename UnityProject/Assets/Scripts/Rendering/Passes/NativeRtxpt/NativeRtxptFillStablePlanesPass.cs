@@ -32,7 +32,6 @@ namespace PathTracing
         private          NativeRtxptPassContext _ctx;
         private readonly SampleMiniConstants[]  _miniConstArray = new SampleMiniConstants[1];
         private          GraphicsBuffer         _miniConstBuffer;
-        private          IntPtr                 _miniConstBufferPtr;
 
         /// <summary>Pipeline handles exposed for NativeRtxptBuildTlasPass hit-table rebuilds.</summary>
         public RayTracePipeline FillPipeline => _fillSP;
@@ -58,7 +57,6 @@ namespace PathTracing
                     GraphicsBuffer.Target.Constant, 1,
                     Marshal.SizeOf<SampleMiniConstants>())
                 { name = "Rtxpt_MiniConst_Fill" };
-            _miniConstBufferPtr = _miniConstBuffer.GetNativeBufferPtr();
         }
 
         public void Dispose()
@@ -68,8 +66,7 @@ namespace PathTracing
             _refDs?.Dispose();
             _refSP?.Dispose();
             _miniConstBuffer?.Dispose();
-            _miniConstBuffer    = null;
-            _miniConstBufferPtr = IntPtr.Zero;
+            _miniConstBuffer = null;
         }
 
         public void Setup(NativeRtxptPassContext ctx) => _ctx = ctx;
@@ -82,7 +79,6 @@ namespace PathTracing
             internal NativeRayTraceDescriptorSet FillDs, RefDs;
             internal NativeRtxptPassContext      Ctx;
             internal GraphicsBuffer              MiniConstBuffer;
-            internal IntPtr                      MiniConstBufferPtr;
             internal int2                        RenderRes;
             internal bool                        IsRealtime;
         }
@@ -99,7 +95,6 @@ namespace PathTracing
             passData.RefDs              = _refDs;
             passData.Ctx                = _ctx;
             passData.MiniConstBuffer    = _miniConstBuffer;
-            passData.MiniConstBufferPtr = _miniConstBufferPtr;
             passData.RenderRes          = _ctx.RenderResolution;
             passData.IsRealtime         = _ctx.Setting.realtimeMode;
 

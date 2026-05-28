@@ -141,11 +141,15 @@ namespace PathTracing
         public IntPtr EnvBakerCbPtr        { get; private set; }
         public IntPtr ImportanceBakerCbPtr { get; private set; }
 
-        public void RefreshLightUploadBufferPtrs()
+        public void RefreshLightControlBufferPtr()
         {
             LightControlBufferPtr = LightControlBuffer?.GetNativeBufferPtr() ?? IntPtr.Zero;
-            LightBufferPtr        = LightBuffer?.GetNativeBufferPtr()        ?? IntPtr.Zero;
-            LightExBufferPtr      = LightExBuffer?.GetNativeBufferPtr()      ?? IntPtr.Zero;
+        }
+
+        public void RefreshAnalyticLightBufferPtrs()
+        {
+            LightBufferPtr   = LightBuffer?.GetNativeBufferPtr()   ?? IntPtr.Zero;
+            LightExBufferPtr = LightExBuffer?.GetNativeBufferPtr() ?? IntPtr.Zero;
         }
 
         public void RefreshLightScratchBufferPtr()

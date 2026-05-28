@@ -37,6 +37,12 @@ namespace PathTracing
         private GraphicsBuffer _ptMaterialGpuBuf; // t_PTMaterialData     (t5)
         private GraphicsBuffer _geomDebugGpuBuf; // t_GeometryDebugData  (t4)
 
+        private IntPtr _instanceGpuBufPtr;
+        private IntPtr _geometryGpuBufPtr;
+        private IntPtr _subInstanceGpuBufPtr;
+        private IntPtr _ptMaterialGpuBufPtr;
+        private IntPtr _geomDebugGpuBufPtr;
+
         // Bindless
         private BindlessBuffer  _sceneBuffers;
         private BindlessTexture _sceneTextures;
@@ -288,7 +294,10 @@ namespace PathTracing
 
             // Re-upload SubInstanceData (EmissiveLightMappingOffset fields updated)
             if (_subInstanceGpuBuf != null && _subInstanceCpu != null)
+            {
                 _subInstanceGpuBuf.SetData(_subInstanceCpu);
+                _subInstanceGpuBufPtr = _subInstanceGpuBuf.GetNativeBufferPtr();
+            }
 
             // Upload task array to scratch buffer (Raw buffer, stride = 4 bytes, tasks = 8 uints each)
             if (taskIdx > 0 && scratchBuffer != null)
@@ -335,19 +344,19 @@ namespace PathTracing
             out IntPtr ptMaterialPtr,  out int ptMaterialCount,  out int ptMaterialStride)
         {
             if (_subInstanceGpuBuf != null)
-            { subInstancePtr = _subInstanceGpuBuf.GetNativeBufferPtr(); subInstanceCount = _subInstanceGpuBuf.count; subInstanceStride = _subInstanceGpuBuf.stride; }
+            { subInstancePtr = _subInstanceGpuBufPtr; subInstanceCount = _subInstanceGpuBuf.count; subInstanceStride = _subInstanceGpuBuf.stride; }
             else { subInstancePtr = IntPtr.Zero; subInstanceCount = 0; subInstanceStride = 1; }
 
             if (_instanceGpuBuf != null)
-            { instancePtr = _instanceGpuBuf.GetNativeBufferPtr(); instanceCount = _instanceGpuBuf.count; instanceStride = _instanceGpuBuf.stride; }
+            { instancePtr = _instanceGpuBufPtr; instanceCount = _instanceGpuBuf.count; instanceStride = _instanceGpuBuf.stride; }
             else { instancePtr = IntPtr.Zero; instanceCount = 0; instanceStride = 1; }
 
             if (_geometryGpuBuf != null)
-            { geometryPtr = _geometryGpuBuf.GetNativeBufferPtr(); geometryCount = _geometryGpuBuf.count; geometryStride = _geometryGpuBuf.stride; }
+            { geometryPtr = _geometryGpuBufPtr; geometryCount = _geometryGpuBuf.count; geometryStride = _geometryGpuBuf.stride; }
             else { geometryPtr = IntPtr.Zero; geometryCount = 0; geometryStride = 1; }
 
             if (_ptMaterialGpuBuf != null)
-            { ptMaterialPtr = _ptMaterialGpuBuf.GetNativeBufferPtr(); ptMaterialCount = _ptMaterialGpuBuf.count; ptMaterialStride = _ptMaterialGpuBuf.stride; }
+            { ptMaterialPtr = _ptMaterialGpuBufPtr; ptMaterialCount = _ptMaterialGpuBuf.count; ptMaterialStride = _ptMaterialGpuBuf.stride; }
             else { ptMaterialPtr = IntPtr.Zero; ptMaterialCount = 0; ptMaterialStride = 1; }
         }
 
@@ -360,11 +369,11 @@ namespace PathTracing
         public void BindToShader(NativeComputeDescriptorSet ds)
         {
             if (ds == null) return;
-            ds.SetStructuredBuffer("t_SubInstanceData", _subInstanceGpuBuf.GetNativeBufferPtr(), _subInstanceGpuBuf.count, _subInstanceGpuBuf.stride);
-            ds.SetStructuredBuffer("t_InstanceData", _instanceGpuBuf.GetNativeBufferPtr(), _instanceGpuBuf.count, _instanceGpuBuf.stride);
-            ds.SetStructuredBuffer("t_GeometryData", _geometryGpuBuf.GetNativeBufferPtr(), _geometryGpuBuf.count, _geometryGpuBuf.stride);
-            ds.SetStructuredBuffer("t_GeometryDebugData", _geomDebugGpuBuf.GetNativeBufferPtr(), _geomDebugGpuBuf.count, _geomDebugGpuBuf.stride);
-            ds.SetStructuredBuffer("t_PTMaterialData", _ptMaterialGpuBuf.GetNativeBufferPtr(), _ptMaterialGpuBuf.count, _ptMaterialGpuBuf.stride);
+            ds.SetStructuredBuffer("t_SubInstanceData", _subInstanceGpuBufPtr, _subInstanceGpuBuf.count, _subInstanceGpuBuf.stride);
+            ds.SetStructuredBuffer("t_InstanceData", _instanceGpuBufPtr, _instanceGpuBuf.count, _instanceGpuBuf.stride);
+            ds.SetStructuredBuffer("t_GeometryData", _geometryGpuBufPtr, _geometryGpuBuf.count, _geometryGpuBuf.stride);
+            ds.SetStructuredBuffer("t_GeometryDebugData", _geomDebugGpuBufPtr, _geomDebugGpuBuf.count, _geomDebugGpuBuf.stride);
+            ds.SetStructuredBuffer("t_PTMaterialData", _ptMaterialGpuBufPtr, _ptMaterialGpuBuf.count, _ptMaterialGpuBuf.stride);
             ds.SetBindlessBuffer("t_BindlessBuffers", _sceneBuffers);
             ds.SetBindlessTexture("t_BindlessTextures", _sceneTextures);
         }
@@ -372,11 +381,11 @@ namespace PathTracing
         public void BindToShader(NativeRayTraceDescriptorSet ds)
         {
             if (ds == null) return;
-            ds.SetStructuredBuffer("t_SubInstanceData", _subInstanceGpuBuf.GetNativeBufferPtr(), _subInstanceGpuBuf.count, _subInstanceGpuBuf.stride);
-            ds.SetStructuredBuffer("t_InstanceData", _instanceGpuBuf.GetNativeBufferPtr(), _instanceGpuBuf.count, _instanceGpuBuf.stride);
-            ds.SetStructuredBuffer("t_GeometryData", _geometryGpuBuf.GetNativeBufferPtr(), _geometryGpuBuf.count, _geometryGpuBuf.stride);
-            ds.SetStructuredBuffer("t_GeometryDebugData", _geomDebugGpuBuf.GetNativeBufferPtr(), _geomDebugGpuBuf.count, _geomDebugGpuBuf.stride);
-            ds.SetStructuredBuffer("t_PTMaterialData", _ptMaterialGpuBuf.GetNativeBufferPtr(), _ptMaterialGpuBuf.count, _ptMaterialGpuBuf.stride);
+            ds.SetStructuredBuffer("t_SubInstanceData", _subInstanceGpuBufPtr, _subInstanceGpuBuf.count, _subInstanceGpuBuf.stride);
+            ds.SetStructuredBuffer("t_InstanceData", _instanceGpuBufPtr, _instanceGpuBuf.count, _instanceGpuBuf.stride);
+            ds.SetStructuredBuffer("t_GeometryData", _geometryGpuBufPtr, _geometryGpuBuf.count, _geometryGpuBuf.stride);
+            ds.SetStructuredBuffer("t_GeometryDebugData", _geomDebugGpuBufPtr, _geomDebugGpuBuf.count, _geomDebugGpuBuf.stride);
+            ds.SetStructuredBuffer("t_PTMaterialData", _ptMaterialGpuBufPtr, _ptMaterialGpuBuf.count, _ptMaterialGpuBuf.stride);
             ds.SetBindlessBuffer("t_BindlessBuffers", _sceneBuffers);
             ds.SetBindlessTexture("t_BindlessTextures", _sceneTextures);
         }
@@ -519,14 +528,19 @@ namespace PathTracing
         {
             _instanceGpuBuf?.Release();
             _instanceGpuBuf = null;
+            _instanceGpuBufPtr = IntPtr.Zero;
             _geometryGpuBuf?.Release();
             _geometryGpuBuf = null;
+            _geometryGpuBufPtr = IntPtr.Zero;
             _subInstanceGpuBuf?.Release();
             _subInstanceGpuBuf = null;
+            _subInstanceGpuBufPtr = IntPtr.Zero;
             _ptMaterialGpuBuf?.Release();
             _ptMaterialGpuBuf = null;
+            _ptMaterialGpuBufPtr = IntPtr.Zero;
             _geomDebugGpuBuf?.Release();
             _geomDebugGpuBuf = null;
+            _geomDebugGpuBufPtr = IntPtr.Zero;
             _sceneBuffers?.Dispose();
             _sceneBuffers = null;
             _sceneTextures?.Dispose();
@@ -853,18 +867,23 @@ namespace PathTracing
 
             _instanceGpuBuf = new GraphicsBuffer(GraphicsBuffer.Target.Structured, _instanceCpu.Length, Marshal.SizeOf<DonutInstanceData>());
             _instanceGpuBuf.SetData(_instanceCpu);
+            _instanceGpuBufPtr = _instanceGpuBuf.GetNativeBufferPtr();
 
             _geometryGpuBuf = new GraphicsBuffer(GraphicsBuffer.Target.Structured, _geometryCpu.Length, Marshal.SizeOf<DonutGeometryData>());
             _geometryGpuBuf.SetData(_geometryCpu);
+            _geometryGpuBufPtr = _geometryGpuBuf.GetNativeBufferPtr();
 
             _subInstanceGpuBuf = new GraphicsBuffer(GraphicsBuffer.Target.Structured, _subInstanceCpu.Length, Marshal.SizeOf<SubInstanceData>());
             _subInstanceGpuBuf.SetData(_subInstanceCpu);
+            _subInstanceGpuBufPtr = _subInstanceGpuBuf.GetNativeBufferPtr();
 
             _ptMaterialGpuBuf = new GraphicsBuffer(GraphicsBuffer.Target.Structured, _ptMaterialCpu.Length, Marshal.SizeOf<PTMaterialData>());
             _ptMaterialGpuBuf.SetData(_ptMaterialCpu);
+            _ptMaterialGpuBufPtr = _ptMaterialGpuBuf.GetNativeBufferPtr();
 
             _geomDebugGpuBuf = new GraphicsBuffer(GraphicsBuffer.Target.Structured, _geomDebugCpu.Length, Marshal.SizeOf<GeometryDebugData>());
             _geomDebugGpuBuf.SetData(_geomDebugCpu);
+            _geomDebugGpuBufPtr = _geomDebugGpuBuf.GetNativeBufferPtr();
 
             _sceneGpuDirty = false;
         }
@@ -901,7 +920,10 @@ namespace PathTracing
             }
 
             if (dirtyMin <= dirtyMax)
+            {
                 _ptMaterialGpuBuf.SetData(_ptMaterialCpu, dirtyMin, dirtyMin, dirtyMax - dirtyMin + 1);
+                _ptMaterialGpuBufPtr = _ptMaterialGpuBuf.GetNativeBufferPtr();
+            }
         }
 
         /// <summary>
@@ -998,6 +1020,7 @@ namespace PathTracing
                 }
 
                 _instanceGpuBuf.SetData(_instanceCpu, start, start, count);
+                _instanceGpuBufPtr = _instanceGpuBuf.GetNativeBufferPtr();
                 entry.wasMoving = moved;
             }
         }

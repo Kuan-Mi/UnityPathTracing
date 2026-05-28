@@ -27,7 +27,6 @@ namespace PathTracing
         private          NativeRtxptPassContext _ctx;
         private readonly SampleMiniConstants[]  _miniConstArray = new SampleMiniConstants[1];
         private          GraphicsBuffer         _miniConstBuffer;
-        private          IntPtr                 _miniConstBufferPtr;
 
         /// <summary>Pipeline handle exposed for NativeRtxptBuildTlasPass hit-table rebuilds.</summary>
         public RayTracePipeline BuildPipeline => _buildSP;
@@ -45,7 +44,6 @@ namespace PathTracing
                     GraphicsBuffer.Target.Constant, 1,
                     Marshal.SizeOf<SampleMiniConstants>())
                 { name = "Rtxpt_MiniConst_Build" };
-            _miniConstBufferPtr = _miniConstBuffer.GetNativeBufferPtr();
         }
 
         public void Dispose()
@@ -53,8 +51,7 @@ namespace PathTracing
             _buildDs?.Dispose();
             _buildSP?.Dispose();
             _miniConstBuffer?.Dispose();
-            _miniConstBuffer    = null;
-            _miniConstBufferPtr = IntPtr.Zero;
+            _miniConstBuffer = null;
         }
 
         public void Setup(NativeRtxptPassContext ctx) => _ctx = ctx;
@@ -67,7 +64,6 @@ namespace PathTracing
             internal NativeRayTraceDescriptorSet BuildDs;
             internal NativeRtxptPassContext      Ctx;
             internal GraphicsBuffer              MiniConstBuffer;
-            internal IntPtr                      MiniConstBufferPtr;
             internal int2                        RenderRes;
         }
 
@@ -81,7 +77,6 @@ namespace PathTracing
             passData.BuildDs            = _buildDs;
             passData.Ctx                = _ctx;
             passData.MiniConstBuffer    = _miniConstBuffer;
-            passData.MiniConstBufferPtr = _miniConstBufferPtr;
             passData.RenderRes          = _ctx.RenderResolution;
 
             builder.AllowPassCulling(false);

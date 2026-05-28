@@ -305,8 +305,9 @@ namespace PathTracing
 
             uint emissiveLightOffset = EnvQtTotalNodeCount + (uint)_analyticLightCount;
             gpuScene.PrepareEmissiveTriangleTasks(emissiveLightOffset, ctx.Buffers.LightScratchBuffer);
-            ctx.Buffers.RefreshLightScratchBufferPtr();
             _emissiveTaskCount     = gpuScene.LastEmissiveTaskCount;
+            if (_emissiveTaskCount > 0)
+                ctx.Buffers.RefreshLightScratchBufferPtr();
             _emissiveTotalTriCount = gpuScene.LastEmissiveTriangleCount;
             BuildControlData();
         }
@@ -478,6 +479,7 @@ namespace PathTracing
             // CPU uploads.
             context.cmd.BeginSample(RenderPassMarkers.RtxptControlDataSetup);
             data.LightControlBuffer.SetData(data.ControlData, 0, 0, 1);
+            buf.RefreshLightControlBufferPtr();
             context.cmd.EndSample(RenderPassMarkers.RtxptControlDataSetup);
 
             if (data.AnalyticLightCount > 0)
@@ -485,12 +487,11 @@ namespace PathTracing
                 context.cmd.BeginSample(RenderPassMarkers.RtxptEnvmapAndAnalyticLightBuffers);
                 data.LightBuffer.SetData(data.LightData, 0, (int)EnvQtTotalNodeCount, data.AnalyticLightCount);
                 data.LightExBuffer.SetData(data.LightExData, 0, (int)EnvQtTotalNodeCount, data.AnalyticLightCount);
+                buf.RefreshAnalyticLightBufferPtrs();
                 context.cmd.EndSample(RenderPassMarkers.RtxptEnvmapAndAnalyticLightBuffers);
             }
 
             // Refresh cached pointers after CPU uploads before binding.
-            buf.RefreshLightUploadBufferPtrs();
-
             var pCtrl     = buf.LightControlBufferPtr;
             var pLights   = buf.LightBufferPtr;
             var pLightsEx = buf.LightExBufferPtr;
