@@ -88,6 +88,7 @@ namespace PathTracing
             ctx.BakedEnvCubePtr                = ctx.Textures.EnvCubeMip0.IsCreated ? ctx.Textures.EnvCubeMip0.NativePtr : IntPtr.Zero;
             ctx.EnvImportanceMapPtr            = ctx.Textures.EnvImportanceMap.IsCreated ? ctx.Textures.EnvImportanceMap.NativePtr : IntPtr.Zero;
             ctx.EnvRadianceAndImportanceMapPtr = ctx.Textures.EnvRadianceMap.IsCreated ? ctx.Textures.EnvRadianceMap.NativePtr : IntPtr.Zero;
+            ctx.EnvLightLookupMapPtr           = ctx.Textures.EnvLightLookupMap.IsCreated ? ctx.Textures.EnvLightLookupMap.NativePtr : IntPtr.Zero;
         }
 
         private class PassData
@@ -98,8 +99,8 @@ namespace PathTracing
             internal NativeComputeDescriptorSet ImportanceBakerDs;
             internal NativeBuffer               EnvBakerCb;
             internal NativeBuffer               ImportanceBakerCb;
-            internal EnvMapBakerCB    EnvBakerCbData;
-            internal ImportanceBakerCB ImportanceCbData;
+            internal EnvMapBakerCB              EnvBakerCbData;
+            internal ImportanceBakerCB          ImportanceCbData;
             internal IntPtr                     SkyTexturePtr;
             internal IntPtr                     EnvCubeMip0Ptr;
             internal IntPtr                     EnvCubeMip1Ptr;
@@ -124,15 +125,15 @@ namespace PathTracing
             pd.EnvBakerCbData   = s_envBakerCb;
             pd.ImportanceCbData = s_importanceCb;
             var skyTex = _ctx.Setting?.environmentMap;
-            pd.SkyTexturePtr    = skyTex != null ? skyTex.GetNativeTexturePtr() : Texture2D.blackTexture.GetNativeTexturePtr();
-            pd.EnvCubeMip0Ptr   = _ctx.Textures.EnvCubeMip0.NativePtr;
-            pd.EnvCubeMip1Ptr   = _ctx.Textures.EnvCubeMip1.NativePtr;
-            pd.ImportanceMapPtr = _ctx.Textures.EnvImportanceMap.NativePtr;
-            pd.RadianceMapPtr   = _ctx.Textures.EnvRadianceMap.NativePtr;
-            pd.ImportanceMapRt  = _ctx.Textures.EnvImportanceMap.rt;
-            pd.RadianceMapRt    = _ctx.Textures.EnvRadianceMap.rt;
-            pd.DummyCubePtr     = _ctx.Textures.EnvDummyCube.NativePtr;
-            pd.DummyTex2DPtr    = Texture2D.blackTexture.GetNativeTexturePtr();
+            pd.SkyTexturePtr       = skyTex != null ? skyTex.GetNativeTexturePtr() : Texture2D.blackTexture.GetNativeTexturePtr();
+            pd.EnvCubeMip0Ptr      = _ctx.Textures.EnvCubeMip0.NativePtr;
+            pd.EnvCubeMip1Ptr      = _ctx.Textures.EnvCubeMip1.NativePtr;
+            pd.ImportanceMapPtr    = _ctx.Textures.EnvImportanceMap.NativePtr;
+            pd.RadianceMapPtr      = _ctx.Textures.EnvRadianceMap.NativePtr;
+            pd.ImportanceMapRt     = _ctx.Textures.EnvImportanceMap.rt;
+            pd.RadianceMapRt       = _ctx.Textures.EnvRadianceMap.rt;
+            pd.DummyCubePtr        = _ctx.Textures.EnvDummyCube.NativePtr;
+            pd.DummyTex2DPtr       = Texture2D.blackTexture.GetNativeTexturePtr();
 
             builder.AllowPassCulling(false);
             builder.SetRenderFunc((PassData d, UnsafeGraphContext c) => ExecutePass(d, c));

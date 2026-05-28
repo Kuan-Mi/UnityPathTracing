@@ -128,6 +128,9 @@ namespace PathTracing
 
         /// <summary>4×4 dummy cubemap (RGBA8). Used to satisfy shader bindings when the real cube is unneeded.</summary>
         public NriTextureResource EnvDummyCube;
+        
+        /// <summary>1024×1024 env-light lookup map (R32_UINT). Filled by EnvLightsFillLookupMap. Bound as t_EnvLookupMap (t18).</summary>
+        public NriTextureResource EnvLightLookupMap;
 
         // ── Resolved dimensions ───────────────────────────────────────────────
         public int2 renderResolution  { get; private set; }
@@ -180,6 +183,7 @@ namespace PathTracing
             EnvImportanceMap = new NriTextureResource("Rtxpt_EnvImportanceMap", GraphicsFormat.R32_SFloat,           uav);
             EnvRadianceMap   = new NriTextureResource("Rtxpt_EnvRadianceMap",   GraphicsFormat.R16G16B16A16_SFloat, uav);
             EnvDummyCube     = new NriTextureResource("Rtxpt_EnvDummyCube",     GraphicsFormat.R8G8B8A8_UNorm,      srv);
+            EnvLightLookupMap     = new NriTextureResource("Rtxpt_EnvLightLookupMap",     GraphicsFormat.R32_UInt,      srv);
         }
 
         /// <summary>
@@ -194,6 +198,7 @@ namespace PathTracing
             EnvImportanceMap.Allocate(new int2(1024, 1024), useMipMap: true);
             EnvRadianceMap.Allocate(new int2(1024, 1024), useMipMap: true);
             EnvDummyCube.AllocateCube(4, enableRandomWrite: false);
+            EnvLightLookupMap.Allocate(new int2(1024, 1024), useMipMap: false);
         }
 
         /// <summary>
@@ -273,7 +278,7 @@ namespace PathTracing
             FeedbackTotalWeightBlended, FeedbackCandidatesBlended,
             NEEATHistoryDepth,
             ShaderDebugViz, DebugOutputColor, DlssRrOutput, AccumulatedRadiance, ProcessedOutputColor,
-            EnvCubeMip0, EnvCubeMip1, EnvImportanceMap, EnvRadianceMap, EnvDummyCube,
+            EnvCubeMip0, EnvCubeMip1, EnvImportanceMap, EnvRadianceMap, EnvDummyCube,EnvLightLookupMap
         };
     }
 }

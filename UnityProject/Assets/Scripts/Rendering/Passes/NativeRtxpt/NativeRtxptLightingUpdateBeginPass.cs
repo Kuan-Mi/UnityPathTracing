@@ -139,8 +139,6 @@ namespace PathTracing
         // Owned render textures
         // ====================================================================
 
-        private RenderTexture _envLightLookupMapRt; // 1024×1024 2D R32_UINT UAV
-
         // ====================================================================
         // CPU staging
         // ====================================================================
@@ -231,8 +229,6 @@ namespace PathTracing
             _processFeedbackHistoryPreFilterDs = new NativeComputeDescriptorSet(_processFeedbackHistoryPreFilterCs);
             _processFeedbackHistoryP0Cs        = new NativeComputePipeline(processFeedbackHistoryP0Cs);
             _processFeedbackHistoryP0Ds        = new NativeComputeDescriptorSet(_processFeedbackHistoryP0Cs);
-
-            EnsureLookupMapTexture();
         }
 
         // ====================================================================
@@ -277,8 +273,6 @@ namespace PathTracing
             _processFeedbackHistoryP0Ds?.Dispose();
             _processFeedbackHistoryP0Cs?.Dispose();
 
-            // Render textures
-            DestroyRT(ref _envLightLookupMapRt);
         }
 
         // ====================================================================
@@ -289,12 +283,6 @@ namespace PathTracing
         {
             _dbgFrameCounter++;
             _ctx = ctx;
-            EnsureLookupMapTexture();
-
-            // Expose env-light lookup map pointer
-            ctx.EnvLightLookupMapPtr = _envLightLookupMapRt != null && _envLightLookupMapRt.IsCreated()
-                ? _envLightLookupMapRt.GetNativeTexturePtr()
-                : IntPtr.Zero;
 
             // --- LightsBaker CPU staging work ---
             _analyticLightCount = CollectAndPackLights();
@@ -407,7 +395,7 @@ namespace PathTracing
             pd.FillLookupMapDs      = _fillLookupMapDs;
             pd.MapPastToCurrentCs   = _mapPastToCurrentCs;
             pd.MapPastToCurrentDs   = _mapPastToCurrentDs;
-            pd.EnvLightLookupMapPtr = _ctx.EnvLightLookupMapPtr;
+            pd.EnvLightLookupMapPtr = _ctx.Textures.EnvLightLookupMap.NativePtr;
 
             // Proxy build
             pd.ResetProxyCountersCs          = _resetLightProxyCountersCs;
@@ -1107,32 +1095,6 @@ namespace PathTracing
             uint  sign   = u & 0x80000000u;
             uint  body   = s & 0x0FFFFFFFu;
             return ((sign >> 16) | (body >> 13)) & 0xFFFFu;
-        }
-
-        // ====================================================================
-        // Render texture helpers
-        // ====================================================================
-
-        private void EnsureLookupMapTexture()
-        {
-            if (_envLightLookupMapRt != null && _envLightLookupMapRt.IsCreated()) return;
-            _envLightLookupMapRt?.Release();
-            var desc = new RenderTextureDescriptor(EnvLookupMapDim, EnvLookupMapDim, GraphicsFormat.R32_UInt, 0)
-            {
-                enableRandomWrite = true,
-                useMipMap         = false,
-                dimension         = UnityEngine.Rendering.TextureDimension.Tex2D,
-            };
-            _envLightLookupMapRt = new RenderTexture(desc) { autoGenerateMips = false, hideFlags = HideFlags.HideAndDontSave };
-            _envLightLookupMapRt.Create();
-        }
-
-        private static void DestroyRT(ref RenderTexture rt)
-        {
-            if (rt == null) return;
-            rt.Release();
-            Object.DestroyImmediate(rt);
-            rt = null;
         }
     }
 }
