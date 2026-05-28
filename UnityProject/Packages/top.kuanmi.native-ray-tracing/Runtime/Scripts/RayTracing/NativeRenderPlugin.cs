@@ -486,14 +486,6 @@ namespace NativeRender
         [DllImport(DllName)]
         public static extern void NR_DestroyNativeStructuredBuffer(ulong handle);
 
-        /// <summary>Copies <paramref name="elementCount"/> elements from <paramref name="data"/> starting at <paramref name="elementOffset"/>.</summary>
-        [DllImport(DllName)]
-        public static extern unsafe void NR_NSB_UploadRange(ulong handle, void* data, uint elementOffset, uint elementCount);
-
-        /// <summary>Grows the buffer to at least <paramref name="newCapacity"/> elements, preserving existing data.</summary>
-        [DllImport(DllName)]
-        public static extern void NR_NSB_Grow(ulong handle, uint newCapacity);
-
         /// <summary>Returns the ID3D12Resource* as IntPtr for binding as an SRV.</summary>
         [DllImport(DllName)]
         public static extern IntPtr NR_NSB_GetNativePtr(ulong handle);
@@ -503,28 +495,21 @@ namespace NativeRender
         public static extern uint NR_NSB_GetCapacity(ulong handle);
 
         /// <summary>
-        /// Returns the <c>UnityRenderingEventAndData</c> function pointer for flushing staged
-        /// instance data into the GPU-resident buffer via <c>CopyBufferRegion</c>.
+        /// Returns the <c>UnityRenderingEventAndData</c> function pointer that drains the pending
+        /// queue and records the staged <c>CopyBufferRegion</c> into the GPU-resident buffer.
         /// Pass the buffer handle as the data pointer to <c>CommandBuffer.IssuePluginEventAndData</c>.
         /// </summary>
         [DllImport(DllName)]
         public static extern IntPtr NR_NSB_GetFlushEventFunc();
 
         /// <summary>
-        /// Returns the <c>UnityRenderingEventAndData</c> function pointer for draining the
-        /// main-thread pending-upload queue into staging[g_frameIndex] on the render thread.
-        /// Must be issued BEFORE <see cref="NR_NSB_GetFlushEventFunc"/> in the same CommandBuffer.
+        /// Allocates a flush snapshot blob of <paramref name="sizeBytes"/> bytes. C# fills it with
+        /// the header + range table + packed payload and passes the pointer as the data argument of
+        /// <c>CommandBuffer.IssuePluginEventAndData</c>; the render-thread flush callback parses and
+        /// frees it. Allocated and freed by the plugin so the allocator matches across the boundary.
         /// </summary>
         [DllImport(DllName)]
-        public static extern IntPtr NR_NSB_GetDrainEventFunc();
-
-        /// <summary>
-        /// Thread-safe (main thread): deep-copies <paramref name="elementCount"/> elements from
-        /// <paramref name="data"/> into the pending-upload queue. The actual staging write
-        /// happens on the render thread when the Drain event fires.
-        /// </summary>
-        [DllImport(DllName)]
-        public static unsafe extern void NR_NSB_EnqueueUpload(ulong handle, void* data, uint elementOffset, uint elementCount);
+        public static extern IntPtr NR_NSB_AllocFlushBuffer(uint sizeBytes);
 
         // -------------------------------------------------------------------
         // ComputeShader API  (generic compute pipeline, cs_6_x)

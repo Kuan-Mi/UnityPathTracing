@@ -2,6 +2,7 @@
 #include "DescriptorHeapAllocator.h"
 #include "TransientDescriptorRing.h"
 #include <cstdint>
+#include <functional>
 
 // ---------------------------------------------------------------------------
 // Internal helpers shared between Plugin.cpp and the resource classes.
@@ -16,6 +17,11 @@
 void NR_EnqueueDescriptorRangeFree(DescriptorHeapAllocator* alloc,
                                    uint32_t                 base,
                                    uint32_t                 count);
+
+// Enqueue an arbitrary cleanup task to run after a GPU fence delay (kDeleteDelay
+// frames). Used by resource classes to defer-release transient D3D12 resources
+// (e.g. per-flush upload buffers) until the GPU is guaranteed done with them.
+void EnqueueCleanup(std::function<void()>&& cleanupTask);
 
 enum class DeferredType {
     BindlessTexture,

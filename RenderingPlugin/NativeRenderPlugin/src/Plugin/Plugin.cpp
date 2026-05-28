@@ -9,6 +9,7 @@
 #include <wrl/client.h>
 #include <cstdarg>
 #include <cstdint>
+#include <cstdlib>
 #include <cstdio>
 #include <list>
 #include <mutex>
@@ -1516,34 +1517,17 @@ NR_GetClearNativeGpuBufferCallbackPtr()
 }
 
 
-//   Legacy export: redirects to EnqueueUpload for backwards compatibility.
 // ---------------------------------------------------------------------------
-extern "C" void UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API
-NR_NSB_UploadRange(uint64_t handle, const void* data, uint32_t elementOffset, uint32_t elementCount)
+// NR_NSB_AllocFlushBuffer
+//   Allocates a flush snapshot blob that C# fills (header + ranges + payload) and
+//   passes as the data pointer of IssuePluginEventAndData. The render-thread
+//   NsbFlushCallback parses and frees it. Allocated/freed by the plugin so the
+//   allocator matches across the managed/native boundary.
+// ---------------------------------------------------------------------------
+extern "C" intptr_t UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API
+NR_NSB_AllocFlushBuffer(uint32_t sizeBytes)
 {
-    if (!handle || !data) return;
-    reinterpret_cast<NativeStructuredBuffer*>(handle)->EnqueueUpload(data, elementOffset, elementCount);
-}
-
-// ---------------------------------------------------------------------------
-// NR_NSB_Grow
-//   Grows the buffer to at least |newCapacity| elements.
-//   Old GPU and staging resources are enqueued for deferred deletion.
-// ---------------------------------------------------------------------------
-extern "C" void UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API
-NR_NSB_Grow(uint64_t handle, uint32_t newCapacity)
-{
-    if (!handle) return;
-    auto* nsb = reinterpret_cast<NativeStructuredBuffer*>(handle);
-    NativeStructuredBuffer::GrowResult old;
-    if (nsb->Grow(newCapacity, old))
-    {
-        // Defer deletion of superseded resources until the GPU is done with them.
-        if (old.oldBuffer)
-            EnqueueCleanup([buf = std::move(old.oldBuffer)] {});
-        for (auto& s : old.oldStaging)
-            if (s) EnqueueCleanup([res = std::move(s)] {});
-    }
+    return sizeBytes ? reinterpret_cast<intptr_t>(std::malloc(sizeBytes)) : 0;
 }
 
 // ---------------------------------------------------------------------------
@@ -1568,55 +1552,40 @@ NR_NSB_GetCapacity(uint64_t handle)
 }
 
 // ---------------------------------------------------------------------------
-// NR_NSB_FlushPendingCopies render-event callback
+// NsbFlushCallback render-event callback
 //   Called via CommandBuffer.IssuePluginEventAndData.
-//   data = opaque NativeStructuredBuffer* (passed as IntPtr from C#).
+//   data = flush snapshot blob (NR_NSB_AllocFlushBuffer) carrying the target
+//   handle, stride, ranges and packed payload. Records the GPU copy and frees the
+//   blob. C# only issues this event for buffers that actually changed.
 // ---------------------------------------------------------------------------
 static void UNITY_INTERFACE_API NsbFlushCallback(int /*eventId*/, void* data)
 {
-    if (!s_RendererReady || !s_D3D12 || !data) return;
+    if (!data) return;
+
+    const auto* blob = static_cast<const uint8_t*>(data);
+    const auto* hdr  = reinterpret_cast<const NsbFlushHeader*>(blob);
+
     UnityGraphicsD3D12RecordingState recordingState = {};
-    if (!s_D3D12->CommandRecordingState(&recordingState) || !recordingState.commandList) return;
-    auto* nsb     = static_cast<NativeStructuredBuffer*>(data);
-    auto* cmdList = static_cast<ID3D12GraphicsCommandList*>(recordingState.commandList);
-    nsb->FlushPendingCopies(cmdList);
+    if (s_RendererReady && s_D3D12 && hdr->bufferHandle &&
+        s_D3D12->CommandRecordingState(&recordingState) && recordingState.commandList)
+    {
+        auto* nsb     = reinterpret_cast<NativeStructuredBuffer*>(hdr->bufferHandle);
+        auto* cmdList = static_cast<ID3D12GraphicsCommandList*>(recordingState.commandList);
+
+        const auto*    ranges  = reinterpret_cast<const NsbFlushRange*>(blob + sizeof(NsbFlushHeader));
+        const uint8_t* payload = blob + sizeof(NsbFlushHeader) + static_cast<size_t>(hdr->rangeCount) * sizeof(NsbFlushRange);
+
+        nsb->UploadSnapshot(cmdList, ranges, hdr->rangeCount, payload);
+    }
+
+    std::free(data);
 }
 
-/// <summary>Returns the render-event function pointer for FlushPendingCopies.</summary>
+/// <summary>Returns the render-event function pointer for Flush.</summary>
 extern "C" UnityRenderingEventAndData UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API
 NR_NSB_GetFlushEventFunc()
 {
     return NsbFlushCallback;
-}
-
-// ---------------------------------------------------------------------------
-// NR_NSB_DrainEnqueuedUploads render-event callback
-//   Drains the main-thread pending-upload queue and writes into staging[g_frameIndex].
-//   Must be issued BEFORE NsbFlushCallback in the same CommandBuffer.
-// ---------------------------------------------------------------------------
-static void UNITY_INTERFACE_API NsbDrainCallback(int /*eventId*/, void* data)
-{
-    if (!data) return;
-    static_cast<NativeStructuredBuffer*>(data)->DrainEnqueuedUploads();
-}
-
-extern "C" UnityRenderingEventAndData UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API
-NR_NSB_GetDrainEventFunc()
-{
-    return NsbDrainCallback;
-}
-
-// ---------------------------------------------------------------------------
-// NR_NSB_EnqueueUpload
-//   Thread-safe (main-thread) counterpart to UploadRange.
-//   Deep-copies |elementCount| elements from |data| into the pending queue.
-//   The actual staging write happens on the render thread via NsbDrainCallback.
-// ---------------------------------------------------------------------------
-extern "C" void UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API
-NR_NSB_EnqueueUpload(uint64_t handle, const void* data, uint32_t elementOffset, uint32_t elementCount)
-{
-    if (!handle || !data) return;
-    reinterpret_cast<NativeStructuredBuffer*>(handle)->EnqueueUpload(data, elementOffset, elementCount);
 }
 
 // ===========================================================================

@@ -501,7 +501,7 @@ namespace NativeRender
             meshDataArr.Dispose();
 
             // Partial GPU uploads.
-            _instanceDataBuf.UploadRange(_instanceCpu, (int)instBase, subCnt);
+            _instanceDataBuf.SetData(_instanceCpu, (int)instBase, subCnt);
             for (int sub = 0; sub < subCnt; sub++)
                 _primitiveDataBuf.SetData(_primitiveCpu,
                     (int)subPrimOffsets[sub], (int)subPrimOffsets[sub], subPrimCounts[sub]);
@@ -604,7 +604,7 @@ namespace NativeRender
                 {
                     var entry = kv.Value;
                     if (entry.submeshCount > 0)
-                        _instanceDataBuf.UploadRange(_instanceCpu,
+                        _instanceDataBuf.SetData(_instanceCpu,
                             (int)entry.firstInstanceDataIndex,
                             entry.submeshCount);
                 }
@@ -771,7 +771,7 @@ namespace NativeRender
         /// <summary>Build / update both TLASes (call inside a CommandBuffer).</summary>
         public void FlushPendingCopies(CommandBuffer cmd)
         {
-            _instanceDataBuf?.FlushPendingCopies(cmd);
+            _instanceDataBuf?.Flush(cmd);
         }
 
         public void BuildAccelerationStructures(CommandBuffer cmd)
@@ -1064,7 +1064,7 @@ namespace NativeRender
             _instanceCpu = instList.ToArray();
 
             _instanceDataBuf = new NativeStructuredBuffer(_instanceCpu.Length, Marshal.SizeOf<InstanceDataNRD>());
-            _instanceDataBuf.UploadRange(_instanceCpu, 0, _instanceCpu.Length);
+            _instanceDataBuf.SetData(_instanceCpu, 0, _instanceCpu.Length);
             InstanceDataBufPtr = _instanceDataBuf.NativePtr;
 
             Debug.Log($"Geometries {_instanceCpu.Length}");
@@ -1385,7 +1385,7 @@ namespace NativeRender
                             }
 
                             // Upload changed instance slots for this group.
-                            _instanceDataBuf.UploadRange(_instanceCpu, (int)grp.firstInstanceIdx, grp.submeshIndices.Length);
+                            _instanceDataBuf.SetData(_instanceCpu, (int)grp.firstInstanceIdx, grp.submeshIndices.Length);
                         }
 
                         info.lastTransform = xform;
@@ -1436,7 +1436,7 @@ namespace NativeRender
 
             // Upload zeroed instance slots. We do per-group uploads since slots may not be contiguous.
             foreach (var grp in info.groups)
-                _instanceDataBuf?.UploadRange(_instanceCpu, (int)grp.firstInstanceIdx, grp.submeshIndices.Length);
+                _instanceDataBuf?.SetData(_instanceCpu, (int)grp.firstInstanceIdx, grp.submeshIndices.Length);
 
             InstanceDataBufPtr = _instanceDataBuf?.NativePtr ?? IntPtr.Zero;
         }
@@ -1610,7 +1610,7 @@ namespace NativeRender
             meshDataArr.Dispose();
 
             // Partial GPU uploads — only the ranges we touched.
-            _instanceDataBuf.UploadRange(_instanceCpu, (int)instBase, totalSubCount);
+            _instanceDataBuf.SetData(_instanceCpu, (int)instBase, totalSubCount);
             foreach (var grp in groups)
                 for (int gi = 0; gi < grp.submeshIndices.Length; gi++)
                     _primitiveDataBuf.SetData(_primitiveCpu,
@@ -1664,16 +1664,15 @@ namespace NativeRender
 
             _instanceAlloc.GrowTo(cap);
 
-            if (_instanceDataBuf == null)
+            // Fixed-capacity buffer: dispose-and-recreate to grow (old resource is
+            // deferred-deleted in the plugin), then re-upload the full used range.
+            if (_instanceDataBuf == null || _instanceDataBuf.Capacity < cap)
             {
+                _instanceDataBuf?.Dispose();
                 _instanceDataBuf = new NativeStructuredBuffer(cap, Marshal.SizeOf<InstanceDataNRD>());
             }
-            else
-            {
-                _instanceDataBuf.Grow(cap);
-            }
 
-            _instanceDataBuf.UploadRange(_instanceCpu, 0, _instanceCpu.Length);
+            _instanceDataBuf.SetData(_instanceCpu, 0, _instanceCpu.Length);
             InstanceDataBufPtr = _instanceDataBuf.NativePtr;
         }
 
