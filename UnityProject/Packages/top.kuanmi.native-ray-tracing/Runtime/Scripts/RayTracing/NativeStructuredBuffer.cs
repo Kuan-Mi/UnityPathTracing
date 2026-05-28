@@ -48,10 +48,10 @@ namespace NativeRender
         public ulong Handle { get; private set; }
 
         /// <summary>Fixed element capacity of the underlying D3D12 buffer.</summary>
-        public int Capacity => (int)NativeRenderPlugin.NR_NSB_GetCapacity(Handle);
+        public int count => (int)NativeRenderPlugin.NR_NSB_GetCapacity(Handle);
 
         /// <summary>Element stride in bytes (fixed at construction).</summary>
-        public int Stride { get; }
+        public int stride { get; }
 
         /// <summary>Upload granularity (fixed at construction).</summary>
         public UploadMode Mode { get; }
@@ -87,7 +87,7 @@ namespace NativeRender
         {
             if (capacity      <= 0) throw new ArgumentOutOfRangeException(nameof(capacity));
             if (elementStride <= 0) throw new ArgumentOutOfRangeException(nameof(elementStride));
-            Stride = elementStride;
+            stride = elementStride;
             Mode   = mode;
             Handle = NativeRenderPlugin.NR_CreateNativeStructuredBuffer((uint)capacity, (uint)elementStride);
             if (Handle == 0)
@@ -128,16 +128,16 @@ namespace NativeRender
             if (count <= 0) return;
 
             byte* basePtr = (byte*)NativeArrayUnsafeUtility.GetUnsafeReadOnlyPtr(data);
-            Append(basePtr + (long)dstOffset * Stride, dstOffset, count);
+            Append(basePtr + (long)dstOffset * stride, dstOffset, count);
         }
 
         private unsafe void Append(void* src, int dstElementOffset, int count)
         {
-            int byteCount = count * Stride;
+            int byteCount = count * stride;
 
             if (Mode == UploadMode.Whole)
             {
-                fixed (byte* dst = &_mirror[(long)dstElementOffset * Stride])
+                fixed (byte* dst = &_mirror[(long)dstElementOffset * stride])
                     Buffer.MemoryCopy(src, dst, byteCount, byteCount);
 
                 int end = dstElementOffset + count;
@@ -188,7 +188,7 @@ namespace NativeRender
             if (whole ? !_wholeDirty : _ranges.Count == 0) return; // clean — buffer keeps its resident data
 
             int rangeCount = whole ? 1 : _ranges.Count;
-            int payloadLen = whole ? (_dirtyMaxElem - _dirtyMinElem) * Stride : _payloadLen;
+            int payloadLen = whole ? (_dirtyMaxElem - _dirtyMinElem) * stride : _payloadLen;
 
             int rangeTableSize = rangeCount * RangeSize;
             int totalSize      = HeaderSize + rangeTableSize + payloadLen;
@@ -198,7 +198,7 @@ namespace NativeRender
 
             byte* p = (byte*)blob;
             *(ulong*)(p + 0) = Handle;
-            *(uint*)(p + 8)  = (uint)Stride;
+            *(uint*)(p + 8)  = (uint)stride;
             *(uint*)(p + 12) = (uint)rangeCount;
 
             byte* table      = p + HeaderSize;
@@ -211,7 +211,7 @@ namespace NativeRender
                 *(uint*)(table + 8) = 0u;
 
                 if (payloadLen > 0)
-                    fixed (byte* src = &_mirror[(long)_dirtyMinElem * Stride])
+                    fixed (byte* src = &_mirror[(long)_dirtyMinElem * stride])
                         Buffer.MemoryCopy(src, payloadDst, payloadLen, payloadLen);
             }
             else

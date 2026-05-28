@@ -1666,7 +1666,7 @@ namespace NativeRender
 
             // Fixed-capacity buffer: dispose-and-recreate to grow (old resource is
             // deferred-deleted in the plugin), then re-upload the full used range.
-            if (_instanceDataBuf == null || _instanceDataBuf.Capacity < cap)
+            if (_instanceDataBuf == null || _instanceDataBuf.count < cap)
             {
                 _instanceDataBuf?.Dispose();
                 _instanceDataBuf = new NativeStructuredBuffer(cap, Marshal.SizeOf<InstanceDataNRD>());

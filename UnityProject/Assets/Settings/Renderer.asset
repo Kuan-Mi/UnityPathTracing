@@ -12,7 +12,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 5a4e0d79381289b4cb6b3a5e5d56f537, type: 3}
   m_Name: NativeNrdFeature
   m_EditorClassIdentifier: Assembly-CSharp::PathTracing.NativeNrdFeature
-  m_Active: 1
+  m_Active: 0
   setting:
     showMode: 0
     showValidation: 0
@@ -38,8 +38,8 @@ MonoBehaviour:
     separator: 0
     hitDistScale: 3
     resolutionScale: 1
-    maxAccumulatedFrameNum: 31
-    maxFastAccumulatedFrameNum: 7
+    maxAccumulatedFrameNum: 60
+    maxFastAccumulatedFrameNum: 12
     onScreen: 0
     forcedMaterial: 0
     denoiser: 0
@@ -67,11 +67,11 @@ MonoBehaviour:
   commonSettings:
     viewZScale: 1
     timeDeltaBetweenFrames: 0
-    denoisingRange: 500000
+    denoisingRange: 1000
     disocclusionThreshold: 0.01
-    disocclusionThresholdAlternate: 0.05
+    disocclusionThresholdAlternate: 0.1
     cameraAttachedReflectionMaterialID: 999
-    strandMaterialID: 999
+    strandMaterialID: 2
     historyFixAlternatePixelStrideMaterialID: 999
     strandThickness: 0.00008
     splitScreen: 0
@@ -97,9 +97,9 @@ MonoBehaviour:
       s: 1
       b: 0.2
       p: 0.8
-    maxAccumulatedFrameNum: 30
-    maxFastAccumulatedFrameNum: 6
-    maxStabilizedFrameNum: 63
+    maxAccumulatedFrameNum: 60
+    maxFastAccumulatedFrameNum: 12
+    maxStabilizedFrameNum: 60
     historyFixFrameNum: 3
     historyFixBasePixelStride: 14
     historyFixAlternatePixelStride: 14
@@ -116,9 +116,9 @@ MonoBehaviour:
     - 0.5
     - 0.9
     fireflySuppressorMinRelativeScale: 2
-    minMaterialForDiffuse: 4
-    minMaterialForSpecular: 4
-    checkerboardMode: 0
+    minMaterialForDiffuse: 0
+    minMaterialForSpecular: 1
+    checkerboardMode: 2
     hitDistanceReconstructionMode: 0
     _enableAntiFirefly: 1
     _usePrepassOnlyForSpecularMotionEstimation: 0
@@ -129,10 +129,10 @@ MonoBehaviour:
       spatialSigmaScale: 4.5
       temporalSigmaScale: 0.5
       resetAmount: 0.5
-    diffuseMaxAccumulatedFrameNum: 30
-    specularMaxAccumulatedFrameNum: 30
-    diffuseMaxFastAccumulatedFrameNum: 6
-    specularMaxFastAccumulatedFrameNum: 6
+    diffuseMaxAccumulatedFrameNum: 60
+    specularMaxAccumulatedFrameNum: 60
+    diffuseMaxFastAccumulatedFrameNum: 12
+    specularMaxFastAccumulatedFrameNum: 12
     historyFixFrameNum: 3
     historyFixBasePixelStride: 14
     historyFixAlternatePixelStride: 14
@@ -158,7 +158,7 @@ MonoBehaviour:
     luminanceEdgeStoppingRelaxation: 0.5
     normalEdgeStoppingRelaxation: 0.3
     roughnessEdgeStoppingRelaxation: 1
-    checkerboardMode: 0
+    checkerboardMode: 2
     hitDistanceReconstructionMode: 0
     minMaterialForDiffuse: 4
     minMaterialForSpecular: 4
@@ -197,7 +197,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 324cab2d455449e4b9e70b945e4d8e49, type: 3}
   m_Name: NativeRtxptFeature
   m_EditorClassIdentifier: Assembly-CSharp::PathTracing.NativeRtxptFeature
-  m_Active: 0
+  m_Active: 1
   setting:
     realtimeMode: 1
     realtimeAA: 3

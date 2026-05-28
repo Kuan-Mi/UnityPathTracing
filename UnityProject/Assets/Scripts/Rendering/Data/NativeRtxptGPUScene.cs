@@ -36,7 +36,10 @@ namespace PathTracing
         private GraphicsBuffer _geometryGpuBuf; // t_GeometryData  (t3)
 
         // RTXPT-specific structured buffers
-        private GraphicsBuffer _subInstanceGpuBuf; // t_SubInstanceData    (t1)
+        // t_SubInstanceData (t1): emissive-light mapping offsets are recomputed and re-uploaded
+        // every frame, so this uses NativeStructuredBuffer for a stable NativePtr (no per-frame
+        // GetNativeBufferPtr re-fetch). SRV-only — never bound as a UAV.
+        private NativeStructuredBuffer _subInstanceGpuBuf; // t_SubInstanceData    (t1)
         private GraphicsBuffer _ptMaterialGpuBuf; // t_PTMaterialData     (t5)
         private GraphicsBuffer _geomDebugGpuBuf; // t_GeometryDebugData  (t4)
 
@@ -295,12 +298,10 @@ namespace PathTracing
             foreach (var kv in newHistoric)
                 _emissiveHistoricOffsets[kv.Key] = kv.Value;
 
-            // Re-upload SubInstanceData (EmissiveLightMappingOffset fields updated)
+            // Re-upload SubInstanceData (EmissiveLightMappingOffset fields updated). Pointer is
+            // stable; the GPU copy is recorded by FlushSubInstanceBuffer(cmd) in the lighting pass.
             if (_subInstanceGpuBuf != null && _subInstanceCpu != null)
-            {
-                _subInstanceGpuBuf.SetData(_subInstanceCpu);
-                _subInstanceGpuBufPtr = _subInstanceGpuBuf.GetNativeBufferPtr();
-            }
+                _subInstanceGpuBuf.SetData(_subInstanceCpu, 0, _subInstanceCpu.Length);
 
             // Upload task array to scratch buffer (Raw buffer, stride = 4 bytes, tasks = 8 uints each)
             if (taskIdx > 0 && scratchBuffer != null)
@@ -351,7 +352,7 @@ namespace PathTracing
             else { subInstancePtr = IntPtr.Zero; subInstanceCount = 0; subInstanceStride = 1; }
 
             if (_instanceGpuBuf != null)
-            { instancePtr = _instanceGpuBufPtr; instanceCount = _instanceGpuBuf.Capacity; instanceStride = _instanceGpuBuf.Stride; }
+            { instancePtr = _instanceGpuBufPtr; instanceCount = _instanceGpuBuf.count; instanceStride = _instanceGpuBuf.stride; }
             else { instancePtr = IntPtr.Zero; instanceCount = 0; instanceStride = 1; }
 
             if (_geometryGpuBuf != null)
@@ -373,7 +374,7 @@ namespace PathTracing
         {
             if (ds == null) return;
             ds.SetStructuredBuffer("t_SubInstanceData", _subInstanceGpuBufPtr, _subInstanceGpuBuf.count, _subInstanceGpuBuf.stride);
-            ds.SetStructuredBuffer("t_InstanceData", _instanceGpuBufPtr, _instanceGpuBuf.Capacity, _instanceGpuBuf.Stride);
+            ds.SetStructuredBuffer("t_InstanceData", _instanceGpuBufPtr, _instanceGpuBuf.count, _instanceGpuBuf.stride);
             ds.SetStructuredBuffer("t_GeometryData", _geometryGpuBufPtr, _geometryGpuBuf.count, _geometryGpuBuf.stride);
             ds.SetStructuredBuffer("t_GeometryDebugData", _geomDebugGpuBufPtr, _geomDebugGpuBuf.count, _geomDebugGpuBuf.stride);
             ds.SetStructuredBuffer("t_PTMaterialData", _ptMaterialGpuBufPtr, _ptMaterialGpuBuf.count, _ptMaterialGpuBuf.stride);
@@ -385,7 +386,7 @@ namespace PathTracing
         {
             if (ds == null) return;
             ds.SetStructuredBuffer("t_SubInstanceData", _subInstanceGpuBufPtr, _subInstanceGpuBuf.count, _subInstanceGpuBuf.stride);
-            ds.SetStructuredBuffer("t_InstanceData", _instanceGpuBufPtr, _instanceGpuBuf.Capacity, _instanceGpuBuf.Stride);
+            ds.SetStructuredBuffer("t_InstanceData", _instanceGpuBufPtr, _instanceGpuBuf.count, _instanceGpuBuf.stride);
             ds.SetStructuredBuffer("t_GeometryData", _geometryGpuBufPtr, _geometryGpuBuf.count, _geometryGpuBuf.stride);
             ds.SetStructuredBuffer("t_GeometryDebugData", _geomDebugGpuBufPtr, _geomDebugGpuBuf.count, _geomDebugGpuBuf.stride);
             ds.SetStructuredBuffer("t_PTMaterialData", _ptMaterialGpuBufPtr, _ptMaterialGpuBuf.count, _ptMaterialGpuBuf.stride);
@@ -407,6 +408,16 @@ namespace PathTracing
         public void FlushInstanceBuffer(CommandBuffer cmd)
         {
             _instanceGpuBuf?.Flush(cmd);
+        }
+
+        /// <summary>
+        /// Records the deferred GPU copy for any t_SubInstanceData writes accumulated this frame
+        /// (emissive-light mapping offsets). A no-op when nothing changed. Must run in the same
+        /// CommandBuffer as, and before, the first pass that reads t_SubInstanceData.
+        /// </summary>
+        public void FlushSubInstanceBuffer(CommandBuffer cmd)
+        {
+            _subInstanceGpuBuf?.Flush(cmd);
         }
 
         /// <summary>
@@ -545,7 +556,7 @@ namespace PathTracing
             _geometryGpuBuf?.Release();
             _geometryGpuBuf = null;
             _geometryGpuBufPtr = IntPtr.Zero;
-            _subInstanceGpuBuf?.Release();
+            _subInstanceGpuBuf?.Dispose();
             _subInstanceGpuBuf = null;
             _subInstanceGpuBufPtr = IntPtr.Zero;
             _ptMaterialGpuBuf?.Release();
@@ -888,9 +899,9 @@ namespace PathTracing
             _geometryGpuBuf.SetData(_geometryCpu);
             _geometryGpuBufPtr = _geometryGpuBuf.GetNativeBufferPtr();
 
-            _subInstanceGpuBuf = new GraphicsBuffer(GraphicsBuffer.Target.Structured, _subInstanceCpu.Length, Marshal.SizeOf<SubInstanceData>());
-            _subInstanceGpuBuf.SetData(_subInstanceCpu);
-            _subInstanceGpuBufPtr = _subInstanceGpuBuf.GetNativeBufferPtr();
+            _subInstanceGpuBuf = new NativeStructuredBuffer(_subInstanceCpu.Length, Marshal.SizeOf<SubInstanceData>());
+            _subInstanceGpuBuf.SetData(_subInstanceCpu, 0, _subInstanceCpu.Length);
+            _subInstanceGpuBufPtr = _subInstanceGpuBuf.NativePtr; // stable for the buffer's lifetime
 
             _ptMaterialGpuBuf = new GraphicsBuffer(GraphicsBuffer.Target.Structured, _ptMaterialCpu.Length, Marshal.SizeOf<PTMaterialData>());
             _ptMaterialGpuBuf.SetData(_ptMaterialCpu);

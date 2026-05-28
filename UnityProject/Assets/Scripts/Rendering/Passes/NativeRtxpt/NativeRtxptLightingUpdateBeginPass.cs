@@ -464,6 +464,10 @@ namespace PathTracing
 
             cmd.BeginSample(RenderPassMarkers.RtxptLightingUpdateBegin);
 
+            // Record the deferred t_SubInstanceData upload (emissive mapping recomputed this frame)
+            // before any dispatch that reads it. No-op when unchanged.
+            data.Ctx.GpuScene?.FlushSubInstanceBuffer(cmd);
+
             // CPU uploads.
             context.cmd.BeginSample(RenderPassMarkers.RtxptControlDataSetup);
             data.LightControlBuffer.SetData(data.ControlData, 0, 0, 1);
