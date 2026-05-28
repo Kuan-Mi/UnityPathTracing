@@ -2,63 +2,65 @@
 #include <d3d12.h>
 #include <wrl/client.h>
 #include <cstdint>
-#include <array>
-#include <mutex>
-#include <vector>
 #include "IUnityLog.h"
 
 using Microsoft::WRL::ComPtr;
 
+// ---------------------------------------------------------------------------
+// Flush snapshot blob layout (shared contract with the C# NativeStructuredBuffer).
+//
+//   [ NsbFlushHeader ]                       (16 bytes)
+//   [ NsbFlushRange  ] x header.rangeCount   (12 bytes each)
+//   [ packed payload bytes ]                 (each range's data at payloadByteOffset)
+//
+// The blob is allocated by NR_NSB_AllocFlushBuffer, filled on the C# main thread,
+// passed as the data pointer of IssuePluginEventAndData, then parsed and freed by
+// the render-thread flush callback. payloadByteOffset is relative to the start of
+// the packed payload region.
+// ---------------------------------------------------------------------------
+struct NsbFlushHeader
+{
+    uint64_t bufferHandle; // NativeStructuredBuffer*
+    uint32_t stride;
+    uint32_t rangeCount;
+};
+
+struct NsbFlushRange
+{
+    uint32_t elementOffset;
+    uint32_t elementCount;
+    uint32_t payloadByteOffset;
+};
+
 /// <summary>
-/// GPU-resident (DEFAULT heap) structured buffer with a triple-buffered UPLOAD
-/// staging layer for CPU writes.
+/// GPU-resident (DEFAULT heap) structured buffer of fixed capacity.
 ///
-/// Write path  : UploadRange() → writes into staging[g_frameIndex]
-/// Flush path  : FlushPendingCopies(cmdList) → COMMON→COPY_DEST, CopyBufferRegion,
-///               COPY_DEST→COMMON; GPU buffer is then readable as SRV.
-/// SRV access  : uses implicit state promotion (COMMON → NON_PIXEL_SHADER_RESOURCE).
+/// The allocation is immutable in size: to change capacity the owner disposes
+/// this instance and constructs a new one (deferred-deleted via the plugin's
+/// fence-gated cleanup queue), mirroring nvrhi's immutable Buffer model.
+///
+/// CPU writes are buffered entirely on the C# side; this class never holds a
+/// pending-upload queue. The render thread receives a self-describing snapshot
+/// blob and stages it through one transient UPLOAD buffer (UploadSnapshot),
+/// recording the CopyBufferRegion(s) into the DEFAULT buffer, then defer-releases
+/// the transient buffer. Mirrors nvrhi's CommandList::writeBuffer.
 /// </summary>
 class NativeStructuredBuffer
 {
 public:
-    static constexpr uint32_t kFrames = 3;
-
-    /// <summary>Resources from a superseded allocation; caller must defer-delete them.</summary>
-    struct GrowResult
-    {
-        ComPtr<ID3D12Resource> oldBuffer;
-        ComPtr<ID3D12Resource> oldStaging[kFrames];
-    };
-
     bool Initialize(ID3D12Device* device, uint32_t capacity, uint32_t elementStride, IUnityLog* log = nullptr);
     ~NativeStructuredBuffer();
 
     /// <summary>
-    /// Thread-safe: enqueues a copy of [data, data+elementCount) into an internal queue.
-    /// Must be called from the main thread. The actual write into staging happens on the
-    /// render thread via DrainEnqueuedUploads(), which reads g_frameIndex at the correct time.
+    /// Render-thread: stages |payloadBytes| of packed data through one transient UPLOAD
+    /// buffer and records a CopyBufferRegion per range (COMMON->COPY_DEST->COMMON). Each
+    /// range copies only its own slice; untouched regions of the DEFAULT buffer keep their
+    /// previously-uploaded contents. The transient buffer is defer-released.
     /// </summary>
-    void EnqueueUpload(const void* data, uint32_t elementOffset, uint32_t elementCount);
-
-    /// <summary>
-    /// Render-thread: drains the enqueue queue and writes all pending entries into
-    /// staging[g_frameIndex]. Called via IssuePluginEventAndData before FlushPendingCopies.
-    /// </summary>
-    void DrainEnqueuedUploads();
-
-    /// <summary>
-    /// Issues COMMON→COPY_DEST barrier, CopyBufferRegion for the frame's dirty range,
-    /// then COPY_DEST→COMMON barrier. Must be called with an active D3D12 command list
-    /// before the buffer is used as an SRV.
-    /// </summary>
-    void FlushPendingCopies(ID3D12GraphicsCommandList* cmdList);
-
-    /// <summary>
-    /// Grows to at least <paramref name="newCapacity"/> elements.
-    /// Old resources are returned in <paramref name="out"/> for deferred deletion by the caller.
-    /// Returns false on allocation failure (old resources unchanged in that case).
-    /// </summary>
-    bool Grow(uint32_t newCapacity, GrowResult& out);
+    void UploadSnapshot(ID3D12GraphicsCommandList* cmdList,
+                        const NsbFlushRange*       ranges,
+                        uint32_t                   rangeCount,
+                        const uint8_t*             payload);
 
     ID3D12Resource* GetResource() const { return m_buffer.Get(); }
     uint32_t        GetCapacity() const { return m_capacity; }
@@ -67,17 +69,8 @@ public:
 private:
     ID3D12Device*          m_device   = nullptr;
 
-    // Main GPU-resident buffer (DEFAULT heap, COMMON state between flushes)
+    // Main GPU-resident buffer (DEFAULT heap, COMMON state between flushes).
     ComPtr<ID3D12Resource> m_buffer;
-
-    // Triple-buffered staging (UPLOAD heap, persistently mapped)
-    ComPtr<ID3D12Resource> m_staging[kFrames];
-    void*                  m_mappedStaging[kFrames] = {};
-
-    // Per-frame dirty region (element indices, half-open [min, max))
-    uint32_t m_dirtyMin[kFrames]  = {};
-    uint32_t m_dirtyMax[kFrames]  = {};
-    bool     m_hasPending[kFrames] = {};
 
     uint32_t m_capacity = 0;
     uint32_t m_stride   = 0;
@@ -85,22 +78,5 @@ private:
     IUnityLog* m_log = nullptr;
 
     void Log(const char* msg) const;
-
-    bool AllocBuffer (uint32_t capacity);
-    bool AllocStaging(uint32_t capacity);
-    void FreeStaging (GrowResult* outOld = nullptr); // moves old resources into outOld if non-null
-
-    // Render-thread only: directly writes into staging[g_frameIndex] and expands the dirty region.
-    void UploadRange(const void* data, uint32_t elementOffset, uint32_t elementCount);
-
-    // Pending upload queue (main-thread enqueue, render-thread drain)
-    struct PendingUpload
-    {
-        std::vector<uint8_t> data;
-        uint32_t             offset;
-        uint32_t             count;
-    };
-    std::vector<PendingUpload> m_pendingQueue;
-    std::mutex                 m_queueMutex;
+    bool AllocBuffer(uint32_t capacity);
 };
-
