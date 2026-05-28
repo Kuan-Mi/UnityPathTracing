@@ -42,6 +42,11 @@ bool NativeStructuredBuffer::AllocBuffer(uint32_t capacity)
         IID_PPV_ARGS(&m_buffer));
     if (FAILED(hr)) return false;
 
+    // Name the resource so PIX captures and D3D12 debug-layer messages are readable.
+    wchar_t name[64];
+    swprintf_s(name, L"NativeStructuredBuffer(n=%u,stride=%u)", capacity, m_stride);
+    m_buffer->SetName(name);
+
     m_capacity = capacity;
     return true;
 }
@@ -79,7 +84,7 @@ void NativeStructuredBuffer::UploadSnapshot(ID3D12GraphicsCommandList* cmdList,
 
     // Suballocate from the shared UPLOAD chunk pool (recycled by frame fence) instead of
     // creating a committed resource every flush.
-    SharedUploadPool::Allocation alloc = g_uploadPool.Allocate(totalBytes, 16);
+    SharedUploadPool::Allocation alloc = g_uploadPool.Allocate(totalBytes, 256);
     if (!alloc.IsValid())
     {
         Log("[NativeStructuredBuffer::UploadSnapshot] shared upload allocation failed");

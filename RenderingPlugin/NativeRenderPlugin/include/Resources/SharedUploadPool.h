@@ -71,6 +71,7 @@ private:
 
     ID3D12Device* m_device           = nullptr;
     uint64_t      m_defaultChunkSize = 0;
+    uint32_t      m_nextChunkId      = 0; // for resource naming / debugging
 
     std::vector<std::unique_ptr<Chunk>> m_chunks;
     Chunk*                              m_current = nullptr;

@@ -1,4 +1,5 @@
 #include "SharedUploadPool.h"
+#include <cstdio>
 
 namespace
 {
@@ -71,6 +72,12 @@ SharedUploadPool::Chunk* SharedUploadPool::CreateChunk(uint64_t size)
     chunk->size         = size;
     chunk->writePointer = 0;
     chunk->fence        = kInFlightUnknown; // becomes current immediately
+
+    // Name the chunk so PIX captures and debug-layer messages are readable.
+    wchar_t name[64];
+    swprintf_s(name, L"NSB Upload Chunk %u (%llu B)",
+               m_nextChunkId++, static_cast<unsigned long long>(size));
+    chunk->buffer->SetName(name);
 
     Chunk* raw = chunk.get();
     m_chunks.push_back(std::move(chunk));
