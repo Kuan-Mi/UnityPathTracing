@@ -53,19 +53,22 @@ namespace PathTracing
         {
             public MeshRenderer renderer;
 
-            public Transform transform;
-
             // Non-zero for TLAS instances added via AddInstanceGroup (SubmeshGroups path).
             // When non-zero, use SetInstanceTransform(groupHandle, ...) instead of SetInstanceTransform(renderer, ...).
             public uint groupHandle;
+        }
 
-            // Previous frame's world matrix rows (for prevTransform)
-            public Vector4 prevRow0;
-            public Vector4 prevRow1;
-            public Vector4 prevRow2;
+        // Per-renderer tracking for transform updates (NRD-style: one entry per renderer, not per TLAS instance).
+        private sealed class RendererEntry
+        {
+            public Transform transform;
+            public bool wasMoving = true; // start true so first frame always syncs prev = current
+            public int firstInstanceIdx;
+            public int instanceCount;
         }
 
         private readonly List<SceneInstance>                                     _sceneInstances   = new();
+        private readonly Dictionary<int, RendererEntry>                          _rendererEntries  = new();
         private readonly Dictionary<int, (int vb, int ib)>                       _meshBufferSlots  = new();
         private readonly Dictionary<int, int>                                    _materialSlots    = new();
         private readonly Dictionary<int, int>                                    _textureSlots     = new();
@@ -534,6 +537,7 @@ namespace PathTracing
             _ptMaterialCpu  = null;
             _geomDebugCpu   = null;
             _sceneInstances.Clear();
+            _rendererEntries.Clear();
             _meshBufferSlots.Clear();
             _materialSlots.Clear();
             _textureSlots.Clear();
@@ -732,7 +736,8 @@ namespace PathTracing
                     // Each SubmeshGroup is a separate TLAS instance (AddInstanceGroup), so each needs
                     // its own DonutInstanceData with firstGeometryIndex pointing to its own geomList slice.
                     // GeometryIndex() in the shader is 0-based within each group instance.
-                    int mrId = mr.GetInstanceID();
+                    int mrId              = mr.GetInstanceID();
+                    int firstGroupInstIdx = _sceneInstances.Count;
                     for (int gi = 0; gi < groups.Length; gi++)
                     {
                         var grp               = groups[gi];
@@ -761,13 +766,15 @@ namespace PathTracing
                         _sceneInstances.Add(new SceneInstance
                         {
                             renderer    = mr,
-                            transform   = mr.transform,
                             groupHandle = groupHandle,
-                            prevRow0    = row0,
-                            prevRow1    = row1,
-                            prevRow2    = row2,
                         });
                     }
+                    _rendererEntries[mrId] = new RendererEntry
+                    {
+                        transform        = mr.transform,
+                        firstInstanceIdx = firstGroupInstIdx,
+                        instanceCount    = groups.Length,
+                    };
                 }
                 else
                 {
@@ -792,15 +799,18 @@ namespace PathTracing
                         prevTransformRow1          = row1,
                         prevTransformRow2          = row2,
                     });
+                    int singleInstIdx = _sceneInstances.Count;
                     _sceneInstances.Add(new SceneInstance
                     {
                         renderer    = mr,
-                        transform   = mr.transform,
                         groupHandle = 0u,
-                        prevRow0    = row0,
-                        prevRow1    = row1,
-                        prevRow2    = row2,
                     });
+                    _rendererEntries[mr.GetInstanceID()] = new RendererEntry
+                    {
+                        transform        = mr.transform,
+                        firstInstanceIdx = singleInstIdx,
+                        instanceCount    = 1,
+                    };
                 }
 
                 if (overrideMatIndices != null)
@@ -940,54 +950,56 @@ namespace PathTracing
         {
             if (_instanceCpu == null || _instanceGpuBuf == null) return;
 
-            int instanceCount = Mathf.Min(_sceneInstances.Count, _instanceCpu.Length);
-            int dirtyStart    = -1;
-
-            for (int i = 0; i < instanceCount; i++)
+            foreach (var entry in _rendererEntries.Values)
             {
-                var si = _sceneInstances[i];
-                if (si.transform == null || !si.transform.hasChanged)
-                {
-                    if (dirtyStart >= 0)
-                    {
-                        _instanceGpuBuf.SetData(_instanceCpu, dirtyStart, dirtyStart, i - dirtyStart);
-                        dirtyStart = -1;
-                    }
+                if (entry.transform == null) continue;
 
-                    continue;
+                bool moved = entry.transform.hasChanged;
+                if (moved) entry.transform.hasChanged = false;
+
+                if (!moved && !entry.wasMoving) continue;
+
+                int start = entry.firstInstanceIdx;
+                int count = Mathf.Min(entry.instanceCount, _instanceCpu.Length - start);
+                if (count <= 0) continue;
+
+                if (moved)
+                {
+                    Matrix4x4 m    = entry.transform.localToWorldMatrix;
+                    var       row0 = new Vector4(m.m00, m.m01, m.m02, m.m03);
+                    var       row1 = new Vector4(m.m10, m.m11, m.m12, m.m13);
+                    var       row2 = new Vector4(m.m20, m.m21, m.m22, m.m23);
+
+                    for (int i = start; i < start + count; i++)
+                    {
+                        _instanceCpu[i].prevTransformRow0 = _instanceCpu[i].transformRow0;
+                        _instanceCpu[i].prevTransformRow1 = _instanceCpu[i].transformRow1;
+                        _instanceCpu[i].prevTransformRow2 = _instanceCpu[i].transformRow2;
+                        _instanceCpu[i].transformRow0     = row0;
+                        _instanceCpu[i].transformRow1     = row1;
+                        _instanceCpu[i].transformRow2     = row2;
+
+                        var si = _sceneInstances[i];
+                        if (si.groupHandle != 0)
+                            _accelStructure.SetInstanceTransform(si.groupHandle, m);
+                        else
+                            _accelStructure.SetInstanceTransform(si.renderer, m);
+                    }
+                }
+                else
+                {
+                    // First stationary frame: sync prev = current so the shader sees no ghost motion.
+                    for (int i = start; i < start + count; i++)
+                    {
+                        _instanceCpu[i].prevTransformRow0 = _instanceCpu[i].transformRow0;
+                        _instanceCpu[i].prevTransformRow1 = _instanceCpu[i].transformRow1;
+                        _instanceCpu[i].prevTransformRow2 = _instanceCpu[i].transformRow2;
+                    }
                 }
 
-                Matrix4x4 m    = si.transform.localToWorldMatrix;
-                var       row0 = new Vector4(m.m00, m.m01, m.m02, m.m03);
-                var       row1 = new Vector4(m.m10, m.m11, m.m12, m.m13);
-                var       row2 = new Vector4(m.m20, m.m21, m.m22, m.m23);
-
-                // shift current → prev
-                _instanceCpu[i].prevTransformRow0 = _instanceCpu[i].transformRow0;
-                _instanceCpu[i].prevTransformRow1 = _instanceCpu[i].transformRow1;
-                _instanceCpu[i].prevTransformRow2 = _instanceCpu[i].transformRow2;
-                // write new current
-                _instanceCpu[i].transformRow0 = row0;
-                _instanceCpu[i].transformRow1 = row1;
-                _instanceCpu[i].transformRow2 = row2;
-
-                if (si.groupHandle != 0)
-                    _accelStructure.SetInstanceTransform(si.groupHandle, m);
-                else
-                    _accelStructure.SetInstanceTransform(si.renderer, m);
-                // Debug.Log($"[NativeRtxptGPUScene] Updated transform for instance {i} ({si.renderer.name}) pos = {si.transform.position}");
-                if (dirtyStart < 0) dirtyStart = i;
-
-                // update cached prev for next frame
-                var updated = si;
-                updated.prevRow0   = row0;
-                updated.prevRow1   = row1;
-                updated.prevRow2   = row2;
-                _sceneInstances[i] = updated;
+                _instanceGpuBuf.SetData(_instanceCpu, start, start, count);
+                entry.wasMoving = moved;
             }
-
-            if (dirtyStart >= 0)
-                _instanceGpuBuf.SetData(_instanceCpu, dirtyStart, dirtyStart, instanceCount - dirtyStart);
         }
 
         private int BuildMaterialFromOverride(RtxptMaterialSlot slot, List<PTMaterialData> ptMatList, List<IntPtr> texPtrs)
