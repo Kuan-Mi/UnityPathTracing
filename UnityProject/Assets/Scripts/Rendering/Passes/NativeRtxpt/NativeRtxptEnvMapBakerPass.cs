@@ -79,16 +79,8 @@ namespace PathTracing
         public void Setup(NativeRtxptPassContext ctx)
         {
             _ctx = ctx;
-            ctx.Textures.EnsureEnvMapResources();
-            ctx.Buffers.EnsureEnvBakerBuffers();
-
             FillEnvBakerConstants(ctx.Setting);
             FillImportanceBakerConstants();
-
-            ctx.BakedEnvCubePtr                = ctx.Textures.EnvCubeMip0.IsCreated ? ctx.Textures.EnvCubeMip0.NativePtr : IntPtr.Zero;
-            ctx.EnvImportanceMapPtr            = ctx.Textures.EnvImportanceMap.IsCreated ? ctx.Textures.EnvImportanceMap.NativePtr : IntPtr.Zero;
-            ctx.EnvRadianceAndImportanceMapPtr = ctx.Textures.EnvRadianceMap.IsCreated ? ctx.Textures.EnvRadianceMap.NativePtr : IntPtr.Zero;
-            ctx.EnvLightLookupMapPtr           = ctx.Textures.EnvLightLookupMap.IsCreated ? ctx.Textures.EnvLightLookupMap.NativePtr : IntPtr.Zero;
         }
 
         private class PassData

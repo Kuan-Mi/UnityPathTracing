@@ -119,7 +119,7 @@ namespace PathTracing
         /// <summary>Constant buffer for the importance baker pass. 48 bytes.</summary>
         public NativeBuffer ImportanceBakerCb;
 
-        // ── Cached native pointers (immutable after allocation) ───────────────
+        // ── Cached native pointers ────────────────────────────────────────────
         // Resolution-dependent buffers — valid after EnsureResources(), cleared on resize
         public IntPtr StablePlanesBufferPtr  { get; private set; }
         public IntPtr SurfaceDataBufferPtr   { get; private set; }
@@ -138,7 +138,7 @@ namespace PathTracing
         public IntPtr LightWeightsBufferPtr       { get; private set; }
         public IntPtr ScratchListBufferPtr        { get; private set; }
 
-        // Env baker CBs — valid after EnsureEnvBakerBuffers()
+        // ── Pointer refreshers — call after SetData() on the corresponding buffer ──
         public void RefreshLightControlBufferPtr()
         {
             LightControlBufferPtr = LightControlBuffer?.GetNativeBufferPtr() ?? IntPtr.Zero;
@@ -354,7 +354,6 @@ namespace PathTracing
             HistoryRemapPastToCurrent?.Release(); HistoryRemapPastToCurrent= null; HistoryRemapPastToCurrPtr   = IntPtr.Zero;
             LightProxyCounters?.Release();        LightProxyCounters       = null; LightProxyCountersPtr       = IntPtr.Zero;
             LightSamplingProxies?.Release();      LightSamplingProxies     = null; LightSamplingProxiesPtr     = IntPtr.Zero;
-            LocalSamplingBuffer?.Release();       LocalSamplingBuffer      = null; LocalSamplingBufferPtr      = IntPtr.Zero;
             LightWeightsBuffer?.Release();        LightWeightsBuffer       = null; LightWeightsBufferPtr       = IntPtr.Zero;
             ScratchListBuffer?.Release();         ScratchListBuffer        = null; ScratchListBufferPtr        = IntPtr.Zero;
         }

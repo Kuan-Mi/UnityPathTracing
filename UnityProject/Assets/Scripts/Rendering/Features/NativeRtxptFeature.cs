@@ -233,8 +233,10 @@ namespace PathTracing
             var renderResolution  = ComputeRenderResolution(displayResolution, setting.upscalerMode);
 
             bool texturesChanged = texPool.EnsureResources(renderResolution, displayResolution);
+            texPool.EnsureEnvMapResources();
             bufPool.EnsureResources(renderResolution);
             bufPool.EnsureLightBuffers();
+            bufPool.EnsureEnvBakerBuffers();
 
             // ---- Per-camera temporal state ----------------------------------
             if (!_cameraFrameStates.TryGetValue(uniqueKey, out var frameState))
