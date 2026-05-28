@@ -478,9 +478,13 @@ namespace NativeRender
         // NativeStructuredBuffer API  (single upload-heap SRV buffer)
         // -------------------------------------------------------------------
 
-        /// <summary>Allocates an upload-heap structured buffer with <paramref name="capacity"/> elements.</summary>
+        /// <summary>
+        /// Allocates a DEFAULT-heap structured buffer with <paramref name="capacity"/> elements,
+        /// fed by the CPU upload-snapshot path. <paramref name="allowUAV"/> != 0 adds
+        /// ALLOW_UNORDERED_ACCESS so it can also be bound as a RWStructuredBuffer (GPU writes).
+        /// </summary>
         [DllImport(DllName)]
-        public static extern ulong NR_CreateNativeStructuredBuffer(uint capacity, uint elementStride);
+        public static extern ulong NR_CreateNativeStructuredBuffer(uint capacity, uint elementStride, uint allowUAV);
 
         /// <summary>Enqueues destruction after a GPU fence delay.</summary>
         [DllImport(DllName)]

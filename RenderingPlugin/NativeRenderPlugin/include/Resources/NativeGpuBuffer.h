@@ -2,6 +2,7 @@
 #include <d3d12.h>
 #include <wrl/client.h>
 #include <cstdint>
+#include "INativeResource.h"
 
 using Microsoft::WRL::ComPtr;
 
@@ -21,18 +22,18 @@ using Microsoft::WRL::ComPtr;
 //     objectKind = NativeGpuBuffer (7) in a BindingSlot.
 //     DescriptorSetBase resolves GetResource() to create the SRV/UAV.
 // ---------------------------------------------------------------------------
-class NativeGpuBuffer
+class NativeGpuBuffer : public INativeResource
 {
 public:
-    NativeGpuBuffer()  = default;
-    ~NativeGpuBuffer() = default;
+    NativeGpuBuffer()           = default;
+    ~NativeGpuBuffer() override = default;
 
     // Allocates a DEFAULT-heap buffer of |sizeInBytes| with ALLOW_UNORDERED_ACCESS.
     // sizeInBytes is used as-is (caller is responsible for alignment if needed).
     bool Initialize(ID3D12Device* device, uint32_t sizeInBytes);
 
     // Return the underlying ID3D12Resource*.
-    ID3D12Resource* GetResource() const { return m_buffer.Get(); }
+    ID3D12Resource* GetResource() const override { return m_buffer.Get(); }
 
     // Return the GPU virtual address.
     D3D12_GPU_VIRTUAL_ADDRESS GetGPUVA() const;

@@ -31,31 +31,35 @@ bool NativeStructuredBuffer::AllocBuffer(uint32_t capacity)
     desc.MipLevels        = 1;
     desc.SampleDesc.Count = 1;
     desc.Layout           = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
-    desc.Flags            = D3D12_RESOURCE_FLAG_NONE;
+    desc.Flags            = m_allowUAV ? D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS
+                                       : D3D12_RESOURCE_FLAG_NONE;
 
     HRESULT hr = m_device->CreateCommittedResource(
         &heapProps,
         D3D12_HEAP_FLAG_NONE,
         &desc,
-        D3D12_RESOURCE_STATE_COMMON, // safe start state; promotes to SRV, transitions to COPY_DEST
+        D3D12_RESOURCE_STATE_COMMON, // safe start state; promotes to SRV/UAV, transitions to COPY_DEST
         nullptr,
         IID_PPV_ARGS(&m_buffer));
     if (FAILED(hr)) return false;
 
     // Name the resource so PIX captures and D3D12 debug-layer messages are readable.
-    wchar_t name[64];
-    swprintf_s(name, L"NativeStructuredBuffer(n=%u,stride=%u)", capacity, m_stride);
+    wchar_t name[80];
+    swprintf_s(name, L"NativeStructuredBuffer(n=%u,stride=%u%s)", capacity, m_stride,
+               m_allowUAV ? L",uav" : L"");
     m_buffer->SetName(name);
 
     m_capacity = capacity;
     return true;
 }
 
-bool NativeStructuredBuffer::Initialize(ID3D12Device* device, uint32_t capacity, uint32_t elementStride, IUnityLog* log)
+bool NativeStructuredBuffer::Initialize(ID3D12Device* device, uint32_t capacity, uint32_t elementStride,
+                                        IUnityLog* log, bool allowUAV)
 {
-    m_device = device;
-    m_stride = elementStride;
-    m_log    = log;
+    m_device   = device;
+    m_stride   = elementStride;
+    m_log      = log;
+    m_allowUAV = allowUAV;
     return AllocBuffer(capacity);
 }
 
@@ -69,6 +73,7 @@ void NativeStructuredBuffer::Log(const char* msg) const
 }
 
 void NativeStructuredBuffer::UploadSnapshot(ID3D12GraphicsCommandList* cmdList,
+                                            const ResourceStateTracker& tracker,
                                             const NsbFlushRange*       ranges,
                                             uint32_t                   rangeCount,
                                             const uint8_t*             payload)
@@ -94,15 +99,26 @@ void NativeStructuredBuffer::UploadSnapshot(ID3D12GraphicsCommandList* cmdList,
     // The payload is contiguous; copy it once into the suballocation.
     memcpy(alloc.cpu, payload, static_cast<size_t>(totalBytes));
 
-    // COMMON -> COPY_DEST. The buffer starts in COMMON and decays back to COMMON at each
-    // ExecuteCommandLists boundary, so this transition is always valid here.
+    // Transition into COPY_DEST. When Unity's tracker is available we go through it so
+    // the transition starts from whatever state surrounding passes left the buffer in
+    // (e.g. NON_PIXEL_SHADER_RESOURCE) and composes correctly. Otherwise we fall back to
+    // a manual barrier, relying on the COMMON decay at the ExecuteCommandLists boundary.
+    const bool tracked = tracker.Valid();
     D3D12_RESOURCE_BARRIER barrier = {};
     barrier.Type                   = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
     barrier.Transition.pResource   = m_buffer.Get();
     barrier.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
-    barrier.Transition.StateBefore = D3D12_RESOURCE_STATE_COMMON;
-    barrier.Transition.StateAfter  = D3D12_RESOURCE_STATE_COPY_DEST;
-    cmdList->ResourceBarrier(1, &barrier);
+
+    if (tracked)
+    {
+        tracker.Require(m_buffer.Get(), D3D12_RESOURCE_STATE_COPY_DEST);
+    }
+    else
+    {
+        barrier.Transition.StateBefore = D3D12_RESOURCE_STATE_COMMON;
+        barrier.Transition.StateAfter  = D3D12_RESOURCE_STATE_COPY_DEST;
+        cmdList->ResourceBarrier(1, &barrier);
+    }
 
     for (uint32_t i = 0; i < rangeCount; ++i)
     {
@@ -116,9 +132,17 @@ void NativeStructuredBuffer::UploadSnapshot(ID3D12GraphicsCommandList* cmdList,
                                   alloc.resource, alloc.offset + r.payloadByteOffset, bytes);
     }
 
-    // COPY_DEST -> COMMON. Returning to COMMON lets the resource be implicitly promoted
-    // to NON_PIXEL_SHADER_RESOURCE when shaders read it later in the same command list.
-    barrier.Transition.StateBefore = D3D12_RESOURCE_STATE_COPY_DEST;
-    barrier.Transition.StateAfter  = D3D12_RESOURCE_STATE_COMMON;
-    cmdList->ResourceBarrier(1, &barrier);
+    if (tracked)
+    {
+        // Record the post-copy state; the next consumer's Require transitions out of it.
+        tracker.Notify(m_buffer.Get(), D3D12_RESOURCE_STATE_COPY_DEST);
+    }
+    else
+    {
+        // COPY_DEST -> COMMON. Returning to COMMON lets the resource be implicitly promoted
+        // to NON_PIXEL_SHADER_RESOURCE when shaders read it later in the same command list.
+        barrier.Transition.StateBefore = D3D12_RESOURCE_STATE_COPY_DEST;
+        barrier.Transition.StateAfter  = D3D12_RESOURCE_STATE_COMMON;
+        cmdList->ResourceBarrier(1, &barrier);
+    }
 }

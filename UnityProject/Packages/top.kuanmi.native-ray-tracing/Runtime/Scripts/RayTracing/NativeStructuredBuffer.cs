@@ -56,6 +56,9 @@ namespace NativeRender
         /// <summary>Upload granularity (fixed at construction).</summary>
         public UploadMode Mode { get; }
 
+        /// <summary>True when the buffer was created with UAV support (bindable as RWStructuredBuffer).</summary>
+        public bool AllowsUAV { get; }
+
         private bool _disposed;
 
         private readonly struct Range
@@ -82,15 +85,20 @@ namespace NativeRender
         private int  _dirtyMaxElem; // half-open
         private bool _wholeDirty;
 
-        /// <summary>Allocates a fixed-capacity structured buffer with <paramref name="capacity"/> elements.</summary>
-        public NativeStructuredBuffer(int capacity, int elementStride, UploadMode mode = UploadMode.Ranges)
+        /// <summary>
+        /// Allocates a fixed-capacity structured buffer with <paramref name="capacity"/> elements.
+        /// Set <paramref name="allowUAV"/> when the buffer must also be GPU-writable (bound as a
+        /// RWStructuredBuffer) — e.g. a buffer that mixes CPU uploads with compute-shader writes.
+        /// </summary>
+        public NativeStructuredBuffer(int capacity, int elementStride, UploadMode mode = UploadMode.Ranges, bool allowUAV = false)
         {
             if (capacity      <= 0) throw new ArgumentOutOfRangeException(nameof(capacity));
             if (elementStride <= 0) throw new ArgumentOutOfRangeException(nameof(elementStride));
-            count = capacity;
-            stride = elementStride;
-            Mode   = mode;
-            Handle = NativeRenderPlugin.NR_CreateNativeStructuredBuffer((uint)capacity, (uint)elementStride);
+            count     = capacity;
+            stride    = elementStride;
+            Mode      = mode;
+            AllowsUAV = allowUAV;
+            Handle = NativeRenderPlugin.NR_CreateNativeStructuredBuffer((uint)capacity, (uint)elementStride, allowUAV ? 1u : 0u);
             if (Handle == 0)
                 throw new InvalidOperationException("NR_CreateNativeStructuredBuffer failed (renderer not ready?)");
 

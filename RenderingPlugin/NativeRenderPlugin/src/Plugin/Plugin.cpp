@@ -32,6 +32,7 @@
 #include "NativeBuffer.h"
 #include "NativeStructuredBuffer.h"
 #include "NativeGpuBuffer.h"
+#include "ResourceStateTracker.h"
 #include "D3D12HeapHook.h"
 #include "PluginInternal.h"
 #include <map>
@@ -1386,17 +1387,19 @@ GetNativeBufferUploadCallbackPtr()
 
 // ---------------------------------------------------------------------------
 // NR_CreateNativeStructuredBuffer
-//   Allocates an upload-heap structured buffer with |capacity| elements of
-//   |elementStride| bytes each. Returns opaque handle or 0 on failure.
+//   Allocates a DEFAULT-heap structured buffer with |capacity| elements of
+//   |elementStride| bytes each, fed by the CPU upload-snapshot path. When
+//   |allowUAV| is non-zero the resource gets ALLOW_UNORDERED_ACCESS so it can
+//   also be bound as a RWStructuredBuffer (GPU writes). Returns handle or 0.
 // ---------------------------------------------------------------------------
 extern "C" uint64_t UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API
-NR_CreateNativeStructuredBuffer(uint32_t capacity, uint32_t elementStride)
+NR_CreateNativeStructuredBuffer(uint32_t capacity, uint32_t elementStride, uint32_t allowUAV)
 {
     if (!s_D3D12) { NR_WARN("NR_CreateNativeStructuredBuffer: renderer not ready"); return 0; }
     ID3D12Device* device = s_D3D12->GetDevice();
     if (!device)  { NR_WARN("NR_CreateNativeStructuredBuffer: no D3D12 device"); return 0; }
     auto* nsb = new NativeStructuredBuffer();
-    if (!nsb->Initialize(device, capacity, elementStride, s_Log))
+    if (!nsb->Initialize(device, capacity, elementStride, s_Log, allowUAV != 0))
     {
         delete nsb;
         NR_WARN("NR_CreateNativeStructuredBuffer: Initialize failed");
@@ -1494,8 +1497,8 @@ static void UNITY_INTERFACE_API NR_ClearNativeGpuBufferCallback(int /*eventId*/,
     D3D12_GPU_DESCRIPTOR_HANDLE gpuHandle = s_DescHeap.GetGPUHandle(tempSlot);
 
     // Transition to UAV state via Unity's barrier system.
-    if (s_D3D12v8)
-        s_D3D12v8->RequestResourceState(res, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
+    ResourceStateTracker tracker(s_D3D12v8);
+    tracker.Require(res, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
 
     // BeginPluginDispatch marks that we are in a plugin-owned dispatch so the
     // vtable hook does not overwrite the cache with our heap binding.
@@ -1513,8 +1516,7 @@ static void UNITY_INTERFACE_API NR_ClearNativeGpuBufferCallback(int /*eventId*/,
 
     // Notify Unity that the resource is in UAV state with a UAV access (triggers UAV barrier
     // before next use, even if the state doesn't change — write-after-write hazard).
-    if (s_D3D12v8)
-        s_D3D12v8->NotifyResourceState(res, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, /*UAVAccess=*/true);
+    tracker.Notify(res, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, /*uavAccess=*/true);
 
     // Return the temporary slot to the pool.
     s_DescHeap.Free(tempSlot, 1);
@@ -1588,7 +1590,7 @@ static void UNITY_INTERFACE_API NsbFlushCallback(int /*eventId*/, void* data)
         const auto*    ranges  = reinterpret_cast<const NsbFlushRange*>(blob + sizeof(NsbFlushHeader));
         const uint8_t* payload = blob + sizeof(NsbFlushHeader) + static_cast<size_t>(hdr->rangeCount) * sizeof(NsbFlushRange);
 
-        nsb->UploadSnapshot(cmdList, ranges, hdr->rangeCount, payload);
+        nsb->UploadSnapshot(cmdList, ResourceStateTracker(s_D3D12v8), ranges, hdr->rangeCount, payload);
     }
 
     std::free(data);

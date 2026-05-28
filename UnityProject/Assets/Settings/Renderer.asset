@@ -12,7 +12,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 5a4e0d79381289b4cb6b3a5e5d56f537, type: 3}
   m_Name: NativeNrdFeature
   m_EditorClassIdentifier: Assembly-CSharp::PathTracing.NativeNrdFeature
-  m_Active: 0
+  m_Active: 1
   setting:
     showMode: 0
     showValidation: 0
@@ -38,8 +38,8 @@ MonoBehaviour:
     separator: 0
     hitDistScale: 3
     resolutionScale: 1
-    maxAccumulatedFrameNum: 60
-    maxFastAccumulatedFrameNum: 12
+    maxAccumulatedFrameNum: 9
+    maxFastAccumulatedFrameNum: 1
     onScreen: 0
     forcedMaterial: 0
     denoiser: 0
@@ -97,9 +97,9 @@ MonoBehaviour:
       s: 1
       b: 0.2
       p: 0.8
-    maxAccumulatedFrameNum: 60
-    maxFastAccumulatedFrameNum: 12
-    maxStabilizedFrameNum: 60
+    maxAccumulatedFrameNum: 9
+    maxFastAccumulatedFrameNum: 1
+    maxStabilizedFrameNum: 9
     historyFixFrameNum: 3
     historyFixBasePixelStride: 14
     historyFixAlternatePixelStride: 14
@@ -129,10 +129,10 @@ MonoBehaviour:
       spatialSigmaScale: 4.5
       temporalSigmaScale: 0.5
       resetAmount: 0.5
-    diffuseMaxAccumulatedFrameNum: 60
-    specularMaxAccumulatedFrameNum: 60
-    diffuseMaxFastAccumulatedFrameNum: 12
-    specularMaxFastAccumulatedFrameNum: 12
+    diffuseMaxAccumulatedFrameNum: 9
+    specularMaxAccumulatedFrameNum: 9
+    diffuseMaxFastAccumulatedFrameNum: 1
+    specularMaxFastAccumulatedFrameNum: 1
     historyFixFrameNum: 3
     historyFixBasePixelStride: 14
     historyFixAlternatePixelStride: 14
@@ -197,7 +197,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 324cab2d455449e4b9e70b945e4d8e49, type: 3}
   m_Name: NativeRtxptFeature
   m_EditorClassIdentifier: Assembly-CSharp::PathTracing.NativeRtxptFeature
-  m_Active: 1
+  m_Active: 0
   setting:
     realtimeMode: 1
     realtimeAA: 3
@@ -265,7 +265,7 @@ MonoBehaviour:
     environmentMapEnabled: 1
     environmentMapIntensity: 1
     environmentMapTint: {r: 1, g: 1, b: 1, a: 1}
-    environmentMap: {fileID: 2800000, guid: 2495a36711fb9464ba7a46811ac56985, type: 3}
+    environmentMap: {fileID: 2800000, guid: 5d8fd7994f717214481ba9721da2ebe6, type: 3}
     enableToneMapping: 1
     showValidation: 0
     enableShaderDebug: 1

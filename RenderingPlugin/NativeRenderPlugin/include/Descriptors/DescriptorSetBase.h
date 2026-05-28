@@ -5,6 +5,7 @@
 #include "IUnityLog.h"
 #include "IUnityGraphicsD3D12.h"
 #include "DescriptorHeapAllocator.h"
+#include "ResourceStateTracker.h"
 #include "ComputeShader.h"   // CS_BindingSlot, CS_BindingObjectKind, ComputeBinding, ComputeBindingType
 
 // ---------------------------------------------------------------------------
@@ -82,7 +83,7 @@ protected:
     ID3D12Device*            m_device    = nullptr;
     IUnityLog*               m_log       = nullptr;
     DescriptorHeapAllocator* m_allocator = nullptr;
-    IUnityGraphicsD3D12v8*   m_d3d12v8   = nullptr;
+    ResourceStateTracker     m_tracker;   // facade over the IUnityGraphicsD3D12v8 state tracker
 
     static constexpr uint32_t kInvalidAlloc = UINT32_MAX;
 };

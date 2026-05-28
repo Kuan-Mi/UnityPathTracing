@@ -2,6 +2,7 @@
 #include <d3d12.h>
 #include <wrl/client.h>
 #include <cstdint>
+#include "INativeResource.h"
 
 using Microsoft::WRL::ComPtr;
 
@@ -21,11 +22,11 @@ using Microsoft::WRL::ComPtr;
 //     in a CS_BindingSlot.  ComputeDescriptorSet::Dispatch resolves the
 //     current frame's ID3D12Resource* dynamically, exactly like TLAS.
 // ---------------------------------------------------------------------------
-class NativeBuffer
+class NativeBuffer : public INativeResource
 {
 public:
     NativeBuffer() = default;
-    ~NativeBuffer();
+    ~NativeBuffer() override;
 
     // Allocate three upload-heap buffers of |sizeInBytes| and Map them all.
     // sizeInBytes is rounded up to D3D12_CONSTANT_BUFFER_DATA_PLACEMENT_ALIGNMENT (256).
@@ -36,7 +37,7 @@ public:
     void Upload(const void* data, uint32_t bytes);
 
     // Return the ID3D12Resource* for the current frame slot.
-    ID3D12Resource* GetResource() const;
+    ID3D12Resource* GetResource() const override;
 
     // Return the GPU virtual address for the current frame slot.
     D3D12_GPU_VIRTUAL_ADDRESS GetGPUVA() const;

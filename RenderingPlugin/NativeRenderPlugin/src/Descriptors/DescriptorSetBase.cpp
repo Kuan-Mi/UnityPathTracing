@@ -5,12 +5,34 @@
 #include "BindlessTexture.h"
 #include "BindlessBuffer.h"
 #include "BindlessUAVTexture.h"
-#include "NativeBuffer.h"
-#include "NativeGpuBuffer.h"
+#include "INativeResource.h"
 #include "TransientDescriptorRing.h"
 #include "PluginInternal.h"
 #include <cstdio>
 #include <cstdarg>
+
+// ---------------------------------------------------------------------------
+// ResolveBoundResource
+//   Resolves the ID3D12Resource* a binding slot points at. Wrapper objects
+//   (NativeBuffer, NativeGpuBuffer, ...) all derive INativeResource, so a
+//   single cast covers every current and future wrapper kind; everything else
+//   falls back to the raw resourcePtr (Unity textures, AS-backed buffers, ...).
+// ---------------------------------------------------------------------------
+static ID3D12Resource* ResolveBoundResource(const BindingSlot& slot)
+{
+    if (slot.objectPtr)
+    {
+        switch (slot.objectKind)
+        {
+        case BindingObjectKind::NativeBuffer:
+        case BindingObjectKind::NativeGpuBuffer:
+            return reinterpret_cast<INativeResource*>(slot.objectPtr)->GetResource();
+        default:
+            break;
+        }
+    }
+    return reinterpret_cast<ID3D12Resource*>(slot.resourcePtr);
+}
 
 // ===========================================================================
 // Constructor
@@ -23,7 +45,8 @@ DescriptorSetBase<ShaderT>::DescriptorSetBase(
     IUnityLog*                log,
     DescriptorHeapAllocator*  allocator,
     IUnityGraphicsD3D12v8*    d3d12v8)
-    : m_shader(shader), m_device(device), m_log(log), m_allocator(allocator), m_d3d12v8(d3d12v8)
+    : m_shader(shader), m_device(device), m_log(log), m_allocator(allocator),
+      m_tracker(d3d12v8)
 {
 }
 
@@ -136,11 +159,7 @@ void DescriptorSetBase<ShaderT>::WriteDescriptors(
                 D3D12_CPU_DESCRIPTOR_HANDLE h = m_allocator->GetCPUHandle(srvBase + b.heapOffset);
                 D3D12_SHADER_RESOURCE_VIEW_DESC s = {};
                 s.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
-                ID3D12Resource* res = (slot.objectKind == BindingObjectKind::NativeBuffer && slot.objectPtr)
-                    ? reinterpret_cast<::NativeBuffer*>(slot.objectPtr)->GetResource()
-                    : (slot.objectKind == BindingObjectKind::NativeGpuBuffer && slot.objectPtr)
-                        ? reinterpret_cast<::NativeGpuBuffer*>(slot.objectPtr)->GetResource()
-                        : reinterpret_cast<ID3D12Resource*>(slot.resourcePtr);
+                ID3D12Resource* res = ResolveBoundResource(slot);
                 if (res)
                 {
                     auto rd = res->GetDesc();
@@ -218,11 +237,7 @@ void DescriptorSetBase<ShaderT>::WriteDescriptors(
             const auto& b = bindings[i];
             if (b.type != BindingType::UAV) continue;
             const BindingSlot& slot = (i < slotCount) ? slots[i] : BindingSlot{};
-            ID3D12Resource* res = (slot.objectKind == BindingObjectKind::NativeBuffer && slot.objectPtr)
-                ? reinterpret_cast<::NativeBuffer*>(slot.objectPtr)->GetResource()
-                : (slot.objectKind == BindingObjectKind::NativeGpuBuffer && slot.objectPtr)
-                    ? reinterpret_cast<::NativeGpuBuffer*>(slot.objectPtr)->GetResource()
-                    : reinterpret_cast<ID3D12Resource*>(slot.resourcePtr);
+            ID3D12Resource* res = ResolveBoundResource(slot);
             D3D12_CPU_DESCRIPTOR_HANDLE h = m_allocator->GetCPUHandle(uavBase + b.heapOffset);
             D3D12_UNORDERED_ACCESS_VIEW_DESC u = {};
             if (res)
@@ -285,85 +300,53 @@ template<typename ShaderT>
 void DescriptorSetBase<ShaderT>::RequestResourceStates(
     const BindingSlot* slots, uint32_t slotCount)
 {
-    if (!m_d3d12v8) return;
+    if (!m_tracker.Valid()) return;
     const auto& bindings = m_shader->GetBindings();
 
     for (size_t i = 0; i < bindings.size(); ++i)
     {
         const auto& b = bindings[i];
         const BindingSlot& slot = (i < slotCount) ? slots[i] : BindingSlot{};
-        ID3D12Resource* res = reinterpret_cast<ID3D12Resource*>(slot.resourcePtr);
 
         if (b.type == BindingType::SRV)
         {
-            ID3D12Resource* srvRes = (slot.objectKind == BindingObjectKind::NativeBuffer && slot.objectPtr)
-                ? reinterpret_cast<::NativeBuffer*>(slot.objectPtr)->GetResource()
-                : (slot.objectKind == BindingObjectKind::NativeGpuBuffer && slot.objectPtr)
-                    ? reinterpret_cast<::NativeGpuBuffer*>(slot.objectPtr)->GetResource()
-                    : res;
-            if (srvRes)
-                m_d3d12v8->RequestResourceState(srvRes, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
+            m_tracker.Require(ResolveBoundResource(slot), D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
         }
         else if (b.type == BindingType::ROOT_SRV)
         {
-            ID3D12Resource* srvRes = nullptr;
-            if (slot.objectKind == BindingObjectKind::AccelStruct && slot.objectPtr)
-                srvRes = reinterpret_cast<AccelerationStructure*>(slot.objectPtr)->GetTLAS();
-            else
-                srvRes = res;
-            if (srvRes)
-                m_d3d12v8->RequestResourceState(srvRes, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
+            ID3D12Resource* srvRes = (slot.objectKind == BindingObjectKind::AccelStruct && slot.objectPtr)
+                ? reinterpret_cast<AccelerationStructure*>(slot.objectPtr)->GetTLAS()
+                : reinterpret_cast<ID3D12Resource*>(slot.resourcePtr);
+            m_tracker.Require(srvRes, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
         }
         else if (b.type == BindingType::UAV)
         {
-            ID3D12Resource* uavRes = (slot.objectKind == BindingObjectKind::NativeBuffer && slot.objectPtr)
-                ? reinterpret_cast<::NativeBuffer*>(slot.objectPtr)->GetResource()
-                : (slot.objectKind == BindingObjectKind::NativeGpuBuffer && slot.objectPtr)
-                    ? reinterpret_cast<::NativeGpuBuffer*>(slot.objectPtr)->GetResource()
-                    : res;
-            if (uavRes)
-                m_d3d12v8->RequestResourceState(uavRes, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
+            m_tracker.Require(ResolveBoundResource(slot), D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
         }
         else if (b.type == BindingType::CBV)
         {
-            ID3D12Resource* cbvRes = (slot.objectKind == BindingObjectKind::NativeBuffer && slot.objectPtr)
-                ? reinterpret_cast<::NativeBuffer*>(slot.objectPtr)->GetResource()
-                : res;
-            if (cbvRes)
-                m_d3d12v8->RequestResourceState(cbvRes, D3D12_RESOURCE_STATE_VERTEX_AND_CONSTANT_BUFFER);
+            m_tracker.Require(ResolveBoundResource(slot), D3D12_RESOURCE_STATE_VERTEX_AND_CONSTANT_BUFFER);
         }
         else if (b.type == BindingType::SRV_ARRAY &&
                  slot.objectKind == BindingObjectKind::BindlessTexture && slot.objectPtr)
         {
             auto* bt = reinterpret_cast<BindlessTexture*>(slot.objectPtr);
             for (uint32_t k = 0; k < bt->Capacity(); ++k)
-            {
-                ID3D12Resource* tex = bt->GetTexture(k);
-                if (tex)
-                    m_d3d12v8->RequestResourceState(tex, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
-            }
+                m_tracker.Require(bt->GetTexture(k), D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
         }
         else if (b.type == BindingType::SRV_ARRAY &&
                  slot.objectKind == BindingObjectKind::BindlessBuffer && slot.objectPtr)
         {
             auto* bb = reinterpret_cast<BindlessBuffer*>(slot.objectPtr);
             for (uint32_t k = 0; k < bb->Capacity(); ++k)
-            {
-                ID3D12Resource* buf = bb->GetBuffer(k);
-                if (buf)
-                    m_d3d12v8->RequestResourceState(buf, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
-            }
+                m_tracker.Require(bb->GetBuffer(k), D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
         }
         else if (b.type == BindingType::UAV_ARRAY &&
                  slot.objectKind == BindingObjectKind::BindlessUAVTexture && slot.objectPtr)
         {
             auto* bt = reinterpret_cast<BindlessUAVTexture*>(slot.objectPtr);
             for (uint32_t k = 0; k < bt->Capacity(); ++k)
-            {
-                ID3D12Resource* tex = bt->GetTexture(k);
-                if (tex)
-                    m_d3d12v8->RequestResourceState(tex, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
-            }
+                m_tracker.Require(bt->GetTexture(k), D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
         }
     }
 }
@@ -380,30 +363,23 @@ template<typename ShaderT>
 void DescriptorSetBase<ShaderT>::NotifyResourceStates(
     const BindingSlot* slots, uint32_t slotCount)
 {
-    if (!m_d3d12v8) return;
+    if (!m_tracker.Valid()) return;
     const auto& bindings = m_shader->GetBindings();
 
     for (size_t i = 0; i < bindings.size(); ++i)
     {
         const auto& b = bindings[i];
         const BindingSlot& slot = (i < slotCount) ? slots[i] : BindingSlot{};
-        ID3D12Resource* res = reinterpret_cast<ID3D12Resource*>(slot.resourcePtr);
 
         if (b.type == BindingType::UAV)
         {
-            ID3D12Resource* uavRes = (slot.objectKind == BindingObjectKind::NativeBuffer && slot.objectPtr)
-                ? reinterpret_cast<::NativeBuffer*>(slot.objectPtr)->GetResource()
-                : (slot.objectKind == BindingObjectKind::NativeGpuBuffer && slot.objectPtr)
-                    ? reinterpret_cast<::NativeGpuBuffer*>(slot.objectPtr)->GetResource()
-                    : res;
-            if (uavRes)
-                m_d3d12v8->NotifyResourceState(uavRes, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, /*UAVAccess=*/true);
+            m_tracker.Notify(ResolveBoundResource(slot), D3D12_RESOURCE_STATE_UNORDERED_ACCESS, /*uavAccess=*/true);
         }
         else if (b.type == BindingType::UAV_ARRAY &&
                  slot.objectKind == BindingObjectKind::BindlessUAVTexture && slot.objectPtr)
         {
-            if (res)
-                m_d3d12v8->NotifyResourceState(res, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, /*UAVAccess=*/true);
+            m_tracker.Notify(reinterpret_cast<ID3D12Resource*>(slot.resourcePtr),
+                             D3D12_RESOURCE_STATE_UNORDERED_ACCESS, /*uavAccess=*/true);
         }
     }
 }
@@ -552,11 +528,7 @@ void DescriptorSetBase<ShaderT>::BindRootParams(
             const auto& b = bindings[i];
             if (b.type != BindingType::CBV) continue;
             const BindingSlot& slot = (i < slotCount) ? slots[i] : BindingSlot{};
-            ID3D12Resource* res = nullptr;
-            if (slot.objectKind == BindingObjectKind::NativeBuffer && slot.objectPtr)
-                res = reinterpret_cast<::NativeBuffer*>(slot.objectPtr)->GetResource();
-            else
-                res = reinterpret_cast<ID3D12Resource*>(slot.resourcePtr);
+            ID3D12Resource* res = ResolveBoundResource(slot);
             D3D12_GPU_VIRTUAL_ADDRESS addr = res ? res->GetGPUVirtualAddress() : 0;
             cmdList->SetComputeRootConstantBufferView(rootParamCBVBase + b.heapOffset, addr);
         }

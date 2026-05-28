@@ -3,6 +3,8 @@
 #include <wrl/client.h>
 #include <cstdint>
 #include "IUnityLog.h"
+#include "INativeResource.h"
+#include "ResourceStateTracker.h"
 
 using Microsoft::WRL::ComPtr;
 
@@ -45,26 +47,36 @@ struct NsbFlushRange
 /// recording the CopyBufferRegion(s) into the DEFAULT buffer, then defer-releases
 /// the transient buffer. Mirrors nvrhi's CommandList::writeBuffer.
 /// </summary>
-class NativeStructuredBuffer
+class NativeStructuredBuffer : public INativeResource
 {
 public:
-    bool Initialize(ID3D12Device* device, uint32_t capacity, uint32_t elementStride, IUnityLog* log = nullptr);
-    ~NativeStructuredBuffer();
+    // allowUAV: create the DEFAULT-heap resource with ALLOW_UNORDERED_ACCESS so it can
+    // be bound as a RWStructuredBuffer/RWBuffer (GPU writes) in addition to the CPU
+    // upload path — the nvrhi canHaveUAVs analog. Mixed CPU-upload + GPU-UAV buffers
+    // (e.g. RTXPT's lightsBuffer) require this.
+    bool Initialize(ID3D12Device* device, uint32_t capacity, uint32_t elementStride,
+                    IUnityLog* log = nullptr, bool allowUAV = false);
+    ~NativeStructuredBuffer() override;
 
     /// <summary>
     /// Render-thread: stages the packed payload through one suballocation from the shared
-    /// UPLOAD chunk pool and records a CopyBufferRegion per range (COMMON->COPY_DEST->COMMON).
+    /// UPLOAD chunk pool and records a CopyBufferRegion per range. State transitions go
+    /// through Unity's resource-state tracker (|tracker|) so the COPY_DEST transition
+    /// composes with the SRV/UAV barriers of surrounding passes; when the tracker is
+    /// unavailable it falls back to manual COMMON->COPY_DEST->COMMON barriers.
     /// Each range copies only its own slice; untouched regions of the DEFAULT buffer keep
     /// their previously-uploaded contents. The upload memory is recycled by the frame fence.
     /// </summary>
     void UploadSnapshot(ID3D12GraphicsCommandList* cmdList,
+                        const ResourceStateTracker& tracker,
                         const NsbFlushRange*       ranges,
                         uint32_t                   rangeCount,
                         const uint8_t*             payload);
 
-    ID3D12Resource* GetResource() const { return m_buffer.Get(); }
+    ID3D12Resource* GetResource() const override { return m_buffer.Get(); }
     uint32_t        GetCapacity() const { return m_capacity; }
     uint32_t        GetStride()   const { return m_stride; }
+    bool            AllowsUAV()   const { return m_allowUAV; }
 
 private:
     ID3D12Device*          m_device   = nullptr;
@@ -74,6 +86,7 @@ private:
 
     uint32_t m_capacity = 0;
     uint32_t m_stride   = 0;
+    bool     m_allowUAV = false;
 
     IUnityLog* m_log = nullptr;
 
