@@ -80,9 +80,9 @@ namespace NativeRender
         public unsafe void UploadDirect<T>(UnsafeCommandBuffer cmd, T[] data) where T : unmanaged
         {
             if (_disposed || data == null || data.Length == 0) return;
-            
+
             AdvanceFrame();
-            
+
             // 固定托管数组地址进行拷贝
             fixed (void* srcPtr = data)
             {
@@ -90,6 +90,19 @@ namespace NativeRender
                 long  sizeToCopy = Math.Min((long)data.Length * UnsafeUtility.SizeOf<T>(), (long)_singleFrameSize);
                 UnsafeUtility.MemCpy(dstPtr, srcPtr, sizeToCopy);
             }
+
+            Execute(cmd, _bufferIndex);
+        }
+
+        public unsafe void UploadDirect<T>(UnsafeCommandBuffer cmd, T data) where T : unmanaged
+        {
+            if (_disposed) return;
+
+            AdvanceFrame();
+
+            void* srcPtr = UnsafeUtility.AddressOf(ref data);
+            void* dstPtr = _frameDataArray[_bufferIndex].GetUnsafePtr();
+            UnsafeUtility.MemCpy(dstPtr, srcPtr, Math.Min(sizeof(T), _singleFrameSize));
 
             Execute(cmd, _bufferIndex);
         }

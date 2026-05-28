@@ -323,9 +323,9 @@ namespace PathTracing
         {
             if (EnvBakerCb != null && ImportanceBakerCb != null) return;
             EnvBakerCb?.Dispose();
-            EnvBakerCb = new NativeBuffer(704);
+            EnvBakerCb = new NativeBuffer(NativeRtxptEnvMapBakerPass.EnvBakerCbSize);
             ImportanceBakerCb?.Dispose();
-            ImportanceBakerCb = new NativeBuffer(48);
+            ImportanceBakerCb = new NativeBuffer(NativeRtxptEnvMapBakerPass.ImportanceBakerCbSize);
         }
 
         private void ReleaseResolutionBuffers()

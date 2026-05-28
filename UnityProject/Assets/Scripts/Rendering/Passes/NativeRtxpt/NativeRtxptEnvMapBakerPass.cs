@@ -1,4 +1,5 @@
 using System;
+using System.Runtime.InteropServices;
 using NativeRender;
 using UnityEngine;
 using UnityEngine.Rendering;
@@ -19,13 +20,43 @@ namespace PathTracing
         private const int BaseLayerGroupsXY       = (CubeDim / 2 + 7) / 8;
         private const int ImportanceBakerGroupsXY = (ImportanceMapDim + 15) / 16;
 
+        // Mirrors HLSL EnvMapBakerConstants (EnvMapBaker.hlsl):
+        //   EMB_DirectionalLight DirectionalLights[16]  — 512 bytes (16 × float4 ColorIntensity + float3 Direction + float AngularSize)
+        //   ProceduralSkyConstants ProcSkyConsts        — 160 bytes (always zeroed in Unity)
+        //   float3 ScaleColor; uint DirectionalLightCount;
+        //   uint CubeDim, CubeDimLowRes, ProcSkyEnabled, BackgroundSourceType;
+        [StructLayout(LayoutKind.Sequential, Pack = 4)]
+        private unsafe struct EnvMapBakerCB
+        {
+            public fixed float DirectionalLights[16 * 8];   // EMB_DirectionalLight[16]
+            public fixed uint  ProcSkyConstsPad[160 / 4];   // ProceduralSkyConstants (zeroed)
+            public float ScaleColorR, ScaleColorG, ScaleColorB;
+            public uint  DirectionalLightCount;
+            public uint  CubeDim, CubeDimLowRes, ProcSkyEnabled, BackgroundSourceType;
+        }
+
+        // Mirrors HLSL EnvMapImportanceSamplingBakerConstants (EnvMapImportanceSamplingBaker.hlsl)
+        [StructLayout(LayoutKind.Sequential, Pack = 4)]
+        private struct ImportanceBakerCB
+        {
+            public uint  SourceCubeDim, SourceCubeMIPCount, SampleIndex, Padding1;
+            public uint  ImportanceMapDimX, ImportanceMapDimY;
+            public uint  ImportanceMapDimInSamplesX, ImportanceMapDimInSamplesY;
+            public uint  ImportanceMapNumSamplesX, ImportanceMapNumSamplesY;
+            public float ImportanceMapInvSamples;
+            public uint  ImportanceMapBaseMip;
+        }
+
+        internal static unsafe int EnvBakerCbSize      => sizeof(EnvMapBakerCB);
+        internal static          int ImportanceBakerCbSize => System.Runtime.InteropServices.Marshal.SizeOf<ImportanceBakerCB>();
+
         private readonly NativeComputePipeline      _baseLayerCs;
         private readonly NativeComputeDescriptorSet _baseLayerDs;
         private readonly NativeComputePipeline      _importanceBakerCs;
         private readonly NativeComputeDescriptorSet _importanceBakerDs;
 
-        private static readonly uint[] s_envBakerWords   = new uint[704 / 4];
-        private static readonly uint[] s_importanceWords = new uint[48 / 4];
+        private static EnvMapBakerCB    s_envBakerCb;
+        private static ImportanceBakerCB s_importanceCb;
 
         private NativeRtxptPassContext _ctx;
 
@@ -67,8 +98,8 @@ namespace PathTracing
             internal NativeComputeDescriptorSet ImportanceBakerDs;
             internal NativeBuffer               EnvBakerCb;
             internal NativeBuffer               ImportanceBakerCb;
-            internal uint[]                     EnvBakerWords;
-            internal uint[]                     ImportanceWords;
+            internal EnvMapBakerCB    EnvBakerCbData;
+            internal ImportanceBakerCB ImportanceCbData;
             internal IntPtr                     SkyTexturePtr;
             internal IntPtr                     EnvCubeMip0Ptr;
             internal IntPtr                     EnvCubeMip1Ptr;
@@ -90,8 +121,8 @@ namespace PathTracing
             pd.ImportanceBakerDs    = _importanceBakerDs;
             pd.EnvBakerCb        = _ctx.Buffers.EnvBakerCb;
             pd.ImportanceBakerCb = _ctx.Buffers.ImportanceBakerCb;
-            pd.EnvBakerWords     = (uint[])s_envBakerWords.Clone();
-            pd.ImportanceWords   = (uint[])s_importanceWords.Clone();
+            pd.EnvBakerCbData   = s_envBakerCb;
+            pd.ImportanceCbData = s_importanceCb;
             var skyTex = _ctx.Setting?.environmentMap;
             pd.SkyTexturePtr    = skyTex != null ? skyTex.GetNativeTexturePtr() : Texture2D.blackTexture.GetNativeTexturePtr();
             pd.EnvCubeMip0Ptr   = _ctx.Textures.EnvCubeMip0.NativePtr;
@@ -115,7 +146,7 @@ namespace PathTracing
 
             {
                 var ds = data.BaseLayerDs;
-                data.EnvBakerCb.UploadDirect(context.cmd, data.EnvBakerWords);
+                data.EnvBakerCb.UploadDirect(context.cmd, data.EnvBakerCbData);  // single-value overload
                 ds.SetConstantBuffer("g_Const", data.EnvBakerCb);
                 ds.SetTexture("t_SrcEquirectangularEnvMap", data.SkyTexturePtr);
                 ds.SetTexture("t_SrcCubemapEnvMap", data.DummyCubePtr);
@@ -131,7 +162,7 @@ namespace PathTracing
 
             {
                 var ds = data.ImportanceBakerDs;
-                data.ImportanceBakerCb.UploadDirect(context.cmd, data.ImportanceWords);
+                data.ImportanceBakerCb.UploadDirect(context.cmd, data.ImportanceCbData);  // single-value overload
                 ds.SetConstantBuffer("g_BuilderConsts", data.ImportanceBakerCb);
                 ds.SetTexture("t_EnvMapCube", data.EnvCubeMip0Ptr);
                 ds.SetRWTexture("u_ImportanceMap", data.ImportanceMapPtr);
@@ -147,75 +178,62 @@ namespace PathTracing
             cmd.EndSample(RenderPassMarkers.RtxptEnvMapBaker);
         }
 
-        private static void FillEnvBakerConstants(NativeRtxptSetting setting)
+        private static unsafe void FillEnvBakerConstants(NativeRtxptSetting setting)
         {
-            Array.Clear(s_envBakerWords, 0, s_envBakerWords.Length);
-            int lightCount = 0;
+            s_envBakerCb = default;
+            ref var cb = ref s_envBakerCb;
 
+            int lightCount = 0;
             foreach (var light in Object.FindObjectsByType<Light>(FindObjectsSortMode.None))
             {
                 if (!light.enabled || !light.gameObject.activeInHierarchy) continue;
                 if (light.type != LightType.Directional) continue;
                 if (lightCount >= 16) break;
 
-                Color linear    = light.color.linear;
-                float intensity = light.intensity;
-                int   offset    = lightCount * 32;
-
-                WriteF32(s_envBakerWords, offset + 0, linear.r);
-                WriteF32(s_envBakerWords, offset + 4, linear.g);
-                WriteF32(s_envBakerWords, offset + 8, linear.b);
-                WriteF32(s_envBakerWords, offset + 12, intensity);
-
-                Vector3 fwd = light.transform.forward;
-                WriteF32(s_envBakerWords, offset + 16, fwd.x);
-                WriteF32(s_envBakerWords, offset + 20, fwd.y);
-                WriteF32(s_envBakerWords, offset + 24, fwd.z);
-                WriteF32(s_envBakerWords, offset + 28, 0.1f);
-
+                Color   linear = light.color.linear;
+                Vector3 fwd    = light.transform.forward;
+                int     f      = lightCount * 8;  // 8 floats per EMB_DirectionalLight
+                cb.DirectionalLights[f + 0] = linear.r;
+                cb.DirectionalLights[f + 1] = linear.g;
+                cb.DirectionalLights[f + 2] = linear.b;
+                cb.DirectionalLights[f + 3] = light.intensity;
+                cb.DirectionalLights[f + 4] = fwd.x;
+                cb.DirectionalLights[f + 5] = fwd.y;
+                cb.DirectionalLights[f + 6] = fwd.z;
+                cb.DirectionalLights[f + 7] = 0.1f;  // AngularSize
                 lightCount++;
             }
 
             float envIntensity = setting?.environmentMapIntensity ?? 1.0f;
             Color tint         = setting?.environmentMapTint ?? Color.white;
             bool  hasSky       = setting?.environmentMap != null;
-            int   o            = 672;
 
-            WriteF32(s_envBakerWords, o + 0, tint.linear.r * envIntensity);
-            WriteF32(s_envBakerWords, o + 4, tint.linear.g * envIntensity);
-            WriteF32(s_envBakerWords, o + 8, tint.linear.b * envIntensity);
-            WriteU32(s_envBakerWords, o + 12, (uint)lightCount);
-            WriteU32(s_envBakerWords, o + 16, (uint)CubeDim);
-            WriteU32(s_envBakerWords, o + 20, (uint)CubeDimLowRes);
-            WriteU32(s_envBakerWords, o + 24, 0u);
-            WriteU32(s_envBakerWords, o + 28, hasSky ? 1u : 0u);
+            cb.ScaleColorR           = tint.linear.r * envIntensity;
+            cb.ScaleColorG           = tint.linear.g * envIntensity;
+            cb.ScaleColorB           = tint.linear.b * envIntensity;
+            cb.DirectionalLightCount = (uint)lightCount;
+            cb.CubeDim               = CubeDim;
+            cb.CubeDimLowRes         = CubeDimLowRes;
+            cb.ProcSkyEnabled        = 0;
+            cb.BackgroundSourceType  = hasSky ? 1u : 0u;
         }
 
         private static void FillImportanceBakerConstants()
         {
-            Array.Clear(s_importanceWords, 0, s_importanceWords.Length);
-            WriteU32(s_importanceWords, 0, (uint)CubeDim);
-            WriteU32(s_importanceWords, 4, 1u);
-            WriteU32(s_importanceWords, 8, 0u);
-            WriteU32(s_importanceWords, 12, 0u);
-            WriteU32(s_importanceWords, 16, (uint)ImportanceMapDim);
-            WriteU32(s_importanceWords, 20, (uint)ImportanceMapDim);
-            WriteU32(s_importanceWords, 24, (uint)(ImportanceMapDim * ImportanceSamplesX));
-            WriteU32(s_importanceWords, 28, (uint)(ImportanceMapDim * ImportanceSamplesY));
-            WriteU32(s_importanceWords, 32, (uint)ImportanceSamplesX);
-            WriteU32(s_importanceWords, 36, (uint)ImportanceSamplesY);
-            WriteF32(s_importanceWords, 40, 1.0f / ImportanceSamples);
-            WriteU32(s_importanceWords, 44, 10u);
-        }
-
-        private static void WriteF32(uint[] buf, int offset, float v)
-        {
-            buf[offset / 4] = unchecked((uint)BitConverter.ToInt32(BitConverter.GetBytes(v), 0));
-        }
-
-        private static void WriteU32(uint[] buf, int offset, uint v)
-        {
-            buf[offset / 4] = v;
+            s_importanceCb = default;
+            ref var cb = ref s_importanceCb;
+            cb.SourceCubeDim              = (uint)CubeDim;
+            cb.SourceCubeMIPCount         = 1;
+            cb.SampleIndex                = 0;
+            cb.Padding1                   = 0;
+            cb.ImportanceMapDimX          = (uint)ImportanceMapDim;
+            cb.ImportanceMapDimY          = (uint)ImportanceMapDim;
+            cb.ImportanceMapDimInSamplesX = (uint)(ImportanceMapDim * ImportanceSamplesX);
+            cb.ImportanceMapDimInSamplesY = (uint)(ImportanceMapDim * ImportanceSamplesY);
+            cb.ImportanceMapNumSamplesX   = (uint)ImportanceSamplesX;
+            cb.ImportanceMapNumSamplesY   = (uint)ImportanceSamplesY;
+            cb.ImportanceMapInvSamples    = 1.0f / ImportanceSamples;
+            cb.ImportanceMapBaseMip       = 10;
         }
     }
 }
