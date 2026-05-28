@@ -12,7 +12,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 5a4e0d79381289b4cb6b3a5e5d56f537, type: 3}
   m_Name: NativeNrdFeature
   m_EditorClassIdentifier: Assembly-CSharp::PathTracing.NativeNrdFeature
-  m_Active: 1
+  m_Active: 0
   setting:
     showMode: 0
     showValidation: 0
@@ -197,7 +197,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 324cab2d455449e4b9e70b945e4d8e49, type: 3}
   m_Name: NativeRtxptFeature
   m_EditorClassIdentifier: Assembly-CSharp::PathTracing.NativeRtxptFeature
-  m_Active: 0
+  m_Active: 1
   setting:
     realtimeMode: 1
     realtimeAA: 3
@@ -265,7 +265,7 @@ MonoBehaviour:
     environmentMapEnabled: 1
     environmentMapIntensity: 1
     environmentMapTint: {r: 1, g: 1, b: 1, a: 1}
-    environmentMap: {fileID: 2800000, guid: 5d8fd7994f717214481ba9721da2ebe6, type: 3}
+    environmentMap: {fileID: 0}
     enableToneMapping: 1
     showValidation: 0
     enableShaderDebug: 1
@@ -273,7 +273,7 @@ MonoBehaviour:
     dbgDiscardNonNEELighting: 0
     dbgDiscardNEELighting: 0
     dbgDisablePostProcessFilters: 0
-    showMode: 0
+    showMode: 2
     debugViewType: 0
     debugViewStablePlaneIndex: -1
     skipRightEyeInVR: 1

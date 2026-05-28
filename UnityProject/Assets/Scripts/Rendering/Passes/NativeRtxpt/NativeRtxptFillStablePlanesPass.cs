@@ -191,7 +191,7 @@ namespace PathTracing
             ds.SetTypedBuffer("t_LightProxyIndices",        buf.LightSamplingProxiesPtr, buf.LightSamplingProxies.count, (uint)Nri.DXGI_FORMAT.DXGI_FORMAT_R32_UINT);
             ds.SetTypedBuffer("t_LightLocalSamplingBuffer", buf.LocalSamplingBufferPtr,  buf.LocalSamplingBuffer.count,  (uint)Nri.DXGI_FORMAT.DXGI_FORMAT_R32_UINT);
 
-            ds.SetStructuredBuffer("t_LightsEx", buf.LightExBuffer);
+            ds.SetStructuredBuffer("t_LightsEx", buf.LightExBufferPtr, buf.LightExBuffer.count, buf.LightExBuffer.stride);
 
             var tex = ctx.Textures;
             ds.SetRWTexture("u_LightFeedbackTotalWeight", tex.LightFeedbackTotalWeight.NativePtr);

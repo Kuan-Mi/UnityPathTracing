@@ -496,12 +496,50 @@ namespace PathTracing
                 return;
             }
 
+            // GPU readback is async (fence-gated): record the copy on a one-shot command buffer,
+            // then poll across editor frames until the GPU has produced the data, and visualize.
             int readCount = (int)System.Math.Min(triCount, 4096u);
             var data      = new RtxptPolymorphicLightInfo[readCount];
-            buf.LightBuffer.GetData(data, 0, (int)triOffset, readCount);
 
+            var rbCmd = new CommandBuffer { name = "Rtxpt_LightBufferReadback" };
+            buf.LightBuffer.RequestReadback(rbCmd, (int)triOffset, readCount);
+            Graphics.ExecuteCommandBuffer(rbCmd);
+            rbCmd.Release();
+
+#if UNITY_EDITOR
+            var lightBuffer = buf.LightBuffer;
+            int framesWaited = 0;
+            const int maxFrames = 180;
+            UnityEditor.EditorApplication.CallbackFunction poll = null;
+            poll = () =>
+            {
+                framesWaited++;
+                if (lightBuffer.TryGetReadback(data, readCount))
+                {
+                    UnityEditor.EditorApplication.update -= poll;
+                    LogEmissiveTriangleReadback(sb, data, readCount, triOffset, triCount);
+                }
+                else if (framesWaited > maxFrames)
+                {
+                    UnityEditor.EditorApplication.update -= poll;
+                    sb.AppendLine($"  Readback timed out after {maxFrames} frames (is the scene rendering?).");
+                    Debug.Log(sb.ToString());
+                }
+            };
+            UnityEditor.EditorApplication.update += poll;
+#else
+            sb.AppendLine("  Readback polling is editor-only.");
+            Debug.Log(sb.ToString());
+#endif
+        }
+
+        // Decodes and visualizes the emissive-triangle light entries read back from LightBuffer.
+        private static void LogEmissiveTriangleReadback(
+            System.Text.StringBuilder sb, RtxptPolymorphicLightInfo[] data, int readCount, uint triOffset, uint triCount)
+        {
             int   nonZero  = 0;
             float drawTime = 30f; // seconds visible in scene view
+            var   segments = new List<(Vector3 a, Vector3 b, Color c)>();
 
             for (int i = 0; i < readCount; i++)
             {
@@ -534,12 +572,12 @@ namespace PathTracing
                 var normal  = Vector3.Cross(edge1, edge2).normalized;
                 var triBase = center - (edge1 + edge2) / 3f; // recover base vertex
 
-                // Draw triangle outline + normal
+                // Triangle outline + normal
                 float size = 0.05f;
-                Debug.DrawLine(triBase, triBase + edge1, col, drawTime);
-                Debug.DrawLine(triBase, triBase + edge2, col, drawTime);
-                Debug.DrawLine(triBase + edge1, triBase + edge2, col, drawTime);
-                Debug.DrawLine(center, center + normal * (size * 3f), col, drawTime);
+                segments.Add((triBase, triBase + edge1, col));
+                segments.Add((triBase, triBase + edge2, col));
+                segments.Add((triBase + edge1, triBase + edge2, col));
+                segments.Add((center, center + normal * (size * 3f), col));
 
                 if (nonZero <= 16)
                 {
@@ -556,7 +594,58 @@ namespace PathTracing
                 sb.AppendLine($"  (only first {readCount} of {triCount} entries read back)");
 
             Debug.Log(sb.ToString());
+
+#if UNITY_EDITOR
+            ShowDebugSegments(segments, drawTime);
+#endif
         }
+
+#if UNITY_EDITOR
+        // Editor-safe debug line drawing. Debug.DrawLine is unreliable outside play mode, so we
+        // draw the collected segments with Handles via SceneView.duringSceneGui, forcing repaints
+        // until the expiry time, then unhook. Visible in the Scene view regardless of play state.
+        private static List<(Vector3 a, Vector3 b, Color c)> s_debugSegments;
+        private static double s_debugExpiry;
+        private static bool   s_debugHooked;
+
+        private static void ShowDebugSegments(List<(Vector3 a, Vector3 b, Color c)> segments, float seconds)
+        {
+            s_debugSegments = segments;
+            s_debugExpiry   = UnityEditor.EditorApplication.timeSinceStartup + seconds;
+
+            if (!s_debugHooked)
+            {
+                s_debugHooked = true;
+                UnityEditor.SceneView.duringSceneGui += OnSceneGuiDrawDebug;
+                UnityEditor.EditorApplication.update += RepaintWhileDebugging;
+            }
+            UnityEditor.SceneView.RepaintAll();
+        }
+
+        private static void OnSceneGuiDrawDebug(UnityEditor.SceneView sv)
+        {
+            if (s_debugSegments == null) return;
+            foreach (var (a, b, c) in s_debugSegments)
+            {
+                UnityEditor.Handles.color = c;
+                UnityEditor.Handles.DrawLine(a, b);
+            }
+        }
+
+        private static void RepaintWhileDebugging()
+        {
+            if (UnityEditor.EditorApplication.timeSinceStartup < s_debugExpiry)
+            {
+                UnityEditor.SceneView.RepaintAll();
+                return;
+            }
+            // Expired — unhook and clear.
+            UnityEditor.SceneView.duringSceneGui -= OnSceneGuiDrawDebug;
+            UnityEditor.EditorApplication.update -= RepaintWhileDebugging;
+            s_debugHooked   = false;
+            s_debugSegments = null;
+        }
+#endif
 
         /// <summary>
         /// Debug readback for the NEE-AT data path.

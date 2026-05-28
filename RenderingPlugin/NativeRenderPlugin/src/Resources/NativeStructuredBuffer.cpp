@@ -146,3 +146,96 @@ void NativeStructuredBuffer::UploadSnapshot(ID3D12GraphicsCommandList* cmdList,
         cmdList->ResourceBarrier(1, &barrier);
     }
 }
+
+bool NativeStructuredBuffer::EnsureReadbackCapacity(uint64_t bytes)
+{
+    if (bytes == 0) return false;
+    if (m_readbackBuffer && m_readbackCapacity >= bytes) return true;
+
+    // (Re)allocate the READBACK-heap staging resource. READBACK resources must be
+    // created in (and remain in) COPY_DEST, so no state transition is ever needed.
+    D3D12_HEAP_PROPERTIES heapProps = {};
+    heapProps.Type = D3D12_HEAP_TYPE_READBACK;
+
+    D3D12_RESOURCE_DESC desc = {};
+    desc.Dimension        = D3D12_RESOURCE_DIMENSION_BUFFER;
+    desc.Width            = bytes;
+    desc.Height           = 1;
+    desc.DepthOrArraySize = 1;
+    desc.MipLevels        = 1;
+    desc.SampleDesc.Count = 1;
+    desc.Layout           = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
+    desc.Flags            = D3D12_RESOURCE_FLAG_NONE;
+
+    ComPtr<ID3D12Resource> staging;
+    HRESULT hr = m_device->CreateCommittedResource(
+        &heapProps, D3D12_HEAP_FLAG_NONE, &desc,
+        D3D12_RESOURCE_STATE_COPY_DEST, nullptr, IID_PPV_ARGS(&staging));
+    if (FAILED(hr))
+    {
+        Log("[NativeStructuredBuffer::EnsureReadbackCapacity] readback alloc failed");
+        return false;
+    }
+
+    m_readbackBuffer   = staging;
+    m_readbackCapacity = bytes;
+    return true;
+}
+
+void NativeStructuredBuffer::RequestReadback(ID3D12GraphicsCommandList* cmdList,
+                                             const ResourceStateTracker& tracker,
+                                             uint64_t srcByteOffset,
+                                             uint64_t bytes,
+                                             uint64_t fenceTarget)
+{
+    assert(cmdList);
+    if (!cmdList || bytes == 0) return;
+
+    // Clamp to the buffer's byte size.
+    const uint64_t bufBytes = static_cast<uint64_t>(m_capacity) * m_stride;
+    if (srcByteOffset >= bufBytes) return;
+    if (srcByteOffset + bytes > bufBytes) bytes = bufBytes - srcByteOffset;
+
+    if (!EnsureReadbackCapacity(bytes)) return;
+
+    // Transition the source to COPY_SOURCE through Unity's tracker so the barrier composes
+    // with whatever state the buffer was last left in (UAV/SRV/COPY_DEST). When the tracker
+    // is unavailable we cannot safely barrier here, so skip rather than risk a state mismatch.
+    if (!tracker.Valid())
+    {
+        Log("[NativeStructuredBuffer::RequestReadback] no state tracker; readback skipped");
+        return;
+    }
+    tracker.Require(m_buffer.Get(), D3D12_RESOURCE_STATE_COPY_SOURCE);
+
+    cmdList->CopyBufferRegion(m_readbackBuffer.Get(), 0, m_buffer.Get(), srcByteOffset, bytes);
+
+    tracker.Notify(m_buffer.Get(), D3D12_RESOURCE_STATE_COPY_SOURCE);
+
+    m_readbackBytes       = bytes;
+    m_readbackFenceTarget = fenceTarget;
+    m_readbackPending     = true;
+}
+
+bool NativeStructuredBuffer::TryReadback(uint64_t completedFenceValue, void* dst, uint64_t dstBytes)
+{
+    if (!m_readbackPending || !dst || !m_readbackBuffer) return false;
+    if (completedFenceValue < m_readbackFenceTarget) return false; // copy still in flight
+
+    const uint64_t copyBytes = (dstBytes < m_readbackBytes) ? dstBytes : m_readbackBytes;
+
+    void*       mapped    = nullptr;
+    D3D12_RANGE readRange = { 0, static_cast<SIZE_T>(m_readbackBytes) };
+    if (FAILED(m_readbackBuffer->Map(0, &readRange, &mapped)) || !mapped)
+    {
+        Log("[NativeStructuredBuffer::TryReadback] Map failed");
+        return false;
+    }
+    memcpy(dst, mapped, static_cast<size_t>(copyBytes));
+
+    D3D12_RANGE writeRange = { 0, 0 }; // CPU did not write
+    m_readbackBuffer->Unmap(0, &writeRange);
+
+    m_readbackPending = false;
+    return true;
+}

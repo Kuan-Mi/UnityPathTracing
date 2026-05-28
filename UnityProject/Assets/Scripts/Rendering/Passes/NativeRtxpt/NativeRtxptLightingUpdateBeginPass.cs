@@ -354,8 +354,8 @@ namespace PathTracing
             internal uint                       TotalLightCount;
             internal uint                       HistoricTotalLightCount;
             internal GraphicsBuffer             LightControlBuffer;
-            internal GraphicsBuffer             LightBuffer;
-            internal GraphicsBuffer             LightExBuffer;
+            internal NativeStructuredBuffer     LightBuffer;
+            internal NativeStructuredBuffer     LightExBuffer;
             internal RtxptLightingControlData[] ControlData;
             internal RtxptPolymorphicLightInfo[] LightData;
             internal RtxptPolymorphicLightInfoEx[] LightExData;
@@ -477,9 +477,13 @@ namespace PathTracing
             if (data.AnalyticLightCount > 0)
             {
                 context.cmd.BeginSample(RenderPassMarkers.RtxptEnvmapAndAnalyticLightBuffers);
+                // Record the analytic-light writes into the native buffers' accumulators, then
+                // Flush() to issue the GPU copy on this command buffer before the dispatches below
+                // read/refine the buffers. The native pointer is stable, so no refresh is needed.
                 data.LightBuffer.SetData(data.LightData, 0, (int)EnvQtTotalNodeCount, data.AnalyticLightCount);
                 data.LightExBuffer.SetData(data.LightExData, 0, (int)EnvQtTotalNodeCount, data.AnalyticLightCount);
-                buf.RefreshAnalyticLightBufferPtrs();
+                data.LightBuffer.Flush(cmd);
+                data.LightExBuffer.Flush(cmd);
                 context.cmd.EndSample(RenderPassMarkers.RtxptEnvmapAndAnalyticLightBuffers);
             }
 

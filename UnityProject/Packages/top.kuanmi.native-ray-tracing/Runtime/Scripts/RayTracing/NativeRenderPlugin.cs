@@ -515,6 +515,23 @@ namespace NativeRender
         [DllImport(DllName)]
         public static extern IntPtr NR_NSB_AllocFlushBuffer(uint sizeBytes);
 
+        /// <summary>
+        /// Returns the <c>UnityRenderingEventAndData</c> function pointer that records a GPU->CPU
+        /// readback copy. Pass an <c>NsbReadbackRequest</c> blob (allocated via
+        /// <see cref="NR_NSB_AllocFlushBuffer"/>) as the data argument of
+        /// <c>CommandBuffer.IssuePluginEventAndData</c>; the callback frees it.
+        /// </summary>
+        [DllImport(DllName)]
+        public static extern IntPtr NR_NSB_GetReadbackEventFunc();
+
+        /// <summary>
+        /// Main thread: copies a completed readback into <paramref name="dst"/> (up to
+        /// <paramref name="dstBytes"/>) and returns 1; returns 0 while the copy is still in flight
+        /// on the GPU or when no readback is pending.
+        /// </summary>
+        [DllImport(DllName)]
+        public static extern uint NR_NSB_TryReadback(ulong handle, IntPtr dst, ulong dstBytes);
+
         // -------------------------------------------------------------------
         // ComputeShader API  (generic compute pipeline, cs_6_x)
         // -------------------------------------------------------------------

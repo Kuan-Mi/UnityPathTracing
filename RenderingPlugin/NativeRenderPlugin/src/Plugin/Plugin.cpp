@@ -1603,6 +1603,63 @@ NR_NSB_GetFlushEventFunc()
     return NsbFlushCallback;
 }
 
+// ---------------------------------------------------------------------------
+// NativeStructuredBuffer GPU->CPU readback
+//
+//   Async, fence-gated (mirrors AsyncGPUReadback): a render-thread event records
+//   the DEFAULT->READBACK copy and stamps the frame-fence value at which it will
+//   be done; the main thread later polls NR_NSB_TryReadback, which copies the
+//   data out once the GPU has passed that value.
+// ---------------------------------------------------------------------------
+
+// Frame fence is created once by Unity and stable; cache it on the render thread so the
+// main-thread poll can read GetCompletedValue() (free-threaded on the fence object).
+static ID3D12Fence* s_FrameFenceCached = nullptr;
+
+static void UNITY_INTERFACE_API NsbReadbackCallback(int /*eventId*/, void* data)
+{
+    if (!data) return;
+
+    const auto* req = static_cast<const NsbReadbackRequest*>(data);
+
+    UnityGraphicsD3D12RecordingState rs = {};
+    if (s_RendererReady && s_D3D12 && req->bufferHandle &&
+        s_D3D12->CommandRecordingState(&rs) && rs.commandList)
+    {
+        auto* nsb     = reinterpret_cast<NativeStructuredBuffer*>(req->bufferHandle);
+        auto* cmdList = static_cast<ID3D12GraphicsCommandList*>(rs.commandList);
+
+        if (!s_FrameFenceCached) s_FrameFenceCached = s_D3D12->GetFrameFence();
+        const uint64_t fenceTarget = s_D3D12->GetNextFrameFenceValue();
+
+        nsb->RequestReadback(cmdList, ResourceStateTracker(s_D3D12v8),
+                             req->srcByteOffset, req->bytes, fenceTarget);
+    }
+
+    std::free(data);
+}
+
+/// <summary>Returns the render-event function pointer for the readback request.</summary>
+extern "C" UnityRenderingEventAndData UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API
+NR_NSB_GetReadbackEventFunc()
+{
+    return NsbReadbackCallback;
+}
+
+// ---------------------------------------------------------------------------
+// NR_NSB_TryReadback
+//   Main thread: returns 1 and fills |dst| (up to |dstBytes|) if a pending readback
+//   has completed on the GPU; returns 0 while still in flight or with no request.
+// ---------------------------------------------------------------------------
+extern "C" uint32_t UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API
+NR_NSB_TryReadback(uint64_t handle, void* dst, uint64_t dstBytes)
+{
+    if (!handle || !dst || !s_FrameFenceCached) return 0;
+    const uint64_t completed = s_FrameFenceCached->GetCompletedValue();
+    auto* nsb = reinterpret_cast<NativeStructuredBuffer*>(handle);
+    return nsb->TryReadback(completed, dst, dstBytes) ? 1u : 0u;
+}
+
 // ===========================================================================
 // ComputeShader  -  generic compute pipeline (cs_6_x)
 // ===========================================================================

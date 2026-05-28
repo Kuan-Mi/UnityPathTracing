@@ -128,6 +128,23 @@ namespace NativeRender
         }
 
         /// <summary>
+        /// Main thread: records a write of <paramref name="count"/> elements read from
+        /// <paramref name="data"/> starting at element <paramref name="srcOffset"/>, into the GPU
+        /// buffer starting at element <paramref name="dstOffset"/>. Mirrors GraphicsBuffer.SetData's
+        /// (managedBufferStartIndex, graphicsBufferStartIndex, count) form for the case where the
+        /// source and destination offsets differ. Pure managed — no native call.
+        /// </summary>
+        public unsafe void SetData<T>(T[] data, int srcOffset, int dstOffset, int count) where T : unmanaged
+        {
+            if (_disposed) throw new ObjectDisposedException(nameof(NativeStructuredBuffer));
+            if (data == null) throw new ArgumentNullException(nameof(data));
+            if (count <= 0) return;
+
+            fixed (T* src = &data[srcOffset])
+                Append(src, dstOffset, count);
+        }
+
+        /// <summary>
         /// Main thread: records a write of <paramref name="count"/> elements from a
         /// <see cref="NativeArray{T}"/> (starting at element <paramref name="dstOffset"/>).
         /// </summary>
@@ -254,6 +271,46 @@ namespace NativeRender
                 _ranges.Clear();
                 _payloadLen = 0; // keep _payload capacity for reuse
             }
+        }
+
+        // Readback request blob layout (must match NsbReadbackRequest in NativeStructuredBuffer.h).
+        private const int ReadbackRequestSize = 24; // ulong handle + ulong srcByteOffset + ulong bytes
+
+        /// <summary>
+        /// Records a GPU->CPU readback of <paramref name="elementCount"/> elements starting at element
+        /// <paramref name="srcElementOffset"/>. Async: the copy is recorded on <paramref name="cmd"/>
+        /// and completes a frame or two later — poll <see cref="TryGetReadback{T}"/> until it returns
+        /// true. Only one readback is tracked at a time; a new request supersedes a pending one.
+        /// </summary>
+        public unsafe void RequestReadback(CommandBuffer cmd, int srcElementOffset, int elementCount)
+        {
+            if (_disposed) throw new ObjectDisposedException(nameof(NativeStructuredBuffer));
+            if (elementCount <= 0) return;
+
+            IntPtr blob = NativeRenderPlugin.NR_NSB_AllocFlushBuffer(ReadbackRequestSize);
+            if (blob == IntPtr.Zero) return;
+
+            ulong* p = (ulong*)blob;
+            p[0] = Handle;
+            p[1] = (ulong)((long)srcElementOffset * stride);
+            p[2] = (ulong)((long)elementCount * stride);
+
+            cmd.IssuePluginEventAndData(NativeRenderPlugin.NR_NSB_GetReadbackEventFunc(), 1, blob);
+        }
+
+        /// <summary>
+        /// Polls a pending <see cref="RequestReadback"/>. Returns true and fills the first
+        /// <paramref name="count"/> elements of <paramref name="dst"/> once the GPU copy has
+        /// completed; returns false while still in flight or when no request is pending.
+        /// </summary>
+        public unsafe bool TryGetReadback<T>(T[] dst, int count) where T : unmanaged
+        {
+            if (_disposed) throw new ObjectDisposedException(nameof(NativeStructuredBuffer));
+            if (dst == null || count <= 0) return false;
+
+            ulong dstBytes = (ulong)count * (ulong)sizeof(T);
+            fixed (T* p = dst)
+                return NativeRenderPlugin.NR_NSB_TryReadback(Handle, (IntPtr)p, dstBytes) != 0;
         }
 
         public void Dispose()

@@ -60,14 +60,16 @@ namespace PathTracing
         /// <summary>
         /// Per-light data array. MaxLights elements.
         /// HLSL: u_lightsBuffer (u1).
+        /// GPU-resident native buffer: CPU uploads the analytic-light sub-range while compute
+        /// passes write env-quad-node and emissive-triangle entries via UAV. Stable native ptr.
         /// </summary>
-        public GraphicsBuffer LightBuffer;
+        public NativeStructuredBuffer LightBuffer;
 
         /// <summary>
         /// Extended per-light data array. MaxLights elements.
-        /// HLSL: u_lightsExBuffer (u2).
+        /// HLSL: u_lightsExBuffer (u2). Same CPU-upload + GPU-UAV model as <see cref="LightBuffer"/>.
         /// </summary>
-        public GraphicsBuffer LightExBuffer;
+        public NativeStructuredBuffer LightExBuffer;
 
         /// <summary>
         /// Scratch buffer for light processing passes.
@@ -128,8 +130,10 @@ namespace PathTracing
         // Light system buffers — valid after EnsureLightBuffers(), cleared in ReleaseLightBuffers()
         public IntPtr FeedbackBufferPtr           { get; private set; }
         public IntPtr LightControlBufferPtr       { get; private set; }
-        public IntPtr LightBufferPtr              { get; private set; }
-        public IntPtr LightExBufferPtr            { get; private set; }
+        // LightBuffer/LightExBuffer are native buffers with a stable resource pointer — derive
+        // the ptr directly instead of caching/refreshing it after every SetData.
+        public IntPtr LightBufferPtr              => LightBuffer?.NativePtr   ?? IntPtr.Zero;
+        public IntPtr LightExBufferPtr            => LightExBuffer?.NativePtr ?? IntPtr.Zero;
         public IntPtr LightScratchBufferPtr       { get; private set; }
         public IntPtr HistoryRemapCurrToPastPtr   { get; private set; }
         public IntPtr HistoryRemapPastToCurrPtr   { get; private set; }
@@ -142,12 +146,6 @@ namespace PathTracing
         public void RefreshLightControlBufferPtr()
         {
             LightControlBufferPtr = LightControlBuffer?.GetNativeBufferPtr() ?? IntPtr.Zero;
-        }
-
-        public void RefreshAnalyticLightBufferPtrs()
-        {
-            LightBufferPtr   = LightBuffer?.GetNativeBufferPtr()   ?? IntPtr.Zero;
-            LightExBufferPtr = LightExBuffer?.GetNativeBufferPtr() ?? IntPtr.Zero;
         }
 
         public void RefreshLightScratchBufferPtr()
@@ -255,17 +253,15 @@ namespace PathTracing
             LightControlBufferPtr = LightControlBuffer.GetNativeBufferPtr();
 
             // LightBuffer / LightExBuffer — match PolymorphicLightInfo (32B) and PolymorphicLightInfoEx (16B).
-            LightBuffer = new GraphicsBuffer(
-                GraphicsBuffer.Target.Structured,
-                MaxLights, Marshal.SizeOf<RtxptPolymorphicLightInfo>())
-            { name = "Rtxpt_LightBuffer" };
-            LightBufferPtr = LightBuffer.GetNativeBufferPtr();
+            // Native UAV-capable upload buffers: CPU writes the analytic-light sub-range (Ranges mode),
+            // compute passes write env/emissive entries via UAV. Stable pointer (no GetNativeBufferPtr churn).
+            LightBuffer = new NativeStructuredBuffer(
+                MaxLights, Marshal.SizeOf<RtxptPolymorphicLightInfo>(),
+                NativeStructuredBuffer.UploadMode.Ranges, allowUAV: true);
 
-            LightExBuffer = new GraphicsBuffer(
-                GraphicsBuffer.Target.Structured,
-                MaxLights, Marshal.SizeOf<RtxptPolymorphicLightInfoEx>())
-            { name = "Rtxpt_LightExBuffer" };
-            LightExBufferPtr = LightExBuffer.GetNativeBufferPtr();
+            LightExBuffer = new NativeStructuredBuffer(
+                MaxLights, Marshal.SizeOf<RtxptPolymorphicLightInfoEx>(),
+                NativeStructuredBuffer.UploadMode.Ranges, allowUAV: true);
 
             LightScratchBuffer = new GraphicsBuffer(
                 GraphicsBuffer.Target.Raw,
@@ -347,8 +343,8 @@ namespace PathTracing
             ImportanceBakerCb?.Dispose();         ImportanceBakerCb        = null;
             FeedbackBuffer?.Release();            FeedbackBuffer           = null; FeedbackBufferPtr           = IntPtr.Zero;
             LightControlBuffer?.Release();        LightControlBuffer       = null; LightControlBufferPtr       = IntPtr.Zero;
-            LightBuffer?.Release();               LightBuffer              = null; LightBufferPtr              = IntPtr.Zero;
-            LightExBuffer?.Release();             LightExBuffer            = null; LightExBufferPtr            = IntPtr.Zero;
+            LightBuffer?.Dispose();               LightBuffer              = null;
+            LightExBuffer?.Dispose();             LightExBuffer            = null;
             LightScratchBuffer?.Release();        LightScratchBuffer       = null; LightScratchBufferPtr       = IntPtr.Zero;
             HistoryRemapCurrentToPast?.Release(); HistoryRemapCurrentToPast= null; HistoryRemapCurrToPastPtr   = IntPtr.Zero;
             HistoryRemapPastToCurrent?.Release(); HistoryRemapPastToCurrent= null; HistoryRemapPastToCurrPtr   = IntPtr.Zero;

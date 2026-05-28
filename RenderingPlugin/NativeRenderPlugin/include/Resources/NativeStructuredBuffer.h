@@ -34,6 +34,20 @@ struct NsbFlushRange
     uint32_t payloadByteOffset;
 };
 
+// ---------------------------------------------------------------------------
+// Readback request blob (shared contract with the C# NativeStructuredBuffer).
+// Passed as the data pointer of IssuePluginEventAndData for a GPU->CPU readback;
+// the render-thread callback records the copy into the buffer's READBACK staging
+// resource and frees the blob. The CPU later polls TryReadback once the frame
+// fence has passed the recorded target value.
+// ---------------------------------------------------------------------------
+struct NsbReadbackRequest
+{
+    uint64_t bufferHandle; // NativeStructuredBuffer*
+    uint64_t srcByteOffset;
+    uint64_t bytes;
+};
+
 /// <summary>
 /// GPU-resident (DEFAULT heap) structured buffer of fixed capacity.
 ///
@@ -73,6 +87,26 @@ public:
                         uint32_t                   rangeCount,
                         const uint8_t*             payload);
 
+    /// <summary>
+    /// Render-thread: records a copy of [srcByteOffset, srcByteOffset+bytes) from the DEFAULT
+    /// buffer into an internal READBACK-heap staging resource (lazily (re)allocated), then
+    /// stamps |fenceTarget| as the frame-fence value at which the copy completes. The source
+    /// transition to COPY_SOURCE goes through Unity's tracker so it composes with other passes.
+    /// </summary>
+    void RequestReadback(ID3D12GraphicsCommandList* cmdList,
+                         const ResourceStateTracker& tracker,
+                         uint64_t srcByteOffset,
+                         uint64_t bytes,
+                         uint64_t fenceTarget);
+
+    /// <summary>
+    /// Main-thread poll: if a readback is pending and the GPU has passed the recorded fence
+    /// value (|completedFenceValue|), maps the staging resource, copies up to |dstBytes| into
+    /// |dst|, clears the pending flag, and returns true. Returns false while still in flight or
+    /// when no request is pending.
+    /// </summary>
+    bool TryReadback(uint64_t completedFenceValue, void* dst, uint64_t dstBytes);
+
     ID3D12Resource* GetResource() const override { return m_buffer.Get(); }
     uint32_t        GetCapacity() const { return m_capacity; }
     uint32_t        GetStride()   const { return m_stride; }
@@ -88,8 +122,16 @@ private:
     uint32_t m_stride   = 0;
     bool     m_allowUAV = false;
 
+    // GPU->CPU readback staging (READBACK heap, permanently in COPY_DEST). Lazily sized.
+    ComPtr<ID3D12Resource> m_readbackBuffer;
+    uint64_t               m_readbackCapacity   = 0;     // allocated bytes
+    uint64_t               m_readbackBytes      = 0;     // bytes copied by the pending request
+    uint64_t               m_readbackFenceTarget = 0;    // frame-fence value at which the copy is done
+    bool                   m_readbackPending    = false;
+
     IUnityLog* m_log = nullptr;
 
     void Log(const char* msg) const;
     bool AllocBuffer(uint32_t capacity);
+    bool EnsureReadbackCapacity(uint64_t bytes);
 };
