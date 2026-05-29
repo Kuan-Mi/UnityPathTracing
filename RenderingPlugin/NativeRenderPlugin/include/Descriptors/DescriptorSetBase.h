@@ -68,6 +68,14 @@ protected:
     void RequestResourceStates(const BindingSlot* slots, uint32_t slotCount);
     void NotifyResourceStates (const BindingSlot* slots, uint32_t slotCount);
 
+    // Build the per-type binding index lists (and size the view cache) once.
+    // The reflection in m_shader is immutable for the lifetime of this object
+    // (a hot-reload destroys and recreates the descriptor set), so the lists are
+    // computed lazily on the first dispatch and reused thereafter.  This lets
+    // every per-dispatch pass touch only the bindings it cares about instead of
+    // re-scanning the whole bindings vector once per pass.
+    void EnsureCategoryIndices();
+
     // Binds the global heap, the root signature, and all root parameters
     // (descriptor tables, inline CBVs, inline SRVs, root constants).
     // Takes the base ID3D12GraphicsCommandList* so it works for both
@@ -84,6 +92,41 @@ protected:
     IUnityLog*               m_log       = nullptr;
     DescriptorHeapAllocator* m_allocator = nullptr;
     ResourceStateTracker     m_tracker;   // facade over the IUnityGraphicsD3D12v8 state tracker
+
+    // --- Per-type binding index lists (built by EnsureCategoryIndices) ---
+    // Each holds the indices into m_shader->GetBindings() of one BindingType, so
+    // a pass over (say) the CBVs iterates only m_idxCBV rather than filtering the
+    // whole bindings vector with a per-element `if (b.type != X) continue;`.
+    std::vector<uint32_t> m_idxSRV;        // BindingType::SRV
+    std::vector<uint32_t> m_idxTLAS;       // BindingType::TLAS
+    std::vector<uint32_t> m_idxUAV;        // BindingType::UAV
+    std::vector<uint32_t> m_idxCBV;        // BindingType::CBV
+    std::vector<uint32_t> m_idxRootSRV;    // BindingType::ROOT_SRV
+    std::vector<uint32_t> m_idxRootConst;  // BindingType::ROOT_CONSTANTS
+    std::vector<uint32_t> m_idxSRVArray;   // BindingType::SRV_ARRAY
+    std::vector<uint32_t> m_idxUAVArray;   // BindingType::UAV_ARRAY
+    bool                  m_categoriesBuilt = false;
+
+    // Cached SRV/UAV view descriptors, one entry per binding index.  The transient
+    // ring hands out a fresh heap slot every dispatch, so CreateView still runs each
+    // time, but the GetDesc() round-trip and view-desc derivation are skipped while
+    // the resolved resource and buffer view params (count/stride/format) are unchanged
+    // — the common case for the path tracer, which rebinds the same resources every frame.
+    struct CachedView
+    {
+        uint64_t res    = 0;     // resolved ID3D12Resource* the cached desc was built for
+        uint32_t count  = 0;
+        uint32_t stride = 0;
+        uint32_t format = 0;
+        bool     valid  = false;
+        union
+        {
+            D3D12_SHADER_RESOURCE_VIEW_DESC  srv;
+            D3D12_UNORDERED_ACCESS_VIEW_DESC uav;
+        };
+        CachedView() : srv{} {}
+    };
+    std::vector<CachedView> m_viewCache;
 
     static constexpr uint32_t kInvalidAlloc = UINT32_MAX;
 };

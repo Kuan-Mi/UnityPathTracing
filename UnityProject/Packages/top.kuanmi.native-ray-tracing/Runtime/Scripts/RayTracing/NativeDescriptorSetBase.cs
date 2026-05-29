@@ -44,6 +44,13 @@ namespace NativeRender
         protected NativeRenderPlugin.CS_BindingSlot[] _stagingSlots;
         protected byte[]                              _stagingConstants;
 
+        // Which slots have ever been bound as root-constants, and whether any have.
+        // Lets CopyStagingToRing skip the constants copy + objectPtr fix-up entirely
+        // for shaders that use no root-constants (the common case) and otherwise touch
+        // only the root-constant slots instead of scanning every slot.
+        protected bool[] _slotIsRootConst;
+        protected bool   _anyRootConst;
+
         // Pinned ring buffers for slots and root-constants — read by the render thread.
         protected NativeArray<NativeRenderPlugin.CS_BindingSlot>[] _slotRing;
         protected NativeArray<byte>[]                              _constantsRing;
@@ -62,6 +69,8 @@ namespace NativeRender
             int eff = _slotCount > 0 ? (int)_slotCount : 1;
             _stagingSlots     = new NativeRenderPlugin.CS_BindingSlot[eff];
             _stagingConstants = new byte[eff * MaxRootConstantBytes];
+            _slotIsRootConst  = new bool[eff];
+            _anyRootConst     = false;
         }
 
         protected void AllocateRingBuffersCommon()
@@ -103,26 +112,30 @@ namespace NativeRender
             int ring = _ringIdx % RingSize;
             _ringIdx++;
 
-            // Copy staging → pinned ring slot
+            // Blit staging → pinned ring slot in one shot (CS_BindingSlot is blittable).
             var slotArray = _slotRing[ring];
-            for (int k = 0; k < (int)_slotCount; k++)
-                slotArray[k] = _stagingSlots[k];
+            slotArray.CopyFrom(_stagingSlots);
 
-            // Copy root-constants staging data → pinned constants ring.
-            var constArray = _constantsRing[ring];
-            fixed (byte* src = _stagingConstants)
-                Buffer.MemoryCopy(src, constArray.GetUnsafePtr(),
-                    constArray.Length, _stagingConstants.Length);
-
-            // Fix up objectPtrs for root-constants slots to point into pinned memory.
-            byte* constBase = (byte*)constArray.GetUnsafePtr();
-            for (int k = 0; k < (int)_slotCount; k++)
+            // Root-constants are the only bindings whose payload lives in the constants
+            // ring; skip the whole copy + fix-up when the shader uses none.
+            if (_anyRootConst)
             {
-                if (slotArray[k].objectKind == ObjKindRootConstants)
+                // Copy root-constants staging data → pinned constants ring.
+                var constArray = _constantsRing[ring];
+                fixed (byte* src = _stagingConstants)
+                    Buffer.MemoryCopy(src, constArray.GetUnsafePtr(),
+                        constArray.Length, _stagingConstants.Length);
+
+                // Fix up objectPtrs for root-constants slots to point into pinned memory.
+                byte* constBase = (byte*)constArray.GetUnsafePtr();
+                for (int k = 0; k < (int)_slotCount; k++)
                 {
-                    var s = slotArray[k];
-                    s.objectPtr  = (ulong)(constBase + k * MaxRootConstantBytes);
-                    slotArray[k] = s;
+                    if (_slotIsRootConst[k] && slotArray[k].objectKind == ObjKindRootConstants)
+                    {
+                        var s = slotArray[k];
+                        s.objectPtr  = (ulong)(constBase + k * MaxRootConstantBytes);
+                        slotArray[k] = s;
+                    }
                 }
             }
 
@@ -379,6 +392,8 @@ namespace NativeRender
             _stagingSlots[i].count       = count32;
             _stagingSlots[i].stride      = destOffset32;
             _stagingSlots[i].objectKind  = ObjKindRootConstants;
+            _slotIsRootConst[i]          = true;
+            _anyRootConst                = true;
         }
 
         /// <summary>
@@ -403,6 +418,8 @@ namespace NativeRender
             _stagingSlots[i].count       = count32;
             _stagingSlots[i].stride      = destOffset32;
             _stagingSlots[i].objectKind  = ObjKindRootConstants;
+            _slotIsRootConst[i]          = true;
+            _anyRootConst                = true;
         }
 
         public abstract void Dispose();
