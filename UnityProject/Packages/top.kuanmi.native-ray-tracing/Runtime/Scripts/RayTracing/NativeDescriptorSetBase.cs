@@ -30,7 +30,7 @@ namespace NativeRender
         protected const uint ObjKindBindlessTexture    = 2;
         protected const uint ObjKindBindlessBuffer     = 3;
         protected const uint ObjKindRootConstants      = 4;
-        protected const uint ObjKindNativeBuffer       = 5; // unified plugin buffer (NativeBuffer / NativeGpuBuffer / NativeStructuredBuffer)
+        protected const uint ObjKindNativeBuffer       = 5; // unified plugin buffer (VolatileConstantBuffer / DeviceBuffer / UploadBuffer)
         protected const uint ObjKindBindlessUAVTexture = 6;
 
         // Native C++ descriptor-set handle.
@@ -175,23 +175,12 @@ namespace NativeRender
         }
 
 
-        public void SetRWTypedBuffer(string name, VolatileConstantBuffer volatileConstantBuffer, int count, uint dxgiFormat)
-        {
-            if (!TryGetSlot(name, out uint i)) return;
-            _stagingSlots[i].resourcePtr = 0;
-            _stagingSlots[i].objectPtr   = volatileConstantBuffer.Handle;
-            _stagingSlots[i].objectKind  = ObjKindNativeBuffer;
-            _stagingSlots[i].count       = (uint)count;
-            _stagingSlots[i].stride      = 0;
-            _stagingSlots[i].format      = dxgiFormat;
-        }
-
         /// <summary>Binds a <see cref="DeviceBuffer"/> as a typed RW buffer UAV (e.g. RWBuffer&lt;float2&gt;).</summary>
-        public void SetRWTypedBuffer(string name, DeviceBuffer gpuBuffer, int count, uint dxgiFormat)
+        public void SetRWTypedBuffer(string name, DeviceBuffer deviceBuffer, int count, uint dxgiFormat)
         {
             if (!TryGetSlot(name, out uint i)) return;
             _stagingSlots[i].resourcePtr = 0;
-            _stagingSlots[i].objectPtr   = gpuBuffer.Handle;
+            _stagingSlots[i].objectPtr   = deviceBuffer.Handle;
             _stagingSlots[i].objectKind  = ObjKindNativeBuffer;
             _stagingSlots[i].count       = (uint)count;
             _stagingSlots[i].stride      = 0;
@@ -254,17 +243,6 @@ namespace NativeRender
             _stagingSlots[i].stride      = 0;
         }
 
-        /// <summary>Binds a <see cref="VolatileConstantBuffer"/> as a constant buffer (CBV).</summary>
-        public void SetNativeBuffer(string name, VolatileConstantBuffer nb)
-        {
-            if (!TryGetSlot(name, out uint i)) return;
-            _stagingSlots[i].resourcePtr = 0;
-            _stagingSlots[i].objectPtr   = nb?.Handle ?? 0;
-            _stagingSlots[i].objectKind  = ObjKindNativeBuffer;
-            _stagingSlots[i].count       = 0;
-            _stagingSlots[i].stride      = 0;
-        }
-
         /// <summary>Binds a typed buffer SRV (e.g. Buffer&lt;float2&gt;) with explicit DXGI_FORMAT.</summary>
         public void SetTypedBuffer(string name, IntPtr bufferPtr, int count, uint dxgiFormat)
         {
@@ -276,23 +254,12 @@ namespace NativeRender
             _stagingSlots[i].format      = dxgiFormat;
         }
 
-        public void SetTypedBuffer(string name, VolatileConstantBuffer volatileConstantBuffer, int count, uint dxgiFormat)
-        {
-            if (!TryGetSlot(name, out uint i)) return;
-            _stagingSlots[i].resourcePtr = 0;
-            _stagingSlots[i].objectPtr   = volatileConstantBuffer.Handle;
-            _stagingSlots[i].objectKind  = ObjKindNativeBuffer;
-            _stagingSlots[i].count       = (uint)count;
-            _stagingSlots[i].stride      = 0;
-            _stagingSlots[i].format      = dxgiFormat;
-        }
-
         /// <summary>Binds a <see cref="DeviceBuffer"/> as a typed buffer SRV (e.g. Buffer&lt;float2&gt;).</summary>
-        public void SetTypedBuffer(string name, DeviceBuffer gpuBuffer, int count, uint dxgiFormat)
+        public void SetTypedBuffer(string name, DeviceBuffer deviceBuffer, int count, uint dxgiFormat)
         {
             if (!TryGetSlot(name, out uint i)) return;
             _stagingSlots[i].resourcePtr = 0;
-            _stagingSlots[i].objectPtr   = gpuBuffer.Handle;
+            _stagingSlots[i].objectPtr   = deviceBuffer.Handle;
             _stagingSlots[i].objectKind  = ObjKindNativeBuffer;
             _stagingSlots[i].count       = (uint)count;
             _stagingSlots[i].stride      = 0;

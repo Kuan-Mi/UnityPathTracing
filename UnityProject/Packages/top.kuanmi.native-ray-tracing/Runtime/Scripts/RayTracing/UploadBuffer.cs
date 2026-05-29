@@ -40,11 +40,11 @@ namespace NativeRender
             Whole,
         }
 
-        // Snapshot blob layout (must match NsbFlushHeader / NsbFlushRange in NativeStructuredBuffer.h).
+        // Snapshot blob layout (must match NsbFlushHeader / NsbFlushRange in NativeBuffer.h).
         private const int HeaderSize = 16; // uint64 handle + uint32 stride + uint32 rangeCount
         private const int RangeSize  = 12; // uint32 elementOffset + uint32 elementCount + uint32 payloadByteOffset
 
-        /// <summary>Opaque plugin handle (NativeStructuredBuffer*).</summary>
+        /// <summary>Opaque plugin handle (NativeBuffer*).</summary>
         public ulong Handle { get; private set; }
 
         /// <summary>Fixed element capacity of the underlying D3D12 buffer.</summary>
@@ -276,7 +276,7 @@ namespace NativeRender
             }
         }
 
-        // Readback request blob layout (must match NsbReadbackRequest in NativeStructuredBuffer.h).
+        // Readback request blob layout (must match NsbReadbackRequest in NativeBuffer.h).
         private const int ReadbackRequestSize = 24; // ulong handle + ulong srcByteOffset + ulong bytes
 
         /// <summary>

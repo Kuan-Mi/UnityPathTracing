@@ -30,14 +30,14 @@ namespace PathTracing
 
         // Structured buffers (donut-compatible)
         // t_InstanceData (t2): transforms are re-uploaded every frame, so this uses
-        // NativeStructuredBuffer — its NativePtr is stable across SetData (unlike
+        // UploadBuffer — its NativePtr is stable across SetData (unlike
         // GraphicsBuffer.GetNativeBufferPtr), so we fetch the pointer once at creation.
         private UploadBuffer _instanceGpuBuf;
         private GraphicsBuffer _geometryGpuBuf; // t_GeometryData  (t3)
 
         // RTXPT-specific structured buffers
         // t_SubInstanceData (t1): emissive-light mapping offsets are recomputed and re-uploaded
-        // every frame, so this uses NativeStructuredBuffer for a stable NativePtr (no per-frame
+        // every frame, so this uses UploadBuffer for a stable NativePtr (no per-frame
         // GetNativeBufferPtr re-fetch). SRV-only — never bound as a UAV.
         private UploadBuffer _subInstanceGpuBuf; // t_SubInstanceData    (t1)
         private GraphicsBuffer _ptMaterialGpuBuf; // t_PTMaterialData     (t5)

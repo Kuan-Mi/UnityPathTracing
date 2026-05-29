@@ -29,7 +29,7 @@ namespace NativeRender
                 sizeInBytes, 0u, 1u,
                 /*canHaveUAVs*/ 1u, /*isConstantBuffer*/ 0u, /*isVolatile*/ 0u);
             if (Handle == 0)
-                Debug.LogError("[NativeGpuBuffer] NR_CreateNativeBuffer failed.");
+                Debug.LogError("[DeviceBuffer] NR_CreateNativeBuffer failed.");
         }
 
         /// <summary>
