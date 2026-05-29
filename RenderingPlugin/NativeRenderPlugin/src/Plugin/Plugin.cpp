@@ -76,6 +76,10 @@ static constexpr uint32_t kTransientRingCapacity = 32768u;
 // DEFAULT-heap buffers; chunks are recycled once the frame fence completes.
 SharedUploadPool g_uploadPool;
 
+// Shared DEFAULT-heap UAV scratch pool (see PluginInternal.h). Transient build
+// scratch for acceleration-structure builds; recycled by the frame fence.
+SharedUploadPool g_scratchPool;
+
 // ---------------------------------------------------------------------------
 // Deferred delete queue — delays destruction of GPU-facing objects until the
 // GPU has finished executing all commands that may reference them.
@@ -356,6 +360,10 @@ static void UNITY_INTERFACE_API OnGraphicsDeviceEvent(UnityGfxDeviceEventType ev
             if (!g_uploadPool.Initialize(device))
                 NR_ERROR("SharedUploadPool initialization failed");
 
+            // Shared DEFAULT-heap UAV scratch pool for acceleration-structure builds.
+            if (!g_scratchPool.Initialize(device, (4ull << 20), /*isScratch*/ true))
+                NR_ERROR("Scratch SharedUploadPool initialization failed");
+
             // 1-slot CPU-only heap used by ClearNativeGpuBufferCallback
             {
                 D3D12_DESCRIPTOR_HEAP_DESC hd = {};
@@ -396,6 +404,7 @@ static void UNITY_INTERFACE_API OnGraphicsDeviceEvent(UnityGfxDeviceEventType ev
 
         g_transientRing.Shutdown();
         g_uploadPool.Shutdown();
+        g_scratchPool.Shutdown();
         s_DescHeap.Shutdown();
         s_ClearCpuHeap.Reset();
         s_RendererReady = false;
@@ -994,6 +1003,10 @@ static void UNITY_INTERFACE_API FrameTickCallback(int /*eventId*/)
         // Recycle shared upload chunks under the same frame-fence discipline.
         if (g_uploadPool.IsInitialized())
             g_uploadPool.EndFrame(frameFence, completedValue);
+
+        // Recycle acceleration-structure build scratch under the same discipline.
+        if (g_scratchPool.IsInitialized())
+            g_scratchPool.EndFrame(frameFence, completedValue);
     }
 }
 

@@ -62,3 +62,12 @@ extern TransientDescriptorRing g_transientRing;
 //   init; chunks are reclaimed by the frame fence at each NR_FrameTick.
 // ---------------------------------------------------------------------------
 extern SharedUploadPool g_uploadPool;
+
+// ---------------------------------------------------------------------------
+// g_scratchPool
+//   Shared DEFAULT-heap, UAV-capable scratch pool used as transient build scratch
+//   for all D3D12 acceleration-structure builds (BLAS, OMM array, TLAS). The
+//   scratch-mode counterpart of g_uploadPool — modelled on nvrhi's m_DxrScratchManager.
+//   Chunks are reclaimed by the frame fence at each NR_FrameTick.
+// ---------------------------------------------------------------------------
+extern SharedUploadPool g_scratchPool;

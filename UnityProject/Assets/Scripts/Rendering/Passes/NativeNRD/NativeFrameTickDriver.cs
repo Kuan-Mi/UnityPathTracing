@@ -57,14 +57,14 @@ namespace PathTracing
             // Graphics.ExecuteCommandBuffer queues the event onto the render thread
             // after the frame's submitted work — matching the GPU-flush pattern used
             // elsewhere and avoiding a second context.Submit().
-            Graphics.ExecuteCommandBuffer(_cmd); 
+            Graphics.ExecuteCommandBuffer(_cmd);
             // Debug.Log($"NativeFrameTickDriver issued frame tick event for {Time.frameCount}");
         }
 
         private static void Shutdown()
         {
             RenderPipelineManager.endContextRendering -= OnEndContextRendering;
-            Application.quitting -= Shutdown;
+            Application.quitting                      -= Shutdown;
             _cmd?.Release();
             _cmd = null;
             // Debug.Log("NativeFrameTickDriver shutdown and unsubscribed from RenderPipelineManager.endContextRendering");

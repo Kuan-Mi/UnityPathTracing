@@ -158,7 +158,8 @@ struct MeshKeyHash
 struct BLASEntry
 {
     ComPtr<ID3D12Resource> blas;
-    ComPtr<ID3D12Resource> blasScratch;
+    // Build scratch is transient and suballocated from g_scratchPool per build
+    // (including dynamic PERFORM_UPDATE refits), so it is not retained here.
 
     // Built OMM Array AS (consumed by the BLAS build and at trace time) — must
     // outlive the BLAS. The OMM-array build scratch and the raw array/desc input
@@ -307,18 +308,6 @@ private:
     // TLAS helpers
     bool BuildTLAS(ID3D12GraphicsCommandList4* cmdList, const std::vector<TLASInstanceEntry>& entries);
 
-    // TLAS per-frame double-buffer slot
-    struct TLASFrameResources
-    {
-        ComPtr<ID3D12Resource> instanceDesc;
-        void*                  mappedInstanceDesc   = nullptr;
-        ComPtr<ID3D12Resource> tlas;
-        ComPtr<ID3D12Resource> tlasScratch;
-        uint32_t               instanceDescCapacity = 0;   // instances that fit in instanceDesc
-        UINT64                 tlasResultCapacity   = 0;   // bytes allocated for tlas
-        UINT64                 tlasScratchCapacity  = 0;   // bytes allocated for tlasScratch
-    };
-
     // -----------------------------------------------------------------------
     // Members
     // -----------------------------------------------------------------------
@@ -333,8 +322,14 @@ private:
     std::vector<PendingCompaction> m_pendingCompactions;
     uint32_t m_frameCounter = 0;
 
-    // TLAS triple-buffered resources (indexed by g_frameIndex)
-    TLASFrameResources     m_tlasResources[3];
+    // Single persistent TLAS rebuilt in place each frame (nvrhi model). Serialized
+    // against the previous frame's traversal reads by a UAV barrier in BuildTLAS.
+    // Scratch and instance-desc upload come from g_scratchPool / g_uploadPool.
+    ComPtr<ID3D12Resource> m_tlas;
+    UINT64                 m_tlasResultCapacity = 0; // bytes allocated for m_tlas
+    // Reused CPU-side staging array for instance descriptors (built then uploaded
+    // through g_uploadPool), avoiding a slow per-instance write over PCIe.
+    std::vector<D3D12_RAYTRACING_INSTANCE_DESC> m_dxrInstances;
 
     // Slot system
     std::vector<InstanceSlot>              m_slots;

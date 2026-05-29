@@ -9,11 +9,12 @@ namespace
     }
 }
 
-bool SharedUploadPool::Initialize(ID3D12Device* device, uint64_t defaultChunkSize)
+bool SharedUploadPool::Initialize(ID3D12Device* device, uint64_t defaultChunkSize, bool isScratch)
 {
     if (!device || defaultChunkSize == 0) return false;
     m_device           = device;
     m_defaultChunkSize = defaultChunkSize;
+    m_isScratch        = isScratch;
     m_current          = nullptr;
     m_usedThisFrame.clear();
     m_chunks.clear();
@@ -42,7 +43,7 @@ SharedUploadPool::Chunk* SharedUploadPool::CreateChunk(uint64_t size)
     auto chunk = std::make_unique<Chunk>();
 
     D3D12_HEAP_PROPERTIES heapProps = {};
-    heapProps.Type = D3D12_HEAP_TYPE_UPLOAD;
+    heapProps.Type = m_isScratch ? D3D12_HEAP_TYPE_DEFAULT : D3D12_HEAP_TYPE_UPLOAD;
 
     D3D12_RESOURCE_DESC desc = {};
     desc.Dimension        = D3D12_RESOURCE_DIMENSION_BUFFER;
@@ -52,30 +53,38 @@ SharedUploadPool::Chunk* SharedUploadPool::CreateChunk(uint64_t size)
     desc.MipLevels        = 1;
     desc.SampleDesc.Count = 1;
     desc.Layout           = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
-    desc.Flags            = D3D12_RESOURCE_FLAG_NONE;
+    desc.Flags            = m_isScratch ? D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS
+                                        : D3D12_RESOURCE_FLAG_NONE;
 
+    // Scratch chunks live on the GPU (DEFAULT) and start in COMMON; upload chunks
+    // are CPU-visible (UPLOAD) and fixed in GENERIC_READ.
     HRESULT hr = m_device->CreateCommittedResource(
         &heapProps,
         D3D12_HEAP_FLAG_NONE,
         &desc,
-        D3D12_RESOURCE_STATE_GENERIC_READ,
+        m_isScratch ? D3D12_RESOURCE_STATE_COMMON : D3D12_RESOURCE_STATE_GENERIC_READ,
         nullptr,
         IID_PPV_ARGS(&chunk->buffer));
     if (FAILED(hr)) return nullptr;
 
-    const D3D12_RANGE readRange = { 0, 0 };
-    void* mapped = nullptr;
-    hr = chunk->buffer->Map(0, &readRange, &mapped);
-    if (FAILED(hr)) return nullptr;
+    if (!m_isScratch)
+    {
+        const D3D12_RANGE readRange = { 0, 0 };
+        void* mapped = nullptr;
+        hr = chunk->buffer->Map(0, &readRange, &mapped);
+        if (FAILED(hr)) return nullptr;
+        chunk->cpu = static_cast<uint8_t*>(mapped);
+    }
 
-    chunk->cpu          = static_cast<uint8_t*>(mapped);
+    chunk->gpu          = chunk->buffer->GetGPUVirtualAddress();
     chunk->size         = size;
     chunk->writePointer = 0;
     chunk->fence        = kInFlightUnknown; // becomes current immediately
 
     // Name the chunk so PIX captures and debug-layer messages are readable.
     wchar_t name[64];
-    swprintf_s(name, L"NSB Upload Chunk %u (%llu B)",
+    swprintf_s(name, L"NSB %s Chunk %u (%llu B)",
+               m_isScratch ? L"Scratch" : L"Upload",
                m_nextChunkId++, static_cast<unsigned long long>(size));
     chunk->buffer->SetName(name);
 
@@ -98,7 +107,9 @@ SharedUploadPool::Allocation SharedUploadPool::Allocate(uint64_t size, uint64_t 
         if (offset + size <= m_current->size)
         {
             m_current->writePointer = offset + size;
-            return { m_current->buffer.Get(), offset, m_current->cpu + offset };
+            return { m_current->buffer.Get(), offset,
+                     m_current->cpu ? m_current->cpu + offset : nullptr,
+                     m_current->gpu + offset };
         }
 
         // Full — retire it; it will be stamped with this frame's fence at EndFrame.
@@ -128,7 +139,9 @@ SharedUploadPool::Allocation SharedUploadPool::Allocate(uint64_t size, uint64_t 
 
     const uint64_t offset = 0; // fresh chunk
     m_current->writePointer = size;
-    return { m_current->buffer.Get(), offset, m_current->cpu + offset };
+    return { m_current->buffer.Get(), offset,
+             m_current->cpu ? m_current->cpu + offset : nullptr,
+             m_current->gpu + offset };
 }
 
 void SharedUploadPool::EndFrame(uint64_t frameCompleteFence, uint64_t completedFence)
