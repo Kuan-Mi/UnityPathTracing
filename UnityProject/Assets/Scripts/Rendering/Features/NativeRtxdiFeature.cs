@@ -131,8 +131,6 @@ namespace PathTracing
         private NativeRtxdiPTComputeDuplicationMapPass  _ptComputeDuplicationMapPass;
         private NativeRtxdiPTFinalShadingPass           _ptFinalShadingPass;
 
-        private NativeFrameTick _nativeFrameTickPass;
-
         // Denoising: gradient filter + confidence (mirror FullSample FilterGradientsPass + ConfidencePass)
         private NativeRtxdiFilterGradientsPass   _filterGradientsPass;
         private NativeRtxdiConfidencePass        _confidencePass;
@@ -223,7 +221,6 @@ namespace PathTracing
             _ptFillSampleIDPass           ??= new NativeRtxdiPTFillSampleIDPass(ptFillSampleIDCs, ptFillSampleIDRs) { renderPassEvent                               = renderPassEvent };
             _ptComputeDuplicationMapPass  ??= new NativeRtxdiPTComputeDuplicationMapPass(ptComputeDuplicationMapCs) { renderPassEvent                               = renderPassEvent };
             _ptFinalShadingPass           ??= new NativeRtxdiPTFinalShadingPass(ptFinalShadingCs, ptFinalShadingRs) { renderPassEvent                               = renderPassEvent };
-            _nativeFrameTickPass          ??= new NativeFrameTick { renderPassEvent                                                                                 = renderPassEvent, };
             _filterGradientsPass          ??= new NativeRtxdiFilterGradientsPass(filterGradientsPassCs) { renderPassEvent                                           = renderPassEvent };
             _confidencePass               ??= new NativeRtxdiConfidencePass(confidencePassCs) { renderPassEvent                                                     = renderPassEvent };
             _gradientArrayTestPass        ??= new NativeRtxdiGradientArrayTestPass(gradientArrayTestCs) { renderPassEvent                                           = renderPassEvent };
@@ -886,16 +883,6 @@ namespace PathTracing
                 _outputBlitPass.Setup(outputBlitResource, outputBlitSettings);
                 renderer.EnqueuePass(_outputBlitPass);
             }
-
-            if (renderingData.cameraData.xr.enabled)
-            {
-                if (setting.skipRightEyeInVR || eyeIndex == 1)
-                    renderer.EnqueuePass(_nativeFrameTickPass);
-            }
-            else
-            {
-                renderer.EnqueuePass(_nativeFrameTickPass);
-            }
         }
 
         private static RTXDI_PTParameters BuildRestirPtParams(ImportanceSamplingContext isContext)
@@ -1046,7 +1033,6 @@ namespace PathTracing
             _dlssrPass = null;
             _pdfMipsPass?.Dispose();
             _pdfMipsPass         = null;
-            _nativeFrameTickPass = null;
         }
 
         // -------------------------------------------------------------------

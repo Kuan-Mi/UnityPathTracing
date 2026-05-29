@@ -107,7 +107,6 @@ namespace PathTracing
         private NativeRtxptAccumulationPass           _accumulationPass;
         private NativeRtxptStablePlanesDebugVizPass   _stablePlanesDebugVizPass;
         private NativeRtxptOutputBlitPass             _outputBlitPass;
-        private NativeFrameTick                       _nativeFrameTickPass;
 
         // ---- Shared scene resources -----------------------------------------
         private NativeRtxptGPUScene _gpuScene;
@@ -176,7 +175,6 @@ namespace PathTracing
             _accumulationPass         ??= new NativeRtxptAccumulationPass(accumulationCs) { renderPassEvent                 = renderPassEvent };
             _stablePlanesDebugVizPass ??= new NativeRtxptStablePlanesDebugVizPass(stablePlanesDebugVizCs) { renderPassEvent = renderPassEvent };
             _outputBlitPass           ??= new NativeRtxptOutputBlitPass(outputBlitMaterial) { renderPassEvent               = renderPassEvent };
-            _nativeFrameTickPass      ??= new NativeFrameTick { renderPassEvent                                             = renderPassEvent };
         }
 
         public override void AddRenderPasses(ScriptableRenderer renderer, ref RenderingData renderingData)
@@ -374,9 +372,6 @@ namespace PathTracing
                 _outputBlitPass.Setup(texPool, setting.showMode, 1.0f, setting.debugViewType);
                 renderer.EnqueuePass(_outputBlitPass);
             }
-
-            // ---- Frame tick ------------------------------------------------
-            renderer.EnqueuePass(_nativeFrameTickPass);
         }
 
         // ---- Helpers -------------------------------------------------------

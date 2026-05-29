@@ -76,7 +76,6 @@ namespace PathTracing
         private DlssSRPass              _dlsssrPass;
         private NisPass                 _nisPass;
         private NativeNrdOutputBlitPass _outputBlitPass;
-        private NativeFrameTick         _nativeFrameTickPass;
         private NativeToneMappingPass   _toneMappingPass;
 
         private NRDSampleResource _nrdSampleResource;
@@ -157,7 +156,6 @@ namespace PathTracing
             _dlsssrPass              ??= new DlssSRPass { renderPassEvent                                                                          = renderPassEvent };
             _nisPass                 ??= new NisPass { renderPassEvent                                                                             = renderPassEvent };
             _outputBlitPass          ??= new NativeNrdOutputBlitPass(finalMaterial) { renderPassEvent                                              = renderPassEvent };
-            _nativeFrameTickPass     ??= new NativeFrameTick { renderPassEvent                                                                     = renderPassEvent };
             _depthBarrierFixPass     ??= new DepthBarrierFixPass { renderPassEvent                                                                 = RenderPassEvent.AfterRendering };
             _toneMappingPass         ??= new NativeToneMappingPass(toneMappingHistogramCs, toneMappingExposureCs, toneMappingCs) { renderPassEvent = renderPassEvent };
         }
@@ -757,16 +755,6 @@ namespace PathTracing
                 renderer.EnqueuePass(_outputBlitPass);
 
                 renderer.EnqueuePass(_depthBarrierFixPass);
-
-                if (renderingData.cameraData.xr.enabled)
-                {
-                    if (setting.skipRightEyeInVR || eyeIndex == 1)
-                        renderer.EnqueuePass(_nativeFrameTickPass);
-                }
-                else
-                {
-                    renderer.EnqueuePass(_nativeFrameTickPass);
-                }
             }
         }
 
@@ -868,7 +856,6 @@ namespace PathTracing
             _dlsssrPass          = null;
             _nisPass             = null;
             _outputBlitPass      = null;
-            _nativeFrameTickPass = null;
             _depthBarrierFixPass = null;
             _toneMappingPass     = null;
 
