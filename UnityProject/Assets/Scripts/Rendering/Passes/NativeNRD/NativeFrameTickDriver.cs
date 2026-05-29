@@ -30,7 +30,26 @@ namespace PathTracing
         // old pass which ran whenever a feature's AddRenderPasses executed. Without
         // this the native deferred-delete queue would not drain outside play mode.
         [UnityEditor.InitializeOnLoadMethod]
-        private static void InitializeEditor() => Initialize();
+        private static void InitializeEditor()
+        {
+            Initialize();
+
+            // Exiting Play mode raises Application.quitting (-> Shutdown). With
+            // "Reload Domain" disabled no domain reload follows, so neither
+            // InitializeOnLoadMethod nor RuntimeInitializeOnLoadMethod re-runs and the
+            // edit-mode tick stays dead. Re-initialize explicitly when we return to
+            // Edit mode, and do the real teardown only on actual editor quit.
+            UnityEditor.EditorApplication.playModeStateChanged -= OnPlayModeStateChanged;
+            UnityEditor.EditorApplication.playModeStateChanged += OnPlayModeStateChanged;
+            UnityEditor.EditorApplication.quitting             -= Shutdown;
+            UnityEditor.EditorApplication.quitting             += Shutdown;
+        }
+
+        private static void OnPlayModeStateChanged(UnityEditor.PlayModeStateChange state)
+        {
+            if (state == UnityEditor.PlayModeStateChange.EnteredEditMode)
+                Initialize();
+        }
 #endif
 
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
@@ -43,9 +62,15 @@ namespace PathTracing
             RenderPipelineManager.endContextRendering -= OnEndContextRendering;
             RenderPipelineManager.endContextRendering += OnEndContextRendering;
 
+#if !UNITY_EDITOR
+            // In a player, Application.quitting is the genuine end-of-process signal.
+            // In the editor it also fires on Play-mode exit, which must NOT tear down
+            // the edit-mode tick driver — that is handled via playModeStateChanged /
+            // EditorApplication.quitting in InitializeEditor instead.
             Application.quitting -= Shutdown;
             Application.quitting += Shutdown;
-            // Debug.Log("NativeFrameTickDriver initialized and subscribed to RenderPipelineManager.endContextRendering");
+#endif
+            Debug.Log("NativeFrameTickDriver initialized and subscribed to RenderPipelineManager.endContextRendering");
         }
 
         private static void OnEndContextRendering(ScriptableRenderContext context, List<Camera> cameras)
@@ -67,7 +92,7 @@ namespace PathTracing
             Application.quitting                      -= Shutdown;
             _cmd?.Release();
             _cmd = null;
-            // Debug.Log("NativeFrameTickDriver shutdown and unsubscribed from RenderPipelineManager.endContextRendering");
+            Debug.Log("NativeFrameTickDriver shutdown and unsubscribed from RenderPipelineManager.endContextRendering");
         }
     }
 }
