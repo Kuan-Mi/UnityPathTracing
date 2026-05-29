@@ -110,6 +110,13 @@ struct MeshInfo
     // NOTE: These are Unity-managed resources. We store raw pointers without AddRef
     // because Unity controls their lifetime. Using ComPtr would interfere with Unity's
     // resource management and cause premature or delayed deletion.
+    //
+    // LIFETIME INVARIANT: a BLAS build records GPU reads of these buffers that may
+    // still be in flight for up to kGlobalNumFrames after the command list is
+    // submitted. The caller MUST keep the underlying Unity mesh resources alive for
+    // at least that many frames after RemoveInstance(); destroying the mesh in the
+    // same frame it is removed is a use-after-free. (We cannot enforce this here
+    // because we intentionally do not hold a reference.)
     ID3D12Resource* vertexBuffer = nullptr;
     UINT vertexCount;
     UINT vertexStride;
@@ -153,11 +160,12 @@ struct BLASEntry
     ComPtr<ID3D12Resource> blas;
     ComPtr<ID3D12Resource> blasScratch;
 
+    // Built OMM Array AS (consumed by the BLAS build and at trace time) — must
+    // outlive the BLAS. The OMM-array build scratch and the raw array/desc input
+    // blobs are transient: they are deferred-released inside BuildOMMForSubmesh
+    // right after the build is recorded, so they are not retained here.
     std::vector<ComPtr<ID3D12Resource>> ommArrays;
-    std::vector<ComPtr<ID3D12Resource>> ommArrayScratch;
-    std::vector<ComPtr<ID3D12Resource>> ommIndexBuffers;
-    std::vector<ComPtr<ID3D12Resource>> ommDescArrayBuffers;
-    std::vector<ComPtr<ID3D12Resource>> ommArrayDataBuffers;
+    std::vector<ComPtr<ID3D12Resource>> ommIndexBuffers;   // DEFAULT-heap, referenced by OMM linkage at trace time
     std::vector<DXGI_FORMAT>            ommIndexFormats;
     std::vector<UINT>                   ommIndexStrides;
 
@@ -333,6 +341,8 @@ private:
     std::vector<uint32_t>                  m_freeSlots;
     std::unordered_map<uint32_t, uint32_t> m_handleToSlot;
     uint32_t m_activeCount = 0;
+    // Number of active instances that carry baked OMM data; backs HasAnyOMM() in O(1).
+    uint32_t m_ommInstanceCount = 0;
 
     std::vector<TLASInstanceEntry> m_tlasEntries;
 

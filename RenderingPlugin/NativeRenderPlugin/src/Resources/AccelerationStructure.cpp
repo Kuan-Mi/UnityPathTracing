@@ -157,22 +157,40 @@ bool AccelerationStructure::BuildOMMForSubmesh(ID3D12GraphicsCommandList4 *cmdLi
     }
     descArrayBuf->Unmap(0, nullptr);
 
-    // 3. Upload OMM index buffer
+    // 3. OMM index buffer: lives in a DEFAULT heap because it is referenced by the
+    //    BLAS OMM linkage both during the BLAS build and at ray-traversal time, so
+    //    it must persist and be fast to read on the GPU. Stage through UPLOAD, copy
+    //    into DEFAULT, then transition to NON_PIXEL_SHADER_RESOURCE (AS build input).
     UINT ommIdxBytes = baked.indexCount * baked.indexStride;
+    auto ommIdxStaging = CreateBuffer(m_device.Get(),
+                                      ommIdxBytes ? ommIdxBytes : 1,
+                                      D3D12_RESOURCE_FLAG_NONE, D3D12_RESOURCE_STATE_GENERIC_READ, uploadHeap,
+                                      L"OMM_IndexUpload");
     auto ommIdxBuf = CreateBuffer(m_device.Get(),
                                   ommIdxBytes ? ommIdxBytes : 1,
-                                  D3D12_RESOURCE_FLAG_NONE, D3D12_RESOURCE_STATE_GENERIC_READ, uploadHeap,
+                                  D3D12_RESOURCE_FLAG_NONE, D3D12_RESOURCE_STATE_COPY_DEST, defaultHeap,
                                   L"OMM_IndexBuffer");
-    if (!ommIdxBuf)
+    if (!ommIdxStaging || !ommIdxBuf)
     {
         AccelLogf(m_log, kUnityLogTypeError,
                   "[OMM] BuildOMMForSubmesh[%zu]: OMM index buf alloc failed", subIdx);
         return false;
     }
-    ommIdxBuf->Map(0, nullptr, &mapped);
+    ommIdxStaging->Map(0, nullptr, &mapped);
     if (ommIdxBytes)
         memcpy(mapped, baked.indexBuffer.data(), ommIdxBytes);
-    ommIdxBuf->Unmap(0, nullptr);
+    ommIdxStaging->Unmap(0, nullptr);
+    cmdList->CopyBufferRegion(ommIdxBuf.Get(), 0, ommIdxStaging.Get(), 0, ommIdxBytes ? ommIdxBytes : 1);
+    {
+        D3D12_RESOURCE_BARRIER idxBarrier = {};
+        idxBarrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
+        idxBarrier.Transition.pResource   = ommIdxBuf.Get();
+        idxBarrier.Transition.StateBefore = D3D12_RESOURCE_STATE_COPY_DEST;
+        idxBarrier.Transition.StateAfter  = D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE;
+        idxBarrier.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
+        cmdList->ResourceBarrier(1, &idxBarrier);
+    }
+    SafeReleaseResource(std::move(ommIdxStaging)); // transient; GPU-safe deferred release
 
     // 4. Build OMM Array AS
     D3D12_RAYTRACING_OPACITY_MICROMAP_ARRAY_DESC ommArrayDesc = {};
@@ -192,16 +210,18 @@ bool AccelerationStructure::BuildOMMForSubmesh(ID3D12GraphicsCommandList4 *cmdLi
     D3D12_RAYTRACING_ACCELERATION_STRUCTURE_PREBUILD_INFO prebuildInfo = {};
     m_device->GetRaytracingAccelerationStructurePrebuildInfo(&ommInputs, &prebuildInfo);
 
-    entry.ommArrayScratch[subIdx] = CreateBuffer(m_device.Get(),
-                                                 prebuildInfo.ScratchDataSizeInBytes,
-                                                 D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_COMMON, defaultHeap,
-                                                 L"OMM_ArrayScratch");
+    // OMM-array build scratch is transient — only consumed by the build command
+    // recorded just below, so it is a local and deferred-released afterwards.
+    auto ommArrayScratch = CreateBuffer(m_device.Get(),
+                                        prebuildInfo.ScratchDataSizeInBytes,
+                                        D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_COMMON, defaultHeap,
+                                        L"OMM_ArrayScratch");
     entry.ommArrays[subIdx] = CreateBuffer(m_device.Get(),
                                            prebuildInfo.ResultDataMaxSizeInBytes,
                                            D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS,
                                            D3D12_RESOURCE_STATE_RAYTRACING_ACCELERATION_STRUCTURE, defaultHeap,
                                            L"OMM_Array");
-    if (!entry.ommArrayScratch[subIdx] || !entry.ommArrays[subIdx])
+    if (!ommArrayScratch || !entry.ommArrays[subIdx])
     {
         AccelLogf(m_log, kUnityLogTypeError,
                   "[OMM] BuildOMMForSubmesh[%zu]: OMM array buf alloc failed", subIdx);
@@ -211,7 +231,7 @@ bool AccelerationStructure::BuildOMMForSubmesh(ID3D12GraphicsCommandList4 *cmdLi
     D3D12_BUILD_RAYTRACING_ACCELERATION_STRUCTURE_DESC buildDesc = {};
     buildDesc.DestAccelerationStructureData = entry.ommArrays[subIdx]->GetGPUVirtualAddress();
     buildDesc.Inputs = ommInputs;
-    buildDesc.ScratchAccelerationStructureData = entry.ommArrayScratch[subIdx]->GetGPUVirtualAddress();
+    buildDesc.ScratchAccelerationStructureData = ommArrayScratch->GetGPUVirtualAddress();
     cmdList->BuildRaytracingAccelerationStructure(&buildDesc, 0, nullptr);
 
     D3D12_RESOURCE_BARRIER barrier = {};
@@ -219,11 +239,18 @@ bool AccelerationStructure::BuildOMMForSubmesh(ID3D12GraphicsCommandList4 *cmdLi
     barrier.UAV.pResource = entry.ommArrays[subIdx].Get();
     cmdList->ResourceBarrier(1, &barrier);
 
+    // Persist only the built OMM Array AS and its index buffer; the index format/stride
+    // are needed to wire up the OMM linkage in EnsureBLAS.
     entry.ommIndexBuffers[subIdx] = std::move(ommIdxBuf);
-    entry.ommDescArrayBuffers[subIdx] = std::move(descArrayBuf);
-    entry.ommArrayDataBuffers[subIdx] = std::move(arrayDataBuf);
     entry.ommIndexFormats[subIdx] = baked.indexFormat;
     entry.ommIndexStrides[subIdx] = baked.indexStride;
+
+    // The OMM-array build scratch and the raw array/desc input blobs are dead once
+    // the build above has executed on the GPU. Defer-release them (GPU-safe) instead
+    // of retaining them for the lifetime of the BLAS.
+    SafeReleaseResource(std::move(ommArrayScratch));
+    SafeReleaseResource(std::move(descArrayBuf));
+    SafeReleaseResource(std::move(arrayDataBuf));
 
     AccelLogf(m_log, kUnityLogTypeLog,
               "[OMM] BuildOMMForSubmesh[%zu]: OMM Array AS recorded on cmdlist", subIdx);
@@ -276,7 +303,12 @@ bool AccelerationStructure::EnsureBLAS(ID3D12GraphicsCommandList4 *cmdList, Inst
     // Fast update path: reuse existing dynamic BLAS/Scratch with PERFORM_UPDATE.
     // Topology (indices, OMM) is unchanged; only vertex positions change each frame.
     // ---------------------------------------------------------------------------
-    if (isDynamic && slot.dynamicBlas)
+    // Only take the in-place update path when the cached dynamic BLAS has the same
+    // geometry count as the current submesh layout. A skinned mesh normally keeps a
+    // fixed topology (only vertex positions change), but if the submesh count ever
+    // changes the cached BLAS/scratch sizes no longer apply — fall through to a full
+    // rebuild below (the stale BLAS is deferred-released before being replaced).
+    if (isDynamic && slot.dynamicBlas && slot.dynamicBlas->ommArrays.size() == subCount)
     {
         BLASEntry &existing = *slot.dynamicBlas;
         std::vector<D3D12_RAYTRACING_GEOMETRY_DESC>                  upGeomDescs(subCount);
@@ -339,6 +371,7 @@ bool AccelerationStructure::EnsureBLAS(ID3D12GraphicsCommandList4 *cmdList, Inst
 
         D3D12_RAYTRACING_ACCELERATION_STRUCTURE_BUILD_FLAGS upFlags =
             D3D12_RAYTRACING_ACCELERATION_STRUCTURE_BUILD_FLAG_ALLOW_UPDATE |
+            D3D12_RAYTRACING_ACCELERATION_STRUCTURE_BUILD_FLAG_PREFER_FAST_BUILD |
             D3D12_RAYTRACING_ACCELERATION_STRUCTURE_BUILD_FLAG_PERFORM_UPDATE;
         if (existing.anyOMM)
             upFlags |= D3D12_RAYTRACING_ACCELERATION_STRUCTURE_BUILD_FLAG_ALLOW_DISABLE_OMMS;
@@ -362,10 +395,7 @@ bool AccelerationStructure::EnsureBLAS(ID3D12GraphicsCommandList4 *cmdList, Inst
     }
 
     blas.ommArrays.resize(subCount);
-    blas.ommArrayScratch.resize(subCount);
     blas.ommIndexBuffers.resize(subCount);
-    blas.ommDescArrayBuffers.resize(subCount);
-    blas.ommArrayDataBuffers.resize(subCount);
     blas.ommIndexFormats.resize(subCount, DXGI_FORMAT_R16_UINT);
     blas.ommIndexStrides.resize(subCount, 2);
 
@@ -446,11 +476,14 @@ bool AccelerationStructure::EnsureBLAS(ID3D12GraphicsCommandList4 *cmdList, Inst
 
     D3D12_RAYTRACING_ACCELERATION_STRUCTURE_BUILD_FLAGS blasFlags;
 
-    // Dynamic BLAS (SkinnedMesh): rebuilt every frame, use ALLOW_UPDATE for efficient updates
-    // Static BLAS: built once, use PREFER_FAST_TRACE for optimal ray tracing performance
+    // Dynamic BLAS (SkinnedMesh): refit every frame — ALLOW_UPDATE for in-place refits
+    // plus PREFER_FAST_BUILD since build/refit cost dominates over traversal cost.
+    // Static BLAS: built once, use PREFER_FAST_TRACE for optimal ray tracing performance.
+    // (The initial build flags must stay consistent with the PERFORM_UPDATE flags above.)
     if (isDynamic)
     {
-        blasFlags = D3D12_RAYTRACING_ACCELERATION_STRUCTURE_BUILD_FLAG_ALLOW_UPDATE;
+        blasFlags = D3D12_RAYTRACING_ACCELERATION_STRUCTURE_BUILD_FLAG_ALLOW_UPDATE |
+                    D3D12_RAYTRACING_ACCELERATION_STRUCTURE_BUILD_FLAG_PREFER_FAST_BUILD;
     }
     else
     {
@@ -517,6 +550,11 @@ bool AccelerationStructure::EnsureBLAS(ID3D12GraphicsCommandList4 *cmdList, Inst
 
     slot.blasVA = blas.blas->GetGPUVirtualAddress();
     if(isDynamic){
+        // If a stale dynamic BLAS is being replaced (e.g. submesh count changed, so the
+        // update fast-path was skipped above), defer-delete it — the GPU may still be
+        // reading it for the next 1-3 frames.
+        if (slot.dynamicBlas)
+            EnqueueDeferredDelete(slot.dynamicBlas.release(), DeferredType::AccelStructBlas);
         // Store the BLASEntry in the slot so it can be reused (via PERFORM_UPDATE) next frame.
         // Ownership transfers here; ReleaseBLAS/RemoveInstance will defer-delete it when the
         // instance is destroyed.
@@ -604,20 +642,13 @@ void AccelerationStructure::ReleaseBLAS(const MeshKey &key)
     
     BLASEntry &e = it->second;
     SafeReleaseResource(std::move(e.blas));
-    // e.blasScratch was already moved to pending delete at build time
+    // e.blasScratch was already moved to pending delete at build time.
+    // OMM-array build scratch and array/desc input blobs were already deferred-released
+    // in BuildOMMForSubmesh; only the built OMM Array AS and its index buffer remain.
     for (auto &r : e.ommArrays)
         if (r)
             SafeReleaseResource(std::move(r));
-    for (auto &r : e.ommArrayScratch)
-        if (r)
-            SafeReleaseResource(std::move(r));
     for (auto &r : e.ommIndexBuffers)
-        if (r)
-            SafeReleaseResource(std::move(r));
-    for (auto &r : e.ommDescArrayBuffers)
-        if (r)
-            SafeReleaseResource(std::move(r));
-    for (auto &r : e.ommArrayDataBuffers)
         if (r)
             SafeReleaseResource(std::move(r));
     m_blasCache.erase(it);
@@ -735,16 +766,10 @@ ID3D12Resource* AccelerationStructure::GetTLAS() const
 
 bool AccelerationStructure::HasAnyOMM() const
 {
-    for (const auto &kv : m_blasCache)
-        if (kv.second.anyOMM)
-            return true;
-    // Also check pending slots not yet built
-    for (const auto &slot : m_slots)
-        if (slot.active)
-            for (const auto &sub : slot.meshInfo.submeshes)
-                if (sub.hasBakedOMM)
-                    return true;
-    return false;
+    // O(1): m_ommInstanceCount tracks active instances that were given baked OMM data
+    // (covers both already-built and pending BLASes). Maintained in AddInstance /
+    // RemoveInstance / Clear.
+    return m_ommInstanceCount > 0;
 }
 
 // ---------------------------------------------------------------------------
@@ -1054,16 +1079,7 @@ void AccelerationStructure::Clear()
             for (auto &r : e.ommArrays)
                 if (r)
                     SafeReleaseResource(std::move(r));
-            for (auto &r : e.ommArrayScratch)
-                if (r)
-                    SafeReleaseResource(std::move(r));
             for (auto &r : e.ommIndexBuffers)
-                if (r)
-                    SafeReleaseResource(std::move(r));
-            for (auto &r : e.ommDescArrayBuffers)
-                if (r)
-                    SafeReleaseResource(std::move(r));
-            for (auto &r : e.ommArrayDataBuffers)
                 if (r)
                     SafeReleaseResource(std::move(r));
         }
@@ -1087,6 +1103,7 @@ void AccelerationStructure::Clear()
     m_freeSlots.clear();
     m_handleToSlot.clear();
     m_activeCount = 0;
+    m_ommInstanceCount = 0;
     m_tlasEntries.clear();
 
     AccelLogf(m_log, kUnityLogTypeLog,
@@ -1199,6 +1216,16 @@ bool AccelerationStructure::AddInstance(const NR_AddInstanceDesc &desc)
         }
     }
 
+    // Track OMM presence for O(1) HasAnyOMM().
+    for (const auto &md : slot.meshInfo.submeshes)
+    {
+        if (md.hasBakedOMM)
+        {
+            ++m_ommInstanceCount;
+            break;
+        }
+    }
+
     uint32_t slotIndex;
     if (!m_freeSlots.empty())
     {
@@ -1238,6 +1265,16 @@ void AccelerationStructure::RemoveInstance(uint32_t handle)
     if (slot.dynamicBlas)
     {
         EnqueueDeferredDelete(slot.dynamicBlas.release(), DeferredType::AccelStructBlas);
+    }
+
+    // Keep the OMM-presence counter in sync (mirror of AddInstance).
+    for (const auto &md : slot.meshInfo.submeshes)
+    {
+        if (md.hasBakedOMM)
+        {
+            --m_ommInstanceCount;
+            break;
+        }
     }
 
     // NOTE: We no longer defer deletion of vertex/index buffers because we don't own them.
@@ -1338,28 +1375,35 @@ bool AccelerationStructure::BuildOrUpdate(ID3D12GraphicsCommandList4 *cmdList)
     ProcessPendingCompactions(cmdList);
 
     // -------------------------------------------------------------------
-    // Step A: Build any pending new BLASes (throttled to avoid GPU TDR)
+    // Step A: Build any pending new BLASes.
+    //   Only expensive first-time/static full builds are throttled, to spread a
+    //   mass scene load across frames and avoid a GPU TDR. Dynamic (skinned) BLAS
+    //   refits are cheap PERFORM_UPDATE passes that must run every frame to track
+    //   animation, so they are never throttled. Statics skipped this frame keep
+    //   needsBLAS=true and are retried next frame.
     // -------------------------------------------------------------------
-    static constexpr int kMaxBLASBuildsPerFrame = 10000;
+    static constexpr int kMaxStaticBLASBuildsPerFrame = 256;
     bool anyNewBLAS = false;
-    int blasBuildsThisFrame = 0;
+    int staticBuildsThisFrame = 0;
     for (auto &slot : m_slots)
     {
         if (!slot.active || !slot.needsBLAS)
             continue;
 
-        if (blasBuildsThisFrame >= kMaxBLASBuildsPerFrame)
-            break;
+        if (!slot.isDynamic && staticBuildsThisFrame >= kMaxStaticBLASBuildsPerFrame)
+            continue; // budget exhausted; retry this static build next frame
 
         if (!EnsureBLAS(cmdList, slot))
         {
             AccelLogf(m_log, kUnityLogTypeError, "BuildOrUpdate: EnsureBLAS failed");
             return false;
         }
-        if(!slot.isDynamic)
+        if (!slot.isDynamic)
+        {
             slot.needsBLAS = false;
+            ++staticBuildsThisFrame;
+        }
         anyNewBLAS = true;
-        ++blasBuildsThisFrame;
     }
     // Emit a single global UAV barrier covering all newly-built BLASes.
     if (anyNewBLAS)
