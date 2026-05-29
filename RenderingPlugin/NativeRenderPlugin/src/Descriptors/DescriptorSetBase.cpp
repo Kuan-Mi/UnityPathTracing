@@ -306,9 +306,12 @@ void DescriptorSetBase<ShaderT>::RequestResourceStates(
         }
         else if (b.type == BindingType::ROOT_SRV)
         {
+            // A ROOT_SRV resolves the same way SRVs do (ResolveBoundResource handles the
+            // NativeBuffer/NativeGpuBuffer handle path and the raw resourcePtr fallback), with
+            // the AccelStruct/TLAS special case layered on top.
             ID3D12Resource* srvRes = (slot.objectKind == BindingObjectKind::AccelStruct && slot.objectPtr)
                 ? reinterpret_cast<AccelerationStructure*>(slot.objectPtr)->GetTLAS()
-                : reinterpret_cast<ID3D12Resource*>(slot.resourcePtr);
+                : ResolveBoundResource(slot);
             m_tracker.Require(srvRes, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
         }
         else if (b.type == BindingType::UAV)
@@ -414,7 +417,8 @@ bool DescriptorSetBase<ShaderT>::ValidateBindings(
         case BindingType::ROOT_SRV:
             kind = "ROOT_SRV";
             ok = slot.resourcePtr != 0 ||
-                 (slot.objectKind == BindingObjectKind::AccelStruct && slot.objectPtr != 0);
+                 (slot.objectKind == BindingObjectKind::AccelStruct  && slot.objectPtr != 0) ||
+                 (slot.objectKind == BindingObjectKind::NativeBuffer && slot.objectPtr != 0);
             break;
         case BindingType::CBV:
             kind = "CBV";
@@ -552,7 +556,9 @@ void DescriptorSetBase<ShaderT>::BindRootParams(
             }
             else
             {
-                auto* res = reinterpret_cast<ID3D12Resource*>(slot.resourcePtr);
+                // Resolves a NativeBuffer/NativeGpuBuffer handle to its resource, or falls back
+                // to the raw resourcePtr — the root descriptor binds the buffer's base GPU VA.
+                ID3D12Resource* res = ResolveBoundResource(slot);
                 if (res) va = res->GetGPUVirtualAddress();
             }
             if (va) cmdList->SetComputeRootShaderResourceView(b.rootParam, va);

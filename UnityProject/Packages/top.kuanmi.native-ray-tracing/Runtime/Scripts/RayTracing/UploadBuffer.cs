@@ -105,10 +105,6 @@ namespace NativeRender
             if (Handle == 0)
                 throw new InvalidOperationException("NR_CreateNativeBuffer failed (renderer not ready?)");
 
-            // The DEFAULT-heap resource pointer is fixed for the buffer's lifetime (size is
-            // immutable), so resolve it once instead of P/Invoking on every access.
-            NativePtr = NativeRenderPlugin.NR_NSB_GetNativePtr(Handle);
-
             if (mode == UploadMode.Whole)
                 _mirror = new byte[(long)capacity * elementStride];
             else
@@ -200,8 +196,6 @@ namespace NativeRender
             Array.Resize(ref _payload, newCap);
         }
 
-        /// <summary>ID3D12Resource* as IntPtr for SRV binding. Stable for the buffer's lifetime.</summary>
-        public IntPtr NativePtr { get; }
 
         /// <summary>
         /// Packs the pending writes into a snapshot blob and issues a single render-thread event

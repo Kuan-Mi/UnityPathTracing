@@ -130,10 +130,8 @@ namespace PathTracing
         // Light system buffers — valid after EnsureLightBuffers(), cleared in ReleaseLightBuffers()
         public IntPtr FeedbackBufferPtr           { get; private set; }
         public IntPtr LightControlBufferPtr       { get; private set; }
-        // LightBuffer/LightExBuffer are native buffers with a stable resource pointer — derive
-        // the ptr directly instead of caching/refreshing it after every SetData.
-        public IntPtr LightBufferPtr              => LightBuffer?.NativePtr   ?? IntPtr.Zero;
-        public IntPtr LightExBufferPtr            => LightExBuffer?.NativePtr ?? IntPtr.Zero;
+        // LightBuffer/LightExBuffer are UploadBuffers — bound directly by handle at dispatch
+        // (no cached resource pointer needed).
         public IntPtr LightScratchBufferPtr       { get; private set; }
         public IntPtr HistoryRemapCurrToPastPtr   { get; private set; }
         public IntPtr HistoryRemapPastToCurrPtr   { get; private set; }

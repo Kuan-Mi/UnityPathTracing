@@ -1488,17 +1488,6 @@ NR_NSB_AllocFlushBuffer(uint32_t sizeBytes)
 }
 
 // ---------------------------------------------------------------------------
-// NR_NSB_GetNativePtr
-//   Returns the ID3D12Resource* as intptr_t for binding as an SRV.
-// ---------------------------------------------------------------------------
-extern "C" intptr_t UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API
-NR_NSB_GetNativePtr(uint64_t handle)
-{
-    if (!handle) return 0;
-    return reinterpret_cast<intptr_t>(reinterpret_cast<NativeBuffer*>(handle)->GetResource());
-}
-
-// ---------------------------------------------------------------------------
 // NR_NSB_GetCapacity
 // ---------------------------------------------------------------------------
 extern "C" uint32_t UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API

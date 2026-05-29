@@ -322,18 +322,8 @@ namespace PathTracing
             // --- BakeEmissiveTriangles ---
             internal NativeComputePipeline      BakeEmissiveTrianglesCs;
             internal NativeComputeDescriptorSet BakeEmissiveTrianglesDs;
-            internal IntPtr                     SubInstanceDataPtr;
-            internal int                        SubInstanceDataCount;
-            internal int                        SubInstanceDataStride;
-            internal IntPtr                     InstanceDataPtr;
-            internal int                        InstanceDataCount;
-            internal int                        InstanceDataStride;
-            internal IntPtr                     GeometryDataPtr;
-            internal int                        GeometryDataCount;
-            internal int                        GeometryDataStride;
-            internal IntPtr                     PTMaterialDataPtr;
-            internal int                        PTMaterialDataCount;
-            internal int                        PTMaterialDataStride;
+            // Scene SRV buffers (t_SubInstanceData/t_InstanceData/t_GeometryData/t_PTMaterialData) are
+            // bound at execute time via GpuScene.BindToShader(ds); no per-buffer pointers cached here.
             internal int                        EmissiveTaskCount;
 
             // --- Proxy build ---
@@ -433,15 +423,6 @@ namespace PathTracing
             pd.BakeEmissiveTrianglesCs = _bakeEmissiveTrianglesCs;
             pd.BakeEmissiveTrianglesDs = _bakeEmissiveTrianglesDs;
             pd.EmissiveTaskCount       = _emissiveTaskCount;
-            var gpuSceneRef = _ctx.GpuScene;
-
-            gpuSceneRef.GetSceneBufferPtrs(
-                out pd.SubInstanceDataPtr, out pd.SubInstanceDataCount, out pd.SubInstanceDataStride,
-                out pd.InstanceDataPtr, out pd.InstanceDataCount, out pd.InstanceDataStride,
-                out pd.GeometryDataPtr, out pd.GeometryDataCount, out pd.GeometryDataStride,
-                out pd.PTMaterialDataPtr, out pd.PTMaterialDataCount, out pd.PTMaterialDataStride);
-
-
             _historicTotalLightCount = pd.TotalLightCount;
 
             // Flip ping-pong AFTER filling passData so BuildControlData used same side
@@ -489,8 +470,8 @@ namespace PathTracing
 
             // Refresh cached pointers after CPU uploads before binding.
             var pCtrl     = buf.LightControlBufferPtr;
-            var pLights   = buf.LightBufferPtr;
-            var pLightsEx = buf.LightExBufferPtr;
+            var pLights   = buf.LightBuffer;
+            var pLightsEx = buf.LightExBuffer;
             var pScratch  = buf.LightScratchBufferPtr;
             var pScrList  = buf.ScratchListBufferPtr;
             var pWeights  = buf.LightWeightsBufferPtr;
@@ -599,12 +580,8 @@ namespace PathTracing
                 ds.SetRWTypedBuffer("u_historyRemapPastToCurrent", pHistPas, cHistPas, DXGI_FORMAT_R32_UINT);
                 ds.SetRWStructuredBuffer("u_lightsExBuffer", pLightsEx, cLightsEx, StrideLightsEx);
 
-                // SRV scene inputs
-                ds.SetStructuredBuffer("t_SubInstanceData", data.SubInstanceDataPtr, data.SubInstanceDataCount, data.SubInstanceDataStride);
-                ds.SetStructuredBuffer("t_InstanceData", data.InstanceDataPtr, data.InstanceDataCount, data.InstanceDataStride);
-                ds.SetStructuredBuffer("t_GeometryData", data.GeometryDataPtr, data.GeometryDataCount, data.GeometryDataStride);
-                ds.SetStructuredBuffer("t_PTMaterialData", data.PTMaterialDataPtr, data.PTMaterialDataCount, data.PTMaterialDataStride);
-                // Bindless vertex/index buffers
+                // SRV scene inputs (t_SubInstanceData/t_InstanceData/t_GeometryData/t_PTMaterialData)
+                // + bindless vertex/index buffers — all bound here from the live GpuScene.
                 data.Ctx.GpuScene?.BindToShader(ds);
                 // Dispatch: ceil(taskCount / 8) groups × [256,1,1] threads = taskCount × 32 threads total
                 uint gxBake = Math.Max(1u, ((uint)data.EmissiveTaskCount + 7u) / 8u);

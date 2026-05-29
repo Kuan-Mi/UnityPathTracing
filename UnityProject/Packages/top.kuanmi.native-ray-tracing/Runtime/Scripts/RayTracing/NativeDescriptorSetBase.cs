@@ -202,6 +202,18 @@ namespace NativeRender
             SetRWStructuredBuffer(name, buffe.GetNativeBufferPtr(), buffe.count, buffe.stride);
         }
 
+        /// <summary>Binds an <see cref="UploadBuffer"/> as a RWStructuredBuffer UAV (resolved by handle).
+        /// Requires the buffer to have been created with UAV support.</summary>
+        public void SetRWStructuredBuffer(string name, UploadBuffer buffer, int count, int stride)
+        {
+            if (!TryGetSlot(name, out uint i)) return;
+            _stagingSlots[i].resourcePtr = 0;
+            _stagingSlots[i].objectPtr   = buffer != null ? buffer.Handle : 0;
+            _stagingSlots[i].objectKind  = ObjKindNativeBuffer;
+            _stagingSlots[i].count       = (uint)count;
+            _stagingSlots[i].stride      = (uint)stride;
+        }
+
         /// <summary>Binds a Texture2D or RenderTexture as a read-only texture (SRV).</summary>
         public void SetTexture(string name, IntPtr texturePtr)
         {
@@ -279,6 +291,23 @@ namespace NativeRender
         public void SetStructuredBuffer(string name, GraphicsBuffer buffer)
         {
             SetStructuredBuffer(name, buffer.GetNativeBufferPtr(), buffer.count, buffer.stride);
+        }
+
+        /// <summary>Binds an <see cref="UploadBuffer"/> as a StructuredBuffer SRV. Resolved by handle
+        /// (the resource pointer is resolved natively at dispatch), so no cached NativePtr is needed.</summary>
+        public void SetStructuredBuffer(string name, UploadBuffer buffer, int elementCount, int elementStride)
+        {
+            if (!TryGetSlot(name, out uint i)) return;
+            _stagingSlots[i].resourcePtr = 0;
+            _stagingSlots[i].objectPtr   = buffer != null ? buffer.Handle : 0;
+            _stagingSlots[i].objectKind  = ObjKindNativeBuffer;
+            _stagingSlots[i].count       = (uint)elementCount;
+            _stagingSlots[i].stride      = (uint)elementStride;
+        }
+
+        public void SetStructuredBuffer(string name, UploadBuffer buffer)
+        {
+            SetStructuredBuffer(name, buffer, buffer != null ? buffer.count : 0, buffer != null ? buffer.stride : 0);
         }
 
         /// <summary>Binds a RaytracingAccelerationStructure (TLAS) by HLSL variable name.</summary>

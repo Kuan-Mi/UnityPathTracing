@@ -43,9 +43,8 @@ namespace PathTracing
         private GraphicsBuffer _ptMaterialGpuBuf; // t_PTMaterialData     (t5)
         private GraphicsBuffer _geomDebugGpuBuf; // t_GeometryDebugData  (t4)
 
-        private IntPtr _instanceGpuBufPtr;
+        // _instanceGpuBuf / _subInstanceGpuBuf are UploadBuffers — bound by handle (no cached ptr).
         private IntPtr _geometryGpuBufPtr;
-        private IntPtr _subInstanceGpuBufPtr;
         private IntPtr _ptMaterialGpuBufPtr;
         private IntPtr _geomDebugGpuBufPtr;
 
@@ -337,34 +336,6 @@ namespace PathTracing
         }
 
         /// <summary>
-        /// Outputs native buffer pointers and metadata for the four scene buffers needed by
-        /// BakeEmissiveTriangles (t_SubInstanceData, t_InstanceData, t_GeometryData, t_PTMaterialData).
-        /// Returns zeroed values if the buffers have not yet been allocated.
-        /// </summary>
-        public void GetSceneBufferPtrs(
-            out IntPtr subInstancePtr, out int subInstanceCount, out int subInstanceStride,
-            out IntPtr instancePtr,    out int instanceCount,    out int instanceStride,
-            out IntPtr geometryPtr,    out int geometryCount,    out int geometryStride,
-            out IntPtr ptMaterialPtr,  out int ptMaterialCount,  out int ptMaterialStride)
-        {
-            if (_subInstanceGpuBuf != null)
-            { subInstancePtr = _subInstanceGpuBufPtr; subInstanceCount = _subInstanceGpuBuf.count; subInstanceStride = _subInstanceGpuBuf.stride; }
-            else { subInstancePtr = IntPtr.Zero; subInstanceCount = 0; subInstanceStride = 1; }
-
-            if (_instanceGpuBuf != null)
-            { instancePtr = _instanceGpuBufPtr; instanceCount = _instanceGpuBuf.count; instanceStride = _instanceGpuBuf.stride; }
-            else { instancePtr = IntPtr.Zero; instanceCount = 0; instanceStride = 1; }
-
-            if (_geometryGpuBuf != null)
-            { geometryPtr = _geometryGpuBufPtr; geometryCount = _geometryGpuBuf.count; geometryStride = _geometryGpuBuf.stride; }
-            else { geometryPtr = IntPtr.Zero; geometryCount = 0; geometryStride = 1; }
-
-            if (_ptMaterialGpuBuf != null)
-            { ptMaterialPtr = _ptMaterialGpuBufPtr; ptMaterialCount = _ptMaterialGpuBuf.count; ptMaterialStride = _ptMaterialGpuBuf.stride; }
-            else { ptMaterialPtr = IntPtr.Zero; ptMaterialCount = 0; ptMaterialStride = 1; }
-        }
-
-        /// <summary>
         /// Binds all RTXPT scene buffers to a native compute descriptor set.
         /// Binds: t_SubInstanceData(t1), t_InstanceData(t2), t_GeometryData(t3),
         ///        t_GeometryDebugData(t4), t_PTMaterialData(t5),
@@ -373,8 +344,8 @@ namespace PathTracing
         public void BindToShader(NativeComputeDescriptorSet ds)
         {
             if (ds == null) return;
-            ds.SetStructuredBuffer("t_SubInstanceData", _subInstanceGpuBufPtr, _subInstanceGpuBuf.count, _subInstanceGpuBuf.stride);
-            ds.SetStructuredBuffer("t_InstanceData", _instanceGpuBufPtr, _instanceGpuBuf.count, _instanceGpuBuf.stride);
+            ds.SetStructuredBuffer("t_SubInstanceData", _subInstanceGpuBuf, _subInstanceGpuBuf.count, _subInstanceGpuBuf.stride);
+            ds.SetStructuredBuffer("t_InstanceData", _instanceGpuBuf, _instanceGpuBuf.count, _instanceGpuBuf.stride);
             ds.SetStructuredBuffer("t_GeometryData", _geometryGpuBufPtr, _geometryGpuBuf.count, _geometryGpuBuf.stride);
             ds.SetStructuredBuffer("t_GeometryDebugData", _geomDebugGpuBufPtr, _geomDebugGpuBuf.count, _geomDebugGpuBuf.stride);
             ds.SetStructuredBuffer("t_PTMaterialData", _ptMaterialGpuBufPtr, _ptMaterialGpuBuf.count, _ptMaterialGpuBuf.stride);
@@ -385,8 +356,8 @@ namespace PathTracing
         public void BindToShader(NativeRayTraceDescriptorSet ds)
         {
             if (ds == null) return;
-            ds.SetStructuredBuffer("t_SubInstanceData", _subInstanceGpuBufPtr, _subInstanceGpuBuf.count, _subInstanceGpuBuf.stride);
-            ds.SetStructuredBuffer("t_InstanceData", _instanceGpuBufPtr, _instanceGpuBuf.count, _instanceGpuBuf.stride);
+            ds.SetStructuredBuffer("t_SubInstanceData", _subInstanceGpuBuf, _subInstanceGpuBuf.count, _subInstanceGpuBuf.stride);
+            ds.SetStructuredBuffer("t_InstanceData", _instanceGpuBuf, _instanceGpuBuf.count, _instanceGpuBuf.stride);
             ds.SetStructuredBuffer("t_GeometryData", _geometryGpuBufPtr, _geometryGpuBuf.count, _geometryGpuBuf.stride);
             ds.SetStructuredBuffer("t_GeometryDebugData", _geomDebugGpuBufPtr, _geomDebugGpuBuf.count, _geomDebugGpuBuf.stride);
             ds.SetStructuredBuffer("t_PTMaterialData", _ptMaterialGpuBufPtr, _ptMaterialGpuBuf.count, _ptMaterialGpuBuf.stride);
@@ -552,13 +523,11 @@ namespace PathTracing
         {
             _instanceGpuBuf?.Dispose();
             _instanceGpuBuf = null;
-            _instanceGpuBufPtr = IntPtr.Zero;
             _geometryGpuBuf?.Release();
             _geometryGpuBuf = null;
             _geometryGpuBufPtr = IntPtr.Zero;
             _subInstanceGpuBuf?.Dispose();
             _subInstanceGpuBuf = null;
-            _subInstanceGpuBufPtr = IntPtr.Zero;
             _ptMaterialGpuBuf?.Release();
             _ptMaterialGpuBuf = null;
             _ptMaterialGpuBufPtr = IntPtr.Zero;
@@ -893,7 +862,6 @@ namespace PathTracing
             // so we upload just those sub-ranges rather than a full-buffer span.
             _instanceGpuBuf = new UploadBuffer(_instanceCpu.Length, Marshal.SizeOf<DonutInstanceData>());
             _instanceGpuBuf.SetData(_instanceCpu, 0, _instanceCpu.Length);
-            _instanceGpuBufPtr = _instanceGpuBuf.NativePtr; // stable for the buffer's lifetime
 
             _geometryGpuBuf = new GraphicsBuffer(GraphicsBuffer.Target.Structured, _geometryCpu.Length, Marshal.SizeOf<DonutGeometryData>());
             _geometryGpuBuf.SetData(_geometryCpu);
@@ -901,7 +869,6 @@ namespace PathTracing
 
             _subInstanceGpuBuf = new UploadBuffer(_subInstanceCpu.Length, Marshal.SizeOf<SubInstanceData>());
             _subInstanceGpuBuf.SetData(_subInstanceCpu, 0, _subInstanceCpu.Length);
-            _subInstanceGpuBufPtr = _subInstanceGpuBuf.NativePtr; // stable for the buffer's lifetime
 
             _ptMaterialGpuBuf = new GraphicsBuffer(GraphicsBuffer.Target.Structured, _ptMaterialCpu.Length, Marshal.SizeOf<PTMaterialData>());
             _ptMaterialGpuBuf.SetData(_ptMaterialCpu);

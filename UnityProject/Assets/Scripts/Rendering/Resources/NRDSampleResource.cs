@@ -207,7 +207,7 @@ namespace NativeRender
         public GraphicsBuffer PrimitiveDataBuf => _primitiveDataBuf;
         public GraphicsBuffer MorphPrimitivePositionsPrevBuf => _morphPrimitivePositionsPrevBuf;
 
-        public IntPtr InstanceDataBufPtr { get; private set; }
+        // InstanceDataBuf is an UploadBuffer — bound by handle (no cached resource pointer).
         public IntPtr PrimitiveDataBufPtr { get; private set; }
         public IntPtr MorphPrimitivePositionsPrevBufPtr { get; private set; }
 
@@ -505,7 +505,6 @@ namespace NativeRender
             for (int sub = 0; sub < subCnt; sub++)
                 _primitiveDataBuf.SetData(_primitiveCpu,
                     (int)subPrimOffsets[sub], (int)subPrimOffsets[sub], subPrimCounts[sub]);
-            InstanceDataBufPtr  = _instanceDataBuf.NativePtr;
             PrimitiveDataBufPtr = _primitiveDataBuf.GetNativeBufferPtr();
 
             // Note: vertexBufferTarget and skinnedMotionVectors are now set in
@@ -608,8 +607,6 @@ namespace NativeRender
                             (int)entry.firstInstanceDataIndex,
                             entry.submeshCount);
                 }
-
-                InstanceDataBufPtr = _instanceDataBuf.NativePtr;
             }
         }
 
@@ -1065,7 +1062,6 @@ namespace NativeRender
 
             _instanceDataBuf = new UploadBuffer(_instanceCpu.Length, Marshal.SizeOf<InstanceDataNRD>());
             _instanceDataBuf.SetData(_instanceCpu, 0, _instanceCpu.Length);
-            InstanceDataBufPtr = _instanceDataBuf.NativePtr;
 
             Debug.Log($"Geometries {_instanceCpu.Length}");
 
@@ -1437,8 +1433,6 @@ namespace NativeRender
             // Upload zeroed instance slots. We do per-group uploads since slots may not be contiguous.
             foreach (var grp in info.groups)
                 _instanceDataBuf?.SetData(_instanceCpu, (int)grp.firstInstanceIdx, grp.submeshIndices.Length);
-
-            InstanceDataBufPtr = _instanceDataBuf?.NativePtr ?? IntPtr.Zero;
         }
 
         /// <summary>
@@ -1616,7 +1610,6 @@ namespace NativeRender
                     _primitiveDataBuf.SetData(_primitiveCpu,
                         (int)grp.primitiveOffsets[gi], (int)grp.primitiveOffsets[gi], grp.primitiveCounts[gi]);
 
-            InstanceDataBufPtr  = _instanceDataBuf.NativePtr;
             PrimitiveDataBufPtr = _primitiveDataBuf.GetNativeBufferPtr();
 
             _perTargetBlas[mrId] = new PerTargetBlas
@@ -1673,7 +1666,6 @@ namespace NativeRender
             }
 
             _instanceDataBuf.SetData(_instanceCpu, 0, _instanceCpu.Length);
-            InstanceDataBufPtr = _instanceDataBuf.NativePtr;
         }
 
         /// <summary>

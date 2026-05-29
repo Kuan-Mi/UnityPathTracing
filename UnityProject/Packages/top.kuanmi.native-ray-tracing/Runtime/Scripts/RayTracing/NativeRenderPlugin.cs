@@ -464,10 +464,6 @@ namespace NativeRender
         [DllImport(DllName)]
         public static extern IntPtr NR_GetClearNativeGpuBufferCallbackPtr();
 
-        /// <summary>Returns the ID3D12Resource* as IntPtr for binding as an SRV.</summary>
-        [DllImport(DllName)]
-        public static extern IntPtr NR_NSB_GetNativePtr(ulong handle);
-
         /// <summary>Returns the current element capacity of the buffer.</summary>
         [DllImport(DllName)]
         public static extern uint NR_NSB_GetCapacity(ulong handle);
