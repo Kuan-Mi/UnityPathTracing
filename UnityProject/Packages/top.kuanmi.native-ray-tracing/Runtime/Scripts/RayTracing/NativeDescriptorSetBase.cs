@@ -176,6 +176,18 @@ namespace NativeRender
             _stagingSlots[i].format      = 0;
         }
 
+        /// <summary>Binds an <see cref="UploadBuffer"/> as a raw RW buffer UAV.</summary>
+        public void SetRWBuffer(string name, UploadBuffer buffer)
+        {
+            if (!TryGetSlot(name, out uint i)) return;
+            _stagingSlots[i].resourcePtr = 0;
+            _stagingSlots[i].objectPtr   = buffer != null ? buffer.Handle : 0;
+            _stagingSlots[i].objectKind  = ObjKindNativeBuffer;
+            _stagingSlots[i].count       = 0;
+            _stagingSlots[i].stride      = 0;
+            _stagingSlots[i].format      = 0;
+        }
+
         /// <summary>Binds an RW typed buffer (UAV) with an explicit DXGI_FORMAT.</summary>
         public void SetRWTypedBuffer(string name, IntPtr bufferPtr, int count, uint dxgiFormat)
         {

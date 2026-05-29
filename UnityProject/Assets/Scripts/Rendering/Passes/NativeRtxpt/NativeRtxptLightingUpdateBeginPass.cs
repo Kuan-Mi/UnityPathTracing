@@ -294,8 +294,6 @@ namespace PathTracing
             uint emissiveLightOffset = EnvQtTotalNodeCount + (uint)_analyticLightCount;
             gpuScene.PrepareEmissiveTriangleTasks(emissiveLightOffset, ctx.Buffers.LightScratchBuffer);
             _emissiveTaskCount     = gpuScene.LastEmissiveTaskCount;
-            if (_emissiveTaskCount > 0)
-                ctx.Buffers.RefreshLightScratchBufferPtr();
             _emissiveTotalTriCount = gpuScene.LastEmissiveTriangleCount;
             BuildControlData();
         }
@@ -343,7 +341,7 @@ namespace PathTracing
             internal NativeComputeDescriptorSet ExecuteProxyJobsDs;
             internal uint                       TotalLightCount;
             internal uint                       HistoricTotalLightCount;
-            internal GraphicsBuffer             LightControlBuffer;
+            internal UploadBuffer               LightControlBuffer;
             internal UploadBuffer     LightBuffer;
             internal UploadBuffer     LightExBuffer;
             internal RtxptLightingControlData[] ControlData;
@@ -452,8 +450,11 @@ namespace PathTracing
             // CPU uploads.
             context.cmd.BeginSample(RenderPassMarkers.RtxptControlDataSetup);
             data.LightControlBuffer.SetData(data.ControlData, 0, 0, 1);
-            buf.RefreshLightControlBufferPtr();
+            buf.LastLightControlData = data.ControlData[0];
+            data.LightControlBuffer.Flush(cmd);
             context.cmd.EndSample(RenderPassMarkers.RtxptControlDataSetup);
+
+            buf.LightScratchBuffer.Flush(cmd);
 
             if (data.AnalyticLightCount > 0)
             {
@@ -468,11 +469,11 @@ namespace PathTracing
                 context.cmd.EndSample(RenderPassMarkers.RtxptEnvmapAndAnalyticLightBuffers);
             }
 
-            // Refresh cached pointers after CPU uploads before binding.
-            var pCtrl     = buf.LightControlBufferPtr;
+            // Native buffers bind by stable plugin handles; Unity-owned buffers still bind by cached native pointers.
+            var pCtrl     = buf.LightControlBuffer;
             var pLights   = buf.LightBuffer;
             var pLightsEx = buf.LightExBuffer;
-            var pScratch  = buf.LightScratchBufferPtr;
+            var pScratch  = buf.LightScratchBuffer;
             var pScrList  = buf.ScratchListBufferPtr;
             var pWeights  = buf.LightWeightsBufferPtr;
             var pHistCur  = buf.HistoryRemapCurrToPastPtr;

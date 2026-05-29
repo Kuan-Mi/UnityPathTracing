@@ -221,10 +221,10 @@ namespace PathTracing
         /// </summary>
         /// <param name="lightOffset">Base index in lightsBuffer where triangle lights start
         ///     (= EnvQtTotalNodeCount + analyticLightCount).</param>
-        /// <param name="scratchBuffer">Raw <see cref="GraphicsBuffer"/> bound as u_scratchBuffer.
+        /// <param name="scratchBuffer">Raw native buffer bound as u_scratchBuffer.
         ///     Tasks are written at element offset 0 (each element = 4 bytes; tasks are 32 B each,
         ///     so stride-8 within the raw buffer).</param>
-        public void PrepareEmissiveTriangleTasks(uint lightOffset, GraphicsBuffer scratchBuffer)
+        public void PrepareEmissiveTriangleTasks(uint lightOffset, UploadBuffer scratchBuffer)
         {
             if (_instanceCpu == null || _subInstanceCpu == null || _ptMaterialCpu == null)
             {
@@ -302,9 +302,9 @@ namespace PathTracing
             if (_subInstanceGpuBuf != null && _subInstanceCpu != null)
                 _subInstanceGpuBuf.SetData(_subInstanceCpu, 0, _subInstanceCpu.Length);
 
-            // Upload task array to scratch buffer (Raw buffer, stride = 4 bytes, tasks = 8 uints each)
+            // Upload task array to scratch buffer (raw buffer, stride = 4 bytes, tasks = 8 uints each).
             if (taskIdx > 0 && scratchBuffer != null)
-                scratchBuffer.SetData(s_emissiveTaskStaging, 0, 0, taskIdx);
+                scratchBuffer.SetRawData(s_emissiveTaskStaging, 0, 0, taskIdx);
 
             LastEmissiveTaskCount     = taskIdx;
             LastEmissiveTriangleCount = accumTriangles;

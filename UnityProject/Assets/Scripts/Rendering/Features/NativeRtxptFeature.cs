@@ -121,9 +121,12 @@ namespace PathTracing
 
         // ---- Lifecycle ------------------------------------------------------
 
+        public IntPtr blackTexturePtr;
+        
         public override void Create()
         {
-            setting ??= new NativeRtxptSetting();
+            setting         ??= new NativeRtxptSetting();
+            blackTexturePtr =   Texture2D.blackTexture.GetNativeTexturePtr();
         }
 
         private void CreatePasses()
@@ -269,6 +272,7 @@ namespace PathTracing
                 DisplayResolution = displayResolution,
                 FrameState        = frameState,
                 Setting           = setting,
+                blackTexturePtr =  blackTexturePtr,
             };
             passCtx.ResolveNativePtrs();
 
@@ -674,9 +678,7 @@ namespace PathTracing
                 return;
             }
 
-            var ctrlData = new RtxptLightingControlData[1];
-            buf.LightControlBuffer.GetData(ctrlData);
-            var ctrl = ctrlData[0];
+            var ctrl = buf.LastLightControlData;
             uint invalidFeedbackCount = ReadUIntAt(buf.LightProxyCounters, (int)ctrl.TotalLightCount);
             uint derivedValidFeedback = ctrl.TotalMaxFeedbackCount > invalidFeedbackCount
                 ? ctrl.TotalMaxFeedbackCount - invalidFeedbackCount

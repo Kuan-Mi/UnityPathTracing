@@ -28,34 +28,34 @@ namespace PathTracing
         [StructLayout(LayoutKind.Sequential, Pack = 4)]
         private unsafe struct EnvMapBakerCB
         {
-            public fixed float DirectionalLights[16 * 8];   // EMB_DirectionalLight[16]
-            public fixed uint  ProcSkyConstsPad[160 / 4];   // ProceduralSkyConstants (zeroed)
-            public float ScaleColorR, ScaleColorG, ScaleColorB;
-            public uint  DirectionalLightCount;
-            public uint  CubeDim, CubeDimLowRes, ProcSkyEnabled, BackgroundSourceType;
+            public fixed float DirectionalLights[16 * 8]; // EMB_DirectionalLight[16]
+            public fixed uint  ProcSkyConstsPad[160 / 4]; // ProceduralSkyConstants (zeroed)
+            public       float ScaleColorR, ScaleColorG, ScaleColorB;
+            public       uint  DirectionalLightCount;
+            public       uint  CubeDim, CubeDimLowRes, ProcSkyEnabled, BackgroundSourceType;
         }
 
         // Mirrors HLSL EnvMapImportanceSamplingBakerConstants (EnvMapImportanceSamplingBaker.hlsl)
         [StructLayout(LayoutKind.Sequential, Pack = 4)]
         private struct ImportanceBakerCB
         {
-            public uint  SourceCubeDim, SourceCubeMIPCount, SampleIndex, Padding1;
-            public uint  ImportanceMapDimX, ImportanceMapDimY;
+            public uint  SourceCubeDim,              SourceCubeMIPCount, SampleIndex, Padding1;
+            public uint  ImportanceMapDimX,          ImportanceMapDimY;
             public uint  ImportanceMapDimInSamplesX, ImportanceMapDimInSamplesY;
-            public uint  ImportanceMapNumSamplesX, ImportanceMapNumSamplesY;
+            public uint  ImportanceMapNumSamplesX,   ImportanceMapNumSamplesY;
             public float ImportanceMapInvSamples;
             public uint  ImportanceMapBaseMip;
         }
 
-        internal static unsafe int EnvBakerCbSize      => sizeof(EnvMapBakerCB);
-        internal static          int ImportanceBakerCbSize => System.Runtime.InteropServices.Marshal.SizeOf<ImportanceBakerCB>();
+        internal static unsafe int EnvBakerCbSize => sizeof(EnvMapBakerCB);
+        internal static int ImportanceBakerCbSize => System.Runtime.InteropServices.Marshal.SizeOf<ImportanceBakerCB>();
 
         private readonly NativeComputePipeline      _baseLayerCs;
         private readonly NativeComputeDescriptorSet _baseLayerDs;
         private readonly NativeComputePipeline      _importanceBakerCs;
         private readonly NativeComputeDescriptorSet _importanceBakerDs;
 
-        private static EnvMapBakerCB    s_envBakerCb;
+        private static EnvMapBakerCB     s_envBakerCb;
         private static ImportanceBakerCB s_importanceCb;
 
         private NativeRtxptPassContext _ctx;
@@ -89,8 +89,8 @@ namespace PathTracing
             internal NativeComputeDescriptorSet BaseLayerDs;
             internal NativeComputePipeline      ImportanceBakerCs;
             internal NativeComputeDescriptorSet ImportanceBakerDs;
-            internal VolatileConstantBuffer               EnvBakerCb;
-            internal VolatileConstantBuffer               ImportanceBakerCb;
+            internal VolatileConstantBuffer     EnvBakerCb;
+            internal VolatileConstantBuffer     ImportanceBakerCb;
             internal EnvMapBakerCB              EnvBakerCbData;
             internal ImportanceBakerCB          ImportanceCbData;
             internal IntPtr                     SkyTexturePtr;
@@ -108,24 +108,24 @@ namespace PathTracing
         {
             using var builder = renderGraph.AddUnsafePass<PassData>("NativeRtxpt.EnvMapBaker", out var pd);
 
-            pd.BaseLayerCs          = _baseLayerCs;
-            pd.BaseLayerDs          = _baseLayerDs;
-            pd.ImportanceBakerCs    = _importanceBakerCs;
-            pd.ImportanceBakerDs    = _importanceBakerDs;
+            pd.BaseLayerCs       = _baseLayerCs;
+            pd.BaseLayerDs       = _baseLayerDs;
+            pd.ImportanceBakerCs = _importanceBakerCs;
+            pd.ImportanceBakerDs = _importanceBakerDs;
             pd.EnvBakerCb        = _ctx.Buffers.EnvBakerCb;
             pd.ImportanceBakerCb = _ctx.Buffers.ImportanceBakerCb;
-            pd.EnvBakerCbData   = s_envBakerCb;
-            pd.ImportanceCbData = s_importanceCb;
+            pd.EnvBakerCbData    = s_envBakerCb;
+            pd.ImportanceCbData  = s_importanceCb;
             var skyTex = _ctx.Setting?.environmentMap;
-            pd.SkyTexturePtr       = skyTex != null ? skyTex.GetNativeTexturePtr() : Texture2D.blackTexture.GetNativeTexturePtr();
-            pd.EnvCubeMip0Ptr      = _ctx.Textures.EnvCubeMip0.NativePtr;
-            pd.EnvCubeMip1Ptr      = _ctx.Textures.EnvCubeMip1.NativePtr;
-            pd.ImportanceMapPtr    = _ctx.Textures.EnvImportanceMap.NativePtr;
-            pd.RadianceMapPtr      = _ctx.Textures.EnvRadianceMap.NativePtr;
-            pd.ImportanceMapRt     = _ctx.Textures.EnvImportanceMap.rt;
-            pd.RadianceMapRt       = _ctx.Textures.EnvRadianceMap.rt;
-            pd.DummyCubePtr        = _ctx.Textures.EnvDummyCube.NativePtr;
-            pd.DummyTex2DPtr       = Texture2D.blackTexture.GetNativeTexturePtr();
+            pd.SkyTexturePtr    = skyTex != null ? skyTex.GetNativeTexturePtr() : _ctx.blackTexturePtr;
+            pd.EnvCubeMip0Ptr   = _ctx.Textures.EnvCubeMip0.NativePtr;
+            pd.EnvCubeMip1Ptr   = _ctx.Textures.EnvCubeMip1.NativePtr;
+            pd.ImportanceMapPtr = _ctx.Textures.EnvImportanceMap.NativePtr;
+            pd.RadianceMapPtr   = _ctx.Textures.EnvRadianceMap.NativePtr;
+            pd.ImportanceMapRt  = _ctx.Textures.EnvImportanceMap.rt;
+            pd.RadianceMapRt    = _ctx.Textures.EnvRadianceMap.rt;
+            pd.DummyCubePtr     = _ctx.Textures.EnvDummyCube.NativePtr;
+            pd.DummyTex2DPtr    = _ctx.blackTexturePtr;
 
             builder.AllowPassCulling(false);
             builder.SetRenderFunc((PassData d, UnsafeGraphContext c) => ExecutePass(d, c));
@@ -139,7 +139,7 @@ namespace PathTracing
 
             {
                 var ds = data.BaseLayerDs;
-                data.EnvBakerCb.UploadDirect(context.cmd, data.EnvBakerCbData);  // single-value overload
+                data.EnvBakerCb.UploadDirect(context.cmd, data.EnvBakerCbData); // single-value overload
                 ds.SetConstantBuffer("g_Const", data.EnvBakerCb);
                 ds.SetTexture("t_SrcEquirectangularEnvMap", data.SkyTexturePtr);
                 ds.SetTexture("t_SrcCubemapEnvMap", data.DummyCubePtr);
@@ -155,7 +155,7 @@ namespace PathTracing
 
             {
                 var ds = data.ImportanceBakerDs;
-                data.ImportanceBakerCb.UploadDirect(context.cmd, data.ImportanceCbData);  // single-value overload
+                data.ImportanceBakerCb.UploadDirect(context.cmd, data.ImportanceCbData); // single-value overload
                 ds.SetConstantBuffer("g_BuilderConsts", data.ImportanceBakerCb);
                 ds.SetTexture("t_EnvMapCube", data.EnvCubeMip0Ptr);
                 ds.SetRWTexture("u_ImportanceMap", data.ImportanceMapPtr);
@@ -185,7 +185,7 @@ namespace PathTracing
 
                 Color   linear = light.color.linear;
                 Vector3 fwd    = light.transform.forward;
-                int     f      = lightCount * 8;  // 8 floats per EMB_DirectionalLight
+                int     f      = lightCount * 8; // 8 floats per EMB_DirectionalLight
                 cb.DirectionalLights[f + 0] = linear.r;
                 cb.DirectionalLights[f + 1] = linear.g;
                 cb.DirectionalLights[f + 2] = linear.b;
@@ -193,7 +193,7 @@ namespace PathTracing
                 cb.DirectionalLights[f + 4] = fwd.x;
                 cb.DirectionalLights[f + 5] = fwd.y;
                 cb.DirectionalLights[f + 6] = fwd.z;
-                cb.DirectionalLights[f + 7] = 0.1f;  // AngularSize
+                cb.DirectionalLights[f + 7] = 0.1f; // AngularSize
                 lightCount++;
             }
 

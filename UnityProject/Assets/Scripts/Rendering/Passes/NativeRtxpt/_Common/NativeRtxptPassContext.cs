@@ -109,6 +109,8 @@ namespace PathTracing
         public IntPtr FeedbackCandidatesBlendedPtr;
         /// <summary>u_historyDepth (u17) — NEE-AT per-pixel history depth / confidence (R32_FLOAT).</summary>
         public IntPtr NEEATHistoryDepthPtr;
+ 
+        public IntPtr blackTexturePtr;
 
         // ── Factory ───────────────────────────────────────────────────────────
 

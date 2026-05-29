@@ -163,14 +163,10 @@ namespace PathTracing
 
             ctx.GpuScene.BindToShader(ds);
 
-            var envCubePtr = ctx.BakedEnvCubePtr != IntPtr.Zero
-                ? ctx.BakedEnvCubePtr
-                : Texture2D.blackTexture.GetNativeTexturePtr();
+            var envCubePtr = ctx.BakedEnvCubePtr;
             ds.SetTexture("t_EnvironmentMap", envCubePtr);
 
-            var envLookupPtr = ctx.EnvLightLookupMapPtr != IntPtr.Zero
-                ? ctx.EnvLightLookupMapPtr
-                : Texture2D.blackTexture.GetNativeTexturePtr();
+            var envLookupPtr = ctx.EnvLightLookupMapPtr;
             ds.SetTexture("t_EnvLookupMap", envLookupPtr);
 
             ds.SetRWStructuredBuffer("u_FeedbackBuffer",
@@ -184,7 +180,7 @@ namespace PathTracing
             var buf = ctx.Buffers;
             if (buf == null) return;
 
-            ds.SetStructuredBuffer("t_LightsCB", buf.LightControlBufferPtr, buf.LightControlBuffer.count, buf.LightControlBuffer.stride);
+            ds.SetStructuredBuffer("t_LightsCB", buf.LightControlBuffer, buf.LightControlBuffer.count, buf.LightControlBuffer.stride);
             ds.SetStructuredBuffer("t_Lights",   buf.LightBuffer,        buf.LightBuffer.count,        buf.LightBuffer.stride);
 
             ds.SetTypedBuffer("t_LightProxyCounters",       buf.LightProxyCountersPtr,   buf.LightProxyCounters.count,   (uint)Nri.DXGI_FORMAT.DXGI_FORMAT_R32_UINT);

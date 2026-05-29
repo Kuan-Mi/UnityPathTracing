@@ -55,7 +55,7 @@ namespace PathTracing
         /// Light control / management struct. Single-element structured buffer.
         /// HLSL: u_controlBuffer (u0 in BakeEmissiveTriangles).
         /// </summary>
-        public GraphicsBuffer LightControlBuffer;
+        public UploadBuffer LightControlBuffer;
 
         /// <summary>
         /// Per-light data array. MaxLights elements.
@@ -75,7 +75,7 @@ namespace PathTracing
         /// Scratch buffer for light processing passes.
         /// HLSL: u_scratchBuffer (u3).
         /// </summary>
-        public GraphicsBuffer LightScratchBuffer;
+        public UploadBuffer LightScratchBuffer;
 
         /// <summary>
         /// Light history remap: current frame index → previous frame index.
@@ -129,10 +129,6 @@ namespace PathTracing
 
         // Light system buffers — valid after EnsureLightBuffers(), cleared in ReleaseLightBuffers()
         public IntPtr FeedbackBufferPtr           { get; private set; }
-        public IntPtr LightControlBufferPtr       { get; private set; }
-        // LightBuffer/LightExBuffer are UploadBuffers — bound directly by handle at dispatch
-        // (no cached resource pointer needed).
-        public IntPtr LightScratchBufferPtr       { get; private set; }
         public IntPtr HistoryRemapCurrToPastPtr   { get; private set; }
         public IntPtr HistoryRemapPastToCurrPtr   { get; private set; }
         public IntPtr LightProxyCountersPtr       { get; private set; }
@@ -140,16 +136,9 @@ namespace PathTracing
         public IntPtr LightWeightsBufferPtr       { get; private set; }
         public IntPtr ScratchListBufferPtr        { get; private set; }
 
-        // ── Pointer refreshers — call after SetData() on the corresponding buffer ──
-        public void RefreshLightControlBufferPtr()
-        {
-            LightControlBufferPtr = LightControlBuffer?.GetNativeBufferPtr() ?? IntPtr.Zero;
-        }
-
-        public void RefreshLightScratchBufferPtr()
-        {
-            LightScratchBufferPtr = LightScratchBuffer?.GetNativeBufferPtr() ?? IntPtr.Zero;
-        }
+        // CPU-side copy of the latest control data uploaded into LightControlBuffer.
+        // NativeBuffer does not support the old synchronous GraphicsBuffer.GetData path.
+        public RtxptLightingControlData LastLightControlData { get; internal set; }
 
         // ── Resolved resolution ───────────────────────────────────────────────
         public int2 renderResolution { get; private set; }
@@ -244,11 +233,9 @@ namespace PathTracing
             FeedbackBufferPtr = FeedbackBuffer.GetNativeBufferPtr();
 
             // LightControlBuffer — single RtxptLightingControlData element (576 bytes).
-            LightControlBuffer = new GraphicsBuffer(
-                GraphicsBuffer.Target.Structured,
-                1, Marshal.SizeOf<RtxptLightingControlData>())
-            { name = "Rtxpt_LightControlBuffer" };
-            LightControlBufferPtr = LightControlBuffer.GetNativeBufferPtr();
+            LightControlBuffer = new UploadBuffer(
+                1, Marshal.SizeOf<RtxptLightingControlData>(),
+                UploadBuffer.UploadMode.Whole, allowUAV: true);
 
             // LightBuffer / LightExBuffer — match PolymorphicLightInfo (32B) and PolymorphicLightInfoEx (16B).
             // Native UAV-capable upload buffers: CPU writes the analytic-light sub-range (Ranges mode),
@@ -261,11 +248,9 @@ namespace PathTracing
                 MaxLights, Marshal.SizeOf<RtxptPolymorphicLightInfoEx>(),
                 UploadBuffer.UploadMode.Ranges, allowUAV: true);
 
-            LightScratchBuffer = new GraphicsBuffer(
-                GraphicsBuffer.Target.Raw,
-                ScratchElementCount, 4)
-            { name = "Rtxpt_LightScratchBuffer" };
-            LightScratchBufferPtr = LightScratchBuffer.GetNativeBufferPtr();
+            LightScratchBuffer = new UploadBuffer(
+                ScratchElementCount, 4,
+                UploadBuffer.UploadMode.Ranges, allowUAV: true);
 
             HistoryRemapCurrentToPast = new GraphicsBuffer(
                 GraphicsBuffer.Target.Structured,
@@ -340,10 +325,10 @@ namespace PathTracing
             EnvBakerCb?.Dispose();               EnvBakerCb               = null;
             ImportanceBakerCb?.Dispose();         ImportanceBakerCb        = null;
             FeedbackBuffer?.Release();            FeedbackBuffer           = null; FeedbackBufferPtr           = IntPtr.Zero;
-            LightControlBuffer?.Release();        LightControlBuffer       = null; LightControlBufferPtr       = IntPtr.Zero;
+            LightControlBuffer?.Dispose();        LightControlBuffer       = null; 
             LightBuffer?.Dispose();               LightBuffer              = null;
             LightExBuffer?.Dispose();             LightExBuffer            = null;
-            LightScratchBuffer?.Release();        LightScratchBuffer       = null; LightScratchBufferPtr       = IntPtr.Zero;
+            LightScratchBuffer?.Dispose();        LightScratchBuffer       = null; 
             HistoryRemapCurrentToPast?.Release(); HistoryRemapCurrentToPast= null; HistoryRemapCurrToPastPtr   = IntPtr.Zero;
             HistoryRemapPastToCurrent?.Release(); HistoryRemapPastToCurrent= null; HistoryRemapPastToCurrPtr   = IntPtr.Zero;
             LightProxyCounters?.Release();        LightProxyCounters       = null; LightProxyCountersPtr       = IntPtr.Zero;

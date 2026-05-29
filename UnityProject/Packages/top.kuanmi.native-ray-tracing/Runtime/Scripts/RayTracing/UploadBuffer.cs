@@ -156,16 +156,41 @@ namespace NativeRender
             Append(basePtr + (long)dstOffset * stride, dstOffset, count);
         }
 
+        /// <summary>
+        /// Records a raw byte write from <paramref name="count"/> source elements into this buffer.
+        /// The destination offset is still expressed in this buffer's stride-sized elements.
+        /// Use this for raw buffers whose logical payload type is wider than the buffer stride
+        /// (for example writing 32-byte task structs into a 4-byte-addressed RWByteAddressBuffer).
+        /// </summary>
+        public unsafe void SetRawData<T>(T[] data, int srcOffset, int dstOffset, int count) where T : unmanaged
+        {
+            if (_disposed) throw new ObjectDisposedException(nameof(UploadBuffer));
+            if (data == null) throw new ArgumentNullException(nameof(data));
+            if (count <= 0) return;
+
+            int byteCount = count * sizeof(T);
+            if ((byteCount % stride) != 0)
+                throw new ArgumentException("Raw upload byte count must be a multiple of the buffer stride.", nameof(count));
+
+            fixed (T* src = &data[srcOffset])
+                AppendBytes(src, dstOffset, byteCount);
+        }
+
         private unsafe void Append(void* src, int dstElementOffset, int count)
         {
-            int byteCount = count * stride;
+            AppendBytes(src, dstElementOffset, count * stride);
+        }
+
+        private unsafe void AppendBytes(void* src, int dstElementOffset, int byteCount)
+        {
+            int elementCount = byteCount / stride;
 
             if (Mode == UploadMode.Whole)
             {
                 fixed (byte* dst = &_mirror[(long)dstElementOffset * stride])
                     Buffer.MemoryCopy(src, dst, byteCount, byteCount);
 
-                int end = dstElementOffset + count;
+                int end = dstElementOffset + elementCount;
                 if (!_wholeDirty)
                 {
                     _dirtyMinElem = dstElementOffset;
@@ -184,7 +209,7 @@ namespace NativeRender
                 fixed (byte* dst = &_payload[_payloadLen])
                     Buffer.MemoryCopy(src, dst, byteCount, byteCount);
 
-                _ranges.Add(new Range(dstElementOffset, count, _payloadLen));
+                _ranges.Add(new Range(dstElementOffset, elementCount, _payloadLen));
                 _payloadLen += byteCount;
             }
         }

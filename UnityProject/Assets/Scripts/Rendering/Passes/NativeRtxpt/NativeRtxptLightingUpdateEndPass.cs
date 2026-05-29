@@ -132,7 +132,7 @@ namespace PathTracing
             cmd.BeginSample(RenderPassMarkers.RtxptLightingUpdateEnd);
 
             // Shared pointers (all cached — immutable for lifetime of buffer objects)
-            var pCtrl    = buf.LightControlBufferPtr;
+            var pCtrl    = buf.LightControlBuffer;
             int cCtrl    = buf.LightControlBuffer.count;
             var pWeights = buf.LightWeightsBufferPtr;
             int cWeights = buf.LightWeightsBuffer.count;
