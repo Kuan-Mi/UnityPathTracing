@@ -12,7 +12,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 5a4e0d79381289b4cb6b3a5e5d56f537, type: 3}
   m_Name: NativeNrdFeature
   m_EditorClassIdentifier: Assembly-CSharp::PathTracing.NativeNrdFeature
-  m_Active: 1
+  m_Active: 0
   setting:
     showMode: 0
     showValidation: 0
@@ -38,8 +38,8 @@ MonoBehaviour:
     separator: 0
     hitDistScale: 3
     resolutionScale: 1
-    maxAccumulatedFrameNum: 15
-    maxFastAccumulatedFrameNum: 3
+    maxAccumulatedFrameNum: 10
+    maxFastAccumulatedFrameNum: 2
     onScreen: 0
     forcedMaterial: 0
     denoiser: 0
@@ -97,9 +97,9 @@ MonoBehaviour:
       s: 1
       b: 0.2
       p: 0.8
-    maxAccumulatedFrameNum: 15
-    maxFastAccumulatedFrameNum: 3
-    maxStabilizedFrameNum: 15
+    maxAccumulatedFrameNum: 10
+    maxFastAccumulatedFrameNum: 2
+    maxStabilizedFrameNum: 10
     historyFixFrameNum: 3
     historyFixBasePixelStride: 14
     historyFixAlternatePixelStride: 14
@@ -129,10 +129,10 @@ MonoBehaviour:
       spatialSigmaScale: 4.5
       temporalSigmaScale: 0.5
       resetAmount: 0.5
-    diffuseMaxAccumulatedFrameNum: 15
-    specularMaxAccumulatedFrameNum: 15
-    diffuseMaxFastAccumulatedFrameNum: 3
-    specularMaxFastAccumulatedFrameNum: 3
+    diffuseMaxAccumulatedFrameNum: 10
+    specularMaxAccumulatedFrameNum: 10
+    diffuseMaxFastAccumulatedFrameNum: 2
+    specularMaxFastAccumulatedFrameNum: 2
     historyFixFrameNum: 3
     historyFixBasePixelStride: 14
     historyFixAlternatePixelStride: 14
@@ -197,7 +197,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 324cab2d455449e4b9e70b945e4d8e49, type: 3}
   m_Name: NativeRtxptFeature
   m_EditorClassIdentifier: Assembly-CSharp::PathTracing.NativeRtxptFeature
-  m_Active: 0
+  m_Active: 1
   setting:
     realtimeMode: 1
     realtimeAA: 3

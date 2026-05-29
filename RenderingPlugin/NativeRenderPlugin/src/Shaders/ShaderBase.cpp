@@ -184,12 +184,22 @@ bool ShaderBase::BuildRootSignature()
     std::vector<D3D12_DESCRIPTOR_RANGE1> allRanges;
     allRanges.reserve(m_numSRV + m_numUAV + m_numSRVArray + m_numUAVArray);
 
-    Logf(kUnityLogTypeLog,
-         "ShaderBase::BuildRootSignature [%s]: %u SRV, %u UAV, %u CBV, "
-         "%u SRV_ARRAY, %u UAV_ARRAY, %u ROOT_SRV, %u ROOT_CONSTANTS",
-         m_name.c_str(),
-         m_numSRV, m_numUAV, m_numCBV,
-         m_numSRVArray, m_numUAVArray, m_numRootSRV, m_numRootConstants);
+    std::string buildLog;
+    auto AppendLogf = [&buildLog](const char* fmt, ...) {
+        char buf[512];
+        va_list args;
+        va_start(args, fmt);
+        vsnprintf(buf, sizeof(buf), fmt, args);
+        va_end(args);
+        buildLog += buf;
+        buildLog += '\n';
+    };
+
+    AppendLogf("ShaderBase::BuildRootSignature [%s]: %u SRV, %u UAV, %u CBV, "
+               "%u SRV_ARRAY, %u UAV_ARRAY, %u ROOT_SRV, %u ROOT_CONSTANTS",
+               m_name.c_str(),
+               m_numSRV, m_numUAV, m_numCBV,
+               m_numSRVArray, m_numUAVArray, m_numRootSRV, m_numRootConstants);
 
     // --- SRV descriptor ranges (SRV + TLAS) ---
     const size_t srvRangesOffset = allRanges.size();
@@ -205,8 +215,8 @@ bool ShaderBase::BuildRootSignature()
                                               D3D12_DESCRIPTOR_RANGE_FLAG_DATA_VOLATILE;
         r.OffsetInDescriptorsFromTableStart = b.heapOffset;
         allRanges.push_back(r);
-        Logf(kUnityLogTypeLog, "  SRV: '%s' t%u space%u heapOffset=%u",
-             b.name.c_str(), b.registerIndex, b.space, b.heapOffset);
+        AppendLogf("  SRV: '%s' t%u space%u heapOffset=%u",
+                   b.name.c_str(), b.registerIndex, b.space, b.heapOffset);
     }
 
     // --- UAV descriptor ranges ---
@@ -223,8 +233,8 @@ bool ShaderBase::BuildRootSignature()
                                               D3D12_DESCRIPTOR_RANGE_FLAG_DATA_VOLATILE;
         r.OffsetInDescriptorsFromTableStart = b.heapOffset;
         allRanges.push_back(r);
-        Logf(kUnityLogTypeLog, "  UAV: '%s' u%u space%u heapOffset=%u",
-             b.name.c_str(), b.registerIndex, b.space, b.heapOffset);
+        AppendLogf("  UAV: '%s' u%u space%u heapOffset=%u",
+                   b.name.c_str(), b.registerIndex, b.space, b.heapOffset);
     }
 
     // --- SRV_ARRAY descriptor ranges (unbounded) ---
@@ -241,7 +251,7 @@ bool ShaderBase::BuildRootSignature()
                                               D3D12_DESCRIPTOR_RANGE_FLAG_DATA_VOLATILE;
         r.OffsetInDescriptorsFromTableStart = 0;
         allRanges.push_back(r);
-        Logf(kUnityLogTypeLog, "  SRV_ARRAY: '%s' t%u space%u", b.name.c_str(), b.registerIndex, b.space);
+        AppendLogf("  SRV_ARRAY: '%s' t%u space%u", b.name.c_str(), b.registerIndex, b.space);
     }
 
     // --- UAV_ARRAY descriptor ranges (unbounded) ---
@@ -258,7 +268,7 @@ bool ShaderBase::BuildRootSignature()
                                               D3D12_DESCRIPTOR_RANGE_FLAG_DATA_VOLATILE;
         r.OffsetInDescriptorsFromTableStart = 0;
         allRanges.push_back(r);
-        Logf(kUnityLogTypeLog, "  UAV_ARRAY: '%s' u%u space%u", b.name.c_str(), b.registerIndex, b.space);
+        AppendLogf("  UAV_ARRAY: '%s' u%u space%u", b.name.c_str(), b.registerIndex, b.space);
     }
 
     std::vector<D3D12_ROOT_PARAMETER1> params;
@@ -276,7 +286,7 @@ bool ShaderBase::BuildRootSignature()
         p.DescriptorTable.pDescriptorRanges   = &allRanges[srvRangesOffset];
         p.ShaderVisibility                    = D3D12_SHADER_VISIBILITY_ALL;
         params.push_back(p);
-        Logf(kUnityLogTypeLog, "  Root param %u: SRV table (%u)", m_rootParamSRV, m_numSRV);
+        AppendLogf("  Root param %u: SRV table (%u)", m_rootParamSRV, m_numSRV);
     }
 
     // Optional — UAV descriptor table
@@ -289,7 +299,7 @@ bool ShaderBase::BuildRootSignature()
         p.DescriptorTable.pDescriptorRanges   = &allRanges[uavRangesOffset];
         p.ShaderVisibility                    = D3D12_SHADER_VISIBILITY_ALL;
         params.push_back(p);
-        Logf(kUnityLogTypeLog, "  Root param %u: UAV table (%u)", m_rootParamUAV, m_numUAV);
+        AppendLogf("  Root param %u: UAV table (%u)", m_rootParamUAV, m_numUAV);
     }
 
     // One table per SRV_ARRAY
@@ -305,7 +315,7 @@ bool ShaderBase::BuildRootSignature()
             p.DescriptorTable.pDescriptorRanges   = &allRanges[srvArrayRangesOffset + arrayIdx++];
             p.ShaderVisibility                    = D3D12_SHADER_VISIBILITY_ALL;
             params.push_back(p);
-            Logf(kUnityLogTypeLog, "  Root param %u: SRV_ARRAY '%s'", b.rootParam, b.name.c_str());
+            AppendLogf("  Root param %u: SRV_ARRAY '%s'", b.rootParam, b.name.c_str());
         }
     }
 
@@ -322,7 +332,7 @@ bool ShaderBase::BuildRootSignature()
             p.DescriptorTable.pDescriptorRanges   = &allRanges[uavArrayRangesOffset + arrayIdx++];
             p.ShaderVisibility                    = D3D12_SHADER_VISIBILITY_ALL;
             params.push_back(p);
-            Logf(kUnityLogTypeLog, "  Root param %u: UAV_ARRAY '%s'", b.rootParam, b.name.c_str());
+            AppendLogf("  Root param %u: UAV_ARRAY '%s'", b.rootParam, b.name.c_str());
         }
     }
 
@@ -340,8 +350,8 @@ bool ShaderBase::BuildRootSignature()
             p.Descriptor.RegisterSpace  = b.space;
             p.ShaderVisibility          = D3D12_SHADER_VISIBILITY_ALL;
             params.push_back(p);
-            Logf(kUnityLogTypeLog, "  Root param %u: CBV '%s' b%u space%u",
-                 b.rootParam, b.name.c_str(), b.registerIndex, b.space);
+            AppendLogf("  Root param %u: CBV '%s' b%u space%u",
+                       b.rootParam, b.name.c_str(), b.registerIndex, b.space);
         }
     }
 
@@ -360,8 +370,8 @@ bool ShaderBase::BuildRootSignature()
             p.Descriptor.Flags          = D3D12_ROOT_DESCRIPTOR_FLAG_DATA_VOLATILE;
             p.ShaderVisibility          = D3D12_SHADER_VISIBILITY_ALL;
             params.push_back(p);
-            Logf(kUnityLogTypeLog, "  Root param %u: ROOT_SRV '%s' t%u space%u",
-                 b.rootParam, b.name.c_str(), b.registerIndex, b.space);
+            AppendLogf("  Root param %u: ROOT_SRV '%s' t%u space%u",
+                       b.rootParam, b.name.c_str(), b.registerIndex, b.space);
         }
     }
 
@@ -377,8 +387,8 @@ bool ShaderBase::BuildRootSignature()
         p.Constants.Num32BitValues = b.num32BitValues;
         p.ShaderVisibility         = D3D12_SHADER_VISIBILITY_ALL;
         params.push_back(p);
-        Logf(kUnityLogTypeLog, "  Root param %u: ROOT_CONSTANTS '%s' b%u space%u num32=%u",
-             b.rootParam, b.name.c_str(), b.registerIndex, b.space, b.num32BitValues);
+        AppendLogf("  Root param %u: ROOT_CONSTANTS '%s' b%u space%u num32=%u",
+                   b.rootParam, b.name.c_str(), b.registerIndex, b.space, b.num32BitValues);
     }
 
     // --- Static samplers (Unity inline sampler naming convention) ---
@@ -421,9 +431,13 @@ bool ShaderBase::BuildRootSignature()
         sd.RegisterSpace    = sr.space;
         sd.ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
         samplers.push_back(sd);
-        Logf(kUnityLogTypeLog, "  Static sampler: '%s' filter=%u addr=%u s%u space%u maxLod=%g",
-             sr.name.c_str(), filter, addr, sr.reg, sr.space, maxLod);
+        AppendLogf("  Static sampler: '%s' filter=%u addr=%u s%u space%u maxLod=%g",
+                   sr.name.c_str(), filter, addr, sr.reg, sr.space, maxLod);
     }
+
+    AppendLogf("  %u root param(s), %u static sampler(s)",
+               static_cast<UINT>(params.size()), static_cast<UINT>(samplers.size()));
+    Log(kUnityLogTypeLog, buildLog.c_str());
 
     // --- Validate register spaces ---
     bool spaceValid = true;
@@ -469,9 +483,6 @@ bool ShaderBase::BuildRootSignature()
     D3D12_VERSIONED_ROOT_SIGNATURE_DESC vrsDesc = {};
     vrsDesc.Version  = D3D_ROOT_SIGNATURE_VERSION_1_2;
     vrsDesc.Desc_1_2 = rsDesc2;
-
-    Logf(kUnityLogTypeLog, "  %u root param(s), %u static sampler(s)",
-         rsDesc2.NumParameters, rsDesc2.NumStaticSamplers);
 
     ComPtr<ID3DBlob> sigBlob, errBlob;
     HRESULT hr = D3D12SerializeVersionedRootSignature(&vrsDesc, &sigBlob, &errBlob);
