@@ -80,10 +80,11 @@ SharedUploadPool g_uploadPool;
 // Deferred delete queue — delays destruction of GPU-facing objects until the
 // GPU has finished executing all commands that may reference them.
 //
-// Each frame NR_FrameTick() signals s_DeletionFence with an incrementing value.
-// Destroy functions push entries tagged with (current fence value + kDeleteDelay)
-// instead of immediately deleting.  DrainDeferredDeletes() frees entries whose
-// safeAfterValue <= fence->GetCompletedValue().
+// Destroy functions push entries tagged with max(GetNextFrameFenceValue(),
+// GetFrameFence()->GetCompletedValue()) + kDeleteDelay — i.e. the fence value the
+// current frame's GPU work will reach, but never below current GPU progress (see
+// EnqueueCleanup for why the clamp is required), instead of deleting immediately.
+// DrainDeferredDeletes() frees entries whose tag <= GetFrameFence()->GetCompletedValue().
 // ---------------------------------------------------------------------------
 
 using DeletionTask = std::function<void()>;
@@ -93,24 +94,36 @@ static std::mutex s_DeletionMutex;
 
 // Forward declarations
 static void PluginLog(UnityLogType type, const char* msg, const char* file, int line);
+static void PluginLogFmt(UnityLogType type, const char* file, int line, const char* fmt, ...);
+
+#define NR_LOG(fmt, ...)   PluginLogFmt(kUnityLogTypeLog,     __FILE__, __LINE__, fmt, ##__VA_ARGS__)
+#define NR_WARN(fmt, ...)  PluginLogFmt(kUnityLogTypeWarning, __FILE__, __LINE__, fmt, ##__VA_ARGS__)
+#define NR_ERROR(fmt, ...) PluginLogFmt(kUnityLogTypeError,   __FILE__, __LINE__, fmt, ##__VA_ARGS__)
 
 // kDeleteDelay: number of frames to wait before freeing.
 // Unity D3D12 uses up to 2 frames in flight; 3 provides a safe margin.
 static constexpr int kDeleteDelay = 3;
 
-
 void EnqueueCleanup(std::function<void()>&& cleanupTask)
 {
     if (!cleanupTask) return;
 
-    uint64_t fenceValue = s_D3D12->GetNextFrameFenceValue() + kDeleteDelay;
-
-    if(fenceValue == 4){
-        fenceValue = 20; 
+    // In a packaged player GetNextFrameFenceValue() can return a stale, too-low
+    // value (observed: 1) while the frame fence has already completed a higher
+    // value (observed: 8). Tagging against the stale value schedules the resource
+    // for deletion at a fence the GPU has *already* passed, so the next drain frees
+    // it while it is still in use -> GPU hang (DXGI_ERROR_DEVICE_HUNG 0x887a0006).
+    // Clamp the base to the current completed value so the tag is always strictly
+    // ahead of GPU progress by kDeleteDelay frames.
+    uint64_t completed = 0;
+    if (s_D3D12)
+    {
+        if (ID3D12Fence* fence = s_D3D12->GetFrameFence())
+            completed = fence->GetCompletedValue();
     }
-    // char logMsg[128];
-    // snprintf(logMsg, sizeof(logMsg), "Enqueueing Cleanup Task for Fence Value: %llu", fenceValue);
-    // PluginLog(kUnityLogTypeLog, logMsg, __FILE__, __LINE__);
+    const uint64_t next       = s_D3D12 ? s_D3D12->GetNextFrameFenceValue() : 0;
+    const uint64_t base       = next > completed ? next : completed;
+    const uint64_t fenceValue = base + kDeleteDelay;
 
     std::lock_guard<std::mutex> lk(s_DeletionMutex);
     s_DeletionQueue[fenceValue].emplace_back(std::move(cleanupTask));
@@ -160,13 +173,16 @@ static void DrainDeferredDeletes(bool force = false)
     if (!force)
         g_frameIndex = (g_frameIndex + 1) % kGlobalNumFrames;
 
-    // 获取当前 GPU 已完成的 Fence 值
-    uint64_t completedValue = (s_D3D12 && !force) ? s_D3D12->GetFrameFence()->GetCompletedValue() : UINT64_MAX;
+    // 获取当前 GPU 已完成的 Fence 值 (null-check the fence: it may not exist yet on
+    // the first frame of a packaged player).
+    ID3D12Fence* frameFence = s_D3D12 ? s_D3D12->GetFrameFence() : nullptr;
+    uint64_t completedValue = (frameFence && !force) ? frameFence->GetCompletedValue() : UINT64_MAX;
 
     std::vector<std::vector<DeletionTask>> tasksToExecute;
 
     {
         std::lock_guard<std::mutex> lk(s_DeletionMutex);
+
         auto it = s_DeletionQueue.begin();
         while (it != s_DeletionQueue.end())
         {
@@ -178,16 +194,6 @@ static void DrainDeferredDeletes(bool force = false)
             it = s_DeletionQueue.erase(it);
         }
     }
-
-    char logMsg[256];
-
-    auto countTasks = 0;
-    for (const auto& batch : tasksToExecute)
-        countTasks += batch.size();
-
-    // snprintf(logMsg, sizeof(logMsg), "Draining Deferred Deletes: executing %zu batches, %d tasks in Frame %llu (force=%d)", tasksToExecute.size(), countTasks, completedValue, force);
-    // PluginLog(kUnityLogTypeLog, logMsg, __FILE__, __LINE__);
-
 
     // 在锁外执行真正的析构操作，防止死锁并减少锁占用时间
     for (auto& batch : tasksToExecute)
@@ -290,10 +296,6 @@ static void PluginLogFmt(UnityLogType type, const char* file, int line, const ch
 }
 
 static void FlushGpuAndWait();
-
-#define NR_LOG(fmt, ...)   PluginLogFmt(kUnityLogTypeLog,     __FILE__, __LINE__, fmt, ##__VA_ARGS__)
-#define NR_WARN(fmt, ...)  PluginLogFmt(kUnityLogTypeWarning, __FILE__, __LINE__, fmt, ##__VA_ARGS__)
-#define NR_ERROR(fmt, ...) PluginLogFmt(kUnityLogTypeError,   __FILE__, __LINE__, fmt, ##__VA_ARGS__)
 
 // Bridge D3D12HeapHook logs into Unity's log (called from any thread).
 static void HeapHookLogBridge(int level, const char* msg)
@@ -976,10 +978,17 @@ static void UNITY_INTERFACE_API FrameTickCallback(int /*eventId*/)
     // and record this frame's high-water mark against the value the fence will
     // reach once this frame's GPU work finishes. kDeleteDelay matches the safety
     // margin used by the deferred-delete queue so the lifetime semantics align.
-    if (s_D3D12 && g_transientRing.IsInitialized())
+    ID3D12Fence* tickFence = s_D3D12 ? s_D3D12->GetFrameFence() : nullptr;
+    if (tickFence && g_transientRing.IsInitialized())
     {
-        const uint64_t completedValue = s_D3D12->GetFrameFence()->GetCompletedValue();
-        const uint64_t frameFence     = s_D3D12->GetNextFrameFenceValue() + kDeleteDelay;
+        const uint64_t completedValue = tickFence->GetCompletedValue();
+        // Clamp against completedValue for the same reason as EnqueueCleanup: a
+        // stale-low GetNextFrameFenceValue() (observed 1 vs completed 8) would tag
+        // this frame's slots/chunks for reuse below current GPU progress, recycling
+        // them while still in flight. See EnqueueCleanup for details.
+        const uint64_t nextValue  = s_D3D12->GetNextFrameFenceValue();
+        const uint64_t base       = nextValue > completedValue ? nextValue : completedValue;
+        const uint64_t frameFence = base + kDeleteDelay;
         g_transientRing.EndFrame(frameFence, completedValue);
 
         // Recycle shared upload chunks under the same frame-fence discipline.
