@@ -1,143 +1,103 @@
 using System;
-using System.Runtime.InteropServices;
-using Unity.Collections;
 using Unity.Collections.LowLevel.Unsafe;
-using UnityEngine;
 using UnityEngine.Rendering;
 using UnityEngine.Rendering.RenderGraphModule;
 using UnityEngine.Rendering.Universal;
 
 namespace NativeRender
 {
+    /// <summary>
+    /// Volatile (dynamic) constant buffer — the nvrhi volatile-constant-buffer model.
+    ///
+    /// There is no persistent GPU resource and no CPU-side multi-buffering. Each upload
+    /// packs the data into a self-contained, plugin-owned blob ([handle][bytes][payload]),
+    /// hands the pointer to a single render-thread event, and the plugin copies it into a
+    /// fresh suballocation of the shared UPLOAD pool (fence-recycled) and frees the blob.
+    /// Because nothing persistent is shared between the main and render threads, the old
+    /// triple-buffered source arrays are gone.
+    ///
+    /// The buffer is bound as a root CBV by GPU VA; it must be uploaded every frame before
+    /// it is bound (volatile semantics).
+    /// </summary>
     public sealed class NativeBuffer : IDisposable
     {
         public  ulong Handle { get; private set; }
         private bool  _disposed;
 
-        private const    int BufferCount  = 3; // 三缓冲
-        private          int _bufferIndex = 0;
-        private readonly int _singleFrameSize;
+        private readonly int _sizeInBytes;
 
-        // 1. 数据缓冲区数组
-        private NativeArray<byte>[] _frameDataArray;
-
-        // 2. 参数缓冲区数组 (用于传递给 Native)
-        private NativeArray<UploadParams>[] _paramsArray;
+        // Blob layout (must match NbUploadHeader in Plugin.cpp):
+        //   [ ulong bufferHandle ][ uint bytes ][ uint pad ][ payload bytes ]
+        private const int HeaderSize = 16;
 
         private readonly InternalUploadPass _internalPass;
-
-        [StructLayout(LayoutKind.Sequential)]
-        struct UploadParams
-        {
-            public ulong  BufferHandle;
-            public IntPtr SourceDataPtr;
-            public uint   Size;
-        }
 
         public NativeBuffer(int sizeInBytes)
         {
             if (sizeInBytes <= 0) throw new ArgumentOutOfRangeException(nameof(sizeInBytes));
 
-            _singleFrameSize = (sizeInBytes + 255) & ~255;
-            // Volatile constant buffer: per-frame UPLOAD ring (BufferCount versions).
+            _sizeInBytes = (sizeInBytes + 255) & ~255;
+            // Volatile constant buffer: no backing resource, suballocated per upload.
             Handle = NativeRenderPlugin.NR_CreateNativeBuffer(
-                (ulong)_singleFrameSize, 0u, (uint)BufferCount,
+                (ulong)_sizeInBytes, 0u, 1u,
                 /*canHaveUAVs*/ 0u, /*isConstantBuffer*/ 1u, /*isVolatile*/ 1u);
-
-            _frameDataArray = new NativeArray<byte>[BufferCount];
-            _paramsArray    = new NativeArray<UploadParams>[BufferCount];
-
-            for (int i = 0; i < BufferCount; i++)
-            {
-                _frameDataArray[i] = new NativeArray<byte>(_singleFrameSize, Allocator.Persistent);
-                _paramsArray[i]    = new NativeArray<UploadParams>(1, Allocator.Persistent);
-            }
 
             _internalPass = new InternalUploadPass(this);
         }
 
-        public void AdvanceFrame()
+        /// <summary>
+        /// Builds a plugin-owned upload blob holding <paramref name="data"/>. The render-thread
+        /// callback copies it into the upload pool and frees it. Returns IntPtr.Zero on failure.
+        /// </summary>
+        private unsafe IntPtr BuildBlob<T>(T data) where T : unmanaged
         {
-            _bufferIndex = (_bufferIndex + 1) % BufferCount;
+            int bytes = Math.Min(sizeof(T), _sizeInBytes);
+
+            IntPtr blob = NativeRenderPlugin.NR_NSB_AllocFlushBuffer((uint)(HeaderSize + bytes));
+            if (blob == IntPtr.Zero) return IntPtr.Zero;
+
+            byte* p = (byte*)blob;
+            *(ulong*)(p + 0) = Handle;
+            *(uint*)(p + 8)  = (uint)bytes;
+            *(uint*)(p + 12) = 0u;
+            UnsafeUtility.MemCpy(p + HeaderSize, UnsafeUtility.AddressOf(ref data), bytes);
+            return blob;
         }
-        
-        
-        // todo 目前要手动确保每帧只调用一次
-        public unsafe void Upload<T>(ScriptableRenderer renderer, T data) where T : unmanaged
+
+        /// <summary>
+        /// Records an upload of <paramref name="data"/> by enqueuing a BeforeRendering pass that
+        /// issues the plugin event. Call once per frame before the buffer is bound.
+        /// </summary>
+        public void Upload<T>(ScriptableRenderer renderer, T data) where T : unmanaged
         {
             if (_disposed) return;
 
+            IntPtr blob = BuildBlob(data);
+            if (blob == IntPtr.Zero) return;
 
-            AdvanceFrame();
-            
-            // 拷贝数据到当前帧对应的缓冲区
-            var   currentData = _frameDataArray[_bufferIndex];
-            void* srcPtr      = UnsafeUtility.AddressOf(ref data);
-            void* dstPtr      = currentData.GetUnsafePtr();
-            UnsafeUtility.MemCpy(dstPtr, srcPtr, Math.Min(sizeof(T), _singleFrameSize));
-
-            _internalPass.Setup(_bufferIndex);
+            _internalPass.Setup(blob);
             renderer.EnqueuePass(_internalPass);
         }
-        
-        public unsafe void UploadDirect<T>(UnsafeCommandBuffer cmd, T[] data) where T : unmanaged
-        {
-            if (_disposed || data == null || data.Length == 0) return;
 
-            AdvanceFrame();
-
-            // 固定托管数组地址进行拷贝
-            fixed (void* srcPtr = data)
-            {
-                void* dstPtr     = _frameDataArray[_bufferIndex].GetUnsafePtr();
-                long  sizeToCopy = Math.Min((long)data.Length * UnsafeUtility.SizeOf<T>(), (long)_singleFrameSize);
-                UnsafeUtility.MemCpy(dstPtr, srcPtr, sizeToCopy);
-            }
-
-            Execute(cmd, _bufferIndex);
-        }
-
-        public unsafe void UploadDirect<T>(UnsafeCommandBuffer cmd, T data) where T : unmanaged
+        /// <summary>
+        /// Records an upload of <paramref name="data"/> directly onto <paramref name="cmd"/>.
+        /// </summary>
+        public void UploadDirect<T>(UnsafeCommandBuffer cmd, T data) where T : unmanaged
         {
             if (_disposed) return;
 
-            AdvanceFrame();
+            IntPtr blob = BuildBlob(data);
+            if (blob == IntPtr.Zero) return;
 
-            void* srcPtr = UnsafeUtility.AddressOf(ref data);
-            void* dstPtr = _frameDataArray[_bufferIndex].GetUnsafePtr();
-            UnsafeUtility.MemCpy(dstPtr, srcPtr, Math.Min(sizeof(T), _singleFrameSize));
-
-            Execute(cmd, _bufferIndex);
-        }
-
-        private unsafe void Execute(UnsafeCommandBuffer cmd, int index)
-        {
-            var currentParams = _paramsArray[index];
-
-            currentParams[0] = new UploadParams
-            {
-                BufferHandle  = Handle,
-                SourceDataPtr = (IntPtr)_frameDataArray[index].GetUnsafePtr(),
-                Size          = (uint)_singleFrameSize
-            };
-
-            // 获取参数的固定地址传给 Native
-            IntPtr pParams = (IntPtr)currentParams.GetUnsafePtr();
-
-            // 这里的 eventId 可以自定义，data 传入参数指针
-            // 注意：Native 层收到该指针后只能读取，不能 free
-            cmd.IssuePluginEventAndData(NativeRenderPlugin.GetNativeBufferUploadCallbackPtr(), 0x01, pParams);
+            cmd.IssuePluginEventAndData(NativeRenderPlugin.GetNativeBufferUploadCallbackPtr(), 0x01, blob);
         }
 
         private class InternalUploadPass : ScriptableRenderPass
         {
             private readonly NativeBuffer _owner;
-            private          int          _recordedIndex;
+            private          IntPtr       _blob;
 
-            public void Setup(int index)
-            {
-                _recordedIndex = index;
-            }
+            public void Setup(IntPtr blob) => _blob = blob;
 
             public InternalUploadPass(NativeBuffer owner)
             {
@@ -149,29 +109,30 @@ namespace NativeRender
             {
                 using var builder = renderGraph.AddUnsafePass<UploadPassData>("NativeBufferUpload", out var passData);
 
-
-                passData.BufferIndex = _recordedIndex;
+                passData.Blob = _blob;
 
                 builder.AllowPassCulling(false);
-                builder.SetRenderFunc((UploadPassData data, UnsafeGraphContext context) => { _owner.Execute(context.cmd, data.BufferIndex); });
+                builder.SetRenderFunc((UploadPassData data, UnsafeGraphContext context) =>
+                {
+                    context.cmd.IssuePluginEventAndData(
+                        NativeRenderPlugin.GetNativeBufferUploadCallbackPtr(), 0x01, data.Blob);
+                });
             }
 
             class UploadPassData
             {
-                public int BufferIndex;
+                public IntPtr Blob;
             }
         }
 
         public void Dispose()
         {
             if (_disposed) return;
-            for (int i = 0; i < BufferCount; i++)
+            if (Handle != 0)
             {
-                if (_frameDataArray[i].IsCreated) _frameDataArray[i].Dispose();
-                if (_paramsArray[i].IsCreated) _paramsArray[i].Dispose();
+                NativeRenderPlugin.NR_DestroyNativeBuffer(Handle);
+                Handle = 0;
             }
-
-            if (Handle != 0) NativeRenderPlugin.NR_DestroyNativeBuffer(Handle);
             _disposed = true;
         }
     }

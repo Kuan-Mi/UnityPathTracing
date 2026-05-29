@@ -518,8 +518,19 @@ void DescriptorSetBase<ShaderT>::BindRootParams(
             const auto& b = bindings[i];
             if (b.type != BindingType::CBV) continue;
             const BindingSlot& slot = (i < slotCount) ? slots[i] : BindingSlot{};
-            ID3D12Resource* res = ResolveBoundResource(slot);
-            D3D12_GPU_VIRTUAL_ADDRESS addr = res ? res->GetGPUVirtualAddress() : 0;
+            // A NativeBuffer resolves its own VA: volatile buffers have no resource
+            // and return the current upload-pool suballocation's address; everything
+            // else binds the raw resource's base VA.
+            D3D12_GPU_VIRTUAL_ADDRESS addr = 0;
+            if (slot.objectKind == BindingObjectKind::NativeBuffer && slot.objectPtr)
+            {
+                addr = reinterpret_cast<INativeResource*>(slot.objectPtr)->GetGpuVirtualAddress();
+            }
+            else
+            {
+                ID3D12Resource* res = ResolveBoundResource(slot);
+                addr = res ? res->GetGPUVirtualAddress() : 0;
+            }
             cmdList->SetComputeRootConstantBufferView(rootParamCBVBase + b.heapOffset, addr);
         }
     }

@@ -636,13 +636,17 @@ struct ShtRebuildEventData
 };  // 24 bytes
 #pragma pack(pop)
 
-// NativeBuffer update event data - passed to NativeBufferUpdateCallback
+// NativeBuffer volatile-upload blob: [ NbUploadHeader ][ payload bytes ].
+// Self-contained and plugin-owned (malloc'd via NR_NSB_AllocFlushBuffer on the C#
+// main thread, freed by the render-thread callback after the data is copied into
+// a fresh upload-pool slice). Because nothing persistent is shared across the
+// main/render threads, the C# side needs no triple-buffered source array.
 #pragma pack(push, 4)
-struct UploadParams
+struct NbUploadHeader
 {
-    NativeBuffer* bufferInstance; // 对应 C# 的 ulong BufferPtr
-    void* sourceData;             // 对应 C# 的 IntPtr SourceData
-    uint32_t size;
+    uint64_t bufferHandle; // NativeBuffer*
+    uint32_t bytes;
+    uint32_t _pad;
 };
 #pragma pack(pop)
 
@@ -1370,13 +1374,14 @@ static void UNITY_INTERFACE_API NativeBufferUploadCallback(int /*eventId*/, void
 {
     if (!data) return;
 
-    auto* params = static_cast<UploadParams*>(data);
-
-    if (params->bufferInstance && params->sourceData)
+    const auto* hdr = static_cast<const NbUploadHeader*>(data);
+    if (hdr->bufferHandle && hdr->bytes)
     {
-        params->bufferInstance->Upload(params->sourceData, params->size);
+        auto* nb = reinterpret_cast<NativeBuffer*>(hdr->bufferHandle);
+        nb->Upload(static_cast<const uint8_t*>(data) + sizeof(NbUploadHeader), hdr->bytes);
     }
 
+    std::free(data);
 }
 
 extern "C" UnityRenderingEventAndData UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API

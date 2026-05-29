@@ -55,10 +55,15 @@ struct NsbReadbackRequest
 //   and the active upload/readback code path:
 //
 //     * Volatile constant/dynamic buffer  (the old NativeBuffer)
-//         isVolatile = true, maxVersions = N (>1)
-//         => N persistently-mapped UPLOAD-heap slots, one written per frame
-//            (g_frameIndex). GetResource() resolves the current frame's slot.
-//            CPU writes via Upload(); no copy command, no staging.
+//         isVolatile = true
+//         => no persistent resource. Each Upload() suballocates a fresh slice
+//            from the shared UPLOAD chunk pool (g_uploadPool), memcpys the data,
+//            and records that slice's GPU VA. The buffer is bound as a root CBV
+//            by that VA (GetGpuVirtualAddress); GetResource() returns nullptr.
+//            This mirrors nvrhi's d3d12 volatile-constant-buffer model
+//            (CommandList::writeBuffer + m_VolatileConstantBufferAddresses):
+//            recycling is frame-fence-gated, not a fixed mod-N slot ring, so the
+//            buffer must be written every frame before it is bound.
 //
 //     * GPU-resident DEFAULT buffer with staged CPU writes  (the old
 //       NativeStructuredBuffer)
@@ -79,10 +84,10 @@ struct NativeBufferDesc
 {
     uint64_t byteSize         = 0;     // total size in bytes
     uint32_t structStride     = 0;     // element stride; 0 = raw/typed buffer
-    uint32_t maxVersions      = 1;     // >1 => per-frame UPLOAD ring (requires isVolatile)
+    uint32_t maxVersions      = 1;     // nvrhi-parity field; unused on D3D12 (pool handles versioning)
     bool     canHaveUAVs      = false; // ALLOW_UNORDERED_ACCESS on the DEFAULT resource
     bool     isConstantBuffer = false; // round byteSize up to the 256-byte CBV alignment
-    bool     isVolatile       = false; // UPLOAD heap, persistently mapped, per-frame versions
+    bool     isVolatile       = false; // dynamic CB: per-write upload-pool suballocation, bound by VA
 };
 
 /// <summary>
@@ -101,9 +106,11 @@ public:
 
     bool Initialize(ID3D12Device* device, const NativeBufferDesc& desc, IUnityLog* log = nullptr);
 
-    // --- Volatile / UPLOAD-ring path (the old NativeBuffer) ---------------------
-    // Copy |bytes| into the current frame's mapped slot (g_frameIndex). No-op for
-    // non-volatile buffers.
+    // --- Volatile path (nvrhi-style dynamic constant buffer) --------------------
+    // Suballocate a fresh slice from the shared UPLOAD pool, copy |bytes| into it,
+    // and record its GPU VA for the next bind. Called on the render thread, before
+    // the dispatch that reads it (event ordering guarantees within-frame currency).
+    // No-op for non-volatile buffers.
     void Upload(const void* data, uint32_t bytes);
 
     // --- DEFAULT staged-copy path (the old NativeStructuredBuffer) --------------
@@ -142,10 +149,12 @@ public:
     /// </summary>
     bool TryReadback(uint64_t completedFenceValue, void* dst, uint64_t dstBytes);
 
-    // The underlying D3D12 resource. For volatile buffers this resolves to the
-    // current frame's slot (g_frameIndex); otherwise the single DEFAULT resource.
+    // The single DEFAULT-heap resource for non-volatile buffers; nullptr for
+    // volatile buffers (they have no persistent resource — bound by VA).
     ID3D12Resource*           GetResource() const override;
-    D3D12_GPU_VIRTUAL_ADDRESS GetGPUVA() const;
+    // Volatile: the current suballocation's offset-correct VA. Otherwise the
+    // resource base VA.
+    D3D12_GPU_VIRTUAL_ADDRESS GetGpuVirtualAddress() const override;
 
     const NativeBufferDesc& GetDesc()  const { return m_desc; }
     uint32_t SizeInBytes() const { return static_cast<uint32_t>(m_desc.byteSize); }
@@ -154,17 +163,16 @@ public:
     bool     AllowsUAV()   const { return m_desc.canHaveUAVs; }
 
 private:
-    static constexpr uint32_t kMaxFrames = 3;
-
     ID3D12Device*    m_device = nullptr;
     NativeBufferDesc m_desc{};
     IUnityLog*       m_log = nullptr;
 
-    // Volatile: m_versions[0..m_versionCount) are UPLOAD-heap, persistently mapped.
-    // Non-volatile: only m_versions[0] is used (DEFAULT heap) and m_mapped is null.
-    ComPtr<ID3D12Resource> m_versions[kMaxFrames];
-    void*                  m_mapped[kMaxFrames] = {};
-    uint32_t               m_versionCount = 1;
+    // Non-volatile (DEFAULT heap): the single GPU-resident resource.
+    ComPtr<ID3D12Resource> m_buffer;
+
+    // Volatile: latest upload-pool suballocation recorded by Upload(). The chunk
+    // resource is owned by g_uploadPool (not by this buffer); we only cache its VA.
+    D3D12_GPU_VIRTUAL_ADDRESS m_volatileGpuVA = 0;
 
     // GPU->CPU readback staging (READBACK heap, permanently in COPY_DEST). Lazily sized.
     ComPtr<ID3D12Resource> m_readbackBuffer;
@@ -174,10 +182,6 @@ private:
     bool                   m_readbackPending     = false;
 
     void Log(const char* msg) const;
-    bool AllocUploadRing();
     bool AllocDefault();
     bool EnsureReadbackCapacity(uint64_t bytes);
-
-    // Index of the slot the current frame reads/writes.
-    uint32_t CurrentSlot() const;
 };

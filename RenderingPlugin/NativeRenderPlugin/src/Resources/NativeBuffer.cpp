@@ -10,25 +10,18 @@
 //
 // One class covering the three former buffer wrappers, selected by
 // NativeBufferDesc (nvrhi BufferDesc analog):
-//   * isVolatile        -> UPLOAD-heap ring, persistently mapped (Upload()).
+//   * isVolatile        -> no persistent resource; each Upload() suballocates a
+//                          fresh slice from the shared UPLOAD pool (g_uploadPool)
+//                          and records its VA, bound as a root CBV by that VA.
+//                          Mirrors nvrhi CommandList::writeBuffer for volatile CBs.
 //   * DEFAULT + stride  -> GPU-resident, CPU writes staged via UploadSnapshot()
-//                          through the shared UPLOAD chunk pool (g_uploadPool),
-//                          mirroring nvrhi's CommandList::writeBuffer.
+//                          through g_uploadPool, mirroring nvrhi's writeBuffer
+//                          for non-volatile buffers.
 //   * canHaveUAVs       -> ALLOW_UNORDERED_ACCESS on the DEFAULT resource.
 // GPU->CPU readback (RequestReadback/TryReadback) is available on DEFAULT buffers.
 // ---------------------------------------------------------------------------
 
-NativeBuffer::~NativeBuffer()
-{
-    for (uint32_t i = 0; i < kMaxFrames; ++i)
-    {
-        if (m_mapped[i] && m_versions[i])
-        {
-            m_versions[i]->Unmap(0, nullptr);
-            m_mapped[i] = nullptr;
-        }
-    }
-}
+NativeBuffer::~NativeBuffer() = default;
 
 void NativeBuffer::Log(const char* msg) const
 {
@@ -39,55 +32,11 @@ void NativeBuffer::Log(const char* msg) const
         OutputDebugStringA(msg);
 }
 
-uint32_t NativeBuffer::CurrentSlot() const
-{
-    return (m_versionCount > 1) ? (g_frameIndex % m_versionCount) : 0u;
-}
-
-// ---------------------------------------------------------------------------
-// Volatile UPLOAD-heap ring: |maxVersions| persistently-mapped slots, one
-// written per frame. (The old NativeBuffer.)
-// ---------------------------------------------------------------------------
-bool NativeBuffer::AllocUploadRing()
-{
-    m_versionCount = (m_desc.maxVersions == 0) ? 1u
-                   : (m_desc.maxVersions > kMaxFrames ? kMaxFrames : m_desc.maxVersions);
-
-    D3D12_HEAP_PROPERTIES heapProps = {};
-    heapProps.Type = D3D12_HEAP_TYPE_UPLOAD;
-
-    D3D12_RESOURCE_DESC desc = {};
-    desc.Dimension        = D3D12_RESOURCE_DIMENSION_BUFFER;
-    desc.Width            = m_desc.byteSize;
-    desc.Height           = 1;
-    desc.DepthOrArraySize = 1;
-    desc.MipLevels        = 1;
-    desc.SampleDesc.Count = 1;
-    desc.Layout           = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
-    desc.Flags            = D3D12_RESOURCE_FLAG_NONE;
-
-    D3D12_RANGE readRange = { 0, 0 };
-
-    for (uint32_t i = 0; i < m_versionCount; ++i)
-    {
-        HRESULT hr = m_device->CreateCommittedResource(
-            &heapProps, D3D12_HEAP_FLAG_NONE, &desc,
-            D3D12_RESOURCE_STATE_GENERIC_READ, nullptr, IID_PPV_ARGS(&m_versions[i]));
-        if (FAILED(hr)) return false;
-
-        hr = m_versions[i]->Map(0, &readRange, &m_mapped[i]);
-        if (FAILED(hr)) return false;
-    }
-    return true;
-}
-
 // ---------------------------------------------------------------------------
 // DEFAULT-heap single resource (the old NativeStructuredBuffer / NativeGpuBuffer).
 // ---------------------------------------------------------------------------
 bool NativeBuffer::AllocDefault()
 {
-    m_versionCount = 1;
-
     D3D12_HEAP_PROPERTIES heapProps = {};
     heapProps.Type = D3D12_HEAP_TYPE_DEFAULT;
 
@@ -105,7 +54,7 @@ bool NativeBuffer::AllocDefault()
     HRESULT hr = m_device->CreateCommittedResource(
         &heapProps, D3D12_HEAP_FLAG_NONE, &desc,
         D3D12_RESOURCE_STATE_COMMON, // safe start state; promotes to SRV/UAV, transitions to COPY_DEST
-        nullptr, IID_PPV_ARGS(&m_versions[0]));
+        nullptr, IID_PPV_ARGS(&m_buffer));
     if (FAILED(hr)) return false;
 
     // Name the resource so PIX captures and D3D12 debug-layer messages are readable.
@@ -113,7 +62,7 @@ bool NativeBuffer::AllocDefault()
     swprintf_s(name, L"NativeBuffer(bytes=%llu,stride=%u%s)",
                static_cast<unsigned long long>(m_desc.byteSize), m_desc.structStride,
                m_desc.canHaveUAVs ? L",uav" : L"");
-    m_versions[0]->SetName(name);
+    m_buffer->SetName(name);
     return true;
 }
 
@@ -133,26 +82,42 @@ bool NativeBuffer::Initialize(ID3D12Device* device, const NativeBufferDesc& desc
         m_desc.byteSize = (m_desc.byteSize + kAlign - 1) & ~(kAlign - 1);
     }
 
-    return m_desc.isVolatile ? AllocUploadRing() : AllocDefault();
+    // Volatile buffers allocate nothing up front — each Upload() pulls a fresh
+    // slice from the shared upload pool (nvrhi's volatile model).
+    return m_desc.isVolatile ? true : AllocDefault();
 }
 
 ID3D12Resource* NativeBuffer::GetResource() const
 {
-    return m_versions[CurrentSlot()].Get();
+    // Volatile buffers have no persistent resource; they are bound by VA.
+    return m_desc.isVolatile ? nullptr : m_buffer.Get();
 }
 
-D3D12_GPU_VIRTUAL_ADDRESS NativeBuffer::GetGPUVA() const
+D3D12_GPU_VIRTUAL_ADDRESS NativeBuffer::GetGpuVirtualAddress() const
 {
-    ID3D12Resource* r = m_versions[CurrentSlot()].Get();
-    return r ? r->GetGPUVirtualAddress() : 0;
+    if (m_desc.isVolatile) return m_volatileGpuVA;
+    return m_buffer ? m_buffer->GetGPUVirtualAddress() : 0;
 }
 
 void NativeBuffer::Upload(const void* data, uint32_t bytes)
 {
     assert(bytes <= m_desc.byteSize);
-    const uint32_t slot = CurrentSlot();
-    if (!data || !m_mapped[slot]) return;
-    memcpy(m_mapped[slot], data, bytes);
+    if (!data || bytes == 0 || !m_desc.isVolatile) return;
+
+    // Suballocate a fresh slice from the shared UPLOAD pool, aligned for a CBV,
+    // and record its offset-correct GPU VA for the next bind. The chunk lifetime
+    // is frame-fence-gated by the pool, so the VA stays valid until this frame's
+    // GPU work completes (the buffer must be re-uploaded each frame before use).
+    SharedUploadPool::Allocation alloc =
+        g_uploadPool.Allocate(bytes, D3D12_CONSTANT_BUFFER_DATA_PLACEMENT_ALIGNMENT);
+    if (!alloc.IsValid())
+    {
+        Log("[NativeBuffer::Upload] shared upload allocation failed");
+        return;
+    }
+
+    memcpy(alloc.cpu, data, bytes);
+    m_volatileGpuVA = alloc.resource->GetGPUVirtualAddress() + alloc.offset;
 }
 
 void NativeBuffer::UploadSnapshot(ID3D12GraphicsCommandList* cmdList,
@@ -164,7 +129,7 @@ void NativeBuffer::UploadSnapshot(ID3D12GraphicsCommandList* cmdList,
     assert(cmdList);
     if (!cmdList || !ranges || rangeCount == 0 || !payload) return;
 
-    ID3D12Resource* buffer = m_versions[0].Get();
+    ID3D12Resource* buffer = m_buffer.Get();
     if (!buffer) return;
 
     const uint32_t stride = m_desc.structStride;
@@ -279,7 +244,7 @@ void NativeBuffer::RequestReadback(ID3D12GraphicsCommandList* cmdList,
     assert(cmdList);
     if (!cmdList || bytes == 0) return;
 
-    ID3D12Resource* buffer = m_versions[0].Get();
+    ID3D12Resource* buffer = m_buffer.Get();
     if (!buffer) return;
 
     // Clamp to the buffer's byte size.
