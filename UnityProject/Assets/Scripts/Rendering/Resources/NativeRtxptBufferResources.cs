@@ -63,13 +63,13 @@ namespace PathTracing
         /// GPU-resident native buffer: CPU uploads the analytic-light sub-range while compute
         /// passes write env-quad-node and emissive-triangle entries via UAV. Stable native ptr.
         /// </summary>
-        public NativeStructuredBuffer LightBuffer;
+        public UploadBuffer LightBuffer;
 
         /// <summary>
         /// Extended per-light data array. MaxLights elements.
         /// HLSL: u_lightsExBuffer (u2). Same CPU-upload + GPU-UAV model as <see cref="LightBuffer"/>.
         /// </summary>
-        public NativeStructuredBuffer LightExBuffer;
+        public UploadBuffer LightExBuffer;
 
         /// <summary>
         /// Scratch buffer for light processing passes.
@@ -116,10 +116,10 @@ namespace PathTracing
 
         // ── Env map baker constant buffers ────────────────────────────────────
         /// <summary>Constant buffer for the base-layer env bake pass. 704 bytes.</summary>
-        public NativeBuffer EnvBakerCb;
+        public VolatileConstantBuffer EnvBakerCb;
 
         /// <summary>Constant buffer for the importance baker pass. 48 bytes.</summary>
-        public NativeBuffer ImportanceBakerCb;
+        public VolatileConstantBuffer ImportanceBakerCb;
 
         // ── Cached native pointers ────────────────────────────────────────────
         // Resolution-dependent buffers — valid after EnsureResources(), cleared on resize
@@ -255,13 +255,13 @@ namespace PathTracing
             // LightBuffer / LightExBuffer — match PolymorphicLightInfo (32B) and PolymorphicLightInfoEx (16B).
             // Native UAV-capable upload buffers: CPU writes the analytic-light sub-range (Ranges mode),
             // compute passes write env/emissive entries via UAV. Stable pointer (no GetNativeBufferPtr churn).
-            LightBuffer = new NativeStructuredBuffer(
+            LightBuffer = new UploadBuffer(
                 MaxLights, Marshal.SizeOf<RtxptPolymorphicLightInfo>(),
-                NativeStructuredBuffer.UploadMode.Ranges, allowUAV: true);
+                UploadBuffer.UploadMode.Ranges, allowUAV: true);
 
-            LightExBuffer = new NativeStructuredBuffer(
+            LightExBuffer = new UploadBuffer(
                 MaxLights, Marshal.SizeOf<RtxptPolymorphicLightInfoEx>(),
-                NativeStructuredBuffer.UploadMode.Ranges, allowUAV: true);
+                UploadBuffer.UploadMode.Ranges, allowUAV: true);
 
             LightScratchBuffer = new GraphicsBuffer(
                 GraphicsBuffer.Target.Raw,
@@ -319,9 +319,9 @@ namespace PathTracing
         {
             if (EnvBakerCb != null && ImportanceBakerCb != null) return;
             EnvBakerCb?.Dispose();
-            EnvBakerCb = new NativeBuffer(NativeRtxptEnvMapBakerPass.EnvBakerCbSize);
+            EnvBakerCb = new VolatileConstantBuffer(NativeRtxptEnvMapBakerPass.EnvBakerCbSize);
             ImportanceBakerCb?.Dispose();
-            ImportanceBakerCb = new NativeBuffer(NativeRtxptEnvMapBakerPass.ImportanceBakerCbSize);
+            ImportanceBakerCb = new VolatileConstantBuffer(NativeRtxptEnvMapBakerPass.ImportanceBakerCbSize);
         }
 
         private void ReleaseResolutionBuffers()

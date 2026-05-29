@@ -60,7 +60,7 @@ namespace NativeRender
         private MergedBlas _blasEmissive;
 
         // ----- Scene structured buffers -----
-        private NativeStructuredBuffer _instanceDataBuf; // gIn_InstanceData
+        private UploadBuffer _instanceDataBuf; // gIn_InstanceData
         private GraphicsBuffer         _primitiveDataBuf; // gIn_PrimitiveData
         private GraphicsBuffer         _morphPrimitivePositionsPrevBuf; // gIn_MorphPrimitivePositionsPrev (stub)
 
@@ -203,7 +203,7 @@ namespace NativeRender
         public RayTracingAccelerationStructure WorldAS => _worldAS;
         public RayTracingAccelerationStructure LightAS => _lightAS;
 
-        public NativeStructuredBuffer InstanceDataBuf => _instanceDataBuf;
+        public UploadBuffer InstanceDataBuf => _instanceDataBuf;
         public GraphicsBuffer PrimitiveDataBuf => _primitiveDataBuf;
         public GraphicsBuffer MorphPrimitivePositionsPrevBuf => _morphPrimitivePositionsPrevBuf;
 
@@ -1063,7 +1063,7 @@ namespace NativeRender
             if (instList.Count == 0) instList.Add(default);
             _instanceCpu = instList.ToArray();
 
-            _instanceDataBuf = new NativeStructuredBuffer(_instanceCpu.Length, Marshal.SizeOf<InstanceDataNRD>());
+            _instanceDataBuf = new UploadBuffer(_instanceCpu.Length, Marshal.SizeOf<InstanceDataNRD>());
             _instanceDataBuf.SetData(_instanceCpu, 0, _instanceCpu.Length);
             InstanceDataBufPtr = _instanceDataBuf.NativePtr;
 
@@ -1669,7 +1669,7 @@ namespace NativeRender
             if (_instanceDataBuf == null || _instanceDataBuf.count < cap)
             {
                 _instanceDataBuf?.Dispose();
-                _instanceDataBuf = new NativeStructuredBuffer(cap, Marshal.SizeOf<InstanceDataNRD>());
+                _instanceDataBuf = new UploadBuffer(cap, Marshal.SizeOf<InstanceDataNRD>());
             }
 
             _instanceDataBuf.SetData(_instanceCpu, 0, _instanceCpu.Length);

@@ -24,7 +24,7 @@ namespace NativeRender
     ///
     /// Upload granularity is fixed at construction via <see cref="UploadMode"/>.
     /// </summary>
-    public sealed class NativeStructuredBuffer : IDisposable
+    public sealed class UploadBuffer : IDisposable
     {
         /// <summary>How accumulated writes are turned into GPU copies at <see cref="Flush"/>.</summary>
         public enum UploadMode
@@ -90,7 +90,7 @@ namespace NativeRender
         /// Set <paramref name="allowUAV"/> when the buffer must also be GPU-writable (bound as a
         /// RWStructuredBuffer) — e.g. a buffer that mixes CPU uploads with compute-shader writes.
         /// </summary>
-        public NativeStructuredBuffer(int capacity, int elementStride, UploadMode mode = UploadMode.Ranges, bool allowUAV = false)
+        public UploadBuffer(int capacity, int elementStride, UploadMode mode = UploadMode.Ranges, bool allowUAV = false)
         {
             if (capacity      <= 0) throw new ArgumentOutOfRangeException(nameof(capacity));
             if (elementStride <= 0) throw new ArgumentOutOfRangeException(nameof(elementStride));
@@ -122,7 +122,7 @@ namespace NativeRender
         /// </summary>
         public unsafe void SetData<T>(T[] data, int dstOffset, int count) where T : unmanaged
         {
-            if (_disposed) throw new ObjectDisposedException(nameof(NativeStructuredBuffer));
+            if (_disposed) throw new ObjectDisposedException(nameof(UploadBuffer));
             if (data == null) throw new ArgumentNullException(nameof(data));
             if (count <= 0) return;
 
@@ -139,7 +139,7 @@ namespace NativeRender
         /// </summary>
         public unsafe void SetData<T>(T[] data, int srcOffset, int dstOffset, int count) where T : unmanaged
         {
-            if (_disposed) throw new ObjectDisposedException(nameof(NativeStructuredBuffer));
+            if (_disposed) throw new ObjectDisposedException(nameof(UploadBuffer));
             if (data == null) throw new ArgumentNullException(nameof(data));
             if (count <= 0) return;
 
@@ -153,7 +153,7 @@ namespace NativeRender
         /// </summary>
         public unsafe void SetData<T>(NativeArray<T> data, int dstOffset, int count) where T : unmanaged
         {
-            if (_disposed) throw new ObjectDisposedException(nameof(NativeStructuredBuffer));
+            if (_disposed) throw new ObjectDisposedException(nameof(UploadBuffer));
             if (count <= 0) return;
 
             byte* basePtr = (byte*)NativeArrayUnsafeUtility.GetUnsafeReadOnlyPtr(data);
@@ -211,7 +211,7 @@ namespace NativeRender
         /// </summary>
         public unsafe void Flush(CommandBuffer cmd)
         {
-            if (_disposed) throw new ObjectDisposedException(nameof(NativeStructuredBuffer));
+            if (_disposed) throw new ObjectDisposedException(nameof(UploadBuffer));
 
             bool whole = Mode == UploadMode.Whole;
             if (whole ? !_wholeDirty : _ranges.Count == 0) return; // clean — buffer keeps its resident data
@@ -287,7 +287,7 @@ namespace NativeRender
         /// </summary>
         public unsafe void RequestReadback(CommandBuffer cmd, int srcElementOffset, int elementCount)
         {
-            if (_disposed) throw new ObjectDisposedException(nameof(NativeStructuredBuffer));
+            if (_disposed) throw new ObjectDisposedException(nameof(UploadBuffer));
             if (elementCount <= 0) return;
 
             IntPtr blob = NativeRenderPlugin.NR_NSB_AllocFlushBuffer(ReadbackRequestSize);
@@ -308,7 +308,7 @@ namespace NativeRender
         /// </summary>
         public unsafe bool TryGetReadback<T>(T[] dst, int count) where T : unmanaged
         {
-            if (_disposed) throw new ObjectDisposedException(nameof(NativeStructuredBuffer));
+            if (_disposed) throw new ObjectDisposedException(nameof(UploadBuffer));
             if (dst == null || count <= 0) return false;
 
             ulong dstBytes = (ulong)count * (ulong)sizeof(T);

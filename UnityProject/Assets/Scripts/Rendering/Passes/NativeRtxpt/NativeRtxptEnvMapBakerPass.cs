@@ -89,8 +89,8 @@ namespace PathTracing
             internal NativeComputeDescriptorSet BaseLayerDs;
             internal NativeComputePipeline      ImportanceBakerCs;
             internal NativeComputeDescriptorSet ImportanceBakerDs;
-            internal NativeBuffer               EnvBakerCb;
-            internal NativeBuffer               ImportanceBakerCb;
+            internal VolatileConstantBuffer               EnvBakerCb;
+            internal VolatileConstantBuffer               ImportanceBakerCb;
             internal EnvMapBakerCB              EnvBakerCbData;
             internal ImportanceBakerCB          ImportanceCbData;
             internal IntPtr                     SkyTexturePtr;

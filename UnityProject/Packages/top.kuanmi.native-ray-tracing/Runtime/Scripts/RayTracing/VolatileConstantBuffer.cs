@@ -19,7 +19,7 @@ namespace NativeRender
     /// The buffer is bound as a root CBV by GPU VA; it must be uploaded every frame before
     /// it is bound (volatile semantics).
     /// </summary>
-    public sealed class NativeBuffer : IDisposable
+    public sealed class VolatileConstantBuffer : IDisposable
     {
         public  ulong Handle { get; private set; }
         private bool  _disposed;
@@ -32,7 +32,7 @@ namespace NativeRender
 
         private readonly InternalUploadPass _internalPass;
 
-        public NativeBuffer(int sizeInBytes)
+        public VolatileConstantBuffer(int sizeInBytes)
         {
             if (sizeInBytes <= 0) throw new ArgumentOutOfRangeException(nameof(sizeInBytes));
 
@@ -94,12 +94,12 @@ namespace NativeRender
 
         private class InternalUploadPass : ScriptableRenderPass
         {
-            private readonly NativeBuffer _owner;
+            private readonly VolatileConstantBuffer _owner;
             private          IntPtr       _blob;
 
             public void Setup(IntPtr blob) => _blob = blob;
 
-            public InternalUploadPass(NativeBuffer owner)
+            public InternalUploadPass(VolatileConstantBuffer owner)
             {
                 _owner          = owner;
                 renderPassEvent = RenderPassEvent.BeforeRendering;

@@ -82,7 +82,7 @@ namespace PathTracing
         private NRDSampleResource _nrdSampleResource;
         public  NRDSampleResource NrdSampleResource => _nrdSampleResource;
 
-        private readonly Dictionary<long, NativeBuffer> _nrdConstantBuffers = new();
+        private readonly Dictionary<long, VolatileConstantBuffer> _nrdConstantBuffers = new();
 
         private readonly Dictionary<long, SigmaDenoiser>     _sigmaDenoisers     = new();
         private readonly Dictionary<long, ReblurDenoiser>    _reblurDenoisers    = new();
@@ -292,7 +292,7 @@ namespace PathTracing
 
             if (!_nrdConstantBuffers.TryGetValue(uniqueKey, out var nrdConstantBuffer))
             {
-                nrdConstantBuffer = new NativeBuffer(Marshal.SizeOf<NRDGlobalConstants>());
+                nrdConstantBuffer = new VolatileConstantBuffer(Marshal.SizeOf<NRDGlobalConstants>());
                 _nrdConstantBuffers.Add(uniqueKey, nrdConstantBuffer);
             }
 
@@ -770,7 +770,7 @@ namespace PathTracing
             }
         }
 
-        private void EnqueueDlssAfterPass(ScriptableRenderer renderer, NativeNrdTextureResources pool, int2 outputResolution, NativeBuffer nrdConstantBuffer)
+        private void EnqueueDlssAfterPass(ScriptableRenderer renderer, NativeNrdTextureResources pool, int2 outputResolution, VolatileConstantBuffer nrdConstantBuffer)
         {
             var outputGridW = (outputResolution.x + 15) / 16;
             var outputGridH = (outputResolution.y + 15) / 16;

@@ -53,7 +53,7 @@ namespace PathTracing
 
         public class Resource
         {
-            internal NativeBuffer ConstantBuffer;
+            internal VolatileConstantBuffer ConstantBuffer;
 
             // Stochastic sampling textures
             internal IntPtr ScramblingRanking;

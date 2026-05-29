@@ -354,8 +354,8 @@ namespace PathTracing
             internal uint                       TotalLightCount;
             internal uint                       HistoricTotalLightCount;
             internal GraphicsBuffer             LightControlBuffer;
-            internal NativeStructuredBuffer     LightBuffer;
-            internal NativeStructuredBuffer     LightExBuffer;
+            internal UploadBuffer     LightBuffer;
+            internal UploadBuffer     LightExBuffer;
             internal RtxptLightingControlData[] ControlData;
             internal RtxptPolymorphicLightInfo[] LightData;
             internal RtxptPolymorphicLightInfoEx[] LightExData;

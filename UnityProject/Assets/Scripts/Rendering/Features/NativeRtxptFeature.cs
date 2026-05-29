@@ -115,7 +115,7 @@ namespace PathTracing
         // ---- Per-camera resource pools (key = instanceID + eyeIndex*100000) -
         private readonly Dictionary<long, NativeRtxptTextureResources> _texturePools      = new();
         private readonly Dictionary<long, NativeRtxptBufferResources>  _bufferPools       = new();
-        private readonly Dictionary<long, NativeBuffer>                _constantBuffers   = new();
+        private readonly Dictionary<long, VolatileConstantBuffer>                _constantBuffers   = new();
         private readonly Dictionary<long, DlrrDenoiser>                _dlrrDenoisers     = new();
         private readonly Dictionary<long, RtxptCameraFrameState>       _cameraFrameStates = new();
 
@@ -224,7 +224,7 @@ namespace PathTracing
 
             if (!_constantBuffers.TryGetValue(uniqueKey, out var constantBuffer))
             {
-                constantBuffer = new NativeBuffer(Marshal.SizeOf<SampleConstants>());
+                constantBuffer = new VolatileConstantBuffer(Marshal.SizeOf<SampleConstants>());
                 _constantBuffers.Add(uniqueKey, constantBuffer);
             }
 

@@ -32,14 +32,14 @@ namespace PathTracing
         // t_InstanceData (t2): transforms are re-uploaded every frame, so this uses
         // NativeStructuredBuffer — its NativePtr is stable across SetData (unlike
         // GraphicsBuffer.GetNativeBufferPtr), so we fetch the pointer once at creation.
-        private NativeStructuredBuffer _instanceGpuBuf;
+        private UploadBuffer _instanceGpuBuf;
         private GraphicsBuffer _geometryGpuBuf; // t_GeometryData  (t3)
 
         // RTXPT-specific structured buffers
         // t_SubInstanceData (t1): emissive-light mapping offsets are recomputed and re-uploaded
         // every frame, so this uses NativeStructuredBuffer for a stable NativePtr (no per-frame
         // GetNativeBufferPtr re-fetch). SRV-only — never bound as a UAV.
-        private NativeStructuredBuffer _subInstanceGpuBuf; // t_SubInstanceData    (t1)
+        private UploadBuffer _subInstanceGpuBuf; // t_SubInstanceData    (t1)
         private GraphicsBuffer _ptMaterialGpuBuf; // t_PTMaterialData     (t5)
         private GraphicsBuffer _geomDebugGpuBuf; // t_GeometryDebugData  (t4)
 
@@ -891,7 +891,7 @@ namespace PathTracing
 
             // Ranges mode: per-frame transform updates touch only the moved instances,
             // so we upload just those sub-ranges rather than a full-buffer span.
-            _instanceGpuBuf = new NativeStructuredBuffer(_instanceCpu.Length, Marshal.SizeOf<DonutInstanceData>());
+            _instanceGpuBuf = new UploadBuffer(_instanceCpu.Length, Marshal.SizeOf<DonutInstanceData>());
             _instanceGpuBuf.SetData(_instanceCpu, 0, _instanceCpu.Length);
             _instanceGpuBufPtr = _instanceGpuBuf.NativePtr; // stable for the buffer's lifetime
 
@@ -899,7 +899,7 @@ namespace PathTracing
             _geometryGpuBuf.SetData(_geometryCpu);
             _geometryGpuBufPtr = _geometryGpuBuf.GetNativeBufferPtr();
 
-            _subInstanceGpuBuf = new NativeStructuredBuffer(_subInstanceCpu.Length, Marshal.SizeOf<SubInstanceData>());
+            _subInstanceGpuBuf = new UploadBuffer(_subInstanceCpu.Length, Marshal.SizeOf<SubInstanceData>());
             _subInstanceGpuBuf.SetData(_subInstanceCpu, 0, _subInstanceCpu.Length);
             _subInstanceGpuBufPtr = _subInstanceGpuBuf.NativePtr; // stable for the buffer's lifetime
 

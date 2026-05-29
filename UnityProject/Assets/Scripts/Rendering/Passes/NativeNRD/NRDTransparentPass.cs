@@ -50,7 +50,7 @@ namespace PathTracing
 
         public class Resource
         {
-            internal NativeBuffer ConstantBuffer;
+            internal VolatileConstantBuffer ConstantBuffer;
 
             // RT textures sourced from the pool inside ExecutePass
             internal NativeNrdTextureResources Pool;

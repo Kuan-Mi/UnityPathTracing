@@ -175,19 +175,19 @@ namespace NativeRender
         }
 
 
-        public void SetRWTypedBuffer(string name, NativeBuffer nativeBuffer, int count, uint dxgiFormat)
+        public void SetRWTypedBuffer(string name, VolatileConstantBuffer volatileConstantBuffer, int count, uint dxgiFormat)
         {
             if (!TryGetSlot(name, out uint i)) return;
             _stagingSlots[i].resourcePtr = 0;
-            _stagingSlots[i].objectPtr   = nativeBuffer.Handle;
+            _stagingSlots[i].objectPtr   = volatileConstantBuffer.Handle;
             _stagingSlots[i].objectKind  = ObjKindNativeBuffer;
             _stagingSlots[i].count       = (uint)count;
             _stagingSlots[i].stride      = 0;
             _stagingSlots[i].format      = dxgiFormat;
         }
 
-        /// <summary>Binds a <see cref="NativeGpuBuffer"/> as a typed RW buffer UAV (e.g. RWBuffer&lt;float2&gt;).</summary>
-        public void SetRWTypedBuffer(string name, NativeGpuBuffer gpuBuffer, int count, uint dxgiFormat)
+        /// <summary>Binds a <see cref="DeviceBuffer"/> as a typed RW buffer UAV (e.g. RWBuffer&lt;float2&gt;).</summary>
+        public void SetRWTypedBuffer(string name, DeviceBuffer gpuBuffer, int count, uint dxgiFormat)
         {
             if (!TryGetSlot(name, out uint i)) return;
             _stagingSlots[i].resourcePtr = 0;
@@ -244,18 +244,18 @@ namespace NativeRender
         }
 
         /// <summary>Binds a GraphicsBuffer as a constant buffer (CBV).</summary>
-        public void SetConstantBuffer(string name, NativeBuffer nativeBuffer)
+        public void SetConstantBuffer(string name, VolatileConstantBuffer volatileConstantBuffer)
         {
             if (!TryGetSlot(name, out uint i)) return;
             _stagingSlots[i].resourcePtr = 0;
-            _stagingSlots[i].objectPtr   = nativeBuffer.Handle;
+            _stagingSlots[i].objectPtr   = volatileConstantBuffer.Handle;
             _stagingSlots[i].objectKind  = ObjKindNativeBuffer;
             _stagingSlots[i].count       = 0;
             _stagingSlots[i].stride      = 0;
         }
 
-        /// <summary>Binds a <see cref="NativeBuffer"/> as a constant buffer (CBV).</summary>
-        public void SetNativeBuffer(string name, NativeBuffer nb)
+        /// <summary>Binds a <see cref="VolatileConstantBuffer"/> as a constant buffer (CBV).</summary>
+        public void SetNativeBuffer(string name, VolatileConstantBuffer nb)
         {
             if (!TryGetSlot(name, out uint i)) return;
             _stagingSlots[i].resourcePtr = 0;
@@ -276,19 +276,19 @@ namespace NativeRender
             _stagingSlots[i].format      = dxgiFormat;
         }
 
-        public void SetTypedBuffer(string name, NativeBuffer nativeBuffer, int count, uint dxgiFormat)
+        public void SetTypedBuffer(string name, VolatileConstantBuffer volatileConstantBuffer, int count, uint dxgiFormat)
         {
             if (!TryGetSlot(name, out uint i)) return;
             _stagingSlots[i].resourcePtr = 0;
-            _stagingSlots[i].objectPtr   = nativeBuffer.Handle;
+            _stagingSlots[i].objectPtr   = volatileConstantBuffer.Handle;
             _stagingSlots[i].objectKind  = ObjKindNativeBuffer;
             _stagingSlots[i].count       = (uint)count;
             _stagingSlots[i].stride      = 0;
             _stagingSlots[i].format      = dxgiFormat;
         }
 
-        /// <summary>Binds a <see cref="NativeGpuBuffer"/> as a typed buffer SRV (e.g. Buffer&lt;float2&gt;).</summary>
-        public void SetTypedBuffer(string name, NativeGpuBuffer gpuBuffer, int count, uint dxgiFormat)
+        /// <summary>Binds a <see cref="DeviceBuffer"/> as a typed buffer SRV (e.g. Buffer&lt;float2&gt;).</summary>
+        public void SetTypedBuffer(string name, DeviceBuffer gpuBuffer, int count, uint dxgiFormat)
         {
             if (!TryGetSlot(name, out uint i)) return;
             _stagingSlots[i].resourcePtr = 0;

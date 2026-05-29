@@ -21,7 +21,7 @@ namespace PathTracing
     {
         // ── Constant buffers ──────────────────────────────────────────────────
         /// <summary>g_Const (b0) — SampleConstants, built each frame by NativeRtxptConstantsBuilder.</summary>
-        public NativeBuffer ConstantBuffer;
+        public VolatileConstantBuffer ConstantBuffer;
 
         // ── Scene acceleration structure ──────────────────────────────────────
         // (TLAS is owned by GpuScene; use GpuScene.AccelerationStructure directly)
