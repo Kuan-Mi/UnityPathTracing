@@ -5,9 +5,9 @@
 #include <cstring>
 #include <algorithm>
 
-// Forward declaration of global deferred resource delete function from Plugin.cpp
+// Forward declaration of global deferred resource delete function from Plugin.cpp.
+// RetireObject<T> (typed deferred delete) comes from the included PluginInternal.h.
 extern void SafeReleaseResource(ComPtr<ID3D12Resource> resource);
-extern void EnqueueDeferredDelete(void* ptr, DeferredType type);
 
 // ---------------------------------------------------------------------------
 // HashSubmeshDescs
@@ -534,7 +534,7 @@ bool AccelerationStructure::EnsureBLAS(ID3D12GraphicsCommandList4 *cmdList, Inst
         // update fast-path was skipped above), defer-delete it — the GPU may still be
         // reading it for the next 1-3 frames.
         if (slot.dynamicBlas)
-            EnqueueDeferredDelete(slot.dynamicBlas.release(), DeferredType::AccelStructBlas);
+            RetireObject(slot.dynamicBlas.release());
         // Store the BLASEntry in the slot so it can be reused (via PERFORM_UPDATE) next frame.
         // Ownership transfers here; ReleaseBLAS/RemoveInstance will defer-delete it when the
         // instance is destroyed.
@@ -1204,7 +1204,7 @@ void AccelerationStructure::RemoveInstance(uint32_t handle)
     // Release the persistent dynamic BLAS (deferred GPU delete, safe after 3 frames).
     if (slot.dynamicBlas)
     {
-        EnqueueDeferredDelete(slot.dynamicBlas.release(), DeferredType::AccelStructBlas);
+        RetireObject(slot.dynamicBlas.release());
     }
 
     // Keep the OMM-presence counter in sync (mirror of AddInstance).

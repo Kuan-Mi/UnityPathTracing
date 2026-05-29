@@ -34,6 +34,7 @@
 #include "D3D12HeapHook.h"
 #include "PluginInternal.h"
 #include <map>
+#include <deque>
 #include <vector>
 #include <functional>
 #include <mutex>
@@ -84,17 +85,29 @@ SharedUploadPool g_scratchPool;
 // Deferred delete queue — delays destruction of GPU-facing objects until the
 // GPU has finished executing all commands that may reference them.
 //
-// Destroy functions push entries tagged with max(GetNextFrameFenceValue(),
-// GetFrameFence()->GetCompletedValue()) + kDeleteDelay — i.e. the fence value the
-// current frame's GPU work will reach, but never below current GPU progress (see
-// EnqueueCleanup for why the clamp is required), instead of deleting immediately.
-// DrainDeferredDeletes() frees entries whose tag <= GetFrameFence()->GetCompletedValue().
+// Modelled on nvrhi's per-submission keep-alive lists (Queue::commandListsInFlight):
+// deletions are grouped into one "retire bucket" per frame. The open bucket
+// (s_CurrentBucket) accumulates this frame's deletions and is stamped — once, on
+// first use — with the fence value the frame's GPU work will reach, plus a
+// kDeleteDelay safety margin, never below current GPU progress (see EnqueueCleanup
+// for why the clamp is required). At each frame tick DrainDeferredDeletes() closes
+// the open bucket into the in-flight deque (ascending fence order, oldest at front)
+// and runs every bucket whose stamped fence has completed.
 // ---------------------------------------------------------------------------
 
 using DeletionTask = std::function<void()>;
 
-static std::map<uint64_t, std::vector<DeletionTask>> s_DeletionQueue;
-static std::mutex s_DeletionMutex;
+// One frame's worth of deferred deletions plus the fence value at which they are
+// safe to run. fenceValue == 0 marks an open/unstamped bucket.
+struct RetireBucket
+{
+    uint64_t                  fenceValue = 0;
+    std::vector<DeletionTask> tasks;
+};
+
+static std::deque<RetireBucket> s_RetireBuckets; // in flight, ascending fenceValue
+static RetireBucket             s_CurrentBucket; // open bucket for the current frame
+static std::mutex               s_DeletionMutex;
 
 // Forward declarations
 static void PluginLog(UnityLogType type, const char* msg, const char* file, int line);
@@ -112,36 +125,32 @@ void EnqueueCleanup(std::function<void()>&& cleanupTask)
 {
     if (!cleanupTask) return;
 
-    // In a packaged player GetNextFrameFenceValue() can return a stale, too-low
-    // value (observed: 1) while the frame fence has already completed a higher
-    // value (observed: 8). Tagging against the stale value schedules the resource
-    // for deletion at a fence the GPU has *already* passed, so the next drain frees
-    // it while it is still in use -> GPU hang (DXGI_ERROR_DEVICE_HUNG 0x887a0006).
-    // Clamp the base to the current completed value so the tag is always strictly
-    // ahead of GPU progress by kDeleteDelay frames.
-    uint64_t completed = 0;
-    if (s_D3D12)
-    {
-        if (ID3D12Fence* fence = s_D3D12->GetFrameFence())
-            completed = fence->GetCompletedValue();
-    }
-    const uint64_t next       = s_D3D12 ? s_D3D12->GetNextFrameFenceValue() : 0;
-    const uint64_t base       = next > completed ? next : completed;
-    const uint64_t fenceValue = base + kDeleteDelay;
-
     std::lock_guard<std::mutex> lk(s_DeletionMutex);
-    s_DeletionQueue[fenceValue].emplace_back(std::move(cleanupTask));
-}
 
-template<typename T>
-void SafeDelete(T*& ptr)
-{
-    if (!ptr) return;
-    T* rawPtr = ptr;
-    ptr = nullptr; // 立即置空防止野指针
-    EnqueueCleanup([rawPtr]() {
-        delete rawPtr;
-    });
+    // Stamp the open bucket with this frame's target fence on first use. All of a
+    // frame's deletions share one stamp (computed once instead of per task), and the
+    // bucket is closed into the in-flight deque at the next frame tick.
+    //
+    // In a packaged player GetNextFrameFenceValue() can return a stale, too-low value
+    // (observed: 1) while the frame fence has already completed a higher value
+    // (observed: 8). Tagging against the stale value would schedule deletion at a fence
+    // the GPU has *already* passed, freeing the resource while still in use -> GPU hang
+    // (DXGI_ERROR_DEVICE_HUNG 0x887a0006). Clamp the base to the current completed value
+    // so the tag is always strictly ahead of GPU progress by kDeleteDelay frames.
+    if (s_CurrentBucket.fenceValue == 0)
+    {
+        uint64_t completed = 0;
+        if (s_D3D12)
+        {
+            if (ID3D12Fence* fence = s_D3D12->GetFrameFence())
+                completed = fence->GetCompletedValue();
+        }
+        const uint64_t next = s_D3D12 ? s_D3D12->GetNextFrameFenceValue() : 0;
+        const uint64_t base = next > completed ? next : completed;
+        s_CurrentBucket.fenceValue = base + kDeleteDelay;
+    }
+
+    s_CurrentBucket.tasks.emplace_back(std::move(cleanupTask));
 }
 
 void SafeReleaseResource(ComPtr<ID3D12Resource> resource)
@@ -182,101 +191,36 @@ static void DrainDeferredDeletes(bool force = false)
     ID3D12Fence* frameFence = s_D3D12 ? s_D3D12->GetFrameFence() : nullptr;
     uint64_t completedValue = (frameFence && !force) ? frameFence->GetCompletedValue() : UINT64_MAX;
 
-    std::vector<std::vector<DeletionTask>> tasksToExecute;
+    std::vector<RetireBucket> bucketsToExecute;
 
     {
         std::lock_guard<std::mutex> lk(s_DeletionMutex);
 
-        auto it = s_DeletionQueue.begin();
-        while (it != s_DeletionQueue.end())
+        // Close this frame's open bucket into the in-flight deque. Buckets are appended
+        // in ascending fenceValue order (the stamp is monotonic across frames), so the
+        // deque stays sorted with the oldest at the front.
+        if (!s_CurrentBucket.tasks.empty())
         {
-            // 因为 map 是有序的，如果当前 key > 已完成值，后面所有的都没完成
-            if (!force && it->first > completedValue)
+            s_RetireBuckets.push_back(std::move(s_CurrentBucket));
+            s_CurrentBucket = RetireBucket{};
+        }
+
+        // Run buckets whose fence has completed. Sorted front-to-back, so we can stop
+        // at the first one still in flight.
+        while (!s_RetireBuckets.empty())
+        {
+            if (!force && s_RetireBuckets.front().fenceValue > completedValue)
                 break;
-
-            tasksToExecute.emplace_back(std::move(it->second));
-            it = s_DeletionQueue.erase(it);
+            bucketsToExecute.push_back(std::move(s_RetireBuckets.front()));
+            s_RetireBuckets.pop_front();
         }
     }
 
-    // 在锁外执行真正的析构操作，防止死锁并减少锁占用时间
-    for (auto& batch : tasksToExecute)
-    {
-        for (auto& task : batch)
-        {
+    // Run destructors outside the lock to avoid deadlock and reduce lock hold time.
+    for (auto& bucket : bucketsToExecute)
+        for (auto& task : bucket.tasks)
             if (task) task();
-        }
-    }
 }
-
-void EnqueueDeferredDelete(void* ptr, DeferredType type)
-{
-    if (!ptr) return;
-
-    // 根据类型将 void* 强转回具体指针，并包装成 Lambda
-    // 这里使用 Lambda 捕获，可以在销毁时正确触发各个类的析构函数
-    switch (type)
-    {
-    case DeferredType::BindlessTexture:
-        EnqueueCleanup([p = static_cast<BindlessTexture*>(ptr)] { delete p; });
-        break;
-
-    case DeferredType::BindlessBuffer:
-        EnqueueCleanup([p = static_cast<BindlessBuffer*>(ptr)] { delete p; });
-        break;
-
-    case DeferredType::BindlessUAVTexture:
-        EnqueueCleanup([p = static_cast<BindlessUAVTexture*>(ptr)] { delete p; });
-        break;
-
-    case DeferredType::AccelStruct:
-        EnqueueCleanup([p = static_cast<AccelerationStructure*>(ptr)] { delete p; });
-        break;
-
-    case DeferredType::RayTraceShader:
-        EnqueueCleanup([p = static_cast<RayTraceShader*>(ptr)] { delete p; });
-        break;
-
-    case DeferredType::RayTraceDescriptorSet:
-        EnqueueCleanup([p = static_cast<::RayTraceDescriptorSet*>(ptr)] { delete p; });
-        break;
-
-    case DeferredType::ComputeShader:
-        EnqueueCleanup([p = static_cast<ComputeShader*>(ptr)] { delete p; });
-        break;
-
-    case DeferredType::ComputeDescriptorSet:
-        EnqueueCleanup([p = static_cast<ComputeDescriptorSet*>(ptr)] { delete p; });
-        break;
-
-    case DeferredType::AccelStructBlas:
-        EnqueueCleanup([p = static_cast<BLASEntry*>(ptr)] { delete p; });
-        break;
-
-    case DeferredType::NativeBuffer:
-        EnqueueCleanup([p = static_cast<NativeBuffer*>(ptr)] { delete p; });
-        break;
-
-    default:
-        // 如果进入了未定义的类型，为了安全起见，尝试直接 delete 
-        // 但注意：void* 是不能直接 delete 的，这里最好记录一个错误日志
-        if (s_Log) {
-            char buf[256];
-            snprintf(buf, sizeof(buf), "Unknown DeferredType %d for ptr 0x%p", (int)type, ptr);
-            s_Log->Log(kUnityLogTypeWarning, buf, __FILE__, __LINE__);
-        }
-        break;
-    }
-
-    // 可选：调试用 Log（建议只在 Debug 模式开启，避免性能抖动）
-// #ifdef _DEBUG
-    // char logMsg[128];
-    // snprintf(logMsg, sizeof(logMsg), "Enqueued Cleanup: ptr=0x%p, type=%d", ptr, (int)type);
-    // PluginLog(kUnityLogTypeLog, logMsg, __FILE__, __LINE__);
-// #endif
-}
-
-
 
 // ---------------------------------------------------------------------------
 // Logging helpers - fall back to printf when IUnityLog isn't available yet
@@ -486,7 +430,7 @@ extern "C" void UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API
 NR_DestroyAccelerationStructure(uint64_t handle)
 {
     if (!handle) return;
-    EnqueueDeferredDelete(reinterpret_cast<void*>(handle), DeferredType::AccelStruct);
+    RetireObject(reinterpret_cast<AccelerationStructure*>(handle));
 }
 
 // ---------------------------------------------------------------------------
@@ -738,7 +682,7 @@ extern "C" void UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API
 NR_DestroyRayTraceShader(uint64_t handle)
 {
     if (!handle) return;
-    EnqueueDeferredDelete(reinterpret_cast<void*>(handle), DeferredType::RayTraceShader);
+    RetireObject(reinterpret_cast<RayTraceShader*>(handle));
 }
 
 // ---------------------------------------------------------------------------
@@ -931,7 +875,7 @@ extern "C" void UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API
 NR_RTS_DestroyDescriptorSet(uint64_t handle)
 {
     if (!handle) return;
-    EnqueueDeferredDelete(reinterpret_cast<void*>(handle), DeferredType::RayTraceDescriptorSet);
+    RetireObject(reinterpret_cast<::RayTraceDescriptorSet*>(handle));
 }
 
 // ---------------------------------------------------------------------------
@@ -1126,7 +1070,7 @@ NR_CreateBindlessTexture(uint32_t capacity)
 extern "C" void UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API
 NR_DestroyBindlessTexture(uint64_t handle)
 {
-    if (handle) EnqueueDeferredDelete(reinterpret_cast<void*>(handle), DeferredType::BindlessTexture);
+    if (handle) RetireObject(reinterpret_cast<BindlessTexture*>(handle));
 }
 
 // ---------------------------------------------------------------------------
@@ -1207,7 +1151,7 @@ NR_CreateBindlessBuffer(uint32_t capacity)
 extern "C" void UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API
 NR_DestroyBindlessBuffer(uint64_t handle)
 {
-    if (handle) EnqueueDeferredDelete(reinterpret_cast<void*>(handle), DeferredType::BindlessBuffer);
+    if (handle) RetireObject(reinterpret_cast<BindlessBuffer*>(handle));
 }
 
 // ---------------------------------------------------------------------------
@@ -1287,7 +1231,7 @@ NR_CreateBindlessUAVTexture(uint32_t capacity)
 extern "C" void UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API
 NR_DestroyBindlessUAVTexture(uint64_t handle)
 {
-    if (handle) EnqueueDeferredDelete(reinterpret_cast<void*>(handle), DeferredType::BindlessUAVTexture);
+    if (handle) RetireObject(reinterpret_cast<BindlessUAVTexture*>(handle));
 }
 
 // ---------------------------------------------------------------------------
@@ -1389,7 +1333,7 @@ NR_CreateNativeBuffer(uint64_t byteSize, uint32_t structStride, uint32_t maxVers
 extern "C" void UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API
 NR_DestroyNativeBuffer(uint64_t handle)
 {
-    if (handle) EnqueueDeferredDelete(reinterpret_cast<void*>(handle), DeferredType::NativeBuffer);
+    if (handle) RetireObject(reinterpret_cast<NativeBuffer*>(handle));
 }
  
 static void UNITY_INTERFACE_API NativeBufferUploadCallback(int /*eventId*/, void* data)
@@ -1876,7 +1820,7 @@ extern "C" void UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API
 NR_DestroyComputeShader(uint64_t handle)
 {
     if (!handle) return;
-    EnqueueDeferredDelete(reinterpret_cast<void*>(handle), DeferredType::ComputeShader);
+    RetireObject(reinterpret_cast<ComputeShader*>(handle));
 }
 
 // ---------------------------------------------------------------------------
@@ -1898,7 +1842,7 @@ extern "C" void UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API
 NR_CS_DestroyDescriptorSet(uint64_t handle)
 {
     if (!handle) return;
-    EnqueueDeferredDelete(reinterpret_cast<void*>(handle), DeferredType::ComputeDescriptorSet);
+    RetireObject(reinterpret_cast<ComputeDescriptorSet*>(handle));
 }
 
 // ---------------------------------------------------------------------------

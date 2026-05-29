@@ -24,18 +24,12 @@ void NR_EnqueueDescriptorRangeFree(DescriptorHeapAllocator* alloc,
 // (e.g. per-flush upload buffers) until the GPU is guaranteed done with them.
 void EnqueueCleanup(std::function<void()>&& cleanupTask);
 
-enum class DeferredType {
-    BindlessTexture,
-    BindlessBuffer,
-    BindlessUAVTexture,
-    AccelStruct,
-    RayTraceShader,
-    RayTraceDescriptorSet,
-    ComputeShader,
-    ComputeDescriptorSet,
-    AccelStructBlas,
-    NativeBuffer,
-};
+// Defer-delete a plugin-owned heap object until the GPU has finished any work that
+// may still reference it (the delete runs once the retire-bucket fence completes).
+// Type-safe replacement for the old void*+DeferredType dispatch: each caller already
+// knows the concrete type, and `delete p` resolves it via the caller's include.
+template<class T>
+inline void RetireObject(T* p) { if (p) EnqueueCleanup([p]{ delete p; }); }
 
 // ---------------------------------------------------------------------------
 // g_frameIndex
