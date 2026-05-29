@@ -35,14 +35,11 @@ namespace PathTracing
         private readonly NativeComputePipeline      _cs;
         private readonly NativeComputeDescriptorSet _ds;
         private          NativeRtxptPassContext     _ctx;
-        private static readonly RootConstantsHint[] AccumulationRootConstantsHints =
-        {
-            new RootConstantsHint { Name = "g_Const", Count = 9 }
-        };
 
         public NativeRtxptAccumulationPass(NativeComputeShader shader)
         {
-            _cs = new NativeComputePipeline(shader, AccumulationRootConstantsHints);
+            // Root-constant hints (g_Const) live on the .computeshader asset (the importer).
+            _cs = new NativeComputePipeline(shader);
             _ds = new NativeComputeDescriptorSet(_cs);
         }
 

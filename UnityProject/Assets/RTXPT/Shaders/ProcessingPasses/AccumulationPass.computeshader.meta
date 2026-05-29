@@ -21,5 +21,7 @@ ScriptedImporter:
   defines: []
   entryPoint: main
   targetProfile: cs_6_6
-  rootConstantsHints: []
+  rootConstantsHints:
+  - Name: g_Const
+    Count: 9
   rootSRVHints: []

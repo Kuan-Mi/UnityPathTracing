@@ -41,14 +41,11 @@ namespace PathTracing
         private readonly NativeComputeDescriptorSet _pingDs;
         private readonly NativeComputeDescriptorSet _pongDs;
         private          NativeRtxptPassContext     _ctx;
-        private static readonly RootConstantsHint[] DenoisingRootConstantsHints =
-        {
-            new RootConstantsHint { Name = "g_denoisingConstants", Count = 16 }
-        };
 
         public NativeRtxptDenoisingGuidesBakePass(NativeComputeShader shader)
         {
-            _cs = new NativeComputePipeline(shader, DenoisingRootConstantsHints);
+            // Root-constant hints (g_denoisingConstants) live on the .computeshader asset (the importer).
+            _cs = new NativeComputePipeline(shader);
             _pingDs = new NativeComputeDescriptorSet(_cs);
             _pongDs = new NativeComputeDescriptorSet(_cs);
         }
