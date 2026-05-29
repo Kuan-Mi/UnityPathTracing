@@ -13,17 +13,21 @@
 
 // ---------------------------------------------------------------------------
 // ResolveBoundResource
-//   Resolves the ID3D12Resource* a binding slot points at. The unified
-//   NativeBuffer wrapper derives INativeResource, so a single cast covers every
-//   current and future wrapper kind (and resolves the per-frame slot of volatile
-//   buffers dynamically); everything else falls back to the raw resourcePtr
-//   (Unity textures, AS-backed buffers, the stable DEFAULT-buffer pointer, ...).
+//   Resolves the ID3D12Resource* a singular-resource binding slot points at.
+//   With the unified objectPtr there are exactly two cases for the slot kinds
+//   that reach here (SRV / UAV / CBV / non-AS ROOT_SRV):
+//     - NativeBuffer: objectPtr is an INativeResource*; GetResource() resolves the
+//       per-frame slot of volatile buffers dynamically.
+//     - None:         objectPtr is already a raw ID3D12Resource* (Unity textures,
+//       AS-backed buffers, the stable DEFAULT-buffer pointer, ...).
+//   AccelStruct / Bindless* slots are handled by their callers and never reach
+//   this function, so no separate raw-pointer field is needed.
 // ---------------------------------------------------------------------------
 static ID3D12Resource* ResolveBoundResource(const BindingSlot& slot)
 {
-    if (slot.objectPtr && slot.objectKind == BindingObjectKind::NativeBuffer)
-        return reinterpret_cast<INativeResource*>(slot.objectPtr)->GetResource();
-    return reinterpret_cast<ID3D12Resource*>(slot.resourcePtr);
+    if (slot.objectKind == BindingObjectKind::NativeBuffer)
+        return slot.objectPtr ? reinterpret_cast<INativeResource*>(slot.objectPtr)->GetResource() : nullptr;
+    return reinterpret_cast<ID3D12Resource*>(slot.objectPtr);
 }
 
 // ===========================================================================
@@ -170,7 +174,7 @@ void DescriptorSetBase<ShaderT>::WriteDescriptors(
             if (slot.objectKind == BindingObjectKind::AccelStruct && slot.objectPtr)
                 tlas = reinterpret_cast<AccelerationStructure*>(slot.objectPtr)->GetTLAS();
             else
-                tlas = reinterpret_cast<ID3D12Resource*>(slot.resourcePtr);
+                tlas = reinterpret_cast<ID3D12Resource*>(slot.objectPtr); // raw TLAS resource (kind None)
 
             s.RaytracingAccelerationStructure.Location = tlas ? tlas->GetGPUVirtualAddress() : 0;
             m_device->CreateShaderResourceView(nullptr, &s,
@@ -362,7 +366,7 @@ void DescriptorSetBase<ShaderT>::RequestResourceStates(
     for (uint32_t i : m_idxRootSRV)
     {
         // A ROOT_SRV resolves the same way SRVs do (ResolveBoundResource handles the
-        // NativeBuffer/NativeGpuBuffer handle path and the raw resourcePtr fallback), with
+        // NativeBuffer handle path and the raw-resource objectPtr fallback), with
         // the AccelStruct/TLAS special case layered on top.
         const BindingSlot slot = slotOf(i);
         ID3D12Resource* srvRes = (slot.objectKind == BindingObjectKind::AccelStruct && slot.objectPtr)
@@ -459,33 +463,33 @@ bool DescriptorSetBase<ShaderT>::ValidateBindings(
         bool ok = false;
         const char* kind = "?";
 
+        // A non-null objectPtr is required; the kind set narrows which wrappers are
+        // valid for the binding type (None == a raw ID3D12Resource* in objectPtr).
+        const bool isNone        = slot.objectKind == BindingObjectKind::None;
+        const bool isNativeBuf   = slot.objectKind == BindingObjectKind::NativeBuffer;
+        const bool isAccelStruct = slot.objectKind == BindingObjectKind::AccelStruct;
+
         switch (b.type)
         {
         case BindingType::TLAS:
             kind = "TLAS";
-            ok = slot.resourcePtr != 0 ||
-                 (slot.objectKind == BindingObjectKind::AccelStruct && slot.objectPtr != 0);
+            ok = slot.objectPtr != 0 && (isNone || isAccelStruct);
             break;
         case BindingType::SRV:
             kind = "SRV";
-            ok = slot.resourcePtr != 0 ||
-                 (slot.objectKind == BindingObjectKind::NativeBuffer && slot.objectPtr != 0);
+            ok = slot.objectPtr != 0 && (isNone || isNativeBuf);
             break;
         case BindingType::UAV:
             kind = "UAV";
-            ok = slot.resourcePtr != 0 ||
-                 (slot.objectKind == BindingObjectKind::NativeBuffer && slot.objectPtr != 0);
+            ok = slot.objectPtr != 0 && (isNone || isNativeBuf);
             break;
         case BindingType::ROOT_SRV:
             kind = "ROOT_SRV";
-            ok = slot.resourcePtr != 0 ||
-                 (slot.objectKind == BindingObjectKind::AccelStruct  && slot.objectPtr != 0) ||
-                 (slot.objectKind == BindingObjectKind::NativeBuffer && slot.objectPtr != 0);
+            ok = slot.objectPtr != 0 && (isNone || isAccelStruct || isNativeBuf);
             break;
         case BindingType::CBV:
             kind = "CBV";
-            ok = slot.resourcePtr != 0 ||
-                 (slot.objectKind == BindingObjectKind::NativeBuffer && slot.objectPtr != 0);
+            ok = slot.objectPtr != 0 && (isNone || isNativeBuf);
             break;
         case BindingType::SRV_ARRAY:
             kind = "SRV_ARRAY";
@@ -618,8 +622,8 @@ void DescriptorSetBase<ShaderT>::BindRootParams(
             }
             else
             {
-                // Resolves a NativeBuffer/NativeGpuBuffer handle to its resource, or falls back
-                // to the raw resourcePtr — the root descriptor binds the buffer's base GPU VA.
+                // Resolves a NativeBuffer handle to its resource, or falls back to the
+                // raw-resource objectPtr — the root descriptor binds the buffer's base GPU VA.
                 ID3D12Resource* res = ResolveBoundResource(slot);
                 if (res) va = res->GetGPUVirtualAddress();
             }

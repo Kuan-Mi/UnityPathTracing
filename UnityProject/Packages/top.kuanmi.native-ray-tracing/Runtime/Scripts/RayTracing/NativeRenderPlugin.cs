@@ -567,16 +567,15 @@ namespace NativeRender
 
         /// <summary>
         /// One slot per reflected binding. Filled on the main thread; read on the render thread.
-        /// Must match C++ CS_BindingSlot exactly (Pack=4, 32 bytes).
+        /// Must match C++ BindingSlot exactly (Pack=4, 24 bytes).
         /// </summary>
         [StructLayout(LayoutKind.Sequential, Pack = 4)]
         public struct CS_BindingSlot
         {
-            public ulong resourcePtr; // ID3D12Resource* (may be 0)
-            public ulong objectPtr; // AccelerationStructure* | BindlessTexture* | BindlessBuffer*
+            public ulong objectPtr; // resource/wrapper/payload pointer, interpreted per objectKind
             public uint  count; // element count  (StructuredBuffer or typed buffer)
             public uint  stride; // element stride (StructuredBuffer; 0 = raw/typed)
-            public uint  objectKind; // 0=none, 1=AccelStruct, 2=BindlessTexture, 3=BindlessBuffer
+            public uint  objectKind; // 0=None(raw ID3D12Resource*),1=AccelStruct,2=BindlessTex,3=BindlessBuf,4=RootConstants,5=NativeBuffer,6=BindlessUAVTex
             public uint  format; // DXGI_FORMAT for typed buffer UAV (0 = raw/structured)
         }
 

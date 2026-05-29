@@ -15,6 +15,12 @@ namespace NativeRender
     /// slot/constants ring buffers, and every <c>Set*</c> binding method.
     /// Subclasses own the typed header ring and supply pipeline-specific
     /// create/destroy/snapshot logic.
+    ///
+    /// Binding names can be resolved to a process-global integer id via
+    /// <see cref="PropertyToID"/> (mirrors <c>UnityEngine.Shader.PropertyToID</c>).
+    /// Cache the id once and pass it to the <c>int</c>-id <c>Set*</c> overloads to
+    /// skip the per-call string hash.  Ids survive pipeline hot-reloads — each set
+    /// rebuilds its id→slot map from the refreshed layout.
     /// </summary>
     public abstract class NativeDescriptorSetBase : IDisposable
     {
@@ -33,12 +39,47 @@ namespace NativeRender
         protected const uint ObjKindNativeBuffer       = 5; // unified plugin buffer (VolatileConstantBuffer / DeviceBuffer / UploadBuffer)
         protected const uint ObjKindBindlessUAVTexture = 6;
 
+        // -------------------------------------------------------------------
+        // Global binding-name interning (à la UnityEngine.Shader.PropertyToID)
+        // -------------------------------------------------------------------
+
+        private static readonly object                  s_idLock   = new object();
+        private static readonly Dictionary<string, int> s_nameToId = new Dictionary<string, int>(256);
+
+        /// <summary>
+        /// Interns a binding (HLSL variable) name to a process-global integer id, exactly like
+        /// <c>UnityEngine.Shader.PropertyToID</c>.  The id is stable for the lifetime of the process,
+        /// so the idiom is to cache it once in a <c>static readonly int</c> and pass it to the int-id
+        /// <c>Set*</c> overloads, avoiding the per-call dictionary string-hash.
+        /// </summary>
+        public static int PropertyToID(string name)
+        {
+            if (name == null) return -1;
+            lock (s_idLock)
+            {
+                if (!s_nameToId.TryGetValue(name, out int id))
+                {
+                    id = s_nameToId.Count;
+                    s_nameToId[name] = id;
+                }
+                return id;
+            }
+        }
+
+        private static int GlobalIdCount
+        {
+            get { lock (s_idLock) { return s_nameToId.Count; } }
+        }
+
         // Native C++ descriptor-set handle.
         protected ulong _descriptorSetHandle;
 
         // Slot layout mirrored from the pipeline (refreshed on hot-reload).
-        protected Dictionary<string, uint> _nameToSlot;
-        protected uint                     _slotCount;
+        protected uint _slotCount;
+
+        // Maps a global PropertyToID id → this set's slot index (-1 = not a binding of this set).
+        // Rebuilt whenever the slot layout is (re)copied, so cached ids survive hot-reloads.
+        private int[] _idToSlot;
 
         // Staging arrays written by Set* on the main thread (not pinned).
         protected NativeRenderPlugin.CS_BindingSlot[] _stagingSlots;
@@ -62,10 +103,20 @@ namespace NativeRender
 
         protected void CopySlotLayoutCommon(uint slotCount, IReadOnlyDictionary<string, uint> nameToSlot)
         {
-            _slotCount  = slotCount;
-            _nameToSlot = new Dictionary<string, uint>(slotCount > 0 ? (int)slotCount : 0);
+            _slotCount = slotCount;
+
+            // Intern every binding name, then map its global id → local slot index.  Sizing the
+            // array to the current global id count keeps slot resolution a single bounds-checked
+            // index — no string (or even dictionary) lookup on the binding hot path.
             foreach (var kv in nameToSlot)
-                _nameToSlot[kv.Key] = kv.Value;
+                PropertyToID(kv.Key);
+
+            _idToSlot = new int[GlobalIdCount];
+            for (int k = 0; k < _idToSlot.Length; k++)
+                _idToSlot[k] = -1;
+            foreach (var kv in nameToSlot)
+                _idToSlot[PropertyToID(kv.Key)] = (int)kv.Value;
+
             int eff = _slotCount > 0 ? (int)_slotCount : 1;
             _stagingSlots     = new NativeRenderPlugin.CS_BindingSlot[eff];
             _stagingConstants = new byte[eff * MaxRootConstantBytes];
@@ -144,243 +195,313 @@ namespace NativeRender
 
         // -------------------------------------------------------------------
         // Resource binding  (main thread — writes _stagingSlots)
+        //
+        // Each binder has two overloads: an int-id overload (the implementation,
+        // resolving the slot via a single bounds-checked array index) and a thin
+        // string overload that interns the name through PropertyToID.  Both no-op
+        // when the name/id is not a binding of this descriptor set.
         // -------------------------------------------------------------------
 
-        private bool TryGetSlot(string name, out uint idx)
+        /// <summary>Resolves a global PropertyToID id to this set's slot index, or -1 if unknown.</summary>
+        private int SlotFromId(int nameId)
         {
-            if (name != null && _nameToSlot != null && _nameToSlot.TryGetValue(name, out idx))
-                return true;
-            idx = uint.MaxValue;
-            return false;
+            var map = _idToSlot;
+            return (map != null && (uint)nameId < (uint)map.Length) ? map[nameId] : -1;
         }
 
+        /// <summary>
+        /// Resolves a binding name to this set's slot index, or -1 if the name is not a binding
+        /// of this set.  Equivalent to <c>SlotFromId(PropertyToID(name))</c>; exposed so callers
+        /// can validate a name once and decide whether to bind.
+        /// </summary>
+        public int GetSlotIndex(string name) => SlotFromId(PropertyToID(name));
+
+        /// <summary>Binds a raw/structured buffer (SRV).</summary>
+        public void SetBuffer(int nameId, IntPtr bufferPtr)
+        {
+            int i = SlotFromId(nameId);
+            if (i < 0) return;
+            _stagingSlots[i].objectPtr   = (ulong)bufferPtr;
+            _stagingSlots[i].objectKind  = ObjKindNone;
+            _stagingSlots[i].count       = 0;
+            _stagingSlots[i].stride      = 0;
+            _stagingSlots[i].format      = 0;
+        }
         /// <summary>Binds a raw/structured buffer (SRV) by HLSL variable name.</summary>
-        public void SetBuffer(string name, IntPtr bufferPtr)
-        {
-            if (!TryGetSlot(name, out uint i)) return;
-            _stagingSlots[i].resourcePtr = (ulong)bufferPtr;
-            _stagingSlots[i].objectKind  = ObjKindNone;
-            _stagingSlots[i].count       = 0;
-            _stagingSlots[i].stride      = 0;
-            _stagingSlots[i].format      = 0;
-        }
+        public void SetBuffer(string name, IntPtr bufferPtr) => SetBuffer(PropertyToID(name), bufferPtr);
 
-        /// <summary>Binds an RW buffer (UAV) by HLSL variable name.</summary>
-        public void SetRWBuffer(string name, IntPtr bufferPtr)
+        /// <summary>Binds an RW buffer (UAV).</summary>
+        public void SetRWBuffer(int nameId, IntPtr bufferPtr)
         {
-            if (!TryGetSlot(name, out uint i)) return;
-            _stagingSlots[i].resourcePtr = (ulong)bufferPtr;
+            int i = SlotFromId(nameId);
+            if (i < 0) return;
+            _stagingSlots[i].objectPtr   = (ulong)bufferPtr;
             _stagingSlots[i].objectKind  = ObjKindNone;
             _stagingSlots[i].count       = 0;
             _stagingSlots[i].stride      = 0;
             _stagingSlots[i].format      = 0;
         }
+        /// <summary>Binds an RW buffer (UAV) by HLSL variable name.</summary>
+        public void SetRWBuffer(string name, IntPtr bufferPtr) => SetRWBuffer(PropertyToID(name), bufferPtr);
 
         /// <summary>Binds an <see cref="UploadBuffer"/> as a raw RW buffer UAV.</summary>
-        public void SetRWBuffer(string name, UploadBuffer buffer)
+        public void SetRWBuffer(int nameId, UploadBuffer buffer)
         {
-            if (!TryGetSlot(name, out uint i)) return;
-            _stagingSlots[i].resourcePtr = 0;
+            int i = SlotFromId(nameId);
+            if (i < 0) return;
             _stagingSlots[i].objectPtr   = buffer != null ? buffer.Handle : 0;
             _stagingSlots[i].objectKind  = ObjKindNativeBuffer;
             _stagingSlots[i].count       = 0;
             _stagingSlots[i].stride      = 0;
             _stagingSlots[i].format      = 0;
         }
+        /// <summary>Binds an <see cref="UploadBuffer"/> as a raw RW buffer UAV.</summary>
+        public void SetRWBuffer(string name, UploadBuffer buffer) => SetRWBuffer(PropertyToID(name), buffer);
 
         /// <summary>Binds an RW typed buffer (UAV) with an explicit DXGI_FORMAT.</summary>
-        public void SetRWTypedBuffer(string name, IntPtr bufferPtr, int count, uint dxgiFormat)
+        public void SetRWTypedBuffer(int nameId, IntPtr bufferPtr, int count, uint dxgiFormat)
         {
-            if (!TryGetSlot(name, out uint i)) return;
-            _stagingSlots[i].resourcePtr = (ulong)bufferPtr;
+            int i = SlotFromId(nameId);
+            if (i < 0) return;
+            _stagingSlots[i].objectPtr   = (ulong)bufferPtr;
             _stagingSlots[i].objectKind  = ObjKindNone;
             _stagingSlots[i].count       = (uint)count;
             _stagingSlots[i].stride      = 0;
             _stagingSlots[i].format      = dxgiFormat;
         }
-
+        /// <summary>Binds an RW typed buffer (UAV) with an explicit DXGI_FORMAT.</summary>
+        public void SetRWTypedBuffer(string name, IntPtr bufferPtr, int count, uint dxgiFormat)
+            => SetRWTypedBuffer(PropertyToID(name), bufferPtr, count, dxgiFormat);
 
         /// <summary>Binds a <see cref="DeviceBuffer"/> as a typed RW buffer UAV (e.g. RWBuffer&lt;float2&gt;).</summary>
-        public void SetRWTypedBuffer(string name, DeviceBuffer deviceBuffer, int count, uint dxgiFormat)
+        public void SetRWTypedBuffer(int nameId, DeviceBuffer deviceBuffer, int count, uint dxgiFormat)
         {
-            if (!TryGetSlot(name, out uint i)) return;
-            _stagingSlots[i].resourcePtr = 0;
+            int i = SlotFromId(nameId);
+            if (i < 0) return;
             _stagingSlots[i].objectPtr   = deviceBuffer.Handle;
             _stagingSlots[i].objectKind  = ObjKindNativeBuffer;
             _stagingSlots[i].count       = (uint)count;
             _stagingSlots[i].stride      = 0;
             _stagingSlots[i].format      = dxgiFormat;
         }
+        /// <summary>Binds a <see cref="DeviceBuffer"/> as a typed RW buffer UAV (e.g. RWBuffer&lt;float2&gt;).</summary>
+        public void SetRWTypedBuffer(string name, DeviceBuffer deviceBuffer, int count, uint dxgiFormat)
+            => SetRWTypedBuffer(PropertyToID(name), deviceBuffer, count, dxgiFormat);
 
         /// <summary>Binds a structured buffer (UAV) with explicit element count and stride.</summary>
-        public void SetRWStructuredBuffer(string name, IntPtr bufferPtr, int count, int stride)
+        public void SetRWStructuredBuffer(int nameId, IntPtr bufferPtr, int count, int stride)
         {
-            if (!TryGetSlot(name, out uint i)) return;
-            _stagingSlots[i].resourcePtr = (ulong)bufferPtr;
+            int i = SlotFromId(nameId);
+            if (i < 0) return;
+            _stagingSlots[i].objectPtr   = (ulong)bufferPtr;
             _stagingSlots[i].objectKind  = ObjKindNone;
             _stagingSlots[i].count       = (uint)count;
             _stagingSlots[i].stride      = (uint)stride;
         }
+        /// <summary>Binds a structured buffer (UAV) with explicit element count and stride.</summary>
+        public void SetRWStructuredBuffer(string name, IntPtr bufferPtr, int count, int stride)
+            => SetRWStructuredBuffer(PropertyToID(name), bufferPtr, count, stride);
 
+        public void SetRWStructuredBuffer(int nameId, GraphicsBuffer buffe)
+            => SetRWStructuredBuffer(nameId, buffe.GetNativeBufferPtr(), buffe.count, buffe.stride);
         public void SetRWStructuredBuffer(string name, GraphicsBuffer buffe)
-        {
-            SetRWStructuredBuffer(name, buffe.GetNativeBufferPtr(), buffe.count, buffe.stride);
-        }
+            => SetRWStructuredBuffer(PropertyToID(name), buffe.GetNativeBufferPtr(), buffe.count, buffe.stride);
 
         /// <summary>Binds an <see cref="UploadBuffer"/> as a RWStructuredBuffer UAV (resolved by handle).
         /// Requires the buffer to have been created with UAV support.</summary>
-        public void SetRWStructuredBuffer(string name, UploadBuffer buffer, int count, int stride)
+        public void SetRWStructuredBuffer(int nameId, UploadBuffer buffer, int count, int stride)
         {
-            if (!TryGetSlot(name, out uint i)) return;
-            _stagingSlots[i].resourcePtr = 0;
+            int i = SlotFromId(nameId);
+            if (i < 0) return;
             _stagingSlots[i].objectPtr   = buffer != null ? buffer.Handle : 0;
             _stagingSlots[i].objectKind  = ObjKindNativeBuffer;
             _stagingSlots[i].count       = (uint)count;
             _stagingSlots[i].stride      = (uint)stride;
         }
+        /// <summary>Binds an <see cref="UploadBuffer"/> as a RWStructuredBuffer UAV (resolved by handle).</summary>
+        public void SetRWStructuredBuffer(string name, UploadBuffer buffer, int count, int stride)
+            => SetRWStructuredBuffer(PropertyToID(name), buffer, count, stride);
 
         /// <summary>Binds a Texture2D or RenderTexture as a read-only texture (SRV).</summary>
-        public void SetTexture(string name, IntPtr texturePtr)
+        public void SetTexture(int nameId, IntPtr texturePtr)
         {
-            if (!TryGetSlot(name, out uint i)) return;
-            _stagingSlots[i].resourcePtr = (ulong)texturePtr;
+            int i = SlotFromId(nameId);
+            if (i < 0) return;
+            _stagingSlots[i].objectPtr   = (ulong)texturePtr;
             _stagingSlots[i].objectKind  = ObjKindNone;
             _stagingSlots[i].count       = 0;
             _stagingSlots[i].stride      = 0;
         }
+        /// <summary>Binds a Texture2D or RenderTexture as a read-only texture (SRV).</summary>
+        public void SetTexture(string name, IntPtr texturePtr) => SetTexture(PropertyToID(name), texturePtr);
 
         /// <summary>Binds a RenderTexture as a read-write texture (UAV).</summary>
-        public void SetRWTexture(string name, IntPtr texturePtr)
+        public void SetRWTexture(int nameId, IntPtr texturePtr)
         {
-            if (!TryGetSlot(name, out uint i)) return;
-            _stagingSlots[i].resourcePtr = (ulong)texturePtr;
+            int i = SlotFromId(nameId);
+            if (i < 0) return;
+            _stagingSlots[i].objectPtr   = (ulong)texturePtr;
             _stagingSlots[i].objectKind  = ObjKindNone;
             _stagingSlots[i].count       = 0;
             _stagingSlots[i].stride      = 0;
         }
+        /// <summary>Binds a RenderTexture as a read-write texture (UAV).</summary>
+        public void SetRWTexture(string name, IntPtr texturePtr) => SetRWTexture(PropertyToID(name), texturePtr);
 
         /// <summary>Binds a GraphicsBuffer as a constant buffer (CBV).</summary>
-        public void SetConstantBuffer(string name, IntPtr bufferPtr)
+        public void SetConstantBuffer(int nameId, IntPtr bufferPtr)
         {
-            if (!TryGetSlot(name, out uint i)) return;
-            _stagingSlots[i].resourcePtr = (ulong)bufferPtr;
+            int i = SlotFromId(nameId);
+            if (i < 0) return;
+            _stagingSlots[i].objectPtr   = (ulong)bufferPtr;
             _stagingSlots[i].objectKind  = ObjKindNone;
             _stagingSlots[i].count       = 0;
             _stagingSlots[i].stride      = 0;
         }
-
         /// <summary>Binds a GraphicsBuffer as a constant buffer (CBV).</summary>
-        public void SetConstantBuffer(string name, VolatileConstantBuffer volatileConstantBuffer)
+        public void SetConstantBuffer(string name, IntPtr bufferPtr) => SetConstantBuffer(PropertyToID(name), bufferPtr);
+
+        /// <summary>Binds a <see cref="VolatileConstantBuffer"/> as a constant buffer (CBV).</summary>
+        public void SetConstantBuffer(int nameId, VolatileConstantBuffer volatileConstantBuffer)
         {
-            if (!TryGetSlot(name, out uint i)) return;
-            _stagingSlots[i].resourcePtr = 0;
+            int i = SlotFromId(nameId);
+            if (i < 0) return;
             _stagingSlots[i].objectPtr   = volatileConstantBuffer.Handle;
             _stagingSlots[i].objectKind  = ObjKindNativeBuffer;
             _stagingSlots[i].count       = 0;
             _stagingSlots[i].stride      = 0;
         }
+        /// <summary>Binds a <see cref="VolatileConstantBuffer"/> as a constant buffer (CBV).</summary>
+        public void SetConstantBuffer(string name, VolatileConstantBuffer volatileConstantBuffer)
+            => SetConstantBuffer(PropertyToID(name), volatileConstantBuffer);
 
         /// <summary>Binds a typed buffer SRV (e.g. Buffer&lt;float2&gt;) with explicit DXGI_FORMAT.</summary>
-        public void SetTypedBuffer(string name, IntPtr bufferPtr, int count, uint dxgiFormat)
+        public void SetTypedBuffer(int nameId, IntPtr bufferPtr, int count, uint dxgiFormat)
         {
-            if (!TryGetSlot(name, out uint i)) return;
-            _stagingSlots[i].resourcePtr = (ulong)bufferPtr;
+            int i = SlotFromId(nameId);
+            if (i < 0) return;
+            _stagingSlots[i].objectPtr   = (ulong)bufferPtr;
             _stagingSlots[i].objectKind  = ObjKindNone;
             _stagingSlots[i].count       = (uint)count;
             _stagingSlots[i].stride      = 0;
             _stagingSlots[i].format      = dxgiFormat;
         }
+        /// <summary>Binds a typed buffer SRV (e.g. Buffer&lt;float2&gt;) with explicit DXGI_FORMAT.</summary>
+        public void SetTypedBuffer(string name, IntPtr bufferPtr, int count, uint dxgiFormat)
+            => SetTypedBuffer(PropertyToID(name), bufferPtr, count, dxgiFormat);
 
         /// <summary>Binds a <see cref="DeviceBuffer"/> as a typed buffer SRV (e.g. Buffer&lt;float2&gt;).</summary>
-        public void SetTypedBuffer(string name, DeviceBuffer deviceBuffer, int count, uint dxgiFormat)
+        public void SetTypedBuffer(int nameId, DeviceBuffer deviceBuffer, int count, uint dxgiFormat)
         {
-            if (!TryGetSlot(name, out uint i)) return;
-            _stagingSlots[i].resourcePtr = 0;
+            int i = SlotFromId(nameId);
+            if (i < 0) return;
             _stagingSlots[i].objectPtr   = deviceBuffer.Handle;
             _stagingSlots[i].objectKind  = ObjKindNativeBuffer;
             _stagingSlots[i].count       = (uint)count;
             _stagingSlots[i].stride      = 0;
             _stagingSlots[i].format      = dxgiFormat;
         }
+        /// <summary>Binds a <see cref="DeviceBuffer"/> as a typed buffer SRV (e.g. Buffer&lt;float2&gt;).</summary>
+        public void SetTypedBuffer(string name, DeviceBuffer deviceBuffer, int count, uint dxgiFormat)
+            => SetTypedBuffer(PropertyToID(name), deviceBuffer, count, dxgiFormat);
 
         /// <summary>Binds a StructuredBuffer SRV with explicit element count and stride.</summary>
-        public void SetStructuredBuffer(string name, IntPtr bufferPtr, int elementCount, int elementStride)
+        public void SetStructuredBuffer(int nameId, IntPtr bufferPtr, int elementCount, int elementStride)
         {
-            if (!TryGetSlot(name, out uint i)) return;
-            _stagingSlots[i].resourcePtr = (ulong)bufferPtr;
+            int i = SlotFromId(nameId);
+            if (i < 0) return;
+            _stagingSlots[i].objectPtr   = (ulong)bufferPtr;
             _stagingSlots[i].objectKind  = ObjKindNone;
             _stagingSlots[i].count       = (uint)elementCount;
             _stagingSlots[i].stride      = (uint)elementStride;
         }
+        /// <summary>Binds a StructuredBuffer SRV with explicit element count and stride.</summary>
+        public void SetStructuredBuffer(string name, IntPtr bufferPtr, int elementCount, int elementStride)
+            => SetStructuredBuffer(PropertyToID(name), bufferPtr, elementCount, elementStride);
 
+        public void SetStructuredBuffer(int nameId, GraphicsBuffer buffer)
+            => SetStructuredBuffer(nameId, buffer.GetNativeBufferPtr(), buffer.count, buffer.stride);
         public void SetStructuredBuffer(string name, GraphicsBuffer buffer)
-        {
-            SetStructuredBuffer(name, buffer.GetNativeBufferPtr(), buffer.count, buffer.stride);
-        }
+            => SetStructuredBuffer(PropertyToID(name), buffer.GetNativeBufferPtr(), buffer.count, buffer.stride);
 
         /// <summary>Binds an <see cref="UploadBuffer"/> as a StructuredBuffer SRV. Resolved by handle
         /// (the resource pointer is resolved natively at dispatch), so no cached NativePtr is needed.</summary>
-        public void SetStructuredBuffer(string name, UploadBuffer buffer, int elementCount, int elementStride)
+        public void SetStructuredBuffer(int nameId, UploadBuffer buffer, int elementCount, int elementStride)
         {
-            if (!TryGetSlot(name, out uint i)) return;
-            _stagingSlots[i].resourcePtr = 0;
+            int i = SlotFromId(nameId);
+            if (i < 0) return;
             _stagingSlots[i].objectPtr   = buffer != null ? buffer.Handle : 0;
             _stagingSlots[i].objectKind  = ObjKindNativeBuffer;
             _stagingSlots[i].count       = (uint)elementCount;
             _stagingSlots[i].stride      = (uint)elementStride;
         }
+        /// <summary>Binds an <see cref="UploadBuffer"/> as a StructuredBuffer SRV (resolved by handle).</summary>
+        public void SetStructuredBuffer(string name, UploadBuffer buffer, int elementCount, int elementStride)
+            => SetStructuredBuffer(PropertyToID(name), buffer, elementCount, elementStride);
 
+        public void SetStructuredBuffer(int nameId, UploadBuffer buffer)
+            => SetStructuredBuffer(nameId, buffer, buffer != null ? buffer.count : 0, buffer != null ? buffer.stride : 0);
         public void SetStructuredBuffer(string name, UploadBuffer buffer)
-        {
-            SetStructuredBuffer(name, buffer, buffer != null ? buffer.count : 0, buffer != null ? buffer.stride : 0);
-        }
+            => SetStructuredBuffer(PropertyToID(name), buffer, buffer != null ? buffer.count : 0, buffer != null ? buffer.stride : 0);
 
-        /// <summary>Binds a RaytracingAccelerationStructure (TLAS) by HLSL variable name.</summary>
-        public void SetAccelerationStructure(string name, RayTracingAccelerationStructure accelStructure)
+        /// <summary>Binds a RaytracingAccelerationStructure (TLAS).</summary>
+        public void SetAccelerationStructure(int nameId, RayTracingAccelerationStructure accelStructure)
         {
-            if (!TryGetSlot(name, out uint i)) return;
-            _stagingSlots[i].resourcePtr = 0;
+            int i = SlotFromId(nameId);
+            if (i < 0) return;
             _stagingSlots[i].objectPtr   = accelStructure != null ? accelStructure.Handle : 0;
             _stagingSlots[i].objectKind  = ObjKindAccelStruct;
             _stagingSlots[i].count       = 0;
             _stagingSlots[i].stride      = 0;
         }
+        /// <summary>Binds a RaytracingAccelerationStructure (TLAS) by HLSL variable name.</summary>
+        public void SetAccelerationStructure(string name, RayTracingAccelerationStructure accelStructure)
+            => SetAccelerationStructure(PropertyToID(name), accelStructure);
 
         /// <summary>Binds a BindlessTexture to an unbounded Texture2D[] variable.</summary>
-        public void SetBindlessTexture(string name, BindlessTexture bt)
+        public void SetBindlessTexture(int nameId, BindlessTexture bt)
         {
-            if (!TryGetSlot(name, out uint i)) return;
-            _stagingSlots[i].resourcePtr = 0;
+            int i = SlotFromId(nameId);
+            if (i < 0) return;
             _stagingSlots[i].objectPtr   = bt != null ? bt.Handle : 0;
             _stagingSlots[i].objectKind  = ObjKindBindlessTexture;
             _stagingSlots[i].count       = 0;
             _stagingSlots[i].stride      = 0;
         }
+        /// <summary>Binds a BindlessTexture to an unbounded Texture2D[] variable.</summary>
+        public void SetBindlessTexture(string name, BindlessTexture bt) => SetBindlessTexture(PropertyToID(name), bt);
 
         /// <summary>Binds a BindlessBuffer to an unbounded ByteAddressBuffer[] variable.</summary>
-        public void SetBindlessBuffer(string name, BindlessBuffer bb)
+        public void SetBindlessBuffer(int nameId, BindlessBuffer bb)
         {
-            if (!TryGetSlot(name, out uint i)) return;
-            _stagingSlots[i].resourcePtr = 0;
+            int i = SlotFromId(nameId);
+            if (i < 0) return;
             _stagingSlots[i].objectPtr   = bb != null ? bb.Handle : 0;
             _stagingSlots[i].objectKind  = ObjKindBindlessBuffer;
             _stagingSlots[i].count       = 0;
             _stagingSlots[i].stride      = 0;
         }
+        /// <summary>Binds a BindlessBuffer to an unbounded ByteAddressBuffer[] variable.</summary>
+        public void SetBindlessBuffer(string name, BindlessBuffer bb) => SetBindlessBuffer(PropertyToID(name), bb);
 
         /// <summary>
         /// Binds a BindlessUAVTexture to an unbounded RWTexture2D[] variable.
-        /// <paramref name="baseResource"/>: native ptr of the base texture for state tracking.
         /// </summary>
-        public void SetBindlessRWTexture(string name, BindlessUAVTexture uav, IntPtr baseResource = default)
+        /// <param name="baseResource">Unused — retained for source compatibility. Resource-state
+        /// tracking now walks every element of the bindless array natively, so no base pointer
+        /// is needed.</param>
+        public void SetBindlessRWTexture(int nameId, BindlessUAVTexture uav, IntPtr baseResource = default)
         {
-            if (!TryGetSlot(name, out uint i)) return;
-            _stagingSlots[i].resourcePtr = (ulong)baseResource;
+            int i = SlotFromId(nameId);
+            if (i < 0) return;
             _stagingSlots[i].objectPtr   = uav != null ? uav.Handle : 0;
             _stagingSlots[i].objectKind  = ObjKindBindlessUAVTexture;
             _stagingSlots[i].count       = 0;
             _stagingSlots[i].stride      = 0;
         }
+        /// <summary>Binds a BindlessUAVTexture to an unbounded RWTexture2D[] variable.</summary>
+        public void SetBindlessRWTexture(string name, BindlessUAVTexture uav, IntPtr baseResource = default)
+            => SetBindlessRWTexture(PropertyToID(name), uav, baseResource);
 
         /// <summary>
         /// Pushes inline 32-bit constants directly into the root signature.
@@ -388,10 +509,11 @@ namespace NativeRender
         /// Data is copied immediately; the pointer need not remain valid after this call.
         /// </summary>
         public unsafe void SetRootConstants<T>(
-            string name, T* dataPtr, uint count32 = 0, uint destOffset32 = 0)
+            int nameId, T* dataPtr, uint count32 = 0, uint destOffset32 = 0)
             where T : unmanaged
         {
-            if (!TryGetSlot(name, out uint i)) return;
+            int i = SlotFromId(nameId);
+            if (i < 0) return;
             uint byteCount      = count32 == 0 ? (uint)sizeof(T) : count32 * 4u;
             uint destByteOffset = destOffset32 * 4u;
             fixed (byte* dst = _stagingConstants)
@@ -399,7 +521,6 @@ namespace NativeRender
                     dst + i * MaxRootConstantBytes + destByteOffset,
                     MaxRootConstantBytes - destByteOffset,
                     byteCount);
-            _stagingSlots[i].resourcePtr = 0;
             _stagingSlots[i].objectPtr   = 0; // resolved to pinned ptr at Snapshot time
             _stagingSlots[i].count       = count32;
             _stagingSlots[i].stride      = destOffset32;
@@ -407,16 +528,22 @@ namespace NativeRender
             _slotIsRootConst[i]          = true;
             _anyRootConst                = true;
         }
+        /// <summary>Pushes inline 32-bit constants directly into the root signature.</summary>
+        public unsafe void SetRootConstants<T>(
+            string name, T* dataPtr, uint count32 = 0, uint destOffset32 = 0)
+            where T : unmanaged
+            => SetRootConstants(PropertyToID(name), dataPtr, count32, destOffset32);
 
         /// <summary>
         /// Pushes inline 32-bit constants from a <see cref="NativeArray{T}"/>.
         /// Data is copied immediately.
         /// </summary>
         public unsafe void SetRootConstants<T>(
-            string name, NativeArray<T> data, uint count32 = 0, uint destOffset32 = 0)
+            int nameId, NativeArray<T> data, uint count32 = 0, uint destOffset32 = 0)
             where T : unmanaged
         {
-            if (!TryGetSlot(name, out uint i)) return;
+            int i = SlotFromId(nameId);
+            if (i < 0) return;
             void* src            = NativeArrayUnsafeUtility.GetUnsafeReadOnlyPtr(data);
             uint  byteCount      = count32 == 0 ? (uint)(data.Length * sizeof(T)) : count32 * 4u;
             uint  destByteOffset = destOffset32 * 4u;
@@ -425,7 +552,6 @@ namespace NativeRender
                     dst + i * MaxRootConstantBytes + destByteOffset,
                     MaxRootConstantBytes - destByteOffset,
                     byteCount);
-            _stagingSlots[i].resourcePtr = 0;
             _stagingSlots[i].objectPtr   = 0;
             _stagingSlots[i].count       = count32;
             _stagingSlots[i].stride      = destOffset32;
@@ -433,6 +559,11 @@ namespace NativeRender
             _slotIsRootConst[i]          = true;
             _anyRootConst                = true;
         }
+        /// <summary>Pushes inline 32-bit constants from a <see cref="NativeArray{T}"/>.</summary>
+        public unsafe void SetRootConstants<T>(
+            string name, NativeArray<T> data, uint count32 = 0, uint destOffset32 = 0)
+            where T : unmanaged
+            => SetRootConstants(PropertyToID(name), data, count32, destOffset32);
 
         public abstract void Dispose();
     }
