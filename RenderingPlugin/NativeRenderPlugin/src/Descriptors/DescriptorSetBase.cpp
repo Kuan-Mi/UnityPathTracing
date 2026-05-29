@@ -13,24 +13,16 @@
 
 // ---------------------------------------------------------------------------
 // ResolveBoundResource
-//   Resolves the ID3D12Resource* a binding slot points at. Wrapper objects
-//   (NativeBuffer, NativeGpuBuffer, ...) all derive INativeResource, so a
-//   single cast covers every current and future wrapper kind; everything else
-//   falls back to the raw resourcePtr (Unity textures, AS-backed buffers, ...).
+//   Resolves the ID3D12Resource* a binding slot points at. The unified
+//   NativeBuffer wrapper derives INativeResource, so a single cast covers every
+//   current and future wrapper kind (and resolves the per-frame slot of volatile
+//   buffers dynamically); everything else falls back to the raw resourcePtr
+//   (Unity textures, AS-backed buffers, the stable DEFAULT-buffer pointer, ...).
 // ---------------------------------------------------------------------------
 static ID3D12Resource* ResolveBoundResource(const BindingSlot& slot)
 {
-    if (slot.objectPtr)
-    {
-        switch (slot.objectKind)
-        {
-        case BindingObjectKind::NativeBuffer:
-        case BindingObjectKind::NativeGpuBuffer:
-            return reinterpret_cast<INativeResource*>(slot.objectPtr)->GetResource();
-        default:
-            break;
-        }
-    }
+    if (slot.objectPtr && slot.objectKind == BindingObjectKind::NativeBuffer)
+        return reinterpret_cast<INativeResource*>(slot.objectPtr)->GetResource();
     return reinterpret_cast<ID3D12Resource*>(slot.resourcePtr);
 }
 
@@ -412,14 +404,12 @@ bool DescriptorSetBase<ShaderT>::ValidateBindings(
         case BindingType::SRV:
             kind = "SRV";
             ok = slot.resourcePtr != 0 ||
-                 (slot.objectKind == BindingObjectKind::NativeBuffer    && slot.objectPtr != 0) ||
-                 (slot.objectKind == BindingObjectKind::NativeGpuBuffer && slot.objectPtr != 0);
+                 (slot.objectKind == BindingObjectKind::NativeBuffer && slot.objectPtr != 0);
             break;
         case BindingType::UAV:
             kind = "UAV";
             ok = slot.resourcePtr != 0 ||
-                 (slot.objectKind == BindingObjectKind::NativeBuffer    && slot.objectPtr != 0) ||
-                 (slot.objectKind == BindingObjectKind::NativeGpuBuffer && slot.objectPtr != 0);
+                 (slot.objectKind == BindingObjectKind::NativeBuffer && slot.objectPtr != 0);
             break;
         case BindingType::ROOT_SRV:
             kind = "ROOT_SRV";

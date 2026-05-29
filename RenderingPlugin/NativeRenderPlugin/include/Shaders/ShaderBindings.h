@@ -42,9 +42,8 @@ enum class BindingObjectKind : uint32_t
     BindlessTexture    = 2,
     BindlessBuffer     = 3,
     RootConstants      = 4,
-    NativeBuffer       = 5,
+    NativeBuffer       = 5, // unified plugin buffer (volatile / DEFAULT-staged / UAV)
     BindlessUAVTexture = 6,
-    NativeGpuBuffer    = 7,
 };
 
 struct BindingSlot

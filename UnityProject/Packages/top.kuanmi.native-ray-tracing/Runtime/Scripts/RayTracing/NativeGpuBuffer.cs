@@ -24,9 +24,12 @@ namespace NativeRender
         public NativeGpuBuffer(uint sizeInBytes)
         {
             if (sizeInBytes == 0) throw new ArgumentOutOfRangeException(nameof(sizeInBytes));
-            Handle = NativeRenderPlugin.NR_CreateNativeGpuBuffer(sizeInBytes);
+            // GPU-resident DEFAULT-heap buffer with ALLOW_UNORDERED_ACCESS (no CPU upload).
+            Handle = NativeRenderPlugin.NR_CreateNativeBuffer(
+                sizeInBytes, 0u, 1u,
+                /*canHaveUAVs*/ 1u, /*isConstantBuffer*/ 0u, /*isVolatile*/ 0u);
             if (Handle == 0)
-                Debug.LogError("[NativeGpuBuffer] NR_CreateNativeGpuBuffer failed.");
+                Debug.LogError("[NativeGpuBuffer] NR_CreateNativeBuffer failed.");
         }
 
         /// <summary>
@@ -50,7 +53,7 @@ namespace NativeRender
             if (_disposed) return;
             if (Handle != 0)
             {
-                NativeRenderPlugin.NR_DestroyNativeGpuBuffer(Handle);
+                NativeRenderPlugin.NR_DestroyNativeBuffer(Handle);
                 Handle = 0;
             }
             _disposed = true;

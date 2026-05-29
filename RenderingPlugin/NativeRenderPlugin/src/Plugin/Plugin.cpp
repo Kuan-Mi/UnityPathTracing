@@ -30,8 +30,6 @@
 #include "BindlessBuffer.h"
 #include "BindlessUAVTexture.h"
 #include "NativeBuffer.h"
-#include "NativeStructuredBuffer.h"
-#include "NativeGpuBuffer.h"
 #include "ResourceStateTracker.h"
 #include "D3D12HeapHook.h"
 #include "PluginInternal.h"
@@ -247,14 +245,6 @@ void EnqueueDeferredDelete(void* ptr, DeferredType type)
 
     case DeferredType::NativeBuffer:
         EnqueueCleanup([p = static_cast<NativeBuffer*>(ptr)] { delete p; });
-        break;
-
-    case DeferredType::NativeStructuredBuffer:
-        EnqueueCleanup([p = static_cast<NativeStructuredBuffer*>(ptr)] { delete p; });
-        break;
-
-    case DeferredType::NativeGpuBuffer:
-        EnqueueCleanup([p = static_cast<NativeGpuBuffer*>(ptr)] { delete p; });
         break;
 
     default:
@@ -1325,11 +1315,16 @@ NR_BUAV_GetCapacity(uint64_t handle)
 
 // ---------------------------------------------------------------------------
 // NR_CreateNativeBuffer
-//   Allocates a triple-buffered upload-heap buffer of |sizeInBytes|.
+//   Unified buffer allocation (nvrhi Buffer analog). The desc flags select the
+//   heap and the active upload/readback path — see NativeBufferDesc:
+//     * isVolatile + maxVersions>1 -> per-frame UPLOAD ring (CPU writes via Upload).
+//     * DEFAULT + structStride     -> GPU-resident, staged CPU writes / readback.
+//     * canHaveUAVs                 -> ALLOW_UNORDERED_ACCESS on the DEFAULT resource.
 //   Returns opaque handle (NativeBuffer*) or 0 on failure.
 // ---------------------------------------------------------------------------
 extern "C" uint64_t UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API
-NR_CreateNativeBuffer(uint32_t sizeInBytes)
+NR_CreateNativeBuffer(uint64_t byteSize, uint32_t structStride, uint32_t maxVersions,
+                      uint32_t canHaveUAVs, uint32_t isConstantBuffer, uint32_t isVolatile)
 {
     if (!s_D3D12)
     {
@@ -1342,8 +1337,17 @@ NR_CreateNativeBuffer(uint32_t sizeInBytes)
         NR_WARN("NR_CreateNativeBuffer: no D3D12 device");
         return 0;
     }
+
+    NativeBufferDesc desc{};
+    desc.byteSize         = byteSize;
+    desc.structStride     = structStride;
+    desc.maxVersions      = maxVersions ? maxVersions : 1u;
+    desc.canHaveUAVs      = canHaveUAVs != 0;
+    desc.isConstantBuffer = isConstantBuffer != 0;
+    desc.isVolatile       = isVolatile != 0;
+
     auto* nb = new NativeBuffer();
-    if (!nb->Initialize(device, sizeInBytes))
+    if (!nb->Initialize(device, desc, s_Log))
     {
         delete nb;
         NR_WARN("NR_CreateNativeBuffer: Initialize failed");
@@ -1382,80 +1386,13 @@ GetNativeBufferUploadCallbackPtr()
 }
 
 // ===========================================================================
-// NativeStructuredBuffer — single upload-heap SRV buffer
+// NativeBuffer GPU clear (DEFAULT-heap buffers with ALLOW_UNORDERED_ACCESS)
 // ===========================================================================
-
-// ---------------------------------------------------------------------------
-// NR_CreateNativeStructuredBuffer
-//   Allocates a DEFAULT-heap structured buffer with |capacity| elements of
-//   |elementStride| bytes each, fed by the CPU upload-snapshot path. When
-//   |allowUAV| is non-zero the resource gets ALLOW_UNORDERED_ACCESS so it can
-//   also be bound as a RWStructuredBuffer (GPU writes). Returns handle or 0.
-// ---------------------------------------------------------------------------
-extern "C" uint64_t UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API
-NR_CreateNativeStructuredBuffer(uint32_t capacity, uint32_t elementStride, uint32_t allowUAV)
-{
-    if (!s_D3D12) { NR_WARN("NR_CreateNativeStructuredBuffer: renderer not ready"); return 0; }
-    ID3D12Device* device = s_D3D12->GetDevice();
-    if (!device)  { NR_WARN("NR_CreateNativeStructuredBuffer: no D3D12 device"); return 0; }
-    auto* nsb = new NativeStructuredBuffer();
-    if (!nsb->Initialize(device, capacity, elementStride, s_Log, allowUAV != 0))
-    {
-        delete nsb;
-        NR_WARN("NR_CreateNativeStructuredBuffer: Initialize failed");
-        return 0;
-    }
-    return reinterpret_cast<uint64_t>(nsb);
-}
-
-// ---------------------------------------------------------------------------
-// NR_DestroyNativeStructuredBuffer
-// ---------------------------------------------------------------------------
-extern "C" void UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API
-NR_DestroyNativeStructuredBuffer(uint64_t handle)
-{
-    if (handle) EnqueueDeferredDelete(reinterpret_cast<void*>(handle), DeferredType::NativeStructuredBuffer);
-}
-
-// ===========================================================================
-// NativeGpuBuffer — single DEFAULT-heap buffer with ALLOW_UNORDERED_ACCESS
-// ===========================================================================
-
-// ---------------------------------------------------------------------------
-// NR_CreateNativeGpuBuffer
-//   Allocates a DEFAULT-heap buffer of |sizeInBytes| with UAV support.
-//   Returns opaque handle (NativeGpuBuffer*) or 0 on failure.
-// ---------------------------------------------------------------------------
-extern "C" uint64_t UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API
-NR_CreateNativeGpuBuffer(uint32_t sizeInBytes)
-{
-    if (!s_D3D12) { NR_WARN("NR_CreateNativeGpuBuffer: renderer not ready"); return 0; }
-    ID3D12Device* device = s_D3D12->GetDevice();
-    if (!device)  { NR_WARN("NR_CreateNativeGpuBuffer: no D3D12 device"); return 0; }
-    auto* buf = new NativeGpuBuffer();
-    if (!buf->Initialize(device, sizeInBytes))
-    {
-        delete buf;
-        NR_WARN("NR_CreateNativeGpuBuffer: Initialize failed");
-        return 0;
-    }
-    return reinterpret_cast<uint64_t>(buf);
-}
-
-// ---------------------------------------------------------------------------
-// NR_DestroyNativeGpuBuffer
-//   Enqueues destruction after a GPU fence delay.
-// ---------------------------------------------------------------------------
-extern "C" void UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API
-NR_DestroyNativeGpuBuffer(uint64_t handle)
-{
-    if (handle) EnqueueDeferredDelete(reinterpret_cast<void*>(handle), DeferredType::NativeGpuBuffer);
-}
 
 // ---------------------------------------------------------------------------
 // NR_ClearNativeGpuBufferCallback
 //   Render-thread callback (IssuePluginEventAndData).
-//   data = NativeGpuBuffer*  (the Handle value from C#).
+//   data = NativeBuffer*  (the Handle value from C#).
 //   Zeroes the entire buffer via ClearUnorderedAccessViewUint using:
 //     - a 1-slot CPU-only descriptor heap (s_ClearCpuHeap) for the CPU handle
 //     - a temporarily allocated slot from s_DescHeap (shader-visible) for the
@@ -1467,7 +1404,7 @@ static void UNITY_INTERFACE_API NR_ClearNativeGpuBufferCallback(int /*eventId*/,
 {
     if (!s_RendererReady || !s_D3D12 || !data || !s_ClearCpuHeap) return;
 
-    auto* buf = static_cast<NativeGpuBuffer*>(data);
+    auto* buf = static_cast<NativeBuffer*>(data);
     ID3D12Resource* res = buf->GetResource();
     if (!res) return;
 
@@ -1553,7 +1490,7 @@ extern "C" intptr_t UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API
 NR_NSB_GetNativePtr(uint64_t handle)
 {
     if (!handle) return 0;
-    return reinterpret_cast<intptr_t>(reinterpret_cast<NativeStructuredBuffer*>(handle)->GetResource());
+    return reinterpret_cast<intptr_t>(reinterpret_cast<NativeBuffer*>(handle)->GetResource());
 }
 
 // ---------------------------------------------------------------------------
@@ -1563,7 +1500,7 @@ extern "C" uint32_t UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API
 NR_NSB_GetCapacity(uint64_t handle)
 {
     if (!handle) return 0;
-    return reinterpret_cast<NativeStructuredBuffer*>(handle)->GetCapacity();
+    return reinterpret_cast<NativeBuffer*>(handle)->GetCapacity();
 }
 
 // ---------------------------------------------------------------------------
@@ -1584,7 +1521,7 @@ static void UNITY_INTERFACE_API NsbFlushCallback(int /*eventId*/, void* data)
     if (s_RendererReady && s_D3D12 && hdr->bufferHandle &&
         s_D3D12->CommandRecordingState(&recordingState) && recordingState.commandList)
     {
-        auto* nsb     = reinterpret_cast<NativeStructuredBuffer*>(hdr->bufferHandle);
+        auto* nsb     = reinterpret_cast<NativeBuffer*>(hdr->bufferHandle);
         auto* cmdList = static_cast<ID3D12GraphicsCommandList*>(recordingState.commandList);
 
         const auto*    ranges  = reinterpret_cast<const NsbFlushRange*>(blob + sizeof(NsbFlushHeader));
@@ -1626,7 +1563,7 @@ static void UNITY_INTERFACE_API NsbReadbackCallback(int /*eventId*/, void* data)
     if (s_RendererReady && s_D3D12 && req->bufferHandle &&
         s_D3D12->CommandRecordingState(&rs) && rs.commandList)
     {
-        auto* nsb     = reinterpret_cast<NativeStructuredBuffer*>(req->bufferHandle);
+        auto* nsb     = reinterpret_cast<NativeBuffer*>(req->bufferHandle);
         auto* cmdList = static_cast<ID3D12GraphicsCommandList*>(rs.commandList);
 
         if (!s_FrameFenceCached) s_FrameFenceCached = s_D3D12->GetFrameFence();
@@ -1656,7 +1593,7 @@ NR_NSB_TryReadback(uint64_t handle, void* dst, uint64_t dstBytes)
 {
     if (!handle || !dst || !s_FrameFenceCached) return 0;
     const uint64_t completed = s_FrameFenceCached->GetCompletedValue();
-    auto* nsb = reinterpret_cast<NativeStructuredBuffer*>(handle);
+    auto* nsb = reinterpret_cast<NativeBuffer*>(handle);
     return nsb->TryReadback(completed, dst, dstBytes) ? 1u : 0u;
 }
 

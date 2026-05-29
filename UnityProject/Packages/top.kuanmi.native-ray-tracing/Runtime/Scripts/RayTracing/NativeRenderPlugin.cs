@@ -430,65 +430,39 @@ namespace NativeRender
         public static extern uint NR_BUAV_GetCapacity(ulong handle);
 
         // -------------------------------------------------------------------
-        // NativeBuffer API  (triple-buffered upload-heap constant buffer)
+        // NativeBuffer API  (unified plugin buffer — nvrhi Buffer analog)
+        //
+        // One create/destroy pair covers the three former buffer roles; the desc
+        // flags select the heap and the active upload/readback path:
+        //   * Volatile constant/dynamic buffer:
+        //         isVolatile = 1, maxVersions = N (>1)  -> per-frame UPLOAD ring,
+        //         written via the upload callback (GetNativeBufferUploadCallbackPtr).
+        //   * GPU-resident structured buffer with staged CPU writes:
+        //         structStride > 0  -> DEFAULT heap fed by the NR_NSB_* snapshot path.
+        //   * GPU-only UAV buffer:
+        //         canHaveUAVs = 1  -> DEFAULT heap with ALLOW_UNORDERED_ACCESS.
         // -------------------------------------------------------------------
 
         /// <summary>
-        /// Allocates a triple-buffered upload-heap buffer of <paramref name="sizeInBytes"/>.
-        /// Returns an opaque handle; caller must call NR_DestroyNativeBuffer when done.
+        /// Allocates a unified plugin buffer. Returns an opaque handle; caller must call
+        /// <see cref="NR_DestroyNativeBuffer"/> when done.
         /// </summary>
         [DllImport(DllName)]
-        public static extern ulong NR_CreateNativeBuffer(uint sizeInBytes);
+        public static extern ulong NR_CreateNativeBuffer(
+            ulong byteSize, uint structStride, uint maxVersions,
+            uint canHaveUAVs, uint isConstantBuffer, uint isVolatile);
 
         /// <summary>Enqueues destruction after a GPU fence delay.</summary>
         [DllImport(DllName)]
         public static extern void NR_DestroyNativeBuffer(ulong handle);
 
-        // -------------------------------------------------------------------
-        // NativeGpuBuffer API  (single DEFAULT-heap buffer with UAV support)
-        // -------------------------------------------------------------------
-
         /// <summary>
-        /// Allocates a DEFAULT-heap buffer of <paramref name="sizeInBytes"/> with
-        /// D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS. Suitable for SRV and UAV bindings.
-        /// Returns an opaque handle; caller must call NR_DestroyNativeGpuBuffer when done.
-        /// </summary>
-        [DllImport(DllName)]
-        public static extern ulong NR_CreateNativeGpuBuffer(uint sizeInBytes);
-
-        /// <summary>Enqueues destruction after a GPU fence delay.</summary>
-        [DllImport(DllName)]
-        public static extern void NR_DestroyNativeGpuBuffer(ulong handle);
-
-        /// <summary>
-        /// Returns the render-event callback pointer for zeroing a NativeGpuBuffer.
-        /// Pass the result to <c>cmd.IssuePluginEventAndData</c> with the buffer Handle as data.
+        /// Returns the render-event callback pointer for zeroing a DEFAULT-heap buffer via
+        /// ClearUnorderedAccessViewUint. Pass the result to <c>cmd.IssuePluginEventAndData</c>
+        /// with the buffer Handle as data.
         /// </summary>
         [DllImport(DllName)]
         public static extern IntPtr NR_GetClearNativeGpuBufferCallbackPtr();
-
-        // /// <summary>
-        // /// Copies <paramref name="bytes"/> bytes from <paramref name="data"/> into the
-        // /// current frame's mapped slot.  Call each frame before issuing GPU work.
-        // /// </summary>
-        // [DllImport(DllName)]
-        // public static extern unsafe void NR_NB_Upload(ulong handle, void* data, uint bytes);
-
-        // -------------------------------------------------------------------
-        // NativeStructuredBuffer API  (single upload-heap SRV buffer)
-        // -------------------------------------------------------------------
-
-        /// <summary>
-        /// Allocates a DEFAULT-heap structured buffer with <paramref name="capacity"/> elements,
-        /// fed by the CPU upload-snapshot path. <paramref name="allowUAV"/> != 0 adds
-        /// ALLOW_UNORDERED_ACCESS so it can also be bound as a RWStructuredBuffer (GPU writes).
-        /// </summary>
-        [DllImport(DllName)]
-        public static extern ulong NR_CreateNativeStructuredBuffer(uint capacity, uint elementStride, uint allowUAV);
-
-        /// <summary>Enqueues destruction after a GPU fence delay.</summary>
-        [DllImport(DllName)]
-        public static extern void NR_DestroyNativeStructuredBuffer(ulong handle);
 
         /// <summary>Returns the ID3D12Resource* as IntPtr for binding as an SRV.</summary>
         [DllImport(DllName)]

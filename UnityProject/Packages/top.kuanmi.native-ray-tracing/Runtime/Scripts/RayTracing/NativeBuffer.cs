@@ -39,7 +39,10 @@ namespace NativeRender
             if (sizeInBytes <= 0) throw new ArgumentOutOfRangeException(nameof(sizeInBytes));
 
             _singleFrameSize = (sizeInBytes + 255) & ~255;
-            Handle           = NativeRenderPlugin.NR_CreateNativeBuffer((uint)_singleFrameSize);
+            // Volatile constant buffer: per-frame UPLOAD ring (BufferCount versions).
+            Handle = NativeRenderPlugin.NR_CreateNativeBuffer(
+                (ulong)_singleFrameSize, 0u, (uint)BufferCount,
+                /*canHaveUAVs*/ 0u, /*isConstantBuffer*/ 1u, /*isVolatile*/ 1u);
 
             _frameDataArray = new NativeArray<byte>[BufferCount];
             _paramsArray    = new NativeArray<UploadParams>[BufferCount];

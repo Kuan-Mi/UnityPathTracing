@@ -30,9 +30,8 @@ namespace NativeRender
         protected const uint ObjKindBindlessTexture    = 2;
         protected const uint ObjKindBindlessBuffer     = 3;
         protected const uint ObjKindRootConstants      = 4;
-        protected const uint ObjKindNativeBuffer       = 5;
+        protected const uint ObjKindNativeBuffer       = 5; // unified plugin buffer (NativeBuffer / NativeGpuBuffer / NativeStructuredBuffer)
         protected const uint ObjKindBindlessUAVTexture = 6;
-        protected const uint ObjKindNativeGpuBuffer    = 7;
 
         // Native C++ descriptor-set handle.
         protected ulong _descriptorSetHandle;
@@ -193,7 +192,7 @@ namespace NativeRender
             if (!TryGetSlot(name, out uint i)) return;
             _stagingSlots[i].resourcePtr = 0;
             _stagingSlots[i].objectPtr   = gpuBuffer.Handle;
-            _stagingSlots[i].objectKind  = ObjKindNativeGpuBuffer;
+            _stagingSlots[i].objectKind  = ObjKindNativeBuffer;
             _stagingSlots[i].count       = (uint)count;
             _stagingSlots[i].stride      = 0;
             _stagingSlots[i].format      = dxgiFormat;
@@ -294,7 +293,7 @@ namespace NativeRender
             if (!TryGetSlot(name, out uint i)) return;
             _stagingSlots[i].resourcePtr = 0;
             _stagingSlots[i].objectPtr   = gpuBuffer.Handle;
-            _stagingSlots[i].objectKind  = ObjKindNativeGpuBuffer;
+            _stagingSlots[i].objectKind  = ObjKindNativeBuffer;
             _stagingSlots[i].count       = (uint)count;
             _stagingSlots[i].stride      = 0;
             _stagingSlots[i].format      = dxgiFormat;

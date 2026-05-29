@@ -98,9 +98,12 @@ namespace NativeRender
             stride    = elementStride;
             Mode      = mode;
             AllowsUAV = allowUAV;
-            Handle = NativeRenderPlugin.NR_CreateNativeStructuredBuffer((uint)capacity, (uint)elementStride, allowUAV ? 1u : 0u);
+            // GPU-resident DEFAULT-heap structured buffer fed by the staged-copy snapshot path.
+            Handle = NativeRenderPlugin.NR_CreateNativeBuffer(
+                (ulong)capacity * (ulong)elementStride, (uint)elementStride, 1u,
+                /*canHaveUAVs*/ allowUAV ? 1u : 0u, /*isConstantBuffer*/ 0u, /*isVolatile*/ 0u);
             if (Handle == 0)
-                throw new InvalidOperationException("NR_CreateNativeStructuredBuffer failed (renderer not ready?)");
+                throw new InvalidOperationException("NR_CreateNativeBuffer failed (renderer not ready?)");
 
             // The DEFAULT-heap resource pointer is fixed for the buffer's lifetime (size is
             // immutable), so resolve it once instead of P/Invoking on every access.
@@ -319,7 +322,7 @@ namespace NativeRender
             _disposed = true;
             if (Handle != 0)
             {
-                NativeRenderPlugin.NR_DestroyNativeStructuredBuffer(Handle);
+                NativeRenderPlugin.NR_DestroyNativeBuffer(Handle);
                 Handle = 0;
             }
         }
