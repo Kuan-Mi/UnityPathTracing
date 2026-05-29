@@ -104,7 +104,7 @@ namespace PathTracing
                 ds.SetRWTexture("u_StableRadiance",            res.StableRadiance.NativePtr);
                 ds.SetRWTexture("u_SpecularHitT",              res.SpecularHitT.NativePtr);
                 ds.SetRWTexture("u_ShaderDebugVizTextureBuffer", res.ShaderDebugViz.NativePtr);
-                ds.SetRWStructuredBuffer("u_StablePlanesBuffer", buf.StablePlanesBuffer);
+                ds.SetRWStructuredBuffer("u_StablePlanesBuffer", buf.StablePlanesBufferPtr,buf.StablePlanesBuffer.count, buf.StablePlanesBuffer.stride);
 
                 data.BuildSP.Dispatch(cmd, ds, (uint)data.RenderRes.x, (uint)data.RenderRes.y);
             }

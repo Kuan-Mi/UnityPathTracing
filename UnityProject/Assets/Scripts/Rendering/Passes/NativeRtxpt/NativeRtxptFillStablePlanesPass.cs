@@ -123,7 +123,7 @@ namespace PathTracing
                     ds.SetRWTexture("u_DebugOutputColor",            res.DebugOutputColor.NativePtr);
                     ds.SetRWTexture("u_StablePlanesHeader",          res.StablePlanesHeader.NativePtr);
                     ds.SetRWTexture("u_SpecularHitT",                res.SpecularHitT.NativePtr);
-                    ds.SetRWStructuredBuffer("u_StablePlanesBuffer", buf.StablePlanesBuffer);
+                    ds.SetRWStructuredBuffer("u_StablePlanesBuffer", buf.StablePlanesBufferPtr, buf.StablePlanesBuffer.count, buf.StablePlanesBuffer.stride);
 
                     data.FillSP.Dispatch(cmd, ds, (uint)data.RenderRes.x, (uint)data.RenderRes.y);
                 }
