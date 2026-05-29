@@ -38,6 +38,15 @@ namespace NativeRender
         [SerializeField, HideInInspector]
         private string _rayGenName = "";
 
+        /// <summary>Root constants hints. Written by the ScriptedImporter. Consumed by RayTracePipeline.</summary>
+        [SerializeField, HideInInspector]
+        private RootConstantsHint[] _rootConstantsHints = Array.Empty<RootConstantsHint>();
+
+        /// <summary>Root SRV hints. Written by the ScriptedImporter. Consumed by RayTracePipeline.
+        /// Names buffer SRV / TLAS bindings to promote to inline root descriptors.</summary>
+        [SerializeField, HideInInspector]
+        private string[] _rootSRVHints = Array.Empty<string>();
+
         /// <summary>Pre-compiled DXIL bytecode. Populated by EnsureCompiled(); persisted by Unity serialization.</summary>
         [SerializeField, HideInInspector]
         private byte[] _compiledDxil;
@@ -60,6 +69,12 @@ namespace NativeRender
 
         /// <summary>JSON reflection data produced after the last successful compilation. Empty when not yet compiled.</summary>
         public string ReflectionJson => _reflectionJson ?? "";
+
+        /// <summary>Root constants hints stored by the importer. Read by <see cref="RayTracePipeline"/>.</summary>
+        internal RootConstantsHint[] RootConstantsHints => _rootConstantsHints ?? Array.Empty<RootConstantsHint>();
+
+        /// <summary>Root SRV hints stored by the importer. Read by <see cref="RayTracePipeline"/>.</summary>
+        internal string[] RootSRVHints => _rootSRVHints ?? Array.Empty<string>();
 
         /// <summary>
         /// Fired after this shader asset has been successfully (re)compiled.

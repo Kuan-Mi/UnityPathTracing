@@ -637,6 +637,19 @@ bool NR_SC_ReflectCS(
         const char* dim     = SrvDimensionToString(bd.Dimension);
         const char* retType = ReturnTypeToString(bd.ReturnType);
 
+        // For constant buffers, capture the byte size so the editor can derive the root
+        // 32-bit-constant count (= size / 4) automatically, without the user entering it.
+        UINT cbByteSize = 0;
+        if (bd.Type == D3D_SIT_CBUFFER && bd.Name)
+        {
+            if (ID3D12ShaderReflectionConstantBuffer* cb = refl->GetConstantBufferByName(bd.Name))
+            {
+                D3D12_SHADER_BUFFER_DESC cbDesc{};
+                if (SUCCEEDED(cb->GetDesc(&cbDesc)))
+                    cbByteSize = cbDesc.Size;
+            }
+        }
+
         if (i > 0) json += ",\n";
         json += "    { \"name\": \"";
         json += name;
@@ -650,7 +663,13 @@ bool NR_SC_ReflectCS(
         json += dim;
         json += "\", \"retType\": \"";
         json += retType;
-        json += "\" }";
+        json += "\"";
+        if (cbByteSize > 0)
+        {
+            json += ", \"size\": ";
+            json += std::to_string(cbByteSize);
+        }
+        json += " }";
     }
 
     json += "\n  ]\n}";
@@ -745,7 +764,7 @@ bool NR_SC_ReflectLib(
     // Collect unique bindings across all exported functions
     // Use a map keyed on (name, space, reg) to deduplicate.
     struct BindKey { std::string name; UINT space; UINT reg; };
-    struct BindVal { std::string type; std::string dim; std::string retType; };
+    struct BindVal { std::string type; std::string dim; std::string retType; UINT size; };
     std::vector<std::pair<BindKey, BindVal>> bindings;
 
     auto alreadyAdded = [&](const std::string& name, UINT space, UINT reg) -> bool {
@@ -829,8 +848,21 @@ bool NR_SC_ReflectLib(
             default: break;
             }
 
+            // Capture constant-buffer byte size so the editor can derive the root
+            // 32-bit-constant count (= size / 4) automatically.
+            UINT cbByteSize = 0;
+            if (bd.Type == D3D_SIT_CBUFFER && bd.Name)
+            {
+                if (ID3D12ShaderReflectionConstantBuffer* cb = fn->GetConstantBufferByName(bd.Name))
+                {
+                    D3D12_SHADER_BUFFER_DESC cbDesc{};
+                    if (SUCCEEDED(cb->GetDesc(&cbDesc)))
+                        cbByteSize = cbDesc.Size;
+                }
+            }
+
             BindKey k{ name, bd.Space, bd.BindPoint };
-            BindVal v{ typeName, SrvDimensionToString(bd.Dimension), ReturnTypeToString(bd.ReturnType) };
+            BindVal v{ typeName, SrvDimensionToString(bd.Dimension), ReturnTypeToString(bd.ReturnType), cbByteSize };
             bindings.push_back({ k, v });
         }
     }
@@ -867,7 +899,13 @@ bool NR_SC_ReflectLib(
         json += v.dim;
         json += "\", \"retType\": \"";
         json += v.retType;
-        json += "\" }";
+        json += "\"";
+        if (v.size > 0)
+        {
+            json += ", \"size\": ";
+            json += std::to_string(v.size);
+        }
+        json += " }";
     }
 
     json += "\n  ]\n}";

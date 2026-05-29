@@ -56,11 +56,14 @@ namespace NativeRender
 
         /// <summary>
         /// Creates a new DXR pipeline from the given shader asset.
+        /// Root binding hints defined on the asset (via the importer) are applied automatically.
         /// Triggers HLSL compilation if the asset has not been compiled yet.
         /// Throws <see cref="InvalidOperationException"/> if pipeline creation fails.
         /// </summary>
         public RayTracePipeline(RayTraceShader shader)
-            : this(shader, null, null)
+            : this(shader,
+                   shader != null ? shader.RootConstantsHints : null,
+                   shader != null ? shader.RootSRVHints        : null)
         {
         }
 
@@ -91,7 +94,9 @@ namespace NativeRender
         /// constructor when no extra hit groups are needed.
         /// </summary>
         public RayTracePipeline(RayTraceShader primaryShader, HitGroupShader[] hitGroupShaders)
-            : this(primaryShader, hitGroupShaders, null, null)
+            : this(primaryShader, hitGroupShaders,
+                   primaryShader != null ? primaryShader.RootConstantsHints : null,
+                   primaryShader != null ? primaryShader.RootSRVHints        : null)
         {
         }
 
