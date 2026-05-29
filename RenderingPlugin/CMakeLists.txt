@@ -328,6 +328,7 @@ target_link_libraries(OMMBakerPlugin PRIVATE omm-lib)
 # ---------------------------------------------------------------------------
 add_library(NativeRenderPlugin SHARED
     NativeRenderPlugin/src/Plugin/Plugin.cpp
+    NativeRenderPlugin/src/Plugin/DeferredDeleteQueue.cpp
     NativeRenderPlugin/src/Shaders/ShaderBase.cpp
     NativeRenderPlugin/src/Descriptors/DescriptorSetBase.cpp
     NativeRenderPlugin/src/Shaders/RayTraceShader.cpp

@@ -33,8 +33,8 @@
 #include "ResourceStateTracker.h"
 #include "D3D12HeapHook.h"
 #include "PluginInternal.h"
+#include "DeferredDeleteQueue.h"
 #include <map>
-#include <deque>
 #include <vector>
 #include <functional>
 #include <mutex>
@@ -82,32 +82,13 @@ SharedUploadPool g_uploadPool;
 SharedUploadPool g_scratchPool;
 
 // ---------------------------------------------------------------------------
-// Deferred delete queue — delays destruction of GPU-facing objects until the
-// GPU has finished executing all commands that may reference them.
-//
-// Modelled on nvrhi's per-submission keep-alive lists (Queue::commandListsInFlight):
-// deletions are grouped into one "retire bucket" per frame. The open bucket
-// (s_CurrentBucket) accumulates this frame's deletions and is stamped — once, on
-// first use — with the fence value the frame's GPU work will reach, plus a
-// kDeleteDelay safety margin, never below current GPU progress (see EnqueueCleanup
-// for why the clamp is required). At each frame tick DrainDeferredDeletes() closes
-// the open bucket into the in-flight deque (ascending fence order, oldest at front)
-// and runs every bucket whose stamped fence has completed.
+// Deferred deletion — delays destruction of GPU-facing objects until the GPU has
+// finished any commands that may reference them. The mechanism lives in
+// DeferredDeleteQueue; the free functions below (EnqueueCleanup / SafeReleaseResource
+// / NR_EnqueueDescriptorRangeFree, plus RetireObject<T> in PluginInternal.h) are thin
+// wrappers over the single instance so resource code stays decoupled from it.
 // ---------------------------------------------------------------------------
-
-using DeletionTask = std::function<void()>;
-
-// One frame's worth of deferred deletions plus the fence value at which they are
-// safe to run. fenceValue == 0 marks an open/unstamped bucket.
-struct RetireBucket
-{
-    uint64_t                  fenceValue = 0;
-    std::vector<DeletionTask> tasks;
-};
-
-static std::deque<RetireBucket> s_RetireBuckets; // in flight, ascending fenceValue
-static RetireBucket             s_CurrentBucket; // open bucket for the current frame
-static std::mutex               s_DeletionMutex;
+static DeferredDeleteQueue s_DeleteQueue;
 
 // Forward declarations
 static void PluginLog(UnityLogType type, const char* msg, const char* file, int line);
@@ -123,34 +104,7 @@ static constexpr int kDeleteDelay = 3;
 
 void EnqueueCleanup(std::function<void()>&& cleanupTask)
 {
-    if (!cleanupTask) return;
-
-    std::lock_guard<std::mutex> lk(s_DeletionMutex);
-
-    // Stamp the open bucket with this frame's target fence on first use. All of a
-    // frame's deletions share one stamp (computed once instead of per task), and the
-    // bucket is closed into the in-flight deque at the next frame tick.
-    //
-    // In a packaged player GetNextFrameFenceValue() can return a stale, too-low value
-    // (observed: 1) while the frame fence has already completed a higher value
-    // (observed: 8). Tagging against the stale value would schedule deletion at a fence
-    // the GPU has *already* passed, freeing the resource while still in use -> GPU hang
-    // (DXGI_ERROR_DEVICE_HUNG 0x887a0006). Clamp the base to the current completed value
-    // so the tag is always strictly ahead of GPU progress by kDeleteDelay frames.
-    if (s_CurrentBucket.fenceValue == 0)
-    {
-        uint64_t completed = 0;
-        if (s_D3D12)
-        {
-            if (ID3D12Fence* fence = s_D3D12->GetFrameFence())
-                completed = fence->GetCompletedValue();
-        }
-        const uint64_t next = s_D3D12 ? s_D3D12->GetNextFrameFenceValue() : 0;
-        const uint64_t base = next > completed ? next : completed;
-        s_CurrentBucket.fenceValue = base + kDeleteDelay;
-    }
-
-    s_CurrentBucket.tasks.emplace_back(std::move(cleanupTask));
+    s_DeleteQueue.Enqueue(std::move(cleanupTask));
 }
 
 void SafeReleaseResource(ComPtr<ID3D12Resource> resource)
@@ -182,44 +136,12 @@ void NR_EnqueueDescriptorRangeFree(DescriptorHeapAllocator* alloc, uint32_t base
 static void DrainDeferredDeletes(bool force = false)
 {
     // Advance the global triple-buffer frame index at the start of each frame tick.
-    // Skipped when force=true (shutdown path) to avoid disturbing the index during teardown.
+    // Skipped when force=true (shutdown path) to avoid disturbing the index during
+    // teardown. (Frame-index advancement is a plugin-wide concern, not the queue's.)
     if (!force)
         g_frameIndex = (g_frameIndex + 1) % kGlobalNumFrames;
 
-    // 获取当前 GPU 已完成的 Fence 值 (null-check the fence: it may not exist yet on
-    // the first frame of a packaged player).
-    ID3D12Fence* frameFence = s_D3D12 ? s_D3D12->GetFrameFence() : nullptr;
-    uint64_t completedValue = (frameFence && !force) ? frameFence->GetCompletedValue() : UINT64_MAX;
-
-    std::vector<RetireBucket> bucketsToExecute;
-
-    {
-        std::lock_guard<std::mutex> lk(s_DeletionMutex);
-
-        // Close this frame's open bucket into the in-flight deque. Buckets are appended
-        // in ascending fenceValue order (the stamp is monotonic across frames), so the
-        // deque stays sorted with the oldest at the front.
-        if (!s_CurrentBucket.tasks.empty())
-        {
-            s_RetireBuckets.push_back(std::move(s_CurrentBucket));
-            s_CurrentBucket = RetireBucket{};
-        }
-
-        // Run buckets whose fence has completed. Sorted front-to-back, so we can stop
-        // at the first one still in flight.
-        while (!s_RetireBuckets.empty())
-        {
-            if (!force && s_RetireBuckets.front().fenceValue > completedValue)
-                break;
-            bucketsToExecute.push_back(std::move(s_RetireBuckets.front()));
-            s_RetireBuckets.pop_front();
-        }
-    }
-
-    // Run destructors outside the lock to avoid deadlock and reduce lock hold time.
-    for (auto& bucket : bucketsToExecute)
-        for (auto& task : bucket.tasks)
-            if (task) task();
+    s_DeleteQueue.Drain(force);
 }
 
 // ---------------------------------------------------------------------------
@@ -274,6 +196,13 @@ static void UNITY_INTERFACE_API OnGraphicsDeviceEvent(UnityGfxDeviceEventType ev
             NR_ERROR("IUnityGraphicsD3D12v7 not available - is D3D12 the active graphics API?");
             return;
         }
+
+        // Wire the deferred-delete queue to Unity's frame fence. The getters read the
+        // live s_D3D12 each call, so they stay valid across device re-init / shutdown.
+        s_DeleteQueue.Initialize(
+            []() -> uint64_t { ID3D12Fence* f = s_D3D12 ? s_D3D12->GetFrameFence() : nullptr; return f ? f->GetCompletedValue() : 0; },
+            []() -> uint64_t { return s_D3D12 ? s_D3D12->GetNextFrameFenceValue() : 0; },
+            kDeleteDelay);
 
         ID3D12Device* device = s_D3D12->GetDevice();
         if (!device)
