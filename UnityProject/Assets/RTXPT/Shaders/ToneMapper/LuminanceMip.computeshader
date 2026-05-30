@@ -1,0 +1,44 @@
+/*
+* Donut-style native-compute mip reduction for the auto-exposure luminance pyramid.
+*
+* Replaces the original luminance_ps + Unity GenerateMips + capture chain's GenerateMips step with a
+* pure UAV compute pass (donut MipMapGenPass MODE_COLOR semantics: 2x2 box average = arithmetic mean
+* of log2-luminance = log2 of the geometric-mean luminance). Crucially this is native compute, not a
+* Unity sampler-heap GenerateMips, so it does not leave a SAMPLER heap bound between native dispatches
+* (the documented D3D12 crash). One destination mip per dispatch; the C# side loops mip 1..top.
+*
+* Both the source and destination mip levels are addressed through a single bindless UAV array
+* (BindlessUAVTexture, one slot per mip of the luminance texture) — reading mip N-1 as a UAV load and
+* writing mip N. A UAV barrier between dispatches (NotifyResourceState uavAccess) orders them.
+*/
+
+RWTexture2D<float> u_mips[] : register(u0);   // one slot per mip level of the luminance texture
+
+cbuffer MipConstants : register(b0)
+{
+    uint g_srcMip;   // source mip index (read)
+    uint g_dstMip;   // destination mip index (write)
+    uint g_srcW;     // source mip width  (for edge clamping on non-square pyramids)
+    uint g_srcH;     // source mip height
+    uint g_dstW;     // destination mip width
+    uint g_dstH;     // destination mip height
+    uint _pad0;
+    uint _pad1;
+};
+
+[numthreads(8, 8, 1)]
+void main(uint3 tid : SV_DispatchThreadID)
+{
+    if (tid.x >= g_dstW || tid.y >= g_dstH)
+        return;
+
+    uint2 s   = tid.xy * 2;
+    uint2 maxc = uint2(g_srcW - 1, g_srcH - 1);
+
+    float a = u_mips[g_srcMip][min(s + uint2(0, 0), maxc)];
+    float b = u_mips[g_srcMip][min(s + uint2(1, 0), maxc)];
+    float c = u_mips[g_srcMip][min(s + uint2(0, 1), maxc)];
+    float d = u_mips[g_srcMip][min(s + uint2(1, 1), maxc)];
+
+    u_mips[g_dstMip][tid.xy] = (a + b + c + d) * 0.25;
+}

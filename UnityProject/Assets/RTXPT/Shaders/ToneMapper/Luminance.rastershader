@@ -1,0 +1,21 @@
+/*
+* Per-pixel log2-luminance write — the original RTXPT ToneMapper luminance_ps run as a
+* fullscreen pixel shader through the native raster pipeline. #includes ToneMapper/luminance_ps.hlsl
+* VERBATIM (its main() PS + luminance() + gColorTex/gColorSampler) and only adds a fullscreen VS.
+*
+* Output: log2(max(0.0001, luminance(color))) into the mip-0 of the luminance pyramid texture,
+* which LuminanceMip.computeshader then box-reduces; capture_cs reads the 1x1 top mip as the
+* geometric-mean log-luminance for auto-exposure (replicating ToneMappingPasses.cpp).
+*/
+
+#pragma pack_matrix(row_major)
+
+#include "luminance_ps.hlsl"   // PS entry `main`, luminance(), gColorTex (t0), gColorSampler (s1, linear)
+
+void VSMain(uint vid : SV_VertexID, out float4 pos : SV_Position, out float2 uv : UV)
+{
+    // Fullscreen triangle; uv 0..1 over the (pow2) luminance target so the PS linear-samples
+    // the full-res source down into it — matches the original luminance draw.
+    uv  = float2((vid << 1) & 2, vid & 2);
+    pos = float4(uv.x * 2.0 - 1.0, 1.0 - uv.y * 2.0, 0.0, 1.0);
+}
