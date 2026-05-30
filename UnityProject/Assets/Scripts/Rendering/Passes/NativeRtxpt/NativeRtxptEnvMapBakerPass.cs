@@ -60,6 +60,11 @@ namespace PathTracing
 
         private NativeRtxptPassContext _ctx;
 
+        // When true the env contents are identical to what is already baked into this camera's
+        // cube/importance maps, so the whole bake (base layer + importance map + mip chains) is
+        // skipped this frame. Mirrors the original EnvMapBaker::Update contentsChanged early-out.
+        private bool _skipBake;
+
         public NativeRtxptEnvMapBakerPass(NativeComputeShader baseLayerCs, NativeComputeShader importanceBakerCs)
         {
             _baseLayerCs       = new NativeComputePipeline(baseLayerCs);
@@ -81,6 +86,39 @@ namespace PathTracing
             _ctx = ctx;
             FillEnvBakerConstants(ctx.Setting);
             FillImportanceBakerConstants();
+
+            // Decide whether anything that affects the baked cube/importance map changed since
+            // this camera's last bake. If not, skip the whole pass (the textures persist across
+            // frames). This matches the original EnvMapBaker, which only re-bakes on change.
+            var tex = ctx.Textures;
+            var skyTex = ctx.Setting?.environmentMap;
+            int skyId = skyTex != null ? skyTex.GetInstanceID() : 0;
+            ulong signature = ComputeEnvSignature(skyId);
+
+            _skipBake = tex.EnvBaked && tex.EnvBakeSignature == signature;
+            if (!_skipBake)
+            {
+                // The bake is guaranteed to be recorded this frame, so mark it done now.
+                tex.EnvBaked         = true;
+                tex.EnvBakeSignature = signature;
+            }
+        }
+
+        // FNV-1a hash over the env baker constants (directional lights, scale color, counts,
+        // background type) plus the sky texture identity — the same inputs the original baker
+        // compares to detect changes.
+        private static unsafe ulong ComputeEnvSignature(int skyTextureId)
+        {
+            ulong h = 14695981039346656037UL;
+            fixed (EnvMapBakerCB* p = &s_envBakerCb)
+            {
+                byte* b = (byte*)p;
+                int   n = sizeof(EnvMapBakerCB);
+                for (int i = 0; i < n; i++) { h ^= b[i]; h *= 1099511628211UL; }
+            }
+            h ^= (uint)skyTextureId;
+            h *= 1099511628211UL;
+            return h;
         }
 
         private class PassData
@@ -106,6 +144,10 @@ namespace PathTracing
 
         public override void RecordRenderGraph(RenderGraph renderGraph, ContextContainer frameData)
         {
+            // Env contents unchanged since last bake — the cube/importance maps already hold valid
+            // data, so don't enqueue any GPU work this frame (the expensive part of the regression).
+            if (_skipBake) return;
+
             using var builder = renderGraph.AddUnsafePass<PassData>("NativeRtxpt.EnvMapBaker", out var pd);
 
             pd.BaseLayerCs       = _baseLayerCs;

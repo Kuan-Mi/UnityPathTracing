@@ -132,6 +132,22 @@ namespace PathTracing
         /// <summary>1024×1024 env-light lookup map (R32_UINT). Filled by EnvLightsFillLookupMap. Bound as t_EnvLookupMap (t18).</summary>
         public NriTextureResource EnvLightLookupMap;
 
+        // ── Env map bake state ────────────────────────────────────────────────
+        /// <summary>
+        /// False until the env cubemap/importance map have been baked at least once for the
+        /// current allocation. Reset whenever env textures are (re)allocated so the baker
+        /// always produces valid contents before they are sampled. Mirrors the original
+        /// EnvMapBaker's force-rebake-on-recreate behaviour.
+        /// </summary>
+        public bool  EnvBaked;
+
+        /// <summary>
+        /// Hash of the inputs (directional lights, sky texture, tint/intensity) used for the
+        /// last bake. The baker re-bakes only when this changes — equivalent to the original
+        /// EnvMapBaker::Update <c>contentsChanged</c> early-out.
+        /// </summary>
+        public ulong EnvBakeSignature;
+
         // ── Resolved dimensions ───────────────────────────────────────────────
         public int2 renderResolution  { get; private set; }
         public int2 displayResolution { get; private set; }
@@ -190,15 +206,19 @@ namespace PathTracing
         /// Allocates env map baking textures (fixed sizes, not resolution-dependent).
         /// Idempotent — safe to call every frame.
         /// </summary>
-        public void EnsureEnvMapResources()
+        public bool EnsureEnvMapResources()
         {
-            if (EnvCubeMip0.IsCreated) return;
+            if (EnvCubeMip0.IsCreated) return false;
             EnvCubeMip0.AllocateCube(256);
             EnvCubeMip1.AllocateCube(128);
             EnvImportanceMap.Allocate(new int2(1024, 1024), useMipMap: true);
             EnvRadianceMap.Allocate(new int2(1024, 1024), useMipMap: true);
             EnvDummyCube.AllocateCube(4, enableRandomWrite: false);
             EnvLightLookupMap.Allocate(new int2(1024, 1024), useMipMap: false);
+
+            // Freshly allocated cube/importance maps hold garbage — force the baker to re-run.
+            EnvBaked = false;
+            return true;
         }
 
         /// <summary>
