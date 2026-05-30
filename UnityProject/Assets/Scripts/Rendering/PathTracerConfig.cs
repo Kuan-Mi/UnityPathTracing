@@ -29,6 +29,12 @@ namespace PathTracing
         /// <summary>Number of stable denoising planes. More than 3 is not supported.</summary>
         internal const int cStablePlaneCount = 3;
 
+        /// <summary>
+        /// Max stable-plane vertex index (StablePlanes.hlsli). 15 is the maximum that keeps the
+        /// stableBranchID within 32 bits. Used to clamp <c>maxStablePlaneVertexDepth</c>.
+        /// </summary>
+        internal const uint cStablePlaneMaxVertexIndex = 15u;
+
         // ── Compute thread dims ───────────────────────────────────────────────
 
         /// <summary>Compute shader tile size per dimension for path-tracer passes.</summary>

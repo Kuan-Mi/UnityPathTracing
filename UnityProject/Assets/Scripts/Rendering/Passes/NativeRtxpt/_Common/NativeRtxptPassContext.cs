@@ -46,6 +46,14 @@ namespace PathTracing
         // ── Inspector settings snapshot ───────────────────────────────────────
         public NativeRtxptSetting Setting;
 
+        // ── Shared scene light list ───────────────────────────────────────────
+        /// <summary>
+        /// All scene lights, gathered once per frame by <see cref="NativeRtxptFeature"/> and shared
+        /// by the env-map baker (directional lights) and the lighting-update pass (point/spot lights),
+        /// so the expensive full-scene query runs once per frame instead of once per pass.
+        /// </summary>
+        public Light[] SceneLights;
+
         // ── Pre-resolved IntPtrs (filled once per frame from Textures pool) ───
         // u0  OutputColor
         public IntPtr OutputColorPtr;

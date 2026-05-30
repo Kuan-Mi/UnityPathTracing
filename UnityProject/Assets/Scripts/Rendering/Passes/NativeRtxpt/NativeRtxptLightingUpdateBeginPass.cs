@@ -744,7 +744,9 @@ namespace PathTracing
         private int CollectAndPackLights()
         {
             int count = 0;
-            foreach (var light in Object.FindObjectsByType<Light>(FindObjectsSortMode.None))
+            var sceneLights = _ctx.SceneLights;
+            if (sceneLights == null) return 0;
+            foreach (var light in sceneLights)
             {
                 if (light == null || !light.enabled) continue;
                 if (count >= NativeRtxptBufferResources.MaxLights)

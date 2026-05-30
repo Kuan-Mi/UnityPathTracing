@@ -145,7 +145,10 @@ namespace PathTracing
                 perPixelJitterAAScale                        = fs.perPixelJitterAAScale,
                 bounceCount                                  = (uint)setting.bounceCount,
                 diffuseBounceCount                           = (uint)setting.diffuseBounceCount,
-                environmentMapDiffuseSampleMIPLevel          = 0f,
+                // Original (Sample.cpp:1539): sample a pre-filtered MIP for diffuse env lookups.
+                // Hardcoding 0 forced full-res env fetches on every diffuse bounce — noisier and
+                // higher bandwidth than the intended prefiltered level.
+                environmentMapDiffuseSampleMIPLevel          = (float)setting.environmentMapDiffuseSampleMIPLevel,
                 texLODBias                                   = setting.texLODBias + dlssBias,
                 invSubSampleCount                            = 1.0f / spp,
                 fireflyFilterThreshold                       = fireflyThreshold,
@@ -155,15 +158,25 @@ namespace PathTracing
                 useReSTIRDI                                  = 0u,
                 useReSTIRGI                                  = 0u,
                 _padding5                                    = 0u,
-                stablePlanesSplitStopThreshold               = 0.05f,
+                // Original (Sample.cpp:1526) reads these straight from the UI; the fork hardcoded
+                // them, silently ignoring the inspector and deviating from the original tuning.
+                stablePlanesSplitStopThreshold               = setting.stablePlanesSplitStopThreshold,
                 _padding3                                    = 0f,
                 _padding4                                    = 0u,
-                stablePlanesSuppressPrimaryIndirectSpecularK = 0f,
+                stablePlanesSuppressPrimaryIndirectSpecularK = setting.stablePlanesSuppressPrimaryIndirectSpecular
+                                                                   ? setting.stablePlanesSuppressPrimaryIndirectSpecularK
+                                                                   : 0f,
                 denoiserRadianceClampK                       = setting.denoiserRadianceClampK,
                 dlssRRBrightnessClampK                       = dlssRRClamp,
-                stablePlanesAntiAliasingFallthrough          = 0.04f,
+                stablePlanesAntiAliasingFallthrough          = setting.stablePlanesAntiAliasingFallthrough,
                 activeStablePlaneCount                       = (uint)setting.stablePlanesActiveCount,
-                maxStablePlaneVertexDepth                    = 8u,
+                // Original (Sample.cpp:1524): min(StablePlanesMaxVertexDepth, cStablePlaneMaxVertexIndex, BounceCount).
+                // Hardcoding 8 both ignored the inspector and skipped the BounceCount clamp, so lowering
+                // BounceCount no longer reduced stable-plane build depth as it does in the original.
+                maxStablePlaneVertexDepth                    = (uint)math.min(
+                                                                   math.min((uint)setting.stablePlanesMaxVertexDepth,
+                                                                            PathTracerConfig.cStablePlaneMaxVertexIndex),
+                                                                   (uint)setting.bounceCount),
                 allowPrimarySurfaceReplacement               = setting.allowPrimarySurfaceReplacement ? 1u : 0u,
                 // Tiled-swizzled addressing (TS_TILE_SIZE = 8 in Utils.hlsli).
                 // Strides must be rounded up to the tile size, not raw image dims.

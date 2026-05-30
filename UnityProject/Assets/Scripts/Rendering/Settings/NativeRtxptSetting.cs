@@ -28,7 +28,8 @@ namespace PathTracing
         // ── AA / Upscaler ─────────────────────────────────────────────────────
         // realtimeAA: 0=None, 1=TAA, 2=DLSS-SR, 3=DLSS-RR
         public int          realtimeAA   = 3;
-        public UpscalerMode upscalerMode = UpscalerMode.QUALITY;
+        // C++ default: SampleUIData::DLSSModeDefault = eBalanced.
+        public UpscalerMode upscalerMode = UpscalerMode.BALANCED;
 
         // ── Camera ────────────────────────────────────────────────────────────
         public bool  cameraJitter        = true;
@@ -41,17 +42,17 @@ namespace PathTracing
         [Range(1, 8)]
         public int realtimeSamplesPerPixel = 1;
 
-        /// <summary>Max total bounces. SampleUIData::BounceCount.</summary>
+        /// <summary>Max total bounces. SampleUIData::BounceCount (C++ default 20).</summary>
         [Range(1, 48)]
-        public int bounceCount = 24;
+        public int bounceCount = 20;
 
-        /// <summary>Max diffuse-only bounces. SampleUIData::DiffuseBounceCount.</summary>
+        /// <summary>Max diffuse-only bounces. SampleUIData::DiffuseBounceCount (C++ default 2).</summary>
         [Range(1, 8)]
-        public int diffuseBounceCount = 3;
+        public int diffuseBounceCount = 2;
 
-        /// <summary>Texture LOD bias applied during tracing. SampleUIData::TexLODBias.</summary>
+        /// <summary>Texture LOD bias applied during tracing. SampleUIData::TexLODBias (C++ default -1.0).</summary>
         [Range(-4f, 4f)]
-        public float texLODBias = -1.5f;
+        public float texLODBias = -1.0f;
 
         // ── Reference mode accumulation ───────────────────────────────────────
         /// <summary>Reference mode: target sample count. SampleUIData::AccumulationTarget.</summary>
@@ -63,11 +64,13 @@ namespace PathTracing
 
         // ── NEE / Lighting ────────────────────────────────────────────────────
         public bool  useNEE              = true;
-        public NativeRtxptNeeType neeType = NativeRtxptNeeType.Power;
+        // C++ default: CommandLineOptions::NEEType = 2 (NEE-AT).
+        public NativeRtxptNeeType neeType = NativeRtxptNeeType.NEEAT;
         [Range(1, 16)]
         public int   neeCandidateSamples = 5;
+        // C++ default: SampleUIData::NEEFullSamples = 1 (each full sample casts a shadow ray).
         [Range(1, 4)]
-        public int   neeFullSamples      = 2;
+        public int   neeFullSamples      = 1;
         /// <summary>0=Full MIS always; 1=Full in ref / approx in realtime; 2=Approx always.</summary>
         public int   neeMisType          = 1;
         public float neeatGlobalTemporalFeedbackWeight = 0.75f;

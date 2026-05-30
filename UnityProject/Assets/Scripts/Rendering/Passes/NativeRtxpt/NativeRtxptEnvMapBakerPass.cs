@@ -84,7 +84,7 @@ namespace PathTracing
         public void Setup(NativeRtxptPassContext ctx)
         {
             _ctx = ctx;
-            FillEnvBakerConstants(ctx.Setting);
+            FillEnvBakerConstants(ctx.Setting, ctx.SceneLights);
             FillImportanceBakerConstants();
 
             // Decide whether anything that affects the baked cube/importance map changed since
@@ -213,15 +213,15 @@ namespace PathTracing
             cmd.EndSample(RenderPassMarkers.RtxptEnvMapBaker);
         }
 
-        private static unsafe void FillEnvBakerConstants(NativeRtxptSetting setting)
+        private static unsafe void FillEnvBakerConstants(NativeRtxptSetting setting, Light[] sceneLights)
         {
             s_envBakerCb = default;
             ref var cb = ref s_envBakerCb;
 
             int lightCount = 0;
-            foreach (var light in Object.FindObjectsByType<Light>(FindObjectsSortMode.None))
+            foreach (var light in sceneLights)
             {
-                if (!light.enabled || !light.gameObject.activeInHierarchy) continue;
+                if (light == null || !light.enabled || !light.gameObject.activeInHierarchy) continue;
                 if (light.type != LightType.Directional) continue;
                 if (lightCount >= 16) break;
 

@@ -259,6 +259,11 @@ namespace PathTracing
 
             constantBuffer.Upload(renderer, sampleConstants);
 
+            // ---- Gather scene lights once (shared by env baker + lighting pass) ----
+            // Previously both passes each ran their own full-scene FindObjectsByType<Light>;
+            // gathering once here halves that per-camera cost.
+            var sceneLights = UnityEngine.Object.FindObjectsByType<Light>(FindObjectsSortMode.None);
+
             // ---- Build shared pass context ----------------------------------
             var passCtx = new NativeRtxptPassContext
             {
@@ -270,6 +275,7 @@ namespace PathTracing
                 DisplayResolution = displayResolution,
                 FrameState        = frameState,
                 Setting           = setting,
+                SceneLights       = sceneLights,
                 blackTexturePtr =  blackTexturePtr,
             };
             passCtx.ResolveNativePtrs();
