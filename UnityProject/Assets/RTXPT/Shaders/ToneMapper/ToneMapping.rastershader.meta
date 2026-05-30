@@ -13,11 +13,13 @@ ScriptedImporter:
   - ../RenderingPlugin/External/RTXPT/Rtxpt
   - ../RenderingPlugin/External/RTXPT/External
   - ../RenderingPlugin/External/donut/include
+  - ../RenderingPlugin/External/donut/shaders
   extraArgs:
   - -enable-16bit-types
-  defines: []
-  vsEntryPoint: VSMain
-  psEntryPoint: PSMain
+  defines:
+  - QUAD_Z=0
+  vsEntryPoint: main
+  psEntryPoint: main_ps
   vsTargetProfile: vs_6_6
   psTargetProfile: ps_6_6
   rootConstantsHints: []

@@ -22,7 +22,10 @@ struct RasterPipelineStateDesc
     uint32_t depthWriteEnable;       // bool (0/1)
     uint32_t depthFunc;              // D3D12_COMPARISON_FUNC; 0 => LESS_EQUAL
     uint32_t blendMode;              // 0=opaque, 1=alpha, 2=additive, 3=premultiplied
-    uint32_t topologyType;           // D3D12_PRIMITIVE_TOPOLOGY_TYPE; 0 => TRIANGLE
+    uint32_t primitiveTopology;      // D3D_PRIMITIVE_TOPOLOGY for IASetPrimitiveTopology
+                                     // (POINTLIST=1, LINELIST=2, LINESTRIP=3, TRIANGLELIST=4,
+                                     //  TRIANGLESTRIP=5); 0 => TRIANGLELIST. The PSO's
+                                     //  PrimitiveTopologyType is derived from this.
     uint32_t frontCounterClockwise;  // bool (0/1)
     uint32_t sampleCount;            // MSAA sample count; 0 => 1
 };

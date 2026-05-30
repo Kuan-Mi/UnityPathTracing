@@ -170,14 +170,22 @@ static D3D12_RENDER_TARGET_BLEND_DESC MakeBlend(uint32_t mode)
 
 bool RasterShader::BuildPipeline(IDxcBlob* vsBlob, IDxcBlob* psBlob)
 {
-    const D3D12_PRIMITIVE_TOPOLOGY_TYPE topoType =
-        m_state.topologyType ? static_cast<D3D12_PRIMITIVE_TOPOLOGY_TYPE>(m_state.topologyType)
-                             : D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
-    switch (topoType)
+    // The caller picks the actual IA primitive topology (list/strip/…); the PSO's coarser
+    // PrimitiveTopologyType (point/line/triangle) is derived from it.
+    m_primTopology = m_state.primitiveTopology
+        ? static_cast<D3D12_PRIMITIVE_TOPOLOGY>(m_state.primitiveTopology)
+        : D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
+
+    D3D12_PRIMITIVE_TOPOLOGY_TYPE topoType;
+    switch (m_primTopology)
     {
-    case D3D12_PRIMITIVE_TOPOLOGY_TYPE_POINT: m_primTopology = D3D_PRIMITIVE_TOPOLOGY_POINTLIST;    break;
-    case D3D12_PRIMITIVE_TOPOLOGY_TYPE_LINE:  m_primTopology = D3D_PRIMITIVE_TOPOLOGY_LINELIST;     break;
-    default:                                  m_primTopology = D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST; break;
+    case D3D_PRIMITIVE_TOPOLOGY_POINTLIST:
+        topoType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_POINT; break;
+    case D3D_PRIMITIVE_TOPOLOGY_LINELIST:
+    case D3D_PRIMITIVE_TOPOLOGY_LINESTRIP:
+        topoType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_LINE; break;
+    default: // triangle list / strip (and anything else) → triangle
+        topoType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE; break;
     }
 
     D3D12_GRAPHICS_PIPELINE_STATE_DESC psoDesc = {};

@@ -288,6 +288,22 @@ namespace NativeRender
         public void SetRWTypedBuffer(string name, DeviceBuffer deviceBuffer, int count, uint dxgiFormat)
             => SetRWTypedBuffer(PropertyToID(name), deviceBuffer, count, dxgiFormat);
 
+        /// <summary>Binds an <see cref="UploadBuffer"/> as a typed RW buffer UAV (e.g. RWBuffer&lt;float&gt;).
+        /// The buffer must have been created with UAV support. Resolved by handle at dispatch.</summary>
+        public void SetRWTypedBuffer(int nameId, UploadBuffer buffer, int count, uint dxgiFormat)
+        {
+            int i = SlotFromId(nameId);
+            if (i < 0) return;
+            _stagingSlots[i].objectPtr   = buffer != null ? buffer.Handle : 0;
+            _stagingSlots[i].objectKind  = ObjKindNativeBuffer;
+            _stagingSlots[i].count       = (uint)count;
+            _stagingSlots[i].stride      = 0;
+            _stagingSlots[i].format      = dxgiFormat;
+        }
+        /// <summary>Binds an <see cref="UploadBuffer"/> as a typed RW buffer UAV (e.g. RWBuffer&lt;float&gt;).</summary>
+        public void SetRWTypedBuffer(string name, UploadBuffer buffer, int count, uint dxgiFormat)
+            => SetRWTypedBuffer(PropertyToID(name), buffer, count, dxgiFormat);
+
         /// <summary>Binds a structured buffer (UAV) with explicit element count and stride.</summary>
         public void SetRWStructuredBuffer(int nameId, IntPtr bufferPtr, int count, int stride)
         {

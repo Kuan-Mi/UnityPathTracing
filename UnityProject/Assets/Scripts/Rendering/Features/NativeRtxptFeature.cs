@@ -60,17 +60,13 @@ namespace PathTracing
         public NativeComputeShader bloomBlurCs;
         public NativeComputeShader bloomCompositeCs;
 
-        // Phase 7: Tone mapping (RTXPT ToneMapper: native luminance reduce → apply)
-        public NativeComputeShader toneMapReduceCs;
-        public NativeComputeShader toneMapApplyCs;
-        // Optional raster apply: reuses the original RTXPT ToneMapping.ps.hlsli as a fullscreen
-        // pixel shader (used instead of toneMapApplyCs when setting.useRasterToneMapping is on).
-        public NativeRasterShader  toneMapApplyRasterShader;
-        // Optional faithful mip-chain auto-exposure (luminance_ps raster → native mip reduce → capture):
-        // used when setting.useMipChainAutoExposure is on.
-        public NativeRasterShader  luminanceRasterShader;   // Luminance.rastershader
+        // Phase 7: Tone mapping — faithful native replica of RTXPT ToneMappingPasses.cpp, built from the
+        // original shaders as thin verbatim #include wrappers: luminance_ps (raster) → native mip reduce
+        // → capture_cs → CPU read-back → ToneMapping main_ps (raster).
+        public NativeRasterShader  luminanceRasterShader;   // Luminance.rastershader (= fullscreen_vs + luminance_ps)
         public NativeComputeShader luminanceMipCs;          // LuminanceMip.computeshader
-        public NativeComputeShader captureLuminanceCs;      // capture_cs.computeshader
+        public NativeComputeShader captureLuminanceCs;      // capture_cs.computeshader (= ToneMapping.hlsl capture_cs)
+        public NativeRasterShader  toneMapApplyRasterShader;// ToneMapping.rastershader (= fullscreen_vs + main_ps)
 
         // Phase 8
         public NativeComputeShader accumulationCs;
@@ -122,8 +118,6 @@ namespace PathTracing
         private NativeRtxptDlssRRPrepareInputsPass    _dlssRrPrepareInputsPass;
         private DlssRRPass                            _dlssRRPass;
         private NativeRtxptBloomPass                  _bloomPass;
-        private NativeRtxptToneMappingPass            _toneMappingPass;
-        private NativeRtxptToneMappingRasterPass      _toneMappingRasterPass;
         private NativeRtxptToneMappingMipChainPass    _toneMappingMipChainPass;
         private NativeRtxptAccumulationPass           _accumulationPass;
         private NativeRtxptStablePlanesDebugVizPass   _stablePlanesDebugVizPass;
@@ -196,14 +190,8 @@ namespace PathTracing
             // Bloom is optional — only build once all three compute shaders are assigned/imported.
             if (_bloomPass == null && bloomDownsampleCs != null && bloomBlurCs != null && bloomCompositeCs != null)
                 _bloomPass = new NativeRtxptBloomPass(bloomDownsampleCs, bloomBlurCs, bloomCompositeCs) { renderPassEvent = renderPassEvent };
-            // Tone mapping is optional — only build it once both compute shaders are assigned/imported
-            // (NativeComputePipeline throws on a null shader). Run AutoFillShaders if these are unset.
-            if (_toneMappingPass == null && toneMapReduceCs != null && toneMapApplyCs != null)
-                _toneMappingPass = new NativeRtxptToneMappingPass(toneMapReduceCs, toneMapApplyCs) { renderPassEvent = renderPassEvent };
-            // Raster tone-map apply is optional — built once the reduce CS and raster shader exist.
-            if (_toneMappingRasterPass == null && toneMapReduceCs != null && toneMapApplyRasterShader != null)
-                _toneMappingRasterPass = new NativeRtxptToneMappingRasterPass(toneMapReduceCs, toneMapApplyRasterShader) { renderPassEvent = renderPassEvent };
-            // Faithful mip-chain auto-exposure path — needs the luminance raster, mip CS, capture CS, and apply raster.
+            // Tone mapping — faithful RTXPT replica. Built once all four original-shader wrappers exist
+            // (Native*Pipeline throws on a null shader); run AutoFillShaders if these are unset.
             if (_toneMappingMipChainPass == null && luminanceRasterShader != null && luminanceMipCs != null
                 && captureLuminanceCs != null && toneMapApplyRasterShader != null)
                 _toneMappingMipChainPass = new NativeRtxptToneMappingMipChainPass(
@@ -404,25 +392,10 @@ namespace PathTracing
 
                 // Phase 7: Tone mapping + auto-exposure on the display-res HDR DLSS-RR output.
                 // Writes the LDR result into ProcessedOutputColor (unused elsewhere in realtime mode).
-                if (setting.enableToneMapping)
+                if (setting.enableToneMapping && _toneMappingMipChainPass != null)
                 {
-                    // Selection order: faithful mip-chain auto-exposure → raster apply (reuses the RTXPT
-                    // pixel shader) → compute apply. All write ProcessedOutputColor identically.
-                    if (setting.useMipChainAutoExposure && _toneMappingMipChainPass != null)
-                    {
-                        _toneMappingMipChainPass.Setup(passCtx, texPool.DlssRrOutput, texPool.ProcessedOutputColor);
-                        renderer.EnqueuePass(_toneMappingMipChainPass);
-                    }
-                    else if (setting.useRasterToneMapping && _toneMappingRasterPass != null)
-                    {
-                        _toneMappingRasterPass.Setup(passCtx, texPool.DlssRrOutput, texPool.ProcessedOutputColor);
-                        renderer.EnqueuePass(_toneMappingRasterPass);
-                    }
-                    else if (_toneMappingPass != null)
-                    {
-                        _toneMappingPass.Setup(passCtx, texPool.DlssRrOutput, texPool.ProcessedOutputColor);
-                        renderer.EnqueuePass(_toneMappingPass);
-                    }
+                    _toneMappingMipChainPass.Setup(passCtx, texPool.DlssRrOutput, texPool.ProcessedOutputColor);
+                    renderer.EnqueuePass(_toneMappingMipChainPass);
                 }
             }
             else
@@ -444,9 +417,7 @@ namespace PathTracing
                 // When tone mapping ran, the final image lives in ProcessedOutputColor; show it in
                 // place of the raw HDR DLSS-RR output unless the user picked an explicit debug view.
                 var displayMode = setting.showMode;
-                bool toneMapRan = setting.realtimeMode && setting.enableToneMapping &&
-                    ((setting.useMipChainAutoExposure && _toneMappingMipChainPass != null) ||
-                     (setting.useRasterToneMapping && _toneMappingRasterPass != null) || _toneMappingPass != null);
+                bool toneMapRan = setting.realtimeMode && setting.enableToneMapping && _toneMappingMipChainPass != null;
                 if (toneMapRan && displayMode == NativeRtxptShowMode.DlssRrOutput)
                     displayMode = NativeRtxptShowMode.ProcessedOutput;
 
@@ -501,10 +472,6 @@ namespace PathTracing
             _dlssRrPrepareInputsPass = null;
             _bloomPass?.Dispose();
             _bloomPass = null;
-            _toneMappingPass?.Dispose();
-            _toneMappingPass = null;
-            _toneMappingRasterPass?.Dispose();
-            _toneMappingRasterPass = null;
             _toneMappingMipChainPass?.Dispose();
             _toneMappingMipChainPass = null;
             _accumulationPass?.Dispose();
@@ -951,12 +918,10 @@ namespace PathTracing
             bloomDownsampleCs        = LoadCs($"{shaderRoot}/ToneMapper/BloomDownsample");
             bloomBlurCs              = LoadCs($"{shaderRoot}/ToneMapper/BloomBlur");
             bloomCompositeCs         = LoadCs($"{shaderRoot}/ToneMapper/BloomComposite");
-            toneMapReduceCs          = LoadCs($"{shaderRoot}/ToneMapper/ReduceLuminance");
-            toneMapApplyCs           = LoadCs($"{shaderRoot}/ToneMapper/ToneMappingApply");
-            toneMapApplyRasterShader = LoadRas($"{shaderRoot}/ToneMapper/ToneMapping");
             luminanceRasterShader    = LoadRas($"{shaderRoot}/ToneMapper/Luminance");
             luminanceMipCs           = LoadCs($"{shaderRoot}/ToneMapper/LuminanceMip");
             captureLuminanceCs       = LoadCs($"{shaderRoot}/ToneMapper/capture_cs");
+            toneMapApplyRasterShader = LoadRas($"{shaderRoot}/ToneMapper/ToneMapping");
             accumulationCs           = LoadCs($"{shaderRoot}/ProcessingPasses/AccumulationPass");
             stablePlanesDebugVizCs   = LoadCs($"{shaderRoot}/ProcessingPasses/PostProcess_StablePlanesDebugViz");
 

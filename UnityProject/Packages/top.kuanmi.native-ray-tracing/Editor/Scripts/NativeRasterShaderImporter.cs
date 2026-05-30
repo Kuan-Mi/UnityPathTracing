@@ -116,6 +116,42 @@ namespace NativeRender
         }
     }
 
+    [CustomEditor(typeof(NativeRasterShaderImporter))]
+    internal class NativeRasterShaderImporterEditor : NativeShaderImporterEditorBase
+    {
+        protected override bool TryGetStatus(string assetPath,
+            out bool hasCompiledBytes, out int byteCount, out string reflectionJson)
+        {
+            hasCompiledBytes = false; byteCount = 0; reflectionJson = "";
+            var shader = AssetDatabase.LoadAssetAtPath<NativeRasterShader>(assetPath);
+            if (shader == null) return false;
+
+            hasCompiledBytes = shader.HasCompiledBytes;
+            byteCount        = shader.CompiledByteCount;
+            reflectionJson   = shader.ReflectionJson;
+            return true;
+        }
+
+        protected override void DrawImportSettings()
+        {
+            EditorGUILayout.PropertyField(serializedObject.FindProperty("vsEntryPoint"));
+            EditorGUILayout.PropertyField(serializedObject.FindProperty("psEntryPoint"));
+            EditorGUILayout.PropertyField(serializedObject.FindProperty("vsTargetProfile"));
+            EditorGUILayout.PropertyField(serializedObject.FindProperty("psTargetProfile"));
+            EditorGUILayout.PropertyField(serializedObject.FindProperty("defines"), true);
+            EditorGUILayout.PropertyField(serializedObject.FindProperty("additionalIncludePaths"), true);
+            EditorGUILayout.PropertyField(serializedObject.FindProperty("extraArgs"), true);
+        }
+
+        // Reflected CBV / buffer-SRV / TLAS rows get an inline "promote to root binding" checkbox
+        // (shared with the compute / ray-tracing importers), so a binding is configured where it's listed.
+        protected override bool TryDrawBindingRow(ShaderBindingEntry e)
+            => RootBindingHintsGUI.TryDrawBindingRow((ScriptedImporter)target, e);
+
+        protected override void DrawExtraReflection(ShaderReflectionInfo info)
+            => RootBindingHintsGUI.DrawStaleHints((ScriptedImporter)target, info);
+    }
+
     /// <summary>Notifies live pipelines that a .rastershader was reimported so they rebuild.</summary>
     internal class NativeRasterShaderPostprocessor : AssetPostprocessor
     {

@@ -616,12 +616,21 @@ namespace NativeRender
             public uint depthWriteEnable;
             public uint depthFunc;                                         // D3D12_COMPARISON_FUNC; 0 => LESS_EQUAL
             public uint blendMode;                                         // 0=opaque,1=alpha,2=additive,3=premultiplied
-            public uint topologyType;                                      // D3D12_PRIMITIVE_TOPOLOGY_TYPE; 0 => TRIANGLE
+            public uint primitiveTopology;                                 // D3D_PRIMITIVE_TOPOLOGY (TRIANGLELIST=4, TRIANGLESTRIP=5, …); 0 => TRIANGLELIST
             public uint frontCounterClockwise;
             public uint sampleCount;                                       // 0 => 1
 
-            /// <summary>Returns a single-RTV opaque fullscreen-pass default for the given color format.</summary>
-            public static RasterPipelineStateDesc FullscreenOpaque(uint rtvFormat)
+            // D3D_PRIMITIVE_TOPOLOGY values.
+            public const uint TopologyTriangleList  = 4;
+            public const uint TopologyTriangleStrip = 5;
+
+            /// <summary>
+            /// Single-RTV opaque fullscreen-pass default for the given color format. Uses a triangle
+            /// STRIP (the donut fullscreen_vs.hlsl quad) — draw with vertexCount = 4. Pass
+            /// <paramref name="primitiveTopology"/> = <see cref="TopologyTriangleList"/> for a 3-vertex
+            /// triangle-list fullscreen VS instead.
+            /// </summary>
+            public static RasterPipelineStateDesc FullscreenOpaque(uint rtvFormat, uint primitiveTopology = TopologyTriangleStrip)
             {
                 var d = new RasterPipelineStateDesc
                 {
@@ -634,7 +643,7 @@ namespace NativeRender
                     depthWriteEnable = 0,
                     depthFunc        = 0,
                     blendMode        = 0,
-                    topologyType     = 3, // D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE
+                    primitiveTopology = primitiveTopology,
                     frontCounterClockwise = 0,
                     sampleCount      = 1,
                 };

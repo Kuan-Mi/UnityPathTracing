@@ -167,21 +167,6 @@ namespace PathTracing
         // Mirrors RTXPT ToneMappingParameters (ToneMapper/ToneMappingPasses.h).
         public bool enableToneMapping = true;
 
-        /// <summary>
-        /// Run the tone-map apply as a fullscreen pixel shader (ToneMapping.rastershader, which reuses
-        /// the original RTXPT ToneMapping.ps.hlsli) through the native raster pipeline, instead of the
-        /// ToneMappingApply compute shader. Same math/output; demonstrates the raster path.
-        /// </summary>
-        public bool useRasterToneMapping = false;
-
-        /// <summary>
-        /// Use the faithful original auto-exposure chain — luminance_ps (raster) → native compute mip
-        /// reduction (donut MipMapGenPass-style) → capture_cs → tone-map apply (raster) — replicating
-        /// ToneMappingPasses.cpp end to end, instead of the single-pass ReduceLuminance reduction.
-        /// Takes priority over useRasterToneMapping when both are set. Steady-state output matches.
-        /// </summary>
-        public bool useMipChainAutoExposure = false;
-
         /// <summary>Tone-map operator. RTXPT default = ACES.</summary>
         public NativeRtxptToneMapOperator toneMapOperator = NativeRtxptToneMapOperator.Aces;
 

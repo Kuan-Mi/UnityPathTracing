@@ -1,57 +1,21 @@
 /*
-* Raster (pixel-shader) tone-map apply for the NativeRtxpt pipeline.
+* RTXPT tone-map apply — thin verbatim wrapper, two #includes selected by stage:
+*   VS = donut fullscreen_vs.hlsl (the engine's m_FullscreenVS, entry `main`, outputs UV) — VERBATIM
+*   PS = RTXPT ToneMapper/ToneMapping.hlsl (entry `main_ps` → applyToneMapping) — VERBATIM
 *
-* This is the original RTXPT ToneMapper run as a fullscreen pixel shader through the
-* native raster pipeline: it #includes ToneMapper/ToneMapping.ps.hlsli VERBATIM and reuses
-* its operators (toneMapAces / toneMapReinhard / ...), the toneMap() dispatch, calcLuminance(),
-* kExposureKey, the gColorTex (t0) declaration and the ToneMappingConstants (PerImageCB, b0).
-*
-* The only thing not reused from applyToneMapping() is the auto-exposure FETCH: the original
-* samples gLuminanceTex (a mip pyramid built by luminance_ps + GenerateMips), which crashes the
-* D3D12 heap when interleaved with native dispatches (see ReduceLuminance.computeshader). Here the
-* average log2-luminance comes from the native ReduceLuminance compute buffer instead — identical
-* math to ToneMappingApply.computeshader, now sharing the operator code rather than copying it.
+* Runs the original main_ps VERBATIM through the native raster pipeline. Auto-exposure uses the
+* original shipped path (TONEMAPPING_AUTOEXPOSURE_CPU==1 in ToneMapping_cb.h): main_ps reads the
+* average luminance from gParams.avgLuminance, which the CPU feeds from the capture_cs read-back —
+* exactly as ToneMappingPasses.cpp does. gLuminanceTex / its sampler are unreferenced on this path
+* and DXC-stripped.
 */
 
 #pragma pack_matrix(row_major)
 
-// Brings in: operators, toneMap(), calcLuminance(), kExposureKey, gParams (PerImageCB @ b0),
-// gColorTex (t0), and (unused here, so stripped by DXC) gLuminanceTex/samplers.
-#include "ToneMapping.ps.hlsli"
+#ifdef NR_VERTEX_SHADER
+#include "fullscreen_vs.hlsl"
+#endif
 
-// Average log2 luminance (geometric mean) from ReduceLuminance.computeshader. Placed at t2 so it
-// does not clash with the included gLuminanceTex (t1), which is unreferenced here and dropped.
-Buffer<float> t_AvgLuminance : register(t2);
-
-void VSMain(uint vid : SV_VertexID, out float4 pos : SV_Position, out float2 uv : TEXCOORD0)
-{
-    // Fullscreen triangle (3 verts): vid 0,1,2 -> uv (0,0),(2,0),(0,2).
-    uv  = float2((vid << 1) & 2, vid & 2);
-    pos = float4(uv.x * 2.0 - 1.0, 1.0 - uv.y * 2.0, 0.0, 1.0);
-}
-
-float4 PSMain(float4 pos : SV_Position, float2 uv : TEXCOORD0) : SV_Target
-{
-    // Point-load the source at the pixel center (matches ToneMappingApply.computeshader's
-    // gColorTex[tid] exactly — no sampler, bit-identical fetch at 1:1 fullscreen).
-    int2 px = int2(pos.xy);
-    float4 color = gColorTex[px];
-    float3 finalColor = color.rgb;
-
-    if (gParams.autoExposure)
-    {
-        float avgLuminance = exp2(t_AvgLuminance[0]);
-        finalColor *= clamp(kExposureKey / avgLuminance,
-                            gParams.autoExposureLumValueMin, gParams.autoExposureLumValueMax);
-    }
-
-    if (gParams.enabled)
-    {
-        finalColor = mul(finalColor, (float3x3)gParams.colorTransform);
-        finalColor = toneMap(finalColor);   // reused operator dispatch
-        if (gParams.clamped)
-            finalColor = saturate(finalColor);
-    }
-
-    return float4(finalColor, color.a);
-}
+#ifdef NR_PIXEL_SHADER
+#include "ToneMapping.hlsl"
+#endif

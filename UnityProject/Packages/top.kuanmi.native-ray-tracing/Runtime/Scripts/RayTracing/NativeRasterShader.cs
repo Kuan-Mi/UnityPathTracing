@@ -64,8 +64,15 @@ namespace NativeRender
             string vsTgt   = string.IsNullOrEmpty(_vsTargetProfile) ? "vs_6_6" : _vsTargetProfile;
             string psTgt   = string.IsNullOrEmpty(_psTargetProfile) ? "ps_6_6" : _psTargetProfile;
 
-            _vsDxil = CompileStage(hlslPath, vsEntry, vsTgt, includeDirs, defines, extraArgs);
-            _psDxil = CompileStage(hlslPath, psEntry, psTgt, includeDirs, defines, extraArgs);
+            // A per-stage define lets a single source #include the stage-specific original file
+            // (e.g. donut fullscreen_vs.hlsl for the VS, luminance_ps.hlsl for the PS) without the two
+            // 'main' entry points colliding — the body guards each include with #ifdef NR_VERTEX_SHADER
+            // / NR_PIXEL_SHADER. This is how the ToneMapper assets become thin verbatim include wrappers.
+            string vsDefines = AppendDefine(defines, "NR_VERTEX_SHADER=1");
+            string psDefines = AppendDefine(defines, "NR_PIXEL_SHADER=1");
+
+            _vsDxil = CompileStage(hlslPath, vsEntry, vsTgt, includeDirs, vsDefines, extraArgs);
+            _psDxil = CompileStage(hlslPath, psEntry, psTgt, includeDirs, psDefines, extraArgs);
             if (!HasCompiledBytes)
             {
                 Debug.LogError($"[NativeRasterShader] Compilation failed (VS or PS): {hlslPath}", this);
@@ -82,6 +89,9 @@ namespace NativeRender
             Debug.Log($"[NativeRasterShader] Compiled VS {_vsDxil.Length}B + PS {_psDxil.Length}B: {hlslPath}");
             OnRecompiled?.Invoke(this);
         }
+
+        private static string AppendDefine(string defines, string extra)
+            => string.IsNullOrEmpty(defines) ? extra : defines + ";" + extra;
 
         private byte[] CompileStage(string hlslPath, string entry, string target,
                                     string includeDirs, string defines, string extraArgs)
