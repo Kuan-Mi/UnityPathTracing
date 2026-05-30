@@ -55,7 +55,12 @@ namespace PathTracing
         // Phase 5
         public NativeComputeShader dlssBeforeCs;
 
-        // Phase 6: Tone mapping (RTXPT ToneMapper: native luminance reduce → apply)
+        // Phase 6: Bloom (donut BloomPass: downsample → separable blur → composite)
+        public NativeComputeShader bloomDownsampleCs;
+        public NativeComputeShader bloomBlurCs;
+        public NativeComputeShader bloomCompositeCs;
+
+        // Phase 7: Tone mapping (RTXPT ToneMapper: native luminance reduce → apply)
         public NativeComputeShader toneMapReduceCs;
         public NativeComputeShader toneMapApplyCs;
 
@@ -108,6 +113,7 @@ namespace PathTracing
         private NativeRtxptDenoisingGuidesBakePass    _denoisingGuidesBakePass;
         private NativeRtxptDlssRRPrepareInputsPass    _dlssRrPrepareInputsPass;
         private DlssRRPass                            _dlssRRPass;
+        private NativeRtxptBloomPass                  _bloomPass;
         private NativeRtxptToneMappingPass            _toneMappingPass;
         private NativeRtxptAccumulationPass           _accumulationPass;
         private NativeRtxptStablePlanesDebugVizPass   _stablePlanesDebugVizPass;
@@ -177,6 +183,9 @@ namespace PathTracing
             _denoisingGuidesBakePass  ??= new NativeRtxptDenoisingGuidesBakePass(denoiseSpecHitTCs) { renderPassEvent       = renderPassEvent };
             _dlssRrPrepareInputsPass  ??= new NativeRtxptDlssRRPrepareInputsPass(dlssBeforeCs) { renderPassEvent            = renderPassEvent };
             _dlssRRPass               ??= new DlssRRPass { renderPassEvent                                                  = renderPassEvent };
+            // Bloom is optional — only build once all three compute shaders are assigned/imported.
+            if (_bloomPass == null && bloomDownsampleCs != null && bloomBlurCs != null && bloomCompositeCs != null)
+                _bloomPass = new NativeRtxptBloomPass(bloomDownsampleCs, bloomBlurCs, bloomCompositeCs) { renderPassEvent = renderPassEvent };
             // Tone mapping is optional — only build it once both compute shaders are assigned/imported
             // (NativeComputePipeline throws on a null shader). Run AutoFillShaders if these are unset.
             if (_toneMappingPass == null && toneMapReduceCs != null && toneMapApplyCs != null)
@@ -368,7 +377,14 @@ namespace PathTracing
                     renderer.EnqueuePass(_dlssRRPass);
                 }
 
-                // Phase 6: Tone mapping + auto-exposure on the display-res HDR DLSS-RR output.
+                // Phase 6: Bloom on the display-res HDR DLSS-RR output (composited in place, before tone mapping).
+                if (setting.enableBloom && setting.bloomIntensity > 0f && setting.bloomRadius > 0f && _bloomPass != null)
+                {
+                    _bloomPass.Setup(passCtx, texPool.DlssRrOutput);
+                    renderer.EnqueuePass(_bloomPass);
+                }
+
+                // Phase 7: Tone mapping + auto-exposure on the display-res HDR DLSS-RR output.
                 // Writes the LDR result into ProcessedOutputColor (unused elsewhere in realtime mode).
                 if (setting.enableToneMapping && _toneMappingPass != null)
                 {
@@ -448,6 +464,8 @@ namespace PathTracing
             _denoisingGuidesBakePass = null;
             _dlssRrPrepareInputsPass?.Dispose();
             _dlssRrPrepareInputsPass = null;
+            _bloomPass?.Dispose();
+            _bloomPass = null;
             _toneMappingPass?.Dispose();
             _toneMappingPass = null;
             _accumulationPass?.Dispose();
@@ -891,6 +909,9 @@ namespace PathTracing
             exportVisibilityBufferCs = LoadCs($"{shaderRoot}/ProcessingPasses/ExportVisibilityBuffer");
             denoiseSpecHitTCs        = LoadCs($"{shaderRoot}/ProcessingPasses/DenoisingGuidesBaker_DenoiseSpecHitT");
             dlssBeforeCs             = LoadCs($"{shaderRoot}/ProcessingPasses/PostProcess_DenoiserPrepareInputsDlssRR");
+            bloomDownsampleCs        = LoadCs($"{shaderRoot}/ToneMapper/BloomDownsample");
+            bloomBlurCs              = LoadCs($"{shaderRoot}/ToneMapper/BloomBlur");
+            bloomCompositeCs         = LoadCs($"{shaderRoot}/ToneMapper/BloomComposite");
             toneMapReduceCs          = LoadCs($"{shaderRoot}/ToneMapper/ReduceLuminance");
             toneMapApplyCs           = LoadCs($"{shaderRoot}/ToneMapper/ToneMappingApply");
             accumulationCs           = LoadCs($"{shaderRoot}/ProcessingPasses/AccumulationPass");

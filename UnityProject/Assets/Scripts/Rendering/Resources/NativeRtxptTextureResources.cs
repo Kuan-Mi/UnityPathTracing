@@ -76,6 +76,16 @@ namespace PathTracing
         /// <summary>DLSS-RR denoised + upscaled output. RGBA16_FLOAT. Display resolution.</summary>
         public NriTextureResource DlssRrOutput;
 
+        // ── Bloom scratch (donut BloomPass: downscale ×2 → separable blur ping-pong) ──
+        /// <summary>Bloom half-resolution downscale. RGBA16_FLOAT.</summary>
+        public NriTextureResource BloomDownscale1;
+        /// <summary>Bloom quarter-resolution downscale (blur source). RGBA16_FLOAT.</summary>
+        public NriTextureResource BloomDownscale2;
+        /// <summary>Bloom horizontal-blur result (quarter res). RGBA16_FLOAT.</summary>
+        public NriTextureResource BloomBlurPass1;
+        /// <summary>Bloom vertical-blur result (quarter res), composited back into the HDR image. RGBA16_FLOAT.</summary>
+        public NriTextureResource BloomBlurPass2;
+
         // ── Light feedback (NEE adaptive sampling) ────────────────────────────────
         /// <summary>Per-pixel accumulated NEE weight. R32_FLOAT. Bound as u_LightFeedbackTotalWeight (u20).</summary>
         public NriTextureResource LightFeedbackTotalWeight;
@@ -180,6 +190,11 @@ namespace PathTracing
 
             DlssRrOutput          = new NriTextureResource("Rtxpt_DlssRrOutput",          GraphicsFormat.R16G16B16A16_SFloat,     uav);
 
+            BloomDownscale1       = new NriTextureResource("Rtxpt_BloomDownscale1",       GraphicsFormat.R16G16B16A16_SFloat,     uav);
+            BloomDownscale2       = new NriTextureResource("Rtxpt_BloomDownscale2",       GraphicsFormat.R16G16B16A16_SFloat,     uav);
+            BloomBlurPass1        = new NriTextureResource("Rtxpt_BloomBlurPass1",        GraphicsFormat.R16G16B16A16_SFloat,     uav);
+            BloomBlurPass2        = new NriTextureResource("Rtxpt_BloomBlurPass2",        GraphicsFormat.R16G16B16A16_SFloat,     uav);
+
             LightFeedbackTotalWeight = new NriTextureResource("Rtxpt_LightFeedbackTotalWeight", GraphicsFormat.R32_SFloat,  uav);
             LightFeedbackCandidates  = new NriTextureResource("Rtxpt_LightFeedbackCandidates",  GraphicsFormat.R32_UInt,    uav);
 
@@ -255,6 +270,14 @@ namespace PathTracing
             DlssRrOutput.Allocate(displayResolution);
             ProcessedOutputColor.Allocate(displayResolution);
 
+            // Bloom scratch: half- and quarter-resolution of the display image.
+            var bloomHalfRes    = new int2((displayRes.x + 1) / 2, (displayRes.y + 1) / 2);
+            var bloomQuarterRes = new int2((bloomHalfRes.x + 1) / 2, (bloomHalfRes.y + 1) / 2);
+            BloomDownscale1.Allocate(bloomHalfRes);
+            BloomDownscale2.Allocate(bloomQuarterRes);
+            BloomBlurPass1.Allocate(bloomQuarterRes);
+            BloomBlurPass2.Allocate(bloomQuarterRes);
+
             return true;
         }
 
@@ -297,7 +320,9 @@ namespace PathTracing
             FeedbackTotalWeightScratch, FeedbackCandidatesScratch,
             FeedbackTotalWeightBlended, FeedbackCandidatesBlended,
             NEEATHistoryDepth,
-            ShaderDebugViz, DebugOutputColor, DlssRrOutput, AccumulatedRadiance, ProcessedOutputColor,
+            ShaderDebugViz, DebugOutputColor, DlssRrOutput,
+            BloomDownscale1, BloomDownscale2, BloomBlurPass1, BloomBlurPass2,
+            AccumulatedRadiance, ProcessedOutputColor,
             EnvCubeMip0, EnvCubeMip1, EnvImportanceMap, EnvRadianceMap, EnvDummyCube,EnvLightLookupMap
         };
     }
