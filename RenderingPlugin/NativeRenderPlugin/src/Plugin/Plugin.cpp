@@ -25,6 +25,8 @@
 #include "RayTraceDescriptorSet.h"
 #include "ComputeShader.h"
 #include "ComputeDescriptorSet.h"
+#include "RasterShader.h"
+#include "RasterDescriptorSet.h"
 #include "DescriptorHeapAllocator.h"
 #include "BindlessTexture.h"
 #include "BindlessBuffer.h"
@@ -1835,4 +1837,211 @@ extern "C" uint32_t UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API
 NR_CS_GetRenderEventDataSize()
 {
     return static_cast<uint32_t>(sizeof(CS_RenderEventData));
+}
+
+// ===========================================================================
+// RasterShader  -  generic graphics pipeline (vs_6_x + ps_6_x)
+// ===========================================================================
+
+// ---------------------------------------------------------------------------
+// RAS_RenderEventData
+//   Passed from C# via IssuePluginEventAndData for per-descriptor-set draws.
+//   Must match NativeRenderPlugin.RAS_RenderEventData exactly (Pack=4).
+//   Render targets / depth target travel here (they are not reflected
+//   resources); SRV/CBV/sampler inputs travel via bindingSlotsPtr.
+// ---------------------------------------------------------------------------
+#pragma pack(push, 4)
+struct RAS_RenderEventData
+{
+    uint64_t descriptorSetHandle;  // RasterDescriptorSet*
+    uint64_t bindingSlotsPtr;      // BindingSlot*
+    uint32_t bindingCount;
+    uint32_t numRenderTargets;
+    uint64_t rtvResources[8];      // ID3D12Resource*
+    uint32_t rtvFormats[8];        // DXGI_FORMAT
+    uint64_t dsvResource;          // ID3D12Resource* or 0
+    uint32_t dsvFormat;            // DXGI_FORMAT
+    uint32_t clearFlags;           // bit0 = clear color, bit1 = clear depth
+    float    clearColor[4];
+    float    clearDepth;
+    float    viewportX, viewportY, viewportW, viewportH;
+    uint32_t vertexCount;
+    uint32_t instanceCount;
+    uint32_t _pad;
+};
+#pragma pack(pop)
+
+// ---------------------------------------------------------------------------
+// NR_CreateRasterShader / NR_CreateRasterShaderEx
+//   Build a graphics pipeline from pre-compiled VS + PS DXIL blobs and a
+//   RasterPipelineStateDesc.  The Ex form also accepts a hintsJson string
+//   (rootConstants / rootSRV), identical to the compute / ray-tracing Ex forms.
+// ---------------------------------------------------------------------------
+static uint64_t CreateRasterShaderImpl(
+    const uint8_t* vsDxil, uint32_t vsSize,
+    const uint8_t* psDxil, uint32_t psSize,
+    const RasterPipelineStateDesc* state,
+    const char* name, const char* hintsJson)
+{
+    if (!s_RendererReady)
+    {
+        NR_WARN("NR_CreateRasterShader: renderer not ready");
+        return 0;
+    }
+    if (!state)
+    {
+        NR_WARN("NR_CreateRasterShader: null state desc");
+        return 0;
+    }
+    ID3D12Device* device = s_D3D12->GetDevice();
+    if (!device)
+    {
+        NR_ERROR("NR_CreateRasterShader: failed to obtain ID3D12Device");
+        return 0;
+    }
+    ID3D12Device5* dev5 = nullptr;
+    if (FAILED(device->QueryInterface(IID_PPV_ARGS(&dev5))))
+    {
+        NR_ERROR("NR_CreateRasterShader: failed to obtain ID3D12Device5");
+        return 0;
+    }
+    auto* rs = new RasterShader();
+    if (!rs->Initialize(dev5, s_Log, s_D3D12v8))
+    {
+        delete rs;
+        dev5->Release();
+        return 0;
+    }
+    ApplyRootConstantsHints(rs, hintsJson);
+    ApplyRootSRVHints(rs, hintsJson);
+    if (!rs->LoadShaderFromBlobs(vsDxil, vsSize, psDxil, psSize, *state, name))
+    {
+        delete rs;
+        dev5->Release();
+        return 0;
+    }
+    dev5->Release();
+    return reinterpret_cast<uint64_t>(rs);
+}
+
+extern "C" uint64_t UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API
+NR_CreateRasterShader(const uint8_t* vsDxil, uint32_t vsSize,
+                      const uint8_t* psDxil, uint32_t psSize,
+                      const RasterPipelineStateDesc* state, const char* name)
+{
+    return CreateRasterShaderImpl(vsDxil, vsSize, psDxil, psSize, state, name, nullptr);
+}
+
+extern "C" uint64_t UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API
+NR_CreateRasterShaderEx(const uint8_t* vsDxil, uint32_t vsSize,
+                        const uint8_t* psDxil, uint32_t psSize,
+                        const RasterPipelineStateDesc* state, const char* name,
+                        const char* hintsJson)
+{
+    return CreateRasterShaderImpl(vsDxil, vsSize, psDxil, psSize, state, name, hintsJson);
+}
+
+extern "C" void UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API
+NR_DestroyRasterShader(uint64_t handle)
+{
+    if (!handle) return;
+    RetireObject(reinterpret_cast<RasterShader*>(handle));
+}
+
+// ---------------------------------------------------------------------------
+// NR_RAS_CreateDescriptorSet / NR_RAS_DestroyDescriptorSet
+// ---------------------------------------------------------------------------
+extern "C" uint64_t UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API
+NR_RAS_CreateDescriptorSet(uint64_t shaderHandle)
+{
+    if (!shaderHandle || !s_RendererReady) return 0;
+    auto* rs = reinterpret_cast<RasterShader*>(shaderHandle);
+    auto* ds = new RasterDescriptorSet(rs, s_D3D12->GetDevice(), s_Log, &s_DescHeap, s_D3D12v8);
+    return reinterpret_cast<uint64_t>(ds);
+}
+
+extern "C" void UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API
+NR_RAS_DestroyDescriptorSet(uint64_t handle)
+{
+    if (!handle) return;
+    RetireObject(reinterpret_cast<RasterDescriptorSet*>(handle));
+}
+
+// ---------------------------------------------------------------------------
+// Slot-layout discovery (mirrors NR_CS_*)
+// ---------------------------------------------------------------------------
+extern "C" uint32_t UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API
+NR_RAS_GetBindingCount(uint64_t handle)
+{
+    if (!handle) return 0;
+    return reinterpret_cast<RasterShader*>(handle)->GetBindingCount();
+}
+
+extern "C" uint32_t UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API
+NR_RAS_GetSlotIndex(uint64_t handle, const char* name)
+{
+    if (!handle) return UINT32_MAX;
+    return reinterpret_cast<RasterShader*>(handle)->GetSlotIndex(name);
+}
+
+extern "C" UNITY_INTERFACE_EXPORT const char* UNITY_INTERFACE_API
+NR_RAS_GetBindingName(uint64_t handle, uint32_t index)
+{
+    if (!handle) return nullptr;
+    return reinterpret_cast<RasterShader*>(handle)->GetBindingName(index);
+}
+
+// ---------------------------------------------------------------------------
+// RasDrawCallback — issued via CommandBuffer.IssuePluginEventAndData.
+// ---------------------------------------------------------------------------
+static void UNITY_INTERFACE_API RasDrawCallback(int /*eventId*/, void* data)
+{
+    if (!s_RendererReady || !s_D3D12 || !data) return;
+
+    auto* ed = static_cast<RAS_RenderEventData*>(data);
+    if (!ed->descriptorSetHandle) return;
+
+    UnityGraphicsD3D12RecordingState recordingState = {};
+    if (!s_D3D12->CommandRecordingState(&recordingState) || !recordingState.commandList) return;
+
+    auto* ds      = reinterpret_cast<RasterDescriptorSet*>(ed->descriptorSetHandle);
+    auto* cmdList = static_cast<ID3D12GraphicsCommandList*>(recordingState.commandList);
+    auto* slots   = reinterpret_cast<const BindingSlot*>(ed->bindingSlotsPtr);
+
+    RasterDrawDesc draw = {};
+    draw.numRenderTargets = ed->numRenderTargets;
+    for (uint32_t i = 0; i < 8; ++i)
+    {
+        draw.rtvResources[i] = reinterpret_cast<ID3D12Resource*>(ed->rtvResources[i]);
+        draw.rtvFormats[i]   = ed->rtvFormats[i];
+    }
+    draw.dsvResource  = reinterpret_cast<ID3D12Resource*>(ed->dsvResource);
+    draw.dsvFormat    = ed->dsvFormat;
+    draw.clearFlags   = ed->clearFlags;
+    draw.clearColor[0] = ed->clearColor[0]; draw.clearColor[1] = ed->clearColor[1];
+    draw.clearColor[2] = ed->clearColor[2]; draw.clearColor[3] = ed->clearColor[3];
+    draw.clearDepth   = ed->clearDepth;
+    draw.viewportX = ed->viewportX; draw.viewportY = ed->viewportY;
+    draw.viewportW = ed->viewportW; draw.viewportH = ed->viewportH;
+    draw.vertexCount   = ed->vertexCount;
+    draw.instanceCount = ed->instanceCount;
+
+    D3D12HeapHook::BeginPluginDispatch();
+    ds->Draw(cmdList, draw, slots, ed->bindingCount);
+    D3D12HeapHook::EndPluginDispatch();
+
+    // Restore Unity's descriptor heaps (our Draw rebinds a private heap).
+    D3D12HeapHook::RestoreUnityHeaps(cmdList);
+}
+
+extern "C" UnityRenderingEventAndData UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API
+NR_RAS_GetRenderEventFunc()
+{
+    return RasDrawCallback;
+}
+
+extern "C" uint32_t UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API
+NR_RAS_GetRenderEventDataSize()
+{
+    return static_cast<uint32_t>(sizeof(RAS_RenderEventData));
 }

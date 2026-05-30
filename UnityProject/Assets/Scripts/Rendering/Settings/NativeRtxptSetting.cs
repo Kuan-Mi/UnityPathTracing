@@ -167,6 +167,13 @@ namespace PathTracing
         // Mirrors RTXPT ToneMappingParameters (ToneMapper/ToneMappingPasses.h).
         public bool enableToneMapping = true;
 
+        /// <summary>
+        /// Run the tone-map apply as a fullscreen pixel shader (ToneMapping.rastershader, which reuses
+        /// the original RTXPT ToneMapping.ps.hlsli) through the native raster pipeline, instead of the
+        /// ToneMappingApply compute shader. Same math/output; demonstrates the raster path.
+        /// </summary>
+        public bool useRasterToneMapping = false;
+
         /// <summary>Tone-map operator. RTXPT default = ACES.</summary>
         public NativeRtxptToneMapOperator toneMapOperator = NativeRtxptToneMapOperator.Aces;
 

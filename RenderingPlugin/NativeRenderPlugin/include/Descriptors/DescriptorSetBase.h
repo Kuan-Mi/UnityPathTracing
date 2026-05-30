@@ -93,6 +93,13 @@ protected:
     DescriptorHeapAllocator* m_allocator = nullptr;
     ResourceStateTracker     m_tracker;   // facade over the IUnityGraphicsD3D12v8 state tracker
 
+    // Pipeline-kind knobs, set by the subclass constructor.  Compute and ray
+    // tracing leave the defaults; the raster set flips them so BindRootParams
+    // emits SetGraphicsRoot* and SRV inputs are requested in the
+    // pixel-shader-readable state.
+    bool                 m_graphicsRootBinding = false;
+    D3D12_RESOURCE_STATES m_srvReadState       = D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE;
+
     // --- Per-type binding index lists (built by EnsureCategoryIndices) ---
     // Each holds the indices into m_shader->GetBindings() of one BindingType, so
     // a pass over (say) the CBVs iterates only m_idxCBV rather than filtering the

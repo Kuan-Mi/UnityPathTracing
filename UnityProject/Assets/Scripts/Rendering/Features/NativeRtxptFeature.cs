@@ -63,6 +63,9 @@ namespace PathTracing
         // Phase 7: Tone mapping (RTXPT ToneMapper: native luminance reduce → apply)
         public NativeComputeShader toneMapReduceCs;
         public NativeComputeShader toneMapApplyCs;
+        // Optional raster apply: reuses the original RTXPT ToneMapping.ps.hlsli as a fullscreen
+        // pixel shader (used instead of toneMapApplyCs when setting.useRasterToneMapping is on).
+        public NativeRasterShader  toneMapApplyRasterShader;
 
         // Phase 8
         public NativeComputeShader accumulationCs;
@@ -115,6 +118,7 @@ namespace PathTracing
         private DlssRRPass                            _dlssRRPass;
         private NativeRtxptBloomPass                  _bloomPass;
         private NativeRtxptToneMappingPass            _toneMappingPass;
+        private NativeRtxptToneMappingRasterPass      _toneMappingRasterPass;
         private NativeRtxptAccumulationPass           _accumulationPass;
         private NativeRtxptStablePlanesDebugVizPass   _stablePlanesDebugVizPass;
         private NativeRtxptOutputBlitPass             _outputBlitPass;
@@ -190,6 +194,9 @@ namespace PathTracing
             // (NativeComputePipeline throws on a null shader). Run AutoFillShaders if these are unset.
             if (_toneMappingPass == null && toneMapReduceCs != null && toneMapApplyCs != null)
                 _toneMappingPass = new NativeRtxptToneMappingPass(toneMapReduceCs, toneMapApplyCs) { renderPassEvent = renderPassEvent };
+            // Raster tone-map apply is optional — built once the reduce CS and raster shader exist.
+            if (_toneMappingRasterPass == null && toneMapReduceCs != null && toneMapApplyRasterShader != null)
+                _toneMappingRasterPass = new NativeRtxptToneMappingRasterPass(toneMapReduceCs, toneMapApplyRasterShader) { renderPassEvent = renderPassEvent };
             _accumulationPass         ??= new NativeRtxptAccumulationPass(accumulationCs) { renderPassEvent                 = renderPassEvent };
             _stablePlanesDebugVizPass ??= new NativeRtxptStablePlanesDebugVizPass(stablePlanesDebugVizCs) { renderPassEvent = renderPassEvent };
             _outputBlitPass           ??= new NativeRtxptOutputBlitPass(outputBlitMaterial) { renderPassEvent               = renderPassEvent };
@@ -386,10 +393,20 @@ namespace PathTracing
 
                 // Phase 7: Tone mapping + auto-exposure on the display-res HDR DLSS-RR output.
                 // Writes the LDR result into ProcessedOutputColor (unused elsewhere in realtime mode).
-                if (setting.enableToneMapping && _toneMappingPass != null)
+                if (setting.enableToneMapping)
                 {
-                    _toneMappingPass.Setup(passCtx, texPool.DlssRrOutput, texPool.ProcessedOutputColor);
-                    renderer.EnqueuePass(_toneMappingPass);
+                    // Raster apply (reuses the original RTXPT pixel shader) when opted in and available;
+                    // otherwise the compute apply. Both share the native luminance-reduce + constants.
+                    if (setting.useRasterToneMapping && _toneMappingRasterPass != null)
+                    {
+                        _toneMappingRasterPass.Setup(passCtx, texPool.DlssRrOutput, texPool.ProcessedOutputColor);
+                        renderer.EnqueuePass(_toneMappingRasterPass);
+                    }
+                    else if (_toneMappingPass != null)
+                    {
+                        _toneMappingPass.Setup(passCtx, texPool.DlssRrOutput, texPool.ProcessedOutputColor);
+                        renderer.EnqueuePass(_toneMappingPass);
+                    }
                 }
             }
             else
@@ -411,8 +428,9 @@ namespace PathTracing
                 // When tone mapping ran, the final image lives in ProcessedOutputColor; show it in
                 // place of the raw HDR DLSS-RR output unless the user picked an explicit debug view.
                 var displayMode = setting.showMode;
-                if (setting.realtimeMode && setting.enableToneMapping && _toneMappingPass != null
-                    && displayMode == NativeRtxptShowMode.DlssRrOutput)
+                bool toneMapRan = setting.realtimeMode && setting.enableToneMapping &&
+                    ((setting.useRasterToneMapping && _toneMappingRasterPass != null) || _toneMappingPass != null);
+                if (toneMapRan && displayMode == NativeRtxptShowMode.DlssRrOutput)
                     displayMode = NativeRtxptShowMode.ProcessedOutput;
 
                 _outputBlitPass.Setup(texPool, displayMode, 1.0f, setting.debugViewType);
@@ -468,6 +486,8 @@ namespace PathTracing
             _bloomPass = null;
             _toneMappingPass?.Dispose();
             _toneMappingPass = null;
+            _toneMappingRasterPass?.Dispose();
+            _toneMappingRasterPass = null;
             _accumulationPass?.Dispose();
             _accumulationPass = null;
             _stablePlanesDebugVizPass?.Dispose();
@@ -914,6 +934,7 @@ namespace PathTracing
             bloomCompositeCs         = LoadCs($"{shaderRoot}/ToneMapper/BloomComposite");
             toneMapReduceCs          = LoadCs($"{shaderRoot}/ToneMapper/ReduceLuminance");
             toneMapApplyCs           = LoadCs($"{shaderRoot}/ToneMapper/ToneMappingApply");
+            toneMapApplyRasterShader = LoadRas($"{shaderRoot}/ToneMapper/ToneMapping");
             accumulationCs           = LoadCs($"{shaderRoot}/ProcessingPasses/AccumulationPass");
             stablePlanesDebugVizCs   = LoadCs($"{shaderRoot}/ProcessingPasses/PostProcess_StablePlanesDebugViz");
 
@@ -956,6 +977,14 @@ namespace PathTracing
                 var s = UnityEditor.AssetDatabase.LoadAssetAtPath<RayTraceShader>(path + ".rayshader");
                 if (s == null)
                     Debug.LogWarning($"[NativeRtxptFeature] Missing RayTraceShader at: {path}");
+                return s;
+            }
+
+            static NativeRasterShader LoadRas(string path)
+            {
+                var s = UnityEditor.AssetDatabase.LoadAssetAtPath<NativeRasterShader>(path + ".rastershader");
+                if (s == null)
+                    Debug.LogWarning($"[NativeRtxptFeature] Missing NativeRasterShader at: {path}");
                 return s;
             }
         }

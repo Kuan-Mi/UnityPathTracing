@@ -594,6 +594,132 @@ namespace NativeRender
             public ulong bindingSlotsPtr; // pointer to CS_BindingSlot[] in pinned NativeArray
         }
 
+        // -------------------------------------------------------------------
+        // RasterShader API  (generic graphics pipeline, vs_6_x + ps_6_x)
+        // -------------------------------------------------------------------
+
+        /// <summary>
+        /// Fixed-function graphics-pipeline state. Must match C++ RasterPipelineStateDesc
+        /// exactly (Pack=4). Enum fields use raw D3D12 enum values; 0 selects a default
+        /// (cull NONE, fill SOLID, depth func LESS_EQUAL, topology TRIANGLE).
+        /// </summary>
+        [StructLayout(LayoutKind.Sequential, Pack = 4)]
+        public struct RasterPipelineStateDesc
+        {
+            public uint numRenderTargets;                                  // 0..8
+            [MarshalAs(UnmanagedType.ByValArray, SizeConst = 8)]
+            public uint[] rtvFormats;                                      // DXGI_FORMAT per RT
+            public uint dsvFormat;                                         // DXGI_FORMAT, 0 = none
+            public uint cullMode;                                          // D3D12_CULL_MODE; 0 => NONE
+            public uint fillMode;                                          // D3D12_FILL_MODE; 0 => SOLID
+            public uint depthTestEnable;
+            public uint depthWriteEnable;
+            public uint depthFunc;                                         // D3D12_COMPARISON_FUNC; 0 => LESS_EQUAL
+            public uint blendMode;                                         // 0=opaque,1=alpha,2=additive,3=premultiplied
+            public uint topologyType;                                      // D3D12_PRIMITIVE_TOPOLOGY_TYPE; 0 => TRIANGLE
+            public uint frontCounterClockwise;
+            public uint sampleCount;                                       // 0 => 1
+
+            /// <summary>Returns a single-RTV opaque fullscreen-pass default for the given color format.</summary>
+            public static RasterPipelineStateDesc FullscreenOpaque(uint rtvFormat)
+            {
+                var d = new RasterPipelineStateDesc
+                {
+                    numRenderTargets = 1,
+                    rtvFormats       = new uint[8],
+                    dsvFormat        = 0,
+                    cullMode         = 1, // D3D12_CULL_MODE_NONE
+                    fillMode         = 3, // D3D12_FILL_MODE_SOLID
+                    depthTestEnable  = 0,
+                    depthWriteEnable = 0,
+                    depthFunc        = 0,
+                    blendMode        = 0,
+                    topologyType     = 3, // D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE
+                    frontCounterClockwise = 0,
+                    sampleCount      = 1,
+                };
+                d.rtvFormats[0] = rtvFormat;
+                return d;
+            }
+        }
+
+        /// <summary>
+        /// Builds a graphics pipeline from pre-compiled VS + PS DXIL blobs and a fixed-function
+        /// state desc. Returns an opaque handle on success, 0 on failure.
+        /// </summary>
+        [DllImport(DllName)]
+        public static extern ulong NR_CreateRasterShader(
+            byte[] vsDxil, uint vsSize, byte[] psDxil, uint psSize,
+            ref RasterPipelineStateDesc state,
+            [MarshalAs(UnmanagedType.LPStr)] string name);
+
+        /// <summary>Like NR_CreateRasterShader, with a hintsJson string (rootConstants / rootSRV).</summary>
+        [DllImport(DllName)]
+        public static extern ulong NR_CreateRasterShaderEx(
+            byte[] vsDxil, uint vsSize, byte[] psDxil, uint psSize,
+            ref RasterPipelineStateDesc state,
+            [MarshalAs(UnmanagedType.LPStr)] string name,
+            [MarshalAs(UnmanagedType.LPStr)] string hintsJson);
+
+        /// <summary>Destroys a RasterShader created by NR_CreateRasterShader(Ex) (deferred).</summary>
+        [DllImport(DllName)]
+        public static extern void NR_DestroyRasterShader(ulong handle);
+
+        /// <summary>Creates a RasterDescriptorSet for the given RasterShader handle. Returns 0 on failure.</summary>
+        [DllImport(DllName)]
+        public static extern ulong NR_RAS_CreateDescriptorSet(ulong shaderHandle);
+
+        /// <summary>Destroys a RasterDescriptorSet (deferred until the GPU is done).</summary>
+        [DllImport(DllName)]
+        public static extern void NR_RAS_DestroyDescriptorSet(ulong handle);
+
+        /// <summary>Returns the number of reflected bindings (slot count) for the shader.</summary>
+        [DllImport(DllName)]
+        public static extern uint NR_RAS_GetBindingCount(ulong handle);
+
+        /// <summary>Returns the slot index for the named binding, or uint.MaxValue if not found.</summary>
+        [DllImport(DllName)]
+        public static extern uint NR_RAS_GetSlotIndex(ulong handle,
+            [MarshalAs(UnmanagedType.LPStr)] string name);
+
+        /// <summary>Returns the HLSL variable name for the binding at the given index, or null.</summary>
+        [DllImport(DllName)]
+        public static extern IntPtr NR_RAS_GetBindingName(ulong handle, uint index);
+
+        /// <summary>Returns the render event callback pointer for per-descriptor-set draws.</summary>
+        [DllImport(DllName)]
+        public static extern IntPtr NR_RAS_GetRenderEventFunc();
+
+        /// <summary>Returns sizeof(RAS_RenderEventData) for buffer allocation.</summary>
+        [DllImport(DllName)]
+        public static extern uint NR_RAS_GetRenderEventDataSize();
+
+        /// <summary>
+        /// Event data for NR_RAS_GetRenderEventFunc draws.
+        /// Must match C++ RAS_RenderEventData exactly (Pack=4).
+        /// Blittable (fixed buffers, no managed arrays) so it can live in a pinned
+        /// <see cref="Unity.Collections.NativeArray{T}"/> ring like CS_RenderEventData.
+        /// </summary>
+        [StructLayout(LayoutKind.Sequential, Pack = 4)]
+        public unsafe struct RAS_RenderEventData
+        {
+            public ulong descriptorSetHandle; // RasterDescriptorSet*
+            public ulong bindingSlotsPtr;     // CS_BindingSlot*
+            public uint  bindingCount;
+            public uint  numRenderTargets;
+            public fixed ulong rtvResources[8]; // ID3D12Resource*
+            public fixed uint  rtvFormats[8];   // DXGI_FORMAT
+            public ulong dsvResource;         // ID3D12Resource* or 0
+            public uint  dsvFormat;           // DXGI_FORMAT
+            public uint  clearFlags;          // bit0 = clear color, bit1 = clear depth
+            public fixed float clearColor[4];
+            public float clearDepth;
+            public float viewportX, viewportY, viewportW, viewportH;
+            public uint  vertexCount;
+            public uint  instanceCount;
+            public uint  _pad;
+        }
+
         // -----------------------------------------------------------------------
         // ShaderCompilerPlugin — standalone HLSL-to-DXIL compiler DLL.
         // No Unity runtime dependency.

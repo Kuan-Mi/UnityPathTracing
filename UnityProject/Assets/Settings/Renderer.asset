@@ -82,6 +82,7 @@ MonoBehaviour:
     environmentMapTint: {r: 1, g: 1, b: 1, a: 1}
     environmentMap: {fileID: 0}
     enableToneMapping: 1
+    useRasterToneMapping: 1
     toneMapOperator: 5
     autoExposure: 1
     exposureCompensation: 2
@@ -127,6 +128,7 @@ MonoBehaviour:
   bloomCompositeCs: {fileID: -2368575503658470205, guid: f60718293a4b5c6d7e8f901234567890, type: 3}
   toneMapReduceCs: {fileID: -2368575503658470205, guid: c3d4e5f60718293a4b5c6d7e8f901234, type: 3}
   toneMapApplyCs: {fileID: -2368575503658470205, guid: b2c3d4e5f60718293a4b5c6d7e8f9012, type: 3}
+  toneMapApplyRasterShader: {fileID: 6164937308047190184, guid: dee04467b72143fc9d0f9deae4154fb9, type: 3}
   accumulationCs: {fileID: -2368575503658470205, guid: 96ba0c67e691b484781846c8b20f6061, type: 3}
   stablePlanesDebugVizCs: {fileID: -2368575503658470205, guid: a1b2c3d4e5f6a1b2c3d4e5f6a1b2c301, type: 3}
   baseLayerCs: {fileID: -2368575503658470205, guid: 106bca701da24f7a9ed113d910f8393d, type: 3}

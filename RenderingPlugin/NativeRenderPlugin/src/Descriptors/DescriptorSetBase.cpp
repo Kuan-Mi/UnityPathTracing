@@ -1,6 +1,7 @@
 #include "DescriptorSetBase.h"
 #include "ComputeShader.h"
 #include "RayTraceShader.h"
+#include "RasterShader.h"
 #include "AccelerationStructure.h"
 #include "BindlessTexture.h"
 #include "BindlessBuffer.h"
@@ -361,7 +362,7 @@ void DescriptorSetBase<ShaderT>::RequestResourceStates(
     auto slotOf = [&](uint32_t i) -> BindingSlot { return (i < slotCount) ? slots[i] : BindingSlot{}; };
 
     for (uint32_t i : m_idxSRV)
-        m_tracker.Require(ResolveBoundResource(slotOf(i)), D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
+        m_tracker.Require(ResolveBoundResource(slotOf(i)), m_srvReadState);
 
     for (uint32_t i : m_idxRootSRV)
     {
@@ -372,7 +373,7 @@ void DescriptorSetBase<ShaderT>::RequestResourceStates(
         ID3D12Resource* srvRes = (slot.objectKind == BindingObjectKind::AccelStruct && slot.objectPtr)
             ? reinterpret_cast<AccelerationStructure*>(slot.objectPtr)->GetTLAS()
             : ResolveBoundResource(slot);
-        m_tracker.Require(srvRes, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
+        m_tracker.Require(srvRes, m_srvReadState);
     }
 
     for (uint32_t i : m_idxUAV)
@@ -388,13 +389,13 @@ void DescriptorSetBase<ShaderT>::RequestResourceStates(
         {
             auto* bt = reinterpret_cast<BindlessTexture*>(slot.objectPtr);
             for (uint32_t k = 0; k < bt->Capacity(); ++k)
-                m_tracker.Require(bt->GetTexture(k), D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
+                m_tracker.Require(bt->GetTexture(k), m_srvReadState);
         }
         else if (slot.objectKind == BindingObjectKind::BindlessBuffer && slot.objectPtr)
         {
             auto* bb = reinterpret_cast<BindlessBuffer*>(slot.objectPtr);
             for (uint32_t k = 0; k < bb->Capacity(); ++k)
-                m_tracker.Require(bb->GetBuffer(k), D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
+                m_tracker.Require(bb->GetBuffer(k), m_srvReadState);
         }
     }
 
@@ -534,11 +535,36 @@ void DescriptorSetBase<ShaderT>::BindRootParams(
 {
     EnsureCategoryIndices();
 
+    // Compute vs graphics share the same root layout; only the setter family
+    // differs.  These thin shims pick SetGraphicsRoot* / SetComputeRoot* once
+    // per call site based on the pipeline kind set by the subclass.
+    const bool gfx = m_graphicsRootBinding;
+    auto SetRootSig = [&](ID3D12RootSignature* rs) {
+        if (gfx) cmdList->SetGraphicsRootSignature(rs);
+        else     cmdList->SetComputeRootSignature(rs);
+    };
+    auto SetTable = [&](UINT p, D3D12_GPU_DESCRIPTOR_HANDLE h) {
+        if (gfx) cmdList->SetGraphicsRootDescriptorTable(p, h);
+        else     cmdList->SetComputeRootDescriptorTable(p, h);
+    };
+    auto SetCBV = [&](UINT p, D3D12_GPU_VIRTUAL_ADDRESS a) {
+        if (gfx) cmdList->SetGraphicsRootConstantBufferView(p, a);
+        else     cmdList->SetComputeRootConstantBufferView(p, a);
+    };
+    auto SetSRV = [&](UINT p, D3D12_GPU_VIRTUAL_ADDRESS a) {
+        if (gfx) cmdList->SetGraphicsRootShaderResourceView(p, a);
+        else     cmdList->SetComputeRootShaderResourceView(p, a);
+    };
+    auto SetConstants = [&](UINT p, UINT n, const void* d, UINT off) {
+        if (gfx) cmdList->SetGraphicsRoot32BitConstants(p, n, d, off);
+        else     cmdList->SetComputeRoot32BitConstants(p, n, d, off);
+    };
+
     // Bind the global shared heap
     ID3D12DescriptorHeap* heapsToBind[1] = { m_allocator->GetHeap() };
     cmdList->SetDescriptorHeaps(1, heapsToBind);
 
-    cmdList->SetComputeRootSignature(m_shader->GetRootSignature());
+    SetRootSig(m_shader->GetRootSignature());
 
     const auto& bindings        = m_shader->GetBindings();
     const uint32_t rootParamSRV     = m_shader->GetRootParamSRV();
@@ -549,13 +575,11 @@ void DescriptorSetBase<ShaderT>::BindRootParams(
 
     // SRV descriptor table
     if (rootParamSRV != kInvalidAlloc && srvBase != kInvalidAlloc)
-        cmdList->SetComputeRootDescriptorTable(rootParamSRV,
-            m_allocator->GetGPUHandle(srvBase));
+        SetTable(rootParamSRV, m_allocator->GetGPUHandle(srvBase));
 
     // UAV descriptor table
     if (rootParamUAV != kInvalidAlloc && uavBase != kInvalidAlloc)
-        cmdList->SetComputeRootDescriptorTable(rootParamUAV,
-            m_allocator->GetGPUHandle(uavBase));
+        SetTable(rootParamUAV, m_allocator->GetGPUHandle(uavBase));
 
     // SRV_ARRAY bindings — each has its own root parameter
     for (uint32_t i : m_idxSRVArray)
@@ -564,10 +588,10 @@ void DescriptorSetBase<ShaderT>::BindRootParams(
         if (b.rootParam == kInvalidAlloc) continue;
         const BindingSlot slot = slotOf(i);
         if (slot.objectKind == BindingObjectKind::BindlessTexture && slot.objectPtr)
-            cmdList->SetComputeRootDescriptorTable(b.rootParam,
+            SetTable(b.rootParam,
                 reinterpret_cast<BindlessTexture*>(slot.objectPtr)->GetGPUHandle());
         else if (slot.objectKind == BindingObjectKind::BindlessBuffer && slot.objectPtr)
-            cmdList->SetComputeRootDescriptorTable(b.rootParam,
+            SetTable(b.rootParam,
                 reinterpret_cast<BindlessBuffer*>(slot.objectPtr)->GetGPUHandle());
     }
 
@@ -578,7 +602,7 @@ void DescriptorSetBase<ShaderT>::BindRootParams(
         if (b.rootParam == kInvalidAlloc) continue;
         const BindingSlot slot = slotOf(i);
         if (slot.objectKind == BindingObjectKind::BindlessUAVTexture && slot.objectPtr)
-            cmdList->SetComputeRootDescriptorTable(b.rootParam,
+            SetTable(b.rootParam,
                 reinterpret_cast<BindlessUAVTexture*>(slot.objectPtr)->GetGPUHandle());
     }
 
@@ -602,7 +626,7 @@ void DescriptorSetBase<ShaderT>::BindRootParams(
                 ID3D12Resource* res = ResolveBoundResource(slot);
                 addr = res ? res->GetGPUVirtualAddress() : 0;
             }
-            cmdList->SetComputeRootConstantBufferView(rootParamCBVBase + b.heapOffset, addr);
+            SetCBV(rootParamCBVBase + b.heapOffset, addr);
         }
     }
 
@@ -627,7 +651,7 @@ void DescriptorSetBase<ShaderT>::BindRootParams(
                 ID3D12Resource* res = ResolveBoundResource(slot);
                 if (res) va = res->GetGPUVirtualAddress();
             }
-            if (va) cmdList->SetComputeRootShaderResourceView(b.rootParam, va);
+            if (va) SetSRV(b.rootParam, va);
         }
     }
 
@@ -640,7 +664,7 @@ void DescriptorSetBase<ShaderT>::BindRootParams(
         if (!slot.objectPtr) continue;
         UINT num32      = slot.count > 0 ? slot.count : b.num32BitValues;
         UINT destOffset = slot.stride; // destOffsetIn32BitValues
-        cmdList->SetComputeRoot32BitConstants(
+        SetConstants(
             b.rootParam,
             num32,
             reinterpret_cast<const void*>(static_cast<uintptr_t>(slot.objectPtr)),
@@ -654,3 +678,4 @@ void DescriptorSetBase<ShaderT>::BindRootParams(
 
 template class DescriptorSetBase<ComputeShader>;
 template class DescriptorSetBase<RayTraceShader>;
+template class DescriptorSetBase<RasterShader>;

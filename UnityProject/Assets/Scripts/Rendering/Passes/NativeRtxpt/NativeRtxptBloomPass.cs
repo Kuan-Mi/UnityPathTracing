@@ -33,7 +33,7 @@ namespace PathTracing
             public float   normalizationScale;
             public Vector3 padding;
             public float   numSamples;
-        }
+        } 
 
         [StructLayout(LayoutKind.Sequential)]
         private struct CompositeConstants
