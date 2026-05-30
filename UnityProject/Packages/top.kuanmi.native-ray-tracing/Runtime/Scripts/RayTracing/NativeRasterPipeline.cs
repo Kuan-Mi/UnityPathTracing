@@ -25,6 +25,7 @@ namespace NativeRender
         public Rect    viewport;          // in pixels (x, y, width, height)
         public uint    vertexCount;       // e.g. 3 for a fullscreen triangle
         public uint    instanceCount;     // 0 => 1
+        public float   blendFactor;       // OMSetBlendFactor constant; only used by blendMode==4 (constant-color)
     }
 
     /// <summary>

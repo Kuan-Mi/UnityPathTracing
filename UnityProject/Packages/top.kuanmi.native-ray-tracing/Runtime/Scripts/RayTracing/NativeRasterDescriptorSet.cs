@@ -118,6 +118,7 @@ namespace NativeRender
 
             hdr->vertexCount   = draw.vertexCount;
             hdr->instanceCount = draw.instanceCount;
+            hdr->blendFactor   = draw.blendFactor;
 
             return (IntPtr)hdr;
         }

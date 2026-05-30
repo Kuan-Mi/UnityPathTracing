@@ -11,19 +11,28 @@ using UnityEngine.Rendering.Universal;
 namespace PathTracing
 {
     /// <summary>
-    /// Port of donut <c>BloomPass</c> (the bloom the original RTXPT uses), implemented as native
-    /// compute so nothing interleaves Unity ops with the plugin's dispatches:
+    /// Faithful native replica of donut <c>BloomPass</c> (the bloom the original RTXPT uses), built
+    /// entirely from the original shaders — each Unity asset is a thin verbatim #include wrapper:
     ///
-    ///   1. Downsample HDR → half → quarter (bilinear).
-    ///   2. Separable Gaussian blur at quarter res (horizontal then vertical).
-    ///   3. Composite the blurred bloom back into the HDR image in place:
-    ///      result = lerp(original, bloom, intensity)  (matches donut's ConstantColor blend).
+    ///   1. downsample — BloomDownsample.rastershader (= donut fullscreen_vs + blit_ps.hlsl) renders the
+    ///                   HDR into a half-res RT, then half → quarter. The single bilinear tap of blit_ps,
+    ///                   driven at half-size, is the exact 2x2 box average CommonRenderPasses::BlitTexture
+    ///                   does for the original's two downscales.
+    ///   2. blur       — BloomBlur.rastershader (= donut fullscreen_vs + passes/bloom_ps.hlsl) runs the
+    ///                   verbatim separable Gaussian twice at quarter res (horizontal then vertical).
+    ///   3. composite  — BloomComposite.rastershader (= donut fullscreen_vs + blit_ps.hlsl) samples the
+    ///                   blurred bloom and the constant-color blend hardware composites it back into the
+    ///                   HDR image in place. The pipeline uses blendMode 4 (SrcBlend=ConstantColor,
+    ///                   DestBlend=InvConstantColor) with blendFactor = bloom intensity, so
+    ///                   result = lerp(hdr, bloom, intensity) — exactly donut's ConstantColor blend.
     ///
-    /// Runs after DLSS-RR and before tone mapping, operating on the display-resolution HDR image.
     /// Gaussian weights and constants are taken verbatim from donut bloom_ps.hlsl / BloomPass.cpp.
+    /// Runs after DLSS-RR and before tone mapping, operating on the display-resolution HDR image.
     /// </summary>
     public class NativeRtxptBloomPass : ScriptableRenderPass, IDisposable
     {
+        private const uint kRGBA16F = (uint)DXGI_FORMAT.DXGI_FORMAT_R16G16B16A16_FLOAT;
+
         // Mirrors donut bloom_cb.h BloomConstants (32 bytes).
         [StructLayout(LayoutKind.Sequential)]
         private struct BloomConstants
@@ -33,60 +42,63 @@ namespace PathTracing
             public float   normalizationScale;
             public Vector3 padding;
             public float   numSamples;
-        }  
-
-        [StructLayout(LayoutKind.Sequential)]
-        private struct CompositeConstants
-        {
-            public float   blendFactor;
-            public Vector3 padding;
         }
 
-        private readonly NativeComputePipeline      _downsampleCs;
-        private readonly NativeComputeDescriptorSet _downsample1Ds;
-        private readonly NativeComputeDescriptorSet _downsample2Ds;
-        private readonly NativeComputePipeline      _blurCs;
-        private readonly NativeComputeDescriptorSet _blurHDs;
-        private readonly NativeComputeDescriptorSet _blurVDs;
-        private readonly NativeComputePipeline      _compositeCs;
-        private readonly NativeComputeDescriptorSet _compositeDs;
+        // ── Pipelines (built once) ──
+        private readonly NativeRasterPipeline      _downsampleRaster;
+        private readonly NativeRasterDescriptorSet _downsample1Ds;
+        private readonly NativeRasterDescriptorSet _downsample2Ds;
+        private readonly NativeRasterPipeline      _blurRaster;
+        private readonly NativeRasterDescriptorSet _blurHDs;
+        private readonly NativeRasterDescriptorSet _blurVDs;
+        private readonly NativeRasterPipeline      _compositeRaster;
+        private readonly NativeRasterDescriptorSet _compositeDs;
 
         private readonly VolatileConstantBuffer _hBlurCb;
         private readonly VolatileConstantBuffer _vBlurCb;
-        private readonly VolatileConstantBuffer _compositeCb;
+
+        // Single-RT format array shared by every draw (all bloom targets are RGBA16F).
+        private readonly uint[] _colorFmt = { kRGBA16F };
 
         private NativeRtxptPassContext _ctx;
         private IntPtr                 _hdrPtr;
 
-        public NativeRtxptBloomPass(NativeComputeShader downsampleCs, NativeComputeShader blurCs, NativeComputeShader compositeCs)
+        public NativeRtxptBloomPass(NativeRasterShader downsampleShader,
+                                    NativeRasterShader blurShader,
+                                    NativeRasterShader compositeShader)
         {
-            _downsampleCs  = new NativeComputePipeline(downsampleCs);
-            _downsample1Ds = new NativeComputeDescriptorSet(_downsampleCs);
-            _downsample2Ds = new NativeComputeDescriptorSet(_downsampleCs);
-            _blurCs        = new NativeComputePipeline(blurCs);
-            _blurHDs       = new NativeComputeDescriptorSet(_blurCs);
-            _blurVDs       = new NativeComputeDescriptorSet(_blurCs);
-            _compositeCs   = new NativeComputePipeline(compositeCs);
-            _compositeDs   = new NativeComputeDescriptorSet(_compositeCs);
+            var opaque = NativeRenderPlugin.RasterPipelineStateDesc.FullscreenOpaque(kRGBA16F);
 
-            _hBlurCb     = new VolatileConstantBuffer(Marshal.SizeOf<BloomConstants>());
-            _vBlurCb     = new VolatileConstantBuffer(Marshal.SizeOf<BloomConstants>());
-            _compositeCb = new VolatileConstantBuffer(Marshal.SizeOf<CompositeConstants>());
+            // Composite: opaque fullscreen state but with the constant-color blend (donut's
+            // ConstantColor/InvConstantColor); the blend constant is supplied per-draw.
+            var constColor = NativeRenderPlugin.RasterPipelineStateDesc.FullscreenOpaque(kRGBA16F);
+            constColor.blendMode = NativeRenderPlugin.RasterPipelineStateDesc.BlendModeConstantColor;
+
+            _downsampleRaster = new NativeRasterPipeline(downsampleShader, opaque);
+            _downsample1Ds    = new NativeRasterDescriptorSet(_downsampleRaster);
+            _downsample2Ds    = new NativeRasterDescriptorSet(_downsampleRaster);
+            _blurRaster       = new NativeRasterPipeline(blurShader, opaque);
+            _blurHDs          = new NativeRasterDescriptorSet(_blurRaster);
+            _blurVDs          = new NativeRasterDescriptorSet(_blurRaster);
+            _compositeRaster  = new NativeRasterPipeline(compositeShader, constColor);
+            _compositeDs      = new NativeRasterDescriptorSet(_compositeRaster);
+
+            _hBlurCb = new VolatileConstantBuffer(Marshal.SizeOf<BloomConstants>());
+            _vBlurCb = new VolatileConstantBuffer(Marshal.SizeOf<BloomConstants>());
         }
 
         public void Dispose()
         {
             _downsample1Ds?.Dispose();
             _downsample2Ds?.Dispose();
-            _downsampleCs?.Dispose();
+            _downsampleRaster?.Dispose();
             _blurHDs?.Dispose();
             _blurVDs?.Dispose();
-            _blurCs?.Dispose();
+            _blurRaster?.Dispose();
             _compositeDs?.Dispose();
-            _compositeCs?.Dispose();
+            _compositeRaster?.Dispose();
             _hBlurCb?.Dispose();
             _vBlurCb?.Dispose();
-            _compositeCb?.Dispose();
         }
 
         /// <summary>HDR image that is downsampled, blurred and composited back in place (e.g. DlssRrOutput).</summary>
@@ -98,14 +110,16 @@ namespace PathTracing
 
         private class PassData
         {
-            internal NativeComputePipeline      DownsampleCs, BlurCs, CompositeCs;
-            internal NativeComputeDescriptorSet Downsample1Ds, Downsample2Ds, BlurHDs, BlurVDs, CompositeDs;
-            internal VolatileConstantBuffer     HBlurCb, VBlurCb, CompositeCb;
-            internal BloomConstants             HBlur, VBlur;
-            internal CompositeConstants         Composite;
-            internal IntPtr                     HdrPtr;
-            internal IntPtr                     Down1Ptr, Down2Ptr, Pass1Ptr, Pass2Ptr;
-            internal int2                        DisplayRes, HalfRes, QuarterRes;
+            internal NativeRasterPipeline      DownsampleRaster, BlurRaster, CompositeRaster;
+            internal NativeRasterDescriptorSet Downsample1Ds, Downsample2Ds, BlurHDs, BlurVDs, CompositeDs;
+            internal VolatileConstantBuffer    HBlurCb, VBlurCb;
+            internal BloomConstants            HBlur, VBlur;
+            internal float                     BlendFactor;
+            internal IntPtr                    HdrPtr;
+            internal IntPtr                    Down1Ptr, Down2Ptr, Pass1Ptr, Pass2Ptr;
+            internal int2                       DisplayRes, HalfRes, QuarterRes;
+            internal uint[]                    ColorFmt;
+            internal IntPtr[]                  ColorRes;   // scratch length-1, refilled per draw
         }
 
         public override void RecordRenderGraph(RenderGraph renderGraph, ContextContainer frameData)
@@ -116,9 +130,9 @@ namespace PathTracing
             var quarter = new int2((half.x + 1) / 2, (half.y + 1) / 2);
 
             // donut BloomPass::Render constant derivation.
-            float sigma   = math.clamp(s.bloomRadius * 0.25f, 1f, 100f);
-            float argScale = -1f / (2f * sigma * sigma);
-            float normScale = 1f / (math.sqrt(2f * math.PI) * sigma);
+            float sigma      = math.clamp(s.bloomRadius * 0.25f, 1f, 100f);
+            float argScale   = -1f / (2f * sigma * sigma);
+            float normScale  = 1f / (math.sqrt(2f * math.PI) * sigma);
             float numSamples = math.round(sigma * 4f);
 
             var hBlur = new BloomConstants
@@ -133,37 +147,32 @@ namespace PathTracing
             vBlur.pixstep = new Vector2(0f, 1f / quarter.y);
 
             using var builder = renderGraph.AddUnsafePass<PassData>("NativeRtxpt.Bloom", out var pd);
-            pd.DownsampleCs  = _downsampleCs;
-            pd.Downsample1Ds = _downsample1Ds;
-            pd.Downsample2Ds = _downsample2Ds;
-            pd.BlurCs        = _blurCs;
-            pd.BlurHDs       = _blurHDs;
-            pd.BlurVDs       = _blurVDs;
-            pd.CompositeCs   = _compositeCs;
-            pd.CompositeDs   = _compositeDs;
-            pd.HBlurCb       = _hBlurCb;
-            pd.VBlurCb       = _vBlurCb;
-            pd.CompositeCb   = _compositeCb;
-            pd.HBlur         = hBlur;
-            pd.VBlur         = vBlur;
-            pd.Composite     = new CompositeConstants { blendFactor = s.bloomIntensity, padding = Vector3.zero };
-            pd.HdrPtr        = _hdrPtr;
-            pd.Down1Ptr      = _ctx.Textures.BloomDownscale1.NativePtr;
-            pd.Down2Ptr      = _ctx.Textures.BloomDownscale2.NativePtr;
-            pd.Pass1Ptr      = _ctx.Textures.BloomBlurPass1.NativePtr;
-            pd.Pass2Ptr      = _ctx.Textures.BloomBlurPass2.NativePtr;
-            pd.DisplayRes    = disp;
-            pd.HalfRes       = half;
-            pd.QuarterRes    = quarter;
+            pd.DownsampleRaster = _downsampleRaster;
+            pd.Downsample1Ds    = _downsample1Ds;
+            pd.Downsample2Ds    = _downsample2Ds;
+            pd.BlurRaster       = _blurRaster;
+            pd.BlurHDs          = _blurHDs;
+            pd.BlurVDs          = _blurVDs;
+            pd.CompositeRaster  = _compositeRaster;
+            pd.CompositeDs      = _compositeDs;
+            pd.HBlurCb          = _hBlurCb;
+            pd.VBlurCb          = _vBlurCb;
+            pd.HBlur            = hBlur;
+            pd.VBlur            = vBlur;
+            pd.BlendFactor      = s.bloomIntensity;
+            pd.HdrPtr           = _hdrPtr;
+            pd.Down1Ptr         = _ctx.Textures.BloomDownscale1.NativePtr;
+            pd.Down2Ptr         = _ctx.Textures.BloomDownscale2.NativePtr;
+            pd.Pass1Ptr         = _ctx.Textures.BloomBlurPass1.NativePtr;
+            pd.Pass2Ptr         = _ctx.Textures.BloomBlurPass2.NativePtr;
+            pd.DisplayRes       = disp;
+            pd.HalfRes          = half;
+            pd.QuarterRes       = quarter;
+            pd.ColorFmt         = _colorFmt;
+            pd.ColorRes         = new IntPtr[1];
 
             builder.AllowPassCulling(false);
             builder.SetRenderFunc((PassData data, UnsafeGraphContext context) => ExecutePass(data, context));
-        }
-
-        private static void Groups(int2 res, out uint gx, out uint gy)
-        {
-            gx = ((uint)res.x + 7u) / 8u;
-            gy = ((uint)res.y + 7u) / 8u;
         }
 
         private static void ExecutePass(PassData data, UnsafeGraphContext context)
@@ -172,33 +181,48 @@ namespace PathTracing
 
             cmd.BeginSample(RenderPassMarkers.Bloom);
 
-            // 1. Downsample HDR → half.
+            // 1. Downsample HDR → half (blit_ps bilinear, opaque).
             {
                 var ds = data.Downsample1Ds;
-                ds.SetTexture("t_Src", data.HdrPtr);
-                ds.SetRWTexture("u_Dst", data.Down1Ptr);
-                Groups(data.HalfRes, out var gx, out var gy);
-                data.DownsampleCs.Dispatch(cmd, ds, gx, gy, 1);
+                ds.SetTexture("tex", data.HdrPtr);
+                data.ColorRes[0] = data.Down1Ptr;
+                var draw = new RasterDrawDesc
+                {
+                    numRenderTargets = 1, colorResources = data.ColorRes, colorFormats = data.ColorFmt,
+                    depthResource = IntPtr.Zero, viewport = new Rect(0, 0, data.HalfRes.x, data.HalfRes.y),
+                    vertexCount = 4, instanceCount = 1,
+                };
+                data.DownsampleRaster.Draw(cmd, ds, in draw);
             }
 
             // 2. Downsample half → quarter.
             {
                 var ds = data.Downsample2Ds;
-                ds.SetTexture("t_Src", data.Down1Ptr);
-                ds.SetRWTexture("u_Dst", data.Down2Ptr);
-                Groups(data.QuarterRes, out var gx, out var gy);
-                data.DownsampleCs.Dispatch(cmd, ds, gx, gy, 1);
+                ds.SetTexture("tex", data.Down1Ptr);
+                data.ColorRes[0] = data.Down2Ptr;
+                var draw = new RasterDrawDesc
+                {
+                    numRenderTargets = 1, colorResources = data.ColorRes, colorFormats = data.ColorFmt,
+                    depthResource = IntPtr.Zero, viewport = new Rect(0, 0, data.QuarterRes.x, data.QuarterRes.y),
+                    vertexCount = 4, instanceCount = 1,
+                };
+                data.DownsampleRaster.Draw(cmd, ds, in draw);
             }
 
-            // 3a. Horizontal blur (quarter): downscale2 → pass1.
+            // 3a. Horizontal blur (quarter): downscale2 → pass1 (verbatim bloom_ps).
             {
                 data.HBlurCb.UploadDirect(context.cmd, data.HBlur);
                 var ds = data.BlurHDs;
                 ds.SetConstantBuffer("c_Bloom", data.HBlurCb);
                 ds.SetTexture("t_Src", data.Down2Ptr);
-                ds.SetRWTexture("u_Dst", data.Pass1Ptr);
-                Groups(data.QuarterRes, out var gx, out var gy);
-                data.BlurCs.Dispatch(cmd, ds, gx, gy, 1);
+                data.ColorRes[0] = data.Pass1Ptr;
+                var draw = new RasterDrawDesc
+                {
+                    numRenderTargets = 1, colorResources = data.ColorRes, colorFormats = data.ColorFmt,
+                    depthResource = IntPtr.Zero, viewport = new Rect(0, 0, data.QuarterRes.x, data.QuarterRes.y),
+                    vertexCount = 4, instanceCount = 1,
+                };
+                data.BlurRaster.Draw(cmd, ds, in draw);
             }
 
             // 3b. Vertical blur (quarter): pass1 → pass2.
@@ -207,20 +231,29 @@ namespace PathTracing
                 var ds = data.BlurVDs;
                 ds.SetConstantBuffer("c_Bloom", data.VBlurCb);
                 ds.SetTexture("t_Src", data.Pass1Ptr);
-                ds.SetRWTexture("u_Dst", data.Pass2Ptr);
-                Groups(data.QuarterRes, out var gx, out var gy);
-                data.BlurCs.Dispatch(cmd, ds, gx, gy, 1);
+                data.ColorRes[0] = data.Pass2Ptr;
+                var draw = new RasterDrawDesc
+                {
+                    numRenderTargets = 1, colorResources = data.ColorRes, colorFormats = data.ColorFmt,
+                    depthResource = IntPtr.Zero, viewport = new Rect(0, 0, data.QuarterRes.x, data.QuarterRes.y),
+                    vertexCount = 4, instanceCount = 1,
+                };
+                data.BlurRaster.Draw(cmd, ds, in draw);
             }
 
-            // 4. Composite blurred bloom back into the HDR image (display res, in place).
+            // 4. Composite blurred bloom back into the HDR image (display res, in place) via the
+            //    constant-color blend: result = bloom*intensity + hdr*(1-intensity).
             {
-                data.CompositeCb.UploadDirect(context.cmd, data.Composite);
                 var ds = data.CompositeDs;
-                ds.SetConstantBuffer("c_Composite", data.CompositeCb);
-                ds.SetTexture("t_Bloom", data.Pass2Ptr);
-                ds.SetRWTexture("u_Output", data.HdrPtr);
-                Groups(data.DisplayRes, out var gx, out var gy);
-                data.CompositeCs.Dispatch(cmd, ds, gx, gy, 1);
+                ds.SetTexture("tex", data.Pass2Ptr);
+                data.ColorRes[0] = data.HdrPtr;
+                var draw = new RasterDrawDesc
+                {
+                    numRenderTargets = 1, colorResources = data.ColorRes, colorFormats = data.ColorFmt,
+                    depthResource = IntPtr.Zero, viewport = new Rect(0, 0, data.DisplayRes.x, data.DisplayRes.y),
+                    vertexCount = 4, instanceCount = 1, blendFactor = data.BlendFactor,
+                };
+                data.CompositeRaster.Draw(cmd, ds, in draw);
             }
 
             cmd.EndSample(RenderPassMarkers.Bloom);

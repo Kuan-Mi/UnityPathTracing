@@ -624,6 +624,13 @@ namespace NativeRender
             public const uint TopologyTriangleList  = 4;
             public const uint TopologyTriangleStrip = 5;
 
+            // blendMode values (see C++ MakeBlend).
+            public const uint BlendModeOpaque         = 0;
+            public const uint BlendModeAlpha          = 1;
+            public const uint BlendModeAdditive       = 2;
+            public const uint BlendModePremultiplied  = 3;
+            public const uint BlendModeConstantColor  = 4; // src*C + dst*(1-C); C = RasterDrawDesc.blendFactor
+
             /// <summary>
             /// Single-RTV opaque fullscreen-pass default for the given color format. Uses a triangle
             /// STRIP (the donut fullscreen_vs.hlsl quad) — draw with vertexCount = 4. Pass
@@ -726,7 +733,7 @@ namespace NativeRender
             public float viewportX, viewportY, viewportW, viewportH;
             public uint  vertexCount;
             public uint  instanceCount;
-            public uint  _pad;
+            public float blendFactor;       // OMSetBlendFactor constant (blendMode==4 constant-color); was _pad
         }
 
         // -----------------------------------------------------------------------

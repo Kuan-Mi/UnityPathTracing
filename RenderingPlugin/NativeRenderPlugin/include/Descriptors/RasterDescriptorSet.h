@@ -22,6 +22,7 @@ struct RasterDrawDesc
     float           viewportX, viewportY, viewportW, viewportH;
     uint32_t        vertexCount;
     uint32_t        instanceCount;
+    float           blendFactor;          // OMSetBlendFactor constant (used by blendMode==4 constant-color)
 };
 
 // ---------------------------------------------------------------------------

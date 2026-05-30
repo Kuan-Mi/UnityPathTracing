@@ -1,0 +1,23 @@
+fileFormatVersion: 2
+guid: 8a4d2b0c3e5f4a6b9d7c1e2f3a4b5c6d
+ScriptedImporter:
+  internalIDToNameTable: []
+  externalObjects: {}
+  serializedVersion: 2
+  userData:
+  assetBundleName:
+  assetBundleVariant:
+  script: {fileID: 11500000, guid: 027188e0fad048b1a20a4377aff4684c, type: 3}
+  additionalIncludePaths:
+  - ../RenderingPlugin/External/donut/shaders
+  - ../RenderingPlugin/External/donut/include
+  extraArgs:
+  - -enable-16bit-types
+  defines:
+  - QUAD_Z=0
+  vsEntryPoint: main
+  psEntryPoint: main
+  vsTargetProfile: vs_6_6
+  psTargetProfile: ps_6_6
+  rootConstantsHints: []
+  rootSRVHints: []

@@ -1867,7 +1867,7 @@ struct RAS_RenderEventData
     float    viewportX, viewportY, viewportW, viewportH;
     uint32_t vertexCount;
     uint32_t instanceCount;
-    uint32_t _pad;
+    float    blendFactor;          // OMSetBlendFactor constant (blendMode==4 constant-color); was _pad
 };
 #pragma pack(pop)
 
@@ -2025,6 +2025,7 @@ static void UNITY_INTERFACE_API RasDrawCallback(int /*eventId*/, void* data)
     draw.viewportW = ed->viewportW; draw.viewportH = ed->viewportH;
     draw.vertexCount   = ed->vertexCount;
     draw.instanceCount = ed->instanceCount;
+    draw.blendFactor   = ed->blendFactor;
 
     D3D12HeapHook::BeginPluginDispatch();
     ds->Draw(cmdList, draw, slots, ed->bindingCount);

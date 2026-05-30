@@ -89,6 +89,12 @@ void RasterDescriptorSet::Draw(
     cmdList->SetPipelineState(m_shader->GetPSO());
     BindRootParams(cmdList, slots, slotCount, srvBase, uavBase);
 
+    // Constant blend color for the constant-color blend mode (donut bloom composite).
+    // All four channels carry the same factor, matching nvrhi::Color(blendFactor); ignored by
+    // pipelines whose blend state does not reference BLEND_FACTOR.
+    const float blendConst[4] = { draw.blendFactor, draw.blendFactor, draw.blendFactor, draw.blendFactor };
+    cmdList->OMSetBlendFactor(blendConst);
+
     // --- Output merger / rasterizer fixed state ---
     cmdList->OMSetRenderTargets(numRT, numRT ? &rtvStart : nullptr,
                                 /*RTsSingleHandleToDescriptorRange=*/TRUE,

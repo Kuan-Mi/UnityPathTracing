@@ -160,6 +160,14 @@ static D3D12_RENDER_TARGET_BLEND_DESC MakeBlend(uint32_t mode)
         b.SrcBlend = D3D12_BLEND_ONE; b.DestBlend = D3D12_BLEND_INV_SRC_ALPHA;
         b.SrcBlendAlpha = D3D12_BLEND_ONE; b.DestBlendAlpha = D3D12_BLEND_INV_SRC_ALPHA;
         break;
+    case 4: // constant-color lerp — donut BloomPass composite (SrcBlend=ConstantColor,
+            // DestBlend=InvConstantColor, alpha Src=Zero/Dest=One). The blend constant is set
+            // per-draw via OMSetBlendFactor (RAS_RenderEventData.blendFactor = bloom intensity),
+            // giving result = src*C + dst*(1-C) = lerp(dst, src, C).
+        b.BlendEnable = TRUE;
+        b.SrcBlend = D3D12_BLEND_BLEND_FACTOR; b.DestBlend = D3D12_BLEND_INV_BLEND_FACTOR;
+        b.SrcBlendAlpha = D3D12_BLEND_ZERO;    b.DestBlendAlpha = D3D12_BLEND_ONE;
+        break;
     default: // 0 = opaque
         b.BlendEnable = FALSE;
         b.SrcBlend = D3D12_BLEND_ONE; b.DestBlend = D3D12_BLEND_ZERO;

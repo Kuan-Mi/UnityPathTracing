@@ -1,0 +1,22 @@
+/*
+* RTXPT bloom composite — thin verbatim wrapper, two #includes selected by stage:
+*   VS = donut fullscreen_vs.hlsl (4-vertex triangle-strip quad, outputs UV) — VERBATIM
+*   PS = donut blit_ps.hlsl (entry `main`, single bilinear tap) — VERBATIM
+*
+* This is the exact shader CommonRenderPasses::BlitTexture runs for donut BloomPass's final "Apply":
+* it samples the quarter-res blurred bloom and the constant-color blend hardware composites it back
+* into the HDR image in place. The pipeline uses blendMode 4 (SrcBlend=ConstantColor,
+* DestBlend=InvConstantColor) with RasterDrawDesc.blendFactor = bloom intensity, so
+* result = bloom*intensity + hdr*(1-intensity) = lerp(hdr, bloom, intensity) — exactly donut's
+* ConstantColor/InvConstantColor blend. TEXTURE_ARRAY left undefined; fullscreen_vs needs QUAD_Z=0.
+*/
+
+#pragma pack_matrix(row_major)
+
+#ifdef NR_VERTEX_SHADER
+#include "fullscreen_vs.hlsl"
+#endif
+
+#ifdef NR_PIXEL_SHADER
+#include "blit_ps.hlsl"
+#endif

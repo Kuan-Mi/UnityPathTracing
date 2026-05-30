@@ -55,10 +55,12 @@ namespace PathTracing
         // Phase 5
         public NativeComputeShader dlssBeforeCs;
 
-        // Phase 6: Bloom (donut BloomPass: downsample → separable blur → composite)
-        public NativeComputeShader bloomDownsampleCs;
-        public NativeComputeShader bloomBlurCs;
-        public NativeComputeShader bloomCompositeCs;
+        // Phase 6: Bloom (donut BloomPass: downsample → separable blur → composite).
+        // Verbatim raster wrappers: blur = fullscreen_vs + passes/bloom_ps.hlsl; downsample/composite =
+        // fullscreen_vs + blit_ps.hlsl (composite uses the constant-color blend = donut's ConstantColor).
+        public NativeRasterShader bloomDownsampleRasterShader;
+        public NativeRasterShader bloomBlurRasterShader;
+        public NativeRasterShader bloomCompositeRasterShader;
 
         // Phase 7: Tone mapping — faithful native replica of RTXPT ToneMappingPasses.cpp, built from the
         // original shaders as thin verbatim #include wrappers: luminance_ps (raster) → native mip reduce
@@ -187,9 +189,9 @@ namespace PathTracing
             _denoisingGuidesBakePass  ??= new NativeRtxptDenoisingGuidesBakePass(denoiseSpecHitTCs) { renderPassEvent       = renderPassEvent };
             _dlssRrPrepareInputsPass  ??= new NativeRtxptDlssRRPrepareInputsPass(dlssBeforeCs) { renderPassEvent            = renderPassEvent };
             _dlssRRPass               ??= new DlssRRPass { renderPassEvent                                                  = renderPassEvent };
-            // Bloom is optional — only build once all three compute shaders are assigned/imported.
-            if (_bloomPass == null && bloomDownsampleCs != null && bloomBlurCs != null && bloomCompositeCs != null)
-                _bloomPass = new NativeRtxptBloomPass(bloomDownsampleCs, bloomBlurCs, bloomCompositeCs) { renderPassEvent = renderPassEvent };
+            // Bloom is optional — only build once all three raster wrappers are assigned/imported.
+            if (_bloomPass == null && bloomDownsampleRasterShader != null && bloomBlurRasterShader != null && bloomCompositeRasterShader != null)
+                _bloomPass = new NativeRtxptBloomPass(bloomDownsampleRasterShader, bloomBlurRasterShader, bloomCompositeRasterShader) { renderPassEvent = renderPassEvent };
             // Tone mapping — faithful RTXPT replica. Built once all four original-shader wrappers exist
             // (Native*Pipeline throws on a null shader); run AutoFillShaders if these are unset.
             if (_toneMappingMipChainPass == null && luminanceRasterShader != null && luminanceMipCs != null
@@ -915,9 +917,9 @@ namespace PathTracing
             exportVisibilityBufferCs = LoadCs($"{shaderRoot}/ProcessingPasses/ExportVisibilityBuffer");
             denoiseSpecHitTCs        = LoadCs($"{shaderRoot}/ProcessingPasses/DenoisingGuidesBaker_DenoiseSpecHitT");
             dlssBeforeCs             = LoadCs($"{shaderRoot}/ProcessingPasses/PostProcess_DenoiserPrepareInputsDlssRR");
-            bloomDownsampleCs        = LoadCs($"{shaderRoot}/ToneMapper/BloomDownsample");
-            bloomBlurCs              = LoadCs($"{shaderRoot}/ToneMapper/BloomBlur");
-            bloomCompositeCs         = LoadCs($"{shaderRoot}/ToneMapper/BloomComposite");
+            bloomDownsampleRasterShader = LoadRas($"{shaderRoot}/ToneMapper/BloomDownsample");
+            bloomBlurRasterShader       = LoadRas($"{shaderRoot}/ToneMapper/BloomBlur");
+            bloomCompositeRasterShader  = LoadRas($"{shaderRoot}/ToneMapper/BloomComposite");
             luminanceRasterShader    = LoadRas($"{shaderRoot}/ToneMapper/Luminance");
             luminanceMipCs           = LoadCs($"{shaderRoot}/ToneMapper/LuminanceMip");
             captureLuminanceCs       = LoadCs($"{shaderRoot}/ToneMapper/capture_cs");
