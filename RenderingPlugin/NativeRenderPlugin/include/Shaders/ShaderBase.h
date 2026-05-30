@@ -55,6 +55,10 @@ public:
     uint32_t GetRootParamRootSRVBase() const { return m_rootParamRootSRVBase; }
     uint32_t GetNumSRV()               const { return m_numSRV; }
     uint32_t GetNumUAV()               const { return m_numUAV; }
+    // Total descriptor slots in the SRV / UAV tables (bounded arrays count as arrayCount slots,
+    // singles as 1). Equals GetNumSRV()/GetNumUAV() unless a shader uses a bounded array.
+    uint32_t GetNumSRVSlots()          const { return m_numSRVSlots; }
+    uint32_t GetNumUAVSlots()          const { return m_numUAVSlots; }
     const char* GetName()              const { return m_name.c_str(); }
 
     static constexpr uint32_t kInvalidAlloc = UINT32_MAX;
@@ -102,8 +106,10 @@ protected:
     uint32_t m_rootParamRootSRVBase = kInvalidAlloc;
 
     // Binding counts (populated by ReflectBindings in subclass)
-    uint32_t m_numSRV           = 0;
-    uint32_t m_numUAV           = 0;
+    uint32_t m_numSRV           = 0;    // # of SRV/TLAS bindings (= # of descriptor-table ranges)
+    uint32_t m_numUAV           = 0;    // # of UAV bindings
+    uint32_t m_numSRVSlots      = 0;    // total SRV/TLAS descriptors (sum of arrayCount)
+    uint32_t m_numUAVSlots      = 0;    // total UAV descriptors (sum of arrayCount)
     uint32_t m_numCBV           = 0;
     uint32_t m_numSRVArray      = 0;
     uint32_t m_numUAVArray      = 0;

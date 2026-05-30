@@ -1,44 +1,63 @@
 /*
-* Donut-style native-compute mip reduction for the auto-exposure luminance pyramid.
+* Auto-exposure luminance mip reduction — donut MipMapGenPass algorithm (MODE_COLOR box average),
+* driven through the native binding model's new BOUNDED UAV ARRAY support.
 *
-* Replaces the original luminance_ps + Unity GenerateMips + capture chain's GenerateMips step with a
-* pure UAV compute pass (donut MipMapGenPass MODE_COLOR semantics: 2x2 box average = arithmetic mean
-* of log2-luminance = log2 of the geometric-mean luminance). Crucially this is native compute, not a
-* Unity sampler-heap GenerateMips, so it does not leave a SAMPLER heap bound between native dispatches
-* (the documented D3D12 crash). One destination mip per dispatch; the C# side loops mip 1..top.
+* This reduces NUM_LODS(=4) mips per dispatch with a 16x16 groupshared reduction — donut's
+* mipmapgen_cs algorithm verbatim. The one deviation from donut's shader: the input mip is read
+* through the SAME bounded UAV array as the outputs (u_mips[0]) instead of a separate SRV (t_input).
+* Reason: Unity's IUnityGraphicsD3D12 RequestResourceState is PER-RESOURCE (no subresource arg), so a
+* resource cannot have mip N in SHADER_RESOURCE (SRV) while mips N+1.. are in UNORDERED_ACCESS (UAV)
+* within one dispatch — which is exactly what donut's SRV-input mipmapgen needs. Keeping every access
+* on the UAV array leaves the whole pyramid in UNORDERED_ACCESS, so there is no per-subresource clash.
 *
-* Both the source and destination mip levels are addressed through a single bindless UAV array
-* (BindlessUAVTexture, one slot per mip of the luminance texture) — reading mip N-1 as a UAV load and
-* writing mip N. A UAV barrier between dispatches (NotifyResourceState uavAccess) orders them.
+* u_mips is a bounded array (RWTexture2D u_mips[5] : register(u0)) — the capability this exercises:
+* the C# driver binds it via SetRWTextureMipArray(baseMip = inputMip), so u_mips[0] = the input mip and
+* u_mips[1..4] = the four output mips. A UAV barrier between dispatches orders pass i -> pass i+1.
 */
 
-RWTexture2D<float> u_mips[] : register(u0);   // one slot per mip level of the luminance texture
+RWTexture2D<float> u_mips[5] : register(u0);   // [0] = input mip, [1..4] = output mips (NUM_LODS = 4)
 
-cbuffer MipConstants : register(b0)
+cbuffer c_Mip : register(b0)
 {
-    uint g_srcMip;   // source mip index (read)
-    uint g_dstMip;   // destination mip index (write)
-    uint g_srcW;     // source mip width  (for edge clamping on non-square pyramids)
-    uint g_srcH;     // source mip height
-    uint g_dstW;     // destination mip width
-    uint g_dstH;     // destination mip height
-    uint _pad0;
-    uint _pad1;
+    uint g_numLODs;   // output mips to write this pass (1..4)
+    uint g_inW;       // input-mip width  (for edge clamping)
+    uint g_inH;       // input-mip height
+    uint g_pad;
 };
 
-[numthreads(8, 8, 1)]
-void main(uint3 tid : SV_DispatchThreadID)
+#define GROUP_SIZE 16
+groupshared float s_Reduction[GROUP_SIZE][GROUP_SIZE];
+
+[numthreads(GROUP_SIZE, GROUP_SIZE, 1)]
+void main(uint2 groupIdx : SV_GroupID, uint2 globalIdx : SV_DispatchThreadID, uint2 threadIdx : SV_GroupThreadID)
 {
-    if (tid.x >= g_dstW || tid.y >= g_dstH)
-        return;
+    uint2 maxc  = uint2(g_inW - 1, g_inH - 1);
+    float value = u_mips[0][min(globalIdx, maxc)];
 
-    uint2 s   = tid.xy * 2;
-    uint2 maxc = uint2(g_srcW - 1, g_srcH - 1);
+    [unroll]
+    for (uint level = 1; level <= 4; level++)
+    {
+        if (level == g_numLODs + 1)
+            break;
 
-    float a = u_mips[g_srcMip][min(s + uint2(0, 0), maxc)];
-    float b = u_mips[g_srcMip][min(s + uint2(1, 0), maxc)];
-    float c = u_mips[g_srcMip][min(s + uint2(0, 1), maxc)];
-    float d = u_mips[g_srcMip][min(s + uint2(1, 1), maxc)];
+        uint outGroupSize = (uint)GROUP_SIZE >> level;
+        uint inGroupSize  = outGroupSize << 1;
 
-    u_mips[g_dstMip][tid.xy] = (a + b + c + d) * 0.25;
+        if (all(threadIdx < inGroupSize))
+            s_Reduction[threadIdx.y][threadIdx.x] = value;
+
+        GroupMemoryBarrierWithGroupSync();
+
+        if (all(threadIdx < outGroupSize))
+        {
+            float a = s_Reduction[threadIdx.y * 2 + 0][threadIdx.x * 2 + 0];
+            float b = s_Reduction[threadIdx.y * 2 + 0][threadIdx.x * 2 + 1];
+            float c = s_Reduction[threadIdx.y * 2 + 1][threadIdx.x * 2 + 0];
+            float d = s_Reduction[threadIdx.y * 2 + 1][threadIdx.x * 2 + 1];
+            value = (a + b + c + d) * 0.25;                       // MODE_COLOR: 2x2 box average
+            u_mips[level][groupIdx * outGroupSize + threadIdx] = value;
+        }
+
+        GroupMemoryBarrierWithGroupSync();
+    }
 }

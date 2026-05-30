@@ -116,8 +116,9 @@ template<typename ShaderT>
 bool DescriptorSetBase<ShaderT>::AllocateTransientTables(
     uint32_t& outSrvBase, uint32_t& outUavBase) const
 {
-    const uint32_t numSRV = m_shader->GetNumSRV();
-    const uint32_t numUAV = m_shader->GetNumUAV();
+    // Slot totals (not binding counts): a bounded array occupies arrayCount contiguous slots.
+    const uint32_t numSRV = m_shader->GetNumSRVSlots();
+    const uint32_t numUAV = m_shader->GetNumUAVSlots();
     const uint32_t total  = numSRV + numUAV;
 
     if (total == 0)
@@ -188,6 +189,39 @@ void DescriptorSetBase<ShaderT>::WriteDescriptors(
             const BindingSlot& slot = (i < slotCount) ? slots[i] : BindingSlot{};
             D3D12_CPU_DESCRIPTOR_HANDLE h = m_allocator->GetCPUHandle(srvBase + b.heapOffset);
             ID3D12Resource* res = ResolveBoundResource(slot);
+
+            // Bounded SRV array (e.g. Texture2D t[N]): arrayCount single-mip Texture2D views
+            // starting at mip slot.stride (consecutive). Texture-only; cache is bypassed.
+            if (b.arrayCount > 1)
+            {
+                D3D12_RESOURCE_DESC rd = res ? res->GetDesc() : D3D12_RESOURCE_DESC{};
+                uint32_t maxMip = (res && rd.MipLevels > 0) ? rd.MipLevels - 1 : 0;
+                for (uint32_t k = 0; k < b.arrayCount; ++k)
+                {
+                    D3D12_CPU_DESCRIPTOR_HANDLE hk = m_allocator->GetCPUHandle(srvBase + b.heapOffset + k);
+                    D3D12_SHADER_RESOURCE_VIEW_DESC s = {};
+                    s.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+                    if (res)
+                    {
+                        s.ViewDimension             = D3D12_SRV_DIMENSION_TEXTURE2D;
+                        s.Format                    = rd.Format;
+                        s.Texture2D.MostDetailedMip = (slot.stride + k < maxMip) ? (slot.stride + k) : maxMip;
+                        s.Texture2D.MipLevels       = 1;
+                        m_device->CreateShaderResourceView(res, &s, hk);
+                    }
+                    else
+                    {
+                        s.ViewDimension      = D3D12_SRV_DIMENSION_BUFFER;
+                        s.Format             = DXGI_FORMAT_R32_TYPELESS;
+                        s.Buffer.Flags       = D3D12_BUFFER_SRV_FLAG_RAW;
+                        s.Buffer.NumElements = 1;
+                        m_device->CreateShaderResourceView(nullptr, &s, hk);
+                    }
+                }
+                m_viewCache[i].valid = false;
+                continue;
+            }
+
             if (res)
             {
                 CachedView& cv = m_viewCache[i];
@@ -244,9 +278,15 @@ void DescriptorSetBase<ShaderT>::WriteDescriptors(
                     }
                     else
                     {
-                        s.ViewDimension       = D3D12_SRV_DIMENSION_TEXTURE2D;
-                        s.Format              = rd.Format;
-                        s.Texture2D.MipLevels = rd.MipLevels;
+                        // Single Texture2D. slot.stride = most-detailed mip, slot.count = mip count
+                        // (0 = all remaining) — both 0 for the default whole-texture SetTexture, so
+                        // this is identical to before unless a per-mip SetTexture overload is used.
+                        s.ViewDimension             = D3D12_SRV_DIMENSION_TEXTURE2D;
+                        s.Format                    = rd.Format;
+                        s.Texture2D.MostDetailedMip = slot.stride;
+                        s.Texture2D.MipLevels       = (slot.count > 0)
+                            ? slot.count
+                            : (rd.MipLevels > slot.stride ? rd.MipLevels - slot.stride : 1);
                     }
                     cv.srv    = s;
                     cv.res    = reinterpret_cast<uint64_t>(res);
@@ -282,6 +322,37 @@ void DescriptorSetBase<ShaderT>::WriteDescriptors(
             const BindingSlot& slot = (i < slotCount) ? slots[i] : BindingSlot{};
             ID3D12Resource* res = ResolveBoundResource(slot);
             D3D12_CPU_DESCRIPTOR_HANDLE h = m_allocator->GetCPUHandle(uavBase + b.heapOffset);
+
+            // Bounded UAV array (e.g. RWTexture2D u[NUM_LODS]): arrayCount per-mip Texture2D UAVs
+            // starting at mip slot.stride (consecutive). Texture-only; cache is bypassed.
+            if (b.arrayCount > 1)
+            {
+                D3D12_RESOURCE_DESC rd = res ? res->GetDesc() : D3D12_RESOURCE_DESC{};
+                uint32_t maxMip = (res && rd.MipLevels > 0) ? rd.MipLevels - 1 : 0;
+                for (uint32_t k = 0; k < b.arrayCount; ++k)
+                {
+                    D3D12_CPU_DESCRIPTOR_HANDLE hk = m_allocator->GetCPUHandle(uavBase + b.heapOffset + k);
+                    D3D12_UNORDERED_ACCESS_VIEW_DESC u = {};
+                    if (res)
+                    {
+                        u.ViewDimension      = D3D12_UAV_DIMENSION_TEXTURE2D;
+                        u.Format             = rd.Format;
+                        u.Texture2D.MipSlice = (slot.stride + k < maxMip) ? (slot.stride + k) : maxMip;
+                        m_device->CreateUnorderedAccessView(res, nullptr, &u, hk);
+                    }
+                    else
+                    {
+                        u.ViewDimension      = D3D12_UAV_DIMENSION_BUFFER;
+                        u.Format             = DXGI_FORMAT_R32_TYPELESS;
+                        u.Buffer.Flags       = D3D12_BUFFER_UAV_FLAG_RAW;
+                        u.Buffer.NumElements = 1;
+                        m_device->CreateUnorderedAccessView(nullptr, nullptr, &u, hk);
+                    }
+                }
+                m_viewCache[i].valid = false;
+                continue;
+            }
+
             if (res)
             {
                 CachedView& cv = m_viewCache[i];
@@ -322,8 +393,10 @@ void DescriptorSetBase<ShaderT>::WriteDescriptors(
                     }
                     else
                     {
-                        u.ViewDimension = D3D12_UAV_DIMENSION_TEXTURE2D;
-                        u.Format        = rd.Format;
+                        // Single Texture2D UAV. slot.stride = mip slice (0 = mip 0, the default).
+                        u.ViewDimension      = D3D12_UAV_DIMENSION_TEXTURE2D;
+                        u.Format             = rd.Format;
+                        u.Texture2D.MipSlice = slot.stride;
                     }
                     cv.uav    = u;
                     cv.res    = reinterpret_cast<uint64_t>(res);

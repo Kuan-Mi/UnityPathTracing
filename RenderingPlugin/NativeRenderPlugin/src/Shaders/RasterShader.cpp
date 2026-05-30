@@ -54,6 +54,7 @@ bool RasterShader::LoadShaderFromBlobs(const uint8_t* vsDxil, uint32_t vsSize,
     m_bindingIndex.clear();
     m_samplerBindings.clear();
     m_numSRV = m_numUAV = m_numCBV = m_numSRVArray = m_numUAVArray = m_numRootConstants = m_numRootSRV = 0;
+    m_numSRVSlots = m_numUAVSlots = 0;
     m_rootParamSRV = m_rootParamUAV = m_rootParamCBVBase = m_rootParamRootSRVBase = kInvalidAlloc;
 
     // Reflect both stages into the shared binding table (deduped by name), then

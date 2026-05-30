@@ -351,6 +351,25 @@ namespace NativeRender
         /// <summary>Binds a Texture2D or RenderTexture as a read-only texture (SRV).</summary>
         public void SetTexture(string name, IntPtr texturePtr) => SetTexture(PropertyToID(name), texturePtr);
 
+        /// <summary>
+        /// Binds a single mip range of a texture as an SRV (MostDetailedMip = <paramref name="firstMip"/>,
+        /// MipLevels = <paramref name="mipCount"/>). For <c>Texture2D.Load(int3(x,y,mip))</c> across the
+        /// whole chain, pass firstMip=0, mipCount=0 (all). For a 1-mip view, mipCount=1.
+        /// </summary>
+        public void SetTexture(int nameId, IntPtr texturePtr, int firstMip, int mipCount)
+        {
+            int i = SlotFromId(nameId);
+            if (i < 0) return;
+            _stagingSlots[i].objectPtr  = (ulong)texturePtr;
+            _stagingSlots[i].objectKind = ObjKindNone;
+            _stagingSlots[i].count      = (uint)mipCount;   // texture SRV: MipLevels (0 = all remaining)
+            _stagingSlots[i].stride     = (uint)firstMip;   // texture SRV: MostDetailedMip
+            _stagingSlots[i].format     = 0;
+        }
+        /// <summary>Binds a single mip range of a texture as an SRV.</summary>
+        public void SetTexture(string name, IntPtr texturePtr, int firstMip, int mipCount)
+            => SetTexture(PropertyToID(name), texturePtr, firstMip, mipCount);
+
         /// <summary>Binds a RenderTexture as a read-write texture (UAV).</summary>
         public void SetRWTexture(int nameId, IntPtr texturePtr)
         {
@@ -363,6 +382,58 @@ namespace NativeRender
         }
         /// <summary>Binds a RenderTexture as a read-write texture (UAV).</summary>
         public void SetRWTexture(string name, IntPtr texturePtr) => SetRWTexture(PropertyToID(name), texturePtr);
+
+        /// <summary>Binds a single mip slice of a texture as a UAV (RWTexture2D at MipSlice = <paramref name="mipSlice"/>).</summary>
+        public void SetRWTexture(int nameId, IntPtr texturePtr, int mipSlice)
+        {
+            int i = SlotFromId(nameId);
+            if (i < 0) return;
+            _stagingSlots[i].objectPtr  = (ulong)texturePtr;
+            _stagingSlots[i].objectKind = ObjKindNone;
+            _stagingSlots[i].count      = 0;
+            _stagingSlots[i].stride     = (uint)mipSlice;   // texture UAV: MipSlice
+            _stagingSlots[i].format     = 0;
+        }
+        /// <summary>Binds a single mip slice of a texture as a UAV.</summary>
+        public void SetRWTexture(string name, IntPtr texturePtr, int mipSlice)
+            => SetRWTexture(PropertyToID(name), texturePtr, mipSlice);
+
+        /// <summary>
+        /// Binds a bounded UAV array (<c>RWTexture2D u[N] : register(uK)</c>) to N consecutive mip slices
+        /// of one texture, starting at <paramref name="baseMip"/>. N comes from the shader's reflected
+        /// array size; mips beyond the texture's last are clamped (and must not be written by the shader).
+        /// </summary>
+        public void SetRWTextureMipArray(int nameId, IntPtr texturePtr, int baseMip)
+        {
+            int i = SlotFromId(nameId);
+            if (i < 0) return;
+            _stagingSlots[i].objectPtr  = (ulong)texturePtr;
+            _stagingSlots[i].objectKind = ObjKindNone;
+            _stagingSlots[i].count      = 0;
+            _stagingSlots[i].stride     = (uint)baseMip;    // first mip of the array
+            _stagingSlots[i].format     = 0;
+        }
+        /// <summary>Binds a bounded UAV array to N consecutive mip slices of one texture.</summary>
+        public void SetRWTextureMipArray(string name, IntPtr texturePtr, int baseMip)
+            => SetRWTextureMipArray(PropertyToID(name), texturePtr, baseMip);
+
+        /// <summary>
+        /// Binds a bounded SRV array (<c>Texture2D t[N]</c>) to N consecutive single-mip views of one
+        /// texture, starting at <paramref name="baseMip"/>. N comes from the shader's reflected array size.
+        /// </summary>
+        public void SetTextureMipArray(int nameId, IntPtr texturePtr, int baseMip)
+        {
+            int i = SlotFromId(nameId);
+            if (i < 0) return;
+            _stagingSlots[i].objectPtr  = (ulong)texturePtr;
+            _stagingSlots[i].objectKind = ObjKindNone;
+            _stagingSlots[i].count      = 0;
+            _stagingSlots[i].stride     = (uint)baseMip;
+            _stagingSlots[i].format     = 0;
+        }
+        /// <summary>Binds a bounded SRV array to N consecutive single-mip views of one texture.</summary>
+        public void SetTextureMipArray(string name, IntPtr texturePtr, int baseMip)
+            => SetTextureMipArray(PropertyToID(name), texturePtr, baseMip);
 
         /// <summary>Binds a GraphicsBuffer as a constant buffer (CBV).</summary>
         public void SetConstantBuffer(int nameId, IntPtr bufferPtr)

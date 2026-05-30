@@ -100,6 +100,7 @@ bool RayTraceShader::LoadShaderFromBytes(const uint8_t* dxilBytes, uint32_t size
     m_hitGroups.clear();
     m_hitGroupIndex.clear();
     m_numSRV = m_numUAV = m_numCBV = m_numSRVArray = m_numUAVArray = m_numRootConstants = m_numRootSRV = 0;
+    m_numSRVSlots = m_numUAVSlots = 0;
     m_rootParamSRV = m_rootParamUAV = m_rootParamCBVBase = m_rootParamRootSRVBase = kInvalidAlloc;
 
     if (!ReflectBindings(shaderLib.Get()))  return false;
@@ -845,6 +846,7 @@ bool RayTraceShader::LoadShaderFromMultipleBlobs(const BlobDesc* blobs, uint32_t
     m_hitGroups.clear();
     m_hitGroupIndex.clear();
     m_numSRV = m_numUAV = m_numCBV = m_numSRVArray = m_numUAVArray = m_numRootConstants = m_numRootSRV = 0;
+    m_numSRVSlots = m_numUAVSlots = 0;
     m_rootParamSRV = m_rootParamUAV = m_rootParamCBVBase = m_rootParamRootSRVBase = kInvalidAlloc;
 
     ComPtr<IDxcUtils> utils;

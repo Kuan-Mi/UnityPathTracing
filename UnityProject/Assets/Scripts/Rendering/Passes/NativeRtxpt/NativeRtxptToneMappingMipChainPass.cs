@@ -46,17 +46,25 @@ namespace PathTracing
             public uint    enabled, _padding0, _padding1, _padding2;
         }
 
-        // MipConstants — root constants for LuminanceMip.computeshader (8 × u32).
+        // c_Mip — root constants for LuminanceMip.computeshader (donut algorithm, bounded-UAV-array form).
         [StructLayout(LayoutKind.Sequential)]
         private struct MipConstants
         {
-            public uint srcMip, dstMip, srcW, srcH, dstW, dstH, _p0, _p1;
+            public uint numLODs;    // output mips this pass (1..NUM_LODS)
+            public uint inW, inH;   // input-mip dimensions (edge clamping)
+            public uint padding;
         }
+
+        // donut MipMapGenPass constants (GROUP_SIZE / NUM_LODS / MAX_PASSES).
+        private const int kGroupSize = 16;
+        private const int kNumLods   = 4;
+        private const int kMaxPasses = 4;
 
         // ── Pipelines (built once) ──
         private readonly NativeRasterPipeline       _lumRaster;
         private readonly NativeRasterDescriptorSet  _lumDs;
         private readonly NativeComputePipeline       _mipCs;
+        private readonly NativeComputeDescriptorSet  _mipDs;     // donut runs ≤4 passes/frame (< ring depth)
         private readonly NativeComputePipeline       _captureCs;
         private readonly NativeComputeDescriptorSet  _captureDs;
         private readonly NativeRasterPipeline        _applyRaster;
@@ -70,12 +78,10 @@ namespace PathTracing
         private readonly IntPtr[] _applyColorRes = new IntPtr[1];
         private readonly uint[]   _applyColorFmt = { kRGBA16F };
         private readonly IntPtr[] _lumColorRes   = new IntPtr[1];
-        private readonly uint[]   _lumColorFmt   = { kR32F };
+        private readonly uint[]   _lumColorFmt   = { kR32F }; // single-channel log-luminance pyramid
 
         // ── Resolution-dependent ──
-        private NriTextureResource           _lumTex;
-        private BindlessUAVTexture           _mipUav;
-        private NativeComputeDescriptorSet[] _mipSets;
+        private NriTextureResource _lumTex;
         private int  _lumW, _lumH, _mipCount;
 
         private NativeRtxptPassContext _ctx;
@@ -92,6 +98,7 @@ namespace PathTracing
                                NativeRenderPlugin.RasterPipelineStateDesc.FullscreenOpaque(kR32F));
             _lumDs       = new NativeRasterDescriptorSet(_lumRaster);
             _mipCs       = new NativeComputePipeline(luminanceMipCs);
+            _mipDs       = new NativeComputeDescriptorSet(_mipCs);
             _captureCs   = new NativeComputePipeline(captureCs);
             _captureDs   = new NativeComputeDescriptorSet(_captureCs);
             _applyRaster = new NativeRasterPipeline(toneMapRasterShader,
@@ -106,21 +113,12 @@ namespace PathTracing
         public void Dispose()
         {
             _lumDs?.Dispose();        _lumRaster?.Dispose();
-            DisposeMipSets();
-            _mipUav?.Dispose();
-            _mipCs?.Dispose();
+            _mipDs?.Dispose();        _mipCs?.Dispose();
             _captureDs?.Dispose();    _captureCs?.Dispose();
             _applyDs?.Dispose();      _applyRaster?.Dispose();
             _avgLumBuffer?.Dispose();
             _applyCb?.Dispose();
             _lumTex?.Release();
-        }
-
-        private void DisposeMipSets()
-        {
-            if (_mipSets == null) return;
-            foreach (var s in _mipSets) s?.Dispose();
-            _mipSets = null;
         }
 
         public void Setup(NativeRtxptPassContext ctx, NriTextureResource source, NriTextureResource output)
@@ -146,22 +144,14 @@ namespace PathTracing
 
             _lumW = w; _lumH = h;
 
+            // Single-channel R32_FLOAT log-luminance pyramid. luminance_ps writes float4(logLum,0,0,1) →
+            // only .r is stored; the mip shader's RWTexture2D<float> and capture_cs's Texture2D<float>
+            // both bind it exactly (R32_FLOAT supports UAV typed load/store on all hardware).
             _lumTex ??= new NriTextureResource("Rtxpt_Luminance", GraphicsFormat.R32_SFloat,
                             new NriResourceState { accessBits = AccessBits.SHADER_RESOURCE_STORAGE,
                                                    layout = Layout.SHADER_RESOURCE_STORAGE, stageBits = 1 << 10 });
             _lumTex.Allocate(new int2(w, h), 1, useMipMap: true);
             _mipCount = _lumTex.rt.mipmapCount;
-
-            _mipUav?.Dispose();
-            _mipUav = new BindlessUAVTexture(_mipCount);
-            for (int k = 0; k < _mipCount; k++)
-                _mipUav.SetTexture(k, _lumTex.rt, mipSlice: k, dxgiFormat: kR32F);
-
-            DisposeMipSets();
-            int dstCount = Mathf.Max(0, _mipCount - 1);
-            _mipSets = new NativeComputeDescriptorSet[dstCount];
-            for (int i = 0; i < dstCount; i++)
-                _mipSets[i] = new NativeComputeDescriptorSet(_mipCs);
         }
 
         // Mirrors SetParameters / Update* and the CPU avgLuminance feed (exp2 of the read-back log2 value).
@@ -198,8 +188,7 @@ namespace PathTracing
             internal NativeRasterPipeline       LumRaster;
             internal NativeRasterDescriptorSet  LumDs;
             internal NativeComputePipeline       MipCs;
-            internal NativeComputeDescriptorSet[] MipSets;
-            internal BindlessUAVTexture          MipUav;
+            internal NativeComputeDescriptorSet  MipDs;
             internal NativeComputePipeline       CaptureCs;
             internal NativeComputeDescriptorSet  CaptureDs;
             internal NativeRasterPipeline        ApplyRaster;
@@ -220,7 +209,7 @@ namespace PathTracing
             using var builder = renderGraph.AddUnsafePass<PassData>("NativeRtxpt.ToneMapping", out var pd);
 
             pd.LumRaster = _lumRaster; pd.LumDs = _lumDs;
-            pd.MipCs = _mipCs; pd.MipSets = _mipSets; pd.MipUav = _mipUav;
+            pd.MipCs = _mipCs; pd.MipDs = _mipDs;
             pd.CaptureCs = _captureCs; pd.CaptureDs = _captureDs;
             pd.ApplyRaster = _applyRaster; pd.ApplyDs = _applyDs;
             pd.AvgLumBuffer = _avgLumBuffer; pd.ApplyCb = _applyCb;
@@ -242,7 +231,7 @@ namespace PathTracing
             var cmd = CommandBufferHelpers.GetNativeCommandBuffer(context.cmd);
             cmd.BeginSample(RenderPassMarkers.ToneMapping);
 
-            if (data.AutoExposure && data.LumTexPtr != IntPtr.Zero && data.MipUav != null && data.MipSets != null)
+            if (data.AutoExposure && data.LumTexPtr != IntPtr.Zero && data.MipDs != null)
             {
                 // 1. luminance → mip 0 (raster, verbatim luminance_ps).
                 var lds = data.LumDs;
@@ -256,23 +245,28 @@ namespace PathTracing
                 };
                 data.LumRaster.Draw(cmd, lds, in lumDraw);
 
-                // 2. mip reduction — one destination mip per dispatch.
-                for (int dst = 1; dst < data.MipCount; dst++)
+                // 2. mip reduction — donut MipMapGenPass algorithm: each pass reduces NUM_LODS mips from
+                //    input mip (i*NUM_LODS) via a 16x16 groupshared reduction. The bounded UAV array u_mips
+                //    spans [inputMip .. inputMip+4] (u_mips[0]=input, [1..4]=outputs) — all-UAV so the whole
+                //    pyramid stays in UNORDERED_ACCESS (Unity's per-resource tracker can't split mip states).
+                int nmip = data.MipCount;
+                var mds  = data.MipDs;
+                for (int i = 0; i < kMaxPasses; i++)
                 {
-                    int srcW = Mathf.Max(1, data.LumW >> (dst - 1));
-                    int srcH = Mathf.Max(1, data.LumH >> (dst - 1));
-                    int dstW = Mathf.Max(1, data.LumW >> dst);
-                    int dstH = Mathf.Max(1, data.LumH >> dst);
-
-                    var mds = data.MipSets[dst - 1];
-                    mds.SetBindlessRWTexture("u_mips", data.MipUav);
+                    int inputMip = i * kNumLods;
+                    if (inputMip >= nmip) break;
+                    int inW = Mathf.Max(1, data.LumW >> inputMip);
+                    int inH = Mathf.Max(1, data.LumH >> inputMip);
                     var mc = new MipConstants
                     {
-                        srcMip = (uint)(dst - 1), dstMip = (uint)dst,
-                        srcW = (uint)srcW, srcH = (uint)srcH, dstW = (uint)dstW, dstH = (uint)dstH,
+                        numLODs = (uint)Mathf.Min(nmip - inputMip - 1, kNumLods),
+                        inW = (uint)inW, inH = (uint)inH,
                     };
-                    mds.SetRootConstants("MipConstants", &mc, 8);
-                    data.MipCs.Dispatch(cmd, mds, ((uint)dstW + 7u) / 8u, ((uint)dstH + 7u) / 8u, 1);
+                    mds.SetRWTextureMipArray("u_mips", data.LumTexPtr, inputMip); // bounded UAV array: input + 4 outputs
+                    mds.SetRootConstants("c_Mip", &mc, 4);
+                    data.MipCs.Dispatch(cmd, mds,
+                        (uint)((inW + kGroupSize - 1) / kGroupSize),
+                        (uint)((inH + kGroupSize - 1) / kGroupSize), 1);
                 }
 
                 // 3. capture top mip → 1-float UAV buffer (verbatim capture_cs).

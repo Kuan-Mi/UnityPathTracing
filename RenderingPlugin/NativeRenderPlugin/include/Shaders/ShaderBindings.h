@@ -27,6 +27,9 @@ struct Binding
     uint32_t           heapOffset;      // offset within the shared SRV/UAV alloc range
     uint32_t           rootParam;       // root parameter index
     uint32_t           num32BitValues;  // ROOT_CONSTANTS only: total DWORD count from hint
+    uint32_t           arrayCount;      // SRV/UAV: descriptors this binding occupies (1 = single,
+                                        // N = bounded array e.g. RWTexture2D u[N]). Always 1 for
+                                        // CBV/TLAS/ROOT_*; unbounded arrays use SRV_ARRAY/UAV_ARRAY.
 };
 
 // ---------------------------------------------------------------------------

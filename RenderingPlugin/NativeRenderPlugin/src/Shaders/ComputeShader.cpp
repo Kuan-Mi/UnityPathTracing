@@ -48,6 +48,7 @@ bool ComputeShader::LoadShaderFromBytes(const uint8_t* dxilBytes, uint32_t size,
     m_bindingIndex.clear();
     m_samplerBindings.clear();
     m_numSRV = m_numUAV = m_numCBV = m_numSRVArray = m_numUAVArray = m_numRootConstants = m_numRootSRV = 0;
+    m_numSRVSlots = m_numUAVSlots = 0;
     m_rootParamSRV = m_rootParamUAV = m_rootParamCBVBase = m_rootParamRootSRVBase = kInvalidAlloc;
 
     if (!ReflectBindings(shaderBlob.Get())) return false;

@@ -78,6 +78,7 @@ bool ShaderBase::ClassifyBinding(const D3D12_SHADER_INPUT_BIND_DESC& bind,
     b.heapOffset     = 0;
     b.rootParam      = kInvalidAlloc;
     b.num32BitValues = 0;
+    b.arrayCount     = 1;
 
     switch (bind.Type)
     {
@@ -94,6 +95,7 @@ bool ShaderBase::ClassifyBinding(const D3D12_SHADER_INPUT_BIND_DESC& bind,
         {
             b.type = BindingType::TLAS;
             ++m_numSRV;
+            ++m_numSRVSlots;
         }
         break;
 
@@ -130,8 +132,12 @@ bool ShaderBase::ClassifyBinding(const D3D12_SHADER_INPUT_BIND_DESC& bind,
         }
         else
         {
-            b.type = BindingType::SRV;
+            // BindCount == 1 → single; BindCount > 1 → bounded array (e.g. Texture2D t[4]),
+            // which occupies BindCount contiguous descriptors in the SRV table.
+            b.type       = BindingType::SRV;
+            b.arrayCount = bind.BindCount;
             ++m_numSRV;
+            m_numSRVSlots += bind.BindCount;
         }
         break;
 
@@ -143,8 +149,11 @@ bool ShaderBase::ClassifyBinding(const D3D12_SHADER_INPUT_BIND_DESC& bind,
         }
         else
         {
-            b.type = BindingType::UAV;
+            // BindCount > 1 → bounded array (e.g. RWTexture2D u[NUM_LODS]).
+            b.type       = BindingType::UAV;
+            b.arrayCount = bind.BindCount;
             ++m_numUAV;
+            m_numUAVSlots += bind.BindCount;
         }
         break;
     }
@@ -164,10 +173,12 @@ void ShaderBase::AssignHeapOffsets()
     uint32_t srvOff = 0, uavOff = 0, cbvOff = 0;
     for (auto& b : m_bindings)
     {
+        // SRV/UAV bindings reserve arrayCount contiguous slots (1 for singles); the binding's
+        // heapOffset is the first, so a bounded array fills [heapOffset, heapOffset+arrayCount).
         if      (b.type == BindingType::SRV || b.type == BindingType::TLAS)
-            b.heapOffset = srvOff++;
+            { b.heapOffset = srvOff; srvOff += b.arrayCount; }
         else if (b.type == BindingType::UAV)
-            b.heapOffset = uavOff++;
+            { b.heapOffset = uavOff; uavOff += b.arrayCount; }
         else if (b.type == BindingType::CBV)
             b.heapOffset = cbvOff++;
     }
@@ -208,15 +219,15 @@ bool ShaderBase::BuildRootSignature()
         if (b.type != BindingType::SRV && b.type != BindingType::TLAS) continue;
         D3D12_DESCRIPTOR_RANGE1 r = {};
         r.RangeType                         = D3D12_DESCRIPTOR_RANGE_TYPE_SRV;
-        r.NumDescriptors                    = 1;
+        r.NumDescriptors                    = b.arrayCount; // 1 for singles, N for bounded arrays
         r.BaseShaderRegister                = b.registerIndex;
         r.RegisterSpace                     = b.space;
         r.Flags                             = D3D12_DESCRIPTOR_RANGE_FLAG_DESCRIPTORS_VOLATILE |
                                               D3D12_DESCRIPTOR_RANGE_FLAG_DATA_VOLATILE;
         r.OffsetInDescriptorsFromTableStart = b.heapOffset;
         allRanges.push_back(r);
-        AppendLogf("  SRV: '%s' t%u space%u heapOffset=%u",
-                   b.name.c_str(), b.registerIndex, b.space, b.heapOffset);
+        AppendLogf("  SRV: '%s' t%u space%u heapOffset=%u count=%u",
+                   b.name.c_str(), b.registerIndex, b.space, b.heapOffset, b.arrayCount);
     }
 
     // --- UAV descriptor ranges ---
@@ -226,15 +237,15 @@ bool ShaderBase::BuildRootSignature()
         if (b.type != BindingType::UAV) continue;
         D3D12_DESCRIPTOR_RANGE1 r = {};
         r.RangeType                         = D3D12_DESCRIPTOR_RANGE_TYPE_UAV;
-        r.NumDescriptors                    = 1;
+        r.NumDescriptors                    = b.arrayCount; // 1 for singles, N for bounded arrays
         r.BaseShaderRegister                = b.registerIndex;
         r.RegisterSpace                     = b.space;
         r.Flags                             = D3D12_DESCRIPTOR_RANGE_FLAG_DESCRIPTORS_VOLATILE |
                                               D3D12_DESCRIPTOR_RANGE_FLAG_DATA_VOLATILE;
         r.OffsetInDescriptorsFromTableStart = b.heapOffset;
         allRanges.push_back(r);
-        AppendLogf("  UAV: '%s' u%u space%u heapOffset=%u",
-                   b.name.c_str(), b.registerIndex, b.space, b.heapOffset);
+        AppendLogf("  UAV: '%s' u%u space%u heapOffset=%u count=%u",
+                   b.name.c_str(), b.registerIndex, b.space, b.heapOffset, b.arrayCount);
     }
 
     // --- SRV_ARRAY descriptor ranges (unbounded) ---
