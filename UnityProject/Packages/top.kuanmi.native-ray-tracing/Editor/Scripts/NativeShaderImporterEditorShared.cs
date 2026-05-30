@@ -17,6 +17,29 @@ namespace NativeRender
     // into each editor.
     // =======================================================================
 
+    /// <summary>
+    /// Writes a <see cref="SamplerHint"/>[] into the shader asset's serialized <c>_samplerHints</c>
+    /// property. Shared by all three shader importers so the field mapping lives in one place.
+    /// </summary>
+    internal static class SamplerHintSerialization
+    {
+        public static void Write(SerializedProperty prop, SamplerHint[] hints)
+        {
+            if (prop == null) return;
+            int count = hints?.Length ?? 0;
+            prop.arraySize = count;
+            for (int i = 0; i < count; i++)
+            {
+                var elem = prop.GetArrayElementAtIndex(i);
+                elem.FindPropertyRelative("Name").stringValue          = hints[i].Name ?? "";
+                elem.FindPropertyRelative("Filter").enumValueIndex     = (int)hints[i].Filter;
+                elem.FindPropertyRelative("Address").enumValueIndex    = (int)hints[i].Address;
+                elem.FindPropertyRelative("Mips").boolValue            = hints[i].Mips;
+                elem.FindPropertyRelative("MaxAnisotropy").intValue    = (int)hints[i].MaxAnisotropy;
+            }
+        }
+    }
+
     /// <summary>A single bound resource discovered by DXIL reflection.</summary>
     internal sealed class ShaderBindingEntry
     {
@@ -398,20 +421,24 @@ namespace NativeRender
                 return DrawRootConstantRow(importer, e);
             if (e.Type == "TLAS" || (e.Type == "SRV" && IsBufferLike(e)))
                 return DrawRootSrvRow(importer, e);
-            return false; // textures, UAVs, samplers → default read-only label
+            if (e.Type == "Sampler")
+                return DrawSamplerRow(importer, e);
+            return false; // textures, UAVs → default read-only label
         }
 
         /// <summary>Trailing cleanup block for hints whose binding is no longer in the reflection.</summary>
         public static void DrawStaleHints(ScriptedImporter importer, ShaderReflectionInfo info)
         {
             var reflected = new HashSet<string>();
-            foreach (var c in info.CBV)  reflected.Add(c.Name);
-            foreach (var s in info.SRV)  reflected.Add(s.Name);
-            foreach (var t in info.TLAS) reflected.Add(t.Name);
+            foreach (var c in info.CBV)     reflected.Add(c.Name);
+            foreach (var s in info.SRV)     reflected.Add(s.Name);
+            foreach (var t in info.TLAS)    reflected.Add(t.Name);
+            foreach (var s in info.Sampler) reflected.Add(s.Name);
 
             var so = new SerializedObject(importer);
             var rc = so.FindProperty("rootConstantsHints");
             var sv = so.FindProperty("rootSRVHints");
+            var sh = so.FindProperty("samplerHints");
 
             var staleConstants = new List<string>();
             if (rc != null)
@@ -429,7 +456,15 @@ namespace NativeRender
                     if (!reflected.Contains(n)) staleSrv.Add(n);
                 }
 
-            if (staleConstants.Count == 0 && staleSrv.Count == 0) return;
+            var staleSamplers = new List<string>();
+            if (sh != null)
+                for (int i = 0; i < sh.arraySize; i++)
+                {
+                    string n = sh.GetArrayElementAtIndex(i).FindPropertyRelative("Name").stringValue;
+                    if (!reflected.Contains(n)) staleSamplers.Add(n);
+                }
+
+            if (staleConstants.Count == 0 && staleSrv.Count == 0 && staleSamplers.Count == 0) return;
 
             EditorGUILayout.Space(4);
             EditorGUILayout.LabelField("Stale hints (binding not in current reflection)", EditorStyles.miniBoldLabel);
@@ -440,6 +475,9 @@ namespace NativeRender
             foreach (var name in staleSrv)
                 if (!EditorGUILayout.ToggleLeft($"{name}    (root SRV)", true))
                     RemoveHint(importer, "rootSRVHints", name, isStruct: false);
+            foreach (var name in staleSamplers)
+                if (!EditorGUILayout.ToggleLeft($"{name}    (sampler override)", true))
+                    RemoveHint(importer, "samplerHints", name, isStruct: true);
             EditorGUI.indentLevel--;
         }
 
@@ -544,6 +582,81 @@ namespace NativeRender
                 }
                 so.ApplyModifiedProperties();
                 ShaderImporterGUI.ScheduleReimport(importer);
+            }
+            return true;
+        }
+
+        // Inline sampler-override row: a toggle on the reflected sampler binding plus, when on,
+        // dropdowns for filter / address / mips / anisotropy. The name comes from reflection, so
+        // there is nothing to type. When off, the native plugin infers attributes from the name.
+        private static bool DrawSamplerRow(ScriptedImporter importer, ShaderBindingEntry e)
+        {
+            var so   = new SerializedObject(importer);
+            var prop = so.FindProperty("samplerHints");
+            if (prop == null) return false;
+
+            int  idx  = FindHintIndex(prop, e.Name);
+            bool isOn = idx >= 0;
+
+            var label = new GUIContent(
+                $"{e.Name}    SamplerState  space{e.Space}:s{e.Reg}",
+                "Override the static-sampler attributes. When off, they are inferred from the sampler name "
+                + "(e.g. sampler_LinearClamp).");
+
+            bool newOn = EditorGUILayout.ToggleLeft(label, isOn);
+            if (newOn != isOn)
+            {
+                if (newOn)
+                {
+                    idx = prop.arraySize;
+                    prop.InsertArrayElementAtIndex(idx);
+                    var el = prop.GetArrayElementAtIndex(idx);
+                    el.FindPropertyRelative("Name").stringValue        = e.Name;
+                    el.FindPropertyRelative("Filter").enumValueIndex   = (int)SamplerFilter.Linear;
+                    el.FindPropertyRelative("Address").enumValueIndex  = (int)SamplerAddress.Clamp;
+                    el.FindPropertyRelative("Mips").boolValue          = false;
+                    el.FindPropertyRelative("MaxAnisotropy").intValue  = 16;
+                }
+                else
+                {
+                    prop.DeleteArrayElementAtIndex(idx);
+                }
+                so.ApplyModifiedProperties();
+                ShaderImporterGUI.ScheduleReimport(importer);
+                return true;
+            }
+
+            if (newOn)
+            {
+                var el          = prop.GetArrayElementAtIndex(idx);
+                var filterProp  = el.FindPropertyRelative("Filter");
+                var addressProp = el.FindPropertyRelative("Address");
+                var mipsProp    = el.FindPropertyRelative("Mips");
+                var anisoProp   = el.FindPropertyRelative("MaxAnisotropy");
+
+                EditorGUI.indentLevel++;
+                EditorGUI.BeginChangeCheck();
+                EditorGUILayout.PropertyField(filterProp,  new GUIContent("Filter"));
+                EditorGUILayout.PropertyField(addressProp, new GUIContent("Address"));
+                EditorGUILayout.PropertyField(mipsProp,    new GUIContent("Sample Mips"));
+                bool changed = EditorGUI.EndChangeCheck();
+
+                if (filterProp.enumValueIndex == (int)SamplerFilter.Anisotropic)
+                {
+                    int newAniso = EditorGUILayout.DelayedIntField("Max Anisotropy", anisoProp.intValue);
+                    if (newAniso != anisoProp.intValue)
+                    {
+                        anisoProp.intValue = Mathf.Clamp(newAniso, 1, 16);
+                        changed = true;
+                    }
+                }
+                EditorGUI.indentLevel--;
+
+                if (changed)
+                {
+                    so.ApplyModifiedProperties();
+                    ShaderImporterGUI.ScheduleReimport(importer);
+                }
             }
             return true;
         }

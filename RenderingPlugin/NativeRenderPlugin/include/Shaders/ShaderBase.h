@@ -41,6 +41,15 @@ public:
     void SetRootConstantsHint(const char* name, uint32_t num32BitValues);
     void SetRootSRVHint(const char* name);
 
+    // Overrides the static-sampler attributes for the sampler whose HLSL variable
+    // name matches `name`, replacing the name-inference fallback in BuildRootSignature.
+    //   filter : 0 = point, 1 = linear, 2 = anisotropic
+    //   address: 0 = wrap,  1 = clamp,  2 = mirror, 3 = mirror-once, 4 = border
+    //   mips   : sample mips (MaxLOD 16) when true, else MaxLOD 0
+    //   maxAnisotropy: used only when filter == anisotropic
+    void SetSamplerHint(const char* name, uint32_t filter, uint32_t address,
+                        bool mips, uint32_t maxAnisotropy);
+
     // --- Binding metadata queries ---
     uint32_t    GetBindingCount() const;
     uint32_t    GetSlotIndex   (const char* name) const;
@@ -116,7 +125,17 @@ protected:
     uint32_t m_numRootConstants = 0;
     uint32_t m_numRootSRV       = 0;
 
+    // Editor-authored static-sampler override (see SetSamplerHint).
+    struct SamplerHint
+    {
+        uint32_t filter        = 1;   // 0 point, 1 linear, 2 aniso
+        uint32_t address       = 0;   // 0 wrap, 1 clamp, 2 mirror, 3 mirror-once, 4 border
+        bool     mips          = false;
+        uint32_t maxAnisotropy = 16;
+    };
+
     // Pre-load hints
-    std::unordered_map<std::string, uint32_t> m_rootConstantsHints;
-    std::unordered_set<std::string>           m_rootSRVHints;
+    std::unordered_map<std::string, uint32_t>    m_rootConstantsHints;
+    std::unordered_set<std::string>              m_rootSRVHints;
+    std::unordered_map<std::string, SamplerHint> m_samplerHints;
 };

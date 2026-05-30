@@ -30,6 +30,7 @@ namespace NativeRender
 
         [SerializeField, HideInInspector] private RootConstantsHint[] _rootConstantsHints = Array.Empty<RootConstantsHint>();
         [SerializeField, HideInInspector] private string[]            _rootSRVHints       = Array.Empty<string>();
+        [SerializeField, HideInInspector] private SamplerHint[]       _samplerHints       = Array.Empty<SamplerHint>();
 
         [SerializeField, HideInInspector] private byte[] _vsDxil;
         [SerializeField, HideInInspector] private byte[] _psDxil;
@@ -41,6 +42,7 @@ namespace NativeRender
 
         internal RootConstantsHint[] RootConstantsHints => _rootConstantsHints ?? Array.Empty<RootConstantsHint>();
         internal string[]            RootSRVHints       => _rootSRVHints       ?? Array.Empty<string>();
+        internal SamplerHint[]       SamplerHints       => _samplerHints       ?? Array.Empty<SamplerHint>();
 
         public static event Action<NativeRasterShader> OnRecompiled;
         public static void InvokeOnRecompiled(NativeRasterShader shader) => OnRecompiled?.Invoke(shader);

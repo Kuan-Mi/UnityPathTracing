@@ -1613,6 +1613,64 @@ static void ApplyRootSRVHints(ShaderBase* shader, const char* hintsJson)
     }
 }
 
+// Parses "samplers":[{"name":"...","filter":N,"address":N,"mips":N,"aniso":N}] from
+// the hints JSON. Each entry overrides the static-sampler attributes for the matching
+// HLSL sampler variable (see ShaderBase::SetSamplerHint). Missing numeric fields default
+// to 0, except aniso which defaults to 16.
+static void ApplySamplerHints(ShaderBase* shader, const char* hintsJson)
+{
+    if (!hintsJson || hintsJson[0] == '\0') return;
+    const char* tag = strstr(hintsJson, "\"samplers\"");
+    if (!tag) return;
+    const char* arrStart = strchr(tag + 10, '[');
+    if (!arrStart) return;
+    const char* arrEnd = strchr(arrStart, ']');
+    if (!arrEnd) return;
+
+    // Reads an integer field within [objBegin, objEnd); returns fallback if absent.
+    auto ReadInt = [](const char* objBegin, const char* objEnd,
+                      const char* key, int fallback) -> int {
+        const char* k = strstr(objBegin, key);
+        if (!k || k >= objEnd) return fallback;
+        const char* colon = strchr(k, ':');
+        if (!colon || colon >= objEnd) return fallback;
+        return atoi(colon + 1);
+    };
+
+    const char* p = arrStart + 1;
+    while (p < arrEnd)
+    {
+        const char* objStart = strchr(p, '{');
+        if (!objStart || objStart >= arrEnd) break;
+        const char* objEnd = strchr(objStart, '}');
+        if (!objEnd) break;
+
+        // name
+        const char* nameTag = strstr(objStart, "\"name\"");
+        std::string name;
+        if (nameTag && nameTag < objEnd)
+        {
+            const char* q1 = strchr(nameTag + 6, '"');
+            const char* q2 = q1 ? strchr(q1 + 1, '"') : nullptr;
+            if (q1 && q2 && q2 < objEnd) name.assign(q1 + 1, q2);
+        }
+
+        if (!name.empty())
+        {
+            int filter  = ReadInt(objStart, objEnd, "\"filter\"",  1);
+            int address = ReadInt(objStart, objEnd, "\"address\"", 0);
+            int mips    = ReadInt(objStart, objEnd, "\"mips\"",    0);
+            int aniso   = ReadInt(objStart, objEnd, "\"aniso\"",   16);
+            shader->SetSamplerHint(name.c_str(),
+                                   static_cast<uint32_t>(filter),
+                                   static_cast<uint32_t>(address),
+                                   mips != 0,
+                                   static_cast<uint32_t>(aniso));
+        }
+        p = objEnd + 1;
+    }
+}
+
 extern "C" uint64_t UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API
 NR_CreateRayTraceShaderFromBytesEx(
     const uint8_t* dxilBytes,
@@ -1644,6 +1702,7 @@ NR_CreateRayTraceShaderFromBytesEx(
     }
     ApplyRootConstantsHints(shader, hintsJson);
     ApplyRootSRVHints(shader, hintsJson);
+    ApplySamplerHints(shader, hintsJson);
     if (!shader->LoadShaderFromBytes(dxilBytes, size, name, flags, maxPayloadSizeInBytes, rayGenName))
     {
         delete shader;
@@ -1697,6 +1756,7 @@ NR_CreateRayTracePipelineFromBlobsEx(
     }
     ApplyRootConstantsHints(shader, hintsJson);
     ApplyRootSRVHints(shader, hintsJson);
+    ApplySamplerHints(shader, hintsJson);
     if (!shader->LoadShaderFromMultipleBlobs(descs.data(), blobCount, name, flags,
                                              maxPayloadSizeInBytes, rayGenName))
     {
@@ -1737,6 +1797,7 @@ NR_CreateComputeShaderEx(const uint8_t* dxilBytes, uint32_t size, const char* na
     }
     ApplyRootConstantsHints(cs, hintsJson);
     ApplyRootSRVHints(cs, hintsJson);
+    ApplySamplerHints(cs, hintsJson);
     if (!cs->LoadShaderFromBytes(dxilBytes, size, name))
     {
         delete cs;
@@ -1914,6 +1975,7 @@ static uint64_t CreateRasterShaderImpl(
     }
     ApplyRootConstantsHints(rs, hintsJson);
     ApplyRootSRVHints(rs, hintsJson);
+    ApplySamplerHints(rs, hintsJson);
     if (!rs->LoadShaderFromBlobs(vsDxil, vsSize, psDxil, psSize, *state, name))
     {
         delete rs;

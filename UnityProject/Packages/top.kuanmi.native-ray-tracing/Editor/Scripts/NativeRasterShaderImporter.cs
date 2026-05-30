@@ -46,6 +46,11 @@ namespace NativeRender
         [Tooltip("Promote these buffer SRV / TLAS bindings to inline root descriptors. Each string must match the HLSL variable name exactly.")]
         public string[] rootSRVHints = Array.Empty<string>();
 
+        [Tooltip("Override static-sampler attributes per sampler instead of inferring them from the " +
+                 "sampler name. \"Name\" must match the HLSL sampler variable exactly. Samplers not " +
+                 "listed here fall back to the name-inference convention (sampler_LinearClamp, …).")]
+        public SamplerHint[] samplerHints = Array.Empty<SamplerHint>();
+
         public override void OnImportAsset(AssetImportContext ctx)
         {
             var asset = ScriptableObject.CreateInstance<NativeRasterShader>();
@@ -89,6 +94,7 @@ namespace NativeRender
                 elem.FindPropertyRelative("Count").intValue   = (int)rootConstantsHints[i].Count;
             }
             WriteStringArray(so, "_rootSRVHints", rootSRVHints ?? Array.Empty<string>());
+            SamplerHintSerialization.Write(so.FindProperty("_samplerHints"), samplerHints);
 
             so.ApplyModifiedPropertiesWithoutUndo();
 

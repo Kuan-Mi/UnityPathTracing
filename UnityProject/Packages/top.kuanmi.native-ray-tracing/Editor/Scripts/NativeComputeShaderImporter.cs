@@ -42,6 +42,11 @@ namespace NativeRender
                  "Each string must match the HLSL variable name exactly.")]
         public string[] rootSRVHints = Array.Empty<string>();
 
+        [Tooltip("Override static-sampler attributes per sampler instead of inferring them from the " +
+                 "sampler name. \"Name\" must match the HLSL sampler variable exactly. Samplers not " +
+                 "listed here fall back to the name-inference convention (sampler_LinearClamp, …).")]
+        public SamplerHint[] samplerHints = Array.Empty<SamplerHint>();
+
         public override void OnImportAsset(AssetImportContext ctx)
         {
             var asset = ScriptableObject.CreateInstance<NativeComputeShader>();
@@ -120,6 +125,8 @@ namespace NativeRender
             srvHintsProp.arraySize = rootSRVHints?.Length ?? 0;
             for (int i = 0; i < (rootSRVHints?.Length ?? 0); i++)
                 srvHintsProp.GetArrayElementAtIndex(i).stringValue = rootSRVHints[i] ?? "";
+
+            SamplerHintSerialization.Write(so.FindProperty("_samplerHints"), samplerHints);
 
             so.ApplyModifiedPropertiesWithoutUndo();
 

@@ -18,6 +18,56 @@ namespace NativeRender
         public uint   Count;
     }
 
+    /// <summary>Texture filtering mode for a <see cref="SamplerHint"/>. Order matches the native parser.</summary>
+    public enum SamplerFilter { Point = 0, Linear = 1, Anisotropic = 2 }
+
+    /// <summary>Texture address (wrap) mode for a <see cref="SamplerHint"/>. Order matches the native parser.</summary>
+    public enum SamplerAddress { Wrap = 0, Clamp = 1, Mirror = 2, MirrorOnce = 3, Border = 4 }
+
+    /// <summary>
+    /// Overrides the static-sampler attributes for one HLSL sampler, replacing the
+    /// name-inference convention (sampler_LinearClamp, …) used by the native plugin.
+    /// Authored on the shader importer and serialized into the pipeline hints JSON.
+    /// </summary>
+    [Serializable]
+    public struct SamplerHint
+    {
+        /// <summary>HLSL sampler variable name to match exactly.</summary>
+        public string         Name;
+        public SamplerFilter  Filter;
+        public SamplerAddress Address;
+        /// <summary>Sample mip levels (MaxLOD 16) when true; clamp to mip 0 otherwise.</summary>
+        public bool           Mips;
+        /// <summary>Max anisotropy; used only when <see cref="Filter"/> is Anisotropic.</summary>
+        public uint           MaxAnisotropy;
+    }
+
+    /// <summary>
+    /// Shared JSON serialization for <see cref="SamplerHint"/> arrays, used by every pipeline's
+    /// BuildHintsJson so the wire format stays in sync with the native parser (ApplySamplerHints).
+    /// </summary>
+    internal static class SamplerHintJson
+    {
+        public static bool Has(SamplerHint[] hints) => hints != null && hints.Length > 0;
+
+        public static void Append(System.Text.StringBuilder sb, SamplerHint[] hints)
+        {
+            sb.Append("\"samplers\":[");
+            for (int i = 0; i < hints.Length; i++)
+            {
+                if (i > 0) sb.Append(',');
+                var h = hints[i];
+                sb.Append("{\"name\":\"").Append(h.Name)
+                  .Append("\",\"filter\":").Append((int)h.Filter)
+                  .Append(",\"address\":").Append((int)h.Address)
+                  .Append(",\"mips\":").Append(h.Mips ? 1 : 0)
+                  .Append(",\"aniso\":").Append(h.MaxAnisotropy)
+                  .Append('}');
+            }
+            sb.Append(']');
+        }
+    }
+
     /// <summary>
     /// Manages the D3D12 compute pipeline state (PSO + root signature + slot layout)
     /// created from a <see cref="NativeComputeShader"/> asset.
@@ -35,6 +85,7 @@ namespace NativeRender
         private NativeComputeShader _shader;
         private RootConstantsHint[] _rootConstantsHints; // may be null
         private string[]            _rootSRVHints;       // may be null
+        private SamplerHint[]       _samplerHints;       // from shader asset; may be null
 
         // Slot layout: name → slot index as reported by NR_CS_GetSlotIndex
         private Dictionary<string, uint> _nameToSlot;
@@ -92,6 +143,7 @@ namespace NativeRender
             _shader             = shader;
             _rootConstantsHints = rootConstantsHints;
             _rootSRVHints       = rootSRVHints;
+            _samplerHints       = shader.SamplerHints;
             BuildNativeHandle(shader);
             BuildSlotLayout(shader);
             NativeComputeShader.OnRecompiled += OnShaderRecompiled;
@@ -104,7 +156,7 @@ namespace NativeRender
                 throw new InvalidOperationException(
                     $"[NativeComputePipeline] Shader compilation failed for: {shader.GetHlslPath()}");
 
-            string hintsJson = BuildHintsJson(_rootConstantsHints, _rootSRVHints);
+            string hintsJson = BuildHintsJson(_rootConstantsHints, _rootSRVHints, _samplerHints);
             if (hintsJson != null)
                 _handle = NativeRenderPlugin.NR_CreateComputeShaderEx(dxil, (uint)dxil.Length, shader.name, hintsJson);
             else
@@ -115,14 +167,17 @@ namespace NativeRender
                     $"[NativeComputePipeline] NR_CreateComputeShader(Ex) returned 0 for: {shader.name}");
         }
 
-        private static string BuildHintsJson(RootConstantsHint[] rcHints, string[] srvHints)
+        private static string BuildHintsJson(RootConstantsHint[] rcHints, string[] srvHints,
+                                             SamplerHint[] samplerHints)
         {
-            bool hasRC  = rcHints  != null && rcHints.Length  > 0;
-            bool hasSRV = srvHints != null && srvHints.Length > 0;
-            if (!hasRC && !hasSRV) return null;
+            bool hasRC   = rcHints  != null && rcHints.Length  > 0;
+            bool hasSRV  = srvHints != null && srvHints.Length > 0;
+            bool hasSamp = SamplerHintJson.Has(samplerHints);
+            if (!hasRC && !hasSRV && !hasSamp) return null;
 
             var sb = new System.Text.StringBuilder();
             sb.Append('{');
+            bool any = false;
 
             if (hasRC)
             {
@@ -138,11 +193,12 @@ namespace NativeRender
                     sb.Append('}');
                 }
                 sb.Append(']');
+                any = true;
             }
 
             if (hasSRV)
             {
-                if (hasRC) sb.Append(',');
+                if (any) sb.Append(',');
                 sb.Append("\"rootSRV\":");
                 sb.Append('[');
                 for (int i = 0; i < srvHints.Length; i++)
@@ -153,6 +209,13 @@ namespace NativeRender
                     sb.Append('"');
                 }
                 sb.Append(']');
+                any = true;
+            }
+
+            if (hasSamp)
+            {
+                if (any) sb.Append(',');
+                SamplerHintJson.Append(sb, samplerHints);
             }
 
             sb.Append('}');

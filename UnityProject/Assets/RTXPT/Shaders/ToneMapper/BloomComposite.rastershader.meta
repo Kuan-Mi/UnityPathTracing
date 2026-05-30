@@ -4,9 +4,9 @@ ScriptedImporter:
   internalIDToNameTable: []
   externalObjects: {}
   serializedVersion: 2
-  userData:
-  assetBundleName:
-  assetBundleVariant:
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
   script: {fileID: 11500000, guid: 027188e0fad048b1a20a4377aff4684c, type: 3}
   additionalIncludePaths:
   - ../RenderingPlugin/External/donut/shaders
@@ -21,3 +21,9 @@ ScriptedImporter:
   psTargetProfile: ps_6_6
   rootConstantsHints: []
   rootSRVHints: []
+  samplerHints:
+  - Name: samp
+    Filter: 1
+    Address: 1
+    Mips: 0
+    MaxAnisotropy: 16

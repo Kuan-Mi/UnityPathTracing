@@ -82,8 +82,6 @@ MonoBehaviour:
     environmentMapTint: {r: 1, g: 1, b: 1, a: 1}
     environmentMap: {fileID: 0}
     enableToneMapping: 1
-    useRasterToneMapping: 1
-    useMipChainAutoExposure: 1
     toneMapOperator: 5
     autoExposure: 1
     exposureCompensation: 2
@@ -124,15 +122,13 @@ MonoBehaviour:
   exportVisibilityBufferCs: {fileID: -2368575503658470205, guid: 1ff1244216fcd31478566758afd6b1ff, type: 3}
   denoiseSpecHitTCs: {fileID: -2368575503658470205, guid: abb4162c8ba2cd041955d93cefb0143e, type: 3}
   dlssBeforeCs: {fileID: -2368575503658470205, guid: a1b2c3d4e5f6a1b2c3d4e5f6a1b2c306, type: 3}
-  bloomDownsampleCs: {fileID: -2368575503658470205, guid: d4e5f60718293a4b5c6d7e8f90123456, type: 3}
-  bloomBlurCs: {fileID: -2368575503658470205, guid: e5f60718293a4b5c6d7e8f9012345678, type: 3}
-  bloomCompositeCs: {fileID: -2368575503658470205, guid: f60718293a4b5c6d7e8f901234567890, type: 3}
-  toneMapReduceCs: {fileID: -2368575503658470205, guid: c3d4e5f60718293a4b5c6d7e8f901234, type: 3}
-  toneMapApplyCs: {fileID: -2368575503658470205, guid: b2c3d4e5f60718293a4b5c6d7e8f9012, type: 3}
-  toneMapApplyRasterShader: {fileID: 6164937308047190184, guid: dee04467b72143fc9d0f9deae4154fb9, type: 3}
+  bloomDownsampleRasterShader: {fileID: 6164937308047190184, guid: 8a4d2b0c3e5f4a6b9d7c1e2f3a4b5c6d, type: 3}
+  bloomBlurRasterShader: {fileID: 6164937308047190184, guid: 7f3c1a9b2d4e4f5a8c6b0d1e2f3a4b5c, type: 3}
+  bloomCompositeRasterShader: {fileID: 6164937308047190184, guid: 9b5e3c1d4f60516cae8d2f3a4b5c6d7e, type: 3}
   luminanceRasterShader: {fileID: 6164937308047190184, guid: 736da13794b44aa8aa9ad182c3d4ae2b, type: 3}
   luminanceMipCs: {fileID: -2368575503658470205, guid: 36cc916041f9467ba1313d8ff8f5bf0c, type: 3}
   captureLuminanceCs: {fileID: -2368575503658470205, guid: 935928f7dbb94801bf0f9a2a4b9a10d9, type: 3}
+  toneMapApplyRasterShader: {fileID: 6164937308047190184, guid: dee04467b72143fc9d0f9deae4154fb9, type: 3}
   accumulationCs: {fileID: -2368575503658470205, guid: 96ba0c67e691b484781846c8b20f6061, type: 3}
   stablePlanesDebugVizCs: {fileID: -2368575503658470205, guid: a1b2c3d4e5f6a1b2c3d4e5f6a1b2c301, type: 3}
   baseLayerCs: {fileID: -2368575503658470205, guid: 106bca701da24f7a9ed113d910f8393d, type: 3}

@@ -24,6 +24,7 @@ namespace NativeRender
         private HitGroupShader[] _hitGroupShaders; // null when not using multi-blob path
         private RootConstantsHint[] _rootConstantsHints;
         private string[]            _rootSRVHints;
+        private SamplerHint[]       _samplerHints;
 
         /// <summary>True if the underlying D3D12 pipeline is valid and ready to dispatch.</summary>
         public bool IsValid => _handle != 0;
@@ -80,6 +81,7 @@ namespace NativeRender
             _shader             = shader;
             _rootConstantsHints = rootConstantsHints;
             _rootSRVHints       = rootSRVHints;
+            _samplerHints       = shader.SamplerHints;
             BuildNativeHandle(shader);
             RayTraceShader.OnRecompiled += OnShaderRecompiled;
         }
@@ -116,6 +118,7 @@ namespace NativeRender
             _hitGroupShaders    = hitGroupShaders;
             _rootConstantsHints = rootConstantsHints;
             _rootSRVHints       = rootSRVHints;
+            _samplerHints       = primaryShader.SamplerHints;
 
             BuildNativeHandleMultiBlob(primaryShader, hitGroupShaders);
             RayTraceShader.OnRecompiled  += OnShaderRecompiled;
@@ -133,7 +136,7 @@ namespace NativeRender
             uint maxPayload = shader.MaxPayloadSizeInBytes;
             Debug.Log($"[RayTracePipeline] Creating pipeline for: {shader.name} (DXIL size: {dxil.Length} bytes, OMM support: {flags != 0}, MaxPayload: {maxPayload})");
             string rayGenName = string.IsNullOrEmpty(shader.RayGenName) ? null : shader.RayGenName;
-            string hintsJson = BuildHintsJson(_rootConstantsHints, _rootSRVHints);
+            string hintsJson = BuildHintsJson(_rootConstantsHints, _rootSRVHints, _samplerHints);
             _handle = hintsJson != null
                 ? NativeRenderPlugin.NR_CreateRayTraceShaderFromBytesEx(dxil, (uint)dxil.Length, shader.name, flags, maxPayload, rayGenName, hintsJson)
                 : NativeRenderPlugin.NR_CreateRayTraceShaderFromBytes(dxil, (uint)dxil.Length, shader.name, flags, maxPayload, rayGenName);
@@ -181,7 +184,7 @@ namespace NativeRender
                 string rayGenName = string.IsNullOrEmpty(primaryShader.RayGenName) ? null : primaryShader.RayGenName;
 
                 Debug.Log($"[RayTracePipeline] Creating multi-blob pipeline for '{primaryShader.name}' ({totalBlobs} blobs)");
-                string hintsJson = BuildHintsJson(_rootConstantsHints, _rootSRVHints);
+                string hintsJson = BuildHintsJson(_rootConstantsHints, _rootSRVHints, _samplerHints);
                 _handle = hintsJson != null
                     ? NativeRenderPlugin.NR_CreateRayTracePipelineFromBlobsEx(
                         ptrs, sizes, (uint)totalBlobs,
@@ -220,14 +223,17 @@ namespace NativeRender
             return major > 6 || (major == 6 && minor >= 9);
         }
 
-        private static string BuildHintsJson(RootConstantsHint[] rcHints, string[] srvHints)
+        private static string BuildHintsJson(RootConstantsHint[] rcHints, string[] srvHints,
+                                             SamplerHint[] samplerHints)
         {
-            bool hasRC  = rcHints  != null && rcHints.Length  > 0;
-            bool hasSRV = srvHints != null && srvHints.Length > 0;
-            if (!hasRC && !hasSRV) return null;
+            bool hasRC   = rcHints  != null && rcHints.Length  > 0;
+            bool hasSRV  = srvHints != null && srvHints.Length > 0;
+            bool hasSamp = SamplerHintJson.Has(samplerHints);
+            if (!hasRC && !hasSRV && !hasSamp) return null;
 
             var sb = new System.Text.StringBuilder();
             sb.Append('{');
+            bool any = false;
 
             if (hasRC)
             {
@@ -242,11 +248,12 @@ namespace NativeRender
                     sb.Append('}');
                 }
                 sb.Append(']');
+                any = true;
             }
 
             if (hasSRV)
             {
-                if (hasRC) sb.Append(',');
+                if (any) sb.Append(',');
                 sb.Append("\"rootSRV\":[");
                 for (int i = 0; i < srvHints.Length; i++)
                 {
@@ -256,6 +263,13 @@ namespace NativeRender
                     sb.Append('"');
                 }
                 sb.Append(']');
+                any = true;
+            }
+
+            if (hasSamp)
+            {
+                if (any) sb.Append(',');
+                SamplerHintJson.Append(sb, samplerHints);
             }
 
             sb.Append('}');

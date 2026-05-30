@@ -43,6 +43,10 @@ namespace NativeRender
         [SerializeField, HideInInspector]
         private string[] _rootSRVHints = Array.Empty<string>();
 
+        /// <summary>Static-sampler overrides. Written by the ScriptedImporter. Consumed by NativeComputePipeline.</summary>
+        [SerializeField, HideInInspector]
+        private SamplerHint[] _samplerHints = Array.Empty<SamplerHint>();
+
         /// <summary>Pre-compiled DXIL bytecode. Populated by EnsureCompiled(); persisted by Unity serialization.</summary>
         [SerializeField, HideInInspector]
         private byte[] _compiledDxil;
@@ -77,6 +81,9 @@ namespace NativeRender
 
         /// <summary>Root SRV hints stored by the importer. Read by <see cref="NativeComputePipeline"/>.</summary>
         internal string[] RootSRVHints => _rootSRVHints ?? Array.Empty<string>();
+
+        /// <summary>Static-sampler overrides stored by the importer. Read by <see cref="NativeComputePipeline"/>.</summary>
+        internal SamplerHint[] SamplerHints => _samplerHints ?? Array.Empty<SamplerHint>();
 
         // -------------------------------------------------------------------
         // Compilation  (ShaderCompilerPlugin — no D3D12 needed)

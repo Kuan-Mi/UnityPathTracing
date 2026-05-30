@@ -43,6 +43,7 @@ namespace NativeRender
         private NativeRenderPlugin.RasterPipelineStateDesc _state;
         private RootConstantsHint[] _rootConstantsHints;
         private string[]            _rootSRVHints;
+        private SamplerHint[]       _samplerHints;
 
         private Dictionary<string, uint> _nameToSlot;
         private uint _slotCount;
@@ -71,6 +72,7 @@ namespace NativeRender
             _state              = state;
             _rootConstantsHints = rootConstantsHints;
             _rootSRVHints       = rootSRVHints;
+            _samplerHints       = shader.SamplerHints;
             BuildNativeHandle();
             BuildSlotLayout();
             NativeRasterShader.OnRecompiled += OnShaderRecompiled;
@@ -84,7 +86,7 @@ namespace NativeRender
                 throw new InvalidOperationException(
                     $"[NativeRasterPipeline] Shader compilation failed for: {_shader.GetHlslPath()}");
 
-            string hintsJson = BuildHintsJson(_rootConstantsHints, _rootSRVHints);
+            string hintsJson = BuildHintsJson(_rootConstantsHints, _rootSRVHints, _samplerHints);
             if (hintsJson != null)
                 _handle = NativeRenderPlugin.NR_CreateRasterShaderEx(
                     vs, (uint)vs.Length, ps, (uint)ps.Length, ref _state, _shader.name, hintsJson);
@@ -97,14 +99,17 @@ namespace NativeRender
                     $"[NativeRasterPipeline] NR_CreateRasterShader returned 0 for: {_shader.name}");
         }
 
-        private static string BuildHintsJson(RootConstantsHint[] rcHints, string[] srvHints)
+        private static string BuildHintsJson(RootConstantsHint[] rcHints, string[] srvHints,
+                                             SamplerHint[] samplerHints)
         {
-            bool hasRC  = rcHints  != null && rcHints.Length  > 0;
-            bool hasSRV = srvHints != null && srvHints.Length > 0;
-            if (!hasRC && !hasSRV) return null;
+            bool hasRC   = rcHints  != null && rcHints.Length  > 0;
+            bool hasSRV  = srvHints != null && srvHints.Length > 0;
+            bool hasSamp = SamplerHintJson.Has(samplerHints);
+            if (!hasRC && !hasSRV && !hasSamp) return null;
 
             var sb = new System.Text.StringBuilder();
             sb.Append('{');
+            bool any = false;
             if (hasRC)
             {
                 sb.Append("\"rootConstants\":[");
@@ -114,10 +119,11 @@ namespace NativeRender
                     sb.Append("{\"name\":\"").Append(rcHints[i].Name).Append("\",\"count\":").Append(rcHints[i].Count).Append('}');
                 }
                 sb.Append(']');
+                any = true;
             }
             if (hasSRV)
             {
-                if (hasRC) sb.Append(',');
+                if (any) sb.Append(',');
                 sb.Append("\"rootSRV\":[");
                 for (int i = 0; i < srvHints.Length; i++)
                 {
@@ -125,6 +131,12 @@ namespace NativeRender
                     sb.Append('"').Append(srvHints[i]).Append('"');
                 }
                 sb.Append(']');
+                any = true;
+            }
+            if (hasSamp)
+            {
+                if (any) sb.Append(',');
+                SamplerHintJson.Append(sb, samplerHints);
             }
             sb.Append('}');
             return sb.ToString();
