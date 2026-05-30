@@ -14,6 +14,19 @@ namespace PathTracing
     }
 
     /// <summary>
+    /// Mirrors RTXPT ToneMapping_cb.h ToneMapperOperator. Numeric values are the shader ABI.
+    /// </summary>
+    public enum NativeRtxptToneMapOperator
+    {
+        Linear           = 0,
+        Reinhard         = 1,
+        ReinhardModified = 2,
+        HejiHableAlu     = 3,
+        HableUc2         = 4,
+        Aces             = 5,
+    }
+
+    /// <summary>
     /// Inspector-facing settings for <see cref="NativeRtxptFeature"/>.
     /// Mirrors <c>SampleUIData</c> from RTXPT/Rtxpt/SampleUI.h, adapted for Unity.
     /// Denoising is handled exclusively by DLSS Ray Reconstruction (DLSS-RR).
@@ -151,7 +164,41 @@ namespace PathTracing
         public Texture environmentMap          = null;
 
         // ── Tone mapping ──────────────────────────────────────────────────────
+        // Mirrors RTXPT ToneMappingParameters (ToneMapper/ToneMappingPasses.h).
         public bool enableToneMapping = true;
+
+        /// <summary>Tone-map operator. RTXPT default = ACES.</summary>
+        public NativeRtxptToneMapOperator toneMapOperator = NativeRtxptToneMapOperator.Aces;
+
+        /// <summary>
+        /// Enable histogram-free auto-exposure (geometric-mean luminance). RTXPT's C++ default is
+        /// false (scene-driven), but the realtime path-tracer output benefits from it, so it is on
+        /// by default here. When off, photographic manual exposure (filmSpeed/fNumber/shutter) is used.
+        /// </summary>
+        public bool autoExposure = true;
+
+        /// <summary>Exposure compensation in stops (EV). RTXPT default 2.0 (Sample.cpp).</summary>
+        [Range(-8f, 8f)]
+        public float exposureCompensation = 2.0f;
+
+        /// <summary>Manual exposure value (EV) used to derive shutter/aperture when autoExposure is off.</summary>
+        public float exposureValue = 0.0f;
+
+        /// <summary>Auto-exposure clamp range, in EV.</summary>
+        public float exposureValueMin = -16.0f;
+        public float exposureValueMax = 16.0f;
+
+        // Photographic controls (manual exposure path).
+        public float filmSpeed = 100.0f;
+        public float fNumber   = 1.0f;
+        public float shutter   = 1.0f;
+
+        // Color grading / operator parameters.
+        public bool  toneMapWhiteBalance   = false;
+        public float toneMapWhitePoint     = 6500.0f;
+        public float toneMapWhiteMaxLuminance = 1.0f;
+        public float toneMapWhiteScale     = 5.1f;
+        public bool  toneMapClamped        = true;
 
         // ── Debug ─────────────────────────────────────────────────────────────
         public bool showValidation    = false;

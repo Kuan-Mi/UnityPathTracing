@@ -1,0 +1,118 @@
+/*
+* Compute port of RTXPT ToneMapper/ToneMapping.hlsl (main_ps / applyToneMapping).
+*
+* Reads the HDR source plus the GPU auto-exposure value (log2 average luminance,
+* produced by Luminance.computeshader + GenerateMips + capture_cs), applies optional
+* auto-exposure, the color-grade transform and the selected tone-map operator, and
+* writes the LDR result. Operator math is copied verbatim from ToneMapping.ps.hlsli so
+* the output matches the original; only the avgLuminance source differs (GPU buffer
+* instead of a CPU-readback constant), keeping the whole path on the GPU.
+*/
+
+#pragma pack_matrix(row_major)
+
+#include "ToneMapping_cb.h"   // ToneMapperOperator, ToneMappingConstants, TONEMAPPING_EXPOSURE_KEY
+
+Texture2D<float4>   gColorTex      : register(t0);
+Buffer<float>       t_AvgLuminance : register(t1); // [0] = log2(average luminance)
+RWTexture2D<float4> u_Output       : register(u0);
+
+cbuffer PerImageCB : register(b0)
+{
+    ToneMappingConstants gParams;
+};
+
+static const float kExposureKey = TONEMAPPING_EXPOSURE_KEY;
+
+float calcLuminance(float3 color)
+{
+    return dot(color, float3(0.299, 0.587, 0.114));
+}
+
+float3 toneMapLinear(float3 color) { return color; }
+
+float3 toneMapReinhard(float3 color)
+{
+    float luminance = calcLuminance(color);
+    float reinhard = luminance / (luminance + 1);
+    return color * (reinhard / luminance);
+}
+
+float3 toneMapReinhardModified(float3 color)
+{
+    float luminance = calcLuminance(color);
+    float reinhard = luminance * (1 + luminance / (gParams.whiteMaxLuminance * gParams.whiteMaxLuminance)) * (1 + luminance);
+    return color * (reinhard / luminance);
+}
+
+float3 toneMapHejiHableAlu(float3 color)
+{
+    color = max(float(0).rrr, color - 0.004);
+    color = (color * (6.2 * color + 0.5)) / (color * (6.2 * color + 1.7) + 0.06);
+    return pow(color, float3(2.2, 2.2, 2.2)); // includes sRGB conversion
+}
+
+float3 applyUc2Curve(float3 color)
+{
+    float A = 0.22, B = 0.3, C = 0.1, D = 0.2, E = 0.01, F = 0.3;
+    color = ((color * (A * color + C * B) + D * E) / (color * (A * color + B) + D * F)) - (E / F);
+    return color;
+}
+
+float3 toneMapHableUc2(float3 color)
+{
+    float exposureBias = 2.0f;
+    color = applyUc2Curve(exposureBias * color);
+    float whiteScale = 1 / applyUc2Curve(float3(gParams.whiteScale, gParams.whiteScale, gParams.whiteScale)).x;
+    return color * whiteScale;
+}
+
+float3 toneMapAces(float3 color)
+{
+    color *= 0.6; // cancel out the pre-exposure baked into the ACES curve fit
+    float A = 2.51, B = 0.03, C = 2.43, D = 0.59, E = 0.14;
+    color = saturate((color * (A * color + B)) / (color * (C * color + D) + E));
+    return color;
+}
+
+float3 toneMap(float3 color)
+{
+    switch ((ToneMapperOperator)gParams.toneMapOperator)
+    {
+        case ToneMapperOperator::Linear:           return toneMapLinear(color);
+        case ToneMapperOperator::Reinhard:         return toneMapReinhard(color);
+        case ToneMapperOperator::ReinhardModified: return toneMapReinhardModified(color);
+        case ToneMapperOperator::HejiHableAlu:     return toneMapHejiHableAlu(color);
+        case ToneMapperOperator::HableUc2:         return toneMapHableUc2(color);
+        case ToneMapperOperator::Aces:             return toneMapAces(color);
+        default:                                   return color;
+    }
+}
+
+[numthreads(8, 8, 1)]
+void main(uint3 tid : SV_DispatchThreadID)
+{
+    uint w, h;
+    u_Output.GetDimensions(w, h);
+    if (tid.x >= w || tid.y >= h)
+        return;
+
+    float4 color = gColorTex[tid.xy];
+    float3 finalColor = color.rgb;
+
+    if (gParams.autoExposure)
+    {
+        float avgLuminance = exp2(t_AvgLuminance[0]);
+        finalColor *= clamp(kExposureKey / avgLuminance, gParams.autoExposureLumValueMin, gParams.autoExposureLumValueMax);
+    }
+
+    if (gParams.enabled)
+    {
+        finalColor = mul(finalColor, (float3x3)gParams.colorTransform);
+        finalColor = toneMap(finalColor);
+        if (gParams.clamped)
+            finalColor = saturate(finalColor);
+    }
+
+    u_Output[tid.xy] = float4(finalColor, color.a);
+}

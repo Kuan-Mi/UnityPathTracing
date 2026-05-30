@@ -55,6 +55,10 @@ namespace PathTracing
         // Phase 5
         public NativeComputeShader dlssBeforeCs;
 
+        // Phase 6: Tone mapping (RTXPT ToneMapper: native luminance reduce → apply)
+        public NativeComputeShader toneMapReduceCs;
+        public NativeComputeShader toneMapApplyCs;
+
         // Phase 8
         public NativeComputeShader accumulationCs;
 
@@ -104,6 +108,7 @@ namespace PathTracing
         private NativeRtxptDenoisingGuidesBakePass    _denoisingGuidesBakePass;
         private NativeRtxptDlssRRPrepareInputsPass    _dlssRrPrepareInputsPass;
         private DlssRRPass                            _dlssRRPass;
+        private NativeRtxptToneMappingPass            _toneMappingPass;
         private NativeRtxptAccumulationPass           _accumulationPass;
         private NativeRtxptStablePlanesDebugVizPass   _stablePlanesDebugVizPass;
         private NativeRtxptOutputBlitPass             _outputBlitPass;
@@ -172,6 +177,10 @@ namespace PathTracing
             _denoisingGuidesBakePass  ??= new NativeRtxptDenoisingGuidesBakePass(denoiseSpecHitTCs) { renderPassEvent       = renderPassEvent };
             _dlssRrPrepareInputsPass  ??= new NativeRtxptDlssRRPrepareInputsPass(dlssBeforeCs) { renderPassEvent            = renderPassEvent };
             _dlssRRPass               ??= new DlssRRPass { renderPassEvent                                                  = renderPassEvent };
+            // Tone mapping is optional — only build it once both compute shaders are assigned/imported
+            // (NativeComputePipeline throws on a null shader). Run AutoFillShaders if these are unset.
+            if (_toneMappingPass == null && toneMapReduceCs != null && toneMapApplyCs != null)
+                _toneMappingPass = new NativeRtxptToneMappingPass(toneMapReduceCs, toneMapApplyCs) { renderPassEvent = renderPassEvent };
             _accumulationPass         ??= new NativeRtxptAccumulationPass(accumulationCs) { renderPassEvent                 = renderPassEvent };
             _stablePlanesDebugVizPass ??= new NativeRtxptStablePlanesDebugVizPass(stablePlanesDebugVizCs) { renderPassEvent = renderPassEvent };
             _outputBlitPass           ??= new NativeRtxptOutputBlitPass(outputBlitMaterial) { renderPassEvent               = renderPassEvent };
@@ -358,6 +367,14 @@ namespace PathTracing
                         new DlssRRPass.Settings { tmpDisableRR = setting.tmpDisableDlssRR });
                     renderer.EnqueuePass(_dlssRRPass);
                 }
+
+                // Phase 6: Tone mapping + auto-exposure on the display-res HDR DLSS-RR output.
+                // Writes the LDR result into ProcessedOutputColor (unused elsewhere in realtime mode).
+                if (setting.enableToneMapping && _toneMappingPass != null)
+                {
+                    _toneMappingPass.Setup(passCtx, texPool.DlssRrOutput, texPool.ProcessedOutputColor);
+                    renderer.EnqueuePass(_toneMappingPass);
+                }
             }
             else
             {
@@ -375,7 +392,14 @@ namespace PathTracing
 
             // ---- Phase 9: Output blit (debug display) ----------------------
             {
-                _outputBlitPass.Setup(texPool, setting.showMode, 1.0f, setting.debugViewType);
+                // When tone mapping ran, the final image lives in ProcessedOutputColor; show it in
+                // place of the raw HDR DLSS-RR output unless the user picked an explicit debug view.
+                var displayMode = setting.showMode;
+                if (setting.realtimeMode && setting.enableToneMapping && _toneMappingPass != null
+                    && displayMode == NativeRtxptShowMode.DlssRrOutput)
+                    displayMode = NativeRtxptShowMode.ProcessedOutput;
+
+                _outputBlitPass.Setup(texPool, displayMode, 1.0f, setting.debugViewType);
                 renderer.EnqueuePass(_outputBlitPass);
             }
         }
@@ -424,6 +448,8 @@ namespace PathTracing
             _denoisingGuidesBakePass = null;
             _dlssRrPrepareInputsPass?.Dispose();
             _dlssRrPrepareInputsPass = null;
+            _toneMappingPass?.Dispose();
+            _toneMappingPass = null;
             _accumulationPass?.Dispose();
             _accumulationPass = null;
             _stablePlanesDebugVizPass?.Dispose();
@@ -865,6 +891,8 @@ namespace PathTracing
             exportVisibilityBufferCs = LoadCs($"{shaderRoot}/ProcessingPasses/ExportVisibilityBuffer");
             denoiseSpecHitTCs        = LoadCs($"{shaderRoot}/ProcessingPasses/DenoisingGuidesBaker_DenoiseSpecHitT");
             dlssBeforeCs             = LoadCs($"{shaderRoot}/ProcessingPasses/PostProcess_DenoiserPrepareInputsDlssRR");
+            toneMapReduceCs          = LoadCs($"{shaderRoot}/ToneMapper/ReduceLuminance");
+            toneMapApplyCs           = LoadCs($"{shaderRoot}/ToneMapper/ToneMappingApply");
             accumulationCs           = LoadCs($"{shaderRoot}/ProcessingPasses/AccumulationPass");
             stablePlanesDebugVizCs   = LoadCs($"{shaderRoot}/ProcessingPasses/PostProcess_StablePlanesDebugViz");
 
