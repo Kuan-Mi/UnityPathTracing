@@ -1613,10 +1613,11 @@ static void ApplyRootSRVHints(ShaderBase* shader, const char* hintsJson)
     }
 }
 
-// Parses "samplers":[{"name":"...","filter":N,"address":N,"mips":N,"aniso":N}] from
-// the hints JSON. Each entry overrides the static-sampler attributes for the matching
-// HLSL sampler variable (see ShaderBase::SetSamplerHint). Missing numeric fields default
-// to 0, except aniso which defaults to 16.
+// Parses "samplers":[{"name":"...","filter":N,"addressU":N,"addressV":N,"addressW":N,
+// "mips":N,"aniso":N}] from the hints JSON. Each entry overrides the static-sampler
+// attributes for the matching HLSL sampler variable (see ShaderBase::SetSamplerHint).
+// Missing numeric fields default to 0, except aniso which defaults to 16. A single
+// "address" key (if present) is used as the fallback for any missing per-axis field.
 static void ApplySamplerHints(ShaderBase* shader, const char* hintsJson)
 {
     if (!hintsJson || hintsJson[0] == '\0') return;
@@ -1657,13 +1658,18 @@ static void ApplySamplerHints(ShaderBase* shader, const char* hintsJson)
 
         if (!name.empty())
         {
-            int filter  = ReadInt(objStart, objEnd, "\"filter\"",  1);
-            int address = ReadInt(objStart, objEnd, "\"address\"", 0);
-            int mips    = ReadInt(objStart, objEnd, "\"mips\"",    0);
-            int aniso   = ReadInt(objStart, objEnd, "\"aniso\"",   16);
+            int filter   = ReadInt(objStart, objEnd, "\"filter\"",   1);
+            int address  = ReadInt(objStart, objEnd, "\"address\"",  0); // legacy single-axis fallback
+            int addressU = ReadInt(objStart, objEnd, "\"addressU\"", address);
+            int addressV = ReadInt(objStart, objEnd, "\"addressV\"", address);
+            int addressW = ReadInt(objStart, objEnd, "\"addressW\"", address);
+            int mips     = ReadInt(objStart, objEnd, "\"mips\"",     0);
+            int aniso    = ReadInt(objStart, objEnd, "\"aniso\"",    16);
             shader->SetSamplerHint(name.c_str(),
                                    static_cast<uint32_t>(filter),
-                                   static_cast<uint32_t>(address),
+                                   static_cast<uint32_t>(addressU),
+                                   static_cast<uint32_t>(addressV),
+                                   static_cast<uint32_t>(addressW),
                                    mips != 0,
                                    static_cast<uint32_t>(aniso));
         }

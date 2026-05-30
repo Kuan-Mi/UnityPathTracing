@@ -38,13 +38,16 @@ void ShaderBase::SetRootSRVHint(const char* name)
     if (name) m_rootSRVHints.insert(name);
 }
 
-void ShaderBase::SetSamplerHint(const char* name, uint32_t filter, uint32_t address,
+void ShaderBase::SetSamplerHint(const char* name, uint32_t filter,
+                                uint32_t addressU, uint32_t addressV, uint32_t addressW,
                                 bool mips, uint32_t maxAnisotropy)
 {
     if (!name) return;
     SamplerHint h;
     h.filter        = filter;
-    h.address       = address;
+    h.addressU      = addressU;
+    h.addressV      = addressV;
+    h.addressW      = addressW;
     h.mips          = mips;
     h.maxAnisotropy = maxAnisotropy;
     m_samplerHints[name] = h;
@@ -448,7 +451,7 @@ bool ShaderBase::BuildRootSignature()
     for (const auto& sr : m_samplerBindings)
     {
         D3D12_FILTER               filter;
-        D3D12_TEXTURE_ADDRESS_MODE addr;
+        D3D12_TEXTURE_ADDRESS_MODE addrU, addrV, addrW;
         FLOAT                      maxLod;
         UINT                       maxAniso;
 
@@ -458,7 +461,9 @@ bool ShaderBase::BuildRootSignature()
             // Editor override takes precedence over name inference.
             const SamplerHint& h = hintIt->second;
             filter   = FilterFromHint(h.filter);
-            addr     = AddressFromHint(h.address);
+            addrU    = AddressFromHint(h.addressU);
+            addrV    = AddressFromHint(h.addressV);
+            addrW    = AddressFromHint(h.addressW);
             maxLod   = h.mips ? 16.0f : 0.0f;
             maxAniso = (filter == D3D12_FILTER_ANISOTROPIC) ? h.maxAnisotropy : 0;
         }
@@ -473,11 +478,12 @@ bool ShaderBase::BuildRootSignature()
             else if (Contains(lower, "aniso"))   filter = D3D12_FILTER_ANISOTROPIC;
             else if (Contains(lower, "linear"))  filter = D3D12_FILTER_MIN_MAG_MIP_LINEAR;
 
-            addr = D3D12_TEXTURE_ADDRESS_MODE_WRAP;
+            D3D12_TEXTURE_ADDRESS_MODE addr = D3D12_TEXTURE_ADDRESS_MODE_WRAP;
             if      (Contains(lower, "mirroronce")) addr = D3D12_TEXTURE_ADDRESS_MODE_MIRROR_ONCE;
             else if (Contains(lower, "mirror"))     addr = D3D12_TEXTURE_ADDRESS_MODE_MIRROR;
             else if (Contains(lower, "clamp"))      addr = D3D12_TEXTURE_ADDRESS_MODE_CLAMP;
             else if (Contains(lower, "repeat"))     addr = D3D12_TEXTURE_ADDRESS_MODE_WRAP;
+            addrU = addrV = addrW = addr;
 
             maxLod   = Contains(lower, "mipmap") ? 16.0f : 0.0f;
             maxAniso = (filter == D3D12_FILTER_ANISOTROPIC) ? 16 : 0;
@@ -492,7 +498,9 @@ bool ShaderBase::BuildRootSignature()
 
         D3D12_STATIC_SAMPLER_DESC1 sd = {};
         sd.Filter           = filter;
-        sd.AddressU = sd.AddressV = sd.AddressW = addr;
+        sd.AddressU         = addrU;
+        sd.AddressV         = addrV;
+        sd.AddressW         = addrW;
         sd.MaxAnisotropy    = maxAniso;
         sd.ComparisonFunc   = D3D12_COMPARISON_FUNC_NONE;
         sd.BorderColor      = D3D12_STATIC_BORDER_COLOR_TRANSPARENT_BLACK;
@@ -501,8 +509,8 @@ bool ShaderBase::BuildRootSignature()
         sd.RegisterSpace    = sr.space;
         sd.ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
         samplers.push_back(sd);
-        AppendLogf("  Static sampler: '%s' filter=%u addr=%u s%u space%u maxLod=%g%s",
-                   sr.name.c_str(), filter, addr, sr.reg, sr.space, maxLod,
+        AppendLogf("  Static sampler: '%s' filter=%u addr=%u/%u/%u s%u space%u maxLod=%g%s",
+                   sr.name.c_str(), filter, addrU, addrV, addrW, sr.reg, sr.space, maxLod,
                    (m_samplerHints.find(sr.name) != m_samplerHints.end()) ? " (override)" : "");
     }
 

@@ -35,7 +35,11 @@ namespace NativeRender
         /// <summary>HLSL sampler variable name to match exactly.</summary>
         public string         Name;
         public SamplerFilter  Filter;
-        public SamplerAddress Address;
+        /// <summary>Address mode for the U/V/W texture axes. Usually all three are equal;
+        /// they differ only for cases like an equirectangular sampler (U=Wrap, V/W=Clamp).</summary>
+        public SamplerAddress AddressU;
+        public SamplerAddress AddressV;
+        public SamplerAddress AddressW;
         /// <summary>Sample mip levels (MaxLOD 16) when true; clamp to mip 0 otherwise.</summary>
         public bool           Mips;
         /// <summary>Max anisotropy; used only when <see cref="Filter"/> is Anisotropic.</summary>
@@ -59,7 +63,9 @@ namespace NativeRender
                 var h = hints[i];
                 sb.Append("{\"name\":\"").Append(h.Name)
                   .Append("\",\"filter\":").Append((int)h.Filter)
-                  .Append(",\"address\":").Append((int)h.Address)
+                  .Append(",\"addressU\":").Append((int)h.AddressU)
+                  .Append(",\"addressV\":").Append((int)h.AddressV)
+                  .Append(",\"addressW\":").Append((int)h.AddressW)
                   .Append(",\"mips\":").Append(h.Mips ? 1 : 0)
                   .Append(",\"aniso\":").Append(h.MaxAnisotropy)
                   .Append('}');

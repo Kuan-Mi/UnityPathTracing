@@ -43,11 +43,12 @@ public:
 
     // Overrides the static-sampler attributes for the sampler whose HLSL variable
     // name matches `name`, replacing the name-inference fallback in BuildRootSignature.
-    //   filter : 0 = point, 1 = linear, 2 = anisotropic
-    //   address: 0 = wrap,  1 = clamp,  2 = mirror, 3 = mirror-once, 4 = border
-    //   mips   : sample mips (MaxLOD 16) when true, else MaxLOD 0
-    //   maxAnisotropy: used only when filter == anisotropic
-    void SetSamplerHint(const char* name, uint32_t filter, uint32_t address,
+    //   filter         : 0 = point, 1 = linear, 2 = anisotropic
+    //   addressU/V/W   : 0 = wrap,  1 = clamp,  2 = mirror, 3 = mirror-once, 4 = border
+    //   mips           : sample mips (MaxLOD 16) when true, else MaxLOD 0
+    //   maxAnisotropy  : used only when filter == anisotropic
+    void SetSamplerHint(const char* name, uint32_t filter,
+                        uint32_t addressU, uint32_t addressV, uint32_t addressW,
                         bool mips, uint32_t maxAnisotropy);
 
     // --- Binding metadata queries ---
@@ -129,7 +130,9 @@ protected:
     struct SamplerHint
     {
         uint32_t filter        = 1;   // 0 point, 1 linear, 2 aniso
-        uint32_t address       = 0;   // 0 wrap, 1 clamp, 2 mirror, 3 mirror-once, 4 border
+        uint32_t addressU      = 0;   // 0 wrap, 1 clamp, 2 mirror, 3 mirror-once, 4 border
+        uint32_t addressV      = 0;
+        uint32_t addressW      = 0;
         bool     mips          = false;
         uint32_t maxAnisotropy = 16;
     };

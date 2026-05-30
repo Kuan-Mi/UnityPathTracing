@@ -33,7 +33,9 @@ namespace NativeRender
                 var elem = prop.GetArrayElementAtIndex(i);
                 elem.FindPropertyRelative("Name").stringValue          = hints[i].Name ?? "";
                 elem.FindPropertyRelative("Filter").enumValueIndex     = (int)hints[i].Filter;
-                elem.FindPropertyRelative("Address").enumValueIndex    = (int)hints[i].Address;
+                elem.FindPropertyRelative("AddressU").enumValueIndex   = (int)hints[i].AddressU;
+                elem.FindPropertyRelative("AddressV").enumValueIndex   = (int)hints[i].AddressV;
+                elem.FindPropertyRelative("AddressW").enumValueIndex   = (int)hints[i].AddressW;
                 elem.FindPropertyRelative("Mips").boolValue            = hints[i].Mips;
                 elem.FindPropertyRelative("MaxAnisotropy").intValue    = (int)hints[i].MaxAnisotropy;
             }
@@ -613,7 +615,9 @@ namespace NativeRender
                     var el = prop.GetArrayElementAtIndex(idx);
                     el.FindPropertyRelative("Name").stringValue        = e.Name;
                     el.FindPropertyRelative("Filter").enumValueIndex   = (int)SamplerFilter.Linear;
-                    el.FindPropertyRelative("Address").enumValueIndex  = (int)SamplerAddress.Clamp;
+                    el.FindPropertyRelative("AddressU").enumValueIndex = (int)SamplerAddress.Clamp;
+                    el.FindPropertyRelative("AddressV").enumValueIndex = (int)SamplerAddress.Clamp;
+                    el.FindPropertyRelative("AddressW").enumValueIndex = (int)SamplerAddress.Clamp;
                     el.FindPropertyRelative("Mips").boolValue          = false;
                     el.FindPropertyRelative("MaxAnisotropy").intValue  = 16;
                 }
@@ -630,15 +634,35 @@ namespace NativeRender
             {
                 var el          = prop.GetArrayElementAtIndex(idx);
                 var filterProp  = el.FindPropertyRelative("Filter");
-                var addressProp = el.FindPropertyRelative("Address");
+                var addrUProp   = el.FindPropertyRelative("AddressU");
+                var addrVProp   = el.FindPropertyRelative("AddressV");
+                var addrWProp   = el.FindPropertyRelative("AddressW");
                 var mipsProp    = el.FindPropertyRelative("Mips");
                 var anisoProp   = el.FindPropertyRelative("MaxAnisotropy");
 
+                bool axesDiffer = addrUProp.enumValueIndex != addrVProp.enumValueIndex
+                               || addrUProp.enumValueIndex != addrWProp.enumValueIndex;
+                string perAxisKey = "NativeShader.samplerPerAxis." + importer.assetPath + "." + e.Name;
+                bool perAxis = SessionState.GetBool(perAxisKey, axesDiffer);
+
                 EditorGUI.indentLevel++;
                 EditorGUI.BeginChangeCheck();
-                EditorGUILayout.PropertyField(filterProp,  new GUIContent("Filter"));
-                EditorGUILayout.PropertyField(addressProp, new GUIContent("Address"));
-                EditorGUILayout.PropertyField(mipsProp,    new GUIContent("Sample Mips"));
+                EditorGUILayout.PropertyField(filterProp, new GUIContent("Filter"));
+
+                if (!perAxis)
+                {
+                    // One control drives all three axes (the common case).
+                    EditorGUILayout.PropertyField(addrUProp, new GUIContent("Address"));
+                    addrVProp.enumValueIndex = addrWProp.enumValueIndex = addrUProp.enumValueIndex;
+                }
+                else
+                {
+                    EditorGUILayout.PropertyField(addrUProp, new GUIContent("Address U"));
+                    EditorGUILayout.PropertyField(addrVProp, new GUIContent("Address V"));
+                    EditorGUILayout.PropertyField(addrWProp, new GUIContent("Address W"));
+                }
+
+                EditorGUILayout.PropertyField(mipsProp, new GUIContent("Sample Mips"));
                 bool changed = EditorGUI.EndChangeCheck();
 
                 if (filterProp.enumValueIndex == (int)SamplerFilter.Anisotropic)
@@ -650,6 +674,9 @@ namespace NativeRender
                         changed = true;
                     }
                 }
+
+                bool newPerAxis = EditorGUILayout.ToggleLeft("Per-axis address", perAxis);
+                if (newPerAxis != perAxis) SessionState.SetBool(perAxisKey, newPerAxis);
                 EditorGUI.indentLevel--;
 
                 if (changed)
