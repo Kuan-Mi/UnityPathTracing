@@ -3,6 +3,7 @@
 .vscode/
 .claude/
 build/
+Other/
 
 # Unity generated
 UnityProject/Library/
