@@ -24,3 +24,8 @@ ScriptedImporter:
   targetProfile: lib_6_9
   maxPayloadSizeInBytes: 80
   rayGenName: RayGen_FILL
+  samplerBindings:
+  - Name: s_MaterialSampler
+    Sampler: {fileID: 11400000, guid: fb53ff4d69f74ca6b672a48c57084dac, type: 2}
+  - Name: s_EnvironmentMapSampler
+    Sampler: {fileID: 11400000, guid: 56b0e93e78c14055953d8d697b5a16fc, type: 2}

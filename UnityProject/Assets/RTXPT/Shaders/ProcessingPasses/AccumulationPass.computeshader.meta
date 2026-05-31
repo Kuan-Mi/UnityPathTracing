@@ -25,3 +25,6 @@ ScriptedImporter:
   - Name: g_Const
     Count: 9
   rootSRVHints: []
+  samplerBindings:
+  - Name: s_Sampler
+    Sampler: {fileID: 11400000, guid: 9be38ccb4f704279889964491d3d8a2a, type: 2}

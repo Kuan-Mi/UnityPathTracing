@@ -23,3 +23,6 @@ ScriptedImporter:
   targetProfile: cs_6_6
   rootConstantsHints: []
   rootSRVHints: []
+  samplerBindings:
+  - Name: s_materialSampler
+    Sampler: {fileID: 11400000, guid: fb53ff4d69f74ca6b672a48c57084dac, type: 2}

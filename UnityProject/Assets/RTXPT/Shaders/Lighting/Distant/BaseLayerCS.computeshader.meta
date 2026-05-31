@@ -23,3 +23,8 @@ ScriptedImporter:
   targetProfile: cs_6_6
   rootConstantsHints: []
   rootSRVHints: []
+  samplerBindings:
+  - Name: s_Linear
+    Sampler: {fileID: 11400000, guid: 56b0e93e78c14055953d8d697b5a16fc, type: 2}
+  - Name: s_EquiRectSampler
+    Sampler: {fileID: 11400000, guid: 15b8b917626e4f5dac8a61bad73e80c5, type: 2}
