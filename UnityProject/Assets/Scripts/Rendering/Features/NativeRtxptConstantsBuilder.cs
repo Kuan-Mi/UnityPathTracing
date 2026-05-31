@@ -87,32 +87,12 @@ namespace PathTracing
             };
 
             // ── Previous-frame camera ─────────────────────────────────────────
-            var prevViewInv = fs.prevWorldToView.inverse;
-            var prevRight   = new Vector3(prevViewInv.m00, prevViewInv.m10, prevViewInv.m20);
-            var prevUp      = new Vector3(prevViewInv.m01, prevViewInv.m11, prevViewInv.m21);
-            var prevFwd     = new Vector3(-prevViewInv.m02, -prevViewInv.m12, -prevViewInv.m22);
-
-            var prevCamera = new PathTracerCameraData
-            {
-                PosW                 = new Vector3(fs.prevCamPos.x, fs.prevCamPos.y, fs.prevCamPos.z),
-                NearZ                = nearZ,
-                DirectionW           = prevFwd,
-                PixelConeSpreadAngle = spreadAngle,
-                CameraU              = prevRight * ulen,
-                FarZ                 = farZ,
-                CameraV              = prevUp * vlen,
-                FocalDistance        = focalDist,
-                CameraW              = prevFwd * focalDist,
-                AspectRatio          = displayAspect,
-                ViewportSizeX        = (uint)renderRes.x,
-                ViewportSizeY        = (uint)renderRes.y,
-                ApertureRadius       = setting.cameraAperture,
-                _padding0            = 0f,
-                JitterX              = -fs.prevViewportJitter.x,
-                JitterY              =  fs.prevViewportJitter.y,
-                _padding1            = 0f,
-                _padding2            = 0f,
-            };
+            // Reference (Sample.cpp:2085) memsets the whole SampleConstants to 0, then
+            // UpdatePathTracerConstants (Sample.cpp:1489) writes only ptConsts.camera —
+            // ptConsts.prevCamera is never assigned, so it stays all-zero in the capture, and
+            // no shader ever reads it (it's only declared in PathTracerShared.h). The fork
+            // populated it, diverging from the source for a dead field; leave it default for parity.
+            var prevCamera = default(PathTracerCameraData);
 
             // DLSS upscaling MIP bias (Sample.cpp:1496) — sharpens textures to compensate for upscale.
             float renderArea  = (float)renderRes.x   * renderRes.y;
@@ -242,7 +222,10 @@ namespace PathTracing
                 pickX                     = -1,
                 pickY                     = -1,
                 pick                      = 0,
-                debugLineScale            = 1f,
+                // Reference (RTVersionGConst capture) leaves this 0 — it is the debug-line draw
+                // scale and there is no setting plumbed for it, so 1f was a stray non-default that
+                // diverged from the source. Keep debug drawing off for parity.
+                debugLineScale            = 0f,
                 showWireframe             = 0u,
                 debugViewType             = (int)(setting.showMode == NativeRtxptShowMode.NEELightColor
                                                 ? RtxptDebugViewType.NEELightColor
