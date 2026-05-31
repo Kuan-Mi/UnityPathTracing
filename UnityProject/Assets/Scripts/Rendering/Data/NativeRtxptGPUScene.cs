@@ -82,6 +82,11 @@ namespace PathTracing
         private readonly Dictionary<int, RendererEntry>                          _rendererEntries  = new();
         private readonly Dictionary<int, (int vb, int ib)>                       _meshBufferSlots  = new();
         private readonly Dictionary<int, int>                                    _materialSlots    = new();
+        // Dedup for material-override slots, keyed on the shared RtxptMaterialOverrideAsset
+        // InstanceID. Override assets are explicitly shareable across renderers/sub-meshes,
+        // so identical references collapse to a single PTMaterialData entry (mirrors how
+        // _materialSlots dedups normal Unity materials).
+        private readonly Dictionary<int, int>                                    _overrideSlots    = new();
         private readonly Dictionary<int, int>                                    _textureSlots     = new();
         private readonly Dictionary<int, (GraphicsBuffer vb, GraphicsBuffer ib)> _donutBufferCache = new();
         private readonly List<GraphicsBuffer>                                    _ownedGfxBuffers  = new();
@@ -555,6 +560,7 @@ namespace PathTracing
             _rendererEntries.Clear();
             _meshBufferSlots.Clear();
             _materialSlots.Clear();
+            _overrideSlots.Clear();
             _textureSlots.Clear();
             _perTargetGroupHandles.Clear();
             _overrideMaterialIndices.Clear();
@@ -1094,9 +1100,18 @@ namespace PathTracing
             // ----------------------------------------------------------------
             if (matOverride != null && subMeshIndex < matOverride.Slots.Count && matOverride.Slots[subMeshIndex] != null)
             {
-                // Overrides are per-(renderer, subMesh), so skip the shared material cache
-                // and always produce a unique GPU material entry.
-                return BuildMaterialFromOverride(matOverride.Slots[subMeshIndex].Slot, ptMatList, texPtrs);
+                // Override assets are shareable across renderers/sub-meshes, so dedup on the
+                // asset reference: identical references reuse the same GPU material entry rather
+                // than emitting one per (renderer, subMesh). Keeps MaterialCount = unique materials,
+                // matching the C++ baker (Sample.cpp:2095).
+                RtxptMaterialOverrideAsset asset = matOverride.Slots[subMeshIndex];
+                int assetId = asset.GetInstanceID();
+                if (_overrideSlots.TryGetValue(assetId, out int existingOverride))
+                    return existingOverride;
+
+                int newOverride = BuildMaterialFromOverride(asset.Slot, ptMatList, texPtrs);
+                _overrideSlots[assetId] = newOverride;
+                return newOverride;
             }
 
             // ----------------------------------------------------------------
