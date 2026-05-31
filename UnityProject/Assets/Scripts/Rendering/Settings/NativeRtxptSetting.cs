@@ -94,9 +94,13 @@ namespace PathTracing
         public float neeatDepthDisocclusionThreshold       = 1.5f;
         public float neeatReservoirHistoryDropoff          = 0.005f;
         public bool  neeatEnableMotionReprojection         = true;
-        public float neeatImportanceBoostIntensityDelta    = 0.0f;
-        public float neeatImportanceBoostFrustumMul        = 0.0f;
-        public float neeatImportanceBoostFrustumFadeDistance = 0.0f;
+        // Original RTXPT enables both boosts by default (LightsBaker.h:245-249):
+        //   IntensityDelta = m_importanceBoost_IntensityDelta(true) ? 64.0 : 0
+        //   FrustumMul     = m_importanceBoost_Frustum(true)        ? 8.0  : 0
+        //   FrustumFadeDistance = 5.0 (ungated)
+        public float neeatImportanceBoostIntensityDelta    = 64.0f;
+        public float neeatImportanceBoostFrustumMul        = 8.0f;
+        public float neeatImportanceBoostFrustumFadeDistance = 5.0f;
         public float neeatSceneAverageContentsDistance     = 10.0f;
 
         public bool useReSTIRDI = false;

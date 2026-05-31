@@ -40,9 +40,9 @@ MonoBehaviour:
     neeatDepthDisocclusionThreshold: 1.5
     neeatReservoirHistoryDropoff: 0.005
     neeatEnableMotionReprojection: 1
-    neeatImportanceBoostIntensityDelta: 0
-    neeatImportanceBoostFrustumMul: 0
-    neeatImportanceBoostFrustumFadeDistance: 0
+    neeatImportanceBoostIntensityDelta: 64
+    neeatImportanceBoostFrustumMul: 8
+    neeatImportanceBoostFrustumFadeDistance: 5
     neeatSceneAverageContentsDistance: 10
     useReSTIRDI: 0
     useReSTIRGI: 0
