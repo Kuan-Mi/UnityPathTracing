@@ -79,14 +79,14 @@ namespace PathTracing
 
         /// <summary>
         /// Light history remap: current frame index → previous frame index.
-        /// MaxLights uint elements.
+        /// 2 × (MaxLights+1) uint elements (matches original's carried-over byteSize; only [0..MaxLights) used).
         /// HLSL: u_historyRemapCurrentToPast (u6).
         /// </summary>
         public GraphicsBuffer HistoryRemapCurrentToPast;
 
         /// <summary>
         /// Light history remap: previous frame index → current frame index.
-        /// MaxLights uint elements.
+        /// 2 × (MaxLights+1) uint elements (matches original's carried-over byteSize; only [0..MaxLights) used).
         /// HLSL: u_historyRemapPastToCurrent (u7).
         /// </summary>
         public GraphicsBuffer HistoryRemapPastToCurrent;
@@ -109,7 +109,7 @@ namespace PathTracing
 
         /// <summary>
         /// Typed uint scratch list used by ComputeProxyCounts / CreateProxyJobs.
-        /// MaxLights uint elements.
+        /// 2 × (MaxLights+1) uint elements (matches original's carried-over byteSize).
         /// HLSL: u_scratchList (u4).
         /// </summary>
         public GraphicsBuffer ScratchListBuffer;
@@ -146,22 +146,35 @@ namespace PathTracing
         // Scratch buffer size (heuristic: 16 ints per light entry).
         private const int ScratchElementCount = MaxLights * 16;
 
+        // LightWeights ping-pong half-count: RTXPT_LIGHTING_WEIGHTS_COUNT_HALF (= MaxLights + 1).
+        private const int WeightsCountHalf = LightingConfig.RTXPT_LIGHTING_WEIGHTS_COUNT_HALF;
+
+        // Carryover-group element count = 2 × (MaxLights+1).
+        // In the original RTXPT (LightsBaker.cpp) a single bufferDesc.byteSize —
+        // 2 × sizeof(float) × RTXPT_LIGHTING_WEIGHTS_COUNT_HALF — is computed once for
+        // m_lightWeights and then reused (never reset) for the next four buffers:
+        //   m_historyRemapCurrentToPast, m_historyRemapPastToCurrent,
+        //   m_perLightProxyCounters, m_scratchList.
+        // So all five are actually allocated with 2 × (MaxLights+1) uint/float elements,
+        // even though LightsBaker.h documents the intent of the last four as MaxLights.
+        // We mirror the actual allocation here to stay byte-for-byte consistent with the
+        // reference; the upper half of the four uint buffers is unused but the layout matches.
+        private const int CarryoverGroupCount = 2 * WeightsCountHalf;
+
         // Proxy buffer sizes — derived from LightingConfig.h constants.
-        // ProxyCounterCount must be >= MaxLights (indexed by lightIndex).
-        //   +1: HLSL uses [TotalLightCount] for invalid-feedback count.
-        private const int ProxyCounterCount   = LightingConfig.RTXPT_LIGHTING_MAX_LIGHTS + 1;
+        // ProxyCounterCount: HLSL only ever indexes [0 .. TotalLightCount], where the last
+        // slot [TotalLightCount] holds the invalid-feedback count, so MaxLights+1 elements
+        // would be functionally sufficient. Sized to CarryoverGroupCount to match the original.
+        private const int ProxyCounterCount   = CarryoverGroupCount;
         // ProxySamplingCount: worst-case total proxies = RTXPT_LIGHTING_MAX_SAMPLING_PROXIES.
         internal const int ProxySamplingCount = LightingConfig.RTXPT_LIGHTING_MAX_SAMPLING_PROXIES;
         private const int LocalSamplingCount  = LightingConfig.RTXPT_LIGHTING_MAX_LIGHTS; // placeholder; actual buffer is resolution-dependent (see EnsureResources)
 
-        // LightWeights ping-pong half-count: RTXPT_LIGHTING_WEIGHTS_COUNT_HALF.
-        private const int WeightsCountHalf = LightingConfig.RTXPT_LIGHTING_WEIGHTS_COUNT_HALF;
-
-        // ScratchListBuffer must be large enough for both:
+        // ScratchListBuffer functional requirement is the larger of:
         //   - proxy-build passes: MaxLights entries
         //   - env-light backup region: 2 × RTXPT_NEEAT_ENVMAP_QT_TOTAL_NODE_COUNT (5368×2 = 10736)
-        private static readonly int ScratchListCount =
-            System.Math.Max(LightingConfig.RTXPT_LIGHTING_MAX_LIGHTS, LightingConfig.RTXPT_NEEAT_ENVMAP_QT_TOTAL_NODE_COUNT * 2);
+        // Both are well under CarryoverGroupCount, which is what the original actually allocates.
+        private const int ScratchListCount = CarryoverGroupCount;
 
         /// <summary>
         /// Allocates or reallocates all resolution-dependent buffers.
@@ -186,8 +199,11 @@ namespace PathTracing
 
             // LocalSamplingBuffer: tileW × tileH × LOCAL_PROXY_COUNT uint elements.
             // Each tile covers RTXPT_LIGHTING_SAMPLING_BUFFER_TILE_SIZE × TILE_SIZE pixels.
-            int tileW    = (renderRes.x + LightingConfig.RTXPT_LIGHTING_SAMPLING_BUFFER_TILE_SIZE - 1) / LightingConfig.RTXPT_LIGHTING_SAMPLING_BUFFER_TILE_SIZE;
-            int tileH    = (renderRes.y + LightingConfig.RTXPT_LIGHTING_SAMPLING_BUFFER_TILE_SIZE - 1) / LightingConfig.RTXPT_LIGHTING_SAMPLING_BUFFER_TILE_SIZE;
+            // +1 border tile on each axis to accommodate the jitter offset — must match
+            // LightsBaker.cpp:340-341 and the LocalSamplingResolution uploaded to the control
+            // buffer (NativeRtxptLightingUpdateBeginPass), since that value is the addressing stride.
+            int tileW    = (renderRes.x + LightingConfig.RTXPT_LIGHTING_SAMPLING_BUFFER_TILE_SIZE - 1) / LightingConfig.RTXPT_LIGHTING_SAMPLING_BUFFER_TILE_SIZE + 1;
+            int tileH    = (renderRes.y + LightingConfig.RTXPT_LIGHTING_SAMPLING_BUFFER_TILE_SIZE - 1) / LightingConfig.RTXPT_LIGHTING_SAMPLING_BUFFER_TILE_SIZE + 1;
             int localSampCount = tileW * tileH * LightingConfig.RTXPT_LIGHTING_LOCAL_PROXY_COUNT;
             LocalSamplingBuffer?.Release();
             LocalSamplingBuffer = new GraphicsBuffer(
@@ -252,15 +268,17 @@ namespace PathTracing
                 ScratchElementCount, 4,
                 UploadBuffer.UploadMode.Ranges, allowUAV: true);
 
+            // HistoryRemap buffers: functional need is MaxLights, but the original reuses the
+            // carried-over byteSize (see CarryoverGroupCount) → 2 × (MaxLights+1). Match it.
             HistoryRemapCurrentToPast = new GraphicsBuffer(
                 GraphicsBuffer.Target.Structured,
-                MaxLights, 4)
+                CarryoverGroupCount, 4)
             { name = "Rtxpt_HistoryRemapCurrentToPast" };
             HistoryRemapCurrToPastPtr = HistoryRemapCurrentToPast.GetNativeBufferPtr();
 
             HistoryRemapPastToCurrent = new GraphicsBuffer(
                 GraphicsBuffer.Target.Structured,
-                MaxLights, 4)
+                CarryoverGroupCount, 4)
             { name = "Rtxpt_HistoryRemapPastToCurrent" };
             HistoryRemapPastToCurrPtr = HistoryRemapPastToCurrent.GetNativeBufferPtr();
 
@@ -286,8 +304,8 @@ namespace PathTracing
             LightWeightsBufferPtr = LightWeightsBuffer.GetNativeBufferPtr();
 
             // ScratchListBuffer: uint typed scratch for proxy count prefix-sum and job list.
-            // Must hold at least 2 × RTXPT_NEEAT_ENVMAP_QT_TOTAL_NODE_COUNT (=5368×2=10736) entries
-            // for the env-light backup history region, plus MaxLights for proxy-build passes.
+            // Functional need is max(MaxLights, 2 × RTXPT_NEEAT_ENVMAP_QT_TOTAL_NODE_COUNT);
+            // sized to CarryoverGroupCount (= 2 × (MaxLights+1)) to match the original allocation.
             ScratchListBuffer = new GraphicsBuffer(
                 GraphicsBuffer.Target.Structured,
                 ScratchListCount, 4)

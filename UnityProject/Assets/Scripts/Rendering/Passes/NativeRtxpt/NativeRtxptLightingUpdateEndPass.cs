@@ -146,9 +146,11 @@ namespace PathTracing
             int blendW = (renderRes.x + LightingConfig.RTXPT_NEEAT_EARLY_FEEDBACK_TILE_SIZE - 1) / LightingConfig.RTXPT_NEEAT_EARLY_FEEDBACK_TILE_SIZE;
             int blendH = (renderRes.y + LightingConfig.RTXPT_NEEAT_EARLY_FEEDBACK_TILE_SIZE - 1) / LightingConfig.RTXPT_NEEAT_EARLY_FEEDBACK_TILE_SIZE;
 
-            // Local sampling resolution = ceil(renderRes / SAMPLING_BUFFER_TILE_SIZE=8)
-            int localW = (renderRes.x + LightingConfig.RTXPT_LIGHTING_SAMPLING_BUFFER_TILE_SIZE - 1) / LightingConfig.RTXPT_LIGHTING_SAMPLING_BUFFER_TILE_SIZE;
-            int localH = (renderRes.y + LightingConfig.RTXPT_LIGHTING_SAMPLING_BUFFER_TILE_SIZE - 1) / LightingConfig.RTXPT_LIGHTING_SAMPLING_BUFFER_TILE_SIZE;
+            // Local sampling resolution = ceil(renderRes / SAMPLING_BUFFER_TILE_SIZE=8) + 1 border tile.
+            // P2/P3 dispatch over the full (bordered) tile grid, matching the original's dispatch over
+            // LocalSamplingResolution (LightsBaker.cpp:1378,1384) and the uploaded LocalSamplingResolution.
+            int localW = (renderRes.x + LightingConfig.RTXPT_LIGHTING_SAMPLING_BUFFER_TILE_SIZE - 1) / LightingConfig.RTXPT_LIGHTING_SAMPLING_BUFFER_TILE_SIZE + 1;
+            int localH = (renderRes.y + LightingConfig.RTXPT_LIGHTING_SAMPLING_BUFFER_TILE_SIZE - 1) / LightingConfig.RTXPT_LIGHTING_SAMPLING_BUFFER_TILE_SIZE + 1;
 
             // ----------------------------------------------------------------
             // 1. ProcessFeedbackHistoryP1a

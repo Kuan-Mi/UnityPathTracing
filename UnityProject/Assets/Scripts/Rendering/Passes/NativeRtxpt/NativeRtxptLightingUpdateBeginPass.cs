@@ -802,8 +802,11 @@ namespace PathTracing
             uint feedbackH          = (uint)Math.Max(1, renderRes.y);
             uint blendedW           = (uint)Math.Max(1, (renderRes.x + LightingConfig.RTXPT_NEEAT_EARLY_FEEDBACK_TILE_SIZE - 1) / LightingConfig.RTXPT_NEEAT_EARLY_FEEDBACK_TILE_SIZE);
             uint blendedH           = (uint)Math.Max(1, (renderRes.y + LightingConfig.RTXPT_NEEAT_EARLY_FEEDBACK_TILE_SIZE - 1) / LightingConfig.RTXPT_NEEAT_EARLY_FEEDBACK_TILE_SIZE);
-            uint localW             = (uint)Math.Max(1, (renderRes.x + LightingConfig.RTXPT_LIGHTING_SAMPLING_BUFFER_TILE_SIZE - 1) / LightingConfig.RTXPT_LIGHTING_SAMPLING_BUFFER_TILE_SIZE);
-            uint localH             = (uint)Math.Max(1, (renderRes.y + LightingConfig.RTXPT_LIGHTING_SAMPLING_BUFFER_TILE_SIZE - 1) / LightingConfig.RTXPT_LIGHTING_SAMPLING_BUFFER_TILE_SIZE);
+            // +1 border tile on each axis for the jitter offset (LightsBaker.cpp:340-341).
+            // This is the LocalSamplingResolution used as the addressing stride — must match the
+            // LocalSamplingBuffer allocation (NativeRtxptBufferResources) and the P2/P3 dispatch dims.
+            uint localW             = (uint)Math.Max(1, (renderRes.x + LightingConfig.RTXPT_LIGHTING_SAMPLING_BUFFER_TILE_SIZE - 1) / LightingConfig.RTXPT_LIGHTING_SAMPLING_BUFFER_TILE_SIZE) + 1;
+            uint localH             = (uint)Math.Max(1, (renderRes.y + LightingConfig.RTXPT_LIGHTING_SAMPLING_BUFFER_TILE_SIZE - 1) / LightingConfig.RTXPT_LIGHTING_SAMPLING_BUFFER_TILE_SIZE) + 1;
             uint p0ThreadCount      = ((feedbackW + LLB_NUM_COMPUTE_THREADS_2D - 1) / LLB_NUM_COMPUTE_THREADS_2D)
                                     * ((feedbackH + LLB_NUM_COMPUTE_THREADS_2D - 1) / LLB_NUM_COMPUTE_THREADS_2D)
                                     * LLB_NUM_COMPUTE_THREADS_2D * LLB_NUM_COMPUTE_THREADS_2D;
