@@ -16,28 +16,25 @@ namespace PathTracing
     /// LightingUpdateBegin — single unified pass that mirrors LightsBaker::UpdateFrame
     /// (the front half) in original RTXPT.
     ///
-    /// ScriptableRenderPass with the correct dispatch order:
+    /// ScriptableRenderPass with the correct command-buffer order (ExecutePass):
     ///
-    ///   CPU (Setup)
-    ///     ControlDataSetup          — pack LightingControlData → LightControlBuffer
-    ///     EnvmapAndAnalyticLightBuffers — pack point/spot lights → LightBuffer / LightExBuffer
-    ///
-    ///   GPU (ExecutePass)
-    ///     1.  ResetLightProxyCounters
-    ///     2.  ResetPastToCurrentHistory
-    ///     3.  EnvLightsBackupPast
-    ///     4.  EnvLightsSubdivideBase
-    ///     5.  EnvLightsSubdivideBoost
-    ///     6.  BakeEmissiveTriangles
-    ///     7.  EnvLightFillLookupMap
-    ///     8.  EnvLightsMapPastToCurrent
-    ///     9.  ProcessFeedbackHistoryPreFilter
-    ///     10. ProcessFeedbackHistoryP0
-    ///     11. ComputeWeights
-    ///     12. ComputeProxyCounts
-    ///     13. ComputeProxyBaselineOffsets
-    ///     14. CreateProxyJobs
-    ///     15. ExecuteProxyJobs
+    ///     1.  ControlDataSetup                — upload LightingControlData → LightControlBuffer
+    ///     2.  ResetLightProxyCounters
+    ///     3.  ResetPastToCurrentHistory
+    ///     4.  EnvLightsBackupPast
+    ///     5.  EnvmapAndAnalyticLightBuffers   — upload analytic lights + history → Light/Ex/remap buffers
+    ///     6.  EnvLightsSubdivideBase
+    ///     7.  EnvLightsSubdivideBoost
+    ///     8.  BakeEmissiveTriangles
+    ///     9.  EnvLightFillLookupMap
+    ///     10. EnvLightsMapPastToCurrent
+    ///     11. ProcessFeedbackHistoryPreFilter
+    ///     12. ProcessFeedbackHistoryP0
+    ///     13. ComputeWeights
+    ///     14. ComputeProxyCounts
+    ///     15. ComputeProxyBaselineOffsets
+    ///     16. CreateProxyJobs
+    ///     17. ExecuteProxyJobs
     /// </summary>
     public class NativeRtxptLightingUpdateBeginPass : ScriptableRenderPass, IDisposable
     {
@@ -154,9 +151,35 @@ namespace PathTracing
         // Analytic-light history remap staging (mirrors LightsBaker.cpp scratch buffers).
         // Indexed by analytic-local index i; the corresponding global light slot is EnvQtTotalNodeCount+i.
         //   s_currentToPastStaging[i]      = previous-frame global index of light i (or INVALID).
-        //   s_pastToCurrentStaging[j]      = current global index that maps onto previous-frame analytic slot j.
+        //   s_pastToCurrentStaging[j]      = current global index that maps onto current analytic slot j.
         private static          uint[] s_currentToPastStaging = new uint[NativeRtxptBufferResources.MaxLights];
         private static          uint[] s_pastToCurrentStaging = new uint[NativeRtxptBufferResources.MaxLights];
+
+        // Env-quad-node placeholders for the [0..EnvQt) range, uploaded unconditionally every frame to
+        // mirror LightsBaker::CollectEnvmapLightPlaceholders. The light/lightsEx structs are zeroed (the
+        // light entries are completely overwritten by EnvLightsSubdivideBase/Boost), the remap entries are
+        // RTXPT_INVALID_LIGHT_INDEX. Built once; never mutated.
+        private static readonly RtxptPolymorphicLightInfo[]   s_envLightPlaceholders   = BuildEnvLightPlaceholders();
+        private static readonly RtxptPolymorphicLightInfoEx[] s_envLightExPlaceholders = new RtxptPolymorphicLightInfoEx[EnvQtTotalNodeCount];
+        private static readonly uint[]                        s_envInvalidIndices      = BuildEnvInvalidIndices();
+
+        private static RtxptPolymorphicLightInfo[] BuildEnvLightPlaceholders()
+        {
+            var arr = new RtxptPolymorphicLightInfo[EnvQtTotalNodeCount];
+            // dummy.ColorTypeAndFlags = kEnvironmentQuad << kPolymorphicLightTypeShift (LightsBaker.cpp:573).
+            uint typeBits = (uint)RtxptLightType.EnvironmentQuad << (int)kTypeShift;
+            for (int i = 0; i < arr.Length; i++)
+                arr[i].ColorTypeAndFlags = typeBits;
+            return arr;
+        }
+
+        private static uint[] BuildEnvInvalidIndices()
+        {
+            var arr = new uint[EnvQtTotalNodeCount];
+            for (int i = 0; i < arr.Length; i++)
+                arr[i] = RTXPT_INVALID_LIGHT_INDEX;
+            return arr;
+        }
 
         // ====================================================================
         // Per-frame state
@@ -170,9 +193,6 @@ namespace PathTracing
         // frame. _prev holds last frame's assignment (read this frame); _cur is built this frame.
         private Dictionary<int, uint>  _prevAnalyticLightIndices = new Dictionary<int, uint>();
         private Dictionary<int, uint>  _curAnalyticLightIndices  = new Dictionary<int, uint>();
-        private int                    _prevAnalyticLightCount;
-        // Element count of the past-to-current analytic upload this frame (= previous-frame analytic count).
-        private int                    _pastToCurrentCount;
         private int                    _emissiveTaskCount;
         private uint                   _emissiveTotalTriCount;
         private bool                   _ping = true; // ping-pong for weights buffer
@@ -370,7 +390,6 @@ namespace PathTracing
             internal int                        AnalyticLightCount;
             internal uint[]                     CurrentToPastData;
             internal uint[]                     PastToCurrentData;
-            internal int                        PastToCurrentCount;
 
             // --- Feedback pre-processing (begin) ---
             internal NativeComputePipeline      ProcessFeedbackHistoryPreFilterCs;
@@ -434,7 +453,6 @@ namespace PathTracing
             pd.AnalyticLightCount            = _analyticLightCount;
             pd.CurrentToPastData             = s_currentToPastStaging;
             pd.PastToCurrentData             = s_pastToCurrentStaging;
-            pd.PastToCurrentCount            = _pastToCurrentCount;
 
             // Feedback pre-processing (begin)
             pd.ProcessFeedbackHistoryPreFilterCs = _processFeedbackHistoryPreFilterCs;
@@ -473,14 +491,14 @@ namespace PathTracing
             // before any dispatch that reads it. No-op when unchanged.
             data.Ctx.GpuScene?.FlushSubInstanceBuffer(cmd);
 
-            // CPU uploads.
+            // ----------------------------------------------------------------
+            // 1. ControlDataSetup
+            // ----------------------------------------------------------------
             context.cmd.BeginSample(RenderPassMarkers.RtxptControlDataSetup);
             data.LightControlBuffer.SetData(data.ControlData, 0, 0, 1);
             buf.LastLightControlData = data.ControlData[0];
             data.LightControlBuffer.Flush(cmd);
             context.cmd.EndSample(RenderPassMarkers.RtxptControlDataSetup);
-
-            buf.LightScratchBuffer.Flush(cmd);
 
             // Native buffers bind by stable plugin handles; Unity-owned buffers still bind by cached native pointers.
             var pCtrl     = buf.LightControlBuffer;
@@ -510,7 +528,7 @@ namespace PathTracing
             var  envLookupMapPtr  = data.EnvLightLookupMapPtr;
 
             // ----------------------------------------------------------------
-            // 1. ResetLightProxyCounters
+            // 2. ResetLightProxyCounters
             // ----------------------------------------------------------------
             {
                 var ds = data.ResetProxyCountersDs;
@@ -523,7 +541,7 @@ namespace PathTracing
             }
 
             // ----------------------------------------------------------------
-            // 2. ResetPastToCurrentHistory
+            // 3. ResetPastToCurrentHistory
             // ----------------------------------------------------------------
             {
                 uint items = Math.Max(historic, total);
@@ -537,7 +555,7 @@ namespace PathTracing
             }
 
             // ----------------------------------------------------------------
-            // 5. EnvLightsBackupPast
+            // 4. EnvLightsBackupPast
             // ----------------------------------------------------------------
             {
                 var ds = data.BackupPastDs;
@@ -551,32 +569,47 @@ namespace PathTracing
             }
 
             // ----------------------------------------------------------------
-            // EnvmapAndAnalyticLightBuffers — CPU-prepared light + history uploads.
-            //   Mirrors LightsBaker.cpp:1134 (placed after EnvLightsBackupPast, which reads the
-            //   prior-frame env range, and after ResetPastToCurrentHistory, which clears the
-            //   past→current buffer that we now overwrite for the analytic range).
-            //   Only the analytic sub-range [EnvQt..EnvQt+An) is uploaded — env-quad-node and
-            //   emissive-triangle entries of all four buffers are produced by the GPU passes.
+            // 5. EnvmapAndAnalyticLightBuffers — the five CPU writeBuffer uploads of the original
+            //   LightsBaker.cpp:1134, in the same position (after EnvLightsBackupPast reads the
+            //   prior-frame env range, and after ResetPastToCurrentHistory clears past→current) and
+            //   the same order. Each buffer is uploaded over the full env+analytic range:
+            //     [0..EnvQt)      env-quad-node placeholders (overwritten later by the GPU subdivide
+            //                     passes for lights; INVALID for the remap buffers),
+            //     [EnvQt..+An)    the CPU-packed analytic lights / history.
             //   Flush() issues a native plugin event on this command buffer (same mechanism as the
             //   compute dispatches), so it is correctly ordered and safe between native dispatches.
+            int envCount = (int)EnvQtTotalNodeCount;
             {
                 context.cmd.BeginSample(RenderPassMarkers.RtxptEnvmapAndAnalyticLightBuffers);
-                if (data.AnalyticLightCount > 0)
-                {
-                    data.LightBuffer.SetData(data.LightData, 0, (int)EnvQtTotalNodeCount, data.AnalyticLightCount);
-                    data.LightExBuffer.SetData(data.LightExData, 0, (int)EnvQtTotalNodeCount, data.AnalyticLightCount);
-                    // current→past for the current analytic lights.
-                    pHistCur.SetData(data.CurrentToPastData, 0, (int)EnvQtTotalNodeCount, data.AnalyticLightCount);
-                    data.LightBuffer.Flush(cmd);
-                    data.LightExBuffer.Flush(cmd);
-                    pHistCur.Flush(cmd);
-                }
-                // past→current over the previous-frame analytic range (independent of this frame's count).
-                if (data.PastToCurrentCount > 0)
-                {
-                    pHistPas.SetData(data.PastToCurrentData, 0, (int)EnvQtTotalNodeCount, data.PastToCurrentCount);
-                    pHistPas.Flush(cmd);
-                }
+
+                // Each buffer is written over the full [0..EnvQt+An) range like the original's single
+                // writeBuffer; here it is two contiguous SetData calls (env placeholder array + analytic
+                // staging array). The analytic SetData is a no-op when AnalyticLightCount == 0.
+                int analyticCount = data.AnalyticLightCount;
+
+                // 1. lightsBuffer
+                data.LightBuffer.SetData(s_envLightPlaceholders, 0, 0, envCount);
+                data.LightBuffer.SetData(data.LightData, 0, envCount, analyticCount);
+                data.LightBuffer.Flush(cmd);
+
+                // 2. lightsExBuffer
+                data.LightExBuffer.SetData(s_envLightExPlaceholders, 0, 0, envCount);
+                data.LightExBuffer.SetData(data.LightExData, 0, envCount, analyticCount);
+                data.LightExBuffer.Flush(cmd);
+
+                // 3. historyRemapCurrentToPast
+                pHistCur.SetData(s_envInvalidIndices, 0, 0, envCount);
+                pHistCur.SetData(data.CurrentToPastData, 0, envCount, analyticCount);
+                pHistCur.Flush(cmd);
+
+                // 4. historyRemapPastToCurrent
+                pHistPas.SetData(s_envInvalidIndices, 0, 0, envCount);
+                pHistPas.SetData(data.PastToCurrentData, 0, envCount, analyticCount);
+                pHistPas.Flush(cmd);
+
+                // 5. scratchBuffer (emissive-triangle proc tasks, written into LightScratchBuffer in Setup)
+                buf.LightScratchBuffer.Flush(cmd);
+
                 context.cmd.EndSample(RenderPassMarkers.RtxptEnvmapAndAnalyticLightBuffers);
             }
 
@@ -663,12 +696,13 @@ namespace PathTracing
             }
 
             // ----------------------------------------------------------------
-            // 11. ProcessFeedbackHistoryPreFilter / P0
+            // 11. ProcessFeedbackHistoryPreFilter / 12. ProcessFeedbackHistoryP0
             //     Original RTXPT only runs these when the previous frame's
             //     temporal feedback buffer is known to contain valid data.
             // ----------------------------------------------------------------
             if (data.LastFrameFeedbackAvailable)
             {
+                // 11. ProcessFeedbackHistoryPreFilter
                 {
                     var ds  = data.ProcessFeedbackHistoryPreFilterDs;
                     var ctx = data.Ctx;
@@ -682,6 +716,7 @@ namespace PathTracing
                     cmd.EndSample(RenderPassMarkers.RtxptProcessFeedbackHistoryPreFilter);
                 }
 
+                // 12. ProcessFeedbackHistoryP0
                 {
                     var ds  = data.ProcessFeedbackHistoryP0Ds;
                     var ctx = data.Ctx;
@@ -815,29 +850,27 @@ namespace PathTracing
                 }
             }
 
-            // Derive past-to-current from current-to-past, over last frame's analytic range
-            // (mirrors the tail of LightsBaker::CollectAnalyticLightsCPU). The env range
-            // [0..EnvQt) of both remap buffers is produced by the GPU passes, not uploaded here.
-            int pastCount = _prevAnalyticLightCount; // = previous-frame analytic light count
-            for (int j = 0; j < pastCount; j++)
+            // Derive past-to-current from current-to-past (mirrors the tail of
+            // LightsBaker::CollectAnalyticLightsCPU). The original sizes the analytic past-to-current
+            // range to the *current* analytic count (An_cur) and scatters into it; we match that.
+            for (int j = 0; j < count; j++)
                 s_pastToCurrentStaging[j] = RTXPT_INVALID_LIGHT_INDEX;
             for (int i = 0; i < count; i++)
             {
                 uint historicIndex = s_currentToPastStaging[i];
                 if (historicIndex == RTXPT_INVALID_LIGHT_INDEX) continue;
                 int localPast = (int)historicIndex - (int)EnvQtTotalNodeCount;
-                // Guard the scatter to the uploaded range; a match outside it (light count shrank)
-                // is dropped — the GPU reset already left that slot INVALID. C++ assumes this never
-                // happens and would write out of bounds, so this is a strictly-safer equivalent.
-                if (localPast >= 0 && localPast < pastCount)
+                // C++ writes pastToCurrent[historicIndex] directly; its vector is sized to An_cur, so a
+                // historicIndex >= An_cur (light count shrank) would be an out-of-bounds write. We clamp
+                // to the same [0..An_cur) range — a strictly-safer equivalent (that slot stays INVALID
+                // from ResetPastToCurrentHistory).
+                if (localPast >= 0 && localPast < count)
                     s_pastToCurrentStaging[localPast] = EnvQtTotalNodeCount + (uint)i;
             }
-            _pastToCurrentCount = pastCount;
 
             // Ping-pong the history maps so this frame's assignment becomes next frame's "previous".
             (_prevAnalyticLightIndices, _curAnalyticLightIndices) = (_curAnalyticLightIndices, _prevAnalyticLightIndices);
             _curAnalyticLightIndices.Clear();
-            _prevAnalyticLightCount = count;
 
             _dbgFrameCounter++;
             return count;
