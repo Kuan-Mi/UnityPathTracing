@@ -81,15 +81,19 @@ namespace PathTracing
         /// Light history remap: current frame index → previous frame index.
         /// 2 × (MaxLights+1) uint elements (matches original's carried-over byteSize; only [0..MaxLights) used).
         /// HLSL: u_historyRemapCurrentToPast (u6).
+        /// UAV-capable upload buffer: CPU writes the analytic-light sub-range (mirrors the original
+        /// LightsBaker EnvmapAndAnalyticLightBuffers writeBuffer), compute passes write env/emissive
+        /// entries via UAV. Bound as a typed R32_UINT buffer.
         /// </summary>
-        public GraphicsBuffer HistoryRemapCurrentToPast;
+        public UploadBuffer HistoryRemapCurrentToPast;
 
         /// <summary>
         /// Light history remap: previous frame index → current frame index.
         /// 2 × (MaxLights+1) uint elements (matches original's carried-over byteSize; only [0..MaxLights) used).
-        /// HLSL: u_historyRemapPastToCurrent (u7).
+        /// HLSL: u_historyRemapPastToCurrent (u7). Same CPU-upload + GPU-UAV model as
+        /// <see cref="HistoryRemapCurrentToPast"/>.
         /// </summary>
-        public GraphicsBuffer HistoryRemapPastToCurrent;
+        public UploadBuffer HistoryRemapPastToCurrent;
 
         // ── Light proxy / sampling buffers ────────────────────────────────────
         /// <summary>Per-proxy light counters. Size determined by proxy grid config.</summary>
@@ -129,8 +133,6 @@ namespace PathTracing
 
         // Light system buffers — valid after EnsureLightBuffers(), cleared in ReleaseLightBuffers()
         public IntPtr FeedbackBufferPtr           { get; private set; }
-        public IntPtr HistoryRemapCurrToPastPtr   { get; private set; }
-        public IntPtr HistoryRemapPastToCurrPtr   { get; private set; }
         public IntPtr LightProxyCountersPtr       { get; private set; }
         public IntPtr LightSamplingProxiesPtr     { get; private set; }
         public IntPtr LightWeightsBufferPtr       { get; private set; }
@@ -273,17 +275,15 @@ namespace PathTracing
 
             // HistoryRemap buffers: functional need is MaxLights, but the original reuses the
             // carried-over byteSize (see CarryoverGroupCount) → 2 × (MaxLights+1). Match it.
-            HistoryRemapCurrentToPast = new GraphicsBuffer(
-                GraphicsBuffer.Target.Structured,
-                CarryoverGroupCount, 4)
-            { name = "HistoryRemapCurrentToPast" };
-            HistoryRemapCurrToPastPtr = HistoryRemapCurrentToPast.GetNativeBufferPtr();
+            // UAV-capable upload buffers (Ranges mode): CPU writes the analytic-light sub-range,
+            // compute passes write env/emissive entries via UAV. Bound typed R32_UINT.
+            HistoryRemapCurrentToPast = new UploadBuffer(
+                CarryoverGroupCount, 4,
+                UploadBuffer.UploadMode.Ranges, allowUAV: true, debugName: "HistoryRemapCurrentToPast");
 
-            HistoryRemapPastToCurrent = new GraphicsBuffer(
-                GraphicsBuffer.Target.Structured,
-                CarryoverGroupCount, 4)
-            { name = "HistoryRemapPastToCurrent" };
-            HistoryRemapPastToCurrPtr = HistoryRemapPastToCurrent.GetNativeBufferPtr();
+            HistoryRemapPastToCurrent = new UploadBuffer(
+                CarryoverGroupCount, 4,
+                UploadBuffer.UploadMode.Ranges, allowUAV: true, debugName: "HistoryRemapPastToCurrent");
 
             LightProxyCounters = new GraphicsBuffer(
                 GraphicsBuffer.Target.Structured,
@@ -352,8 +352,8 @@ namespace PathTracing
             LightBuffer?.Dispose();               LightBuffer              = null;
             LightExBuffer?.Dispose();             LightExBuffer            = null;
             LightScratchBuffer?.Dispose();        LightScratchBuffer       = null; 
-            HistoryRemapCurrentToPast?.Release(); HistoryRemapCurrentToPast= null; HistoryRemapCurrToPastPtr   = IntPtr.Zero;
-            HistoryRemapPastToCurrent?.Release(); HistoryRemapPastToCurrent= null; HistoryRemapPastToCurrPtr   = IntPtr.Zero;
+            HistoryRemapCurrentToPast?.Dispose(); HistoryRemapCurrentToPast= null;
+            HistoryRemapPastToCurrent?.Dispose(); HistoryRemapPastToCurrent= null;
             LightProxyCounters?.Release();        LightProxyCounters       = null; LightProxyCountersPtr       = IntPtr.Zero;
             LightSamplingProxies?.Release();      LightSamplingProxies     = null; LightSamplingProxiesPtr     = IntPtr.Zero;
             LightWeightsBuffer?.Release();        LightWeightsBuffer       = null; LightWeightsBufferPtr       = IntPtr.Zero;

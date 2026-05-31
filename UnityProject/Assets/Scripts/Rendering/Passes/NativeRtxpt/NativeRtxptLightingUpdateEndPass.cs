@@ -195,7 +195,7 @@ namespace PathTracing
                 ds.SetRWTexture("u_feedbackCandidatesBlended", ctx.FeedbackCandidatesBlendedPtr);
                 ds.SetRWTexture("u_historyDepth", ctx.NEEATHistoryDepthPtr);
                 ds.SetRWTexture("u_ShaderDebugVizTextureBuffer", ctx.ShaderDebugVizPtr);
-                ds.SetRWTypedBuffer("u_historyRemapPastToCurrent", buf.HistoryRemapPastToCurrPtr, buf.HistoryRemapPastToCurrent.count, DXGI_FORMAT_R32_UINT);
+                ds.SetRWTypedBuffer("u_historyRemapPastToCurrent", buf.HistoryRemapPastToCurrent, buf.HistoryRemapPastToCurrent.count, DXGI_FORMAT_R32_UINT);
                 ds.SetRWTypedBuffer("u_lightSamplingProxies",      buf.LightSamplingProxiesPtr,   buf.LightSamplingProxies.count,   DXGI_FORMAT_R32_UINT);
                 ds.SetRWTypedBuffer("u_localSamplingBuffer", pLocal, cLocal, DXGI_FORMAT_R32_UINT);
 
