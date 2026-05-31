@@ -234,7 +234,7 @@ namespace PathTracing
 
         public override void RecordRenderGraph(RenderGraph renderGraph, ContextContainer frameData)
         {
-            using var builder = renderGraph.AddUnsafePass<PassData>("NativeRtxpt.ToneMapping", out var pd);
+            using var builder = renderGraph.AddUnsafePass<PassData>("ToneMapping", out var pd);
 
             pd.LumRaster = _lumRaster; pd.LumDs = _lumDs;
             pd.MipCs = _mipCs; pd.MipDs = _mipDs;

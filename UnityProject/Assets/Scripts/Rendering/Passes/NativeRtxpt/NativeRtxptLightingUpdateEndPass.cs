@@ -103,7 +103,7 @@ namespace PathTracing
 
         public override void RecordRenderGraph(RenderGraph renderGraph, ContextContainer frameData)
         {
-            using var builder = renderGraph.AddUnsafePass<PassData>("NativeRtxpt.LightingUpdateEnd", out var pd);
+            using var builder = renderGraph.AddUnsafePass<PassData>("LightingUpdateEnd", out var pd);
 
             pd.P1aCs   = _p1aCs;
             pd.P1aDs   = _p1aDs;

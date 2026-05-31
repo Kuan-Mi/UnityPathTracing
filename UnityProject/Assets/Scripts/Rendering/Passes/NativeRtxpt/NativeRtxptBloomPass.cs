@@ -146,7 +146,7 @@ namespace PathTracing
             var vBlur = hBlur;
             vBlur.pixstep = new Vector2(0f, 1f / quarter.y);
 
-            using var builder = renderGraph.AddUnsafePass<PassData>("NativeRtxpt.Bloom", out var pd);
+            using var builder = renderGraph.AddUnsafePass<PassData>("Bloom", out var pd);
             pd.DownsampleRaster = _downsampleRaster;
             pd.Downsample1Ds    = _downsample1Ds;
             pd.Downsample2Ds    = _downsample2Ds;

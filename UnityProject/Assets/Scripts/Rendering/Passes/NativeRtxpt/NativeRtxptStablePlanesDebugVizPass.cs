@@ -53,7 +53,7 @@ namespace PathTracing
 
         public override void RecordRenderGraph(RenderGraph renderGraph, ContextContainer frameData)
         {
-            using var builder = renderGraph.AddUnsafePass<PassData>("NativeRtxpt.StablePlanesDebugViz", out var passData);
+            using var builder = renderGraph.AddUnsafePass<PassData>("StablePlanesDebugViz", out var passData);
             passData.Cs  = _cs;
             passData.Ds  = _ds;
             passData.Ctx = _ctx;

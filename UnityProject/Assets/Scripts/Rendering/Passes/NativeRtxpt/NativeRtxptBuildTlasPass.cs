@@ -38,7 +38,7 @@ namespace PathTracing
 
         public override void RecordRenderGraph(RenderGraph renderGraph, ContextContainer frameData)
         {
-            using var builder = renderGraph.AddUnsafePass<PassData>("NativeRtxpt.BuildTlas", out var passData);
+            using var builder = renderGraph.AddUnsafePass<PassData>("BuildTlas", out var passData);
 
             passData.GpuScene      = _gpuScene;
             passData.BuildPipeline = _buildPipeline;

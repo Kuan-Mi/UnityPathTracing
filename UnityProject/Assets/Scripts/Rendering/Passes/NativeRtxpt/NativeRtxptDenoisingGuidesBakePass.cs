@@ -73,7 +73,7 @@ namespace PathTracing
 
         public override void RecordRenderGraph(RenderGraph renderGraph, ContextContainer frameData)
         {
-            using var builder = renderGraph.AddUnsafePass<PassData>("NativeRtxpt.DenoiseSpecHitT", out var passData);
+            using var builder = renderGraph.AddUnsafePass<PassData>("DenoiseSpecHitT", out var passData);
             passData.Cs         = _cs;
             passData.PingDs     = _pingDs;
             passData.PongDs     = _pongDs;

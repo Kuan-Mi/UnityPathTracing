@@ -370,7 +370,7 @@ namespace PathTracing
                 return;
             }
 
-            using var builder = renderGraph.AddUnsafePass<PassData>("NativeRtxpt.LightingUpdateBegin", out var pd);
+            using var builder = renderGraph.AddUnsafePass<PassData>("LightingUpdateBegin", out var pd);
 
             // EnvLightsBaker
             pd.BackupPastCs         = _backupPastCs;

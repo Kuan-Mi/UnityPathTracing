@@ -155,7 +155,7 @@ namespace PathTracing
             // data, so don't enqueue any GPU work this frame (the expensive part of the regression).
             if (_skipBake) return;
 
-            using var builder = renderGraph.AddUnsafePass<PassData>("NativeRtxpt.EnvMapBaker", out var pd);
+            using var builder = renderGraph.AddUnsafePass<PassData>("EnvMapBaker", out var pd);
 
             pd.BaseLayerCs       = _baseLayerCs;
             pd.BaseLayerDs       = _baseLayerDs;
