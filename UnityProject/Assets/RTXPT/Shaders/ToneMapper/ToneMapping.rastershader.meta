@@ -4,9 +4,9 @@ ScriptedImporter:
   internalIDToNameTable: []
   externalObjects: {}
   serializedVersion: 2
-  userData:
-  assetBundleName:
-  assetBundleVariant:
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
   script: {fileID: 11500000, guid: 027188e0fad048b1a20a4377aff4684c, type: 3}
   additionalIncludePaths:
   - ../RenderingPlugin/External/RTXPT/Rtxpt/ToneMapper
@@ -25,7 +25,5 @@ ScriptedImporter:
   rootConstantsHints: []
   rootSRVHints: []
   samplerBindings:
-  - Name: gLuminanceTexSampler
-    Sampler: {fileID: 11400000, guid: 56b0e93e78c14055953d8d697b5a16fc, type: 2}
   - Name: gColorSampler
     Sampler: {fileID: 11400000, guid: 2fdd2d849eee449787dd20fa8587e624, type: 2}
