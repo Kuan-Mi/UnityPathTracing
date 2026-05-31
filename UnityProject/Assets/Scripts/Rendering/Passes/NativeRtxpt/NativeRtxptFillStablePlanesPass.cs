@@ -113,7 +113,7 @@ namespace PathTracing
 
             if (data.IsRealtime)
             {
-                cmd.BeginSample("Rtxpt.FillStablePlanes");
+                cmd.BeginSample("FillStablePlanes");
                 {
                     var ds = data.FillDs;
                     BindCommonRT(ds, ctx, &miniConst, tlas);
@@ -127,11 +127,11 @@ namespace PathTracing
 
                     data.FillSP.Dispatch(cmd, ds, (uint)data.RenderRes.x, (uint)data.RenderRes.y);
                 }
-                cmd.EndSample("Rtxpt.FillStablePlanes");
+                cmd.EndSample("FillStablePlanes");
             }
             else
             {
-                cmd.BeginSample("Rtxpt.Reference");
+                cmd.BeginSample("Reference");
                 {
                     var ds = data.RefDs;
                     BindCommonRT(ds, ctx, &miniConst, tlas);
@@ -145,7 +145,7 @@ namespace PathTracing
 
                     data.RefSP.Dispatch(cmd, ds, (uint)data.RenderRes.x, (uint)data.RenderRes.y);
                 }
-                cmd.EndSample("Rtxpt.Reference");
+                cmd.EndSample("Reference");
             }
         }
 

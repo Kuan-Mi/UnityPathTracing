@@ -81,7 +81,7 @@ namespace PathTracing
             var ds  = data.Ds;
             var res = ctx.Textures;
 
-            cmd.BeginSample("Rtxpt.Accumulation");
+            cmd.BeginSample("Accumulation");
 
             var inputSize  = new float2(ctx.RenderResolution.x, ctx.RenderResolution.y);
             var outputSize = new float2(ctx.DisplayResolution.x, ctx.DisplayResolution.y);
@@ -112,7 +112,7 @@ namespace PathTracing
             uint gy = ((uint)ctx.DisplayResolution.y + 7u) / 8u;
             data.Cs.Dispatch(cmd, ds, gx, gy, 1);
 
-            cmd.EndSample("Rtxpt.Accumulation");
+            cmd.EndSample("Accumulation");
         }
     }
 }

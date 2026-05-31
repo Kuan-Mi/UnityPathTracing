@@ -92,7 +92,7 @@ namespace PathTracing
 
             var tlas = ctx.GpuScene?.AccelerationStructure;
 
-            cmd.BeginSample("Rtxpt.BuildStablePlanes");
+            cmd.BeginSample("BuildStablePlanes");
             {
                 var ds = data.BuildDs;
                 BindCommonRT(ds, ctx, &miniConst, tlas);
@@ -108,7 +108,7 @@ namespace PathTracing
 
                 data.BuildSP.Dispatch(cmd, ds, (uint)data.RenderRes.x, (uint)data.RenderRes.y);
             }
-            cmd.EndSample("Rtxpt.BuildStablePlanes");
+            cmd.EndSample("BuildStablePlanes");
         }
 
         // ── Binding helpers ────────────────────────────────────────────────────

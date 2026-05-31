@@ -93,13 +93,13 @@ namespace PathTracing
             uint gx = ((uint)ctx.RenderResolution.x + 7u) / 8u;
             uint gy = ((uint)ctx.RenderResolution.y + 7u) / 8u;
 
-            cmd.BeginSample("Rtxpt.DenoiseSpecHitT[Ping]");
+            cmd.BeginSample("DenoiseSpecHitT[Ping]");
             DispatchDenoiseSpecHitT(cmd, data, data.PingDs, 1u, gx, gy, res, ctx);
-            cmd.EndSample("Rtxpt.DenoiseSpecHitT[Ping]");
+            cmd.EndSample("DenoiseSpecHitT[Ping]");
 
-            cmd.BeginSample("Rtxpt.DenoiseSpecHitT[Pong]");
+            cmd.BeginSample("DenoiseSpecHitT[Pong]");
             DispatchDenoiseSpecHitT(cmd, data, data.PongDs, 0u, gx, gy, res, ctx);
-            cmd.EndSample("Rtxpt.DenoiseSpecHitT[Pong]");
+            cmd.EndSample("DenoiseSpecHitT[Pong]");
         }
 
         private static unsafe void DispatchDenoiseSpecHitT(

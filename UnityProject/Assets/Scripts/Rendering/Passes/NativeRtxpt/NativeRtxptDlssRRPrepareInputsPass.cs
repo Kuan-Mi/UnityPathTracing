@@ -76,7 +76,7 @@ namespace PathTracing
             var res = ctx.Textures;
             var buf = ctx.Buffers;
 
-            cmd.BeginSample("Rtxpt.DlssBefore");
+            cmd.BeginSample("DlssBefore");
 
             ds.SetConstantBuffer("g_Const", ctx.ConstantBuffer);
 
@@ -104,7 +104,7 @@ namespace PathTracing
             uint gy = ((uint)ctx.RenderResolution.y + 7u) / 8u;
             data.Cs.Dispatch(cmd, ds, gx, gy, 1);
 
-            cmd.EndSample("Rtxpt.DlssBefore");
+            cmd.EndSample("DlssBefore");
         }
     }
 }

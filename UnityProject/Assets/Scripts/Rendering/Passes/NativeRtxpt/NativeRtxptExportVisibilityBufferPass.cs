@@ -66,7 +66,7 @@ namespace PathTracing
             var ds  = data.Ds;
             var res = ctx.Textures;
 
-            cmd.BeginSample("Rtxpt.ExportVisibilityBuffer");
+            cmd.BeginSample("ExportVisibilityBuffer");
 
             ds.SetConstantBuffer("g_Const", ctx.ConstantBuffer);
             ds.SetRWTexture("u_MotionVectors", res.ScreenMotionVectors.NativePtr);
@@ -77,7 +77,7 @@ namespace PathTracing
             uint gy = ((uint)ctx.RenderResolution.y + 7u) / 8u;
             data.Cs.Dispatch(cmd, ds, gx, gy, 1);
 
-            cmd.EndSample("Rtxpt.ExportVisibilityBuffer");
+            cmd.EndSample("ExportVisibilityBuffer");
         }
     }
 }

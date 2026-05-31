@@ -60,14 +60,14 @@ namespace PathTracing
             var scaleOffset     = new Vector4(data.RenderScale, data.RenderScale, 0f, 0f);
             var fullScaleOffset = new Vector4(1f, 1f, 0f, 0f);
 
-            cmd.BeginSample("Rtxpt.OutputBlit");
+            cmd.BeginSample("OutputBlit");
             cmd.SetRenderTarget(data.CameraTexture);
 
             // When a debug view is active, override showMode and display the debug viz texture.
             if (data.DebugViewType != RtxptDebugViewType.Disabled)
             {
                 Blitter.BlitTexture(cmd, res.ShaderDebugViz.Handle, scaleOffset, mat, (int)ShowPass.Out);
-                cmd.EndSample("Rtxpt.OutputBlit");
+                cmd.EndSample("OutputBlit");
                 return;
             }
 
@@ -149,7 +149,7 @@ namespace PathTracing
                     break;
             }
 
-            cmd.EndSample("Rtxpt.OutputBlit");
+            cmd.EndSample("OutputBlit");
         }
 
         public override void RecordRenderGraph(RenderGraph renderGraph, ContextContainer frameData)
