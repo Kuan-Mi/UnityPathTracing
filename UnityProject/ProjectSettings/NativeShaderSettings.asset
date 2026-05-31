@@ -6,5 +6,8 @@
     "globalIncludePaths": [
         "../RenderingPlugin/External/NRD/Shaders"
     ],
-    "globalExtraArgs": []
+    "globalExtraArgs": [
+        "-Zi",
+        "-Qembed_debug"
+    ]
 }
