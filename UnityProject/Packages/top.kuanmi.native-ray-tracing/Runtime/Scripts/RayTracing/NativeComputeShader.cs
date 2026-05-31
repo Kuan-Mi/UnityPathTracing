@@ -43,9 +43,10 @@ namespace NativeRender
         [SerializeField, HideInInspector]
         private string[] _rootSRVHints = Array.Empty<string>();
 
-        /// <summary>Static-sampler overrides. Written by the ScriptedImporter. Consumed by NativeComputePipeline.</summary>
+        /// <summary>Per-sampler references to shared <see cref="NativeSampler"/> assets. Written by the
+        /// ScriptedImporter. Resolved by NativeComputePipeline via <see cref="ResolveSamplerHints"/>.</summary>
         [SerializeField, HideInInspector]
-        private SamplerHint[] _samplerHints = Array.Empty<SamplerHint>();
+        private SamplerBinding[] _samplerBindings = Array.Empty<SamplerBinding>();
 
         /// <summary>Pre-compiled DXIL bytecode. Populated by EnsureCompiled(); persisted by Unity serialization.</summary>
         [SerializeField, HideInInspector]
@@ -82,8 +83,12 @@ namespace NativeRender
         /// <summary>Root SRV hints stored by the importer. Read by <see cref="NativeComputePipeline"/>.</summary>
         internal string[] RootSRVHints => _rootSRVHints ?? Array.Empty<string>();
 
-        /// <summary>Static-sampler overrides stored by the importer. Read by <see cref="NativeComputePipeline"/>.</summary>
-        internal SamplerHint[] SamplerHints => _samplerHints ?? Array.Empty<SamplerHint>();
+        /// <summary>Per-sampler references stored by the importer. Read by the editor inspector.</summary>
+        internal SamplerBinding[] SamplerBindings => _samplerBindings ?? Array.Empty<SamplerBinding>();
+
+        /// <summary>Resolves the sampler references into static-sampler hints for the pipeline. Called at
+        /// (re)build time so live edits to the referenced <see cref="NativeSampler"/> assets are picked up.</summary>
+        internal SamplerHint[] ResolveSamplerHints() => SamplerBindingResolver.Resolve(_samplerBindings);
 
         // -------------------------------------------------------------------
         // Compilation  (ShaderCompilerPlugin — no D3D12 needed)

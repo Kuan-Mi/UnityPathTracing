@@ -149,7 +149,7 @@ namespace NativeRender
             _shader             = shader;
             _rootConstantsHints = rootConstantsHints;
             _rootSRVHints       = rootSRVHints;
-            _samplerHints       = shader.SamplerHints;
+            _samplerHints       = shader.ResolveSamplerHints();
             BuildNativeHandle(shader);
             BuildSlotLayout(shader);
             NativeComputeShader.OnRecompiled += OnShaderRecompiled;

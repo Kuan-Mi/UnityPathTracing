@@ -72,7 +72,7 @@ namespace NativeRender
             _state              = state;
             _rootConstantsHints = rootConstantsHints;
             _rootSRVHints       = rootSRVHints;
-            _samplerHints       = shader.SamplerHints;
+            _samplerHints       = shader.ResolveSamplerHints();
             BuildNativeHandle();
             BuildSlotLayout();
             NativeRasterShader.OnRecompiled += OnShaderRecompiled;

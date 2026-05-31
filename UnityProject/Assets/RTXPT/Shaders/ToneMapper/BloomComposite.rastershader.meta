@@ -21,9 +21,6 @@ ScriptedImporter:
   psTargetProfile: ps_6_6
   rootConstantsHints: []
   rootSRVHints: []
-  samplerHints:
+  samplerBindings:
   - Name: samp
-    Filter: 1
-    Address: 1
-    Mips: 0
-    MaxAnisotropy: 16
+    Sampler: {fileID: 11400000, guid: 9be38ccb4f704279889964491d3d8a2a, type: 2}

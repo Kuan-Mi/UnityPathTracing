@@ -18,26 +18,22 @@ namespace NativeRender
     // =======================================================================
 
     /// <summary>
-    /// Writes a <see cref="SamplerHint"/>[] into the shader asset's serialized <c>_samplerHints</c>
-    /// property. Shared by all three shader importers so the field mapping lives in one place.
+    /// Writes a <see cref="SamplerBinding"/>[] into the shader asset's serialized <c>_samplerBindings</c>
+    /// property (HLSL name + a reference to a shared <see cref="NativeSampler"/> asset). Shared by all
+    /// three shader importers so the field mapping lives in one place.
     /// </summary>
-    internal static class SamplerHintSerialization
+    internal static class SamplerBindingSerialization
     {
-        public static void Write(SerializedProperty prop, SamplerHint[] hints)
+        public static void Write(SerializedProperty prop, SamplerBinding[] bindings)
         {
             if (prop == null) return;
-            int count = hints?.Length ?? 0;
+            int count = bindings?.Length ?? 0;
             prop.arraySize = count;
             for (int i = 0; i < count; i++)
             {
                 var elem = prop.GetArrayElementAtIndex(i);
-                elem.FindPropertyRelative("Name").stringValue          = hints[i].Name ?? "";
-                elem.FindPropertyRelative("Filter").enumValueIndex     = (int)hints[i].Filter;
-                elem.FindPropertyRelative("AddressU").enumValueIndex   = (int)hints[i].AddressU;
-                elem.FindPropertyRelative("AddressV").enumValueIndex   = (int)hints[i].AddressV;
-                elem.FindPropertyRelative("AddressW").enumValueIndex   = (int)hints[i].AddressW;
-                elem.FindPropertyRelative("Mips").boolValue            = hints[i].Mips;
-                elem.FindPropertyRelative("MaxAnisotropy").intValue    = (int)hints[i].MaxAnisotropy;
+                elem.FindPropertyRelative("Name").stringValue            = bindings[i].Name ?? "";
+                elem.FindPropertyRelative("Sampler").objectReferenceValue = bindings[i].Sampler;
             }
         }
     }
@@ -440,7 +436,7 @@ namespace NativeRender
             var so = new SerializedObject(importer);
             var rc = so.FindProperty("rootConstantsHints");
             var sv = so.FindProperty("rootSRVHints");
-            var sh = so.FindProperty("samplerHints");
+            var sh = so.FindProperty("samplerBindings");
 
             var staleConstants = new List<string>();
             if (rc != null)
@@ -478,8 +474,8 @@ namespace NativeRender
                 if (!EditorGUILayout.ToggleLeft($"{name}    (root SRV)", true))
                     RemoveHint(importer, "rootSRVHints", name, isStruct: false);
             foreach (var name in staleSamplers)
-                if (!EditorGUILayout.ToggleLeft($"{name}    (sampler override)", true))
-                    RemoveHint(importer, "samplerHints", name, isStruct: true);
+                if (!EditorGUILayout.ToggleLeft($"{name}    (sampler reference)", true))
+                    RemoveHint(importer, "samplerBindings", name, isStruct: true);
             EditorGUI.indentLevel--;
         }
 
@@ -588,103 +584,47 @@ namespace NativeRender
             return true;
         }
 
-        // Inline sampler-override row: a toggle on the reflected sampler binding plus, when on,
-        // dropdowns for filter / address / mips / anisotropy. The name comes from reflection, so
-        // there is nothing to type. When off, the native plugin infers attributes from the name.
+        // Sampler reference row: an object field on the reflected sampler binding that points at a
+        // shared NativeSampler asset. The name comes from reflection, so there is nothing to type.
+        // When left empty, the native plugin infers the attributes from the sampler name.
         private static bool DrawSamplerRow(ScriptedImporter importer, ShaderBindingEntry e)
         {
             var so   = new SerializedObject(importer);
-            var prop = so.FindProperty("samplerHints");
+            var prop = so.FindProperty("samplerBindings");
             if (prop == null) return false;
 
-            int  idx  = FindHintIndex(prop, e.Name);
-            bool isOn = idx >= 0;
+            int idx = FindHintIndex(prop, e.Name);
+            var current = idx >= 0
+                ? prop.GetArrayElementAtIndex(idx).FindPropertyRelative("Sampler").objectReferenceValue as NativeSampler
+                : null;
 
             var label = new GUIContent(
                 $"{e.Name}    SamplerState  space{e.Space}:s{e.Reg}",
-                "Override the static-sampler attributes. When off, they are inferred from the sampler name "
-                + "(e.g. sampler_LinearClamp).");
+                "Assign a shared NativeSampler asset (Create > Native Render > Sampler). Editing that "
+                + "asset updates every shader that references it. When left empty, the native plugin "
+                + "infers the attributes from the sampler name (e.g. sampler_LinearClamp).");
 
-            bool newOn = EditorGUILayout.ToggleLeft(label, isOn);
-            if (newOn != isOn)
+            var newSampler = (NativeSampler)EditorGUILayout.ObjectField(label, current, typeof(NativeSampler), false);
+            if (newSampler == current) return true;
+
+            if (newSampler != null)
             {
-                if (newOn)
+                if (idx < 0)
                 {
                     idx = prop.arraySize;
                     prop.InsertArrayElementAtIndex(idx);
-                    var el = prop.GetArrayElementAtIndex(idx);
-                    el.FindPropertyRelative("Name").stringValue        = e.Name;
-                    el.FindPropertyRelative("Filter").enumValueIndex   = (int)SamplerFilter.Linear;
-                    el.FindPropertyRelative("AddressU").enumValueIndex = (int)SamplerAddress.Clamp;
-                    el.FindPropertyRelative("AddressV").enumValueIndex = (int)SamplerAddress.Clamp;
-                    el.FindPropertyRelative("AddressW").enumValueIndex = (int)SamplerAddress.Clamp;
-                    el.FindPropertyRelative("Mips").boolValue          = false;
-                    el.FindPropertyRelative("MaxAnisotropy").intValue  = 16;
+                    prop.GetArrayElementAtIndex(idx).FindPropertyRelative("Name").stringValue = e.Name;
                 }
-                else
-                {
-                    prop.DeleteArrayElementAtIndex(idx);
-                }
-                so.ApplyModifiedProperties();
-                ShaderImporterGUI.ScheduleReimport(importer);
-                return true;
+                prop.GetArrayElementAtIndex(idx).FindPropertyRelative("Sampler").objectReferenceValue = newSampler;
             }
-
-            if (newOn)
+            else if (idx >= 0)
             {
-                var el          = prop.GetArrayElementAtIndex(idx);
-                var filterProp  = el.FindPropertyRelative("Filter");
-                var addrUProp   = el.FindPropertyRelative("AddressU");
-                var addrVProp   = el.FindPropertyRelative("AddressV");
-                var addrWProp   = el.FindPropertyRelative("AddressW");
-                var mipsProp    = el.FindPropertyRelative("Mips");
-                var anisoProp   = el.FindPropertyRelative("MaxAnisotropy");
-
-                bool axesDiffer = addrUProp.enumValueIndex != addrVProp.enumValueIndex
-                               || addrUProp.enumValueIndex != addrWProp.enumValueIndex;
-                string perAxisKey = "NativeShader.samplerPerAxis." + importer.assetPath + "." + e.Name;
-                bool perAxis = SessionState.GetBool(perAxisKey, axesDiffer);
-
-                EditorGUI.indentLevel++;
-                EditorGUI.BeginChangeCheck();
-                EditorGUILayout.PropertyField(filterProp, new GUIContent("Filter"));
-
-                if (!perAxis)
-                {
-                    // One control drives all three axes (the common case).
-                    EditorGUILayout.PropertyField(addrUProp, new GUIContent("Address"));
-                    addrVProp.enumValueIndex = addrWProp.enumValueIndex = addrUProp.enumValueIndex;
-                }
-                else
-                {
-                    EditorGUILayout.PropertyField(addrUProp, new GUIContent("Address U"));
-                    EditorGUILayout.PropertyField(addrVProp, new GUIContent("Address V"));
-                    EditorGUILayout.PropertyField(addrWProp, new GUIContent("Address W"));
-                }
-
-                EditorGUILayout.PropertyField(mipsProp, new GUIContent("Sample Mips"));
-                bool changed = EditorGUI.EndChangeCheck();
-
-                if (filterProp.enumValueIndex == (int)SamplerFilter.Anisotropic)
-                {
-                    int newAniso = EditorGUILayout.DelayedIntField("Max Anisotropy", anisoProp.intValue);
-                    if (newAniso != anisoProp.intValue)
-                    {
-                        anisoProp.intValue = Mathf.Clamp(newAniso, 1, 16);
-                        changed = true;
-                    }
-                }
-
-                bool newPerAxis = EditorGUILayout.ToggleLeft("Per-axis address", perAxis);
-                if (newPerAxis != perAxis) SessionState.SetBool(perAxisKey, newPerAxis);
-                EditorGUI.indentLevel--;
-
-                if (changed)
-                {
-                    so.ApplyModifiedProperties();
-                    ShaderImporterGUI.ScheduleReimport(importer);
-                }
+                // Element is a struct (not a bare object-reference array), so a single delete removes it.
+                prop.DeleteArrayElementAtIndex(idx);
             }
+
+            so.ApplyModifiedProperties();
+            ShaderImporterGUI.ScheduleReimport(importer);
             return true;
         }
 

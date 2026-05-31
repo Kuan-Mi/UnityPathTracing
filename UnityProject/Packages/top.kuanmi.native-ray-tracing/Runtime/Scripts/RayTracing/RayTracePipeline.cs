@@ -81,7 +81,7 @@ namespace NativeRender
             _shader             = shader;
             _rootConstantsHints = rootConstantsHints;
             _rootSRVHints       = rootSRVHints;
-            _samplerHints       = shader.SamplerHints;
+            _samplerHints       = shader.ResolveSamplerHints();
             BuildNativeHandle(shader);
             RayTraceShader.OnRecompiled += OnShaderRecompiled;
         }
@@ -118,7 +118,7 @@ namespace NativeRender
             _hitGroupShaders    = hitGroupShaders;
             _rootConstantsHints = rootConstantsHints;
             _rootSRVHints       = rootSRVHints;
-            _samplerHints       = primaryShader.SamplerHints;
+            _samplerHints       = primaryShader.ResolveSamplerHints();
 
             BuildNativeHandleMultiBlob(primaryShader, hitGroupShaders);
             RayTraceShader.OnRecompiled  += OnShaderRecompiled;
