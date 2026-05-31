@@ -32,7 +32,10 @@ namespace NativeRender
 
         private readonly InternalUploadPass _internalPass;
 
-        public VolatileConstantBuffer(int sizeInBytes)
+        // Note: volatile constant buffers have no persistent GPU resource (each upload is a
+        // pool suballocation), so debugName cannot show as a stable resource name in PIX — it
+        // is accepted for API symmetry. The original RTXPT volatile CBs are likewise anonymous.
+        public VolatileConstantBuffer(int sizeInBytes, string debugName = null)
         {
             if (sizeInBytes <= 0) throw new ArgumentOutOfRangeException(nameof(sizeInBytes));
 
@@ -40,7 +43,7 @@ namespace NativeRender
             // Volatile constant buffer: no backing resource, suballocated per upload.
             Handle = NativeRenderPlugin.NR_CreateNativeBuffer(
                 (ulong)_sizeInBytes, 0u, 1u,
-                /*canHaveUAVs*/ 0u, /*isConstantBuffer*/ 1u, /*isVolatile*/ 1u);
+                /*canHaveUAVs*/ 0u, /*isConstantBuffer*/ 1u, /*isVolatile*/ 1u, debugName);
 
             _internalPass = new InternalUploadPass(this);
         }

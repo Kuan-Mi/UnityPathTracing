@@ -21,13 +21,14 @@ namespace NativeRender
         private bool _disposed;
 
         /// <param name="sizeInBytes">Size of the buffer in bytes.</param>
-        public DeviceBuffer(uint sizeInBytes)
+        /// <param name="debugName">Optional PIX/D3D12 debug name for the DEFAULT resource.</param>
+        public DeviceBuffer(uint sizeInBytes, string debugName = null)
         {
             if (sizeInBytes == 0) throw new ArgumentOutOfRangeException(nameof(sizeInBytes));
             // GPU-resident DEFAULT-heap buffer with ALLOW_UNORDERED_ACCESS (no CPU upload).
             Handle = NativeRenderPlugin.NR_CreateNativeBuffer(
                 sizeInBytes, 0u, 1u,
-                /*canHaveUAVs*/ 1u, /*isConstantBuffer*/ 0u, /*isVolatile*/ 0u);
+                /*canHaveUAVs*/ 1u, /*isConstantBuffer*/ 0u, /*isVolatile*/ 0u, debugName);
             if (Handle == 0)
                 Debug.LogError("[DeviceBuffer] NR_CreateNativeBuffer failed.");
         }

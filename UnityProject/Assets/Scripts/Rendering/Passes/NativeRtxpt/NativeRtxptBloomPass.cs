@@ -83,8 +83,9 @@ namespace PathTracing
             _compositeRaster  = new NativeRasterPipeline(compositeShader, constColor);
             _compositeDs      = new NativeRasterDescriptorSet(_compositeRaster);
 
-            _hBlurCb = new VolatileConstantBuffer(Marshal.SizeOf<BloomConstants>());
-            _vBlurCb = new VolatileConstantBuffer(Marshal.SizeOf<BloomConstants>());
+            // Names mirror donut BloomPass.cpp debugName strings ("BloomConstantsH"/"BloomConstantsV").
+            _hBlurCb = new VolatileConstantBuffer(Marshal.SizeOf<BloomConstants>(), "BloomConstantsH");
+            _vBlurCb = new VolatileConstantBuffer(Marshal.SizeOf<BloomConstants>(), "BloomConstantsV");
         }
 
         public void Dispose()

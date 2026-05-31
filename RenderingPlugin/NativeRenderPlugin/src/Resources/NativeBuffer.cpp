@@ -58,11 +58,26 @@ bool NativeBuffer::AllocDefault()
     if (FAILED(hr)) return false;
 
     // Name the resource so PIX captures and D3D12 debug-layer messages are readable.
-    wchar_t name[96];
-    swprintf_s(name, L"NativeBuffer(bytes=%llu,stride=%u%s)",
-               static_cast<unsigned long long>(m_desc.byteSize), m_desc.structStride,
-               m_desc.canHaveUAVs ? L",uav" : L"");
-    m_buffer->SetName(name);
+    // When the caller supplied a debug name we use it verbatim (so the resource matches
+    // the original RTXPT name in PIX); otherwise fall back to an auto-generated label.
+    if (!m_desc.debugName.empty())
+    {
+        const int wlen = MultiByteToWideChar(CP_UTF8, 0, m_desc.debugName.c_str(), -1, nullptr, 0);
+        if (wlen > 0)
+        {
+            std::wstring wname(static_cast<size_t>(wlen), L'\0');
+            MultiByteToWideChar(CP_UTF8, 0, m_desc.debugName.c_str(), -1, wname.data(), wlen);
+            m_buffer->SetName(wname.c_str());
+        }
+    }
+    else
+    {
+        wchar_t name[96];
+        swprintf_s(name, L"NativeBuffer(bytes=%llu,stride=%u%s)",
+                   static_cast<unsigned long long>(m_desc.byteSize), m_desc.structStride,
+                   m_desc.canHaveUAVs ? L",uav" : L"");
+        m_buffer->SetName(name);
+    }
     return true;
 }
 

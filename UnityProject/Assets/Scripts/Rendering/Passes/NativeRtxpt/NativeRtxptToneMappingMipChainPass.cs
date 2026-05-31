@@ -109,8 +109,9 @@ namespace PathTracing
             _applyDs     = new NativeRasterDescriptorSet(_applyRaster);
 
             // UAV-capable + readback-capable single-float buffer for the capture target.
-            _avgLumBuffer = new UploadBuffer(1, sizeof(float), UploadBuffer.UploadMode.Ranges, allowUAV: true);
-            _applyCb      = new VolatileConstantBuffer(Marshal.SizeOf<ToneMappingConstants>());
+            // Names mirror the original RTXPT ToneMappingPasses.cpp debugName strings for PIX parity.
+            _avgLumBuffer = new UploadBuffer(1, sizeof(float), UploadBuffer.UploadMode.Ranges, allowUAV: true, debugName: "AvgLuminanceBuffer");
+            _applyCb      = new VolatileConstantBuffer(Marshal.SizeOf<ToneMappingConstants>(), "ToneMappingConstants");
         }
 
         public void Dispose()
@@ -150,7 +151,7 @@ namespace PathTracing
             // Single-channel R32_FLOAT log-luminance pyramid. luminance_ps writes float4(logLum,0,0,1) →
             // only .r is stored; the mip shader's RWTexture2D<float> and capture_cs's Texture2D<float>
             // both bind it exactly (R32_FLOAT supports UAV typed load/store on all hardware).
-            _lumTex ??= new NriTextureResource("Rtxpt_Luminance", GraphicsFormat.R32_SFloat,
+            _lumTex ??= new NriTextureResource("Luminance Texture", GraphicsFormat.R32_SFloat,
                             new NriResourceState { accessBits = AccessBits.SHADER_RESOURCE_STORAGE,
                                                    layout = Layout.SHADER_RESOURCE_STORAGE, stageBits = 1 << 10 });
             _lumTex.Allocate(new int2(w, h), 1, useMipMap: true);

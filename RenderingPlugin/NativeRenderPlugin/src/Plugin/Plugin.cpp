@@ -1225,7 +1225,8 @@ NR_BUAV_GetCapacity(uint64_t handle)
 // ---------------------------------------------------------------------------
 extern "C" uint64_t UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API
 NR_CreateNativeBuffer(uint64_t byteSize, uint32_t structStride, uint32_t maxVersions,
-                      uint32_t canHaveUAVs, uint32_t isConstantBuffer, uint32_t isVolatile)
+                      uint32_t canHaveUAVs, uint32_t isConstantBuffer, uint32_t isVolatile,
+                      const char* debugName)
 {
     if (!s_D3D12)
     {
@@ -1246,6 +1247,7 @@ NR_CreateNativeBuffer(uint64_t byteSize, uint32_t structStride, uint32_t maxVers
     desc.canHaveUAVs      = canHaveUAVs != 0;
     desc.isConstantBuffer = isConstantBuffer != 0;
     desc.isVolatile       = isVolatile != 0;
+    if (debugName && debugName[0]) desc.debugName = debugName;
 
     auto* nb = new NativeBuffer();
     if (!nb->Initialize(device, desc, s_Log))

@@ -251,7 +251,8 @@ namespace PathTracing
 
             if (!_constantBuffers.TryGetValue(uniqueKey, out var constantBuffer))
             {
-                constantBuffer = new VolatileConstantBuffer(Marshal.SizeOf<SampleConstants>());
+                // Name mirrors the original RTXPT main constants buffer (Sample.cpp "SampleConstants").
+                constantBuffer = new VolatileConstantBuffer(Marshal.SizeOf<SampleConstants>(), "SampleConstants");
                 _constantBuffers.Add(uniqueKey, constantBuffer);
             }
 

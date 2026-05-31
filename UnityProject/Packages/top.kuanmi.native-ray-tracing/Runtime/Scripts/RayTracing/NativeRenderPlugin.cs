@@ -450,7 +450,8 @@ namespace NativeRender
         [DllImport(DllName)]
         public static extern ulong NR_CreateNativeBuffer(
             ulong byteSize, uint structStride, uint maxVersions,
-            uint canHaveUAVs, uint isConstantBuffer, uint isVolatile);
+            uint canHaveUAVs, uint isConstantBuffer, uint isVolatile,
+            [MarshalAs(UnmanagedType.LPUTF8Str)] string debugName);
 
         /// <summary>Enqueues destruction after a GPU fence delay.</summary>
         [DllImport(DllName)]

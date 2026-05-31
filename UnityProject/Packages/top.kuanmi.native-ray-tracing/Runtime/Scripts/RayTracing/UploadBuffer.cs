@@ -90,7 +90,7 @@ namespace NativeRender
         /// Set <paramref name="allowUAV"/> when the buffer must also be GPU-writable (bound as a
         /// RWStructuredBuffer) — e.g. a buffer that mixes CPU uploads with compute-shader writes.
         /// </summary>
-        public UploadBuffer(int capacity, int elementStride, UploadMode mode = UploadMode.Ranges, bool allowUAV = false)
+        public UploadBuffer(int capacity, int elementStride, UploadMode mode = UploadMode.Ranges, bool allowUAV = false, string debugName = null)
         {
             if (capacity      <= 0) throw new ArgumentOutOfRangeException(nameof(capacity));
             if (elementStride <= 0) throw new ArgumentOutOfRangeException(nameof(elementStride));
@@ -101,7 +101,7 @@ namespace NativeRender
             // GPU-resident DEFAULT-heap structured buffer fed by the staged-copy snapshot path.
             Handle = NativeRenderPlugin.NR_CreateNativeBuffer(
                 (ulong)capacity * (ulong)elementStride, (uint)elementStride, 1u,
-                /*canHaveUAVs*/ allowUAV ? 1u : 0u, /*isConstantBuffer*/ 0u, /*isVolatile*/ 0u);
+                /*canHaveUAVs*/ allowUAV ? 1u : 0u, /*isConstantBuffer*/ 0u, /*isVolatile*/ 0u, debugName);
             if (Handle == 0)
                 throw new InvalidOperationException("NR_CreateNativeBuffer failed (renderer not ready?)");
 

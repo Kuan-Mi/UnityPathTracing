@@ -209,7 +209,7 @@ namespace PathTracing
             LocalSamplingBuffer = new GraphicsBuffer(
                 GraphicsBuffer.Target.Structured,
                 localSampCount, 4)
-            { name = "Rtxpt_LocalSamplingBuffer" };
+            { name = "NEE_AT_LocalSamplingBuffer" };
             LocalSamplingBufferPtr = LocalSamplingBuffer.GetNativeBufferPtr();
 
             // StablePlanesBuffer: W×H×StablePlaneCount structured entries, stride = StablePlaneStride (80).
@@ -218,7 +218,7 @@ namespace PathTracing
                 GraphicsBuffer.Target.Structured,
                 tsPlaneStride * StablePlaneCount,
                 StablePlaneStride)
-            { name = "Rtxpt_StablePlanesBuffer" };
+            { name = "StablePlanesBuffer" };
             StablePlanesBufferPtr = StablePlanesBuffer.GetNativeBufferPtr();
 
             // SurfaceDataBuffer: W×H×2 structured entries, stride = SurfaceDataStride (64).
@@ -227,7 +227,7 @@ namespace PathTracing
                 GraphicsBuffer.Target.Structured,
                 pixelCount * 2,
                 SurfaceDataStride)
-            { name = "Rtxpt_SurfaceDataBuffer" };
+            { name = "SurfaceData(GBuffer)" };
             SurfaceDataBufferPtr = SurfaceDataBuffer.GetNativeBufferPtr();
 
             return true;
@@ -241,57 +241,60 @@ namespace PathTracing
         {
             if (LightControlBuffer != null) return;
 
+            // Buffer debug names are kept byte-for-byte identical to the original RTXPT
+            // RenderTargets.cpp / LightsBaker.cpp debugName strings for PIX parity.
+
             // FeedbackBuffer stub — 1 element, 64B stride (matches DebugFeedbackStruct size).
             FeedbackBuffer = new GraphicsBuffer(
                 GraphicsBuffer.Target.Structured,
                 1, 64)
-            { name = "Rtxpt_FeedbackBuffer" };
+            { name = "Feedback_Buffer_Gpu" };
             FeedbackBufferPtr = FeedbackBuffer.GetNativeBufferPtr();
 
             // LightControlBuffer — single RtxptLightingControlData element (576 bytes).
             LightControlBuffer = new UploadBuffer(
                 1, Marshal.SizeOf<RtxptLightingControlData>(),
-                UploadBuffer.UploadMode.Whole, allowUAV: true);
+                UploadBuffer.UploadMode.Whole, allowUAV: true, debugName: "LightingControlData");
 
             // LightBuffer / LightExBuffer — match PolymorphicLightInfo (32B) and PolymorphicLightInfoEx (16B).
             // Native UAV-capable upload buffers: CPU writes the analytic-light sub-range (Ranges mode),
             // compute passes write env/emissive entries via UAV. Stable pointer (no GetNativeBufferPtr churn).
             LightBuffer = new UploadBuffer(
                 MaxLights, Marshal.SizeOf<RtxptPolymorphicLightInfo>(),
-                UploadBuffer.UploadMode.Ranges, allowUAV: true);
+                UploadBuffer.UploadMode.Ranges, allowUAV: true, debugName: "LightsBuffer");
 
             LightExBuffer = new UploadBuffer(
                 MaxLights, Marshal.SizeOf<RtxptPolymorphicLightInfoEx>(),
-                UploadBuffer.UploadMode.Ranges, allowUAV: true);
+                UploadBuffer.UploadMode.Ranges, allowUAV: true, debugName: "LightsExBuffer");
 
             LightScratchBuffer = new UploadBuffer(
                 ScratchElementCount, 4,
-                UploadBuffer.UploadMode.Ranges, allowUAV: true);
+                UploadBuffer.UploadMode.Ranges, allowUAV: true, debugName: "LightsScratchBuffer");
 
             // HistoryRemap buffers: functional need is MaxLights, but the original reuses the
             // carried-over byteSize (see CarryoverGroupCount) → 2 × (MaxLights+1). Match it.
             HistoryRemapCurrentToPast = new GraphicsBuffer(
                 GraphicsBuffer.Target.Structured,
                 CarryoverGroupCount, 4)
-            { name = "Rtxpt_HistoryRemapCurrentToPast" };
+            { name = "HistoryRemapCurrentToPast" };
             HistoryRemapCurrToPastPtr = HistoryRemapCurrentToPast.GetNativeBufferPtr();
 
             HistoryRemapPastToCurrent = new GraphicsBuffer(
                 GraphicsBuffer.Target.Structured,
                 CarryoverGroupCount, 4)
-            { name = "Rtxpt_HistoryRemapPastToCurrent" };
+            { name = "HistoryRemapPastToCurrent" };
             HistoryRemapPastToCurrPtr = HistoryRemapPastToCurrent.GetNativeBufferPtr();
 
             LightProxyCounters = new GraphicsBuffer(
                 GraphicsBuffer.Target.Structured,
                 ProxyCounterCount, 4)
-            { name = "Rtxpt_LightProxyCounters" };
+            { name = "PerLightProxyCounters" };
             LightProxyCountersPtr = LightProxyCounters.GetNativeBufferPtr();
 
             LightSamplingProxies = new GraphicsBuffer(
                 GraphicsBuffer.Target.Structured,
                 ProxySamplingCount, 4)
-            { name = "Rtxpt_LightSamplingProxies" };
+            { name = "LightSamplingProxies" };
             LightSamplingProxiesPtr = LightSamplingProxies.GetNativeBufferPtr();
 
             // LocalSamplingBuffer is now allocated in EnsureResources() with the correct resolution-dependent size.
@@ -300,7 +303,7 @@ namespace PathTracing
             LightWeightsBuffer = new GraphicsBuffer(
                 GraphicsBuffer.Target.Structured,
                 2 * WeightsCountHalf, 4)
-            { name = "Rtxpt_LightWeightsBuffer" };
+            { name = "LightsWeights" };
             LightWeightsBufferPtr = LightWeightsBuffer.GetNativeBufferPtr();
 
             // ScratchListBuffer: uint typed scratch for proxy count prefix-sum and job list.
@@ -309,7 +312,7 @@ namespace PathTracing
             ScratchListBuffer = new GraphicsBuffer(
                 GraphicsBuffer.Target.Structured,
                 ScratchListCount, 4)
-            { name = "Rtxpt_ScratchListBuffer" };
+            { name = "ScratchList" };
             ScratchListBufferPtr = ScratchListBuffer.GetNativeBufferPtr();
         }
 
@@ -319,10 +322,12 @@ namespace PathTracing
         public void EnsureEnvBakerBuffers()
         {
             if (EnvBakerCb != null && ImportanceBakerCb != null) return;
+            // Volatile CBs (pool suballocations) — names mirror the original RTXPT debugName
+            // strings for symmetry, though volatile buffers have no stable PIX resource name.
             EnvBakerCb?.Dispose();
-            EnvBakerCb = new VolatileConstantBuffer(NativeRtxptEnvMapBakerPass.EnvBakerCbSize);
+            EnvBakerCb = new VolatileConstantBuffer(NativeRtxptEnvMapBakerPass.EnvBakerCbSize, "EnvMapBakerConstants");
             ImportanceBakerCb?.Dispose();
-            ImportanceBakerCb = new VolatileConstantBuffer(NativeRtxptEnvMapBakerPass.ImportanceBakerCbSize);
+            ImportanceBakerCb = new VolatileConstantBuffer(NativeRtxptEnvMapBakerPass.ImportanceBakerCbSize, "EnvMapImportanceSamplingBakerConstants");
         }
 
         private void ReleaseResolutionBuffers()

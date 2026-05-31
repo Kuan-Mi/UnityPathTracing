@@ -874,21 +874,24 @@ namespace PathTracing
 
             // Ranges mode: per-frame transform updates touch only the moved instances,
             // so we upload just those sub-ranges rather than a full-buffer span.
-            _instanceGpuBuf = new UploadBuffer(_instanceCpu.Length, Marshal.SizeOf<DonutInstanceData>());
+            // Debug names match the original RTXPT/donut debugName strings (donut Scene.cpp
+            // "Instances"/"BindlessGeometry", Sample.cpp "Instances", MaterialsBaker.cpp
+            // "PTMaterialDataStorage", OmmBaker.cpp "BindlessGeometryDebug") for PIX parity.
+            _instanceGpuBuf = new UploadBuffer(_instanceCpu.Length, Marshal.SizeOf<DonutInstanceData>(), debugName: "Instances");
             _instanceGpuBuf.SetData(_instanceCpu, 0, _instanceCpu.Length);
 
-            _geometryGpuBuf = new GraphicsBuffer(GraphicsBuffer.Target.Structured, _geometryCpu.Length, Marshal.SizeOf<DonutGeometryData>());
+            _geometryGpuBuf = new GraphicsBuffer(GraphicsBuffer.Target.Structured, _geometryCpu.Length, Marshal.SizeOf<DonutGeometryData>()) { name = "BindlessGeometry" };
             _geometryGpuBuf.SetData(_geometryCpu);
             _geometryGpuBufPtr = _geometryGpuBuf.GetNativeBufferPtr();
 
-            _subInstanceGpuBuf = new UploadBuffer(_subInstanceCpu.Length, Marshal.SizeOf<SubInstanceData>());
+            _subInstanceGpuBuf = new UploadBuffer(_subInstanceCpu.Length, Marshal.SizeOf<SubInstanceData>(), debugName: "Instances");
             _subInstanceGpuBuf.SetData(_subInstanceCpu, 0, _subInstanceCpu.Length);
 
-            _ptMaterialGpuBuf = new GraphicsBuffer(GraphicsBuffer.Target.Structured, _ptMaterialCpu.Length, Marshal.SizeOf<PTMaterialData>());
+            _ptMaterialGpuBuf = new GraphicsBuffer(GraphicsBuffer.Target.Structured, _ptMaterialCpu.Length, Marshal.SizeOf<PTMaterialData>()) { name = "PTMaterialDataStorage" };
             _ptMaterialGpuBuf.SetData(_ptMaterialCpu);
             _ptMaterialGpuBufPtr = _ptMaterialGpuBuf.GetNativeBufferPtr();
 
-            _geomDebugGpuBuf = new GraphicsBuffer(GraphicsBuffer.Target.Structured, _geomDebugCpu.Length, Marshal.SizeOf<GeometryDebugData>());
+            _geomDebugGpuBuf = new GraphicsBuffer(GraphicsBuffer.Target.Structured, _geomDebugCpu.Length, Marshal.SizeOf<GeometryDebugData>()) { name = "BindlessGeometryDebug" };
             _geomDebugGpuBuf.SetData(_geomDebugCpu);
             _geomDebugGpuBufPtr = _geomDebugGpuBuf.GetNativeBufferPtr();
 
@@ -1345,7 +1348,7 @@ namespace PathTracing
 
             var vbUint = new uint[vbBytes / 4];
             Buffer.BlockCopy(vbData, 0, vbUint, 0, vbBytes);
-            var vbGfx = new GraphicsBuffer(GraphicsBuffer.Target.Raw, vbBytes / 4, 4);
+            var vbGfx = new GraphicsBuffer(GraphicsBuffer.Target.Raw, vbBytes / 4, 4) { name = "VertexBuffer" };
             vbGfx.SetData(vbUint);
 
             // ---- IB (uint32, matching Unity submesh indexStart layout) ----
@@ -1366,7 +1369,7 @@ namespace PathTracing
             }
 
             int ibBytes = ibData.Length * 4;
-            var ibGfx   = new GraphicsBuffer(GraphicsBuffer.Target.Raw, ibBytes / 4, 4);
+            var ibGfx   = new GraphicsBuffer(GraphicsBuffer.Target.Raw, ibBytes / 4, 4) { name = "IndexBuffer" };
             ibGfx.SetData(ibData);
 
             _ownedGfxBuffers.Add(vbGfx);
