@@ -102,7 +102,10 @@ namespace PathTracing
             int skyId = skyTex != null ? skyTex.GetInstanceID() : 0;
             ulong signature = ComputeEnvSignature(skyId);
 
-            _skipBake = tex.EnvBaked && tex.EnvBakeSignature == signature;
+            // DEBUG: caching temporarily disabled — force a re-bake every frame (mirrors the
+            // original EnvMapBaker m_dbgForceDynamic). Revert to re-enable the cache:
+            //   _skipBake = tex.EnvBaked && tex.EnvBakeSignature == signature;
+            _skipBake = false;
             if (!_skipBake)
             {
                 // The bake is guaranteed to be recorded this frame, so mark it done now.

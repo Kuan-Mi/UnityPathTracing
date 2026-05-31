@@ -1081,7 +1081,7 @@ namespace PathTracing
                 MetalRoughOrSpecularTextureIndex = SafeIdx(ormTexIdx),
                 EmissiveTextureIndex             = SafeIdx(emissiveTexIdx),
                 NormalTextureIndex               = SafeIdx(normalTexIdx),
-                OcclusionTextureIndex            = 0xFFFFFFFFu, // packed into ORM above
+                OcclusionTextureIndex            = 0u, // C++ FillData never writes this field; PTMaterialData is zero-initialized so it stays 0 (occlusion is packed into ORM, UseOcclusionTexture is disabled). See MaterialsBaker.cpp:516/907
                 TransmissionTextureIndex         = SafeIdx(transmTexIdx),
                 IoR                              = slot.IoR,
                 ThicknessFactor                  = slot.ThicknessFactor,
@@ -1220,7 +1220,7 @@ namespace PathTracing
                 MetalRoughOrSpecularTextureIndex = SafeTexIdx(metalRoughTexIdx),
                 EmissiveTextureIndex             = SafeTexIdx(emissiveTexIdx),
                 NormalTextureIndex               = SafeTexIdx(normalTexIdx),
-                OcclusionTextureIndex            = SafeTexIdx(occlusionTexIdx),
+                OcclusionTextureIndex            = 0u, // match C++ FillData: field is never written and stays zero-initialized (occlusion packed into ORM)
                 TransmissionTextureIndex         = 0xFFFFFFFFu,
                 IoR                              = 1.5f,
                 ThicknessFactor                  = 0f,
