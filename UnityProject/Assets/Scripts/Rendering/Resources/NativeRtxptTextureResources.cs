@@ -124,10 +124,10 @@ namespace PathTracing
         public NriTextureResource ProcessedOutputColor;
 
         // ── Env map baking outputs (fixed size, shared across frames) ─────────
-        /// <summary>256×256 baked env cubemap mip0. RGBA16F, UAV. Bound as t_EnvironmentMap.</summary>
+        /// <summary>Baked env cubemap mip0 (NativeRtxptEnvMapBakerPass.CubeDim, e.g. 2048²). RGBA16F, UAV. Bound as t_EnvironmentMap.</summary>
         public NriTextureResource EnvCubeMip0;
 
-        /// <summary>128×128 baked env cubemap mip1. RGBA16F, UAV.</summary>
+        /// <summary>Baked env cubemap mip1 (CubeDim/2). RGBA16F, UAV.</summary>
         public NriTextureResource EnvCubeMip1;
 
         /// <summary>1024×1024 importance map. R32F, UAV, mipmapped. Bound as u_ImportanceMap / t_EnvImportanceMap.</summary>
@@ -230,8 +230,8 @@ namespace PathTracing
         public bool EnsureEnvMapResources()
         {
             if (EnvCubeMip0.IsCreated) return false;
-            EnvCubeMip0.AllocateCube(256);
-            EnvCubeMip1.AllocateCube(128);
+            EnvCubeMip0.AllocateCube(NativeRtxptEnvMapBakerPass.CubeDim);
+            EnvCubeMip1.AllocateCube(NativeRtxptEnvMapBakerPass.CubeDim / 2);
             EnvImportanceMap.Allocate(new int2(1024, 1024), useMipMap: true);
             EnvRadianceMap.Allocate(new int2(1024, 1024), useMipMap: true);
             EnvDummyCube.AllocateCube(4, enableRandomWrite: false);

@@ -2,6 +2,7 @@
 #include <d3d12.h>
 #include <wrl/client.h>
 #include <cstdint>
+#include <string>
 #include "IUnityLog.h"
 #include "INativeResource.h"
 #include "ResourceStateTracker.h"
@@ -88,6 +89,7 @@ struct NativeBufferDesc
     bool     canHaveUAVs      = false; // ALLOW_UNORDERED_ACCESS on the DEFAULT resource
     bool     isConstantBuffer = false; // round byteSize up to the 256-byte CBV alignment
     bool     isVolatile       = false; // dynamic CB: per-write upload-pool suballocation, bound by VA
+    std::string debugName;             // optional PIX/D3D12 debug name for the DEFAULT resource (empty = auto)
 };
 
 /// <summary>

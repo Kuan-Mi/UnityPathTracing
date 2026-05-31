@@ -11,8 +11,13 @@ namespace PathTracing
 {
     public class NativeRtxptEnvMapBakerPass : ScriptableRenderPass, IDisposable
     {
-        private const int CubeDim                 = 256;
-        private const int CubeDimLowRes           = 32;
+        // Baked radiance cube resolution. Matches the original EnvMapBaker target for an
+        // image/HDR background: 2048 (EnvMapBaker.cpp:375, non-procedural). The importance &
+        // radiance maps (1024) are built by sampling this cube's mip0, so this drives the
+        // fidelity of all environment lighting. CubeDimLowRes mirrors m_cubeDimLowResDim =
+        // cubeDim/2 (EnvMapBaker.cpp:318). Public so the texture allocator stays in sync.
+        public  const int CubeDim                 = 2048;
+        private const int CubeDimLowRes           = CubeDim / 2;
         private const int ImportanceMapDim        = 1024;
         private const int ImportanceSamples       = 16;
         private const int ImportanceSamplesX      = 4;
