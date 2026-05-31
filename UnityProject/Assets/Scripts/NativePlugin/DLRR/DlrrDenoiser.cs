@@ -17,6 +17,32 @@ namespace DLRR
         [DllImport("Denoiser")]
         private static extern void DestroyDLRRInstance(int id);
 
+        [DllImport("Denoiser")]
+        private static extern bool DLRR_QueryOptimalRenderSize(
+            uint outputWidth, uint outputHeight, byte mode,
+            out uint renderWidth, out uint renderHeight);
+
+        /// <summary>
+        /// Queries the NGX/Streamline-recommended render resolution for a given output
+        /// resolution and DLSS mode, matching RTXPT's QueryDLSSOptimalSettings path.
+        /// Results are cached in the native plugin; the first call per unique
+        /// (outputRes, mode) may stall briefly for GPU idle.
+        /// Returns false if the native plugin is unavailable, in which case
+        /// <paramref name="renderRes"/> is set to <paramref name="outputRes"/>.
+        /// </summary>
+        public static bool TryGetOptimalRenderSize(int2 outputRes, UpscalerMode mode, out int2 renderRes)
+        {
+            if (DLRR_QueryOptimalRenderSize(
+                    (uint)outputRes.x, (uint)outputRes.y, (byte)mode,
+                    out uint rw, out uint rh))
+            {
+                renderRes = new int2((int)rw, (int)rh);
+                return true;
+            }
+            renderRes = outputRes;
+            return false;
+        }
+
         private readonly int                        _instanceId;
         private          NativeArray<DlrrFrameData> _buffer;
         private const    int                        BufferCount = 3;

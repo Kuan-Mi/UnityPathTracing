@@ -20,7 +20,9 @@ namespace PathTracing
             NativeRtxptSetting setting,
             int2 renderRes,
             int2 displayRes,
-            RtxptCameraFrameState fs)
+            RtxptCameraFrameState fs,
+            float preExposedGrayLuminance,
+            uint materialCount)
         {
             var  cam    = renderingData.cameraData.camera;
             var  xrPass = renderingData.cameraData.xr;
@@ -116,9 +118,9 @@ namespace PathTracing
             uint sampleIndex     = setting.realtimeMode ? (fs.frameIndex % 8192u) : 0u;
             uint sampleBaseIndex = sampleIndex * (uint)spp;
 
-            // No tonemapper hookup in this port — original multiplies by luminance(GetPreExposedGray(0))
-            // when tone mapping is enabled; with neutral exposure this is 1.0.
-            const float preExposedGrayLuminance = 1.0f;
+            // preExposedGrayLuminance mirrors Sample.cpp:1508 (luminance(GetPreExposedGray(0)) when tone
+            // mapping is on, else 1.0). Supplied by the caller from the tone-mapping pass's auto-exposure
+            // read-back so the firefly/DLSS clamps below adapt to scene luminance like the original.
 
             // Original (Sample.cpp:1511-1514): scales with sqrt(preExposedGrayLuminance) * 1e3.
             float fireflyThreshold;
@@ -247,7 +249,7 @@ namespace PathTracing
                 ptConsts                       = ptConsts,
                 debug                          = debug,
                 denoisingHitParamConsts        = new Vector4(3f, 0.1f, 20f, -25f),
-                materialCount                  = 0u,
+                materialCount                  = materialCount,
                 _padding0                      = 0u,
                 _padding1                      = 0u,
                 _padding2                      = 0u,

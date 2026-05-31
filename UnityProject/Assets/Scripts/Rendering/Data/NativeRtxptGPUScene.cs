@@ -163,6 +163,14 @@ namespace PathTracing
         public int TotalGeometryInstanceCount => _geometryCpu != null ? _geometryCpu.Length : 0;
 
         /// <summary>
+        /// Number of PT material entries (length of t_PTMaterialData). Mirrors
+        /// <c>m_materialsBaker->GetMaterialDataCount()</c> (Sample.cpp:2095) and feeds
+        /// <c>SampleConstants.MaterialCount</c>, which shaders use to bounds-check material indices
+        /// in <c>Bridge::loadIoR</c> / <c>loadHomogeneousVolumeData</c>.
+        /// </summary>
+        public uint MaterialDataCount => _ptMaterialCpu != null ? (uint)_ptMaterialCpu.Length : 0u;
+
+        /// <summary>
         /// Returns one <see cref="EmissiveGeometryEntry"/> for every sub-mesh whose material has
         /// a non-zero emissiveColor.  Must be called after <see cref="UpdateForFrame"/>.
         /// </summary>

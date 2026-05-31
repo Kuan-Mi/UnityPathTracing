@@ -703,12 +703,12 @@ void AccelerationStructure::ProcessPendingCompactions(ID3D12GraphicsCommandList4
             entry.blas->GetGPUVirtualAddress(),
             D3D12_RAYTRACING_ACCELERATION_STRUCTURE_COPY_MODE_COMPACT);
 
-        AccelLogf(m_log, kUnityLogTypeLog,
-            "[BLAS Compact] vb=%p: %.3f MB -> %.3f MB (%.2f%% smaller)",
-            (void *)it->key.vbPtr,
-            entry.blas->GetDesc().Width/ (1024.0 * 1024.0) ,
-            compactedSize / (1024.0 * 1024.0),
-            100.0 * (1.0 - (double)compactedSize / (double)entry.blas->GetDesc().Width));
+        // AccelLogf(m_log, kUnityLogTypeLog,
+        //     "[BLAS Compact] vb=%p: %.3f MB -> %.3f MB (%.2f%% smaller)",
+        //     (void *)it->key.vbPtr,
+        //     entry.blas->GetDesc().Width/ (1024.0 * 1024.0) ,
+        //     compactedSize / (1024.0 * 1024.0),
+        //     100.0 * (1.0 - (double)compactedSize / (double)entry.blas->GetDesc().Width));
 
         // Swap cache entry: schedule old buffer for 3-frame deferred delete
         D3D12_GPU_VIRTUAL_ADDRESS oldVA = entry.blas->GetGPUVirtualAddress();

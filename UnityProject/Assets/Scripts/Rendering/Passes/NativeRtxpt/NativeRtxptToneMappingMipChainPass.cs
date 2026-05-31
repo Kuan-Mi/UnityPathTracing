@@ -60,6 +60,9 @@ namespace PathTracing
         private const int kNumLods   = 4;
         private const int kMaxPasses = 4;
 
+        // TONEMAPPING_EXPOSURE_KEY (ToneMapping_cb.h:15) — the "key" gray that auto-exposure maps to.
+        private const float kExposureKey = 0.042f;
+
         // ── Pipelines (built once) ──
         private readonly NativeRasterPipeline       _lumRaster;
         private readonly NativeRasterDescriptorSet  _lumDs;
@@ -154,19 +157,44 @@ namespace PathTracing
             _mipCount = _lumTex.rt.mipmapCount;
         }
 
-        // Mirrors SetParameters / Update* and the CPU avgLuminance feed (exp2 of the read-back log2 value).
-        private static ToneMappingConstants BuildConstants(NativeRtxptSetting s, float avgLumLog2)
+        // Scalar of m_ColorTransform (ToneMappingPasses.cpp:431-440). White-balance is identity here, so the
+        // transform is k·I where k = exposureScale · manualExposureScale.
+        private static float ExposureScale(NativeRtxptSetting s)
         {
-            bool auto = s.autoExposure;
             float exposureScale       = Mathf.Pow(2f, s.exposureCompensation);
             float manualExposureScale = 1f;
-            if (!auto)
+            if (!s.autoExposure)
             {
                 float ev      = s.exposureValue;
                 float shutter = Mathf.Clamp(Mathf.Pow(2f, ev) / (s.fNumber * s.fNumber), 0.001f, 10000f);
                 manualExposureScale = (s.filmSpeed / 100f) / (shutter * s.fNumber * s.fNumber);
             }
-            float k = exposureScale * manualExposureScale;
+            return exposureScale * manualExposureScale;
+        }
+
+        /// <summary>
+        /// Mirrors Sample.cpp:1508 — <c>constants.preExposedGrayLuminance = EnableToneMapping ?
+        /// luminance(GetPreExposedGray(0)) : 1.0</c>. With the diagonal (white-balance-identity) color
+        /// transform used here, <c>GetPreExposedGray = inverse(k·I)·0.18 = 0.18/k</c>, divided by
+        /// <c>EXPOSURE_KEY / avgLuminance</c> when auto-exposure is on; <c>luminance(x,x,x) == x</c>.
+        /// Uses the last CPU-read-back average luminance (1-2 frame lag, exactly like
+        /// ToneMappingPass::GetPreExposedGray reading avgLuminanceLastCaptured). Returns 1.0 when tone
+        /// mapping is disabled — the neutral value the path tracer's firefly/DLSS clamps assume.
+        /// </summary>
+        public float GetPreExposedGrayLuminance(NativeRtxptSetting s)
+        {
+            if (!s.enableToneMapping) return 1.0f;
+            float gray = 0.18f / ExposureScale(s);
+            if (s.autoExposure)
+                gray *= Mathf.Pow(2f, _avgLumLog2) / kExposureKey; // /= (EXPOSURE_KEY / avgLuminance)
+            return gray;
+        }
+
+        // Mirrors SetParameters / Update* and the CPU avgLuminance feed (exp2 of the read-back log2 value).
+        private static ToneMappingConstants BuildConstants(NativeRtxptSetting s, float avgLumLog2)
+        {
+            bool auto = s.autoExposure;
+            float k = ExposureScale(s);
             float lumMin = Mathf.Pow(2f, auto ? s.exposureValueMin : -16f);
             float lumMax = Mathf.Pow(2f, auto ? s.exposureValueMax :  16f);
             return new ToneMappingConstants

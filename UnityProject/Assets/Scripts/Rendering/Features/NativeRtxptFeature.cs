@@ -281,7 +281,16 @@ namespace PathTracing
             frameState.Update(renderingData, texturesChanged, 1.0f, setting);
 
             // ---- Build & upload SampleConstants -----------------------------
-            sampleConstants = NativeRtxptConstantsBuilder.Build(renderingData, setting, renderResolution, displayResolution, frameState);
+            // Pre-exposed gray luminance comes from the tone-mapping pass's auto-exposure read-back
+            // (populated by the previous frame's GPU→CPU copy, mirroring the original's 1-2 frame lag).
+            // The pass instance persists across frames, so its last captured value is available here even
+            // though this frame's tone-mapping pass hasn't recorded yet.
+            float preExposedGrayLuminance = _toneMappingMipChainPass != null
+                ? _toneMappingMipChainPass.GetPreExposedGrayLuminance(setting)
+                : 1.0f;
+            // MaterialCount (Sample.cpp:2095 = GetMaterialDataCount): shaders bounds-check material
+            // indices against it (Bridge::loadIoR / loadHomogeneousVolumeData) — 0 disables IoR/volumes.
+            sampleConstants = NativeRtxptConstantsBuilder.Build(renderingData, setting, renderResolution, displayResolution, frameState, preExposedGrayLuminance, _gpuScene.MaterialDataCount);
 
             constantBuffer.Upload(renderer, sampleConstants);
 
@@ -436,15 +445,22 @@ namespace PathTracing
 
         private static int2 ComputeRenderResolution(int2 outputRes, UpscalerMode mode)
         {
+            // Query NGX for the SDK-recommended render resolution, matching RTXPT's
+            // QueryDLSSOptimalSettings path. Results are cached in the native plugin.
+            if (DlrrDenoiser.TryGetOptimalRenderSize(outputRes, mode, out var nativeRes))
+                return nativeRes;
+            Debug.LogError($"[NativeRtxptFeature] Failed to get optimal render size from native plugin for mode {mode}, falling back to hardcoded scale table.");
+
+            // Fallback (native plugin unavailable): hardcoded scale table.
             float scale = mode switch
             {
-                UpscalerMode.NATIVE => 1.0f,
-                UpscalerMode.ULTRA_QUALITY => 1.3f,
-                UpscalerMode.QUALITY => 1.5f,
-                UpscalerMode.BALANCED => 1.7f,
-                UpscalerMode.PERFORMANCE => 2.0f,
+                UpscalerMode.NATIVE            => 1.0f,
+                UpscalerMode.ULTRA_QUALITY     => 1.3f,
+                UpscalerMode.QUALITY           => 1.5f,
+                UpscalerMode.BALANCED          => 1.7f,
+                UpscalerMode.PERFORMANCE       => 2.0f,
                 UpscalerMode.ULTRA_PERFORMANCE => 3.0f,
-                _ => 1.0f,
+                _                              => 1.0f,
             };
             return new int2((int)(outputRes.x / scale + 0.5f),
                 (int)(outputRes.y / scale + 0.5f));
