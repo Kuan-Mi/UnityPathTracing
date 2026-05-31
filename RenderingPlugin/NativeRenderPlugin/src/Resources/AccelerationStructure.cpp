@@ -251,7 +251,7 @@ bool AccelerationStructure::EnsureBLAS(ID3D12GraphicsCommandList4 *cmdList, Inst
         {
             it->second.refCount++;
             slot.blasVA = it->second.blas->GetGPUVirtualAddress();
-            AccelLogf(m_log, kUnityLogTypeLog, "[BLAS] AddRef  vb=%p refCount=%d", (void *)slot.meshInfo.vertexBuffer, it->second.refCount);
+            // AccelLogf(m_log, kUnityLogTypeLog, "[BLAS] AddRef  vb=%p refCount=%d", (void *)slot.meshInfo.vertexBuffer, it->second.refCount);
             return true;
         }
     }
@@ -688,9 +688,9 @@ void AccelerationStructure::ProcessPendingCompactions(ID3D12GraphicsCommandList4
 
         if (!compactedBlas)
         {
-            AccelLogf(m_log, kUnityLogTypeWarning,
-                "[BLAS Compact] Buffer alloc failed for vb=%p (size=%llu), skipping",
-                (void *)it->key.vbPtr, (unsigned long long)compactedSize);
+            // AccelLogf(m_log, kUnityLogTypeWarning,
+            //     "[BLAS Compact] Buffer alloc failed for vb=%p (size=%llu), skipping",
+            //     (void *)it->key.vbPtr, (unsigned long long)compactedSize);
             if (it->mappedReadback)
                 it->readbackBuffer->Unmap(0, nullptr);
             it = m_pendingCompactions.erase(it);
@@ -1111,7 +1111,7 @@ bool AccelerationStructure::AddInstance(const NR_AddInstanceDesc &desc)
     }
     vb->SetName(vbName);
     ib->SetName(ibName);
-    AccelLogf(m_log, kUnityLogTypeLog, "[AddInstance] Set names: VB=%p '%ls', IB=%p '%ls', isDynamic=%d", (void *)vb, vbName, (void *)ib, ibName, (int)slot.isDynamic);
+    // AccelLogf(m_log, kUnityLogTypeLog, "[AddInstance] Set names: VB=%p '%ls', IB=%p '%ls', isDynamic=%d", (void *)vb, vbName, (void *)ib, ibName, (int)slot.isDynamic);
 
     slot.meshInfo.vertexBuffer = vb;
     slot.meshInfo.vertexCount = desc.vertexCount;
