@@ -105,8 +105,6 @@ namespace PathTracing
                 _padding2            = 0f,
             };
 
-            bool isDlssRR = setting.realtimeAA == 3 && !setting.tmpDisableDlssRR;
-
             // DLSS upscaling MIP bias (Sample.cpp:1496) — sharpens textures to compensate for upscale.
             float renderArea  = (float)renderRes.x   * renderRes.y;
             float displayArea = (float)displayRes.x  * displayRes.y;
@@ -155,7 +153,10 @@ namespace PathTracing
                 invSubSampleCount                            = 1.0f / spp,
                 fireflyFilterThreshold                       = fireflyThreshold,
                 preExposedGrayLuminance                      = preExposedGrayLuminance,
-                denoisingEnabled                             = isDlssRR ? 1u : 0u,
+                // Original (Sample.cpp:1521): hardcoded 0 — this is the legacy stable-planes / NRD
+                // guide flag and is unused by DLSS-RR (the entire RTXPT codebase never sets it non-zero).
+                // The fork's `realtimeAA==DLSS-RR ? 1 : 0` diverged from the DLSS-RR reference, which captures 0.
+                denoisingEnabled                             = 0u,
                 frameIndex                                   = fs.frameIndex,
                 useReSTIRDI                                  = 0u,
                 useReSTIRGI                                  = 0u,
@@ -196,7 +197,14 @@ namespace PathTracing
                 prevCamera                                   = prevCamera,
             };
 
-            // ── EnvMapSceneParams (identity — overridden by env-map baker pass) ─
+            // ── EnvMapSceneParams ─────────────────────────────────────────────
+            // This is g_Const.envMapSceneParams, read by the path tracer (EnvMap.hlsli sample).
+            // Nothing overrides it later, so ColorMultiplier must be set here just like the
+            // original (Sample.cpp:1913): TintColor * (Intensity / c_envMapRadianceScale). The
+            // divide cancels the constant compression scale baked into the cube
+            // (NativeRtxptEnvMapBakerPass.EnvMapRadianceScale) → net radiance = source * tint * intensity.
+            Color   envTintLin = setting.environmentMapTint.linear;
+            float   envColMul  = setting.environmentMapIntensity / NativeRtxptEnvMapBakerPass.EnvMapRadianceScale;
             var envMapParams = new EnvMapSceneParams
             {
                 TransformRow0    = new Vector4(1, 0, 0, 0),
@@ -205,7 +213,7 @@ namespace PathTracing
                 InvTransformRow0 = new Vector4(1, 0, 0, 0),
                 InvTransformRow1 = new Vector4(0, 1, 0, 0),
                 InvTransformRow2 = new Vector4(0, 0, 1, 0),
-                colorMultiplier  = Vector3.one,
+                colorMultiplier  = new Vector3(envTintLin.r, envTintLin.g, envTintLin.b) * envColMul,
                 enabled          = 1f,  // always enabled; env cube is baked each frame (directional lights + optional skybox)
             };
 
@@ -248,7 +256,11 @@ namespace PathTracing
                 envMapImportanceSamplingParams = envMapIS,
                 ptConsts                       = ptConsts,
                 debug                          = debug,
-                denoisingHitParamConsts        = new Vector4(3f, 0.1f, 20f, -25f),
+                // Original (Sample.cpp:2127): zero-initialized. Read only by the NRD ReBLUR
+                // denoiser front-end packing (PostProcess.hlsl:544, #else branch), which never
+                // runs under DLSS-RR — so it's a dead value there. The fork hardcoded the NRD
+                // ReBLUR default {3, 0.1, 20, -25}; matching the source keeps DLSS-RR parity.
+                denoisingHitParamConsts        = Vector4.zero,
                 materialCount                  = materialCount,
                 _padding0                      = 0u,
                 _padding1                      = 0u,

@@ -876,9 +876,12 @@ namespace PathTracing
                 InvTransformRow0 = new Vector4(1, 0, 0, 0),
                 InvTransformRow1 = new Vector4(0, 1, 0, 0),
                 InvTransformRow2 = new Vector4(0, 0, 1, 0),
-                ColorMultiplierR = envTint.r * envIntensity,
-                ColorMultiplierG = envTint.g * envIntensity,
-                ColorMultiplierB = envTint.b * envIntensity,
+                // Original (Sample.cpp:1912): ColorMultiplier = TintColor * (Intensity / c_envMapRadianceScale).
+                // The divide cancels the constant compression scale baked into the cube
+                // (NativeRtxptEnvMapBakerPass.EnvMapRadianceScale), so net radiance = source * tint * intensity.
+                ColorMultiplierR = envTint.r * envIntensity / NativeRtxptEnvMapBakerPass.EnvMapRadianceScale,
+                ColorMultiplierG = envTint.g * envIntensity / NativeRtxptEnvMapBakerPass.EnvMapRadianceScale,
+                ColorMultiplierB = envTint.b * envIntensity / NativeRtxptEnvMapBakerPass.EnvMapRadianceScale,
                 Enabled          = 1.0f,
             };
 

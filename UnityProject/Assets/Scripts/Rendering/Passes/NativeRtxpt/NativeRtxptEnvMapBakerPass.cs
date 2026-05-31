@@ -20,6 +20,13 @@ namespace PathTracing
         private const int BaseLayerGroupsXY       = (CubeDim / 2 + 7) / 8;
         private const int ImportanceBakerGroupsXY = (ImportanceMapDim + 15) / 16;
 
+        // Constant radiance-compression factor applied at bake time so 32-bit HDR source
+        // radiance fits the 16-bit-float / BC6U range the baker uses (Sample.cpp:89,
+        // c_envMapRadianceScale = 1/4). Tint & intensity are NOT applied here — they are
+        // applied at sample time via EnvMapSceneParams.ColorMultiplier, which also divides
+        // by this factor to cancel it (Sample.cpp:1912). Lowering below 1/4 breaks BC6U.
+        public const float EnvMapRadianceScale = 0.25f;
+
         // Mirrors HLSL EnvMapBakerConstants (EnvMapBaker.hlsl):
         //   EMB_DirectionalLight DirectionalLights[16]  — 512 bytes (16 × float4 ColorIntensity + float3 Direction + float AngularSize)
         //   ProceduralSkyConstants ProcSkyConsts        — 160 bytes (always zeroed in Unity)
@@ -239,13 +246,16 @@ namespace PathTracing
                 lightCount++;
             }
 
-            float envIntensity = setting?.environmentMapIntensity ?? 1.0f;
-            Color tint         = setting?.environmentMapTint ?? Color.white;
             bool  hasSky       = setting?.environmentMap != null;
 
-            cb.ScaleColorR           = tint.linear.r * envIntensity;
-            cb.ScaleColorG           = tint.linear.g * envIntensity;
-            cb.ScaleColorB           = tint.linear.b * envIntensity;
+            // Original (EnvMapBaker.cpp:480): ScaleColor is the constant radiance-compression
+            // factor only. Tint/intensity are applied at sample time via ColorMultiplier
+            // (NativeRtxptLightingUpdateBeginPass), NOT baked in here. The fork baked tint*intensity
+            // here AND multiplied again at sample time, double-applying it (and dropping the BC6U
+            // compression scale), so any non-1 intensity diverged from the original.
+            cb.ScaleColorR           = EnvMapRadianceScale;
+            cb.ScaleColorG           = EnvMapRadianceScale;
+            cb.ScaleColorB           = EnvMapRadianceScale;
             cb.DirectionalLightCount = (uint)lightCount;
             cb.CubeDim               = CubeDim;
             cb.CubeDimLowRes         = CubeDimLowRes;

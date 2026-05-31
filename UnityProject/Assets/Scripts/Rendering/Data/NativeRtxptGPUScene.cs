@@ -1281,7 +1281,7 @@ namespace PathTracing
             if (src == null) return (null, null);
             int key = src.GetInstanceID();
             if (_donutBufferCache.TryGetValue(key, out var cached)) return cached;
-
+ 
             int  vc         = src.vertexCount;
             bool hasNormal  = src.HasVertexAttribute(VertexAttribute.Normal);
             bool hasUV      = src.HasVertexAttribute(VertexAttribute.TexCoord0);
