@@ -36,8 +36,17 @@ namespace PathTracing
             var prevView = BuildSimpleViewConstants(fs.prevWorldToView, fs.prevViewToClip, fs.prevWorldToClip, renderRes, 1.0f, fs.prevViewportJitter);
 
             // ── Camera geometry ───────────────────────────────────────────────
-            float nearZ = proj.m23 / (proj.m22 - 1.0f);
-            float farZ  = proj.m23 / (proj.m22 + 1.0f);
+            // ComputeRayPinhole (PathTracerHelpers.hlsli) consumes NearZ/FarZ purely as positive
+            // eye-space distances along the optical axis: tMin = NearZ*invCos (ray pushed onto the
+            // near plane), tMax = FarZ*invCos. They are NOT clip-space/NDC depth, so the old
+            // proj.m23/(m22∓1) extraction (an OpenGL [-1,1] decode applied to the D3D reverse-Z
+            // `proj`) was the wrong kind of value and yielded a negated near / lost far.
+            // NearZ: positive near-plane distance — cam.nearClipPlane (handedness-independent).
+            float nearZ = cam.nearClipPlane;
+            // FarZ: primary-ray tMax only (no depth-precision role here). cam.farClipPlane exists
+            // for raster depth precision and would clip distant geometry/env the reference still
+            // traces; mirror RTXPT's effectively-unbounded far plane instead.
+            float farZ  = 1e7f;
 
             // Falcor-style ray-gen orthonormal frame
             var   viewInv     = fs.worldToView.inverse;
