@@ -740,7 +740,11 @@ namespace PathTracing
                         FlagsAndAlphaInfo                       = siFlags,
                         GlobalGeometryIndex_PTMaterialDataIndex = ((uint)globalGeomIdx << 16) | ((uint)matIdx & 0xFFFFu),
                         EmissiveLightMappingOffset              = 0xFFFFFFFFu, // no light baker yet
-                        AnalyticProxyLightIndex                 = 0u,
+                        // RTXPT_INVALID_LIGHT_INDEX — the analytic-light-proxy feature
+                        // (PrepareEmissiveTriangleTasks) is not ported, so leave this at the sentinel.
+                        // The shader only reads it for materials flagged EnableAsAnalyticLightProxy;
+                        // INVALID disables the proxy lookup, whereas 0u would alias env-quad light 0.
+                        AnalyticProxyLightIndex                 = 0xFFFFFFFFu,
                         IndexBufferIndex_VertexBufferIndex      = ((uint)slots.ib << 16) | ((uint)slots.vb & 0xFFFFu),
                         IndexOffset                             = (uint)sub.indexStart * 4u,
                         TexCoord1Offset                         = uvOff,
