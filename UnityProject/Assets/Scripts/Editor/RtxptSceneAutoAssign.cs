@@ -10,7 +10,7 @@ using UnityEngine;
 namespace PathTracing
 {
     /// <summary>
-    /// Adds <see cref="NativeRtxptMaterialOverride"/> to every MeshRenderer in the scene
+    /// Adds <see cref="RtxptRenderer"/> to every MeshRenderer in the scene
     /// and auto-assigns slot assets by matching Unity material names to
     /// <see cref="RtxptMaterial"/> files found in a chosen project folder.
     /// Open via  RTXPT ▸ Auto-Assign Material Overrides to Scene…
@@ -149,9 +149,9 @@ namespace PathTracing
                 int slotCount = mf?.sharedMesh != null ? mf.sharedMesh.subMeshCount : mats.Length;
                 if (slotCount == 0) continue;
 
-                var comp = mr.GetComponent<NativeRtxptMaterialOverride>();
+                var comp = mr.GetComponent<RtxptRenderer>();
                 if (comp == null)
-                    comp = Undo.AddComponent<NativeRtxptMaterialOverride>(mr.gameObject);
+                    comp = Undo.AddComponent<RtxptRenderer>(mr.gameObject);
 
                 Undo.RecordObject(comp, "Auto-Assign RTXPT Material Overrides");
                 

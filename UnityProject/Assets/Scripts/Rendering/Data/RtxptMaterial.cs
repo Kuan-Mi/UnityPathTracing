@@ -8,7 +8,7 @@ namespace PathTracing
     // Mirrors PTMaterial in MaterialPT.h. Holds the scalar/flag/colour fields plus
     // Unity texture references. Created from RTXPT material JSON (directly via the
     // *.material.json ScriptedImporter, or baked from a Unity material) and shared
-    // across renderers / sub-meshes by a NativeRtxptMaterialOverride component.
+    // across renderers / sub-meshes by a RtxptRenderer component.
     // =========================================================================
 
     [CreateAssetMenu(menuName = "RTXPT/Material", fileName = "RtxptMaterial")]

@@ -130,12 +130,12 @@ namespace PathTracing
         public uint LastEmissiveTriangleCount { get; private set; }
 
         // Maps MeshRenderer.GetInstanceID() → per-submesh material indices in _ptMaterialCpu
-        // for renderers that have a NativeRtxptMaterialOverride. Used for lightweight material-only updates.
+        // for renderers that have a RtxptRenderer. Used for lightweight material-only updates.
         private readonly Dictionary<int, int[]> _overrideMaterialIndices = new();
 
-        // Cached list of (component, matIndices) for all renderers with a NativeRtxptMaterialOverride.
+        // Cached list of (component, matIndices) for all renderers with a RtxptRenderer.
         // Rebuilt during RebuildSceneGpuData so CheckAndUpdateMaterialOverrides never calls GetComponent.
-        private readonly List<(NativeRtxptMaterialOverride comp, int[] matIndices)> _overrideCache = new();
+        private readonly List<(RtxptRenderer comp, int[] matIndices)> _overrideCache = new();
 
         // Optional equirectangular environment map for RTXDI environment light.
         private Texture _pendingEnvMap;
@@ -667,7 +667,7 @@ namespace PathTracing
                 }
 #endif
 
-                var   matOverride        = mr.GetComponent<NativeRtxptMaterialOverride>();
+                var   matOverride        = mr.GetComponent<RtxptRenderer>();
                 int[] overrideMatIndices = matOverride != null ? new int[subMeshCnt] : null;
 
                 Matrix4x4 m    = target.transform.localToWorldMatrix;
@@ -903,7 +903,7 @@ namespace PathTracing
         }
 
         /// <summary>
-        /// Checks all registered targets for dirty <see cref="NativeRtxptMaterialOverride"/> components
+        /// Checks all registered targets for dirty <see cref="RtxptRenderer"/> components
         /// and, if any are found, refreshes only the affected entries in <c>_ptMaterialCpu</c> and
         /// re-uploads the material buffer.  Texture assignments are not changed; only scalar/color/flag
         /// parameters are updated.  If you also change texture assignments, call
@@ -1099,7 +1099,7 @@ namespace PathTracing
             return idx;
         }
 
-        private int GetOrAddMaterial(Material mat, int subMeshIndex, NativeRtxptMaterialOverride matOverride,
+        private int GetOrAddMaterial(Material mat, int subMeshIndex, RtxptRenderer matOverride,
             List<PTMaterialData> ptMatList, List<IntPtr> texPtrs)
         {
             // ----------------------------------------------------------------

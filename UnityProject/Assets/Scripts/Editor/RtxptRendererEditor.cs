@@ -6,9 +6,9 @@ using UnityEngine;
 
 namespace PathTracing
 {
-    [CustomEditor(typeof(NativeRtxptMaterialOverride))]
+    [CustomEditor(typeof(RtxptRenderer))]
     [CanEditMultipleObjects]
-    public class NativeRtxptMaterialOverrideEditor : Editor
+    public class RtxptRendererEditor : Editor
     {
         private bool[] _slotFoldouts = Array.Empty<bool>();
 
@@ -23,7 +23,7 @@ namespace PathTracing
             {
                 foreach (var t in targets)
                 {
-                    var c = (NativeRtxptMaterialOverride)t;
+                    var c = (RtxptRenderer)t;
                     EnsureSlotAssets(c);
                     Undo.RecordObject(c, "Bake RTXPT Materials from Renderer");
                     c.BakeFromRenderer();
@@ -44,7 +44,7 @@ namespace PathTracing
             }
 
             // Auto-sync slot count to sub-mesh count for the primary target.
-            var primaryComp = (NativeRtxptMaterialOverride)target;
+            var primaryComp = (RtxptRenderer)target;
             SyncSlotCount(primaryComp);
 
             serializedObject.Update();
@@ -130,7 +130,7 @@ namespace PathTracing
         }
 
         // Resize the Slots list to match the renderer's sub-mesh count.
-        private static void SyncSlotCount(NativeRtxptMaterialOverride comp)
+        private static void SyncSlotCount(RtxptRenderer comp)
         {
             var mr = comp.GetComponent<MeshRenderer>();
             var mf = comp.GetComponent<MeshFilter>();
@@ -148,7 +148,7 @@ namespace PathTracing
         }
 
         // Creates asset files for all null slot entries (used by "Bake from Renderer").
-        private static void EnsureSlotAssets(NativeRtxptMaterialOverride comp)
+        private static void EnsureSlotAssets(RtxptRenderer comp)
         {
             SyncSlotCount(comp);
             string dir = ResolveAssetDir(comp.gameObject.scene.path);
@@ -163,7 +163,7 @@ namespace PathTracing
         }
 
         // Creates a single new asset for slot s.
-        private static RtxptMaterial CreateSlotAsset(NativeRtxptMaterialOverride comp, int s, string dir = null)
+        private static RtxptMaterial CreateSlotAsset(RtxptRenderer comp, int s, string dir = null)
         {
             dir ??= ResolveAssetDir(comp.gameObject.scene.path);
             var    asset = CreateInstance<RtxptMaterial>();

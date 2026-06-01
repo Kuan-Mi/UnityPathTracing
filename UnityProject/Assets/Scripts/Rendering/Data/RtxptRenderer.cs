@@ -5,7 +5,7 @@ using UnityEngine;
 namespace PathTracing
 {
     // =========================================================================
-    // NativeRtxptMaterialOverride  —  attach to any MeshRenderer
+    // RtxptRenderer  —  attach to any MeshRenderer
     // =========================================================================
 
     /// <summary>
@@ -22,7 +22,7 @@ namespace PathTracing
     /// </summary>
     [RequireComponent(typeof(MeshRenderer))]
     [DisallowMultipleComponent]
-    public class NativeRtxptMaterialOverride : MonoBehaviour
+    public class RtxptRenderer : MonoBehaviour
     {
         [Tooltip("One asset per sub-mesh. Index matches MeshRenderer.sharedMaterials. Null = use default material baking.")]
         public List<RtxptMaterial> Slots = new();
