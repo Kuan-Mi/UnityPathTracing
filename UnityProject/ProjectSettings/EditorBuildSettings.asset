@@ -20,9 +20,12 @@ EditorBuildSettings:
   - enabled: 0
     path: Assets/Arcade/Arcade.unity
     guid: d03bdcf0bbcbfca47840e76b073eba1a
-  - enabled: 1
+  - enabled: 0
     path: Assets/Art/transparent-machines/transparent-machines.unity
     guid: b47e9c043d27f844e8f3b92f7f727614
+  - enabled: 1
+    path: Assets/Art/transparentMachines.unity
+    guid: 30242e4fa57dbf3429ccbfc3f5ec4a82
   m_configObjects:
     com.unity.input.settings.actions: {fileID: -944628639613478452, guid: 052faaac586de48259a63d0c4782560b, type: 3}
     com.unity.xr.management.loader_settings: {fileID: 11400000, guid: ef0ce46ed818dba47ac25c34755259b6, type: 2}

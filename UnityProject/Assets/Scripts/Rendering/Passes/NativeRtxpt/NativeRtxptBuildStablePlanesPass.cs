@@ -23,7 +23,8 @@ namespace PathTracing
         private readonly RayTracePipeline            _buildSP;
         private readonly NativeRayTraceDescriptorSet _buildDs;
 
-        private          NativeRtxptPassContext _ctx;
+        private NativeRtxptPassContext _ctx;
+
         private static readonly RootConstantsHint[] MiniConstRootConstantsHints =
         {
             new RootConstantsHint { Name = "g_MiniConst", Count = 16 }
@@ -66,10 +67,10 @@ namespace PathTracing
         {
             using var builder = renderGraph.AddUnsafePass<PassData>("BuildStablePlanes", out var passData);
 
-            passData.BuildSP            = _buildSP;
-            passData.BuildDs            = _buildDs;
-            passData.Ctx                = _ctx;
-            passData.RenderRes          = _ctx.RenderResolution;
+            passData.BuildSP   = _buildSP;
+            passData.BuildDs   = _buildDs;
+            passData.Ctx       = _ctx;
+            passData.RenderRes = _ctx.RenderResolution;
 
             builder.AllowPassCulling(false);
             builder.SetRenderFunc((PassData data, UnsafeGraphContext context) => ExecutePass(data, context));
@@ -97,14 +98,17 @@ namespace PathTracing
                 var ds = data.BuildDs;
                 BindCommonRT(ds, ctx, &miniConst, tlas);
 
-                ds.SetRWTexture("u_Throughput",                res.Throughput.NativePtr);
-                ds.SetRWTexture("u_MotionVectors",             res.ScreenMotionVectors.NativePtr);
-                ds.SetRWTexture("u_Depth",                     res.Depth.NativePtr);
-                ds.SetRWTexture("u_StablePlanesHeader",        res.StablePlanesHeader.NativePtr);
-                ds.SetRWTexture("u_StableRadiance",            res.StableRadiance.NativePtr);
-                ds.SetRWTexture("u_SpecularHitT",              res.SpecularHitT.NativePtr);
+                ds.SetRWTexture("u_Throughput", res.Throughput.NativePtr);
+                ds.SetRWTexture("u_MotionVectors", res.ScreenMotionVectors.NativePtr);
+                ds.SetRWTexture("u_Depth", res.Depth.NativePtr);
+                ds.SetRWTexture("u_StablePlanesHeader", res.StablePlanesHeader.NativePtr);
+                ds.SetRWTexture("u_StableRadiance", res.StableRadiance.NativePtr);
+                ds.SetRWTexture("u_SpecularHitT", res.SpecularHitT.NativePtr);
                 ds.SetRWTexture("u_ShaderDebugVizTextureBuffer", res.ShaderDebugViz.NativePtr);
-                ds.SetRWStructuredBuffer("u_StablePlanesBuffer", buf.StablePlanesBufferPtr,buf.StablePlanesBuffer.count, buf.StablePlanesBuffer.stride);
+
+                ds.SetStructuredBuffer("t_Lights", buf.LightBuffer, buf.LightBuffer.count, buf.LightBuffer.stride);
+                ds.SetStructuredBuffer("t_LightsEx", buf.LightExBuffer, buf.LightExBuffer.count, buf.LightExBuffer.stride);
+                ds.SetRWStructuredBuffer("u_StablePlanesBuffer", buf.StablePlanesBufferPtr, buf.StablePlanesBuffer.count, buf.StablePlanesBuffer.stride);
 
                 data.BuildSP.Dispatch(cmd, ds, (uint)data.RenderRes.x, (uint)data.RenderRes.y);
             }
@@ -119,7 +123,7 @@ namespace PathTracing
             SampleMiniConstants* miniConst,
             RayTracingAccelerationStructure tlas)
         {
-            ds.SetConstantBuffer("g_Const",    ctx.ConstantBuffer);
+            ds.SetConstantBuffer("g_Const", ctx.ConstantBuffer);
             ds.SetRootConstants("g_MiniConst", miniConst);
             ds.SetAccelerationStructure("SceneBVH", tlas);
 
