@@ -2,7 +2,6 @@
 using System;
 using System.Collections.Generic;
 using System.Text;
-using NativeRender;
 using UnityEditor;
 using UnityEditor.SceneManagement;
 using UnityEngine;
@@ -154,12 +153,6 @@ namespace PathTracing
                     comp = Undo.AddComponent<RtxptRenderer>(mr.gameObject);
 
                 Undo.RecordObject(comp, "Auto-Assign RTXPT Material Overrides");
-                
-                var renderTarget = mr.GetComponent<NativeRayTracingTarget>();
-                if (renderTarget == null)
-                    renderTarget = Undo.AddComponent<NativeRayTracingTarget>(mr.gameObject);
-                
-                Undo.RecordObject(renderTarget, "Auto-Assign RTXPT NativeRayTracingTarget");
 
                 while (comp.Slots.Count < slotCount) comp.Slots.Add(null);
                 if (comp.Slots.Count > slotCount)     comp.Slots.RemoveRange(slotCount, comp.Slots.Count - slotCount);

@@ -89,7 +89,8 @@ namespace PathTracing
         private readonly Dictionary<int, (GraphicsBuffer vb, GraphicsBuffer ib)> _donutBufferCache = new();
         private readonly List<GraphicsBuffer>                                    _ownedGfxBuffers  = new();
 
-        private readonly List<NativeRayTracingTarget> _registeredTargets = new();
+        private readonly List<RtxptRenderer> _registeredTargets = new();
+        private int _lastTopologyVersion = -1;
 
         // Maps MeshRenderer.GetInstanceID() → list of per-group TLAS handles registered in _accelStructure.
         private readonly Dictionary<int, List<uint>> _perTargetGroupHandles = new();
@@ -327,13 +328,14 @@ namespace PathTracing
         /// </summary>
         public void UpdateForFrame()
         {
-            var targets = NativeRayTracingTarget.All;
+            var targets = RtxptRenderer.All;
 
-            if (_forceRebuild || TargetSetChanged(targets))
+            if (_forceRebuild || _lastTopologyVersion != RtxptRenderer.TopologyVersion || TargetSetChanged(targets))
             {
                 RegisterScene(targets);
                 _registeredTargets.Clear();
                 _registeredTargets.AddRange(targets);
+                _lastTopologyVersion = RtxptRenderer.TopologyVersion;
                 _forceRebuild  = false;
                 _sceneGpuDirty = true;
             }
@@ -429,7 +431,7 @@ namespace PathTracing
 
         // -----------------------------------------------------------------------
 
-        private void RegisterScene(IReadOnlyList<NativeRayTracingTarget> targets)
+        private void RegisterScene(IReadOnlyList<RtxptRenderer> targets)
         {
             // Full teardown + rebuild
             if (_registeredTargets.Count > 0)
@@ -437,7 +439,7 @@ namespace PathTracing
                 foreach (var t in _registeredTargets)
                 {
                     if (t == null) continue;
-                    var mr = t.GetComponent<MeshRenderer>();
+                    var mr = t.MeshRenderer;
                     if (mr == null) continue;
                     int mrId = mr.GetInstanceID();
                     if (_perTargetGroupHandles.TryGetValue(mrId, out var oldHandles))
@@ -463,7 +465,7 @@ namespace PathTracing
             foreach (var t in targets)
             {
                 if (t == null) continue;
-                var mr = t.GetComponent<MeshRenderer>();
+                var mr = t.MeshRenderer;
                 if (mr == null) continue;
 
                 var groups = t.SubmeshGroups;
@@ -474,7 +476,7 @@ namespace PathTracing
 
                     uint indexStride = mesh.indexFormat == UnityEngine.Rendering.IndexFormat.UInt16 ? 2u : 4u;
                     int  mrId        = mr.GetInstanceID();
-                    var  rr          = mr.GetComponent<RtxptRenderer>();
+                    var  rr          = t;
                     var  handles     = new List<uint>(groups.Length);
 
                     for (int gi = 0; gi < groups.Length; gi++)
@@ -525,8 +527,7 @@ namespace PathTracing
                     // the BLAS and cannot disable individual ones, so per-sub-mesh skipping is not
                     // supported here — register the renderer only when all sub-meshes are assigned.
                     var fbMesh = mr.GetComponent<MeshFilter>()?.sharedMesh;
-                    var fbRr   = mr.GetComponent<RtxptRenderer>();
-                    if (fbMesh != null && AllSubmeshesAssigned(fbRr, fbMesh.subMeshCount))
+                    if (fbMesh != null && AllSubmeshesAssigned(t, fbMesh.subMeshCount))
                         _accelStructure.AddInstance(mr);
                     else
                         Debug.LogWarning($"[NativeRtxptGPUScene] '{mr.name}' has no SubmeshGroups and not all sub-meshes have an RtxptMaterial assigned — skipping the whole renderer (per-sub-mesh skip requires the grouped path).");
@@ -584,7 +585,7 @@ namespace PathTracing
             _donutBufferCache.Clear();
         }
 
-        private void RebuildSceneGpuData(IReadOnlyList<NativeRayTracingTarget> targets)
+        private void RebuildSceneGpuData(IReadOnlyList<RtxptRenderer> targets)
         {
             DisposeGpuBuffers();
 
@@ -599,7 +600,7 @@ namespace PathTracing
             foreach (var target in targets)
             {
                 if (target == null) continue;
-                var mr = target.GetComponent<MeshRenderer>();
+                var mr = target.MeshRenderer;
                 if (mr == null) continue;
                 var mf = mr.GetComponent<MeshFilter>();
                 if (mf == null || mf.sharedMesh == null) continue;
@@ -678,7 +679,7 @@ namespace PathTracing
                 }
 #endif
 
-                var   matOverride        = mr.GetComponent<RtxptRenderer>();
+                var   matOverride        = target;
                 int[] overrideMatIndices = matOverride != null ? new int[subMeshCnt] : null;
 
                 Matrix4x4 m    = target.transform.localToWorldMatrix;
@@ -1165,7 +1166,7 @@ namespace PathTracing
             return slot;
         }
 
-        private bool TargetSetChanged(IReadOnlyList<NativeRayTracingTarget> current)
+        private bool TargetSetChanged(IReadOnlyList<RtxptRenderer> current)
         {
             if (current.Count != _registeredTargets.Count) return true;
             for (int i = 0; i < current.Count; i++)
