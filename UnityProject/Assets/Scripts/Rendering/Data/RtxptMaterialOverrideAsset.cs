@@ -110,26 +110,28 @@ namespace PathTracing
 
         /// <summary>
         /// Creates a new <see cref="RtxptMaterialSlot"/> populated from a RTXPT material JSON string.
-        /// Texture fields are not set (no paths in the JSON); assign them separately.
+        /// When <paramref name="textureResolver"/> is supplied, texture path entries in the JSON are
+        /// resolved to Unity assets and assigned; otherwise texture fields are left unset.
         /// </summary>
-        public static RtxptMaterialSlot FromJson(string json)
+        public static RtxptMaterialSlot FromJson(string json, Func<RtxptTextureRef, Texture> textureResolver = null)
         {
-            var raw  = JsonUtility.FromJson<SlotJson>(json);
             var slot = new RtxptMaterialSlot();
-            slot.ApplyJsonData(raw);
+            slot.ApplyJsonData(JsonUtility.FromJson<SlotJson>(json), textureResolver);
             return slot;
         }
 
         /// <summary>
         /// Overwrites all non-texture fields from a RTXPT material JSON string.
-        /// Existing texture assignments are preserved.
+        /// When <paramref name="textureResolver"/> is null, existing texture assignments are preserved.
+        /// When supplied, each texture path present in the JSON is resolved and assigned (paths the
+        /// resolver cannot find become null); texture entries absent from the JSON are left unchanged.
         /// </summary>
-        public void LoadFromJson(string json)
+        public void LoadFromJson(string json, Func<RtxptTextureRef, Texture> textureResolver = null)
         {
-            ApplyJsonData(JsonUtility.FromJson<SlotJson>(json));
+            ApplyJsonData(JsonUtility.FromJson<SlotJson>(json), textureResolver);
         }
 
-        private void ApplyJsonData(SlotJson d)
+        private void ApplyJsonData(SlotJson d, Func<RtxptTextureRef, Texture> textureResolver = null)
         {
             BaseColorFactor             = Rgb(d.BaseOrDiffuseColor, 1f);
             SpecularColor               = Rgb(d.SpecularColor, 1f);
@@ -165,6 +167,23 @@ namespace PathTracing
             PSDDominantDeltaLobe        = d.PSDDominantDeltaLobe;
             NestedPriority              = d.NestedPriority;
             PSDBlockMotionVectorsAtSurfaceType = d.PSDBlockMotionVectorsAtSurfaceType;
+
+            if (textureResolver != null)
+            {
+                ResolveTex(d.BaseTexture,                       textureResolver, ref BaseOrDiffuseTexture);
+                ResolveTex(d.OcclusionRoughnessMetallicTexture, textureResolver, ref OcclusionRoughnessMetallicTexture);
+                ResolveTex(d.NormalTexture,                     textureResolver, ref NormalTexture);
+                ResolveTex(d.EmissiveTexture,                   textureResolver, ref EmissiveTexture);
+                ResolveTex(d.TransmissionTexture,               textureResolver, ref TransmissionTexture);
+            }
+        }
+
+        // Resolves one JSON texture entry into a Unity asset. Entries absent from the JSON (null or
+        // empty path) leave the existing assignment untouched; present paths are always (re)assigned.
+        private static void ResolveTex(TexJson tex, Func<RtxptTextureRef, Texture> resolver, ref Texture dst)
+        {
+            if (tex == null || string.IsNullOrEmpty(tex.path)) return;
+            dst = resolver(new RtxptTextureRef { Path = tex.path, IsSRGB = tex.sRGB, IsNormalMap = tex.NormalMap });
         }
 
         private static Color Rgb(float[] arr, float a)
@@ -208,7 +227,43 @@ namespace PathTracing
             public bool    UseSpecularGlossModel                   = false;
             public float[] VolumeAttenuationColor                  = { 1f, 1f, 1f };
             public float   VolumeAttenuationDistance               = float.MaxValue;
+
+            // Texture path entries. Keys mirror the RTXPT exporter; absent entries deserialize with
+            // an empty path and are treated as "no texture" by ResolveTex.
+            public TexJson BaseTexture;
+            public TexJson OcclusionRoughnessMetallicTexture;
+            public TexJson NormalTexture;
+            public TexJson EmissiveTexture;
+            public TexJson TransmissionTexture;
         }
+
+        // One texture reference as written by the RTXPT material exporter.
+        [Serializable]
+        private class TexJson
+        {
+            public bool   NormalMap = false;
+            public string path      = "";   // exporter-relative, backslash-separated, e.g. "Models\\Kitchen\\foo.dds"
+            public bool   sRGB      = false;
+        }
+    }
+
+    // =========================================================================
+    // RtxptTextureRef  —  a texture path entry parsed from RTXPT material JSON
+    // =========================================================================
+
+    /// <summary>
+    /// Describes one texture slot as written by the RTXPT material exporter. Passed to the texture
+    /// resolver delegate of <see cref="RtxptMaterialSlot.LoadFromJson"/> so editor code can map the
+    /// exporter-relative <see cref="Path"/> onto a Unity <see cref="Texture"/> asset.
+    /// </summary>
+    public struct RtxptTextureRef
+    {
+        /// <summary>Exporter-relative, backslash-separated path, e.g. "Models\Kitchen\foo.dds".</summary>
+        public string Path;
+        /// <summary>True if the source texture is sRGB-encoded (color), false for linear data.</summary>
+        public bool   IsSRGB;
+        /// <summary>True if the texture is a normal map.</summary>
+        public bool   IsNormalMap;
     }
 
     // =========================================================================

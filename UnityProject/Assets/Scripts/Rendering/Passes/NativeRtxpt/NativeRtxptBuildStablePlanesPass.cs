@@ -128,16 +128,8 @@ namespace PathTracing
             ds.SetAccelerationStructure("SceneBVH", tlas);
 
             ctx.GpuScene.BindToShader(ds);
-
-            var envCubePtr = ctx.BakedEnvCubePtr != IntPtr.Zero
-                ? ctx.BakedEnvCubePtr
-                : Texture2D.blackTexture.GetNativeTexturePtr();
-            ds.SetTexture("t_EnvironmentMap", envCubePtr);
-
-            var envLookupPtr = ctx.EnvLightLookupMapPtr != IntPtr.Zero
-                ? ctx.EnvLightLookupMapPtr
-                : Texture2D.blackTexture.GetNativeTexturePtr();
-            ds.SetTexture("t_EnvLookupMap", envLookupPtr);
+            ds.SetTexture("t_EnvironmentMap", ctx.BakedEnvCubePtr);
+            ds.SetTexture("t_EnvLookupMap", ctx.EnvLightLookupMapPtr);
 
             ds.SetRWStructuredBuffer("u_FeedbackBuffer",
                 ctx.Buffers.FeedbackBufferPtr,

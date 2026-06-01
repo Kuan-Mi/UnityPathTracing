@@ -18,6 +18,8 @@ namespace PathTracing
         private bool   _recurse        = true;
         private bool   _preserveLayout = true;
         private bool   _skipExisting   = true;
+        private bool   _importTextures = true;
+        private string _textureRoot    = "Assets/Art/RTXPTAssets";
 
         private Vector2 _scroll;
         private string  _lastReport = "";
@@ -87,6 +89,40 @@ namespace PathTracing
                 _preserveLayout = EditorGUILayout.Toggle("Mirror Subfolder Structure", _preserveLayout);
             _skipExisting = EditorGUILayout.Toggle("Skip Existing Assets", _skipExisting);
 
+            EditorGUILayout.Space(8);
+            EditorGUILayout.LabelField("Textures", EditorStyles.boldLabel);
+            _importTextures = EditorGUILayout.Toggle(new GUIContent("Resolve Textures",
+                "Resolve texture path entries in the JSON to project textures and assign them to each slot."),
+                _importTextures);
+
+            if (_importTextures)
+            {
+                EditorGUILayout.BeginHorizontal();
+                _textureRoot = EditorGUILayout.TextField(new GUIContent("Texture Root",
+                    "Project-relative folder the JSON 'path' fields are resolved against, e.g. \"Models\\Kitchen\\foo.dds\" under Assets/Art/RTXPTAssets."),
+                    _textureRoot);
+                if (GUILayout.Button("…", GUILayout.Width(26)))
+                {
+                    string picked = EditorUtility.OpenFolderPanel("Select texture root inside the project", ToAbsoluteIfRelative(_textureRoot), "");
+                    if (!string.IsNullOrEmpty(picked))
+                    {
+                        string rel = AbsToRelative(picked);
+                        if (rel != null) _textureRoot = rel;
+                        else EditorUtility.DisplayDialog("Invalid folder", "Texture root must be inside the project's Assets folder.", "OK");
+                    }
+                }
+                EditorGUILayout.EndHorizontal();
+
+                if (Path.IsPathRooted(_textureRoot))
+                {
+                    string rel = AbsToRelative(_textureRoot);
+                    if (rel != null) _textureRoot = rel;
+                }
+
+                if (!AssetDatabase.IsValidFolder(_textureRoot.TrimEnd('/')))
+                    EditorGUILayout.HelpBox("Texture root is not an existing folder under Assets/.", MessageType.Warning);
+            }
+
             EditorGUILayout.Space(10);
 
             GUI.enabled = srcOk && dstOk;
@@ -137,8 +173,11 @@ namespace PathTracing
 
             EnsureFolder(dst);
 
-            int created = 0, skipped = 0, failed = 0;
-            var errors = new List<string>();
+            string textureRoot = _textureRoot.Trim().Replace('\\', '/').TrimEnd('/');
+
+            int created = 0, skipped = 0, failed = 0, texMissing = 0;
+            var errors        = new List<string>();
+            var missingTexErr = new HashSet<string>();
 
             foreach (string jsonPath in jsonFiles)
             {
@@ -168,7 +207,21 @@ namespace PathTracing
                 {
                     string json  = File.ReadAllText(jsonPath);
                     var    asset = CreateInstance<RtxptMaterialOverrideAsset>();
-                    asset.Slot.LoadFromJson(json);
+
+                    Func<RtxptTextureRef, Texture> resolver = null;
+                    if (_importTextures)
+                        resolver = texRef =>
+                        {
+                            var tex = RtxptTextureResolver.Resolve(textureRoot, texRef.Path, out _);
+                            if (tex == null && !string.IsNullOrEmpty(texRef.Path))
+                            {
+                                texMissing++;
+                                missingTexErr.Add(texRef.Path);
+                            }
+                            return tex;
+                        };
+
+                    asset.Slot.LoadFromJson(json, resolver);
                     if (!_skipExisting)
                         assetPath = AssetDatabase.GenerateUniqueAssetPath(assetPath);
                     AssetDatabase.CreateAsset(asset, assetPath);
@@ -190,6 +243,12 @@ namespace PathTracing
             {
                 sb.AppendLine($"Failed  : {failed}");
                 foreach (var e in errors) sb.AppendLine($"  • {e}");
+            }
+            if (_importTextures && texMissing > 0)
+            {
+                sb.AppendLine();
+                sb.AppendLine($"Textures unresolved : {texMissing} reference(s), {missingTexErr.Count} unique path(s) under '{textureRoot}':");
+                foreach (var p in missingTexErr) sb.AppendLine($"  • {p}");
             }
             _lastReport = sb.ToString().TrimEnd();
         }
