@@ -11,11 +11,13 @@ namespace PathTracing
     /// <summary>
     /// Per-renderer RTXPT material override component.
     ///
-    /// Attach to any <see cref="MeshRenderer"/> to take manual control of the
-    /// RTXPT material properties sent to the GPU. Each sub-mesh slot references
-    /// a <see cref="RtxptMaterial"/> that can be shared across
-    /// multiple renderers. A null entry means "use the default baking path" for
-    /// that sub-mesh.
+    /// Attach to any <see cref="MeshRenderer"/> to supply the RTXPT material
+    /// properties sent to the GPU. Each sub-mesh slot references a
+    /// <see cref="RtxptMaterial"/> that can be shared across multiple renderers.
+    /// A null entry means the sub-mesh is skipped — it is not added to the
+    /// acceleration structure and does not render. Materials must be authored in
+    /// advance (imported from RTXPT JSON, or baked once with the button below);
+    /// there is no runtime Unity-material fallback.
     ///
     /// Use the "Bake from Renderer" button in the Inspector to create and
     /// populate slot assets from the current Unity materials as a starting point.
@@ -24,7 +26,7 @@ namespace PathTracing
     [DisallowMultipleComponent]
     public class RtxptRenderer : MonoBehaviour
     {
-        [Tooltip("One asset per sub-mesh. Index matches MeshRenderer.sharedMaterials. Null = use default material baking.")]
+        [Tooltip("One RtxptMaterial per sub-mesh. Index matches MeshRenderer.sharedMaterials. Null = sub-mesh is skipped (not rendered) — there is no runtime Unity-material fallback.")]
         public List<RtxptMaterial> Slots = new();
 
         /// <summary>

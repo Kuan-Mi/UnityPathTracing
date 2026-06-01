@@ -68,7 +68,7 @@ namespace PathTracing
             for (int i = 0; i < primaryCount; i++)
             {
                 var    assetRef = primaryComp.Slots[i];
-                string label    = assetRef != null ? assetRef.name : $"Slot {i}  (default baking)";
+                string label    = assetRef != null ? assetRef.name : $"Slot {i}  (not rendered)";
 
                 _slotFoldouts[i] = EditorGUILayout.BeginFoldoutHeaderGroup(_slotFoldouts[i], $"Sub-mesh {i}  —  {label}");
 
@@ -113,7 +113,7 @@ namespace PathTracing
                     }
                     else
                     {
-                        EditorGUILayout.HelpBox("No asset assigned — this slot uses the default material baking path.", MessageType.None);
+                        EditorGUILayout.HelpBox("No material assigned — this sub-mesh will not be rendered.", MessageType.Warning);
                     }
 
                     EditorGUI.indentLevel--;

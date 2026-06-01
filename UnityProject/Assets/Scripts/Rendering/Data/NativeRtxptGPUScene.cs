@@ -81,11 +81,9 @@ namespace PathTracing
         private readonly List<SceneInstance>                                     _sceneInstances   = new();
         private readonly Dictionary<int, RendererEntry>                          _rendererEntries  = new();
         private readonly Dictionary<int, (int vb, int ib)>                       _meshBufferSlots  = new();
-        private readonly Dictionary<int, int>                                    _materialSlots    = new();
-        // Dedup for material-override slots, keyed on the shared RtxptMaterial
-        // InstanceID. Override assets are explicitly shareable across renderers/sub-meshes,
-        // so identical references collapse to a single PTMaterialData entry (mirrors how
-        // _materialSlots dedups normal Unity materials).
+        // Dedup for RtxptMaterial slots, keyed on the shared RtxptMaterial InstanceID. Material
+        // assets are explicitly shareable across renderers/sub-meshes, so identical references
+        // collapse to a single PTMaterialData entry.
         private readonly Dictionary<int, int>                                    _overrideSlots    = new();
         private readonly Dictionary<int, int>                                    _textureSlots     = new();
         private readonly Dictionary<int, (GraphicsBuffer vb, GraphicsBuffer ib)> _donutBufferCache = new();
@@ -476,24 +474,31 @@ namespace PathTracing
 
                     uint indexStride = mesh.indexFormat == UnityEngine.Rendering.IndexFormat.UInt16 ? 2u : 4u;
                     int  mrId        = mr.GetInstanceID();
+                    var  rr          = mr.GetComponent<RtxptRenderer>();
                     var  handles     = new List<uint>(groups.Length);
 
                     for (int gi = 0; gi < groups.Length; gi++)
                     {
-                        var grp    = groups[gi];
-                        int subCnt = grp.submeshIndices.Length;
-                        var descs  = new NativeRenderPlugin.SubmeshDesc[subCnt];
-                        for (int si = 0; si < subCnt; si++)
+                        var grp = groups[gi];
+
+                        // Only sub-meshes with a pre-baked RtxptMaterial are added to the BLAS. This
+                        // must match RebuildSceneGpuData's grouped filter exactly so the shader's flat
+                        // per-geometry arrays (variantList / geomList) stay aligned with the BLAS.
+                        var descsList = new List<NativeRenderPlugin.SubmeshDesc>(grp.submeshIndices.Length);
+                        foreach (int sIdx in grp.submeshIndices)
                         {
-                            var sub = mesh.GetSubMesh(grp.submeshIndices[si]);
-                            descs[si] = new NativeRenderPlugin.SubmeshDesc
+                            if (!SubmeshHasMaterial(rr, sIdx)) continue;
+                            var sub = mesh.GetSubMesh(sIdx);
+                            descsList.Add(new NativeRenderPlugin.SubmeshDesc
                             {
                                 indexCount      = (uint)sub.indexCount,
                                 indexByteOffset = (uint)sub.indexStart * indexStride,
                                 baseVertex      = (uint)sub.baseVertex,
                                 flags           = grp.isAlphaClip ? 0u : NativeRenderPlugin.SUBMESH_FLAG_GEOMETRY_OPAQUE,
-                            };
+                            });
                         }
+                        if (descsList.Count == 0) continue; // every sub-mesh in this group is unassigned
+                        var descs = descsList.ToArray();
 
                         uint handle          = MakeGroupHandle(mrId, gi);
                         uint hitGroupVariant = grp.isEmissive ? 0u : 1u;
@@ -501,9 +506,9 @@ namespace PathTracing
                         {
                             _accelStructure.SetInstanceTransform(handle, mr.transform.localToWorldMatrix);
                             handles.Add(handle);
-                            for (int si = 0; si < subCnt; si++)
+                            for (int k = 0; k < descs.Length; k++)
                                 variantList.Add(hitGroupVariant);
-                            runningContribution += (uint)subCnt;
+                            runningContribution += (uint)descs.Length;
                         }
                         else
                         {
@@ -516,8 +521,15 @@ namespace PathTracing
                 }
                 else
                 {
-                    // Fallback: no group info, add as single instance (hitgroup 0 = NonEmissive default)
-                    _accelStructure.AddInstance(mr);
+                    // Fallback: no group info. The native AddInstance(mr) path adds every sub-mesh to
+                    // the BLAS and cannot disable individual ones, so per-sub-mesh skipping is not
+                    // supported here — register the renderer only when all sub-meshes are assigned.
+                    var fbMesh = mr.GetComponent<MeshFilter>()?.sharedMesh;
+                    var fbRr   = mr.GetComponent<RtxptRenderer>();
+                    if (fbMesh != null && AllSubmeshesAssigned(fbRr, fbMesh.subMeshCount))
+                        _accelStructure.AddInstance(mr);
+                    else
+                        Debug.LogWarning($"[NativeRtxptGPUScene] '{mr.name}' has no SubmeshGroups and not all sub-meshes have an RtxptMaterial assigned — skipping the whole renderer (per-sub-mesh skip requires the grouped path).");
                 }
             }
 
@@ -559,7 +571,6 @@ namespace PathTracing
             _sceneInstances.Clear();
             _rendererEntries.Clear();
             _meshBufferSlots.Clear();
-            _materialSlots.Clear();
             _overrideSlots.Clear();
             _textureSlots.Clear();
             _perTargetGroupHandles.Clear();
@@ -676,11 +687,12 @@ namespace PathTracing
                 var       row2 = new Vector4(m.m20, m.m21, m.m22, m.m23);
 
                 // Local helper: append geometry + sub-instance data for one sub-mesh index.
+                // Only ever called for sub-meshes that have a pre-baked RtxptMaterial assigned
+                // (callers filter via SubmeshHasMaterial), so matOverride.Slots[s] is non-null here.
                 void AddSubmeshData(int s)
                 {
                     SubMeshDescriptor sub                                 = mesh.GetSubMesh(s);
-                    Material          mat                                 = s < mats.Length ? mats[s] : (mats.Length > 0 ? mats[mats.Length - 1] : null);
-                    int               matIdx                              = GetOrAddMaterial(mat, s, matOverride, ptMatList, texPtrs);
+                    int               matIdx                              = GetOrAddMaterial(s, matOverride, ptMatList, texPtrs);
                     if (overrideMatIndices != null) overrideMatIndices[s] = matIdx;
 
                     int globalGeomIdx = geomList.Count;
@@ -709,22 +721,10 @@ namespace PathTracing
                     });
 
                     // --- SubInstanceData (RTXPT t1) ---
-                    var   overrideSlot  = matOverride != null && s < matOverride.Slots.Count ? matOverride.Slots[s] : null;
-                    bool  isAlphaTested;
-                    float aCutoff;
-                    bool  excludeFromNEE;
-                    if (overrideSlot != null)
-                    {
-                        isAlphaTested  = overrideSlot.EnableAlphaTesting;
-                        aCutoff        = isAlphaTested ? overrideSlot.AlphaCutoff : 0f;
-                        excludeFromNEE = overrideSlot.ExcludeFromNEE;
-                    }
-                    else
-                    {
-                        isAlphaTested  = mat != null && TryGetFloat(mat, "_Cutoff", 0f) > 0f;
-                        aCutoff        = isAlphaTested ? TryGetFloat(mat, "_Cutoff", 0f) : 0f;
-                        excludeFromNEE = false;
-                    }
+                    RtxptMaterial overrideSlot = matOverride.Slots[s];
+                    bool  isAlphaTested  = overrideSlot.EnableAlphaTesting;
+                    float aCutoff        = isAlphaTested ? overrideSlot.AlphaCutoff : 0f;
+                    bool  excludeFromNEE = overrideSlot.ExcludeFromNEE;
                     uint alphaU8     = (uint)Mathf.RoundToInt(Mathf.Clamp01(aCutoff) * 255f);
                     // AlphaTextureIndex in lo16: use base texture slot if alpha-tested, else 0
                     uint alphaTexIdx = isAlphaTested && ptMatList.Count > matIdx
@@ -763,13 +763,27 @@ namespace PathTracing
                     // GeometryIndex() in the shader is 0-based within each group instance.
                     int mrId              = mr.GetInstanceID();
                     int firstGroupInstIdx = _sceneInstances.Count;
+                    int addedGroups       = 0;
                     for (int gi = 0; gi < groups.Length; gi++)
                     {
                         var grp               = groups[gi];
                         int firstGeomForGroup = geomList.Count;
 
+                        // Skip sub-meshes with no assigned RtxptMaterial. Must match the BLAS filter
+                        // in RegisterScene exactly so the shader's per-geometry indices stay aligned.
                         for (int si = 0; si < grp.submeshIndices.Length; si++)
-                            AddSubmeshData(grp.submeshIndices[si]);
+                        {
+                            int sIdx = grp.submeshIndices[si];
+                            if (!SubmeshHasMaterial(matOverride, sIdx))
+                            {
+                                Debug.LogWarning($"[NativeRtxptGPUScene] '{mr.name}' sub-mesh {sIdx} has no RtxptMaterial assigned — skipping (not rendered).");
+                                continue;
+                            }
+                            AddSubmeshData(sIdx);
+                        }
+
+                        int numGeom = geomList.Count - firstGeomForGroup;
+                        if (numGeom == 0) continue; // whole group unassigned — matches RegisterScene
 
                         int  groupInstIdx = instList.Count;
                         uint groupHandle  = MakeGroupHandle(mrId, gi);
@@ -780,7 +794,7 @@ namespace PathTracing
                             flags                      = 0u,
                             firstGeometryInstanceIndex = (uint)firstGeomForGroup,
                             firstGeometryIndex         = (uint)firstGeomForGroup,
-                            numGeometries              = (uint)grp.submeshIndices.Length,
+                            numGeometries              = (uint)numGeom,
                             transformRow0              = row0,
                             transformRow1              = row1,
                             transformRow2              = row2,
@@ -793,17 +807,24 @@ namespace PathTracing
                             renderer    = mr,
                             groupHandle = groupHandle,
                         });
+                        addedGroups++;
                     }
-                    _rendererEntries[mrId] = new RendererEntry
-                    {
-                        transform        = mr.transform,
-                        firstInstanceIdx = firstGroupInstIdx,
-                        instanceCount    = groups.Length,
-                    };
+                    if (addedGroups > 0)
+                        _rendererEntries[mrId] = new RendererEntry
+                        {
+                            transform        = mr.transform,
+                            firstInstanceIdx = firstGroupInstIdx,
+                            instanceCount    = addedGroups,
+                        };
                 }
                 else
                 {
-                    // Non-grouped: one TLAS instance (AddInstance) covers all sub-meshes.
+                    // Non-grouped: one TLAS instance (AddInstance) covers all sub-meshes. The native
+                    // AddInstance(mr) path can't disable individual sub-meshes, so RegisterScene only
+                    // registers this renderer when every sub-mesh is assigned — mirror that here.
+                    if (!AllSubmeshesAssigned(matOverride, subMeshCnt))
+                        continue;
+
                     int firstGeom = geomList.Count;
                     int instIdx   = instList.Count;
 
@@ -1099,144 +1120,38 @@ namespace PathTracing
             return idx;
         }
 
-        private int GetOrAddMaterial(Material mat, int subMeshIndex, RtxptRenderer matOverride,
+        // Returns the GPU material index for a sub-mesh's pre-baked RtxptMaterial. Only called for
+        // sub-meshes the build passes have already confirmed are assigned (see SubmeshHasMaterial),
+        // so matOverride.Slots[subMeshIndex] is non-null. Runtime baking of Unity Materials is no
+        // longer supported — materials must be authored as RtxptMaterial assets in advance.
+        private int GetOrAddMaterial(int subMeshIndex, RtxptRenderer matOverride,
             List<PTMaterialData> ptMatList, List<IntPtr> texPtrs)
         {
-            // ----------------------------------------------------------------
-            // Fast path: renderer has a manual override for this sub-mesh
-            // ----------------------------------------------------------------
-            if (matOverride != null && subMeshIndex < matOverride.Slots.Count && matOverride.Slots[subMeshIndex] != null)
-            {
-                // Override assets are shareable across renderers/sub-meshes, so dedup on the
-                // asset reference: identical references reuse the same GPU material entry rather
-                // than emitting one per (renderer, subMesh). Keeps MaterialCount = unique materials,
-                // matching the C++ baker (Sample.cpp:2095).
-                RtxptMaterial asset = matOverride.Slots[subMeshIndex];
-                int assetId = asset.GetInstanceID();
-                if (_overrideSlots.TryGetValue(assetId, out int existingOverride))
-                    return existingOverride;
-
-                int newOverride = BuildMaterialFromOverride(asset, ptMatList, texPtrs);
-                _overrideSlots[assetId] = newOverride;
-                return newOverride;
-            }
-
-            // ----------------------------------------------------------------
-            // Normal path: derive from Unity Material
-            // ----------------------------------------------------------------
-            int matId = mat != null ? mat.GetInstanceID() : -1;
-            if (_materialSlots.TryGetValue(matId, out int existing))
+            // RtxptMaterial assets are shareable across renderers/sub-meshes, so dedup on the asset
+            // reference: identical references reuse the same GPU material entry rather than emitting
+            // one per (renderer, subMesh). Keeps MaterialCount = unique materials, matching the C++
+            // baker (Sample.cpp:2095).
+            RtxptMaterial asset = matOverride.Slots[subMeshIndex];
+            int assetId = asset.GetInstanceID();
+            if (_overrideSlots.TryGetValue(assetId, out int existing))
                 return existing;
 
-            int idx = ptMatList.Count;
-            _materialSlots[matId] = idx;
+            int newIdx = BuildMaterialFromOverride(asset, ptMatList, texPtrs);
+            _overrideSlots[assetId] = newIdx;
+            return newIdx;
+        }
 
-            int   baseTexIdx, normalTexIdx, metalRoughTexIdx, emissiveTexIdx, occlusionTexIdx;
-            Color baseColor;
-            Color emissive;
-            float roughness, metalness, alphaCutoff, normalScale, occStr;
-            int   domain;
+        // True when renderer rr has a pre-baked RtxptMaterial assigned for the given sub-mesh.
+        private static bool SubmeshHasMaterial(RtxptRenderer rr, int subMesh)
+            => rr != null && subMesh < rr.Slots.Count && rr.Slots[subMesh] != null;
 
-            bool isGltf = mat != null && mat.shader.name == "Shader Graphs/glTF-pbrMetallicRoughness";
-            if (isGltf)
-            {
-                baseTexIdx       = AddTexture(TryGetTex(mat, "baseColorTexture"), texPtrs);
-                normalTexIdx     = AddTexture(TryGetTex(mat, "normalTexture"), texPtrs);
-                metalRoughTexIdx = AddTexture(TryGetTex(mat, "metallicRoughnessTexture"), texPtrs);
-                emissiveTexIdx   = AddTexture(TryGetTex(mat, "emissiveTexture"), texPtrs);
-                occlusionTexIdx  = AddTexture(TryGetTex(mat, "occlusionTexture"), texPtrs);
-
-                baseColor   = TryGetColor(mat, "baseColorFactor", Color.white);
-                emissive    = TryGetColor(mat, "emissiveFactor", Color.black);
-                roughness   = TryGetFloat(mat, "roughnessFactor", 0.5f);
-                metalness   = TryGetFloat(mat, "metallicFactor", 0f);
-                alphaCutoff = mat.IsKeywordEnabled("_ALPHATEST_ON") ? TryGetFloat(mat, "alphaCutoff", 0.5f) : 0f;
-                normalScale = 1f;
-                occStr      = TryGetFloat(mat, "occlusionStrength", 1f);
-
-                domain = mat.IsKeywordEnabled("_SURFACE_TYPE_TRANSPARENT") ? 1 : 0;
-            }
-            else
-            {
-                // URP/Lit, RayTracing/Lit, and unknown-shader fallback
-                baseTexIdx       = AddTexture(TryGetTex(mat, "_BaseMap"), texPtrs);
-                normalTexIdx     = AddTexture(TryGetTex(mat, "_BumpMap"), texPtrs);
-                metalRoughTexIdx = AddTexture(TryGetTex(mat, "_MetallicGlossMap"), texPtrs);
-                emissiveTexIdx   = AddTexture(TryGetTex(mat, "_EmissionMap"), texPtrs);
-                occlusionTexIdx  = AddTexture(TryGetTex(mat, "_OcclusionMap"), texPtrs);
-
-                baseColor   = TryGetColor(mat, "_BaseColor", Color.white);
-                emissive    = TryGetColor(mat, "_EmissionColor", Color.black);
-                roughness   = 1f - TryGetFloat(mat, "_Smoothness", 0.5f);
-                metalness   = TryGetFloat(mat, "_Metallic", 0f);
-                alphaCutoff = TryGetFloat(mat, "_Cutoff", 0f);
-                normalScale = TryGetFloat(mat, "_BumpScale", 1f);
-                occStr      = TryGetFloat(mat, "_OcclusionStrength", 1f);
-
-                domain = 0;
-                if (mat != null && mat.HasProperty("_Surface"))
-                    domain = (int)mat.GetFloat("_Surface");
-                else if (alphaCutoff > 0f)
-                    domain = 1; // AlphaTested
-            }
-
-            // Approximate F0 specular colour (donut convention)
-            Vector3 dielectricF0   = Vector3.one * 0.04f;
-            Vector3 metalBaseColor = new Vector3(baseColor.r, baseColor.g, baseColor.b);
-            Vector3 specularColor  = Vector3.Lerp(dielectricF0, metalBaseColor, metalness);
-
-            int matFlags                        = 0;
-            if (baseTexIdx >= 0) matFlags       |= DonutMaterialFlags.UseBaseOrDiffuseTexture;
-            if (normalTexIdx >= 0) matFlags     |= DonutMaterialFlags.UseNormalTexture;
-            if (metalRoughTexIdx >= 0) matFlags |= DonutMaterialFlags.UseMetalRoughOrSpecularTexture;
-            if (emissiveTexIdx >= 0) matFlags   |= DonutMaterialFlags.UseEmissiveTexture;
-            if (occlusionTexIdx >= 0) matFlags  |= DonutMaterialFlags.UseOcclusionTexture;
-
-            if (metalRoughTexIdx >= 0)
-                metalness = 1;
-
-            // --- PTMaterialData (same flag bit values as DonutMaterialFlags for texture flags) ---
-            // PTMaterialData texture indices use uint with 0xFFFFFFFF = none
-            uint SafeTexIdx(int i) => i >= 0 ? (uint)i : 0xFFFFFFFFu;
-
-            // Additional PT-specific flags (beyond the shared donut texture flags)
-            uint ptExtraFlags = 0;
-            // All Unity materials use TransmissionFactor=0 (no transmission), so they are thin surfaces.
-            // Matches C++ MaterialsBaker: if (ThinSurface || !EnableTransmission) data.Flags |= ThinSurface
-            ptExtraFlags |= PTMaterialFlags.ThinSurface;
-            // URP _MetallicGlossMap stores metalness in the R channel
-            // if (metalRoughTexIdx >= 0)
-            //     ptExtraFlags |= PTMaterialFlags.MetalnessInRedChannel;
-
-            ptMatList.Add(new PTMaterialData
-            {
-                BaseOrDiffuseColor               = new Vector3(baseColor.r, baseColor.g, baseColor.b),
-                Flags                            = (uint)matFlags | ptExtraFlags, // flag bits 1..8 are identical between donut and RTXPT
-                SpecularColor                    = specularColor,
-                _padding0                        = 0,
-                EmissiveColor                    = new Vector3(emissive.r, emissive.g, emissive.b),
-                ShadowNoLFadeout                 = 0f, // C++ clamps to [0, 0.25f]; 0 = full shadow fadeout always shown
-                Opacity                          = baseColor.a,
-                Roughness                        = roughness,
-                Metalness                        = metalness,
-                NormalTextureScale               = normalScale,
-                _padding1                        = 0f,
-                AlphaCutoff                      = alphaCutoff,
-                TransmissionFactor               = 0f,
-                BaseOrDiffuseTextureIndex        = SafeTexIdx(baseTexIdx),
-                MetalRoughOrSpecularTextureIndex = SafeTexIdx(metalRoughTexIdx),
-                EmissiveTextureIndex             = SafeTexIdx(emissiveTexIdx),
-                NormalTextureIndex               = SafeTexIdx(normalTexIdx),
-                OcclusionTextureIndex            = 0u, // match C++ FillData: field is never written and stays zero-initialized (occlusion packed into ORM)
-                TransmissionTextureIndex         = 0xFFFFFFFFu,
-                IoR                              = 1.5f,
-                ThicknessFactor                  = 0f,
-                DiffuseTransmissionFactor        = 0f,
-                VolumeAttenuationColor           = Vector3.one,
-                VolumeAttenuationDistance        = float.MaxValue,
-            });
-
-            return idx;
+        // True when every sub-mesh [0, subMeshCount) has an assigned RtxptMaterial.
+        private static bool AllSubmeshesAssigned(RtxptRenderer rr, int subMeshCount)
+        {
+            if (rr == null) return false;
+            for (int s = 0; s < subMeshCount; s++)
+                if (!SubmeshHasMaterial(rr, s)) return false;
+            return true;
         }
 
         private int AddTexture(Texture tex, List<IntPtr> texPtrs)
@@ -1248,24 +1163,6 @@ namespace PathTracing
             texPtrs.Add(tex.GetNativeTexturePtr());
             _textureSlots[texId] = slot;
             return slot;
-        }
-
-        private static Texture TryGetTex(Material mat, string prop)
-        {
-            if (mat == null || !mat.HasProperty(prop)) return null;
-            return mat.GetTexture(prop);
-        }
-
-        private static Color TryGetColor(Material mat, string prop, Color fallback)
-        {
-            if (mat == null || !mat.HasProperty(prop)) return fallback;
-            return mat.GetColor(prop);
-        }
-
-        private static float TryGetFloat(Material mat, string prop, float fallback)
-        {
-            if (mat == null || !mat.HasProperty(prop)) return fallback;
-            return mat.GetFloat(prop);
         }
 
         private bool TargetSetChanged(IReadOnlyList<NativeRayTracingTarget> current)
