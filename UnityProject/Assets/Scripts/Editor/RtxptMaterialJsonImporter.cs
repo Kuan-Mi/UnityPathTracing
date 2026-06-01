@@ -8,7 +8,7 @@ using UnityEngine;
 namespace PathTracing
 {
     /// <summary>
-    /// Imports RTXPT *.material.json files directly as <see cref="RtxptMaterialOverrideAsset"/> objects,
+    /// Imports RTXPT *.material.json files directly as <see cref="RtxptMaterial"/> objects,
     /// so each JSON file in the project IS an assignable RTXPT material (no separate generated .asset).
     /// Texture path entries are resolved to project textures via <see cref="RtxptTextureResolver"/>.
     ///
@@ -25,7 +25,7 @@ namespace PathTracing
 
         public override void OnImportAsset(AssetImportContext ctx)
         {
-            var asset = ScriptableObject.CreateInstance<RtxptMaterialOverrideAsset>();
+            var asset = ScriptableObject.CreateInstance<RtxptMaterial>();
 
             string json;
             try { json = File.ReadAllText(ctx.assetPath); }
@@ -40,7 +40,7 @@ namespace PathTracing
 
             try
             {
-                asset.Slot.LoadFromJson(json, texRef =>
+                asset.LoadFromJson(json, texRef =>
                 {
                     var tex = RtxptTextureResolver.Resolve(root, texRef.Path, out string resolvedPath);
                     if (resolvedPath != null)
@@ -59,7 +59,7 @@ namespace PathTracing
             Finish(ctx, asset);
         }
 
-        private static void Finish(AssetImportContext ctx, RtxptMaterialOverrideAsset asset)
+        private static void Finish(AssetImportContext ctx, RtxptMaterial asset)
         {
             ctx.AddObjectToAsset("material", asset);
             ctx.SetMainObject(asset);

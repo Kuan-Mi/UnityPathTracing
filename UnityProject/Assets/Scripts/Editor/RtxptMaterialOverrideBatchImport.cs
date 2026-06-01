@@ -8,7 +8,7 @@ using UnityEngine;
 namespace PathTracing
 {
     /// <summary>
-    /// Batch-creates <see cref="RtxptMaterialOverrideAsset"/> files from a folder of RTXPT
+    /// Batch-creates <see cref="RtxptMaterial"/> files from a folder of RTXPT
     /// material JSON files. Open via  RTXPT ▸ Batch Import Material Overrides from JSON…
     /// </summary>
     public class RtxptMaterialOverrideBatchImport : EditorWindow
@@ -197,7 +197,7 @@ namespace PathTracing
 
                 if (!string.IsNullOrEmpty(relSubDir)) EnsureFolder(assetDir);
 
-                if (_skipExisting && AssetDatabase.LoadAssetAtPath<RtxptMaterialOverrideAsset>(assetPath) != null)
+                if (_skipExisting && AssetDatabase.LoadAssetAtPath<RtxptMaterial>(assetPath) != null)
                 {
                     skipped++;
                     continue;
@@ -206,7 +206,7 @@ namespace PathTracing
                 try
                 {
                     string json  = File.ReadAllText(jsonPath);
-                    var    asset = CreateInstance<RtxptMaterialOverrideAsset>();
+                    var    asset = CreateInstance<RtxptMaterial>();
 
                     Func<RtxptTextureRef, Texture> resolver = null;
                     if (_importTextures)
@@ -221,7 +221,7 @@ namespace PathTracing
                             return tex;
                         };
 
-                    asset.Slot.LoadFromJson(json, resolver);
+                    asset.LoadFromJson(json, resolver);
                     if (!_skipExisting)
                         assetPath = AssetDatabase.GenerateUniqueAssetPath(assetPath);
                     AssetDatabase.CreateAsset(asset, assetPath);

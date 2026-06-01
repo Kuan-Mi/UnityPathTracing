@@ -13,7 +13,7 @@ namespace PathTracing
     ///
     /// Attach to any <see cref="MeshRenderer"/> to take manual control of the
     /// RTXPT material properties sent to the GPU. Each sub-mesh slot references
-    /// a <see cref="RtxptMaterialOverrideAsset"/> that can be shared across
+    /// a <see cref="RtxptMaterial"/> that can be shared across
     /// multiple renderers. A null entry means "use the default baking path" for
     /// that sub-mesh.
     ///
@@ -25,7 +25,7 @@ namespace PathTracing
     public class NativeRtxptMaterialOverride : MonoBehaviour
     {
         [Tooltip("One asset per sub-mesh. Index matches MeshRenderer.sharedMaterials. Null = use default material baking.")]
-        public List<RtxptMaterialOverrideAsset> Slots = new();
+        public List<RtxptMaterial> Slots = new();
 
         /// <summary>
         /// True when any slot parameter has changed since the last GPU upload.
@@ -38,7 +38,7 @@ namespace PathTracing
         public void MarkDirty()  => IsDirty = true;
         public void ClearDirty() => IsDirty = false;
 
-        private readonly List<RtxptMaterialOverrideAsset> _subscribedAssets = new();
+        private readonly List<RtxptMaterial> _subscribedAssets = new();
 
         private void OnEnable()  => RefreshSubscriptions();
         private void OnDisable() => ClearSubscriptions();
@@ -70,7 +70,7 @@ namespace PathTracing
 
         /// <summary>
         /// Bakes slot data from the renderer's current Unity materials into any
-        /// already-assigned <see cref="RtxptMaterialOverrideAsset"/> entries.
+        /// already-assigned <see cref="RtxptMaterial"/> entries.
         /// Null slot entries are skipped — use the "Bake from Renderer" Inspector
         /// button to create missing assets automatically.
         /// </summary>
@@ -90,11 +90,11 @@ namespace PathTracing
             {
                 if (Slots[s] == null) continue;
                 Material mat = s < mats.Length ? mats[s] : (mats.Length > 0 ? mats[^1] : null);
-                BakeSlotFromMaterial(Slots[s].Slot, mat);
+                BakeSlotFromMaterial(Slots[s], mat);
             }
         }
 
-        internal static void BakeSlotFromMaterial(RtxptMaterialSlot slot, Material mat)
+        internal static void BakeSlotFromMaterial(RtxptMaterial slot, Material mat)
         {
             if (mat == null) return;
 

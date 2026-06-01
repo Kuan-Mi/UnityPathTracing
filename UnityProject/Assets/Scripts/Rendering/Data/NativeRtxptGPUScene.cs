@@ -82,7 +82,7 @@ namespace PathTracing
         private readonly Dictionary<int, RendererEntry>                          _rendererEntries  = new();
         private readonly Dictionary<int, (int vb, int ib)>                       _meshBufferSlots  = new();
         private readonly Dictionary<int, int>                                    _materialSlots    = new();
-        // Dedup for material-override slots, keyed on the shared RtxptMaterialOverrideAsset
+        // Dedup for material-override slots, keyed on the shared RtxptMaterial
         // InstanceID. Override assets are explicitly shareable across renderers/sub-meshes,
         // so identical references collapse to a single PTMaterialData entry (mirrors how
         // _materialSlots dedups normal Unity materials).
@@ -715,9 +715,9 @@ namespace PathTracing
                     bool  excludeFromNEE;
                     if (overrideSlot != null)
                     {
-                        isAlphaTested  = overrideSlot.Slot.EnableAlphaTesting;
-                        aCutoff        = isAlphaTested ? overrideSlot.Slot.AlphaCutoff : 0f;
-                        excludeFromNEE = overrideSlot.Slot.ExcludeFromNEE;
+                        isAlphaTested  = overrideSlot.EnableAlphaTesting;
+                        aCutoff        = isAlphaTested ? overrideSlot.AlphaCutoff : 0f;
+                        excludeFromNEE = overrideSlot.ExcludeFromNEE;
                     }
                     else
                     {
@@ -925,7 +925,7 @@ namespace PathTracing
                     if (matOverride.Slots[s] == null) continue;
                     int idx = matIndices[s];
                     if (idx < 0 || idx >= _ptMaterialCpu.Length) continue;
-                    RefreshMaterialCpuFromOverride(matOverride.Slots[s].Slot, ref _ptMaterialCpu[idx]);
+                    RefreshMaterialCpuFromOverride(matOverride.Slots[s], ref _ptMaterialCpu[idx]);
                     if (idx < dirtyMin) dirtyMin = idx;
                     if (idx > dirtyMax) dirtyMax = idx;
                 }
@@ -944,7 +944,7 @@ namespace PathTracing
         /// Refreshes all scalar/color/flag fields of <paramref name="data"/> from <paramref name="slot"/>,
         /// preserving the existing texture index fields (which are set only during a full scene rebuild).
         /// </summary>
-        private static void RefreshMaterialCpuFromOverride(RtxptMaterialSlot slot, ref PTMaterialData data)
+        private static void RefreshMaterialCpuFromOverride(RtxptMaterial slot, ref PTMaterialData data)
         {
             // Texture flags: preserve loaded state (indices set during full rebuild) AND'd with slot enables.
             uint flags = 0;
@@ -1040,7 +1040,7 @@ namespace PathTracing
             }
         }
 
-        private int BuildMaterialFromOverride(RtxptMaterialSlot slot, List<PTMaterialData> ptMatList, List<IntPtr> texPtrs)
+        private int BuildMaterialFromOverride(RtxptMaterial slot, List<PTMaterialData> ptMatList, List<IntPtr> texPtrs)
         {
             int idx = ptMatList.Count;
 
@@ -1111,12 +1111,12 @@ namespace PathTracing
                 // asset reference: identical references reuse the same GPU material entry rather
                 // than emitting one per (renderer, subMesh). Keeps MaterialCount = unique materials,
                 // matching the C++ baker (Sample.cpp:2095).
-                RtxptMaterialOverrideAsset asset = matOverride.Slots[subMeshIndex];
+                RtxptMaterial asset = matOverride.Slots[subMeshIndex];
                 int assetId = asset.GetInstanceID();
                 if (_overrideSlots.TryGetValue(assetId, out int existingOverride))
                     return existingOverride;
 
-                int newOverride = BuildMaterialFromOverride(asset.Slot, ptMatList, texPtrs);
+                int newOverride = BuildMaterialFromOverride(asset, ptMatList, texPtrs);
                 _overrideSlots[assetId] = newOverride;
                 return newOverride;
             }

@@ -2,6 +2,7 @@
 using System;
 using System.Collections.Generic;
 using System.Text;
+using NativeRender;
 using UnityEditor;
 using UnityEditor.SceneManagement;
 using UnityEngine;
@@ -11,7 +12,7 @@ namespace PathTracing
     /// <summary>
     /// Adds <see cref="NativeRtxptMaterialOverride"/> to every MeshRenderer in the scene
     /// and auto-assigns slot assets by matching Unity material names to
-    /// <see cref="RtxptMaterialOverrideAsset"/> files found in a chosen project folder.
+    /// <see cref="RtxptMaterial"/> files found in a chosen project folder.
     /// Open via  RTXPT ▸ Auto-Assign Material Overrides to Scene…
     /// </summary>
     public class RtxptSceneAutoAssign : EditorWindow
@@ -38,7 +39,7 @@ namespace PathTracing
             _assetFolder = EditorGUILayout.TextField("Folder", _assetFolder);
             if (GUILayout.Button("…", GUILayout.Width(26)))
             {
-                string picked = EditorUtility.OpenFolderPanel("Select folder with RtxptMaterialOverrideAsset files", ToAbsolute(_assetFolder), "");
+                string picked = EditorUtility.OpenFolderPanel("Select folder with RtxptMaterial files", ToAbsolute(_assetFolder), "");
                 if (!string.IsNullOrEmpty(picked))
                 {
                     string rel = AbsToRelative(picked);
@@ -103,9 +104,9 @@ namespace PathTracing
             var comparer   = StringComparer.FromComparison(comparison);
 
             // ---- 1. Index: asset filename (without .asset) → asset ----
-            var assetMap = new Dictionary<string, RtxptMaterialOverrideAsset>(comparer);
+            var assetMap = new Dictionary<string, RtxptMaterial>(comparer);
 
-            string[] guids = AssetDatabase.FindAssets("t:RtxptMaterialOverrideAsset", new[] { _assetFolder.TrimEnd('/') });
+            string[] guids = AssetDatabase.FindAssets("t:RtxptMaterial", new[] { _assetFolder.TrimEnd('/') });
             foreach (string guid in guids)
             {
                 string path = AssetDatabase.GUIDToAssetPath(guid);
@@ -115,7 +116,7 @@ namespace PathTracing
                     if (!string.Equals(parent, _assetFolder.TrimEnd('/'), StringComparison.OrdinalIgnoreCase))
                         continue;
                 }
-                var asset = AssetDatabase.LoadAssetAtPath<RtxptMaterialOverrideAsset>(path);
+                var asset = AssetDatabase.LoadAssetAtPath<RtxptMaterial>(path);
                 if (asset == null) continue;
                 string key = System.IO.Path.GetFileNameWithoutExtension(path);
                 if (!assetMap.ContainsKey(key)) assetMap[key] = asset;
@@ -153,6 +154,12 @@ namespace PathTracing
                     comp = Undo.AddComponent<NativeRtxptMaterialOverride>(mr.gameObject);
 
                 Undo.RecordObject(comp, "Auto-Assign RTXPT Material Overrides");
+                
+                var renderTarget = mr.GetComponent<NativeRayTracingTarget>();
+                if (renderTarget == null)
+                    renderTarget = Undo.AddComponent<NativeRayTracingTarget>(mr.gameObject);
+                
+                Undo.RecordObject(renderTarget, "Auto-Assign RTXPT NativeRayTracingTarget");
 
                 while (comp.Slots.Count < slotCount) comp.Slots.Add(null);
                 if (comp.Slots.Count > slotCount)     comp.Slots.RemoveRange(slotCount, comp.Slots.Count - slotCount);
@@ -201,8 +208,8 @@ namespace PathTracing
         }
 
         // Strict match: "{prefix}.{matName}.material" when prefix is set, else "{matName}".
-        private static RtxptMaterialOverrideAsset Lookup(
-            Dictionary<string, RtxptMaterialOverrideAsset> map,
+        private static RtxptMaterial Lookup(
+            Dictionary<string, RtxptMaterial> map,
             string matName, string prefix, StringComparison cmp)
         {
             string key = string.IsNullOrEmpty(prefix) ? matName : $"{prefix}.{matName}.material";

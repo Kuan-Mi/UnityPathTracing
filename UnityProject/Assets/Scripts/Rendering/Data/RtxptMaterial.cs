@@ -4,13 +4,15 @@ using UnityEngine;
 namespace PathTracing
 {
     // =========================================================================
-    // RtxptMaterialSlot  —  per-sub-mesh material override data
-    // Mirrors PTMaterial in MaterialPT.h (scalar/flag fields only; textures are
-    // Unity asset references set separately).
+    // RtxptMaterial  —  one RTXPT material asset
+    // Mirrors PTMaterial in MaterialPT.h. Holds the scalar/flag/colour fields plus
+    // Unity texture references. Created from RTXPT material JSON (directly via the
+    // *.material.json ScriptedImporter, or baked from a Unity material) and shared
+    // across renderers / sub-meshes by a NativeRtxptMaterialOverride component.
     // =========================================================================
 
-    [Serializable]
-    public class RtxptMaterialSlot
+    [CreateAssetMenu(menuName = "RTXPT/Material", fileName = "RtxptMaterial")]
+    public class RtxptMaterial : ScriptableObject
     {
         [Header("Textures")]
         public Texture BaseOrDiffuseTexture;
@@ -106,19 +108,16 @@ namespace PathTracing
         [Range(0, 3)]
         public int PSDBlockMotionVectorsAtSurfaceType = 0;
 
-        // ---- JSON import ----
+        /// <summary>Fired when the asset's data changes — subscribers (renderers) use this to mark themselves dirty.</summary>
+        public event Action Modified;
 
-        /// <summary>
-        /// Creates a new <see cref="RtxptMaterialSlot"/> populated from a RTXPT material JSON string.
-        /// When <paramref name="textureResolver"/> is supplied, texture path entries in the JSON are
-        /// resolved to Unity assets and assigned; otherwise texture fields are left unset.
-        /// </summary>
-        public static RtxptMaterialSlot FromJson(string json, Func<RtxptTextureRef, Texture> textureResolver = null)
-        {
-            var slot = new RtxptMaterialSlot();
-            slot.ApplyJsonData(JsonUtility.FromJson<SlotJson>(json), textureResolver);
-            return slot;
-        }
+        public void MarkModified() => Modified?.Invoke();
+
+#if UNITY_EDITOR
+        private void OnValidate() => Modified?.Invoke();
+#endif
+
+        // ---- JSON import ----
 
         /// <summary>
         /// Overwrites all non-texture fields from a RTXPT material JSON string.
@@ -253,7 +252,7 @@ namespace PathTracing
 
     /// <summary>
     /// Describes one texture slot as written by the RTXPT material exporter. Passed to the texture
-    /// resolver delegate of <see cref="RtxptMaterialSlot.LoadFromJson"/> so editor code can map the
+    /// resolver delegate of <see cref="RtxptMaterial.LoadFromJson"/> so editor code can map the
     /// exporter-relative <see cref="Path"/> onto a Unity <see cref="Texture"/> asset.
     /// </summary>
     public struct RtxptTextureRef
@@ -264,24 +263,5 @@ namespace PathTracing
         public bool   IsSRGB;
         /// <summary>True if the texture is a normal map.</summary>
         public bool   IsNormalMap;
-    }
-
-    // =========================================================================
-    // RtxptMaterialOverrideAsset  —  one asset per material slot
-    // =========================================================================
-
-    [CreateAssetMenu(menuName = "RTXPT/Material Override", fileName = "RtxptMaterialOverride")]
-    public class RtxptMaterialOverrideAsset : ScriptableObject
-    {
-        public RtxptMaterialSlot Slot = new();
-
-        /// <summary>Fired when the asset's data changes — subscribers (renderers) use this to mark themselves dirty.</summary>
-        public event Action Modified;
-
-        public void MarkModified() => Modified?.Invoke();
-
-#if UNITY_EDITOR
-        private void OnValidate() => Modified?.Invoke();
-#endif
     }
 }

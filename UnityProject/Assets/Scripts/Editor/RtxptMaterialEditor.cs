@@ -5,8 +5,8 @@ using UnityEngine;
 
 namespace PathTracing
 {
-    [CustomEditor(typeof(RtxptMaterialOverrideAsset))]
-    public class RtxptMaterialOverrideAssetEditor : Editor
+    [CustomEditor(typeof(RtxptMaterial))]
+    public class RtxptMaterialEditor : Editor
     {
         private bool   _jsonFoldout = false;
         private string _jsonText    = "";
@@ -49,11 +49,11 @@ namespace PathTracing
             EditorGUI.BeginDisabledGroup(string.IsNullOrWhiteSpace(_jsonText));
             if (GUILayout.Button("Apply to Slot", GUILayout.Height(26)))
             {
-                var asset = (RtxptMaterialOverrideAsset)target;
+                var asset = (RtxptMaterial)target;
                 try
                 {
-                    Undo.RecordObject(asset, "Apply JSON to RTXPT Slot");
-                    asset.Slot.LoadFromJson(_jsonText);
+                    Undo.RecordObject(asset, "Apply JSON to RTXPT Material");
+                    asset.LoadFromJson(_jsonText);
                     EditorUtility.SetDirty(asset);
                     _errorMsg = null;
                 }

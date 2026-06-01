@@ -76,7 +76,7 @@ namespace PathTracing
                 {
                     EditorGUI.indentLevel++;
 
-                    // Asset reference field — drag any RtxptMaterialOverrideAsset here.
+                    // Asset reference field — drag any RtxptMaterial here.
                     EditorGUILayout.BeginHorizontal();
                     EditorGUILayout.PropertyField(slotsProp.GetArrayElementAtIndex(i), new GUIContent("Override Asset"));
 
@@ -95,12 +95,19 @@ namespace PathTracing
 
                     EditorGUILayout.EndHorizontal();
 
-                    // Inline-edit the assigned asset.
+                    // Inline-edit the assigned asset (draw all its fields except the script ref).
                     if (assetRef != null)
                     {
                         var assetSO = new SerializedObject(assetRef);
                         assetSO.Update();
-                        EditorGUILayout.PropertyField(assetSO.FindProperty("Slot"), includeChildren: true);
+                        SerializedProperty prop = assetSO.GetIterator();
+                        bool enterChildren = true;
+                        while (prop.NextVisible(enterChildren))
+                        {
+                            enterChildren = false;
+                            if (prop.name == "m_Script") continue;
+                            EditorGUILayout.PropertyField(prop, includeChildren: true);
+                        }
                         if (assetSO.ApplyModifiedProperties())
                             EditorUtility.SetDirty(assetRef);
                     }
@@ -156,10 +163,10 @@ namespace PathTracing
         }
 
         // Creates a single new asset for slot s.
-        private static RtxptMaterialOverrideAsset CreateSlotAsset(NativeRtxptMaterialOverride comp, int s, string dir = null)
+        private static RtxptMaterial CreateSlotAsset(NativeRtxptMaterialOverride comp, int s, string dir = null)
         {
             dir ??= ResolveAssetDir(comp.gameObject.scene.path);
-            var    asset = CreateInstance<RtxptMaterialOverrideAsset>();
+            var    asset = CreateInstance<RtxptMaterial>();
             string path  = AssetDatabase.GenerateUniqueAssetPath($"{dir}/{comp.gameObject.name}_Slot{s}.asset");
             AssetDatabase.CreateAsset(asset, path);
             AssetDatabase.SaveAssets();
