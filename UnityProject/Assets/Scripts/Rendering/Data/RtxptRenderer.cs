@@ -81,7 +81,7 @@ namespace PathTracing
             MeshRenderer = GetComponent<MeshRenderer>();
             if (!s_All.Contains(this)) s_All.Add(this);
             RefreshSubscriptions();
-            RebuildGroups();   // also bumps TopologyVersion (covers set growth)
+            RebuildGroups(); // also bumps TopologyVersion (covers set growth)
         }
 
         private void OnDisable()
@@ -93,10 +93,10 @@ namespace PathTracing
 
         private void OnValidate()
         {
-            IsDirty = true;
+            IsDirty      = true;
             MeshRenderer = GetComponent<MeshRenderer>();
             RefreshSubscriptions();
-            RebuildGroups();   // slot (un)assignment or flag changes can alter grouping
+            RebuildGroups(); // slot (un)assignment or flag changes can alter grouping
         }
 
         private void RefreshSubscriptions()
@@ -114,7 +114,8 @@ namespace PathTracing
         private void ClearSubscriptions()
         {
             foreach (var asset in _subscribedAssets)
-                if (asset != null) asset.Modified -= OnSlotMaterialModified;
+                if (asset != null)
+                    asset.Modified -= OnSlotMaterialModified;
             _subscribedAssets.Clear();
         }
 
@@ -150,10 +151,11 @@ namespace PathTracing
                 var key = (IsTransparent(mat), IsEmissive(mat), mat.EnableAlphaTesting);
                 if (!lists.TryGetValue(key, out var list))
                 {
-                    list = new List<int>();
+                    list       = new List<int>();
                     lists[key] = list;
                     order.Add(key);
                 }
+
                 list.Add(s);
             }
 
@@ -188,13 +190,16 @@ namespace PathTracing
                     x.isAlphaClip != y.isAlphaClip || x.submeshIndices.Length != y.submeshIndices.Length)
                     return false;
                 for (int k = 0; k < x.submeshIndices.Length; k++)
-                    if (x.submeshIndices[k] != y.submeshIndices[k]) return false;
+                    if (x.submeshIndices[k] != y.submeshIndices[k])
+                        return false;
             }
+
             return true;
         }
 
         // Classification mirrors the RTXPT material semantics (not Unity shader sniffing).
         private static bool IsTransparent(RtxptMaterial m) => m.EnableTransmission;
+
         private static bool IsEmissive(RtxptMaterial m)
             => m.EmissiveIntensity > 0f &&
                (m.EmissiveColor.r > 0f || m.EmissiveColor.g > 0f || m.EmissiveColor.b > 0f);
@@ -240,14 +245,14 @@ namespace PathTracing
                 slot.EmissiveTexture                   = TryGetTex(mat, "emissiveTexture");
 
                 Color baseC = TryGetColor(mat, "baseColorFactor", Color.white);
-                slot.BaseColorFactor       = baseC;
-                slot.Opacity               = baseC.a;
-                slot.EmissiveColor         = TryGetColor(mat, "emissiveFactor", Color.black);
-                slot.Roughness             = TryGetFloat(mat, "roughnessFactor", 0.5f);
-                slot.Metalness             = TryGetFloat(mat, "metallicFactor", 0f);
-                slot.EnableAlphaTesting    = mat.IsKeywordEnabled("_ALPHATEST_ON");
-                slot.AlphaCutoff           = slot.EnableAlphaTesting ? TryGetFloat(mat, "alphaCutoff", 0.5f) : 0f;
-                slot.NormalTextureScale    = 1f;
+                slot.BaseColorFactor    = baseC;
+                slot.Opacity            = baseC.a;
+                slot.EmissiveColor      = TryGetColor(mat, "emissiveFactor", Color.black);
+                slot.Roughness          = TryGetFloat(mat, "roughnessFactor", 0.5f);
+                slot.Metalness          = TryGetFloat(mat, "metallicFactor", 0f);
+                slot.EnableAlphaTesting = mat.IsKeywordEnabled("_ALPHATEST_ON");
+                slot.AlphaCutoff        = slot.EnableAlphaTesting ? TryGetFloat(mat, "alphaCutoff", 0.5f) : 0f;
+                slot.NormalTextureScale = 1f;
             }
             else
             {
@@ -268,19 +273,19 @@ namespace PathTracing
                 slot.NormalTextureScale = TryGetFloat(mat, "_BumpScale", 1f);
             }
 
-            slot.EmissiveIntensity   = 1f;
-            slot.EnableTransmission  = false;
-            slot.TransmissionFactor  = 0f;
+            slot.EmissiveIntensity  = 1f;
+            slot.EnableTransmission = false;
+            slot.TransmissionFactor = 0f;
 
             float   met            = slot.Metalness;
             Vector3 dielectricF0   = new Vector3(0.04f, 0.04f, 0.04f);
             Vector3 metalBaseColor = new Vector3(slot.BaseColorFactor.r, slot.BaseColorFactor.g, slot.BaseColorFactor.b);
             Vector3 specF0         = Vector3.Lerp(dielectricF0, metalBaseColor, met);
-            slot.SpecularColor     = new Color(specF0.x, specF0.y, specF0.z, 1f);
+            slot.SpecularColor = new Color(specF0.x, specF0.y, specF0.z, 1f);
 
-            slot.UseSpecularGlossModel  = false;
-            slot.ThinSurface            = false;
-            slot.MetalnessInRedChannel  = slot.OcclusionRoughnessMetallicTexture != null;
+            slot.UseSpecularGlossModel = false;
+            slot.ThinSurface           = false;
+            slot.MetalnessInRedChannel = slot.OcclusionRoughnessMetallicTexture != null;
 
             // Texture enables: on by default for all assigned textures
             slot.EnableBaseTexture                       = true;
@@ -307,9 +312,10 @@ namespace PathTracing
     // =========================================================================
     public sealed class RtxptSubmeshGroup
     {
-        public bool  isTransparent;
-        public bool  isEmissive;
-        public bool  isAlphaClip;
+        public bool isTransparent;
+        public bool isEmissive;
+        public bool isAlphaClip;
+
         /// <summary>Indices into the Mesh's sub-meshes, in ascending order.</summary>
         public int[] submeshIndices;
     }
