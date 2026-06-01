@@ -1,0 +1,68 @@
+{
+	"AlphaCutoff" : 0.5,
+	"BaseOrDiffuseColor" : 
+	[
+		0.80800002813339233,
+		0.80000001192092896,
+		0.80000001192092896
+	],
+	"BaseTexture" : 
+	{
+		"NormalMap" : false,
+		"path" : "Models\\Bistro\\objects\\props\\natural\\paris_flowers_01a\\paris_flowers_01a_diff.dds",
+		"sRGB" : true
+	},
+	"DiffuseTransmissionFactor" : 0.5,
+	"EmissiveColor" : 
+	[
+		0.0,
+		0.0,
+		0.0
+	],
+	"EmissiveIntensity" : 1.0,
+	"EnableAlphaTesting" : true,
+	"EnableAsAnalyticLightProxy" : false,
+	"EnableBaseTexture" : true,
+	"EnableEmissiveTexture" : true,
+	"EnableNormalTexture" : true,
+	"EnableOcclusionRoughnessMetallicTexture" : true,
+	"EnableTransmission" : true,
+	"EnableTransmissionTexture" : true,
+	"ExcludeFromNEE" : false,
+	"IgnoreMeshTangentSpace" : false,
+	"IoR" : 1.5,
+	"Metalness" : 0.0,
+	"MetalnessInRedChannel" : false,
+	"NestedPriority" : 14,
+	"NormalTexture" : 
+	{
+		"NormalMap" : true,
+		"path" : "Models\\Bistro\\objects\\props\\natural\\paris_flowers_01a\\paris_flowers_01a_ddna.dds",
+		"sRGB" : false
+	},
+	"NormalTextureScale" : 1.0,
+	"Opacity" : 1.0,
+	"PSDDominantDeltaLobe" : -1,
+	"PSDExclude" : false,
+	"Roughness" : 0.43999999761581421,
+	"ShadowNoLFadeout" : 0.0,
+	"SkipRender" : false,
+	"SpecularColor" : 
+	[
+		0.0039215688593685627,
+		0.0039215688593685627,
+		0.0039215688593685627
+	],
+	"ThinSurface" : true,
+	"TransmissionFactor" : 0.0,
+	"UseDonutEmissiveIntensity" : false,
+	"UseSpecularGlossModel" : true,
+	"VolumeAttenuationColor" : 
+	[
+		1.0,
+		1.0,
+		1.0
+	],
+	"VolumeAttenuationDistance" : 3.4028234663852886e+38,
+	"version" : 1
+}

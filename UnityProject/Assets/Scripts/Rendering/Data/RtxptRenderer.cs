@@ -227,7 +227,7 @@ namespace PathTracing
             RebuildGroups();
         }
 
-        internal static void BakeSlotFromMaterial(RtxptMaterial slot, Material mat)
+        public static void BakeSlotFromMaterial(RtxptMaterial slot, Material mat)
         {
             if (mat == null) return;
 

@@ -1,0 +1,80 @@
+{
+	"AlphaCutoff" : 0.5,
+	"BaseOrDiffuseColor" : 
+	[
+		1.0,
+		1.0,
+		1.0
+	],
+	"BaseTexture" : 
+	{
+		"NormalMap" : false,
+		"path" : "Models\\Bistro\\objects\\props\\street\\paris_lantern_01\\paris_lantern_01a_diff.dds",
+		"sRGB" : true
+	},
+	"DiffuseTransmissionFactor" : 0.0,
+	"EmissiveColor" : 
+	[
+		1.0,
+		0.796875,
+		0.59375
+	],
+	"EmissiveIntensity" : 2.0,
+	"EmissiveTexture" : 
+	{
+		"NormalMap" : false,
+		"path" : "Models\\Bistro\\objects\\props\\street\\paris_lantern_01\\paris_lantern_01a_emi.dds",
+		"sRGB" : true
+	},
+	"EnableAlphaTesting" : false,
+	"EnableAsAnalyticLightProxy" : false,
+	"EnableBaseTexture" : true,
+	"EnableEmissiveTexture" : true,
+	"EnableNormalTexture" : true,
+	"EnableOcclusionRoughnessMetallicTexture" : true,
+	"EnableTransmission" : false,
+	"EnableTransmissionTexture" : true,
+	"ExcludeFromNEE" : false,
+	"IgnoreMeshTangentSpace" : false,
+	"IoR" : 1.5,
+	"Metalness" : 0.0,
+	"MetalnessInRedChannel" : false,
+	"NestedPriority" : 14,
+	"NormalTexture" : 
+	{
+		"NormalMap" : true,
+		"path" : "Models\\Bistro\\objects\\props\\street\\paris_lantern_01\\paris_lantern_01a_ddna.dds",
+		"sRGB" : false
+	},
+	"NormalTextureScale" : 1.0,
+	"OcclusionRoughnessMetallicTexture" : 
+	{
+		"NormalMap" : false,
+		"path" : "Models\\Bistro\\objects\\props\\street\\paris_lantern_01\\paris_lantern_01a_spec.dds",
+		"sRGB" : true
+	},
+	"Opacity" : 1.0,
+	"PSDDominantDeltaLobe" : -1,
+	"PSDExclude" : false,
+	"Roughness" : 0.31000000238418579,
+	"ShadowNoLFadeout" : 0.0,
+	"SkipRender" : false,
+	"SpecularColor" : 
+	[
+		0.53333336114883423,
+		0.4017900824546814,
+		0.19450980424880981
+	],
+	"ThinSurface" : false,
+	"TransmissionFactor" : 0.0,
+	"UseDonutEmissiveIntensity" : false,
+	"UseSpecularGlossModel" : true,
+	"VolumeAttenuationColor" : 
+	[
+		1.0,
+		1.0,
+		1.0
+	],
+	"VolumeAttenuationDistance" : 3.4028234663852886e+38,
+	"version" : 1
+}

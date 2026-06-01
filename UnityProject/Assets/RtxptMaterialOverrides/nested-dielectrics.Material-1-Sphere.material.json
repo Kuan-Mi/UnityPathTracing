@@ -1,0 +1,57 @@
+{
+	"AlphaCutoff" : 0.5,
+	"BaseOrDiffuseColor" : 
+	[
+		0.80000001192092896,
+		0.80000001192092896,
+		0.80000001192092896
+	],
+	"DiffuseTransmissionFactor" : 0.0,
+	"EmissiveColor" : 
+	[
+		0.0,
+		0.0,
+		0.0
+	],
+	"EmissiveIntensity" : 1.0,
+	"EnableAlphaTesting" : false,
+	"EnableAsAnalyticLightProxy" : false,
+	"EnableBaseTexture" : true,
+	"EnableEmissiveTexture" : true,
+	"EnableNormalTexture" : true,
+	"EnableOcclusionRoughnessMetallicTexture" : true,
+	"EnableTransmission" : true,
+	"EnableTransmissionTexture" : true,
+	"ExcludeFromNEE" : false,
+	"IgnoreMeshTangentSpace" : false,
+	"IoR" : 1.0010000467300415,
+	"Metalness" : 0.0,
+	"MetalnessInRedChannel" : false,
+	"NestedPriority" : 2,
+	"NormalTextureScale" : 0.0,
+	"Opacity" : 1.0,
+	"PSDBlockMotionVectorsAtSurfaceType" : 1,
+	"PSDDominantDeltaLobe" : 0,
+	"PSDExclude" : false,
+	"Roughness" : 0.0,
+	"ShadowNoLFadeout" : 0.0,
+	"SkipRender" : false,
+	"SpecularColor" : 
+	[
+		0.0,
+		0.0,
+		0.0
+	],
+	"ThinSurface" : false,
+	"TransmissionFactor" : 1.0,
+	"UseDonutEmissiveIntensity" : false,
+	"UseSpecularGlossModel" : false,
+	"VolumeAttenuationColor" : 
+	[
+		0.99000000953674316,
+		0.99000000953674316,
+		0.99000000953674316
+	],
+	"VolumeAttenuationDistance" : 2.0,
+	"version" : 1
+}

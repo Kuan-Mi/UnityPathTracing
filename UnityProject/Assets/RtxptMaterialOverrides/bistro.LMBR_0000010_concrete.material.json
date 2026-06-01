@@ -1,0 +1,74 @@
+{
+	"AlphaCutoff" : 0.5,
+	"BaseOrDiffuseColor" : 
+	[
+		1.0,
+		1.0,
+		1.0
+	],
+	"BaseTexture" : 
+	{
+		"NormalMap" : false,
+		"path" : "Models\\Bistro\\objects\\props\\street\\paris_mainbalcony_01\\paris_doors_04a_diff.dds",
+		"sRGB" : true
+	},
+	"DiffuseTransmissionFactor" : 0.0,
+	"EmissiveColor" : 
+	[
+		0.0,
+		0.0,
+		0.0
+	],
+	"EmissiveIntensity" : 1.0,
+	"EnableAlphaTesting" : false,
+	"EnableAsAnalyticLightProxy" : false,
+	"EnableBaseTexture" : true,
+	"EnableEmissiveTexture" : true,
+	"EnableNormalTexture" : true,
+	"EnableOcclusionRoughnessMetallicTexture" : true,
+	"EnableTransmission" : false,
+	"EnableTransmissionTexture" : true,
+	"ExcludeFromNEE" : false,
+	"IgnoreMeshTangentSpace" : false,
+	"IoR" : 1.5,
+	"Metalness" : 0.0,
+	"MetalnessInRedChannel" : false,
+	"NestedPriority" : 14,
+	"NormalTexture" : 
+	{
+		"NormalMap" : true,
+		"path" : "Models\\Bistro\\objects\\props\\street\\paris_mainbalcony_01\\paris_doors_04a_ddna.dds",
+		"sRGB" : false
+	},
+	"NormalTextureScale" : 1.0,
+	"OcclusionRoughnessMetallicTexture" : 
+	{
+		"NormalMap" : false,
+		"path" : "Models\\Bistro\\objects\\props\\street\\paris_mainbalcony_01\\paris_doors_04a_spec.dds",
+		"sRGB" : true
+	},
+	"Opacity" : 1.0,
+	"PSDDominantDeltaLobe" : -1,
+	"PSDExclude" : false,
+	"Roughness" : 0.49000000953674316,
+	"ShadowNoLFadeout" : 0.0,
+	"SkipRender" : false,
+	"SpecularColor" : 
+	[
+		1.0,
+		1.0,
+		1.0
+	],
+	"ThinSurface" : false,
+	"TransmissionFactor" : 0.0,
+	"UseDonutEmissiveIntensity" : false,
+	"UseSpecularGlossModel" : true,
+	"VolumeAttenuationColor" : 
+	[
+		1.0,
+		1.0,
+		1.0
+	],
+	"VolumeAttenuationDistance" : 3.4028234663852886e+38,
+	"version" : 1
+}

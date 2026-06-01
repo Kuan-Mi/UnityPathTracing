@@ -1,0 +1,65 @@
+{
+	"AlphaCutoff" : 0.5,
+	"BaseOrDiffuseColor" : 
+	[
+		1.0,
+		1.0,
+		1.0
+	],
+	"BaseTexture" : 
+	{
+		"NormalMap" : false,
+		"path" : "Models\\Mech_drone\\textures\\Fire_diffuse.dds",
+		"sRGB" : true
+	},
+	"DiffuseTransmissionFactor" : 0.0,
+	"EmissiveColor" : 
+	[
+		1.0,
+		0.60000002384185791,
+		0.30000001192092896
+	],
+	"EmissiveIntensity" : 10.0,
+	"EmissiveTexture" : 
+	{
+		"NormalMap" : false,
+		"path" : "Models\\Mech_drone\\textures\\Fire_emissive.dds",
+		"sRGB" : true
+	},
+	"EnableAlphaTesting" : false,
+	"EnableAsAnalyticLightProxy" : false,
+	"EnableBaseTexture" : true,
+	"EnableEmissiveTexture" : true,
+	"EnableNormalTexture" : true,
+	"EnableOcclusionRoughnessMetallicTexture" : true,
+	"EnableTransmission" : true,
+	"EnableTransmissionTexture" : true,
+	"ExcludeFromNEE" : true,
+	"IoR" : 1.0499999523162842,
+	"Metalness" : 0.0,
+	"MetalnessInRedChannel" : false,
+	"NestedPriority" : 14,
+	"NormalTextureScale" : 0.0,
+	"Opacity" : 0.070000000298023224,
+	"PSDDominantDeltaLobe" : -1,
+	"PSDExclude" : false,
+	"Roughness" : 0.0,
+	"ShadowNoLFadeout" : 0.0,
+	"SpecularColor" : 
+	[
+		0.0,
+		0.0,
+		0.0
+	],
+	"ThinSurface" : true,
+	"TransmissionFactor" : 1.0,
+	"UseSpecularGlossModel" : false,
+	"VolumeAttenuationColor" : 
+	[
+		1.0,
+		1.0,
+		1.0
+	],
+	"VolumeAttenuationDistance" : 3.4028234663852886e+38,
+	"version" : 1
+}

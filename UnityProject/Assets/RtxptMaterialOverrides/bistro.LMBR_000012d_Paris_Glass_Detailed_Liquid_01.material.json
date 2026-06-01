@@ -1,0 +1,62 @@
+{
+	"AlphaCutoff" : 0.5,
+	"BaseOrDiffuseColor" : 
+	[
+		0.94730699062347412,
+		0.42326799035072327,
+		0.02217400074005127
+	],
+	"BaseTexture" : 
+	{
+		"NormalMap" : false,
+		"path" : "Models\\Bistro\\objects\\props\\bistro\\paris_glass_detailed_01\\paris_glass_detailed_bubbles_01_diff.dds",
+		"sRGB" : true
+	},
+	"DiffuseTransmissionFactor" : 0.0,
+	"EmissiveColor" : 
+	[
+		0.0,
+		0.0,
+		0.0
+	],
+	"EmissiveIntensity" : 1.0,
+	"EnableAlphaTesting" : true,
+	"EnableAsAnalyticLightProxy" : false,
+	"EnableBaseTexture" : true,
+	"EnableEmissiveTexture" : true,
+	"EnableNormalTexture" : true,
+	"EnableOcclusionRoughnessMetallicTexture" : true,
+	"EnableTransmission" : false,
+	"EnableTransmissionTexture" : true,
+	"ExcludeFromNEE" : false,
+	"IgnoreMeshTangentSpace" : false,
+	"IoR" : 1.5,
+	"Metalness" : 0.0,
+	"MetalnessInRedChannel" : false,
+	"NestedPriority" : 14,
+	"NormalTextureScale" : 0.0,
+	"Opacity" : 1.0,
+	"PSDDominantDeltaLobe" : -1,
+	"PSDExclude" : false,
+	"Roughness" : 0.0,
+	"ShadowNoLFadeout" : 0.0,
+	"SkipRender" : false,
+	"SpecularColor" : 
+	[
+		0.57112497091293335,
+		0.064802996814250946,
+		0.0069949999451637268
+	],
+	"ThinSurface" : true,
+	"TransmissionFactor" : 0.0,
+	"UseDonutEmissiveIntensity" : false,
+	"UseSpecularGlossModel" : true,
+	"VolumeAttenuationColor" : 
+	[
+		1.0,
+		1.0,
+		1.0
+	],
+	"VolumeAttenuationDistance" : 3.4028234663852886e+38,
+	"version" : 1
+}

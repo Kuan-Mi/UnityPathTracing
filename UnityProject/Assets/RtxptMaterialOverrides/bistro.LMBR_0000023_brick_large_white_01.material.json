@@ -1,0 +1,68 @@
+{
+	"AlphaCutoff" : 0.5,
+	"BaseOrDiffuseColor" : 
+	[
+		0.37626200914382935,
+		0.37626200914382935,
+		0.37626200914382935
+	],
+	"BaseTexture" : 
+	{
+		"NormalMap" : false,
+		"path" : "Models\\Bistro\\textures\\shared\\tiling\\brick_large_02\\Brick_Large_02_Diff.dds",
+		"sRGB" : true
+	},
+	"DiffuseTransmissionFactor" : 0.0,
+	"EmissiveColor" : 
+	[
+		0.0,
+		0.0,
+		0.0
+	],
+	"EmissiveIntensity" : 1.0,
+	"EnableAlphaTesting" : false,
+	"EnableAsAnalyticLightProxy" : false,
+	"EnableBaseTexture" : true,
+	"EnableEmissiveTexture" : true,
+	"EnableNormalTexture" : true,
+	"EnableOcclusionRoughnessMetallicTexture" : true,
+	"EnableTransmission" : false,
+	"EnableTransmissionTexture" : true,
+	"ExcludeFromNEE" : false,
+	"IgnoreMeshTangentSpace" : false,
+	"IoR" : 1.5,
+	"Metalness" : 0.0,
+	"MetalnessInRedChannel" : false,
+	"NestedPriority" : 14,
+	"NormalTexture" : 
+	{
+		"NormalMap" : true,
+		"path" : "Models\\Bistro\\textures\\shared\\tiling\\brick_large_02\\Brick_Large_02_ddna.dds",
+		"sRGB" : false
+	},
+	"NormalTextureScale" : 1.0,
+	"Opacity" : 1.0,
+	"PSDDominantDeltaLobe" : -1,
+	"PSDExclude" : false,
+	"Roughness" : 0.2823529839515686,
+	"ShadowNoLFadeout" : 0.0,
+	"SkipRender" : false,
+	"SpecularColor" : 
+	[
+		0.046665001660585403,
+		0.046665001660585403,
+		0.046665001660585403
+	],
+	"ThinSurface" : false,
+	"TransmissionFactor" : 0.0,
+	"UseDonutEmissiveIntensity" : false,
+	"UseSpecularGlossModel" : true,
+	"VolumeAttenuationColor" : 
+	[
+		1.0,
+		1.0,
+		1.0
+	],
+	"VolumeAttenuationDistance" : 3.4028234663852886e+38,
+	"version" : 1
+}

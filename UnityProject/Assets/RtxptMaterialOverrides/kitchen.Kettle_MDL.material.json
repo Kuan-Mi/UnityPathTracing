@@ -1,0 +1,65 @@
+{
+	"AlphaCutoff" : 0.5,
+	"BaseOrDiffuseColor" : 
+	[
+		0.069213852286338806,
+		0.23571288585662842,
+		0.045464139431715012
+	],
+	"DiffuseTransmissionFactor" : 0.0,
+	"EmissiveColor" : 
+	[
+		0.0,
+		0.0,
+		0.0
+	],
+	"EmissiveIntensity" : 1.0,
+	"EnableAlphaTesting" : false,
+	"EnableAsAnalyticLightProxy" : false,
+	"EnableBaseTexture" : true,
+	"EnableEmissiveTexture" : true,
+	"EnableNormalTexture" : true,
+	"EnableOcclusionRoughnessMetallicTexture" : true,
+	"EnableTransmission" : false,
+	"EnableTransmissionTexture" : true,
+	"ExcludeFromNEE" : false,
+	"IoR" : 1.4500000476837158,
+	"Metalness" : 1.0,
+	"MetalnessInRedChannel" : false,
+	"NestedPriority" : 14,
+	"NormalTexture" : 
+	{
+		"NormalMap" : true,
+		"path" : "Models\\Kitchen\\Kettle_MDL_Normal.dds",
+		"sRGB" : false
+	},
+	"NormalTextureScale" : 0.05000000074505806,
+	"OcclusionRoughnessMetallicTexture" : 
+	{
+		"NormalMap" : false,
+		"path" : "Models\\Kitchen\\Kettle_MDL_Metallic-Kettle_MDL_Roughness.dds",
+		"sRGB" : false
+	},
+	"Opacity" : 1.0,
+	"PSDDominantDeltaLobe" : -1,
+	"PSDExclude" : false,
+	"Roughness" : 1.0,
+	"ShadowNoLFadeout" : 0.0,
+	"SpecularColor" : 
+	[
+		0.0,
+		0.0,
+		0.0
+	],
+	"ThinSurface" : true,
+	"TransmissionFactor" : 0.0,
+	"UseSpecularGlossModel" : false,
+	"VolumeAttenuationColor" : 
+	[
+		1.0,
+		1.0,
+		1.0
+	],
+	"VolumeAttenuationDistance" : 3.4028234663852886e+38,
+	"version" : 1
+}
