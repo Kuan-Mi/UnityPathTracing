@@ -16,14 +16,20 @@ namespace PathTracing
         // radiance maps (1024) are built by sampling this cube's mip0, so this drives the
         // fidelity of all environment lighting. CubeDimLowRes mirrors m_cubeDimLowResDim =
         // cubeDim/2 (EnvMapBaker.cpp:318). Public so the texture allocator stays in sync.
-        public  const int CubeDim                 = 2048;
-        private const int CubeDimLowRes           = CubeDim / 2;
-        private const int ImportanceMapDim        = 1024;
-        private const int ImportanceSamples       = 16;
-        private const int ImportanceSamplesX      = 4;
-        private const int ImportanceSamplesY      = 4;
-        private const int BaseLayerGroupsXY       = (CubeDim / 2 + 7) / 8;
-        private const int ImportanceBakerGroupsXY = (ImportanceMapDim + 15) / 16;
+        public const  int CubeDim       = 2048;
+        private const int CubeDimLowRes = CubeDim / 2;
+
+        // Number of cubemap mips, mirroring EnvMapBaker.cpp InitBuffers:
+        //   mipLevels = log2(cubeDim / c_BlockCompressionBlockSize), c_BlockCompressionBlockSize = 4.
+        // 2048 → 9 (mips 0..8). BaseLayerCS writes mip 0+1; MIPReduceCS fills mips 2..N-1, so the
+        // reduce loop issues (CubeMipCount-2) dispatches — must stay ≤ the descriptor-set ring depth (8).
+        public static readonly int CubeMipCount            = (int)(System.Math.Log(CubeDim / 4.0, 2.0) + 0.5);
+        private const          int ImportanceMapDim        = 1024;
+        private const          int ImportanceSamples       = 16;
+        private const          int ImportanceSamplesX      = 4;
+        private const          int ImportanceSamplesY      = 4;
+        private const          int BaseLayerGroupsXY       = (CubeDim / 2 + 7) / 8;
+        private const          int ImportanceBakerGroupsXY = (ImportanceMapDim + 15) / 16;
 
         // Constant radiance-compression factor applied at bake time so 32-bit HDR source
         // radiance fits the 16-bit-float / BC6U range the baker uses (Sample.cpp:89,
@@ -64,6 +70,8 @@ namespace PathTracing
 
         private readonly NativeComputePipeline      _baseLayerCs;
         private readonly NativeComputeDescriptorSet _baseLayerDs;
+        private readonly NativeComputePipeline      _mipReduceCs;
+        private readonly NativeComputeDescriptorSet _mipReduceDs;
         private readonly NativeComputePipeline      _importanceBakerCs;
         private readonly NativeComputeDescriptorSet _importanceBakerDs;
 
@@ -77,10 +85,12 @@ namespace PathTracing
         // skipped this frame. Mirrors the original EnvMapBaker::Update contentsChanged early-out.
         private bool _skipBake;
 
-        public NativeRtxptEnvMapBakerPass(NativeComputeShader baseLayerCs, NativeComputeShader importanceBakerCs)
+        public NativeRtxptEnvMapBakerPass(NativeComputeShader baseLayerCs, NativeComputeShader mipReduceCs, NativeComputeShader importanceBakerCs)
         {
             _baseLayerCs       = new NativeComputePipeline(baseLayerCs);
             _baseLayerDs       = new NativeComputeDescriptorSet(_baseLayerCs);
+            _mipReduceCs       = new NativeComputePipeline(mipReduceCs);
+            _mipReduceDs       = new NativeComputeDescriptorSet(_mipReduceCs);
             _importanceBakerCs = new NativeComputePipeline(importanceBakerCs);
             _importanceBakerDs = new NativeComputeDescriptorSet(_importanceBakerCs);
         }
@@ -89,6 +99,8 @@ namespace PathTracing
         {
             _baseLayerDs?.Dispose();
             _baseLayerCs?.Dispose();
+            _mipReduceDs?.Dispose();
+            _mipReduceCs?.Dispose();
             _importanceBakerDs?.Dispose();
             _importanceBakerCs?.Dispose();
         }
@@ -102,9 +114,9 @@ namespace PathTracing
             // Decide whether anything that affects the baked cube/importance map changed since
             // this camera's last bake. If not, skip the whole pass (the textures persist across
             // frames). This matches the original EnvMapBaker, which only re-bakes on change.
-            var tex = ctx.Textures;
-            var skyTex = ctx.Setting?.environmentMap;
-            int skyId = skyTex != null ? skyTex.GetInstanceID() : 0;
+            var   tex       = ctx.Textures;
+            var   skyTex    = ctx.Setting?.environmentMap;
+            int   skyId     = skyTex != null ? skyTex.GetInstanceID() : 0;
             ulong signature = ComputeEnvSignature(skyId);
 
             // DEBUG: caching temporarily disabled — force a re-bake every frame (mirrors the
@@ -129,8 +141,13 @@ namespace PathTracing
             {
                 byte* b = (byte*)p;
                 int   n = sizeof(EnvMapBakerCB);
-                for (int i = 0; i < n; i++) { h ^= b[i]; h *= 1099511628211UL; }
+                for (int i = 0; i < n; i++)
+                {
+                    h ^= b[i];
+                    h *= 1099511628211UL;
+                }
             }
+
             h ^= (uint)skyTextureId;
             h *= 1099511628211UL;
             return h;
@@ -140,6 +157,8 @@ namespace PathTracing
         {
             internal NativeComputePipeline      BaseLayerCs;
             internal NativeComputeDescriptorSet BaseLayerDs;
+            internal NativeComputePipeline      MipReduceCs;
+            internal NativeComputeDescriptorSet MipReduceDs;
             internal NativeComputePipeline      ImportanceBakerCs;
             internal NativeComputeDescriptorSet ImportanceBakerDs;
             internal VolatileConstantBuffer     EnvBakerCb;
@@ -147,8 +166,7 @@ namespace PathTracing
             internal EnvMapBakerCB              EnvBakerCbData;
             internal ImportanceBakerCB          ImportanceCbData;
             internal IntPtr                     SkyTexturePtr;
-            internal IntPtr                     EnvCubeMip0Ptr;
-            internal IntPtr                     EnvCubeMip1Ptr;
+            internal IntPtr                     EnvCubePtr;
             internal IntPtr                     ImportanceMapPtr;
             internal IntPtr                     RadianceMapPtr;
             internal RenderTexture              ImportanceMapRt;
@@ -167,6 +185,8 @@ namespace PathTracing
 
             pd.BaseLayerCs       = _baseLayerCs;
             pd.BaseLayerDs       = _baseLayerDs;
+            pd.MipReduceCs       = _mipReduceCs;
+            pd.MipReduceDs       = _mipReduceDs;
             pd.ImportanceBakerCs = _importanceBakerCs;
             pd.ImportanceBakerDs = _importanceBakerDs;
             pd.EnvBakerCb        = _ctx.Buffers.EnvBakerCb;
@@ -175,8 +195,7 @@ namespace PathTracing
             pd.ImportanceCbData  = s_importanceCb;
             var skyTex = _ctx.Setting?.environmentMap;
             pd.SkyTexturePtr    = skyTex != null ? skyTex.GetNativeTexturePtr() : _ctx.blackTexturePtr;
-            pd.EnvCubeMip0Ptr   = _ctx.Textures.EnvCubeMip0.NativePtr;
-            pd.EnvCubeMip1Ptr   = _ctx.Textures.EnvCubeMip1.NativePtr;
+            pd.EnvCubePtr       = _ctx.Textures.EnvCubemap.NativePtr;
             pd.ImportanceMapPtr = _ctx.Textures.EnvImportanceMap.NativePtr;
             pd.RadianceMapPtr   = _ctx.Textures.EnvRadianceMap.NativePtr;
             pd.ImportanceMapRt  = _ctx.Textures.EnvImportanceMap.rt;
@@ -194,6 +213,8 @@ namespace PathTracing
 
             cmd.BeginSample(RenderPassMarkers.RtxptEnvMapBaker);
 
+            // ── Base layer: BaseLayerCS writes cube mip 0 (Dst0) and the first solid-angle
+            //    downsample into mip 1 (Dst1) of the same cubemap (EnvMapBaker.cpp:537-550). ──
             {
                 var ds = data.BaseLayerDs;
                 data.EnvBakerCb.UploadDirect(context.cmd, data.EnvBakerCbData); // single-value overload
@@ -203,18 +224,38 @@ namespace PathTracing
                 ds.SetTexture("t_LowResPrePassCube", data.DummyCubePtr);
                 ds.SetTexture("t_ProcSkyTransmittance", data.DummyTex2DPtr);
                 ds.SetTexture("t_ProcSkyScatter", data.DummyTex2DPtr);
-                ds.SetRWTexture("u_EnvMapCubeFacesDst0", data.EnvCubeMip0Ptr);
-                ds.SetRWTexture("u_EnvMapCubeFacesDst1", data.EnvCubeMip1Ptr);
+                ds.SetRWTexture("u_EnvMapCubeFacesDst0", data.EnvCubePtr, 0); // mip 0
+                ds.SetRWTexture("u_EnvMapCubeFacesDst1", data.EnvCubePtr, 1); // mip 1
                 cmd.BeginSample(RenderPassMarkers.RtxptEnvMapBaseLayer);
                 data.BaseLayerCs.Dispatch(cmd, ds, BaseLayerGroupsXY, BaseLayerGroupsXY, 6);
                 cmd.EndSample(RenderPassMarkers.RtxptEnvMapBaseLayer);
             }
 
+            // ── MIP reduce: fill mips 2..N-1 from the previous mip with the solid-angle weighted
+            //    downsample (MIPReduceCS), mirroring EnvMapBaker.cpp:555-591. Each iteration reads
+            //    mip i-1 and writes mip i of the same cube; the plugin's per-resource UAV barrier
+            //    (NotifyResourceStates uavAccess=true) serializes the read-after-write chain. ──
+            {
+                cmd.BeginSample(RenderPassMarkers.RtxptEnvMapMipReduce);
+                var ds = data.MipReduceDs;
+                for (int i = 2; i < CubeMipCount; i++)
+                {
+                    int destRes = CubeDim >> i;
+                    var groups  = (uint)((destRes + 7) / 8); // EMB_NUM_COMPUTE_THREADS_PER_DIM = 8
+                    ds.SetRWTexture("u_EnvMapCubeFacesDst", data.EnvCubePtr, i); // dest mip i
+                    ds.SetRWTexture("u_EnvMapCubeFacesSrc", data.EnvCubePtr, i - 1); // src  mip i-1
+                    data.MipReduceCs.Dispatch(cmd, ds, groups, groups, 6);
+                }
+
+                cmd.EndSample(RenderPassMarkers.RtxptEnvMapMipReduce);
+            }
+
+            // ── Importance/radiance map build from the baked cube's mip 0 (samples SampleLevel 0). ──
             {
                 var ds = data.ImportanceBakerDs;
                 data.ImportanceBakerCb.UploadDirect(context.cmd, data.ImportanceCbData); // single-value overload
                 ds.SetConstantBuffer("g_BuilderConsts", data.ImportanceBakerCb);
-                ds.SetTexture("t_EnvMapCube", data.EnvCubeMip0Ptr);
+                ds.SetTexture("t_EnvMapCube", data.EnvCubePtr);
                 ds.SetRWTexture("u_ImportanceMap", data.ImportanceMapPtr);
                 ds.SetRWTexture("u_RadianceMap", data.RadianceMapPtr);
                 cmd.BeginSample(RenderPassMarkers.RtxptEnvMapImportanceBaker);
@@ -254,7 +295,7 @@ namespace PathTracing
                 lightCount++;
             }
 
-            bool  hasSky       = setting?.environmentMap != null;
+            bool hasSky = setting?.environmentMap != null;
 
             // Original (EnvMapBaker.cpp:480): ScaleColor is the constant radiance-compression
             // factor only. Tint/intensity are applied at sample time via ColorMultiplier
@@ -276,7 +317,7 @@ namespace PathTracing
             s_importanceCb = default;
             ref var cb = ref s_importanceCb;
             cb.SourceCubeDim              = (uint)CubeDim;
-            cb.SourceCubeMIPCount         = 1;
+            cb.SourceCubeMIPCount         = (uint)CubeMipCount; // EnvMapBaker.cpp: sourceCubemap->getDesc().mipLevels
             cb.SampleIndex                = 0;
             cb.Padding1                   = 0;
             cb.ImportanceMapDimX          = (uint)ImportanceMapDim;

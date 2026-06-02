@@ -384,9 +384,13 @@ void DescriptorSetBase<ShaderT>::WriteDescriptors(
                     }
                     else if (rd.DepthOrArraySize > 1)
                     {
+                        // Texture2DArray / cubemap UAV. slot.stride = mip slice (0 = mip 0, the
+                        // default). Honoring it lets a single mip-chained cube be written one mip
+                        // at a time (e.g. EnvMapBaker base layer writes mip 0+1, MIPReduceCS fills
+                        // the rest) — mirroring nvrhi's .setDimension(Texture2DArray) per-mip views.
                         u.ViewDimension                  = D3D12_UAV_DIMENSION_TEXTURE2DARRAY;
                         u.Format                         = rd.Format;
-                        u.Texture2DArray.MipSlice        = 0;
+                        u.Texture2DArray.MipSlice        = slot.stride;
                         u.Texture2DArray.FirstArraySlice = 0;
                         u.Texture2DArray.ArraySize       = rd.DepthOrArraySize;
                         u.Texture2DArray.PlaneSlice      = 0;

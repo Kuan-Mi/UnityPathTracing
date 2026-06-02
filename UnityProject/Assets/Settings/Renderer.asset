@@ -12,7 +12,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 324cab2d455449e4b9e70b945e4d8e49, type: 3}
   m_Name: NativeRtxptFeature
   m_EditorClassIdentifier: Assembly-CSharp::PathTracing.NativeRtxptFeature
-  m_Active: 0
+  m_Active: 1
   setting:
     realtimeMode: 1
     realtimeAA: 3
@@ -73,7 +73,7 @@ MonoBehaviour:
     dlssrrMicroJitter: 0.1
     disableReSTIRsWithDLSSRR: 1
     tmpDisableDlssRR: 0
-    enableBloom: 1
+    enableBloom: 0
     bloomRadius: 8
     bloomIntensity: 0.004
     environmentMapDiffuseSampleMIPLevel: 2
@@ -83,7 +83,7 @@ MonoBehaviour:
     environmentMap: {fileID: 2800000, guid: 6891d0f00c8e5e04c9aa7f03f9401c6a, type: 3}
     enableToneMapping: 1
     toneMapOperator: 5
-    autoExposure: 1
+    autoExposure: 0
     exposureCompensation: 2
     exposureValue: 0
     exposureValueMin: -16
@@ -132,6 +132,7 @@ MonoBehaviour:
   accumulationCs: {fileID: -2368575503658470205, guid: 96ba0c67e691b484781846c8b20f6061, type: 3}
   stablePlanesDebugVizCs: {fileID: -2368575503658470205, guid: a1b2c3d4e5f6a1b2c3d4e5f6a1b2c301, type: 3}
   baseLayerCs: {fileID: -2368575503658470205, guid: 106bca701da24f7a9ed113d910f8393d, type: 3}
+  mipReduceCs: {fileID: -2368575503658470205, guid: eab7ad2cc6ec40e4889e152e2958e911, type: 3}
   envMapImportanceBakerCs: {fileID: -2368575503658470205, guid: 160f5c1d357e92a4eb92eb09a58ba1b7, type: 3}
   envLightsBackupPastCs: {fileID: -2368575503658470205, guid: cf73e6cf697e4f138478b7b3025711ef, type: 3}
   envLightsSubdivideBaseCs: {fileID: -2368575503658470205, guid: 55fd78dd2602429aa3889925f4f08b7f, type: 3}

@@ -124,11 +124,10 @@ namespace PathTracing
         public NriTextureResource ProcessedOutputColor;
 
         // ── Env map baking outputs (fixed size, shared across frames) ─────────
-        /// <summary>Baked env cubemap mip0 (NativeRtxptEnvMapBakerPass.CubeDim, e.g. 2048²). RGBA16F, UAV. Bound as t_EnvironmentMap.</summary>
-        public NriTextureResource EnvCubeMip0;
-
-        /// <summary>Baked env cubemap mip1 (CubeDim/2). RGBA16F, UAV.</summary>
-        public NriTextureResource EnvCubeMip1;
+        /// <summary>Baked env cubemap (NativeRtxptEnvMapBakerPass.CubeDim, e.g. 2048²), full solid-angle
+        /// mip chain. RGBA16F, UAV. Mirrors the original EnvMapBaker m_cubemap: BaseLayerCS writes mip 0+1,
+        /// MIPReduceCS fills mips 2…N. Bound as t_EnvironmentMap / t_EnvMapCube.</summary>
+        public NriTextureResource EnvCubemap;
 
         /// <summary>1024×1024 importance map. R32F, UAV, mipmapped. Bound as u_ImportanceMap / t_EnvImportanceMap.</summary>
         public NriTextureResource EnvImportanceMap;
@@ -215,8 +214,7 @@ namespace PathTracing
             // Replica's final LDR / tone-map target → original tone-map output (LdrColor).
             ProcessedOutputColor = new NriTextureResource("LdrColor",                    GraphicsFormat.R16G16B16A16_SFloat,     uav);
 
-            EnvCubeMip0      = new NriTextureResource("EnvMapBakerMainCube",       GraphicsFormat.R16G16B16A16_SFloat, uav);
-            EnvCubeMip1      = new NriTextureResource("EnvMapBakerMainCubeLowRes", GraphicsFormat.R16G16B16A16_SFloat, uav);
+            EnvCubemap      = new NriTextureResource("EnvMapBakerMainCube",       GraphicsFormat.R16G16B16A16_SFloat, uav);
             EnvImportanceMap = new NriTextureResource("EnvImportanceMap",          GraphicsFormat.R32_SFloat,           uav);
             EnvRadianceMap   = new NriTextureResource("EnvRadianceMap",            GraphicsFormat.R16G16B16A16_SFloat, uav);
             EnvDummyCube     = new NriTextureResource("EnvDummyCube",              GraphicsFormat.R8G8B8A8_UNorm,      srv);
@@ -229,9 +227,9 @@ namespace PathTracing
         /// </summary>
         public bool EnsureEnvMapResources()
         {
-            if (EnvCubeMip0.IsCreated) return false;
-            EnvCubeMip0.AllocateCube(NativeRtxptEnvMapBakerPass.CubeDim);
-            EnvCubeMip1.AllocateCube(NativeRtxptEnvMapBakerPass.CubeDim / 2);
+            if (EnvCubemap.IsCreated) return false;
+            EnvCubemap.AllocateCube(NativeRtxptEnvMapBakerPass.CubeDim, useMipMap: true,
+                mipCount: NativeRtxptEnvMapBakerPass.CubeMipCount);
             EnvImportanceMap.Allocate(new int2(1024, 1024), useMipMap: true);
             EnvRadianceMap.Allocate(new int2(1024, 1024), useMipMap: true);
             EnvDummyCube.AllocateCube(4, enableRandomWrite: false);
@@ -329,7 +327,7 @@ namespace PathTracing
             ShaderDebugViz, DebugOutputColor, DlssRrOutput,
             BloomDownscale1, BloomDownscale2, BloomBlurPass1, BloomBlurPass2,
             AccumulatedRadiance, ProcessedOutputColor,
-            EnvCubeMip0, EnvCubeMip1, EnvImportanceMap, EnvRadianceMap, EnvDummyCube,EnvLightLookupMap
+            EnvCubemap, EnvImportanceMap, EnvRadianceMap, EnvDummyCube,EnvLightLookupMap
         };
     }
 }

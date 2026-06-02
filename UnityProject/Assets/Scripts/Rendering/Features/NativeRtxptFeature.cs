@@ -78,6 +78,7 @@ namespace PathTracing
 
         // EnvMapBaker + LightingUpdateBegin compute shaders
         public NativeComputeShader baseLayerCs;
+        public NativeComputeShader mipReduceCs;
         public NativeComputeShader envMapImportanceBakerCs;
         public NativeComputeShader envLightsBackupPastCs;
         public NativeComputeShader envLightsSubdivideBaseCs;
@@ -152,7 +153,7 @@ namespace PathTracing
                 renderPassEvent = renderPassEvent,
             };
 
-            _envMapBakerPass ??= new NativeRtxptEnvMapBakerPass(baseLayerCs, envMapImportanceBakerCs)
+            _envMapBakerPass ??= new NativeRtxptEnvMapBakerPass(baseLayerCs, mipReduceCs, envMapImportanceBakerCs)
             {
                 renderPassEvent = renderPassEvent,
             };
@@ -396,19 +397,19 @@ namespace PathTracing
                 }
 
                 // Phase 6: Bloom on the display-res HDR DLSS-RR output (composited in place, before tone mapping).
-                if (setting.enableBloom && setting.bloomIntensity > 0f && setting.bloomRadius > 0f && _bloomPass != null)
-                {
-                    _bloomPass.Setup(passCtx, texPool.DlssRrOutput);
-                    renderer.EnqueuePass(_bloomPass);
-                }
+                // if (setting.enableBloom && setting.bloomIntensity > 0f && setting.bloomRadius > 0f && _bloomPass != null)
+                // {
+                //     _bloomPass.Setup(passCtx, texPool.DlssRrOutput);
+                //     renderer.EnqueuePass(_bloomPass);
+                // }
 
                 // Phase 7: Tone mapping + auto-exposure on the display-res HDR DLSS-RR output.
                 // Writes the LDR result into ProcessedOutputColor (unused elsewhere in realtime mode).
-                if (setting.enableToneMapping && _toneMappingMipChainPass != null)
-                {
-                    _toneMappingMipChainPass.Setup(passCtx, texPool.DlssRrOutput, texPool.ProcessedOutputColor);
-                    renderer.EnqueuePass(_toneMappingMipChainPass);
-                }
+                // if (setting.enableToneMapping && _toneMappingMipChainPass != null)
+                // {
+                //     _toneMappingMipChainPass.Setup(passCtx, texPool.DlssRrOutput, texPool.ProcessedOutputColor);
+                //     renderer.EnqueuePass(_toneMappingMipChainPass);
+                // }
             }
             else
             {
@@ -947,6 +948,7 @@ namespace PathTracing
             string lightRoot   = $"{shaderRoot}/Lighting";
             string distantRoot = $"{lightRoot}/Distant";
             baseLayerCs             = LoadCs($"{distantRoot}/BaseLayerCS");
+            mipReduceCs             = LoadCs($"{distantRoot}/MIPReduceCS");
             envMapImportanceBakerCs = LoadCs($"{distantRoot}/EnvMapImportanceSamplingBaker");
 
             resetLightProxyCountersCs     = LoadCs($"{lightRoot}/ResetLightProxyCounters");

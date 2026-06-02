@@ -80,7 +80,7 @@ namespace Nri
         /// <summary>
         /// Allocates a cubemap render texture. NriPtr is left zero — cubemaps are not used with NRD.
         /// </summary>
-        public void AllocateCube(int size, bool useMipMap = false, bool enableRandomWrite = true)
+        public void AllocateCube(int size, bool useMipMap = false, bool enableRandomWrite = true, int mipCount = 0)
         {
             Release();
 
@@ -93,6 +93,12 @@ namespace Nri
                 msaaSamples       = 1,
                 sRGB              = SRGB,
             };
+
+            // Cap the chain to an explicit mip count (mirrors the original EnvMapBaker, which
+            // allocates exactly log2(cubeDim/4) mips). Leaving it at the default would let Unity
+            // build the full chain down to 1×1, exposing unwritten mips through the SRV.
+            if (useMipMap && mipCount > 0)
+                desc.mipCount = mipCount;
 
             rt = new RenderTexture(desc)
             {

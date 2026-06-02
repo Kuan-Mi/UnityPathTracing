@@ -79,6 +79,7 @@ public static class RenderPassMarkers
     public static readonly NamedMarker RtxptControlDataSetup = new(ProfilerCategory.Render, "ControlDataSetup", MarkerFlags.SampleGPU);
     public static readonly NamedMarker RtxptEnvMapBaker = new(ProfilerCategory.Render, "EnvMapBaker", MarkerFlags.SampleGPU);
     public static readonly NamedMarker RtxptEnvMapBaseLayer = new(ProfilerCategory.Render, "EnvMap BaseLayer", MarkerFlags.SampleGPU);
+    public static readonly NamedMarker RtxptEnvMapMipReduce = new(ProfilerCategory.Render, "EnvMap MipReduce", MarkerFlags.SampleGPU);
     public static readonly NamedMarker RtxptEnvMapImportanceBaker = new(ProfilerCategory.Render, "EnvMap ImportanceBaker", MarkerFlags.SampleGPU);
     public static readonly NamedMarker RtxptResetLightProxyCounters = new(ProfilerCategory.Render, "ResetLightProxyCounters", MarkerFlags.SampleGPU);
     public static readonly NamedMarker RtxptResetPastToCurrentHistory = new(ProfilerCategory.Render, "ResetPastToCurrentHistory", MarkerFlags.SampleGPU);

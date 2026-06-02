@@ -151,7 +151,7 @@ namespace PathTracing
             FeedbackCandidatesBlendedPtr  = Textures.FeedbackCandidatesBlended.NativePtr;
             NEEATHistoryDepthPtr          = Textures.NEEATHistoryDepth.NativePtr;
 
-            BakedEnvCubePtr                = Textures.EnvCubeMip0.NativePtr;
+            BakedEnvCubePtr                = Textures.EnvCubemap.NativePtr;
             EnvImportanceMapPtr            = Textures.EnvImportanceMap.NativePtr;
             EnvRadianceAndImportanceMapPtr = Textures.EnvRadianceMap.NativePtr;
             EnvLightLookupMapPtr           = Textures.EnvLightLookupMap.NativePtr;
