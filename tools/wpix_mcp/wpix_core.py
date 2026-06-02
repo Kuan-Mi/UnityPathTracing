@@ -150,6 +150,52 @@ def export_region(wpix, start, end):
     open(done, "w").close()
     return export_dir
 
+def export_full(wpix):
+    """Export the ORIGINAL capture to C++ directly (no recapture-region). Cached per capture.
+
+    Use this for static frame metadata — resource debug names, formats, descriptor bindings.
+    recapture-region (export_region) truncates resource debug names (e.g. 'simplebluesky'
+    -> 'simple') and re-encodes resource formats (e.g. BC6H -> R32G32B32A32_FLOAT), so it is
+    unreliable for names/formats regardless of how wide the region is. A direct export of the
+    capture preserves both. It does NOT give per-event resource state, so pixel data at a
+    specific event still requires export_region."""
+    pixtool = find_pixtool()
+    key = hashlib.sha1((os.path.abspath(wpix) + str(os.path.getmtime(wpix)) +
+                        "|full").encode()).hexdigest()[:16]
+    export_dir = os.path.join(_cache_root(), f"full_{key}")
+    done = os.path.join(export_dir, ".done")
+    if os.path.isfile(done):
+        return export_dir
+    os.makedirs(export_dir, exist_ok=True)
+    _run([pixtool, "open-capture", wpix, "export-to-cpp", "--force", export_dir])
+    open(done, "w").close()
+    return export_dir
+
+_EXPORT_DATA_CACHE = {}
+
+def load_export(export_dir):
+    """ExportData for a directory, parsed once and reused within the process."""
+    ed = _EXPORT_DATA_CACHE.get(export_dir)
+    if ed is None:
+        ed = _EXPORT_DATA_CACHE[export_dir] = ExportData(export_dir)
+    return ed
+
+def canonical_name(wpix, res):
+    """Map a region-recapture resource (truncated name + desc) to its full debug name from
+    the original-capture export. Returns the original (truncated) name if no unique match."""
+    tn = res.get("name") or ""
+    try:
+        full = load_export(export_full(wpix))
+    except Exception:
+        return res.get("name")
+    names = {r.get("name") for r in full.resources.values()
+             if r.get("width") == res.get("width")
+             and r.get("height") == res.get("height")
+             and r.get("array_or_depth") == res.get("array_or_depth")
+             and r.get("mips") == res.get("mips")
+             and (r.get("name") or "").startswith(tn)}
+    return names.pop() if len(names) == 1 else res.get("name")
+
 # --------------------------------------------------------------------------------------
 # export parsing
 # --------------------------------------------------------------------------------------
@@ -559,8 +605,14 @@ def binding_table(exp, dispatch=None):
             "cbv": cbv, "srv": srv, "uav": uav}
 
 def describe_dispatch(wpix, global_id):
-    exp = ExportData(export_region(wpix, global_id, global_id))
-    return binding_table(exp)
+    # Names/formats/bindings are static frame metadata: read them from a direct export of the
+    # original capture so debug names and formats are intact (export_region truncates names and
+    # re-encodes formats). Fall back to a region recapture if the dispatch isn't in the export.
+    exp = load_export(export_full(wpix))
+    d = next((d for d in exp.dispatches if d["global_id"] == global_id), None)
+    if d is not None:
+        return binding_table(exp, d)
+    return binding_table(ExportData(export_region(wpix, global_id, global_id)))
 
 def _resolve(exp, selector, bt):
     """selector: one of {'srv':i},{'uav':i},{'cbv':i},{'slot':n},{'name':str}."""
@@ -627,7 +679,7 @@ def extract(wpix, global_id, selector, mip=0, array_slice=0, out_npy=None,
     sub = subresource_index(mip, array_slice, res["mips"])
     fp = get_footprint(res, sub)
     arr = decode_subresource(decompress_blob(exp.dir, rid, exp), fp)
-    info = {"role": tgt["role"], "resource_name": res.get("name"),
+    info = {"role": tgt["role"], "resource_name": canonical_name(wpix, res),
             "resource_id_in_region": rid, "region": "after" if is_output else "before",
             "subresource": sub, "mip": mip, "array_slice": array_slice,
             "format": res["format"], "stats": array_stats(arr)}
