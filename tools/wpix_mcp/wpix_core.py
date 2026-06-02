@@ -174,7 +174,12 @@ def export_full(wpix):
 _EXPORT_DATA_CACHE = {}
 
 def load_export(export_dir):
-    """ExportData for a directory, parsed once and reused within the process."""
+    """ExportData for a directory, parsed once and reused within the process.
+
+    Parsing an export dir (regex over every *.cpp + the recursive blob-offset
+    simulation in _simulate_blob_offsets) is expensive, so all callers — extract,
+    compare and describe_dispatch — must go through here rather than constructing
+    ExportData directly, or each call re-parses the whole exported C++ project."""
     ed = _EXPORT_DATA_CACHE.get(export_dir)
     if ed is None:
         ed = _EXPORT_DATA_CACHE[export_dir] = ExportData(export_dir)
@@ -447,8 +452,19 @@ class ExportData:
 
 _COMPRESS_ALGORITHM_XPRESS = 3
 
+# Decompressed resource blobs keyed by (export_dir, resource_id). A single blob can be
+# 100MB+ (e.g. a 2048^2 cube, all faces+mips), and one blob is reused across every
+# mip/face of the same resource, so without this each face re-inflated the whole thing.
+# Bounded to keep memory in check; clear_cache() also drops it.
+_BLOB_CACHE = {}
+_BLOB_CACHE_MAX = 6
+
 def decompress_blob(export_dir, resource_id, exp=None):
-    exp = exp or ExportData(export_dir)
+    ckey = (export_dir, resource_id)
+    cached = _BLOB_CACHE.get(ckey)
+    if cached is not None:
+        return cached
+    exp = exp or load_export(export_dir)
     if resource_id not in exp.blob_offset:
         raise KeyError(f"resource {resource_id} has no initial data in this region")
     off = exp.blob_offset[resource_id]
@@ -468,9 +484,13 @@ def decompress_blob(export_dir, resource_id, exp=None):
         if not cab.Decompress(hdec, comp, ctypes.c_size_t(csize), out,
                               ctypes.c_size_t(final.value), ctypes.byref(got)):
             raise ctypes.WinError(ctypes.get_last_error())
-        return bytes(out[:got.value])
+        blob = bytes(out[:got.value])
     finally:
         cab.CloseDecompressor(hdec)
+    if len(_BLOB_CACHE) >= _BLOB_CACHE_MAX:
+        _BLOB_CACHE.pop(next(iter(_BLOB_CACHE)))  # FIFO eviction
+    _BLOB_CACHE[ckey] = blob
+    return blob
 
 # --------------------------------------------------------------------------------------
 # DXGI format decoding -> numpy (H, W, C) float for color formats
@@ -612,7 +632,7 @@ def describe_dispatch(wpix, global_id):
     d = next((d for d in exp.dispatches if d["global_id"] == global_id), None)
     if d is not None:
         return binding_table(exp, d)
-    return binding_table(ExportData(export_region(wpix, global_id, global_id)))
+    return binding_table(load_export(export_region(wpix, global_id, global_id)))
 
 def _resolve(exp, selector, bt):
     """selector: one of {'srv':i},{'uav':i},{'cbv':i},{'slot':n},{'name':str}."""
@@ -642,7 +662,7 @@ def extract(wpix, global_id, selector, mip=0, array_slice=0, out_npy=None,
             cbv_size=None):
     """Extract a dispatch input/output as numpy (texture) or bytes/floats (cbv).
     Returns a JSON-able dict with stats; optionally saves .npy."""
-    A = ExportData(export_region(wpix, global_id, global_id))
+    A = load_export(export_region(wpix, global_id, global_id))
     bt = binding_table(A)
     tgt = _resolve(A, selector, bt)
 
@@ -664,7 +684,7 @@ def extract(wpix, global_id, selector, mip=0, array_slice=0, out_npy=None,
         nxt = next_global_id(wpix, global_id)
         if nxt is None:
             raise RuntimeError("no event after this dispatch to snapshot its output")
-        B = ExportData(export_region(wpix, nxt, nxt))
+        B = load_export(export_region(wpix, nxt, nxt))
         ra = A.resources[tgt["resource_id"]]
         like = {k: ra[k] for k in ("width", "height", "array_or_depth", "mips",
                                    "format", "dimension")}
@@ -689,13 +709,13 @@ def extract(wpix, global_id, selector, mip=0, array_slice=0, out_npy=None,
     return info
 
 def _load_for_compare(wpix, global_id, selector, mip, array_slice):
-    A = ExportData(export_region(wpix, global_id, global_id))
+    A = load_export(export_region(wpix, global_id, global_id))
     bt = binding_table(A)
     tgt = _resolve(A, selector, bt)
     is_output = (tgt["role"] == "uav")
     if is_output:
         nxt = next_global_id(wpix, global_id)
-        B = ExportData(export_region(wpix, nxt, nxt))
+        B = load_export(export_region(wpix, nxt, nxt))
         ra = A.resources[tgt["resource_id"]]
         like = {k: ra[k] for k in ("width", "height", "array_or_depth", "mips",
                                    "format", "dimension")}
@@ -738,6 +758,10 @@ def compare(spec_a, spec_b, out_npy_diff=None):
 
 def clear_cache():
     import shutil
+    # Drop in-process caches too, or the on-disk export dirs they point at are deleted
+    # while parsed ExportData / decompressed blobs (100MB+) stay resident in memory.
+    _EXPORT_DATA_CACHE.clear()
+    _BLOB_CACHE.clear()
     root = _cache_root()
     n = 0
     for name in os.listdir(root):
