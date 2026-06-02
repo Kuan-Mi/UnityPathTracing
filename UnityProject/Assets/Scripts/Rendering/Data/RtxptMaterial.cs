@@ -16,13 +16,15 @@ namespace PathTracing
     {
         [Header("Textures")]
         public Texture BaseOrDiffuseTexture;
+
         public Texture OcclusionRoughnessMetallicTexture; // R=Occlusion G=Roughness B=Metalness  (or spec-gloss fallback)
         public Texture NormalTexture;
         public Texture EmissiveTexture;
         public Texture TransmissionTexture;
 
         [Header("Texture Toggles")]
-        public bool EnableBaseTexture                       = true;
+        public bool EnableBaseTexture = true;
+
         public bool EnableOcclusionRoughnessMetallicTexture = true;
         public bool EnableNormalTexture                     = true;
         public bool EnableEmissiveTexture                   = true;
@@ -30,7 +32,7 @@ namespace PathTracing
 
         [Header("Base")]
         [ColorUsage(false, false)]
-        public Color BaseColorFactor = Color.white;     // metal-rough: base color; spec-gloss: diffuse color
+        public Color BaseColorFactor = Color.white; // metal-rough: base color; spec-gloss: diffuse color
 
         [Range(0f, 1f)]
         public float Metalness = 0f;
@@ -41,7 +43,8 @@ namespace PathTracing
         public Color SpecularColor = new Color(0.04f, 0.04f, 0.04f, 1f); // spec-gloss: F0
 
         [Header("Emissive")]
-        public Color EmissiveColor     = Color.black;
+        public Color EmissiveColor = Color.black;
+
         [Min(0f)]
         public float EmissiveIntensity = 1f;
 
@@ -83,12 +86,13 @@ namespace PathTracing
         public float ShadowNoLFadeout = 0f;
 
         [Header("PT Flags")]
-        public bool UseSpecularGlossModel  = false;
-        public bool MetalnessInRedChannel  = false;
-        public bool ThinSurface            = false;
-        public bool ExcludeFromNEE         = false;
-        public bool PSDExclude             = true;
-        public bool IgnoreMeshTangentSpace = false;
+        public bool UseSpecularGlossModel = false;
+
+        public bool MetalnessInRedChannel      = false;
+        public bool ThinSurface                = false;
+        public bool ExcludeFromNEE             = false;
+        public bool PSDExclude                 = true;
+        public bool IgnoreMeshTangentSpace     = false;
         public bool EnableAsAnalyticLightProxy = false;
         public bool UseDonutEmissiveIntensity  = false;
         public bool SkipRender                 = false;
@@ -132,48 +136,48 @@ namespace PathTracing
 
         private void ApplyJsonData(SlotJson d, Func<RtxptTextureRef, Texture> textureResolver = null)
         {
-            BaseColorFactor             = Rgb(d.BaseOrDiffuseColor, 1f);
-            SpecularColor               = Rgb(d.SpecularColor, 1f);
-            EmissiveColor               = Rgb(d.EmissiveColor, 0f);
-            EmissiveIntensity           = d.EmissiveIntensity;
-            Opacity                     = d.Opacity;
-            Metalness                   = d.Metalness;
-            Roughness                   = d.Roughness;
-            EnableAlphaTesting          = d.EnableAlphaTesting;
-            AlphaCutoff                 = d.AlphaCutoff;
-            NormalTextureScale          = d.NormalTextureScale;
-            IoR                         = d.IoR;
-            EnableTransmission          = d.EnableTransmission;
-            TransmissionFactor          = d.TransmissionFactor;
-            DiffuseTransmissionFactor   = d.DiffuseTransmissionFactor;
-            VolumeAttenuationColor      = Rgb(d.VolumeAttenuationColor, 1f);
-            VolumeAttenuationDistance   = d.VolumeAttenuationDistance;
-            ShadowNoLFadeout            = d.ShadowNoLFadeout;
+            BaseColorFactor                         = Rgb(d.BaseOrDiffuseColor, 1f);
+            SpecularColor                           = Rgb(d.SpecularColor, 1f);
+            EmissiveColor                           = Rgb(d.EmissiveColor, 0f);
+            EmissiveIntensity                       = d.EmissiveIntensity;
+            Opacity                                 = d.Opacity;
+            Metalness                               = d.Metalness;
+            Roughness                               = d.Roughness;
+            EnableAlphaTesting                      = d.EnableAlphaTesting;
+            AlphaCutoff                             = d.AlphaCutoff;
+            NormalTextureScale                      = d.NormalTextureScale;
+            IoR                                     = d.IoR;
+            EnableTransmission                      = d.EnableTransmission;
+            TransmissionFactor                      = d.TransmissionFactor;
+            DiffuseTransmissionFactor               = d.DiffuseTransmissionFactor;
+            VolumeAttenuationColor                  = Rgb(d.VolumeAttenuationColor, 1f);
+            VolumeAttenuationDistance               = d.VolumeAttenuationDistance;
+            ShadowNoLFadeout                        = d.ShadowNoLFadeout;
             EnableBaseTexture                       = d.EnableBaseTexture;
             EnableOcclusionRoughnessMetallicTexture = d.EnableOcclusionRoughnessMetallicTexture;
             EnableNormalTexture                     = d.EnableNormalTexture;
             EnableEmissiveTexture                   = d.EnableEmissiveTexture;
             EnableTransmissionTexture               = d.EnableTransmissionTexture;
-            UseSpecularGlossModel       = d.UseSpecularGlossModel;
-            MetalnessInRedChannel       = d.MetalnessInRedChannel;
-            ThinSurface                 = d.ThinSurface;
-            ExcludeFromNEE              = d.ExcludeFromNEE;
-            PSDExclude                  = d.PSDExclude;
-            IgnoreMeshTangentSpace      = d.IgnoreMeshTangentSpace;
-            EnableAsAnalyticLightProxy  = d.EnableAsAnalyticLightProxy;
-            UseDonutEmissiveIntensity   = d.UseDonutEmissiveIntensity;
-            SkipRender                  = d.SkipRender;
-            PSDDominantDeltaLobe        = d.PSDDominantDeltaLobe;
-            NestedPriority              = d.NestedPriority;
-            PSDBlockMotionVectorsAtSurfaceType = d.PSDBlockMotionVectorsAtSurfaceType;
+            UseSpecularGlossModel                   = d.UseSpecularGlossModel;
+            MetalnessInRedChannel                   = d.MetalnessInRedChannel;
+            ThinSurface                             = d.ThinSurface;
+            ExcludeFromNEE                          = d.ExcludeFromNEE;
+            PSDExclude                              = d.PSDExclude;
+            IgnoreMeshTangentSpace                  = d.IgnoreMeshTangentSpace;
+            EnableAsAnalyticLightProxy              = d.EnableAsAnalyticLightProxy;
+            UseDonutEmissiveIntensity               = d.UseDonutEmissiveIntensity;
+            SkipRender                              = d.SkipRender;
+            PSDDominantDeltaLobe                    = d.PSDDominantDeltaLobe;
+            NestedPriority                          = d.NestedPriority;
+            PSDBlockMotionVectorsAtSurfaceType      = d.PSDBlockMotionVectorsAtSurfaceType;
 
             if (textureResolver != null)
             {
-                ResolveTex(d.BaseTexture,                       textureResolver, ref BaseOrDiffuseTexture);
+                ResolveTex(d.BaseTexture, textureResolver, ref BaseOrDiffuseTexture);
                 ResolveTex(d.OcclusionRoughnessMetallicTexture, textureResolver, ref OcclusionRoughnessMetallicTexture);
-                ResolveTex(d.NormalTexture,                     textureResolver, ref NormalTexture);
-                ResolveTex(d.EmissiveTexture,                   textureResolver, ref EmissiveTexture);
-                ResolveTex(d.TransmissionTexture,               textureResolver, ref TransmissionTexture);
+                ResolveTex(d.NormalTexture, textureResolver, ref NormalTexture);
+                ResolveTex(d.EmissiveTexture, textureResolver, ref EmissiveTexture);
+                ResolveTex(d.TransmissionTexture, textureResolver, ref TransmissionTexture);
             }
         }
 
@@ -241,7 +245,7 @@ namespace PathTracing
         private class TexJson
         {
             public bool   NormalMap = false;
-            public string path      = "";   // exporter-relative, backslash-separated, e.g. "Models\\Kitchen\\foo.dds"
+            public string path      = ""; // exporter-relative, backslash-separated, e.g. "Models\\Kitchen\\foo.dds"
             public bool   sRGB      = false;
         }
     }
@@ -259,9 +263,11 @@ namespace PathTracing
     {
         /// <summary>Exporter-relative, backslash-separated path, e.g. "Models\Kitchen\foo.dds".</summary>
         public string Path;
+
         /// <summary>True if the source texture is sRGB-encoded (color), false for linear data.</summary>
-        public bool   IsSRGB;
+        public bool IsSRGB;
+
         /// <summary>True if the texture is a normal map.</summary>
-        public bool   IsNormalMap;
+        public bool IsNormalMap;
     }
 }
