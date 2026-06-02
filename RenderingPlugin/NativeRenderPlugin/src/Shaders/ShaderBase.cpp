@@ -202,7 +202,9 @@ void ShaderBase::AssignHeapOffsets()
 // ===========================================================================
 // BuildRootSignature
 //   Fully dynamic — no hardcoded registers or spaces.
-//   Uses D3D_ROOT_SIGNATURE_VERSION_1_2 (requires Device5/D3D12Agility SDK).
+//   Uses D3D_ROOT_SIGNATURE_VERSION_1_1. (1.1, not 1.2: PIX "Export Capture as C++
+//   Project" cannot serialize a root signature containing a 1.2 D3D12_STATIC_SAMPLER_DESC1
+//   static sampler. No 1.2-only sampler features are used, so 1.1 is lossless here.)
 //   Called by both ComputeShader and RayTraceShader after ReflectBindings().
 // ===========================================================================
 bool ShaderBase::BuildRootSignature()
@@ -446,7 +448,7 @@ bool ShaderBase::BuildRootSignature()
         }
     };
 
-    std::vector<D3D12_STATIC_SAMPLER_DESC1> samplers;
+    std::vector<D3D12_STATIC_SAMPLER_DESC> samplers;
     samplers.reserve(m_samplerBindings.size());
     for (const auto& sr : m_samplerBindings)
     {
@@ -496,7 +498,7 @@ bool ShaderBase::BuildRootSignature()
             }
         }
 
-        D3D12_STATIC_SAMPLER_DESC1 sd = {};
+        D3D12_STATIC_SAMPLER_DESC sd = {};
         sd.Filter           = filter;
         sd.AddressU         = addrU;
         sd.AddressV         = addrV;
@@ -552,16 +554,16 @@ bool ShaderBase::BuildRootSignature()
     if (!spaceValid) return false;
 
     // --- Serialize & create ---
-    D3D12_ROOT_SIGNATURE_DESC2 rsDesc2 = {};
-    rsDesc2.NumParameters     = static_cast<UINT>(params.size());
-    rsDesc2.pParameters       = params.empty()   ? nullptr : params.data();
-    rsDesc2.NumStaticSamplers = static_cast<UINT>(samplers.size());
-    rsDesc2.pStaticSamplers   = samplers.empty() ? nullptr : samplers.data();
-    rsDesc2.Flags             = D3D12_ROOT_SIGNATURE_FLAG_NONE;
+    D3D12_ROOT_SIGNATURE_DESC1 rsDesc1 = {};
+    rsDesc1.NumParameters     = static_cast<UINT>(params.size());
+    rsDesc1.pParameters       = params.empty()   ? nullptr : params.data();
+    rsDesc1.NumStaticSamplers = static_cast<UINT>(samplers.size());
+    rsDesc1.pStaticSamplers   = samplers.empty() ? nullptr : samplers.data();
+    rsDesc1.Flags             = D3D12_ROOT_SIGNATURE_FLAG_NONE;
 
     D3D12_VERSIONED_ROOT_SIGNATURE_DESC vrsDesc = {};
-    vrsDesc.Version  = D3D_ROOT_SIGNATURE_VERSION_1_2;
-    vrsDesc.Desc_1_2 = rsDesc2;
+    vrsDesc.Version  = D3D_ROOT_SIGNATURE_VERSION_1_1;
+    vrsDesc.Desc_1_1 = rsDesc1;
 
     ComPtr<ID3DBlob> sigBlob, errBlob;
     HRESULT hr = D3D12SerializeVersionedRootSignature(&vrsDesc, &sigBlob, &errBlob);
