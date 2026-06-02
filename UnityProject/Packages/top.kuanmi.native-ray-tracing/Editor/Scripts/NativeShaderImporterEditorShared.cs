@@ -265,13 +265,35 @@ namespace NativeRender
             return clicked;
         }
 
-        public static void DrawCompileStatus(bool hasCompiledBytes, int byteCount)
+        public static void DrawCompileStatus(bool hasCompiledBytes, int byteCount, string shaderHash)
         {
             EditorGUILayout.Space(2);
-            if (hasCompiledBytes)
-                EditorGUILayout.HelpBox($"DXIL cached ({byteCount:N0} bytes)", MessageType.Info);
-            else
+            if (!hasCompiledBytes)
+            {
                 EditorGUILayout.HelpBox("No compiled DXIL – click Compile to build.", MessageType.Warning);
+                return;
+            }
+
+            EditorGUILayout.HelpBox($"DXIL cached ({byteCount:N0} bytes)", MessageType.Info);
+            if (!string.IsNullOrEmpty(shaderHash))
+                DrawShaderHash(shaderHash);
+        }
+
+        /// <summary>
+        /// Selectable, copyable shader-hash row. The hash is the DXIL container digest DXC writes
+        /// (the same value PIX / RenderDoc display), so it can be matched against a capture.
+        /// </summary>
+        private static void DrawShaderHash(string shaderHash)
+        {
+            using (new EditorGUILayout.HorizontalScope())
+            {
+                EditorGUILayout.PrefixLabel(new GUIContent("Shader Hash",
+                    "The DXIL container hash DXC embeds — the same value PIX / RenderDoc show for this shader."));
+                EditorGUILayout.SelectableLabel(shaderHash, EditorStyles.textField,
+                    GUILayout.Height(EditorGUIUtility.singleLineHeight));
+                if (GUILayout.Button("Copy", GUILayout.Width(48)))
+                    EditorGUIUtility.systemCopyBuffer = shaderHash;
+            }
         }
 
         /// <summary>
@@ -676,7 +698,7 @@ namespace NativeRender
         /// could not be loaded (in which case the compile/reflection UI is skipped).
         /// </summary>
         protected abstract bool TryGetStatus(string assetPath,
-            out bool hasCompiledBytes, out int byteCount, out string reflectionJson);
+            out bool hasCompiledBytes, out int byteCount, out string reflectionJson, out string shaderHash);
 
         /// <summary>
         /// Optionally render an interactive row for a reflected binding (e.g. a "promote to root
@@ -705,12 +727,12 @@ namespace NativeRender
             if (targets.Length != 1) return;
 
             var importer = (ScriptedImporter)target;
-            if (!TryGetStatus(importer.assetPath, out bool hasBytes, out int byteCount, out string json))
+            if (!TryGetStatus(importer.assetPath, out bool hasBytes, out int byteCount, out string json, out string shaderHash))
                 return;
 
             if (ShaderImporterGUI.DrawCompileButton(hasBytes))
                 ShaderImporterGUI.ScheduleReimport(importer);
-            ShaderImporterGUI.DrawCompileStatus(hasBytes, byteCount);
+            ShaderImporterGUI.DrawCompileStatus(hasBytes, byteCount, shaderHash);
 
             var info = ShaderReflectionInfo.Parse(json);
             if (info != null)

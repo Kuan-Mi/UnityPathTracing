@@ -74,6 +74,10 @@ namespace NativeRender
         /// <summary>Size in bytes of the cached DXIL bytecode, or 0 if not compiled.</summary>
         public int CompiledByteCount => _compiledDxil?.Length ?? 0;
 
+        /// <summary>The DXIL container shader hash (32-char hex), or "" if not compiled. Matches the
+        /// hash PIX / RenderDoc display for this shader.</summary>
+        public string ShaderHash => DxilContainerUtil.ExtractHashHex(_compiledDxil);
+
         /// <summary>JSON reflection data produced after the last successful compilation. Empty when not yet compiled.</summary>
         public string ReflectionJson => _reflectionJson ?? "";
 

@@ -147,15 +147,16 @@ namespace NativeRender
     internal class RayTraceShaderImporterEditor : NativeShaderImporterEditorBase
     {
         protected override bool TryGetStatus(string assetPath,
-            out bool hasCompiledBytes, out int byteCount, out string reflectionJson)
+            out bool hasCompiledBytes, out int byteCount, out string reflectionJson, out string shaderHash)
         {
-            hasCompiledBytes = false; byteCount = 0; reflectionJson = "";
+            hasCompiledBytes = false; byteCount = 0; reflectionJson = ""; shaderHash = "";
             var shader = AssetDatabase.LoadAssetAtPath<RayTraceShader>(assetPath);
             if (shader == null) return false;
 
             hasCompiledBytes = shader.HasCompiledBytes;
             byteCount        = shader.CompiledByteCount;
             reflectionJson   = shader.ReflectionJson;
+            shaderHash       = shader.ShaderHash;
             return true;
         }
 

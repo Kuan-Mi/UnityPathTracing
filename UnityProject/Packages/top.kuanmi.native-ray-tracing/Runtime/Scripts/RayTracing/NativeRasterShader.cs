@@ -40,6 +40,24 @@ namespace NativeRender
         public int  CompiledByteCount => (_vsDxil?.Length ?? 0) + (_psDxil?.Length ?? 0);
         public string ReflectionJson => _reflectionJson ?? "";
 
+        /// <summary>The DXIL container shader hash (32-char hex) of the vertex-stage blob, or "".</summary>
+        public string VsShaderHash => DxilContainerUtil.ExtractHashHex(_vsDxil);
+
+        /// <summary>The DXIL container shader hash (32-char hex) of the pixel-stage blob, or "".</summary>
+        public string PsShaderHash => DxilContainerUtil.ExtractHashHex(_psDxil);
+
+        /// <summary>Combined per-stage shader hashes ("VS &lt;hash&gt;  PS &lt;hash&gt;"), or "" if not
+        /// compiled. Each matches the hash PIX / RenderDoc display for that stage.</summary>
+        public string ShaderHash
+        {
+            get
+            {
+                string vs = VsShaderHash, ps = PsShaderHash;
+                if (vs.Length == 0 && ps.Length == 0) return "";
+                return $"VS {vs}  PS {ps}";
+            }
+        }
+
         internal RootConstantsHint[] RootConstantsHints => _rootConstantsHints ?? Array.Empty<RootConstantsHint>();
         internal string[]            RootSRVHints       => _rootSRVHints       ?? Array.Empty<string>();
         internal SamplerBinding[]    SamplerBindings    => _samplerBindings    ?? Array.Empty<SamplerBinding>();

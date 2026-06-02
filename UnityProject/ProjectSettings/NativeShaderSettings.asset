@@ -7,6 +7,9 @@
         "../RenderingPlugin/External/NRD/Shaders"
     ],
     "globalExtraArgs": [
-        "-Zi"
+        "-Zi",
+        "-Zsb",
+        "-O3",
+        "-enable-16bit-types"
     ]
 }
