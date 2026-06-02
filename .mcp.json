@@ -1,0 +1,11 @@
+{
+  "mcpServers": {
+    "wpix": {
+      "command": "python",
+      "args": ["f:\\UnityPathTracing\\tools\\wpix_mcp\\wpix_mcp_server.py"],
+      "env": {
+        "WPIX_PIXTOOL": "C:\\Program Files\\Microsoft PIX\\2603.25\\pixtool.exe"
+      }
+    }
+  }
+}
