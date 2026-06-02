@@ -53,44 +53,87 @@ Then restart Claude Code (or `/mcp` to reconnect). Tools appear as `wpix_*`.
 
 | tool | purpose |
 |---|---|
-| `wpix_find_events` | list Dispatch/Draw events (filter by marker name, e.g. `ProcSkyBaseBake`) |
-| `wpix_describe_dispatch` | thread-group counts + CBV/SRV(input)/UAV(output) bindings |
+| `wpix_find_events` | list Dispatch/Draw events (filter by marker name; `dispatches_only` to drop barriers) |
+| `wpix_describe_dispatch` | thread-group counts + CBV/SRV(input)/UAV(output) bindings — **indices match the selectors below** |
 | `wpix_extract` | decode one binding → per-channel stats (+ optional `.npy`) |
-| `wpix_compare` | diff one binding across two captures → max-abs/mse/psnr/#differing texels |
+| `wpix_compare` | diff one binding across two captures → max-abs/mse/psnr/#differing texels (+ `max_fp16_ulp` for half formats) |
+| `wpix_compare_subresources` | diff one binding across **all mips/faces** in one call → per-subresource table + aggregate |
+| `wpix_diff_stage` | **one-call stage diff**: find a marked dispatch in both captures, match UAV outputs by name, verdict per output |
 | `wpix_clear_cache` | delete cached exports |
+
+### Quick start: diff a whole stage
+
+```jsonc
+wpix_diff_stage { "wpix_a": "...\\Rtxpt.wpix", "wpix_b": "...\\Unity.wpix", "marker": "ProcSkyBaseBake" }
+// -> outputs:[{ output:"EnvMapBakerMainCube", verdict:"identical", ... }]
+
+// For a mip-gen chain, point at the last dispatch and compare the full pyramid:
+wpix_diff_stage { "wpix_a": "...", "wpix_b": "...", "marker": "EnvMapBakerMIPs", "mips": "all" }
+```
+
+`mips`: `"base"` (default) compares only mip 0 — correct for a single dispatch, since higher
+mips at that event are stale (written by a later pass). `"all"` compares the full pyramid —
+use only on the final dispatch of a mip-gen chain.
 
 ### Selectors
 
 `wpix_extract` / `wpix_compare` pick a binding with one of:
-`{"srv": i}`, `{"uav": i}`, `{"cbv": i}`, `{"slot": n}`, `{"name": "EnvMapBak"}`.
-For textures, choose `mip` and `array_slice` (cube face = `array_slice` 0..5).
+`{"srv": i}`, `{"uav": i}`, `{"cbv": i}`, `{"slot": n}`, `{"name": "EnvMapBakerMainCube"}`.
+The `i` indices match `wpix_describe_dispatch`'s ordering. `{"name": …}` takes the **full**
+debug name (matching is tolerant of PIX's 8-char truncation). For textures, choose `mip` and
+`array_slice` (cube face = `array_slice` 0..5).
+
+> CBV note: there is no per-view size in the capture, so `wpix_extract` reads a 256-byte
+> window by default and never past the buffer. Pass `cbv_size = sizeof(struct)` to avoid
+> reading adjacent constants; `had_nan` flags uint/padding fields or an over-read.
 
 ## Example: compare the ProcSkyBaseBake output cube (Unity vs Rtxpt)
 
+The one-call way:
+
 ```jsonc
-// 1. find the dispatch in each capture
-wpix_find_events { "wpix_path": "...\\Unity.wpix", "name_filter": "ProcSkyBaseBake" }   // -> global_id 17
-wpix_find_events { "wpix_path": "...\\Rtxpt.wpix", "name_filter": "ProcSkyBaseBake" }   // -> global_id ?
+wpix_diff_stage { "wpix_a": "...\\Rtxpt.wpix", "wpix_b": "...\\Unity.wpix", "marker": "ProcSkyBaseBake" }
+```
 
-// 2. see the bindings
-wpix_describe_dispatch { "wpix_path": "...\\Unity.wpix", "global_id": 17 }
+Or step by step, when you want a specific face/mip:
 
-// 3. diff the baked cube, +X face (array_slice 0), mip 0
+```jsonc
+// 1. find the dispatch in each capture (dispatches_only skips ResourceBarrier rows)
+wpix_find_events { "wpix_path": "...\\Unity.wpix", "name_filter": "ProcSkyBaseBake", "dispatches_only": true }
+wpix_find_events { "wpix_path": "...\\Rtxpt.wpix", "name_filter": "ProcSkyBaseBake", "dispatches_only": true }
+
+// 2. see the bindings (uav/srv/cbv indices here match the selectors in step 3)
+wpix_describe_dispatch { "wpix_path": "...\\Unity.wpix", "global_id": 15 }
+
+// 3a. all 6 faces at once
+wpix_compare_subresources {
+  "a": { "wpix_path": "...\\Rtxpt.wpix", "global_id": 18, "selector": {"uav":1} },
+  "b": { "wpix_path": "...\\Unity.wpix", "global_id": 15, "selector": {"uav":0} }
+}
+
+// 3b. or one face, with a saved diff
 wpix_compare {
-  "a": { "wpix_path": "...\\Unity.wpix", "global_id": 17, "selector": {"uav":0}, "array_slice": 0 },
-  "b": { "wpix_path": "...\\Rtxpt.wpix", "global_id": 42, "selector": {"uav":0}, "array_slice": 0 },
+  "a": { "wpix_path": "...\\Rtxpt.wpix", "global_id": 18, "selector": {"uav":1}, "array_slice": 0 },
+  "b": { "wpix_path": "...\\Unity.wpix", "global_id": 15, "selector": {"uav":0}, "array_slice": 0 },
   "save_diff_npy_path": "...\\diff_face0.npy"
 }
 ```
 
 ## CLI use (without MCP)
 
-`wpix_core.py` is a plain library; you can script it directly:
+`wpix_core.py` is a plain library; you can script it directly (run from this folder, or add
+it to `sys.path`):
 
 ```python
 import wpix_core as w
-bt = w.describe_dispatch(r"...\Unity.wpix", 17)
-info = w.extract(r"...\Unity.wpix", 17, {"uav": 0}, mip=0, array_slice=0, out_npy="cube.npy")
+# whole-stage verdict
+w.diff_stage(r"...\Rtxpt.wpix", r"...\Unity.wpix", "GenIM")
+# all mips/faces of one output
+w.compare_subresources({"wpix_path": r"...\Rtxpt.wpix", "global_id": 32, "selector": {"uav": 1}},
+                       {"wpix_path": r"...\Unity.wpix", "global_id": 29, "selector": {"uav": 0}})
+# single binding
+bt   = w.describe_dispatch(r"...\Unity.wpix", 15)
+info = w.extract(r"...\Unity.wpix", 15, {"uav": 0}, mip=0, array_slice=0, out_npy="cube.npy")
 diff = w.compare(a_spec, b_spec)
 ```
 

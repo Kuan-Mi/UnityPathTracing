@@ -83,9 +83,11 @@ def list_events(wpix):
             })
     return out
 
-def find_shader_events(wpix, name_filter=None):
+def find_shader_events(wpix, name_filter=None, dispatches_only=False):
     """Events that have a global id (Dispatch/Draw/etc), optionally filtered by parent
-    marker name. Returns each with its nearest enclosing named marker for context."""
+    marker name. Returns each with its nearest enclosing named marker for context.
+    Set dispatches_only=True to drop ResourceBarrier/Draw and keep only Dispatch events
+    (the common case when comparing compute passes)."""
     ev = list_events(wpix)
     by_queue = {}
     for e in ev:
@@ -114,6 +116,8 @@ def find_shader_events(wpix, name_filter=None):
             guard += 1
         marker_path = "/".join(reversed(chain))
         if name_filter and name_filter.lower() not in (marker_path + "/" + e["name"]).lower():
+            continue
+        if dispatches_only and e["name"] != "Dispatch":
             continue
         res.append({"global_id": e["global_id"], "name": e["name"], "marker": marker_path})
     return res
@@ -280,6 +284,24 @@ class ExportData:
                 continue
             return rid
         return None
+
+    def find_resource_loose(self, name, like=None):
+        """Like find_resource but tolerant of the 8-char name truncation that
+        export_region applies: matches when either the stored name is a prefix of
+        `name` or vice versa. Prefers an exact match, then a desc-disambiguated
+        prefix match. Returns id or None."""
+        exact = self.find_resource(name=name, like=like)
+        if exact is not None:
+            return exact
+        cands = []
+        for rid, r in self.resources.items():
+            rn = r.get("name") or ""
+            if not rn or not (name.startswith(rn) or rn.startswith(name)):
+                continue
+            if like is not None and any(r.get(k) != v for k, v in like.items()):
+                continue
+            cands.append(rid)
+        return cands[0] if len(cands) == 1 else (cands[0] if cands and like else None)
 
     # ---- resource descs + read sizes ----
     def _parse_resources(self):
@@ -625,14 +647,35 @@ def binding_table(exp, dispatch=None):
             "cbv": cbv, "srv": srv, "uav": uav}
 
 def describe_dispatch(wpix, global_id):
-    # Names/formats/bindings are static frame metadata: read them from a direct export of the
-    # original capture so debug names and formats are intact (export_region truncates names and
-    # re-encodes formats). Fall back to a region recapture if the dispatch isn't in the export.
-    exp = load_export(export_full(wpix))
-    d = next((d for d in exp.dispatches if d["global_id"] == global_id), None)
-    if d is not None:
-        return binding_table(exp, d)
-    return binding_table(load_export(export_region(wpix, global_id, global_id)))
+    """Bindings for a dispatch, with cbv/srv/uav lists in the SAME order that
+    extract()/compare() selectors use — so a {'uav':2} shown here resolves to the
+    same binding there.
+
+    The table is built from the per-event region recapture (the source extract/compare
+    read from); each resource's 8-char-truncated name is then upgraded to its full debug
+    name from a direct full-capture export, where that metadata is intact. If the region
+    recapture failed to parse the root CBV, the CBV is back-filled from the full export
+    (flagged with "from":"full_export") so it is at least visible."""
+    A = load_export(export_region(wpix, global_id, global_id))
+    bt = binding_table(A)
+    full = None
+    try:
+        full = load_export(export_full(wpix))
+    except Exception:
+        pass
+    for role in ("srv", "uav"):
+        for item in bt[role]:
+            rid = item.get("resource_id")
+            if rid is not None and rid in A.resources:
+                item["resource_name"] = canonical_name(wpix, A.resources[rid])
+    if not bt["cbv"] and full is not None:
+        fd = next((d for d in full.dispatches if d["global_id"] == global_id), None)
+        if fd is not None:
+            for param in sorted(fd["root_cbv"]):
+                res, off = fd["root_cbv"][param]
+                bt["cbv"].append({"root_param": param, "resource_id": res,
+                                  "offset": off, "from": "full_export"})
+    return bt
 
 def _resolve(exp, selector, bt):
     """selector: one of {'srv':i},{'uav':i},{'cbv':i},{'slot':n},{'name':str}."""
@@ -643,11 +686,16 @@ def _resolve(exp, selector, bt):
         return {"role": role, "resource_id": desc["resource"],
                 "resource_name": r.get("name"), "view_format": desc["format"]}
     if "name" in selector:
-        rid = exp.find_resource(name=selector["name"])
+        # region exports truncate debug names to 8 chars, so match loosely
+        rid = exp.find_resource_loose(selector["name"])
         if rid is None:
-            raise KeyError(f"no resource named {selector['name']}")
+            raise KeyError(
+                f"no resource named {selector['name']!r} in this region "
+                f"(region names are truncated to 8 chars; try a {{'uav':i}}/{{'srv':i}} "
+                f"index from describe_dispatch instead)")
         role = "uav" if any(u["resource_id"] == rid for u in bt["uav"]) else "srv"
-        return {"role": role, "resource_id": rid, "resource_name": selector["name"],
+        return {"role": role, "resource_id": rid,
+                "resource_name": exp.resources[rid].get("name"),
                 "view_format": exp.resources[rid].get("format")}
     for role in ("srv", "uav", "cbv"):
         if role in selector:
@@ -658,25 +706,65 @@ def _resolve(exp, selector, bt):
                     "offset": item.get("offset")}
     raise ValueError(f"bad selector {selector}")
 
+def _resolve_cbv_via_full(wpix, global_id, selector):
+    """Resolve a {'cbv':i} selector against the full-capture export, used when the
+    per-event region recapture failed to parse the dispatch's root CBV. Resource ids
+    are stable across exports of the same capture, so the returned id reads correctly
+    from the region blob."""
+    full = load_export(export_full(wpix))
+    fd = next((d for d in full.dispatches if d["global_id"] == global_id), None)
+    if fd is None:
+        raise KeyError(f"dispatch {global_id} not found in full export for cbv resolution")
+    params = sorted(fd["root_cbv"])
+    idx = int(selector.get("cbv", 0))
+    if idx >= len(params):
+        raise IndexError(f"cbv index {idx} out of range ({len(params)} cbv bindings)")
+    res, off = fd["root_cbv"][params[idx]]
+    return {"role": "cbv", "resource_id": res, "offset": off,
+            "resource_name": full.resources.get(res, {}).get("name")}
+
 def extract(wpix, global_id, selector, mip=0, array_slice=0, out_npy=None,
             cbv_size=None):
     """Extract a dispatch input/output as numpy (texture) or bytes/floats (cbv).
     Returns a JSON-able dict with stats; optionally saves .npy."""
     A = load_export(export_region(wpix, global_id, global_id))
     bt = binding_table(A)
-    tgt = _resolve(A, selector, bt)
+    is_cbv = ("cbv" in selector) or (selector.get("role") == "cbv")
+    if is_cbv and not bt["cbv"]:
+        tgt = _resolve_cbv_via_full(wpix, global_id, selector)
+    else:
+        tgt = _resolve(A, selector, bt)
 
     if tgt["role"] == "cbv":
         off = tgt["offset"]
-        n = cbv_size or 1024
-        blob = decompress_blob(A.dir, tgt["resource_id"], A)
+        rid = tgt["resource_id"]
+        blob = decompress_blob(A.dir, rid, A) if rid in A.resources else b""
+        avail = max(0, len(blob) - off)
+        if avail == 0:
+            raise RuntimeError(
+                f"constant buffer (resource {rid}) bytes are not in the region recapture of "
+                f"event {global_id}; PIX did not capture this CBV's contents here. The bindings "
+                f"are visible via describe_dispatch, but the values cannot be read for this event.")
+        # default to a single 256B constant-buffer-ish window; never read past the buffer.
+        # NOTE: there is no per-CBV-view size in the capture, so pass cbv_size=sizeof(struct)
+        # to avoid reading adjacent constants/uninitialized bytes.
+        n = min(cbv_size or 256, avail)
         raw = blob[off:off + n]
         nwords = len(raw) // 4
         floats = list(struct.unpack_from("<%df" % nwords, raw, 0))
         uints = list(struct.unpack_from("<%dI" % nwords, raw, 0))
-        return {"role": "cbv", "resource_name": tgt["resource_name"],
-                "offset": off, "byte_size": len(raw),
-                "floats": floats[:256], "uints": uints[:256], "hex": raw[:128].hex()}
+        had_nan = any(f != f for f in floats)  # NaN != NaN
+        # JSON has no NaN/Infinity; null them out (uints/hex keep the raw values).
+        safe_floats = [f if (f == f and abs(f) != float("inf")) else None for f in floats]
+        out = {"role": "cbv", "resource_name": tgt.get("resource_name"),
+               "offset": off, "byte_size": len(raw), "buffer_bytes_after_offset": avail,
+               "had_nan": had_nan, "floats": safe_floats[:256], "uints": uints[:256],
+               "hex": raw[:128].hex()}
+        if had_nan:
+            out["note"] = ("some words are NaN when read as float — this is normal for uint/"
+                           "padding fields (e.g. 0xCCCCCCCC); if unexpected, you may be reading "
+                           "past the struct — pass cbv_size=sizeof(struct).")
+        return out
 
     is_output = (tgt["role"] == "uav")
     if is_output:
@@ -741,20 +829,141 @@ def compare(spec_a, spec_b, out_npy_diff=None):
     ad = np.abs(diff)
     mse = float(np.mean(diff ** 2))
     rng = float(max(np.nanmax(a), np.nanmax(b)) - min(np.nanmin(a), np.nanmin(b))) or 1.0
+    # psnr is undefined (infinite) when mse==0; leave it null and rely on identical/equal,
+    # because JSON has no Infinity (emitting it would break the MCP transport).
     psnr = float(20 * np.log10(rng) - 10 * np.log10(mse)) if mse > 0 else None
+    equal = bool(np.array_equal(a, b))
     res = {
-        "equal": bool(np.array_equal(a, b)),
+        "equal": equal,
+        "identical": equal,  # explicit: psnr_db is null when identical (mse==0, infinite PSNR)
         "shape": list(a.shape),
+        "format": ra.get("format"),
         "max_abs_diff": float(ad.max()),
         "mean_abs_diff": float(ad.mean()),
         "mse": mse, "psnr_db": psnr,
         "num_differing_texels": int((ad.max(-1) > 0).sum()),
         "per_channel_max_abs": [float(x) for x in ad.reshape(-1, ad.shape[-1]).max(0)],
     }
+    # When the stored format is fp16, classify the difference in ULPs of the half grid:
+    # max_fp16_ulp ~1 means the two only differ by last-bit half-float rounding.
+    if not equal and "16" in (ra.get("format") or "") and "FLOAT" in (ra.get("format") or ""):
+        af = a.astype(np.float16)
+        ulp = np.abs(np.nextafter(af, np.float16(np.inf)).astype(np.float64) - af.astype(np.float64))
+        ulp = np.where(ulp > 0, ulp, np.finfo(np.float16).tiny)
+        res["max_fp16_ulp"] = float(np.nanmax(ad / ulp))
     if out_npy_diff:
         np.save(out_npy_diff, diff.astype(np.float32))
         res["saved_diff_npy"] = os.path.abspath(out_npy_diff)
     return res
+
+def _spec_wpix(spec):
+    return spec.get("wpix_path") or spec["wpix"]
+
+def _spec_resource(spec):
+    """The resource desc (dims/format/mips) a compare-spec points at, without decoding —
+    used to enumerate mips/array-slices for compare_subresources."""
+    wpix = _spec_wpix(spec); gid = spec["global_id"]; sel = spec["selector"]
+    A = load_export(export_region(wpix, gid, gid)); bt = binding_table(A)
+    tgt = _resolve(A, sel, bt)
+    if tgt["role"] == "uav":
+        nxt = next_global_id(wpix, gid)
+        B = load_export(export_region(wpix, nxt, nxt))
+        ra = A.resources[tgt["resource_id"]]
+        like = {k: ra[k] for k in ("width", "height", "array_or_depth", "mips",
+                                   "format", "dimension")}
+        rid = B.find_resource(name=ra.get("name"), like=like); exp = B
+    else:
+        rid = tgt["resource_id"]; exp = A
+    return dict(exp.resources[rid], role=tgt["role"])
+
+def compare_subresources(spec_a, spec_b, mips=None, array_slices=None):
+    """Compare the same binding across two captures over many subresources in one call.
+
+    spec_*: {wpix_path, global_id, selector}. `mips`/`array_slices` are iterables; when
+    omitted they default to the full ranges of the resource (all mips, all faces/slices).
+    Returns {per_subresource:[...], aggregate:{...}} where aggregate rolls up the worst
+    max_abs_diff, total differing texels, and worst fp16-ULP across all subresources.
+    Replaces the manual `for face: for mip: compare(...)` loops."""
+    res = _spec_resource(spec_a)
+    if mips is None:
+        mips = range(int(res.get("mips", 1)))
+    if array_slices is None:
+        array_slices = range(int(res.get("array_or_depth", 1)))
+    rows = []
+    worst_abs = 0.0; total_diff = 0; worst_ulp = 0.0; all_equal = True
+    for m in mips:
+        for s in array_slices:
+            a = dict(spec_a, mip=m, array_slice=s)
+            b = dict(spec_b, mip=m, array_slice=s)
+            c = compare(a, b)
+            rows.append({"mip": m, "array_slice": s,
+                         "max_abs_diff": c.get("max_abs_diff"),
+                         "num_differing_texels": c.get("num_differing_texels"),
+                         "max_fp16_ulp": c.get("max_fp16_ulp"),
+                         "equal": c.get("equal")})
+            worst_abs = max(worst_abs, c.get("max_abs_diff") or 0.0)
+            total_diff += c.get("num_differing_texels") or 0
+            if c.get("max_fp16_ulp") is not None:
+                worst_ulp = max(worst_ulp, c["max_fp16_ulp"])
+            all_equal = all_equal and bool(c.get("equal"))
+    agg = {"identical": all_equal, "max_abs_diff": worst_abs,
+           "total_differing_texels": total_diff, "format": res.get("format"),
+           "subresources_compared": len(rows)}
+    if worst_ulp:
+        agg["max_fp16_ulp"] = worst_ulp
+        agg["within_1_ulp"] = worst_ulp <= 1.0 + 1e-6
+    return {"aggregate": agg, "per_subresource": rows}
+
+def diff_stage(wpix_a, wpix_b, marker, dispatch="last", mips="base"):
+    """Compare a whole pipeline stage between two captures in one call.
+
+    Finds the Dispatch(es) whose marker path contains `marker` in each capture, picks
+    one (`dispatch`: "last" (default, = final resource state) or "first"), then compares
+    every UAV output — matched across captures by debug name — and reports a per-output
+    verdict: identical / within-1-fp16-ULP / divergent.
+
+    `mips` controls which mip levels to compare (all array slices/faces are always
+    compared):
+      * "base" (default) — mip 0 only. Correct for a single dispatch, which usually
+        writes only the top mip; higher mips at that event are stale (written by a later
+        pass) and would produce a spurious "divergent".
+      * "all" — every mip. Use only when the chosen dispatch is the last of a chain that
+        populated the full mip pyramid (e.g. the final EnvMapBakerMIPs dispatch)."""
+    def pick(wpix):
+        ds = [e["global_id"] for e in find_shader_events(wpix, marker, dispatches_only=True)]
+        if not ds:
+            raise KeyError(f"no Dispatch under marker {marker!r} in {wpix}")
+        return ds[-1] if dispatch == "last" else ds[0]
+    gid_a, gid_b = pick(wpix_a), pick(wpix_b)
+    da = describe_dispatch(wpix_a, gid_a)
+    db = describe_dispatch(wpix_b, gid_b)
+    # index UAVs by full name on each side
+    def uav_index(desc):
+        out = {}
+        for i, u in enumerate(desc["uav"]):
+            out.setdefault(u.get("resource_name"), i)
+        return out
+    ia, ib = uav_index(da), uav_index(db)
+    mip_arg = None if mips == "all" else [0]
+    outputs = []
+    for name in sorted(set(ia) & set(ib)):
+        c = compare_subresources(
+            {"wpix_path": wpix_a, "global_id": gid_a, "selector": {"uav": ia[name]}},
+            {"wpix_path": wpix_b, "global_id": gid_b, "selector": {"uav": ib[name]}},
+            mips=mip_arg)
+        agg = c["aggregate"]
+        if agg["identical"]:
+            verdict = "identical"
+        elif agg.get("within_1_ulp"):
+            verdict = "within_1_fp16_ulp"
+        else:
+            verdict = "divergent"
+        outputs.append({"output": name, "verdict": verdict, **agg})
+    return {"marker": marker, "dispatch": dispatch,
+            "global_id_a": gid_a, "global_id_b": gid_b,
+            "unmatched_a": sorted(set(ia) - set(ib)),
+            "unmatched_b": sorted(set(ib) - set(ia)),
+            "outputs": outputs}
 
 def clear_cache():
     import shutil

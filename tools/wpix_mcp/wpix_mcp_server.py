@@ -27,8 +27,8 @@ def log(*a):
 # tool implementations -> python objects (serialized to text by the dispatcher)
 # ----------------------------------------------------------------------------------
 
-def t_find_events(wpix_path, name_filter=None):
-    return {"events": core.find_shader_events(wpix_path, name_filter)}
+def t_find_events(wpix_path, name_filter=None, dispatches_only=False):
+    return {"events": core.find_shader_events(wpix_path, name_filter, dispatches_only)}
 
 def t_describe_dispatch(wpix_path, global_id):
     return core.describe_dispatch(wpix_path, int(global_id))
@@ -41,6 +41,12 @@ def t_extract(wpix_path, global_id, selector, mip=0, array_slice=0,
 
 def t_compare(a, b, save_diff_npy_path=None):
     return core.compare(a, b, save_diff_npy_path)
+
+def t_compare_subresources(a, b, mips=None, array_slices=None):
+    return core.compare_subresources(a, b, mips, array_slices)
+
+def t_diff_stage(wpix_a, wpix_b, marker, dispatch="last", mips="base"):
+    return core.diff_stage(wpix_a, wpix_b, marker, dispatch, mips)
 
 def t_clear_cache():
     return core.clear_cache()
@@ -56,6 +62,7 @@ TOOLS = [
             "properties": {
                 "wpix_path": {"type": "string", "description": "Path to the .wpix capture."},
                 "name_filter": {"type": "string", "description": "Optional case-insensitive substring of marker path or event name."},
+                "dispatches_only": {"type": "boolean", "default": False, "description": "Keep only Dispatch events (drop ResourceBarrier/Draw)."},
             },
             "required": ["wpix_path"],
         },
@@ -65,8 +72,10 @@ TOOLS = [
         "name": "wpix_describe_dispatch",
         "description": "For a compute Dispatch identified by its global id, return its thread-"
                        "group counts and root bindings: CBVs, SRV inputs, and UAV outputs, each "
-                       "resolved to a resource debug-name, view format, and dimensions. Use the "
-                       "returned srv/uav/cbv ordering as selectors for wpix_extract/wpix_compare.",
+                       "resolved to a resource debug-name, view format, and dimensions. The "
+                       "srv/uav/cbv list ordering matches the {srv:i}/{uav:i}/{cbv:i} selector "
+                       "indices used by wpix_extract/wpix_compare (resolved from the same region "
+                       "recapture, with full debug names restored from the capture export).",
         "inputSchema": {
             "type": "object",
             "properties": {
@@ -118,6 +127,48 @@ TOOLS = [
             "required": ["a", "b"],
         },
         "handler": t_compare,
+    },
+    {
+        "name": "wpix_compare_subresources",
+        "description": "Compare the same binding across two captures over MANY subresources in "
+                       "one call (replaces manual per-face/per-mip loops). 'a'/'b' are "
+                       "{wpix_path, global_id, selector}. 'mips'/'array_slices' are optional "
+                       "integer lists; omitted = full ranges (all mips, all cube faces/slices). "
+                       "Returns an 'aggregate' (worst max_abs_diff, total differing texels, worst "
+                       "fp16-ULP, identical flag) plus a 'per_subresource' table.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "a": {"type": "object", "description": "{wpix_path, global_id, selector}"},
+                "b": {"type": "object", "description": "{wpix_path, global_id, selector}"},
+                "mips": {"type": "array", "items": {"type": "integer"}, "description": "Mip levels to compare; omit for all."},
+                "array_slices": {"type": "array", "items": {"type": "integer"}, "description": "Array slices / cube faces; omit for all."},
+            },
+            "required": ["a", "b"],
+        },
+        "handler": t_compare_subresources,
+    },
+    {
+        "name": "wpix_diff_stage",
+        "description": "Compare a whole pipeline stage between two captures in ONE call. Locates "
+                       "the Dispatch under marker 'marker' in each capture (dispatch='last' = "
+                       "final state, or 'first'), then compares every UAV output (matched across "
+                       "captures by debug name) and returns a per-output verdict: identical / "
+                       "within_1_fp16_ulp / divergent. mips='base' (default) compares only mip 0 "
+                       "(correct for a single dispatch; higher mips are stale there); mips='all' "
+                       "compares the full pyramid (use for the final dispatch of a mip-gen chain).",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "wpix_a": {"type": "string"},
+                "wpix_b": {"type": "string"},
+                "marker": {"type": "string", "description": "Marker substring, e.g. 'ProcSkyBaseBake', 'GenIM', 'EnvMapBakerMIPs'."},
+                "dispatch": {"type": "string", "enum": ["last", "first"], "default": "last"},
+                "mips": {"type": "string", "enum": ["base", "all"], "default": "base"},
+            },
+            "required": ["wpix_a", "wpix_b", "marker"],
+        },
+        "handler": t_diff_stage,
     },
     {
         "name": "wpix_clear_cache",
