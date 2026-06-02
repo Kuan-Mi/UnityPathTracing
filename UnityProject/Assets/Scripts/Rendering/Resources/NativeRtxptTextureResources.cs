@@ -137,6 +137,21 @@ namespace PathTracing
 
         /// <summary>4×4 dummy cubemap (RGBA8). Used to satisfy shader bindings when the real cube is unneeded.</summary>
         public NriTextureResource EnvDummyCube;
+
+        /// <summary>
+        /// BC6H compression scratch cube (RGBA32_UINT, UAV, CubeDim/4 base, full mip chain). The
+        /// BC6UCompress CS writes one packed 128-bit BC6H block per texel here; <see cref="EnvCubemapBC6H"/>
+        /// is then reinterpret-copied from it. Mirrors the original EnvMapBakerMainCubeBC6HScratch.
+        /// </summary>
+        public NriTextureResource EnvCubemapBC6HScratch;
+
+        /// <summary>
+        /// Final BC6H_UFLOAT compressed env cube (plugin-owned ID3D12Resource*, not a Unity
+        /// RenderTexture — Unity cannot create BC6H RTs). Sampled as t_EnvironmentMap at trace
+        /// time when <see cref="NativeRtxptEnvMapBakerPass.EnableBC6UCompression"/> is on. Mirrors
+        /// the original EnvMapBaker m_cubemapBC6H returned by GetEnvMapCube() when m_outputIsCompressed.
+        /// </summary>
+        public IntPtr EnvCubemapBC6H;
         
         /// <summary>1024×1024 env-light lookup map (R32_UINT). Filled by EnvLightsFillLookupMap. Bound as t_EnvLookupMap (t18).</summary>
         public NriTextureResource EnvLightLookupMap;
@@ -219,6 +234,7 @@ namespace PathTracing
             EnvRadianceMap   = new NriTextureResource("EnvRadianceMap",            GraphicsFormat.R16G16B16A16_SFloat, uav);
             EnvDummyCube     = new NriTextureResource("EnvDummyCube",              GraphicsFormat.R8G8B8A8_UNorm,      srv);
             EnvLightLookupMap     = new NriTextureResource("EnvLightLookupMap",    GraphicsFormat.R32_UInt,      srv);
+            EnvCubemapBC6HScratch = new NriTextureResource("EnvMapBakerMainCubeBC6HScratch", GraphicsFormat.R32G32B32A32_UInt, uav);
         }
 
         /// <summary>
@@ -228,12 +244,23 @@ namespace PathTracing
         public bool EnsureEnvMapResources()
         {
             if (EnvCubemap.IsCreated) return false;
-            EnvCubemap.AllocateCube(NativeRtxptEnvMapBakerPass.CubeDim, useMipMap: true,
-                mipCount: NativeRtxptEnvMapBakerPass.CubeMipCount);
+            int cubeDim  = NativeRtxptEnvMapBakerPass.CubeDim;
+            int cubeMips = NativeRtxptEnvMapBakerPass.CubeMipCount;
+            EnvCubemap.AllocateCube(cubeDim, useMipMap: true, mipCount: cubeMips);
             EnvImportanceMap.Allocate(new int2(1024, 1024), useMipMap: true);
             EnvRadianceMap.Allocate(new int2(1024, 1024), useMipMap: true);
             EnvDummyCube.AllocateCube(4, enableRandomWrite: false);
             EnvLightLookupMap.Allocate(new int2(1024, 1024), useMipMap: false);
+
+            if (NativeRtxptEnvMapBakerPass.EnableBC6UCompression)
+            {
+                // Scratch base = cubeDim / BC block size (4); same mip count as the cube so each
+                // BC6H subresource has a matching RGBA32_UINT block grid. Mirrors EnvMapBaker.cpp
+                // InitBuffers (m_cubemapBC6HScratch / m_cubemapBC6H).
+                EnvCubemapBC6HScratch.AllocateCube(cubeDim / 4, useMipMap: true, mipCount: cubeMips);
+                if (EnvCubemapBC6H == IntPtr.Zero)
+                    EnvCubemapBC6H = NativeRender.NativeRenderPlugin.NR_CreateBC6HCube((uint)cubeDim, (uint)cubeMips);
+            }
 
             // Freshly allocated cube/importance maps hold garbage — force the baker to re-run.
             EnvBaked = false;
@@ -311,6 +338,12 @@ namespace PathTracing
                 }
             }
             foreach (var tex in AllTextures()) tex.Release();
+
+            if (EnvCubemapBC6H != IntPtr.Zero)
+            {
+                NativeRender.NativeRenderPlugin.NR_DestroyBC6HCube(EnvCubemapBC6H);
+                EnvCubemapBC6H = IntPtr.Zero;
+            }
         }
 
         private NriTextureResource[] AllTextures() => new[]
@@ -327,7 +360,8 @@ namespace PathTracing
             ShaderDebugViz, DebugOutputColor, DlssRrOutput,
             BloomDownscale1, BloomDownscale2, BloomBlurPass1, BloomBlurPass2,
             AccumulatedRadiance, ProcessedOutputColor,
-            EnvCubemap, EnvImportanceMap, EnvRadianceMap, EnvDummyCube,EnvLightLookupMap
+            EnvCubemap, EnvImportanceMap, EnvRadianceMap, EnvDummyCube, EnvLightLookupMap,
+            EnvCubemapBC6HScratch
         };
     }
 }

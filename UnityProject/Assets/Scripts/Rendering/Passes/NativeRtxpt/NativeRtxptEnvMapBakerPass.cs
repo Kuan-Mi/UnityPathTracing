@@ -1,6 +1,8 @@
 using System;
 using System.Runtime.InteropServices;
 using NativeRender;
+using Unity.Collections;
+using Unity.Collections.LowLevel.Unsafe;
 using UnityEngine;
 using UnityEngine.Rendering;
 using UnityEngine.Rendering.RenderGraphModule;
@@ -30,6 +32,24 @@ namespace PathTracing
         private const          int ImportanceSamplesY      = 4;
         private const          int BaseLayerGroupsXY       = (CubeDim / 2 + 7) / 8;
         private const          int ImportanceBakerGroupsXY = (ImportanceMapDim + 15) / 16;
+
+        // Mirrors the original EnvMapBaker defaults (EnvMapBaker.h): m_BC6UCompressionEnabled = true
+        // and m_compressionQuality = 1 (Fast / P1-only). When on, the baked RGBA16F cube is
+        // BC6H-compressed (BC6UCompress CS → RGBA32_UINT scratch → reinterpret-copy into a BC6H
+        // cube) and the path tracer samples that BC6H cube as t_EnvironmentMap — matching the
+        // original GetEnvMapCube() returning m_cubemapBC6H when m_outputIsCompressed. The existing
+        // BC6UCompress.computeshader asset has no QUALITY macro, so ENCODE_P2 is false ⇒ exactly the
+        // "Fast" (m_BC6UCompressLowPSO) variant. Set false to sample the uncompressed cube instead.
+        public const bool EnableBC6UCompression = false;
+
+        // DXGI_FORMAT_R16G16B16A16_FLOAT — the env cube's format, used to bind it as a typed
+        // Texture2DArray SRV for the BC6 compressor (the cube's faces, not a TextureCube view).
+        private const uint DXGI_FORMAT_R16G16B16A16_FLOAT = 10;
+
+        // BC6UCompress is [numthreads(8,8,1)] over 4×4-block tiles. The original dispatches the
+        // scratch base block count for every mip and relies on the in-shader bounds guard to clip
+        // smaller mips (EnvMapBaker.cpp:614-619), so we match it: (CubeDim/4 + 7) / 8.
+        private const int BC6UGroupsXY = (CubeDim / 4 + 7) / 8;
 
         // Constant radiance-compression factor applied at bake time so 32-bit HDR source
         // radiance fits the 16-bit-float / BC6U range the baker uses (Sample.cpp:89,
@@ -74,6 +94,16 @@ namespace PathTracing
         private readonly NativeComputeDescriptorSet _mipReduceDs;
         private readonly NativeComputePipeline      _importanceBakerCs;
         private readonly NativeComputeDescriptorSet _importanceBakerDs;
+        private readonly NativeComputePipeline      _bc6uCompressCs;   // null when compression disabled / shader missing
+        private readonly NativeComputeDescriptorSet _bc6uCompressDs;
+
+        // Pinned ring for the BC6H copy plugin-event payload. The data must stay alive until the
+        // render thread consumes the event, so it lives in persistent storage (mirrors the dispatch
+        // header ring in NativeComputeDescriptorSet). The bake runs at most once per frame, so a
+        // few slots is ample.
+        private const int CopyRingSize = 3;
+        private NativeArray<NativeRenderPlugin.BC6HCopy_RenderEventData>[] _copyRing;
+        private int _copyRingIdx;
 
         private static EnvMapBakerCB     s_envBakerCb;
         private static ImportanceBakerCB s_importanceCb;
@@ -85,7 +115,7 @@ namespace PathTracing
         // skipped this frame. Mirrors the original EnvMapBaker::Update contentsChanged early-out.
         private bool _skipBake;
 
-        public NativeRtxptEnvMapBakerPass(NativeComputeShader baseLayerCs, NativeComputeShader mipReduceCs, NativeComputeShader importanceBakerCs)
+        public NativeRtxptEnvMapBakerPass(NativeComputeShader baseLayerCs, NativeComputeShader mipReduceCs, NativeComputeShader importanceBakerCs, NativeComputeShader bc6uCompressCs = null)
         {
             _baseLayerCs       = new NativeComputePipeline(baseLayerCs);
             _baseLayerDs       = new NativeComputeDescriptorSet(_baseLayerCs);
@@ -93,6 +123,16 @@ namespace PathTracing
             _mipReduceDs       = new NativeComputeDescriptorSet(_mipReduceCs);
             _importanceBakerCs = new NativeComputePipeline(importanceBakerCs);
             _importanceBakerDs = new NativeComputeDescriptorSet(_importanceBakerCs);
+
+            if (EnableBC6UCompression && bc6uCompressCs != null)
+            {
+                _bc6uCompressCs = new NativeComputePipeline(bc6uCompressCs);
+                _bc6uCompressDs = new NativeComputeDescriptorSet(_bc6uCompressCs);
+
+                _copyRing = new NativeArray<NativeRenderPlugin.BC6HCopy_RenderEventData>[CopyRingSize];
+                for (int i = 0; i < CopyRingSize; i++)
+                    _copyRing[i] = new NativeArray<NativeRenderPlugin.BC6HCopy_RenderEventData>(1, Allocator.Persistent);
+            }
         }
 
         public void Dispose()
@@ -103,6 +143,31 @@ namespace PathTracing
             _mipReduceCs?.Dispose();
             _importanceBakerDs?.Dispose();
             _importanceBakerCs?.Dispose();
+            _bc6uCompressDs?.Dispose();
+            _bc6uCompressCs?.Dispose();
+            if (_copyRing != null)
+            {
+                for (int i = 0; i < CopyRingSize; i++)
+                    if (_copyRing[i].IsCreated) _copyRing[i].Dispose();
+                _copyRing = null;
+            }
+        }
+
+        // Snapshots the BC6H copy payload into the next pinned ring slot and returns a stable
+        // pointer for CommandBuffer.IssuePluginEventAndData. Returns IntPtr.Zero if unavailable.
+        private unsafe IntPtr StageCopyEvent(IntPtr scratch, IntPtr bc6h)
+        {
+            if (_copyRing == null || scratch == IntPtr.Zero || bc6h == IntPtr.Zero) return IntPtr.Zero;
+            int ring = _copyRingIdx % CopyRingSize;
+            _copyRingIdx++;
+            _copyRing[ring][0] = new NativeRenderPlugin.BC6HCopy_RenderEventData
+            {
+                srcScratch = (ulong)scratch,
+                dstBC6H    = (ulong)bc6h,
+                mipLevels  = (uint)CubeMipCount,
+                arraySize  = 6,
+            };
+            return (IntPtr)_copyRing[ring].GetUnsafePtr();
         }
 
         public void Setup(NativeRtxptPassContext ctx)
@@ -173,6 +238,14 @@ namespace PathTracing
             internal RenderTexture              RadianceMapRt;
             internal IntPtr                     DummyCubePtr;
             internal IntPtr                     DummyTex2DPtr;
+
+            // BC6H compression (null pipeline ⇒ skipped).
+            internal NativeComputePipeline      Bc6uCompressCs;
+            internal NativeComputeDescriptorSet Bc6uCompressDs;
+            internal IntPtr                     Bc6uScratchPtr;
+            internal IntPtr                     Bc6uCubePtr;
+            internal IntPtr                     Bc6uCopyEventFunc;
+            internal IntPtr                     Bc6uCopyEventData;
         }
 
         public override void RecordRenderGraph(RenderGraph renderGraph, ContextContainer frameData)
@@ -203,6 +276,19 @@ namespace PathTracing
             pd.DummyCubePtr     = _ctx.Textures.EnvDummyCube.NativePtr;
             pd.DummyTex2DPtr    = _ctx.blackTexturePtr;
 
+            // BC6H compression: wire the compressor + reinterpret-copy event when enabled and the
+            // BC6H cube is available. Staged here (record time) because all inputs are known then.
+            if (_bc6uCompressCs != null && _bc6uCompressCs.IsValid &&
+                _ctx.Textures.EnvCubemapBC6H != IntPtr.Zero)
+            {
+                pd.Bc6uCompressCs    = _bc6uCompressCs;
+                pd.Bc6uCompressDs    = _bc6uCompressDs;
+                pd.Bc6uScratchPtr    = _ctx.Textures.EnvCubemapBC6HScratch.NativePtr;
+                pd.Bc6uCubePtr       = _ctx.Textures.EnvCubemapBC6H;
+                pd.Bc6uCopyEventFunc = NativeRenderPlugin.NR_GetBC6HCopyEventFunc();
+                pd.Bc6uCopyEventData = StageCopyEvent(pd.Bc6uScratchPtr, pd.Bc6uCubePtr);
+            }
+
             builder.AllowPassCulling(false);
             builder.SetRenderFunc((PassData d, UnsafeGraphContext c) => ExecutePass(d, c));
         }
@@ -214,7 +300,8 @@ namespace PathTracing
             cmd.BeginSample(RenderPassMarkers.RtxptEnvMapBaker);
 
             // ── Base layer: BaseLayerCS writes cube mip 0 (Dst0) and the first solid-angle
-            //    downsample into mip 1 (Dst1) of the same cubemap (EnvMapBaker.cpp:537-550). ──
+            //    downsample into mip 1 (Dst1) of the same cubemap (EnvMapBaker.cpp:537-550). The
+            //    original wraps this dispatch in the "ProcSkyBaseBake" marker. ──
             {
                 var ds = data.BaseLayerDs;
                 data.EnvBakerCb.UploadDirect(context.cmd, data.EnvBakerCbData); // single-value overload
@@ -226,17 +313,18 @@ namespace PathTracing
                 ds.SetTexture("t_ProcSkyScatter", data.DummyTex2DPtr);
                 ds.SetRWTexture("u_EnvMapCubeFacesDst0", data.EnvCubePtr, 0); // mip 0
                 ds.SetRWTexture("u_EnvMapCubeFacesDst1", data.EnvCubePtr, 1); // mip 1
-                cmd.BeginSample(RenderPassMarkers.RtxptEnvMapBaseLayer);
+                cmd.BeginSample(RenderPassMarkers.RtxptEnvMapProcSkyBaseBake);
                 data.BaseLayerCs.Dispatch(cmd, ds, BaseLayerGroupsXY, BaseLayerGroupsXY, 6);
-                cmd.EndSample(RenderPassMarkers.RtxptEnvMapBaseLayer);
+                cmd.EndSample(RenderPassMarkers.RtxptEnvMapProcSkyBaseBake);
             }
 
             // ── MIP reduce: fill mips 2..N-1 from the previous mip with the solid-angle weighted
-            //    downsample (MIPReduceCS), mirroring EnvMapBaker.cpp:555-591. Each iteration reads
-            //    mip i-1 and writes mip i of the same cube; the plugin's per-resource UAV barrier
-            //    (NotifyResourceStates uavAccess=true) serializes the read-after-write chain. ──
+            //    downsample (MIPReduceCS), mirroring EnvMapBaker.cpp:555-591 ("EnvMapBakerMIPs").
+            //    Each iteration reads mip i-1 and writes mip i of the same cube; the plugin's
+            //    per-resource UAV barrier (NotifyResourceStates uavAccess=true) serializes the
+            //    read-after-write chain. ──
             {
-                cmd.BeginSample(RenderPassMarkers.RtxptEnvMapMipReduce);
+                cmd.BeginSample(RenderPassMarkers.RtxptEnvMapBakerMIPs);
                 var ds = data.MipReduceDs;
                 for (int i = 2; i < CubeMipCount; i++)
                 {
@@ -247,24 +335,60 @@ namespace PathTracing
                     data.MipReduceCs.Dispatch(cmd, ds, groups, groups, 6);
                 }
 
-                cmd.EndSample(RenderPassMarkers.RtxptEnvMapMipReduce);
+                cmd.EndSample(RenderPassMarkers.RtxptEnvMapBakerMIPs);
             }
 
-            // ── Importance/radiance map build from the baked cube's mip 0 (samples SampleLevel 0). ──
+            // ── BC6H compression (EnvMapBaker.cpp:593-631, "BC6UCompression"): compress every cube
+            //    mip into the RGBA32_UINT scratch (one packed 128-bit block per texel), then
+            //    reinterpret-copy the scratch into the BC6H cube. The path tracer samples that BC6H
+            //    cube as t_EnvironmentMap. The importance/radiance baker below still reads the
+            //    uncompressed RGBA16F cube (m_cubemap), matching the original. ──
+            if (data.Bc6uCompressCs != null)
             {
+                cmd.BeginSample(RenderPassMarkers.RtxptEnvMapBC6UCompression);
+                var ds = data.Bc6uCompressDs;
+                for (int i = 0; i < CubeMipCount; i++)
+                {
+                    // SrcTexture (t0): cube mip i as a 6-slice Texture2DArray (not a TextureCube).
+                    ds.SetTextureArraySlice("SrcTexture", data.EnvCubePtr, i, DXGI_FORMAT_R16G16B16A16_FLOAT);
+                    // OutputTexture (u0): scratch mip i (RWTexture2DArray<uint4>).
+                    ds.SetRWTexture("OutputTexture", data.Bc6uScratchPtr, i);
+                    data.Bc6uCompressCs.Dispatch(cmd, ds, BC6UGroupsXY, BC6UGroupsXY, 6);
+                }
+
+                // Reinterpret-copy scratch (RGBA32_UINT) → BC6H cube, per subresource.
+                if (data.Bc6uCopyEventFunc != IntPtr.Zero && data.Bc6uCopyEventData != IntPtr.Zero)
+                    cmd.IssuePluginEventAndData(data.Bc6uCopyEventFunc, 1, data.Bc6uCopyEventData);
+
+                cmd.EndSample(RenderPassMarkers.RtxptEnvMapBC6UCompression);
+            }
+
+            // ── Importance/radiance map build from the baked cube's mip 0 (samples SampleLevel 0).
+            //    The original wraps this in "ISBake", with the build dispatch under "GenIM" and each
+            //    mip-chain generation under "MipMapGen::Dispatch" (donut MipMapGenPass). ──
+            {
+                cmd.BeginSample(RenderPassMarkers.RtxptEnvMapISBake);
+
                 var ds = data.ImportanceBakerDs;
                 data.ImportanceBakerCb.UploadDirect(context.cmd, data.ImportanceCbData); // single-value overload
                 ds.SetConstantBuffer("g_BuilderConsts", data.ImportanceBakerCb);
                 ds.SetTexture("t_EnvMapCube", data.EnvCubePtr);
                 ds.SetRWTexture("u_ImportanceMap", data.ImportanceMapPtr);
                 ds.SetRWTexture("u_RadianceMap", data.RadianceMapPtr);
-                cmd.BeginSample(RenderPassMarkers.RtxptEnvMapImportanceBaker);
+                cmd.BeginSample(RenderPassMarkers.RtxptEnvMapGenIM);
                 data.ImportanceBakerCs.Dispatch(cmd, ds, ImportanceBakerGroupsXY, ImportanceBakerGroupsXY, 1);
-                cmd.EndSample(RenderPassMarkers.RtxptEnvMapImportanceBaker);
-            }
+                cmd.EndSample(RenderPassMarkers.RtxptEnvMapGenIM);
 
-            cmd.GenerateMips(data.ImportanceMapRt);
-            cmd.GenerateMips(data.RadianceMapRt);
+                cmd.BeginSample(RenderPassMarkers.RtxptEnvMapMipMapGen);
+                cmd.GenerateMips(data.ImportanceMapRt);
+                cmd.EndSample(RenderPassMarkers.RtxptEnvMapMipMapGen);
+
+                cmd.BeginSample(RenderPassMarkers.RtxptEnvMapMipMapGen);
+                cmd.GenerateMips(data.RadianceMapRt);
+                cmd.EndSample(RenderPassMarkers.RtxptEnvMapMipMapGen);
+
+                cmd.EndSample(RenderPassMarkers.RtxptEnvMapISBake);
+            }
 
             cmd.EndSample(RenderPassMarkers.RtxptEnvMapBaker);
         }

@@ -151,7 +151,12 @@ namespace PathTracing
             FeedbackCandidatesBlendedPtr  = Textures.FeedbackCandidatesBlended.NativePtr;
             NEEATHistoryDepthPtr          = Textures.NEEATHistoryDepth.NativePtr;
 
-            BakedEnvCubePtr                = Textures.EnvCubemap.NativePtr;
+            // Path tracer samples the BC6H-compressed cube when compression is enabled (mirrors the
+            // original GetEnvMapCube() returning m_cubemapBC6H once m_outputIsCompressed). The
+            // importance/radiance baker still reads the uncompressed RGBA16F cube directly.
+            BakedEnvCubePtr                = (NativeRtxptEnvMapBakerPass.EnableBC6UCompression && Textures.EnvCubemapBC6H != IntPtr.Zero)
+                                             ? Textures.EnvCubemapBC6H
+                                             : Textures.EnvCubemap.NativePtr;
             EnvImportanceMapPtr            = Textures.EnvImportanceMap.NativePtr;
             EnvRadianceAndImportanceMapPtr = Textures.EnvRadianceMap.NativePtr;
             EnvLightLookupMapPtr           = Textures.EnvLightLookupMap.NativePtr;

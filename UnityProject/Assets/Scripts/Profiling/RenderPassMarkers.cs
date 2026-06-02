@@ -77,10 +77,25 @@ public static class RenderPassMarkers
     // RTXPT LightingUpdateBegin
     public static readonly NamedMarker RtxptLightingUpdateBegin = new(ProfilerCategory.Render, "LightingUpdateBegin", MarkerFlags.SampleGPU);
     public static readonly NamedMarker RtxptControlDataSetup = new(ProfilerCategory.Render, "ControlDataSetup", MarkerFlags.SampleGPU);
+    // Env map baker markers — strings kept byte-for-byte identical to the original RTXPT
+    // EnvMapBaker.cpp / EnvMapImportanceSamplingBaker.cpp / donut MipMapGenPass.cpp
+    // commandList->beginMarker() labels, so a PIX capture of the replica's bake lines up
+    // with the reference hierarchy:
+    //   EnvMapBaker
+    //   ├─ ProcSkyBaseBake     (BaseLayerCS — writes cube mip 0+1)
+    //   ├─ EnvMapBakerMIPs     (MIPReduceCS — solid-angle mip chain)
+    //   ├─ BC6UCompression     (BC6UCompress CS → scratch, then copy scratch→BC6H cube)
+    //   └─ ISBake              (importance/radiance map build)
+    //      ├─ GenIM            (BuildMIPDescentImportanceMapCS)
+    //      ├─ MipMapGen::Dispatch  (importance map mip chain)
+    //      └─ MipMapGen::Dispatch  (radiance  map mip chain)
     public static readonly NamedMarker RtxptEnvMapBaker = new(ProfilerCategory.Render, "EnvMapBaker", MarkerFlags.SampleGPU);
-    public static readonly NamedMarker RtxptEnvMapBaseLayer = new(ProfilerCategory.Render, "EnvMap BaseLayer", MarkerFlags.SampleGPU);
-    public static readonly NamedMarker RtxptEnvMapMipReduce = new(ProfilerCategory.Render, "EnvMap MipReduce", MarkerFlags.SampleGPU);
-    public static readonly NamedMarker RtxptEnvMapImportanceBaker = new(ProfilerCategory.Render, "EnvMap ImportanceBaker", MarkerFlags.SampleGPU);
+    public static readonly NamedMarker RtxptEnvMapProcSkyBaseBake = new(ProfilerCategory.Render, "ProcSkyBaseBake", MarkerFlags.SampleGPU);
+    public static readonly NamedMarker RtxptEnvMapBakerMIPs = new(ProfilerCategory.Render, "EnvMapBakerMIPs", MarkerFlags.SampleGPU);
+    public static readonly NamedMarker RtxptEnvMapBC6UCompression = new(ProfilerCategory.Render, "BC6UCompression", MarkerFlags.SampleGPU);
+    public static readonly NamedMarker RtxptEnvMapISBake = new(ProfilerCategory.Render, "ISBake", MarkerFlags.SampleGPU);
+    public static readonly NamedMarker RtxptEnvMapGenIM = new(ProfilerCategory.Render, "GenIM", MarkerFlags.SampleGPU);
+    public static readonly NamedMarker RtxptEnvMapMipMapGen = new(ProfilerCategory.Render, "MipMapGen::Dispatch", MarkerFlags.SampleGPU);
     public static readonly NamedMarker RtxptResetLightProxyCounters = new(ProfilerCategory.Render, "ResetLightProxyCounters", MarkerFlags.SampleGPU);
     public static readonly NamedMarker RtxptResetPastToCurrentHistory = new(ProfilerCategory.Render, "ResetPastToCurrentHistory", MarkerFlags.SampleGPU);
     public static readonly NamedMarker RtxptEnvLightsBackupPast = new(ProfilerCategory.Render, "EnvLightsBackupPast", MarkerFlags.SampleGPU);

@@ -254,6 +254,24 @@ void DescriptorSetBase<ShaderT>::WriteDescriptors(
                             s.Buffer.NumElements = static_cast<UINT>(rd.Width / 4);
                         }
                     }
+                    else if (slot.format != 0)
+                    {
+                        // Explicit typed Texture2DArray SRV (slot.format = DXGI_FORMAT, non-zero).
+                        // Lets a cubemap's faces be read as a Texture2DArray<...> instead of the
+                        // default TextureCube — e.g. BC6UCompress gathers the env cube mip i as a
+                        // 6-slice array. Mirrors nvrhi's Texture_SRV(...).setDimension(Texture2DArray).
+                        // slot.stride = MostDetailedMip, slot.count = MipLevels (0 ⇒ 1). Only ever set
+                        // by the SetTextureArraySlice overload; all other texture SRVs leave format=0,
+                        // so this branch is dormant for them.
+                        s.ViewDimension                      = D3D12_SRV_DIMENSION_TEXTURE2DARRAY;
+                        s.Format                             = static_cast<DXGI_FORMAT>(slot.format);
+                        s.Texture2DArray.MostDetailedMip     = slot.stride;
+                        s.Texture2DArray.MipLevels           = (slot.count > 0) ? slot.count : 1;
+                        s.Texture2DArray.FirstArraySlice     = 0;
+                        s.Texture2DArray.ArraySize           = rd.DepthOrArraySize;
+                        s.Texture2DArray.PlaneSlice          = 0;
+                        s.Texture2DArray.ResourceMinLODClamp = 0.0f;
+                    }
                     else if (rd.DepthOrArraySize == 6)
                     {
                         // Cube map: DepthOrArraySize==6 → TEXTURECUBE SRV.

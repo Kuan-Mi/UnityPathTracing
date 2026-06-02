@@ -370,6 +370,28 @@ namespace NativeRender
         public void SetTexture(string name, IntPtr texturePtr, int firstMip, int mipCount)
             => SetTexture(PropertyToID(name), texturePtr, firstMip, mipCount);
 
+        /// <summary>
+        /// Binds a texture array / cubemap as an explicit <c>Texture2DArray</c> SRV (one mip,
+        /// all slices) with an explicit <paramref name="dxgiFormat"/>. Use this to read a
+        /// cubemap's faces as a <c>Texture2DArray</c> instead of the default <c>TextureCube</c>
+        /// view — e.g. BC6UCompress gathering the env cube mip <paramref name="mip"/>. Mirrors
+        /// nvrhi's <c>Texture_SRV(...).setDimension(Texture2DArray)</c>. A non-zero format is the
+        /// signal the native plugin uses to pick the array view, so never pass 0.
+        /// </summary>
+        public void SetTextureArraySlice(int nameId, IntPtr texturePtr, int mip, uint dxgiFormat)
+        {
+            int i = SlotFromId(nameId);
+            if (i < 0) return;
+            _stagingSlots[i].objectPtr  = (ulong)texturePtr;
+            _stagingSlots[i].objectKind = ObjKindNone;
+            _stagingSlots[i].count      = 1;                // MipLevels = 1
+            _stagingSlots[i].stride     = (uint)mip;        // MostDetailedMip
+            _stagingSlots[i].format     = dxgiFormat;       // non-zero ⇒ Texture2DArray view
+        }
+        /// <summary>Binds a cubemap/array mip as an explicit <c>Texture2DArray</c> SRV.</summary>
+        public void SetTextureArraySlice(string name, IntPtr texturePtr, int mip, uint dxgiFormat)
+            => SetTextureArraySlice(PropertyToID(name), texturePtr, mip, dxgiFormat);
+
         /// <summary>Binds a RenderTexture as a read-write texture (UAV).</summary>
         public void SetRWTexture(int nameId, IntPtr texturePtr)
         {

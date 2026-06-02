@@ -1909,6 +1909,139 @@ NR_CS_GetRenderEventDataSize()
 }
 
 // ===========================================================================
+// BC6H cubemap  -  plugin-owned compressed env cube + reinterpret copy
+//
+//   Unity RenderTextures cannot be BC6H, so the EnvMapBaker's compressed output
+//   cube (the original m_cubemapBC6H, sampled as t_EnvironmentMap when compression
+//   is enabled) is created here as a plugin-owned committed resource and handed
+//   back to C# as a raw ID3D12Resource* — bindable exactly like a Unity texture
+//   pointer (objectKind None). The compressor writes an RGBA32_UINT scratch cube
+//   (a normal Unity UAV RenderTexture); NR_BC6HCopy reinterpret-copies that scratch
+//   into the BC6H cube per subresource (RGBA32_UINT and BC6H_UF16 are both 128-bit
+//   and copy-compatible), mirroring EnvMapBaker.cpp's per-slice copyTexture loop.
+// ===========================================================================
+
+// ---------------------------------------------------------------------------
+// NR_CreateBC6HCube
+//   Creates a BC6H_UFLOAT TextureCube (6-slice 2D array) committed resource with
+//   |mipLevels| mips. Returned as the raw ID3D12Resource* (uint64); 0 on failure.
+//   Released via NR_DestroyBC6HCube.
+// ---------------------------------------------------------------------------
+extern "C" uint64_t UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API
+NR_CreateBC6HCube(uint32_t dim, uint32_t mipLevels)
+{
+    if (!s_RendererReady) { NR_WARN("NR_CreateBC6HCube: renderer not ready"); return 0; }
+    ID3D12Device* device = s_D3D12 ? s_D3D12->GetDevice() : nullptr;
+    if (!device)          { NR_ERROR("NR_CreateBC6HCube: no ID3D12Device"); return 0; }
+    if (dim == 0 || mipLevels == 0) { NR_ERROR("NR_CreateBC6HCube: invalid dim/mips"); return 0; }
+
+    D3D12_HEAP_PROPERTIES heapProps = {};
+    heapProps.Type = D3D12_HEAP_TYPE_DEFAULT;
+
+    D3D12_RESOURCE_DESC desc = {};
+    desc.Dimension        = D3D12_RESOURCE_DIMENSION_TEXTURE2D;
+    desc.Width            = dim;
+    desc.Height           = dim;
+    desc.DepthOrArraySize = 6;                       // cube faces (SRV becomes TEXTURECUBE)
+    desc.MipLevels        = static_cast<UINT16>(mipLevels);
+    desc.Format           = DXGI_FORMAT_BC6H_UF16;   // matches nvrhi BC6H_UFLOAT
+    desc.SampleDesc.Count = 1;
+    desc.Layout           = D3D12_TEXTURE_LAYOUT_UNKNOWN;
+    desc.Flags            = D3D12_RESOURCE_FLAG_NONE; // BC formats cannot be UAV; copy-dest only
+
+    ID3D12Resource* res = nullptr;
+    HRESULT hr = device->CreateCommittedResource(
+        &heapProps, D3D12_HEAP_FLAG_NONE, &desc,
+        D3D12_RESOURCE_STATE_COMMON, // first Require()/Notify() through Unity's tracker composes from COMMON
+        nullptr, IID_PPV_ARGS(&res));
+    if (FAILED(hr) || !res)
+    {
+        NR_ERROR("NR_CreateBC6HCube: CreateCommittedResource failed (hr=0x%08x)", static_cast<unsigned>(hr));
+        return 0;
+    }
+    res->SetName(L"EnvMapBakerMainCubeBC6H");
+    return reinterpret_cast<uint64_t>(res);
+}
+
+extern "C" void UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API
+NR_DestroyBC6HCube(uint64_t handle)
+{
+    if (!handle) return;
+    // Defer the Release until the GPU is past any in-flight frame that may still
+    // reference the cube (same retire-bucket discipline as other plugin resources).
+    auto* res = reinterpret_cast<ID3D12Resource*>(handle);
+    EnqueueCleanup([res]{ res->Release(); });
+}
+
+// ---------------------------------------------------------------------------
+// BC6HCopy_RenderEventData
+//   Must match NativeRenderPlugin.BC6HCopy_RenderEventData exactly (Pack=4).
+// ---------------------------------------------------------------------------
+#pragma pack(push, 4)
+struct BC6HCopy_RenderEventData
+{
+    uint64_t srcScratch;  // +0  (8B): ID3D12Resource* RGBA32_UINT scratch cube
+    uint64_t dstBC6H;     // +8  (8B): ID3D12Resource* BC6H cube (from NR_CreateBC6HCube)
+    uint32_t mipLevels;   // +16 (4B)
+    uint32_t arraySize;   // +20 (4B): always 6 for a cube
+};  // Total: 24 bytes
+#pragma pack(pop)
+
+static void UNITY_INTERFACE_API BC6HCopyCallback(int /*eventId*/, void* data)
+{
+    if (!s_RendererReady || !s_D3D12 || !data) return;
+    auto* ed = static_cast<BC6HCopy_RenderEventData*>(data);
+    auto* src = reinterpret_cast<ID3D12Resource*>(ed->srcScratch);
+    auto* dst = reinterpret_cast<ID3D12Resource*>(ed->dstBC6H);
+    if (!src || !dst || ed->mipLevels == 0 || ed->arraySize == 0) return;
+
+    UnityGraphicsD3D12RecordingState recordingState = {};
+    if (!s_D3D12->CommandRecordingState(&recordingState) || !recordingState.commandList) return;
+    auto* cmdList = static_cast<ID3D12GraphicsCommandList*>(recordingState.commandList);
+
+    // Route both transitions through Unity's tracker so they compose with surrounding
+    // passes (scratch was last left in UAV; the BC6H cube's next use is an SRV read,
+    // whose Require will transition it out of COPY_DEST).
+    ResourceStateTracker tracker(s_D3D12v8);
+    tracker.Require(src, D3D12_RESOURCE_STATE_COPY_SOURCE);
+    tracker.Require(dst, D3D12_RESOURCE_STATE_COPY_DEST);
+
+    // Per-subresource reinterpret copy: scratch texel (RGBA32_UINT) ↦ one BC6H 4×4 block.
+    // Matches EnvMapBaker.cpp:623-628 (copyTexture per mip × face).
+    for (uint32_t m = 0; m < ed->mipLevels; ++m)
+        for (uint32_t f = 0; f < ed->arraySize; ++f)
+        {
+            // subresource = MipSlice + ArraySlice*MipLevels + PlaneSlice*MipLevels*ArraySize
+            // (PlaneSlice 0). Same as D3D12CalcSubresource, inlined to avoid the d3dx12 dependency.
+            const UINT sub = m + f * ed->mipLevels;
+            D3D12_TEXTURE_COPY_LOCATION dstLoc = {};
+            dstLoc.pResource        = dst;
+            dstLoc.Type             = D3D12_TEXTURE_COPY_TYPE_SUBRESOURCE_INDEX;
+            dstLoc.SubresourceIndex = sub;
+            D3D12_TEXTURE_COPY_LOCATION srcLoc = {};
+            srcLoc.pResource        = src;
+            srcLoc.Type             = D3D12_TEXTURE_COPY_TYPE_SUBRESOURCE_INDEX;
+            srcLoc.SubresourceIndex = sub;
+            cmdList->CopyTextureRegion(&dstLoc, 0, 0, 0, &srcLoc, nullptr);
+        }
+
+    tracker.Notify(src, D3D12_RESOURCE_STATE_COPY_SOURCE);
+    tracker.Notify(dst, D3D12_RESOURCE_STATE_COPY_DEST);
+}
+
+extern "C" UnityRenderingEventAndData UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API
+NR_GetBC6HCopyEventFunc()
+{
+    return BC6HCopyCallback;
+}
+
+extern "C" uint32_t UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API
+NR_GetBC6HCopyEventDataSize()
+{
+    return static_cast<uint32_t>(sizeof(BC6HCopy_RenderEventData));
+}
+
+// ===========================================================================
 // RasterShader  -  generic graphics pipeline (vs_6_x + ps_6_x)
 // ===========================================================================
 

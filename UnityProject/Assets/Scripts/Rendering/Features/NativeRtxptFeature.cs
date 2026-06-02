@@ -80,6 +80,7 @@ namespace PathTracing
         public NativeComputeShader baseLayerCs;
         public NativeComputeShader mipReduceCs;
         public NativeComputeShader envMapImportanceBakerCs;
+        public NativeComputeShader bc6uCompressCs;
         public NativeComputeShader envLightsBackupPastCs;
         public NativeComputeShader envLightsSubdivideBaseCs;
         public NativeComputeShader envLightsSubdivideBoostCs;
@@ -156,7 +157,7 @@ namespace PathTracing
                 renderPassEvent = renderPassEvent,
             };
 
-            _envMapBakerPass ??= new NativeRtxptEnvMapBakerPass(baseLayerCs, mipReduceCs, envMapImportanceBakerCs)
+            _envMapBakerPass ??= new NativeRtxptEnvMapBakerPass(baseLayerCs, mipReduceCs, envMapImportanceBakerCs, bc6uCompressCs)
             {
                 renderPassEvent = renderPassEvent,
             };
@@ -962,6 +963,7 @@ namespace PathTracing
             baseLayerCs             = LoadCs($"{distantRoot}/BaseLayerCS");
             mipReduceCs             = LoadCs($"{distantRoot}/MIPReduceCS");
             envMapImportanceBakerCs = LoadCs($"{distantRoot}/EnvMapImportanceSamplingBaker");
+            bc6uCompressCs          = LoadCs($"{distantRoot}/BC6UCompress");
 
             resetLightProxyCountersCs     = LoadCs($"{lightRoot}/ResetLightProxyCounters");
             resetPastToCurrentHistoryCs   = LoadCs($"{lightRoot}/ResetPastToCurrentHistory");

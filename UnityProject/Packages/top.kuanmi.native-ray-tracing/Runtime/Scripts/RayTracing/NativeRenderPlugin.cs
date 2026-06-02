@@ -596,6 +596,43 @@ namespace NativeRender
         }
 
         // -------------------------------------------------------------------
+        // BC6H cubemap API  (plugin-owned compressed env cube + reinterpret copy)
+        // -------------------------------------------------------------------
+
+        /// <summary>Creates a BC6H_UFLOAT TextureCube (6 faces, <paramref name="mipLevels"/> mips)
+        /// committed resource. Returns the raw ID3D12Resource* (bindable like a Unity texture ptr),
+        /// or IntPtr.Zero on failure. Release via <see cref="NR_DestroyBC6HCube"/>.</summary>
+        [DllImport(DllName)]
+        public static extern IntPtr NR_CreateBC6HCube(uint dim, uint mipLevels);
+
+        /// <summary>Defer-releases a BC6H cube created by <see cref="NR_CreateBC6HCube"/>.</summary>
+        [DllImport(DllName)]
+        public static extern void NR_DestroyBC6HCube(IntPtr handle);
+
+        /// <summary>Returns the render event callback that reinterpret-copies the RGBA32_UINT scratch
+        /// cube into the BC6H cube (per subresource). Pass a pinned <see cref="BC6HCopy_RenderEventData"/>
+        /// to <c>CommandBuffer.IssuePluginEventAndData</c>.</summary>
+        [DllImport(DllName)]
+        public static extern IntPtr NR_GetBC6HCopyEventFunc();
+
+        /// <summary>Returns sizeof(BC6HCopy_RenderEventData) for buffer allocation.</summary>
+        [DllImport(DllName)]
+        public static extern uint NR_GetBC6HCopyEventDataSize();
+
+        /// <summary>
+        /// Event data for <see cref="NR_GetBC6HCopyEventFunc"/>. Must match C++
+        /// BC6HCopy_RenderEventData exactly (Pack=4, 24 bytes).
+        /// </summary>
+        [StructLayout(LayoutKind.Sequential, Pack = 4)]
+        public struct BC6HCopy_RenderEventData
+        {
+            public ulong srcScratch; // ID3D12Resource* RGBA32_UINT scratch cube
+            public ulong dstBC6H;    // ID3D12Resource* BC6H cube
+            public uint  mipLevels;
+            public uint  arraySize;  // 6 for a cube
+        }
+
+        // -------------------------------------------------------------------
         // RasterShader API  (generic graphics pipeline, vs_6_x + ps_6_x)
         // -------------------------------------------------------------------
 
