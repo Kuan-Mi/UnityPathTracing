@@ -23,7 +23,7 @@ EditorBuildSettings:
   - enabled: 0
     path: Assets/Art/transparent-machines/transparent-machines.unity
     guid: b47e9c043d27f844e8f3b92f7f727614
-  - enabled: 1
+  - enabled: 0
     path: Assets/Art/transparentMachines.unity
     guid: 30242e4fa57dbf3429ccbfc3f5ec4a82
   - enabled: 0

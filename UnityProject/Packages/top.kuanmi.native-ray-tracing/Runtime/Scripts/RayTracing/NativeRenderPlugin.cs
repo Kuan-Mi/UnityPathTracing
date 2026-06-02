@@ -783,12 +783,23 @@ namespace NativeRender
             private const string DllName = "ShaderCompilerPlugin";
 
             /// <summary>
+            /// Directory where DXC writes separate shader PDBs (debug symbols). Compiling with
+            /// debug info (-Zi) but without -Qembed_debug keeps the DXIL blob — and therefore the
+            /// serialized asset and the player build — small, while PIX still resolves symbols from
+            /// the PDBs in this folder (add it to PIX's symbol search path). Compilation only runs
+            /// at editor import time, so this resolves relative to the project root.
+            /// </summary>
+            public static string PdbOutputDir =>
+                System.IO.Path.GetFullPath(System.IO.Path.Combine(Application.dataPath, "..", "ShaderPDB"));
+
+            /// <summary>
             /// Compiles the HLSL file at <paramref name="hlslPath"/> to DXIL bytecode.
             /// On success returns true and sets <paramref name="outBytes"/> / <paramref name="outSize"/>;
             /// the caller must free the buffer with <see cref="NR_SC_Free"/>.
             /// <paramref name="includeDirs"/> may be null or semicolon-separated paths.
             /// <paramref name="extraArgs"/> may be null or semicolon-separated additional DXC arguments
             /// (e.g. "-disable-payload-qualifiers").
+            /// <paramref name="pdbOutDir"/> may be null/empty; when set, the separate PDB is written there.
             /// </summary>
             [DllImport(DllName)]
             public static extern bool NR_SC_Compile(
@@ -797,6 +808,7 @@ namespace NativeRender
                 [MarshalAs(UnmanagedType.LPStr)] string includeDirs,
                 [MarshalAs(UnmanagedType.LPStr)] string defines,
                 [MarshalAs(UnmanagedType.LPStr)] string extraArgs,
+                [MarshalAs(UnmanagedType.LPStr)] string pdbOutDir,
                 out IntPtr outBytes,
                 out uint outSize);
 
@@ -843,6 +855,7 @@ namespace NativeRender
                 [MarshalAs(UnmanagedType.LPStr)] string includeDirs,
                 [MarshalAs(UnmanagedType.LPStr)] string defines,
                 [MarshalAs(UnmanagedType.LPStr)] string extraArgs,
+                [MarshalAs(UnmanagedType.LPStr)] string pdbOutDir,
                 out IntPtr outBytes,
                 out uint outSize);
         }

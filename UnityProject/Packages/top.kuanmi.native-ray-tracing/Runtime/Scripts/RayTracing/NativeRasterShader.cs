@@ -101,6 +101,7 @@ namespace NativeRender
         {
             bool ok = NativeRenderPlugin.ShaderCompilerPlugin.NR_SC_CompileCS(
                 hlslPath, entry, target, includeDirs, defines, extraArgs,
+                NativeRenderPlugin.ShaderCompilerPlugin.PdbOutputDir,
                 out IntPtr nativePtr, out uint nativeSize);
             if (!ok || nativePtr == IntPtr.Zero || nativeSize == 0)
             {

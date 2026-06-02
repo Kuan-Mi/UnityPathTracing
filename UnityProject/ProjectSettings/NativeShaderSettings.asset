@@ -7,7 +7,6 @@
         "../RenderingPlugin/External/NRD/Shaders"
     ],
     "globalExtraArgs": [
-        "-Zi",
-        "-Qembed_debug"
+        "-Zi"
     ]
 }

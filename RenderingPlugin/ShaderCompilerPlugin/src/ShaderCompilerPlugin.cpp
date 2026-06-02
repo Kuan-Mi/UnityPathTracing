@@ -5,7 +5,7 @@
  * Integrates IUnityLog for in-Editor log output when loaded by Unity.
  *
  * Exported API:
- *   bool  NR_SC_Compile(hlslPath, targetProfile, includeDirs, defines, extraArgs, outBytes*, outSize*) – compile HLSL to DXIL
+ *   bool  NR_SC_Compile(hlslPath, targetProfile, includeDirs, defines, extraArgs, pdbOutDir, outBytes*, outSize*) – compile HLSL to DXIL (writes a separate PDB into pdbOutDir when set)
  *   void  NR_SC_Free(ptr)                                           – free the output buffer
  *   (Unity lifecycle) UnityPluginLoad / UnityPluginUnload
  */
@@ -167,7 +167,9 @@ ComPtr<IDxcBlob> ShaderCompilerPlugin::CompileShader(
     const std::wstring& target,
     const std::vector<std::wstring>& defines,
     const std::vector<std::wstring>& includeDirs,
-    const std::vector<std::wstring>& extraArgs)
+    const std::vector<std::wstring>& extraArgs,
+    ComPtr<IDxcBlob>* outPdb,
+    std::wstring* outPdbName)
 {
     ComPtr<IDxcBlobEncoding> sourceBlob;
     HRESULT hr = m_dxcUtils->CreateBlob(
@@ -255,6 +257,19 @@ ComPtr<IDxcBlob> ShaderCompilerPlugin::CompileShader(
 
     ComPtr<IDxcBlob> shaderBlob;
     result->GetResult(&shaderBlob);
+
+    // Separate PDB: when the caller wants it and the shader carries debug info (-Zi) without
+    // -Qembed_debug, DXC exposes a standalone PDB plus a hash-based file name. The shader object
+    // above stays lean (only a debug-name reference), keeping the serialized blob / build small.
+    if (outPdb)
+    {
+        ComPtr<IDxcBlobUtf16> pdbName;
+        HRESULT pdbHr = result->GetOutput(
+            DXC_OUT_PDB, IID_PPV_ARGS(outPdb->GetAddressOf()), pdbName.GetAddressOf());
+        if (SUCCEEDED(pdbHr) && outPdbName && pdbName && pdbName->GetStringLength() > 0)
+            *outPdbName = pdbName->GetStringPointer();
+    }
+
     return shaderBlob;
 }
 
@@ -307,6 +322,24 @@ static std::vector<std::wstring> ParseIncludeDirs(const char* shaderPath, const 
     return dirs;
 }
 
+// Writes a DXC-produced PDB blob to <dir>/<dxcName>. The name is DXC's hash-based PDB file
+// name, which PIX uses to match the shader to its symbols via its symbol search path.
+static bool WritePdbFile(const std::wstring& dir, const std::wstring& name, IDxcBlob* pdb)
+{
+    if (!pdb || dir.empty() || name.empty()) return false;
+
+    std::error_code ec;
+    std::filesystem::create_directories(dir, ec);
+
+    std::filesystem::path full = std::filesystem::path(dir) / name;
+    std::ofstream out(full, std::ios::binary);
+    if (!out.is_open()) return false;
+
+    out.write(static_cast<const char*>(pdb->GetBufferPointer()),
+              static_cast<std::streamsize>(pdb->GetBufferSize()));
+    return out.good();
+}
+
 // ---------------------------------------------------------------------------
 // Module-level ShaderCompilerPlugin instance (initialized once on first use)
 // ---------------------------------------------------------------------------
@@ -336,6 +369,7 @@ bool NR_SC_Compile(
     const char* includeDirs,
     const char* defines,
     const char* extraArgs,
+    const char* pdbOutDir,
     uint8_t**   outBytes,
     uint32_t*   outSize)
 {
@@ -375,13 +409,31 @@ bool NR_SC_Compile(
         ? std::wstring(targetProfile, targetProfile + strlen(targetProfile))
         : L"lib_6_9";
 
+    const bool wantPdb = pdbOutDir && pdbOutDir[0] != '\0';
+    ComPtr<IDxcBlob> pdbBlob;
+    std::wstring     pdbName;
+
     ComPtr<IDxcBlob> blob = s_Plugin.CompileShader(
-        source.c_str(), L"", targetProfileW.c_str(), defs, dirs, dxcArgs);
+        source.c_str(), L"", targetProfileW.c_str(), defs, dirs, dxcArgs,
+        wantPdb ? &pdbBlob : nullptr, wantPdb ? &pdbName : nullptr);
 
     if (!blob)
     {
         SCLogError("NR_SC_Compile: compilation failed");
         return false;
+    }
+
+    if (wantPdb)
+    {
+        if (pdbBlob && !pdbName.empty())
+        {
+            if (!WritePdbFile(Utf8ToWide(pdbOutDir), pdbName, pdbBlob.Get()))
+                SCLogWarn("NR_SC_Compile: failed to write PDB file");
+        }
+        else
+        {
+            SCLogWarn("NR_SC_Compile: PDB requested but none produced (need -Zi without -Qembed_debug)");
+        }
     }
 
     const SIZE_T size = blob->GetBufferSize();
@@ -412,6 +464,7 @@ bool NR_SC_CompileCS(
     const char* includeDirs,
     const char* defines,
     const char* extraArgs,
+    const char* pdbOutDir,
     uint8_t**   outBytes,
     uint32_t*   outSize)
 {
@@ -460,13 +513,31 @@ bool NR_SC_CompileCS(
     std::wstring wEntry  = Utf8ToWide(entryPoint);
     std::wstring wTarget = Utf8ToWide(target);
 
+    const bool wantPdb = pdbOutDir && pdbOutDir[0] != '\0';
+    ComPtr<IDxcBlob> pdbBlob;
+    std::wstring     pdbName;
+
     ComPtr<IDxcBlob> blob = s_Plugin.CompileShader(
-        source.c_str(), wEntry, wTarget, defs, dirs, dxcArgs);
+        source.c_str(), wEntry, wTarget, defs, dirs, dxcArgs,
+        wantPdb ? &pdbBlob : nullptr, wantPdb ? &pdbName : nullptr);
 
     if (!blob)
     {
         SCLogError("NR_SC_CompileCS: compilation failed");
         return false;
+    }
+
+    if (wantPdb)
+    {
+        if (pdbBlob && !pdbName.empty())
+        {
+            if (!WritePdbFile(Utf8ToWide(pdbOutDir), pdbName, pdbBlob.Get()))
+                SCLogWarn("NR_SC_CompileCS: failed to write PDB file");
+        }
+        else
+        {
+            SCLogWarn("NR_SC_CompileCS: PDB requested but none produced (need -Zi without -Qembed_debug)");
+        }
     }
 
     const SIZE_T size = blob->GetBufferSize();

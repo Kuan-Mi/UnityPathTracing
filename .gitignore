@@ -13,6 +13,7 @@ UnityProject/Builds/
 UnityProject/Logs/
 UnityProject/UserSettings/
 UnityProject/ProfilerCaptures/
+UnityProject/ShaderPDB/
 UnityProject/*.sln
 UnityProject/*.csproj
 
