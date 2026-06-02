@@ -15,7 +15,7 @@ namespace PathTracing
     /// The version number (first ctor arg) must be bumped whenever the import logic changes so Unity
     /// re-imports existing assets.
     /// </summary>
-    [ScriptedImporter(1, "material.json")]
+    [ScriptedImporter(2, "material.json")]
     public class RtxptMaterialJsonImporter : ScriptedImporter
     {
         [Tooltip("Project-relative folder the texture 'path' fields are resolved against.\n" +
