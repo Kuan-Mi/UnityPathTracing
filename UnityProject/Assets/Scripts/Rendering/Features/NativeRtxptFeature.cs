@@ -80,6 +80,7 @@ namespace PathTracing
         public NativeComputeShader baseLayerCs;
         public NativeComputeShader mipReduceCs;
         public NativeComputeShader envMapImportanceBakerCs;
+        public NativeComputeShader mipMapGenCs; // mipmapgen_cs.computeshader (donut MipMapGenPass MODE_COLOR)
         public NativeComputeShader bc6uCompressCs;
         public NativeComputeShader envLightsBackupPastCs;
         public NativeComputeShader envLightsSubdivideBaseCs;
@@ -157,7 +158,7 @@ namespace PathTracing
                 renderPassEvent = renderPassEvent,
             };
 
-            _envMapBakerPass ??= new NativeRtxptEnvMapBakerPass(baseLayerCs, mipReduceCs, envMapImportanceBakerCs, bc6uCompressCs)
+            _envMapBakerPass ??= new NativeRtxptEnvMapBakerPass(baseLayerCs, mipReduceCs, envMapImportanceBakerCs, mipMapGenCs, bc6uCompressCs)
             {
                 renderPassEvent = renderPassEvent,
             };
@@ -963,6 +964,7 @@ namespace PathTracing
             baseLayerCs             = LoadCs($"{distantRoot}/BaseLayerCS");
             mipReduceCs             = LoadCs($"{distantRoot}/MIPReduceCS");
             envMapImportanceBakerCs = LoadCs($"{distantRoot}/EnvMapImportanceSamplingBaker");
+            mipMapGenCs             = LoadCs($"{distantRoot}/mipmapgen_cs");
             bc6uCompressCs          = LoadCs($"{distantRoot}/BC6UCompress");
 
             resetLightProxyCountersCs     = LoadCs($"{lightRoot}/ResetLightProxyCounters");

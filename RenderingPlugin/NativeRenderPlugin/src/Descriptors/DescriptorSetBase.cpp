@@ -456,8 +456,54 @@ void DescriptorSetBase<ShaderT>::RequestResourceStates(
 
     auto slotOf = [&](uint32_t i) -> BindingSlot { return (i < slotCount) ? slots[i] : BindingSlot{}; };
 
+    m_subresReadBarriers.clear();
+
+    // Resources bound as a UAV in this dispatch. An SRV that targets one of these is
+    // the same-resource SRV+UAV case (donut mipmapgen): it must be handled with manual
+    // per-subresource barriers rather than a conflicting whole-resource Require.
+    auto boundAsUAV = [&](ID3D12Resource* res) -> bool {
+        if (!res) return false;
+        for (uint32_t j : m_idxUAV)
+            if (ResolveBoundResource(slotOf(j)) == res) return true;
+        for (uint32_t j : m_idxUAVArray)
+        {
+            const BindingSlot s = slotOf(j);
+            if (s.objectKind == BindingObjectKind::BindlessUAVTexture && s.objectPtr)
+            {
+                auto* bt = reinterpret_cast<BindlessUAVTexture*>(s.objectPtr);
+                for (uint32_t k = 0; k < bt->Capacity(); ++k)
+                    if (bt->GetTexture(k) == res) return true;
+            }
+        }
+        return false;
+    };
+
     for (uint32_t i : m_idxSRV)
-        m_tracker.Require(ResolveBoundResource(slotOf(i)), m_srvReadState);
+    {
+        const BindingSlot slot = slotOf(i);
+        ID3D12Resource*   res  = ResolveBoundResource(slot);
+        if (boundAsUAV(res))
+        {
+            // Keep |res| in UNORDERED_ACCESS (the UAV Require below does that) and
+            // transition only the SRV-read mip(s) per-subresource in the Dispatch.
+            // slot.stride = MostDetailedMip, slot.count = MipLevels (0 => 1 read mip).
+            D3D12_RESOURCE_DESC rd = res->GetDesc();
+            const UINT mipLevels   = rd.MipLevels ? rd.MipLevels : 1;
+            const UINT arraySlices = (rd.Dimension == D3D12_RESOURCE_DIMENSION_TEXTURE3D)
+                                   ? 1 : (rd.DepthOrArraySize ? rd.DepthOrArraySize : 1);
+            const UINT firstMip    = slot.stride;
+            const UINT mipCount    = slot.count ? slot.count : 1;
+            for (UINT a = 0; a < arraySlices; ++a)
+            {
+                // D3D12 subresource index = mip + arraySlice*mipLevels + plane*mipLevels*arraySize
+                // (plane 0 for these color formats) — computed inline to avoid the d3dx12 helper.
+                const UINT firstSub = firstMip + a * mipLevels;
+                m_subresReadBarriers.push_back({ res, firstSub, mipCount });
+            }
+            continue;  // do NOT Require(SHADER_RESOURCE) on the whole resource
+        }
+        m_tracker.Require(res, m_srvReadState);
+    }
 
     for (uint32_t i : m_idxRootSRV)
     {
@@ -539,6 +585,55 @@ void DescriptorSetBase<ShaderT>::NotifyResourceStates(
                 m_tracker.Notify(bt->GetTexture(k), D3D12_RESOURCE_STATE_UNORDERED_ACCESS, /*uavAccess=*/true);
         }
     }
+}
+
+// ===========================================================================
+// EmitSubresourceReadBarriers / RestoreSubresourceUAVStates
+//   Balanced manual per-subresource barriers for the same-resource SRV+UAV case
+//   (donut mipmapgen). The resource is in UNORDERED_ACCESS (RequestResourceStates
+//   kept it there); we flip only the SRV-read subresource(s) to the read state for
+//   the dispatch, then flip them back so Unity's per-resource tracker — which still
+//   believes the resource is UNORDERED_ACCESS — stays correct. Both directions emit
+//   one transition barrier per subresource (no ALL_SUBRESOURCES, so the UAV mips are
+//   untouched and the writer/reader split is honoured within the resource).
+// ===========================================================================
+
+template<typename ShaderT>
+void DescriptorSetBase<ShaderT>::EmitSubresourceReadBarriers(ID3D12GraphicsCommandList* cmd)
+{
+    if (!cmd || m_subresReadBarriers.empty()) return;
+    std::vector<D3D12_RESOURCE_BARRIER> bars;
+    for (const auto& b : m_subresReadBarriers)
+        for (UINT k = 0; k < b.subCount; ++k)
+        {
+            D3D12_RESOURCE_BARRIER rb = {};
+            rb.Type                   = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
+            rb.Transition.pResource   = b.res;
+            rb.Transition.Subresource = b.firstSub + k;
+            rb.Transition.StateBefore = D3D12_RESOURCE_STATE_UNORDERED_ACCESS;
+            rb.Transition.StateAfter  = m_srvReadState;
+            bars.push_back(rb);
+        }
+    if (!bars.empty()) cmd->ResourceBarrier((UINT)bars.size(), bars.data());
+}
+
+template<typename ShaderT>
+void DescriptorSetBase<ShaderT>::RestoreSubresourceUAVStates(ID3D12GraphicsCommandList* cmd)
+{
+    if (!cmd || m_subresReadBarriers.empty()) return;
+    std::vector<D3D12_RESOURCE_BARRIER> bars;
+    for (const auto& b : m_subresReadBarriers)
+        for (UINT k = 0; k < b.subCount; ++k)
+        {
+            D3D12_RESOURCE_BARRIER rb = {};
+            rb.Type                   = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
+            rb.Transition.pResource   = b.res;
+            rb.Transition.Subresource = b.firstSub + k;
+            rb.Transition.StateBefore = m_srvReadState;
+            rb.Transition.StateAfter  = D3D12_RESOURCE_STATE_UNORDERED_ACCESS;
+            bars.push_back(rb);
+        }
+    if (!bars.empty()) cmd->ResourceBarrier((UINT)bars.size(), bars.data());
 }
 
 // ===========================================================================

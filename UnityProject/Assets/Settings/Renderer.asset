@@ -134,6 +134,7 @@ MonoBehaviour:
   baseLayerCs: {fileID: -2368575503658470205, guid: 106bca701da24f7a9ed113d910f8393d, type: 3}
   mipReduceCs: {fileID: -2368575503658470205, guid: eab7ad2cc6ec40e4889e152e2958e911, type: 3}
   envMapImportanceBakerCs: {fileID: -2368575503658470205, guid: 160f5c1d357e92a4eb92eb09a58ba1b7, type: 3}
+  mipMapGenCs: {fileID: -2368575503658470205, guid: 9f2c7b41e6a84d3590b1c8e2f0a7d6b3, type: 3}
   bc6uCompressCs: {fileID: -2368575503658470205, guid: 66a8214e3c7589348a61934a0b724a55, type: 3}
   envLightsBackupPastCs: {fileID: -2368575503658470205, guid: cf73e6cf697e4f138478b7b3025711ef, type: 3}
   envLightsSubdivideBaseCs: {fileID: -2368575503658470205, guid: 55fd78dd2602429aa3889925f4f08b7f, type: 3}

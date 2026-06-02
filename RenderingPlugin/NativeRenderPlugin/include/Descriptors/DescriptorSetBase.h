@@ -68,6 +68,24 @@ protected:
     void RequestResourceStates(const BindingSlot* slots, uint32_t slotCount);
     void NotifyResourceStates (const BindingSlot* slots, uint32_t slotCount);
 
+    // --- Per-subresource SRV+UAV on the same resource (donut mipmapgen pattern) ---
+    // Unity's IUnityGraphicsD3D12 tracks state PER RESOURCE, so a resource bound as
+    // an SRV on one mip and a UAV on other mips within the same dispatch cannot be
+    // expressed through the tracker (one whole-resource state). RequestResourceStates
+    // detects that case: it keeps the resource in UNORDERED_ACCESS (via the UAV
+    // binding) and records the SRV-read subresources here instead of requesting
+    // SHADER_RESOURCE on the whole resource. The compute Dispatch then brackets the
+    // GPU dispatch with manual, balanced per-subresource barriers — transitioning
+    // just the SRV mip(s) UAV->read before, and read->UAV after — so the resource is
+    // handed back to Unity in exactly the UNORDERED_ACCESS state the tracker believes
+    // it is in. This is the ONLY place the plugin issues its own ResourceBarrier; it
+    // is balanced within one Dispatch so it never desyncs Unity's per-resource map.
+    struct SubresReadBarrier { ID3D12Resource* res; UINT firstSub; UINT subCount; };
+    std::vector<SubresReadBarrier> m_subresReadBarriers;  // filled by RequestResourceStates
+
+    void EmitSubresourceReadBarriers (ID3D12GraphicsCommandList* cmd);  // UAV  -> m_srvReadState
+    void RestoreSubresourceUAVStates (ID3D12GraphicsCommandList* cmd);  // read -> UAV
+
     // Build the per-type binding index lists (and size the view cache) once.
     // The reflection in m_shader is immutable for the lifetime of this object
     // (a hot-reload destroys and recreates the descriptor set), so the lists are

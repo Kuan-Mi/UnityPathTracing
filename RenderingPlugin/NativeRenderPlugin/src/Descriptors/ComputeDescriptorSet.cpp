@@ -17,8 +17,10 @@ void ComputeDescriptorSet::Dispatch(
     WriteDescriptors(slots, slotCount, srvBase, uavBase);
 
     cmdList->SetPipelineState(m_shader->GetPSO());
-    RequestResourceStates(slots, slotCount);
+    RequestResourceStates(slots, slotCount);                 // may record per-subresource SRV reads
     BindRootParams(cmdList, slots, slotCount, srvBase, uavBase);
+    EmitSubresourceReadBarriers(cmdList);                    // UAV -> read on the SRV mip(s), if any
     cmdList->Dispatch(threadGroupX, threadGroupY, threadGroupZ);
+    RestoreSubresourceUAVStates(cmdList);                    // read -> UAV (hand back as Unity expects)
     NotifyResourceStates(slots, slotCount);
 }

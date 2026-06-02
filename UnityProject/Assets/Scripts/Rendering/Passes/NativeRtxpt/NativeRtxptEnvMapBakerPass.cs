@@ -33,6 +33,14 @@ namespace PathTracing
         private const          int BaseLayerGroupsXY       = (CubeDim / 2 + 7) / 8;
         private const          int ImportanceBakerGroupsXY = (ImportanceMapDim + 15) / 16;
 
+        // donut MipMapGenPass constants (mipmapgen_cb.h): GROUP_SIZE / NUM_LODS / MAX_PASSES. The
+        // importance & radiance map mip chains are built with the ORIGINAL donut mipmapgen_cs shader
+        // (mipmapgen_cs.computeshader) — SRV input mip + bounded UAV output-mip array — instead of
+        // Unity's cmd.GenerateMips, so the chains are bit-identical to RTXPT (which uses this exact pass).
+        private const int kGroupSize = 16;
+        private const int kNumLods   = 4;
+        private const int kMaxPasses = 4;
+
         // Mirrors the original EnvMapBaker defaults (EnvMapBaker.h): m_BC6UCompressionEnabled = true
         // and m_compressionQuality = 1 (Fast / P1-only). When on, the baked RGBA16F cube is
         // BC6H-compressed (BC6UCompress CS → RGBA32_UINT scratch → reinterpret-copy into a BC6H
@@ -73,6 +81,16 @@ namespace PathTracing
             public       uint  CubeDim, CubeDimLowRes, ProcSkyEnabled, BackgroundSourceType;
         }
 
+        // donut MipmmapGenConstants (mipmapgen_cb.h): { uint dispatch; uint numLODs; uint padding[2]; }.
+        // Bound as root constants for mipmapgen_cs.computeshader (varies per pass).
+        [StructLayout(LayoutKind.Sequential)]
+        private struct MipMapGenCB
+        {
+            public uint dispatch; // pass index (unused by MODE_COLOR; kept for donut layout parity)
+            public uint numLODs; // output mips this pass (1..NUM_LODS)
+            public uint pad0, pad1;
+        }
+
         // Mirrors HLSL EnvMapImportanceSamplingBakerConstants (EnvMapImportanceSamplingBaker.hlsl)
         [StructLayout(LayoutKind.Sequential, Pack = 4)]
         private struct ImportanceBakerCB
@@ -85,8 +103,8 @@ namespace PathTracing
             public uint  ImportanceMapBaseMip;
         }
 
-        internal static unsafe int EnvBakerCbSize => sizeof(EnvMapBakerCB);
-        internal static int ImportanceBakerCbSize => System.Runtime.InteropServices.Marshal.SizeOf<ImportanceBakerCB>();
+        internal static unsafe int EnvBakerCbSize        => sizeof(EnvMapBakerCB);
+        internal static        int ImportanceBakerCbSize => System.Runtime.InteropServices.Marshal.SizeOf<ImportanceBakerCB>();
 
         private readonly NativeComputePipeline      _baseLayerCs;
         private readonly NativeComputeDescriptorSet _baseLayerDs;
@@ -94,16 +112,18 @@ namespace PathTracing
         private readonly NativeComputeDescriptorSet _mipReduceDs;
         private readonly NativeComputePipeline      _importanceBakerCs;
         private readonly NativeComputeDescriptorSet _importanceBakerDs;
-        private readonly NativeComputePipeline      _bc6uCompressCs;   // null when compression disabled / shader missing
+        private readonly NativeComputePipeline      _mipMapGenCs; // donut mipmapgen_cs (importance/radiance mip chains)
+        private readonly NativeComputeDescriptorSet _mipMapGenDs; // reused over ≤3 passes × 2 maps = 6 dispatches (< ring depth 8)
+        private readonly NativeComputePipeline      _bc6uCompressCs; // null when compression disabled / shader missing
         private readonly NativeComputeDescriptorSet _bc6uCompressDs;
 
         // Pinned ring for the BC6H copy plugin-event payload. The data must stay alive until the
         // render thread consumes the event, so it lives in persistent storage (mirrors the dispatch
         // header ring in NativeComputeDescriptorSet). The bake runs at most once per frame, so a
         // few slots is ample.
-        private const int CopyRingSize = 3;
-        private NativeArray<NativeRenderPlugin.BC6HCopy_RenderEventData>[] _copyRing;
-        private int _copyRingIdx;
+        private const int                                                        CopyRingSize = 3;
+        private       NativeArray<NativeRenderPlugin.BC6HCopy_RenderEventData>[] _copyRing;
+        private       int                                                        _copyRingIdx;
 
         private static EnvMapBakerCB     s_envBakerCb;
         private static ImportanceBakerCB s_importanceCb;
@@ -115,7 +135,7 @@ namespace PathTracing
         // skipped this frame. Mirrors the original EnvMapBaker::Update contentsChanged early-out.
         private bool _skipBake;
 
-        public NativeRtxptEnvMapBakerPass(NativeComputeShader baseLayerCs, NativeComputeShader mipReduceCs, NativeComputeShader importanceBakerCs, NativeComputeShader bc6uCompressCs = null)
+        public NativeRtxptEnvMapBakerPass(NativeComputeShader baseLayerCs, NativeComputeShader mipReduceCs, NativeComputeShader importanceBakerCs, NativeComputeShader mipMapGenCs, NativeComputeShader bc6uCompressCs = null)
         {
             _baseLayerCs       = new NativeComputePipeline(baseLayerCs);
             _baseLayerDs       = new NativeComputeDescriptorSet(_baseLayerCs);
@@ -123,6 +143,8 @@ namespace PathTracing
             _mipReduceDs       = new NativeComputeDescriptorSet(_mipReduceCs);
             _importanceBakerCs = new NativeComputePipeline(importanceBakerCs);
             _importanceBakerDs = new NativeComputeDescriptorSet(_importanceBakerCs);
+            _mipMapGenCs       = new NativeComputePipeline(mipMapGenCs);
+            _mipMapGenDs       = new NativeComputeDescriptorSet(_mipMapGenCs);
 
             if (EnableBC6UCompression && bc6uCompressCs != null)
             {
@@ -143,12 +165,15 @@ namespace PathTracing
             _mipReduceCs?.Dispose();
             _importanceBakerDs?.Dispose();
             _importanceBakerCs?.Dispose();
+            _mipMapGenDs?.Dispose();
+            _mipMapGenCs?.Dispose();
             _bc6uCompressDs?.Dispose();
             _bc6uCompressCs?.Dispose();
             if (_copyRing != null)
             {
                 for (int i = 0; i < CopyRingSize; i++)
-                    if (_copyRing[i].IsCreated) _copyRing[i].Dispose();
+                    if (_copyRing[i].IsCreated)
+                        _copyRing[i].Dispose();
                 _copyRing = null;
             }
         }
@@ -226,6 +251,10 @@ namespace PathTracing
             internal NativeComputeDescriptorSet MipReduceDs;
             internal NativeComputePipeline      ImportanceBakerCs;
             internal NativeComputeDescriptorSet ImportanceBakerDs;
+            internal NativeComputePipeline      MipMapGenCs;
+            internal NativeComputeDescriptorSet MipMapGenDs;
+            internal int                        ImportanceMapMips;
+            internal int                        RadianceMapMips;
             internal VolatileConstantBuffer     EnvBakerCb;
             internal VolatileConstantBuffer     ImportanceBakerCb;
             internal EnvMapBakerCB              EnvBakerCbData;
@@ -262,19 +291,23 @@ namespace PathTracing
             pd.MipReduceDs       = _mipReduceDs;
             pd.ImportanceBakerCs = _importanceBakerCs;
             pd.ImportanceBakerDs = _importanceBakerDs;
+            pd.MipMapGenCs       = _mipMapGenCs;
+            pd.MipMapGenDs       = _mipMapGenDs;
             pd.EnvBakerCb        = _ctx.Buffers.EnvBakerCb;
             pd.ImportanceBakerCb = _ctx.Buffers.ImportanceBakerCb;
             pd.EnvBakerCbData    = s_envBakerCb;
             pd.ImportanceCbData  = s_importanceCb;
             var skyTex = _ctx.Setting?.environmentMap;
-            pd.SkyTexturePtr    = skyTex != null ? skyTex.GetNativeTexturePtr() : _ctx.blackTexturePtr;
-            pd.EnvCubePtr       = _ctx.Textures.EnvCubemap.NativePtr;
-            pd.ImportanceMapPtr = _ctx.Textures.EnvImportanceMap.NativePtr;
-            pd.RadianceMapPtr   = _ctx.Textures.EnvRadianceMap.NativePtr;
-            pd.ImportanceMapRt  = _ctx.Textures.EnvImportanceMap.rt;
-            pd.RadianceMapRt    = _ctx.Textures.EnvRadianceMap.rt;
-            pd.DummyCubePtr     = _ctx.Textures.EnvDummyCube.NativePtr;
-            pd.DummyTex2DPtr    = _ctx.blackTexturePtr;
+            pd.SkyTexturePtr     = skyTex != null ? skyTex.GetNativeTexturePtr() : _ctx.blackTexturePtr;
+            pd.EnvCubePtr        = _ctx.Textures.EnvCubemap.NativePtr;
+            pd.ImportanceMapPtr  = _ctx.Textures.EnvImportanceMap.NativePtr;
+            pd.RadianceMapPtr    = _ctx.Textures.EnvRadianceMap.NativePtr;
+            pd.ImportanceMapRt   = _ctx.Textures.EnvImportanceMap.rt;
+            pd.RadianceMapRt     = _ctx.Textures.EnvRadianceMap.rt;
+            pd.ImportanceMapMips = pd.ImportanceMapRt != null ? pd.ImportanceMapRt.mipmapCount : 0;
+            pd.RadianceMapMips   = pd.RadianceMapRt != null ? pd.RadianceMapRt.mipmapCount : 0;
+            pd.DummyCubePtr      = _ctx.Textures.EnvDummyCube.NativePtr;
+            pd.DummyTex2DPtr     = _ctx.blackTexturePtr;
 
             // BC6H compression: wire the compressor + reinterpret-copy event when enabled and the
             // BC6H cube is available. Staged here (record time) because all inputs are known then.
@@ -379,18 +412,53 @@ namespace PathTracing
                 data.ImportanceBakerCs.Dispatch(cmd, ds, ImportanceBakerGroupsXY, ImportanceBakerGroupsXY, 1);
                 cmd.EndSample(RenderPassMarkers.RtxptEnvMapGenIM);
 
+                // ── Importance & radiance map mip chains via the ORIGINAL donut mipmapgen_cs shader
+                //    (SRV input mip + bounded UAV output-mip array), not Unity's cmd.GenerateMips, so the
+                //    chains are bit-identical to RTXPT's donut MipMapGenPass(MODE_COLOR). Mip 0 is the
+                //    GenIM output above; this fills mips 1..N-1. The native plugin brackets each dispatch
+                //    with balanced per-subresource barriers (mip N read / mips N+1.. UAV on one resource). ──
                 cmd.BeginSample(RenderPassMarkers.RtxptEnvMapMipMapGen);
-                cmd.GenerateMips(data.ImportanceMapRt);
+                GenerateDonutMipChain(cmd, data.MipMapGenCs, data.MipMapGenDs, data.ImportanceMapPtr, ImportanceMapDim, data.ImportanceMapMips);
                 cmd.EndSample(RenderPassMarkers.RtxptEnvMapMipMapGen);
 
                 cmd.BeginSample(RenderPassMarkers.RtxptEnvMapMipMapGen);
-                cmd.GenerateMips(data.RadianceMapRt);
+                GenerateDonutMipChain(cmd, data.MipMapGenCs, data.MipMapGenDs, data.RadianceMapPtr, ImportanceMapDim, data.RadianceMapMips);
                 cmd.EndSample(RenderPassMarkers.RtxptEnvMapMipMapGen);
 
                 cmd.EndSample(RenderPassMarkers.RtxptEnvMapISBake);
             }
 
             cmd.EndSample(RenderPassMarkers.RtxptEnvMapBaker);
+        }
+
+        // donut MipMapGenPass::Dispatch replicated exactly so the generated chain is bit-identical to
+        // RTXPT. Group count = ceil(baseDim / GROUP_SIZE) for EVERY pass (donut over-dispatches; the
+        // out-of-range UAV writes are dropped by D3D12), numLODs = min(mipCount - i*NUM_LODS - 1,
+        // NUM_LODS), at most MAX_PASSES. Pass i reads mip i*NUM_LODS via the t_input SRV and writes mips
+        // i*NUM_LODS+1.. via the u_output UAV array (same resource). mip 0 (the GenIM output) is the
+        // chain's source and is never rewritten here. The native per-subresource barriers (see
+        // ComputeDescriptorSet::Dispatch) make the SRV-read-mip / UAV-write-mips split legal under
+        // Unity's per-resource state tracker.
+        private static unsafe void GenerateDonutMipChain(
+            CommandBuffer cmd, NativeComputePipeline cs, NativeComputeDescriptorSet ds,
+            IntPtr mapPtr, int dim, int mipCount)
+        {
+            if (cs == null || ds == null || mapPtr == IntPtr.Zero || mipCount <= 1) return;
+
+            uint groups = (uint)((dim + kGroupSize - 1) / kGroupSize);
+            for (int i = 0; i < kMaxPasses; i++)
+            {
+                int inputMip = i * kNumLods;
+                if (inputMip >= mipCount) break;
+                int numLODs = Mathf.Min(mipCount - inputMip - 1, kNumLods);
+                if (numLODs <= 0) break;
+
+                var mc = new MipMapGenCB { dispatch = (uint)i, numLODs = (uint)numLODs };
+                ds.SetTexture("t_input", mapPtr, inputMip, 1); // SRV: MostDetailedMip = inputMip, 1 mip
+                ds.SetRWTextureMipArray("u_output", mapPtr, inputMip + 1); // UAV array: mips inputMip+1 .. +NUM_LODS
+                ds.SetRootConstants("c_MipMapgen", &mc, 4);
+                cs.Dispatch(cmd, ds, groups, groups, 1);
+            }
         }
 
         private static unsafe void FillEnvBakerConstants(NativeRtxptSetting setting, Light[] sceneLights)
