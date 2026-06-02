@@ -65,10 +65,10 @@ namespace PathTracing
         // Phase 7: Tone mapping — faithful native replica of RTXPT ToneMappingPasses.cpp, built from the
         // original shaders as thin verbatim #include wrappers: luminance_ps (raster) → native mip reduce
         // → capture_cs → CPU read-back → ToneMapping main_ps (raster).
-        public NativeRasterShader  luminanceRasterShader;   // Luminance.rastershader (= fullscreen_vs + luminance_ps)
-        public NativeComputeShader luminanceMipCs;          // LuminanceMip.computeshader
-        public NativeComputeShader captureLuminanceCs;      // capture_cs.computeshader (= ToneMapping.hlsl capture_cs)
-        public NativeRasterShader  toneMapApplyRasterShader;// ToneMapping.rastershader (= fullscreen_vs + main_ps)
+        public NativeRasterShader  luminanceRasterShader; // Luminance.rastershader (= fullscreen_vs + luminance_ps)
+        public NativeComputeShader luminanceMipCs; // LuminanceMip.computeshader
+        public NativeComputeShader captureLuminanceCs; // capture_cs.computeshader (= ToneMapping.hlsl capture_cs)
+        public NativeRasterShader  toneMapApplyRasterShader; // ToneMapping.rastershader (= fullscreen_vs + main_ps)
 
         // Phase 8
         public NativeComputeShader accumulationCs;
@@ -126,20 +126,23 @@ namespace PathTracing
         private NativeRtxptStablePlanesDebugVizPass   _stablePlanesDebugVizPass;
         private NativeRtxptOutputBlitPass             _outputBlitPass;
 
+
+        private DepthBarrierFixPass _depthBarrierFixPass;
+
         // ---- Shared scene resources -----------------------------------------
         private NativeRtxptGPUScene _gpuScene;
 
         // ---- Per-camera resource pools (key = instanceID + eyeIndex*100000) -
         private readonly Dictionary<long, NativeRtxptTextureResources> _texturePools      = new();
         private readonly Dictionary<long, NativeRtxptBufferResources>  _bufferPools       = new();
-        private readonly Dictionary<long, VolatileConstantBuffer>                _constantBuffers   = new();
+        private readonly Dictionary<long, VolatileConstantBuffer>      _constantBuffers   = new();
         private readonly Dictionary<long, DlrrDenoiser>                _dlrrDenoisers     = new();
         private readonly Dictionary<long, RtxptCameraFrameState>       _cameraFrameStates = new();
 
         // ---- Lifecycle ------------------------------------------------------
 
         public IntPtr blackTexturePtr;
-        
+
         public override void Create()
         {
             setting         ??= new NativeRtxptSetting();
@@ -187,9 +190,9 @@ namespace PathTracing
                     fillStablePlanesShader, referenceShader,
                     fillHitGroups, referenceHitGroups)
                 { renderPassEvent = renderPassEvent };
-            _denoisingGuidesBakePass  ??= new NativeRtxptDenoisingGuidesBakePass(denoiseSpecHitTCs) { renderPassEvent       = renderPassEvent };
-            _dlssRrPrepareInputsPass  ??= new NativeRtxptDlssRRPrepareInputsPass(dlssBeforeCs) { renderPassEvent            = renderPassEvent };
-            _dlssRRPass               ??= new DlssRRPass { renderPassEvent                                                  = renderPassEvent };
+            _denoisingGuidesBakePass ??= new NativeRtxptDenoisingGuidesBakePass(denoiseSpecHitTCs) { renderPassEvent = renderPassEvent };
+            _dlssRrPrepareInputsPass ??= new NativeRtxptDlssRRPrepareInputsPass(dlssBeforeCs) { renderPassEvent      = renderPassEvent };
+            _dlssRRPass              ??= new DlssRRPass { renderPassEvent                                            = renderPassEvent };
             // Bloom is optional — only build once all three raster wrappers are assigned/imported.
             if (_bloomPass == null && bloomDownsampleRasterShader != null && bloomBlurRasterShader != null && bloomCompositeRasterShader != null)
                 _bloomPass = new NativeRtxptBloomPass(bloomDownsampleRasterShader, bloomBlurRasterShader, bloomCompositeRasterShader) { renderPassEvent = renderPassEvent };
@@ -202,6 +205,7 @@ namespace PathTracing
             _accumulationPass         ??= new NativeRtxptAccumulationPass(accumulationCs) { renderPassEvent                 = renderPassEvent };
             _stablePlanesDebugVizPass ??= new NativeRtxptStablePlanesDebugVizPass(stablePlanesDebugVizCs) { renderPassEvent = renderPassEvent };
             _outputBlitPass           ??= new NativeRtxptOutputBlitPass(outputBlitMaterial) { renderPassEvent               = renderPassEvent };
+            _depthBarrierFixPass      ??= new DepthBarrierFixPass { renderPassEvent                                         = RenderPassEvent.AfterRendering };
         }
 
         public override void AddRenderPasses(ScriptableRenderer renderer, ref RenderingData renderingData)
@@ -313,7 +317,7 @@ namespace PathTracing
                 FrameState        = frameState,
                 Setting           = setting,
                 SceneLights       = sceneLights,
-                blackTexturePtr =  blackTexturePtr,
+                blackTexturePtr   = blackTexturePtr,
             };
             passCtx.ResolveNativePtrs();
 
@@ -397,19 +401,19 @@ namespace PathTracing
                 }
 
                 // Phase 6: Bloom on the display-res HDR DLSS-RR output (composited in place, before tone mapping).
-                // if (setting.enableBloom && setting.bloomIntensity > 0f && setting.bloomRadius > 0f && _bloomPass != null)
-                // {
-                //     _bloomPass.Setup(passCtx, texPool.DlssRrOutput);
-                //     renderer.EnqueuePass(_bloomPass);
-                // }
+                if (setting.enableBloom && setting.bloomIntensity > 0f && setting.bloomRadius > 0f && _bloomPass != null)
+                {
+                    _bloomPass.Setup(passCtx, texPool.DlssRrOutput);
+                    renderer.EnqueuePass(_bloomPass);
+                }
 
                 // Phase 7: Tone mapping + auto-exposure on the display-res HDR DLSS-RR output.
                 // Writes the LDR result into ProcessedOutputColor (unused elsewhere in realtime mode).
-                // if (setting.enableToneMapping && _toneMappingMipChainPass != null)
-                // {
-                //     _toneMappingMipChainPass.Setup(passCtx, texPool.DlssRrOutput, texPool.ProcessedOutputColor);
-                //     renderer.EnqueuePass(_toneMappingMipChainPass);
-                // }
+                if (setting.enableToneMapping && _toneMappingMipChainPass != null)
+                {
+                    _toneMappingMipChainPass.Setup(passCtx, texPool.DlssRrOutput, texPool.ProcessedOutputColor);
+                    renderer.EnqueuePass(_toneMappingMipChainPass);
+                }
             }
             else
             {
@@ -429,14 +433,16 @@ namespace PathTracing
             {
                 // When tone mapping ran, the final image lives in ProcessedOutputColor; show it in
                 // place of the raw HDR DLSS-RR output unless the user picked an explicit debug view.
-                var displayMode = setting.showMode;
-                bool toneMapRan = setting.realtimeMode && setting.enableToneMapping && _toneMappingMipChainPass != null;
+                var  displayMode = setting.showMode;
+                bool toneMapRan  = setting.realtimeMode && setting.enableToneMapping && _toneMappingMipChainPass != null;
                 if (toneMapRan && displayMode == NativeRtxptShowMode.DlssRrOutput)
                     displayMode = NativeRtxptShowMode.ProcessedOutput;
 
                 _outputBlitPass.Setup(texPool, displayMode, 1.0f, setting.debugViewType);
                 renderer.EnqueuePass(_outputBlitPass);
             }
+
+            renderer.EnqueuePass(_depthBarrierFixPass);
         }
 
         // ---- Helpers -------------------------------------------------------
@@ -456,13 +462,13 @@ namespace PathTracing
             // Fallback (native plugin unavailable): hardcoded scale table.
             float scale = mode switch
             {
-                UpscalerMode.NATIVE            => 1.0f,
-                UpscalerMode.ULTRA_QUALITY     => 1.3f,
-                UpscalerMode.QUALITY           => 1.5f,
-                UpscalerMode.BALANCED          => 1.7f,
-                UpscalerMode.PERFORMANCE       => 2.0f,
+                UpscalerMode.NATIVE => 1.0f,
+                UpscalerMode.ULTRA_QUALITY => 1.3f,
+                UpscalerMode.QUALITY => 1.5f,
+                UpscalerMode.BALANCED => 1.7f,
+                UpscalerMode.PERFORMANCE => 2.0f,
                 UpscalerMode.ULTRA_PERFORMANCE => 3.0f,
-                _                              => 1.0f,
+                _ => 1.0f,
             };
             return new int2((int)(outputRes.x / scale + 0.5f),
                 (int)(outputRes.y / scale + 0.5f));
@@ -499,6 +505,8 @@ namespace PathTracing
             _stablePlanesDebugVizPass?.Dispose();
             _stablePlanesDebugVizPass = null;
             _outputBlitPass           = null;
+            _depthBarrierFixPass      = null;
+
 
             foreach (var p in _texturePools.Values) p.Dispose();
             _texturePools.Clear();
@@ -582,10 +590,10 @@ namespace PathTracing
             rbCmd.Release();
 
 #if UNITY_EDITOR
-            var lightBuffer = buf.LightBuffer;
-            int framesWaited = 0;
-            const int maxFrames = 180;
-            UnityEditor.EditorApplication.CallbackFunction poll = null;
+            var                                            lightBuffer  = buf.LightBuffer;
+            int                                            framesWaited = 0;
+            const int                                      maxFrames    = 180;
+            UnityEditor.EditorApplication.CallbackFunction poll         = null;
             poll = () =>
             {
                 framesWaited++;
@@ -680,8 +688,8 @@ namespace PathTracing
         // draw the collected segments with Handles via SceneView.duringSceneGui, forcing repaints
         // until the expiry time, then unhook. Visible in the Scene view regardless of play state.
         private static List<(Vector3 a, Vector3 b, Color c)> s_debugSegments;
-        private static double s_debugExpiry;
-        private static bool   s_debugHooked;
+        private static double                                s_debugExpiry;
+        private static bool                                  s_debugHooked;
 
         private static void ShowDebugSegments(List<(Vector3 a, Vector3 b, Color c)> segments, float seconds)
         {
@@ -690,10 +698,11 @@ namespace PathTracing
 
             if (!s_debugHooked)
             {
-                s_debugHooked = true;
+                s_debugHooked                        =  true;
                 UnityEditor.SceneView.duringSceneGui += OnSceneGuiDrawDebug;
                 UnityEditor.EditorApplication.update += RepaintWhileDebugging;
             }
+
             UnityEditor.SceneView.RepaintAll();
         }
 
@@ -714,11 +723,12 @@ namespace PathTracing
                 UnityEditor.SceneView.RepaintAll();
                 return;
             }
+
             // Expired — unhook and clear.
             UnityEditor.SceneView.duringSceneGui -= OnSceneGuiDrawDebug;
             UnityEditor.EditorApplication.update -= RepaintWhileDebugging;
-            s_debugHooked   = false;
-            s_debugSegments = null;
+            s_debugHooked                        =  false;
+            s_debugSegments                      =  null;
         }
 #endif
 
@@ -728,7 +738,7 @@ namespace PathTracing
         /// </summary>
         public void TestNeeAtReadback()
         {
-            NativeRtxptBufferResources buf = null;
+            NativeRtxptBufferResources  buf = null;
             NativeRtxptTextureResources tex = null;
 
             foreach (var kv in _bufferPools)
@@ -749,7 +759,7 @@ namespace PathTracing
                 return;
             }
 
-            var ctrl = buf.LastLightControlData;
+            var  ctrl                 = buf.LastLightControlData;
             uint invalidFeedbackCount = ReadUIntAt(buf.LightProxyCounters, (int)ctrl.TotalLightCount);
             uint derivedValidFeedback = ctrl.TotalMaxFeedbackCount > invalidFeedbackCount
                 ? ctrl.TotalMaxFeedbackCount - invalidFeedbackCount
@@ -762,8 +772,10 @@ namespace PathTracing
             sb.AppendLine($"  Lights: total={ctrl.TotalLightCount} env={ctrl.EnvmapQuadNodeCount} analytic={ctrl.AnalyticLightCount} emissiveTriangles={ctrl.TriangleLightCount}");
             sb.AppendLine($"  Proxies: samplingProxyCount={ctrl.SamplingProxyCount} proxyBuildTaskCount={ctrl.ProxyBuildTaskCount} validFeedback={derivedValidFeedback}/{ctrl.TotalMaxFeedbackCount} invalidFeedback={invalidFeedbackCount}");
             sb.AppendLine($"  LocalSampling: resolution={ctrl.LocalSamplingResolutionX}x{ctrl.LocalSamplingResolutionY} tileBufferHeight={ctrl.TileBufferHeight} bufferCount={buf.LocalSamplingBuffer?.count ?? 0}");
-            sb.AppendLine($"  Feedback: resolution={ctrl.BakerConstants.FeedbackResolutionX}x{ctrl.BakerConstants.FeedbackResolutionY} blended={ctrl.BakerConstants.BlendedFeedbackResolutionX}x{ctrl.BakerConstants.BlendedFeedbackResolutionY}");
-            sb.AppendLine($"  Weights: currentOffset={ctrl.BakerConstants.CurrentWeightsBufferOffset} historicOffset={ctrl.BakerConstants.HistoricWeightsBufferOffset} globalFeedbackWeight={ctrl.GlobalFeedbackUseWeight:F3} localToGlobal={ctrl.LocalToGlobalSampleRatio:F3}");
+            sb.AppendLine(
+                $"  Feedback: resolution={ctrl.BakerConstants.FeedbackResolutionX}x{ctrl.BakerConstants.FeedbackResolutionY} blended={ctrl.BakerConstants.BlendedFeedbackResolutionX}x{ctrl.BakerConstants.BlendedFeedbackResolutionY}");
+            sb.AppendLine(
+                $"  Weights: currentOffset={ctrl.BakerConstants.CurrentWeightsBufferOffset} historicOffset={ctrl.BakerConstants.HistoricWeightsBufferOffset} globalFeedbackWeight={ctrl.GlobalFeedbackUseWeight:F3} localToGlobal={ctrl.LocalToGlobalSampleRatio:F3}");
 
             AppendFloatBufferStats(sb, "LightWeights.current", buf.LightWeightsBuffer, (int)ctrl.BakerConstants.CurrentWeightsBufferOffset, (int)Math.Min(ctrl.TotalLightCount + 1u, 4096u));
             AppendUIntBufferStats(sb, "LightProxyCounters", buf.LightProxyCounters, 0, (int)Math.Min(ctrl.TotalLightCount + 1u, 4096u));
@@ -799,17 +811,17 @@ namespace PathTracing
             var data = new float[count];
             buffer.GetData(data, 0, start, count);
 
-            int nonZero = 0;
-            float min = float.PositiveInfinity;
-            float max = float.NegativeInfinity;
-            double sum = 0.0;
+            int    nonZero = 0;
+            float  min     = float.PositiveInfinity;
+            float  max     = float.NegativeInfinity;
+            double sum     = 0.0;
             for (int i = 0; i < data.Length; i++)
             {
                 float v = data[i];
                 if (float.IsNaN(v) || float.IsInfinity(v)) continue;
                 if (Mathf.Abs(v) > 1e-8f) nonZero++;
-                min = Mathf.Min(min, v);
-                max = Mathf.Max(max, v);
+                min =  Mathf.Min(min, v);
+                max =  Mathf.Max(max, v);
                 sum += v;
             }
 
@@ -857,19 +869,19 @@ namespace PathTracing
                 return;
             }
 
-            var data = req.GetData<float>();
-            int count = Mathf.Min(data.Length, maxSamples);
-            int nonZero = 0;
-            float min = float.PositiveInfinity;
-            float max = float.NegativeInfinity;
-            double sum = 0.0;
+            var    data    = req.GetData<float>();
+            int    count   = Mathf.Min(data.Length, maxSamples);
+            int    nonZero = 0;
+            float  min     = float.PositiveInfinity;
+            float  max     = float.NegativeInfinity;
+            double sum     = 0.0;
             for (int i = 0; i < count; i++)
             {
                 float v = data[i];
                 if (float.IsNaN(v) || float.IsInfinity(v)) continue;
                 if (Mathf.Abs(v) > 1e-8f) nonZero++;
-                min = Mathf.Min(min, v);
-                max = Mathf.Max(max, v);
+                min =  Mathf.Min(min, v);
+                max =  Mathf.Max(max, v);
                 sum += v;
             }
 
@@ -893,8 +905,8 @@ namespace PathTracing
                 return;
             }
 
-            var data = req.GetData<uint>();
-            int count = Mathf.Min(data.Length, maxSamples);
+            var data   = req.GetData<uint>();
+            int count  = Mathf.Min(data.Length, maxSamples);
             var sample = new uint[count];
             for (int i = 0; i < count; i++)
                 sample[i] = data[i];
@@ -903,10 +915,10 @@ namespace PathTracing
 
         private static void AppendUIntStats(System.Text.StringBuilder sb, string label, uint[] data, int totalCount = -1)
         {
-            int nonZero = 0;
-            int invalid = 0;
-            uint min = uint.MaxValue;
-            uint max = 0;
+            int   nonZero    = 0;
+            int   invalid    = 0;
+            uint  min        = uint.MaxValue;
+            uint  max        = 0;
             ulong sumLowBits = 0;
             for (int i = 0; i < data.Length; i++)
             {
@@ -919,7 +931,7 @@ namespace PathTracing
             }
 
             if (data.Length == 0) min = 0;
-            string suffix = totalCount >= 0 ? $"/{totalCount}" : "";
+            string suffix             = totalCount >= 0 ? $"/{totalCount}" : "";
             sb.AppendLine($"  {label}: read={data.Length}{suffix} nonZero={nonZero} invalid=0xFFFFFFFF:{invalid} min={min} max={max} sumLow16={sumLowBits}");
         }
 
@@ -929,21 +941,21 @@ namespace PathTracing
             const string shaderRoot = "Assets/RTXPT/Shaders";
 
             // Phase 2a/2d: PathTracer RT shaders
-            buildStablePlanesShader  = LoadRs($"{shaderRoot}/BuildStablePlanes");
-            fillStablePlanesShader   = LoadRs($"{shaderRoot}/FillStablePlanes");
-            referenceShader          = LoadRs($"{shaderRoot}/Reference");
-            exportVisibilityBufferCs = LoadCs($"{shaderRoot}/ProcessingPasses/ExportVisibilityBuffer");
-            denoiseSpecHitTCs        = LoadCs($"{shaderRoot}/ProcessingPasses/DenoisingGuidesBaker_DenoiseSpecHitT");
-            dlssBeforeCs             = LoadCs($"{shaderRoot}/ProcessingPasses/PostProcess_DenoiserPrepareInputsDlssRR");
+            buildStablePlanesShader     = LoadRs($"{shaderRoot}/BuildStablePlanes");
+            fillStablePlanesShader      = LoadRs($"{shaderRoot}/FillStablePlanes");
+            referenceShader             = LoadRs($"{shaderRoot}/Reference");
+            exportVisibilityBufferCs    = LoadCs($"{shaderRoot}/ProcessingPasses/ExportVisibilityBuffer");
+            denoiseSpecHitTCs           = LoadCs($"{shaderRoot}/ProcessingPasses/DenoisingGuidesBaker_DenoiseSpecHitT");
+            dlssBeforeCs                = LoadCs($"{shaderRoot}/ProcessingPasses/PostProcess_DenoiserPrepareInputsDlssRR");
             bloomDownsampleRasterShader = LoadRas($"{shaderRoot}/ToneMapper/BloomDownsample");
             bloomBlurRasterShader       = LoadRas($"{shaderRoot}/ToneMapper/BloomBlur");
             bloomCompositeRasterShader  = LoadRas($"{shaderRoot}/ToneMapper/BloomComposite");
-            luminanceRasterShader    = LoadRas($"{shaderRoot}/ToneMapper/Luminance");
-            luminanceMipCs           = LoadCs($"{shaderRoot}/ToneMapper/LuminanceMip");
-            captureLuminanceCs       = LoadCs($"{shaderRoot}/ToneMapper/capture_cs");
-            toneMapApplyRasterShader = LoadRas($"{shaderRoot}/ToneMapper/ToneMapping");
-            accumulationCs           = LoadCs($"{shaderRoot}/ProcessingPasses/AccumulationPass");
-            stablePlanesDebugVizCs   = LoadCs($"{shaderRoot}/ProcessingPasses/PostProcess_StablePlanesDebugViz");
+            luminanceRasterShader       = LoadRas($"{shaderRoot}/ToneMapper/Luminance");
+            luminanceMipCs              = LoadCs($"{shaderRoot}/ToneMapper/LuminanceMip");
+            captureLuminanceCs          = LoadCs($"{shaderRoot}/ToneMapper/capture_cs");
+            toneMapApplyRasterShader    = LoadRas($"{shaderRoot}/ToneMapper/ToneMapping");
+            accumulationCs              = LoadCs($"{shaderRoot}/ProcessingPasses/AccumulationPass");
+            stablePlanesDebugVizCs      = LoadCs($"{shaderRoot}/ProcessingPasses/PostProcess_StablePlanesDebugViz");
 
             string lightRoot   = $"{shaderRoot}/Lighting";
             string distantRoot = $"{lightRoot}/Distant";

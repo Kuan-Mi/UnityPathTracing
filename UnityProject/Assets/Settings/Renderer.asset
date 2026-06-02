@@ -73,7 +73,7 @@ MonoBehaviour:
     dlssrrMicroJitter: 0.1
     disableReSTIRsWithDLSSRR: 1
     tmpDisableDlssRR: 0
-    enableBloom: 0
+    enableBloom: 1
     bloomRadius: 8
     bloomIntensity: 0.004
     environmentMapDiffuseSampleMIPLevel: 2
@@ -83,7 +83,7 @@ MonoBehaviour:
     environmentMap: {fileID: 2800000, guid: 6891d0f00c8e5e04c9aa7f03f9401c6a, type: 3}
     enableToneMapping: 1
     toneMapOperator: 5
-    autoExposure: 0
+    autoExposure: 1
     exposureCompensation: 2
     exposureValue: 0
     exposureValueMin: -16
