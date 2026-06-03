@@ -127,6 +127,19 @@ namespace PathTracing
         {
             var cmd = CommandBufferHelpers.GetNativeCommandBuffer(context.cmd);
             var ctx = data.Ctx;
+
+            // Mirror LightsBaker.cpp:1335 — UpdateEnd returns immediately when not NEE-AT.
+            // The P1a/P1b/P2/P3/Clear passes only process the screen-space temporal feedback
+            // (TotalWeight/Candidates/blended/local-sampling), none of which is consumed by
+            // sampling in Uniform/Power mode. Skipping them avoids wasted work and matches the
+            // original's behavior exactly. NEE-AT is active iff ImportanceSamplingType == NEEAT
+            // (begin pass sets ImportanceSamplingType = useNEE ? neeType : 0).
+            var setting = ctx.Setting;
+            bool neeAtEnabled = setting != null && setting.useNEE
+                                && setting.neeType == NativeRtxptNeeType.NEEAT;
+            if (!neeAtEnabled)
+                return;
+
             var buf = ctx.Buffers;
 
             cmd.BeginSample(RenderPassMarkers.RtxptLightingUpdateEnd);
