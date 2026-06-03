@@ -267,6 +267,15 @@ namespace PathTracing
             var displayResolution = ComputeOutputResolution(renderingData.cameraData);
             var renderResolution  = ComputeRenderResolution(displayResolution, setting.upscalerMode);
 
+            // DLSS / DLSS-RR require an output of at least 32x32 (NGX minimum). In a
+            // packaged build the window can momentarily come up at a degenerate size
+            // (e.g. 144x1 while it is being created/resized), which makes the native
+            // nri CreateUpscaler fail. Skip the whole path-tracing pass list for this
+            // camera until it has a usable resolution.
+            if (math.cmin(displayResolution) < MinUpscalerResolution ||
+                math.cmin(renderResolution)  < MinUpscalerResolution)
+                return;
+
             bool texturesChanged = texPool.EnsureResources(renderResolution, displayResolution);
             texPool.EnsureEnvMapResources();
             bufPool.EnsureResources(renderResolution);
@@ -448,6 +457,9 @@ namespace PathTracing
         }
 
         // ---- Helpers -------------------------------------------------------
+
+        // Minimum render/output size DLSS (NGX) will accept; below this CreateUpscaler fails.
+        private const int MinUpscalerResolution = 32;
 
         private static int2 ComputeOutputResolution(CameraData cameraData) =>
             new int2(cameraData.cameraTargetDescriptor.width,
