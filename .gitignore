@@ -18,6 +18,11 @@ UnityProject/*.sln
 UnityProject/*.csproj
 
 Editor.log
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
 /RTXDI/
 
 # Generated reflection dumps next to .computeshader assets
