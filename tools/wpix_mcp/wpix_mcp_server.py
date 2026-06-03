@@ -30,23 +30,24 @@ def log(*a):
 def t_find_events(wpix_path, name_filter=None, dispatches_only=False):
     return {"events": core.find_shader_events(wpix_path, name_filter, dispatches_only)}
 
-def t_describe_dispatch(wpix_path, global_id):
-    return core.describe_dispatch(wpix_path, int(global_id))
+def t_describe_dispatch(wpix_path, global_id, used_only=False):
+    return core.describe_dispatch(wpix_path, int(global_id), bool(used_only))
 
 def t_extract(wpix_path, global_id, selector, mip=0, array_slice=0,
-              save_npy_path=None, cbv_size=None):
+              save_npy_path=None, cbv_size=None, struct_def=None, struct_name=None):
     return core.extract(wpix_path, int(global_id), selector, int(mip),
                         int(array_slice), save_npy_path,
-                        int(cbv_size) if cbv_size else None)
+                        int(cbv_size) if cbv_size else None, struct_def, struct_name)
 
-def t_compare(a, b, save_diff_npy_path=None):
-    return core.compare(a, b, save_diff_npy_path)
+def t_compare(a, b, save_diff_npy_path=None, struct_def=None, struct_name=None):
+    return core.compare(a, b, save_diff_npy_path, struct_def, struct_name)
 
-def t_compare_subresources(a, b, mips=None, array_slices=None):
-    return core.compare_subresources(a, b, mips, array_slices)
+def t_compare_subresources(a, b, mips=None, array_slices=None, struct_def=None, struct_name=None):
+    return core.compare_subresources(a, b, mips, array_slices, struct_def, struct_name)
 
-def t_diff_stage(wpix_a, wpix_b, marker, dispatch="last", mips="base"):
-    return core.diff_stage(wpix_a, wpix_b, marker, dispatch, mips)
+def t_diff_stage(wpix_a, wpix_b, marker, dispatch="last", mips="base", used_only=False,
+                 struct_defs=None):
+    return core.diff_stage(wpix_a, wpix_b, marker, dispatch, mips, bool(used_only), struct_defs)
 
 def t_clear_cache():
     return core.clear_cache()
@@ -75,12 +76,17 @@ TOOLS = [
                        "resolved to a resource debug-name, view format, and dimensions. The "
                        "srv/uav/cbv list ordering matches the {srv:i}/{uav:i}/{cbv:i} selector "
                        "indices used by wpix_extract/wpix_compare (resolved from the same region "
-                       "recapture, with full debug names restored from the capture export).",
+                       "recapture, with full debug names restored from the capture export). Each "
+                       "srv/uav/cbv item carries its HLSL register ('reg') and a 'used' flag from "
+                       "shader reflection (the kernel's PSV0 chunk) — true/false/null. Set "
+                       "used_only=true to drop bound-but-unused bindings (common when many kernels "
+                       "share one root signature); selector indices then refer to the kept set.",
         "inputSchema": {
             "type": "object",
             "properties": {
                 "wpix_path": {"type": "string"},
                 "global_id": {"type": "integer", "description": "Global id of the Dispatch (from wpix_find_events)."},
+                "used_only": {"type": "boolean", "default": False, "description": "Drop bindings the shader doesn't reference (per PSV0 reflection)."},
             },
             "required": ["wpix_path", "global_id"],
         },
@@ -94,8 +100,9 @@ TOOLS = [
                        "as the state after it (matched across captures by debug-name). 'selector' "
                        "is one of {\"srv\":i}, {\"uav\":i}, {\"cbv\":i}, {\"slot\":n}, "
                        "{\"name\":\"EnvMapBak\"}. For textures choose mip/array_slice (cube face = "
-                       "array_slice 0..5). Block-compressed inputs (e.g. BC6H) are reported but "
-                       "not decoded (no decoder available).",
+                       "array_slice 0..5). Raw/structured buffers are dumped as bytes / 32-bit "
+                       "words (floats+uints+hex), with cbv_size capping the byte count. Block-"
+                       "compressed inputs (e.g. BC6H) are reported but not decoded.",
         "inputSchema": {
             "type": "object",
             "properties": {
@@ -106,6 +113,8 @@ TOOLS = [
                 "array_slice": {"type": "integer", "default": 0, "description": "Array slice / cube face (0..5)."},
                 "save_npy_path": {"type": "string", "description": "Optional path to save the decoded array as .npy."},
                 "cbv_size": {"type": "integer", "description": "Bytes to read for a CBV selector (default 1024)."},
+                "struct_def": {"type": "string", "description": "Optional HLSL/C++ struct definition string to overlay on a buffer's bytes (tight 4-byte structured-buffer packing). Returns named 'fields' + a readable 'table'. Paste dependency structs too; nested structs are expanded."},
+                "struct_name": {"type": "string", "description": "Root struct name in struct_def (default: last struct defined)."},
             },
             "required": ["wpix_path", "global_id", "selector"],
         },
@@ -114,15 +123,19 @@ TOOLS = [
     {
         "name": "wpix_compare",
         "description": "Decode the same binding from two captures (or two dispatches) and report "
-                       "pixel-level difference: max_abs_diff, mean_abs_diff, mse, psnr_db, "
-                       "num_differing_texels, per-channel max. Each side is {wpix_path, global_id, "
-                       "selector, mip?, array_slice?}. Optionally save the signed diff as .npy.",
+                       "difference. Textures: pixel-level max_abs_diff, mean_abs_diff, mse, "
+                       "psnr_db, num_differing_texels, per-channel max. Raw/structured buffers: "
+                       "byte/word-level num_differing_words, num_differing_bytes, and a sample of "
+                       "the first differing 32-bit words (uint/hex/float). Each side is {wpix_path, "
+                       "global_id, selector, mip?, array_slice?}. Optionally save the signed diff as .npy.",
         "inputSchema": {
             "type": "object",
             "properties": {
                 "a": {"type": "object", "description": "{wpix_path, global_id, selector, mip?, array_slice?}"},
                 "b": {"type": "object", "description": "{wpix_path, global_id, selector, mip?, array_slice?}"},
                 "save_diff_npy_path": {"type": "string"},
+                "struct_def": {"type": "string", "description": "Optional HLSL/C++ struct definition string. For buffer comparisons, overlays the bytes on named fields and returns a per-field 'differing_fields' list + a readable 'table' (field | type | A | B)."},
+                "struct_name": {"type": "string", "description": "Root struct name in struct_def (default: last struct defined)."},
             },
             "required": ["a", "b"],
         },
@@ -165,6 +178,8 @@ TOOLS = [
                 "marker": {"type": "string", "description": "Marker substring, e.g. 'ProcSkyBaseBake', 'GenIM', 'EnvMapBakerMIPs'."},
                 "dispatch": {"type": "string", "enum": ["last", "first"], "default": "last"},
                 "mips": {"type": "string", "enum": ["base", "all"], "default": "base"},
+                "used_only": {"type": "boolean", "default": False, "description": "Skip UAVs the kernel doesn't reference (PSV0 reflection); confines the diff to real outputs and disambiguates duplicate-named views. No-op if reflection unavailable."},
+                "struct_defs": {"type": "object", "description": "Map of {resource_name: HLSL/C++ struct text}. When a buffer output diverges and its name matches a key (exact, else substring), the output gains a field-level diff ('num_differing_fields' + readable 'field_table') instead of just a byte count.", "additionalProperties": {"type": "string"}},
             },
             "required": ["wpix_a", "wpix_b", "marker"],
         },
