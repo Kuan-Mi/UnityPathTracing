@@ -73,7 +73,7 @@ namespace PathTracing
 
         public override void RecordRenderGraph(RenderGraph renderGraph, ContextContainer frameData)
         {
-            using var builder = renderGraph.AddUnsafePass<PassData>("DenoiseSpecHitT", out var passData);
+            using var builder = renderGraph.AddUnsafePass<PassData>("Denoising Guides Bake", out var passData);
             passData.Cs         = _cs;
             passData.PingDs     = _pingDs;
             passData.PongDs     = _pongDs;
@@ -93,13 +93,16 @@ namespace PathTracing
             uint gx = ((uint)ctx.RenderResolution.x + 7u) / 8u;
             uint gy = ((uint)ctx.RenderResolution.y + 7u) / 8u;
 
-            cmd.BeginSample("DenoiseSpecHitT[Ping]");
+            // Two dispatches (ping then pong) both labelled "DenoiseSpecHitT" to mirror the
+            // original RTXPT DenoisingGuidesBaker, which emits the inner marker twice by that
+            // name under the "Denoising Guides Bake" group — so PIX captures line up.
+            cmd.BeginSample("DenoiseSpecHitT");
             DispatchDenoiseSpecHitT(cmd, data, data.PingDs, 1u, gx, gy, res, ctx);
-            cmd.EndSample("DenoiseSpecHitT[Ping]");
+            cmd.EndSample("DenoiseSpecHitT");
 
-            cmd.BeginSample("DenoiseSpecHitT[Pong]");
+            cmd.BeginSample("DenoiseSpecHitT");
             DispatchDenoiseSpecHitT(cmd, data, data.PongDs, 0u, gx, gy, res, ctx);
-            cmd.EndSample("DenoiseSpecHitT[Pong]");
+            cmd.EndSample("DenoiseSpecHitT");
         }
 
         private static unsafe void DispatchDenoiseSpecHitT(
