@@ -58,7 +58,7 @@ namespace PathTracing
 
         public override void RecordRenderGraph(RenderGraph renderGraph, ContextContainer frameData)
         {
-            using var builder = renderGraph.AddUnsafePass<PassData>("DlssBefore", out var passData);
+            using var builder = renderGraph.AddUnsafePass<PassData>("DLSSRR_PrepareInputs", out var passData);
             passData.Cs  = _cs;
             passData.Ds  = _ds;
             passData.Ctx = _ctx;
@@ -76,7 +76,7 @@ namespace PathTracing
             var res = ctx.Textures;
             var buf = ctx.Buffers;
 
-            cmd.BeginSample("DlssBefore");
+            cmd.BeginSample("DLSSRR_PrepareInputs");
 
             ds.SetConstantBuffer("g_Const", ctx.ConstantBuffer);
 
@@ -104,7 +104,7 @@ namespace PathTracing
             uint gy = ((uint)ctx.RenderResolution.y + 7u) / 8u;
             data.Cs.Dispatch(cmd, ds, gx, gy, 1);
 
-            cmd.EndSample("DlssBefore");
+            cmd.EndSample("DLSSRR_PrepareInputs");
         }
     }
 }

@@ -1,8 +1,5 @@
 {
-    "globalDefines": [
-        "WITH_NRD",
-        "PT_NEE_ENABLED"
-    ],
+    "globalDefines": [],
     "globalIncludePaths": [
         "../RenderingPlugin/External/NRD/Shaders"
     ],

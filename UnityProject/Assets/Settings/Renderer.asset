@@ -29,7 +29,7 @@ MonoBehaviour:
     accumulationPreWarmRealtimeCaches: 1
     accumulationAA: 1
     useNEE: 1
-    neeType: 1
+    neeType: 2
     neeCandidateSamples: 5
     neeFullSamples: 1
     neeMisType: 1

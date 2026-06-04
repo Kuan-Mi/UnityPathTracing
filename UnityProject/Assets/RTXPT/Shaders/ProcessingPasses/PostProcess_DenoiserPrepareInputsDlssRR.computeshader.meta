@@ -21,7 +21,9 @@ ScriptedImporter:
   defines:
   - DENOISER_PREPARE_INPUTS=1
   - DENOISER_DLSS_RR=1
+  - TARGET_D3D12
+  - ENABLE_DEBUG_PRINT
   entryPoint: main
-  targetProfile: cs_6_6
+  targetProfile: cs_6_9
   rootConstantsHints: []
   rootSRVHints: []

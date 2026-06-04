@@ -16,9 +16,11 @@ ScriptedImporter:
   - ../RenderingPlugin/External/RTXPT/External
   - ../RenderingPlugin/External/donut/include
   extraArgs: []
-  defines: []
+  defines:
+  - TARGET_D3D12
+  - ENABLE_DEBUG_PRINT
   entryPoint: DenoiseSpecHitT
-  targetProfile: cs_6_6
+  targetProfile: cs_6_9
   rootConstantsHints:
   - Name: g_denoisingConstants
     Count: 16

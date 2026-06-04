@@ -11,9 +11,11 @@ ScriptedImporter:
   isComputeShader: 1
   additionalIncludePaths: []
   extraArgs: []
-  defines: []
+  defines:
+  - MODE=0
+  - TARGET_D3D12
   entryPoint: main
-  targetProfile: cs_6_6
+  targetProfile: cs_6_5
   rootConstantsHints:
   - Name: c_MipMapgen
     Count: 4
