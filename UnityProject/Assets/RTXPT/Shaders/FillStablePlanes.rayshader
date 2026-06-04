@@ -1,2 +1,6 @@
+// Ray-generation library: raygen + miss only (matches RTXPT PTPipelineVariant raygen, which
+// compiles PathTracerSample.hlsl WITHOUT the material specialization). The closest-hit/anyhit
+// entries live in the separate FillSP_Hit*.hitgroupshader blobs and are linked into the RTPSO
+// at state-object creation; including the specialization here would inflate the raygen library
+// with the closest-hit's light/material/NEE/feedback bindings and diverge from RTXPT's DXIL.
 #include "PathTracerSample.hlsl"
-#include "PathTracerMaterialSpecializations.hlsl"
