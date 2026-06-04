@@ -1313,7 +1313,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 8771091787928289351, guid: e253bb300620d274b95f897bde5f902a, type: 3}
       propertyPath: m_IsActive
-      value: 0
+      value: 1
       objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
@@ -14401,7 +14401,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 8771091787928289351, guid: cf93348c5572d7c4ebc361a65ad15797, type: 3}
       propertyPath: m_IsActive
-      value: 0
+      value: 1
       objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
@@ -36302,6 +36302,10 @@ PrefabInstance:
     - target: {fileID: 7449782648777001352, guid: 5a8038db0ef82d145a7c4977d636b74f, type: 3}
       propertyPath: m_Name
       value: cube
+      objectReference: {fileID: 0}
+    - target: {fileID: 7449782648777001352, guid: 5a8038db0ef82d145a7c4977d636b74f, type: 3}
+      propertyPath: m_IsActive
+      value: 0
       objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
