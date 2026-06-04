@@ -1,65 +1,97 @@
 /*
-* Donut MipMapGenPass MODE_COLOR reduction — VERBATIM from donut/shaders/passes/mipmapgen_cs.hlsl,
-* MODE_COLOR (2x2 solid box average via a lerp tree) specialized to NUM_LODS=4 / GROUP_SIZE=16.
+* Copyright (c) 2014-2021, NVIDIA CORPORATION. All rights reserved.
 *
-* Unlike LuminanceMip.computeshader (which reads the input mip through the UAV array as a workaround),
-* this keeps donut's ORIGINAL binding: the input mip is a Texture2D SRV (t_input) while the four
-* output mips are a bounded RWTexture2D UAV array (u_output) — i.e. mip N is SHADER_RESOURCE while
-* mips N+1.. are UNORDERED_ACCESS on the SAME resource within one dispatch. The native plugin makes
-* this legal under Unity's per-RESOURCE state tracker via balanced per-SUBRESOURCE barriers around the
-* dispatch (ComputeDescriptorSet::Dispatch + DescriptorSetBase::Emit/RestoreSubresource*). Keeping the
-* binding and the reduce arithmetic identical to donut makes the generated mip chain bit-identical to
-* the original RTXPT (which drives this exact shader through donut::render::MipMapGenPass).
+* Permission is hereby granted, free of charge, to any person obtaining a
+* copy of this software and associated documentation files (the "Software"),
+* to deal in the Software without restriction, including without limitation
+* the rights to use, copy, modify, merge, publish, distribute, sublicense,
+* and/or sell copies of the Software, and to permit persons to whom the
+* Software is furnished to do so, subject to the following conditions:
 *
-* VALUE_TYPE is float4 even for the R32_FLOAT importance map: the SRV/UAV use the texture's real format,
-* so a float4 view over a 1-channel format reads/writes only .x — exactly as donut does for that map.
+* The above copyright notice and this permission notice shall be included in
+* all copies or substantial portions of the Software.
+*
+* THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+* IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+* FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.  IN NO EVENT SHALL
+* THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+* LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+* FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
+* DEALINGS IN THE SOFTWARE.
 */
 
-#define GROUP_SIZE 16
-#define NUM_LODS   4
+#include <donut/shaders/mipmapgen_cb.h>
 
-// donut MipmmapGenConstants (mipmapgen_cb.h): { uint dispatch; uint numLODs; uint padding[2]; }.
-// Promoted to root constants (see .meta rootConstantsHints) so it can vary per pass cheaply.
+
+#if MODE == MODE_COLOR
+    #define VALUE_TYPE float4
+    float4 reduce(float4 a, float4 b)
+    {
+        return lerp(a, b, 0.5);
+    }
+    float4 reduce(float4 a, float4 b, float4 c, float4 d)
+    {
+        return reduce(reduce(a, b), reduce(c, d));
+    }
+#elif MODE == MODE_MINMAX
+    #define VALUE_TYPE float2
+    float2 reduce(float2 a, float2 b)
+    {
+        return float2(min(a.x, b.x), max(a.y, b.y));
+    }
+    float2 reduce(float2 a, float2 b, float2 c, float2 d)
+    {
+        return reduce(reduce(a, b), reduce(c, d));
+    }
+#else
+    #define VALUE_TYPE float
+    VALUE_TYPE reduce(VALUE_TYPE a, VALUE_TYPE b)
+    {
+    #if MODE == MODE_MIN
+        return min(a, b);
+    #elif MODE == MODE_MAX
+        return max(a, b);
+    #endif
+    }
+    VALUE_TYPE reduce(float4 a)
+    {
+        return reduce(reduce(a.x, a.y), reduce(a.z, a.w));
+    }
+#endif
+
 cbuffer c_MipMapgen : register(b0)
 {
-    uint g_dispatch;   // pass index (unused in MODE_COLOR; kept for layout parity with donut)
-    uint g_numLODs;    // output mips to write this pass (1..NUM_LODS)
-    uint2 g_padding;
+    MipmmapGenConstants g_MipMapGen;
 };
 
-#define VALUE_TYPE float4
-float4 reduce(float4 a, float4 b)
-{
-    return lerp(a, b, 0.5);
-}
-float4 reduce(float4 a, float4 b, float4 c, float4 d)
-{
-    return reduce(reduce(a, b), reduce(c, d));
-}
-
 RWTexture2D<VALUE_TYPE> u_output[NUM_LODS] : register(u0);
-Texture2D<VALUE_TYPE>   t_input            : register(t0);
+Texture2D<VALUE_TYPE> t_input : register(t0);
 
 groupshared VALUE_TYPE s_ReductionData[GROUP_SIZE][GROUP_SIZE];
 
-[numthreads(GROUP_SIZE, GROUP_SIZE, 1)] void main(
-    uint2 groupIdx  : SV_GroupID,
+[numthreads(16, 16, 1)] void main(
+    uint2 groupIdx : SV_GroupID,
     uint2 globalIdx : SV_DispatchThreadID,
     uint2 threadIdx : SV_GroupThreadID)
 {
     uint texWidth, texHeight;
     t_input.GetDimensions(texWidth, texHeight);
 
-    VALUE_TYPE value = t_input.mips[0][min(globalIdx.xy, uint2(texWidth - 1, texHeight - 1))];
+    VALUE_TYPE value = t_input.mips[0][min(globalIdx.xy, uint2(texWidth-1, texHeight-1))];
+
+#if MODE == MODE_MINMAX
+    if (g_MipMapGen.dispatch==0)
+        value.y = value.x;
+#endif
 
     [unroll]
     for (uint level = 1; level <= NUM_LODS; level++)
     {
-        if (level == g_numLODs + 1)
+        if (level == g_MipMapGen.numLODs+1)
             break;
 
         uint outGroupSize = uint(GROUP_SIZE) >> level;
-        uint inGroupSize  = outGroupSize << 1;
+        uint inGroupSize = outGroupSize << 1;
 
         if (all(threadIdx.xy < inGroupSize))
         {
@@ -75,8 +107,12 @@ groupshared VALUE_TYPE s_ReductionData[GROUP_SIZE][GROUP_SIZE];
             VALUE_TYPE c = s_ReductionData[threadIdx.y * 2 + 1][threadIdx.x * 2 + 0];
             VALUE_TYPE d = s_ReductionData[threadIdx.y * 2 + 1][threadIdx.x * 2 + 1];
 
+#if MODE == MODE_COLOR || MODE == MODE_MINMAX
             value = reduce(a, b, c, d);
-            u_output[level - 1][groupIdx.xy * outGroupSize + threadIdx.xy] = value;
+#else
+            value = reduce(float4(a, b, c, d));
+#endif
+            u_output[level-1][groupIdx.xy * outGroupSize + threadIdx.xy] = value;
         }
 
         GroupMemoryBarrierWithGroupSync();

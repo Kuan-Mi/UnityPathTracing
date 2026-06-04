@@ -9,7 +9,8 @@ ScriptedImporter:
   assetBundleVariant:
   script: {fileID: 11500000, guid: ea13329833ed16543aa33a7c88f8c5bf, type: 3}
   isComputeShader: 1
-  additionalIncludePaths: []
+  additionalIncludePaths:
+  - ../RenderingPlugin/External/donut/include
   extraArgs: []
   defines:
   - MODE=0
