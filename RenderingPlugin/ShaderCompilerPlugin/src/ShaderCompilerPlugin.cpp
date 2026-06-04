@@ -184,20 +184,16 @@ ComPtr<IDxcBlob> ShaderCompilerPlugin::CompileShader(
         return nullptr;
     }
 
+    // Only entry/target are fixed here; every other compile flag (optimization level, -Zi/-Zsb,
+    // -enable-16bit-types, warnings policy, all_resources_bound, etc.) is supplied by the C# caller
+    // via extraArgs. Hardcoding flags here (notably -WX, -all_resources_bound and a _DEBUG-only
+    // -Zi/-Od) made the emitted DXIL — and therefore the shader hash — diverge from the original
+    // RTXPT build, which drives compilation entirely from its own argument list.
     std::vector<LPCWSTR> arguments;
     arguments.push_back(L"-E");
     arguments.push_back(entryPoint.c_str());
     arguments.push_back(L"-T");
     arguments.push_back(target.c_str());
-    arguments.push_back(DXC_ARG_WARNINGS_ARE_ERRORS);
-    arguments.push_back(DXC_ARG_ALL_RESOURCES_BOUND);
-
-#ifdef _DEBUG
-    arguments.push_back(DXC_ARG_DEBUG);
-    arguments.push_back(DXC_ARG_SKIP_OPTIMIZATIONS);
-#else
-    arguments.push_back(DXC_ARG_OPTIMIZATION_LEVEL3);
-#endif
 
     for (const auto& define : defines)
     {

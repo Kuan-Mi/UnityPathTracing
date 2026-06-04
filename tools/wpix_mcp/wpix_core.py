@@ -785,14 +785,25 @@ def describe_shader(wpix, global_id, disassemble=True, pdb_dir=None):
     'args_source' in the result says which was used. Set disassemble=False for container-only
     fields. pdb_dir overrides the PDB folder (default: auto-detected ShaderPDB, or WPIX_PDB_DIR);
     WPIX_DXC overrides the dxc.exe / dxcompiler.dll used."""
-    A = load_export(export_region(wpix, global_id, global_id))
-    d = next((x for x in A.dispatches if x["global_id"] == global_id),
-             A.dispatches[-1] if A.dispatches else None)
-    if d is None:
-        raise RuntimeError(f"no dispatch at global_id {global_id}")
-    pso = d.get("pso")
-    if pso is None or pso not in getattr(A, "pso_blob", {}):
-        raise RuntimeError(f"dispatch {global_id} (pso {pso}) has no compute-shader blob to inspect")
+    # The shader container is static frame metadata (identical wherever the PSO is bound),
+    # so a single whole-capture export serves every dispatch and is cached once per capture.
+    # That avoids a per-global_id recapture-region + export (the slow path): only fall back
+    # to it if the full export somehow lacks this PSO's blob.
+    def _resolve(export_dir):
+        A = load_export(export_dir)
+        d = next((x for x in A.dispatches if x["global_id"] == global_id),
+                 A.dispatches[-1] if A.dispatches else None)
+        if d is None:
+            return None
+        pso = d.get("pso")
+        if pso is None or pso not in getattr(A, "pso_blob", {}):
+            return None
+        return A, pso
+
+    resolved = _resolve(export_full(wpix)) or _resolve(export_region(wpix, global_id, global_id))
+    if resolved is None:
+        raise RuntimeError(f"dispatch {global_id} has no compute-shader blob to inspect")
+    A, pso = resolved
     off, csize = A.pso_blob[pso]
     blob = _xpress_decompress_at(A.dir, off, csize)
     blob = blob[:A.pso_cs_size.get(pso, len(blob))]
