@@ -171,19 +171,23 @@ namespace PathTracing
         // Mirrors RTXPT ToneMappingParameters (ToneMapper/ToneMappingPasses.h).
         public bool enableToneMapping = true;
 
-        /// <summary>Tone-map operator. RTXPT default = ACES.</summary>
-        public NativeRtxptToneMapOperator toneMapOperator = NativeRtxptToneMapOperator.Aces;
+        /// <summary>Tone-map operator. Matches the RTXPT reference capture (HableUc2).</summary>
+        public NativeRtxptToneMapOperator toneMapOperator = NativeRtxptToneMapOperator.HableUc2;
 
         /// <summary>
         /// Enable histogram-free auto-exposure (geometric-mean luminance). RTXPT's C++ default is
         /// false (scene-driven), but the realtime path-tracer output benefits from it, so it is on
         /// by default here. When off, photographic manual exposure (filmSpeed/fNumber/shutter) is used.
         /// </summary>
-        public bool autoExposure = true;
+        public bool autoExposure = false;
 
-        /// <summary>Exposure compensation in stops (EV). RTXPT default 2.0 (Sample.cpp).</summary>
+        /// <summary>
+        /// Exposure compensation in stops (EV). Set to 1.5 to reproduce the RTXPT reference
+        /// capture's manual color-transform scale k = 2^1.5 ≈ 2.828 (with neutral film/aperture:
+        /// 2^EC · (filmSpeed/100)/(shutter·fNumber²) = 2^1.5 · 1). RTXPT's Sample.cpp default is 2.0.
+        /// </summary>
         [Range(-8f, 8f)]
-        public float exposureCompensation = 2.0f;
+        public float exposureCompensation = 1.5f;
 
         /// <summary>Manual exposure value (EV) used to derive shutter/aperture when autoExposure is off.</summary>
         public float exposureValue = 0.0f;

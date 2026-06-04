@@ -82,9 +82,9 @@ MonoBehaviour:
     environmentMapTint: {r: 1, g: 1, b: 1, a: 1}
     environmentMap: {fileID: 2800000, guid: 7fb1be0394d024a4eabf7ab64524cdd9, type: 3}
     enableToneMapping: 1
-    toneMapOperator: 5
-    autoExposure: 1
-    exposureCompensation: 2
+    toneMapOperator: 4
+    autoExposure: 0
+    exposureCompensation: 1.5
     exposureValue: 0
     exposureValueMin: -16
     exposureValueMax: 16
