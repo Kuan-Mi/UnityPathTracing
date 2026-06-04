@@ -280,7 +280,7 @@ namespace NativeRender
         }
 
         /// <summary>
-        /// Selectable, copyable shader-hash row. The hash is the DXIL container digest DXC writes
+        /// Selectable, copyable shader-hash row. The hash is the DXIL HASH-part digest DXC writes
         /// (the same value PIX / RenderDoc display), so it can be matched against a capture.
         /// </summary>
         private static void DrawShaderHash(string shaderHash)
@@ -288,7 +288,7 @@ namespace NativeRender
             using (new EditorGUILayout.HorizontalScope())
             {
                 EditorGUILayout.PrefixLabel(new GUIContent("Shader Hash",
-                    "The DXIL container hash DXC embeds — the same value PIX / RenderDoc show for this shader."));
+                    "The DXIL shader hash (HASH part) DXC embeds — the same value PIX / RenderDoc show for this shader."));
                 EditorGUILayout.SelectableLabel(shaderHash, EditorStyles.textField,
                     GUILayout.Height(EditorGUIUtility.singleLineHeight));
                 if (GUILayout.Button("Copy", GUILayout.Width(48)))

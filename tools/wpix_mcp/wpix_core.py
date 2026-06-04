@@ -45,6 +45,24 @@ def find_pixtool():
     cands.sort()
     return cands[-1]
 
+def find_dxc():
+    """Locate a dxc.exe able to disassemble this project's shaders. Prefers the RTXPT-bundled
+    compiler (matches what built them; new enough for recent shader models), then falls back to
+    the Windows SDK. WPIX_DXC overrides. dxc.exe needs dxcompiler.dll beside it — the bundled
+    bin/x64 has it."""
+    p = os.environ.get("WPIX_DXC")
+    if p and os.path.isfile(p):
+        return p
+    repo = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+    bundled = sorted(glob.glob(os.path.join(repo, "RenderingPlugin", "_deps", "*",
+                                            "bin", "x64", "dxc.exe")))
+    if bundled:
+        return bundled[-1]
+    sdk = sorted(glob.glob(r"C:\Program Files (x86)\Windows Kits\10\bin\*\x64\dxc.exe"))
+    if sdk:
+        return sdk[-1]
+    raise FileNotFoundError("dxc.exe not found; set WPIX_DXC env var")
+
 def _cache_root():
     root = os.environ.get("WPIX_CACHE") or os.path.join(tempfile.gettempdir(), "wpix_mcp_cache")
     os.makedirs(root, exist_ok=True)
@@ -606,6 +624,224 @@ def psv0_resource_bindings(dxil):
             out.append({"class": _PSV_RTYPE_CLASS.get(rt, "?"),
                         "space": space, "lo": lo, "hi": hi})
     return out
+
+# --------------------------------------------------------------------------------------
+# Shader compile-time info: read identity/profile/features straight from the DXIL
+# container, and recover the original DXC command line (entry/defines/flags) from the
+# embedded debug metadata via a dxc.exe -dumpbin disassembly.
+# --------------------------------------------------------------------------------------
+
+# DXIL program-version shader-kind nibble -> profile prefix.
+_SHADER_KIND = {0: "ps", 1: "vs", 2: "gs", 3: "hs", 4: "ds", 5: "cs",
+                6: "lib", 7: "ms", 8: "as"}
+
+# DXIL ShaderFeatureInfo (SFI0) bit index -> feature name.
+_SFI0_FEATURES = {
+    0: "Doubles", 1: "ComputeShadersPlusRawAndStructuredBuffersViaShader4X",
+    2: "UAVsAtEveryStage", 3: "64UAVs", 4: "MinimumPrecision", 5: "DoubleExtensions",
+    6: "ShaderExtensions", 7: "ComparisonFiltering", 8: "TiledResources",
+    9: "PSOutStencilRef", 10: "InnerCoverage", 11: "TypedUAVLoadAdditionalFormats",
+    12: "ROVs", 13: "ViewportAndRTArrayIndexFromAnyShaderFeedingRasterizer",
+    14: "WaveOps", 15: "Int64Ops", 16: "ViewID", 17: "Barycentrics",
+    18: "NativeLowPrecision", 19: "ShadingRate", 20: "Raytracing_Tier_1_1",
+    21: "SamplerFeedback", 22: "AtomicInt64OnTypedResource",
+    23: "AtomicInt64OnGroupShared", 24: "DerivativesInMeshAndAmpShaders",
+    25: "ResourceDescriptorHeapIndexing", 26: "SamplerDescriptorHeapIndexing",
+    27: "AtomicInt64OnHeapResource", 28: "AdvancedTextureOps",
+    29: "WriteableMSAATextures",
+}
+
+def container_parts(blob):
+    """{fourcc_bytes: (data_offset, size)} for a DXBC/DXIL container, or {} if not one."""
+    if len(blob) < 32 or blob[:4] != b"DXBC":
+        return {}
+    n = struct.unpack_from("<I", blob, 28)[0]
+    parts = {}
+    for o in struct.unpack_from("<%dI" % n, blob, 32):
+        if o + 8 > len(blob):
+            continue
+        parts[blob[o:o + 4]] = (o + 8, struct.unpack_from("<I", blob, o + 4)[0])
+    return parts
+
+def container_compile_info(blob):
+    """Compile-time fields readable from the container itself (no disassembler):
+    shader_hash (HASH part digest — the value PIX/RenderDoc show, NOT the header checksum),
+    target/profile + shader_kind (DXIL program version), debug_name (ILDN), and the SFI0
+    required-feature flags."""
+    parts = container_parts(blob)
+    info = {"container_parts": sorted(c.decode("ascii", "replace") for c in parts)}
+    if b"HASH" in parts:                      # DxilShaderHash { uint32 Flags; byte Digest[16] }
+        o, _ = parts[b"HASH"]
+        info["shader_hash"] = blob[o + 4:o + 20].hex()
+    for part in (b"DXIL", b"ILDB"):           # program-version header gives the profile
+        if part in parts:
+            ver = struct.unpack_from("<I", blob, parts[part][0])[0]
+            kind, major, minor = (ver >> 16) & 0xFFFF, (ver >> 4) & 0xF, ver & 0xF
+            info["shader_kind"] = _SHADER_KIND.get(kind, str(kind))
+            info["target"] = "%s_%d_%d" % (_SHADER_KIND.get(kind, "?"), major, minor)
+            break
+    if b"ILDN" in parts:                      # DxilShaderDebugName { u16 Flags; u16 NameLen; char[] }
+        o, _ = parts[b"ILDN"]
+        nl = struct.unpack_from("<H", blob, o + 2)[0]
+        info["debug_name"] = blob[o + 4:o + 4 + nl].split(b"\x00")[0].decode("utf-8", "replace")
+    if b"SFI0" in parts and parts[b"SFI0"][1] >= 8:
+        mask = struct.unpack_from("<Q", blob, parts[b"SFI0"][0])[0]
+        info["feature_flags_mask"] = hex(mask)
+        info["feature_flags"] = [v for b, v in _SFI0_FEATURES.items() if mask & (1 << b)]
+    return info
+
+def _llvm_unescape(s):
+    """Decode LLVM-IR metadata-string escapes (\\\\ and \\XX hex), e.g. DXC writes '\\5C' for '\\'."""
+    out, i, n = [], 0, len(s)
+    while i < n:
+        if s[i] == "\\" and i + 1 < n:
+            if s[i + 1] == "\\":
+                out.append("\\"); i += 2; continue
+            h = s[i + 1:i + 3]
+            if len(h) == 2 and all(c in "0123456789abcdefABCDEF" for c in h):
+                out.append(chr(int(h, 16))); i += 3; continue
+            out.append(s[i + 1]); i += 2; continue
+        out.append(s[i]); i += 1
+    return "".join(out)
+
+def _structure_args(toks):
+    """Fold a DXC argument token list into {raw_args, entry, target, output, defines,
+    includes, flags}. Shared by the embedded-debug and external-PDB code paths."""
+    out = {"raw_args": list(toks), "defines": [], "includes": [], "flags": []}
+    i = 0
+    valued = {"-E": "entry", "-T": "target", "-Fo": "output"}
+    listed = {"-D": "defines", "-I": "includes"}
+    while i < len(toks):
+        t = toks[i]
+        if t in valued and i + 1 < len(toks):
+            out[valued[t]] = toks[i + 1]; i += 2; continue
+        if t in listed and i + 1 < len(toks):
+            if toks[i + 1] not in out[listed[t]]:   # build scripts often pass -D/-I twice
+                out[listed[t]].append(toks[i + 1])
+            i += 2; continue
+        if t.startswith("-"):
+            out["flags"].append(t)
+        i += 1
+    return out
+
+def _parse_compile_args(disasm):
+    """Pull the embedded DXC command line out of a -dumpbin disassembly. The args live in a
+    one-line metadata node like `!{!"-E", !"main", !"-T", !"cs_6_9", !"-D", !"FOO", ...}` that
+    DXC emits only with -Zi/-Qembed_debug. Returns the structured dict or {} when absent."""
+    arg_line = next((ln for ln in disasm.splitlines() if '!"-T"' in ln and "!{" in ln), None) \
+        or next((ln for ln in disasm.splitlines() if '!"-E"' in ln and "!{" in ln), None)
+    if not arg_line:
+        return {}
+    toks = [_llvm_unescape(t) for t in re.findall(r'!"((?:[^"\\]|\\.)*)"', arg_line)]
+    return _structure_args(toks) if toks else {}
+
+def _parse_required_features(disasm):
+    """The `; Note: shader requires additional functionality:` block -> list of feature lines."""
+    lines = disasm.splitlines()
+    for i, ln in enumerate(lines):
+        if "requires additional functionality" in ln:
+            feats = []
+            for ln2 in lines[i + 1:]:
+                s = ln2.strip().lstrip(";").strip()
+                if not s:
+                    break
+                feats.append(s)
+            return feats
+    return []
+
+def _default_pdb_dir():
+    """Unity writes side-car shader PDBs (hash-named, MSF/DIA) to UnityProject\\ShaderPDB.
+    WPIX_PDB_DIR overrides; returns None if neither exists."""
+    p = os.environ.get("WPIX_PDB_DIR")
+    if p and os.path.isdir(p):
+        return p
+    repo = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+    cand = os.path.join(repo, "UnityProject", "ShaderPDB")
+    return cand if os.path.isdir(cand) else None
+
+def _compile_args_from_pdb(shader_hash, pdb_dir, dxc):
+    """Recover compile args from an external DXC PDB named <shader_hash>.pdb (Unity's
+    layout). Returns (structured_args, pdb_path, main_file) or (None, path_or_None, None)."""
+    if not shader_hash or not pdb_dir:
+        return None, None, None
+    pdb_path = os.path.join(pdb_dir, f"{shader_hash}.pdb")
+    if not os.path.isfile(pdb_path):
+        return None, None, None
+    import dxc_pdb  # lazy: only loads dxcompiler.dll when an external PDB is actually needed
+    dll = os.path.join(os.path.dirname(dxc), "dxcompiler.dll")
+    raw = dxc_pdb.read_pdb_compile_info(pdb_path, dll)
+    structured = _structure_args(raw.get("args") or [])
+    return structured, pdb_path, raw.get("main_file")
+
+def describe_shader(wpix, global_id, disassemble=True, pdb_dir=None):
+    """Compile-time info for the compute shader bound at a Dispatch: shader_hash, target,
+    shader_kind, required-feature flags and debug name (always, from the DXIL container), plus
+    the original DXC command line — entry, defines, includes, flags.
+
+    The command line is recovered from whichever source carries it:
+      * embedded debug info (-Zi/-Qembed_debug) in the captured blob, via dxc -dumpbin; else
+      * an external side-car PDB named <shader_hash>.pdb (Unity's UnityProject\\ShaderPDB
+        layout), read through IDxcPdbUtils2 in dxcompiler.dll.
+    'args_source' in the result says which was used. Set disassemble=False for container-only
+    fields. pdb_dir overrides the PDB folder (default: auto-detected ShaderPDB, or WPIX_PDB_DIR);
+    WPIX_DXC overrides the dxc.exe / dxcompiler.dll used."""
+    A = load_export(export_region(wpix, global_id, global_id))
+    d = next((x for x in A.dispatches if x["global_id"] == global_id),
+             A.dispatches[-1] if A.dispatches else None)
+    if d is None:
+        raise RuntimeError(f"no dispatch at global_id {global_id}")
+    pso = d.get("pso")
+    if pso is None or pso not in getattr(A, "pso_blob", {}):
+        raise RuntimeError(f"dispatch {global_id} (pso {pso}) has no compute-shader blob to inspect")
+    off, csize = A.pso_blob[pso]
+    blob = _xpress_decompress_at(A.dir, off, csize)
+    blob = blob[:A.pso_cs_size.get(pso, len(blob))]
+    info = {"global_id": global_id, "pso": pso, "container_bytes": len(blob)}
+    info.update(container_compile_info(blob))
+    if not disassemble:
+        return info
+    try:
+        dxc = find_dxc()
+    except FileNotFoundError as e:
+        info["disasm_note"] = f"{e}; entry/defines/flags unavailable"
+        return info
+    info["dxc"] = dxc
+
+    # 1) embedded compile args (-Zi/-Qembed_debug), via disassembly — also gives features.
+    tmp = os.path.join(_cache_root(), f"cs_{info.get('shader_hash', 'blob')}.bin")
+    with open(tmp, "wb") as fh:
+        fh.write(blob)
+    proc = subprocess.run([dxc, "-dumpbin", tmp], capture_output=True, text=True)
+    if proc.returncode == 0:
+        rf = _parse_required_features(proc.stdout)
+        if rf:
+            info["required_features"] = rf
+        args = _parse_compile_args(proc.stdout)
+        if args:
+            info.update(args)
+            info["args_source"] = "embedded_debug"
+            return info
+    else:
+        info["disasm_note"] = f"dxc -dumpbin failed: {(proc.stdout + proc.stderr).strip()[:300]}"
+
+    # 2) fall back to an external side-car PDB (Unity's no-embed-debug layout).
+    pdb_dir = pdb_dir or _default_pdb_dir()
+    try:
+        args, pdb_path, main_file = _compile_args_from_pdb(info.get("shader_hash"), pdb_dir, dxc)
+    except Exception as e:
+        info["pdb_note"] = f"external PDB read failed: {type(e).__name__}: {e}"
+        return info
+    if args:
+        info.update(args)
+        info["args_source"] = "external_pdb"
+        info["pdb_path"] = pdb_path
+        if main_file:
+            info["main_file"] = main_file
+    elif "disasm_note" not in info:
+        where = f" (looked in {pdb_dir})" if pdb_dir else " (no ShaderPDB dir found)"
+        info["disasm_note"] = ("no embedded compile args (built without -Zi/-Qembed_debug) "
+                               f"and no <hash>.pdb side-car{where}; entry/defines/flags unavailable")
+    return info
 
 # --------------------------------------------------------------------------------------
 # DXGI format decoding -> numpy (H, W, C) float for color formats

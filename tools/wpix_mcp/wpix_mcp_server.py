@@ -5,6 +5,7 @@ exposing PIX .wpix shader input/output inspection for pixel-level comparison.
 Tools:
   wpix_find_events       find Dispatch/Draw events (optionally by marker name)
   wpix_describe_dispatch list a dispatch's bound CBVs / SRV inputs / UAV outputs
+  wpix_describe_shader   compile-time info for a dispatch's CS (hash/target/defines/flags)
   wpix_extract           decode one input/output (or CBV) to stats + optional .npy
   wpix_compare           diff the same binding across two captures (max-abs/mse/psnr)
   wpix_clear_cache       delete cached exports
@@ -32,6 +33,9 @@ def t_find_events(wpix_path, name_filter=None, dispatches_only=False):
 
 def t_describe_dispatch(wpix_path, global_id, used_only=False):
     return core.describe_dispatch(wpix_path, int(global_id), bool(used_only))
+
+def t_describe_shader(wpix_path, global_id, disassemble=True, pdb_dir=None):
+    return core.describe_shader(wpix_path, int(global_id), bool(disassemble), pdb_dir)
 
 def t_extract(wpix_path, global_id, selector, mip=0, array_slice=0,
               save_npy_path=None, cbv_size=None, struct_def=None, struct_name=None):
@@ -91,6 +95,34 @@ TOOLS = [
             "required": ["wpix_path", "global_id"],
         },
         "handler": t_describe_dispatch,
+    },
+    {
+        "name": "wpix_describe_shader",
+        "description": "Compile-time info for the compute shader bound at a Dispatch (by global "
+                       "id): shader_hash (the HASH-part digest PIX/RenderDoc show — NOT the "
+                       "container header checksum), target/profile, shader_kind, required-feature "
+                       "flags and debug/PDB name (all read straight from the DXIL container), plus "
+                       "the original DXC command line — entry, defines, includes, flags. The "
+                       "command line comes from whichever source has it: embedded debug info "
+                       "(-Zi/-Qembed_debug) via dxc -dumpbin, else an external side-car PDB named "
+                       "<shader_hash>.pdb (Unity's UnityProject\\ShaderPDB layout) read via "
+                       "IDxcPdbUtils2 in dxcompiler.dll. 'args_source' reports which was used "
+                       "(embedded_debug | external_pdb). Useful for comparing how the same pass is "
+                       "compiled across two apps (e.g. Unity cs_6_6 vs RTXPT cs_6_9, differing "
+                       "-D defines). Set disassemble=false for just the container fields. Env: "
+                       "WPIX_DXC overrides dxc.exe/dxcompiler.dll; WPIX_PDB_DIR (or the pdb_dir "
+                       "arg) overrides the side-car PDB folder.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "wpix_path": {"type": "string"},
+                "global_id": {"type": "integer", "description": "Global id of the Dispatch (from wpix_find_events)."},
+                "disassemble": {"type": "boolean", "default": True, "description": "Recover entry/defines/flags (dxc -dumpbin, then external-PDB fallback); false = container-only fields (hash/target/features)."},
+                "pdb_dir": {"type": "string", "description": "Folder of side-car <hash>.pdb files for shaders built without embedded debug (default: auto-detected UnityProject/ShaderPDB, or WPIX_PDB_DIR)."},
+            },
+            "required": ["wpix_path", "global_id"],
+        },
+        "handler": t_describe_shader,
     },
     {
         "name": "wpix_extract",
