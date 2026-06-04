@@ -65,7 +65,8 @@ namespace PathTracing
 
         public override void RecordRenderGraph(RenderGraph renderGraph, ContextContainer frameData)
         {
-            using var builder = renderGraph.AddUnsafePass<PassData>("BuildStablePlanes", out var passData);
+            // PIX marker matches the original RTXPT (AdvancedSample PathTracePrePass / RayGen_BUILD).
+            using var builder = renderGraph.AddUnsafePass<PassData>("PathTracePrePass", out var passData);
 
             passData.BuildSP   = _buildSP;
             passData.BuildDs   = _buildDs;
@@ -93,7 +94,7 @@ namespace PathTracing
 
             var tlas = ctx.GpuScene?.AccelerationStructure;
 
-            cmd.BeginSample("BuildStablePlanes");
+            cmd.BeginSample("PathTracePrePass");
             {
                 var ds = data.BuildDs;
                 BindCommonRT(ds, ctx, &miniConst, tlas);
@@ -112,7 +113,7 @@ namespace PathTracing
 
                 data.BuildSP.Dispatch(cmd, ds, (uint)data.RenderRes.x, (uint)data.RenderRes.y);
             }
-            cmd.EndSample("BuildStablePlanes");
+            cmd.EndSample("PathTracePrePass");
         }
 
         // ── Binding helpers ────────────────────────────────────────────────────

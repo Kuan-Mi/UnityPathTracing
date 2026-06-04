@@ -16,13 +16,15 @@ ScriptedImporter:
   - ../RenderingPlugin/External/RTXPT/External
   - ../RenderingPlugin/External/donut/include
   - ../RenderingPlugin/External/RTXPT/Rtxpt/Shaders
-  extraArgs: []
+  extraArgs:
+  - -all_resources_bound
   defines:
   - PATH_TRACER_MODE=PATH_TRACER_MODE_FILL_STABLE_PLANES
   - RTXPT_PIPELINE_PERMUTATION_NAME=FILL
   - RTXPT_MATERIAL_PERMUTATION_NAME=FILL_NonEmissive
   - RTXPT_MATERIAL_IS_EMISSIVE=0
   - RTXPT_MATERIAL_IS_ANALYTIC_LIGHT_PROXY=0
+  - ENABLE_DEBUG_SURFACE_VIZ=0
   - PT_NEE_ENABLED=1
   - TARGET_D3D12
   - ENABLE_DEBUG_PRINT

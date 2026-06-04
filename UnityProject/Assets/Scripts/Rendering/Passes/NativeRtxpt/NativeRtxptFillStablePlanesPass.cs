@@ -80,7 +80,9 @@ namespace PathTracing
 
         public override void RecordRenderGraph(RenderGraph renderGraph, ContextContainer frameData)
         {
-            using var builder = renderGraph.AddUnsafePass<PassData>("FillStablePlanes", out var passData);
+            // PIX marker matches the original RTXPT (AdvancedSample PathTrace / RayGen_FILL, and the
+            // REF pipeline in reference mode — RTXPT drives both through the single "PathTrace" marker).
+            using var builder = renderGraph.AddUnsafePass<PassData>("PathTrace", out var passData);
 
             passData.FillSP             = _fillSP;
             passData.FillDs             = _fillDs;
@@ -113,7 +115,7 @@ namespace PathTracing
 
             if (data.IsRealtime)
             {
-                cmd.BeginSample("FillStablePlanes");
+                cmd.BeginSample("PathTrace");
                 {
                     var ds = data.FillDs;
                     BindCommonRT(ds, ctx, &miniConst, tlas);
@@ -127,11 +129,11 @@ namespace PathTracing
 
                     data.FillSP.Dispatch(cmd, ds, (uint)data.RenderRes.x, (uint)data.RenderRes.y);
                 }
-                cmd.EndSample("FillStablePlanes");
+                cmd.EndSample("PathTrace");
             }
             else
             {
-                cmd.BeginSample("Reference");
+                cmd.BeginSample("PathTrace");
                 {
                     var ds = data.RefDs;
                     BindCommonRT(ds, ctx, &miniConst, tlas);
@@ -145,7 +147,7 @@ namespace PathTracing
 
                     data.RefSP.Dispatch(cmd, ds, (uint)data.RenderRes.x, (uint)data.RenderRes.y);
                 }
-                cmd.EndSample("Reference");
+                cmd.EndSample("PathTrace");
             }
         }
 
