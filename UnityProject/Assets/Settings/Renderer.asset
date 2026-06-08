@@ -16,8 +16,8 @@ MonoBehaviour:
   setting:
     realtimeMode: 1
     realtimeAA: 3
-    upscalerMode: 0
-    cameraJitter: 0
+    upscalerMode: 2
+    cameraJitter: 1
     cameraAperture: 0
     cameraFocalDistance: 10000
     cameraMoveSpeed: 1
@@ -72,7 +72,7 @@ MonoBehaviour:
     dlssrrBrightnessClampK: 4096
     dlssrrMicroJitter: 0.1
     disableReSTIRsWithDLSSRR: 1
-    tmpDisableDlssRR: 1
+    tmpDisableDlssRR: 0
     enableBloom: 1
     bloomRadius: 8
     bloomIntensity: 0.004
@@ -102,7 +102,7 @@ MonoBehaviour:
     dbgDiscardNonNEELighting: 0
     dbgDiscardNEELighting: 0
     dbgDisablePostProcessFilters: 0
-    showMode: 2
+    showMode: 0
     debugViewType: 0
     debugViewStablePlaneIndex: -1
     skipRightEyeInVR: 1
