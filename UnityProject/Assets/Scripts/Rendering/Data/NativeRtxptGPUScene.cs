@@ -1281,20 +1281,27 @@ namespace PathTracing
             return result;
         }
 
+        // Matches donut's dm::vectorToSnorm8 (vector.cpp) bit-for-bit: scale = 127/length,
+        // then TRUNCATE toward zero via (int) cast (donut uses int(v*scale), not rounding),
+        // and keep the low byte with &0xFF. This is what the original RTXPT importer
+        // (GltfImporter.cpp -> vectorToSnorm8) does, so normals/tangents quantize identically.
         private static uint PackRGB8Snorm(Vector3 v)
         {
-            byte r = (byte)(Mathf.RoundToInt(Mathf.Clamp(v.x, -1f, 1f) * 127f) & 0xFF);
-            byte g = (byte)(Mathf.RoundToInt(Mathf.Clamp(v.y, -1f, 1f) * 127f) & 0xFF);
-            byte b = (byte)(Mathf.RoundToInt(Mathf.Clamp(v.z, -1f, 1f) * 127f) & 0xFF);
+            float scale = 127.0f / Mathf.Sqrt(v.x * v.x + v.y * v.y + v.z * v.z);
+            int r = (int)(v.x * scale) & 0xFF;
+            int g = (int)(v.y * scale) & 0xFF;
+            int b = (int)(v.z * scale) & 0xFF;
             return (uint)(r | (g << 8) | (b << 16));
         }
 
         private static uint PackRGBA8Snorm(Vector4 v)
         {
-            byte r = (byte)(Mathf.RoundToInt(Mathf.Clamp(v.x, -1f, 1f) * 127f) & 0xFF);
-            byte g = (byte)(Mathf.RoundToInt(Mathf.Clamp(v.y, -1f, 1f) * 127f) & 0xFF);
-            byte b = (byte)(Mathf.RoundToInt(Mathf.Clamp(v.z, -1f, 1f) * 127f) & 0xFF);
-            byte a = (byte)(Mathf.RoundToInt(Mathf.Clamp(v.w, -1f, 1f) * 127f) & 0xFF);
+            // donut scales all four channels by 127/length(xyz) (w shares the xyz-based scale).
+            float scale = 127.0f / Mathf.Sqrt(v.x * v.x + v.y * v.y + v.z * v.z);
+            int r = (int)(v.x * scale) & 0xFF;
+            int g = (int)(v.y * scale) & 0xFF;
+            int b = (int)(v.z * scale) & 0xFF;
+            int a = (int)(v.w * scale) & 0xFF;
             return (uint)(r | (g << 8) | (b << 16) | (a << 24));
         }
     }
