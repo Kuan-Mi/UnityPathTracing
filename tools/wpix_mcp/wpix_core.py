@@ -487,10 +487,12 @@ class ExportData:
             for fn in re.finditer(r'void (PopulateCommandList_\w+)\(\)\s*\{(.*?)\n\}', t, re.S):
                 body = fn.group(2)
                 root_tables = {}; root_cbv = {}; cur_sig = None; cur_pso = None
-                last_gid = None
+                last_gid = None; rays_dims = None
                 for ln in body.split("\n"):
                     m = re.search(r'SetPipelineState\(GetPipelineState\((\d+)\)', ln)
                     if m: cur_pso = int(m.group(1))
+                    m = re.search(r'SetPipelineState1\(GetStateObject\((\d+)\)', ln)
+                    if m: cur_pso = None  # DXR state object: no single compute kernel to reflect
                     m = re.search(r'SetComputeRootSignature\(GetRootSignature\((\d+)\)', ln)
                     if m: cur_sig = int(m.group(1))
                     m = re.search(r'SetComputeRootDescriptorTable\((\d+),\s*GetGpuDescriptor\([^,]+,\s*(\d+)\)', ln)
@@ -510,6 +512,24 @@ class ExportData:
                             "root_tables": dict(root_tables),   # param -> start slot
                             "root_cbv": dict(root_cbv),         # param -> (res, offset)
                         })
+                    # DXR: a DispatchRays carries the same compute root bindings (CBV/tables)
+                    # as a Dispatch, so register it too -> describe_dispatch/extract/compare
+                    # work on ray-dispatch global ids. The D3D12_DISPATCH_RAYS_DESC trailing
+                    # ints are the ray-grid Width/Height/Depth (used as 'groups').
+                    m = re.search(r'D3D12_DISPATCH_RAYS_DESC\b.*?(\d+),\s*(\d+),\s*(\d+)\s*\}\s*;', ln)
+                    if m: rays_dims = (int(m.group(1)), int(m.group(2)), int(m.group(3)))
+                    if '->DispatchRays(' in ln:
+                        self.dispatches.append({
+                            "func": fn.group(1),
+                            "global_id": last_gid,
+                            "groups": rays_dims or (0, 0, 0),
+                            "root_signature": cur_sig,
+                            "pso": cur_pso,
+                            "root_tables": dict(root_tables),   # param -> start slot
+                            "root_cbv": dict(root_cbv),         # param -> (res, offset)
+                            "ray_dispatch": True,
+                        })
+                        rays_dims = None
 
     # ---- enumerate populated descriptor slots of a table (start slot..next table/gap) ----
     def table_slots(self, start_slot, stop_slots, max_count=64):
@@ -1173,9 +1193,23 @@ def binding_table(exp, dispatch=None):
         start = d["root_tables"][param]
         ranges = sig.get(param, {}).get("ranges") or []
         size = sig.get(param, {}).get("table_size") or 0
-        slots = ([exp.descriptors[s] for s in range(start, start + size)
-                  if s in exp.descriptors] if size
-                 else exp.table_slots(start, set(d["root_tables"].values())))
+        # An unbounded/bindless table reports an enormous table_size (e.g. ~2^33), so never
+        # iterate range(start, start+size) -- walk only the heap slots that actually exist,
+        # stopping at the next table's start (same boundary table_slots uses).
+        if size:
+            end = start + size
+            stop = set(d["root_tables"].values()) - {start}
+            slots = []
+            for s in sorted(exp.descriptors):
+                if s < start:
+                    continue
+                if s >= end or (s != start and s in stop):
+                    break
+                slots.append(exp.descriptors[s])
+                if len(slots) >= 8192:
+                    break
+        else:
+            slots = exp.table_slots(start, set(d["root_tables"].values()))
         for desc in slots:
             r = exp.resources.get(desc["resource"], {})
             cls, reg, space = _slot_register(ranges, desc["slot"] - start)
@@ -1338,13 +1372,28 @@ def _match_output_resource(A, rid_a, B):
             ("width", "height", "array_or_depth", "mips", "format", "dimension")}
     return B.find_resource(name=A.resources[rid_a].get("name"), like=like)
 
+def _save_raw_bin(path, raw):
+    """Write exact bytes to a file (creating parent dirs) for byte-accurate interop with
+    other programs. Returns {"saved_bin","saved_bytes"} to merge into the result dict."""
+    path = os.path.abspath(path)
+    os.makedirs(os.path.dirname(path) or ".", exist_ok=True)
+    with open(path, "wb") as fh:
+        fh.write(raw)
+    return {"saved_bin": path, "saved_bytes": len(raw)}
+
 def extract(wpix, global_id, selector, mip=0, array_slice=0, out_npy=None,
-            cbv_size=None, struct_def=None, struct_name=None):
+            cbv_size=None, struct_def=None, struct_name=None, save_bin=None):
     """Extract a dispatch input/output as numpy (texture), or bytes/32-bit words
     (cbv and raw/structured buffers). Returns a JSON-able dict with stats; optionally
     saves .npy. For buffers, cbv_size caps how many bytes are read (default: whole buffer).
     If struct_def (an HLSL/C++ struct definition string) is given for a buffer, the bytes
-    are overlaid onto named fields ('fields' list + a readable 'table')."""
+    are overlaid onto named fields ('fields' list + a readable 'table').
+
+    save_bin writes the EXACT raw bytes (no decoding, no truncation) to a .bin file, the
+    portable format other programs can read directly (e.g. C fread / numpy.fromfile). For a
+    CBV/buffer that is the byte window actually read (size capped by cbv_size); for a texture
+    it is the raw decoded subresource buffer. The JSON result is unchanged (still truncated);
+    the .bin holds the full data."""
     A = load_export(export_region(wpix, global_id, global_id))
     bt = binding_table(A)
     is_cbv = ("cbv" in selector) or (selector.get("role") == "cbv")
@@ -1382,6 +1431,8 @@ def extract(wpix, global_id, selector, mip=0, array_slice=0, out_npy=None,
             out["note"] = ("some words are NaN when read as float — this is normal for uint/"
                            "padding fields (e.g. 0xCCCCCCCC); if unexpected, you may be reading "
                            "past the struct — pass cbv_size=sizeof(struct).")
+        if save_bin:
+            out.update(_save_raw_bin(save_bin, raw))
         return out
 
     is_output = (tgt["role"] == "uav")
@@ -1427,6 +1478,8 @@ def extract(wpix, global_id, selector, mip=0, array_slice=0, out_npy=None,
         if out_npy:
             np.save(out_npy, np.frombuffer(raw[:len(raw) // 4 * 4], np.uint32))
             info["saved_npy"] = os.path.abspath(out_npy)
+        if save_bin:
+            info.update(_save_raw_bin(save_bin, raw))
         return info
     sub = subresource_index(mip, array_slice, res["mips"])
     fp = get_footprint(res, sub)
@@ -1438,6 +1491,10 @@ def extract(wpix, global_id, selector, mip=0, array_slice=0, out_npy=None,
     if out_npy:
         np.save(out_npy, arr)
         info["saved_npy"] = os.path.abspath(out_npy)
+    if save_bin:
+        info.update(_save_raw_bin(save_bin, np.ascontiguousarray(arr).tobytes()))
+        info["bin_dtype"] = str(arr.dtype)
+        info["bin_shape"] = list(arr.shape)
     return info
 
 def _load_for_compare(wpix, global_id, selector, mip, array_slice):

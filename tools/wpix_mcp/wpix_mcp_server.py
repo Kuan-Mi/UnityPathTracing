@@ -38,10 +38,12 @@ def t_describe_shader(wpix_path, global_id, disassemble=True, pdb_dir=None):
     return core.describe_shader(wpix_path, int(global_id), bool(disassemble), pdb_dir)
 
 def t_extract(wpix_path, global_id, selector, mip=0, array_slice=0,
-              save_npy_path=None, cbv_size=None, struct_def=None, struct_name=None):
+              save_npy_path=None, cbv_size=None, struct_def=None, struct_name=None,
+              save_bin_path=None):
     return core.extract(wpix_path, int(global_id), selector, int(mip),
                         int(array_slice), save_npy_path,
-                        int(cbv_size) if cbv_size else None, struct_def, struct_name)
+                        int(cbv_size) if cbv_size else None, struct_def, struct_name,
+                        save_bin_path)
 
 def t_compare(a, b, save_diff_npy_path=None, struct_def=None, struct_name=None):
     return core.compare(a, b, save_diff_npy_path, struct_def, struct_name)
@@ -144,6 +146,7 @@ TOOLS = [
                 "mip": {"type": "integer", "default": 0},
                 "array_slice": {"type": "integer", "default": 0, "description": "Array slice / cube face (0..5)."},
                 "save_npy_path": {"type": "string", "description": "Optional path to save the decoded array as .npy."},
+                "save_bin_path": {"type": "string", "description": "Optional path to save the EXACT raw bytes as .bin (no decoding, no truncation) for byte-accurate interop with other programs (C fread / numpy.fromfile). For a CBV/buffer this is the byte window read (size via cbv_size); for a texture it's the raw decoded subresource (dtype/shape returned as bin_dtype/bin_shape)."},
                 "cbv_size": {"type": "integer", "description": "Bytes to read for a CBV selector (default 1024)."},
                 "struct_def": {"type": "string", "description": "Optional HLSL/C++ struct definition string to overlay on a buffer's bytes (tight 4-byte structured-buffer packing). Returns named 'fields' + a readable 'table'. Paste dependency structs too; nested structs are expanded."},
                 "struct_name": {"type": "string", "description": "Root struct name in struct_def (default: last struct defined)."},
