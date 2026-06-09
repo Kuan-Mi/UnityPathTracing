@@ -11,6 +11,7 @@ dds_to_png.py
     python dds_to_png.py <folder>              # 转换指定目录
     python dds_to_png.py <folder> --overwrite  # 覆盖已存在的 PNG
     python dds_to_png.py <folder> --no-recursive
+    python dds_to_png.py <folder> --delete-dds # 转换后删除有同名 PNG 的 .dds (含 .dds.meta)
 
 Pillow 自带 BCn 解码器可处理本工程中绝大多数格式
 (DXT1/BC1, DXT5/BC3, ATI2/BC5, BC7)。两类例外由本脚本手动兜底:
@@ -137,6 +138,8 @@ def main():
     ap.add_argument('--overwrite', action='store_true', help='overwrite existing .png files')
     ap.add_argument('--no-recursive', dest='recursive', action='store_false',
                     help='do not descend into subfolders')
+    ap.add_argument('--delete-dds', action='store_true',
+                    help='delete each .dds (and its Unity .dds.meta) once a same-name .png exists')
     args = ap.parse_args()
 
     if not os.path.isdir(args.folder):
@@ -144,7 +147,7 @@ def main():
         sys.exit(1)
 
     walker = os.walk(args.folder) if args.recursive else [(args.folder, [], os.listdir(args.folder))]
-    converted = skipped = failed = 0
+    converted = skipped = failed = deleted = 0
     for dp, _, fs in walker:
         for fn in fs:
             if not fn.lower().endswith('.dds'):
@@ -153,17 +156,26 @@ def main():
             dst = os.path.splitext(src)[0] + '.png'
             if os.path.exists(dst) and not args.overwrite:
                 skipped += 1
-                continue
-            try:
-                im = to_png_image(load_dds(src))
-                im.save(dst)
-                converted += 1
-                print(f'  OK  {os.path.relpath(src, args.folder)}  -> {im.mode} {im.size}')
-            except Exception as e:
-                failed += 1
-                print(f'  ERR {os.path.relpath(src, args.folder)}  {type(e).__name__}: {e}')
+            else:
+                try:
+                    im = to_png_image(load_dds(src))
+                    im.save(dst)
+                    converted += 1
+                    print(f'  OK  {os.path.relpath(src, args.folder)}  -> {im.mode} {im.size}')
+                except Exception as e:
+                    failed += 1
+                    print(f'  ERR {os.path.relpath(src, args.folder)}  {type(e).__name__}: {e}')
+                    continue  # no valid PNG -> never delete the source
 
-    print(f'\n完成: 转换 {converted}, 跳过(已存在) {skipped}, 失败 {failed}.')
+            # Only reachable when a same-name .png exists (just written or pre-existing).
+            if args.delete_dds:
+                os.remove(src)
+                deleted += 1
+                meta = src + '.meta'   # Unity import sidecar
+                if os.path.exists(meta):
+                    os.remove(meta)
+
+    print(f'\n完成: 转换 {converted}, 跳过(已存在) {skipped}, 失败 {failed}, 删除DDS {deleted}.')
     if failed:
         sys.exit(2)
 
