@@ -644,6 +644,11 @@ namespace PathTracing
                 if (hasUV) streamOffset     += vc * 8u;
                 uint tanOff                 = hasTangent ? streamOffset : 0xFFFFFFFFu;
 
+                if (!hasNormal || !hasTangent)
+                {
+                    Debug.LogWarning($"[NativeRtxptGPUScene] '{mesh.name}': missing normal or tangent stream");
+                } 
+
                 Material[] mats       = mr.sharedMaterials ?? Array.Empty<Material>();
                 int        subMeshCnt = mesh.subMeshCount;
                 // (firstGeom and instIdx are computed per-branch below)
@@ -651,7 +656,7 @@ namespace PathTracing
 #if UNITY_EDITOR
                 if (mr.name == "Bistro_Research_Interior_Paris_Flower_Pot_01A_2442" ||
                     mr.name == "Bistro_Research_Interior_Paris_ToffeeJar_01_3262" ||
-                    mr.name == "Bistro_Research_Interior_Paris_Wall_Light_Interior_01_3266")
+                    mr.name == "Wall_Front_Left")
                 {
                     var groups_dbg = target.SubmeshGroups;
                     var sb         = new System.Text.StringBuilder();

@@ -366,7 +366,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 1
+  m_IsActive: 0
 --- !u!114 &307774784
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -633,21 +633,33 @@ PrefabInstance:
     - targetCorrespondingSourceObject: {fileID: -3714074880520146989, guid: 23a7c2d222024b34288d7a9c98990daa, type: 3}
       insertIndex: -1
       addedObject: {fileID: 308568799}
+    - targetCorrespondingSourceObject: {fileID: -3714074880520146989, guid: 23a7c2d222024b34288d7a9c98990daa, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 1442166431}
     - targetCorrespondingSourceObject: {fileID: -4864833620444741553, guid: 23a7c2d222024b34288d7a9c98990daa, type: 3}
       insertIndex: -1
       addedObject: {fileID: 308568792}
     - targetCorrespondingSourceObject: {fileID: -4864833620444741553, guid: 23a7c2d222024b34288d7a9c98990daa, type: 3}
       insertIndex: -1
       addedObject: {fileID: 571469188}
+    - targetCorrespondingSourceObject: {fileID: -4864833620444741553, guid: 23a7c2d222024b34288d7a9c98990daa, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 617201255}
     - targetCorrespondingSourceObject: {fileID: 8493015188241380710, guid: 23a7c2d222024b34288d7a9c98990daa, type: 3}
       insertIndex: -1
       addedObject: {fileID: 308568798}
     - targetCorrespondingSourceObject: {fileID: 8493015188241380710, guid: 23a7c2d222024b34288d7a9c98990daa, type: 3}
       insertIndex: -1
       addedObject: {fileID: 308568801}
+    - targetCorrespondingSourceObject: {fileID: 8493015188241380710, guid: 23a7c2d222024b34288d7a9c98990daa, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 1442166430}
     - targetCorrespondingSourceObject: {fileID: -877593755064287766, guid: 23a7c2d222024b34288d7a9c98990daa, type: 3}
       insertIndex: -1
       addedObject: {fileID: 308568797}
+    - targetCorrespondingSourceObject: {fileID: -877593755064287766, guid: 23a7c2d222024b34288d7a9c98990daa, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 1693006193}
   m_SourcePrefab: {fileID: 100100000, guid: 23a7c2d222024b34288d7a9c98990daa, type: 3}
 --- !u!1 &308568791 stripped
 GameObject:
@@ -1564,6 +1576,20 @@ MeshRenderer:
   m_CorrespondingSourceObject: {fileID: 4210357320963261148, guid: 23a7c2d222024b34288d7a9c98990daa, type: 3}
   m_PrefabInstance: {fileID: 308568790}
   m_PrefabAsset: {fileID: 0}
+--- !u!114 &617201255
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 308568791}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: e198bd8f1fa7c2340822fa968f5c1be3, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::PathTracing.RtxptRenderer
+  Slots:
+  - {fileID: 11400000, guid: 7e8f9e974f9718d4792991a178507edc, type: 2}
 --- !u!1 &729773734
 GameObject:
   m_ObjectHideFlags: 0
@@ -2482,7 +2508,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 1
+  m_IsActive: 0
 --- !u!4 &1246522491
 Transform:
   m_ObjectHideFlags: 0
@@ -2649,6 +2675,36 @@ MeshRenderer:
   m_CorrespondingSourceObject: {fileID: 4572538528485005993, guid: 23a7c2d222024b34288d7a9c98990daa, type: 3}
   m_PrefabInstance: {fileID: 308568790}
   m_PrefabAsset: {fileID: 0}
+--- !u!114 &1442166430
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 308568795}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: e198bd8f1fa7c2340822fa968f5c1be3, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::PathTracing.RtxptRenderer
+  Slots:
+  - {fileID: 11400000, guid: ecf0e6d3abd3ffe41b3496621b4f5820, type: 2}
+  - {fileID: 11400000, guid: 725d4ad021d373146b644c6b5b092c22, type: 2}
+--- !u!114 &1442166431
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 308568796}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: e198bd8f1fa7c2340822fa968f5c1be3, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::PathTracing.RtxptRenderer
+  Slots:
+  - {fileID: 11400000, guid: def7d5154958e214cb5f50b94ad59fde, type: 2}
+  - {fileID: 11400000, guid: 4e3502d8f4ad6094891916bb1cadc888, type: 2}
 --- !u!1 &1481037814
 GameObject:
   m_ObjectHideFlags: 0
@@ -2934,7 +2990,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 1
+  m_IsActive: 0
 --- !u!23 &1634265931
 MeshRenderer:
   m_ObjectHideFlags: 0
@@ -3076,6 +3132,20 @@ MeshRenderer:
   m_CorrespondingSourceObject: {fileID: 7401102832525348, guid: 23a7c2d222024b34288d7a9c98990daa, type: 3}
   m_PrefabInstance: {fileID: 308568790}
   m_PrefabAsset: {fileID: 0}
+--- !u!114 &1693006193
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 308568794}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: e198bd8f1fa7c2340822fa968f5c1be3, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::PathTracing.RtxptRenderer
+  Slots:
+  - {fileID: 11400000, guid: b150244d679f2644b84d8df0aa3add9e, type: 2}
 --- !u!1001 &1766313773
 PrefabInstance:
   m_ObjectHideFlags: 0
@@ -3641,7 +3711,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 1
+  m_IsActive: 0
 --- !u!114 &1994543429
 MonoBehaviour:
   m_ObjectHideFlags: 0

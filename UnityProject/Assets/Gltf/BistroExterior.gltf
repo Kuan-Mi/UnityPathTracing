@@ -43311,17 +43311,17 @@
 		{
 			"mimeType":"image/png",
 			"name":"Vespa_Headlight_Normal",
-			"uri":"Textures/Vespa_Headlight_Normal.dds"
+			"uri":"Textures/Vespa_Headlight_Normal.png"
 		},
 		{
 			"mimeType":"image/png",
 			"name":"Vespa_Headlight_BaseColor",
-			"uri":"Textures/Vespa_Headlight_BaseColor.dds"
+			"uri":"Textures/Vespa_Headlight_BaseColor.png"
 		},
 		{
 			"mimeType":"image/png",
 			"name":"Vespa_Headlight_Specular",
-			"uri":"Textures/Vespa_Headlight_Specular.dds"
+			"uri":"Textures/Vespa_Headlight_Specular.png"
 		},
 		{
 			"mimeType":"image/png",
@@ -43331,2012 +43331,2012 @@
 		{
 			"mimeType":"image/png",
 			"name":"Foliage_Leaves_Normal",
-			"uri":"Textures/Foliage_Leaves_Normal.dds"
+			"uri":"Textures/Foliage_Leaves_Normal.png"
 		},
 		{
 			"mimeType":"image/png",
 			"name":"Foliage_Leaves_BaseColor.005",
-			"uri":"Textures/Foliage_Leaves_BaseColor.dds"
+			"uri":"Textures/Foliage_Leaves_BaseColor.png"
 		},
 		{
 			"mimeType":"image/png",
 			"name":"Foliage_Leaves_Specular",
-			"uri":"Textures/Foliage_Leaves_Specular.dds"
+			"uri":"Textures/Foliage_Leaves_Specular.png"
 		},
 		{
 			"mimeType":"image/png",
 			"name":"Foliage_Trunk_Normal",
-			"uri":"Textures/Foliage_Trunk_Normal.dds"
+			"uri":"Textures/Foliage_Trunk_Normal.png"
 		},
 		{
 			"mimeType":"image/png",
 			"name":"Foliage_Trunk_BaseColor",
-			"uri":"Textures/Foliage_Trunk_BaseColor.dds"
+			"uri":"Textures/Foliage_Trunk_BaseColor.png"
 		},
 		{
 			"mimeType":"image/png",
 			"name":"Foliage_Trunk_Specular",
-			"uri":"Textures/Foliage_Trunk_Specular.dds"
+			"uri":"Textures/Foliage_Trunk_Specular.png"
 		},
 		{
 			"mimeType":"image/png",
 			"name":"Vespa_Odometer_Glass_Normal",
-			"uri":"Textures/Vespa_Odometer_Glass_Normal.dds"
+			"uri":"Textures/Vespa_Odometer_Glass_Normal.png"
 		},
 		{
 			"mimeType":"image/png",
 			"name":"Vespa_Odometer_Glass_BaseColor",
-			"uri":"Textures/Vespa_Odometer_Glass_BaseColor.dds"
+			"uri":"Textures/Vespa_Odometer_Glass_BaseColor.png"
 		},
 		{
 			"mimeType":"image/png",
 			"name":"Vespa_Odometer_Glass_Specular",
-			"uri":"Textures/Vespa_Odometer_Glass_Specular.dds"
+			"uri":"Textures/Vespa_Odometer_Glass_Specular.png"
 		},
 		{
 			"mimeType":"image/png",
 			"name":"Vespa_Normal",
-			"uri":"Textures/Vespa_Normal.dds"
+			"uri":"Textures/Vespa_Normal.png"
 		},
 		{
 			"mimeType":"image/png",
 			"name":"Vespa_BaseColor",
-			"uri":"Textures/Vespa_BaseColor.dds"
+			"uri":"Textures/Vespa_BaseColor.png"
 		},
 		{
 			"mimeType":"image/png",
 			"name":"Vespa_Specular",
-			"uri":"Textures/Vespa_Specular.dds"
+			"uri":"Textures/Vespa_Specular.png"
 		},
 		{
 			"mimeType":"image/png",
 			"name":"Vespa_Odometer_Normal",
-			"uri":"Textures/Vespa_Odometer_Normal.dds"
+			"uri":"Textures/Vespa_Odometer_Normal.png"
 		},
 		{
 			"mimeType":"image/png",
 			"name":"Vespa_Odometer_BaseColor",
-			"uri":"Textures/Vespa_Odometer_BaseColor.dds"
+			"uri":"Textures/Vespa_Odometer_BaseColor.png"
 		},
 		{
 			"mimeType":"image/png",
 			"name":"Vespa_Odometer_Specular",
-			"uri":"Textures/Vespa_Odometer_Specular.dds"
+			"uri":"Textures/Vespa_Odometer_Specular.png"
 		},
 		{
 			"mimeType":"image/png",
 			"name":"Foliage_Bux_Hedges46_Normal",
-			"uri":"Textures/Foliage_Bux_Hedges46_Normal.dds"
+			"uri":"Textures/Foliage_Bux_Hedges46_Normal.png"
 		},
 		{
 			"mimeType":"image/png",
 			"name":"Foliage_Bux_Hedges46_BaseColor.005",
-			"uri":"Textures/Foliage_Bux_Hedges46_BaseColor.dds"
+			"uri":"Textures/Foliage_Bux_Hedges46_BaseColor.png"
 		},
 		{
 			"mimeType":"image/png",
 			"name":"Foliage_Bux_Hedges46_Specular",
-			"uri":"Textures/Foliage_Bux_Hedges46_Specular.dds"
+			"uri":"Textures/Foliage_Bux_Hedges46_Specular.png"
 		},
 		{
 			"mimeType":"image/png",
 			"name":"Foliage_Ivy_leaf_a_Normal",
-			"uri":"Textures/Foliage_Ivy_leaf_a_Normal.dds"
+			"uri":"Textures/Foliage_Ivy_leaf_a_Normal.png"
 		},
 		{
 			"mimeType":"image/png",
 			"name":"Foliage_Ivy_leaf_a_BaseColor.005",
-			"uri":"Textures/Foliage_Ivy_leaf_a_BaseColor.dds"
+			"uri":"Textures/Foliage_Ivy_leaf_a_BaseColor.png"
 		},
 		{
 			"mimeType":"image/png",
 			"name":"Foliage_Ivy_leaf_a_Specular",
-			"uri":"Textures/Foliage_Ivy_leaf_a_Specular.dds"
+			"uri":"Textures/Foliage_Ivy_leaf_a_Specular.png"
 		},
 		{
 			"mimeType":"image/png",
 			"name":"Foliage_Ivy_branches_Normal",
-			"uri":"Textures/Foliage_Ivy_branches_Normal.dds"
+			"uri":"Textures/Foliage_Ivy_branches_Normal.png"
 		},
 		{
 			"mimeType":"image/png",
 			"name":"Foliage_Ivy_branches_BaseColor",
-			"uri":"Textures/Foliage_Ivy_branches_BaseColor.dds"
+			"uri":"Textures/Foliage_Ivy_branches_BaseColor.png"
 		},
 		{
 			"mimeType":"image/png",
 			"name":"Foliage_Ivy_branches_Specular",
-			"uri":"Textures/Foliage_Ivy_branches_Specular.dds"
+			"uri":"Textures/Foliage_Ivy_branches_Specular.png"
 		},
 		{
 			"mimeType":"image/png",
 			"name":"Foliage_Linde_Tree_Large_Trunk_Normal",
-			"uri":"Textures/Foliage_Linde_Tree_Large_Trunk_Normal.dds"
+			"uri":"Textures/Foliage_Linde_Tree_Large_Trunk_Normal.png"
 		},
 		{
 			"mimeType":"image/png",
 			"name":"Foliage_Linde_Tree_Large_Trunk_BaseColor",
-			"uri":"Textures/Foliage_Linde_Tree_Large_Trunk_BaseColor.dds"
+			"uri":"Textures/Foliage_Linde_Tree_Large_Trunk_BaseColor.png"
 		},
 		{
 			"mimeType":"image/png",
 			"name":"Foliage_Linde_Tree_Large_Trunk_Specular",
-			"uri":"Textures/Foliage_Linde_Tree_Large_Trunk_Specular.dds"
+			"uri":"Textures/Foliage_Linde_Tree_Large_Trunk_Specular.png"
 		},
 		{
 			"mimeType":"image/png",
 			"name":"Foliage_Linde_Tree_Large_Orange_Leaves_Normal",
-			"uri":"Textures/Foliage_Linde_Tree_Large_Orange_Leaves_Normal.dds"
+			"uri":"Textures/Foliage_Linde_Tree_Large_Orange_Leaves_Normal.png"
 		},
 		{
 			"mimeType":"image/png",
 			"name":"Foliage_Linde_Tree_Large_Orange_Leaves_BaseColor.005",
-			"uri":"Textures/Foliage_Linde_Tree_Large_Orange_Leaves_BaseColor.dds"
+			"uri":"Textures/Foliage_Linde_Tree_Large_Orange_Leaves_BaseColor.png"
 		},
 		{
 			"mimeType":"image/png",
 			"name":"Foliage_Linde_Tree_Large_Orange_Leaves_Specular",
-			"uri":"Textures/Foliage_Linde_Tree_Large_Orange_Leaves_Specular.dds"
+			"uri":"Textures/Foliage_Linde_Tree_Large_Orange_Leaves_Specular.png"
 		},
 		{
 			"mimeType":"image/png",
 			"name":"Foliage_Linde_Tree_Large_Green_Leaves_Normal",
-			"uri":"Textures/Foliage_Linde_Tree_Large_Green_Leaves_Normal.dds"
+			"uri":"Textures/Foliage_Linde_Tree_Large_Green_Leaves_Normal.png"
 		},
 		{
 			"mimeType":"image/png",
 			"name":"Foliage_Linde_Tree_Large_Green_Leaves_BaseColor.005",
-			"uri":"Textures/Foliage_Linde_Tree_Large_Green_Leaves_BaseColor.dds"
+			"uri":"Textures/Foliage_Linde_Tree_Large_Green_Leaves_BaseColor.png"
 		},
 		{
 			"mimeType":"image/png",
 			"name":"Foliage_Linde_Tree_Large_Green_Leaves_Specular",
-			"uri":"Textures/Foliage_Linde_Tree_Large_Green_Leaves_Specular.dds"
+			"uri":"Textures/Foliage_Linde_Tree_Large_Green_Leaves_Specular.png"
 		},
 		{
 			"mimeType":"image/png",
 			"name":"Antenna_Metal_Normal",
-			"uri":"Textures/Antenna_Metal_Normal.dds"
+			"uri":"Textures/Antenna_Metal_Normal.png"
 		},
 		{
 			"mimeType":"image/png",
 			"name":"Antenna_Metal_BaseColor",
-			"uri":"Textures/Antenna_Metal_BaseColor.dds"
+			"uri":"Textures/Antenna_Metal_BaseColor.png"
 		},
 		{
 			"mimeType":"image/png",
 			"name":"Antenna_Metal_Specular",
-			"uri":"Textures/Antenna_Metal_Specular.dds"
+			"uri":"Textures/Antenna_Metal_Specular.png"
 		},
 		{
 			"mimeType":"image/png",
 			"name":"Antenna_Plastic_Blue_Normal",
-			"uri":"Textures/Antenna_Plastic_Blue_Normal.dds"
+			"uri":"Textures/Antenna_Plastic_Blue_Normal.png"
 		},
 		{
 			"mimeType":"image/png",
 			"name":"Antenna_Plastic_Blue_BaseColor",
-			"uri":"Textures/Antenna_Plastic_Blue_BaseColor.dds"
+			"uri":"Textures/Antenna_Plastic_Blue_BaseColor.png"
 		},
 		{
 			"mimeType":"image/png",
 			"name":"Antenna_Plastic_Blue_Specular",
-			"uri":"Textures/Antenna_Plastic_Blue_Specular.dds"
+			"uri":"Textures/Antenna_Plastic_Blue_Specular.png"
 		},
 		{
 			"mimeType":"image/png",
 			"name":"Antenna_Plastic_Normal",
-			"uri":"Textures/Antenna_Plastic_Normal.dds"
+			"uri":"Textures/Antenna_Plastic_Normal.png"
 		},
 		{
 			"mimeType":"image/png",
 			"name":"Antenna_Plastic_BaseColor",
-			"uri":"Textures/Antenna_Plastic_BaseColor.dds"
+			"uri":"Textures/Antenna_Plastic_BaseColor.png"
 		},
 		{
 			"mimeType":"image/png",
 			"name":"Antenna_Plastic_Specular",
-			"uri":"Textures/Antenna_Plastic_Specular.dds"
+			"uri":"Textures/Antenna_Plastic_Specular.png"
 		},
 		{
 			"mimeType":"image/png",
 			"name":"Ashtray_Normal",
-			"uri":"Textures/Ashtray_Normal.dds"
+			"uri":"Textures/Ashtray_Normal.png"
 		},
 		{
 			"mimeType":"image/png",
 			"name":"Ashtray_BaseColor",
-			"uri":"Textures/Ashtray_BaseColor.dds"
+			"uri":"Textures/Ashtray_BaseColor.png"
 		},
 		{
 			"mimeType":"image/png",
 			"name":"Ashtray_Specular",
-			"uri":"Textures/Ashtray_Specular.dds"
+			"uri":"Textures/Ashtray_Specular.png"
 		},
 		{
 			"mimeType":"image/png",
 			"name":"Awnings_Hotel_Fabric_Normal",
-			"uri":"Textures/Awnings_Hotel_Fabric_Normal.dds"
+			"uri":"Textures/Awnings_Hotel_Fabric_Normal.png"
 		},
 		{
 			"mimeType":"image/png",
 			"name":"Awnings_Hotel_Fabric_BaseColor",
-			"uri":"Textures/Awnings_Hotel_Fabric_BaseColor.dds"
+			"uri":"Textures/Awnings_Hotel_Fabric_BaseColor.png"
 		},
 		{
 			"mimeType":"image/png",
 			"name":"Awnings_Hotel_Fabric_Specular",
-			"uri":"Textures/Awnings_Hotel_Fabric_Specular.dds"
+			"uri":"Textures/Awnings_Hotel_Fabric_Specular.png"
 		},
 		{
 			"mimeType":"image/png",
 			"name":"Awnings_Fabric_Normal",
-			"uri":"Textures/Awnings_Fabric_Normal.dds"
+			"uri":"Textures/Awnings_Fabric_Normal.png"
 		},
 		{
 			"mimeType":"image/png",
 			"name":"Awnings_Fabric_BaseColor",
-			"uri":"Textures/Awnings_Fabric_BaseColor.dds"
+			"uri":"Textures/Awnings_Fabric_BaseColor.png"
 		},
 		{
 			"mimeType":"image/png",
 			"name":"Awnings_Fabric_Specular",
-			"uri":"Textures/Awnings_Fabric_Specular.dds"
+			"uri":"Textures/Awnings_Fabric_Specular.png"
 		},
 		{
 			"mimeType":"image/png",
 			"name":"Awnings_Beams_Normal",
-			"uri":"Textures/Awnings_Beams_Normal.dds"
+			"uri":"Textures/Awnings_Beams_Normal.png"
 		},
 		{
 			"mimeType":"image/png",
 			"name":"Awnings_Beams_BaseColor",
-			"uri":"Textures/Awnings_Beams_BaseColor.dds"
+			"uri":"Textures/Awnings_Beams_BaseColor.png"
 		},
 		{
 			"mimeType":"image/png",
 			"name":"Awnings_Beams_Specular",
-			"uri":"Textures/Awnings_Beams_Specular.dds"
+			"uri":"Textures/Awnings_Beams_Specular.png"
 		},
 		{
 			"mimeType":"image/png",
 			"name":"Banner_Metal_Normal",
-			"uri":"Textures/Banner_Metal_Normal.dds"
+			"uri":"Textures/Banner_Metal_Normal.png"
 		},
 		{
 			"mimeType":"image/png",
 			"name":"Banner_Metal_BaseColor",
-			"uri":"Textures/Banner_Metal_BaseColor.dds"
+			"uri":"Textures/Banner_Metal_BaseColor.png"
 		},
 		{
 			"mimeType":"image/png",
 			"name":"Banner_Metal_Specular",
-			"uri":"Textures/Banner_Metal_Specular.dds"
+			"uri":"Textures/Banner_Metal_Specular.png"
 		},
 		{
 			"mimeType":"image/png",
 			"name":"Bistro_Sign_Main_Normal",
-			"uri":"Textures/Bistro_Sign_Main_Normal.dds"
+			"uri":"Textures/Bistro_Sign_Main_Normal.png"
 		},
 		{
 			"mimeType":"image/png",
 			"name":"Bistro_Sign_Main_BaseColor",
-			"uri":"Textures/Bistro_Sign_Main_BaseColor.dds"
+			"uri":"Textures/Bistro_Sign_Main_BaseColor.png"
 		},
 		{
 			"mimeType":"image/png",
 			"name":"Bistro_Sign_Main_Specular",
-			"uri":"Textures/Bistro_Sign_Main_Specular.dds"
+			"uri":"Textures/Bistro_Sign_Main_Specular.png"
 		},
 		{
 			"mimeType":"image/png",
 			"name":"Bistro_Sign_Letters_Normal",
-			"uri":"Textures/Bistro_Sign_Letters_Normal.dds"
+			"uri":"Textures/Bistro_Sign_Letters_Normal.png"
 		},
 		{
 			"mimeType":"image/png",
 			"name":"Bistro_Sign_Letters_BaseColor",
-			"uri":"Textures/Bistro_Sign_Letters_BaseColor.dds"
+			"uri":"Textures/Bistro_Sign_Letters_BaseColor.png"
 		},
 		{
 			"mimeType":"image/png",
 			"name":"Bistro_Sign_Letters_Specular",
-			"uri":"Textures/Bistro_Sign_Letters_Specular.dds"
+			"uri":"Textures/Bistro_Sign_Letters_Specular.png"
 		},
 		{
 			"mimeType":"image/png",
 			"name":"Bollards_Normal",
-			"uri":"Textures/Bollards_Normal.dds"
+			"uri":"Textures/Bollards_Normal.png"
 		},
 		{
 			"mimeType":"image/png",
 			"name":"Bollards_BaseColor",
-			"uri":"Textures/Bollards_BaseColor.dds"
+			"uri":"Textures/Bollards_BaseColor.png"
 		},
 		{
 			"mimeType":"image/png",
 			"name":"Bollards_Specular",
-			"uri":"Textures/Bollards_Specular.dds"
+			"uri":"Textures/Bollards_Specular.png"
 		},
 		{
 			"mimeType":"image/png",
 			"name":"MASTER_Wood_Painted3_Normal",
-			"uri":"Textures/MASTER_Wood_Painted3_Normal.dds"
+			"uri":"Textures/MASTER_Wood_Painted3_Normal.png"
 		},
 		{
 			"mimeType":"image/png",
 			"name":"MASTER_Wood_Painted3_BaseColor",
-			"uri":"Textures/MASTER_Wood_Painted3_BaseColor.dds"
+			"uri":"Textures/MASTER_Wood_Painted3_BaseColor.png"
 		},
 		{
 			"mimeType":"image/png",
 			"name":"MASTER_Wood_Painted3_Specular",
-			"uri":"Textures/MASTER_Wood_Painted3_Specular.dds"
+			"uri":"Textures/MASTER_Wood_Painted3_Specular.png"
 		},
 		{
 			"mimeType":"image/png",
 			"name":"MASTER_Concrete_Grooved_Normal",
-			"uri":"Textures/MASTER_Concrete_Grooved_Normal.dds"
+			"uri":"Textures/MASTER_Concrete_Grooved_Normal.png"
 		},
 		{
 			"mimeType":"image/png",
 			"name":"MASTER_Concrete_Grooved_BaseColor",
-			"uri":"Textures/MASTER_Concrete_Grooved_BaseColor.dds"
+			"uri":"Textures/MASTER_Concrete_Grooved_BaseColor.png"
 		},
 		{
 			"mimeType":"image/png",
 			"name":"MASTER_Concrete_Grooved_Specular",
-			"uri":"Textures/MASTER_Concrete_Grooved_Specular.dds"
+			"uri":"Textures/MASTER_Concrete_Grooved_Specular.png"
 		},
 		{
 			"mimeType":"image/png",
 			"name":"MASTER_Concrete_Smooth_Normal",
-			"uri":"Textures/MASTER_Concrete_Smooth_Normal.dds"
+			"uri":"Textures/MASTER_Concrete_Smooth_Normal.png"
 		},
 		{
 			"mimeType":"image/png",
 			"name":"MASTER_Concrete_Smooth_BaseColor",
-			"uri":"Textures/MASTER_Concrete_Smooth_BaseColor.dds"
+			"uri":"Textures/MASTER_Concrete_Smooth_BaseColor.png"
 		},
 		{
 			"mimeType":"image/png",
 			"name":"MASTER_Concrete_Smooth_Specular",
-			"uri":"Textures/MASTER_Concrete_Smooth_Specular.dds"
+			"uri":"Textures/MASTER_Concrete_Smooth_Specular.png"
 		},
 		{
 			"mimeType":"image/png",
 			"name":"MASTER_Concrete_Plaster1_BLENDSHADER_Normal",
-			"uri":"Textures/MASTER_Concrete_Plaster1_BLENDSHADER_Normal.dds"
+			"uri":"Textures/MASTER_Concrete_Plaster1_BLENDSHADER_Normal.png"
 		},
 		{
 			"mimeType":"image/png",
 			"name":"MASTER_Concrete_Plaster1_BLENDSHADER_BaseColor",
-			"uri":"Textures/MASTER_Concrete_Plaster1_BLENDSHADER_BaseColor.dds"
+			"uri":"Textures/MASTER_Concrete_Plaster1_BLENDSHADER_BaseColor.png"
 		},
 		{
 			"mimeType":"image/png",
 			"name":"MASTER_Concrete_Plaster1_BLENDSHADER_Specular",
-			"uri":"Textures/MASTER_Concrete_Plaster1_BLENDSHADER_Specular.dds"
+			"uri":"Textures/MASTER_Concrete_Plaster1_BLENDSHADER_Specular.png"
 		},
 		{
 			"mimeType":"image/png",
 			"name":"Spotlight_Glass_Emissive_Emissive",
-			"uri":"Textures/Spotlight_Glass_Emissive_Emissive.dds"
+			"uri":"Textures/Spotlight_Glass_Emissive_Emissive.png"
 		},
 		{
 			"mimeType":"image/png",
 			"name":"Spotlight_Glass_Emissive_Normal",
-			"uri":"Textures/Spotlight_Glass_Emissive_Normal.dds"
+			"uri":"Textures/Spotlight_Glass_Emissive_Normal.png"
 		},
 		{
 			"mimeType":"image/png",
 			"name":"Spotlight_Glass_Emissive_BaseColor",
-			"uri":"Textures/Spotlight_Glass_Emissive_BaseColor.dds"
+			"uri":"Textures/Spotlight_Glass_Emissive_BaseColor.png"
 		},
 		{
 			"mimeType":"image/png",
 			"name":"Spotlight_Glass_Emissive_Specular",
-			"uri":"Textures/Spotlight_Glass_Emissive_Specular.dds"
+			"uri":"Textures/Spotlight_Glass_Emissive_Specular.png"
 		},
 		{
 			"mimeType":"image/png",
 			"name":"MASTER_Focus_Normal",
-			"uri":"Textures/MASTER_Focus_Normal.dds"
+			"uri":"Textures/MASTER_Focus_Normal.png"
 		},
 		{
 			"mimeType":"image/png",
 			"name":"MASTER_Focus_BaseColor",
-			"uri":"Textures/MASTER_Focus_BaseColor.dds"
+			"uri":"Textures/MASTER_Focus_BaseColor.png"
 		},
 		{
 			"mimeType":"image/png",
 			"name":"MASTER_Focus_Specular",
-			"uri":"Textures/MASTER_Focus_Specular.dds"
+			"uri":"Textures/MASTER_Focus_Specular.png"
 		},
 		{
 			"mimeType":"image/png",
 			"name":"MASTER_Grain_Metal_Normal",
-			"uri":"Textures/MASTER_Grain_Metal_Normal.dds"
+			"uri":"Textures/MASTER_Grain_Metal_Normal.png"
 		},
 		{
 			"mimeType":"image/png",
 			"name":"MASTER_Grain_Metal_BaseColor",
-			"uri":"Textures/MASTER_Grain_Metal_BaseColor.dds"
+			"uri":"Textures/MASTER_Grain_Metal_BaseColor.png"
 		},
 		{
 			"mimeType":"image/png",
 			"name":"MASTER_Grain_Metal_Specular",
-			"uri":"Textures/MASTER_Grain_Metal_Specular.dds"
+			"uri":"Textures/MASTER_Grain_Metal_Specular.png"
 		},
 		{
 			"mimeType":"image/png",
 			"name":"MASTER_Glass_Exterior_Normal",
-			"uri":"Textures/MASTER_Glass_Exterior_Normal.dds"
+			"uri":"Textures/MASTER_Glass_Exterior_Normal.png"
 		},
 		{
 			"mimeType":"image/png",
 			"name":"MASTER_Glass_Exterior_BaseColor.005",
-			"uri":"Textures/MASTER_Glass_Exterior_BaseColor.dds"
+			"uri":"Textures/MASTER_Glass_Exterior_BaseColor.png"
 		},
 		{
 			"mimeType":"image/png",
 			"name":"MASTER_Glass_Exterior_Specular",
-			"uri":"Textures/MASTER_Glass_Exterior_Specular.dds"
+			"uri":"Textures/MASTER_Glass_Exterior_Specular.png"
 		},
 		{
 			"mimeType":"image/png",
 			"name":"MASTER_Metal_Normal",
-			"uri":"Textures/MASTER_Metal_Normal.dds"
+			"uri":"Textures/MASTER_Metal_Normal.png"
 		},
 		{
 			"mimeType":"image/png",
 			"name":"MASTER_Metal_BaseColor",
-			"uri":"Textures/MASTER_Metal_BaseColor.dds"
+			"uri":"Textures/MASTER_Metal_BaseColor.png"
 		},
 		{
 			"mimeType":"image/png",
 			"name":"MASTER_Metal_Specular",
-			"uri":"Textures/MASTER_Metal_Specular.dds"
+			"uri":"Textures/MASTER_Metal_Specular.png"
 		},
 		{
 			"mimeType":"image/png",
 			"name":"MASTER_Light_Bulb_Normal",
-			"uri":"Textures/MASTER_Light_Bulb_Normal.dds"
+			"uri":"Textures/MASTER_Light_Bulb_Normal.png"
 		},
 		{
 			"mimeType":"image/png",
 			"name":"MASTER_Light_Bulb_BaseColor",
-			"uri":"Textures/MASTER_Light_Bulb_BaseColor.dds"
+			"uri":"Textures/MASTER_Light_Bulb_BaseColor.png"
 		},
 		{
 			"mimeType":"image/png",
 			"name":"MASTER_Light_Bulb_Specular",
-			"uri":"Textures/MASTER_Light_Bulb_Specular.dds"
+			"uri":"Textures/MASTER_Light_Bulb_Specular.png"
 		},
 		{
 			"mimeType":"image/png",
 			"name":"MASTER_Metal_Pipe_Normal",
-			"uri":"Textures/MASTER_Metal_Pipe_Normal.dds"
+			"uri":"Textures/MASTER_Metal_Pipe_Normal.png"
 		},
 		{
 			"mimeType":"image/png",
 			"name":"MASTER_Metal_Pipe_BaseColor",
-			"uri":"Textures/MASTER_Metal_Pipe_BaseColor.dds"
+			"uri":"Textures/MASTER_Metal_Pipe_BaseColor.png"
 		},
 		{
 			"mimeType":"image/png",
 			"name":"MASTER_Metal_Pipe_Specular",
-			"uri":"Textures/MASTER_Metal_Pipe_Specular.dds"
+			"uri":"Textures/MASTER_Metal_Pipe_Specular.png"
 		},
 		{
 			"mimeType":"image/png",
 			"name":"MASTER_Forge_Metal_Normal",
-			"uri":"Textures/MASTER_Forge_Metal_Normal.dds"
+			"uri":"Textures/MASTER_Forge_Metal_Normal.png"
 		},
 		{
 			"mimeType":"image/png",
 			"name":"MASTER_Forge_Metal_BaseColor.005",
-			"uri":"Textures/MASTER_Forge_Metal_BaseColor.dds"
+			"uri":"Textures/MASTER_Forge_Metal_BaseColor.png"
 		},
 		{
 			"mimeType":"image/png",
 			"name":"MASTER_Forge_Metal_Specular",
-			"uri":"Textures/MASTER_Forge_Metal_Specular.dds"
+			"uri":"Textures/MASTER_Forge_Metal_Specular.png"
 		},
 		{
 			"mimeType":"image/png",
 			"name":"MASTER_Focus_Ornament_Normal",
-			"uri":"Textures/MASTER_Focus_Ornament_Normal.dds"
+			"uri":"Textures/MASTER_Focus_Ornament_Normal.png"
 		},
 		{
 			"mimeType":"image/png",
 			"name":"MASTER_Focus_Ornament_BaseColor",
-			"uri":"Textures/MASTER_Focus_Ornament_BaseColor.dds"
+			"uri":"Textures/MASTER_Focus_Ornament_BaseColor.png"
 		},
 		{
 			"mimeType":"image/png",
 			"name":"MASTER_Focus_Ornament_Specular",
-			"uri":"Textures/MASTER_Focus_Ornament_Specular.dds"
+			"uri":"Textures/MASTER_Focus_Ornament_Specular.png"
 		},
 		{
 			"mimeType":"image/png",
 			"name":"MASTER_Wood_Polished_Normal",
-			"uri":"Textures/MASTER_Wood_Polished_Normal.dds"
+			"uri":"Textures/MASTER_Wood_Polished_Normal.png"
 		},
 		{
 			"mimeType":"image/png",
 			"name":"MASTER_Wood_Polished_BaseColor",
-			"uri":"Textures/MASTER_Wood_Polished_BaseColor.dds"
+			"uri":"Textures/MASTER_Wood_Polished_BaseColor.png"
 		},
 		{
 			"mimeType":"image/png",
 			"name":"MASTER_Wood_Polished_Specular",
-			"uri":"Textures/MASTER_Wood_Polished_Specular.dds"
+			"uri":"Textures/MASTER_Wood_Polished_Specular.png"
 		},
 		{
 			"mimeType":"image/png",
 			"name":"MASTER_Roofing_Shingle_Grey_Normal",
-			"uri":"Textures/MASTER_Roofing_Shingle_Grey_Normal.dds"
+			"uri":"Textures/MASTER_Roofing_Shingle_Grey_Normal.png"
 		},
 		{
 			"mimeType":"image/png",
 			"name":"MASTER_Roofing_Shingle_Grey_BaseColor",
-			"uri":"Textures/MASTER_Roofing_Shingle_Grey_BaseColor.dds"
+			"uri":"Textures/MASTER_Roofing_Shingle_Grey_BaseColor.png"
 		},
 		{
 			"mimeType":"image/png",
 			"name":"MASTER_Roofing_Shingle_Grey_Specular",
-			"uri":"Textures/MASTER_Roofing_Shingle_Grey_Specular.dds"
+			"uri":"Textures/MASTER_Roofing_Shingle_Grey_Specular.png"
 		},
 		{
 			"mimeType":"image/png",
 			"name":"MASTER_Roofing_Shingle_Green_Normal",
-			"uri":"Textures/MASTER_Roofing_Shingle_Green_Normal.dds"
+			"uri":"Textures/MASTER_Roofing_Shingle_Green_Normal.png"
 		},
 		{
 			"mimeType":"image/png",
 			"name":"MASTER_Roofing_Shingle_Green_BaseColor",
-			"uri":"Textures/MASTER_Roofing_Shingle_Green_BaseColor.dds"
+			"uri":"Textures/MASTER_Roofing_Shingle_Green_BaseColor.png"
 		},
 		{
 			"mimeType":"image/png",
 			"name":"MASTER_Roofing_Shingle_Green_Specular",
-			"uri":"Textures/MASTER_Roofing_Shingle_Green_Specular.dds"
+			"uri":"Textures/MASTER_Roofing_Shingle_Green_Specular.png"
 		},
 		{
 			"mimeType":"image/png",
 			"name":"MASTER_Plastic_Normal",
-			"uri":"Textures/MASTER_Plastic_Normal.dds"
+			"uri":"Textures/MASTER_Plastic_Normal.png"
 		},
 		{
 			"mimeType":"image/png",
 			"name":"MASTER_Plastic_BaseColor",
-			"uri":"Textures/MASTER_Plastic_BaseColor.dds"
+			"uri":"Textures/MASTER_Plastic_BaseColor.png"
 		},
 		{
 			"mimeType":"image/png",
 			"name":"MASTER_Plastic_Specular",
-			"uri":"Textures/MASTER_Plastic_Specular.dds"
+			"uri":"Textures/MASTER_Plastic_Specular.png"
 		},
 		{
 			"mimeType":"image/png",
 			"name":"MASTER_Concrete1_Normal",
-			"uri":"Textures/MASTER_Concrete1_Normal.dds"
+			"uri":"Textures/MASTER_Concrete1_Normal.png"
 		},
 		{
 			"mimeType":"image/png",
 			"name":"MASTER_Concrete1_BaseColor",
-			"uri":"Textures/MASTER_Concrete1_BaseColor.dds"
+			"uri":"Textures/MASTER_Concrete1_BaseColor.png"
 		},
 		{
 			"mimeType":"image/png",
 			"name":"MASTER_Concrete1_Specular",
-			"uri":"Textures/MASTER_Concrete1_Specular.dds"
+			"uri":"Textures/MASTER_Concrete1_Specular.png"
 		},
 		{
 			"mimeType":"image/png",
 			"name":"MASTER_Curtains_Normal",
-			"uri":"Textures/MASTER_Curtains_Normal.dds"
+			"uri":"Textures/MASTER_Curtains_Normal.png"
 		},
 		{
 			"mimeType":"image/png",
 			"name":"MASTER_Curtains_BaseColor.005",
-			"uri":"Textures/MASTER_Curtains_BaseColor.dds"
+			"uri":"Textures/MASTER_Curtains_BaseColor.png"
 		},
 		{
 			"mimeType":"image/png",
 			"name":"MASTER_Curtains_Specular",
-			"uri":"Textures/MASTER_Curtains_Specular.dds"
+			"uri":"Textures/MASTER_Curtains_Specular.png"
 		},
 		{
 			"mimeType":"image/png",
 			"name":"MASTER_Glass_Dirty_MASKED_Normal",
-			"uri":"Textures/MASTER_Glass_Dirty_MASKED_Normal.dds"
+			"uri":"Textures/MASTER_Glass_Dirty_MASKED_Normal.png"
 		},
 		{
 			"mimeType":"image/png",
 			"name":"MASTER_Glass_Dirty_MASKED_BaseColor.005",
-			"uri":"Textures/MASTER_Glass_Dirty_MASKED_BaseColor.dds"
+			"uri":"Textures/MASTER_Glass_Dirty_MASKED_BaseColor.png"
 		},
 		{
 			"mimeType":"image/png",
 			"name":"MASTER_Glass_Dirty_MASKED_Specular",
-			"uri":"Textures/MASTER_Glass_Dirty_MASKED_Specular.dds"
+			"uri":"Textures/MASTER_Glass_Dirty_MASKED_Specular.png"
 		},
 		{
 			"mimeType":"image/png",
 			"name":"MASTER_Concrete_Normal",
-			"uri":"Textures/MASTER_Concrete_Normal.dds"
+			"uri":"Textures/MASTER_Concrete_Normal.png"
 		},
 		{
 			"mimeType":"image/png",
 			"name":"MASTER_Concrete_BaseColor",
-			"uri":"Textures/MASTER_Concrete_BaseColor.dds"
+			"uri":"Textures/MASTER_Concrete_BaseColor.png"
 		},
 		{
 			"mimeType":"image/png",
 			"name":"MASTER_Concrete_Specular",
-			"uri":"Textures/MASTER_Concrete_Specular.dds"
+			"uri":"Textures/MASTER_Concrete_Specular.png"
 		},
 		{
 			"mimeType":"image/png",
 			"name":"MASTER_Bistro_Main_Door_Normal",
-			"uri":"Textures/MASTER_Bistro_Main_Door_Normal.dds"
+			"uri":"Textures/MASTER_Bistro_Main_Door_Normal.png"
 		},
 		{
 			"mimeType":"image/png",
 			"name":"MASTER_Bistro_Main_Door_BaseColor",
-			"uri":"Textures/MASTER_Bistro_Main_Door_BaseColor.dds"
+			"uri":"Textures/MASTER_Bistro_Main_Door_BaseColor.png"
 		},
 		{
 			"mimeType":"image/png",
 			"name":"MASTER_Bistro_Main_Door_Specular",
-			"uri":"Textures/MASTER_Bistro_Main_Door_Specular.dds"
+			"uri":"Textures/MASTER_Bistro_Main_Door_Specular.png"
 		},
 		{
 			"mimeType":"image/png",
 			"name":"MASTER_Concrete_Yellow_Normal",
-			"uri":"Textures/MASTER_Concrete_Yellow_Normal.dds"
+			"uri":"Textures/MASTER_Concrete_Yellow_Normal.png"
 		},
 		{
 			"mimeType":"image/png",
 			"name":"MASTER_Concrete_Yellow_BaseColor",
-			"uri":"Textures/MASTER_Concrete_Yellow_BaseColor.dds"
+			"uri":"Textures/MASTER_Concrete_Yellow_BaseColor.png"
 		},
 		{
 			"mimeType":"image/png",
 			"name":"MASTER_Concrete_Yellow_Specular",
-			"uri":"Textures/MASTER_Concrete_Yellow_Specular.dds"
+			"uri":"Textures/MASTER_Concrete_Yellow_Specular.png"
 		},
 		{
 			"mimeType":"image/png",
 			"name":"MASTER_Trim_Cornice_Normal",
-			"uri":"Textures/MASTER_Trim_Cornice_Normal.dds"
+			"uri":"Textures/MASTER_Trim_Cornice_Normal.png"
 		},
 		{
 			"mimeType":"image/png",
 			"name":"MASTER_Trim_Cornice_BaseColor",
-			"uri":"Textures/MASTER_Trim_Cornice_BaseColor.dds"
+			"uri":"Textures/MASTER_Trim_Cornice_BaseColor.png"
 		},
 		{
 			"mimeType":"image/png",
 			"name":"MASTER_Trim_Cornice_Specular",
-			"uri":"Textures/MASTER_Trim_Cornice_Specular.dds"
+			"uri":"Textures/MASTER_Trim_Cornice_Specular.png"
 		},
 		{
 			"mimeType":"image/png",
 			"name":"Emissive_StreetLight_Emissive",
-			"uri":"Textures/Emissive_StreetLight_Emissive.dds"
+			"uri":"Textures/Emissive_StreetLight_Emissive.png"
 		},
 		{
 			"mimeType":"image/png",
 			"name":"Emissive_StreetLight_Normal",
-			"uri":"Textures/Emissive_StreetLight_Normal.dds"
+			"uri":"Textures/Emissive_StreetLight_Normal.png"
 		},
 		{
 			"mimeType":"image/png",
 			"name":"Emissive_StreetLight_BaseColor",
-			"uri":"Textures/Emissive_StreetLight_BaseColor.dds"
+			"uri":"Textures/Emissive_StreetLight_BaseColor.png"
 		},
 		{
 			"mimeType":"image/png",
 			"name":"Emissive_StreetLight_Specular",
-			"uri":"Textures/Emissive_StreetLight_Specular.dds"
+			"uri":"Textures/Emissive_StreetLight_Specular.png"
 		},
 		{
 			"mimeType":"image/png",
 			"name":"MASTER_Side_Letters_Normal",
-			"uri":"Textures/MASTER_Side_Letters_Normal.dds"
+			"uri":"Textures/MASTER_Side_Letters_Normal.png"
 		},
 		{
 			"mimeType":"image/png",
 			"name":"MASTER_Side_Letters_BaseColor.005",
-			"uri":"Textures/MASTER_Side_Letters_BaseColor.dds"
+			"uri":"Textures/MASTER_Side_Letters_BaseColor.png"
 		},
 		{
 			"mimeType":"image/png",
 			"name":"MASTER_Side_Letters_Specular",
-			"uri":"Textures/MASTER_Side_Letters_Specular.dds"
+			"uri":"Textures/MASTER_Side_Letters_Specular.png"
 		},
 		{
 			"mimeType":"image/png",
 			"name":"MASTER_Glass_Dirty_Normal",
-			"uri":"Textures/MASTER_Glass_Dirty_Normal.dds"
+			"uri":"Textures/MASTER_Glass_Dirty_Normal.png"
 		},
 		{
 			"mimeType":"image/png",
 			"name":"MASTER_Glass_Dirty_BaseColor",
-			"uri":"Textures/MASTER_Glass_Dirty_BaseColor.dds"
+			"uri":"Textures/MASTER_Glass_Dirty_BaseColor.png"
 		},
 		{
 			"mimeType":"image/png",
 			"name":"MASTER_Glass_Dirty_Specular",
-			"uri":"Textures/MASTER_Glass_Dirty_Specular.dds"
+			"uri":"Textures/MASTER_Glass_Dirty_Specular.png"
 		},
 		{
 			"mimeType":"image/png",
 			"name":"MASTER_Doors_Normal",
-			"uri":"Textures/MASTER_Doors_Normal.dds"
+			"uri":"Textures/MASTER_Doors_Normal.png"
 		},
 		{
 			"mimeType":"image/png",
 			"name":"MASTER_Doors_BaseColor",
-			"uri":"Textures/MASTER_Doors_BaseColor.dds"
+			"uri":"Textures/MASTER_Doors_BaseColor.png"
 		},
 		{
 			"mimeType":"image/png",
 			"name":"MASTER_Doors_Specular",
-			"uri":"Textures/MASTER_Doors_Specular.dds"
+			"uri":"Textures/MASTER_Doors_Specular.png"
 		},
 		{
 			"mimeType":"image/png",
 			"name":"MASTER_Brick_Large_Beige_BLENDSHADER_Normal",
-			"uri":"Textures/MASTER_Brick_Large_Beige_BLENDSHADER_Normal.dds"
+			"uri":"Textures/MASTER_Brick_Large_Beige_BLENDSHADER_Normal.png"
 		},
 		{
 			"mimeType":"image/png",
 			"name":"MASTER_Brick_Large_Beige_BLENDSHADER_BaseColor",
-			"uri":"Textures/MASTER_Brick_Large_Beige_BLENDSHADER_BaseColor.dds"
+			"uri":"Textures/MASTER_Brick_Large_Beige_BLENDSHADER_BaseColor.png"
 		},
 		{
 			"mimeType":"image/png",
 			"name":"MASTER_Brick_Large_Beige_BLENDSHADER_Specular",
-			"uri":"Textures/MASTER_Brick_Large_Beige_BLENDSHADER_Specular.dds"
+			"uri":"Textures/MASTER_Brick_Large_Beige_BLENDSHADER_Specular.png"
 		},
 		{
 			"mimeType":"image/png",
 			"name":"MASTER_Wood_Brown_Normal",
-			"uri":"Textures/MASTER_Wood_Brown_Normal.dds"
+			"uri":"Textures/MASTER_Wood_Brown_Normal.png"
 		},
 		{
 			"mimeType":"image/png",
 			"name":"MASTER_Wood_Brown_BaseColor",
-			"uri":"Textures/MASTER_Wood_Brown_BaseColor.dds"
+			"uri":"Textures/MASTER_Wood_Brown_BaseColor.png"
 		},
 		{
 			"mimeType":"image/png",
 			"name":"MASTER_Wood_Brown_Specular",
-			"uri":"Textures/MASTER_Wood_Brown_Specular.dds"
+			"uri":"Textures/MASTER_Wood_Brown_Specular.png"
 		},
 		{
 			"mimeType":"image/png",
 			"name":"MASTER_Brick_Small_Red_BLENDSHADER_Normal",
-			"uri":"Textures/MASTER_Brick_Small_Red_BLENDSHADER_Normal.dds"
+			"uri":"Textures/MASTER_Brick_Small_Red_BLENDSHADER_Normal.png"
 		},
 		{
 			"mimeType":"image/png",
 			"name":"MASTER_Brick_Small_Red_BLENDSHADER_BaseColor",
-			"uri":"Textures/MASTER_Brick_Small_Red_BLENDSHADER_BaseColor.dds"
+			"uri":"Textures/MASTER_Brick_Small_Red_BLENDSHADER_BaseColor.png"
 		},
 		{
 			"mimeType":"image/png",
 			"name":"MASTER_Brick_Small_Red_BLENDSHADER_Specular",
-			"uri":"Textures/MASTER_Brick_Small_Red_BLENDSHADER_Specular.dds"
+			"uri":"Textures/MASTER_Brick_Small_Red_BLENDSHADER_Specular.png"
 		},
 		{
 			"mimeType":"image/png",
 			"name":"MASTER_Wood_Painted_Green_Normal",
-			"uri":"Textures/MASTER_Wood_Painted_Green_Normal.dds"
+			"uri":"Textures/MASTER_Wood_Painted_Green_Normal.png"
 		},
 		{
 			"mimeType":"image/png",
 			"name":"MASTER_Wood_Painted_Green_BaseColor",
-			"uri":"Textures/MASTER_Wood_Painted_Green_BaseColor.dds"
+			"uri":"Textures/MASTER_Wood_Painted_Green_BaseColor.png"
 		},
 		{
 			"mimeType":"image/png",
 			"name":"MASTER_Wood_Painted_Green_Specular",
-			"uri":"Textures/MASTER_Wood_Painted_Green_Specular.dds"
+			"uri":"Textures/MASTER_Wood_Painted_Green_Specular.png"
 		},
 		{
 			"mimeType":"image/png",
 			"name":"MASTER_Concrete_Plaster_Normal",
-			"uri":"Textures/MASTER_Concrete_Plaster_Normal.dds"
+			"uri":"Textures/MASTER_Concrete_Plaster_Normal.png"
 		},
 		{
 			"mimeType":"image/png",
 			"name":"MASTER_Concrete_Plaster_BaseColor",
-			"uri":"Textures/MASTER_Concrete_Plaster_BaseColor.dds"
+			"uri":"Textures/MASTER_Concrete_Plaster_BaseColor.png"
 		},
 		{
 			"mimeType":"image/png",
 			"name":"MASTER_Concrete_Plaster_Specular",
-			"uri":"Textures/MASTER_Concrete_Plaster_Specular.dds"
+			"uri":"Textures/MASTER_Concrete_Plaster_Specular.png"
 		},
 		{
 			"mimeType":"image/png",
 			"name":"MASTER_Black_Metal_Normal",
-			"uri":"Textures/MASTER_Black_Metal_Normal.dds"
+			"uri":"Textures/MASTER_Black_Metal_Normal.png"
 		},
 		{
 			"mimeType":"image/png",
 			"name":"MASTER_Black_Metal_BaseColor",
-			"uri":"Textures/MASTER_Black_Metal_BaseColor.dds"
+			"uri":"Textures/MASTER_Black_Metal_BaseColor.png"
 		},
 		{
 			"mimeType":"image/png",
 			"name":"MASTER_Black_Metal_Specular",
-			"uri":"Textures/MASTER_Black_Metal_Specular.dds"
+			"uri":"Textures/MASTER_Black_Metal_Specular.png"
 		},
 		{
 			"mimeType":"image/png",
 			"name":"MASTER_Brick_Large_White_Normal",
-			"uri":"Textures/MASTER_Brick_Large_White_Normal.dds"
+			"uri":"Textures/MASTER_Brick_Large_White_Normal.png"
 		},
 		{
 			"mimeType":"image/png",
 			"name":"MASTER_Brick_Large_White_BaseColor",
-			"uri":"Textures/MASTER_Brick_Large_White_BaseColor.dds"
+			"uri":"Textures/MASTER_Brick_Large_White_BaseColor.png"
 		},
 		{
 			"mimeType":"image/png",
 			"name":"MASTER_Brick_Large_White_Specular",
-			"uri":"Textures/MASTER_Brick_Large_White_Specular.dds"
+			"uri":"Textures/MASTER_Brick_Large_White_Specular.png"
 		},
 		{
 			"mimeType":"image/png",
 			"name":"MASTER_Building_Details_Normal",
-			"uri":"Textures/MASTER_Building_Details_Normal.dds"
+			"uri":"Textures/MASTER_Building_Details_Normal.png"
 		},
 		{
 			"mimeType":"image/png",
 			"name":"MASTER_Building_Details_BaseColor",
-			"uri":"Textures/MASTER_Building_Details_BaseColor.dds"
+			"uri":"Textures/MASTER_Building_Details_BaseColor.png"
 		},
 		{
 			"mimeType":"image/png",
 			"name":"MASTER_Building_Details_Specular",
-			"uri":"Textures/MASTER_Building_Details_Specular.dds"
+			"uri":"Textures/MASTER_Building_Details_Specular.png"
 		},
 		{
 			"mimeType":"image/png",
 			"name":"MASTER_Wood_Painted_Cyan_Normal",
-			"uri":"Textures/MASTER_Wood_Painted_Cyan_Normal.dds"
+			"uri":"Textures/MASTER_Wood_Painted_Cyan_Normal.png"
 		},
 		{
 			"mimeType":"image/png",
 			"name":"MASTER_Wood_Painted_Cyan_BaseColor",
-			"uri":"Textures/MASTER_Wood_Painted_Cyan_BaseColor.dds"
+			"uri":"Textures/MASTER_Wood_Painted_Cyan_BaseColor.png"
 		},
 		{
 			"mimeType":"image/png",
 			"name":"MASTER_Wood_Painted_Cyan_Specular",
-			"uri":"Textures/MASTER_Wood_Painted_Cyan_Specular.dds"
+			"uri":"Textures/MASTER_Wood_Painted_Cyan_Specular.png"
 		},
 		{
 			"mimeType":"image/png",
 			"name":"MASTER_Brick_Small_Red_Normal",
-			"uri":"Textures/MASTER_Brick_Small_Red_Normal.dds"
+			"uri":"Textures/MASTER_Brick_Small_Red_Normal.png"
 		},
 		{
 			"mimeType":"image/png",
 			"name":"MASTER_Brick_Small_Red_BaseColor",
-			"uri":"Textures/MASTER_Brick_Small_Red_BaseColor.dds"
+			"uri":"Textures/MASTER_Brick_Small_Red_BaseColor.png"
 		},
 		{
 			"mimeType":"image/png",
 			"name":"MASTER_Brick_Small_Red_Specular",
-			"uri":"Textures/MASTER_Brick_Small_Red_Specular.dds"
+			"uri":"Textures/MASTER_Brick_Small_Red_Specular.png"
 		},
 		{
 			"mimeType":"image/png",
 			"name":"MASTER_Roofing_Metal_01_Normal",
-			"uri":"Textures/MASTER_Roofing_Metal_01_Normal.dds"
+			"uri":"Textures/MASTER_Roofing_Metal_01_Normal.png"
 		},
 		{
 			"mimeType":"image/png",
 			"name":"MASTER_Roofing_Metal_01_BaseColor",
-			"uri":"Textures/MASTER_Roofing_Metal_01_BaseColor.dds"
+			"uri":"Textures/MASTER_Roofing_Metal_01_BaseColor.png"
 		},
 		{
 			"mimeType":"image/png",
 			"name":"MASTER_Roofing_Metal_01_Specular",
-			"uri":"Textures/MASTER_Roofing_Metal_01_Specular.dds"
+			"uri":"Textures/MASTER_Roofing_Metal_01_Specular.png"
 		},
 		{
 			"mimeType":"image/png",
 			"name":"MASTER_Room_Interior_Normal",
-			"uri":"Textures/MASTER_Room_Interior_Normal.dds"
+			"uri":"Textures/MASTER_Room_Interior_Normal.png"
 		},
 		{
 			"mimeType":"image/png",
 			"name":"MASTER_Room_Interior_BaseColor",
-			"uri":"Textures/MASTER_Room_Interior_BaseColor.dds"
+			"uri":"Textures/MASTER_Room_Interior_BaseColor.png"
 		},
 		{
 			"mimeType":"image/png",
 			"name":"MASTER_Room_Interior_Specular",
-			"uri":"Textures/MASTER_Room_Interior_Specular.dds"
+			"uri":"Textures/MASTER_Room_Interior_Specular.png"
 		},
 		{
 			"mimeType":"image/png",
 			"name":"MASTER_Awning_Beams_Normal",
-			"uri":"Textures/MASTER_Awning_Beams_Normal.dds"
+			"uri":"Textures/MASTER_Awning_Beams_Normal.png"
 		},
 		{
 			"mimeType":"image/png",
 			"name":"MASTER_Awning_Beams_BaseColor",
-			"uri":"Textures/MASTER_Awning_Beams_BaseColor.dds"
+			"uri":"Textures/MASTER_Awning_Beams_BaseColor.png"
 		},
 		{
 			"mimeType":"image/png",
 			"name":"MASTER_Awning_Beams_Specular",
-			"uri":"Textures/MASTER_Awning_Beams_Specular.dds"
+			"uri":"Textures/MASTER_Awning_Beams_Specular.png"
 		},
 		{
 			"mimeType":"image/png",
 			"name":"MASTER_Boulangerie_Normal",
-			"uri":"Textures/MASTER_Boulangerie_Normal.dds"
+			"uri":"Textures/MASTER_Boulangerie_Normal.png"
 		},
 		{
 			"mimeType":"image/png",
 			"name":"MASTER_Boulangerie_BaseColor",
-			"uri":"Textures/MASTER_Boulangerie_BaseColor.dds"
+			"uri":"Textures/MASTER_Boulangerie_BaseColor.png"
 		},
 		{
 			"mimeType":"image/png",
 			"name":"MASTER_Boulangerie_Specular",
-			"uri":"Textures/MASTER_Boulangerie_Specular.dds"
+			"uri":"Textures/MASTER_Boulangerie_Specular.png"
 		},
 		{
 			"mimeType":"image/png",
 			"name":"MASTER_Frosted_Glass_Normal",
-			"uri":"Textures/MASTER_Frosted_Glass_Normal.dds"
+			"uri":"Textures/MASTER_Frosted_Glass_Normal.png"
 		},
 		{
 			"mimeType":"image/png",
 			"name":"MASTER_Frosted_Glass_BaseColor",
-			"uri":"Textures/MASTER_Frosted_Glass_BaseColor.dds"
+			"uri":"Textures/MASTER_Frosted_Glass_BaseColor.png"
 		},
 		{
 			"mimeType":"image/png",
 			"name":"MASTER_Frosted_Glass_Specular",
-			"uri":"Textures/MASTER_Frosted_Glass_Specular.dds"
+			"uri":"Textures/MASTER_Frosted_Glass_Specular.png"
 		},
 		{
 			"mimeType":"image/png",
 			"name":"MASTER_Awning_Fabric_Cyan_Normal",
-			"uri":"Textures/MASTER_Awning_Fabric_Cyan_Normal.dds"
+			"uri":"Textures/MASTER_Awning_Fabric_Cyan_Normal.png"
 		},
 		{
 			"mimeType":"image/png",
 			"name":"MASTER_Awning_Fabric_Cyan_BaseColor",
-			"uri":"Textures/MASTER_Awning_Fabric_Cyan_BaseColor.dds"
+			"uri":"Textures/MASTER_Awning_Fabric_Cyan_BaseColor.png"
 		},
 		{
 			"mimeType":"image/png",
 			"name":"MASTER_Awning_Fabric_Cyan_Specular",
-			"uri":"Textures/MASTER_Awning_Fabric_Cyan_Specular.dds"
+			"uri":"Textures/MASTER_Awning_Fabric_Cyan_Specular.png"
 		},
 		{
 			"mimeType":"image/png",
 			"name":"MASTER_Concrete_White_Normal",
-			"uri":"Textures/MASTER_Concrete_White_Normal.dds"
+			"uri":"Textures/MASTER_Concrete_White_Normal.png"
 		},
 		{
 			"mimeType":"image/png",
 			"name":"MASTER_Concrete_White_BaseColor",
-			"uri":"Textures/MASTER_Concrete_White_BaseColor.dds"
+			"uri":"Textures/MASTER_Concrete_White_BaseColor.png"
 		},
 		{
 			"mimeType":"image/png",
 			"name":"MASTER_Concrete_White_Specular",
-			"uri":"Textures/MASTER_Concrete_White_Specular.dds"
+			"uri":"Textures/MASTER_Concrete_White_Specular.png"
 		},
 		{
 			"mimeType":"image/png",
 			"name":"MASTER_Bronze_BLENDSHADER_Normal",
-			"uri":"Textures/MASTER_Bronze_BLENDSHADER_Normal.dds"
+			"uri":"Textures/MASTER_Bronze_BLENDSHADER_Normal.png"
 		},
 		{
 			"mimeType":"image/png",
 			"name":"MASTER_Bronze_BLENDSHADER_BaseColor",
-			"uri":"Textures/MASTER_Bronze_BLENDSHADER_BaseColor.dds"
+			"uri":"Textures/MASTER_Bronze_BLENDSHADER_BaseColor.png"
 		},
 		{
 			"mimeType":"image/png",
 			"name":"MASTER_Bronze_BLENDSHADER_Specular",
-			"uri":"Textures/MASTER_Bronze_BLENDSHADER_Specular.dds"
+			"uri":"Textures/MASTER_Bronze_BLENDSHADER_Specular.png"
 		},
 		{
 			"mimeType":"image/png",
 			"name":"MASTER_Awning_Fabric_Red_Normal",
-			"uri":"Textures/MASTER_Awning_Fabric_Red_Normal.dds"
+			"uri":"Textures/MASTER_Awning_Fabric_Red_Normal.png"
 		},
 		{
 			"mimeType":"image/png",
 			"name":"MASTER_Awning_Fabric_Red_BaseColor",
-			"uri":"Textures/MASTER_Awning_Fabric_Red_BaseColor.dds"
+			"uri":"Textures/MASTER_Awning_Fabric_Red_BaseColor.png"
 		},
 		{
 			"mimeType":"image/png",
 			"name":"MASTER_Awning_Fabric_Red_Specular",
-			"uri":"Textures/MASTER_Awning_Fabric_Red_Specular.dds"
+			"uri":"Textures/MASTER_Awning_Fabric_Red_Specular.png"
 		},
 		{
 			"mimeType":"image/png",
 			"name":"MASTER_Book_Covers_Normal",
-			"uri":"Textures/MASTER_Book_Covers_Normal.dds"
+			"uri":"Textures/MASTER_Book_Covers_Normal.png"
 		},
 		{
 			"mimeType":"image/png",
 			"name":"MASTER_Book_Covers_BaseColor",
-			"uri":"Textures/MASTER_Book_Covers_BaseColor.dds"
+			"uri":"Textures/MASTER_Book_Covers_BaseColor.png"
 		},
 		{
 			"mimeType":"image/png",
 			"name":"MASTER_Book_Covers_Specular",
-			"uri":"Textures/MASTER_Book_Covers_Specular.dds"
+			"uri":"Textures/MASTER_Book_Covers_Specular.png"
 		},
 		{
 			"mimeType":"image/png",
 			"name":"MASTER_Concrete_Smooth_BLENDSHADER_Normal",
-			"uri":"Textures/MASTER_Concrete_Smooth_BLENDSHADER_Normal.dds"
+			"uri":"Textures/MASTER_Concrete_Smooth_BLENDSHADER_Normal.png"
 		},
 		{
 			"mimeType":"image/png",
 			"name":"MASTER_Concrete_Smooth_BLENDSHADER_BaseColor",
-			"uri":"Textures/MASTER_Concrete_Smooth_BLENDSHADER_BaseColor.dds"
+			"uri":"Textures/MASTER_Concrete_Smooth_BLENDSHADER_BaseColor.png"
 		},
 		{
 			"mimeType":"image/png",
 			"name":"MASTER_Concrete_Smooth_BLENDSHADER_Specular",
-			"uri":"Textures/MASTER_Concrete_Smooth_BLENDSHADER_Specular.dds"
+			"uri":"Textures/MASTER_Concrete_Smooth_BLENDSHADER_Specular.png"
 		},
 		{
 			"mimeType":"image/png",
 			"name":"MASTER_Wood_Painted_Green_BLENDSHADER_Normal",
-			"uri":"Textures/MASTER_Wood_Painted_Green_BLENDSHADER_Normal.dds"
+			"uri":"Textures/MASTER_Wood_Painted_Green_BLENDSHADER_Normal.png"
 		},
 		{
 			"mimeType":"image/png",
 			"name":"MASTER_Wood_Painted_Green_BLENDSHADER_BaseColor",
-			"uri":"Textures/MASTER_Wood_Painted_Green_BLENDSHADER_BaseColor.dds"
+			"uri":"Textures/MASTER_Wood_Painted_Green_BLENDSHADER_BaseColor.png"
 		},
 		{
 			"mimeType":"image/png",
 			"name":"MASTER_Wood_Painted_Green_BLENDSHADER_Specular",
-			"uri":"Textures/MASTER_Wood_Painted_Green_BLENDSHADER_Specular.dds"
+			"uri":"Textures/MASTER_Wood_Painted_Green_BLENDSHADER_Specular.png"
 		},
 		{
 			"mimeType":"image/png",
 			"name":"MASTER_Rollup_Door_Normal",
-			"uri":"Textures/MASTER_Rollup_Door_Normal.dds"
+			"uri":"Textures/MASTER_Rollup_Door_Normal.png"
 		},
 		{
 			"mimeType":"image/png",
 			"name":"MASTER_Rollup_Door_BaseColor",
-			"uri":"Textures/MASTER_Rollup_Door_BaseColor.dds"
+			"uri":"Textures/MASTER_Rollup_Door_BaseColor.png"
 		},
 		{
 			"mimeType":"image/png",
 			"name":"MASTER_Rollup_Door_Specular",
-			"uri":"Textures/MASTER_Rollup_Door_Specular.dds"
+			"uri":"Textures/MASTER_Rollup_Door_Specular.png"
 		},
 		{
 			"mimeType":"image/png",
 			"name":"MASTER_Details_Dark_Normal",
-			"uri":"Textures/MASTER_Details_Dark_Normal.dds"
+			"uri":"Textures/MASTER_Details_Dark_Normal.png"
 		},
 		{
 			"mimeType":"image/png",
 			"name":"MASTER_Details_Dark_BaseColor",
-			"uri":"Textures/MASTER_Details_Dark_BaseColor.dds"
+			"uri":"Textures/MASTER_Details_Dark_BaseColor.png"
 		},
 		{
 			"mimeType":"image/png",
 			"name":"MASTER_Details_Dark_Specular",
-			"uri":"Textures/MASTER_Details_Dark_Specular.dds"
+			"uri":"Textures/MASTER_Details_Dark_Specular.png"
 		},
 		{
 			"mimeType":"image/png",
 			"name":"Paris_Chair_01_Normal",
-			"uri":"Textures/Paris_Chair_01_Normal.dds"
+			"uri":"Textures/Paris_Chair_01_Normal.png"
 		},
 		{
 			"mimeType":"image/png",
 			"name":"Paris_Chair_01_BaseColor",
-			"uri":"Textures/Paris_Chair_01_BaseColor.dds"
+			"uri":"Textures/Paris_Chair_01_BaseColor.png"
 		},
 		{
 			"mimeType":"image/png",
 			"name":"Paris_Chair_01_Specular",
-			"uri":"Textures/Paris_Chair_01_Specular.dds"
+			"uri":"Textures/Paris_Chair_01_Specular.png"
 		},
 		{
 			"mimeType":"image/png",
 			"name":"Concrete_Normal",
-			"uri":"Textures/Concrete_Normal.dds"
+			"uri":"Textures/Concrete_Normal.png"
 		},
 		{
 			"mimeType":"image/png",
 			"name":"Concrete_BaseColor",
-			"uri":"Textures/Concrete_BaseColor.dds"
+			"uri":"Textures/Concrete_BaseColor.png"
 		},
 		{
 			"mimeType":"image/png",
 			"name":"Concrete_Specular",
-			"uri":"Textures/Concrete_Specular.dds"
+			"uri":"Textures/Concrete_Specular.png"
 		},
 		{
 			"mimeType":"image/png",
 			"name":"Plaster_Normal",
-			"uri":"Textures/Plaster_Normal.dds"
+			"uri":"Textures/Plaster_Normal.png"
 		},
 		{
 			"mimeType":"image/png",
 			"name":"Plaster_BaseColor",
-			"uri":"Textures/Plaster_BaseColor.dds"
+			"uri":"Textures/Plaster_BaseColor.png"
 		},
 		{
 			"mimeType":"image/png",
 			"name":"Plaster_Specular",
-			"uri":"Textures/Plaster_Specular.dds"
+			"uri":"Textures/Plaster_Specular.png"
 		},
 		{
 			"mimeType":"image/png",
 			"name":"Concrete_Striped_Normal",
-			"uri":"Textures/Concrete_Striped_Normal.dds"
+			"uri":"Textures/Concrete_Striped_Normal.png"
 		},
 		{
 			"mimeType":"image/png",
 			"name":"Concrete_Striped_BaseColor",
-			"uri":"Textures/Concrete_Striped_BaseColor.dds"
+			"uri":"Textures/Concrete_Striped_BaseColor.png"
 		},
 		{
 			"mimeType":"image/png",
 			"name":"Concrete_Striped_Specular",
-			"uri":"Textures/Concrete_Striped_Specular.dds"
+			"uri":"Textures/Concrete_Striped_Specular.png"
 		},
 		{
 			"mimeType":"image/png",
 			"name":"Concrete2_Normal",
-			"uri":"Textures/Concrete2_Normal.dds"
+			"uri":"Textures/Concrete2_Normal.png"
 		},
 		{
 			"mimeType":"image/png",
 			"name":"Concrete2_BaseColor",
-			"uri":"Textures/Concrete2_BaseColor.dds"
+			"uri":"Textures/Concrete2_BaseColor.png"
 		},
 		{
 			"mimeType":"image/png",
 			"name":"Concrete2_Specular",
-			"uri":"Textures/Concrete2_Specular.dds"
+			"uri":"Textures/Concrete2_Specular.png"
 		},
 		{
 			"mimeType":"image/png",
 			"name":"Chimneys_Metal_Normal",
-			"uri":"Textures/Chimneys_Metal_Normal.dds"
+			"uri":"Textures/Chimneys_Metal_Normal.png"
 		},
 		{
 			"mimeType":"image/png",
 			"name":"Chimneys_Metal_BaseColor",
-			"uri":"Textures/Chimneys_Metal_BaseColor.dds"
+			"uri":"Textures/Chimneys_Metal_BaseColor.png"
 		},
 		{
 			"mimeType":"image/png",
 			"name":"Chimneys_Metal_Specular",
-			"uri":"Textures/Chimneys_Metal_Specular.dds"
+			"uri":"Textures/Chimneys_Metal_Specular.png"
 		},
 		{
 			"mimeType":"image/png",
 			"name":"ElectricBox_Normal",
-			"uri":"Textures/ElectricBox_Normal.dds"
+			"uri":"Textures/ElectricBox_Normal.png"
 		},
 		{
 			"mimeType":"image/png",
 			"name":"ElectricBox_BaseColor",
-			"uri":"Textures/ElectricBox_BaseColor.dds"
+			"uri":"Textures/ElectricBox_BaseColor.png"
 		},
 		{
 			"mimeType":"image/png",
 			"name":"ElectricBox_Specular",
-			"uri":"Textures/ElectricBox_Specular.dds"
+			"uri":"Textures/ElectricBox_Specular.png"
 		},
 		{
 			"mimeType":"image/png",
 			"name":"Foliage_Paris_Flowers_Normal",
-			"uri":"Textures/Foliage_Paris_Flowers_Normal.dds"
+			"uri":"Textures/Foliage_Paris_Flowers_Normal.png"
 		},
 		{
 			"mimeType":"image/png",
 			"name":"Foliage_Paris_Flowers_BaseColor",
-			"uri":"Textures/Foliage_Paris_Flowers_BaseColor.dds"
+			"uri":"Textures/Foliage_Paris_Flowers_BaseColor.png"
 		},
 		{
 			"mimeType":"image/png",
 			"name":"Foliage_Paris_Flowers_Specular",
-			"uri":"Textures/Foliage_Paris_Flowers_Specular.dds"
+			"uri":"Textures/Foliage_Paris_Flowers_Specular.png"
 		},
 		{
 			"mimeType":"image/png",
 			"name":"Foliage_Flowers_Normal",
-			"uri":"Textures/Foliage_Flowers_Normal.dds"
+			"uri":"Textures/Foliage_Flowers_Normal.png"
 		},
 		{
 			"mimeType":"image/png",
 			"name":"Foliage_Flowers_BaseColor.005",
-			"uri":"Textures/Foliage_Flowers_BaseColor.dds"
+			"uri":"Textures/Foliage_Flowers_BaseColor.png"
 		},
 		{
 			"mimeType":"image/png",
 			"name":"Foliage_Flowers_Specular",
-			"uri":"Textures/Foliage_Flowers_Specular.dds"
+			"uri":"Textures/Foliage_Flowers_Specular.png"
 		},
 		{
 			"mimeType":"image/png",
 			"name":"Paris_LiquorBottle_01_Glass_Wine_Normal",
-			"uri":"Textures/Paris_LiquorBottle_01_Glass_Wine_Normal.dds"
+			"uri":"Textures/Paris_LiquorBottle_01_Glass_Wine_Normal.png"
 		},
 		{
 			"mimeType":"image/png",
 			"name":"Paris_LiquorBottle_01_Glass_Wine_BaseColor",
-			"uri":"Textures/Paris_LiquorBottle_01_Glass_Wine_BaseColor.dds"
+			"uri":"Textures/Paris_LiquorBottle_01_Glass_Wine_BaseColor.png"
 		},
 		{
 			"mimeType":"image/png",
 			"name":"Paris_LiquorBottle_01_Glass_Wine_Specular",
-			"uri":"Textures/Paris_LiquorBottle_01_Glass_Wine_Specular.dds"
+			"uri":"Textures/Paris_LiquorBottle_01_Glass_Wine_Specular.png"
 		},
 		{
 			"mimeType":"image/png",
 			"name":"Paris_LiquorBottle_01_Caps_Normal",
-			"uri":"Textures/Paris_LiquorBottle_01_Caps_Normal.dds"
+			"uri":"Textures/Paris_LiquorBottle_01_Caps_Normal.png"
 		},
 		{
 			"mimeType":"image/png",
 			"name":"Paris_LiquorBottle_01_Caps_BaseColor",
-			"uri":"Textures/Paris_LiquorBottle_01_Caps_BaseColor.dds"
+			"uri":"Textures/Paris_LiquorBottle_01_Caps_BaseColor.png"
 		},
 		{
 			"mimeType":"image/png",
 			"name":"Paris_LiquorBottle_01_Caps_Specular",
-			"uri":"Textures/Paris_LiquorBottle_01_Caps_Specular.dds"
+			"uri":"Textures/Paris_LiquorBottle_01_Caps_Specular.png"
 		},
 		{
 			"mimeType":"image/png",
 			"name":"Paris_LiquorBottle_01_Labels_Normal",
-			"uri":"Textures/Paris_LiquorBottle_01_Labels_Normal.dds"
+			"uri":"Textures/Paris_LiquorBottle_01_Labels_Normal.png"
 		},
 		{
 			"mimeType":"image/png",
 			"name":"Paris_LiquorBottle_01_Labels_BaseColor.005",
-			"uri":"Textures/Paris_LiquorBottle_01_Labels_BaseColor.dds"
+			"uri":"Textures/Paris_LiquorBottle_01_Labels_BaseColor.png"
 		},
 		{
 			"mimeType":"image/png",
 			"name":"Balcony_Concrete_Normal",
-			"uri":"Textures/Balcony_Concrete_Normal.dds"
+			"uri":"Textures/Balcony_Concrete_Normal.png"
 		},
 		{
 			"mimeType":"image/png",
 			"name":"Balcony_Concrete_BaseColor",
-			"uri":"Textures/Balcony_Concrete_BaseColor.dds"
+			"uri":"Textures/Balcony_Concrete_BaseColor.png"
 		},
 		{
 			"mimeType":"image/png",
 			"name":"Balcony_Concrete_Specular",
-			"uri":"Textures/Balcony_Concrete_Specular.dds"
+			"uri":"Textures/Balcony_Concrete_Specular.png"
 		},
 		{
 			"mimeType":"image/png",
 			"name":"Balcony_Trims_Normal",
-			"uri":"Textures/Balcony_Trims_Normal.dds"
+			"uri":"Textures/Balcony_Trims_Normal.png"
 		},
 		{
 			"mimeType":"image/png",
 			"name":"Balcony_Trims_BaseColor",
-			"uri":"Textures/Balcony_Trims_BaseColor.dds"
+			"uri":"Textures/Balcony_Trims_BaseColor.png"
 		},
 		{
 			"mimeType":"image/png",
 			"name":"Balcony_Trims_Specular",
-			"uri":"Textures/Balcony_Trims_Specular.dds"
+			"uri":"Textures/Balcony_Trims_Specular.png"
 		},
 		{
 			"mimeType":"image/png",
 			"name":"Balcony_Ornaments_Normal",
-			"uri":"Textures/Balcony_Ornaments_Normal.dds"
+			"uri":"Textures/Balcony_Ornaments_Normal.png"
 		},
 		{
 			"mimeType":"image/png",
 			"name":"Balcony_Ornaments_BaseColor",
-			"uri":"Textures/Balcony_Ornaments_BaseColor.dds"
+			"uri":"Textures/Balcony_Ornaments_BaseColor.png"
 		},
 		{
 			"mimeType":"image/png",
 			"name":"Balcony_Ornaments_Specular",
-			"uri":"Textures/Balcony_Ornaments_Specular.dds"
+			"uri":"Textures/Balcony_Ornaments_Specular.png"
 		},
 		{
 			"mimeType":"image/png",
 			"name":"Balcony_Green_Wood_Normal",
-			"uri":"Textures/Balcony_Green_Wood_Normal.dds"
+			"uri":"Textures/Balcony_Green_Wood_Normal.png"
 		},
 		{
 			"mimeType":"image/png",
 			"name":"Balcony_Green_Wood_BaseColor",
-			"uri":"Textures/Balcony_Green_Wood_BaseColor.dds"
+			"uri":"Textures/Balcony_Green_Wood_BaseColor.png"
 		},
 		{
 			"mimeType":"image/png",
 			"name":"Balcony_Green_Wood_Specular",
-			"uri":"Textures/Balcony_Green_Wood_Specular.dds"
+			"uri":"Textures/Balcony_Green_Wood_Specular.png"
 		},
 		{
 			"mimeType":"image/png",
 			"name":"MenuSign_01_Normal",
-			"uri":"Textures/MenuSign_01_Normal.dds"
+			"uri":"Textures/MenuSign_01_Normal.png"
 		},
 		{
 			"mimeType":"image/png",
 			"name":"MenuSign_01_BaseColor",
-			"uri":"Textures/MenuSign_01_BaseColor.dds"
+			"uri":"Textures/MenuSign_01_BaseColor.png"
 		},
 		{
 			"mimeType":"image/png",
 			"name":"MenuSign_01_Specular",
-			"uri":"Textures/MenuSign_01_Specular.dds"
+			"uri":"Textures/MenuSign_01_Specular.png"
 		},
 		{
 			"mimeType":"image/png",
 			"name":"MenuSign_02_Mesh_Normal",
-			"uri":"Textures/MenuSign_02_Mesh_Normal.dds"
+			"uri":"Textures/MenuSign_02_Mesh_Normal.png"
 		},
 		{
 			"mimeType":"image/png",
 			"name":"MenuSign_02_Mesh_BaseColor",
-			"uri":"Textures/MenuSign_02_Mesh_BaseColor.dds"
+			"uri":"Textures/MenuSign_02_Mesh_BaseColor.png"
 		},
 		{
 			"mimeType":"image/png",
 			"name":"MenuSign_02_Mesh_Specular",
-			"uri":"Textures/MenuSign_02_Mesh_Specular.dds"
+			"uri":"Textures/MenuSign_02_Mesh_Specular.png"
 		},
 		{
 			"mimeType":"image/png",
 			"name":"MenuSign_02_Glass_Normal",
-			"uri":"Textures/MenuSign_02_Glass_Normal.dds"
+			"uri":"Textures/MenuSign_02_Glass_Normal.png"
 		},
 		{
 			"mimeType":"image/png",
 			"name":"MenuSign_02_Glass_BaseColor",
-			"uri":"Textures/MenuSign_02_Glass_BaseColor.dds"
+			"uri":"Textures/MenuSign_02_Glass_BaseColor.png"
 		},
 		{
 			"mimeType":"image/png",
 			"name":"MenuSign_02_Glass_Specular",
-			"uri":"Textures/MenuSign_02_Glass_Specular.dds"
+			"uri":"Textures/MenuSign_02_Glass_Specular.png"
 		},
 		{
 			"mimeType":"image/png",
 			"name":"NapkinHolder_Normal",
-			"uri":"Textures/NapkinHolder_Normal.dds"
+			"uri":"Textures/NapkinHolder_Normal.png"
 		},
 		{
 			"mimeType":"image/png",
 			"name":"NapkinHolder_BaseColor",
-			"uri":"Textures/NapkinHolder_BaseColor.dds"
+			"uri":"Textures/NapkinHolder_BaseColor.png"
 		},
 		{
 			"mimeType":"image/png",
 			"name":"NapkinHolder_Specular",
-			"uri":"Textures/NapkinHolder_Specular.dds"
+			"uri":"Textures/NapkinHolder_Specular.png"
 		},
 		{
 			"mimeType":"image/png",
 			"name":"Plantpots_Normal",
-			"uri":"Textures/Plantpots_Normal.dds"
+			"uri":"Textures/Plantpots_Normal.png"
 		},
 		{
 			"mimeType":"image/png",
 			"name":"Plantpots_BaseColor",
-			"uri":"Textures/Plantpots_BaseColor.dds"
+			"uri":"Textures/Plantpots_BaseColor.png"
 		},
 		{
 			"mimeType":"image/png",
 			"name":"Plantpots_Specular",
-			"uri":"Textures/Plantpots_Specular.dds"
+			"uri":"Textures/Plantpots_Specular.png"
 		},
 		{
 			"mimeType":"image/png",
 			"name":"Shopsign_Bakery_Normal",
-			"uri":"Textures/Shopsign_Bakery_Normal.dds"
+			"uri":"Textures/Shopsign_Bakery_Normal.png"
 		},
 		{
 			"mimeType":"image/png",
 			"name":"Shopsign_Bakery_BaseColor",
-			"uri":"Textures/Shopsign_Bakery_BaseColor.dds"
+			"uri":"Textures/Shopsign_Bakery_BaseColor.png"
 		},
 		{
 			"mimeType":"image/png",
 			"name":"Shopsign_Bakery_Specular",
-			"uri":"Textures/Shopsign_Bakery_Specular.dds"
+			"uri":"Textures/Shopsign_Bakery_Specular.png"
 		},
 		{
 			"mimeType":"image/png",
 			"name":"Shopsign_Ties_Shop_Normal",
-			"uri":"Textures/Shopsign_Ties_Shop_Normal.dds"
+			"uri":"Textures/Shopsign_Ties_Shop_Normal.png"
 		},
 		{
 			"mimeType":"image/png",
 			"name":"Shopsign_Ties_Shop_BaseColor",
-			"uri":"Textures/Shopsign_Ties_Shop_BaseColor.dds"
+			"uri":"Textures/Shopsign_Ties_Shop_BaseColor.png"
 		},
 		{
 			"mimeType":"image/png",
 			"name":"Shopsign_Ties_Shop_Specular",
-			"uri":"Textures/Shopsign_Ties_Shop_Specular.dds"
+			"uri":"Textures/Shopsign_Ties_Shop_Specular.png"
 		},
 		{
 			"mimeType":"image/png",
 			"name":"Shopsign_Book_Store_Emissive_Emissive",
-			"uri":"Textures/Shopsign_Book_Store_Emissive_Emissive.dds"
+			"uri":"Textures/Shopsign_Book_Store_Emissive_Emissive.png"
 		},
 		{
 			"mimeType":"image/png",
 			"name":"Shopsign_Book_Store_Emissive_Normal",
-			"uri":"Textures/Shopsign_Book_Store_Emissive_Normal.dds"
+			"uri":"Textures/Shopsign_Book_Store_Emissive_Normal.png"
 		},
 		{
 			"mimeType":"image/png",
 			"name":"Shopsign_Book_Store_Emissive_BaseColor",
-			"uri":"Textures/Shopsign_Book_Store_Emissive_BaseColor.dds"
+			"uri":"Textures/Shopsign_Book_Store_Emissive_BaseColor.png"
 		},
 		{
 			"mimeType":"image/png",
 			"name":"Shopsign_Book_Store_Emissive_Specular",
-			"uri":"Textures/Shopsign_Book_Store_Emissive_Specular.dds"
+			"uri":"Textures/Shopsign_Book_Store_Emissive_Specular.png"
 		},
 		{
 			"mimeType":"image/png",
 			"name":"Shopsign_Pharmacy_Emissive_Emissive",
-			"uri":"Textures/Shopsign_Pharmacy_Emissive_Emissive.dds"
+			"uri":"Textures/Shopsign_Pharmacy_Emissive_Emissive.png"
 		},
 		{
 			"mimeType":"image/png",
 			"name":"Shopsign_Pharmacy_Emissive_Normal",
-			"uri":"Textures/Shopsign_Pharmacy_Emissive_Normal.dds"
+			"uri":"Textures/Shopsign_Pharmacy_Emissive_Normal.png"
 		},
 		{
 			"mimeType":"image/png",
 			"name":"Shopsign_Pharmacy_Emissive_BaseColor",
-			"uri":"Textures/Shopsign_Pharmacy_Emissive_BaseColor.dds"
+			"uri":"Textures/Shopsign_Pharmacy_Emissive_BaseColor.png"
 		},
 		{
 			"mimeType":"image/png",
 			"name":"Shopsign_Pharmacy_Emissive_Specular",
-			"uri":"Textures/Shopsign_Pharmacy_Emissive_Specular.dds"
+			"uri":"Textures/Shopsign_Pharmacy_Emissive_Specular.png"
 		},
 		{
 			"mimeType":"image/png",
 			"name":"Sidewalkbarrier_Normal",
-			"uri":"Textures/Sidewalkbarrier_Normal.dds"
+			"uri":"Textures/Sidewalkbarrier_Normal.png"
 		},
 		{
 			"mimeType":"image/png",
 			"name":"Sidewalkbarrier_BaseColor",
-			"uri":"Textures/Sidewalkbarrier_BaseColor.dds"
+			"uri":"Textures/Sidewalkbarrier_BaseColor.png"
 		},
 		{
 			"mimeType":"image/png",
 			"name":"Sidewalkbarrier_Specular",
-			"uri":"Textures/Sidewalkbarrier_Specular.dds"
+			"uri":"Textures/Sidewalkbarrier_Specular.png"
 		},
 		{
 			"mimeType":"image/png",
 			"name":"Pavement_Curbstones_Normal",
-			"uri":"Textures/Pavement_Curbstones_Normal.dds"
+			"uri":"Textures/Pavement_Curbstones_Normal.png"
 		},
 		{
 			"mimeType":"image/png",
 			"name":"Pavement_Curbstones_BaseColor",
-			"uri":"Textures/Pavement_Curbstones_BaseColor.dds"
+			"uri":"Textures/Pavement_Curbstones_BaseColor.png"
 		},
 		{
 			"mimeType":"image/png",
 			"name":"Pavement_Curbstones_Specular",
-			"uri":"Textures/Pavement_Curbstones_Specular.dds"
+			"uri":"Textures/Pavement_Curbstones_Specular.png"
 		},
 		{
 			"mimeType":"image/png",
 			"name":"Pavement_Cobblestone_Small_BLENDSHADER_Normal",
-			"uri":"Textures/Pavement_Cobblestone_Small_BLENDSHADER_Normal.dds"
+			"uri":"Textures/Pavement_Cobblestone_Small_BLENDSHADER_Normal.png"
 		},
 		{
 			"mimeType":"image/png",
 			"name":"Pavement_Cobblestone_Small_BLENDSHADER_BaseColor",
-			"uri":"Textures/Pavement_Cobblestone_Small_BLENDSHADER_BaseColor.dds"
+			"uri":"Textures/Pavement_Cobblestone_Small_BLENDSHADER_BaseColor.png"
 		},
 		{
 			"mimeType":"image/png",
 			"name":"Pavement_Cobblestone_Small_BLENDSHADER_Specular",
-			"uri":"Textures/Pavement_Cobblestone_Small_BLENDSHADER_Specular.dds"
+			"uri":"Textures/Pavement_Cobblestone_Small_BLENDSHADER_Specular.png"
 		},
 		{
 			"mimeType":"image/png",
 			"name":"Pavement_Cobblestone_Big_BLENDSHADER_Normal",
-			"uri":"Textures/Pavement_Cobblestone_Big_BLENDSHADER_Normal.dds"
+			"uri":"Textures/Pavement_Cobblestone_Big_BLENDSHADER_Normal.png"
 		},
 		{
 			"mimeType":"image/png",
 			"name":"Pavement_Cobblestone_Big_BLENDSHADER_BaseColor",
-			"uri":"Textures/Pavement_Cobblestone_Big_BLENDSHADER_BaseColor.dds"
+			"uri":"Textures/Pavement_Cobblestone_Big_BLENDSHADER_BaseColor.png"
 		},
 		{
 			"mimeType":"image/png",
 			"name":"Pavement_Cobblestone_Big_BLENDSHADER_Specular",
-			"uri":"Textures/Pavement_Cobblestone_Big_BLENDSHADER_Specular.dds"
+			"uri":"Textures/Pavement_Cobblestone_Big_BLENDSHADER_Specular.png"
 		},
 		{
 			"mimeType":"image/png",
 			"name":"Pavement_Brick_BLENDSHADER_Normal",
-			"uri":"Textures/Pavement_Brick_BLENDSHADER_Normal.dds"
+			"uri":"Textures/Pavement_Brick_BLENDSHADER_Normal.png"
 		},
 		{
 			"mimeType":"image/png",
 			"name":"Pavement_Brick_BLENDSHADER_BaseColor",
-			"uri":"Textures/Pavement_Brick_BLENDSHADER_BaseColor.dds"
+			"uri":"Textures/Pavement_Brick_BLENDSHADER_BaseColor.png"
 		},
 		{
 			"mimeType":"image/png",
 			"name":"Pavement_Brick_BLENDSHADER_Specular",
-			"uri":"Textures/Pavement_Brick_BLENDSHADER_Specular.dds"
+			"uri":"Textures/Pavement_Brick_BLENDSHADER_Specular.png"
 		},
 		{
 			"mimeType":"image/png",
 			"name":"Pavement_Cobblestone_02_Normal",
-			"uri":"Textures/Pavement_Cobblestone_02_Normal.dds"
+			"uri":"Textures/Pavement_Cobblestone_02_Normal.png"
 		},
 		{
 			"mimeType":"image/png",
 			"name":"Pavement_Cobblestone_02_BaseColor",
-			"uri":"Textures/Pavement_Cobblestone_02_BaseColor.dds"
+			"uri":"Textures/Pavement_Cobblestone_02_BaseColor.png"
 		},
 		{
 			"mimeType":"image/png",
 			"name":"Pavement_Cobblestone_02_Specular",
-			"uri":"Textures/Pavement_Cobblestone_02_Specular.dds"
+			"uri":"Textures/Pavement_Cobblestone_02_Specular.png"
 		},
 		{
 			"mimeType":"image/png",
 			"name":"Pavement_Ground_Wet_Normal",
-			"uri":"Textures/Pavement_Ground_Wet_Normal.dds"
+			"uri":"Textures/Pavement_Ground_Wet_Normal.png"
 		},
 		{
 			"mimeType":"image/png",
 			"name":"Pavement_Ground_Wet_BaseColor",
-			"uri":"Textures/Pavement_Ground_Wet_BaseColor.dds"
+			"uri":"Textures/Pavement_Ground_Wet_BaseColor.png"
 		},
 		{
 			"mimeType":"image/png",
 			"name":"Pavement_Ground_Wet_Specular",
-			"uri":"Textures/Pavement_Ground_Wet_Specular.dds"
+			"uri":"Textures/Pavement_Ground_Wet_Specular.png"
 		},
 		{
 			"mimeType":"image/png",
 			"name":"Pavement_Cobblestone_Wet_BLENDSHADER_Normal",
-			"uri":"Textures/Pavement_Cobblestone_Wet_BLENDSHADER_Normal.dds"
+			"uri":"Textures/Pavement_Cobblestone_Wet_BLENDSHADER_Normal.png"
 		},
 		{
 			"mimeType":"image/png",
 			"name":"Pavement_Cobblestone_Wet_BLENDSHADER_BaseColor",
-			"uri":"Textures/Pavement_Cobblestone_Wet_BLENDSHADER_BaseColor.dds"
+			"uri":"Textures/Pavement_Cobblestone_Wet_BLENDSHADER_BaseColor.png"
 		},
 		{
 			"mimeType":"image/png",
 			"name":"Pavement_Cobblestone_Wet_BLENDSHADER_Specular",
-			"uri":"Textures/Pavement_Cobblestone_Wet_BLENDSHADER_Specular.dds"
+			"uri":"Textures/Pavement_Cobblestone_Wet_BLENDSHADER_Specular.png"
 		},
 		{
 			"mimeType":"image/png",
 			"name":"Pavement_Cobblestone_Wet_Leaves_BLENDSHADER_Normal",
-			"uri":"Textures/Pavement_Cobblestone_Wet_Leaves_BLENDSHADER_Normal.dds"
+			"uri":"Textures/Pavement_Cobblestone_Wet_Leaves_BLENDSHADER_Normal.png"
 		},
 		{
 			"mimeType":"image/png",
 			"name":"Pavement_Cobblestone_Wet_Leaves_BLENDSHADER_BaseColor",
-			"uri":"Textures/Pavement_Cobblestone_Wet_Leaves_BLENDSHADER_BaseColor.dds"
+			"uri":"Textures/Pavement_Cobblestone_Wet_Leaves_BLENDSHADER_BaseColor.png"
 		},
 		{
 			"mimeType":"image/png",
 			"name":"Pavement_Cobblestone_Wet_Leaves_BLENDSHADER_Specular",
-			"uri":"Textures/Pavement_Cobblestone_Wet_Leaves_BLENDSHADER_Specular.dds"
+			"uri":"Textures/Pavement_Cobblestone_Wet_Leaves_BLENDSHADER_Specular.png"
 		},
 		{
 			"mimeType":"image/png",
 			"name":"Pavement_Cobble_Leaves_BLENDSHADER_Normal",
-			"uri":"Textures/Pavement_Cobble_Leaves_BLENDSHADER_Normal.dds"
+			"uri":"Textures/Pavement_Cobble_Leaves_BLENDSHADER_Normal.png"
 		},
 		{
 			"mimeType":"image/png",
 			"name":"Pavement_Cobble_Leaves_BLENDSHADER_BaseColor",
-			"uri":"Textures/Pavement_Cobble_Leaves_BLENDSHADER_BaseColor.dds"
+			"uri":"Textures/Pavement_Cobble_Leaves_BLENDSHADER_BaseColor.png"
 		},
 		{
 			"mimeType":"image/png",
 			"name":"Pavement_Cobble_Leaves_BLENDSHADER_Specular",
-			"uri":"Textures/Pavement_Cobble_Leaves_BLENDSHADER_Specular.dds"
+			"uri":"Textures/Pavement_Cobble_Leaves_BLENDSHADER_Specular.png"
 		},
 		{
 			"mimeType":"image/png",
 			"name":"Pavement_Cobblestone_01_BLENDSHADER_Normal",
-			"uri":"Textures/Pavement_Cobblestone_01_BLENDSHADER_Normal.dds"
+			"uri":"Textures/Pavement_Cobblestone_01_BLENDSHADER_Normal.png"
 		},
 		{
 			"mimeType":"image/png",
 			"name":"Pavement_Cobblestone_01_BLENDSHADER_BaseColor",
-			"uri":"Textures/Pavement_Cobblestone_01_BLENDSHADER_BaseColor.dds"
+			"uri":"Textures/Pavement_Cobblestone_01_BLENDSHADER_BaseColor.png"
 		},
 		{
 			"mimeType":"image/png",
 			"name":"Pavement_Cobblestone_01_BLENDSHADER_Specular",
-			"uri":"Textures/Pavement_Cobblestone_01_BLENDSHADER_Specular.dds"
+			"uri":"Textures/Pavement_Cobblestone_01_BLENDSHADER_Specular.png"
 		},
 		{
 			"mimeType":"image/png",
 			"name":"Concrete3_Normal",
-			"uri":"Textures/Concrete3_Normal.dds"
+			"uri":"Textures/Concrete3_Normal.png"
 		},
 		{
 			"mimeType":"image/png",
 			"name":"Concrete3_BaseColor",
-			"uri":"Textures/Concrete3_BaseColor.dds"
+			"uri":"Textures/Concrete3_BaseColor.png"
 		},
 		{
 			"mimeType":"image/png",
 			"name":"Concrete3_Specular",
-			"uri":"Textures/Concrete3_Specular.dds"
+			"uri":"Textures/Concrete3_Specular.png"
 		},
 		{
 			"mimeType":"image/png",
 			"name":"Streetlight_Metal_Normal",
-			"uri":"Textures/Streetlight_Metal_Normal.dds"
+			"uri":"Textures/Streetlight_Metal_Normal.png"
 		},
 		{
 			"mimeType":"image/png",
 			"name":"Streetlight_Metal_BaseColor",
-			"uri":"Textures/Streetlight_Metal_BaseColor.dds"
+			"uri":"Textures/Streetlight_Metal_BaseColor.png"
 		},
 		{
 			"mimeType":"image/png",
 			"name":"Streetlight_Metal_Specular",
-			"uri":"Textures/Streetlight_Metal_Specular.dds"
+			"uri":"Textures/Streetlight_Metal_Specular.png"
 		},
 		{
 			"mimeType":"image/png",
 			"name":"Paris_StringLights_01_White_Color_Normal",
-			"uri":"Textures/Paris_StringLights_01_White_Color_Normal.dds"
+			"uri":"Textures/Paris_StringLights_01_White_Color_Normal.png"
 		},
 		{
 			"mimeType":"image/png",
 			"name":"Paris_StringLights_01_White_Color_BaseColor",
-			"uri":"Textures/Paris_StringLights_01_White_Color_BaseColor.dds"
+			"uri":"Textures/Paris_StringLights_01_White_Color_BaseColor.png"
 		},
 		{
 			"mimeType":"image/png",
 			"name":"Paris_StringLights_01_White_Color_Specular",
-			"uri":"Textures/Paris_StringLights_01_White_Color_Specular.dds"
+			"uri":"Textures/Paris_StringLights_01_White_Color_Specular.png"
 		},
 		{
 			"mimeType":"image/png",
 			"name":"Streetlight_Support_Bulb_Normal",
-			"uri":"Textures/Streetlight_Support_Bulb_Normal.dds"
+			"uri":"Textures/Streetlight_Support_Bulb_Normal.png"
 		},
 		{
 			"mimeType":"image/png",
 			"name":"Streetlight_Support_Bulb_BaseColor",
-			"uri":"Textures/Streetlight_Support_Bulb_BaseColor.dds"
+			"uri":"Textures/Streetlight_Support_Bulb_BaseColor.png"
 		},
 		{
 			"mimeType":"image/png",
 			"name":"Streetlight_Support_Bulb_Specular",
-			"uri":"Textures/Streetlight_Support_Bulb_Specular.dds"
+			"uri":"Textures/Streetlight_Support_Bulb_Specular.png"
 		},
 		{
 			"mimeType":"image/png",
 			"name":"Streetlight_Chains_Normal",
-			"uri":"Textures/Streetlight_Chains_Normal.dds"
+			"uri":"Textures/Streetlight_Chains_Normal.png"
 		},
 		{
 			"mimeType":"image/png",
 			"name":"Streetlight_Chains_BaseColor",
-			"uri":"Textures/Streetlight_Chains_BaseColor.dds"
+			"uri":"Textures/Streetlight_Chains_BaseColor.png"
 		},
 		{
 			"mimeType":"image/png",
 			"name":"Streetlight_Chains_Specular",
-			"uri":"Textures/Streetlight_Chains_Specular.dds"
+			"uri":"Textures/Streetlight_Chains_Specular.png"
 		},
 		{
 			"mimeType":"image/png",
 			"name":"Paris_StreetPivot_Normal",
-			"uri":"Textures/Paris_StreetPivot_Normal.dds"
+			"uri":"Textures/Paris_StreetPivot_Normal.png"
 		},
 		{
 			"mimeType":"image/png",
 			"name":"Paris_StreetPivot_BaseColor",
-			"uri":"Textures/Paris_StreetPivot_BaseColor.dds"
+			"uri":"Textures/Paris_StreetPivot_BaseColor.png"
 		},
 		{
 			"mimeType":"image/png",
 			"name":"Paris_StreetPivot_Specular",
-			"uri":"Textures/Paris_StreetPivot_Specular.dds"
+			"uri":"Textures/Paris_StreetPivot_Specular.png"
 		},
 		{
 			"mimeType":"image/png",
 			"name":"Paris_StreetSign_01_Normal",
-			"uri":"Textures/Paris_StreetSign_01_Normal.dds"
+			"uri":"Textures/Paris_StreetSign_01_Normal.png"
 		},
 		{
 			"mimeType":"image/png",
 			"name":"Paris_StreetSign_01_BaseColor",
-			"uri":"Textures/Paris_StreetSign_01_BaseColor.dds"
+			"uri":"Textures/Paris_StreetSign_01_BaseColor.png"
 		},
 		{
 			"mimeType":"image/png",
 			"name":"Paris_StreetSign_01_Specular",
-			"uri":"Textures/Paris_StreetSign_01_Specular.dds"
+			"uri":"Textures/Paris_StreetSign_01_Specular.png"
 		},
 		{
 			"mimeType":"image/png",
 			"name":"Paris_Table_Terrace_Normal",
-			"uri":"Textures/Paris_Table_Terrace_Normal.dds"
+			"uri":"Textures/Paris_Table_Terrace_Normal.png"
 		},
 		{
 			"mimeType":"image/png",
 			"name":"Paris_Table_Terrace_BaseColor",
-			"uri":"Textures/Paris_Table_Terrace_BaseColor.dds"
+			"uri":"Textures/Paris_Table_Terrace_BaseColor.png"
 		},
 		{
 			"mimeType":"image/png",
 			"name":"Paris_Table_Terrace_Specular",
-			"uri":"Textures/Paris_Table_Terrace_Specular.dds"
+			"uri":"Textures/Paris_Table_Terrace_Specular.png"
 		},
 		{
 			"mimeType":"image/png",
 			"name":"Paris_TrafficSign_A_Normal",
-			"uri":"Textures/Paris_TrafficSign_A_Normal.dds"
+			"uri":"Textures/Paris_TrafficSign_A_Normal.png"
 		},
 		{
 			"mimeType":"image/png",
 			"name":"Paris_TrafficSign_A_BaseColor",
-			"uri":"Textures/Paris_TrafficSign_A_BaseColor.dds"
+			"uri":"Textures/Paris_TrafficSign_A_BaseColor.png"
 		},
 		{
 			"mimeType":"image/png",
 			"name":"Paris_TrafficSign_A_Specular",
-			"uri":"Textures/Paris_TrafficSign_A_Specular.dds"
+			"uri":"Textures/Paris_TrafficSign_A_Specular.png"
 		},
 		{
 			"mimeType":"image/png",
 			"name":"Trashcan_Normal",
-			"uri":"Textures/Trashcan_Normal.dds"
+			"uri":"Textures/Trashcan_Normal.png"
 		},
 		{
 			"mimeType":"image/png",
 			"name":"Trashcan_BaseColor",
-			"uri":"Textures/Trashcan_BaseColor.dds"
+			"uri":"Textures/Trashcan_BaseColor.png"
 		},
 		{
 			"mimeType":"image/png",
 			"name":"Trashcan_Specular",
-			"uri":"Textures/Trashcan_Specular.dds"
+			"uri":"Textures/Trashcan_Specular.png"
 		},
 		{
 			"mimeType":"image/png",
 			"name":"Spotlight_Main_Normal",
-			"uri":"Textures/Spotlight_Main_Normal.dds"
+			"uri":"Textures/Spotlight_Main_Normal.png"
 		},
 		{
 			"mimeType":"image/png",
 			"name":"Spotlight_Main_BaseColor",
-			"uri":"Textures/Spotlight_Main_BaseColor.dds"
+			"uri":"Textures/Spotlight_Main_BaseColor.png"
 		},
 		{
 			"mimeType":"image/png",
 			"name":"Spotlight_Main_Specular",
-			"uri":"Textures/Spotlight_Main_Specular.dds"
+			"uri":"Textures/Spotlight_Main_Specular.png"
 		},
 		{
 			"mimeType":"image/png",
 			"name":"Spotlight_Emissive_Normal",
-			"uri":"Textures/Spotlight_Emissive_Normal.dds"
+			"uri":"Textures/Spotlight_Emissive_Normal.png"
 		},
 		{
 			"mimeType":"image/png",
 			"name":"Spotlight_Emissive_BaseColor",
-			"uri":"Textures/Spotlight_Emissive_BaseColor.dds"
+			"uri":"Textures/Spotlight_Emissive_BaseColor.png"
 		},
 		{
 			"mimeType":"image/png",
 			"name":"Spotlight_Emissive_Specular",
-			"uri":"Textures/Spotlight_Emissive_Specular.dds"
+			"uri":"Textures/Spotlight_Emissive_Specular.png"
 		},
 		{
 			"mimeType":"image/png",
 			"name":"LanternEmissive_Normal",
-			"uri":"Textures/LanternEmissive_Normal.dds"
+			"uri":"Textures/LanternEmissive_Normal.png"
 		},
 		{
 			"mimeType":"image/png",
 			"name":"LanternEmissive_BaseColor.005",
-			"uri":"Textures/LanternEmissive_BaseColor.dds"
+			"uri":"Textures/LanternEmissive_BaseColor.png"
 		},
 		{
 			"mimeType":"image/png",
 			"name":"LanternEmissive_Specular",
-			"uri":"Textures/LanternEmissive_Specular.dds"
+			"uri":"Textures/LanternEmissive_Specular.png"
 		},
 		{
 			"mimeType":"image/png",
 			"name":"Pavement_Manhole_Cover_Normal",
-			"uri":"Textures/Pavement_Manhole_Cover_Normal.dds"
+			"uri":"Textures/Pavement_Manhole_Cover_Normal.png"
 		},
 		{
 			"mimeType":"image/png",
 			"name":"Pavement_Manhole_Cover_BaseColor",
-			"uri":"Textures/Pavement_Manhole_Cover_BaseColor.dds"
+			"uri":"Textures/Pavement_Manhole_Cover_BaseColor.png"
 		},
 		{
 			"mimeType":"image/png",
 			"name":"Pavement_Manhole_Cover_Specular",
-			"uri":"Textures/Pavement_Manhole_Cover_Specular.dds"
+			"uri":"Textures/Pavement_Manhole_Cover_Specular.png"
 		},
 		{
 			"mimeType":"image/png",
 			"name":"Stringlights_Normal",
-			"uri":"Textures/Stringlights_Normal.dds"
+			"uri":"Textures/Stringlights_Normal.png"
 		},
 		{
 			"mimeType":"image/png",
 			"name":"Stringlights_BaseColor",
-			"uri":"Textures/Stringlights_BaseColor.dds"
+			"uri":"Textures/Stringlights_BaseColor.png"
 		},
 		{
 			"mimeType":"image/png",
 			"name":"Stringlights_Specular",
-			"uri":"Textures/Stringlights_Specular.dds"
+			"uri":"Textures/Stringlights_Specular.png"
 		},
 		{
 			"mimeType":"image/png",
 			"name":"Paris_StringLights_01_Orange_Color_Emissive_Emissive",
-			"uri":"Textures/Paris_StringLights_01_Orange_Color_Emissive_Emissive.dds"
+			"uri":"Textures/Paris_StringLights_01_Orange_Color_Emissive_Emissive.png"
 		},
 		{
 			"mimeType":"image/png",
 			"name":"Paris_StringLights_01_Orange_Color_Emissive_Normal",
-			"uri":"Textures/Paris_StringLights_01_Orange_Color_Emissive_Normal.dds"
+			"uri":"Textures/Paris_StringLights_01_Orange_Color_Emissive_Normal.png"
 		},
 		{
 			"mimeType":"image/png",
 			"name":"Paris_StringLights_01_Orange_Color_Emissive_BaseColor",
-			"uri":"Textures/Paris_StringLights_01_Orange_Color_Emissive_BaseColor.dds"
+			"uri":"Textures/Paris_StringLights_01_Orange_Color_Emissive_BaseColor.png"
 		},
 		{
 			"mimeType":"image/png",
 			"name":"Paris_StringLights_01_Orange_Color_Emissive_Specular",
-			"uri":"Textures/Paris_StringLights_01_Orange_Color_Emissive_Specular.dds"
+			"uri":"Textures/Paris_StringLights_01_Orange_Color_Emissive_Specular.png"
 		},
 		{
 			"mimeType":"image/png",
 			"name":"Paris_StringLights_01_Blue_Color_Emissive_Emissive",
-			"uri":"Textures/Paris_StringLights_01_Blue_Color_Emissive_Emissive.dds"
+			"uri":"Textures/Paris_StringLights_01_Blue_Color_Emissive_Emissive.png"
 		},
 		{
 			"mimeType":"image/png",
 			"name":"Paris_StringLights_01_Blue_Color_Emissive_Normal",
-			"uri":"Textures/Paris_StringLights_01_Blue_Color_Emissive_Normal.dds"
+			"uri":"Textures/Paris_StringLights_01_Blue_Color_Emissive_Normal.png"
 		},
 		{
 			"mimeType":"image/png",
 			"name":"Paris_StringLights_01_Blue_Color_Emissive_BaseColor",
-			"uri":"Textures/Paris_StringLights_01_Blue_Color_Emissive_BaseColor.dds"
+			"uri":"Textures/Paris_StringLights_01_Blue_Color_Emissive_BaseColor.png"
 		},
 		{
 			"mimeType":"image/png",
 			"name":"Paris_StringLights_01_Blue_Color_Emissive_Specular",
-			"uri":"Textures/Paris_StringLights_01_Blue_Color_Emissive_Specular.dds"
+			"uri":"Textures/Paris_StringLights_01_Blue_Color_Emissive_Specular.png"
 		},
 		{
 			"mimeType":"image/png",
 			"name":"Paris_StringLights_01_White_Color_Emissive_Emissive",
-			"uri":"Textures/Paris_StringLights_01_White_Color_Emissive_Emissive.dds"
+			"uri":"Textures/Paris_StringLights_01_White_Color_Emissive_Emissive.png"
 		},
 		{
 			"mimeType":"image/png",
 			"name":"Paris_StringLights_01_White_Color_Emissive_Normal",
-			"uri":"Textures/Paris_StringLights_01_White_Color_Emissive_Normal.dds"
+			"uri":"Textures/Paris_StringLights_01_White_Color_Emissive_Normal.png"
 		},
 		{
 			"mimeType":"image/png",
 			"name":"Paris_StringLights_01_White_Color_Emissive_BaseColor",
-			"uri":"Textures/Paris_StringLights_01_White_Color_Emissive_BaseColor.dds"
+			"uri":"Textures/Paris_StringLights_01_White_Color_Emissive_BaseColor.png"
 		},
 		{
 			"mimeType":"image/png",
 			"name":"Paris_StringLights_01_White_Color_Emissive_Specular",
-			"uri":"Textures/Paris_StringLights_01_White_Color_Emissive_Specular.dds"
+			"uri":"Textures/Paris_StringLights_01_White_Color_Emissive_Specular.png"
 		},
 		{
 			"mimeType":"image/png",
 			"name":"Paris_StringLights_01_Pink_Color_Emissive_Emissive",
-			"uri":"Textures/Paris_StringLights_01_Pink_Color_Emissive_Emissive.dds"
+			"uri":"Textures/Paris_StringLights_01_Pink_Color_Emissive_Emissive.png"
 		},
 		{
 			"mimeType":"image/png",
 			"name":"Paris_StringLights_01_Pink_Color_Emissive_Normal",
-			"uri":"Textures/Paris_StringLights_01_Pink_Color_Emissive_Normal.dds"
+			"uri":"Textures/Paris_StringLights_01_Pink_Color_Emissive_Normal.png"
 		},
 		{
 			"mimeType":"image/png",
 			"name":"Paris_StringLights_01_Pink_Color_Emissive_BaseColor",
-			"uri":"Textures/Paris_StringLights_01_Pink_Color_Emissive_BaseColor.dds"
+			"uri":"Textures/Paris_StringLights_01_Pink_Color_Emissive_BaseColor.png"
 		},
 		{
 			"mimeType":"image/png",
 			"name":"Paris_StringLights_01_Pink_Color_Emissive_Specular",
-			"uri":"Textures/Paris_StringLights_01_Pink_Color_Emissive_Specular.dds"
+			"uri":"Textures/Paris_StringLights_01_Pink_Color_Emissive_Specular.png"
 		},
 		{
 			"mimeType":"image/png",
 			"name":"Paris_StringLights_01_Red_Color_Emissive_Emissive",
-			"uri":"Textures/Paris_StringLights_01_Red_Color_Emissive_Emissive.dds"
+			"uri":"Textures/Paris_StringLights_01_Red_Color_Emissive_Emissive.png"
 		},
 		{
 			"mimeType":"image/png",
 			"name":"Paris_StringLights_01_Red_Color_Emissive_Normal",
-			"uri":"Textures/Paris_StringLights_01_Red_Color_Emissive_Normal.dds"
+			"uri":"Textures/Paris_StringLights_01_Red_Color_Emissive_Normal.png"
 		},
 		{
 			"mimeType":"image/png",
 			"name":"Paris_StringLights_01_Red_Color_Emissive_BaseColor",
-			"uri":"Textures/Paris_StringLights_01_Red_Color_Emissive_BaseColor.dds"
+			"uri":"Textures/Paris_StringLights_01_Red_Color_Emissive_BaseColor.png"
 		},
 		{
 			"mimeType":"image/png",
 			"name":"Paris_StringLights_01_Red_Color_Emissive_Specular",
-			"uri":"Textures/Paris_StringLights_01_Red_Color_Emissive_Specular.dds"
+			"uri":"Textures/Paris_StringLights_01_Red_Color_Emissive_Specular.png"
 		},
 		{
 			"mimeType":"image/png",
 			"name":"Paris_StringLights_01_Green_Color_Emissive_Emissive",
-			"uri":"Textures/Paris_StringLights_01_Green_Color_Emissive_Emissive.dds"
+			"uri":"Textures/Paris_StringLights_01_Green_Color_Emissive_Emissive.png"
 		},
 		{
 			"mimeType":"image/png",
 			"name":"Paris_StringLights_01_Green_Color_Emissive_Normal",
-			"uri":"Textures/Paris_StringLights_01_Green_Color_Emissive_Normal.dds"
+			"uri":"Textures/Paris_StringLights_01_Green_Color_Emissive_Normal.png"
 		},
 		{
 			"mimeType":"image/png",
 			"name":"Paris_StringLights_01_Green_Color_Emissive_BaseColor",
-			"uri":"Textures/Paris_StringLights_01_Green_Color_Emissive_BaseColor.dds"
+			"uri":"Textures/Paris_StringLights_01_Green_Color_Emissive_BaseColor.png"
 		},
 		{
 			"mimeType":"image/png",
 			"name":"Paris_StringLights_01_Green_Color_Emissive_Specular",
-			"uri":"Textures/Paris_StringLights_01_Green_Color_Emissive_Specular.dds"
+			"uri":"Textures/Paris_StringLights_01_Green_Color_Emissive_Specular.png"
 		}
 	],
 	"accessors":[
