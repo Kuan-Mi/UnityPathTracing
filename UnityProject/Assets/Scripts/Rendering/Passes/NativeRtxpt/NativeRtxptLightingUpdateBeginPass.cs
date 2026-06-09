@@ -868,6 +868,12 @@ namespace PathTracing
                     s_pastToCurrentStaging[localPast] = EnvQtTotalNodeCount + (uint)i;
             }
 
+            // Resolve analytic-light-proxy sub-instances using THIS frame's light map (Unity Light
+            // InstanceID → global light index), which lives in _curAnalyticLightIndices until the
+            // ping-pong below. The writes land in the GpuScene's SubInstanceData CPU array and are
+            // uploaded by the PrepareEmissiveTriangleTasks SetData that follows in Setup().
+            _ctx.GpuScene?.ResolveAnalyticProxyLights(_curAnalyticLightIndices);
+
             // Ping-pong the history maps so this frame's assignment becomes next frame's "previous".
             (_prevAnalyticLightIndices, _curAnalyticLightIndices) = (_curAnalyticLightIndices, _prevAnalyticLightIndices);
             _curAnalyticLightIndices.Clear();

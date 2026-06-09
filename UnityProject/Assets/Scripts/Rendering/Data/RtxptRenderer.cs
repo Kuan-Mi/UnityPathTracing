@@ -57,9 +57,9 @@ namespace PathTracing
         public MeshRenderer MeshRenderer { get; private set; }
 
         /// <summary>
-        /// Sub-meshes grouped by (isTransparent, isEmissive, isAlphaClip), derived from the assigned
-        /// <see cref="RtxptMaterial"/> slots. Each group becomes a separate TLAS instance. Null slots
-        /// are excluded (their sub-mesh is not rendered). Rebuilt on enable / validate / bake.
+        /// Sub-meshes grouped by (isTransparent, isEmissive, isAlphaClip, isAnalyticProxy), derived from
+        /// the assigned <see cref="RtxptMaterial"/> slots. Each group becomes a separate TLAS instance.
+        /// Null slots are excluded (their sub-mesh is not rendered). Rebuilt on enable / validate / bake.
         /// </summary>
         public RtxptSubmeshGroup[] SubmeshGroups { get; private set; } = Array.Empty<RtxptSubmeshGroup>();
 
@@ -130,8 +130,8 @@ namespace PathTracing
 
         /// <summary>
         /// Rebuilds <see cref="SubmeshGroups"/> from the assigned slots, grouping sub-meshes that
-        /// share the same (isTransparent, isEmissive, isAlphaClip) tuple while preserving sub-mesh
-        /// order. Null slots are skipped (their sub-mesh is not rendered). Bumps
+        /// share the same (isTransparent, isEmissive, isAlphaClip, isAnalyticProxy) tuple while
+        /// preserving sub-mesh order. Null slots are skipped (their sub-mesh is not rendered). Bumps
         /// <see cref="TopologyVersion"/> only when the grouping actually changed, so scalar-only
         /// edits keep using the lightweight material-update path instead of a full scene rebuild.
         /// </summary>
@@ -140,15 +140,15 @@ namespace PathTracing
             var mf     = GetComponent<MeshFilter>();
             int subCnt = mf != null && mf.sharedMesh != null ? mf.sharedMesh.subMeshCount : (Slots?.Count ?? 0);
 
-            var order = new List<(bool t, bool e, bool a)>();
-            var lists = new Dictionary<(bool, bool, bool), List<int>>();
+            var order = new List<(bool t, bool e, bool a, bool p)>();
+            var lists = new Dictionary<(bool, bool, bool, bool), List<int>>();
 
             for (int s = 0; s < subCnt; s++)
             {
                 RtxptMaterial mat = Slots != null && s < Slots.Count ? Slots[s] : null;
                 if (mat == null) continue; // unassigned sub-mesh — excluded (not rendered)
 
-                var key = (IsTransparent(mat), IsEmissive(mat), mat.EnableAlphaTesting);
+                var key = (IsTransparent(mat), IsEmissive(mat), mat.EnableAlphaTesting, IsAnalyticProxy(mat));
                 if (!lists.TryGetValue(key, out var list))
                 {
                     list       = new List<int>();
@@ -165,10 +165,11 @@ namespace PathTracing
                 var key = order[i];
                 groups[i] = new RtxptSubmeshGroup
                 {
-                    isTransparent  = key.t,
-                    isEmissive     = key.e,
-                    isAlphaClip    = key.a,
-                    submeshIndices = lists[key].ToArray(),
+                    isTransparent   = key.t,
+                    isEmissive      = key.e,
+                    isAlphaClip     = key.a,
+                    isAnalyticProxy = key.p,
+                    submeshIndices  = lists[key].ToArray(),
                 };
             }
 
@@ -187,7 +188,8 @@ namespace PathTracing
                 var x = a[i];
                 var y = b[i];
                 if (x.isTransparent != y.isTransparent || x.isEmissive != y.isEmissive ||
-                    x.isAlphaClip != y.isAlphaClip || x.submeshIndices.Length != y.submeshIndices.Length)
+                    x.isAlphaClip != y.isAlphaClip || x.isAnalyticProxy != y.isAnalyticProxy ||
+                    x.submeshIndices.Length != y.submeshIndices.Length)
                     return false;
                 for (int k = 0; k < x.submeshIndices.Length; k++)
                     if (x.submeshIndices[k] != y.submeshIndices[k])
@@ -203,6 +205,10 @@ namespace PathTracing
         private static bool IsEmissive(RtxptMaterial m)
             => m.EmissiveIntensity > 0f &&
                (m.EmissiveColor.r > 0f || m.EmissiveColor.g > 0f || m.EmissiveColor.b > 0f);
+
+        // Analytic-light-proxy materials must use the emissive hit-group variant (the proxy NEE branch
+        // is compiled out of the non-emissive variant), so they get their own grouping dimension.
+        private static bool IsAnalyticProxy(RtxptMaterial m) => m.EnableAsAnalyticLightProxy;
 
         /// <summary>
         /// Bakes slot data from the renderer's current Unity materials into any
@@ -306,7 +312,7 @@ namespace PathTracing
     }
 
     // =========================================================================
-    // RtxptSubmeshGroup  —  sub-meshes sharing one (transparent, emissive, alphaClip)
+    // RtxptSubmeshGroup  —  sub-meshes sharing one (transparent, emissive, alphaClip, analyticProxy)
     // tuple, each becoming a separate TLAS instance. Derived from RtxptMaterial slots
     // by RtxptRenderer (replaces NativeRender.SubmeshGroupDesc for the Rtxpt path).
     // =========================================================================
@@ -315,6 +321,12 @@ namespace PathTracing
         public bool isTransparent;
         public bool isEmissive;
         public bool isAlphaClip;
+
+        /// <summary>
+        /// True when the group's material is flagged <c>EnableAsAnalyticLightProxy</c>. Routed to the
+        /// emissive hit-group variant (variant 0) so the analytic-proxy NEE branch is compiled in.
+        /// </summary>
+        public bool isAnalyticProxy;
 
         /// <summary>Indices into the Mesh's sub-meshes, in ascending order.</summary>
         public int[] submeshIndices;

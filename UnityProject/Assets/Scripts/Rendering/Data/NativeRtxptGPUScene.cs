@@ -118,6 +118,12 @@ namespace PathTracing
         // Maps (globalInstanceIndex, geometrySubIndex) → last-frame DestinationBufferOffset
         private readonly Dictionary<(int, int), uint> _emissiveHistoricOffsets = new();
 
+        // ---- Analytic-light-proxy tracking -----------------------------------
+        // Sub-instances whose material has EnableAsAnalyticLightProxy, recorded at scene rebuild as
+        // (subInstanceIndex, targetLightInstanceID). Resolved to SubInstanceData.AnalyticProxyLightIndex
+        // each frame by ResolveAnalyticProxyLights (the global light index can change frame to frame).
+        private readonly List<(int subIdx, int lightId)> _proxySubInstances = new();
+
         // Max task count: MaxLights / LLB_MAX_TRIANGLES_PER_TASK * 2
         private const int MaxEmissiveProcTasks = NativeRtxptBufferResources.MaxLights / 32 * 2;
         private static readonly RtxptEmissiveTrianglesProcTask[] s_emissiveTaskStaging =
@@ -236,6 +242,53 @@ namespace PathTracing
         /// <param name="scratchBuffer">Raw native buffer bound as u_scratchBuffer.
         ///     Tasks are written at element offset 0 (each element = 4 bytes; tasks are 32 B each,
         ///     so stride-8 within the raw buffer).</param>
+        /// <summary>
+        /// Resolves the target Spot/Point <see cref="Light"/> a proxy mesh stands in for: an explicit
+        /// <see cref="RtxptAnalyticLightProxy"/> reference if present, otherwise the nearest Spot/Point
+        /// light on this GameObject or an ancestor (mirrors RTXPT's ProxiedAnalyticLight / parent-node
+        /// rules). Returns null if no eligible light is found.
+        /// </summary>
+        private static Light ResolveProxyTargetLight(Component renderer)
+        {
+            var proxy = renderer.GetComponent<RtxptAnalyticLightProxy>();
+            if (proxy != null && proxy.TargetLight != null)
+                return proxy.TargetLight;
+
+            for (var t = renderer.transform; t != null; t = t.parent)
+            {
+                var light = t.GetComponent<Light>();
+                if (light != null && (light.type == LightType.Spot || light.type == LightType.Point))
+                    return light;
+            }
+            return null;
+        }
+
+        /// <summary>
+        /// Per-frame: write each proxy sub-instance's <c>AnalyticProxyLightIndex</c> from the current
+        /// frame's analytic-light map (Unity <see cref="Light"/> InstanceID → global light index).
+        /// Lights absent from the map (disabled/culled, or never collected) fall back to
+        /// RTXPT_INVALID_LIGHT_INDEX, which disables the proxy lookup for that frame.
+        ///
+        /// Must be called before the SubInstanceData re-upload performed by
+        /// <see cref="PrepareEmissiveTriangleTasks"/>, which is what pushes these writes to the GPU.
+        /// </summary>
+        public void ResolveAnalyticProxyLights(IReadOnlyDictionary<int, uint> lightIndexMap)
+        {
+            if (_subInstanceCpu == null || _proxySubInstances.Count == 0) return;
+
+            const uint Invalid = 0xFFFFFFFFu;
+            foreach (var (subIdx, lightId) in _proxySubInstances)
+            {
+                if (subIdx < 0 || subIdx >= _subInstanceCpu.Length) continue;
+
+                uint globalIndex = Invalid;
+                if (lightId != 0 && lightIndexMap != null && lightIndexMap.TryGetValue(lightId, out var idx))
+                    globalIndex = idx;
+
+                _subInstanceCpu[subIdx].AnalyticProxyLightIndex = globalIndex;
+            }
+        }
+
         public void PrepareEmissiveTriangleTasks(uint lightOffset, UploadBuffer scratchBuffer)
         {
             if (_instanceCpu == null || _subInstanceCpu == null || _ptMaterialCpu == null)
@@ -503,7 +556,10 @@ namespace PathTracing
                         var descs = descsList.ToArray();
 
                         uint handle          = MakeGroupHandle(mrId, gi);
-                        uint hitGroupVariant = grp.isEmissive ? 0u : 1u;
+                        // Variant 0 = emissive hit group (HitEmissive), variant 1 = non-emissive.
+                        // Analytic-light-proxy materials must use variant 0: the proxy NEE branch is
+                        // compiled out of the non-emissive variant (RTXPT_MATERIAL_IS_ANALYTIC_LIGHT_PROXY=0).
+                        uint hitGroupVariant = (grp.isEmissive || grp.isAnalyticProxy) ? 0u : 1u;
                         if (_accelStructure.AddInstanceGroup(mesh, descs, handle, hitGroupContribution: runningContribution))
                         {
                             _accelStructure.SetInstanceTransform(handle, mr.transform.localToWorldMatrix);
@@ -597,6 +653,8 @@ namespace PathTracing
             var bufPtrs     = new List<IntPtr>();
             var texPtrs     = new List<IntPtr>();
 
+            _proxySubInstances.Clear();
+
             foreach (var target in targets)
             {
                 if (target == null) continue;
@@ -646,7 +704,7 @@ namespace PathTracing
 
                 if (!hasNormal || !hasTangent)
                 {
-                    Debug.LogWarning($"[NativeRtxptGPUScene] '{mesh.name}': missing normal or tangent stream");
+                    Debug.LogWarning($"[NativeRtxptGPUScene] {target.name} '{mesh.name}': missing normal or tangent stream");
                 } 
 
                 Material[] mats       = mr.sharedMaterials ?? Array.Empty<Material>();
@@ -677,7 +735,7 @@ namespace PathTracing
                         for (int _gi = 0; _gi < groups_dbg.Length; _gi++)
                         {
                             var _grp = groups_dbg[_gi];
-                            sb.AppendLine($"  Group[{_gi}]: emissive={_grp.isEmissive} alphaClip={_grp.isAlphaClip} submeshIndices=[{string.Join(",", _grp.submeshIndices)}]");
+                            sb.AppendLine($"  Group[{_gi}]: emissive={_grp.isEmissive} alphaClip={_grp.isAlphaClip} analyticProxy={_grp.isAnalyticProxy} submeshIndices=[{string.Join(",", _grp.submeshIndices)}]");
                         }
 
                     Debug.Log(sb.ToString());
@@ -741,15 +799,29 @@ namespace PathTracing
                     if (excludeFromNEE) siFlags |= SubInstanceFlags.ExcludeFromNEE;
                     siFlags |= (alphaU8 << SubInstanceFlags.AlphaOffsetOffset);
 
+                    // Record analytic-light-proxy sub-instances. The actual AnalyticProxyLightIndex is
+                    // filled per-frame by ResolveAnalyticProxyLights once the light global indices exist;
+                    // here we only capture (subInstanceIndex, targetLightInstanceID). subInstList.Count
+                    // equals the index this entry is about to occupy.
+                    if (overrideSlot.EnableAsAnalyticLightProxy)
+                    {
+                        Light targetLight = ResolveProxyTargetLight(mr);
+                        _proxySubInstances.Add((subInstList.Count, targetLight != null ? targetLight.GetInstanceID() : 0));
+                        if (targetLight == null)
+                            Debug.LogWarning($"[NativeRtxptGPUScene] Renderer '{mr.name}' submesh {s} is flagged " +
+                                             "EnableAsAnalyticLightProxy but has no Spot/Point target light " +
+                                             "(add an RtxptAnalyticLightProxy component or parent it under a light).");
+                    }
+
                     subInstList.Add(new SubInstanceData
                     {
                         FlagsAndAlphaInfo                       = siFlags,
                         GlobalGeometryIndex_PTMaterialDataIndex = ((uint)globalGeomIdx << 16) | ((uint)matIdx & 0xFFFFu),
-                        EmissiveLightMappingOffset              = 0xFFFFFFFFu, // no light baker yet
-                        // RTXPT_INVALID_LIGHT_INDEX — the analytic-light-proxy feature
-                        // (PrepareEmissiveTriangleTasks) is not ported, so leave this at the sentinel.
-                        // The shader only reads it for materials flagged EnableAsAnalyticLightProxy;
-                        // INVALID disables the proxy lookup, whereas 0u would alias env-quad light 0.
+                        EmissiveLightMappingOffset              = 0xFFFFFFFFu, // set per-frame by PrepareEmissiveTriangleTasks
+                        // Default to RTXPT_INVALID_LIGHT_INDEX (disables the proxy lookup, which the
+                        // shader only performs for EnableAsAnalyticLightProxy materials; 0u would alias
+                        // env-quad light 0). For proxy materials this is overwritten each frame by
+                        // ResolveAnalyticProxyLights once the analytic light global indices are known.
                         AnalyticProxyLightIndex                 = 0xFFFFFFFFu,
                         IndexBufferIndex_VertexBufferIndex      = ((uint)slots.ib << 16) | ((uint)slots.vb & 0xFFFFu),
                         IndexOffset                             = (uint)sub.indexStart * 4u,
