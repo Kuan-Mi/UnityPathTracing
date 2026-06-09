@@ -163,24 +163,18 @@ namespace PathTracing
                 renderPassEvent = renderPassEvent,
             };
 
-            if (_lightingUpdateBeginPass == null)
-            {
-                _lightingUpdateBeginPass = new NativeRtxptLightingUpdateBeginPass(
-                        envLightsBackupPastCs, envLightsSubdivideBaseCs, envLightsSubdivideBoostCs,
-                        envLightsFillLookupMapCs, envLightsMapPastToCurrentCs,
-                        resetLightProxyCountersCs, resetPastToCurrentHistoryCs,
-                        computeWeightsCs, computeProxyCountsCs, computeProxyBaselineOffsetsCs,
-                        createProxyJobsCs, executeProxyJobsCs,
-                        bakeEmissiveTrianglesCs,
-                        processFeedbackHistoryPreFilterCs, processFeedbackHistoryP0Cs)
-                    { renderPassEvent = renderPassEvent };
-            }
-
-            _buildStablePlanesPass ??= new NativeRtxptBuildStablePlanesPass(
-                    buildStablePlanesShader, buildHitGroups)
+            _lightingUpdateBeginPass ??= new NativeRtxptLightingUpdateBeginPass(
+                    envLightsBackupPastCs, envLightsSubdivideBaseCs, envLightsSubdivideBoostCs,
+                    envLightsFillLookupMapCs, envLightsMapPastToCurrentCs,
+                    resetLightProxyCountersCs, resetPastToCurrentHistoryCs,
+                    computeWeightsCs, computeProxyCountsCs, computeProxyBaselineOffsetsCs,
+                    createProxyJobsCs, executeProxyJobsCs,
+                    bakeEmissiveTrianglesCs,
+                    processFeedbackHistoryPreFilterCs, processFeedbackHistoryP0Cs)
                 { renderPassEvent = renderPassEvent };
 
-            _exportVisibilityBufferPass ??= new NativeRtxptExportVisibilityBufferPass(exportVisibilityBufferCs) { renderPassEvent = renderPassEvent };
+            _buildStablePlanesPass      ??= new NativeRtxptBuildStablePlanesPass(buildStablePlanesShader, buildHitGroups) { renderPassEvent = renderPassEvent };
+            _exportVisibilityBufferPass ??= new NativeRtxptExportVisibilityBufferPass(exportVisibilityBufferCs) { renderPassEvent           = renderPassEvent };
 
             _lightingUpdateEndPass ??= new NativeRtxptLightingUpdateEndPass(
                     processFeedbackHistoryP1aCs, processFeedbackHistoryP1bCs,
@@ -188,26 +182,16 @@ namespace PathTracing
                     clearFeedbackHistoryCs)
                 { renderPassEvent = renderPassEvent };
 
-            _fillStablePlanesPass ??= new NativeRtxptFillStablePlanesPass(
-                    fillStablePlanesShader, referenceShader,
-                    fillHitGroups, referenceHitGroups)
-                { renderPassEvent = renderPassEvent };
-            _denoisingGuidesBakePass ??= new NativeRtxptDenoisingGuidesBakePass(denoiseSpecHitTCs) { renderPassEvent = renderPassEvent };
-            _dlssRrPrepareInputsPass ??= new NativeRtxptDlssRRPrepareInputsPass(dlssBeforeCs) { renderPassEvent      = renderPassEvent };
-            _dlssRRPass              ??= new DlssRRPass { renderPassEvent                                            = renderPassEvent };
-            // Bloom is optional — only build once all three raster wrappers are assigned/imported.
-            if (_bloomPass == null && bloomDownsampleRasterShader != null && bloomBlurRasterShader != null && bloomCompositeRasterShader != null)
-                _bloomPass = new NativeRtxptBloomPass(bloomDownsampleRasterShader, bloomBlurRasterShader, bloomCompositeRasterShader) { renderPassEvent = renderPassEvent };
-            // Tone mapping — faithful RTXPT replica. Built once all four original-shader wrappers exist
-            // (Native*Pipeline throws on a null shader); run AutoFillShaders if these are unset.
-            if (_toneMappingMipChainPass == null && luminanceRasterShader != null && luminanceMipCs != null
-                && captureLuminanceCs != null && toneMapApplyRasterShader != null)
-                _toneMappingMipChainPass = new NativeRtxptToneMappingMipChainPass(
-                    luminanceRasterShader, luminanceMipCs, captureLuminanceCs, toneMapApplyRasterShader) { renderPassEvent = renderPassEvent };
-            _accumulationPass         ??= new NativeRtxptAccumulationPass(accumulationCs) { renderPassEvent                 = renderPassEvent };
-            _stablePlanesDebugVizPass ??= new NativeRtxptStablePlanesDebugVizPass(stablePlanesDebugVizCs) { renderPassEvent = renderPassEvent };
-            _outputBlitPass           ??= new NativeRtxptOutputBlitPass(outputBlitMaterial) { renderPassEvent               = renderPassEvent };
-            _depthBarrierFixPass      ??= new DepthBarrierFixPass { renderPassEvent                                         = RenderPassEvent.AfterRendering };
+            _fillStablePlanesPass     ??= new NativeRtxptFillStablePlanesPass(fillStablePlanesShader, referenceShader, fillHitGroups, referenceHitGroups) { renderPassEvent             = renderPassEvent };
+            _denoisingGuidesBakePass  ??= new NativeRtxptDenoisingGuidesBakePass(denoiseSpecHitTCs) { renderPassEvent                                                                   = renderPassEvent };
+            _dlssRrPrepareInputsPass  ??= new NativeRtxptDlssRRPrepareInputsPass(dlssBeforeCs) { renderPassEvent                                                                        = renderPassEvent };
+            _dlssRRPass               ??= new DlssRRPass { renderPassEvent                                                                                                              = renderPassEvent };
+            _bloomPass                ??= new NativeRtxptBloomPass(bloomDownsampleRasterShader, bloomBlurRasterShader, bloomCompositeRasterShader) { renderPassEvent                    = renderPassEvent };
+            _toneMappingMipChainPass  ??= new NativeRtxptToneMappingMipChainPass(luminanceRasterShader, luminanceMipCs, captureLuminanceCs, toneMapApplyRasterShader) { renderPassEvent = renderPassEvent };
+            _accumulationPass         ??= new NativeRtxptAccumulationPass(accumulationCs) { renderPassEvent                                                                             = renderPassEvent };
+            _stablePlanesDebugVizPass ??= new NativeRtxptStablePlanesDebugVizPass(stablePlanesDebugVizCs) { renderPassEvent                                                             = renderPassEvent };
+            _outputBlitPass           ??= new NativeRtxptOutputBlitPass(outputBlitMaterial) { renderPassEvent                                                                           = renderPassEvent };
+            _depthBarrierFixPass      ??= new DepthBarrierFixPass { renderPassEvent                                                                                                     = RenderPassEvent.AfterRendering };
         }
 
         public override void AddRenderPasses(ScriptableRenderer renderer, ref RenderingData renderingData)
@@ -273,7 +257,7 @@ namespace PathTracing
             // nri CreateUpscaler fail. Skip the whole path-tracing pass list for this
             // camera until it has a usable resolution.
             if (math.cmin(displayResolution) < MinUpscalerResolution ||
-                math.cmin(renderResolution)  < MinUpscalerResolution)
+                math.cmin(renderResolution) < MinUpscalerResolution)
                 return;
 
             bool texturesChanged = texPool.EnsureResources(renderResolution, displayResolution);

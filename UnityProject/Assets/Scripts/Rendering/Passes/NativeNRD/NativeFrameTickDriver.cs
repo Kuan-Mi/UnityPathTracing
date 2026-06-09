@@ -77,6 +77,14 @@ namespace PathTracing
         {
             if (_cmd == null) return;
 
+            // Asset-preview / thumbnail rendering (e.g. FBX previews via
+            // PreviewRenderUtility) drives its own isolated RenderPipeline.Render with a
+            // temporary camera and graphics state. Issuing our render-thread plugin event
+            // in that context crashes inside Unity's GetFrameFenceImpl. The frame tick
+            // only needs to run for genuine editor/game frames, so skip contexts made up
+            // entirely of preview/thumbnail cameras.
+            if (IsPreviewOnlyContext(cameras)) return;
+
             _cmd.Clear();
             _cmd.IssuePluginEvent(NativeRenderPlugin.NR_GetFrameTickEventFunc(), 1);
             // Graphics.ExecuteCommandBuffer queues the event onto the render thread
@@ -84,6 +92,20 @@ namespace PathTracing
             // elsewhere and avoiding a second context.Submit().
             Graphics.ExecuteCommandBuffer(_cmd);
             // Debug.Log($"NativeFrameTickDriver issued frame tick event for {Time.frameCount}");
+        }
+
+        // True when every camera in the context is a preview/thumbnail camera, i.e. an
+        // editor asset-preview render rather than a real Scene/Game frame.
+        private static bool IsPreviewOnlyContext(List<Camera> cameras)
+        {
+            if (cameras == null || cameras.Count == 0) return false;
+            foreach (var cam in cameras)
+            {
+                if (cam == null) continue;
+                if (cam.cameraType != CameraType.Preview)
+                    return false;
+            }
+            return true;
         }
 
         private static void Shutdown()
