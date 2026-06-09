@@ -33,7 +33,23 @@ namespace PathTracing
 
             // 1. Exact path under the root.
             string combined = root + "/" + rel;
-            var tex = AssetDatabase.LoadAssetAtPath<Texture>(combined);
+            var    tex      = AssetDatabase.LoadAssetAtPath<Texture>(combined);
+            if (tex != null)
+            {
+                resolvedAssetPath = combined;
+                return tex;
+            }
+
+            combined = Path.ChangeExtension(combined, "png");
+            tex      = AssetDatabase.LoadAssetAtPath<Texture>(combined);
+            if (tex != null)
+            {
+                resolvedAssetPath = combined;
+                return tex;
+            }
+
+            combined = Path.ChangeExtension(combined, "jpg");
+            tex      = AssetDatabase.LoadAssetAtPath<Texture>(combined);
             if (tex != null)
             {
                 resolvedAssetPath = combined;
@@ -49,7 +65,7 @@ namespace PathTracing
             {
                 string path = AssetDatabase.GUIDToAssetPath(guid);
                 if (!string.Equals(Path.GetFileNameWithoutExtension(path), fileName,
-                                   System.StringComparison.OrdinalIgnoreCase))
+                        System.StringComparison.OrdinalIgnoreCase))
                     continue;
                 tex = AssetDatabase.LoadAssetAtPath<Texture>(path);
                 if (tex != null)

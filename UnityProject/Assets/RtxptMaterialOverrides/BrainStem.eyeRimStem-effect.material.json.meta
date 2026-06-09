@@ -1,7 +1,11 @@
 fileFormatVersion: 2
 guid: 36550ce77d1588946b0f0e3a16473d0c
-TextScriptImporter:
+ScriptedImporter:
+  internalIDToNameTable: []
   externalObjects: {}
+  serializedVersion: 2
   userData: 
   assetBundleName: 
   assetBundleVariant: 
+  script: {fileID: 11500000, guid: d85b855fe4358334cb7eb4b105cd7d74, type: 3}
+  textureRoot: Assets/Art/RTXPTAssets
