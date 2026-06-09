@@ -705,11 +705,11 @@ namespace PathTracing
                 if (!hasNormal || !hasTangent)
                 {
                     Debug.LogWarning($"[NativeRtxptGPUScene] {target.name} '{mesh.name}': missing normal or tangent stream");
-                } 
+                }  
 
                 Material[] mats       = mr.sharedMaterials ?? Array.Empty<Material>();
                 int        subMeshCnt = mesh.subMeshCount;
-                // (firstGeom and instIdx are computed per-branch below)
+                // (firstGeom is computed per-branch below)
 
 #if UNITY_EDITOR
                 if (mr.name == "Bistro_Research_Interior_Paris_Flower_Pot_01A_2442" ||
@@ -863,9 +863,14 @@ namespace PathTracing
                         int numGeom = geomList.Count - firstGeomForGroup;
                         if (numGeom == 0) continue; // whole group unassigned — matches RegisterScene
 
-                        int  groupInstIdx = instList.Count;
                         uint groupHandle  = MakeGroupHandle(mrId, gi);
-                        _accelStructure.SetInstanceID(groupHandle, (uint)groupInstIdx);
+                        // TLAS InstanceID must be the SubInstanceData base offset (firstGeometryInstanceIndex),
+                        // NOT the instance index: the any-hit alpha test indexes t_SubInstanceData[InstanceID()
+                        // + geometryIndex] directly (PathTracerBridgeDonut.hlsli AlphaTest), mirroring RTXPT's
+                        // instanceDesc.instanceID = instance->GetGeometryInstanceIndex() (Sample.cpp). The
+                        // closest-hit path is unaffected — it uses the automatic InstanceIndex() to fetch the
+                        // instance, then adds firstGeometryInstanceIndex itself.
+                        _accelStructure.SetInstanceID(groupHandle, (uint)firstGeomForGroup);
 
                         instList.Add(new DonutInstanceData
                         {
@@ -904,12 +909,14 @@ namespace PathTracing
                         continue;
 
                     int firstGeom = geomList.Count;
-                    int instIdx   = instList.Count;
 
                     for (int s = 0; s < subMeshCnt; s++)
                         AddSubmeshData(s);
 
-                    _accelStructure.SetInstanceID(mr, (uint)instIdx);
+                    // InstanceID = SubInstanceData base offset (firstGeometryInstanceIndex), matching the
+                    // grouped path above and RTXPT's GetGeometryInstanceIndex() — required by the any-hit
+                    // alpha test which indexes t_SubInstanceData[InstanceID() + geometryIndex] directly.
+                    _accelStructure.SetInstanceID(mr, (uint)firstGeom);
                     instList.Add(new DonutInstanceData
                     {
                         flags                      = 0u,
