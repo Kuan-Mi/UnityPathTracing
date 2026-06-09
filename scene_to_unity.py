@@ -9,13 +9,25 @@ use the SAME convention so it lines up with the imported meshes.
   position (x,y,z)        -> (-x, y, z)
   uniform scale s         -> s   (unchanged)
 
-Rotation uses ONE rule for EVERY object (mesh and camera alike): treat the
-object exactly like a camera. Convert its local forward (-Z) and up (+Y) basis
-vectors with M (negate-X), then rebuild with Unity's LookRotation(forward, up).
-There is no per-object forward difference.
+Rotation needs TWO different rules, because meshes and cameras are mirrored
+differently by glTFast:
 
-  (Verified: camera quat [-0.044203,0.863331,0.076813,0.496796] -> euler
-  [10.1689, 59.8358, 359.9998].)
+  * MESH  -> the geometry itself is X-mirrored, so the rotation is the true
+            X-mirror CONJUGATION  M R M  (M = M^-1 = diag(-1,1,1)), which for a
+            quaternion (x,y,z,w) is simply  (x, -y, -z, w).
+            (Verified: scene node [0,-0.7071068,0,-0.7071068] -> euler
+            [0, -90, 0], matching the hand-placed parent for GlassLiquidIce.)
+
+  * CAMERA -> the view must NOT be mirrored (that would flip the image), so we
+            reconstruct from the local forward (-Z) / up (+Y) basis: convert both
+            with M (negate-X) and rebuild via Unity LookRotation(forward, up).
+            (Verified: camera quat [-0.044203,0.863331,0.076813,0.496796] ->
+            euler [10.1689, 59.8358, 359.9998].)
+
+NOTE: a mesh's own glTF root node may bake a +90 deg X axis-fixup (Z-up -> Y-up).
+That rotation lives INSIDE the model and must be preserved by the glTFast prefab
+hierarchy (e.g. nest the converted parent ABOVE the prefab root); it is NOT part
+of the scene-graph node transform this script converts.
 """
 
 import json
@@ -96,11 +108,22 @@ def convert_position(p):
     return [-x, y, z]
 
 
-def convert_rotation(q, forward=(0, 0, -1), up=(0, 1, 0)):
-    """One rotation conversion for EVERY object (treat it like a camera).
+def convert_rotation_mesh(q):
+    """Rotation for a MESH: true X-mirror conjugation M R M.
+
+    For M = diag(-1,1,1) this reduces to negating y and z of the quaternion.
+    Use this for any geometry instance, because glTFast X-mirrors the vertices.
+    """
+    x, y, z, w = q
+    return [x, -y, -z, w]
+
+
+def convert_rotation_camera(q, forward=(0, 0, -1), up=(0, 1, 0)):
+    """Rotation for a CAMERA: reconstruct from the forward/up basis.
 
     Convert the local `forward`(-Z)/`up`(+Y) basis vectors with M (negate-X) and
-    rebuild via Unity LookRotation (left-handed: +Z=forward, +Y=up).
+    rebuild via Unity LookRotation (left-handed: +Z=forward, +Y=up). The view is
+    NOT mirrored, unlike mesh geometry.
     """
     R = quat_to_mat(q)
     fwd = _mv(M, _mv(R, list(forward)))
@@ -124,10 +147,13 @@ if __name__ == "__main__":
     # --- self-checks against the values the user verified ---
     print("VERIFY position [7.548285, 1.611793, -4.109409] ->",
           fmt(convert_position([7.548285, 1.611793, -4.109409])))
-    cam = convert_rotation([-0.044203, 0.863331, 0.076813, 0.496796])
+    cam = convert_rotation_camera([-0.044203, 0.863331, 0.076813, 0.496796])
     print("VERIFY camera rotation -> quat", fmt(cam))
     print("                       -> euler", fmt(unity_euler(cam), 4),
           " (target [10.1689, 59.8358, 359.9998])")
+    mesh = convert_rotation_mesh([0, -0.7071068, 0, -0.7071068])
+    print("VERIFY mesh rotation   -> euler", fmt(unity_euler(mesh), 4),
+          " (target [0, -90, 0])")
     print()
 
     if len(sys.argv) > 1:
@@ -143,8 +169,11 @@ if __name__ == "__main__":
                         print("  position:", fmt(convert_position(n["translation"])))
                     r = n.get("rotation")
                     if r and len(r) == 4:
-                        uq = convert_rotation(r)   # same rule for every object
-                        print("  rot quat (xyzw):", fmt(uq))
+                        is_cam = "Camera" in n.get("type", "")
+                        uq = (convert_rotation_camera(r) if is_cam
+                              else convert_rotation_mesh(r))
+                        print("  rot quat (xyzw):", fmt(uq),
+                              "(camera)" if is_cam else "(mesh)")
                         print("  rot euler (xyz):", fmt(unity_euler(uq), 3))
                     elif r and len(r) != 4:
                         print("  rotation: SKIPPED (malformed, %d components)" % len(r))
