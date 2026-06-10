@@ -346,6 +346,11 @@ add_library(NativeRenderPlugin SHARED
     NativeRenderPlugin/src/Resources/NativeBuffer.cpp
     NativeRenderPlugin/src/Resources/SharedUploadPool.cpp
     NativeRenderPlugin/src/Hooks/D3D12HeapHook.cpp
+    # RTXMU (NVIDIA RTX Memory Utility) — BLAS suballocation + compaction
+    # management; vendored D3D12 subset (see External/rtxmu/README.md).
+    External/rtxmu/src/D3D12AccelStructManager.cpp
+    External/rtxmu/src/D3D12Suballocator.cpp
+    External/rtxmu/src/Logger.cpp
 )
 
 target_include_directories(NativeRenderPlugin PRIVATE
@@ -355,6 +360,7 @@ target_include_directories(NativeRenderPlugin PRIVATE
     NativeRenderPlugin/include/Resources
     NativeRenderPlugin/include/Hooks
     NativeRenderPlugin/src/Plugin
+    External/rtxmu/include
     D3D12HeapHook
     "${UNITY_PLUGIN_API_DIR}"
     "${DXC_INC}"

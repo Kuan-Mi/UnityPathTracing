@@ -10,8 +10,12 @@
 #include <cstdint>
 #include "IUnityLog.h"
 #include "IUnityGraphicsD3D12.h"
+#include "rtxmu/D3D12AccelStructManager.h"
 
 using Microsoft::WRL::ComPtr;
+
+// Sentinel for "no RTXMU acceleration structure" (RTXMU ids start at 1).
+static constexpr uint64_t kInvalidRtxmuId = ~0ull;
 
 // ---------------------------------------------------------------------------
 // NR_SubmeshDesc
@@ -157,14 +161,18 @@ struct MeshKeyHash
 
 struct BLASEntry
 {
-    ComPtr<ID3D12Resource> blas;
-    // Build scratch is transient and suballocated from g_scratchPool per build
-    // (including dynamic PERFORM_UPDATE refits), so it is not retained here.
+    // The BLAS itself lives inside RTXMU (NVIDIA RTX Memory Utility): result /
+    // scratch / update-scratch / compacted memory are all suballocated from
+    // RTXMU's pooled blocks and identified by this id. Resolve the current GPU
+    // VA via DxAccelStructManager::GetAccelStructGPUVA — it switches to the
+    // compacted location automatically once compaction has been recorded.
+    uint64_t rtxmuId = kInvalidRtxmuId;
 
     // Built OMM Array AS (consumed by the BLAS build and at trace time) — must
-    // outlive the BLAS. The OMM-array build scratch and the raw array/desc input
-    // blobs are transient: they are deferred-released inside BuildOMMForSubmesh
-    // right after the build is recorded, so they are not retained here.
+    // outlive the BLAS. Kept outside RTXMU (committed buffers), matching nvrhi,
+    // which also manages OMM arrays separately from rtxmu. The OMM-array build
+    // scratch and the raw array/desc input blobs are transient: they are
+    // pool-owned and recycled by the frame fence, so they are not retained here.
     std::vector<ComPtr<ID3D12Resource>> ommArrays;
     std::vector<ComPtr<ID3D12Resource>> ommIndexBuffers;   // DEFAULT-heap, referenced by OMM linkage at trace time
     std::vector<DXGI_FORMAT>            ommIndexFormats;
@@ -172,11 +180,6 @@ struct BLASEntry
 
     bool anyOMM   = false;
     int  refCount = 0;
-
-    // For dynamic (ALLOW_UPDATE) BLASes: UpdateScratchDataSizeInBytes captured from
-    // the initial build's prebuild info. Fixed for a fixed topology, so per-frame
-    // PERFORM_UPDATE refits can suballocate scratch without re-querying prebuild info.
-    UINT64 updateScratchSize = 0;
 };
 // ---------------------------------------------------------------------------
 // AccelerationStructure
@@ -263,24 +266,23 @@ private:
     // Internal BLAS types
     // -----------------------------------------------------------------------
 
-    // Deferred BLAS compaction batch — one per frame that built static BLASes.
-    // EnsureBLAS queues each newly built static key; after the frame's global
-    // post-build UAV barrier, QueueCompactionSizeQueries records ONE
-    // EmitRaytracingAccelerationStructurePostbuildInfo for all of them (the API
-    // takes an array of source VAs and writes one 8-byte size per AS,
-    // consecutively) plus one copy into a shared READBACK buffer. Three frames
-    // later ProcessPendingCompactions reads the sizes, allocates the smaller
-    // result buffers, records CopyRaytracingAccelerationStructure (COMPACT),
-    // and swaps the cache entries. Batching mirrors RTXMU (which nvrhi/donut
-    // delegate compaction to) and avoids the previous two committed 8-byte
-    // resources per BLAS — each of which occupied a 64KB heap.
-    struct PendingCompactionBatch
+    // RTXMU build lifecycle batch: the ids built (PopulateBuildCommandList) in
+    // one frame travel together through the deferred stages —
+    //   frame N   : build + inline compaction-size emit; size copy to readback
+    //               (PopulateCompactionSizeCopiesCommandList)
+    //   frame N+3 : GPU provably done → PopulateCompactionCommandList records
+    //               the compaction copies (RTXMU reads the sizes from its
+    //               mapped readback and switches GetAccelStructGPUVA over)
+    //   frame N+6 : compaction copies provably done → GarbageCollection frees
+    //               the transient result / scratch / size memory.
+    // Mirrors nvrhi's rtxmuBuildIds → asBuildsCompleted → rtxmuCompactionIds
+    // flow, with the frame-fence delay standing in for nvrhi's per-commandlist
+    // fences. Non-compaction builds (dynamic BLASes) ride the same queue;
+    // RTXMU skips them where compaction does not apply.
+    struct RtxmuIdBatch
     {
-        std::vector<MeshKey>   keys;           // same order as the emitted size entries
-        ComPtr<ID3D12Resource> sizeBuffer;     // DEFAULT UAV, target of EmitPostbuildInfo
-        ComPtr<ID3D12Resource> readbackBuffer; // READBACK, CPU reads the compacted sizes
-        void*    mappedReadback = nullptr;     // persistently-mapped readback pointer
-        uint32_t buildFrame     = 0;           // value of m_frameCounter when submitted
+        std::vector<uint64_t> ids;
+        uint32_t              frame = 0;   // m_frameCounter when this stage was recorded
     };
 
     struct TLASInstanceEntry
@@ -315,7 +317,9 @@ private:
         // TLAS emission order (SetInstanceOrderIndex). 0xFFFFFFFF = unordered: emitted after
         // all ordered instances, in slot order (stable sort), preserving legacy behavior.
         uint32_t tlasOrder = 0xFFFFFFFFu;
-        D3D12_GPU_VIRTUAL_ADDRESS blasVA;
+        // RTXMU id of this instance's BLAS. The GPU VA is resolved per frame at
+        // TLAS emission (it moves when RTXMU compacts the BLAS).
+        uint64_t blasRtxmuId = kInvalidRtxmuId;
         // Persistent BLAS for dynamic (skinned) instances – reused every frame with PERFORM_UPDATE
         std::unique_ptr<BLASEntry> dynamicBlas;
     };
@@ -328,11 +332,25 @@ private:
     D3D12_GPU_VIRTUAL_ADDRESS GetBLASVA(const MeshKey& key) const;
     bool BuildOMMForSubmesh(ID3D12GraphicsCommandList4* cmdList,
                             BLASEntry& entry, size_t subIdx, const SubMeshData& mesh);
-    void ProcessPendingCompactions(ID3D12GraphicsCommandList4* cmdList);
-    // Records the batched compacted-size query + readback copy for every static
-    // BLAS built this frame (m_compactionQueue). Must run after the frame's
-    // global post-build UAV barrier so the postbuild info reads completed builds.
-    void QueueCompactionSizeQueries(ID3D12GraphicsCommandList4* cmdList);
+
+    // --- RTXMU lifecycle helpers ---
+    // Advances the deferred stages (compaction copies, garbage collection) for
+    // batches whose previous stage has provably completed on the GPU.
+    void ProcessRtxmuCompaction(ID3D12GraphicsCommandList4* cmdList);
+    // Records the compaction-size readback copy for this frame's builds and
+    // queues them for the deferred stages. Must run after the frame's global
+    // post-build UAV barrier.
+    void FlushRtxmuBuilds(ID3D12GraphicsCommandList4* cmdList);
+    // Defers RemoveAccelerationStructures(id) until the GPU has finished any
+    // frame that may still reference it (shares the deferred-delete fence).
+    void ScheduleRtxmuRemove(uint64_t id);
+    // Removes |id| from every pending lifecycle batch so a released BLAS is
+    // never compacted / garbage-collected after its removal was scheduled.
+    void ScrubPendingRtxmuId(uint64_t id);
+    // Releases everything a BLASEntry owns (RTXMU memory + OMM buffers), GPU-safely.
+    void ReleaseBLASEntryResources(BLASEntry& e);
+    // Current GPU VA for an RTXMU id (compacted VA once compaction is recorded), 0 if invalid.
+    D3D12_GPU_VIRTUAL_ADDRESS ResolveBlasVA(uint64_t id) const;
 
     // TLAS helpers
     bool BuildTLAS(ID3D12GraphicsCommandList4* cmdList, const std::vector<TLASInstanceEntry>& entries);
@@ -347,10 +365,21 @@ private:
     // BLAS cache
     std::unordered_map<MeshKey, BLASEntry, MeshKeyHash> m_blasCache;
 
-    // Deferred compaction (static BLASes only): keys built this frame awaiting
-    // their batched size query, and in-flight batches awaiting readback.
-    std::vector<MeshKey>                m_compactionQueue;
-    std::vector<PendingCompactionBatch> m_pendingCompactionBatches;
+    // RTXMU acceleration-structure memory manager (suballocated result/scratch/
+    // compaction pools). shared_ptr so deferred-delete lambdas that still need
+    // to call RemoveAccelerationStructures keep it alive past this object.
+    std::shared_ptr<rtxmu::DxAccelStructManager> m_rtxmu;
+
+    // RTXMU lifecycle queues (see RtxmuIdBatch).
+    std::vector<uint64_t>     m_rtxmuBuildsThisFrame;
+    std::vector<RtxmuIdBatch> m_rtxmuPendingCompaction;  // size copy recorded, awaiting GPU
+    std::vector<RtxmuIdBatch> m_rtxmuPendingGC;          // compaction recorded, awaiting GPU
+    // Frames to wait before trusting that a recorded stage has executed on the
+    // GPU — same margin as the deferred-delete queue (kDeleteDelay).
+    static constexpr uint32_t kRtxmuStageLatency = 3;
+    // Suballocator block size; matches nvrhi's rtxMemUtil->Initialize(8388608).
+    static constexpr uint32_t kRtxmuBlockSize = 8u * 1024u * 1024u;
+
     uint32_t m_frameCounter = 0;
 
     // Single persistent TLAS rebuilt in place each frame (nvrhi model). Serialized
