@@ -9,7 +9,7 @@ using UnityEngine;
 namespace PathTracing
 {
     /// <summary>
-    /// One-click baker that adds <see cref="RtxptRenderer"/> to every MeshRenderer in the
+    /// One-click baker that adds <see cref="RtxptRenderer"/> to every Renderer in the
     /// scene and bakes a <see cref="RtxptMaterial"/> asset for every sub-mesh slot —
     /// reusing the same asset whenever multiple slots reference the same Unity <see cref="Material"/>.
     ///
@@ -138,15 +138,26 @@ namespace PathTracing
             }
 
             // Collect renderers.
-            MeshRenderer[] renderers = CollectRenderers();
+            Renderer[] renderers = CollectRenderers();
 
             int renderersTouched = 0, slotsCreated = 0, slotsReused = 0, slotsSkipped = 0;
 
             foreach (var mr in renderers)
             {
+                
                 var mf        = mr.GetComponent<MeshFilter>();
                 var mats      = mr.sharedMaterials ?? Array.Empty<Material>();
-                int slotCount = mf?.sharedMesh != null ? mf.sharedMesh.subMeshCount : mats.Length;
+
+
+                int slotCount = 0;
+                if (mf != null)
+                {
+                    slotCount = mf.sharedMesh.subMeshCount;
+                } 
+                else
+                {
+                    slotCount = mats.Length;
+                } 
                 if (slotCount == 0) continue;
 
                 // Ensure RtxptRenderer exists.
@@ -248,16 +259,16 @@ namespace PathTracing
 
         // ---- Helpers ----
 
-        private MeshRenderer[] CollectRenderers()
+        private Renderer[] CollectRenderers()
         {
             if (_selectedOnly)
             {
-                var list = new List<MeshRenderer>();
+                var list = new List<Renderer>();
                 foreach (var go in Selection.gameObjects)
-                    list.AddRange(go.GetComponentsInChildren<MeshRenderer>(includeInactive: true));
+                    list.AddRange(go.GetComponentsInChildren<Renderer>(includeInactive: true));
                 return list.ToArray();
             }
-            return FindObjectsByType<MeshRenderer>(FindObjectsInactive.Include, FindObjectsSortMode.None);
+            return FindObjectsByType<Renderer>(FindObjectsInactive.Include, FindObjectsSortMode.None);
         }
 
         /// <summary>Ensures every segment of <paramref name="folderPath"/> exists.</summary>
