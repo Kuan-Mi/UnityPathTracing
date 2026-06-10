@@ -12,7 +12,7 @@ using Rtxdi.GI;
 using Rtxdi.ReGIR;
 using Rtxdi.LightSampling;
 using Rtxdi.PT;
-
+ 
 namespace Rtxdi
 {
     public struct ImportanceSamplingContext_StaticParameters

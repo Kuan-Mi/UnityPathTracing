@@ -476,9 +476,9 @@ namespace PathTracing
                     bufPtrs.Add(donutIb.GetNativeBufferPtr());
                     _meshBufferSlots[meshId] = slots;
 
-                    if (!mesh.HasVertexAttribute(VertexAttribute.Normal) ||
-                        !mesh.HasVertexAttribute(VertexAttribute.Tangent))
-                        Debug.LogWarning($"[NativeRtxptGPUScene] '{mesh.name}': missing normal or tangent stream");
+                    // if (!mesh.HasVertexAttribute(VertexAttribute.Normal) ||
+                    //     !mesh.HasVertexAttribute(VertexAttribute.Tangent))
+                    //     Debug.LogWarning($"[NativeRtxptGPUScene] '{mesh.name}': missing normal or tangent stream");
                 }
 
                 var streams = new RtxptMeshStreamOffsets(mesh, withPrevPosition: rec.IsSkinned);

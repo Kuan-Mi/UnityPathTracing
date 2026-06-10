@@ -24,6 +24,7 @@ import argparse
 import io
 import math
 import os
+import stat
 import struct
 import sys
 
@@ -131,6 +132,15 @@ def to_png_image(im):
     return im.convert('RGBA')
 
 
+def _force_remove(path):
+    """os.remove that first clears the Windows read-only attribute if set."""
+    try:
+        os.remove(path)
+    except PermissionError:
+        os.chmod(path, stat.S_IWRITE)
+        os.remove(path)
+
+
 def main():
     ap = argparse.ArgumentParser(description='Convert DDS textures in a folder to PNG (originals kept).')
     ap.add_argument('folder', nargs='?', default='UnityProject/Assets',
@@ -169,11 +179,11 @@ def main():
 
             # Only reachable when a same-name .png exists (just written or pre-existing).
             if args.delete_dds:
-                os.remove(src)
+                _force_remove(src)
                 deleted += 1
                 meta = src + '.meta'   # Unity import sidecar
                 if os.path.exists(meta):
-                    os.remove(meta)
+                    _force_remove(meta)
 
     print(f'\n完成: 转换 {converted}, 跳过(已存在) {skipped}, 失败 {failed}, 删除DDS {deleted}.')
     if failed:
