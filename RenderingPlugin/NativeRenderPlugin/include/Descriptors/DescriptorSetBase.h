@@ -83,6 +83,12 @@ protected:
     struct SubresReadBarrier { ID3D12Resource* res; UINT firstSub; UINT subCount; };
     std::vector<SubresReadBarrier> m_subresReadBarriers;  // filled by RequestResourceStates
 
+    // Reused per-dispatch scratch: every resource bound as a UAV (singular or via a
+    // bindless UAV array) in the current RequestResourceStates call. Built once per
+    // dispatch so the same-resource SRV+UAV detection is a lookup in this small list
+    // instead of a re-walk of all UAV bindings per SRV.
+    std::vector<ID3D12Resource*> m_uavResScratch;
+
     void EmitSubresourceReadBarriers (ID3D12GraphicsCommandList* cmd);  // UAV  -> m_srvReadState
     void RestoreSubresourceUAVStates (ID3D12GraphicsCommandList* cmd);  // read -> UAV
 

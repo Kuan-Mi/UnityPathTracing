@@ -291,9 +291,14 @@ bool AccelerationStructure::EnsureBLAS(ID3D12GraphicsCommandList4 *cmdList, Inst
     if (isDynamic && slot.dynamicBlas && slot.dynamicBlas->ommArrays.size() == subCount)
     {
         BLASEntry &existing = *slot.dynamicBlas;
-        std::vector<D3D12_RAYTRACING_GEOMETRY_DESC>                  upGeomDescs(subCount);
-        std::vector<D3D12_RAYTRACING_GEOMETRY_TRIANGLES_DESC>        upOmmTriDescs(subCount);
-        std::vector<D3D12_RAYTRACING_GEOMETRY_OMM_LINKAGE_DESC>      upOmmLinkages(subCount);
+        // Member scratch (capacity retained across frames): this path runs every frame
+        // for every skinned instance, so avoid three heap allocations per refit.
+        m_refitGeomDescs.resize(subCount);
+        m_refitOmmTriDescs.resize(subCount);
+        m_refitOmmLinkages.resize(subCount);
+        auto &upGeomDescs   = m_refitGeomDescs;
+        auto &upOmmTriDescs = m_refitOmmTriDescs;
+        auto &upOmmLinkages = m_refitOmmLinkages;
 
         for (size_t j = 0; j < subCount; ++j)
         {
@@ -363,12 +368,21 @@ bool AccelerationStructure::EnsureBLAS(ID3D12GraphicsCommandList4 *cmdList, Inst
         upInputs.DescsLayout  = D3D12_ELEMENTS_LAYOUT_ARRAY;
         upInputs.pGeometryDescs = upGeomDescs.data();
 
-        // Suballocate update scratch from the pool each frame (nvrhi re-queries and
-        // suballocates on every build, including PERFORM_UPDATE refits).
-        D3D12_RAYTRACING_ACCELERATION_STRUCTURE_PREBUILD_INFO upPrebuild = {};
-        m_device->GetRaytracingAccelerationStructurePrebuildInfo(&upInputs, &upPrebuild);
+        // Suballocate update scratch from the pool each frame. The required size was
+        // captured from the initial build's prebuild info (fixed for fixed topology),
+        // so the per-refit GetRaytracingAccelerationStructurePrebuildInfo round-trip
+        // is skipped; the query remains only as a fallback for entries built before
+        // the size was tracked.
+        UINT64 updateScratchSize = existing.updateScratchSize;
+        if (updateScratchSize == 0)
+        {
+            D3D12_RAYTRACING_ACCELERATION_STRUCTURE_PREBUILD_INFO upPrebuild = {};
+            m_device->GetRaytracingAccelerationStructurePrebuildInfo(&upInputs, &upPrebuild);
+            updateScratchSize          = upPrebuild.UpdateScratchDataSizeInBytes;
+            existing.updateScratchSize = updateScratchSize;
+        }
         SharedUploadPool::Allocation upScratch = g_scratchPool.Allocate(
-            upPrebuild.UpdateScratchDataSizeInBytes, D3D12_RAYTRACING_ACCELERATION_STRUCTURE_BYTE_ALIGNMENT);
+            updateScratchSize, D3D12_RAYTRACING_ACCELERATION_STRUCTURE_BYTE_ALIGNMENT);
         if (!upScratch.IsValid())
         {
             AccelLogf(m_log, kUnityLogTypeError, "EnsureBLAS: dynamic update scratch suballoc failed");
@@ -498,6 +512,11 @@ bool AccelerationStructure::EnsureBLAS(ID3D12GraphicsCommandList4 *cmdList, Inst
 
     D3D12_RAYTRACING_ACCELERATION_STRUCTURE_PREBUILD_INFO prebuildInfo = {};
     m_device->GetRaytracingAccelerationStructurePrebuildInfo(&inputs, &prebuildInfo);
+
+    // Captured for dynamic BLASes so per-frame PERFORM_UPDATE refits skip the
+    // prebuild-info query (the update scratch size is fixed for fixed topology).
+    if (isDynamic)
+        blas.updateScratchSize = prebuildInfo.UpdateScratchDataSizeInBytes;
 
     D3D12_HEAP_PROPERTIES defaultHeap = {};
     defaultHeap.Type = D3D12_HEAP_TYPE_DEFAULT;

@@ -172,6 +172,11 @@ struct BLASEntry
 
     bool anyOMM   = false;
     int  refCount = 0;
+
+    // For dynamic (ALLOW_UPDATE) BLASes: UpdateScratchDataSizeInBytes captured from
+    // the initial build's prebuild info. Fixed for a fixed topology, so per-frame
+    // PERFORM_UPDATE refits can suballocate scratch without re-querying prebuild info.
+    UINT64 updateScratchSize = 0;
 };
 // ---------------------------------------------------------------------------
 // AccelerationStructure
@@ -358,6 +363,13 @@ private:
     std::vector<TLASInstanceEntry> m_tlasEntries;
     // Reused scratch: active slot indices sorted by InstanceSlot::tlasOrder for TLAS emission.
     std::vector<uint32_t>          m_orderedSlotScratch;
+
+    // Reused scratch for the per-frame dynamic-BLAS refit path in EnsureBLAS (geometry
+    // descs reference the tri/linkage descs by pointer, so all three live together).
+    // Guarded by m_stateMutex like everything else EnsureBLAS touches.
+    std::vector<D3D12_RAYTRACING_GEOMETRY_DESC>             m_refitGeomDescs;
+    std::vector<D3D12_RAYTRACING_GEOMETRY_TRIANGLES_DESC>   m_refitOmmTriDescs;
+    std::vector<D3D12_RAYTRACING_GEOMETRY_OMM_LINKAGE_DESC> m_refitOmmLinkages;
 
     // Mutex protecting shared state accessed from both Main Thread (Clear, AddInstance,
     // RemoveInstance, SetInstance*) and Render Thread (BuildOrUpdate / BuildTLAS).

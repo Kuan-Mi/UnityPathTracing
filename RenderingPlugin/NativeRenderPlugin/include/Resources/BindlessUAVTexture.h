@@ -56,6 +56,11 @@ public:
     uint32_t Capacity()  const { return m_capacity;  }
     uint32_t AllocBase() const { return m_allocBase; }
 
+    // Highest slot index ever assigned a non-null resource, plus one. All slots at
+    // or beyond this are guaranteed null, so per-dispatch resource-state walks can
+    // stop here instead of scanning the full capacity.
+    uint32_t UsedCount() const { return m_usedCount; }
+
     // Returns the resource at |index|, or nullptr if the slot is empty / index is out of range.
     ID3D12Resource* GetTexture(uint32_t index) const
     {
@@ -87,5 +92,6 @@ private:
 
     uint32_t m_capacity  = 0;
     uint32_t m_allocBase = 0;
+    uint32_t m_usedCount = 0;   // see UsedCount(); grow-only except on shrinking Resize
     bool     m_initialized = false;
 };

@@ -1,8 +1,20 @@
 @echo off
 setlocal
 
+:: Build configuration: pass as first argument (Debug / Release). Default: Debug.
+set CONFIG=%~1
+if "%CONFIG%"=="" set CONFIG=Debug
+set OUT_DIR=RenderingPlugin\_Build\%CONFIG%
+
+:: NRD/NRI are built externally; fall back to their Debug output if the
+:: requested configuration was never built there.
+set NRD_DIR=RenderingPlugin\_ExternalBuild\NRD_build\%CONFIG%
+if not exist "%NRD_DIR%\NRD.dll" set NRD_DIR=RenderingPlugin\_ExternalBuild\NRD_build\Debug
+set NRI_DIR=RenderingPlugin\_ExternalBuild\NRI_build\%CONFIG%
+if not exist "%NRI_DIR%\NRI.dll" set NRI_DIR=RenderingPlugin\_ExternalBuild\NRI_build\Debug
+
 echo ============================================================
-echo  NativeRenderPlugin Build and Copy
+echo  NativeRenderPlugin Build and Copy (%CONFIG%)
 echo ============================================================
 echo.
 
@@ -25,7 +37,7 @@ if exist "%DLL_PATH%" (
 )
 
 :: Build
-call build.bat
+call build.bat %CONFIG%
 if errorlevel 1 (
     pause
     exit /b 1
@@ -34,15 +46,15 @@ if errorlevel 1 (
 :: Copy DLLs to Unity
 echo Copying DLLs to Unity...
 
-:: Project build outputs
-copy /Y "RenderingPlugin\_Build\Debug\NativeRenderPlugin.dll"    "%UNITY_PLUGINS%\" >nul
-copy /Y "RenderingPlugin\_Build\Debug\NativeRenderPlugin.pdb"    "%UNITY_PLUGINS%\" >nul
-copy /Y "RenderingPlugin\_Build\Debug\OMMBakerPlugin.dll"        "%UNITY_PLUGINS%\" >nul
-copy /Y "RenderingPlugin\_Build\Debug\OMMBakerPlugin.pdb"        "%UNITY_PLUGINS%\" >nul
-copy /Y "RenderingPlugin\_Build\Debug\ShaderCompilerPlugin.dll"  "%UNITY_PLUGINS%\" >nul
-copy /Y "RenderingPlugin\_Build\Debug\ShaderCompilerPlugin.pdb"  "%UNITY_PLUGINS%\" >nul
-copy /Y "RenderingPlugin\_Build\Debug\D3D12HeapHook.dll"         "%UNITY_PLUGINS%\" >nul
-copy /Y "RenderingPlugin\_Build\Debug\D3D12HeapHook.pdb"         "%UNITY_PLUGINS%\" >nul
+:: Project build outputs (PDB copies fail harmlessly for configs that emit none)
+copy /Y "%OUT_DIR%\NativeRenderPlugin.dll"    "%UNITY_PLUGINS%\" >nul
+copy /Y "%OUT_DIR%\NativeRenderPlugin.pdb"    "%UNITY_PLUGINS%\" >nul
+copy /Y "%OUT_DIR%\OMMBakerPlugin.dll"        "%UNITY_PLUGINS%\" >nul
+copy /Y "%OUT_DIR%\OMMBakerPlugin.pdb"        "%UNITY_PLUGINS%\" >nul
+copy /Y "%OUT_DIR%\ShaderCompilerPlugin.dll"  "%UNITY_PLUGINS%\" >nul
+copy /Y "%OUT_DIR%\ShaderCompilerPlugin.pdb"  "%UNITY_PLUGINS%\" >nul
+copy /Y "%OUT_DIR%\D3D12HeapHook.dll"         "%UNITY_PLUGINS%\" >nul
+copy /Y "%OUT_DIR%\D3D12HeapHook.pdb"         "%UNITY_PLUGINS%\" >nul
 
 :: DXC (dxcompiler / dxil)
 copy /Y "RenderingPlugin\_deps\dxc-nuget\build\native\bin\x64\dxcompiler.dll" "%UNITY_PLUGINS%\" >nul
@@ -52,22 +64,22 @@ copy /Y "RenderingPlugin\_deps\dxc-nuget\build\native\bin\x64\dxil.dll"       "%
 copy /Y "RenderingPlugin\_deps\omm-src\bin\omm-lib.dll" "%UNITY_PLUGINS%\" >nul
 
 :: Denoiser / PrepareLight -> Assets\Plugins\x86_64
-copy /Y "RenderingPlugin\_Build\Debug\Denoiser.dll"              "%UNITY_ASSETS_PLUGINS%\" >nul
-copy /Y "RenderingPlugin\_Build\Debug\Denoiser.pdb"              "%UNITY_ASSETS_PLUGINS%\" >nul
-copy /Y "RenderingPlugin\_Build\Debug\PrepareLight.dll"          "%UNITY_ASSETS_PLUGINS%\" >nul
-copy /Y "RenderingPlugin\_Build\Debug\PrepareLight.pdb"          "%UNITY_ASSETS_PLUGINS%\" >nul
-copy /Y "RenderingPlugin\_Build\Debug\D3D12HeapHook.dll"         "%UNITY_ASSETS_PLUGINS%\" >nul
-copy /Y "RenderingPlugin\_Build\Debug\D3D12HeapHook.pdb"         "%UNITY_ASSETS_PLUGINS%\" >nul
+copy /Y "%OUT_DIR%\Denoiser.dll"              "%UNITY_ASSETS_PLUGINS%\" >nul
+copy /Y "%OUT_DIR%\Denoiser.pdb"              "%UNITY_ASSETS_PLUGINS%\" >nul
+copy /Y "%OUT_DIR%\PrepareLight.dll"          "%UNITY_ASSETS_PLUGINS%\" >nul
+copy /Y "%OUT_DIR%\PrepareLight.pdb"          "%UNITY_ASSETS_PLUGINS%\" >nul
+copy /Y "%OUT_DIR%\D3D12HeapHook.dll"         "%UNITY_ASSETS_PLUGINS%\" >nul
+copy /Y "%OUT_DIR%\D3D12HeapHook.pdb"         "%UNITY_ASSETS_PLUGINS%\" >nul
 
 :: NRD / NRI -> Assets\Plugins\x86_64
-copy /Y "RenderingPlugin\_ExternalBuild\NRD_build\Debug\NRD.dll" "%UNITY_ASSETS_PLUGINS%\" >nul
-copy /Y "RenderingPlugin\_ExternalBuild\NRD_build\Debug\NRD.pdb" "%UNITY_ASSETS_PLUGINS%\" >nul
-copy /Y "RenderingPlugin\_ExternalBuild\NRI_build\Debug\NRI.dll" "%UNITY_ASSETS_PLUGINS%\" >nul
-copy /Y "RenderingPlugin\_ExternalBuild\NRI_build\Debug\NRI.pdb" "%UNITY_ASSETS_PLUGINS%\" >nul
+copy /Y "%NRD_DIR%\NRD.dll" "%UNITY_ASSETS_PLUGINS%\" >nul
+copy /Y "%NRD_DIR%\NRD.pdb" "%UNITY_ASSETS_PLUGINS%\" >nul
+copy /Y "%NRI_DIR%\NRI.dll" "%UNITY_ASSETS_PLUGINS%\" >nul
+copy /Y "%NRI_DIR%\NRI.pdb" "%UNITY_ASSETS_PLUGINS%\" >nul
 
 :: DLSS / DLSS-D -> Assets\Plugins\x86_64
-copy /Y "RenderingPlugin\_ExternalBuild\NRI_build\Debug\nvngx_dlss.dll"  "%UNITY_ASSETS_PLUGINS%\" >nul
-copy /Y "RenderingPlugin\_ExternalBuild\NRI_build\Debug\nvngx_dlssd.dll" "%UNITY_ASSETS_PLUGINS%\" >nul
+copy /Y "%NRI_DIR%\nvngx_dlss.dll"  "%UNITY_ASSETS_PLUGINS%\" >nul
+copy /Y "%NRI_DIR%\nvngx_dlssd.dll" "%UNITY_ASSETS_PLUGINS%\" >nul
 
 echo.
 echo ============================================================

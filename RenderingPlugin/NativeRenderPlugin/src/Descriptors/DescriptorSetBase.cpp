@@ -458,23 +458,29 @@ void DescriptorSetBase<ShaderT>::RequestResourceStates(
 
     m_subresReadBarriers.clear();
 
-    // Resources bound as a UAV in this dispatch. An SRV that targets one of these is
-    // the same-resource SRV+UAV case (donut mipmapgen): it must be handled with manual
-    // per-subresource barriers rather than a conflicting whole-resource Require.
+    // Resources bound as a UAV in this dispatch, collected once. An SRV that targets
+    // one of these is the same-resource SRV+UAV case (donut mipmapgen): it must be
+    // handled with manual per-subresource barriers rather than a conflicting
+    // whole-resource Require.
+    m_uavResScratch.clear();
+    for (uint32_t j : m_idxUAV)
+        if (ID3D12Resource* r = ResolveBoundResource(slotOf(j)))
+            m_uavResScratch.push_back(r);
+    for (uint32_t j : m_idxUAVArray)
+    {
+        const BindingSlot s = slotOf(j);
+        if (s.objectKind == BindingObjectKind::BindlessUAVTexture && s.objectPtr)
+        {
+            auto* bt = reinterpret_cast<BindlessUAVTexture*>(s.objectPtr);
+            for (uint32_t k = 0, n = bt->UsedCount(); k < n; ++k)
+                if (ID3D12Resource* r = bt->GetTexture(k))
+                    m_uavResScratch.push_back(r);
+        }
+    }
     auto boundAsUAV = [&](ID3D12Resource* res) -> bool {
         if (!res) return false;
-        for (uint32_t j : m_idxUAV)
-            if (ResolveBoundResource(slotOf(j)) == res) return true;
-        for (uint32_t j : m_idxUAVArray)
-        {
-            const BindingSlot s = slotOf(j);
-            if (s.objectKind == BindingObjectKind::BindlessUAVTexture && s.objectPtr)
-            {
-                auto* bt = reinterpret_cast<BindlessUAVTexture*>(s.objectPtr);
-                for (uint32_t k = 0; k < bt->Capacity(); ++k)
-                    if (bt->GetTexture(k) == res) return true;
-            }
-        }
+        for (ID3D12Resource* r : m_uavResScratch)
+            if (r == res) return true;
         return false;
     };
 
@@ -529,13 +535,13 @@ void DescriptorSetBase<ShaderT>::RequestResourceStates(
         if (slot.objectKind == BindingObjectKind::BindlessTexture && slot.objectPtr)
         {
             auto* bt = reinterpret_cast<BindlessTexture*>(slot.objectPtr);
-            for (uint32_t k = 0; k < bt->Capacity(); ++k)
+            for (uint32_t k = 0, n = bt->UsedCount(); k < n; ++k)
                 m_tracker.Require(bt->GetTexture(k), m_srvReadState);
         }
         else if (slot.objectKind == BindingObjectKind::BindlessBuffer && slot.objectPtr)
         {
             auto* bb = reinterpret_cast<BindlessBuffer*>(slot.objectPtr);
-            for (uint32_t k = 0; k < bb->Capacity(); ++k)
+            for (uint32_t k = 0, n = bb->UsedCount(); k < n; ++k)
                 m_tracker.Require(bb->GetBuffer(k), m_srvReadState);
         }
     }
@@ -546,7 +552,7 @@ void DescriptorSetBase<ShaderT>::RequestResourceStates(
         if (slot.objectKind == BindingObjectKind::BindlessUAVTexture && slot.objectPtr)
         {
             auto* bt = reinterpret_cast<BindlessUAVTexture*>(slot.objectPtr);
-            for (uint32_t k = 0; k < bt->Capacity(); ++k)
+            for (uint32_t k = 0, n = bt->UsedCount(); k < n; ++k)
                 m_tracker.Require(bt->GetTexture(k), D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
         }
     }
@@ -581,7 +587,7 @@ void DescriptorSetBase<ShaderT>::NotifyResourceStates(
             // per-element Require() in RequestResourceStates so the post-dispatch UAV
             // barrier covers all textures, not just the base resource.
             auto* bt = reinterpret_cast<BindlessUAVTexture*>(slot.objectPtr);
-            for (uint32_t k = 0; k < bt->Capacity(); ++k)
+            for (uint32_t k = 0, n = bt->UsedCount(); k < n; ++k)
                 m_tracker.Notify(bt->GetTexture(k), D3D12_RESOURCE_STATE_UNORDERED_ACCESS, /*uavAccess=*/true);
         }
     }
