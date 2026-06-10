@@ -114,6 +114,17 @@ namespace NativeRender
         [DllImport(DllName)]
         public static extern void NR_AS_SetInstanceID(ulong handle, uint instanceHandle, uint id);
 
+        /// <summary>Sets the TLAS emission order for an instance. The native build emits TLAS
+        /// instances sorted ascending by this value (stable; default 0xFFFFFFFF = legacy slot
+        /// order). Required when shaders index per-instance buffers via InstanceIndex().</summary>
+        [DllImport(DllName)]
+        public static extern void NR_AS_SetInstanceOrderIndex(ulong handle, uint instanceHandle, uint order);
+
+        /// <summary>Updates InstanceContributionToHitGroupIndex for an existing instance (its
+        /// base offset in the flat shader table, which shifts on scene layout changes).</summary>
+        [DllImport(DllName)]
+        public static extern void NR_AS_SetInstanceHitGroupContribution(ulong handle, uint instanceHandle, uint contribution);
+
         /// <summary>
         /// Removes an instance previously added via NR_AS_AddInstance.
         /// instanceHandle is the value passed to NR_AS_AddInstance.

@@ -86,11 +86,23 @@ namespace PathTracing
         // collapse to a single PTMaterialData entry.
         private readonly Dictionary<int, int>                                    _overrideSlots    = new();
         private readonly Dictionary<int, int>                                    _textureSlots     = new();
+        // Donut SoA VB/IB per mesh. Persistent across scene rebuilds (owned here, released in
+        // Dispose / evicted in RebuildSceneGpuData when the mesh is no longer used) — re-packing
+        // every mesh's vertex data on each topology change was the dominant rebuild cost.
         private readonly Dictionary<int, (GraphicsBuffer vb, GraphicsBuffer ib)> _donutBufferCache = new();
-        private readonly List<GraphicsBuffer>                                    _ownedGfxBuffers  = new();
 
         private readonly List<RtxptRenderer> _registeredTargets = new();
         private int _lastTopologyVersion = -1;
+
+        // Live TLAS registrations: handle → hash of the BLAS-affecting inputs (mesh + submesh
+        // descs). Lets RegisterScene diff against the previous registration instead of tearing
+        // the whole scene down: survivors keep their BLAS, mirroring the original RTXPT where
+        // BLASes are persistent and only the TLAS instance list is regenerated. NOT cleared in
+        // DisposeGpuBuffers — it must survive until the next RegisterScene diff.
+        private readonly Dictionary<uint, ulong> _registeredHandles     = new();
+        private readonly HashSet<uint>           _desiredHandlesScratch = new();
+        private readonly List<uint>              _staleHandlesScratch   = new();
+        private readonly List<int>               _donutEvictScratch     = new();
 
         // Flat per-geometry hit-group variant index (one entry per TLAS geometry, in insertion
         // order), used to rebuild each ray-trace pipeline's hit-group shader table. Owned here
@@ -474,32 +486,50 @@ namespace PathTracing
             if (_disposed) return;
             _disposed = true;
             DisposeGpuBuffers();
+            ReleaseDonutBuffers();
+            _registeredHandles.Clear();
             if (_variantIndexArray.IsCreated) _variantIndexArray.Dispose();
             _accelStructure?.Dispose();
             _accelStructure = null;
+        }
+
+        private void ReleaseDonutBuffers()
+        {
+            foreach (var (vb, ib) in _donutBufferCache.Values)
+            {
+                vb?.Release();
+                ib?.Release();
+            }
+            _donutBufferCache.Clear();
         }
 
         // -----------------------------------------------------------------------
 
         private void RegisterScene(IReadOnlyList<RtxptRenderer> targets)
         {
-            // Full teardown + rebuild via Clear(), which resets the native slot system — NOT
-            // per-handle RemoveInstance. The native AS emits TLAS instances in slot order and
-            // reuses freed slots LIFO, so remove + re-add permutes the TLAS instance order
-            // relative to instList/t_InstanceData. Every InstanceIndex()-based lookup
-            // (Bridge::loadSurface → instance transform, firstGeometryIndex) then reads the
-            // wrong instance: hits stay correct (BLAS) but normals/UVs/materials are garbage.
-            // Clear + sequential re-add guarantees TLAS slot i == registration order i. It also
-            // tears down instances of renderers that have since been destroyed (which compare
-            // == null and could no longer be removed by MeshRenderer reference).
-            _accelStructure.Clear();
+            // Incremental diff against the live TLAS registrations, mirroring the original RTXPT
+            // (donut): BLASes are persistent per mesh; a topology change only edits the TLAS
+            // instance list. Surviving instances stay registered (no BLAS rebuild); instances
+            // whose BLAS-affecting inputs changed are re-created; stale ones are removed by raw
+            // handle at the end (which also covers renderers that have since been destroyed).
+            //
+            // Ordering: the shaders fetch t_InstanceData[InstanceIndex()] (Bridge::loadSurface),
+            // so the TLAS instance order must equal RebuildSceneGpuData's instList order. The
+            // native AS reuses freed slots (LIFO), so raw slot order stops matching registration
+            // order once anything has been removed — instead every desired instance is assigned
+            // a dense SetInstanceOrderIndex in iteration order and the native build emits TLAS
+            // instances sorted by it. Survivors also get SetInstanceHitGroupContribution updated,
+            // because their base offset in the flat shader table shifts when earlier geometry is
+            // added or removed.
+            var desired = _desiredHandlesScratch;
+            desired.Clear();
 
             // Flat per-geometry hit-group variant array, rebuilt in lockstep with the TLAS
-            // insertion order. runningContribution is each group's InstanceContributionToHitGroupIndex
-            // (the base offset of its geometries in the flat shader table) — the value the AS used to
-            // compute internally, now pre-calculated here so the AS stays free of hit-group concerns.
+            // emission order. runningContribution is each group's InstanceContributionToHitGroupIndex
+            // (the base offset of its geometries in the flat shader table).
             var  variantList         = new List<uint>();
             uint runningContribution = 0;
+            uint orderIndex          = 0;
 
             foreach (var t in targets)
             {
@@ -540,22 +570,46 @@ namespace PathTracing
                         if (descsList.Count == 0) continue; // every sub-mesh in this group is unassigned
                         var descs = descsList.ToArray();
 
-                        uint handle          = MakeGroupHandle(mrId, gi);
+                        uint  handle = MakeGroupHandle(mrId, gi);
+                        ulong hash   = HashRegistration(mesh.GetInstanceID(), descs);
+
+                        bool isRegistered = _registeredHandles.TryGetValue(handle, out ulong oldHash);
+                        if (isRegistered && oldHash != hash)
+                        {
+                            // Sub-mesh membership or opacity flags changed → different BLAS content.
+                            _accelStructure.RemoveInstance(handle);
+                            _registeredHandles.Remove(handle);
+                            isRegistered = false;
+                        }
+
+                        if (!isRegistered)
+                        {
+                            if (_accelStructure.AddInstanceGroup(mesh, descs, handle, hitGroupContribution: runningContribution))
+                            {
+                                _accelStructure.SetInstanceTransform(handle, mr.transform.localToWorldMatrix);
+                                _registeredHandles[handle] = hash;
+                            }
+                            else
+                            {
+                                Debug.LogWarning($"[NativeRtxptGPUScene] AddInstanceGroup failed for '{mr.name}' gi={gi}");
+                                continue;
+                            }
+                        }
+                        else
+                        {
+                            _accelStructure.SetInstanceHitGroupContribution(handle, runningContribution);
+                        }
+
+                        desired.Add(handle);
+                        _accelStructure.SetInstanceOrderIndex(handle, orderIndex++);
+
                         // Variant 0 = emissive hit group (HitEmissive), variant 1 = non-emissive.
                         // Analytic-light-proxy materials must use variant 0: the proxy NEE branch is
                         // compiled out of the non-emissive variant (RTXPT_MATERIAL_IS_ANALYTIC_LIGHT_PROXY=0).
                         uint hitGroupVariant = (grp.isEmissive || grp.isAnalyticProxy) ? 0u : 1u;
-                        if (_accelStructure.AddInstanceGroup(mesh, descs, handle, hitGroupContribution: runningContribution))
-                        {
-                            _accelStructure.SetInstanceTransform(handle, mr.transform.localToWorldMatrix);
-                            for (int k = 0; k < descs.Length; k++)
-                                variantList.Add(hitGroupVariant);
-                            runningContribution += (uint)descs.Length;
-                        }
-                        else
-                        {
-                            Debug.LogWarning($"[NativeRtxptGPUScene] AddInstanceGroup failed for '{mr.name}' gi={gi}");
-                        }
+                        for (int k = 0; k < descs.Length; k++)
+                            variantList.Add(hitGroupVariant);
+                        runningContribution += (uint)descs.Length;
                     }
                 }
                 else
@@ -565,10 +619,45 @@ namespace PathTracing
                     // supported here — register the renderer only when all sub-meshes are assigned.
                     var fbMesh = mr.GetComponent<MeshFilter>()?.sharedMesh;
                     if (fbMesh != null && AllSubmeshesAssigned(t, fbMesh.subMeshCount))
-                        _accelStructure.AddInstance(mr);
+                    {
+                        uint  handle = (uint)mr.GetInstanceID();
+                        ulong hash   = HashRegistration(fbMesh.GetInstanceID(), null);
+
+                        bool isRegistered = _registeredHandles.TryGetValue(handle, out ulong oldHash);
+                        if (isRegistered && oldHash != hash)
+                        {
+                            _accelStructure.RemoveInstance(handle);
+                            _registeredHandles.Remove(handle);
+                            isRegistered = false;
+                        }
+
+                        if (!isRegistered)
+                        {
+                            if (_accelStructure.AddInstance(mr))
+                                _registeredHandles[handle] = hash;
+                            else
+                                continue;
+                        }
+
+                        desired.Add(handle);
+                        _accelStructure.SetInstanceOrderIndex(handle, orderIndex++);
+                    }
                     else
                         Debug.LogWarning($"[NativeRtxptGPUScene] '{mr.name}' has no SubmeshGroups and not all sub-meshes have an RtxptMaterial assigned — skipping the whole renderer (per-sub-mesh skip requires the grouped path).");
                 }
+            }
+
+            // Remove registrations that are no longer desired: renderer destroyed or disabled,
+            // group disappeared, or its content hash changed under a different handle. Removal is
+            // by raw handle, so no live Unity object is required.
+            _staleHandlesScratch.Clear();
+            foreach (var kv in _registeredHandles)
+                if (!desired.Contains(kv.Key))
+                    _staleHandlesScratch.Add(kv.Key);
+            foreach (var h in _staleHandlesScratch)
+            {
+                _accelStructure.RemoveInstance(h);
+                _registeredHandles.Remove(h);
             }
 
             // Publish the new per-geometry variant array and flag pipelines for a one-time SBT rebuild.
@@ -581,6 +670,28 @@ namespace PathTracing
 
         private static uint MakeGroupHandle(int mrInstanceId, int groupIndex)
             => (uint)(mrInstanceId & 0x0FFFFFFF) | ((uint)groupIndex << 28);
+
+        // FNV-1a over the BLAS-affecting registration inputs (mesh identity + submesh subset +
+        // geometry flags). Equal hash ⇒ the already-registered native instance/BLAS is reused
+        // as-is; a change forces remove + re-add. descs == null marks the non-grouped
+        // AddInstance(mr) path (whole mesh, native-side submesh layout).
+        private static ulong HashRegistration(int meshId, NativeRenderPlugin.SubmeshDesc[] descs)
+        {
+            const ulong Prime = 1099511628211UL;
+            ulong h = 14695981039346656037UL;
+            h = (h ^ (uint)meshId) * Prime;
+            if (descs == null)
+                return h;
+            h = (h ^ (uint)descs.Length) * Prime;
+            foreach (var d in descs)
+            {
+                h = (h ^ d.indexCount) * Prime;
+                h = (h ^ d.indexByteOffset) * Prime;
+                h = (h ^ d.baseVertex) * Prime;
+                h = (h ^ d.flags) * Prime;
+            }
+            return h;
+        }
 
         private void DisposeGpuBuffers()
         {
@@ -615,10 +726,9 @@ namespace PathTracing
             _overrideCache.Clear();
             _environmentMapTextureIndex = -1;
 
-            foreach (var buf in _ownedGfxBuffers)
-                buf?.Release();
-            _ownedGfxBuffers.Clear();
-            _donutBufferCache.Clear();
+            // _donutBufferCache is intentionally NOT released here: the per-mesh SoA buffers are
+            // persistent across rebuilds (evicted in RebuildSceneGpuData when a mesh drops out of
+            // the scene, fully released in Dispose).
         }
 
         private void RebuildSceneGpuData(IReadOnlyList<RtxptRenderer> targets)
@@ -991,6 +1101,21 @@ namespace PathTracing
             _geomDebugGpuBuf.SetData(_geomDebugCpu);
             _geomDebugGpuBufPtr = _geomDebugGpuBuf.GetNativeBufferPtr();
 
+            // Evict donut buffers for meshes that no renderer references anymore (the cache is
+            // otherwise persistent across rebuilds). _meshBufferSlots was just repopulated above,
+            // so it is the exact set of meshes used this rebuild.
+            _donutEvictScratch.Clear();
+            foreach (var key in _donutBufferCache.Keys)
+                if (!_meshBufferSlots.ContainsKey(key))
+                    _donutEvictScratch.Add(key);
+            foreach (var key in _donutEvictScratch)
+            {
+                var (vb, ib) = _donutBufferCache[key];
+                vb?.Release();
+                ib?.Release();
+                _donutBufferCache.Remove(key);
+            }
+
             _sceneGpuDirty = false;
         }
 
@@ -1344,8 +1469,6 @@ namespace PathTracing
             var ibGfx   = new GraphicsBuffer(GraphicsBuffer.Target.Raw, ibBytes / 4, 4) { name = "IndexBuffer" };
             ibGfx.SetData(ibData);
 
-            _ownedGfxBuffers.Add(vbGfx);
-            _ownedGfxBuffers.Add(ibGfx);
             var result = (vbGfx, ibGfx);
             _donutBufferCache[key] = result;
             return result;

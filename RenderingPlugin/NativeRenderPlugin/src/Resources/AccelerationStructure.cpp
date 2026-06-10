@@ -1298,6 +1298,30 @@ void AccelerationStructure::SetInstanceID(uint32_t handle, uint32_t id)
     slot.customInstanceID = id;
 }
 
+void AccelerationStructure::SetInstanceOrderIndex(uint32_t handle, uint32_t order)
+{
+    std::lock_guard<std::mutex> lock(m_stateMutex);
+    auto it = m_handleToSlot.find(handle);
+    if (it == m_handleToSlot.end())
+        return;
+    InstanceSlot &slot = m_slots[it->second];
+    if (!slot.active)
+        return;
+    slot.tlasOrder = order;
+}
+
+void AccelerationStructure::SetInstanceHitGroupContribution(uint32_t handle, uint32_t contribution)
+{
+    std::lock_guard<std::mutex> lock(m_stateMutex);
+    auto it = m_handleToSlot.find(handle);
+    if (it == m_handleToSlot.end())
+        return;
+    InstanceSlot &slot = m_slots[it->second];
+    if (!slot.active)
+        return;
+    slot.hitGroupContribution = contribution;
+}
+
 // ---------------------------------------------------------------------------
 // BuildOrUpdate  -  called every frame before ray dispatch.
 // ---------------------------------------------------------------------------
@@ -1354,11 +1378,23 @@ bool AccelerationStructure::BuildOrUpdate(ID3D12GraphicsCommandList4 *cmdList)
         cmdList->ResourceBarrier(1, &blasBarrier);
     }
 
+    // Emit TLAS instances in caller-specified order (SetInstanceOrderIndex), not raw slot
+    // order: freed slots are reused, so slot order diverges from registration order after
+    // any remove. Shaders that index per-instance buffers by InstanceIndex() (RTXPT
+    // t_InstanceData) rely on this order matching their CPU-side array. Slots without an
+    // assigned order keep the 0xFFFFFFFF default and the stable sort emits them last, in
+    // slot order — identical to the legacy behavior for callers that never set one.
+    m_orderedSlotScratch.clear();
+    for (uint32_t s = 0; s < static_cast<uint32_t>(m_slots.size()); ++s)
+        if (m_slots[s].active)
+            m_orderedSlotScratch.push_back(s);
+    std::stable_sort(m_orderedSlotScratch.begin(), m_orderedSlotScratch.end(),
+                     [this](uint32_t a, uint32_t b) { return m_slots[a].tlasOrder < m_slots[b].tlasOrder; });
+
     m_tlasEntries.clear();
-    for (const auto &slot : m_slots)
+    for (uint32_t s : m_orderedSlotScratch)
     {
-        if (!slot.active)
-            continue;
+        const InstanceSlot &slot = m_slots[s];
         TLASInstanceEntry e;
         e.blasVA = slot.blasVA;
         e.instanceID = slot.customInstanceID;

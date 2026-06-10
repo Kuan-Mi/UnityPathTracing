@@ -396,6 +396,31 @@ namespace NativeRender
             NativeRenderPlugin.NR_AS_SetInstanceID(_handle, handle, id);
         }
 
+        /// <summary>
+        /// Sets the TLAS emission order for an instance. The native build emits TLAS instances
+        /// sorted ascending by this value (stable sort; the 0xFFFFFFFF default keeps legacy
+        /// slot-order emission). Callers whose shaders index per-instance buffers via
+        /// <c>InstanceIndex()</c> must re-assign dense order indices (0..N-1, matching their
+        /// CPU-side instance array) after any add/remove — freed slots are reused, so raw slot
+        /// order stops matching registration order once instances have been removed.
+        /// </summary>
+        public void SetInstanceOrderIndex(uint handle, uint order)
+        {
+            if (_handle == 0) return;
+            NativeRenderPlugin.NR_AS_SetInstanceOrderIndex(_handle, handle, order);
+        }
+
+        /// <summary>
+        /// Updates <c>InstanceContributionToHitGroupIndex</c> for an existing instance — its base
+        /// offset in the flat hit-group shader table, which shifts for surviving instances
+        /// whenever the scene's geometry layout changes.
+        /// </summary>
+        public void SetInstanceHitGroupContribution(uint handle, uint contribution)
+        {
+            if (_handle == 0) return;
+            NativeRenderPlugin.NR_AS_SetInstanceHitGroupContribution(_handle, handle, contribution);
+        }
+
         /// <summary>Removes an instance by raw <paramref name="handle"/>.</summary>
         public void RemoveInstance(uint handle)
         {

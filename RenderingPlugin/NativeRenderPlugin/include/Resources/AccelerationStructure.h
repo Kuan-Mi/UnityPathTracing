@@ -224,6 +224,19 @@ public:
     // Use this to align InstanceID() with an index into a structured buffer (e.g. t_InstanceData).
     void SetInstanceID(uint32_t handle, uint32_t id);
 
+    // Set the TLAS emission order for this instance. BuildOrUpdate emits TLAS instances
+    // sorted ascending by this value (stable sort; the default 0xFFFFFFFF keeps legacy
+    // slot-order emission for callers that never assign one). Callers whose shaders index
+    // per-instance buffers by InstanceIndex() must re-assign dense order indices after any
+    // add/remove: freed slots are reused (LIFO), so raw slot order stops matching
+    // registration order as soon as instances have been removed.
+    void SetInstanceOrderIndex(uint32_t handle, uint32_t order);
+
+    // Update InstanceContributionToHitGroupIndex for an existing instance — the base offset
+    // of its geometries in the caller's flat shader table, which shifts for surviving
+    // instances whenever the scene's geometry layout changes.
+    void SetInstanceHitGroupContribution(uint32_t handle, uint32_t contribution);
+
     // Number of active (non-removed) instances.
     uint32_t GetInstanceCount() const { return m_activeCount; }
 
@@ -290,6 +303,9 @@ private:
         bool    needsBLAS = false;
         bool    isDynamic = false; // SkinnedMeshRenderer: BLAS updated each frame
         uint32_t hitGroupContribution = 0; // InstanceContributionToHitGroupIndex, computed by C#
+        // TLAS emission order (SetInstanceOrderIndex). 0xFFFFFFFF = unordered: emitted after
+        // all ordered instances, in slot order (stable sort), preserving legacy behavior.
+        uint32_t tlasOrder = 0xFFFFFFFFu;
         D3D12_GPU_VIRTUAL_ADDRESS blasVA;
         // Persistent BLAS for dynamic (skinned) instances – reused every frame with PERFORM_UPDATE
         std::unique_ptr<BLASEntry> dynamicBlas;
@@ -340,6 +356,8 @@ private:
     uint32_t m_ommInstanceCount = 0;
 
     std::vector<TLASInstanceEntry> m_tlasEntries;
+    // Reused scratch: active slot indices sorted by InstanceSlot::tlasOrder for TLAS emission.
+    std::vector<uint32_t>          m_orderedSlotScratch;
 
     // Mutex protecting shared state accessed from both Main Thread (Clear, AddInstance,
     // RemoveInstance, SetInstance*) and Render Thread (BuildOrUpdate / BuildTLAS).

@@ -443,6 +443,35 @@ NR_AS_SetInstanceID(uint64_t handle, uint32_t instanceHandle, uint32_t id)
 }
 
 // ---------------------------------------------------------------------------
+// NR_AS_SetInstanceOrderIndex
+//   Set the TLAS emission order for an instance. BuildOrUpdate emits TLAS
+//   instances sorted ascending by this value (stable sort; the 0xFFFFFFFF
+//   default keeps legacy slot-order emission). Required by callers whose
+//   shaders index per-instance buffers via InstanceIndex().
+// ---------------------------------------------------------------------------
+extern "C" void UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API
+NR_AS_SetInstanceOrderIndex(uint64_t handle, uint32_t instanceHandle, uint32_t order)
+{
+    if (!handle) return;
+    reinterpret_cast<AccelerationStructure*>(handle)
+        ->SetInstanceOrderIndex(instanceHandle, order);
+}
+
+// ---------------------------------------------------------------------------
+// NR_AS_SetInstanceHitGroupContribution
+//   Update InstanceContributionToHitGroupIndex for an existing instance (its
+//   base offset in the caller's flat shader table, which shifts for surviving
+//   instances whenever the scene's geometry layout changes).
+// ---------------------------------------------------------------------------
+extern "C" void UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API
+NR_AS_SetInstanceHitGroupContribution(uint64_t handle, uint32_t instanceHandle, uint32_t contribution)
+{
+    if (!handle) return;
+    reinterpret_cast<AccelerationStructure*>(handle)
+        ->SetInstanceHitGroupContribution(instanceHandle, contribution);
+}
+
+// ---------------------------------------------------------------------------
 // NR_AS_RemoveInstance
 //   Remove an instance previously added via NR_AS_AddInstance.
 //   instanceHandle is the value returned by NR_AS_AddInstance.
