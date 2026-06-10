@@ -2,7 +2,6 @@ using System;
 using System.Collections.Generic;
 using System.Runtime.InteropServices;
 using NativeRender;
-using Unity.Collections;
 using UnityEngine;
 using UnityEngine.Rendering;
 using RayTracingAccelerationStructure = NativeRender.RayTracingAccelerationStructure;
@@ -10,38 +9,50 @@ using RayTracingAccelerationStructure = NativeRender.RayTracingAccelerationStruc
 namespace PathTracing
 {
     // =========================================================================
-    // NativeRtxdiGPUScene
+    // NativeRtxptGPUScene
     // =========================================================================
 
     /// <summary>
-    /// Self-contained GPU scene for RTXDI-native compute passes.
-    /// Owns the TLAS and provides donut-compatible structured buffers
-    /// (<c>t_InstanceData</c>, <c>t_GeometryData</c>, <c>t_MaterialConstants</c>,
-    /// bindless VB/IB, bindless textures).
+    /// Self-contained GPU scene for the RTXPT native passes. Owns the TLAS and provides
+    /// donut-compatible structured buffers (<c>t_SubInstanceData</c>, <c>t_InstanceData</c>,
+    /// <c>t_GeometryData</c>, <c>t_PTMaterialData</c>, bindless VB/IB, bindless textures).
+    /// Struct layouts exactly mirror <c>donut/shaders/bindless.h</c> and RTXPT's
+    /// <c>SubInstanceData</c>/<c>PTMaterialData</c>, so shaders that include
+    /// <c>SceneGeometry.hlsli</c> / <c>PathTracerBridgeDonut.hlsli</c> work without any
+    /// layout mismatch.
     ///
-    /// Struct layouts exactly mirror <c>donut/shaders/bindless.h</c> and
-    /// <c>donut/shaders/material_cb.h</c> so all RTXDI shaders that include
-    /// <c>SceneGeometry.hlsli</c> work without any layout mismatch.
+    /// Update model (mirrors original RTXPT): on a topology change a single traversal builds
+    /// the flat <see cref="RtxptInstanceRecord"/> list (<see cref="RtxptSceneLayout"/>), the
+    /// acceleration structure is diffed incrementally against it (<see cref="RtxptAccelRegistry"/>,
+    /// persistent BLASes), and the GPU-side arrays are rebuilt from the same list — so the TLAS
+    /// instance order and every CPU/GPU array can never drift apart.
     /// </summary>
     public sealed class NativeRtxptGPUScene : IDisposable
     {
-        // Acceleration structure
+        // Acceleration structure + incremental TLAS registration
         private RayTracingAccelerationStructure _accelStructure;
+        private readonly RtxptAccelRegistry     _accelRegistry = new();
+
+        // Scene layout of the last topology change — the single source of truth that both the
+        // AS registration and the GPU-buffer build derive from.
+        private List<RtxptInstanceRecord> _layout = new();
+
+        // Per-mesh donut SoA buffers, persistent across rebuilds.
+        private readonly RtxptGeometryCache _geometryCache = new();
 
         // Structured buffers (donut-compatible)
         // t_InstanceData (t2): transforms are re-uploaded every frame, so this uses
         // UploadBuffer — its NativePtr is stable across SetData (unlike
         // GraphicsBuffer.GetNativeBufferPtr), so we fetch the pointer once at creation.
-        private UploadBuffer _instanceGpuBuf;
+        private UploadBuffer   _instanceGpuBuf;
         private GraphicsBuffer _geometryGpuBuf; // t_GeometryData  (t3)
 
         // RTXPT-specific structured buffers
-        // t_SubInstanceData (t1): emissive-light mapping offsets are recomputed and re-uploaded
-        // every frame, so this uses UploadBuffer for a stable NativePtr (no per-frame
-        // GetNativeBufferPtr re-fetch). SRV-only — never bound as a UAV.
-        private UploadBuffer _subInstanceGpuBuf; // t_SubInstanceData    (t1)
-        private GraphicsBuffer _ptMaterialGpuBuf; // t_PTMaterialData     (t5)
-        private GraphicsBuffer _geomDebugGpuBuf; // t_GeometryDebugData  (t4)
+        // t_SubInstanceData (t1): emissive-light mapping offsets are recomputed per frame, so
+        // this uses UploadBuffer for a stable NativePtr. SRV-only — never bound as a UAV.
+        private UploadBuffer   _subInstanceGpuBuf; // t_SubInstanceData    (t1)
+        private GraphicsBuffer _ptMaterialGpuBuf;  // t_PTMaterialData     (t5)
+        private GraphicsBuffer _geomDebugGpuBuf;   // t_GeometryDebugData  (t4)
 
         // _instanceGpuBuf / _subInstanceGpuBuf are UploadBuffers — bound by handle (no cached ptr).
         private IntPtr _geometryGpuBufPtr;
@@ -59,17 +70,16 @@ namespace PathTracing
         private PTMaterialData[]    _ptMaterialCpu;
         private GeometryDebugData[] _geomDebugCpu;
 
-        // Per-instance tracking for transforms
-        private struct SceneInstance
-        {
-            public MeshRenderer renderer;
+        // True when any _subInstanceCpu field changed since the last upload (emissive mapping
+        // offsets / analytic-proxy light indices). Lets the per-frame path skip the full-array
+        // re-upload when nothing moved.
+        private bool _subInstanceCpuDirty;
 
-            // Non-zero for TLAS instances added via AddInstanceGroup (SubmeshGroups path).
-            // When non-zero, use SetInstanceTransform(groupHandle, ...) instead of SetInstanceTransform(renderer, ...).
-            public uint groupHandle;
-        }
+        // Native TLAS handle per instance, parallel to _instanceCpu (for transform updates).
+        private readonly List<uint> _instanceHandles = new();
 
-        // Per-renderer tracking for transform updates (NRD-style: one entry per renderer, not per TLAS instance).
+        // Per-renderer tracking for transform updates (one entry per renderer; its TLAS
+        // instances occupy the contiguous range [firstInstanceIdx, firstInstanceIdx+instanceCount)).
         private sealed class RendererEntry
         {
             public Transform transform;
@@ -78,59 +88,33 @@ namespace PathTracing
             public int instanceCount;
         }
 
-        private readonly List<SceneInstance>                                     _sceneInstances   = new();
-        private readonly Dictionary<int, RendererEntry>                          _rendererEntries  = new();
-        private readonly Dictionary<int, (int vb, int ib)>                       _meshBufferSlots  = new();
-        // Dedup for RtxptMaterial slots, keyed on the shared RtxptMaterial InstanceID. Material
-        // assets are explicitly shareable across renderers/sub-meshes, so identical references
-        // collapse to a single PTMaterialData entry.
-        private readonly Dictionary<int, int>                                    _overrideSlots    = new();
-        private readonly Dictionary<int, int>                                    _textureSlots     = new();
-        // Donut SoA VB/IB per mesh. Persistent across scene rebuilds (owned here, released in
-        // Dispose / evicted in RebuildSceneGpuData when the mesh is no longer used) — re-packing
-        // every mesh's vertex data on each topology change was the dominant rebuild cost.
-        private readonly Dictionary<int, (GraphicsBuffer vb, GraphicsBuffer ib)> _donutBufferCache = new();
+        private readonly Dictionary<int, RendererEntry>    _rendererEntries = new();
+        private readonly Dictionary<int, (int vb, int ib)> _meshBufferSlots = new();
 
         private readonly List<RtxptRenderer> _registeredTargets = new();
         private int _lastTopologyVersion = -1;
 
-        // Live TLAS registrations: handle → hash of the BLAS-affecting inputs (mesh + submesh
-        // descs). Lets RegisterScene diff against the previous registration instead of tearing
-        // the whole scene down: survivors keep their BLAS, mirroring the original RTXPT where
-        // BLASes are persistent and only the TLAS instance list is regenerated. NOT cleared in
-        // DisposeGpuBuffers — it must survive until the next RegisterScene diff.
-        private readonly Dictionary<uint, ulong> _registeredHandles     = new();
-        private readonly HashSet<uint>           _desiredHandlesScratch = new();
-        private readonly List<uint>              _staleHandlesScratch   = new();
-        private readonly List<int>               _donutEvictScratch     = new();
-
-        // Flat per-geometry hit-group variant index (one entry per TLAS geometry, in insertion
-        // order), used to rebuild each ray-trace pipeline's hit-group shader table. Owned here
-        // (not by the AS) so RayTraceShader and RayTracingAccelerationStructure stay decoupled.
-        // Rebuilt only when the scene topology changes (in RegisterScene); the SBT rebuild is
-        // then issued once per affected pipeline instead of every frame.
-        private NativeArray<uint> _variantIndexArray;
-        private bool              _shaderTableDirty;
-
-        /// <summary>
-        /// True when the per-geometry hit-group variant layout changed since the last
-        /// <see cref="MarkShaderTableClean"/>. While set, callers should rebuild the hit-group
-        /// table of every ray-trace pipeline via <see cref="RebuildShaderTable"/>.
-        /// </summary>
-        public bool ShaderTableDirty => _shaderTableDirty;
+        public bool ShaderTableDirty => _accelRegistry.ShaderTableDirty;
 
         private bool _sceneGpuDirty = true;
-        private bool _forceRebuild  = false;
+        private bool _forceRebuild;
         private bool _disposed;
 
         // ---- Emissive triangle light tracking --------------------------------
-        // Maps (globalInstanceIndex, geometrySubIndex) → last-frame DestinationBufferOffset
-        private readonly Dictionary<(int, int), uint> _emissiveHistoricOffsets = new();
+        // (instanceIndex, geometrySubIndex) → last-frame DestinationBufferOffset. Two maps are
+        // swapped each frame to avoid a per-frame dictionary allocation.
+        private Dictionary<(int, int), uint> _emissiveHistoricOffsets = new();
+        private Dictionary<(int, int), uint> _emissiveHistoricScratch = new();
+
+        // Emissive geometry entries, cached at rebuild time: membership only changes on a
+        // topology change (emissive flips alter SubmeshGroups, which bumps TopologyVersion),
+        // so the per-frame emissive pass never has to re-scan all instances × geometries.
+        private readonly List<EmissiveGeometryEntry> _emissiveCache = new();
 
         // ---- Analytic-light-proxy tracking -----------------------------------
-        // Sub-instances whose material has EnableAsAnalyticLightProxy, recorded at scene rebuild as
-        // (subInstanceIndex, targetLightInstanceID). Resolved to SubInstanceData.AnalyticProxyLightIndex
-        // each frame by ResolveAnalyticProxyLights (the global light index can change frame to frame).
+        // Sub-instances whose material has EnableAsAnalyticLightProxy, recorded at scene rebuild
+        // as (subInstanceIndex, targetLightInstanceID). Resolved each frame by
+        // ResolveAnalyticProxyLights (the global light index can change frame to frame).
         private readonly List<(int subIdx, int lightId)> _proxySubInstances = new();
 
         // Max task count: MaxLights / LLB_MAX_TRIANGLES_PER_TASK * 2
@@ -143,15 +127,15 @@ namespace PathTracing
         /// <summary>Total triangle-light count produced by the last <see cref="PrepareEmissiveTriangleTasks"/> call.</summary>
         public uint LastEmissiveTriangleCount { get; private set; }
 
-        // Maps MeshRenderer.GetInstanceID() → per-submesh material indices in _ptMaterialCpu
-        // for renderers that have a RtxptRenderer. Used for lightweight material-only updates.
+        // Maps MeshRenderer.GetInstanceID() → per-submesh material indices in _ptMaterialCpu.
+        // Used for lightweight material-only updates (CheckAndUpdateMaterialOverrides).
         private readonly Dictionary<int, int[]> _overrideMaterialIndices = new();
 
-        // Cached list of (component, matIndices) for all renderers with a RtxptRenderer.
-        // Rebuilt during RebuildSceneGpuData so CheckAndUpdateMaterialOverrides never calls GetComponent.
+        // Cached list of (component, matIndices), rebuilt during RebuildSceneGpuData so
+        // CheckAndUpdateMaterialOverrides never calls GetComponent.
         private readonly List<(RtxptRenderer comp, int[] matIndices)> _overrideCache = new();
 
-        // Optional equirectangular environment map for RTXDI environment light.
+        // Optional equirectangular environment map appended to the bindless texture array.
         private Texture _pendingEnvMap;
         private int     _environmentMapTextureIndex = -1;
 
@@ -190,46 +174,11 @@ namespace PathTracing
         public uint MaterialDataCount => _ptMaterialCpu != null ? (uint)_ptMaterialCpu.Length : 0u;
 
         /// <summary>
-        /// Returns one <see cref="EmissiveGeometryEntry"/> for every sub-mesh whose material has
-        /// a non-zero emissiveColor.  Must be called after <see cref="UpdateForFrame"/>.
+        /// One <see cref="EmissiveGeometryEntry"/> for every sub-mesh whose material has a
+        /// non-zero emissiveColor. Cached at rebuild time (emissive membership changes always
+        /// bump the topology version via SubmeshGroups). Valid after <see cref="UpdateForFrame"/>.
         /// </summary>
-        public List<EmissiveGeometryEntry> GetEmissiveGeometries()
-        {
-            var result = new List<EmissiveGeometryEntry>();
-            if (_instanceCpu == null || _geometryCpu == null)
-                return result;
-
-            for (int i = 0; i < _instanceCpu.Length; i++)
-            {
-                var inst      = _instanceCpu[i];
-                int firstGeom = (int)inst.firstGeometryIndex;
-                int numGeoms  = (int)inst.numGeometries;
-
-                for (int s = 0; s < numGeoms; s++)
-                {
-                    int geomIdx = firstGeom + s;
-                    if (geomIdx >= _geometryCpu.Length) break;
-
-                    var geom   = _geometryCpu[geomIdx];
-                    int matIdx = (int)geom.materialIndex;
-                    if (matIdx < 0 || matIdx >= _ptMaterialCpu.Length) continue;
-
-                    var mat = _ptMaterialCpu[matIdx];
-                    if (mat.EmissiveColor.x <= 0f && mat.EmissiveColor.y <= 0f && mat.EmissiveColor.z <= 0f)
-                        continue;
-
-                    result.Add(new EmissiveGeometryEntry
-                    {
-                        InstanceIndex              = i,
-                        GeometrySubIndex           = s,
-                        TriangleCount              = geom.numIndices / 3u,
-                        FirstGeometryInstanceIndex = inst.firstGeometryInstanceIndex,
-                    });
-                }
-            }
-
-            return result;
-        }
+        public IReadOnlyList<EmissiveGeometryEntry> GetEmissiveGeometries() => _emissiveCache;
 
         public NativeRtxptGPUScene()
         {
@@ -238,155 +187,13 @@ namespace PathTracing
 
         public void MarkRebuildDirty() => _forceRebuild = true;
 
-        /// <summary>
-        /// CPU-side emissive-triangle pass: mirrors <c>LightsBaker::ProcessEmissiveGeometry</c>.
-        /// Generates <see cref="RtxptEmissiveTrianglesProcTask"/> entries, uploads them to
-        /// <paramref name="scratchBuffer"/>, updates <c>SubInstanceData.EmissiveLightMappingOffset</c>
-        /// for emissive geometries, and re-uploads the sub-instance GPU buffer.
-        /// Must be called on the main thread after <see cref="UpdateForFrame"/> and before
-        /// command-buffer recording (i.e. from a pass <c>Setup</c> method).
-        /// </summary>
-        /// <param name="lightOffset">Base index in lightsBuffer where triangle lights start
-        ///     (= EnvQtTotalNodeCount + analyticLightCount).</param>
-        /// <param name="scratchBuffer">Raw native buffer bound as u_scratchBuffer.
-        ///     Tasks are written at element offset 0 (each element = 4 bytes; tasks are 32 B each,
-        ///     so stride-8 within the raw buffer).</param>
-        /// <summary>
-        /// Resolves the target Spot/Point <see cref="Light"/> a proxy mesh stands in for: an explicit
-        /// <see cref="RtxptAnalyticLightProxy"/> reference if present, otherwise the nearest Spot/Point
-        /// light on this GameObject or an ancestor (mirrors RTXPT's ProxiedAnalyticLight / parent-node
-        /// rules). Returns null if no eligible light is found.
-        /// </summary>
-        private static Light ResolveProxyTargetLight(Component renderer)
-        {
-            var proxy = renderer.GetComponent<RtxptAnalyticLightProxy>();
-            if (proxy != null && proxy.TargetLight != null)
-                return proxy.TargetLight;
-
-            for (var t = renderer.transform; t != null; t = t.parent)
-            {
-                var light = t.GetComponent<Light>();
-                if (light != null && (light.type == LightType.Spot || light.type == LightType.Point))
-                    return light;
-            }
-            return null;
-        }
-
-        /// <summary>
-        /// Per-frame: write each proxy sub-instance's <c>AnalyticProxyLightIndex</c> from the current
-        /// frame's analytic-light map (Unity <see cref="Light"/> InstanceID → global light index).
-        /// Lights absent from the map (disabled/culled, or never collected) fall back to
-        /// RTXPT_INVALID_LIGHT_INDEX, which disables the proxy lookup for that frame.
-        ///
-        /// Must be called before the SubInstanceData re-upload performed by
-        /// <see cref="PrepareEmissiveTriangleTasks"/>, which is what pushes these writes to the GPU.
-        /// </summary>
-        public void ResolveAnalyticProxyLights(IReadOnlyDictionary<int, uint> lightIndexMap)
-        {
-            if (_subInstanceCpu == null || _proxySubInstances.Count == 0) return;
-
-            const uint Invalid = 0xFFFFFFFFu;
-            foreach (var (subIdx, lightId) in _proxySubInstances)
-            {
-                if (subIdx < 0 || subIdx >= _subInstanceCpu.Length) continue;
-
-                uint globalIndex = Invalid;
-                if (lightId != 0 && lightIndexMap != null && lightIndexMap.TryGetValue(lightId, out var idx))
-                    globalIndex = idx;
-
-                _subInstanceCpu[subIdx].AnalyticProxyLightIndex = globalIndex;
-            }
-        }
-
-        public void PrepareEmissiveTriangleTasks(uint lightOffset, UploadBuffer scratchBuffer)
-        {
-            if (_instanceCpu == null || _subInstanceCpu == null || _ptMaterialCpu == null)
-            {
-                LastEmissiveTaskCount     = 0;
-                LastEmissiveTriangleCount = 0u;
-                return;
-            }
-
-            const uint Invalid = 0xFFFFFFFFu;
-            const uint MaxTriPerTask = 32u;
-
-            var emissive = GetEmissiveGeometries();
-
-            var newHistoric = new Dictionary<(int, int), uint>(emissive.Count);
-            int taskIdx        = 0;
-            uint accumTriangles = 0u;
-
-            foreach (var e in emissive)
-            {
-                if (taskIdx >= MaxEmissiveProcTasks)
-                {
-                    Debug.LogWarning("[NativeRtxptGPUScene] EmissiveTrianglesProcTask overflow — some emissive geometry ignored.");
-                    break;
-                }
-
-                uint triCount  = e.TriangleCount;
-                uint destBase  = lightOffset + accumTriangles;
-
-                // Overflow guard
-                if (destBase + triCount > NativeRtxptBufferResources.MaxLights)
-                {
-                    Debug.LogWarning($"[NativeRtxptGPUScene] MaxLights overflow at emissive geometry (inst={e.InstanceIndex}, geom={e.GeometrySubIndex}) — skipping.");
-                    break;
-                }
-
-                _emissiveHistoricOffsets.TryGetValue((e.InstanceIndex, e.GeometrySubIndex), out uint historicBase);
-                if (!_emissiveHistoricOffsets.ContainsKey((e.InstanceIndex, e.GeometrySubIndex)))
-                    historicBase = Invalid;
-
-                // Update SubInstanceData.EmissiveLightMappingOffset
-                int siIdx = (int)(e.FirstGeometryInstanceIndex + (uint)e.GeometrySubIndex);
-                if (siIdx >= 0 && siIdx < _subInstanceCpu.Length)
-                    _subInstanceCpu[siIdx].EmissiveLightMappingOffset = destBase;
-
-                // Split into tasks of at most MaxTriPerTask triangles.
-                // Each task writes to DestinationBufferOffset + subIndex (0..31), so successive
-                // tasks must each advance the offset by MaxTriPerTask to avoid aliasing.
-                for (uint from = 0u; from < triCount && taskIdx < MaxEmissiveProcTasks; from += MaxTriPerTask)
-                {
-                    uint to = System.Math.Min(from + MaxTriPerTask, triCount);
-                    s_emissiveTaskStaging[taskIdx++] = new RtxptEmissiveTrianglesProcTask
-                    {
-                        InstanceIndex              = (uint)e.InstanceIndex,
-                        GeometryIndex              = (uint)e.GeometrySubIndex,
-                        TriangleIndexFrom          = from,
-                        TriangleIndexTo            = to,
-                        DestinationBufferOffset    = destBase + from,   // each task owns its own 32-slot window
-                        HistoricBufferOffset       = (historicBase != Invalid) ? historicBase + from : Invalid,
-                        EmissiveLightMappingOffset = (uint)siIdx,
-                        Padding0                   = 0u,
-                    };
-                }
-
-                newHistoric[(e.InstanceIndex, e.GeometrySubIndex)] = destBase;
-                accumTriangles += triCount;
-            }
-
-            // Swap historic offsets for next frame
-            _emissiveHistoricOffsets.Clear();
-            foreach (var kv in newHistoric)
-                _emissiveHistoricOffsets[kv.Key] = kv.Value;
-
-            // Re-upload SubInstanceData (EmissiveLightMappingOffset fields updated). Pointer is
-            // stable; the GPU copy is recorded by FlushSubInstanceBuffer(cmd) in the lighting pass.
-            if (_subInstanceGpuBuf != null && _subInstanceCpu != null)
-                _subInstanceGpuBuf.SetData(_subInstanceCpu, 0, _subInstanceCpu.Length);
-
-            // Upload task array to scratch buffer (raw buffer, stride = 4 bytes, tasks = 8 uints each).
-            if (taskIdx > 0 && scratchBuffer != null)
-                scratchBuffer.SetRawData(s_emissiveTaskStaging, 0, 0, taskIdx);
-
-            LastEmissiveTaskCount     = taskIdx;
-            LastEmissiveTriangleCount = accumTriangles;
-        }
+        // -----------------------------------------------------------------------
+        // Per-frame entry point
+        // -----------------------------------------------------------------------
 
         /// <summary>
         /// Call once per frame before <see cref="BuildAccelerationStructure"/>.
-        /// Handles dirty detection, GPU data rebuild, and transform updates.
+        /// Handles dirty detection, AS diff, GPU data rebuild, and transform updates.
         /// </summary>
         public void UpdateForFrame()
         {
@@ -394,41 +201,45 @@ namespace PathTracing
 
             if (_forceRebuild || _lastTopologyVersion != RtxptRenderer.TopologyVersion || TargetSetChanged(targets))
             {
-                RegisterScene(targets);
+                _layout = RtxptSceneLayout.Build(targets);
+                _accelRegistry.Sync(_accelStructure, _layout);
+
                 _registeredTargets.Clear();
                 _registeredTargets.AddRange(targets);
+                // Captured AFTER Build: it may invoke RebuildGroups, which can bump the version.
                 _lastTopologyVersion = RtxptRenderer.TopologyVersion;
                 _forceRebuild  = false;
                 _sceneGpuDirty = true;
             }
 
             if (_sceneGpuDirty)
-                RebuildSceneGpuData(targets);
+                RebuildSceneGpuData();
             else
                 CheckAndUpdateMaterialOverrides();
 
             UpdateInstanceTransforms();
         }
 
-        /// <summary>
-        /// Binds all RTXPT scene buffers to a native compute descriptor set.
-        /// Binds: t_SubInstanceData(t1), t_InstanceData(t2), t_GeometryData(t3),
-        ///        t_GeometryDebugData(t4), t_PTMaterialData(t5),
-        ///        t_MaterialConstants (donut compat), t_BindlessBuffers(space1), t_BindlessTextures(space2).
-        /// </summary>
-        public void BindToShader(NativeComputeDescriptorSet ds)
+        private bool TargetSetChanged(IReadOnlyList<RtxptRenderer> current)
         {
-            if (ds == null) return;
-            ds.SetStructuredBuffer("t_SubInstanceData", _subInstanceGpuBuf, _subInstanceGpuBuf.count, _subInstanceGpuBuf.stride);
-            ds.SetStructuredBuffer("t_InstanceData", _instanceGpuBuf, _instanceGpuBuf.count, _instanceGpuBuf.stride);
-            ds.SetStructuredBuffer("t_GeometryData", _geometryGpuBufPtr, _geometryGpuBuf.count, _geometryGpuBuf.stride);
-            ds.SetStructuredBuffer("t_GeometryDebugData", _geomDebugGpuBufPtr, _geomDebugGpuBuf.count, _geomDebugGpuBuf.stride);
-            ds.SetStructuredBuffer("t_PTMaterialData", _ptMaterialGpuBufPtr, _ptMaterialGpuBuf.count, _ptMaterialGpuBuf.stride);
-            ds.SetBindlessBuffer("t_BindlessBuffers", _sceneBuffers);
-            ds.SetBindlessTexture("t_BindlessTextures", _sceneTextures);
+            if (current.Count != _registeredTargets.Count) return true;
+            for (int i = 0; i < current.Count; i++)
+                if (current[i] != _registeredTargets[i])
+                    return true;
+            return false;
         }
 
-        public void BindToShader(NativeRayTraceDescriptorSet ds)
+        // -----------------------------------------------------------------------
+        // Binding / command-buffer hooks
+        // -----------------------------------------------------------------------
+
+        /// <summary>
+        /// Binds all RTXPT scene buffers to a native descriptor set (compute or ray-trace).
+        /// Binds: t_SubInstanceData(t1), t_InstanceData(t2), t_GeometryData(t3),
+        ///        t_GeometryDebugData(t4), t_PTMaterialData(t5),
+        ///        t_BindlessBuffers(space1), t_BindlessTextures(space2).
+        /// </summary>
+        public void BindToShader(NativeDescriptorSetBase ds)
         {
             if (ds == null) return;
             ds.SetStructuredBuffer("t_SubInstanceData", _subInstanceGpuBuf, _subInstanceGpuBuf.count, _subInstanceGpuBuf.stride);
@@ -473,225 +284,25 @@ namespace PathTracing
         /// <see cref="MarkShaderTableClean"/>. Issue in the same CommandBuffer as the TLAS build.
         /// </summary>
         public void RebuildShaderTable(CommandBuffer cmd, RayTracePipeline pipeline)
-        {
-            if (!_shaderTableDirty || pipeline == null || !_variantIndexArray.IsCreated) return;
-            pipeline.RebuildHitGroupTable(cmd, _variantIndexArray);
-        }
+            => _accelRegistry.RebuildShaderTable(cmd, pipeline);
 
         /// <summary>Clears the dirty flag after every pipeline's hit-group table has been rebuilt.</summary>
-        public void MarkShaderTableClean() => _shaderTableDirty = false;
+        public void MarkShaderTableClean() => _accelRegistry.MarkShaderTableClean();
 
         public void Dispose()
         {
             if (_disposed) return;
             _disposed = true;
             DisposeGpuBuffers();
-            ReleaseDonutBuffers();
-            _registeredHandles.Clear();
-            if (_variantIndexArray.IsCreated) _variantIndexArray.Dispose();
+            _geometryCache.Dispose();
+            _accelRegistry.Dispose();
             _accelStructure?.Dispose();
             _accelStructure = null;
         }
 
-        private void ReleaseDonutBuffers()
-        {
-            foreach (var (vb, ib) in _donutBufferCache.Values)
-            {
-                vb?.Release();
-                ib?.Release();
-            }
-            _donutBufferCache.Clear();
-        }
-
         // -----------------------------------------------------------------------
-
-        private void RegisterScene(IReadOnlyList<RtxptRenderer> targets)
-        {
-            // Incremental diff against the live TLAS registrations, mirroring the original RTXPT
-            // (donut): BLASes are persistent per mesh; a topology change only edits the TLAS
-            // instance list. Surviving instances stay registered (no BLAS rebuild); instances
-            // whose BLAS-affecting inputs changed are re-created; stale ones are removed by raw
-            // handle at the end (which also covers renderers that have since been destroyed).
-            //
-            // Ordering: the shaders fetch t_InstanceData[InstanceIndex()] (Bridge::loadSurface),
-            // so the TLAS instance order must equal RebuildSceneGpuData's instList order. The
-            // native AS reuses freed slots (LIFO), so raw slot order stops matching registration
-            // order once anything has been removed — instead every desired instance is assigned
-            // a dense SetInstanceOrderIndex in iteration order and the native build emits TLAS
-            // instances sorted by it. Survivors also get SetInstanceHitGroupContribution updated,
-            // because their base offset in the flat shader table shifts when earlier geometry is
-            // added or removed.
-            var desired = _desiredHandlesScratch;
-            desired.Clear();
-
-            // Flat per-geometry hit-group variant array, rebuilt in lockstep with the TLAS
-            // emission order. runningContribution is each group's InstanceContributionToHitGroupIndex
-            // (the base offset of its geometries in the flat shader table).
-            var  variantList         = new List<uint>();
-            uint runningContribution = 0;
-            uint orderIndex          = 0;
-
-            foreach (var t in targets)
-            {
-                if (t == null) continue;
-                var mr = t.MeshRenderer;
-                if (mr == null) continue;
-
-                var groups = t.SubmeshGroups;
-                if (groups != null && groups.Length > 0)
-                {
-                    var mesh = mr.GetComponent<MeshFilter>()?.sharedMesh;
-                    if (mesh == null) continue;
-
-                    uint indexStride = mesh.indexFormat == UnityEngine.Rendering.IndexFormat.UInt16 ? 2u : 4u;
-                    int  mrId        = mr.GetInstanceID();
-                    var  rr          = t;
-
-                    for (int gi = 0; gi < groups.Length; gi++)
-                    {
-                        var grp = groups[gi];
-
-                        // Only sub-meshes with a pre-baked RtxptMaterial are added to the BLAS. This
-                        // must match RebuildSceneGpuData's grouped filter exactly so the shader's flat
-                        // per-geometry arrays (variantList / geomList) stay aligned with the BLAS.
-                        var descsList = new List<NativeRenderPlugin.SubmeshDesc>(grp.submeshIndices.Length);
-                        foreach (int sIdx in grp.submeshIndices)
-                        {
-                            if (!SubmeshHasMaterial(rr, sIdx)) continue;
-                            var sub = mesh.GetSubMesh(sIdx);
-                            descsList.Add(new NativeRenderPlugin.SubmeshDesc
-                            {
-                                indexCount      = (uint)sub.indexCount,
-                                indexByteOffset = (uint)sub.indexStart * indexStride,
-                                baseVertex      = (uint)sub.baseVertex,
-                                flags           = grp.isAlphaClip ? 0u : NativeRenderPlugin.SUBMESH_FLAG_GEOMETRY_OPAQUE,
-                            });
-                        }
-                        if (descsList.Count == 0) continue; // every sub-mesh in this group is unassigned
-                        var descs = descsList.ToArray();
-
-                        uint  handle = MakeGroupHandle(mrId, gi);
-                        ulong hash   = HashRegistration(mesh.GetInstanceID(), descs);
-
-                        bool isRegistered = _registeredHandles.TryGetValue(handle, out ulong oldHash);
-                        if (isRegistered && oldHash != hash)
-                        {
-                            // Sub-mesh membership or opacity flags changed → different BLAS content.
-                            _accelStructure.RemoveInstance(handle);
-                            _registeredHandles.Remove(handle);
-                            isRegistered = false;
-                        }
-
-                        if (!isRegistered)
-                        {
-                            if (_accelStructure.AddInstanceGroup(mesh, descs, handle, hitGroupContribution: runningContribution))
-                            {
-                                _accelStructure.SetInstanceTransform(handle, mr.transform.localToWorldMatrix);
-                                _registeredHandles[handle] = hash;
-                            }
-                            else
-                            {
-                                Debug.LogWarning($"[NativeRtxptGPUScene] AddInstanceGroup failed for '{mr.name}' gi={gi}");
-                                continue;
-                            }
-                        }
-                        else
-                        {
-                            _accelStructure.SetInstanceHitGroupContribution(handle, runningContribution);
-                        }
-
-                        desired.Add(handle);
-                        _accelStructure.SetInstanceOrderIndex(handle, orderIndex++);
-
-                        // Variant 0 = emissive hit group (HitEmissive), variant 1 = non-emissive.
-                        // Analytic-light-proxy materials must use variant 0: the proxy NEE branch is
-                        // compiled out of the non-emissive variant (RTXPT_MATERIAL_IS_ANALYTIC_LIGHT_PROXY=0).
-                        uint hitGroupVariant = (grp.isEmissive || grp.isAnalyticProxy) ? 0u : 1u;
-                        for (int k = 0; k < descs.Length; k++)
-                            variantList.Add(hitGroupVariant);
-                        runningContribution += (uint)descs.Length;
-                    }
-                }
-                else
-                {
-                    // Fallback: no group info. The native AddInstance(mr) path adds every sub-mesh to
-                    // the BLAS and cannot disable individual ones, so per-sub-mesh skipping is not
-                    // supported here — register the renderer only when all sub-meshes are assigned.
-                    var fbMesh = mr.GetComponent<MeshFilter>()?.sharedMesh;
-                    if (fbMesh != null && AllSubmeshesAssigned(t, fbMesh.subMeshCount))
-                    {
-                        uint  handle = (uint)mr.GetInstanceID();
-                        ulong hash   = HashRegistration(fbMesh.GetInstanceID(), null);
-
-                        bool isRegistered = _registeredHandles.TryGetValue(handle, out ulong oldHash);
-                        if (isRegistered && oldHash != hash)
-                        {
-                            _accelStructure.RemoveInstance(handle);
-                            _registeredHandles.Remove(handle);
-                            isRegistered = false;
-                        }
-
-                        if (!isRegistered)
-                        {
-                            if (_accelStructure.AddInstance(mr))
-                                _registeredHandles[handle] = hash;
-                            else
-                                continue;
-                        }
-
-                        desired.Add(handle);
-                        _accelStructure.SetInstanceOrderIndex(handle, orderIndex++);
-                    }
-                    else
-                        Debug.LogWarning($"[NativeRtxptGPUScene] '{mr.name}' has no SubmeshGroups and not all sub-meshes have an RtxptMaterial assigned — skipping the whole renderer (per-sub-mesh skip requires the grouped path).");
-                }
-            }
-
-            // Remove registrations that are no longer desired: renderer destroyed or disabled,
-            // group disappeared, or its content hash changed under a different handle. Removal is
-            // by raw handle, so no live Unity object is required.
-            _staleHandlesScratch.Clear();
-            foreach (var kv in _registeredHandles)
-                if (!desired.Contains(kv.Key))
-                    _staleHandlesScratch.Add(kv.Key);
-            foreach (var h in _staleHandlesScratch)
-            {
-                _accelStructure.RemoveInstance(h);
-                _registeredHandles.Remove(h);
-            }
-
-            // Publish the new per-geometry variant array and flag pipelines for a one-time SBT rebuild.
-            if (_variantIndexArray.IsCreated) _variantIndexArray.Dispose();
-            _variantIndexArray = new NativeArray<uint>(variantList.Count, Allocator.Persistent);
-            for (int i = 0; i < variantList.Count; i++)
-                _variantIndexArray[i] = variantList[i];
-            _shaderTableDirty = true;
-        }
-
-        private static uint MakeGroupHandle(int mrInstanceId, int groupIndex)
-            => (uint)(mrInstanceId & 0x0FFFFFFF) | ((uint)groupIndex << 28);
-
-        // FNV-1a over the BLAS-affecting registration inputs (mesh identity + submesh subset +
-        // geometry flags). Equal hash ⇒ the already-registered native instance/BLAS is reused
-        // as-is; a change forces remove + re-add. descs == null marks the non-grouped
-        // AddInstance(mr) path (whole mesh, native-side submesh layout).
-        private static ulong HashRegistration(int meshId, NativeRenderPlugin.SubmeshDesc[] descs)
-        {
-            const ulong Prime = 1099511628211UL;
-            ulong h = 14695981039346656037UL;
-            h = (h ^ (uint)meshId) * Prime;
-            if (descs == null)
-                return h;
-            h = (h ^ (uint)descs.Length) * Prime;
-            foreach (var d in descs)
-            {
-                h = (h ^ d.indexCount) * Prime;
-                h = (h ^ d.indexByteOffset) * Prime;
-                h = (h ^ d.baseVertex) * Prime;
-                h = (h ^ d.flags) * Prime;
-            }
-            return h;
-        }
+        // GPU data rebuild (consumes _layout)
+        // -----------------------------------------------------------------------
 
         private void DisposeGpuBuffers()
         {
@@ -717,21 +328,19 @@ namespace PathTracing
             _subInstanceCpu = null;
             _ptMaterialCpu  = null;
             _geomDebugCpu   = null;
-            _sceneInstances.Clear();
+            _instanceHandles.Clear();
             _rendererEntries.Clear();
             _meshBufferSlots.Clear();
-            _overrideSlots.Clear();
-            _textureSlots.Clear();
             _overrideMaterialIndices.Clear();
             _overrideCache.Clear();
             _environmentMapTextureIndex = -1;
 
-            // _donutBufferCache is intentionally NOT released here: the per-mesh SoA buffers are
-            // persistent across rebuilds (evicted in RebuildSceneGpuData when a mesh drops out of
-            // the scene, fully released in Dispose).
+            // The donut buffer cache (_geometryCache) is intentionally NOT released here: the
+            // per-mesh SoA buffers are persistent across rebuilds (unused meshes are evicted at
+            // the end of RebuildSceneGpuData, everything is released in Dispose).
         }
 
-        private void RebuildSceneGpuData(IReadOnlyList<RtxptRenderer> targets)
+        private void RebuildSceneGpuData()
         {
             DisposeGpuBuffers();
 
@@ -740,37 +349,23 @@ namespace PathTracing
             // light history to the baker. Drop them; the first frame after a rebuild treats all
             // emissive geometry as new (HistoricBufferOffset = invalid).
             _emissiveHistoricOffsets.Clear();
-
-            var instList    = new List<DonutInstanceData>();
-            var geomList    = new List<DonutGeometryData>();
-            var subInstList = new List<SubInstanceData>();
-            var ptMatList   = new List<PTMaterialData>();
-            var geomDbgList = new List<GeometryDebugData>();
-            var bufPtrs     = new List<IntPtr>();
-            var texPtrs     = new List<IntPtr>();
-
             _proxySubInstances.Clear();
 
-            foreach (var target in targets)
+            var matTable    = new RtxptMaterialTable();
+            var instList    = new List<DonutInstanceData>(_layout.Count);
+            var geomList    = new List<DonutGeometryData>();
+            var subInstList = new List<SubInstanceData>();
+            var geomDbgList = new List<GeometryDebugData>();
+            var bufPtrs     = new List<IntPtr>();
+
+            foreach (var rec in _layout)
             {
-                if (target == null) continue;
-                var mr = target.MeshRenderer;
-                if (mr == null) continue;
-                var mf = mr.GetComponent<MeshFilter>();
-                if (mf == null || mf.sharedMesh == null) continue;
+                Mesh mesh   = rec.Mesh;
+                int  meshId = mesh.GetInstanceID();
 
-                Mesh mesh = mf.sharedMesh;
-                if (mesh == null) continue;
-                int meshKey = mesh.GetInstanceID();
-
-                if (!_meshBufferSlots.TryGetValue(meshKey, out var slots))
+                if (!_meshBufferSlots.TryGetValue(meshId, out var slots))
                 {
-                    var (donutVb, donutIb) = GetOrCreateDonutBuffers(mesh);
-                    if (donutVb == null || donutIb == null)
-                    {
-                        Debug.LogWarning($"[NativeRtxdiGPUScene] '{mesh.name}': failed to build donut buffers — skipping");
-                        continue;
-                    }
+                    var (donutVb, donutIb) = _geometryCache.GetOrCreate(mesh);
 
                     slots = (bufPtrs.Count, bufPtrs.Count + 1);
                     // SubInstanceData.IndexBufferIndex_VertexBufferIndex packs both as 16-bit.
@@ -778,276 +373,70 @@ namespace PathTracing
                         Debug.LogError($"[NativeRtxptGPUScene] Bindless buffer slot overflow: VB slot index {bufPtrs.Count} exceeds 16-bit limit (65535). Rendering will be corrupted. Mesh='{mesh.name}'.");
                     bufPtrs.Add(donutVb.GetNativeBufferPtr());
                     bufPtrs.Add(donutIb.GetNativeBufferPtr());
-                    _meshBufferSlots[meshKey] = slots;
+                    _meshBufferSlots[meshId] = slots;
+
+                    if (!mesh.HasVertexAttribute(VertexAttribute.Normal) ||
+                        !mesh.HasVertexAttribute(VertexAttribute.Tangent))
+                        Debug.LogWarning($"[NativeRtxptGPUScene] '{mesh.name}': missing normal or tangent stream");
                 }
 
-                // SoA offsets — must match GetOrCreateDonutBuffers stream order exactly:
-                //   [positions: vc*12] [normals?: vc*4] [uvs?: vc*8] [tangents?: vc*4]
-                // Only present streams occupy bytes, so offsets are computed cumulatively.
-                uint vc         = (uint)mesh.vertexCount;
-                bool hasNormal  = mesh.HasVertexAttribute(VertexAttribute.Normal);
-                bool hasUV      = mesh.HasVertexAttribute(VertexAttribute.TexCoord0);
-                bool hasTangent = mesh.HasVertexAttribute(VertexAttribute.Tangent);
+                var streams = new RtxptMeshStreamOffsets(mesh);
 
-                uint streamOffset = 0u;
-                uint posOff       = streamOffset;
-                streamOffset += vc * 12u;
-                uint normOff                = hasNormal ? streamOffset : 0xFFFFFFFFu;
-                if (hasNormal) streamOffset += vc * 4u;
-                uint uvOff                  = hasUV ? streamOffset : 0xFFFFFFFFu;
-                if (hasUV) streamOffset     += vc * 8u;
-                uint tanOff                 = hasTangent ? streamOffset : 0xFFFFFFFFu;
-
-                if (!hasNormal || !hasTangent)
+                // Per-renderer material-index array for the lightweight material-edit path.
+                // A renderer's records are consecutive in the layout; the array spans all of
+                // its sub-meshes, so create it on the renderer's first record.
+                if (!_overrideMaterialIndices.TryGetValue(rec.RendererId, out int[] overrideMatIndices))
                 {
-                    Debug.LogWarning($"[NativeRtxptGPUScene] {target.name} '{mesh.name}': missing normal or tangent stream");
-                }  
-
-                Material[] mats       = mr.sharedMaterials ?? Array.Empty<Material>();
-                int        subMeshCnt = mesh.subMeshCount;
-                // (firstGeom is computed per-branch below)
-
-#if UNITY_EDITOR
-                if (mr.name == "Bistro_Research_Interior_Paris_Flower_Pot_01A_2442" ||
-                    mr.name == "Bistro_Research_Interior_Paris_ToffeeJar_01_3262" ||
-                    mr.name == "Wall_Front_Left")
-                {
-                    var groups_dbg = target.SubmeshGroups;
-                    var sb         = new System.Text.StringBuilder();
-                    sb.AppendLine($"[GPUScene DEBUG] Renderer: '{mr.name}'");
-                    sb.AppendLine($"  Mesh: '{mesh.name}'  vertexCount={vc}  subMeshCount={subMeshCnt}");
-                    sb.AppendLine($"  SoA offsets: pos={posOff}  norm={normOff}  uv={uvOff}  tan={tanOff}");
-                    sb.AppendLine($"  Buffer slots: vb={slots.vb}  ib={slots.ib}");
-                    sb.AppendLine($"  instList.Count={instList.Count}  geomList.Count={geomList.Count}  groups={groups_dbg?.Length ?? 0}");
-                    for (int _s = 0; _s < subMeshCnt; _s++)
-                    {
-                        var _sub = mesh.GetSubMesh(_s);
-                        sb.AppendLine($"  subMesh[{_s}]: indexStart={_sub.indexStart}  indexCount={_sub.indexCount}  baseVertex={_sub.baseVertex}  topology={_sub.topology}");
-                        var _mat = _s < mats.Length ? mats[_s] : null;
-                        sb.AppendLine($"  subMesh[{_s}]: mat='{(_mat != null ? _mat.name : "null")}'");
-                    }
-
-                    if (groups_dbg != null)
-                        for (int _gi = 0; _gi < groups_dbg.Length; _gi++)
-                        {
-                            var _grp = groups_dbg[_gi];
-                            sb.AppendLine($"  Group[{_gi}]: emissive={_grp.isEmissive} alphaClip={_grp.isAlphaClip} analyticProxy={_grp.isAnalyticProxy} submeshIndices=[{string.Join(",", _grp.submeshIndices)}]");
-                        }
-
-                    Debug.Log(sb.ToString());
+                    overrideMatIndices = new int[mesh.subMeshCount];
+                    _overrideMaterialIndices[rec.RendererId] = overrideMatIndices;
+                    _overrideCache.Add((rec.Renderer, overrideMatIndices));
                 }
-#endif
 
-                var   matOverride        = target;
-                int[] overrideMatIndices = matOverride != null ? new int[subMeshCnt] : null;
+                int firstGeom = geomList.Count;
+                foreach (int s in rec.SubmeshIndices)
+                    AddSubmeshGeometry(rec, s, slots, streams, matTable, geomList, subInstList, geomDbgList, overrideMatIndices);
 
-                Matrix4x4 m    = target.transform.localToWorldMatrix;
+                // TLAS InstanceID must be the SubInstanceData base offset (firstGeometryInstanceIndex),
+                // NOT the instance index: the any-hit alpha test indexes t_SubInstanceData[InstanceID()
+                // + geometryIndex] directly (PathTracerBridgeDonut.hlsli AlphaTest), mirroring RTXPT's
+                // instanceDesc.instanceID = instance->GetGeometryInstanceIndex() (Sample.cpp). The
+                // closest-hit path is unaffected — it uses the automatic InstanceIndex() to fetch the
+                // instance, then adds firstGeometryInstanceIndex itself.
+                _accelStructure.SetInstanceID(rec.Handle, (uint)firstGeom);
+
+                Matrix4x4 m    = rec.MeshRenderer.transform.localToWorldMatrix;
                 var       row0 = new Vector4(m.m00, m.m01, m.m02, m.m03);
                 var       row1 = new Vector4(m.m10, m.m11, m.m12, m.m13);
                 var       row2 = new Vector4(m.m20, m.m21, m.m22, m.m23);
 
-                // Local helper: append geometry + sub-instance data for one sub-mesh index.
-                // Only ever called for sub-meshes that have a pre-baked RtxptMaterial assigned
-                // (callers filter via SubmeshHasMaterial), so matOverride.Slots[s] is non-null here.
-                void AddSubmeshData(int s)
+                instList.Add(new DonutInstanceData
                 {
-                    SubMeshDescriptor sub                                 = mesh.GetSubMesh(s);
-                    int               matIdx                              = GetOrAddMaterial(s, matOverride, ptMatList, texPtrs);
-                    if (overrideMatIndices != null) overrideMatIndices[s] = matIdx;
+                    flags                      = 0u,
+                    firstGeometryInstanceIndex = (uint)firstGeom,
+                    firstGeometryIndex         = (uint)firstGeom,
+                    numGeometries              = (uint)(geomList.Count - firstGeom),
+                    transformRow0              = row0,
+                    transformRow1              = row1,
+                    transformRow2              = row2,
+                    prevTransformRow0          = row0,
+                    prevTransformRow1          = row1,
+                    prevTransformRow2          = row2,
+                });
+                _instanceHandles.Add(rec.Handle);
 
-                    int globalGeomIdx = geomList.Count;
-
-                    // SubInstanceData.GlobalGeometryIndex_PTMaterialDataIndex packs both fields as 16-bit.
-                    if (globalGeomIdx > 0xFFFF)
-                        Debug.LogError($"[NativeRtxptGPUScene] GlobalGeometryIndex overflow: geomIndex={globalGeomIdx} exceeds 16-bit limit (65535). Rendering will be corrupted. Renderer='{mr.name}' subMesh={s}.");
-                    if (matIdx > 0xFFFF)
-                        Debug.LogError($"[NativeRtxptGPUScene] PTMaterialDataIndex overflow: matIndex={matIdx} exceeds 16-bit limit (65535). Rendering will be corrupted. Renderer='{mr.name}' subMesh={s}.");
-
-                    geomList.Add(new DonutGeometryData
-                    {
-                        numIndices         = (uint)sub.indexCount,
-                        numVertices        = (uint)mesh.vertexCount,
-                        indexBufferIndex   = slots.ib,
-                        indexOffset        = (uint)sub.indexStart * 4u, // always uint32
-                        vertexBufferIndex  = slots.vb,
-                        positionOffset     = posOff,
-                        prevPositionOffset = posOff, // no skinning / morph support yet
-                        texCoord1Offset    = uvOff,
-                        texCoord2Offset    = 0xFFFFFFFFu,
-                        normalOffset       = normOff,
-                        tangentOffset      = tanOff,
-                        curveRadiusOffset  = 0xFFFFFFFFu,
-                        materialIndex      = (uint)matIdx,
-                    });
-
-                    // --- SubInstanceData (RTXPT t1) ---
-                    RtxptMaterial overrideSlot = matOverride.Slots[s];
-                    bool  isAlphaTested  = overrideSlot.EnableAlphaTesting;
-                    float aCutoff        = isAlphaTested ? overrideSlot.AlphaCutoff : 0f;
-                    bool  excludeFromNEE = overrideSlot.ExcludeFromNEE;
-                    uint alphaU8     = (uint)Mathf.RoundToInt(Mathf.Clamp01(aCutoff) * 255f);
-                    // AlphaTextureIndex in lo16: use base texture slot if alpha-tested, else 0
-                    uint alphaTexIdx = isAlphaTested && ptMatList.Count > matIdx
-                        ? (uint)Mathf.Max(0, ptMatList[matIdx].BaseOrDiffuseTextureIndex)
-                        : 0u;
-                    uint siFlags = alphaTexIdx & 0xFFFFu;
-                    if (isAlphaTested)  siFlags |= SubInstanceFlags.AlphaTested;
-                    if (excludeFromNEE) siFlags |= SubInstanceFlags.ExcludeFromNEE;
-                    siFlags |= (alphaU8 << SubInstanceFlags.AlphaOffsetOffset);
-
-                    // Record analytic-light-proxy sub-instances. The actual AnalyticProxyLightIndex is
-                    // filled per-frame by ResolveAnalyticProxyLights once the light global indices exist;
-                    // here we only capture (subInstanceIndex, targetLightInstanceID). subInstList.Count
-                    // equals the index this entry is about to occupy.
-                    if (overrideSlot.EnableAsAnalyticLightProxy)
-                    {
-                        Light targetLight = ResolveProxyTargetLight(mr);
-                        _proxySubInstances.Add((subInstList.Count, targetLight != null ? targetLight.GetInstanceID() : 0));
-                        if (targetLight == null)
-                            Debug.LogWarning($"[NativeRtxptGPUScene] Renderer '{mr.name}' submesh {s} is flagged " +
-                                             "EnableAsAnalyticLightProxy but has no Spot/Point target light " +
-                                             "(add an RtxptAnalyticLightProxy component or parent it under a light).");
-                    }
-
-                    subInstList.Add(new SubInstanceData
-                    {
-                        FlagsAndAlphaInfo                       = siFlags,
-                        GlobalGeometryIndex_PTMaterialDataIndex = ((uint)globalGeomIdx << 16) | ((uint)matIdx & 0xFFFFu),
-                        EmissiveLightMappingOffset              = 0xFFFFFFFFu, // set per-frame by PrepareEmissiveTriangleTasks
-                        // Default to RTXPT_INVALID_LIGHT_INDEX (disables the proxy lookup, which the
-                        // shader only performs for EnableAsAnalyticLightProxy materials; 0u would alias
-                        // env-quad light 0). For proxy materials this is overwritten each frame by
-                        // ResolveAnalyticProxyLights once the analytic light global indices are known.
-                        AnalyticProxyLightIndex                 = 0xFFFFFFFFu,
-                        IndexBufferIndex_VertexBufferIndex      = ((uint)slots.ib << 16) | ((uint)slots.vb & 0xFFFFu),
-                        IndexOffset                             = (uint)sub.indexStart * 4u,
-                        TexCoord1Offset                         = uvOff,
-                        padding0                                = 0u,
-                    });
-
-                    // --- GeometryDebugData (RTXPT t4, all zero = no OMM) ---
-                    geomDbgList.Add(default);
-                }
-
-                var groups = target.SubmeshGroups;
-                if (groups != null && groups.Length > 0)
-                {
-                    // Each SubmeshGroup is a separate TLAS instance (AddInstanceGroup), so each needs
-                    // its own DonutInstanceData with firstGeometryIndex pointing to its own geomList slice.
-                    // GeometryIndex() in the shader is 0-based within each group instance.
-                    int mrId              = mr.GetInstanceID();
-                    int firstGroupInstIdx = _sceneInstances.Count;
-                    int addedGroups       = 0;
-                    for (int gi = 0; gi < groups.Length; gi++)
-                    {
-                        var grp               = groups[gi];
-                        int firstGeomForGroup = geomList.Count;
-
-                        // Skip sub-meshes with no assigned RtxptMaterial. Must match the BLAS filter
-                        // in RegisterScene exactly so the shader's per-geometry indices stay aligned.
-                        for (int si = 0; si < grp.submeshIndices.Length; si++)
-                        {
-                            int sIdx = grp.submeshIndices[si];
-                            if (!SubmeshHasMaterial(matOverride, sIdx))
-                            {
-                                Debug.LogWarning($"[NativeRtxptGPUScene] '{mr.name}' sub-mesh {sIdx} has no RtxptMaterial assigned — skipping (not rendered).");
-                                continue;
-                            }
-                            AddSubmeshData(sIdx);
-                        }
-
-                        int numGeom = geomList.Count - firstGeomForGroup;
-                        if (numGeom == 0) continue; // whole group unassigned — matches RegisterScene
-
-                        uint groupHandle  = MakeGroupHandle(mrId, gi);
-                        // TLAS InstanceID must be the SubInstanceData base offset (firstGeometryInstanceIndex),
-                        // NOT the instance index: the any-hit alpha test indexes t_SubInstanceData[InstanceID()
-                        // + geometryIndex] directly (PathTracerBridgeDonut.hlsli AlphaTest), mirroring RTXPT's
-                        // instanceDesc.instanceID = instance->GetGeometryInstanceIndex() (Sample.cpp). The
-                        // closest-hit path is unaffected — it uses the automatic InstanceIndex() to fetch the
-                        // instance, then adds firstGeometryInstanceIndex itself.
-                        _accelStructure.SetInstanceID(groupHandle, (uint)firstGeomForGroup);
-
-                        instList.Add(new DonutInstanceData
-                        {
-                            flags                      = 0u,
-                            firstGeometryInstanceIndex = (uint)firstGeomForGroup,
-                            firstGeometryIndex         = (uint)firstGeomForGroup,
-                            numGeometries              = (uint)numGeom,
-                            transformRow0              = row0,
-                            transformRow1              = row1,
-                            transformRow2              = row2,
-                            prevTransformRow0          = row0,
-                            prevTransformRow1          = row1,
-                            prevTransformRow2          = row2,
-                        });
-                        _sceneInstances.Add(new SceneInstance
-                        {
-                            renderer    = mr,
-                            groupHandle = groupHandle,
-                        });
-                        addedGroups++;
-                    }
-                    if (addedGroups > 0)
-                        _rendererEntries[mrId] = new RendererEntry
-                        {
-                            transform        = mr.transform,
-                            firstInstanceIdx = firstGroupInstIdx,
-                            instanceCount    = addedGroups,
-                        };
-                }
+                if (_rendererEntries.TryGetValue(rec.RendererId, out var entry))
+                    entry.instanceCount++; // records of one renderer are consecutive
                 else
-                {
-                    // Non-grouped: one TLAS instance (AddInstance) covers all sub-meshes. The native
-                    // AddInstance(mr) path can't disable individual sub-meshes, so RegisterScene only
-                    // registers this renderer when every sub-mesh is assigned — mirror that here.
-                    if (!AllSubmeshesAssigned(matOverride, subMeshCnt))
-                        continue;
-
-                    int firstGeom = geomList.Count;
-
-                    for (int s = 0; s < subMeshCnt; s++)
-                        AddSubmeshData(s);
-
-                    // InstanceID = SubInstanceData base offset (firstGeometryInstanceIndex), matching the
-                    // grouped path above and RTXPT's GetGeometryInstanceIndex() — required by the any-hit
-                    // alpha test which indexes t_SubInstanceData[InstanceID() + geometryIndex] directly.
-                    _accelStructure.SetInstanceID(mr, (uint)firstGeom);
-                    instList.Add(new DonutInstanceData
+                    _rendererEntries[rec.RendererId] = new RendererEntry
                     {
-                        flags                      = 0u,
-                        firstGeometryInstanceIndex = (uint)firstGeom,
-                        firstGeometryIndex         = (uint)firstGeom,
-                        numGeometries              = (uint)subMeshCnt,
-                        transformRow0              = row0,
-                        transformRow1              = row1,
-                        transformRow2              = row2,
-                        prevTransformRow0          = row0,
-                        prevTransformRow1          = row1,
-                        prevTransformRow2          = row2,
-                    });
-                    int singleInstIdx = _sceneInstances.Count;
-                    _sceneInstances.Add(new SceneInstance
-                    {
-                        renderer    = mr,
-                        groupHandle = 0u,
-                    });
-                    _rendererEntries[mr.GetInstanceID()] = new RendererEntry
-                    {
-                        transform        = mr.transform,
-                        firstInstanceIdx = singleInstIdx,
+                        transform        = rec.MeshRenderer.transform,
+                        firstInstanceIdx = instList.Count - 1,
                         instanceCount    = 1,
                     };
-                }
-
-                if (overrideMatIndices != null)
-                {
-                    _overrideMaterialIndices[mr.GetInstanceID()] = overrideMatIndices;
-                    _overrideCache.Add((matOverride, overrideMatIndices));
-                }
             }
 
             // Append environment map to bindless texture array (if registered)
+            var texPtrs = matTable.TexturePtrs;
             if (_pendingEnvMap != null)
             {
                 _environmentMapTextureIndex = texPtrs.Count;
@@ -1058,8 +447,7 @@ namespace PathTracing
             for (int i = 0; i < bufPtrs.Count; i++)
                 _sceneBuffers.SetNativePtr(i, bufPtrs[i]);
 
-            int texCount = Mathf.Max(texPtrs.Count, 1);
-            _sceneTextures = new BindlessTexture(texCount);
+            _sceneTextures = new BindlessTexture(Mathf.Max(texPtrs.Count, 1));
             for (int i = 0; i < texPtrs.Count; i++)
                 _sceneTextures.SetNativePtr(i, texPtrs[i]);
 
@@ -1068,14 +456,14 @@ namespace PathTracing
                 instList.Add(default);
                 geomList.Add(default);
                 subInstList.Add(default);
-                ptMatList.Add(default);
+                matTable.Materials.Add(default);
                 geomDbgList.Add(default);
             }
 
             _instanceCpu    = instList.ToArray();
             _geometryCpu    = geomList.ToArray();
             _subInstanceCpu = subInstList.ToArray();
-            _ptMaterialCpu  = ptMatList.ToArray();
+            _ptMaterialCpu  = matTable.Materials.ToArray();
             _geomDebugCpu   = geomDbgList.ToArray();
 
             // Ranges mode: per-frame transform updates touch only the moved instances,
@@ -1092,6 +480,7 @@ namespace PathTracing
 
             _subInstanceGpuBuf = new UploadBuffer(_subInstanceCpu.Length, Marshal.SizeOf<SubInstanceData>(), debugName: "Instances");
             _subInstanceGpuBuf.SetData(_subInstanceCpu, 0, _subInstanceCpu.Length);
+            _subInstanceCpuDirty = false;
 
             _ptMaterialGpuBuf = new GraphicsBuffer(GraphicsBuffer.Target.Structured, _ptMaterialCpu.Length, Marshal.SizeOf<PTMaterialData>()) { name = "PTMaterialDataStorage" };
             _ptMaterialGpuBuf.SetData(_ptMaterialCpu);
@@ -1101,23 +490,141 @@ namespace PathTracing
             _geomDebugGpuBuf.SetData(_geomDebugCpu);
             _geomDebugGpuBufPtr = _geomDebugGpuBuf.GetNativeBufferPtr();
 
-            // Evict donut buffers for meshes that no renderer references anymore (the cache is
-            // otherwise persistent across rebuilds). _meshBufferSlots was just repopulated above,
-            // so it is the exact set of meshes used this rebuild.
-            _donutEvictScratch.Clear();
-            foreach (var key in _donutBufferCache.Keys)
-                if (!_meshBufferSlots.ContainsKey(key))
-                    _donutEvictScratch.Add(key);
-            foreach (var key in _donutEvictScratch)
-            {
-                var (vb, ib) = _donutBufferCache[key];
-                vb?.Release();
-                ib?.Release();
-                _donutBufferCache.Remove(key);
-            }
+            RebuildEmissiveCache();
+
+            // Drop donut buffers for meshes that no renderer references anymore.
+            _geometryCache.EvictUnused(_meshBufferSlots.ContainsKey);
 
             _sceneGpuDirty = false;
         }
+
+        // Appends geometry + sub-instance + debug data for one assigned sub-mesh of a record.
+        // Only called for sub-meshes the layout has already confirmed assigned, so
+        // rec.Renderer.Slots[s] is non-null here.
+        private void AddSubmeshGeometry(RtxptInstanceRecord rec, int s, (int vb, int ib) slots,
+            in RtxptMeshStreamOffsets streams, RtxptMaterialTable matTable,
+            List<DonutGeometryData> geomList, List<SubInstanceData> subInstList,
+            List<GeometryDebugData> geomDbgList, int[] overrideMatIndices)
+        {
+            Mesh              mesh = rec.Mesh;
+            SubMeshDescriptor sub  = mesh.GetSubMesh(s);
+            RtxptMaterial     slot = rec.Renderer.Slots[s];
+
+            int matIdx = matTable.GetOrAdd(slot);
+            if (s < overrideMatIndices.Length)
+                overrideMatIndices[s] = matIdx;
+
+            int globalGeomIdx = geomList.Count;
+
+            // SubInstanceData.GlobalGeometryIndex_PTMaterialDataIndex packs both fields as 16-bit.
+            if (globalGeomIdx > 0xFFFF)
+                Debug.LogError($"[NativeRtxptGPUScene] GlobalGeometryIndex overflow: geomIndex={globalGeomIdx} exceeds 16-bit limit (65535). Rendering will be corrupted. Renderer='{rec.MeshRenderer.name}' subMesh={s}.");
+            if (matIdx > 0xFFFF)
+                Debug.LogError($"[NativeRtxptGPUScene] PTMaterialDataIndex overflow: matIndex={matIdx} exceeds 16-bit limit (65535). Rendering will be corrupted. Renderer='{rec.MeshRenderer.name}' subMesh={s}.");
+
+            geomList.Add(new DonutGeometryData
+            {
+                numIndices         = (uint)sub.indexCount,
+                numVertices        = (uint)mesh.vertexCount,
+                indexBufferIndex   = slots.ib,
+                indexOffset        = (uint)sub.indexStart * 4u, // donut IB is always uint32
+                vertexBufferIndex  = slots.vb,
+                positionOffset     = streams.Pos,
+                prevPositionOffset = streams.Pos, // no skinning / morph support yet
+                texCoord1Offset    = streams.Uv,
+                texCoord2Offset    = 0xFFFFFFFFu,
+                normalOffset       = streams.Normal,
+                tangentOffset      = streams.Tangent,
+                curveRadiusOffset  = 0xFFFFFFFFu,
+                materialIndex      = (uint)matIdx,
+            });
+
+            // --- SubInstanceData (RTXPT t1) ---
+            bool  isAlphaTested  = slot.EnableAlphaTesting;
+            float aCutoff        = isAlphaTested ? slot.AlphaCutoff : 0f;
+            uint  alphaU8        = (uint)Mathf.RoundToInt(Mathf.Clamp01(aCutoff) * 255f);
+            // AlphaTextureIndex in lo16: use base texture slot if alpha-tested, else 0
+            uint alphaTexIdx = isAlphaTested && matTable.Materials[matIdx].BaseOrDiffuseTextureIndex != 0xFFFFFFFFu
+                ? matTable.Materials[matIdx].BaseOrDiffuseTextureIndex
+                : 0u;
+            uint siFlags = alphaTexIdx & 0xFFFFu;
+            if (isAlphaTested)       siFlags |= SubInstanceFlags.AlphaTested;
+            if (slot.ExcludeFromNEE) siFlags |= SubInstanceFlags.ExcludeFromNEE;
+            siFlags |= (alphaU8 << SubInstanceFlags.AlphaOffsetOffset);
+
+            // Record analytic-light-proxy sub-instances. The actual AnalyticProxyLightIndex is
+            // filled per-frame by ResolveAnalyticProxyLights once the light global indices exist;
+            // here we only capture (subInstanceIndex, targetLightInstanceID). subInstList.Count
+            // equals the index this entry is about to occupy.
+            if (slot.EnableAsAnalyticLightProxy)
+            {
+                Light targetLight = ResolveProxyTargetLight(rec.MeshRenderer);
+                _proxySubInstances.Add((subInstList.Count, targetLight != null ? targetLight.GetInstanceID() : 0));
+                if (targetLight == null)
+                    Debug.LogWarning($"[NativeRtxptGPUScene] Renderer '{rec.MeshRenderer.name}' submesh {s} is flagged " +
+                                     "EnableAsAnalyticLightProxy but has no Spot/Point target light " +
+                                     "(add an RtxptAnalyticLightProxy component or parent it under a light).");
+            }
+
+            subInstList.Add(new SubInstanceData
+            {
+                FlagsAndAlphaInfo                       = siFlags,
+                GlobalGeometryIndex_PTMaterialDataIndex = ((uint)globalGeomIdx << 16) | ((uint)matIdx & 0xFFFFu),
+                EmissiveLightMappingOffset              = 0xFFFFFFFFu, // set per-frame by PrepareEmissiveTriangleTasks
+                // Default to RTXPT_INVALID_LIGHT_INDEX (disables the proxy lookup, which the
+                // shader only performs for EnableAsAnalyticLightProxy materials; 0u would alias
+                // env-quad light 0). For proxy materials this is overwritten each frame by
+                // ResolveAnalyticProxyLights once the analytic light global indices are known.
+                AnalyticProxyLightIndex                 = 0xFFFFFFFFu,
+                IndexBufferIndex_VertexBufferIndex      = ((uint)slots.ib << 16) | ((uint)slots.vb & 0xFFFFu),
+                IndexOffset                             = (uint)sub.indexStart * 4u,
+                TexCoord1Offset                         = streams.Uv,
+                padding0                                = 0u,
+            });
+
+            // --- GeometryDebugData (RTXPT t4, all zero = no OMM) ---
+            geomDbgList.Add(default);
+        }
+
+        private void RebuildEmissiveCache()
+        {
+            _emissiveCache.Clear();
+            if (_instanceCpu == null || _geometryCpu == null)
+                return;
+
+            for (int i = 0; i < _instanceCpu.Length; i++)
+            {
+                var inst      = _instanceCpu[i];
+                int firstGeom = (int)inst.firstGeometryIndex;
+                int numGeoms  = (int)inst.numGeometries;
+
+                for (int s = 0; s < numGeoms; s++)
+                {
+                    int geomIdx = firstGeom + s;
+                    if (geomIdx >= _geometryCpu.Length) break;
+
+                    var geom   = _geometryCpu[geomIdx];
+                    int matIdx = (int)geom.materialIndex;
+                    if (matIdx < 0 || matIdx >= _ptMaterialCpu.Length) continue;
+
+                    var mat = _ptMaterialCpu[matIdx];
+                    if (mat.EmissiveColor.x <= 0f && mat.EmissiveColor.y <= 0f && mat.EmissiveColor.z <= 0f)
+                        continue;
+
+                    _emissiveCache.Add(new EmissiveGeometryEntry
+                    {
+                        InstanceIndex              = i,
+                        GeometrySubIndex           = s,
+                        TriangleCount              = geom.numIndices / 3u,
+                        FirstGeometryInstanceIndex = inst.firstGeometryInstanceIndex,
+                    });
+                }
+            }
+        }
+
+        // -----------------------------------------------------------------------
+        // Per-frame: material edits, transforms, lighting bridge
+        // -----------------------------------------------------------------------
 
         /// <summary>
         /// Checks all registered targets for dirty <see cref="RtxptRenderer"/> components
@@ -1142,7 +649,7 @@ namespace PathTracing
                     if (matOverride.Slots[s] == null) continue;
                     int idx = matIndices[s];
                     if (idx < 0 || idx >= _ptMaterialCpu.Length) continue;
-                    RefreshMaterialCpuFromOverride(matOverride.Slots[s], ref _ptMaterialCpu[idx]);
+                    RtxptMaterialTable.RefreshScalars(matOverride.Slots[s], ref _ptMaterialCpu[idx]);
                     if (idx < dirtyMin) dirtyMin = idx;
                     if (idx > dirtyMax) dirtyMax = idx;
                 }
@@ -1155,48 +662,6 @@ namespace PathTracing
                 _ptMaterialGpuBuf.SetData(_ptMaterialCpu, dirtyMin, dirtyMin, dirtyMax - dirtyMin + 1);
                 _ptMaterialGpuBufPtr = _ptMaterialGpuBuf.GetNativeBufferPtr();
             }
-        }
-
-        /// <summary>
-        /// Refreshes all scalar/color/flag fields of <paramref name="data"/> from <paramref name="slot"/>,
-        /// preserving the existing texture index fields (which are set only during a full scene rebuild).
-        /// </summary>
-        private static void RefreshMaterialCpuFromOverride(RtxptMaterial slot, ref PTMaterialData data)
-        {
-            // Texture flags: preserve loaded state (indices set during full rebuild) AND'd with slot enables.
-            uint flags = 0;
-            if (slot.UseSpecularGlossModel) flags |= PTMaterialFlags.UseSpecularGlossModel;
-            if (data.BaseOrDiffuseTextureIndex        != 0xFFFFFFFFu && slot.EnableBaseTexture)                                             flags |= PTMaterialFlags.UseBaseOrDiffuseTexture;
-            if (data.MetalRoughOrSpecularTextureIndex != 0xFFFFFFFFu && slot.EnableOcclusionRoughnessMetallicTexture)                       flags |= PTMaterialFlags.UseMetalRoughOrSpecularTexture;
-            if (data.EmissiveTextureIndex             != 0xFFFFFFFFu && slot.EnableEmissiveTexture)                                         flags |= PTMaterialFlags.UseEmissiveTexture;
-            if (data.NormalTextureIndex               != 0xFFFFFFFFu && slot.EnableNormalTexture)                                           flags |= PTMaterialFlags.UseNormalTexture;
-            if (data.TransmissionTextureIndex         != 0xFFFFFFFFu && slot.EnableTransmissionTexture && slot.EnableTransmission)           flags |= PTMaterialFlags.UseTransmissionTexture;
-            if (slot.MetalnessInRedChannel)                                                             flags |= PTMaterialFlags.MetalnessInRedChannel;
-            if (slot.ThinSurface || !slot.EnableTransmission)                                           flags |= PTMaterialFlags.ThinSurface;
-            if (slot.PSDExclude)                                                                        flags |= PTMaterialFlags.PSDExclude;
-            if (slot.EnableAsAnalyticLightProxy)                                                        flags |= PTMaterialFlags.EnableAsAnalyticLightProxy;
-            if (slot.IgnoreMeshTangentSpace)                                                            flags |= PTMaterialFlags.IgnoreMeshTangentSpace;
-            if (slot.PSDBlockMotionVectorsAtSurfaceType % 2 != 0)                                       flags |= PTMaterialFlags.PSDBlockMVsAtSurfaceTypeB0;
-            if (slot.PSDBlockMotionVectorsAtSurfaceType / 2 != 0)                                       flags |= PTMaterialFlags.PSDBlockMVsAtSurfaceTypeB1;
-            flags |= (uint)Mathf.Clamp(slot.NestedPriority, 0, 14) << PTMaterialFlags.NestedPriorityShift;
-            flags |= (uint)Mathf.Clamp(slot.PSDDominantDeltaLobe + 1, 0, 7) << PTMaterialFlags.PSDDominantDeltaLobeP1Shift;
-
-            data.Flags                     = flags;
-            data.BaseOrDiffuseColor        = new Vector3(slot.BaseColorFactor.r, slot.BaseColorFactor.g, slot.BaseColorFactor.b);
-            data.SpecularColor             = new Vector3(slot.SpecularColor.r, slot.SpecularColor.g, slot.SpecularColor.b);
-            data.EmissiveColor             = new Vector3(slot.EmissiveColor.r, slot.EmissiveColor.g, slot.EmissiveColor.b) * slot.EmissiveIntensity;
-            data.ShadowNoLFadeout          = Mathf.Clamp(slot.ShadowNoLFadeout, 0f, 0.25f);
-            data.Opacity                   = slot.Opacity;
-            data.Roughness                 = slot.Roughness;
-            data.Metalness                 = slot.Metalness;
-            data.NormalTextureScale        = slot.NormalTextureScale;
-            data.AlphaCutoff               = slot.AlphaCutoff;
-            data.TransmissionFactor        = slot.EnableTransmission ? slot.TransmissionFactor       : 0f;
-            data.DiffuseTransmissionFactor = slot.EnableTransmission ? slot.DiffuseTransmissionFactor : 0f;
-            data.IoR                       = slot.IoR;
-            data.ThicknessFactor           = slot.ThicknessFactor;
-            data.VolumeAttenuationColor    = new Vector3(slot.VolumeAttenuationColor.r, slot.VolumeAttenuationColor.g, slot.VolumeAttenuationColor.b);
-            data.VolumeAttenuationDistance = slot.VolumeAttenuationDistance;
         }
 
         private void UpdateInstanceTransforms()
@@ -1232,11 +697,7 @@ namespace PathTracing
                         _instanceCpu[i].transformRow1     = row1;
                         _instanceCpu[i].transformRow2     = row2;
 
-                        var si = _sceneInstances[i];
-                        if (si.groupHandle != 0)
-                            _accelStructure.SetInstanceTransform(si.groupHandle, m);
-                        else
-                            _accelStructure.SetInstanceTransform(si.renderer, m);
+                        _accelStructure.SetInstanceTransform(_instanceHandles[i], m);
                     }
                 }
                 else
@@ -1257,245 +718,158 @@ namespace PathTracing
             }
         }
 
-        private int BuildMaterialFromOverride(RtxptMaterial slot, List<PTMaterialData> ptMatList, List<IntPtr> texPtrs)
+        /// <summary>
+        /// Resolves the target Spot/Point <see cref="Light"/> a proxy mesh stands in for: an explicit
+        /// <see cref="RtxptAnalyticLightProxy"/> reference if present, otherwise the nearest Spot/Point
+        /// light on this GameObject or an ancestor (mirrors RTXPT's ProxiedAnalyticLight / parent-node
+        /// rules). Returns null if no eligible light is found.
+        /// </summary>
+        private static Light ResolveProxyTargetLight(Component renderer)
         {
-            int idx = ptMatList.Count;
+            var proxy = renderer.GetComponent<RtxptAnalyticLightProxy>();
+            if (proxy != null && proxy.TargetLight != null)
+                return proxy.TargetLight;
 
-            int baseTexIdx    = AddTexture(slot.BaseOrDiffuseTexture,              texPtrs);
-            int ormTexIdx     = AddTexture(slot.OcclusionRoughnessMetallicTexture, texPtrs);
-            int normalTexIdx  = AddTexture(slot.NormalTexture,                     texPtrs);
-            int emissiveTexIdx = AddTexture(slot.EmissiveTexture,                  texPtrs);
-            int transmTexIdx  = AddTexture(slot.TransmissionTexture,               texPtrs);
-
-            uint SafeIdx(int i) => i >= 0 ? (uint)i : 0xFFFFFFFFu;
-
-            uint flags = 0;
-            if (slot.UseSpecularGlossModel)                                                         flags |= PTMaterialFlags.UseSpecularGlossModel;
-            if (baseTexIdx    >= 0 && slot.EnableBaseTexture)                                        flags |= PTMaterialFlags.UseBaseOrDiffuseTexture;
-            if (ormTexIdx     >= 0 && slot.EnableOcclusionRoughnessMetallicTexture)                  flags |= PTMaterialFlags.UseMetalRoughOrSpecularTexture;
-            if (emissiveTexIdx >= 0 && slot.EnableEmissiveTexture)                                   flags |= PTMaterialFlags.UseEmissiveTexture;
-            if (normalTexIdx  >= 0 && slot.EnableNormalTexture)                                      flags |= PTMaterialFlags.UseNormalTexture;
-            if (transmTexIdx  >= 0 && slot.EnableTransmissionTexture && slot.EnableTransmission)     flags |= PTMaterialFlags.UseTransmissionTexture;
-            if (slot.MetalnessInRedChannel)                                                          flags |= PTMaterialFlags.MetalnessInRedChannel;
-            if (slot.ThinSurface || !slot.EnableTransmission)                                        flags |= PTMaterialFlags.ThinSurface;
-            if (slot.PSDExclude)                                                                     flags |= PTMaterialFlags.PSDExclude;
-            if (slot.EnableAsAnalyticLightProxy)                                                     flags |= PTMaterialFlags.EnableAsAnalyticLightProxy;
-            if (slot.IgnoreMeshTangentSpace)                                                         flags |= PTMaterialFlags.IgnoreMeshTangentSpace;
-            if (slot.PSDBlockMotionVectorsAtSurfaceType % 2 != 0)                                    flags |= PTMaterialFlags.PSDBlockMVsAtSurfaceTypeB0;
-            if (slot.PSDBlockMotionVectorsAtSurfaceType / 2 != 0)                                    flags |= PTMaterialFlags.PSDBlockMVsAtSurfaceTypeB1;
-            flags |= (uint)Mathf.Clamp(slot.NestedPriority, 0, 14) << PTMaterialFlags.NestedPriorityShift;
-            flags |= (uint)Mathf.Clamp(slot.PSDDominantDeltaLobe + 1, 0, 7) << PTMaterialFlags.PSDDominantDeltaLobeP1Shift;
-
-            ptMatList.Add(new PTMaterialData
+            for (var t = renderer.transform; t != null; t = t.parent)
             {
-                BaseOrDiffuseColor               = new Vector3(slot.BaseColorFactor.r, slot.BaseColorFactor.g, slot.BaseColorFactor.b),
-                Flags                            = flags,
-                SpecularColor                    = new Vector3(slot.SpecularColor.r, slot.SpecularColor.g, slot.SpecularColor.b),
-                _padding0                        = 42,
-                EmissiveColor                    = new Vector3(slot.EmissiveColor.r, slot.EmissiveColor.g, slot.EmissiveColor.b) * slot.EmissiveIntensity,
-                ShadowNoLFadeout                 = Mathf.Clamp(slot.ShadowNoLFadeout, 0f, 0.25f),
-                Opacity                          = slot.Opacity,
-                Roughness                        = slot.Roughness,
-                Metalness                        = slot.Metalness,
-                NormalTextureScale               = slot.NormalTextureScale,
-                _padding1                        = 42f,
-                AlphaCutoff                      = slot.AlphaCutoff,
-                TransmissionFactor               = slot.EnableTransmission ? slot.TransmissionFactor        : 0f,
-                BaseOrDiffuseTextureIndex        = SafeIdx(baseTexIdx),
-                MetalRoughOrSpecularTextureIndex = SafeIdx(ormTexIdx),
-                EmissiveTextureIndex             = SafeIdx(emissiveTexIdx),
-                NormalTextureIndex               = SafeIdx(normalTexIdx),
-                OcclusionTextureIndex            = 0u, // C++ FillData never writes this field; PTMaterialData is zero-initialized so it stays 0 (occlusion is packed into ORM, UseOcclusionTexture is disabled). See MaterialsBaker.cpp:516/907
-                TransmissionTextureIndex         = SafeIdx(transmTexIdx),
-                IoR                              = slot.IoR,
-                ThicknessFactor                  = slot.ThicknessFactor,
-                DiffuseTransmissionFactor        = slot.EnableTransmission ? slot.DiffuseTransmissionFactor : 0f,
-                VolumeAttenuationColor           = new Vector3(slot.VolumeAttenuationColor.r, slot.VolumeAttenuationColor.g, slot.VolumeAttenuationColor.b),
-                VolumeAttenuationDistance        = slot.VolumeAttenuationDistance,
-            });
-            return idx;
-        }
-
-        // Returns the GPU material index for a sub-mesh's pre-baked RtxptMaterial. Only called for
-        // sub-meshes the build passes have already confirmed are assigned (see SubmeshHasMaterial),
-        // so matOverride.Slots[subMeshIndex] is non-null. Runtime baking of Unity Materials is no
-        // longer supported — materials must be authored as RtxptMaterial assets in advance.
-        private int GetOrAddMaterial(int subMeshIndex, RtxptRenderer matOverride,
-            List<PTMaterialData> ptMatList, List<IntPtr> texPtrs)
-        {
-            // RtxptMaterial assets are shareable across renderers/sub-meshes, so dedup on the asset
-            // reference: identical references reuse the same GPU material entry rather than emitting
-            // one per (renderer, subMesh). Keeps MaterialCount = unique materials, matching the C++
-            // baker (Sample.cpp:2095).
-            RtxptMaterial asset = matOverride.Slots[subMeshIndex];
-            int assetId = asset.GetInstanceID();
-            if (_overrideSlots.TryGetValue(assetId, out int existing))
-                return existing;
-
-            int newIdx = BuildMaterialFromOverride(asset, ptMatList, texPtrs);
-            _overrideSlots[assetId] = newIdx;
-            return newIdx;
-        }
-
-        // True when renderer rr has a pre-baked RtxptMaterial assigned for the given sub-mesh.
-        private static bool SubmeshHasMaterial(RtxptRenderer rr, int subMesh)
-            => rr != null && subMesh < rr.Slots.Count && rr.Slots[subMesh] != null;
-
-        // True when every sub-mesh [0, subMeshCount) has an assigned RtxptMaterial.
-        private static bool AllSubmeshesAssigned(RtxptRenderer rr, int subMeshCount)
-        {
-            if (rr == null) return false;
-            for (int s = 0; s < subMeshCount; s++)
-                if (!SubmeshHasMaterial(rr, s)) return false;
-            return true;
-        }
-
-        private int AddTexture(Texture tex, List<IntPtr> texPtrs)
-        {
-            if (tex == null) return -1;
-            int texId = tex.GetInstanceID();
-            if (_textureSlots.TryGetValue(texId, out int slot)) return slot;
-            slot = texPtrs.Count;
-            texPtrs.Add(tex.GetNativeTexturePtr());
-            _textureSlots[texId] = slot;
-            return slot;
-        }
-
-        private bool TargetSetChanged(IReadOnlyList<RtxptRenderer> current)
-        {
-            if (current.Count != _registeredTargets.Count) return true;
-            for (int i = 0; i < current.Count; i++)
-                if (current[i] != _registeredTargets[i])
-                    return true;
-            return false;
+                var light = t.GetComponent<Light>();
+                if (light != null && (light.type == LightType.Spot || light.type == LightType.Point))
+                    return light;
+            }
+            return null;
         }
 
         /// <summary>
-        /// Builds donut-compatible SoA vertex buffer and uint32 index buffer for the given mesh.
-        /// VB layout: [Position: float3 × vc][Normal: RGB8_SNORM × vc][TexCoord: float2 × vc][Tangent: RGBA8_SNORM × vc]
-        /// IB layout: uint32 per index, same slot layout as Unity submesh indexStart.
-        /// Both returned as <c>GraphicsBuffer.Target.Raw</c> (ByteAddressBuffer).
+        /// Per-frame: write each proxy sub-instance's <c>AnalyticProxyLightIndex</c> from the current
+        /// frame's analytic-light map (Unity <see cref="Light"/> InstanceID → global light index).
+        /// Lights absent from the map (disabled/culled, or never collected) fall back to
+        /// RTXPT_INVALID_LIGHT_INDEX, which disables the proxy lookup for that frame.
+        ///
+        /// Must be called before the SubInstanceData re-upload performed by
+        /// <see cref="PrepareEmissiveTriangleTasks"/>, which is what pushes these writes to the GPU.
         /// </summary>
-        private (GraphicsBuffer vb, GraphicsBuffer ib) GetOrCreateDonutBuffers(Mesh src)
+        public void ResolveAnalyticProxyLights(IReadOnlyDictionary<int, uint> lightIndexMap)
         {
-            if (src == null) return (null, null);
-            int key = src.GetInstanceID();
-            if (_donutBufferCache.TryGetValue(key, out var cached)) return cached;
- 
-            int  vc         = src.vertexCount;
-            bool hasNormal  = src.HasVertexAttribute(VertexAttribute.Normal);
-            bool hasUV      = src.HasVertexAttribute(VertexAttribute.TexCoord0);
-            bool hasTangent = src.HasVertexAttribute(VertexAttribute.Tangent);
+            if (_subInstanceCpu == null || _proxySubInstances.Count == 0) return;
 
-            // ---- VB (SoA) ----
-            int vbBytes             = vc * 12; // position always present
-            if (hasNormal) vbBytes  += vc * 4; // RGB8_SNORM
-            if (hasUV) vbBytes      += vc * 8; // float2
-            if (hasTangent) vbBytes += vc * 4; // RGBA8_SNORM
-
-            var vbData = new byte[vbBytes];
-
-            // Position stream (float3, no compression)
-            Vector3[] positions = src.vertices;
-            int       writePos  = 0;
-            for (int i = 0; i < vc; i++)
+            const uint Invalid = 0xFFFFFFFFu;
+            foreach (var (subIdx, lightId) in _proxySubInstances)
             {
-                Buffer.BlockCopy(BitConverter.GetBytes(positions[i].x), 0, vbData, writePos, 4);
-                Buffer.BlockCopy(BitConverter.GetBytes(positions[i].y), 0, vbData, writePos + 4, 4);
-                Buffer.BlockCopy(BitConverter.GetBytes(positions[i].z), 0, vbData, writePos + 8, 4);
-                writePos += 12;
-            }
+                if (subIdx < 0 || subIdx >= _subInstanceCpu.Length) continue;
 
-            // Normal stream (RGB8_SNORM, 4 bytes each)
-            if (hasNormal)
-            {
-                Vector3[] normals = src.normals;
-                for (int i = 0; i < vc; i++)
+                uint globalIndex = Invalid;
+                if (lightId != 0 && lightIndexMap != null && lightIndexMap.TryGetValue(lightId, out var idx))
+                    globalIndex = idx;
+
+                if (_subInstanceCpu[subIdx].AnalyticProxyLightIndex != globalIndex)
                 {
-                    uint packed = PackRGB8Snorm(normals[i]);
-                    Buffer.BlockCopy(BitConverter.GetBytes(packed), 0, vbData, writePos, 4);
-                    writePos += 4;
+                    _subInstanceCpu[subIdx].AnalyticProxyLightIndex = globalIndex;
+                    _subInstanceCpuDirty = true;
                 }
             }
-
-            // TexCoord stream (float2, 8 bytes each)
-            if (hasUV)
-            {
-                Vector2[] uvs = src.uv;
-                for (int i = 0; i < vc; i++)
-                {
-                    Buffer.BlockCopy(BitConverter.GetBytes(uvs[i].x), 0, vbData, writePos, 4);
-                    Buffer.BlockCopy(BitConverter.GetBytes(uvs[i].y), 0, vbData, writePos + 4, 4);
-                    writePos += 8;
-                }
-            }
-
-            // Tangent stream (RGBA8_SNORM, 4 bytes each)
-            if (hasTangent)
-            {
-                Vector4[] tangents = src.tangents;
-                for (int i = 0; i < vc; i++)
-                {
-                    // todo 这里取反了
-                    uint packed = PackRGBA8Snorm(new Vector4(tangents[i].x, tangents[i].y, tangents[i].z, -tangents[i].w));
-                    Buffer.BlockCopy(BitConverter.GetBytes(packed), 0, vbData, writePos, 4);
-                    writePos += 4;
-                }
-            }
-
-            var vbUint = new uint[vbBytes / 4];
-            Buffer.BlockCopy(vbData, 0, vbUint, 0, vbBytes);
-            var vbGfx = new GraphicsBuffer(GraphicsBuffer.Target.Raw, vbBytes / 4, 4) { name = "VertexBuffer" };
-            vbGfx.SetData(vbUint);
-
-            // ---- IB (uint32, matching Unity submesh indexStart layout) ----
-            int totalIndexSlots = 0;
-            for (int s = 0; s < src.subMeshCount; s++)
-            {
-                var sub = src.GetSubMesh(s);
-                totalIndexSlots = Mathf.Max(totalIndexSlots, sub.indexStart + sub.indexCount);
-            }
-
-            var ibData = new uint[Mathf.Max(totalIndexSlots, 3)];
-            for (int s = 0; s < src.subMeshCount; s++)
-            {
-                var   sub    = src.GetSubMesh(s);
-                int[] subIdx = src.GetIndices(s, applyBaseVertex: true);
-                for (int k = 0; k < subIdx.Length; k++)
-                    ibData[sub.indexStart + k] = (uint)subIdx[k];
-            }
-
-            int ibBytes = ibData.Length * 4;
-            var ibGfx   = new GraphicsBuffer(GraphicsBuffer.Target.Raw, ibBytes / 4, 4) { name = "IndexBuffer" };
-            ibGfx.SetData(ibData);
-
-            var result = (vbGfx, ibGfx);
-            _donutBufferCache[key] = result;
-            return result;
         }
 
-        // Matches donut's dm::vectorToSnorm8 (vector.cpp) bit-for-bit: scale = 127/length,
-        // then TRUNCATE toward zero via (int) cast (donut uses int(v*scale), not rounding),
-        // and keep the low byte with &0xFF. This is what the original RTXPT importer
-        // (GltfImporter.cpp -> vectorToSnorm8) does, so normals/tangents quantize identically.
-        private static uint PackRGB8Snorm(Vector3 v)
+        /// <summary>
+        /// CPU-side emissive-triangle pass: mirrors <c>LightsBaker::ProcessEmissiveGeometry</c>.
+        /// Generates <see cref="RtxptEmissiveTrianglesProcTask"/> entries, uploads them to
+        /// <paramref name="scratchBuffer"/>, updates <c>SubInstanceData.EmissiveLightMappingOffset</c>
+        /// for emissive geometries, and re-uploads the sub-instance GPU buffer when anything
+        /// actually changed. Must be called on the main thread after <see cref="UpdateForFrame"/>
+        /// and before command-buffer recording (i.e. from a pass <c>Setup</c> method).
+        /// </summary>
+        /// <param name="lightOffset">Base index in lightsBuffer where triangle lights start
+        ///     (= EnvQtTotalNodeCount + analyticLightCount).</param>
+        /// <param name="scratchBuffer">Raw native buffer bound as u_scratchBuffer.
+        ///     Tasks are written at element offset 0 (each element = 4 bytes; tasks are 32 B each,
+        ///     so stride-8 within the raw buffer).</param>
+        public void PrepareEmissiveTriangleTasks(uint lightOffset, UploadBuffer scratchBuffer)
         {
-            float scale = 127.0f / Mathf.Sqrt(v.x * v.x + v.y * v.y + v.z * v.z);
-            int r = (int)(v.x * scale) & 0xFF;
-            int g = (int)(v.y * scale) & 0xFF;
-            int b = (int)(v.z * scale) & 0xFF;
-            return (uint)(r | (g << 8) | (b << 16));
-        }
+            if (_instanceCpu == null || _subInstanceCpu == null || _ptMaterialCpu == null)
+            {
+                LastEmissiveTaskCount     = 0;
+                LastEmissiveTriangleCount = 0u;
+                return;
+            }
 
-        private static uint PackRGBA8Snorm(Vector4 v)
-        {
-            // donut scales all four channels by 127/length(xyz) (w shares the xyz-based scale).
-            float scale = 127.0f / Mathf.Sqrt(v.x * v.x + v.y * v.y + v.z * v.z);
-            int r = (int)(v.x * scale) & 0xFF;
-            int g = (int)(v.y * scale) & 0xFF;
-            int b = (int)(v.z * scale) & 0xFF;
-            int a = (int)(v.w * scale) & 0xFF;
-            return (uint)(r | (g << 8) | (b << 16) | (a << 24));
+            const uint Invalid       = 0xFFFFFFFFu;
+            const uint MaxTriPerTask = 32u;
+
+            var newHistoric = _emissiveHistoricScratch;
+            newHistoric.Clear();
+            int  taskIdx        = 0;
+            uint accumTriangles = 0u;
+
+            foreach (var e in _emissiveCache)
+            {
+                if (taskIdx >= MaxEmissiveProcTasks)
+                {
+                    Debug.LogWarning("[NativeRtxptGPUScene] EmissiveTrianglesProcTask overflow — some emissive geometry ignored.");
+                    break;
+                }
+
+                uint triCount = e.TriangleCount;
+                uint destBase = lightOffset + accumTriangles;
+
+                // Overflow guard
+                if (destBase + triCount > NativeRtxptBufferResources.MaxLights)
+                {
+                    Debug.LogWarning($"[NativeRtxptGPUScene] MaxLights overflow at emissive geometry (inst={e.InstanceIndex}, geom={e.GeometrySubIndex}) — skipping.");
+                    break;
+                }
+
+                if (!_emissiveHistoricOffsets.TryGetValue((e.InstanceIndex, e.GeometrySubIndex), out uint historicBase))
+                    historicBase = Invalid;
+
+                // Update SubInstanceData.EmissiveLightMappingOffset
+                int siIdx = (int)(e.FirstGeometryInstanceIndex + (uint)e.GeometrySubIndex);
+                if (siIdx >= 0 && siIdx < _subInstanceCpu.Length &&
+                    _subInstanceCpu[siIdx].EmissiveLightMappingOffset != destBase)
+                {
+                    _subInstanceCpu[siIdx].EmissiveLightMappingOffset = destBase;
+                    _subInstanceCpuDirty = true;
+                }
+
+                // Split into tasks of at most MaxTriPerTask triangles.
+                // Each task writes to DestinationBufferOffset + subIndex (0..31), so successive
+                // tasks must each advance the offset by MaxTriPerTask to avoid aliasing.
+                for (uint from = 0u; from < triCount && taskIdx < MaxEmissiveProcTasks; from += MaxTriPerTask)
+                {
+                    uint to = Math.Min(from + MaxTriPerTask, triCount);
+                    s_emissiveTaskStaging[taskIdx++] = new RtxptEmissiveTrianglesProcTask
+                    {
+                        InstanceIndex              = (uint)e.InstanceIndex,
+                        GeometryIndex              = (uint)e.GeometrySubIndex,
+                        TriangleIndexFrom          = from,
+                        TriangleIndexTo            = to,
+                        DestinationBufferOffset    = destBase + from,   // each task owns its own 32-slot window
+                        HistoricBufferOffset       = (historicBase != Invalid) ? historicBase + from : Invalid,
+                        EmissiveLightMappingOffset = (uint)siIdx,
+                        Padding0                   = 0u,
+                    };
+                }
+
+                newHistoric[(e.InstanceIndex, e.GeometrySubIndex)] = destBase;
+                accumTriangles += triCount;
+            }
+
+            // Swap historic offsets for next frame (no per-frame dictionary allocation).
+            (_emissiveHistoricOffsets, _emissiveHistoricScratch) = (newHistoric, _emissiveHistoricOffsets);
+
+            // Re-upload SubInstanceData only when an offset or proxy-light index actually
+            // changed this frame. Pointer is stable; the GPU copy is recorded by
+            // FlushSubInstanceBuffer(cmd) in the lighting pass.
+            if (_subInstanceCpuDirty && _subInstanceGpuBuf != null)
+            {
+                _subInstanceGpuBuf.SetData(_subInstanceCpu, 0, _subInstanceCpu.Length);
+                _subInstanceCpuDirty = false;
+            }
+
+            // Upload task array to scratch buffer (raw buffer, stride = 4 bytes, tasks = 8 uints each).
+            if (taskIdx > 0 && scratchBuffer != null)
+                scratchBuffer.SetRawData(s_emissiveTaskStaging, 0, 0, taskIdx);
+
+            LastEmissiveTaskCount     = taskIdx;
+            LastEmissiveTriangleCount = accumTriangles;
         }
     }
 }
