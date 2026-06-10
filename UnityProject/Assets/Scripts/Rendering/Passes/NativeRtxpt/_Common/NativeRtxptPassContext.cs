@@ -46,6 +46,9 @@ namespace PathTracing
         // ── Inspector settings snapshot ───────────────────────────────────────
         public NativeRtxptSetting Setting;
 
+        private Texture lastEnvironmentMap;
+        public  IntPtr  environmentMapPtrPtr;
+
         // ── Shared scene light list ───────────────────────────────────────────
         /// <summary>
         /// All scene lights, gathered once per frame by <see cref="NativeRtxptFeature"/> and shared
@@ -94,30 +97,39 @@ namespace PathTracing
         // ── Baked env map (filled by NativeRtxptEnvMapBakerPass each frame) ─────
         /// <summary>Baked 256×256 cubemap mip0. Bound as t_EnvironmentMap (TextureCube).</summary>
         public IntPtr BakedEnvCubePtr;
+
         /// <summary>1024×1024 flat importance map (R32F). Single-channel luminance/importance only.</summary>
         public IntPtr EnvImportanceMapPtr;
+
         /// <summary>1024×1024 combined radiance+importance map (RGBA16F, rgb=radiance, a=luminance).
         /// This is what LightsBaker shaders expect as t_envRadianceAndImportanceMap.</summary>
         public IntPtr EnvRadianceAndImportanceMapPtr;
+
         /// <summary>1024×1024 env-light lookup map (R32_UINT). Filled by EnvLightsFillLookupMap. Bound as t_EnvLookupMap (t18).</summary>
         public IntPtr EnvLightLookupMapPtr;
 
         // ── NEE-AT feedback texture pointers ─────────────────────────────────
         /// <summary>u_feedbackTotalWeight (u11) — main reservoir working surface (R32_FLOAT).</summary>
         public IntPtr FeedbackTotalWeightPtr;
+
         /// <summary>u_feedbackCandidates (u12) — main reservoir working surface (R32_UINT).</summary>
         public IntPtr FeedbackCandidatesPtr;
+
         /// <summary>u_feedbackTotalWeightScratch (u13) — scratch reprojection surface (R32_FLOAT).</summary>
         public IntPtr FeedbackTotalWeightScratchPtr;
+
         /// <summary>u_feedbackCandidatesScratch (u14) — scratch reprojection surface (R32_UINT).</summary>
         public IntPtr FeedbackCandidatesScratchPtr;
+
         /// <summary>u_feedbackTotalWeightBlended (u15) — blended early-feedback surface (R32_FLOAT, half-res).</summary>
         public IntPtr FeedbackTotalWeightBlendedPtr;
+
         /// <summary>u_feedbackCandidatesBlended (u16) — blended early-feedback surface (R32_UINT, half-res).</summary>
         public IntPtr FeedbackCandidatesBlendedPtr;
+
         /// <summary>u_historyDepth (u17) — NEE-AT per-pixel history depth / confidence (R32_FLOAT).</summary>
         public IntPtr NEEATHistoryDepthPtr;
- 
+
         public IntPtr blackTexturePtr;
 
         // ── Factory ───────────────────────────────────────────────────────────
@@ -154,12 +166,23 @@ namespace PathTracing
             // Path tracer samples the BC6H-compressed cube when compression is enabled (mirrors the
             // original GetEnvMapCube() returning m_cubemapBC6H once m_outputIsCompressed). The
             // importance/radiance baker still reads the uncompressed RGBA16F cube directly.
-            BakedEnvCubePtr                = (NativeRtxptEnvMapBakerPass.EnableBC6UCompression && Textures.EnvCubemapBC6H != IntPtr.Zero)
-                                             ? Textures.EnvCubemapBC6H
-                                             : Textures.EnvCubemap.NativePtr;
+            BakedEnvCubePtr = (NativeRtxptEnvMapBakerPass.EnableBC6UCompression && Textures.EnvCubemapBC6H != IntPtr.Zero)
+                ? Textures.EnvCubemapBC6H
+                : Textures.EnvCubemap.NativePtr;
             EnvImportanceMapPtr            = Textures.EnvImportanceMap.NativePtr;
             EnvRadianceAndImportanceMapPtr = Textures.EnvRadianceMap.NativePtr;
             EnvLightLookupMapPtr           = Textures.EnvLightLookupMap.NativePtr;
+
+
+            if (Setting.environmentMap == null)
+            {
+                environmentMapPtrPtr = IntPtr.Zero;
+            }
+            else if (lastEnvironmentMap != Setting.environmentMap)
+            {
+                environmentMapPtrPtr = Setting.environmentMap.GetNativeTexturePtr();
+                lastEnvironmentMap   = Setting.environmentMap;
+            }
         }
     }
 }

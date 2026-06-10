@@ -296,9 +296,8 @@ namespace PathTracing
             pd.EnvBakerCb        = _ctx.Buffers.EnvBakerCb;
             pd.ImportanceBakerCb = _ctx.Buffers.ImportanceBakerCb;
             pd.EnvBakerCbData    = s_envBakerCb;
-            pd.ImportanceCbData  = s_importanceCb;
-            var skyTex = _ctx.Setting?.environmentMap;
-            pd.SkyTexturePtr     = skyTex != null ? skyTex.GetNativeTexturePtr() : _ctx.blackTexturePtr;
+            pd.ImportanceCbData  = s_importanceCb; 
+            pd.SkyTexturePtr     = _ctx.environmentMapPtrPtr != IntPtr.Zero ? _ctx.environmentMapPtrPtr : _ctx.blackTexturePtr;
             pd.EnvCubePtr        = _ctx.Textures.EnvCubemap.NativePtr;
             pd.ImportanceMapPtr  = _ctx.Textures.EnvImportanceMap.NativePtr;
             pd.RadianceMapPtr    = _ctx.Textures.EnvRadianceMap.NativePtr;

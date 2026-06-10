@@ -198,6 +198,7 @@ namespace PathTracing
             _depthBarrierFixPass      ??= new DepthBarrierFixPass { renderPassEvent                                                                                                     = RenderPassEvent.AfterRendering };
         }
 
+        private NativeRtxptPassContext passCtx;
         public override void AddRenderPasses(ScriptableRenderer renderer, ref RenderingData renderingData)
         {
             var cam = renderingData.cameraData.camera;
@@ -305,19 +306,19 @@ namespace PathTracing
             var sceneLights = UnityEngine.Object.FindObjectsByType<Light>(FindObjectsSortMode.None);
 
             // ---- Build shared pass context ----------------------------------
-            var passCtx = new NativeRtxptPassContext
-            {
-                ConstantBuffer    = constantBuffer,
-                GpuScene          = _gpuScene,
-                Textures          = texPool,
-                Buffers           = bufPool,
-                RenderResolution  = renderResolution,
-                DisplayResolution = displayResolution,
-                FrameState        = frameState,
-                Setting           = setting,
-                SceneLights       = sceneLights,
-                blackTexturePtr   = blackTexturePtr,
-            };
+            passCtx ??= new NativeRtxptPassContext();
+            
+            passCtx.ConstantBuffer    = constantBuffer;
+            passCtx.GpuScene          = _gpuScene;
+            passCtx.Textures          = texPool;
+            passCtx.Buffers           = bufPool;
+            passCtx.RenderResolution  = renderResolution;
+            passCtx.DisplayResolution = displayResolution;
+            passCtx.FrameState        = frameState;
+            passCtx.Setting           = setting;
+            passCtx.SceneLights       = sceneLights;
+            passCtx.blackTexturePtr   = blackTexturePtr;
+            
             passCtx.ResolveNativePtrs();
 
             // ---- Phase 0: TLAS ---------------------------------------------
