@@ -4920,9 +4920,6 @@
             "doubleSided" : true,
             "extensions" : {
                 "KHR_materials_specular" : {
-                    "specularColorTexture" : {
-                        "index" : 0
-                    },
                     "specularColorFactor" : [
                         2.371357614441398,
                         2.371357614441398,
@@ -4935,12 +4932,12 @@
             },
             "name" : "Plates_Ceramic_MDL",
             "normalTexture" : {
-                "index" : 1,
+                "index" : 0,
                 "scale" : 0
             },
             "pbrMetallicRoughness" : {
                 "baseColorTexture" : {
-                    "index" : 2
+                    "index" : 1
                 },
                 "metallicFactor" : 0,
                 "roughnessFactor" : 0
@@ -4964,9 +4961,6 @@
             "doubleSided" : true,
             "extensions" : {
                 "KHR_materials_specular" : {
-                    "specularColorTexture" : {
-                        "index" : 3
-                    },
                     "specularColorFactor" : [
                         1.776193385899288,
                         1.776193385899288,
@@ -4979,14 +4973,14 @@
             },
             "name" : "Bread_Container_MDL_Bake",
             "normalTexture" : {
-                "index" : 4
+                "index" : 2
             },
             "pbrMetallicRoughness" : {
                 "baseColorTexture" : {
-                    "index" : 5
+                    "index" : 3
                 },
                 "metallicRoughnessTexture" : {
-                    "index" : 6
+                    "index" : 4
                 },
                 "roughnessFactor" : 0.5
             }
@@ -4995,9 +4989,6 @@
             "doubleSided" : true,
             "extensions" : {
                 "KHR_materials_specular" : {
-                    "specularColorTexture" : {
-                        "index" : 7
-                    },
                     "specularColorFactor" : [
                         2.334159991501444,
                         2.334159991501444,
@@ -5011,10 +5002,10 @@
             "name" : "Aluminum_Handles_MDL",
             "pbrMetallicRoughness" : {
                 "baseColorTexture" : {
-                    "index" : 8
+                    "index" : 5
                 },
                 "metallicRoughnessTexture" : {
-                    "index" : 9
+                    "index" : 6
                 },
                 "roughnessFactor" : 0.2590909004211426
             }
@@ -5023,9 +5014,6 @@
             "doubleSided" : true,
             "extensions" : {
                 "KHR_materials_specular" : {
-                    "specularColorTexture" : {
-                        "index" : 10
-                    },
                     "specularColorFactor" : [
                         1.794792409385157,
                         1.794792409385157,
@@ -5038,14 +5026,14 @@
             },
             "name" : "Counter_Cabinets_MDL",
             "normalTexture" : {
-                "index" : 11
+                "index" : 7
             },
             "pbrMetallicRoughness" : {
                 "baseColorTexture" : {
-                    "index" : 12
+                    "index" : 8
                 },
                 "metallicRoughnessTexture" : {
-                    "index" : 13
+                    "index" : 9
                 },
                 "roughnessFactor" : 0.5
             }
@@ -5078,9 +5066,6 @@
             "doubleSided" : true,
             "extensions" : {
                 "KHR_materials_specular" : {
-                    "specularColorTexture" : {
-                        "index" : 14
-                    },
                     "specularColorFactor" : [
                         1.0973341877184437,
                         1.0973341877184437,
@@ -5093,7 +5078,7 @@
             },
             "name" : "Light_Exterior_MDL",
             "normalTexture" : {
-                "index" : 15
+                "index" : 10
             },
             "pbrMetallicRoughness" : {
                 "baseColorFactor" : [
@@ -5110,9 +5095,6 @@
             "doubleSided" : true,
             "extensions" : {
                 "KHR_materials_specular" : {
-                    "specularColorTexture" : {
-                        "index" : 16
-                    },
                     "specularColorFactor" : [
                         1.831990173669039,
                         1.831990173669039,
@@ -5125,11 +5107,11 @@
             },
             "name" : "Counter_Top_PBR",
             "normalTexture" : {
-                "index" : 17
+                "index" : 11
             },
             "pbrMetallicRoughness" : {
                 "baseColorTexture" : {
-                    "index" : 18
+                    "index" : 12
                 },
                 "metallicFactor" : 0,
                 "roughnessFactor" : 0.7590909004211426
@@ -5138,18 +5120,14 @@
         {
             "doubleSided" : true,
             "extensions" : {
-                "KHR_materials_specular" : {
-                    "specularColorTexture" : {
-                        "index" : 19
-                    }
-                },
+                "KHR_materials_specular" : {},
                 "KHR_materials_ior" : {
                     "ior" : 1.4500000476837158
                 }
             },
             "name" : "Hand_Towel_MDL",
             "normalTexture" : {
-                "index" : 20
+                "index" : 13
             },
             "pbrMetallicRoughness" : {
                 "baseColorFactor" : [
@@ -5159,7 +5137,7 @@
                     1
                 ],
                 "metallicRoughnessTexture" : {
-                    "index" : 21
+                    "index" : 14
                 },
                 "roughnessFactor" : 0.5
             }
@@ -5168,15 +5146,15 @@
             "doubleSided" : true,
             "name" : "Cookbook_Cover_MDL",
             "normalTexture" : {
-                "index" : 22
+                "index" : 15
             },
             "pbrMetallicRoughness" : {
                 "baseColorTexture" : {
-                    "index" : 23
+                    "index" : 16
                 },
                 "metallicFactor" : 0,
                 "metallicRoughnessTexture" : {
-                    "index" : 24
+                    "index" : 17
                 }
             }
         },
@@ -5184,15 +5162,15 @@
             "doubleSided" : true,
             "name" : "Page_02_MDL",
             "normalTexture" : {
-                "index" : 25
+                "index" : 18
             },
             "pbrMetallicRoughness" : {
                 "baseColorTexture" : {
-                    "index" : 26
+                    "index" : 19
                 },
                 "metallicFactor" : 0,
                 "metallicRoughnessTexture" : {
-                    "index" : 27
+                    "index" : 20
                 }
             }
         },
@@ -5200,15 +5178,15 @@
             "doubleSided" : true,
             "name" : "Page_01_MDL",
             "normalTexture" : {
-                "index" : 28
+                "index" : 21
             },
             "pbrMetallicRoughness" : {
                 "baseColorTexture" : {
-                    "index" : 29
+                    "index" : 22
                 },
                 "metallicFactor" : 0,
                 "metallicRoughnessTexture" : {
-                    "index" : 30
+                    "index" : 23
                 }
             }
         },
@@ -5228,12 +5206,12 @@
             },
             "name" : "Cutting_Board_MDL",
             "normalTexture" : {
-                "index" : 31,
+                "index" : 24,
                 "scale" : 2
             },
             "pbrMetallicRoughness" : {
                 "baseColorTexture" : {
-                    "index" : 32
+                    "index" : 25
                 },
                 "metallicFactor" : 0,
                 "roughnessFactor" : 0.5
@@ -5243,9 +5221,6 @@
             "doubleSided" : true,
             "extensions" : {
                 "KHR_materials_specular" : {
-                    "specularColorTexture" : {
-                        "index" : 33
-                    },
                     "specularColorFactor" : [
                         1.8040918504561276,
                         1.8040918504561276,
@@ -5258,14 +5233,14 @@
             },
             "name" : "Island_Cabinets_MDL",
             "normalTexture" : {
-                "index" : 34
+                "index" : 26
             },
             "pbrMetallicRoughness" : {
                 "baseColorTexture" : {
-                    "index" : 35
+                    "index" : 27
                 },
                 "metallicRoughnessTexture" : {
-                    "index" : 36
+                    "index" : 28
                 },
                 "roughnessFactor" : 0.5
             }
@@ -5274,9 +5249,6 @@
             "doubleSided" : true,
             "extensions" : {
                 "KHR_materials_specular" : {
-                    "specularColorTexture" : {
-                        "index" : 37
-                    },
                     "specularColorFactor" : [
                         1.2926224502088235,
                         1.2926224502088235,
@@ -5289,15 +5261,15 @@
             },
             "name" : "Pots_MDL",
             "normalTexture" : {
-                "index" : 38,
+                "index" : 29,
                 "scale" : 0.05000000074505806
             },
             "pbrMetallicRoughness" : {
                 "baseColorTexture" : {
-                    "index" : 39
+                    "index" : 30
                 },
                 "metallicRoughnessTexture" : {
-                    "index" : 40
+                    "index" : 31
                 }
             }
         },
@@ -5305,9 +5277,6 @@
             "doubleSided" : true,
             "extensions" : {
                 "KHR_materials_specular" : {
-                    "specularColorTexture" : {
-                        "index" : 41
-                    },
                     "specularColorFactor" : [
                         1.5158090359121148,
                         1.5158090359121148,
@@ -5320,14 +5289,14 @@
             },
             "name" : "Mahogany_Handles_MDL",
             "normalTexture" : {
-                "index" : 42
+                "index" : 32
             },
             "pbrMetallicRoughness" : {
                 "baseColorTexture" : {
-                    "index" : 43
+                    "index" : 33
                 },
                 "metallicRoughnessTexture" : {
-                    "index" : 44
+                    "index" : 34
                 },
                 "roughnessFactor" : 0.5
             }
@@ -5336,15 +5305,15 @@
             "doubleSided" : true,
             "name" : "Carrot_MDL",
             "normalTexture" : {
-                "index" : 45
+                "index" : 35
             },
             "pbrMetallicRoughness" : {
                 "baseColorTexture" : {
-                    "index" : 46
+                    "index" : 36
                 },
                 "metallicFactor" : 0,
                 "metallicRoughnessTexture" : {
-                    "index" : 47
+                    "index" : 37
                 }
             }
         },
@@ -5364,15 +5333,15 @@
             },
             "name" : "Mushroom_Sliced_MDL",
             "normalTexture" : {
-                "index" : 48
+                "index" : 38
             },
             "pbrMetallicRoughness" : {
                 "baseColorTexture" : {
-                    "index" : 49
+                    "index" : 39
                 },
                 "metallicFactor" : 0,
                 "metallicRoughnessTexture" : {
-                    "index" : 50
+                    "index" : 40
                 }
             }
         },
@@ -5392,15 +5361,15 @@
             },
             "name" : "Mushroom_Whole_MDL",
             "normalTexture" : {
-                "index" : 51
+                "index" : 41
             },
             "pbrMetallicRoughness" : {
                 "baseColorTexture" : {
-                    "index" : 52
+                    "index" : 42
                 },
                 "metallicFactor" : 0,
                 "metallicRoughnessTexture" : {
-                    "index" : 53
+                    "index" : 43
                 }
             }
         },
@@ -5408,15 +5377,15 @@
             "doubleSided" : true,
             "name" : "Pepper_Red_MDL",
             "normalTexture" : {
-                "index" : 54
+                "index" : 44
             },
             "pbrMetallicRoughness" : {
                 "baseColorTexture" : {
-                    "index" : 55
+                    "index" : 45
                 },
                 "metallicFactor" : 0,
                 "metallicRoughnessTexture" : {
-                    "index" : 56
+                    "index" : 46
                 }
             }
         },
@@ -5424,7 +5393,7 @@
             "doubleSided" : true,
             "name" : "Pepper_Stem_MDL",
             "normalTexture" : {
-                "index" : 57
+                "index" : 47
             },
             "pbrMetallicRoughness" : {
                 "baseColorFactor" : [
@@ -5435,7 +5404,7 @@
                 ],
                 "metallicFactor" : 0,
                 "metallicRoughnessTexture" : {
-                    "index" : 58
+                    "index" : 48
                 }
             }
         },
@@ -5443,15 +5412,15 @@
             "doubleSided" : true,
             "name" : "Pepper_Green_MDL",
             "normalTexture" : {
-                "index" : 59
+                "index" : 49
             },
             "pbrMetallicRoughness" : {
                 "baseColorTexture" : {
-                    "index" : 60
+                    "index" : 50
                 },
                 "metallicFactor" : 0,
                 "metallicRoughnessTexture" : {
-                    "index" : 61
+                    "index" : 51
                 }
             }
         },
@@ -5459,15 +5428,15 @@
             "doubleSided" : true,
             "name" : "Pepper_Orange_MDL",
             "normalTexture" : {
-                "index" : 62
+                "index" : 52
             },
             "pbrMetallicRoughness" : {
                 "baseColorTexture" : {
-                    "index" : 63
+                    "index" : 53
                 },
                 "metallicFactor" : 0,
                 "metallicRoughnessTexture" : {
-                    "index" : 64
+                    "index" : 54
                 }
             }
         },
@@ -5475,15 +5444,15 @@
             "doubleSided" : true,
             "name" : "Tomatoes_MDL",
             "normalTexture" : {
-                "index" : 65
+                "index" : 55
             },
             "pbrMetallicRoughness" : {
                 "baseColorTexture" : {
-                    "index" : 66
+                    "index" : 56
                 },
                 "metallicFactor" : 0,
                 "metallicRoughnessTexture" : {
-                    "index" : 67
+                    "index" : 57
                 }
             }
         },
@@ -5491,9 +5460,6 @@
             "doubleSided" : true,
             "extensions" : {
                 "KHR_materials_specular" : {
-                    "specularColorTexture" : {
-                        "index" : 68
-                    },
                     "specularColorFactor" : [
                         1.9063857022368027,
                         1.9063857022368027,
@@ -5506,14 +5472,14 @@
             },
             "name" : "Microwave_MDL",
             "normalTexture" : {
-                "index" : 69
+                "index" : 58
             },
             "pbrMetallicRoughness" : {
                 "baseColorTexture" : {
-                    "index" : 70
+                    "index" : 59
                 },
                 "metallicRoughnessTexture" : {
-                    "index" : 71
+                    "index" : 60
                 },
                 "roughnessFactor" : 0.5
             }
@@ -5566,9 +5532,6 @@
             "doubleSided" : true,
             "extensions" : {
                 "KHR_materials_specular" : {
-                    "specularColorTexture" : {
-                        "index" : 72
-                    },
                     "specularColorFactor" : [
                         2.3527588736433853,
                         2.3527588736433853,
@@ -5588,7 +5551,7 @@
                     1
                 ],
                 "metallicRoughnessTexture" : {
-                    "index" : 73
+                    "index" : 61
                 },
                 "roughnessFactor" : 0.5
             }
@@ -5597,9 +5560,6 @@
             "doubleSided" : true,
             "extensions" : {
                 "KHR_materials_specular" : {
-                    "specularColorTexture" : {
-                        "index" : 74
-                    },
                     "specularColorFactor" : [
                         1.2926224502088235,
                         1.2926224502088235,
@@ -5612,7 +5572,7 @@
             },
             "name" : "Kettle_MDL",
             "normalTexture" : {
-                "index" : 75,
+                "index" : 62,
                 "scale" : 0.05000000074505806
             },
             "pbrMetallicRoughness" : {
@@ -5623,7 +5583,7 @@
                     1
                 ],
                 "metallicRoughnessTexture" : {
-                    "index" : 76
+                    "index" : 63
                 }
             }
         },
@@ -5631,9 +5591,6 @@
             "doubleSided" : true,
             "extensions" : {
                 "KHR_materials_specular" : {
-                    "specularColorTexture" : {
-                        "index" : 77
-                    },
                     "specularColorFactor" : [
                         2.0644762004433006,
                         2.0644762004433006,
@@ -5646,7 +5603,7 @@
             },
             "name" : "Stove_MDL",
             "normalTexture" : {
-                "index" : 78
+                "index" : 64
             },
             "pbrMetallicRoughness" : {
                 "baseColorFactor" : [
@@ -5656,32 +5613,28 @@
                     1
                 ],
                 "metallicRoughnessTexture" : {
-                    "index" : 79
+                    "index" : 65
                 }
             }
         },
         {
             "doubleSided" : true,
             "extensions" : {
-                "KHR_materials_specular" : {
-                    "specularColorTexture" : {
-                        "index" : 80
-                    }
-                },
+                "KHR_materials_specular" : {},
                 "KHR_materials_ior" : {
                     "ior" : 1.4500000476837158
                 }
             },
             "name" : "Pot_Handles_MDL",
             "normalTexture" : {
-                "index" : 81
+                "index" : 66
             },
             "pbrMetallicRoughness" : {
                 "baseColorTexture" : {
-                    "index" : 82
+                    "index" : 67
                 },
                 "metallicRoughnessTexture" : {
-                    "index" : 83
+                    "index" : 68
                 }
             }
         },
@@ -5701,16 +5654,16 @@
             },
             "name" : "Burner_Metal_MDL",
             "normalTexture" : {
-                "index" : 84,
+                "index" : 69,
                 "scale" : 0.5
             },
             "pbrMetallicRoughness" : {
                 "baseColorTexture" : {
-                    "index" : 85
+                    "index" : 70
                 },
                 "metallicFactor" : 0.7045454382896423,
                 "metallicRoughnessTexture" : {
-                    "index" : 86
+                    "index" : 71
                 }
             }
         },
@@ -5730,16 +5683,16 @@
             },
             "name" : "Stove_Grate_MDL",
             "normalTexture" : {
-                "index" : 87,
+                "index" : 72,
                 "scale" : 0.5
             },
             "pbrMetallicRoughness" : {
                 "baseColorTexture" : {
-                    "index" : 88
+                    "index" : 73
                 },
                 "metallicFactor" : 0.7045454382896423,
                 "metallicRoughnessTexture" : {
-                    "index" : 89
+                    "index" : 74
                 }
             }
         },
@@ -5775,9 +5728,6 @@
             "doubleSided" : true,
             "extensions" : {
                 "KHR_materials_specular" : {
-                    "specularColorTexture" : {
-                        "index" : 90
-                    },
                     "specularColorFactor" : [
                         1.8412896147400095,
                         1.8412896147400095,
@@ -5791,10 +5741,10 @@
             "name" : "Range_Hood_MDL",
             "pbrMetallicRoughness" : {
                 "baseColorTexture" : {
-                    "index" : 91
+                    "index" : 75
                 },
                 "metallicRoughnessTexture" : {
-                    "index" : 92
+                    "index" : 76
                 }
             }
         },
@@ -5802,9 +5752,6 @@
             "doubleSided" : true,
             "extensions" : {
                 "KHR_materials_specular" : {
-                    "specularColorTexture" : {
-                        "index" : 93
-                    },
                     "specularColorFactor" : [
                         1.8040918504561276,
                         1.8040918504561276,
@@ -5817,14 +5764,14 @@
             },
             "name" : "Table_Wood_MDL",
             "normalTexture" : {
-                "index" : 94
+                "index" : 77
             },
             "pbrMetallicRoughness" : {
                 "baseColorTexture" : {
-                    "index" : 95
+                    "index" : 78
                 },
                 "metallicRoughnessTexture" : {
-                    "index" : 96
+                    "index" : 79
                 },
                 "roughnessFactor" : 0.12272727489471436
             }
@@ -5832,25 +5779,21 @@
         {
             "doubleSided" : true,
             "extensions" : {
-                "KHR_materials_specular" : {
-                    "specularColorTexture" : {
-                        "index" : 97
-                    }
-                },
+                "KHR_materials_specular" : {},
                 "KHR_materials_ior" : {
                     "ior" : 1.4500000476837158
                 }
             },
             "name" : "Chair_Cushion_MDL",
             "normalTexture" : {
-                "index" : 98
+                "index" : 80
             },
             "pbrMetallicRoughness" : {
                 "baseColorTexture" : {
-                    "index" : 99
+                    "index" : 81
                 },
                 "metallicRoughnessTexture" : {
-                    "index" : 100
+                    "index" : 82
                 },
                 "roughnessFactor" : 0.7772727012634277
             }
@@ -5871,15 +5814,15 @@
             },
             "name" : "Placemats_MDL",
             "normalTexture" : {
-                "index" : 101,
+                "index" : 83,
                 "scale" : 2
             },
             "pbrMetallicRoughness" : {
                 "baseColorTexture" : {
-                    "index" : 102
+                    "index" : 84
                 },
                 "metallicRoughnessTexture" : {
-                    "index" : 103
+                    "index" : 85
                 }
             }
         },
@@ -5887,9 +5830,6 @@
             "doubleSided" : true,
             "extensions" : {
                 "KHR_materials_specular" : {
-                    "specularColorTexture" : {
-                        "index" : 104
-                    },
                     "specularColorFactor" : [
                         1.831990173669039,
                         1.831990173669039,
@@ -5902,14 +5842,14 @@
             },
             "name" : "Table_MDL",
             "normalTexture" : {
-                "index" : 105
+                "index" : 86
             },
             "pbrMetallicRoughness" : {
                 "baseColorTexture" : {
-                    "index" : 106
+                    "index" : 87
                 },
                 "metallicRoughnessTexture" : {
-                    "index" : 107
+                    "index" : 88
                 },
                 "roughnessFactor" : 0.5
             }
@@ -5918,9 +5858,6 @@
             "doubleSided" : true,
             "extensions" : {
                 "KHR_materials_specular" : {
-                    "specularColorTexture" : {
-                        "index" : 108
-                    },
                     "specularColorFactor" : [
                         1.8040918504561276,
                         1.8040918504561276,
@@ -5933,14 +5870,14 @@
             },
             "name" : "Window_Wood_MDL",
             "normalTexture" : {
-                "index" : 109
+                "index" : 89
             },
             "pbrMetallicRoughness" : {
                 "baseColorTexture" : {
-                    "index" : 110
+                    "index" : 90
                 },
                 "metallicRoughnessTexture" : {
-                    "index" : 111
+                    "index" : 91
                 },
                 "roughnessFactor" : 0.12272727489471436
             }
@@ -5949,9 +5886,6 @@
             "doubleSided" : true,
             "extensions" : {
                 "KHR_materials_specular" : {
-                    "specularColorTexture" : {
-                        "index" : 112
-                    },
                     "specularColorFactor" : [
                         1.0787353055765028,
                         1.0787353055765028,
@@ -5964,14 +5898,14 @@
             },
             "name" : "Walls_MDL",
             "normalTexture" : {
-                "index" : 113
+                "index" : 92
             },
             "pbrMetallicRoughness" : {
                 "baseColorTexture" : {
-                    "index" : 114
+                    "index" : 93
                 },
                 "metallicRoughnessTexture" : {
-                    "index" : 115
+                    "index" : 94
                 },
                 "roughnessFactor" : 0.5909090042114258
             }
@@ -5980,9 +5914,6 @@
             "doubleSided" : true,
             "extensions" : {
                 "KHR_materials_specular" : {
-                    "specularColorTexture" : {
-                        "index" : 116
-                    },
                     "specularColorFactor" : [
                         1.8505890558109799,
                         1.8505890558109799,
@@ -5995,14 +5926,14 @@
             },
             "name" : "Floor_MDL",
             "normalTexture" : {
-                "index" : 117
+                "index" : 95
             },
             "pbrMetallicRoughness" : {
                 "baseColorTexture" : {
-                    "index" : 118
+                    "index" : 96
                 },
                 "metallicRoughnessTexture" : {
-                    "index" : 119
+                    "index" : 97
                 },
                 "roughnessFactor" : 0.4909090995788574
             }
@@ -6011,9 +5942,6 @@
             "doubleSided" : true,
             "extensions" : {
                 "KHR_materials_specular" : {
-                    "specularColorTexture" : {
-                        "index" : 120
-                    },
                     "specularColorFactor" : [
                         2.3527588736433853,
                         2.3527588736433853,
@@ -6027,10 +5955,10 @@
             "name" : "Backsplash_Tile_MDL",
             "pbrMetallicRoughness" : {
                 "baseColorTexture" : {
-                    "index" : 121
+                    "index" : 98
                 },
                 "metallicRoughnessTexture" : {
-                    "index" : 122
+                    "index" : 99
                 },
                 "roughnessFactor" : 0.12272727489471436
             }
@@ -6038,11 +5966,7 @@
         {
             "doubleSided" : true,
             "extensions" : {
-                "KHR_materials_specular" : {
-                    "specularColorTexture" : {
-                        "index" : 123
-                    }
-                },
+                "KHR_materials_specular" : {},
                 "KHR_materials_ior" : {
                     "ior" : 1.4500000476837158
                 }
@@ -6050,10 +5974,10 @@
             "name" : "Window_Blinds_MDL",
             "pbrMetallicRoughness" : {
                 "baseColorTexture" : {
-                    "index" : 124
+                    "index" : 100
                 },
                 "metallicRoughnessTexture" : {
-                    "index" : 125
+                    "index" : 101
                 },
                 "roughnessFactor" : 0.12272727489471436
             }
@@ -11469,10 +11393,6 @@
         },
         {
             "sampler" : 0,
-            "source" : 37
-        },
-        {
-            "sampler" : 0,
             "source" : 74
         },
         {
@@ -11490,10 +11410,6 @@
         {
             "sampler" : 0,
             "source" : 78
-        },
-        {
-            "sampler" : 0,
-            "source" : 19
         },
         {
             "sampler" : 0,
@@ -11586,102 +11502,9 @@
         {
             "sampler" : 0,
             "source" : 101
-        },
-        {
-            "sampler" : 0,
-            "source" : 16
-        },
-        {
-            "sampler" : 0,
-            "source" : 102
-        },
-        {
-            "sampler" : 0,
-            "source" : 103
-        },
-        {
-            "sampler" : 0,
-            "source" : 104
-        },
-        {
-            "sampler" : 0,
-            "source" : 105
-        },
-        {
-            "sampler" : 0,
-            "source" : 106
-        },
-        {
-            "sampler" : 0,
-            "source" : 107
-        },
-        {
-            "sampler" : 0,
-            "source" : 108
-        },
-        {
-            "sampler" : 0,
-            "source" : 109
-        },
-        {
-            "sampler" : 0,
-            "source" : 110
-        },
-        {
-            "sampler" : 0,
-            "source" : 111
-        },
-        {
-            "sampler" : 0,
-            "source" : 112
-        },
-        {
-            "sampler" : 0,
-            "source" : 113
-        },
-        {
-            "sampler" : 0,
-            "source" : 114
-        },
-        {
-            "sampler" : 0,
-            "source" : 115
-        },
-        {
-            "sampler" : 0,
-            "source" : 116
-        },
-        {
-            "sampler" : 0,
-            "source" : 72
-        },
-        {
-            "sampler" : 0,
-            "source" : 117
-        },
-        {
-            "sampler" : 0,
-            "source" : 118
-        },
-        {
-            "sampler" : 0,
-            "source" : 119
-        },
-        {
-            "sampler" : 0,
-            "source" : 120
-        },
-        {
-            "sampler" : 0,
-            "source" : 121
         }
     ],
     "images" : [
-        {
-            "mimeType" : "image/png",
-            "name" : "Image",
-            "uri" : "Image.png"
-        },
         {
             "mimeType" : "image/jpeg",
             "name" : "Plates_Ceramic_MDL_Normal",
@@ -11691,11 +11514,6 @@
             "mimeType" : "image/jpeg",
             "name" : "Plates_Ceramic_MDL_Base Color",
             "uri" : "Plates_Ceramic_MDL_Base%20Color.png"
-        },
-        {
-            "mimeType" : "image/png",
-            "name" : "Image",
-            "uri" : "Image-1.png"
         },
         {
             "mimeType" : "image/jpeg",
@@ -11713,11 +11531,6 @@
             "uri" : "Bread_Container_MDL_Metallic.png"
         },
         {
-            "mimeType" : "image/png",
-            "name" : "Image",
-            "uri" : "Image.png"
-        },
-        {
             "mimeType" : "image/jpeg",
             "name" : "Aluminum_Handles_MDL_Base Color",
             "uri" : "Aluminum_Handles_MDL_Base%20Color.png"
@@ -11726,11 +11539,6 @@
             "mimeType" : "image/png",
             "name" : "Aluminum_Handles_MDL_Metallic",
             "uri" : "Aluminum_Handles_MDL_Metallic.png"
-        },
-        {
-            "mimeType" : "image/png",
-            "name" : "Image",
-            "uri" : "Image.png"
         },
         {
             "mimeType" : "image/jpeg",
@@ -11748,19 +11556,9 @@
             "uri" : "Counter_Cabinets_MDL_Metallic.png"
         },
         {
-            "mimeType" : "image/png",
-            "name" : "Image",
-            "uri" : "Image.png"
-        },
-        {
             "mimeType" : "image/jpeg",
             "name" : "Light_Exterior_MDL_Normal",
             "uri" : "Light_Exterior_MDL_Normal.png"
-        },
-        {
-            "mimeType" : "image/png",
-            "name" : "Image",
-            "uri" : "Image.png"
         },
         {
             "mimeType" : "image/jpeg",
@@ -11771,11 +11569,6 @@
             "mimeType" : "image/jpeg",
             "name" : "Counter_Top_PBR_Base Color",
             "uri" : "Counter_Top_PBR_Base%20Color.png"
-        },
-        {
-            "mimeType" : "image/png",
-            "name" : "Image",
-            "uri" : "Image.png"
         },
         {
             "mimeType" : "image/png",
@@ -11843,11 +11636,6 @@
             "uri" : "Cutting_Board_MDL_Base%20Color.png"
         },
         {
-            "mimeType" : "image/png",
-            "name" : "Image",
-            "uri" : "Image.png"
-        },
-        {
             "mimeType" : "image/jpeg",
             "name" : "Island_Cabinets_MDL_Normal",
             "uri" : "Island_Cabinets_MDL_Normal.png"
@@ -11863,11 +11651,6 @@
             "uri" : "Island_Cabinets_MDL_Metallic.png"
         },
         {
-            "mimeType" : "image/png",
-            "name" : "Image",
-            "uri" : "Image.png"
-        },
-        {
             "mimeType" : "image/jpeg",
             "name" : "Pots_MDL_Normal",
             "uri" : "Pots_MDL_Normal.png"
@@ -11881,11 +11664,6 @@
             "mimeType" : "image/png",
             "name" : "Pots_MDL_Metallic-Pots_MDL_Roughness",
             "uri" : "Pots_MDL_Metallic-Pots_MDL_Roughness.png"
-        },
-        {
-            "mimeType" : "image/png",
-            "name" : "Image",
-            "uri" : "Image.png"
         },
         {
             "mimeType" : "image/jpeg",
@@ -12018,11 +11796,6 @@
             "uri" : "Tomatoes_Roughness.png"
         },
         {
-            "mimeType" : "image/png",
-            "name" : "Image",
-            "uri" : "Image.png"
-        },
-        {
             "mimeType" : "image/jpeg",
             "name" : "Microwave_MDL_Normal",
             "uri" : "Microwave_MDL_Normal.png"
@@ -12039,11 +11812,6 @@
         },
         {
             "mimeType" : "image/png",
-            "name" : "Image",
-            "uri" : "Image.png"
-        },
-        {
-            "mimeType" : "image/png",
             "name" : "Radio_Face_MDL_Metallic",
             "uri" : "Radio_Face_MDL_Metallic.png"
         },
@@ -12056,11 +11824,6 @@
             "mimeType" : "image/png",
             "name" : "Kettle_MDL_Metallic-Kettle_MDL_Roughness",
             "uri" : "Kettle_MDL_Metallic-Kettle_MDL_Roughness.png"
-        },
-        {
-            "mimeType" : "image/png",
-            "name" : "Image",
-            "uri" : "Image.png"
         },
         {
             "mimeType" : "image/jpeg",
@@ -12118,11 +11881,6 @@
             "uri" : "Stove_Grate_MDL_Roughness.png"
         },
         {
-            "mimeType" : "image/png",
-            "name" : "Image",
-            "uri" : "Image.png"
-        },
-        {
             "mimeType" : "image/jpeg",
             "name" : "Range_Hood_MDL_Base Color",
             "uri" : "Range_Hood_MDL_Base%20Color.png"
@@ -12131,11 +11889,6 @@
             "mimeType" : "image/png",
             "name" : "Range_Hood_MDL_Metallic-Range_Hood_MDL_Roughness",
             "uri" : "Range_Hood_MDL_Metallic-Range_Hood_MDL_Roughness.png"
-        },
-        {
-            "mimeType" : "image/png",
-            "name" : "Image",
-            "uri" : "Image.png"
         },
         {
             "mimeType" : "image/jpeg",
@@ -12151,11 +11904,6 @@
             "mimeType" : "image/png",
             "name" : "Table_Wood_MDL_Metallic",
             "uri" : "Table_Wood_MDL_Metallic.png"
-        },
-        {
-            "mimeType" : "image/png",
-            "name" : "Image",
-            "uri" : "Image.png"
         },
         {
             "mimeType" : "image/jpeg",
@@ -12203,11 +11951,6 @@
             "uri" : "Table_MDL_Metallic.png"
         },
         {
-            "mimeType" : "image/png",
-            "name" : "Image",
-            "uri" : "Image.png"
-        },
-        {
             "mimeType" : "image/jpeg",
             "name" : "Window_Wood_MDL_Normal",
             "uri" : "Window_Wood_MDL_Normal.png"
@@ -12223,11 +11966,6 @@
             "uri" : "Window_Wood_MDL_Metallic.png"
         },
         {
-            "mimeType" : "image/png",
-            "name" : "Image",
-            "uri" : "Image.png"
-        },
-        {
             "mimeType" : "image/jpeg",
             "name" : "Walls_MDL_Normal",
             "uri" : "Walls_MDL_Normal.png"
@@ -12241,11 +11979,6 @@
             "mimeType" : "image/png",
             "name" : "Walls_MDL_Metallic",
             "uri" : "Walls_MDL_Metallic.png"
-        },
-        {
-            "mimeType" : "image/png",
-            "name" : "Image",
-            "uri" : "Image.png"
         },
         {
             "mimeType" : "image/jpeg",
@@ -12271,11 +12004,6 @@
             "mimeType" : "image/png",
             "name" : "Backsplash_Tile_MDL_Metallic",
             "uri" : "Backsplash_Tile_MDL_Metallic.png"
-        },
-        {
-            "mimeType" : "image/png",
-            "name" : "Image",
-            "uri" : "Image.png"
         },
         {
             "mimeType" : "image/jpeg",

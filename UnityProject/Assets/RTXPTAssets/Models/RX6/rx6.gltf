@@ -398,8 +398,8 @@
 	"images":[
 		{
 			"mimeType":"image/png",
-			"name":"RX6_green",
-			"uri":"RX6_green.png"
+			"name":"RX6_blue",
+			"uri":"RX6_blue.png"
 		}
 	],
 	"accessors":[

@@ -41681,12 +41681,12 @@
                     ],
                     "glossinessFactor": 0.6600000262260437,
                     "diffuseTexture": {
-                        "index": 32
+                        "index": 31
                     }
                 }
             },
             "normalTexture": {
-                "index": 31
+                "index": 30
             }
         },
         {
@@ -41707,12 +41707,12 @@
                     ],
                     "glossinessFactor": 0.7269999980926514,
                     "diffuseTexture": {
-                        "index": 34
+                        "index": 33
                     }
                 }
             },
             "normalTexture": {
-                "index": 33
+                "index": 32
             }
         },
         {
@@ -41733,12 +41733,12 @@
                     ],
                     "glossinessFactor": 0.5,
                     "diffuseTexture": {
-                        "index": 36
+                        "index": 35
                     }
                 }
             },
             "normalTexture": {
-                "index": 35
+                "index": 34
             }
         },
         {
@@ -41755,7 +41755,7 @@
                 "roughnessFactor": 0.4
             },
             "normalTexture": {
-                "index": 37
+                "index": 36
             }
         },
         {
@@ -41777,12 +41777,12 @@
                     ],
                     "glossinessFactor": 0.6,
                     "diffuseTexture": {
-                        "index": 40
+                        "index": 39
                     }
                 }
             },
             "normalTexture": {
-                "index": 39
+                "index": 38
             }
         },
         {
@@ -41808,7 +41808,7 @@
                 }
             },
             "normalTexture": {
-                "index": 41
+                "index": 40
             }
         },
         {
@@ -41829,12 +41829,12 @@
                     ],
                     "glossinessFactor": 0.0,
                     "diffuseTexture": {
-                        "index": 43
+                        "index": 42
                     }
                 }
             },
             "normalTexture": {
-                "index": 42
+                "index": 41
             }
         },
         {
@@ -41855,7 +41855,7 @@
                     ],
                     "glossinessFactor": 0.6000000238418579,
                     "diffuseTexture": {
-                        "index": 44
+                        "index": 43
                     },
                     "specularGlossinessTexture": {
                         "index": 7
@@ -41884,15 +41884,15 @@
                     ],
                     "glossinessFactor": 0.7400000095367432,
                     "diffuseTexture": {
-                        "index": 46
+                        "index": 45
                     },
                     "specularGlossinessTexture": {
-                        "index": 47
+                        "index": 46
                     }
                 }
             },
             "normalTexture": {
-                "index": 45
+                "index": 44
             }
         },
         {
@@ -41909,7 +41909,7 @@
                 "roughnessFactor": 0.4
             },
             "normalTexture": {
-                "index": 37
+                "index": 36
             }
         },
         {
@@ -41930,12 +41930,12 @@
                     ],
                     "glossinessFactor": 0.5,
                     "diffuseTexture": {
-                        "index": 49
+                        "index": 48
                     }
                 }
             },
             "normalTexture": {
-                "index": 48
+                "index": 47
             }
         },
         {
@@ -41956,12 +41956,12 @@
                     ],
                     "glossinessFactor": 0.7176470160484314,
                     "diffuseTexture": {
-                        "index": 51
+                        "index": 50
                     }
                 }
             },
             "normalTexture": {
-                "index": 50
+                "index": 49
             }
         },
         {
@@ -42011,12 +42011,12 @@
                     ],
                     "glossinessFactor": 0.03921600058674812,
                     "diffuseTexture": {
-                        "index": 49
+                        "index": 48
                     }
                 }
             },
             "normalTexture": {
-                "index": 48
+                "index": 47
             }
         },
         {
@@ -42037,15 +42037,15 @@
                     ],
                     "glossinessFactor": 0.8196079730987549,
                     "diffuseTexture": {
-                        "index": 53
+                        "index": 52
                     },
                     "specularGlossinessTexture": {
-                        "index": 54
+                        "index": 53
                     }
                 }
             },
             "normalTexture": {
-                "index": 52
+                "index": 51
             }
         },
         {
@@ -42066,15 +42066,15 @@
                     ],
                     "glossinessFactor": 0.6800000071525574,
                     "diffuseTexture": {
-                        "index": 38
+                        "index": 37
                     },
                     "specularGlossinessTexture": {
-                        "index": 55
+                        "index": 54
                     }
                 }
             },
             "normalTexture": {
-                "index": 37
+                "index": 36
             }
         },
         {
@@ -42095,15 +42095,15 @@
                     ],
                     "glossinessFactor": 0.6039220094680786,
                     "diffuseTexture": {
-                        "index": 57
+                        "index": 56
                     },
                     "specularGlossinessTexture": {
-                        "index": 58
+                        "index": 57
                     }
                 }
             },
             "normalTexture": {
-                "index": 56
+                "index": 55
             }
         },
         {
@@ -42124,12 +42124,12 @@
                     ],
                     "glossinessFactor": 0.7200000286102295,
                     "diffuseTexture": {
-                        "index": 38
+                        "index": 37
                     }
                 }
             },
             "normalTexture": {
-                "index": 37
+                "index": 36
             }
         },
         {
@@ -42150,12 +42150,12 @@
                     ],
                     "glossinessFactor": 0.5,
                     "diffuseTexture": {
-                        "index": 60
+                        "index": 59
                     }
                 }
             },
             "normalTexture": {
-                "index": 59
+                "index": 58
             }
         },
         {
@@ -42176,12 +42176,12 @@
                     ],
                     "glossinessFactor": 0.6000000238418579,
                     "diffuseTexture": {
-                        "index": 49
+                        "index": 48
                     }
                 }
             },
             "normalTexture": {
-                "index": 48
+                "index": 47
             }
         },
         {
@@ -42222,12 +42222,12 @@
                     ],
                     "glossinessFactor": 0.6000000238418579,
                     "diffuseTexture": {
-                        "index": 32
+                        "index": 31
                     }
                 }
             },
             "normalTexture": {
-                "index": 31
+                "index": 30
             }
         },
         {
@@ -42248,12 +42248,12 @@
                     ],
                     "glossinessFactor": 0.5,
                     "diffuseTexture": {
-                        "index": 36
+                        "index": 35
                     }
                 }
             },
             "normalTexture": {
-                "index": 35
+                "index": 34
             }
         },
         {
@@ -42274,12 +42274,12 @@
                     ],
                     "glossinessFactor": 0.6000000238418579,
                     "diffuseTexture": {
-                        "index": 32
+                        "index": 31
                     }
                 }
             },
             "normalTexture": {
-                "index": 41
+                "index": 40
             }
         },
         {
@@ -42300,12 +42300,12 @@
                     ],
                     "glossinessFactor": 0.5,
                     "diffuseTexture": {
-                        "index": 62
+                        "index": 61
                     }
                 }
             },
             "normalTexture": {
-                "index": 61
+                "index": 60
             }
         },
         {
@@ -42326,12 +42326,12 @@
                     ],
                     "glossinessFactor": 0.746999979019165,
                     "diffuseTexture": {
-                        "index": 34
+                        "index": 33
                     }
                 }
             },
             "normalTexture": {
-                "index": 33
+                "index": 32
             }
         },
         {
@@ -42352,12 +42352,12 @@
                     ],
                     "glossinessFactor": 0.6000000238418579,
                     "diffuseTexture": {
-                        "index": 64
+                        "index": 63
                     }
                 }
             },
             "normalTexture": {
-                "index": 63
+                "index": 62
             }
         },
         {
@@ -42378,12 +42378,12 @@
                     ],
                     "glossinessFactor": 0.8470590114593506,
                     "diffuseTexture": {
-                        "index": 34
+                        "index": 33
                     }
                 }
             },
             "normalTexture": {
-                "index": 33
+                "index": 32
             }
         },
         {
@@ -42409,7 +42409,7 @@
                 }
             },
             "normalTexture": {
-                "index": 41
+                "index": 40
             }
         },
         {
@@ -42431,12 +42431,12 @@
                     ],
                     "glossinessFactor": 0.6,
                     "diffuseTexture": {
-                        "index": 40
+                        "index": 39
                     }
                 }
             },
             "normalTexture": {
-                "index": 39
+                "index": 38
             }
         },
         {
@@ -42457,12 +42457,12 @@
                     ],
                     "glossinessFactor": 0.0,
                     "diffuseTexture": {
-                        "index": 43
+                        "index": 42
                     }
                 }
             },
             "normalTexture": {
-                "index": 42
+                "index": 41
             }
         },
         {
@@ -42484,7 +42484,7 @@
                     ],
                     "glossinessFactor": 0.0,
                     "diffuseTexture": {
-                        "index": 66
+                        "index": 64
                     }
                 }
             }
@@ -42508,7 +42508,7 @@
                     ],
                     "glossinessFactor": 0.03921600058674812,
                     "diffuseTexture": {
-                        "index": 67
+                        "index": 65
                     }
                 }
             }
@@ -42532,12 +42532,12 @@
                     ],
                     "glossinessFactor": 0.0,
                     "diffuseTexture": {
-                        "index": 69
+                        "index": 67
                     }
                 }
             },
             "normalTexture": {
-                "index": 68
+                "index": 66
             }
         },
         {
@@ -42558,15 +42558,15 @@
                     ],
                     "glossinessFactor": 0.6499999761581421,
                     "diffuseTexture": {
-                        "index": 38
+                        "index": 37
                     },
                     "specularGlossinessTexture": {
-                        "index": 70
+                        "index": 68
                     }
                 }
             },
             "normalTexture": {
-                "index": 37
+                "index": 36
             }
         },
         {
@@ -42587,15 +42587,15 @@
                     ],
                     "glossinessFactor": 0.8039219975471497,
                     "diffuseTexture": {
-                        "index": 72
+                        "index": 70
                     },
                     "specularGlossinessTexture": {
-                        "index": 73
+                        "index": 71
                     }
                 }
             },
             "normalTexture": {
-                "index": 71
+                "index": 69
             }
         },
         {
@@ -42621,15 +42621,15 @@
                     ],
                     "glossinessFactor": 0.8500000238418579,
                     "diffuseTexture": {
-                        "index": 75
+                        "index": 73
                     },
                     "specularGlossinessTexture": {
-                        "index": 76
+                        "index": 74
                     }
                 }
             },
             "normalTexture": {
-                "index": 74
+                "index": 72
             }
         },
         {
@@ -42650,12 +42650,12 @@
                     ],
                     "glossinessFactor": 0.7137259840965271,
                     "diffuseTexture": {
-                        "index": 78
+                        "index": 76
                     }
                 }
             },
             "normalTexture": {
-                "index": 77
+                "index": 75
             }
         },
         {
@@ -42678,7 +42678,7 @@
                 }
             },
             "normalTexture": {
-                "index": 79
+                "index": 77
             }
         },
         {
@@ -42699,15 +42699,15 @@
                     ],
                     "glossinessFactor": 0.7400000095367432,
                     "diffuseTexture": {
-                        "index": 83
+                        "index": 79
                     },
                     "specularGlossinessTexture": {
-                        "index": 84
+                        "index": 80
                     }
                 }
             },
             "normalTexture": {
-                "index": 82
+                "index": 78
             }
         },
         {
@@ -42728,15 +42728,15 @@
                     ],
                     "glossinessFactor": 0.65,
                     "diffuseTexture": {
-                        "index": 86
+                        "index": 82
                     },
                     "specularGlossinessTexture": {
-                        "index": 87
+                        "index": 83
                     }
                 }
             },
             "normalTexture": {
-                "index": 85
+                "index": 81
             }
         },
         {
@@ -42757,12 +42757,12 @@
                     ],
                     "glossinessFactor": 0.5,
                     "diffuseTexture": {
-                        "index": 49
+                        "index": 48
                     }
                 }
             },
             "normalTexture": {
-                "index": 48
+                "index": 47
             }
         },
         {
@@ -42826,7 +42826,7 @@
                     ],
                     "glossinessFactor": 1.0,
                     "diffuseTexture": {
-                        "index": 75
+                        "index": 73
                     }
                 }
             }
@@ -42849,12 +42849,12 @@
                     ],
                     "glossinessFactor": 0.5411760210990906,
                     "diffuseTexture": {
-                        "index": 88
+                        "index": 84
                     }
                 }
             },
             "normalTexture": {
-                "index": 33
+                "index": 32
             }
         },
         {
@@ -42875,12 +42875,12 @@
                     ],
                     "glossinessFactor": 0.7400000095367432,
                     "diffuseTexture": {
-                        "index": 88
+                        "index": 84
                     }
                 }
             },
             "normalTexture": {
-                "index": 33
+                "index": 32
             }
         },
         {
@@ -42901,15 +42901,15 @@
                     ],
                     "glossinessFactor": 0.75,
                     "diffuseTexture": {
-                        "index": 88
+                        "index": 84
                     },
                     "specularGlossinessTexture": {
-                        "index": 89
+                        "index": 85
                     }
                 }
             },
             "normalTexture": {
-                "index": 33
+                "index": 32
             }
         },
         {
@@ -42930,15 +42930,15 @@
                     ],
                     "glossinessFactor": 0.4,
                     "diffuseTexture": {
-                        "index": 91
+                        "index": 87
                     },
                     "specularGlossinessTexture": {
-                        "index": 92
+                        "index": 88
                     }
                 }
             },
             "normalTexture": {
-                "index": 90
+                "index": 86
             }
         },
         {
@@ -42960,15 +42960,15 @@
                     ],
                     "glossinessFactor": 0.8999999761581421,
                     "diffuseTexture": {
-                        "index": 93
+                        "index": 89
                     },
                     "specularGlossinessTexture": {
-                        "index": 94
+                        "index": 90
                     }
                 }
             },
             "normalTexture": {
-                "index": 33
+                "index": 32
             }
         },
         {
@@ -42989,12 +42989,12 @@
                     ],
                     "glossinessFactor": 0.5099999904632568,
                     "diffuseTexture": {
-                        "index": 96
+                        "index": 92
                     }
                 }
             },
             "normalTexture": {
-                "index": 95
+                "index": 91
             }
         },
         {
@@ -43015,12 +43015,12 @@
                     ],
                     "glossinessFactor": 0.6100000143051147,
                     "diffuseTexture": {
-                        "index": 98
+                        "index": 94
                     }
                 }
             },
             "normalTexture": {
-                "index": 97
+                "index": 93
             }
         },
         {
@@ -43061,7 +43061,7 @@
                     ],
                     "glossinessFactor": 0.03921600058674812,
                     "diffuseTexture": {
-                        "index": 99
+                        "index": 95
                     }
                 }
             }
@@ -43084,12 +43084,12 @@
                     ],
                     "glossinessFactor": 0.5,
                     "diffuseTexture": {
-                        "index": 32
+                        "index": 31
                     }
                 }
             },
             "normalTexture": {
-                "index": 41
+                "index": 40
             }
         },
         {
@@ -43110,15 +43110,15 @@
                     ],
                     "glossinessFactor": 0.8039219975471497,
                     "diffuseTexture": {
-                        "index": 72
+                        "index": 70
                     },
                     "specularGlossinessTexture": {
-                        "index": 73
+                        "index": 71
                     }
                 }
             },
             "normalTexture": {
-                "index": 71
+                "index": 69
             }
         },
         {
@@ -43139,12 +43139,12 @@
                     ],
                     "glossinessFactor": 0.8299999833106995,
                     "diffuseTexture": {
-                        "index": 34
+                        "index": 33
                     }
                 }
             },
             "normalTexture": {
-                "index": 33
+                "index": 32
             }
         },
         {
@@ -43165,12 +43165,12 @@
                     ],
                     "glossinessFactor": 0.800000011920929,
                     "diffuseTexture": {
-                        "index": 101
+                        "index": 97
                     }
                 }
             },
             "normalTexture": {
-                "index": 100
+                "index": 96
             }
         },
         {
@@ -43191,7 +43191,7 @@
                     ],
                     "glossinessFactor": 1.0,
                     "diffuseTexture": {
-                        "index": 102
+                        "index": 98
                     },
                     "specularGlossinessTexture": {
                         "index": 10
@@ -43220,7 +43220,7 @@
                     ],
                     "glossinessFactor": 1.0,
                     "diffuseTexture": {
-                        "index": 103
+                        "index": 99
                     }
                 }
             }
@@ -43272,12 +43272,12 @@
                     ],
                     "glossinessFactor": 1.0,
                     "diffuseTexture": {
-                        "index": 105
+                        "index": 101
                     }
                 }
             },
             "normalTexture": {
-                "index": 104
+                "index": 100
             }
         },
         {
@@ -43298,12 +43298,12 @@
                     ],
                     "glossinessFactor": 0.7137259840965271,
                     "diffuseTexture": {
-                        "index": 78
+                        "index": 76
                     }
                 }
             },
             "normalTexture": {
-                "index": 77
+                "index": 75
             }
         },
         {
@@ -43324,12 +43324,12 @@
                     ],
                     "glossinessFactor": 0.8500000238418579,
                     "diffuseTexture": {
-                        "index": 34
+                        "index": 33
                     }
                 }
             },
             "normalTexture": {
-                "index": 33
+                "index": 32
             }
         },
         {
@@ -43350,15 +43350,15 @@
                     ],
                     "glossinessFactor": 0.6000000238418579,
                     "diffuseTexture": {
-                        "index": 107
+                        "index": 103
                     },
                     "specularGlossinessTexture": {
-                        "index": 108
+                        "index": 104
                     }
                 }
             },
             "normalTexture": {
-                "index": 106
+                "index": 102
             }
         },
         {
@@ -43379,12 +43379,12 @@
                     ],
                     "glossinessFactor": 0.03921600058674812,
                     "diffuseTexture": {
-                        "index": 110
+                        "index": 106
                     }
                 }
             },
             "normalTexture": {
-                "index": 109
+                "index": 105
             }
         },
         {
@@ -43405,15 +43405,15 @@
                     ],
                     "glossinessFactor": 0.5400000214576721,
                     "diffuseTexture": {
-                        "index": 112
+                        "index": 108
                     },
                     "specularGlossinessTexture": {
-                        "index": 113
+                        "index": 109
                     }
                 }
             },
             "normalTexture": {
-                "index": 111
+                "index": 107
             }
         },
         {
@@ -43434,15 +43434,15 @@
                     ],
                     "glossinessFactor": 0.5,
                     "diffuseTexture": {
-                        "index": 107
+                        "index": 103
                     },
                     "specularGlossinessTexture": {
-                        "index": 108
+                        "index": 104
                     }
                 }
             },
             "normalTexture": {
-                "index": 106
+                "index": 102
             }
         },
         {
@@ -43463,15 +43463,15 @@
                     ],
                     "glossinessFactor": 0.75,
                     "diffuseTexture": {
-                        "index": 115
+                        "index": 111
                     },
                     "specularGlossinessTexture": {
-                        "index": 116
+                        "index": 112
                     }
                 }
             },
             "normalTexture": {
-                "index": 114
+                "index": 110
             }
         },
         {
@@ -43492,12 +43492,12 @@
                     ],
                     "glossinessFactor": 0.5,
                     "diffuseTexture": {
-                        "index": 60
+                        "index": 59
                     }
                 }
             },
             "normalTexture": {
-                "index": 59
+                "index": 58
             }
         },
         {
@@ -43518,12 +43518,12 @@
                     ],
                     "glossinessFactor": 0.8270000219345093,
                     "diffuseTexture": {
-                        "index": 34
+                        "index": 33
                     }
                 }
             },
             "normalTexture": {
-                "index": 33
+                "index": 32
             }
         },
         {
@@ -43544,12 +43544,12 @@
                     ],
                     "glossinessFactor": 0.8470590114593506,
                     "diffuseTexture": {
-                        "index": 34
+                        "index": 33
                     }
                 }
             },
             "normalTexture": {
-                "index": 33
+                "index": 32
             }
         },
         {
@@ -43570,7 +43570,7 @@
                     ],
                     "glossinessFactor": 0.699999988079071,
                     "diffuseTexture": {
-                        "index": 117
+                        "index": 113
                     }
                 }
             }
@@ -43593,12 +43593,12 @@
                     ],
                     "glossinessFactor": 0.6100000143051147,
                     "diffuseTexture": {
-                        "index": 53
+                        "index": 52
                     }
                 }
             },
             "normalTexture": {
-                "index": 52
+                "index": 51
             }
         },
         {
@@ -43619,15 +43619,15 @@
                     ],
                     "glossinessFactor": 0.4470590054988861,
                     "diffuseTexture": {
-                        "index": 119
+                        "index": 115
                     },
                     "specularGlossinessTexture": {
-                        "index": 120
+                        "index": 116
                     }
                 }
             },
             "normalTexture": {
-                "index": 118
+                "index": 114
             }
         },
         {
@@ -43648,12 +43648,12 @@
                     ],
                     "glossinessFactor": 0.5,
                     "diffuseTexture": {
-                        "index": 96
+                        "index": 92
                     }
                 }
             },
             "normalTexture": {
-                "index": 95
+                "index": 91
             }
         },
         {
@@ -43700,15 +43700,15 @@
                     ],
                     "glossinessFactor": 1.0,
                     "diffuseTexture": {
-                        "index": 122
+                        "index": 118
                     },
                     "specularGlossinessTexture": {
-                        "index": 123
+                        "index": 119
                     }
                 }
             },
             "normalTexture": {
-                "index": 121
+                "index": 117
             }
         },
         {
@@ -43729,15 +43729,15 @@
                     ],
                     "glossinessFactor": 0.8100000023841858,
                     "diffuseTexture": {
-                        "index": 125
+                        "index": 121
                     },
                     "specularGlossinessTexture": {
-                        "index": 126
+                        "index": 122
                     }
                 }
             },
             "normalTexture": {
-                "index": 124
+                "index": 120
             }
         },
         {
@@ -43758,15 +43758,15 @@
                     ],
                     "glossinessFactor": 0.9490200281143188,
                     "diffuseTexture": {
-                        "index": 128
+                        "index": 124
                     },
                     "specularGlossinessTexture": {
-                        "index": 129
+                        "index": 125
                     }
                 }
             },
             "normalTexture": {
-                "index": 127
+                "index": 123
             }
         },
         {
@@ -43787,7 +43787,7 @@
                     ],
                     "glossinessFactor": 0.949999988079071,
                     "diffuseTexture": {
-                        "index": 130
+                        "index": 126
                     }
                 }
             }
@@ -43810,15 +43810,15 @@
                     ],
                     "glossinessFactor": 1.0,
                     "diffuseTexture": {
-                        "index": 132
+                        "index": 128
                     },
                     "specularGlossinessTexture": {
-                        "index": 133
+                        "index": 129
                     }
                 }
             },
             "normalTexture": {
-                "index": 131
+                "index": 127
             }
         },
         {
@@ -43839,15 +43839,15 @@
                     ],
                     "glossinessFactor": 0.5,
                     "diffuseTexture": {
-                        "index": 135
+                        "index": 131
                     },
                     "specularGlossinessTexture": {
-                        "index": 136
+                        "index": 132
                     }
                 }
             },
             "normalTexture": {
-                "index": 134
+                "index": 130
             }
         },
         {
@@ -43868,15 +43868,15 @@
                     ],
                     "glossinessFactor": 0.8100000023841858,
                     "diffuseTexture": {
-                        "index": 138
+                        "index": 134
                     },
                     "specularGlossinessTexture": {
-                        "index": 139
+                        "index": 135
                     }
                 }
             },
             "normalTexture": {
-                "index": 137
+                "index": 133
             }
         },
         {
@@ -43897,15 +43897,15 @@
                     ],
                     "glossinessFactor": 0.800000011920929,
                     "diffuseTexture": {
-                        "index": 141
+                        "index": 137
                     },
                     "specularGlossinessTexture": {
-                        "index": 142
+                        "index": 138
                     }
                 }
             },
             "normalTexture": {
-                "index": 140
+                "index": 136
             }
         },
         {
@@ -43926,15 +43926,15 @@
                     ],
                     "glossinessFactor": 0.5,
                     "diffuseTexture": {
-                        "index": 144
+                        "index": 140
                     },
                     "specularGlossinessTexture": {
-                        "index": 145
+                        "index": 141
                     }
                 }
             },
             "normalTexture": {
-                "index": 143
+                "index": 139
             }
         },
         {
@@ -43955,15 +43955,15 @@
                     ],
                     "glossinessFactor": 0.800000011920929,
                     "diffuseTexture": {
-                        "index": 147
+                        "index": 143
                     },
                     "specularGlossinessTexture": {
-                        "index": 148
+                        "index": 144
                     }
                 }
             },
             "normalTexture": {
-                "index": 146
+                "index": 142
             }
         },
         {
@@ -43993,15 +43993,15 @@
                     ],
                     "glossinessFactor": 0.8019999861717224,
                     "diffuseTexture": {
-                        "index": 150
+                        "index": 146
                     },
                     "specularGlossinessTexture": {
-                        "index": 151
+                        "index": 147
                     }
                 }
             },
             "normalTexture": {
-                "index": 149
+                "index": 145
             }
         },
         {
@@ -44022,12 +44022,12 @@
                     ],
                     "glossinessFactor": 0.20999999344348907,
                     "diffuseTexture": {
-                        "index": 153
+                        "index": 149
                     }
                 }
             },
             "normalTexture": {
-                "index": 152
+                "index": 148
             }
         },
         {
@@ -44049,12 +44049,12 @@
                     ],
                     "glossinessFactor": 0.2800000011920929,
                     "diffuseTexture": {
-                        "index": 155
+                        "index": 151
                     }
                 }
             },
             "normalTexture": {
-                "index": 154
+                "index": 150
             }
         },
         {
@@ -44076,12 +44076,12 @@
                     ],
                     "glossinessFactor": 1.0,
                     "diffuseTexture": {
-                        "index": 157
+                        "index": 153
                     }
                 }
             },
             "normalTexture": {
-                "index": 156
+                "index": 152
             }
         },
         {
@@ -44103,12 +44103,12 @@
                     ],
                     "glossinessFactor": 0.27799999713897705,
                     "diffuseTexture": {
-                        "index": 159
+                        "index": 155
                     }
                 }
             },
             "normalTexture": {
-                "index": 158
+                "index": 154
             }
         },
         {
@@ -44129,12 +44129,12 @@
                     ],
                     "glossinessFactor": 0.8823530077934265,
                     "diffuseTexture": {
-                        "index": 161
+                        "index": 157
                     }
                 }
             },
             "normalTexture": {
-                "index": 160
+                "index": 156
             }
         },
         {
@@ -44155,12 +44155,12 @@
                     ],
                     "glossinessFactor": 0.33000001311302185,
                     "diffuseTexture": {
-                        "index": 163
+                        "index": 159
                     }
                 }
             },
             "normalTexture": {
-                "index": 162
+                "index": 158
             }
         },
         {
@@ -44181,12 +44181,12 @@
                     ],
                     "glossinessFactor": 1.0,
                     "diffuseTexture": {
-                        "index": 163
+                        "index": 159
                     }
                 }
             },
             "normalTexture": {
-                "index": 162
+                "index": 158
             }
         },
         {
@@ -44208,7 +44208,7 @@
                     ],
                     "glossinessFactor": 0.3100000023841858,
                     "diffuseTexture": {
-                        "index": 164
+                        "index": 160
                     }
                 }
             }
@@ -44232,7 +44232,7 @@
                     ],
                     "glossinessFactor": 0.1411760002374649,
                     "diffuseTexture": {
-                        "index": 165
+                        "index": 161
                     }
                 }
             }
@@ -44256,12 +44256,12 @@
                     ],
                     "glossinessFactor": 0.47999998927116394,
                     "diffuseTexture": {
-                        "index": 167
+                        "index": 163
                     }
                 }
             },
             "normalTexture": {
-                "index": 166
+                "index": 162
             }
         },
         {
@@ -44283,12 +44283,12 @@
                     ],
                     "glossinessFactor": 1.0,
                     "diffuseTexture": {
-                        "index": 169
+                        "index": 165
                     }
                 }
             },
             "normalTexture": {
-                "index": 168
+                "index": 164
             }
         },
         {
@@ -44309,15 +44309,15 @@
                     ],
                     "glossinessFactor": 0.7900000214576721,
                     "diffuseTexture": {
-                        "index": 171
+                        "index": 167
                     },
                     "specularGlossinessTexture": {
-                        "index": 172
+                        "index": 168
                     }
                 }
             },
             "normalTexture": {
-                "index": 170
+                "index": 166
             }
         },
         {
@@ -44338,15 +44338,15 @@
                     ],
                     "glossinessFactor": 0.9843140244483948,
                     "diffuseTexture": {
-                        "index": 174
+                        "index": 170
                     },
                     "specularGlossinessTexture": {
-                        "index": 175
+                        "index": 171
                     }
                 }
             },
             "normalTexture": {
-                "index": 173
+                "index": 169
             }
         },
         {
@@ -44367,12 +44367,12 @@
                     ],
                     "glossinessFactor": 0.8100000023841858,
                     "diffuseTexture": {
-                        "index": 177
+                        "index": 173
                     }
                 }
             },
             "normalTexture": {
-                "index": 176
+                "index": 172
             }
         },
         {
@@ -44393,12 +44393,12 @@
                     ],
                     "glossinessFactor": 0.5529410243034363,
                     "diffuseTexture": {
-                        "index": 179
+                        "index": 175
                     }
                 }
             },
             "normalTexture": {
-                "index": 178
+                "index": 174
             }
         },
         {
@@ -44419,15 +44419,15 @@
                     ],
                     "glossinessFactor": 0.95,
                     "diffuseTexture": {
-                        "index": 181
+                        "index": 177
                     },
                     "specularGlossinessTexture": {
-                        "index": 182
+                        "index": 178
                     }
                 }
             },
             "normalTexture": {
-                "index": 180
+                "index": 176
             }
         },
         {
@@ -44448,15 +44448,15 @@
                     ],
                     "glossinessFactor": 0.8700000047683716,
                     "diffuseTexture": {
-                        "index": 181
+                        "index": 177
                     },
                     "specularGlossinessTexture": {
-                        "index": 182
+                        "index": 178
                     }
                 }
             },
             "normalTexture": {
-                "index": 180
+                "index": 176
             }
         },
         {
@@ -44477,15 +44477,15 @@
                     ],
                     "glossinessFactor": 0.5099999904632568,
                     "diffuseTexture": {
-                        "index": 181
+                        "index": 177
                     },
                     "specularGlossinessTexture": {
-                        "index": 182
+                        "index": 178
                     }
                 }
             },
             "normalTexture": {
-                "index": 180
+                "index": 176
             }
         },
         {
@@ -44508,7 +44508,7 @@
                 }
             },
             "normalTexture": {
-                "index": 180
+                "index": 176
             }
         },
         {
@@ -44529,12 +44529,12 @@
                     ],
                     "glossinessFactor": 1.0,
                     "diffuseTexture": {
-                        "index": 184
+                        "index": 180
                     }
                 }
             },
             "normalTexture": {
-                "index": 183
+                "index": 179
             }
         },
         {
@@ -44555,7 +44555,7 @@
                     ],
                     "glossinessFactor": 1.0,
                     "specularGlossinessTexture": {
-                        "index": 30
+                        "index": 29
                     }
                 }
             }
@@ -44578,12 +44578,12 @@
                     ],
                     "glossinessFactor": 0.5,
                     "diffuseTexture": {
-                        "index": 186
+                        "index": 182
                     }
                 }
             },
             "normalTexture": {
-                "index": 185
+                "index": 181
             }
         },
         {
@@ -44604,12 +44604,12 @@
                     ],
                     "glossinessFactor": 0.6579999923706055,
                     "diffuseTexture": {
-                        "index": 188
+                        "index": 184
                     }
                 }
             },
             "normalTexture": {
-                "index": 187
+                "index": 183
             }
         },
         {
@@ -44631,7 +44631,7 @@
                     ],
                     "glossinessFactor": 0.33333298563957214,
                     "diffuseTexture": {
-                        "index": 189
+                        "index": 185
                     }
                 }
             }
@@ -44654,15 +44654,15 @@
                     ],
                     "glossinessFactor": 1.0,
                     "diffuseTexture": {
-                        "index": 191
+                        "index": 187
                     },
                     "specularGlossinessTexture": {
-                        "index": 192
+                        "index": 188
                     }
                 }
             },
             "normalTexture": {
-                "index": 190
+                "index": 186
             }
         },
         {
@@ -44683,15 +44683,15 @@
                     ],
                     "glossinessFactor": 0.7400000095367432,
                     "diffuseTexture": {
-                        "index": 194
+                        "index": 190
                     },
                     "specularGlossinessTexture": {
-                        "index": 195
+                        "index": 191
                     }
                 }
             },
             "normalTexture": {
-                "index": 193
+                "index": 189
             }
         },
         {
@@ -44712,12 +44712,12 @@
                     ],
                     "glossinessFactor": 0.7803919911384583,
                     "diffuseTexture": {
-                        "index": 197
+                        "index": 193
                     }
                 }
             },
             "normalTexture": {
-                "index": 196
+                "index": 192
             }
         },
         {
@@ -44738,15 +44738,15 @@
                     ],
                     "glossinessFactor": 0.7400000095367432,
                     "diffuseTexture": {
-                        "index": 115
+                        "index": 111
                     },
                     "specularGlossinessTexture": {
-                        "index": 198
+                        "index": 194
                     }
                 }
             },
             "normalTexture": {
-                "index": 114
+                "index": 110
             }
         },
         {
@@ -44767,12 +44767,12 @@
                     ],
                     "glossinessFactor": 0.9411759972572327,
                     "diffuseTexture": {
-                        "index": 197
+                        "index": 193
                     }
                 }
             },
             "normalTexture": {
-                "index": 196
+                "index": 192
             }
         },
         {
@@ -44793,15 +44793,15 @@
                     ],
                     "glossinessFactor": 0.699999988079071,
                     "diffuseTexture": {
-                        "index": 75
+                        "index": 73
                     },
                     "specularGlossinessTexture": {
-                        "index": 76
+                        "index": 74
                     }
                 }
             },
             "normalTexture": {
-                "index": 74
+                "index": 72
             }
         },
         {
@@ -44827,7 +44827,7 @@
                     ],
                     "glossinessFactor": 1.0,
                     "diffuseTexture": {
-                        "index": 75
+                        "index": 73
                     }
                 }
             }
@@ -44852,7 +44852,7 @@
                 }
             },
             "normalTexture": {
-                "index": 79
+                "index": 77
             }
         },
         {
@@ -44873,12 +44873,12 @@
                     ],
                     "glossinessFactor": 0.7137259840965271,
                     "diffuseTexture": {
-                        "index": 78
+                        "index": 76
                     }
                 }
             },
             "normalTexture": {
-                "index": 77
+                "index": 75
             }
         },
         {
@@ -44899,15 +44899,15 @@
                     ],
                     "glossinessFactor": 0.75,
                     "diffuseTexture": {
-                        "index": 200
+                        "index": 196
                     },
                     "specularGlossinessTexture": {
-                        "index": 201
+                        "index": 197
                     }
                 }
             },
             "normalTexture": {
-                "index": 199
+                "index": 195
             }
         },
         {
@@ -44928,15 +44928,15 @@
                     ],
                     "glossinessFactor": 0.5199999809265137,
                     "diffuseTexture": {
-                        "index": 203
+                        "index": 199
                     },
                     "specularGlossinessTexture": {
-                        "index": 204
+                        "index": 200
                     }
                 }
             },
             "normalTexture": {
-                "index": 202
+                "index": 198
             }
         },
         {
@@ -44957,12 +44957,12 @@
                     ],
                     "glossinessFactor": 0.8899999856948853,
                     "diffuseTexture": {
-                        "index": 197
+                        "index": 193
                     }
                 }
             },
             "normalTexture": {
-                "index": 196
+                "index": 192
             }
         },
         {
@@ -44983,7 +44983,7 @@
                     ],
                     "glossinessFactor": 0.98,
                     "diffuseTexture": {
-                        "index": 130
+                        "index": 126
                     }
                 }
             }
@@ -45006,15 +45006,15 @@
                     ],
                     "glossinessFactor": 0.55,
                     "diffuseTexture": {
-                        "index": 132
+                        "index": 128
                     },
                     "specularGlossinessTexture": {
-                        "index": 133
+                        "index": 129
                     }
                 }
             },
             "normalTexture": {
-                "index": 131
+                "index": 127
             }
         },
         {
@@ -45035,15 +45035,15 @@
                     ],
                     "glossinessFactor": 0.47999998927116394,
                     "diffuseTexture": {
-                        "index": 135
+                        "index": 131
                     },
                     "specularGlossinessTexture": {
-                        "index": 136
+                        "index": 132
                     }
                 }
             },
             "normalTexture": {
-                "index": 134
+                "index": 130
             }
         },
         {
@@ -45064,7 +45064,7 @@
                     ],
                     "glossinessFactor": 0.98,
                     "diffuseTexture": {
-                        "index": 205
+                        "index": 201
                     }
                 }
             }
@@ -45087,7 +45087,7 @@
                     ],
                     "glossinessFactor": 1.0,
                     "diffuseTexture": {
-                        "index": 205
+                        "index": 201
                     }
                 }
             }
@@ -45110,7 +45110,7 @@
                     ],
                     "glossinessFactor": 0.98,
                     "diffuseTexture": {
-                        "index": 205
+                        "index": 201
                     }
                 }
             }
@@ -45133,7 +45133,7 @@
                     ],
                     "glossinessFactor": 0.9803919792175293,
                     "diffuseTexture": {
-                        "index": 205
+                        "index": 201
                     }
                 }
             }
@@ -45156,15 +45156,15 @@
                     ],
                     "glossinessFactor": 0.6800000071525574,
                     "diffuseTexture": {
-                        "index": 115
+                        "index": 111
                     },
                     "specularGlossinessTexture": {
-                        "index": 198
+                        "index": 194
                     }
                 }
             },
             "normalTexture": {
-                "index": 114
+                "index": 110
             }
         },
         {
@@ -45185,15 +45185,15 @@
                     ],
                     "glossinessFactor": 1.0,
                     "diffuseTexture": {
-                        "index": 135
+                        "index": 131
                     },
                     "specularGlossinessTexture": {
-                        "index": 136
+                        "index": 132
                     }
                 }
             },
             "normalTexture": {
-                "index": 134
+                "index": 130
             }
         },
         {
@@ -45234,15 +45234,15 @@
                     ],
                     "glossinessFactor": 0.7,
                     "diffuseTexture": {
-                        "index": 78
+                        "index": 76
                     },
                     "specularGlossinessTexture": {
-                        "index": 206
+                        "index": 202
                     }
                 }
             },
             "normalTexture": {
-                "index": 77
+                "index": 75
             }
         },
         {
@@ -45283,15 +45283,15 @@
                     ],
                     "glossinessFactor": 0.7300000190734863,
                     "diffuseTexture": {
-                        "index": 208
+                        "index": 204
                     },
                     "specularGlossinessTexture": {
-                        "index": 209
+                        "index": 205
                     }
                 }
             },
             "normalTexture": {
-                "index": 207
+                "index": 203
             }
         },
         {
@@ -45312,15 +45312,15 @@
                     ],
                     "glossinessFactor": 0.65,
                     "diffuseTexture": {
-                        "index": 211
+                        "index": 207
                     },
                     "specularGlossinessTexture": {
-                        "index": 212
+                        "index": 208
                     }
                 }
             },
             "normalTexture": {
-                "index": 210
+                "index": 206
             }
         },
         {
@@ -45341,7 +45341,7 @@
                     ],
                     "glossinessFactor": 0.9599999785423279,
                     "diffuseTexture": {
-                        "index": 213
+                        "index": 209
                     }
                 }
             }
@@ -45364,12 +45364,12 @@
                     ],
                     "glossinessFactor": 1.0,
                     "diffuseTexture": {
-                        "index": 215
+                        "index": 211
                     }
                 }
             },
             "normalTexture": {
-                "index": 214
+                "index": 210
             }
         },
         {
@@ -45390,15 +45390,15 @@
                     ],
                     "glossinessFactor": 0.6890000104904175,
                     "diffuseTexture": {
-                        "index": 128
+                        "index": 124
                     },
                     "specularGlossinessTexture": {
-                        "index": 129
+                        "index": 125
                     }
                 }
             },
             "normalTexture": {
-                "index": 127
+                "index": 123
             }
         },
         {
@@ -45439,15 +45439,15 @@
                     ],
                     "glossinessFactor": 0.85,
                     "diffuseTexture": {
-                        "index": 217
+                        "index": 213
                     },
                     "specularGlossinessTexture": {
-                        "index": 218
+                        "index": 214
                     }
                 }
             },
             "normalTexture": {
-                "index": 216
+                "index": 212
             }
         },
         {
@@ -45468,15 +45468,15 @@
                     ],
                     "glossinessFactor": 0.75,
                     "diffuseTexture": {
-                        "index": 220
+                        "index": 216
                     },
                     "specularGlossinessTexture": {
-                        "index": 221
+                        "index": 217
                     }
                 }
             },
             "normalTexture": {
-                "index": 219
+                "index": 215
             }
         },
         {
@@ -45497,15 +45497,15 @@
                     ],
                     "glossinessFactor": 0.8700000047683716,
                     "diffuseTexture": {
-                        "index": 222
+                        "index": 218
                     },
                     "specularGlossinessTexture": {
-                        "index": 73
+                        "index": 71
                     }
                 }
             },
             "normalTexture": {
-                "index": 71
+                "index": 69
             }
         },
         {
@@ -45526,12 +45526,12 @@
                     ],
                     "glossinessFactor": 0.7400000095367432,
                     "diffuseTexture": {
-                        "index": 222
+                        "index": 218
                     }
                 }
             },
             "normalTexture": {
-                "index": 71
+                "index": 69
             }
         },
         {
@@ -45552,15 +45552,15 @@
                     ],
                     "glossinessFactor": 0.734000027179718,
                     "diffuseTexture": {
-                        "index": 224
+                        "index": 220
                     },
                     "specularGlossinessTexture": {
-                        "index": 225
+                        "index": 221
                     }
                 }
             },
             "normalTexture": {
-                "index": 223
+                "index": 219
             }
         },
         {
@@ -45600,15 +45600,15 @@
                     ],
                     "glossinessFactor": 0.6830000281333923,
                     "diffuseTexture": {
-                        "index": 227
+                        "index": 223
                     },
                     "specularGlossinessTexture": {
-                        "index": 228
+                        "index": 224
                     }
                 }
             },
             "normalTexture": {
-                "index": 226
+                "index": 222
             }
         },
         {
@@ -45629,15 +45629,15 @@
                     ],
                     "glossinessFactor": 0.8100000023841858,
                     "diffuseTexture": {
-                        "index": 230
+                        "index": 226
                     },
                     "specularGlossinessTexture": {
-                        "index": 231
+                        "index": 227
                     }
                 }
             },
             "normalTexture": {
-                "index": 229
+                "index": 225
             }
         },
         {
@@ -45658,15 +45658,15 @@
                     ],
                     "glossinessFactor": 1.0,
                     "diffuseTexture": {
-                        "index": 233
+                        "index": 229
                     },
                     "specularGlossinessTexture": {
-                        "index": 234
+                        "index": 230
                     }
                 }
             },
             "normalTexture": {
-                "index": 232
+                "index": 228
             }
         },
         {
@@ -45706,15 +45706,15 @@
                     ],
                     "glossinessFactor": 0.765999972820282,
                     "diffuseTexture": {
-                        "index": 115
+                        "index": 111
                     },
                     "specularGlossinessTexture": {
-                        "index": 198
+                        "index": 194
                     }
                 }
             },
             "normalTexture": {
-                "index": 114
+                "index": 110
             }
         },
         {
@@ -45735,15 +45735,15 @@
                     ],
                     "glossinessFactor": 1.0,
                     "diffuseTexture": {
-                        "index": 236
+                        "index": 232
                     },
                     "specularGlossinessTexture": {
-                        "index": 237
+                        "index": 233
                     }
                 }
             },
             "normalTexture": {
-                "index": 235
+                "index": 231
             }
         },
         {
@@ -45764,15 +45764,15 @@
                     ],
                     "glossinessFactor": 0.7411760091781616,
                     "diffuseTexture": {
-                        "index": 57
+                        "index": 56
                     },
                     "specularGlossinessTexture": {
-                        "index": 58
+                        "index": 57
                     }
                 }
             },
             "normalTexture": {
-                "index": 56
+                "index": 55
             }
         },
         {
@@ -45795,7 +45795,7 @@
                 }
             },
             "normalTexture": {
-                "index": 238
+                "index": 234
             }
         },
         {
@@ -45818,7 +45818,7 @@
                 }
             },
             "normalTexture": {
-                "index": 238
+                "index": 234
             }
         },
         {
@@ -45839,15 +45839,15 @@
                     ],
                     "glossinessFactor": 0.0,
                     "diffuseTexture": {
-                        "index": 241
+                        "index": 237
                     },
                     "specularGlossinessTexture": {
-                        "index": 242
+                        "index": 238
                     }
                 }
             },
             "normalTexture": {
-                "index": 240
+                "index": 236
             }
         },
         {
@@ -45869,7 +45869,7 @@
                     ],
                     "glossinessFactor": 1.0,
                     "diffuseTexture": {
-                        "index": 243
+                        "index": 239
                     }
                 }
             }
@@ -45892,15 +45892,15 @@
                     ],
                     "glossinessFactor": 0.6399999856948853,
                     "diffuseTexture": {
-                        "index": 245
+                        "index": 241
                     },
                     "specularGlossinessTexture": {
-                        "index": 246
+                        "index": 242
                     }
                 }
             },
             "normalTexture": {
-                "index": 244
+                "index": 240
             }
         },
         {
@@ -45921,15 +45921,15 @@
                     ],
                     "glossinessFactor": 0.5099999904632568,
                     "diffuseTexture": {
-                        "index": 248
+                        "index": 244
                     },
                     "specularGlossinessTexture": {
-                        "index": 249
+                        "index": 245
                     }
                 }
             },
             "normalTexture": {
-                "index": 247
+                "index": 243
             }
         },
         {
@@ -45950,15 +45950,15 @@
                     ],
                     "glossinessFactor": 0.5400000214576721,
                     "diffuseTexture": {
-                        "index": 251
+                        "index": 247
                     },
                     "specularGlossinessTexture": {
-                        "index": 252
+                        "index": 248
                     }
                 }
             },
             "normalTexture": {
-                "index": 250
+                "index": 246
             }
         },
         {
@@ -45979,15 +45979,15 @@
                     ],
                     "glossinessFactor": 0.6980389952659607,
                     "diffuseTexture": {
-                        "index": 57
+                        "index": 56
                     },
                     "specularGlossinessTexture": {
-                        "index": 58
+                        "index": 57
                     }
                 }
             },
             "normalTexture": {
-                "index": 56
+                "index": 55
             }
         },
         {
@@ -46008,15 +46008,15 @@
                     ],
                     "glossinessFactor": 0.5,
                     "diffuseTexture": {
-                        "index": 254
+                        "index": 250
                     },
                     "specularGlossinessTexture": {
-                        "index": 255
+                        "index": 251
                     }
                 }
             },
             "normalTexture": {
-                "index": 253
+                "index": 249
             }
         },
         {
@@ -46037,15 +46037,15 @@
                     ],
                     "glossinessFactor": 0.65,
                     "diffuseTexture": {
-                        "index": 78
+                        "index": 76
                     },
                     "specularGlossinessTexture": {
-                        "index": 206
+                        "index": 202
                     }
                 }
             },
             "normalTexture": {
-                "index": 77
+                "index": 75
             }
         },
         {
@@ -46066,12 +46066,12 @@
                     ],
                     "glossinessFactor": 0.5529410243034363,
                     "diffuseTexture": {
-                        "index": 179
+                        "index": 175
                     }
                 }
             },
             "normalTexture": {
-                "index": 178
+                "index": 174
             }
         },
         {
@@ -46092,15 +46092,15 @@
                     ],
                     "glossinessFactor": 0.65,
                     "diffuseTexture": {
-                        "index": 78
+                        "index": 76
                     },
                     "specularGlossinessTexture": {
-                        "index": 206
+                        "index": 202
                     }
                 }
             },
             "normalTexture": {
-                "index": 77
+                "index": 75
             }
         },
         {
@@ -46121,15 +46121,15 @@
                     ],
                     "glossinessFactor": 0.4117650091648102,
                     "diffuseTexture": {
-                        "index": 57
+                        "index": 56
                     },
                     "specularGlossinessTexture": {
-                        "index": 58
+                        "index": 57
                     }
                 }
             },
             "normalTexture": {
-                "index": 56
+                "index": 55
             }
         },
         {
@@ -46150,15 +46150,15 @@
                     ],
                     "glossinessFactor": 1.0,
                     "diffuseTexture": {
-                        "index": 203
+                        "index": 199
                     },
                     "specularGlossinessTexture": {
-                        "index": 204
+                        "index": 200
                     }
                 }
             },
             "normalTexture": {
-                "index": 202
+                "index": 198
             }
         },
         {
@@ -46179,15 +46179,15 @@
                     ],
                     "glossinessFactor": 0.8,
                     "diffuseTexture": {
-                        "index": 88
+                        "index": 84
                     },
                     "specularGlossinessTexture": {
-                        "index": 89
+                        "index": 85
                     }
                 }
             },
             "normalTexture": {
-                "index": 33
+                "index": 32
             }
         },
         {
@@ -46228,15 +46228,15 @@
                     ],
                     "glossinessFactor": 1.0,
                     "diffuseTexture": {
-                        "index": 135
+                        "index": 131
                     },
                     "specularGlossinessTexture": {
-                        "index": 136
+                        "index": 132
                     }
                 }
             },
             "normalTexture": {
-                "index": 134
+                "index": 130
             }
         },
         {
@@ -46257,15 +46257,15 @@
                     ],
                     "glossinessFactor": 0.7,
                     "diffuseTexture": {
-                        "index": 78
+                        "index": 76
                     },
                     "specularGlossinessTexture": {
-                        "index": 206
+                        "index": 202
                     }
                 }
             },
             "normalTexture": {
-                "index": 77
+                "index": 75
             }
         },
         {
@@ -46286,12 +46286,12 @@
                     ],
                     "glossinessFactor": 0.5199999809265137,
                     "diffuseTexture": {
-                        "index": 257
+                        "index": 253
                     }
                 }
             },
             "normalTexture": {
-                "index": 256
+                "index": 252
             }
         },
         {
@@ -46312,15 +46312,15 @@
                     ],
                     "glossinessFactor": 0.7,
                     "diffuseTexture": {
-                        "index": 115
+                        "index": 111
                     },
                     "specularGlossinessTexture": {
-                        "index": 116
+                        "index": 112
                     }
                 }
             },
             "normalTexture": {
-                "index": 258
+                "index": 254
             }
         },
         {
@@ -46342,12 +46342,12 @@
                     ],
                     "glossinessFactor": 0.800000011920929,
                     "diffuseTexture": {
-                        "index": 260
+                        "index": 256
                     }
                 }
             },
             "normalTexture": {
-                "index": 259
+                "index": 255
             }
         },
         {
@@ -46373,18 +46373,18 @@
                     ],
                     "glossinessFactor": 0.800000011920929,
                     "diffuseTexture": {
-                        "index": 263
+                        "index": 259
                     },
                     "specularGlossinessTexture": {
-                        "index": 264
+                        "index": 260
                     }
                 }
             },
             "emissiveTexture": {
-                "index": 261
+                "index": 257
             },
             "normalTexture": {
-                "index": 262
+                "index": 258
             }
         },
         {
@@ -46405,15 +46405,15 @@
                     ],
                     "glossinessFactor": 0.800000011920929,
                     "diffuseTexture": {
-                        "index": 265
+                        "index": 261
                     },
                     "specularGlossinessTexture": {
-                        "index": 116
+                        "index": 112
                     }
                 }
             },
             "normalTexture": {
-                "index": 258
+                "index": 254
             }
         },
         {
@@ -46459,12 +46459,12 @@
                     ],
                     "glossinessFactor": 0.0,
                     "diffuseTexture": {
-                        "index": 267
+                        "index": 263
                     }
                 }
             },
             "normalTexture": {
-                "index": 266
+                "index": 262
             }
         },
         {
@@ -46485,12 +46485,12 @@
                     ],
                     "glossinessFactor": 0.23999999463558197,
                     "diffuseTexture": {
-                        "index": 267
+                        "index": 263
                     }
                 }
             },
             "normalTexture": {
-                "index": 266
+                "index": 262
             }
         },
         {
@@ -46511,12 +46511,12 @@
                     ],
                     "glossinessFactor": 0.20000000298023224,
                     "diffuseTexture": {
-                        "index": 269
+                        "index": 265
                     }
                 }
             },
             "normalTexture": {
-                "index": 268
+                "index": 264
             }
         },
         {
@@ -46537,12 +46537,12 @@
                     ],
                     "glossinessFactor": 0.20000000298023224,
                     "diffuseTexture": {
-                        "index": 271
+                        "index": 267
                     }
                 }
             },
             "normalTexture": {
-                "index": 270
+                "index": 266
             }
         },
         {
@@ -46563,12 +46563,12 @@
                     ],
                     "glossinessFactor": 0.20000000298023224,
                     "diffuseTexture": {
-                        "index": 273
+                        "index": 269
                     }
                 }
             },
             "normalTexture": {
-                "index": 272
+                "index": 268
             }
         },
         {
@@ -46589,12 +46589,12 @@
                     ],
                     "glossinessFactor": 0.5,
                     "diffuseTexture": {
-                        "index": 275
+                        "index": 271
                     }
                 }
             },
             "normalTexture": {
-                "index": 274
+                "index": 270
             }
         },
         {
@@ -46615,12 +46615,12 @@
                     ],
                     "glossinessFactor": 0.8019999861717224,
                     "diffuseTexture": {
-                        "index": 277
+                        "index": 273
                     }
                 }
             },
             "normalTexture": {
-                "index": 276
+                "index": 272
             }
         },
         {
@@ -46641,12 +46641,12 @@
                     ],
                     "glossinessFactor": 0.7799999713897705,
                     "diffuseTexture": {
-                        "index": 279
+                        "index": 275
                     }
                 }
             },
             "normalTexture": {
-                "index": 278
+                "index": 274
             }
         },
         {
@@ -46668,15 +46668,15 @@
                     ],
                     "glossinessFactor": 0.800000011920929,
                     "diffuseTexture": {
-                        "index": 281
+                        "index": 277
                     },
                     "specularGlossinessTexture": {
-                        "index": 282
+                        "index": 278
                     }
                 }
             },
             "normalTexture": {
-                "index": 280
+                "index": 276
             }
         },
         {
@@ -46697,12 +46697,12 @@
                     ],
                     "glossinessFactor": 0.5,
                     "diffuseTexture": {
-                        "index": 284
+                        "index": 280
                     }
                 }
             },
             "normalTexture": {
-                "index": 283
+                "index": 279
             }
         },
         {
@@ -46723,12 +46723,12 @@
                     ],
                     "glossinessFactor": 0.5,
                     "diffuseTexture": {
-                        "index": 284
+                        "index": 280
                     }
                 }
             },
             "normalTexture": {
-                "index": 283
+                "index": 279
             }
         },
         {
@@ -46749,12 +46749,12 @@
                     ],
                     "glossinessFactor": 0.5,
                     "diffuseTexture": {
-                        "index": 286
+                        "index": 282
                     }
                 }
             },
             "normalTexture": {
-                "index": 285
+                "index": 281
             }
         },
         {
@@ -46775,12 +46775,12 @@
                     ],
                     "glossinessFactor": 0.5,
                     "diffuseTexture": {
-                        "index": 286
+                        "index": 282
                     }
                 }
             },
             "normalTexture": {
-                "index": 285
+                "index": 281
             }
         },
         {
@@ -46801,12 +46801,12 @@
                     ],
                     "glossinessFactor": 0.33399999141693115,
                     "diffuseTexture": {
-                        "index": 98
+                        "index": 94
                     }
                 }
             },
             "normalTexture": {
-                "index": 97
+                "index": 93
             }
         },
         {
@@ -46832,7 +46832,7 @@
                 }
             },
             "normalTexture": {
-                "index": 41
+                "index": 40
             }
         },
         {
@@ -46853,12 +46853,12 @@
                     ],
                     "glossinessFactor": 0.75,
                     "diffuseTexture": {
-                        "index": 288
+                        "index": 284
                     }
                 }
             },
             "normalTexture": {
-                "index": 287
+                "index": 283
             }
         },
         {
@@ -46880,12 +46880,12 @@
                     ],
                     "glossinessFactor": 0.36000001430511475,
                     "diffuseTexture": {
-                        "index": 290
+                        "index": 286
                     }
                 }
             },
             "normalTexture": {
-                "index": 289
+                "index": 285
             }
         },
         {
@@ -46907,12 +46907,12 @@
                     ],
                     "glossinessFactor": 0.5600000023841858,
                     "diffuseTexture": {
-                        "index": 167
+                        "index": 163
                     }
                 }
             },
             "normalTexture": {
-                "index": 166
+                "index": 162
             }
         },
         {
@@ -46934,7 +46934,7 @@
                     ],
                     "glossinessFactor": 0.11764699965715408,
                     "diffuseTexture": {
-                        "index": 291
+                        "index": 287
                     }
                 }
             }
@@ -46958,12 +46958,12 @@
                     ],
                     "glossinessFactor": 1.0,
                     "diffuseTexture": {
-                        "index": 169
+                        "index": 165
                     }
                 }
             },
             "normalTexture": {
-                "index": 168
+                "index": 164
             }
         },
         {
@@ -46984,7 +46984,7 @@
                     ],
                     "glossinessFactor": 0.043136999011039734,
                     "diffuseTexture": {
-                        "index": 292
+                        "index": 288
                     }
                 }
             }
@@ -47012,18 +47012,18 @@
                     ],
                     "glossinessFactor": 0.65,
                     "diffuseTexture": {
-                        "index": 295
+                        "index": 291
                     },
                     "specularGlossinessTexture": {
-                        "index": 296
+                        "index": 292
                     }
                 }
             },
             "emissiveTexture": {
-                "index": 293
+                "index": 289
             },
             "normalTexture": {
-                "index": 294
+                "index": 290
             }
         },
         {
@@ -47071,7 +47071,7 @@
                 }
             },
             "normalTexture": {
-                "index": 297
+                "index": 293
             }
         },
         {
@@ -47092,15 +47092,15 @@
                     ],
                     "glossinessFactor": 0.7,
                     "diffuseTexture": {
-                        "index": 300
+                        "index": 295
                     },
                     "specularGlossinessTexture": {
-                        "index": 301
+                        "index": 296
                     }
                 }
             },
             "normalTexture": {
-                "index": 299
+                "index": 294
             }
         },
         {
@@ -47126,12 +47126,12 @@
                     ],
                     "glossinessFactor": 0.8799999952316284,
                     "diffuseTexture": {
-                        "index": 303
+                        "index": 298
                     }
                 }
             },
             "emissiveTexture": {
-                "index": 302
+                "index": 297
             }
         },
         {
@@ -47152,12 +47152,12 @@
                     ],
                     "glossinessFactor": 0.75,
                     "diffuseTexture": {
-                        "index": 205
+                        "index": 201
                     }
                 }
             },
             "normalTexture": {
-                "index": 297
+                "index": 293
             }
         },
         {
@@ -47179,15 +47179,15 @@
                     ],
                     "glossinessFactor": 0.7529410123825073,
                     "diffuseTexture": {
-                        "index": 305
+                        "index": 300
                     },
                     "specularGlossinessTexture": {
-                        "index": 306
+                        "index": 301
                     }
                 }
             },
             "normalTexture": {
-                "index": 304
+                "index": 299
             }
         },
         {
@@ -47208,12 +47208,12 @@
                     ],
                     "glossinessFactor": 0.7609999775886536,
                     "diffuseTexture": {
-                        "index": 78
+                        "index": 76
                     }
                 }
             },
             "normalTexture": {
-                "index": 77
+                "index": 75
             }
         },
         {
@@ -47240,18 +47240,18 @@
                     ],
                     "glossinessFactor": 0.75,
                     "diffuseTexture": {
-                        "index": 307
+                        "index": 302
                     },
                     "specularGlossinessTexture": {
-                        "index": 309
+                        "index": 304
                     }
                 }
             },
             "emissiveTexture": {
-                "index": 307
+                "index": 302
             },
             "normalTexture": {
-                "index": 308
+                "index": 303
             }
         },
         {
@@ -47272,15 +47272,15 @@
                     ],
                     "glossinessFactor": 0.5600000023841858,
                     "diffuseTexture": {
-                        "index": 191
+                        "index": 187
                     },
                     "specularGlossinessTexture": {
-                        "index": 192
+                        "index": 188
                     }
                 }
             },
             "normalTexture": {
-                "index": 190
+                "index": 186
             }
         },
         {
@@ -47306,7 +47306,7 @@
                     ],
                     "glossinessFactor": 0.6000000238418579,
                     "diffuseTexture": {
-                        "index": 239
+                        "index": 235
                     }
                 }
             }
@@ -47334,7 +47334,7 @@
                     ],
                     "glossinessFactor": 0.6000000238418579,
                     "diffuseTexture": {
-                        "index": 239
+                        "index": 235
                     }
                 }
             }
@@ -47362,7 +47362,7 @@
                     ],
                     "glossinessFactor": 0.6000000238418579,
                     "diffuseTexture": {
-                        "index": 239
+                        "index": 235
                     }
                 }
             }
@@ -47390,7 +47390,7 @@
                     ],
                     "glossinessFactor": 0.6000000238418579,
                     "diffuseTexture": {
-                        "index": 239
+                        "index": 235
                     }
                 }
             }
@@ -47418,7 +47418,7 @@
                     ],
                     "glossinessFactor": 0.6000000238418579,
                     "diffuseTexture": {
-                        "index": 239
+                        "index": 235
                     }
                 }
             }
@@ -47446,7 +47446,7 @@
                     ],
                     "glossinessFactor": 0.6000000238418579,
                     "diffuseTexture": {
-                        "index": 239
+                        "index": 235
                     }
                 }
             }
@@ -47474,18 +47474,18 @@
                     ],
                     "glossinessFactor": 0.6899999976158142,
                     "diffuseTexture": {
-                        "index": 263
+                        "index": 259
                     },
                     "specularGlossinessTexture": {
-                        "index": 264
+                        "index": 260
                     }
                 }
             },
             "emissiveTexture": {
-                "index": 261
+                "index": 257
             },
             "normalTexture": {
-                "index": 262
+                "index": 258
             }
         },
         {
@@ -47543,15 +47543,15 @@
                     ],
                     "glossinessFactor": 0.6200000047683716,
                     "diffuseTexture": {
-                        "index": 311
+                        "index": 306
                     },
                     "specularGlossinessTexture": {
-                        "index": 312
+                        "index": 307
                     }
                 }
             },
             "normalTexture": {
-                "index": 310
+                "index": 305
             }
         },
         {
@@ -47577,18 +47577,18 @@
                     ],
                     "glossinessFactor": 0.7,
                     "diffuseTexture": {
-                        "index": 315
+                        "index": 310
                     },
                     "specularGlossinessTexture": {
-                        "index": 316
+                        "index": 311
                     }
                 }
             },
             "emissiveTexture": {
-                "index": 313
+                "index": 308
             },
             "normalTexture": {
-                "index": 314
+                "index": 309
             }
         },
         {
@@ -47609,18 +47609,18 @@
                     ],
                     "glossinessFactor": 0.800000011920929,
                     "diffuseTexture": {
-                        "index": 319
+                        "index": 314
                     },
                     "specularGlossinessTexture": {
-                        "index": 320
+                        "index": 315
                     }
                 }
             },
             "emissiveTexture": {
-                "index": 317
+                "index": 312
             },
             "normalTexture": {
-                "index": 318
+                "index": 313
             }
         },
         {
@@ -47646,12 +47646,12 @@
                     ],
                     "glossinessFactor": 0.0,
                     "diffuseTexture": {
-                        "index": 205
+                        "index": 201
                     }
                 }
             },
             "emissiveTexture": {
-                "index": 321
+                "index": 316
             }
         },
         {
@@ -47672,12 +47672,12 @@
                     ],
                     "glossinessFactor": 0.7239999771118164,
                     "diffuseTexture": {
-                        "index": 78
+                        "index": 76
                     }
                 }
             },
             "normalTexture": {
-                "index": 77
+                "index": 75
             }
         },
         {
@@ -47698,7 +47698,7 @@
                     ],
                     "glossinessFactor": 1.0,
                     "diffuseTexture": {
-                        "index": 324
+                        "index": 319
                     }
                 }
             },
@@ -47708,10 +47708,10 @@
                 0.06
             ],
             "emissiveTexture": {
-                "index": 322
+                "index": 317
             },
             "normalTexture": {
-                "index": 323
+                "index": 318
             }
         },
         {
@@ -47758,15 +47758,15 @@
                     ],
                     "glossinessFactor": 0.800000011920929,
                     "diffuseTexture": {
-                        "index": 222
+                        "index": 218
                     },
                     "specularGlossinessTexture": {
-                        "index": 73
+                        "index": 71
                     }
                 }
             },
             "normalTexture": {
-                "index": 71
+                "index": 69
             }
         },
         {
@@ -47787,15 +47787,15 @@
                     ],
                     "glossinessFactor": 0.5099999904632568,
                     "diffuseTexture": {
-                        "index": 236
+                        "index": 232
                     },
                     "specularGlossinessTexture": {
-                        "index": 73
+                        "index": 71
                     }
                 }
             },
             "normalTexture": {
-                "index": 235
+                "index": 231
             }
         },
         {
@@ -47845,15 +47845,15 @@
                     ],
                     "glossinessFactor": 1.0,
                     "diffuseTexture": {
-                        "index": 88
+                        "index": 84
                     },
                     "specularGlossinessTexture": {
-                        "index": 89
+                        "index": 85
                     }
                 }
             },
             "normalTexture": {
-                "index": 33
+                "index": 32
             }
         },
         {
@@ -47874,15 +47874,15 @@
                     ],
                     "glossinessFactor": 0.32548999786376953,
                     "diffuseTexture": {
-                        "index": 205
+                        "index": 201
                     },
                     "specularGlossinessTexture": {
-                        "index": 326
+                        "index": 321
                     }
                 }
             },
             "normalTexture": {
-                "index": 325
+                "index": 320
             }
         },
         {
@@ -47903,10 +47903,10 @@
                     ],
                     "glossinessFactor": 0.7,
                     "diffuseTexture": {
-                        "index": 327
+                        "index": 322
                     },
                     "specularGlossinessTexture": {
-                        "index": 328
+                        "index": 323
                     }
                 }
             }
@@ -47929,12 +47929,12 @@
                     ],
                     "glossinessFactor": 1.0,
                     "diffuseTexture": {
-                        "index": 105
+                        "index": 101
                     }
                 }
             },
             "normalTexture": {
-                "index": 104
+                "index": 100
             }
         },
         {
@@ -47955,12 +47955,12 @@
                     ],
                     "glossinessFactor": 0.6930000185966492,
                     "diffuseTexture": {
-                        "index": 330
+                        "index": 325
                     }
                 }
             },
             "normalTexture": {
-                "index": 329
+                "index": 324
             }
         },
         {
@@ -48000,15 +48000,15 @@
                     ],
                     "glossinessFactor": 0.764706015586853,
                     "diffuseTexture": {
-                        "index": 332
+                        "index": 327
                     },
                     "specularGlossinessTexture": {
-                        "index": 333
+                        "index": 328
                     }
                 }
             },
             "normalTexture": {
-                "index": 331
+                "index": 326
             }
         },
         {
@@ -48029,15 +48029,15 @@
                     ],
                     "glossinessFactor": 0.3199999928474426,
                     "diffuseTexture": {
-                        "index": 335
+                        "index": 330
                     },
                     "specularGlossinessTexture": {
-                        "index": 336
+                        "index": 331
                     }
                 }
             },
             "normalTexture": {
-                "index": 334
+                "index": 329
             }
         },
         {
@@ -48052,21 +48052,21 @@
                         1.0
                     ],
                     "specularFactor": [
-                        0.30,
-                        0.30,
-                        0.30
+                        0.3,
+                        0.3,
+                        0.3
                     ],
                     "glossinessFactor": 0.64,
                     "diffuseTexture": {
-                        "index": 338
+                        "index": 333
                     },
                     "specularGlossinessTexture": {
-                        "index": 339
+                        "index": 334
                     }
                 }
             },
             "normalTexture": {
-                "index": 337
+                "index": 332
             }
         },
         {
@@ -48087,7 +48087,7 @@
                     ],
                     "glossinessFactor": 0.6941180229187012,
                     "diffuseTexture": {
-                        "index": 239
+                        "index": 235
                     }
                 }
             }
@@ -48110,15 +48110,15 @@
                     ],
                     "glossinessFactor": 0.7300000190734863,
                     "diffuseTexture": {
-                        "index": 147
+                        "index": 143
                     },
                     "specularGlossinessTexture": {
-                        "index": 148
+                        "index": 144
                     }
                 }
             },
             "normalTexture": {
-                "index": 146
+                "index": 142
             }
         },
         {
@@ -48144,18 +48144,18 @@
                     ],
                     "glossinessFactor": 0.4000000059604645,
                     "diffuseTexture": {
-                        "index": 263
+                        "index": 259
                     },
                     "specularGlossinessTexture": {
-                        "index": 264
+                        "index": 260
                     }
                 }
             },
             "emissiveTexture": {
-                "index": 261
+                "index": 257
             },
             "normalTexture": {
-                "index": 262
+                "index": 258
             }
         },
         {
@@ -48207,15 +48207,15 @@
                     ],
                     "glossinessFactor": 1.0,
                     "diffuseTexture": {
-                        "index": 342
+                        "index": 337
                     }
                 }
             },
             "emissiveTexture": {
-                "index": 340
+                "index": 335
             },
             "normalTexture": {
-                "index": 341
+                "index": 336
             }
         }
     ],
@@ -186805,46 +186805,6 @@
                     "source": 675
                 }
             }
-        },
-        {
-            "source": 676,
-            "extensions": {
-                "MSFT_texture_dds": {
-                    "source": 677
-                }
-            }
-        },
-        {
-            "source": 678,
-            "extensions": {
-                "MSFT_texture_dds": {
-                    "source": 679
-                }
-            }
-        },
-        {
-            "source": 680,
-            "extensions": {
-                "MSFT_texture_dds": {
-                    "source": 681
-                }
-            }
-        },
-        {
-            "source": 682,
-            "extensions": {
-                "MSFT_texture_dds": {
-                    "source": 683
-                }
-            }
-        },
-        {
-            "source": 684,
-            "extensions": {
-                "MSFT_texture_dds": {
-                    "source": 685
-                }
-            }
         }
     ],
     "images": [
@@ -187023,12 +186983,6 @@
             "uri": "objects/props/street/paris_mainbalcony_01/paris_doors_03a_spec.png"
         },
         {
-            "uri": "textures/shared/tiling/glass_dirty_01/glass_dirty_01_diff.png"
-        },
-        {
-            "uri": "textures/shared/tiling/glass_dirty_01/glass_dirty_01_diff.png"
-        },
-        {
             "uri": "textures/shared/tiling/glass_dirty_01/glass_dirty_01_spec.png"
         },
         {
@@ -187239,12 +187193,6 @@
             "uri": "textures/shared/tiling/Trim_cornice_01/Trim_cornice_01_diff.png"
         },
         {
-            "uri": "objects/structures/modular/windows/paris_building01_window/paris_building01_window_01_displ.png"
-        },
-        {
-            "uri": "objects/structures/modular/windows/paris_building01_window/paris_building01_window_01_displ.png"
-        },
-        {
             "uri": "textures/shared/decals/wall_decals/wall_decals.png"
         },
         {
@@ -187327,18 +187275,6 @@
         },
         {
             "uri": "objects/props/street/paris_bistroexteriorspotlight_01/paris_bistroexteriorspotlightglass_01_ddna.png"
-        },
-        {
-            "uri": "objects/props/street/paris_bistroexteriorspotlight_01/paris_bistroexteriorspotlightglass_01_diff.png"
-        },
-        {
-            "uri": "objects/props/street/paris_bistroexteriorspotlight_01/paris_bistroexteriorspotlightglass_01_diff.png"
-        },
-        {
-            "uri": "objects/props/street/paris_bistroexteriorspotlight_01/paris_bistroexteriorspotlightglass_01_spec.png"
-        },
-        {
-            "uri": "objects/props/street/paris_bistroexteriorspotlight_01/paris_bistroexteriorspotlightglass_01_spec.png"
         },
         {
             "uri": "objects/structures/standard/walls/bistro_woodpanel_01/bistro_woodpanelornament_01_ddna.png"
@@ -188635,12 +188571,6 @@
         },
         {
             "uri": "objects/props/street/paris_streetlight_01/paris_streetlight_glass_01_ddna.png"
-        },
-        {
-            "uri": "objects/props/street/paris_streetlight_01/paris_streetlight_glass_01_diff.png"
-        },
-        {
-            "uri": "objects/props/street/paris_streetlight_01/paris_streetlight_glass_01_diff.png"
         },
         {
             "uri": "objects/props/street/paris_streetlight_01/paris_streetlight_01_ddna.png"
