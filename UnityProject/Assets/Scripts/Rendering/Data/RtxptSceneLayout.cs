@@ -113,7 +113,12 @@ namespace PathTracing
                         {
                             indexCount      = (uint)sub.indexCount,
                             indexByteOffset = (uint)sub.indexStart * indexStride,
-                            baseVertex      = (uint)sub.baseVertex,
+                            // The donut IB already has baseVertex baked into its uint32 indices
+                            // (GetIndices applyBaseVertex), so the skinned BLAS — which reads that
+                            // IB — must not offset the vertex buffer by baseVertex a second time.
+                            // The native mesh IB (static path) stores baseVertex-relative indices,
+                            // so there the offset is required.
+                            baseVertex      = skinned ? 0u : (uint)sub.baseVertex,
                             flags           = grp.isAlphaClip ? 0u : NativeRenderPlugin.SUBMESH_FLAG_GEOMETRY_OPAQUE,
                         });
                     }
