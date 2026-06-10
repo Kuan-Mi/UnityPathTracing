@@ -263,18 +263,22 @@ private:
     // Internal BLAS types
     // -----------------------------------------------------------------------
 
-    // Deferred BLAS compaction entry.
-    // After EnsureBLAS records a build command, we simultaneously record
-    // EmitRaytracingAccelerationStructurePostbuildInfo (compacted size) and
-    // copy its result to a CPU-readable READBACK buffer.  Three frames later
-    // (by which time the GPU has definitely consumed the data) we read the
-    // size, allocate a smaller result buffer, record CopyRaytracingAccelerationStructure
-    // (COMPACT), and swap the cache entry.
-    struct PendingCompaction
+    // Deferred BLAS compaction batch — one per frame that built static BLASes.
+    // EnsureBLAS queues each newly built static key; after the frame's global
+    // post-build UAV barrier, QueueCompactionSizeQueries records ONE
+    // EmitRaytracingAccelerationStructurePostbuildInfo for all of them (the API
+    // takes an array of source VAs and writes one 8-byte size per AS,
+    // consecutively) plus one copy into a shared READBACK buffer. Three frames
+    // later ProcessPendingCompactions reads the sizes, allocates the smaller
+    // result buffers, records CopyRaytracingAccelerationStructure (COMPACT),
+    // and swaps the cache entries. Batching mirrors RTXMU (which nvrhi/donut
+    // delegate compaction to) and avoids the previous two committed 8-byte
+    // resources per BLAS — each of which occupied a 64KB heap.
+    struct PendingCompactionBatch
     {
-        MeshKey key;
+        std::vector<MeshKey>   keys;           // same order as the emitted size entries
         ComPtr<ID3D12Resource> sizeBuffer;     // DEFAULT UAV, target of EmitPostbuildInfo
-        ComPtr<ID3D12Resource> readbackBuffer; // READBACK, CPU reads the compacted size
+        ComPtr<ID3D12Resource> readbackBuffer; // READBACK, CPU reads the compacted sizes
         void*    mappedReadback = nullptr;     // persistently-mapped readback pointer
         uint32_t buildFrame     = 0;           // value of m_frameCounter when submitted
     };
@@ -325,6 +329,10 @@ private:
     bool BuildOMMForSubmesh(ID3D12GraphicsCommandList4* cmdList,
                             BLASEntry& entry, size_t subIdx, const SubMeshData& mesh);
     void ProcessPendingCompactions(ID3D12GraphicsCommandList4* cmdList);
+    // Records the batched compacted-size query + readback copy for every static
+    // BLAS built this frame (m_compactionQueue). Must run after the frame's
+    // global post-build UAV barrier so the postbuild info reads completed builds.
+    void QueueCompactionSizeQueries(ID3D12GraphicsCommandList4* cmdList);
 
     // TLAS helpers
     bool BuildTLAS(ID3D12GraphicsCommandList4* cmdList, const std::vector<TLASInstanceEntry>& entries);
@@ -339,8 +347,10 @@ private:
     // BLAS cache
     std::unordered_map<MeshKey, BLASEntry, MeshKeyHash> m_blasCache;
 
-    // Deferred compaction queue (static BLASes only)
-    std::vector<PendingCompaction> m_pendingCompactions;
+    // Deferred compaction (static BLASes only): keys built this frame awaiting
+    // their batched size query, and in-flight batches awaiting readback.
+    std::vector<MeshKey>                m_compactionQueue;
+    std::vector<PendingCompactionBatch> m_pendingCompactionBatches;
     uint32_t m_frameCounter = 0;
 
     // Single persistent TLAS rebuilt in place each frame (nvrhi model). Serialized

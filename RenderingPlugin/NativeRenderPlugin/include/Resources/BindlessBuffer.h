@@ -56,6 +56,25 @@ public:
     // stop here instead of scanning the full capacity.
     uint32_t UsedCount() const { return m_usedCount; }
 
+    // Per-frame resource-state sweep dedup — see BindlessTexture.h for the full
+    // rationale (donut's setPermanentTextureState adapted to Unity-owned state
+    // tracking). Valid for buffers too: anything that rewrites an element between
+    // our dispatches (e.g. Unity skinning) runs before the SRP passes, and the
+    // new frame serial re-arms the sweep.
+    bool NeedsStateSweep(uint64_t frameSerial, uint32_t state) const
+    {
+        return m_sweptEpoch != m_contentEpoch || m_sweptFrame != frameSerial ||
+               (m_sweptStates & state) != state;
+    }
+    void MarkStateSweep(uint64_t frameSerial, uint32_t state)
+    {
+        if (m_sweptFrame != frameSerial || m_sweptEpoch != m_contentEpoch)
+            m_sweptStates = 0;
+        m_sweptEpoch  = m_contentEpoch;
+        m_sweptFrame  = frameSerial;
+        m_sweptStates |= state;
+    }
+
     // Non-owning pointer to the resource at |index|, or nullptr if the slot is empty.
     ID3D12Resource* GetBuffer(uint32_t index) const
     {
@@ -82,4 +101,11 @@ private:
     uint32_t m_allocBase = 0;
     uint32_t m_usedCount = 0;   // see UsedCount(); grow-only except on shrinking Resize
     bool     m_initialized = false;
+
+    // Sweep-dedup state (see NeedsStateSweep). m_contentEpoch bumps on every
+    // SetBuffer / Resize so a content change forces the next dispatch to re-sweep.
+    uint64_t m_contentEpoch = 1;
+    uint64_t m_sweptEpoch   = 0;
+    uint64_t m_sweptFrame   = ~0ull;
+    uint32_t m_sweptStates  = 0;
 };

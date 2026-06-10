@@ -651,20 +651,28 @@ void DescriptorSetBase<ShaderT>::RequestResourceStates(
     for (uint32_t i : m_idxCBV)
         m_tracker.Require(ResolveBoundResource(slotOf(i)), D3D12_RESOURCE_STATE_VERTEX_AND_CONSTANT_BUFFER);
 
+    // SRV arrays: read-only within a frame, so the per-element Require sweep only
+    // needs to run on the first dispatch that binds the array each frame (or after
+    // its contents change) — the donut model is setPermanentTextureState on loaded
+    // textures; once-per-frame is the safe adaptation with Unity owning the tracker.
     for (uint32_t i : m_idxSRVArray)
     {
         const BindingSlot slot = slotOf(i);
         if (slot.objectKind == BindingObjectKind::BindlessTexture && slot.objectPtr)
         {
             auto* bt = reinterpret_cast<BindlessTexture*>(slot.objectPtr);
+            if (!bt->NeedsStateSweep(g_frameSerial, m_srvReadState)) continue;
             for (uint32_t k = 0, n = bt->UsedCount(); k < n; ++k)
                 m_tracker.Require(bt->GetTexture(k), m_srvReadState);
+            bt->MarkStateSweep(g_frameSerial, m_srvReadState);
         }
         else if (slot.objectKind == BindingObjectKind::BindlessBuffer && slot.objectPtr)
         {
             auto* bb = reinterpret_cast<BindlessBuffer*>(slot.objectPtr);
+            if (!bb->NeedsStateSweep(g_frameSerial, m_srvReadState)) continue;
             for (uint32_t k = 0, n = bb->UsedCount(); k < n; ++k)
                 m_tracker.Require(bb->GetBuffer(k), m_srvReadState);
+            bb->MarkStateSweep(g_frameSerial, m_srvReadState);
         }
     }
 

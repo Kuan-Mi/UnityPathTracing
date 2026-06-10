@@ -41,6 +41,18 @@ static constexpr uint32_t kGlobalNumFrames = 3;
 extern uint32_t g_frameIndex;
 
 // ---------------------------------------------------------------------------
+// g_frameSerial
+//   Monotonic frame counter advanced alongside g_frameIndex at each frame tick
+//   (never wraps in practice). Used by per-frame dedup logic that needs to ask
+//   "did X already happen this frame?" — e.g. the bindless SRV-array resource-
+//   state sweep in DescriptorSetBase, which only needs to run once per frame
+//   per array (the donut equivalent is setPermanentTextureState on loaded
+//   textures; here Unity owns the state tracker, so once-per-frame is the
+//   safe adaptation).
+// ---------------------------------------------------------------------------
+extern uint64_t g_frameSerial;
+
+// ---------------------------------------------------------------------------
 // g_transientRing
 //   Shared transient-descriptor ring used by ComputeDescriptorSet and
 //   RayTraceDescriptorSet for per-dispatch SRV/UAV table allocation.  Reserves

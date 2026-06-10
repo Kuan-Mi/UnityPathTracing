@@ -65,6 +65,9 @@ static HANDLE                    s_gpuFlushDoneEvent = nullptr;
 // per-frame ring buffers using this value so they stay in sync.
 uint32_t g_frameIndex = 0;
 
+// Monotonic frame serial — see PluginInternal.h. Advanced with g_frameIndex.
+uint64_t g_frameSerial = 0;
+
 // Shared transient descriptor ring (see PluginInternal.h). Reserves a contiguous
 // sub-range of s_DescHeap at renderer init; descriptor-set dispatches bump-allocate
 // SRV/UAV tables out of it and the ring reclaims them once the frame fence completes.
@@ -141,7 +144,10 @@ static void DrainDeferredDeletes(bool force = false)
     // Skipped when force=true (shutdown path) to avoid disturbing the index during
     // teardown. (Frame-index advancement is a plugin-wide concern, not the queue's.)
     if (!force)
+    {
         g_frameIndex = (g_frameIndex + 1) % kGlobalNumFrames;
+        ++g_frameSerial;
+    }
 
     s_DeleteQueue.Drain(force);
 }

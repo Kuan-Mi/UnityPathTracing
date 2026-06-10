@@ -564,56 +564,10 @@ bool AccelerationStructure::EnsureBLAS(ID3D12GraphicsCommandList4 *cmdList, Inst
         //           (void*)key.vbPtr, (int)blas.anyOMM);
         m_blasCache.emplace(key, std::move(blas));
 
-        // Schedule compaction: query the actual compacted size so ProcessPendingCompactions
-        // can later create a smaller BLAS and free the over-allocated original.
-        {
-            D3D12_HEAP_PROPERTIES defaultHeap = {};
-            defaultHeap.Type = D3D12_HEAP_TYPE_DEFAULT;
-            D3D12_HEAP_PROPERTIES readbackHeap = {};
-            readbackHeap.Type = D3D12_HEAP_TYPE_READBACK;
-
-            PendingCompaction pc;
-            pc.key        = key;
-            pc.buildFrame = m_frameCounter;
-            pc.sizeBuffer = CreateBuffer(m_device.Get(), sizeof(uint64_t),
-                D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS,
-                D3D12_RESOURCE_STATE_UNORDERED_ACCESS,
-                defaultHeap, L"BLAS_CompactSizeUAV");
-            pc.readbackBuffer = CreateBuffer(m_device.Get(), sizeof(uint64_t),
-                D3D12_RESOURCE_FLAG_NONE,
-                D3D12_RESOURCE_STATE_COPY_DEST,
-                readbackHeap, L"BLAS_CompactSizeReadback");
-
-            if (pc.sizeBuffer && pc.readbackBuffer)
-            {
-                pc.readbackBuffer->Map(0, nullptr, &pc.mappedReadback);
-
-                // UAV barrier: ensure the build above is visible before querying
-                D3D12_RESOURCE_BARRIER uavBarrier = {};
-                uavBarrier.Type = D3D12_RESOURCE_BARRIER_TYPE_UAV;
-                uavBarrier.UAV.pResource = m_blasCache.at(key).blas.Get();
-                cmdList->ResourceBarrier(1, &uavBarrier);
-
-                D3D12_GPU_VIRTUAL_ADDRESS blasGpuVA = m_blasCache.at(key).blas->GetGPUVirtualAddress();
-                D3D12_RAYTRACING_ACCELERATION_STRUCTURE_POSTBUILD_INFO_DESC postbuildDesc = {};
-                postbuildDesc.DestBuffer = pc.sizeBuffer->GetGPUVirtualAddress();
-                postbuildDesc.InfoType   = D3D12_RAYTRACING_ACCELERATION_STRUCTURE_POSTBUILD_INFO_COMPACTED_SIZE;
-                cmdList->EmitRaytracingAccelerationStructurePostbuildInfo(&postbuildDesc, 1, &blasGpuVA);
-
-                // Transition sizeBuffer UAV → COPY_SOURCE so we can copy to readback
-                D3D12_RESOURCE_BARRIER transBarrier = {};
-                transBarrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
-                transBarrier.Transition.pResource   = pc.sizeBuffer.Get();
-                transBarrier.Transition.StateBefore = D3D12_RESOURCE_STATE_UNORDERED_ACCESS;
-                transBarrier.Transition.StateAfter  = D3D12_RESOURCE_STATE_COPY_SOURCE;
-                transBarrier.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
-                cmdList->ResourceBarrier(1, &transBarrier);
-
-                cmdList->CopyBufferRegion(pc.readbackBuffer.Get(), 0, pc.sizeBuffer.Get(), 0, sizeof(uint64_t));
-
-                m_pendingCompactions.push_back(std::move(pc));
-            }
-        }
+        // Schedule compaction: the actual size query is recorded in one batch for
+        // all static BLASes built this frame (QueueCompactionSizeQueries), after
+        // BuildOrUpdate's global post-build UAV barrier.
+        m_compactionQueue.push_back(key);
     }
 
     return true;
@@ -653,10 +607,81 @@ void AccelerationStructure::ReleaseBLAS(const MeshKey &key)
 }
 
 // ---------------------------------------------------------------------------
+// QueueCompactionSizeQueries
+//   Records ONE batched compacted-size query for every static BLAS built this
+//   frame: a single EmitRaytracingAccelerationStructurePostbuildInfo over all
+//   source VAs (one 8-byte size written per AS, consecutively) and one copy into
+//   a shared READBACK buffer. Replaces the previous two committed 8-byte
+//   resources per BLAS (64KB heap granularity each); mirrors RTXMU's batched
+//   compaction, which nvrhi/donut delegate to.
+//   Caller (BuildOrUpdate) must have issued the global post-build UAV barrier.
+// ---------------------------------------------------------------------------
+void AccelerationStructure::QueueCompactionSizeQueries(ID3D12GraphicsCommandList4 *cmdList)
+{
+    if (m_compactionQueue.empty())
+        return;
+
+    PendingCompactionBatch batch;
+    batch.keys.reserve(m_compactionQueue.size());
+    std::vector<D3D12_GPU_VIRTUAL_ADDRESS> vas;
+    vas.reserve(m_compactionQueue.size());
+    for (const MeshKey &key : m_compactionQueue)
+    {
+        auto it = m_blasCache.find(key);
+        if (it == m_blasCache.end() || !it->second.blas)
+            continue;   // already released this frame
+        batch.keys.push_back(key);
+        vas.push_back(it->second.blas->GetGPUVirtualAddress());
+    }
+    m_compactionQueue.clear();
+    if (batch.keys.empty())
+        return;
+
+    const UINT64 bytes = batch.keys.size() * sizeof(uint64_t);
+
+    D3D12_HEAP_PROPERTIES defaultHeap = {};
+    defaultHeap.Type = D3D12_HEAP_TYPE_DEFAULT;
+    D3D12_HEAP_PROPERTIES readbackHeap = {};
+    readbackHeap.Type = D3D12_HEAP_TYPE_READBACK;
+
+    batch.buildFrame = m_frameCounter;
+    batch.sizeBuffer = CreateBuffer(m_device.Get(), bytes,
+        D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS,
+        D3D12_RESOURCE_STATE_UNORDERED_ACCESS,
+        defaultHeap, L"BLAS_CompactSizeUAV");
+    batch.readbackBuffer = CreateBuffer(m_device.Get(), bytes,
+        D3D12_RESOURCE_FLAG_NONE,
+        D3D12_RESOURCE_STATE_COPY_DEST,
+        readbackHeap, L"BLAS_CompactSizeReadback");
+    if (!batch.sizeBuffer || !batch.readbackBuffer)
+        return;   // size query skipped; the BLASes simply stay uncompacted
+    batch.readbackBuffer->Map(0, nullptr, &batch.mappedReadback);
+
+    D3D12_RAYTRACING_ACCELERATION_STRUCTURE_POSTBUILD_INFO_DESC postbuildDesc = {};
+    postbuildDesc.DestBuffer = batch.sizeBuffer->GetGPUVirtualAddress();
+    postbuildDesc.InfoType   = D3D12_RAYTRACING_ACCELERATION_STRUCTURE_POSTBUILD_INFO_COMPACTED_SIZE;
+    cmdList->EmitRaytracingAccelerationStructurePostbuildInfo(
+        &postbuildDesc, static_cast<UINT>(vas.size()), vas.data());
+
+    // Transition the size buffer UAV → COPY_SOURCE and copy all sizes at once.
+    D3D12_RESOURCE_BARRIER transBarrier = {};
+    transBarrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
+    transBarrier.Transition.pResource   = batch.sizeBuffer.Get();
+    transBarrier.Transition.StateBefore = D3D12_RESOURCE_STATE_UNORDERED_ACCESS;
+    transBarrier.Transition.StateAfter  = D3D12_RESOURCE_STATE_COPY_SOURCE;
+    transBarrier.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
+    cmdList->ResourceBarrier(1, &transBarrier);
+
+    cmdList->CopyBufferRegion(batch.readbackBuffer.Get(), 0, batch.sizeBuffer.Get(), 0, bytes);
+
+    m_pendingCompactionBatches.push_back(std::move(batch));
+}
+
+// ---------------------------------------------------------------------------
 // ProcessPendingCompactions
-//   Called at the start of BuildOrUpdate each frame.  Items that were
+//   Called at the start of BuildOrUpdate each frame.  Batches that were
 //   submitted 3+ frames ago are safe to read (GPU has consumed them).
-//   For each ready item we:
+//   For each BLAS in a ready batch we:
 //     1. Read the compacted size from the READBACK buffer (CPU-visible).
 //     2. Allocate a smaller BLAS result buffer.
 //     3. Record CopyRaytracingAccelerationStructure (COMPACT) into cmdList.
@@ -665,86 +690,68 @@ void AccelerationStructure::ReleaseBLAS(const MeshKey &key)
 // ---------------------------------------------------------------------------
 void AccelerationStructure::ProcessPendingCompactions(ID3D12GraphicsCommandList4 *cmdList)
 {
-    if (m_pendingCompactions.empty())
+    if (m_pendingCompactionBatches.empty())
         return;
 
-    auto it = m_pendingCompactions.begin();
-    while (it != m_pendingCompactions.end())
+    auto batchIt = m_pendingCompactionBatches.begin();
+    while (batchIt != m_pendingCompactionBatches.end())
     {
         // Wait at least 3 frames so the GPU has finished the size-emit copy
-        if (m_frameCounter - it->buildFrame < 3)
+        if (m_frameCounter - batchIt->buildFrame < 3)
         {
-            ++it;
+            ++batchIt;
             continue;
         }
 
-        const uint64_t compactedSize = it->mappedReadback
-            ? *static_cast<const uint64_t *>(it->mappedReadback)
-            : 0;
+        const uint64_t* sizes = static_cast<const uint64_t *>(batchIt->mappedReadback);
 
-        auto cacheIt = m_blasCache.find(it->key);
-        if (cacheIt == m_blasCache.end() || compactedSize == 0 || !cacheIt->second.blas)
+        for (size_t e = 0; e < batchIt->keys.size(); ++e)
         {
-            // BLAS was already removed or size query failed — just clean up
-            if (it->mappedReadback)
-                it->readbackBuffer->Unmap(0, nullptr);
-            it = m_pendingCompactions.erase(it);
-            continue;
+            const MeshKey &key           = batchIt->keys[e];
+            const uint64_t compactedSize = sizes ? sizes[e] : 0;
+
+            auto cacheIt = m_blasCache.find(key);
+            if (cacheIt == m_blasCache.end() || compactedSize == 0 || !cacheIt->second.blas)
+                continue;   // BLAS already removed or size query failed
+
+            BLASEntry &entry = cacheIt->second;
+
+            // Allocate compacted result buffer
+            D3D12_HEAP_PROPERTIES defaultHeap = {};
+            defaultHeap.Type = D3D12_HEAP_TYPE_DEFAULT;
+
+            wchar_t name[64];
+            swprintf(name, 64, L"BLAS_Compacted_VB_%p", (void *)key.vbPtr);
+            auto compactedBlas = CreateBuffer(m_device.Get(), compactedSize,
+                D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS,
+                D3D12_RESOURCE_STATE_RAYTRACING_ACCELERATION_STRUCTURE,
+                defaultHeap, name);
+            if (!compactedBlas)
+                continue;   // alloc failed; the BLAS simply stays uncompacted
+
+            // Record the compaction copy command
+            cmdList->CopyRaytracingAccelerationStructure(
+                compactedBlas->GetGPUVirtualAddress(),
+                entry.blas->GetGPUVirtualAddress(),
+                D3D12_RAYTRACING_ACCELERATION_STRUCTURE_COPY_MODE_COMPACT);
+
+            // Swap cache entry: schedule old buffer for 3-frame deferred delete
+            D3D12_GPU_VIRTUAL_ADDRESS oldVA = entry.blas->GetGPUVirtualAddress();
+            D3D12_GPU_VIRTUAL_ADDRESS newVA = compactedBlas->GetGPUVirtualAddress();
+            SafeReleaseResource(std::move(entry.blas));
+            entry.blas = std::move(compactedBlas);
+
+            // Patch all active slots that still reference the old GPU VA
+            for (auto &slot : m_slots)
+            {
+                if (slot.active && slot.blasVA == oldVA)
+                    slot.blasVA = newVA;
+            }
         }
 
-        BLASEntry &entry = cacheIt->second;
-
-        // Allocate compacted result buffer
-        D3D12_HEAP_PROPERTIES defaultHeap = {};
-        defaultHeap.Type = D3D12_HEAP_TYPE_DEFAULT;
-
-        wchar_t name[64];
-        swprintf(name, 64, L"BLAS_Compacted_VB_%p", (void *)it->key.vbPtr);
-        auto compactedBlas = CreateBuffer(m_device.Get(), compactedSize,
-            D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS,
-            D3D12_RESOURCE_STATE_RAYTRACING_ACCELERATION_STRUCTURE,
-            defaultHeap, name);
-
-        if (!compactedBlas)
-        {
-            // AccelLogf(m_log, kUnityLogTypeWarning,
-            //     "[BLAS Compact] Buffer alloc failed for vb=%p (size=%llu), skipping",
-            //     (void *)it->key.vbPtr, (unsigned long long)compactedSize);
-            if (it->mappedReadback)
-                it->readbackBuffer->Unmap(0, nullptr);
-            it = m_pendingCompactions.erase(it);
-            continue;
-        }
-
-        // Record the compaction copy command
-        cmdList->CopyRaytracingAccelerationStructure(
-            compactedBlas->GetGPUVirtualAddress(),
-            entry.blas->GetGPUVirtualAddress(),
-            D3D12_RAYTRACING_ACCELERATION_STRUCTURE_COPY_MODE_COMPACT);
-
-        // AccelLogf(m_log, kUnityLogTypeLog,
-        //     "[BLAS Compact] vb=%p: %.3f MB -> %.3f MB (%.2f%% smaller)",
-        //     (void *)it->key.vbPtr,
-        //     entry.blas->GetDesc().Width/ (1024.0 * 1024.0) ,
-        //     compactedSize / (1024.0 * 1024.0),
-        //     100.0 * (1.0 - (double)compactedSize / (double)entry.blas->GetDesc().Width));
-
-        // Swap cache entry: schedule old buffer for 3-frame deferred delete
-        D3D12_GPU_VIRTUAL_ADDRESS oldVA = entry.blas->GetGPUVirtualAddress();
-        D3D12_GPU_VIRTUAL_ADDRESS newVA = compactedBlas->GetGPUVirtualAddress();
-        SafeReleaseResource(std::move(entry.blas));
-        entry.blas = std::move(compactedBlas);
-
-        // Patch all active slots that still reference the old GPU VA
-        for (auto &slot : m_slots)
-        {
-            if (slot.active && slot.blasVA == oldVA)
-                slot.blasVA = newVA;
-        }
-
-        if (it->mappedReadback)
-            it->readbackBuffer->Unmap(0, nullptr);
-        it = m_pendingCompactions.erase(it);
+        if (batchIt->mappedReadback)
+            batchIt->readbackBuffer->Unmap(0, nullptr);
+        batchIt = m_pendingCompactionBatches.erase(batchIt);
     }
 }
 
@@ -1045,15 +1052,16 @@ void AccelerationStructure::Clear()
     }
     m_blasCache.clear();
 
-    // Clean up any pending compaction entries (their GPU work will be abandoned,
+    // Clean up any pending compaction batches (their GPU work will be abandoned,
     // but since we are clearing everything the buffers just need to be released).
-    for (auto &pc : m_pendingCompactions)
+    for (auto &batch : m_pendingCompactionBatches)
     {
-        if (pc.mappedReadback)
-            pc.readbackBuffer->Unmap(0, nullptr);
-        // sizeBuffer and readbackBuffer released when PendingCompaction destructs
+        if (batch.mappedReadback)
+            batch.readbackBuffer->Unmap(0, nullptr);
+        // sizeBuffer and readbackBuffer released when the batch destructs
     }
-    m_pendingCompactions.clear();
+    m_pendingCompactionBatches.clear();
+    m_compactionQueue.clear();
 
     // NOTE: We no longer defer deletion of vertex/index buffers from slots because we don't own them.
     // Unity manages these resources, and we only store raw pointers without AddRef.
@@ -1396,6 +1404,10 @@ bool AccelerationStructure::BuildOrUpdate(ID3D12GraphicsCommandList4 *cmdList)
         blasBarrier.UAV.pResource = nullptr; // nullptr = all UAV resources
         cmdList->ResourceBarrier(1, &blasBarrier);
     }
+
+    // Record the batched compacted-size query for this frame's new static BLASes
+    // (must follow the global UAV barrier above so the builds are complete).
+    QueueCompactionSizeQueries(cmdList);
 
     // Emit TLAS instances in caller-specified order (SetInstanceOrderIndex), not raw slot
     // order: freed slots are reused, so slot order diverges from registration order after

@@ -69,6 +69,7 @@ void BindlessTexture::SetTexture(uint32_t index, ID3D12Resource* resource)
     m_textures[index] = resource;
     if (resource && index >= m_usedCount)
         m_usedCount = index + 1;
+    ++m_contentEpoch;   // re-arm the per-frame state sweep
     WriteDescriptor(index, resource);
 }
 
@@ -87,6 +88,7 @@ void BindlessTexture::Resize(uint32_t newCapacity)
     m_capacity = newCapacity;
     if (m_usedCount > newCapacity)
         m_usedCount = newCapacity;
+    ++m_contentEpoch;   // re-arm the per-frame state sweep
 
     // Re-write all descriptors in the new range
     for (uint32_t i = 0; i < newCapacity; ++i)
