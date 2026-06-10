@@ -4,33 +4,34 @@
 // prev = current). Run once per skinned instance per frame, BEFORE the BLAS refit that
 // consumes the positions.
 //
+// Unity compute port of the former SkinnedRepack.computeshader (native plugin): both the
+// source (SkinnedMeshRenderer.GetVertexBuffer) and the destination donut SoA buffer are plain
+// Unity GraphicsBuffers (Target.Raw), so this binds them directly via SetComputeBufferParam and
+// avoids the per-frame GetNativeBufferPtr() marshalling the native path required.
+//
 // Quantization matches donut's dm::vectorToSnorm8 / the C# RtxptGeometryCache packers
 // bit-for-bit: scale = 127/length(xyz), truncation toward zero, low byte kept.
 
-struct SkinnedRepackConstants
-{
-    uint VertexCount;
-    uint SrcStride;           // Unity skinned VB stride (stream 0 of the shared mesh)
-    uint SrcPosOffset;        // byte offsets within one source vertex
-    uint SrcNormalOffset;
-    uint SrcTangentOffset;
-    uint DstPosOffset;        // byte offsets of the SoA streams in the destination buffer
-    uint DstPrevPosOffset;
-    uint DstNormalOffset;     // 0xFFFFFFFF when the stream is absent
-    uint DstTangentOffset;
-    uint Flags;
-    uint _pad0;
-    uint _pad1;
-};
+#pragma kernel SkinnedRepack
+
+// Per-dispatch constants (set via CommandBuffer.SetComputeIntParam from C#).
+uint g_VertexCount;
+uint g_SrcStride;        // Unity skinned VB stride (stream 0 of the shared mesh)
+uint g_SrcPosOffset;     // byte offsets within one source vertex
+uint g_SrcNormalOffset;
+uint g_SrcTangentOffset;
+uint g_DstPosOffset;     // byte offsets of the SoA streams in the destination buffer
+uint g_DstPrevPosOffset;
+uint g_DstNormalOffset;  // unused (and may be 0xFFFFFFFF) when FLAG_HAS_NORMAL is clear
+uint g_DstTangentOffset;
+uint g_Flags;
 
 #define FLAG_FIRST_FRAME (1u << 0)
 #define FLAG_HAS_NORMAL  (1u << 1)
 #define FLAG_HAS_TANGENT (1u << 2)
 
-ConstantBuffer<SkinnedRepackConstants> g_Const : register(b0);
-
-ByteAddressBuffer   t_SrcVertexBuffer : register(t0); // Unity GPU-skinned VB
-RWByteAddressBuffer u_DstVertexBuffer : register(u0); // donut SoA buffer (BLAS + bindless input)
+ByteAddressBuffer   t_SrcVertexBuffer; // Unity GPU-skinned VB
+RWByteAddressBuffer u_DstVertexBuffer; // donut SoA buffer (BLAS + bindless input)
 
 uint PackRGB8Snorm(float3 v)
 {
@@ -53,38 +54,39 @@ uint PackRGBA8Snorm(float4 v)
 }
 
 [numthreads(64, 1, 1)]
-void main(uint vtx : SV_DispatchThreadID)
+void SkinnedRepack(uint3 dispatchId : SV_DispatchThreadID)
 {
-    if (vtx >= g_Const.VertexCount)
+    uint vtx = dispatchId.x;
+    if (vtx >= g_VertexCount)
         return;
 
-    uint srcBase = vtx * g_Const.SrcStride;
+    uint srcBase = vtx * g_SrcStride;
 
-    float3 position = asfloat(t_SrcVertexBuffer.Load3(srcBase + g_Const.SrcPosOffset));
+    float3 position = asfloat(t_SrcVertexBuffer.Load3(srcBase + g_SrcPosOffset));
 
     // Copy the current output position into PrevPosition before overwriting it
     // (donut skinning_cs.hlsl model; first frame has no history → prev = current).
-    uint   dstPosAddr = g_Const.DstPosOffset + vtx * 12u;
+    uint   dstPosAddr = g_DstPosOffset + vtx * 12u;
     float3 prevPosition;
-    if (g_Const.Flags & FLAG_FIRST_FRAME)
+    if (g_Flags & FLAG_FIRST_FRAME)
         prevPosition = position;
     else
         prevPosition = asfloat(u_DstVertexBuffer.Load3(dstPosAddr));
-    u_DstVertexBuffer.Store3(g_Const.DstPrevPosOffset + vtx * 12u, asuint(prevPosition));
+    u_DstVertexBuffer.Store3(g_DstPrevPosOffset + vtx * 12u, asuint(prevPosition));
 
     u_DstVertexBuffer.Store3(dstPosAddr, asuint(position));
 
-    if (g_Const.Flags & FLAG_HAS_NORMAL)
+    if (g_Flags & FLAG_HAS_NORMAL)
     {
-        float3 normal = asfloat(t_SrcVertexBuffer.Load3(srcBase + g_Const.SrcNormalOffset));
-        u_DstVertexBuffer.Store(g_Const.DstNormalOffset + vtx * 4u, PackRGB8Snorm(normal));
+        float3 normal = asfloat(t_SrcVertexBuffer.Load3(srcBase + g_SrcNormalOffset));
+        u_DstVertexBuffer.Store(g_DstNormalOffset + vtx * 4u, PackRGB8Snorm(normal));
     }
 
-    if (g_Const.Flags & FLAG_HAS_TANGENT)
+    if (g_Flags & FLAG_HAS_TANGENT)
     {
-        float4 tangent = asfloat(t_SrcVertexBuffer.Load4(srcBase + g_Const.SrcTangentOffset));
+        float4 tangent = asfloat(t_SrcVertexBuffer.Load4(srcBase + g_SrcTangentOffset));
         // The w (handedness) sign is flipped to match the static path / RTXPT glTF convention.
         tangent.w = -tangent.w;
-        u_DstVertexBuffer.Store(g_Const.DstTangentOffset + vtx * 4u, PackRGBA8Snorm(tangent));
+        u_DstVertexBuffer.Store(g_DstTangentOffset + vtx * 4u, PackRGBA8Snorm(tangent));
     }
 }

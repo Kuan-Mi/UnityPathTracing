@@ -1,5 +1,4 @@
 using System;
-using System.Runtime.InteropServices;
 using NativeRender;
 using UnityEngine;
 using UnityEngine.Rendering;
@@ -19,48 +18,45 @@ namespace PathTracing
     ///      refit inside the build then consumes the fresh positions;
     ///   2. the deferred t_InstanceData upload (transforms updated this frame);
     ///   3. each pipeline's hit-group table rebuild when the scene topology changed.
+    ///
+    /// The repack runs as a plain Unity <see cref="ComputeShader"/> (SkinnedRepack.compute):
+    /// both the source (SkinnedMeshRenderer.GetVertexBuffer) and the destination donut SoA
+    /// buffer are Unity GraphicsBuffers, so they bind directly via SetComputeBufferParam —
+    /// the former native-compute path required a per-frame GetNativeBufferPtr() on each.
     /// </summary>
     public class NativeRtxptBuildTlasPass : ScriptableRenderPass, IDisposable
     {
-        // Mirrors SkinnedRepackConstants in SkinnedRepack.computeshader (12 uints, root constants).
-        [StructLayout(LayoutKind.Sequential, Pack = 4)]
-        private struct SkinnedRepackConstants
-        {
-            public uint VertexCount;
-            public uint SrcStride;
-            public uint SrcPosOffset;
-            public uint SrcNormalOffset;
-            public uint SrcTangentOffset;
-            public uint DstPosOffset;
-            public uint DstPrevPosOffset;
-            public uint DstNormalOffset;
-            public uint DstTangentOffset;
-            public uint Flags;
-            public uint _pad0;
-            public uint _pad1;
-        }
+        // Shader property IDs for the SkinnedRepack.compute uniforms/resources.
+        private static readonly int _idVertexCount     = Shader.PropertyToID("g_VertexCount");
+        private static readonly int _idSrcStride       = Shader.PropertyToID("g_SrcStride");
+        private static readonly int _idSrcPosOffset    = Shader.PropertyToID("g_SrcPosOffset");
+        private static readonly int _idSrcNormalOffset = Shader.PropertyToID("g_SrcNormalOffset");
+        private static readonly int _idSrcTangentOffset= Shader.PropertyToID("g_SrcTangentOffset");
+        private static readonly int _idDstPosOffset    = Shader.PropertyToID("g_DstPosOffset");
+        private static readonly int _idDstPrevPosOffset= Shader.PropertyToID("g_DstPrevPosOffset");
+        private static readonly int _idDstNormalOffset = Shader.PropertyToID("g_DstNormalOffset");
+        private static readonly int _idDstTangentOffset= Shader.PropertyToID("g_DstTangentOffset");
+        private static readonly int _idFlags           = Shader.PropertyToID("g_Flags");
+        private static readonly int _idSrcVertexBuffer = Shader.PropertyToID("t_SrcVertexBuffer");
+        private static readonly int _idDstVertexBuffer = Shader.PropertyToID("u_DstVertexBuffer");
 
         private NativeRtxptGPUScene _gpuScene;
         private RayTracePipeline    _buildPipeline;
         private RayTracePipeline    _fillPipeline;
         private RayTracePipeline    _refPipeline;
 
-        private readonly NativeComputePipeline      _repackCs; // null when no shader assigned
-        private readonly NativeComputeDescriptorSet _repackDs;
+        private readonly ComputeShader _repackCs; // null when no shader assigned
+        private readonly int           _repackKernel;
 
-        public NativeRtxptBuildTlasPass(NativeComputeShader skinnedRepackShader = null)
+        public NativeRtxptBuildTlasPass(ComputeShader skinnedRepackShader = null)
         {
-            if (skinnedRepackShader != null)
-            {
-                _repackCs = new NativeComputePipeline(skinnedRepackShader);
-                _repackDs = new NativeComputeDescriptorSet(_repackCs);
-            }
+            _repackCs = skinnedRepackShader;
+            if (_repackCs != null)
+                _repackKernel = _repackCs.FindKernel("SkinnedRepack");
         }
 
         public void Dispose()
         {
-            _repackDs?.Dispose();
-            _repackCs?.Dispose();
         }
 
         public void Setup(NativeRtxptGPUScene gpuScene,
@@ -76,12 +72,12 @@ namespace PathTracing
 
         private class PassData
         {
-            internal NativeRtxptGPUScene        GpuScene;
-            internal RayTracePipeline           BuildPipeline;
-            internal RayTracePipeline           FillPipeline;
-            internal RayTracePipeline           RefPipeline;
-            internal NativeComputePipeline      RepackCs;
-            internal NativeComputeDescriptorSet RepackDs;
+            internal NativeRtxptGPUScene GpuScene;
+            internal RayTracePipeline    BuildPipeline;
+            internal RayTracePipeline    FillPipeline;
+            internal RayTracePipeline    RefPipeline;
+            internal ComputeShader       RepackCs;
+            internal int                 RepackKernel;
         }
 
         public override void RecordRenderGraph(RenderGraph renderGraph, ContextContainer frameData)
@@ -93,7 +89,7 @@ namespace PathTracing
             passData.FillPipeline  = _fillPipeline;
             passData.RefPipeline   = _refPipeline;
             passData.RepackCs      = _repackCs;
-            passData.RepackDs      = _repackDs;
+            passData.RepackKernel  = _repackKernel;
 
             builder.AllowPassCulling(false);
             builder.SetRenderFunc((PassData data, UnsafeGraphContext context) => ExecutePass(data, context));
@@ -123,47 +119,46 @@ namespace PathTracing
             cmd.EndSample(RenderPassMarkers.TLAS);
         }
 
-        private static unsafe void RecordSkinnedRepack(PassData data, CommandBuffer cmd)
+        private static void RecordSkinnedRepack(PassData data, CommandBuffer cmd)
         {
             var dispatches = data.GpuScene.SkinnedDispatches;
             if (dispatches.Count == 0) return;
-            if (data.RepackCs == null || data.RepackDs == null)
+            if (data.RepackCs == null)
             {
                 Debug.LogWarning("[NativeRtxptBuildTlasPass] Scene has skinned renderers but no SkinnedRepack compute shader is assigned — skinned geometry stays in rest pose.");
                 return;
             }
 
-            var ds = data.RepackDs;
+            var cs     = data.RepackCs;
+            int kernel = data.RepackKernel;
             foreach (var d in dispatches)
             {
                 if (d.Smr == null) continue;
 
-                // Current-frame GPU-skinned vertex buffer. The wrapper is disposed immediately —
-                // the underlying resource is owned (and kept alive) by the SkinnedMeshRenderer.
-                var vb = d.Smr.GetVertexBuffer();
-                if (vb == null) continue; // not skinned yet this frame; rest pose is in the SoA buffer
-                IntPtr srcPtr = vb.GetNativeBufferPtr();
-                vb.Dispose();
-                if (srcPtr == IntPtr.Zero) continue;
+                // Current-frame GPU-skinned vertex buffer (a Unity GraphicsBuffer wrapping the
+                // SMR-owned resource). Not disposed here: the CommandBuffer keeps it alive until
+                // deferred execution, and the wrapper is reclaimed by the GC after the frame —
+                // mirroring NRDSampleResource.RecordSkinnedMorphUpdate.
+                var srcVb = d.Smr.GetVertexBuffer();
+                if (srcVb == null) continue; // not skinned yet this frame; rest pose is in the SoA buffer
 
-                var constants = new SkinnedRepackConstants
-                {
-                    VertexCount      = (uint)d.VertexCount,
-                    SrcStride        = d.SrcStride,
-                    SrcPosOffset     = d.SrcPosOffset,
-                    SrcNormalOffset  = d.SrcNormalOffset,
-                    SrcTangentOffset = d.SrcTangentOffset,
-                    DstPosOffset     = d.Streams.Pos,
-                    DstPrevPosOffset = d.Streams.PrevPos,
-                    DstNormalOffset  = d.Streams.Normal,
-                    DstTangentOffset = d.Streams.Tangent,
-                    Flags            = d.BaseFlags | (d.Geometry.PendingFirstFrame ? RtxptSkinnedDispatch.FlagFirstFrame : 0u),
-                };
-                ds.SetRootConstants("g_Const", &constants);
-                ds.SetBuffer("t_SrcVertexBuffer", srcPtr);
-                ds.SetRWBuffer("u_DstVertexBuffer", d.DstVbPtr);
+                uint flags = d.BaseFlags | (d.Geometry.PendingFirstFrame ? RtxptSkinnedDispatch.FlagFirstFrame : 0u);
 
-                data.RepackCs.Dispatch(cmd, ds, ((uint)d.VertexCount + 63u) / 64u, 1, 1);
+                cmd.SetComputeIntParam(cs, _idVertexCount,      d.VertexCount);
+                cmd.SetComputeIntParam(cs, _idSrcStride,        (int)d.SrcStride);
+                cmd.SetComputeIntParam(cs, _idSrcPosOffset,     (int)d.SrcPosOffset);
+                cmd.SetComputeIntParam(cs, _idSrcNormalOffset,  (int)d.SrcNormalOffset);
+                cmd.SetComputeIntParam(cs, _idSrcTangentOffset, (int)d.SrcTangentOffset);
+                cmd.SetComputeIntParam(cs, _idDstPosOffset,     (int)d.Streams.Pos);
+                cmd.SetComputeIntParam(cs, _idDstPrevPosOffset, (int)d.Streams.PrevPos);
+                cmd.SetComputeIntParam(cs, _idDstNormalOffset,  (int)d.Streams.Normal);
+                cmd.SetComputeIntParam(cs, _idDstTangentOffset, (int)d.Streams.Tangent);
+                cmd.SetComputeIntParam(cs, _idFlags,            (int)flags);
+
+                cmd.SetComputeBufferParam(cs, kernel, _idSrcVertexBuffer, srcVb);
+                cmd.SetComputeBufferParam(cs, kernel, _idDstVertexBuffer, d.Geometry.Vb);
+
+                cmd.DispatchCompute(cs, kernel, ((int)d.VertexCount + 63) / 64, 1, 1);
                 d.Geometry.PendingFirstFrame = false;
             }
         }

@@ -47,8 +47,9 @@ namespace PathTracing
         public HitGroupShader[] referenceHitGroups;
 
         // Phase 0: skinned-repack compute (Unity skinned VB → per-instance donut SoA buffer),
-        // recorded by the TLAS build pass before the BLAS refit each frame.
-        public NativeComputeShader skinnedRepackCs;
+        // recorded by the TLAS build pass before the BLAS refit each frame. A plain Unity
+        // ComputeShader: both src/dst are Unity GraphicsBuffers, bound without GetNativeBufferPtr.
+        public ComputeShader skinnedRepackCs;
 
         // Phase 3
         public NativeComputeShader exportVisibilityBufferCs;
@@ -961,7 +962,9 @@ namespace PathTracing
             toneMapApplyRasterShader    = LoadRas($"{shaderRoot}/ToneMapper/ToneMapping");
             accumulationCs              = LoadCs($"{shaderRoot}/ProcessingPasses/AccumulationPass");
             stablePlanesDebugVizCs      = LoadCs($"{shaderRoot}/ProcessingPasses/PostProcess_StablePlanesDebugViz");
-            skinnedRepackCs             = LoadCs($"{shaderRoot}/Misc/SkinnedRepack");
+            skinnedRepackCs             = UnityEditor.AssetDatabase.LoadAssetAtPath<ComputeShader>($"{shaderRoot}/Misc/SkinnedRepack.compute");
+            if (skinnedRepackCs == null)
+                Debug.LogWarning($"[NativeRtxptFeature] Missing ComputeShader at: {shaderRoot}/Misc/SkinnedRepack.compute");
 
             string lightRoot   = $"{shaderRoot}/Lighting";
             string distantRoot = $"{lightRoot}/Distant";

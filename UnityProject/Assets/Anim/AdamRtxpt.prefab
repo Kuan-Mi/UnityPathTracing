@@ -46,7 +46,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: -8679921383154817045, guid: de926825f0840584db0f9890040354ed, type: 3}
       propertyPath: m_LocalPosition.x
-      value: 20.29687
+      value: 20.81
       objectReference: {fileID: 0}
     - target: {fileID: -8679921383154817045, guid: de926825f0840584db0f9890040354ed, type: 3}
       propertyPath: m_LocalPosition.y
@@ -54,7 +54,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: -8679921383154817045, guid: de926825f0840584db0f9890040354ed, type: 3}
       propertyPath: m_LocalPosition.z
-      value: 7.53368
+      value: 7.382
       objectReference: {fileID: 0}
     - target: {fileID: -8679921383154817045, guid: de926825f0840584db0f9890040354ed, type: 3}
       propertyPath: m_LocalRotation.w
@@ -1851,6 +1851,10 @@ PrefabInstance:
     - target: {fileID: 919132149155446097, guid: de926825f0840584db0f9890040354ed, type: 3}
       propertyPath: m_Name
       value: AdamRtxpt
+      objectReference: {fileID: 0}
+    - target: {fileID: 919132149155446097, guid: de926825f0840584db0f9890040354ed, type: 3}
+      propertyPath: m_IsActive
+      value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 927303451679019032, guid: de926825f0840584db0f9890040354ed, type: 3}
       propertyPath: m_LocalEulerAnglesHint.x
@@ -4108,7 +4112,7 @@ Animator:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 3439214596278566197}
   m_Enabled: 1
-  m_Avatar: {fileID: 0}
+  m_Avatar: {fileID: 9000000, guid: de926825f0840584db0f9890040354ed, type: 3}
   m_Controller: {fileID: 9100000, guid: a8e4206b0d8d4b747b347eba663aad4a, type: 2}
   m_CullingMode: 0
   m_UpdateMode: 0

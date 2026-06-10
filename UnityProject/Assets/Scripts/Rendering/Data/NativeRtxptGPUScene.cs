@@ -296,11 +296,11 @@ namespace PathTracing
                 if (normOff >= 0 && streams.HasNormal)  flags |= RtxptSkinnedDispatch.FlagHasNormal;
                 if (tanOff  >= 0 && streams.HasTangent) flags |= RtxptSkinnedDispatch.FlagHasTangent;
 
+
                 _skinnedDispatches.Add(new RtxptSkinnedDispatch
                 {
                     Smr              = rec.Skinned,
                     Geometry         = geo,
-                    DstVbPtr         = geo.Vb.GetNativeBufferPtr(),
                     VertexCount      = geo.VertexCount,
                     SrcStride        = (uint)stride,
                     SrcPosOffset     = (uint)posOff,
@@ -1028,7 +1028,6 @@ namespace PathTracing
 
         public SkinnedMeshRenderer  Smr;
         public RtxptSkinnedGeometry Geometry;
-        public IntPtr               DstVbPtr;
         public int                  VertexCount;
 
         // Unity skinned-VB layout (stream 0 of the shared mesh).
