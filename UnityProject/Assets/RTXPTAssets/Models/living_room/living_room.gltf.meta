@@ -1,0 +1,79 @@
+fileFormatVersion: 2
+guid: cb9b84b9aa58bad459b70de5c2f41af5
+ScriptedImporter:
+  internalIDToNameTable: []
+  externalObjects: {}
+  serializedVersion: 2
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+  script: {fileID: 11500000, guid: 715df9372183c47e389bb6e19fbc3b52, type: 3}
+  editorImportSettings:
+    generateSecondaryUVSet: 0
+  importSettings:
+    nodeNameMethod: 1
+    animationMethod: 2
+    generateMipMaps: 1
+    texturesReadable: 0
+    defaultMinFilterMode: 9729
+    defaultMagFilterMode: 9729
+    anisotropicFilterLevel: 1
+  instantiationSettings:
+    mask: -1
+    layer: 0
+    skinUpdateWhenOffscreen: 1
+    lightIntensityFactor: 1
+    sceneObjectCreation: 2
+  assetDependencies:
+  - type: 0
+    originalUri: Assets\Art\RTXPTAssets\Models\living_room\living_room.bin
+    assetPath: Assets\Art\RTXPTAssets\Models\living_room\living_room.bin
+  - type: 1
+    originalUri: Assets\Art\RTXPTAssets\Models\living_room\textures\book-spines.jpg
+    assetPath: Assets\Art\RTXPTAssets\Models\living_room\textures\book-spines.jpg
+  - type: 1
+    originalUri: Assets\Art\RTXPTAssets\Models\living_room\textures\shade-stripes.jpg
+    assetPath: Assets\Art\RTXPTAssets\Models\living_room\textures\shade-stripes.jpg
+  - type: 1
+    originalUri: Assets\Art\RTXPTAssets\Models\living_room\textures\pic5wide.jpg
+    assetPath: Assets\Art\RTXPTAssets\Models\living_room\textures\pic5wide.jpg
+  - type: 1
+    originalUri: Assets\Art\RTXPTAssets\Models\living_room\textures\apple.jpg
+    assetPath: Assets\Art\RTXPTAssets\Models\living_room\textures\apple.jpg
+  - type: 1
+    originalUri: Assets\Art\RTXPTAssets\Models\living_room\textures\cushion-green-circles.jpg
+    assetPath: Assets\Art\RTXPTAssets\Models\living_room\textures\cushion-green-circles.jpg
+  - type: 1
+    originalUri: Assets\Art\RTXPTAssets\Models\living_room\textures\photo3.jpg
+    assetPath: Assets\Art\RTXPTAssets\Models\living_room\textures\photo3.jpg
+  - type: 1
+    originalUri: Assets\Art\RTXPTAssets\Models\living_room\textures\magazine.jpg
+    assetPath: Assets\Art\RTXPTAssets\Models\living_room\textures\magazine.jpg
+  - type: 1
+    originalUri: Assets\Art\RTXPTAssets\Models\living_room\textures\Shade-paper.jpg
+    assetPath: Assets\Art\RTXPTAssets\Models\living_room\textures\Shade-paper.jpg
+  - type: 1
+    originalUri: Assets\Art\RTXPTAssets\Models\living_room\textures\cushion-stripe-purple.jpg
+    assetPath: Assets\Art\RTXPTAssets\Models\living_room\textures\cushion-stripe-purple.jpg
+  - type: 1
+    originalUri: Assets\Art\RTXPTAssets\Models\living_room\textures\picture11-vert.jpg
+    assetPath: Assets\Art\RTXPTAssets\Models\living_room\textures\picture11-vert.jpg
+  - type: 1
+    originalUri: Assets\Art\RTXPTAssets\Models\living_room\textures\cushion-purple-yellow-stripe.jpg
+    assetPath: Assets\Art\RTXPTAssets\Models\living_room\textures\cushion-purple-yellow-stripe.jpg
+  - type: 1
+    originalUri: Assets\Art\RTXPTAssets\Models\living_room\textures\photo1.jpg
+    assetPath: Assets\Art\RTXPTAssets\Models\living_room\textures\photo1.jpg
+  - type: 1
+    originalUri: Assets\Art\RTXPTAssets\Models\living_room\textures\photo2.jpg
+    assetPath: Assets\Art\RTXPTAssets\Models\living_room\textures\photo2.jpg
+  - type: 1
+    originalUri: Assets\Art\RTXPTAssets\Models\living_room\textures\photo4.jpg
+    assetPath: Assets\Art\RTXPTAssets\Models\living_room\textures\photo4.jpg
+  - type: 1
+    originalUri: Assets\Art\RTXPTAssets\Models\living_room\textures\wood4.jpg
+    assetPath: Assets\Art\RTXPTAssets\Models\living_room\textures\wood4.jpg
+  - type: 1
+    originalUri: Assets\Art\RTXPTAssets\Models\living_room\textures\carpet-text3b.jpg
+    assetPath: Assets\Art\RTXPTAssets\Models\living_room\textures\carpet-text3b.jpg
+  reportItems: []

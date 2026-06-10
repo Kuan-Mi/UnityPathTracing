@@ -1,0 +1,54 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: b5e6825437c0f154bbb51920bcfc591f, type: 3}
+  m_Name: bistro.LMBR_000017b_leaf
+  m_EditorClassIdentifier: Assembly-CSharp::PathTracing.RtxptMaterial
+  BaseOrDiffuseTexture: {fileID: 2800000, guid: b4c984de9e0de7c4397b01115f46dc2e, type: 3}
+  OcclusionRoughnessMetallicTexture: {fileID: 0}
+  NormalTexture: {fileID: 2800000, guid: e221377d838ed2543945e283bfd804b7, type: 3}
+  EmissiveTexture: {fileID: 0}
+  TransmissionTexture: {fileID: 0}
+  EnableBaseTexture: 1
+  EnableOcclusionRoughnessMetallicTexture: 1
+  EnableNormalTexture: 1
+  EnableEmissiveTexture: 1
+  EnableTransmissionTexture: 1
+  BaseColorFactor: {r: 1, g: 1, b: 1, a: 1}
+  Metalness: 0
+  Roughness: 0.64
+  SpecularColor: {r: 0.007843138, g: 0.007843138, b: 0.007843138, a: 1}
+  EmissiveColor: {r: 0, g: 0, b: 0, a: 0}
+  EmissiveIntensity: 1
+  Opacity: 1
+  AlphaCutoff: 0.5
+  EnableAlphaTesting: 1
+  IoR: 1.5
+  NormalTextureScale: 1
+  EnableTransmission: 1
+  TransmissionFactor: 0.545
+  DiffuseTransmissionFactor: 0.84
+  ThicknessFactor: 0
+  VolumeAttenuationColor: {r: 1, g: 1, b: 1, a: 1}
+  VolumeAttenuationDistance: 3.4028235e+38
+  ShadowNoLFadeout: 0
+  UseSpecularGlossModel: 1
+  MetalnessInRedChannel: 0
+  ThinSurface: 1
+  ExcludeFromNEE: 0
+  PSDExclude: 0
+  IgnoreMeshTangentSpace: 0
+  EnableAsAnalyticLightProxy: 0
+  UseDonutEmissiveIntensity: 0
+  SkipRender: 0
+  PSDDominantDeltaLobe: -1
+  NestedPriority: 14
+  PSDBlockMotionVectorsAtSurfaceType: 0

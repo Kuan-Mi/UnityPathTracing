@@ -1,0 +1,140 @@
+fileFormatVersion: 2
+guid: 6d73236270d9c91499f5e1738a41a744
+ScriptedImporter:
+  internalIDToNameTable: []
+  externalObjects: {}
+  serializedVersion: 2
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+  script: {fileID: 11500000, guid: 715df9372183c47e389bb6e19fbc3b52, type: 3}
+  editorImportSettings:
+    generateSecondaryUVSet: 0
+  importSettings:
+    nodeNameMethod: 1
+    animationMethod: 2
+    generateMipMaps: 1
+    texturesReadable: 0
+    defaultMinFilterMode: 9729
+    defaultMagFilterMode: 9729
+    anisotropicFilterLevel: 1
+  instantiationSettings:
+    mask: -1
+    layer: 0
+    skinUpdateWhenOffscreen: 1
+    lightIntensityFactor: 1
+    sceneObjectCreation: 2
+  assetDependencies:
+  - type: 0
+    originalUri: Assets\Art\RTXPTAssets\Models\glTF-Sample-Models\2.0\ABeautifulGame\glTF\ABeautifulGame.bin
+    assetPath: Assets\Art\RTXPTAssets\Models\glTF-Sample-Models\2.0\ABeautifulGame\glTF\ABeautifulGame.bin
+  - type: 1
+    originalUri: Assets\Art\RTXPTAssets\Models\glTF-Sample-Models\2.0\ABeautifulGame\glTF\King_black_normal.jpg
+    assetPath: Assets\Art\RTXPTAssets\Models\glTF-Sample-Models\2.0\ABeautifulGame\glTF\King_black_normal.jpg
+  - type: 1
+    originalUri: Assets\Art\RTXPTAssets\Models\glTF-Sample-Models\2.0\ABeautifulGame\glTF\King_black_ORM.jpg
+    assetPath: Assets\Art\RTXPTAssets\Models\glTF-Sample-Models\2.0\ABeautifulGame\glTF\King_black_ORM.jpg
+  - type: 1
+    originalUri: Assets\Art\RTXPTAssets\Models\glTF-Sample-Models\2.0\ABeautifulGame\glTF\king_black_base_color.jpg
+    assetPath: Assets\Art\RTXPTAssets\Models\glTF-Sample-Models\2.0\ABeautifulGame\glTF\king_black_base_color.jpg
+  - type: 1
+    originalUri: Assets\Art\RTXPTAssets\Models\glTF-Sample-Models\2.0\ABeautifulGame\glTF\King_white_normal.jpg
+    assetPath: Assets\Art\RTXPTAssets\Models\glTF-Sample-Models\2.0\ABeautifulGame\glTF\King_white_normal.jpg
+  - type: 1
+    originalUri: Assets\Art\RTXPTAssets\Models\glTF-Sample-Models\2.0\ABeautifulGame\glTF\King_white_ORM.jpg
+    assetPath: Assets\Art\RTXPTAssets\Models\glTF-Sample-Models\2.0\ABeautifulGame\glTF\King_white_ORM.jpg
+  - type: 1
+    originalUri: Assets\Art\RTXPTAssets\Models\glTF-Sample-Models\2.0\ABeautifulGame\glTF\king_white_base_color.jpg
+    assetPath: Assets\Art\RTXPTAssets\Models\glTF-Sample-Models\2.0\ABeautifulGame\glTF\king_white_base_color.jpg
+  - type: 1
+    originalUri: Assets\Art\RTXPTAssets\Models\glTF-Sample-Models\2.0\ABeautifulGame\glTF\Queen_black_normal.jpg
+    assetPath: Assets\Art\RTXPTAssets\Models\glTF-Sample-Models\2.0\ABeautifulGame\glTF\Queen_black_normal.jpg
+  - type: 1
+    originalUri: Assets\Art\RTXPTAssets\Models\glTF-Sample-Models\2.0\ABeautifulGame\glTF\Queen_black_ORM.jpg
+    assetPath: Assets\Art\RTXPTAssets\Models\glTF-Sample-Models\2.0\ABeautifulGame\glTF\Queen_black_ORM.jpg
+  - type: 1
+    originalUri: Assets\Art\RTXPTAssets\Models\glTF-Sample-Models\2.0\ABeautifulGame\glTF\queen_black_base_color.jpg
+    assetPath: Assets\Art\RTXPTAssets\Models\glTF-Sample-Models\2.0\ABeautifulGame\glTF\queen_black_base_color.jpg
+  - type: 1
+    originalUri: Assets\Art\RTXPTAssets\Models\glTF-Sample-Models\2.0\ABeautifulGame\glTF\Queen_white_normal.jpg
+    assetPath: Assets\Art\RTXPTAssets\Models\glTF-Sample-Models\2.0\ABeautifulGame\glTF\Queen_white_normal.jpg
+  - type: 1
+    originalUri: Assets\Art\RTXPTAssets\Models\glTF-Sample-Models\2.0\ABeautifulGame\glTF\Queen_white_ORM.jpg
+    assetPath: Assets\Art\RTXPTAssets\Models\glTF-Sample-Models\2.0\ABeautifulGame\glTF\Queen_white_ORM.jpg
+  - type: 1
+    originalUri: Assets\Art\RTXPTAssets\Models\glTF-Sample-Models\2.0\ABeautifulGame\glTF\queen_white_base_color.jpg
+    assetPath: Assets\Art\RTXPTAssets\Models\glTF-Sample-Models\2.0\ABeautifulGame\glTF\queen_white_base_color.jpg
+  - type: 1
+    originalUri: Assets\Art\RTXPTAssets\Models\glTF-Sample-Models\2.0\ABeautifulGame\glTF\chessboard_normal.jpg
+    assetPath: Assets\Art\RTXPTAssets\Models\glTF-Sample-Models\2.0\ABeautifulGame\glTF\chessboard_normal.jpg
+  - type: 1
+    originalUri: Assets\Art\RTXPTAssets\Models\glTF-Sample-Models\2.0\ABeautifulGame\glTF\Chessboard_ORM.jpg
+    assetPath: Assets\Art\RTXPTAssets\Models\glTF-Sample-Models\2.0\ABeautifulGame\glTF\Chessboard_ORM.jpg
+  - type: 1
+    originalUri: Assets\Art\RTXPTAssets\Models\glTF-Sample-Models\2.0\ABeautifulGame\glTF\chessboard_base_color.jpg
+    assetPath: Assets\Art\RTXPTAssets\Models\glTF-Sample-Models\2.0\ABeautifulGame\glTF\chessboard_base_color.jpg
+  - type: 1
+    originalUri: Assets\Art\RTXPTAssets\Models\glTF-Sample-Models\2.0\ABeautifulGame\glTF\Pawn_normal.jpg
+    assetPath: Assets\Art\RTXPTAssets\Models\glTF-Sample-Models\2.0\ABeautifulGame\glTF\Pawn_normal.jpg
+  - type: 1
+    originalUri: Assets\Art\RTXPTAssets\Models\glTF-Sample-Models\2.0\ABeautifulGame\glTF\Pawn_ORM.jpg
+    assetPath: Assets\Art\RTXPTAssets\Models\glTF-Sample-Models\2.0\ABeautifulGame\glTF\Pawn_ORM.jpg
+  - type: 1
+    originalUri: Assets\Art\RTXPTAssets\Models\glTF-Sample-Models\2.0\ABeautifulGame\glTF\pawn_white_base_color.jpg
+    assetPath: Assets\Art\RTXPTAssets\Models\glTF-Sample-Models\2.0\ABeautifulGame\glTF\pawn_white_base_color.jpg
+  - type: 1
+    originalUri: Assets\Art\RTXPTAssets\Models\glTF-Sample-Models\2.0\ABeautifulGame\glTF\pawn_black_base_color.jpg
+    assetPath: Assets\Art\RTXPTAssets\Models\glTF-Sample-Models\2.0\ABeautifulGame\glTF\pawn_black_base_color.jpg
+  - type: 1
+    originalUri: Assets\Art\RTXPTAssets\Models\glTF-Sample-Models\2.0\ABeautifulGame\glTF\Castle_normal.jpg
+    assetPath: Assets\Art\RTXPTAssets\Models\glTF-Sample-Models\2.0\ABeautifulGame\glTF\Castle_normal.jpg
+  - type: 1
+    originalUri: Assets\Art\RTXPTAssets\Models\glTF-Sample-Models\2.0\ABeautifulGame\glTF\Castle_ORM.jpg
+    assetPath: Assets\Art\RTXPTAssets\Models\glTF-Sample-Models\2.0\ABeautifulGame\glTF\Castle_ORM.jpg
+  - type: 1
+    originalUri: Assets\Art\RTXPTAssets\Models\glTF-Sample-Models\2.0\ABeautifulGame\glTF\castle_black_base_color.jpg
+    assetPath: Assets\Art\RTXPTAssets\Models\glTF-Sample-Models\2.0\ABeautifulGame\glTF\castle_black_base_color.jpg
+  - type: 1
+    originalUri: Assets\Art\RTXPTAssets\Models\glTF-Sample-Models\2.0\ABeautifulGame\glTF\castle_white_base_color.jpg
+    assetPath: Assets\Art\RTXPTAssets\Models\glTF-Sample-Models\2.0\ABeautifulGame\glTF\castle_white_base_color.jpg
+  - type: 1
+    originalUri: Assets\Art\RTXPTAssets\Models\glTF-Sample-Models\2.0\ABeautifulGame\glTF\Knight_normal.jpg
+    assetPath: Assets\Art\RTXPTAssets\Models\glTF-Sample-Models\2.0\ABeautifulGame\glTF\Knight_normal.jpg
+  - type: 1
+    originalUri: Assets\Art\RTXPTAssets\Models\glTF-Sample-Models\2.0\ABeautifulGame\glTF\Knight_ORM.jpg
+    assetPath: Assets\Art\RTXPTAssets\Models\glTF-Sample-Models\2.0\ABeautifulGame\glTF\Knight_ORM.jpg
+  - type: 1
+    originalUri: Assets\Art\RTXPTAssets\Models\glTF-Sample-Models\2.0\ABeautifulGame\glTF\knight_black_base_color.jpg
+    assetPath: Assets\Art\RTXPTAssets\Models\glTF-Sample-Models\2.0\ABeautifulGame\glTF\knight_black_base_color.jpg
+  - type: 1
+    originalUri: Assets\Art\RTXPTAssets\Models\glTF-Sample-Models\2.0\ABeautifulGame\glTF\knight_white_base_color.jpg
+    assetPath: Assets\Art\RTXPTAssets\Models\glTF-Sample-Models\2.0\ABeautifulGame\glTF\knight_white_base_color.jpg
+  - type: 1
+    originalUri: Assets\Art\RTXPTAssets\Models\glTF-Sample-Models\2.0\ABeautifulGame\glTF\bishop_black_normal.jpg
+    assetPath: Assets\Art\RTXPTAssets\Models\glTF-Sample-Models\2.0\ABeautifulGame\glTF\bishop_black_normal.jpg
+  - type: 1
+    originalUri: Assets\Art\RTXPTAssets\Models\glTF-Sample-Models\2.0\ABeautifulGame\glTF\Bishop_black_ORM.jpg
+    assetPath: Assets\Art\RTXPTAssets\Models\glTF-Sample-Models\2.0\ABeautifulGame\glTF\Bishop_black_ORM.jpg
+  - type: 1
+    originalUri: Assets\Art\RTXPTAssets\Models\glTF-Sample-Models\2.0\ABeautifulGame\glTF\bishop_black_base_color.jpg
+    assetPath: Assets\Art\RTXPTAssets\Models\glTF-Sample-Models\2.0\ABeautifulGame\glTF\bishop_black_base_color.jpg
+  - type: 1
+    originalUri: Assets\Art\RTXPTAssets\Models\glTF-Sample-Models\2.0\ABeautifulGame\glTF\bishop_white_normal.jpg
+    assetPath: Assets\Art\RTXPTAssets\Models\glTF-Sample-Models\2.0\ABeautifulGame\glTF\bishop_white_normal.jpg
+  - type: 1
+    originalUri: Assets\Art\RTXPTAssets\Models\glTF-Sample-Models\2.0\ABeautifulGame\glTF\Bishop_white_ORM.jpg
+    assetPath: Assets\Art\RTXPTAssets\Models\glTF-Sample-Models\2.0\ABeautifulGame\glTF\Bishop_white_ORM.jpg
+  - type: 1
+    originalUri: Assets\Art\RTXPTAssets\Models\glTF-Sample-Models\2.0\ABeautifulGame\glTF\bishop_white_base_color.jpg
+    assetPath: Assets\Art\RTXPTAssets\Models\glTF-Sample-Models\2.0\ABeautifulGame\glTF\bishop_white_base_color.jpg
+  reportItems:
+  - type: 2
+    code: 20
+    messages:
+    - KHR_materials_volume
+  - type: 2
+    code: 31
+    messages: []
+  - type: 2
+    code: 31
+    messages: []

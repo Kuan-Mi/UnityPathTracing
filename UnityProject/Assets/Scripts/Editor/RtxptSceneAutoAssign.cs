@@ -68,10 +68,10 @@ namespace PathTracing
             _prefix = EditorGUILayout.TextField(new GUIContent("Asset Name Prefix",
                 "Optional prefix to prepend when looking up an asset.\n" +
                 "e.g. prefix \"transparent-machines-pt0\" makes \"RandomColor_803\" also try\n" +
-                "\"transparent-machines-pt0.RandomColor_803.material\" and\n" +
+                "\"transparent-machines-pt0.RandomColor_803\" and\n" +
                 "\"transparent-machines-pt0.RandomColor_803\"."), _prefix);
 
-            string previewName = string.IsNullOrWhiteSpace(_prefix) ? "<name>" : $"{_prefix.Trim()}.<name>.material";
+            string previewName = string.IsNullOrWhiteSpace(_prefix) ? "<name>" : $"{_prefix.Trim()}.<name>";
             EditorGUILayout.HelpBox($"Matches asset named exactly: {previewName}", MessageType.None);
 
             _caseSensitive = EditorGUILayout.Toggle("Case-Sensitive Match", _caseSensitive);
@@ -200,12 +200,12 @@ namespace PathTracing
             _lastReport = sb.ToString().TrimEnd();
         }
 
-        // Strict match: "{prefix}.{matName}.material" when prefix is set, else "{matName}".
+        // Strict match: "{prefix}.{matName}" when prefix is set, else "{matName}".
         private static RtxptMaterial Lookup(
             Dictionary<string, RtxptMaterial> map,
             string matName, string prefix, StringComparison cmp)
         {
-            string key = string.IsNullOrEmpty(prefix) ? matName : $"{prefix}.{matName}.material";
+            string key = string.IsNullOrEmpty(prefix) ? matName : $"{prefix}.{matName}";
             return map.TryGetValue(key, out var asset) ? asset : null;
         }
 

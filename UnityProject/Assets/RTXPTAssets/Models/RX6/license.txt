@@ -1,0 +1,11 @@
+
+Model Information:
+* title:	RX6 FIGHTER Spacecraft
+* source:	https://www.cgtrader.com/
+* author:	CGPitbull
+
+Model License:
+* LICENSED TO:   fstrugar, Nvidia
+* license type:	 Royalty Free no AI
+
+
