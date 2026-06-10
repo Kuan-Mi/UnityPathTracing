@@ -2,6 +2,7 @@
 #include <cstdint>
 #include <d3d12.h>
 #include <dxgi1_6.h>
+#include <wrl/client.h>
 #include "IUnityLog.h"
 #include "IUnityGraphicsD3D12.h"
 #include "DescriptorHeapAllocator.h"
@@ -62,8 +63,22 @@ protected:
     // Write SRV/TLAS and UAV descriptors into the supplied transient table
     // bases.  ROOT_SRV / CBV / ROOT_CONSTANTS / SRV_ARRAY / UAV_ARRAY are
     // bound elsewhere (BindRootParams) and are skipped here.
+    //
+    // Descriptors are maintained in a persistent CPU-only staging heap whose
+    // layout mirrors the transient tables (SRV slots [0, numSRV), UAV slots
+    // [numSRV, numSRV+numUAV)). A binding's descriptor is (re)created in staging
+    // only when its resolved resource / view params change; each dispatch then
+    // publishes the whole region with a single CopyDescriptorsSimple into the
+    // fresh transient-ring range — replacing the previous per-binding
+    // CreateShaderResourceView/CreateUnorderedAccessView calls on every dispatch.
     void WriteDescriptors(const BindingSlot* slots, uint32_t slotCount,
                           uint32_t srvBase, uint32_t uavBase);
+
+    // Lazily creates the CPU-only staging heap backing WriteDescriptors.
+    // Returns false (and disables staging permanently for this set) on failure,
+    // in which case WriteDescriptors falls back to creating descriptors directly
+    // into the transient range every dispatch.
+    bool EnsureStagingHeap(uint32_t totalSlots);
 
     void RequestResourceStates(const BindingSlot* slots, uint32_t slotCount);
     void NotifyResourceStates (const BindingSlot* slots, uint32_t slotCount);
@@ -158,6 +173,13 @@ protected:
         CachedView() : srv{} {}
     };
     std::vector<CachedView> m_viewCache;
+
+    // Persistent CPU-only (non-shader-visible) staging heap: one descriptor per
+    // transient table slot. Source of the per-dispatch CopyDescriptorsSimple.
+    Microsoft::WRL::ComPtr<ID3D12DescriptorHeap> m_stagingHeap;
+    D3D12_CPU_DESCRIPTOR_HANDLE                  m_stagingBase   = {};
+    uint32_t                                     m_descSize      = 0;
+    bool                                         m_stagingFailed = false;
 
     static constexpr uint32_t kInvalidAlloc = UINT32_MAX;
 };

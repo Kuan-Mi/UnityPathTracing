@@ -144,8 +144,44 @@ bool DescriptorSetBase<ShaderT>::AllocateTransientTables(
 }
 
 // ===========================================================================
+// EnsureStagingHeap
+//   Creates the persistent CPU-only staging heap backing WriteDescriptors
+//   (one descriptor per transient table slot). On failure staging is disabled
+//   permanently for this set and WriteDescriptors creates descriptors directly
+//   into the transient range every dispatch, exactly as before.
+// ===========================================================================
+
+template<typename ShaderT>
+bool DescriptorSetBase<ShaderT>::EnsureStagingHeap(uint32_t totalSlots)
+{
+    if (m_stagingHeap) return true;
+    if (m_stagingFailed || !m_device || totalSlots == 0) return false;
+
+    D3D12_DESCRIPTOR_HEAP_DESC hd = {};
+    hd.Type           = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
+    hd.NumDescriptors = totalSlots;
+    hd.Flags          = D3D12_DESCRIPTOR_HEAP_FLAG_NONE; // CPU-only: CopyDescriptors source
+    if (FAILED(m_device->CreateDescriptorHeap(&hd, IID_PPV_ARGS(&m_stagingHeap))))
+    {
+        m_stagingFailed = true;
+        Logf(kUnityLogTypeWarning,
+             "DescriptorSet [%s]: staging descriptor heap creation failed - "
+             "falling back to per-dispatch descriptor creation",
+             m_shader->GetName());
+        return false;
+    }
+    m_stagingBase = m_stagingHeap->GetCPUDescriptorHandleForHeapStart();
+    m_descSize    = m_device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+    return true;
+}
+
+// ===========================================================================
 // WriteDescriptors
-//   Writes all SRV/UAV descriptors into the transient table bases.
+//   Maintains all SRV/TLAS/UAV descriptors in the persistent staging heap and
+//   publishes them into the transient table bases with one CopyDescriptorsSimple.
+//   A binding's descriptor is only (re)created when its resolved resource or
+//   view params changed since the last dispatch — the common case for the path
+//   tracer (same resources rebound every frame) writes zero descriptors.
 //   CBVs and ROOT_SRVs are bound as inline root descriptors in BindRootParams.
 //   SRV_ARRAY / UAV_ARRAY bindings use their own heap (Bindless* objects).
 // ===========================================================================
@@ -158,19 +194,40 @@ void DescriptorSetBase<ShaderT>::WriteDescriptors(
     EnsureCategoryIndices();
     const auto& bindings = m_shader->GetBindings();
 
+    const uint32_t numSRV = m_shader->GetNumSRVSlots();
+    const uint32_t numUAV = m_shader->GetNumUAVSlots();
+    const uint32_t total  = numSRV + numUAV;
+    if (total == 0) return;
+
+    const bool staged = EnsureStagingHeap(total);
+
+    // Destination for an SRV-table / UAV-table slot. The staging layout mirrors
+    // the transient block AllocateTransientTables hands out: SRV slots occupy
+    // [0, numSRV) and UAV slots [numSRV, total).
+    auto srvDest = [&](uint32_t off) -> D3D12_CPU_DESCRIPTOR_HANDLE {
+        if (!staged) return m_allocator->GetCPUHandle(srvBase + off);
+        D3D12_CPU_DESCRIPTOR_HANDLE h = m_stagingBase;
+        h.ptr += static_cast<SIZE_T>(off) * m_descSize;
+        return h;
+    };
+    auto uavDest = [&](uint32_t off) -> D3D12_CPU_DESCRIPTOR_HANDLE {
+        if (!staged) return m_allocator->GetCPUHandle(uavBase + off);
+        D3D12_CPU_DESCRIPTOR_HANDLE h = m_stagingBase;
+        h.ptr += static_cast<SIZE_T>(numSRV + off) * m_descSize;
+        return h;
+    };
+
     // --- SRV / TLAS ---
     if (srvBase != kInvalidAlloc)
     {
-        // TLAS — never cached: the acceleration structure is rebuilt every frame,
-        // so its GPU virtual address changes and the view must be re-derived.
+        // TLAS — the acceleration structure is rebuilt every frame but in place:
+        // the result buffer (and so the GPU VA the view points at) only changes
+        // when it is reallocated to fit more instances. Cache on the VA itself
+        // (stored in cv.res) so the view is re-derived exactly when that happens.
         for (uint32_t i : m_idxTLAS)
         {
             const auto& b           = bindings[i];
             const BindingSlot& slot = (i < slotCount) ? slots[i] : BindingSlot{};
-
-            D3D12_SHADER_RESOURCE_VIEW_DESC s = {};
-            s.ViewDimension           = D3D12_SRV_DIMENSION_RAYTRACING_ACCELERATION_STRUCTURE;
-            s.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
 
             ID3D12Resource* tlas = nullptr;
             if (slot.objectKind == BindingObjectKind::AccelStruct && slot.objectPtr)
@@ -178,27 +235,44 @@ void DescriptorSetBase<ShaderT>::WriteDescriptors(
             else
                 tlas = reinterpret_cast<ID3D12Resource*>(slot.objectPtr); // raw TLAS resource (kind None)
 
-            s.RaytracingAccelerationStructure.Location = tlas ? tlas->GetGPUVirtualAddress() : 0;
-            m_device->CreateShaderResourceView(nullptr, &s,
-                m_allocator->GetCPUHandle(srvBase + b.heapOffset));
+            const uint64_t va = tlas ? tlas->GetGPUVirtualAddress() : 0;
+            CachedView& cv = m_viewCache[i];
+            if (staged && cv.valid && cv.res == va)
+                continue;
+
+            D3D12_SHADER_RESOURCE_VIEW_DESC s = {};
+            s.ViewDimension           = D3D12_SRV_DIMENSION_RAYTRACING_ACCELERATION_STRUCTURE;
+            s.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+            s.RaytracingAccelerationStructure.Location = va;
+            m_device->CreateShaderResourceView(nullptr, &s, srvDest(b.heapOffset));
+            cv.res    = va;
+            cv.count  = 0;
+            cv.stride = 0;
+            cv.format = 0;
+            cv.valid  = staged;
         }
 
         for (uint32_t i : m_idxSRV)
         {
             const auto& b           = bindings[i];
             const BindingSlot& slot = (i < slotCount) ? slots[i] : BindingSlot{};
-            D3D12_CPU_DESCRIPTOR_HANDLE h = m_allocator->GetCPUHandle(srvBase + b.heapOffset);
             ID3D12Resource* res = ResolveBoundResource(slot);
 
             // Bounded SRV array (e.g. Texture2D t[N]): arrayCount single-mip Texture2D views
-            // starting at mip slot.stride (consecutive). Texture-only; cache is bypassed.
+            // starting at mip slot.stride (consecutive). Texture-only. The cache entry keys
+            // the whole run on (res, stride); the view descs themselves are not stored.
             if (b.arrayCount > 1)
             {
+                CachedView& cv = m_viewCache[i];
+                if (staged && cv.valid && cv.res == reinterpret_cast<uint64_t>(res) &&
+                    cv.stride == slot.stride)
+                    continue;
+
                 D3D12_RESOURCE_DESC rd = res ? res->GetDesc() : D3D12_RESOURCE_DESC{};
                 uint32_t maxMip = (res && rd.MipLevels > 0) ? rd.MipLevels - 1 : 0;
                 for (uint32_t k = 0; k < b.arrayCount; ++k)
                 {
-                    D3D12_CPU_DESCRIPTOR_HANDLE hk = m_allocator->GetCPUHandle(srvBase + b.heapOffset + k);
+                    D3D12_CPU_DESCRIPTOR_HANDLE hk = srvDest(b.heapOffset + k);
                     D3D12_SHADER_RESOURCE_VIEW_DESC s = {};
                     s.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
                     if (res)
@@ -218,15 +292,22 @@ void DescriptorSetBase<ShaderT>::WriteDescriptors(
                         m_device->CreateShaderResourceView(nullptr, &s, hk);
                     }
                 }
-                m_viewCache[i].valid = false;
+                cv.res    = reinterpret_cast<uint64_t>(res);
+                cv.count  = 0;
+                cv.stride = slot.stride;
+                cv.format = 0;
+                cv.valid  = staged;
                 continue;
             }
 
             if (res)
             {
                 CachedView& cv = m_viewCache[i];
-                if (!cv.valid || cv.res != reinterpret_cast<uint64_t>(res) ||
-                    cv.count != slot.count || cv.stride != slot.stride || cv.format != slot.format)
+                const bool match = cv.valid && cv.res == reinterpret_cast<uint64_t>(res) &&
+                    cv.count == slot.count && cv.stride == slot.stride && cv.format == slot.format;
+                if (staged && match)
+                    continue;   // staging already holds this exact view
+                if (!match)
                 {
                     D3D12_SHADER_RESOURCE_VIEW_DESC s = {};
                     s.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
@@ -313,20 +394,28 @@ void DescriptorSetBase<ShaderT>::WriteDescriptors(
                     cv.format = slot.format;
                     cv.valid  = true;
                 }
-                m_device->CreateShaderResourceView(res, &cv.srv, h);
+                m_device->CreateShaderResourceView(res, &cv.srv, srvDest(b.heapOffset));
             }
             else
             {
-                // Null descriptor — write a safe raw buffer placeholder.
-                // Drop the cache so a later non-null bind re-derives the real view.
-                m_viewCache[i].valid = false;
+                // Null descriptor — a safe raw buffer placeholder, cached with res == 0
+                // so staging is not rewritten every dispatch; a later non-null bind
+                // mismatches on res and re-derives the real view.
+                CachedView& cv = m_viewCache[i];
+                if (staged && cv.valid && cv.res == 0)
+                    continue;
                 D3D12_SHADER_RESOURCE_VIEW_DESC s = {};
                 s.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
                 s.ViewDimension      = D3D12_SRV_DIMENSION_BUFFER;
                 s.Format             = DXGI_FORMAT_R32_TYPELESS;
                 s.Buffer.Flags       = D3D12_BUFFER_SRV_FLAG_RAW;
                 s.Buffer.NumElements = 1;
-                m_device->CreateShaderResourceView(nullptr, &s, h);
+                m_device->CreateShaderResourceView(nullptr, &s, srvDest(b.heapOffset));
+                cv.res    = 0;
+                cv.count  = 0;
+                cv.stride = 0;
+                cv.format = 0;
+                cv.valid  = staged;
             }
         }
     }
@@ -339,17 +428,22 @@ void DescriptorSetBase<ShaderT>::WriteDescriptors(
             const auto& b           = bindings[i];
             const BindingSlot& slot = (i < slotCount) ? slots[i] : BindingSlot{};
             ID3D12Resource* res = ResolveBoundResource(slot);
-            D3D12_CPU_DESCRIPTOR_HANDLE h = m_allocator->GetCPUHandle(uavBase + b.heapOffset);
 
             // Bounded UAV array (e.g. RWTexture2D u[NUM_LODS]): arrayCount per-mip Texture2D UAVs
-            // starting at mip slot.stride (consecutive). Texture-only; cache is bypassed.
+            // starting at mip slot.stride (consecutive). Texture-only. The cache entry keys
+            // the whole run on (res, stride); the view descs themselves are not stored.
             if (b.arrayCount > 1)
             {
+                CachedView& cv = m_viewCache[i];
+                if (staged && cv.valid && cv.res == reinterpret_cast<uint64_t>(res) &&
+                    cv.stride == slot.stride)
+                    continue;
+
                 D3D12_RESOURCE_DESC rd = res ? res->GetDesc() : D3D12_RESOURCE_DESC{};
                 uint32_t maxMip = (res && rd.MipLevels > 0) ? rd.MipLevels - 1 : 0;
                 for (uint32_t k = 0; k < b.arrayCount; ++k)
                 {
-                    D3D12_CPU_DESCRIPTOR_HANDLE hk = m_allocator->GetCPUHandle(uavBase + b.heapOffset + k);
+                    D3D12_CPU_DESCRIPTOR_HANDLE hk = uavDest(b.heapOffset + k);
                     D3D12_UNORDERED_ACCESS_VIEW_DESC u = {};
                     if (res)
                     {
@@ -367,15 +461,22 @@ void DescriptorSetBase<ShaderT>::WriteDescriptors(
                         m_device->CreateUnorderedAccessView(nullptr, nullptr, &u, hk);
                     }
                 }
-                m_viewCache[i].valid = false;
+                cv.res    = reinterpret_cast<uint64_t>(res);
+                cv.count  = 0;
+                cv.stride = slot.stride;
+                cv.format = 0;
+                cv.valid  = staged;
                 continue;
             }
 
             if (res)
             {
                 CachedView& cv = m_viewCache[i];
-                if (!cv.valid || cv.res != reinterpret_cast<uint64_t>(res) ||
-                    cv.count != slot.count || cv.stride != slot.stride || cv.format != slot.format)
+                const bool match = cv.valid && cv.res == reinterpret_cast<uint64_t>(res) &&
+                    cv.count == slot.count && cv.stride == slot.stride && cv.format == slot.format;
+                if (staged && match)
+                    continue;   // staging already holds this exact view
+                if (!match)
                 {
                     D3D12_UNORDERED_ACCESS_VIEW_DESC u = {};
                     auto rd = res->GetDesc();
@@ -427,19 +528,40 @@ void DescriptorSetBase<ShaderT>::WriteDescriptors(
                     cv.format = slot.format;
                     cv.valid  = true;
                 }
-                m_device->CreateUnorderedAccessView(res, nullptr, &cv.uav, h);
+                m_device->CreateUnorderedAccessView(res, nullptr, &cv.uav, uavDest(b.heapOffset));
             }
             else
             {
-                m_viewCache[i].valid = false;
+                // Null UAV placeholder, cached with res == 0 (see SRV null branch).
+                CachedView& cv = m_viewCache[i];
+                if (staged && cv.valid && cv.res == 0)
+                    continue;
                 D3D12_UNORDERED_ACCESS_VIEW_DESC u = {};
                 u.ViewDimension      = D3D12_UAV_DIMENSION_BUFFER;
                 u.Format             = DXGI_FORMAT_R32_TYPELESS;
                 u.Buffer.Flags       = D3D12_BUFFER_UAV_FLAG_RAW;
                 u.Buffer.NumElements = 1;
-                m_device->CreateUnorderedAccessView(nullptr, nullptr, &u, h);
+                m_device->CreateUnorderedAccessView(nullptr, nullptr, &u, uavDest(b.heapOffset));
+                cv.res    = 0;
+                cv.count  = 0;
+                cv.stride = 0;
+                cv.format = 0;
+                cv.valid  = staged;
             }
         }
+    }
+
+    // --- Publish: one copy from staging into this dispatch's transient block ---
+    // AllocateTransientTables hands out a single contiguous block (SRV slots then
+    // UAV slots), so the whole region is covered by one CopyDescriptorsSimple.
+    if (staged)
+    {
+        const uint32_t destBase = (numSRV > 0) ? srvBase : uavBase;
+        if (destBase != kInvalidAlloc)
+            m_device->CopyDescriptorsSimple(total,
+                m_allocator->GetCPUHandle(destBase),
+                m_stagingBase,
+                D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
     }
 }
 
