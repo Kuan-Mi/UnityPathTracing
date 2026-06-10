@@ -786,9 +786,11 @@ namespace PathTracing
 
                 // Skinned instances deform every frame: update unconditionally from the root
                 // bone, with last frame's root as the previous transform (motion vectors).
+                // Rigid frame only — bone scale is baked into the GPU-skinned positions
+                // (see RtxptSceneLayout.GetRootTransform).
                 if (entry.isSkinned)
                 {
-                    Matrix4x4 cur  = entry.transform.localToWorldMatrix;
+                    Matrix4x4 cur  = Matrix4x4.TRS(entry.transform.position, entry.transform.rotation, Vector3.one);
                     Matrix4x4 prev = entry.hasLastRoot ? entry.lastRoot : cur;
 
                     var curRow0  = new Vector4(cur.m00, cur.m01, cur.m02, cur.m03);

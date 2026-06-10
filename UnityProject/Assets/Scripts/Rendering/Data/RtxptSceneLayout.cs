@@ -145,14 +145,20 @@ namespace PathTracing
             => rr != null && subMesh < rr.Slots.Count && rr.Slots[subMesh] != null;
 
         /// <summary>
-        /// World transform for a record's TLAS instance. GPU-skinned vertices are in root-bone
-        /// space (Unity skins with <c>bone.localToWorldMatrix * bindpose</c>), so skinned
-        /// instances must use the root bone's transform; static instances use the renderer's.
+        /// World transform for a record's TLAS instance. GPU-skinned vertices are in the root
+        /// bone's RIGID frame: Unity bakes all bone scale (including the root's) into the
+        /// skinned positions and draws the renderer with the root bone's unscaled
+        /// rotation+translation. Using localToWorldMatrix here would apply the root's scale a
+        /// second time (e.g. a glTF unit-scale root of ~0.0018 shrinks the instance to nothing).
+        /// Static instances use the renderer's full transform.
         /// </summary>
         public static Matrix4x4 GetRootTransform(RtxptInstanceRecord rec)
         {
-            if (rec.Skinned != null && rec.Skinned.rootBone != null)
-                return rec.Skinned.rootBone.localToWorldMatrix;
+            if (rec.Skinned != null)
+            {
+                Transform root = rec.Skinned.rootBone != null ? rec.Skinned.rootBone : rec.TargetRenderer.transform;
+                return Matrix4x4.TRS(root.position, root.rotation, Vector3.one);
+            }
             return rec.TargetRenderer.transform.localToWorldMatrix;
         }
 
