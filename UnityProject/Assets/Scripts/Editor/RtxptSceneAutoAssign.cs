@@ -9,7 +9,7 @@ using UnityEngine;
 namespace PathTracing
 {
     /// <summary>
-    /// Adds <see cref="RtxptRenderer"/> to every MeshRenderer in the scene
+    /// Adds <see cref="RtxptRenderer"/> to every Renderer in the scene
     /// and auto-assigns slot assets by matching Unity material names to
     /// <see cref="RtxptMaterial"/> files found in a chosen project folder.
     /// Open via  RTXPT ▸ Auto-Assign Material Overrides to Scene…
@@ -122,17 +122,17 @@ namespace PathTracing
             }
 
             // ---- 2. Collect renderers ----
-            MeshRenderer[] renderers;
+            Renderer[] renderers;
             if (_selectedOnly)
             {
-                var list = new List<MeshRenderer>();
+                var list = new List<Renderer>();
                 foreach (var go in Selection.gameObjects)
-                    list.AddRange(go.GetComponentsInChildren<MeshRenderer>(includeInactive: true));
+                    list.AddRange(go.GetComponentsInChildren<Renderer>(includeInactive: true));
                 renderers = list.ToArray();
             }
             else
             {
-                renderers = FindObjectsByType<MeshRenderer>(FindObjectsInactive.Include, FindObjectsSortMode.None);
+                renderers = FindObjectsByType<Renderer>(FindObjectsInactive.Include, FindObjectsSortMode.None);
             }
 
             // ---- 3. Assign ----
@@ -145,7 +145,16 @@ namespace PathTracing
             {
                 var mf        = mr.GetComponent<MeshFilter>();
                 var mats      = mr.sharedMaterials ?? Array.Empty<Material>();
-                int slotCount = mf?.sharedMesh != null ? mf.sharedMesh.subMeshCount : mats.Length;
+
+                int slotCount = 0;
+                if (mf == null)
+                {
+                    slotCount = mats.Length;
+                }
+                else
+                {
+                    slotCount = mf.sharedMesh.subMeshCount;
+                }
                 if (slotCount == 0) continue;
 
                 var comp = mr.GetComponent<RtxptRenderer>();

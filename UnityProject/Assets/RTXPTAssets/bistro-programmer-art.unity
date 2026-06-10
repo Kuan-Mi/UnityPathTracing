@@ -67431,10 +67431,6 @@ PrefabInstance:
       propertyPath: m_Name
       value: AdamRtxpt
       objectReference: {fileID: 0}
-    - target: {fileID: 3439214596278566197, guid: f513b6a343118bb409dc0813604a473d, type: 3}
-      propertyPath: m_IsActive
-      value: 1
-      objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
