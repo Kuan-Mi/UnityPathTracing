@@ -46,6 +46,10 @@ namespace PathTracing
         public HitGroupShader[] fillHitGroups;
         public HitGroupShader[] referenceHitGroups;
 
+        // Phase 0: skinned-repack compute (Unity skinned VB → per-instance donut SoA buffer),
+        // recorded by the TLAS build pass before the BLAS refit each frame.
+        public NativeComputeShader skinnedRepackCs;
+
         // Phase 3
         public NativeComputeShader exportVisibilityBufferCs;
 
@@ -153,7 +157,7 @@ namespace PathTracing
 
         private void CreatePasses()
         {
-            _buildTlasPass ??= new NativeRtxptBuildTlasPass
+            _buildTlasPass ??= new NativeRtxptBuildTlasPass(skinnedRepackCs)
             {
                 renderPassEvent = renderPassEvent,
             };
@@ -478,6 +482,8 @@ namespace PathTracing
         {
             if (!disposing) return;
 
+            _buildTlasPass?.Dispose();
+            _buildTlasPass = null;
             _lightingUpdateBeginPass?.Dispose();
             _lightingUpdateBeginPass = null;
             _envMapBakerPass?.Dispose();
@@ -954,6 +960,7 @@ namespace PathTracing
             toneMapApplyRasterShader    = LoadRas($"{shaderRoot}/ToneMapper/ToneMapping");
             accumulationCs              = LoadCs($"{shaderRoot}/ProcessingPasses/AccumulationPass");
             stablePlanesDebugVizCs      = LoadCs($"{shaderRoot}/ProcessingPasses/PostProcess_StablePlanesDebugViz");
+            skinnedRepackCs             = LoadCs($"{shaderRoot}/Misc/SkinnedRepack");
 
             string lightRoot   = $"{shaderRoot}/Lighting";
             string distantRoot = $"{lightRoot}/Distant";

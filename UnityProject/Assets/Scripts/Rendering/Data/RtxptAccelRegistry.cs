@@ -103,14 +103,24 @@ namespace PathTracing
 
                 if (!isRegistered)
                 {
-                    if (accel.AddInstanceGroup(rec.Mesh, rec.Descs, handle, hitGroupContribution: runningContribution))
+                    // Skinned records register their per-instance SoA buffer (positions at
+                    // offset 0, stride 12; donut uint32 IB) as a dynamic BLAS — the native AS
+                    // then refits it every frame after the repack compute has rewritten it.
+                    bool added = rec.IsSkinned
+                        ? rec.SkinnedVb != null && accel.AddInstanceGroup(
+                            rec.SkinnedVb, (uint)rec.SkinnedVertexCount, 12u,
+                            rec.SkinnedIb, 4u,
+                            rec.Descs, handle, isDynamic: true, hitGroupContribution: runningContribution)
+                        : accel.AddInstanceGroup(rec.Mesh, rec.Descs, handle, hitGroupContribution: runningContribution);
+
+                    if (added)
                     {
-                        accel.SetInstanceTransform(handle, rec.MeshRenderer.transform.localToWorldMatrix);
+                        accel.SetInstanceTransform(handle, RtxptSceneLayout.GetRootTransform(rec));
                         _registeredHandles[handle] = rec.ContentHash;
                     }
                     else
                     {
-                        Debug.LogWarning($"[RtxptAccelRegistry] AddInstanceGroup failed for '{rec.MeshRenderer.name}' group={rec.GroupIndex} — instance dropped.");
+                        Debug.LogWarning($"[RtxptAccelRegistry] AddInstanceGroup failed for '{rec.TargetRenderer.name}' group={rec.GroupIndex} — instance dropped.");
                         records.RemoveAt(i--);
                         continue;
                     }

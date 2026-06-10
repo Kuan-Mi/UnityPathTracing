@@ -11,18 +11,21 @@ namespace PathTracing
     /// <summary>
     /// Per-renderer RTXPT material override component.
     ///
-    /// Attach to any <see cref="MeshRenderer"/> to supply the RTXPT material
-    /// properties sent to the GPU. Each sub-mesh slot references a
+    /// Attach to any <see cref="MeshRenderer"/> or <see cref="SkinnedMeshRenderer"/> to supply
+    /// the RTXPT material properties sent to the GPU. Each sub-mesh slot references a
     /// <see cref="RtxptMaterial"/> that can be shared across multiple renderers.
     /// A null entry means the sub-mesh is skipped — it is not added to the
     /// acceleration structure and does not render. Materials must be authored in
     /// advance (imported from RTXPT JSON, or baked once with the button below);
     /// there is no runtime Unity-material fallback.
     ///
+    /// Skinned renderers take the dynamic path: a per-frame repack compute converts Unity's
+    /// GPU-skinned vertex buffer into the donut SoA layout (with a PrevPosition stream for
+    /// motion vectors) and the BLAS is refit every frame.
+    ///
     /// Use the "Bake from Renderer" button in the Inspector to create and
     /// populate slot assets from the current Unity materials as a starting point.
     /// </summary>
-    [RequireComponent(typeof(MeshRenderer))]
     [DisallowMultipleComponent]
     [ExecuteAlways]
     public class RtxptRenderer : MonoBehaviour
@@ -53,8 +56,31 @@ namespace PathTracing
             TopologyVersion = 0;
         }
 
-        /// <summary>The MeshRenderer on the same GameObject (cached on enable).</summary>
-        public MeshRenderer MeshRenderer { get; private set; }
+        /// <summary>The renderer on the same GameObject — MeshRenderer or SkinnedMeshRenderer (cached on enable).</summary>
+        public Renderer TargetRenderer { get; private set; }
+
+        /// <summary>Non-null when the target is a SkinnedMeshRenderer (dynamic/skinned path).</summary>
+        public SkinnedMeshRenderer Skinned { get; private set; }
+
+        /// <summary>The mesh defining the sub-mesh layout: MeshFilter.sharedMesh or SkinnedMeshRenderer.sharedMesh.</summary>
+        public Mesh SharedMesh
+        {
+            get
+            {
+                if (Skinned != null) return Skinned.sharedMesh;
+                var mf = GetComponent<MeshFilter>();
+                return mf != null ? mf.sharedMesh : null;
+            }
+        }
+
+        private void CacheRenderer()
+        {
+            Skinned        = GetComponent<SkinnedMeshRenderer>();
+            TargetRenderer = Skinned != null ? (Renderer)Skinned : GetComponent<MeshRenderer>();
+            // The skinned VB is read as a ByteAddressBuffer by the per-frame repack compute.
+            if (Skinned != null)
+                Skinned.vertexBufferTarget |= GraphicsBuffer.Target.Raw;
+        }
 
         /// <summary>
         /// Sub-meshes grouped by (isTransparent, isEmissive, isAlphaClip, isAnalyticProxy), derived from
@@ -78,7 +104,7 @@ namespace PathTracing
 
         private void OnEnable()
         {
-            MeshRenderer = GetComponent<MeshRenderer>();
+            CacheRenderer();
             if (!s_All.Contains(this)) s_All.Add(this);
             RefreshSubscriptions();
             RebuildGroups(); // also bumps TopologyVersion (covers set growth)
@@ -93,8 +119,8 @@ namespace PathTracing
 
         private void OnValidate()
         {
-            IsDirty      = true;
-            MeshRenderer = GetComponent<MeshRenderer>();
+            IsDirty = true;
+            CacheRenderer();
             RefreshSubscriptions();
             RebuildGroups(); // slot (un)assignment or flag changes can alter grouping
         }
@@ -137,8 +163,8 @@ namespace PathTracing
         /// </summary>
         public void RebuildGroups()
         {
-            var mf     = GetComponent<MeshFilter>();
-            int subCnt = mf != null && mf.sharedMesh != null ? mf.sharedMesh.subMeshCount : (Slots?.Count ?? 0);
+            Mesh mesh   = SharedMesh;
+            int  subCnt = mesh != null ? mesh.subMeshCount : (Slots?.Count ?? 0);
 
             var order = new List<(bool t, bool e, bool a, bool p)>();
             var lists = new Dictionary<(bool, bool, bool, bool), List<int>>();
@@ -218,12 +244,13 @@ namespace PathTracing
         /// </summary>
         public void BakeFromRenderer()
         {
-            var mr = GetComponent<MeshRenderer>();
-            var mf = GetComponent<MeshFilter>();
-            if (mr == null) return;
+            CacheRenderer();
+            var r = TargetRenderer;
+            if (r == null) return;
 
-            Material[] mats       = mr.sharedMaterials ?? Array.Empty<Material>();
-            int        subMeshCnt = mf != null && mf.sharedMesh != null ? mf.sharedMesh.subMeshCount : mats.Length;
+            Material[] mats       = r.sharedMaterials ?? Array.Empty<Material>();
+            Mesh       mesh       = SharedMesh;
+            int        subMeshCnt = mesh != null ? mesh.subMeshCount : mats.Length;
 
             while (Slots.Count < subMeshCnt) Slots.Add(null);
             if (Slots.Count > subMeshCnt) Slots.RemoveRange(subMeshCnt, Slots.Count - subMeshCnt);

@@ -382,6 +382,57 @@ namespace NativeRender
             }
         }
 
+        /// <summary>
+        /// Adds a BLAS instance from caller-supplied GPU buffers instead of a Unity Mesh.
+        /// Positions are read at byte offset <c>baseVertex * vertexStride</c> within
+        /// <paramref name="vertexBuffer"/> (a float3 at the start of each stride-sized vertex).
+        /// Use <paramref name="isDynamic"/> = true for compute-deformed geometry (e.g. a skinned
+        /// SoA buffer rewritten each frame): the BLAS is then refit (PERFORM_UPDATE) on every
+        /// <see cref="BuildOrUpdate"/> instead of being built once and cached.
+        /// </summary>
+        public unsafe bool AddInstanceGroup(
+            GraphicsBuffer vertexBuffer, uint vertexCount, uint vertexStride,
+            GraphicsBuffer indexBuffer, uint indexStride,
+            NativeRenderPlugin.SubmeshDesc[] groupSubmeshDescs,
+            uint customHandle,
+            bool isDynamic = false,
+            uint hitGroupContribution = 0)
+        {
+            if (_handle == 0 || vertexBuffer == null || indexBuffer == null ||
+                groupSubmeshDescs == null || groupSubmeshDescs.Length == 0)
+                return false;
+
+            IntPtr vbPtr = vertexBuffer.GetNativeBufferPtr();
+            IntPtr ibPtr = indexBuffer.GetNativeBufferPtr();
+            if (vbPtr == IntPtr.Zero || ibPtr == IntPtr.Zero)
+            {
+                Debug.LogError($"[NativeRayTracing] AddInstanceGroup(buffers): null native pointer (handle={customHandle})");
+                return false;
+            }
+
+            fixed (NativeRenderPlugin.SubmeshDesc* pDescs = groupSubmeshDescs)
+            {
+                var desc = new NativeRenderPlugin.AddInstanceDesc
+                {
+                    instanceHandle        = customHandle,
+                    vertexBufferNativePtr = vbPtr,
+                    vertexCount           = vertexCount,
+                    vertexStride          = vertexStride,
+                    indexBufferNativePtr  = ibPtr,
+                    indexStride           = indexStride,
+                    submeshDescs          = (IntPtr)pDescs,
+                    submeshCount          = (uint)groupSubmeshDescs.Length,
+                    ommDescs              = IntPtr.Zero,
+                    isDynamic             = isDynamic ? 1u : 0u,
+                    hitGroupContribution  = hitGroupContribution,
+                };
+                bool ok = NativeRenderPlugin.NR_AS_AddInstance(_handle, ref desc);
+                if (!ok)
+                    Debug.LogError($"[NativeRayTracing] AddInstanceGroup(buffers) failed, handle={customHandle}");
+                return ok;
+            }
+        }
+
         /// <summary>Sets the per-instance visibility mask using a raw <paramref name="handle"/>.</summary>
         public void SetInstanceMask(uint handle, byte mask)
         {

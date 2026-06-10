@@ -82,14 +82,32 @@ namespace PathTracing
         // instances occupy the contiguous range [firstInstanceIdx, firstInstanceIdx+instanceCount)).
         private sealed class RendererEntry
         {
-            public Transform transform;
+            public Transform transform; // skinned: the root bone (vertices are in root-bone space)
             public bool wasMoving = true; // start true so first frame always syncs prev = current
             public int firstInstanceIdx;
             public int instanceCount;
+
+            // Skinned instances deform every frame: transforms update unconditionally from the
+            // root bone, with last frame's root kept for prevTransform (motion vectors).
+            public bool      isSkinned;
+            public Matrix4x4 lastRoot;
+            public bool      hasLastRoot;
         }
 
         private readonly Dictionary<int, RendererEntry>    _rendererEntries = new();
         private readonly Dictionary<int, (int vb, int ib)> _meshBufferSlots = new();
+
+        // Skinned instances: bindless slot pair per renderer (own SoA VB + shared donut IB),
+        // and the set of mesh ids referenced this rebuild (for geometry-cache eviction).
+        private readonly Dictionary<int, (int vb, int ib)> _skinnedBufferSlots = new();
+        private readonly HashSet<int>                      _usedMeshIds        = new();
+
+        // One repack dispatch per skinned renderer, rebuilt on topology change and consumed by
+        // NativeRtxptBuildTlasPass every frame before the TLAS/BLAS build.
+        private readonly List<RtxptSkinnedDispatch> _skinnedDispatches   = new();
+        private readonly HashSet<int>               _skinnedSeenScratch  = new();
+
+        internal IReadOnlyList<RtxptSkinnedDispatch> SkinnedDispatches => _skinnedDispatches;
 
         private readonly List<RtxptRenderer> _registeredTargets = new();
         private int _lastTopologyVersion = -1;
@@ -202,6 +220,7 @@ namespace PathTracing
             if (_forceRebuild || _lastTopologyVersion != RtxptRenderer.TopologyVersion || TargetSetChanged(targets))
             {
                 _layout = RtxptSceneLayout.Build(targets);
+                PrepareSkinnedRecords(_layout);
                 _accelRegistry.Sync(_accelStructure, _layout);
 
                 _registeredTargets.Clear();
@@ -227,6 +246,70 @@ namespace PathTracing
                 if (current[i] != _registeredTargets[i])
                     return true;
             return false;
+        }
+
+        /// <summary>
+        /// Ensures every skinned record has its per-instance SoA geometry (created/validated via
+        /// the geometry cache) BEFORE the AS sync registers it as a dynamic BLAS, and rebuilds
+        /// the per-renderer repack dispatch list consumed each frame by the TLAS build pass.
+        /// </summary>
+        private void PrepareSkinnedRecords(List<RtxptInstanceRecord> layout)
+        {
+            _skinnedDispatches.Clear();
+            _skinnedSeenScratch.Clear();
+
+            foreach (var rec in layout)
+            {
+                if (!rec.IsSkinned) continue;
+
+                var geo = _geometryCache.GetOrCreateSkinned(rec.RendererId, rec.Mesh);
+                rec.SkinnedVb          = geo.Vb;
+                rec.SkinnedIb          = geo.Ib;
+                rec.SkinnedVertexCount = geo.VertexCount;
+
+                if (!_skinnedSeenScratch.Add(rec.RendererId)) continue; // one dispatch per renderer
+
+                Mesh mesh = rec.Mesh;
+                // Unity's GPU-skinned vertex buffer mirrors stream 0 of the shared mesh; the
+                // skinned attributes (position/normal/tangent) are float32 there. Attributes
+                // outside stream 0 are not present in the skinned buffer.
+                if (mesh.GetVertexAttributeStream(VertexAttribute.Position) != 0 ||
+                    mesh.GetVertexAttributeFormat(VertexAttribute.Position) != VertexAttributeFormat.Float32)
+                {
+                    Debug.LogError($"[NativeRtxptGPUScene] Skinned mesh '{mesh.name}': position is not a float32 stream-0 attribute — skinned repack skipped (geometry will stay in rest pose).");
+                    continue;
+                }
+
+                int stride  = mesh.GetVertexBufferStride(0);
+                int posOff  = mesh.GetVertexAttributeOffset(VertexAttribute.Position);
+                int normOff = mesh.HasVertexAttribute(VertexAttribute.Normal) &&
+                              mesh.GetVertexAttributeStream(VertexAttribute.Normal) == 0 &&
+                              mesh.GetVertexAttributeFormat(VertexAttribute.Normal) == VertexAttributeFormat.Float32
+                    ? mesh.GetVertexAttributeOffset(VertexAttribute.Normal) : -1;
+                int tanOff  = mesh.HasVertexAttribute(VertexAttribute.Tangent) &&
+                              mesh.GetVertexAttributeStream(VertexAttribute.Tangent) == 0 &&
+                              mesh.GetVertexAttributeFormat(VertexAttribute.Tangent) == VertexAttributeFormat.Float32
+                    ? mesh.GetVertexAttributeOffset(VertexAttribute.Tangent) : -1;
+
+                var streams = new RtxptMeshStreamOffsets(mesh, withPrevPosition: true);
+                uint flags = 0;
+                if (normOff >= 0 && streams.HasNormal)  flags |= RtxptSkinnedDispatch.FlagHasNormal;
+                if (tanOff  >= 0 && streams.HasTangent) flags |= RtxptSkinnedDispatch.FlagHasTangent;
+
+                _skinnedDispatches.Add(new RtxptSkinnedDispatch
+                {
+                    Smr              = rec.Skinned,
+                    Geometry         = geo,
+                    DstVbPtr         = geo.Vb.GetNativeBufferPtr(),
+                    VertexCount      = geo.VertexCount,
+                    SrcStride        = (uint)stride,
+                    SrcPosOffset     = (uint)posOff,
+                    SrcNormalOffset  = (uint)Mathf.Max(normOff, 0),
+                    SrcTangentOffset = (uint)Mathf.Max(tanOff, 0),
+                    Streams          = streams,
+                    BaseFlags        = flags,
+                });
+            }
         }
 
         // -----------------------------------------------------------------------
@@ -331,6 +414,8 @@ namespace PathTracing
             _instanceHandles.Clear();
             _rendererEntries.Clear();
             _meshBufferSlots.Clear();
+            _skinnedBufferSlots.Clear();
+            _usedMeshIds.Clear();
             _overrideMaterialIndices.Clear();
             _overrideCache.Clear();
             _environmentMapTextureIndex = -1;
@@ -362,8 +447,24 @@ namespace PathTracing
             {
                 Mesh mesh   = rec.Mesh;
                 int  meshId = mesh.GetInstanceID();
+                _usedMeshIds.Add(meshId);
 
-                if (!_meshBufferSlots.TryGetValue(meshId, out var slots))
+                (int vb, int ib) slots;
+                if (rec.IsSkinned)
+                {
+                    // Per-instance SoA VB (rewritten each frame by the repack compute) + shared
+                    // per-mesh donut IB, registered as their own bindless slot pair per renderer.
+                    if (!_skinnedBufferSlots.TryGetValue(rec.RendererId, out slots))
+                    {
+                        slots = (bufPtrs.Count, bufPtrs.Count + 1);
+                        if (bufPtrs.Count > 0xFFFF)
+                            Debug.LogError($"[NativeRtxptGPUScene] Bindless buffer slot overflow: VB slot index {bufPtrs.Count} exceeds 16-bit limit (65535). Rendering will be corrupted. Mesh='{mesh.name}'.");
+                        bufPtrs.Add(rec.SkinnedVb.GetNativeBufferPtr());
+                        bufPtrs.Add(rec.SkinnedIb.GetNativeBufferPtr());
+                        _skinnedBufferSlots[rec.RendererId] = slots;
+                    }
+                }
+                else if (!_meshBufferSlots.TryGetValue(meshId, out slots))
                 {
                     var (donutVb, donutIb) = _geometryCache.GetOrCreate(mesh);
 
@@ -380,7 +481,7 @@ namespace PathTracing
                         Debug.LogWarning($"[NativeRtxptGPUScene] '{mesh.name}': missing normal or tangent stream");
                 }
 
-                var streams = new RtxptMeshStreamOffsets(mesh);
+                var streams = new RtxptMeshStreamOffsets(mesh, withPrevPosition: rec.IsSkinned);
 
                 // Per-renderer material-index array for the lightweight material-edit path.
                 // A renderer's records are consecutive in the layout; the array spans all of
@@ -404,7 +505,7 @@ namespace PathTracing
                 // instance, then adds firstGeometryInstanceIndex itself.
                 _accelStructure.SetInstanceID(rec.Handle, (uint)firstGeom);
 
-                Matrix4x4 m    = rec.MeshRenderer.transform.localToWorldMatrix;
+                Matrix4x4 m    = RtxptSceneLayout.GetRootTransform(rec);
                 var       row0 = new Vector4(m.m00, m.m01, m.m02, m.m03);
                 var       row1 = new Vector4(m.m10, m.m11, m.m12, m.m13);
                 var       row2 = new Vector4(m.m20, m.m21, m.m22, m.m23);
@@ -429,7 +530,11 @@ namespace PathTracing
                 else
                     _rendererEntries[rec.RendererId] = new RendererEntry
                     {
-                        transform        = rec.MeshRenderer.transform,
+                        // Skinned vertices are in root-bone space, so track the root bone.
+                        transform = rec.IsSkinned && rec.Skinned.rootBone != null
+                            ? rec.Skinned.rootBone
+                            : rec.TargetRenderer.transform,
+                        isSkinned        = rec.IsSkinned,
                         firstInstanceIdx = instList.Count - 1,
                         instanceCount    = 1,
                     };
@@ -492,8 +597,9 @@ namespace PathTracing
 
             RebuildEmissiveCache();
 
-            // Drop donut buffers for meshes that no renderer references anymore.
-            _geometryCache.EvictUnused(_meshBufferSlots.ContainsKey);
+            // Drop donut buffers no longer referenced: per-mesh VB/IB by mesh usage (static or
+            // skinned — skinned instances share the per-mesh IB), skinned VBs by renderer.
+            _geometryCache.EvictUnused(_usedMeshIds.Contains, _skinnedBufferSlots.ContainsKey);
 
             _sceneGpuDirty = false;
         }
@@ -518,9 +624,9 @@ namespace PathTracing
 
             // SubInstanceData.GlobalGeometryIndex_PTMaterialDataIndex packs both fields as 16-bit.
             if (globalGeomIdx > 0xFFFF)
-                Debug.LogError($"[NativeRtxptGPUScene] GlobalGeometryIndex overflow: geomIndex={globalGeomIdx} exceeds 16-bit limit (65535). Rendering will be corrupted. Renderer='{rec.MeshRenderer.name}' subMesh={s}.");
+                Debug.LogError($"[NativeRtxptGPUScene] GlobalGeometryIndex overflow: geomIndex={globalGeomIdx} exceeds 16-bit limit (65535). Rendering will be corrupted. Renderer='{rec.TargetRenderer.name}' subMesh={s}.");
             if (matIdx > 0xFFFF)
-                Debug.LogError($"[NativeRtxptGPUScene] PTMaterialDataIndex overflow: matIndex={matIdx} exceeds 16-bit limit (65535). Rendering will be corrupted. Renderer='{rec.MeshRenderer.name}' subMesh={s}.");
+                Debug.LogError($"[NativeRtxptGPUScene] PTMaterialDataIndex overflow: matIndex={matIdx} exceeds 16-bit limit (65535). Rendering will be corrupted. Renderer='{rec.TargetRenderer.name}' subMesh={s}.");
 
             geomList.Add(new DonutGeometryData
             {
@@ -530,7 +636,9 @@ namespace PathTracing
                 indexOffset        = (uint)sub.indexStart * 4u, // donut IB is always uint32
                 vertexBufferIndex  = slots.vb,
                 positionOffset     = streams.Pos,
-                prevPositionOffset = streams.Pos, // no skinning / morph support yet
+                // Skinned buffers carry a real PrevPosition stream (repack copies last frame's
+                // positions there, donut SkinningPass model); static buffers alias positions.
+                prevPositionOffset = streams.PrevPos,
                 texCoord1Offset    = streams.Uv,
                 texCoord2Offset    = 0xFFFFFFFFu,
                 normalOffset       = streams.Normal,
@@ -558,10 +666,10 @@ namespace PathTracing
             // equals the index this entry is about to occupy.
             if (slot.EnableAsAnalyticLightProxy)
             {
-                Light targetLight = ResolveProxyTargetLight(rec.MeshRenderer);
+                Light targetLight = ResolveProxyTargetLight(rec.TargetRenderer);
                 _proxySubInstances.Add((subInstList.Count, targetLight != null ? targetLight.GetInstanceID() : 0));
                 if (targetLight == null)
-                    Debug.LogWarning($"[NativeRtxptGPUScene] Renderer '{rec.MeshRenderer.name}' submesh {s} is flagged " +
+                    Debug.LogWarning($"[NativeRtxptGPUScene] Renderer '{rec.TargetRenderer.name}' submesh {s} is flagged " +
                                      "EnableAsAnalyticLightProxy but has no Spot/Point target light " +
                                      "(add an RtxptAnalyticLightProxy component or parent it under a light).");
             }
@@ -672,14 +780,46 @@ namespace PathTracing
             {
                 if (entry.transform == null) continue;
 
+                int start = entry.firstInstanceIdx;
+                int count = Mathf.Min(entry.instanceCount, _instanceCpu.Length - start);
+                if (count <= 0) continue;
+
+                // Skinned instances deform every frame: update unconditionally from the root
+                // bone, with last frame's root as the previous transform (motion vectors).
+                if (entry.isSkinned)
+                {
+                    Matrix4x4 cur  = entry.transform.localToWorldMatrix;
+                    Matrix4x4 prev = entry.hasLastRoot ? entry.lastRoot : cur;
+
+                    var curRow0  = new Vector4(cur.m00, cur.m01, cur.m02, cur.m03);
+                    var curRow1  = new Vector4(cur.m10, cur.m11, cur.m12, cur.m13);
+                    var curRow2  = new Vector4(cur.m20, cur.m21, cur.m22, cur.m23);
+                    var prevRow0 = new Vector4(prev.m00, prev.m01, prev.m02, prev.m03);
+                    var prevRow1 = new Vector4(prev.m10, prev.m11, prev.m12, prev.m13);
+                    var prevRow2 = new Vector4(prev.m20, prev.m21, prev.m22, prev.m23);
+
+                    for (int i = start; i < start + count; i++)
+                    {
+                        _instanceCpu[i].prevTransformRow0 = prevRow0;
+                        _instanceCpu[i].prevTransformRow1 = prevRow1;
+                        _instanceCpu[i].prevTransformRow2 = prevRow2;
+                        _instanceCpu[i].transformRow0     = curRow0;
+                        _instanceCpu[i].transformRow1     = curRow1;
+                        _instanceCpu[i].transformRow2     = curRow2;
+
+                        _accelStructure.SetInstanceTransform(_instanceHandles[i], cur);
+                    }
+
+                    _instanceGpuBuf.SetData(_instanceCpu, start, count);
+                    entry.lastRoot    = cur;
+                    entry.hasLastRoot = true;
+                    continue;
+                }
+
                 bool moved = entry.transform.hasChanged;
                 if (moved) entry.transform.hasChanged = false;
 
                 if (!moved && !entry.wasMoving) continue;
-
-                int start = entry.firstInstanceIdx;
-                int count = Mathf.Min(entry.instanceCount, _instanceCpu.Length - start);
-                if (count <= 0) continue;
 
                 if (moved)
                 {
@@ -871,5 +1011,35 @@ namespace PathTracing
             LastEmissiveTaskCount     = taskIdx;
             LastEmissiveTriangleCount = accumTriangles;
         }
+    }
+
+    /// <summary>
+    /// One skinned-repack compute dispatch: converts a SkinnedMeshRenderer's GPU-skinned vertex
+    /// buffer (interleaved, root-bone space) into the instance's donut SoA buffer each frame,
+    /// maintaining the PrevPosition stream (donut skinning_cs.hlsl model). Built per topology
+    /// change by <see cref="NativeRtxptGPUScene"/>; recorded each frame by NativeRtxptBuildTlasPass
+    /// before the TLAS/BLAS build.
+    /// </summary>
+    internal sealed class RtxptSkinnedDispatch
+    {
+        public const uint FlagFirstFrame = 1u << 0; // prev = current (no history yet)
+        public const uint FlagHasNormal  = 1u << 1;
+        public const uint FlagHasTangent = 1u << 2;
+
+        public SkinnedMeshRenderer  Smr;
+        public RtxptSkinnedGeometry Geometry;
+        public IntPtr               DstVbPtr;
+        public int                  VertexCount;
+
+        // Unity skinned-VB layout (stream 0 of the shared mesh).
+        public uint SrcStride;
+        public uint SrcPosOffset;
+        public uint SrcNormalOffset;
+        public uint SrcTangentOffset;
+
+        // Destination donut SoA stream offsets (includes the PrevPosition stream).
+        public RtxptMeshStreamOffsets Streams;
+
+        public uint BaseFlags; // FlagHasNormal / FlagHasTangent
     }
 }
