@@ -92,9 +92,6 @@ namespace PathTracing
         private readonly List<RtxptRenderer> _registeredTargets = new();
         private int _lastTopologyVersion = -1;
 
-        // Maps MeshRenderer.GetInstanceID() → list of per-group TLAS handles registered in _accelStructure.
-        private readonly Dictionary<int, List<uint>> _perTargetGroupHandles = new();
-
         // Flat per-geometry hit-group variant index (one entry per TLAS geometry, in insertion
         // order), used to rebuild each ray-trace pipeline's hit-group shader table. Owned here
         // (not by the AS) so RayTraceShader and RayTracingAccelerationStructure stay decoupled.
@@ -486,27 +483,16 @@ namespace PathTracing
 
         private void RegisterScene(IReadOnlyList<RtxptRenderer> targets)
         {
-            // Full teardown + rebuild
-            if (_registeredTargets.Count > 0)
-            {
-                foreach (var t in _registeredTargets)
-                {
-                    if (t == null) continue;
-                    var mr = t.MeshRenderer;
-                    if (mr == null) continue;
-                    int mrId = mr.GetInstanceID();
-                    if (_perTargetGroupHandles.TryGetValue(mrId, out var oldHandles))
-                    {
-                        foreach (var h in oldHandles)
-                            _accelStructure.RemoveInstance(h);
-                        _perTargetGroupHandles.Remove(mrId);
-                    }
-                    else
-                    {
-                        _accelStructure.RemoveInstance(mr);
-                    }
-                }
-            }
+            // Full teardown + rebuild via Clear(), which resets the native slot system — NOT
+            // per-handle RemoveInstance. The native AS emits TLAS instances in slot order and
+            // reuses freed slots LIFO, so remove + re-add permutes the TLAS instance order
+            // relative to instList/t_InstanceData. Every InstanceIndex()-based lookup
+            // (Bridge::loadSurface → instance transform, firstGeometryIndex) then reads the
+            // wrong instance: hits stay correct (BLAS) but normals/UVs/materials are garbage.
+            // Clear + sequential re-add guarantees TLAS slot i == registration order i. It also
+            // tears down instances of renderers that have since been destroyed (which compare
+            // == null and could no longer be removed by MeshRenderer reference).
+            _accelStructure.Clear();
 
             // Flat per-geometry hit-group variant array, rebuilt in lockstep with the TLAS
             // insertion order. runningContribution is each group's InstanceContributionToHitGroupIndex
@@ -530,7 +516,6 @@ namespace PathTracing
                     uint indexStride = mesh.indexFormat == UnityEngine.Rendering.IndexFormat.UInt16 ? 2u : 4u;
                     int  mrId        = mr.GetInstanceID();
                     var  rr          = t;
-                    var  handles     = new List<uint>(groups.Length);
 
                     for (int gi = 0; gi < groups.Length; gi++)
                     {
@@ -563,7 +548,6 @@ namespace PathTracing
                         if (_accelStructure.AddInstanceGroup(mesh, descs, handle, hitGroupContribution: runningContribution))
                         {
                             _accelStructure.SetInstanceTransform(handle, mr.transform.localToWorldMatrix);
-                            handles.Add(handle);
                             for (int k = 0; k < descs.Length; k++)
                                 variantList.Add(hitGroupVariant);
                             runningContribution += (uint)descs.Length;
@@ -573,9 +557,6 @@ namespace PathTracing
                             Debug.LogWarning($"[NativeRtxptGPUScene] AddInstanceGroup failed for '{mr.name}' gi={gi}");
                         }
                     }
-
-                    if (handles.Count > 0)
-                        _perTargetGroupHandles[mrId] = handles;
                 }
                 else
                 {
@@ -630,7 +611,6 @@ namespace PathTracing
             _meshBufferSlots.Clear();
             _overrideSlots.Clear();
             _textureSlots.Clear();
-            _perTargetGroupHandles.Clear();
             _overrideMaterialIndices.Clear();
             _overrideCache.Clear();
             _environmentMapTextureIndex = -1;
@@ -644,6 +624,12 @@ namespace PathTracing
         private void RebuildSceneGpuData(IReadOnlyList<RtxptRenderer> targets)
         {
             DisposeGpuBuffers();
+
+            // Historic emissive offsets are keyed by (instanceIndex, geometrySubIndex), which
+            // remap when the scene topology changes — stale entries would hand another object's
+            // light history to the baker. Drop them; the first frame after a rebuild treats all
+            // emissive geometry as new (HistoricBufferOffset = invalid).
+            _emissiveHistoricOffsets.Clear();
 
             var instList    = new List<DonutInstanceData>();
             var geomList    = new List<DonutGeometryData>();
