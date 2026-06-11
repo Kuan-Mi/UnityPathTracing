@@ -44,6 +44,7 @@ MonoBehaviour:
     neeatImportanceBoostFrustumMul: 8
     neeatImportanceBoostFrustumFadeDistance: 5
     neeatSceneAverageContentsDistance: 10
+    neeatSampleBakedEnvironment: 1
     useReSTIRDI: 0
     useReSTIRGI: 0
     normalMap: 1
@@ -57,6 +58,8 @@ MonoBehaviour:
     nestedDielectricsQuality: 1
     usePrevFrame: 1
     useFp16Types: 1
+    dxHitObjectExtension: 1
+    dxMaybeReorderThreads: 1
     allowPrimarySurfaceReplacement: 1
     stablePlanesSuppressPrimaryIndirectSpecular: 1
     stablePlanesSuppressPrimaryIndirectSpecularK: 0.6
@@ -102,6 +105,7 @@ MonoBehaviour:
     dbgDiscardNonNEELighting: 0
     dbgDiscardNEELighting: 0
     dbgDisablePostProcessFilters: 0
+    dbgDisableSERTerminationHint: 0
     showMode: 0
     debugViewType: 0
     debugViewStablePlaneIndex: -1

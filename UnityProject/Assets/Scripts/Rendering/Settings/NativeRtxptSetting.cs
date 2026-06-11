@@ -102,6 +102,12 @@ namespace PathTracing
         public float neeatImportanceBoostFrustumMul        = 8.0f;
         public float neeatImportanceBoostFrustumFadeDistance = 5.0f;
         public float neeatSceneAverageContentsDistance     = 10.0f;
+        /// <summary>
+        /// Sample the baked env cube for distant-light radiance (LightsBaker.h:241
+        /// m_advSetting_SampleBakedEnvironment). Compile-time macro
+        /// NEE_AT_SAMPLE_BAKED_ENVIRONMENT — applied via the shader-macro sync (reimport).
+        /// </summary>
+        public bool  neeatSampleBakedEnvironment           = true;
 
         public bool useReSTIRDI = false;
         public bool useReSTIRGI = false;
@@ -119,6 +125,14 @@ namespace PathTracing
         public int  nestedDielectricsQuality = 1; // 0=off, 1=fast, 2=quality
         public bool usePrevFrame         = true;
         public bool useFp16Types         = true;
+
+        // ── Ray-tracing pipeline (compile-time macros, applied via shader-macro sync) ──
+        // C++ defaults to the NVAPI HitObject extension (SampleUI.h:221-225); the Unity plugin has
+        // no NVAPI integration, so the SM 6.9 DX HitObject path is used instead (USE_NVAPI_* stay 0).
+        /// <summary>USE_DX_HIT_OBJECT_EXTENSION — DX1.x HitObject API (SER) on SM 6.9.</summary>
+        public bool dxHitObjectExtension  = true;
+        /// <summary>USE_DX_MAYBE_REORDER_THREADS — MaybeReorderThread() with the DX HitObject path.</summary>
+        public bool dxMaybeReorderThreads = true;
 
         // ── PSR / SHARC / Stable Planes ───────────────────────────────────────
         public bool  allowPrimarySurfaceReplacement          = true;
@@ -175,9 +189,9 @@ namespace PathTracing
         public NativeRtxptToneMapOperator toneMapOperator = NativeRtxptToneMapOperator.HableUc2;
 
         /// <summary>
-        /// Enable histogram-free auto-exposure (geometric-mean luminance). RTXPT's C++ default is
-        /// false (scene-driven), but the realtime path-tracer output benefits from it, so it is on
-        /// by default here. When off, photographic manual exposure (filmSpeed/fNumber/shutter) is used.
+        /// Enable histogram-free auto-exposure (geometric-mean luminance). Off by default, matching
+        /// RTXPT's C++ default (scene JSON can override it there) and the reference capture, which
+        /// uses photographic manual exposure (filmSpeed/fNumber/shutter) with exposureCompensation.
         /// </summary>
         public bool autoExposure = false;
 
@@ -215,6 +229,8 @@ namespace PathTracing
         public bool dbgDiscardNonNEELighting     = false;
         public bool dbgDiscardNEELighting        = false;
         public bool dbgDisablePostProcessFilters = false;
+        /// <summary>RTXPT_DISABLE_SER_TERMINATION_HINT (SampleUI.h:299). Compile-time macro.</summary>
+        public bool dbgDisableSERTerminationHint = false;
 
         /// <summary>Which buffer to display in the output blit pass.</summary>
         public NativeRtxptShowMode showMode = NativeRtxptShowMode.DlssRrOutput;

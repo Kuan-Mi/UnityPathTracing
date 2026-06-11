@@ -101,8 +101,23 @@ namespace PathTracing
 
             int spp = math.max(setting.realtimeSamplesPerPixel, 1);
 
-            // Original (Sample.cpp:1444,1499): sampleIndex = frameIndex % 8192, sampleBaseIndex = sampleIndex * spp.
-            uint sampleIndex     = setting.realtimeMode ? (fs.frameIndex % 8192u) : 0u;
+            // Original (Sample.cpp:1438-1444,1499): realtime sampleIndex = frameIndex % 8192
+            // (0 while the noise seed is frozen for debugging); reference sampleIndex follows the
+            // accumulation index — offset by 4096 during the negative pre-warm window so warm-up
+            // frames get their own seed range, then clamped to keep looping the last sample once
+            // the target is reached. sampleBaseIndex = sampleIndex * spp.
+            uint sampleIndex;
+            if (setting.realtimeMode)
+            {
+                sampleIndex = setting.dbgFreezeRealtimeNoiseSeed ? 0u : fs.frameIndex % 8192u;
+            }
+            else
+            {
+                int accumIndex = fs.accumulationSampleIndex;
+                sampleIndex = (uint)(accumIndex < 0
+                    ? accumIndex + 4096
+                    : math.min(accumIndex, math.max(setting.accumulationTarget - 1, 0)));
+            }
             uint sampleBaseIndex = sampleIndex * (uint)spp;
 
             // preExposedGrayLuminance mirrors Sample.cpp:1508 (luminance(GetPreExposedGray(0)) when tone
@@ -192,8 +207,14 @@ namespace PathTracing
             // original (Sample.cpp:1913): TintColor * (Intensity / c_envMapRadianceScale). The
             // divide cancels the constant compression scale baked into the cube
             // (NativeRtxptEnvMapBakerPass.EnvMapRadianceScale) → net radiance = source * tint * intensity.
+            // Original (Sample.cpp:1910-1925): when EnvironmentMapParams.Enabled is off, both
+            // ColorMultiplier and Enabled are zeroed — all environment lighting stops, including
+            // the directional lights baked into the env cube (analytic-light list is unaffected).
+            bool    envEnabled = setting.environmentMapEnabled;
             Color   envTintLin = setting.environmentMapTint.linear;
-            float   envColMul  = setting.environmentMapIntensity / NativeRtxptEnvMapBakerPass.EnvMapRadianceScale;
+            float   envColMul  = envEnabled
+                ? setting.environmentMapIntensity / NativeRtxptEnvMapBakerPass.EnvMapRadianceScale
+                : 0f;
             var envMapParams = new EnvMapSceneParams
             {
                 TransformRow0    = new Vector4(1, 0, 0, 0),
@@ -203,7 +224,7 @@ namespace PathTracing
                 InvTransformRow1 = new Vector4(0, 1, 0, 0),
                 InvTransformRow2 = new Vector4(0, 0, 1, 0),
                 colorMultiplier  = new Vector3(envTintLin.r, envTintLin.g, envTintLin.b) * envColMul,
-                enabled          = 1f,  // always enabled; env cube is baked each frame (directional lights + optional skybox)
+                enabled          = envEnabled ? 1f : 0f,
             };
 
             // ImportanceMapDim = 1024, mipLevels = 11 → ImportanceBaseMip = 10, InvDim = 1/1024

@@ -32,6 +32,15 @@ namespace PathTracing
         public float  perPixelJitterAAScale;
         public int    convergenceStep;
 
+        /// <summary>
+        /// Reference-mode accumulation sample index, mirroring C++ m_accumulationSampleIndex
+        /// (Sample.cpp:1411-1449). Reset every realtime frame and on camera/settings changes;
+        /// starts at -32 when accumulationPreWarmRealtimeCaches is on (the negative window runs
+        /// the path tracer without accumulating, letting NEE-AT feedback and other temporal
+        /// caches converge), then counts 0..accumulationTarget (clamped).
+        /// </summary>
+        public int accumulationSampleIndex;
+
         public RtxptCameraFrameState(float initialResolutionScale)
         {
             resolutionScale     = initialResolutionScale;
@@ -82,6 +91,15 @@ namespace PathTracing
                 convergenceStep = 0;
             else
                 convergenceStep++;
+
+            // Original (Sample.cpp:1413-1418, 1449): resetAccum |= ResetAccumulation | RealtimeMode;
+            // on reset start at -32 (pre-warm) or 0, otherwise advance and clamp at the target
+            // (PostUpdatePathTracing increments after rendering ≡ incrementing before the next frame).
+            bool resetAccum = setting.realtimeMode || hasCameraMoved || settingsChanged;
+            if (resetAccum)
+                accumulationSampleIndex = setting.accumulationPreWarmRealtimeCaches ? -32 : 0;
+            else
+                accumulationSampleIndex = math.min(accumulationSampleIndex + 1, setting.accumulationTarget);
         }
 
         private static bool UseCameraJitter(NativeRtxptSetting setting)

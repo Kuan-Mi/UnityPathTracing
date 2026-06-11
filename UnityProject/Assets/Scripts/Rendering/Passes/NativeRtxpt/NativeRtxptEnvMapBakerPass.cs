@@ -145,7 +145,7 @@ namespace PathTracing
             _importanceBakerDs = new NativeComputeDescriptorSet(_importanceBakerCs);
             _mipMapGenCs       = new NativeComputePipeline(mipMapGenCs);
             _mipMapGenDs       = new NativeComputeDescriptorSet(_mipMapGenCs);
-
+ 
             if (EnableBC6UCompression && bc6uCompressCs != null)
             {
                 _bc6uCompressCs = new NativeComputePipeline(bc6uCompressCs);

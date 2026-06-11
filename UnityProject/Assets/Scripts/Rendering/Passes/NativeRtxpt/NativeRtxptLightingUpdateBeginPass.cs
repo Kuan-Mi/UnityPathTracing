@@ -925,7 +925,10 @@ namespace PathTracing
             uint currentOffset  = _ping ? 0u : WeightsCountHalf;
             uint historicOffset = _ping ? WeightsCountHalf : 0u;
 
-            float envIntensity = _ctx.Setting?.environmentMapIntensity ?? 1.0f;
+            // Original (Sample.cpp:1404,1910-1925): the LightsBaker receives the same env-map
+            // params as the path tracer — ColorMultiplier and Enabled zeroed when disabled.
+            bool  envEnabled   = _ctx.Setting?.environmentMapEnabled ?? true;
+            float envIntensity = envEnabled ? (_ctx.Setting?.environmentMapIntensity ?? 1.0f) : 0.0f;
             Color envTint      = (_ctx.Setting?.environmentMapTint ?? Color.white).linear;
 
             ref var ctrl = ref s_controlStaging[0];
@@ -1029,7 +1032,7 @@ namespace PathTracing
                 ColorMultiplierR = envTint.r * envIntensity / NativeRtxptEnvMapBakerPass.EnvMapRadianceScale,
                 ColorMultiplierG = envTint.g * envIntensity / NativeRtxptEnvMapBakerPass.EnvMapRadianceScale,
                 ColorMultiplierB = envTint.b * envIntensity / NativeRtxptEnvMapBakerPass.EnvMapRadianceScale,
-                Enabled          = 1.0f,
+                Enabled          = envEnabled ? 1.0f : 0.0f,
             };
 
             _previousFrameTemporalFeedbackAvailable = ctrl.TemporalFeedbackRequired != 0;

@@ -6,9 +6,23 @@ using UnityEngine;
 
 namespace PathTracing
 {
+    /// <summary>
+    /// Custom inspector for <see cref="NativeRtxptFeature"/>. The settings page mirrors the RTXPT
+    /// C++ ImGui layout (SampleUI.cpp buildUI): same section structure, ordering, labels, ranges
+    /// and realtime/reference conditional visibility. Fields marked with " *" are shader
+    /// compile-time macros — they only take effect via the "Apply Shader Macros" button below.
+    /// Settings with no C++ counterpart are grouped under "Unity-specific". Inert legacy fields
+    /// (NRD leftovers, ReSTIR toggles) are intentionally not drawn but kept serialized.
+    /// </summary>
     [CustomEditor(typeof(NativeRtxptFeature))]
     public class NativeRtxptFeatureEditor : Editor
     {
+        // Mirror of shader-side limits (PathTracerConfig is internal to the runtime assembly).
+        private const int   kStablePlaneCount          = 3;   // PathTracerConfig.cStablePlaneCount
+        private const int   kStablePlaneMaxVertexIndex = 15;  // PathTracerConfig.cStablePlaneMaxVertexIndex
+        private const int   kMaxBounceCount            = 96;  // Config.h MAX_BOUNCE_COUNT
+        private const int   kMaxLightSamples           = 63;  // LightingConfig.h RTXPT_LIGHTING_MAX_SAMPLE_COUNT
+
         private string GetKey(string headerName) =>
             $"PT_NativeRtxpt_Foldout_{target.GetInstanceID()}_{headerName}";
 
@@ -18,13 +32,7 @@ namespace PathTracing
 
             var feature = (NativeRtxptFeature)target;
 
-            // Setting
-            var settingsProp = serializedObject.FindProperty("setting");
-            if (settingsProp != null)
-                EditorGUILayout.PropertyField(settingsProp, includeChildren: true);
-
-            // Flush setting edits so the macro-sync check below sees the current values.
-            serializedObject.ApplyModifiedProperties();
+            DrawSettings(feature);
 
             EditorGUILayout.Space(4);
             DrawShaderMacroSync(feature);
@@ -71,6 +79,461 @@ namespace PathTracing
             serializedObject.ApplyModifiedProperties();
         }
 
+        // ═════════════════════════════════════════════════════════════════════
+        // Settings page (mirrors SampleUI.cpp buildUI)
+        // ═════════════════════════════════════════════════════════════════════
+
+        private void DrawSettings(NativeRtxptFeature feature)
+        {
+            var s = feature.setting;
+            if (s == null)
+            {
+                EditorGUILayout.HelpBox("No settings instance.", MessageType.Warning);
+                return;
+            }
+
+            EditorGUI.BeginChangeCheck();
+            Undo.RecordObject(feature, "RTXPT Settings");
+
+            DrawEnvironmentMapSection(s);     // SampleUI.cpp:586  (Scene -> Environment Map)
+            DrawCameraSection(s);             // SampleUI.cpp:669
+            DrawLightPreprocessingSection(s); // SampleUI.cpp:722
+            DrawPathTracerSection(s);         // SampleUI.cpp:794  (DefaultOpen in C++)
+            DrawDlssSection(s);               // SampleUI.cpp:1104
+            DrawStablePlanesSection(s);       // SampleUI.cpp:1207
+            DrawPostProcessSection(s);        // SampleUI.cpp:1273
+            DrawDebuggingSection(s);          // SampleUI.cpp:1371
+            DrawUnitySpecificSection(s);
+
+            EditorGUILayout.Space(2);
+            EditorGUILayout.LabelField("Fields marked * are compile-time shader macros — use 'Apply Shader Macros' below.",
+                                       EditorStyles.miniLabel);
+
+            if (EditorGUI.EndChangeCheck())
+                EditorUtility.SetDirty(feature);
+        }
+
+        // ── Scene -> Environment Map (SampleUI.cpp:586) ───────────────────────
+        private void DrawEnvironmentMapSection(NativeRtxptSetting s)
+        {
+            if (!Foldout("EnvMap", "Environment Map")) return;
+            using var _ = new EditorGUI.IndentLevelScope();
+
+            s.environmentMapEnabled = EditorGUILayout.Toggle("Enabled", s.environmentMapEnabled);
+            // C++ has a media-list Override combo; Unity overrides via an explicit texture
+            // (the env cube otherwise bakes directional lights only).
+            s.environmentMap = (Texture)EditorGUILayout.ObjectField(
+                new GUIContent("Override", "Equirectangular HDR environment map baked into the env cube (t_SrcEquirectangularEnvMap). None = directional lights only."),
+                s.environmentMap, typeof(Texture), false);
+
+            EditorGUILayout.Space(2);
+            s.environmentMapTint      = EditorGUILayout.ColorField("Tint Color", s.environmentMapTint);
+            s.environmentMapIntensity = EditorGUILayout.FloatField("Intensity", s.environmentMapIntensity);
+        }
+
+        // ── Camera (SampleUI.cpp:669) ─────────────────────────────────────────
+        private void DrawCameraSection(NativeRtxptSetting s)
+        {
+            if (!Foldout("Camera", "Camera")) return;
+            using var _ = new EditorGUI.IndentLevelScope();
+
+            s.cameraAperture = Mathf.Clamp(EditorGUILayout.FloatField("Aperture", s.cameraAperture), 0f, 1f);
+            s.cameraFocalDistance = Mathf.Clamp(
+                EditorGUILayout.FloatField("Focal Distance", s.cameraFocalDistance), 0.001f, 1e16f);
+            s.cameraMoveSpeed = EditorGUILayout.Slider(
+                new GUIContent("Keyboard move speed", "Unused in Unity — the camera is driven by Unity components."),
+                s.cameraMoveSpeed, 0.1f, 10.0f);
+            s.cameraJitter = EditorGUILayout.Toggle(
+                new GUIContent("Camera jitter (Unity)", "Viewport jitter for AA/upscalers (C++ derives this from the AA mode)."),
+                s.cameraJitter);
+        }
+
+        // ── Light pre-processing and sampling (SampleUI.cpp:722) ──────────────
+        private void DrawLightPreprocessingSection(NativeRtxptSetting s)
+        {
+            if (!Foldout("Lighting", "Light pre-processing and sampling")) return;
+            using var _ = new EditorGUI.IndentLevelScope();
+
+            if (!s.useNEE)
+                EditorGUILayout.HelpBox("NOTE: NEE inactive (enable in `Path Tracer -> Light sampling`).", MessageType.Warning);
+
+            Category("Importance sampling:");
+            using (new EditorGUI.IndentLevelScope())
+            {
+                if (s.neeType != NativeRtxptNeeType.NEEAT)
+                {
+                    EditorGUILayout.LabelField("NOTE: NEE-AT inactive (enable in `Path Tracer -> NEE settings`).", EditorStyles.wordWrappedMiniLabel);
+                }
+                else
+                {
+                    Category("NEE-AT settings:");
+                    using (new EditorGUI.IndentLevelScope())
+                    {
+                        s.neeatGlobalTemporalFeedbackWeight = EditorGUILayout.Slider(
+                            new GUIContent("Global feedback weight", "How much to rely on last frame's usage statistic as opposed to simple power based sampling."),
+                            s.neeatGlobalTemporalFeedbackWeight, 0.0f, 0.95f);
+                        s.neeatLocalToGlobalSampleRatio = EditorGUILayout.Slider(
+                            new GUIContent("Local to global sampler ratio", "When drawing new light candidate samples, how many to draw from Global versus Local (tile) samplers."),
+                            s.neeatLocalToGlobalSampleRatio, 0.0f, 0.95f);
+
+                        // LightingTypes.hlsli:148 candidate split, shown as a tooltip in C++.
+                        int total = Mathf.Max(1, s.neeCandidateSamples);
+                        int local = (int)((total - 1) * s.neeatLocalToGlobalSampleRatio + 0.75f);
+                        EditorGUILayout.LabelField($"Candidate split: {local} local / {total - local} global (of {total}) *", EditorStyles.miniLabel);
+
+                        s.neeatDistantVsLocalImportance = EditorGUILayout.Slider(
+                            new GUIContent("Distant vs Local initial importance", "Higher = more initial importance to environment map / sunlight vs local scene lights."),
+                            s.neeatDistantVsLocalImportance, 0.01f, 100.0f);
+                    }
+                }
+            }
+
+            if (Foldout("LightingAdv", "Advanced (LightsBaker)"))
+            {
+                using var __ = new EditorGUI.IndentLevelScope();
+                s.neeatScreenSpaceVsWorldSpaceThreshold = EditorGUILayout.FloatField("ScreenSpace vs WorldSpace threshold", s.neeatScreenSpaceVsWorldSpaceThreshold);
+                s.neeatDepthDisocclusionThreshold       = EditorGUILayout.FloatField("Depth disocclusion threshold", s.neeatDepthDisocclusionThreshold);
+                s.neeatReservoirHistoryDropoff          = EditorGUILayout.FloatField("Reservoir history dropoff", s.neeatReservoirHistoryDropoff);
+                s.neeatEnableMotionReprojection         = EditorGUILayout.Toggle("Motion reprojection", s.neeatEnableMotionReprojection);
+                s.neeatImportanceBoostIntensityDelta    = EditorGUILayout.FloatField("Importance boost: intensity delta", s.neeatImportanceBoostIntensityDelta);
+                s.neeatImportanceBoostFrustumMul        = EditorGUILayout.FloatField("Importance boost: frustum mul", s.neeatImportanceBoostFrustumMul);
+                s.neeatImportanceBoostFrustumFadeDistance = EditorGUILayout.FloatField("Importance boost: frustum fade distance", s.neeatImportanceBoostFrustumFadeDistance);
+                s.neeatSceneAverageContentsDistance     = EditorGUILayout.FloatField("Scene average contents distance", s.neeatSceneAverageContentsDistance);
+                s.neeatSampleBakedEnvironment           = EditorGUILayout.Toggle("Sample baked environment *", s.neeatSampleBakedEnvironment);
+            }
+        }
+
+        // ── Path Tracer (SampleUI.cpp:794, DefaultOpen) ───────────────────────
+        private void DrawPathTracerSection(NativeRtxptSetting s)
+        {
+            if (!Foldout("PathTracer", "Path Tracer", defaultOpen: true)) return;
+            using var _ = new EditorGUI.IndentLevelScope();
+
+            int modeIndex = s.realtimeMode ? 1 : 0;
+            modeIndex = EditorGUILayout.Popup("Mode", modeIndex, new[] { "Reference", "Realtime" });
+            s.realtimeMode = modeIndex != 0;
+
+            Category("Setup:");
+            using (new EditorGUI.IndentLevelScope())
+            {
+                if (s.realtimeMode)
+                {
+                    s.realtimeSamplesPerPixel = EditorGUILayout.IntSlider("Samples per pixel", s.realtimeSamplesPerPixel, 1, 8);
+                }
+                else
+                {
+                    s.accumulationTarget = Mathf.Clamp(
+                        EditorGUILayout.IntField(new GUIContent("Sample count", "Number of path samples per pixel to collect"), s.accumulationTarget),
+                        1, 4 * 1024 * 1024);
+                    s.accumulationPreWarmRealtimeCaches = EditorGUILayout.Toggle(
+                        new GUIContent("Pre-warm real-time caches", "Pre-warm lighting and other temporal systems before sample 0 is accumulated; otherwise initial samples are lower quality."),
+                        s.accumulationPreWarmRealtimeCaches);
+                    s.accumulationAA = EditorGUILayout.Toggle(
+                        new GUIContent("Jitter anti-aliasing", "Each sample gets a random per-pixel jitter emulating a box filter."),
+                        s.accumulationAA);
+                }
+
+                s.bounceCount = Mathf.Clamp(
+                    EditorGUILayout.IntField(new GUIContent("Max bounces", "Max number of all bounces (including NEE and diffuse bounces)"), s.bounceCount),
+                    0, kMaxBounceCount);
+                s.diffuseBounceCount = Mathf.Clamp(
+                    EditorGUILayout.IntField(new GUIContent("Max diffuse bounces", "Max number of diffuse bounces"), s.diffuseBounceCount),
+                    0, kMaxBounceCount);
+
+                if (s.realtimeMode)
+                {
+                    s.realtimeFireflyFilterEnabled = EditorGUILayout.Toggle(
+                        new GUIContent("FireflyFilter (realtime) *", "Smart firefly filter that clamps max radiance based on a probability heuristic."),
+                        s.realtimeFireflyFilterEnabled);
+                    if (s.realtimeFireflyFilterEnabled)
+                    {
+                        using var __ = new EditorGUI.IndentLevelScope();
+                        s.realtimeFireflyFilterThreshold = Mathf.Clamp(
+                            EditorGUILayout.FloatField("FF Threshold", s.realtimeFireflyFilterThreshold), 0.00001f, 1000.0f);
+                    }
+                }
+                else
+                {
+                    s.referenceFireflyFilterEnabled = EditorGUILayout.Toggle(
+                        new GUIContent("FireflyFilter (reference *)", "With both auto-exposure and firefly filter enabled in reference mode, results are no longer deterministic."),
+                        s.referenceFireflyFilterEnabled);
+                    if (s.referenceFireflyFilterEnabled)
+                    {
+                        using var __ = new EditorGUI.IndentLevelScope();
+                        s.referenceFireflyFilterThreshold = Mathf.Clamp(
+                            EditorGUILayout.FloatField("FF Threshold", s.referenceFireflyFilterThreshold), 0.01f, 1000.0f);
+                    }
+                }
+
+                s.texLODBias = EditorGUILayout.FloatField("Texture MIP bias", s.texLODBias);
+
+                s.environmentMapDiffuseSampleMIPLevel = Mathf.Clamp(
+                    EditorGUILayout.IntField(new GUIContent("Diffuse sample envmap MIP level", "MIP level for env-map light sampling and diffuse path termination into sky. Only 0 is unbiased."),
+                                             s.environmentMapDiffuseSampleMIPLevel),
+                    0, 16);
+
+                s.enableRussianRoulette = EditorGUILayout.Toggle(
+                    new GUIContent("Use Russian Roulette early out *", "Stochastic path termination for low-throughput diffuse paths."),
+                    s.enableRussianRoulette);
+            }
+
+            Category("Post processing:");
+            using (new EditorGUI.IndentLevelScope())
+            {
+                if (s.realtimeMode)
+                {
+                    s.realtimeAA = EditorGUILayout.Popup(
+                        new GUIContent("AA/SR/Denoising", "TAA — temporal AA\nDLSS — super sampling\nDLSS-RR — DLSS + Ray Reconstruction (denoise & upscale)"),
+                        s.realtimeAA, Options("Disabled", "TAA", "DLSS", "DLSS-RR"));
+                    if (s.realtimeAA == 1 || s.realtimeAA == 2)
+                        EditorGUILayout.HelpBox("TAA and DLSS (SR-only) are not implemented in the Unity port yet — use Disabled or DLSS-RR.", MessageType.Warning);
+                    if (s.realtimeAA >= 2)
+                    {
+                        using var __ = new EditorGUI.IndentLevelScope();
+                        s.upscalerMode = (UpscalerMode)EditorGUILayout.EnumPopup("DLSS Mode", s.upscalerMode);
+                    }
+                }
+                s.enableToneMapping = EditorGUILayout.Toggle(
+                    new GUIContent("Enable tone mapping", "Full tone mapping settings available under `Post-process -> Tone Mapping`."),
+                    s.enableToneMapping);
+            }
+
+            Category("Light sampling:");
+            using (new EditorGUI.IndentLevelScope())
+            {
+                if (s.realtimeMode)
+                {
+                    // ReSTIR DI/GI exist in the original; this fork has no RTXDI (PT_USE_RESTIR_*=0).
+                    using (new EditorGUI.DisabledScope(true))
+                    {
+                        EditorGUILayout.Toggle(new GUIContent("Use ReSTIR DI (RTXDI)", "Not available — RTXDI is excluded from this fork."), false);
+                        EditorGUILayout.Toggle(new GUIContent("Use ReSTIR GI (RTXDI)", "Not available — RTXDI is excluded from this fork."), false);
+                    }
+                }
+
+                s.useNEE = EditorGUILayout.Toggle(
+                    new GUIContent("Use Next Event Estimation *", "Direct light importance sampling. Analytic lights only come out of NEE — they go missing when disabled."),
+                    s.useNEE);
+
+                if (s.useNEE)
+                {
+                    Category("NEE settings:");
+                    using var __ = new EditorGUI.IndentLevelScope();
+                    s.neeType = (NativeRtxptNeeType)EditorGUILayout.Popup(
+                        new GUIContent("Sampling technique", "Light importance sampling technique for NEE. NEE-AT settings under `Light pre-processing and sampling`."),
+                        (int)s.neeType, Options("Uniform", "Power+", "NEE-AT"));
+                    s.neeCandidateSamples = Mathf.Clamp(
+                        EditorGUILayout.IntField(new GUIContent("Candidate samples *", "Number of light samples weighted with BSDF used to pick each full sample."), s.neeCandidateSamples),
+                        1, kMaxLightSamples);
+                    s.neeFullSamples = Mathf.Clamp(
+                        EditorGUILayout.IntField(new GUIContent("Full samples *", "Number of light samples to shadow test and integrate. Max total samples is 63."), s.neeFullSamples),
+                        0, kMaxLightSamples);
+                    s.neeMisType = EditorGUILayout.Popup(
+                        new GUIContent("MIS Type *", "Path (BSDF) vs light sampler MIS approach. 'Approximate' is faster but more noisy — especially detrimental in reference accumulation."),
+                        s.neeMisType, Options("Full", "ApproxInRealtime", "Approximate"));
+                }
+            }
+
+            // PT: Advanced Settings (SampleUI.cpp:1016)
+            if (Foldout("PTAdvanced", "PT: Advanced Settings"))
+            {
+                using var __ = new EditorGUI.IndentLevelScope();
+
+                Category("Features:");
+                s.nestedDielectricsQuality = EditorGUILayout.Popup(
+                    new GUIContent("Nested Dielectrics *", "Priority-based nested dielectrics; 'Quality' allows more correct rejections, 'Fast' is faster."),
+                    s.nestedDielectricsQuality, Options("Off", "Fast", "Quality"));
+                if (s.realtimeMode && s.realtimeAA == 3)
+                {
+                    s.dlssrrBrightnessClampK = EditorGUILayout.FloatField(
+                        new GUIContent("RR brightness clamp", "RR doesn't handle too-bright areas well; clamps brightness at the expense of bloom."),
+                        s.dlssrrBrightnessClampK);
+                }
+                s.denoiserRadianceClampK = EditorGUILayout.FloatField(
+                    new GUIContent("Denoiser radiance clamp", "Radiance clamp K applied in the denoiser front-end (ptConsts.denoiserRadianceClampK)."),
+                    s.denoiserRadianceClampK);
+
+                Category("Performance:");
+                EditorGUILayout.LabelField("<NVAPI Hit Object Extension not supported>", EditorStyles.miniLabel);
+                s.dxHitObjectExtension = EditorGUILayout.Toggle(
+                    new GUIContent("dx::HitObject codepath *", "If disabled, the traditional TraceRay path is used; if enabled, TraceRayInline→MakeHit→MaybeReorderThread→InvokeHit (SM 6.9)."),
+                    s.dxHitObjectExtension);
+                if (s.dxHitObjectExtension)
+                {
+                    using var ___ = new EditorGUI.IndentLevelScope();
+                    s.dxMaybeReorderThreads = EditorGUILayout.Toggle("dx::MaybeReorderThreads *", s.dxMaybeReorderThreads);
+                }
+                s.useFp16Types          = EditorGUILayout.Toggle("Use explicit fp16 types *", s.useFp16Types);
+                s.enableLDSamplerForBSDF = EditorGUILayout.Toggle("Enable LD sampler for BSDF *", s.enableLDSamplerForBSDF);
+            }
+        }
+
+        // ── DLSS settings (SampleUI.cpp:1104, shown when realtime && AA > 1) ──
+        private void DrawDlssSection(NativeRtxptSetting s)
+        {
+            if (!(s.realtimeMode && s.realtimeAA > 1)) return;
+            if (!Foldout("DLSS", "DLSS settings")) return;
+            using var _ = new EditorGUI.IndentLevelScope();
+
+            s.upscalerMode = (UpscalerMode)EditorGUILayout.EnumPopup("DLSS Mode", s.upscalerMode);
+            if (s.realtimeAA == 3)
+            {
+                s.dlssrrMicroJitter = EditorGUILayout.Slider("DLSS-RR micro jitter", s.dlssrrMicroJitter, 0.0f, 1.0f);
+                s.tmpDisableDlssRR  = EditorGUILayout.Toggle(
+                    new GUIContent("Temporarily disable DLSS-RR (Unity)", "Debug: skip the DLSS-RR dispatch and show the noisy input."),
+                    s.tmpDisableDlssRR);
+            }
+        }
+
+        // ── Stable Planes (denoising layers) (SampleUI.cpp:1207) ──────────────
+        private void DrawStablePlanesSection(NativeRtxptSetting s)
+        {
+            if (!Foldout("StablePlanes", "Stable Planes (denoising layers)")) return;
+            using var _ = new EditorGUI.IndentLevelScope();
+
+            if (!s.realtimeMode)
+            {
+                EditorGUILayout.LabelField("Not available in reference mode", EditorStyles.miniLabel);
+                return;
+            }
+
+            s.stablePlanesActiveCount = Mathf.Clamp(
+                EditorGUILayout.IntField(new GUIContent("Active stable planes *", "How many stable planes to allow — 1 is just standard denoising"), s.stablePlanesActiveCount),
+                1, kStablePlaneCount);
+            s.stablePlanesMaxVertexDepth = Mathf.Clamp(
+                EditorGUILayout.IntField(new GUIContent("Max stable plane vertex depth", "How deep the stable part of path tracing can go"), s.stablePlanesMaxVertexDepth),
+                2, kStablePlaneMaxVertexIndex);
+            s.stablePlanesSplitStopThreshold = EditorGUILayout.Slider(
+                new GUIContent("Path split stop threshold", "Stops splitting if more than this throughput would be on a non-taken branch (divided by vertexIndex)."),
+                s.stablePlanesSplitStopThreshold, 0.0f, 2.0f);
+            s.allowPrimarySurfaceReplacement = EditorGUILayout.Toggle(
+                new GUIContent("Primary Surface Replacement", "Whether PSR can be used for the first (base) plane"),
+                s.allowPrimarySurfaceReplacement);
+            s.stablePlanesSuppressPrimaryIndirectSpecular = EditorGUILayout.Toggle(
+                new GUIContent("Suppress primary plane noisy specular", "Suppress noisy specular on the primary stable plane when at least one more plane is in use."),
+                s.stablePlanesSuppressPrimaryIndirectSpecular);
+            s.stablePlanesSuppressPrimaryIndirectSpecularK = EditorGUILayout.Slider(
+                "Suppress primary plane noisy specular amount", s.stablePlanesSuppressPrimaryIndirectSpecularK, 0.0f, 1.0f);
+            s.stablePlanesAntiAliasingFallthrough = EditorGUILayout.Slider(
+                new GUIContent("Non-primary plane anti-aliasing fallthrough", "Divert some radiance on highly curved/edge areas from non-0 planes back to plane 0 to reduce aliasing."),
+                s.stablePlanesAntiAliasingFallthrough, 0.0f, 1.0f);
+        }
+
+        // ── Post-process (SampleUI.cpp:1273) ──────────────────────────────────
+        private void DrawPostProcessSection(NativeRtxptSetting s)
+        {
+            if (!Foldout("PostProcess", "Post-process")) return;
+            using var _ = new EditorGUI.IndentLevelScope();
+
+            if (Foldout("Bloom", "Bloom"))
+            {
+                using var __ = new EditorGUI.IndentLevelScope();
+                s.enableBloom    = EditorGUILayout.Toggle("Enable Bloom", s.enableBloom);
+                s.bloomRadius    = EditorGUILayout.Slider("Bloom Width (Pixels)", s.bloomRadius, 0f, 64f);
+                s.bloomIntensity = EditorGUILayout.Slider("Bloom Intensity", s.bloomIntensity, 0f, 0.1f);
+            }
+
+            if (Foldout("ToneMapping", "Tone Mapping"))
+            {
+                using var __ = new EditorGUI.IndentLevelScope();
+                s.enableToneMapping = EditorGUILayout.Toggle("Enable", s.enableToneMapping);
+                s.toneMapOperator   = (NativeRtxptToneMapOperator)EditorGUILayout.EnumPopup("Operator", s.toneMapOperator);
+
+                s.autoExposure = EditorGUILayout.Toggle("Auto Exposure", s.autoExposure);
+                if (s.autoExposure)
+                {
+                    s.exposureValueMin = EditorGUILayout.FloatField("Auto Exposure Min", s.exposureValueMin);
+                    s.exposureValueMin = Mathf.Min(s.exposureValueMax, s.exposureValueMin);
+                    s.exposureValueMax = EditorGUILayout.FloatField("Auto Exposure Max", s.exposureValueMax);
+                    s.exposureValueMax = Mathf.Max(s.exposureValueMin, s.exposureValueMax);
+                }
+
+                s.exposureCompensation = Mathf.Clamp(
+                    EditorGUILayout.FloatField("Exposure Compensation", s.exposureCompensation), -12.0f, 12.0f);
+                s.exposureValue = Mathf.Clamp(
+                    EditorGUILayout.FloatField("Exposure Value", s.exposureValue),
+                    Mathf.Log(0.001f, 2f), Mathf.Log(1e9f, 2f));
+                s.filmSpeed = Mathf.Clamp(EditorGUILayout.FloatField("Film Speed", s.filmSpeed), 1.0f, 6400.0f);
+                s.fNumber   = Mathf.Clamp(EditorGUILayout.FloatField("fNumber", s.fNumber), 0.1f, 100.0f);
+                s.shutter   = Mathf.Clamp(EditorGUILayout.FloatField("Shutter", s.shutter), 0.1f, 10000.0f);
+
+                s.toneMapWhiteBalance = EditorGUILayout.Toggle("Enable White Balance", s.toneMapWhiteBalance);
+                s.toneMapWhitePoint   = Mathf.Clamp(EditorGUILayout.FloatField("White Point", s.toneMapWhitePoint), 1905.0f, 25000.0f);
+                s.toneMapWhiteMaxLuminance = Mathf.Max(0.1f, EditorGUILayout.FloatField("White Max Luminance", s.toneMapWhiteMaxLuminance));
+                s.toneMapWhiteScale   = Mathf.Clamp(EditorGUILayout.FloatField("White Scale", s.toneMapWhiteScale), 0f, 100f);
+                s.toneMapClamped      = EditorGUILayout.Toggle("Enable Clamp", s.toneMapClamped);
+            }
+        }
+
+        // ── Debugging (SampleUI.cpp:1371) ─────────────────────────────────────
+        private void DrawDebuggingSection(NativeRtxptSetting s)
+        {
+            if (!Foldout("Debugging", "Debugging")) return;
+            using var _ = new EditorGUI.IndentLevelScope();
+
+            if (Foldout("DebugSwitches", "Debug switches"))
+            {
+                using var __ = new EditorGUI.IndentLevelScope();
+                if (s.realtimeMode)
+                {
+                    s.dbgFreezeRealtimeNoiseSeed = EditorGUILayout.Toggle(
+                        new GUIContent("Freeze realtime noise seed", "Global noise seed will not change per frame. Useful for debugging transient issues hidden by noise."),
+                        s.dbgFreezeRealtimeNoiseSeed);
+                }
+                s.dbgDisableSERTerminationHint = EditorGUILayout.Toggle(
+                    new GUIContent("Disable SER path termination hint *", "Disable the path-termination hint passed to SER reordering."),
+                    s.dbgDisableSERTerminationHint);
+                s.dbgDiscardNonNEELighting = EditorGUILayout.Toggle("Discard path (non-NEE) lighting *", s.dbgDiscardNonNEELighting);
+                s.dbgDiscardNEELighting    = EditorGUILayout.Toggle("Discard NEE lighting *", s.dbgDiscardNEELighting);
+            }
+
+            s.debugViewType = (RtxptDebugViewType)EditorGUILayout.EnumPopup("Debug view *", s.debugViewType);
+            if (s.debugViewType >= RtxptDebugViewType.StablePlane_VirtualRayLength &&
+                s.debugViewType <= RtxptDebugViewType.StablePlane_DenoiserValidation)
+            {
+                using var __ = new EditorGUI.IndentLevelScope();
+                s.debugViewStablePlaneIndex = EditorGUILayout.IntSlider(
+                    new GUIContent("Stable Plane index", "-1 = all planes combined"),
+                    s.debugViewStablePlaneIndex, -1, s.stablePlanesActiveCount - 1);
+            }
+        }
+
+        // ── Unity-specific (no C++ counterpart) ───────────────────────────────
+        private void DrawUnitySpecificSection(NativeRtxptSetting s)
+        {
+            if (!Foldout("UnitySpecific", "Unity-specific")) return;
+            using var _ = new EditorGUI.IndentLevelScope();
+
+            s.showMode = (NativeRtxptShowMode)EditorGUILayout.EnumPopup(
+                new GUIContent("Show mode", "Which buffer the output blit pass displays."), s.showMode);
+            s.showValidation   = EditorGUILayout.Toggle(
+                new GUIContent("Show validation", "Show the DLSS validation overlay when available."), s.showValidation);
+            s.skipRightEyeInVR = EditorGUILayout.Toggle("Skip right eye in VR", s.skipRightEyeInVR);
+        }
+
+        // ─────────────────────────────────────────────────────────────────────
+
+        private bool Foldout(string key, string label, bool defaultOpen = false)
+        {
+            string k    = GetKey(key);
+            bool   open = SessionState.GetBool(k, defaultOpen);
+            bool   now  = EditorGUILayout.Foldout(open, label, toggleOnLabelClick: true, EditorStyles.foldoutHeader);
+            if (now != open) SessionState.SetBool(k, now);
+            return now;
+        }
+
+        private static void Category(string label) =>
+            EditorGUILayout.LabelField(label, EditorStyles.boldLabel);
+
+        // EditorGUILayout.Popup has no (GUIContent, int, string[]) overload on all Unity versions.
+        private static GUIContent[] Options(params string[] items)
+        {
+            var result = new GUIContent[items.Length];
+            for (int i = 0; i < items.Length; i++)
+                result[i] = new GUIContent(items[i]);
+            return result;
+        }
+
         /// <summary>
         /// Settings ↔ shader-macro sync (mirrors Sample.cpp SetGlobalShaderMacros). Several
         /// NativeRtxptSetting fields are shader compile-time macros, not constants — they only
@@ -85,8 +548,8 @@ namespace PathTracing
                 EditorGUILayout.HelpBox(
                     "Shader macros are out of sync with the settings for: " + string.Join(", ", stale) +
                     ".\nThese settings (RR, MIS, NEE sample counts, FP16, nested dielectrics, LD sampler, " +
-                    "firefly filter, stable-plane count, NEE discard debug) are compile-time macros and " +
-                    "only take effect after reimport.",
+                    "firefly filter, stable-plane count, NEE/SER debug toggles, debug view, DX hit-object, " +
+                    "NEE-AT baked env) are compile-time macros and only take effect after reimport.",
                     MessageType.Warning);
             }
 

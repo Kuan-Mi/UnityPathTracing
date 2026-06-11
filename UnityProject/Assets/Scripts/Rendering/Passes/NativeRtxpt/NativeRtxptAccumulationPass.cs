@@ -85,9 +85,12 @@ namespace PathTracing
 
             var inputSize  = new float2(ctx.RenderResolution.x, ctx.RenderResolution.y);
             var outputSize = new float2(ctx.DisplayResolution.x, ctx.DisplayResolution.y);
-            uint sampleIndex = math.max(1u, ctx.FrameState.frameIndex);
-            float blendFactor = sampleIndex <= (uint)math.max(1, ctx.Setting.accumulationTarget)
-                ? 1.0f / sampleIndex
+            // Original (Sample.cpp:2665): weight = accumIndex < target ? 1/(max(0,accumIndex)+1) : 0.
+            // Negative index = pre-warm — weight 1 just displays the current frame; weight 0 once
+            // the target is reached keeps showing the converged accumulation.
+            int accumIndex = ctx.FrameState.accumulationSampleIndex;
+            float blendFactor = accumIndex < ctx.Setting.accumulationTarget
+                ? 1.0f / (math.max(0, accumIndex) + 1)
                 : 0.0f;
             var constants = new AccumulationConstants
             {

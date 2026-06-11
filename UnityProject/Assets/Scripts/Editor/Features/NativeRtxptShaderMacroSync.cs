@@ -19,8 +19,9 @@ namespace PathTracing
     ///   RTXPT_FIREFLY_FILTER     — ActualFireflyFilterEnabled() (SampleUI.h:125):
     ///       realtime pipelines: realtimeFireflyFilterEnabled, reference: referenceFireflyFilterEnabled.
     ///
-    /// Unmanaged defines on the assets (PATH_TRACER_MODE, permutation names, hit-object extension
-    /// selection, debug viz toggles, …) are preserved untouched.
+    /// Unmanaged defines on the assets (PATH_TRACER_MODE, permutation names, USE_NVAPI_* — the
+    /// plugin has no NVAPI integration, ENABLE_DEBUG_LINES_VIZ — debug-line machinery not ported)
+    /// are preserved untouched.
     /// </summary>
     internal static class NativeRtxptShaderMacroSync
     {
@@ -44,8 +45,14 @@ namespace PathTracing
             bool approximateMis = referencePipeline ? s.neeMisType == 2 : s.neeMisType != 0;
             bool fireflyFilter  = referencePipeline ? s.referenceFireflyFilterEnabled : s.realtimeFireflyFilterEnabled;
 
+            // Sample.cpp:995 — DebugView != Disabled. The NEELightColor show mode also reads the
+            // viz texture (NativeRtxptConstantsBuilder forces debugViewType for it), so include it.
+            bool debugSurfaceViz = s.debugViewType != RtxptDebugViewType.Disabled
+                                   || s.showMode == NativeRtxptShowMode.NEELightColor;
+
             return new Dictionary<string, string>
             {
+                ["ENABLE_DEBUG_SURFACE_VIZ"]                      = B(debugSurfaceViz),
                 ["PT_ENABLE_RUSSIAN_ROULETTE"]                    = B(s.enableRussianRoulette),
                 ["PT_NEE_ENABLED"]                                = B(s.useNEE),
                 ["RTXPT_USE_APPROXIMATE_MIS"]                     = B(approximateMis),
@@ -53,6 +60,7 @@ namespace PathTracing
                 ["RTXPT_NEE_LOCAL_CANDIDATE_SAMPLE_COUNT"]        = localCandidates.ToString(),
                 ["RTXPT_NEE_GLOBAL_CANDIDATE_SAMPLE_COUNT"]       = globalCandidates.ToString(),
                 ["RTXPT_NEE_TOTAL_CANDIDATE_SAMPLE_COUNT"]        = totalCandidates.ToString(),
+                ["RTXPT_DISABLE_SER_TERMINATION_HINT"]            = B(s.dbgDisableSERTerminationHint),
                 ["RTXPT_DISCARD_NON_NEE_LIGHTING"]                = B(s.dbgDiscardNonNEELighting),
                 ["RTXPT_DISCARD_NEE_LIGHTING"]                    = B(s.dbgDiscardNEELighting),
                 ["RTXPT_FIREFLY_FILTER"]                          = B(fireflyFilter),
@@ -60,6 +68,10 @@ namespace PathTracing
                 ["RTXPT_NESTED_DIELECTRICS_QUALITY"]              = s.nestedDielectricsQuality.ToString(),
                 ["RTXPT_LP_TYPES_USE_16BIT_PRECISION"]            = B(s.useFp16Types),
                 ["RTXPT_ENABLE_LOW_DISCREPANCY_SAMPLER_FOR_BSDF"] = B(s.enableLDSamplerForBSDF),
+                ["NEE_AT_SAMPLE_BAKED_ENVIRONMENT"]               = B(s.neeatSampleBakedEnvironment),
+                // Sample.cpp:1001-1002 — reorder only meaningful with the hit-object extension on.
+                ["USE_DX_HIT_OBJECT_EXTENSION"]                   = B(s.dxHitObjectExtension),
+                ["USE_DX_MAYBE_REORDER_THREADS"]                  = B(s.dxHitObjectExtension && s.dxMaybeReorderThreads),
             };
         }
 
