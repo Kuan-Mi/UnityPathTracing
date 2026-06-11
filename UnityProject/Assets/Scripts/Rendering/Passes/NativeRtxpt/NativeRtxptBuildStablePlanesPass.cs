@@ -136,6 +136,15 @@ namespace PathTracing
                 ctx.Buffers.FeedbackBufferPtr,
                 ctx.Buffers.FeedbackBuffer.count,
                 ctx.Buffers.FeedbackBuffer.stride);
+
+            // ShaderDebug raw buffer (u125, DebugPrint/DebugLine/DebugTriangle) and the picked-pixel
+            // line buffer (u52, only referenced when compiled with ENABLE_DEBUG_LINES_VIZ=1).
+            // Both no-op when absent from the shader reflection or not allocated.
+            if (ctx.Buffers.ShaderDebugBufferPtr != IntPtr.Zero)
+                ds.SetRWBuffer("u_ShaderDebugBuffer", ctx.Buffers.ShaderDebugBufferPtr);
+            if (ctx.Buffers.DebugLinesBufferPtr != IntPtr.Zero)
+                ds.SetRWStructuredBuffer("u_DebugLinesBuffer", ctx.Buffers.DebugLinesBufferPtr,
+                    NativeRtxptBufferResources.MaxDebugLines, NativeRtxptBufferResources.DebugLineStructSize);
         }
     }
 }

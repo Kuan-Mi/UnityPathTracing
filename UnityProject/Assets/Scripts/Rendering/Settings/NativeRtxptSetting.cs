@@ -224,7 +224,25 @@ namespace PathTracing
 
         // ── Debug ─────────────────────────────────────────────────────────────
         public bool showValidation    = false;
+        /// <summary>
+        /// Master switch for the ShaderDebug machinery (SampleUIData::EnableShaderDebug):
+        /// allocates the u_ShaderDebugBuffer (u125, ~100 MB like the original), clears its header
+        /// each frame, draws DebugLine/DebugTriangle geometry + the debug-viz overlay, and reads
+        /// back DebugPrint() output to the Unity console.
+        /// </summary>
         public bool enableShaderDebug = true;
+
+        // ── ShaderDebug / pixel debugging (mirrors SampleUIData debug block) ──
+        /// <summary>Draw the picked pixel's path-trace debug lines (SampleUIData::ShowDebugLines).
+        /// Compile-time macro ENABLE_DEBUG_LINES_VIZ — applied via the shader-macro sync.</summary>
+        public bool  showDebugLines = false;
+        /// <summary>DebugConstants::debugLineScale (C++ DebugLineScale default 0.05; 0 disables).</summary>
+        public float debugLineScale = 0.05f;
+        /// <summary>Debug pixel for pick feedback + DebugPrint (SampleUIData::DebugPixel).</summary>
+        public int debugPixelX = 0;
+        public int debugPixelY = 0;
+        /// <summary>Pick the debug pixel every frame (SampleUIData::ContinuousDebugFeedback).</summary>
+        public bool continuousDebugFeedback = false;
         public bool dbgFreezeRealtimeNoiseSeed   = false;
         public bool dbgDiscardNonNEELighting     = false;
         public bool dbgDiscardNEELighting        = false;

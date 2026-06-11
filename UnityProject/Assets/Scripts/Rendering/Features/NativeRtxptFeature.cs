@@ -81,6 +81,13 @@ namespace PathTracing
         // Phase Debug: StablePlanesDebugViz
         public NativeComputeShader stablePlanesDebugVizCs;
 
+        // Phase Debug: ShaderDebug (DebugPrint readback, DebugLine/DebugTriangle draw, viz overlay).
+        // Ports of Libraries/ShaderDebug/ShaderDebug.hlsl draw shaders + the Sample.cpp debug-lines draw.
+        public NativeRasterShader shaderDebugTrianglesRasterShader;
+        public NativeRasterShader shaderDebugLinesRasterShader;
+        public NativeRasterShader shaderDebugFeedbackLinesRasterShader;
+        public NativeRasterShader shaderDebugBlendVizRasterShader;
+
         // EnvMapBaker + LightingUpdateBegin compute shaders
         public NativeComputeShader baseLayerCs;
         public NativeComputeShader mipReduceCs;
@@ -131,6 +138,8 @@ namespace PathTracing
         private NativeRtxptToneMappingMipChainPass    _toneMappingMipChainPass;
         private NativeRtxptAccumulationPass           _accumulationPass;
         private NativeRtxptStablePlanesDebugVizPass   _stablePlanesDebugVizPass;
+        private NativeRtxptShaderDebugBeginPass       _shaderDebugBeginPass;
+        private NativeRtxptShaderDebugDrawPass        _shaderDebugDrawPass;
         private NativeRtxptOutputBlitPass             _outputBlitPass;
 
 
@@ -195,6 +204,13 @@ namespace PathTracing
             _toneMappingMipChainPass  ??= new NativeRtxptToneMappingMipChainPass(luminanceRasterShader, luminanceMipCs, captureLuminanceCs, toneMapApplyRasterShader) { renderPassEvent = renderPassEvent };
             _accumulationPass         ??= new NativeRtxptAccumulationPass(accumulationCs) { renderPassEvent                                                                             = renderPassEvent };
             _stablePlanesDebugVizPass ??= new NativeRtxptStablePlanesDebugVizPass(stablePlanesDebugVizCs) { renderPassEvent                                                             = renderPassEvent };
+            _shaderDebugBeginPass     ??= new NativeRtxptShaderDebugBeginPass { renderPassEvent                                                                                         = renderPassEvent };
+            if (_shaderDebugDrawPass == null
+                && shaderDebugTrianglesRasterShader != null && shaderDebugLinesRasterShader != null
+                && shaderDebugFeedbackLinesRasterShader != null && shaderDebugBlendVizRasterShader != null)
+                _shaderDebugDrawPass = new NativeRtxptShaderDebugDrawPass(
+                    shaderDebugTrianglesRasterShader, shaderDebugLinesRasterShader,
+                    shaderDebugFeedbackLinesRasterShader, shaderDebugBlendVizRasterShader) { renderPassEvent = renderPassEvent };
             _outputBlitPass           ??= new NativeRtxptOutputBlitPass(outputBlitMaterial) { renderPassEvent                                                                           = renderPassEvent };
             _depthBarrierFixPass      ??= new DepthBarrierFixPass { renderPassEvent                                                                                                     = RenderPassEvent.AfterRendering };
         }
@@ -271,6 +287,9 @@ namespace PathTracing
             bufPool.EnsureResources(renderResolution);
             bufPool.EnsureLightBuffers();
             bufPool.EnsureEnvBakerBuffers();
+            // ShaderDebug buffer (~100 MB, mirrors the original's fixed layout) only lives while
+            // the master toggle is on; the original allocates it unconditionally.
+            bufPool.EnsureShaderDebugBuffers(setting.enableShaderDebug);
 
             // ---- Per-camera temporal state ----------------------------------
             if (!_cameraFrameStates.TryGetValue(uniqueKey, out var frameState))
@@ -330,6 +349,13 @@ namespace PathTracing
                     _fillStablePlanesPass?.FillPipeline,
                     _fillStablePlanesPass?.RefPipeline);
                 renderer.EnqueuePass(_buildTlasPass);
+            }
+
+            // ---- ShaderDebug::BeginFrame — reset header (counters + worldToClip) -----
+            if (setting.enableShaderDebug && bufPool.ShaderDebugBuffer != null)
+            {
+                _shaderDebugBeginPass.Setup(passCtx);
+                renderer.EnqueuePass(_shaderDebugBeginPass);
             }
 
             // ---- LightingUpdateBegin -----------------------------------------
@@ -430,6 +456,18 @@ namespace PathTracing
                 renderer.EnqueuePass(_stablePlanesDebugVizPass);
             }
 
+            // ---- Phase Debug: ShaderDebug draw + readback (C++ EndFrameAndOutput) ----
+            // Drawn into the image the blit will display (= C++ drawing on LdrColor pre-blit).
+            if (setting.enableShaderDebug && _shaderDebugDrawPass != null && bufPool.ShaderDebugBuffer != null)
+            {
+                bool ranToneMap = setting.realtimeMode && setting.enableToneMapping && _toneMappingMipChainPass != null;
+                var  debugTarget = !setting.realtimeMode || ranToneMap
+                    ? texPool.ProcessedOutputColor
+                    : texPool.DlssRrOutput;
+                _shaderDebugDrawPass.Setup(passCtx, debugTarget, displayResolution);
+                renderer.EnqueuePass(_shaderDebugDrawPass);
+            }
+
             // ---- Phase 9: Output blit (debug display) ----------------------
             {
                 // When tone mapping ran, the final image lives in ProcessedOutputColor; show it in
@@ -510,6 +548,9 @@ namespace PathTracing
             _accumulationPass = null;
             _stablePlanesDebugVizPass?.Dispose();
             _stablePlanesDebugVizPass = null;
+            _shaderDebugDrawPass?.Dispose();
+            _shaderDebugDrawPass      = null;
+            _shaderDebugBeginPass     = null;
             _outputBlitPass           = null;
             _depthBarrierFixPass      = null;
 
@@ -962,6 +1003,10 @@ namespace PathTracing
             toneMapApplyRasterShader    = LoadRas($"{shaderRoot}/ToneMapper/ToneMapping");
             accumulationCs              = LoadCs($"{shaderRoot}/ProcessingPasses/AccumulationPass");
             stablePlanesDebugVizCs      = LoadCs($"{shaderRoot}/ProcessingPasses/PostProcess_StablePlanesDebugViz");
+            shaderDebugTrianglesRasterShader     = LoadRas($"{shaderRoot}/ShaderDebug/ShaderDebugTriangles");
+            shaderDebugLinesRasterShader         = LoadRas($"{shaderRoot}/ShaderDebug/ShaderDebugLines");
+            shaderDebugFeedbackLinesRasterShader = LoadRas($"{shaderRoot}/ShaderDebug/ShaderDebugFeedbackLines");
+            shaderDebugBlendVizRasterShader      = LoadRas($"{shaderRoot}/ShaderDebug/ShaderDebugBlendViz");
             skinnedRepackCs             = UnityEditor.AssetDatabase.LoadAssetAtPath<ComputeShader>($"{shaderRoot}/Misc/SkinnedRepack.compute");
             if (skinnedRepackCs == null)
                 Debug.LogWarning($"[NativeRtxptFeature] Missing ComputeShader at: {shaderRoot}/Misc/SkinnedRepack.compute");

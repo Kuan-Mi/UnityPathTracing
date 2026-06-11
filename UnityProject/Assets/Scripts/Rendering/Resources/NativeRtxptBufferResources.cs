@@ -45,10 +45,66 @@ namespace PathTracing
 
         // ── Debug buffers ─────────────────────────────────────────────────────
         /// <summary>
-        /// Stub feedback buffer for shader debugging. 1 element, 64B stride.
+        /// Pick feedback for shader debugging. 1 element, stride = sizeof(DebugFeedbackStruct)
+        /// (PathTracerDebug.hlsli: float4 debugPrint[16] + 4 ints + DeltaTreeVizHeader = 320 B).
         /// HLSL: RWStructuredBuffer u_FeedbackBuffer (u51).
         /// </summary>
         public GraphicsBuffer FeedbackBuffer;
+        public const int FeedbackStructSize = 320;
+
+        // ── ShaderDebug (Libraries/ShaderDebug/ShaderDebug.hlsl, u125) ────────
+        // Buffer layout (fixed by the shader #defines — cannot shrink without editing the vendored
+        // file): 96 B header (print/triangle counters + indirect args + worldToClip) +
+        // 256 KB DebugPrint region + 100 MB DebugLine/DebugTriangle region. Allocated only while
+        // setting.enableShaderDebug is on (the original allocates it unconditionally).
+        public const int ShaderDebugHeaderBytes      = 96;
+        public const int ShaderDebugPrintBytes       = 256 * 1024;
+        public const int ShaderDebugTriangleBytes    = 100 * 1024 * 1024;
+        public const int ShaderDebugTotalBytes       = ShaderDebugHeaderBytes + ShaderDebugPrintBytes + ShaderDebugTriangleBytes;
+        public const int ShaderDebugNoTrianglesBytes = ShaderDebugHeaderBytes + ShaderDebugPrintBytes;
+
+        /// <summary>HLSL: RWByteAddressBuffer u_ShaderDebugBuffer (u125). Raw UAV.</summary>
+        public GraphicsBuffer ShaderDebugBuffer;
+        public IntPtr         ShaderDebugBufferPtr { get; private set; }
+
+        /// <summary>
+        /// Picked-pixel debug line vertices (PathTracerDebug.hlsli DebugLineStruct, 32 B).
+        /// MAX_DEBUG_LINES = 2048 vertices. HLSL: RWStructuredBuffer u_DebugLinesBuffer (u52) —
+        /// only referenced when the shaders are compiled with ENABLE_DEBUG_LINES_VIZ=1.
+        /// </summary>
+        public GraphicsBuffer DebugLinesBuffer;
+        public IntPtr         DebugLinesBufferPtr { get; private set; }
+        public const int MaxDebugLines       = 2048; // PathTracerDebug.hlsli MAX_DEBUG_LINES
+        public const int DebugLineStructSize = 32;
+
+        /// <summary>Allocates / releases the ShaderDebug buffers to match the master toggle.</summary>
+        public void EnsureShaderDebugBuffers(bool enabled)
+        {
+            if (!enabled)
+            {
+                ReleaseShaderDebugBuffers();
+                return;
+            }
+            if (ShaderDebugBuffer != null) return;
+
+            ShaderDebugBuffer = new GraphicsBuffer(
+                GraphicsBuffer.Target.Raw,
+                ShaderDebugTotalBytes / 4, 4)
+            { name = "ShaderDebugBufferGPU" };
+            ShaderDebugBufferPtr = ShaderDebugBuffer.GetNativeBufferPtr();
+
+            DebugLinesBuffer = new GraphicsBuffer(
+                GraphicsBuffer.Target.Structured,
+                MaxDebugLines, DebugLineStructSize)
+            { name = "DebugLinesBuffer" };
+            DebugLinesBufferPtr = DebugLinesBuffer.GetNativeBufferPtr();
+        }
+
+        private void ReleaseShaderDebugBuffers()
+        {
+            ShaderDebugBuffer?.Release(); ShaderDebugBuffer = null; ShaderDebugBufferPtr = IntPtr.Zero;
+            DebugLinesBuffer?.Release();  DebugLinesBuffer  = null; DebugLinesBufferPtr  = IntPtr.Zero;
+        }
 
         // ── Light system buffers ──────────────────────────────────────────────
         /// <summary>
@@ -246,10 +302,10 @@ namespace PathTracing
             // Buffer debug names are kept byte-for-byte identical to the original RTXPT
             // RenderTargets.cpp / LightsBaker.cpp debugName strings for PIX parity.
 
-            // FeedbackBuffer stub — 1 element, 64B stride (matches DebugFeedbackStruct size).
+            // FeedbackBuffer — 1 element of DebugFeedbackStruct (PathTracerDebug.hlsli, 320 B).
             FeedbackBuffer = new GraphicsBuffer(
                 GraphicsBuffer.Target.Structured,
-                1, 64)
+                1, FeedbackStructSize)
             { name = "Feedback_Buffer_Gpu" };
             FeedbackBufferPtr = FeedbackBuffer.GetNativeBufferPtr();
 
@@ -364,6 +420,7 @@ namespace PathTracing
         {
             ReleaseResolutionBuffers();
             ReleaseLightBuffers();
+            ReleaseShaderDebugBuffers();
         }
     }
 }

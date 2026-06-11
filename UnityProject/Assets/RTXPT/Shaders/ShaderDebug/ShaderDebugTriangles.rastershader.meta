@@ -1,0 +1,20 @@
+fileFormatVersion: 2
+guid: 3a1c92e4b7d04f1a8c5e6d9f0a2b4c6d
+ScriptedImporter:
+  internalIDToNameTable: []
+  externalObjects: {}
+  serializedVersion: 2
+  userData:
+  assetBundleName:
+  assetBundleVariant:
+  script: {fileID: 11500000, guid: 027188e0fad048b1a20a4377aff4684c, type: 3}
+  additionalIncludePaths: []
+  extraArgs: []
+  defines: []
+  vsEntryPoint: main_vs
+  psEntryPoint: main_ps
+  vsTargetProfile: vs_6_6
+  psTargetProfile: ps_6_6
+  rootConstantsHints: []
+  rootSRVHints: []
+  samplerBindings: []

@@ -468,6 +468,10 @@ namespace PathTracing
             if (!Foldout("Debugging", "Debugging")) return;
             using var _ = new EditorGUI.IndentLevelScope();
 
+            s.enableShaderDebug = EditorGUILayout.Toggle(
+                new GUIContent("Enable shader debug", "ShaderDebug machinery: DebugPrint → console, DebugLine/DebugTriangle drawing, viz overlay. Allocates a ~100 MB GPU buffer (same as the original)."),
+                s.enableShaderDebug);
+
             if (Foldout("DebugSwitches", "Debug switches"))
             {
                 using var __ = new EditorGUI.IndentLevelScope();
@@ -492,6 +496,44 @@ namespace PathTracing
                 s.debugViewStablePlaneIndex = EditorGUILayout.IntSlider(
                     new GUIContent("Stable Plane index", "-1 = all planes combined"),
                     s.debugViewStablePlaneIndex, -1, s.stablePlanesActiveCount - 1);
+            }
+
+            using (new EditorGUI.DisabledScope(!s.enableShaderDebug))
+            {
+                var px = EditorGUILayout.Vector2IntField(
+                    new GUIContent("Debug pixel", "Render-resolution pixel whose path is debugged (pick feedback, DebugPrint slots, debug lines)."),
+                    new Vector2Int(s.debugPixelX, s.debugPixelY));
+                s.debugPixelX = px.x;
+                s.debugPixelY = px.y;
+
+                s.continuousDebugFeedback = EditorGUILayout.Toggle(
+                    new GUIContent("Continuous feedback", "Pick the debug pixel every frame and read back the feedback struct."),
+                    s.continuousDebugFeedback);
+
+                s.showDebugLines = EditorGUILayout.Toggle(
+                    new GUIContent("Show debug lines *", "Draw the picked pixel's path-trace debug lines. Compile-time macro ENABLE_DEBUG_LINES_VIZ — apply shader macros after toggling."),
+                    s.showDebugLines);
+                if (s.showDebugLines)
+                {
+                    using var __ = new EditorGUI.IndentLevelScope();
+                    s.debugLineScale = EditorGUILayout.FloatField(
+                        new GUIContent("Debug line scale", "DebugConstants::debugLineScale (C++ default 0.05; 0 disables)."),
+                        s.debugLineScale);
+                }
+            }
+
+            // Live pick feedback (mirrors the C++ ImGui "debugPrint %d: ..." block).
+            var fb = NativeRtxptShaderDebug.LastFeedback;
+            if (s.continuousDebugFeedback && fb.Valid && Application.isPlaying)
+            {
+                EditorGUILayout.LabelField($"Debug line count: {fb.LineVertexCount / 2}   picked materialID: {fb.PickedMaterialID}", EditorStyles.miniLabel);
+                for (int i = 0; i < fb.DebugPrintSlots.Length; i++)
+                {
+                    Vector4 v = fb.DebugPrintSlots[i];
+                    if (v == new Vector4(-1, -1, -1, -1)) continue; // unwritten slot (DebugContext::Reset)
+                    EditorGUILayout.LabelField($"debugPrint {i}: {v.x:0.####}, {v.y:0.####}, {v.z:0.####}, {v.w:0.####}", EditorStyles.miniLabel);
+                }
+                Repaint();
             }
         }
 
@@ -545,8 +587,8 @@ namespace PathTracing
                 EditorGUILayout.HelpBox(
                     "Shader macros are out of sync with the settings for: " + string.Join(", ", stale) +
                     ".\nThese settings (RR, MIS, NEE sample counts, FP16, nested dielectrics, LD sampler, " +
-                    "firefly filter, stable-plane count, NEE/SER debug toggles, debug view, DX hit-object, " +
-                    "NEE-AT baked env) are compile-time macros and only take effect after reimport.",
+                    "firefly filter, stable-plane count, NEE/SER debug toggles, debug view, debug lines, " +
+                    "DX hit-object, NEE-AT baked env) are compile-time macros and only take effect after reimport.",
                     MessageType.Warning);
             }
 

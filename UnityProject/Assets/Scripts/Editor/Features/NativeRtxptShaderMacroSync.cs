@@ -20,8 +20,7 @@ namespace PathTracing
     ///       realtime pipelines: realtimeFireflyFilterEnabled, reference: referenceFireflyFilterEnabled.
     ///
     /// Unmanaged defines on the assets (PATH_TRACER_MODE, permutation names, USE_NVAPI_* — the
-    /// plugin has no NVAPI integration, ENABLE_DEBUG_LINES_VIZ — debug-line machinery not ported)
-    /// are preserved untouched.
+    /// plugin has no NVAPI integration) are preserved untouched.
     /// </summary>
     internal static class NativeRtxptShaderMacroSync
     {
@@ -53,6 +52,8 @@ namespace PathTracing
             return new Dictionary<string, string>
             {
                 ["ENABLE_DEBUG_SURFACE_VIZ"]                      = B(debugSurfaceViz),
+                // Sample.cpp:996 — picked-pixel debug-line writes (u_DebugLinesBuffer, u52).
+                ["ENABLE_DEBUG_LINES_VIZ"]                        = B(s.showDebugLines),
                 ["PT_ENABLE_RUSSIAN_ROULETTE"]                    = B(s.enableRussianRoulette),
                 ["PT_NEE_ENABLED"]                                = B(s.useNEE),
                 ["RTXPT_USE_APPROXIMATE_MIS"]                     = B(approximateMis),

@@ -238,20 +238,23 @@ namespace PathTracing
             };
 
             // ── DebugConstants ────────────────────────────────────────────────
+            // Original (Sample.cpp:2107-2125): pick = one-shot pick || ContinuousDebugFeedback;
+            // pickX/Y = DebugPixel only while picking; debugLineScale gated by ShowDebugLines.
+            bool debugPick = setting.enableShaderDebug && setting.continuousDebugFeedback;
             var debug = new DebugConstants
             {
-                pickX                     = -1,
-                pickY                     = -1,
-                pick                      = 0,
-                // Reference (RTVersionGConst capture) leaves this 0 — it is the debug-line draw
-                // scale and there is no setting plumbed for it, so 1f was a stray non-default that
-                // diverged from the source. Keep debug drawing off for parity.
-                debugLineScale            = 0f,
+                pickX                     = debugPick ? setting.debugPixelX : -1,
+                pickY                     = debugPick ? setting.debugPixelY : -1,
+                pick                      = debugPick ? 1 : 0,
+                debugLineScale            = setting.showDebugLines ? setting.debugLineScale : 0f,
                 showWireframe             = 0u,
                 debugViewType             = (int)(setting.showMode == NativeRtxptShowMode.NEELightColor
                                                 ? RtxptDebugViewType.NEELightColor
                                                 : setting.debugViewType),
-                debugViewStablePlaneIndex = setting.debugViewStablePlaneIndex,
+                // Original (Sample.cpp:2114): forced to plane 0 when only one plane is active.
+                debugViewStablePlaneIndex = setting.stablePlanesActiveCount == 1
+                                                ? 0
+                                                : setting.debugViewStablePlaneIndex,
                 exploreDeltaTree          = 0,
                 imageWidth                = renderRes.x,
                 imageHeight               = renderRes.y,

@@ -1,0 +1,54 @@
+/*
+* Debug-viz overlay composite — port of RTXPT ShaderDebug.hlsl BLEND_DEBUG_BUFFER (line 783):
+* alpha-blends the (render-res) ShaderDebugViz texture over the (display-res) final image, with
+* the original's stochastic 4-tap upsampler. The original derives the per-pixel jitter from
+* SampleGenerator; here a small integer hash stands in (visual-only difference).
+*
+* VS is the donut fullscreen_vs quad (4-vertex TRIANGLESTRIP, QUAD_Z=0) inlined.
+* Pipeline: TRIANGLESTRIP, alpha blend, no depth.
+*/
+
+#pragma pack_matrix(row_major)
+
+Texture2D<float4>   t_DebugVizOutput    : register(t0);
+
+#ifdef NR_VERTEX_SHADER
+void main_vs( in uint iVertex : SV_VertexID,
+              out float4 o_posClip : SV_Position, out float2 o_uv : UV )
+{
+    // donut fullscreen_vs.hlsl quad
+    uint u = iVertex & 1;
+    uint v = (iVertex >> 1) & 1;
+    o_posClip = float4(float(u) * 2 - 1, 1 - float(v) * 2, 0, 1);
+    o_uv      = float2(u, v);
+}
+#endif
+
+#ifdef NR_PIXEL_SHADER
+// Lowbias32 integer hash — stands in for the original's SampleGenerator jitter.
+uint Hash32(uint x)
+{
+    x ^= x >> 16; x *= 0x7feb352du;
+    x ^= x >> 15; x *= 0x846ca68bu;
+    x ^= x >> 16;
+    return x;
+}
+
+float4 main_ps( in float4 pos : SV_Position, in float2 uv : UV ) : SV_Target0
+{
+    // "wacky stochastic upsampler - it looks less blurry than bilinear" (ShaderDebug.hlsl:793)
+    uint  h      = Hash32(uint(pos.x) * 9781u + uint(pos.y) * 6271u);
+    float2 jitter = float2((h & 0xFFFF) / 65535.0, (h >> 16) / 65535.0);
+
+    uint vizWidth, vizHeight;
+    t_DebugVizOutput.GetDimensions(vizWidth, vizHeight);
+    float corner = 0.25;
+    float jitterSize = 0.35;
+    float2 scaledUV = uv * float2(vizWidth, vizHeight);
+    float4 col0 = t_DebugVizOutput[ uint2(scaledUV - 0.5 + (jitter-0.5) * jitterSize + float2(corner,       corner) ) ];
+    float4 col1 = t_DebugVizOutput[ uint2(scaledUV - 0.5 + (jitter-0.5) * jitterSize + float2(corner,       1.0-corner) ) ];
+    float4 col2 = t_DebugVizOutput[ uint2(scaledUV - 0.5 + (jitter-0.5) * jitterSize + float2(1.0-corner,   corner) ) ];
+    float4 col3 = t_DebugVizOutput[ uint2(scaledUV - 0.5 + (jitter-0.5) * jitterSize + float2(1.0-corner,   1.0-corner) ) ];
+    return (col0 + col1 + col2 + col3) * 0.25;
+}
+#endif

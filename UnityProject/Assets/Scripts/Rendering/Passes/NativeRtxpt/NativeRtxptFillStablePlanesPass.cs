@@ -175,6 +175,14 @@ namespace PathTracing
                 ctx.Buffers.FeedbackBufferPtr,
                 ctx.Buffers.FeedbackBuffer.count,
                 ctx.Buffers.FeedbackBuffer.stride);
+
+            // ShaderDebug raw buffer (u125) + picked-pixel debug lines (u52, ENABLE_DEBUG_LINES_VIZ).
+            // Both no-op when absent from the shader reflection or not allocated.
+            if (ctx.Buffers.ShaderDebugBufferPtr != IntPtr.Zero)
+                ds.SetRWBuffer("u_ShaderDebugBuffer", ctx.Buffers.ShaderDebugBufferPtr);
+            if (ctx.Buffers.DebugLinesBufferPtr != IntPtr.Zero)
+                ds.SetRWStructuredBuffer("u_DebugLinesBuffer", ctx.Buffers.DebugLinesBufferPtr,
+                    NativeRtxptBufferResources.MaxDebugLines, NativeRtxptBufferResources.DebugLineStructSize);
         }
 
         private static void BindLightBuffers(NativeRayTraceDescriptorSet ds, NativeRtxptPassContext ctx)
