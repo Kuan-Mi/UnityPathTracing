@@ -172,6 +172,8 @@ namespace PathTracing
                     EditorGUILayout.LabelField($"   analytic:      {lub.AnalyticLightCount}", EditorStyles.miniLabel);
                     EditorGUILayout.LabelField($"   TOTAL:         {lub.TotalLightCount}", EditorStyles.miniLabel);
                     EditorGUILayout.LabelField($"(used: {lub.TotalLightCount * 100f / LightingConfigMaxLights:0.00}% of max {LightingConfigMaxLights})", EditorStyles.miniLabel);
+                    if (lub.HasControlReadback)
+                        EditorGUILayout.LabelField($"(proxies: {lub.SamplingProxyCount}, weightsum: {lub.WeightsSum:0.00000})", EditorStyles.miniLabel);
                     if (lub.TotalLightCount > LightingConfigMaxLights)
                         EditorGUILayout.HelpBox("!!WARNING - scene light count overflow!! increase RTXPT_LIGHTING_MAX_LIGHTS", MessageType.Error);
                 }

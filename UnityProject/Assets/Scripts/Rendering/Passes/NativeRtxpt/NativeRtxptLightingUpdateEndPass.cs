@@ -325,7 +325,11 @@ namespace PathTracing
             //    Zeros FeedbackTotalWeight + FeedbackCandidates so the next
             //    FillStablePlanes can write fresh NEE samples.
             //    Dispatch: ceil(renderW/8) x ceil(renderH/8)
-            // ----------------------------------------------------------------
+            //    Original (LightsBaker.cpp:1401): gated by ctrl.TemporalFeedbackRequired — with
+            //    "Freeze NEE-AT feedback updates" the PT stops writing feedback AND the clear is
+            //    skipped, so the textures keep the frozen (still shadow-aware) data. Clearing
+            //    while frozen would degrade tile sampling to empty/uniform feedback.
+            if (!setting.neeatDbgFreezeUpdates)
             {
                 var ds = data.ClearDs;
                 ds.SetRWStructuredBuffer("u_controlBuffer", pCtrl, cCtrl, StrideCtrl);

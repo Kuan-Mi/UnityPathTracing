@@ -155,6 +155,24 @@ namespace PathTracing
         /// <summary>Editor access for the "Info and statistics:" block (LightsBaker::InfoGUI).</summary>
         public NativeRtxptLightingUpdateBeginPass LightingUpdateBeginPass => _lightingUpdateBeginPass;
 
+        /// <summary>
+        /// Sets setting.debugPixelX/Y from a normalized viewport position (top-left origin, [0,1])
+        /// for the given camera, converting to that camera's RENDER resolution (debug-pixel coords
+        /// are pre-upscale, so the DLSS scale is applied here). Unity-side equivalent of the C++
+        /// right-click DebugPixel pick. Returns false until the camera has rendered at least one
+        /// RTXPT frame (the render resolution isn't known before that).
+        /// </summary>
+        public bool TrySetDebugPixelFromViewport(Camera cam, Vector2 uvTopLeft)
+        {
+            if (setting == null || cam == null) return false;
+            if (!_cameraFrameStates.TryGetValue(cam.GetInstanceID(), out var fs) || fs.renderResolution.x <= 0)
+                return false;
+            var rr = fs.renderResolution;
+            setting.debugPixelX = Mathf.Clamp((int)(uvTopLeft.x * rr.x), 0, rr.x - 1);
+            setting.debugPixelY = Mathf.Clamp((int)(uvTopLeft.y * rr.y), 0, rr.y - 1);
+            return true;
+        }
+
         // ---- Per-camera resource pools (key = instanceID + eyeIndex*100000) -
         private readonly Dictionary<long, NativeRtxptTextureResources> _texturePools      = new();
         private readonly Dictionary<long, NativeRtxptBufferResources>  _bufferPools       = new();

@@ -46,7 +46,7 @@ MonoBehaviour:
     neeatSampleBakedEnvironment: 1
     neeatImportanceBoostPreFilter: 1
     neeatDbgDrawLights: 0
-    neeatDbgDrawTileLightConnections: 1
+    neeatDbgDrawTileLightConnections: 0
     neeatDbgFreezeUpdates: 0
     neeatDbgViewType: 0
     neeatDbgDisableJitter: 0
@@ -110,7 +110,7 @@ MonoBehaviour:
     enableShaderDebug: 1
     showDebugLines: 1
     debugLineScale: 0.05
-    debugPixelX: 104
+    debugPixelX: 368
     debugPixelY: 151
     continuousDebugFeedback: 0
     dbgFreezeRealtimeNoiseSeed: 0

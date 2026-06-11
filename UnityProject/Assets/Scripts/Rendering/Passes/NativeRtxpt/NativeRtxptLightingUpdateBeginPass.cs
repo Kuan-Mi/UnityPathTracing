@@ -218,6 +218,15 @@ namespace PathTracing
         public uint AnalyticLightCount  => (uint)_analyticLightCount;
         public uint TotalLightCount     => EnvQtTotalNodeCount + (uint)_analyticLightCount + _emissiveTotalTriCount;
 
+        // GPU-computed stats from the control buffer (LightsBaker::m_lastReadback — proxies are
+        // counted and weights summed on GPU during the proxy build, LightsBaker.cpp:1301-1326).
+        // Filled by an async readback a few frames behind, like the original's delayed copy.
+        public uint  SamplingProxyCount { get; private set; }
+        public float WeightsSum         { get; private set; }
+        public bool  HasControlReadback { get; private set; }
+        private readonly RtxptLightingControlData[] _controlReadback = new RtxptLightingControlData[1];
+        private bool _controlReadbackPending;
+
         // ====================================================================
         // Constructor
         // ====================================================================
@@ -420,6 +429,7 @@ namespace PathTracing
             internal NativeComputePipeline      DebugDrawLightsCs;
             internal NativeComputeDescriptorSet DebugDrawLightsDs;
             internal bool                       DbgDrawLights;
+            internal bool                       RequestControlReadback;
 
             // --- Shared ---
             internal NativeRtxptPassContext Ctx;
@@ -492,6 +502,18 @@ namespace PathTracing
             pd.DbgDrawLights     = (_ctx.Setting?.neeatDbgDrawLights ?? false)
                                    && (_ctx.Setting?.enableShaderDebug ?? false)
                                    && _ctx.Buffers.ShaderDebugBufferPtr != IntPtr.Zero;
+
+            // Control-buffer stats readback (LightsBaker.cpp:1301-1326 "for debugging only").
+            // Poll the previous request here (main thread); issue a new one in Execute when idle.
+            if (_controlReadbackPending && _ctx.Buffers.LightControlBuffer.TryGetReadback(_controlReadback, 1))
+            {
+                _controlReadbackPending = false;
+                SamplingProxyCount = _controlReadback[0].SamplingProxyCount;
+                WeightsSum         = math.asfloat(_controlReadback[0].WeightsSumUINT);
+                HasControlReadback = true;
+            }
+            pd.RequestControlReadback = !_controlReadbackPending;
+            _controlReadbackPending   = true;
 
             // BakeEmissiveTriangles
             pd.BakeEmissiveTrianglesCs = _bakeEmissiveTrianglesCs;
@@ -867,6 +889,11 @@ namespace PathTracing
                 data.DebugDrawLightsCs.Dispatch(cmd, ds, gx, 1, 1);
                 cmd.EndSample("DebugDrawLights");
             }
+
+            // Control-buffer stats readback (after the proxy build wrote SamplingProxyCount /
+            // WeightsSumUINT on GPU). Polled on the main thread next frames.
+            if (data.RequestControlReadback)
+                data.Ctx.Buffers.LightControlBuffer.RequestReadback(cmd, 0, 1);
 
             cmd.EndSample(RenderPassMarkers.RtxptLightingUpdateBegin);
         }
