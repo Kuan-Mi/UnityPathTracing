@@ -119,6 +119,8 @@ namespace PathTracing
         private readonly NativeComputeDescriptorSet _createProxyJobsDs;
         private readonly NativeComputePipeline      _executeProxyJobsCs;
         private readonly NativeComputeDescriptorSet _executeProxyJobsDs;
+        private readonly NativeComputePipeline      _debugDrawLightsCs; // null when shader not assigned
+        private readonly NativeComputeDescriptorSet _debugDrawLightsDs;
 
         // ====================================================================
         // GPU pipeline — BakeEmissiveTriangles
@@ -211,6 +213,11 @@ namespace PathTracing
         /// <summary>Total emissive triangle-light count produced last frame.</summary>
         public uint EmissiveTriangleCount => _emissiveTotalTriCount;
 
+        // Light statistics for the editor "Info and statistics:" block (LightsBaker::InfoGUI).
+        public uint EnvmapQuadNodeCount => EnvQtTotalNodeCount;
+        public uint AnalyticLightCount  => (uint)_analyticLightCount;
+        public uint TotalLightCount     => EnvQtTotalNodeCount + (uint)_analyticLightCount + _emissiveTotalTriCount;
+
         // ====================================================================
         // Constructor
         // ====================================================================
@@ -234,7 +241,9 @@ namespace PathTracing
             NativeComputeShader bakeEmissiveTrianglesCs,
             // NEE-AT feedback (begin half)
             NativeComputeShader processFeedbackHistoryPreFilterCs,
-            NativeComputeShader processFeedbackHistoryP0Cs)
+            NativeComputeShader processFeedbackHistoryP0Cs,
+            // Debug (optional — LightsBaker::DebugGUI "Debug draw all lights")
+            NativeComputeShader debugDrawLightsCs = null)
         {
             // EnvLightsBaker
             _backupPastCs       = new NativeComputePipeline(envLightsBackupPastCs);
@@ -269,6 +278,12 @@ namespace PathTracing
             _processFeedbackHistoryPreFilterDs = new NativeComputeDescriptorSet(_processFeedbackHistoryPreFilterCs);
             _processFeedbackHistoryP0Cs        = new NativeComputePipeline(processFeedbackHistoryP0Cs);
             _processFeedbackHistoryP0Ds        = new NativeComputeDescriptorSet(_processFeedbackHistoryP0Cs);
+
+            if (debugDrawLightsCs != null)
+            {
+                _debugDrawLightsCs = new NativeComputePipeline(debugDrawLightsCs);
+                _debugDrawLightsDs = new NativeComputeDescriptorSet(_debugDrawLightsCs);
+            }
         }
 
         // ====================================================================
@@ -304,6 +319,8 @@ namespace PathTracing
             _createProxyJobsCs?.Dispose();
             _executeProxyJobsDs?.Dispose();
             _executeProxyJobsCs?.Dispose();
+            _debugDrawLightsDs?.Dispose();
+            _debugDrawLightsCs?.Dispose();
             _bakeEmissiveTrianglesDs?.Dispose();
             _bakeEmissiveTrianglesCs?.Dispose();
 
@@ -397,6 +414,12 @@ namespace PathTracing
             internal NativeComputePipeline      ProcessFeedbackHistoryP0Cs;
             internal NativeComputeDescriptorSet ProcessFeedbackHistoryP0Ds;
             internal bool                       LastFrameFeedbackAvailable;
+            internal bool                       ImportanceBoostPreFilter;
+
+            // --- Debug (LightsBaker::DebugGUI) ---
+            internal NativeComputePipeline      DebugDrawLightsCs;
+            internal NativeComputeDescriptorSet DebugDrawLightsDs;
+            internal bool                       DbgDrawLights;
 
             // --- Shared ---
             internal NativeRtxptPassContext Ctx;
@@ -460,6 +483,15 @@ namespace PathTracing
             pd.ProcessFeedbackHistoryP0Cs        = _processFeedbackHistoryP0Cs;
             pd.ProcessFeedbackHistoryP0Ds        = _processFeedbackHistoryP0Ds;
             pd.LastFrameFeedbackAvailable        = s_controlStaging[0].LastFrameTemporalFeedbackAvailable != 0;
+            // m_importanceBoost_PreFilter (LightsBaker.cpp:1206) gates the PreFilter dispatch.
+            pd.ImportanceBoostPreFilter          = _ctx.Setting?.neeatImportanceBoostPreFilter ?? true;
+
+            // Debug draw lights (LightsBaker.cpp:1290) — needs the ShaderDebug buffer for output.
+            pd.DebugDrawLightsCs = _debugDrawLightsCs;
+            pd.DebugDrawLightsDs = _debugDrawLightsDs;
+            pd.DbgDrawLights     = (_ctx.Setting?.neeatDbgDrawLights ?? false)
+                                   && (_ctx.Setting?.enableShaderDebug ?? false)
+                                   && _ctx.Buffers.ShaderDebugBufferPtr != IntPtr.Zero;
 
             // BakeEmissiveTriangles
             pd.BakeEmissiveTrianglesCs = _bakeEmissiveTrianglesCs;
@@ -702,7 +734,9 @@ namespace PathTracing
             // ----------------------------------------------------------------
             if (data.LastFrameFeedbackAvailable)
             {
-                // 11. ProcessFeedbackHistoryPreFilter
+                // 11. ProcessFeedbackHistoryPreFilter — gated by the "...by pre-filter merge"
+                //     importance boost (LightsBaker.cpp:1206 m_importanceBoost_PreFilter).
+                if (data.ImportanceBoostPreFilter)
                 {
                     var ds  = data.ProcessFeedbackHistoryPreFilterDs;
                     var ctx = data.Ctx;
@@ -810,6 +844,28 @@ namespace PathTracing
                 cmd.BeginSample(RenderPassMarkers.RtxptExecuteProxyJobs);
                 data.ExecuteProxyJobsCs.Dispatch(cmd, ds, gx, 1, 1);
                 cmd.EndSample(RenderPassMarkers.RtxptExecuteProxyJobs);
+            }
+
+            // ----------------------------------------------------------------
+            // 18. DebugDrawLights (LightsBaker.cpp:1290) — emits DebugLine/DebugSphere
+            //     wireframes for every light into the ShaderDebug buffer. The original
+            //     over-dispatches to MAX_SAMPLING_PROXIES ("brute force to max"); the
+            //     kernel early-outs beyond g_controlInfo.TotalLightCount.
+            // ----------------------------------------------------------------
+            if (data.DbgDrawLights && data.DebugDrawLightsCs != null)
+            {
+                var ds = data.DebugDrawLightsDs;
+                ds.SetRWStructuredBuffer("u_controlBuffer", pCtrl, cCtrl, StrideCtrl);
+                ds.SetRWStructuredBuffer("u_lightsBuffer", pLights, cLights, StrideLights);
+                ds.SetRWStructuredBuffer("u_lightsExBuffer", pLightsEx, cLightsEx, StrideLightsEx);
+                ds.SetRWTypedBuffer("u_lightWeights", pWeights, cWeights, DXGI_FORMAT_R32_FLOAT);
+                ds.SetRWTypedBuffer("u_lightSamplingProxies", pProxies, cProxies, DXGI_FORMAT_R32_UINT);
+                ds.SetRWBuffer("u_ShaderDebugBuffer", data.Ctx.Buffers.ShaderDebugBufferPtr);
+                ds.SetRWTexture("u_ShaderDebugVizTextureBuffer", data.Ctx.ShaderDebugVizPtr);
+                uint gx = Math.Max(1u, ((uint)LightingConfig.RTXPT_LIGHTING_MAX_SAMPLING_PROXIES + LLB_NUM_COMPUTE_THREADS - 1) / LLB_NUM_COMPUTE_THREADS);
+                cmd.BeginSample("DebugDrawLights");
+                data.DebugDrawLightsCs.Dispatch(cmd, ds, gx, 1, 1);
+                cmd.EndSample("DebugDrawLights");
             }
 
             cmd.EndSample(RenderPassMarkers.RtxptLightingUpdateBegin);
@@ -941,7 +997,10 @@ namespace PathTracing
             if (!neeAtSelected)
                 _feedbackBufferFilled = false;
 
-            bool lastFrameFeedback  = neeAtEnabled && _feedbackBufferFilled;
+            // Original (LightsBaker.cpp:1021): feedback availability also gated by the
+            // "disable last frame feedback" debug switch.
+            bool lastFrameFeedback  = neeAtEnabled && _feedbackBufferFilled
+                                      && !(setting?.neeatDbgDisableLastFrameFeedback ?? false);
             bool lastFrameLocal     = _previousFrameTemporalFeedbackAvailable && lastFrameFeedback;
             uint totalLightCount    = EnvQtTotalNodeCount + (uint)_analyticLightCount + _emissiveTotalTriCount;
             int2 renderRes          = _ctx.RenderResolution;
@@ -966,8 +1025,9 @@ namespace PathTracing
             ctrl.LastFrameTemporalFeedbackAvailable = lastFrameFeedback ? 1u : 0u;
             ctrl.LastFrameLocalSamplesAvailable     = lastFrameLocal ? 1u : 0u;
             ctrl.ImportanceSamplingType             = setting != null && setting.useNEE ? (uint)setting.neeType : 0u;
-            // LightsBaker.cpp:1022,1070 — depends only on ImportanceSamplingType == NEEAT.
-            ctrl.TemporalFeedbackRequired           = neeAtSelected ? 1u : 0u;
+            // LightsBaker.cpp:1022,1070 — depends only on ImportanceSamplingType == NEEAT,
+            // and the "Freeze NEE-AT feedback updates" debug switch.
+            ctrl.TemporalFeedbackRequired           = neeAtSelected && !(setting?.neeatDbgFreezeUpdates ?? false) ? 1u : 0u;
             ctrl.TotalMaxFeedbackCount              = lastFrameFeedback ? p0ThreadCount : 0u;
             ctrl.GlobalFeedbackUseWeight            = lastFrameFeedback ? (setting?.neeatGlobalTemporalFeedbackWeight ?? 0.75f) : 0.0f;
             ctrl.LocalToGlobalSampleRatio           = lastFrameFeedback ? (setting?.neeatLocalToGlobalSampleRatio ?? 0.65f) : 0.0f;
@@ -1014,9 +1074,22 @@ namespace PathTracing
             bk.ImportanceBoostFrustumMul        = setting?.neeatImportanceBoostFrustumMul ?? 0f;
             bk.ImportanceBoostFrustumFadeDistance = setting?.neeatImportanceBoostFrustumFadeDistance ?? 0f;
 
+            // LightsBaker::DebugGUI wiring (LightsBaker.cpp:1059-1061). C++ uses the live mouse
+            // cursor for the tile-connection pick; Unity reuses the ShaderDebug debug pixel.
+            bk.DebugDrawType      = (int)(setting?.neeatDbgViewType ?? RtxptLightingDebugViewType.Disabled);
+            bk.DebugDrawTileLights = (setting?.neeatDbgDrawTileLightConnections ?? false) ? 1u : 0u;
+            bk.MouseCursorPosX    = (uint)math.max(0, setting?.debugPixelX ?? 0);
+            bk.MouseCursorPosY    = (uint)math.max(0, setting?.debugPixelY ?? 0);
+
             // Frustum planes + corners (Gribb-Hartmann, LightsBaker.cpp:884 UpdateFrustumConsts).
             if (_ctx.FrameState != null)
                 FillFrustumPlanesAndCorners(ref bk, _ctx.FrameState.worldToClip);
+
+            // Frustum freeze debug (LightsBaker.cpp:919-925): while frozen, keep using the
+            // cached planes/corners and let the DebugViz pass draw the frozen frustum.
+            bool freezeFrustum = setting?.neeatDbgFreezeFrustumUpdates ?? false;
+            ApplyFrustumFreeze(ref bk, freezeFrustum);
+            bk.DebugDrawFrustum = freezeFrustum ? 1u : 0u;
 
             bk.EnvMapParams = new RtxptLightsBakerEnvMapParams
             {
@@ -1038,6 +1111,29 @@ namespace PathTracing
             _previousFrameTemporalFeedbackAvailable = ctrl.TemporalFeedbackRequired != 0;
             if (ctrl.TemporalFeedbackRequired != 0)
                 _feedbackBufferFilled = true;
+        }
+
+        // Cached frustum planes+corners for the freeze-frustum debug switch
+        // (mirrors LightsBaker::m_dbgFrozenFrustum, LightsBaker.cpp:919-922).
+        private readonly float[] _frozenFrustum = new float[24 + 32];
+        private bool _frozenFrustumValid;
+
+        private unsafe void ApplyFrustumFreeze(ref RtxptLightsBakerConstants bk, bool freeze)
+        {
+            fixed (RtxptLightsBakerConstants* pBk = &bk)
+            {
+                if (freeze && _frozenFrustumValid)
+                {
+                    for (int i = 0; i < 24; i++) pBk->FrustumPlanes[i]  = _frozenFrustum[i];
+                    for (int i = 0; i < 32; i++) pBk->FrustumCorners[i] = _frozenFrustum[24 + i];
+                }
+                else
+                {
+                    for (int i = 0; i < 24; i++) _frozenFrustum[i]      = pBk->FrustumPlanes[i];
+                    for (int i = 0; i < 32; i++) _frozenFrustum[24 + i] = pBk->FrustumCorners[i];
+                    _frozenFrustumValid = true;
+                }
+            }
         }
 
         // ─────────────────────────────────────────────────────────────────────
@@ -1141,6 +1237,13 @@ namespace PathTracing
         private void UpdateLocalSamplingJitter()
         {
             _prevLocalSamplingTileJitter = _localSamplingTileJitter;
+
+            // Original (LightsBaker.cpp:946): jitter disabled entirely by the debug switch.
+            if (_ctx?.Setting?.neeatDbgDisableJitter ?? false)
+            {
+                _localSamplingTileJitter = uint2.zero;
+                return;
+            }
 
             const float g  = 1.324717957244746f;
             const float a1 = 1.0f / g;

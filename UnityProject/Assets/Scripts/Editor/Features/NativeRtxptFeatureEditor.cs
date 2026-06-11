@@ -22,6 +22,7 @@ namespace PathTracing
         private const int   kStablePlaneMaxVertexIndex = 15;  // PathTracerConfig.cStablePlaneMaxVertexIndex
         private const int   kMaxBounceCount            = 96;  // Config.h MAX_BOUNCE_COUNT
         private const int   kMaxLightSamples           = 63;  // LightingConfig.h RTXPT_LIGHTING_MAX_SAMPLE_COUNT
+        private const int   LightingConfigMaxLights    = 512 * 1024; // LightingConfig.RTXPT_LIGHTING_MAX_LIGHTS
 
         private string GetKey(string headerName) =>
             $"PT_NativeRtxpt_Foldout_{target.GetInstanceID()}_{headerName}";
@@ -154,6 +155,32 @@ namespace PathTracing
             if (!s.useNEE)
                 EditorGUILayout.HelpBox("NOTE: NEE inactive (enable in `Path Tracer -> Light sampling`).", MessageType.Warning);
 
+            // LightsBaker::InfoGUI (LightsBaker.cpp:1420) — live light statistics.
+            Category("Info and statistics:");
+            using (new EditorGUI.IndentLevelScope())
+            {
+                // Counts are filled by the LightingUpdateBegin pass — valid once the RTXPT
+                // renderer has drawn at least one frame (game OR scene view, edit mode included).
+                var lub = (target as NativeRtxptFeature)?.LightingUpdateBeginPass;
+                if (lub != null && lub.TotalLightCount > 0)
+                {
+                    string[] modes = { "Uniform", "Power+", "NEE-AT" };
+                    EditorGUILayout.LabelField($"Current mode:  {modes[Mathf.Clamp((int)s.neeType, 0, 2)]}", EditorStyles.miniLabel);
+                    EditorGUILayout.LabelField("Scene lights by type:", EditorStyles.miniLabel);
+                    EditorGUILayout.LabelField($"   envmap quads:  {lub.EnvmapQuadNodeCount}", EditorStyles.miniLabel);
+                    EditorGUILayout.LabelField($"   emissive tris: {lub.EmissiveTriangleCount}", EditorStyles.miniLabel);
+                    EditorGUILayout.LabelField($"   analytic:      {lub.AnalyticLightCount}", EditorStyles.miniLabel);
+                    EditorGUILayout.LabelField($"   TOTAL:         {lub.TotalLightCount}", EditorStyles.miniLabel);
+                    EditorGUILayout.LabelField($"(used: {lub.TotalLightCount * 100f / LightingConfigMaxLights:0.00}% of max {LightingConfigMaxLights})", EditorStyles.miniLabel);
+                    if (lub.TotalLightCount > LightingConfigMaxLights)
+                        EditorGUILayout.HelpBox("!!WARNING - scene light count overflow!! increase RTXPT_LIGHTING_MAX_LIGHTS", MessageType.Error);
+                }
+                else
+                {
+                    EditorGUILayout.LabelField("(no RTXPT frame rendered yet)", EditorStyles.miniLabel);
+                }
+            }
+
             Category("Importance sampling:");
             using (new EditorGUI.IndentLevelScope())
             {
@@ -185,18 +212,58 @@ namespace PathTracing
                 }
             }
 
-            if (Foldout("LightingAdv", "Advanced (LightsBaker)"))
+            // LightsBaker::DebugGUI (LightsBaker.cpp:1452).
+            Category("Debugging:");
+            using (new EditorGUI.IndentLevelScope())
             {
-                using var __ = new EditorGUI.IndentLevelScope();
-                s.neeatScreenSpaceVsWorldSpaceThreshold = EditorGUILayout.FloatField("ScreenSpace vs WorldSpace threshold", s.neeatScreenSpaceVsWorldSpaceThreshold);
-                s.neeatDepthDisocclusionThreshold       = EditorGUILayout.FloatField("Depth disocclusion threshold", s.neeatDepthDisocclusionThreshold);
-                s.neeatReservoirHistoryDropoff          = EditorGUILayout.FloatField("Reservoir history dropoff", s.neeatReservoirHistoryDropoff);
-                s.neeatEnableMotionReprojection         = EditorGUILayout.Toggle("Motion reprojection", s.neeatEnableMotionReprojection);
-                s.neeatImportanceBoostIntensityDelta    = EditorGUILayout.FloatField("Importance boost: intensity delta", s.neeatImportanceBoostIntensityDelta);
-                s.neeatImportanceBoostFrustumMul        = EditorGUILayout.FloatField("Importance boost: frustum mul", s.neeatImportanceBoostFrustumMul);
-                s.neeatImportanceBoostFrustumFadeDistance = EditorGUILayout.FloatField("Importance boost: frustum fade distance", s.neeatImportanceBoostFrustumFadeDistance);
-                s.neeatSceneAverageContentsDistance     = EditorGUILayout.FloatField("Scene average contents distance", s.neeatSceneAverageContentsDistance);
-                s.neeatSampleBakedEnvironment           = EditorGUILayout.Toggle("Sample baked environment *", s.neeatSampleBakedEnvironment);
+                using (new EditorGUI.DisabledScope(!s.enableShaderDebug))
+                {
+                    s.neeatDbgDrawLights = EditorGUILayout.Toggle(
+                        new GUIContent("Debug draw all lights", "Wireframe colour indicates type: red - environment map; green - emissive triangles; blue - analytic. Requires 'Enable shader debug'."),
+                        s.neeatDbgDrawLights);
+                    s.neeatDbgDrawTileLightConnections = EditorGUILayout.Toggle(
+                        new GUIContent("Debug draw NEE-AT tile light connections", "Shows lights sampled by the debug pixel's tile local sampling pdf (C++ uses the mouse cursor; Unity uses 'Debug pixel')."),
+                        s.neeatDbgDrawTileLightConnections);
+                }
+
+                s.neeatDbgFreezeUpdates = EditorGUILayout.Toggle(
+                    new GUIContent("Freeze NEE-AT feedback updates", "Feedback from the path tracer remains frozen while enabled."),
+                    s.neeatDbgFreezeUpdates);
+                s.neeatDbgViewType = (RtxptLightingDebugViewType)EditorGUILayout.EnumPopup(
+                    new GUIContent("NEE-AT debug view", "Show various NEE-AT buffers (via the debug-viz overlay)."),
+                    s.neeatDbgViewType);
+                s.neeatDbgDisableJitter = EditorGUILayout.Toggle(
+                    new GUIContent("Debug disable local tile jitter", "Pixel→tile mapping jitter avoids denoising artifacts and helps spatial sharing; disable for debugging."),
+                    s.neeatDbgDisableJitter);
+                s.neeatDbgDisableLastFrameFeedback = EditorGUILayout.Toggle(
+                    new GUIContent("Debug disable last frame feedback", "Quality reverts to slightly worse than power-based sampling."),
+                    s.neeatDbgDisableLastFrameFeedback);
+                s.neeatDbgFreezeFrustumUpdates = EditorGUILayout.Toggle("Debug freeze frustum updates", s.neeatDbgFreezeFrustumUpdates);
+
+                if (Foldout("LightingAdv", "Advanced settings"))
+                {
+                    using var __ = new EditorGUI.IndentLevelScope();
+                    s.neeatScreenSpaceVsWorldSpaceThreshold = EditorGUILayout.FloatField("ScreenSpace vs WorldSpace threshold", s.neeatScreenSpaceVsWorldSpaceThreshold);
+                    s.neeatDepthDisocclusionThreshold       = EditorGUILayout.FloatField("Depth disocclusion threshold", s.neeatDepthDisocclusionThreshold);
+                    s.neeatReservoirHistoryDropoff          = EditorGUILayout.FloatField("Reservoir history dropoff", s.neeatReservoirHistoryDropoff);
+                    s.neeatEnableMotionReprojection         = EditorGUILayout.Toggle("Motion reprojection", s.neeatEnableMotionReprojection);
+                    s.neeatSampleBakedEnvironment           = EditorGUILayout.Toggle(
+                        new GUIContent("Sample environment proxy lights *", "Bake the env map into sampling proxies instead of direct NEE sampling. Biased, faster, blurrier shadows in some cases."),
+                        s.neeatSampleBakedEnvironment);
+                    EditorGUILayout.LabelField("Importance boosts:", EditorStyles.miniBoldLabel);
+                    using (new EditorGUI.IndentLevelScope())
+                    {
+                        s.neeatImportanceBoostIntensityDelta    = EditorGUILayout.FloatField("...by light intensity change (mul)", s.neeatImportanceBoostIntensityDelta);
+                        s.neeatImportanceBoostFrustumMul        = EditorGUILayout.FloatField("...by light frustum proximity (mul)", s.neeatImportanceBoostFrustumMul);
+                        s.neeatImportanceBoostFrustumFadeDistance = EditorGUILayout.FloatField(
+                            new GUIContent("fade distance", "How fast the boost fades outside of the frustum; bigger = slower fade."),
+                            s.neeatImportanceBoostFrustumFadeDistance);
+                        s.neeatImportanceBoostPreFilter         = EditorGUILayout.Toggle(
+                            new GUIContent("...by pre-filter merge", "Stronger feedback in a 3x3 kernel can 'overwhelm' neighbors. EXPERIMENTAL - SUPER-SLOW."),
+                            s.neeatImportanceBoostPreFilter);
+                    }
+                    s.neeatSceneAverageContentsDistance     = EditorGUILayout.FloatField("Scene average contents distance", s.neeatSceneAverageContentsDistance);
+                }
             }
         }
 
@@ -538,9 +605,10 @@ namespace PathTracing
                 }
             }
 
-            // Live pick feedback (mirrors the C++ ImGui "debugPrint %d: ..." block).
+            // Live pick feedback (mirrors the C++ ImGui "debugPrint %d: ..." block). Valid whenever
+            // frames are being rendered — game or scene view, edit mode included.
             var fb = NativeRtxptShaderDebug.LastFeedback;
-            if (s.continuousDebugFeedback && fb.Valid && Application.isPlaying)
+            if (s.continuousDebugFeedback && fb.Valid)
             {
                 EditorGUILayout.LabelField($"Debug line count: {fb.LineVertexCount / 2}   picked materialID: {fb.PickedMaterialID}", EditorStyles.miniLabel);
                 for (int i = 0; i < fb.DebugPrintSlots.Length; i++)

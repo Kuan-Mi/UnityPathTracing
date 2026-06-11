@@ -45,6 +45,8 @@ namespace PathTracing
         private readonly NativeComputeDescriptorSet _p3Ds;
         private readonly NativeComputePipeline      _clearCs;
         private readonly NativeComputeDescriptorSet _clearDs;
+        private readonly NativeComputePipeline      _debugVizCs; // null when shader not assigned
+        private readonly NativeComputeDescriptorSet _debugVizDs;
 
         // ── Per-frame state ────────────────────────────────────────────────────
         private NativeRtxptPassContext _ctx;
@@ -56,7 +58,8 @@ namespace PathTracing
             NativeComputeShader processFeedbackHistoryP1bCs,
             NativeComputeShader processFeedbackHistoryP2Cs,
             NativeComputeShader processFeedbackHistoryP3Cs,
-            NativeComputeShader clearFeedbackHistoryCs)
+            NativeComputeShader clearFeedbackHistoryCs,
+            NativeComputeShader processFeedbackHistoryDebugVizCs = null)
         {
             _p1aCs   = new NativeComputePipeline(processFeedbackHistoryP1aCs);
             _p1aDs   = new NativeComputeDescriptorSet(_p1aCs);
@@ -68,6 +71,11 @@ namespace PathTracing
             _p3Ds    = new NativeComputeDescriptorSet(_p3Cs);
             _clearCs = new NativeComputePipeline(clearFeedbackHistoryCs);
             _clearDs = new NativeComputeDescriptorSet(_clearCs);
+            if (processFeedbackHistoryDebugVizCs != null)
+            {
+                _debugVizCs = new NativeComputePipeline(processFeedbackHistoryDebugVizCs);
+                _debugVizDs = new NativeComputeDescriptorSet(_debugVizCs);
+            }
         }
 
         // ── IDisposable ────────────────────────────────────────────────────────
@@ -84,6 +92,8 @@ namespace PathTracing
             _p3Cs?.Dispose();
             _clearDs?.Dispose();
             _clearCs?.Dispose();
+            _debugVizDs?.Dispose();
+            _debugVizCs?.Dispose();
         }
 
         // ── Setup ──────────────────────────────────────────────────────────────
@@ -94,8 +104,8 @@ namespace PathTracing
 
         private class PassData
         {
-            internal NativeComputePipeline      P1aCs, P1bCs, P2Cs, P3Cs, ClearCs;
-            internal NativeComputeDescriptorSet P1aDs, P1bDs, P2Ds, P3Ds, ClearDs;
+            internal NativeComputePipeline      P1aCs, P1bCs, P2Cs, P3Cs, ClearCs, DebugVizCs;
+            internal NativeComputeDescriptorSet P1aDs, P1bDs, P2Ds, P3Ds, ClearDs, DebugVizDs;
             internal NativeRtxptPassContext     Ctx;
         }
 
@@ -115,6 +125,8 @@ namespace PathTracing
             pd.P3Ds    = _p3Ds;
             pd.ClearCs = _clearCs;
             pd.ClearDs = _clearDs;
+            pd.DebugVizCs = _debugVizCs;
+            pd.DebugVizDs = _debugVizDs;
             pd.Ctx     = _ctx;
 
             builder.AllowPassCulling(false);
@@ -261,6 +273,51 @@ namespace PathTracing
                 cmd.BeginSample(RenderPassMarkers.RtxptProcessFeedbackHistoryP3);
                 data.P3Cs.Dispatch(cmd, ds, (uint)Math.Max(1, localW), (uint)Math.Max(1, localH), 1);
                 cmd.EndSample(RenderPassMarkers.RtxptProcessFeedbackHistoryP3);
+            }
+
+            // ----------------------------------------------------------------
+            // 4b. ProcessFeedbackHistoryDebugViz (LightsBaker.cpp:1388-1398)
+            //     Tile-connection lines / tile heatmap / correctness validation / frozen
+            //     frustum, drawn via the ShaderDebug machinery (DebugLine → u125, heatmap →
+            //     viz texture). Same gating as the original.
+            // ----------------------------------------------------------------
+            {
+                var view = setting.neeatDbgViewType;
+                bool wantViz = setting.neeatDbgDrawTileLightConnections
+                               || view == RtxptLightingDebugViewType.TileHeatmap
+                               || view == RtxptLightingDebugViewType.ValidateCorrectness
+                               || setting.neeatDbgFreezeFrustumUpdates;
+                if (wantViz && data.DebugVizCs != null && setting.enableShaderDebug
+                    && buf.ShaderDebugBufferPtr != IntPtr.Zero)
+                {
+                    // The kernel's ValidateCorrectness path calls FillTile() — the P2 tile-fill
+                    // routine — so it statically references the union of the P1/P2/P3 resources.
+                    var ds = data.DebugVizDs;
+                    ds.SetRWStructuredBuffer("u_controlBuffer", pCtrl, cCtrl, StrideCtrl);
+                    ds.SetRWStructuredBuffer("u_lightsBuffer", buf.LightBuffer, buf.LightBuffer.count, buf.LightBuffer.stride);
+                    ds.SetRWStructuredBuffer("u_lightsExBuffer", buf.LightExBuffer, buf.LightExBuffer.count, buf.LightExBuffer.stride);
+                    ds.SetRWTypedBuffer("u_lightWeights", pWeights, cWeights, DXGI_FORMAT_R32_FLOAT);
+                    ds.SetRWTypedBuffer("u_localSamplingBuffer", pLocal, cLocal, DXGI_FORMAT_R32_UINT);
+                    ds.SetRWTypedBuffer("u_lightSamplingProxies", buf.LightSamplingProxiesPtr, buf.LightSamplingProxies.count, DXGI_FORMAT_R32_UINT);
+                    ds.SetRWTypedBuffer("u_historyRemapPastToCurrent", buf.HistoryRemapPastToCurrent, buf.HistoryRemapPastToCurrent.count, DXGI_FORMAT_R32_UINT);
+                    ds.SetRWTypedBuffer("u_historyRemapCurrentToPast", buf.HistoryRemapCurrentToPast, buf.HistoryRemapCurrentToPast.count, DXGI_FORMAT_R32_UINT);
+                    ds.SetRWTexture("u_feedbackTotalWeight", ctx.FeedbackTotalWeightPtr);
+                    ds.SetRWTexture("u_feedbackCandidates", ctx.FeedbackCandidatesPtr);
+                    ds.SetRWTexture("u_feedbackTotalWeightScratch", ctx.FeedbackTotalWeightScratchPtr);
+                    ds.SetRWTexture("u_feedbackCandidatesScratch", ctx.FeedbackCandidatesScratchPtr);
+                    ds.SetRWTexture("u_feedbackTotalWeightBlended", ctx.FeedbackTotalWeightBlendedPtr);
+                    ds.SetRWTexture("u_feedbackCandidatesBlended", ctx.FeedbackCandidatesBlendedPtr);
+                    ds.SetRWTexture("u_historyDepth", ctx.NEEATHistoryDepthPtr);
+                    ds.SetTexture("t_depthBuffer", ctx.DepthPtr);
+                    ds.SetTexture("t_motionVectors", ctx.MotionVectorsPtr);
+                    ds.SetRWTexture("u_ShaderDebugVizTextureBuffer", ctx.ShaderDebugVizPtr);
+                    ds.SetRWBuffer("u_ShaderDebugBuffer", buf.ShaderDebugBufferPtr);
+                    uint gx = (uint)Math.Max(1, (localW + Threads2D - 1) / Threads2D);
+                    uint gy = (uint)Math.Max(1, (localH + Threads2D - 1) / Threads2D);
+                    cmd.BeginSample("ProcessFeedbackHistoryDebugViz");
+                    data.DebugVizCs.Dispatch(cmd, ds, gx, gy, 1);
+                    cmd.EndSample("ProcessFeedbackHistoryDebugViz");
+                }
             }
 
             // ----------------------------------------------------------------

@@ -14,6 +14,25 @@ namespace PathTracing
     }
 
     /// <summary>
+    /// Mirrors LightingDebugViewType (LightsBaker / LightingTypes.hlsli). Numeric values are the
+    /// shader ABI (LightsBakerConstants::DebugDrawType).
+    /// </summary>
+    public enum RtxptLightingDebugViewType
+    {
+        Disabled = 0,
+        Disocclusion,
+        NoHistoryFeedback,
+        MissingFeedbackScreenSpaceCoherent,
+        MissingFeedbackWorldSpaceCoherent,
+        FeedbackRawScreenSpaceCoherent,
+        FeedbackRawWorldSpaceCoherent,
+        LowResBlendedFeedback,
+        FeedbackAfterClear,
+        TileHeatmap,
+        ValidateCorrectness,
+    }
+
+    /// <summary>
     /// Mirrors RTXPT ToneMapping_cb.h ToneMapperOperator. Numeric values are the shader ABI.
     /// </summary>
     public enum NativeRtxptToneMapOperator
@@ -107,6 +126,26 @@ namespace PathTracing
         /// NEE_AT_SAMPLE_BAKED_ENVIRONMENT — applied via the shader-macro sync (reimport).
         /// </summary>
         public bool  neeatSampleBakedEnvironment           = true;
+        /// <summary>m_importanceBoost_PreFilter (LightsBaker.h:251) — gates the
+        /// ProcessFeedbackHistoryPreFilter pass ("...by pre-filter merge").</summary>
+        public bool  neeatImportanceBoostPreFilter         = true;
+
+        // LightsBaker debugging (mirrors LightsBaker.h m_dbg* / LightsBaker::DebugGUI).
+        // The draws go through the ShaderDebug machinery (enableShaderDebug must be on).
+        /// <summary>m_dbgDebugDrawLights — wireframe color: red env / green emissive / blue analytic.</summary>
+        public bool neeatDbgDrawLights = false;
+        /// <summary>m_dbgDebugDrawTileLightConnections — lights sampled by the debug pixel's tile.</summary>
+        public bool neeatDbgDrawTileLightConnections = false;
+        /// <summary>m_dbgFreezeUpdates — freezes path-tracer feedback while enabled.</summary>
+        public bool neeatDbgFreezeUpdates = false;
+        /// <summary>m_dbgDebugDrawType — NEE-AT buffer visualisations (written to the debug-viz overlay).</summary>
+        public RtxptLightingDebugViewType neeatDbgViewType = RtxptLightingDebugViewType.Disabled;
+        /// <summary>m_dbgDebugDisableJitter — disable the pixel→tile mapping jitter.</summary>
+        public bool neeatDbgDisableJitter = false;
+        /// <summary>m_dbgDebugDisableLastFrameFeedback — quality reverts to ~power-based sampling.</summary>
+        public bool neeatDbgDisableLastFrameFeedback = false;
+        /// <summary>m_dbgFreezeFrustumUpdates — freeze + draw the frustum used by importance boosts.</summary>
+        public bool neeatDbgFreezeFrustumUpdates = false;
 
         public bool useReSTIRDI = false;
         public bool useReSTIRGI = false;

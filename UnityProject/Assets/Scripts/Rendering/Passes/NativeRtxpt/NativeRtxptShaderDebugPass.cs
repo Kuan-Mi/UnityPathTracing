@@ -49,18 +49,52 @@ namespace PathTracing
         public static RtxptDebugFeedback LastFeedback;
     }
 
-    /// <summary>Start-of-frame header reset (ShaderDebug::BeginFrame, ShaderDebug.cpp:174).</summary>
-    public class NativeRtxptShaderDebugBeginPass : ScriptableRenderPass
+    /// <summary>
+    /// Start-of-frame header reset (ShaderDebug::BeginFrame, ShaderDebug.cpp:174) and viz-texture
+    /// clear (Sample.cpp:1413-1422: resetAccum |= RealtimeMode → ClearDebugVizTexture — i.e. every
+    /// realtime frame, and on accumulation reset in reference mode; otherwise DebugPixel writes
+    /// would persist forever once their source toggle is turned off).
+    /// </summary>
+    public class NativeRtxptShaderDebugBeginPass : ScriptableRenderPass, IDisposable
     {
+        private const uint kRGBA16F = (uint)DXGI_FORMAT.DXGI_FORMAT_R16G16B16A16_FLOAT;
+
         private NativeRtxptPassContext _ctx;
         private readonly uint[] _header = new uint[NativeRtxptBufferResources.ShaderDebugHeaderBytes / 4];
+
+        // Zero-vertex draw with clearColor=true — clears DebugVizOutput inside the native
+        // plugin's state tracking. Reuses the blend-viz shader purely for pipeline creation.
+        private readonly NativeRasterPipeline      _clearRaster; // null when shader not assigned
+        private readonly NativeRasterDescriptorSet _clearDs;
+        private readonly uint[]   _clearFmt = { kRGBA16F };
+        private readonly IntPtr[] _clearRes = new IntPtr[1];
+
+        public NativeRtxptShaderDebugBeginPass(NativeRasterShader vizClearShader = null)
+        {
+            if (vizClearShader == null) return;
+            var state = NativeRenderPlugin.RasterPipelineStateDesc.FullscreenOpaque(kRGBA16F);
+            _clearRaster = new NativeRasterPipeline(vizClearShader, state);
+            _clearDs     = new NativeRasterDescriptorSet(_clearRaster);
+        }
+
+        public void Dispose()
+        {
+            _clearDs?.Dispose();
+            _clearRaster?.Dispose();
+        }
 
         public void Setup(NativeRtxptPassContext ctx) => _ctx = ctx;
 
         private class PassData
         {
-            internal GraphicsBuffer Buffer;
-            internal uint[]         Header;
+            internal GraphicsBuffer            Buffer;
+            internal uint[]                    Header;
+            internal NativeRasterPipeline      ClearRaster;
+            internal NativeRasterDescriptorSet ClearDs;
+            internal uint[]                    ClearFmt;
+            internal IntPtr[]                  ClearRes;
+            internal NativeRtxptPassContext    Ctx;
+            internal bool                      ClearViz;
         }
 
         public override void RecordRenderGraph(RenderGraph renderGraph, ContextContainer frameData)
@@ -72,21 +106,63 @@ namespace PathTracing
             Array.Clear(_header, 0, _header.Length);
             _header[4] = 3; // VertexCountPerInstance
 
+            // Debug geometry must not be far-clipped: env-quad light wireframes are drawn on the
+            // distant-light sphere at DISTANT_LIGHT_DISTANCE = 100 km (LightsBaker.hlsl:2107),
+            // far beyond the camera's far plane. donut uses an infinite-far reverse-Z projection,
+            // so rebuild worldToClip with the far plane at infinity (reverse-Z: m22 = 0,
+            // m23 = near, where near = m23/(1+m22) of the finite matrix). Only the ShaderDebug
+            // draw shaders read this matrix.
+            Matrix4x4 proj = _ctx.FrameState.viewToClip;
+            float nearZ = proj.m23 / (1f + proj.m22);
+            proj.m22 = 0f;
+            proj.m23 = nearZ;
+            Matrix4x4 m = proj * _ctx.FrameState.worldToView;
+
             // Unity's column-major Matrix4x4 memory (m[0..15] = column by column) read as a
             // row-major HLSL float4x4 used with mul(rowVector, M) applies exactly M_unity * v —
             // so the raw indexer order is the correct byte layout for the header.
-            Matrix4x4 m = _ctx.FrameState.worldToClip;
             for (int i = 0; i < 16; i++)
                 _header[8 + i] = BitsOf(m[i]);
 
+            // ClearDebugVizTexture condition (Sample.cpp:1413-1422): every realtime frame; in
+            // reference mode only on the frame the accumulation index was reset.
+            var s  = _ctx.Setting;
+            var fs = _ctx.FrameState;
+            bool clearViz = s.realtimeMode
+                            || fs.accumulationSampleIndex == (s.accumulationPreWarmRealtimeCaches ? -32 : 0);
+
             using var builder = renderGraph.AddUnsafePass<PassData>("ShaderDebugBegin", out var pd);
-            pd.Buffer = buffer;
-            pd.Header = _header;
+            pd.Buffer      = buffer;
+            pd.Header      = _header;
+            pd.ClearRaster = _clearRaster;
+            pd.ClearDs     = _clearDs;
+            pd.ClearFmt    = _clearFmt;
+            pd.ClearRes    = _clearRes;
+            pd.Ctx         = _ctx;
+            pd.ClearViz    = clearViz;
             builder.AllowPassCulling(false);
             builder.SetRenderFunc((PassData data, UnsafeGraphContext context) =>
             {
                 var cmd = CommandBufferHelpers.GetNativeCommandBuffer(context.cmd);
                 cmd.SetBufferData(data.Buffer, data.Header);
+
+                if (data.ClearViz && data.ClearRaster != null)
+                {
+                    // Fullscreen opaque draw sampling the black dummy texture → writes (0,0,0,0)
+                    // to every pixel (plus clearColor for good measure). Binding the viz texture
+                    // itself as the SRV while it is the render target would be a hazard.
+                    data.ClearDs.SetTexture("t_DebugVizOutput", data.Ctx.blackTexturePtr);
+                    data.ClearRes[0] = data.Ctx.Textures.ShaderDebugViz.NativePtr;
+                    var draw = new RasterDrawDesc
+                    {
+                        numRenderTargets = 1, colorResources = data.ClearRes, colorFormats = data.ClearFmt,
+                        depthResource = IntPtr.Zero,
+                        clearColor = true, clearColorValue = new Color(0, 0, 0, 0),
+                        viewport = new Rect(0, 0, data.Ctx.RenderResolution.x, data.Ctx.RenderResolution.y),
+                        vertexCount = 4, instanceCount = 1,
+                    };
+                    data.ClearRaster.Draw(cmd, data.ClearDs, in draw);
+                }
             });
         }
 

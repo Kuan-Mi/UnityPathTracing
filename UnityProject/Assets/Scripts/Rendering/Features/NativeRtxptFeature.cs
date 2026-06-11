@@ -120,6 +120,10 @@ namespace PathTracing
         public NativeComputeShader processFeedbackHistoryP3Cs;
         public NativeComputeShader clearFeedbackHistoryCs;
 
+        // LightsBaker debug passes (LightsBaker::DebugGUI — draw all lights / NEE-AT debug viz)
+        public NativeComputeShader debugDrawLightsCs;
+        public NativeComputeShader processFeedbackHistoryDebugVizCs;
+
         // Phase 9: Output blit (debug display)
         public Material outputBlitMaterial;
 
@@ -147,6 +151,9 @@ namespace PathTracing
 
         // ---- Shared scene resources -----------------------------------------
         private NativeRtxptGPUScene _gpuScene;
+
+        /// <summary>Editor access for the "Info and statistics:" block (LightsBaker::InfoGUI).</summary>
+        public NativeRtxptLightingUpdateBeginPass LightingUpdateBeginPass => _lightingUpdateBeginPass;
 
         // ---- Per-camera resource pools (key = instanceID + eyeIndex*100000) -
         private readonly Dictionary<long, NativeRtxptTextureResources> _texturePools      = new();
@@ -184,7 +191,8 @@ namespace PathTracing
                     computeWeightsCs, computeProxyCountsCs, computeProxyBaselineOffsetsCs,
                     createProxyJobsCs, executeProxyJobsCs,
                     bakeEmissiveTrianglesCs,
-                    processFeedbackHistoryPreFilterCs, processFeedbackHistoryP0Cs)
+                    processFeedbackHistoryPreFilterCs, processFeedbackHistoryP0Cs,
+                    debugDrawLightsCs)
                 { renderPassEvent = renderPassEvent };
 
             _buildStablePlanesPass      ??= new NativeRtxptBuildStablePlanesPass(buildStablePlanesShader, buildHitGroups) { renderPassEvent = renderPassEvent };
@@ -193,7 +201,8 @@ namespace PathTracing
             _lightingUpdateEndPass ??= new NativeRtxptLightingUpdateEndPass(
                     processFeedbackHistoryP1aCs, processFeedbackHistoryP1bCs,
                     processFeedbackHistoryP2Cs, processFeedbackHistoryP3Cs,
-                    clearFeedbackHistoryCs)
+                    clearFeedbackHistoryCs,
+                    processFeedbackHistoryDebugVizCs)
                 { renderPassEvent = renderPassEvent };
 
             _fillStablePlanesPass     ??= new NativeRtxptFillStablePlanesPass(fillStablePlanesShader, referenceShader, fillHitGroups, referenceHitGroups) { renderPassEvent             = renderPassEvent };
@@ -204,18 +213,21 @@ namespace PathTracing
             _toneMappingMipChainPass  ??= new NativeRtxptToneMappingMipChainPass(luminanceRasterShader, luminanceMipCs, captureLuminanceCs, toneMapApplyRasterShader) { renderPassEvent = renderPassEvent };
             _accumulationPass         ??= new NativeRtxptAccumulationPass(accumulationCs) { renderPassEvent                                                                             = renderPassEvent };
             _stablePlanesDebugVizPass ??= new NativeRtxptStablePlanesDebugVizPass(stablePlanesDebugVizCs) { renderPassEvent                                                             = renderPassEvent };
-            _shaderDebugBeginPass     ??= new NativeRtxptShaderDebugBeginPass { renderPassEvent                                                                                         = renderPassEvent };
+            // The begin pass also clears the debug-viz texture; it reuses the blend-viz shader
+            // for a clear-only raster pipeline (null = header reset only, no clear).
+            _shaderDebugBeginPass     ??= new NativeRtxptShaderDebugBeginPass(shaderDebugBlendVizRasterShader) { renderPassEvent                                                        = renderPassEvent };
             if (_shaderDebugDrawPass == null
                 && shaderDebugTrianglesRasterShader != null && shaderDebugLinesRasterShader != null
                 && shaderDebugFeedbackLinesRasterShader != null && shaderDebugBlendVizRasterShader != null)
                 _shaderDebugDrawPass = new NativeRtxptShaderDebugDrawPass(
                     shaderDebugTrianglesRasterShader, shaderDebugLinesRasterShader,
                     shaderDebugFeedbackLinesRasterShader, shaderDebugBlendVizRasterShader) { renderPassEvent = renderPassEvent };
-            _outputBlitPass           ??= new NativeRtxptOutputBlitPass(outputBlitMaterial) { renderPassEvent                                                                           = renderPassEvent };
-            _depthBarrierFixPass      ??= new DepthBarrierFixPass { renderPassEvent                                                                                                     = RenderPassEvent.AfterRendering };
+            _outputBlitPass      ??= new NativeRtxptOutputBlitPass(outputBlitMaterial) { renderPassEvent = renderPassEvent };
+            _depthBarrierFixPass ??= new DepthBarrierFixPass { renderPassEvent                           = RenderPassEvent.AfterRendering };
         }
 
         private NativeRtxptPassContext passCtx;
+
         public override void AddRenderPasses(ScriptableRenderer renderer, ref RenderingData renderingData)
         {
             var cam = renderingData.cameraData.camera;
@@ -327,7 +339,7 @@ namespace PathTracing
 
             // ---- Build shared pass context ----------------------------------
             passCtx ??= new NativeRtxptPassContext();
-            
+
             passCtx.ConstantBuffer    = constantBuffer;
             passCtx.GpuScene          = _gpuScene;
             passCtx.Textures          = texPool;
@@ -338,7 +350,7 @@ namespace PathTracing
             passCtx.Setting           = setting;
             passCtx.SceneLights       = sceneLights;
             passCtx.blackTexturePtr   = blackTexturePtr;
-            
+
             passCtx.ResolveNativePtrs();
 
             // ---- Phase 0: TLAS ---------------------------------------------
@@ -461,7 +473,7 @@ namespace PathTracing
             if (setting.enableShaderDebug && _shaderDebugDrawPass != null && bufPool.ShaderDebugBuffer != null)
             {
                 bool ranToneMap = setting.realtimeMode && setting.enableToneMapping && _toneMappingMipChainPass != null;
-                var  debugTarget = !setting.realtimeMode || ranToneMap
+                var debugTarget = !setting.realtimeMode || ranToneMap
                     ? texPool.ProcessedOutputColor
                     : texPool.DlssRrOutput;
                 _shaderDebugDrawPass.Setup(passCtx, debugTarget, displayResolution);
@@ -549,10 +561,11 @@ namespace PathTracing
             _stablePlanesDebugVizPass?.Dispose();
             _stablePlanesDebugVizPass = null;
             _shaderDebugDrawPass?.Dispose();
-            _shaderDebugDrawPass      = null;
-            _shaderDebugBeginPass     = null;
-            _outputBlitPass           = null;
-            _depthBarrierFixPass      = null;
+            _shaderDebugDrawPass  = null;
+            _shaderDebugBeginPass?.Dispose();
+            _shaderDebugBeginPass = null;
+            _outputBlitPass       = null;
+            _depthBarrierFixPass  = null;
 
 
             foreach (var p in _texturePools.Values) p.Dispose();
@@ -988,26 +1001,26 @@ namespace PathTracing
             const string shaderRoot = "Assets/RTXPT/Shaders";
 
             // Phase 2a/2d: PathTracer RT shaders
-            buildStablePlanesShader     = LoadRs($"{shaderRoot}/BuildStablePlanes");
-            fillStablePlanesShader      = LoadRs($"{shaderRoot}/FillStablePlanes");
-            referenceShader             = LoadRs($"{shaderRoot}/Reference");
-            exportVisibilityBufferCs    = LoadCs($"{shaderRoot}/ProcessingPasses/ExportVisibilityBuffer");
-            denoiseSpecHitTCs           = LoadCs($"{shaderRoot}/ProcessingPasses/DenoisingGuidesBaker_DenoiseSpecHitT");
-            dlssBeforeCs                = LoadCs($"{shaderRoot}/ProcessingPasses/PostProcess_DenoiserPrepareInputsDlssRR");
-            bloomDownsampleRasterShader = LoadRas($"{shaderRoot}/ToneMapper/BloomDownsample");
-            bloomBlurRasterShader       = LoadRas($"{shaderRoot}/ToneMapper/BloomBlur");
-            bloomCompositeRasterShader  = LoadRas($"{shaderRoot}/ToneMapper/BloomComposite");
-            luminanceRasterShader       = LoadRas($"{shaderRoot}/ToneMapper/Luminance");
-            luminanceMipCs              = LoadCs($"{shaderRoot}/ToneMapper/LuminanceMip");
-            captureLuminanceCs          = LoadCs($"{shaderRoot}/ToneMapper/capture_cs");
-            toneMapApplyRasterShader    = LoadRas($"{shaderRoot}/ToneMapper/ToneMapping");
-            accumulationCs              = LoadCs($"{shaderRoot}/ProcessingPasses/AccumulationPass");
-            stablePlanesDebugVizCs      = LoadCs($"{shaderRoot}/ProcessingPasses/PostProcess_StablePlanesDebugViz");
+            buildStablePlanesShader              = LoadRs($"{shaderRoot}/BuildStablePlanes");
+            fillStablePlanesShader               = LoadRs($"{shaderRoot}/FillStablePlanes");
+            referenceShader                      = LoadRs($"{shaderRoot}/Reference");
+            exportVisibilityBufferCs             = LoadCs($"{shaderRoot}/ProcessingPasses/ExportVisibilityBuffer");
+            denoiseSpecHitTCs                    = LoadCs($"{shaderRoot}/ProcessingPasses/DenoisingGuidesBaker_DenoiseSpecHitT");
+            dlssBeforeCs                         = LoadCs($"{shaderRoot}/ProcessingPasses/PostProcess_DenoiserPrepareInputsDlssRR");
+            bloomDownsampleRasterShader          = LoadRas($"{shaderRoot}/ToneMapper/BloomDownsample");
+            bloomBlurRasterShader                = LoadRas($"{shaderRoot}/ToneMapper/BloomBlur");
+            bloomCompositeRasterShader           = LoadRas($"{shaderRoot}/ToneMapper/BloomComposite");
+            luminanceRasterShader                = LoadRas($"{shaderRoot}/ToneMapper/Luminance");
+            luminanceMipCs                       = LoadCs($"{shaderRoot}/ToneMapper/LuminanceMip");
+            captureLuminanceCs                   = LoadCs($"{shaderRoot}/ToneMapper/capture_cs");
+            toneMapApplyRasterShader             = LoadRas($"{shaderRoot}/ToneMapper/ToneMapping");
+            accumulationCs                       = LoadCs($"{shaderRoot}/ProcessingPasses/AccumulationPass");
+            stablePlanesDebugVizCs               = LoadCs($"{shaderRoot}/ProcessingPasses/PostProcess_StablePlanesDebugViz");
             shaderDebugTrianglesRasterShader     = LoadRas($"{shaderRoot}/ShaderDebug/ShaderDebugTriangles");
             shaderDebugLinesRasterShader         = LoadRas($"{shaderRoot}/ShaderDebug/ShaderDebugLines");
             shaderDebugFeedbackLinesRasterShader = LoadRas($"{shaderRoot}/ShaderDebug/ShaderDebugFeedbackLines");
             shaderDebugBlendVizRasterShader      = LoadRas($"{shaderRoot}/ShaderDebug/ShaderDebugBlendViz");
-            skinnedRepackCs             = UnityEditor.AssetDatabase.LoadAssetAtPath<ComputeShader>($"{shaderRoot}/Misc/SkinnedRepack.compute");
+            skinnedRepackCs                      = UnityEditor.AssetDatabase.LoadAssetAtPath<ComputeShader>($"{shaderRoot}/Misc/SkinnedRepack.compute");
             if (skinnedRepackCs == null)
                 Debug.LogWarning($"[NativeRtxptFeature] Missing ComputeShader at: {shaderRoot}/Misc/SkinnedRepack.compute");
 
@@ -1031,15 +1044,17 @@ namespace PathTracing
             processFeedbackHistoryPreFilterCs = LoadCs($"{lightRoot}/ProcessFeedbackHistoryPreFilter");
             processFeedbackHistoryP0Cs        = LoadCs($"{lightRoot}/ProcessFeedbackHistoryP0");
 
-            processFeedbackHistoryP1aCs = LoadCs($"{lightRoot}/ProcessFeedbackHistoryP1a");
-            processFeedbackHistoryP1bCs = LoadCs($"{lightRoot}/ProcessFeedbackHistoryP1b");
-            processFeedbackHistoryP2Cs  = LoadCs($"{lightRoot}/ProcessFeedbackHistoryP2");
-            processFeedbackHistoryP3Cs  = LoadCs($"{lightRoot}/ProcessFeedbackHistoryP3");
-            clearFeedbackHistoryCs      = LoadCs($"{lightRoot}/ClearFeedbackHistory");
+            processFeedbackHistoryP1aCs      = LoadCs($"{lightRoot}/ProcessFeedbackHistoryP1a");
+            processFeedbackHistoryP1bCs      = LoadCs($"{lightRoot}/ProcessFeedbackHistoryP1b");
+            processFeedbackHistoryP2Cs       = LoadCs($"{lightRoot}/ProcessFeedbackHistoryP2");
+            processFeedbackHistoryP3Cs       = LoadCs($"{lightRoot}/ProcessFeedbackHistoryP3");
+            clearFeedbackHistoryCs           = LoadCs($"{lightRoot}/ClearFeedbackHistory");
+            debugDrawLightsCs                = LoadCs($"{lightRoot}/DebugDrawLights");
+            processFeedbackHistoryDebugVizCs = LoadCs($"{lightRoot}/ProcessFeedbackHistoryDebugViz");
 
             UnityEditor.EditorUtility.SetDirty(this);
             return;
-
+ 
             static NativeComputeShader LoadCs(string path)
             {
                 var s = UnityEditor.AssetDatabase.LoadAssetAtPath<NativeComputeShader>(path + ".computeshader");
