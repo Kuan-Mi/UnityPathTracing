@@ -166,8 +166,10 @@ namespace PathTracing
         public bool  EnvBaked;
 
         /// <summary>
-        /// Hash of the inputs (directional lights, sky texture, tint/intensity) used for the
-        /// last bake. The baker re-bakes only when this changes — equivalent to the original
+        /// Hash of the inputs used for the last bake: the env baker constants (directional
+        /// lights, scale color, background type) plus the sky texture identity and update count.
+        /// Tint/intensity are NOT included — they are applied at sample time, not baked. The
+        /// baker re-bakes only when this changes — equivalent to the original
         /// EnvMapBaker::Update <c>contentsChanged</c> early-out.
         /// </summary>
         public ulong EnvBakeSignature;

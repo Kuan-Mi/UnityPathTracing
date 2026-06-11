@@ -16,10 +16,10 @@ MonoBehaviour:
   setting:
     realtimeMode: 1
     realtimeAA: 3
-    upscalerMode: 2
+    upscalerMode: 3
     cameraJitter: 1
     cameraAperture: 0
-    cameraFocalDistance: 0.5
+    cameraFocalDistance: 10000
     realtimeSamplesPerPixel: 1
     bounceCount: 18
     diffuseBounceCount: 2
@@ -90,12 +90,12 @@ MonoBehaviour:
     environmentMapEnabled: 1
     environmentMapIntensity: 1
     environmentMapTint: {r: 1, g: 1, b: 1, a: 1}
-    environmentMap: {fileID: 8900000, guid: 2495a36711fb9464ba7a46811ac56985, type: 3}
+    environmentMap: {fileID: 8900000, guid: 2f36c92edfbce6e4cb7792dbe3fea7a7, type: 3}
     enableToneMapping: 1
     toneMapOperator: 4
     autoExposure: 0
     exposureCompensation: -1.54
-    exposureValue: -4.17
+    exposureValue: -4.23919
     exposureValueMin: -16
     exposureValueMax: 16
     filmSpeed: 100
@@ -108,7 +108,7 @@ MonoBehaviour:
     toneMapClamped: 1
     showValidation: 0
     enableShaderDebug: 1
-    showDebugLines: 1
+    showDebugLines: 0
     debugLineScale: 0.05
     debugPixelX: 368
     debugPixelY: 151

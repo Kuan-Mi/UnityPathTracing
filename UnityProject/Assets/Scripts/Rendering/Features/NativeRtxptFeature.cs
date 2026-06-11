@@ -334,7 +334,17 @@ namespace PathTracing
                 frameState.frameIndex       = 0;
             }
 
-            frameState.Update(renderingData, texturesChanged, 1.0f, setting);
+            // ---- Gather scene lights once (shared by env baker + lighting pass) ----
+            // Both consumers previously each ran their own full-scene FindObjectsByType<Light>;
+            // gathering once here halves that per-camera cost.
+            var sceneLights = UnityEngine.Object.FindObjectsByType<Light>(FindObjectsSortMode.None);
+
+            // Env bake gating must be decided before frameState.Update so a re-bake resets
+            // accumulation this frame — original: Sample.cpp:1383, if (m_envMapBaker->Update(...))
+            // m_ui.ResetAccumulation = true.
+            bool envMapChanged = _envMapBakerPass.PrepareBake(setting, sceneLights, texPool);
+
+            frameState.Update(renderingData, texturesChanged || envMapChanged, 1.0f, setting);
 
             // ---- Build & upload SampleConstants -----------------------------
             // Pre-exposed gray luminance comes from the tone-mapping pass's auto-exposure read-back
@@ -349,11 +359,6 @@ namespace PathTracing
             sampleConstants = NativeRtxptConstantsBuilder.Build(renderingData, setting, renderResolution, displayResolution, frameState, preExposedGrayLuminance, _gpuScene.MaterialDataCount);
 
             constantBuffer.Upload(renderer, sampleConstants);
-
-            // ---- Gather scene lights once (shared by env baker + lighting pass) ----
-            // Previously both passes each ran their own full-scene FindObjectsByType<Light>;
-            // gathering once here halves that per-camera cost.
-            var sceneLights = UnityEngine.Object.FindObjectsByType<Light>(FindObjectsSortMode.None);
 
             // ---- Build shared pass context ----------------------------------
             passCtx ??= new NativeRtxptPassContext();

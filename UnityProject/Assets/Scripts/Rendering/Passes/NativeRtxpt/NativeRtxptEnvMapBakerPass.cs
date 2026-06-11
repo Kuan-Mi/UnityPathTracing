@@ -135,6 +135,10 @@ namespace PathTracing
         // skipped this frame. Mirrors the original EnvMapBaker::Update contentsChanged early-out.
         private bool _skipBake;
 
+        // Debug escape hatch mirroring the original m_dbgForceDynamic ("Force dynamic" checkbox,
+        // EnvMapBaker.cpp:429,712): when true the cache is bypassed and the bake runs every frame.
+        public static bool DebugForceDynamic = false;
+
         public NativeRtxptEnvMapBakerPass(NativeComputeShader baseLayerCs, NativeComputeShader mipReduceCs, NativeComputeShader importanceBakerCs, NativeComputeShader mipMapGenCs, NativeComputeShader bc6uCompressCs = null)
         {
             _baseLayerCs       = new NativeComputePipeline(baseLayerCs);
@@ -195,36 +199,53 @@ namespace PathTracing
             return (IntPtr)_copyRing[ring].GetUnsafePtr();
         }
 
-        public void Setup(NativeRtxptPassContext ctx)
+        /// <summary>
+        /// Decides whether anything that affects the baked cube/importance maps changed since this
+        /// camera's last bake — the C# equivalent of EnvMapBaker::Update's contentsChanged gating
+        /// (EnvMapBaker.cpp:425-459): renderPassesDirty (fresh/resized textures, source change) is
+        /// covered by <c>tex.EnvBaked</c>, the per-light isnear comparison and source-path change by
+        /// the constants/identity signature. Must run before RtxptCameraFrameState.Update so a
+        /// re-bake resets accumulation the same frame, mirroring Sample.cpp:1383-1384
+        /// (<c>if (m_envMapBaker->Update(...)) m_ui.ResetAccumulation = true;</c>).
+        /// Returns true when a bake will be recorded this frame.
+        /// </summary>
+        public bool PrepareBake(NativeRtxptSetting setting, Light[] sceneLights, NativeRtxptTextureResources tex)
         {
-            _ctx = ctx;
-            FillEnvBakerConstants(ctx.Setting, ctx.SceneLights);
-            FillImportanceBakerConstants();
+            FillEnvBakerConstants(setting, sceneLights);
 
-            // Decide whether anything that affects the baked cube/importance map changed since
-            // this camera's last bake. If not, skip the whole pass (the textures persist across
-            // frames). This matches the original EnvMapBaker, which only re-bakes on change.
-            var   tex       = ctx.Textures;
-            var   skyTex    = ctx.Setting?.environmentMap;
-            int   skyId     = skyTex != null ? skyTex.GetInstanceID() : 0;
-            ulong signature = ComputeEnvSignature(skyId);
+            Texture sky      = setting?.environmentMap;
+            int     skyId    = sky != null ? sky.GetInstanceID() : 0;
+            uint    skyEdits = sky != null ? sky.updateCount : 0u; // bumps on CPU uploads (Apply etc.)
+            ulong   signature = ComputeEnvSignature(skyId, skyEdits);
 
-            // DEBUG: caching temporarily disabled — force a re-bake every frame (mirrors the
-            // original EnvMapBaker m_dbgForceDynamic). Revert to re-enable the cache:
-            //   _skipBake = tex.EnvBaked && tex.EnvBakeSignature == signature;
-            _skipBake = false;
+            // A RenderTexture source can be rewritten on the GPU without any CPU-observable change
+            // (updateCount does not track compute/UAV writes), so treat it as dynamic and re-bake
+            // every frame — the role the (animated) procedural sky plays in the original.
+            bool dynamicSource = sky is RenderTexture;
+
+            _skipBake = !DebugForceDynamic && !dynamicSource
+                        && tex.EnvBaked && tex.EnvBakeSignature == signature;
             if (!_skipBake)
             {
                 // The bake is guaranteed to be recorded this frame, so mark it done now.
                 tex.EnvBaked         = true;
                 tex.EnvBakeSignature = signature;
             }
+
+            return !_skipBake;
+        }
+
+        public void Setup(NativeRtxptPassContext ctx)
+        {
+            _ctx = ctx;
+            FillImportanceBakerConstants();
         }
 
         // FNV-1a hash over the env baker constants (directional lights, scale color, counts,
-        // background type) plus the sky texture identity — the same inputs the original baker
-        // compares to detect changes.
-        private static unsafe ulong ComputeEnvSignature(int skyTextureId)
+        // background type) plus the sky texture identity & update count — the same inputs the
+        // original baker compares to detect changes (exact bytes instead of dm::isnear, which is
+        // strictly more conservative: tiny changes re-bake instead of being missed).
+        private static unsafe ulong ComputeEnvSignature(int skyTextureId, uint skyUpdateCount)
         {
             ulong h = 14695981039346656037UL;
             fixed (EnvMapBakerCB* p = &s_envBakerCb)
@@ -239,6 +260,8 @@ namespace PathTracing
             }
 
             h ^= (uint)skyTextureId;
+            h *= 1099511628211UL;
+            h ^= skyUpdateCount;
             h *= 1099511628211UL;
             return h;
         }
