@@ -123,7 +123,7 @@ namespace PathTracing
             // C++ has a media-list Override combo; Unity overrides via an explicit texture
             // (the env cube otherwise bakes directional lights only).
             s.environmentMap = (Texture)EditorGUILayout.ObjectField(
-                new GUIContent("Override", "Equirectangular HDR environment map baked into the env cube (t_SrcEquirectangularEnvMap). None = directional lights only."),
+                new GUIContent("Override", "HDR environment map baked into the env cube: an equirectangular Texture2D or a Cubemap. None = directional lights only."),
                 s.environmentMap, typeof(Texture), false);
 
             EditorGUILayout.Space(2);
@@ -140,9 +140,6 @@ namespace PathTracing
             s.cameraAperture = Mathf.Clamp(EditorGUILayout.FloatField("Aperture", s.cameraAperture), 0f, 1f);
             s.cameraFocalDistance = Mathf.Clamp(
                 EditorGUILayout.FloatField("Focal Distance", s.cameraFocalDistance), 0.001f, 1e16f);
-            s.cameraMoveSpeed = EditorGUILayout.Slider(
-                new GUIContent("Keyboard move speed", "Unused in Unity — the camera is driven by Unity components."),
-                s.cameraMoveSpeed, 0.1f, 10.0f);
             s.cameraJitter = EditorGUILayout.Toggle(
                 new GUIContent("Camera jitter (Unity)", "Viewport jitter for AA/upscalers (C++ derives this from the AA mode)."),
                 s.cameraJitter);

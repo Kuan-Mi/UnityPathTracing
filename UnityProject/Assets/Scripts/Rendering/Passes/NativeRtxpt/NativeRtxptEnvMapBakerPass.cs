@@ -260,6 +260,9 @@ namespace PathTracing
             internal EnvMapBakerCB              EnvBakerCbData;
             internal ImportanceBakerCB          ImportanceCbData;
             internal IntPtr                     SkyTexturePtr;
+            // True when SkyTexturePtr is a cubemap (DepthOrArraySize==6) source, so it must bind to
+            // t_SrcCubemapEnvMap (BackgroundSourceType==2) rather than the equirectangular 2D slot.
+            internal bool                       SourceIsCube;
             internal IntPtr                     EnvCubePtr;
             internal IntPtr                     ImportanceMapPtr;
             internal IntPtr                     RadianceMapPtr;
@@ -298,6 +301,9 @@ namespace PathTracing
             pd.EnvBakerCbData    = s_envBakerCb;
             pd.ImportanceCbData  = s_importanceCb; 
             pd.SkyTexturePtr     = _ctx.environmentMapPtrPtr != IntPtr.Zero ? _ctx.environmentMapPtrPtr : _ctx.blackTexturePtr;
+            // A real cube source only counts when its native pointer is bound; otherwise SkyTexturePtr
+            // fell back to the 2D black dummy and must use the equirectangular path.
+            pd.SourceIsCube      = _ctx.environmentMapPtrPtr != IntPtr.Zero && IsCubeTexture(_ctx.Setting?.environmentMap);
             pd.EnvCubePtr        = _ctx.Textures.EnvCubemap.NativePtr;
             pd.ImportanceMapPtr  = _ctx.Textures.EnvImportanceMap.NativePtr;
             pd.RadianceMapPtr    = _ctx.Textures.EnvRadianceMap.NativePtr;
@@ -338,8 +344,21 @@ namespace PathTracing
                 var ds = data.BaseLayerDs;
                 data.EnvBakerCb.UploadDirect(context.cmd, data.EnvBakerCbData); // single-value overload
                 ds.SetConstantBuffer("g_Const", data.EnvBakerCb);
-                ds.SetTexture("t_SrcEquirectangularEnvMap", data.SkyTexturePtr);
-                ds.SetTexture("t_SrcCubemapEnvMap", data.DummyCubePtr);
+                // The source background is sampled as either an equirectangular Texture2D
+                // (BackgroundSourceType==1) or a TextureCube (==2). Bind the real source to its
+                // matching slot and a dummy of the right dimension to the other so neither SRV is
+                // null. The native plugin auto-selects a TEXTURECUBE SRV for a DepthOrArraySize==6
+                // resource, so a Unity Cubemap pointer binds correctly to t_SrcCubemapEnvMap.
+                if (data.SourceIsCube)
+                {
+                    ds.SetTexture("t_SrcEquirectangularEnvMap", data.DummyTex2DPtr);
+                    ds.SetTexture("t_SrcCubemapEnvMap", data.SkyTexturePtr);
+                }
+                else
+                {
+                    ds.SetTexture("t_SrcEquirectangularEnvMap", data.SkyTexturePtr);
+                    ds.SetTexture("t_SrcCubemapEnvMap", data.DummyCubePtr);
+                }
                 ds.SetTexture("t_LowResPrePassCube", data.DummyCubePtr);
                 ds.SetTexture("t_ProcSkyTransmittance", data.DummyTex2DPtr);
                 ds.SetTexture("t_ProcSkyScatter", data.DummyTex2DPtr);
@@ -486,7 +505,9 @@ namespace PathTracing
                 lightCount++;
             }
 
-            bool hasSky = setting?.environmentMap != null;
+            Texture sky = setting?.environmentMap;
+            // 0 - disabled; 1 - equirectangular Texture2D; 2 - TextureCube (EnvMapBaker.hlsl).
+            uint backgroundSourceType = sky == null ? 0u : (IsCubeTexture(sky) ? 2u : 1u);
 
             // Original (EnvMapBaker.cpp:480): ScaleColor is the constant radiance-compression
             // factor only. Tint/intensity are applied at sample time via ColorMultiplier
@@ -500,7 +521,15 @@ namespace PathTracing
             cb.CubeDim               = CubeDim;
             cb.CubeDimLowRes         = CubeDimLowRes;
             cb.ProcSkyEnabled        = 0;
-            cb.BackgroundSourceType  = hasSky ? 1u : 0u;
+            cb.BackgroundSourceType  = backgroundSourceType;
+        }
+
+        // A Cubemap, or a Cube-dimension RenderTexture, is baked via the TextureCube source path
+        // (BackgroundSourceType==2); everything else is treated as an equirectangular Texture2D.
+        private static bool IsCubeTexture(Texture tex)
+        {
+            return tex is Cubemap
+                || (tex is RenderTexture rt && rt.dimension == TextureDimension.Cube);
         }
 
         private static void FillImportanceBakerConstants()

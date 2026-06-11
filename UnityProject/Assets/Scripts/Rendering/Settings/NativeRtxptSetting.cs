@@ -48,7 +48,6 @@ namespace PathTracing
         public bool  cameraJitter        = true;
         public float cameraAperture      = 0.0f;
         public float cameraFocalDistance = 10000.0f;
-        public float cameraMoveSpeed     = 1.0f;
 
         // ── Path tracer quality ───────────────────────────────────────────────
         /// <summary>Samples per pixel per frame (realtime). SampleUIData::RealtimeSamplesPerPixel.</summary>
@@ -178,7 +177,8 @@ namespace PathTracing
         public bool      environmentMapEnabled   = true;
         public float     environmentMapIntensity = 1.0f;
         public Color     environmentMapTint      = Color.white;
-        /// <summary>Equirectangular HDR environment map. Bound as t_EnvironmentMap (t10).</summary>
+        /// <summary>HDR environment map: either an equirectangular Texture2D or a Cubemap. Baked into
+        /// the radiance cube (t_EnvironmentMap, t10) by NativeRtxptEnvMapBakerPass.</summary>
         public Texture environmentMap          = null;
 
         // ── Tone mapping ──────────────────────────────────────────────────────
