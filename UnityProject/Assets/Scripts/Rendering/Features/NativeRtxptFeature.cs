@@ -512,6 +512,17 @@ namespace PathTracing
             }
 
             renderer.EnqueuePass(_depthBarrierFixPass);
+
+#if UNITY_EDITOR
+            // Auto-exposure converges through a 1–2 frame GPU→CPU read-back lag (see
+            // NativeRtxptToneMappingMipChainPass), so it only updates if the view keeps rendering
+            // frames. Outside Play mode the Scene/Game view repaints only on interaction, which left
+            // exposure frozen until the mouse moved over the Inspector. Keep the editor ticking while
+            // auto-exposure is active so the read-back keeps flowing without manual interaction.
+            if (!Application.isPlaying && setting != null && setting.realtimeMode &&
+                setting.enableToneMapping && setting.autoExposure)
+                RequestContinuousEditorRepaint();
+#endif
         }
 
         // ---- Helpers -------------------------------------------------------
@@ -807,6 +818,38 @@ namespace PathTracing
             UnityEditor.EditorApplication.update -= RepaintWhileDebugging;
             s_debugHooked                        =  false;
             s_debugSegments                      =  null;
+        }
+
+        // Continuous edit-mode repaint pump so temporally-fed effects (auto-exposure's lagged
+        // read-back, accumulation) keep converging without the user having to move the mouse.
+        // Re-armed every rendered frame from AddRenderPasses; unhooks shortly after the view stops
+        // rendering (feature removed / window closed) instead of spinning the GPU forever.
+        private static double s_editorRepaintExpiry;
+        private static bool   s_editorRepaintHooked;
+
+        private static void RequestContinuousEditorRepaint()
+        {
+            // Stay armed a beat past the last frame so we self-sustain while rendering but lapse
+            // once nothing is driving frames anymore.
+            s_editorRepaintExpiry = UnityEditor.EditorApplication.timeSinceStartup + 0.5;
+
+            if (s_editorRepaintHooked) return;
+            s_editorRepaintHooked                =  true;
+            UnityEditor.EditorApplication.update += PumpEditorRepaint;
+        }
+
+        private static void PumpEditorRepaint()
+        {
+            if (UnityEditor.EditorApplication.timeSinceStartup < s_editorRepaintExpiry)
+            {
+                // QueuePlayerLoopUpdate drives the Game view in edit mode; RepaintAll covers Scene views.
+                UnityEditor.EditorApplication.QueuePlayerLoopUpdate();
+                UnityEditor.SceneView.RepaintAll();
+                return;
+            }
+
+            UnityEditor.EditorApplication.update -= PumpEditorRepaint;
+            s_editorRepaintHooked                =  false;
         }
 #endif
 
