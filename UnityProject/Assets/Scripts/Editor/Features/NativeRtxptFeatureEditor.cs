@@ -472,6 +472,17 @@ namespace PathTracing
                 new GUIContent("Enable shader debug", "ShaderDebug machinery: DebugPrint → console, DebugLine/DebugTriangle drawing, viz overlay. Allocates a ~100 MB GPU buffer (same as the original)."),
                 s.enableShaderDebug);
 
+            var feature = (NativeRtxptFeature)target;
+            if (s.enableShaderDebug &&
+                (feature.shaderDebugTrianglesRasterShader == null || feature.shaderDebugLinesRasterShader == null ||
+                 feature.shaderDebugFeedbackLinesRasterShader == null || feature.shaderDebugBlendVizRasterShader == null))
+            {
+                EditorGUILayout.HelpBox(
+                    "ShaderDebug raster shaders are not assigned — the debug draw/readback pass is inactive " +
+                    "(no lines, overlay, or DebugPrint console output). Click 'Auto Fill Shaders' below.",
+                    MessageType.Warning);
+            }
+
             if (Foldout("DebugSwitches", "Debug switches"))
             {
                 using var __ = new EditorGUI.IndentLevelScope();
@@ -519,6 +530,11 @@ namespace PathTracing
                     s.debugLineScale = EditorGUILayout.FloatField(
                         new GUIContent("Debug line scale", "DebugConstants::debugLineScale (C++ default 0.05; 0 disables)."),
                         s.debugLineScale);
+                    if (!s.continuousDebugFeedback)
+                        EditorGUILayout.HelpBox(
+                            "Debug lines are only emitted for the picked pixel (IsDebugPixel gates every DrawLine) — " +
+                            "enable 'Continuous feedback' and point 'Debug pixel' at geometry (render-resolution coords).",
+                            MessageType.Info);
                 }
             }
 
