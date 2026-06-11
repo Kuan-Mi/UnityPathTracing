@@ -50,6 +50,8 @@ ScriptedImporter:
   targetProfile: lib_6_9
   maxPayloadSizeInBytes: 80
   rayGenName: RayGen_BUILD
+  rootConstantsHints: []
+  rootSRVHints: []
   samplerBindings:
   - Name: s_EnvironmentMapSampler
     Sampler: {fileID: 11400000, guid: 56b0e93e78c14055953d8d697b5a16fc, type: 2}
