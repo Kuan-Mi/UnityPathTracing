@@ -885,6 +885,7 @@ _FORMATS = {
     "DXGI_FORMAT_R16G16B16A16_UNORM": (np.uint16, 4, 8, 65535.0, False),
     "DXGI_FORMAT_R32G32_FLOAT":       (np.float32, 2, 8, None, False),
     "DXGI_FORMAT_R32_FLOAT":          (np.float32, 1, 4, None, False),
+    "DXGI_FORMAT_R16G16_FLOAT":       (np.float16, 2, 4, None, False),
     "DXGI_FORMAT_R16_FLOAT":          (np.float16, 1, 2, None, False),
     "DXGI_FORMAT_R8G8B8A8_UNORM":      (np.uint8, 4, 4, 255.0, False),
     "DXGI_FORMAT_R8G8B8A8_UNORM_SRGB": (np.uint8, 4, 4, 255.0, True),
