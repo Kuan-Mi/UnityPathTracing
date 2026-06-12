@@ -339,20 +339,23 @@ namespace PathTracing
             // gathering once here halves that per-camera cost.
             var sceneLights = UnityEngine.Object.FindObjectsByType<Light>(FindObjectsSortMode.None);
 
+            // ---- Resolve URP Volume overrides -------------------------------
+            // Apply optional per-scene / per-region Volume overrides for environment-map and exposure
+            // settings. Clone-on-write: `effectiveSetting` stays the authored `setting` until an
+            // override is actually active, so the serialized inspector object is never mutated. Done
+            // before PrepareBake so env-map overrides drive this frame's bake gating.
+            var effectiveSetting = setting;
+            NativeRtxptEnvironmentMapVolume.ApplyOverrides(ref effectiveSetting, setting);
+            NativeRtxptExposureVolume.ApplyOverrides(ref effectiveSetting, setting);
+
             // Env bake gating must be decided before frameState.Update so a re-bake resets
             // accumulation this frame — original: Sample.cpp:1383, if (m_envMapBaker->Update(...))
             // m_ui.ResetAccumulation = true.
-            bool envMapChanged = _envMapBakerPass.PrepareBake(setting, sceneLights, texPool);
+            bool envMapChanged = _envMapBakerPass.PrepareBake(effectiveSetting, sceneLights, texPool);
 
-            frameState.Update(renderingData, texturesChanged || envMapChanged, 1.0f, setting);
+            frameState.Update(renderingData, texturesChanged || envMapChanged, 1.0f, effectiveSetting);
 
             // ---- Build & upload SampleConstants -----------------------------
-            // Apply optional URP Volume overrides for exposure / auto-exposure (per-scene or
-            // per-region control). Returns the authored `setting` unchanged when no Volume override
-            // is active, otherwise a per-frame clone with the blended overrides applied so the
-            // serialized inspector settings are never mutated.
-            var effectiveSetting = NativeRtxptExposureVolume.ApplyOverrides(setting);
-
             // Pre-exposed gray luminance comes from the tone-mapping pass's auto-exposure read-back
             // (populated by the previous frame's GPU→CPU copy, mirroring the original's 1-2 frame lag).
             // The pass instance persists across frames, so its last captured value is available here even

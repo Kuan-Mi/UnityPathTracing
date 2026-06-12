@@ -37,6 +37,35 @@ MonoBehaviour:
   shutter:
     m_OverrideState: 0
     m_Value: 1
+--- !u!114 &-1750273009853561106
+MonoBehaviour:
+  m_ObjectHideFlags: 3
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 48d06e2c9b65f1c48a8be712b513c326, type: 3}
+  m_Name: NativeRtxptEnvironmentMapVolume
+  m_EditorClassIdentifier: Assembly-CSharp::PathTracing.NativeRtxptEnvironmentMapVolume
+  active: 1
+  environmentMapEnabled:
+    m_OverrideState: 1
+    m_Value: 1
+  environmentMap:
+    m_OverrideState: 0
+    m_Value: {fileID: 0}
+    dimension: 1
+  environmentMapIntensity:
+    m_OverrideState: 0
+    m_Value: 1
+  environmentMapTint:
+    m_OverrideState: 0
+    m_Value: {r: 1, g: 1, b: 1, a: 1}
+  environmentMapDiffuseSampleMIPLevel:
+    m_OverrideState: 0
+    m_Value: 2
 --- !u!114 &11400000
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -51,3 +80,4 @@ MonoBehaviour:
   m_EditorClassIdentifier: Unity.RenderPipelines.Core.Runtime::UnityEngine.Rendering.VolumeProfile
   components:
   - {fileID: -2528170761884391034}
+  - {fileID: -1750273009853561106}

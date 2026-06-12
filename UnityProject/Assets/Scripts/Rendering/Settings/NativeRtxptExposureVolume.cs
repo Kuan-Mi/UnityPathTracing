@@ -52,27 +52,32 @@ namespace PathTracing
             fNumber.overrideState || shutter.overrideState;
 
         /// <summary>
-        /// Returns the exposure settings for the currently rendering camera: the authored
-        /// <paramref name="baseSetting"/> when no Volume override is active, otherwise a clone with the
-        /// active (blended) overrides applied. URP updates <c>VolumeManager.instance.stack</c> for the
-        /// rendering camera before render passes are set up, so this reflects the camera's Volumes.
+        /// Overlays the active (blended) exposure overrides onto the per-frame settings. Uses a
+        /// clone-on-write pattern: <paramref name="setting"/> is replaced with a clone of
+        /// <paramref name="authored"/> the first time any override is applied, so the serialized
+        /// inspector object is never mutated and chained volume overrides share one clone. URP updates
+        /// <c>VolumeManager.instance.stack</c> for the rendering camera before render passes set up, so
+        /// this reflects the camera's Volumes.
         /// </summary>
-        public static NativeRtxptSetting ApplyOverrides(NativeRtxptSetting baseSetting)
+        public static void ApplyOverrides(ref NativeRtxptSetting setting, NativeRtxptSetting authored)
         {
-            if (baseSetting == null)
-                return null;
+            if (authored == null)
+                return;
 
             // VolumeManager isn't ready during early editor/domain-reload frames; querying the stack
             // before it's initialized throws (baseComponentTypeArray). Skip overrides until then.
             var mgr = VolumeManager.instance;
             if (mgr == null || !mgr.isInitialized || mgr.stack == null)
-                return baseSetting;
+                return;
 
             var v = mgr.stack.GetComponent<NativeRtxptExposureVolume>();
             if (v == null || !v.IsActive())
-                return baseSetting;
+                return;
 
-            var s = baseSetting.Clone();
+            if (ReferenceEquals(setting, authored))
+                setting = authored.Clone();
+
+            var s = setting;
             if (v.autoExposure.overrideState)         s.autoExposure         = v.autoExposure.value;
             if (v.exposureCompensation.overrideState) s.exposureCompensation = v.exposureCompensation.value;
             if (v.exposureValueMin.overrideState)     s.exposureValueMin     = v.exposureValueMin.value;
@@ -81,7 +86,6 @@ namespace PathTracing
             if (v.filmSpeed.overrideState)            s.filmSpeed            = v.filmSpeed.value;
             if (v.fNumber.overrideState)              s.fNumber              = v.fNumber.value;
             if (v.shutter.overrideState)              s.shutter              = v.shutter.value;
-            return s;
         }
     }
 }
