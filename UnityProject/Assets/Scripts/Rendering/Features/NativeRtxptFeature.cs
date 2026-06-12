@@ -68,10 +68,10 @@ namespace PathTracing
         public NativeRasterShader bloomCompositeRasterShader;
 
         // Phase 7: Tone mapping — faithful native replica of RTXPT ToneMappingPasses.cpp, built from the
-        // original shaders as thin verbatim #include wrappers: luminance_ps (raster) → native mip reduce
-        // → capture_cs → CPU read-back → ToneMapping main_ps (raster).
+        // original shaders as thin verbatim #include wrappers: luminance_ps (raster) → donut
+        // mipmapgen_cs mip reduce (shared mipMapGenCs asset) → capture_cs → CPU read-back →
+        // ToneMapping main_ps (raster).
         public NativeRasterShader  luminanceRasterShader; // Luminance.rastershader (= fullscreen_vs + luminance_ps)
-        public NativeComputeShader luminanceMipCs; // LuminanceMip.computeshader
         public NativeComputeShader captureLuminanceCs; // capture_cs.computeshader (= ToneMapping.hlsl capture_cs)
         public NativeRasterShader  toneMapApplyRasterShader; // ToneMapping.rastershader (= fullscreen_vs + main_ps)
 
@@ -228,7 +228,7 @@ namespace PathTracing
             _dlssRrPrepareInputsPass  ??= new NativeRtxptDlssRRPrepareInputsPass(dlssBeforeCs) { renderPassEvent                                                                        = renderPassEvent };
             _dlssRRPass               ??= new DlssRRPass { renderPassEvent                                                                                                              = renderPassEvent };
             _bloomPass                ??= new NativeRtxptBloomPass(bloomDownsampleRasterShader, bloomBlurRasterShader, bloomCompositeRasterShader) { renderPassEvent                    = renderPassEvent };
-            _toneMappingMipChainPass  ??= new NativeRtxptToneMappingMipChainPass(luminanceRasterShader, luminanceMipCs, captureLuminanceCs, toneMapApplyRasterShader) { renderPassEvent = renderPassEvent };
+            _toneMappingMipChainPass  ??= new NativeRtxptToneMappingMipChainPass(luminanceRasterShader, mipMapGenCs, captureLuminanceCs, toneMapApplyRasterShader) { renderPassEvent   = renderPassEvent };
             _accumulationPass         ??= new NativeRtxptAccumulationPass(accumulationCs) { renderPassEvent                                                                             = renderPassEvent };
             _stablePlanesDebugVizPass ??= new NativeRtxptStablePlanesDebugVizPass(stablePlanesDebugVizCs) { renderPassEvent                                                             = renderPassEvent };
             // The begin pass also clears the debug-viz texture; it reuses the blend-viz shader
@@ -1034,7 +1034,6 @@ namespace PathTracing
             bloomBlurRasterShader                = LoadRas($"{shaderRoot}/ToneMapper/BloomBlur");
             bloomCompositeRasterShader           = LoadRas($"{shaderRoot}/ToneMapper/BloomComposite");
             luminanceRasterShader                = LoadRas($"{shaderRoot}/ToneMapper/Luminance");
-            luminanceMipCs                       = LoadCs($"{shaderRoot}/ToneMapper/LuminanceMip");
             captureLuminanceCs                   = LoadCs($"{shaderRoot}/ToneMapper/capture_cs");
             toneMapApplyRasterShader             = LoadRas($"{shaderRoot}/ToneMapper/ToneMapping");
             accumulationCs                       = LoadCs($"{shaderRoot}/ProcessingPasses/AccumulationPass");

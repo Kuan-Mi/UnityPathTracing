@@ -151,6 +151,12 @@ public static class RenderPassMarkers
     public static readonly NamedMarker NisSharpening = new(ProfilerCategory.Render, "NIS Sharpening", MarkerFlags.SampleGPU);
 
     
+    // RTXPT ToneMappingPasses.cpp marker strings, byte-for-byte: "Luminance" wraps the luminance
+    // draw + donut MipMapGen::Dispatch mip chain + capture_cs + read-back copy; "ToneMapping" wraps
+    // the tone-map apply draw.
+    public static readonly NamedMarker RtxptLuminance = new(ProfilerCategory.Render, "Luminance", MarkerFlags.SampleGPU);
+    public static readonly NamedMarker RtxptToneMapping = new(ProfilerCategory.Render, "ToneMapping", MarkerFlags.SampleGPU);
+
     public static readonly NamedMarker Acc = new(ProfilerCategory.Render, "Acc", MarkerFlags.SampleGPU);
     public static readonly NamedMarker AutoExposure = new(ProfilerCategory.Render, "Auto Exposure", MarkerFlags.SampleGPU);
     public static readonly NamedMarker Taa = new(ProfilerCategory.Render, "TAA", MarkerFlags.SampleGPU);

@@ -17,8 +17,8 @@ namespace PathTracing
     ///
     ///   1. luminance  — Luminance.rastershader (= donut fullscreen_vs + RTXPT luminance_ps.hlsl)
     ///                   writes log2-luminance into mip-0 of a pow2 luminance pyramid.
-    ///   2. mip reduce — LuminanceMip.computeshader (donut MipMapGenPass-style 2x2 box average,
-    ///                   native compute via a bindless per-mip UAV array) builds the pyramid.
+    ///   2. mip reduce — mipmapgen_cs.computeshader (donut passes/mipmapgen_cs.hlsl MODE_COLOR,
+    ///                   verbatim: t_input SRV mip + u_output UAV mip array) builds the pyramid.
     ///   3. capture    — capture_cs.computeshader (= ToneMapping.hlsl capture_cs, verbatim) copies the
     ///                   1x1 top mip (log2 geometric-mean luminance) into a 1-float UAV buffer.
     ///   4. read-back  — the buffer is read to the CPU (UploadBuffer.RequestReadback/TryGetReadback) and
@@ -27,11 +27,12 @@ namespace PathTracing
     ///   5. apply      — ToneMapping.rastershader (= donut fullscreen_vs + RTXPT ToneMapping.hlsl main_ps,
     ///                   verbatim, TONEMAPPING_AUTOEXPOSURE_CPU==1 path) tone-maps the HDR source.
     ///
-    /// The only non-verbatim shader is LuminanceMip (donut's mipmapgen_cs uses a bounded UAV array +
-    /// per-mip SRV that the native binding model doesn't support); the math is the same box average.
+    /// PIX markers mirror ToneMappingPasses.cpp: "Luminance" { draw, "MipMapGen::Dispatch" { mip
+    /// dispatches }, capture, read-back copy } then "ToneMapping" { apply draw }.
     /// </summary>
     public class NativeRtxptToneMappingMipChainPass : ScriptableRenderPass, IDisposable
     {
+        private const uint kR16F    = (uint)DXGI_FORMAT.DXGI_FORMAT_R16_FLOAT;
         private const uint kR32F    = (uint)DXGI_FORMAT.DXGI_FORMAT_R32_FLOAT;
         private const uint kRGBA16F = (uint)DXGI_FORMAT.DXGI_FORMAT_R16G16B16A16_FLOAT;
 
@@ -46,13 +47,14 @@ namespace PathTracing
             public uint    enabled, _padding0, _padding1, _padding2;
         }
 
-        // c_Mip — root constants for LuminanceMip.computeshader (donut algorithm, bounded-UAV-array form).
+        // donut MipmmapGenConstants (mipmapgen_cb.h): { uint dispatch; uint numLODs; uint padding[2]; }.
+        // Bound as root constants for mipmapgen_cs.computeshader (varies per pass).
         [StructLayout(LayoutKind.Sequential)]
-        private struct MipConstants
+        private struct MipMapGenCB
         {
+            public uint dispatch;   // pass index
             public uint numLODs;    // output mips this pass (1..NUM_LODS)
-            public uint inW, inH;   // input-mip dimensions (edge clamping)
-            public uint padding;
+            public uint padding0, padding1;
         }
 
         // donut MipMapGenPass constants (GROUP_SIZE / NUM_LODS / MAX_PASSES).
@@ -81,7 +83,7 @@ namespace PathTracing
         private readonly IntPtr[] _applyColorRes = new IntPtr[1];
         private readonly uint[]   _applyColorFmt = { kRGBA16F };
         private readonly IntPtr[] _lumColorRes   = new IntPtr[1];
-        private readonly uint[]   _lumColorFmt   = { kR32F }; // single-channel log-luminance pyramid
+        private readonly uint[]   _lumColorFmt   = { kR16F }; // single-channel log-luminance pyramid
 
         // ── Resolution-dependent ──
         private NriTextureResource _lumTex;
@@ -93,14 +95,14 @@ namespace PathTracing
 
         public NativeRtxptToneMappingMipChainPass(
             NativeRasterShader  luminanceRasterShader,
-            NativeComputeShader luminanceMipCs,
+            NativeComputeShader mipMapGenCs,
             NativeComputeShader captureCs,
             NativeRasterShader  toneMapRasterShader)
         {
             _lumRaster   = new NativeRasterPipeline(luminanceRasterShader,
-                               NativeRenderPlugin.RasterPipelineStateDesc.FullscreenOpaque(kR32F));
+                               NativeRenderPlugin.RasterPipelineStateDesc.FullscreenOpaque(kR16F));
             _lumDs       = new NativeRasterDescriptorSet(_lumRaster);
-            _mipCs       = new NativeComputePipeline(luminanceMipCs);
+            _mipCs       = new NativeComputePipeline(mipMapGenCs);
             _mipDs       = new NativeComputeDescriptorSet(_mipCs);
             _captureCs   = new NativeComputePipeline(captureCs);
             _captureDs   = new NativeComputeDescriptorSet(_captureCs);
@@ -155,10 +157,10 @@ namespace PathTracing
 
             _lumW = w; _lumH = h;
 
-            // Single-channel R32_FLOAT log-luminance pyramid. luminance_ps writes float4(logLum,0,0,1) →
-            // only .r is stored; the mip shader's RWTexture2D<float> and capture_cs's Texture2D<float>
-            // both bind it exactly (R32_FLOAT supports UAV typed load/store on all hardware).
-            _lumTex ??= new NriTextureResource("Luminance Texture", GraphicsFormat.R32_SFloat,
+            // Single-channel R16_FLOAT log-luminance pyramid — the format ToneMappingPasses.cpp picks
+            // for non-RGBA32F sources. luminance_ps writes float4(logLum,0,0,1) → only .r is stored;
+            // mipmapgen_cs's typed views and capture_cs's Texture2D<float> read it back component-wise.
+            _lumTex ??= new NriTextureResource("Luminance Texture", GraphicsFormat.R16_SFloat,
                             new NriResourceState { accessBits = AccessBits.SHADER_RESOURCE_STORAGE,
                                                    layout = Layout.SHADER_RESOURCE_STORAGE, stageBits = 1 << 10 });
             _lumTex.Allocate(new int2(w, h), 1, useMipMap: true);
@@ -265,10 +267,12 @@ namespace PathTracing
         private static unsafe void ExecutePass(PassData data, UnsafeGraphContext context)
         {
             var cmd = CommandBufferHelpers.GetNativeCommandBuffer(context.cmd);
-            cmd.BeginSample(RenderPassMarkers.ToneMapping);
 
             if (data.AutoExposure && data.LumTexPtr != IntPtr.Zero && data.MipDs != null)
             {
+                // "Luminance" marker (ToneMappingPasses.cpp:220) wraps draw + mip chain + capture + copy.
+                cmd.BeginSample(RenderPassMarkers.RtxptLuminance);
+
                 // 1. luminance → mip 0 (raster, verbatim luminance_ps).
                 var lds = data.LumDs;
                 lds.SetTexture("gColorTex", data.SourcePtr);
@@ -281,29 +285,31 @@ namespace PathTracing
                 };
                 data.LumRaster.Draw(cmd, lds, in lumDraw);
 
-                // 2. mip reduction — donut MipMapGenPass algorithm: each pass reduces NUM_LODS mips from
-                //    input mip (i*NUM_LODS) via a 16x16 groupshared reduction. The bounded UAV array u_mips
-                //    spans [inputMip .. inputMip+4] (u_mips[0]=input, [1..4]=outputs) — all-UAV so the whole
-                //    pyramid stays in UNORDERED_ACCESS (Unity's per-resource tracker can't split mip states).
-                int nmip = data.MipCount;
-                var mds  = data.MipDs;
+                // 2. mip reduction — donut MipMapGenPass::Dispatch replicated exactly (same scheme as
+                //    NativeRtxptEnvMapBakerPass.GenerateDonutMipChain): pass i reads mip i*NUM_LODS via
+                //    the t_input SRV and writes mips i*NUM_LODS+1.. via the u_output UAV array, with the
+                //    base-mip group count for EVERY pass (donut over-dispatches; out-of-range UAV writes
+                //    are dropped). The native per-subresource barriers make the SRV-read-mip /
+                //    UAV-write-mips split on one resource legal under Unity's per-resource state tracker.
+                cmd.BeginSample(RenderPassMarkers.RtxptEnvMapMipMapGen); // "MipMapGen::Dispatch"
+                int  nmip    = data.MipCount;
+                var  mds     = data.MipDs;
+                uint groupsX = (uint)((data.LumW + kGroupSize - 1) / kGroupSize);
+                uint groupsY = (uint)((data.LumH + kGroupSize - 1) / kGroupSize);
                 for (int i = 0; i < kMaxPasses; i++)
                 {
                     int inputMip = i * kNumLods;
                     if (inputMip >= nmip) break;
-                    int inW = Mathf.Max(1, data.LumW >> inputMip);
-                    int inH = Mathf.Max(1, data.LumH >> inputMip);
-                    var mc = new MipConstants
-                    {
-                        numLODs = (uint)Mathf.Min(nmip - inputMip - 1, kNumLods),
-                        inW = (uint)inW, inH = (uint)inH,
-                    };
-                    mds.SetRWTextureMipArray("u_mips", data.LumTexPtr, inputMip); // bounded UAV array: input + 4 outputs
-                    mds.SetRootConstants("c_Mip", &mc, 4);
-                    data.MipCs.Dispatch(cmd, mds,
-                        (uint)((inW + kGroupSize - 1) / kGroupSize),
-                        (uint)((inH + kGroupSize - 1) / kGroupSize), 1);
+                    int numLODs = Mathf.Min(nmip - inputMip - 1, kNumLods);
+                    if (numLODs <= 0) break;
+
+                    var mc = new MipMapGenCB { dispatch = (uint)i, numLODs = (uint)numLODs };
+                    mds.SetTexture("t_input", data.LumTexPtr, inputMip, 1); // SRV: MostDetailedMip = inputMip, 1 mip
+                    mds.SetRWTextureMipArray("u_output", data.LumTexPtr, inputMip + 1); // UAV array: mips inputMip+1 .. +NUM_LODS
+                    mds.SetRootConstants("c_MipMapgen", &mc, 4);
+                    data.MipCs.Dispatch(cmd, mds, groupsX, groupsY, 1);
                 }
+                cmd.EndSample(RenderPassMarkers.RtxptEnvMapMipMapGen);
 
                 // 3. capture top mip → 1-float UAV buffer (verbatim capture_cs).
                 var cds = data.CaptureDs;
@@ -313,10 +319,14 @@ namespace PathTracing
 
                 // 4. queue the GPU→CPU read-back of the captured value (consumed in Setup next frame).
                 data.AvgLumBuffer.RequestReadback(cmd, 0, 1);
+
+                cmd.EndSample(RenderPassMarkers.RtxptLuminance);
             }
 
-            // 5. tone-map apply (raster, verbatim main_ps) → ProcessedOutputColor.
-            //    Auto-exposure reads gParams.avgLuminance (CPU-fed in BuildConstants).
+            // 5. tone-map apply (raster, verbatim main_ps) → ProcessedOutputColor, under the original's
+            //    "ToneMapping" marker (ToneMappingPasses.cpp:295). Auto-exposure reads
+            //    gParams.avgLuminance (CPU-fed in BuildConstants).
+            cmd.BeginSample(RenderPassMarkers.RtxptToneMapping);
             data.ApplyCb.UploadDirect(context.cmd, data.Cb);
             var ads = data.ApplyDs;
             ads.SetConstantBuffer("PerImageCB", data.ApplyCb);
@@ -330,8 +340,7 @@ namespace PathTracing
                 vertexCount = 4, instanceCount = 1,   // donut fullscreen_vs.hlsl = 4-vertex triangle strip
             };
             data.ApplyRaster.Draw(cmd, ads, in applyDraw);
-
-            cmd.EndSample(RenderPassMarkers.ToneMapping);
+            cmd.EndSample(RenderPassMarkers.RtxptToneMapping);
         }
     }
 }
