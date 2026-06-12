@@ -62,39 +62,18 @@ namespace PathTracing
         private NativeRtxptPassContext _ctx;
         private readonly uint[] _header = new uint[NativeRtxptBufferResources.ShaderDebugHeaderBytes / 4];
 
-        // Zero-vertex draw with clearColor=true — clears DebugVizOutput inside the native
-        // plugin's state tracking. Reuses the blend-viz shader purely for pipeline creation.
-        private readonly NativeRasterPipeline      _clearRaster; // null when shader not assigned
-        private readonly NativeRasterDescriptorSet _clearDs;
-        private readonly uint[]   _clearFmt = { kRGBA16F };
-        private readonly IntPtr[] _clearRes = new IntPtr[1];
-
-        public NativeRtxptShaderDebugBeginPass(NativeRasterShader vizClearShader = null)
-        {
-            if (vizClearShader == null) return;
-            var state = NativeRenderPlugin.RasterPipelineStateDesc.FullscreenOpaque(kRGBA16F);
-            _clearRaster = new NativeRasterPipeline(vizClearShader, state);
-            _clearDs     = new NativeRasterDescriptorSet(_clearRaster);
-        }
-
         public void Dispose()
         {
-            _clearDs?.Dispose();
-            _clearRaster?.Dispose();
         }
 
         public void Setup(NativeRtxptPassContext ctx) => _ctx = ctx;
 
         private class PassData
         {
-            internal GraphicsBuffer            Buffer;
-            internal uint[]                    Header;
-            internal NativeRasterPipeline      ClearRaster;
-            internal NativeRasterDescriptorSet ClearDs;
-            internal uint[]                    ClearFmt;
-            internal IntPtr[]                  ClearRes;
-            internal NativeRtxptPassContext    Ctx;
-            internal bool                      ClearViz;
+            internal GraphicsBuffer Buffer;
+            internal uint[]         Header;
+            internal IntPtr         VizPtr;
+            internal bool           ClearViz;
         }
 
         public override void RecordRenderGraph(RenderGraph renderGraph, ContextContainer frameData)
@@ -132,37 +111,20 @@ namespace PathTracing
                             || fs.accumulationSampleIndex == (s.accumulationPreWarmRealtimeCaches ? -32 : 0);
 
             using var builder = renderGraph.AddUnsafePass<PassData>("ShaderDebugBegin", out var pd);
-            pd.Buffer      = buffer;
-            pd.Header      = _header;
-            pd.ClearRaster = _clearRaster;
-            pd.ClearDs     = _clearDs;
-            pd.ClearFmt    = _clearFmt;
-            pd.ClearRes    = _clearRes;
-            pd.Ctx         = _ctx;
-            pd.ClearViz    = clearViz;
+            pd.Buffer   = buffer;
+            pd.Header   = _header;
+            pd.VizPtr   = _ctx.Textures.ShaderDebugViz.NativePtr;
+            pd.ClearViz = clearViz;
             builder.AllowPassCulling(false);
             builder.SetRenderFunc((PassData data, UnsafeGraphContext context) =>
             {
                 var cmd = CommandBufferHelpers.GetNativeCommandBuffer(context.cmd);
                 cmd.SetBufferData(data.Buffer, data.Header);
 
-                if (data.ClearViz && data.ClearRaster != null)
-                {
-                    // Fullscreen opaque draw sampling the black dummy texture → writes (0,0,0,0)
-                    // to every pixel (plus clearColor for good measure). Binding the viz texture
-                    // itself as the SRV while it is the render target would be a hazard.
-                    data.ClearDs.SetTexture("t_DebugVizOutput", data.Ctx.blackTexturePtr);
-                    data.ClearRes[0] = data.Ctx.Textures.ShaderDebugViz.NativePtr;
-                    var draw = new RasterDrawDesc
-                    {
-                        numRenderTargets = 1, colorResources = data.ClearRes, colorFormats = data.ClearFmt,
-                        depthResource = IntPtr.Zero,
-                        clearColor = true, clearColorValue = new Color(0, 0, 0, 0),
-                        viewport = new Rect(0, 0, data.Ctx.RenderResolution.x, data.Ctx.RenderResolution.y),
-                        vertexCount = 4, instanceCount = 1,
-                    };
-                    data.ClearRaster.Draw(cmd, data.ClearDs, in draw);
-                }
+                // ClearUnorderedAccessViewFloat, exactly like the original's
+                // ShaderDebug::ClearDebugVizTexture → nvrhi clearTextureFloat (UAV path).
+                if (data.ClearViz)
+                    NativeTextureClear.ClearUavFloat(cmd, data.VizPtr, kRGBA16F, new Color(0, 0, 0, 0));
             });
         }
 

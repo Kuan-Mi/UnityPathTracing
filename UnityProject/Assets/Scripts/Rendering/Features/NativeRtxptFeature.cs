@@ -231,9 +231,9 @@ namespace PathTracing
             _toneMappingMipChainPass  ??= new NativeRtxptToneMappingMipChainPass(luminanceRasterShader, mipMapGenCs, captureLuminanceCs, toneMapApplyRasterShader) { renderPassEvent   = renderPassEvent };
             _accumulationPass         ??= new NativeRtxptAccumulationPass(accumulationCs) { renderPassEvent                                                                             = renderPassEvent };
             _stablePlanesDebugVizPass ??= new NativeRtxptStablePlanesDebugVizPass(stablePlanesDebugVizCs) { renderPassEvent                                                             = renderPassEvent };
-            // The begin pass also clears the debug-viz texture; it reuses the blend-viz shader
-            // for a clear-only raster pipeline (null = header reset only, no clear).
-            _shaderDebugBeginPass     ??= new NativeRtxptShaderDebugBeginPass(shaderDebugBlendVizRasterShader) { renderPassEvent                                                        = renderPassEvent };
+            // The begin pass also clears the debug-viz texture via the plugin's UAV-clear event
+            // (ClearUnorderedAccessViewFloat, matching the original's nvrhi clearTextureFloat).
+            _shaderDebugBeginPass     ??= new NativeRtxptShaderDebugBeginPass { renderPassEvent                                                                                          = renderPassEvent };
             if (_shaderDebugDrawPass == null
                 && shaderDebugTrianglesRasterShader != null && shaderDebugLinesRasterShader != null
                 && shaderDebugFeedbackLinesRasterShader != null && shaderDebugBlendVizRasterShader != null)

@@ -1408,6 +1408,114 @@ NR_GetClearNativeGpuBufferCallbackPtr()
     return NR_ClearNativeGpuBufferCallback;
 }
 
+// ===========================================================================
+// Texture UAV clear (ClearUnorderedAccessViewFloat)
+//   Replicates nvrhi CommandList::clearTextureFloat for UAV textures (d3d12-
+//   texture.cpp): one ClearUnorderedAccessViewFloat per mip, no pipeline, no
+//   draw — the path the original RTXPT uses for e.g. DebugVizOutput.
+// ===========================================================================
+
+// Must match the blob layout written by C# NativeTextureClear.ClearUavFloat.
+#pragma pack(push, 4)
+struct ClearTextureUavFloatEventData
+{
+    uint64_t textureResource; // ID3D12Resource* (Unity GetNativeTexturePtr)
+    uint32_t format;          // DXGI_FORMAT for the UAV; UNKNOWN derives from the resource desc
+    float    color[4];
+};
+#pragma pack(pop)
+
+// ---------------------------------------------------------------------------
+// NR_ClearTextureUavFloatCallback
+//   Render-thread callback (IssuePluginEventAndData).
+//   data = ClearTextureUavFloatEventData blob from NR_NSB_AllocFlushBuffer;
+//   freed here. Descriptor handling mirrors NR_ClearNativeGpuBufferCallback,
+//   except the shader-visible slots come from the fence-reclaimed transient
+//   ring: the GPU reads them at execution, so they must not be recycled within
+//   the frame. The CPU-only slot is consumed at record time and is safe to
+//   rewrite per mip.
+// ---------------------------------------------------------------------------
+static void UNITY_INTERFACE_API NR_ClearTextureUavFloatCallback(int /*eventId*/, void* data)
+{
+    if (!data) return;
+    const ClearTextureUavFloatEventData ed = *static_cast<ClearTextureUavFloatEventData*>(data);
+    std::free(data);
+
+    auto* res = reinterpret_cast<ID3D12Resource*>(ed.textureResource);
+    if (!s_RendererReady || !s_D3D12 || !res || !s_ClearCpuHeap) return;
+
+    UnityGraphicsD3D12RecordingState rs = {};
+    if (!s_D3D12->CommandRecordingState(&rs) || !rs.commandList) return;
+    auto* cmdList = static_cast<ID3D12GraphicsCommandList*>(rs.commandList);
+
+    ID3D12Device* device = s_D3D12->GetDevice();
+    if (!device) return;
+
+    const D3D12_RESOURCE_DESC rd = res->GetDesc();
+    if (rd.Dimension != D3D12_RESOURCE_DIMENSION_TEXTURE2D)
+    {
+        NR_WARN("NR_ClearTextureUavFloatCallback: resource is not a Texture2D");
+        return;
+    }
+
+    const uint32_t    mipLevels = rd.MipLevels ? rd.MipLevels : 1u;
+    const DXGI_FORMAT fmt       = (ed.format != DXGI_FORMAT_UNKNOWN)
+                                      ? static_cast<DXGI_FORMAT>(ed.format) : rd.Format;
+
+    uint32_t   slotBase = g_transientRing.IsInitialized() ? g_transientRing.Allocate(mipLevels)
+                                                          : UINT32_MAX;
+    const bool fromRing = slotBase != UINT32_MAX;
+    if (!fromRing) slotBase = s_DescHeap.Allocate(mipLevels);
+
+    ResourceStateTracker tracker(s_D3D12v8);
+    tracker.Require(res, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
+
+    D3D12HeapHook::BeginPluginDispatch();
+
+    // The GPU handle must live in the heap currently set on the command list.
+    ID3D12DescriptorHeap* heaps[] = { s_DescHeap.GetHeap() };
+    cmdList->SetDescriptorHeaps(1, heaps);
+
+    for (uint32_t mip = 0; mip < mipLevels; ++mip)
+    {
+        D3D12_UNORDERED_ACCESS_VIEW_DESC u = {};
+        u.Format = fmt;
+        if (rd.DepthOrArraySize > 1)
+        {
+            u.ViewDimension                  = D3D12_UAV_DIMENSION_TEXTURE2DARRAY;
+            u.Texture2DArray.MipSlice        = mip;
+            u.Texture2DArray.FirstArraySlice = 0;
+            u.Texture2DArray.ArraySize       = rd.DepthOrArraySize;
+        }
+        else
+        {
+            u.ViewDimension      = D3D12_UAV_DIMENSION_TEXTURE2D;
+            u.Texture2D.MipSlice = mip;
+        }
+
+        D3D12_CPU_DESCRIPTOR_HANDLE cpuHandle = s_ClearCpuHeap->GetCPUDescriptorHandleForHeapStart();
+        device->CreateUnorderedAccessView(res, nullptr, &u, cpuHandle);
+        device->CreateUnorderedAccessView(res, nullptr, &u, s_DescHeap.GetCPUHandle(slotBase + mip));
+
+        cmdList->ClearUnorderedAccessViewFloat(s_DescHeap.GetGPUHandle(slotBase + mip),
+                                               cpuHandle, res, ed.color, 0, nullptr);
+    }
+
+    D3D12HeapHook::EndPluginDispatch();
+
+    tracker.Notify(res, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, /*uavAccess=*/true);
+
+    if (!fromRing) s_DescHeap.Free(slotBase, mipLevels);
+
+    D3D12HeapHook::RestoreUnityHeaps(cmdList);
+}
+
+extern "C" UnityRenderingEventAndData UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API
+NR_GetClearTextureUavFloatCallbackPtr()
+{
+    return NR_ClearTextureUavFloatCallback;
+}
+
 
 // ---------------------------------------------------------------------------
 // NR_NSB_AllocFlushBuffer

@@ -571,12 +571,14 @@ namespace PathTracing
             _ptMaterialCpu  = matTable.Materials.ToArray();
             _geomDebugCpu   = geomDbgList.ToArray();
 
-            // Ranges mode: per-frame transform updates touch only the moved instances,
-            // so we upload just those sub-ranges rather than a full-buffer span.
+            // Whole mode: one CopyBufferRegion spanning the dirty [min,max) element span per
+            // flush, matching donut's WriteInstanceBuffer single full-array writeBuffer (one
+            // copy per frame) instead of one copy per moved renderer. At 112 B/instance the
+            // extra bytes in the span are cheaper than dozens of tiny copy commands.
             // Debug names match the original RTXPT/donut debugName strings (donut Scene.cpp
             // "Instances"/"BindlessGeometry", Sample.cpp "Instances", MaterialsBaker.cpp
             // "PTMaterialDataStorage", OmmBaker.cpp "BindlessGeometryDebug") for PIX parity.
-            _instanceGpuBuf = new UploadBuffer(_instanceCpu.Length, Marshal.SizeOf<DonutInstanceData>(), debugName: "Instances");
+            _instanceGpuBuf = new UploadBuffer(_instanceCpu.Length, Marshal.SizeOf<DonutInstanceData>(), UploadBuffer.UploadMode.Whole, debugName: "Instances");
             _instanceGpuBuf.SetData(_instanceCpu, 0, _instanceCpu.Length);
 
             _geometryGpuBuf = new GraphicsBuffer(GraphicsBuffer.Target.Structured, _geometryCpu.Length, Marshal.SizeOf<DonutGeometryData>()) { name = "BindlessGeometry" };

@@ -476,6 +476,16 @@ namespace NativeRender
         [DllImport(DllName)]
         public static extern IntPtr NR_GetClearNativeGpuBufferCallbackPtr();
 
+        /// <summary>
+        /// Returns the render-event callback pointer that clears a UAV-capable D3D12 texture via
+        /// ClearUnorderedAccessViewFloat (nvrhi clearTextureFloat equivalent — no pipeline, no
+        /// draw). Pass a <c>ClearTextureUavFloatEventData</c> blob (allocated via
+        /// <see cref="NR_NSB_AllocFlushBuffer"/>, see <see cref="NativeTextureClear"/>) as the data
+        /// argument of <c>cmd.IssuePluginEventAndData</c>; the callback frees it.
+        /// </summary>
+        [DllImport(DllName)]
+        public static extern IntPtr NR_GetClearTextureUavFloatCallbackPtr();
+
         /// <summary>Returns the current element capacity of the buffer.</summary>
         [DllImport(DllName)]
         public static extern uint NR_NSB_GetCapacity(ulong handle);
