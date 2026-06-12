@@ -147,21 +147,13 @@ namespace PathTracing
         /// <summary>m_dbgFreezeFrustumUpdates — freeze + draw the frustum used by importance boosts.</summary>
         public bool neeatDbgFreezeFrustumUpdates = false;
 
-        public bool useReSTIRDI = false;
-        public bool useReSTIRGI = false;
 
         // ── Material / shading features ───────────────────────────────────────
-        public bool normalMap            = true;
-        public bool specularLobeTrimming = true;
-        public bool importanceSampling   = true;
+
         public bool enableLDSamplerForBSDF = true;
-        public bool indirectDiffuse      = true;
-        public bool indirectSpecular     = true;
         public bool enableRussianRoulette = true;
-        public bool emission             = true;
         [Range(0, 2)]
         public int  nestedDielectricsQuality = 1; // 0=off, 1=fast, 2=quality
-        public bool usePrevFrame         = true;
         public bool useFp16Types         = true;
 
         // ── Ray-tracing pipeline (compile-time macros, applied via shader-macro sync) ──
@@ -200,7 +192,6 @@ namespace PathTracing
         [Range(0f, 8192f)]
         public float dlssrrBrightnessClampK  = 4096.0f;
         public float dlssrrMicroJitter       = 0.1f;
-        public bool  disableReSTIRsWithDLSSRR = true;
         public bool  tmpDisableDlssRR        = false;
 
         // ── Bloom ─────────────────────────────────────────────────────────────
@@ -309,5 +300,12 @@ namespace PathTracing
 
         // ── Misc ──────────────────────────────────────────────────────────────
         public bool skipRightEyeInVR = true;
+
+        /// <summary>
+        /// Shallow copy used to build a per-frame snapshot when URP Volume overrides
+        /// (see <see cref="NativeRtxptExposureVolume"/>) are applied on top of the authored
+        /// inspector values, so the serialized settings are never mutated.
+        /// </summary>
+        public NativeRtxptSetting Clone() => (NativeRtxptSetting)MemberwiseClone();
     }
 }

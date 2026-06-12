@@ -347,16 +347,20 @@ namespace PathTracing
             frameState.Update(renderingData, texturesChanged || envMapChanged, 1.0f, setting);
 
             // ---- Build & upload SampleConstants -----------------------------
+            // Apply optional URP Volume overrides for exposure / auto-exposure (per-scene or
+            // per-region control). Returns the authored `setting` unchanged when no Volume override
+            // is active, otherwise a per-frame clone with the blended overrides applied so the
+            // serialized inspector settings are never mutated.
+            var effectiveSetting = NativeRtxptExposureVolume.ApplyOverrides(setting);
+
             // Pre-exposed gray luminance comes from the tone-mapping pass's auto-exposure read-back
             // (populated by the previous frame's GPU→CPU copy, mirroring the original's 1-2 frame lag).
             // The pass instance persists across frames, so its last captured value is available here even
             // though this frame's tone-mapping pass hasn't recorded yet.
-            float preExposedGrayLuminance = _toneMappingMipChainPass != null
-                ? _toneMappingMipChainPass.GetPreExposedGrayLuminance(setting)
-                : 1.0f;
+            float preExposedGrayLuminance = _toneMappingMipChainPass.GetPreExposedGrayLuminance(effectiveSetting);
             // MaterialCount (Sample.cpp:2095 = GetMaterialDataCount): shaders bounds-check material
             // indices against it (Bridge::loadIoR / loadHomogeneousVolumeData) — 0 disables IoR/volumes.
-            sampleConstants = NativeRtxptConstantsBuilder.Build(renderingData, setting, renderResolution, displayResolution, frameState, preExposedGrayLuminance, _gpuScene.MaterialDataCount);
+            sampleConstants = NativeRtxptConstantsBuilder.Build(renderingData, effectiveSetting, renderResolution, displayResolution, frameState, preExposedGrayLuminance, _gpuScene.MaterialDataCount);
 
             constantBuffer.Upload(renderer, sampleConstants);
 
@@ -370,7 +374,7 @@ namespace PathTracing
             passCtx.RenderResolution  = renderResolution;
             passCtx.DisplayResolution = displayResolution;
             passCtx.FrameState        = frameState;
-            passCtx.Setting           = setting;
+            passCtx.Setting           = effectiveSetting;
             passCtx.SceneLights       = sceneLights;
             passCtx.blackTexturePtr   = blackTexturePtr;
 
