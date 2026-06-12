@@ -9,9 +9,7 @@ set OUT_DIR=RenderingPlugin\_Build\%CONFIG%
 :: NRD/NRI are built externally; fall back to their Debug output if the
 :: requested configuration was never built there.
 set NRD_DIR=RenderingPlugin\_ExternalBuild\NRD_build\%CONFIG%
-if not exist "%NRD_DIR%\NRD.dll" set NRD_DIR=RenderingPlugin\_ExternalBuild\NRD_build\Debug
 set NRI_DIR=RenderingPlugin\_ExternalBuild\NRI_build\%CONFIG%
-if not exist "%NRI_DIR%\NRI.dll" set NRI_DIR=RenderingPlugin\_ExternalBuild\NRI_build\Debug
 
 echo ============================================================
 echo  NativeRenderPlugin Build and Copy (%CONFIG%)
