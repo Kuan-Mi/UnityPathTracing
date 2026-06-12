@@ -16,7 +16,7 @@ MonoBehaviour:
   setting:
     realtimeMode: 1
     realtimeAA: 3
-    upscalerMode: 3
+    upscalerMode: 0
     cameraJitter: 1
     cameraAperture: 0
     cameraFocalDistance: 10000
@@ -46,24 +46,15 @@ MonoBehaviour:
     neeatSampleBakedEnvironment: 1
     neeatImportanceBoostPreFilter: 1
     neeatDbgDrawLights: 0
-    neeatDbgDrawTileLightConnections: 0
+    neeatDbgDrawTileLightConnections: 1
     neeatDbgFreezeUpdates: 0
     neeatDbgViewType: 0
     neeatDbgDisableJitter: 0
     neeatDbgDisableLastFrameFeedback: 0
     neeatDbgFreezeFrustumUpdates: 0
-    useReSTIRDI: 0
-    useReSTIRGI: 0
-    normalMap: 1
-    specularLobeTrimming: 1
-    importanceSampling: 1
     enableLDSamplerForBSDF: 1
-    indirectDiffuse: 1
-    indirectSpecular: 1
     enableRussianRoulette: 1
-    emission: 1
     nestedDielectricsQuality: 1
-    usePrevFrame: 1
     useFp16Types: 1
     dxHitObjectExtension: 1
     dxMaybeReorderThreads: 1
@@ -81,7 +72,6 @@ MonoBehaviour:
     denoiserRadianceClampK: 8
     dlssrrBrightnessClampK: 4096
     dlssrrMicroJitter: 0.1
-    disableReSTIRsWithDLSSRR: 1
     tmpDisableDlssRR: 0
     enableBloom: 1
     bloomRadius: 8
@@ -89,8 +79,9 @@ MonoBehaviour:
     environmentMapDiffuseSampleMIPLevel: 2
     environmentMapEnabled: 1
     environmentMapIntensity: 1
+    environmentMapRotationY: 180
     environmentMapTint: {r: 1, g: 1, b: 1, a: 1}
-    environmentMap: {fileID: 8900000, guid: 2f36c92edfbce6e4cb7792dbe3fea7a7, type: 3}
+    environmentMap: {fileID: 8900000, guid: 81914d60359992741877d83b4b345e1a, type: 3}
     enableToneMapping: 1
     toneMapOperator: 4
     autoExposure: 1

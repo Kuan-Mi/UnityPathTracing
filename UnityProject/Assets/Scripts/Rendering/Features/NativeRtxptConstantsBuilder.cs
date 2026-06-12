@@ -215,14 +215,22 @@ namespace PathTracing
             float   envColMul  = envEnabled
                 ? setting.environmentMapIntensity / NativeRtxptEnvMapBakerPass.EnvMapRadianceScale
                 : 0f;
+ 
+            float rad       = setting.environmentMapRotationY * Mathf.Deg2Rad;
+            float s         = Mathf.Sin(rad);
+            float c         = Mathf.Cos(rad);
+
             var envMapParams = new EnvMapSceneParams
             {
-                TransformRow0    = new Vector4(1, 0, 0, 0),
-                TransformRow1    = new Vector4(0, 1, 0, 0),
-                TransformRow2    = new Vector4(0, 0, 1, 0),
-                InvTransformRow0 = new Vector4(1, 0, 0, 0),
-                InvTransformRow1 = new Vector4(0, 1, 0, 0),
-                InvTransformRow2 = new Vector4(0, 0, 1, 0),
+                // Standard Y-axis rotation matrix (World Transform)
+                TransformRow0 = new Vector4(c,  0, s, 0),
+                TransformRow1 = new Vector4(0,  1, 0, 0),
+                TransformRow2 = new Vector4(-s, 0, c, 0),
+
+                // Transpose of the rotation matrix (Inverse Transform)
+                InvTransformRow0 = new Vector4(c, 0, -s, 0),
+                InvTransformRow1 = new Vector4(0, 1, 0,  0),
+                InvTransformRow2 = new Vector4(s, 0, c,  0),
                 colorMultiplier  = new Vector3(envTintLin.r, envTintLin.g, envTintLin.b) * envColMul,
                 enabled          = envEnabled ? 1f : 0f,
             };

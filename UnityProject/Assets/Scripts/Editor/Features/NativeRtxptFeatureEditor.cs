@@ -130,6 +130,7 @@ namespace PathTracing
             EditorGUILayout.Space(2);
             s.environmentMapTint      = EditorGUILayout.ColorField("Tint Color", s.environmentMapTint);
             s.environmentMapIntensity = EditorGUILayout.FloatField("Intensity", s.environmentMapIntensity);
+            s.environmentMapRotationY = EditorGUILayout.FloatField("Rotation", s.environmentMapRotationY);
         }
 
         // ── Camera (SampleUI.cpp:669) ─────────────────────────────────────────

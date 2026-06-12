@@ -206,6 +206,7 @@ namespace PathTracing
         public int       environmentMapDiffuseSampleMIPLevel = 2;
         public bool      environmentMapEnabled   = true;
         public float     environmentMapIntensity = 1.0f;
+        public float     environmentMapRotationY = 0.0f;
         public Color     environmentMapTint      = Color.white;
         /// <summary>HDR environment map: either an equirectangular Texture2D or a Cubemap. Baked into
         /// the radiance cube (t_EnvironmentMap, t10) by NativeRtxptEnvMapBakerPass.</summary>

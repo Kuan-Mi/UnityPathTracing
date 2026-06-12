@@ -177,6 +177,7 @@ namespace PathTracing
             if (Setting.environmentMap == null)
             {
                 environmentMapPtrPtr = IntPtr.Zero;
+                lastEnvironmentMap  = null;
             }
             else if (lastEnvironmentMap != Setting.environmentMap)
             {

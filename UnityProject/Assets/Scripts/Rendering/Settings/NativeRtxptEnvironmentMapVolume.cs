@@ -29,6 +29,8 @@ namespace PathTracing
 
         /// <summary>Linear intensity multiplier applied to the environment radiance.</summary>
         public MinFloatParameter environmentMapIntensity = new MinFloatParameter(1.0f, 0f);
+        
+        public ClampedFloatParameter environmentMapRotationY = new ClampedFloatParameter(0f, 0f, 360f);
 
         /// <summary>Color tint multiplied into the environment radiance.</summary>
         public ColorParameter environmentMapTint = new ColorParameter(Color.white, hdr: false, showAlpha: false, showEyeDropper: true);
@@ -40,6 +42,7 @@ namespace PathTracing
         public bool IsActive() =>
             environmentMapEnabled.overrideState || environmentMap.overrideState ||
             environmentMapIntensity.overrideState || environmentMapTint.overrideState ||
+            environmentMapRotationY.overrideState ||
             environmentMapDiffuseSampleMIPLevel.overrideState;
 
         /// <summary>
@@ -71,6 +74,7 @@ namespace PathTracing
             if (v.environmentMapEnabled.overrideState)               s.environmentMapEnabled               = v.environmentMapEnabled.value;
             if (v.environmentMap.overrideState)                      s.environmentMap                      = v.environmentMap.value;
             if (v.environmentMapIntensity.overrideState)             s.environmentMapIntensity             = v.environmentMapIntensity.value;
+            if (v.environmentMapRotationY.overrideState)             s.environmentMapRotationY             = v.environmentMapRotationY.value;
             if (v.environmentMapTint.overrideState)                  s.environmentMapTint                  = v.environmentMapTint.value;
             if (v.environmentMapDiffuseSampleMIPLevel.overrideState) s.environmentMapDiffuseSampleMIPLevel = v.environmentMapDiffuseSampleMIPLevel.value;
         }

@@ -1,6 +1,6 @@
 %YAML 1.1
 %TAG !u! tag:unity3d.com,2011:
---- !u!114 &-2528170761884391034
+--- !u!114 &-4643817988733963927
 MonoBehaviour:
   m_ObjectHideFlags: 3
   m_CorrespondingSourceObject: {fileID: 0}
@@ -18,16 +18,16 @@ MonoBehaviour:
     m_Value: 1
   exposureCompensation:
     m_OverrideState: 1
-    m_Value: 0.6
+    m_Value: 1.3
   exposureValueMin:
     m_OverrideState: 1
     m_Value: -4
   exposureValueMax:
     m_OverrideState: 1
-    m_Value: 6
+    m_Value: 5
   exposureValue:
     m_OverrideState: 1
-    m_Value: -1
+    m_Value: -2
   filmSpeed:
     m_OverrideState: 0
     m_Value: 100
@@ -37,7 +37,22 @@ MonoBehaviour:
   shutter:
     m_OverrideState: 0
     m_Value: 1
---- !u!114 &-1750273009853561106
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: d7fd9488000d3734a9e00ee676215985, type: 3}
+  m_Name: Global Volume Profile
+  m_EditorClassIdentifier: Unity.RenderPipelines.Core.Runtime::UnityEngine.Rendering.VolumeProfile
+  components:
+  - {fileID: 4110438187449560187}
+  - {fileID: -4643817988733963927}
+--- !u!114 &4110438187449560187
 MonoBehaviour:
   m_ObjectHideFlags: 3
   m_CorrespondingSourceObject: {fileID: 0}
@@ -55,7 +70,7 @@ MonoBehaviour:
     m_Value: 1
   environmentMap:
     m_OverrideState: 1
-    m_Value: {fileID: 8900000, guid: c0ddf50de09ea5644bcf3a84a4f4a600, type: 3}
+    m_Value: {fileID: 8900000, guid: 81914d60359992741877d83b4b345e1a, type: 3}
     dimension: 1
   environmentMapIntensity:
     m_OverrideState: 0
@@ -69,18 +84,3 @@ MonoBehaviour:
   environmentMapDiffuseSampleMIPLevel:
     m_OverrideState: 0
     m_Value: 2
---- !u!114 &11400000
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 0}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: d7fd9488000d3734a9e00ee676215985, type: 3}
-  m_Name: Global Volume Profile
-  m_EditorClassIdentifier: Unity.RenderPipelines.Core.Runtime::UnityEngine.Rendering.VolumeProfile
-  components:
-  - {fileID: -2528170761884391034}
-  - {fileID: -1750273009853561106}
