@@ -1353,6 +1353,11 @@ namespace PathTracing
                 py = oy;
             }
 
+            // Mirrors C++/HLSL NDirToOctUnorm32: Encode_Oct applies *0.5+0.5 once ([-1,1]→[0,1]),
+            // then NDirToOctUnorm32 applies *0.5+0.5 a second time ([0,1]→[0.5,1.0]).
+            // The decoder (OctToNDirUnorm32 + Decode_Oct) inverts both steps with *2-1 twice.
+            px = px * 0.5f + 0.5f;
+            py = py * 0.5f + 0.5f;
             px = Mathf.Clamp01(px * 0.5f + 0.5f);
             py = Mathf.Clamp01(py * 0.5f + 0.5f);
             return ((uint)Mathf.RoundToInt(px * 0xFFFEu)) | (((uint)Mathf.RoundToInt(py * 0xFFFEu)) << 16);

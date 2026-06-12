@@ -98,7 +98,7 @@ MonoBehaviour:
     toneMapWhiteScale: 5.1
     toneMapClamped: 1
     showValidation: 0
-    enableShaderDebug: 1
+    enableShaderDebug: 0
     showDebugLines: 0
     debugLineScale: 0.05
     debugPixelX: 368
