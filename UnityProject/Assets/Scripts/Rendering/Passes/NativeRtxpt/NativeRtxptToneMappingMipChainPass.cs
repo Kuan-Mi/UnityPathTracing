@@ -145,13 +145,18 @@ namespace PathTracing
             //     Debug.LogWarning($"[ToneMapping] Avg luminance read-back not ready yet (frame lag), using last value log2(avg luminance) = {_avgLumLog2:F4}");
             // }
 
-            EnsureResources(ctx.DisplayResolution);
+            // Pyramid is sized from the RENDER resolution, replicating the original's quirk:
+            // Sample.cpp:1290 constructs ToneMappingPass with the render-res *m_view (the pyramid is
+            // pow2-floored from that view's extent at construction), while Render() runs with the
+            // display-res fullscreenView on the display-res HDR. The luminance draw simply samples
+            // the display-res source over the render-res-derived pow2 viewport (UV-based, lossless).
+            EnsureResources(ctx.RenderResolution);
         }
 
-        private void EnsureResources(int2 displayRes)
+        private void EnsureResources(int2 renderRes)
         {
-            int w = 1 << (int)Mathf.Floor(Mathf.Log(Mathf.Max(2, displayRes.x), 2f));
-            int h = 1 << (int)Mathf.Floor(Mathf.Log(Mathf.Max(2, displayRes.y), 2f));
+            int w = 1 << (int)Mathf.Floor(Mathf.Log(Mathf.Max(2, renderRes.x), 2f));
+            int h = 1 << (int)Mathf.Floor(Mathf.Log(Mathf.Max(2, renderRes.y), 2f));
             if (_lumTex != null && _lumTex.IsCreated && w == _lumW && h == _lumH)
                 return;
 

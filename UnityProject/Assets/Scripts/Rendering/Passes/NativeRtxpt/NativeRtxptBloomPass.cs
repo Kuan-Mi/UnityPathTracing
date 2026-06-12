@@ -127,7 +127,12 @@ namespace PathTracing
         {
             var s    = _ctx.Setting;
             var disp = _ctx.DisplayResolution;
-            var half    = new int2((disp.x + 1) / 2, (disp.y + 1) / 2);
+            // Intermediate sizes derive from the RENDER resolution (donut ceil(/2)), replicating the
+            // original's quirk: Sample.cpp constructs BloomPass with the render-res *m_view, so the
+            // first "Downscale" blit is a >2x reduction of the display-res HDR and the blur runs on
+            // quarter-render-res buffers, while the final Apply composites at display res.
+            var rend = _ctx.RenderResolution;
+            var half    = new int2((rend.x + 1) / 2, (rend.y + 1) / 2);
             var quarter = new int2((half.x + 1) / 2, (half.y + 1) / 2);
 
             // donut BloomPass::Render constant derivation.
@@ -182,6 +187,9 @@ namespace PathTracing
 
             cmd.BeginSample(RenderPassMarkers.Bloom);
 
+            // "Downscale" marker (donut BloomPass.cpp:189) wraps both half-scale blits.
+            cmd.BeginSample(RenderPassMarkers.RtxptBloomDownscale);
+
             // 1. Downsample HDR → half (blit_ps bilinear, opaque).
             {
                 var ds = data.Downsample1Ds;
@@ -209,6 +217,11 @@ namespace PathTracing
                 };
                 data.DownsampleRaster.Draw(cmd, ds, in draw);
             }
+
+            cmd.EndSample(RenderPassMarkers.RtxptBloomDownscale);
+
+            // "Blur" marker (donut BloomPass.cpp:220) wraps the H+V Gaussian draws.
+            cmd.BeginSample(RenderPassMarkers.RtxptBloomBlur);
 
             // 3a. Horizontal blur (quarter): downscale2 → pass1 (verbatim bloom_ps).
             {
@@ -242,6 +255,11 @@ namespace PathTracing
                 data.BlurRaster.Draw(cmd, ds, in draw);
             }
 
+            cmd.EndSample(RenderPassMarkers.RtxptBloomBlur);
+
+            // "Apply" marker (donut BloomPass.cpp:260) wraps the composite draw.
+            cmd.BeginSample(RenderPassMarkers.RtxptBloomApply);
+
             // 4. Composite blurred bloom back into the HDR image (display res, in place) via the
             //    constant-color blend: result = bloom*intensity + hdr*(1-intensity).
             {
@@ -256,6 +274,8 @@ namespace PathTracing
                 };
                 data.CompositeRaster.Draw(cmd, ds, in draw);
             }
+
+            cmd.EndSample(RenderPassMarkers.RtxptBloomApply);
 
             cmd.EndSample(RenderPassMarkers.Bloom);
         }

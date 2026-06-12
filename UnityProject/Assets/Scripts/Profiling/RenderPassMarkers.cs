@@ -157,6 +157,12 @@ public static class RenderPassMarkers
     public static readonly NamedMarker RtxptLuminance = new(ProfilerCategory.Render, "Luminance", MarkerFlags.SampleGPU);
     public static readonly NamedMarker RtxptToneMapping = new(ProfilerCategory.Render, "ToneMapping", MarkerFlags.SampleGPU);
 
+    // donut BloomPass.cpp marker strings, byte-for-byte, nested inside "Bloom": "Downscale" wraps
+    // the two half-scale blits, "Blur" the H+V Gaussian draws, "Apply" the composite draw.
+    public static readonly NamedMarker RtxptBloomDownscale = new(ProfilerCategory.Render, "Downscale", MarkerFlags.SampleGPU);
+    public static readonly NamedMarker RtxptBloomBlur = new(ProfilerCategory.Render, "Blur", MarkerFlags.SampleGPU);
+    public static readonly NamedMarker RtxptBloomApply = new(ProfilerCategory.Render, "Apply", MarkerFlags.SampleGPU);
+
     public static readonly NamedMarker Acc = new(ProfilerCategory.Render, "Acc", MarkerFlags.SampleGPU);
     public static readonly NamedMarker AutoExposure = new(ProfilerCategory.Render, "Auto Exposure", MarkerFlags.SampleGPU);
     public static readonly NamedMarker Taa = new(ProfilerCategory.Render, "TAA", MarkerFlags.SampleGPU);

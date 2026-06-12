@@ -8,7 +8,8 @@
 * into the HDR image in place. The pipeline uses blendMode 4 (SrcBlend=ConstantColor,
 * DestBlend=InvConstantColor) with RasterDrawDesc.blendFactor = bloom intensity, so
 * result = bloom*intensity + hdr*(1-intensity) = lerp(hdr, bloom, intensity) — exactly donut's
-* ConstantColor/InvConstantColor blend. TEXTURE_ARRAY left undefined; fullscreen_vs needs QUAD_Z=0.
+* ConstantColor/InvConstantColor blend. TEXTURE_ARRAY=0 (the Texture2D blit permutation donut
+* uses); fullscreen_vs needs QUAD_Z=0.
 */
 
 #pragma pack_matrix(row_major)

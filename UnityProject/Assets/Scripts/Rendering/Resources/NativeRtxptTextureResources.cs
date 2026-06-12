@@ -303,8 +303,12 @@ namespace PathTracing
             DlssRrOutput.Allocate(displayResolution);
             ProcessedOutputColor.Allocate(displayResolution);
 
-            // Bloom scratch: half- and quarter-resolution of the display image.
-            var bloomHalfRes    = new int2((displayRes.x + 1) / 2, (displayRes.y + 1) / 2);
+            // Bloom scratch: half- and quarter-RENDER-resolution (ceil), replicating the original's
+            // quirk — Sample.cpp:1291 constructs donut BloomPass with *m_view (the render-res view),
+            // so its intermediates are ceil(renderRes/2) even though Render() blits from/to the
+            // display-res ProcessedOutputColor. The first "Downscale" is therefore a >2x reduction
+            // and the Gaussian sigma lives in quarter-render-res pixels (wider bloom on screen).
+            var bloomHalfRes    = new int2((renderRes.x + 1) / 2, (renderRes.y + 1) / 2);
             var bloomQuarterRes = new int2((bloomHalfRes.x + 1) / 2, (bloomHalfRes.y + 1) / 2);
             BloomDownscale1.Allocate(bloomHalfRes);
             BloomDownscale2.Allocate(bloomQuarterRes);

@@ -15,10 +15,12 @@ ScriptedImporter:
   - -enable-16bit-types
   defines:
   - QUAD_Z=0
+  - TEXTURE_ARRAY=0
+  - TARGET_D3D12
   vsEntryPoint: main
   psEntryPoint: main
-  vsTargetProfile: vs_6_6
-  psTargetProfile: ps_6_6
+  vsTargetProfile: vs_6_5
+  psTargetProfile: ps_6_5
   rootConstantsHints: []
   rootSRVHints: []
   samplerBindings:
