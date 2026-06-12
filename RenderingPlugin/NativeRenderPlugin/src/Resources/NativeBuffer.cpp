@@ -215,19 +215,24 @@ void NativeBuffer::UploadSnapshot(ID3D12GraphicsCommandList* cmdList,
     }
 }
 
+// Called with m_readbackMutex held.
 bool NativeBuffer::EnsureReadbackCapacity(uint64_t bytes)
 {
     if (bytes == 0) return false;
-    if (m_readbackBuffer && m_readbackCapacity >= bytes) return true;
+    if (m_readbackBuffer && m_readbackSlotCapacity >= bytes) return true;
 
-    // (Re)allocate the READBACK-heap staging resource. READBACK resources must be
+    // Round the per-slot capacity up so a sequence of slowly growing requests doesn't
+    // reallocate every time.
+    const uint64_t slotCapacity = (bytes + 255) & ~255ull;
+
+    // (Re)allocate the READBACK-heap staging ring. READBACK resources must be
     // created in (and remain in) COPY_DEST, so no state transition is ever needed.
     D3D12_HEAP_PROPERTIES heapProps = {};
     heapProps.Type = D3D12_HEAP_TYPE_READBACK;
 
     D3D12_RESOURCE_DESC desc = {};
     desc.Dimension        = D3D12_RESOURCE_DIMENSION_BUFFER;
-    desc.Width            = bytes;
+    desc.Width            = slotCapacity * kReadbackLag;
     desc.Height           = 1;
     desc.DepthOrArraySize = 1;
     desc.MipLevels        = 1;
@@ -245,8 +250,14 @@ bool NativeBuffer::EnsureReadbackCapacity(uint64_t bytes)
         return false;
     }
 
-    m_readbackBuffer   = staging;
-    m_readbackCapacity = bytes;
+    // The old staging resource may still be the destination of in-flight GPU copies —
+    // release it through the fence-gated cleanup queue, and retire any unconsumed
+    // requests since their data lives in the old resource.
+    if (m_readbackBuffer)
+        EnqueueCleanup([old = std::move(m_readbackBuffer)] {});
+    m_readbackBuffer       = staging;
+    m_readbackSlotCapacity = slotCapacity;
+    m_readbackConsumed     = m_readbackIssued;
     return true;
 }
 
@@ -267,8 +278,6 @@ void NativeBuffer::RequestReadback(ID3D12GraphicsCommandList* cmdList,
     if (srcByteOffset >= bufBytes) return;
     if (srcByteOffset + bytes > bufBytes) bytes = bufBytes - srcByteOffset;
 
-    if (!EnsureReadbackCapacity(bytes)) return;
-
     // Transition the source to COPY_SOURCE through Unity's tracker so the barrier composes
     // with whatever state the buffer was last left in (UAV/SRV/COPY_DEST). When the tracker
     // is unavailable we cannot safely barrier here, so skip rather than risk a state mismatch.
@@ -277,36 +286,63 @@ void NativeBuffer::RequestReadback(ID3D12GraphicsCommandList* cmdList,
         Log("[NativeBuffer::RequestReadback] no state tracker; readback skipped");
         return;
     }
+
+    std::lock_guard<std::mutex> lock(m_readbackMutex);
+    if (!EnsureReadbackCapacity(bytes)) return;
+
+    // Next ring slot. With kReadbackLag slots a request from <lag frames ago is never
+    // overwritten before TryReadback had a chance to harvest it.
+    const uint64_t slot       = m_readbackIssued % kReadbackLag;
+    const uint64_t slotOffset = slot * m_readbackSlotCapacity;
+
     tracker.Require(buffer, D3D12_RESOURCE_STATE_COPY_SOURCE);
 
-    cmdList->CopyBufferRegion(m_readbackBuffer.Get(), 0, buffer, srcByteOffset, bytes);
+    cmdList->CopyBufferRegion(m_readbackBuffer.Get(), slotOffset, buffer, srcByteOffset, bytes);
 
     tracker.Notify(buffer, D3D12_RESOURCE_STATE_COPY_SOURCE);
 
-    m_readbackBytes       = bytes;
-    m_readbackFenceTarget = fenceTarget;
-    m_readbackPending     = true;
+    m_readbackSlots[slot].bytes       = bytes;
+    m_readbackSlots[slot].fenceTarget = fenceTarget;
+    ++m_readbackIssued;
 }
 
 bool NativeBuffer::TryReadback(uint64_t completedFenceValue, void* dst, uint64_t dstBytes)
 {
-    if (!m_readbackPending || !dst || !m_readbackBuffer) return false;
-    if (completedFenceValue < m_readbackFenceTarget) return false; // copy still in flight
+    if (!dst) return false;
 
-    const uint64_t copyBytes = (dstBytes < m_readbackBytes) ? dstBytes : m_readbackBytes;
+    std::lock_guard<std::mutex> lock(m_readbackMutex);
+    if (!m_readbackBuffer || m_readbackIssued == m_readbackConsumed) return false;
 
-    void*       mapped    = nullptr;
-    D3D12_RANGE readRange = { 0, static_cast<SIZE_T>(m_readbackBytes) };
-    if (FAILED(m_readbackBuffer->Map(0, &readRange, &mapped)) || !mapped)
+    // Scan unconsumed requests newest-first; fence targets are monotonic, so the first
+    // completed one found is the newest. Requests older than (issued - lag) have had their
+    // slot reused by a newer request and are excluded.
+    const uint64_t oldestValid = (m_readbackIssued > kReadbackLag) ? m_readbackIssued - kReadbackLag : 0;
+    const uint64_t scanFloor   = (m_readbackConsumed > oldestValid) ? m_readbackConsumed : oldestValid;
+
+    for (uint64_t idx = m_readbackIssued; idx > scanFloor; --idx)
     {
-        Log("[NativeBuffer::TryReadback] Map failed");
-        return false;
+        const uint64_t      slot = (idx - 1) % kReadbackLag;
+        const ReadbackSlot& s    = m_readbackSlots[slot];
+        if (completedFenceValue < s.fenceTarget) continue; // still in flight; try an older one
+
+        const uint64_t copyBytes  = (dstBytes < s.bytes) ? dstBytes : s.bytes;
+        const uint64_t slotOffset = slot * m_readbackSlotCapacity;
+
+        void*       mapped    = nullptr;
+        D3D12_RANGE readRange = { static_cast<SIZE_T>(slotOffset),
+                                  static_cast<SIZE_T>(slotOffset + copyBytes) };
+        if (FAILED(m_readbackBuffer->Map(0, &readRange, &mapped)) || !mapped)
+        {
+            Log("[NativeBuffer::TryReadback] Map failed");
+            return false;
+        }
+        memcpy(dst, static_cast<const uint8_t*>(mapped) + slotOffset, static_cast<size_t>(copyBytes));
+
+        D3D12_RANGE writeRange = { 0, 0 }; // CPU did not write
+        m_readbackBuffer->Unmap(0, &writeRange);
+
+        m_readbackConsumed = idx; // retire this request and everything older
+        return true;
     }
-    memcpy(dst, mapped, static_cast<size_t>(copyBytes));
-
-    D3D12_RANGE writeRange = { 0, 0 }; // CPU did not write
-    m_readbackBuffer->Unmap(0, &writeRange);
-
-    m_readbackPending = false;
-    return true;
+    return false; // all unconsumed requests still in flight
 }

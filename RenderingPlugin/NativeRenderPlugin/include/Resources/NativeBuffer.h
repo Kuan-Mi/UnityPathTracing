@@ -2,6 +2,7 @@
 #include <d3d12.h>
 #include <wrl/client.h>
 #include <cstdint>
+#include <mutex>
 #include <string>
 #include "IUnityLog.h"
 #include "INativeResource.h"
@@ -38,9 +39,9 @@ struct NsbFlushRange
 // ---------------------------------------------------------------------------
 // Readback request blob (shared contract with the C# NativeStructuredBuffer).
 // Passed as the data pointer of IssuePluginEventAndData for a GPU->CPU readback;
-// the render-thread callback records the copy into the buffer's READBACK staging
-// resource and frees the blob. The CPU later polls TryReadback once the frame
-// fence has passed the recorded target value.
+// the render-thread callback records the copy into one slot of the buffer's
+// READBACK staging ring and frees the blob. The CPU later polls TryReadback,
+// which returns the newest request whose frame fence has passed.
 // ---------------------------------------------------------------------------
 struct NsbReadbackRequest
 {
@@ -132,10 +133,12 @@ public:
                         const uint8_t*             payload);
 
     /// <summary>
-    /// Render-thread: records a copy of [srcByteOffset, srcByteOffset+bytes) into an internal
-    /// READBACK-heap staging resource (lazily (re)allocated), then stamps |fenceTarget| as the
-    /// frame-fence value at which the copy completes. The source transition to COPY_SOURCE goes
-    /// through Unity's tracker so it composes with other passes.
+    /// Render-thread: records a copy of [srcByteOffset, srcByteOffset+bytes) into the next slot
+    /// of an internal READBACK-heap staging ring (lazily (re)allocated), then stamps
+    /// |fenceTarget| as the frame-fence value at which that slot's copy completes. The ring
+    /// (RTXPT's cReadbackLag idiom) lets a new request be issued every frame while earlier
+    /// ones are still in flight — TryReadback harvests the newest completed one. The source
+    /// transition to COPY_SOURCE goes through Unity's tracker so it composes with other passes.
     /// </summary>
     void RequestReadback(ID3D12GraphicsCommandList* cmdList,
                          const ResourceStateTracker& tracker,
@@ -144,10 +147,11 @@ public:
                          uint64_t fenceTarget);
 
     /// <summary>
-    /// Main-thread poll: if a readback is pending and the GPU has passed the recorded fence
-    /// value (|completedFenceValue|), maps the staging resource, copies up to |dstBytes| into
-    /// |dst|, clears the pending flag, and returns true. Returns false while still in flight or
-    /// when no request is pending.
+    /// Main-thread poll: if any unconsumed request's copy has completed on the GPU
+    /// (|completedFenceValue| has passed its fence target), maps that slot, copies up to
+    /// |dstBytes| into |dst|, retires it and everything older, and returns true. When several
+    /// requests have completed, the newest wins. Returns false while all requests are still in
+    /// flight or none is pending.
     /// </summary>
     bool TryReadback(uint64_t completedFenceValue, void* dst, uint64_t dstBytes);
 
@@ -176,12 +180,27 @@ private:
     // resource is owned by g_uploadPool (not by this buffer); we only cache its VA.
     D3D12_GPU_VIRTUAL_ADDRESS m_volatileGpuVA = 0;
 
-    // GPU->CPU readback staging (READBACK heap, permanently in COPY_DEST). Lazily sized.
+    // GPU->CPU readback staging: a ring of kReadbackLag slots within one READBACK-heap
+    // resource (lazily sized, permanently in COPY_DEST). Request i lands in slot
+    // (i % kReadbackLag), so up to kReadbackLag requests can be in flight before a slot is
+    // reused — enough to issue one per frame without ever superseding an unharvested copy
+    // (mirrors RTXPT ToneMappingPasses.cpp's cReadbackLag staging ring). m_readbackMutex
+    // guards all bookkeeping: requests are recorded on the render thread, polls run on the
+    // main thread.
+    static constexpr uint32_t kReadbackLag = 3; // > Unity's max frames in flight (2)
+
+    struct ReadbackSlot
+    {
+        uint64_t fenceTarget = 0; // frame-fence value at which this slot's copy is done
+        uint64_t bytes       = 0; // bytes copied into this slot
+    };
+
     ComPtr<ID3D12Resource> m_readbackBuffer;
-    uint64_t               m_readbackCapacity    = 0; // allocated bytes
-    uint64_t               m_readbackBytes       = 0; // bytes copied by the pending request
-    uint64_t               m_readbackFenceTarget = 0; // frame-fence value at which the copy is done
-    bool                   m_readbackPending     = false;
+    uint64_t               m_readbackSlotCapacity = 0; // per-slot bytes (resource = kReadbackLag x this)
+    ReadbackSlot           m_readbackSlots[kReadbackLag];
+    uint64_t               m_readbackIssued   = 0; // total requests recorded (render thread)
+    uint64_t               m_readbackConsumed = 0; // requests retired by TryReadback (main thread)
+    std::mutex             m_readbackMutex;
 
     void Log(const char* msg) const;
     bool AllocDefault();

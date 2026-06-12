@@ -93,7 +93,7 @@ MonoBehaviour:
     environmentMap: {fileID: 8900000, guid: 2f36c92edfbce6e4cb7792dbe3fea7a7, type: 3}
     enableToneMapping: 1
     toneMapOperator: 4
-    autoExposure: 0
+    autoExposure: 1
     exposureCompensation: -1.54
     exposureValue: -4.23919
     exposureValueMin: -16

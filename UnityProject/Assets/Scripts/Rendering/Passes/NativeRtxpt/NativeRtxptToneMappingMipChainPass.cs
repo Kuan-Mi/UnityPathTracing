@@ -134,7 +134,14 @@ namespace PathTracing
             // Poll the CPU read-back of the average luminance (filled a frame or two after capture),
             // mirroring ToneMappingPass::Render's map/read of avgLuminanceBufferReadback.
             if (_avgLumBuffer.TryGetReadback(_avgLumReadback, 1))
+            {
                 _avgLumLog2 = _avgLumReadback[0];
+                // Debug.Log($"[ToneMapping] Captured log2(avg luminance) = {_avgLumLog2:F4} (avg luminance = {Mathf.Pow(2f, _avgLumLog2):F4})");
+            }
+            // else
+            // {
+            //     Debug.LogWarning($"[ToneMapping] Avg luminance read-back not ready yet (frame lag), using last value log2(avg luminance) = {_avgLumLog2:F4}");
+            // }
 
             EnsureResources(ctx.DisplayResolution);
         }

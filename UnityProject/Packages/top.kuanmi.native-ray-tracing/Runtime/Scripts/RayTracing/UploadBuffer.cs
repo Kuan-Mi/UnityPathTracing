@@ -301,13 +301,18 @@ namespace NativeRender
         /// <summary>
         /// Records a GPU->CPU readback of <paramref name="elementCount"/> elements starting at element
         /// <paramref name="srcElementOffset"/>. Async: the copy is recorded on <paramref name="cmd"/>
-        /// and completes a frame or two later — poll <see cref="TryGetReadback{T}"/> until it returns
-        /// true. Only one readback is tracked at a time; a new request supersedes a pending one.
+        /// into a slot of a native staging ring and completes a frame or two later — poll
+        /// <see cref="TryGetReadback{T}"/>, which returns the newest completed request. Safe to issue
+        /// every frame: the ring is deep enough that an unread copy is never overwritten while a
+        /// newer one is still in flight (mirrors RTXPT's cReadbackLag staging ring).
         /// </summary>
         public unsafe void RequestReadback(CommandBuffer cmd, int srcElementOffset, int elementCount)
         {
             if (_disposed) throw new ObjectDisposedException(nameof(UploadBuffer));
             if (elementCount <= 0) return;
+            if (srcElementOffset < 0 || srcElementOffset + elementCount > count)
+                throw new ArgumentOutOfRangeException(nameof(elementCount),
+                    $"Readback range [{srcElementOffset}, {srcElementOffset + elementCount}) exceeds buffer capacity {count}.");
 
             IntPtr blob = NativeRenderPlugin.NR_NSB_AllocFlushBuffer(ReadbackRequestSize);
             if (blob == IntPtr.Zero) return;
@@ -321,14 +326,18 @@ namespace NativeRender
         }
 
         /// <summary>
-        /// Polls a pending <see cref="RequestReadback"/>. Returns true and fills the first
-        /// <paramref name="count"/> elements of <paramref name="dst"/> once the GPU copy has
-        /// completed; returns false while still in flight or when no request is pending.
+        /// Polls the pending <see cref="RequestReadback"/> requests. Returns true and fills the
+        /// first <paramref name="count"/> elements of <paramref name="dst"/> with the newest
+        /// request whose GPU copy has completed (retiring it and any older ones); returns false
+        /// while all requests are still in flight or none is pending.
         /// </summary>
         public unsafe bool TryGetReadback<T>(T[] dst, int count) where T : unmanaged
         {
             if (_disposed) throw new ObjectDisposedException(nameof(UploadBuffer));
             if (dst == null || count <= 0) return false;
+            if (count > dst.Length)
+                throw new ArgumentOutOfRangeException(nameof(count),
+                    $"count ({count}) exceeds dst.Length ({dst.Length}); the native copy would overrun the array.");
 
             ulong dstBytes = (ulong)count * (ulong)sizeof(T);
             fixed (T* p = dst)
