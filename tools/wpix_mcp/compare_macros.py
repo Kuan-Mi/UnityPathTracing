@@ -1,13 +1,13 @@
 """Compare compile macros (-D defines) and key flags of every compute Dispatch shared
 between the two kitchen captures, plus full detail for hash-mismatched passes.
 
-Run from tools/wpix_mcp:  python compare_macros.py
+Run from tools/wpix_mcp:  python compare_macros.py [rtxpt.wpix] [unity.wpix]
 """
-import os, sys
+import argparse, os, sys
 import wpix_core as w
 
-RTXPT = os.path.join("..", "..", "Other", "Rtxpt-kitchen.wpix")
-UNITY = os.path.join("..", "..", "Other", "Unity-kitchen.wpix")
+DEF_RTXPT = os.path.join("..", "..", "Other", "Rtxpt-kitchen.wpix")
+DEF_UNITY = os.path.join("..", "..", "Other", "Unity-kitchen.wpix")
 
 
 def leaf(marker):
@@ -32,11 +32,11 @@ def fmt_defs(defs):
     return sorted(defs or [])
 
 
-def main():
+def main(rtxpt=DEF_RTXPT, unity=DEF_UNITY):
     print("Reading RTXPT capture (this exports/caches the capture on first run)...")
-    a = shader_infos(RTXPT)
+    a = shader_infos(rtxpt)
     print("Reading Unity capture ...")
-    b = shader_infos(UNITY)
+    b = shader_infos(unity)
 
     shared = sorted(set(a) & set(b))
     only_a = sorted(set(a) - set(b))
@@ -75,4 +75,8 @@ def main():
 
 
 if __name__ == "__main__":
-    sys.exit(main())
+    p = argparse.ArgumentParser(description=__doc__.splitlines()[0])
+    p.add_argument("rtxpt", nargs="?", default=DEF_RTXPT, help="RTXPT capture (.wpix)")
+    p.add_argument("unity", nargs="?", default=DEF_UNITY, help="Unity capture (.wpix)")
+    args = p.parse_args()
+    sys.exit(main(args.rtxpt, args.unity))

@@ -3,13 +3,13 @@ captures under Other/ (Rtxpt.wpix = original RTXPT, Unity.wpix = NativeRtxptFeat
 replica). Prints a per-marker table and a verdict on whether each capture ran the
 exact same shader binaries.
 
-Run from tools/wpix_mcp:  python compare_shader_hashes.py
+Run from tools/wpix_mcp:  python compare_shader_hashes.py [rtxpt.wpix] [unity.wpix]
 """
-import os, sys
+import argparse, os, sys
 import wpix_core as w
 
-RTXPT = os.path.join("..", "..", "Other", "Rtxpt.wpix")
-UNITY = os.path.join("..", "..", "Other", "Unity.wpix")
+DEF_RTXPT = os.path.join("..", "..", "Other", "Rtxpt.wpix")
+DEF_UNITY = os.path.join("..", "..", "Other", "Unity.wpix")
 
 
 def shader_table(wpix):
@@ -31,11 +31,11 @@ def leaf(marker):
     return marker.rsplit("/", 1)[-1] if marker else marker
 
 
-def main():
+def main(rtxpt=DEF_RTXPT, unity=DEF_UNITY):
     print("Reading RTXPT capture ...")
-    a = shader_table(RTXPT)
+    a = shader_table(rtxpt)
     print("Reading Unity capture ...")
-    b = shader_table(UNITY)
+    b = shader_table(unity)
 
     # Group hashes by the dispatch's leaf marker name (the shader pass).
     from collections import defaultdict
@@ -89,4 +89,8 @@ def main():
 
 
 if __name__ == "__main__":
-    sys.exit(main())
+    p = argparse.ArgumentParser(description=__doc__.splitlines()[0])
+    p.add_argument("rtxpt", nargs="?", default=DEF_RTXPT, help="RTXPT capture (.wpix)")
+    p.add_argument("unity", nargs="?", default=DEF_UNITY, help="Unity capture (.wpix)")
+    args = p.parse_args()
+    sys.exit(main(args.rtxpt, args.unity))

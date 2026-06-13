@@ -12,26 +12,29 @@ The SampleConstants layout is pulled live from the RTXPT shader headers and over
 bytes; SampleConstants is hand-padded to 16-byte rows so its tight-packed layout matches the
 cbuffer layout, which is what wpix_core's struct parser assumes.
 
-Run from tools/wpix_mcp:  python compare_gconst.py
+Run from tools/wpix_mcp:  python compare_gconst.py [rtxpt.wpix] [unity.wpix] [--shaders DIR]
 """
-import os, re, sys
+import argparse, os, re, sys
 import wpix_core as w
 from wpix_core import parse_struct_layout, _field_value, _val_str, _render_table
 
-RTXPT = os.path.join("..", "..", "Other", "Rtxpt.wpix")
-UNITY = os.path.join("..", "..", "Other", "Unity.wpix")
+DEF_RTXPT = os.path.join("..", "..", "Other", "Rtxpt.wpix")
+DEF_UNITY = os.path.join("..", "..", "Other", "Unity.wpix")
 
-SHADERS = os.path.join("..", "..", "RenderingPlugin", "External", "RTXPT", "Rtxpt", "Shaders")
-# (file, struct) in dependency order — dependencies must precede the structs that use them.
-STRUCT_SOURCES = [
-    (os.path.join(SHADERS, "PathTracer", "PathTracerShared.h"), "PathTracerCameraData"),
-    (os.path.join(SHADERS, "PathTracer", "PathTracerShared.h"), "PathTracerConstants"),
-    (os.path.join(SHADERS, "PathTracer", "Lighting", "EnvMap.hlsli"), "EnvMapSceneParams"),
-    (os.path.join(SHADERS, "PathTracer", "Lighting", "EnvMap.hlsli"), "EnvMapImportanceSamplingParams"),
-    (os.path.join(SHADERS, "PathTracer", "PathTracerDebug.hlsli"), "DebugConstants"),
-    (os.path.join(SHADERS, "SampleConstantBuffer.h"), "SimpleViewConstants"),
-    (os.path.join(SHADERS, "SampleConstantBuffer.h"), "SampleConstants"),
-]
+DEF_SHADERS = os.path.join("..", "..", "RenderingPlugin", "External", "RTXPT", "Rtxpt", "Shaders")
+
+
+def struct_sources(shaders):
+    """(file, struct) in dependency order — dependencies must precede the structs that use them."""
+    return [
+        (os.path.join(shaders, "PathTracer", "PathTracerShared.h"), "PathTracerCameraData"),
+        (os.path.join(shaders, "PathTracer", "PathTracerShared.h"), "PathTracerConstants"),
+        (os.path.join(shaders, "PathTracer", "Lighting", "EnvMap.hlsli"), "EnvMapSceneParams"),
+        (os.path.join(shaders, "PathTracer", "Lighting", "EnvMap.hlsli"), "EnvMapImportanceSamplingParams"),
+        (os.path.join(shaders, "PathTracer", "PathTracerDebug.hlsli"), "DebugConstants"),
+        (os.path.join(shaders, "SampleConstantBuffer.h"), "SimpleViewConstants"),
+        (os.path.join(shaders, "SampleConstantBuffer.h"), "SampleConstants"),
+    ]
 
 
 def grab_struct(path, name):
@@ -52,8 +55,8 @@ def grab_struct(path, name):
     return t[m.start():j + 1] + ";\n"
 
 
-def sample_constants_def():
-    return "\n".join(grab_struct(p, n) for p, n in STRUCT_SOURCES)
+def sample_constants_def(shaders=DEF_SHADERS):
+    return "\n".join(grab_struct(p, n) for p, n in struct_sources(shaders))
 
 
 def gconst_binding(wpix):
@@ -95,12 +98,12 @@ def read_gconst(ed, rid, off, nbytes):
     return blob[off:off + nbytes]
 
 
-def main():
-    layout, size = parse_struct_layout(sample_constants_def(), "SampleConstants")
+def main(rtxpt=DEF_RTXPT, unity=DEF_UNITY, shaders=DEF_SHADERS):
+    layout, size = parse_struct_layout(sample_constants_def(shaders), "SampleConstants")
     print(f"sizeof(SampleConstants) = {size} bytes ({len(layout)} scalar fields)\n")
 
     captures = {}
-    for tag, wpix in [("RTXPT", RTXPT), ("UNITY", UNITY)]:
+    for tag, wpix in [("RTXPT", rtxpt), ("UNITY", unity)]:
         ed, binds = gconst_binding(wpix)
         # all ray passes in a capture bind the same g_Const buffer+offset; report + verify.
         markers = {e["global_id"]: e["marker"].split("/")[-1]
@@ -139,4 +142,9 @@ def main():
 
 
 if __name__ == "__main__":
-    sys.exit(main())
+    p = argparse.ArgumentParser(description=__doc__.splitlines()[0])
+    p.add_argument("rtxpt", nargs="?", default=DEF_RTXPT, help="RTXPT capture (.wpix)")
+    p.add_argument("unity", nargs="?", default=DEF_UNITY, help="Unity capture (.wpix)")
+    p.add_argument("--shaders", default=DEF_SHADERS, help="RTXPT Shaders dir for struct layouts")
+    args = p.parse_args()
+    sys.exit(main(args.rtxpt, args.unity, args.shaders))

@@ -16,7 +16,7 @@ MonoBehaviour:
   setting:
     realtimeMode: 1
     realtimeAA: 3
-    upscalerMode: 0
+    upscalerMode: 3
     cameraJitter: 1
     cameraAperture: 0
     cameraFocalDistance: 10000
@@ -46,7 +46,7 @@ MonoBehaviour:
     neeatSampleBakedEnvironment: 1
     neeatImportanceBoostPreFilter: 1
     neeatDbgDrawLights: 0
-    neeatDbgDrawTileLightConnections: 1
+    neeatDbgDrawTileLightConnections: 0
     neeatDbgFreezeUpdates: 0
     neeatDbgViewType: 0
     neeatDbgDisableJitter: 0
@@ -73,7 +73,7 @@ MonoBehaviour:
     dlssrrBrightnessClampK: 4096
     dlssrrMicroJitter: 0.1
     tmpDisableDlssRR: 0
-    enableBloom: 1
+    enableBloom: 0
     bloomRadius: 8
     bloomIntensity: 0.004
     environmentMapDiffuseSampleMIPLevel: 2
@@ -98,7 +98,7 @@ MonoBehaviour:
     toneMapWhiteScale: 5.1
     toneMapClamped: 1
     showValidation: 0
-    enableShaderDebug: 0
+    enableShaderDebug: 1
     showDebugLines: 0
     debugLineScale: 0.05
     debugPixelX: 368

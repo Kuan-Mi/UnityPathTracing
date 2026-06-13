@@ -19,18 +19,18 @@ ScriptedImporter:
     defaultMagFilterMode: 9729
     anisotropicFilterLevel: 1
   instantiationSettings:
-    mask: -1
+    mask: 6
     layer: 0
     skinUpdateWhenOffscreen: 1
     lightIntensityFactor: 1
     sceneObjectCreation: 2
   assetDependencies:
   - type: 0
-    originalUri: Assets\Art\RTXPTAssets\Models\RX6\rx6.bin
-    assetPath: Assets\Art\RTXPTAssets\Models\RX6\rx6.bin
+    originalUri: Assets\RTXPTAssets\Models\RX6\rx6.bin
+    assetPath: Assets\RTXPTAssets\Models\RX6\rx6.bin
   - type: 1
-    originalUri: Assets\Art\RTXPTAssets\Models\RX6\RX6_green.png
-    assetPath: 
+    originalUri: Assets\RTXPTAssets\Models\RX6\RX6_blue.png
+    assetPath: Assets\RTXPTAssets\Models\RX6\RX6_blue.png
   reportItems:
   - type: 2
     code: 20
@@ -40,15 +40,6 @@ ScriptedImporter:
     code: 20
     messages:
     - KHR_materials_ior
-  - type: 0
-    code: 43
-    messages:
-    - Couldn't load texture at Assets\Art\RTXPTAssets\Models\RX6\RX6_green.png
-    - 0
   - type: 2
     code: 31
     messages: []
-  - type: 0
-    code: 45
-    messages:
-    - 0

@@ -225,7 +225,11 @@ namespace PathTracing
         private static void SetSpot(Transform root, string node, Color color, float intensity, float outerHalfDeg, float innerHalfDeg)
         {
             var light = GetOrAddLight(root, node);
-            if (light == null) return;
+            if (light == null)
+            {
+                Debug.LogWarning($"[RtxptShipImporter] spot light node '{node}' not found under {root.name}");
+                return;
+            }
             light.type           = LightType.Spot;
             light.color          = color;
             light.intensity      = intensity;
@@ -237,7 +241,11 @@ namespace PathTracing
         private static void SetPoint(Transform root, string node, Color color, float intensity)
         {
             var light = GetOrAddLight(root, node);
-            if (light == null) return;
+            if (light == null)
+            {
+                Debug.LogWarning($"[RtxptShipImporter] point light node '{node}' not found under {root.name}");
+                return;
+            }
             light.type      = LightType.Point;
             light.color     = color;
             light.intensity = intensity;
@@ -252,7 +260,13 @@ namespace PathTracing
                 Debug.LogWarning($"[RtxptShipImporter] light node '{node}' not found under {root.name}");
                 return null;
             }
-            return t.GetComponent<Light>() ?? t.gameObject.AddComponent<Light>();
+            
+            Debug.Log($"[RtxptShipImporter] GetOrAddLight  for (t={t.name}, node={node})");
+            
+            var light = t.GetComponent<Light>();
+            if (light != null) return light;
+            
+            return t.gameObject.AddComponent<Light>();
         }
 
         // ---- Helpers ----

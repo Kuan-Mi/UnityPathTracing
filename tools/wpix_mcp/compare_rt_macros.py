@@ -4,16 +4,16 @@ DispatchRays in both kitchen captures, and diff RTXPT vs Unity per pass.
 RTXPT libs carry embedded debug info (-Qembed_debug build); Unity libs resolve via
 the <hash>.pdb side-cars in UnityProject/ShaderPDB.
 
-Run from tools/wpix_mcp:  python compare_rt_macros.py
+Run from tools/wpix_mcp:  python compare_rt_macros.py [rtxpt.wpix] [unity.wpix]
 """
-import os, subprocess, sys
+import argparse, os, subprocess, sys
 import wpix_core as w
 from wpix_core import (_xpress_decompress_at, container_compile_info, _parse_compile_args,
                        _compile_args_from_pdb, _default_pdb_dir, find_dxc, _cache_root)
 import compare_rt_shaders as cr
 
-RTXPT = os.path.join("..", "..", "Other", "Rtxpt-kitchen.wpix")
-UNITY = os.path.join("..", "..", "Other", "Unity-kitchen.wpix")
+DEF_RTXPT = os.path.join("..", "..", "Other", "Rtxpt-kitchen.wpix")
+DEF_UNITY = os.path.join("..", "..", "Other", "Unity-kitchen.wpix")
 
 
 def lib_args(blob, dxc, pdb_dir):
@@ -56,8 +56,8 @@ def report(wpix):
     return out
 
 
-def main():
-    a, b = report(RTXPT), report(UNITY)
+def main(rtxpt=DEF_RTXPT, unity=DEF_UNITY):
+    a, b = report(rtxpt), report(unity)
     for lf in sorted(set(a) | set(b)):
         print(f"\n######## {lf} ########")
         for tag, rows in (("RTXPT", a.get(lf, [])), ("UNITY", b.get(lf, []))):
@@ -78,4 +78,8 @@ def main():
 
 
 if __name__ == "__main__":
-    sys.exit(main())
+    p = argparse.ArgumentParser(description=__doc__.splitlines()[0])
+    p.add_argument("rtxpt", nargs="?", default=DEF_RTXPT, help="RTXPT capture (.wpix)")
+    p.add_argument("unity", nargs="?", default=DEF_UNITY, help="Unity capture (.wpix)")
+    args = p.parse_args()
+    sys.exit(main(args.rtxpt, args.unity))

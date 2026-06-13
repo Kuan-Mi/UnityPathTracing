@@ -6,14 +6,14 @@ only handles compute PSOs, so this walks the exported CreateStateObject_*() func
 the global resources.bin read order to find each DXIL library's byte offset, decompresses it,
 and reads its container HASH (the value PIX shows) + target + debug name + exports/hit groups.
 
-Run from tools/wpix_mcp:  python compare_rt_shaders.py
+Run from tools/wpix_mcp:  python compare_rt_shaders.py [rtxpt.wpix] [unity.wpix]
 """
-import os, re, sys
+import argparse, os, re, sys
 import wpix_core as w
 from wpix_core import _READ_RE, _CALL_RE, container_compile_info, _xpress_decompress_at
 
-RTXPT = os.path.join("..", "..", "Other", "Rtxpt.wpix")
-UNITY = os.path.join("..", "..", "Other", "Unity.wpix")
+DEF_RTXPT = os.path.join("..", "..", "Other", "Rtxpt.wpix")
+DEF_UNITY = os.path.join("..", "..", "Other", "Unity.wpix")
 
 
 def _has_read_map(funcs):
@@ -145,11 +145,11 @@ def rt_report(wpix):
     return passes
 
 
-def main():
+def main(rtxpt=DEF_RTXPT, unity=DEF_UNITY):
     print("Reading RTXPT raytracing pipelines ...")
-    a = rt_report(RTXPT)
+    a = rt_report(rtxpt)
     print("Reading Unity raytracing pipelines ...\n")
-    b = rt_report(UNITY)
+    b = rt_report(unity)
 
     def dump(tag, passes):
         print(f"==================== {tag} ====================")
@@ -184,4 +184,8 @@ def main():
 
 
 if __name__ == "__main__":
-    sys.exit(main())
+    p = argparse.ArgumentParser(description=__doc__.splitlines()[0])
+    p.add_argument("rtxpt", nargs="?", default=DEF_RTXPT, help="RTXPT capture (.wpix)")
+    p.add_argument("unity", nargs="?", default=DEF_UNITY, help="Unity capture (.wpix)")
+    args = p.parse_args()
+    sys.exit(main(args.rtxpt, args.unity))

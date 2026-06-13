@@ -38,9 +38,12 @@ EditorBuildSettings:
   - enabled: 0
     path: Assets/RTXPTAssets/kitchen.unity
     guid: ef6e255891b305a47b73f5bf98f9b4fe
-  - enabled: 1
+  - enabled: 0
     path: Assets/RTXPTAssets/bistro-programmer-art.unity
     guid: e62505b00b0c9bf46b07ce9268ad9996
+  - enabled: 1
+    path: Assets/RTXPTAssets/bistro.unity
+    guid: 282167b52b099884698419ebc09f0555
   m_configObjects:
     com.unity.input.settings.actions: {fileID: -944628639613478452, guid: 052faaac586de48259a63d0c4782560b, type: 3}
     com.unity.xr.management.loader_settings: {fileID: 11400000, guid: ef0ce46ed818dba47ac25c34755259b6, type: 2}
