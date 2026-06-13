@@ -3,7 +3,7 @@ captures under Other/ (Rtxpt.wpix = original RTXPT, Unity.wpix = NativeRtxptFeat
 replica). Prints a per-marker table and a verdict on whether each capture ran the
 exact same shader binaries.
 
-Run from tools/wpix_mcp:  python compare_shader_hashes.py [rtxpt.wpix] [unity.wpix]
+Run from tools/wpix_mcp:  python compare_compute_shaders.py [rtxpt.wpix] [unity.wpix]
 """
 import argparse, os, sys
 import wpix_core as w
