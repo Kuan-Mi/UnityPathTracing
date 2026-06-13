@@ -88,7 +88,7 @@ namespace PathTracing
             if (slot.PSDBlockMotionVectorsAtSurfaceType / 2 != 0) flags |= PTMaterialFlags.PSDBlockMVsAtSurfaceTypeB1;
             flags |= (uint)Mathf.Clamp(slot.NestedPriority, 0, 14) << PTMaterialFlags.NestedPriorityShift;
             flags |= (uint)Mathf.Clamp(slot.PSDDominantDeltaLobe + 1, 0, 7) << PTMaterialFlags.PSDDominantDeltaLobeP1Shift;
-
+ 
             data.Flags                     = flags;
             data.BaseOrDiffuseColor        = new Vector3(slot.BaseColorFactor.r, slot.BaseColorFactor.g, slot.BaseColorFactor.b);
             data.SpecularColor             = new Vector3(slot.SpecularColor.r, slot.SpecularColor.g, slot.SpecularColor.b);

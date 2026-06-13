@@ -10,7 +10,7 @@ namespace PathTracing
     /// looping at <see cref="duration"/>.
     ///
     /// Ported from RTXPT SampleGame <c>*.prop.json</c> flight paths (the RX6 ship fleet). Keyframes
-    /// are pre-converted to Unity space by <c>RtxptShipImporter</c> (glTFast negate-X). The path
+    /// are pre-converted to Unity space by <c>RtxptPropImporter</c> (glTFast negate-X). The path
     /// tracer reads <c>transform.localToWorldMatrix</c> every frame, so simply moving the transform
     /// animates both the mesh and any child analytic lights — no extra plumbing required.
     /// </summary>
