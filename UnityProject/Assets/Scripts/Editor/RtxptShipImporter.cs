@@ -157,23 +157,21 @@ namespace PathTracing
             if (root == null) throw new Exception("root is not a JSON object");
 
             float playbackSpeed = root.TryGetValue("animPlaybackSpeed", out var ps) ? (float)(double)ps : 1f;
-            if (!(root.TryGetValue("animation", out var animObj) && animObj is List<object> anim) || anim.Count == 0)
-                throw new Exception("missing/empty 'animation' array");
 
-            int n = anim.Count;
-            var times = new float[n];
-            var positions = new Vector3[n];
-            var rotations = new Quaternion[n];
-
-            for (int i = 0; i < n; i++)
+            // A prop is either animated (a keyframed 'animation' array) or static (a single 'startPose',
+            // e.g. SHIP_random_1..3, which also carries a non-unit scale like 6×).
+            bool hasAnim = root.TryGetValue("animation", out var animObj)
+                           && animObj is List<object> a && a.Count > 0;
+            var anim = hasAnim ? (List<object>)animObj : null;
+            Dictionary<string, object> startPose = null;
+            if (!hasAnim)
             {
-                var key = (Dictionary<string, object>)anim[i];
-                times[i]     = (float)(double)key["keytime"];
-                positions[i] = ConvPos((List<object>)key["translation"]);
-                rotations[i] = ConvRot((List<object>)key["rotation"]);
+                if (!(root.TryGetValue("startPose", out var spObj) && spObj is Dictionary<string, object> sp))
+                    throw new Exception("prop has neither a keyframed 'animation' array nor a static 'startPose'");
+                startPose = sp;
             }
 
-            // --- Build the ship: outer (path-driven) → model instance (modelPose baked in) ---
+            // --- Build the ship: outer (path-driven or static) → model instance (modelPose baked in) ---
             var outer = new GameObject(name);
             Undo.RegisterCreatedObjectUndo(outer, "Import Ship Prop");
             outer.transform.SetParent(shipsRoot.transform, worldPositionStays: false);
@@ -193,13 +191,37 @@ namespace PathTracing
             AssignMaterials(instance.transform, matMap);
             SetupLights(instance.transform);
 
-            var path = outer.AddComponent<PropFlightPath>();
-            path.times = times;
-            path.positions = positions;
-            path.rotations = rotations;
-            path.duration = times[n - 1];
-            path.playbackSpeed = playbackSpeed;
-            path.loop = true;
+            if (hasAnim)
+            {
+                int n = anim.Count;
+                var times = new float[n];
+                var positions = new Vector3[n];
+                var rotations = new Quaternion[n];
+
+                for (int i = 0; i < n; i++)
+                {
+                    var key = (Dictionary<string, object>)anim[i];
+                    times[i]     = (float)(double)key["keytime"];
+                    positions[i] = ConvPos((List<object>)key["translation"]);
+                    rotations[i] = ConvRot((List<object>)key["rotation"]);
+                }
+
+                var path = outer.AddComponent<PropFlightPath>();
+                path.times = times;
+                path.positions = positions;
+                path.rotations = rotations;
+                path.duration = times[n - 1];
+                path.playbackSpeed = playbackSpeed;
+                path.loop = true;
+            }
+            else
+            {
+                // Static prop: place the outer node directly from startPose (no PropFlightPath).
+                outer.transform.localPosition = ConvPos((List<object>)startPose["translation"]);
+                outer.transform.localRotation = ConvRot((List<object>)startPose["rotation"]);
+                if (startPose.TryGetValue("scaling", out var sc) && sc is List<object> scl)
+                    outer.transform.localScale = ConvScale(scl);
+            }
 
             return outer;
         }
@@ -335,6 +357,10 @@ namespace PathTracing
 
         private static Quaternion ConvRot(List<object> v)
             => new((float)(double)v[0], -(float)(double)v[1], -(float)(double)v[2], (float)(double)v[3]);
+
+        // Scale is sign-invariant under the negate-X convention (only positions/handedness flip).
+        private static Vector3 ConvScale(List<object> v)
+            => new((float)(double)v[0], (float)(double)v[1], (float)(double)v[2]);
     }
 
     /// <summary>Minimal allocation-tolerant JSON parser (objects, arrays, numbers as double, strings,
