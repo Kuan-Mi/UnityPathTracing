@@ -443,6 +443,7 @@ namespace PathTracing
             using var _ = new EditorGUI.IndentLevelScope();
 
             s.upscalerMode = (UpscalerMode)EditorGUILayout.EnumPopup("DLSS Mode", s.upscalerMode);
+            s.dlssRRPreset =  (DlssRRPreset)EditorGUILayout.EnumPopup("DLSS-RR preset", s.dlssRRPreset);
             if (s.realtimeAA == 3)
             {
                 s.dlssrrMicroJitter = EditorGUILayout.Slider("DLSS-RR micro jitter", s.dlssrrMicroJitter, 0.0f, 1.0f);

@@ -62,6 +62,8 @@ namespace PathTracing
         public int          realtimeAA   = 3;
         // C++ default: SampleUIData::DLSSModeDefault = eBalanced.
         public UpscalerMode upscalerMode = UpscalerMode.BALANCED;
+        // DLSS-RR render preset (only used when realtimeAA == 3). Default = driver/OTA default network.
+        public DlssRRPreset dlssRRPreset = DlssRRPreset.Default;
 
         // ── Camera ────────────────────────────────────────────────────────────
         public bool  cameraJitter        = true;

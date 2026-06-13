@@ -55,6 +55,18 @@ namespace PathTracing
         ULTRA_PERFORMANCE // 3.0x                 72
     }
 
+    /// <summary>
+    /// DLSS Ray Reconstruction render preset. Values mirror
+    /// NVSDK_NGX_RayReconstruction_Hint_Render_Preset; only Default/D/E are usable,
+    /// the rest revert to default behavior on current drivers.
+    /// </summary>
+    public enum DlssRRPreset : byte
+    {
+        Default = 0, // driver/OTA default
+        D       = 4, // default transformer model
+        E       = 5, // latest transformer model (required when a DoF guide is used)
+    }
+
     public enum DenoiserType
     {
         DENOISER_REBLUR    = 0,

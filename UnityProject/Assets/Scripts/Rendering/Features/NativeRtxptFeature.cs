@@ -464,7 +464,7 @@ namespace PathTracing
                         specularMvOrHitTex = texPool.DlssRrSpecMotionVectors,
                     };
                     _dlssRRPass.Setup(
-                        dlrr.GetInteropDataPtr(dlrrInput, dlrrRes, 1.0f, setting.upscalerMode),
+                        dlrr.GetInteropDataPtr(dlrrInput, dlrrRes, 1.0f, setting.upscalerMode, setting.dlssRRPreset),
                         new DlssRRPass.Settings { tmpDisableRR = setting.tmpDisableDlssRR });
                     renderer.EnqueuePass(_dlssRRPass);
                 }

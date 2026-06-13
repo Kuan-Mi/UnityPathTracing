@@ -87,7 +87,7 @@ namespace DLRR
             Debug.Log($"[DLSS RR] Created Denoiser Instance {_instanceId} for Camera {_cameraName}");
         }
 
-        private DlrrFrameData GetData(DlrrFrameInput fi, DlrrResources res, float resolutionScale, UpscalerMode upscalerMode)
+        private DlrrFrameData GetData(DlrrFrameInput fi, DlrrResources res, float resolutionScale, UpscalerMode upscalerMode, DlssRRPreset preset)
         {
             ushort rectW = (ushort)(fi.renderResolution.x * resolutionScale + 0.5f);
             ushort rectH = (ushort)(fi.renderResolution.y * resolutionScale + 0.5f);
@@ -110,6 +110,7 @@ namespace DLRR
                 currentWidth            = rectW,
                 currentHeight           = rectH,
                 upscalerMode            = upscalerMode,
+                preset                  = (byte)preset,
                 cameraJitter            = fi.viewportJitter,
                 instanceId              = _instanceId,
             };
@@ -117,10 +118,10 @@ namespace DLRR
             return data;
         }
 
-        public IntPtr GetInteropDataPtr(DlrrFrameInput fi, DlrrResources res, float resolutionScale, UpscalerMode upscalerMode)
+        public IntPtr GetInteropDataPtr(DlrrFrameInput fi, DlrrResources res, float resolutionScale, UpscalerMode upscalerMode, DlssRRPreset preset = DlssRRPreset.Default)
         {
             var index = (int)(fi.frameIndex % BufferCount);
-            _buffer[index] = GetData(fi, res, resolutionScale, upscalerMode);
+            _buffer[index] = GetData(fi, res, resolutionScale, upscalerMode, preset);
             unsafe
             {
                 return (IntPtr)_buffer.GetUnsafePtr() + index * sizeof(DlrrFrameData);
