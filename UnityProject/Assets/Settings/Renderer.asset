@@ -17,6 +17,7 @@ MonoBehaviour:
     realtimeMode: 1
     realtimeAA: 3
     upscalerMode: 3
+    dlssRRPreset: 5
     cameraJitter: 1
     cameraAperture: 0
     cameraFocalDistance: 10000
