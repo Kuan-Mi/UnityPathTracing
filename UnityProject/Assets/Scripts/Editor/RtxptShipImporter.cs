@@ -31,7 +31,7 @@ namespace PathTracing
 
         // RX6SpaceShip.model.json modelPose (model-local offset applied on top of the prop transform).
         private static readonly Vector3    kModelPosePosition = new(0f, -0.08f, 0f);
-        private static readonly Quaternion kModelPoseRotation = Quaternion.Euler(0f, 90f, 0f); // euler Y = 1.5708 rad; flip sign if the ship faces backward
+        private static readonly Quaternion kModelPoseRotation = Quaternion.Euler(0f, -90f, 0f); // euler Y = -1.5708 rad; negated so the ship's nose faces the flight direction
         private const float                kModelPoseScale    = 0.04f;
 
         private string _propsFolder = @"F:\RTXPT\Assets\SampleGame\bistro-programmer-art.scene\props";
@@ -71,6 +71,9 @@ namespace PathTracing
             if (GUILayout.Button($"Import Subset ({kDefaultProps.Length} ships)", GUILayout.Height(28)))
                 ImportNamed(kDefaultProps);
 
+            if (GUILayout.Button("Import All Ships", GUILayout.Height(28)))
+                ImportAll();
+
             if (GUILayout.Button("Import Selected *.prop.json…", GUILayout.Height(22)))
             {
                 string file = EditorUtility.OpenFilePanel("Select a *.prop.json", _propsFolder, "json");
@@ -84,6 +87,24 @@ namespace PathTracing
                 EditorGUILayout.HelpBox(_report, MessageType.None);
                 EditorGUILayout.EndScrollView();
             }
+        }
+
+        private void ImportAll()
+        {
+            if (!Directory.Exists(_propsFolder))
+            {
+                _report = $"Props folder not found: {_propsFolder}";
+                return;
+            }
+
+            var files = Directory.GetFiles(_propsFolder, "SHIP_*.prop.json", SearchOption.TopDirectoryOnly);
+            Array.Sort(files, StringComparer.OrdinalIgnoreCase);
+            if (files.Length == 0)
+            {
+                _report = $"No SHIP_*.prop.json files found in: {_propsFolder}";
+                return;
+            }
+            ImportFiles(files);
         }
 
         private void ImportNamed(IEnumerable<string> names)
@@ -236,6 +257,9 @@ namespace PathTracing
             light.spotAngle      = outerHalfDeg * 2f;
             light.innerSpotAngle = innerHalfDeg * 2f;
             light.shadows        = LightShadows.None; // path traced
+            // The model pose was negated (Euler Y -90) to face the nose forward, which also rotated
+            // these child spot nodes 180°. Spin them back so the beams point along the flight direction.
+            light.transform.localRotation *= Quaternion.Euler(0f, 180f, 0f);
         }
 
         private static void SetPoint(Transform root, string node, Color color, float intensity)
