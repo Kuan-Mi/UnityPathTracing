@@ -107,8 +107,18 @@ namespace PathTracing
                             continue;
                         }
 
-                        var sub = mesh.GetSubMesh(sIdx);
+                        var sub  = mesh.GetSubMesh(sIdx);
+                        var slot = t.Slots[sIdx];
                         submeshIdx.Add(sIdx);
+
+                        // BLAS geometry is non-opaque when the any-hit shader must run for it:
+                        // alpha-tested OR ExcludeFromNEE (the latter lets NEE shadow rays pass
+                        // through transmissive surfaces like glass). Mirrors RTXPT's rule in
+                        // AccelerationStructureUtil.h: flags = (EnableAlphaTesting || ExcludeFromNEE)
+                        // ? GeometryFlags::None : GeometryFlags::Opaque. Without the ExcludeFromNEE
+                        // term, glass is built opaque and wrongly blocks NEE light.
+                        bool nonOpaque = grp.isAlphaClip || (slot != null && slot.ExcludeFromNEE);
+
                         descs.Add(new NativeRenderPlugin.SubmeshDesc
                         {
                             indexCount      = (uint)sub.indexCount,
@@ -119,7 +129,7 @@ namespace PathTracing
                             // The native mesh IB (static path) stores baseVertex-relative indices,
                             // so there the offset is required.
                             baseVertex      = skinned ? 0u : (uint)sub.baseVertex,
-                            flags           = grp.isAlphaClip ? 0u : NativeRenderPlugin.SUBMESH_FLAG_GEOMETRY_OPAQUE,
+                            flags           = nonOpaque ? 0u : NativeRenderPlugin.SUBMESH_FLAG_GEOMETRY_OPAQUE,
                         });
                     }
 
