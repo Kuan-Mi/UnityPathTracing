@@ -27,7 +27,7 @@ MonoBehaviour:
   Roughness: 0.39999998
   SpecularColor: {r: 0.02745098, g: 0.02745098, b: 0.02745098, a: 1}
   EmissiveColor: {r: 0.96874994, g: 0.1171875, b: 1, a: 0}
-  EmissiveIntensity: 0.1
+  EmissiveIntensity: 12.8
   Opacity: 1
   AlphaCutoff: 0.5
   EnableAlphaTesting: 0
