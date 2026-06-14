@@ -40,6 +40,7 @@ import sys
 from concurrent.futures import ThreadPoolExecutor
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+REPO_ROOT = os.path.dirname(SCRIPT_DIR)  # this script lives in <repo>/tools
 
 # When --src is omitted and no legacy local checkout is found, clone this repo.
 # Its root maps directly to the RTXPT "Assets" layout (EnvironmentMaps/, Models/,
@@ -122,7 +123,7 @@ def main():
                     help="where to clone RTXPT-Assets when --src is omitted "
                          "(default: <repo>/tools/.rtxpt-assets)")
     ap.add_argument("--dest",
-                    default=os.path.join(SCRIPT_DIR, "UnityProject", "Assets", "RTXPTAssets"),
+                    default=os.path.join(REPO_ROOT, "UnityProject", "Assets", "RTXPTAssets"),
                     help="Unity RTXPTAssets folder (default: <repo>/UnityProject/Assets/RTXPTAssets)")
     ap.add_argument("--overwrite", action="store_true",
                     help="re-copy/re-convert even if the payload already exists")

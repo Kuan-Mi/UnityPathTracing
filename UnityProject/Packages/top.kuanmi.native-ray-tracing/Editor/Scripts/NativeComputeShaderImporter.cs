@@ -127,6 +127,7 @@ namespace NativeRender
                 srvHintsProp.GetArrayElementAtIndex(i).stringValue = rootSRVHints[i] ?? "";
 
             SamplerBindingSerialization.Write(so.FindProperty("_samplerBindings"), samplerBindings);
+            SamplerBindingSerialization.RegisterDependencies(ctx, samplerBindings);
 
             so.ApplyModifiedPropertiesWithoutUndo();
 

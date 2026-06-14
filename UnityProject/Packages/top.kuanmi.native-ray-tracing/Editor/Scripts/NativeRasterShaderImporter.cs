@@ -95,6 +95,7 @@ namespace NativeRender
             }
             WriteStringArray(so, "_rootSRVHints", rootSRVHints ?? Array.Empty<string>());
             SamplerBindingSerialization.Write(so.FindProperty("_samplerBindings"), samplerBindings);
+            SamplerBindingSerialization.RegisterDependencies(ctx, samplerBindings);
 
             so.ApplyModifiedPropertiesWithoutUndo();
 

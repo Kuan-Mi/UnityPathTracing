@@ -36,6 +36,25 @@ namespace NativeRender
                 elem.FindPropertyRelative("Sampler").objectReferenceValue = bindings[i].Sampler;
             }
         }
+
+        /// <summary>
+        /// Declares an import dependency on every referenced <see cref="NativeSampler"/> asset so Unity
+        /// imports the sampler before the shader. Without this, a cold import (empty Library) can resolve
+        /// the importer's live sampler PPtr mid-transfer, producing the harmless-but-noisy "Unexpected
+        /// recursive transfer of scripted class" warning. As a bonus, editing a sampler now reimports the
+        /// shaders that reference it. Shared by all three shader importers.
+        /// </summary>
+        public static void RegisterDependencies(AssetImportContext ctx, SamplerBinding[] bindings)
+        {
+            if (ctx == null || bindings == null) return;
+            foreach (var b in bindings)
+            {
+                if (b.Sampler == null) continue;
+                string path = AssetDatabase.GetAssetPath(b.Sampler);
+                if (!string.IsNullOrEmpty(path))
+                    ctx.DependsOnSourceAsset(path);
+            }
+        }
     }
 
     /// <summary>A single bound resource discovered by DXIL reflection.</summary>
