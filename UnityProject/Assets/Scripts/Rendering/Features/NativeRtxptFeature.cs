@@ -202,8 +202,6 @@ namespace PathTracing
                 renderPassEvent = renderPassEvent,
             };
 
-            Debug.Log($"envLightsBackupPastCs is null? {envLightsBackupPastCs.asset == null}");
-
             _lightingUpdateBeginPass ??= new NativeRtxptLightingUpdateBeginPass(
                     envLightsBackupPastCs.asset, envLightsSubdivideBaseCs.asset, envLightsSubdivideBoostCs.asset,
                     envLightsFillLookupMapCs.asset, envLightsMapPastToCurrentCs.asset,
@@ -253,19 +251,6 @@ namespace PathTracing
             var cam = renderingData.cameraData.camera;
             if (cam.cameraType is CameraType.Preview or CameraType.Reflection) return;
             if (cam.cameraType != CameraType.Game && cam.cameraType != CameraType.SceneView) return;
-
-            if (baseLayerCs.asset == null && envLightsBackupPastCs.asset == null)
-            {
-#if UNITY_EDITOR
-                if (!Application.isPlaying)
-                {
-                    AutoFillShaders();
-                    return;
-                }
-#endif
-                Debug.LogWarning("Missing required assets, skipping pass.");
-                return;
-            }
 
             CreatePasses();
 
