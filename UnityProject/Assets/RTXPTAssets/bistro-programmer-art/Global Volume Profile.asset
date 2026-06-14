@@ -52,7 +52,7 @@ MonoBehaviour:
   active: 1
   environmentMapEnabled:
     m_OverrideState: 1
-    m_Value: 1
+    m_Value: 0
   environmentMap:
     m_OverrideState: 1
     m_Value: {fileID: 8900000, guid: 81914d60359992741877d83b4b345e1a, type: 3}

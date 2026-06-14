@@ -223,17 +223,17 @@ namespace PathTracing
                     processFeedbackHistoryDebugVizCs)
                 { renderPassEvent = renderPassEvent };
 
-            _fillStablePlanesPass     ??= new NativeRtxptFillStablePlanesPass(fillStablePlanesShader, referenceShader, fillHitGroups, referenceHitGroups) { renderPassEvent             = renderPassEvent };
-            _denoisingGuidesBakePass  ??= new NativeRtxptDenoisingGuidesBakePass(denoiseSpecHitTCs) { renderPassEvent                                                                   = renderPassEvent };
-            _dlssRrPrepareInputsPass  ??= new NativeRtxptDlssRRPrepareInputsPass(dlssBeforeCs) { renderPassEvent                                                                        = renderPassEvent };
-            _dlssRRPass               ??= new DlssRRPass { renderPassEvent                                                                                                              = renderPassEvent };
-            _bloomPass                ??= new NativeRtxptBloomPass(bloomDownsampleRasterShader, bloomBlurRasterShader, bloomCompositeRasterShader) { renderPassEvent                    = renderPassEvent };
-            _toneMappingMipChainPass  ??= new NativeRtxptToneMappingMipChainPass(luminanceRasterShader, mipMapGenCs, captureLuminanceCs, toneMapApplyRasterShader) { renderPassEvent   = renderPassEvent };
-            _accumulationPass         ??= new NativeRtxptAccumulationPass(accumulationCs) { renderPassEvent                                                                             = renderPassEvent };
-            _stablePlanesDebugVizPass ??= new NativeRtxptStablePlanesDebugVizPass(stablePlanesDebugVizCs) { renderPassEvent                                                             = renderPassEvent };
+            _fillStablePlanesPass     ??= new NativeRtxptFillStablePlanesPass(fillStablePlanesShader, referenceShader, fillHitGroups, referenceHitGroups) { renderPassEvent          = renderPassEvent };
+            _denoisingGuidesBakePass  ??= new NativeRtxptDenoisingGuidesBakePass(denoiseSpecHitTCs) { renderPassEvent                                                                = renderPassEvent };
+            _dlssRrPrepareInputsPass  ??= new NativeRtxptDlssRRPrepareInputsPass(dlssBeforeCs) { renderPassEvent                                                                     = renderPassEvent };
+            _dlssRRPass               ??= new DlssRRPass { renderPassEvent                                                                                                           = renderPassEvent };
+            _bloomPass                ??= new NativeRtxptBloomPass(bloomDownsampleRasterShader, bloomBlurRasterShader, bloomCompositeRasterShader) { renderPassEvent                 = renderPassEvent };
+            _toneMappingMipChainPass  ??= new NativeRtxptToneMappingMipChainPass(luminanceRasterShader, mipMapGenCs, captureLuminanceCs, toneMapApplyRasterShader) { renderPassEvent = renderPassEvent };
+            _accumulationPass         ??= new NativeRtxptAccumulationPass(accumulationCs) { renderPassEvent                                                                          = renderPassEvent };
+            _stablePlanesDebugVizPass ??= new NativeRtxptStablePlanesDebugVizPass(stablePlanesDebugVizCs) { renderPassEvent                                                          = renderPassEvent };
             // The begin pass also clears the debug-viz texture via the plugin's UAV-clear event
             // (ClearUnorderedAccessViewFloat, matching the original's nvrhi clearTextureFloat).
-            _shaderDebugBeginPass     ??= new NativeRtxptShaderDebugBeginPass { renderPassEvent                                                                                          = renderPassEvent };
+            _shaderDebugBeginPass ??= new NativeRtxptShaderDebugBeginPass { renderPassEvent = renderPassEvent };
             if (_shaderDebugDrawPass == null
                 && shaderDebugTrianglesRasterShader != null && shaderDebugLinesRasterShader != null
                 && shaderDebugFeedbackLinesRasterShader != null && shaderDebugBlendVizRasterShader != null)
@@ -251,6 +251,19 @@ namespace PathTracing
             var cam = renderingData.cameraData.camera;
             if (cam.cameraType is CameraType.Preview or CameraType.Reflection) return;
             if (cam.cameraType != CameraType.Game && cam.cameraType != CameraType.SceneView) return;
+
+            if (baseLayerCs == null)
+            {
+#if UNITY_EDITOR
+                if (!Application.isPlaying)
+                {
+                    AutoFillShaders();
+                    return;
+                }
+#endif
+                Debug.LogWarning("Missing required assets, skipping pass.");
+                return;
+            }
 
             CreatePasses();
 
@@ -591,7 +604,7 @@ namespace PathTracing
             _stablePlanesDebugVizPass?.Dispose();
             _stablePlanesDebugVizPass = null;
             _shaderDebugDrawPass?.Dispose();
-            _shaderDebugDrawPass  = null;
+            _shaderDebugDrawPass = null;
             _shaderDebugBeginPass?.Dispose();
             _shaderDebugBeginPass = null;
             _outputBlitPass       = null;
@@ -1083,7 +1096,7 @@ namespace PathTracing
 
             UnityEditor.EditorUtility.SetDirty(this);
             return;
- 
+
             static NativeComputeShader LoadCs(string path)
             {
                 var s = UnityEditor.AssetDatabase.LoadAssetAtPath<NativeComputeShader>(path + ".computeshader");
