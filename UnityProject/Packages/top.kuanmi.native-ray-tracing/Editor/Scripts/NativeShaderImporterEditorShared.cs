@@ -33,7 +33,7 @@ namespace NativeRender
             {
                 var elem = prop.GetArrayElementAtIndex(i);
                 elem.FindPropertyRelative("Name").stringValue            = bindings[i].Name ?? "";
-                elem.FindPropertyRelative("Sampler").objectReferenceValue = bindings[i].Sampler;
+                elem.FindPropertyRelative("Sampler").objectReferenceValue = bindings[i].Sampler.asset;
             }
         }
 
@@ -49,8 +49,9 @@ namespace NativeRender
             if (ctx == null || bindings == null) return;
             foreach (var b in bindings)
             {
-                if (b.Sampler == null) continue;
-                string path = AssetDatabase.GetAssetPath(b.Sampler);
+                var sampler = b.Sampler.asset;
+                if (sampler == null) continue;
+                string path = AssetDatabase.GetAssetPath(sampler);
                 if (!string.IsNullOrEmpty(path))
                     ctx.DependsOnSourceAsset(path);
             }

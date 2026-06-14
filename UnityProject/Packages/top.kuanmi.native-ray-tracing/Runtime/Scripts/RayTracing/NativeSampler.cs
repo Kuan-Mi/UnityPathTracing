@@ -56,9 +56,16 @@ namespace NativeRender
     public struct SamplerBinding
     {
         /// <summary>HLSL sampler variable name to match exactly.</summary>
-        public string        Name;
-        /// <summary>The shared sampler definition; null falls back to native name-inference.</summary>
-        public NativeSampler Sampler;
+        public string Name;
+        /// <summary>
+        /// The shared sampler definition; unset falls back to native name-inference.
+        /// Stored as a <see cref="LazyLoadReference{T}"/> (a weak PPtr) rather than a direct
+        /// reference: a hard reference held by a ScriptedImporter is transferred inline during
+        /// import and triggers Unity's "Unexpected recursive transfer of scripted class" warning
+        /// when the sampler asset is imported in the same batch. The lazy reference serializes to
+        /// the identical <c>{fileID, guid, type}</c> PPtr but is not recursively transferred.
+        /// </summary>
+        public LazyLoadReference<NativeSampler> Sampler;
     }
 
     /// <summary>
@@ -74,8 +81,11 @@ namespace NativeRender
             if (bindings == null || bindings.Length == 0) return Array.Empty<SamplerHint>();
             var hints = new List<SamplerHint>(bindings.Length);
             foreach (var b in bindings)
-                if (b.Sampler != null && !string.IsNullOrEmpty(b.Name))
-                    hints.Add(b.Sampler.ToHint(b.Name));
+            {
+                var sampler = b.Sampler.asset;
+                if (sampler != null && !string.IsNullOrEmpty(b.Name))
+                    hints.Add(sampler.ToHint(b.Name));
+            }
             return hints.Count == 0 ? Array.Empty<SamplerHint>() : hints.ToArray();
         }
     }
