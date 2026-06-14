@@ -82,7 +82,7 @@ MonoBehaviour:
     environmentMapIntensity: 1
     environmentMapRotationY: 263.97
     environmentMapTint: {r: 1, g: 1, b: 1, a: 1}
-    environmentMap: {fileID: 8900000, guid: 81914d60359992741877d83b4b345e1a, type: 3}
+    environmentMap: {fileID: 8900000, guid: f6c70be56cca30c438e7bcde1cb72f7c, type: 3}
     enableToneMapping: 1
     toneMapOperator: 4
     autoExposure: 1
