@@ -71,6 +71,8 @@ void BindlessUAVTexture::SetTexture(uint32_t index, ID3D12Resource* resource,
     m_slots[index].resource = resource;
     m_slots[index].mipSlice = mipSlice;
     m_slots[index].format   = format;
+    if (resource && index >= m_usedCount)
+        m_usedCount = index + 1;
     WriteDescriptor(index);
 }
 
@@ -86,6 +88,8 @@ void BindlessUAVTexture::Resize(uint32_t newCapacity)
     uint32_t oldCapacity = m_capacity;
     m_slots.resize(newCapacity);
     m_capacity = newCapacity;
+    if (m_usedCount > newCapacity)
+        m_usedCount = newCapacity;
 
     // Re-write all descriptors in the new range
     for (uint32_t i = 0; i < newCapacity; ++i)

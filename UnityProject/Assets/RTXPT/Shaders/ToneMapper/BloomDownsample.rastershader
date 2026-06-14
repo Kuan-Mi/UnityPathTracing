@@ -1,0 +1,20 @@
+/*
+* RTXPT bloom 2x downsample — thin verbatim wrapper, two #includes selected by stage:
+*   VS = donut fullscreen_vs.hlsl (4-vertex triangle-strip quad, outputs UV) — VERBATIM
+*   PS = donut blit_ps.hlsl (entry `main`, single bilinear tap) — VERBATIM
+*
+* This is the exact shader CommonRenderPasses::BlitTexture runs for donut BloomPass's two half-scale
+* downsamples: rendering it into a half-size render target with a linear sampler averages each 2x2
+* source block in one bilinear tap. Opaque pipeline (blendMode 0). TEXTURE_ARRAY=0 (the Texture2D
+* blit permutation donut uses). fullscreen_vs needs QUAD_Z=0; draw with vertexCount = 4 + TRIANGLESTRIP.
+*/
+
+#pragma pack_matrix(row_major)
+
+#ifdef NR_VERTEX_SHADER
+#include "fullscreen_vs.hlsl"
+#endif
+
+#ifdef NR_PIXEL_SHADER
+#include "blit_ps.hlsl"
+#endif

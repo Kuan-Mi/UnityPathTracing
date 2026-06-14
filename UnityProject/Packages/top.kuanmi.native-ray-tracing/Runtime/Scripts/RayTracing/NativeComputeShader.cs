@@ -43,6 +43,11 @@ namespace NativeRender
         [SerializeField, HideInInspector]
         private string[] _rootSRVHints = Array.Empty<string>();
 
+        /// <summary>Per-sampler references to shared <see cref="NativeSampler"/> assets. Written by the
+        /// ScriptedImporter. Resolved by NativeComputePipeline via <see cref="ResolveSamplerHints"/>.</summary>
+        [SerializeField, HideInInspector]
+        private SamplerBinding[] _samplerBindings = Array.Empty<SamplerBinding>();
+
         /// <summary>Pre-compiled DXIL bytecode. Populated by EnsureCompiled(); persisted by Unity serialization.</summary>
         [SerializeField, HideInInspector]
         private byte[] _compiledDxil;
@@ -69,6 +74,10 @@ namespace NativeRender
         /// <summary>Size in bytes of the cached DXIL bytecode, or 0 if not compiled.</summary>
         public int CompiledByteCount => _compiledDxil?.Length ?? 0;
 
+        /// <summary>The DXIL container shader hash (32-char hex), or "" if not compiled. Matches the
+        /// hash PIX / RenderDoc display for this shader.</summary>
+        public string ShaderHash => DxilContainerUtil.ExtractHashHex(_compiledDxil);
+
         /// <summary>JSON reflection data produced after the last successful compilation. Empty when not yet compiled.</summary>
         public string ReflectionJson => _reflectionJson ?? "";
 
@@ -77,6 +86,13 @@ namespace NativeRender
 
         /// <summary>Root SRV hints stored by the importer. Read by <see cref="NativeComputePipeline"/>.</summary>
         internal string[] RootSRVHints => _rootSRVHints ?? Array.Empty<string>();
+
+        /// <summary>Per-sampler references stored by the importer. Read by the editor inspector.</summary>
+        internal SamplerBinding[] SamplerBindings => _samplerBindings ?? Array.Empty<SamplerBinding>();
+
+        /// <summary>Resolves the sampler references into static-sampler hints for the pipeline. Called at
+        /// (re)build time so live edits to the referenced <see cref="NativeSampler"/> assets are picked up.</summary>
+        internal SamplerHint[] ResolveSamplerHints() => SamplerBindingResolver.Resolve(_samplerBindings);
 
         // -------------------------------------------------------------------
         // Compilation  (ShaderCompilerPlugin — no D3D12 needed)
@@ -103,6 +119,7 @@ namespace NativeRender
 
             bool ok = NativeRenderPlugin.ShaderCompilerPlugin.NR_SC_CompileCS(
                 hlslPath, entryPoint, target, includeDirs, defines, extraArgs,
+                NativeRenderPlugin.ShaderCompilerPlugin.PdbOutputDir,
                 out IntPtr nativePtr, out uint nativeSize);
 
             if (!ok || nativePtr == IntPtr.Zero || nativeSize == 0)

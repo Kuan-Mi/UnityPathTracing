@@ -4,9 +4,10 @@
 
 // ---------------------------------------------------------------------------
 // ComputeDescriptorSet
-//   Owns the GPU-heap slice (SRV / UAV allocations) for one logical
-//   descriptor-set tied to a ComputeShader.  All common descriptor management
-//   is provided by DescriptorSetBase<ComputeShader>.
+//   Binds resources and issues one compute Dispatch for a ComputeShader.  Holds
+//   no per-frame GPU-heap state of its own: each Dispatch bump-allocates its
+//   SRV/UAV descriptor table from the global TransientDescriptorRing.  All
+//   common descriptor management is provided by DescriptorSetBase<ComputeShader>.
 //
 //   Lifetime: created via NR_CS_CreateDescriptorSet /
 //             destroyed via NR_CS_DestroyDescriptorSet (both called from C#).

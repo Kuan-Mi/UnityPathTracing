@@ -1,0 +1,75 @@
+/*
+* Picked-pixel debug-line drawing — Unity counterpart of the Sample.cpp:2177-2195 "Debug Lines"
+* draw: the path tracer appends DebugLineStruct vertices into u_DebugLinesBuffer (u52, only when
+* compiled with ENABLE_DEBUG_LINES_VIZ=1) and bumps feedbackBuffer[0].lineVertexCount
+* (PathTracerDebug.hlsli DebugContext::DrawLine).
+*
+* The original copies the capture buffer to a vertex buffer and draws lineVertexCount vertices
+* (CPU-known from the same-frame feedback readback). Here the vertices are pulled by SV_VertexID
+* from the structured buffer and the VS culls against the GPU-side lineVertexCount directly
+* (feedback raw view, byte 256 = after float4 debugPrint[16]) — no CPU round-trip needed.
+*
+* worldToClip comes from the ShaderDebugBuffer header like the other debug draw shaders.
+* Pipeline: LINELIST, alpha blend, no depth (manual depth test in the PS, same as ShaderDebugLines).
+*/
+
+#pragma pack_matrix(row_major)
+
+#define MAX_DEBUG_LINES                 (2048)  // PathTracerDebug.hlsli
+#define FEEDBACK_LINE_COUNT_BYTE_OFFSET (16*16) // after float4 debugPrint[MAX_DEBUG_PRINT_SLOTS]
+
+struct DebugLineStruct { float4 pos; float4 col; };
+
+StructuredBuffer<DebugLineStruct> t_DebugLines        : register(t0);
+ByteAddressBuffer                 t_ShaderDebugBuffer : register(t1);
+ByteAddressBuffer                 t_Feedback          : register(t2);
+Texture2D<float>                  t_Depth             : register(t3);
+
+float4 LoadF4(uint byteOffset) { return asfloat(t_ShaderDebugBuffer.Load4(byteOffset)); }
+
+float4x4 LoadWorldToClip()
+{
+    float4x4 m;
+    m[0] = LoadF4(8*4 + 0*16);
+    m[1] = LoadF4(8*4 + 1*16);
+    m[2] = LoadF4(8*4 + 2*16);
+    m[3] = LoadF4(8*4 + 3*16);
+    return m;
+}
+
+#ifdef NR_VERTEX_SHADER
+void main_vs( in uint vertexID : SV_VertexID,
+              out float4 outPos : SV_Position, out float4 outCol : COLOR,
+              out float4 outProjPos : TEXCOORD0 )
+{
+    outPos = outCol = outProjPos = float4(0,0,0,0);
+
+    uint writtenVertices = min(t_Feedback.Load(FEEDBACK_LINE_COUNT_BYTE_OFFSET), MAX_DEBUG_LINES);
+    if (vertexID >= writtenVertices)
+        return;
+
+    DebugLineStruct v = t_DebugLines[vertexID];
+    outPos     = mul(float4(v.pos.xyz, 1.0), LoadWorldToClip());
+    outCol     = v.col;
+    outProjPos = outPos;
+}
+#endif
+
+#ifdef NR_PIXEL_SHADER
+void main_ps( in float4 i_pos : SV_Position, in float4 i_col : COLOR,
+              in float4 projPos : TEXCOORD0, out float4 o_color : SV_Target0 )
+{
+    uint depthWidth, depthHeight;
+    t_Depth.GetDimensions(depthWidth, depthHeight);
+    float2 uv = frac(projPos.xy/projPos.ww * float2( 0.5, -0.5 ) + float2( 0.5, 0.5 ));
+    float depth0 = t_Depth[ uint2(uv * float2(depthWidth, depthHeight) + float2(0.0, 0.0) ) ];
+    float depth1 = t_Depth[ uint2(uv * float2(depthWidth, depthHeight) + float2(0.0, 1.0) ) ];
+    float depth2 = t_Depth[ uint2(uv * float2(depthWidth, depthHeight) + float2(1.0, 0.0) ) ];
+    float depth3 = t_Depth[ uint2(uv * float2(depthWidth, depthHeight) + float2(1.0, 1.0) ) ];
+    float depth = min(min(depth0, depth1), min(depth2, depth3));
+
+    bool behind = depth > (projPos.z/projPos.w*1.002 + 0.000001);
+
+    o_color = float4( lerp(i_col.rgb, i_col.rgb*0.7+0.2, behind), i_col.a * ((behind)?(0.15):(1)));
+}
+#endif

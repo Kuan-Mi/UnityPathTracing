@@ -68,6 +68,9 @@ void BindlessBuffer::SetBuffer(uint32_t index, ID3D12Resource* resource)
         return;
     }
     m_buffers[index] = resource;
+    if (resource && index >= m_usedCount)
+        m_usedCount = index + 1;
+    ++m_contentEpoch;   // re-arm the per-frame state sweep
     WriteDescriptor(index, resource);
 }
 
@@ -84,6 +87,9 @@ void BindlessBuffer::Resize(uint32_t newCapacity)
     uint32_t oldCapacity = m_capacity;
     m_buffers.resize(newCapacity, nullptr);
     m_capacity = newCapacity;
+    if (m_usedCount > newCapacity)
+        m_usedCount = newCapacity;
+    ++m_contentEpoch;   // re-arm the per-frame state sweep
 
     // Re-write all descriptors in the new range
     for (uint32_t i = 0; i < newCapacity; ++i)

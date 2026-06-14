@@ -1,8 +1,12 @@
 @echo off
 setlocal enabledelayedexpansion
 
+:: Build configuration: pass as first argument (Debug / Release). Default: Debug.
+set CONFIG=%~1
+if "%CONFIG%"=="" set CONFIG=Debug
+
 echo ============================================================
-echo  NativeRenderPlugin Build
+echo  NativeRenderPlugin Build (%CONFIG%)
 echo ============================================================
 echo.
 
@@ -41,7 +45,7 @@ if errorlevel 1 (
 
 echo.
 echo Building...
-cmake --build "%BUILD_DIR%" --config Debug
+cmake --build "%BUILD_DIR%" --config %CONFIG%
 if errorlevel 1 (
     echo [ERROR] Build failed.
     exit /b 1
@@ -50,7 +54,7 @@ if errorlevel 1 (
 echo.
 echo ============================================================
 echo  Build successful!
-echo  Output: %BUILD_DIR%\Debug\
+echo  Output: %BUILD_DIR%\%CONFIG%\
 echo ============================================================
 echo.
 exit /b 0

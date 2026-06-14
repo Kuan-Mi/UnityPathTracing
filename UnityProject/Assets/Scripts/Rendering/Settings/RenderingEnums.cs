@@ -55,6 +55,18 @@ namespace PathTracing
         ULTRA_PERFORMANCE // 3.0x                 72
     }
 
+    /// <summary>
+    /// DLSS Ray Reconstruction render preset. Values mirror
+    /// NVSDK_NGX_RayReconstruction_Hint_Render_Preset; only Default/D/E are usable,
+    /// the rest revert to default behavior on current drivers.
+    /// </summary>
+    public enum DlssRRPreset : byte
+    {
+        Default = 0, // driver/OTA default
+        D       = 4, // default transformer model
+        E       = 5, // latest transformer model (required when a DoF guide is used)
+    }
+
     public enum DenoiserType
     {
         DENOISER_REBLUR    = 0,
@@ -170,6 +182,127 @@ namespace PathTracing
         GradientArraySlice0,
         /// <summary>Slice 1 of the gradient Texture2DArray.</summary>
         GradientArraySlice1,
+    }
+
+    /// <summary>
+    /// Debug / display modes for <see cref="NativeRtxptFeature"/>'s
+    /// <see cref="NativeRtxptOutputBlitPass"/>.
+    /// </summary>
+    public enum NativeRtxptShowMode
+    {
+        // ── Final outputs ──────────────────────────────────────────────────
+        /// <summary>DLSS-RR denoised + upscaled output (realtime mode).</summary>
+        DlssRrOutput,
+        /// <summary>Post-accumulation tone-mapped output (reference mode).</summary>
+        ProcessedOutput,
+        /// <summary>Raw PT output color before denoising.</summary>
+        OutputColor,
+
+        // ── GBuffer ────────────────────────────────────────────────────────
+        BaseColor,
+        RoughnessMetal,
+        SpecNormal,
+
+        // ── Depth / motion ─────────────────────────────────────────────────
+        Depth,
+        MotionVectors,
+
+        // ── Stable planes ─────────────────────────────────────────────────
+        SpecularHitT,
+        StableRadiance,
+
+        // ── DLSS-RR guide buffers ──────────────────────────────────────────
+        DlssDiffuseAlbedo,
+        DlssSpecularAlbedo,
+        DlssNormal,
+        DlssRoughness,
+        DlssSpecMotionVectors,
+
+        // ── Debug ──────────────────────────────────────────────────────────
+        ShaderDebugViz,
+
+        /// <summary>First-hit NEE sampled light radiance (tonemapped) written to ShaderDebugViz.</summary>
+        NEELightColor,
+
+        /// <summary>First-hit surface debug visualisation driven by <see cref="RtxptDebugViewType"/>.
+        /// Displayed when <see cref="NativeRtxptSetting.debugViewType"/> is not Disabled.</summary>
+        FirstHitDebugViz,
+
+        // ── 环境光调试 ─────────────────────────────────────────────────────
+        /// <summary>调试纹理：由 PathTracer HandleMiss 中调试代码写入（环境光采样结果等）。</summary>
+        DebugOutputColor,
+    }
+
+    /// <summary>
+    /// Mirrors HLSL <c>DebugViewType</c> from PathTracerDebug.hlsli.
+    /// Controls which surface attribute the path tracer writes into the ShaderDebugViz texture.
+    /// </summary>
+    public enum RtxptDebugViewType : int
+    {
+        Disabled = 0,
+        DominantStablePlaneIndex,
+
+        StablePlane_VirtualRayLength,
+        StablePlane_MotionVectors,
+        StablePlane_Normals,
+        StablePlane_Roughness,
+        StablePlane_SpecAvg,
+        StablePlane_DiffBSDFEstimate,
+        StablePlane_DiffRadiance,
+        StablePlane_SpecBSDFEstimate,
+        StablePlane_SpecRadiance,
+        StablePlane_RelaxedDisocclusion,
+        StablePlane_DiffRadianceDenoised,
+        StablePlane_SpecRadianceDenoised,
+        StablePlane_CombinedRadianceDenoised,
+        StablePlane_ViewZ,
+        StablePlane_Throughput,
+        StablePlane_DenoiserValidation,
+
+        StableRadiance,
+
+        DenoiserGuide_Depth,
+        DenoiserGuide_Roughness,
+        DenoiserGuide_Albedo,
+        DenoiserGuide_SpecAlbedo,
+        DenoiserGuide_Normal,
+        DenoiserGuide_MotionVectors,
+        DenoiserGuide_SpecMotionVectors,
+        DenoiserGuide_SpecHitT,
+        DenoiserGuide_LayerWeights,
+        DenoiserGuide_PrimaryLayer,
+
+        FirstHit_Barycentrics,
+        FirstHit_FaceNormal,
+        FirstHit_GeometryNormal,
+        FirstHit_ShadingNormal,
+        FirstHit_ShadingTangent,
+        FirstHit_ShadingBitangent,
+        FirstHit_FrontFacing,
+        FirstHit_ThinSurface,
+        FirstHit_Diffuse,
+        FirstHit_Specular,
+        FirstHit_Roughness,
+        FirstHit_Metallic,
+        FirstHit_ShaderID,
+        FirstHit_MaterialID,
+
+        VBufferMotionVectors,
+        VBufferDepth,
+
+        SecondarySurfacePosition,
+        SecondarySurfaceRadiance,
+        ReSTIRGIOutput,
+
+        ReSTIRDIInitialOutput,
+        ReSTIRDITemporalOutput,
+        ReSTIRDISpatialOutput,
+        ReSTIRDIFinalOutput,
+        ReSTIRDIFinalContribution,
+        ReGIRIndirectOutput,
+
+        /// <summary>First-hit NEE sampled radiance written to ShaderDebugViz by the path tracer.</summary>
+        NEELightColor,
     }
 
     /// <summary>

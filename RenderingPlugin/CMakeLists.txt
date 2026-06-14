@@ -328,21 +328,29 @@ target_link_libraries(OMMBakerPlugin PRIVATE omm-lib)
 # ---------------------------------------------------------------------------
 add_library(NativeRenderPlugin SHARED
     NativeRenderPlugin/src/Plugin/Plugin.cpp
+    NativeRenderPlugin/src/Plugin/DeferredDeleteQueue.cpp
     NativeRenderPlugin/src/Shaders/ShaderBase.cpp
     NativeRenderPlugin/src/Descriptors/DescriptorSetBase.cpp
     NativeRenderPlugin/src/Shaders/RayTraceShader.cpp
     NativeRenderPlugin/src/Descriptors/RayTraceDescriptorSet.cpp
     NativeRenderPlugin/src/Shaders/ComputeShader.cpp
     NativeRenderPlugin/src/Descriptors/ComputeDescriptorSet.cpp
+    NativeRenderPlugin/src/Shaders/RasterShader.cpp
+    NativeRenderPlugin/src/Descriptors/RasterDescriptorSet.cpp
     NativeRenderPlugin/src/Resources/AccelerationStructure.cpp
     NativeRenderPlugin/src/Descriptors/DescriptorHeapAllocator.cpp
+    NativeRenderPlugin/src/Descriptors/TransientDescriptorRing.cpp
     NativeRenderPlugin/src/Resources/BindlessTexture.cpp
     NativeRenderPlugin/src/Resources/BindlessBuffer.cpp
     NativeRenderPlugin/src/Resources/BindlessUAVTexture.cpp
     NativeRenderPlugin/src/Resources/NativeBuffer.cpp
-    NativeRenderPlugin/src/Resources/NativeStructuredBuffer.cpp
-    NativeRenderPlugin/src/Resources/NativeGpuBuffer.cpp
+    NativeRenderPlugin/src/Resources/SharedUploadPool.cpp
     NativeRenderPlugin/src/Hooks/D3D12HeapHook.cpp
+    # RTXMU (NVIDIA RTX Memory Utility) — BLAS suballocation + compaction
+    # management; vendored D3D12 subset (see External/rtxmu/README.md).
+    External/rtxmu/src/D3D12AccelStructManager.cpp
+    External/rtxmu/src/D3D12Suballocator.cpp
+    External/rtxmu/src/Logger.cpp
 )
 
 target_include_directories(NativeRenderPlugin PRIVATE
@@ -352,6 +360,7 @@ target_include_directories(NativeRenderPlugin PRIVATE
     NativeRenderPlugin/include/Resources
     NativeRenderPlugin/include/Hooks
     NativeRenderPlugin/src/Plugin
+    External/rtxmu/include
     D3D12HeapHook
     "${UNITY_PLUGIN_API_DIR}"
     "${DXC_INC}"

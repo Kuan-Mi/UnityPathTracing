@@ -5,7 +5,7 @@
  * Integrates IUnityLog for in-Editor log output when loaded by Unity.
  *
  * Exported API:
- *   bool  NR_SC_Compile(hlslPath, targetProfile, includeDirs, defines, extraArgs, outBytes*, outSize*) – compile HLSL to DXIL
+ *   bool  NR_SC_Compile(hlslPath, targetProfile, includeDirs, defines, extraArgs, pdbOutDir, outBytes*, outSize*) – compile HLSL to DXIL (writes a separate PDB into pdbOutDir when set)
  *   void  NR_SC_Free(ptr)                                           – free the output buffer
  *   (Unity lifecycle) UnityPluginLoad / UnityPluginUnload
  */
@@ -167,7 +167,9 @@ ComPtr<IDxcBlob> ShaderCompilerPlugin::CompileShader(
     const std::wstring& target,
     const std::vector<std::wstring>& defines,
     const std::vector<std::wstring>& includeDirs,
-    const std::vector<std::wstring>& extraArgs)
+    const std::vector<std::wstring>& extraArgs,
+    ComPtr<IDxcBlob>* outPdb,
+    std::wstring* outPdbName)
 {
     ComPtr<IDxcBlobEncoding> sourceBlob;
     HRESULT hr = m_dxcUtils->CreateBlob(
@@ -182,20 +184,16 @@ ComPtr<IDxcBlob> ShaderCompilerPlugin::CompileShader(
         return nullptr;
     }
 
+    // Only entry/target are fixed here; every other compile flag (optimization level, -Zi/-Zsb,
+    // -enable-16bit-types, warnings policy, all_resources_bound, etc.) is supplied by the C# caller
+    // via extraArgs. Hardcoding flags here (notably -WX, -all_resources_bound and a _DEBUG-only
+    // -Zi/-Od) made the emitted DXIL — and therefore the shader hash — diverge from the original
+    // RTXPT build, which drives compilation entirely from its own argument list.
     std::vector<LPCWSTR> arguments;
     arguments.push_back(L"-E");
     arguments.push_back(entryPoint.c_str());
     arguments.push_back(L"-T");
     arguments.push_back(target.c_str());
-    arguments.push_back(DXC_ARG_WARNINGS_ARE_ERRORS);
-    arguments.push_back(DXC_ARG_ALL_RESOURCES_BOUND);
-
-#ifdef _DEBUG
-    arguments.push_back(DXC_ARG_DEBUG);
-    arguments.push_back(DXC_ARG_SKIP_OPTIMIZATIONS);
-#else
-    arguments.push_back(DXC_ARG_OPTIMIZATION_LEVEL3);
-#endif
 
     for (const auto& define : defines)
     {
@@ -255,6 +253,19 @@ ComPtr<IDxcBlob> ShaderCompilerPlugin::CompileShader(
 
     ComPtr<IDxcBlob> shaderBlob;
     result->GetResult(&shaderBlob);
+
+    // Separate PDB: when the caller wants it and the shader carries debug info (-Zi) without
+    // -Qembed_debug, DXC exposes a standalone PDB plus a hash-based file name. The shader object
+    // above stays lean (only a debug-name reference), keeping the serialized blob / build small.
+    if (outPdb)
+    {
+        ComPtr<IDxcBlobUtf16> pdbName;
+        HRESULT pdbHr = result->GetOutput(
+            DXC_OUT_PDB, IID_PPV_ARGS(outPdb->GetAddressOf()), pdbName.GetAddressOf());
+        if (SUCCEEDED(pdbHr) && outPdbName && pdbName && pdbName->GetStringLength() > 0)
+            *outPdbName = pdbName->GetStringPointer();
+    }
+
     return shaderBlob;
 }
 
@@ -307,6 +318,24 @@ static std::vector<std::wstring> ParseIncludeDirs(const char* shaderPath, const 
     return dirs;
 }
 
+// Writes a DXC-produced PDB blob to <dir>/<dxcName>. The name is DXC's hash-based PDB file
+// name, which PIX uses to match the shader to its symbols via its symbol search path.
+static bool WritePdbFile(const std::wstring& dir, const std::wstring& name, IDxcBlob* pdb)
+{
+    if (!pdb || dir.empty() || name.empty()) return false;
+
+    std::error_code ec;
+    std::filesystem::create_directories(dir, ec);
+
+    std::filesystem::path full = std::filesystem::path(dir) / name;
+    std::ofstream out(full, std::ios::binary);
+    if (!out.is_open()) return false;
+
+    out.write(static_cast<const char*>(pdb->GetBufferPointer()),
+              static_cast<std::streamsize>(pdb->GetBufferSize()));
+    return out.good();
+}
+
 // ---------------------------------------------------------------------------
 // Module-level ShaderCompilerPlugin instance (initialized once on first use)
 // ---------------------------------------------------------------------------
@@ -336,6 +365,7 @@ bool NR_SC_Compile(
     const char* includeDirs,
     const char* defines,
     const char* extraArgs,
+    const char* pdbOutDir,
     uint8_t**   outBytes,
     uint32_t*   outSize)
 {
@@ -375,13 +405,31 @@ bool NR_SC_Compile(
         ? std::wstring(targetProfile, targetProfile + strlen(targetProfile))
         : L"lib_6_9";
 
+    const bool wantPdb = pdbOutDir && pdbOutDir[0] != '\0';
+    ComPtr<IDxcBlob> pdbBlob;
+    std::wstring     pdbName;
+
     ComPtr<IDxcBlob> blob = s_Plugin.CompileShader(
-        source.c_str(), L"", targetProfileW.c_str(), defs, dirs, dxcArgs);
+        source.c_str(), L"", targetProfileW.c_str(), defs, dirs, dxcArgs,
+        wantPdb ? &pdbBlob : nullptr, wantPdb ? &pdbName : nullptr);
 
     if (!blob)
     {
         SCLogError("NR_SC_Compile: compilation failed");
         return false;
+    }
+
+    if (wantPdb)
+    {
+        if (pdbBlob && !pdbName.empty())
+        {
+            if (!WritePdbFile(Utf8ToWide(pdbOutDir), pdbName, pdbBlob.Get()))
+                SCLogWarn("NR_SC_Compile: failed to write PDB file");
+        }
+        else
+        {
+            SCLogWarn("NR_SC_Compile: PDB requested but none produced (need -Zi without -Qembed_debug)");
+        }
     }
 
     const SIZE_T size = blob->GetBufferSize();
@@ -412,6 +460,7 @@ bool NR_SC_CompileCS(
     const char* includeDirs,
     const char* defines,
     const char* extraArgs,
+    const char* pdbOutDir,
     uint8_t**   outBytes,
     uint32_t*   outSize)
 {
@@ -460,13 +509,31 @@ bool NR_SC_CompileCS(
     std::wstring wEntry  = Utf8ToWide(entryPoint);
     std::wstring wTarget = Utf8ToWide(target);
 
+    const bool wantPdb = pdbOutDir && pdbOutDir[0] != '\0';
+    ComPtr<IDxcBlob> pdbBlob;
+    std::wstring     pdbName;
+
     ComPtr<IDxcBlob> blob = s_Plugin.CompileShader(
-        source.c_str(), wEntry, wTarget, defs, dirs, dxcArgs);
+        source.c_str(), wEntry, wTarget, defs, dirs, dxcArgs,
+        wantPdb ? &pdbBlob : nullptr, wantPdb ? &pdbName : nullptr);
 
     if (!blob)
     {
         SCLogError("NR_SC_CompileCS: compilation failed");
         return false;
+    }
+
+    if (wantPdb)
+    {
+        if (pdbBlob && !pdbName.empty())
+        {
+            if (!WritePdbFile(Utf8ToWide(pdbOutDir), pdbName, pdbBlob.Get()))
+                SCLogWarn("NR_SC_CompileCS: failed to write PDB file");
+        }
+        else
+        {
+            SCLogWarn("NR_SC_CompileCS: PDB requested but none produced (need -Zi without -Qembed_debug)");
+        }
     }
 
     const SIZE_T size = blob->GetBufferSize();
@@ -637,6 +704,19 @@ bool NR_SC_ReflectCS(
         const char* dim     = SrvDimensionToString(bd.Dimension);
         const char* retType = ReturnTypeToString(bd.ReturnType);
 
+        // For constant buffers, capture the byte size so the editor can derive the root
+        // 32-bit-constant count (= size / 4) automatically, without the user entering it.
+        UINT cbByteSize = 0;
+        if (bd.Type == D3D_SIT_CBUFFER && bd.Name)
+        {
+            if (ID3D12ShaderReflectionConstantBuffer* cb = refl->GetConstantBufferByName(bd.Name))
+            {
+                D3D12_SHADER_BUFFER_DESC cbDesc{};
+                if (SUCCEEDED(cb->GetDesc(&cbDesc)))
+                    cbByteSize = cbDesc.Size;
+            }
+        }
+
         if (i > 0) json += ",\n";
         json += "    { \"name\": \"";
         json += name;
@@ -650,7 +730,13 @@ bool NR_SC_ReflectCS(
         json += dim;
         json += "\", \"retType\": \"";
         json += retType;
-        json += "\" }";
+        json += "\"";
+        if (cbByteSize > 0)
+        {
+            json += ", \"size\": ";
+            json += std::to_string(cbByteSize);
+        }
+        json += " }";
     }
 
     json += "\n  ]\n}";
@@ -745,7 +831,7 @@ bool NR_SC_ReflectLib(
     // Collect unique bindings across all exported functions
     // Use a map keyed on (name, space, reg) to deduplicate.
     struct BindKey { std::string name; UINT space; UINT reg; };
-    struct BindVal { std::string type; std::string dim; std::string retType; };
+    struct BindVal { std::string type; std::string dim; std::string retType; UINT size; };
     std::vector<std::pair<BindKey, BindVal>> bindings;
 
     auto alreadyAdded = [&](const std::string& name, UINT space, UINT reg) -> bool {
@@ -829,8 +915,21 @@ bool NR_SC_ReflectLib(
             default: break;
             }
 
+            // Capture constant-buffer byte size so the editor can derive the root
+            // 32-bit-constant count (= size / 4) automatically.
+            UINT cbByteSize = 0;
+            if (bd.Type == D3D_SIT_CBUFFER && bd.Name)
+            {
+                if (ID3D12ShaderReflectionConstantBuffer* cb = fn->GetConstantBufferByName(bd.Name))
+                {
+                    D3D12_SHADER_BUFFER_DESC cbDesc{};
+                    if (SUCCEEDED(cb->GetDesc(&cbDesc)))
+                        cbByteSize = cbDesc.Size;
+                }
+            }
+
             BindKey k{ name, bd.Space, bd.BindPoint };
-            BindVal v{ typeName, SrvDimensionToString(bd.Dimension), ReturnTypeToString(bd.ReturnType) };
+            BindVal v{ typeName, SrvDimensionToString(bd.Dimension), ReturnTypeToString(bd.ReturnType), cbByteSize };
             bindings.push_back({ k, v });
         }
     }
@@ -867,7 +966,13 @@ bool NR_SC_ReflectLib(
         json += v.dim;
         json += "\", \"retType\": \"";
         json += v.retType;
-        json += "\" }";
+        json += "\"";
+        if (v.size > 0)
+        {
+            json += ", \"size\": ";
+            json += std::to_string(v.size);
+        }
+        json += " }";
     }
 
     json += "\n  ]\n}";

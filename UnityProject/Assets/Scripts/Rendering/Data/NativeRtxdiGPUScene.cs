@@ -163,7 +163,6 @@ namespace PathTracing
     // =========================================================================
     // Emissive geometry enumeration (used by NativeRtxdiPrepareLightsPass)
     // =========================================================================
-
     /// <summary>
     /// One entry per emissive sub-mesh in the scene.
     /// Mirrors the per-geometry task record that PrepareLights.computeshader needs.
@@ -493,7 +492,7 @@ namespace PathTracing
                 {
                     SubMeshDescriptor sub    = mesh.GetSubMesh(s);
                     Material          mat    = s < mats.Length ? mats[s] : (mats.Length > 0 ? mats[mats.Length - 1] : null);
-                    int               matIdx = GetOrAddMaterial(mat, instIdx, matList, texPtrs);
+                    int               matIdx = GetOrAddMaterial(mat, matList, texPtrs);
 
                     geomList.Add(new DonutGeometryData
                     {
@@ -631,8 +630,7 @@ namespace PathTracing
                 _instanceGpuBuf.SetData(_instanceCpu, dirtyStart, dirtyStart, instanceCount - dirtyStart);
         }
 
-        private int GetOrAddMaterial(Material mat, int instanceSlotIndex,
-            List<DonutMaterialConstants> matList, List<IntPtr> texPtrs)
+        private int GetOrAddMaterial(Material mat, List<DonutMaterialConstants> matList, List<IntPtr> texPtrs)
         {
             int matId = mat != null ? mat.GetInstanceID() : -1;
             if (_materialSlots.TryGetValue(matId, out int existing))

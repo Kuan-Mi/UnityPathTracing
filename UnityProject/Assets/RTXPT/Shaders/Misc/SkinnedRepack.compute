@@ -1,0 +1,92 @@
+// SkinnedRepack: converts a Unity GPU-skinned vertex buffer (interleaved float attributes,
+// root-bone space) into an RTXPT/donut SoA vertex buffer, maintaining a PrevPosition stream
+// exactly like donut's skinning_cs.hlsl (prev = the position written last frame; first frame
+// prev = current). Run once per skinned instance per frame, BEFORE the BLAS refit that
+// consumes the positions.
+//
+// Unity compute port of the former SkinnedRepack.computeshader (native plugin): both the
+// source (SkinnedMeshRenderer.GetVertexBuffer) and the destination donut SoA buffer are plain
+// Unity GraphicsBuffers (Target.Raw), so this binds them directly via SetComputeBufferParam and
+// avoids the per-frame GetNativeBufferPtr() marshalling the native path required.
+//
+// Quantization matches donut's dm::vectorToSnorm8 / the C# RtxptGeometryCache packers
+// bit-for-bit: scale = 127/length(xyz), truncation toward zero, low byte kept.
+
+#pragma kernel SkinnedRepack
+
+// Per-dispatch constants (set via CommandBuffer.SetComputeIntParam from C#).
+uint g_VertexCount;
+uint g_SrcStride;        // Unity skinned VB stride (stream 0 of the shared mesh)
+uint g_SrcPosOffset;     // byte offsets within one source vertex
+uint g_SrcNormalOffset;
+uint g_SrcTangentOffset;
+uint g_DstPosOffset;     // byte offsets of the SoA streams in the destination buffer
+uint g_DstPrevPosOffset;
+uint g_DstNormalOffset;  // unused (and may be 0xFFFFFFFF) when FLAG_HAS_NORMAL is clear
+uint g_DstTangentOffset;
+uint g_Flags;
+
+#define FLAG_FIRST_FRAME (1u << 0)
+#define FLAG_HAS_NORMAL  (1u << 1)
+#define FLAG_HAS_TANGENT (1u << 2)
+
+ByteAddressBuffer   t_SrcVertexBuffer; // Unity GPU-skinned VB
+RWByteAddressBuffer u_DstVertexBuffer; // donut SoA buffer (BLAS + bindless input)
+
+uint PackRGB8Snorm(float3 v)
+{
+    float scale = 127.0 / sqrt(dot(v, v));
+    uint r = (uint)((int)(v.x * scale) & 0xFF);
+    uint g = (uint)((int)(v.y * scale) & 0xFF);
+    uint b = (uint)((int)(v.z * scale) & 0xFF);
+    return r | (g << 8) | (b << 16);
+}
+
+uint PackRGBA8Snorm(float4 v)
+{
+    // donut scales all four channels by 127/length(xyz) (w shares the xyz-based scale).
+    float scale = 127.0 / sqrt(dot(v.xyz, v.xyz));
+    uint r = (uint)((int)(v.x * scale) & 0xFF);
+    uint g = (uint)((int)(v.y * scale) & 0xFF);
+    uint b = (uint)((int)(v.z * scale) & 0xFF);
+    uint a = (uint)((int)(v.w * scale) & 0xFF);
+    return r | (g << 8) | (b << 16) | (a << 24);
+}
+
+[numthreads(64, 1, 1)]
+void SkinnedRepack(uint3 dispatchId : SV_DispatchThreadID)
+{
+    uint vtx = dispatchId.x;
+    if (vtx >= g_VertexCount)
+        return;
+
+    uint srcBase = vtx * g_SrcStride;
+
+    float3 position = asfloat(t_SrcVertexBuffer.Load3(srcBase + g_SrcPosOffset));
+
+    // Copy the current output position into PrevPosition before overwriting it
+    // (donut skinning_cs.hlsl model; first frame has no history → prev = current).
+    uint   dstPosAddr = g_DstPosOffset + vtx * 12u;
+    float3 prevPosition;
+    if (g_Flags & FLAG_FIRST_FRAME)
+        prevPosition = position;
+    else
+        prevPosition = asfloat(u_DstVertexBuffer.Load3(dstPosAddr));
+    u_DstVertexBuffer.Store3(g_DstPrevPosOffset + vtx * 12u, asuint(prevPosition));
+
+    u_DstVertexBuffer.Store3(dstPosAddr, asuint(position));
+
+    if (g_Flags & FLAG_HAS_NORMAL)
+    {
+        float3 normal = asfloat(t_SrcVertexBuffer.Load3(srcBase + g_SrcNormalOffset));
+        u_DstVertexBuffer.Store(g_DstNormalOffset + vtx * 4u, PackRGB8Snorm(normal));
+    }
+
+    if (g_Flags & FLAG_HAS_TANGENT)
+    {
+        float4 tangent = asfloat(t_SrcVertexBuffer.Load4(srcBase + g_SrcTangentOffset));
+        // The w (handedness) sign is flipped to match the static path / RTXPT glTF convention.
+        tangent.w = -tangent.w;
+        u_DstVertexBuffer.Store(g_DstTangentOffset + vtx * 4u, PackRGBA8Snorm(tangent));
+    }
+}

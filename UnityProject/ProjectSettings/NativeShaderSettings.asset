@@ -1,9 +1,12 @@
 {
-    "globalDefines": [
-        "WITH_NRD"
-    ],
+    "globalDefines": [],
     "globalIncludePaths": [
         "../RenderingPlugin/External/NRD/Shaders"
     ],
-    "globalExtraArgs": []
+    "globalExtraArgs": [
+        "-Zi",
+        "-Zsb",
+        "-O3",
+        "-enable-16bit-types"
+    ]
 }

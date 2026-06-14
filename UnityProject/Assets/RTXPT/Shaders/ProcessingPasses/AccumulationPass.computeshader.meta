@@ -8,7 +8,6 @@ ScriptedImporter:
   assetBundleName: 
   assetBundleVariant: 
   script: {fileID: 11500000, guid: ea13329833ed16543aa33a7c88f8c5bf, type: 3}
-  isComputeShader: 1
   additionalIncludePaths:
   - ../RenderingPlugin/External/RTXPT/Rtxpt/ProcessingPasses
   - ../RenderingPlugin/External/RTXPT/Rtxpt
@@ -21,5 +20,10 @@ ScriptedImporter:
   defines: []
   entryPoint: main
   targetProfile: cs_6_6
-  rootConstantsHints: []
+  rootConstantsHints:
+  - Name: g_Const
+    Count: 12
   rootSRVHints: []
+  samplerBindings:
+  - Name: s_Sampler
+    Sampler: {fileID: 11400000, guid: 9be38ccb4f704279889964491d3d8a2a, type: 2}

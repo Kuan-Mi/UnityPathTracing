@@ -51,7 +51,7 @@ namespace PathTracing
 
         public class Resource
         {
-            internal NativeBuffer              ConstantBuffer;  // GlobalConstants CBV
+            internal VolatileConstantBuffer              ConstantBuffer;  // GlobalConstants CBV
             internal NativeNrdTextureResources Pool;
         }
 

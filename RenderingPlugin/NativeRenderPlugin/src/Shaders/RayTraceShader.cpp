@@ -5,6 +5,10 @@
 #include <algorithm>
 #include <windows.h>
 
+// Deferred-release helper defined in Plugin.cpp.
+// Enqueues the resource for GPU-safe destruction after in-flight frames complete.
+extern void SafeReleaseResource(ComPtr<ID3D12Resource> resource);
+
 // ---------------------------------------------------------------------------
 // Heap / buffer helpers
 // ---------------------------------------------------------------------------
@@ -38,12 +42,10 @@ namespace
 // ---------------------------------------------------------------------------
 
 bool RayTraceShader::Initialize(ID3D12Device5* device, IUnityLog* log,
-                                 DescriptorHeapAllocator* allocator,
                                  IUnityGraphicsD3D12v8*   d3d12v8)
 {
     m_log       = log;
     m_device    = device;
-    m_allocator = allocator;
     m_d3d12v8   = d3d12v8;
     return true;
 }
@@ -98,6 +100,7 @@ bool RayTraceShader::LoadShaderFromBytes(const uint8_t* dxilBytes, uint32_t size
     m_hitGroups.clear();
     m_hitGroupIndex.clear();
     m_numSRV = m_numUAV = m_numCBV = m_numSRVArray = m_numUAVArray = m_numRootConstants = m_numRootSRV = 0;
+    m_numSRVSlots = m_numUAVSlots = 0;
     m_rootParamSRV = m_rootParamUAV = m_rootParamCBVBase = m_rootParamRootSRVBase = kInvalidAlloc;
 
     if (!ReflectBindings(shaderLib.Get()))  return false;
@@ -475,8 +478,75 @@ bool RayTraceShader::BuildShaderTable()
     hgNames.reserve(m_hitGroups.size());
     for (const auto& hg : m_hitGroups) hgNames.push_back(hg.groupExport);
     m_hitGroupTable = MakeTable("HitGroup", hgNames);
+    // NOTE: intentionally leave m_hitGroupTableEntryCount = 0 here.
+    // The real per-geometry SBT is built by RebuildHitGroupTable(); until
+    // that runs on the render thread, DispatchRays must be suppressed
+    // (see the GetHitGroupCount() == 0 guard in RayTraceDescriptorSet::Dispatch).
+    (void)m_hitGroupTable; // table allocated but count stays 0 until Rebuild runs
 
     return m_rayGenTable && m_missTable && m_hitGroupTable;
+}
+
+// ---------------------------------------------------------------------------
+// RebuildHitGroupTable
+//   Rebuilds the hit-group shader table with one entry per geometry (TLAS order).
+//   variantIndices[i] selects which m_hitGroups entry to use for geometry i.
+//   C# pre-computes this array; no AccelerationStructure involvement.
+// ---------------------------------------------------------------------------
+bool RayTraceShader::RebuildHitGroupTable(const uint32_t* variantIndices, uint32_t count)
+{
+    if (!m_pso) { Log(kUnityLogTypeError, "RebuildHitGroupTable: m_pso is null"); return false; }
+    if (!variantIndices || count == 0) return true;
+
+    ComPtr<ID3D12StateObjectProperties> props;
+    if (FAILED(m_pso->QueryInterface(IID_PPV_ARGS(&props))) || !props)
+    {
+        Log(kUnityLogTypeError, "RebuildHitGroupTable: QueryInterface for ID3D12StateObjectProperties failed");
+        return false;
+    }
+
+    const UINT stride    = D3D12_RAYTRACING_SHADER_RECORD_BYTE_ALIGNMENT;
+    const UINT idSize    = D3D12_SHADER_IDENTIFIER_SIZE_IN_BYTES;
+    const UINT totalSize = stride * count;
+
+    auto buf = CreateUploadBuffer(m_device.Get(), totalSize);
+    if (!buf) { Log(kUnityLogTypeError, "RebuildHitGroupTable: CreateUploadBuffer failed"); return false; }
+
+    uint8_t* p = nullptr;
+    if (FAILED(buf->Map(0, nullptr, reinterpret_cast<void**>(&p))) || !p)
+    {
+        Log(kUnityLogTypeError, "RebuildHitGroupTable: Map failed");
+        return false;
+    }
+
+    for (uint32_t i = 0; i < count; ++i)
+    {
+        const uint32_t idx = variantIndices[i];
+        if (idx >= m_hitGroups.size())
+        {
+            Logf(kUnityLogTypeError, "RebuildHitGroupTable: variantIndex[%u]=%u out of range (hitGroups=%zu)",
+                 i, idx, m_hitGroups.size());
+            buf->Unmap(0, nullptr);
+            return false;
+        }
+        void* id = props->GetShaderIdentifier(m_hitGroups[idx].groupExport.c_str());
+        if (!id)
+        {
+            char nameA[256] = {};
+            WideCharToMultiByte(CP_UTF8, 0, m_hitGroups[idx].groupExport.c_str(), -1, nameA, sizeof(nameA)-1, nullptr, nullptr);
+            Logf(kUnityLogTypeError, "RebuildHitGroupTable: GetShaderIdentifier null for '%s' at index %u", nameA, idx);
+            buf->Unmap(0, nullptr);
+            return false;
+        }
+        memcpy(p, id, idSize);
+        p += stride;
+    }
+    buf->Unmap(0, nullptr);
+    // Defer-release the old table: the GPU may still be reading it from in-flight frames.
+    SafeReleaseResource(std::move(m_hitGroupTable));
+    m_hitGroupTable = std::move(buf);
+    m_hitGroupTableEntryCount = count;  // SizeInBytes in DispatchRays must reflect the new count
+    return true;
 }
 
 // ---------------------------------------------------------------------------
@@ -776,6 +846,7 @@ bool RayTraceShader::LoadShaderFromMultipleBlobs(const BlobDesc* blobs, uint32_t
     m_hitGroups.clear();
     m_hitGroupIndex.clear();
     m_numSRV = m_numUAV = m_numCBV = m_numSRVArray = m_numUAVArray = m_numRootConstants = m_numRootSRV = 0;
+    m_numSRVSlots = m_numUAVSlots = 0;
     m_rootParamSRV = m_rootParamUAV = m_rootParamCBVBase = m_rootParamRootSRVBase = kInvalidAlloc;
 
     ComPtr<IDxcUtils> utils;

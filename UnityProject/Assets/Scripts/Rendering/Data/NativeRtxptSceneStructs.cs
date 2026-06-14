@@ -168,4 +168,203 @@ namespace PathTracing
         public const uint AlphaOffsetMask   = 0xFF000000u;
         public const int  AlphaOffsetOffset = 24;
     }
+
+    // =========================================================================
+    // RTXPT Lighting structs
+    // Mirror PolymorphicLight.h / LightingTypes.hlsli
+    // =========================================================================
+
+    /// <summary>
+    /// RTXPT polymorphic light type codes.
+    /// Mirrors <c>PolymorphicLightType</c> in <c>PolymorphicLight.h</c>.
+    /// </summary>
+    public enum RtxptLightType : uint
+    {
+        Sphere         = 0,
+        Triangle       = 1,
+        Directional    = 2,
+        Environment    = 3,
+        Point          = 4,
+        EnvironmentQuad = 5,
+    }
+
+    /// <summary>
+    /// Per-light GPU data. Mirrors <c>PolymorphicLightInfo</c> in <c>PolymorphicLight.h</c>.
+    /// Size = 2 × uint4 = 32 bytes.
+    /// Shader binding: <c>StructuredBuffer&lt;PolymorphicLightInfo&gt; t_Lights : register(t13)</c>
+    /// </summary>
+    [StructLayout(LayoutKind.Sequential, Pack = 4)]
+    public struct RtxptPolymorphicLightInfo
+    {
+        // uint4[0]: position + packed color/type
+        public float CenterX;
+        public float CenterY;
+        public float CenterZ;
+        public uint  ColorTypeAndFlags;  // R8G8B8 chroma | type<<24 | flags<<28
+
+        // uint4[1]: direction / scalar encodings + log-radiance
+        public uint Direction1;    // oct-encoded normal (for triangles/directionals)
+        public uint Direction2;    // oct-encoded or fp16 cone angle pair (for spots)
+        public uint Scalars;       // fp16 pair: e.g. sphere radius
+        public uint LogRadiance;   // uint16 log2-encoded radiance magnitude
+    } // 32 bytes
+
+    /// <summary>
+    /// Extended per-light data (shaping / IES). Mirrors <c>PolymorphicLightInfoEx</c>.
+    /// Size = 1 × uint4 = 16 bytes.
+    /// Shader binding: <c>StructuredBuffer&lt;PolymorphicLightInfoEx&gt; t_LightsEx : register(t14)</c>
+    /// </summary>
+    [StructLayout(LayoutKind.Sequential, Pack = 4)]
+    public struct RtxptPolymorphicLightInfoEx
+    {
+        public uint IesProfileIndex;
+        public uint PrimaryAxis;               // oct-encoded spot/IES primary axis
+        public uint CosConeAngleAndSoftness;   // fp16 pair: cos(outerAngle) | softness
+        public uint UniqueID;                  // debug-only hash
+    } // 16 bytes
+
+    /// <summary>
+    /// CPU-side mirror of <c>EmissiveTrianglesProcTask</c> in <c>NEEATBaker.hlsli</c>.
+    /// One task covers up to <c>LLB_MAX_TRIANGLES_PER_TASK</c> (32) consecutive triangles
+    /// of a single emissive geometry.  Stride = 8 × 4 = 32 bytes.
+    /// </summary>
+    [StructLayout(LayoutKind.Sequential)]
+    public struct RtxptEmissiveTrianglesProcTask
+    {
+        public uint InstanceIndex;             // index into t_InstanceData
+        public uint GeometryIndex;             // sub-mesh index within the instance
+        public uint TriangleIndexFrom;         // first triangle (inclusive) in this task
+        public uint TriangleIndexTo;           // last  triangle (exclusive) in this task
+        public uint DestinationBufferOffset;   // write offset in lightsBuffer
+        public uint HistoricBufferOffset;      // last-frame block base, or 0xFFFFFFFF if new
+        public uint EmissiveLightMappingOffset;// = firstGeometryInstanceIndex + GeometryIndex
+        public uint Padding0;
+    } // 32 bytes
+
+    /// <summary>
+    /// Mirrors <c>LightsBakerEnvMapParams</c> in <c>LightingTypes.hlsli</c>.
+    /// Size = 48 + 48 + 12 + 4 = 112 bytes.
+    /// </summary>
+    [StructLayout(LayoutKind.Sequential, Pack = 4)]
+    public struct RtxptLightsBakerEnvMapParams
+    {
+        // ROW_MAJOR float3x4 Transform (local → world)
+        public Vector4 TransformRow0;
+        public Vector4 TransformRow1;
+        public Vector4 TransformRow2;
+        // ROW_MAJOR float3x4 InvTransform (world → local)
+        public Vector4 InvTransformRow0;
+        public Vector4 InvTransformRow1;
+        public Vector4 InvTransformRow2;
+        // float3 ColorMultiplier (Tint × Intensity)
+        public float ColorMultiplierR;
+        public float ColorMultiplierG;
+        public float ColorMultiplierB;
+        // float Enabled: 1 if enabled, 0 if not
+        public float Enabled;
+    } // 112 bytes
+
+    /// <summary>
+    /// Mirrors <c>LightsBakerConstants</c> in <c>LightingTypes.hlsli</c>.
+    /// Size = NEEAT_LIGHTS_BAKER_CONSTANTS_SIZE = 464 bytes.
+    /// </summary>
+    [StructLayout(LayoutKind.Sequential, Pack = 4)]
+    public unsafe struct RtxptLightsBakerConstants
+    {
+        public float DistantVsLocalRelativeImportance;   // [0]
+        public uint  EnvMapImportanceMapMIPCount;         // [1]
+        public uint  EnvMapImportanceMapResolution;       // [2]
+        public uint  TriangleLightTaskCount;              // [3]
+
+        public uint  FeedbackResolutionX;                // [4]
+        public uint  FeedbackResolutionY;                // [5]
+        public uint  BlendedFeedbackResolutionX;         // [6]
+        public uint  BlendedFeedbackResolutionY;         // [7]
+
+        public uint  MouseCursorPosX;                    // [8]
+        public uint  MouseCursorPosY;                    // [9]
+        public float PrevOverCurrentViewportSizeX;       // [10]
+        public float PrevOverCurrentViewportSizeY;       // [11]
+
+        public int   DebugDrawType;                      // [12]
+        public uint  DebugDrawTileLights;                // [13]
+        public uint  UpdateCounter;                      // [14]
+        public uint  DebugDrawFrustum;                   // [15]
+
+        public float ImportanceBoostIntensityDelta;      // [16]
+        public float ImportanceBoostFrustumMul;          // [17]
+        public float ImportanceBoostFrustumFadeDistance; // [18]
+        public float _padding3;                          // [19]
+
+        public float SceneCameraPosX;                    // [20]
+        public float SceneCameraPosY;                    // [21]
+        public float SceneCameraPosZ;                    // [22]
+        public float SceneAverageContentsDistance;       // [23]
+
+        public float DepthDisocclusionThreshold;         // [24]
+        public uint  EnableMotionReprojection;           // [25]
+        public float ReservoirHistoryDropoff;            // [26]
+        public uint  _padding0;                          // [27]
+
+        public uint  CurrentWeightsBufferOffset;         // [28] 0 or RTXPT_LIGHTING_WEIGHTS_COUNT_HALF
+        public uint  HistoricWeightsBufferOffset;        // [29] 0 or RTXPT_LIGHTING_WEIGHTS_COUNT_HALF
+        public uint  _padding1;                          // [30]
+        public uint  _padding2;                          // [31]
+
+        // float4 FrustumPlanes[6]  — Left Right Top Bottom Near Far (96 bytes, [32]..[55])
+        public fixed float FrustumPlanes[24];
+        // float4 FrustumCorners[8] — for debugging only (128 bytes, [56]..[87])
+        public fixed float FrustumCorners[32];
+
+        // LightsBakerEnvMapParams EnvMapParams (112 bytes, [88]..[115])
+        public RtxptLightsBakerEnvMapParams EnvMapParams;
+    } // 464 bytes
+
+    /// <summary>
+    /// Single-element control buffer read by the path tracer each frame.
+    /// Mirrors <c>LightingControlData</c> in <c>LightingTypes.hlsli</c>.
+    /// Size = 112 + 464 (BakerConstants) = 576 bytes.
+    /// Shader binding: <c>StructuredBuffer&lt;LightingControlData&gt; t_LightsCB : register(t12)</c>
+    /// </summary>
+    [StructLayout(LayoutKind.Sequential, Pack = 4)]
+    public unsafe struct RtxptLightingControlData
+    {
+        public uint  TotalLightCount;
+        public uint  EnvmapQuadNodeCount;
+        public uint  AnalyticLightCount;
+        public uint  TriangleLightCount;
+
+        public uint  SamplingProxyCount;
+        public uint  HistoricTotalLightCount;
+        public uint  LastFrameTemporalFeedbackAvailable;
+        public uint  LastFrameLocalSamplesAvailable;
+
+        public uint  ProxyBuildTaskCount;
+        public uint  WeightsSumUINT;
+        public uint  ImportanceSamplingType;   // 0=Uniform, 1=Power, 2=NEE-AT
+        public uint  _padding0;
+
+        public uint  TemporalFeedbackRequired;
+        public uint  TotalMaxFeedbackCount;
+        public float GlobalFeedbackUseWeight;
+        public float LocalToGlobalSampleRatio;
+
+        public uint  TileBufferHeight;
+        public float ScreenSpaceVsWorldSpaceThreshold;
+        public uint  LocalSamplingResolutionX;
+        public uint  LocalSamplingResolutionY;
+
+        public uint  LocalSamplingTileJitterX;
+        public uint  LocalSamplingTileJitterY;
+        public uint  LocalSamplingTileJitterPrevX;
+        public uint  LocalSamplingTileJitterPrevY;
+
+        public uint  ValidFeedbackCount;
+        public uint  _padding1;
+        public uint  _padding2;
+        public uint  _padding3;
+
+        // Mirrors LightsBakerConstants (NEEAT_BAKER_ONLY path); always present to keep struct size = 576 bytes.
+        public RtxptLightsBakerConstants BakerConstants;
+    } // 576 bytes
 }

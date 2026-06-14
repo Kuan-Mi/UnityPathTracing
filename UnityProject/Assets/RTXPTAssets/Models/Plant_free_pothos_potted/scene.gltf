@@ -1,0 +1,461 @@
+{
+  "accessors": [
+    {
+      "bufferView": 2,
+      "componentType": 5126,
+      "count": 2548,
+      "max": [
+        0.2200099229812622,
+        0.2200099229812622,
+        0.5150075554847717
+      ],
+      "min": [
+        -0.22000989317893982,
+        -0.22000989317893982,
+        -8.01209534984082e-06
+      ],
+      "type": "VEC3"
+    },
+    {
+      "bufferView": 2,
+      "byteOffset": 30576,
+      "componentType": 5126,
+      "count": 2548,
+      "max": [
+        0.9998659491539001,
+        0.9998659491539001,
+        1.0
+      ],
+      "min": [
+        -0.9998658895492554,
+        -0.9998659491539001,
+        -1.0
+      ],
+      "type": "VEC3"
+    },
+    {
+      "bufferView": 1,
+      "componentType": 5126,
+      "count": 2548,
+      "max": [
+        0.9968484044075012,
+        0.9961761832237244
+      ],
+      "min": [
+        0.006027281284332275,
+        0.006553919520229101
+      ],
+      "type": "VEC2"
+    },
+    {
+      "bufferView": 1,
+      "byteOffset": 20384,
+      "componentType": 5126,
+      "count": 2548,
+      "max": [
+        0.9968484044075012,
+        0.9961761832237244
+      ],
+      "min": [
+        0.006027281284332275,
+        0.006553919520229101
+      ],
+      "type": "VEC2"
+    },
+    {
+      "bufferView": 1,
+      "byteOffset": 40768,
+      "componentType": 5126,
+      "count": 2548,
+      "max": [
+        0.9968484044075012,
+        0.9961761832237244
+      ],
+      "min": [
+        0.006027281284332275,
+        0.006553919520229101
+      ],
+      "type": "VEC2"
+    },
+    {
+      "bufferView": 0,
+      "componentType": 5125,
+      "count": 13368,
+      "type": "SCALAR"
+    },
+    {
+      "bufferView": 2,
+      "byteOffset": 61152,
+      "componentType": 5126,
+      "count": 7469,
+      "max": [
+        0.8170578479766846,
+        0.5808318853378296,
+        0.970401406288147
+      ],
+      "min": [
+        -0.7737277150154114,
+        -0.7488699555397034,
+        -0.9045058488845825
+      ],
+      "type": "VEC3"
+    },
+    {
+      "bufferView": 2,
+      "byteOffset": 150780,
+      "componentType": 5126,
+      "count": 7469,
+      "max": [
+        0.9999903440475464,
+        0.9998554587364197,
+        0.9999756813049316
+      ],
+      "min": [
+        -0.9995446801185608,
+        -0.9380946755409241,
+        -0.999994158744812
+      ],
+      "type": "VEC3"
+    },
+    {
+      "bufferView": 3,
+      "componentType": 5126,
+      "count": 7469,
+      "max": [
+        0.9997671842575073,
+        0.9999985694885254,
+        0.9998056292533875,
+        1.0
+      ],
+      "min": [
+        -0.9999718070030212,
+        -0.9999335408210754,
+        -0.9996424913406372,
+        -1.0
+      ],
+      "type": "VEC4"
+    },
+    {
+      "bufferView": 1,
+      "byteOffset": 61152,
+      "componentType": 5126,
+      "count": 7469,
+      "max": [
+        0.9527187347412109,
+        0.9869564771652222
+      ],
+      "min": [
+        0.04657834768295288,
+        0.04348387569189072
+      ],
+      "type": "VEC2"
+    },
+    {
+      "bufferView": 1,
+      "byteOffset": 120904,
+      "componentType": 5126,
+      "count": 7469,
+      "max": [
+        1.0,
+        0.9996291399002075
+      ],
+      "min": [
+        1.0,
+        0.2218179851770401
+      ],
+      "type": "VEC2"
+    },
+    {
+      "bufferView": 0,
+      "byteOffset": 53472,
+      "componentType": 5125,
+      "count": 33864,
+      "type": "SCALAR"
+    }
+  ],
+  "asset": {
+    "extras": {
+      "author": "AllQuad (https://sketchfab.com/AllQuad)",
+      "license": "CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)",
+      "source": "https://sketchfab.com/3d-models/free-pothos-potted-plant-money-plant-e9832f38484f4f85b3f9081b51fa3799",
+      "title": "[FREE] Pothos Potted Plant - Money Plant"
+    },
+    "generator": "Sketchfab-14.86.0",
+    "version": "2.0"
+  },
+  "bufferViews": [
+    {
+      "buffer": 0,
+      "byteLength": 188928,
+      "name": "floatBufferViews",
+      "target": 34963
+    },
+    {
+      "buffer": 0,
+      "byteLength": 180656,
+      "byteOffset": 188928,
+      "byteStride": 8,
+      "name": "floatBufferViews",
+      "target": 34962
+    },
+    {
+      "buffer": 0,
+      "byteLength": 240408,
+      "byteOffset": 369584,
+      "byteStride": 12,
+      "name": "floatBufferViews",
+      "target": 34962
+    },
+    {
+      "buffer": 0,
+      "byteLength": 119504,
+      "byteOffset": 609992,
+      "byteStride": 16,
+      "name": "floatBufferViews",
+      "target": 34962
+    }
+  ],
+  "buffers": [
+    {
+      "byteLength": 729496,
+      "uri": "scene.bin"
+    }
+  ],
+  "images": [
+    {
+      "uri": "textures/WOODEN_LEGS_POT_baseColor.png"
+    },
+    {
+      "uri": "textures/WOODEN_LEGS_POT_metallicRoughness.png"
+    },
+    {
+      "uri": "textures/POTHOS_Mat_baseColor.png"
+    },
+    {
+      "uri": "textures/POTHOS_Mat_metallicRoughness.png"
+    },
+    {
+      "uri": "textures/POTHOS_Mat_normal.jpeg"
+    }
+  ],
+  "materials": [
+    {
+      "doubleSided": true,
+      "name": "WOODEN_LEGS_POT",
+      "pbrMetallicRoughness": {
+        "baseColorTexture": {
+          "index": 0
+        },
+        "metallicFactor": 0.0,
+        "metallicRoughnessTexture": {
+          "index": 1
+        }
+      }
+    },
+    {
+      "alphaMode": "BLEND",
+      "doubleSided": true,
+      "name": "POTHOS_Mat",
+      "normalTexture": {
+        "index": 4
+      },
+      "pbrMetallicRoughness": {
+        "baseColorTexture": {
+          "index": 2
+        },
+        "metallicFactor": 0.0,
+        "metallicRoughnessTexture": {
+          "index": 3
+        }
+      }
+    }
+  ],
+  "meshes": [
+    {
+      "name": "POT_WOOD_LEGS_WOODEN_LEGS_POT_0",
+      "primitives": [
+        {
+          "attributes": {
+            "NORMAL": 1,
+            "POSITION": 0,
+            "TEXCOORD_0": 2,
+            "TEXCOORD_1": 3,
+            "TEXCOORD_2": 4
+          },
+          "indices": 5,
+          "material": 0,
+          "mode": 4
+        }
+      ]
+    },
+    {
+      "name": "POTHOS_POTHOS_Mat_0",
+      "primitives": [
+        {
+          "attributes": {
+            "NORMAL": 7,
+            "POSITION": 6,
+            "TANGENT": 8,
+            "TEXCOORD_0": 9,
+            "TEXCOORD_1": 10
+          },
+          "indices": 11,
+          "material": 1,
+          "mode": 4
+        }
+      ]
+    }
+  ],
+  "nodes": [
+    {
+      "children": [
+        1
+      ],
+      "matrix": [
+        1.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        2.220446049250313e-16,
+        -1.0,
+        0.0,
+        0.0,
+        1.0,
+        2.220446049250313e-16,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        1.0
+      ],
+      "name": "Sketchfab_model"
+    },
+    {
+      "children": [
+        2
+      ],
+      "matrix": [
+        0.009999999776482582,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.009999999776482582,
+        0.0,
+        0.0,
+        -0.009999999776482582,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        1.0
+      ],
+      "name": "ce6de248fdee413fae242a30c4473ab8.fbx"
+    },
+    {
+      "children": [
+        3,
+        5
+      ],
+      "name": "RootNode"
+    },
+    {
+      "children": [
+        4
+      ],
+      "matrix": [
+        100.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        -1.629206793918314e-05,
+        -99.99999999999868,
+        0.0,
+        0.0,
+        99.99999999999868,
+        -1.629206793918314e-05,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        1.0
+      ],
+      "name": "POT_WOOD_LEGS"
+    },
+    {
+      "mesh": 0,
+      "name": "POT_WOOD_LEGS_WOODEN_LEGS_POT_0"
+    },
+    {
+      "children": [
+        6
+      ],
+      "matrix": [
+        51.956905364990234,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        51.956905364990185,
+        2.2711084645863848e-06,
+        0.0,
+        0.0,
+        -2.2711084645863848e-06,
+        51.956905364990185,
+        0.0,
+        0.5283680558204651,
+        48.98542404174805,
+        2.8820111751556396,
+        1.0
+      ],
+      "name": "POTHOS"
+    },
+    {
+      "mesh": 1,
+      "name": "POTHOS_POTHOS_Mat_0"
+    }
+  ],
+  "samplers": [
+    {
+      "magFilter": 9729,
+      "minFilter": 9987,
+      "wrapS": 10497,
+      "wrapT": 10497
+    }
+  ],
+  "scene": 0,
+  "scenes": [
+    {
+      "name": "Sketchfab_Scene",
+      "nodes": [
+        0
+      ]
+    }
+  ],
+  "textures": [
+    {
+      "sampler": 0,
+      "source": 0
+    },
+    {
+      "sampler": 0,
+      "source": 1
+    },
+    {
+      "sampler": 0,
+      "source": 2
+    },
+    {
+      "sampler": 0,
+      "source": 3
+    },
+    {
+      "sampler": 0,
+      "source": 4
+    }
+  ]
+}

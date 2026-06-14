@@ -50,7 +50,7 @@ namespace PathTracing
 
         public class Resource
         {
-            internal NativeBuffer ConstantBuffer;
+            internal VolatileConstantBuffer ConstantBuffer;
 
             // RT textures sourced from the pool inside ExecutePass
             internal NativeNrdTextureResources Pool;
@@ -95,7 +95,7 @@ namespace PathTracing
             ds.SetAccelerationStructure("gWorldTlas", nrd.WorldAS);
 
             // 3. Scene structured buffers
-            ds.SetStructuredBuffer("gIn_InstanceData", nrd.InstanceDataBufPtr, nrd.InstanceDataBuf.Capacity, nrd.InstanceDataBuf.Stride);
+            ds.SetStructuredBuffer("gIn_InstanceData", nrd.InstanceDataBuf, nrd.InstanceDataBuf.count, nrd.InstanceDataBuf.stride);
             ds.SetStructuredBuffer("gIn_PrimitiveData", nrd.PrimitiveDataBufPtr, nrd.PrimitiveDataBuf.count, nrd.PrimitiveDataBuf.stride);
             ds.SetStructuredBuffer("gIn_MorphPrimitivePositionsPrev", nrd.MorphPrimitivePositionsPrevBufPtr, nrd.MorphPrimitivePositionsPrevBuf.count, nrd.MorphPrimitivePositionsPrevBuf.stride);
 

@@ -131,8 +131,6 @@ namespace PathTracing
         private NativeRtxdiPTComputeDuplicationMapPass  _ptComputeDuplicationMapPass;
         private NativeRtxdiPTFinalShadingPass           _ptFinalShadingPass;
 
-        private NativeFrameTick _nativeFrameTickPass;
-
         // Denoising: gradient filter + confidence (mirror FullSample FilterGradientsPass + ConfidencePass)
         private NativeRtxdiFilterGradientsPass   _filterGradientsPass;
         private NativeRtxdiConfidencePass        _confidencePass;
@@ -223,7 +221,6 @@ namespace PathTracing
             _ptFillSampleIDPass           ??= new NativeRtxdiPTFillSampleIDPass(ptFillSampleIDCs, ptFillSampleIDRs) { renderPassEvent                               = renderPassEvent };
             _ptComputeDuplicationMapPass  ??= new NativeRtxdiPTComputeDuplicationMapPass(ptComputeDuplicationMapCs) { renderPassEvent                               = renderPassEvent };
             _ptFinalShadingPass           ??= new NativeRtxdiPTFinalShadingPass(ptFinalShadingCs, ptFinalShadingRs) { renderPassEvent                               = renderPassEvent };
-            _nativeFrameTickPass          ??= new NativeFrameTick { renderPassEvent                                                                                 = renderPassEvent, };
             _filterGradientsPass          ??= new NativeRtxdiFilterGradientsPass(filterGradientsPassCs) { renderPassEvent                                           = renderPassEvent };
             _confidencePass               ??= new NativeRtxdiConfidencePass(confidencePassCs) { renderPassEvent                                                     = renderPassEvent };
             _gradientArrayTestPass        ??= new NativeRtxdiGradientArrayTestPass(gradientArrayTestCs) { renderPassEvent                                           = renderPassEvent };
@@ -310,6 +307,7 @@ namespace PathTracing
                 // count actual emissive meshes / triangles / geometry instances from the live scene,
                 // then round up to allocation quanta so minor scene changes don't force a realloc.
                 // Rebuild on overflow is deferred (TODO).
+                // NOTE: overflow detection below will fire if the scene grows beyond the initial allocation.
                 const uint kMeshQuantum     = 128u;
                 const uint kTriangleQuantum = 1024u;
                 const uint kPrimQuantum     = 128u;
@@ -337,6 +335,22 @@ namespace PathTracing
                     1u, // EnvW — no environment map yet
                     1u); // EnvH
                 _rtxdiResources.Add(uniqueKey, rtxdiResources);
+            }
+            else
+            {
+                // Resources already allocated at first frame — check for overflow (dynamic resize is TODO).
+                var  emissiveGeos     = _rtxdiGpuScene.GetEmissiveGeometries();
+                uint curMeshes        = (uint)emissiveGeos.Count;
+                uint curTriangles     = 0u;
+                foreach (var e in emissiveGeos) curTriangles += e.TriangleCount;
+                uint curGeomInstances = (uint)_rtxdiGpuScene.TotalGeometryInstanceCount;
+
+                if (curMeshes > rtxdiResources.MaxEmissiveMeshes)
+                    Debug.LogError($"[NativeRtxdiFeature] Emissive mesh count overflow: current={curMeshes} > allocated={rtxdiResources.MaxEmissiveMeshes}. GPU buffers are too small — rendering will be corrupted. (Dynamic resize not yet implemented.)");
+                if (curTriangles > rtxdiResources.MaxEmissiveTriangles)
+                    Debug.LogError($"[NativeRtxdiFeature] Emissive triangle count overflow: current={curTriangles} > allocated={rtxdiResources.MaxEmissiveTriangles}. GPU buffers are too small — rendering will be corrupted. (Dynamic resize not yet implemented.)");
+                if (curGeomInstances > rtxdiResources.MaxGeometryInstances)
+                    Debug.LogError($"[NativeRtxdiFeature] Geometry instance count overflow: current={curGeomInstances} > allocated={rtxdiResources.MaxGeometryInstances}. GPU buffers are too small — rendering will be corrupted. (Dynamic resize not yet implemented.)");
             }
 
             if (resourcesChanged)
@@ -869,16 +883,6 @@ namespace PathTracing
                 _outputBlitPass.Setup(outputBlitResource, outputBlitSettings);
                 renderer.EnqueuePass(_outputBlitPass);
             }
-
-            if (renderingData.cameraData.xr.enabled)
-            {
-                if (setting.skipRightEyeInVR || eyeIndex == 1)
-                    renderer.EnqueuePass(_nativeFrameTickPass);
-            }
-            else
-            {
-                renderer.EnqueuePass(_nativeFrameTickPass);
-            }
         }
 
         private static RTXDI_PTParameters BuildRestirPtParams(ImportanceSamplingContext isContext)
@@ -1029,7 +1033,6 @@ namespace PathTracing
             _dlssrPass = null;
             _pdfMipsPass?.Dispose();
             _pdfMipsPass         = null;
-            _nativeFrameTickPass = null;
         }
 
         // -------------------------------------------------------------------

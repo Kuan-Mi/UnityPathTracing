@@ -1,0 +1,16 @@
+// Hit-group shader for FillStablePlanes pipeline — Emissive material permutation.
+// Only contains ClosestHit / AnyHit entry points.
+// Merged with FillStablePlanes.rayshader at RTPSO creation time via RayTracePipeline(primary, hitGroups[]).
+//
+// Active material flags:
+//   RTXPT_MATERIAL_IS_EMISSIVE             = (not defined)  — default path; covers emissive AND analytic-proxy materials
+//   RTXPT_MATERIAL_IS_ANALYTIC_LIGHT_PROXY = (not defined)  — same default path
+//
+// NOTE: The C++ baker only injects these macros when BOTH flags are false (non-emissive, non-proxy).
+//       When either flag is true the macros are left undefined, so both cases share this variant.
+//
+// Entry points produced (after macro expansion in Utils.hlsli):
+//   ClosestHit_FILL_Emissive
+//   AnyHit_FILL_Emissive  (if defined by PathTracerMaterialSpecializations.hlsl)
+
+#include "PathTracerMaterialSpecializations.hlsl"

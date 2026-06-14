@@ -23,7 +23,9 @@ class DescriptorHeapAllocator
 {
 public:
     // Total number of CBV/SRV/UAV descriptor slots in the shared heap.
-    static constexpr uint32_t kCapacity = 65536u;
+    // Sized to leave ~65536 general-purpose slots after the TransientDescriptorRing
+    // reserves its sub-range at renderer init (see kTransientRingCapacity in Plugin.cpp).
+    static constexpr uint32_t kCapacity = 98304u;
 
     // Create the D3D12 heap.  Must be called once before any other method.
     bool Initialize(ID3D12Device* device);

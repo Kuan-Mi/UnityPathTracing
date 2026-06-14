@@ -1,0 +1,19 @@
+/*
+* RTXPT luminance pass — thin verbatim wrapper, two #includes selected by stage:
+*   VS = donut fullscreen_vs.hlsl (the engine's m_FullscreenVS, entry `main`, outputs UV) — VERBATIM
+*   PS = RTXPT ToneMapper/luminance_ps.hlsl (entry `main`, writes log2-luminance) — VERBATIM
+*
+* fullscreen_vs is a 4-vertex triangle STRIP quad; the pass draws it with vertexCount = 4 and the
+* pipeline's primitiveTopology = TRIANGLESTRIP. The NR_VERTEX_SHADER / NR_PIXEL_SHADER guards keep
+* the two identically-named `main` entry points from colliding when DXC parses each stage.
+*/
+
+#pragma pack_matrix(row_major)
+
+#ifdef NR_VERTEX_SHADER
+#include "fullscreen_vs.hlsl"
+#endif
+
+#ifdef NR_PIXEL_SHADER
+#include "luminance_ps.hlsl"
+#endif

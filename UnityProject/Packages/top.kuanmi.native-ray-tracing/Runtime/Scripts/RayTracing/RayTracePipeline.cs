@@ -22,6 +22,9 @@ namespace NativeRender
         private ulong _handle;
         private RayTraceShader  _shader;
         private HitGroupShader[] _hitGroupShaders; // null when not using multi-blob path
+        private RootConstantsHint[] _rootConstantsHints;
+        private string[]            _rootSRVHints;
+        private SamplerHint[]       _samplerHints;
 
         /// <summary>True if the underlying D3D12 pipeline is valid and ready to dispatch.</summary>
         public bool IsValid => _handle != 0;
@@ -41,21 +44,54 @@ namespace NativeRender
         private uint                     _slotCount;
         private Dictionary<string, uint> _nameToSlot = new Dictionary<string, uint>();
 
+        // Persisted event data for hit-group-table rebuild dispatches.
+        // Ring of 3 slots so consecutive rebuilds don't overwrite a slot the render
+        // thread may still be reading from a previous (in-flight) frame.
+        private const int kShtRingSize = 3;
+        private NativeArray<NativeRenderPlugin.ShtRebuildEventData> _shtEventData;
+        private int _shtRingIndex;
+
+        // Pipeline-owned copy of the last-applied per-geometry variant indices
+        // (main-thread master) plus a ring of pinned copies the render thread reads.
+        // Owning the copies — instead of pointing the event at the caller's array —
+        // survives the caller reallocating its array and lets a hot-reload rebuild
+        // re-apply the hit-group table: a freshly built native pipeline has an empty
+        // table and suppresses every DispatchRays until RebuildHitGroupTable runs.
+        private NativeArray<uint>   _shtVariants;
+        private NativeArray<uint>[] _shtVariantRing;
+        private bool                _shtNeedsReapply;
+
         // -------------------------------------------------------------------
         // Construction
         // -------------------------------------------------------------------
 
         /// <summary>
         /// Creates a new DXR pipeline from the given shader asset.
+        /// Root binding hints defined on the asset (via the importer) are applied automatically.
         /// Triggers HLSL compilation if the asset has not been compiled yet.
         /// Throws <see cref="InvalidOperationException"/> if pipeline creation fails.
         /// </summary>
         public RayTracePipeline(RayTraceShader shader)
+            : this(shader,
+                   shader != null ? shader.RootConstantsHints : null,
+                   shader != null ? shader.RootSRVHints        : null)
+        {
+        }
+
+        public RayTracePipeline(RayTraceShader shader, RootConstantsHint[] rootConstantsHints)
+            : this(shader, rootConstantsHints, null)
+        {
+        }
+
+        public RayTracePipeline(RayTraceShader shader, RootConstantsHint[] rootConstantsHints, string[] rootSRVHints)
         {
             if (shader == null)
                 throw new ArgumentNullException(nameof(shader));
 
-            _shader = shader;
+            _shader             = shader;
+            _rootConstantsHints = rootConstantsHints;
+            _rootSRVHints       = rootSRVHints;
+            _samplerHints       = shader.ResolveSamplerHints();
             BuildNativeHandle(shader);
             RayTraceShader.OnRecompiled += OnShaderRecompiled;
         }
@@ -70,6 +106,17 @@ namespace NativeRender
         /// constructor when no extra hit groups are needed.
         /// </summary>
         public RayTracePipeline(RayTraceShader primaryShader, HitGroupShader[] hitGroupShaders)
+            : this(primaryShader, hitGroupShaders,
+                   primaryShader != null ? primaryShader.RootConstantsHints : null,
+                   primaryShader != null ? primaryShader.RootSRVHints        : null)
+        {
+        }
+
+        public RayTracePipeline(
+            RayTraceShader primaryShader,
+            HitGroupShader[] hitGroupShaders,
+            RootConstantsHint[] rootConstantsHints,
+            string[] rootSRVHints = null)
         {
             if (primaryShader == null)
                 throw new ArgumentNullException(nameof(primaryShader));
@@ -77,8 +124,11 @@ namespace NativeRender
                 throw new ArgumentException("Use the single-shader constructor when there are no extra hit groups.",
                     nameof(hitGroupShaders));
 
-            _shader          = primaryShader;
-            _hitGroupShaders = hitGroupShaders;
+            _shader             = primaryShader;
+            _hitGroupShaders    = hitGroupShaders;
+            _rootConstantsHints = rootConstantsHints;
+            _rootSRVHints       = rootSRVHints;
+            _samplerHints       = primaryShader.ResolveSamplerHints();
 
             BuildNativeHandleMultiBlob(primaryShader, hitGroupShaders);
             RayTraceShader.OnRecompiled  += OnShaderRecompiled;
@@ -96,7 +146,10 @@ namespace NativeRender
             uint maxPayload = shader.MaxPayloadSizeInBytes;
             Debug.Log($"[RayTracePipeline] Creating pipeline for: {shader.name} (DXIL size: {dxil.Length} bytes, OMM support: {flags != 0}, MaxPayload: {maxPayload})");
             string rayGenName = string.IsNullOrEmpty(shader.RayGenName) ? null : shader.RayGenName;
-            _handle = NativeRenderPlugin.NR_CreateRayTraceShaderFromBytes(dxil, (uint)dxil.Length, shader.name, flags, maxPayload, rayGenName);
+            string hintsJson = BuildHintsJson(_rootConstantsHints, _rootSRVHints, _samplerHints);
+            _handle = hintsJson != null
+                ? NativeRenderPlugin.NR_CreateRayTraceShaderFromBytesEx(dxil, (uint)dxil.Length, shader.name, flags, maxPayload, rayGenName, hintsJson)
+                : NativeRenderPlugin.NR_CreateRayTraceShaderFromBytes(dxil, (uint)dxil.Length, shader.name, flags, maxPayload, rayGenName);
             if (_handle == 0)
                 throw new InvalidOperationException(
                     $"[RayTracePipeline] NR_CreateRayTraceShaderFromBytes returned 0 for: {shader.name}");
@@ -141,9 +194,14 @@ namespace NativeRender
                 string rayGenName = string.IsNullOrEmpty(primaryShader.RayGenName) ? null : primaryShader.RayGenName;
 
                 Debug.Log($"[RayTracePipeline] Creating multi-blob pipeline for '{primaryShader.name}' ({totalBlobs} blobs)");
-                _handle = NativeRenderPlugin.NR_CreateRayTracePipelineFromBlobs(
-                    ptrs, sizes, (uint)totalBlobs,
-                    primaryShader.name, flags, maxPayload, rayGenName);
+                string hintsJson = BuildHintsJson(_rootConstantsHints, _rootSRVHints, _samplerHints);
+                _handle = hintsJson != null
+                    ? NativeRenderPlugin.NR_CreateRayTracePipelineFromBlobsEx(
+                        ptrs, sizes, (uint)totalBlobs,
+                        primaryShader.name, flags, maxPayload, rayGenName, hintsJson)
+                    : NativeRenderPlugin.NR_CreateRayTracePipelineFromBlobs(
+                        ptrs, sizes, (uint)totalBlobs,
+                        primaryShader.name, flags, maxPayload, rayGenName);
 
                 if (_handle == 0)
                     throw new InvalidOperationException(
@@ -173,6 +231,59 @@ namespace NativeRender
             if (parts.Length < 2) return false;
             if (!int.TryParse(parts[0], out int major) || !int.TryParse(parts[1], out int minor)) return false;
             return major > 6 || (major == 6 && minor >= 9);
+        }
+
+        private static string BuildHintsJson(RootConstantsHint[] rcHints, string[] srvHints,
+                                             SamplerHint[] samplerHints)
+        {
+            bool hasRC   = rcHints  != null && rcHints.Length  > 0;
+            bool hasSRV  = srvHints != null && srvHints.Length > 0;
+            bool hasSamp = SamplerHintJson.Has(samplerHints);
+            if (!hasRC && !hasSRV && !hasSamp) return null;
+
+            var sb = new System.Text.StringBuilder();
+            sb.Append('{');
+            bool any = false;
+
+            if (hasRC)
+            {
+                sb.Append("\"rootConstants\":[");
+                for (int i = 0; i < rcHints.Length; i++)
+                {
+                    if (i > 0) sb.Append(',');
+                    sb.Append("{\"name\":\"");
+                    sb.Append(rcHints[i].Name);
+                    sb.Append("\",\"count\":");
+                    sb.Append(rcHints[i].Count);
+                    sb.Append('}');
+                }
+                sb.Append(']');
+                any = true;
+            }
+
+            if (hasSRV)
+            {
+                if (any) sb.Append(',');
+                sb.Append("\"rootSRV\":[");
+                for (int i = 0; i < srvHints.Length; i++)
+                {
+                    if (i > 0) sb.Append(',');
+                    sb.Append('"');
+                    sb.Append(srvHints[i]);
+                    sb.Append('"');
+                }
+                sb.Append(']');
+                any = true;
+            }
+
+            if (hasSamp)
+            {
+                if (any) sb.Append(',');
+                SamplerHintJson.Append(sb, samplerHints);
+            }
+
+            sb.Append('}');
+            return sb.ToString();
         }
 
         private void RefreshSlotLayout()
@@ -206,28 +317,62 @@ namespace NativeRender
                 if (hg == shader) { RebuildPipeline(); return; }
         }
 
+        // Guards against re-entrance: BuildNativeHandle* → GetOrCompileDxil →
+        // EnsureCompiled fires OnRecompiled when it has to (re)compile, which would
+        // re-enter RebuildPipeline mid-rebuild and leak a native pipeline.
+        private bool _rebuilding;
+
         private void RebuildPipeline()
+        {
+            if (_rebuilding) return;
+            _rebuilding = true;
+            try { RebuildPipelineCore(); }
+            finally { _rebuilding = false; }
+        }
+
+        private void RebuildPipelineCore()
         {
             if (_handle != 0)
             {
-                GL.Flush();
-                NativeRenderPlugin.NR_DestroyRayTraceShader(_handle);
-                _handle = 0;
+                // Drain the render thread + GPU before swapping handles: in-flight
+                // dispatch / SHT-rebuild events still reference the old pipeline, and
+                // OnRebuilt makes the descriptor sets free their pinned ring buffers.
+                // GL.Flush() alone only queues commands — it does NOT wait for
+                // execution (same fix as NativeComputePipeline.OnShaderRecompiled).
+                using var flushCmd = new CommandBuffer { name = "NR_GpuFlush" };
+                flushCmd.IssuePluginEvent(NativeRenderPlugin.NR_GetGpuFlushEventFunc(), 0);
+                Graphics.ExecuteCommandBuffer(flushCmd);
+                NativeRenderPlugin.NR_WaitForGpuFlush();
             }
 
+            ulong oldHandle = _handle;
+            _handle = 0;
             try
             {
+                _samplerHints = _shader.ResolveSamplerHints();
                 if (_hitGroupShaders != null && _hitGroupShaders.Length > 0)
                     BuildNativeHandleMultiBlob(_shader, _hitGroupShaders);
                 else
                     BuildNativeHandle(_shader);
-                Debug.Log($"[RayTracePipeline] Rebuilt pipeline for: {_shader.name}");
-                OnRebuilt?.Invoke(this);
             }
             catch (Exception e)
             {
-                Debug.LogError(e.Message);
+                // Keep the previous pipeline so rendering continues with the old shader.
+                _handle = oldHandle;
+                Debug.LogError($"[RayTracePipeline] Hot-reload rebuild failed for '{_shader.name}' — keeping previous pipeline: {e.Message}");
+                return;
             }
+
+            if (oldHandle != 0)
+                NativeRenderPlugin.NR_DestroyRayTraceShader(oldHandle);
+
+            // The fresh native pipeline starts with an empty hit-group table and
+            // suppresses DispatchRays until it is rebuilt — re-apply the cached
+            // variant indices on the next Dispatch.
+            _shtNeedsReapply = _shtVariants.IsCreated;
+
+            Debug.Log($"[RayTracePipeline] Rebuilt pipeline for: {_shader.name}");
+            OnRebuilt?.Invoke(this);
         }
 
         // -------------------------------------------------------------------
@@ -238,6 +383,15 @@ namespace NativeRender
         {
             RayTraceShader.OnRecompiled  -= OnShaderRecompiled;
             HitGroupShader.OnRecompiled  -= OnHitGroupShaderRecompiled;
+
+            if (_shtEventData.IsCreated) _shtEventData.Dispose();
+            if (_shtVariants.IsCreated)  _shtVariants.Dispose();
+            if (_shtVariantRing != null)
+            {
+                for (int i = 0; i < _shtVariantRing.Length; i++)
+                    if (_shtVariantRing[i].IsCreated) _shtVariantRing[i].Dispose();
+                _shtVariantRing = null;
+            }
 
             if (_handle != 0)
             {
@@ -258,9 +412,80 @@ namespace NativeRender
         public void Dispatch(CommandBuffer cmd, NativeRayTraceDescriptorSet ds, uint width, uint height)
         {
             if (!IsValid || ds == null) return;
+            // After a hot-reload rebuild the fresh native pipeline has an empty
+            // hit-group table (DispatchRays is suppressed until it is rebuilt) —
+            // re-apply the cached variants ahead of the dispatch event; events
+            // execute in command-buffer order on the render thread.
+            if (_shtNeedsReapply && _shtVariants.IsCreated)
+            {
+                _shtNeedsReapply = false;
+                IssueShtRebuild(cmd);
+            }
             IntPtr ptr = ds.SnapshotAndBuildHeader(width, height);
             if (ptr == IntPtr.Zero) return;
             cmd.IssuePluginEventAndData(NativeRenderPlugin.NR_RTS_GetRenderEventFunc(), 1, ptr);
+        }
+
+        /// <summary>
+        /// Issues a render event to rebuild this pipeline's hit-group shader table from the
+        /// flat per-geometry <paramref name="variantIndices"/> array (one entry per TLAS
+        /// geometry, selecting which hit-group export to use). The indices are copied into
+        /// pipeline-owned storage, so the caller's array may be freed or reused immediately;
+        /// the copy is also re-applied automatically after a shader hot-reload rebuild.
+        ///
+        /// No <see cref="RayTracingAccelerationStructure"/> dependency: only rebuild when the
+        /// variant layout actually changes (e.g. on a scene topology change), not every frame.
+        /// </summary>
+        public void RebuildHitGroupTable(CommandBuffer cmd, NativeArray<uint> variantIndices)
+        {
+            if (!IsValid || !variantIndices.IsCreated || variantIndices.Length == 0) return;
+
+            if (!_shtVariants.IsCreated || _shtVariants.Length != variantIndices.Length)
+            {
+                if (_shtVariants.IsCreated) _shtVariants.Dispose();
+                _shtVariants = new NativeArray<uint>(variantIndices.Length, Allocator.Persistent);
+            }
+            _shtVariants.CopyFrom(variantIndices);
+            _shtNeedsReapply = false;
+            IssueShtRebuild(cmd);
+        }
+
+        /// <summary>
+        /// Copies the master variant array into the next pinned ring slot and issues the
+        /// SHT-rebuild render event pointing at it. The ring keeps the pointer valid while
+        /// previous (in-flight) frames may still be read by the render thread.
+        /// </summary>
+        private unsafe void IssueShtRebuild(CommandBuffer cmd)
+        {
+            if (!_shtEventData.IsCreated)
+                _shtEventData = new NativeArray<NativeRenderPlugin.ShtRebuildEventData>(kShtRingSize, Allocator.Persistent);
+            _shtVariantRing ??= new NativeArray<uint>[kShtRingSize];
+
+            // Advance ring index so we never overwrite the slot the render thread
+            // may still be reading from a previous (in-flight) frame.
+            _shtRingIndex = (_shtRingIndex + 1) % kShtRingSize;
+
+            ref var ringSlot = ref _shtVariantRing[_shtRingIndex];
+            if (!ringSlot.IsCreated || ringSlot.Length != _shtVariants.Length)
+            {
+                if (ringSlot.IsCreated) ringSlot.Dispose();
+                ringSlot = new NativeArray<uint>(_shtVariants.Length, Allocator.Persistent);
+            }
+            ringSlot.CopyFrom(_shtVariants);
+
+            _shtEventData[_shtRingIndex] = new NativeRenderPlugin.ShtRebuildEventData
+            {
+                shaderHandle      = _handle,
+                variantIndicesPtr = (IntPtr)NativeArrayUnsafeUtility.GetUnsafeReadOnlyPtr(ringSlot),
+                count             = (uint)ringSlot.Length,
+                _pad              = 0,
+            };
+
+            var basePtr = (NativeRenderPlugin.ShtRebuildEventData*)NativeArrayUnsafeUtility.GetUnsafePtr(_shtEventData);
+            cmd.IssuePluginEventAndData(
+                NativeRenderPlugin.NR_RTS_GetRebuildHitGroupTableEventFunc(),
+                2,
+                (IntPtr)(basePtr + _shtRingIndex));
         }
     }
 }

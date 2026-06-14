@@ -1,0 +1,91 @@
+/*
+* ShaderDebug line drawing — port of RTXPT Shaders/Libraries/ShaderDebug/ShaderDebug.hlsl
+* DRAW_LINES_SHADERS (main_vs:720 / main_ps:757). Same SRV-read + VS instance-cull adaptation as
+* ShaderDebugTriangles.rastershader (no ExecuteIndirect in the native raster path).
+*
+* Lines are stored as ShaderDebugTriangle entries with B==C and the line magic marker; the
+* original draws them with the same indirect args on a LINELIST topology (3 verts per instance =
+* one line + a dangling vertex that produces no primitive).
+*
+* Pipeline: LINELIST, alpha blend, no depth (manual depth test in the PS).
+*/
+
+#pragma pack_matrix(row_major)
+
+#define SHADER_DEBUG_HEADER_IN_BYTES        (96)
+#define SHADER_DEBUG_PRINT_BUFFER_IN_BYTES  (256*1024)
+#define SHADER_DEBUG_TRIANGLE_SIZE_BYTES    (64)
+#define FLT_MAX                             (3.402823466e+38)
+
+static const float cMagicLineMarker = 7.0f;
+
+ByteAddressBuffer   t_ShaderDebugBuffer : register(t0);
+Texture2D<float>    t_Depth             : register(t1);
+Texture2D<float4>   t_DebugVizOutput    : register(t2);
+
+float4 LoadF4(uint byteOffset) { return asfloat(t_ShaderDebugBuffer.Load4(byteOffset)); }
+
+float4x4 LoadWorldToClip()
+{
+    float4x4 m;
+    m[0] = LoadF4(8*4 + 0*16);
+    m[1] = LoadF4(8*4 + 1*16);
+    m[2] = LoadF4(8*4 + 2*16);
+    m[3] = LoadF4(8*4 + 3*16);
+    return m;
+}
+
+#ifdef NR_VERTEX_SHADER
+void main_vs( in uint vertexID : SV_VertexID, in uint instanceID : SV_InstanceID,
+              out float4 outPos : SV_Position, out float4 outCol : COLOR,
+              out float4 outProjPos : TEXCOORD0 )
+{
+    outPos = outCol = outProjPos = float4(0,0,0,0);
+
+    uint writtenInstances = t_ShaderDebugBuffer.Load(5*4);
+    if (instanceID >= writtenInstances)
+        return;
+
+    const uint dataOffset = SHADER_DEBUG_HEADER_IN_BYTES + SHADER_DEBUG_PRINT_BUFFER_IN_BYTES
+                          + instanceID * SHADER_DEBUG_TRIANGLE_SIZE_BYTES;
+
+    float4 worldPos = LoadF4(dataOffset + vertexID*4*4);
+    if( worldPos.w != cMagicLineMarker )
+        return;
+    worldPos.w = 1.0;
+    outCol = LoadF4(dataOffset + 3*4*4);
+
+    if( worldPos.z == FLT_MAX )
+    {
+        // 2D variant — coords are in (render-res) screen space; viz texture provides the dims.
+        uint width, height;
+        t_DebugVizOutput.GetDimensions(width, height);
+        outPos = float4( ((worldPos.x + 0.5) / float(width))*2.0 - 1.0, ((worldPos.y + 0.5) / float(height))*(-2.0) + 1.0, 0.5, 1 );
+    }
+    else
+    {
+        outPos = mul(worldPos, LoadWorldToClip());
+    }
+
+    outProjPos = outPos;
+}
+#endif
+
+#ifdef NR_PIXEL_SHADER
+void main_ps( in float4 i_pos : SV_Position, in float4 i_col : COLOR,
+              in float4 projPos : TEXCOORD0, out float4 o_color : SV_Target0 )
+{
+    uint depthWidth, depthHeight;
+    t_Depth.GetDimensions(depthWidth, depthHeight);
+    float2 uv = frac(projPos.xy/projPos.ww * float2( 0.5, -0.5 ) + float2( 0.5, 0.5 ));
+    float depth0 = t_Depth[ uint2(uv * float2(depthWidth, depthHeight) + float2(0.0, 0.0) ) ];
+    float depth1 = t_Depth[ uint2(uv * float2(depthWidth, depthHeight) + float2(0.0, 1.0) ) ];
+    float depth2 = t_Depth[ uint2(uv * float2(depthWidth, depthHeight) + float2(1.0, 0.0) ) ];
+    float depth3 = t_Depth[ uint2(uv * float2(depthWidth, depthHeight) + float2(1.0, 1.0) ) ];
+    float depth = min(min(depth0, depth1), min(depth2, depth3));
+
+    bool behind = depth > (projPos.z/projPos.w*1.002 + 0.000001);
+
+    o_color = float4( lerp(i_col.rgb, i_col.rgb*0.7+0.2, behind), i_col.a * ((behind)?(0.15):(1)));
+}
+#endif

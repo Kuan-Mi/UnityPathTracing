@@ -65,7 +65,7 @@ namespace PathTracing
         private readonly NativeComputePipeline      _tonemapCs;
         private readonly NativeComputeDescriptorSet _tonemapDs;
         
-        private readonly NativeGpuBuffer _histogramBuffer; // 256 x uint (DEFAULT heap, UAV-capable)
+        private readonly DeviceBuffer _histogramBuffer; // 256 x uint (DEFAULT heap, UAV-capable)
         private readonly GraphicsBuffer  _exposureBuffer; // 1 x uint (float bits)
 
         private IntPtr expPtr;
@@ -89,7 +89,7 @@ namespace PathTracing
             _tonemapCs = new NativeComputePipeline(tonemapCs);
             _tonemapDs = new NativeComputeDescriptorSet(_tonemapCs);
             
-            _histogramBuffer = new NativeGpuBuffer(256 * sizeof(uint));
+            _histogramBuffer = new DeviceBuffer(256 * sizeof(uint));
             _exposureBuffer   = new GraphicsBuffer(GraphicsBuffer.Target.Raw, 1, sizeof(uint));
 
             expPtr  = _exposureBuffer.GetNativeBufferPtr();
@@ -193,7 +193,7 @@ namespace PathTracing
             internal NativeComputePipeline      TonemapCs;
             internal NativeComputeDescriptorSet TonemapDs;
 
-            internal NativeGpuBuffer          HistogramBuffer;
+            internal DeviceBuffer          HistogramBuffer;
             internal Resource                   Resource;
             internal Settings                   Settings;
             public   IntPtr                     expPtr;

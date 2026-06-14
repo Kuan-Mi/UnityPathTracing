@@ -742,7 +742,7 @@ namespace PathTracing
                         diffAlbedo      = pool.RrGuideDiffAlbedo,
                         specAlbedo      = pool.RrGuideSpecAlbedo,
                         normalRoughness = pool.RrGuideNormalRoughness,
-                        specHitDistance = pool.RrGuideSpecHitDistance,
+                        specularMvOrHitTex = pool.RrGuideSpecHitDistance,
                     };
 
                     var dlrrInput = new DlrrDenoiser.DlrrFrameInput

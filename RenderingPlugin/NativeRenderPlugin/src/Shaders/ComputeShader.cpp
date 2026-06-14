@@ -6,12 +6,10 @@
 // ---------------------------------------------------------------------------
 
 bool ComputeShader::Initialize(ID3D12Device5* device, IUnityLog* log,
-                                DescriptorHeapAllocator* allocator,
                                 IUnityGraphicsD3D12v8*   d3d12v8)
 {
     m_log       = log;
     m_device    = device;
-    m_allocator = allocator;
     m_d3d12v8   = d3d12v8;
     return true;
 }
@@ -50,6 +48,7 @@ bool ComputeShader::LoadShaderFromBytes(const uint8_t* dxilBytes, uint32_t size,
     m_bindingIndex.clear();
     m_samplerBindings.clear();
     m_numSRV = m_numUAV = m_numCBV = m_numSRVArray = m_numUAVArray = m_numRootConstants = m_numRootSRV = 0;
+    m_numSRVSlots = m_numUAVSlots = 0;
     m_rootParamSRV = m_rootParamUAV = m_rootParamCBVBase = m_rootParamRootSRVBase = kInvalidAlloc;
 
     if (!ReflectBindings(shaderBlob.Get())) return false;

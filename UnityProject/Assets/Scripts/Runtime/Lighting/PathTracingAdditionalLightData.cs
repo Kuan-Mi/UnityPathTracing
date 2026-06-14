@@ -20,16 +20,6 @@ public class PathTracingAdditionalLightData : MonoBehaviour
     private void OnValidate()
     {
         if (radius < 0f) radius = 0f;
-
-        var light = GetComponent<Light>();
-        if (light != null &&
-            light.type != LightType.Point &&
-            light.type != LightType.Spot)
-        {
-            Debug.LogWarning(
-                $"[PathTracingAdditionalLightData] '{name}': radius is only meaningful for " +
-                $"Point and Spot lights. Current type: {light.type}", this);
-        }
     }
 #endif
 }

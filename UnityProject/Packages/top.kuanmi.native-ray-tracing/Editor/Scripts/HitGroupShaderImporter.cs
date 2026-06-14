@@ -102,31 +102,28 @@ namespace NativeRender
     // -----------------------------------------------------------------------
 
     [CustomEditor(typeof(HitGroupShaderImporter))]
-    public class HitGroupShaderImporterEditor : ScriptedImporterEditor
+    internal class HitGroupShaderImporterEditor : NativeShaderImporterEditorBase
     {
-        public override void OnInspectorGUI()
+        protected override bool TryGetStatus(string assetPath,
+            out bool hasCompiledBytes, out int byteCount, out string reflectionJson, out string shaderHash)
         {
-            base.OnInspectorGUI();
+            hasCompiledBytes = false; byteCount = 0; reflectionJson = ""; shaderHash = "";
+            var shader = AssetDatabase.LoadAssetAtPath<HitGroupShader>(assetPath);
+            if (shader == null) return false;
 
-            if (targets.Length != 1) return;
-            var importer = (HitGroupShaderImporter)target;
-            var shader   = AssetDatabase.LoadAssetAtPath<HitGroupShader>(importer.assetPath);
-            if (shader == null) return;
+            hasCompiledBytes = shader.HasCompiledBytes;
+            byteCount        = shader.CompiledByteCount;
+            reflectionJson   = shader.ReflectionJson;
+            shaderHash       = shader.ShaderHash;
+            return true;
+        }
 
-            EditorGUILayout.Space(6);
-
-            GUI.backgroundColor = shader.HasCompiledBytes
-                ? new Color(0.4f, 0.8f, 0.4f)
-                : new Color(1f, 0.6f, 0.3f);
-            if (GUILayout.Button(shader.HasCompiledBytes ? "Recompile" : "Compile", GUILayout.Height(28)))
-                importer.SaveAndReimport();
-            GUI.backgroundColor = Color.white;
-
-            EditorGUILayout.Space(2);
-            if (shader.HasCompiledBytes)
-                EditorGUILayout.HelpBox($"DXIL cached ({shader.CompiledByteCount:N0} bytes)", MessageType.Info);
-            else
-                EditorGUILayout.HelpBox("No compiled DXIL – click Compile to build.", MessageType.Warning);
+        protected override void DrawImportSettings()
+        {
+            EditorGUILayout.PropertyField(serializedObject.FindProperty("targetProfile"));
+            EditorGUILayout.PropertyField(serializedObject.FindProperty("defines"), true);
+            EditorGUILayout.PropertyField(serializedObject.FindProperty("additionalIncludePaths"), true);
+            EditorGUILayout.PropertyField(serializedObject.FindProperty("extraArgs"), true);
         }
     }
 

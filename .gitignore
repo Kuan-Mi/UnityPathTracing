@@ -3,6 +3,7 @@
 .vscode/
 .claude/
 build/
+Other/
 
 # Unity generated
 UnityProject/Library/
@@ -12,10 +13,16 @@ UnityProject/Builds/
 UnityProject/Logs/
 UnityProject/UserSettings/
 UnityProject/ProfilerCaptures/
+UnityProject/ShaderPDB/
 UnityProject/*.sln
 UnityProject/*.csproj
 
 Editor.log
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
 /RTXDI/
 
 # Generated reflection dumps next to .computeshader assets
@@ -25,3 +32,6 @@ Editor.log
 # Build output DLLs copied by build_and_copy.bat
 UnityProject/Packages/top.kuanmi.native-ray-tracing/Plugins/x86_64/
 UnityProject/Assets/Plugins/x86_64/
+
+# Auto-clone of NVIDIA-RTX/RTXPT-Assets by tools/restore_rtxpt_assets.py
+tools/.rtxpt-assets/

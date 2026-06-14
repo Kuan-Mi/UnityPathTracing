@@ -1,0 +1,94 @@
+/*
+* ShaderDebug triangle drawing — port of RTXPT Shaders/Libraries/ShaderDebug/ShaderDebug.hlsl
+* DRAW_TRIANGLES_SHADERS (main_vs:646 / main_ps:676). Reads the same u_ShaderDebugBuffer memory,
+* but as an SRV (the draw stage only loads), and replaces the original's ExecuteIndirect with a
+* fixed CPU-side instance budget: the VS rejects instances >= the GPU-written InstanceCount
+* (header byte 20) by emitting degenerate triangles — same culling the indirect draw achieves.
+*
+* Pipeline: TRIANGLELIST, alpha blend, no depth (manual depth test vs t_Depth in the PS, verbatim).
+*/
+
+#pragma pack_matrix(row_major)
+
+#define SHADER_DEBUG_HEADER_IN_BYTES        (96)
+#define SHADER_DEBUG_PRINT_BUFFER_IN_BYTES  (256*1024)
+#define SHADER_DEBUG_TRIANGLE_SIZE_BYTES    (64)        // sizeof(ShaderDebugTriangle): A,B,C,Color float4
+
+static const float cMagicTriangleMarker = 42.0f;
+
+ByteAddressBuffer   t_ShaderDebugBuffer : register(t0);
+Texture2D<float>    t_Depth             : register(t1);
+
+float4 LoadF4(uint byteOffset) { return asfloat(t_ShaderDebugBuffer.Load4(byteOffset)); }
+
+float4x4 LoadWorldToClip()
+{
+    // Header bytes 32..95 — row-major rows (ShaderDebug.hlsl:663-667 loads at 8*4 + row*16).
+    float4x4 m;
+    m[0] = LoadF4(8*4 + 0*16);
+    m[1] = LoadF4(8*4 + 1*16);
+    m[2] = LoadF4(8*4 + 2*16);
+    m[3] = LoadF4(8*4 + 3*16);
+    return m;
+}
+
+#ifdef NR_VERTEX_SHADER
+void main_vs( in uint vertexID : SV_VertexID, in uint instanceID : SV_InstanceID,
+              out float4 outPos : SV_Position, out float4 outCol : COLOR,
+              out float4 outProjPos : TEXCOORD0, out float3 outBarys : TEXCOORD1 )
+{
+    outPos = outCol = outProjPos = float4(0,0,0,0); outBarys = float3(0,0,0);
+
+    // Indirect-draw replacement: cull instances beyond the GPU-side counter (header byte 20).
+    uint writtenInstances = t_ShaderDebugBuffer.Load(5*4);
+    if (instanceID >= writtenInstances)
+        return;
+
+    const uint dataOffset = SHADER_DEBUG_HEADER_IN_BYTES + SHADER_DEBUG_PRINT_BUFFER_IN_BYTES
+                          + instanceID * SHADER_DEBUG_TRIANGLE_SIZE_BYTES;
+
+    float4 worldPos = LoadF4(dataOffset + vertexID*4*4);
+    if( worldPos.w != cMagicTriangleMarker )
+        return;
+
+    worldPos.w = 1.0;
+    outCol = LoadF4(dataOffset + 3*4*4);
+
+    outPos = mul(worldPos, LoadWorldToClip());
+    outProjPos = outPos;
+
+    outBarys = float3( vertexID == 0, vertexID == 1, vertexID == 2 );
+}
+#endif
+
+#ifdef NR_PIXEL_SHADER
+void main_ps( in float4 i_pos : SV_Position, in float4 i_col : COLOR,
+              in float4 projPos : TEXCOORD0, in float3 barys : TEXCOORD1,
+              out float4 o_color : SV_Target0 )
+{
+    // Verbatim ShaderDebug.hlsl:676-712 — manual reverse-Z depth test against the (render-res)
+    // depth buffer via projected UV, plus checkerboarded wireframe overlay.
+    uint depthWidth, depthHeight;
+    t_Depth.GetDimensions(depthWidth, depthHeight);
+    float2 uv = frac(projPos.xy/projPos.ww * float2( 0.5, -0.5 ) + float2( 0.5, 0.5 ));
+    float depth0 = t_Depth[ uint2(uv * float2(depthWidth, depthHeight) + float2(0.0, 0.0) ) ];
+    float depth1 = t_Depth[ uint2(uv * float2(depthWidth, depthHeight) + float2(0.0, 1.0) ) ];
+    float depth2 = t_Depth[ uint2(uv * float2(depthWidth, depthHeight) + float2(1.0, 0.0) ) ];
+    float depth3 = t_Depth[ uint2(uv * float2(depthWidth, depthHeight) + float2(1.0, 1.0) ) ];
+    float depth = min(min(depth0, depth1), min(depth2, depth3));
+
+    bool behind = depth > (projPos.z/projPos.w*1.002 + 0.000001);
+
+    float4 color = float4( lerp(i_col.rgb, i_col.rgb*0.7+0.2, behind), i_col.a * ((behind)?(0.15):(1)));
+
+    float3 onEdge3 = min( barys, 1-barys );
+    float onEdge = min( onEdge3.x, min( onEdge3.y, onEdge3.z ) );
+    float delta = abs(ddx(onEdge)) + abs(ddy(onEdge));
+    float wireframeThickness = 0.7;
+    onEdge = smoothstep(0, delta*wireframeThickness, onEdge);
+    float wireframe = (1-onEdge);
+    wireframe *= ((uint(i_pos.x)+uint(i_pos.y)) % 2 == 0);
+
+    o_color = lerp( color, float4( 0.8, 1.0, 0.8, 1 - behind * 0.8 ), wireframe );
+}
+#endif

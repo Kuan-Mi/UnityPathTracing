@@ -1,0 +1,9 @@
+see original README.txt included
+
+Model Information:
+* title:	Transparent Machines (partial mesh from Transparent Machines™ short movie)
+* source:	https://www.beeple-crap.com/resources
+* author:	Mike Winkelmann Aka Beeple
+
+Model License:
+* license type:	CREATIVE COMMONS

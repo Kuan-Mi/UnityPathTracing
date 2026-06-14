@@ -51,6 +51,33 @@ public:
     uint32_t Capacity()  const { return m_capacity;  }
     uint32_t AllocBase() const { return m_allocBase; }
 
+    // Highest slot index ever assigned a non-null resource, plus one. All slots at
+    // or beyond this are guaranteed null, so per-dispatch resource-state walks can
+    // stop here instead of scanning the full capacity.
+    uint32_t UsedCount() const { return m_usedCount; }
+
+    // ---- Per-frame resource-state sweep dedup -------------------------------
+    // Loaded textures only ever need to be in the SRV-read state (donut marks them
+    // permanently ShaderResource at load: setPermanentTextureState). Unity owns the
+    // state tracker here, so the safe adaptation is once per frame: the first
+    // dispatch that binds this array sweeps Require() over all elements; subsequent
+    // dispatches in the same frame skip it. Re-armed whenever the contents change.
+    // |state| accumulates so e.g. a NON_PIXEL sweep does not satisfy a later
+    // PIXEL|NON_PIXEL (raster) request within the same frame.
+    bool NeedsStateSweep(uint64_t frameSerial, uint32_t state) const
+    {
+        return m_sweptEpoch != m_contentEpoch || m_sweptFrame != frameSerial ||
+               (m_sweptStates & state) != state;
+    }
+    void MarkStateSweep(uint64_t frameSerial, uint32_t state)
+    {
+        if (m_sweptFrame != frameSerial || m_sweptEpoch != m_contentEpoch)
+            m_sweptStates = 0;
+        m_sweptEpoch  = m_contentEpoch;
+        m_sweptFrame  = frameSerial;
+        m_sweptStates |= state;
+    }
+
     // Non-owning pointer to the resource at |index|, or nullptr if the slot is empty.
     ID3D12Resource* GetTexture(uint32_t index) const
     {
@@ -75,5 +102,13 @@ private:
 
     uint32_t m_capacity  = 0;
     uint32_t m_allocBase = 0;
+    uint32_t m_usedCount = 0;   // see UsedCount(); grow-only except on shrinking Resize
     bool     m_initialized = false;
+
+    // Sweep-dedup state (see NeedsStateSweep). m_contentEpoch bumps on every
+    // SetTexture / Resize so a content change forces the next dispatch to re-sweep.
+    uint64_t m_contentEpoch = 1;
+    uint64_t m_sweptEpoch   = 0;
+    uint64_t m_sweptFrame   = ~0ull;
+    uint32_t m_sweptStates  = 0;
 };

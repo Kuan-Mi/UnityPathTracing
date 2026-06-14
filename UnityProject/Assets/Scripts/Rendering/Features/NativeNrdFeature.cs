@@ -76,13 +76,12 @@ namespace PathTracing
         private DlssSRPass              _dlsssrPass;
         private NisPass                 _nisPass;
         private NativeNrdOutputBlitPass _outputBlitPass;
-        private NativeFrameTick         _nativeFrameTickPass;
         private NativeToneMappingPass   _toneMappingPass;
 
         private NRDSampleResource _nrdSampleResource;
         public  NRDSampleResource NrdSampleResource => _nrdSampleResource;
 
-        private readonly Dictionary<long, NativeBuffer> _nrdConstantBuffers = new();
+        private readonly Dictionary<long, VolatileConstantBuffer> _nrdConstantBuffers = new();
 
         private readonly Dictionary<long, SigmaDenoiser>     _sigmaDenoisers     = new();
         private readonly Dictionary<long, ReblurDenoiser>    _reblurDenoisers    = new();
@@ -157,7 +156,6 @@ namespace PathTracing
             _dlsssrPass              ??= new DlssSRPass { renderPassEvent                                                                          = renderPassEvent };
             _nisPass                 ??= new NisPass { renderPassEvent                                                                             = renderPassEvent };
             _outputBlitPass          ??= new NativeNrdOutputBlitPass(finalMaterial) { renderPassEvent                                              = renderPassEvent };
-            _nativeFrameTickPass     ??= new NativeFrameTick { renderPassEvent                                                                     = renderPassEvent };
             _depthBarrierFixPass     ??= new DepthBarrierFixPass { renderPassEvent                                                                 = RenderPassEvent.AfterRendering };
             _toneMappingPass         ??= new NativeToneMappingPass(toneMappingHistogramCs, toneMappingExposureCs, toneMappingCs) { renderPassEvent = renderPassEvent };
         }
@@ -292,7 +290,7 @@ namespace PathTracing
 
             if (!_nrdConstantBuffers.TryGetValue(uniqueKey, out var nrdConstantBuffer))
             {
-                nrdConstantBuffer = new NativeBuffer(Marshal.SizeOf<NRDGlobalConstants>());
+                nrdConstantBuffer = new VolatileConstantBuffer(Marshal.SizeOf<NRDGlobalConstants>());
                 _nrdConstantBuffers.Add(uniqueKey, nrdConstantBuffer);
             }
 
@@ -595,7 +593,7 @@ namespace PathTracing
                     diffAlbedo      = pool.RrGuideDiffAlbedo,
                     specAlbedo      = pool.RrGuideSpecAlbedo,
                     normalRoughness = pool.RrGuideNormalRoughness,
-                    specHitDistance = pool.RrGuideSpecHitDistance
+                    specularMvOrHitTex = pool.RrGuideSpecHitDistance
                 };
 
                 var dlrrInput = new DlrrDenoiser.DlrrFrameInput
@@ -757,20 +755,10 @@ namespace PathTracing
                 renderer.EnqueuePass(_outputBlitPass);
 
                 renderer.EnqueuePass(_depthBarrierFixPass);
-
-                if (renderingData.cameraData.xr.enabled)
-                {
-                    if (setting.skipRightEyeInVR || eyeIndex == 1)
-                        renderer.EnqueuePass(_nativeFrameTickPass);
-                }
-                else
-                {
-                    renderer.EnqueuePass(_nativeFrameTickPass);
-                }
             }
         }
 
-        private void EnqueueDlssAfterPass(ScriptableRenderer renderer, NativeNrdTextureResources pool, int2 outputResolution, NativeBuffer nrdConstantBuffer)
+        private void EnqueueDlssAfterPass(ScriptableRenderer renderer, NativeNrdTextureResources pool, int2 outputResolution, VolatileConstantBuffer nrdConstantBuffer)
         {
             var outputGridW = (outputResolution.x + 15) / 16;
             var outputGridH = (outputResolution.y + 15) / 16;
@@ -868,7 +856,6 @@ namespace PathTracing
             _dlsssrPass          = null;
             _nisPass             = null;
             _outputBlitPass      = null;
-            _nativeFrameTickPass = null;
             _depthBarrierFixPass = null;
             _toneMappingPass     = null;
 
@@ -897,7 +884,8 @@ namespace PathTracing
             finalMaterial = UnityEditor.AssetDatabase.LoadAssetAtPath<Material>("Assets/Shaders/Mat/KM_Final.mat");
 
             updateSkinnedPrimitivesCS = UnityEditor.AssetDatabase.LoadAssetAtPath<ComputeShader>("Assets/NRD-Sample/Shaders/UpdateSkinnedPrimitives.compute");
-
+            fillUintTextureCS         = UnityEditor.AssetDatabase.LoadAssetAtPath<ComputeShader>("Assets/Scripts/FillUintTexture.compute");
+                
             nrdOpaqueTracingShader  = UnityEditor.AssetDatabase.LoadAssetAtPath<NativeComputeShader>("Assets/NRD-Sample/Shaders/TraceOpaque.computeshader");
             nrdSharcResolve         = UnityEditor.AssetDatabase.LoadAssetAtPath<NativeComputeShader>("Assets/NRD-Sample/Shaders/SharcResolve.computeshader");
             nrdSharcUpdate          = UnityEditor.AssetDatabase.LoadAssetAtPath<NativeComputeShader>("Assets/NRD-Sample/Shaders/SharcUpdate.computeshader");

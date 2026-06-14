@@ -86,6 +86,8 @@ namespace NativeRender
             public uint indexStride;
             public uint submeshCount;
             public uint isDynamic; // 1 = SkinnedMeshRenderer (BLAS rebuilt every frame)
+            public uint hitGroupContribution; // InstanceContributionToHitGroupIndex, computed by C#
+            public uint _pad; // explicit padding to match C++ 8-byte struct alignment (total 64 bytes)
         }
 
         /// <summary>
@@ -111,6 +113,17 @@ namespace NativeRender
         /// instanceHandle is the value passed to NR_AS_AddInstance (e.g. MeshRenderer.GetInstanceID()).</summary>
         [DllImport(DllName)]
         public static extern void NR_AS_SetInstanceID(ulong handle, uint instanceHandle, uint id);
+
+        /// <summary>Sets the TLAS emission order for an instance. The native build emits TLAS
+        /// instances sorted ascending by this value (stable; default 0xFFFFFFFF = legacy slot
+        /// order). Required when shaders index per-instance buffers via InstanceIndex().</summary>
+        [DllImport(DllName)]
+        public static extern void NR_AS_SetInstanceOrderIndex(ulong handle, uint instanceHandle, uint order);
+
+        /// <summary>Updates InstanceContributionToHitGroupIndex for an existing instance (its
+        /// base offset in the flat shader table, which shifts on scene layout changes).</summary>
+        [DllImport(DllName)]
+        public static extern void NR_AS_SetInstanceHitGroupContribution(ulong handle, uint instanceHandle, uint contribution);
 
         /// <summary>
         /// Removes an instance previously added via NR_AS_AddInstance.
@@ -150,6 +163,16 @@ namespace NativeRender
         [DllImport(DllName)]
         public static extern ulong NR_CreateRayTraceShaderFromBytes(byte[] dxilBytes, uint size, string name, uint flags = 0, uint maxPayloadSizeInBytes = 4, string rayGenName = null);
 
+        [DllImport(DllName)]
+        public static extern ulong NR_CreateRayTraceShaderFromBytesEx(
+            byte[] dxilBytes,
+            uint size,
+            string name,
+            uint flags,
+            uint maxPayloadSizeInBytes,
+            string rayGenName,
+            string hintsJson);
+
         /// <summary>
         /// Builds a DXR pipeline from N pre-compiled DXIL blobs merged into one RTPSO.
         /// blobDataPtrs[0] must contain raygen + miss shaders.
@@ -166,6 +189,17 @@ namespace NativeRender
             uint flags,
             uint maxPayloadSizeInBytes,
             string rayGenName);
+
+        [DllImport(DllName)]
+        public static extern ulong NR_CreateRayTracePipelineFromBlobsEx(
+            [In] IntPtr[] blobDataPtrs,
+            [In] uint[] blobSizes,
+            uint blobCount,
+            string name,
+            uint flags,
+            uint maxPayloadSizeInBytes,
+            string rayGenName,
+            string hintsJson);
 
 
         /// <summary>Creates a RayTraceDescriptorSet bound to the given shader handle. Returns 0 on failure.</summary>
@@ -261,12 +295,36 @@ namespace NativeRender
             public uint  _pad; // +28
         }
 
-        /// <summary>Event data for NR_AS_GetBuildRenderEventFunc. Must match C++ AS_BuildEventData (Pack=4).</summary>
+        /// <summary>Event data for NR_AS_GetBuildRenderEventFunc. Must match C++ AS_BuildEventData (Pack=4, 8 bytes).</summary>
         [StructLayout(LayoutKind.Sequential, Pack = 4)]
         public struct AS_BuildEventData
         {
             public ulong asHandle;
         }
+
+        /// <summary>
+        /// Event data for NR_RTS_GetRebuildHitGroupTableEventFunc.
+        /// C# pre-computes the flat variant-index array; native side writes shader identifiers.
+        /// Must match C++ ShtRebuildEventData (Pack=4, 24 bytes).
+        /// variantIndicesPtr must point to a pinned/NativeArray of uint32 for the duration of GPU execution.
+        /// </summary>
+        [StructLayout(LayoutKind.Sequential, Pack = 4)]
+        public struct ShtRebuildEventData
+        {
+            public ulong  shaderHandle;      // RayTraceShader*
+            public IntPtr variantIndicesPtr; // const uint32_t* — per-geometry variant index array
+            public uint   count;             // number of geometries
+            public uint   _pad;
+        }
+
+        /// <summary>Returns the render event function for shader hit-group table rebuild.
+        /// Issue via CommandBuffer.IssuePluginEventAndData after the AS build event.</summary>
+        [DllImport(DllName)]
+        public static extern IntPtr NR_RTS_GetRebuildHitGroupTableEventFunc();
+
+        /// <summary>Returns sizeof(ShtRebuildEventData) for buffer allocation.</summary>
+        [DllImport(DllName)]
+        public static extern uint NR_RTS_GetRebuildHitGroupTableEventDataSize();
 
         // -------------------------------------------------------------------
         // BindlessTexture API  (independent GPU-visible texture array)
@@ -383,101 +441,88 @@ namespace NativeRender
         public static extern uint NR_BUAV_GetCapacity(ulong handle);
 
         // -------------------------------------------------------------------
-        // NativeBuffer API  (triple-buffered upload-heap constant buffer)
+        // NativeBuffer API  (unified plugin buffer — nvrhi Buffer analog)
+        //
+        // One create/destroy pair covers the three former buffer roles; the desc
+        // flags select the heap and the active upload/readback path:
+        //   * Volatile constant/dynamic buffer:
+        //         isVolatile = 1, maxVersions = N (>1)  -> per-frame UPLOAD ring,
+        //         written via the upload callback (GetNativeBufferUploadCallbackPtr).
+        //   * GPU-resident structured buffer with staged CPU writes:
+        //         structStride > 0  -> DEFAULT heap fed by the NR_NSB_* snapshot path.
+        //   * GPU-only UAV buffer:
+        //         canHaveUAVs = 1  -> DEFAULT heap with ALLOW_UNORDERED_ACCESS.
         // -------------------------------------------------------------------
 
         /// <summary>
-        /// Allocates a triple-buffered upload-heap buffer of <paramref name="sizeInBytes"/>.
-        /// Returns an opaque handle; caller must call NR_DestroyNativeBuffer when done.
+        /// Allocates a unified plugin buffer. Returns an opaque handle; caller must call
+        /// <see cref="NR_DestroyNativeBuffer"/> when done.
         /// </summary>
         [DllImport(DllName)]
-        public static extern ulong NR_CreateNativeBuffer(uint sizeInBytes);
+        public static extern ulong NR_CreateNativeBuffer(
+            ulong byteSize, uint structStride, uint maxVersions,
+            uint canHaveUAVs, uint isConstantBuffer, uint isVolatile,
+            [MarshalAs(UnmanagedType.LPUTF8Str)] string debugName);
 
         /// <summary>Enqueues destruction after a GPU fence delay.</summary>
         [DllImport(DllName)]
         public static extern void NR_DestroyNativeBuffer(ulong handle);
 
-        // -------------------------------------------------------------------
-        // NativeGpuBuffer API  (single DEFAULT-heap buffer with UAV support)
-        // -------------------------------------------------------------------
-
         /// <summary>
-        /// Allocates a DEFAULT-heap buffer of <paramref name="sizeInBytes"/> with
-        /// D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS. Suitable for SRV and UAV bindings.
-        /// Returns an opaque handle; caller must call NR_DestroyNativeGpuBuffer when done.
-        /// </summary>
-        [DllImport(DllName)]
-        public static extern ulong NR_CreateNativeGpuBuffer(uint sizeInBytes);
-
-        /// <summary>Enqueues destruction after a GPU fence delay.</summary>
-        [DllImport(DllName)]
-        public static extern void NR_DestroyNativeGpuBuffer(ulong handle);
-
-        /// <summary>
-        /// Returns the render-event callback pointer for zeroing a NativeGpuBuffer.
-        /// Pass the result to <c>cmd.IssuePluginEventAndData</c> with the buffer Handle as data.
+        /// Returns the render-event callback pointer for zeroing a DEFAULT-heap buffer via
+        /// ClearUnorderedAccessViewUint. Pass the result to <c>cmd.IssuePluginEventAndData</c>
+        /// with the buffer Handle as data.
         /// </summary>
         [DllImport(DllName)]
         public static extern IntPtr NR_GetClearNativeGpuBufferCallbackPtr();
 
-        // /// <summary>
-        // /// Copies <paramref name="bytes"/> bytes from <paramref name="data"/> into the
-        // /// current frame's mapped slot.  Call each frame before issuing GPU work.
-        // /// </summary>
-        // [DllImport(DllName)]
-        // public static extern unsafe void NR_NB_Upload(ulong handle, void* data, uint bytes);
-
-        // -------------------------------------------------------------------
-        // NativeStructuredBuffer API  (single upload-heap SRV buffer)
-        // -------------------------------------------------------------------
-
-        /// <summary>Allocates an upload-heap structured buffer with <paramref name="capacity"/> elements.</summary>
+        /// <summary>
+        /// Returns the render-event callback pointer that clears a UAV-capable D3D12 texture via
+        /// ClearUnorderedAccessViewFloat (nvrhi clearTextureFloat equivalent — no pipeline, no
+        /// draw). Pass a <c>ClearTextureUavFloatEventData</c> blob (allocated via
+        /// <see cref="NR_NSB_AllocFlushBuffer"/>, see <see cref="NativeTextureClear"/>) as the data
+        /// argument of <c>cmd.IssuePluginEventAndData</c>; the callback frees it.
+        /// </summary>
         [DllImport(DllName)]
-        public static extern ulong NR_CreateNativeStructuredBuffer(uint capacity, uint elementStride);
-
-        /// <summary>Enqueues destruction after a GPU fence delay.</summary>
-        [DllImport(DllName)]
-        public static extern void NR_DestroyNativeStructuredBuffer(ulong handle);
-
-        /// <summary>Copies <paramref name="elementCount"/> elements from <paramref name="data"/> starting at <paramref name="elementOffset"/>.</summary>
-        [DllImport(DllName)]
-        public static extern unsafe void NR_NSB_UploadRange(ulong handle, void* data, uint elementOffset, uint elementCount);
-
-        /// <summary>Grows the buffer to at least <paramref name="newCapacity"/> elements, preserving existing data.</summary>
-        [DllImport(DllName)]
-        public static extern void NR_NSB_Grow(ulong handle, uint newCapacity);
-
-        /// <summary>Returns the ID3D12Resource* as IntPtr for binding as an SRV.</summary>
-        [DllImport(DllName)]
-        public static extern IntPtr NR_NSB_GetNativePtr(ulong handle);
+        public static extern IntPtr NR_GetClearTextureUavFloatCallbackPtr();
 
         /// <summary>Returns the current element capacity of the buffer.</summary>
         [DllImport(DllName)]
         public static extern uint NR_NSB_GetCapacity(ulong handle);
 
         /// <summary>
-        /// Returns the <c>UnityRenderingEventAndData</c> function pointer for flushing staged
-        /// instance data into the GPU-resident buffer via <c>CopyBufferRegion</c>.
+        /// Returns the <c>UnityRenderingEventAndData</c> function pointer that drains the pending
+        /// queue and records the staged <c>CopyBufferRegion</c> into the GPU-resident buffer.
         /// Pass the buffer handle as the data pointer to <c>CommandBuffer.IssuePluginEventAndData</c>.
         /// </summary>
         [DllImport(DllName)]
         public static extern IntPtr NR_NSB_GetFlushEventFunc();
 
         /// <summary>
-        /// Returns the <c>UnityRenderingEventAndData</c> function pointer for draining the
-        /// main-thread pending-upload queue into staging[g_frameIndex] on the render thread.
-        /// Must be issued BEFORE <see cref="NR_NSB_GetFlushEventFunc"/> in the same CommandBuffer.
+        /// Allocates a flush snapshot blob of <paramref name="sizeBytes"/> bytes. C# fills it with
+        /// the header + range table + packed payload and passes the pointer as the data argument of
+        /// <c>CommandBuffer.IssuePluginEventAndData</c>; the render-thread flush callback parses and
+        /// frees it. Allocated and freed by the plugin so the allocator matches across the boundary.
         /// </summary>
         [DllImport(DllName)]
-        public static extern IntPtr NR_NSB_GetDrainEventFunc();
+        public static extern IntPtr NR_NSB_AllocFlushBuffer(uint sizeBytes);
 
         /// <summary>
-        /// Thread-safe (main thread): deep-copies <paramref name="elementCount"/> elements from
-        /// <paramref name="data"/> into the pending-upload queue. The actual staging write
-        /// happens on the render thread when the Drain event fires.
+        /// Returns the <c>UnityRenderingEventAndData</c> function pointer that records a GPU->CPU
+        /// readback copy. Pass an <c>NsbReadbackRequest</c> blob (allocated via
+        /// <see cref="NR_NSB_AllocFlushBuffer"/>) as the data argument of
+        /// <c>CommandBuffer.IssuePluginEventAndData</c>; the callback frees it.
         /// </summary>
         [DllImport(DllName)]
-        public static unsafe extern void NR_NSB_EnqueueUpload(ulong handle, void* data, uint elementOffset, uint elementCount);
+        public static extern IntPtr NR_NSB_GetReadbackEventFunc();
+
+        /// <summary>
+        /// Main thread: copies a completed readback into <paramref name="dst"/> (up to
+        /// <paramref name="dstBytes"/>) and returns 1; returns 0 while the copy is still in flight
+        /// on the GPU or when no readback is pending.
+        /// </summary>
+        [DllImport(DllName)]
+        public static extern uint NR_NSB_TryReadback(ulong handle, IntPtr dst, ulong dstBytes);
 
         // -------------------------------------------------------------------
         // ComputeShader API  (generic compute pipeline, cs_6_x)
@@ -544,16 +589,15 @@ namespace NativeRender
 
         /// <summary>
         /// One slot per reflected binding. Filled on the main thread; read on the render thread.
-        /// Must match C++ CS_BindingSlot exactly (Pack=4, 32 bytes).
+        /// Must match C++ BindingSlot exactly (Pack=4, 24 bytes).
         /// </summary>
         [StructLayout(LayoutKind.Sequential, Pack = 4)]
         public struct CS_BindingSlot
         {
-            public ulong resourcePtr; // ID3D12Resource* (may be 0)
-            public ulong objectPtr; // AccelerationStructure* | BindlessTexture* | BindlessBuffer*
+            public ulong objectPtr; // resource/wrapper/payload pointer, interpreted per objectKind
             public uint  count; // element count  (StructuredBuffer or typed buffer)
             public uint  stride; // element stride (StructuredBuffer; 0 = raw/typed)
-            public uint  objectKind; // 0=none, 1=AccelStruct, 2=BindlessTexture, 3=BindlessBuffer
+            public uint  objectKind; // 0=None(raw ID3D12Resource*),1=AccelStruct,2=BindlessTex,3=BindlessBuf,4=RootConstants,5=NativeBuffer,6=BindlessUAVTex
             public uint  format; // DXGI_FORMAT for typed buffer UAV (0 = raw/structured)
         }
 
@@ -572,6 +616,185 @@ namespace NativeRender
             public ulong bindingSlotsPtr; // pointer to CS_BindingSlot[] in pinned NativeArray
         }
 
+        // -------------------------------------------------------------------
+        // BC6H cubemap API  (plugin-owned compressed env cube + reinterpret copy)
+        // -------------------------------------------------------------------
+
+        /// <summary>Creates a BC6H_UFLOAT TextureCube (6 faces, <paramref name="mipLevels"/> mips)
+        /// committed resource. Returns the raw ID3D12Resource* (bindable like a Unity texture ptr),
+        /// or IntPtr.Zero on failure. Release via <see cref="NR_DestroyBC6HCube"/>.</summary>
+        [DllImport(DllName)]
+        public static extern IntPtr NR_CreateBC6HCube(uint dim, uint mipLevels);
+
+        /// <summary>Defer-releases a BC6H cube created by <see cref="NR_CreateBC6HCube"/>.</summary>
+        [DllImport(DllName)]
+        public static extern void NR_DestroyBC6HCube(IntPtr handle);
+
+        /// <summary>Returns the render event callback that reinterpret-copies the RGBA32_UINT scratch
+        /// cube into the BC6H cube (per subresource). Pass a pinned <see cref="BC6HCopy_RenderEventData"/>
+        /// to <c>CommandBuffer.IssuePluginEventAndData</c>.</summary>
+        [DllImport(DllName)]
+        public static extern IntPtr NR_GetBC6HCopyEventFunc();
+
+        /// <summary>Returns sizeof(BC6HCopy_RenderEventData) for buffer allocation.</summary>
+        [DllImport(DllName)]
+        public static extern uint NR_GetBC6HCopyEventDataSize();
+
+        /// <summary>
+        /// Event data for <see cref="NR_GetBC6HCopyEventFunc"/>. Must match C++
+        /// BC6HCopy_RenderEventData exactly (Pack=4, 24 bytes).
+        /// </summary>
+        [StructLayout(LayoutKind.Sequential, Pack = 4)]
+        public struct BC6HCopy_RenderEventData
+        {
+            public ulong srcScratch; // ID3D12Resource* RGBA32_UINT scratch cube
+            public ulong dstBC6H;    // ID3D12Resource* BC6H cube
+            public uint  mipLevels;
+            public uint  arraySize;  // 6 for a cube
+        }
+
+        // -------------------------------------------------------------------
+        // RasterShader API  (generic graphics pipeline, vs_6_x + ps_6_x)
+        // -------------------------------------------------------------------
+
+        /// <summary>
+        /// Fixed-function graphics-pipeline state. Must match C++ RasterPipelineStateDesc
+        /// exactly (Pack=4). Enum fields use raw D3D12 enum values; 0 selects a default
+        /// (cull NONE, fill SOLID, depth func LESS_EQUAL, topology TRIANGLE).
+        /// </summary>
+        [StructLayout(LayoutKind.Sequential, Pack = 4)]
+        public struct RasterPipelineStateDesc
+        {
+            public uint numRenderTargets;                                  // 0..8
+            [MarshalAs(UnmanagedType.ByValArray, SizeConst = 8)]
+            public uint[] rtvFormats;                                      // DXGI_FORMAT per RT
+            public uint dsvFormat;                                         // DXGI_FORMAT, 0 = none
+            public uint cullMode;                                          // D3D12_CULL_MODE; 0 => NONE
+            public uint fillMode;                                          // D3D12_FILL_MODE; 0 => SOLID
+            public uint depthTestEnable;
+            public uint depthWriteEnable;
+            public uint depthFunc;                                         // D3D12_COMPARISON_FUNC; 0 => LESS_EQUAL
+            public uint blendMode;                                         // 0=opaque,1=alpha,2=additive,3=premultiplied
+            public uint primitiveTopology;                                 // D3D_PRIMITIVE_TOPOLOGY (TRIANGLELIST=4, TRIANGLESTRIP=5, …); 0 => TRIANGLELIST
+            public uint frontCounterClockwise;
+            public uint sampleCount;                                       // 0 => 1
+
+            // D3D_PRIMITIVE_TOPOLOGY values.
+            public const uint TopologyTriangleList  = 4;
+            public const uint TopologyTriangleStrip = 5;
+
+            // blendMode values (see C++ MakeBlend).
+            public const uint BlendModeOpaque         = 0;
+            public const uint BlendModeAlpha          = 1;
+            public const uint BlendModeAdditive       = 2;
+            public const uint BlendModePremultiplied  = 3;
+            public const uint BlendModeConstantColor  = 4; // src*C + dst*(1-C); C = RasterDrawDesc.blendFactor
+
+            /// <summary>
+            /// Single-RTV opaque fullscreen-pass default for the given color format. Uses a triangle
+            /// STRIP (the donut fullscreen_vs.hlsl quad) — draw with vertexCount = 4. Pass
+            /// <paramref name="primitiveTopology"/> = <see cref="TopologyTriangleList"/> for a 3-vertex
+            /// triangle-list fullscreen VS instead.
+            /// </summary>
+            public static RasterPipelineStateDesc FullscreenOpaque(uint rtvFormat, uint primitiveTopology = TopologyTriangleStrip)
+            {
+                var d = new RasterPipelineStateDesc
+                {
+                    numRenderTargets = 1,
+                    rtvFormats       = new uint[8],
+                    dsvFormat        = 0,
+                    cullMode         = 1, // D3D12_CULL_MODE_NONE
+                    fillMode         = 3, // D3D12_FILL_MODE_SOLID
+                    depthTestEnable  = 0,
+                    depthWriteEnable = 0,
+                    depthFunc        = 0,
+                    blendMode        = 0,
+                    primitiveTopology = primitiveTopology,
+                    frontCounterClockwise = 0,
+                    sampleCount      = 1,
+                };
+                d.rtvFormats[0] = rtvFormat;
+                return d;
+            }
+        }
+
+        /// <summary>
+        /// Builds a graphics pipeline from pre-compiled VS + PS DXIL blobs and a fixed-function
+        /// state desc. Returns an opaque handle on success, 0 on failure.
+        /// </summary>
+        [DllImport(DllName)]
+        public static extern ulong NR_CreateRasterShader(
+            byte[] vsDxil, uint vsSize, byte[] psDxil, uint psSize,
+            ref RasterPipelineStateDesc state,
+            [MarshalAs(UnmanagedType.LPStr)] string name);
+
+        /// <summary>Like NR_CreateRasterShader, with a hintsJson string (rootConstants / rootSRV).</summary>
+        [DllImport(DllName)]
+        public static extern ulong NR_CreateRasterShaderEx(
+            byte[] vsDxil, uint vsSize, byte[] psDxil, uint psSize,
+            ref RasterPipelineStateDesc state,
+            [MarshalAs(UnmanagedType.LPStr)] string name,
+            [MarshalAs(UnmanagedType.LPStr)] string hintsJson);
+
+        /// <summary>Destroys a RasterShader created by NR_CreateRasterShader(Ex) (deferred).</summary>
+        [DllImport(DllName)]
+        public static extern void NR_DestroyRasterShader(ulong handle);
+
+        /// <summary>Creates a RasterDescriptorSet for the given RasterShader handle. Returns 0 on failure.</summary>
+        [DllImport(DllName)]
+        public static extern ulong NR_RAS_CreateDescriptorSet(ulong shaderHandle);
+
+        /// <summary>Destroys a RasterDescriptorSet (deferred until the GPU is done).</summary>
+        [DllImport(DllName)]
+        public static extern void NR_RAS_DestroyDescriptorSet(ulong handle);
+
+        /// <summary>Returns the number of reflected bindings (slot count) for the shader.</summary>
+        [DllImport(DllName)]
+        public static extern uint NR_RAS_GetBindingCount(ulong handle);
+
+        /// <summary>Returns the slot index for the named binding, or uint.MaxValue if not found.</summary>
+        [DllImport(DllName)]
+        public static extern uint NR_RAS_GetSlotIndex(ulong handle,
+            [MarshalAs(UnmanagedType.LPStr)] string name);
+
+        /// <summary>Returns the HLSL variable name for the binding at the given index, or null.</summary>
+        [DllImport(DllName)]
+        public static extern IntPtr NR_RAS_GetBindingName(ulong handle, uint index);
+
+        /// <summary>Returns the render event callback pointer for per-descriptor-set draws.</summary>
+        [DllImport(DllName)]
+        public static extern IntPtr NR_RAS_GetRenderEventFunc();
+
+        /// <summary>Returns sizeof(RAS_RenderEventData) for buffer allocation.</summary>
+        [DllImport(DllName)]
+        public static extern uint NR_RAS_GetRenderEventDataSize();
+
+        /// <summary>
+        /// Event data for NR_RAS_GetRenderEventFunc draws.
+        /// Must match C++ RAS_RenderEventData exactly (Pack=4).
+        /// Blittable (fixed buffers, no managed arrays) so it can live in a pinned
+        /// <see cref="Unity.Collections.NativeArray{T}"/> ring like CS_RenderEventData.
+        /// </summary>
+        [StructLayout(LayoutKind.Sequential, Pack = 4)]
+        public unsafe struct RAS_RenderEventData
+        {
+            public ulong descriptorSetHandle; // RasterDescriptorSet*
+            public ulong bindingSlotsPtr;     // CS_BindingSlot*
+            public uint  bindingCount;
+            public uint  numRenderTargets;
+            public fixed ulong rtvResources[8]; // ID3D12Resource*
+            public fixed uint  rtvFormats[8];   // DXGI_FORMAT
+            public ulong dsvResource;         // ID3D12Resource* or 0
+            public uint  dsvFormat;           // DXGI_FORMAT
+            public uint  clearFlags;          // bit0 = clear color, bit1 = clear depth
+            public fixed float clearColor[4];
+            public float clearDepth;
+            public float viewportX, viewportY, viewportW, viewportH;
+            public uint  vertexCount;
+            public uint  instanceCount;
+            public float blendFactor;       // OMSetBlendFactor constant (blendMode==4 constant-color); was _pad
+        }
+
         // -----------------------------------------------------------------------
         // ShaderCompilerPlugin — standalone HLSL-to-DXIL compiler DLL.
         // No Unity runtime dependency.
@@ -581,12 +804,23 @@ namespace NativeRender
             private const string DllName = "ShaderCompilerPlugin";
 
             /// <summary>
+            /// Directory where DXC writes separate shader PDBs (debug symbols). Compiling with
+            /// debug info (-Zi) but without -Qembed_debug keeps the DXIL blob — and therefore the
+            /// serialized asset and the player build — small, while PIX still resolves symbols from
+            /// the PDBs in this folder (add it to PIX's symbol search path). Compilation only runs
+            /// at editor import time, so this resolves relative to the project root.
+            /// </summary>
+            public static string PdbOutputDir =>
+                System.IO.Path.GetFullPath(System.IO.Path.Combine(Application.dataPath, "..", "ShaderPDB"));
+
+            /// <summary>
             /// Compiles the HLSL file at <paramref name="hlslPath"/> to DXIL bytecode.
             /// On success returns true and sets <paramref name="outBytes"/> / <paramref name="outSize"/>;
             /// the caller must free the buffer with <see cref="NR_SC_Free"/>.
             /// <paramref name="includeDirs"/> may be null or semicolon-separated paths.
             /// <paramref name="extraArgs"/> may be null or semicolon-separated additional DXC arguments
             /// (e.g. "-disable-payload-qualifiers").
+            /// <paramref name="pdbOutDir"/> may be null/empty; when set, the separate PDB is written there.
             /// </summary>
             [DllImport(DllName)]
             public static extern bool NR_SC_Compile(
@@ -595,6 +829,7 @@ namespace NativeRender
                 [MarshalAs(UnmanagedType.LPStr)] string includeDirs,
                 [MarshalAs(UnmanagedType.LPStr)] string defines,
                 [MarshalAs(UnmanagedType.LPStr)] string extraArgs,
+                [MarshalAs(UnmanagedType.LPStr)] string pdbOutDir,
                 out IntPtr outBytes,
                 out uint outSize);
 
@@ -641,6 +876,7 @@ namespace NativeRender
                 [MarshalAs(UnmanagedType.LPStr)] string includeDirs,
                 [MarshalAs(UnmanagedType.LPStr)] string defines,
                 [MarshalAs(UnmanagedType.LPStr)] string extraArgs,
+                [MarshalAs(UnmanagedType.LPStr)] string pdbOutDir,
                 out IntPtr outBytes,
                 out uint outSize);
         }

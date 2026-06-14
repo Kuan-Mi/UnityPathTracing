@@ -1,5 +1,6 @@
 ﻿#include <cassert>
 #include <mutex>
+#include <unordered_map>
 
 #include "DLRRInstance.h"
 #include "DLSRInstance.h"
@@ -24,6 +25,30 @@ namespace
     IUnityInterfaces* s_UnityInterfaces = nullptr;
     IUnityGraphics* s_Graphics = nullptr;
     IUnityLog* s_Logger = nullptr;
+
+    // Cache for DLRR_QueryOptimalRenderSize — keyed by (outputWidth, outputHeight, mode).
+    // A temporary upscaler is created once per unique key to query the NGX-recommended
+    // render resolution, matching RTXPT's QueryDLSSOptimalSettings path.
+    struct OptimalResKey
+    {
+        uint32_t outputWidth;
+        uint32_t outputHeight;
+        uint8_t  mode;
+        bool operator==(const OptimalResKey& o) const
+        {
+            return outputWidth == o.outputWidth && outputHeight == o.outputHeight && mode == o.mode;
+        }
+    };
+    struct OptimalResKeyHash
+    {
+        size_t operator()(const OptimalResKey& k) const
+        {
+            uint64_t v = ((uint64_t)k.outputWidth << 24) | ((uint64_t)k.outputHeight << 8) | k.mode;
+            return std::hash<uint64_t>()(v);
+        }
+    };
+    std::unordered_map<OptimalResKey, nri::Dim2_t, OptimalResKeyHash> g_OptimalResCache;
+    std::mutex g_OptimalResCacheMutex;
 
     std::unordered_map<int32_t, NrdInstance*> g_NrdInstances;
     std::mutex g_NrdInstanceMutex;
@@ -249,5 +274,74 @@ void UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API UpdateDenoiserResources(
     {
         it->second->UpdateResources(resources, count);
     }
+}
+
+// Query the NGX/Streamline-recommended render resolution for a given output resolution
+// and DLSS mode, matching RTXPT Sample.cpp QueryDLSSOptimalSettings().
+// Creates a temporary DLRR upscaler (without a command buffer, which triggers a GPU
+// wait-for-idle) on the first call per unique (outputWidth, outputHeight, mode);
+// subsequent calls return immediately from cache.
+// mode matches nri::UpscalerMode: 0=NATIVE,1=ULTRA_QUALITY,2=QUALITY,3=BALANCED,
+//                                  4=PERFORMANCE,5=ULTRA_PERFORMANCE.
+UNITY_INTERFACE_EXPORT bool UNITY_INTERFACE_API DLRR_QueryOptimalRenderSize(
+    uint32_t  outputWidth,
+    uint32_t  outputHeight,
+    uint8_t   mode,
+    uint32_t* outRenderWidth,
+    uint32_t* outRenderHeight)
+{
+    if (!outRenderWidth || !outRenderHeight)
+        return false;
+
+    // NATIVE (mode 0): render resolution equals output resolution.
+    if (mode == 0)
+    {
+        *outRenderWidth  = outputWidth;
+        *outRenderHeight = outputHeight;
+        return true;
+    }
+
+    OptimalResKey key{ outputWidth, outputHeight, mode };
+
+    {
+        std::scoped_lock lock(g_OptimalResCacheMutex);
+        auto it = g_OptimalResCache.find(key);
+        if (it != g_OptimalResCache.end())
+        {
+            *outRenderWidth  = it->second.w;
+            *outRenderHeight = it->second.h;
+            return true;
+        }
+    }
+
+    // Cache miss: create a temporary upscaler to ask NGX for the optimal resolution.
+    RenderSystem& rs = RenderSystem::Get();
+    if (!rs.GetNriDevice())
+        return false;
+
+    nri::UpscalerDesc desc = {};
+    desc.upscaleResolution = { (nri::Dim_t)outputWidth, (nri::Dim_t)outputHeight };
+    desc.type  = nri::UpscalerType::DLRR;
+    desc.mode  = (nri::UpscalerMode)mode;
+    desc.flags = nri::UpscalerBits::DEPTH_INFINITE | nri::UpscalerBits::HDR | nri::UpscalerBits::DEPTH_INVERTED;
+    desc.commandBuffer = nullptr; // no command buffer → NRI blocks until GPU is idle
+
+    nri::Upscaler* upscaler = nullptr;
+    nri::Result r = rs.GetNriUpScaler().CreateUpscaler(*rs.GetNriDevice(), desc, upscaler);
+    if (r != nri::Result::SUCCESS || !upscaler)
+        return false;
+
+    nri::UpscalerProps props = {};
+    rs.GetNriUpScaler().GetUpscalerProps(*upscaler, props);
+    rs.GetNriUpScaler().DestroyUpscaler(upscaler);
+
+    {
+        std::scoped_lock lock(g_OptimalResCacheMutex);
+        g_OptimalResCache[key] = props.renderResolution;
+    }
+
+    *outRenderWidth  = props.renderResolution.w;
+    *outRenderHeight = props.renderResolution.h;
+    return true;
 }
 }

@@ -53,6 +53,10 @@ namespace NativeRender
         /// <summary>Size in bytes of the cached DXIL bytecode, or 0 if not compiled.</summary>
         public int CompiledByteCount => _compiledDxil?.Length ?? 0;
 
+        /// <summary>The DXIL container shader hash (32-char hex), or "" if not compiled. Matches the
+        /// hash PIX / RenderDoc display for this shader.</summary>
+        public string ShaderHash => DxilContainerUtil.ExtractHashHex(_compiledDxil);
+
         /// <summary>
         /// Fired after this asset has been successfully (re)compiled.
         /// Subscribe in <see cref="RayTracePipeline"/> to trigger a hot-reload.
@@ -76,11 +80,12 @@ namespace NativeRender
                 hlslPath = GetHlslPath();
             string includeDirs = BuildIncludeDirs(hlslPath);
             string target      = string.IsNullOrEmpty(_targetProfile) ? "lib_6_6" : _targetProfile;
-            string defines     = _defines   is { Length: > 0 } ? string.Join(";", _defines)   : null;
+            string defines     = _defines is { Length: > 0 } ? string.Join(";", _defines) : null;
             string extraArgs   = _extraArgs is { Length: > 0 } ? string.Join(";", _extraArgs) : null;
 
             bool ok = NativeRenderPlugin.ShaderCompilerPlugin.NR_SC_Compile(
                 hlslPath, target, includeDirs, defines, extraArgs,
+                NativeRenderPlugin.ShaderCompilerPlugin.PdbOutputDir,
                 out IntPtr nativePtr, out uint nativeSize);
 
             if (!ok || nativePtr == IntPtr.Zero || nativeSize == 0)

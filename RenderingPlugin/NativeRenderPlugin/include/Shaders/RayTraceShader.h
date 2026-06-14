@@ -1,8 +1,8 @@
 #pragma once
-#include "ShaderBase.h"  // pulls in all D3D12/DXC/Unity headers + ComputeBinding types
+#include "ShaderBase.h"  // pulls in all D3D12/DXC/Unity headers + Binding types
 
-// RayTraceBindingType and RayTraceBinding are type aliases for the Compute
-// counterparts — shared descriptor-set logic uses ComputeBinding directly.
+// RayTraceBindingType and RayTraceBinding are kept as aliases for call-site
+// readability; shared descriptor-set logic uses Binding / BindingType directly.
 using RayTraceBindingType = BindingType;
 using RayTraceBinding     = Binding;
 
@@ -26,8 +26,7 @@ public:
     RayTraceShader()  = default;
     ~RayTraceShader() = default;
 
-    bool Initialize(ID3D12Device5* device, IUnityLog* log,
-                    DescriptorHeapAllocator* allocator, IUnityGraphicsD3D12v8* d3d12v8);
+    bool Initialize(ID3D12Device5* device, IUnityLog* log, IUnityGraphicsD3D12v8* d3d12v8);
 
     // Build DXR pipeline from a single pre-compiled DXIL lib blob.
     // flags: bit 0 = allow D3D12_RAYTRACING_PIPELINE_FLAG_ALLOW_OPACITY_MICROMAPS (lib_6_9+).
@@ -41,7 +40,7 @@ public:
 
     // Build DXR pipeline from multiple DXIL blobs.
     // blobs[0]        : raygen + miss shaders
-    // blobs[1..N-1]   : additional hit-group blobs (each compiled with distinct RTXPT_MATERIAL_PERMUTATION_NAME)
+    // blobs[1..N-1]   : additional hit-group blobs
     // Each blob is reflected independently; bindings are de-duplicated across blobs.
     struct BlobDesc { const uint8_t* data; uint32_t size; };
     bool LoadShaderFromMultipleBlobs(const BlobDesc* blobs, uint32_t blobCount,
@@ -61,7 +60,12 @@ public:
     ID3D12Resource* GetMissTable()      const { return m_missTable.Get(); }
     ID3D12Resource* GetHitGroupTable()  const { return m_hitGroupTable.Get(); }
     uint32_t        GetMissCount()      const { return static_cast<uint32_t>(m_missShaders.size()); }
-    uint32_t        GetHitGroupCount()  const { return static_cast<uint32_t>(m_hitGroups.size()); }
+    /// Returns the number of entries currently in the hit-group shader table.
+    /// After RebuildHitGroupTable(count) this equals `count` (one entry per geometry),
+    /// not m_hitGroups.size() (number of variants). DispatchRays uses this for SizeInBytes.
+    uint32_t        GetHitGroupCount()  const { return m_hitGroupTableEntryCount; }
+    /// Returns the number of hit-group variants compiled into the PSO.
+    uint32_t        GetHitGroupVariantCount() const { return static_cast<uint32_t>(m_hitGroups.size()); }
 
 private:
     bool ReflectBindings(IDxcBlob* shaderLib);
@@ -69,6 +73,12 @@ private:
     bool BuildPipeline  (const std::vector<ComPtr<IDxcBlob>>& libs);
     bool BuildPipeline  (IDxcBlob* shaderLib); // single-blob convenience
     bool BuildShaderTable();
+
+public:
+    /// Rebuilds the hit-group shader table with one entry per geometry (in TLAS order).
+    /// variantIndices[i] selects which m_hitGroups entry to use for geometry i.
+    /// C# pre-computes this array; no AccelerationStructure reference needed.
+    bool RebuildHitGroupTable(const uint32_t* variantIndices, uint32_t count);
 
     // Hit group info — one per discovered (ClosestHit*/AnyHit*) group
     struct HitGroupInfo
@@ -95,4 +105,8 @@ private:
 
     bool     m_allowOpacityMicromaps = false;
     uint32_t m_maxPayloadSizeInBytes = 4;
+    // Actual number of entries in m_hitGroupTable.
+    // Initialized to m_hitGroups.size() by BuildShaderTable();
+    // updated to `count` by RebuildHitGroupTable(count).
+    uint32_t m_hitGroupTableEntryCount = 0;
 };

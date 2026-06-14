@@ -12,13 +12,15 @@ void ComputeDescriptorSet::Dispatch(
     if (!slots && slotCount > 0) return;
     if (!ValidateBindings(slots, slotCount)) return;
 
-    uint32_t slotIdx;
-    AcquireSlot(slotIdx);
-    EnsureDescriptors(slots, slotCount, slotIdx);
+    uint32_t srvBase, uavBase;
+    if (!AllocateTransientTables(srvBase, uavBase)) return;
+    WriteDescriptors(slots, slotCount, srvBase, uavBase);
 
     cmdList->SetPipelineState(m_shader->GetPSO());
-    BindRootParams(cmdList, slots, slotCount, slotIdx);
-    RequestResourceStates(slots, slotCount);
+    RequestResourceStates(slots, slotCount);                 // may record per-subresource SRV reads
+    BindRootParams(cmdList, slots, slotCount, srvBase, uavBase);
+    EmitSubresourceReadBarriers(cmdList);                    // UAV -> read on the SRV mip(s), if any
     cmdList->Dispatch(threadGroupX, threadGroupY, threadGroupZ);
+    RestoreSubresourceUAVStates(cmdList);                    // read -> UAV (hand back as Unity expects)
     NotifyResourceStates(slots, slotCount);
 }

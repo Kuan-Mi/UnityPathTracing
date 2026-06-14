@@ -7,8 +7,8 @@ class BindlessUAVTexture;
 class AccelerationStructure;
 class NativeBuffer;
 
-// ComputeBindingType, ComputeBinding, CS_BindingSlot, CS_BindingObjectKind
-// are defined in ShaderBindings.h (included transitively via ShaderBase.h).
+// BindingType, Binding, BindingSlot, BindingObjectKind are defined in
+// ShaderBindings.h (included transitively via ShaderBase.h).
 
 // ---------------------------------------------------------------------------
 // ComputeShader
@@ -29,8 +29,7 @@ public:
     ComputeShader()  = default;
     ~ComputeShader() = default;
 
-    bool Initialize(ID3D12Device5* device, IUnityLog* log,
-                    DescriptorHeapAllocator* allocator, IUnityGraphicsD3D12v8* d3d12v8);
+    bool Initialize(ID3D12Device5* device, IUnityLog* log, IUnityGraphicsD3D12v8* d3d12v8);
 
     // Build pipeline from pre-compiled DXIL bytes (compiled as cs_6_x).
     bool LoadShaderFromBytes(const uint8_t* dxilBytes, uint32_t size, const char* name = nullptr);

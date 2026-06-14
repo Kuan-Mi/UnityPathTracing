@@ -5,10 +5,10 @@ EditorBuildSettings:
   m_ObjectHideFlags: 0
   serializedVersion: 2
   m_Scenes:
-  - enabled: 1
+  - enabled: 0
     path: Assets/Gltf/BistroInterior.unity
     guid: fde80c6f946b47545bcaa37aa4ec6c64
-  - enabled: 1
+  - enabled: 0
     path: Assets/Gltf/BistroExterior.unity
     guid: 1bdb4a44586c16e41a76056b2cdb15ae
   - enabled: 0
@@ -20,6 +20,30 @@ EditorBuildSettings:
   - enabled: 0
     path: Assets/Arcade/Arcade.unity
     guid: d03bdcf0bbcbfca47840e76b073eba1a
+  - enabled: 0
+    path: Assets/RTXPTAssets/transparent-machines.unity
+    guid: b47e9c043d27f844e8f3b92f7f727614
+  - enabled: 0
+    path: Assets/Gltf/transparentMachines.unity
+    guid: 30242e4fa57dbf3429ccbfc3f5ec4a82
+  - enabled: 0
+    path: Assets/Gltf/BistroInteriorRtxPT.unity
+    guid: 56b2d767279b20641a14d882962be58d
+  - enabled: 0
+    path: Assets/Art/transparentMachines 1.unity
+    guid: 5b1d1428d4e46a944941c81534c4587c
+  - enabled: 0
+    path: Assets/Scenes/Empty.unity
+    guid: 04ff104d4da5b3c41abf1177f278de61
+  - enabled: 0
+    path: Assets/RTXPTAssets/kitchen.unity
+    guid: ef6e255891b305a47b73f5bf98f9b4fe
+  - enabled: 0
+    path: Assets/RTXPTAssets/bistro-programmer-art.unity
+    guid: e62505b00b0c9bf46b07ce9268ad9996
+  - enabled: 1
+    path: Assets/RTXPTAssets/bistro.unity
+    guid: 282167b52b099884698419ebc09f0555
   m_configObjects:
     com.unity.input.settings.actions: {fileID: -944628639613478452, guid: 052faaac586de48259a63d0c4782560b, type: 3}
     com.unity.xr.management.loader_settings: {fileID: 11400000, guid: ef0ce46ed818dba47ac25c34755259b6, type: 2}

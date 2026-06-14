@@ -1,0 +1,21 @@
+/*
+* RTXPT tone-map apply — thin verbatim wrapper, two #includes selected by stage:
+*   VS = donut fullscreen_vs.hlsl (the engine's m_FullscreenVS, entry `main`, outputs UV) — VERBATIM
+*   PS = RTXPT ToneMapper/ToneMapping.hlsl (entry `main_ps` → applyToneMapping) — VERBATIM
+*
+* Runs the original main_ps VERBATIM through the native raster pipeline. Auto-exposure uses the
+* original shipped path (TONEMAPPING_AUTOEXPOSURE_CPU==1 in ToneMapping_cb.h): main_ps reads the
+* average luminance from gParams.avgLuminance, which the CPU feeds from the capture_cs read-back —
+* exactly as ToneMappingPasses.cpp does. gLuminanceTex / its sampler are unreferenced on this path
+* and DXC-stripped.
+*/
+
+#pragma pack_matrix(row_major)
+
+#ifdef NR_VERTEX_SHADER
+#include "fullscreen_vs.hlsl"
+#endif
+
+#ifdef NR_PIXEL_SHADER
+#include "ToneMapping.hlsl"
+#endif

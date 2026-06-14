@@ -98,7 +98,7 @@ void DLRRInstance::DispatchCompute(RRFrameData* data)
     RenderSystem::Get().GetNriWrapper().CreateCommandBufferD3D12(*RenderSystem::Get().GetNriDevice(), cmdDesc, nriCmdBuffer);
 
 
-    if (TextureWidth != data->outputWidth || TextureHeight != data->outputHeight  || upscalerMode != data->upscalerMode)
+    if (TextureWidth != data->outputWidth || TextureHeight != data->outputHeight  || upscalerMode != data->upscalerMode || preset != data->preset)
     {
         if (TextureWidth == 0 || TextureHeight == 0)
         {
@@ -112,6 +112,7 @@ void DLRRInstance::DispatchCompute(RRFrameData* data)
         TextureWidth = data->outputWidth;
         TextureHeight = data->outputHeight;
         upscalerMode = data->upscalerMode;
+        preset = data->preset;
 
         if (m_DLRR)
         {
@@ -132,6 +133,7 @@ void DLRRInstance::DispatchCompute(RRFrameData* data)
         upscalerDesc.type = nri::UpscalerType::DLRR;
         upscalerDesc.mode = mode;
         upscalerDesc.flags = upscalerFlags;
+        upscalerDesc.preset = preset;
         upscalerDesc.commandBuffer = nriCmdBuffer;
 
         nri::Result r = rs.GetNriUpScaler().CreateUpscaler(*rs.GetNriDevice(), upscalerDesc, m_DLRR);
@@ -166,6 +168,9 @@ void DLRRInstance::DispatchCompute(RRFrameData* data)
     dispatchUpscaleDesc.cameraJitter = {-data->cameraJitter[0], -data->cameraJitter[1]};
     dispatchUpscaleDesc.mvScale = {1.0f, 1.0f};
     dispatchUpscaleDesc.flags = nri::DispatchUpscaleBits::NONE;
+    if (data->useSpecularMotionVector) {
+        dispatchUpscaleDesc.flags |= nri::DispatchUpscaleBits::USE_SPECULAR_MOTION;
+    }
 
     dispatchUpscaleDesc.guides.denoiser.mv = GetPair(data->mvTex, false);
     dispatchUpscaleDesc.guides.denoiser.depth = GetPair(data->depthTex, false);

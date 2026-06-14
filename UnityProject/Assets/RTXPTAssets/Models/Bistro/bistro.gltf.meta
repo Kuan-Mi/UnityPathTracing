@@ -1,0 +1,5062 @@
+fileFormatVersion: 2
+guid: 4c241572bbd98b0499b406da2f7b8661
+ScriptedImporter:
+  internalIDToNameTable: []
+  externalObjects: {}
+  serializedVersion: 2
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+  script: {fileID: 11500000, guid: 715df9372183c47e389bb6e19fbc3b52, type: 3}
+  editorImportSettings:
+    generateSecondaryUVSet: 0
+  importSettings:
+    nodeNameMethod: 1
+    animationMethod: 2
+    generateMipMaps: 1
+    texturesReadable: 0
+    defaultMinFilterMode: 9729
+    defaultMagFilterMode: 9729
+    anisotropicFilterLevel: 1
+  instantiationSettings:
+    mask: -1
+    layer: 0
+    skinUpdateWhenOffscreen: 1
+    lightIntensityFactor: 1
+    sceneObjectCreation: 2
+  assetDependencies:
+  - type: 0
+    originalUri: Assets\Art\RTXPTAssets\Models\Bistro\bistro.bin
+    assetPath: Assets\Art\RTXPTAssets\Models\Bistro\bistro.bin
+  - type: 1
+    originalUri: Assets\Art\RTXPTAssets\Models\Bistro\objects\props\bistro\paris_ceilingfan_01\paris_ceilingfan_01a_em.png
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Art\RTXPTAssets\Models\Bistro\objects\props\bistro\paris_ceilingfan_01\paris_ceilingfan_01a_ddna.png
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Art\RTXPTAssets\Models\Bistro\objects\props\bistro\paris_ceilingfan_01\paris_ceilingfan_01a_diff.png
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Art\RTXPTAssets\Models\Bistro\objects\props\bistro\paris_ceilingfan_01\paris_ceilingfan_01a_spec.png
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Art\RTXPTAssets\Models\Bistro\textures\lumberyard_splash_2560x2560.png
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Art\RTXPTAssets\Models\Bistro\objects\props\street\paris_bistroawning_01\paris_bistroawning_fabric_01a_ddna.png
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Art\RTXPTAssets\Models\Bistro\objects\props\street\paris_bistroawning_01\paris_bistroawning_fabric_01a_diff.png
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Art\RTXPTAssets\Models\Bistro\objects\props\street\paris_bistroawning_01\paris_bistroawning_fabric_01a_spec.png
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Art\RTXPTAssets\Models\Bistro\objects\props\street\paris_bistroawning_01\paris_bistroawning_beams_01a_ddna.png
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Art\RTXPTAssets\Models\Bistro\objects\props\street\paris_bistroawning_01\paris_bistroawning_beams_01a_diff.png
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Art\RTXPTAssets\Models\Bistro\objects\props\street\paris_bistroawning_01\paris_bistroawning_beams_01a_spec.png
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Art\RTXPTAssets\Models\Bistro\textures\shared\tiling\concrete_smooth_02\concrete_smooth_02_ddna.png
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Art\RTXPTAssets\Models\Bistro\textures\shared\tiling\concrete_smooth_02\concrete_smooth_02_diff.png
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Art\RTXPTAssets\Models\Bistro\textures\shared\tiling\concrete_smooth_02\concrete_smooth_02_spec.png
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Art\RTXPTAssets\Models\Bistro\textures\shared\tiling\brick_large_01\brick_large_01_ddna.png
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Art\RTXPTAssets\Models\Bistro\textures\shared\tiling\brick_large_01\brick_large_01_diff.png
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Art\RTXPTAssets\Models\Bistro\textures\shared\tiling\brick_large_01\brick_large_01_spec.png
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Art\RTXPTAssets\Models\Bistro\objects\props\street\paris_mainbalcony_01\paris_doors_04a_ddna.png
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Art\RTXPTAssets\Models\Bistro\objects\props\street\paris_mainbalcony_01\paris_doors_04a_diff.png
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Art\RTXPTAssets\Models\Bistro\objects\props\street\paris_mainbalcony_01\paris_doors_04a_spec.png
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Art\RTXPTAssets\Models\Bistro\objects\props\street\paris_mainbalcony_01\paris_mainbalcony_02a_ddna.png
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Art\RTXPTAssets\Models\Bistro\objects\props\street\paris_mainbalcony_01\paris_mainbalcony_02a_diff.png
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Art\RTXPTAssets\Models\Bistro\objects\props\street\paris_mainbalcony_01\paris_mainbalcony_02a_spec.png
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Art\RTXPTAssets\Models\Bistro\objects\props\street\paris_mainbalcony_01\paris_mainbalcony_01a_ddna.png
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Art\RTXPTAssets\Models\Bistro\objects\props\street\paris_mainbalcony_01\paris_mainbalcony_01a_diff.png
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Art\RTXPTAssets\Models\Bistro\objects\props\street\paris_mainbalcony_01\paris_mainbalcony_01a_spec.png
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Art\RTXPTAssets\Models\Bistro\objects\props\street\paris_mainbalcony_01\paris_doors_03a_ddna.png
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Art\RTXPTAssets\Models\Bistro\objects\props\street\paris_mainbalcony_01\paris_doors_03a_diff.png
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Art\RTXPTAssets\Models\Bistro\objects\props\street\paris_mainbalcony_01\paris_doors_03a_spec.png
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Art\RTXPTAssets\Models\Bistro\textures\shared\tiling\glass_dirty_01\glass_dirty_01_diff.png
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Art\RTXPTAssets\Models\Bistro\textures\shared\tiling\glass_dirty_01\glass_dirty_01_spec.png
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Art\RTXPTAssets\Models\Bistro\textures\shared\tiling\concrete_smooth_03\Concrete_Smooth_03_ddna.png
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Art\RTXPTAssets\Models\Bistro\textures\shared\tiling\concrete_smooth_03\Concrete_Smooth_03_Diff.png
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Art\RTXPTAssets\Models\Bistro\textures\shared\tiling\wood_painted_02\wood_painted_02_ddna.png
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Art\RTXPTAssets\Models\Bistro\textures\shared\tiling\wood_painted_flat_grey_01\wood_painted_flat_grey_01_diff.png
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Art\RTXPTAssets\Models\Bistro\textures\shared\tiling\roofing_shingle_01\roofing_shingle_01_ddna.png
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Art\RTXPTAssets\Models\Bistro\textures\shared\tiling\roofing_shingle_01\roofing_shingle_01_diff.png
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Art\RTXPTAssets\Models\Bistro\textures\shared\tiling\grain_metal_01\grain_metal_01_ddna.png
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Art\RTXPTAssets\Models\Bistro\textures\shared\tiling\grain_metal_01\grain_metal_01_diff.png
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Art\RTXPTAssets\Models\Bistro\objects\structures\modular\windows\paris_building01_window\paris_building01_window_01_ddna.png
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Art\RTXPTAssets\Models\Bistro\objects\structures\modular\windows\paris_building01_window\paris_building01_window_01_diff.png
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Art\RTXPTAssets\Models\Bistro\textures\shared\tiling\plaster_yellow_01\plaster_yellow_01a_ddna.png
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Art\RTXPTAssets\Models\Bistro\objects\structures\buildings\paris_building_09\windows_curtains_ddna.png
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Art\RTXPTAssets\Models\Bistro\objects\structures\buildings\paris_building_09\windows_curtains_diff.png
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Art\RTXPTAssets\Models\Bistro\objects\props\street\paris_bistroawning_01\paris_bistroawning_fabric_greyscale_01a_diff.png
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Art\RTXPTAssets\Models\Bistro\objects\structures\standard\doors\paris_doors_01a\paris_doors_01a_ddna.png
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Art\RTXPTAssets\Models\Bistro\objects\structures\standard\doors\paris_doors_01a\paris_doors_01a_diff.png
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Art\RTXPTAssets\Models\Bistro\objects\structures\standard\doors\paris_doors_01a\paris_doors_01a_spec.png
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Art\RTXPTAssets\Models\Bistro\textures\shared\tiling\concrete_grooved_02\Concrete_Grooved_02_ddna.png
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Art\RTXPTAssets\Models\Bistro\textures\shared\tiling\concrete_grooved_02\Concrete_Grooved_02_Diff.png
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Art\RTXPTAssets\Models\Bistro\textures\shared\tiling\brick_large_02\Brick_Large_02_ddna.png
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Art\RTXPTAssets\Models\Bistro\textures\shared\tiling\brick_large_02\Brick_Large_02_Diff.png
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Art\RTXPTAssets\Models\Bistro\textures\shared\tiling\concrete_smooth_01\concrete_smooth_01_ddna.png
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Art\RTXPTAssets\Models\Bistro\textures\shared\tiling\concrete_smooth_01\concrete_smooth_01_diff.png
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Art\RTXPTAssets\Models\Bistro\textures\shared\tiling\concrete_smooth_01\Concrete_Smooth_01_spec.png
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Art\RTXPTAssets\Models\Bistro\textures\shared\tiling\grain_metal_01\grain_metal_01_spec.png
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Art\RTXPTAssets\Models\Bistro\textures\shared\tiling\plastic_01\plastic_01_ddna.png
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Art\RTXPTAssets\Models\Bistro\textures\shared\tiling\plastic_01\plastic_01_diff.png
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Art\RTXPTAssets\Models\Bistro\textures\shared\tiling\plastic_01\plastic_01_spec.png
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Art\RTXPTAssets\Models\Bistro\textures\shared\tiling\plastic_01\plastic_01_spec.png
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Art\RTXPTAssets\Models\Bistro\textures\shared\tiling\plaster_01\plaster_01a_ddna.png
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Art\RTXPTAssets\Models\Bistro\textures\shared\tiling\plaster_01\plaster_01a_diff.png
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Art\RTXPTAssets\Models\Bistro\textures\shared\tiling\roofing_shingle_03\roofing_shingle_03_ddna.png
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Art\RTXPTAssets\Models\Bistro\textures\shared\tiling\roofing_shingle_03\roofing_shingle_03_diff.png
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Art\RTXPTAssets\Models\Bistro\textures\shared\tiling\Trim_cornice_01\Trim_cornice_01_ddna.png
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Art\RTXPTAssets\Models\Bistro\textures\shared\tiling\Trim_cornice_01\Trim_cornice_01_diff.png
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Art\RTXPTAssets\Models\Bistro\objects\structures\modular\windows\paris_building01_window\paris_building01_window_01_displ.png
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Art\RTXPTAssets\Models\Bistro\textures\shared\decals\wall_decals\wall_decals.png
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Art\RTXPTAssets\Models\Bistro\textures\decals\bottomdirt_01\bottomdirt_01_diff.png
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Art\RTXPTAssets\Models\Bistro\textures\decals\plastercracks_02\plastercracks_02_ddna.png
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Art\RTXPTAssets\Models\Bistro\textures\decals\plastercracks_02\plastercracks_02_diff.png
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Art\RTXPTAssets\Models\Bistro\textures\shared\tiling\metal_galvanized_01\metal_galvanized_01_spec.png
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Art\RTXPTAssets\Models\Bistro\textures\shared\tiling\wood_polished_01\wood_polished_01_ddna.png
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Art\RTXPTAssets\Models\Bistro\textures\shared\tiling\wood_base_01\wood_base_01_diff.png
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Art\RTXPTAssets\Models\Bistro\textures\shared\tiling\wood_polished_01\wood_polished_01_spec.png
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Art\RTXPTAssets\Models\Bistro\textures\shared\tiling\wood_polished_01\wood_polished_01_spec.png
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Art\RTXPTAssets\Models\Bistro\objects\props\street\paris_bistroexteriorspotlight_01\paris_bistroexteriorspotlight_01_ddna.png
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Art\RTXPTAssets\Models\Bistro\objects\props\street\paris_bistroexteriorspotlight_01\paris_bistroexteriorspotlight_01_diff.png
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Art\RTXPTAssets\Models\Bistro\objects\props\street\paris_bistroexteriorspotlight_01\paris_bistroexteriorspotlight_01_spec.png
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Art\RTXPTAssets\Models\Bistro\textures\shared\tiling\metal_chrome_01\metal_chrome_01_ddna.png
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Art\RTXPTAssets\Models\Bistro\textures\shared\tiling\metal_chrome_01\metal_chrome_01_diff.png
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Art\RTXPTAssets\Models\Bistro\textures\shared\tiling\metal_chrome_01\metal_chrome_01_diff.png
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Art\RTXPTAssets\Models\Bistro\objects\props\street\paris_bistroexteriorspotlight_01\paris_bistroexteriorspotlightglass_01_ddna.png
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Art\RTXPTAssets\Models\Bistro\objects\props\street\paris_bistroexteriorspotlight_01\paris_bistroexteriorspotlightglass_01_diff.png
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Art\RTXPTAssets\Models\Bistro\objects\props\street\paris_bistroexteriorspotlight_01\paris_bistroexteriorspotlightglass_01_spec.png
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Art\RTXPTAssets\Models\Bistro\objects\structures\standard\walls\bistro_woodpanel_01\bistro_woodpanelornament_01_ddna.png
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Art\RTXPTAssets\Models\Bistro\objects\structures\standard\walls\bistro_woodpanel_01\bistro_woodpanelornament_01_diff.png
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Art\RTXPTAssets\Models\Bistro\objects\structures\standard\walls\bistro_woodpanel_01\bistro_woodpanelornament_01_spec.png
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Art\RTXPTAssets\Models\Bistro\objects\structures\standard\doors\bistro_main_door\bistro_main_door_ddna.png
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Art\RTXPTAssets\Models\Bistro\objects\structures\standard\doors\bistro_main_door\bistro_main_door_diff.png
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Art\RTXPTAssets\Models\Bistro\objects\structures\standard\doors\bistro_main_door\bistro_main_door_spec.png
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Art\RTXPTAssets\Models\Bistro\textures\shared\tiling\wood_painted_02\wood_painted_02_diff.png
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Art\RTXPTAssets\Models\Bistro\textures\shared\tiling\wood_painted_02\wood_painted_02_spec.png
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Art\RTXPTAssets\Models\Bistro\objects\structures\standard\doors\bistro_main_door_concrete_01a\bistro_main_door_concrete_01a_ddna.png
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Art\RTXPTAssets\Models\Bistro\objects\structures\standard\doors\bistro_main_door_concrete_01a\bistro_main_door_concrete_01a_diff.png
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Art\RTXPTAssets\Models\Bistro\objects\structures\standard\doors\bistro_main_door_concrete_01a\bistro_main_door_concrete_01a_spec.png
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Art\RTXPTAssets\Models\Bistro\objects\props\street\paris_bistrofrontbanner_01\paris_bistrosidebanner_diff.png
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Art\RTXPTAssets\Models\Bistro\objects\props\street\paris_bistrofrontbanner_01\paris_bistrosidebanner_spec.png
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Art\RTXPTAssets\Models\Bistro\textures\shared\tiling\brick_large_03\brick_large_03_ddna.png
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Art\RTXPTAssets\Models\Bistro\textures\shared\tiling\brick_large_03\brick_large_03_diff.png
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Art\RTXPTAssets\Models\Bistro\textures\shared\tiling\brick_small_03\brick_small_03_ddna.png
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Art\RTXPTAssets\Models\Bistro\textures\shared\tiling\brick_small_03\brick_small_03_diff.png
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Art\RTXPTAssets\Models\Bistro\objects\structures\buildings\paris_building_09\room_interior_diff.png
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Art\RTXPTAssets\Models\Bistro\textures\shared\tiling\roofing_metal_01\roofing_metal_01_ddna.png
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Art\RTXPTAssets\Models\Bistro\textures\shared\tiling\roofing_metal_01\Roofing_Metal_01_diff.png
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Art\RTXPTAssets\Models\Bistro\objects\props\street\paris_bistroawning_01\paris_bistroawning_beams_01b_diff.png
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Art\RTXPTAssets\Models\Bistro\textures\shared\tiling\boulangerie\boulangeria_diff.png
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Art\RTXPTAssets\Models\Bistro\objects\structures\buildings\paris_building_10\frosted_glass_ddna.png
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Art\RTXPTAssets\Models\Bistro\objects\structures\buildings\paris_building_10\frosted_glass_diff.png
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Art\RTXPTAssets\Models\Bistro\objects\structures\buildings\paris_building_09\paris_building_09_details_ddna.png
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Art\RTXPTAssets\Models\Bistro\objects\structures\buildings\paris_building_09\paris_building_09_details_diff.png
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Art\RTXPTAssets\Models\Bistro\objects\structures\buildings\paris_building_09\paris_building_09_details_spec.png
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Art\RTXPTAssets\Models\Bistro\textures\shared\tiling\edge_decals_01\edge_decals_01_ddna.png
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Art\RTXPTAssets\Models\Bistro\textures\shared\tiling\edge_decals_01\edge_decals_01_diff.png
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Art\RTXPTAssets\Models\Bistro\textures\shared\tiling\metal_rolldoor_01\metal_rolldoor_01_ddna.png
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Art\RTXPTAssets\Models\Bistro\textures\shared\tiling\metal_rolldoor_01\metal_rolldoor_01_diff.png
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Art\RTXPTAssets\Models\Bistro\textures\shared\tiling\metal_rolldoor_01\metal_rolldoor_01_spec.png
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Art\RTXPTAssets\Models\Bistro\textures\shared\tiling\metal_clean_01\metal_clean_01_ddna.png
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Art\RTXPTAssets\Models\Bistro\textures\shared\tiling\metal_clean_01\metal_clean_01_diff.png
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Art\RTXPTAssets\Models\Bistro\textures\shared\tiling\bronze_01\bronze_01_spec.png
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Art\RTXPTAssets\Models\Bistro\textures\shared\tiling\books_covers\books_covers_diff.png
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Art\RTXPTAssets\Models\Bistro\textures\shared\tiling\wood_painted_04\wood_painted_04_ddna.png
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Art\RTXPTAssets\Models\Bistro\textures\shared\tiling\wood_painted_04\wood_painted_04_diff.png
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Art\RTXPTAssets\Models\Bistro\textures\shared\tiling\wood_painted_04\wood_painted_04_spec.png
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Art\RTXPTAssets\Models\Bistro\objects\props\bistro\paris_ashtray_01\paris_ashtray_01a_ddna.png
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Art\RTXPTAssets\Models\Bistro\objects\props\bistro\paris_ashtray_01\paris_ashtray_01a_diff.png
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Art\RTXPTAssets\Models\Bistro\objects\props\bistro\paris_ashtray_01\paris_ashtray_01a_spec.png
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Art\RTXPTAssets\Models\Bistro\objects\props\bistro\paris_chair_01\paris_chair_01a_ddna.png
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Art\RTXPTAssets\Models\Bistro\objects\props\bistro\paris_chair_01\paris_chair_01a_diff.png
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Art\RTXPTAssets\Models\Bistro\objects\props\bistro\paris_chair_01\paris_chair_01a_spec.png
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Art\RTXPTAssets\Models\Bistro\objects\props\bistro\paris_napkinholder_01\paris_napkinholder_01_ddna.png
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Art\RTXPTAssets\Models\Bistro\objects\props\bistro\paris_napkinholder_01\paris_napkinholder_01_diff.png
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Art\RTXPTAssets\Models\Bistro\objects\props\bistro\paris_napkinholder_01\paris_napkinholder_01_spec.png
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Art\RTXPTAssets\Models\Bistro\textures\shared\colors\Grey_30.png
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Art\RTXPTAssets\Models\Bistro\objects\props\bistro\paris_liquorbottle_01\Paris_LiquorBottle_01_Cap_ddna.png
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Art\RTXPTAssets\Models\Bistro\objects\props\bistro\paris_liquorbottle_01\Paris_LiquorBottle_01_Cap_Diff.png
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Art\RTXPTAssets\Models\Bistro\objects\props\bistro\paris_liquorbottle_01\Paris_LiquorBottle_01_Cap_Spec.png
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Art\RTXPTAssets\Models\Bistro\objects\props\bistro\paris_liquorbottle_01\paris_liquorbottle_labels_01_ddna.png
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Art\RTXPTAssets\Models\Bistro\objects\props\bistro\paris_liquorbottle_01\paris_liquorbottle_labels_01_diff.png
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Art\RTXPTAssets\Models\Bistro\objects\props\bistro\paris_liquorbottle_01\paris_liquorbottle_labels_01_spec.png
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Art\RTXPTAssets\Models\Bistro\objects\props\bistro\paris_table_01\paris_table_01a_ddna.png
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Art\RTXPTAssets\Models\Bistro\objects\props\bistro\paris_table_01\paris_table_01a_diff.png
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Art\RTXPTAssets\Models\Bistro\objects\props\bistro\paris_table_01\paris_table_01a_spec.png
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Art\RTXPTAssets\Models\Bistro\objects\props\street\paris_bollard_01\paris_bollard_01a_ddna.png
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Art\RTXPTAssets\Models\Bistro\objects\props\street\paris_bollard_01\paris_bollard_01a_diff.png
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Art\RTXPTAssets\Models\Bistro\objects\props\street\paris_bollard_01\paris_bollard_01a_spec.png
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Art\RTXPTAssets\Models\Bistro\objects\props\street\paris_menusign_01\paris_menusign_01a_ddna.png
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Art\RTXPTAssets\Models\Bistro\objects\props\street\paris_menusign_01\paris_menusign_01a_diff.png
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Art\RTXPTAssets\Models\Bistro\objects\props\street\paris_menusign_01\paris_menusign_01a_spec.png
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Art\RTXPTAssets\Models\Bistro\objects\props\street\paris_menusign_01\paris_menusign_01b_ddna.png
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Art\RTXPTAssets\Models\Bistro\objects\props\street\paris_menusign_01\paris_menusign_01b_diff.png
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Art\RTXPTAssets\Models\Bistro\objects\props\street\paris_menusign_01\paris_menusign_01b_spec.png
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Art\RTXPTAssets\Models\Bistro\objects\props\street\paris_sidewalkbarrier_01\paris_sidewalkbarrier_01_ddna.png
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Art\RTXPTAssets\Models\Bistro\objects\props\street\paris_sidewalkbarrier_01\paris_sidewalkbarrier_01_diff.png
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Art\RTXPTAssets\Models\Bistro\objects\props\street\paris_sidewalkbarrier_01\paris_sidewalkbarrier_01_spec.png
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Art\RTXPTAssets\Models\Bistro\objects\props\natural\paris_ivy_01a\paris_ivy_branch_ddna.png
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Art\RTXPTAssets\Models\Bistro\objects\props\natural\paris_ivy_01a\paris_ivy_branch_diff.png
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Art\RTXPTAssets\Models\Bistro\objects\props\natural\paris_ivy_01a\paris_ivy_leaf_a_ddna.png
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Art\RTXPTAssets\Models\Bistro\objects\props\natural\paris_ivy_01a\paris_ivy_leaf_a_diff.png
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Art\RTXPTAssets\Models\Bistro\objects\props\natural\paris_ivy_01a\paris_ivy_leaf_b_ddna.png
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Art\RTXPTAssets\Models\Bistro\objects\props\natural\paris_ivy_01a\paris_ivy_leaf_b_diff.png
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Art\RTXPTAssets\Models\Bistro\objects\props\natural\italian_cypress\italian_cypress_leaves_ddna.png
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Art\RTXPTAssets\Models\Bistro\objects\props\natural\italian_cypress\italian_cypress_leaves_diff.png
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Art\RTXPTAssets\Models\Bistro\objects\props\natural\italian_cypress\italian_cypress_bark_ddna.png
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Art\RTXPTAssets\Models\Bistro\objects\props\natural\italian_cypress\italian_cypress_bark_diff.png
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Art\RTXPTAssets\Models\Bistro\objects\props\natural\linden\linden_bark_a_ddna.png
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Art\RTXPTAssets\Models\Bistro\objects\props\natural\linden\linden_bark_a_diff.png
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Art\RTXPTAssets\Models\Bistro\objects\props\natural\linden\leaves_a_diff.png
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Art\RTXPTAssets\Models\Bistro\objects\props\natural\linden\leaves_b_diff.png
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Art\RTXPTAssets\Models\Bistro\objects\props\natural\paris_flowers_01a\paris_flowers_01a_ddna.png
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Art\RTXPTAssets\Models\Bistro\objects\props\natural\paris_flowers_01a\paris_flowers_01a_diff.png
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Art\RTXPTAssets\Models\Bistro\objects\props\natural\paris_flowers_01a\paris_foliage_01a_ddna.png
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Art\RTXPTAssets\Models\Bistro\objects\props\natural\paris_flowers_01a\paris_foliage_01a_diff.png
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Art\RTXPTAssets\Models\Bistro\objects\props\street\paris_bistroawning_02\paris_bistroawning_02_ddna.png
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Art\RTXPTAssets\Models\Bistro\objects\props\street\paris_bistroawning_02\paris_bistroawning_02_diff.png
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Art\RTXPTAssets\Models\Bistro\objects\props\street\paris_bistroawning_02\paris_bistroawning_02_spec.png
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Art\RTXPTAssets\Models\Bistro\objects\props\street\paris_trafficsign_01\paris_trafficsign_01_ddna.png
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Art\RTXPTAssets\Models\Bistro\objects\props\street\paris_trafficsign_01\paris_trafficsign_01_diff.png
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Art\RTXPTAssets\Models\Bistro\objects\props\street\paris_trafficsign_01\paris_trafficsign_01_spec.png
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Art\RTXPTAssets\Models\Bistro\objects\props\street\paris_plantpot_01\paris_plantpot_01a_ddna.png
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Art\RTXPTAssets\Models\Bistro\objects\props\street\paris_plantpot_01\paris_plantpot_01a_diff.png
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Art\RTXPTAssets\Models\Bistro\objects\props\bistro\paris_wickerbasket_01\paris_wickerbasket_01_ddna.png
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Art\RTXPTAssets\Models\Bistro\objects\props\bistro\paris_wickerbasket_01\paris_wickerbasket_01_diff.png
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Art\RTXPTAssets\Models\Bistro\objects\props\street\paris_vespascooter_01\paris_vespascooter_01_ddna.png
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Art\RTXPTAssets\Models\Bistro\objects\props\street\paris_vespascooter_01\paris_vespascooter_01_diff.png
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Art\RTXPTAssets\Models\Bistro\objects\props\street\paris_vespascooter_01\paris_vespascooter_01_spec.png
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Art\RTXPTAssets\Models\Bistro\objects\props\street\paris_vespascooter_01\paris_vespascooter_01_odometer_ddna.png
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Art\RTXPTAssets\Models\Bistro\objects\props\street\paris_vespascooter_01\paris_vespascooter_01_odometer_diff.png
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Art\RTXPTAssets\Models\Bistro\objects\props\bistro\paris_doormats\paris_doormat_01_ddna.png
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Art\RTXPTAssets\Models\Bistro\objects\props\bistro\paris_doormats\paris_doormat_01_diff.png
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Art\RTXPTAssets\Models\Bistro\textures\shared\tiling\brick_small_02\brick_small_02_ddna.png
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Art\RTXPTAssets\Models\Bistro\textures\shared\tiling\brick_small_02\brick_small_02_diff.png
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Art\RTXPTAssets\Models\Bistro\objects\props\bistro\paris_bistro_glass_decal_ornament\paris_bistro_glass_decal_ornament_diff.png
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Art\RTXPTAssets\Models\Bistro\objects\props\street\paris_stringlights_01\Paris_StringLights_01_ddna.png
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Art\RTXPTAssets\Models\Bistro\objects\props\street\paris_stringlights_01\Paris_StringLights_01_diff.png
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Art\RTXPTAssets\Models\Bistro\objects\props\street\paris_stringlights_01\Paris_StringLights_01_spec.png
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Art\RTXPTAssets\Models\Bistro\objects\props\street\paris_electricbox_01\paris_electricbox_01_ddna.png
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Art\RTXPTAssets\Models\Bistro\objects\props\street\paris_electricbox_01\paris_electricbox_01_diff.png
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Art\RTXPTAssets\Models\Bistro\objects\props\street\paris_electricbox_01\paris_electricbox_01_spec.png
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Art\RTXPTAssets\Models\Bistro\textures\shared\tiling\plastic_02\plastic_02_ddna.png
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Art\RTXPTAssets\Models\Bistro\textures\shared\tiling\plastic_02\plastic_02_diff.png
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Art\RTXPTAssets\Models\Bistro\textures\shared\tiling\plastic_02\plastic_02_diff.png
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Art\RTXPTAssets\Models\Bistro\textures\shared\tiling\metal_clean_01\metal_clean_01_spec.png
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Art\RTXPTAssets\Models\Bistro\objects\props\street\paris_streetsign_01\paris_streetsign_01a_ddna.png
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Art\RTXPTAssets\Models\Bistro\objects\props\street\paris_streetsign_01\paris_streetsign_01a_diff.png
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Art\RTXPTAssets\Models\Bistro\objects\props\street\paris_streetsign_01\paris_streetsign_01a_spec.png
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Art\RTXPTAssets\Models\Bistro\objects\props\street\paris_trashcan_01\paris_trashcan_01_ddna.png
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Art\RTXPTAssets\Models\Bistro\objects\props\street\paris_trashcan_01\paris_trashcan_01_diff.png
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Art\RTXPTAssets\Models\Bistro\objects\props\street\paris_trashcan_01\paris_trashcan_01_spec.png
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Art\RTXPTAssets\Models\Bistro\textures\shared\colors\grey_128.png
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Art\RTXPTAssets\Models\Bistro\textures\shared\tiling\metal_chrome_01\metal_chrome_01_spec.png
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Art\RTXPTAssets\Models\Bistro\textures\shared\tiling\metal_chrome_01\metal_chrome_01_spec.png
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Art\RTXPTAssets\Models\Bistro\objects\props\bistro\paris_painting_01\paris_paintings_01_ddna.png
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Art\RTXPTAssets\Models\Bistro\objects\props\bistro\paris_painting_01\paris_paintings_01_diff.png
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Art\RTXPTAssets\Models\Bistro\objects\props\bistro\paris_painting_01\paris_paintings_01_spec.png
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Art\RTXPTAssets\Models\Bistro\objects\props\bistro\paris_painting_01\paris_painting_01_ddna.png
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Art\RTXPTAssets\Models\Bistro\objects\props\bistro\paris_painting_01\paris_painting_01_diff.png
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Art\RTXPTAssets\Models\Bistro\objects\props\bistro\paris_painting_01\paris_painting_01_spec.png
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Art\RTXPTAssets\Models\Bistro\textures\shared\tiling\ceramic_01\ceramic_01_diff.png
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Art\RTXPTAssets\Models\Bistro\objects\props\bistro\paris_plates_01\paris_plates_details_ddna.png
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Art\RTXPTAssets\Models\Bistro\objects\props\bistro\paris_plates_01\paris_plates_details_diff.png
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Art\RTXPTAssets\Models\Bistro\textures\shared\tiling\metal_chrome_02\metal_chrome_02_ddna.png
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Art\RTXPTAssets\Models\Bistro\textures\shared\tiling\metal_chrome_02\metal_chrome_02_diff.png
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Art\RTXPTAssets\Models\Bistro\textures\shared\tiling\metal_chrome_02\metal_chrome_02_spec.png
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Art\RTXPTAssets\Models\Bistro\textures\shared\tiling\metal_chrome_02\metal_chrome_02_spec.png
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Art\RTXPTAssets\Models\Bistro\objects\props\bistro\paris_cutlery_01\paris_cutlery_01_details_ddna.png
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Art\RTXPTAssets\Models\Bistro\objects\props\bistro\paris_cutlery_01\paris_cutlery_01_details_diff.png
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Art\RTXPTAssets\Models\Bistro\objects\props\bistro\paris_cutlery_01\paris_cutlery_01_details_spec.png
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Art\RTXPTAssets\Models\Bistro\textures\shared\tiling\wood_polished_01\wood_polished_01_diff.png
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Art\RTXPTAssets\Models\Bistro\objects\props\bistro\paris_beertap_01\paris_beertap_01_ddna.png
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Art\RTXPTAssets\Models\Bistro\objects\props\bistro\paris_beertap_01\paris_beertap_01_diff.png
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Art\RTXPTAssets\Models\Bistro\objects\props\bistro\paris_beertap_01\paris_beertap_01_spec.png
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Art\RTXPTAssets\Models\Bistro\objects\props\bistro\paris_barstool_01\paris_barstool_01a_ddna.png
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Art\RTXPTAssets\Models\Bistro\objects\props\bistro\paris_barstool_01\paris_barstool_01a_diff.png
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Art\RTXPTAssets\Models\Bistro\objects\props\bistro\paris_barstool_01\paris_barstool_01a_spec.png
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Art\RTXPTAssets\Models\Bistro\objects\props\bistro\paris_cashregister_01\paris_cashregister_01_ddna.png
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Art\RTXPTAssets\Models\Bistro\objects\props\bistro\paris_cashregister_01\paris_cashregister_01_diff.png
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Art\RTXPTAssets\Models\Bistro\objects\props\bistro\paris_cashregister_01\paris_cashregister_01_spec.png
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Art\RTXPTAssets\Models\Bistro\objects\props\bistro\paris_cashregister_01\paris_cashregister_buttons_01_ddna.png
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Art\RTXPTAssets\Models\Bistro\objects\props\bistro\paris_cashregister_01\paris_cashregister_buttons_01_diff.png
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Art\RTXPTAssets\Models\Bistro\objects\props\bistro\paris_cashregister_01\paris_cashregister_buttons_01_spec.png
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Art\RTXPTAssets\Models\Bistro\textures\shared\tiling\wood_planks_01\wood_planks_01_ddna.png
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Art\RTXPTAssets\Models\Bistro\textures\shared\tiling\wood_planks_01\wood_planks_01_diff.png
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Art\RTXPTAssets\Models\Bistro\textures\shared\tiling\wood_planks_01\wood_planks_01_spec.png
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Art\RTXPTAssets\Models\Bistro\objects\props\bistro\paris_glass_detailed_01\paris_glass_detailed_01_nogloss_ddna.png
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Art\RTXPTAssets\Models\Bistro\textures\shared\colors\white.png
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Art\RTXPTAssets\Models\Bistro\objects\props\bistro\paris_glass_detailed_01\paris_glass_detailed_01_ddna.png
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Art\RTXPTAssets\Models\Bistro\objects\props\bistro\paris_glass_detailed_01\paris_glass_detailed_01_diff.png
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Art\RTXPTAssets\Models\Bistro\objects\props\bistro\paris_glass_detailed_01\paris_glass_detailed_01_spec.png
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Art\RTXPTAssets\Models\Bistro\objects\props\bistro\paris_glass_detailed_01\paris_glass_detailed_bubbles_01_diff.png
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Art\RTXPTAssets\Models\Bistro\objects\props\bistro\paris_coasters_01\paris_coasters_01_ddna.png
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Art\RTXPTAssets\Models\Bistro\objects\props\bistro\paris_coasters_01\paris_coasters_01_diff.png
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Art\RTXPTAssets\Models\Bistro\objects\props\bistro\paris_coasters_01\paris_coasters_01_spec.png
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Art\RTXPTAssets\Models\Bistro\objects\props\bistro\paris_cotton_placemat_01\paris_cotton_placemat_01_ddna.png
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Art\RTXPTAssets\Models\Bistro\objects\props\bistro\paris_cotton_placemat_01\paris_cotton_placemat_01_diff.png
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Art\RTXPTAssets\Models\Bistro\objects\props\bistro\paris_cotton_placemat_01\paris_cotton_placemat_01_spec.png
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Art\RTXPTAssets\Models\Bistro\textures\shared\tiling\rubber_bar_mat_01\rubber_bar_mat_01_ddna.png
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Art\RTXPTAssets\Models\Bistro\textures\shared\tiling\rubber_bar_mat_01\rubber_bar_mat_01_diff.png
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Art\RTXPTAssets\Models\Bistro\textures\shared\tiling\rubber_bar_mat_01\rubber_bar_mat_01_spec.png
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Art\RTXPTAssets\Models\Bistro\objects\props\bistro\paris_radiator_01\paris_radiator_01_ddna.png
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Art\RTXPTAssets\Models\Bistro\objects\props\bistro\paris_radiator_01\paris_radiator_01_diff.png
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Art\RTXPTAssets\Models\Bistro\objects\props\bistro\paris_radiator_01\paris_radiator_01_spec.png
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Art\RTXPTAssets\Models\Bistro\objects\props\bistro\paris_cookiejar\cookie_01_lo_default_ddna.png
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Art\RTXPTAssets\Models\Bistro\objects\props\bistro\paris_cookiejar\cookie_01_lo_default_diff.png
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Art\RTXPTAssets\Models\Bistro\textures\shared\tiling\bronze_01\bronze_01_ddna.png
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Art\RTXPTAssets\Models\Bistro\objects\props\bistro\paris_flower_pot_01\paris_interior_plants_01_ddna.png
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Art\RTXPTAssets\Models\Bistro\objects\props\bistro\paris_flower_pot_01\paris_interior_plants_01_diff.png
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Art\RTXPTAssets\Models\Bistro\objects\props\street\paris_lantern_01\paris_lantern_01a_emi.png
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Art\RTXPTAssets\Models\Bistro\objects\props\street\paris_lantern_01\paris_lantern_01a_ddna.png
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Art\RTXPTAssets\Models\Bistro\objects\props\street\paris_lantern_01\paris_lantern_01a_diff.png
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Art\RTXPTAssets\Models\Bistro\objects\props\street\paris_lantern_01\paris_lantern_01a_spec.png
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Art\RTXPTAssets\Models\Bistro\textures\shared\tiling\bronze_01\bronze_01_diff.png
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Art\RTXPTAssets\Models\Bistro\objects\props\bistro\paris_cloths_01\paris_cloths_01_ddna.png
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Art\RTXPTAssets\Models\Bistro\objects\props\bistro\paris_cloths_01\paris_cloths_01_diff.png
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Art\RTXPTAssets\Models\Bistro\objects\structures\street\paris_curbstones_01_ddna.png
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Art\RTXPTAssets\Models\Bistro\objects\structures\street\paris_curbstones_01_diff.png
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Art\RTXPTAssets\Models\Bistro\textures\shared\tiling\pavement_cobblestone_small_01\pavement_cobblestone_small_01_ddna.png
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Art\RTXPTAssets\Models\Bistro\textures\shared\tiling\pavement_cobblestone_small_01\pavement_cobblestone_small_01_diff.png
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Art\RTXPTAssets\Models\Bistro\textures\shared\tiling\pavement_cobblestone_big_01\pavement_cobblestone_big_01_ddna.png
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Art\RTXPTAssets\Models\Bistro\textures\shared\tiling\pavement_cobblestone_big_01\pavement_cobblestone_big_01_diff.png
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Art\RTXPTAssets\Models\Bistro\textures\shared\tiling\pavement_brick_01\pavement_brick_01_ddna.png
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Art\RTXPTAssets\Models\Bistro\textures\shared\tiling\pavement_brick_01\pavement_brick_01_diff.png
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Art\RTXPTAssets\Models\Bistro\textures\shared\tiling\pavement_cobblestone_03\pavement_cobblestone_03_ddna.png
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Art\RTXPTAssets\Models\Bistro\textures\shared\tiling\pavement_cobblestone_03\pavement_cobblestone_03_diff.png
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Art\RTXPTAssets\Models\Bistro\textures\shared\tiling\ground_wet_01\ground_wet_01_ddna.png
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Art\RTXPTAssets\Models\Bistro\textures\shared\tiling\ground_wet_01\ground_wet_01_diff.png
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Art\RTXPTAssets\Models\Bistro\objects\props\street\paris_manholecover_01\paris_manholecover_01b\paris_manholecover_01b_ddna.png
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Art\RTXPTAssets\Models\Bistro\objects\props\street\paris_manholecover_01\paris_manholecover_01b\paris_manholecover_01b_diff.png
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Art\RTXPTAssets\Models\Bistro\objects\props\street\paris_manholecover_01\paris_manholecover_01b\paris_manholecover_01b_spec.png
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Art\RTXPTAssets\Models\Bistro\textures\shared\tiling\pavement_cobblestone_02\cobble_02b_ddna.png
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Art\RTXPTAssets\Models\Bistro\textures\shared\tiling\pavement_cobblestone_02\cobble_02b_diff.png
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Art\RTXPTAssets\Models\Bistro\textures\shared\tiling\pavement_cobblestone_01\pavement_cobblestone_01_b_ddna.png
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Art\RTXPTAssets\Models\Bistro\textures\shared\tiling\pavement_cobblestone_01\pavement_cobblestone_01_b_diff.png
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Art\RTXPTAssets\Models\Bistro\objects\props\street\paris_streetpivot\paris_streetpivot_ddna.png
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Art\RTXPTAssets\Models\Bistro\objects\props\street\paris_streetpivot\paris_streetpivot_diff.png
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Art\RTXPTAssets\Models\Bistro\objects\natural\bushes\buxus\buxus_ddna.png
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Art\RTXPTAssets\Models\Bistro\objects\natural\bushes\buxus\buxus_diff.png
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Art\RTXPTAssets\Models\Bistro\objects\natural\ground\forest_ground\forest_ground_diff.png
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Art\RTXPTAssets\Models\Bistro\objects\natural\ground\forest_ground\forest_rocks_diff.png
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Art\RTXPTAssets\Models\Bistro\objects\props\bistro\paris_wall_light_interior_01\paris_wall_light_interior_emi.png
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Art\RTXPTAssets\Models\Bistro\objects\props\bistro\paris_wall_light_interior_01\paris_wall_light_interior_ddna.png
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Art\RTXPTAssets\Models\Bistro\objects\props\bistro\paris_wall_light_interior_01\paris_wall_light_interior_diff.png
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Art\RTXPTAssets\Models\Bistro\objects\props\bistro\paris_wall_light_interior_01\paris_wall_light_interior_spec.png
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Art\RTXPTAssets\Models\Bistro\objects\props\street\paris_streetlight_01\paris_streetlight_glass_01_ddna.png
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Art\RTXPTAssets\Models\Bistro\objects\props\street\paris_streetlight_01\paris_streetlight_glass_01_diff.png
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Art\RTXPTAssets\Models\Bistro\objects\props\street\paris_streetlight_01\paris_streetlight_01_ddna.png
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Art\RTXPTAssets\Models\Bistro\objects\props\street\paris_streetlight_01\paris_streetlight_01_diff.png
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Art\RTXPTAssets\Models\Bistro\objects\props\street\paris_streetlight_01\paris_streetlight_01_spec.png
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Art\RTXPTAssets\Models\Bistro\objects\props\street\paris_streetlight_01\paris_streetlight_bulb_01_emmitance.png
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Art\RTXPTAssets\Models\Bistro\objects\props\street\paris_streetlight_01\paris_streetlight_bulb_01_diff.png
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Art\RTXPTAssets\Models\Bistro\textures\decals\street_decals_ddna.png
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Art\RTXPTAssets\Models\Bistro\textures\decals\street_decals_diff.png
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Art\RTXPTAssets\Models\Bistro\textures\decals\street_decals_spec.png
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Art\RTXPTAssets\Models\Bistro\objects\props\street\paris_shopsign_01\paris_shopsign_bakery_diff.png
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Art\RTXPTAssets\Models\Bistro\objects\props\street\paris_shopsign_01\paris_shopsign_bakery_ddna.png
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Art\RTXPTAssets\Models\Bistro\objects\props\street\paris_shopsign_01\paris_shopsign_bakery_spec.png
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Art\RTXPTAssets\Models\Bistro\objects\props\street\paris_shopsign_01\paris_shopsign_ties_shop_ddna.png
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Art\RTXPTAssets\Models\Bistro\objects\props\street\paris_shopsign_01\paris_shopsign_ties_shop_diff.png
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Art\RTXPTAssets\Models\Bistro\objects\props\street\paris_shopsign_01\paris_shopsign_ties_shop_spec.png
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Art\RTXPTAssets\Models\Bistro\objects\props\bistro\paris_ceiling_lamp_01\paris_ceiling_lamp_01_emi.png
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Art\RTXPTAssets\Models\Bistro\objects\props\bistro\paris_ceiling_lamp_01\paris_ceiling_lamp_01_ddna.png
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Art\RTXPTAssets\Models\Bistro\objects\props\bistro\paris_ceiling_lamp_01\paris_ceiling_lamp_01_diff.png
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Art\RTXPTAssets\Models\Bistro\objects\props\bistro\paris_ceiling_lamp_01\paris_ceiling_lamp_01_spec.png
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Art\RTXPTAssets\Models\Bistro\objects\props\street\paris_bistrofrontbanner_01\paris_bistrofrontbanner_01_emt.png
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Art\RTXPTAssets\Models\Bistro\objects\props\street\paris_bistrofrontbanner_01\paris_bistrofrontbanner_01_ddna.png
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Art\RTXPTAssets\Models\Bistro\objects\props\street\paris_bistrofrontbanner_01\paris_bistrofrontbanner_01_diff.png
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Art\RTXPTAssets\Models\Bistro\objects\props\street\paris_bistrofrontbanner_01\paris_bistrofrontbanner_01_spec.png
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Art\RTXPTAssets\Models\Bistro\objects\props\street\paris_bistrofrontbanner_01\bistro_frontbannerletters_emt.png
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Art\RTXPTAssets\Models\Bistro\objects\props\street\paris_shopsign_01\paris_shopsign_bookshop_emt.png
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Art\RTXPTAssets\Models\Bistro\objects\props\street\paris_shopsign_01\paris_shopsign_bookshop_ddna.png
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Art\RTXPTAssets\Models\Bistro\objects\props\street\paris_shopsign_01\paris_shopsign_bookshop_diff.png
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Art\RTXPTAssets\Models\Bistro\textures\shared\tiling\metal_hexagonal_grid_01\metal_hexagonal_grid_01_ddna.jpg
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Art\RTXPTAssets\Models\Bistro\textures\shared\tiling\metal_hexagonal_grid_01\metal_hexagonal_grid_01_spec.jpg
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Art\RTXPTAssets\Models\Bistro\textures\shared\tiling\brushed_metal_01\paris_brushed_metal_diff.png
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Art\RTXPTAssets\Models\Bistro\textures\shared\tiling\brushed_metal_01\paris_brushed_metal_spec.png
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Art\RTXPTAssets\Models\Bistro\textures\shared\tiling\tile_hexagonal_01\tile_hexagonal_01_ddna.png
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Art\RTXPTAssets\Models\Bistro\textures\shared\tiling\tile_hexagonal_01\tile_hexagonal_01_diff.png
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Art\RTXPTAssets\Models\Bistro\objects\props\bistro\paris_curtain_01\paris_curtain_01a_ddna.png
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Art\RTXPTAssets\Models\Bistro\objects\props\bistro\paris_curtain_01\paris_curtain_01a_diff.png
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Art\RTXPTAssets\Models\Bistro\objects\props\bistro\paris_curtain_01\paris_curtain_01a_spec.png
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Art\RTXPTAssets\Models\Bistro\objects\props\bistro\paris_curtain_01\paris_curtain_01b_ddna.png
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Art\RTXPTAssets\Models\Bistro\objects\props\bistro\paris_curtain_01\paris_curtain_01b_diff.png
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Art\RTXPTAssets\Models\Bistro\objects\props\bistro\paris_curtain_01\paris_curtain_01b_spec.png
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Art\RTXPTAssets\Models\Bistro\textures\shared\tiling\bar_trim_01\paris_bartrim_01a_ddna.png
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Art\RTXPTAssets\Models\Bistro\textures\shared\tiling\bar_trim_01\paris_bartrim_01a_diff.png
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Art\RTXPTAssets\Models\Bistro\textures\shared\tiling\bar_trim_01\paris_bartrim_01a_spec.png
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Art\RTXPTAssets\Models\Bistro\objects\props\street\paris_shopsign_01\paris_shopsign_pharmacy_emt.png
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Art\RTXPTAssets\Models\Bistro\objects\props\street\paris_shopsign_01\paris_shopsign_pharmacy_ddna.png
+    assetPath: 
+  - type: 1
+    originalUri: Assets\Art\RTXPTAssets\Models\Bistro\objects\props\street\paris_shopsign_01\paris_shopsign_pharmacy_diff.png
+    assetPath: 
+  reportItems:
+  - type: 2
+    code: 20
+    messages:
+    - MSFT_texture_dds
+  - type: 0
+    code: 26
+    messages:
+    - 1
+    - objects/props/bistro/paris_ceilingfan_01/paris_ceilingfan_01a_em.dds
+  - type: 0
+    code: 26
+    messages:
+    - 3
+    - objects/props/bistro/paris_ceilingfan_01/paris_ceilingfan_01a_ddna.dds
+  - type: 0
+    code: 26
+    messages:
+    - 5
+    - objects/props/bistro/paris_ceilingfan_01/paris_ceilingfan_01a_diff.dds
+  - type: 0
+    code: 26
+    messages:
+    - 7
+    - objects/props/bistro/paris_ceilingfan_01/paris_ceilingfan_01a_spec.dds
+  - type: 0
+    code: 26
+    messages:
+    - 9
+    - textures/lumberyard_splash_2560x2560.dds
+  - type: 0
+    code: 26
+    messages:
+    - 11
+    - objects/props/street/paris_bistroawning_01/paris_bistroawning_fabric_01a_ddna.dds
+  - type: 0
+    code: 26
+    messages:
+    - 13
+    - objects/props/street/paris_bistroawning_01/paris_bistroawning_fabric_01a_diff.dds
+  - type: 0
+    code: 26
+    messages:
+    - 15
+    - objects/props/street/paris_bistroawning_01/paris_bistroawning_fabric_01a_spec.dds
+  - type: 0
+    code: 26
+    messages:
+    - 17
+    - objects/props/street/paris_bistroawning_01/paris_bistroawning_beams_01a_ddna.dds
+  - type: 0
+    code: 26
+    messages:
+    - 19
+    - objects/props/street/paris_bistroawning_01/paris_bistroawning_beams_01a_diff.dds
+  - type: 0
+    code: 26
+    messages:
+    - 21
+    - objects/props/street/paris_bistroawning_01/paris_bistroawning_beams_01a_spec.dds
+  - type: 0
+    code: 26
+    messages:
+    - 23
+    - textures/shared/tiling/concrete_smooth_02/concrete_smooth_02_ddna.dds
+  - type: 0
+    code: 26
+    messages:
+    - 25
+    - textures/shared/tiling/concrete_smooth_02/concrete_smooth_02_diff.dds
+  - type: 0
+    code: 26
+    messages:
+    - 27
+    - textures/shared/tiling/concrete_smooth_02/concrete_smooth_02_spec.dds
+  - type: 0
+    code: 26
+    messages:
+    - 29
+    - textures/shared/tiling/brick_large_01/brick_large_01_ddna.dds
+  - type: 0
+    code: 26
+    messages:
+    - 31
+    - textures/shared/tiling/brick_large_01/brick_large_01_diff.dds
+  - type: 0
+    code: 26
+    messages:
+    - 33
+    - textures/shared/tiling/brick_large_01/brick_large_01_spec.dds
+  - type: 0
+    code: 26
+    messages:
+    - 35
+    - objects/props/street/paris_mainbalcony_01/paris_doors_04a_ddna.dds
+  - type: 0
+    code: 26
+    messages:
+    - 37
+    - objects/props/street/paris_mainbalcony_01/paris_doors_04a_diff.dds
+  - type: 0
+    code: 26
+    messages:
+    - 39
+    - objects/props/street/paris_mainbalcony_01/paris_doors_04a_spec.dds
+  - type: 0
+    code: 26
+    messages:
+    - 41
+    - objects/props/street/paris_mainbalcony_01/paris_mainbalcony_02a_ddna.dds
+  - type: 0
+    code: 26
+    messages:
+    - 43
+    - objects/props/street/paris_mainbalcony_01/paris_mainbalcony_02a_diff.dds
+  - type: 0
+    code: 26
+    messages:
+    - 45
+    - objects/props/street/paris_mainbalcony_01/paris_mainbalcony_02a_spec.dds
+  - type: 0
+    code: 26
+    messages:
+    - 47
+    - objects/props/street/paris_mainbalcony_01/paris_mainbalcony_01a_ddna.dds
+  - type: 0
+    code: 26
+    messages:
+    - 49
+    - objects/props/street/paris_mainbalcony_01/paris_mainbalcony_01a_diff.dds
+  - type: 0
+    code: 26
+    messages:
+    - 51
+    - objects/props/street/paris_mainbalcony_01/paris_mainbalcony_01a_spec.dds
+  - type: 0
+    code: 26
+    messages:
+    - 53
+    - objects/props/street/paris_mainbalcony_01/paris_doors_03a_ddna.dds
+  - type: 0
+    code: 26
+    messages:
+    - 55
+    - objects/props/street/paris_mainbalcony_01/paris_doors_03a_diff.dds
+  - type: 0
+    code: 26
+    messages:
+    - 57
+    - objects/props/street/paris_mainbalcony_01/paris_doors_03a_spec.dds
+  - type: 0
+    code: 26
+    messages:
+    - 59
+    - textures/shared/tiling/glass_dirty_01/glass_dirty_01_diff.dds
+  - type: 0
+    code: 26
+    messages:
+    - 61
+    - textures/shared/tiling/glass_dirty_01/glass_dirty_01_spec.dds
+  - type: 0
+    code: 26
+    messages:
+    - 63
+    - textures/shared/tiling/concrete_smooth_03/Concrete_Smooth_03_ddna.dds
+  - type: 0
+    code: 26
+    messages:
+    - 65
+    - textures/shared/tiling/concrete_smooth_03/Concrete_Smooth_03_Diff.dds
+  - type: 0
+    code: 26
+    messages:
+    - 67
+    - textures/shared/tiling/wood_painted_02/wood_painted_02_ddna.dds
+  - type: 0
+    code: 26
+    messages:
+    - 69
+    - textures/shared/tiling/wood_painted_flat_grey_01/wood_painted_flat_grey_01_diff.dds
+  - type: 0
+    code: 26
+    messages:
+    - 71
+    - textures/shared/tiling/roofing_shingle_01/roofing_shingle_01_ddna.dds
+  - type: 0
+    code: 26
+    messages:
+    - 73
+    - textures/shared/tiling/roofing_shingle_01/roofing_shingle_01_diff.dds
+  - type: 0
+    code: 26
+    messages:
+    - 75
+    - textures/shared/tiling/grain_metal_01/grain_metal_01_ddna.dds
+  - type: 0
+    code: 26
+    messages:
+    - 77
+    - textures/shared/tiling/grain_metal_01/grain_metal_01_diff.dds
+  - type: 0
+    code: 26
+    messages:
+    - 79
+    - objects/structures/modular/windows/paris_building01_window/paris_building01_window_01_ddna.dds
+  - type: 0
+    code: 26
+    messages:
+    - 81
+    - objects/structures/modular/windows/paris_building01_window/paris_building01_window_01_diff.dds
+  - type: 0
+    code: 26
+    messages:
+    - 83
+    - textures/shared/tiling/plaster_yellow_01/plaster_yellow_01a_ddna.dds
+  - type: 0
+    code: 26
+    messages:
+    - 85
+    - objects/structures/buildings/paris_building_09/windows_curtains_ddna.dds
+  - type: 0
+    code: 26
+    messages:
+    - 87
+    - objects/structures/buildings/paris_building_09/windows_curtains_diff.dds
+  - type: 0
+    code: 26
+    messages:
+    - 89
+    - objects/props/street/paris_bistroawning_01/paris_bistroawning_fabric_greyscale_01a_diff.dds
+  - type: 0
+    code: 26
+    messages:
+    - 91
+    - objects/structures/standard/doors/paris_doors_01a/paris_doors_01a_ddna.dds
+  - type: 0
+    code: 26
+    messages:
+    - 93
+    - objects/structures/standard/doors/paris_doors_01a/paris_doors_01a_diff.dds
+  - type: 0
+    code: 26
+    messages:
+    - 95
+    - objects/structures/standard/doors/paris_doors_01a/paris_doors_01a_spec.dds
+  - type: 0
+    code: 26
+    messages:
+    - 97
+    - textures/shared/tiling/concrete_grooved_02/Concrete_Grooved_02_ddna.dds
+  - type: 0
+    code: 26
+    messages:
+    - 99
+    - textures/shared/tiling/concrete_grooved_02/Concrete_Grooved_02_Diff.dds
+  - type: 0
+    code: 26
+    messages:
+    - 101
+    - textures/shared/tiling/brick_large_02/Brick_Large_02_ddna.dds
+  - type: 0
+    code: 26
+    messages:
+    - 103
+    - textures/shared/tiling/brick_large_02/Brick_Large_02_Diff.dds
+  - type: 0
+    code: 26
+    messages:
+    - 105
+    - textures/shared/tiling/concrete_smooth_01/concrete_smooth_01_ddna.dds
+  - type: 0
+    code: 26
+    messages:
+    - 107
+    - textures/shared/tiling/concrete_smooth_01/concrete_smooth_01_diff.dds
+  - type: 0
+    code: 26
+    messages:
+    - 109
+    - textures/shared/tiling/concrete_smooth_01/Concrete_Smooth_01_spec.dds
+  - type: 0
+    code: 26
+    messages:
+    - 111
+    - textures/shared/tiling/grain_metal_01/grain_metal_01_spec.dds
+  - type: 0
+    code: 26
+    messages:
+    - 113
+    - textures/shared/tiling/plastic_01/plastic_01_ddna.dds
+  - type: 0
+    code: 26
+    messages:
+    - 115
+    - textures/shared/tiling/plastic_01/plastic_01_diff.dds
+  - type: 0
+    code: 26
+    messages:
+    - 119
+    - textures/shared/tiling/plaster_01/plaster_01a_ddna.dds
+  - type: 0
+    code: 26
+    messages:
+    - 121
+    - textures/shared/tiling/plaster_01/plaster_01a_diff.dds
+  - type: 0
+    code: 26
+    messages:
+    - 123
+    - textures/shared/tiling/roofing_shingle_03/roofing_shingle_03_ddna.dds
+  - type: 0
+    code: 26
+    messages:
+    - 125
+    - textures/shared/tiling/roofing_shingle_03/roofing_shingle_03_diff.dds
+  - type: 0
+    code: 26
+    messages:
+    - 127
+    - textures/shared/tiling/Trim_cornice_01/Trim_cornice_01_ddna.dds
+  - type: 0
+    code: 26
+    messages:
+    - 129
+    - textures/shared/tiling/Trim_cornice_01/Trim_cornice_01_diff.dds
+  - type: 0
+    code: 26
+    messages:
+    - 131
+    - objects/structures/modular/windows/paris_building01_window/paris_building01_window_01_displ.dds
+  - type: 0
+    code: 26
+    messages:
+    - 133
+    - textures/shared/decals/wall_decals/wall_decals.dds
+  - type: 0
+    code: 26
+    messages:
+    - 135
+    - textures/decals/bottomdirt_01/bottomdirt_01_diff.dds
+  - type: 0
+    code: 26
+    messages:
+    - 137
+    - textures/decals/plastercracks_02/plastercracks_02_ddna.dds
+  - type: 0
+    code: 26
+    messages:
+    - 139
+    - textures/decals/plastercracks_02/plastercracks_02_diff.dds
+  - type: 0
+    code: 26
+    messages:
+    - 141
+    - textures/shared/tiling/metal_galvanized_01/metal_galvanized_01_spec.dds
+  - type: 0
+    code: 26
+    messages:
+    - 143
+    - textures/shared/tiling/wood_polished_01/wood_polished_01_ddna.dds
+  - type: 0
+    code: 26
+    messages:
+    - 145
+    - textures/shared/tiling/wood_base_01/wood_base_01_diff.dds
+  - type: 0
+    code: 26
+    messages:
+    - 149
+    - objects/props/street/paris_bistroexteriorspotlight_01/paris_bistroexteriorspotlight_01_ddna.dds
+  - type: 0
+    code: 26
+    messages:
+    - 151
+    - objects/props/street/paris_bistroexteriorspotlight_01/paris_bistroexteriorspotlight_01_diff.dds
+  - type: 0
+    code: 26
+    messages:
+    - 153
+    - objects/props/street/paris_bistroexteriorspotlight_01/paris_bistroexteriorspotlight_01_spec.dds
+  - type: 0
+    code: 26
+    messages:
+    - 155
+    - textures/shared/tiling/metal_chrome_01/metal_chrome_01_ddna.dds
+  - type: 0
+    code: 26
+    messages:
+    - 159
+    - objects/props/street/paris_bistroexteriorspotlight_01/paris_bistroexteriorspotlightglass_01_ddna.dds
+  - type: 0
+    code: 26
+    messages:
+    - 161
+    - objects/props/street/paris_bistroexteriorspotlight_01/paris_bistroexteriorspotlightglass_01_diff.dds
+  - type: 0
+    code: 26
+    messages:
+    - 163
+    - objects/props/street/paris_bistroexteriorspotlight_01/paris_bistroexteriorspotlightglass_01_spec.dds
+  - type: 0
+    code: 26
+    messages:
+    - 165
+    - objects/structures/standard/walls/bistro_woodpanel_01/bistro_woodpanelornament_01_ddna.dds
+  - type: 0
+    code: 26
+    messages:
+    - 167
+    - objects/structures/standard/walls/bistro_woodpanel_01/bistro_woodpanelornament_01_diff.dds
+  - type: 0
+    code: 26
+    messages:
+    - 169
+    - objects/structures/standard/walls/bistro_woodpanel_01/bistro_woodpanelornament_01_spec.dds
+  - type: 0
+    code: 26
+    messages:
+    - 171
+    - objects/structures/standard/doors/bistro_main_door/bistro_main_door_ddna.dds
+  - type: 0
+    code: 26
+    messages:
+    - 173
+    - objects/structures/standard/doors/bistro_main_door/bistro_main_door_diff.dds
+  - type: 0
+    code: 26
+    messages:
+    - 175
+    - objects/structures/standard/doors/bistro_main_door/bistro_main_door_spec.dds
+  - type: 0
+    code: 26
+    messages:
+    - 177
+    - textures/shared/tiling/wood_painted_02/wood_painted_02_diff.dds
+  - type: 0
+    code: 26
+    messages:
+    - 179
+    - textures/shared/tiling/wood_painted_02/wood_painted_02_spec.dds
+  - type: 0
+    code: 26
+    messages:
+    - 181
+    - objects/structures/standard/doors/bistro_main_door_concrete_01a/bistro_main_door_concrete_01a_ddna.dds
+  - type: 0
+    code: 26
+    messages:
+    - 183
+    - objects/structures/standard/doors/bistro_main_door_concrete_01a/bistro_main_door_concrete_01a_diff.dds
+  - type: 0
+    code: 26
+    messages:
+    - 185
+    - objects/structures/standard/doors/bistro_main_door_concrete_01a/bistro_main_door_concrete_01a_spec.dds
+  - type: 0
+    code: 26
+    messages:
+    - 187
+    - objects/props/street/paris_bistrofrontbanner_01/paris_bistrosidebanner_diff.dds
+  - type: 0
+    code: 26
+    messages:
+    - 189
+    - objects/props/street/paris_bistrofrontbanner_01/paris_bistrosidebanner_spec.dds
+  - type: 0
+    code: 26
+    messages:
+    - 191
+    - textures/shared/tiling/brick_large_03/brick_large_03_ddna.dds
+  - type: 0
+    code: 26
+    messages:
+    - 193
+    - textures/shared/tiling/brick_large_03/brick_large_03_diff.dds
+  - type: 0
+    code: 26
+    messages:
+    - 195
+    - textures/shared/tiling/brick_small_03/brick_small_03_ddna.dds
+  - type: 0
+    code: 26
+    messages:
+    - 197
+    - textures/shared/tiling/brick_small_03/brick_small_03_diff.dds
+  - type: 0
+    code: 26
+    messages:
+    - 199
+    - objects/structures/buildings/paris_building_09/room_interior_diff.dds
+  - type: 0
+    code: 26
+    messages:
+    - 201
+    - textures/shared/tiling/roofing_metal_01/roofing_metal_01_ddna.dds
+  - type: 0
+    code: 26
+    messages:
+    - 203
+    - textures/shared/tiling/roofing_metal_01/Roofing_Metal_01_diff.dds
+  - type: 0
+    code: 26
+    messages:
+    - 205
+    - objects/props/street/paris_bistroawning_01/paris_bistroawning_beams_01b_diff.dds
+  - type: 0
+    code: 26
+    messages:
+    - 207
+    - textures/shared/tiling/boulangerie/boulangeria_diff.dds
+  - type: 0
+    code: 26
+    messages:
+    - 209
+    - objects/structures/buildings/paris_building_10/frosted_glass_ddna.dds
+  - type: 0
+    code: 26
+    messages:
+    - 211
+    - objects/structures/buildings/paris_building_10/frosted_glass_diff.dds
+  - type: 0
+    code: 26
+    messages:
+    - 213
+    - objects/structures/buildings/paris_building_09/paris_building_09_details_ddna.dds
+  - type: 0
+    code: 26
+    messages:
+    - 215
+    - objects/structures/buildings/paris_building_09/paris_building_09_details_diff.dds
+  - type: 0
+    code: 26
+    messages:
+    - 217
+    - objects/structures/buildings/paris_building_09/paris_building_09_details_spec.dds
+  - type: 0
+    code: 26
+    messages:
+    - 219
+    - textures/shared/tiling/edge_decals_01/edge_decals_01_ddna.dds
+  - type: 0
+    code: 26
+    messages:
+    - 221
+    - textures/shared/tiling/edge_decals_01/edge_decals_01_diff.dds
+  - type: 0
+    code: 26
+    messages:
+    - 223
+    - textures/shared/tiling/metal_rolldoor_01/metal_rolldoor_01_ddna.dds
+  - type: 0
+    code: 26
+    messages:
+    - 225
+    - textures/shared/tiling/metal_rolldoor_01/metal_rolldoor_01_diff.dds
+  - type: 0
+    code: 26
+    messages:
+    - 227
+    - textures/shared/tiling/metal_rolldoor_01/metal_rolldoor_01_spec.dds
+  - type: 0
+    code: 26
+    messages:
+    - 229
+    - textures/shared/tiling/metal_clean_01/metal_clean_01_ddna.dds
+  - type: 0
+    code: 26
+    messages:
+    - 231
+    - textures/shared/tiling/metal_clean_01/metal_clean_01_diff.dds
+  - type: 0
+    code: 26
+    messages:
+    - 233
+    - textures/shared/tiling/bronze_01/bronze_01_spec.dds
+  - type: 0
+    code: 26
+    messages:
+    - 235
+    - textures/shared/tiling/books_covers/books_covers_diff.dds
+  - type: 0
+    code: 26
+    messages:
+    - 237
+    - textures/shared/tiling/wood_painted_04/wood_painted_04_ddna.dds
+  - type: 0
+    code: 26
+    messages:
+    - 239
+    - textures/shared/tiling/wood_painted_04/wood_painted_04_diff.dds
+  - type: 0
+    code: 26
+    messages:
+    - 241
+    - textures/shared/tiling/wood_painted_04/wood_painted_04_spec.dds
+  - type: 0
+    code: 26
+    messages:
+    - 243
+    - objects/props/bistro/paris_ashtray_01/paris_ashtray_01a_ddna.dds
+  - type: 0
+    code: 26
+    messages:
+    - 245
+    - objects/props/bistro/paris_ashtray_01/paris_ashtray_01a_diff.dds
+  - type: 0
+    code: 26
+    messages:
+    - 247
+    - objects/props/bistro/paris_ashtray_01/paris_ashtray_01a_spec.dds
+  - type: 0
+    code: 26
+    messages:
+    - 249
+    - objects/props/bistro/paris_chair_01/paris_chair_01a_ddna.dds
+  - type: 0
+    code: 26
+    messages:
+    - 251
+    - objects/props/bistro/paris_chair_01/paris_chair_01a_diff.dds
+  - type: 0
+    code: 26
+    messages:
+    - 253
+    - objects/props/bistro/paris_chair_01/paris_chair_01a_spec.dds
+  - type: 0
+    code: 26
+    messages:
+    - 255
+    - objects/props/bistro/paris_napkinholder_01/paris_napkinholder_01_ddna.dds
+  - type: 0
+    code: 26
+    messages:
+    - 257
+    - objects/props/bistro/paris_napkinholder_01/paris_napkinholder_01_diff.dds
+  - type: 0
+    code: 26
+    messages:
+    - 259
+    - objects/props/bistro/paris_napkinholder_01/paris_napkinholder_01_spec.dds
+  - type: 0
+    code: 26
+    messages:
+    - 261
+    - textures/shared/colors/Grey_30.dds
+  - type: 0
+    code: 26
+    messages:
+    - 263
+    - objects/props/bistro/paris_liquorbottle_01/Paris_LiquorBottle_01_Cap_ddna.dds
+  - type: 0
+    code: 26
+    messages:
+    - 265
+    - objects/props/bistro/paris_liquorbottle_01/Paris_LiquorBottle_01_Cap_Diff.dds
+  - type: 0
+    code: 26
+    messages:
+    - 267
+    - objects/props/bistro/paris_liquorbottle_01/Paris_LiquorBottle_01_Cap_Spec.dds
+  - type: 0
+    code: 26
+    messages:
+    - 269
+    - objects/props/bistro/paris_liquorbottle_01/paris_liquorbottle_labels_01_ddna.dds
+  - type: 0
+    code: 26
+    messages:
+    - 271
+    - objects/props/bistro/paris_liquorbottle_01/paris_liquorbottle_labels_01_diff.dds
+  - type: 0
+    code: 26
+    messages:
+    - 273
+    - objects/props/bistro/paris_liquorbottle_01/paris_liquorbottle_labels_01_spec.dds
+  - type: 0
+    code: 26
+    messages:
+    - 275
+    - objects/props/bistro/paris_table_01/paris_table_01a_ddna.dds
+  - type: 0
+    code: 26
+    messages:
+    - 277
+    - objects/props/bistro/paris_table_01/paris_table_01a_diff.dds
+  - type: 0
+    code: 26
+    messages:
+    - 279
+    - objects/props/bistro/paris_table_01/paris_table_01a_spec.dds
+  - type: 0
+    code: 26
+    messages:
+    - 281
+    - objects/props/street/paris_bollard_01/paris_bollard_01a_ddna.dds
+  - type: 0
+    code: 26
+    messages:
+    - 283
+    - objects/props/street/paris_bollard_01/paris_bollard_01a_diff.dds
+  - type: 0
+    code: 26
+    messages:
+    - 285
+    - objects/props/street/paris_bollard_01/paris_bollard_01a_spec.dds
+  - type: 0
+    code: 26
+    messages:
+    - 287
+    - objects/props/street/paris_menusign_01/paris_menusign_01a_ddna.dds
+  - type: 0
+    code: 26
+    messages:
+    - 289
+    - objects/props/street/paris_menusign_01/paris_menusign_01a_diff.dds
+  - type: 0
+    code: 26
+    messages:
+    - 291
+    - objects/props/street/paris_menusign_01/paris_menusign_01a_spec.dds
+  - type: 0
+    code: 26
+    messages:
+    - 293
+    - objects/props/street/paris_menusign_01/paris_menusign_01b_ddna.dds
+  - type: 0
+    code: 26
+    messages:
+    - 295
+    - objects/props/street/paris_menusign_01/paris_menusign_01b_diff.dds
+  - type: 0
+    code: 26
+    messages:
+    - 297
+    - objects/props/street/paris_menusign_01/paris_menusign_01b_spec.dds
+  - type: 0
+    code: 26
+    messages:
+    - 299
+    - objects/props/street/paris_sidewalkbarrier_01/paris_sidewalkbarrier_01_ddna.dds
+  - type: 0
+    code: 26
+    messages:
+    - 301
+    - objects/props/street/paris_sidewalkbarrier_01/paris_sidewalkbarrier_01_diff.dds
+  - type: 0
+    code: 26
+    messages:
+    - 303
+    - objects/props/street/paris_sidewalkbarrier_01/paris_sidewalkbarrier_01_spec.dds
+  - type: 0
+    code: 26
+    messages:
+    - 305
+    - objects/props/natural/paris_ivy_01a/paris_ivy_branch_ddna.dds
+  - type: 0
+    code: 26
+    messages:
+    - 307
+    - objects/props/natural/paris_ivy_01a/paris_ivy_branch_diff.dds
+  - type: 0
+    code: 26
+    messages:
+    - 309
+    - objects/props/natural/paris_ivy_01a/paris_ivy_leaf_a_ddna.dds
+  - type: 0
+    code: 26
+    messages:
+    - 311
+    - objects/props/natural/paris_ivy_01a/paris_ivy_leaf_a_diff.dds
+  - type: 0
+    code: 26
+    messages:
+    - 313
+    - objects/props/natural/paris_ivy_01a/paris_ivy_leaf_b_ddna.dds
+  - type: 0
+    code: 26
+    messages:
+    - 315
+    - objects/props/natural/paris_ivy_01a/paris_ivy_leaf_b_diff.dds
+  - type: 0
+    code: 26
+    messages:
+    - 317
+    - objects/props/natural/italian_cypress/italian_cypress_leaves_ddna.dds
+  - type: 0
+    code: 26
+    messages:
+    - 319
+    - objects/props/natural/italian_cypress/italian_cypress_leaves_diff.dds
+  - type: 0
+    code: 26
+    messages:
+    - 321
+    - objects/props/natural/italian_cypress/italian_cypress_bark_ddna.dds
+  - type: 0
+    code: 26
+    messages:
+    - 323
+    - objects/props/natural/italian_cypress/italian_cypress_bark_diff.dds
+  - type: 0
+    code: 26
+    messages:
+    - 325
+    - objects/props/natural/linden/linden_bark_a_ddna.dds
+  - type: 0
+    code: 26
+    messages:
+    - 327
+    - objects/props/natural/linden/linden_bark_a_diff.dds
+  - type: 0
+    code: 26
+    messages:
+    - 329
+    - objects/props/natural/linden/leaves_a_diff.dds
+  - type: 0
+    code: 26
+    messages:
+    - 331
+    - objects/props/natural/linden/leaves_b_diff.dds
+  - type: 0
+    code: 26
+    messages:
+    - 333
+    - objects/props/natural/paris_flowers_01a/paris_flowers_01a_ddna.dds
+  - type: 0
+    code: 26
+    messages:
+    - 335
+    - objects/props/natural/paris_flowers_01a/paris_flowers_01a_diff.dds
+  - type: 0
+    code: 26
+    messages:
+    - 337
+    - objects/props/natural/paris_flowers_01a/paris_foliage_01a_ddna.dds
+  - type: 0
+    code: 26
+    messages:
+    - 339
+    - objects/props/natural/paris_flowers_01a/paris_foliage_01a_diff.dds
+  - type: 0
+    code: 26
+    messages:
+    - 341
+    - objects/props/street/paris_bistroawning_02/paris_bistroawning_02_ddna.dds
+  - type: 0
+    code: 26
+    messages:
+    - 343
+    - objects/props/street/paris_bistroawning_02/paris_bistroawning_02_diff.dds
+  - type: 0
+    code: 26
+    messages:
+    - 345
+    - objects/props/street/paris_bistroawning_02/paris_bistroawning_02_spec.dds
+  - type: 0
+    code: 26
+    messages:
+    - 347
+    - objects/props/street/paris_trafficsign_01/paris_trafficsign_01_ddna.dds
+  - type: 0
+    code: 26
+    messages:
+    - 349
+    - objects/props/street/paris_trafficsign_01/paris_trafficsign_01_diff.dds
+  - type: 0
+    code: 26
+    messages:
+    - 351
+    - objects/props/street/paris_trafficsign_01/paris_trafficsign_01_spec.dds
+  - type: 0
+    code: 26
+    messages:
+    - 353
+    - objects/props/street/paris_plantpot_01/paris_plantpot_01a_ddna.dds
+  - type: 0
+    code: 26
+    messages:
+    - 355
+    - objects/props/street/paris_plantpot_01/paris_plantpot_01a_diff.dds
+  - type: 0
+    code: 26
+    messages:
+    - 357
+    - objects/props/bistro/paris_wickerbasket_01/paris_wickerbasket_01_ddna.dds
+  - type: 0
+    code: 26
+    messages:
+    - 359
+    - objects/props/bistro/paris_wickerbasket_01/paris_wickerbasket_01_diff.dds
+  - type: 0
+    code: 26
+    messages:
+    - 361
+    - objects/props/street/paris_vespascooter_01/paris_vespascooter_01_ddna.dds
+  - type: 0
+    code: 26
+    messages:
+    - 363
+    - objects/props/street/paris_vespascooter_01/paris_vespascooter_01_diff.dds
+  - type: 0
+    code: 26
+    messages:
+    - 365
+    - objects/props/street/paris_vespascooter_01/paris_vespascooter_01_spec.dds
+  - type: 0
+    code: 26
+    messages:
+    - 367
+    - objects/props/street/paris_vespascooter_01/paris_vespascooter_01_odometer_ddna.dds
+  - type: 0
+    code: 26
+    messages:
+    - 369
+    - objects/props/street/paris_vespascooter_01/paris_vespascooter_01_odometer_diff.dds
+  - type: 0
+    code: 26
+    messages:
+    - 371
+    - objects/props/bistro/paris_doormats/paris_doormat_01_ddna.dds
+  - type: 0
+    code: 26
+    messages:
+    - 373
+    - objects/props/bistro/paris_doormats/paris_doormat_01_diff.dds
+  - type: 0
+    code: 26
+    messages:
+    - 375
+    - textures/shared/tiling/brick_small_02/brick_small_02_ddna.dds
+  - type: 0
+    code: 26
+    messages:
+    - 377
+    - textures/shared/tiling/brick_small_02/brick_small_02_diff.dds
+  - type: 0
+    code: 26
+    messages:
+    - 379
+    - objects/props/bistro/paris_bistro_glass_decal_ornament/paris_bistro_glass_decal_ornament_diff.dds
+  - type: 0
+    code: 26
+    messages:
+    - 381
+    - objects/props/street/paris_stringlights_01/Paris_StringLights_01_ddna.dds
+  - type: 0
+    code: 26
+    messages:
+    - 383
+    - objects/props/street/paris_stringlights_01/Paris_StringLights_01_diff.dds
+  - type: 0
+    code: 26
+    messages:
+    - 385
+    - objects/props/street/paris_stringlights_01/Paris_StringLights_01_spec.dds
+  - type: 0
+    code: 26
+    messages:
+    - 387
+    - objects/props/street/paris_electricbox_01/paris_electricbox_01_ddna.dds
+  - type: 0
+    code: 26
+    messages:
+    - 389
+    - objects/props/street/paris_electricbox_01/paris_electricbox_01_diff.dds
+  - type: 0
+    code: 26
+    messages:
+    - 391
+    - objects/props/street/paris_electricbox_01/paris_electricbox_01_spec.dds
+  - type: 0
+    code: 26
+    messages:
+    - 393
+    - textures/shared/tiling/plastic_02/plastic_02_ddna.dds
+  - type: 0
+    code: 26
+    messages:
+    - 397
+    - textures/shared/tiling/metal_clean_01/metal_clean_01_spec.dds
+  - type: 0
+    code: 26
+    messages:
+    - 399
+    - objects/props/street/paris_streetsign_01/paris_streetsign_01a_ddna.dds
+  - type: 0
+    code: 26
+    messages:
+    - 401
+    - objects/props/street/paris_streetsign_01/paris_streetsign_01a_diff.dds
+  - type: 0
+    code: 26
+    messages:
+    - 403
+    - objects/props/street/paris_streetsign_01/paris_streetsign_01a_spec.dds
+  - type: 0
+    code: 26
+    messages:
+    - 405
+    - objects/props/street/paris_trashcan_01/paris_trashcan_01_ddna.dds
+  - type: 0
+    code: 26
+    messages:
+    - 407
+    - objects/props/street/paris_trashcan_01/paris_trashcan_01_diff.dds
+  - type: 0
+    code: 26
+    messages:
+    - 409
+    - objects/props/street/paris_trashcan_01/paris_trashcan_01_spec.dds
+  - type: 0
+    code: 26
+    messages:
+    - 411
+    - textures/shared/colors/grey_128.dds
+  - type: 0
+    code: 26
+    messages:
+    - 415
+    - objects/props/bistro/paris_painting_01/paris_paintings_01_ddna.dds
+  - type: 0
+    code: 26
+    messages:
+    - 417
+    - objects/props/bistro/paris_painting_01/paris_paintings_01_diff.dds
+  - type: 0
+    code: 26
+    messages:
+    - 419
+    - objects/props/bistro/paris_painting_01/paris_paintings_01_spec.dds
+  - type: 0
+    code: 26
+    messages:
+    - 421
+    - objects/props/bistro/paris_painting_01/paris_painting_01_ddna.dds
+  - type: 0
+    code: 26
+    messages:
+    - 423
+    - objects/props/bistro/paris_painting_01/paris_painting_01_diff.dds
+  - type: 0
+    code: 26
+    messages:
+    - 425
+    - objects/props/bistro/paris_painting_01/paris_painting_01_spec.dds
+  - type: 0
+    code: 26
+    messages:
+    - 427
+    - textures/shared/tiling/ceramic_01/ceramic_01_diff.dds
+  - type: 0
+    code: 26
+    messages:
+    - 429
+    - objects/props/bistro/paris_plates_01/paris_plates_details_ddna.dds
+  - type: 0
+    code: 26
+    messages:
+    - 431
+    - objects/props/bistro/paris_plates_01/paris_plates_details_diff.dds
+  - type: 0
+    code: 26
+    messages:
+    - 433
+    - textures/shared/tiling/metal_chrome_02/metal_chrome_02_ddna.dds
+  - type: 0
+    code: 26
+    messages:
+    - 435
+    - textures/shared/tiling/metal_chrome_02/metal_chrome_02_diff.dds
+  - type: 0
+    code: 26
+    messages:
+    - 439
+    - objects/props/bistro/paris_cutlery_01/paris_cutlery_01_details_ddna.dds
+  - type: 0
+    code: 26
+    messages:
+    - 441
+    - objects/props/bistro/paris_cutlery_01/paris_cutlery_01_details_diff.dds
+  - type: 0
+    code: 26
+    messages:
+    - 443
+    - objects/props/bistro/paris_cutlery_01/paris_cutlery_01_details_spec.dds
+  - type: 0
+    code: 26
+    messages:
+    - 445
+    - textures/shared/tiling/wood_polished_01/wood_polished_01_diff.dds
+  - type: 0
+    code: 26
+    messages:
+    - 447
+    - objects/props/bistro/paris_beertap_01/paris_beertap_01_ddna.dds
+  - type: 0
+    code: 26
+    messages:
+    - 449
+    - objects/props/bistro/paris_beertap_01/paris_beertap_01_diff.dds
+  - type: 0
+    code: 26
+    messages:
+    - 451
+    - objects/props/bistro/paris_beertap_01/paris_beertap_01_spec.dds
+  - type: 0
+    code: 26
+    messages:
+    - 453
+    - objects/props/bistro/paris_barstool_01/paris_barstool_01a_ddna.dds
+  - type: 0
+    code: 26
+    messages:
+    - 455
+    - objects/props/bistro/paris_barstool_01/paris_barstool_01a_diff.dds
+  - type: 0
+    code: 26
+    messages:
+    - 457
+    - objects/props/bistro/paris_barstool_01/paris_barstool_01a_spec.dds
+  - type: 0
+    code: 26
+    messages:
+    - 459
+    - objects/props/bistro/paris_cashregister_01/paris_cashregister_01_ddna.dds
+  - type: 0
+    code: 26
+    messages:
+    - 461
+    - objects/props/bistro/paris_cashregister_01/paris_cashregister_01_diff.dds
+  - type: 0
+    code: 26
+    messages:
+    - 463
+    - objects/props/bistro/paris_cashregister_01/paris_cashregister_01_spec.dds
+  - type: 0
+    code: 26
+    messages:
+    - 465
+    - objects/props/bistro/paris_cashregister_01/paris_cashregister_buttons_01_ddna.dds
+  - type: 0
+    code: 26
+    messages:
+    - 467
+    - objects/props/bistro/paris_cashregister_01/paris_cashregister_buttons_01_diff.dds
+  - type: 0
+    code: 26
+    messages:
+    - 469
+    - objects/props/bistro/paris_cashregister_01/paris_cashregister_buttons_01_spec.dds
+  - type: 0
+    code: 26
+    messages:
+    - 471
+    - textures/shared/tiling/wood_planks_01/wood_planks_01_ddna.dds
+  - type: 0
+    code: 26
+    messages:
+    - 473
+    - textures/shared/tiling/wood_planks_01/wood_planks_01_diff.dds
+  - type: 0
+    code: 26
+    messages:
+    - 475
+    - textures/shared/tiling/wood_planks_01/wood_planks_01_spec.dds
+  - type: 0
+    code: 26
+    messages:
+    - 477
+    - objects/props/bistro/paris_glass_detailed_01/paris_glass_detailed_01_nogloss_ddna.dds
+  - type: 0
+    code: 26
+    messages:
+    - 479
+    - textures/shared/colors/white.dds
+  - type: 0
+    code: 26
+    messages:
+    - 481
+    - objects/props/bistro/paris_glass_detailed_01/paris_glass_detailed_01_ddna.dds
+  - type: 0
+    code: 26
+    messages:
+    - 483
+    - objects/props/bistro/paris_glass_detailed_01/paris_glass_detailed_01_diff.dds
+  - type: 0
+    code: 26
+    messages:
+    - 485
+    - objects/props/bistro/paris_glass_detailed_01/paris_glass_detailed_01_spec.dds
+  - type: 0
+    code: 26
+    messages:
+    - 487
+    - objects/props/bistro/paris_glass_detailed_01/paris_glass_detailed_bubbles_01_diff.dds
+  - type: 0
+    code: 26
+    messages:
+    - 489
+    - objects/props/bistro/paris_coasters_01/paris_coasters_01_ddna.dds
+  - type: 0
+    code: 26
+    messages:
+    - 491
+    - objects/props/bistro/paris_coasters_01/paris_coasters_01_diff.dds
+  - type: 0
+    code: 26
+    messages:
+    - 493
+    - objects/props/bistro/paris_coasters_01/paris_coasters_01_spec.dds
+  - type: 0
+    code: 26
+    messages:
+    - 495
+    - objects/props/bistro/paris_cotton_placemat_01/paris_cotton_placemat_01_ddna.dds
+  - type: 0
+    code: 26
+    messages:
+    - 497
+    - objects/props/bistro/paris_cotton_placemat_01/paris_cotton_placemat_01_diff.dds
+  - type: 0
+    code: 26
+    messages:
+    - 499
+    - objects/props/bistro/paris_cotton_placemat_01/paris_cotton_placemat_01_spec.dds
+  - type: 0
+    code: 26
+    messages:
+    - 501
+    - textures/shared/tiling/rubber_bar_mat_01/rubber_bar_mat_01_ddna.dds
+  - type: 0
+    code: 26
+    messages:
+    - 503
+    - textures/shared/tiling/rubber_bar_mat_01/rubber_bar_mat_01_diff.dds
+  - type: 0
+    code: 26
+    messages:
+    - 505
+    - textures/shared/tiling/rubber_bar_mat_01/rubber_bar_mat_01_spec.dds
+  - type: 0
+    code: 26
+    messages:
+    - 507
+    - objects/props/bistro/paris_radiator_01/paris_radiator_01_ddna.dds
+  - type: 0
+    code: 26
+    messages:
+    - 509
+    - objects/props/bistro/paris_radiator_01/paris_radiator_01_diff.dds
+  - type: 0
+    code: 26
+    messages:
+    - 511
+    - objects/props/bistro/paris_radiator_01/paris_radiator_01_spec.dds
+  - type: 0
+    code: 26
+    messages:
+    - 513
+    - objects/props/bistro/paris_cookiejar/cookie_01_lo_default_ddna.dds
+  - type: 0
+    code: 26
+    messages:
+    - 515
+    - objects/props/bistro/paris_cookiejar/cookie_01_lo_default_diff.dds
+  - type: 0
+    code: 26
+    messages:
+    - 517
+    - textures/shared/tiling/bronze_01/bronze_01_ddna.dds
+  - type: 0
+    code: 26
+    messages:
+    - 519
+    - objects/props/bistro/paris_flower_pot_01/paris_interior_plants_01_ddna.dds
+  - type: 0
+    code: 26
+    messages:
+    - 521
+    - objects/props/bistro/paris_flower_pot_01/paris_interior_plants_01_diff.dds
+  - type: 0
+    code: 26
+    messages:
+    - 523
+    - objects/props/street/paris_lantern_01/paris_lantern_01a_emi.dds
+  - type: 0
+    code: 26
+    messages:
+    - 525
+    - objects/props/street/paris_lantern_01/paris_lantern_01a_ddna.dds
+  - type: 0
+    code: 26
+    messages:
+    - 527
+    - objects/props/street/paris_lantern_01/paris_lantern_01a_diff.dds
+  - type: 0
+    code: 26
+    messages:
+    - 529
+    - objects/props/street/paris_lantern_01/paris_lantern_01a_spec.dds
+  - type: 0
+    code: 26
+    messages:
+    - 531
+    - textures/shared/tiling/bronze_01/bronze_01_diff.dds
+  - type: 0
+    code: 26
+    messages:
+    - 533
+    - objects/props/bistro/paris_cloths_01/paris_cloths_01_ddna.dds
+  - type: 0
+    code: 26
+    messages:
+    - 535
+    - objects/props/bistro/paris_cloths_01/paris_cloths_01_diff.dds
+  - type: 0
+    code: 26
+    messages:
+    - 537
+    - objects/structures/street/paris_curbstones_01_ddna.dds
+  - type: 0
+    code: 26
+    messages:
+    - 539
+    - objects/structures/street/paris_curbstones_01_diff.dds
+  - type: 0
+    code: 26
+    messages:
+    - 541
+    - textures/shared/tiling/pavement_cobblestone_small_01/pavement_cobblestone_small_01_ddna.dds
+  - type: 0
+    code: 26
+    messages:
+    - 543
+    - textures/shared/tiling/pavement_cobblestone_small_01/pavement_cobblestone_small_01_diff.dds
+  - type: 0
+    code: 26
+    messages:
+    - 545
+    - textures/shared/tiling/pavement_cobblestone_big_01/pavement_cobblestone_big_01_ddna.dds
+  - type: 0
+    code: 26
+    messages:
+    - 547
+    - textures/shared/tiling/pavement_cobblestone_big_01/pavement_cobblestone_big_01_diff.dds
+  - type: 0
+    code: 26
+    messages:
+    - 549
+    - textures/shared/tiling/pavement_brick_01/pavement_brick_01_ddna.dds
+  - type: 0
+    code: 26
+    messages:
+    - 551
+    - textures/shared/tiling/pavement_brick_01/pavement_brick_01_diff.dds
+  - type: 0
+    code: 26
+    messages:
+    - 553
+    - textures/shared/tiling/pavement_cobblestone_03/pavement_cobblestone_03_ddna.dds
+  - type: 0
+    code: 26
+    messages:
+    - 555
+    - textures/shared/tiling/pavement_cobblestone_03/pavement_cobblestone_03_diff.dds
+  - type: 0
+    code: 26
+    messages:
+    - 557
+    - textures/shared/tiling/ground_wet_01/ground_wet_01_ddna.dds
+  - type: 0
+    code: 26
+    messages:
+    - 559
+    - textures/shared/tiling/ground_wet_01/ground_wet_01_diff.dds
+  - type: 0
+    code: 26
+    messages:
+    - 561
+    - objects/props/street/paris_manholecover_01/paris_manholecover_01b/paris_manholecover_01b_ddna.dds
+  - type: 0
+    code: 26
+    messages:
+    - 563
+    - objects/props/street/paris_manholecover_01/paris_manholecover_01b/paris_manholecover_01b_diff.dds
+  - type: 0
+    code: 26
+    messages:
+    - 565
+    - objects/props/street/paris_manholecover_01/paris_manholecover_01b/paris_manholecover_01b_spec.dds
+  - type: 0
+    code: 26
+    messages:
+    - 567
+    - textures/shared/tiling/pavement_cobblestone_02/cobble_02b_ddna.dds
+  - type: 0
+    code: 26
+    messages:
+    - 569
+    - textures/shared/tiling/pavement_cobblestone_02/cobble_02b_diff.dds
+  - type: 0
+    code: 26
+    messages:
+    - 571
+    - textures/shared/tiling/pavement_cobblestone_01/pavement_cobblestone_01_b_ddna.dds
+  - type: 0
+    code: 26
+    messages:
+    - 573
+    - textures/shared/tiling/pavement_cobblestone_01/pavement_cobblestone_01_b_diff.dds
+  - type: 0
+    code: 26
+    messages:
+    - 575
+    - objects/props/street/paris_streetpivot/paris_streetpivot_ddna.dds
+  - type: 0
+    code: 26
+    messages:
+    - 577
+    - objects/props/street/paris_streetpivot/paris_streetpivot_diff.dds
+  - type: 0
+    code: 26
+    messages:
+    - 579
+    - objects/natural/bushes/buxus/buxus_ddna.dds
+  - type: 0
+    code: 26
+    messages:
+    - 581
+    - objects/natural/bushes/buxus/buxus_diff.dds
+  - type: 0
+    code: 26
+    messages:
+    - 583
+    - objects/natural/ground/forest_ground/forest_ground_diff.dds
+  - type: 0
+    code: 26
+    messages:
+    - 585
+    - objects/natural/ground/forest_ground/forest_rocks_diff.dds
+  - type: 0
+    code: 26
+    messages:
+    - 587
+    - objects/props/bistro/paris_wall_light_interior_01/paris_wall_light_interior_emi.dds
+  - type: 0
+    code: 26
+    messages:
+    - 589
+    - objects/props/bistro/paris_wall_light_interior_01/paris_wall_light_interior_ddna.dds
+  - type: 0
+    code: 26
+    messages:
+    - 591
+    - objects/props/bistro/paris_wall_light_interior_01/paris_wall_light_interior_diff.dds
+  - type: 0
+    code: 26
+    messages:
+    - 593
+    - objects/props/bistro/paris_wall_light_interior_01/paris_wall_light_interior_spec.dds
+  - type: 0
+    code: 26
+    messages:
+    - 595
+    - objects/props/street/paris_streetlight_01/paris_streetlight_glass_01_ddna.dds
+  - type: 0
+    code: 26
+    messages:
+    - 597
+    - objects/props/street/paris_streetlight_01/paris_streetlight_glass_01_diff.dds
+  - type: 0
+    code: 26
+    messages:
+    - 599
+    - objects/props/street/paris_streetlight_01/paris_streetlight_01_ddna.dds
+  - type: 0
+    code: 26
+    messages:
+    - 601
+    - objects/props/street/paris_streetlight_01/paris_streetlight_01_diff.dds
+  - type: 0
+    code: 26
+    messages:
+    - 603
+    - objects/props/street/paris_streetlight_01/paris_streetlight_01_spec.dds
+  - type: 0
+    code: 26
+    messages:
+    - 605
+    - objects/props/street/paris_streetlight_01/paris_streetlight_bulb_01_emmitance.dds
+  - type: 0
+    code: 26
+    messages:
+    - 607
+    - objects/props/street/paris_streetlight_01/paris_streetlight_bulb_01_diff.dds
+  - type: 0
+    code: 26
+    messages:
+    - 609
+    - textures/decals/street_decals_ddna.dds
+  - type: 0
+    code: 26
+    messages:
+    - 611
+    - textures/decals/street_decals_diff.dds
+  - type: 0
+    code: 26
+    messages:
+    - 613
+    - textures/decals/street_decals_spec.dds
+  - type: 0
+    code: 26
+    messages:
+    - 615
+    - objects/props/street/paris_shopsign_01/paris_shopsign_bakery_diff.dds
+  - type: 0
+    code: 26
+    messages:
+    - 617
+    - objects/props/street/paris_shopsign_01/paris_shopsign_bakery_ddna.dds
+  - type: 0
+    code: 26
+    messages:
+    - 619
+    - objects/props/street/paris_shopsign_01/paris_shopsign_bakery_spec.dds
+  - type: 0
+    code: 26
+    messages:
+    - 621
+    - objects/props/street/paris_shopsign_01/paris_shopsign_ties_shop_ddna.dds
+  - type: 0
+    code: 26
+    messages:
+    - 623
+    - objects/props/street/paris_shopsign_01/paris_shopsign_ties_shop_diff.dds
+  - type: 0
+    code: 26
+    messages:
+    - 625
+    - objects/props/street/paris_shopsign_01/paris_shopsign_ties_shop_spec.dds
+  - type: 0
+    code: 26
+    messages:
+    - 627
+    - objects/props/bistro/paris_ceiling_lamp_01/paris_ceiling_lamp_01_emi.dds
+  - type: 0
+    code: 26
+    messages:
+    - 629
+    - objects/props/bistro/paris_ceiling_lamp_01/paris_ceiling_lamp_01_ddna.dds
+  - type: 0
+    code: 26
+    messages:
+    - 631
+    - objects/props/bistro/paris_ceiling_lamp_01/paris_ceiling_lamp_01_diff.dds
+  - type: 0
+    code: 26
+    messages:
+    - 633
+    - objects/props/bistro/paris_ceiling_lamp_01/paris_ceiling_lamp_01_spec.dds
+  - type: 0
+    code: 26
+    messages:
+    - 635
+    - objects/props/street/paris_bistrofrontbanner_01/paris_bistrofrontbanner_01_emt.dds
+  - type: 0
+    code: 26
+    messages:
+    - 637
+    - objects/props/street/paris_bistrofrontbanner_01/paris_bistrofrontbanner_01_ddna.dds
+  - type: 0
+    code: 26
+    messages:
+    - 639
+    - objects/props/street/paris_bistrofrontbanner_01/paris_bistrofrontbanner_01_diff.dds
+  - type: 0
+    code: 26
+    messages:
+    - 641
+    - objects/props/street/paris_bistrofrontbanner_01/paris_bistrofrontbanner_01_spec.dds
+  - type: 0
+    code: 26
+    messages:
+    - 643
+    - objects/props/street/paris_bistrofrontbanner_01/bistro_frontbannerletters_emt.dds
+  - type: 0
+    code: 26
+    messages:
+    - 645
+    - objects/props/street/paris_shopsign_01/paris_shopsign_bookshop_emt.dds
+  - type: 0
+    code: 26
+    messages:
+    - 647
+    - objects/props/street/paris_shopsign_01/paris_shopsign_bookshop_ddna.dds
+  - type: 0
+    code: 26
+    messages:
+    - 649
+    - objects/props/street/paris_shopsign_01/paris_shopsign_bookshop_diff.dds
+  - type: 0
+    code: 26
+    messages:
+    - 651
+    - textures/shared/tiling/metal_hexagonal_grid_01/metal_hexagonal_grid_01_ddna.dds
+  - type: 0
+    code: 26
+    messages:
+    - 653
+    - textures/shared/tiling/metal_hexagonal_grid_01/metal_hexagonal_grid_01_spec.dds
+  - type: 0
+    code: 26
+    messages:
+    - 655
+    - textures/shared/tiling/brushed_metal_01/paris_brushed_metal_diff.dds
+  - type: 0
+    code: 26
+    messages:
+    - 657
+    - textures/shared/tiling/brushed_metal_01/paris_brushed_metal_spec.dds
+  - type: 0
+    code: 26
+    messages:
+    - 659
+    - textures/shared/tiling/tile_hexagonal_01/tile_hexagonal_01_ddna.dds
+  - type: 0
+    code: 26
+    messages:
+    - 661
+    - textures/shared/tiling/tile_hexagonal_01/tile_hexagonal_01_diff.dds
+  - type: 0
+    code: 26
+    messages:
+    - 663
+    - objects/props/bistro/paris_curtain_01/paris_curtain_01a_ddna.dds
+  - type: 0
+    code: 26
+    messages:
+    - 665
+    - objects/props/bistro/paris_curtain_01/paris_curtain_01a_diff.dds
+  - type: 0
+    code: 26
+    messages:
+    - 667
+    - objects/props/bistro/paris_curtain_01/paris_curtain_01a_spec.dds
+  - type: 0
+    code: 26
+    messages:
+    - 669
+    - objects/props/bistro/paris_curtain_01/paris_curtain_01b_ddna.dds
+  - type: 0
+    code: 26
+    messages:
+    - 671
+    - objects/props/bistro/paris_curtain_01/paris_curtain_01b_diff.dds
+  - type: 0
+    code: 26
+    messages:
+    - 673
+    - objects/props/bistro/paris_curtain_01/paris_curtain_01b_spec.dds
+  - type: 0
+    code: 26
+    messages:
+    - 675
+    - textures/shared/tiling/bar_trim_01/paris_bartrim_01a_ddna.dds
+  - type: 0
+    code: 26
+    messages:
+    - 677
+    - textures/shared/tiling/bar_trim_01/paris_bartrim_01a_diff.dds
+  - type: 0
+    code: 26
+    messages:
+    - 679
+    - textures/shared/tiling/bar_trim_01/paris_bartrim_01a_spec.dds
+  - type: 0
+    code: 26
+    messages:
+    - 681
+    - objects/props/street/paris_shopsign_01/paris_shopsign_pharmacy_emt.dds
+  - type: 0
+    code: 26
+    messages:
+    - 683
+    - objects/props/street/paris_shopsign_01/paris_shopsign_pharmacy_ddna.dds
+  - type: 0
+    code: 26
+    messages:
+    - 685
+    - objects/props/street/paris_shopsign_01/paris_shopsign_pharmacy_diff.dds
+  - type: 0
+    code: 43
+    messages:
+    - Couldn't load texture at Assets\Art\RTXPTAssets\Models\Bistro\objects\props\bistro\paris_ceilingfan_01\paris_ceilingfan_01a_em.png
+    - 0
+  - type: 0
+    code: 45
+    messages:
+    - 2
+  - type: 0
+    code: 45
+    messages:
+    - 3
+  - type: 0
+    code: 45
+    messages:
+    - 1
+  - type: 0
+    code: 45
+    messages:
+    - 0
+  - type: 0
+    code: 45
+    messages:
+    - 4
+  - type: 0
+    code: 45
+    messages:
+    - 6
+  - type: 0
+    code: 45
+    messages:
+    - 7
+  - type: 0
+    code: 45
+    messages:
+    - 5
+  - type: 0
+    code: 45
+    messages:
+    - 9
+  - type: 0
+    code: 45
+    messages:
+    - 10
+  - type: 0
+    code: 45
+    messages:
+    - 8
+  - type: 0
+    code: 45
+    messages:
+    - 12
+  - type: 0
+    code: 45
+    messages:
+    - 13
+  - type: 0
+    code: 45
+    messages:
+    - 11
+  - type: 0
+    code: 45
+    messages:
+    - 15
+  - type: 0
+    code: 45
+    messages:
+    - 16
+  - type: 0
+    code: 45
+    messages:
+    - 14
+  - type: 0
+    code: 45
+    messages:
+    - 18
+  - type: 0
+    code: 45
+    messages:
+    - 19
+  - type: 0
+    code: 45
+    messages:
+    - 17
+  - type: 0
+    code: 45
+    messages:
+    - 21
+  - type: 0
+    code: 45
+    messages:
+    - 22
+  - type: 0
+    code: 45
+    messages:
+    - 20
+  - type: 0
+    code: 45
+    messages:
+    - 24
+  - type: 0
+    code: 45
+    messages:
+    - 25
+  - type: 0
+    code: 45
+    messages:
+    - 23
+  - type: 0
+    code: 45
+    messages:
+    - 27
+  - type: 0
+    code: 45
+    messages:
+    - 28
+  - type: 0
+    code: 45
+    messages:
+    - 26
+  - type: 2
+    code: 31
+    messages: []
+  - type: 0
+    code: 45
+    messages:
+    - 32
+  - type: 0
+    code: 45
+    messages:
+    - 31
+  - type: 0
+    code: 45
+    messages:
+    - 34
+  - type: 0
+    code: 45
+    messages:
+    - 33
+  - type: 0
+    code: 45
+    messages:
+    - 36
+  - type: 0
+    code: 45
+    messages:
+    - 35
+  - type: 0
+    code: 45
+    messages:
+    - 37
+  - type: 0
+    code: 45
+    messages:
+    - 40
+  - type: 0
+    code: 45
+    messages:
+    - 39
+  - type: 0
+    code: 45
+    messages:
+    - 12
+  - type: 0
+    code: 45
+    messages:
+    - 41
+  - type: 0
+    code: 45
+    messages:
+    - 43
+  - type: 0
+    code: 45
+    messages:
+    - 42
+  - type: 0
+    code: 45
+    messages:
+    - 44
+  - type: 0
+    code: 45
+    messages:
+    - 7
+  - type: 0
+    code: 45
+    messages:
+    - 5
+  - type: 0
+    code: 45
+    messages:
+    - 46
+  - type: 0
+    code: 45
+    messages:
+    - 47
+  - type: 0
+    code: 45
+    messages:
+    - 45
+  - type: 0
+    code: 45
+    messages:
+    - 37
+  - type: 0
+    code: 45
+    messages:
+    - 49
+  - type: 0
+    code: 45
+    messages:
+    - 48
+  - type: 0
+    code: 45
+    messages:
+    - 51
+  - type: 0
+    code: 45
+    messages:
+    - 50
+  - type: 0
+    code: 45
+    messages:
+    - 12
+  - type: 0
+    code: 45
+    messages:
+    - 13
+  - type: 0
+    code: 45
+    messages:
+    - 11
+  - type: 0
+    code: 45
+    messages:
+    - 49
+  - type: 0
+    code: 45
+    messages:
+    - 48
+  - type: 0
+    code: 45
+    messages:
+    - 53
+  - type: 0
+    code: 45
+    messages:
+    - 54
+  - type: 0
+    code: 45
+    messages:
+    - 52
+  - type: 0
+    code: 45
+    messages:
+    - 38
+  - type: 0
+    code: 45
+    messages:
+    - 55
+  - type: 0
+    code: 45
+    messages:
+    - 37
+  - type: 0
+    code: 45
+    messages:
+    - 57
+  - type: 0
+    code: 45
+    messages:
+    - 58
+  - type: 0
+    code: 45
+    messages:
+    - 56
+  - type: 0
+    code: 45
+    messages:
+    - 38
+  - type: 0
+    code: 45
+    messages:
+    - 37
+  - type: 0
+    code: 45
+    messages:
+    - 60
+  - type: 0
+    code: 45
+    messages:
+    - 59
+  - type: 0
+    code: 45
+    messages:
+    - 49
+  - type: 0
+    code: 45
+    messages:
+    - 48
+  - type: 2
+    code: 31
+    messages: []
+  - type: 0
+    code: 45
+    messages:
+    - 32
+  - type: 0
+    code: 45
+    messages:
+    - 31
+  - type: 0
+    code: 45
+    messages:
+    - 36
+  - type: 0
+    code: 45
+    messages:
+    - 35
+  - type: 0
+    code: 45
+    messages:
+    - 32
+  - type: 0
+    code: 45
+    messages:
+    - 41
+  - type: 0
+    code: 45
+    messages:
+    - 62
+  - type: 0
+    code: 45
+    messages:
+    - 61
+  - type: 0
+    code: 45
+    messages:
+    - 34
+  - type: 0
+    code: 45
+    messages:
+    - 33
+  - type: 0
+    code: 45
+    messages:
+    - 64
+  - type: 0
+    code: 45
+    messages:
+    - 63
+  - type: 0
+    code: 45
+    messages:
+    - 34
+  - type: 0
+    code: 45
+    messages:
+    - 33
+  - type: 0
+    code: 45
+    messages:
+    - 12
+  - type: 0
+    code: 45
+    messages:
+    - 41
+  - type: 0
+    code: 45
+    messages:
+    - 40
+  - type: 0
+    code: 45
+    messages:
+    - 39
+  - type: 0
+    code: 45
+    messages:
+    - 43
+  - type: 0
+    code: 45
+    messages:
+    - 42
+  - type: 0
+    code: 45
+    messages:
+    - 66
+  - type: 0
+    code: 45
+    messages:
+    - 67
+  - type: 0
+    code: 45
+    messages:
+    - 69
+  - type: 0
+    code: 45
+    messages:
+    - 68
+  - type: 0
+    code: 45
+    messages:
+    - 38
+  - type: 0
+    code: 45
+    messages:
+    - 70
+  - type: 0
+    code: 45
+    messages:
+    - 37
+  - type: 0
+    code: 45
+    messages:
+    - 72
+  - type: 0
+    code: 45
+    messages:
+    - 73
+  - type: 0
+    code: 45
+    messages:
+    - 71
+  - type: 0
+    code: 45
+    messages:
+    - 75
+  - type: 0
+    code: 45
+    messages:
+    - 76
+  - type: 0
+    code: 45
+    messages:
+    - 74
+  - type: 0
+    code: 45
+    messages:
+    - 78
+  - type: 0
+    code: 45
+    messages:
+    - 77
+  - type: 0
+    code: 45
+    messages:
+    - 79
+  - type: 2
+    code: 31
+    messages: []
+  - type: 0
+    code: 45
+    messages:
+    - 83
+  - type: 0
+    code: 45
+    messages:
+    - 84
+  - type: 0
+    code: 45
+    messages:
+    - 82
+  - type: 0
+    code: 45
+    messages:
+    - 86
+  - type: 0
+    code: 45
+    messages:
+    - 87
+  - type: 0
+    code: 45
+    messages:
+    - 85
+  - type: 0
+    code: 45
+    messages:
+    - 49
+  - type: 0
+    code: 45
+    messages:
+    - 48
+  - type: 2
+    code: 31
+    messages: []
+  - type: 2
+    code: 31
+    messages: []
+  - type: 0
+    code: 45
+    messages:
+    - 75
+  - type: 0
+    code: 45
+    messages:
+    - 88
+  - type: 0
+    code: 45
+    messages:
+    - 33
+  - type: 0
+    code: 45
+    messages:
+    - 88
+  - type: 0
+    code: 45
+    messages:
+    - 33
+  - type: 0
+    code: 45
+    messages:
+    - 88
+  - type: 0
+    code: 45
+    messages:
+    - 89
+  - type: 0
+    code: 45
+    messages:
+    - 33
+  - type: 0
+    code: 45
+    messages:
+    - 91
+  - type: 0
+    code: 45
+    messages:
+    - 92
+  - type: 0
+    code: 45
+    messages:
+    - 90
+  - type: 0
+    code: 45
+    messages:
+    - 93
+  - type: 0
+    code: 45
+    messages:
+    - 94
+  - type: 0
+    code: 45
+    messages:
+    - 33
+  - type: 0
+    code: 45
+    messages:
+    - 96
+  - type: 0
+    code: 45
+    messages:
+    - 95
+  - type: 0
+    code: 45
+    messages:
+    - 98
+  - type: 0
+    code: 45
+    messages:
+    - 97
+  - type: 2
+    code: 31
+    messages: []
+  - type: 0
+    code: 45
+    messages:
+    - 99
+  - type: 0
+    code: 45
+    messages:
+    - 32
+  - type: 0
+    code: 45
+    messages:
+    - 41
+  - type: 0
+    code: 45
+    messages:
+    - 72
+  - type: 0
+    code: 45
+    messages:
+    - 73
+  - type: 0
+    code: 45
+    messages:
+    - 71
+  - type: 0
+    code: 45
+    messages:
+    - 34
+  - type: 0
+    code: 45
+    messages:
+    - 33
+  - type: 0
+    code: 45
+    messages:
+    - 101
+  - type: 0
+    code: 45
+    messages:
+    - 100
+  - type: 0
+    code: 45
+    messages:
+    - 102
+  - type: 0
+    code: 45
+    messages:
+    - 10
+  - type: 0
+    code: 45
+    messages:
+    - 8
+  - type: 0
+    code: 45
+    messages:
+    - 103
+  - type: 0
+    code: 45
+    messages:
+    - 6
+  - type: 0
+    code: 45
+    messages:
+    - 7
+  - type: 0
+    code: 45
+    messages:
+    - 5
+  - type: 0
+    code: 45
+    messages:
+    - 105
+  - type: 0
+    code: 45
+    messages:
+    - 104
+  - type: 0
+    code: 45
+    messages:
+    - 78
+  - type: 0
+    code: 45
+    messages:
+    - 77
+  - type: 0
+    code: 45
+    messages:
+    - 34
+  - type: 0
+    code: 45
+    messages:
+    - 33
+  - type: 0
+    code: 45
+    messages:
+    - 107
+  - type: 0
+    code: 45
+    messages:
+    - 108
+  - type: 0
+    code: 45
+    messages:
+    - 106
+  - type: 0
+    code: 45
+    messages:
+    - 110
+  - type: 0
+    code: 45
+    messages:
+    - 109
+  - type: 0
+    code: 45
+    messages:
+    - 112
+  - type: 0
+    code: 45
+    messages:
+    - 113
+  - type: 0
+    code: 45
+    messages:
+    - 111
+  - type: 0
+    code: 45
+    messages:
+    - 107
+  - type: 0
+    code: 45
+    messages:
+    - 108
+  - type: 0
+    code: 45
+    messages:
+    - 106
+  - type: 0
+    code: 45
+    messages:
+    - 115
+  - type: 0
+    code: 45
+    messages:
+    - 116
+  - type: 0
+    code: 45
+    messages:
+    - 114
+  - type: 0
+    code: 45
+    messages:
+    - 60
+  - type: 0
+    code: 45
+    messages:
+    - 59
+  - type: 0
+    code: 45
+    messages:
+    - 34
+  - type: 0
+    code: 45
+    messages:
+    - 33
+  - type: 0
+    code: 45
+    messages:
+    - 34
+  - type: 0
+    code: 45
+    messages:
+    - 33
+  - type: 0
+    code: 45
+    messages:
+    - 117
+  - type: 0
+    code: 45
+    messages:
+    - 53
+  - type: 0
+    code: 45
+    messages:
+    - 52
+  - type: 0
+    code: 45
+    messages:
+    - 119
+  - type: 0
+    code: 45
+    messages:
+    - 120
+  - type: 0
+    code: 45
+    messages:
+    - 118
+  - type: 0
+    code: 45
+    messages:
+    - 96
+  - type: 0
+    code: 45
+    messages:
+    - 95
+  - type: 0
+    code: 45
+    messages:
+    - 15
+  - type: 0
+    code: 45
+    messages:
+    - 14
+  - type: 0
+    code: 45
+    messages:
+    - 122
+  - type: 0
+    code: 45
+    messages:
+    - 123
+  - type: 0
+    code: 45
+    messages:
+    - 121
+  - type: 0
+    code: 45
+    messages:
+    - 125
+  - type: 0
+    code: 45
+    messages:
+    - 126
+  - type: 0
+    code: 45
+    messages:
+    - 124
+  - type: 0
+    code: 45
+    messages:
+    - 128
+  - type: 0
+    code: 45
+    messages:
+    - 129
+  - type: 0
+    code: 45
+    messages:
+    - 127
+  - type: 0
+    code: 45
+    messages:
+    - 130
+  - type: 0
+    code: 45
+    messages:
+    - 132
+  - type: 0
+    code: 45
+    messages:
+    - 133
+  - type: 0
+    code: 45
+    messages:
+    - 131
+  - type: 0
+    code: 45
+    messages:
+    - 135
+  - type: 0
+    code: 45
+    messages:
+    - 136
+  - type: 0
+    code: 45
+    messages:
+    - 134
+  - type: 0
+    code: 45
+    messages:
+    - 138
+  - type: 0
+    code: 45
+    messages:
+    - 139
+  - type: 0
+    code: 45
+    messages:
+    - 137
+  - type: 0
+    code: 45
+    messages:
+    - 141
+  - type: 0
+    code: 45
+    messages:
+    - 142
+  - type: 0
+    code: 45
+    messages:
+    - 140
+  - type: 0
+    code: 45
+    messages:
+    - 144
+  - type: 0
+    code: 45
+    messages:
+    - 145
+  - type: 0
+    code: 45
+    messages:
+    - 143
+  - type: 0
+    code: 45
+    messages:
+    - 147
+  - type: 0
+    code: 45
+    messages:
+    - 148
+  - type: 0
+    code: 45
+    messages:
+    - 146
+  - type: 2
+    code: 31
+    messages: []
+  - type: 0
+    code: 45
+    messages:
+    - 150
+  - type: 0
+    code: 45
+    messages:
+    - 151
+  - type: 0
+    code: 45
+    messages:
+    - 149
+  - type: 0
+    code: 45
+    messages:
+    - 153
+  - type: 0
+    code: 45
+    messages:
+    - 152
+  - type: 0
+    code: 45
+    messages:
+    - 155
+  - type: 0
+    code: 45
+    messages:
+    - 154
+  - type: 0
+    code: 45
+    messages:
+    - 157
+  - type: 0
+    code: 45
+    messages:
+    - 156
+  - type: 0
+    code: 45
+    messages:
+    - 159
+  - type: 0
+    code: 45
+    messages:
+    - 158
+  - type: 0
+    code: 45
+    messages:
+    - 161
+  - type: 0
+    code: 45
+    messages:
+    - 160
+  - type: 0
+    code: 45
+    messages:
+    - 163
+  - type: 0
+    code: 45
+    messages:
+    - 162
+  - type: 0
+    code: 45
+    messages:
+    - 163
+  - type: 0
+    code: 45
+    messages:
+    - 162
+  - type: 0
+    code: 45
+    messages:
+    - 164
+  - type: 0
+    code: 45
+    messages:
+    - 165
+  - type: 0
+    code: 45
+    messages:
+    - 167
+  - type: 0
+    code: 45
+    messages:
+    - 166
+  - type: 0
+    code: 45
+    messages:
+    - 169
+  - type: 0
+    code: 45
+    messages:
+    - 168
+  - type: 0
+    code: 45
+    messages:
+    - 171
+  - type: 0
+    code: 45
+    messages:
+    - 172
+  - type: 0
+    code: 45
+    messages:
+    - 170
+  - type: 0
+    code: 45
+    messages:
+    - 174
+  - type: 0
+    code: 45
+    messages:
+    - 175
+  - type: 0
+    code: 45
+    messages:
+    - 173
+  - type: 0
+    code: 45
+    messages:
+    - 177
+  - type: 0
+    code: 45
+    messages:
+    - 176
+  - type: 0
+    code: 45
+    messages:
+    - 179
+  - type: 0
+    code: 45
+    messages:
+    - 178
+  - type: 0
+    code: 45
+    messages:
+    - 181
+  - type: 0
+    code: 45
+    messages:
+    - 182
+  - type: 0
+    code: 45
+    messages:
+    - 180
+  - type: 0
+    code: 45
+    messages:
+    - 181
+  - type: 0
+    code: 45
+    messages:
+    - 182
+  - type: 0
+    code: 45
+    messages:
+    - 180
+  - type: 0
+    code: 45
+    messages:
+    - 181
+  - type: 0
+    code: 45
+    messages:
+    - 182
+  - type: 0
+    code: 45
+    messages:
+    - 180
+  - type: 0
+    code: 45
+    messages:
+    - 180
+  - type: 2
+    code: 31
+    messages: []
+  - type: 0
+    code: 45
+    messages:
+    - 184
+  - type: 0
+    code: 45
+    messages:
+    - 183
+  - type: 0
+    code: 45
+    messages:
+    - 30
+  - type: 0
+    code: 45
+    messages:
+    - 186
+  - type: 0
+    code: 45
+    messages:
+    - 185
+  - type: 0
+    code: 45
+    messages:
+    - 188
+  - type: 0
+    code: 45
+    messages:
+    - 187
+  - type: 0
+    code: 45
+    messages:
+    - 189
+  - type: 0
+    code: 45
+    messages:
+    - 191
+  - type: 0
+    code: 45
+    messages:
+    - 192
+  - type: 0
+    code: 45
+    messages:
+    - 190
+  - type: 0
+    code: 45
+    messages:
+    - 194
+  - type: 0
+    code: 45
+    messages:
+    - 195
+  - type: 0
+    code: 45
+    messages:
+    - 193
+  - type: 0
+    code: 45
+    messages:
+    - 197
+  - type: 0
+    code: 45
+    messages:
+    - 196
+  - type: 0
+    code: 45
+    messages:
+    - 115
+  - type: 0
+    code: 45
+    messages:
+    - 198
+  - type: 0
+    code: 45
+    messages:
+    - 114
+  - type: 0
+    code: 45
+    messages:
+    - 197
+  - type: 0
+    code: 45
+    messages:
+    - 196
+  - type: 0
+    code: 45
+    messages:
+    - 75
+  - type: 0
+    code: 45
+    messages:
+    - 76
+  - type: 0
+    code: 45
+    messages:
+    - 74
+  - type: 0
+    code: 45
+    messages:
+    - 75
+  - type: 0
+    code: 45
+    messages:
+    - 79
+  - type: 2
+    code: 31
+    messages: []
+  - type: 0
+    code: 45
+    messages:
+    - 78
+  - type: 0
+    code: 45
+    messages:
+    - 77
+  - type: 0
+    code: 45
+    messages:
+    - 200
+  - type: 0
+    code: 45
+    messages:
+    - 201
+  - type: 0
+    code: 45
+    messages:
+    - 199
+  - type: 0
+    code: 45
+    messages:
+    - 203
+  - type: 0
+    code: 45
+    messages:
+    - 204
+  - type: 0
+    code: 45
+    messages:
+    - 202
+  - type: 0
+    code: 45
+    messages:
+    - 197
+  - type: 0
+    code: 45
+    messages:
+    - 196
+  - type: 0
+    code: 45
+    messages:
+    - 130
+  - type: 0
+    code: 45
+    messages:
+    - 132
+  - type: 0
+    code: 45
+    messages:
+    - 133
+  - type: 0
+    code: 45
+    messages:
+    - 131
+  - type: 0
+    code: 45
+    messages:
+    - 135
+  - type: 0
+    code: 45
+    messages:
+    - 136
+  - type: 0
+    code: 45
+    messages:
+    - 134
+  - type: 0
+    code: 45
+    messages:
+    - 205
+  - type: 0
+    code: 45
+    messages:
+    - 205
+  - type: 0
+    code: 45
+    messages:
+    - 205
+  - type: 0
+    code: 45
+    messages:
+    - 205
+  - type: 0
+    code: 45
+    messages:
+    - 115
+  - type: 0
+    code: 45
+    messages:
+    - 198
+  - type: 0
+    code: 45
+    messages:
+    - 114
+  - type: 0
+    code: 45
+    messages:
+    - 135
+  - type: 0
+    code: 45
+    messages:
+    - 136
+  - type: 0
+    code: 45
+    messages:
+    - 134
+  - type: 2
+    code: 31
+    messages: []
+  - type: 0
+    code: 45
+    messages:
+    - 78
+  - type: 0
+    code: 45
+    messages:
+    - 206
+  - type: 0
+    code: 45
+    messages:
+    - 77
+  - type: 0
+    code: 45
+    messages:
+    - 208
+  - type: 0
+    code: 45
+    messages:
+    - 209
+  - type: 0
+    code: 45
+    messages:
+    - 207
+  - type: 0
+    code: 45
+    messages:
+    - 211
+  - type: 0
+    code: 45
+    messages:
+    - 212
+  - type: 0
+    code: 45
+    messages:
+    - 210
+  - type: 0
+    code: 45
+    messages:
+    - 213
+  - type: 0
+    code: 45
+    messages:
+    - 215
+  - type: 0
+    code: 45
+    messages:
+    - 214
+  - type: 0
+    code: 45
+    messages:
+    - 128
+  - type: 0
+    code: 45
+    messages:
+    - 129
+  - type: 0
+    code: 45
+    messages:
+    - 127
+  - type: 2
+    code: 31
+    messages: []
+  - type: 0
+    code: 45
+    messages:
+    - 217
+  - type: 0
+    code: 45
+    messages:
+    - 218
+  - type: 0
+    code: 45
+    messages:
+    - 216
+  - type: 0
+    code: 45
+    messages:
+    - 220
+  - type: 0
+    code: 45
+    messages:
+    - 221
+  - type: 0
+    code: 45
+    messages:
+    - 219
+  - type: 0
+    code: 45
+    messages:
+    - 222
+  - type: 0
+    code: 45
+    messages:
+    - 73
+  - type: 0
+    code: 45
+    messages:
+    - 71
+  - type: 0
+    code: 45
+    messages:
+    - 222
+  - type: 0
+    code: 45
+    messages:
+    - 71
+  - type: 0
+    code: 45
+    messages:
+    - 224
+  - type: 0
+    code: 45
+    messages:
+    - 225
+  - type: 0
+    code: 45
+    messages:
+    - 223
+  - type: 2
+    code: 31
+    messages: []
+  - type: 0
+    code: 45
+    messages:
+    - 227
+  - type: 0
+    code: 45
+    messages:
+    - 228
+  - type: 0
+    code: 45
+    messages:
+    - 226
+  - type: 0
+    code: 45
+    messages:
+    - 230
+  - type: 0
+    code: 45
+    messages:
+    - 231
+  - type: 0
+    code: 45
+    messages:
+    - 229
+  - type: 0
+    code: 45
+    messages:
+    - 233
+  - type: 0
+    code: 45
+    messages:
+    - 234
+  - type: 0
+    code: 45
+    messages:
+    - 232
+  - type: 2
+    code: 31
+    messages: []
+  - type: 0
+    code: 45
+    messages:
+    - 115
+  - type: 0
+    code: 45
+    messages:
+    - 198
+  - type: 0
+    code: 45
+    messages:
+    - 114
+  - type: 0
+    code: 45
+    messages:
+    - 236
+  - type: 0
+    code: 45
+    messages:
+    - 237
+  - type: 0
+    code: 45
+    messages:
+    - 235
+  - type: 0
+    code: 45
+    messages:
+    - 57
+  - type: 0
+    code: 45
+    messages:
+    - 58
+  - type: 0
+    code: 45
+    messages:
+    - 56
+  - type: 0
+    code: 45
+    messages:
+    - 238
+  - type: 2
+    code: 31
+    messages: []
+  - type: 0
+    code: 45
+    messages:
+    - 238
+  - type: 2
+    code: 31
+    messages: []
+  - type: 0
+    code: 45
+    messages:
+    - 241
+  - type: 0
+    code: 45
+    messages:
+    - 242
+  - type: 0
+    code: 45
+    messages:
+    - 240
+  - type: 0
+    code: 45
+    messages:
+    - 243
+  - type: 0
+    code: 45
+    messages:
+    - 245
+  - type: 0
+    code: 45
+    messages:
+    - 246
+  - type: 0
+    code: 45
+    messages:
+    - 244
+  - type: 0
+    code: 45
+    messages:
+    - 248
+  - type: 0
+    code: 45
+    messages:
+    - 249
+  - type: 0
+    code: 45
+    messages:
+    - 247
+  - type: 0
+    code: 45
+    messages:
+    - 251
+  - type: 0
+    code: 45
+    messages:
+    - 252
+  - type: 0
+    code: 45
+    messages:
+    - 250
+  - type: 0
+    code: 45
+    messages:
+    - 57
+  - type: 0
+    code: 45
+    messages:
+    - 58
+  - type: 0
+    code: 45
+    messages:
+    - 56
+  - type: 0
+    code: 45
+    messages:
+    - 254
+  - type: 0
+    code: 45
+    messages:
+    - 255
+  - type: 0
+    code: 45
+    messages:
+    - 253
+  - type: 0
+    code: 45
+    messages:
+    - 78
+  - type: 0
+    code: 45
+    messages:
+    - 206
+  - type: 0
+    code: 45
+    messages:
+    - 77
+  - type: 0
+    code: 45
+    messages:
+    - 179
+  - type: 0
+    code: 45
+    messages:
+    - 178
+  - type: 0
+    code: 45
+    messages:
+    - 78
+  - type: 0
+    code: 45
+    messages:
+    - 206
+  - type: 0
+    code: 45
+    messages:
+    - 77
+  - type: 0
+    code: 45
+    messages:
+    - 57
+  - type: 0
+    code: 45
+    messages:
+    - 58
+  - type: 0
+    code: 45
+    messages:
+    - 56
+  - type: 0
+    code: 45
+    messages:
+    - 203
+  - type: 0
+    code: 45
+    messages:
+    - 204
+  - type: 0
+    code: 45
+    messages:
+    - 202
+  - type: 0
+    code: 45
+    messages:
+    - 88
+  - type: 0
+    code: 45
+    messages:
+    - 89
+  - type: 0
+    code: 45
+    messages:
+    - 33
+  - type: 2
+    code: 31
+    messages: []
+  - type: 0
+    code: 45
+    messages:
+    - 135
+  - type: 0
+    code: 45
+    messages:
+    - 136
+  - type: 0
+    code: 45
+    messages:
+    - 134
+  - type: 0
+    code: 45
+    messages:
+    - 78
+  - type: 0
+    code: 45
+    messages:
+    - 206
+  - type: 0
+    code: 45
+    messages:
+    - 77
+  - type: 0
+    code: 45
+    messages:
+    - 257
+  - type: 0
+    code: 45
+    messages:
+    - 256
+  - type: 0
+    code: 45
+    messages:
+    - 115
+  - type: 0
+    code: 45
+    messages:
+    - 116
+  - type: 0
+    code: 45
+    messages:
+    - 258
+  - type: 0
+    code: 45
+    messages:
+    - 260
+  - type: 0
+    code: 45
+    messages:
+    - 259
+  - type: 0
+    code: 45
+    messages:
+    - 263
+  - type: 0
+    code: 45
+    messages:
+    - 264
+  - type: 0
+    code: 45
+    messages:
+    - 262
+  - type: 0
+    code: 45
+    messages:
+    - 261
+  - type: 0
+    code: 45
+    messages:
+    - 265
+  - type: 0
+    code: 45
+    messages:
+    - 116
+  - type: 0
+    code: 45
+    messages:
+    - 258
+  - type: 0
+    code: 45
+    messages:
+    - 267
+  - type: 0
+    code: 45
+    messages:
+    - 266
+  - type: 0
+    code: 45
+    messages:
+    - 267
+  - type: 0
+    code: 45
+    messages:
+    - 266
+  - type: 0
+    code: 45
+    messages:
+    - 269
+  - type: 0
+    code: 45
+    messages:
+    - 268
+  - type: 0
+    code: 45
+    messages:
+    - 271
+  - type: 0
+    code: 45
+    messages:
+    - 270
+  - type: 0
+    code: 45
+    messages:
+    - 273
+  - type: 0
+    code: 45
+    messages:
+    - 272
+  - type: 0
+    code: 45
+    messages:
+    - 275
+  - type: 0
+    code: 45
+    messages:
+    - 274
+  - type: 0
+    code: 45
+    messages:
+    - 277
+  - type: 0
+    code: 45
+    messages:
+    - 276
+  - type: 0
+    code: 45
+    messages:
+    - 279
+  - type: 0
+    code: 45
+    messages:
+    - 278
+  - type: 0
+    code: 45
+    messages:
+    - 281
+  - type: 0
+    code: 45
+    messages:
+    - 282
+  - type: 0
+    code: 45
+    messages:
+    - 280
+  - type: 0
+    code: 45
+    messages:
+    - 284
+  - type: 0
+    code: 45
+    messages:
+    - 283
+  - type: 0
+    code: 45
+    messages:
+    - 284
+  - type: 0
+    code: 45
+    messages:
+    - 283
+  - type: 0
+    code: 45
+    messages:
+    - 286
+  - type: 0
+    code: 45
+    messages:
+    - 285
+  - type: 0
+    code: 45
+    messages:
+    - 286
+  - type: 0
+    code: 45
+    messages:
+    - 285
+  - type: 0
+    code: 45
+    messages:
+    - 98
+  - type: 0
+    code: 45
+    messages:
+    - 97
+  - type: 0
+    code: 45
+    messages:
+    - 12
+  - type: 0
+    code: 45
+    messages:
+    - 41
+  - type: 0
+    code: 45
+    messages:
+    - 288
+  - type: 0
+    code: 45
+    messages:
+    - 287
+  - type: 0
+    code: 45
+    messages:
+    - 290
+  - type: 0
+    code: 45
+    messages:
+    - 289
+  - type: 0
+    code: 45
+    messages:
+    - 167
+  - type: 0
+    code: 45
+    messages:
+    - 166
+  - type: 0
+    code: 45
+    messages:
+    - 291
+  - type: 0
+    code: 45
+    messages:
+    - 169
+  - type: 0
+    code: 45
+    messages:
+    - 168
+  - type: 0
+    code: 45
+    messages:
+    - 292
+  - type: 0
+    code: 45
+    messages:
+    - 295
+  - type: 0
+    code: 45
+    messages:
+    - 296
+  - type: 0
+    code: 45
+    messages:
+    - 294
+  - type: 0
+    code: 45
+    messages:
+    - 293
+  - type: 0
+    code: 45
+    messages:
+    - 297
+  - type: 2
+    code: 31
+    messages: []
+  - type: 0
+    code: 45
+    messages:
+    - 300
+  - type: 0
+    code: 45
+    messages:
+    - 301
+  - type: 0
+    code: 45
+    messages:
+    - 299
+  - type: 0
+    code: 45
+    messages:
+    - 303
+  - type: 0
+    code: 45
+    messages:
+    - 302
+  - type: 0
+    code: 45
+    messages:
+    - 205
+  - type: 0
+    code: 45
+    messages:
+    - 297
+  - type: 0
+    code: 45
+    messages:
+    - 305
+  - type: 0
+    code: 45
+    messages:
+    - 306
+  - type: 0
+    code: 45
+    messages:
+    - 304
+  - type: 0
+    code: 45
+    messages:
+    - 78
+  - type: 0
+    code: 45
+    messages:
+    - 77
+  - type: 0
+    code: 45
+    messages:
+    - 307
+  - type: 0
+    code: 45
+    messages:
+    - 309
+  - type: 0
+    code: 45
+    messages:
+    - 308
+  - type: 0
+    code: 45
+    messages:
+    - 307
+  - type: 0
+    code: 45
+    messages:
+    - 191
+  - type: 0
+    code: 45
+    messages:
+    - 192
+  - type: 0
+    code: 45
+    messages:
+    - 190
+  - type: 0
+    code: 45
+    messages:
+    - 239
+  - type: 0
+    code: 45
+    messages:
+    - 239
+  - type: 0
+    code: 45
+    messages:
+    - 239
+  - type: 0
+    code: 45
+    messages:
+    - 239
+  - type: 0
+    code: 45
+    messages:
+    - 239
+  - type: 0
+    code: 45
+    messages:
+    - 239
+  - type: 0
+    code: 45
+    messages:
+    - 263
+  - type: 0
+    code: 45
+    messages:
+    - 264
+  - type: 0
+    code: 45
+    messages:
+    - 262
+  - type: 0
+    code: 45
+    messages:
+    - 261
+  - type: 0
+    code: 45
+    messages:
+    - 2
+  - type: 0
+    code: 45
+    messages:
+    - 3
+  - type: 0
+    code: 45
+    messages:
+    - 1
+  - type: 0
+    code: 45
+    messages:
+    - 0
+  - type: 0
+    code: 45
+    messages:
+    - 311
+  - type: 0
+    code: 45
+    messages:
+    - 312
+  - type: 0
+    code: 45
+    messages:
+    - 310
+  - type: 0
+    code: 45
+    messages:
+    - 315
+  - type: 0
+    code: 45
+    messages:
+    - 316
+  - type: 0
+    code: 45
+    messages:
+    - 314
+  - type: 0
+    code: 45
+    messages:
+    - 313
+  - type: 0
+    code: 45
+    messages:
+    - 319
+  - type: 0
+    code: 45
+    messages:
+    - 320
+  - type: 0
+    code: 45
+    messages:
+    - 318
+  - type: 0
+    code: 45
+    messages:
+    - 317
+  - type: 0
+    code: 45
+    messages:
+    - 205
+  - type: 0
+    code: 45
+    messages:
+    - 321
+  - type: 0
+    code: 45
+    messages:
+    - 78
+  - type: 0
+    code: 45
+    messages:
+    - 77
+  - type: 0
+    code: 45
+    messages:
+    - 324
+  - type: 0
+    code: 45
+    messages:
+    - 323
+  - type: 0
+    code: 45
+    messages:
+    - 322
+  - type: 0
+    code: 45
+    messages:
+    - 12
+  - type: 0
+    code: 45
+    messages:
+    - 11
+  - type: 0
+    code: 45
+    messages:
+    - 222
+  - type: 0
+    code: 45
+    messages:
+    - 73
+  - type: 0
+    code: 45
+    messages:
+    - 71
+  - type: 0
+    code: 45
+    messages:
+    - 236
+  - type: 0
+    code: 45
+    messages:
+    - 73
+  - type: 0
+    code: 45
+    messages:
+    - 235
+  - type: 0
+    code: 45
+    messages:
+    - 12
+  - type: 0
+    code: 45
+    messages:
+    - 13
+  - type: 0
+    code: 45
+    messages:
+    - 11
+  - type: 0
+    code: 45
+    messages:
+    - 88
+  - type: 0
+    code: 45
+    messages:
+    - 89
+  - type: 0
+    code: 45
+    messages:
+    - 33
+  - type: 0
+    code: 45
+    messages:
+    - 205
+  - type: 0
+    code: 45
+    messages:
+    - 326
+  - type: 0
+    code: 45
+    messages:
+    - 325
+  - type: 0
+    code: 45
+    messages:
+    - 327
+  - type: 0
+    code: 45
+    messages:
+    - 328
+  - type: 0
+    code: 45
+    messages:
+    - 105
+  - type: 0
+    code: 45
+    messages:
+    - 104
+  - type: 0
+    code: 45
+    messages:
+    - 330
+  - type: 0
+    code: 45
+    messages:
+    - 329
+  - type: 2
+    code: 31
+    messages: []
+  - type: 0
+    code: 45
+    messages:
+    - 332
+  - type: 0
+    code: 45
+    messages:
+    - 333
+  - type: 0
+    code: 45
+    messages:
+    - 331
+  - type: 0
+    code: 45
+    messages:
+    - 335
+  - type: 0
+    code: 45
+    messages:
+    - 336
+  - type: 0
+    code: 45
+    messages:
+    - 334
+  - type: 0
+    code: 45
+    messages:
+    - 338
+  - type: 0
+    code: 45
+    messages:
+    - 339
+  - type: 0
+    code: 45
+    messages:
+    - 337
+  - type: 0
+    code: 45
+    messages:
+    - 239
+  - type: 0
+    code: 45
+    messages:
+    - 147
+  - type: 0
+    code: 45
+    messages:
+    - 148
+  - type: 0
+    code: 45
+    messages:
+    - 146
+  - type: 0
+    code: 45
+    messages:
+    - 263
+  - type: 0
+    code: 45
+    messages:
+    - 264
+  - type: 0
+    code: 45
+    messages:
+    - 262
+  - type: 0
+    code: 45
+    messages:
+    - 261
+  - type: 0
+    code: 45
+    messages:
+    - 12
+  - type: 0
+    code: 45
+    messages:
+    - 11
+  - type: 0
+    code: 45
+    messages:
+    - 342
+  - type: 0
+    code: 45
+    messages:
+    - 341
+  - type: 0
+    code: 45
+    messages:
+    - 340

@@ -1,0 +1,31 @@
+fileFormatVersion: 2
+guid: 736da13794b44aa8aa9ad182c3d4ae2b
+ScriptedImporter:
+  internalIDToNameTable: []
+  externalObjects: {}
+  serializedVersion: 2
+  userData:
+  assetBundleName:
+  assetBundleVariant:
+  script: {fileID: 11500000, guid: 027188e0fad048b1a20a4377aff4684c, type: 3}
+  additionalIncludePaths:
+  - ../RenderingPlugin/External/RTXPT/Rtxpt/ToneMapper
+  - ../RenderingPlugin/External/RTXPT/Rtxpt
+  - ../RenderingPlugin/External/RTXPT/External
+  - ../RenderingPlugin/External/donut/include
+  - ../RenderingPlugin/External/donut/shaders
+  extraArgs:
+  - -enable-16bit-types
+  defines:
+  - QUAD_Z=0
+  - TARGET_D3D12
+  - ENABLE_DEBUG_PRINT
+  vsEntryPoint: main
+  psEntryPoint: main
+  vsTargetProfile: vs_6_5
+  psTargetProfile: ps_6_9
+  rootConstantsHints: []
+  rootSRVHints: []
+  samplerBindings:
+  - Name: gColorSampler
+    Sampler: {fileID: 11400000, guid: 56b0e93e78c14055953d8d697b5a16fc, type: 2}

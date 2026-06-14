@@ -1,0 +1,8 @@
+/*
+* Thin verbatim wrapper around donut's passes/mipmapgen_cs.hlsl (MODE selected via the importer's
+* defines, MODE=0 = MODE_COLOR). Compiled cs_6_5 with MODE=0 + TARGET_D3D12 — the exact donut
+* framework configuration — so the DXIL hash matches the original RTXPT/donut MipMapGenPass shader.
+* Used by both the env-map baker (importance/radiance chains) and the tone-mapper luminance pyramid.
+*/
+
+#include "passes/mipmapgen_cs.hlsl"

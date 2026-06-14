@@ -11,16 +11,17 @@ void RayTraceDescriptorSet::Dispatch(
 {
     if (!m_shader || !m_shader->GetPSO() || !m_shader->GetRootSignature() || !m_allocator) return;
     if (!m_shader->GetRayGenTable() || !m_shader->GetMissTable() || !m_shader->GetHitGroupTable()) return;
+    if (m_shader->GetHitGroupCount() == 0) return; // RebuildHitGroupTable not yet run; skip DispatchRays
     if (!slots && slotCount > 0) return;
     if (!ValidateBindings(slots, slotCount)) return;
 
-    uint32_t slotIdx;
-    AcquireSlot(slotIdx);
-    EnsureDescriptors(slots, slotCount, slotIdx);
+    uint32_t srvBase, uavBase;
+    if (!AllocateTransientTables(srvBase, uavBase)) return;
+    WriteDescriptors(slots, slotCount, srvBase, uavBase);
 
     cmdList->SetPipelineState1(m_shader->GetPSO());
-    BindRootParams(cmdList, slots, slotCount, slotIdx);
     RequestResourceStates(slots, slotCount);
+    BindRootParams(cmdList, slots, slotCount, srvBase, uavBase);
 
     // DispatchRays
     const UINT stride = D3D12_RAYTRACING_SHADER_RECORD_BYTE_ALIGNMENT;
@@ -36,6 +37,7 @@ void RayTraceDescriptorSet::Dispatch(
     drd.Width  = width;
     drd.Height = height;
     drd.Depth  = 1;
+
     cmdList->DispatchRays(&drd);
     NotifyResourceStates(slots, slotCount);
 }

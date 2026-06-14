@@ -1,4 +1,4 @@
- 
+using System;
 using System.Collections.Generic;
 using System.Runtime.InteropServices;
 using DLRR;
@@ -16,13 +16,14 @@ namespace PathTracing
     /// Pass execution order:
     ///   Phase 0 : NativeRtxptBuildTlasPass              - TLAS rebuild
     ///   Phase 1 : LightsBaker passes                    - env map / emissive / proxies / feedback (TODO)
-    ///   Phase 2 : NativeRtxptPathTracerPass             - BuildStablePlanes + FillStablePlanes (realtime) / Reference
-    ///   Phase 3 : NativeRtxptExportVisibilityBufferPass - depth + motion vectors export
-    ///   Phase 4 : NativeRtxptDenoiseSpecHitTPass        - specular hit-distance bilateral filter x2
-    ///   Phase 5 : NativeRtxptNoDenoiserFinalMergePass   - merge stable planes to OutputColor
-    ///   Phase 6 : NativeRtxptDlssBeforePass             - prepare DLSS-RR guide buffers
-    ///   Phase 7 : DlssRRPass                            - DLSS Ray Reconstruction (denoise + upscale)
-    ///   Phase 8 : NativeRtxptAccumulationPass           - multi-frame accumulation (reference mode only)
+    ///   Phase 2a: NativeRtxptBuildStablePlanesPass       - BuildStablePlanes RT (PathTracePrePass)
+    ///   Phase 2b: NativeRtxptExportVisibilityBufferPass  - depth + motion vectors export
+    ///   Phase 2c: NativeRtxptLightingUpdateEndPass       - NEE-AT feedback processing (stub)
+    ///   Phase 2d: NativeRtxptFillStablePlanesPass        - FillStablePlanes RT (PathTrace) / Reference
+    ///   Phase 3 : NativeRtxptDenoiseSpecHitTPass         - specular hit-distance bilateral filter x2
+    ///   Phase 4 : NativeRtxptDlssBeforePass              - prepare DLSS-RR guide buffers
+    ///   Phase 5 : DlssRRPass                             - DLSS Ray Reconstruction (denoise + upscale)
+    ///   Phase 7 : NativeRtxptAccumulationPass            - multi-frame accumulation (reference mode only)
     ///
     /// PT_USE_RESTIR_DI = 0, PT_USE_RESTIR_GI = 0 (no RTXDI).
     /// cStablePlaneCount = 3.
@@ -31,102 +32,219 @@ namespace PathTracing
     {
         // ---- Inspector fields -----------------------------------------------
         public NativeRtxptSetting setting;
-        public RenderPassEvent renderPassEvent = RenderPassEvent.BeforeRenderingPostProcessing;
+        public RenderPassEvent    renderPassEvent = RenderPassEvent.BeforeRenderingPostProcessing;
 
-        // Phase 2: PathTracer RT shaders
-        public RayTraceShader buildStablePlanesShader;
-        public RayTraceShader fillStablePlanesShader;
-        public RayTraceShader referenceShader;
+        public SampleConstants sampleConstants;
 
-        // Phase 2: per-pipeline extra hit-group blobs
-        public HitGroupShader[] buildHitGroups;
-        public HitGroupShader[] fillHitGroups;
-        public HitGroupShader[] referenceHitGroups;
+        // Phase 2a/2d: PathTracer RT shaders
+        public LazyLoadReference<RayTraceShader> buildStablePlanesShader;
+        public LazyLoadReference<RayTraceShader> fillStablePlanesShader;
+        public LazyLoadReference<RayTraceShader> referenceShader;
+
+        // Phase 2a/2d: per-pipeline extra hit-group blobs
+        public LazyLoadReference<HitGroupShader>[] buildHitGroups;
+        public LazyLoadReference<HitGroupShader>[] fillHitGroups;
+        public LazyLoadReference<HitGroupShader>[] referenceHitGroups;
+
+        // Phase 0: skinned-repack compute (Unity skinned VB → per-instance donut SoA buffer),
+        // recorded by the TLAS build pass before the BLAS refit each frame. A plain Unity
+        // ComputeShader: both src/dst are Unity GraphicsBuffers, bound without GetNativeBufferPtr.
+        public ComputeShader skinnedRepackCs;
 
         // Phase 3
-        public NativeComputeShader exportVisibilityBufferCs;
+        public LazyLoadReference<NativeComputeShader>exportVisibilityBufferCs;
+
         // Phase 4
-        public NativeComputeShader denoiseSpecHitTCs;
+        public LazyLoadReference<NativeComputeShader>denoiseSpecHitTCs;
+
         // Phase 5
-        public NativeComputeShader noDenoiserFinalMergeCs;
-        // Phase 6
-        public NativeComputeShader dlssBeforeCs;
+        public LazyLoadReference<NativeComputeShader>dlssBeforeCs;
+
+        // Phase 6: Bloom (donut BloomPass: downsample → separable blur → composite).
+        // Verbatim raster wrappers: blur = fullscreen_vs + passes/bloom_ps.hlsl; downsample/composite =
+        // fullscreen_vs + blit_ps.hlsl (composite uses the constant-color blend = donut's ConstantColor).
+        public LazyLoadReference<NativeRasterShader>bloomDownsampleRasterShader;
+        public LazyLoadReference<NativeRasterShader>bloomBlurRasterShader;
+        public LazyLoadReference<NativeRasterShader>bloomCompositeRasterShader;
+
+        // Phase 7: Tone mapping — faithful native replica of RTXPT ToneMappingPasses.cpp, built from the
+        // original shaders as thin verbatim #include wrappers: luminance_ps (raster) → donut
+        // mipmapgen_cs mip reduce (shared mipMapGenCs asset) → capture_cs → CPU read-back →
+        // ToneMapping main_ps (raster).
+        public LazyLoadReference<NativeRasterShader> luminanceRasterShader; // Luminance.rastershader (= fullscreen_vs + luminance_ps)
+        public LazyLoadReference<NativeComputeShader>captureLuminanceCs; // capture_cs.computeshader (= ToneMapping.hlsl capture_cs)
+        public LazyLoadReference<NativeRasterShader> toneMapApplyRasterShader; // ToneMapping.rastershader (= fullscreen_vs + main_ps)
+
         // Phase 8
-        public NativeComputeShader accumulationCs;
+        public LazyLoadReference<NativeComputeShader>accumulationCs;
+
+        // Phase Debug: StablePlanesDebugViz
+        public LazyLoadReference<NativeComputeShader>stablePlanesDebugVizCs;
+
+        // Phase Debug: ShaderDebug (DebugPrint readback, DebugLine/DebugTriangle draw, viz overlay).
+        // Ports of Libraries/ShaderDebug/ShaderDebug.hlsl draw shaders + the Sample.cpp debug-lines draw.
+        public LazyLoadReference<NativeRasterShader>shaderDebugTrianglesRasterShader;
+        public LazyLoadReference<NativeRasterShader>shaderDebugLinesRasterShader;
+        public LazyLoadReference<NativeRasterShader>shaderDebugFeedbackLinesRasterShader;
+        public LazyLoadReference<NativeRasterShader>shaderDebugBlendVizRasterShader;
+
+        // EnvMapBaker + LightingUpdateBegin compute shaders
+        public LazyLoadReference<NativeComputeShader>baseLayerCs;
+        public LazyLoadReference<NativeComputeShader>mipReduceCs;
+        public LazyLoadReference<NativeComputeShader>envMapImportanceBakerCs;
+        public LazyLoadReference<NativeComputeShader>mipMapGenCs; // mipmapgen_cs.computeshader (donut MipMapGenPass MODE_COLOR)
+        public LazyLoadReference<NativeComputeShader>bc6uCompressCs;
+        public LazyLoadReference<NativeComputeShader>envLightsBackupPastCs;
+        public LazyLoadReference<NativeComputeShader>envLightsSubdivideBaseCs;
+        public LazyLoadReference<NativeComputeShader>envLightsSubdivideBoostCs;
+        public LazyLoadReference<NativeComputeShader>envLightsFillLookupMapCs;
+        public LazyLoadReference<NativeComputeShader>envLightsMapPastToCurrentCs;
+        public LazyLoadReference<NativeComputeShader>resetLightProxyCountersCs;
+        public LazyLoadReference<NativeComputeShader>resetPastToCurrentHistoryCs;
+        public LazyLoadReference<NativeComputeShader>computeWeightsCs;
+        public LazyLoadReference<NativeComputeShader>computeProxyCountsCs;
+        public LazyLoadReference<NativeComputeShader>computeProxyBaselineOffsetsCs;
+        public LazyLoadReference<NativeComputeShader>createProxyJobsCs;
+        public LazyLoadReference<NativeComputeShader>executeProxyJobsCs;
+        public LazyLoadReference<NativeComputeShader>bakeEmissiveTrianglesCs;
+
+        // LightingUpdateBegin feedback passes
+        public LazyLoadReference<NativeComputeShader>processFeedbackHistoryPreFilterCs;
+
+        public LazyLoadReference<NativeComputeShader>processFeedbackHistoryP0Cs;
+
+        // LightingUpdateEnd feedback passes
+        public LazyLoadReference<NativeComputeShader>processFeedbackHistoryP1aCs;
+        public LazyLoadReference<NativeComputeShader>processFeedbackHistoryP1bCs;
+        public LazyLoadReference<NativeComputeShader>processFeedbackHistoryP2Cs;
+        public LazyLoadReference<NativeComputeShader>processFeedbackHistoryP3Cs;
+        public LazyLoadReference<NativeComputeShader>clearFeedbackHistoryCs;
+
+        // LightsBaker debug passes (LightsBaker::DebugGUI — draw all lights / NEE-AT debug viz)
+        public LazyLoadReference<NativeComputeShader>debugDrawLightsCs;
+        public LazyLoadReference<NativeComputeShader>processFeedbackHistoryDebugVizCs;
+
+        // Phase 9: Output blit (debug display)
+        public Material outputBlitMaterial;
 
         // ---- Pass instances -------------------------------------------------
         private NativeRtxptBuildTlasPass              _buildTlasPass;
-        private NativeRtxptPathTracerPass             _pathTracerPass;
+        private NativeRtxptEnvMapBakerPass            _envMapBakerPass;
+        private NativeRtxptLightingUpdateBeginPass    _lightingUpdateBeginPass;
+        private NativeRtxptBuildStablePlanesPass      _buildStablePlanesPass;
         private NativeRtxptExportVisibilityBufferPass _exportVisibilityBufferPass;
-        private NativeRtxptDenoiseSpecHitTPass        _denoiseSpecHitTPass;
-        private NativeRtxptNoDenoiserFinalMergePass   _noDenoiserFinalMergePass;
-        private NativeRtxptDlssBeforePass             _dlssBeforePass;
+        private NativeRtxptLightingUpdateEndPass      _lightingUpdateEndPass;
+        private NativeRtxptFillStablePlanesPass       _fillStablePlanesPass;
+        private NativeRtxptDenoisingGuidesBakePass    _denoisingGuidesBakePass;
+        private NativeRtxptDlssRRPrepareInputsPass    _dlssRrPrepareInputsPass;
         private DlssRRPass                            _dlssRRPass;
+        private NativeRtxptBloomPass                  _bloomPass;
+        private NativeRtxptToneMappingMipChainPass    _toneMappingMipChainPass;
         private NativeRtxptAccumulationPass           _accumulationPass;
-        private NativeFrameTick                       _nativeFrameTickPass;
+        private NativeRtxptStablePlanesDebugVizPass   _stablePlanesDebugVizPass;
+        private NativeRtxptShaderDebugBeginPass       _shaderDebugBeginPass;
+        private NativeRtxptShaderDebugDrawPass        _shaderDebugDrawPass;
+        private NativeRtxptOutputBlitPass             _outputBlitPass;
+
+
+        private DepthBarrierFixPass _depthBarrierFixPass;
 
         // ---- Shared scene resources -----------------------------------------
-        private NRDSampleResource   _nrdSampleResource;
-        private NativeRtxdiGPUScene _gpuScene;
+        private NativeRtxptGPUScene _gpuScene;
+
+        /// <summary>Editor access for the "Info and statistics:" block (LightsBaker::InfoGUI).</summary>
+        public NativeRtxptLightingUpdateBeginPass LightingUpdateBeginPass => _lightingUpdateBeginPass;
+
+        /// <summary>
+        /// Sets setting.debugPixelX/Y from a normalized viewport position (top-left origin, [0,1])
+        /// for the given camera, converting to that camera's RENDER resolution (debug-pixel coords
+        /// are pre-upscale, so the DLSS scale is applied here). Unity-side equivalent of the C++
+        /// right-click DebugPixel pick. Returns false until the camera has rendered at least one
+        /// RTXPT frame (the render resolution isn't known before that).
+        /// </summary>
+        public bool TrySetDebugPixelFromViewport(Camera cam, Vector2 uvTopLeft)
+        {
+            if (setting == null || cam == null) return false;
+            if (!_cameraFrameStates.TryGetValue(cam.GetInstanceID(), out var fs) || fs.renderResolution.x <= 0)
+                return false;
+            var rr = fs.renderResolution;
+            setting.debugPixelX = Mathf.Clamp((int)(uvTopLeft.x * rr.x), 0, rr.x - 1);
+            setting.debugPixelY = Mathf.Clamp((int)(uvTopLeft.y * rr.y), 0, rr.y - 1);
+            return true;
+        }
 
         // ---- Per-camera resource pools (key = instanceID + eyeIndex*100000) -
         private readonly Dictionary<long, NativeRtxptTextureResources> _texturePools      = new();
         private readonly Dictionary<long, NativeRtxptBufferResources>  _bufferPools       = new();
-        private readonly Dictionary<long, GraphicsBuffer>              _constantBuffers   = new();
+        private readonly Dictionary<long, VolatileConstantBuffer>      _constantBuffers   = new();
         private readonly Dictionary<long, DlrrDenoiser>                _dlrrDenoisers     = new();
-        private readonly Dictionary<long, CameraFrameState>            _cameraFrameStates = new();
-
-        private readonly SampleConstants[] _sampleConstantsArray = new SampleConstants[1];
+        private readonly Dictionary<long, RtxptCameraFrameState>       _cameraFrameStates = new();
 
         // ---- Lifecycle ------------------------------------------------------
 
+        public IntPtr blackTexturePtr;
+
         public override void Create()
         {
-            setting ??= new NativeRtxptSetting();
+            setting         ??= new NativeRtxptSetting();
+            blackTexturePtr =   Texture2D.blackTexture.GetNativeTexturePtr();
         }
 
         private void CreatePasses()
         {
-            _buildTlasPass ??= new NativeRtxptBuildTlasPass
+            _buildTlasPass ??= new NativeRtxptBuildTlasPass(skinnedRepackCs)
             {
-                renderPassEvent           = renderPassEvent,
+                renderPassEvent = renderPassEvent,
             };
 
-            if (_pathTracerPass == null
-                && buildStablePlanesShader != null
-                && fillStablePlanesShader  != null
-                && referenceShader         != null)
+            _envMapBakerPass ??= new NativeRtxptEnvMapBakerPass(baseLayerCs.asset, mipReduceCs.asset, envMapImportanceBakerCs.asset, mipMapGenCs.asset, bc6uCompressCs.asset)
             {
-                _pathTracerPass = new NativeRtxptPathTracerPass(
-                    buildStablePlanesShader, fillStablePlanesShader, referenceShader,
-                    buildHitGroups, fillHitGroups, referenceHitGroups)
+                renderPassEvent = renderPassEvent,
+            };
+
+            _lightingUpdateBeginPass ??= new NativeRtxptLightingUpdateBeginPass(
+                    envLightsBackupPastCs.asset, envLightsSubdivideBaseCs.asset, envLightsSubdivideBoostCs.asset,
+                    envLightsFillLookupMapCs.asset, envLightsMapPastToCurrentCs.asset,
+                    resetLightProxyCountersCs.asset, resetPastToCurrentHistoryCs.asset,
+                    computeWeightsCs.asset, computeProxyCountsCs.asset, computeProxyBaselineOffsetsCs.asset,
+                    createProxyJobsCs.asset, executeProxyJobsCs.asset,
+                    bakeEmissiveTrianglesCs.asset,
+                    processFeedbackHistoryPreFilterCs.asset, processFeedbackHistoryP0Cs.asset,
+                    debugDrawLightsCs.asset)
                 { renderPassEvent = renderPassEvent };
-            }
 
-            if (_exportVisibilityBufferPass == null && exportVisibilityBufferCs != null)
-                _exportVisibilityBufferPass = new NativeRtxptExportVisibilityBufferPass(exportVisibilityBufferCs)
-                    { renderPassEvent = renderPassEvent };
+            _buildStablePlanesPass      ??= new NativeRtxptBuildStablePlanesPass(buildStablePlanesShader.asset, ResolveHitGroups(buildHitGroups)) { renderPassEvent = renderPassEvent };
+            _exportVisibilityBufferPass ??= new NativeRtxptExportVisibilityBufferPass(exportVisibilityBufferCs.asset) { renderPassEvent           = renderPassEvent };
 
-            if (_denoiseSpecHitTPass == null && denoiseSpecHitTCs != null)
-                _denoiseSpecHitTPass = new NativeRtxptDenoiseSpecHitTPass(denoiseSpecHitTCs)
-                    { renderPassEvent = renderPassEvent };
+            _lightingUpdateEndPass ??= new NativeRtxptLightingUpdateEndPass(
+                    processFeedbackHistoryP1aCs.asset, processFeedbackHistoryP1bCs.asset,
+                    processFeedbackHistoryP2Cs.asset, processFeedbackHistoryP3Cs.asset,
+                    clearFeedbackHistoryCs.asset,
+                    processFeedbackHistoryDebugVizCs.asset)
+                { renderPassEvent = renderPassEvent };
 
-            if (_noDenoiserFinalMergePass == null && noDenoiserFinalMergeCs != null)
-                _noDenoiserFinalMergePass = new NativeRtxptNoDenoiserFinalMergePass(noDenoiserFinalMergeCs)
-                    { renderPassEvent = renderPassEvent };
-
-            if (_dlssBeforePass == null && dlssBeforeCs != null)
-                _dlssBeforePass = new NativeRtxptDlssBeforePass(dlssBeforeCs)
-                    { renderPassEvent = renderPassEvent };
-
-            _dlssRRPass ??= new DlssRRPass { renderPassEvent = renderPassEvent };
-
-            if (_accumulationPass == null && accumulationCs != null)
-                _accumulationPass = new NativeRtxptAccumulationPass(accumulationCs)
-                    { renderPassEvent = renderPassEvent };
-
-            _nativeFrameTickPass ??= new NativeFrameTick { renderPassEvent = renderPassEvent };
+            _fillStablePlanesPass     ??= new NativeRtxptFillStablePlanesPass(fillStablePlanesShader.asset, referenceShader.asset, ResolveHitGroups(fillHitGroups), ResolveHitGroups(referenceHitGroups)) { renderPassEvent          = renderPassEvent };
+            _denoisingGuidesBakePass  ??= new NativeRtxptDenoisingGuidesBakePass(denoiseSpecHitTCs.asset) { renderPassEvent                                                                = renderPassEvent };
+            _dlssRrPrepareInputsPass  ??= new NativeRtxptDlssRRPrepareInputsPass(dlssBeforeCs.asset) { renderPassEvent                                                                     = renderPassEvent };
+            _dlssRRPass               ??= new DlssRRPass { renderPassEvent                                                                                                           = renderPassEvent };
+            _bloomPass                ??= new NativeRtxptBloomPass(bloomDownsampleRasterShader.asset, bloomBlurRasterShader.asset, bloomCompositeRasterShader.asset) { renderPassEvent                 = renderPassEvent };
+            _toneMappingMipChainPass  ??= new NativeRtxptToneMappingMipChainPass(luminanceRasterShader.asset, mipMapGenCs.asset, captureLuminanceCs.asset, toneMapApplyRasterShader.asset) { renderPassEvent = renderPassEvent };
+            _accumulationPass         ??= new NativeRtxptAccumulationPass(accumulationCs.asset) { renderPassEvent                                                                          = renderPassEvent };
+            _stablePlanesDebugVizPass ??= new NativeRtxptStablePlanesDebugVizPass(stablePlanesDebugVizCs.asset) { renderPassEvent                                                          = renderPassEvent };
+            // The begin pass also clears the debug-viz texture via the plugin's UAV-clear event
+            // (ClearUnorderedAccessViewFloat, matching the original's nvrhi clearTextureFloat).
+            _shaderDebugBeginPass ??= new NativeRtxptShaderDebugBeginPass { renderPassEvent = renderPassEvent };
+            if (_shaderDebugDrawPass == null
+                && shaderDebugTrianglesRasterShader.asset != null && shaderDebugLinesRasterShader.asset != null
+                && shaderDebugFeedbackLinesRasterShader.asset != null && shaderDebugBlendVizRasterShader.asset != null)
+                _shaderDebugDrawPass = new NativeRtxptShaderDebugDrawPass(
+                    shaderDebugTrianglesRasterShader.asset, shaderDebugLinesRasterShader.asset,
+                    shaderDebugFeedbackLinesRasterShader.asset, shaderDebugBlendVizRasterShader.asset) { renderPassEvent = renderPassEvent };
+            _outputBlitPass      ??= new NativeRtxptOutputBlitPass(outputBlitMaterial) { renderPassEvent = renderPassEvent };
+            _depthBarrierFixPass ??= new DepthBarrierFixPass { renderPassEvent                           = RenderPassEvent.AfterRendering };
         }
+
+        private NativeRtxptPassContext passCtx;
 
         public override void AddRenderPasses(ScriptableRenderer renderer, ref RenderingData renderingData)
         {
@@ -139,16 +257,18 @@ namespace PathTracing
             cam.depthTextureMode = DepthTextureMode.Depth | DepthTextureMode.MotionVectors;
 
             var eyeIndex = renderingData.cameraData.xr.enabled
-                ? renderingData.cameraData.xr.multipassId : 0;
+                ? renderingData.cameraData.xr.multipassId
+                : 0;
 
             if (eyeIndex == 1 && setting.skipRightEyeInVR) return;
 
             // ---- Shared scene resources -------------------------------------
-            _nrdSampleResource ??= new NRDSampleResource();
-            _gpuScene          ??= new NativeRtxdiGPUScene();
+            _gpuScene ??= new NativeRtxptGPUScene();
 
             if (eyeIndex == 0)
-                _nrdSampleResource.UpdateForFrame();
+            {
+                _gpuScene.UpdateForFrame();
+            }
 
             // ---- Per-camera resource lookup / creation ----------------------
             var  uniqueKey = cam.GetInstanceID() + (eyeIndex * 100_000L);
@@ -159,20 +279,23 @@ namespace PathTracing
                 texPool = new NativeRtxptTextureResources();
                 _texturePools.Add(uniqueKey, texPool);
             }
+
             if (!_bufferPools.TryGetValue(uniqueKey, out var bufPool))
             {
                 bufPool = new NativeRtxptBufferResources();
                 _bufferPools.Add(uniqueKey, bufPool);
             }
+
             if (!_dlrrDenoisers.TryGetValue(uniqueKey, out var dlrr))
             {
                 dlrr = new DlrrDenoiser(isVR ? $"{cam.name}_Eye{eyeIndex}" : cam.name);
                 _dlrrDenoisers.Add(uniqueKey, dlrr);
             }
+
             if (!_constantBuffers.TryGetValue(uniqueKey, out var constantBuffer))
             {
-                constantBuffer = new GraphicsBuffer(GraphicsBuffer.Target.Constant, 1,
-                    Marshal.SizeOf<SampleConstants>());
+                // Name mirrors the original RTXPT main constants buffer (Sample.cpp "SampleConstants").
+                constantBuffer = new VolatileConstantBuffer(Marshal.SizeOf<SampleConstants>(), "SampleConstants");
                 _constantBuffers.Add(uniqueKey, constantBuffer);
             }
 
@@ -180,91 +303,143 @@ namespace PathTracing
             var displayResolution = ComputeOutputResolution(renderingData.cameraData);
             var renderResolution  = ComputeRenderResolution(displayResolution, setting.upscalerMode);
 
+            // DLSS / DLSS-RR require an output of at least 32x32 (NGX minimum). In a
+            // packaged build the window can momentarily come up at a degenerate size
+            // (e.g. 144x1 while it is being created/resized), which makes the native
+            // nri CreateUpscaler fail. Skip the whole path-tracing pass list for this
+            // camera until it has a usable resolution.
+            if (math.cmin(displayResolution) < MinUpscalerResolution ||
+                math.cmin(renderResolution) < MinUpscalerResolution)
+                return;
+
             bool texturesChanged = texPool.EnsureResources(renderResolution, displayResolution);
+            texPool.EnsureEnvMapResources();
             bufPool.EnsureResources(renderResolution);
             bufPool.EnsureLightBuffers();
+            bufPool.EnsureEnvBakerBuffers();
+            // ShaderDebug buffer (~100 MB, mirrors the original's fixed layout) only lives while
+            // the master toggle is on; the original allocates it unconditionally.
+            bufPool.EnsureShaderDebugBuffers(setting.enableShaderDebug);
 
             // ---- Per-camera temporal state ----------------------------------
             if (!_cameraFrameStates.TryGetValue(uniqueKey, out var frameState))
             {
-                frameState = new CameraFrameState(1.0f);
+                frameState = new RtxptCameraFrameState(1.0f);
                 _cameraFrameStates.Add(uniqueKey, frameState);
             }
+
             if (texturesChanged)
             {
                 frameState.renderResolution = renderResolution;
                 frameState.frameIndex       = 0;
             }
-            frameState.Update(renderingData, texturesChanged, 1.0f);
+
+            // ---- Gather scene lights once (shared by env baker + lighting pass) ----
+            // Both consumers previously each ran their own full-scene FindObjectsByType<Light>;
+            // gathering once here halves that per-camera cost.
+            var sceneLights = UnityEngine.Object.FindObjectsByType<Light>(FindObjectsSortMode.None);
+
+            // ---- Resolve URP Volume overrides -------------------------------
+            // Apply optional per-scene / per-region Volume overrides for environment-map and exposure
+            // settings. Clone-on-write: `effectiveSetting` stays the authored `setting` until an
+            // override is actually active, so the serialized inspector object is never mutated. Done
+            // before PrepareBake so env-map overrides drive this frame's bake gating.
+            var effectiveSetting = setting;
+            NativeRtxptEnvironmentMapVolume.ApplyOverrides(ref effectiveSetting, setting);
+            NativeRtxptExposureVolume.ApplyOverrides(ref effectiveSetting, setting);
+
+            // Env bake gating must be decided before frameState.Update so a re-bake resets
+            // accumulation this frame — original: Sample.cpp:1383, if (m_envMapBaker->Update(...))
+            // m_ui.ResetAccumulation = true.
+            bool envMapChanged = _envMapBakerPass.PrepareBake(effectiveSetting, sceneLights, texPool);
+
+            frameState.Update(renderingData, texturesChanged || envMapChanged, 1.0f, effectiveSetting);
 
             // ---- Build & upload SampleConstants -----------------------------
-            _sampleConstantsArray[0] = NativeRtxptConstantsBuilder.Build(
-                renderingData, setting, renderResolution, displayResolution, frameState);
-            constantBuffer.SetData(_sampleConstantsArray);
+            // Pre-exposed gray luminance comes from the tone-mapping pass's auto-exposure read-back
+            // (populated by the previous frame's GPU→CPU copy, mirroring the original's 1-2 frame lag).
+            // The pass instance persists across frames, so its last captured value is available here even
+            // though this frame's tone-mapping pass hasn't recorded yet.
+            float preExposedGrayLuminance = _toneMappingMipChainPass.GetPreExposedGrayLuminance(effectiveSetting);
+            // MaterialCount (Sample.cpp:2095 = GetMaterialDataCount): shaders bounds-check material
+            // indices against it (Bridge::loadIoR / loadHomogeneousVolumeData) — 0 disables IoR/volumes.
+            sampleConstants = NativeRtxptConstantsBuilder.Build(renderingData, effectiveSetting, renderResolution, displayResolution, frameState, preExposedGrayLuminance, _gpuScene.MaterialDataCount);
+
+            constantBuffer.Upload(renderer, sampleConstants);
 
             // ---- Build shared pass context ----------------------------------
-            var passCtx = new NativeRtxptPassContext
-            {
-                ConstantBuffer    = constantBuffer,
-                NrdSampleResource = _nrdSampleResource,
-                GpuScene          = _gpuScene,
-                Textures          = texPool,
-                Buffers           = bufPool,
-                RenderResolution  = renderResolution,
-                DisplayResolution = displayResolution,
-                FrameState        = frameState,
-                Setting           = setting,
-            };
+            passCtx ??= new NativeRtxptPassContext();
+
+            passCtx.ConstantBuffer    = constantBuffer;
+            passCtx.GpuScene          = _gpuScene;
+            passCtx.Textures          = texPool;
+            passCtx.Buffers           = bufPool;
+            passCtx.RenderResolution  = renderResolution;
+            passCtx.DisplayResolution = displayResolution;
+            passCtx.FrameState        = frameState;
+            passCtx.Setting           = effectiveSetting;
+            passCtx.SceneLights       = sceneLights;
+            passCtx.blackTexturePtr   = blackTexturePtr;
+
             passCtx.ResolveNativePtrs();
 
             // ---- Phase 0: TLAS ---------------------------------------------
             if (eyeIndex == 0)
             {
-                _buildTlasPass.SetNRDSampleResource(_nrdSampleResource);
+                _buildTlasPass.Setup(_gpuScene,
+                    _buildStablePlanesPass?.BuildPipeline,
+                    _fillStablePlanesPass?.FillPipeline,
+                    _fillStablePlanesPass?.RefPipeline);
                 renderer.EnqueuePass(_buildTlasPass);
             }
 
-            // ---- Phase 1: LightsBaker (TODO) --------------------------------
-
-            // ---- Phase 2: PathTracer RT Shader ------------------------------
-            if (_pathTracerPass != null)
+            // ---- ShaderDebug::BeginFrame — reset header (counters + worldToClip) -----
+            if (setting.enableShaderDebug && bufPool.ShaderDebugBuffer != null)
             {
-                _pathTracerPass.Setup(passCtx);
-                renderer.EnqueuePass(_pathTracerPass);
+                _shaderDebugBeginPass.Setup(passCtx);
+                renderer.EnqueuePass(_shaderDebugBeginPass);
             }
 
-            // ---- Phase 3: ExportVisibilityBuffer ----------------------------
-            if (_exportVisibilityBufferPass != null)
-            {
-                _exportVisibilityBufferPass.Setup(passCtx);
-                renderer.EnqueuePass(_exportVisibilityBufferPass);
-            }
+            // ---- LightingUpdateBegin -----------------------------------------
+            // Unified pass: EnvMapBaker → EnvLightsBaker → ProxyBuild
+            // Correct order mirrors original RTXPT LightsBaker::UpdateFrame front half.
+            _envMapBakerPass.Setup(passCtx);
+            renderer.EnqueuePass(_envMapBakerPass);
 
-            // ---- Realtime-only phases (4-7) ---------------------------------
+            _lightingUpdateBeginPass.Setup(passCtx);
+            renderer.EnqueuePass(_lightingUpdateBeginPass);
+
+            // ---- Phase 2a: BuildStablePlanes RT (PathTracePrePass) ----------
+            _buildStablePlanesPass.Setup(passCtx);
+            renderer.EnqueuePass(_buildStablePlanesPass);
+
+            // ---- Phase 2b: ExportVisibilityBuffer ---------------------------
+            // Outputs Depth + MotionVectors needed by LightingUpdateEnd.
+            _exportVisibilityBufferPass.Setup(passCtx);
+            renderer.EnqueuePass(_exportVisibilityBufferPass);
+
+            // ---- Phase 2c: LightingUpdateEnd --------------------------------
+            // NEE-AT feedback processing: builds per-tile LocalSamplingBuffer
+            // for FillStablePlanes, then clears feedback for current frame.
+            _lightingUpdateEndPass.Setup(passCtx);
+            renderer.EnqueuePass(_lightingUpdateEndPass);
+
+            // ---- Phase 2d: FillStablePlanes RT (PathTrace) / Reference ------
+            _fillStablePlanesPass.Setup(passCtx);
+            renderer.EnqueuePass(_fillStablePlanesPass);
+
+            // ---- Realtime-only phases (3-5): DLSS-RR path -------------------
             if (setting.realtimeMode)
             {
-                // Phase 4: DenoiseSpecHitT x2
-                if (_denoiseSpecHitTPass != null)
-                {
-                    _denoiseSpecHitTPass.Setup(passCtx);
-                    renderer.EnqueuePass(_denoiseSpecHitTPass);
-                }
+                // Phase 3: DenoiseSpecHitT x2
+                _denoisingGuidesBakePass.Setup(passCtx);
+                renderer.EnqueuePass(_denoisingGuidesBakePass);
 
-                // Phase 5: NoDenoiserFinalMerge
-                if (_noDenoiserFinalMergePass != null)
-                {
-                    _noDenoiserFinalMergePass.Setup(passCtx);
-                    renderer.EnqueuePass(_noDenoiserFinalMergePass);
-                }
+                // Phase 4: DlssBefore
+                _dlssRrPrepareInputsPass.Setup(passCtx);
+                renderer.EnqueuePass(_dlssRrPrepareInputsPass);
 
-                // Phase 6: DlssBefore
-                if (_dlssBeforePass != null)
-                {
-                    _dlssBeforePass.Setup(passCtx);
-                    renderer.EnqueuePass(_dlssBeforePass);
-                }
-
-                // Phase 7: DLSS-RR
+                // Phase 5: DLSS-RR
                 {
                     var dlrrInput = new DlrrDenoiser.DlrrFrameInput
                     {
@@ -275,58 +450,123 @@ namespace PathTracing
                         frameIndex       = frameState.frameIndex,
                         outputWidth      = (ushort)displayResolution.x,
                         outputHeight     = (ushort)displayResolution.y,
+                        useMv            = true
                     };
                     var dlrrRes = new DlrrDenoiser.DlrrResources
                     {
-                        input           = texPool.OutputColor,
-                        output          = texPool.DlssRrOutput,
-                        mv              = texPool.ScreenMotionVectors,
-                        depth           = texPool.Depth,
-                        diffAlbedo      = texPool.DlssRrDiffAlbedo,
-                        specAlbedo      = texPool.DlssRrSpecAlbedo,
-                        normalRoughness = texPool.DlssRrNormalRoughness,
-                        specHitDistance = texPool.DlssRrSpecHitDistance,
+                        input              = texPool.OutputColor,
+                        output             = texPool.DlssRrOutput,
+                        mv                 = texPool.ScreenMotionVectors,
+                        depth              = texPool.Depth,
+                        diffAlbedo         = texPool.DlssRrDiffAlbedo,
+                        specAlbedo         = texPool.DlssRrSpecAlbedo,
+                        normalRoughness    = texPool.DlssRrNormalRoughness,
+                        specularMvOrHitTex = texPool.DlssRrSpecMotionVectors,
                     };
                     _dlssRRPass.Setup(
-                        dlrr.GetInteropDataPtr(dlrrInput, dlrrRes, 1.0f, setting.upscalerMode),
+                        dlrr.GetInteropDataPtr(dlrrInput, dlrrRes, 1.0f, setting.upscalerMode, setting.dlssRRPreset),
                         new DlssRRPass.Settings { tmpDisableRR = setting.tmpDisableDlssRR });
                     renderer.EnqueuePass(_dlssRRPass);
+                }
+
+                // Phase 6: Bloom on the display-res HDR DLSS-RR output (composited in place, before tone mapping).
+                if (setting.enableBloom && setting.bloomIntensity > 0f && setting.bloomRadius > 0f && _bloomPass != null)
+                {
+                    _bloomPass.Setup(passCtx, texPool.DlssRrOutput);
+                    renderer.EnqueuePass(_bloomPass);
+                }
+
+                // Phase 7: Tone mapping + auto-exposure on the display-res HDR DLSS-RR output.
+                // Writes the LDR result into ProcessedOutputColor (unused elsewhere in realtime mode).
+                if (setting.enableToneMapping && _toneMappingMipChainPass != null)
+                {
+                    _toneMappingMipChainPass.Setup(passCtx, texPool.DlssRrOutput, texPool.ProcessedOutputColor);
+                    renderer.EnqueuePass(_toneMappingMipChainPass);
                 }
             }
             else
             {
-                // Phase 8: Accumulation (reference mode)
-                if (_accumulationPass != null)
-                {
-                    _accumulationPass.Setup(passCtx);
-                    renderer.EnqueuePass(_accumulationPass);
-                }
+                // Phase 7: Accumulation (reference mode)
+                _accumulationPass.Setup(passCtx);
+                renderer.EnqueuePass(_accumulationPass);
             }
 
-            // ---- Frame tick ------------------------------------------------
-            renderer.EnqueuePass(_nativeFrameTickPass);
+            // ---- Phase Debug: StablePlanesDebugViz (only when a debug view is active) ----
+            if (setting.debugViewType != RtxptDebugViewType.Disabled && stablePlanesDebugVizCs.asset != null)
+            {
+                _stablePlanesDebugVizPass.Setup(passCtx);
+                renderer.EnqueuePass(_stablePlanesDebugVizPass);
+            }
+
+            // ---- Phase Debug: ShaderDebug draw + readback (C++ EndFrameAndOutput) ----
+            // Drawn into the image the blit will display (= C++ drawing on LdrColor pre-blit).
+            if (setting.enableShaderDebug && _shaderDebugDrawPass != null && bufPool.ShaderDebugBuffer != null)
+            {
+                bool ranToneMap = setting.realtimeMode && setting.enableToneMapping && _toneMappingMipChainPass != null;
+                var debugTarget = !setting.realtimeMode || ranToneMap
+                    ? texPool.ProcessedOutputColor
+                    : texPool.DlssRrOutput;
+                _shaderDebugDrawPass.Setup(passCtx, debugTarget, displayResolution);
+                renderer.EnqueuePass(_shaderDebugDrawPass);
+            }
+
+            // ---- Phase 9: Output blit (debug display) ----------------------
+            {
+                // When tone mapping ran, the final image lives in ProcessedOutputColor; show it in
+                // place of the raw HDR DLSS-RR output unless the user picked an explicit debug view.
+                var  displayMode = setting.showMode;
+                bool toneMapRan  = setting.realtimeMode && setting.enableToneMapping && _toneMappingMipChainPass != null;
+                if (toneMapRan && displayMode == NativeRtxptShowMode.DlssRrOutput)
+                    displayMode = NativeRtxptShowMode.ProcessedOutput;
+
+                _outputBlitPass.Setup(texPool, displayMode, 1.0f, setting.debugViewType);
+                renderer.EnqueuePass(_outputBlitPass);
+            }
+
+            renderer.EnqueuePass(_depthBarrierFixPass);
         }
 
         // ---- Helpers -------------------------------------------------------
 
+        // Resolves a serialized array of lazy hit-group references to the concrete assets the
+        // RT passes expect, loading each on demand. Returns null for an unset array.
+        private static HitGroupShader[] ResolveHitGroups(LazyLoadReference<HitGroupShader>[] refs)
+        {
+            if (refs == null) return null;
+            var result = new HitGroupShader[refs.Length];
+            for (int i = 0; i < refs.Length; i++)
+                result[i] = refs[i].asset;
+            return result;
+        }
+
+        // Minimum render/output size DLSS (NGX) will accept; below this CreateUpscaler fails.
+        private const int MinUpscalerResolution = 32;
+
         private static int2 ComputeOutputResolution(CameraData cameraData) =>
             new int2(cameraData.cameraTargetDescriptor.width,
-                     cameraData.cameraTargetDescriptor.height);
+                cameraData.cameraTargetDescriptor.height);
 
         private static int2 ComputeRenderResolution(int2 outputRes, UpscalerMode mode)
         {
+            // Query NGX for the SDK-recommended render resolution, matching RTXPT's
+            // QueryDLSSOptimalSettings path. Results are cached in the native plugin.
+            if (DlrrDenoiser.TryGetOptimalRenderSize(outputRes, mode, out var nativeRes))
+                return nativeRes;
+            Debug.LogError($"[NativeRtxptFeature] Failed to get optimal render size from native plugin for mode {mode}, falling back to hardcoded scale table.");
+
+            // Fallback (native plugin unavailable): hardcoded scale table.
             float scale = mode switch
             {
-                UpscalerMode.NATIVE            => 1.0f,
-                UpscalerMode.ULTRA_QUALITY     => 1.3f,
-                UpscalerMode.QUALITY           => 1.5f,
-                UpscalerMode.BALANCED          => 1.7f,
-                UpscalerMode.PERFORMANCE       => 2.0f,
+                UpscalerMode.NATIVE => 1.0f,
+                UpscalerMode.ULTRA_QUALITY => 1.3f,
+                UpscalerMode.QUALITY => 1.5f,
+                UpscalerMode.BALANCED => 1.7f,
+                UpscalerMode.PERFORMANCE => 2.0f,
                 UpscalerMode.ULTRA_PERFORMANCE => 3.0f,
-                _                              => 1.0f,
+                _ => 1.0f,
             };
             return new int2((int)(outputRes.x / scale + 0.5f),
-                            (int)(outputRes.y / scale + 0.5f));
+                (int)(outputRes.y / scale + 0.5f));
         }
 
         // ---- Cleanup -------------------------------------------------------
@@ -335,21 +575,52 @@ namespace PathTracing
         {
             if (!disposing) return;
 
-            _pathTracerPass?.Dispose();             _pathTracerPass            = null;
-            _exportVisibilityBufferPass?.Dispose(); _exportVisibilityBufferPass = null;
-            _denoiseSpecHitTPass?.Dispose();        _denoiseSpecHitTPass        = null;
-            _noDenoiserFinalMergePass?.Dispose();   _noDenoiserFinalMergePass   = null;
-            _dlssBeforePass?.Dispose();             _dlssBeforePass             = null;
-            _accumulationPass?.Dispose();           _accumulationPass           = null;
+            _buildTlasPass?.Dispose();
+            _buildTlasPass = null;
+            _lightingUpdateBeginPass?.Dispose();
+            _lightingUpdateBeginPass = null;
+            _envMapBakerPass?.Dispose();
+            _envMapBakerPass = null;
+            _buildStablePlanesPass?.Dispose();
+            _buildStablePlanesPass = null;
+            _fillStablePlanesPass?.Dispose();
+            _fillStablePlanesPass = null;
+            _lightingUpdateEndPass?.Dispose();
+            _lightingUpdateEndPass = null;
+            _exportVisibilityBufferPass?.Dispose();
+            _exportVisibilityBufferPass = null;
+            _denoisingGuidesBakePass?.Dispose();
+            _denoisingGuidesBakePass = null;
+            _dlssRrPrepareInputsPass?.Dispose();
+            _dlssRrPrepareInputsPass = null;
+            _bloomPass?.Dispose();
+            _bloomPass = null;
+            _toneMappingMipChainPass?.Dispose();
+            _toneMappingMipChainPass = null;
+            _accumulationPass?.Dispose();
+            _accumulationPass = null;
+            _stablePlanesDebugVizPass?.Dispose();
+            _stablePlanesDebugVizPass = null;
+            _shaderDebugDrawPass?.Dispose();
+            _shaderDebugDrawPass = null;
+            _shaderDebugBeginPass?.Dispose();
+            _shaderDebugBeginPass = null;
+            _outputBlitPass       = null;
+            _depthBarrierFixPass  = null;
 
-            foreach (var p in _texturePools.Values)  p.Dispose();   _texturePools.Clear();
-            foreach (var p in _bufferPools.Values)   p.Dispose();   _bufferPools.Clear();
-            foreach (var cb in _constantBuffers.Values) cb.Dispose(); _constantBuffers.Clear();
-            foreach (var d in _dlrrDenoisers.Values) d?.Dispose();  _dlrrDenoisers.Clear();
+
+            foreach (var p in _texturePools.Values) p.Dispose();
+            _texturePools.Clear();
+            foreach (var p in _bufferPools.Values) p.Dispose();
+            _bufferPools.Clear();
+            foreach (var cb in _constantBuffers.Values) cb.Dispose();
+            _constantBuffers.Clear();
+            foreach (var d in _dlrrDenoisers.Values) d?.Dispose();
+            _dlrrDenoisers.Clear();
             _cameraFrameStates.Clear();
 
-            _nrdSampleResource?.Dispose(); _nrdSampleResource = null;
-            _gpuScene?.Dispose();          _gpuScene          = null;
+            _gpuScene?.Dispose();
+            _gpuScene = null;
         }
 
         // ---- Editor helpers ----------------------------------------------------
@@ -361,29 +632,465 @@ namespace PathTracing
             AutoFillShaders();
         }
 
+        /// <summary>
+        /// Debug readback: logs all emissive triangle light entries from the GPU LightBuffer.
+        /// Run the scene for at least one frame before clicking.
+        /// </summary>
+        public void TestEmissiveTriangles()
+        {
+            if (_lightingUpdateBeginPass == null)
+            {
+                Debug.LogWarning("[NativeRtxptFeature] LightingUpdateBeginPass not created — run the scene first.");
+                return;
+            }
+
+            NativeRtxptBufferResources buf = null;
+            foreach (var kv in _bufferPools)
+            {
+                buf = kv.Value;
+                break;
+            }
+
+            if (buf?.LightBuffer == null)
+            {
+                Debug.LogWarning("[NativeRtxptFeature] LightBuffer is null — run the scene first.");
+                return;
+            }
+
+            uint triOffset = _lightingUpdateBeginPass.EmissiveLightOffset;
+            uint triCount  = _lightingUpdateBeginPass.EmissiveTriangleCount;
+
+            var sb = new System.Text.StringBuilder();
+            sb.AppendLine($"[Rtxpt Emissive Triangles] offset={triOffset}  count={triCount}  analyticCount={triOffset - 5368}  MaxLights={NativeRtxptBufferResources.MaxLights}");
+
+            // ---- CPU-side: SubInstanceData EmissiveLightMappingOffset ----
+            if (_gpuScene != null)
+            {
+                var emissive = _gpuScene.GetEmissiveGeometries();
+                sb.AppendLine($"  Emissive geometries ({emissive.Count}):");
+                foreach (var e in emissive)
+                    sb.AppendLine($"    inst={e.InstanceIndex} geom={e.GeometrySubIndex}  triCount={e.TriangleCount}");
+            }
+
+            // ---- GPU readback: LightBuffer entries at emissive range ----
+            if (triCount == 0)
+            {
+                sb.AppendLine("  No emissive triangles collected last frame.");
+                Debug.Log(sb.ToString());
+                return;
+            }
+
+            // GPU readback is async (fence-gated): record the copy on a one-shot command buffer,
+            // then poll across editor frames until the GPU has produced the data, and visualize.
+            int readCount = (int)System.Math.Min(triCount, 4096u);
+            var data      = new RtxptPolymorphicLightInfo[readCount];
+
+            var rbCmd = new CommandBuffer { name = "Rtxpt_LightBufferReadback" };
+            buf.LightBuffer.RequestReadback(rbCmd, (int)triOffset, readCount);
+            Graphics.ExecuteCommandBuffer(rbCmd);
+            rbCmd.Release();
+
+#if UNITY_EDITOR
+            var                                            lightBuffer  = buf.LightBuffer;
+            int                                            framesWaited = 0;
+            const int                                      maxFrames    = 180;
+            UnityEditor.EditorApplication.CallbackFunction poll         = null;
+            poll = () =>
+            {
+                framesWaited++;
+                if (lightBuffer.TryGetReadback(data, readCount))
+                {
+                    UnityEditor.EditorApplication.update -= poll;
+                    LogEmissiveTriangleReadback(sb, data, readCount, triOffset, triCount);
+                }
+                else if (framesWaited > maxFrames)
+                {
+                    UnityEditor.EditorApplication.update -= poll;
+                    sb.AppendLine($"  Readback timed out after {maxFrames} frames (is the scene rendering?).");
+                    Debug.Log(sb.ToString());
+                }
+            };
+            UnityEditor.EditorApplication.update += poll;
+#else
+            sb.AppendLine("  Readback polling is editor-only.");
+            Debug.Log(sb.ToString());
+#endif
+        }
+
+        // Decodes and visualizes the emissive-triangle light entries read back from LightBuffer.
+        private static void LogEmissiveTriangleReadback(
+            System.Text.StringBuilder sb, RtxptPolymorphicLightInfo[] data, int readCount, uint triOffset, uint triCount)
+        {
+            int   nonZero  = 0;
+            float drawTime = 30f; // seconds visible in scene view
+            var   segments = new List<(Vector3 a, Vector3 b, Color c)>();
+
+            for (int i = 0; i < readCount; i++)
+            {
+                var  info   = data[i];
+                uint logRad = info.LogRadiance & 0xFFFFu;
+                float intensity = (logRad == 0)
+                    ? 0f
+                    : Unity.Mathematics.math.exp2(((logRad - 1) / 65534f) * 48f - 8f);
+                if (intensity < 0.001f) continue;
+                nonZero++;
+
+                // Decode color (RGB8 in bits 0-23 of ColorTypeAndFlags)
+                float normR = (info.ColorTypeAndFlags & 0xFFu) / 255f;
+                float normG = ((info.ColorTypeAndFlags >> 8) & 0xFFu) / 255f;
+                float normB = ((info.ColorTypeAndFlags >> 16) & 0xFFu) / 255f;
+                var   col   = new Color(normR, normG, normB, 1f); // use hue only, not intensity (too large)
+
+                // Direction1/Direction2/Scalars pack edge1.xyz and edge2.xyz as fp16 pairs:
+                //   low  16 bits → edge1 component,  high 16 bits → edge2 component
+                // Center = base + (edge1 + edge2) / 3  (triangle centroid)
+                var center = new Vector3(info.CenterX, info.CenterY, info.CenterZ);
+                var edge1 = new Vector3(
+                    Mathf.HalfToFloat((ushort)(info.Direction1 & 0xFFFFu)),
+                    Mathf.HalfToFloat((ushort)(info.Direction2 & 0xFFFFu)),
+                    Mathf.HalfToFloat((ushort)(info.Scalars & 0xFFFFu)));
+                var edge2 = new Vector3(
+                    Mathf.HalfToFloat((ushort)((info.Direction1 >> 16) & 0xFFFFu)),
+                    Mathf.HalfToFloat((ushort)((info.Direction2 >> 16) & 0xFFFFu)),
+                    Mathf.HalfToFloat((ushort)((info.Scalars >> 16) & 0xFFFFu)));
+                var normal  = Vector3.Cross(edge1, edge2).normalized;
+                var triBase = center - (edge1 + edge2) / 3f; // recover base vertex
+
+                // Triangle outline + normal
+                float size = 0.05f;
+                segments.Add((triBase, triBase + edge1, col));
+                segments.Add((triBase, triBase + edge2, col));
+                segments.Add((triBase + edge1, triBase + edge2, col));
+                segments.Add((center, center + normal * (size * 3f), col));
+
+                if (nonZero <= 16)
+                {
+                    uint typeCode = (info.ColorTypeAndFlags >> 24) & 0xFu;
+                    sb.AppendLine($"    [{(int)triOffset + i}] type={typeCode}  intensity={intensity:F3}" +
+                                  $"  center=({info.CenterX:F2},{info.CenterY:F2},{info.CenterZ:F2})" +
+                                  $"  normal=({normal.x:F2},{normal.y:F2},{normal.z:F2})" +
+                                  $"  e1=({edge1.x:F2},{edge1.y:F2},{edge1.z:F2})");
+                }
+            }
+
+            sb.AppendLine($"  Non-zero entries in first {readCount}: {nonZero}  (draws visible for {drawTime}s in Scene view)");
+            if (triCount > (uint)readCount)
+                sb.AppendLine($"  (only first {readCount} of {triCount} entries read back)");
+
+            Debug.Log(sb.ToString());
+
+#if UNITY_EDITOR
+            ShowDebugSegments(segments, drawTime);
+#endif
+        }
+
+#if UNITY_EDITOR
+        // Editor-safe debug line drawing. Debug.DrawLine is unreliable outside play mode, so we
+        // draw the collected segments with Handles via SceneView.duringSceneGui, forcing repaints
+        // until the expiry time, then unhook. Visible in the Scene view regardless of play state.
+        private static List<(Vector3 a, Vector3 b, Color c)> s_debugSegments;
+        private static double                                s_debugExpiry;
+        private static bool                                  s_debugHooked;
+
+        private static void ShowDebugSegments(List<(Vector3 a, Vector3 b, Color c)> segments, float seconds)
+        {
+            s_debugSegments = segments;
+            s_debugExpiry   = UnityEditor.EditorApplication.timeSinceStartup + seconds;
+
+            if (!s_debugHooked)
+            {
+                s_debugHooked                        =  true;
+                UnityEditor.SceneView.duringSceneGui += OnSceneGuiDrawDebug;
+                UnityEditor.EditorApplication.update += RepaintWhileDebugging;
+            }
+
+            UnityEditor.SceneView.RepaintAll();
+        }
+
+        private static void OnSceneGuiDrawDebug(UnityEditor.SceneView sv)
+        {
+            if (s_debugSegments == null) return;
+            foreach (var (a, b, c) in s_debugSegments)
+            {
+                UnityEditor.Handles.color = c;
+                UnityEditor.Handles.DrawLine(a, b);
+            }
+        }
+
+        private static void RepaintWhileDebugging()
+        {
+            if (UnityEditor.EditorApplication.timeSinceStartup < s_debugExpiry)
+            {
+                UnityEditor.SceneView.RepaintAll();
+                return;
+            }
+
+            // Expired — unhook and clear.
+            UnityEditor.SceneView.duringSceneGui -= OnSceneGuiDrawDebug;
+            UnityEditor.EditorApplication.update -= RepaintWhileDebugging;
+            s_debugHooked                        =  false;
+            s_debugSegments                      =  null;
+        }
+#endif
+
+        /// <summary>
+        /// Debug readback for the NEE-AT data path.
+        /// Run with setting.neeType = NEEAT for a few frames before clicking.
+        /// </summary>
+        public void TestNeeAtReadback()
+        {
+            NativeRtxptBufferResources  buf = null;
+            NativeRtxptTextureResources tex = null;
+
+            foreach (var kv in _bufferPools)
+            {
+                buf = kv.Value;
+                break;
+            }
+
+            foreach (var kv in _texturePools)
+            {
+                tex = kv.Value;
+                break;
+            }
+
+            if (buf?.LightControlBuffer == null || tex == null)
+            {
+                Debug.LogWarning("[NativeRtxptFeature] NEE-AT readback unavailable - run the scene for a few frames first.");
+                return;
+            }
+
+            var  ctrl                 = buf.LastLightControlData;
+            uint invalidFeedbackCount = ReadUIntAt(buf.LightProxyCounters, (int)ctrl.TotalLightCount);
+            uint derivedValidFeedback = ctrl.TotalMaxFeedbackCount > invalidFeedbackCount
+                ? ctrl.TotalMaxFeedbackCount - invalidFeedbackCount
+                : 0u;
+
+            var sb = new System.Text.StringBuilder();
+            sb.AppendLine("[Rtxpt NEE-AT Readback]");
+            sb.AppendLine($"  Inspector: useNEE={setting?.useNEE} neeType={setting?.neeType} candidateSamples={setting?.neeCandidateSamples} fullSamples={setting?.neeFullSamples}");
+            sb.AppendLine($"  Control: importanceType={ctrl.ImportanceSamplingType} temporalRequired={ctrl.TemporalFeedbackRequired} lastTemporal={ctrl.LastFrameTemporalFeedbackAvailable} lastLocal={ctrl.LastFrameLocalSamplesAvailable}");
+            sb.AppendLine($"  Lights: total={ctrl.TotalLightCount} env={ctrl.EnvmapQuadNodeCount} analytic={ctrl.AnalyticLightCount} emissiveTriangles={ctrl.TriangleLightCount}");
+            sb.AppendLine($"  Proxies: samplingProxyCount={ctrl.SamplingProxyCount} proxyBuildTaskCount={ctrl.ProxyBuildTaskCount} validFeedback={derivedValidFeedback}/{ctrl.TotalMaxFeedbackCount} invalidFeedback={invalidFeedbackCount}");
+            sb.AppendLine($"  LocalSampling: resolution={ctrl.LocalSamplingResolutionX}x{ctrl.LocalSamplingResolutionY} tileBufferHeight={ctrl.TileBufferHeight} bufferCount={buf.LocalSamplingBuffer?.count ?? 0}");
+            sb.AppendLine(
+                $"  Feedback: resolution={ctrl.BakerConstants.FeedbackResolutionX}x{ctrl.BakerConstants.FeedbackResolutionY} blended={ctrl.BakerConstants.BlendedFeedbackResolutionX}x{ctrl.BakerConstants.BlendedFeedbackResolutionY}");
+            sb.AppendLine(
+                $"  Weights: currentOffset={ctrl.BakerConstants.CurrentWeightsBufferOffset} historicOffset={ctrl.BakerConstants.HistoricWeightsBufferOffset} globalFeedbackWeight={ctrl.GlobalFeedbackUseWeight:F3} localToGlobal={ctrl.LocalToGlobalSampleRatio:F3}");
+
+            AppendFloatBufferStats(sb, "LightWeights.current", buf.LightWeightsBuffer, (int)ctrl.BakerConstants.CurrentWeightsBufferOffset, (int)Math.Min(ctrl.TotalLightCount + 1u, 4096u));
+            AppendUIntBufferStats(sb, "LightProxyCounters", buf.LightProxyCounters, 0, (int)Math.Min(ctrl.TotalLightCount + 1u, 4096u));
+            AppendUIntBufferStats(sb, "LightSamplingProxies", buf.LightSamplingProxies, 0, Mathf.Min(buf.LightSamplingProxies?.count ?? 0, 4096));
+            AppendUIntBufferStats(sb, "LocalSamplingBuffer", buf.LocalSamplingBuffer, 0, Mathf.Min(buf.LocalSamplingBuffer?.count ?? 0, 4096));
+
+            AppendFloatTextureStats(sb, "FeedbackTotalWeight", tex.LightFeedbackTotalWeight, 8192);
+            AppendUIntTextureStats(sb, "FeedbackCandidates", tex.LightFeedbackCandidates, 8192);
+            AppendFloatTextureStats(sb, "FeedbackTotalWeightBlended", tex.FeedbackTotalWeightBlended, 8192);
+            AppendUIntTextureStats(sb, "FeedbackCandidatesBlended", tex.FeedbackCandidatesBlended, 8192);
+
+            if (ctrl.ImportanceSamplingType != 2 || ctrl.TemporalFeedbackRequired == 0)
+                sb.AppendLine("  RESULT: NEE-AT is not enabled in LightingControl. Set NativeRtxptSetting.neeType = NEEAT and useNEE = true.");
+            else if (ctrl.SamplingProxyCount == 0)
+                sb.AppendLine("  RESULT: NEE-AT config is active, but proxy data is empty. Check light counts, env/emissive setup, and proxy build passes.");
+            else if (ctrl.LastFrameTemporalFeedbackAvailable == 0)
+                sb.AppendLine("  RESULT: First-frame warmup state. Wait a few frames, then read back again.");
+            else
+                sb.AppendLine("  RESULT: NEE-AT control/proxy/local-sampling path is producing data.");
+
+            Debug.Log(sb.ToString());
+        }
+
+        private static void AppendFloatBufferStats(System.Text.StringBuilder sb, string label, GraphicsBuffer buffer, int start, int count)
+        {
+            if (buffer == null || count <= 0 || start < 0 || start >= buffer.count)
+            {
+                sb.AppendLine($"  {label}: unavailable");
+                return;
+            }
+
+            count = Mathf.Min(count, buffer.count - start);
+            var data = new float[count];
+            buffer.GetData(data, 0, start, count);
+
+            int    nonZero = 0;
+            float  min     = float.PositiveInfinity;
+            float  max     = float.NegativeInfinity;
+            double sum     = 0.0;
+            for (int i = 0; i < data.Length; i++)
+            {
+                float v = data[i];
+                if (float.IsNaN(v) || float.IsInfinity(v)) continue;
+                if (Mathf.Abs(v) > 1e-8f) nonZero++;
+                min =  Mathf.Min(min, v);
+                max =  Mathf.Max(max, v);
+                sum += v;
+            }
+
+            if (float.IsInfinity(min)) min = max = 0.0f;
+            sb.AppendLine($"  {label}: read={count} nonZero={nonZero} min={min:G4} max={max:G4} sum={sum:G5}");
+        }
+
+        private static uint ReadUIntAt(GraphicsBuffer buffer, int index)
+        {
+            if (buffer == null || index < 0 || index >= buffer.count)
+                return 0u;
+
+            var data = new uint[1];
+            buffer.GetData(data, 0, index, 1);
+            return data[0];
+        }
+
+        private static void AppendUIntBufferStats(System.Text.StringBuilder sb, string label, GraphicsBuffer buffer, int start, int count)
+        {
+            if (buffer == null || count <= 0 || start < 0 || start >= buffer.count)
+            {
+                sb.AppendLine($"  {label}: unavailable");
+                return;
+            }
+
+            count = Mathf.Min(count, buffer.count - start);
+            var data = new uint[count];
+            buffer.GetData(data, 0, start, count);
+            AppendUIntStats(sb, label, data);
+        }
+
+        private static void AppendFloatTextureStats(System.Text.StringBuilder sb, string label, Nri.NriTextureResource tex, int maxSamples)
+        {
+            if (tex?.Handle == null)
+            {
+                sb.AppendLine($"  {label}: unavailable");
+                return;
+            }
+
+            var req = AsyncGPUReadback.Request(tex.Handle);
+            req.WaitForCompletion();
+            if (req.hasError)
+            {
+                sb.AppendLine($"  {label}: readback error");
+                return;
+            }
+
+            var    data    = req.GetData<float>();
+            int    count   = Mathf.Min(data.Length, maxSamples);
+            int    nonZero = 0;
+            float  min     = float.PositiveInfinity;
+            float  max     = float.NegativeInfinity;
+            double sum     = 0.0;
+            for (int i = 0; i < count; i++)
+            {
+                float v = data[i];
+                if (float.IsNaN(v) || float.IsInfinity(v)) continue;
+                if (Mathf.Abs(v) > 1e-8f) nonZero++;
+                min =  Mathf.Min(min, v);
+                max =  Mathf.Max(max, v);
+                sum += v;
+            }
+
+            if (float.IsInfinity(min)) min = max = 0.0f;
+            sb.AppendLine($"  {label}: read={count}/{data.Length} nonZero={nonZero} min={min:G4} max={max:G4} sum={sum:G5}");
+        }
+
+        private static void AppendUIntTextureStats(System.Text.StringBuilder sb, string label, Nri.NriTextureResource tex, int maxSamples)
+        {
+            if (tex?.Handle == null)
+            {
+                sb.AppendLine($"  {label}: unavailable");
+                return;
+            }
+
+            var req = AsyncGPUReadback.Request(tex.Handle);
+            req.WaitForCompletion();
+            if (req.hasError)
+            {
+                sb.AppendLine($"  {label}: readback error");
+                return;
+            }
+
+            var data   = req.GetData<uint>();
+            int count  = Mathf.Min(data.Length, maxSamples);
+            var sample = new uint[count];
+            for (int i = 0; i < count; i++)
+                sample[i] = data[i];
+            AppendUIntStats(sb, label, sample, data.Length);
+        }
+
+        private static void AppendUIntStats(System.Text.StringBuilder sb, string label, uint[] data, int totalCount = -1)
+        {
+            int   nonZero    = 0;
+            int   invalid    = 0;
+            uint  min        = uint.MaxValue;
+            uint  max        = 0;
+            ulong sumLowBits = 0;
+            for (int i = 0; i < data.Length; i++)
+            {
+                uint v = data[i];
+                if (v != 0) nonZero++;
+                if (v == 0xffffffffu) invalid++;
+                if (v < min) min = v;
+                if (v > max) max = v;
+                sumLowBits += v & 0xffffu;
+            }
+
+            if (data.Length == 0) min = 0;
+            string suffix             = totalCount >= 0 ? $"/{totalCount}" : "";
+            sb.AppendLine($"  {label}: read={data.Length}{suffix} nonZero={nonZero} invalid=0xFFFFFFFF:{invalid} min={min} max={max} sumLow16={sumLowBits}");
+        }
+
+
         public void AutoFillShaders()
         {
             const string shaderRoot = "Assets/RTXPT/Shaders";
 
-            // Phase 2: PathTracer RT shaders
-            buildStablePlanesShader = LoadRs($"{shaderRoot}/BuildStablePlanes");
-            fillStablePlanesShader  = LoadRs($"{shaderRoot}/FillStablePlanes");
-            referenceShader         = LoadRs($"{shaderRoot}/Reference");
+            // Phase 2a/2d: PathTracer RT shaders
+            buildStablePlanesShader              = LoadRs($"{shaderRoot}/BuildStablePlanes");
+            fillStablePlanesShader               = LoadRs($"{shaderRoot}/FillStablePlanes");
+            referenceShader                      = LoadRs($"{shaderRoot}/Reference");
+            exportVisibilityBufferCs             = LoadCs($"{shaderRoot}/ProcessingPasses/ExportVisibilityBuffer");
+            denoiseSpecHitTCs                    = LoadCs($"{shaderRoot}/ProcessingPasses/DenoisingGuidesBaker_DenoiseSpecHitT");
+            dlssBeforeCs                         = LoadCs($"{shaderRoot}/ProcessingPasses/PostProcess_DenoiserPrepareInputsDlssRR");
+            bloomDownsampleRasterShader          = LoadRas($"{shaderRoot}/ToneMapper/BloomDownsample");
+            bloomBlurRasterShader                = LoadRas($"{shaderRoot}/ToneMapper/BloomBlur");
+            bloomCompositeRasterShader           = LoadRas($"{shaderRoot}/ToneMapper/BloomComposite");
+            luminanceRasterShader                = LoadRas($"{shaderRoot}/ToneMapper/Luminance");
+            captureLuminanceCs                   = LoadCs($"{shaderRoot}/ToneMapper/capture_cs");
+            toneMapApplyRasterShader             = LoadRas($"{shaderRoot}/ToneMapper/ToneMapping");
+            accumulationCs                       = LoadCs($"{shaderRoot}/ProcessingPasses/AccumulationPass");
+            stablePlanesDebugVizCs               = LoadCs($"{shaderRoot}/ProcessingPasses/PostProcess_StablePlanesDebugViz");
+            shaderDebugTrianglesRasterShader     = LoadRas($"{shaderRoot}/ShaderDebug/ShaderDebugTriangles");
+            shaderDebugLinesRasterShader         = LoadRas($"{shaderRoot}/ShaderDebug/ShaderDebugLines");
+            shaderDebugFeedbackLinesRasterShader = LoadRas($"{shaderRoot}/ShaderDebug/ShaderDebugFeedbackLines");
+            shaderDebugBlendVizRasterShader      = LoadRas($"{shaderRoot}/ShaderDebug/ShaderDebugBlendViz");
+            skinnedRepackCs                      = UnityEditor.AssetDatabase.LoadAssetAtPath<ComputeShader>($"{shaderRoot}/Misc/SkinnedRepack.compute");
+            if (skinnedRepackCs == null)
+                Debug.LogWarning($"[NativeRtxptFeature] Missing ComputeShader at: {shaderRoot}/Misc/SkinnedRepack.compute");
 
-            // Phase 3
-            exportVisibilityBufferCs = LoadCs($"{shaderRoot}/ProcessingPasses/ExportVisibilityBuffer");
+            string lightRoot   = $"{shaderRoot}/Lighting";
+            string distantRoot = $"{lightRoot}/Distant";
+            baseLayerCs             = LoadCs($"{distantRoot}/BaseLayerCS");
+            mipReduceCs             = LoadCs($"{distantRoot}/MIPReduceCS");
+            envMapImportanceBakerCs = LoadCs($"{distantRoot}/EnvMapImportanceSamplingBaker");
+            mipMapGenCs             = LoadCs($"{distantRoot}/mipmapgen_cs");
+            bc6uCompressCs          = LoadCs($"{distantRoot}/BC6UCompress");
 
-            // Phase 4
-            denoiseSpecHitTCs = LoadCs($"{shaderRoot}/ProcessingPasses/DenoisingGuidesBaker_DenoiseSpecHitT");
+            resetLightProxyCountersCs     = LoadCs($"{lightRoot}/ResetLightProxyCounters");
+            resetPastToCurrentHistoryCs   = LoadCs($"{lightRoot}/ResetPastToCurrentHistory");
+            computeWeightsCs              = LoadCs($"{lightRoot}/ComputeWeights");
+            computeProxyCountsCs          = LoadCs($"{lightRoot}/ComputeProxyCounts");
+            computeProxyBaselineOffsetsCs = LoadCs($"{lightRoot}/ComputeProxyBaselineOffsets");
+            createProxyJobsCs             = LoadCs($"{lightRoot}/CreateProxyJobs");
+            executeProxyJobsCs            = LoadCs($"{lightRoot}/ExecuteProxyJobs");
+            bakeEmissiveTrianglesCs       = LoadCs($"{lightRoot}/BakeEmissiveTriangles");
 
-            // Phase 5
-            noDenoiserFinalMergeCs = LoadCs($"{shaderRoot}/ProcessingPasses/PostProcess_NoDenoiserFinalMerge");
+            processFeedbackHistoryPreFilterCs = LoadCs($"{lightRoot}/ProcessFeedbackHistoryPreFilter");
+            processFeedbackHistoryP0Cs        = LoadCs($"{lightRoot}/ProcessFeedbackHistoryP0");
 
-            // Phase 6
-            dlssBeforeCs = LoadCs($"{shaderRoot}/ProcessingPasses/PostProcess_DenoiserPrepareInputsDlssRR");
-
-            // Phase 8
-            accumulationCs = LoadCs($"{shaderRoot}/ProcessingPasses/AccumulationPass");
+            processFeedbackHistoryP1aCs      = LoadCs($"{lightRoot}/ProcessFeedbackHistoryP1a");
+            processFeedbackHistoryP1bCs      = LoadCs($"{lightRoot}/ProcessFeedbackHistoryP1b");
+            processFeedbackHistoryP2Cs       = LoadCs($"{lightRoot}/ProcessFeedbackHistoryP2");
+            processFeedbackHistoryP3Cs       = LoadCs($"{lightRoot}/ProcessFeedbackHistoryP3");
+            clearFeedbackHistoryCs           = LoadCs($"{lightRoot}/ClearFeedbackHistory");
+            debugDrawLightsCs                = LoadCs($"{lightRoot}/DebugDrawLights");
+            processFeedbackHistoryDebugVizCs = LoadCs($"{lightRoot}/ProcessFeedbackHistoryDebugViz");
 
             UnityEditor.EditorUtility.SetDirty(this);
             return;
@@ -401,6 +1108,14 @@ namespace PathTracing
                 var s = UnityEditor.AssetDatabase.LoadAssetAtPath<RayTraceShader>(path + ".rayshader");
                 if (s == null)
                     Debug.LogWarning($"[NativeRtxptFeature] Missing RayTraceShader at: {path}");
+                return s;
+            }
+
+            static NativeRasterShader LoadRas(string path)
+            {
+                var s = UnityEditor.AssetDatabase.LoadAssetAtPath<NativeRasterShader>(path + ".rastershader");
+                if (s == null)
+                    Debug.LogWarning($"[NativeRtxptFeature] Missing NativeRasterShader at: {path}");
                 return s;
             }
         }

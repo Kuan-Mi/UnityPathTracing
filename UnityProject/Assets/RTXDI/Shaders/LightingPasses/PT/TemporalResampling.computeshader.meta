@@ -8,7 +8,6 @@ ScriptedImporter:
   assetBundleName: 
   assetBundleVariant: 
   script: {fileID: 11500000, guid: ea13329833ed16543aa33a7c88f8c5bf, type: 3}
-  isComputeShader: 1
   additionalIncludePaths:
   - ../RenderingPlugin/External/RTXDI-Library/Include
   - ../RenderingPlugin/External/donut/include
@@ -17,9 +16,11 @@ ScriptedImporter:
   extraArgs:
   - -Wno-conversion
   - -enable-16bit-types
+  - -O0
   defines:
   - USE_RAY_QUERY=1
   entryPoint: main
   targetProfile: cs_6_6
   rootConstantsHints: []
   rootSRVHints: []
+  samplerBindings: []

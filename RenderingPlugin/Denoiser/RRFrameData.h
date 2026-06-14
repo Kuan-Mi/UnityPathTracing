@@ -29,8 +29,10 @@ struct RRFrameData
     float cameraJitter[2];
 
     int instanceId;
+    bool useSpecularMotionVector; // true: 传入mv，false: 传入hitT
     nri::UpscalerMode upscalerMode;
-    
+    uint8_t preset; // 0 = default RR network; otherwise NVSDK_NGX_RayReconstruction_Hint_Render_Preset (e.g. D=4, E=5)
+
 };
 
 #pragma pack(pop)

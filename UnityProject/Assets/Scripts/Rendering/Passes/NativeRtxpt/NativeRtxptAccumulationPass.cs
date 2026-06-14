@@ -1,5 +1,7 @@
 using System;
+using System.Runtime.InteropServices;
 using NativeRender;
+using Unity.Mathematics;
 using UnityEngine.Rendering;
 using UnityEngine.Rendering.RenderGraphModule;
 using UnityEngine.Rendering.Universal;
@@ -20,12 +22,23 @@ namespace PathTracing
     /// </summary>
     public class NativeRtxptAccumulationPass : ScriptableRenderPass, IDisposable
     {
+        [StructLayout(LayoutKind.Sequential, Pack = 4)]
+        private struct AccumulationConstants
+        {
+            public float2 outputSize;
+            public float2 inputSize;
+            public float2 inputTextureSizeInv;
+            public float2 pixelOffset;
+            public float  blendFactor;
+        }
+
         private readonly NativeComputePipeline      _cs;
         private readonly NativeComputeDescriptorSet _ds;
         private          NativeRtxptPassContext     _ctx;
 
         public NativeRtxptAccumulationPass(NativeComputeShader shader)
         {
+            // Root-constant hints (g_Const) live on the .computeshader asset (the importer).
             _cs = new NativeComputePipeline(shader);
             _ds = new NativeComputeDescriptorSet(_cs);
         }
@@ -51,7 +64,7 @@ namespace PathTracing
 
         public override void RecordRenderGraph(RenderGraph renderGraph, ContextContainer frameData)
         {
-            using var builder = renderGraph.AddUnsafePass<PassData>("NativeRtxpt.Accumulation", out var passData);
+            using var builder = renderGraph.AddUnsafePass<PassData>("Accumulation", out var passData);
             passData.Cs  = _cs;
             passData.Ds  = _ds;
             passData.Ctx = _ctx;
@@ -61,17 +74,33 @@ namespace PathTracing
 
         // ── Execute ───────────────────────────────────────────────────────────
 
-        private static void ExecutePass(PassData data, UnsafeGraphContext context)
+        private static unsafe void ExecutePass(PassData data, UnsafeGraphContext context)
         {
             var cmd = CommandBufferHelpers.GetNativeCommandBuffer(context.cmd);
             var ctx = data.Ctx;
             var ds  = data.Ds;
             var res = ctx.Textures;
 
-            cmd.BeginSample("Rtxpt.Accumulation");
+            cmd.BeginSample("Accumulation");
 
-            if (ctx.ConstantBuffer != null)
-                ds.SetConstantBuffer("g_Const", ctx.ConstantBuffer.GetNativeBufferPtr());
+            var inputSize  = new float2(ctx.RenderResolution.x, ctx.RenderResolution.y);
+            var outputSize = new float2(ctx.DisplayResolution.x, ctx.DisplayResolution.y);
+            // Original (Sample.cpp:2665): weight = accumIndex < target ? 1/(max(0,accumIndex)+1) : 0.
+            // Negative index = pre-warm — weight 1 just displays the current frame; weight 0 once
+            // the target is reached keeps showing the converged accumulation.
+            int accumIndex = ctx.FrameState.accumulationSampleIndex;
+            float blendFactor = accumIndex < ctx.Setting.accumulationTarget
+                ? 1.0f / (math.max(0, accumIndex) + 1)
+                : 0.0f;
+            var constants = new AccumulationConstants
+            {
+                outputSize          = outputSize,
+                inputSize           = inputSize,
+                inputTextureSizeInv = 1.0f / inputSize,
+                pixelOffset         = float2.zero,
+                blendFactor         = blendFactor,
+            };
+            ds.SetRootConstants("g_Const", &constants);
 
             // SRV input: noisy PT output
             ds.SetTexture("t_InputColor", res.OutputColor.NativePtr);
@@ -86,7 +115,7 @@ namespace PathTracing
             uint gy = ((uint)ctx.DisplayResolution.y + 7u) / 8u;
             data.Cs.Dispatch(cmd, ds, gx, gy, 1);
 
-            cmd.EndSample("Rtxpt.Accumulation");
+            cmd.EndSample("Accumulation");
         }
     }
 }

@@ -43,8 +43,6 @@ namespace NativeRender
     {
         public bool isTransparent;
         public bool isEmissive;
-
-        /// <summary>True when any submesh in the group uses alpha-clip; GEOMETRY_OPAQUE is NOT set for these geometries.</summary>
         public bool isAlphaClip;
 
         /// <summary>Indices into the Mesh's subMeshCount — also indices into SubmeshMaterialInfos.</summary>
@@ -211,7 +209,7 @@ namespace NativeRender
                 data.textures[0] = TryGetTex(mat, "baseColorTexture") ?? White;
                 data.textures[1] = TryGetTex(mat, "metallicRoughnessTexture") ?? Black;
 
-                var normal = TryGetTex(mat, "normalTexture");
+                var normal = TryGetTex(mat, "normalTexture") ?? FlatNormal;
                 if (normal.height <= 4)
                 {
                     normal = FlatNormal;

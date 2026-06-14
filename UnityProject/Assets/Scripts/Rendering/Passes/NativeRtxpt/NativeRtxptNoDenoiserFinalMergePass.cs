@@ -51,7 +51,7 @@ namespace PathTracing
 
         public override void RecordRenderGraph(RenderGraph renderGraph, ContextContainer frameData)
         {
-            using var builder = renderGraph.AddUnsafePass<PassData>("NativeRtxpt.NoDenoiserFinalMerge", out var passData);
+            using var builder = renderGraph.AddUnsafePass<PassData>("NoDenoiserFinalMerge", out var passData);
             passData.Cs  = _cs;
             passData.Ds  = _ds;
             passData.Ctx = _ctx;
@@ -69,25 +69,25 @@ namespace PathTracing
             var res = ctx.Textures;
             var buf = ctx.Buffers;
 
-            cmd.BeginSample("Rtxpt.NoDenoiserFinalMerge");
+            cmd.BeginSample("NoDenoiserFinalMerge");
 
             if (ctx.ConstantBuffer != null)
-                ds.SetConstantBuffer("g_Const", ctx.ConstantBuffer.GetNativeBufferPtr());
+                ds.SetConstantBuffer("g_Const", ctx.ConstantBuffer);
 
             ds.SetRWTexture("u_OutputColor", res.OutputColor.NativePtr);
             ds.SetRWTexture("u_StablePlanesHeader", res.StablePlanesHeader.NativePtr);
             ds.SetRWTexture("u_StableRadiance", res.StableRadiance.NativePtr);
 
-            if (buf?.StablePlanesBuffer != null)
+            if (buf?.StablePlanesBufferPtr != IntPtr.Zero)
                 ds.SetRWStructuredBuffer("u_StablePlanesBuffer",
-                    buf.StablePlanesBuffer.GetNativeBufferPtr(),
+                    buf.StablePlanesBufferPtr,
                     buf.StablePlanesBuffer.count, buf.StablePlanesBuffer.stride);
 
             uint gx = ((uint)ctx.RenderResolution.x + 7u) / 8u;
             uint gy = ((uint)ctx.RenderResolution.y + 7u) / 8u;
             data.Cs.Dispatch(cmd, ds, gx, gy, 1);
 
-            cmd.EndSample("Rtxpt.NoDenoiserFinalMerge");
+            cmd.EndSample("NoDenoiserFinalMerge");
         }
     }
 }

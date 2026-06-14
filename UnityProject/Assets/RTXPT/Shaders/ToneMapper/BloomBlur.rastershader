@@ -1,0 +1,20 @@
+/*
+* RTXPT bloom separable Gaussian blur — thin verbatim wrapper, two #includes selected by stage:
+*   VS = donut fullscreen_vs.hlsl (4-vertex triangle-strip quad, outputs UV) — VERBATIM
+*   PS = donut passes/bloom_ps.hlsl (entry `main`, separable Gaussian) — VERBATIM
+*
+* Run twice per frame (horizontal then vertical) by uploading a different c_Bloom (pixstep). This is
+* the exact pixel shader donut BloomPass runs on its m_FullscreenVS; the NR_VERTEX_SHADER /
+* NR_PIXEL_SHADER guards keep the two `main` entry points from colliding when DXC parses each stage.
+* fullscreen_vs needs QUAD_Z=0; draw it with vertexCount = 4 + TRIANGLESTRIP topology.
+*/
+
+#pragma pack_matrix(row_major)
+
+#ifdef NR_VERTEX_SHADER
+#include "fullscreen_vs.hlsl"
+#endif
+
+#ifdef NR_PIXEL_SHADER
+#include "passes/bloom_ps.hlsl"
+#endif

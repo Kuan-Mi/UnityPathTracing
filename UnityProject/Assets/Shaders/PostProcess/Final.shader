@@ -386,6 +386,8 @@
 
             float3 SRGBToLinear(float3 srgb)
             {
+                return  pow( srgb, 2.2);
+                
                 float3 linear1;
                 linear1.r = (srgb.r <= 0.04045) ? (srgb.r / 12.92) : pow((srgb.r + 0.055) / 1.055, 2.4);
                 linear1.g = (srgb.g <= 0.04045) ? (srgb.g / 12.92) : pow((srgb.g + 0.055) / 1.055, 2.4);
@@ -393,8 +395,9 @@
                 return linear1;
             }
 
-            float LinearToSRGB(float linear1)
+            float3 LinearToSRGB(float3 linear1)
             {
+                return pow(linear1, 1.0 / 2.2);
                 return (linear1 <= 0.0031308) ? (linear1 * 12.92) : (1.055 * pow(linear1, 1.0 / 2.4) - 0.055);
             }
 
@@ -410,8 +413,13 @@
                 float3 rgb = SAMPLE_TEXTURE2D(_BlitTexture, sampler_BlitTexture, i.uv).rgb;
 
                 // float3 linearRgb = LinearToSRGB(rgb);
-
-
+                //
+                // // linearRgb.r = 1 - linearRgb.r;
+                //
+                // rgb = SRGBToLinear(linearRgb);
+                // // rgb.r = 1 - rgb.r;
+                // // rgb.g = 1 - rgb.g;
+  
                 return float4(rgb, 1);
             }
             ENDHLSL
@@ -781,8 +789,14 @@
 
                 // ViewZ 存储的是负值（view space, camera looks down -Z）
                 float viewZ = SAMPLE_TEXTURE2D(_BlitTexture, sampler_BlitTexture, i.uv).r;
-                float depth = -viewZ; // 转为正数
+                float depth = abs(viewZ); // 转为正数
 
+                
+                
+// float linear01 = Linear01Depth(depth, _ZBufferParams);
+// float linearEye = LinearEyeDepth(depth, _ZBufferParams);
+                
+                
                 // 对数映射：更好地显示近处细节
                 float normalized = log2(1.0 + depth) / log2(1.0 + 1000.0);
                 normalized = saturate(normalized);

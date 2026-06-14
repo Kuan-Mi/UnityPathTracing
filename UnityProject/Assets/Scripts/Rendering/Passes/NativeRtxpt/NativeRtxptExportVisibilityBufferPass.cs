@@ -49,7 +49,7 @@ namespace PathTracing
 
         public override void RecordRenderGraph(RenderGraph renderGraph, ContextContainer frameData)
         {
-            using var builder = renderGraph.AddUnsafePass<PassData>("NativeRtxpt.ExportVisibilityBuffer", out var passData);
+            using var builder = renderGraph.AddUnsafePass<PassData>("VBufferExport", out var passData);
             passData.Cs  = _cs;
             passData.Ds  = _ds;
             passData.Ctx = _ctx;
@@ -66,19 +66,18 @@ namespace PathTracing
             var ds  = data.Ds;
             var res = ctx.Textures;
 
-            cmd.BeginSample("Rtxpt.ExportVisibilityBuffer");
+            cmd.BeginSample("VBufferExport");
 
-            if (ctx.ConstantBuffer != null)
-                ds.SetConstantBuffer("g_Const", ctx.ConstantBuffer.GetNativeBufferPtr());
-
+            ds.SetConstantBuffer("g_Const", ctx.ConstantBuffer);
             ds.SetRWTexture("u_MotionVectors", res.ScreenMotionVectors.NativePtr);
             ds.SetRWTexture("u_Depth", res.Depth.NativePtr);
+            ds.SetRWTexture("u_ShaderDebugVizTextureBuffer", res.ShaderDebugViz.NativePtr);
 
             uint gx = ((uint)ctx.RenderResolution.x + 7u) / 8u;
             uint gy = ((uint)ctx.RenderResolution.y + 7u) / 8u;
             data.Cs.Dispatch(cmd, ds, gx, gy, 1);
 
-            cmd.EndSample("Rtxpt.ExportVisibilityBuffer");
+            cmd.EndSample("VBufferExport");
         }
     }
 }

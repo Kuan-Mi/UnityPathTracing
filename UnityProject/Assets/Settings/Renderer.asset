@@ -1,5 +1,176 @@
 %YAML 1.1
 %TAG !u! tag:unity3d.com,2011:
+--- !u!114 &-109193640429523280
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 324cab2d455449e4b9e70b945e4d8e49, type: 3}
+  m_Name: NativeRtxptFeature
+  m_EditorClassIdentifier: Assembly-CSharp::PathTracing.NativeRtxptFeature
+  m_Active: 1
+  setting:
+    realtimeMode: 1
+    realtimeAA: 3
+    upscalerMode: 3
+    dlssRRPreset: 5
+    cameraJitter: 1
+    cameraAperture: 0
+    cameraFocalDistance: 10000
+    realtimeSamplesPerPixel: 1
+    bounceCount: 18
+    diffuseBounceCount: 2
+    texLODBias: -1
+    accumulationTarget: 4096
+    accumulationPreWarmRealtimeCaches: 1
+    accumulationAA: 1
+    useNEE: 1
+    neeType: 2
+    neeCandidateSamples: 5
+    neeFullSamples: 1
+    neeMisType: 1
+    neeatGlobalTemporalFeedbackWeight: 0.75
+    neeatLocalToGlobalSampleRatio: 0.65
+    neeatDistantVsLocalImportance: 1
+    neeatScreenSpaceVsWorldSpaceThreshold: 0.3
+    neeatDepthDisocclusionThreshold: 1.5
+    neeatReservoirHistoryDropoff: 0.005
+    neeatEnableMotionReprojection: 1
+    neeatImportanceBoostIntensityDelta: 64
+    neeatImportanceBoostFrustumMul: 8
+    neeatImportanceBoostFrustumFadeDistance: 5
+    neeatSceneAverageContentsDistance: 10
+    neeatSampleBakedEnvironment: 1
+    neeatImportanceBoostPreFilter: 1
+    neeatDbgDrawLights: 0
+    neeatDbgDrawTileLightConnections: 0
+    neeatDbgFreezeUpdates: 0
+    neeatDbgViewType: 0
+    neeatDbgDisableJitter: 0
+    neeatDbgDisableLastFrameFeedback: 0
+    neeatDbgFreezeFrustumUpdates: 0
+    enableLDSamplerForBSDF: 1
+    enableRussianRoulette: 1
+    nestedDielectricsQuality: 1
+    useFp16Types: 1
+    dxHitObjectExtension: 1
+    dxMaybeReorderThreads: 1
+    allowPrimarySurfaceReplacement: 1
+    stablePlanesSuppressPrimaryIndirectSpecular: 1
+    stablePlanesSuppressPrimaryIndirectSpecularK: 0.6
+    stablePlanesActiveCount: 3
+    stablePlanesMaxVertexDepth: 9
+    stablePlanesSplitStopThreshold: 0.95
+    stablePlanesAntiAliasingFallthrough: 0.6
+    realtimeFireflyFilterEnabled: 1
+    realtimeFireflyFilterThreshold: 0.1
+    referenceFireflyFilterEnabled: 1
+    referenceFireflyFilterThreshold: 5
+    denoiserRadianceClampK: 8
+    dlssrrBrightnessClampK: 4096
+    dlssrrMicroJitter: 0.1
+    tmpDisableDlssRR: 0
+    enableBloom: 0
+    bloomRadius: 8
+    bloomIntensity: 0.004
+    environmentMapDiffuseSampleMIPLevel: 2
+    environmentMapEnabled: 1
+    environmentMapIntensity: 1
+    environmentMapRotationY: 263.97
+    environmentMapTint: {r: 1, g: 1, b: 1, a: 1}
+    environmentMap: {fileID: 8900000, guid: f6c70be56cca30c438e7bcde1cb72f7c, type: 3}
+    enableToneMapping: 1
+    toneMapOperator: 4
+    autoExposure: 1
+    exposureCompensation: 1.3
+    exposureValue: -2
+    exposureValueMin: -4
+    exposureValueMax: 5
+    filmSpeed: 100
+    fNumber: 1
+    shutter: 1
+    toneMapWhiteBalance: 0
+    toneMapWhitePoint: 6500
+    toneMapWhiteMaxLuminance: 1
+    toneMapWhiteScale: 5.1
+    toneMapClamped: 1
+    showValidation: 0
+    enableShaderDebug: 0
+    showDebugLines: 0
+    debugLineScale: 0.05
+    debugPixelX: 368
+    debugPixelY: 151
+    continuousDebugFeedback: 0
+    dbgFreezeRealtimeNoiseSeed: 0
+    dbgDiscardNonNEELighting: 0
+    dbgDiscardNEELighting: 0
+    dbgDisablePostProcessFilters: 0
+    dbgDisableSERTerminationHint: 0
+    showMode: 0
+    debugViewType: 0
+    debugViewStablePlaneIndex: -1
+    skipRightEyeInVR: 1
+  renderPassEvent: 550
+  buildStablePlanesShader: {fileID: -6676421132958364438, guid: be311863611ef33419d1a1aead5b64a0, type: 3}
+  fillStablePlanesShader: {fileID: -6676421132958364438, guid: fd6d33330a3e97e43ac449908a5fe035, type: 3}
+  referenceShader: {fileID: -6676421132958364438, guid: ff675002877a45d4497da9c6e89e523e, type: 3}
+  buildHitGroups:
+  - {fileID: 4618623340242925623, guid: f2211fa4e496d5a4a82f6b4a069cdc08, type: 3}
+  - {fileID: 4618623340242925623, guid: e551595081865004ab6865917eb81087, type: 3}
+  fillHitGroups:
+  - {fileID: 4618623340242925623, guid: 6cc389b3a4b4e18409f4bbfd0ff031cb, type: 3}
+  - {fileID: 4618623340242925623, guid: 16aa14aa3cecec342b1af1dd46e0da99, type: 3}
+  referenceHitGroups:
+  - {fileID: 4618623340242925623, guid: 8e4d55a9917144e49992d45946efcf15, type: 3}
+  - {fileID: 4618623340242925623, guid: f268b9294a8fe9e4b94e7397da4786b6, type: 3}
+  skinnedRepackCs: {fileID: 7200000, guid: 08b45cae9272aad49975cb4b08980396, type: 3}
+  exportVisibilityBufferCs: {fileID: -2368575503658470205, guid: 1ff1244216fcd31478566758afd6b1ff, type: 3}
+  denoiseSpecHitTCs: {fileID: -2368575503658470205, guid: abb4162c8ba2cd041955d93cefb0143e, type: 3}
+  dlssBeforeCs: {fileID: -2368575503658470205, guid: a1b2c3d4e5f6a1b2c3d4e5f6a1b2c306, type: 3}
+  bloomDownsampleRasterShader: {fileID: 6164937308047190184, guid: 8a4d2b0c3e5f4a6b9d7c1e2f3a4b5c6d, type: 3}
+  bloomBlurRasterShader: {fileID: 6164937308047190184, guid: 7f3c1a9b2d4e4f5a8c6b0d1e2f3a4b5c, type: 3}
+  bloomCompositeRasterShader: {fileID: 6164937308047190184, guid: 9b5e3c1d4f60516cae8d2f3a4b5c6d7e, type: 3}
+  luminanceRasterShader: {fileID: 6164937308047190184, guid: 736da13794b44aa8aa9ad182c3d4ae2b, type: 3}
+  captureLuminanceCs: {fileID: -2368575503658470205, guid: 935928f7dbb94801bf0f9a2a4b9a10d9, type: 3}
+  toneMapApplyRasterShader: {fileID: 6164937308047190184, guid: dee04467b72143fc9d0f9deae4154fb9, type: 3}
+  accumulationCs: {fileID: -2368575503658470205, guid: 96ba0c67e691b484781846c8b20f6061, type: 3}
+  stablePlanesDebugVizCs: {fileID: -2368575503658470205, guid: a1b2c3d4e5f6a1b2c3d4e5f6a1b2c301, type: 3}
+  shaderDebugTrianglesRasterShader: {fileID: 6164937308047190184, guid: 3a1c92e4b7d04f1a8c5e6d9f0a2b4c6d, type: 3}
+  shaderDebugLinesRasterShader: {fileID: 6164937308047190184, guid: 4b2da3f5c8e15a2b9d6f7e0a1b3c5d7e, type: 3}
+  shaderDebugFeedbackLinesRasterShader: {fileID: 6164937308047190184, guid: 5c3eb4a6d9f26b3c0e7a8f1b2c4d6e8f, type: 3}
+  shaderDebugBlendVizRasterShader: {fileID: 6164937308047190184, guid: 6d4fc5b7eaf37c4d1f8b9a2c3d5e7f9a, type: 3}
+  baseLayerCs: {fileID: -2368575503658470205, guid: 106bca701da24f7a9ed113d910f8393d, type: 3}
+  mipReduceCs: {fileID: -2368575503658470205, guid: eab7ad2cc6ec40e4889e152e2958e911, type: 3}
+  envMapImportanceBakerCs: {fileID: -2368575503658470205, guid: 160f5c1d357e92a4eb92eb09a58ba1b7, type: 3}
+  mipMapGenCs: {fileID: -2368575503658470205, guid: 9f2c7b41e6a84d3590b1c8e2f0a7d6b3, type: 3}
+  bc6uCompressCs: {fileID: -2368575503658470205, guid: 66a8214e3c7589348a61934a0b724a55, type: 3}
+  envLightsBackupPastCs: {fileID: -2368575503658470205, guid: cf73e6cf697e4f138478b7b3025711ef, type: 3}
+  envLightsSubdivideBaseCs: {fileID: -2368575503658470205, guid: 55fd78dd2602429aa3889925f4f08b7f, type: 3}
+  envLightsSubdivideBoostCs: {fileID: -2368575503658470205, guid: 7d3bec58059446d78bef95b87ec5a63c, type: 3}
+  envLightsFillLookupMapCs: {fileID: -2368575503658470205, guid: de5fd4bbbb2849b8b041bc233379bb11, type: 3}
+  envLightsMapPastToCurrentCs: {fileID: -2368575503658470205, guid: 0330c94e2ff3413e856ac5ad84ff2458, type: 3}
+  resetLightProxyCountersCs: {fileID: -2368575503658470205, guid: d39e180f0a3b4801969e3c8626e4f939, type: 3}
+  resetPastToCurrentHistoryCs: {fileID: -2368575503658470205, guid: 882f9176fb34445f9b10491fca509467, type: 3}
+  computeWeightsCs: {fileID: -2368575503658470205, guid: 357734e515354e6e88e43b2a78219c90, type: 3}
+  computeProxyCountsCs: {fileID: -2368575503658470205, guid: ce571adbe4d247d5a14e91d557f28f6d, type: 3}
+  computeProxyBaselineOffsetsCs: {fileID: -2368575503658470205, guid: dd00e3d605f947ad946391f7217f322d, type: 3}
+  createProxyJobsCs: {fileID: -2368575503658470205, guid: fb8a3f0c6249439f98d3691c1c405d0a, type: 3}
+  executeProxyJobsCs: {fileID: -2368575503658470205, guid: fbef0b02cf5a4a318cfd39f808e415cf, type: 3}
+  bakeEmissiveTrianglesCs: {fileID: -2368575503658470205, guid: 00ace2221f9744748f666064d2858c5c, type: 3}
+  processFeedbackHistoryPreFilterCs: {fileID: -2368575503658470205, guid: 7bb4a6a209574968ad95a4360afa87aa, type: 3}
+  processFeedbackHistoryP0Cs: {fileID: -2368575503658470205, guid: e0f94af128ba49fda3ddf56baf27c568, type: 3}
+  processFeedbackHistoryP1aCs: {fileID: -2368575503658470205, guid: 08a2acfbd9ef4f3a804554de21da1810, type: 3}
+  processFeedbackHistoryP1bCs: {fileID: -2368575503658470205, guid: a266fce7cd9441b0a521b055622ade32, type: 3}
+  processFeedbackHistoryP2Cs: {fileID: -2368575503658470205, guid: 80685bbf11f9476ca61ac0c406dfb301, type: 3}
+  processFeedbackHistoryP3Cs: {fileID: -2368575503658470205, guid: 73a1be516d2c482494cab22b23855c24, type: 3}
+  clearFeedbackHistoryCs: {fileID: -2368575503658470205, guid: 0516581ad4c349f2ab07379494fff911, type: 3}
+  debugDrawLightsCs: {fileID: -2368575503658470205, guid: 6208e9f107294d6aa8207db6c3f2613c, type: 3}
+  processFeedbackHistoryDebugVizCs: {fileID: -2368575503658470205, guid: 44f9f61ababc4fc696da4c16f3ce74f5, type: 3}
+  outputBlitMaterial: {fileID: 2100000, guid: 27695a2bc55ef2f469362b9a2994989e, type: 2}
 --- !u!114 &11400000
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -25,8 +196,8 @@ MonoBehaviour:
     probeSamplingDebugTexture: {fileID: 2800000, guid: 24ec0e140fb444a44ab96ee80844e18e, type: 3}
     probeVolumeBlendStatesCS: {fileID: 7200000, guid: b9a23f869c4fd45f19c5ada54dd82176, type: 3}
   m_RendererFeatures:
-  - {fileID: 2424755221429042075}
-  m_RendererFeatureMap: 9b3b8de80676a621
+  - {fileID: -109193640429523280}
+  m_RendererFeatureMap: b06e776af6107cfe
   m_UseNativeRenderPass: 1
   xrSystemData: {fileID: 0}
   postProcessData: {fileID: 11400000, guid: 41439944d30ece34e96484bdb6645b55, type: 2}
@@ -55,188 +226,3 @@ MonoBehaviour:
   m_DepthTextureFormat: 0
   m_AccurateGbufferNormals: 0
   m_IntermediateTextureMode: 0
---- !u!114 &2424755221429042075
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 0}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 5a4e0d79381289b4cb6b3a5e5d56f537, type: 3}
-  m_Name: NativeNrdFeature
-  m_EditorClassIdentifier: Assembly-CSharp::PathTracing.NativeNrdFeature
-  m_Active: 1
-  setting:
-    showMode: 0
-    showValidation: 0
-    showMv: 0
-    cameraJitter: 1
-    sunAngularDiameter: 0.5
-    enableAutoExposure: 0
-    fixExposure: 1
-    toneMappingParams:
-      histogramLowPercentile: 0.8
-      histogramHighPercentile: 0.95
-      eyeAdaptationSpeedUp: 1
-      eyeAdaptationSpeedDown: 1
-      minAdaptedLuminance: 0.02
-      maxAdaptedLuminance: 0.5
-      exposureBias: 2.06
-      whitePoint: 3
-      enableColorLUT: 0
-    roughnessOverride: 0
-    metalnessOverride: 0
-    emissionIntensityLights: 1
-    meterToUnitsMultiplier: 1
-    separator: 0
-    hitDistScale: 3
-    resolutionScale: 1
-    maxAccumulatedFrameNum: 50
-    maxFastAccumulatedFrameNum: 10
-    onScreen: 0
-    forcedMaterial: 0
-    denoiser: 0
-    rpp: 1
-    bounceNum: 1
-    tracingMode: 2
-    SHARC: 1
-    PSR: 1
-    normalMap: 1
-    TAA: 1
-    emission: 1
-    importanceSampling: 1
-    adaptiveAccumulation: 0
-    usePrevFrame: 1
-    boost: 1
-    SR: 0
-    RR: 0
-    upscalerMode: 0
-    confidence: 1
-    denoisingRange: 1000
-    nisSharpness: 0.2
-    skipRightEyeInVR: 0
-    dofAperture: 0
-    dofFocalDistance: 2
-  commonSettings:
-    viewZScale: 1
-    timeDeltaBetweenFrames: 0
-    denoisingRange: 1000
-    disocclusionThreshold: 0.01
-    disocclusionThresholdAlternate: 0.1
-    cameraAttachedReflectionMaterialID: 999
-    strandMaterialID: 2
-    historyFixAlternatePixelStrideMaterialID: 999
-    strandThickness: 0.00008
-    splitScreen: 0
-    printfAt: 0f270f27
-    debug: 0
-    rectOrigin: 0000000000000000
-    accumulationMode: 0
-  sigmaSettings:
-    planeDistanceSensitivity: 0.02
-    maxStabilizedFrameNum: 5
-  reblurSettings:
-    hitDistanceParameters:
-      A: 3
-      B: 0.1
-      C: 20
-    antilagSettings:
-      luminanceSigmaScale: 2
-      luminanceSensitivity: 3
-    responsiveAccumulationSettings:
-      roughnessThreshold: 0
-      minAccumulatedFrameNum: 3
-    convergenceSettings:
-      s: 1
-      b: 0.2
-      p: 0.8
-    maxAccumulatedFrameNum: 50
-    maxFastAccumulatedFrameNum: 10
-    maxStabilizedFrameNum: 50
-    historyFixFrameNum: 3
-    historyFixBasePixelStride: 14
-    historyFixAlternatePixelStride: 14
-    fastHistoryClampingSigmaScale: 1.5
-    diffusePrepassBlurRadius: 30
-    specularPrepassBlurRadius: 50
-    minHitDistanceWeight: 0.1
-    minBlurRadius: 1
-    maxBlurRadius: 30
-    lobeAngleFraction: 0.15
-    roughnessFraction: 0.15
-    planeDistanceSensitivity: 0.02
-    specularProbabilityThresholdsForMvModification:
-    - 0.5
-    - 0.9
-    fireflySuppressorMinRelativeScale: 2
-    minMaterialForDiffuse: 0
-    minMaterialForSpecular: 1
-    checkerboardMode: 2
-    hitDistanceReconstructionMode: 0
-    _enableAntiFirefly: 1
-    _usePrepassOnlyForSpecularMotionEstimation: 0
-    _returnHistoryLengthInsteadOfOcclusion: 0
-  relaxSettings:
-    antilagSettings:
-      accelerationAmount: 0.3
-      spatialSigmaScale: 4.5
-      temporalSigmaScale: 0.5
-      resetAmount: 0.5
-    diffuseMaxAccumulatedFrameNum: 50
-    specularMaxAccumulatedFrameNum: 50
-    diffuseMaxFastAccumulatedFrameNum: 10
-    specularMaxFastAccumulatedFrameNum: 10
-    historyFixFrameNum: 3
-    historyFixBasePixelStride: 14
-    historyFixAlternatePixelStride: 14
-    historyFixEdgeStoppingNormalPower: 8
-    fastHistoryClampingSigmaScale: 1.5
-    diffusePrepassBlurRadius: 30
-    specularPrepassBlurRadius: 50
-    minHitDistanceWeight: 0.1
-    spatialVarianceEstimationHistoryThreshold: 3
-    diffusePhiLuminance: 2
-    specularPhiLuminance: 1
-    lobeAngleFraction: 0.5
-    roughnessFraction: 0.15
-    specularVarianceBoost: 0
-    specularLobeAngleSlack: 0.15
-    atrousIterationNum: 5
-    diffuseMinLuminanceWeight: 0
-    specularMinLuminanceWeight: 0
-    depthThreshold: 0.003
-    confidenceDrivenRelaxationMultiplier: 0
-    confidenceDrivenLuminanceEdgeStoppingRelaxation: 0
-    confidenceDrivenNormalEdgeStoppingRelaxation: 0
-    luminanceEdgeStoppingRelaxation: 0.5
-    normalEdgeStoppingRelaxation: 0.3
-    roughnessEdgeStoppingRelaxation: 1
-    checkerboardMode: 2
-    hitDistanceReconstructionMode: 0
-    minMaterialForDiffuse: 0
-    minMaterialForSpecular: 1
-    _enableAntiFirefly: 0
-    _enableRoughnessEdgeStopping: 1
-  referenceSettings:
-    maxAccumulatedFrameNum: 4096
-  renderPassEvent: 550
-  finalMaterial: {fileID: 2100000, guid: 27695a2bc55ef2f469362b9a2994989e, type: 2}
-  nrdOpaqueTracingShader: {fileID: -2368575503658470205, guid: 317f1945d390e3d40b100508cc1e2544, type: 3}
-  nrdSharcResolve: {fileID: -2368575503658470205, guid: 7c20265b003288c49842d62c8ce69e27, type: 3}
-  nrdSharcUpdate: {fileID: -2368575503658470205, guid: e1a3da821ed1c744a8dcfc18fb0f7530, type: 3}
-  nrdTransparentShader: {fileID: -2368575503658470205, guid: 7957299d34ac3e943926d9f401406336, type: 3}
-  nrdCompositionShader: {fileID: -2368575503658470205, guid: 86da1103c52cad44bae7fd3fef15beea, type: 3}
-  nrdTaaShader: {fileID: -2368575503658470205, guid: 45b3301336e00c442aaed94343a0413a, type: 3}
-  nrdConfidenceBlurShader: {fileID: -2368575503658470205, guid: 929c736cc18b2104480622d169c7adf2, type: 3}
-  nrdFinalShader: {fileID: -2368575503658470205, guid: 605dffff832546846a67b4ebeb7109df, type: 3}
-  nrdDlssBeforeShader: {fileID: -2368575503658470205, guid: f5e21f2594d12fc49b4fd26c01c33415, type: 3}
-  nrdDlssAfterShader: {fileID: -2368575503658470205, guid: ccb470348255bd1489d6a9752f36b77d, type: 3}
-  updateSkinnedPrimitivesCS: {fileID: 7200000, guid: 2d589790ec726d548addcbbeb7a17477, type: 3}
-  fillUintTextureCS: {fileID: 7200000, guid: da922a7f1acd46fcbe05a782e905537f, type: 3}
-  toneMappingHistogramCs: {fileID: -2368575503658470205, guid: 4da6f987bf06072418d582edb57f6fa6, type: 3}
-  toneMappingExposureCs: {fileID: -2368575503658470205, guid: 3d65022f076c70242ab9845539bd4e1f, type: 3}
-  toneMappingCs: {fileID: -2368575503658470205, guid: 9d906646ce76618439a964cd3565df1e, type: 3}
-  scramblingRankingTex: {fileID: 2800000, guid: ba45d1e4dcf9022438a4798a5f9e7b80, type: 3}
-  sobolTex: {fileID: 2800000, guid: 17e7ce8147355314ea8aab1178a6a43c, type: 3}

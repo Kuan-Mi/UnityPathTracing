@@ -18,8 +18,13 @@ ScriptedImporter:
   - ../RenderingPlugin/External/donut/include
   extraArgs:
   - -enable-16bit-types
-  defines: []
+  defines:
+  - TARGET_D3D12
+  - ENABLE_DEBUG_PRINT
   entryPoint: BakeEmissiveTriangles
-  targetProfile: cs_6_6
+  targetProfile: cs_6_9
   rootConstantsHints: []
   rootSRVHints: []
+  samplerBindings:
+  - Name: s_materialSampler
+    Sampler: {fileID: 11400000, guid: fb53ff4d69f74ca6b672a48c57084dac, type: 2}
