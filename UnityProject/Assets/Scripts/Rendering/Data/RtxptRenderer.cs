@@ -295,8 +295,12 @@ namespace PathTracing
                 slot.OcclusionRoughnessMetallicTexture = TryGetTex(mat, "_MetallicGlossMap");
                 slot.EmissiveTexture                   = TryGetTex(mat, "_EmissionMap");
 
+                // Unity LDR color properties (_BaseColor) are gamma-space; RtxptMaterial.BaseColorFactor
+                // is copied verbatim into the *linear* PTMaterialData.BaseOrDiffuseColor, so linearize
+                // here to match RTXPT (verified vs capture: 0.36140567 → 0.107407). Emissive is HDR and
+                // already linear, so it is left as-is.
                 Color baseC = TryGetColor(mat, "_BaseColor", Color.white);
-                slot.BaseColorFactor    = baseC;
+                slot.BaseColorFactor    = baseC.linear;
                 slot.Opacity            = baseC.a;
                 slot.EmissiveColor      = TryGetColor(mat, "_EmissionColor", Color.black);
                 slot.Roughness          = 1f - TryGetFloat(mat, "_Smoothness", 0.5f);
@@ -310,11 +314,14 @@ namespace PathTracing
             slot.EnableTransmission = false;
             slot.TransmissionFactor = 0f;
 
-            float   met            = slot.Metalness;
-            Vector3 dielectricF0   = new Vector3(0.04f, 0.04f, 0.04f);
-            Vector3 metalBaseColor = new Vector3(slot.BaseColorFactor.r, slot.BaseColorFactor.g, slot.BaseColorFactor.b);
-            Vector3 specF0         = Vector3.Lerp(dielectricF0, metalBaseColor, met);
-            slot.SpecularColor = new Color(specF0.x, specF0.y, specF0.z, 1f);
+            // Metalness model: PTMaterialData.SpecularColor holds only the *dielectric* F0 — the shader
+            // derives the final F0 = lerp(dielectricF0, baseColor, metalness) itself
+            // (PathTracerBridgeDonut.hlsli:353), so it must NOT be pre-baked here. Store the dielectric
+            // term that fades to 0 as the surface turns metallic, matching RTXPT (all its metals carry
+            // SpecularColor=0, dielectrics ~0.04). The old lerp double-counted baseColor for metals.
+            float met          = slot.Metalness;
+            float dielF0       = 0.04f * (1f - met);
+            slot.SpecularColor = new Color(dielF0, dielF0, dielF0, 1f);
 
             slot.UseSpecularGlossModel = false;
             slot.ThinSurface           = false;

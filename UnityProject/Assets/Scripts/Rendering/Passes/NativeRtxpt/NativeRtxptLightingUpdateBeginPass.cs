@@ -46,10 +46,11 @@ namespace PathTracing
         private const uint  RTXPT_INVALID_LIGHT_INDEX = 0xFFFFFFFFu;
 
         // PolymorphicLight.h
-        private const uint  kTypeShift        = 24;
-        private const uint  kShapingEnableBit = 1u << 28;
-        private const float kMinLog2Radiance  = -8f;
-        private const float kMaxLog2Radiance  = 40f;
+        private const uint  kTypeShift               = 24;
+        private const uint  kShapingEnableBit        = 1u << 28;
+        private const uint  kShapingUseMinFalloffBit = 1u << 30; // kPolymorphicLightShapingUseMinFalloff
+        private const float kMinLog2Radiance         = -8f;
+        private const float kMaxLog2Radiance         = 40f;
 
         // Env quad-tree — derived from LightingConfig.h via LightingConfig.cs
         private const uint EnvQtBaseResolution   = LightingConfig.RTXPT_NEEAT_ENVMAP_QT_BASE_RESOLUTION;
@@ -1292,6 +1293,20 @@ namespace PathTracing
         // Light packing helpers (mirrors LightsBaker.cpp)
         // ====================================================================
 
+        // Average world-space scale of the light node. Mirrors GameModel.cpp:204
+        // reallyAverageScale, which the original feeds into spot/point light.radius — for these
+        // props it is the modelPose scaling (e.g. SpotLight.model.json scaling=0.1 → radius 0.1).
+        private static float NodeAverageScale(Light light)
+        {
+            Vector3 s = light.transform.lossyScale;
+            return (Mathf.Abs(s.x) + Mathf.Abs(s.y) + Mathf.Abs(s.z)) / 3f;
+        }
+
+        // Falcor light color is linear; the importer stores it straight into Light.color, so use the
+        // raw rgb here (an extra .linear would double-apply sRGB→linear, desaturating the hue).
+        private static Vector3 LinearColor(Light light) =>
+            new Vector3(light.color.r, light.color.g, light.color.b);
+
         private static void PackPointLight(Light light, ref RtxptPolymorphicLightInfo info, ref RtxptPolymorphicLightInfoEx infoEx)
         {
             info   = default;
@@ -1300,10 +1315,22 @@ namespace PathTracing
             info.CenterX = pos.x;
             info.CenterY = pos.y;
             info.CenterZ = pos.z;
-            const float r        = 0.01f;
-            Vector3     radiance = new Vector3(light.color.linear.r, light.color.linear.g, light.color.linear.b) * light.intensity / (Mathf.PI * r * r);
-            PackLightColor(radiance, ref info, (uint)RtxptLightType.Sphere);
-            info.Scalars = Fp32ToFp16(r);
+
+            float   r     = NodeAverageScale(light);
+            Vector3 color = LinearColor(light) * light.intensity;
+            if (r <= 0f)
+            {
+                // Delta point light (LightsBaker.cpp:532) — flux used directly, default cone angles
+                // so the shader's shared spot path stays well-defined.
+                PackLightColor(color, ref info, (uint)RtxptLightType.Point);
+                info.Direction2 = Fp32ToFp16(Mathf.PI) | (Fp32ToFp16(0f) << 16);
+            }
+            else
+            {
+                Vector3 radiance = color / (Mathf.PI * r * r);
+                PackLightColor(radiance, ref info, (uint)RtxptLightType.Sphere);
+                info.Scalars = Fp32ToFp16(r);
+            }
         }
 
         private static void PackSpotLight(Light light, ref RtxptPolymorphicLightInfo info, ref RtxptPolymorphicLightInfoEx infoEx)
@@ -1314,13 +1341,18 @@ namespace PathTracing
             info.CenterX = pos.x;
             info.CenterY = pos.y;
             info.CenterZ = pos.z;
-            const float r        = 0.01f;
-            float       outerRad = Mathf.Deg2Rad * (light.spotAngle * 0.5f);
-            float       innerRad = outerRad * 0.8f;
-            float       softness = Mathf.Clamp01(1f - innerRad / outerRad);
-            Vector3     radiance = new Vector3(light.color.linear.r, light.color.linear.g, light.color.linear.b) * light.intensity / (Mathf.PI * r * r);
+
+            // radius from node scale (GameModel.cpp:227 spotLight->radius = reallyAverageScale).
+            float r        = NodeAverageScale(light);
+            float outerRad = Mathf.Deg2Rad * (light.spotAngle * 0.5f);
+            // softness from the authored inner/outer cone (LightsBaker.cpp:484), not a fixed 0.8 ratio.
+            float softness = Mathf.Clamp01(1f - light.innerSpotAngle / light.spotAngle);
+            Vector3 radiance = LinearColor(light) * light.intensity / (Mathf.PI * r * r);
             PackLightColor(radiance, ref info, (uint)RtxptLightType.Sphere);
             info.ColorTypeAndFlags         |= kShapingEnableBit;
+            // SampleGame forces kUseMinSpotlightFalloff=true (GameModel.cpp:233), encoded via a
+            // negative outerAngle that ConvertLight turns into this flag (LightsBaker.cpp:486).
+            info.ColorTypeAndFlags         |= kShapingUseMinFalloffBit;
             info.Scalars                   =  Fp32ToFp16(r);
             infoEx.PrimaryAxis             =  NDirToOctUnorm32(light.transform.forward);
             infoEx.CosConeAngleAndSoftness =  Fp32ToFp16(Mathf.Cos(outerRad)) | (Fp32ToFp16(softness) << 16);
