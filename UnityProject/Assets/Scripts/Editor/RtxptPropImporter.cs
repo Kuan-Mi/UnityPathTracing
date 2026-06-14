@@ -20,6 +20,12 @@ namespace PathTracing
     /// prop either via a keyframed <see cref="PropFlightPath"/> (<c>animation</c>) or a static
     /// <c>startPose</c>. Falcor→Unity conversion is the glTFast negate-X convention.
     ///
+    /// Beyond transform animation, the prop's <c>modelsLightsOverrides</c> refine each light
+    /// (color/intensity/angles/enabled) — and where they add blink timing, a
+    /// <see cref="RtxptBlinkingLight"/> is attached (RTXPT <c>UpdateLightFromControllers</c>). The
+    /// prop's <c>components</c> add behaviours: <c>PoliceLightingOnRX6</c> →
+    /// <see cref="RtxptPoliceLights"/>; <c>BasicInteractableUI</c> (editor-only selection) is skipped.
+    ///
     /// Open via  RTXPT ▸ Import Props…
     /// </summary>
     public class RtxptPropImporter : EditorWindow
@@ -198,7 +204,11 @@ namespace PathTracing
             AssignMaterials(instance.transform, model.SceneModelName, matMap);
             // Set up lights *before* renaming: a single scene-root gltf node (e.g. OrbLight) is promoted
             // to the instance root, so its node name must still be intact for the by-name lookup.
-            SetupLights(instance.transform, model.Lights);
+            // Per-prop 'modelsLightsOverrides' refine the model.json defaults (color/intensity/angles)
+            // and may add blink controllers; 'components' add behaviours (e.g. police lighting).
+            var lights = ApplyLightOverrides(model.Lights, root);
+            SetupLights(instance.transform, lights);
+            SetupComponents(outer, instance.transform, root, lights);
             instance.name = "Model";
 
             if (hasAnim)
@@ -293,6 +303,7 @@ namespace PathTracing
                     ld.IsSpot       = outer > 0f;
                     ld.OuterHalfDeg = outer;
                     ld.InnerHalfDeg = inner;
+                    ld.Enabled      = !(l.TryGetValue("enabled", out var en) && en is bool eb) || eb;
                     def.Lights.Add(ld);
                 }
             }
@@ -321,6 +332,11 @@ namespace PathTracing
             public float Intensity;
             public bool IsSpot;
             public float InnerHalfDeg, OuterHalfDeg;
+            public bool Enabled = true;
+            // Blink controller (RTXPT LightController) — non-zero off+on means the light auto-toggles.
+            public float AutoOffTime, AutoOnTime, AutoOnOffTimeOffset;
+
+            public LightDef Clone() => (LightDef)MemberwiseClone();
         }
 
         // ---- Materials: add RtxptRenderer + assign slots by matching Unity material name ----
@@ -383,7 +399,104 @@ namespace PathTracing
                 {
                     light.type = LightType.Point;
                 }
+
+                // Blink controller (RTXPT autoOff/autoOn) → runtime component drives intensity each frame.
+                bool blinks = d.AutoOffTime != 0f && d.AutoOnTime != 0f;
+                if (blinks)
+                {
+                    var blink = node.GetComponent<RtxptBlinkingLight>();
+                    if (blink == null) blink = node.gameObject.AddComponent<RtxptBlinkingLight>();
+                    blink.baseIntensity       = d.Intensity;
+                    blink.baseEnabled         = d.Enabled;
+                    blink.autoOffTime         = d.AutoOffTime;
+                    blink.autoOnTime          = d.AutoOnTime;
+                    blink.autoOnOffTimeOffset = d.AutoOnOffTimeOffset;
+                }
+                else if (!d.Enabled)
+                {
+                    light.intensity = 0f; // statically disabled (RTXPT enabled:false → intensity 0)
+                }
             }
+        }
+
+        // ---- Per-prop light overrides ('modelsLightsOverrides'): refine model.json light defs ----
+        // Returns a fresh, per-prop list (the model defs are cached and shared, so never mutate them).
+        private static List<LightDef> ApplyLightOverrides(List<LightDef> baseLights, Dictionary<string, object> root)
+        {
+            var merged = new List<LightDef>(baseLights.Count);
+            foreach (var b in baseLights) merged.Add(b.Clone());
+
+            if (!(root.TryGetValue("modelsLightsOverrides", out var mloObj) && mloObj is List<object> mlo))
+                return merged;
+
+            // All importer props are single-model SimpleProps, so match overrides by light name across
+            // every entry rather than tracking the (always "SimplePropOnlyModel") modelInstanceName.
+            foreach (var mEntry in mlo)
+            {
+                if (mEntry is not Dictionary<string, object> m) continue;
+                if (!(m.TryGetValue("lightOverrides", out var loObj) && loObj is List<object> los)) continue;
+                foreach (var loRaw in los)
+                {
+                    if (loRaw is not Dictionary<string, object> lo) continue;
+                    string lname = lo.TryGetValue("name", out var n) ? (string)n : "";
+                    var ld = merged.Find(x => x.Name == lname);
+                    if (ld == null) continue;
+
+                    if (lo.TryGetValue("color", out var c) && c is List<object> cl)
+                        ld.Color = new Color((float)(double)cl[0], (float)(double)cl[1], (float)(double)cl[2]);
+                    if (lo.TryGetValue("intensity", out var inten))           ld.Intensity           = (float)(double)inten;
+                    if (lo.TryGetValue("innerAngle", out var ia))            ld.InnerHalfDeg        = (float)(double)ia;
+                    if (lo.TryGetValue("outerAngle", out var oa))            ld.OuterHalfDeg        = (float)(double)oa;
+                    if (lo.TryGetValue("enabled", out var en) && en is bool eb) ld.Enabled          = eb;
+                    if (lo.TryGetValue("autoOffTime", out var aoff))         ld.AutoOffTime         = (float)(double)aoff;
+                    if (lo.TryGetValue("autoOnTime", out var aon))           ld.AutoOnTime          = (float)(double)aon;
+                    if (lo.TryGetValue("autoOnOffTimeOffset", out var aoo))  ld.AutoOnOffTimeOffset = (float)(double)aoo;
+
+                    // An override may add angles to a point light (police blobs) → promote it to a spot.
+                    ld.IsSpot = ld.OuterHalfDeg > 0f;
+                }
+            }
+            return merged;
+        }
+
+        // ---- Prop 'components': recreate runtime behaviours (police lighting; UI selection is skipped) ----
+        private static void SetupComponents(
+            GameObject outer, Transform modelRoot, Dictionary<string, object> root, List<LightDef> lights)
+        {
+            if (!(root.TryGetValue("components", out var cObj) && cObj is List<object> comps)) return;
+            foreach (var cRaw in comps)
+            {
+                if (cRaw is not Dictionary<string, object> c) continue;
+                string type = c.TryGetValue("type", out var t) ? (string)t : "";
+
+                if (type == "PoliceLightingOnRX6")
+                {
+                    var pl = outer.GetComponent<RtxptPoliceLights>();
+                    if (pl == null) pl = outer.AddComponent<RtxptPoliceLights>();
+                    pl.animTimeStart = c.TryGetValue("animTimeStart", out var s) ? (float)(double)s : 0f;
+                    pl.animTimeStop  = c.TryGetValue("animTimeStop",  out var e) ? (float)(double)e : 0f;
+
+                    pl.spotLeft  = WirePoliceLight(modelRoot, lights, "SpotLeft",  out pl.spotLeftIntensity);
+                    pl.spotRight = WirePoliceLight(modelRoot, lights, "SpotRight", out pl.spotRightIntensity);
+                    pl.blobLeft  = WirePoliceLight(modelRoot, lights, "BlobLeft",  out pl.blobLeftIntensity);
+                    pl.blobRight = WirePoliceLight(modelRoot, lights, "BlobRight", out pl.blobRightIntensity);
+
+                    // Capture blob base rotations after SetupLights (which may have applied the spot flip).
+                    if (pl.blobLeft  != null) pl.blobLeftRot  = pl.blobLeft.transform.localRotation;
+                    if (pl.blobRight != null) pl.blobRightRot = pl.blobRight.transform.localRotation;
+                }
+                // "BasicInteractableUI" is an editor click-to-select overlay with no runtime visual — skip.
+            }
+        }
+
+        private static Light WirePoliceLight(
+            Transform modelRoot, List<LightDef> lights, string name, out float intensity)
+        {
+            intensity = 0f;
+            var ld = lights.Find(x => x.Name == name);
+            if (ld != null) intensity = ld.Intensity;
+            var node = FindLightNode(modelRoot, name);
+            return node != null ? node.GetComponent<Light>() : null;
         }
 
         // Locate a light's node by name, preferring an inner node over a same-named instance/wrapper root

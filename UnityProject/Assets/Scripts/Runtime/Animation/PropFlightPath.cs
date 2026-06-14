@@ -43,6 +43,13 @@ namespace PathTracing
         // Cursor in seconds along the (unscaled) path timeline. Not serialized.
         private float _cursor;
 
+        // Wrapped time within [0, duration] last applied — mirrors RTXPT's per-prop animTime,
+        // consumed by prop components such as RtxptPoliceLights.
+        private float _animationTime;
+
+        /// <summary>The current wrapped animation time (seconds), matching RTXPT's <c>animTime</c>.</summary>
+        public float AnimationTime => _animationTime;
+
 #if UNITY_EDITOR
         private double _lastEditorTime;
 #endif
@@ -102,6 +109,7 @@ namespace PathTracing
 
             if (duration > 0f)
                 t = loop ? Mathf.Repeat(t, duration) : Mathf.Clamp(t, 0f, duration);
+            _animationTime = t;
 
             if (t <= times[0]) { Apply(0); return; }
             if (t >= times[n - 1]) { Apply(n - 1); return; }
