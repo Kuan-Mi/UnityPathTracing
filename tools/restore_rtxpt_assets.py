@@ -21,19 +21,32 @@ Dependencies: Pillow (pip install Pillow) -- only needed when DDS conversion
 actually has to run.
 
 Usage (from the repo root, on the machine that has the RTXPT assets):
-    python restore_rtxpt_assets.py                          # src=F:\\RTXPT\\Assets
+    python restore_rtxpt_assets.py                          # auto: clone RTXPT-Assets
     python restore_rtxpt_assets.py --src D:\\RTXPT\\Assets
     python restore_rtxpt_assets.py --dry-run                # show the plan only
     python restore_rtxpt_assets.py --overwrite              # refresh existing files
+
+When --src is omitted, the source is resolved automatically:
+    1. F:\\RTXPT\\Assets if it exists (legacy local checkout), else
+    2. the NVIDIA-RTX/RTXPT-Assets repo is cloned into <repo>/tools/.rtxpt-assets
+       (an existing clone there is reused). Git + Git LFS must be installed.
 """
 
 import argparse
 import os
 import shutil
+import subprocess
 import sys
 from concurrent.futures import ThreadPoolExecutor
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+
+# When --src is omitted and no legacy local checkout is found, clone this repo.
+# Its root maps directly to the RTXPT "Assets" layout (EnvironmentMaps/, Models/,
+# Materials/, ...), so the clone directory is used as --src as-is.
+ASSETS_REPO_URL = "https://github.com/NVIDIA-RTX/RTXPT-Assets.git"
+LEGACY_SRC = r"F:\RTXPT\Assets"
+DEFAULT_CLONE_DIR = os.path.join(SCRIPT_DIR, ".rtxpt-assets")
 
 # Hand-authored files that are NOT derivable from the RTXPT assets and are
 # expected to be committed to git directly (git add -f). Listed so the
@@ -65,13 +78,49 @@ def find_jobs(dest, src, overwrite):
             yield "missing", rel, None, dst_path
 
 
+def ensure_assets_clone(clone_dir, dry_run):
+    """Clone NVIDIA-RTX/RTXPT-Assets into clone_dir (reuse if already there)."""
+    if os.path.isdir(os.path.join(clone_dir, ".git")):
+        print(f"Using existing RTXPT-Assets clone: {clone_dir}")
+        return clone_dir
+    if dry_run:
+        print(f"(dry run) would clone {ASSETS_REPO_URL} -> {clone_dir}")
+        return clone_dir
+    print(f"Cloning {ASSETS_REPO_URL}")
+    print(f"     -> {clone_dir}  (large; Git LFS must be installed)")
+    try:
+        subprocess.run(["git", "clone", "--depth", "1", ASSETS_REPO_URL, clone_dir],
+                       check=True)
+    except FileNotFoundError:
+        print("error: 'git' not found on PATH; cannot auto-clone RTXPT-Assets.")
+        sys.exit(1)
+    except subprocess.CalledProcessError as e:
+        print(f"error: git clone failed (exit {e.returncode}).")
+        sys.exit(1)
+    return clone_dir
+
+
+def resolve_src(args):
+    """Return the asset source root, cloning RTXPT-Assets if --src was omitted."""
+    if args.src is not None:
+        return args.src
+    if os.path.isdir(LEGACY_SRC):
+        print(f"Using legacy local assets: {LEGACY_SRC}")
+        return LEGACY_SRC
+    return ensure_assets_clone(args.clone_dir, args.dry_run)
+
+
 def main():
     ap = argparse.ArgumentParser(
         description="Restore git-ignored RTXPTAssets payloads from an RTXPT asset checkout.",
         epilog="MISSING files marked '(expected in git)' are hand-authored and "
                "must be committed with: git add -f <file>  on the source machine.")
-    ap.add_argument("--src", default=r"F:\RTXPT\Assets",
-                    help=r"RTXPT assets root (default: F:\RTXPT\Assets)")
+    ap.add_argument("--src", default=None,
+                    help=r"RTXPT assets root. If omitted: use F:\RTXPT\Assets when "
+                         "present, otherwise clone NVIDIA-RTX/RTXPT-Assets.")
+    ap.add_argument("--clone-dir", default=DEFAULT_CLONE_DIR,
+                    help="where to clone RTXPT-Assets when --src is omitted "
+                         "(default: <repo>/tools/.rtxpt-assets)")
     ap.add_argument("--dest",
                     default=os.path.join(SCRIPT_DIR, "UnityProject", "Assets", "RTXPTAssets"),
                     help="Unity RTXPTAssets folder (default: <repo>/UnityProject/Assets/RTXPTAssets)")
@@ -82,7 +131,11 @@ def main():
                     help="parallel worker threads (default: CPU count)")
     args = ap.parse_args()
 
+    args.src = resolve_src(args)
     if not os.path.isdir(args.src):
+        if args.dry_run:
+            print(f"(dry run) src not present yet: {args.src} -- skipping plan.")
+            return
         print(f"error: --src not found: {args.src}")
         sys.exit(1)
     if not os.path.isdir(args.dest):
