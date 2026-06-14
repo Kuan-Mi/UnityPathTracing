@@ -138,16 +138,16 @@ namespace PathTracing
 
         private static IEnumerable<(Object asset, bool referencePipeline)> EnumerateShaderAssets(NativeRtxptFeature f)
         {
-            if (f.buildStablePlanesShader != null) yield return (f.buildStablePlanesShader, false);
-            if (f.fillStablePlanesShader  != null) yield return (f.fillStablePlanesShader,  false);
-            if (f.referenceShader         != null) yield return (f.referenceShader,         true);
+            if (f.buildStablePlanesShader.asset != null) yield return (f.buildStablePlanesShader.asset, false);
+            if (f.fillStablePlanesShader.asset  != null) yield return (f.fillStablePlanesShader.asset,  false);
+            if (f.referenceShader.asset         != null) yield return (f.referenceShader.asset,         true);
 
-            foreach (var hg in f.buildHitGroups     ?? System.Array.Empty<HitGroupShader>())
-                if (hg != null) yield return (hg, false);
-            foreach (var hg in f.fillHitGroups      ?? System.Array.Empty<HitGroupShader>())
-                if (hg != null) yield return (hg, false);
-            foreach (var hg in f.referenceHitGroups ?? System.Array.Empty<HitGroupShader>())
-                if (hg != null) yield return (hg, true);
+            foreach (var hg in f.buildHitGroups     ?? System.Array.Empty<LazyLoadReference<HitGroupShader>>())
+                if (hg.asset != null) yield return (hg.asset, false);
+            foreach (var hg in f.fillHitGroups      ?? System.Array.Empty<LazyLoadReference<HitGroupShader>>())
+                if (hg.asset != null) yield return (hg.asset, false);
+            foreach (var hg in f.referenceHitGroups ?? System.Array.Empty<LazyLoadReference<HitGroupShader>>())
+                if (hg.asset != null) yield return (hg.asset, true);
         }
 
         private static AssetImporter GetImporter(Object asset, out string path)

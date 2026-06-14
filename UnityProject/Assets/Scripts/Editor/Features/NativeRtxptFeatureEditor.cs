@@ -544,15 +544,6 @@ namespace PathTracing
                 s.enableShaderDebug);
 
             var feature = (NativeRtxptFeature)target;
-            if (s.enableShaderDebug &&
-                (feature.shaderDebugTrianglesRasterShader == null || feature.shaderDebugLinesRasterShader == null ||
-                 feature.shaderDebugFeedbackLinesRasterShader == null || feature.shaderDebugBlendVizRasterShader == null))
-            {
-                EditorGUILayout.HelpBox(
-                    "ShaderDebug raster shaders are not assigned — the debug draw/readback pass is inactive " +
-                    "(no lines, overlay, or DebugPrint console output). Click 'Auto Fill Shaders' below.",
-                    MessageType.Warning);
-            }
 
             if (Foldout("DebugSwitches", "Debug switches"))
             {
@@ -693,6 +684,17 @@ namespace PathTracing
             }
         }
 
+        // Reduces a field type to the asset type it references: unwraps arrays and
+        // LazyLoadReference<T> so grouping sees RayTraceShader/NativeComputeShader/etc.
+        private static System.Type UnwrapAssetType(System.Type t)
+        {
+            if (t.IsArray)
+                t = t.GetElementType();
+            if (t != null && t.IsGenericType && t.GetGenericTypeDefinition() == typeof(LazyLoadReference<>))
+                t = t.GetGenericArguments()[0];
+            return t;
+        }
+
         private void DrawGroupedAssetFields()
         {
             var skip = new HashSet<string> { "renderPassEvent", "setting" };
@@ -713,10 +715,14 @@ namespace PathTracing
             {
                 if (skip.Contains(field.Name)) continue;
 
+                // Asset fields are serialized as LazyLoadReference<T> (optionally arrayed); unwrap to
+                // the underlying asset type so grouping matches the declared shader kind.
+                var assetType = UnwrapAssetType(field.FieldType);
+
                 string groupName = null;
                 foreach (var kv in groupLabels)
                 {
-                    if (kv.Key.IsAssignableFrom(field.FieldType))
+                    if (kv.Key.IsAssignableFrom(assetType))
                     {
                         groupName = kv.Value;
                         break;
