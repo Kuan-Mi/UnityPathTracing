@@ -514,6 +514,8 @@ namespace PathTracing
                 if (light.type != LightType.Directional) continue;
                 if (lightCount >= 16) break;
 
+                var lightAngularSize = light.GetComponent<LightAngularSize>();
+                
                 Color   linear = light.color.linear;
                 Vector3 fwd    = light.transform.forward;
                 int     f      = lightCount * 8; // 8 floats per EMB_DirectionalLight
@@ -524,7 +526,7 @@ namespace PathTracing
                 cb.DirectionalLights[f + 4] = fwd.x;
                 cb.DirectionalLights[f + 5] = fwd.y;
                 cb.DirectionalLights[f + 6] = fwd.z;
-                cb.DirectionalLights[f + 7] = 0.1f; // AngularSize
+                cb.DirectionalLights[f + 7] = lightAngularSize != null ? lightAngularSize.GetAngularSize() : 0.1f;
                 lightCount++;
             }
 
