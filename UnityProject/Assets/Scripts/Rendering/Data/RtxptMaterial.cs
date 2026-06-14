@@ -48,6 +48,17 @@ namespace PathTracing
         [Min(0f)]
         public float EmissiveIntensity = 1f;
 
+        /// <summary>
+        /// Runtime-only override of <see cref="EmissiveIntensity"/> for the emitted radiance, driven by
+        /// animation components such as <see cref="RtxptStringLightBlink"/> (the RTXPT scene animates
+        /// emissiveIntensity to absolute step values). Negative = no override (use the authored
+        /// intensity). Deliberately excluded from the emissive classification (which keys off
+        /// <see cref="EmissiveIntensity"/>), so overriding to 0 dims the surface without flipping its
+        /// submesh group — i.e. no scene-topology rebuild. Not serialized: resets to -1 on load/domain
+        /// reload so authored brightness is the default.
+        /// </summary>
+        [NonSerialized] public float EmissiveRuntimeIntensity = -1f;
+
         [Header("Surface")]
         [Range(0f, 1f)]
         public float Opacity = 1f;

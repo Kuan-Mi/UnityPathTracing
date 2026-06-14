@@ -92,7 +92,8 @@ namespace PathTracing
             data.Flags                     = flags;
             data.BaseOrDiffuseColor        = new Vector3(slot.BaseColorFactor.r, slot.BaseColorFactor.g, slot.BaseColorFactor.b);
             data.SpecularColor             = new Vector3(slot.SpecularColor.r, slot.SpecularColor.g, slot.SpecularColor.b);
-            data.EmissiveColor             = new Vector3(slot.EmissiveColor.r, slot.EmissiveColor.g, slot.EmissiveColor.b) * slot.EmissiveIntensity;
+            float emissiveIntensity        = slot.EmissiveRuntimeIntensity >= 0f ? slot.EmissiveRuntimeIntensity : slot.EmissiveIntensity;
+            data.EmissiveColor             = new Vector3(slot.EmissiveColor.r, slot.EmissiveColor.g, slot.EmissiveColor.b) * emissiveIntensity;
             data.ShadowNoLFadeout          = Mathf.Clamp(slot.ShadowNoLFadeout, 0f, 0.25f);
             data.Opacity                   = slot.Opacity;
             data.Roughness                 = slot.Roughness;
