@@ -16,7 +16,7 @@ MonoBehaviour:
   setting:
     realtimeMode: 1
     realtimeAA: 3
-    upscalerMode: 3
+    upscalerMode: 0
     dlssRRPreset: 5
     cameraJitter: 1
     cameraAperture: 0
@@ -80,7 +80,7 @@ MonoBehaviour:
     environmentMapDiffuseSampleMIPLevel: 2
     environmentMapEnabled: 1
     environmentMapIntensity: 1
-    environmentMapRotationY: 180
+    environmentMapRotationY: 263.97
     environmentMapTint: {r: 1, g: 1, b: 1, a: 1}
     environmentMap: {fileID: 8900000, guid: 81914d60359992741877d83b4b345e1a, type: 3}
     enableToneMapping: 1

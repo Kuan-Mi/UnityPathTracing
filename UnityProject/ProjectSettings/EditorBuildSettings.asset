@@ -21,7 +21,7 @@ EditorBuildSettings:
     path: Assets/Arcade/Arcade.unity
     guid: d03bdcf0bbcbfca47840e76b073eba1a
   - enabled: 0
-    path: Assets/Art/transparent-machines/transparent-machines.unity
+    path: Assets/RTXPTAssets/transparent-machines.unity
     guid: b47e9c043d27f844e8f3b92f7f727614
   - enabled: 0
     path: Assets/Gltf/transparentMachines.unity
