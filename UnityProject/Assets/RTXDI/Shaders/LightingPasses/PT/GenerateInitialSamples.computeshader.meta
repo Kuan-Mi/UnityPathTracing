@@ -17,6 +17,7 @@ ScriptedImporter:
   extraArgs:
   - -Wno-conversion
   - -enable-16bit-types
+  - -O0
   defines:
   - USE_RAY_QUERY=1
   entryPoint: main

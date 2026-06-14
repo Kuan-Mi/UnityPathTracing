@@ -8,7 +8,6 @@ ScriptedImporter:
   assetBundleName: 
   assetBundleVariant: 
   script: {fileID: 11500000, guid: edebcba6c71d5754a859601f2a711697, type: 3}
-  isRayTraceShader: 1
   additionalIncludePaths:
   - ../RenderingPlugin/External/RTXDI-Library/Include
   - ../RenderingPlugin/External/donut/include
@@ -18,6 +17,11 @@ ScriptedImporter:
   extraArgs:
   - -Wno-conversion
   - -enable-16bit-types
+  - -O0
   defines: []
   targetProfile: lib_6_6
   maxPayloadSizeInBytes: 40
+  rayGenName: 
+  rootConstantsHints: []
+  rootSRVHints: []
+  samplerBindings: []
