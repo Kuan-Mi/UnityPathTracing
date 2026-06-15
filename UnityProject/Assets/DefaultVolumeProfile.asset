@@ -402,6 +402,43 @@ MonoBehaviour:
         m_PreInfinity: 2
         m_PostInfinity: 2
         m_RotationOrder: 4
+--- !u!114 &-2112801976969922201
+MonoBehaviour:
+  m_ObjectHideFlags: 3
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: dd6495a2100536c49afd6366bc0bb564, type: 3}
+  m_Name: NativeRtxptExposureVolume
+  m_EditorClassIdentifier: PathTracing.Rtxpt::PathTracing.NativeRtxptExposureVolume
+  active: 1
+  autoExposure:
+    m_OverrideState: 1
+    m_Value: 0
+  exposureCompensation:
+    m_OverrideState: 1
+    m_Value: 1.5
+  exposureValueMin:
+    m_OverrideState: 1
+    m_Value: -16
+  exposureValueMax:
+    m_OverrideState: 1
+    m_Value: 16
+  exposureValue:
+    m_OverrideState: 1
+    m_Value: 0
+  filmSpeed:
+    m_OverrideState: 1
+    m_Value: 100
+  fNumber:
+    m_OverrideState: 1
+    m_Value: 1
+  shutter:
+    m_OverrideState: 1
+    m_Value: 1
 --- !u!114 &11400000
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -434,6 +471,8 @@ MonoBehaviour:
   - {fileID: -2646423756622164309}
   - {fileID: 5446898356518119339}
   - {fileID: -5850318267727348914}
+  - {fileID: 2316545734622286338}
+  - {fileID: -2112801976969922201}
 --- !u!114 &397028825176658155
 MonoBehaviour:
   m_ObjectHideFlags: 3
@@ -625,6 +664,38 @@ MonoBehaviour:
   rounded:
     m_OverrideState: 1
     m_Value: 0
+--- !u!114 &2316545734622286338
+MonoBehaviour:
+  m_ObjectHideFlags: 3
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 48d06e2c9b65f1c48a8be712b513c326, type: 3}
+  m_Name: NativeRtxptEnvironmentMapVolume
+  m_EditorClassIdentifier: PathTracing.Rtxpt::PathTracing.NativeRtxptEnvironmentMapVolume
+  active: 1
+  environmentMapEnabled:
+    m_OverrideState: 1
+    m_Value: 1
+  environmentMap:
+    m_OverrideState: 1
+    m_Value: {fileID: 0}
+    dimension: 1
+  environmentMapIntensity:
+    m_OverrideState: 1
+    m_Value: 1
+  environmentMapRotationY:
+    m_OverrideState: 1
+    m_Value: 0
+  environmentMapTint:
+    m_OverrideState: 1
+    m_Value: {r: 1, g: 1, b: 1, a: 1}
+  environmentMapDiffuseSampleMIPLevel:
+    m_OverrideState: 1
+    m_Value: 2
 --- !u!114 &2870613982477897612
 MonoBehaviour:
   m_ObjectHideFlags: 3

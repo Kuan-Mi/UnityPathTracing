@@ -95,12 +95,12 @@ Assets/OMMCaches.meta
 *.reflection.json.meta
 
 # Bistro scene data (downloaded by download_bistro.bat)
-Assets/NRD-Sample/Gltf/BistroInterior.bin
-Assets/NRD-Sample/Gltf/BistroInterior.bin.meta
-Assets/NRD-Sample/Gltf/BistroExterior.bin
-Assets/NRD-Sample/Gltf/BistroExterior.bin.meta
-Assets/NRD-Sample/Gltf/Textures/
-Assets/NRD-Sample/Gltf/Textures.meta
+Assets/NRD-Sample/**/*.png
+Assets/NRD-Sample/**/*.jpg
+Assets/NRD-Sample/**/*.glb
+Assets/NRD-Sample/**/*.bin
+Assets/NRD-Sample/**/*.dds
+Assets/NRD-Sample/**/*.exr
 
 Assets/RTXPT/**/*.png
 Assets/RTXPT/**/*.jpg
