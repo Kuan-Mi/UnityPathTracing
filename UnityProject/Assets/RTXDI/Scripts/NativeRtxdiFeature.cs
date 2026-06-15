@@ -106,7 +106,7 @@ namespace PathTracing
         // Tone mapping
         public NativeComputeShader toneMappingHistogramCs; // Shaders/donut/histogram.computeshader
         public NativeComputeShader toneMappingExposureCs; // Shaders/donut/exposure.computeshader
-        public NativeComputeShader toneMappingCs; // Shaders/donut/tonemapping.computeshader
+        public NativeRasterShader  toneMappingCs; // Shaders/donut/tonemapping.rastershader
 
         // -------------------------------------------------------------------
         // Pass instances (one per implemented pass; rest filled in over time)
@@ -1196,7 +1196,9 @@ namespace PathTracing
 
             toneMappingHistogramCs = LoadCs($"Assets/Shaders/donut/histogram");
             toneMappingExposureCs  = LoadCs($"Assets/Shaders/donut/exposure");
-            toneMappingCs          = LoadCs($"Assets/Shaders/donut/tonemapping");
+            toneMappingCs          = UnityEditor.AssetDatabase.LoadAssetAtPath<NativeRasterShader>("Assets/Shaders/donut/tonemapping.rastershader");
+            if (toneMappingCs == null)
+                Debug.LogWarning("[NativeRtxdiFeature] Missing NativeRasterShader at: Assets/Shaders/donut/tonemapping.rastershader");
 
             UnityEditor.EditorUtility.SetDirty(this);
             return;

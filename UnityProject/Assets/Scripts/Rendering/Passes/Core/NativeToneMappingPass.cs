@@ -22,10 +22,10 @@ namespace PathTracing
     ///   Bindings: c_ToneMapping(b0), t_Histogram(t0), u_Exposure(u0)
     ///   Dispatch: 1 x 1 x 1
     ///
-    /// Pass 3 – tonemapping.computeshader
+    /// Pass 3 – tonemapping.rastershader (donut fullscreen_vs + verbatim tonemapping_ps.hlsl)
     ///   Bindings: c_ToneMapping(b0), s_ColorLUTSampler(s0),
-    ///             t_Source(t0), t_Exposure(t1), t_ColorLUT(t2), u_Output(u0)
-    ///   Dispatch: ceil(renderSize / 8)
+    ///             t_Source(t0), t_Exposure(t1), t_ColorLUT(t2) → SV_Target (color RT)
+    ///   Draw: fullscreen quad (4 verts) over the render-resolution viewport
     /// </summary>
     public class NativeToneMappingPass : ScriptableRenderPass, IDisposable
     {
@@ -62,9 +62,18 @@ namespace PathTracing
         private readonly NativeComputePipeline      _exposureCs;
         private readonly NativeComputeDescriptorSet _exposureDs;
 
-        private readonly NativeComputePipeline      _tonemapCs;
-        private readonly NativeComputeDescriptorSet _tonemapDs;
-        
+        // Pass 3 (tone-map apply) is a raster fullscreen draw — the verbatim donut tonemapping_ps.hlsl
+        // is a PIXEL shader, so it runs through a graphics pipeline writing a color render target
+        // (SV_Target) rather than a compute UAV.
+        private readonly NativeRasterPipeline       _tonemapRaster;
+        private readonly NativeRasterDescriptorSet  _tonemapDs;
+
+        // Output RT format (LdrColor is RGBA16F in both the NRD and RTXDI features). Used both to bake
+        // the pipeline's RTV format and as the per-draw colorFormats entry.
+        private const uint kRGBA16F = (uint)Nri.DXGI_FORMAT.DXGI_FORMAT_R16G16B16A16_FLOAT;
+        private readonly uint[]   _colorFmt = { kRGBA16F };
+        private readonly IntPtr[] _colorRes = new IntPtr[1]; // scratch length-1, refilled per draw
+
         private readonly DeviceBuffer _histogramBuffer; // 256 x uint (DEFAULT heap, UAV-capable)
         private readonly GraphicsBuffer  _exposureBuffer; // 1 x uint (float bits)
 
@@ -78,7 +87,7 @@ namespace PathTracing
         public NativeToneMappingPass(
             NativeComputeShader histogramCs,
             NativeComputeShader exposureCs,
-            NativeComputeShader tonemapCs)
+            NativeRasterShader  tonemapShader)
         {
             _histogramCs = new NativeComputePipeline(histogramCs);
             _histogramDs = new NativeComputeDescriptorSet(_histogramCs);
@@ -86,9 +95,10 @@ namespace PathTracing
             _exposureCs = new NativeComputePipeline(exposureCs);
             _exposureDs = new NativeComputeDescriptorSet(_exposureCs);
 
-            _tonemapCs = new NativeComputePipeline(tonemapCs);
-            _tonemapDs = new NativeComputeDescriptorSet(_tonemapCs);
-            
+            _tonemapRaster = new NativeRasterPipeline(tonemapShader,
+                NativeRenderPlugin.RasterPipelineStateDesc.FullscreenOpaque(kRGBA16F));
+            _tonemapDs     = new NativeRasterDescriptorSet(_tonemapRaster);
+
             _histogramBuffer = new DeviceBuffer(256 * sizeof(uint));
             _exposureBuffer   = new GraphicsBuffer(GraphicsBuffer.Target.Raw, 1, sizeof(uint));
 
@@ -102,7 +112,7 @@ namespace PathTracing
             _exposureDs?.Dispose();
             _exposureCs?.Dispose();
             _tonemapDs?.Dispose();
-            _tonemapCs?.Dispose();
+            _tonemapRaster?.Dispose();
             _histogramBuffer?.Dispose();
             _exposureBuffer?.Release();
         }
@@ -142,7 +152,8 @@ namespace PathTracing
             /// <summary>HDR source texture (SRV).</summary>
             public IntPtr SourceTexture;
 
-            /// <summary>Tone-mapped output texture (UAV). Must be RenderTexture with enableRandomWrite.</summary>
+            /// <summary>Tone-mapped output texture. Bound as a color render target (SV_Target) for the
+            /// raster apply pass; any Unity RenderTexture qualifies.</summary>
             public IntPtr OutputTexture;
 
             /// <summary>Optional color LUT texture (SRV). Pass IntPtr.Zero to disable.</summary>
@@ -190,8 +201,10 @@ namespace PathTracing
             public NativeComputeDescriptorSet HistogramDs;
             public NativeComputePipeline      ExposureCs;
             public NativeComputeDescriptorSet ExposureDs;
-            public NativeComputePipeline      TonemapCs;
-            public NativeComputeDescriptorSet TonemapDs;
+            public NativeRasterPipeline       TonemapRaster;
+            public NativeRasterDescriptorSet  TonemapDs;
+            public uint[]                     ColorFmt;
+            public IntPtr[]                   ColorRes;
 
             public DeviceBuffer          HistogramBuffer;
             public Resource                   Resource;
@@ -263,17 +276,27 @@ namespace PathTracing
 
             data.ExposureCs.Dispatch(cmd, data.ExposureDs, 1, 1, 1);
 
-            // ── Pass 3: Tone Map ─────────────────────────────────────────────
+            // ── Pass 3: Tone Map (raster fullscreen draw → color RT) ─────────
+            // donut's tonemapping_ps.hlsl is a pixel shader: the fullscreen quad (fullscreen_vs)
+            // covers the viewport and main() writes SV_Target, indexing t_Source by SV_Position.
             data.TonemapDs.SetRootConstants("c_ToneMapping", &cb);
             data.TonemapDs.SetTexture("t_Source", res.SourceTexture);
             data.TonemapDs.SetTypedBuffer("t_Exposure", expPtr, 1, (uint)Nri.DXGI_FORMAT.DXGI_FORMAT_R32_UINT);
             if (res.ColorLUT != IntPtr.Zero)
                 data.TonemapDs.SetTexture("t_ColorLUT", res.ColorLUT);
-            data.TonemapDs.SetRWTexture("u_Output", res.OutputTexture);
 
-            uint tx = (renderW + 7u) / 8u;
-            uint ty = (renderH + 7u) / 8u;
-            data.TonemapCs.Dispatch(cmd, data.TonemapDs, tx, ty, 1);
+            data.ColorRes[0] = res.OutputTexture;
+            var draw = new RasterDrawDesc
+            {
+                numRenderTargets = 1,
+                colorResources   = data.ColorRes,
+                colorFormats     = data.ColorFmt,
+                depthResource    = IntPtr.Zero,
+                viewport         = new Rect(0, 0, renderW, renderH),
+                vertexCount      = 4,
+                instanceCount    = 1,
+            };
+            data.TonemapRaster.Draw(cmd, data.TonemapDs, in draw);
 
             cmd.EndSample(RenderPassMarkers.ToneMapping);
         }
@@ -288,9 +311,11 @@ namespace PathTracing
             passData.HistogramDs      = _histogramDs;
             passData.ExposureCs       = _exposureCs;
             passData.ExposureDs       = _exposureDs;
-            passData.TonemapCs        = _tonemapCs;
+            passData.TonemapRaster    = _tonemapRaster;
             passData.TonemapDs        = _tonemapDs;
-            
+            passData.ColorFmt         = _colorFmt;
+            passData.ColorRes         = _colorRes;
+
             passData.HistogramBuffer  = _histogramBuffer;
             passData.Resource         = _resource;
             passData.Settings         = _settings;

@@ -1,0 +1,14 @@
+// Verbatim donut tone-map apply — the original donut ToneMappingPass draws a fullscreen quad with
+// the engine's m_FullscreenVS + passes/tonemapping_ps.hlsl (a PIXEL shader, not compute). Kept
+// identical to the original by including each stage's source directly; the per-stage NR_VERTEX_SHADER
+// / NR_PIXEL_SHADER macros are defined by the .rastershader importer. Compile settings (include paths,
+// QUAD_Z, HISTOGRAM_BINS, entry `main`, c_ToneMapping root constants) live in the .meta importer.
+#pragma pack_matrix(row_major)
+
+#ifdef NR_VERTEX_SHADER
+#include "fullscreen_vs.hlsl"
+#endif
+
+#ifdef NR_PIXEL_SHADER
+#include "passes/tonemapping_ps.hlsl"
+#endif

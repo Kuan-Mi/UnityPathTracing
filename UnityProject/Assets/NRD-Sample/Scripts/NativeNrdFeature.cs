@@ -46,7 +46,7 @@ namespace PathTracing
         // Tone mapping
         public NativeComputeShader toneMappingHistogramCs; // Shaders/donut/histogram.computeshader
         public NativeComputeShader toneMappingExposureCs; // Shaders/donut/exposure.computeshader
-        public NativeComputeShader toneMappingCs; // Shaders/donut/tonemapping.computeshader
+        public NativeRasterShader  toneMappingCs; // Shaders/donut/tonemapping.rastershader
 
 
         public Texture2D scramblingRankingTex;
@@ -179,6 +179,7 @@ namespace PathTracing
                 || nrdSharcUpdate == null
                 || nrdConfidenceBlurShader == null
                 || nrdFinalShader == null
+                || toneMappingCs == null
                 || scramblingRankingTex == null
                 || sobolTex == null)
             {
@@ -897,12 +898,14 @@ namespace PathTracing
             nrdDlssBeforeShader     = UnityEditor.AssetDatabase.LoadAssetAtPath<NativeComputeShader>("Assets/NRD-Sample/Shaders/DlssBefore.computeshader");
             nrdDlssAfterShader      = UnityEditor.AssetDatabase.LoadAssetAtPath<NativeComputeShader>("Assets/NRD-Sample/Shaders/DlssAfter.computeshader");
 
-            scramblingRankingTex = UnityEditor.AssetDatabase.LoadAssetAtPath<Texture2D>("Assets/Textures/scrambling_ranking_128x128_2d_4spp.png");
-            sobolTex             = UnityEditor.AssetDatabase.LoadAssetAtPath<Texture2D>("Assets/Textures/sobol_256_4d.png");
+            scramblingRankingTex = UnityEditor.AssetDatabase.LoadAssetAtPath<Texture2D>("Assets/NRD-Sample/Assets/Textures/scrambling_ranking_128x128_2d_4spp.png");
+            sobolTex             = UnityEditor.AssetDatabase.LoadAssetAtPath<Texture2D>("Assets/NRD-Sample/Assets/Textures/sobol_256_4d.png");
 
             toneMappingHistogramCs = LoadCs($"Assets/Shaders/donut/histogram");
             toneMappingExposureCs  = LoadCs($"Assets/Shaders/donut/exposure");
-            toneMappingCs          = LoadCs($"Assets/Shaders/donut/tonemapping");
+            toneMappingCs          = UnityEditor.AssetDatabase.LoadAssetAtPath<NativeRasterShader>("Assets/Shaders/donut/tonemapping.rastershader");
+            if (toneMappingCs == null)
+                Debug.LogWarning("[NativeNrdFeature] Missing NativeRasterShader at: Assets/Shaders/donut/tonemapping.rastershader");
 
 
             UnityEditor.EditorUtility.SetDirty(this);

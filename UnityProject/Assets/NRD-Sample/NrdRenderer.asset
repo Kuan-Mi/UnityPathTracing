@@ -74,13 +74,13 @@ MonoBehaviour:
     showMv: 0
     cameraJitter: 1
     sunAngularDiameter: 0.533
-    enableAutoExposure: 0
+    enableAutoExposure: 1
     fixExposure: 80
     toneMappingParams:
       histogramLowPercentile: 0.8
       histogramHighPercentile: 0.95
-      eyeAdaptationSpeedUp: 1
-      eyeAdaptationSpeedDown: 0.5
+      eyeAdaptationSpeedUp: 2
+      eyeAdaptationSpeedDown: 1
       minAdaptedLuminance: 0.02
       maxAdaptedLuminance: 0.5
       exposureBias: -0.5
@@ -93,8 +93,8 @@ MonoBehaviour:
     separator: 0
     hitDistScale: 3
     resolutionScale: 1
-    maxAccumulatedFrameNum: 9
-    maxFastAccumulatedFrameNum: 1
+    maxAccumulatedFrameNum: 20
+    maxFastAccumulatedFrameNum: 4
     onScreen: 0
     forcedMaterial: 0
     denoiser: 0
@@ -152,9 +152,9 @@ MonoBehaviour:
       s: 1
       b: 0.2
       p: 0.8
-    maxAccumulatedFrameNum: 9
-    maxFastAccumulatedFrameNum: 1
-    maxStabilizedFrameNum: 9
+    maxAccumulatedFrameNum: 20
+    maxFastAccumulatedFrameNum: 4
+    maxStabilizedFrameNum: 20
     historyFixFrameNum: 3
     historyFixBasePixelStride: 14
     historyFixAlternatePixelStride: 14
@@ -184,10 +184,10 @@ MonoBehaviour:
       spatialSigmaScale: 4.5
       temporalSigmaScale: 0.5
       resetAmount: 0.5
-    diffuseMaxAccumulatedFrameNum: 9
-    specularMaxAccumulatedFrameNum: 9
-    diffuseMaxFastAccumulatedFrameNum: 1
-    specularMaxFastAccumulatedFrameNum: 1
+    diffuseMaxAccumulatedFrameNum: 20
+    specularMaxAccumulatedFrameNum: 20
+    diffuseMaxFastAccumulatedFrameNum: 4
+    specularMaxFastAccumulatedFrameNum: 4
     historyFixFrameNum: 3
     historyFixBasePixelStride: 14
     historyFixAlternatePixelStride: 14
@@ -237,6 +237,6 @@ MonoBehaviour:
   fillUintTextureCS: {fileID: 7200000, guid: da922a7f1acd46fcbe05a782e905537f, type: 3}
   toneMappingHistogramCs: {fileID: -2368575503658470205, guid: 4da6f987bf06072418d582edb57f6fa6, type: 3}
   toneMappingExposureCs: {fileID: -2368575503658470205, guid: 3d65022f076c70242ab9845539bd4e1f, type: 3}
-  toneMappingCs: {fileID: -2368575503658470205, guid: 9d906646ce76618439a964cd3565df1e, type: 3}
+  toneMappingCs: {fileID: 6164937308047190184, guid: 9d906646ce76618439a964cd3565df1f, type: 3}
   scramblingRankingTex: {fileID: 2800000, guid: ba45d1e4dcf9022438a4798a5f9e7b80, type: 3}
   sobolTex: {fileID: 2800000, guid: 17e7ce8147355314ea8aab1178a6a43c, type: 3}
