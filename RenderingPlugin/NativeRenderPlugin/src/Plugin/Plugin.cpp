@@ -35,6 +35,7 @@
 #include "NativeBuffer.h"
 #include "ResourceStateTracker.h"
 #include "D3D12HeapHook.h"
+#include "SwapChainHook.h"
 #include "PluginInternal.h"
 #include "DeferredDeleteQueue.h"
 #include <map>
@@ -185,6 +186,24 @@ static void HeapHookLogBridge(int level, const char* msg)
     PluginLog(type, msg, __FILE__, __LINE__);
 }
 
+// Bridge SwapChainHook diagnostics into Unity's log (called from any thread).
+static void SwapChainHookLogBridge(int level, const char* msg)
+{
+    UnityLogType type = (level == 2) ? kUnityLogTypeError
+                      : (level == 1) ? kUnityLogTypeWarning
+                                     : kUnityLogTypeLog;
+    PluginLog(type, msg, __FILE__, __LINE__);
+}
+
+// Try to grab Unity's swapchain (player-only) and patch its Present vtable.
+// Cheap no-op once installed; safe to call from render callbacks every frame.
+static void TryHookUnitySwapChainPresent()
+{
+    if (SwapChainHook::IsPresentHookInstalled()) return;
+    IDXGISwapChain* sc = s_D3D12v8 ? s_D3D12v8->GetSwapChain() : nullptr;
+    if (sc) SwapChainHook::TryInstallPresentHook(sc);
+}
+
 // ---------------------------------------------------------------------------
 // Device lifecycle callback
 // ---------------------------------------------------------------------------
@@ -224,6 +243,10 @@ static void UNITY_INTERFACE_API OnGraphicsDeviceEvent(UnityGfxDeviceEventType ev
         // any more commands. If we wait until our first render callback, we
         // will miss Unity's earlier SetDescriptorHeaps calls in the same frame.
         D3D12HeapHook::InstallHookFromDevice(device);
+
+        // Diagnostic: try to patch Present on Unity's swapchain. Returns null in
+        // the editor (no game swapchain); retried later from the render callback.
+        TryHookUnitySwapChainPresent();
 
         // Check DXR (ID3D12Device5) support
         ComPtr<ID3D12Device5> dev5;
@@ -313,6 +336,14 @@ UnityPluginLoad(IUnityInterfaces* unityInterfaces)
         NR_ERROR("IUnityGraphics not available");
         return;
     }
+
+    // Install the DXGI factory hook as early as possible — this is our only
+    // chance to catch a swapchain *creation* call (CreateSwapChain[ForHwnd]).
+    // Diagnostic-only: it logs and calls through. Returns the Present hook for
+    // any swapchain created after this point; the steady-state present path is
+    // also captured lazily via TryHookUnitySwapChainPresent() (GetSwapChain).
+    SwapChainHook::SetLogger(&SwapChainHookLogBridge);
+    SwapChainHook::InstallFactoryHook();
 
     s_Graphics->RegisterDeviceEventCallback(OnGraphicsDeviceEvent);
 
@@ -756,6 +787,10 @@ NR_CreateRayTracePipelineFromBlobs(
 static void UNITY_INTERFACE_API RtsRenderCallback(int /*eventId*/, void* data)
 {
     if (!s_RendererReady || !s_D3D12 || !data) return;
+
+    // Diagnostic: in a player build GetSwapChain() becomes valid on the render
+    // thread; install the Present hook the first time it does. No-op afterwards.
+    TryHookUnitySwapChainPresent();
 
     auto* ed = static_cast<RTS_RenderEventData*>(data);
     if (!ed->descriptorSetHandle) return;
