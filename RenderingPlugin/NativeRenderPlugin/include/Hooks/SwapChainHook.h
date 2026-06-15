@@ -18,6 +18,7 @@
 
 struct IDXGISwapChain;
 struct ID3D12Device;
+struct ID3D12CommandQueue;
 
 namespace SwapChainHook
 {
@@ -26,6 +27,23 @@ namespace SwapChainHook
 
     // Optional logger. If unset, messages go to OutputDebugStringA.
     void SetLogger(LogFn fn);
+
+    // ----- DLSS-FG present-pacing stub (Test, hardware-independent) ----------
+    // Enable the frame-generation present-pacing HARNESS. This does NOT run AI
+    // frame generation; it stands up the exact present plumbing FG will need so
+    // it can be validated on any GPU (incl. the pre-Ada RTX 3060 dev box):
+    // retain the real frame, present it, pace ~half a frame, then present a
+    // second time. On the 4060 the second (duplicate) present is replaced by the
+    // EvaluateFeature output. Content-preserving — it presents the real frame
+    // twice, so there is no visual corruption; only the Present1 rate doubles.
+    //
+    // Provide Unity's D3D12 device and the queue the swapchain presents on
+    // (Unity's command queue). Off until enabled; the plugin enables it only
+    // when the NR_FG_PACING_STUB env var is set. Idempotent.
+    void EnablePacingStub(ID3D12Device* device, ID3D12CommandQueue* presentQueue);
+
+    // True once the pacing stub is active.
+    bool IsPacingStubEnabled();
 
     // Patch the DXGI factory vtable (CreateSwapChain / CreateSwapChainForHwnd)
     // by creating a throwaway IDXGIFactory2 — the vtable is shared by all

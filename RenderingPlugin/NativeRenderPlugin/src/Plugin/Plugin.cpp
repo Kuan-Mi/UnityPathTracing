@@ -36,6 +36,7 @@
 #include "ResourceStateTracker.h"
 #include "D3D12HeapHook.h"
 #include "SwapChainHook.h"
+#include "NgxContext.h"
 #include "PluginInternal.h"
 #include "DeferredDeleteQueue.h"
 #include <map>
@@ -195,13 +196,42 @@ static void SwapChainHookLogBridge(int level, const char* msg)
     PluginLog(type, msg, __FILE__, __LINE__);
 }
 
+// Bridge NgxContext diagnostics into Unity's log (called from any thread).
+static void NgxLogBridge(int level, const char* msg)
+{
+    UnityLogType type = (level == 2) ? kUnityLogTypeError
+                      : (level == 1) ? kUnityLogTypeWarning
+                                     : kUnityLogTypeLog;
+    PluginLog(type, msg, __FILE__, __LINE__);
+}
+
 // Try to grab Unity's swapchain (player-only) and patch its Present vtable.
 // Cheap no-op once installed; safe to call from render callbacks every frame.
 static void TryHookUnitySwapChainPresent()
 {
-    if (SwapChainHook::IsPresentHookInstalled()) return;
-    IDXGISwapChain* sc = s_D3D12v8 ? s_D3D12v8->GetSwapChain() : nullptr;
-    if (sc) SwapChainHook::TryInstallPresentHook(sc);
+    if (!SwapChainHook::IsPresentHookInstalled())
+    {
+        IDXGISwapChain* sc = s_D3D12v8 ? s_D3D12v8->GetSwapChain() : nullptr;
+        if (sc) SwapChainHook::TryInstallPresentHook(sc);
+    }
+
+    // Once the Present hook is live, optionally enable the DLSS-FG pacing stub.
+    // Env-gated (NR_FG_PACING_STUB=1), default OFF, so normal runs are unaffected.
+    // Needs Unity's device + the queue the swapchain presents on.
+    if (SwapChainHook::IsPresentHookInstalled() && !SwapChainHook::IsPacingStubEnabled())
+    {
+        static const bool wantStub = []{
+            char buf[8] = {};
+            DWORD n = GetEnvironmentVariableA("NR_FG_PACING_STUB", buf, sizeof(buf));
+            return n > 0 && buf[0] == '1';
+        }();
+        if (wantStub && s_D3D12)
+        {
+            ID3D12Device*       dev = s_D3D12->GetDevice();
+            ID3D12CommandQueue* q   = s_D3D12->GetCommandQueue();
+            if (dev && q) SwapChainHook::EnablePacingStub(dev, q);
+        }
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -247,6 +277,13 @@ static void UNITY_INTERFACE_API OnGraphicsDeviceEvent(UnityGfxDeviceEventType ev
         // Diagnostic: try to patch Present on Unity's swapchain. Returns null in
         // the editor (no game swapchain); retried later from the render callback.
         TryHookUnitySwapChainPresent();
+
+        // DLSS-FG bring-up Test 1: stand NGX up on Unity's existing device and
+        // query DLSS-FG support. Init is GPU-agnostic (succeeds on the RTX 3060
+        // dev box); FG availability will report false on pre-Ada hardware, which
+        // is the expected result there. Best-effort — never gate the renderer.
+        NgxContext::SetLogger(&NgxLogBridge);
+        NgxContext::Initialize(device);
 
         // Check DXR (ID3D12Device5) support
         ComPtr<ID3D12Device5> dev5;
@@ -306,6 +343,9 @@ static void UNITY_INTERFACE_API OnGraphicsDeviceEvent(UnityGfxDeviceEventType ev
         NR_LOG("Plugin shutdown - draining deferred deletes (force=true)...");
         DrainDeferredDeletes(true);
         NR_LOG("Plugin shutdown - deferred deletes drained");
+
+        // Shut NGX down while Unity's device is still alive.
+        NgxContext::Shutdown(s_D3D12 ? s_D3D12->GetDevice() : nullptr);
 
         g_transientRing.Shutdown();
         g_uploadPool.Shutdown();

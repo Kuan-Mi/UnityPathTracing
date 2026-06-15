@@ -31,6 +31,15 @@ set(WIN_SDK_INC "${WIN_SDK_PATH}/Include/${WIN_SDK_VERSION}")
 set(WIN_SDK_LIB "${WIN_SDK_PATH}/Lib/${WIN_SDK_VERSION}/um/x64")
 
 # ---------------------------------------------------------------------------
+# NVIDIA NGX / DLSS SDK (vendored under <repo>/Other/DLSS)
+# ---------------------------------------------------------------------------
+set(DLSS_SDK_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../Other/DLSS")
+if(NOT EXISTS "${DLSS_SDK_DIR}/include/nvsdk_ngx.h")
+    message(FATAL_ERROR "DLSS SDK not found at ${DLSS_SDK_DIR}")
+endif()
+message(STATUS "DLSS SDK: ${DLSS_SDK_DIR}")
+
+# ---------------------------------------------------------------------------
 # Keep FetchContent downloads outside _Build so they survive cache resets
 # ---------------------------------------------------------------------------
 set(FETCHCONTENT_BASE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/_deps" CACHE PATH "FetchContent download cache" FORCE)
@@ -347,6 +356,7 @@ add_library(NativeRenderPlugin SHARED
     NativeRenderPlugin/src/Resources/SharedUploadPool.cpp
     NativeRenderPlugin/src/Hooks/D3D12HeapHook.cpp
     NativeRenderPlugin/src/Hooks/SwapChainHook.cpp
+    NativeRenderPlugin/src/Ngx/NgxContext.cpp
     # RTXMU (NVIDIA RTX Memory Utility) — BLAS suballocation + compaction
     # management; vendored D3D12 subset (see External/rtxmu/README.md).
     External/rtxmu/src/D3D12AccelStructManager.cpp
@@ -360,9 +370,11 @@ target_include_directories(NativeRenderPlugin PRIVATE
     NativeRenderPlugin/include/Shaders
     NativeRenderPlugin/include/Resources
     NativeRenderPlugin/include/Hooks
+    NativeRenderPlugin/include/Ngx
     NativeRenderPlugin/src/Plugin
     External/rtxmu/include
     D3D12HeapHook
+    "${DLSS_SDK_DIR}/include"
     "${UNITY_PLUGIN_API_DIR}"
     "${DXC_INC}"
     "${WIN_SDK_INC}/um"
@@ -382,6 +394,11 @@ target_link_libraries(NativeRenderPlugin PRIVATE
     dxguid.lib
     dxcompiler.lib
     D3D12HeapHook
+    # NVIDIA NGX SDK (DLSS / DLSS-FG). Dynamic-CRT libs: nvsdk_ngx_d_dbg.lib is
+    # built with the debug CRT (/MDd, _ITERATOR_DEBUG_LEVEL=2) and must be used
+    # for Debug; nvsdk_ngx_d.lib (/MD) for all other configs. Mixing them trips
+    # LNK2038 RuntimeLibrary / _ITERATOR_DEBUG_LEVEL mismatches.
+    "${DLSS_SDK_DIR}/lib/Windows_x86_64/x64/nvsdk_ngx_d$<$<CONFIG:Debug>:_dbg>.lib"
 )
 
 # ---------------------------------------------------------------------------
