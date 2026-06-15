@@ -69,7 +69,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: PathTracing.NrdSample::PathTracing.UnityNrdFeature
   m_Active: 1
   nrdSampleSetting:
-    exposureEv: 0
+    exposureEv: -3
     cameraJitter: 1
     showMode: 18
     showMv: 0

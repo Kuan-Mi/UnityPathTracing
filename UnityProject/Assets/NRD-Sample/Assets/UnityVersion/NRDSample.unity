@@ -920,7 +920,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 1
+  m_IsActive: 0
 --- !u!114 &1015431880
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -1210,7 +1210,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 1
+  m_IsActive: 0
 --- !u!114 &1154397539
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -2104,9 +2104,9 @@ MonoBehaviour:
     isEmissive: 0
     isAlphaClip: 0
     textures:
-    - {fileID: 2800000, guid: c0a41b5656f00de4d8239f65118bc165, type: 3}
+    - {fileID: 0}
     - {fileID: 2800000, guid: bf8f44f5bc8384d41be295930fede691, type: 3}
-    - {fileID: 2800000, guid: 51196fdf27b68b24681f6b0cf24dd958, type: 3}
+    - {fileID: 0}
     - {fileID: 0}
     baseColor: {r: 1, g: 1, b: 1, a: 1}
     emissionColor: {r: 0, g: 0, b: 0, a: 1}
@@ -2124,9 +2124,9 @@ MonoBehaviour:
       isEmissive: 0
       isAlphaClip: 0
       textures:
-      - {fileID: 2800000, guid: c0a41b5656f00de4d8239f65118bc165, type: 3}
+      - {fileID: 0}
       - {fileID: 2800000, guid: bf8f44f5bc8384d41be295930fede691, type: 3}
-      - {fileID: 2800000, guid: 51196fdf27b68b24681f6b0cf24dd958, type: 3}
+      - {fileID: 0}
       - {fileID: 0}
       baseColor: {r: 1, g: 1, b: 1, a: 1}
       emissionColor: {r: 0, g: 0, b: 0, a: 1}
@@ -2422,7 +2422,7 @@ MonoBehaviour:
     - {fileID: 0}
     - {fileID: 0}
     - {fileID: 0}
-    baseColor: {r: 1, g: 1, b: 1, a: 1}
+    baseColor: {r: 1, g: 1, b: 1, a: 0.2627451}
     emissionColor: {r: 0, g: 0, b: 0, a: 1}
     metallic: 1
     roughnessScale: 0
@@ -2442,7 +2442,7 @@ MonoBehaviour:
       - {fileID: 0}
       - {fileID: 0}
       - {fileID: 0}
-      baseColor: {r: 1, g: 1, b: 1, a: 1}
+      baseColor: {r: 1, g: 1, b: 1, a: 0.2627451}
       emissionColor: {r: 0, g: 0, b: 0, a: 1}
       metallic: 1
       roughnessScale: 0
@@ -3347,9 +3347,9 @@ MonoBehaviour:
     isEmissive: 0
     isAlphaClip: 0
     textures:
-    - {fileID: 2800000, guid: 6610f7da178eba54ba8bc17373d80ece, type: 3}
+    - {fileID: 0}
     - {fileID: 2800000, guid: 558ea19008d2e964fbf9d3ab06656af5, type: 3}
-    - {fileID: 2800000, guid: 8f1374db88c3dfa478b399bb52b34364, type: 3}
+    - {fileID: 0}
     - {fileID: 0}
     baseColor: {r: 1, g: 1, b: 1, a: 1}
     emissionColor: {r: 0, g: 0, b: 0, a: 1}
@@ -3367,9 +3367,9 @@ MonoBehaviour:
       isEmissive: 0
       isAlphaClip: 0
       textures:
-      - {fileID: 2800000, guid: 6610f7da178eba54ba8bc17373d80ece, type: 3}
+      - {fileID: 0}
       - {fileID: 2800000, guid: 558ea19008d2e964fbf9d3ab06656af5, type: 3}
-      - {fileID: 2800000, guid: 8f1374db88c3dfa478b399bb52b34364, type: 3}
+      - {fileID: 0}
       - {fileID: 0}
       baseColor: {r: 1, g: 1, b: 1, a: 1}
       emissionColor: {r: 0, g: 0, b: 0, a: 1}
@@ -3611,7 +3611,7 @@ MonoBehaviour:
     textures:
     - {fileID: 2800000, guid: ce0897d21cea1484da4d16c016810fe6, type: 3}
     - {fileID: 2800000, guid: 6edf2e566b1cce5439114ed66b00bc22, type: 3}
-    - {fileID: 2800000, guid: 4557b0255f09b9c4ba65d70d16879068, type: 3}
+    - {fileID: 0}
     - {fileID: 0}
     baseColor: {r: 1, g: 1, b: 1, a: 1}
     emissionColor: {r: 0, g: 0, b: 0, a: 1}
@@ -3631,7 +3631,7 @@ MonoBehaviour:
       textures:
       - {fileID: 2800000, guid: ce0897d21cea1484da4d16c016810fe6, type: 3}
       - {fileID: 2800000, guid: 6edf2e566b1cce5439114ed66b00bc22, type: 3}
-      - {fileID: 2800000, guid: 4557b0255f09b9c4ba65d70d16879068, type: 3}
+      - {fileID: 0}
       - {fileID: 0}
       baseColor: {r: 1, g: 1, b: 1, a: 1}
       emissionColor: {r: 0, g: 0, b: 0, a: 1}
@@ -3748,7 +3748,7 @@ MonoBehaviour:
     textures:
     - {fileID: 2800000, guid: 23c7b66842763f74cb328ba161cad44d, type: 3}
     - {fileID: 2800000, guid: cda658ec381e7434ea03e1e8a04ed4da, type: 3}
-    - {fileID: 2800000, guid: 5c994fa744408a44ab21cd71da315275, type: 3}
+    - {fileID: 0}
     - {fileID: 0}
     baseColor: {r: 1, g: 1, b: 1, a: 1}
     emissionColor: {r: 0, g: 0, b: 0, a: 1}
@@ -3768,7 +3768,7 @@ MonoBehaviour:
       textures:
       - {fileID: 2800000, guid: 23c7b66842763f74cb328ba161cad44d, type: 3}
       - {fileID: 2800000, guid: cda658ec381e7434ea03e1e8a04ed4da, type: 3}
-      - {fileID: 2800000, guid: 5c994fa744408a44ab21cd71da315275, type: 3}
+      - {fileID: 0}
       - {fileID: 0}
       baseColor: {r: 1, g: 1, b: 1, a: 1}
       emissionColor: {r: 0, g: 0, b: 0, a: 1}
@@ -3872,9 +3872,9 @@ MonoBehaviour:
     isEmissive: 0
     isAlphaClip: 0
     textures:
-    - {fileID: 2800000, guid: 0bdd1003ab7d0e24d9f865477e82c303, type: 3}
+    - {fileID: 0}
     - {fileID: 2800000, guid: 4babd8a715a152a41b562f8ab92ff7c9, type: 3}
-    - {fileID: 2800000, guid: ed6b35e4f22ddd34bb30b9e9d192e4d8, type: 3}
+    - {fileID: 0}
     - {fileID: 0}
     baseColor: {r: 1, g: 1, b: 1, a: 1}
     emissionColor: {r: 0, g: 0, b: 0, a: 1}
@@ -3892,9 +3892,9 @@ MonoBehaviour:
       isEmissive: 0
       isAlphaClip: 0
       textures:
-      - {fileID: 2800000, guid: 0bdd1003ab7d0e24d9f865477e82c303, type: 3}
+      - {fileID: 0}
       - {fileID: 2800000, guid: 4babd8a715a152a41b562f8ab92ff7c9, type: 3}
-      - {fileID: 2800000, guid: ed6b35e4f22ddd34bb30b9e9d192e4d8, type: 3}
+      - {fileID: 0}
       - {fileID: 0}
       baseColor: {r: 1, g: 1, b: 1, a: 1}
       emissionColor: {r: 0, g: 0, b: 0, a: 1}
@@ -4054,9 +4054,9 @@ MonoBehaviour:
     isEmissive: 0
     isAlphaClip: 0
     textures:
-    - {fileID: 2800000, guid: c0a41b5656f00de4d8239f65118bc165, type: 3}
+    - {fileID: 0}
     - {fileID: 2800000, guid: bf8f44f5bc8384d41be295930fede691, type: 3}
-    - {fileID: 2800000, guid: 51196fdf27b68b24681f6b0cf24dd958, type: 3}
+    - {fileID: 0}
     - {fileID: 0}
     baseColor: {r: 1, g: 1, b: 1, a: 1}
     emissionColor: {r: 0, g: 0, b: 0, a: 1}
@@ -4074,9 +4074,9 @@ MonoBehaviour:
       isEmissive: 0
       isAlphaClip: 0
       textures:
-      - {fileID: 2800000, guid: c0a41b5656f00de4d8239f65118bc165, type: 3}
+      - {fileID: 0}
       - {fileID: 2800000, guid: bf8f44f5bc8384d41be295930fede691, type: 3}
-      - {fileID: 2800000, guid: 51196fdf27b68b24681f6b0cf24dd958, type: 3}
+      - {fileID: 0}
       - {fileID: 0}
       baseColor: {r: 1, g: 1, b: 1, a: 1}
       emissionColor: {r: 0, g: 0, b: 0, a: 1}
