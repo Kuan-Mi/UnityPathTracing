@@ -15,26 +15,11 @@ EditorBuildSettings:
     path: Assets/NRD-Sample/NRDSample.unity
     guid: a9fec97d90fc4e149938fbbb34d3c87b
   - enabled: 0
-    path: Assets/Scenes/SampleScene.unity
-    guid: 99c9720ab356a0642a771bea13969a05
-  - enabled: 0
     path: Assets/RTXDI/Assets/Arcade.unity
     guid: d03bdcf0bbcbfca47840e76b073eba1a
   - enabled: 0
     path: Assets/RTXPT/Assets/transparent-machines.unity
     guid: b47e9c043d27f844e8f3b92f7f727614
-  - enabled: 0
-    path: Assets/Gltf/transparentMachines.unity
-    guid: 30242e4fa57dbf3429ccbfc3f5ec4a82
-  - enabled: 0
-    path: Assets/NRD-Sample/Gltf/BistroInteriorRtxPT.unity
-    guid: 56b2d767279b20641a14d882962be58d
-  - enabled: 0
-    path: Assets/Art/transparentMachines 1.unity
-    guid: 5b1d1428d4e46a944941c81534c4587c
-  - enabled: 0
-    path: Assets/Scenes/Empty.unity
-    guid: 04ff104d4da5b3c41abf1177f278de61
   - enabled: 0
     path: Assets/RTXPT/Assets/kitchen.unity
     guid: ef6e255891b305a47b73f5bf98f9b4fe
