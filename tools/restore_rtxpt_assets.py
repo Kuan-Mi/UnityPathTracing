@@ -1,7 +1,7 @@
 """
 restore_rtxpt_assets.py
 -----------------------
-Restore the git-ignored payload files under UnityProject/Assets/RTXPTAssets
+Restore the git-ignored payload files under UnityProject/Assets/RTXPT
 (*.png / *.jpg / *.glb / *.bin, see UnityProject/.gitignore) from an RTXPT
 asset checkout (e.g. F:\\RTXPT\\Assets), so the project can be opened on
 another computer.
@@ -113,7 +113,7 @@ def resolve_src(args):
 
 def main():
     ap = argparse.ArgumentParser(
-        description="Restore git-ignored RTXPTAssets payloads from an RTXPT asset checkout.",
+        description="Restore git-ignored RTXPT payloads from an RTXPT asset checkout.",
         epilog="MISSING files marked '(expected in git)' are hand-authored and "
                "must be committed with: git add -f <file>  on the source machine.")
     ap.add_argument("--src", default=None,
@@ -123,8 +123,8 @@ def main():
                     help="where to clone RTXPT-Assets when --src is omitted "
                          "(default: <repo>/tools/.rtxpt-assets)")
     ap.add_argument("--dest",
-                    default=os.path.join(REPO_ROOT, "UnityProject", "Assets", "RTXPTAssets"),
-                    help="Unity RTXPTAssets folder (default: <repo>/UnityProject/Assets/RTXPTAssets)")
+                    default=os.path.join(REPO_ROOT, "UnityProject", "Assets", "RTXPT"),
+                    help="Unity RTXPT folder (default: <repo>/UnityProject/Assets/RTXPT)")
     ap.add_argument("--overwrite", action="store_true",
                     help="re-copy/re-convert even if the payload already exists")
     ap.add_argument("--dry-run", action="store_true", help="print the plan, write nothing")
