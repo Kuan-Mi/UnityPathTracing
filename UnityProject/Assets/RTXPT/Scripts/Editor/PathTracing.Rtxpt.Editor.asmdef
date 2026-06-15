@@ -1,0 +1,25 @@
+{
+    "name": "PathTracing.Rtxpt.Editor",
+    "rootNamespace": "",
+    "references": [
+        "PathTracing.Core",
+        "PathTracing.Core.Editor",
+        "PathTracing.Rtxpt",
+        "Unity.RenderPipelines.Universal.Runtime",
+        "Unity.RenderPipelines.Core.Runtime",
+        "Unity.Mathematics",
+        "Unity.Burst",
+        "Unity.Collections"
+    ],
+    "includePlatforms": [
+        "Editor"
+    ],
+    "excludePlatforms": [],
+    "allowUnsafeCode": true,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": false
+}

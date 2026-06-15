@@ -3,7 +3,6 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Security.Cryptography;
-using Unity.VisualScripting;
 using UnityEditor;
 using UnityEditor.SceneManagement;
 using UnityEngine;
@@ -306,7 +305,7 @@ namespace DefaultNamespace.Editor
             
             foreach (var meshRenderer in allObjects)
             {
-                allMaterials.AddRange(meshRenderer.sharedMaterials);
+                allMaterials.UnionWith(meshRenderer.sharedMaterials);
             }
             
             
