@@ -64,6 +64,12 @@ powershell -ExecutionPolicy Bypass -File patch.ps1
 
 > **Note:** The built game executable also needs to be patched. Run `patch.ps1` again and select the `.exe` in your build output folder. The `D3D12\` folder will be created automatically next to it.
 
+### Running a Scene
+
+Open the Unity editor and open the `Assets/RTXPT/Assets/ConvergenceTest.unity` scene to see the default RtxPt result.
+
+NRD-Sample, RTXDI, and RTXPT are split into three folders. The scene files in each folder only render correctly when their corresponding Renderer is assigned in `Assets/Settings/RPAsset.asset`.
+
 ---
 
 ## Requirements
@@ -142,6 +148,12 @@ powershell -ExecutionPolicy Bypass -File patch.ps1
 > **注意**：如果 UAC 阻止写入 `Program Files` 目录，请以管理员身份运行 PowerShell。
 
 > **注意**：打包后的游戏可执行文件同样需要修改。再次运行 `patch.ps1`，选择打包输出目录中的 `.exe` 文件即可，`D3D12\` 文件夹会自动创建在其同级目录下。
+
+### 运行场景
+
+打开Unity编辑器，打开 `Assets/RTXPT/Assets/ConvergenceTest.unity` 场景，即可看到默认的Rtxpt的效果。
+
+NRD-Sample、RTXDI、RTXPT分为三个文件夹，每个文件夹中对应的场景文件只有其Renderer被放置在`Assets/Settings/RPAsset.asset`中才能正确显示。
 
 ---
 
