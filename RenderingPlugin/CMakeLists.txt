@@ -306,7 +306,7 @@ if(NOT EXISTS "${UNITY_PLUGIN_API_DIR}/IUnityInterface.h")
         "  IUnityRenderingExtensions.h")
 endif()
 
-set(NATIVE_PLUGINS_UNITY_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../UnityProject/Packages/top.kuanmi.native-ray-tracing/Plugins/x86_64")
+set(NATIVE_PLUGINS_UNITY_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../UnityProject/Packages/top.kuanmi.native-rendering/Plugins/x86_64")
 
 # ---------------------------------------------------------------------------
 # OMMBakerPlugin – standalone CPU baker DLL (Editor-only, no D3D12)

@@ -17,7 +17,7 @@ echo ============================================================
 echo.
 
 :: Create output directories
-set UNITY_PLUGINS=UnityProject\Packages\top.kuanmi.native-ray-tracing\Plugins\x86_64
+set UNITY_PLUGINS=UnityProject\Packages\top.kuanmi.native-rendering\Plugins\x86_64
 set UNITY_ASSETS_PLUGINS=UnityProject\Assets\Plugins\x86_64
 mkdir "%UNITY_PLUGINS%" 2>nul
 mkdir "%UNITY_ASSETS_PLUGINS%" 2>nul

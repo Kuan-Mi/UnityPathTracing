@@ -30,7 +30,7 @@ __pycache__/
 *.computeshader.reflection.json.meta
 
 # Build output DLLs copied by build_and_copy.bat
-UnityProject/Packages/top.kuanmi.native-ray-tracing/Plugins/x86_64/
+UnityProject/Packages/top.kuanmi.native-rendering/Plugins/x86_64/
 UnityProject/Assets/Plugins/x86_64/
 
 # Auto-clone of NVIDIA-RTX/RTXPT-Assets by tools/restore_rtxpt_assets.py

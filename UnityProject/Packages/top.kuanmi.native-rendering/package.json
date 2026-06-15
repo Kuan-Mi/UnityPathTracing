@@ -1,0 +1,19 @@
+{
+  "name": "top.kuanmi.native-rendering",
+  "version": "1.0.0",
+  "displayName": "Native D3D12 Rendering",
+  "description": "Low-level native D3D12 rendering for Unity 6 URP via C++ plugins: compute/raster/ray-tracing pipelines, bindless resources, acceleration structures, and Opacity Micro-Maps (OMM).",
+  "unity": "6000.0",
+  "keywords": [
+    "D3D12",
+    "DXR",
+    "ray tracing",
+    "compute",
+    "bindless",
+    "OMM"
+  ],
+  "dependencies": {
+    "com.unity.render-pipelines.universal": "17.3.0"
+  },
+  "type": "library"
+}

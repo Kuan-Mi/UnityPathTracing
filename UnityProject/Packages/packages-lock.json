@@ -315,8 +315,8 @@
       },
       "url": "https://packages.unity.com"
     },
-    "top.kuanmi.native-ray-tracing": {
-      "version": "file:top.kuanmi.native-ray-tracing",
+    "top.kuanmi.native-rendering": {
+      "version": "file:top.kuanmi.native-rendering",
       "depth": 0,
       "source": "embedded",
       "dependencies": {
