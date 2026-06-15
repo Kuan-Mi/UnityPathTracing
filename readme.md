@@ -27,6 +27,14 @@ Blog post: [RTXDI Implementation in Unity](https://www.kuanmi.top/2026/04/14/Uni
 
 ## How to Run
 
+### Prerequisites
+
+- **Git ≥ 2.46** with **Git LFS** installed. Older versions (e.g. 2.45) reject the Git LFS `post-checkout` hook the RTXPT-Assets repo ships with and `restore_rtxpt_assets.py` fails with *"fatal: active `post-checkout` hook found during `git clone`"*. Upgrading Git resolves it.
+- **Python 3** with **Pillow** for the DDS → PNG conversion in `restore_nrdsample_assets.py`:
+  ```bash
+  pip install Pillow
+  ```
+
 ```bash
 git clone https://github.com/Kuan-Mi/UnityPathTracing
 cd UnityPathTracing
@@ -97,6 +105,14 @@ Rtxpt版本也几乎和原版性能一致，且对Unity的各种分析光源支�
 详见博客：[RTXDI 在 Unity 中的实现](https://www.kuanmi.top/2026/04/14/UnityRtxdi/)
 
 ## 如何运行
+
+### 前置依赖
+
+- **Git ≥ 2.46**，并安装 **Git LFS**。旧版本（如 2.45）会拒绝 RTXPT-Assets 仓库自带的 Git LFS `post-checkout` 钩子，导致 `restore_rtxpt_assets.py` 报错 *"fatal: active `post-checkout` hook found during `git clone`"*。升级 Git 即可解决。
+- **Python 3** 并安装 **Pillow**，用于 `restore_nrdsample_assets.py` 中的 DDS → PNG 转换：
+  ```bash
+  pip install Pillow
+  ```
 
 ```bash
 git clone https://github.com/Kuan-Mi/UnityPathTracing
