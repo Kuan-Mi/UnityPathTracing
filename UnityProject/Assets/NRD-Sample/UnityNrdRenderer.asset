@@ -203,5 +203,5 @@ MonoBehaviour:
   sharcResolveCs: {fileID: 7200000, guid: 8a8bff82bc5641aaabee502a09792151, type: 3}
   autoExposureShader: {fileID: 7200000, guid: dd8e8b3823bdf9c4e987096a78bd2248, type: 3}
   accumulateCs: {fileID: 7200000, guid: c1e50e483fac4de7803cd658d0f9cdd2, type: 3}
-  scramblingRankingTex: {fileID: 0}
-  sobolTex: {fileID: 0}
+  scramblingRankingTex: {fileID: 2800000, guid: ba45d1e4dcf9022438a4798a5f9e7b80, type: 3}
+  sobolTex: {fileID: 2800000, guid: 17e7ce8147355314ea8aab1178a6a43c, type: 3}
