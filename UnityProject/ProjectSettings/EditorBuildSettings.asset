@@ -12,7 +12,7 @@ EditorBuildSettings:
     path: Assets/NRD-Sample/Assets/BistroExterior.unity
     guid: 1bdb4a44586c16e41a76056b2cdb15ae
   - enabled: 0
-    path: Assets/NRD-Sample/NRDSample.unity
+    path: Assets/NRD-Sample/Assets/NRDSample.unity
     guid: a9fec97d90fc4e149938fbbb34d3c87b
   - enabled: 0
     path: Assets/RTXDI/Assets/Arcade.unity

@@ -1058,8 +1058,8 @@ namespace PathTracing
             autoExposureShader       = UnityEditor.AssetDatabase.LoadAssetAtPath<ComputeShader>("Assets/Shaders/PostProcess/AutoExposure.compute");
             accumulateCs             = UnityEditor.AssetDatabase.LoadAssetAtPath<ComputeShader>("Assets/Shaders/PostProcess/Accumulate.compute");
 
-            scramblingRankingTex = UnityEditor.AssetDatabase.LoadAssetAtPath<Texture2D>("Assets/Textures/scrambling_ranking_128x128_2d_4spp.png");
-            sobolTex             = UnityEditor.AssetDatabase.LoadAssetAtPath<Texture2D>("Assets/Textures/sobol_256_4d.png");
+            scramblingRankingTex = UnityEditor.AssetDatabase.LoadAssetAtPath<Texture2D>("Assets/NRD-Sample/Assets/Textures/scrambling_ranking_128x128_2d_4spp.png");
+            sobolTex             = UnityEditor.AssetDatabase.LoadAssetAtPath<Texture2D>("Assets/NRD-Sample/Assets/Textures/sobol_256_4d.png");
 
             UnityEditor.EditorUtility.SetDirty(this);
         }

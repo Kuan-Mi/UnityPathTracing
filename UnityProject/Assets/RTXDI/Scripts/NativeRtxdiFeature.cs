@@ -13,7 +13,6 @@ using Unity.Mathematics;
 using UnityEngine;
 using UnityEngine.Rendering;
 using UnityEngine.Rendering.Universal;
-using CheckerboardMode = Nrd.CheckerboardMode;
 
 namespace PathTracing
 {
@@ -26,7 +25,7 @@ namespace PathTracing
         // User-visible configuration
         // -------------------------------------------------------------------
         public NativeRtxdiSetting setting;
-        public CommonSettings     commonSettings  = CommonSettings._default;
+        public CommonSettings     commonSettings = CommonSettings._default;
 
         [NonSerialized]
         public NativeResamplingConstants resamplingConstants;
@@ -100,9 +99,6 @@ namespace PathTracing
         public NativeComputeShader filterGradientsPassCs; // DenoisingPasses/FilterGradientsPass.computeshader
         public NativeComputeShader confidencePassCs; // DenoisingPasses/ConfidencePass.computeshader
 
-        // Validation: test that NriTextureArrayResource wraps Texture2DArray correctly
-        public NativeComputeShader gradientArrayTestCs; // DenoisingPasses/GradientArrayTest.computeshader
-
         // Tone mapping
         public NativeComputeShader toneMappingHistogramCs; // Shaders/donut/histogram.computeshader
         public NativeComputeShader toneMappingExposureCs; // Shaders/donut/exposure.computeshader
@@ -132,9 +128,8 @@ namespace PathTracing
         private NativeRtxdiPTFinalShadingPass           _ptFinalShadingPass;
 
         // Denoising: gradient filter + confidence (mirror FullSample FilterGradientsPass + ConfidencePass)
-        private NativeRtxdiFilterGradientsPass   _filterGradientsPass;
-        private NativeRtxdiConfidencePass        _confidencePass;
-        private NativeRtxdiGradientArrayTestPass _gradientArrayTestPass;
+        private NativeRtxdiFilterGradientsPass _filterGradientsPass;
+        private NativeRtxdiConfidencePass      _confidencePass;
 
         private NativeToneMappingPass _toneMappingPass;
 
@@ -223,7 +218,6 @@ namespace PathTracing
             _ptFinalShadingPass           ??= new NativeRtxdiPTFinalShadingPass(ptFinalShadingCs, ptFinalShadingRs) { renderPassEvent                               = renderPassEvent };
             _filterGradientsPass          ??= new NativeRtxdiFilterGradientsPass(filterGradientsPassCs) { renderPassEvent                                           = renderPassEvent };
             _confidencePass               ??= new NativeRtxdiConfidencePass(confidencePassCs) { renderPassEvent                                                     = renderPassEvent };
-            _gradientArrayTestPass        ??= new NativeRtxdiGradientArrayTestPass(gradientArrayTestCs) { renderPassEvent                                           = renderPassEvent };
             _toneMappingPass              ??= new NativeToneMappingPass(toneMappingHistogramCs, toneMappingExposureCs, toneMappingCs) { renderPassEvent             = renderPassEvent };
             _dlssrPass                    ??= new DlssSRPass { renderPassEvent                                                                                      = renderPassEvent };
         }
@@ -339,18 +333,21 @@ namespace PathTracing
             else
             {
                 // Resources already allocated at first frame — check for overflow (dynamic resize is TODO).
-                var  emissiveGeos     = _rtxdiGpuScene.GetEmissiveGeometries();
-                uint curMeshes        = (uint)emissiveGeos.Count;
-                uint curTriangles     = 0u;
+                var  emissiveGeos                            = _rtxdiGpuScene.GetEmissiveGeometries();
+                uint curMeshes                               = (uint)emissiveGeos.Count;
+                uint curTriangles                            = 0u;
                 foreach (var e in emissiveGeos) curTriangles += e.TriangleCount;
-                uint curGeomInstances = (uint)_rtxdiGpuScene.TotalGeometryInstanceCount;
+                uint curGeomInstances                        = (uint)_rtxdiGpuScene.TotalGeometryInstanceCount;
 
                 if (curMeshes > rtxdiResources.MaxEmissiveMeshes)
-                    Debug.LogError($"[NativeRtxdiFeature] Emissive mesh count overflow: current={curMeshes} > allocated={rtxdiResources.MaxEmissiveMeshes}. GPU buffers are too small — rendering will be corrupted. (Dynamic resize not yet implemented.)");
+                    Debug.LogError(
+                        $"[NativeRtxdiFeature] Emissive mesh count overflow: current={curMeshes} > allocated={rtxdiResources.MaxEmissiveMeshes}. GPU buffers are too small — rendering will be corrupted. (Dynamic resize not yet implemented.)");
                 if (curTriangles > rtxdiResources.MaxEmissiveTriangles)
-                    Debug.LogError($"[NativeRtxdiFeature] Emissive triangle count overflow: current={curTriangles} > allocated={rtxdiResources.MaxEmissiveTriangles}. GPU buffers are too small — rendering will be corrupted. (Dynamic resize not yet implemented.)");
+                    Debug.LogError(
+                        $"[NativeRtxdiFeature] Emissive triangle count overflow: current={curTriangles} > allocated={rtxdiResources.MaxEmissiveTriangles}. GPU buffers are too small — rendering will be corrupted. (Dynamic resize not yet implemented.)");
                 if (curGeomInstances > rtxdiResources.MaxGeometryInstances)
-                    Debug.LogError($"[NativeRtxdiFeature] Geometry instance count overflow: current={curGeomInstances} > allocated={rtxdiResources.MaxGeometryInstances}. GPU buffers are too small — rendering will be corrupted. (Dynamic resize not yet implemented.)");
+                    Debug.LogError(
+                        $"[NativeRtxdiFeature] Geometry instance count overflow: current={curGeomInstances} > allocated={rtxdiResources.MaxGeometryInstances}. GPU buffers are too small — rendering will be corrupted. (Dynamic resize not yet implemented.)");
             }
 
             if (resourcesChanged)
@@ -739,7 +736,7 @@ namespace PathTracing
                 };
 
                 var nrdRelaxSettings = RelaxSettings._default;
-                
+
                 NrdDenoiserHelper.GetCommonSettings(ref commonSettings, nrdCommon);
 
                 _nrdDenoisePass.Setup(nrdReblur.GetInteropDataPtr(commonSettings, nrdRelaxSettings), RenderPassMarkers.NrdDenoiseRtxdi);
@@ -1032,7 +1029,7 @@ namespace PathTracing
             _dlsrUpscalers.Clear();
             _dlssrPass = null;
             _pdfMipsPass?.Dispose();
-            _pdfMipsPass         = null;
+            _pdfMipsPass = null;
         }
 
         // -------------------------------------------------------------------

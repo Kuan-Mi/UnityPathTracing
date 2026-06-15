@@ -99,7 +99,9 @@ namespace PathTracing
             {
                 { typeof(Material), "Materials" },
                 { typeof(NativeComputeShader), "Native Compute Shaders" },
+                { typeof(RayTraceShader), "Native RayTrace Shaders" },
                 { typeof(ComputeShader), "Compute Shaders" },
+                { typeof(NativeRasterShader), "Native Raster Shaders" },
                 { typeof(Texture), "Textures" },
                 { typeof(Texture2D), "Textures" },
                 { typeof(Texture3D), "Textures" },
@@ -133,7 +135,7 @@ namespace PathTracing
                 groups[groupName].Add(field.Name);
             }
 
-            var order = new[] { "Materials", "Native Compute Shaders", "Compute Shaders", "Textures", "Other" };
+            var order = new[] { "Materials", "Native Compute Shaders", "Native RayTrace Shaders", "Native Raster Shaders", "Compute Shaders", "Textures", "Other" };
             foreach (var groupName in order)
             {
                 if (!groups.TryGetValue(groupName, out var fieldNames) || fieldNames.Count == 0)

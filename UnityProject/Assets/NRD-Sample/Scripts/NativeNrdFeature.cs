@@ -79,7 +79,7 @@ namespace PathTracing
         private NativeToneMappingPass   _toneMappingPass;
 
         private NRDSampleResource _nrdSampleResource;
-        public  NRDSampleResource NrdSampleResource => _nrdSampleResource;
+        public NRDSampleResource NrdSampleResource => _nrdSampleResource;
 
         private readonly Dictionary<long, VolatileConstantBuffer> _nrdConstantBuffers = new();
 
@@ -587,13 +587,13 @@ namespace PathTracing
             {
                 var dlrrRes = new DlrrDenoiser.DlrrResources
                 {
-                    input           = setting.enableAutoExposure ? pool.LdrColor : pool.Composed,
-                    output          = pool.DlssOutput,
-                    mv              = pool.Mv,
-                    depth           = pool.ViewZ,
-                    diffAlbedo      = pool.RrGuideDiffAlbedo,
-                    specAlbedo      = pool.RrGuideSpecAlbedo,
-                    normalRoughness = pool.RrGuideNormalRoughness,
+                    input              = setting.enableAutoExposure ? pool.LdrColor : pool.Composed,
+                    output             = pool.DlssOutput,
+                    mv                 = pool.Mv,
+                    depth              = pool.ViewZ,
+                    diffAlbedo         = pool.RrGuideDiffAlbedo,
+                    specAlbedo         = pool.RrGuideSpecAlbedo,
+                    normalRoughness    = pool.RrGuideNormalRoughness,
                     specularMvOrHitTex = pool.RrGuideSpecHitDistance
                 };
 
@@ -886,7 +886,7 @@ namespace PathTracing
 
             updateSkinnedPrimitivesCS = UnityEditor.AssetDatabase.LoadAssetAtPath<ComputeShader>("Assets/NRD-Sample/Shaders/UpdateSkinnedPrimitives.compute");
             fillUintTextureCS         = UnityEditor.AssetDatabase.LoadAssetAtPath<ComputeShader>("Assets/Scripts/FillUintTexture.compute");
-                
+
             nrdOpaqueTracingShader  = UnityEditor.AssetDatabase.LoadAssetAtPath<NativeComputeShader>("Assets/NRD-Sample/Shaders/TraceOpaque.computeshader");
             nrdSharcResolve         = UnityEditor.AssetDatabase.LoadAssetAtPath<NativeComputeShader>("Assets/NRD-Sample/Shaders/SharcResolve.computeshader");
             nrdSharcUpdate          = UnityEditor.AssetDatabase.LoadAssetAtPath<NativeComputeShader>("Assets/NRD-Sample/Shaders/SharcUpdate.computeshader");
