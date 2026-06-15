@@ -3,26 +3,35 @@ using System.Collections.Generic;
 using System.Reflection;
 using Unity.Mathematics;
 using UnityEngine;
-using UnityEngine.Rendering;
-using UnityEngine.Rendering.Universal;
 
 namespace PathTracing
 {
     /// <summary>
-    /// 运行时 IMGUI 面板，通过反射显示并修改 PathTracingSetting 的所有字段。
-    /// 将此组件挂在场景中任意 GameObject 上，运行时按 F1（可改）切换显示。
+    /// 运行时 IMGUI 面板基类，通过反射显示并修改任意设置对象的所有字段。
+    /// 具体的 RenderFeature/设置来源由子类通过 <see cref="GetSettings"/> 提供，
+    /// 这样每个渲染管线（RTXDI / RTXPT / NRD-Sample）可在各自的程序集中派生自己的面板。
+    /// 将子类组件挂在场景中任意 GameObject 上，运行时按 toggleKey（默认 F1）切换显示。
     /// </summary>
-    public class PathTracingSettingGUI : MonoBehaviour
+    public abstract class SettingsReflectionGUI : MonoBehaviour
     {
         [Tooltip("切换面板的按键（默认 F1）")]
         public KeyCode toggleKey = KeyCode.F1;
+
+        /// <summary>返回要显示/编辑的设置对象，找不到时返回 null（基类会显示 <see cref="NotFoundMessage"/>）。</summary>
+        protected abstract object GetSettings();
+
+        /// <summary>窗口标题。</summary>
+        protected virtual string PanelTitle => "Path Tracing Settings";
+
+        /// <summary>找不到设置来源时显示的提示。</summary>
+        protected virtual string NotFoundMessage => "SettingsReflectionGUI: feature not found";
 
         private bool              _visible;
         private Vector2           _scrollPos;
         private readonly Dictionary<string, bool>   _foldouts  = new();
         private readonly Dictionary<string, string> _textCache = new();
 
-        private UnityRtxdiFeature _feature;
+        private object       _settings;
         private Rect         _windowRect;
         private bool         _windowRectInited;
 
@@ -84,16 +93,15 @@ namespace PathTracing
                 _windowRectInited = true;
             }
 
-            if (_feature == null)
-                _feature = FindFeature();
+            _settings = GetSettings();
 
-            if (_feature == null)
+            if (_settings == null)
             {
-                GUI.Box(new Rect(Screen.width - 360, (int)btnH + 20, 350, 28), "PathTracingSettingGUI: RtxdiFeature not found");
+                GUI.Box(new Rect(Screen.width - 360, (int)btnH + 20, 350, 28), NotFoundMessage);
                 return;
             }
 
-            _windowRect = GUI.Window(0xBEEF, _windowRect, DrawWindow, "Path Tracing Settings  [" + toggleKey + "]");
+            _windowRect = GUI.Window(0xBEEF, _windowRect, DrawWindow, PanelTitle + "  [" + toggleKey + "]");
         }
 
         private void DrawWindow(int id)
@@ -101,7 +109,7 @@ namespace PathTracing
             GUILayout.Space(2);
             _scrollPos = GUILayout.BeginScrollView(_scrollPos, GUILayout.ExpandHeight(true));
 
-            DrawObjectFieldsInPlace(_feature.setting, typeof(NrdSampleSetting), "root");
+            DrawObjectFieldsInPlace(_settings, _settings.GetType(), "root");
 
             GUILayout.EndScrollView();
             GUI.DragWindow(new Rect(0, 0, _windowRect.width, 18));
@@ -398,46 +406,6 @@ namespace PathTracing
             if (GUI.GetNameOfFocusedControl() != key)
                 _textCache[key] = actualValue;
             return _textCache.TryGetValue(key, out var cached) ? cached : actualValue;
-        }
-
-        // ─── Feature finder ──────────────────────────────────────────────
-
-        private static UnityRtxdiFeature FindFeature()
-        {
-            var cam = Camera.main;
-            if (cam == null) return null;
-
-            var uca = cam.GetComponent<UniversalAdditionalCameraData>();
-            if (uca == null) return null;
-
-            var renderer = uca.scriptableRenderer;
-
-            // 尝试公开属性（URP 2021+）
-            var prop = typeof(ScriptableRenderer).GetProperty("rendererFeatures",
-                BindingFlags.Public | BindingFlags.Instance);
-            if (prop != null)
-            {
-                var list = prop.GetValue(renderer) as List<ScriptableRendererFeature>;
-                if (list != null)
-                {
-                    foreach (var f in list)
-                        if (f is UnityRtxdiFeature r) return r;
-                    return null;
-                }
-            }
-
-            // 回退：通过私有字段
-            var fi = typeof(ScriptableRenderer).GetField("m_RendererFeatures",
-                BindingFlags.NonPublic | BindingFlags.Instance);
-            if (fi == null) return null;
-
-            var flist = fi.GetValue(renderer) as List<ScriptableRendererFeature>;
-            if (flist == null) return null;
-
-            foreach (var f in flist)
-                if (f is UnityRtxdiFeature r) return r;
-
-            return null;
         }
     }
 }

@@ -6,7 +6,9 @@
         "Unity.RenderPipelines.Core.Runtime",
         "Unity.Mathematics",
         "Unity.Burst",
-        "Unity.Collections"
+        "Unity.Collections",
+        "Unity.InputSystem",
+        "NativeRayTracing.Runtime"
     ],
     "includePlatforms": [],
     "excludePlatforms": [],
