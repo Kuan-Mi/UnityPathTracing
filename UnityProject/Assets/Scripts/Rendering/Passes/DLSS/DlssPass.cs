@@ -28,13 +28,13 @@ namespace PathTracing
 
         public class Settings
         {
-            internal bool disabled;
+            public bool disabled;
         }
 
         class PassData
         {
-            internal Settings Setting;
-            internal IntPtr    DataPtr;
+            public Settings Setting;
+            public IntPtr    DataPtr;
         }
 
         [DllImport("Denoiser")]

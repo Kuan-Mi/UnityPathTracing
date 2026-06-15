@@ -21,7 +21,7 @@ namespace PathTracing
 
         class PassData
         {
-            internal IntPtr SRDataPtr;
+            public IntPtr SRDataPtr;
         }
 
         [DllImport("Denoiser")]

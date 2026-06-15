@@ -32,32 +32,32 @@ namespace PathTracing
 
         public class Resource
         {
-            internal GraphicsBuffer ConstantBuffer;
+            public GraphicsBuffer ConstantBuffer;
 
-            internal RTHandle NormalRoughness;
-            internal RTHandle BaseColorMetalness;
-            internal RTHandle Spec;
+            public RTHandle NormalRoughness;
+            public RTHandle BaseColorMetalness;
+            public RTHandle Spec;
             
-            internal RTHandle ViewZ;
-            internal RTHandle RRGuide_DiffAlbedo;
-            internal RTHandle RRGuide_SpecAlbedo;
-            internal RTHandle RRGuide_SpecHitDistance;
-            internal RTHandle RRGuide_Normal_Roughness;
+            public RTHandle ViewZ;
+            public RTHandle RRGuide_DiffAlbedo;
+            public RTHandle RRGuide_SpecAlbedo;
+            public RTHandle RRGuide_SpecHitDistance;
+            public RTHandle RRGuide_Normal_Roughness;
 
         }
 
         public class Settings
         {
-            internal int rectGridW;
-            internal int rectGridH;
-            internal bool tmpDisableRR;
+            public int rectGridW;
+            public int rectGridH;
+            public bool tmpDisableRR;
         }
 
         class PassData
         {
-            internal ComputeShader DlssBeforeCs;
-            internal Resource Resource;
-            internal Settings Setting;
+            public ComputeShader DlssBeforeCs;
+            public Resource Resource;
+            public Settings Setting;
         }
 
         [DllImport("Denoiser")]

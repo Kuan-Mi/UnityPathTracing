@@ -140,16 +140,16 @@ namespace PathTracing
         public class Resource
         {
             /// <summary>HDR source texture (SRV).</summary>
-            internal IntPtr SourceTexture;
+            public IntPtr SourceTexture;
 
             /// <summary>Tone-mapped output texture (UAV). Must be RenderTexture with enableRandomWrite.</summary>
-            internal IntPtr OutputTexture;
+            public IntPtr OutputTexture;
 
             /// <summary>Optional color LUT texture (SRV). Pass IntPtr.Zero to disable.</summary>
-            internal IntPtr ColorLUT;
+            public IntPtr ColorLUT;
 
             /// <summary>Color LUT size (height dimension, e.g. 32). 0 = disabled.</summary>
-            internal float ColorLUTSize;
+            public float ColorLUTSize;
         }
 
         [Serializable]
@@ -177,25 +177,25 @@ namespace PathTracing
 
         public class Settings
         {
-            internal int2                  RenderResolution;
-            internal float                 FrameTime;
-            internal ToneMappingParameters ToneMappingParams;
+            public int2                  RenderResolution;
+            public float                 FrameTime;
+            public ToneMappingParameters ToneMappingParams;
         }
 
         // ── Pass data ─────────────────────────────────────────────────────────
 
         class PassData
         {
-            internal NativeComputePipeline      HistogramCs;
-            internal NativeComputeDescriptorSet HistogramDs;
-            internal NativeComputePipeline      ExposureCs;
-            internal NativeComputeDescriptorSet ExposureDs;
-            internal NativeComputePipeline      TonemapCs;
-            internal NativeComputeDescriptorSet TonemapDs;
+            public NativeComputePipeline      HistogramCs;
+            public NativeComputeDescriptorSet HistogramDs;
+            public NativeComputePipeline      ExposureCs;
+            public NativeComputeDescriptorSet ExposureDs;
+            public NativeComputePipeline      TonemapCs;
+            public NativeComputeDescriptorSet TonemapDs;
 
-            internal DeviceBuffer          HistogramBuffer;
-            internal Resource                   Resource;
-            internal Settings                   Settings;
+            public DeviceBuffer          HistogramBuffer;
+            public Resource                   Resource;
+            public Settings                   Settings;
             public   IntPtr                     expPtr;
         }
 

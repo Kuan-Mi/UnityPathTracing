@@ -33,33 +33,33 @@ namespace PathTracing
 
         public class Resource
         {
-            internal GraphicsBuffer ConstantBuffer;
+            public GraphicsBuffer ConstantBuffer;
             
-            internal GraphicsBuffer SpotLightBuffer;
-            internal GraphicsBuffer AreaLightBuffer;
-            internal GraphicsBuffer PointLightBuffer;
+            public GraphicsBuffer SpotLightBuffer;
+            public GraphicsBuffer AreaLightBuffer;
+            public GraphicsBuffer PointLightBuffer;
             
-            internal GraphicsBuffer AeExposureBuffer;
+            public GraphicsBuffer AeExposureBuffer;
 
-            internal RTHandle Output;
+            public RTHandle Output;
         }
 
         public class Settings
         {
-            internal int2 m_RenderResolution;
-            internal float resolutionScale;
-            internal int referenceBounceNum;
-            internal int convergenceStep;
-            internal float split;
+            public int2 m_RenderResolution;
+            public float resolutionScale;
+            public int referenceBounceNum;
+            public int convergenceStep;
+            public float split;
         }
 
         class PassData
         {
-            internal RayTracingShader ReferencePtTs;
-            internal Resource Resource;
-            internal Settings Settings;
+            public RayTracingShader ReferencePtTs;
+            public Resource Resource;
+            public Settings Settings;
 
-            internal TextureHandle OutputTexture;
+            public TextureHandle OutputTexture;
         }
 
         static void ExecutePass(PassData data, UnsafeGraphContext context)

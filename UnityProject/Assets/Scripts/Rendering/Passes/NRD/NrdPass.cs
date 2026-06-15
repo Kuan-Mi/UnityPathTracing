@@ -21,8 +21,8 @@ namespace PathTracing
 
         class PassData
         {
-            internal IntPtr      DataPtr;
-            internal NamedMarker Marker;
+            public IntPtr      DataPtr;
+            public NamedMarker Marker;
         }
 
         [DllImport("Denoiser")]

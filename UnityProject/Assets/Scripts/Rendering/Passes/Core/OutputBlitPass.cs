@@ -25,78 +25,78 @@ namespace PathTracing
 
         public class Resource
         {
-            internal RTHandle Mv;
-            internal RTHandle NormalRoughness;
-            internal RTHandle BaseColorMetalness;
+            public RTHandle Mv;
+            public RTHandle NormalRoughness;
+            public RTHandle BaseColorMetalness;
 
-            internal RTHandle Penumbra;
-            internal RTHandle Diff;
-            internal RTHandle Spec;
+            public RTHandle Penumbra;
+            public RTHandle Diff;
+            public RTHandle Spec;
 
-            internal RTHandle ShadowTranslucency;
-            internal RTHandle DenoisedDiff;
-            internal RTHandle DenoisedSpec;
-            internal RTHandle Validation;
+            public RTHandle ShadowTranslucency;
+            public RTHandle DenoisedDiff;
+            public RTHandle DenoisedSpec;
+            public RTHandle Validation;
 
-            internal RTHandle Composed;
-            internal RTHandle DirectLighting;
+            public RTHandle Composed;
+            public RTHandle DirectLighting;
 
-            internal RTHandle RRGuide_DiffAlbedo;
-            internal RTHandle RRGuide_SpecAlbedo;
-            internal RTHandle RRGuide_SpecHitDistance;
-            internal RTHandle RRGuide_Normal_Roughness;
-            internal RTHandle DlssOutput;
+            public RTHandle RRGuide_DiffAlbedo;
+            public RTHandle RRGuide_SpecAlbedo;
+            public RTHandle RRGuide_SpecHitDistance;
+            public RTHandle RRGuide_Normal_Roughness;
+            public RTHandle DlssOutput;
 
-            internal RTHandle taaDst;
-            internal RTHandle ViewZ;
-            internal RTHandle Gradient;
+            public RTHandle taaDst;
+            public RTHandle ViewZ;
+            public RTHandle Gradient;
 
-            internal RTHandle Output;
-            internal RTHandle DirectEmission;
-            internal RTHandle ComposedDiff;
-            internal RTHandle ComposedSpecViewZ;
+            public RTHandle Output;
+            public RTHandle DirectEmission;
+            public RTHandle ComposedDiff;
+            public RTHandle ComposedSpecViewZ;
 
             // ── Rtxdi native GBuffer debug textures ──────────────────────────
-            internal RTHandle RtxdiViewDepth;
-            internal RTHandle RtxdiDiffuseAlbedo;   // R32_UINT  R11G11B10_UFLOAT
-            internal RTHandle RtxdiSpecularRough;   // R32_UINT  R8G8B8A8_Gamma_UFLOAT
-            internal RTHandle RtxdiNormals;         // R32_UINT  oct32
-            internal RTHandle RtxdiGeoNormals;      // R32_UINT  oct32            // ── Rtxdi PDF debug textures (R32_Float mip chain) ──────────────────
-            internal RTHandle RtxdiDirectLightingRaw;
-            internal RTHandle LocalLightPdfTexture;
-            internal RTHandle EnvironmentPdfTexture;        }
+            public RTHandle RtxdiViewDepth;
+            public RTHandle RtxdiDiffuseAlbedo;   // R32_UINT  R11G11B10_UFLOAT
+            public RTHandle RtxdiSpecularRough;   // R32_UINT  R8G8B8A8_Gamma_UFLOAT
+            public RTHandle RtxdiNormals;         // R32_UINT  oct32
+            public RTHandle RtxdiGeoNormals;      // R32_UINT  oct32            // ── Rtxdi PDF debug textures (R32_Float mip chain) ──────────────────
+            public RTHandle RtxdiDirectLightingRaw;
+            public RTHandle LocalLightPdfTexture;
+            public RTHandle EnvironmentPdfTexture;        }
 
         public class Settings
         {
-            internal ShowMode showMode;
-            internal float resolutionScale;
-            internal bool enableDlssRR;
-            internal bool tmpDisableRR;
-            internal bool showMV;
-            internal bool showValidation;
-            internal bool showReference;
+            public ShowMode showMode;
+            public float resolutionScale;
+            public bool enableDlssRR;
+            public bool tmpDisableRR;
+            public bool showMV;
+            public bool showValidation;
+            public bool showReference;
             /// <summary>Mip level to display for Rtxdi_LocalLightPdf / Rtxdi_EnvironmentPdf modes.</summary>
-            internal int   pdfMipLevel;
+            public int   pdfMipLevel;
             /// <summary>Exposure in stops for the PDF heat-map visualisation.</summary>
-            internal float pdfExposureStops;
+            public float pdfExposureStops;
         }
 
 
         class PassData
         {
-            internal Material BlitMaterial;
+            public Material BlitMaterial;
 
-            internal Resource Resource;
-            internal Settings Setting;
+            public Resource Resource;
+            public Settings Setting;
 
 
-            internal TextureHandle CameraTexture;
+            public TextureHandle CameraTexture;
 
-            internal TextureHandle OutputTexture;
-            internal TextureHandle DirectEmission;
-            internal TextureHandle ComposedDiff;
+            public TextureHandle OutputTexture;
+            public TextureHandle DirectEmission;
+            public TextureHandle ComposedDiff;
 
-            internal TextureHandle ComposedSpecViewZ;
+            public TextureHandle ComposedSpecViewZ;
         }
 
         public OutputBlitPass(Material biltMaterial)

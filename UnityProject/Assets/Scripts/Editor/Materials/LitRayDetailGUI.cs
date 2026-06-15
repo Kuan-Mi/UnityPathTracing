@@ -5,7 +5,7 @@ using UnityEngine.Rendering;
 
 public class LitRayDetailGUI
 {
-    internal static class Styles
+    public static class Styles
     {
         public static readonly GUIContent detailInputs = EditorGUIUtility.TrTextContent("Detail Inputs",
             "These settings define the surface details by tiling and overlaying additional maps on the surface.");

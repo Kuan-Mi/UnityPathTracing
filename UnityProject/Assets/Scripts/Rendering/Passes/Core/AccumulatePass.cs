@@ -28,22 +28,22 @@ namespace PathTracing
 
         public class Resource
         {
-            internal RTHandle noise;
-            internal RTHandle accumulation;
+            public RTHandle noise;
+            public RTHandle accumulation;
         }
 
         public class Settings
         {
-            internal int rectGridW;
-            internal int rectGridH;
-            internal int convergenceStep;
+            public int rectGridW;
+            public int rectGridH;
+            public int convergenceStep;
         }
 
         class PassData
         {
-            internal ComputeShader AccCs;
-            internal Resource Resource;
-            internal Settings Settings;
+            public ComputeShader AccCs;
+            public Resource Resource;
+            public Settings Settings;
         }
 
         static void ExecutePass(PassData data, UnsafeGraphContext context)

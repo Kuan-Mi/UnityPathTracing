@@ -10,7 +10,7 @@ namespace NativeRender
     /// Burst-compatible math utilities for primitive data encoding.
     /// Mirrors the logic in NRDSampleResource.EncodeUnitVector / SafeSign.
     /// </summary>
-    internal static class PrimitiveMathUtil
+    public static class PrimitiveMathUtil
     {
         public static float SafeSign(float x) => x >= 0f ? 1f : -1f;
 
@@ -41,7 +41,7 @@ namespace NativeRender
     ///     starting at this submesh's primitive offset
     /// </summary>
     [BurstCompile]
-    internal struct BuildPrimitivesJob : IJobParallelFor
+    public struct BuildPrimitivesJob : IJobParallelFor
     {
         [ReadOnly] public NativeArray<int>    Indices;   // indexCount = triCount * 3
         [ReadOnly] public NativeArray<float3> Positions; // full mesh vertex count
@@ -117,7 +117,7 @@ namespace NativeRender
     /// contiguous sub-array of the merged VB.
     /// </summary>
     [BurstCompile]
-    internal struct TransformVerticesJob : IJobParallelFor
+    public struct TransformVerticesJob : IJobParallelFor
     {
         [ReadOnly] public NativeArray<float3> LocalPositions;
         public float4x4 LocalToWorld;
@@ -136,7 +136,7 @@ namespace NativeRender
     /// (output[i] = vertBase + localIndices[i]).
     /// </summary>
     [BurstCompile]
-    internal struct RemapIndicesJob : IJobParallelFor
+    public struct RemapIndicesJob : IJobParallelFor
     {
         [ReadOnly] public NativeArray<int> LocalIndices;
         public int VertBase;
@@ -157,7 +157,7 @@ namespace NativeRender
     /// <see cref="LocalToWorld"/>.
     /// </summary>
     [BurstCompile]
-    internal struct BuildMergedPrimitivesJob : IJobParallelFor
+    public struct BuildMergedPrimitivesJob : IJobParallelFor
     {
         [ReadOnly] public NativeArray<int>    Indices;        // local submesh indices
         [ReadOnly] public NativeArray<float3> LocalPositions;

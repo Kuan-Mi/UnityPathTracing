@@ -30,35 +30,35 @@ namespace PathTracing
 
         public class Resource
         {
-            internal GraphicsBuffer AeHistogramBuffer;
-            internal GraphicsBuffer AeExposureBuffer;
+            public GraphicsBuffer AeHistogramBuffer;
+            public GraphicsBuffer AeExposureBuffer;
             
-            internal RTHandle Composed;
+            public RTHandle Composed;
         }
 
         public class Settings
         {
-            internal bool AeEnabled;
-            internal float AeEVMin;
-            internal float AeEVMax;
-            internal float AeLowPercent;
-            internal float AeHighPercent;
-            internal float AeSpeedUp;
-            internal float AeSpeedDown;
-            internal float AeDeltaTime;
-            internal float AeExposureCompensation;
-            internal float AeMinExposure;
-            internal float AeMaxExposure;
-            internal uint AeTexWidth;
-            internal uint AeTexHeight;
-            internal float ManualExposure;
+            public bool AeEnabled;
+            public float AeEVMin;
+            public float AeEVMax;
+            public float AeLowPercent;
+            public float AeHighPercent;
+            public float AeSpeedUp;
+            public float AeSpeedDown;
+            public float AeDeltaTime;
+            public float AeExposureCompensation;
+            public float AeMinExposure;
+            public float AeMaxExposure;
+            public uint AeTexWidth;
+            public uint AeTexHeight;
+            public float ManualExposure;
         }
         
         class SharcPassData
         {
-            internal ComputeShader AeCs;
-            internal Resource Resource;
-            internal Settings Settings;
+            public ComputeShader AeCs;
+            public Resource Resource;
+            public Settings Settings;
         }
 
         static void ExecutePass(SharcPassData data, UnsafeGraphContext context)

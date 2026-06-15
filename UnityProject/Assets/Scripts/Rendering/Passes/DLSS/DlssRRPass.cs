@@ -34,13 +34,13 @@ namespace PathTracing
 
         public class Settings
         {
-            internal bool tmpDisableRR;
+            public bool tmpDisableRR;
         }
 
         class PassData
         {
-            internal Settings Setting;
-            internal IntPtr RRDataPtr;
+            public Settings Setting;
+            public IntPtr RRDataPtr;
         }
 
         [DllImport("Denoiser")]
