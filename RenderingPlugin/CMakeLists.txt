@@ -40,6 +40,18 @@ endif()
 message(STATUS "DLSS SDK: ${DLSS_SDK_DIR}")
 
 # ---------------------------------------------------------------------------
+# NVIDIA Streamline SDK (DLSS Frame Generation proxy swapchain + Reflex).
+# Not yet vendored into the repo; defaults to the local download. Override with
+# -DSTREAMLINE_SDK_DIR=... to relocate.
+# ---------------------------------------------------------------------------
+set(STREAMLINE_SDK_DIR "C:/Users/MK/Downloads/streamline-sdk-v2.9.0"
+    CACHE PATH "Path to the NVIDIA Streamline SDK")
+if(NOT EXISTS "${STREAMLINE_SDK_DIR}/include/sl.h")
+    message(FATAL_ERROR "Streamline SDK not found at ${STREAMLINE_SDK_DIR} (set STREAMLINE_SDK_DIR)")
+endif()
+message(STATUS "Streamline SDK: ${STREAMLINE_SDK_DIR}")
+
+# ---------------------------------------------------------------------------
 # Keep FetchContent downloads outside _Build so they survive cache resets
 # ---------------------------------------------------------------------------
 set(FETCHCONTENT_BASE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/_deps" CACHE PATH "FetchContent download cache" FORCE)
@@ -357,6 +369,7 @@ add_library(NativeRenderPlugin SHARED
     NativeRenderPlugin/src/Hooks/D3D12HeapHook.cpp
     NativeRenderPlugin/src/Hooks/SwapChainHook.cpp
     NativeRenderPlugin/src/Ngx/NgxContext.cpp
+    NativeRenderPlugin/src/Streamline/StreamlineContext.cpp
     # RTXMU (NVIDIA RTX Memory Utility) — BLAS suballocation + compaction
     # management; vendored D3D12 subset (see External/rtxmu/README.md).
     External/rtxmu/src/D3D12AccelStructManager.cpp
@@ -371,10 +384,12 @@ target_include_directories(NativeRenderPlugin PRIVATE
     NativeRenderPlugin/include/Resources
     NativeRenderPlugin/include/Hooks
     NativeRenderPlugin/include/Ngx
+    NativeRenderPlugin/include/Streamline
     NativeRenderPlugin/src/Plugin
     External/rtxmu/include
     D3D12HeapHook
     "${DLSS_SDK_DIR}/include"
+    "${STREAMLINE_SDK_DIR}/include"
     "${UNITY_PLUGIN_API_DIR}"
     "${DXC_INC}"
     "${WIN_SDK_INC}/um"
@@ -399,6 +414,8 @@ target_link_libraries(NativeRenderPlugin PRIVATE
     # for Debug; nvsdk_ngx_d.lib (/MD) for all other configs. Mixing them trips
     # LNK2038 RuntimeLibrary / _ITERATOR_DEBUG_LEVEL mismatches.
     "${DLSS_SDK_DIR}/lib/Windows_x86_64/x64/nvsdk_ngx_d$<$<CONFIG:Debug>:_dbg>.lib"
+    # NVIDIA Streamline interposer import lib (exports slInit/slShutdown/etc.).
+    "${STREAMLINE_SDK_DIR}/lib/x64/sl.interposer.lib"
 )
 
 # ---------------------------------------------------------------------------

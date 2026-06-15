@@ -37,6 +37,7 @@
 #include "D3D12HeapHook.h"
 #include "SwapChainHook.h"
 #include "NgxContext.h"
+#include "StreamlineContext.h"
 #include "PluginInternal.h"
 #include "DeferredDeleteQueue.h"
 #include <map>
@@ -205,6 +206,15 @@ static void NgxLogBridge(int level, const char* msg)
     PluginLog(type, msg, __FILE__, __LINE__);
 }
 
+// Bridge StreamlineContext diagnostics into Unity's log (called from any thread).
+static void StreamlineLogBridge(int level, const char* msg)
+{
+    UnityLogType type = (level == 2) ? kUnityLogTypeError
+                      : (level == 1) ? kUnityLogTypeWarning
+                                     : kUnityLogTypeLog;
+    PluginLog(type, msg, __FILE__, __LINE__);
+}
+
 // Try to grab Unity's swapchain (player-only) and patch its Present vtable.
 // Cheap no-op once installed; safe to call from render callbacks every frame.
 static void TryHookUnitySwapChainPresent()
@@ -285,6 +295,19 @@ static void UNITY_INTERFACE_API OnGraphicsDeviceEvent(UnityGfxDeviceEventType ev
         NgxContext::SetLogger(&NgxLogBridge);
         NgxContext::Initialize(device);
 
+        // DLSS-FG via Streamline (env-gated, NR_STREAMLINE=1). Manual hooking, so
+        // slInit only loads plugins + queries DLSS-G support; it does not touch
+        // Unity's live swapchain. Off by default so normal runs are unaffected.
+        {
+            char buf[8] = {};
+            DWORD n = GetEnvironmentVariableA("NR_STREAMLINE", buf, sizeof(buf));
+            if (n > 0 && buf[0] == '1')
+            {
+                StreamlineContext::SetLogger(&StreamlineLogBridge);
+                StreamlineContext::Initialize(device);
+            }
+        }
+
         // Check DXR (ID3D12Device5) support
         ComPtr<ID3D12Device5> dev5;
         s_RendererReady = SUCCEEDED(device->QueryInterface(IID_PPV_ARGS(&dev5)));
@@ -346,6 +369,7 @@ static void UNITY_INTERFACE_API OnGraphicsDeviceEvent(UnityGfxDeviceEventType ev
 
         // Shut NGX down while Unity's device is still alive.
         NgxContext::Shutdown(s_D3D12 ? s_D3D12->GetDevice() : nullptr);
+        StreamlineContext::Shutdown();
 
         g_transientRing.Shutdown();
         g_uploadPool.Shutdown();
