@@ -444,10 +444,45 @@ target_link_libraries(SwapChainHookPlugin PRIVATE
 )
 
 # ---------------------------------------------------------------------------
+# StreamlineProbePlugin – standalone diagnostic DLL: inits Streamline (SL 2.11.1,
+# prebuilt SDK in Other/) against Unity's device and logs DLSS-G (Frame
+# Generation) capability. Isolated from the raw-NGX DlssgProbe; enable only ONE
+# of StreamlineProbePlugin / SwapChainHookPlugin via "Load on startup" at a time.
+# ---------------------------------------------------------------------------
+set(SL_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../Other/streamline-sdk-v2.11.1")
+
+add_library(StreamlineProbePlugin SHARED
+    StreamlineProbePlugin/src/StreamlineProbePlugin.cpp
+    StreamlineProbePlugin/src/StreamlineProbe.cpp
+)
+
+target_include_directories(StreamlineProbePlugin PRIVATE
+    StreamlineProbePlugin/include
+    "${UNITY_PLUGIN_API_DIR}"
+    "${SL_DIR}/include"
+    "${WIN_SDK_INC}/um"
+    "${WIN_SDK_INC}/shared"
+)
+
+target_compile_options(StreamlineProbePlugin PRIVATE /utf-8)
+
+target_link_directories(StreamlineProbePlugin PRIVATE "${WIN_SDK_LIB}")
+
+# sl.interposer.lib resolves the SL entry points (slInit, slSetD3DDevice, …) to
+# sl.interposer.dll, shipped beside the plugin with the SL plugin DLLs.
+target_link_libraries(StreamlineProbePlugin PRIVATE
+    d3d12.lib
+    dxgi.lib
+    "${SL_DIR}/lib/x64/sl.interposer.lib"
+)
+
+# ---------------------------------------------------------------------------
 # Output directories and post-build copies for the native plugins
 # ---------------------------------------------------------------------------
 if(NOT NR_SKIP_UNITY_COPY)
-    foreach(_TARGET NativeRenderPlugin ShaderCompilerPlugin OMMBakerPlugin SwapChainHookPlugin)
+    # SwapChainHookPlugin is intentionally NOT deployed (raw-proxy route concluded;
+    # source kept for reference). StreamlineProbePlugin is the active FG experiment.
+    foreach(_TARGET NativeRenderPlugin ShaderCompilerPlugin OMMBakerPlugin StreamlineProbePlugin)
         set_target_properties(${_TARGET} PROPERTIES
             RUNTIME_OUTPUT_DIRECTORY         "${NATIVE_PLUGINS_UNITY_DIR}"
             RUNTIME_OUTPUT_DIRECTORY_RELEASE "${NATIVE_PLUGINS_UNITY_DIR}"
@@ -458,14 +493,20 @@ if(NOT NR_SKIP_UNITY_COPY)
         )
     endforeach()
 
-    # nvngx_dlssg.dll — DLSS-G model, must sit beside SwapChainHookPlugin.dll
-    # so its DlssgProbe (NGX) can locate it ('dev' snippet in Debug, 'rel' else).
-    add_custom_command(TARGET SwapChainHookPlugin POST_BUILD
-        COMMAND ${CMAKE_COMMAND} -E copy_if_different
-            "${NGX_DIR}/lib/Windows_x86_64/$<IF:$<CONFIG:Debug>,dev,rel>/nvngx_dlssg.dll"
-            "${NATIVE_PLUGINS_UNITY_DIR}/nvngx_dlssg.dll"
-        COMMENT "Copying nvngx_dlssg.dll to Unity Packages Plugins"
-    )
+    # (SwapChainHookPlugin's raw-NGX nvngx_dlssg.dll copy removed with its deploy;
+    # the Streamline probe ships its own nvngx_dlssg.dll below.)
+
+    # Streamline runtime DLLs must sit beside StreamlineProbePlugin.dll so SL can
+    # init + locate its DLSS-G plugin (development build → verbose SL logging).
+    foreach(_SLDLL sl.interposer.dll sl.common.dll sl.dlss_g.dll sl.reflex.dll
+                   sl.pcl.dll nvngx_dlssg.dll WinPixEventRuntime.dll)
+        add_custom_command(TARGET StreamlineProbePlugin POST_BUILD
+            COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                "${SL_DIR}/bin/x64/development/${_SLDLL}"
+                "${NATIVE_PLUGINS_UNITY_DIR}/${_SLDLL}"
+            COMMENT "Copying Streamline ${_SLDLL} to Unity Packages Plugins"
+        )
+    endforeach()
 
     # D3D12HeapHook.dll (copy to both plugin directories)
     add_custom_command(TARGET D3D12HeapHook POST_BUILD

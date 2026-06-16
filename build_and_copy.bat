@@ -6,10 +6,6 @@ set CONFIG=%~1
 if "%CONFIG%"=="" set CONFIG=Debug
 set OUT_DIR=RenderingPlugin\_Build\%CONFIG%
 
-:: NGX snippet flavor: 'dev' pairs with Debug, 'rel' with Release.
-set NGX_FLAVOR=rel
-if /I "%CONFIG%"=="Debug" set NGX_FLAVOR=dev
-
 :: NRD/NRI are built externally; fall back to their Debug output if the
 :: requested configuration was never built there.
 set NRD_DIR=RenderingPlugin\_ExternalBuild\NRD_build\%CONFIG%
@@ -58,14 +54,24 @@ copy /Y "%OUT_DIR%\ShaderCompilerPlugin.pdb"  "%UNITY_PLUGINS%\" >nul
 copy /Y "%OUT_DIR%\D3D12HeapHook.dll"         "%UNITY_PLUGINS%\" >nul
 copy /Y "%OUT_DIR%\D3D12HeapHook.pdb"         "%UNITY_PLUGINS%\" >nul
 
-:: SwapChainHookPlugin — standalone diagnostic DLL (DLSS-FG present-hook probe).
+:: StreamlineProbePlugin — standalone diagnostic DLL (DLSS-G via Streamline 2.11.1).
 :: Disabled by default in Unity; enable "Load on startup" on this DLL to test.
-copy /Y "%OUT_DIR%\SwapChainHookPlugin.dll"   "%UNITY_PLUGINS%\" >nul
-copy /Y "%OUT_DIR%\SwapChainHookPlugin.pdb"   "%UNITY_PLUGINS%\" >nul
+:: NOTE: SwapChainHookPlugin (raw-NGX route) is no longer deployed; its source is
+:: kept in RenderingPlugin\SwapChainHookPlugin for reference. Enable at most one
+:: FG diagnostic at a time so they don't both init NGX.
+copy /Y "%OUT_DIR%\StreamlineProbePlugin.dll" "%UNITY_PLUGINS%\" >nul
+copy /Y "%OUT_DIR%\StreamlineProbePlugin.pdb" "%UNITY_PLUGINS%\" >nul
 
-:: DLSS-G frame-generation model — required by SwapChainHookPlugin's DlssgProbe.
-:: Must sit beside SwapChainHookPlugin.dll so NGX can locate it.
-copy /Y "RenderingPlugin\_deps\ngx-src\lib\Windows_x86_64\%NGX_FLAVOR%\nvngx_dlssg.dll" "%UNITY_PLUGINS%\" >nul
+:: Streamline runtime (development build) — must sit beside StreamlineProbePlugin.dll
+:: so SL can init and locate its DLSS-G plugin.
+set SL_BIN=Other\streamline-sdk-v2.11.1\bin\x64\development
+copy /Y "%SL_BIN%\sl.interposer.dll"      "%UNITY_PLUGINS%\" >nul
+copy /Y "%SL_BIN%\sl.common.dll"          "%UNITY_PLUGINS%\" >nul
+copy /Y "%SL_BIN%\sl.dlss_g.dll"          "%UNITY_PLUGINS%\" >nul
+copy /Y "%SL_BIN%\sl.reflex.dll"          "%UNITY_PLUGINS%\" >nul
+copy /Y "%SL_BIN%\sl.pcl.dll"             "%UNITY_PLUGINS%\" >nul
+copy /Y "%SL_BIN%\nvngx_dlssg.dll"        "%UNITY_PLUGINS%\" >nul
+copy /Y "%SL_BIN%\WinPixEventRuntime.dll" "%UNITY_PLUGINS%\" >nul
 
 :: DXC (dxcompiler / dxil)
 copy /Y "RenderingPlugin\_deps\dxc-nuget\build\native\bin\x64\dxcompiler.dll" "%UNITY_PLUGINS%\" >nul
@@ -101,8 +107,8 @@ echo    OMMBakerPlugin.dll
 echo    omm-lib.dll
 echo    ShaderCompilerPlugin.dll
 echo    D3D12HeapHook.dll
-echo    SwapChainHookPlugin.dll  ^(diagnostic; enable "Load on startup" to test^)
-echo    nvngx_dlssg.dll          ^(%NGX_FLAVOR%; DLSS-G model for the probe^)
+echo    StreamlineProbePlugin.dll  ^(diagnostic; enable "Load on startup" to test^)
+echo    sl.*.dll + nvngx_dlssg.dll ^(Streamline 2.11.1 runtime for the probe^)
 echo    dxcompiler.dll
 echo    dxil.dll
 echo  Assets Plugins:  %UNITY_ASSETS_PLUGINS%\
