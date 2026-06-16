@@ -346,7 +346,6 @@ add_library(NativeRenderPlugin SHARED
     NativeRenderPlugin/src/Resources/NativeBuffer.cpp
     NativeRenderPlugin/src/Resources/SharedUploadPool.cpp
     NativeRenderPlugin/src/Hooks/D3D12HeapHook.cpp
-    NativeRenderPlugin/src/Hooks/SwapChainHook.cpp
     # RTXMU (NVIDIA RTX Memory Utility) — BLAS suballocation + compaction
     # management; vendored D3D12 subset (see External/rtxmu/README.md).
     External/rtxmu/src/D3D12AccelStructManager.cpp
@@ -411,10 +410,43 @@ target_link_libraries(ShaderCompilerPlugin PRIVATE
 )
 
 # ---------------------------------------------------------------------------
-# Output directories and post-build copies for the three native plugins
+# SwapChainHookPlugin – standalone diagnostic DLL (DXGI factory + Present
+# vtable hooks). Decoupled from NativeRenderPlugin so it can be toggled via
+# the plugin importer ("Load on startup") without affecting shipping plugins.
+# ---------------------------------------------------------------------------
+set(NGX_DIR "${FETCHCONTENT_BASE_DIR}/ngx-src")
+
+add_library(SwapChainHookPlugin SHARED
+    SwapChainHookPlugin/src/SwapChainHookPlugin.cpp
+    SwapChainHookPlugin/src/SwapChainHook.cpp
+    SwapChainHookPlugin/src/DlssgProbe.cpp
+)
+
+target_include_directories(SwapChainHookPlugin PRIVATE
+    SwapChainHookPlugin/include
+    "${UNITY_PLUGIN_API_DIR}"
+    "${NGX_DIR}/include"
+    "${WIN_SDK_INC}/um"
+    "${WIN_SDK_INC}/shared"
+)
+
+target_compile_options(SwapChainHookPlugin PRIVATE /utf-8)
+
+target_link_directories(SwapChainHookPlugin PRIVATE "${WIN_SDK_LIB}")
+
+# NGX static lib: pick the CRT/iterator-matching variant per config (the _dbg
+# build matches the debug CRT used in Debug; the release lib otherwise).
+target_link_libraries(SwapChainHookPlugin PRIVATE
+    dxgi.lib
+    d3d12.lib
+    "${NGX_DIR}/lib/Windows_x86_64/x64/$<IF:$<CONFIG:Debug>,nvsdk_ngx_d_dbg.lib,nvsdk_ngx_d.lib>"
+)
+
+# ---------------------------------------------------------------------------
+# Output directories and post-build copies for the native plugins
 # ---------------------------------------------------------------------------
 if(NOT NR_SKIP_UNITY_COPY)
-    foreach(_TARGET NativeRenderPlugin ShaderCompilerPlugin OMMBakerPlugin)
+    foreach(_TARGET NativeRenderPlugin ShaderCompilerPlugin OMMBakerPlugin SwapChainHookPlugin)
         set_target_properties(${_TARGET} PROPERTIES
             RUNTIME_OUTPUT_DIRECTORY         "${NATIVE_PLUGINS_UNITY_DIR}"
             RUNTIME_OUTPUT_DIRECTORY_RELEASE "${NATIVE_PLUGINS_UNITY_DIR}"
@@ -424,6 +456,15 @@ if(NOT NR_SKIP_UNITY_COPY)
             PDB_OUTPUT_DIRECTORY_DEBUG       "${NATIVE_PLUGINS_UNITY_DIR}"
         )
     endforeach()
+
+    # nvngx_dlssg.dll — DLSS-G model, must sit beside SwapChainHookPlugin.dll
+    # so its DlssgProbe (NGX) can locate it ('dev' snippet in Debug, 'rel' else).
+    add_custom_command(TARGET SwapChainHookPlugin POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different
+            "${NGX_DIR}/lib/Windows_x86_64/$<IF:$<CONFIG:Debug>,dev,rel>/nvngx_dlssg.dll"
+            "${NATIVE_PLUGINS_UNITY_DIR}/nvngx_dlssg.dll"
+        COMMENT "Copying nvngx_dlssg.dll to Unity Packages Plugins"
+    )
 
     # D3D12HeapHook.dll (copy to both plugin directories)
     add_custom_command(TARGET D3D12HeapHook POST_BUILD
