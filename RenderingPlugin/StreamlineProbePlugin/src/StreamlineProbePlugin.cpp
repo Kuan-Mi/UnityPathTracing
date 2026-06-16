@@ -1,22 +1,22 @@
 // StreamlineProbePlugin.cpp
-// Standalone diagnostic plugin: initializes Streamline against Unity's D3D12
-// device and logs whether DLSS-G (Frame Generation) is supported in-process.
+// Step 1: Streamline owns Unity's present path for DLSS-G.
 //
-// Like SwapChainHookPlugin, enable it via the plugin importer's "Load on
-// startup". As a preloaded plugin it loads during PlayerInitEngineNoGraphics —
-// BEFORE the graphics device exists — so we must NOT touch the device at load
-// time; a worker poller calls the probe once a real device appears (GetDevice()
-// is null on the first device-init events, same pitfall as the NGX probe).
+// As a "Load on startup" plugin, UnityPluginLoad runs during
+// PlayerInitEngineNoGraphics — BEFORE Unity creates its D3D12 device/swapchain —
+// which is exactly when Streamline must be initialized (slInit before the
+// CreateSwapChain hook can fire). We then vtable-hook the DXGI factory's
+// CreateSwapChainForHwnd; when Unity creates its swapchain we let the real call
+// run, then upgrade that swapchain into Streamline's FG proxy and hand it back to
+// Unity. From then on Unity presents through Streamline.
 //
-// Keep only ONE of StreamlineProbePlugin / SwapChainHookPlugin enabled at a time
-// so the Streamline runtime and the raw-NGX probe don't both init NGX.
+// Keep only ONE of StreamlineProbePlugin / SwapChainHookPlugin enabled at a time.
 
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
 #include <d3d12.h>
 #include <dxgi1_5.h>
 #include <atomic>
-#include <thread>
+#include <wrl/client.h>
 
 #include "IUnityInterface.h"
 #include "IUnityGraphics.h"
@@ -25,15 +25,13 @@
 
 #include "StreamlineProbe.h"
 
+using Microsoft::WRL::ComPtr;
+
 namespace
 {
-    IUnityInterfaces*      s_Interfaces = nullptr;
-    IUnityLog*             s_Log        = nullptr;
-    IUnityGraphics*        s_Graphics   = nullptr;
-    IUnityGraphicsD3D12v8* s_D3D12v8    = nullptr;
-
-    std::thread       s_Poller;
-    std::atomic<bool> s_PollerStop{false};
+    IUnityInterfaces* s_Interfaces = nullptr;
+    IUnityLog*        s_Log        = nullptr;
+    IUnityGraphics*   s_Graphics   = nullptr;
 
     void LogBridge(int level, const char* msg)
     {
@@ -44,73 +42,98 @@ namespace
                                              : kUnityLogTypeLog;
             s_Log->Log(type, msg, __FILE__, __LINE__);
         }
-        else
+        else { OutputDebugStringA(msg); OutputDebugStringA("\n"); }
+    }
+
+    // --- DXGI factory vtable hook (catch Unity's swapchain creation) --------
+    // IUnknown(0-2)+IDXGIObject(3-6)+IDXGIFactory: EnumAdapters(7),
+    // MakeWindowAssociation(8), GetWindowAssociation(9), CreateSwapChain(10).
+    constexpr UINT kCreateSwapChainVTIdx = 10;
+    // IDXGIFactory1(+2) + IDXGIFactory2: IsWindowedStereoEnabled(14),
+    // CreateSwapChainForHwnd(15).
+    constexpr UINT kCreateSwapChainForHwndVTIdx = 15;
+
+    using PFN_CreateSwapChain = HRESULT(STDMETHODCALLTYPE*)(
+        IDXGIFactory*, IUnknown*, DXGI_SWAP_CHAIN_DESC*, IDXGISwapChain**);
+    using PFN_CreateSwapChainForHwnd = HRESULT(STDMETHODCALLTYPE*)(
+        IDXGIFactory2*, IUnknown*, HWND, const DXGI_SWAP_CHAIN_DESC1*,
+        const DXGI_SWAP_CHAIN_FULLSCREEN_DESC*, IDXGIOutput*, IDXGISwapChain1**);
+
+    std::atomic<bool>          s_FactoryHooked{false};
+    PFN_CreateSwapChain        s_OrigCreateSwapChain        = nullptr;
+    PFN_CreateSwapChainForHwnd s_OrigCreateSwapChainForHwnd = nullptr;
+
+    void* PatchSlot(void* objWithVtable, UINT index, void* hook)
+    {
+        void** vtable = *reinterpret_cast<void***>(objWithVtable);
+        void** slot   = vtable + index;
+        DWORD old = 0;
+        if (!VirtualProtect(slot, sizeof(void*), PAGE_READWRITE, &old)) return nullptr;
+        void* orig = *slot;
+        *slot = hook;
+        VirtualProtect(slot, sizeof(void*), old, &old);
+        return orig;
+    }
+
+    HRESULT STDMETHODCALLTYPE Hooked_CreateSwapChainForHwnd(
+        IDXGIFactory2* This, IUnknown* pDevice, HWND hWnd,
+        const DXGI_SWAP_CHAIN_DESC1* pDesc,
+        const DXGI_SWAP_CHAIN_FULLSCREEN_DESC* pFS,
+        IDXGIOutput* pOut, IDXGISwapChain1** ppSwapChain)
+    {
+        LogBridge(0, "[NR/StreamlineProbe] CreateSwapChainForHwnd intercepted");
+        HRESULT hr = s_OrigCreateSwapChainForHwnd(This, pDevice, hWnd, pDesc, pFS, pOut, ppSwapChain);
+        if (SUCCEEDED(hr) && ppSwapChain && *ppSwapChain)
+            StreamlineProbe::AdoptSwapChain(ppSwapChain, pDevice);   // upgrade → SL FG proxy
+        return hr;
+    }
+
+    HRESULT STDMETHODCALLTYPE Hooked_CreateSwapChain(
+        IDXGIFactory* This, IUnknown* pDevice,
+        DXGI_SWAP_CHAIN_DESC* pDesc, IDXGISwapChain** ppSwapChain)
+    {
+        LogBridge(0, "[NR/StreamlineProbe] CreateSwapChain intercepted");
+        HRESULT hr = s_OrigCreateSwapChain(This, pDevice, pDesc, ppSwapChain);
+        if (SUCCEEDED(hr) && ppSwapChain && *ppSwapChain)
         {
-            OutputDebugStringA(msg);
-            OutputDebugStringA("\n");
+            ComPtr<IDXGISwapChain1> sc1;
+            if (SUCCEEDED((*ppSwapChain)->QueryInterface(IID_PPV_ARGS(&sc1))) && sc1)
+            {
+                IDXGISwapChain1* p = sc1.Get();
+                StreamlineProbe::AdoptSwapChain(&p, pDevice);
+                // base path is unused by Unity; leave *ppSwapChain as-is on adopt.
+            }
         }
+        return hr;
     }
 
-    // GetDevice() is null on the first device-init events; SEH-guarded because it
-    // dereferences Unity-internal state that may not exist yet. No C++ objects.
-    ID3D12Device* SafeGetDevice()
+    void InstallFactoryHook()
     {
-        if (!s_D3D12v8) return nullptr;
-        __try { return s_D3D12v8->GetDevice(); }
-        __except (EXCEPTION_EXECUTE_HANDLER) { return nullptr; }
-    }
+        bool expected = false;
+        if (!s_FactoryHooked.compare_exchange_strong(expected, true)) return;
 
-    void PollerMain()
-    {
-        // Retry until a non-null device appears (then probe once) or give up.
-        for (int i = 0; i < 240 && !s_PollerStop.load(std::memory_order_relaxed); ++i)
+        ComPtr<IDXGIFactory2> factory;
+        if (FAILED(CreateDXGIFactory2(0, IID_PPV_ARGS(&factory))) || !factory)
         {
-            if (!StreamlineProbe::InitAttempted())
-            {
-                if (ID3D12Device* dev = SafeGetDevice())
-                    StreamlineProbe::Init(dev, &LogBridge);
-            }
-            else
-            {
-                return;   // probe ran; done
-            }
-            Sleep(250);
+            LogBridge(2, "[NR/StreamlineProbe ERR] InstallFactoryHook: CreateDXGIFactory2 failed");
+            s_FactoryHooked.store(false);
+            return;
         }
-        if (!s_PollerStop.load(std::memory_order_relaxed) && !StreamlineProbe::InitAttempted())
-            LogBridge(1, "[NR/StreamlineProbe WRN] Poller gave up: GetDevice() never "
-                         "returned a device (editor, or non-D3D12 renderer).");
-    }
+        s_OrigCreateSwapChain = reinterpret_cast<PFN_CreateSwapChain>(
+            PatchSlot(factory.Get(), kCreateSwapChainVTIdx, &Hooked_CreateSwapChain));
+        s_OrigCreateSwapChainForHwnd = reinterpret_cast<PFN_CreateSwapChainForHwnd>(
+            PatchSlot(factory.Get(), kCreateSwapChainForHwndVTIdx, &Hooked_CreateSwapChainForHwnd));
 
-    void StartPoller()
-    {
-        if (s_Poller.joinable()) return;
-        s_PollerStop.store(false, std::memory_order_relaxed);
-        s_Poller = std::thread(PollerMain);
-    }
-
-    void StopPoller()
-    {
-        s_PollerStop.store(true, std::memory_order_relaxed);
-        if (s_Poller.joinable()) s_Poller.join();
+        const bool ok = s_OrigCreateSwapChain && s_OrigCreateSwapChainForHwnd;
+        LogBridge(ok ? 0 : 2, ok
+            ? "[NR/StreamlineProbe] Factory hook installed (CreateSwapChain[ForHwnd])"
+            : "[NR/StreamlineProbe ERR] Factory hook PARTIAL/FAILED");
     }
 
     void UNITY_INTERFACE_API OnGraphicsDeviceEvent(UnityGfxDeviceEventType eventType)
     {
-        if (eventType == kUnityGfxDeviceEventInitialize)
-        {
-            s_D3D12v8 = s_Interfaces ? s_Interfaces->Get<IUnityGraphicsD3D12v8>() : nullptr;
-            LogBridge(s_D3D12v8 ? 0 : 1,
-                      s_D3D12v8 ? "[NR/StreamlineProbe] D3D12v8 interface acquired"
-                                : "[NR/StreamlineProbe WRN] D3D12v8 unavailable "
-                                  "(non-D3D12 renderer?); probe disabled.");
-            StartPoller();
-        }
-        else if (eventType == kUnityGfxDeviceEventShutdown)
-        {
-            StopPoller();
-            StreamlineProbe::Shutdown();
-            s_D3D12v8 = nullptr;
-        }
+        if (eventType == kUnityGfxDeviceEventShutdown)
+            StreamlineProbe::Shutdown();   // before the device dies
     }
 }
 
@@ -121,19 +144,20 @@ UnityPluginLoad(IUnityInterfaces* unityInterfaces)
     s_Log        = unityInterfaces->Get<IUnityLog>();
     s_Graphics   = unityInterfaces->Get<IUnityGraphics>();
 
-    LogBridge(0, "[NR/StreamlineProbe] StreamlineProbePlugin loaded (standalone diagnostic)");
+    LogBridge(0, "[NR/StreamlineProbe] StreamlineProbePlugin loaded (Step 1: SL present takeover)");
 
-    // Do NOT touch the graphics device here (preload: it doesn't exist yet).
+    // Preload (before Unity's device/swapchain exist): init Streamline first, then
+    // install the factory hook so it's in place when Unity creates its swapchain.
+    StreamlineProbe::InitSL(&LogBridge);
+    InstallFactoryHook();
+
     if (s_Graphics)
         s_Graphics->RegisterDeviceEventCallback(OnGraphicsDeviceEvent);
-    else
-        LogBridge(1, "[NR/StreamlineProbe WRN] IUnityGraphics unavailable; probe disabled.");
 }
 
 extern "C" void UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API
 UnityPluginUnload()
 {
-    StopPoller();
     StreamlineProbe::Shutdown();
     if (s_Graphics)
         s_Graphics->UnregisterDeviceEventCallback(OnGraphicsDeviceEvent);
