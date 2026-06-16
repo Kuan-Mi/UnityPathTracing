@@ -5,13 +5,16 @@
 
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
+#include <d3d12.h>
 #include <dxgi1_5.h>
 #include <atomic>
 #include <cstdarg>
 #include <cstdio>
+#include <cstdlib>
 #include <wrl/client.h>
 
 #include "SwapChainHook.h"
+#include "SwapChainProxy.h"
 
 using Microsoft::WRL::ComPtr;
 
@@ -42,6 +45,12 @@ namespace
     std::atomic<bool>  g_FactoryHooked{false};
     std::atomic<bool>  g_PresentHooked{false};
 
+    // NOTE: we must NOT change the swapchain BufferCount underneath Unity. Unity
+    // sizes its RTV array from its OWN requested count (not a GetDesc1 re-query),
+    // so a larger count makes GetCurrentBackBufferIndex return indices Unity has
+    // no RTV for → out-of-bounds → device removed (observed crash at present #4).
+    // The frame-doubler therefore works within Unity's buffer count.
+
     PFN_CreateSwapChain          g_OrigCreateSwapChain        = nullptr;
     PFN_CreateSwapChainForHwnd   g_OrigCreateSwapChainForHwnd = nullptr;
     PFN_Present                  g_OrigPresent                = nullptr;
@@ -50,6 +59,45 @@ namespace
     SwapChainHook::LogFn  g_Logger = nullptr;
 
     std::atomic<uint64_t> g_PresentCount{0};
+
+    // --- present-injection test (R2 present-pacing feasibility) -------------
+    // Interception is already proven; this asks the next question: can the
+    // plugin push an EXTRA present through Unity's flip-model waitable swapchain
+    // (the doubled cadence FG needs) without erroring or hanging? For a bounded
+    // window of real presents we issue one additional original Present per real
+    // one (duplicate of the just-presented frame — no rendering yet) and log the
+    // HRESULT + how long the real vs the injected present each take.
+    //
+    // Hardcoded toggle (no env var). NOTE: naive present-doubling DEVICE-REMOVES
+    // the GPU within 1-2 injected presents — Unity owns the swapchain back-buffer
+    // rotation (1 present/frame) and an extra Present desyncs GetCurrentBackBuffer
+    // Index, hanging the GPU. Left OFF; proper present-pacing needs a swapchain
+    // proxy that owns the buffer bookkeeping, not a passive side hook.
+    std::atomic<bool>     g_InjectEnabled{false};
+    constexpr uint64_t    g_InjectStart = 80;
+    constexpr uint64_t    g_InjectEnd   = 280;
+    std::atomic<uint64_t> g_InjectCount{0};
+    std::atomic<bool>     g_ConfigRead{false};
+    LARGE_INTEGER         g_QpcFreq{};
+
+    void Logf(int level, const char* fmt, ...);   // defined below
+
+    void ReadPresentTestConfig()
+    {
+        bool expected = false;
+        if (!g_ConfigRead.compare_exchange_strong(expected, true)) return;
+
+        QueryPerformanceFrequency(&g_QpcFreq);
+        Logf(0, "Present-injection test ENABLED (window presents [%llu,%llu)) "
+                "- will issue 1 extra present per real present in that range",
+             (unsigned long long)g_InjectStart, (unsigned long long)g_InjectEnd);
+    }
+
+    double QpcMs(LARGE_INTEGER a, LARGE_INTEGER b)
+    {
+        if (g_QpcFreq.QuadPart == 0) return 0.0;
+        return (double)(b.QuadPart - a.QuadPart) * 1000.0 / (double)g_QpcFreq.QuadPart;
+    }
 
     void Logf(int level, const char* fmt, ...)
     {
@@ -123,17 +171,45 @@ namespace
              d->SampleDesc.Count, (int)d->Scaling, (int)d->AlphaMode);
     }
 
+    // Replace Unity's just-created swapchain with our proxy (so we own the
+    // present path the proper way). If wrapping fails, fall back to the old
+    // passive Present vtable hook. Marks the present path "handled" so the
+    // DlssgProbe poller stops trying to install the fallback hook.
+    void InstallProxyOrPresentHook(IDXGISwapChain1** ppSwapChain, IUnknown* pDevice)
+    {
+        // The swapchain's "device" arg is Unity's ID3D12CommandQueue (flip-model
+        // present queue); the proxy records its frame-doubler copy onto it.
+        ComPtr<ID3D12CommandQueue> queue;
+        if (pDevice) pDevice->QueryInterface(IID_PPV_ARGS(&queue));
+
+        IDXGISwapChain1* real  = *ppSwapChain;
+        IDXGISwapChain1* proxy = SwapChainProxy::Wrap(real, queue.Get(), g_Logger);
+        if (proxy)
+        {
+            real->Release();              // the proxy now holds its own reference
+            *ppSwapChain = proxy;         // hand Unity the proxy instead
+            g_PresentHooked.store(true, std::memory_order_release);
+            Logf(0, "Returned PROXY swapchain to Unity (present owned by proxy).");
+        }
+        else
+        {
+            SwapChainHook::TryInstallPresentHook(real);   // fallback: vtable hook
+        }
+    }
+
     HRESULT STDMETHODCALLTYPE Hooked_CreateSwapChain(
         IDXGIFactory* This, IUnknown* pDevice,
         DXGI_SWAP_CHAIN_DESC* pDesc, IDXGISwapChain** ppSwapChain)
     {
         Logf(0, "CreateSwapChain called (factory=%p device=%p)", (void*)This, (void*)pDevice);
         LogSwapChainDesc(pDesc);
+        // Unity D3D12 uses CreateSwapChainForHwnd in practice; this base path is
+        // kept consistent (no BufferCount change, same proxy helper).
         HRESULT hr = g_OrigCreateSwapChain(This, pDevice, pDesc, ppSwapChain);
         Logf(0, "CreateSwapChain -> hr=0x%08lx swapChain=%p",
              (unsigned long)hr, (void*)(ppSwapChain ? *ppSwapChain : nullptr));
         if (SUCCEEDED(hr) && ppSwapChain && *ppSwapChain)
-            SwapChainHook::TryInstallPresentHook(*ppSwapChain);
+            InstallProxyOrPresentHook(reinterpret_cast<IDXGISwapChain1**>(ppSwapChain), pDevice);
         return hr;
     }
 
@@ -146,12 +222,13 @@ namespace
         Logf(0, "CreateSwapChainForHwnd called (factory=%p device=%p hwnd=%p)",
              (void*)This, (void*)pDevice, (void*)hWnd);
         LogSwapChainDesc1(pDesc);
+
         HRESULT hr = g_OrigCreateSwapChainForHwnd(
             This, pDevice, hWnd, pDesc, pFullscreenDesc, pRestrictToOutput, ppSwapChain);
         Logf(0, "CreateSwapChainForHwnd -> hr=0x%08lx swapChain=%p",
              (unsigned long)hr, (void*)(ppSwapChain ? *ppSwapChain : nullptr));
         if (SUCCEEDED(hr) && ppSwapChain && *ppSwapChain)
-            SwapChainHook::TryInstallPresentHook(*ppSwapChain);
+            InstallProxyOrPresentHook(reinterpret_cast<IDXGISwapChain1**>(ppSwapChain), pDevice);
         return hr;
     }
 
@@ -162,7 +239,32 @@ namespace
         if (n <= 4 || (n & 0xFF) == 0)
             Logf(0, "Present #%llu (swapChain=%p sync=%u flags=0x%lx)",
                  (unsigned long long)n, (void*)This, SyncInterval, (unsigned long)Flags);
-        return g_OrigPresent(This, SyncInterval, Flags);
+
+        LARGE_INTEGER t0; QueryPerformanceCounter(&t0);
+        HRESULT hr = g_OrigPresent(This, SyncInterval, Flags);
+        LARGE_INTEGER t1; QueryPerformanceCounter(&t1);
+
+        if (g_InjectEnabled.load(std::memory_order_acquire) &&
+            n >= g_InjectStart && n < g_InjectEnd)
+        {
+            if (n == g_InjectStart) Logf(0, "INJECT window START at present #%llu",
+                                         (unsigned long long)n);
+            HRESULT hr2 = g_OrigPresent(This, 0, Flags);
+            LARGE_INTEGER t2; QueryPerformanceCounter(&t2);
+            const uint64_t ic = g_InjectCount.fetch_add(1, std::memory_order_relaxed) + 1;
+            if (ic <= 4 || (ic & 0x7F) == 0 || FAILED(hr2))
+                Logf(FAILED(hr2) ? 2 : 0,
+                     "INJECT #%llu (present #%llu) extra Present hr=0x%08lx | "
+                     "real=%.2fms extra=%.2fms",
+                     (unsigned long long)ic, (unsigned long long)n,
+                     (unsigned long)hr2, QpcMs(t0, t1), QpcMs(t1, t2));
+            if (FAILED(hr2))
+            {
+                g_InjectEnabled.store(false, std::memory_order_release);
+                Logf(2, "INJECT disabled after failure (hr=0x%08lx).", (unsigned long)hr2);
+            }
+        }
+        return hr;
     }
 
     HRESULT STDMETHODCALLTYPE Hooked_Present1(
@@ -177,7 +279,43 @@ namespace
                  (unsigned long long)n, (void*)This, SyncInterval,
                  (unsigned long)PresentFlags, dirty);
         }
-        return g_OrigPresent1(This, SyncInterval, PresentFlags, pPresentParameters);
+
+        LARGE_INTEGER t0; QueryPerformanceCounter(&t0);
+        HRESULT hr = g_OrigPresent1(This, SyncInterval, PresentFlags, pPresentParameters);
+        LARGE_INTEGER t1; QueryPerformanceCounter(&t1);
+
+        // R2 test: inject one extra present inside the window. Duplicate the just
+        // -presented frame (sync=0 so we never block on vsync; flip-model +
+        // ALLOW_TEARING lets it tear/flip immediately). This proves we can drive
+        // an extra frame through Unity's swapchain and measures its cost.
+        if (g_InjectEnabled.load(std::memory_order_acquire) &&
+            n >= g_InjectStart && n < g_InjectEnd)
+        {
+            if (n == g_InjectStart) Logf(0, "INJECT window START at present #%llu",
+                                         (unsigned long long)n);
+            HRESULT hr2 = g_OrigPresent1(This, 0, PresentFlags, pPresentParameters);
+            LARGE_INTEGER t2; QueryPerformanceCounter(&t2);
+            const uint64_t ic = g_InjectCount.fetch_add(1, std::memory_order_relaxed) + 1;
+            if (ic <= 4 || (ic & 0x7F) == 0 || FAILED(hr2))
+                Logf(FAILED(hr2) ? 2 : 0,
+                     "INJECT #%llu (present #%llu) extra Present1 hr=0x%08lx | "
+                     "real=%.2fms extra=%.2fms",
+                     (unsigned long long)ic, (unsigned long long)n,
+                     (unsigned long)hr2, QpcMs(t0, t1), QpcMs(t1, t2));
+            if (FAILED(hr2))
+            {
+                g_InjectEnabled.store(false, std::memory_order_release);
+                Logf(2, "INJECT disabled after failure (hr=0x%08lx) — extra present "
+                        "rejected by the swapchain.", (unsigned long)hr2);
+            }
+        }
+        else if (g_InjectEnabled.load(std::memory_order_acquire) && n == g_InjectEnd)
+        {
+            Logf(0, "INJECT window END at present #%llu (%llu extra presents issued)",
+                 (unsigned long long)n,
+                 (unsigned long long)g_InjectCount.load(std::memory_order_relaxed));
+        }
+        return hr;
     }
 }
 
@@ -191,6 +329,7 @@ namespace SwapChainHook
 
     bool InstallFactoryHook()
     {
+        ReadPresentTestConfig();   // one-time: read NR_FG_PRESENT_TEST env config
         if (g_FactoryHooked.load(std::memory_order_acquire)) return true;
 
         // Race-guard: only the first caller patches.

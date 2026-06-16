@@ -419,6 +419,7 @@ set(NGX_DIR "${FETCHCONTENT_BASE_DIR}/ngx-src")
 add_library(SwapChainHookPlugin SHARED
     SwapChainHookPlugin/src/SwapChainHookPlugin.cpp
     SwapChainHookPlugin/src/SwapChainHook.cpp
+    SwapChainHookPlugin/src/SwapChainProxy.cpp
     SwapChainHookPlugin/src/DlssgProbe.cpp
 )
 
