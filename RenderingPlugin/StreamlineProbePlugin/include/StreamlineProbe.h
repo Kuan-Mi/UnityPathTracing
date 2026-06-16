@@ -20,9 +20,14 @@
 // device-removal the raw extra-present route hit. Tags are step 2 (NativeRenderPlugin).
 #pragma once
 
+// NOTE: this header is included AFTER <windows.h> + <dxgi1_5.h> in both .cpp units,
+// so HWND / DXGI_SWAP_CHAIN_DESC1 / etc. are already defined where used below.
 struct ID3D12Device;
 struct IUnknown;
 struct IDXGISwapChain1;
+struct IDXGIOutput;
+struct DXGI_SWAP_CHAIN_DESC1;
+struct DXGI_SWAP_CHAIN_FULLSCREEN_DESC;
 
 namespace StreamlineProbe
 {
@@ -33,6 +38,13 @@ namespace StreamlineProbe
     // Returns true on eOk. Safe to call once.
     bool InitSL(LogFn log);
 
+    // Installs a vtable hook on ID3D12Device::CreateCommandQueue (via a throwaway
+    // device's shared vtable) so that the command queues Unity later creates are
+    // SL-proxied. DLSS-G's mandatory manual hook (eID3D12Device_CreateCommandQueue):
+    // without an SL-proxied PRESENT queue, DLSS-G can't attach its async present and
+    // never generates. Call at plugin load, BEFORE Unity creates its device/queues.
+    void InstallDeviceQueueHook();
+
     // True once slInit succeeded.
     bool IsInited();
 
@@ -40,7 +52,35 @@ namespace StreamlineProbe
     // upgrade the swapchain to SL's FG proxy (replacing *ppSwapChain in place),
     // and enable DLSS-G. presentQueue is the swapchain's command queue (the
     // CreateSwapChainForHwnd "device" arg). No-op if SL isn't initialized.
-    void AdoptSwapChain(IDXGISwapChain1** ppSwapChain, IUnknown* presentQueue);
+    void AdoptSwapChain(IDXGISwapChain1** ppSwapChain, IUnknown* presentQueue,
+                        bool alreadyProxy = false);
+
+    // True when Unity's command queue is being SL-proxied (NR_SL_PROXY_QUEUE=1).
+    bool IsQueueProxyActive();
+
+    // Create the swapchain through SL's proxy factory so SL establishes the
+    // device/queue/swapchain proxy links (required for DLSS-G to attach + present
+    // without the proxy-queue crash). The CALLER must guard re-entrancy: SL's proxy
+    // factory calls the native factory's CreateSwapChainForHwnd, which re-enters the
+    // caller's vtable hook. Returns an SL proxy swapchain. Pass the (proxy) queue.
+    HRESULT CreateSwapChainViaProxyFactory(IUnknown* queue, HWND hWnd,
+        const DXGI_SWAP_CHAIN_DESC1* desc, const DXGI_SWAP_CHAIN_FULLSCREEN_DESC* fs,
+        IDXGIOutput* out, IDXGISwapChain1** ppSwapChain);
+
+    // Per-frame, called at the START of Unity's frame (from a render-thread plugin
+    // event issued on RenderPipelineManager.beginContextRendering). Mints this
+    // frame's token, drives slReflexSleep + eSimulationStart, and tags the (dummy)
+    // DLSS-G inputs + constants. The present hook reuses this token and only emits
+    // the present-side markers. This is what gives the SL pacer a real per-frame
+    // timeline (vs. the old present-only path that collapsed every marker onto
+    // present). No-op until the swapchain has been adopted.
+    void BeginFrame();
+
+    // If 'maybeProxy' is an SL proxy interface, returns its underlying NATIVE
+    // interface; otherwise returns it unchanged. Used to hand DXGI the native command
+    // queue when Unity's queue has been SL-proxied (DXGI must not be given a proxy
+    // queue — its present path crashes; SL still tracks the proxy by creation).
+    IUnknown* NativeIfProxy(IUnknown* maybeProxy);
 
     // slShutdown. Idempotent. Call before the device is destroyed.
     void Shutdown();

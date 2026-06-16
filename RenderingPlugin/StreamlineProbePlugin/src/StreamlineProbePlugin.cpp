@@ -81,10 +81,36 @@ namespace
         const DXGI_SWAP_CHAIN_FULLSCREEN_DESC* pFS,
         IDXGIOutput* pOut, IDXGISwapChain1** ppSwapChain)
     {
+        // Re-entrancy guard: when we create via SL's proxy factory below, SL internally
+        // calls the NATIVE factory's CreateSwapChainForHwnd — which re-enters this hook.
+        // On re-entry, go straight to the original (hand DXGI the native queue).
+        static thread_local bool t_inProxyCreate = false;
+        if (t_inProxyCreate)
+        {
+            IUnknown* nativeQ = StreamlineProbe::NativeIfProxy(pDevice);
+            return s_OrigCreateSwapChainForHwnd(This, nativeQ, hWnd, pDesc, pFS, pOut, ppSwapChain);
+        }
+
         LogBridge(0, "[NR/StreamlineProbe] CreateSwapChainForHwnd intercepted");
+
+        if (StreamlineProbe::IsQueueProxyActive())
+        {
+            // Queue is SL-proxied → create the swapchain THROUGH SL's proxy factory so SL
+            // wires the device/queue/swapchain links (fixes the proxy-queue present crash
+            // AND the non-attach we got by unwrapping to native).
+            t_inProxyCreate = true;
+            HRESULT hr = StreamlineProbe::CreateSwapChainViaProxyFactory(
+                pDevice, hWnd, pDesc, pFS, pOut, ppSwapChain);
+            t_inProxyCreate = false;
+            if (SUCCEEDED(hr) && ppSwapChain && *ppSwapChain)
+                StreamlineProbe::AdoptSwapChain(ppSwapChain, pDevice, /*alreadyProxy=*/true);
+            return hr;
+        }
+
+        // No queue proxy (e.g. editor): original path — native create + upgrade swapchain.
         HRESULT hr = s_OrigCreateSwapChainForHwnd(This, pDevice, hWnd, pDesc, pFS, pOut, ppSwapChain);
         if (SUCCEEDED(hr) && ppSwapChain && *ppSwapChain)
-            StreamlineProbe::AdoptSwapChain(ppSwapChain, pDevice);   // upgrade → SL FG proxy
+            StreamlineProbe::AdoptSwapChain(ppSwapChain, pDevice);
         return hr;
     }
 
@@ -135,6 +161,22 @@ namespace
         if (eventType == kUnityGfxDeviceEventShutdown)
             StreamlineProbe::Shutdown();   // before the device dies
     }
+
+    // Render-thread callback issued once per frame at Unity's frame begin (see
+    // StreamlineFrameDriver.cs). Drives the Reflex frame loop + input tagging so the
+    // SL pacer gets a real per-frame timeline.
+    void UNITY_INTERFACE_API ReflexBeginCallback(int /*eventId*/)
+    {
+        StreamlineProbe::BeginFrame();
+    }
+}
+
+// Returns the render-event function for the per-frame Reflex/begin tick. Issue via
+// cmd.IssuePluginEvent(NR_SL_GetReflexBeginEventFunc(), 0) at frame begin.
+extern "C" UnityRenderingEvent UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API
+NR_SL_GetReflexBeginEventFunc()
+{
+    return ReflexBeginCallback;
 }
 
 extern "C" void UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API
@@ -147,8 +189,11 @@ UnityPluginLoad(IUnityInterfaces* unityInterfaces)
     LogBridge(0, "[NR/StreamlineProbe] StreamlineProbePlugin loaded (Step 1: SL present takeover)");
 
     // Preload (before Unity's device/swapchain exist): init Streamline first, then
-    // install the factory hook so it's in place when Unity creates its swapchain.
+    // install the hooks so they're in place when Unity creates its device/swapchain.
     StreamlineProbe::InitSL(&LogBridge);
+    // Device CreateCommandQueue hook FIRST: Unity creates its device + present queue
+    // before its swapchain, and DLSS-G needs that present queue to be an SL proxy.
+    StreamlineProbe::InstallDeviceQueueHook();
     InstallFactoryHook();
 
     if (s_Graphics)

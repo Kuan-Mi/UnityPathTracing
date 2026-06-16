@@ -98,8 +98,8 @@ MonoBehaviour:
     onScreen: 0
     forcedMaterial: 0
     denoiser: 0
-    rpp: 1
-    bounceNum: 1
+    rpp: 50
+    bounceNum: 2
     tracingMode: 2
     SHARC: 1
     PSR: 0
