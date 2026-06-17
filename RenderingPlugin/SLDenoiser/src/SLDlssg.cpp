@@ -1,7 +1,8 @@
 // SLDlssg.cpp — DLSS-G (Frame Generation) via Streamline. See SLDlssg.h.
 //
 // Ported from the proven StreamlineProbe machinery. Differences:
-//   * slInit is shared with the RR path (SLDlssrr::InitSL already loaded DLSS_G/Reflex/PCL).
+//   * slInit/slSetD3DDevice/slShutdown + logging are shared via SLCore (SLCore::Init at
+//     plugin load already loaded DLSS_G/Reflex/PCL alongside DLSS_RR).
 //   * Inputs are REAL path-tracer depth + motion vectors + camera constants (no dummies,
 //     no HUDLessColor — SL interpolates the presented backbuffer for now).
 //
@@ -17,8 +18,6 @@
 #include <d3d12.h>
 #include <dxgi1_5.h>
 #include <atomic>
-#include <cstdarg>
-#include <cstdio>
 #include <cstring>
 #include <wrl/client.h>
 
@@ -28,15 +27,17 @@
 #include "sl_reflex.h"
 #include "sl_pcl.h"
 
+#include "SLCore.h" // shared slInit/slSetD3DDevice/slShutdown + logging/result helpers
 #include "SLDlssg.h"
-#include "SLDlssrr.h" // shared slSetD3DDevice (single guarded device-set)
 
 using Microsoft::WRL::ComPtr;
 
+// Terse forwarders to the shared SLCore helpers (tag every line "SLDlssg").
+#define Logf(level, ...) SLCore::Logf("SLDlssg", level, __VA_ARGS__)
+#define R(r)             SLCore::ResultStr(r)
+
 namespace
 {
-    SLDlssg::LogFn         g_log = nullptr;
-
     std::atomic<int>       g_fgDesired{ -1 };
     std::atomic<bool>      g_fgApplied{ false };
 
@@ -66,45 +67,9 @@ namespace
     PFN_Present1      g_slOrigPresent1 = nullptr;
     std::atomic<bool> g_presentHooked{ false };
 
-    void Logf(int level, const char* fmt, ...)
-    {
-        char buf[768];
-        va_list ap; va_start(ap, fmt);
-        _vsnprintf_s(buf, sizeof(buf), _TRUNCATE, fmt, ap);
-        va_end(ap);
-        const char* tag = (level == 2) ? "[NR/SLDlssg ERR] "
-                        : (level == 1) ? "[NR/SLDlssg WRN] "
-                                       : "[NR/SLDlssg] ";
-        char line[864];
-        _snprintf_s(line, sizeof(line), _TRUNCATE, "%s%s", tag, buf);
-        if (g_log) g_log(level, line);
-        else { OutputDebugStringA(line); OutputDebugStringA("\n"); }
-    }
-
-    const char* R(sl::Result r)
-    {
-        switch (r)
-        {
-            case sl::Result::eOk:                           return "eOk";
-            case sl::Result::eErrorDriverOutOfDate:         return "eErrorDriverOutOfDate";
-            case sl::Result::eErrorOSDisabledHWS:           return "eErrorOSDisabledHWS";
-            case sl::Result::eErrorNoSupportedAdapterFound: return "eErrorNoSupportedAdapterFound";
-            case sl::Result::eErrorAdapterNotSupported:     return "eErrorAdapterNotSupported";
-            case sl::Result::eErrorNoPlugins:               return "eErrorNoPlugins";
-            case sl::Result::eErrorNotInitialized:          return "eErrorNotInitialized";
-            case sl::Result::eErrorInitNotCalled:           return "eErrorInitNotCalled";
-            case sl::Result::eErrorFeatureNotSupported:     return "eErrorFeatureNotSupported";
-            case sl::Result::eErrorMissingProxy:            return "eErrorMissingProxy";
-            case sl::Result::eErrorMissingInputParameter:   return "eErrorMissingInputParameter";
-            case sl::Result::eErrorMissingConstants:        return "eErrorMissingConstants";
-            case sl::Result::eErrorUnsupportedInterface:    return "eErrorUnsupportedInterface";
-            default:                                        return "(other)";
-        }
-    }
-
     void EnsureDevice(IUnknown* presentQueue)
     {
-        if (SLDlssrr::IsDeviceSet() || !presentQueue) return;
+        if (SLCore::IsDeviceSet() || !presentQueue) return;
         ComPtr<ID3D12CommandQueue> queue;
         if (FAILED(presentQueue->QueryInterface(IID_PPV_ARGS(&queue))) || !queue)
         { Logf(2, "AdoptSwapChain: present 'device' arg is not an ID3D12CommandQueue."); return; }
@@ -112,8 +77,8 @@ namespace
         if (!g_device) { Logf(2, "AdoptSwapChain: queue->GetDevice failed."); return; }
 
         // Single shared device-set (guarded; the queue hook usually got here first).
-        SLDlssrr::SetDevice(g_device.Get());
-        if (SLDlssrr::IsDeviceSet())
+        SLCore::SetDevice(g_device.Get());
+        if (SLCore::IsDeviceSet())
         {
             LUID luid = g_device->GetAdapterLuid();
             sl::AdapterInfo ai{};
@@ -288,7 +253,7 @@ namespace
             // ("immediately after creating the device"), so it usually wins the race with
             // the graphics-init event.
             g_device = This;
-            SLDlssrr::SetDevice(This);
+            SLCore::SetDevice(This);
             ID3D12Device* dev = This;
             sl::Result ru = slUpgradeInterface(reinterpret_cast<void**>(&dev));
             if (ru == sl::Result::eOk && dev && dev != This)
@@ -339,8 +304,6 @@ namespace
 
 namespace SLDlssg
 {
-    void SetLog(LogFn log) { g_log = log; }
-
     void InstallDeviceQueueHook()
     {
         bool expected = false;
@@ -379,7 +342,7 @@ namespace SLDlssg
         if (!ppSwapChain || !*ppSwapChain) return;
 
         EnsureDevice(presentQueue);
-        if (!SLDlssrr::IsDeviceSet()) { Logf(1, "AdoptSwapChain: device not set; leaving native swapchain."); return; }
+        if (!SLCore::IsDeviceSet()) { Logf(1, "AdoptSwapChain: device not set; leaving native swapchain."); return; }
 
         DXGI_SWAP_CHAIN_DESC1 desc{};
         (*ppSwapChain)->GetDesc1(&desc);

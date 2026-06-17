@@ -6,14 +6,14 @@
 // SL manages the resource state transitions for tagged resources; the host is
 // responsible for restoring command-list state afterwards — we rely on Unity
 // rebinding its own pipeline for subsequent passes (same as the NRI path).
+//
+// Lifecycle (slInit/slSetD3DDevice/slShutdown + logging/result helpers) lives in
+// SLCore; this file is RR-specific only. See SLCore.h.
 
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
 #include <d3d12.h>
 #include <dxgi1_6.h>
-#include <atomic>
-#include <cstdarg>
-#include <cstdio>
 #include <cstring>
 #include <mutex>
 #include <unordered_map>
@@ -22,17 +22,19 @@
 #include "sl_consts.h"
 #include "sl_dlss.h"
 #include "sl_dlss_d.h"
-#include "sl_reflex.h"
-#include "sl_pcl.h"
 
+#include "SLCore.h"
 #include "SLDlssrr.h"
 #include "SLDlssrrFrameData.h"
 
+// Terse forwarders to the shared SLCore helpers so the call sites below read the
+// same as before the extraction. Tag every line as "SLDlssrr".
+#define Logf(level, ...) SLCore::Logf("SLDlssrr", level, __VA_ARGS__)
+#define R(r)             SLCore::ResultStr(r)
+
 namespace
 {
-    SLDlssrr::LogFn   g_log = nullptr;
-    std::atomic<bool> g_inited{ false };
-    bool              g_deviceSet = false;
+    uint32_t g_frameIndex = 0;
 
     // Per-instance (== per-viewport) tracked options so we only re-issue slDLSSDSetOptions
     // when something changes (matches DLRRInstance recreate-on-change behaviour).
@@ -47,7 +49,6 @@ namespace
     std::unordered_map<int, InstanceState> g_instances;
     std::mutex                             g_instanceMutex;
     int                                    g_nextInstanceId = 1;
-    uint32_t                               g_frameIndex     = 0;
 
     // QueryOptimalRenderSize cache, keyed by (outputWidth, outputHeight, mode).
     struct OptKey
@@ -62,52 +63,6 @@ namespace
     };
     std::unordered_map<OptKey, sl::DLSSDOptimalSettings, OptKeyHash> g_optCache;
     std::mutex                                                       g_optMutex;
-
-    void Logf(int level, const char* fmt, ...)
-    {
-        char buf[768];
-        va_list ap; va_start(ap, fmt);
-        _vsnprintf_s(buf, sizeof(buf), _TRUNCATE, fmt, ap);
-        va_end(ap);
-        const char* tag = (level == 2) ? "[NR/SLDlssrr ERR] "
-                        : (level == 1) ? "[NR/SLDlssrr WRN] "
-                                       : "[NR/SLDlssrr] ";
-        char line[864];
-        _snprintf_s(line, sizeof(line), _TRUNCATE, "%s%s", tag, buf);
-        if (g_log) g_log(level, line);
-        else { OutputDebugStringA(line); OutputDebugStringA("\n"); }
-    }
-
-    void SLLog(sl::LogType type, const char* msg)
-    {
-        if (!g_log || !msg) return;
-        const int lvl = (type == sl::LogType::eError) ? 2
-                      : (type == sl::LogType::eWarn)  ? 1 : 0;
-        char line[1024];
-        _snprintf_s(line, sizeof(line), _TRUNCATE, "[NR/SLDlssrr][SL] %s", msg);
-        size_t n = strnlen_s(line, sizeof(line));
-        while (n && (line[n - 1] == '\n' || line[n - 1] == '\r')) line[--n] = '\0';
-        g_log(lvl, line);
-    }
-
-    const char* R(sl::Result r)
-    {
-        switch (r)
-        {
-            case sl::Result::eOk:                           return "eOk";
-            case sl::Result::eErrorDriverOutOfDate:         return "eErrorDriverOutOfDate";
-            case sl::Result::eErrorNoSupportedAdapterFound: return "eErrorNoSupportedAdapterFound";
-            case sl::Result::eErrorAdapterNotSupported:     return "eErrorAdapterNotSupported";
-            case sl::Result::eErrorNoPlugins:               return "eErrorNoPlugins";
-            case sl::Result::eErrorNotInitialized:          return "eErrorNotInitialized";
-            case sl::Result::eErrorInitNotCalled:           return "eErrorInitNotCalled";
-            case sl::Result::eErrorFeatureNotSupported:     return "eErrorFeatureNotSupported";
-            case sl::Result::eErrorMissingInputParameter:   return "eErrorMissingInputParameter";
-            case sl::Result::eErrorMissingConstants:        return "eErrorMissingConstants";
-            case sl::Result::eErrorMissingOrInvalidAPI:     return "eErrorMissingOrInvalidAPI";
-            default:                                        return "(other)";
-        }
-    }
 
     sl::DLSSMode MapMode(uint8_t m)
     {
@@ -144,65 +99,6 @@ namespace
 
 namespace SLDlssrr
 {
-    bool InitSL(LogFn log)
-    {
-        g_log = log;
-        bool expected = false;
-        if (!g_inited.compare_exchange_strong(expected, true)) return true;
-
-        Logf(0, "slInit Streamline %u.%u.%u for DLSS-RR + DLSS-G (manual hooking)...",
-             SL_VERSION_MAJOR, SL_VERSION_MINOR, SL_VERSION_PATCH);
-
-        // DLSS_RR (evaluate-time) + DLSS_G/Reflex/PCL (present-path frame generation).
-        // One slInit serves both; the FG present/queue hooks are installed only in the
-        // player (see SLDenoiserPlugin.cpp editor auto-detect).
-        static const sl::Feature kFeatures[] = {
-            sl::kFeatureDLSS_RR, sl::kFeatureDLSS_G, sl::kFeatureReflex, sl::kFeaturePCL,
-        };
-        sl::Preferences pref{};
-        // eDefault (warnings/errors only) + no console: eVerbose logs every NGX SRV-cache hit
-        // and VRAM op per frame through the Unity log callback, a real per-frame CPU cost.
-        // Bump to eVerbose + showConsole only when debugging SL itself.
-        pref.showConsole        = false;
-        pref.logLevel           = sl::LogLevel::eDefault;
-        pref.logMessageCallback = &SLLog;
-        pref.featuresToLoad     = kFeatures;
-        pref.numFeaturesToLoad  = (uint32_t)_countof(kFeatures);
-        // Manual hooking: we attach to Unity's device + evaluate on Unity's command list,
-        // SL does not own the swapchain. Frame-based tagging is required by slSetTagForFrame.
-        pref.flags             |= sl::PreferenceFlags::eUseManualHooking;
-        pref.flags             |= sl::PreferenceFlags::eUseFrameBasedResourceTagging;
-        pref.engine             = sl::EngineType::eUnity;
-        pref.engineVersion      = "6000.3";
-        pref.projectId          = "a0f57b54-1daf-4934-90ae-c4035c19df04";
-        pref.renderAPI          = sl::RenderAPI::eD3D12;
-
-        sl::Result r = slInit(pref, sl::kSDKVersion);
-        Logf(r == sl::Result::eOk ? 0 : 2, "slInit -> %s", R(r));
-        if (r != sl::Result::eOk) { g_inited.store(false); return false; }
-        return true;
-    }
-
-    bool IsInited() { return g_inited.load(std::memory_order_acquire); }
-
-    bool IsDeviceSet() { return g_deviceSet; }
-
-    void SetDevice(ID3D12Device* device)
-    {
-        if (!IsInited() || g_deviceSet || !device) return;
-        sl::Result rd = slSetD3DDevice(device);
-        Logf(rd == sl::Result::eOk ? 0 : 2, "slSetD3DDevice -> %s", R(rd));
-        g_deviceSet = (rd == sl::Result::eOk);
-        if (!g_deviceSet) return;
-
-        LUID luid = device->GetAdapterLuid();
-        sl::AdapterInfo ai{};
-        ai.deviceLUID            = reinterpret_cast<uint8_t*>(&luid);
-        ai.deviceLUIDSizeInBytes = sizeof(luid);
-        sl::Result rs = slIsFeatureSupported(sl::kFeatureDLSS_RR, ai);
-        Logf(rs == sl::Result::eOk ? 0 : 1, "slIsFeatureSupported(DLSS_RR) -> %s", R(rs));
-    }
-
     int CreateInstance()
     {
         std::scoped_lock lock(g_instanceMutex);
@@ -217,7 +113,7 @@ namespace SLDlssrr
         std::scoped_lock lock(g_instanceMutex);
         auto it = g_instances.find(id);
         if (it == g_instances.end()) return;
-        if (IsInited())
+        if (SLCore::IsInited())
         {
             sl::ViewportHandle viewport{ (uint32_t)id };
             sl::Result r = slFreeResources(sl::kFeatureDLSS_RR, viewport);
@@ -229,7 +125,7 @@ namespace SLDlssrr
 
     void Dispatch(SLDlssrrFrameData* data, ID3D12GraphicsCommandList* cmdList)
     {
-        if (!IsInited() || !g_deviceSet || !data || !cmdList) return;
+        if (!SLCore::IsInited() || !SLCore::IsDeviceSet() || !data || !cmdList) return;
         if (data->outputWidth == 0 || data->outputHeight == 0) return;
 
         sl::ViewportHandle viewport{ (uint32_t)data->instanceId };
@@ -390,7 +286,7 @@ namespace SLDlssrr
             }
         }
 
-        if (!IsInited() || !g_deviceSet) return false;
+        if (!SLCore::IsInited() || !SLCore::IsDeviceSet()) return false;
 
         sl::DLSSDOptions opt{};
         opt.mode         = MapMode(mode);
@@ -417,14 +313,17 @@ namespace SLDlssrr
 
     void Shutdown()
     {
-        if (!IsInited()) return;
-        g_inited.store(false);
-        g_deviceSet = false;
+        // SL lifecycle (slShutdown) is owned by SLCore; here we only release the RR instances
+        // and their viewport resources. Called before SLCore::Shutdown at device teardown.
+        std::scoped_lock lock(g_instanceMutex);
+        if (SLCore::IsInited())
         {
-            std::scoped_lock lock(g_instanceMutex);
-            g_instances.clear();
+            for (auto& kv : g_instances)
+            {
+                sl::ViewportHandle viewport{ (uint32_t)kv.first };
+                slFreeResources(sl::kFeatureDLSS_RR, viewport);
+            }
         }
-        sl::Result r = slShutdown();
-        Logf(r == sl::Result::eOk ? 0 : 1, "slShutdown -> %s", R(r));
+        g_instances.clear();
     }
 }

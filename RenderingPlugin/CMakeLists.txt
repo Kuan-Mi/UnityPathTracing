@@ -484,6 +484,7 @@ target_link_libraries(StreamlineProbePlugin PRIVATE
 # ---------------------------------------------------------------------------
 add_library(SLDenoiser SHARED
     SLDenoiser/src/SLDenoiserPlugin.cpp
+    SLDenoiser/src/SLCore.cpp
     SLDenoiser/src/SLDlssrr.cpp
     SLDenoiser/src/SLDlssg.cpp
 )

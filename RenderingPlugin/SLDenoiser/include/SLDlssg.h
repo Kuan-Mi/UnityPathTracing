@@ -9,7 +9,8 @@
 // must be load-on-startup and these hooks are installed only in the PLAYER (the editor
 // auto-detect in SLDenoiserPlugin.cpp skips them — queue proxying crashes the editor).
 //
-// slInit is shared with the RR path (SLDlssrr::InitSL loads DLSS_G/Reflex/PCL too).
+// slInit/slSetD3DDevice/slShutdown + logging are shared via SLCore (which loads
+// DLSS_G/Reflex/PCL alongside DLSS_RR). See SLCore.h.
 #pragma once
 
 struct IUnknown;
@@ -20,8 +21,6 @@ struct DXGI_SWAP_CHAIN_FULLSCREEN_DESC;
 
 namespace SLDlssg
 {
-    using LogFn = void (*)(int level, const char* msg);
-
     // Real per-frame DLSS-G inputs from the path tracer. Native ID3D12Resource* pointers;
     // matrices are raw Unity Matrix4x4 bytes (column-major) → memcpy'd into row-major
     // sl::float4x4 (transpose SL expects). Layout MUST match the C# mirror exactly.
@@ -47,8 +46,6 @@ namespace SLDlssg
         int      motionVectors3D;
         int      reset;
     };
-
-    void SetLog(LogFn log);
 
     // Install the ID3D12Device::CreateCommandQueue vtable hook (proxy queue). PLAYER ONLY.
     // Call at plugin load, before Unity creates its device/queues.

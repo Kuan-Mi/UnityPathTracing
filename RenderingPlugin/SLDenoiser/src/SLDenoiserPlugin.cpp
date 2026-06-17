@@ -1,7 +1,8 @@
 // SLDenoiserPlugin.cpp
 // Unity native plugin entry for DLSS Ray Reconstruction (evaluate-time) AND DLSS-G Frame
-// Generation (present-path) via Streamline. One shared slInit (SLDlssrr::InitSL loads
-// DLSS_RR + DLSS_G + Reflex + PCL).
+// Generation (present-path) via Streamline. One shared slInit via SLCore (loads
+// DLSS_RR + DLSS_G + Reflex + PCL). SLCore owns the SL lifecycle + logging so future
+// features (DLSS-SR, NIS, …) can be added without touching init/device/shutdown.
 //
 // LOAD MODEL: this must be a LOAD-ON-STARTUP plugin so the DLSS-G queue/swapchain hooks are
 // installed before Unity creates its device/swapchain. The FG hooks are installed ONLY in a
@@ -23,6 +24,7 @@
 #include "IUnityGraphicsD3D12.h"
 #include "IUnityLog.h"
 
+#include "SLCore.h"
 #include "SLDlssrr.h"
 #include "SLDlssrrFrameData.h"
 #include "SLDlssg.h"
@@ -161,13 +163,14 @@ namespace
         {
             s_D3D12 = s_Interfaces->Get<IUnityGraphicsD3D12v7>();
             if (s_D3D12 && s_D3D12->GetDevice())
-                SLDlssrr::SetDevice(s_D3D12->GetDevice());
+                SLCore::SetDevice(s_D3D12->GetDevice());
             // (Device may not exist yet at plugin-load time; the real init event sets it.)
         }
         else if (eventType == kUnityGfxDeviceEventShutdown)
         {
             SLDlssg::Shutdown();
             SLDlssrr::Shutdown();
+            SLCore::Shutdown();
             s_D3D12 = nullptr;
         }
     }
@@ -202,14 +205,13 @@ extern "C"
 
         s_Graphics->RegisterDeviceEventCallback(OnGraphicsDeviceEvent);
 
-        // Shared slInit (RR + G + Reflex + PCL) — before the device/swapchain exist.
-        SLDlssrr::InitSL(&LogBridge);
+        // Shared slInit (RR + G + Reflex + PCL) + log bridge — before the device/swapchain exist.
+        SLCore::Init(&LogBridge);
 
         if (s_IsPlayer)
         {
             // Player: install the DLSS-G present-path hooks before Unity creates its
             // device/queues/swapchain. Queue hook FIRST (present queue must be SL-proxied).
-            SLDlssg::SetLog(&LogBridge);
             SLDlssg::InstallDeviceQueueHook();
             InstallFactoryHook();
             LogBridge(0, "[NR/SLDlssg] Player detected: DLSS-G present hooks installed.");
@@ -232,6 +234,7 @@ extern "C"
             s_Graphics->UnregisterDeviceEventCallback(OnGraphicsDeviceEvent);
         SLDlssg::Shutdown();
         SLDlssrr::Shutdown();
+        SLCore::Shutdown();
         LogBridge(0, "[NR/SLDlssg] SLDenoiser plugin unloaded.");
     }
 
