@@ -477,12 +477,41 @@ target_link_libraries(StreamlineProbePlugin PRIVATE
 )
 
 # ---------------------------------------------------------------------------
+# SLDenoiser – DLSS Ray Reconstruction via Streamline (standalone A/B comparison
+# against the NRI DLSS-RR path in Denoiser). Evaluate-time feature (no swapchain
+# proxying), so it is editor-safe and loaded on demand. MUST be mutually exclusive
+# with StreamlineProbePlugin at runtime (one slInit per process).
+# ---------------------------------------------------------------------------
+add_library(SLDenoiser SHARED
+    SLDenoiser/src/SLDenoiserPlugin.cpp
+    SLDenoiser/src/SLDlssrr.cpp
+)
+
+target_include_directories(SLDenoiser PRIVATE
+    SLDenoiser/include
+    "${UNITY_PLUGIN_API_DIR}"
+    "${SL_DIR}/include"
+    "${WIN_SDK_INC}/um"
+    "${WIN_SDK_INC}/shared"
+)
+
+target_compile_options(SLDenoiser PRIVATE /utf-8)
+
+target_link_directories(SLDenoiser PRIVATE "${WIN_SDK_LIB}")
+
+target_link_libraries(SLDenoiser PRIVATE
+    d3d12.lib
+    dxgi.lib
+    "${SL_DIR}/lib/x64/sl.interposer.lib"
+)
+
+# ---------------------------------------------------------------------------
 # Output directories and post-build copies for the native plugins
 # ---------------------------------------------------------------------------
 if(NOT NR_SKIP_UNITY_COPY)
     # SwapChainHookPlugin is intentionally NOT deployed (raw-proxy route concluded;
     # source kept for reference). StreamlineProbePlugin is the active FG experiment.
-    foreach(_TARGET NativeRenderPlugin ShaderCompilerPlugin OMMBakerPlugin StreamlineProbePlugin)
+    foreach(_TARGET NativeRenderPlugin ShaderCompilerPlugin OMMBakerPlugin StreamlineProbePlugin SLDenoiser)
         set_target_properties(${_TARGET} PROPERTIES
             RUNTIME_OUTPUT_DIRECTORY         "${NATIVE_PLUGINS_UNITY_DIR}"
             RUNTIME_OUTPUT_DIRECTORY_RELEASE "${NATIVE_PLUGINS_UNITY_DIR}"
@@ -505,6 +534,18 @@ if(NOT NR_SKIP_UNITY_COPY)
                 "${SL_DIR}/bin/x64/development/${_SLDLL}"
                 "${NATIVE_PLUGINS_UNITY_DIR}/${_SLDLL}"
             COMMENT "Copying Streamline ${_SLDLL} to Unity Packages Plugins"
+        )
+    endforeach()
+
+    # Streamline runtime DLLs required by SLDenoiser (DLSS-RR). Attached to SLDenoiser
+    # too so the RR plugin works even when StreamlineProbePlugin isn't built. sl.dlss_d +
+    # nvngx_dlssd are the Ray Reconstruction plugin/model.
+    foreach(_SLDLL sl.interposer.dll sl.common.dll sl.dlss_d.dll sl.pcl.dll nvngx_dlssd.dll)
+        add_custom_command(TARGET SLDenoiser POST_BUILD
+            COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                "${SL_DIR}/bin/x64/development/${_SLDLL}"
+                "${NATIVE_PLUGINS_UNITY_DIR}/${_SLDLL}"
+            COMMENT "Copying Streamline ${_SLDLL} (DLSS-RR) to Unity Packages Plugins"
         )
     endforeach()
 

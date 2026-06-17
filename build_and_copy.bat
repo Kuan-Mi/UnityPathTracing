@@ -73,6 +73,15 @@ copy /Y "%SL_BIN%\sl.pcl.dll"             "%UNITY_PLUGINS%\" >nul
 copy /Y "%SL_BIN%\nvngx_dlssg.dll"        "%UNITY_PLUGINS%\" >nul
 copy /Y "%SL_BIN%\WinPixEventRuntime.dll" "%UNITY_PLUGINS%\" >nul
 
+:: SLDenoiser — standalone DLSS Ray Reconstruction via Streamline (A/B vs the NRI
+:: Denoiser path). Loaded on demand by SLDlssrr.cs. MUST be mutually exclusive with the
+:: StreamlineProbePlugin (DLSS-G) at runtime — one slInit per process.
+copy /Y "%OUT_DIR%\SLDenoiser.dll"        "%UNITY_PLUGINS%\" >nul
+copy /Y "%OUT_DIR%\SLDenoiser.pdb"        "%UNITY_PLUGINS%\" >nul
+:: DLSS-RR Streamline plugin + model (sl.interposer/common/pcl already copied above).
+copy /Y "%SL_BIN%\sl.dlss_d.dll"          "%UNITY_PLUGINS%\" >nul
+copy /Y "%SL_BIN%\nvngx_dlssd.dll"        "%UNITY_PLUGINS%\" >nul
+
 :: DXC (dxcompiler / dxil)
 copy /Y "RenderingPlugin\_deps\dxc-nuget\build\native\bin\x64\dxcompiler.dll" "%UNITY_PLUGINS%\" >nul
 copy /Y "RenderingPlugin\_deps\dxc-nuget\build\native\bin\x64\dxil.dll"       "%UNITY_PLUGINS%\" >nul
